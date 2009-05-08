@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_PERSIST_H
 #define	_SYS_SCSI_GENERIC_PERSIST_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -152,19 +150,42 @@ typedef struct scsi_prin_rpt_cap {
 } scsi_prin_rpt_cap_t;
 
 /*
+ * Refer SPC-3, Revision 23
+ * Section 7.5.4 TransportID identifiers
+ */
+typedef struct scsi_transport_id {
+	uint8_t			protocol_id : 4,
+				resbits : 2,
+				format_code : 2;
+	uint8_t			protocol_data[1];
+} scsi_transport_id_t;
+
+typedef struct scsi_fc_transport_id {
+	uint8_t			protocol_id : 4,
+				resbits : 2,
+				format_code : 2;
+	uint8_t			rsvbytes1[7];
+	uint8_t			port_name[8];
+	uint8_t			rsvbytes2[8];
+} scsi_fc_transport_id_t;
+
+typedef struct iscsi_transport_id {
+	uint8_t			protocol_id : 4,
+				resbits : 2,
+				format_code : 2;
+	uint8_t			rsvbyte1;
+	uint8_t			add_len[2];
+	char			iscsi_name[1];
+} iscsi_transport_id_t;
+
+/*
  * Information obtained from:
  *	SPC-3, Revision 23
  *	Section 6.11.5 PERSISTENCE RESERVE IN
  * 	Table 110/111 - parameter data for READ FULL STATUS
  *	Table 281 - TransportId format
  */
-typedef struct scsi_transport_id {
-	uint8_t			protocol_id : 4,
-				resbits : 2,
-				format_code : 2;
-	uint8_t			add_len[2];
-	char			iscsi_name[1];
-} scsi_transport_id_t;
+
 typedef struct scsi_prin_status_t {
 	uint8_t			reservation_key[8];
 	uint8_t			resbytes1[4];
@@ -220,6 +241,24 @@ typedef struct scsi_prout_plist {
 	uint8_t			obsolete2[2];
 	uint8_t			apd[1];
 } scsi_prout_plist_t;
+
+/*
+ * Information obtained from:
+ *	SPC-3, Revision 23
+ *	Section 6.12.4 PERSISTENCE RESERVE OUT command with REGISTER AND MOVE
+ *	Table 117 - REGISTER and MOVE service action  parameter list
+ */
+typedef struct scsi_prout_reg_move_plist {
+	uint8_t			reservation_key[8];
+	uint8_t			service_key[8];
+	uint8_t			resbytes1;
+	uint8_t			aptpl : 1,
+				unreg : 1,
+				resbits1 : 6;
+	uint8_t			rel_tgt_port_id[2];
+	uint8_t			tptid_len[4];
+	uint8_t			tptid[1];
+} scsi_prout_reg_move_plist_t;
 
 #elif defined(_BIT_FIELDS_HTOL)
 /*
@@ -294,19 +333,42 @@ typedef struct scsi_prin_rpt_cap {
 } scsi_prin_rpt_cap_t;
 
 /*
+ * Refer SPC-3, Revision 23
+ * Section 7.5.4 TransportID identifiers
+ */
+typedef struct scsi_transport_id {
+	uint8_t			format_code : 2,
+				resbits : 2,
+				protocol_id : 4;
+	uint8_t			protocol_data[1];
+} scsi_transport_id_t;
+
+typedef struct scsi_fc_transport_id {
+	uint8_t			format_code : 2,
+				resbits : 2,
+				protocol_id : 4;
+	uint8_t			rsvbytes1[7];
+	uint8_t			port_name[8];
+	uint8_t			rsvbytes2[8];
+} scsi_fc_transport_id_t;
+
+typedef struct iscsi_transport_id {
+	uint8_t			format_code : 2,
+				resbits : 2,
+				protocol_id : 4;
+	uint8_t			rsvbyte1;
+	uint8_t			add_len[2];
+	char			iscsi_name[1];
+} iscsi_transport_id_t;
+
+/*
  * Information obtained from:
  *	SPC-3, Revision 23
  *	Section 6.11.5 PERSISTENCE RESERVE IN
  * 	Table 110/111 - parameter data for READ FULL STATUS
  *	Table 281 - TransportId format
  */
-typedef struct scsi_transport_id {
-	uint8_t			format_code : 2,
-				resbits : 2,
-				protocol_id : 4;
-	uint8_t			add_len[2];
-	char			iscsi_name[1];
-} scsi_transport_id_t;
+
 typedef struct scsi_prin_status_t {
 	uint8_t			reservation_key[8];
 	uint8_t			resbytes1[4];
@@ -362,6 +424,24 @@ typedef struct scsi_prout_plist {
 	uint8_t			obsolete2[2];
 	uint8_t			apd[1];
 } scsi_prout_plist_t;
+
+/*
+ * Information obtained from:
+ *	SPC-3, Revision 23
+ *	Section 6.12.4 PERSISTENCE RESERVE OUT command with REGISTER AND MOVE
+ *	Table 117 - REGISTER and MOVE service action  parameter list
+ */
+typedef struct scsi_prout_reg_move_plist {
+	uint8_t			reservation_key[8];
+	uint8_t			service_key[8];
+	uint8_t			resbytes1;
+	uint8_t			resbits1 : 6,
+				unreg    : 1,
+				aptpl    : 1;
+	uint8_t			rel_tgt_port_id[2];
+	uint8_t			tptid_len[4];
+	uint8_t			tptid[1];
+} scsi_prout_reg_move_plist_t;
 
 #else
 #error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined

@@ -674,6 +674,7 @@ spc_pr_in_fullstat(
 	int			i = 0, max_buf_rsrv, hsize;
 	spc_pr_rsrv_t		*rsrv;
 	scsi_prin_full_status_t	*buf = (scsi_prin_full_status_t *)bp;
+	iscsi_transport_id_t	*tptid;
 
 	hsize = sizeof (buf->PRgeneration) + sizeof (buf->add_len);
 	max_buf_rsrv = ((int)alloc_len - hsize) /
@@ -694,15 +695,15 @@ spc_pr_in_fullstat(
 			buf->full_desc[i].type = rsrv->r_type;
 			SCSI_WRITE16(buf->full_desc[i].rel_tgt_port_id, 0);
 			SCSI_WRITE32(buf->full_desc[i].add_len,
-			    sizeof (scsi_transport_id_t));
+			    sizeof (iscsi_transport_id_t));
 			buf->full_desc[i].trans_id.protocol_id =
 			    iSCSI_PROTOCOL_ID;
 			buf->full_desc[i].trans_id.format_code =
 			    WW_UID_DEVICE_NAME;
-			SCSI_WRITE16(buf->full_desc[i].trans_id.add_len, 0);
-			(void) sprintf(buf->full_desc[i].trans_id.iscsi_name,
-			    "");
-
+			tptid = (iscsi_transport_id_t *)
+			    &(buf->full_desc[i].trans_id);
+			SCSI_WRITE16(tptid->add_len, 0);
+			(void) sprintf(tptid->iscsi_name, "");
 			i++;
 		}
 		else

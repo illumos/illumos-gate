@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,8 @@ typedef struct _subCommandProps {
 	char *exclusive;
 	int operand;
 	char *operandDefinition;
-	uint8_t reserved[64];
+	char *helpText;
+	uint8_t reserved[60];
 } subCommandProps_t;
 
 

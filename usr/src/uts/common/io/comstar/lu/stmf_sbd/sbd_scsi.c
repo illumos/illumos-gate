@@ -35,20 +35,76 @@
 #include <sys/byteorder.h>
 #include <sys/atomic.h>
 #include <sys/sdt.h>
+#include <sys/dkio.h>
 
 #include <stmf.h>
 #include <lpif.h>
 #include <portif.h>
 #include <stmf_ioctl.h>
 #include <stmf_sbd.h>
+#include <stmf_sbd_ioctl.h>
 #include <sbd_impl.h>
+
+#define	SCSI2_CONFLICT_FREE_CMDS(cdb)	( \
+	/* ----------------------- */                                      \
+	/* Refer Both		   */                                      \
+	/* SPC-2 (rev 20) Table 10 */                                      \
+	/* SPC-3 (rev 23) Table 31 */                                      \
+	/* ----------------------- */                                      \
+	((cdb[0]) == SCMD_INQUIRY)					|| \
+	((cdb[0]) == SCMD_LOG_SENSE_G1)					|| \
+	((cdb[0]) == SCMD_RELEASE)					|| \
+	((cdb[0]) == SCMD_RELEASE_G1)					|| \
+	((cdb[0]) == SCMD_REPORT_LUNS)					|| \
+	((cdb[0]) == SCMD_REQUEST_SENSE)				|| \
+	/* PREVENT ALLOW MEDIUM REMOVAL with prevent == 0 */               \
+	((((cdb[0]) == SCMD_DOORLOCK) && (((cdb[4]) & 0x3) == 0)))	|| \
+	/* SERVICE ACTION IN with READ MEDIA SERIAL NUMBER (0x01) */       \
+	(((cdb[0]) == SCMD_SVC_ACTION_IN_G5) && (                          \
+	    ((cdb[1]) & 0x1F) == 0x01))					|| \
+	/* MAINTENANCE IN with service actions REPORT ALIASES (0x0Bh) */   \
+	/* REPORT DEVICE IDENTIFIER (0x05)  REPORT PRIORITY (0x0Eh) */     \
+	/* REPORT TARGET PORT GROUPS (0x0A) REPORT TIMESTAMP (0x0F) */     \
+	(((cdb[0]) == SCMD_MAINTENANCE_IN) && (                            \
+	    (((cdb[1]) & 0x1F) == 0x0B) ||                                 \
+	    (((cdb[1]) & 0x1F) == 0x05) ||                                 \
+	    (((cdb[1]) & 0x1F) == 0x0E) ||                                 \
+	    (((cdb[1]) & 0x1F) == 0x0A) ||                                 \
+	    (((cdb[1]) & 0x1F) == 0x0F)))				|| \
+	/* ----------------------- */                                      \
+	/* SBC-3 (rev 17) Table 3  */                                      \
+	/* ----------------------- */                                      \
+	/* READ CAPACITY(10) */                                            \
+	((cdb[0]) == SCMD_READ_CAPACITY)				|| \
+	/* READ CAPACITY(16) */                                            \
+	(((cdb[0]) == SCMD_SVC_ACTION_IN_G4) && (                          \
+	    ((cdb[1]) & 0x1F) == 0x10))					|| \
+	/* START STOP UNIT with START bit 0 and POWER CONDITION 0  */      \
+	(((cdb[0]) == SCMD_START_STOP) && (                                \
+	    (((cdb[4]) & 0xF0) == 0) && (((cdb[4]) & 0x01) == 0))))
+/* End of SCSI2_CONFLICT_FREE_CMDS */
 
 stmf_status_t sbd_lu_reset_state(stmf_lu_t *lu);
 static void sbd_handle_sync_cache(struct scsi_task *task,
     struct stmf_data_buf *initial_dbuf);
 void sbd_handle_read_xfer_completion(struct scsi_task *task,
     sbd_cmd_t *scmd, struct stmf_data_buf *dbuf);
+void sbd_handle_short_write_xfer_completion(scsi_task_t *task,
+    stmf_data_buf_t *dbuf);
+void sbd_handle_short_write_transfers(scsi_task_t *task,
+    stmf_data_buf_t *dbuf, uint32_t cdb_xfer_size);
+static void sbd_handle_sync_cache(struct scsi_task *task,
+    struct stmf_data_buf *initial_dbuf);
+void sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf,
+    uint32_t buflen);
+void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
 
+extern void sbd_pgr_initialize_it(scsi_task_t *);
+extern int sbd_pgr_reservation_conflict(scsi_task_t *);
+extern void sbd_pgr_remove_it_handle(sbd_lu_t *, sbd_it_data_t *);
+extern void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
+extern void sbd_handle_pgr_out_cmd(scsi_task_t *, stmf_data_buf_t *);
+extern void sbd_handle_pgr_out_data(scsi_task_t *, stmf_data_buf_t *);
 /*
  * IMPORTANT NOTE:
  * =================
@@ -62,8 +118,7 @@ void
 sbd_do_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 					struct stmf_data_buf *dbuf)
 {
-	sbd_store_t *sst = (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint64_t laddr;
 	uint32_t len, buflen, iolen;
 	int ndx;
@@ -75,15 +130,15 @@ sbd_do_read_xfer(struct scsi_task *task, sbd_cmd_t *scmd,
 	    task->task_max_nbufs;
 
 	len = scmd->len > dbuf->db_buf_size ? dbuf->db_buf_size : scmd->len;
-	laddr = scmd->addr + scmd->current_ro + slu->sl_sli->sli_lu_data_offset;
+	laddr = scmd->addr + scmd->current_ro;
 
 	for (buflen = 0, ndx = 0; (buflen < len) &&
 	    (ndx < dbuf->db_sglist_length); ndx++) {
 		iolen = min(len - buflen, dbuf->db_sglist[ndx].seg_length);
 		if (iolen == 0)
 			break;
-		if (sst->sst_data_read(sst, laddr, (uint64_t)iolen,
-		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
+		if (sbd_data_read(sl, laddr, (uint64_t)iolen,
+		    dbuf->db_sglist[0].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			/* Do not need to do xfer anymore, just complete it */
 			dbuf->db_data_size = 0;
@@ -176,8 +231,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	uint64_t lba, laddr;
 	uint32_t len;
 	uint8_t op = task->task_cdb[0];
-	sbd_store_t *sst = (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
 	int fast_path;
@@ -204,10 +258,10 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	laddr = lba << slu->sl_shift_count;
-	len <<= slu->sl_shift_count;
+	laddr = lba << sl->sl_data_blocksize_shift;
+	len <<= sl->sl_data_blocksize_shift;
 
-	if ((laddr + (uint64_t)len) > slu->sl_sli->sli_lu_data_size) {
+	if ((laddr + (uint64_t)len) > sl->sl_lu_size) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
@@ -251,8 +305,7 @@ sbd_handle_read(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	if ((dbuf->db_buf_size >= len) && fast_path &&
 	    (dbuf->db_sglist_length == 1)) {
-		if (sst->sst_data_read(sst,
-		    laddr + slu->sl_sli->sli_lu_data_offset, (uint64_t)len,
+		if (sbd_data_read(sl, laddr, (uint64_t)len,
 		    dbuf->db_sglist[0].seg_addr) == STMF_SUCCESS) {
 			dbuf->db_relative_offset = 0;
 			dbuf->db_data_size = len;
@@ -324,8 +377,7 @@ void
 sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
     struct stmf_data_buf *dbuf, uint8_t dbuf_reusable)
 {
-	sbd_store_t *sst = (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint64_t laddr;
 	uint32_t buflen, iolen;
 	int ndx;
@@ -340,8 +392,7 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		goto WRITE_XFER_DONE;
 	}
 
-	laddr = scmd->addr + dbuf->db_relative_offset +
-	    slu->sl_sli->sli_lu_data_offset;
+	laddr = scmd->addr + dbuf->db_relative_offset;
 
 	for (buflen = 0, ndx = 0; (buflen < dbuf->db_data_size) &&
 	    (ndx < dbuf->db_sglist_length); ndx++) {
@@ -349,8 +400,8 @@ sbd_handle_write_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 		    dbuf->db_sglist[ndx].seg_length);
 		if (iolen == 0)
 			break;
-		if (sst->sst_data_write(sst, laddr, (uint64_t)iolen,
-		    dbuf->db_sglist[ndx].seg_addr) != STMF_SUCCESS) {
+		if (sbd_data_write(sl, laddr, (uint64_t)iolen,
+		    dbuf->db_sglist[0].seg_addr) != STMF_SUCCESS) {
 			scmd->flags |= SBD_SCSI_CMD_XFER_FAIL;
 			break;
 		}
@@ -402,11 +453,15 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	uint64_t lba, laddr;
 	uint32_t len;
 	uint8_t op = task->task_cdb[0], do_immediate_data = 0;
-	sbd_store_t *sst = (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_cmd_t *scmd;
 	stmf_data_buf_t *dbuf;
 
+	if (sl->sl_flags & SL_WRITE_PROTECTED) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_WRITE_PROTECTED);
+		return;
+	}
 	if (op == SCMD_WRITE) {
 		lba = READ_SCSI21(&task->task_cdb[1], uint64_t);
 		len = (uint32_t)task->task_cdb[4];
@@ -429,10 +484,10 @@ sbd_handle_write(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	laddr = lba << slu->sl_shift_count;
-	len <<= slu->sl_shift_count;
+	laddr = lba << sl->sl_data_blocksize_shift;
+	len <<= sl->sl_data_blocksize_shift;
 
-	if ((laddr + (uint64_t)len) > slu->sl_sli->sli_lu_data_size) {
+	if ((laddr + (uint64_t)len) > sl->sl_lu_size) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
@@ -584,18 +639,111 @@ sbd_handle_short_read_xfer_completion(struct scsi_task *task, sbd_cmd_t *scmd,
 }
 
 void
+sbd_handle_short_write_transfers(scsi_task_t *task,
+    stmf_data_buf_t *dbuf, uint32_t cdb_xfer_size)
+{
+	sbd_cmd_t *scmd;
+
+	task->task_cmd_xfer_length = cdb_xfer_size;
+	if (task->task_additional_flags & TASK_AF_NO_EXPECTED_XFER_LENGTH) {
+		task->task_expected_xfer_length = cdb_xfer_size;
+	} else {
+		cdb_xfer_size = min(cdb_xfer_size,
+		    task->task_expected_xfer_length);
+	}
+
+	if (cdb_xfer_size == 0) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+	if (task->task_lu_private == NULL) {
+		task->task_lu_private = kmem_zalloc(sizeof (sbd_cmd_t),
+		    KM_SLEEP);
+	} else {
+		bzero(task->task_lu_private, sizeof (sbd_cmd_t));
+	}
+	scmd = (sbd_cmd_t *)task->task_lu_private;
+	scmd->cmd_type = SBD_CMD_SMALL_WRITE;
+	scmd->flags = SBD_SCSI_CMD_ACTIVE;
+	scmd->len = cdb_xfer_size;
+	if (dbuf == NULL) {
+		uint32_t minsize = cdb_xfer_size;
+
+		dbuf = stmf_alloc_dbuf(task, cdb_xfer_size, &minsize, 0);
+		if (dbuf == NULL) {
+			stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+			    STMF_ALLOC_FAILURE, NULL);
+			return;
+		}
+		dbuf->db_data_size = cdb_xfer_size;
+		dbuf->db_relative_offset = 0;
+		dbuf->db_flags = DB_DIRECTION_FROM_RPORT;
+		stmf_xfer_data(task, dbuf, 0);
+	} else {
+		if (dbuf->db_data_size < cdb_xfer_size) {
+			stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+			    STMF_ABORTED, NULL);
+			return;
+		}
+		dbuf->db_data_size = cdb_xfer_size;
+		sbd_handle_short_write_xfer_completion(task, dbuf);
+	}
+}
+
+void
+sbd_handle_short_write_xfer_completion(scsi_task_t *task,
+    stmf_data_buf_t *dbuf)
+{
+	sbd_cmd_t *scmd;
+
+	/*
+	 * For now lets assume we will get only one sglist element
+	 * for short writes. If that ever changes, we should allocate
+	 * a local buffer and copy all the sg elements to one linear space.
+	 */
+	if ((dbuf->db_xfer_status != STMF_SUCCESS) ||
+	    (dbuf->db_sglist_length > 1)) {
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+		    dbuf->db_xfer_status, NULL);
+		return;
+	}
+
+	task->task_nbytes_transferred = dbuf->db_data_size;
+	scmd = (sbd_cmd_t *)task->task_lu_private;
+	scmd->flags &= ~SBD_SCSI_CMD_ACTIVE;
+
+	/* Lets find out who to call */
+	switch (task->task_cdb[0]) {
+	case SCMD_MODE_SELECT:
+	case SCMD_MODE_SELECT_G1:
+		sbd_handle_mode_select_xfer(task,
+		    dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		break;
+	case SCMD_PERSISTENT_RESERVE_OUT:
+		sbd_handle_pgr_out_data(task, dbuf);
+		break;
+	default:
+		/* This should never happen */
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+		    STMF_ABORTED, NULL);
+	}
+}
+
+void
 sbd_handle_read_capacity(struct scsi_task *task,
     struct stmf_data_buf *initial_dbuf)
 {
-	sbd_store_t *sst = (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
-	sbd_lu_info_t *sli = slu->sl_sli;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint32_t cdb_len;
 	uint8_t p[32];
 	uint64_t s;
+	uint16_t blksize;
 
-	s = sli->sli_lu_data_size >> slu->sl_shift_count;
+	s = sl->sl_lu_size >> sl->sl_data_blocksize_shift;
 	s--;
+	blksize = ((uint16_t)1) << sl->sl_data_blocksize_shift;
+
 	switch (task->task_cdb[0]) {
 	case SCMD_READ_CAPACITY:
 		if (s & 0xffffffff00000000ull) {
@@ -607,10 +755,10 @@ sbd_handle_read_capacity(struct scsi_task *task,
 			p[3] = s & 0xff;
 		}
 		p[4] = 0; p[5] = 0;
-		p[6] = (sli->sli_blocksize >> 8) & 0xff;
-		p[7] = sli->sli_blocksize & 0xff;
+		p[6] = (blksize >> 8) & 0xff;
+		p[7] = blksize & 0xff;
 		sbd_handle_short_read_transfers(task, initial_dbuf, p, 8, 8);
-		return;
+		break;
 
 	case SCMD_SVC_ACTION_IN_G4:
 		cdb_len = READ_SCSI32(&task->task_cdb[10], uint32_t);
@@ -623,154 +771,316 @@ sbd_handle_read_capacity(struct scsi_task *task,
 		p[5] = (s >> 16) & 0xff;
 		p[6] = (s >> 8) & 0xff;
 		p[7] = s & 0xff;
-		p[10] = (sli->sli_blocksize >> 8) & 0xff;
-		p[11] = sli->sli_blocksize & 0xff;
+		p[10] = (blksize >> 8) & 0xff;
+		p[11] = blksize & 0xff;
 		sbd_handle_short_read_transfers(task, initial_dbuf, p,
 		    cdb_len, 32);
-		return;
+		break;
 	}
 }
 
-static uint8_t sbd_p3[] =
-	{3, 0x16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 2, 0, 0, 0,
-	    0, 0, 0, 0, 0x80, 0, 0, 0};
-static uint8_t sbd_p4[] =
-	{4, 0x16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	    0, 0, 0, 0, 0x15, 0x18, 0, 0};
-static uint8_t sbd_pa[] = {0xa, 0xa, 0, 0x10, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8_t sbd_bd[] = {0, 0, 0, 0, 0, 0, 0x02, 0};
+void
+sbd_calc_geometry(uint64_t s, uint16_t blksize, uint8_t *nsectors,
+    uint8_t *nheads, uint32_t *ncyl)
+{
+	if (s < (4ull * 1024ull * 1024ull * 1024ull)) {
+		*nsectors = 32;
+		*nheads = 8;
+	} else {
+		*nsectors = 254;
+		*nheads = 254;
+	}
+	*ncyl = s / ((uint64_t)blksize * (uint64_t)(*nsectors) *
+	    (uint64_t)(*nheads));
+}
 
 void
 sbd_handle_mode_sense(struct scsi_task *task,
-    struct stmf_data_buf *initial_dbuf)
+    struct stmf_data_buf *initial_dbuf, uint8_t *buf)
 {
-	sbd_store_t *sst = (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
-	sbd_lu_info_t *sli = slu->sl_sli;
-	uint32_t cmd_size, hdrsize, xfer_size, ncyl;
-	uint8_t payload_buf[8 + 8 + 24 + 24 + 12];
-	uint8_t *payload, *p;
-	uint8_t ctrl, page;
-	uint16_t ps;
-	uint64_t s = sli->sli_lu_data_size;
-	uint8_t dbd;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	uint32_t cmd_size, n;
+	uint8_t *cdb;
+	uint32_t ncyl;
+	uint8_t nsectors, nheads;
+	uint8_t page, ctrl, header_size, pc_valid;
+	uint16_t nbytes;
+	uint8_t *p;
+	uint64_t s = sl->sl_lu_size;
+	uint32_t dev_spec_param_offset;
 
-	p = &task->task_cdb[0];
-	page = p[2] & 0x3F;
-	ctrl = (p[2] >> 6) & 3;
-	dbd = p[1] & 0x08;
+	p = buf;	/* buf is assumed to be zeroed out and large enough */
+	n = 0;
+	cdb = &task->task_cdb[0];
+	page = cdb[2] & 0x3F;
+	ctrl = (cdb[2] >> 6) & 3;
+	cmd_size = (cdb[0] == SCMD_MODE_SENSE) ? cdb[4] :
+	    READ_SCSI16(&cdb[7], uint32_t);
 
-	hdrsize = (p[0] == SCMD_MODE_SENSE) ? 4 : 8;
-
-	cmd_size = (p[0] == SCMD_MODE_SENSE) ? p[4] :
-	    READ_SCSI16(&p[7], uint32_t);
-
-	switch (page) {
-	case 0x03:
-		ps = hdrsize + sizeof (sbd_p3);
-		break;
-	case 0x04:
-		ps = hdrsize + sizeof (sbd_p4);
-		break;
-	case 0x0A:
-		ps = hdrsize + sizeof (sbd_pa);
-		break;
-	case MODEPAGE_ALLPAGES:
-		ps = hdrsize + sizeof (sbd_p3) + sizeof (sbd_p4)
-		    + sizeof (sbd_pa);
-
-		/*
-		 * If the buffer is big enough, include the block
-		 * descriptor; otherwise, leave it out.
-		 */
-		if (cmd_size < ps) {
-			dbd = 1;
-		}
-
-		if (dbd == 0) {
-			ps += 8;
-		}
-
-		break;
-	default:
-		stmf_scsilib_send_status(task, STATUS_CHECK,
-		    STMF_SAA_INVALID_FIELD_IN_CDB);
-		return;
-	}
-
-	xfer_size = min(cmd_size, ps);
-
-	if ((xfer_size < hdrsize) || (ctrl == 1) ||
-	    (((task->task_additional_flags &
-	    TASK_AF_NO_EXPECTED_XFER_LENGTH) == 0) &&
-	    (xfer_size > task->task_expected_xfer_length))) {
-		stmf_scsilib_send_status(task, STATUS_CHECK,
-		    STMF_SAA_INVALID_FIELD_IN_CDB);
-		return;
-	}
-
-	bzero(payload_buf, xfer_size);
-
-	if (p[0] == SCMD_MODE_SENSE) {
-		payload_buf[0] = ps - 1;
+	if (cdb[0] == SCMD_MODE_SENSE) {
+		header_size = 4;
+		dev_spec_param_offset = 2;
 	} else {
-		ps -= 2;
-		*((uint16_t *)payload_buf) = BE_16(ps);
+		header_size = 8;
+		dev_spec_param_offset = 3;
 	}
 
-	payload = payload_buf + hdrsize;
-
-	switch (page) {
-	case 0x03:
-		bcopy(sbd_p3, payload, sizeof (sbd_p3));
-		break;
-
-	case 0x0A:
-		bcopy(sbd_pa, payload, sizeof (sbd_pa));
-		break;
-
-	case MODEPAGE_ALLPAGES:
-		if (dbd == 0) {
-			payload_buf[3] = sizeof (sbd_bd);
-			bcopy(sbd_bd, payload, sizeof (sbd_bd));
-			payload += sizeof (sbd_bd);
-		}
-
-		bcopy(sbd_p3, payload, sizeof (sbd_p3));
-		payload += sizeof (sbd_p3);
-		bcopy(sbd_pa, payload, sizeof (sbd_pa));
-		payload += sizeof (sbd_pa);
-		/* FALLTHROUGH */
-
-	case 0x04:
-		bcopy(sbd_p4, payload, sizeof (sbd_p4));
-
-		if (s > 1024 * 1024 * 1024) {
-			payload[5] = 16;
-		} else {
-			payload[5] = 2;
-		}
-		ncyl = (uint32_t)((s/(((uint64_t)payload[5]) * 32 * 512)) + 1);
-		payload[4] = (uchar_t)ncyl;
-		payload[3] = (uchar_t)(ncyl >> 8);
-		payload[2] = (uchar_t)(ncyl >> 16);
-		break;
-
+	/* Now validate the command */
+	if ((cdb[2] == 0) || (page == MODEPAGE_ALLPAGES) || (page == 0x08) ||
+	    (page == 0x0A) || (page == 0x03) || (page == 0x04)) {
+		pc_valid = 1;
+	} else {
+		pc_valid = 0;
+	}
+	if ((cmd_size < header_size) || (pc_valid == 0)) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
 	}
 
-	sbd_handle_short_read_transfers(task, initial_dbuf, payload_buf,
-	    cmd_size, xfer_size);
+	/* We will update the length in the mode header at the end */
+
+	/* Block dev device specific param in mode param header has wp bit */
+	if (sl->sl_flags & SL_WRITE_PROTECTED) {
+		p[n + dev_spec_param_offset] = BIT_7;
+	}
+	n += header_size;
+	/* We are not going to return any block descriptor */
+
+	nbytes = ((uint16_t)1) << sl->sl_data_blocksize_shift;
+	sbd_calc_geometry(s, nbytes, &nsectors, &nheads, &ncyl);
+
+	if ((page == 0x03) || (page == MODEPAGE_ALLPAGES)) {
+		p[n] = 0x03;
+		p[n+1] = 0x16;
+		if (ctrl != 1) {
+			p[n + 11] = nsectors;
+			p[n + 12] = nbytes >> 8;
+			p[n + 13] = nbytes & 0xff;
+			p[n + 20] = 0x80;
+		}
+		n += 24;
+	}
+	if ((page == 0x04) || (page == MODEPAGE_ALLPAGES)) {
+		p[n] = 0x04;
+		p[n + 1] = 0x16;
+		if (ctrl != 1) {
+			p[n + 2] = ncyl >> 16;
+			p[n + 3] = ncyl >> 8;
+			p[n + 4] = ncyl & 0xff;
+			p[n + 5] = nheads;
+			p[n + 20] = 0x15;
+			p[n + 21] = 0x18;
+		}
+		n += 24;
+	}
+	if ((page == MODEPAGE_CACHING) || (page == MODEPAGE_ALLPAGES)) {
+		struct mode_caching *mode_caching_page;
+
+		mode_caching_page = (struct mode_caching *)&p[n];
+
+		mode_caching_page->mode_page.code = MODEPAGE_CACHING;
+		mode_caching_page->mode_page.ps = 1; /* A saveable page */
+		mode_caching_page->mode_page.length = 0x12;
+
+		switch (ctrl) {
+		case (0):
+			/* Current */
+			if ((sl->sl_flags & SL_WRITEBACK_CACHE_DISABLE) == 0) {
+				mode_caching_page->wce = 1;
+			}
+			break;
+
+		case (1):
+			/* Changeable */
+			if ((sl->sl_flags &
+			    SL_WRITEBACK_CACHE_SET_UNSUPPORTED) == 0) {
+				mode_caching_page->wce = 1;
+			}
+			break;
+
+		default:
+			if ((sl->sl_flags &
+			    SL_SAVED_WRITE_CACHE_DISABLE) == 0) {
+				mode_caching_page->wce = 1;
+			}
+			break;
+		}
+		n += (sizeof (struct mode_page) +
+		    mode_caching_page->mode_page.length);
+	}
+	if ((page == MODEPAGE_CTRL_MODE) || (page == MODEPAGE_ALLPAGES)) {
+		struct mode_control_scsi3 *mode_control_page;
+
+		mode_control_page = (struct mode_control_scsi3 *)&p[n];
+
+		mode_control_page->mode_page.code = MODEPAGE_CTRL_MODE;
+		mode_control_page->mode_page.length =
+		    PAGELENGTH_MODE_CONTROL_SCSI3;
+		if (ctrl != 1) {
+			/* If not looking for changeable values, report this. */
+			mode_control_page->que_mod = CTRL_QMOD_UNRESTRICT;
+		}
+		n += (sizeof (struct mode_page) +
+		    mode_control_page->mode_page.length);
+	}
+
+	if (cdb[0] == SCMD_MODE_SENSE) {
+		if (n > 255) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			return;
+		}
+		/*
+		 * Mode parameter header length doesn't include the number
+		 * of bytes in the length field, so adjust the count.
+		 * Byte count minus header length field size.
+		 */
+		buf[0] = (n - 1) & 0xff;
+	} else {
+		/* Byte count minus header length field size. */
+		buf[1] = (n - 2) & 0xff;
+		buf[0] = ((n - 2) >> 8) & 0xff;
+	}
+
+	sbd_handle_short_read_transfers(task, initial_dbuf, buf,
+	    cmd_size, n);
 }
 
+void
+sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	uint32_t cmd_xfer_len;
+
+	if (task->task_cdb[0] == SCMD_MODE_SELECT) {
+		cmd_xfer_len = (uint32_t)task->task_cdb[4];
+	} else {
+		cmd_xfer_len = READ_SCSI16(&task->task_cdb[7], uint32_t);
+	}
+
+	if ((task->task_cdb[1] & 0xFE) != 0x10) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		return;
+	}
+
+	if (cmd_xfer_len == 0) {
+		/* zero byte mode selects are allowed */
+		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		return;
+	}
+
+	sbd_handle_short_write_transfers(task, dbuf, cmd_xfer_len);
+}
+
+void
+sbd_handle_mode_select_xfer(scsi_task_t *task, uint8_t *buf, uint32_t buflen)
+{
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	sbd_it_data_t *it;
+	int hdr_len, bd_len;
+	sbd_status_t sret;
+	int i;
+
+	if (task->task_cdb[0] == SCMD_MODE_SELECT) {
+		hdr_len = 4;
+	} else {
+		hdr_len = 8;
+	}
+
+	if (buflen < hdr_len)
+		goto mode_sel_param_len_err;
+
+	bd_len = hdr_len == 4 ? buf[3] : READ_SCSI16(&buf[6], int);
+
+	if (buflen < (hdr_len + bd_len + 2))
+		goto mode_sel_param_len_err;
+
+	buf += hdr_len + bd_len;
+	buflen -= hdr_len + bd_len;
+
+	if ((buf[0] != 8) || (buflen != ((uint32_t)buf[1] + 2))) {
+		goto mode_sel_param_len_err;
+	}
+
+	if (buf[2] & 0xFB) {
+		goto mode_sel_param_field_err;
+	}
+
+	for (i = 3; i < (buf[1] + 2); i++) {
+		if (buf[i]) {
+			goto mode_sel_param_field_err;
+		}
+	}
+
+	sret = SBD_SUCCESS;
+
+	/* All good. Lets handle the write cache change, if any */
+	if (buf[2] & BIT_2) {
+		sret = sbd_wcd_set(0, sl);
+	} else {
+		sret = sbd_wcd_set(1, sl);
+	}
+
+	if (sret != SBD_SUCCESS) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_WRITE_ERROR);
+		return;
+	}
+
+	/* set on the device passed, now set the flags */
+	mutex_enter(&sl->sl_lock);
+	if (buf[2] & BIT_2) {
+		sl->sl_flags &= ~SL_WRITEBACK_CACHE_DISABLE;
+	} else {
+		sl->sl_flags |= SL_WRITEBACK_CACHE_DISABLE;
+	}
+
+	for (it = sl->sl_it_list; it != NULL; it = it->sbd_it_next) {
+		if (it == task->task_lu_itl_handle)
+			continue;
+		it->sbd_it_ua_conditions |= SBD_UA_MODE_PARAMETERS_CHANGED;
+	}
+
+	if (task->task_cdb[1] & 1) {
+		if (buf[2] & BIT_2) {
+			sl->sl_flags &= ~SL_SAVED_WRITE_CACHE_DISABLE;
+		} else {
+			sl->sl_flags |= SL_SAVED_WRITE_CACHE_DISABLE;
+		}
+		mutex_exit(&sl->sl_lock);
+		sret = sbd_write_lu_info(sl);
+	} else {
+		mutex_exit(&sl->sl_lock);
+	}
+	if (sret == SBD_SUCCESS) {
+		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+	} else {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_WRITE_ERROR);
+	}
+	return;
+
+mode_sel_param_len_err:
+	stmf_scsilib_send_status(task, STATUS_CHECK,
+	    STMF_SAA_PARAM_LIST_LENGTH_ERROR);
+	return;
+mode_sel_param_field_err:
+	stmf_scsilib_send_status(task, STATUS_CHECK,
+	    STMF_SAA_INVALID_FIELD_IN_PARAM_LIST);
+}
 
 void
 sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 			uint8_t *p, int bsize)
 {
-	uint8_t		*cdbp = (uint8_t *)&task->task_cdb[0];
-	uint32_t	 cmd_size;
-	uint8_t		 page_length;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
+	uint8_t *cdbp = (uint8_t *)&task->task_cdb[0];
+	uint32_t cmd_size;
+	uint8_t page_length;
+	uint8_t byte0;
 
+	byte0 = DTYPE_DIRECT;
 	/*
 	 * Basic protocol checks.
 	 */
@@ -808,19 +1118,32 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 		page_length = 31;
 		bzero(inq, page_length + 5);
 
-		inq->inq_dtype = 0;
+		inq->inq_dtype = DTYPE_DIRECT;
 		inq->inq_ansi = 5;	/* SPC-3 */
 		inq->inq_hisup = 1;
 		inq->inq_rdf = 2;	/* Response data format for SPC-3 */
 		inq->inq_len = page_length;
 
 		inq->inq_tpgs = 1;
-
 		inq->inq_cmdque = 1;
 
-		(void) strncpy((char *)inq->inq_vid, "SUN     ", 8);
-		(void) strncpy((char *)inq->inq_pid, "COMSTAR         ", 16);
-		(void) strncpy((char *)inq->inq_revision, "1.0 ", 4);
+		if (sl->sl_flags & SL_VID_VALID) {
+			bcopy(sl->sl_vendor_id, inq->inq_vid, 8);
+		} else {
+			bcopy(sbd_vendor_id, inq->inq_vid, 8);
+		}
+
+		if (sl->sl_flags & SL_PID_VALID) {
+			bcopy(sl->sl_product_id, inq->inq_pid, 16);
+		} else {
+			bcopy(sbd_product_id, inq->inq_pid, 16);
+		}
+
+		if (sl->sl_flags & SL_REV_VALID) {
+			bcopy(sl->sl_revision, inq->inq_revision, 4);
+		} else {
+			bcopy(sbd_revision, inq->inq_revision, 4);
+		}
 
 		sbd_handle_short_read_transfers(task, initial_dbuf, p, cmd_size,
 		    min(cmd_size, page_length + 5));
@@ -834,21 +1157,34 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 
 	switch (cdbp[2]) {
 	case 0x00:
-		page_length = 3;
+		page_length = 4;
 
 		bzero(p, page_length + 4);
 
-		p[0] = 0;
-		p[3] = page_length;	/* we support 3 pages, 0, 0x83, 0x86 */
-		p[5] = 0x83;
-		p[6] = 0x86;
+		p[0] = byte0;
+		p[3] = page_length;
+		p[5] = 0x80;
+		p[6] = 0x83;
+		p[7] = 0x86;
 
+		break;
+
+	case 0x80:
+		if (sl->sl_serial_no_size) {
+			page_length = sl->sl_serial_no_size;
+			bcopy(sl->sl_serial_no, p + 4, sl->sl_serial_no_size);
+		} else {
+			bcopy("    ", p + 4, 4);
+		}
+		p[0] = byte0;
+		p[1] = 0x80;
+		p[3] = page_length;
 		break;
 
 	case 0x83:
 
 		page_length = stmf_scsilib_prepare_vpd_page83(task, p,
-		    bsize, 0, STMF_VPD_LU_ID|STMF_VPD_TARGET_ID|
+		    bsize, byte0, STMF_VPD_LU_ID|STMF_VPD_TARGET_ID|
 		    STMF_VPD_TP_GROUP|STMF_VPD_RELATIVE_TP_ID) - 4;
 		break;
 
@@ -857,7 +1193,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 
 		bzero(p, page_length + 4);
 
-		p[0] = 0;
+		p[0] = byte0;
 		p[1] = 0x86;		/* Page 86 response */
 		p[3] = page_length;
 
@@ -894,42 +1230,43 @@ sbd_task_alloc(struct scsi_task *task)
 }
 
 void
-sbd_remove_it_handle(sbd_lu_t *slu, sbd_it_data_t *it)
+sbd_remove_it_handle(sbd_lu_t *sl, sbd_it_data_t *it)
 {
 	sbd_it_data_t **ppit;
 
-	mutex_enter(&slu->sl_it_list_lock);
-	for (ppit = &slu->sl_it_list; *ppit != NULL;
+	sbd_pgr_remove_it_handle(sl, it);
+	mutex_enter(&sl->sl_lock);
+	for (ppit = &sl->sl_it_list; *ppit != NULL;
 	    ppit = &((*ppit)->sbd_it_next)) {
 		if ((*ppit) == it) {
 			*ppit = it->sbd_it_next;
 			break;
 		}
 	}
-	mutex_exit(&slu->sl_it_list_lock);
+	mutex_exit(&sl->sl_lock);
 
-	DTRACE_PROBE2(itl__nexus__end, stmf_lu_t *, slu->sl_lu,
+	DTRACE_PROBE2(itl__nexus__end, stmf_lu_t *, sl->sl_lu,
 	    sbd_it_data_t *, it);
 
 	kmem_free(it, sizeof (*it));
 }
 
 void
-sbd_check_and_clear_scsi2_reservation(sbd_lu_t *slu, sbd_it_data_t *it)
+sbd_check_and_clear_scsi2_reservation(sbd_lu_t *sl, sbd_it_data_t *it)
 {
-	mutex_enter(&slu->sl_it_list_lock);
-	if ((slu->sl_flags & SBD_LU_HAS_SCSI2_RESERVATION) == 0) {
+	mutex_enter(&sl->sl_lock);
+	if ((sl->sl_flags & SL_LU_HAS_SCSI2_RESERVATION) == 0) {
 		/* If we dont have any reservations, just get out. */
-		mutex_exit(&slu->sl_it_list_lock);
+		mutex_exit(&sl->sl_lock);
 		return;
 	}
 
 	if (it == NULL) {
 		/* Find the I_T nexus which is holding the reservation. */
-		for (it = slu->sl_it_list; it != NULL; it = it->sbd_it_next) {
+		for (it = sl->sl_it_list; it != NULL; it = it->sbd_it_next) {
 			if (it->sbd_it_flags & SBD_IT_HAS_SCSI2_RESERVATION) {
 				ASSERT(it->sbd_it_session_id ==
-				    slu->sl_rs_owner_session_id);
+				    sl->sl_rs_owner_session_id);
 				break;
 			}
 		}
@@ -941,74 +1278,63 @@ sbd_check_and_clear_scsi2_reservation(sbd_lu_t *slu, sbd_it_data_t *it)
 		 * called "check_and_clear".
 		 */
 		if ((it->sbd_it_flags & SBD_IT_HAS_SCSI2_RESERVATION) == 0) {
-			mutex_exit(&slu->sl_it_list_lock);
+			mutex_exit(&sl->sl_lock);
 			return;
 		}
 	}
 	it->sbd_it_flags &= ~SBD_IT_HAS_SCSI2_RESERVATION;
-	slu->sl_flags &= ~SBD_IT_HAS_SCSI2_RESERVATION;
-	mutex_exit(&slu->sl_it_list_lock);
+	sl->sl_flags &= ~SL_LU_HAS_SCSI2_RESERVATION;
+	mutex_exit(&sl->sl_lock);
 }
 
-/*
- * returns non-zero, if this command can be allowed to run even if the
- * lu has been reserved by another initiator.
- */
-int
-sbd_reserve_allow(scsi_task_t *task)
-{
-	uint8_t cdb0 = task->task_cdb[0];
-	uint8_t cdb1 = task->task_cdb[1];
 
-	if ((cdb0 == SCMD_INQUIRY) || (cdb0 == SCMD_READ_CAPACITY) ||
-	    ((cdb0 == SCMD_SVC_ACTION_IN_G4) &&
-	    (cdb1 == SSVC_ACTION_READ_CAPACITY_G4))) {
-		return (1);
-	}
-	return (0);
-}
 
 void
 sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 {
-	sbd_store_t *sst = (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_it_data_t *it;
 	uint8_t cdb0, cdb1;
 
 	if ((it = task->task_lu_itl_handle) == NULL) {
-		mutex_enter(&slu->sl_it_list_lock);
-		for (it = slu->sl_it_list; it != NULL; it = it->sbd_it_next) {
+		mutex_enter(&sl->sl_lock);
+		for (it = sl->sl_it_list; it != NULL; it = it->sbd_it_next) {
 			if (it->sbd_it_session_id ==
 			    task->task_session->ss_session_id) {
-				mutex_exit(&slu->sl_it_list_lock);
+				mutex_exit(&sl->sl_lock);
 				stmf_scsilib_send_status(task, STATUS_BUSY, 0);
 				return;
 			}
 		}
 		it = (sbd_it_data_t *)kmem_zalloc(sizeof (*it), KM_NOSLEEP);
 		if (it == NULL) {
-			mutex_exit(&slu->sl_it_list_lock);
+			mutex_exit(&sl->sl_lock);
 			stmf_scsilib_send_status(task, STATUS_BUSY, 0);
 			return;
 		}
 		it->sbd_it_session_id = task->task_session->ss_session_id;
 		bcopy(task->task_lun_no, it->sbd_it_lun, 8);
-		it->sbd_it_next = slu->sl_it_list;
-		slu->sl_it_list = it;
-		mutex_exit(&slu->sl_it_list_lock);
+		it->sbd_it_next = sl->sl_it_list;
+		sl->sl_it_list = it;
+		mutex_exit(&sl->sl_lock);
 
 		DTRACE_PROBE1(itl__nexus__start, scsi_task *, task);
 
+		sbd_pgr_initialize_it(task);
 		if (stmf_register_itl_handle(task->task_lu, task->task_lun_no,
 		    task->task_session, it->sbd_it_session_id, it)
 		    != STMF_SUCCESS) {
-			sbd_remove_it_handle(slu, it);
+			sbd_remove_it_handle(sl, it);
 			stmf_scsilib_send_status(task, STATUS_BUSY, 0);
 			return;
 		}
 		task->task_lu_itl_handle = it;
 		it->sbd_it_ua_conditions = SBD_UA_POR;
+	} else if (it->sbd_it_flags & SBD_IT_PGR_CHECK_FLAG) {
+		sbd_pgr_initialize_it(task);
+		mutex_enter(&sl->sl_lock);
+		it->sbd_it_flags &= ~SBD_IT_PGR_CHECK_FLAG;
+		mutex_exit(&sl->sl_lock);
 	}
 
 	if (task->task_mgmt_function) {
@@ -1016,23 +1342,44 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if ((slu->sl_flags & SBD_LU_HAS_SCSI2_RESERVATION) &&
+	/* Checking ua conditions as per SAM3R14 5.3.2 specified order */
+	if ((it->sbd_it_ua_conditions) && (task->task_cdb[0] != SCMD_INQUIRY)) {
+		uint32_t saa = 0;
+
+		mutex_enter(&sl->sl_lock);
+		if (it->sbd_it_ua_conditions & SBD_UA_POR) {
+			it->sbd_it_ua_conditions &= ~SBD_UA_POR;
+			saa = STMF_SAA_POR;
+		}
+		mutex_exit(&sl->sl_lock);
+		if (saa) {
+			stmf_scsilib_send_status(task, STATUS_CHECK, saa);
+			return;
+		}
+	}
+
+	/* Reservation conflict checks */
+	if (SBD_PGR_RSVD(sl->sl_pgr)) {
+		if (sbd_pgr_reservation_conflict(task)) {
+			stmf_scsilib_send_status(task,
+			    STATUS_RESERVATION_CONFLICT, 0);
+			return;
+		}
+	} else if ((sl->sl_flags & SL_LU_HAS_SCSI2_RESERVATION) &&
 	    ((it->sbd_it_flags & SBD_IT_HAS_SCSI2_RESERVATION) == 0)) {
-		if (!sbd_reserve_allow(task)) {
+		if (!(SCSI2_CONFLICT_FREE_CMDS(task->task_cdb))) {
 			stmf_scsilib_send_status(task,
 			    STATUS_RESERVATION_CONFLICT, 0);
 			return;
 		}
 	}
 
+	/* Rest of the ua conndition checks */
 	if ((it->sbd_it_ua_conditions) && (task->task_cdb[0] != SCMD_INQUIRY)) {
 		uint32_t saa = 0;
 
-		mutex_enter(&slu->sl_it_list_lock);
-		if (it->sbd_it_ua_conditions & SBD_UA_POR) {
-			it->sbd_it_ua_conditions &= ~SBD_UA_POR;
-			saa = STMF_SAA_POR;
-		} else if (it->sbd_it_ua_conditions & SBD_UA_CAPACITY_CHANGED) {
+		mutex_enter(&sl->sl_lock);
+		if (it->sbd_it_ua_conditions & SBD_UA_CAPACITY_CHANGED) {
 			it->sbd_it_ua_conditions &= ~SBD_UA_CAPACITY_CHANGED;
 			if ((task->task_cdb[0] == SCMD_READ_CAPACITY) ||
 			    ((task->task_cdb[0] == SCMD_SVC_ACTION_IN_G4) &&
@@ -1042,17 +1389,21 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			} else {
 				saa = STMF_SAA_CAPACITY_DATA_HAS_CHANGED;
 			}
+		} else if (it->sbd_it_ua_conditions &
+		    SBD_UA_MODE_PARAMETERS_CHANGED) {
+			it->sbd_it_ua_conditions &=
+			    ~SBD_UA_MODE_PARAMETERS_CHANGED;
+			saa = STMF_SAA_MODE_PARAMETERS_CHANGED;
 		} else {
 			it->sbd_it_ua_conditions = 0;
 			saa = 0;
 		}
-		mutex_exit(&slu->sl_it_list_lock);
+		mutex_exit(&sl->sl_lock);
 		if (saa) {
 			stmf_scsilib_send_status(task, STATUS_CHECK, saa);
 			return;
 		}
 	}
-
 
 	cdb0 = task->task_cdb[0] & 0x1F;
 
@@ -1072,6 +1423,130 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	cdb0 = task->task_cdb[0];
 	cdb1 = task->task_cdb[1];
 
+	if (cdb0 == SCMD_INQUIRY) {		/* Inquiry */
+		uint8_t *p;
+
+		p = (uint8_t *)kmem_zalloc(512, KM_SLEEP);
+		sbd_handle_inquiry(task, initial_dbuf, p, 512);
+		kmem_free(p, 512);
+		return;
+	}
+
+	if (cdb0  == SCMD_PERSISTENT_RESERVE_OUT) {
+		sbd_handle_pgr_out_cmd(task, initial_dbuf);
+		return;
+	}
+
+	if (cdb0  == SCMD_PERSISTENT_RESERVE_IN) {
+		sbd_handle_pgr_in_cmd(task, initial_dbuf);
+		return;
+	}
+
+	if (cdb0 == SCMD_RELEASE) {
+		if (cdb1) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			return;
+		}
+
+		mutex_enter(&sl->sl_lock);
+		if (sl->sl_flags & SL_LU_HAS_SCSI2_RESERVATION) {
+			/* If not owner don't release it, just return good */
+			if (it->sbd_it_session_id !=
+			    sl->sl_rs_owner_session_id) {
+				mutex_exit(&sl->sl_lock);
+				stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+				return;
+			}
+		}
+		sl->sl_flags &= ~SL_LU_HAS_SCSI2_RESERVATION;
+		it->sbd_it_flags &= ~SBD_IT_HAS_SCSI2_RESERVATION;
+		mutex_exit(&sl->sl_lock);
+		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		return;
+	}
+
+	if (cdb0 == SCMD_RESERVE) {
+		if (cdb1) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			return;
+		}
+
+		mutex_enter(&sl->sl_lock);
+		if (sl->sl_flags & SL_LU_HAS_SCSI2_RESERVATION) {
+			/* If not owner, return conflict status */
+			if (it->sbd_it_session_id !=
+			    sl->sl_rs_owner_session_id) {
+				mutex_exit(&sl->sl_lock);
+				stmf_scsilib_send_status(task,
+				    STATUS_RESERVATION_CONFLICT, 0);
+				return;
+			}
+		}
+		sl->sl_flags |= SL_LU_HAS_SCSI2_RESERVATION;
+		it->sbd_it_flags |= SBD_IT_HAS_SCSI2_RESERVATION;
+		sl->sl_rs_owner_session_id = it->sbd_it_session_id;
+		mutex_exit(&sl->sl_lock);
+		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		return;
+	}
+
+	if (cdb0 == SCMD_REQUEST_SENSE) {
+		/*
+		 * LU provider needs to store unretrieved sense data
+		 * (e.g. after power-on/reset).  For now, we'll just
+		 * return good status with no sense.
+		 */
+
+		if ((cdb1 & ~1) || task->task_cdb[2] || task->task_cdb[3] ||
+		    task->task_cdb[5]) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+		} else {
+			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		}
+
+		return;
+	}
+
+	/* Report Target Port Groups */
+	if ((cdb0 == SCMD_MAINTENANCE_IN) &&
+	    ((cdb1 & 0x1F) == 0x0A)) {
+		stmf_scsilib_handle_report_tpgs(task, initial_dbuf);
+		return;
+	}
+
+	if (cdb0 == SCMD_START_STOP) {			/* Start stop */
+		task->task_cmd_xfer_length = 0;
+		if (task->task_cdb[4] & 0xFC) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			return;
+		}
+		if (task->task_cdb[4] & 2) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+		} else {
+			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		}
+		return;
+
+	}
+
+	if ((cdb0 == SCMD_MODE_SENSE) || (cdb0 == SCMD_MODE_SENSE_G1)) {
+		uint8_t *p;
+		p = kmem_zalloc(512, KM_SLEEP);
+		sbd_handle_mode_sense(task, initial_dbuf, p);
+		kmem_free(p, 512);
+		return;
+	}
+
+	if ((cdb0 == SCMD_MODE_SELECT) || (cdb0 == SCMD_MODE_SELECT_G1)) {
+		sbd_handle_mode_select(task, initial_dbuf);
+		return;
+	}
+
 	if (cdb0 == SCMD_TEST_UNIT_READY) {	/* Test unit ready */
 		task->task_cmd_xfer_length = 0;
 		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
@@ -1080,15 +1555,6 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	if (cdb0 == SCMD_READ_CAPACITY) {		/* Read Capacity */
 		sbd_handle_read_capacity(task, initial_dbuf);
-		return;
-	}
-
-	if (cdb0 == SCMD_INQUIRY) {		/* Inquiry */
-		uint8_t *p;
-
-		p = (uint8_t *)kmem_zalloc(512, KM_SLEEP);
-		sbd_handle_inquiry(task, initial_dbuf, p, 512);
-		kmem_free(p, 512);
 		return;
 	}
 
@@ -1113,42 +1579,6 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	 * }
 	 */
 
-	if (cdb0 == SCMD_START_STOP) {			/* Start stop */
-		/* XXX Implement power management */
-		task->task_cmd_xfer_length = 0;
-		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
-		return;
-	}
-#if 0
-	/* XXX Remove #if 0 above */
-	if ((cdb0 == SCMD_MODE_SELECT) || (cdb0 == SCMD_MODE_SELECT_G1)) {
-		sbd_handle_mode_select(task, initial_dbuf);
-		return;
-	}
-#endif
-	if ((cdb0 == SCMD_MODE_SENSE) || (cdb0 == SCMD_MODE_SENSE_G1)) {
-		sbd_handle_mode_sense(task, initial_dbuf);
-		return;
-	}
-
-	if (cdb0 == SCMD_REQUEST_SENSE) {
-		/*
-		 * LU provider needs to store unretrieved sense data
-		 * (e.g. after power-on/reset).  For now, we'll just
-		 * return good status with no sense.
-		 */
-
-		if ((cdb1 & ~1) || task->task_cdb[2] || task->task_cdb[3] ||
-		    task->task_cdb[5]) {
-			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_INVALID_FIELD_IN_CDB);
-		} else {
-			stmf_scsilib_send_status(task, STATUS_GOOD, 0);
-		}
-
-		return;
-	}
-
 	if (cdb0 == SCMD_VERIFY) {
 		/*
 		 * Something more likely needs to be done here.
@@ -1158,54 +1588,9 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		return;
 	}
 
-	if ((cdb0 == SCMD_RESERVE) || (cdb0 == SCMD_RELEASE)) {
-		if (cdb1) {
-			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_INVALID_FIELD_IN_CDB);
-			return;
-		}
-		mutex_enter(&slu->sl_it_list_lock);
-		if (slu->sl_flags & SBD_LU_HAS_SCSI2_RESERVATION) {
-			if (it->sbd_it_session_id !=
-			    slu->sl_rs_owner_session_id) {
-				/*
-				 * This can only happen if things were in
-				 * flux.
-				 */
-				mutex_exit(&slu->sl_it_list_lock);
-				stmf_scsilib_send_status(task,
-				    STATUS_RESERVATION_CONFLICT, 0);
-				return;
-			}
-		}
-	}
-
-	if (cdb0 == SCMD_RELEASE) {
-		slu->sl_flags &= ~SBD_LU_HAS_SCSI2_RESERVATION;
-		it->sbd_it_flags &= ~SBD_IT_HAS_SCSI2_RESERVATION;
-		mutex_exit(&slu->sl_it_list_lock);
-		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
-		return;
-	}
-	if (cdb0 == SCMD_RESERVE) {
-		slu->sl_flags |= SBD_LU_HAS_SCSI2_RESERVATION;
-		it->sbd_it_flags |= SBD_IT_HAS_SCSI2_RESERVATION;
-		slu->sl_rs_owner_session_id = it->sbd_it_session_id;
-		mutex_exit(&slu->sl_it_list_lock);
-		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
-		return;
-	}
-
 	if (cdb0 == SCMD_SYNCHRONIZE_CACHE ||
 	    cdb0 == SCMD_SYNCHRONIZE_CACHE_G4) {
 		sbd_handle_sync_cache(task, initial_dbuf);
-		return;
-	}
-
-	/* Report Target Port Groups */
-	if ((cdb0 == SCMD_MAINTENANCE_IN) &&
-	    ((cdb1 & 0x1F) == 0x0A)) {
-		stmf_scsilib_handle_report_tpgs(task, initial_dbuf);
 		return;
 	}
 
@@ -1221,14 +1606,26 @@ sbd_dbuf_xfer_done(struct scsi_task *task, struct stmf_data_buf *dbuf)
 	if ((scmd == NULL) || ((scmd->flags & SBD_SCSI_CMD_ACTIVE) == 0))
 		return;
 
-	if (scmd->cmd_type == SBD_CMD_SCSI_READ) {
+	switch (scmd->cmd_type) {
+	case (SBD_CMD_SCSI_READ):
 		sbd_handle_read_xfer_completion(task, scmd, dbuf);
-	} else if (scmd->cmd_type == SBD_CMD_SCSI_WRITE) {
+		break;
+
+	case (SBD_CMD_SCSI_WRITE):
 		sbd_handle_write_xfer_completion(task, scmd, dbuf, 1);
-	} else if (scmd->cmd_type == SBD_CMD_SMALL_READ) {
+		break;
+
+	case (SBD_CMD_SMALL_READ):
 		sbd_handle_short_read_xfer_completion(task, scmd, dbuf);
-	} else {
+		break;
+
+	case (SBD_CMD_SMALL_WRITE):
+		sbd_handle_short_write_xfer_completion(task, dbuf);
+		break;
+
+	default:
 		cmn_err(CE_PANIC, "Unknown cmd type, task = %p", (void *)task);
+		break;
 	}
 }
 
@@ -1265,8 +1662,7 @@ sbd_task_free(struct scsi_task *task)
 stmf_status_t
 sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 {
-	sbd_store_t *sst = (sbd_store_t *)lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)lu->lu_provider_private;
 	scsi_task_t *task;
 
 	if (abort_cmd == STMF_LU_RESET_STATE) {
@@ -1274,9 +1670,8 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 	}
 
 	if (abort_cmd == STMF_LU_ITL_HANDLE_REMOVED) {
-		sbd_check_and_clear_scsi2_reservation(slu,
-		    (sbd_it_data_t *)arg);
-		sbd_remove_it_handle(slu, (sbd_it_data_t *)arg);
+		sbd_check_and_clear_scsi2_reservation(sl, (sbd_it_data_t *)arg);
+		sbd_remove_it_handle(sl, (sbd_it_data_t *)arg);
 		return (STMF_SUCCESS);
 	}
 
@@ -1298,8 +1693,7 @@ sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 void
 sbd_ctl(struct stmf_lu *lu, int cmd, void *arg)
 {
-	sbd_store_t *sst = (sbd_store_t *)lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)lu->lu_provider_private;
 	stmf_change_status_t st;
 
 	ASSERT((cmd == STMF_CMD_LU_ONLINE) ||
@@ -1312,39 +1706,27 @@ sbd_ctl(struct stmf_lu *lu, int cmd, void *arg)
 
 	switch (cmd) {
 	case STMF_CMD_LU_ONLINE:
-		if (slu->sl_state == STMF_STATE_ONLINE)
+		if (sl->sl_state == STMF_STATE_ONLINE)
 			st.st_completion_status = STMF_ALREADY;
-		else if (slu->sl_state != STMF_STATE_OFFLINE)
+		else if (sl->sl_state != STMF_STATE_OFFLINE)
 			st.st_completion_status = STMF_FAILURE;
 		if (st.st_completion_status == STMF_SUCCESS) {
-			slu->sl_state = STMF_STATE_ONLINING;
-			slu->sl_state_not_acked = 1;
-			st.st_completion_status = sst->sst_online(sst);
-			if (st.st_completion_status != STMF_SUCCESS) {
-				slu->sl_state = STMF_STATE_OFFLINE;
-				slu->sl_state_not_acked = 0;
-			} else {
-				slu->sl_state = STMF_STATE_ONLINE;
-			}
+			sl->sl_state = STMF_STATE_ONLINE;
+			sl->sl_state_not_acked = 1;
 		}
 		(void) stmf_ctl(STMF_CMD_LU_ONLINE_COMPLETE, lu, &st);
 		break;
 
 	case STMF_CMD_LU_OFFLINE:
-		if (slu->sl_state == STMF_STATE_OFFLINE)
+		if (sl->sl_state == STMF_STATE_OFFLINE)
 			st.st_completion_status = STMF_ALREADY;
-		else if (slu->sl_state != STMF_STATE_ONLINE)
+		else if (sl->sl_state != STMF_STATE_ONLINE)
 			st.st_completion_status = STMF_FAILURE;
 		if (st.st_completion_status == STMF_SUCCESS) {
-			slu->sl_state = STMF_STATE_OFFLINING;
-			slu->sl_state_not_acked = 1;
-			st.st_completion_status = sst->sst_offline(sst);
-			if (st.st_completion_status != STMF_SUCCESS) {
-				slu->sl_state = STMF_STATE_ONLINE;
-				slu->sl_state_not_acked = 0;
-			} else {
-				slu->sl_state = STMF_STATE_OFFLINE;
-			}
+			sl->sl_flags &= ~(SL_MEDIUM_REMOVAL_PREVENTED |
+			    SL_LU_HAS_SCSI2_RESERVATION);
+			sl->sl_state = STMF_STATE_OFFLINE;
+			sl->sl_state_not_acked = 1;
 		}
 		(void) stmf_ctl(STMF_CMD_LU_OFFLINE_COMPLETE, lu, &st);
 		break;
@@ -1352,7 +1734,7 @@ sbd_ctl(struct stmf_lu *lu, int cmd, void *arg)
 	case STMF_ACK_LU_ONLINE_COMPLETE:
 		/* Fallthrough */
 	case STMF_ACK_LU_OFFLINE_COMPLETE:
-		slu->sl_state_not_acked = 0;
+		sl->sl_state_not_acked = 0;
 		break;
 
 	}
@@ -1361,7 +1743,7 @@ sbd_ctl(struct stmf_lu *lu, int cmd, void *arg)
 /* ARGSUSED */
 stmf_status_t
 sbd_info(uint32_t cmd, stmf_lu_t *lu, void *arg, uint8_t *buf,
-						uint32_t *bufsizep)
+    uint32_t *bufsizep)
 {
 	return (STMF_NOT_SUPPORTED);
 }
@@ -1369,14 +1751,52 @@ sbd_info(uint32_t cmd, stmf_lu_t *lu, void *arg, uint8_t *buf,
 stmf_status_t
 sbd_lu_reset_state(stmf_lu_t *lu)
 {
-	sbd_store_t *sst = (sbd_store_t *)lu->lu_provider_private;
-	sbd_lu_t *slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)lu->lu_provider_private;
 
-	sbd_check_and_clear_scsi2_reservation(slu, NULL);
+	mutex_enter(&sl->sl_lock);
+	if (sl->sl_flags & SL_SAVED_WRITE_CACHE_DISABLE) {
+		sl->sl_flags |= SL_WRITEBACK_CACHE_DISABLE;
+		mutex_exit(&sl->sl_lock);
+		(void) sbd_wcd_set(1, sl);
+	} else {
+		sl->sl_flags &= ~SL_WRITEBACK_CACHE_DISABLE;
+		mutex_exit(&sl->sl_lock);
+		(void) sbd_wcd_set(0, sl);
+	}
+	sbd_check_and_clear_scsi2_reservation(sl, NULL);
 	if (stmf_deregister_all_lu_itl_handles(lu) != STMF_SUCCESS) {
 		return (STMF_FAILURE);
 	}
 	return (STMF_SUCCESS);
+}
+
+sbd_status_t
+sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done)
+{
+	int r = 0;
+	int ret;
+
+	if (fsync_done)
+		goto over_fsync;
+	if ((sl->sl_data_vtype == VREG) || (sl->sl_data_vtype == VBLK)) {
+		if (VOP_FSYNC(sl->sl_data_vp, FSYNC, kcred, NULL))
+			return (SBD_FAILURE);
+	}
+over_fsync:
+	if (((sl->sl_data_vtype == VCHR) || (sl->sl_data_vtype == VBLK)) &&
+	    ((sl->sl_flags & SL_NO_DATA_DKIOFLUSH) == 0)) {
+		ret = VOP_IOCTL(sl->sl_data_vp, DKIOCFLUSHWRITECACHE, NULL,
+		    FKIOCTL, kcred, &r, NULL);
+		if ((ret == ENOTTY) || (ret == ENOTSUP)) {
+			mutex_enter(&sl->sl_lock);
+			sl->sl_flags |= SL_NO_DATA_DKIOFLUSH;
+			mutex_exit(&sl->sl_lock);
+		} else if (ret != 0) {
+			return (SBD_FAILURE);
+		}
+	}
+
+	return (SBD_SUCCESS);
 }
 
 /* ARGSUSED */
@@ -1384,14 +1804,14 @@ static void
 sbd_handle_sync_cache(struct scsi_task *task,
     struct stmf_data_buf *initial_dbuf)
 {
-	sbd_store_t	*sst =
-	    (sbd_store_t *)task->task_lu->lu_provider_private;
-	sbd_lu_t	*slu = (sbd_lu_t *)sst->sst_sbd_private;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint64_t	lba, laddr;
+	sbd_status_t	sret;
 	uint32_t	len;
 	int		is_g4 = 0;
 	int		immed;
 
+	task->task_cmd_xfer_length = 0;
 	/*
 	 * Determine if this is a 10 or 16 byte CDB
 	 */
@@ -1441,16 +1861,17 @@ sbd_handle_sync_cache(struct scsi_task *task,
 		len = READ_SCSI16(&task->task_cdb[7], uint32_t);
 	}
 
-	laddr = lba << slu->sl_shift_count;
-	len <<= slu->sl_shift_count;
+	laddr = lba << sl->sl_data_blocksize_shift;
+	len <<= sl->sl_data_blocksize_shift;
 
-	if ((laddr + (uint64_t)len) > slu->sl_sli->sli_lu_data_size) {
+	if ((laddr + (uint64_t)len) > sl->sl_lu_size) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_LBA_OUT_OF_RANGE);
 		return;
 	}
 
-	if (sst->sst_data_flush(sst) != STMF_SUCCESS) {
+	sret = sbd_flush_data_cache(sl, 0);
+	if (sret != SBD_SUCCESS) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_WRITE_ERROR);
 		return;

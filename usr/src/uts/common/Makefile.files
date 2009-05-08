@@ -889,7 +889,7 @@ ISCSIT_OBJS +=	$(ISCSIT_SHARED_OBJS) \
 
 STMF_OBJS += lun_map.o stmf.o
 
-STMF_SBD_OBJS += filedisk.o memdisk.o sbd.o sbd_scsi.o
+STMF_SBD_OBJS += sbd.o sbd_scsi.o sbd_pgr.o
 
 SYSMSG_OBJS +=	sysmsg.o
 

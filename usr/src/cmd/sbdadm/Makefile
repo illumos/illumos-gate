@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -41,7 +41,7 @@ POFILE = sbdadm_all.po
 POFILES = $(LOCAL_OBJS:%.o=%.po)
  
 CPPFLAGS += -I. -I$(COMMONBASE)/cmdparse
-LDLIBS += -lstmf -lnvpair
+LDLIBS += -lstmf
 LINTFLAGS += -xerroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:

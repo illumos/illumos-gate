@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,6 +153,8 @@ static int iPsAddRemoveLuViewEntry(char *, char *, int);
 static int iPsGetViewEntry(char *, stmfViewEntry *);
 static int iPsGetActualGroupName(char *, char *, char *);
 static int iPsGetServiceVersion(uint64_t *, scf_handle_t *, scf_service_t *);
+static int iPsGetSetPersistType(uint8_t *, scf_handle_t *, scf_service_t *,
+    int);
 static int viewEntryCompare(const void *, const void *);
 static int holdSignal(sigset_t *);
 static int releaseSignal(sigset_t *);
@@ -175,6 +177,15 @@ boolean_t actionSet = B_FALSE;
 #define	STMF_SMF_VERSION    1
 
 /*
+ * Note: Do not change these property names and size values.
+ * They represent fields in the persistent config and once modified
+ * will have a nasty side effect of invalidating the existing store.
+ * If you do need to change them, you'll need to use the versioning above
+ * to retain backward compatiblity with the previous configuration schema.
+ */
+
+/* BEGIN STORE PROPERTY DEFINITIONS */
+/*
  * Property Group Names and prefixes
  */
 #define	STMF_HOST_GROUPS	"host_groups"
@@ -190,6 +201,7 @@ boolean_t actionSet = B_FALSE;
 #define	STMF_GROUP_PREFIX	"group_name"
 #define	STMF_MEMBER_LIST_SUFFIX	"member_list"
 #define	STMF_VERSION_NAME	"version_name"
+#define	STMF_PERSIST_TYPE	"persist_method"
 
 /*
  * Property names for view entry
@@ -207,17 +219,14 @@ boolean_t actionSet = B_FALSE;
 #define	STMF_PROVIDER_DATA_PROP_TYPE "provider_type"
 #define	STMF_PROVIDER_DATA_PROP_SET_COUNT "provider_data_set_cnt"
 #define	STMF_PROVIDER_DATA_PROP_COUNT "provider_data_cnt"
-/*
- * This is the data chunk size. The current value limit for scf is 4096.
- * This is defined by REP_PROTOCOL_VALUE_LEN in
- * OS/Net: usr/src/common/svc/repcache_protocol.h
- *
- * Larger data property size = better performance
- */
-#define	STMF_PROVIDER_DATA_PROP_SIZE 4000
+
 
 #define	STMF_SMF_READ_ATTR	"solaris.smf.read.stmf"
 
+#define	STMF_PS_PERSIST_NONE	"none"
+#define	STMF_PS_PERSIST_SMF	"smf"
+#define	STMF_PROVIDER_DATA_PROP_SIZE 4000
+/* END STORE PROPERTY DEFINITIONS */
 
 /* service name */
 #define	STMF_SERVICE	"system/stmf"
@@ -231,6 +240,8 @@ boolean_t actionSet = B_FALSE;
 #define	GROUP_MAX UINT64_MAX
 #define	ADD 0
 #define	REMOVE 1
+#define	GET 0
+#define	SET 1
 
 /*
  * sigHandler
@@ -1963,6 +1974,255 @@ out:
 	return (ret);
 }
 
+int
+psGetServicePersist(uint8_t *persistType)
+{
+	scf_handle_t	*handle = NULL;
+	scf_service_t	*svc = NULL;
+	int ret;
+
+
+	ret = iPsInit(&handle, &svc);
+	if (ret != STMF_PS_SUCCESS) {
+		return (STMF_PS_ERROR);
+	}
+
+	ret = iPsGetSetPersistType(persistType, handle, svc, GET);
+
+	/*
+	 * Free resources
+	 */
+	if (handle != NULL) {
+		scf_handle_destroy(handle);
+	}
+	if (svc != NULL) {
+		scf_service_destroy(svc);
+	}
+	return (ret);
+}
+
+int
+psSetServicePersist(uint8_t persistType)
+{
+	scf_handle_t	*handle = NULL;
+	scf_service_t	*svc = NULL;
+	int ret;
+
+
+	ret = iPsInit(&handle, &svc);
+	if (ret != STMF_PS_SUCCESS) {
+		return (STMF_PS_ERROR);
+	}
+
+	ret = iPsGetSetPersistType(&persistType, handle, svc, SET);
+
+	/*
+	 * Free resources
+	 */
+	if (handle != NULL) {
+		scf_handle_destroy(handle);
+	}
+	if (svc != NULL) {
+		scf_service_destroy(svc);
+	}
+	return (ret);
+}
+
+static int
+iPsGetSetPersistType(uint8_t *persistType, scf_handle_t *handle,
+scf_service_t *svc, int getSet)
+{
+	scf_propertygroup_t	*pg = NULL;
+	scf_property_t	*prop = NULL;
+	scf_value_t	*value = NULL;
+	scf_transaction_t *tran = NULL;
+	scf_transaction_entry_t *entry = NULL;
+	char iPersistTypeGet[MAXNAMELEN] = {0};
+	char *iPersistType;
+	int ret = STMF_PS_SUCCESS;
+	int commitRet;
+
+	if (((pg = scf_pg_create(handle)) == NULL) ||
+	    ((prop = scf_property_create(handle)) == NULL) ||
+	    ((entry = scf_entry_create(handle)) == NULL) ||
+	    ((tran = scf_transaction_create(handle)) == NULL) ||
+	    ((value = scf_value_create(handle)) == NULL)) {
+		syslog(LOG_ERR, "scf alloc resource failed - %s",
+		    scf_strerror(scf_error()));
+		ret = STMF_PS_ERROR;
+		goto out;
+	}
+
+	if (getSet == GET) {
+		/* set to default */
+		*persistType = STMF_PERSIST_SMF;
+		iPersistType = STMF_PS_PERSIST_SMF;
+	}
+
+	if (getSet == SET) {
+		if (*persistType == STMF_PERSIST_SMF) {
+			iPersistType = STMF_PS_PERSIST_SMF;
+		} else if (*persistType == STMF_PERSIST_NONE) {
+			iPersistType = STMF_PS_PERSIST_NONE;
+		} else {
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+	}
+
+	/*
+	 * get stmf data property group
+	 */
+	if (scf_service_get_pg(svc, STMF_DATA_GROUP, pg) == -1) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			ret = STMF_PS_ERROR_NOT_FOUND;
+		} else {
+			syslog(LOG_ERR, "get pg failed - %s",
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+		}
+		goto out;
+	}
+
+	/* find persistence property */
+	/*
+	 * Get the persistence property
+	 */
+	if (scf_pg_get_property(pg, STMF_PERSIST_TYPE, prop) == -1) {
+		if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			ret = STMF_PS_ERROR_NOT_FOUND;
+		} else {
+			syslog(LOG_ERR, "get property failed - %s",
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+	}
+
+	/* no persist property found */
+	if (ret == STMF_PS_ERROR_NOT_FOUND || getSet == SET) {
+		/*
+		 * If we have no persistType property, go ahead
+		 * and create it with the user specified value or
+		 * the default value.
+		 */
+		/*
+		 * Begin the transaction
+		 */
+		if (scf_transaction_start(tran, pg) == -1) {
+			syslog(LOG_ERR, "start transaction failed - %s",
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+
+		/* is this a SET or GET w/error? */
+		if (ret) {
+			if (scf_transaction_property_new(tran, entry,
+			    STMF_PERSIST_TYPE, SCF_TYPE_ASTRING) == -1) {
+				syslog(LOG_ERR,
+				    "transaction property new failed - %s",
+				    scf_strerror(scf_error()));
+				ret = STMF_PS_ERROR;
+				goto out;
+			}
+		} else {
+			if (scf_transaction_property_change(tran, entry,
+			    STMF_PERSIST_TYPE, SCF_TYPE_ASTRING) == -1) {
+				syslog(LOG_ERR,
+				    "transaction property change failed - %s",
+				    scf_strerror(scf_error()));
+				ret = STMF_PS_ERROR;
+				goto out;
+			}
+		}
+
+		/*
+		 * set the persist type
+		 */
+		if (scf_value_set_astring(value, iPersistType) == -1) {
+			syslog(LOG_ERR, "set value failed - %s",
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+
+		/*
+		 * add the value to the transaction
+		 */
+		if (scf_entry_add_value(entry, value) == -1) {
+			syslog(LOG_ERR, "add value failed - %s",
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+		if ((commitRet = scf_transaction_commit(tran)) != 1) {
+			syslog(LOG_ERR, "transaction commit failed - %s",
+			    scf_strerror(scf_error()));
+			if (commitRet == 0) {
+				ret = STMF_PS_ERROR_BUSY;
+			} else {
+				ret = STMF_PS_ERROR;
+			}
+			goto out;
+		}
+		/* reset return value */
+		ret = STMF_PS_SUCCESS;
+	} else if (getSet == GET) {
+		/* get the persist property */
+		if (scf_property_get_value(prop, value) == -1) {
+			syslog(LOG_ERR, "get property value failed - %s",
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+
+		/*
+		 * Get the value of the persist property
+		 */
+		if (scf_value_get_astring(value, iPersistTypeGet, MAXNAMELEN)
+		    == -1) {
+			syslog(LOG_ERR, "get count value failed - %s",
+			    scf_strerror(scf_error()));
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+	}
+
+	if (getSet == GET) {
+		if (strcmp(iPersistTypeGet, STMF_PS_PERSIST_NONE) == 0) {
+			*persistType = STMF_PERSIST_NONE;
+		} else if (strcmp(iPersistTypeGet, STMF_PS_PERSIST_SMF) == 0) {
+			*persistType = STMF_PERSIST_SMF;
+		} else {
+			ret = STMF_PS_ERROR;
+			goto out;
+		}
+	}
+out:
+	/*
+	 * Free resources.
+	 * handle and svc should not be free'd here. They're
+	 * free'd elsewhere
+	 */
+	if (pg != NULL) {
+		scf_pg_destroy(pg);
+	}
+	if (prop != NULL) {
+		scf_property_destroy(prop);
+	}
+	if (entry != NULL) {
+		scf_entry_destroy(entry);
+	}
+	if (tran != NULL) {
+		scf_transaction_destroy(tran);
+	}
+	if (value != NULL) {
+		scf_value_destroy(value);
+	}
+	return (ret);
+}
+
 /*
  * Initialize scf stmf service access
  * handle - returned handle
@@ -2053,6 +2313,7 @@ err:
 	}
 	return (ret);
 }
+
 
 /*
  * called by iPsInit only

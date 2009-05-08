@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,31 +43,58 @@
 #include <inttypes.h>
 #include <store.h>
 #include <locale.h>
+#include <math.h>
+#include <libstmf_impl.h>
 #include <sys/stmf_ioctl.h>
+#include <sys/stmf_sbd_ioctl.h>
 
 #define	STMF_PATH    "/devices/pseudo/stmf@0:admin"
+#define	SBD_PATH    "/devices/pseudo/stmf_sbd@0:admin"
 
 #define	EUI "eui."
 #define	WWN "wwn."
 #define	IQN "iqn."
-#define	WWN_ASCII_SIZE 16
+#define	LU_ASCII_GUID_SIZE 32
+#define	LU_GUID_SIZE 16
+#define	OUI_ASCII_SIZE 6
+#define	OUI_SIZE 3
 #define	IDENT_LENGTH_BYTE 3
 
-#define	MAX_LU		2<<16 - 1
-#define	MAX_TARGET_PORT	1024
-#define	MAX_PROVIDER	1024
-#define	MAX_GROUP	1024
-#define	MAX_SESSION	1024
+/* various initial allocation values */
+#define	ALLOC_LU		8192
+#define	ALLOC_TARGET_PORT	2048
+#define	ALLOC_PROVIDER		64
+#define	ALLOC_GROUP		2048
+#define	ALLOC_SESSION		2048
+#define	ALLOC_VE		256
+#define	ALLOC_PP_DATA_SIZE	128*1024
+#define	ALLOC_GRP_MEMBER	256
+
 #define	MAX_ISCSI_NAME	223
+#define	MAX_SERIAL_SIZE 252 + 1
+#define	MAX_LU_ALIAS_SIZE 256
+#define	MAX_SBD_PROPS	MAXPATHLEN + MAX_SERIAL_SIZE + MAX_LU_ALIAS_SIZE
 
 #define	OPEN_STMF 0
 #define	OPEN_EXCL_STMF O_EXCL
+
+#define	OPEN_SBD 0
+#define	OPEN_EXCL_SBD O_EXCL
 
 #define	LOGICAL_UNIT_TYPE 0
 #define	TARGET_TYPE 1
 #define	STMF_SERVICE_TYPE 2
 
+#define	HOST_GROUP   1
+#define	TARGET_GROUP 2
+
+/* set default persistence here */
+#define	STMF_DEFAULT_PERSIST	STMF_PERSIST_SMF
+
+#define	MAX_PROVIDER_RETRY 30
+
 static int openStmf(int, int *fd);
+static int openSbd(int, int *fd);
 static int groupIoctl(int fd, int cmd, stmfGroupName *);
 static int loadStore(int fd);
 static int initializeConfig();
@@ -78,7 +105,36 @@ static int loadHostGroups(int fd, stmfGroupList *);
 static int loadTargetGroups(int fd, stmfGroupList *);
 static int getStmfState(stmf_state_desc_t *);
 static int setStmfState(int fd, stmf_state_desc_t *, int);
-static int setProviderData(int fd, char *, nvlist_t *, int);
+static int setProviderData(int fd, char *, nvlist_t *, int, uint64_t *);
+static int createDiskResource(luResourceImpl *);
+static int createDiskLu(diskResource *, stmfGuid *);
+static int deleteDiskLu(stmfGuid *luGuid);
+static int getDiskProp(luResourceImpl *, uint32_t, char *, size_t *);
+static int getDiskAllProps(stmfGuid *luGuid, luResource *hdl);
+static int loadDiskPropsFromDriver(luResourceImpl *, sbd_lu_props_t *);
+static int removeGuidFromDiskStore(stmfGuid *);
+static int addGuidToDiskStore(stmfGuid *, char *);
+static int persistDiskGuid(stmfGuid *, char *, boolean_t);
+static int setDiskProp(luResourceImpl *, uint32_t, const char *);
+static int checkHexUpper(char *);
+static int strToShift(const char *);
+static int niceStrToNum(const char *, uint64_t *);
+static void diskError(uint32_t, int *);
+static int importDiskLu(char *fname, stmfGuid *);
+static int modifyDiskLu(diskResource *, stmfGuid *, const char *);
+static int modifyDiskLuProp(stmfGuid *, const char *, uint32_t, const char *);
+static int validateModifyDiskProp(uint32_t);
+static uint8_t iGetPersistMethod();
+static int groupListIoctl(stmfGroupList **, int);
+static int iLoadGroupFromPs(stmfGroupList **, int);
+static int groupMemberListIoctl(stmfGroupName *, stmfGroupProperties **, int);
+static int getProviderData(char *, nvlist_t **, int, uint64_t *);
+static int viewEntryCompare(const void *, const void *);
+
+static pthread_mutex_t persistenceTypeLock = PTHREAD_MUTEX_INITIALIZER;
+static int iPersistType = 0;
+/* when B_TRUE, no need to access SMF anymore. Just use iPersistType */
+static boolean_t iLibSetPersist = B_FALSE;
 
 /*
  * Open for stmf module
@@ -96,11 +152,41 @@ openStmf(int flag, int *fd)
 	} else {
 		if (errno == EBUSY) {
 			ret = STMF_ERROR_BUSY;
+		} else if (errno == EACCES) {
+			ret = STMF_ERROR_PERM;
 		} else {
 			ret = STMF_STATUS_ERROR;
 		}
 		syslog(LOG_DEBUG, "openStmf:open failure:%s:errno(%d)",
 		    STMF_PATH, errno);
+	}
+
+	return (ret);
+}
+
+/*
+ * Open for sbd module
+ *
+ * flag - open flag (OPEN_STMF, OPEN_EXCL_STMF)
+ * fd - pointer to integer. On success, contains the stmf file descriptor
+ */
+static int
+openSbd(int flag, int *fd)
+{
+	int ret = STMF_STATUS_ERROR;
+
+	if ((*fd = open(SBD_PATH, O_NDELAY | O_RDONLY | flag)) != -1) {
+		ret = STMF_STATUS_SUCCESS;
+	} else {
+		if (errno == EBUSY) {
+			ret = STMF_ERROR_BUSY;
+		} else if (errno == EACCES) {
+			ret = STMF_ERROR_PERM;
+		} else {
+			ret = STMF_STATUS_ERROR;
+		}
+		syslog(LOG_DEBUG, "openSbd:open failure:%s:errno(%d)",
+		    SBD_PATH, errno);
 	}
 
 	return (ret);
@@ -187,6 +273,7 @@ groupIoctl(int fd, int cmd, stmfGroupName *groupName)
 	ioctlRet = ioctl(fd, cmd, &stmfIoctl);
 	if (ioctlRet != 0) {
 		switch (errno) {
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -219,7 +306,7 @@ done:
 }
 
 /*
- * groupIoctl
+ * groupMemberIoctl
  *
  * Purpose: issue ioctl for add/remove member on group
  *
@@ -257,6 +344,7 @@ groupMemberIoctl(int fd, int cmd, stmfGroupName *groupName, stmfDevid *devid)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -289,6 +377,22 @@ groupMemberIoctl(int fd, int cmd, stmfGroupName *groupName, stmfDevid *devid)
 	}
 done:
 	return (ret);
+}
+
+/*
+ * qsort function
+ * sort on veIndex
+ */
+static int
+viewEntryCompare(const void *p1, const void *p2)
+{
+
+	stmfViewEntry *v1 = (stmfViewEntry *)p1, *v2 = (stmfViewEntry *)p2;
+	if (v1->veIndex > v2->veIndex)
+		return (1);
+	if (v1->veIndex < v2->veIndex)
+		return (-1);
+	return (0);
 }
 
 /*
@@ -348,6 +452,10 @@ stmfAddToHostGroup(stmfGroupName *hostGroupName, stmfDevid *hostName)
 
 	if ((ret = groupMemberIoctl(fd, STMF_IOCTL_ADD_HG_ENTRY, hostGroupName,
 	    hostName)) != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
 		goto done;
 	}
 
@@ -429,6 +537,10 @@ stmfAddToTargetGroup(stmfGroupName *targetGroupName, stmfDevid *targetName)
 
 	if ((ret = groupMemberIoctl(fd, STMF_IOCTL_ADD_TG_ENTRY,
 	    targetGroupName, targetName)) != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
 		goto done;
 	}
 
@@ -525,6 +637,9 @@ addViewEntryIoctl(int fd, stmfGuid *lu, stmfViewEntry *viewEntry)
 		switch (errno) {
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+				ret = STMF_ERROR_PERM;
 				break;
 			case EACCES:
 				switch (stmfIoctl.stmf_error) {
@@ -651,6 +766,10 @@ stmfAddViewEntry(stmfGuid *lu, stmfViewEntry *viewEntry)
 		goto done;
 	}
 
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
+		goto done;
+	}
+
 	/*
 	 * If the add to driver was successful, add it to the persistent
 	 * store.
@@ -760,6 +879,7 @@ stmfClearProviderData(char *providerName, int providerType)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -773,6 +893,10 @@ stmfClearProviderData(char *providerName, int providerType)
 		if (savedErrno != ENOENT) {
 			goto done;
 		}
+	}
+
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
+		goto done;
 	}
 
 	ret = psClearProviderData(providerName, providerType);
@@ -846,6 +970,10 @@ stmfCreateHostGroup(stmfGroupName *hostGroupName)
 		goto done;
 	}
 
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
+		goto done;
+	}
+
 	ret = psCreateHostGroup((char *)hostGroupName);
 	switch (ret) {
 		case STMF_PS_SUCCESS:
@@ -874,6 +1002,1641 @@ stmfCreateHostGroup(stmfGroupName *hostGroupName)
 done:
 	(void) close(fd);
 	return (ret);
+}
+
+/*
+ * stmfCreateLu
+ *
+ * Purpose: Create a logical unit
+ *
+ * hdl - handle to logical unit resource created via stmfCreateLuResource
+ *
+ * luGuid - If non-NULL, on success, contains the guid of the created logical
+ *	    unit
+ */
+int
+stmfCreateLu(luResource hdl, stmfGuid *luGuid)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	luResourceImpl *luPropsHdl = hdl;
+
+	if (hdl == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (luPropsHdl->type == STMF_DISK) {
+		ret = createDiskLu((diskResource *)luPropsHdl->resource,
+		    luGuid);
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	return (ret);
+}
+
+/*
+ * stmfCreateLuResource
+ *
+ * Purpose: Create resource handle for a logical unit
+ *
+ * dType - Type of logical unit resource to create
+ *	   Can be: STMF_DISK
+ *
+ * hdl - pointer to luResource
+ */
+int
+stmfCreateLuResource(uint16_t dType, luResource *hdl)
+{
+	int ret = STMF_STATUS_SUCCESS;
+
+	if (dType != STMF_DISK || hdl == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	*hdl = calloc(1, sizeof (luResourceImpl));
+	if (*hdl == NULL) {
+		return (STMF_ERROR_NOMEM);
+	}
+
+	ret = createDiskResource((luResourceImpl *)*hdl);
+	if (ret != STMF_STATUS_SUCCESS) {
+		free(*hdl);
+		return (ret);
+	}
+
+	return (STMF_STATUS_SUCCESS);
+}
+
+/*
+ * Creates a disk logical unit
+ *
+ * disk - pointer to diskResource structure that represents the properties
+ *        for the disk logical unit to be created.
+ */
+static int
+createDiskLu(diskResource *disk, stmfGuid *createdGuid)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int dataFileNameLen = 0;
+	int metaFileNameLen = 0;
+	int serialNumLen = 0;
+	int luAliasLen = 0;
+	int sluBufSize = 0;
+	int bufOffset = 0;
+	int fd = 0;
+	int ioctlRet;
+	int savedErrno;
+	stmfGuid guid;
+	stmf_iocdata_t sbdIoctl = {0};
+
+	sbd_create_and_reg_lu_t *sbdLu = NULL;
+
+	/*
+	 * Open control node for sbd
+	 */
+	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	/* data file name must be specified */
+	if (disk->luDataFileNameValid) {
+		dataFileNameLen = strlen(disk->luDataFileName);
+	} else {
+		(void) close(fd);
+		return (STMF_ERROR_MISSING_PROP_VAL);
+	}
+
+	sluBufSize += dataFileNameLen + 1;
+
+	if (disk->luMetaFileNameValid) {
+		metaFileNameLen = strlen(disk->luMetaFileName);
+		sluBufSize += metaFileNameLen + 1;
+	}
+
+	serialNumLen = strlen(disk->serialNum);
+	sluBufSize += serialNumLen;
+
+	if (disk->luAliasValid) {
+		luAliasLen = strlen(disk->luAlias);
+		sluBufSize += luAliasLen + 1;
+	}
+
+	/*
+	 * 8 is the size of the buffer set aside for
+	 * concatenation of variable length fields
+	 */
+	sbdLu = (sbd_create_and_reg_lu_t *)calloc(1,
+	    sizeof (sbd_create_and_reg_lu_t) + sluBufSize - 8);
+	if (sbdLu == NULL) {
+		return (STMF_ERROR_NOMEM);
+	}
+
+	sbdLu->slu_struct_size = sizeof (sbd_create_and_reg_lu_t) +
+	    sluBufSize - 8;
+
+	if (metaFileNameLen) {
+		sbdLu->slu_meta_fname_valid = 1;
+		sbdLu->slu_meta_fname_off = bufOffset;
+		bcopy(disk->luMetaFileName, &(sbdLu->slu_buf[bufOffset]),
+		    metaFileNameLen + 1);
+		bufOffset += metaFileNameLen + 1;
+	}
+
+	bcopy(disk->luDataFileName, &(sbdLu->slu_buf[bufOffset]),
+	    dataFileNameLen + 1);
+	sbdLu->slu_data_fname_off = bufOffset;
+	bufOffset += dataFileNameLen + 1;
+
+	/* currently, serial # is not passed null terminated to the driver */
+	if (disk->serialNumValid) {
+		sbdLu->slu_serial_valid = 1;
+		sbdLu->slu_serial_off = bufOffset;
+		sbdLu->slu_serial_size = serialNumLen;
+		bcopy(disk->serialNum, &(sbdLu->slu_buf[bufOffset]),
+		    serialNumLen);
+		bufOffset += serialNumLen;
+	}
+
+	if (disk->luAliasValid) {
+		sbdLu->slu_alias_valid = 1;
+		sbdLu->slu_alias_off = bufOffset;
+		bcopy(disk->luAlias, &(sbdLu->slu_buf[bufOffset]),
+		    luAliasLen + 1);
+		bufOffset += luAliasLen + 1;
+	}
+
+	if (disk->luSizeValid) {
+		sbdLu->slu_lu_size_valid = 1;
+		sbdLu->slu_lu_size = disk->luSize;
+	}
+
+	if (disk->luGuidValid) {
+		sbdLu->slu_guid_valid = 1;
+		bcopy(disk->luGuid, sbdLu->slu_guid, sizeof (disk->luGuid));
+	}
+
+	if (disk->vidValid) {
+		sbdLu->slu_vid_valid = 1;
+		bcopy(disk->vid, sbdLu->slu_vid, sizeof (disk->vid));
+	}
+
+	if (disk->pidValid) {
+		sbdLu->slu_pid_valid = 1;
+		bcopy(disk->pid, sbdLu->slu_pid, sizeof (disk->pid));
+	}
+
+	if (disk->revValid) {
+		sbdLu->slu_rev_valid = 1;
+		bcopy(disk->rev, sbdLu->slu_rev, sizeof (disk->rev));
+	}
+
+	if (disk->companyIdValid) {
+		sbdLu->slu_company_id_valid = 1;
+		sbdLu->slu_company_id = disk->companyId;
+	}
+
+	if (disk->blkSizeValid) {
+		sbdLu->slu_blksize_valid = 1;
+		sbdLu->slu_blksize = disk->blkSize;
+	}
+
+	if (disk->writeProtectEnableValid) {
+		if (disk->writeProtectEnable) {
+			sbdLu->slu_write_protected = 1;
+		}
+	}
+
+	if (disk->writebackCacheDisableValid) {
+		sbdLu->slu_writeback_cache_disable_valid = 1;
+		if (disk->writebackCacheDisable) {
+			sbdLu->slu_writeback_cache_disable = 1;
+		}
+	}
+
+	sbdIoctl.stmf_version = STMF_VERSION_1;
+	sbdIoctl.stmf_ibuf_size = sbdLu->slu_struct_size;
+	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)sbdLu;
+	sbdIoctl.stmf_obuf_size = sbdLu->slu_struct_size;
+	sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)sbdLu;
+
+	ioctlRet = ioctl(fd, SBD_IOCTL_CREATE_AND_REGISTER_LU, &sbdIoctl);
+	if (ioctlRet != 0) {
+		savedErrno = errno;
+		switch (savedErrno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			default:
+				diskError(sbdIoctl.stmf_error, &ret);
+				if (ret == STMF_STATUS_ERROR) {
+					syslog(LOG_DEBUG,
+					"createDiskLu:ioctl "
+					"error(%d) (%d) (%d)", ioctlRet,
+					    sbdIoctl.stmf_error, savedErrno);
+				}
+				break;
+		}
+	}
+
+	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	/*
+	 * on success, copy the resulting guid into the caller's guid if not
+	 * NULL
+	 */
+	if (createdGuid) {
+		bcopy(sbdLu->slu_guid, createdGuid->guid,
+		    sizeof (sbdLu->slu_guid));
+	}
+
+	bcopy(sbdLu->slu_guid, guid.guid, sizeof (sbdLu->slu_guid));
+	if (disk->luMetaFileNameValid) {
+		ret = addGuidToDiskStore(&guid, disk->luMetaFileName);
+	} else {
+		ret = addGuidToDiskStore(&guid, disk->luDataFileName);
+	}
+done:
+	free(sbdLu);
+	(void) close(fd);
+	return (ret);
+}
+
+
+/*
+ * stmfImportLu
+ *
+ * Purpose: Import a previously created logical unit
+ *
+ * dType - Type of logical unit
+ *         Can be: STMF_DISK
+ *
+ * luGuid - If non-NULL, on success, contains the guid of the imported logical
+ *	    unit
+ *
+ * fname - A file name where the metadata resides
+ *
+ */
+int
+stmfImportLu(uint16_t dType, char *fname, stmfGuid *luGuid)
+{
+	int ret = STMF_STATUS_SUCCESS;
+
+	if (dType == STMF_DISK) {
+		ret = importDiskLu(fname, luGuid);
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	return (ret);
+}
+
+/*
+ * importDiskLu
+ *
+ * filename - filename to import
+ * createdGuid - if not NULL, on success contains the imported guid
+ *
+ */
+static int
+importDiskLu(char *fname, stmfGuid *createdGuid)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int fd = 0;
+	int ioctlRet;
+	int savedErrno;
+	int metaFileNameLen;
+	stmfGuid iGuid;
+	int iluBufSize = 0;
+	sbd_import_lu_t *sbdLu = NULL;
+	stmf_iocdata_t sbdIoctl = {0};
+
+	if (fname == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	/*
+	 * Open control node for sbd
+	 */
+	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	metaFileNameLen = strlen(fname);
+	iluBufSize += metaFileNameLen + 1;
+
+	/*
+	 * 8 is the size of the buffer set aside for
+	 * concatenation of variable length fields
+	 */
+	sbdLu = (sbd_import_lu_t *)calloc(1,
+	    sizeof (sbd_import_lu_t) + iluBufSize - 8);
+	if (sbdLu == NULL) {
+		(void) close(fd);
+		return (STMF_ERROR_NOMEM);
+	}
+
+	/*
+	 * Accept either a data file or meta data file.
+	 * sbd will do the right thing here either way.
+	 * i.e. if it's a data file, it assumes that the
+	 * meta data is shared with the data.
+	 */
+	(void) strncpy(sbdLu->ilu_meta_fname, fname, metaFileNameLen);
+
+	sbdLu->ilu_struct_size = sizeof (sbd_import_lu_t) + iluBufSize - 8;
+
+	sbdIoctl.stmf_version = STMF_VERSION_1;
+	sbdIoctl.stmf_ibuf_size = sbdLu->ilu_struct_size;
+	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)sbdLu;
+	sbdIoctl.stmf_obuf_size = sbdLu->ilu_struct_size;
+	sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)sbdLu;
+
+	ioctlRet = ioctl(fd, SBD_IOCTL_IMPORT_LU, &sbdIoctl);
+	if (ioctlRet != 0) {
+		savedErrno = errno;
+		switch (savedErrno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			default:
+				diskError(sbdIoctl.stmf_error, &ret);
+				if (ret == STMF_STATUS_ERROR) {
+					syslog(LOG_DEBUG,
+					"importDiskLu:ioctl "
+					"error(%d) (%d) (%d)", ioctlRet,
+					    sbdIoctl.stmf_error, savedErrno);
+				}
+				break;
+		}
+	}
+
+	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	/*
+	 * on success, copy the resulting guid into the caller's guid if not
+	 * NULL and add it to the persistent store for sbd
+	 */
+	if (createdGuid) {
+		bcopy(sbdLu->ilu_ret_guid, createdGuid->guid,
+		    sizeof (sbdLu->ilu_ret_guid));
+		ret = addGuidToDiskStore(createdGuid, fname);
+	} else {
+		bcopy(sbdLu->ilu_ret_guid, iGuid.guid,
+		    sizeof (sbdLu->ilu_ret_guid));
+		ret = addGuidToDiskStore(&iGuid, fname);
+	}
+done:
+	free(sbdLu);
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * diskError
+ *
+ * Purpose: Translate sbd driver error
+ */
+static void
+diskError(uint32_t stmfError, int *ret)
+{
+	switch (stmfError) {
+		case SBD_RET_META_CREATION_FAILED:
+		case SBD_RET_ZFS_META_CREATE_FAILED:
+			*ret = STMF_ERROR_META_CREATION;
+			break;
+		case SBD_RET_INVALID_BLKSIZE:
+			*ret = STMF_ERROR_INVALID_BLKSIZE;
+			break;
+		case SBD_RET_FILE_ALREADY_REGISTERED:
+			*ret = STMF_ERROR_FILE_IN_USE;
+			break;
+		case SBD_RET_GUID_ALREADY_REGISTERED:
+			*ret = STMF_ERROR_GUID_IN_USE;
+			break;
+		case SBD_RET_META_PATH_NOT_ABSOLUTE:
+		case SBD_RET_META_FILE_LOOKUP_FAILED:
+		case SBD_RET_META_FILE_OPEN_FAILED:
+		case SBD_RET_META_FILE_GETATTR_FAILED:
+		case SBD_RET_NO_META:
+			*ret = STMF_ERROR_META_FILE_NAME;
+			break;
+		case SBD_RET_DATA_PATH_NOT_ABSOLUTE:
+		case SBD_RET_DATA_FILE_LOOKUP_FAILED:
+		case SBD_RET_DATA_FILE_OPEN_FAILED:
+		case SBD_RET_DATA_FILE_GETATTR_FAILED:
+			*ret = STMF_ERROR_DATA_FILE_NAME;
+			break;
+		case SBD_RET_FILE_SIZE_ERROR:
+			*ret = STMF_ERROR_FILE_SIZE_INVALID;
+			break;
+		case SBD_RET_SIZE_OUT_OF_RANGE:
+			*ret = STMF_ERROR_SIZE_OUT_OF_RANGE;
+			break;
+		case SBD_RET_LU_BUSY:
+			*ret = STMF_ERROR_LU_BUSY;
+			break;
+		case SBD_RET_WRITE_CACHE_SET_FAILED:
+			*ret = STMF_ERROR_WRITE_CACHE_SET;
+			break;
+		default:
+			*ret = STMF_STATUS_ERROR;
+			break;
+	}
+}
+
+/*
+ * Creates a logical unit resource of type STMF_DISK.
+ *
+ * No defaults should be set here as all defaults are derived from the
+ * driver's default settings.
+ */
+static int
+createDiskResource(luResourceImpl *hdl)
+{
+	hdl->type = STMF_DISK;
+
+	hdl->resource = calloc(1, sizeof (diskResource));
+	if (hdl->resource == NULL) {
+		return (STMF_ERROR_NOMEM);
+	}
+
+	return (STMF_STATUS_SUCCESS);
+}
+
+/*
+ * stmfDeleteLu
+ *
+ * Purpose: Delete a logical unit
+ *
+ * hdl - handle to logical unit resource created via stmfCreateLuResource
+ *
+ * luGuid - If non-NULL, on success, contains the guid of the created logical
+ *	    unit
+ */
+int
+stmfDeleteLu(stmfGuid *luGuid)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	stmfLogicalUnitProperties luProps;
+
+	if (luGuid == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	/* Check logical unit provider name to call correct dtype function */
+	if ((ret = stmfGetLogicalUnitProperties(luGuid, &luProps))
+	    != STMF_STATUS_SUCCESS) {
+		return (ret);
+	} else {
+		if (strcmp(luProps.providerName, "sbd") == 0) {
+			ret = deleteDiskLu(luGuid);
+		} else if (luProps.status == STMF_LOGICAL_UNIT_UNREGISTERED) {
+			return (STMF_ERROR_NOT_FOUND);
+		} else {
+			return (STMF_ERROR_INVALID_ARG);
+		}
+	}
+
+	return (ret);
+}
+
+static int
+deleteDiskLu(stmfGuid *luGuid)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int fd;
+	int savedErrno;
+	int ioctlRet;
+	sbd_delete_lu_t deleteLu = {0};
+
+	stmf_iocdata_t sbdIoctl = {0};
+
+	/*
+	 * Open control node for sbd
+	 */
+	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	ret = removeGuidFromDiskStore(luGuid);
+	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	bcopy(luGuid, deleteLu.dlu_guid, sizeof (deleteLu.dlu_guid));
+	deleteLu.dlu_by_guid = 1;
+
+	sbdIoctl.stmf_version = STMF_VERSION_1;
+	sbdIoctl.stmf_ibuf_size = sizeof (deleteLu);
+	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)&deleteLu;
+	ioctlRet = ioctl(fd, SBD_IOCTL_DELETE_LU, &sbdIoctl);
+	if (ioctlRet != 0) {
+		savedErrno = errno;
+		switch (savedErrno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			case ENOENT:
+				ret = STMF_ERROR_NOT_FOUND;
+				break;
+			default:
+				syslog(LOG_DEBUG,
+				    "deleteDiskLu:ioctl error(%d) (%d) (%d)",
+				    ioctlRet, sbdIoctl.stmf_error, savedErrno);
+				ret = STMF_STATUS_ERROR;
+				break;
+		}
+	}
+
+done:
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * stmfModifyLu
+ *
+ * Purpose: Modify properties of a logical unit
+ *
+ * luGuid - guid of registered logical unit
+ * prop - property to modify
+ * propVal - property value to set
+ *
+ */
+int
+stmfModifyLu(stmfGuid *luGuid, uint32_t prop, const char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	stmfLogicalUnitProperties luProps;
+
+	if (luGuid == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	/* Check logical unit provider name to call correct dtype function */
+	if ((ret = stmfGetLogicalUnitProperties(luGuid, &luProps))
+	    != STMF_STATUS_SUCCESS) {
+		return (ret);
+	} else {
+		if (strcmp(luProps.providerName, "sbd") == 0) {
+			ret = modifyDiskLuProp(luGuid, NULL, prop, propVal);
+		} else if (luProps.status == STMF_LOGICAL_UNIT_UNREGISTERED) {
+			return (STMF_ERROR_NOT_FOUND);
+		} else {
+			return (STMF_ERROR_INVALID_ARG);
+		}
+	}
+
+	return (ret);
+}
+
+/*
+ * stmfModifyLuByFname
+ *
+ * Purpose: Modify a device by filename. Device does not need to be registered.
+ *
+ * dType - type of device to modify
+ *         STMF_DISK
+ *
+ * fname - filename or meta filename
+ * prop - valid property identifier
+ * propVal - property value
+ *
+ */
+int
+stmfModifyLuByFname(uint16_t dType, const char *fname, uint32_t prop,
+    const char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	if (fname == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (dType == STMF_DISK) {
+		ret = modifyDiskLuProp(NULL, fname, prop, propVal);
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	return (ret);
+}
+
+static int
+modifyDiskLuProp(stmfGuid *luGuid, const char *fname, uint32_t prop,
+    const char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	luResource hdl = NULL;
+	luResourceImpl *luPropsHdl;
+
+	ret = stmfCreateLuResource(STMF_DISK, &hdl);
+	if (ret != STMF_STATUS_SUCCESS) {
+		return (ret);
+	}
+	ret = validateModifyDiskProp(prop);
+	if (ret != STMF_STATUS_SUCCESS) {
+		(void) stmfFreeLuResource(hdl);
+		return (STMF_ERROR_INVALID_PROP);
+	}
+	ret = stmfSetLuProp(hdl, prop, propVal);
+	if (ret != STMF_STATUS_SUCCESS) {
+		(void) stmfFreeLuResource(hdl);
+		return (ret);
+	}
+	luPropsHdl = hdl;
+	ret = modifyDiskLu((diskResource *)luPropsHdl->resource, luGuid, fname);
+	(void) stmfFreeLuResource(hdl);
+	return (ret);
+}
+
+static int
+validateModifyDiskProp(uint32_t prop)
+{
+	switch (prop) {
+		case STMF_LU_PROP_ALIAS:
+		case STMF_LU_PROP_SIZE:
+		case STMF_LU_PROP_WRITE_PROTECT:
+		case STMF_LU_PROP_WRITE_CACHE_DISABLE:
+			return (STMF_STATUS_SUCCESS);
+			break;
+		default:
+			return (STMF_STATUS_ERROR);
+			break;
+	}
+}
+
+static int
+modifyDiskLu(diskResource *disk, stmfGuid *luGuid, const char *fname)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int luAliasLen = 0;
+	int mluBufSize = 0;
+	int bufOffset = 0;
+	int fd = 0;
+	int ioctlRet;
+	int savedErrno;
+	int fnameSize = 0;
+	stmf_iocdata_t sbdIoctl = {0};
+
+	sbd_modify_lu_t *sbdLu = NULL;
+
+	if (luGuid == NULL && fname == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (fname) {
+		fnameSize = strlen(fname) + 1;
+		mluBufSize += fnameSize;
+	}
+
+	/*
+	 * Open control node for sbd
+	 */
+	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	if (disk->luAliasValid) {
+		luAliasLen = strlen(disk->luAlias);
+		mluBufSize += luAliasLen + 1;
+	}
+
+	/*
+	 * 8 is the size of the buffer set aside for
+	 * concatenation of variable length fields
+	 */
+	sbdLu = (sbd_modify_lu_t *)calloc(1,
+	    sizeof (sbd_modify_lu_t) + mluBufSize - 8 + fnameSize);
+	if (sbdLu == NULL) {
+		(void) close(fd);
+		return (STMF_ERROR_NOMEM);
+	}
+
+	sbdLu->mlu_struct_size = sizeof (sbd_modify_lu_t) +
+	    mluBufSize - 8 + fnameSize;
+
+	if (disk->luAliasValid) {
+		sbdLu->mlu_alias_valid = 1;
+		sbdLu->mlu_alias_off = bufOffset;
+		bcopy(disk->luAlias, &(sbdLu->mlu_buf[bufOffset]),
+		    luAliasLen + 1);
+		bufOffset += luAliasLen + 1;
+	}
+
+	if (disk->luSizeValid) {
+		sbdLu->mlu_lu_size_valid = 1;
+		sbdLu->mlu_lu_size = disk->luSize;
+	}
+
+	if (disk->writeProtectEnableValid) {
+		sbdLu->mlu_write_protected_valid = 1;
+		if (disk->writeProtectEnable) {
+			sbdLu->mlu_write_protected = 1;
+		}
+	}
+
+	if (disk->writebackCacheDisableValid) {
+		sbdLu->mlu_writeback_cache_disable_valid = 1;
+		if (disk->writebackCacheDisable) {
+			sbdLu->mlu_writeback_cache_disable = 1;
+		}
+	}
+
+	if (luGuid) {
+		bcopy(luGuid, sbdLu->mlu_input_guid, sizeof (stmfGuid));
+		sbdLu->mlu_by_guid = 1;
+	} else {
+		sbdLu->mlu_fname_off = bufOffset;
+		bcopy(fname, &(sbdLu->mlu_buf[bufOffset]), fnameSize + 1);
+		sbdLu->mlu_by_fname = 1;
+	}
+
+	sbdIoctl.stmf_version = STMF_VERSION_1;
+	sbdIoctl.stmf_ibuf_size = sbdLu->mlu_struct_size;
+	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)sbdLu;
+
+	ioctlRet = ioctl(fd, SBD_IOCTL_MODIFY_LU, &sbdIoctl);
+	if (ioctlRet != 0) {
+		savedErrno = errno;
+		switch (savedErrno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			default:
+				diskError(sbdIoctl.stmf_error, &ret);
+				if (ret == STMF_STATUS_ERROR) {
+					syslog(LOG_DEBUG,
+					"modifyDiskLu:ioctl "
+					"error(%d) (%d) (%d)", ioctlRet,
+					    sbdIoctl.stmf_error, savedErrno);
+				}
+				break;
+		}
+	}
+
+	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+done:
+	free(sbdLu);
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * removeGuidFromDiskStore
+ *
+ * Purpose: delete a logical unit from the sbd provider data
+ */
+static int
+removeGuidFromDiskStore(stmfGuid *guid)
+{
+	return (persistDiskGuid(guid, NULL, B_FALSE));
+}
+
+
+/*
+ * addGuidToDiskStore
+ *
+ * Purpose: add a logical unit to the sbd provider data
+ */
+static int
+addGuidToDiskStore(stmfGuid *guid, char *filename)
+{
+	return (persistDiskGuid(guid, filename, B_TRUE));
+}
+
+
+/*
+ * persistDiskGuid
+ *
+ * Purpose: Persist or unpersist a guid for the sbd provider data
+ *
+ */
+static int
+persistDiskGuid(stmfGuid *guid, char *filename, boolean_t persist)
+{
+	char	    guidAsciiBuf[LU_ASCII_GUID_SIZE + 1] = {0};
+	nvlist_t    *nvl = NULL;
+
+	uint64_t    setToken;
+	boolean_t   retryGetProviderData = B_FALSE;
+	boolean_t   newData = B_FALSE;
+	int	    ret = STMF_STATUS_SUCCESS;
+	int	    retryCnt = 0;
+	int	    stmfRet;
+
+	/* if we're persisting a guid, there must be a filename */
+	if (persist && !filename) {
+		return (1);
+	}
+
+	/* guid is stored in lowercase ascii hex */
+	(void) snprintf(guidAsciiBuf, sizeof (guidAsciiBuf),
+	    "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
+	    "%02x%02x%02x%02x%02x%02x",
+	    guid->guid[0], guid->guid[1], guid->guid[2], guid->guid[3],
+	    guid->guid[4], guid->guid[5], guid->guid[6], guid->guid[7],
+	    guid->guid[8], guid->guid[9], guid->guid[10], guid->guid[11],
+	    guid->guid[12], guid->guid[13], guid->guid[14], guid->guid[15]);
+
+
+	do {
+		retryGetProviderData = B_FALSE;
+		stmfRet = stmfGetProviderDataProt("sbd", &nvl,
+		    STMF_LU_PROVIDER_TYPE, &setToken);
+		if (stmfRet != STMF_STATUS_SUCCESS) {
+			if (persist && stmfRet == STMF_ERROR_NOT_FOUND) {
+				ret = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
+				if (ret != 0) {
+					syslog(LOG_DEBUG,
+					    "unpersistGuid:nvlist_alloc(%d)",
+					    ret);
+					ret = STMF_STATUS_ERROR;
+					goto done;
+				}
+				newData = B_TRUE;
+			} else {
+				ret = stmfRet;
+				goto done;
+			}
+		}
+		if (persist) {
+			ret = nvlist_add_string(nvl, guidAsciiBuf, filename);
+		} else {
+			ret = nvlist_remove(nvl, guidAsciiBuf,
+			    DATA_TYPE_STRING);
+			if (ret == ENOENT) {
+				ret = 0;
+			}
+		}
+		if (ret == 0) {
+			if (newData) {
+				stmfRet = stmfSetProviderDataProt("sbd", nvl,
+				    STMF_LU_PROVIDER_TYPE, NULL);
+			} else {
+				stmfRet = stmfSetProviderDataProt("sbd", nvl,
+				    STMF_LU_PROVIDER_TYPE, &setToken);
+			}
+			if (stmfRet != STMF_STATUS_SUCCESS) {
+				if (stmfRet == STMF_ERROR_BUSY) {
+					/* get/set failed, try again */
+					retryGetProviderData = B_TRUE;
+					if (retryCnt++ > MAX_PROVIDER_RETRY) {
+						ret = stmfRet;
+						break;
+					}
+					continue;
+				} else if (stmfRet ==
+				    STMF_ERROR_PROV_DATA_STALE) {
+					/* update failed, try again */
+					nvlist_free(nvl);
+					nvl = NULL;
+					retryGetProviderData = B_TRUE;
+					if (retryCnt++ > MAX_PROVIDER_RETRY) {
+						ret = stmfRet;
+						break;
+					}
+					continue;
+				} else {
+					syslog(LOG_DEBUG,
+					    "unpersistGuid:error(%x)", stmfRet);
+					ret = stmfRet;
+				}
+				break;
+			}
+		} else {
+			syslog(LOG_DEBUG,
+			    "unpersistGuid:error nvlist_add/remove(%d)",
+			    ret);
+			ret = STMF_STATUS_ERROR;
+		}
+	} while (retryGetProviderData);
+
+done:
+	nvlist_free(nvl);
+	return (ret);
+}
+
+
+/*
+ * stmfGetLuProp
+ *
+ * Purpose: Get current value for a resource property
+ *
+ * hdl - luResource from a previous call to stmfCreateLuResource
+ *
+ * resourceProp - a valid resource property type
+ *
+ * propVal - void pointer to a pointer of the value to be retrieved
+ */
+int
+stmfGetLuProp(luResource hdl, uint32_t prop, char *propVal, size_t *propLen)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	luResourceImpl *luPropsHdl = hdl;
+	if (hdl == NULL || propLen == NULL || propVal == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (luPropsHdl->type == STMF_DISK) {
+		ret = getDiskProp(luPropsHdl, prop, propVal, propLen);
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	return (ret);
+}
+
+/*
+ * stmfGetLuResource
+ *
+ * Purpose: Get a logical unit resource handle for a given logical unit.
+ *
+ * hdl - pointer to luResource
+ */
+int
+stmfGetLuResource(stmfGuid *luGuid, luResource *hdl)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	stmfLogicalUnitProperties luProps;
+
+
+	/* Check logical unit provider name to call correct dtype function */
+	if ((ret = stmfGetLogicalUnitProperties(luGuid, &luProps))
+	    != STMF_STATUS_SUCCESS) {
+		return (ret);
+	} else {
+		if (strcmp(luProps.providerName, "sbd") == 0) {
+			ret = getDiskAllProps(luGuid, hdl);
+		} else if (luProps.status == STMF_LOGICAL_UNIT_UNREGISTERED) {
+			return (STMF_ERROR_NOT_FOUND);
+		} else {
+			return (STMF_ERROR_INVALID_ARG);
+		}
+	}
+
+	return (ret);
+}
+
+/*
+ * getDiskAllProps
+ *
+ * Purpose: load all disk properties from sbd driver
+ *
+ * luGuid - guid of disk device for which properties are to be retrieved
+ * hdl - allocated luResource into which properties are to be copied
+ *
+ */
+static int
+getDiskAllProps(stmfGuid *luGuid, luResource *hdl)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int fd;
+	sbd_lu_props_t *sbdProps;
+	int ioctlRet;
+	int savedErrno;
+	int sbdPropsSize = sizeof (*sbdProps) + MAX_SBD_PROPS;
+	stmf_iocdata_t sbdIoctl = {0};
+
+	/*
+	 * Open control node for sbd
+	 */
+	if ((ret = openSbd(OPEN_SBD, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+
+	*hdl = calloc(1, sizeof (luResourceImpl));
+	if (*hdl == NULL) {
+		(void) close(fd);
+		return (STMF_ERROR_NOMEM);
+	}
+
+	sbdProps = calloc(1, sbdPropsSize);
+	if (sbdProps == NULL) {
+		free(*hdl);
+		(void) close(fd);
+		return (STMF_ERROR_NOMEM);
+	}
+
+	ret = createDiskResource((luResourceImpl *)*hdl);
+	if (ret != STMF_STATUS_SUCCESS) {
+		free(*hdl);
+		(void) close(fd);
+		return (ret);
+	}
+
+	sbdProps->slp_input_guid = 1;
+	bcopy(luGuid, sbdProps->slp_guid, sizeof (sbdProps->slp_guid));
+
+	sbdIoctl.stmf_version = STMF_VERSION_1;
+	sbdIoctl.stmf_ibuf_size = sbdPropsSize;
+	sbdIoctl.stmf_ibuf = (uint64_t)(unsigned long)sbdProps;
+	sbdIoctl.stmf_obuf_size = sbdPropsSize;
+	sbdIoctl.stmf_obuf = (uint64_t)(unsigned long)sbdProps;
+	ioctlRet = ioctl(fd, SBD_IOCTL_GET_LU_PROPS, &sbdIoctl);
+	if (ioctlRet != 0) {
+		savedErrno = errno;
+		switch (savedErrno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			case ENOENT:
+				ret = STMF_ERROR_NOT_FOUND;
+				break;
+			default:
+				syslog(LOG_DEBUG,
+				    "getDiskAllProps:ioctl error(%d) (%d) (%d)",
+				    ioctlRet, sbdIoctl.stmf_error, savedErrno);
+				ret = STMF_STATUS_ERROR;
+				break;
+		}
+	}
+
+	if (ret == STMF_STATUS_SUCCESS) {
+		ret = loadDiskPropsFromDriver((luResourceImpl *)*hdl, sbdProps);
+	}
+
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * loadDiskPropsFromDriver
+ *
+ * Purpose: Retrieve all disk type properties from sbd driver
+ *
+ * hdl - Allocated luResourceImpl
+ * sbdProps - sbd_lu_props_t structure returned from sbd driver
+ *
+ */
+static int
+loadDiskPropsFromDriver(luResourceImpl *hdl, sbd_lu_props_t *sbdProps)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	diskResource *diskLu = hdl->resource;
+	/* copy guid */
+	diskLu->luGuidValid = B_TRUE;
+	bcopy(sbdProps->slp_guid, diskLu->luGuid, sizeof (sbdProps->slp_guid));
+
+	if (sbdProps->slp_separate_meta && sbdProps->slp_meta_fname_valid) {
+		diskLu->luMetaFileNameValid = B_TRUE;
+		if (strlcpy(diskLu->luMetaFileName,
+		    (char *)&(sbdProps->slp_buf[sbdProps->slp_meta_fname_off]),
+		    sizeof (diskLu->luMetaFileName)) >=
+		    sizeof (diskLu->luMetaFileName)) {
+			return (STMF_STATUS_ERROR);
+		}
+	}
+
+	if (sbdProps->slp_data_fname_valid) {
+		diskLu->luDataFileNameValid = B_TRUE;
+		if (strlcpy(diskLu->luDataFileName,
+		    (char *)&(sbdProps->slp_buf[sbdProps->slp_data_fname_off]),
+		    sizeof (diskLu->luDataFileName)) >=
+		    sizeof (diskLu->luDataFileName)) {
+			return (STMF_STATUS_ERROR);
+		}
+	}
+
+	if (sbdProps->slp_serial_valid) {
+		diskLu->serialNumValid = B_TRUE;
+		bcopy(&(sbdProps->slp_buf[sbdProps->slp_serial_off]),
+		    diskLu->serialNum, sbdProps->slp_serial_size);
+	}
+
+	if (sbdProps->slp_alias_valid) {
+		diskLu->luAliasValid = B_TRUE;
+		if (strlcpy(diskLu->luAlias,
+		    (char *)&(sbdProps->slp_buf[sbdProps->slp_alias_off]),
+		    sizeof (diskLu->luAlias)) >=
+		    sizeof (diskLu->luAlias)) {
+			return (STMF_STATUS_ERROR);
+		}
+	} else { /* set alias to data filename if not set */
+		if (sbdProps->slp_data_fname_valid) {
+			diskLu->luAliasValid = B_TRUE;
+			if (strlcpy(diskLu->luAlias,
+			    (char *)&(sbdProps->slp_buf[
+			    sbdProps->slp_data_fname_off]),
+			    sizeof (diskLu->luAlias)) >=
+			    sizeof (diskLu->luAlias)) {
+				return (STMF_STATUS_ERROR);
+			}
+		}
+	}
+
+	diskLu->vidValid = B_TRUE;
+	bcopy(sbdProps->slp_vid, diskLu->vid, sizeof (diskLu->vid));
+
+	diskLu->pidValid = B_TRUE;
+	bcopy(sbdProps->slp_pid, diskLu->pid, sizeof (diskLu->pid));
+
+	diskLu->revValid = B_TRUE;
+	bcopy(sbdProps->slp_rev, diskLu->rev, sizeof (diskLu->rev));
+
+	diskLu->writeProtectEnableValid = B_TRUE;
+	if (sbdProps->slp_write_protected) {
+		diskLu->writeProtectEnable = B_TRUE;
+	}
+
+	diskLu->writebackCacheDisableValid = B_TRUE;
+	if (sbdProps->slp_writeback_cache_disable_cur) {
+		diskLu->writebackCacheDisable = B_TRUE;
+	}
+
+	diskLu->blkSizeValid = B_TRUE;
+	diskLu->blkSize = sbdProps->slp_blksize;
+
+	diskLu->luSizeValid = B_TRUE;
+	diskLu->luSize = sbdProps->slp_lu_size;
+
+	return (ret);
+}
+
+
+/*
+ * stmfSetLuProp
+ *
+ * Purpose: set a property on an luResource
+ *
+ * hdl - allocated luResource
+ * prop - property identifier
+ * propVal - property value to be set
+ */
+int
+stmfSetLuProp(luResource hdl, uint32_t prop, const char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	luResourceImpl *luPropsHdl = hdl;
+	if (hdl == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (luPropsHdl->type == STMF_DISK) {
+		ret = setDiskProp(luPropsHdl, prop, propVal);
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	return (ret);
+}
+
+/*
+ * getDiskProp
+ *
+ * Purpose: retrieve a given property from a logical unit resource of type disk
+ *
+ * hdl - allocated luResourceImpl
+ * prop - property identifier
+ * propVal - pointer to character to contain the retrieved property value
+ * propLen - On input this is the length of propVal. On failure, it contains the
+ *           number of bytes required for propVal
+ */
+static int
+getDiskProp(luResourceImpl *hdl, uint32_t prop, char *propVal, size_t *propLen)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	diskResource *diskLu = hdl->resource;
+	size_t reqLen;
+
+	switch (prop) {
+		case STMF_LU_PROP_BLOCK_SIZE:
+			if (diskLu->blkSizeValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			reqLen = snprintf(propVal, *propLen, "%llu",
+			    (u_longlong_t)diskLu->blkSize);
+			if (reqLen >= *propLen) {
+				*propLen = reqLen + 1;
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			break;
+		case STMF_LU_PROP_FILENAME:
+			if (diskLu->luDataFileNameValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if ((reqLen = strlcpy(propVal, diskLu->luDataFileName,
+			    *propLen)) >= *propLen) {
+				*propLen = reqLen + 1;
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			break;
+		case STMF_LU_PROP_META_FILENAME:
+			if (diskLu->luMetaFileNameValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if ((reqLen = strlcpy(propVal, diskLu->luMetaFileName,
+			    *propLen)) >= *propLen) {
+				*propLen = reqLen + 1;
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			break;
+		case STMF_LU_PROP_GUID:
+			if (diskLu->luGuidValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			reqLen = snprintf(propVal, *propLen,
+			    "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X"
+			    "%02X%02X%02X%02X",
+			    diskLu->luGuid[0], diskLu->luGuid[1],
+			    diskLu->luGuid[2], diskLu->luGuid[3],
+			    diskLu->luGuid[4], diskLu->luGuid[5],
+			    diskLu->luGuid[6], diskLu->luGuid[7],
+			    diskLu->luGuid[8], diskLu->luGuid[9],
+			    diskLu->luGuid[10], diskLu->luGuid[11],
+			    diskLu->luGuid[12], diskLu->luGuid[13],
+			    diskLu->luGuid[14], diskLu->luGuid[15]);
+			if (reqLen >= *propLen) {
+				*propLen = reqLen + 1;
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			break;
+		case STMF_LU_PROP_SERIAL_NUM:
+			if (diskLu->serialNumValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if ((reqLen = strlcpy(propVal, diskLu->serialNum,
+			    *propLen)) >= *propLen) {
+				*propLen = reqLen + 1;
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			break;
+		case STMF_LU_PROP_SIZE:
+			if (diskLu->luSizeValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			(void) snprintf(propVal, *propLen, "%llu",
+			    (u_longlong_t)diskLu->luSize);
+			break;
+		case STMF_LU_PROP_ALIAS:
+			if (diskLu->luAliasValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if ((reqLen = strlcpy(propVal, diskLu->luAlias,
+			    *propLen)) >= *propLen) {
+				*propLen = reqLen + 1;
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			break;
+		case STMF_LU_PROP_VID:
+			if (diskLu->vidValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if (*propLen <= sizeof (diskLu->vid)) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			bcopy(diskLu->vid, propVal, sizeof (diskLu->vid));
+			propVal[sizeof (diskLu->vid)] = 0;
+			break;
+		case STMF_LU_PROP_PID:
+			if (diskLu->pidValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if (*propLen <= sizeof (diskLu->pid)) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			bcopy(diskLu->pid, propVal, sizeof (diskLu->pid));
+			propVal[sizeof (diskLu->pid)] = 0;
+			break;
+		case STMF_LU_PROP_WRITE_PROTECT:
+			if (diskLu->writeProtectEnableValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if (diskLu->writeProtectEnable) {
+				if ((reqLen = strlcpy(propVal, "true",
+				    *propLen)) >= *propLen) {
+					*propLen = reqLen + 1;
+					return (STMF_ERROR_INVALID_ARG);
+				}
+			} else {
+				if ((reqLen = strlcpy(propVal, "false",
+				    *propLen)) >= *propLen) {
+					*propLen = reqLen + 1;
+					return (STMF_ERROR_INVALID_ARG);
+				}
+			}
+			break;
+		case STMF_LU_PROP_WRITE_CACHE_DISABLE:
+			if (diskLu->writebackCacheDisableValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if (diskLu->writebackCacheDisable) {
+				if ((reqLen = strlcpy(propVal, "true",
+				    *propLen)) >= *propLen) {
+					*propLen = reqLen + 1;
+					return (STMF_ERROR_INVALID_ARG);
+				}
+			} else {
+				if ((reqLen = strlcpy(propVal, "false",
+				    *propLen)) >= *propLen) {
+					*propLen = reqLen + 1;
+					return (STMF_ERROR_INVALID_ARG);
+				}
+			}
+			break;
+		default:
+			ret = STMF_ERROR_NO_PROP;
+			break;
+	}
+
+	return (ret);
+}
+
+/*
+ * setDiskProp
+ *
+ * Purpose: set properties for resource of type disk
+ *
+ * hdl - allocated luResourceImpl
+ * resourceProp - valid resource identifier
+ * propVal - valid resource value
+ */
+static int
+setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int i;
+	diskResource *diskLu = hdl->resource;
+	unsigned long long numericProp = 0;
+	char guidProp[LU_ASCII_GUID_SIZE + 1];
+	char ouiProp[OUI_ASCII_SIZE + 1];
+	unsigned int oui[OUI_SIZE];
+	unsigned int guid[LU_GUID_SIZE];
+	int propSize;
+
+
+	if (propVal == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	switch (resourceProp) {
+		case STMF_LU_PROP_ALIAS:
+			if (strlcpy(diskLu->luAlias, propVal,
+			    sizeof (diskLu->luAlias)) >=
+			    sizeof (diskLu->luAlias)) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			diskLu->luAliasValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_BLOCK_SIZE:
+			(void) sscanf(propVal, "%llu", &numericProp);
+			if (numericProp > UINT16_MAX) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			diskLu->blkSize = numericProp;
+			diskLu->blkSizeValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_COMPANY_ID:
+			if ((strlcpy(ouiProp, propVal, sizeof (ouiProp))) >=
+			    sizeof (ouiProp)) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			if (checkHexUpper(ouiProp) != 0) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			(void) sscanf(ouiProp, "%2X%2X%2X",
+			    &oui[0], &oui[1], &oui[2]);
+
+			diskLu->companyId = 0;
+			diskLu->companyId += oui[0] << 16;
+			diskLu->companyId += oui[1] << 8;
+			diskLu->companyId += oui[2];
+			diskLu->companyIdValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_GUID:
+			if (strlen(propVal) != LU_ASCII_GUID_SIZE) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+
+			if ((strlcpy(guidProp, propVal, sizeof (guidProp))) >=
+			    sizeof (guidProp)) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+
+			if (checkHexUpper(guidProp) != 0) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+
+			(void) sscanf(guidProp,
+			    "%2X%2X%2X%2X%2X%2X%2X%2X%2X%2X%2X%2X%2X%2X%2X%2X",
+			    &guid[0], &guid[1], &guid[2], &guid[3], &guid[4],
+			    &guid[5], &guid[6], &guid[7], &guid[8], &guid[9],
+			    &guid[10], &guid[11], &guid[12], &guid[13],
+			    &guid[14], &guid[15]);
+			for (i = 0; i < sizeof (diskLu->luGuid); i++) {
+				diskLu->luGuid[i] = guid[i];
+			}
+			diskLu->luGuidValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_FILENAME:
+			if ((strlcpy(diskLu->luDataFileName, propVal,
+			    sizeof (diskLu->luDataFileName))) >=
+			    sizeof (diskLu->luDataFileName)) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			diskLu->luDataFileNameValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_META_FILENAME:
+			if ((strlcpy(diskLu->luMetaFileName, propVal,
+			    sizeof (diskLu->luMetaFileName))) >=
+			    sizeof (diskLu->luMetaFileName)) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			diskLu->luMetaFileNameValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_PID:
+			if ((propSize = strlen(propVal)) >
+			    sizeof (diskLu->pid)) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			(void) strncpy(diskLu->pid, propVal, propSize);
+			diskLu->pidValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_SERIAL_NUM:
+			if ((propSize = strlen(propVal)) >
+			    (sizeof (diskLu->serialNum) - 1)) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			(void) strncpy(diskLu->serialNum, propVal, propSize);
+			diskLu->serialNumValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_SIZE:
+			if ((niceStrToNum(propVal, &diskLu->luSize) != 0)) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			diskLu->luSizeValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_VID:
+			if ((propSize = strlen(propVal)) >
+			    sizeof (diskLu->vid)) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			(void) strncpy(diskLu->vid, propVal, propSize);
+			diskLu->vidValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_WRITE_PROTECT:
+			if (strcasecmp(propVal, "TRUE") == 0) {
+				diskLu->writeProtectEnable = B_TRUE;
+			} else if (strcasecmp(propVal, "FALSE") == 0) {
+				diskLu->writeProtectEnable = B_FALSE;
+			} else {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			diskLu->writeProtectEnableValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_WRITE_CACHE_DISABLE:
+			if (strcasecmp(propVal, "TRUE") == 0) {
+				diskLu->writebackCacheDisable = B_TRUE;
+			} else if (strcasecmp(propVal, "FALSE") == 0) {
+				diskLu->writebackCacheDisable = B_FALSE;
+			} else {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			diskLu->writebackCacheDisableValid = B_TRUE;
+			break;
+		default:
+			ret = STMF_ERROR_NO_PROP;
+			break;
+	}
+	return (ret);
+}
+
+static int
+checkHexUpper(char *buf)
+{
+	int i;
+
+	for (i = 0; i < strlen(buf); i++) {
+		if (isxdigit(buf[i])) {
+			buf[i] = toupper(buf[i]);
+			continue;
+		}
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * Given a numeric suffix, convert the value into a number of bits that the
+ * resulting value must be shifted.
+ * Code lifted from libzfs_util.c
+ */
+static int
+strToShift(const char *buf)
+{
+	const char *ends = "BKMGTPE";
+	int i;
+
+	if (buf[0] == '\0')
+		return (0);
+
+	for (i = 0; i < strlen(ends); i++) {
+		if (toupper(buf[0]) == ends[i])
+			return (10*i);
+	}
+
+	return (-1);
+}
+
+int
+stmfFreeLuResource(luResource hdl)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	if (hdl == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	luResourceImpl *hdlImpl = hdl;
+	free(hdlImpl->resource);
+	free(hdlImpl);
+	return (ret);
+}
+
+/*
+ * Convert a string of the form '100G' into a real number. Used when setting
+ * the size of a logical unit.
+ * Code lifted from libzfs_util.c
+ */
+static int
+niceStrToNum(const char *value, uint64_t *num)
+{
+	char *end;
+	int shift;
+
+	*num = 0;
+
+	/* Check to see if this looks like a number.  */
+	if ((value[0] < '0' || value[0] > '9') && value[0] != '.') {
+		return (-1);
+	}
+
+	/* Rely on stroull() to process the numeric portion.  */
+	errno = 0;
+	*num = strtoull(value, &end, 10);
+
+	/*
+	 * Check for ERANGE, which indicates that the value is too large to fit
+	 * in a 64-bit value.
+	 */
+	if (errno == ERANGE) {
+		return (-1);
+	}
+
+	/*
+	 * If we have a decimal value, then do the computation with floating
+	 * point arithmetic.  Otherwise, use standard arithmetic.
+	 */
+	if (*end == '.') {
+		double fval = strtod(value, &end);
+
+		if ((shift = strToShift(end)) == -1) {
+			return (-1);
+		}
+
+		fval *= pow(2, shift);
+
+		if (fval > UINT64_MAX) {
+			return (-1);
+		}
+
+		*num = (uint64_t)fval;
+	} else {
+		if ((shift = strToShift(end)) == -1) {
+			return (-1);
+		}
+
+		/* Check for overflow */
+		if (shift >= 64 || (*num << shift) >> shift != *num) {
+			return (-1);
+		}
+
+		*num <<= shift;
+	}
+
+	return (0);
 }
 
 /*
@@ -917,6 +2680,10 @@ stmfCreateTargetGroup(stmfGroupName *targetGroupName)
 	 */
 	if ((ret = groupIoctl(fd, STMF_IOCTL_CREATE_TARGET_GROUP,
 	    targetGroupName)) != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
 		goto done;
 	}
 
@@ -996,6 +2763,10 @@ stmfDeleteHostGroup(stmfGroupName *hostGroupName)
 		goto done;
 	}
 
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
+		goto done;
+	}
+
 	/*
 	 * If the remove from the driver was successful, remove it from the
 	 * persistent store.
@@ -1069,6 +2840,10 @@ stmfDeleteTargetGroup(stmfGroupName *targetGroupName)
 	 */
 	if ((ret = groupIoctl(fd, STMF_IOCTL_REMOVE_TARGET_GROUP,
 	    targetGroupName)) != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
 		goto done;
 	}
 
@@ -1183,23 +2958,306 @@ stmfFreeMemory(void *memory)
 }
 
 /*
- * stmfGetHostGroupList
+ * get host group, target group list from stmf
  *
- * Purpose: Retrieves the list of initiator group oids
- *
- * hostGroupList - pointer to pointer to hostGroupList structure
- *                 on success, this contains the host group list.
+ * groupType - HOST_GROUP, TARGET_GROUP
  */
-int
-stmfGetHostGroupList(stmfGroupList **hostGroupList)
+static int
+groupListIoctl(stmfGroupList **groupList, int groupType)
 {
 	int ret;
+	int fd;
+	int ioctlRet;
+	int i;
+	int cmd;
+	stmf_iocdata_t stmfIoctl;
+	/* framework group list */
+	stmf_group_name_t *iGroupList = NULL;
+	uint32_t groupListSize;
 
-	if (hostGroupList == NULL) {
+	if (groupList == NULL) {
 		return (STMF_ERROR_INVALID_ARG);
 	}
 
-	ret = psGetHostGroupList(hostGroupList);
+	if (groupType == HOST_GROUP) {
+		cmd = STMF_IOCTL_GET_HG_LIST;
+	} else if (groupType == TARGET_GROUP) {
+		cmd = STMF_IOCTL_GET_TG_LIST;
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	/* call init */
+	ret = initializeConfig();
+	if (ret != STMF_STATUS_SUCCESS) {
+		return (ret);
+	}
+
+	/*
+	 * Open control node for stmf
+	 */
+	if ((ret = openStmf(OPEN_STMF, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	/*
+	 * Allocate ioctl input buffer
+	 */
+	groupListSize = ALLOC_GROUP;
+	groupListSize = groupListSize * (sizeof (stmf_group_name_t));
+	iGroupList = (stmf_group_name_t *)calloc(1, groupListSize);
+	if (iGroupList == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
+
+	bzero(&stmfIoctl, sizeof (stmfIoctl));
+	/*
+	 * Issue ioctl to get the group list
+	 */
+	stmfIoctl.stmf_version = STMF_VERSION_1;
+	stmfIoctl.stmf_obuf_size = groupListSize;
+	stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)iGroupList;
+	ioctlRet = ioctl(fd, cmd, &stmfIoctl);
+	if (ioctlRet != 0) {
+		switch (errno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			default:
+				syslog(LOG_DEBUG,
+				    "groupListIoctl:ioctl errno(%d)",
+				    errno);
+				ret = STMF_STATUS_ERROR;
+				break;
+		}
+		goto done;
+	}
+	/*
+	 * Check whether input buffer was large enough
+	 */
+	if (stmfIoctl.stmf_obuf_max_nentries > ALLOC_GROUP) {
+		groupListSize = stmfIoctl.stmf_obuf_max_nentries *
+		    sizeof (stmf_group_name_t);
+		iGroupList = realloc(iGroupList, groupListSize);
+		if (iGroupList == NULL) {
+			ret = STMF_ERROR_NOMEM;
+			goto done;
+		}
+		stmfIoctl.stmf_obuf_size = groupListSize;
+		stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)iGroupList;
+		ioctlRet = ioctl(fd, cmd, &stmfIoctl);
+		if (ioctlRet != 0) {
+			switch (errno) {
+				case EBUSY:
+					ret = STMF_ERROR_BUSY;
+					break;
+				case EPERM:
+				case EACCES:
+					ret = STMF_ERROR_PERM;
+					break;
+				default:
+					syslog(LOG_DEBUG,
+					    "groupListIoctl:ioctl errno(%d)",
+					    errno);
+					ret = STMF_STATUS_ERROR;
+					break;
+			}
+			goto done;
+		}
+	}
+
+	/* allocate and copy to caller's buffer */
+	*groupList = (stmfGroupList *)calloc(1, sizeof (stmfGroupList) *
+	    stmfIoctl.stmf_obuf_nentries);
+	if (*groupList == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
+	(*groupList)->cnt = stmfIoctl.stmf_obuf_nentries;
+	for (i = 0; i < stmfIoctl.stmf_obuf_nentries; i++) {
+		bcopy(iGroupList->name, (*groupList)->name[i],
+		    sizeof (stmfGroupName));
+		iGroupList++;
+	}
+
+done:
+	free(iGroupList);
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * get host group members, target group members from stmf
+ *
+ * groupProps - allocated on success
+ *
+ * groupType - HOST_GROUP, TARGET_GROUP
+ */
+static int
+groupMemberListIoctl(stmfGroupName *groupName, stmfGroupProperties **groupProps,
+    int groupType)
+{
+	int ret;
+	int fd;
+	int ioctlRet;
+	int i;
+	int cmd;
+	stmf_iocdata_t stmfIoctl;
+	/* framework group list */
+	stmf_group_name_t iGroupName;
+	stmf_ge_ident_t *iGroupMembers;
+	uint32_t groupListSize;
+
+	if (groupName == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (groupType == HOST_GROUP) {
+		cmd = STMF_IOCTL_GET_HG_ENTRIES;
+	} else if (groupType == TARGET_GROUP) {
+		cmd = STMF_IOCTL_GET_TG_ENTRIES;
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	/* call init */
+	ret = initializeConfig();
+	if (ret != STMF_STATUS_SUCCESS) {
+		return (ret);
+	}
+
+	/*
+	 * Open control node for stmf
+	 */
+	if ((ret = openStmf(OPEN_STMF, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	bzero(&iGroupName, sizeof (iGroupName));
+
+	bcopy(groupName, &iGroupName.name, strlen((char *)groupName));
+
+	iGroupName.name_size = strlen((char *)groupName);
+
+	/*
+	 * Allocate ioctl input buffer
+	 */
+	groupListSize = ALLOC_GRP_MEMBER;
+	groupListSize = groupListSize * (sizeof (stmf_ge_ident_t));
+	iGroupMembers = (stmf_ge_ident_t *)calloc(1, groupListSize);
+	if (iGroupMembers == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
+
+	bzero(&stmfIoctl, sizeof (stmfIoctl));
+	/*
+	 * Issue ioctl to get the group list
+	 */
+	stmfIoctl.stmf_version = STMF_VERSION_1;
+	stmfIoctl.stmf_ibuf = (uint64_t)(unsigned long)&iGroupName;
+	stmfIoctl.stmf_ibuf_size = sizeof (stmf_group_name_t);
+	stmfIoctl.stmf_obuf_size = groupListSize;
+	stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)iGroupMembers;
+	ioctlRet = ioctl(fd, cmd, &stmfIoctl);
+	if (ioctlRet != 0) {
+		switch (errno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			default:
+				syslog(LOG_DEBUG,
+				    "groupListIoctl:ioctl errno(%d)",
+				    errno);
+				ret = STMF_STATUS_ERROR;
+				break;
+		}
+		goto done;
+	}
+	/*
+	 * Check whether input buffer was large enough
+	 */
+	if (stmfIoctl.stmf_obuf_max_nentries > ALLOC_GRP_MEMBER) {
+		groupListSize = stmfIoctl.stmf_obuf_max_nentries *
+		    sizeof (stmf_ge_ident_t);
+		iGroupMembers = realloc(iGroupMembers, groupListSize);
+		if (iGroupMembers == NULL) {
+			ret = STMF_ERROR_NOMEM;
+			goto done;
+		}
+		stmfIoctl.stmf_ibuf = (uint64_t)(unsigned long)&iGroupName;
+		stmfIoctl.stmf_ibuf_size = sizeof (stmf_group_name_t);
+		stmfIoctl.stmf_obuf_size = groupListSize;
+		stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)iGroupMembers;
+		ioctlRet = ioctl(fd, cmd, &stmfIoctl);
+		if (ioctlRet != 0) {
+			switch (errno) {
+				case EBUSY:
+					ret = STMF_ERROR_BUSY;
+					break;
+				case EPERM:
+				case EACCES:
+					ret = STMF_ERROR_PERM;
+					break;
+				default:
+					syslog(LOG_DEBUG,
+					    "groupListIoctl:ioctl errno(%d)",
+					    errno);
+					ret = STMF_STATUS_ERROR;
+					break;
+			}
+			goto done;
+		}
+	}
+
+	/* allocate and copy to caller's buffer */
+	*groupProps = (stmfGroupProperties *)calloc(1,
+	    sizeof (stmfGroupProperties) * stmfIoctl.stmf_obuf_nentries);
+	if (*groupProps == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
+	(*groupProps)->cnt = stmfIoctl.stmf_obuf_nentries;
+	for (i = 0; i < stmfIoctl.stmf_obuf_nentries; i++) {
+		(*groupProps)->name[i].identLength =
+		    iGroupMembers->ident_size;
+		bcopy(iGroupMembers->ident, (*groupProps)->name[i].ident,
+		    iGroupMembers->ident_size);
+		iGroupMembers++;
+	}
+
+done:
+	free(iGroupMembers);
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * Purpose: access persistent config data for host groups and target groups
+ */
+static int
+iLoadGroupFromPs(stmfGroupList **groupList, int type)
+{
+	int ret;
+
+	if (groupList == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (type == HOST_GROUP) {
+		ret = psGetHostGroupList(groupList);
+	} else if (type == TARGET_GROUP) {
+		ret = psGetTargetGroupList(groupList);
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
 	switch (ret) {
 		case STMF_PS_SUCCESS:
 			ret = STMF_STATUS_SUCCESS;
@@ -1228,25 +3286,47 @@ stmfGetHostGroupList(stmfGroupList **hostGroupList)
 }
 
 /*
- * stmfGetHostGroupMembers
+ * stmfGetHostGroupList
  *
- * Purpose: Retrieves the group properties for a host group
+ * Purpose: Retrieves the list of initiator group oids
  *
- * groupName - name of group for which to retrieve host group members.
- * groupProp - pointer to pointer to stmfGroupProperties structure
- *             on success, this contains the list of group members.
+ * hostGroupList - pointer to pointer to hostGroupList structure
+ *                 on success, this contains the host group list.
  */
 int
-stmfGetHostGroupMembers(stmfGroupName *groupName,
-    stmfGroupProperties **groupProp)
+stmfGetHostGroupList(stmfGroupList **hostGroupList)
 {
-	int ret;
+	int ret = STMF_STATUS_ERROR;
 
-	if (groupName == NULL || groupProp == NULL) {
+	if (hostGroupList == NULL) {
 		return (STMF_ERROR_INVALID_ARG);
 	}
 
-	ret = psGetHostGroupMemberList((char *)groupName, groupProp);
+	ret = groupListIoctl(hostGroupList, HOST_GROUP);
+	return (ret);
+}
+
+
+/*
+ * Purpose: access persistent config data for host groups and target groups
+ */
+static int
+iLoadGroupMembersFromPs(stmfGroupName *groupName,
+    stmfGroupProperties **groupProp, int type)
+{
+	int ret;
+
+	if (groupName == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	if (type == HOST_GROUP) {
+		ret = psGetHostGroupMemberList((char *)groupName, groupProp);
+	} else if (type == TARGET_GROUP) {
+		ret = psGetTargetGroupMemberList((char *)groupName, groupProp);
+	} else {
+		return (STMF_ERROR_INVALID_ARG);
+	}
 	switch (ret) {
 		case STMF_PS_SUCCESS:
 			ret = STMF_STATUS_SUCCESS;
@@ -1265,11 +3345,35 @@ stmfGetHostGroupMembers(stmfGroupName *groupName,
 			break;
 		default:
 			syslog(LOG_DEBUG,
-			    "stmfGetHostGroupMembers:psGetHostGroupMembers"
-			    ":error(%d)", ret);
+			    "iLoadGroupMembersFromPs:psGetHostGroupList:"
+			    "error(%d)", ret);
 			ret = STMF_STATUS_ERROR;
 			break;
 	}
+
+	return (ret);
+}
+
+/*
+ * stmfGetHostGroupMembers
+ *
+ * Purpose: Retrieves the group properties for a host group
+ *
+ * groupName - name of group for which to retrieve host group members.
+ * groupProp - pointer to pointer to stmfGroupProperties structure
+ *             on success, this contains the list of group members.
+ */
+int
+stmfGetHostGroupMembers(stmfGroupName *groupName,
+    stmfGroupProperties **groupProp)
+{
+	int ret;
+
+	if (groupName == NULL || groupProp == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	ret = groupMemberListIoctl(groupName, groupProp, HOST_GROUP);
 
 	return (ret);
 }
@@ -1315,44 +3419,16 @@ stmfGetProviderDataProt(char *providerName, nvlist_t **nvl, int providerType,
 	if (providerName == NULL || nvl == NULL) {
 		return (STMF_ERROR_INVALID_ARG);
 	}
-
 	if (providerType != STMF_LU_PROVIDER_TYPE &&
 	    providerType != STMF_PORT_PROVIDER_TYPE) {
 		return (STMF_ERROR_INVALID_ARG);
 	}
-
 	/* call init */
 	ret = initializeConfig();
 	if (ret != STMF_STATUS_SUCCESS) {
 		return (ret);
 	}
-
-	ret = psGetProviderData(providerName, nvl, providerType, setToken);
-	switch (ret) {
-		case STMF_PS_SUCCESS:
-			ret = STMF_STATUS_SUCCESS;
-			break;
-		case STMF_PS_ERROR_BUSY:
-			ret = STMF_ERROR_BUSY;
-			break;
-		case STMF_PS_ERROR_NOT_FOUND:
-			ret = STMF_ERROR_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_SERVICE_NOT_FOUND:
-			ret = STMF_ERROR_SERVICE_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_VERSION_MISMATCH:
-			ret = STMF_ERROR_SERVICE_DATA_VERSION;
-			break;
-		default:
-			syslog(LOG_DEBUG,
-			    "stmfGetProviderData:psGetProviderData:error(%d)",
-			    ret);
-			ret = STMF_STATUS_ERROR;
-			break;
-	}
-
-	return (ret);
+	return (getProviderData(providerName, nvl, providerType, setToken));
 }
 
 /*
@@ -1435,7 +3511,7 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 	/*
 	 * Allocate ioctl input buffer
 	 */
-	fSessionListSize = MAX_SESSION;
+	fSessionListSize = ALLOC_SESSION;
 	fSessionListSize = fSessionListSize * (sizeof (slist_scsi_session_t));
 	fSessionList = (slist_scsi_session_t *)calloc(1, fSessionListSize);
 	if (fSessionList == NULL) {
@@ -1461,6 +3537,7 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -1476,7 +3553,7 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 	/*
 	 * Check whether input buffer was large enough
 	 */
-	if (stmfIoctl.stmf_obuf_max_nentries > MAX_SESSION) {
+	if (stmfIoctl.stmf_obuf_max_nentries > ALLOC_SESSION) {
 		fSessionListSize = stmfIoctl.stmf_obuf_max_nentries *
 		    sizeof (slist_scsi_session_t);
 		fSessionList = realloc(fSessionList, fSessionListSize);
@@ -1491,6 +3568,7 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 				case EBUSY:
 					ret = STMF_ERROR_BUSY;
 					break;
+				case EPERM:
 				case EACCES:
 					ret = STMF_ERROR_PERM;
 					break;
@@ -1556,31 +3634,7 @@ stmfGetTargetGroupList(stmfGroupList **targetGroupList)
 		return (STMF_ERROR_INVALID_ARG);
 	}
 
-	ret = psGetTargetGroupList(targetGroupList);
-	switch (ret) {
-		case STMF_PS_SUCCESS:
-			ret = STMF_STATUS_SUCCESS;
-			break;
-		case STMF_PS_ERROR_NOT_FOUND:
-			ret = STMF_ERROR_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_BUSY:
-			ret = STMF_ERROR_BUSY;
-			break;
-		case STMF_PS_ERROR_SERVICE_NOT_FOUND:
-			ret = STMF_ERROR_SERVICE_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_VERSION_MISMATCH:
-			ret = STMF_ERROR_SERVICE_DATA_VERSION;
-			break;
-		default:
-			syslog(LOG_DEBUG,
-			    "stmfGetTargetGroupList:psGetTargetGroupList:"
-			    "error(%d)", ret);
-			ret = STMF_STATUS_ERROR;
-			break;
-	}
-
+	ret = groupListIoctl(targetGroupList, TARGET_GROUP);
 	return (ret);
 }
 
@@ -1603,30 +3657,7 @@ stmfGetTargetGroupMembers(stmfGroupName *groupName,
 		return (STMF_ERROR_INVALID_ARG);
 	}
 
-	ret = psGetTargetGroupMemberList((char *)groupName, groupProp);
-	switch (ret) {
-		case STMF_PS_SUCCESS:
-			ret = STMF_STATUS_SUCCESS;
-			break;
-		case STMF_PS_ERROR_NOT_FOUND:
-			ret = STMF_ERROR_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_BUSY:
-			ret = STMF_ERROR_BUSY;
-			break;
-		case STMF_PS_ERROR_SERVICE_NOT_FOUND:
-			ret = STMF_ERROR_SERVICE_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_VERSION_MISMATCH:
-			ret = STMF_ERROR_SERVICE_DATA_VERSION;
-			break;
-		default:
-			syslog(LOG_DEBUG,
-			    "stmfGetTargetGroupMembers:psGetTargetGroupMembers:"
-			    "error(%d)", ret);
-			ret = STMF_STATUS_ERROR;
-			break;
-	}
+	ret = groupMemberListIoctl(groupName, groupProp, TARGET_GROUP);
 
 	return (ret);
 }
@@ -1648,7 +3679,7 @@ stmfGetTargetList(stmfDevidList **targetList)
 	int i;
 	stmf_iocdata_t stmfIoctl;
 	/* framework target port list */
-	slist_target_port_t *fTargetList, *fTargetListP;
+	slist_target_port_t *fTargetList, *fTargetListP = NULL;
 	uint32_t fTargetListSize;
 
 	if (targetList == NULL) {
@@ -1670,10 +3701,11 @@ stmfGetTargetList(stmfDevidList **targetList)
 	/*
 	 * Allocate ioctl input buffer
 	 */
-	fTargetListSize = MAX_TARGET_PORT * sizeof (slist_target_port_t);
+	fTargetListSize = ALLOC_TARGET_PORT * sizeof (slist_target_port_t);
 	fTargetListP = fTargetList =
 	    (slist_target_port_t *)calloc(1, fTargetListSize);
 	if (fTargetList == NULL) {
+		ret = STMF_ERROR_NOMEM;
 		goto done;
 	}
 
@@ -1690,6 +3722,7 @@ stmfGetTargetList(stmfDevidList **targetList)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -1704,13 +3737,14 @@ stmfGetTargetList(stmfDevidList **targetList)
 	/*
 	 * Check whether input buffer was large enough
 	 */
-	if (stmfIoctl.stmf_obuf_max_nentries > MAX_TARGET_PORT) {
+	if (stmfIoctl.stmf_obuf_max_nentries > ALLOC_TARGET_PORT) {
 		fTargetListSize = stmfIoctl.stmf_obuf_max_nentries *
 		    sizeof (slist_target_port_t);
 		fTargetListP = fTargetList =
 		    realloc(fTargetList, fTargetListSize);
 		if (fTargetList == NULL) {
-			return (STMF_ERROR_NOMEM);
+			ret = STMF_ERROR_NOMEM;
+			goto done;
 		}
 		stmfIoctl.stmf_obuf_size = fTargetListSize;
 		stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)fTargetList;
@@ -1721,6 +3755,7 @@ stmfGetTargetList(stmfDevidList **targetList)
 				case EBUSY:
 					ret = STMF_ERROR_BUSY;
 					break;
+				case EPERM:
 				case EACCES:
 					ret = STMF_ERROR_PERM;
 					break;
@@ -1738,6 +3773,10 @@ stmfGetTargetList(stmfDevidList **targetList)
 	*targetList = (stmfDevidList *)calloc(1,
 	    stmfIoctl.stmf_obuf_max_nentries * sizeof (stmfDevid) +
 	    sizeof (stmfDevidList));
+	if (*targetList == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
 
 	(*targetList)->cnt = stmfIoctl.stmf_obuf_max_nentries;
 	for (i = 0; i < stmfIoctl.stmf_obuf_max_nentries; i++, fTargetList++) {
@@ -1809,6 +3848,7 @@ stmfGetTargetProperties(stmfDevid *devid, stmfTargetProperties *targetProps)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -1859,16 +3899,11 @@ stmfGetLogicalUnitList(stmfGuidList **luList)
 	int fd;
 	int ioctlRet;
 	int cmd = STMF_IOCTL_LU_LIST;
-	int i, k;
+	int i;
 	stmf_iocdata_t stmfIoctl;
-	/* framework lu list */
 	slist_lu_t *fLuList;
-	/* persistent store lu list */
-	stmfGuidList *sLuList = NULL;
-	int finalListSize = 0;
-	int newAllocSize;
 	uint32_t fLuListSize;
-	uint32_t endList;
+	uint32_t listCnt;
 
 	if (luList == NULL) {
 		return (STMF_ERROR_INVALID_ARG);
@@ -1889,11 +3924,12 @@ stmfGetLogicalUnitList(stmfGuidList **luList)
 	/*
 	 * Allocate ioctl input buffer
 	 */
-	fLuListSize = MAX_LU;
+	fLuListSize = ALLOC_LU;
 	fLuListSize = fLuListSize * (sizeof (slist_lu_t));
 	fLuList = (slist_lu_t *)calloc(1, fLuListSize);
 	if (fLuList == NULL) {
-		return (STMF_ERROR_NOMEM);
+		ret = STMF_ERROR_NOMEM;
+		goto done;
 	}
 
 	bzero(&stmfIoctl, sizeof (stmfIoctl));
@@ -1909,6 +3945,7 @@ stmfGetLogicalUnitList(stmfGuidList **luList)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -1924,12 +3961,14 @@ stmfGetLogicalUnitList(stmfGuidList **luList)
 	/*
 	 * Check whether input buffer was large enough
 	 */
-	if (stmfIoctl.stmf_obuf_max_nentries > MAX_LU) {
+	if (stmfIoctl.stmf_obuf_max_nentries > ALLOC_LU) {
 		fLuListSize = stmfIoctl.stmf_obuf_max_nentries *
 		    sizeof (slist_lu_t);
-		fLuList = realloc(fLuList, fLuListSize);
+		free(fLuList);
+		fLuList = (slist_lu_t *)calloc(1, fLuListSize);
 		if (fLuList == NULL) {
-			return (STMF_ERROR_NOMEM);
+			ret = STMF_ERROR_NOMEM;
+			goto done;
 		}
 		stmfIoctl.stmf_obuf_size = fLuListSize;
 		stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)fLuList;
@@ -1939,6 +3978,7 @@ stmfGetLogicalUnitList(stmfGuidList **luList)
 				case EBUSY:
 					ret = STMF_ERROR_BUSY;
 					break;
+				case EPERM:
 				case EACCES:
 					ret = STMF_ERROR_PERM;
 					break;
@@ -1953,99 +3993,35 @@ stmfGetLogicalUnitList(stmfGuidList **luList)
 		}
 	}
 
-	ret = psGetLogicalUnitList(&sLuList);
-	switch (ret) {
-		case STMF_PS_SUCCESS:
-			ret = STMF_STATUS_SUCCESS;
-			break;
-		case STMF_PS_ERROR_BUSY:
-			ret = STMF_ERROR_BUSY;
-			break;
-		case STMF_PS_ERROR_SERVICE_NOT_FOUND:
-			ret = STMF_ERROR_SERVICE_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_VERSION_MISMATCH:
-			ret = STMF_ERROR_SERVICE_DATA_VERSION;
-			break;
-		default:
-			syslog(LOG_DEBUG,
-			    "stmfGetLogicalUnitList:psGetLogicalUnitList"
-			    ":error(%d)", ret);
-			ret = STMF_STATUS_ERROR;
-			break;
-	}
 	if (ret != STMF_STATUS_SUCCESS) {
 		goto done;
 	}
 
-	/*
-	 * 2 lists must be merged
-	 * reallocate the store list to add the list from the
-	 * framework
-	 */
-	newAllocSize = sLuList->cnt * sizeof (stmfGuid) + sizeof (stmfGuidList)
-	    + stmfIoctl.stmf_obuf_nentries * sizeof (stmfGuid);
-
-	sLuList = realloc(sLuList, newAllocSize);
-	if (sLuList == NULL) {
-		ret = STMF_ERROR_NOMEM;
-		goto done;
-	}
-
-	/*
-	 * add list from ioctl. Start from end of list retrieved from store.
-	 */
-	endList = sLuList->cnt + stmfIoctl.stmf_obuf_nentries;
-	for (k = 0, i = sLuList->cnt; i < endList; i++, k++) {
-		bcopy(&fLuList[k].lu_guid, sLuList->guid[i].guid,
-		    sizeof (stmfGuid));
-	}
-	sLuList->cnt = endList;
-
-	/*
-	 * sort the list for merging
-	 */
-	qsort((void *)&(sLuList->guid[0]), sLuList->cnt,
-	    sizeof (stmfGuid), guidCompare);
-
-	/*
-	 * get final list count
-	 */
-	for (i = 0; i < sLuList->cnt; i++) {
-		if ((i + 1) <= sLuList->cnt) {
-			if (bcmp(sLuList->guid[i].guid, sLuList->guid[i+1].guid,
-			    sizeof (stmfGuid)) == 0) {
-				continue;
-			}
-		}
-		finalListSize++;
-	}
+	listCnt = stmfIoctl.stmf_obuf_nentries;
 
 	/*
 	 * allocate caller's buffer with the final size
 	 */
 	*luList = (stmfGuidList *)calloc(1, sizeof (stmfGuidList) +
-	    finalListSize * sizeof (stmfGuid));
+	    listCnt * sizeof (stmfGuid));
 	if (*luList == NULL) {
 		ret = STMF_ERROR_NOMEM;
 		goto done;
 	}
 
-	/*
-	 * copy guids to caller's buffer
-	 */
-	for (k = 0, i = 0; i < sLuList->cnt; i++) {
-		if ((i + 1) <= sLuList->cnt) {
-			if (bcmp(sLuList->guid[i].guid, sLuList->guid[i+1].guid,
-			    sizeof (stmfGuid)) == 0) {
-				continue;
-			}
-		}
-		bcopy(&(sLuList->guid[i].guid), (*luList)->guid[k++].guid,
+	(*luList)->cnt = listCnt;
+
+	/* copy to caller's buffer */
+	for (i = 0; i < listCnt; i++) {
+		bcopy(&fLuList[i].lu_guid, (*luList)->guid[i].guid,
 		    sizeof (stmfGuid));
 	}
 
-	(*luList)->cnt = finalListSize;
+	/*
+	 * sort the list. This gives a consistent view across gets
+	 */
+	qsort((void *)&((*luList)->guid[0]), (*luList)->cnt,
+	    sizeof (stmfGuid), guidCompare);
 
 done:
 	(void) close(fd);
@@ -2053,7 +4029,6 @@ done:
 	 * free internal buffers
 	 */
 	free(fLuList);
-	free(sLuList);
 	return (ret);
 }
 
@@ -2078,8 +4053,8 @@ stmfGetLogicalUnitProperties(stmfGuid *lu, stmfLogicalUnitProperties *luProps)
 	stmf_iocdata_t stmfIoctl;
 	sioc_lu_props_t fLuProps;
 
-	if (luProps == NULL || luProps == NULL) {
-		ret = STMF_ERROR_INVALID_ARG;
+	if (lu == NULL || luProps == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
 	}
 
 	bzero(luProps, sizeof (stmfLogicalUnitProperties));
@@ -2111,6 +4086,7 @@ stmfGetLogicalUnitProperties(stmfGuid *lu, stmfLogicalUnitProperties *luProps)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -2234,37 +4210,166 @@ int
 stmfGetViewEntryList(stmfGuid *lu, stmfViewEntryList **viewEntryList)
 {
 	int ret;
+	int fd;
+	int ioctlRet;
+	int cmd = STMF_IOCTL_LU_VE_LIST;
+	int i;
+	stmf_iocdata_t stmfIoctl;
+	stmf_view_op_entry_t *fVeList;
+	uint32_t fVeListSize;
+	uint32_t listCnt;
 
 	if (lu == NULL || viewEntryList == NULL) {
 		return (STMF_ERROR_INVALID_ARG);
 	}
 
-	ret = psGetViewEntryList(lu, viewEntryList);
-	switch (ret) {
-		case STMF_PS_SUCCESS:
-			ret = STMF_STATUS_SUCCESS;
-			break;
-		case STMF_PS_ERROR_NOT_FOUND:
-			ret = STMF_ERROR_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_BUSY:
-			ret = STMF_ERROR_BUSY;
-			break;
-		case STMF_PS_ERROR_SERVICE_NOT_FOUND:
-			ret = STMF_ERROR_SERVICE_NOT_FOUND;
-			break;
-		case STMF_PS_ERROR_VERSION_MISMATCH:
-			ret = STMF_ERROR_SERVICE_DATA_VERSION;
-			break;
-		default:
-			syslog(LOG_DEBUG,
-			    "stmfGetViewEntryList:error(%d)", ret);
-			ret = STMF_STATUS_ERROR;
-			break;
+	/* call init */
+	ret = initializeConfig();
+	if (ret != STMF_STATUS_SUCCESS) {
+		return (ret);
 	}
 
+	/*
+	 * Open control node for stmf
+	 */
+	if ((ret = openStmf(OPEN_STMF, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	/*
+	 * Allocate ioctl input buffer
+	 */
+	fVeListSize = ALLOC_VE;
+	fVeListSize = fVeListSize * (sizeof (stmf_view_op_entry_t));
+	fVeList = (stmf_view_op_entry_t *)calloc(1, fVeListSize);
+	if (fVeList == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
+
+	bzero(&stmfIoctl, sizeof (stmfIoctl));
+	/*
+	 * Issue ioctl to get the LU list
+	 */
+	stmfIoctl.stmf_version = STMF_VERSION_1;
+	stmfIoctl.stmf_ibuf = (uint64_t)(unsigned long)lu;
+	stmfIoctl.stmf_ibuf_size = sizeof (stmfGuid);
+	stmfIoctl.stmf_obuf_size = fVeListSize;
+	stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)fVeList;
+	ioctlRet = ioctl(fd, cmd, &stmfIoctl);
+	if (ioctlRet != 0) {
+		switch (errno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+			case EACCES:
+				ret = STMF_ERROR_PERM;
+				break;
+			default:
+				syslog(LOG_DEBUG,
+				    "stmfGetViewEntryList:ioctl errno(%d)",
+				    errno);
+				ret = STMF_STATUS_ERROR;
+				break;
+		}
+		goto done;
+	}
+	/*
+	 * Check whether input buffer was large enough
+	 */
+	if (stmfIoctl.stmf_obuf_max_nentries > ALLOC_VE) {
+		bzero(&stmfIoctl, sizeof (stmfIoctl));
+		fVeListSize = stmfIoctl.stmf_obuf_max_nentries *
+		    sizeof (stmf_view_op_entry_t);
+		free(fVeList);
+		fVeList = (stmf_view_op_entry_t *)calloc(1, fVeListSize);
+		if (fVeList == NULL) {
+			return (STMF_ERROR_NOMEM);
+		}
+		stmfIoctl.stmf_obuf_size = fVeListSize;
+		stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)fVeList;
+		ioctlRet = ioctl(fd, cmd, &stmfIoctl);
+		if (ioctlRet != 0) {
+			switch (errno) {
+				case EBUSY:
+					ret = STMF_ERROR_BUSY;
+					break;
+				case EPERM:
+				case EACCES:
+					ret = STMF_ERROR_PERM;
+					break;
+				default:
+					syslog(LOG_DEBUG,
+					    "stmfGetLogicalUnitList:"
+					    "ioctl errno(%d)", errno);
+					ret = STMF_STATUS_ERROR;
+					break;
+			}
+			goto done;
+		}
+	}
+
+	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	if (stmfIoctl.stmf_obuf_nentries == 0) {
+		ret = STMF_ERROR_NOT_FOUND;
+		goto done;
+	}
+
+	listCnt = stmfIoctl.stmf_obuf_nentries;
+
+	/*
+	 * allocate caller's buffer with the final size
+	 */
+	*viewEntryList = (stmfViewEntryList *)calloc(1,
+	    sizeof (stmfViewEntryList) + listCnt * sizeof (stmfViewEntry));
+	if (*viewEntryList == NULL) {
+		ret = STMF_ERROR_NOMEM;
+		goto done;
+	}
+
+	(*viewEntryList)->cnt = listCnt;
+
+	/* copy to caller's buffer */
+	for (i = 0; i < listCnt; i++) {
+		(*viewEntryList)->ve[i].veIndexValid = B_TRUE;
+		(*viewEntryList)->ve[i].veIndex = fVeList[i].ve_ndx;
+		if (fVeList[i].ve_all_hosts == 1) {
+			(*viewEntryList)->ve[i].allHosts = B_TRUE;
+		} else {
+			bcopy(fVeList[i].ve_host_group.name,
+			    (*viewEntryList)->ve[i].hostGroup,
+			    fVeList[i].ve_host_group.name_size);
+		}
+		if (fVeList[i].ve_all_targets == 1) {
+			(*viewEntryList)->ve[i].allTargets = B_TRUE;
+		} else {
+			bcopy(fVeList[i].ve_target_group.name,
+			    (*viewEntryList)->ve[i].targetGroup,
+			    fVeList[i].ve_target_group.name_size);
+		}
+		bcopy(fVeList[i].ve_lu_nbr, (*viewEntryList)->ve[i].luNbr,
+		    sizeof ((*viewEntryList)->ve[i].luNbr));
+		(*viewEntryList)->ve[i].luNbrValid = B_TRUE;
+	}
+
+	/*
+	 * sort the list. This gives a consistent view across gets
+	 */
+	qsort((void *)&((*viewEntryList)->ve[0]), (*viewEntryList)->cnt,
+	    sizeof (stmfViewEntry), viewEntryCompare);
+
+done:
+	(void) close(fd);
+	/*
+	 * free internal buffers
+	 */
+	free(fVeList);
 	return (ret);
 }
+
 
 /*
  * loadHostGroups
@@ -2286,8 +4391,8 @@ loadHostGroups(int fd, stmfGroupList *groupList)
 		    &(groupList->name[i]))) != STMF_STATUS_SUCCESS) {
 			goto out;
 		}
-		ret = stmfGetHostGroupMembers(&(groupList->name[i]),
-		    &groupProps);
+		ret = iLoadGroupMembersFromPs(&(groupList->name[i]),
+		    &groupProps, HOST_GROUP);
 		for (j = 0; j < groupProps->cnt; j++) {
 			if ((ret = groupMemberIoctl(fd, STMF_IOCTL_ADD_HG_ENTRY,
 			    &(groupList->name[i]), &(groupProps->name[j])))
@@ -2323,8 +4428,8 @@ loadTargetGroups(int fd, stmfGroupList *groupList)
 		    &(groupList->name[i]))) != STMF_STATUS_SUCCESS) {
 			goto out;
 		}
-		ret = stmfGetTargetGroupMembers(&(groupList->name[i]),
-		    &groupProps);
+		ret = iLoadGroupMembersFromPs(&(groupList->name[i]),
+		    &groupProps, TARGET_GROUP);
 		for (j = 0; j < groupProps->cnt; j++) {
 			if ((ret = groupMemberIoctl(fd, STMF_IOCTL_ADD_TG_ENTRY,
 			    &(groupList->name[i]), &(groupProps->name[j])))
@@ -2366,7 +4471,7 @@ loadStore(int fd)
 
 
 	/* load host groups */
-	ret = stmfGetHostGroupList(&groupList);
+	ret = iLoadGroupFromPs(&groupList, HOST_GROUP);
 	if (ret != STMF_STATUS_SUCCESS) {
 		return (ret);
 	}
@@ -2379,7 +4484,7 @@ loadStore(int fd)
 	groupList = NULL;
 
 	/* load target groups */
-	ret = stmfGetTargetGroupList(&groupList);
+	ret = iLoadGroupFromPs(&groupList, TARGET_GROUP);
 	if (ret != STMF_STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2512,7 +4617,7 @@ loadStore(int fd)
 
 		/* call setProviderData */
 		ret = setProviderData(fd, providerList->provider[i].name, nvl,
-		    providerType);
+		    providerType, NULL);
 		switch (ret) {
 			case STMF_PS_SUCCESS:
 				ret = STMF_STATUS_SUCCESS;
@@ -2565,11 +4670,25 @@ out:
 int
 stmfLoadConfig(void)
 {
-	int ret;
+	int ret = STMF_STATUS_SUCCESS;
 	int fd;
 	stmf_state_desc_t stmfStateSet;
 	stmfState state;
 
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
+		stmfStateSet.state = STMF_STATE_OFFLINE;
+		stmfStateSet.config_state = STMF_CONFIG_INIT;
+		if ((ret = openStmf(OPEN_EXCL_STMF, &fd))
+		    != STMF_STATUS_SUCCESS) {
+			return (ret);
+		}
+		ret = setStmfState(fd, &stmfStateSet, STMF_SERVICE_TYPE);
+		if (ret != STMF_STATUS_SUCCESS) {
+			goto done;
+		}
+		stmfStateSet.config_state = STMF_CONFIG_INIT_DONE;
+		goto done;
+	}
 
 	/* Check to ensure service exists */
 	if (psCheckService() != STMF_STATUS_SUCCESS) {
@@ -2616,6 +4735,7 @@ done:
 	(void) close(fd);
 	return (ret);
 }
+
 
 /*
  * getStmfState
@@ -2715,6 +4835,7 @@ setStmfState(int fd, stmf_state_desc_t *stmfState, int objectType)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
 				break;
@@ -2975,6 +5096,10 @@ stmfRemoveFromHostGroup(stmfGroupName *hostGroupName, stmfDevid *hostName)
 		goto done;
 	}
 
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
+		goto done;
+	}
+
 	ret = psRemoveHostGroupMember((char *)hostGroupName,
 	    (char *)hostName->ident);
 	switch (ret) {
@@ -3043,6 +5168,10 @@ stmfRemoveFromTargetGroup(stmfGroupName *targetGroupName, stmfDevid *targetName)
 
 	if ((ret = groupMemberIoctl(fd, STMF_IOCTL_REMOVE_TG_ENTRY,
 	    targetGroupName, targetName)) != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
 		goto done;
 	}
 
@@ -3132,6 +5261,9 @@ stmfRemoveViewEntry(stmfGuid *lu, uint32_t viewEntryIndex)
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
+				ret = STMF_ERROR_PERM;
+				break;
 			case EACCES:
 				switch (stmfIoctl.stmf_error) {
 					case STMF_IOCERR_UPDATE_NEED_CFG_INIT:
@@ -3153,6 +5285,10 @@ stmfRemoveViewEntry(stmfGuid *lu, uint32_t viewEntryIndex)
 				ret = STMF_STATUS_ERROR;
 				break;
 		}
+		goto done;
+	}
+
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
 		goto done;
 	}
 
@@ -3245,7 +5381,7 @@ stmfSetProviderDataProt(char *providerName, nvlist_t *nvl, int providerType,
 	if ((ret = openStmf(OPEN_STMF, &fd)) != STMF_STATUS_SUCCESS)
 		return (ret);
 
-	ret = setProviderData(fd, providerName, nvl, providerType);
+	ret = setProviderData(fd, providerName, nvl, providerType, setToken);
 
 	(void) close(fd);
 
@@ -3253,8 +5389,12 @@ stmfSetProviderDataProt(char *providerName, nvlist_t *nvl, int providerType,
 		goto done;
 	}
 
+	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
+		goto done;
+	}
+
 	/* setting driver provider data successful. Now persist it */
-	ret = psSetProviderData(providerName, nvl, providerType, setToken);
+	ret = psSetProviderData(providerName, nvl, providerType, NULL);
 	switch (ret) {
 		case STMF_PS_SUCCESS:
 			ret = STMF_STATUS_SUCCESS;
@@ -3287,21 +5427,161 @@ done:
 }
 
 /*
+ * getProviderData
+ *
+ * Purpose: set the provider data from stmf
+ *
+ * providerName - unique name of provider
+ * nvl - nvlist to load/retrieve
+ * providerType - logical unit or port provider
+ * setToken - returned stale data token
+ */
+int
+getProviderData(char *providerName, nvlist_t **nvl, int providerType,
+    uint64_t *setToken)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int fd;
+	int ioctlRet;
+	size_t nvlistSize = ALLOC_PP_DATA_SIZE;
+	int retryCnt = 0;
+	int retryCntMax = MAX_PROVIDER_RETRY;
+	stmf_ppioctl_data_t ppi = {0}, *ppi_out = NULL;
+	boolean_t retry = B_TRUE;
+	stmf_iocdata_t stmfIoctl;
+
+	if (providerName == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	/*
+	 * Open control node for stmf
+	 */
+	if ((ret = openStmf(OPEN_STMF, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	/* set provider name and provider type */
+	if (strlcpy(ppi.ppi_name, providerName,
+	    sizeof (ppi.ppi_name)) >=
+	    sizeof (ppi.ppi_name)) {
+		ret = STMF_ERROR_INVALID_ARG;
+		goto done;
+	}
+	switch (providerType) {
+		case STMF_LU_PROVIDER_TYPE:
+			ppi.ppi_lu_provider = 1;
+			break;
+		case STMF_PORT_PROVIDER_TYPE:
+			ppi.ppi_port_provider = 1;
+			break;
+		default:
+			ret = STMF_ERROR_INVALID_ARG;
+			goto done;
+	}
+
+	do {
+		/* allocate memory for ioctl */
+		ppi_out = (stmf_ppioctl_data_t *)calloc(1, nvlistSize +
+		    sizeof (stmf_ppioctl_data_t));
+		if (ppi_out == NULL) {
+			ret = STMF_ERROR_NOMEM;
+			goto done;
+
+		}
+
+		/* set the size of the ioctl data to allocated buffer */
+		ppi.ppi_data_size = nvlistSize;
+
+		bzero(&stmfIoctl, sizeof (stmfIoctl));
+
+		stmfIoctl.stmf_version = STMF_VERSION_1;
+		stmfIoctl.stmf_ibuf_size = sizeof (stmf_ppioctl_data_t);
+		stmfIoctl.stmf_ibuf = (uint64_t)(unsigned long)&ppi;
+		stmfIoctl.stmf_obuf_size = sizeof (stmf_ppioctl_data_t) +
+		    nvlistSize;
+		stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)ppi_out;
+		ioctlRet = ioctl(fd, STMF_IOCTL_GET_PP_DATA, &stmfIoctl);
+		if (ioctlRet != 0) {
+			switch (errno) {
+				case EBUSY:
+					ret = STMF_ERROR_BUSY;
+					break;
+				case EPERM:
+				case EACCES:
+					ret = STMF_ERROR_PERM;
+					break;
+				case EINVAL:
+					if (stmfIoctl.stmf_error ==
+					    STMF_IOCERR_INSUFFICIENT_BUF) {
+						nvlistSize =
+						    ppi_out->ppi_data_size;
+						free(ppi_out);
+						ppi_out = NULL;
+						if (retryCnt++ > retryCntMax) {
+							retry = B_FALSE;
+							ret = STMF_ERROR_BUSY;
+						} else {
+							ret =
+							    STMF_STATUS_SUCCESS;
+						}
+					} else {
+						syslog(LOG_DEBUG,
+						    "getProviderData:ioctl"
+						    "unable to retrieve "
+						    "nvlist");
+						ret = STMF_STATUS_ERROR;
+					}
+					break;
+				case ENOENT:
+					ret = STMF_ERROR_NOT_FOUND;
+					break;
+				default:
+					syslog(LOG_DEBUG,
+					    "getProviderData:ioctl errno(%d)",
+					    errno);
+					ret = STMF_STATUS_ERROR;
+					break;
+			}
+			if (ret != STMF_STATUS_SUCCESS)
+				goto done;
+		}
+	} while (retry && stmfIoctl.stmf_error == STMF_IOCERR_INSUFFICIENT_BUF);
+
+	if ((ret = nvlist_unpack((char *)ppi_out->ppi_data,
+	    ppi_out->ppi_data_size, nvl, 0)) != 0) {
+		ret = STMF_STATUS_ERROR;
+		goto done;
+	}
+
+	/* caller has asked for new token */
+	if (setToken) {
+		*setToken = ppi_out->ppi_token;
+	}
+done:
+	free(ppi_out);
+	(void) close(fd);
+	return (ret);
+}
+
+/*
  * setProviderData
  *
- * Purpose: set the provider data
+ * Purpose: set the provider data in stmf
  *
  * providerName - unique name of provider
  * nvl - nvlist to set
  * providerType - logical unit or port provider
+ * setToken - stale data token to check if not NULL
  */
 static int
-setProviderData(int fd, char *providerName, nvlist_t *nvl, int providerType)
+setProviderData(int fd, char *providerName, nvlist_t *nvl, int providerType,
+    uint64_t *setToken)
 {
 	int ret = STMF_STATUS_SUCCESS;
 	int ioctlRet;
 	size_t nvlistEncodedSize;
 	stmf_ppioctl_data_t *ppi = NULL;
+	uint64_t outToken;
 	char *allocatedNvBuffer;
 	stmf_iocdata_t stmfIoctl;
 
@@ -3319,6 +5599,11 @@ setProviderData(int fd, char *providerName, nvlist_t *nvl, int providerType)
 	    sizeof (stmf_ppioctl_data_t));
 	if (ppi == NULL) {
 		return (STMF_ERROR_NOMEM);
+	}
+
+	if (setToken) {
+		ppi->ppi_token_valid = 1;
+		ppi->ppi_token = *setToken;
 	}
 
 	allocatedNvBuffer = (char *)&ppi->ppi_data;
@@ -3353,14 +5638,25 @@ setProviderData(int fd, char *providerName, nvlist_t *nvl, int providerType)
 	stmfIoctl.stmf_ibuf_size = nvlistEncodedSize +
 	    sizeof (stmf_ppioctl_data_t) - 8;
 	stmfIoctl.stmf_ibuf = (uint64_t)(unsigned long)ppi;
+	stmfIoctl.stmf_obuf_size = sizeof (uint64_t);
+	stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)&outToken;
 	ioctlRet = ioctl(fd, STMF_IOCTL_LOAD_PP_DATA, &stmfIoctl);
 	if (ioctlRet != 0) {
 		switch (errno) {
 			case EBUSY:
 				ret = STMF_ERROR_BUSY;
 				break;
+			case EPERM:
 			case EACCES:
 				ret = STMF_ERROR_PERM;
+				break;
+			case EINVAL:
+				if (stmfIoctl.stmf_error ==
+				    STMF_IOCERR_PPD_UPDATED) {
+					ret = STMF_ERROR_PROV_DATA_STALE;
+				} else {
+					ret = STMF_STATUS_ERROR;
+				}
 				break;
 			default:
 				syslog(LOG_DEBUG,
@@ -3372,7 +5668,99 @@ setProviderData(int fd, char *providerName, nvlist_t *nvl, int providerType)
 			goto done;
 	}
 
+	/* caller has asked for new token */
+	if (setToken) {
+		*setToken = outToken;
+	}
 done:
 	free(ppi);
+	return (ret);
+}
+
+/*
+ * set the persistence method in the library only or library and service
+ */
+int
+stmfSetPersistMethod(uint8_t persistType, boolean_t serviceSet)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int oldPersist;
+
+	(void) pthread_mutex_lock(&persistenceTypeLock);
+	oldPersist = iPersistType;
+	if (persistType == STMF_PERSIST_NONE ||
+	    persistType == STMF_PERSIST_SMF) {
+		iLibSetPersist = B_TRUE;
+		iPersistType = persistType;
+	} else {
+		(void) pthread_mutex_unlock(&persistenceTypeLock);
+		return (STMF_ERROR_INVALID_ARG);
+	}
+	/* Is this for this library open or in SMF */
+	if (serviceSet == B_TRUE) {
+		ret = psSetServicePersist(persistType);
+		if (ret != STMF_PS_SUCCESS) {
+			ret = STMF_ERROR_PERSIST_TYPE;
+			/* Set to old value */
+			iPersistType = oldPersist;
+		}
+	}
+	(void) pthread_mutex_unlock(&persistenceTypeLock);
+
+	return (ret);
+}
+
+/*
+ * Only returns internal state for persist. If unset, goes to ps. If that
+ * fails, returns default setting
+ */
+static uint8_t
+iGetPersistMethod()
+{
+
+	uint8_t persistType = 0;
+
+	(void) pthread_mutex_lock(&persistenceTypeLock);
+	if (iLibSetPersist) {
+		persistType = iPersistType;
+	} else {
+		int ret;
+		ret = psGetServicePersist(&persistType);
+		if (ret != STMF_PS_SUCCESS) {
+			/* set to default */
+			persistType = STMF_DEFAULT_PERSIST;
+		}
+	}
+	(void) pthread_mutex_unlock(&persistenceTypeLock);
+	return (persistType);
+}
+
+/*
+ * Returns either library state or persistent config state depending on
+ * serviceState
+ */
+int
+stmfGetPersistMethod(uint8_t *persistType, boolean_t serviceState)
+{
+	int ret = STMF_STATUS_SUCCESS;
+
+	if (persistType == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+	if (serviceState) {
+		ret = psGetServicePersist(persistType);
+		if (ret != STMF_PS_SUCCESS) {
+			ret = STMF_ERROR_PERSIST_TYPE;
+		}
+	} else {
+		(void) pthread_mutex_lock(&persistenceTypeLock);
+		if (iLibSetPersist) {
+			*persistType = iPersistType;
+		} else {
+			*persistType = STMF_DEFAULT_PERSIST;
+		}
+		(void) pthread_mutex_unlock(&persistenceTypeLock);
+	}
+
 	return (ret);
 }

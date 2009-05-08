@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -38,7 +38,7 @@ INCS += -I$(SRCDIR)
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
-LDLIBS +=	-lc -lnvpair -lscf
+LDLIBS +=	-lc -lnvpair -lscf -lm
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

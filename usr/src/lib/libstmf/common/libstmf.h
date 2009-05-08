@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,17 +80,62 @@ extern "C" {
 #define	STMF_ERROR_INVALID_HG		(STMF_STATUS_ERROR | 0x11)
 #define	STMF_ERROR_INVALID_TG		(STMF_STATUS_ERROR | 0x12)
 #define	STMF_ERROR_PROV_DATA_STALE	(STMF_STATUS_ERROR | 0x13)
+#define	STMF_ERROR_NO_PROP		(STMF_STATUS_ERROR | 0x14)
+#define	STMF_ERROR_NO_PROP_VAL		(STMF_STATUS_ERROR | 0x15)
+#define	STMF_ERROR_MISSING_PROP_VAL	(STMF_STATUS_ERROR | 0x16)
+#define	STMF_ERROR_INVALID_BLOCKSIZE	(STMF_STATUS_ERROR | 0x17)
+#define	STMF_ERROR_FILE_ALREADY		(STMF_STATUS_ERROR | 0x18)
+#define	STMF_ERROR_INVALID_PROPSIZE	(STMF_STATUS_ERROR | 0x19)
+#define	STMF_ERROR_INVALID_PROP		(STMF_STATUS_ERROR | 0x20)
+#define	STMF_ERROR_PERSIST_TYPE		(STMF_STATUS_ERROR | 0x21)
+
+/* Failures for stmfCreateLu */
+#define	STMF_ERROR_FILE_IN_USE		(STMF_STATUS_ERROR | 0x100)
+#define	STMF_ERROR_INVALID_BLKSIZE	(STMF_STATUS_ERROR | 0x101)
+#define	STMF_ERROR_GUID_IN_USE		(STMF_STATUS_ERROR | 0x102)
+#define	STMF_ERROR_META_FILE_NAME	(STMF_STATUS_ERROR | 0x103)
+#define	STMF_ERROR_DATA_FILE_NAME	(STMF_STATUS_ERROR | 0x104)
+#define	STMF_ERROR_SIZE_OUT_OF_RANGE	(STMF_STATUS_ERROR | 0x105)
+#define	STMF_ERROR_LU_BUSY		(STMF_STATUS_ERROR | 0x106)
+#define	STMF_ERROR_META_CREATION	(STMF_STATUS_ERROR | 0x107)
+#define	STMF_ERROR_FILE_SIZE_INVALID	(STMF_STATUS_ERROR | 0x108)
+#define	STMF_ERROR_WRITE_CACHE_SET	(STMF_STATUS_ERROR | 0x109)
 
 /* Initiator Name Types */
 #define	STMF_FC_PORT_WWN	    1
 #define	STMF_ISCSI_NAME		    2
 
-/* protected data flag for provider store */
-#define	STMF_PROTECTED_DATA	0x0001
 
 /* provider types */
 #define	STMF_LU_PROVIDER_TYPE	1
 #define	STMF_PORT_PROVIDER_TYPE	2
+
+/* LU Resource types */
+#define	STMF_DISK   0
+
+/* Persistence methods */
+#define	STMF_PERSIST_SMF	1
+#define	STMF_PERSIST_NONE	2
+
+/*
+ * LU Disk Properties
+ */
+
+enum {
+	STMF_LU_PROP_ALIAS = 1,
+	STMF_LU_PROP_BLOCK_SIZE,
+	STMF_LU_PROP_COMPANY_ID,
+	STMF_LU_PROP_FILENAME,
+	STMF_LU_PROP_GUID,
+	STMF_LU_PROP_META_FILENAME,
+	STMF_LU_PROP_NEW,
+	STMF_LU_PROP_SIZE,
+	STMF_LU_PROP_WRITE_PROTECT,
+	STMF_LU_PROP_WRITE_CACHE_DISABLE,
+	STMF_LU_PROP_VID,
+	STMF_LU_PROP_PID,
+	STMF_LU_PROP_SERIAL_NUM
+};
 
 
 /* devid code set and name types */
@@ -224,6 +269,8 @@ typedef struct _stmfLogicalUnitProperties
 	stmfGuid    luid;
 } stmfLogicalUnitProperties;
 
+typedef void * luResource;
+
 typedef struct _stmfLogicalUnitProviderProperties
 {
 	char	    providerName[MAXPATHLEN];
@@ -247,11 +294,15 @@ int stmfAddToTargetGroup(stmfGroupName *targetGroupName, stmfDevid *targetName);
 int stmfAddViewEntry(stmfGuid *lu, stmfViewEntry *viewEntry);
 int stmfClearProviderData(char *providerName, int providerType);
 int stmfCreateHostGroup(stmfGroupName *hostGroupName);
+int stmfCreateLu(luResource hdl, stmfGuid *luGuid);
+int stmfCreateLuResource(uint16_t dType, luResource *hdl);
 int stmfCreateTargetGroup(stmfGroupName *targetGroupName);
 int stmfDeleteHostGroup(stmfGroupName *hostGroupName);
+int stmfDeleteLu(stmfGuid *luGuid);
 int stmfDeleteTargetGroup(stmfGroupName *targetGroupName);
 int stmfDevidFromIscsiName(char *iscsiName, stmfDevid *devid);
 int stmfDevidFromWwn(uchar_t wwn[8], stmfDevid *devid);
+int stmfFreeLuResource(luResource hdl);
 void stmfFreeMemory(void *);
 int stmfGetHostGroupList(stmfGroupList **initiatorGroupList);
 int stmfGetHostGroupMembers(stmfGroupName *hostGroupName,
@@ -265,6 +316,10 @@ int stmfGetLogicalUnitProperties(stmfGuid *logicalUnit,
 int stmfGetLogicalUnitProviderList(stmfProviderList **logicalUnitProviderList);
 int stmfGetLogicalUnitProviderProperties(stmfProviderName *providerName,
     stmfLogicalUnitProviderProperties *providerProperties);
+int stmfGetLuProp(luResource hdl, uint32_t propType, char *prop,
+    size_t *propLen);
+int stmfGetLuResource(stmfGuid *luGuid, luResource *hdl);
+int stmfGetPersistMethod(uint8_t *persistType, boolean_t serviceState);
 int stmfGetProviderData(char *providerName, nvlist_t **nvl, int providerType);
 int stmfGetProviderDataProt(char *providerName, nvlist_t **nvl,
     int providerType, uint64_t *setToken);
@@ -277,7 +332,11 @@ int stmfGetTargetList(stmfDevidList **targetList);
 int stmfGetTargetProperties(stmfDevid *target,
     stmfTargetProperties *targetProps);
 int stmfGetViewEntryList(stmfGuid *lu, stmfViewEntryList **viewEntryList);
+int stmfImportLu(uint16_t dType, char *fname, stmfGuid *luGuid);
 int stmfLoadConfig(void);
+int stmfModifyLu(stmfGuid *luGuid, uint32_t prop, const char *propVal);
+int stmfModifyLuByFname(uint16_t dType, const char *fname, uint32_t prop,
+    const char *propVal);
 int stmfOffline(void);
 int stmfOfflineTarget(stmfDevid *devid);
 int stmfOfflineLogicalUnit(stmfGuid *logicalUnit);
@@ -289,6 +348,8 @@ int stmfRemoveFromHostGroup(stmfGroupName *hostGroupName,
 int stmfRemoveFromTargetGroup(stmfGroupName *targetGroupName,
     stmfDevid *targetName);
 int stmfRemoveViewEntry(stmfGuid *lu, uint32_t viewEntryIndex);
+int stmfSetLuProp(luResource hdl, uint32_t propType, const char *propVal);
+int stmfSetPersistMethod(uint8_t persistType, boolean_t serviceSet);
 int stmfSetProviderData(char *providerName, nvlist_t *nvl, int providerType);
 int stmfSetProviderDataProt(char *providerName, nvlist_t *nvl,
     int providerType, uint64_t *setToken);

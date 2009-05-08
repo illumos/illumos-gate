@@ -262,6 +262,7 @@ typedef struct stmf_pp_data {
 				ppd_port_provider:1,
 				ppd_rsvd:30;
 	uint32_t		ppd_alloc_size;
+	uint64_t		ppd_token;
 	char			ppd_name[8];
 } stmf_pp_data_t;
 

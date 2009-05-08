@@ -374,6 +374,8 @@ stmf_status_t stmf_scsilib_uniq_lu_id(uint32_t company_id,
 void stmf_scsilib_send_status(scsi_task_t *task, uint8_t st, uint32_t saa);
 uint32_t stmf_scsilib_prepare_vpd_page83(scsi_task_t *task, uint8_t *page,
 		uint32_t page_len, uint8_t byte0, uint32_t vpd_mask);
+uint16_t stmf_scsilib_get_lport_rtid(struct scsi_devid_desc *devid);
+struct scsi_devid_desc *stmf_scsilib_get_devid_desc(uint16_t rtpid);
 void stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf);
 void stmf_scsilib_handle_task_mgmt(scsi_task_t *task);
 

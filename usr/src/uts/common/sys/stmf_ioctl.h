@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_STMF_IOCTL_H
@@ -51,19 +51,21 @@ extern "C" {
 #define	STMF_IOCTL_REMOVE_TG_ENTRY		(STMF_IOCTL | 17)
 #define	STMF_IOCTL_ADD_VIEW_ENTRY		(STMF_IOCTL | 18)
 #define	STMF_IOCTL_REMOVE_VIEW_ENTRY		(STMF_IOCTL | 19)
-#if 0
 #define	STMF_IOCTL_GET_HG_LIST			(STMF_IOCTL | 20)
 #define	STMF_IOCTL_GET_TG_LIST			(STMF_IOCTL | 21)
 #define	STMF_IOCTL_GET_HG_ENTRIES		(STMF_IOCTL | 22)
 #define	STMF_IOCTL_GET_TG_ENTRIES		(STMF_IOCTL | 23)
 #define	STMF_IOCTL_GET_VE_LIST			(STMF_IOCTL | 24)
-#endif
 #define	STMF_IOCTL_LOAD_PP_DATA			(STMF_IOCTL | 25)
 #define	STMF_IOCTL_CLEAR_PP_DATA		(STMF_IOCTL | 26)
-#define	STMF_IOCTL_CLEAR_TRACE			(STMF_IOCTL | 27)
-#define	STMF_IOCTL_ADD_TRACE			(STMF_IOCTL | 28)
-#define	STMF_IOCTL_GET_TRACE_POSITION		(STMF_IOCTL | 29)
-#define	STMF_IOCTL_GET_TRACE			(STMF_IOCTL | 30)
+#define	STMF_IOCTL_GET_PP_DATA			(STMF_IOCTL | 27)
+#define	STMF_IOCTL_CLEAR_TRACE			(STMF_IOCTL | 28)
+#define	STMF_IOCTL_ADD_TRACE			(STMF_IOCTL | 29)
+#define	STMF_IOCTL_GET_TRACE_POSITION		(STMF_IOCTL | 30)
+#define	STMF_IOCTL_GET_TRACE			(STMF_IOCTL | 31)
+#define	STMF_IOCTL_REG_LU_LIST			(STMF_IOCTL | 32)
+#define	STMF_IOCTL_VE_LU_LIST			(STMF_IOCTL | 33)
+#define	STMF_IOCTL_LU_VE_LIST			(STMF_IOCTL | 34)
 
 typedef	struct stmf_iocdata {
 	uint32_t	stmf_version;
@@ -133,7 +135,7 @@ typedef struct stmf_state_desc {
 	uint8_t		config_state;	/* N/A for LU/LPORTs */
 } stmf_state_desc_t;
 
-/* Error definitions for group/view entry ioctls */
+/* Error definitions for group/view entry/provider dataioctls */
 #define	STMF_IOCERR_NONE			0
 #define	STMF_IOCERR_HG_EXISTS			1
 #define	STMF_IOCERR_INVALID_HG			2
@@ -152,6 +154,9 @@ typedef struct stmf_state_desc {
 #define	STMF_IOCERR_INVALID_VIEW_ENTRY		15
 #define	STMF_IOCERR_INVALID_VE_ID		16
 #define	STMF_IOCERR_UPDATE_NEED_CFG_INIT	17
+#define	STMF_IOCERR_PPD_UPDATED			18
+#define	STMF_IOCERR_INSUFFICIENT_BUF		19
+
 
 typedef struct stmf_group_name {
 	uint16_t	name_size;	/* in bytes */
@@ -163,9 +168,11 @@ typedef struct stmf_group_name {
 /*
  * struct used to operate (add/remove entry) on a group.
  */
-#if 0
-typedef uint8_t	stmf_ge_ident_t[260];
-#endif
+
+typedef struct stmf_ge_ident {
+	uint16_t    ident_size;
+	uint8_t	    ident[256];
+} stmf_ge_ident_t;
 
 typedef struct stmf_group_op_data {
 	stmf_group_name_t	group;
@@ -189,7 +196,9 @@ typedef struct stmf_ppioctl_data {
 	char		ppi_name[255];	/* Provider name including \0 */
 	uint8_t		ppi_port_provider:1,
 			ppi_lu_provider:1,
-			ppt_rsvd:6;
+			ppi_token_valid:1,
+			ppt_rsvd:5;
+	uint64_t	ppi_token;
 	uint64_t	ppi_data_size;
 	uint8_t		ppi_data[8];
 } stmf_ppioctl_data_t;

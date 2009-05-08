@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,13 @@ struct sbd_it_data;
 #define	SMS_DATA_ORDER	SMS_BIG_ENDIAN
 #else
 #define	SMS_DATA_ORDER	SMS_LITTLE_ENDIAN
+#endif
+
+/* Test if one of the BitOrder definitions exists */
+#ifdef _BIT_FIELDS_LTOH
+#elif defined(_BIT_FIELDS_HTOL)
+#else
+#error  One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
 #endif
 
 #define	SBD_V0_MAGIC	0x53554e4d4943524f
@@ -80,18 +87,79 @@ typedef struct sm_v0_section_hdr {
 	uint32_t	rsvd3;		/* 8 byte align */
 } sm_v0_section_hdr_t;
 
-typedef struct sm_section_hdr {
-	uint64_t	sms_offset;	/* Offset of this section */
-	uint32_t	sms_size;	/* Includes the header and padding */
-	uint16_t	sms_id;		/* Section identifier */
-	uint8_t		sms_data_order; /* 0x00 or 0xff */
-	uint8_t		sms_chksum;
-} sm_section_hdr_t;
+/*
+ * sbd_it_flags
+ */
+#define	SBD_IT_HAS_SCSI2_RESERVATION	0x0001
+#define	SBD_IT_PGR_REGISTERED		0x0002
+#define	SBD_IT_PGR_EXCLUSIVE_RSV_HOLDER	0x0004
+#define	SBD_IT_PGR_CHECK_FLAG		0x0008
 
 /*
- * sbd meta section identifiers
+ * PGR flags
  */
-#define	SMS_ID_LU_INFO	0
+#define	SBD_PGR_APTPL			0x01
+#define	SBD_PGR_RSVD_ONE		0x02
+#define	SBD_PGR_RSVD_ALL_REGISTRANTS	0x04
+#define	SBD_PGR_ALL_KEYS_HAS_IT		0x08
+
+#define	SBD_PGR_RSVD(pgr)	(((pgr)->pgr_flags) & (SBD_PGR_RSVD_ONE | \
+					SBD_PGR_RSVD_ALL_REGISTRANTS))
+#define	SBD_PGR_RSVD_NONE(pgr)	(!(SBD_PGR_RSVD(pgr)))
+
+/*
+ * PGR key flags
+ */
+#define	SBD_PGR_KEY_ALL_TG_PT		0x01
+
+typedef struct sbd_pgr_key_info {
+	uint64_t	pgr_key;
+	uint16_t	pgr_key_lpt_len;
+	uint16_t	pgr_key_rpt_len;
+	uint8_t		pgr_key_flags;
+	uint8_t		pgr_key_it[1];	/* devid_desc of initiator will be */
+					/* followed by devid_desc of target */
+} sbd_pgr_key_info_t;
+
+typedef struct sbd_pgr_info {
+	sm_section_hdr_t	pgr_sms_header;
+	uint32_t		pgr_rsvholder_indx;
+	uint32_t		pgr_numkeys;
+	uint8_t			pgr_flags;
+	uint8_t			pgr_data_order;
+#ifdef _BIT_FIELDS_LTOH
+	uint8_t			pgr_rsv_type:4,
+				pgr_rsv_scope:4;
+#else
+	uint8_t			pgr_rsv_scope:4,
+				pgr_rsv_type:4;
+#endif
+	uint8_t			rsvd[5];	/* 8 byte boundary */
+
+} sbd_pgr_info_t;
+
+typedef struct sbd_pgr_key {
+	uint64_t		pgr_key;
+	uint16_t		pgr_key_lpt_len;
+	uint16_t		pgr_key_rpt_len;
+	uint8_t			pgr_key_flags;
+	struct scsi_devid_desc	*pgr_key_lpt_id;
+	struct scsi_devid_desc	*pgr_key_rpt_id;
+	struct sbd_it_data	*pgr_key_it;
+	struct sbd_pgr_key	*pgr_key_next;
+	struct sbd_pgr_key	*pgr_key_prev;
+} sbd_pgr_key_t;
+
+typedef struct sbd_pgr {
+	sbd_pgr_key_t		*pgr_keylist;
+	sbd_pgr_key_t		*pgr_rsvholder;
+	uint32_t		pgr_PRgeneration; /* PGR PRgeneration value */
+	uint8_t			pgr_flags;	/* PGR flags (eg: APTPL)  */
+	uint8_t			pgr_rsv_type:4,
+				pgr_rsv_scope:4;
+	krwlock_t		pgr_lock; /* Lock order pgr_lock, sl_lock */
+} sbd_pgr_t;
+
 
 typedef struct sbd_v0_lu_info {
 	sm_v0_section_hdr_t	sli_sms_header;
@@ -122,26 +190,6 @@ typedef struct sbd_lu_info {
 	uint32_t		rsvd2;
 } sbd_lu_info_t;
 
-typedef struct sbd_lu {
-	sbd_store_t			*sl_sst;
-	uint32_t			sl_total_allocation_size;
-	uint8_t				sl_shift_count;
-	uint8_t				sl_state:7,
-					sl_state_not_acked:1;
-	uint8_t				sl_flags;
-	kmutex_t			sl_it_list_lock;
-	struct sbd_it_data		*sl_it_list;
-	uint64_t			sl_rs_owner_session_id;
-	stmf_lu_t			*sl_lu;
-	struct sbd_lu			*sl_next; /* for int. tracking */
-
-	sbd_meta_start_t		sl_sm;
-	sbd_lu_info_t			*sl_sli;
-	uint64_t			sl_meta_offset;
-} sbd_lu_t;
-
-extern sbd_lu_t *sbd_lu_list;
-
 /*
  * sl_flags
  */
@@ -171,6 +219,7 @@ typedef struct sbd_cmd {
 #define	SBD_CMD_SCSI_WRITE	0x02
 #define	SBD_CMD_SMALL_READ	0x03
 #define	SBD_CMD_SMALL_WRITE	0x04
+#define	SBD_CMD_SCSI_PR_OUT	0x05
 
 typedef struct sbd_it_data {
 	struct sbd_it_data	*sbd_it_next;
@@ -178,6 +227,7 @@ typedef struct sbd_it_data {
 	uint8_t			sbd_it_lun[8];
 	uint8_t			sbd_it_ua_conditions;
 	uint8_t			sbd_it_flags;
+	sbd_pgr_key_t		*pgr_key_ptr;
 } sbd_it_data_t;
 
 /*
@@ -185,11 +235,15 @@ typedef struct sbd_it_data {
  */
 #define	SBD_UA_POR			0x01
 #define	SBD_UA_CAPACITY_CHANGED		0x02
+#define	SBD_UA_MODE_PARAMETERS_CHANGED	0x04
+#define	SBD_UA_REGISTRATIONS_PREEMPTED	0x10
+#define	SBD_UA_RESERVATIONS_PREEMPTED	0x20
+#define	SBD_UA_RESERVATIONS_RELEASED	0x40
 
 /*
  * sbd_it_flags
  */
-#define	SBD_IT_HAS_SCSI2_RESERVATION		0x0001
+#define	SBD_IT_HAS_SCSI2_RESERVATION	0x0001
 
 stmf_status_t sbd_task_alloc(struct scsi_task *task);
 void sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf);
@@ -201,14 +255,6 @@ stmf_status_t sbd_abort(struct stmf_lu *lu, int abort_cmd, void *arg,
 void sbd_ctl(struct stmf_lu *lu, int cmd, void *arg);
 stmf_status_t sbd_info(uint32_t cmd, stmf_lu_t *lu, void *arg,
 				uint8_t *buf, uint32_t *bufsizep);
-
-stmf_status_t memdisk_register_lu(struct register_lu_cmd *rlc);
-stmf_status_t memdisk_deregister_lu(sbd_store_t *sst);
-stmf_status_t filedisk_register_lu(struct register_lu_cmd *rlc);
-stmf_status_t filedisk_deregister_lu(sbd_store_t *sst);
-stmf_status_t filedisk_modify_lu(sbd_store_t *sst, struct modify_lu_cmd *mlc);
-void filedisk_fillout_attr(struct sbd_store *sst, struct sbd_lu_attr *sla);
-void memdisk_fillout_attr(struct sbd_store *sst, struct sbd_lu_attr *sla);
 
 #ifdef	__cplusplus
 }

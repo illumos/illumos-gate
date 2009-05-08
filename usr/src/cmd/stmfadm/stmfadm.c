@@ -46,6 +46,10 @@ static int addHostGroupMemberFunc(int, char **, cmdOptions_t *, void *);
 static int addTargetGroupMemberFunc(int, char **, cmdOptions_t *, void *);
 static int addViewFunc(int, char **, cmdOptions_t *, void *);
 static int createHostGroupFunc(int, char **, cmdOptions_t *, void *);
+static int createLuFunc(int, char **, cmdOptions_t *, void *);
+static int modifyLuFunc(int, char **, cmdOptions_t *, void *);
+static int importLuFunc(int, char **, cmdOptions_t *, void *);
+static int deleteLuFunc(int, char **, cmdOptions_t *, void *);
 static int createTargetGroupFunc(int, char **, cmdOptions_t *, void *);
 static int deleteHostGroupFunc(int, char **, cmdOptions_t *, void *);
 static int deleteTargetGroupFunc(int, char **, cmdOptions_t *, void *);
@@ -63,6 +67,7 @@ static int onlineOfflineTarget(char *, int);
 static int onlineOfflineLu(char *, int);
 static int removeHostGroupMemberFunc(int, char **, cmdOptions_t *, void *);
 static int removeTargetGroupMemberFunc(int, char **, cmdOptions_t *, void *);
+static int callModify(char *, stmfGuid *, uint32_t, const char *, const char *);
 static int removeViewFunc(int, char **, cmdOptions_t *, void *);
 static char *getExecBasename(char *);
 static int parseDevid(char *input, stmfDevid *devid);
@@ -71,9 +76,12 @@ static int checkScsiNameString(wchar_t *, stmfDevid *);
 static int checkHexUpper(char *);
 static int checkIscsiName(wchar_t *);
 static void printLuProps(stmfLogicalUnitProperties *luProps);
+static int printExtLuProps(stmfGuid *guid);
 static void printGuid(stmfGuid *guid, FILE *printWhere);
 static void printTargetProps(stmfTargetProperties *);
 static void printSessionProps(stmfSessionList *);
+static int setLuPropFromInput(luResource, char *);
+static int convertCharToPropId(char *, uint32_t *);
 
 
 
@@ -107,21 +115,68 @@ static void printSessionProps(stmfSessionList *);
 #define	SNS_WWN_16		    16
 #define	SNS_IQN_223		    223
 
+/* LU Property strings */
+#define	GUID			    "GUID"
+#define	ALIAS			    "ALIAS"
+#define	VID			    "VID"
+#define	PID			    "PID"
+#define	META_FILE		    "META"
+#define	WRITE_PROTECT		    "WP"
+#define	WRITEBACK_CACHE_DISABLE	    "WCD"
+#define	COMPANY_ID		    "OUI"
+#define	BLOCK_SIZE		    "BLK"
+#define	SERIAL_NUMBER		    "SERIAL"
+
+#define	MODIFY_HELP "\n"\
+"Description: Modify properties of a logical unit. \n" \
+"Valid properties for -p, --lu-prop are: \n" \
+"     alias - alias for logical unit (up to 255 chars)\n" \
+"     wcd   - write cache disabled (true, false)\n" \
+"     wp    - write protect (true, false)\n\n" \
+"-f alters the meaning of the operand to be a file name\n" \
+"rather than a LU name. This allows for modification\n" \
+"of a logical unit that is not yet imported into stmf\n"
+
+#define	CREATE_HELP "\n"\
+"Description: Create a logical unit. \n" \
+"Valid properties for -p, --lu-prop are: \n" \
+"     alias - alias for logical unit (up to 255 chars)\n" \
+"     blk   - block size in bytes in 2^n\n" \
+"     guid  - 32 ascii hex characters in NAA format \n" \
+"     meta  - separate meta data file name\n" \
+"     oui   - organizational unique identifier\n" \
+"             6 ascii hex characters of valid format\n" \
+"     pid   - product identifier (up to 16 chars)\n" \
+"     serial- serial number (up to 252 chars)\n" \
+"     vid   - vendor identifier (up to 8 chars)\n" \
+"     wp    - write protect (true, false)\n" \
+"     wcd   - write cache disabled (true, false)\n"
+#define	ADD_VIEW_HELP "\n"\
+"Description: Add a view entry to a logical unit. \n" \
+"A view entry is comprised of three elements; the \n" \
+"logical unit number, the target group name and the\n" \
+"host group name. These three elements combine together\n" \
+"to form a view for a given COMSTAR logical unit.\n" \
+"This view is realized by a client, a SCSI initiator,\n" \
+"via a REPORT LUNS command. \n"
+
+
+
 /* tables set up based on cmdparse instructions */
 
 /* add new options here */
 optionTbl_t longOptions[] = {
 	{"all", no_arg, 'a', NULL},
 	{"group-name", required_arg, 'g', "group-name"},
-	{"secure-data", no_arg, 's', NULL},
+	{"keep-views", no_arg, 'k', NULL},
 	{"lu-name", required_arg, 'l', "LU-Name"},
 	{"lun", required_arg, 'n', "logical-unit-number"},
-	{"verbose", no_arg, 'v', NULL},
+	{"lu-prop", required_arg, 'p', "logical-unit-property=value"},
+	{"file", no_arg, 'f', "filename"},
+	{"size", required_arg, 's', "size K/M/G/T/P"},
 	{"target-group", required_arg, 't', "group-name"},
 	{"host-group", required_arg, 'h', "group-name"},
-	{"size", required_arg, 's', "size (k/M/G)"},
-	{"force", no_arg, 'r', NULL},
-	{"new", no_arg, 'n', NULL},
+	{"verbose", no_arg, 'v', NULL},
 	{NULL, 0, 0, 0}
 };
 
@@ -130,45 +185,53 @@ optionTbl_t longOptions[] = {
  */
 subCommandProps_t subcommands[] = {
 	{"add-hg-member", addHostGroupMemberFunc, "g", "g", NULL,
-		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER},
+		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"add-tg-member", addTargetGroupMemberFunc, "g", "g", NULL,
-		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER},
+		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"add-view", addViewFunc, "nth", NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, ADD_VIEW_HELP},
 	{"create-hg", createHostGroupFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME, NULL},
 	{"create-tg", createTargetGroupFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME, NULL},
+	{"create-lu", createLuFunc, "ps", NULL, NULL, OPERAND_MANDATORY_SINGLE,
+		"lu file", CREATE_HELP},
 	{"delete-hg", deleteHostGroupFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME, NULL},
+	{"modify-lu", modifyLuFunc, "psf", NULL, NULL, OPERAND_MANDATORY_SINGLE,
+		OPERANDSTRING_LU, MODIFY_HELP},
+	{"delete-lu", deleteLuFunc, "k", NULL, NULL,
+		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_LU, NULL},
 	{"delete-tg", deleteTargetGroupFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_GROUP_NAME, NULL},
+	{"import-lu", importLuFunc, NULL, NULL, NULL,
+		OPERAND_MANDATORY_SINGLE, "file name", NULL},
 	{"list-hg", listHostGroupFunc, "v", NULL, NULL,
-		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_GROUP_NAME},
+		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_GROUP_NAME, NULL},
 	{"list-lu", listLuFunc, "v", NULL, NULL, OPERAND_OPTIONAL_MULTIPLE,
-		OPERANDSTRING_LU},
+		OPERANDSTRING_LU, NULL},
 	{"list-state", listStateFunc, NULL, NULL, NULL, OPERAND_NONE, NULL},
 	{"list-target", listTargetFunc, "v", NULL, NULL,
-		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_TARGET},
+		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_TARGET, NULL},
 	{"list-tg", listTargetGroupFunc, "v", NULL, NULL,
-		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_GROUP_NAME},
+		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_GROUP_NAME, NULL},
 	{"list-view", listViewFunc, "l", "l", NULL,
-		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY},
+		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY, NULL},
 	{"online-lu", onlineLuFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
 	{"offline-lu", offlineLuFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_LU, NULL},
 	{"online-target", onlineTargetFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_TARGET},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_TARGET, NULL},
 	{"offline-target", offlineTargetFunc, NULL, NULL, NULL,
-		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_TARGET},
+		OPERAND_MANDATORY_SINGLE, OPERANDSTRING_TARGET, NULL},
 	{"remove-hg-member", removeHostGroupMemberFunc, "g", "g", NULL,
-		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER},
+		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"remove-tg-member", removeTargetGroupMemberFunc, "g", "g", NULL,
-		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER},
+		OPERAND_MANDATORY_MULTIPLE, OPERANDSTRING_GROUP_MEMBER, NULL},
 	{"remove-view", removeViewFunc, "la", "l", NULL,
-		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY},
-	{NULL, 0, NULL, NULL, 0, NULL, 0, NULL}
+		OPERAND_OPTIONAL_MULTIPLE, OPERANDSTRING_VIEW_ENTRY, NULL},
+	{NULL, 0, NULL, NULL, 0, NULL, 0, NULL, NULL}
 };
 
 /* globals */
@@ -718,6 +781,630 @@ createHostGroupFunc(int operandLen, char *operands[],
 }
 
 /*
+ * createLuFunc
+ *
+ * Create a logical unit
+ *
+ */
+/*ARGSUSED*/
+static int
+createLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
+    void *args)
+{
+	luResource hdl = NULL;
+	int ret = 0;
+	int stmfRet = 0;
+	char guidAsciiBuf[33];
+	stmfGuid createdGuid;
+
+	stmfRet = stmfCreateLuResource(STMF_DISK, &hdl);
+
+	if (stmfRet != STMF_STATUS_SUCCESS) {
+		(void) fprintf(stderr, "%s: %s\n",
+		    cmdName, gettext("Failure to create lu resource\n"));
+		return (1);
+	}
+
+	for (; options->optval; options++) {
+		switch (options->optval) {
+			case 'p':
+				ret = setLuPropFromInput(hdl, options->optarg);
+				if (ret != 0) {
+					(void) stmfFreeLuResource(hdl);
+					return (1);
+				}
+				break;
+			case 's':
+				stmfRet = stmfSetLuProp(hdl, STMF_LU_PROP_SIZE,
+				    options->optarg);
+				if (stmfRet != STMF_STATUS_SUCCESS) {
+					(void) fprintf(stderr, "%s: %c: %s\n",
+					    cmdName, options->optval,
+					    gettext("size param invalid"));
+					(void) stmfFreeLuResource(hdl);
+					return (1);
+				}
+				break;
+			default:
+				(void) fprintf(stderr, "%s: %c: %s\n",
+				    cmdName, options->optval,
+				    gettext("unknown option"));
+				return (1);
+		}
+	}
+
+	stmfRet = stmfSetLuProp(hdl, STMF_LU_PROP_FILENAME, operands[0]);
+
+	if (stmfRet != STMF_STATUS_SUCCESS) {
+		(void) fprintf(stderr, "%s: %s\n",
+		    cmdName, gettext("could not set filename"));
+		return (1);
+	}
+
+	stmfRet = stmfCreateLu(hdl, &createdGuid);
+	switch (stmfRet) {
+		case STMF_STATUS_SUCCESS:
+			break;
+		case STMF_ERROR_BUSY:
+		case STMF_ERROR_LU_BUSY:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("resource busy"));
+			ret++;
+			break;
+		case STMF_ERROR_PERM:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("permission denied"));
+			ret++;
+			break;
+		case STMF_ERROR_FILE_IN_USE:
+			(void) fprintf(stderr, "%s: filename %s: %s\n", cmdName,
+			    operands[0], gettext("in use"));
+			ret++;
+			break;
+		case STMF_ERROR_INVALID_BLKSIZE:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("invalid block size"));
+			ret++;
+			break;
+		case STMF_ERROR_GUID_IN_USE:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("guid in use"));
+			ret++;
+			break;
+		case STMF_ERROR_META_FILE_NAME:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("meta file error"));
+			ret++;
+			break;
+		case STMF_ERROR_DATA_FILE_NAME:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("data file error"));
+			ret++;
+			break;
+		case STMF_ERROR_FILE_SIZE_INVALID:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("file size invalid"));
+			ret++;
+			break;
+		case STMF_ERROR_SIZE_OUT_OF_RANGE:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("invalid size"));
+			ret++;
+			break;
+		case STMF_ERROR_META_CREATION:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("could not create meta file"));
+			ret++;
+			break;
+		case STMF_ERROR_WRITE_CACHE_SET:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("could not set write cache"));
+			ret++;
+			break;
+		default:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("unknown error"));
+			ret++;
+			break;
+	}
+
+	if (ret != 0) {
+		goto done;
+	}
+
+	(void) snprintf(guidAsciiBuf, sizeof (guidAsciiBuf),
+	    "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X"
+	    "%02X%02X%02X%02X%02X%02X",
+	    createdGuid.guid[0], createdGuid.guid[1], createdGuid.guid[2],
+	    createdGuid.guid[3], createdGuid.guid[4], createdGuid.guid[5],
+	    createdGuid.guid[6], createdGuid.guid[7], createdGuid.guid[8],
+	    createdGuid.guid[9], createdGuid.guid[10], createdGuid.guid[11],
+	    createdGuid.guid[12], createdGuid.guid[13], createdGuid.guid[14],
+	    createdGuid.guid[15]);
+	(void) printf("Logical unit created: %s\n", guidAsciiBuf);
+
+done:
+	(void) stmfFreeLuResource(hdl);
+	return (ret);
+}
+
+/*
+ * createLuFunc
+ *
+ * Create a logical unit
+ *
+ */
+/*ARGSUSED*/
+static int
+modifyLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
+    void *args)
+{
+	stmfGuid inGuid;
+	unsigned int guid[sizeof (stmfGuid)];
+	int ret = 0;
+	int i;
+	char *fname = NULL;
+	char *lasts = NULL;
+	char sGuid[GUID_INPUT + 1];
+	char *prop = NULL;
+	char *propVal = NULL;
+	boolean_t fnameUsed = B_FALSE;
+	uint32_t propId;
+	cmdOptions_t *optionStart = options;
+
+
+	for (; options->optval; options++) {
+		switch (options->optval) {
+			case 'f':
+				fnameUsed = B_TRUE;
+				fname = operands[0];
+				break;
+		}
+	}
+	options = optionStart;
+
+	/* check input length */
+	if (!fnameUsed && strlen(operands[0]) != GUID_INPUT) {
+		(void) fprintf(stderr, "%s: %s: %s%d%s\n", cmdName, operands[0],
+		    gettext("must be "), GUID_INPUT,
+		    gettext(" hexadecimal digits"));
+		return (1);
+	}
+
+	if (!fnameUsed) {
+		/* convert to lower case for scan */
+		for (i = 0; i < 32; i++)
+			sGuid[i] = tolower(operands[0][i]);
+		sGuid[i] = 0;
+		(void) sscanf(sGuid,
+		    "%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x",
+		    &guid[0], &guid[1], &guid[2], &guid[3], &guid[4], &guid[5],
+		    &guid[6], &guid[7], &guid[8], &guid[9], &guid[10],
+		    &guid[11], &guid[12], &guid[13], &guid[14], &guid[15]);
+
+		for (i = 0; i < sizeof (stmfGuid); i++) {
+			inGuid.guid[i] = guid[i];
+		}
+	}
+
+	for (; options->optval; options++) {
+		switch (options->optval) {
+			case 'p':
+				prop = strtok_r(options->optarg, "=", &lasts);
+				if ((propVal = strtok_r(NULL, "=", &lasts))
+				    == NULL) {
+					(void) fprintf(stderr, "%s: %s: %s\n",
+					    cmdName, options->optarg,
+					gettext("invalid property specifier"
+					    "- prop=val\n"));
+					return (1);
+				}
+				ret = convertCharToPropId(prop, &propId);
+				if (ret != 0) {
+					(void) fprintf(stderr, "%s: %s: %s\n",
+					    cmdName,
+					gettext("invalid property specified"),
+					    prop);
+					return (1);
+				}
+				if (callModify(fname, &inGuid, propId, propVal,
+				    prop) != 0) {
+					return (1);
+				}
+				break;
+			case 's':
+				if (callModify(fname, &inGuid,
+				    STMF_LU_PROP_SIZE, options->optarg,
+				    "size") != 0) {
+					return (1);
+				}
+				break;
+			case 'f':
+				break;
+			default:
+				(void) fprintf(stderr, "%s: %c: %s\n",
+				    cmdName, options->optval,
+				    gettext("unknown option"));
+				return (1);
+		}
+	}
+	return (ret);
+}
+
+static int
+callModify(char *fname, stmfGuid *luGuid, uint32_t prop, const char *propVal,
+    const char *propString)
+{
+	int ret = 0;
+	int stmfRet = 0;
+
+	if (!fname) {
+		stmfRet = stmfModifyLu(luGuid, prop, propVal);
+	} else {
+		stmfRet = stmfModifyLuByFname(STMF_DISK, fname, prop,
+		    propVal);
+	}
+	switch (stmfRet) {
+		case STMF_STATUS_SUCCESS:
+			break;
+		case STMF_ERROR_BUSY:
+		case STMF_ERROR_LU_BUSY:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("resource busy"));
+			ret++;
+			break;
+		case STMF_ERROR_PERM:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("permission denied"));
+			ret++;
+			break;
+		case STMF_ERROR_INVALID_BLKSIZE:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("invalid block size"));
+			ret++;
+			break;
+		case STMF_ERROR_GUID_IN_USE:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("guid in use"));
+			ret++;
+			break;
+		case STMF_ERROR_META_FILE_NAME:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("meta file error"));
+			ret++;
+			break;
+		case STMF_ERROR_DATA_FILE_NAME:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("data file error"));
+			ret++;
+			break;
+		case STMF_ERROR_FILE_SIZE_INVALID:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("file size invalid"));
+			ret++;
+			break;
+		case STMF_ERROR_SIZE_OUT_OF_RANGE:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("invalid size"));
+			ret++;
+			break;
+		case STMF_ERROR_META_CREATION:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("could not create meta file"));
+			ret++;
+			break;
+		case STMF_ERROR_INVALID_PROP:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("invalid property for modify"));
+			ret++;
+			break;
+		case STMF_ERROR_WRITE_CACHE_SET:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("could not set write cache"));
+			ret++;
+			break;
+		default:
+			(void) fprintf(stderr, "%s: %s: %s: %d\n", cmdName,
+			    gettext("could not set property"), propString,
+			    stmfRet);
+			ret++;
+			break;
+	}
+
+	return (ret);
+}
+
+
+/*
+ * importLuFunc
+ *
+ * Create a logical unit
+ *
+ */
+/*ARGSUSED*/
+static int
+importLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
+    void *args)
+{
+	int stmfRet = 0;
+	int ret = 0;
+	char guidAsciiBuf[33];
+	stmfGuid createdGuid;
+
+	stmfRet = stmfImportLu(STMF_DISK, operands[0], &createdGuid);
+	switch (stmfRet) {
+		case STMF_STATUS_SUCCESS:
+			break;
+		case STMF_ERROR_BUSY:
+		case STMF_ERROR_LU_BUSY:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("resource busy"));
+			ret++;
+			break;
+		case STMF_ERROR_PERM:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("permission denied"));
+			ret++;
+			break;
+		case STMF_ERROR_FILE_IN_USE:
+			(void) fprintf(stderr, "%s: filename %s: %s\n", cmdName,
+			    operands[0], gettext("in use"));
+			ret++;
+			break;
+		case STMF_ERROR_GUID_IN_USE:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("guid in use"));
+			ret++;
+			break;
+		case STMF_ERROR_META_FILE_NAME:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("meta file error"));
+			ret++;
+			break;
+		case STMF_ERROR_DATA_FILE_NAME:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("data file error"));
+			ret++;
+			break;
+		case STMF_ERROR_META_CREATION:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("could not create meta file"));
+			ret++;
+			break;
+		case STMF_ERROR_WRITE_CACHE_SET:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("could not set write cache"));
+			ret++;
+			break;
+		default:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("unknown error"));
+			ret++;
+			break;
+	}
+
+	if (ret != STMF_STATUS_SUCCESS) {
+		goto done;
+	}
+
+	(void) snprintf(guidAsciiBuf, sizeof (guidAsciiBuf),
+	    "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X"
+	    "%02X%02X%02X%02X%02X%02X",
+	    createdGuid.guid[0], createdGuid.guid[1], createdGuid.guid[2],
+	    createdGuid.guid[3], createdGuid.guid[4], createdGuid.guid[5],
+	    createdGuid.guid[6], createdGuid.guid[7], createdGuid.guid[8],
+	    createdGuid.guid[9], createdGuid.guid[10], createdGuid.guid[11],
+	    createdGuid.guid[12], createdGuid.guid[13], createdGuid.guid[14],
+	    createdGuid.guid[15]);
+	(void) printf("Logical unit imported: %s\n", guidAsciiBuf);
+
+done:
+	return (ret);
+}
+
+static int
+setLuPropFromInput(luResource hdl, char *optarg)
+{
+	char *prop = NULL;
+	char *propVal = NULL;
+	char *lasts = NULL;
+	uint32_t propId;
+	int ret = 0;
+
+	prop = strtok_r(optarg, "=", &lasts);
+	if ((propVal = strtok_r(NULL, "=", &lasts)) == NULL) {
+		(void) fprintf(stderr, "%s: %s: %s\n",
+		    cmdName, optarg,
+		    gettext("invalid property specifier - prop=val\n"));
+		return (1);
+	}
+
+	ret = convertCharToPropId(prop, &propId);
+	if (ret != 0) {
+		(void) fprintf(stderr, "%s: %s: %s\n",
+		    cmdName, gettext("invalid property specified"), prop);
+		return (1);
+	}
+
+	ret = stmfSetLuProp(hdl, propId, propVal);
+	if (ret != STMF_STATUS_SUCCESS) {
+		(void) fprintf(stderr, "%s: %s %s: ",
+		    cmdName, gettext("unable to set"), prop);
+		switch (ret) {
+			case STMF_ERROR_INVALID_PROPSIZE:
+				(void) fprintf(stderr, "invalid length\n");
+				break;
+			case STMF_ERROR_INVALID_ARG:
+				(void) fprintf(stderr, "bad format\n");
+				break;
+			default:
+				(void) fprintf(stderr, "\n");
+				break;
+		}
+		return (1);
+	}
+
+	return (0);
+}
+
+static int
+convertCharToPropId(char *prop, uint32_t *propId)
+{
+	if (strcasecmp(prop, GUID) == 0) {
+		*propId = STMF_LU_PROP_GUID;
+	} else if (strcasecmp(prop, ALIAS) == 0) {
+		*propId = STMF_LU_PROP_ALIAS;
+	} else if (strcasecmp(prop, VID) == 0) {
+		*propId = STMF_LU_PROP_VID;
+	} else if (strcasecmp(prop, PID) == 0) {
+		*propId = STMF_LU_PROP_PID;
+	} else if (strcasecmp(prop, WRITE_PROTECT) == 0) {
+		*propId = STMF_LU_PROP_WRITE_PROTECT;
+	} else if (strcasecmp(prop, WRITEBACK_CACHE_DISABLE) == 0) {
+		*propId = STMF_LU_PROP_WRITE_CACHE_DISABLE;
+	} else if (strcasecmp(prop, BLOCK_SIZE) == 0) {
+		*propId = STMF_LU_PROP_BLOCK_SIZE;
+	} else if (strcasecmp(prop, SERIAL_NUMBER) == 0) {
+		*propId = STMF_LU_PROP_SERIAL_NUM;
+	} else if (strcasecmp(prop, COMPANY_ID) == 0) {
+		*propId = STMF_LU_PROP_COMPANY_ID;
+	} else if (strcasecmp(prop, META_FILE) == 0) {
+		*propId = STMF_LU_PROP_META_FILENAME;
+	} else {
+		return (1);
+	}
+	return (0);
+}
+
+/*
+ * deleteLuFunc
+ *
+ * Delete a logical unit
+ *
+ */
+/*ARGSUSED*/
+static int
+deleteLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
+    void *args)
+{
+	int i, j;
+	int ret = 0;
+	int stmfRet;
+	unsigned int inGuid[sizeof (stmfGuid)];
+	stmfGuid delGuid;
+	boolean_t keepViews = B_FALSE;
+	boolean_t viewEntriesRemoved = B_FALSE;
+	boolean_t noLunFound = B_FALSE;
+	boolean_t views = B_FALSE;
+	char sGuid[GUID_INPUT + 1];
+	stmfViewEntryList *viewEntryList = NULL;
+
+	for (; options->optval; options++) {
+		switch (options->optval) {
+			/* Keep views for logical unit */
+			case 'k':
+				keepViews = B_TRUE;
+				break;
+			default:
+				(void) fprintf(stderr, "%s: %c: %s\n",
+				    cmdName, options->optval,
+				    gettext("unknown option"));
+				return (1);
+		}
+	}
+
+
+	for (i = 0; i < operandLen; i++) {
+		for (j = 0; j < GUID_INPUT; j++) {
+			if (!isxdigit(operands[i][j])) {
+				break;
+			}
+			sGuid[j] = tolower(operands[i][j]);
+		}
+		if (j != GUID_INPUT) {
+			(void) fprintf(stderr, "%s: %s: %s%d%s\n",
+			    cmdName, operands[i], gettext("must be "),
+			    GUID_INPUT,
+			    gettext(" hexadecimal digits long"));
+			continue;
+		}
+
+		sGuid[j] = 0;
+
+		(void) sscanf(sGuid,
+		    "%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x%2x",
+		    &inGuid[0], &inGuid[1], &inGuid[2], &inGuid[3],
+		    &inGuid[4], &inGuid[5], &inGuid[6], &inGuid[7],
+		    &inGuid[8], &inGuid[9], &inGuid[10], &inGuid[11],
+		    &inGuid[12], &inGuid[13], &inGuid[14], &inGuid[15]);
+
+		for (j = 0; j < sizeof (stmfGuid); j++) {
+			delGuid.guid[j] = inGuid[j];
+		}
+
+		stmfRet = stmfDeleteLu(&delGuid);
+		switch (stmfRet) {
+			case STMF_STATUS_SUCCESS:
+				break;
+			case STMF_ERROR_NOT_FOUND:
+				noLunFound = B_TRUE;
+				break;
+			case STMF_ERROR_BUSY:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("resource busy"));
+				ret++;
+				break;
+			case STMF_ERROR_PERM:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("permission denied"));
+				ret++;
+				break;
+			default:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("unknown error"));
+				ret++;
+				break;
+		}
+
+		if (!keepViews) {
+			stmfRet = stmfGetViewEntryList(&delGuid,
+			    &viewEntryList);
+			if (stmfRet == STMF_STATUS_SUCCESS) {
+				for (j = 0; j < viewEntryList->cnt; j++) {
+					(void) stmfRemoveViewEntry(&delGuid,
+					    viewEntryList->ve[j].veIndex);
+				}
+				viewEntriesRemoved = B_TRUE;
+				stmfFreeMemory(viewEntryList);
+			} else if (stmfRet != STMF_ERROR_NOT_FOUND) {
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("unable to remove view entries\n"));
+				ret++;
+			} /* No view entries to remove */
+		}
+		if (keepViews) {
+			stmfRet = stmfGetViewEntryList(&delGuid,
+			    &viewEntryList);
+			if (stmfRet == STMF_STATUS_SUCCESS) {
+				views = B_TRUE;
+				stmfFreeMemory(viewEntryList);
+			}
+		}
+
+		if ((!viewEntriesRemoved && noLunFound && !views) ||
+		    (!views && keepViews && noLunFound)) {
+			(void) fprintf(stderr, "%s: %s: %s\n",
+			    cmdName, sGuid,
+			    gettext("not found"));
+			ret++;
+		}
+		noLunFound = viewEntriesRemoved = views = B_FALSE;
+	}
+	return (ret);
+}
+
+
+/*
  * createTargetGroupFunc
  *
  * Create a target group
@@ -1235,6 +1922,7 @@ listLuFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
 				    cmdName, operands[i], gettext("must be "),
 				    GUID_INPUT,
 				    gettext(" hexadecimal digits long"));
+				invalidInput = B_FALSE;
 				continue;
 			}
 
@@ -1296,6 +1984,8 @@ listLuFunc(int operandLen, char *operands[], cmdOptions_t *options, void *args)
 						(void) printf("unknown");
 					}
 					(void) printf("\n");
+					ret = printExtLuProps(
+					    &(luList->guid[j]));
 				}
 				if (found && operandEntered) {
 					break;
@@ -1320,6 +2010,154 @@ printGuid(stmfGuid *guid, FILE *stream)
 	for (i = 0; i < 16; i++) {
 		(void) fprintf(stream, "%02X", guid->guid[i]);
 	}
+}
+
+static int
+printExtLuProps(stmfGuid *guid)
+{
+	int stmfRet;
+	luResource hdl = NULL;
+	int ret = 0;
+	char propVal[MAXNAMELEN];
+	size_t propValSize = sizeof (propVal);
+
+	if ((stmfRet = stmfGetLuResource(guid, &hdl))
+	    != STMF_STATUS_SUCCESS) {
+		switch (stmfRet) {
+			case STMF_ERROR_BUSY:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("resource busy"));
+				break;
+			case STMF_ERROR_PERM:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("permission denied"));
+				break;
+			case STMF_ERROR_NOT_FOUND:
+				/* No error here */
+				return (0);
+				break;
+			default:
+				(void) fprintf(stderr, "%s: %s\n", cmdName,
+				    gettext("get extended properties failed"));
+				break;
+		}
+		return (1);
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_FILENAME, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Data File");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_META_FILENAME, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Meta File");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_SIZE, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Size");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_BLOCK_SIZE, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Block Size");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_VID, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Vendor ID");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_PID, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Product ID");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_SERIAL_NUM, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Serial Num");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_WRITE_PROTECT, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Write Protect");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n",
+		    strcasecmp(propVal, "true") ? "Disabled" : "Enabled");
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_WRITE_CACHE_DISABLE, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Writeback Cache");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n",
+		    strcasecmp(propVal, "true") ? "Enabled" : "Disabled");
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+
+	(void) stmfFreeLuResource(hdl);
+	return (ret);
+
 }
 
 
@@ -1479,8 +2317,8 @@ getStmfState(stmfState *state)
 			    gettext("STMF service version incorrect"));
 			break;
 		default:
-			(void) fprintf(stderr, "%s: %s\n", cmdName,
-			    gettext("unknown error"));
+			(void) fprintf(stderr, "%s: %s: %d\n", cmdName,
+			    gettext("unknown error"), ret);
 			break;
 	}
 	return (ret);
