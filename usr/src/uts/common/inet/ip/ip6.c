@@ -633,6 +633,10 @@ icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
 			}
 			ip1dbg(("Received mtu from router: %d\n", mtu));
 			ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
+			if (ire->ire_max_frag == mtu) {
+				/* Decreased it */
+				ire->ire_marks |= IRE_MARK_PMTU;
+			}
 			/* Record the new max frag size for the ULP. */
 			if (ire->ire_frag_flag & IPH_FRAG_HDR) {
 				/*
@@ -691,6 +695,10 @@ icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
 
 				ip1dbg(("Received mtu from router: %d\n", mtu));
 				ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
+				if (ire->ire_max_frag == mtu) {
+					/* Decreased it */
+					ire->ire_marks |= IRE_MARK_PMTU;
+				}
 				/* Record the new max frag size for the ULP. */
 				if (ire->ire_frag_flag & IPH_FRAG_HDR) {
 					/*

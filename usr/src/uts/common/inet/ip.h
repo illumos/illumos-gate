@@ -629,6 +629,11 @@ typedef struct ip_m_s {
 #define	IRE_MARK_CONDEMNED	0x0001
 
 /*
+ * An IRE with IRE_MARK_PMTU has ire_max_frag set from an ICMP error.
+ */
+#define	IRE_MARK_PMTU		0x0002
+
+/*
  * An IRE with IRE_MARK_TESTHIDDEN is used by in.mpathd for test traffic.  It
  * can only be looked up by requesting MATCH_IRE_MARK_TESTHIDDEN.
  */

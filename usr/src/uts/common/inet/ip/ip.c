@@ -2308,6 +2308,10 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 			ire->ire_frag_flag = 0;
 		/* Reduce the IRE max frag value as advised. */
 		ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
+		if (ire->ire_max_frag == mtu) {
+			/* Decreased it */
+			ire->ire_marks |= IRE_MARK_PMTU;
+		}
 		mutex_exit(&ire->ire_lock);
 		DTRACE_PROBE4(ip4__pmtu__change, icmph_t *, icmph, ire_t *,
 		    ire, int, orig_mtu, int, mtu);

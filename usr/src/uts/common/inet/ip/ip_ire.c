@@ -1857,6 +1857,7 @@ ire_expire(ire_t *ire, char *arg)
 			ire->ire_max_frag = MIN(ire->ire_ipif->ipif_mtu,
 			    IP_MAXPACKET);
 		}
+		ire->ire_marks &= ~IRE_MARK_PMTU;
 		ire->ire_frag_flag |= IPH_DF;
 		mutex_exit(&ire->ire_lock);
 	}

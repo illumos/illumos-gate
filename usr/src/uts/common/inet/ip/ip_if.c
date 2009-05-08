@@ -15369,7 +15369,17 @@ ipif_mtu_change(ire_t *ire, char *ipif_arg)
 
 	if (ire->ire_stq == NULL || ire->ire_ipif != ipif)
 		return;
-	ire->ire_max_frag = MIN(ipif->ipif_mtu, IP_MAXPACKET);
+
+	mutex_enter(&ire->ire_lock);
+	if (ire->ire_marks & IRE_MARK_PMTU) {
+		/* Avoid increasing the PMTU */
+		ire->ire_max_frag = MIN(ipif->ipif_mtu, ire->ire_max_frag);
+		if (ire->ire_max_frag == ipif->ipif_mtu)
+			ire->ire_marks &= ~IRE_MARK_PMTU;
+	} else {
+		ire->ire_max_frag = MIN(ipif->ipif_mtu, IP_MAXPACKET);
+	}
+	mutex_exit(&ire->ire_lock);
 }
 
 /*
@@ -15384,7 +15394,19 @@ ill_mtu_change(ire_t *ire, char *ill_arg)
 
 	if (ire->ire_stq == NULL || ire->ire_ipif->ipif_ill != ill)
 		return;
-	ire->ire_max_frag = ire->ire_ipif->ipif_mtu;
+
+	mutex_enter(&ire->ire_lock);
+	if (ire->ire_marks & IRE_MARK_PMTU) {
+		/* Avoid increasing the PMTU */
+		ire->ire_max_frag = MIN(ire->ire_ipif->ipif_mtu,
+		    ire->ire_max_frag);
+		if (ire->ire_max_frag == ire->ire_ipif->ipif_mtu) {
+			ire->ire_marks &= ~IRE_MARK_PMTU;
+		}
+	} else {
+		ire->ire_max_frag = MIN(ire->ire_ipif->ipif_mtu, IP_MAXPACKET);
+	}
+	mutex_exit(&ire->ire_lock);
 }
 
 /*
