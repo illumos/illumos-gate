@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SDT_H
 #define	_SYS_SDT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -258,6 +256,26 @@ extern "C" {
 	    type4, arg4)						\
 	DTRACE_PROBE4(__xpv_##name, type1, arg1, type2, arg2, 		\
 	    type3, arg3, type4, arg4);
+
+#define	DTRACE_FC_1(name, type1, arg1) \
+	DTRACE_PROBE1(__fc_##name, type1, arg1);
+
+#define	DTRACE_FC_2(name, type1, arg1, type2, arg2) \
+	DTRACE_PROBE2(__fc_##name, type1, arg1, type2, arg2);
+
+#define	DTRACE_FC_3(name, type1, arg1, type2, arg2, type3, arg3) \
+	DTRACE_PROBE3(__fc_##name, type1, arg1, type2, arg2, type3, arg3);
+
+#define	DTRACE_FC_4(name, type1, arg1, type2, arg2, type3, arg3, type4, arg4) \
+	DTRACE_PROBE4(__fc_##name, type1, arg1, type2, arg2, type3, arg3, \
+	    type4, arg4);
+
+#define	DTRACE_FC_5(name, type1, arg1, type2, arg2, type3, arg3, 	\
+	    type4, arg4, type5, arg5)					\
+	DTRACE_PROBE5(__fc_##name, type1, arg1, type2, arg2, type3, arg3, \
+	    type4, arg4, type5, arg5);
+
+
 
 #endif /* _KERNEL */
 

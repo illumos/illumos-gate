@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_FCT_DEFINES_H
@@ -206,6 +206,11 @@ typedef	stmf_status_t	fct_status_t;
 	(((x) >= NPORT_ID_DOM_CTLR_START) && ((x) <= NPORT_ID_DOM_CTLR_END)))
 
 #define	FC_WWN_LEN		8
+/*
+ * NB: FC_WWN_BUFLEN should be 64-bit aligned (divisible by 8).
+ */
+#define	FC_WWN_BUFLEN		(FC_WWN_LEN * 3)
+#define	FC_WWN_STRLEN		(FC_WWN_BUFLEN - 1)	/* add trailing null */
 
 struct fct_cmd;
 struct fct_local_port;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sdt_impl.h>
 
@@ -41,6 +39,14 @@ static dtrace_pattr_t info_attr = {
 { DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
 { DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
 { DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_ISA },
+};
+
+static dtrace_pattr_t fc_attr = {
+{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_ISA },
+{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
 };
 
 static dtrace_pattr_t fpu_attr = {
@@ -97,6 +103,7 @@ sdt_provider_t sdt_providers[] = {
 	{ "nfsv3", "__nfsv3_", &stab_attr, 0 },
 	{ "nfsv4", "__nfsv4_", &stab_attr, 0 },
 	{ "xpv", "__xpv_", &xpv_attr, 0 },
+	{ "fc", "__fc_", &fc_attr, 0 },
 	{ "sysevent", "__sysevent_", &stab_attr, 0 },
 	{ "sdt", NULL, &sdt_attr, 0 },
 	{ NULL }
@@ -864,6 +871,84 @@ sdt_argdesc_t sdt_args[] = {
 	{ "xpv", "setvcpucontext-end", 0, 0, "int" },
 	{ "xpv", "setvcpucontext-start", 0, 0, "domid_t" },
 	{ "xpv", "setvcpucontext-start", 1, 1, "vcpu_guest_context_t *" },
+
+	{ "fc", "link-up",   0, 0, "fct_i_local_port_t *", "conninfo_t *" },
+	{ "fc", "link-down", 0, 0, "fct_i_local_port_t *", "conninfo_t *" },
+	{ "fc", "fabric-login-start", 0, 0, "fct_i_local_port_t *",
+	    "conninfo_t *" },
+	{ "fc", "fabric-login-start", 1, 0, "fct_i_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "fabric-login-end", 0, 0, "fct_i_local_port_t *",
+	    "conninfo_t *" },
+	{ "fc", "fabric-login-end", 1, 0, "fct_i_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-login-start", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "rport-login-start", 1, 1, "fct_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-login-start", 2, 2, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-login-start", 3, 3, "int", "int" },
+	{ "fc", "rport-login-end", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "rport-login-end", 1, 1, "fct_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-login-end", 2, 2, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-login-end", 3, 3, "int", "int" },
+	{ "fc", "rport-login-end", 4, 4, "int", "int" },
+	{ "fc", "rport-logout-start", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "rport-logout-start", 1, 1, "fct_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-logout-start", 2, 2, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-logout-start", 3, 3, "int", "int" },
+	{ "fc", "rport-logout-end", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "rport-logout-end", 1, 1, "fct_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-logout-end", 2, 2, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "rport-logout-end", 3, 3, "int", "int" },
+	{ "fc", "scsi-command", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "scsi-command", 1, 1, "fct_i_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "scsi-command", 2, 2, "scsi_task_t *",
+	    "scsicmd_t *" },
+	{ "fc", "scsi-command", 3, 3, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "scsi-response", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "scsi-response", 1, 1, "fct_i_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "scsi-response", 2, 2, "scsi_task_t *",
+	    "scsicmd_t *" },
+	{ "fc", "scsi-response", 3, 3, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "xfer-start", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "xfer-start", 1, 1, "fct_i_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "xfer-start", 2, 2, "scsi_task_t *",
+	    "scsicmd_t *" },
+	{ "fc", "xfer-start", 3, 3, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "xfer-start", 4, 4, "stmf_data_buf_t *",
+	    "fc_xferinfo_t *" },
+	{ "fc", "xfer-done", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "xfer-done", 1, 1, "fct_i_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "xfer-done", 2, 2, "scsi_task_t *",
+	    "scsicmd_t *" },
+	{ "fc", "xfer-done", 3, 3, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "xfer-done", 4, 4, "stmf_data_buf_t *",
+	    "fc_xferinfo_t *" },
+
+
 	{ NULL }
 };
 

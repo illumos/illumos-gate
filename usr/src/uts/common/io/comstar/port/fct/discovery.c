@@ -34,6 +34,7 @@
 #include <sys/byteorder.h>
 #include <sys/varargs.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 #include <stmf.h>
 #include <stmf_ioctl.h>
@@ -267,8 +268,16 @@ fct_handle_local_port_event(fct_i_local_port_t *iport)
 	mutex_exit(&iport->iport_worker_lock);
 
 	rw_enter(&iport->iport_lock, RW_WRITER);
+
+	if (in->event_type == FCT_EVENT_LINK_UP) {
+		DTRACE_FC_1(link__up, fct_i_local_port_t, iport);
+	} else if (in->event_type == FCT_EVENT_LINK_DOWN) {
+		DTRACE_FC_1(link__down, fct_i_local_port_t, iport);
+	}
+
 	/* Calculate new state */
 	new_state = iport->iport_link_state;
+
 	if (in->event_type == FCT_EVENT_LINK_DOWN) {
 		new_state = PORT_STATE_LINK_DOWN_CLEANING;
 	} else if (in->event_type == FCT_EVENT_LINK_UP) {
@@ -404,6 +413,8 @@ fct_do_flogi(fct_i_local_port_t *iport)
 	int force_link_down = 0;
 	int do_retry = 0;
 
+	DTRACE_FC_1(fabric__login__start, fct_i_local_port_t, iport);
+
 	bzero(&fx, sizeof (fx));
 	fx.fx_op = ELS_OP_FLOGI;
 	if (iport->iport_login_retry == 0) {
@@ -422,14 +433,14 @@ fct_do_flogi(fct_i_local_port_t *iport)
 	mutex_enter(&iport->iport_worker_lock);
 	if (IPORT_FLOGI_DONE(iport)) {
 		/* The unsolicited path finished it. */
-		return;
+		goto done;
 	}
 	if (ret == FCT_NOT_FOUND) {
 		if (iport->iport_link_info.port_topology &
 		    PORT_TOPOLOGY_PRIVATE_LOOP) {
 			/* This is a private loop. There is no switch. */
 			iport->iport_link_info.port_no_fct_flogi = 1;
-			return;
+			goto done;
 		}
 		/*
 		 * This is really an error. This means we cannot init the
@@ -453,7 +464,7 @@ fct_do_flogi(fct_i_local_port_t *iport)
 		iport->iport_login_retry++;
 		if (iport->iport_login_retry >= 5)
 			force_link_down = 1;
-		return;
+		goto done;
 	}
 
 	if (force_link_down) {
@@ -464,7 +475,7 @@ fct_do_flogi(fct_i_local_port_t *iport)
 		mutex_exit(&iport->iport_worker_lock);
 		fct_handle_event(iport->iport_port, FCT_EVENT_LINK_DOWN, 0, 0);
 		mutex_enter(&iport->iport_worker_lock);
-		return;
+		goto done;
 	}
 
 	/* FLOGI succeeded. Update local port state */
@@ -477,6 +488,10 @@ fct_do_flogi(fct_i_local_port_t *iport)
 		iport->iport_link_info.portid = fx.fx_did;
 	}
 	iport->iport_link_info.port_fct_flogi_done = 1;
+
+done:
+	DTRACE_FC_1(fabric__login__end,
+	    fct_i_local_port_t, iport);
 }
 
 /*
@@ -1380,6 +1395,12 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 	clock_t			 end_time;
 	char			 info[160];
 
+	DTRACE_FC_4(rport__login__start,
+	    fct_cmd_t, cmd,
+	    fct_local_port_t, port,
+	    fct_i_remote_port_t, irp,
+	    int, (cmd_type != FCT_CMD_RCVD_ELS));
+
 	/* Drain I/Os */
 	if ((irp->irp_nonfcp_xchg_count + irp->irp_fcp_xchg_count) > 1) {
 		/* Trigger cleanup if necessary */
@@ -1439,6 +1460,11 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 		bcopy(p+28, rp->rp_nwwn, 8);
 		bcopy(port->port_pwwn, p+20, 8);
 		bcopy(port->port_nwwn, p+28, 8);
+		fct_wwn_to_str(rp->rp_pwwn_str, rp->rp_pwwn);
+		fct_wwn_to_str(rp->rp_nwwn_str, rp->rp_nwwn);
+		fct_wwn_to_str(port->port_pwwn_str, port->port_pwwn);
+		fct_wwn_to_str(port->port_nwwn_str, port->port_nwwn);
+
 		stmf_wwn_to_devid_desc((scsi_devid_desc_t *)irp->irp_id,
 		    rp->rp_pwwn, PROTOCOL_FIBRE_CHANNEL);
 	}
@@ -1498,12 +1524,26 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 				irp->irp_deregister_timer = 0;
 		}
 		if (icmd_flags & ICMD_IMPLICIT) {
+			DTRACE_FC_5(rport__login__end,
+			    fct_cmd_t, cmd,
+			    fct_local_port_t, port,
+			    fct_i_remote_port_t, irp,
+			    int, (cmd_type != FCT_CMD_RCVD_ELS),
+			    int, FCT_SUCCESS);
+
 			p = els->els_resp_payload;
 			p[0] = ELS_OP_ACC;
 			cmd->cmd_comp_status = FCT_SUCCESS;
 			fct_send_cmd_done(cmd, FCT_SUCCESS, FCT_IOF_FCA_DONE);
 		}
 	} else {
+		DTRACE_FC_5(rport__login__end,
+		    fct_cmd_t, cmd,
+		    fct_local_port_t, port,
+		    fct_i_remote_port_t, irp,
+		    int, (cmd_type != FCT_CMD_RCVD_ELS),
+		    int, ret);
+
 		fct_queue_cmd_for_termination(cmd, ret);
 	}
 
@@ -1685,6 +1725,12 @@ fct_process_logo(fct_i_cmd_t *icmd)
 	char			 info[160];
 	clock_t			 end_time;
 
+	DTRACE_FC_4(rport__logout__start,
+	    fct_cmd_t, cmd,
+	    fct_local_port_t, port,
+	    fct_i_remote_port_t, irp,
+	    int, (cmd->cmd_type != FCT_CMD_RCVD_ELS));
+
 	/* Drain I/Os */
 	if ((irp->irp_nonfcp_xchg_count + irp->irp_fcp_xchg_count) > 1) {
 		/* Trigger cleanup if necessary */
@@ -1752,7 +1798,20 @@ fct_process_logo(fct_i_cmd_t *icmd)
 		if (ret != FCT_SUCCESS) {
 			fct_queue_cmd_for_termination(cmd, ret);
 		}
+
+		DTRACE_FC_4(rport__logout__end,
+		    fct_cmd_t, cmd,
+		    fct_local_port_t, port,
+		    fct_i_remote_port_t, irp,
+		    int, (cmd->cmd_type != FCT_CMD_RCVD_ELS));
+
 	} else {
+		DTRACE_FC_4(rport__logout__end,
+		    fct_cmd_t, cmd,
+		    fct_local_port_t, port,
+		    fct_i_remote_port_t, irp,
+		    int, (cmd->cmd_type != FCT_CMD_RCVD_ELS));
+
 		fct_cmd_free(cmd);
 	}
 

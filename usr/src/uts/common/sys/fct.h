@@ -55,6 +55,8 @@ typedef struct fct_remote_port {
 	void		*rp_fca_private;
 
 	struct fct_local_port *rp_port;
+	char		rp_nwwn_str[FC_WWN_BUFLEN];
+	char		rp_pwwn_str[FC_WWN_BUFLEN];
 	uint8_t		rp_nwwn[FC_WWN_LEN];
 	uint8_t		rp_pwwn[FC_WWN_LEN];
 	uint32_t	rp_id;		/* 8 or 24 bit */
@@ -188,6 +190,8 @@ typedef struct fct_local_port {
 	void			*port_fca_private;
 	stmf_local_port_t	*port_lport;
 
+	char			port_nwwn_str[FC_WWN_BUFLEN];
+	char			port_pwwn_str[FC_WWN_BUFLEN];
 	uint8_t			port_nwwn[FC_WWN_LEN];
 	uint8_t			port_pwwn[FC_WWN_LEN];
 	char			*port_default_alias;
@@ -372,6 +376,7 @@ fct_status_t fct_handle_rcvd_flogi(fct_local_port_t *port,
 void fct_log_local_port_event(fct_local_port_t *port, char *subclass);
 void fct_log_remote_port_event(fct_local_port_t *port, char *subclass,
     uint8_t *rp_pwwn, uint32_t rp_id);
+void fct_wwn_to_str(char *to_ptr, const uint8_t *from_ptr);
 
 #ifdef	__cplusplus
 }

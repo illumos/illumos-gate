@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,7 +220,7 @@ _init(void)
 	if (ret == 0) {
 		mutex_init(&qlt_global_lock, 0, MUTEX_DRIVER, 0);
 		qlt_pp = (stmf_port_provider_t *)stmf_alloc(
-			    STMF_STRUCT_PORT_PROVIDER, 0, 0);
+		    STMF_STRUCT_PORT_PROVIDER, 0, 0);
 		qlt_pp->pp_portif_rev = PORTIF_REV_1;
 		qlt_pp->pp_name = qlt_provider_name;
 		if (stmf_register_port_provider(qlt_pp) != STMF_SUCCESS) {
@@ -295,7 +295,7 @@ qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if ((qlt = (qlt_state_t *)ddi_get_soft_state(qlt_state, instance))
-		== NULL) {
+	    == NULL) {
 		goto attach_fail_1;
 	}
 	qlt->instance = instance;
@@ -373,12 +373,12 @@ qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto attach_fail_8;
 
 	(void) snprintf(qlt->qlt_minor_name, sizeof (qlt->qlt_minor_name),
-				"qlt%d", instance);
+	    "qlt%d", instance);
 	(void) snprintf(qlt->qlt_port_alias, sizeof (qlt->qlt_port_alias),
 	    "%s,0", qlt->qlt_minor_name);
 
 	if (ddi_create_minor_node(dip, qlt->qlt_minor_name, S_IFCHR,
-				instance, DDI_NT_STMF_PP, 0) != DDI_SUCCESS) {
+	    instance, DDI_NT_STMF_PP, 0) != DDI_SUCCESS) {
 		goto attach_fail_9;
 	}
 
@@ -426,7 +426,7 @@ qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			cmn_err(CE_WARN, "qlt(%d) malformed "
 			    "pci-max-read-request in qlt.conf. Valid values "
 			    "for this HBA are 128/256/512/1024/2048/4096",
-				instance);
+			    instance);
 			goto over_max_read_xfer_setting;
 		}
 		mr = PCICFG_RD16(qlt, 0x54);
@@ -456,7 +456,7 @@ over_max_read_xfer_setting:;
 			cmn_err(CE_WARN, "qlt(%d) malformed "
 			    "pcie-max-payload-size in qlt.conf. Valid values "
 			    "for this HBA are 128/256/512/1024",
-				instance);
+			    instance);
 			goto over_max_payload_setting;
 		}
 		mr = PCICFG_RD16(qlt, 0x54);
@@ -514,7 +514,7 @@ qlt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	instance = ddi_get_instance(dip);
 	if ((qlt = (qlt_state_t *)ddi_get_soft_state(qlt_state, instance))
-					== NULL) {
+	    == NULL) {
 		return (DDI_FAILURE);
 	}
 
@@ -523,7 +523,7 @@ qlt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	if ((qlt->qlt_state != FCT_STATE_OFFLINE) ||
-				qlt->qlt_state_not_acked) {
+	    qlt->qlt_state_not_acked) {
 		return (DDI_FAILURE);
 	}
 	if (qlt_port_stop((caddr_t)qlt) != FCT_SUCCESS)
@@ -861,13 +861,14 @@ qlt_populate_hba_fru_details(struct fct_local_port *port,
 		kmem_free(bufp, len);
 		bufp = NULL;
 	} else {
+#ifdef __sparc
+#define	FCHBA_OPTION_ROM_ERR_TEXT	"No Fcode found"
+#else
+#define	FCHBA_OPTION_ROM_ERR_TEXT	"N/A"
+#endif
 		(void) snprintf(port_attrs->option_rom_version,
 		    FCHBA_OPTION_ROM_VERSION_LEN, "%s",
-#ifdef __sparc
-		    "No Fcode found");
-#else
-		    "N/A");
-#endif
+		    FCHBA_OPTION_ROM_ERR_TEXT);
 	}
 	port_attrs->vendor_specific_id = qlt->nvram->subsystem_vendor_id[0] |
 	    qlt->nvram->subsystem_vendor_id[1] << 8;
@@ -918,6 +919,8 @@ qlt_port_start(caddr_t arg)
 	port->port_fca_abort_timeout = 5 * 1000;	/* 5 seconds */
 	bcopy(qlt->nvram->node_name, port->port_nwwn, 8);
 	bcopy(qlt->nvram->port_name, port->port_pwwn, 8);
+	fct_wwn_to_str(port->port_nwwn_str, port->port_nwwn);
+	fct_wwn_to_str(port->port_pwwn_str, port->port_pwwn);
 	port->port_default_alias = qlt->qlt_port_alias;
 	port->port_pp = qlt_pp;
 	port->port_fds = fds;
@@ -1044,7 +1047,7 @@ qlt_port_online(qlt_state_t *qlt)
 	SETELSBIT(elsbmp, ELS_OP_RSCN);
 	SETELSBIT(elsbmp, ELS_OP_RNID);
 	(void) ddi_dma_sync(qlt->queue_mem_dma_handle, MBOX_DMA_MEM_OFFSET, 32,
-		DDI_DMA_SYNC_FORDEV);
+	    DDI_DMA_SYNC_FORDEV);
 	ret = qlt_raw_mailbox_command(qlt);
 	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
 	if (ret != QLT_SUCCESS) {
@@ -1099,7 +1102,7 @@ qlt_port_online(qlt_state_t *qlt)
 	DMEM_WR16(qlt, icb+0x58, 2);	/* Interrupt delay Timer */
 	DMEM_WR16(qlt, icb+0x5a, 4);	/* Login timeout (secs) */
 	DMEM_WR32(qlt, icb+0x5c, BIT_11 | BIT_5 | BIT_4 |
-				BIT_2 | BIT_1 | BIT_0);
+	    BIT_2 | BIT_1 | BIT_0);
 	DMEM_WR32(qlt, icb+0x60, BIT_5);
 	DMEM_WR32(qlt, icb+0x64, BIT_14 | BIT_8 | BIT_7 | BIT_4);
 	qlt_dmem_dma_sync(mcp->dbuf, DDI_DMA_SYNC_FORDEV);
@@ -1149,7 +1152,7 @@ qlt_port_offline(qlt_state_t *qlt)
 
 	/* Wait to grab the mailboxes */
 	for (retries = 0; qlt->mbox_io_state != MBOX_STATE_READY;
-				retries++) {
+	    retries++) {
 		cv_wait(&qlt->mbox_cv, &qlt->mbox_lock);
 		if ((retries > 5) ||
 		    (qlt->mbox_io_state == MBOX_STATE_UNKNOWN)) {
@@ -1203,7 +1206,7 @@ link_info_retry:
 		fc_ret = FCT_FAILURE;
 	} else {
 		li->portid = ((uint32_t)(mcp->from_fw[2])) |
-			(((uint32_t)(mcp->from_fw[3])) << 16);
+		    (((uint32_t)(mcp->from_fw[3])) << 16);
 
 		li->port_speed = qlt->link_speed;
 		switch (mcp->from_fw[6]) {
@@ -1459,7 +1462,7 @@ qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		}
 		qlt->fw_length01 = intp[3];
 		qlt->fw_code01 = (uint32_t *)kmem_alloc(iocd->stmf_ibuf_size,
-								KM_SLEEP);
+		    KM_SLEEP);
 		bcopy(intp, qlt->fw_code01, iocd->stmf_ibuf_size);
 		qlt->fw_addr01 = intp[2];
 		qlt->fw_code02 = &qlt->fw_code01[intp[3]];
@@ -1698,8 +1701,8 @@ qlt_get_req_entries(qlt_state_t *qlt, uint32_t n)
 
 		qlt->req_ndx_from_fw = val1;
 		qlt->req_available = REQUEST_QUEUE_ENTRIES - 1 -
-			((qlt->req_ndx_to_fw - qlt->req_ndx_from_fw) &
-			    (REQUEST_QUEUE_ENTRIES - 1));
+		    ((qlt->req_ndx_to_fw - qlt->req_ndx_from_fw) &
+		    (REQUEST_QUEUE_ENTRIES - 1));
 		if (qlt->req_available < n) {
 			if (try < 2) {
 				drv_usecwait(100);
@@ -1743,8 +1746,8 @@ qlt_get_preq_entries(qlt_state_t *qlt, uint32_t n)
 {
 	int try = 0;
 	uint32_t req_available = PRIORITY_QUEUE_ENTRIES - 1 -
-		((qlt->preq_ndx_to_fw - qlt->preq_ndx_from_fw) &
-		    (PRIORITY_QUEUE_ENTRIES - 1));
+	    ((qlt->preq_ndx_to_fw - qlt->preq_ndx_from_fw) &
+	    (PRIORITY_QUEUE_ENTRIES - 1));
 
 	while (req_available < n) {
 		uint32_t val1, val2, val3;
@@ -1756,8 +1759,8 @@ qlt_get_preq_entries(qlt_state_t *qlt, uint32_t n)
 
 		qlt->preq_ndx_from_fw = val1;
 		req_available = PRIORITY_QUEUE_ENTRIES - 1 -
-			((qlt->preq_ndx_to_fw - qlt->preq_ndx_from_fw) &
-			(PRIORITY_QUEUE_ENTRIES - 1));
+		    ((qlt->preq_ndx_to_fw - qlt->preq_ndx_from_fw) &
+		    (PRIORITY_QUEUE_ENTRIES - 1));
 		if (req_available < n) {
 			if (try < 2) {
 				drv_usecwait(100);
@@ -1825,7 +1828,7 @@ qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
 
 	/* Reset the Chip */
 	REG_WR32(qlt, REG_CTRL_STATUS,
-		DMA_SHUTDOWN_CTRL | PCI_X_XFER_CTRL | CHIP_SOFT_RESET);
+	    DMA_SHUTDOWN_CTRL | PCI_X_XFER_CTRL | CHIP_SOFT_RESET);
 
 	qlt->qlt_link_up = 0;
 
@@ -1848,7 +1851,7 @@ qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
 	/* Load the two segments */
 	if (qlt->fw_code01 != NULL) {
 		ret = qlt_load_risc_ram(qlt, qlt->fw_code01, qlt->fw_length01,
-						qlt->fw_addr01);
+		    qlt->fw_addr01);
 		if (ret == QLT_SUCCESS) {
 			ret = qlt_load_risc_ram(qlt, qlt->fw_code02,
 			    qlt->fw_length02, qlt->fw_addr02);
@@ -1856,18 +1859,18 @@ qlt_reset_chip_and_download_fw(qlt_state_t *qlt, int reset_only)
 		start_addr = qlt->fw_addr01;
 	} else if (qlt->qlt_25xx_chip) {
 		ret = qlt_load_risc_ram(qlt, fw2500_code01, fw2500_length01,
-						fw2500_addr01);
+		    fw2500_addr01);
 		if (ret == QLT_SUCCESS) {
 			ret = qlt_load_risc_ram(qlt, fw2500_code02,
-					fw2500_length02, fw2500_addr02);
+			    fw2500_length02, fw2500_addr02);
 		}
 		start_addr = fw2500_addr01;
 	} else {
 		ret = qlt_load_risc_ram(qlt, fw2400_code01, fw2400_length01,
-						fw2400_addr01);
+		    fw2400_addr01);
 		if (ret == QLT_SUCCESS) {
 			ret = qlt_load_risc_ram(qlt, fw2400_code02,
-					fw2400_length02, fw2400_addr02);
+			    fw2400_length02, fw2400_addr02);
 		}
 		start_addr = fw2400_addr01;
 	}
@@ -1928,12 +1931,12 @@ qlt_load_risc_ram(qlt_state_t *qlt, uint32_t *host_addr,
 		cur_host_addr = &(host_addr[words_sent]);
 		cur_risc_addr = risc_addr + (words_sent << 2);
 		words_being_sent = min(word_count - words_sent,
-			TOTAL_DMA_MEM_SIZE >> 2);
+		    TOTAL_DMA_MEM_SIZE >> 2);
 		ddi_rep_put32(qlt->queue_mem_acc_handle, cur_host_addr,
 		    (uint32_t *)qlt->queue_mem_ptr, words_being_sent,
 		    DDI_DEV_AUTOINCR);
 		(void) ddi_dma_sync(qlt->queue_mem_dma_handle, 0,
-				words_being_sent << 2, DDI_DMA_SYNC_FORDEV);
+		    words_being_sent << 2, DDI_DMA_SYNC_FORDEV);
 		da = qlt->queue_mem_cookie.dmac_laddress;
 		REG_WR16(qlt, REG_MBOX(0), 0x0B);
 		REG_WR16(qlt, REG_MBOX(1), risc_addr & 0xffff);
@@ -2061,7 +2064,7 @@ qlt_mailbox_command(qlt_state_t *qlt, mbox_cmd_t *mcp)
 
 	/* Wait to grab the mailboxes */
 	for (retries = 0; qlt->mbox_io_state != MBOX_STATE_READY;
-				retries++) {
+	    retries++) {
 		cv_wait(&qlt->mbox_cv, &qlt->mbox_lock);
 		if ((retries > 5) ||
 		    (qlt->mbox_io_state == MBOX_STATE_UNKNOWN)) {
@@ -2222,7 +2225,7 @@ intr_again:;
 		} else if (code == 0x8012) {
 			qlt->qlt_link_up = 0;
 			fct_handle_event(qlt->qlt_port, FCT_EVENT_LINK_DOWN,
-						0, 0);
+			    0, 0);
 		} else if (code == 0x8011) {
 			switch (mbox1) {
 			case 0: qlt->link_speed = PORT_SPEED_1G;
@@ -2238,7 +2241,7 @@ intr_again:;
 			}
 			qlt->qlt_link_up = 1;
 			fct_handle_event(qlt->qlt_port, FCT_EVENT_LINK_UP,
-						0, 0);
+			    0, 0);
 		} else if (code == 0x8002) {
 			(void) snprintf(info, 80,
 			    "Got 8002, mb1=%x mb2=%x mb5=%x mb6=%x",
@@ -2254,13 +2257,13 @@ intr_again:;
 		if (qlt->mbox_io_state != MBOX_STATE_CMD_RUNNING) {
 			cmn_err(CE_WARN, "qlt(%d): mailbox completion received"
 			    " when driver wasn't waiting for it %d",
-				instance, qlt->mbox_io_state);
+			    instance, qlt->mbox_io_state);
 		} else {
 			for (i = 0; i < MAX_MBOXES; i++) {
 				if (qlt->mcp->from_fw_mask &
 				    (((uint32_t)1) << i)) {
 					qlt->mcp->from_fw[i] =
-						REG_RD16(qlt, REG_MBOX(i));
+					    REG_RD16(qlt, REG_MBOX(i));
 				}
 			}
 			qlt->mbox_io_state = MBOX_STATE_CMD_DONE;
@@ -2329,10 +2332,10 @@ qlt_read_nvram(qlt_state_t *qlt)
 
 	if (qlt->qlt_25xx_chip) {
 		addr = REG_RD32(qlt, REG_CTRL_STATUS) & FUNCTION_NUMBER ?
-			QLT25_NVRAM_FUNC1_ADDR : QLT25_NVRAM_FUNC0_ADDR;
+		    QLT25_NVRAM_FUNC1_ADDR : QLT25_NVRAM_FUNC0_ADDR;
 	} else {
 		addr = REG_RD32(qlt, REG_CTRL_STATUS) & FUNCTION_NUMBER ?
-				NVRAM_FUNC1_ADDR : NVRAM_FUNC0_ADDR;
+		    NVRAM_FUNC1_ADDR : NVRAM_FUNC0_ADDR;
 	}
 	mutex_enter(&qlt_global_lock);
 
@@ -2390,7 +2393,7 @@ qlt_sync_atio_queue(qlt_state_t *qlt)
 		    DDI_DMA_SYNC_FORCPU);
 	} else {
 		total_ent = ATIO_QUEUE_ENTRIES - qlt->atio_ndx_to_fw +
-			qlt->atio_ndx_from_fw;
+		    qlt->atio_ndx_from_fw;
 		(void) ddi_dma_sync(qlt->queue_mem_dma_handle, ATIO_QUEUE_OFFSET
 		    + (qlt->atio_ndx_to_fw << 6), (ATIO_QUEUE_ENTRIES -
 		    qlt->atio_ndx_to_fw) << 6, DDI_DMA_SYNC_FORCPU);
@@ -2413,7 +2416,7 @@ qlt_handle_atio_queue_update(qlt_state_t *qlt)
 
 	do {
 		uint8_t *atio = (uint8_t *)&qlt->atio_ptr[
-					qlt->atio_ndx_to_fw << 6];
+		    qlt->atio_ndx_to_fw << 6];
 		uint32_t ent_cnt;
 
 		ent_cnt = (uint32_t)(atio[1]);
@@ -2433,7 +2436,7 @@ qlt_handle_atio_queue_update(qlt_state_t *qlt)
 			break;
 		}
 		qlt->atio_ndx_to_fw = (qlt->atio_ndx_to_fw + ent_cnt) &
-					(ATIO_QUEUE_ENTRIES - 1);
+		    (ATIO_QUEUE_ENTRIES - 1);
 		total_ent -= ent_cnt;
 	} while (total_ent > 0);
 	REG_WR32(qlt, REG_ATIO_OUT_PTR, qlt->atio_ndx_to_fw);
@@ -2452,7 +2455,7 @@ qlt_sync_resp_queue(qlt_state_t *qlt)
 		    DDI_DMA_SYNC_FORCPU);
 	} else {
 		total_ent = RESPONSE_QUEUE_ENTRIES - qlt->resp_ndx_to_fw +
-			qlt->resp_ndx_from_fw;
+		    qlt->resp_ndx_from_fw;
 		(void) ddi_dma_sync(qlt->queue_mem_dma_handle,
 		    RESPONSE_QUEUE_OFFSET
 		    + (qlt->resp_ndx_to_fw << 6), (RESPONSE_QUEUE_ENTRIES -
@@ -2523,7 +2526,7 @@ qlt_handle_resp_queue_update(qlt_state_t *qlt)
 			break;
 		}
 		qlt->resp_ndx_to_fw = (qlt->resp_ndx_to_fw + ent_cnt) &
-					(RESPONSE_QUEUE_ENTRIES - 1);
+		    (RESPONSE_QUEUE_ENTRIES - 1);
 		total_ent -= ent_cnt;
 	} while (total_ent > 0);
 	REG_WR32(qlt, REG_RESP_OUT_PTR, qlt->resp_ndx_to_fw);
@@ -2571,7 +2574,7 @@ qlt_portid_to_handle(qlt_state_t *qlt, uint32_t id, uint16_t cmd_handle,
 				cmn_err(CE_WARN, "login for portid %x came in "
 				    "with handle %x, while the portid was "
 				    "already using a different handle %x",
-					id, cmd_handle, h);
+				    id, cmd_handle, h);
 				qlt_free_mailbox_command(qlt, mcp);
 				return (QLT_FAILURE);
 			}
@@ -2642,8 +2645,8 @@ qlt_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 	case 0xFFFFFF:	h = 0x7FF; break;
 	default:
 		ret = qlt_portid_to_handle(
-	    (qlt_state_t *)port->port_fca_private, rp->rp_id,
-		login->cmd_rp_handle, &h);
+		    (qlt_state_t *)port->port_fca_private, rp->rp_id,
+		    login->cmd_rp_handle, &h);
 		if (ret != FCT_SUCCESS)
 			return (ret);
 	}
@@ -3058,7 +3061,7 @@ qlt_send_status(qlt_state_t *qlt, fct_cmd_t *cmd)
 		mutex_exit(&qlt->req_lock);
 		if (use_mode2) {
 			qlt_dmem_free(cmd->cmd_port->port_fds,
-						qcmd->dbuf_rsp_iu);
+			    qcmd->dbuf_rsp_iu);
 			qcmd->dbuf_rsp_iu = NULL;
 		}
 		return (FCT_BUSY);
@@ -3399,7 +3402,7 @@ qlt_handle_atio(qlt_state_t *qlt, uint8_t *atio)
 			if (q == ((uint8_t *)qlt->queue_mem_ptr +
 			    ATIO_QUEUE_OFFSET + (ATIO_QUEUE_ENTRIES * 64))) {
 				q = (uint8_t *)qlt->queue_mem_ptr +
-						ATIO_QUEUE_OFFSET;
+				    ATIO_QUEUE_OFFSET;
 			}
 		}
 		for (i = 0; i < 4; i++) {
@@ -3407,16 +3410,16 @@ qlt_handle_atio(qlt_state_t *qlt, uint8_t *atio)
 			if (q == ((uint8_t *)qlt->queue_mem_ptr +
 			    ATIO_QUEUE_OFFSET + (ATIO_QUEUE_ENTRIES * 64))) {
 				q = (uint8_t *)qlt->queue_mem_ptr +
-						ATIO_QUEUE_OFFSET;
+				    ATIO_QUEUE_OFFSET;
 			}
 		}
 		task->task_expected_xfer_length = (((uint32_t)cb[0]) << 24) |
-				(((uint32_t)cb[1]) << 16) |
-				(((uint32_t)cb[2]) << 8) | cb[3];
+		    (((uint32_t)cb[1]) << 16) |
+		    (((uint32_t)cb[2]) << 8) | cb[3];
 	} else {
 		task->task_expected_xfer_length = (((uint32_t)q[0]) << 24) |
-				(((uint32_t)q[1]) << 16) |
-				(((uint32_t)q[2]) << 8) | q[3];
+		    (((uint32_t)q[1]) << 16) |
+		    (((uint32_t)q[2]) << 8) | q[3];
 	}
 	fct_post_rcvd_cmd(cmd, 0);
 }
@@ -3683,7 +3686,7 @@ qlt_handle_sol_els_completion(qlt_state_t *qlt, uint8_t *rsp)
 			qlt_dmem_dma_sync(qcmd->dbuf, DDI_DMA_SYNC_FORKERNEL);
 			bcopy(qcmd->dbuf->db_sglist[0].seg_addr +
 			    qcmd->param.resp_offset,
-				els->els_resp_payload, els->els_resp_size);
+			    els->els_resp_payload, els->els_resp_size);
 		}
 		qlt_dmem_free(NULL, qcmd->dbuf);
 		qcmd->dbuf = NULL;
@@ -4207,7 +4210,7 @@ qlt_send_els(qlt_state_t *qlt, fct_cmd_t *cmd)
 
 	qcmd->dbuf = buf;
 	bcopy(els->els_req_payload, buf->db_sglist[0].seg_addr,
-						els->els_req_size);
+	    els->els_req_size);
 	qlt_dmem_dma_sync(buf, DDI_DMA_SYNC_FORDEV);
 
 	mutex_enter(&qlt->req_lock);
@@ -4236,7 +4239,7 @@ qlt_send_els(qlt_state_t *qlt, fct_cmd_t *cmd)
 	QMEM_WR64(qlt, (&req[0x28]), bctl->bctl_dev_addr);
 	QMEM_WR32(qlt, (&req[0x30]), els->els_req_size);
 	QMEM_WR64(qlt, (&req[0x34]), bctl->bctl_dev_addr +
-					qcmd->param.resp_offset);
+	    qcmd->param.resp_offset);
 	QMEM_WR32(qlt, (&req[0x3C]), els->els_resp_size);
 	qlt_submit_req_entries(qlt, 1);
 	mutex_exit(&qlt->req_lock);
@@ -4267,7 +4270,7 @@ qlt_send_ct(qlt_state_t *qlt, fct_cmd_t *cmd)
 
 	qcmd->dbuf = buf;
 	bcopy(ct->ct_req_payload, buf->db_sglist[0].seg_addr,
-						ct->ct_req_size);
+	    ct->ct_req_size);
 	qlt_dmem_dma_sync(buf, DDI_DMA_SYNC_FORDEV);
 
 	mutex_enter(&qlt->req_lock);
@@ -4657,7 +4660,7 @@ over_aseq_regs:;
 	 * Queues
 	 */
 	n = snprintf(buf, size_left,
-			"\nRequest0 Queue DMA Channel registers\n");
+	    "\nRequest0 Queue DMA Channel registers\n");
 	buf += n; size_left -= n;
 	REG_WR32(qlt, 0x54, 0x7200);
 	n = qlt_fwdump_dump_regs(qlt, buf, 0xc0, 8, size_left);
@@ -4666,7 +4669,7 @@ over_aseq_regs:;
 	buf += n; size_left -= n;
 
 	n = snprintf(buf, size_left,
-			"\n\nResponse0 Queue DMA Channel registers\n");
+	    "\n\nResponse0 Queue DMA Channel registers\n");
 	buf += n; size_left -= n;
 	REG_WR32(qlt, 0x54, 0x7300);
 	n = qlt_fwdump_dump_regs(qlt, buf, 0xc0, 8, size_left);
@@ -4675,7 +4678,7 @@ over_aseq_regs:;
 	buf += n; size_left -= n;
 
 	n = snprintf(buf, size_left,
-			"\n\nRequest1 Queue DMA Channel registers\n");
+	    "\n\nRequest1 Queue DMA Channel registers\n");
 	buf += n; size_left -= n;
 	REG_WR32(qlt, 0x54, 0x7400);
 	n = qlt_fwdump_dump_regs(qlt, buf, 0xc0, 8, size_left);
@@ -5020,7 +5023,7 @@ dump_ok:
 
 	mutex_enter(&qlt->qlt_ioctl_lock);
 	qlt->qlt_ioctl_flags &=
-		~(QLT_FWDUMP_INPROGRESS | QLT_FWDUMP_FETCHED_BY_USER);
+	    ~(QLT_FWDUMP_INPROGRESS | QLT_FWDUMP_FETCHED_BY_USER);
 	qlt->qlt_ioctl_flags |= QLT_FWDUMP_ISVALID;
 	mutex_exit(&qlt->qlt_ioctl_lock);
 	return (FCT_SUCCESS);
@@ -5065,7 +5068,7 @@ qlt_dump_risc_ram(qlt_state_t *qlt, uint32_t addr, uint32_t words,
 	for (i = 0, n = 0; i < words; i++) {
 		if ((i & 7) == 0) {
 			n += snprintf(&buf[n], (size_left - n), "%08x: ",
-				addr + i);
+			    addr + i);
 		}
 		if ((i + 1) & 7) {
 			c = ' ';

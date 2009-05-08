@@ -34,6 +34,7 @@
 #include <sys/byteorder.h>
 #include <sys/varargs.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 #include <stmf.h>
 #include <stmf_ioctl.h>
@@ -871,14 +872,14 @@ fct_alloc(fct_struct_id_t struct_id, int additional_size, int flags)
 
 	additional_size = (additional_size + 7) & (~7);
 	fct_size = fct_sizes[struct_id].shared +
-		fct_sizes[struct_id].fw_private +
-		fct_sizes[struct_id].struct_specific + additional_size;
+	    fct_sizes[struct_id].fw_private +
+	    fct_sizes[struct_id].struct_specific + additional_size;
 
 	if (struct_id == FCT_STRUCT_LOCAL_PORT) {
 		stmf_local_port_t *lport;
 
 		lport = (stmf_local_port_t *)stmf_alloc(
-			STMF_STRUCT_STMF_LOCAL_PORT, fct_size, flags);
+		    STMF_STRUCT_STMF_LOCAL_PORT, fct_size, flags);
 		if (lport) {
 			sh = (__fct_t *)lport->lport_port_private;
 			sh->ss = lport;
@@ -889,7 +890,7 @@ fct_alloc(fct_struct_id_t struct_id, int additional_size, int flags)
 		stmf_dbuf_store_t *ds;
 
 		ds = (stmf_dbuf_store_t *)stmf_alloc(STMF_STRUCT_DBUF_STORE,
-				fct_size, flags);
+		    fct_size, flags);
 		if (ds) {
 			sh = (__fct_t *)ds->ds_port_private;
 			sh->ss = ds;
@@ -969,7 +970,7 @@ fct_alloc_dbuf(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
     uint32_t flags)
 {
 	fct_local_port_t *port = (fct_local_port_t *)
-		task->task_lport->lport_port_private;
+	    task->task_lport->lport_port_private;
 
 	return (port->port_fds->fds_alloc_data_buf(port, size,
 	    pminsize, flags));
@@ -1004,7 +1005,7 @@ fct_register_local_port(fct_local_port_t *port)
 			iport->iport_alias = iport->iport_alias_mem;
 		} else {
 			iport->iport_alias =
-				(char *)kmem_zalloc(l+1, KM_SLEEP);
+			    (char *)kmem_zalloc(l+1, KM_SLEEP);
 		}
 		(void) strcpy(iport->iport_alias, port->port_default_alias);
 	} else {
@@ -1013,7 +1014,7 @@ fct_register_local_port(fct_local_port_t *port)
 	stmf_wwn_to_devid_desc((scsi_devid_desc_t *)iport->iport_id,
 	    port->port_pwwn, PROTOCOL_FIBRE_CHANNEL);
 	(void) snprintf(taskq_name, 24, "stmf_fct_taskq_%d",
-					atomic_add_32_nv(&taskq_cntr, 1));
+	    atomic_add_32_nv(&taskq_cntr, 1));
 	taskq_name[23] = 0;
 	if ((iport->iport_worker_taskq = ddi_taskq_create(NULL,
 	    taskq_name, 1, TASKQ_DEFAULTPRI, 0)) == NULL) {
@@ -1027,19 +1028,19 @@ fct_register_local_port(fct_local_port_t *port)
 	iport->iport_rp_slots = (fct_i_remote_port_t **)kmem_zalloc(
 	    port->port_max_logins * sizeof (fct_i_remote_port_t *), KM_SLEEP);
 	iport->iport_rp_tb = kmem_zalloc(rportid_table_size *
-			sizeof (fct_i_remote_port_t *), KM_SLEEP);
+	    sizeof (fct_i_remote_port_t *), KM_SLEEP);
 
 	/* fct_cmds for SCSI traffic */
 	iport->iport_total_alloced_ncmds = 0;
 	iport->iport_cached_ncmds = 0;
 	port->port_fca_fcp_cmd_size =
-			(port->port_fca_fcp_cmd_size + 7) & ~7;
+	    (port->port_fca_fcp_cmd_size + 7) & ~7;
 	iport->iport_cached_cmdlist = NULL;
 	mutex_init(&iport->iport_cached_cmd_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/* Initialize cmd slots */
 	iport->iport_cmd_slots = (fct_cmd_slot_t *)kmem_zalloc(
-		port->port_max_xchges * sizeof (fct_cmd_slot_t), KM_SLEEP);
+	    port->port_max_xchges * sizeof (fct_cmd_slot_t), KM_SLEEP);
 	iport->iport_next_free_slot = 0;
 	for (i = 0; i < port->port_max_xchges; ) {
 		slot = &iport->iport_cmd_slots[i];
@@ -1050,16 +1051,16 @@ fct_register_local_port(fct_local_port_t *port)
 	iport->iport_nslots_free = port->port_max_xchges;
 
 	iport->iport_task_green_limit =
-		(port->port_max_xchges * FCT_TASK_GREEN_LIMIT) / 100;
+	    (port->port_max_xchges * FCT_TASK_GREEN_LIMIT) / 100;
 	iport->iport_task_yellow_limit =
-		(port->port_max_xchges * FCT_TASK_YELLOW_LIMIT) / 100;
+	    (port->port_max_xchges * FCT_TASK_YELLOW_LIMIT) / 100;
 	iport->iport_task_red_limit =
-		(port->port_max_xchges * FCT_TASK_RED_LIMIT) / 100;
+	    (port->port_max_xchges * FCT_TASK_RED_LIMIT) / 100;
 
 	/* Start worker thread */
 	atomic_and_32(&iport->iport_flags, ~IPORT_TERMINATE_WORKER);
 	(void) ddi_taskq_dispatch(iport->iport_worker_taskq,
-			fct_port_worker, port, DDI_SLEEP);
+	    fct_port_worker, port, DDI_SLEEP);
 	/* Wait for taskq to start */
 	while ((iport->iport_flags & IPORT_WORKER_RUNNING) == 0) {
 		delay(1);
@@ -1108,7 +1109,7 @@ fct_regport_fail1:;
 	ddi_taskq_destroy(iport->iport_worker_taskq);
 	if (iport->iport_rp_tb) {
 		kmem_free(iport->iport_rp_tb, rportid_table_size *
-				sizeof (fct_i_remote_port_t *));
+		    sizeof (fct_i_remote_port_t *));
 	}
 	return (FCT_FAILURE);
 }
@@ -1123,7 +1124,7 @@ fct_deregister_local_port(fct_local_port_t *port)
 	iport = (fct_i_local_port_t *)port->port_fct_private;
 
 	if ((iport->iport_state != FCT_STATE_OFFLINE) ||
-				iport->iport_state_not_acked) {
+	    iport->iport_state_not_acked) {
 		return (FCT_FAILURE);
 	}
 
@@ -1133,14 +1134,14 @@ fct_deregister_local_port(fct_local_port_t *port)
 		cv_broadcast(&iport->iport_worker_cv);
 		for (ndx = 0; ndx < 100; ndx++) {
 			if ((iport->iport_flags & IPORT_WORKER_RUNNING)
-						== 0) {
+			    == 0) {
 				break;
 			}
 			delay(drv_usectohz(10000));
 		}
 		if (ndx == 100) {
 			atomic_and_32(&iport->iport_flags,
-					~IPORT_TERMINATE_WORKER);
+			    ~IPORT_TERMINATE_WORKER);
 			return (FCT_WORKER_STUCK);
 		}
 	}
@@ -1168,16 +1169,16 @@ fct_deregister_local_port(fct_local_port_t *port)
 	}
 	mutex_destroy(&iport->iport_cached_cmd_lock);
 	kmem_free(iport->iport_cmd_slots, port->port_max_xchges *
-		sizeof (fct_cmd_slot_t));
+	    sizeof (fct_cmd_slot_t));
 	kmem_free(iport->iport_rp_slots, port->port_max_logins *
-		sizeof (fct_i_remote_port_t *));
+	    sizeof (fct_i_remote_port_t *));
 	rw_destroy(&iport->iport_lock);
 	cv_destroy(&iport->iport_worker_cv);
 	mutex_destroy(&iport->iport_worker_lock);
 	ddi_taskq_destroy(iport->iport_worker_taskq);
 	if (iport->iport_rp_tb) {
 		kmem_free(iport->iport_rp_tb, rportid_table_size *
-				sizeof (fct_i_remote_port_t *));
+		    sizeof (fct_i_remote_port_t *));
 	}
 
 	fct_log_local_port_event(port, ESC_SUNFC_PORT_DETACH);
@@ -1187,7 +1188,7 @@ fct_deregport_fail1:;
 	/* Restart the worker */
 	atomic_and_32(&iport->iport_flags, ~IPORT_TERMINATE_WORKER);
 	(void) ddi_taskq_dispatch(iport->iport_worker_taskq,
-			fct_port_worker, port, DDI_SLEEP);
+	    fct_port_worker, port, DDI_SLEEP);
 	/* Wait for taskq to start */
 	while ((iport->iport_flags & IPORT_WORKER_RUNNING) == 0) {
 		delay(1);
@@ -1289,7 +1290,7 @@ fct_deque_rp(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 	if (irp_next) {
 		if (irp_last == NULL) {
 			iport->iport_rp_tb[hash_key] =
-				irp->irp_next;
+			    irp->irp_next;
 		} else {
 			irp_last->irp_next = irp->irp_next;
 		}
@@ -1400,7 +1401,7 @@ fct_rehash(fct_i_local_port_t *iport)
 	int i;
 
 	iport_rp_tb_new = kmem_zalloc(rportid_table_size *
-				sizeof (fct_i_remote_port_t *), KM_SLEEP);
+	    sizeof (fct_i_remote_port_t *), KM_SLEEP);
 	rw_enter(&iport->iport_lock, RW_WRITER);
 	/* reconstruct the hash table */
 	iport_rp_tb_tmp = iport->iport_rp_tb;
@@ -1416,7 +1417,7 @@ fct_rehash(fct_i_local_port_t *iport)
 	}
 	rw_exit(&iport->iport_lock);
 	kmem_free(iport_rp_tb_tmp, rportid_table_size *
-			sizeof (fct_i_remote_port_t *));
+	    sizeof (fct_i_remote_port_t *));
 
 }
 
@@ -1449,7 +1450,7 @@ fct_scsi_task_alloc(fct_local_port_t *port, uint16_t rp_handle,
 	fct_cmd_t *cmd;
 	fct_i_cmd_t *icmd;
 	fct_i_local_port_t *iport =
-			(fct_i_local_port_t *)port->port_fct_private;
+	    (fct_i_local_port_t *)port->port_fct_private;
 	fct_i_remote_port_t *irp;
 	scsi_task_t *task;
 	fct_remote_port_t *rp;
@@ -1459,7 +1460,7 @@ fct_scsi_task_alloc(fct_local_port_t *port, uint16_t rp_handle,
 	if ((iport->iport_link_state & S_LINK_ONLINE) == 0) {
 		rw_exit(&iport->iport_lock);
 		stmf_trace(iport->iport_alias, "cmd alloc called while the port"
-			" was offline");
+		    " was offline");
 		return (NULL);
 	}
 
@@ -1502,12 +1503,12 @@ fct_scsi_task_alloc(fct_local_port_t *port, uint16_t rp_handle,
 	mutex_exit(&iport->iport_cached_cmd_lock);
 	if (icmd == NULL) {
 		cmd = (fct_cmd_t *)fct_alloc(FCT_STRUCT_CMD_FCP_XCHG,
-				port->port_fca_fcp_cmd_size, 0);
+		    port->port_fca_fcp_cmd_size, 0);
 		if (cmd == NULL) {
 			rw_exit(&irp->irp_lock);
 			rw_exit(&iport->iport_lock);
 			stmf_trace(iport->iport_alias, "Ran out of "
-					"memory, port=%p", port);
+			    "memory, port=%p", port);
 			return (NULL);
 		}
 
@@ -1546,7 +1547,7 @@ fct_scsi_task_alloc(fct_local_port_t *port, uint16_t rp_handle,
 	icmd->icmd_start_time = ddi_get_lbolt();
 
 	cmd->cmd_specific = stmf_task_alloc(port->port_lport, irp->irp_session,
-				lun, cdb_length, task_ext);
+	    lun, cdb_length, task_ext);
 	if ((task = (scsi_task_t *)cmd->cmd_specific) != NULL) {
 		task->task_port_private = cmd;
 		return (cmd);
@@ -1572,14 +1573,20 @@ fct_post_rcvd_cmd(fct_cmd_t *cmd, stmf_data_buf_t *dbuf)
 	if (cmd->cmd_type == FCT_CMD_FCP_XCHG) {
 		fct_i_cmd_t *icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 		fct_i_local_port_t *iport =
-			(fct_i_local_port_t *)cmd->cmd_port->port_fct_private;
+		    (fct_i_local_port_t *)cmd->cmd_port->port_fct_private;
 		fct_i_remote_port_t *irp =
-			(fct_i_remote_port_t *)cmd->cmd_rp->rp_fct_private;
+		    (fct_i_remote_port_t *)cmd->cmd_rp->rp_fct_private;
 		scsi_task_t *task = (scsi_task_t *)cmd->cmd_specific;
 
 		uint16_t irp_task = irp->irp_fcp_xchg_count;
 		uint32_t load = iport->iport_total_alloced_ncmds -
-			iport->iport_cached_ncmds;
+		    iport->iport_cached_ncmds;
+
+		DTRACE_FC_4(scsi__command,
+		    fct_cmd_t, cmd,
+		    fct_i_local_port_t, iport,
+		    scsi_task_t, task,
+		    fct_i_remote_port_t, irp);
 
 		if (load >= iport->iport_task_green_limit) {
 			if ((load < iport->iport_task_yellow_limit &&
@@ -1589,7 +1596,7 @@ fct_post_rcvd_cmd(fct_cmd_t *cmd, stmf_data_buf_t *dbuf)
 			    irp_task >= 1) ||
 			    (load >= iport->iport_task_red_limit))
 				task->task_additional_flags |=
-					TASK_AF_PORT_LOAD_HIGH;
+				    TASK_AF_PORT_LOAD_HIGH;
 		}
 		stmf_post_task((scsi_task_t *)cmd->cmd_specific, dbuf);
 		atomic_and_32(&icmd->icmd_flags, ~ICMD_IN_TRANSITION);
@@ -1621,7 +1628,7 @@ fct_post_implicit_logo(fct_cmd_t *cmd)
 {
 	fct_local_port_t *port = cmd->cmd_port;
 	fct_i_local_port_t *iport =
-			(fct_i_local_port_t *)port->port_fct_private;
+	    (fct_i_local_port_t *)port->port_fct_private;
 	fct_i_cmd_t *icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 	fct_remote_port_t *rp = cmd->cmd_rp;
 	fct_i_remote_port_t *irp = (fct_i_remote_port_t *)rp->rp_fct_private;
@@ -1673,7 +1680,7 @@ fct_alloc_cmd_slot(fct_i_local_port_t *iport, fct_cmd_t *cmd)
 	iport->iport_cmd_slots[cmd_slot].slot_cmd = icmd;
 	cmd->cmd_handle = (uint32_t)cmd_slot | 0x80000000 |
 	    (((uint32_t)(iport->iport_cmd_slots[cmd_slot].slot_uniq_cntr))
-						    << 24);
+	    << 24);
 	return (cmd_slot);
 }
 
@@ -1690,7 +1697,8 @@ fct_post_to_discovery_queue(fct_i_local_port_t *iport,
 	if (icmd) {
 		icmd->icmd_next = NULL;
 		for (p = &irp->irp_els_list; *p != NULL;
-		    p = &((*p)->icmd_next));
+		    p = &((*p)->icmd_next))
+			;
 		*p = icmd;
 		atomic_or_32(&icmd->icmd_flags, ICMD_IN_IRP_QUEUE);
 	}
@@ -1728,6 +1736,13 @@ fct_xfer_scsi_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 {
 	fct_cmd_t *cmd = (fct_cmd_t *)task->task_port_private;
 
+	DTRACE_FC_5(xfer__start,
+	    fct_cmd_t, cmd,
+	    fct_i_local_port_t, cmd->cmd_port->port_fct_private,
+	    scsi_task_t, task,
+	    fct_i_remote_port_t, cmd->cmd_rp->rp_fct_private,
+	    stmf_data_buf_t, dbuf);
+
 	return (cmd->cmd_port->port_xfer_scsi_data(cmd, dbuf, ioflags));
 }
 
@@ -1737,6 +1752,13 @@ fct_scsi_data_xfer_done(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 	fct_i_cmd_t	*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 	uint32_t	old, new;
 	uint32_t	iof = 0;
+
+	DTRACE_FC_5(xfer__done,
+	    fct_cmd_t, cmd,
+	    fct_i_local_port_t, cmd->cmd_port->port_fct_private,
+	    scsi_task_t, ((scsi_task_t *)cmd->cmd_specific),
+	    fct_i_remote_port_t, cmd->cmd_rp->rp_fct_private,
+	    stmf_data_buf_t, dbuf);
 
 	if (ioflags & FCT_IOF_FCA_DONE) {
 		do {
@@ -1760,6 +1782,14 @@ fct_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 {
 	fct_cmd_t *cmd = (fct_cmd_t *)task->task_port_private;
 
+	DTRACE_FC_4(scsi__response,
+	    fct_cmd_t, cmd,
+	    fct_i_local_port_t,
+	    (fct_i_local_port_t *)cmd->cmd_port->port_fct_private,
+	    scsi_task_t, task,
+	    fct_i_remote_port_t,
+	    (fct_i_remote_port_t *)cmd->cmd_rp->rp_fct_private);
+
 	return (cmd->cmd_port->port_send_cmd_response(cmd, ioflags));
 }
 
@@ -1769,7 +1799,7 @@ fct_send_response_done(fct_cmd_t *cmd, fct_status_t s, uint32_t ioflags)
 	fct_i_cmd_t	*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 	fct_local_port_t *port = cmd->cmd_port;
 	fct_i_local_port_t *iport = (fct_i_local_port_t *)
-						port->port_fct_private;
+	    port->port_fct_private;
 	uint32_t old, new;
 
 	if ((ioflags & FCT_IOF_FCA_DONE) == 0) {
@@ -1788,7 +1818,7 @@ fct_send_response_done(fct_cmd_t *cmd, fct_status_t s, uint32_t ioflags)
 	cmd->cmd_comp_status = s;
 	if (cmd->cmd_type == FCT_CMD_FCP_XCHG) {
 		stmf_send_status_done((scsi_task_t *)cmd->cmd_specific, s,
-					STMF_IOF_LPORT_DONE);
+		    STMF_IOF_LPORT_DONE);
 		return;
 	}
 
@@ -1855,7 +1885,7 @@ fct_cmd_free(fct_cmd_t *cmd)
 		atomic_add_16(&iport->iport_nslots_free, 1);
 		if (cmd->cmd_rp) {
 			irp = (fct_i_remote_port_t *)
-				cmd->cmd_rp->rp_fct_private;
+			    cmd->cmd_rp->rp_fct_private;
 			if (cmd->cmd_type == FCT_CMD_FCP_XCHG)
 				atomic_add_16(&irp->irp_fcp_xchg_count, -1);
 			else
@@ -1867,7 +1897,7 @@ fct_cmd_free(fct_cmd_t *cmd)
 		/* for implicit cmd, no cmd slot is used */
 		if (cmd->cmd_rp) {
 			irp = (fct_i_remote_port_t *)
-				cmd->cmd_rp->rp_fct_private;
+			    cmd->cmd_rp->rp_fct_private;
 			if (cmd->cmd_type == FCT_CMD_FCP_XCHG)
 				atomic_add_16(&irp->irp_fcp_xchg_count, -1);
 			else
@@ -2396,7 +2426,7 @@ fct_create_solct(fct_local_port_t *port, fct_remote_port_t *query_rp,
 		ct->ct_resp_payload = (uint8_t *)kmem_zalloc(ct->ct_resp_size,
 		    KM_SLEEP);
 		ct->ct_req_size = ct->ct_req_alloc_size =
-			(21 + namelen + 3) & ~3;
+		    (21 + namelen + 3) & ~3;
 		p = ct->ct_req_payload = (uint8_t *)kmem_zalloc(ct->ct_req_size,
 		    KM_SLEEP);
 
@@ -2631,7 +2661,7 @@ fct_handle_to_cmd(fct_local_port_t *port, uint32_t fct_handle)
 		return (NULL);
 
 	slot = &((fct_i_local_port_t *)port->port_fct_private)->iport_cmd_slots[
-			ndx];
+	    ndx];
 
 	if ((slot->slot_uniq_cntr | 0x80) != (fct_handle >> 24))
 		return (NULL);
@@ -2653,7 +2683,7 @@ fct_queue_scsi_task_for_termination(fct_cmd_t *cmd, fct_status_t s)
 		new = old | ICMD_BEING_ABORTED;
 	} while (atomic_cas_32(&icmd->icmd_flags, old, new) != old);
 	stmf_abort(STMF_QUEUE_TASK_ABORT, (scsi_task_t *)cmd->cmd_specific,
-					s, NULL);
+	    s, NULL);
 }
 
 void
@@ -2785,7 +2815,7 @@ fct_queue_cmd_for_termination(fct_cmd_t *cmd, fct_status_t s)
 {
 	fct_local_port_t *port = cmd->cmd_port;
 	fct_i_local_port_t *iport = (fct_i_local_port_t *)
-					port->port_fct_private;
+	    port->port_fct_private;
 	fct_i_cmd_t *icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 
 	if (cmd->cmd_type == FCT_CMD_FCP_XCHG) {
@@ -2821,7 +2851,8 @@ fct_q_for_termination_lock_held(fct_i_local_port_t *iport, fct_i_cmd_t *icmd,
 
 	icmd->icmd_next = NULL;
 	for (ppicmd = &(iport->iport_abort_queue); *ppicmd != NULL;
-	    ppicmd = &((*ppicmd)->icmd_next));
+	    ppicmd = &((*ppicmd)->icmd_next))
+		;
 	*ppicmd = icmd;
 }
 
@@ -2950,7 +2981,7 @@ fct_handle_port_offline(fct_i_local_port_t *iport)
 		iport->iport_state = FCT_STATE_OFFLINE;
 		mutex_exit(&iport->iport_worker_lock);
 		(void) stmf_ctl(STMF_CMD_LPORT_OFFLINE_COMPLETE,
-				iport->iport_port->port_lport, &st);
+		    iport->iport_port->port_lport, &st);
 		mutex_enter(&iport->iport_worker_lock);
 		return (DISC_ACTION_DELAY_RESCAN);
 	}
@@ -3066,12 +3097,12 @@ fct_cmd_terminator(fct_i_local_port_t *iport)
 					return (DISC_ACTION_DELAY_RESCAN);
 				}
 				atomic_and_32(&icmd->icmd_flags,
-					~ICMD_FCA_ABORT_CALLED);
+				    ~ICMD_FCA_ABORT_CALLED);
 			} else if ((flags & FCT_IOF_FORCE_FCA_DONE) ||
 			    (abort_ret == FCT_ABORT_SUCCESS) ||
 			    (abort_ret == FCT_NOT_FOUND)) {
 				atomic_and_32(&icmd->icmd_flags,
-					~ICMD_KNOWN_TO_FCA);
+				    ~ICMD_KNOWN_TO_FCA);
 			}
 			ret |= DISC_ACTION_DELAY_RESCAN;
 		} else if (icmd->icmd_flags & ICMD_IMPLICIT) {
@@ -3296,4 +3327,18 @@ fct_value_to_netbuf(uint64_t value, uint8_t *buf, uint8_t nbytes)
 	for (idx = 0; idx < nbytes; idx++) {
 		buf[idx] = 0xFF & (value >> (8 * (nbytes - idx - 1)));
 	}
+}
+
+/*
+ * from_ptr: ptr to uchar_t array of size WWN_SIZE
+ * to_ptr: char ptr to string of size WWN_SIZE*2+1
+ */
+void
+fct_wwn_to_str(char *to_ptr, const uint8_t *from_ptr)
+{
+	ASSERT(to_ptr != NULL && from_ptr != NULL);
+
+	(void) sprintf(to_ptr, "%02x%02x%02x%02x%02x%02x%02x%02x",
+	    from_ptr[0], from_ptr[1], from_ptr[2], from_ptr[3],
+	    from_ptr[4], from_ptr[5], from_ptr[6], from_ptr[7]);
 }
