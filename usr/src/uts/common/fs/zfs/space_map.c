@@ -339,9 +339,6 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 		if (ops != NULL)
 			ops->smop_load(sm);
 	} else {
-		if (ops != NULL)
-			ops->smop_unload(sm);
-		sm->sm_ops = NULL;
 		space_map_vacate(sm, NULL, NULL);
 	}
 
