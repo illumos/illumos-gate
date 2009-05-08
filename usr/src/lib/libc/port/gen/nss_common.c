@@ -1506,20 +1506,23 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 			n_src++;
 		} while (n_src < s->max_src &&
 		    (be = nss_get_backend_u(&rootp, s, n_src)) == 0);
+		contextp->be = be;
 		if (be == 0) {
 			/*
 			 * This is the case where we failed to get the backend
 			 * for the last source. We exhausted all sources.
+			 *
+			 * We need to do cleanup ourselves because end_iter_u()
+			 * does not do it for be == 0.
 			 */
+			NSS_UNREF_UNLOCK(rootp, s);
+			contextp->s = 0;
+			break;
+		} else {
 			NSS_UNLOCK(rootp);
-			nss_endent_u(rootp, initf, contextpp);
-			nss_delete(rootp);
-			return (NSS_SUCCESS);
+			contextp->n_src = n_src;
+			(void) NSS_INVOKE_DBOP(be, NSS_DBOP_SETENT, 0);
 		}
-		NSS_UNLOCK(rootp);
-		contextp->n_src	= n_src;
-		contextp->be	= be;
-		(void) NSS_INVOKE_DBOP(be, NSS_DBOP_SETENT, 0);
 	}
 	/* Got to the end of the sources without finding another entry */
 	end_iter_u(rootp, contextp);
