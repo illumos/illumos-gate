@@ -33,7 +33,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -731,22 +730,11 @@ mixers_save(mlist_t *mlistp, char *sstr, int ovopt, int vopt)
 	FILE		*sfp;
 	int		fp;
 	int		retval;
-	struct	stat	sbuf;
+	int		mode;
 
-	if (stat(sstr, &sbuf) == 0) {
-		if (!ovopt) {
-			warn(_("Would over write existing file [%s]\n"), sstr);
-			return (EINVAL);
-		} else {
-			if (unlink(sstr)) {
-				retval = errno;
-				perror(_("Failed to unlink existing file"));
-				return (retval);
-			}
-		}
-	}
+	mode = O_WRONLY | O_CREAT | (ovopt ? O_TRUNC : O_EXCL);
 
-	if ((fp = open(sstr, O_WRONLY|O_CREAT|O_EXCL, 0666)) == 0) {
+	if ((fp = open(sstr, mode, 0666)) < 0) {
 		retval = errno;
 		perror(_("Failed to create file"));
 		return (retval);
@@ -1127,8 +1115,12 @@ main(int argc, char **argv)
 		} else if ((strcmp(dstr, "/dev/audio") == 0) ||
 		    (strcmp(dstr, "/dev/audioctl") == 0) ||
 		    (strcmp(dstr, "/dev/dsp") == 0)) {
-			/* "default" device, read the link */
-			if (readlink(dstr, scratch, sizeof (scratch)) >= 0) {
+			/*
+			 * "default" device, read the link,
+			 * ensuring NULL termination.
+			 */
+			if (readlink(dstr, scratch, MAXPATHLEN) >= 0) {
+				scratch[MAXPATHLEN] = 0;
 				if ((s = strchr(scratch, '/')) != NULL) {
 					num = atoi(s + 1);
 				}
