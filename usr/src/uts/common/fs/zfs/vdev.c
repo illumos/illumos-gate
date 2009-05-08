@@ -2589,8 +2589,8 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		vd->vdev_removed = B_FALSE;
 	}
 
-	if (!isopen)
-		vdev_propagate_state(vd);
+	if (!isopen && vd->vdev_parent)
+		vdev_propagate_state(vd->vdev_parent);
 }
 
 /*
