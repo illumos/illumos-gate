@@ -1586,17 +1586,34 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 			    ill->ill_name));
 			ipif->ipif_addr_ready = 1;
 			ipif->ipif_added_nce = 1;
+			nce->nce_ipif_cnt++;
 			break;
 		case EINPROGRESS:
 			ip1dbg(("ipif_ndp_up: running DAD now for %s\n",
 			    ill->ill_name));
 			ipif->ipif_added_nce = 1;
+			nce->nce_ipif_cnt++;
 			break;
 		case EEXIST:
-			NCE_REFRELE(nce);
 			ip1dbg(("ipif_ndp_up: NCE already exists for %s\n",
 			    ill->ill_name));
-			goto fail;
+			if ((ipif->ipif_flags & IPIF_POINTOPOINT) == 0) {
+				NCE_REFRELE(nce);
+				goto fail;
+			}
+			/*
+			 * Duplicate local addresses are permissible for
+			 * IPIF_POINTOPOINT interfaces which will get marked
+			 * IPIF_UNNUMBERED later in
+			 * ip_addr_availability_check().
+			 *
+			 * The nce_ipif_cnt field tracks the number of
+			 * ipifs that have nce_addr as their local address.
+			 */
+			ipif->ipif_addr_ready = 1;
+			ipif->ipif_added_nce = 1;
+			nce->nce_ipif_cnt++;
+			break;
 		default:
 			ip1dbg(("ipif_ndp_up: NCE creation failed for %s\n",
 			    ill->ill_name));
@@ -1644,13 +1661,14 @@ ipif_ndp_down(ipif_t *ipif)
 			    B_TRUE,
 			    &ipif->ipif_v6lcl_addr,
 			    B_FALSE);
-			if (nce != NULL) {
-				ndp_delete(nce);
-				NCE_REFRELE(nce);
-			}
+			if (nce == NULL)
+				goto no_nce;
+			if (--nce->nce_ipif_cnt == 0)
+				ndp_delete(nce); /* last ipif for nce */
 			ipif->ipif_added_nce = 0;
+			NCE_REFRELE(nce);
 		}
-
+no_nce:
 		/*
 		 * Make IPMP aware of the deleted data address.
 		 */
@@ -3221,8 +3239,8 @@ ipif_up_done_v6(ipif_t *ipif)
 		 * which is the expected error code.
 		 *
 		 * Note that, for the non-XRESOLV case, ipif_ndp_down() will
-		 * only delete an nce in the case when one was actually created
-		 * by ipif_ndp_up(), as indicated by the ipif_added_nce bit.
+		 * only delete the nce in the case when the nce_ipif_cnt drops
+		 * to 0.
 		 */
 		if (err == EADDRINUSE) {
 			if (ipif->ipif_ill->ill_flags & ILLF_XRESOLV) {

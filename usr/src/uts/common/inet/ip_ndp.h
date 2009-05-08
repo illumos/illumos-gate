@@ -96,6 +96,8 @@ typedef struct nce_s {
 	boolean_t	nce_trace_disable;	/* True when alloc fails */
 	list_t		nce_cb;
 	uint_t		nce_cb_walker_cnt;
+	uint_t		nce_ipif_cnt;	/* number of ipifs with the nce_addr */
+					/* as their local address */
 } nce_t;
 
 /*
@@ -113,8 +115,8 @@ typedef struct nce_s {
  * Locking notes:
  * ndp_g_lock protects neighbor cache tables access and
  * insertion/removal of cache entries into/from these tables.
- * nce_lock protects nce_pcnt, nce_rcnt, nce_qd_mp nce_state,
- * nce_res_mp, nce_refcnt and nce_last.
+ * nce_lock protects nce_pcnt, nce_rcnt, nce_qd_mp nce_state, nce_res_mp,
+ * nce_refcnt, nce_last, and nce_cb_walker_cnt.
  * nce_refcnt is incremented for every ire pointing to this nce and
  * every time ndp_lookup() finds an nce.
  * Should there be a need to obtain nce_lock and ndp_g_lock, ndp_g_lock is

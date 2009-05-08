@@ -654,11 +654,6 @@ dladm_get_single_mac_stat(dladm_handle_t handle, datalink_id_t linkid,
 	kstat_t		*ksp;
 	dladm_phys_attr_t dpap;
 
-	if ((kcp = kstat_open()) == NULL) {
-		warn("kstat_open operation failed");
-		return (-1);
-	}
-
 	if ((status = dladm_datalink_id2info(handle, linkid, &flags, NULL,
 	    &media, link, DLPI_LINKNAME_MAX)) != DLADM_STATUS_OK)
 		return (status);
@@ -675,6 +670,11 @@ dladm_get_single_mac_stat(dladm_handle_t handle, datalink_id_t linkid,
 
 	if (status != DLADM_STATUS_OK)
 		return (status);
+
+	if ((kcp = kstat_open()) == NULL) {
+		warn("kstat_open operation failed");
+		return (-1);
+	}
 
 	/*
 	 * The kstat query could fail if the underlying MAC
