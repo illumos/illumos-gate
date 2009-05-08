@@ -66,6 +66,7 @@ static int tavor_close(dev_t, int, int, cred_t *);
 static int tavor_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int tavor_drv_init(tavor_state_t *state, dev_info_t *dip, int instance);
 static void tavor_drv_fini(tavor_state_t *state);
+static void tavor_drv_fini2(tavor_state_t *state);
 static int tavor_isr_init(tavor_state_t *state);
 static void tavor_isr_fini(tavor_state_t *state);
 static int tavor_hw_init(tavor_state_t *state);
@@ -722,6 +723,7 @@ tavor_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 fail_attach:
 	cmn_err(CE_NOTE, "tavor%d: driver failed to attach: %s", instance,
 	    state->ts_attach_buf);
+	tavor_drv_fini2(state);
 	ddi_soft_state_free(tavor_statep, instance);
 fail_attach_nomsg:
 	TAVOR_TNF_EXIT(tavor_attach);
@@ -827,6 +829,7 @@ tavor_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			    "detached\n");
 		}
 
+		tavor_drv_fini2(state);
 		ddi_soft_state_free(tavor_statep, instance);
 
 		TAVOR_TNF_EXIT(tavor_detach);
@@ -891,7 +894,6 @@ tavor_drv_init(tavor_state_t *state, dev_info_t *dip, int instance)
 
 	/*
 	 * Initialize the Tavor hardware.
-	 *
 	 * Note:  If this routine returns an error, it is often an reasonably
 	 * good indication that something Tavor firmware-related has caused
 	 * the failure.  In order to give the user an opportunity (if desired)
@@ -954,6 +956,29 @@ tavor_drv_fini(tavor_state_t *state)
 	TAVOR_TNF_EXIT(tavor_drv_fini);
 }
 
+/*
+ * tavor_drv_fini2()
+ *    Context: Only called from attach() and/or detach() path contexts
+ */
+static void
+tavor_drv_fini2(tavor_state_t *state)
+{
+	TAVOR_TNF_ENTER(tavor_drv_fini2);
+
+	/* TAVOR_DRV_CLEANUP_LEVEL1 */
+	if (state->ts_reg_cmdhdl) {
+		ddi_regs_map_free(&state->ts_reg_cmdhdl);
+		state->ts_reg_cmdhdl = NULL;
+	}
+
+	/* TAVOR_DRV_CLEANUP_LEVEL0 */
+	if (state->ts_pci_cfghdl) {
+		pci_config_teardown(&state->ts_pci_cfghdl);
+		state->ts_pci_cfghdl = NULL;
+	}
+
+	TAVOR_TNF_EXIT(tavor_drv_fini2);
+}
 
 /*
  * tavor_isr_init()
@@ -1343,7 +1368,6 @@ tavor_hw_init(tavor_state_t *state)
 			    state->ts_fw.fw_rev_minor,
 			    state->ts_fw.fw_rev_subminor);
 		}
-
 		tavor_hw_fini(state, cleanup);
 		TNF_PROBE_0(tavor_hw_init_checkfwver_fail,
 		    TAVOR_TNF_ERROR, "");
@@ -1749,14 +1773,11 @@ tavor_hw_fini(tavor_state_t *state, tavor_drv_cleanup_level_t cleanup)
 		/* FALLTHROUGH */
 
 	case TAVOR_DRV_CLEANUP_LEVEL1:
-		ddi_regs_map_free(&state->ts_reg_cmdhdl);
-		/* FALLTHROUGH */
-
 	case TAVOR_DRV_CLEANUP_LEVEL0:
-		if (state->ts_pci_cfghdl) {
-			ddi_regs_map_free(&state->ts_pci_cfghdl);
-			state->ts_pci_cfghdl = NULL;
-		}
+		/*
+		 * LEVEL1 and LEVEL0 resources are freed in
+		 * tavor_drv_fini2().
+		 */
 		break;
 
 	default:

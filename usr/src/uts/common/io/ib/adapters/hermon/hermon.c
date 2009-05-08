@@ -720,6 +720,7 @@ fail_attach:
 	if (hermon_get_state(state) & HCA_EREPORT_FM) {
 		hermon_fm_ereport(state, HCA_SYS_ERR, HCA_ERR_SRV_LOST);
 	}
+	hermon_drv_fini2(state);
 	hermon_fm_fini(state);
 	ddi_soft_state_free(hermon_statep, instance);
 
@@ -1247,7 +1248,7 @@ hermon_drv_fini(hermon_state_t *state)
 
 /*
  * hermon_drv_fini2()
- *    Context: Only called from or detach() path context
+ *    Context: Only called from attach() and/or detach() path contexts
  */
 static void
 hermon_drv_fini2(hermon_state_t *state)
@@ -1256,13 +1257,59 @@ hermon_drv_fini2(hermon_state_t *state)
 		ddi_periodic_delete(state->hs_fm_poll_thread);
 		state->hs_fm_poll_thread = NULL;
 	}
+
+	/* HERMON_DRV_CLEANUP_LEVEL1 */
 	if (state->hs_fm_cmdhdl) {
 		hermon_regs_map_free(state, &state->hs_fm_cmdhdl);
 		state->hs_fm_cmdhdl = NULL;
 	}
+
 	if (state->hs_reg_cmdhdl) {
 		ddi_regs_map_free(&state->hs_reg_cmdhdl);
 		state->hs_reg_cmdhdl = NULL;
+	}
+
+	/* HERMON_DRV_CLEANUP_LEVEL0 */
+	if (state->hs_msix_tbl_entries) {
+		kmem_free(state->hs_msix_tbl_entries,
+		    state->hs_msix_tbl_size);
+		state->hs_msix_tbl_entries = NULL;
+	}
+
+	if (state->hs_msix_pba_entries) {
+		kmem_free(state->hs_msix_pba_entries,
+		    state->hs_msix_pba_size);
+		state->hs_msix_pba_entries = NULL;
+	}
+
+	if (state->hs_fm_msix_tblhdl) {
+		hermon_regs_map_free(state, &state->hs_fm_msix_tblhdl);
+		state->hs_fm_msix_tblhdl = NULL;
+	}
+
+	if (state->hs_reg_msix_tblhdl) {
+		ddi_regs_map_free(&state->hs_reg_msix_tblhdl);
+		state->hs_reg_msix_tblhdl = NULL;
+	}
+
+	if (state->hs_fm_msix_pbahdl) {
+		hermon_regs_map_free(state, &state->hs_fm_msix_pbahdl);
+		state->hs_fm_msix_pbahdl = NULL;
+	}
+
+	if (state->hs_reg_msix_pbahdl) {
+		ddi_regs_map_free(&state->hs_reg_msix_pbahdl);
+		state->hs_reg_msix_pbahdl = NULL;
+	}
+
+	if (state->hs_fm_pcihdl) {
+		hermon_pci_config_teardown(state, &state->hs_fm_pcihdl);
+		state->hs_fm_pcihdl = NULL;
+	}
+
+	if (state->hs_reg_pcihdl) {
+		pci_config_teardown(&state->hs_reg_pcihdl);
+		state->hs_reg_pcihdl = NULL;
 	}
 }
 
@@ -2203,61 +2250,11 @@ hermon_hw_fini(hermon_state_t *state, hermon_drv_cleanup_level_t cleanup)
 		/* FALLTHROUGH */
 #endif
 	case HERMON_DRV_CLEANUP_LEVEL1:
-		if (HERMON_IS_OPERATIONAL(state->hs_operational_mode) &&
-		    state->hs_fm_cmdhdl) {
-			hermon_regs_map_free(state, &state->hs_fm_cmdhdl);
-			state->hs_fm_cmdhdl = NULL;
-		}
-
-		if (HERMON_IS_OPERATIONAL(state->hs_operational_mode) &&
-		    state->hs_reg_cmdhdl) {
-			ddi_regs_map_free(&state->hs_reg_cmdhdl);
-			state->hs_reg_cmdhdl = NULL;
-		}
-		/* FALLTHROUGH */
-
 	case HERMON_DRV_CLEANUP_LEVEL0:
-		if (state->hs_msix_tbl_entries) {
-			kmem_free(state->hs_msix_tbl_entries,
-			    state->hs_msix_tbl_size);
-			state->hs_msix_tbl_entries = NULL;
-		}
-
-		if (state->hs_msix_pba_entries) {
-			kmem_free(state->hs_msix_pba_entries,
-			    state->hs_msix_pba_size);
-			state->hs_msix_pba_entries = NULL;
-		}
-
-		if (state->hs_fm_msix_tblhdl) {
-			hermon_regs_map_free(state, &state->hs_fm_msix_tblhdl);
-			state->hs_fm_msix_tblhdl = NULL;
-		}
-
-		if (state->hs_reg_msix_tblhdl) {
-			ddi_regs_map_free(&state->hs_reg_msix_tblhdl);
-			state->hs_reg_msix_tblhdl = NULL;
-		}
-
-		if (state->hs_fm_msix_pbahdl) {
-			hermon_regs_map_free(state, &state->hs_fm_msix_pbahdl);
-			state->hs_fm_msix_pbahdl = NULL;
-		}
-
-		if (state->hs_reg_msix_pbahdl) {
-			ddi_regs_map_free(&state->hs_reg_msix_pbahdl);
-			state->hs_reg_msix_pbahdl = NULL;
-		}
-
-		if (state->hs_fm_pcihdl) {
-			hermon_regs_map_free(state, &state->hs_fm_pcihdl);
-			state->hs_fm_pcihdl = NULL;
-		}
-
-		if (state->hs_reg_pcihdl) {
-			ddi_regs_map_free(&state->hs_reg_pcihdl);
-			state->hs_reg_pcihdl = NULL;
-		}
+		/*
+		 * LEVEL1 and LEVEL0 resources are freed in
+		 * hermon_drv_fini2().
+		 */
 		break;
 
 	default:
