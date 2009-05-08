@@ -463,10 +463,13 @@ _print2buf(LineBuf *line, char *toprint, int addsep)
  * domainname is transmitted to ldapcachemgr and ldapcachemgr uses
  * it to select a configuration to transmit back.  Otherwise it
  * is essentially unused in sldap.
+ * If cred_only is not 0, then only the credentials for shadow
+ * update are taken care of.
  */
 
 ns_ldap_error_t *
-__ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname, ns_config_t *new)
+__ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname,
+			ns_config_t *new, int cred_only)
 {
 	ns_config_t	*ptr;
 	char		errstr[MAXERROR];
@@ -497,10 +500,17 @@ __ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname, ns_config_t *new)
 	}
 	(void) memset((char *)configinfo, 0, sizeof (LineBuf));
 	for (i = 0; i <= NS_LDAP_MAX_PIT_P; i++) {
-		/* the credential for shadow update is not to be exposed */
-		if (i == NS_LDAP_ADMIN_BINDDN_P ||
-		    i == NS_LDAP_ADMIN_BINDPASSWD_P)
-			continue;
+		if (cred_only) {
+			/* only exposed credential for shadow update */
+			if (i != NS_LDAP_ADMIN_BINDDN_P &&
+			    i != NS_LDAP_ADMIN_BINDPASSWD_P)
+				continue;
+		} else {
+			/* credential for shadow update is not to be exposed */
+			if (i == NS_LDAP_ADMIN_BINDDN_P ||
+			    i == NS_LDAP_ADMIN_BINDPASSWD_P)
+				continue;
+		}
 		str = __s_api_strValue(ptr, string, sizeof (string), i,
 		    NS_DOOR_FMT);
 		if (str == NULL)

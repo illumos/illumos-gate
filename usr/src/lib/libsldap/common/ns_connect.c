@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -67,6 +65,13 @@ static ns_ldap_return_code createSession(const ns_cred_t *,
 extern int ldap_sasl_cram_md5_bind_s(LDAP *, char *, struct berval *,
 		LDAPControl **, LDAPControl **);
 extern int ldapssl_install_gethostbyaddr(LDAP *ld, const char *skip);
+
+extern int __door_getconf(char **buffer, int *buflen,
+		ns_ldap_error_t **error, int callnumber);
+extern int __ns_ldap_freeUnixCred(UnixCred_t **credp);
+extern int SetDoorInfoToUnixCred(char *buffer,
+		ns_ldap_error_t **errorp,
+		UnixCred_t **cred);
 
 static int openConnection(LDAP **, const char *, const ns_cred_t *,
 		int, ns_ldap_error_t **, int, int, ns_conn_user_t *);
@@ -133,6 +138,41 @@ getFirstFromConfig(ns_server_info_t *ret, ns_ldap_error_t **error)
 	__s_api_free2dArray(servers);
 
 	return (NS_LDAP_SUCCESS);
+}
+
+/* very similar to __door_getldapconfig() in ns_config.c */
+static int
+__door_getadmincred(char **buffer, int *buflen, ns_ldap_error_t **error)
+{
+	return (__door_getconf(buffer, buflen, error, GETADMINCRED));
+}
+
+/*
+ * This function requests Admin credentials from the cache manager through
+ * the door functionality
+ */
+
+static int
+requestAdminCred(UnixCred_t **cred, ns_ldap_error_t **error)
+{
+	char	*buffer = NULL;
+	int	buflen = 0;
+	int	ret;
+
+	*error = NULL;
+	ret = __door_getadmincred(&buffer, &buflen, error);
+
+	if (ret != NS_LDAP_SUCCESS) {
+		if (*error != NULL && (*error)->message != NULL)
+			syslog(LOG_WARNING, "libsldap: %s", (*error)->message);
+		return (ret);
+	}
+
+	/* now convert from door format */
+	ret = SetDoorInfoToUnixCred(buffer, error, cred);
+	free(buffer);
+
+	return (ret);
 }
 
 /*
@@ -1418,6 +1458,8 @@ openConnection(LDAP **ldp, const char *serverAddr, const ns_cred_t *auth,
  *
  * aMethod	Currently requested authentication method to be tried
  *
+ * getAdmin	If non 0,  get Admin -i.e., not proxyAgent- DN and password
+ *
  * OUTPUT:
  *
  * authp		authentication method to use.
@@ -1426,7 +1468,8 @@ static int
 __s_api_getDefaultAuth(
 	int	*cLevel,
 	ns_auth_t *aMethod,
-	ns_cred_t **authp)
+	ns_cred_t **authp,
+	int	getAdmin)
 {
 	void		**paramVal = NULL;
 	char		*modparamVal = NULL;
@@ -1435,6 +1478,7 @@ __s_api_getDefaultAuth(
 	int		getCertpath = 0;
 	int		rc = 0;
 	ns_ldap_error_t	*errorp = NULL;
+	UnixCred_t	*AdminCred = NULL;
 
 #ifdef DEBUG
 	(void) fprintf(stderr, "__s_api_getDefaultAuth START\n");
@@ -1472,7 +1516,6 @@ __s_api_getDefaultAuth(
 				getPasswd++;
 			} else if (aMethod->saslmech != NS_LDAP_SASL_GSSAPI) {
 				(void) __ns_ldap_freeCred(authp);
-				*authp = NULL;
 				return (NS_LDAP_INVALID_PARAM);
 			}
 			break;
@@ -1488,7 +1531,6 @@ __s_api_getDefaultAuth(
 				getCertpath++;
 			} else {
 				(void) __ns_ldap_freeCred(authp);
-				*authp = NULL;
 				return (NS_LDAP_INVALID_PARAM);
 			}
 			break;
@@ -1496,51 +1538,99 @@ __s_api_getDefaultAuth(
 
 	if (getUid) {
 		paramVal = NULL;
-		if ((rc = __ns_ldap_getParam(NS_LDAP_BINDDN_P,
-		    &paramVal, &errorp)) != NS_LDAP_SUCCESS) {
-			(void) __ns_ldap_freeCred(authp);
-			(void) __ns_ldap_freeError(&errorp);
-			*authp = NULL;
-			return (rc);
-		}
+		if (getAdmin) {
+			/*
+			 * Assume AdminCred has been retrieved from
+			 * ldap_cachemgr already. It will not work
+			 * without userID or password. Flags getUid
+			 * and getPasswd should always be set
+			 * together.
+			 */
+			AdminCred = calloc(1, sizeof (UnixCred_t));
+			if (AdminCred == NULL) {
+				(void) __ns_ldap_freeCred(authp);
+				return (NS_LDAP_MEMORY);
+			}
 
-		if (paramVal == NULL || *paramVal == NULL) {
-			(void) __ns_ldap_freeCred(authp);
-			*authp = NULL;
-			return (NS_LDAP_INVALID_PARAM);
-		}
+			rc = requestAdminCred(&AdminCred, &errorp);
+			if (rc != NS_LDAP_SUCCESS) {
+				(void) __ns_ldap_freeCred(authp);
+				(void) __ns_ldap_freeUnixCred(&AdminCred);
+				(void) __ns_ldap_freeError(&errorp);
+				return (rc);
+			}
 
-		(*authp)->cred.unix_cred.userID = strdup((char *)*paramVal);
-		(void) __ns_ldap_freeParam(&paramVal);
+			if (AdminCred->userID == NULL) {
+				(void) __ns_ldap_freeCred(authp);
+				(void) __ns_ldap_freeUnixCred(&AdminCred);
+				return (NS_LDAP_INVALID_PARAM);
+			}
+			(*authp)->cred.unix_cred.userID = AdminCred->userID;
+			AdminCred->userID = NULL;
+		} else {
+			rc = __ns_ldap_getParam(NS_LDAP_BINDDN_P,
+			    &paramVal, &errorp);
+			if (rc != NS_LDAP_SUCCESS) {
+				(void) __ns_ldap_freeCred(authp);
+				(void) __ns_ldap_freeError(&errorp);
+				return (rc);
+			}
+
+			if (paramVal == NULL || *paramVal == NULL) {
+				(void) __ns_ldap_freeCred(authp);
+				return (NS_LDAP_INVALID_PARAM);
+			}
+
+			(*authp)->cred.unix_cred.userID =
+			    strdup((char *)*paramVal);
+			(void) __ns_ldap_freeParam(&paramVal);
+		}
 		if ((*authp)->cred.unix_cred.userID == NULL) {
 			(void) __ns_ldap_freeCred(authp);
-			*authp = NULL;
+			(void) __ns_ldap_freeUnixCred(&AdminCred);
 			return (NS_LDAP_MEMORY);
 		}
 	}
 	if (getPasswd) {
 		paramVal = NULL;
-		if ((rc = __ns_ldap_getParam(NS_LDAP_BINDPASSWD_P,
-		    &paramVal, &errorp)) != NS_LDAP_SUCCESS) {
-			(void) __ns_ldap_freeCred(authp);
-			(void) __ns_ldap_freeError(&errorp);
-			*authp = NULL;
-			return (rc);
+		if (getAdmin) {
+			/*
+			 * Assume AdminCred has been retrieved from
+			 * ldap_cachemgr already. It will not work
+			 * without the userID anyway because for
+			 * getting admin credential, flags getUid
+			 * and getPasswd should always be set
+			 * together.
+			 */
+			if (AdminCred == NULL || AdminCred->passwd == NULL) {
+				(void) __ns_ldap_freeCred(authp);
+				(void) __ns_ldap_freeUnixCred(&AdminCred);
+				return (NS_LDAP_INVALID_PARAM);
+			}
+			modparamVal = dvalue(AdminCred->passwd);
+		} else {
+			rc = __ns_ldap_getParam(NS_LDAP_BINDPASSWD_P,
+			    &paramVal, &errorp);
+			if (rc != NS_LDAP_SUCCESS) {
+				(void) __ns_ldap_freeCred(authp);
+				(void) __ns_ldap_freeError(&errorp);
+				return (rc);
+			}
+
+			if (paramVal == NULL || *paramVal == NULL) {
+				(void) __ns_ldap_freeCred(authp);
+				return (NS_LDAP_INVALID_PARAM);
+			}
+
+			modparamVal = dvalue((char *)*paramVal);
+			(void) __ns_ldap_freeParam(&paramVal);
 		}
 
-		if (paramVal == NULL || *paramVal == NULL) {
-			(void) __ns_ldap_freeCred(authp);
-			*authp = NULL;
-			return (NS_LDAP_INVALID_PARAM);
-		}
-
-		modparamVal = dvalue((char *)*paramVal);
-		(void) __ns_ldap_freeParam(&paramVal);
 		if (modparamVal == NULL || (strlen((char *)modparamVal) == 0)) {
 			(void) __ns_ldap_freeCred(authp);
+			(void) __ns_ldap_freeUnixCred(&AdminCred);
 			if (modparamVal != NULL)
 				free(modparamVal);
-			*authp = NULL;
 			return (NS_LDAP_INVALID_PARAM);
 		}
 
@@ -1551,6 +1641,7 @@ __s_api_getDefaultAuth(
 		if ((rc = __ns_ldap_getParam(NS_LDAP_HOST_CERTPATH_P,
 		    &paramVal, &errorp)) != NS_LDAP_SUCCESS) {
 			(void) __ns_ldap_freeCred(authp);
+			(void) __ns_ldap_freeUnixCred(&AdminCred);
 			(void) __ns_ldap_freeError(&errorp);
 			*authp = NULL;
 			return (rc);
@@ -1558,6 +1649,7 @@ __s_api_getDefaultAuth(
 
 		if (paramVal == NULL || *paramVal == NULL) {
 			(void) __ns_ldap_freeCred(authp);
+			(void) __ns_ldap_freeUnixCred(&AdminCred);
 			*authp = NULL;
 			return (NS_LDAP_INVALID_PARAM);
 		}
@@ -1566,10 +1658,12 @@ __s_api_getDefaultAuth(
 		(void) __ns_ldap_freeParam(&paramVal);
 		if ((*authp)->hostcertpath == NULL) {
 			(void) __ns_ldap_freeCred(authp);
+			(void) __ns_ldap_freeUnixCred(&AdminCred);
 			*authp = NULL;
 			return (NS_LDAP_MEMORY);
 		}
 	}
+	(void) __ns_ldap_freeUnixCred(&AdminCred);
 	return (NS_LDAP_SUCCESS);
 }
 
@@ -1759,7 +1853,8 @@ getConnection(
 					/* with default credentials */
 					authp = NULL;
 					rc = __s_api_getDefaultAuth(*cNext,
-					    *aNext, &authp);
+					    *aNext, &authp,
+					    flags & NS_LDAP_READ_SHADOW);
 					if (rc != NS_LDAP_SUCCESS) {
 						continue;
 					}

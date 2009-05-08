@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NSCD_FRONTEND_H
 #define	_NSCD_FRONTEND_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -40,6 +38,9 @@ extern "C" {
 #define	NSCD_DOORBUF_MAXLEN	1024 * 512
 #define	NSCD_PHDR_LEN(hdrp)	((hdrp)->data_off)
 #define	NSCD_DATA_LEN(hdrp)	((hdrp)->data_len)
+/* used to check clients required privileges */
+#define	NSCD_ALL_PRIV		0
+#define	NSCD_READ_PRIV		1
 
 #define	NSCD_ALLOC_LOOKUP_BUFFER(bufp, bufsiz, hdrp, space, spsiz)  \
 	if ((hdrp)->pbufsiz <= spsiz) { \
@@ -76,7 +77,7 @@ extern "C" {
 
 /* prototypes */
 uid_t _nscd_get_client_euid();
-int _nscd_check_client_read_priv();
+int _nscd_check_client_priv(int);
 int _nscd_setup_server(char *execname, char **argv);
 int _nscd_setup_child_server(int did);
 int _nscd_get_clearance(sema_t *sema);

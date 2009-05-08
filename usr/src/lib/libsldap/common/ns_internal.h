@@ -831,7 +831,7 @@ char		**__ns_ldap_mapAttributeList(const char *service,
 void		__ns_ldap_setServer(int set);
 ns_ldap_error_t	*__ns_ldap_LoadConfiguration();
 ns_ldap_error_t	*__ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname,
-				ns_config_t *new);
+				ns_config_t *new, int cred_only);
 ns_ldap_error_t *__ns_ldap_DumpConfiguration(char *filename);
 ns_ldap_error_t	*__ns_ldap_DumpLdif(char *filename);
 int		__ns_ldap_cache_ping();

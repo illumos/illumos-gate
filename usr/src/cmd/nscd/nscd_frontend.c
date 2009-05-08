@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,16 +320,20 @@ _nscd_get_client_euid()
 }
 
 /*
- * Check to see if the door client's euid is 0 or if it has PRIV_FILE_DAC_READ
+ * Check to see if the door client's euid is 0 or if it has required_priv
  * privilege. Return 0 if yes, -1 otherwise.
+ * Supported values for required_priv are:
+ *    - NSCD_ALL_PRIV: for all zones privileges
+ *    - NSCD_READ_PRIV: for PRIV_FILE_DAC_READ privilege
  */
 int
-_nscd_check_client_read_priv()
+_nscd_check_client_priv(int required_priv)
 {
 	int			rc = 0;
 	ucred_t			*uc = NULL;
 	const priv_set_t	*eset;
 	char			*me = "_nscd_check_client_read_priv";
+	priv_set_t		*zs;	/* zone */
 
 	if (door_ucred(&uc) != 0) {
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
@@ -343,8 +347,27 @@ _nscd_check_client_read_priv()
 	}
 
 	eset = ucred_getprivset(uc, PRIV_EFFECTIVE);
-	if (!priv_ismember(eset, PRIV_FILE_DAC_READ))
-		rc = -1;
+	switch (required_priv) {
+		case NSCD_ALL_PRIV:
+			zs = priv_str_to_set("zone", ",", NULL);
+			if (!priv_isequalset(eset, zs)) {
+				_NSCD_LOG(NSCD_LOG_FRONT_END,
+				    NSCD_LOG_LEVEL_ERROR)
+				(me, "missing all zones privileges\n");
+				rc = -1;
+			}
+			priv_freeset(zs);
+			break;
+		case NSCD_READ_PRIV:
+			if (!priv_ismember(eset, PRIV_FILE_DAC_READ))
+				rc = -1;
+			break;
+		default:
+			_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
+			(me, "unknown required_priv: %d\n", required_priv);
+			rc = -1;
+			break;
+	}
 	ucred_free(uc);
 	return (rc);
 }

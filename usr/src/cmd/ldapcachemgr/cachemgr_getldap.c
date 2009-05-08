@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <errno.h>
@@ -56,6 +54,8 @@
 static rwlock_t	ldap_lock = DEFAULTRWLOCK;
 static int	sighup_update = FALSE;
 extern admin_t	current_admin;
+
+extern int is_root_or_all_privs(char *dc_str, ucred_t **ucp);
 
 /* variables used for SIGHUP wakeup on sleep */
 static mutex_t			sighuplock;
@@ -2665,6 +2665,42 @@ getldap_revalidate()
 }
 
 void
+getldap_admincred(LineBuf *config_info, ldap_call_t *in)
+{
+	ns_ldap_error_t	*error;
+	ldap_config_out_t *cout;
+	ucred_t *uc = NULL;
+
+	if (current_admin.debug_level >= DBG_ALL) {
+		logit("getldap_admincred()...\n");
+	}
+	/* check privileges */
+	if (is_root_or_all_privs("GETADMINCRED", &uc) == 0) {
+		logit("admin credential requested by a non-root and no ALL "
+		    "privilege user not allowed");
+		config_info->str = NULL;
+		config_info->len = 0;
+	} else {
+		(void) rw_rdlock(&ldap_lock);
+		if ((error = __ns_ldap_LoadDoorInfo(config_info,
+		    in->ldap_u.domainname, NULL, 1)) != NULL) {
+			if (error != NULL && error->message != NULL)
+				logit("Error: ldap_lookup: %s\n",
+				    error->message);
+			(void) __ns_ldap_freeError(&error);
+
+			config_info->str = NULL;
+			config_info->len = 0;
+		}
+		/* set change cookie */
+		cout = (ldap_config_out_t *)config_info->str;
+		if (cout)
+			cout->cookie = chg_config_cookie_get();
+		(void) rw_unlock(&ldap_lock);
+	}
+}
+
+void
 getldap_lookup(LineBuf *config_info, ldap_call_t *in)
 {
 	ns_ldap_error_t	*error;
@@ -2675,7 +2711,7 @@ getldap_lookup(LineBuf *config_info, ldap_call_t *in)
 	}
 	(void) rw_rdlock(&ldap_lock);
 	if ((error = __ns_ldap_LoadDoorInfo(config_info,
-	    in->ldap_u.domainname, NULL)) != NULL) {
+	    in->ldap_u.domainname, NULL, 0)) != NULL) {
 		if (error != NULL && error->message != NULL)
 			logit("Error: ldap_lookup: %s\n", error->message);
 		(void) __ns_ldap_freeError(&error);

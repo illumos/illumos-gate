@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,11 +252,46 @@ __ns_ldap_dupAuth(const ns_cred_t *authp)
 }
 
 /*
+ * FUNCTION:	__ns_ldap_freeUnixCred
+ *
+ *	Frees all the memory associated with a UnixCred_t structure.
+ *
+ * RETURN VALUES:	NS_LDAP_INVALID_PARAM, NS_LDAP_SUCCESS
+ * INPUT:		UnixCred
+ */
+int
+__ns_ldap_freeUnixCred(UnixCred_t ** credp)
+{
+	UnixCred_t *ap;
+
+#ifdef DEBUG
+	(void) fprintf(stderr, "__ns_ldap_freeUnixCred START\n");
+#endif
+	if (credp == NULL || *credp == NULL)
+		return (NS_LDAP_INVALID_PARAM);
+
+	ap = *credp;
+	if (ap->userID) {
+		(void) memset(ap->userID, 0, strlen(ap->userID));
+		free(ap->userID);
+	}
+
+	if (ap->passwd) {
+		(void) memset(ap->passwd, 0, strlen(ap->passwd));
+		free(ap->passwd);
+	}
+
+	free(ap);
+	*credp = NULL;
+	return (NS_LDAP_SUCCESS);
+}
+
+/*
  * FUNCTION:	__ns_ldap_freeCred
  *
  *	Frees all the memory associated with a ns_cred_t structure.
  *
- * RETURN VALUES:	NS_LDAP_INVALID_PARAM, NS_LDAP_SUCCESS, NS_LDAP_CONFIG
+ * RETURN VALUES:	NS_LDAP_INVALID_PARAM, NS_LDAP_SUCCESS
  * INPUT:		ns_cred_t
  */
 int

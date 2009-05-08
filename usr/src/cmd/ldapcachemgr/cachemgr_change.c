@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <stdlib.h>
@@ -456,11 +454,11 @@ chg_test_config_change(ns_config_t *new, int *change_status)
 	 * Flatten the config data of the newly downloaded config and
 	 * current default config and compare both.
 	 */
-	if ((errp = __ns_ldap_LoadDoorInfo(&new_cfg, NULL, new)) != NULL) {
+	if ((errp = __ns_ldap_LoadDoorInfo(&new_cfg, NULL, new, 0)) != NULL) {
 		__ns_ldap_freeError(&errp);
 		/* error, assume the config is changed */
 		changed = 1;
-	} else if ((errp = __ns_ldap_LoadDoorInfo(&cur_cfg, NULL, NULL))
+	} else if ((errp = __ns_ldap_LoadDoorInfo(&cur_cfg, NULL, NULL, 0))
 	    != NULL) {
 		__ns_ldap_freeError(&errp);
 		/* error, assume the config is changed */

@@ -3335,8 +3335,10 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 	return (buf);
 }
 
-static int
-__door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
+/* shared by __door_getldapconfig() and __door_getadmincred() */
+int
+__door_getconf(char **buffer, int *buflen, ns_ldap_error_t **error,
+		    int callnumber)
 {
 	typedef union {
 		ldap_data_t	s_d;
@@ -3367,7 +3369,7 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 
 	adata = (sizeof (ldap_call_t) + strlen(domainname) +1);
 	ndata = sizeof (space_t);
-	space->s_d.ldap_call.ldap_callnumber = GETLDAPCONFIGV1;
+	space->s_d.ldap_call.ldap_callnumber = callnumber;
 	(void) strcpy(space->s_d.ldap_call.ldap_u.domainname, domainname);
 	free(domainname);
 	domainname = NULL;
@@ -3408,6 +3410,73 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 	free(space);
 
 	return (retCode);
+}
+
+static int
+__door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
+{
+	return (__door_getconf(buffer, buflen, error, GETLDAPCONFIGV1));
+}
+
+/*
+ * SetDoorInfoToUnixCred parses ldapcachemgr configuration information
+ * for Admin credentials.
+ */
+int
+SetDoorInfoToUnixCred(char *buffer, ns_ldap_error_t **errorp,
+	UnixCred_t **cred)
+{
+	UnixCred_t	*ptr;
+	char		errstr[MAXERROR];
+	char		*name, *value, valbuf[BUFSIZE];
+	char		*bufptr = buffer;
+	char		*strptr;
+	char		*rest;
+	ParamIndexType	index = 0;
+	ldap_config_out_t	*cfghdr;
+
+	if (errorp == NULL || cred == NULL || *cred == NULL)
+		return (NS_LDAP_INVALID_PARAM);
+	*errorp = NULL;
+
+	ptr = *cred;
+
+	cfghdr = (ldap_config_out_t *)bufptr;
+	bufptr = (char *)cfghdr->config_str;
+
+	strptr = (char *)strtok_r(bufptr, DOORLINESEP, &rest);
+	for (; ; ) {
+		if (strptr == NULL)
+			break;
+		(void) strlcpy(valbuf, strptr, sizeof (valbuf));
+		__s_api_split_key_value(valbuf, &name, &value);
+		if (__ns_ldap_getParamType(name, &index) != 0) {
+			(void) snprintf(errstr, MAXERROR,
+			    gettext("SetDoorInfoToUnixCred: "
+			    "Unknown keyword encountered '%s'."), name);
+			MKERROR(LOG_ERR, *errorp, NS_CONFIG_SYNTAX,
+			    strdup(errstr), NULL);
+			return (NS_LDAP_CONFIG);
+		}
+		switch (index) {
+		case NS_LDAP_ADMIN_BINDDN_P:
+			ptr->userID = (char *)strdup(value);
+			break;
+		case NS_LDAP_ADMIN_BINDPASSWD_P:
+			ptr->passwd = (char *)strdup(value);
+			break;
+		default:
+			(void) snprintf(errstr, MAXERROR,
+			    gettext("SetDoorInfoToUnixCred: "
+			    "Unknown index encountered '%d'."), index);
+			MKERROR(LOG_ERR, *errorp, NS_CONFIG_SYNTAX,
+			    strdup(errstr), NULL);
+			return (NS_LDAP_CONFIG);
+		}
+		strptr = (char *)strtok_r(NULL, DOORLINESEP, &rest);
+	}
+
+	return (NS_LDAP_SUCCESS);
 }
 
 /*

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -36,6 +34,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <strings.h>
+#include <priv.h>
 
 #include "ns_sldap.h"
 #include "ns_internal.h"
@@ -2824,6 +2823,70 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 }
 
 /*
+ * For a lookup of shadow data, if shadow update is enabled,
+ * check the calling process' privilege to ensure it's
+ * allowed to perform such operation.
+ */
+static int
+check_shadow(ns_ldap_cookie_t *cookie, const char *service)
+{
+	char errstr[MAXERROR];
+	char *err;
+	boolean_t priv;
+	/* caller */
+	priv_set_t *ps;
+	/* zone */
+	priv_set_t *zs;
+
+	/*
+	 * If service is "shadow", we may need
+	 * to use privilege credentials.
+	 */
+	if ((strcmp(service, "shadow") == 0) &&
+	    __ns_ldap_is_shadow_update_enabled()) {
+		/*
+		 * Since we release admin credentials after
+		 * connection is closed and we do not cache
+		 * them, we allow any root or all zone
+		 * privilege process to read shadow data.
+		 */
+		priv = (geteuid() == 0);
+		if (!priv) {
+			/* caller */
+			ps = priv_allocset();
+
+			(void) getppriv(PRIV_EFFECTIVE, ps);
+			zs = priv_str_to_set("zone", ",", NULL);
+			priv = priv_isequalset(ps, zs);
+			priv_freeset(ps);
+			priv_freeset(zs);
+		}
+		if (!priv) {
+			(void) sprintf(errstr,
+			    gettext("Permission denied"));
+			err = strdup(errstr);
+			if (err == NULL)
+				return (NS_LDAP_MEMORY);
+			MKERROR(LOG_INFO, cookie->errorp, NS_LDAP_INTERNAL, err,
+			    NULL);
+			return (NS_LDAP_INTERNAL);
+		}
+		cookie->i_flags |= NS_LDAP_READ_SHADOW;
+		/*
+		 * We do not want to reuse connection (hence
+		 * keep it open) with admin credentials.
+		 * If NS_LDAP_KEEP_CONN is set, reject the
+		 * request.
+		 */
+		if (cookie->i_flags & NS_LDAP_KEEP_CONN)
+			return (NS_LDAP_INVALID_PARAM);
+		cookie->i_flags |= NS_LDAP_NEW_CONN;
+	}
+
+	return (NS_LDAP_SUCCESS);
+}
+
+/*
  * internal function for __ns_ldap_list
  */
 static int
@@ -2854,6 +2917,13 @@ ldap_list(
 	*errorp = NULL;
 	*rResult = NULL;
 	*rcp = NS_LDAP_SUCCESS;
+
+	/*
+	 * Sanity check - NS_LDAP_READ_SHADOW is for our
+	 * own internal use.
+	 */
+	if (flags & NS_LDAP_READ_SHADOW)
+		return (NS_LDAP_INVALID_PARAM);
 
 	/* Initialize State machine cookie */
 	cookie = init_search_state_machine();
@@ -2947,6 +3017,9 @@ ldap_list(
 		cookie->callback = callback;
 		cookie->use_usercb = 1;
 	}
+
+	/* check_shadow() may add extra value to cookie->i_flags */
+	cookie->i_flags = flags;
 	if (service) {
 		cookie->service = strdup(service);
 		if (cookie->service == NULL) {
@@ -2955,12 +3028,27 @@ ldap_list(
 			*rcp = NS_LDAP_MEMORY;
 			return (NS_LDAP_MEMORY);
 		}
+
+		/*
+		 * If given, use the credential given by the caller, and
+		 * skip the credential check required for shadow update.
+		 */
+		if (auth == NULL) {
+			rc = check_shadow(cookie, service);
+			if (rc != NS_LDAP_SUCCESS) {
+				*errorp = cookie->errorp;
+				cookie->errorp = NULL;
+				delete_search_cookie(cookie);
+				cookie = NULL;
+				*rcp = rc;
+				return (rc);
+			}
+		}
 	}
 
 	cookie->i_filter = strdup(filter);
 	cookie->i_attr = attribute;
 	cookie->i_auth = auth;
-	cookie->i_flags = flags;
 
 	if (batch != NULL) {
 		cookie->batch = batch;
@@ -3450,6 +3538,13 @@ firstEntry(
 	*errorp = NULL;
 	*result = NULL;
 
+	/*
+	 * Sanity check - NS_LDAP_READ_SHADOW is for our
+	 * own internal use.
+	 */
+	if (flags & NS_LDAP_READ_SHADOW)
+		return (NS_LDAP_INVALID_PARAM);
+
 	/* get the service descriptor - or create a default one */
 	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
 	    &sdlist, errorp);
@@ -3545,18 +3640,34 @@ firstEntry(
 		cookie->use_filtercb = 1;
 	}
 	cookie->use_usercb = 0;
+	/* check_shadow() may add extra value to cookie->i_flags */
+	cookie->i_flags = flags;
 	if (service) {
 		cookie->service = strdup(service);
 		if (cookie->service == NULL) {
 			delete_search_cookie(cookie);
 			return (NS_LDAP_MEMORY);
 		}
+
+		/*
+		 * If given, use the credential given by the caller, and
+		 * skip the credential check required for shadow update.
+		 */
+		if (auth == NULL) {
+			rc = check_shadow(cookie, service);
+			if (rc != NS_LDAP_SUCCESS) {
+				*errorp = cookie->errorp;
+				cookie->errorp = NULL;
+				delete_search_cookie(cookie);
+				cookie = NULL;
+				return (rc);
+			}
+		}
 	}
 
 	cookie->i_filter = strdup(filter);
 	cookie->i_attr = attribute;
 	cookie->i_auth = auth;
-	cookie->i_flags = flags;
 
 	state = INIT;
 	for (;;) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -521,6 +521,18 @@ get_gss_func(void **func_p)
 	    "libgss.so", "gss_inquire_cred", func_p));
 }
 
+static nscd_rc_t
+get_sldap_shadow_func(void **func_p)
+{
+	static void	*handle = NULL;
+	static void	*func = NULL;
+	static mutex_t	lock = DEFAULTMUTEX;
+
+	return (get_lib_func(&handle, &func, &lock,
+	    "libsldap.so", "__ns_ldap_is_shadow_update_enabled",
+	    func_p));
+}
+
 /*
  * get_dns_funcs returns pointers to gethostbyname functions in the
  * dynamically loaded nss_dns & nss_mdns modules that return host
@@ -759,14 +771,46 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "nsw source = %s\n", NSCD_NSW_SRC_NAME(srci));
 
-		/* if no privilege to look up, skip */
-		if (params.privdb == 1 && swret != NULL &&
-		    strcmp(NSCD_NSW_SRC_NAME(srci), "files") == 0 &&
-		    _nscd_check_client_read_priv() != 0) {
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-			(me, "no privilege to look up, skip source\n");
+		/*
+		 * If no privilege to look up, skip.
+		 * 'files' requires PRIV_FILE_DAC_READ to read shadow(4) data,
+		 * 'ldap' requires all zones privilege.
+		 */
+		if (params.privdb == 1 && swret != NULL) {
+			boolean_t	(*is_shadow_update_enabled)();
+			boolean_t	check_ldap_priv = B_FALSE;
 
-			goto next_src;
+			if (strcmp(NSCD_NSW_SRC_NAME(srci), "ldap") == 0) {
+				if (get_sldap_shadow_func(
+				    (void **)&is_shadow_update_enabled) ==
+				    NSCD_SUCCESS &&
+				    is_shadow_update_enabled()) {
+					check_ldap_priv = B_TRUE;
+
+					/*
+					 * A peruser nscd doesn't have
+					 * the privileges to lookup a
+					 * private database, such as shadow,
+					 * returns NSS_ALTRETRY to have the
+					 * main nscd do the job.
+					 */
+					if (_whoami == NSCD_CHILD) {
+						res = NSS_ALTRETRY;
+						goto free_nsw_state;
+					}
+				}
+			}
+
+			if ((strcmp(NSCD_NSW_SRC_NAME(srci), "files") == 0 &&
+			    _nscd_check_client_priv(NSCD_READ_PRIV) != 0) ||
+			    (check_ldap_priv &&
+			    _nscd_check_client_priv(NSCD_ALL_PRIV) != 0)) {
+				_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
+				    NSCD_LOG_LEVEL_DEBUG)
+				(me, "no privilege to look up, skip source\n");
+
+				goto next_src;
+			}
 		}
 
 		/* get state of the (backend) client service */
@@ -1057,7 +1101,7 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 
 	/* if no privilege to look up, return */
 	if (params.privdb == 1 && swret != NULL &&
-	    _nscd_check_client_read_priv() != 0) {
+	    _nscd_check_client_priv(NSCD_READ_PRIV) != 0) {
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "no privilege \n");

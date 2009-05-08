@@ -195,6 +195,8 @@ typedef union {
 #define	GETSTATUSCHANGE	25
 	/* perform admin modify via ldap_cachemgr */
 #define	ADMINMODIFY	26
+	/* get admin credentials for shadow lookups */
+#define	GETADMINCRED	27
 
 /*
  * GETLDAPSERVER request flags

@@ -979,6 +979,9 @@ init()
     HOST=""		# NULL or <hostname>
     NAWK="/usr/bin/nawk"
     RM="/usr/bin/rm"
+    WC="/usr/bin/wc"
+    CAT="/usr/bin/cat"
+    SED="/usr/bin/sed"
 
     DOM=""              # Set to NULL
     # If DNS domain (resolv.conf) exists use that, otherwise use domainname.
@@ -1010,6 +1013,7 @@ init()
     LDAP_SUFFIX=""
     LDAP_DOMAIN=$DOM	# domainname on Server (default value)
     GEN_CMD=""
+    PROXY_ACI_NAME="LDAP_Naming_Services_proxy_password_read"
 
     # LDAP COMMANDS
     LDAPSEARCH="/bin/ldapsearch -r"
@@ -2594,11 +2598,12 @@ EOF
 }
 
 #
-# allow_admin_write_shadow(): Give Admin write permission for shadow data.
+# allow_admin_read_write_shadow(): Give Admin read/write permission
+# to shadow data.
 #
-allow_admin_write_shadow()
+allow_admin_read_write_shadow()
 {
-    [ $DEBUG -eq 1 ] && ${ECHO} "In allow_admin_write_shadow()"
+    [ $DEBUG -eq 1 ] && ${ECHO} "In allow_admin_read_write_shadow()"
 
     # Set ACI Name
     ADMIN_ACI_NAME="LDAP_Naming_Services_admin_shadow_write"
@@ -2606,7 +2611,11 @@ allow_admin_write_shadow()
     # Search for ACI_NAME
     eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" \
     -s base objectclass=* aci > ${TMPDIR}/chk_adminwrite_aci 2>&1"
-    ${GREP} "${ADMIN_ACI_NAME}" ${TMPDIR}/chk_adminwrite_aci > /dev/null 2>&1
+
+    # if an ACI with ${ADMIN_ACI_NAME} and "write,compare,read,search"
+    # and ${LDAP_ADMINDN} already exists, we are done
+    ${EGREP} ".*${ADMIN_ACI_NAME}.*write,compare,read,search.*${LDAP_ADMINDN}.*" \
+    	${TMPDIR}/chk_adminwrite_aci 2>&1 > /dev/null
     if [ $? -eq 0 ]; then
 	MSG="Admin ACI ${ADMIN_ACI_NAME} already exists for ${LDAP_BASEDN}."
 	if [ $EXISTING_PROFILE -eq 1 ]; then
@@ -2618,26 +2627,35 @@ allow_admin_write_shadow()
 	return 0
     fi
 
+    # If an ACI with ${ADMIN_ACI_NAME} and "(write)" and ${LDAP_ADMINDN}
+    # already exists, delete it first.
+    find_and_delete_ACI ".*${ADMIN_ACI_NAME}.*(write).*${LDAP_ADMINDN}.*" \
+	${TMPDIR}/chk_adminwrite_aci ${ADMIN_ACI_NAME}
+
     # Create the tmp file to add.
     ( cat <<EOF
 dn: ${LDAP_BASEDN}
 changetype: modify
 add: aci
-aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||userPassword||loginShell||homeDirectory||gecos")(version 3.0; acl ${ADMIN_ACI_NAME}; allow (write) userdn = "ldap:///${LDAP_ADMINDN}";)
+aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="shadowLastChange
+ ||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire
+ ||shadowFlag||userPassword||loginShell||homeDirectory||gecos")
+  (version 3.0; acl ${ADMIN_ACI_NAME}; allow (write,compare,read,search)
+  userdn = "ldap:///${LDAP_ADMINDN}";)
 EOF
 ) > ${TMPDIR}/admin_write
     
     # Add the entry.
     ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/admin_write ${VERB}"
     if [ $? -ne 0 ]; then
-	${ECHO} "  ERROR: Allow ${LDAP_ADMINDN} to write shadow data failed!"
+	${ECHO} "  ERROR: Allow ${LDAP_ADMINDN} read/write access to shadow data failed!"
 	cleanup
 	exit 1
     fi
 
     ${RM} -f ${TMPDIR}/admin_write
     # Display message that the administrator ACL is set.
-    MSG="Give ${LDAP_ADMINDN} write permission for shadow."
+    MSG="Give ${LDAP_ADMINDN} read/write access to shadow data."
     if [ $EXISTING_PROFILE -eq 1 ]; then
 	${ECHO} "  ACI SET: $MSG"
     else
@@ -2647,12 +2665,12 @@ EOF
 }
 
 #
-# allow_host_write_shadow(): Give host principal write permission
+# allow_host_read_write_shadow(): Give host principal read/write permission
 # for shadow data.
 #
-allow_host_write_shadow()
+allow_host_read_write_shadow()
 {
-    [ $DEBUG -eq 1 ] && ${ECHO} "In allow_host_write_shadow()"
+    [ $DEBUG -eq 1 ] && ${ECHO} "In allow_host_read_write_shadow()"
 
     # Set ACI Name
     HOST_ACI_NAME="LDAP_Naming_Services_host_shadow_write"
@@ -2676,20 +2694,20 @@ allow_host_write_shadow()
 dn: ${LDAP_BASEDN}
 changetype: modify
 add: aci
-aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||userPassword||loginShell||homeDirectory||gecos")(version 3.0; acl ${HOST_ACI_NAME}; allow (read, write) authmethod="sasl GSSAPI" and userdn = "ldap:///cn=*+ipHostNumber=*,ou=Hosts,${LDAP_BASEDN}";)
+aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||userPassword||loginShell||homeDirectory||gecos")(version 3.0; acl ${HOST_ACI_NAME}; allow (write,compare,read,search) authmethod="sasl GSSAPI" and userdn = "ldap:///cn=*+ipHostNumber=*,ou=Hosts,${LDAP_BASEDN}";)
 EOF
-) > ${TMPDIR}/host_write
+) > ${TMPDIR}/host_read_write
     
     # Add the entry.
-    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/host_write ${VERB}"
+    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/host_read_write ${VERB}"
     if [ $? -ne 0 ]; then
 	${ECHO} "  ERROR: Allow Host Principal to write shadow data failed!"
 	cleanup
 	exit 1
     fi
 
-    ${RM} -f ${TMPDIR}/host_write
-    MSG="Give host principal write permission for shadow."
+    ${RM} -f ${TMPDIR}/host_read_write
+    MSG="Give host principal read/write permission for shadow."
     if [ $EXISTING_PROFILE -eq 1 ]; then
 	${ECHO} "  ACI SET: $MSG"
     else
@@ -2732,8 +2750,9 @@ setup_shadow_update() {
 	    MSG="Use host principal for shadow data update (y/n/h)?"
 	    get_confirm "$MSG" "y" "use_host_principal_help"
 	    if [ $? -eq 1 ]; then
-		allow_host_write_shadow
-		modify_top_aci
+		delete_proxy_read_pw
+		allow_host_read_write_shadow
+		deny_non_host_shadow_access
 	        ${ECHO} ""
 		${ECHO} "  Shadow update has been enabled."
 	    else
@@ -2750,8 +2769,9 @@ setup_shadow_update() {
 	get_adminDN
 	get_admin_pw
 	add_admin
-	allow_admin_write_shadow
-	modify_top_aci
+	delete_proxy_read_pw
+	allow_admin_read_write_shadow
+	deny_non_admin_shadow_access
         ${ECHO} ""
 	${ECHO} "  Shadow update has been enabled."
 	return
@@ -2799,6 +2819,7 @@ prompt_config_info()
 
     if [ "$LDAP_ENABLE_SHADOW_UPDATE" = "TRUE" ];then
 	setup_shadow_update
+	cleanup
 	exit 0
     fi
 
@@ -4466,7 +4487,6 @@ EOF
     STEP=`expr $STEP + 1`
 }
 
-
 #
 # modify_top_aci(): Modify the ACI for the top entry to disable self modify
 #                   of user attributes.
@@ -4486,38 +4506,11 @@ modify_top_aci()
 	cleanup
 	exit 1
     fi
-
-    # Display "already exists" message if necessary. For shadow update,
-    # check also if the deny self-write to userPassword has been done.
-    # If not, more to do, don't display the message.
-    MSG="Top level ACI ${ACI_NAME} already exists for ${LDAP_BASEDN}."
     ${GREP} "${ACI_NAME}" ${TMPDIR}/chk_top_aci > /dev/null 2>&1
     if [ $? -eq 0 ]; then
-	if [ "$LDAP_ENABLE_SHADOW_UPDATE" != "TRUE" ];then
-	    ${ECHO} "  ${STEP}. $MSG"
-	    STEP=`expr $STEP + 1`
-	    return 0
-	else
-	    ${GREP} "${ACI_NAME}" ${TMPDIR}/chk_top_aci | ${GREP} -i  \
-	    userPassword > /dev/null 2>&1
-	    if [ $? -eq 0 ]; then
-		# userPassword is already on the deny list, no more to do
-		if [ $EXISTING_PROFILE -eq 1 ];then
-		    ${ECHO} "  NOT SET: $MSG"
-		else
-		    ${ECHO} "  ${STEP}. $MSG"
-		    STEP=`expr $STEP + 1`
-		fi
-	        return 0
-	    fi
-	fi
-    fi
-
-    # if shadow update is enabled, also deny self-write to userPassword
-    if [ "$LDAP_ENABLE_SHADOW_UPDATE" = "TRUE" ];then
-	PWD_SELF_CHANGE="userPassword||"
-    else
-	PWD_SELF_CHANGE=""
+	${ECHO} "  ${STEP}. Top level ACI ${ACI_NAME} already exists for ${LDAP_BASEDN}."
+	STEP=`expr $STEP + 1`
+	return 0
     fi
 
     # Crate LDIF for top level ACI.
@@ -4525,7 +4518,7 @@ modify_top_aci()
 dn: ${LDAP_BASEDN}
 changetype: modify
 add: aci
-aci: (targetattr = "${PWD_SELF_CHANGE}cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid||SolarisAuditAlways||SolarisAuditNever||SolarisAttrKeyValue||SolarisAttrReserved1||SolarisAttrReserved2||SolarisUserQualifier")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
+aci: (targetattr = "cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid||SolarisAuditAlways||SolarisAuditNever||SolarisAttrKeyValue||SolarisAttrReserved1||SolarisAttrReserved2||SolarisUserQualifier")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
 -
 EOF
 ) > ${TMPDIR}/top_aci
@@ -4538,9 +4531,190 @@ EOF
 	exit 1
     fi
 
-    # Display message that schema is updated.
+    # Display message that ACI is updated.
     MSG="ACI for ${LDAP_BASEDN} modified to disable self modify."
     if [ $EXISTING_PROFILE -eq 1 ];then
+	${ECHO} "  ACI SET: $MSG"
+    else
+	${ECHO} "  ${STEP}. $MSG"
+	STEP=`expr $STEP + 1`
+    fi
+}
+
+#
+# find_and_delete_ACI(): Find an ACI in file $2 with a matching pattern $1.
+# Delete the ACI and print a message using $3 as the ACI name. $3 is needed
+# because it could have a different value than that of $1.
+find_and_delete_ACI()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In find_and_delete_ACI"
+
+    # if an ACI with pattern $1 exists in file $2, delete it from ${LDAP_BASEDN}
+    ${EGREP} $1 $2 | ${SED} -e 's/aci=//' > ${TMPDIR}/grep_find_delete_aci 2>&1
+    if [ -s ${TMPDIR}/grep_find_delete_aci ]; then
+	aci_to_delete=`${CAT} ${TMPDIR}/grep_find_delete_aci`
+
+	# Create the tmp file to delete the ACI.
+	( cat <<EOF
+dn: ${LDAP_BASEDN}
+changetype: modify
+delete: aci
+aci: ${aci_to_delete}
+EOF
+	) > ${TMPDIR}/find_delete_aci
+
+	# Delete the ACI
+	${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/find_delete_aci ${VERB}"
+	if [ $? -ne 0 ]; then
+	    ${ECHO} "  ERROR: Remove of $3 ACI failed!"
+	    cleanup
+	    exit 1
+	fi
+
+	${RM} -f ${TMPDIR}/find_delete_aci
+	# Display message that an ACL is deleted.
+	MSG="ACI $3 deleted."
+	if [ $EXISTING_PROFILE -eq 1 ]; then
+	    ${ECHO} "  ACI DELETED: $MSG"
+	else
+	    ${ECHO} "  ${STEP}. $MSG"
+	    STEP=`expr $STEP + 1`
+	fi
+    fi
+}
+
+#
+# Add an ACI to deny non-admin access to shadow data when
+# shadow update is enabled.
+#
+deny_non_admin_shadow_access()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In deny_non_admin_shadow_access()"
+
+    # Set ACI Names
+    ACI_TO_ADD="LDAP_Naming_Services_deny_non_admin_shadow_access"
+    ACI_TO_DEL="LDAP_Naming_Services_deny_non_host_shadow_access"
+
+    # Search for ACI_TO_ADD
+    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" -s base objectclass=* aci > ${TMPDIR}/chk_aci_non_admin 2>&1"
+    if [ $? -ne 0 ]; then
+	${ECHO} "Error searching aci for ${LDAP_BASEDN}"
+	cleanup
+	exit 1
+    fi
+
+    # If an ACI with ${ACI_TO_ADD} already exists, we are done.
+    ${EGREP} ${ACI_TO_ADD} ${TMPDIR}/chk_aci_non_admin 2>&1 > /dev/null
+    if [ $? -eq 0 ]; then
+	MSG="ACI ${ACI_TO_ADD} already set for ${LDAP_BASEDN}."
+	if [ $EXISTING_PROFILE -eq 1 ]; then
+	    ${ECHO} "  NOT SET: $MSG"
+	else
+	    ${ECHO} "  ${STEP}. $MSG"
+	    STEP=`expr $STEP + 1`	
+	fi
+	return 0
+    fi
+
+    # The deny_non_admin_shadow_access and deny_non_host_shadow_access ACIs
+    # should be mutually exclusive, so if the latter exists, delete it.
+    find_and_delete_ACI ${ACI_TO_DEL} ${TMPDIR}/chk_aci_non_admin ${ACI_TO_DEL}
+
+    # Create the tmp file to add.
+    ( cat <<EOF
+dn: ${LDAP_BASEDN}
+changetype: modify
+add: aci
+aci: (target="ldap:///${LDAP_BASEDN}")(targetattr = "shadowLastChange||
+ shadowMin|| shadowMax||shadowWarning||shadowInactive||shadowExpire||
+ shadowFlag||userPassword") (version 3.0; acl ${ACI_TO_ADD};
+ deny (write,read,search,compare) userdn != "ldap:///${LDAP_ADMINDN}";)
+EOF
+) > ${TMPDIR}/non_admin_aci_write
+    
+    # Add the entry.
+    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/non_admin_aci_write ${VERB}"
+    if [ $? -ne 0 ]; then
+	${ECHO} "  ERROR: Adding ACI ${ACI_TO_ADD} failed!"
+	${CAT} ${TMPDIR}/non_admin_aci_write
+	cleanup
+	exit 1
+    fi
+
+    ${RM} -f ${TMPDIR}/non_admin_aci_write
+    # Display message that the non-admin access to shadow data is denied.
+    MSG="Non-Admin access to shadow data denied."
+    if [ $EXISTING_PROFILE -eq 1 ]; then
+	${ECHO} "  ACI SET: $MSG"
+    else
+	${ECHO} "  ${STEP}. $MSG"
+	STEP=`expr $STEP + 1`
+    fi
+}
+
+#
+# Add an ACI to deny non-host access to shadow data when
+# shadow update is enabled and auth Method if gssapi.
+#
+deny_non_host_shadow_access()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In deny_non_host_shadow_access()"
+
+    # Set ACI Names
+    ACI_TO_ADD="LDAP_Naming_Services_deny_non_host_shadow_access"
+    ACI_TO_DEL="LDAP_Naming_Services_deny_non_admin_shadow_access"
+
+    # Search for ACI_TO_ADD
+    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" -s base objectclass=* aci > ${TMPDIR}/chk_aci_non_host 2>&1"
+    if [ $? -ne 0 ]; then
+	${ECHO} "Error searching aci for ${LDAP_BASEDN}"
+	cleanup
+	exit 1
+    fi
+
+    # If an ACI with ${ACI_TO_ADD} already exists, we are done.
+    ${EGREP} ${ACI_TO_ADD} ${TMPDIR}/chk_aci_non_host 2>&1 > /dev/null
+    if [ $? -eq 0 ]; then
+	MSG="ACI ${ACI_TO_ADD} already set for ${LDAP_BASEDN}."
+	if [ $EXISTING_PROFILE -eq 1 ]; then
+	    ${ECHO} "  NOT SET: $MSG"
+	else
+	    ${ECHO} "  ${STEP}. $MSG"
+	    STEP=`expr $STEP + 1`	
+	fi
+	return 0
+    fi
+
+    # The deny_non_admin_shadow_access and deny_non_host_shadow_access ACIs
+    # should be mutually exclusive, so if the former exists, delete it.
+    find_and_delete_ACI ${ACI_TO_DEL} ${TMPDIR}/chk_aci_non_host ${ACI_TO_DEL}
+
+    # Create the tmp file to add.
+    ( cat <<EOF
+dn: ${LDAP_BASEDN}
+changetype: modify
+add: aci
+aci: (target="ldap:///${LDAP_BASEDN}")(targetattr = "shadowLastChange||
+ shadowMin|| shadowMax||shadowWarning||shadowInactive||shadowExpire||
+ shadowFlag||userPassword") (version 3.0; acl ${ACI_TO_ADD};
+  deny (write,read,search,compare)
+  userdn != "ldap:///cn=*+ipHostNumber=*,ou=Hosts,${LDAP_BASEDN}";)
+EOF
+) > ${TMPDIR}/non_host_aci_write
+    
+    # Add the entry.
+    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/non_host_aci_write ${VERB}"
+    if [ $? -ne 0 ]; then
+	${ECHO} "  ERROR: Adding ACI ${ACI_TO_ADD} failed!"
+	${CAT} ${TMPDIR}/non_host_aci_write
+	cleanup
+	exit 1
+    fi
+
+    ${RM} -f ${TMPDIR}/non_host_aci_write
+    # Display message that the non-host access to shadow data is denied.
+    MSG="Non-host access to shadow data is denied."
+    if [ $EXISTING_PROFILE -eq 1 ]; then
 	${ECHO} "  ACI SET: $MSG"
     else
 	${ECHO} "  ${STEP}. $MSG"
@@ -4927,9 +5101,6 @@ allow_proxy_read_pw()
 {
     [ $DEBUG -eq 1 ] && ${ECHO} "In allow_proxy_read_pw()"
 
-    # Set ACI Name
-    PROXY_ACI_NAME="LDAP_Naming_Services_proxy_password_read"
-
     # Search for ACI_NAME
     eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" -s base objectclass=* aci > ${TMPDIR}/chk_proxyread_aci 2>&1"
     ${GREP} "${PROXY_ACI_NAME}" ${TMPDIR}/chk_proxyread_aci > /dev/null 2>&1
@@ -4944,7 +5115,9 @@ allow_proxy_read_pw()
 dn: ${LDAP_BASEDN}
 changetype: modify
 add: aci
-aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="userPassword")(version 3.0; acl ${PROXY_ACI_NAME}; allow (compare,read,search) userdn = "ldap:///${LDAP_PROXYAGENT}";)
+aci: (target="ldap:///${LDAP_BASEDN}")(targetattr="userPassword")
+  (version 3.0; acl ${PROXY_ACI_NAME}; allow (compare,read,search)
+  userdn = "ldap:///${LDAP_PROXYAGENT}";)
 EOF
 ) > ${TMPDIR}/proxy_read
     
@@ -4959,6 +5132,83 @@ EOF
     # Display message that schema is updated.
     ${ECHO} "  ${STEP}. Give ${LDAP_PROXYAGENT} read permission for password."
     STEP=`expr $STEP + 1`
+}
+
+#  Delete Proxy Agent read permission for password.
+delete_proxy_read_pw()
+{
+    [ $DEBUG -eq 1 ] && ${ECHO} "In delete_proxy_read_pw()"
+
+    # Search for ACI_NAME
+    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"${LDAP_BASEDN}\" -s base objectclass=* aci > ${TMPDIR}/chk_proxyread_aci 2>&1"
+    ${GREP} "${PROXY_ACI_NAME}" ${TMPDIR}/chk_proxyread_aci | \
+	${SED} -e 's/aci=//' > ${TMPDIR}/grep_proxyread_aci 2>&1
+    if [ $? -ne 0 ]; then
+	${ECHO} "Proxy ACI ${PROXY_ACI_NAME} does not exist for ${LDAP_BASEDN}."
+	return 0
+    fi
+
+    # We need to remove proxy agent's read access to user passwords,
+    # but We do not know the value of the ${LDAP_PROXYAGENT} here, so
+    # 1. if only one match found, delete it
+    # 2. if more than one matches found, ask the user which one to delete
+    HOWMANY=`${WC} -l ${TMPDIR}/grep_proxyread_aci | ${NAWK} '{print $1}'`
+    if [ $HOWMANY -eq 0 ]; then
+	${ECHO} "Proxy ACI ${PROXY_ACI_NAME} does not exist for ${LDAP_BASEDN}."
+	return 0
+    fi
+    if [ $HOWMANY -eq 1 ];then
+	proxy_aci=`${CAT} ${TMPDIR}/grep_proxyread_aci`
+    else
+	    ${CAT} << EOF
+
+Proxy agent is not allowed to read user passwords when shadow
+update is enabled. There are more than one proxy agents found.
+Please select the currently proxy agent being used, so that
+idsconfig can remove its read access to user passwords.
+
+The proxy agents are:
+
+EOF
+	    # generate the proxy agent list
+    	    ${SED} -e "s/.*ldap:\/\/\/.*ldap:\/\/\///" \
+	    ${TMPDIR}/grep_proxyread_aci | ${SED} -e "s/\";)//" > \
+	    	${TMPDIR}/proxy_agent_list
+
+	    # print the proxy agent list
+	    ${NAWK} '{print NR ": " $0}' ${TMPDIR}/proxy_agent_list
+
+	    # ask the user to pick one
+	    _MENU_PROMPT="Select the proxy agent (1-$HOWMANY): "
+	    get_menu_choice "${_MENU_PROMPT}" "0" "$HOWMANY"
+	    _CH=$MN_CH
+	    proxy_aci=`${SED} -n "$_CH p" ${TMPDIR}/grep_proxyread_aci`
+    fi
+
+    # Create the tmp file to delete the ACI.
+    ( cat <<EOF
+dn: ${LDAP_BASEDN}
+changetype: modify
+delete: aci
+aci: ${proxy_aci}
+EOF
+    ) > ${TMPDIR}/proxy_delete
+
+    # Delete the ACI
+    ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/proxy_delete ${VERB}"
+    if [ $? -ne 0 ]; then
+	${ECHO} "  ERROR: Remove of ${PROXY_ACI_NAME} ACI failed!"
+	cat ${TMPDIR}/proxy_delete
+	cleanup
+	exit 1
+    fi
+
+    # Display message that ACI is updated.
+    MSG="Removed ${PROXY_ACI_NAME} ACI for proxyagent read permission for password."
+    ${ECHO} " "
+    ${ECHO} "  ACI REMOVED: $MSG"
+    ${ECHO} "  The ACI removed is $proxy_aci"
+    ${ECHO} " "
 }
 
 #
@@ -5156,20 +5406,29 @@ add_vlv_aci
 # if Proxy needed, Add Proxy Agent and give read permission for password.
 if [ $NEED_PROXY -eq 1 ]; then
     add_proxyagent
-    allow_proxy_read_pw
+    if [ "$LDAP_ENABLE_SHADOW_UPDATE" != "TRUE" ]; then
+	allow_proxy_read_pw
+    fi
 fi
 
 # If admin needed for shadow update, Add the administrator identity and
-# give write permission for shadow.
+# give read/write permission for shadow, and deny all others read/write
+# access to it.
 if [ $NEED_ADMIN -eq 1 ]; then
     add_admin
-    allow_admin_write_shadow
+    allow_admin_read_write_shadow
+    # deny non-admin access to shadow data
+    deny_non_admin_shadow_access
 fi
 
-# if use host principal for shadow update, give write permission for shadow.
+# If use host principal for shadow update, give read/write permission for
+# shadow, and deny all others' read/write access to it.
 if [ $NEED_HOSTACL -eq 1 ]; then
-    allow_host_write_shadow
+    allow_host_read_write_shadow
+    # deny non-host access to shadow data
+    deny_non_host_shadow_access
 fi
+
 
 # Generate client profile and add it to the server.
 add_profile

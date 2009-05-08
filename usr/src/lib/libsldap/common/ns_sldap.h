@@ -91,6 +91,13 @@ typedef enum ScopeType {
 #define	NS_LDAP_UPDATE_SHADOW	0x4000
 
 /*
+ * NS_LDAP_READ_SHADOW is for a privileged caller of __ns_ldap_list()
+ * and __ns_ldap_firstEntry() to read the shadow database on the
+ * LDAP server.
+ */
+#define	NS_LDAP_READ_SHADOW	0x8000
+
+/*
  * Authentication Information
  */
 typedef enum CredLevel {

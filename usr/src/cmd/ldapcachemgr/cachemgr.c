@@ -72,7 +72,7 @@ static int setadmin(ldap_call_t *ptr);
 static  int client_setadmin(admin_t *ptr);
 static int client_showstats(admin_t *ptr);
 static int is_root(int free_uc, char *dc_str, ucred_t **uc);
-static int is_root_or_all_privs(char *dc_str, ucred_t **ucp);
+int is_root_or_all_privs(char *dc_str, ucred_t **ucp);
 static void admin_modify(LineBuf *config_info, ldap_call_t *in);
 
 #ifdef SLP
@@ -741,9 +741,20 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			 * Get the current LDAP configuration.
 			 * Since this is dynamic data and its size can exceed
 			 * the size of ldap_return_t, the next step will
-			 * calculate who much space exactly is required.
+			 * calculate how much space exactly is required.
 			 */
 			getldap_lookup(&configInfo, ptr);
+
+			state = GETSIZE;
+			break;
+		case GETADMINCRED:
+			/*
+			 * Get the current Admin Credentials (DN and password).
+			 * Since this is dynamic data and its size can exceed
+			 * the size of ldap_return_t, the next step will
+			 * calculate how much space exactly is required.
+			 */
+			getldap_admincred(&configInfo, ptr);
 
 			state = GETSIZE;
 			break;
@@ -752,7 +763,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			 * Get the root DSE for a next server in the list.
 			 * Since this is dynamic data and its size can exceed
 			 * the size of ldap_return_t, the next step will
-			 * calculate who much space exactly is required.
+			 * calculate how much space exactly is required.
 			 */
 			getldap_getserver(&configInfo, ptr);
 
@@ -1802,7 +1813,7 @@ out:
  * return - 0 No or error
  *          1 Yes
  */
-static int
+int
 is_root_or_all_privs(char *dc_str, ucred_t **ucp)
 {
 	const priv_set_t *ps;	/* door client */

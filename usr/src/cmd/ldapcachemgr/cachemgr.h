@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CACHEMGR_H
 #define	_CACHEMGR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,6 +101,7 @@ extern void getldap_revalidate(void);
 extern int getldap_uidkeepalive(int keep, int interval);
 extern int getldap_invalidate(void);
 extern void getldap_lookup(LineBuf *config_info, ldap_call_t *in);
+extern void getldap_admincred(LineBuf *config_info, ldap_call_t *in);
 extern void getldap_refresh(void);
 extern int cachemgr_set_dl(admin_t *ptr, int value);
 extern int cachemgr_set_ttl(ldap_stat_t *cache, char *name, int value);
