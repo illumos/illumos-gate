@@ -229,7 +229,7 @@ typedef	struct {
  * Possible values returned by aplist_test()
  */
 typedef enum {
-	ALE_ALLOCFAIL = 0,	/* Memory allocation error */
+	ALE_ALLOCFAIL = 0,	/* memory allocation error */
 	ALE_EXISTS =	1,	/* alist entry already exists */
 	ALE_NOTFND =	2,	/* item not found and insert not required */
 	ALE_CREATE =	3	/* alist entry created */

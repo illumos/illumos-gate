@@ -78,6 +78,7 @@
 #include "symbols_msg.h"
 #include "symbols_sparc_msg.h"
 #include "syminfo_msg.h"
+#include "time_msg.h"
 #include "version_msg.h"
 
 void
@@ -110,6 +111,7 @@ foo()
 	USE(_sgs_msg_libconv_symbols);
 	USE(_sgs_msg_libconv_symbols_sparc);
 	USE(_sgs_msg_libconv_syminfo);
+	USE(_sgs_msg_libconv_time);
 	USE(_sgs_msg_libconv_version);
 
 #undef USE

@@ -60,6 +60,8 @@ const char *
 conv_grphdl_flags(uint_t flags, Conv_grphdl_flags_buf_t *grphdl_flags_buf)
 {
 	static const Val_desc vda[] = {
+		{ GPH_PUBLIC,		MSG_GPH_PUBLIC },
+		{ GPH_PRIVATE,		MSG_GPH_PRIVATE },
 		{ GPH_ZERO,		MSG_GPH_ZERO },
 		{ GPH_LDSO,		MSG_GPH_LDSO },
 		{ GPH_FIRST,		MSG_GPH_FIRST },
@@ -118,8 +120,8 @@ conv_grpdesc_flags(uint_t flags, Conv_grpdesc_flags_buf_t *grpdesc_flags_buf)
 		{ GPD_ADDEPS,		MSG_GPD_ADDEPS },
 		{ GPD_PARENT,		MSG_GPD_PARENT },
 		{ GPD_FILTER,		MSG_GPD_FILTER },
-		{ GPD_PROMOTE,		MSG_GPD_PROMOTE },
 		{ GPD_REMOVE,		MSG_GPD_REMOVE },
+		{ GPD_MODECHANGE,	MSG_GPD_MODECHANGE },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {

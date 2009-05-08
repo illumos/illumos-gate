@@ -377,6 +377,8 @@ ld_create_outfile(Ofl_desc *ofl)
 	Boolean		fixalign = FALSE;
 	int		fd, nseg = 0, shidx, dataidx, ptloadidx = 0;
 
+	DBG_CALL(Dbg_basic_create(ofl->ofl_lml));
+
 	/*
 	 * If DF_1_NOHDR was set in map_parse() or FLG_OF1_VADDR was set,
 	 * we need to do alignment adjustment.

@@ -15,7 +15,7 @@
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
- *
+
  * CDDL HEADER END
  */
 /* LINTLIBRARY */
@@ -34,8 +34,8 @@ int	Dbg_setup(dbg_setup_caller_t, const char *, Dbg_desc *, const char **);
 const char *
 	Dbg_demangle_name(const char *);
 
-void	Dbg_args_files(Lm_list *, int, char *);
-void	Dbg_args_opts(Lm_list *, int, int, char *);
+void	Dbg_args_file(Lm_list *, int, char *);
+void	Dbg_args_option(Lm_list *, int, int, char *);
 void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
 void	Dbg_args_Wldel(Lm_list *, int, const char *);
 void	Dbg_audit_ignore(Rt_map *);
@@ -47,6 +47,14 @@ void	Dbg_audit_symval(Lm_list *, const char *, const char *, const char *,
 void	Dbg_audit_skip(Lm_list *, const char *, const char *);
 void	Dbg_audit_terminate(Lm_list *, const char *);
 void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
+
+void	Dbg_basic_collect(Lm_list *);
+void	Dbg_basic_create(Lm_list *);
+void	Dbg_basic_files(Lm_list *);
+void	Dbg_basic_finish(Lm_list *);
+void	Dbg_basic_options(Lm_list *);
+void	Dbg_basic_relocate(Lm_list *);
+void	Dbg_basic_validate(Lm_list *);
 
 void	Dbg_tls_modactivity(Lm_list *, void *, uint_t);
 void	Dbg_tls_static_block(Lm_list *, void *, ulong_t, ulong_t);

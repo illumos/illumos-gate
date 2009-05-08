@@ -303,11 +303,11 @@ elf_verify(caddr_t addr, size_t size, Fdesc *fdp, const char *name,
  * to perform plt relocation on ld.so.1's link-map.  The first time lazy loading
  * is called we get here to perform these initializations:
  *
- *  o	elf_needed() is called to set up the DYNINFO() indexes for each lazy
+ *  -	elf_needed() is called to set up the DYNINFO() indexes for each lazy
  *	dependency.  Typically, for all other objects, this is called during
  *	analyze_so(), but as ld.so.1 is set-contained we skip this processing.
  *
- *  o	For intel, ld.so.1's JMPSLOT relocations need relative updates. These
+ *  -	For intel, ld.so.1's JMPSLOT relocations need relative updates. These
  *	are by default skipped thus delaying all relative relocation processing
  * 	on every invocation of ld.so.1.
  */
@@ -332,10 +332,10 @@ elf_rtld_load()
 	 * This is a kludge to give ld.so.1 a performance benefit on i386.
 	 * It's based around two factors.
 	 *
-	 *  o	JMPSLOT relocations (PLT's) actually need a relative relocation
+	 *  -	JMPSLOT relocations (PLT's) actually need a relative relocation
 	 *	applied to the GOT entry so that they can find PLT0.
 	 *
-	 *  o	ld.so.1 does not exercise *any* PLT's before it has made a call
+	 *  -	ld.so.1 does not exercise *any* PLT's before it has made a call
 	 *	to elf_lazy_load().  This is because all dynamic dependencies
 	 * 	are recorded as lazy dependencies.
 	 */
@@ -353,12 +353,11 @@ elf_rtld_load()
  */
 Rt_map *
 elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
-    int *in_nfavl)
+    uint_t flags, Grp_hdl **hdl, int *in_nfavl)
 {
 	Alist		*palp = NULL;
 	Rt_map		*nlmp;
 	Dyninfo		*dip = &DYNINFO(clmp)[ndx], *pdip;
-	uint_t		flags = 0;
 	const char	*name;
 	Lm_list		*lml = LIST(clmp);
 	Aliste		lmco;
@@ -392,7 +391,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * is created.
 	 */
 	if (dip->di_flags & FLG_DI_GROUP)
-		flags |= (FLG_RT_SETGROUP | FLG_RT_HANDLE);
+		flags |= (FLG_RT_SETGROUP | FLG_RT_PUBHDL);
 
 	/*
 	 * Lazy dependencies are identified as DT_NEEDED entries with a
@@ -425,7 +424,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * Load the associated object.
 	 */
 	dip->di_info = nlmp =
-	    load_one(lml, lmco, palp, clmp, MODE(clmp), flags, 0, in_nfavl);
+	    load_one(lml, lmco, palp, clmp, MODE(clmp), flags, hdl, in_nfavl);
 
 	/*
 	 * Remove any expanded pathname infrastructure.  Reduce the pending lazy
@@ -662,7 +661,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 				if (pdyn->d_un.d_val & DF_P1_GROUPPERM) {
 					dip->di_flags |= FLG_DI_GROUP;
 					flags =
-					    (FLG_RT_SETGROUP | FLG_RT_HANDLE);
+					    (FLG_RT_SETGROUP | FLG_RT_PUBHDL);
 				}
 			}
 
@@ -956,7 +955,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			DBG_CALL(Dbg_cap_hw_filter(lml, dir, ilmp));
 			if (hwcap_filtees((Alist **)&dip->di_info, idx, dir,
 			    lmco, ilmp, filtees, mode,
-			    (FLG_RT_HANDLE | FLG_RT_HWCAP), in_nfavl) == 0) {
+			    (FLG_RT_PUBHDL | FLG_RT_HWCAP), in_nfavl) == 0) {
 				if ((lml->lm_flags & LML_FLG_TRC_ENABLE) &&
 				    (dip->di_flags & FLG_DI_AUXFLTR) &&
 				    (rtld_flags & RT_FL_WARNFLTR)) {
@@ -1014,20 +1013,49 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 #else
 			if (strcmp(filtee, MSG_ORIG(MSG_PTH_RTLD)) == 0) {
 #endif
+				uint_t	hflags, rdflags, cdflags;
+
 				/*
-				 * Create an association between ld.so.1 and the
-				 * filter.  As an optimization, a handle for
-				 * ld.so.1 itself (required for the dlopen()
-				 * family filtering mechanism) shouldn't search
-				 * any dependencies of ld.so.1.  Omitting
-				 * GPD_ADDEPS prevents the addition of any
-				 * ld.so.1 dependencies to this handle.
+				 * Establish any flags for the handle (Grp_hdl).
+				 *
+				 *  -	This is a special, public, ld.so.1
+				 *	handle.
+				 *  -	Only the first object on this handle
+				 *	can supply symbols.
+				 *  -	This handle provides a filtee.
+				 *
+				 * Essentially, this handle allows a caller to
+				 * reference the dl*() family of interfaces from
+				 * ld.so.1.
 				 */
+				hflags = (GPH_PUBLIC | GPH_LDSO |
+				    GPH_FIRST | GPH_FILTEE);
+
+				/*
+				 * Establish the flags for the referenced
+				 * dependency descriptor (Grp_desc).
+				 *
+				 *  -	ld.so.1 is available for dlsym().
+				 *  -	ld.so.1 is available to relocate
+				 *	against.
+				 *  -	There's no need to add an dependencies
+				 * 	to this handle.
+				 */
+				rdflags = (GPD_DLSYM | GPD_RELOC);
+
+				/*
+				 * Establish the flags for this callers
+				 * dependency descriptor (Grp_desc).
+				 *
+				 *  -   The explicit creation of a handle
+				 *	creates a descriptor for the referenced
+				 *	object and the parent (caller).
+				 */
+				cdflags = GPD_PARENT;
+
 				nlmp = lml_rtld.lm_head;
 				if ((ghp = hdl_create(&lml_rtld, nlmp, ilmp,
-				    (GPH_LDSO | GPH_FIRST | GPH_FILTEE),
-				    (GPD_DLSYM | GPD_RELOC), GPD_PARENT)) ==
-				    NULL)
+				    hflags, rdflags, cdflags)) == NULL)
 					nlmp = NULL;
 
 				/*
@@ -1072,10 +1100,10 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 * Locate and load the filtee.
 				 */
 				if ((nlmp = load_path(lml, lmco, ilmp, mode,
-				    FLG_RT_HANDLE, &ghp, &fd, &rej,
+				    FLG_RT_PUBHDL, &ghp, &fd, &rej,
 				    in_nfavl)) == NULL)
 					file_notfound(LIST(ilmp), filtee, ilmp,
-					    FLG_RT_HANDLE, &rej);
+					    FLG_RT_PUBHDL, &rej);
 
 				filtee = pdp->pd_pname;
 
@@ -1126,8 +1154,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 * necessary.
 				 */
 				DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
-				if (nlmp && ghp &&
-				    (hdl_add(ghp, ilmp, GPD_FILTER) == 0))
+				if (nlmp && ghp && (hdl_add(ghp, ilmp,
+				    GPD_FILTER, NULL) == NULL))
 					nlmp = NULL;
 
 				/*
@@ -1258,17 +1286,17 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
  * produced.  ldd(1) employs printf(), and here, the selection of whether to
  * print a diagnostic in regards to auxiliary filters is a little more complex.
  *
- *   .	The determination of whether to produce an ldd message, or a fatal
+ *   -	The determination of whether to produce an ldd message, or a fatal
  *	error message is driven by LML_FLG_TRC_ENABLE.
- *   .	More detailed ldd messages may also be driven off of LML_FLG_TRC_WARN,
+ *   -	More detailed ldd messages may also be driven off of LML_FLG_TRC_WARN,
  *	(ldd -d/-r), LML_FLG_TRC_VERBOSE (ldd -v), LML_FLG_TRC_SEARCH (ldd -s),
  *	and LML_FLG_TRC_UNREF/LML_FLG_TRC_UNUSED (ldd -U/-u).
  *
- *   .	If the calling object is lddstub, then several classes of message are
+ *   -	If the calling object is lddstub, then several classes of message are
  *	suppressed.  The user isn't trying to diagnose lddstub, this is simply
  *	a stub executable employed to preload a user specified library against.
  *
- *   .	If RT_FL_SILENCERR is in effect then any generic ldd() messages should
+ *   -	If RT_FL_SILENCERR is in effect then any generic ldd() messages should
  *	be suppressed.  All detailed ldd messages should still be produced.
  */
 Sym *
@@ -1924,7 +1952,7 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 					FLAGS1(lmp) |= FL1_RT_DISPREL;
 				if (dyn->d_un.d_val & DF_1_GROUP)
 					FLAGS(lmp) |=
-					    (FLG_RT_SETGROUP | FLG_RT_HANDLE);
+					    (FLG_RT_SETGROUP | FLG_RT_PUBHDL);
 				if ((dyn->d_un.d_val & DF_1_NOW) &&
 				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
 					MODE(lmp) |= RTLD_NOW;
@@ -2475,42 +2503,49 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	}
 }
 
-static void
-elf_lazy_cleanup(APlist *alp)
-{
-	Rt_map	*lmp;
-	Aliste	idx;
-
-	/*
-	 * Cleanup any link-maps added to this dynamic list and free it.
-	 */
-	for (APLIST_TRAVERSE(alp, idx, lmp))
-		FLAGS(lmp) &= ~FLG_RT_TMPLIST;
-	free(alp);
-}
-
 /*
  * This routine is called as a last fall-back to search for a symbol from a
- * standard relocation.  To maintain lazy loadings goal of reducing the number
- * of objects mapped, any symbol search is first carried out using the objects
- * that already exist in the process (either on a link-map list or handle).
- * If a symbol can't be found, and lazy dependencies are still pending, this
- * routine loads the dependencies in an attempt to locate the symbol.
- *
- * Only new objects are inspected as we will have already inspected presently
- * loaded objects before calling this routine.  However, a new object may not
- * be new - although the di_lmp might be zero, the object may have been mapped
- * as someone elses dependency.  Thus there's a possibility of some symbol
- * search duplication.
+ * standard relocation or dlsym().  To maintain lazy loadings goal of reducing
+ * the number of objects mapped, any symbol search is first carried out using
+ * the objects that already exist in the process (either on a link-map list or
+ * handle).  If a symbol can't be found, and lazy dependencies are still
+ * pending, this routine loads the dependencies in an attempt to locate the
+ * symbol.
  */
 Sym *
 elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 {
 	Sym		*sym = NULL;
-	APlist		*alist = NULL;
-	Aliste		idx;
-	Rt_map		*lmp1, *lmp = slp->sl_imap;
+	static APlist	*alist = NULL;
+	Aliste		idx1;
+	Rt_map		*lmp1, *lmp = slp->sl_imap, *clmp = slp->sl_cmap;
 	const char	*name = slp->sl_name;
+	Slookup		sl1 = *slp;
+	Lm_list		*lml;
+	Lm_cntl		*lmc;
+
+	/*
+	 * It's quite possible we've been here before to process objects,
+	 * therefore reinitialize our dynamic list.
+	 */
+	if (alist)
+		aplist_reset(alist);
+
+	/*
+	 * Discard any relocation index from further symbol searches.  This
+	 * index has already been used to trigger any necessary lazy-loads,
+	 * and it might be because one of these lazy loads has failed that
+	 * we're performing this fallback.  By removing the relocation index
+	 * we don't try and perform the same failed lazy loading activity again.
+	 */
+	sl1.sl_rsymndx = 0;
+
+	/*
+	 * Determine the callers link-map list so that we can monitor whether
+	 * new objects have been added.
+	 */
+	lml = LIST(clmp);
+	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, CNTL(clmp));
 
 	/*
 	 * Generate a local list of new objects to process.  This list can grow
@@ -2518,22 +2553,10 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 	 */
 	if (aplist_append(&alist, lmp, AL_CNT_LAZYFIND) == NULL)
 		return (NULL);
-	FLAGS(lmp) |= FLG_RT_TMPLIST;
 
-	for (APLIST_TRAVERSE(alist, idx, lmp1)) {
+	for (APLIST_TRAVERSE(alist, idx1, lmp1)) {
 		uint_t	cnt = 0;
-		Slookup	sl = *slp;
 		Dyninfo	*dip, *pdip;
-
-		/*
-		 * Discard any relocation index from further symbol searches.
-		 * This index will have already been used to trigger any
-		 * necessary lazy-loads, and it might be because one of these
-		 * lazy loads have failed that we're here performing this
-		 * fallback.  By removing the relocation index we don't try
-		 * and perform the same failed lazy loading activity again.
-		 */
-		sl.sl_rsymndx = 0;
 
 		/*
 		 * Loop through the lazy DT_NEEDED entries examining each object
@@ -2544,7 +2567,11 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 		lmp = lmp1;
 		for (dip = DYNINFO(lmp), pdip = NULL; cnt < DYNINFOCNT(lmp);
 		    cnt++, pdip = dip++) {
-			Rt_map *nlmp;
+			Grp_hdl		*ghp;
+			Grp_desc	*gdp;
+			Rt_map		*nlmp, *llmp;
+			Slookup		sl2;
+			Aliste		idx2;
 
 			if (((dip->di_flags & FLG_DI_LAZY) == 0) ||
 			    dip->di_info)
@@ -2566,57 +2593,102 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 			}
 
 			/*
+			 * Determine the last link-map presently on the callers
+			 * link-map control list.
+			 */
+			llmp = lmc->lc_tail;
+
+			/*
 			 * Try loading this lazy dependency.  If the object
 			 * can't be loaded, consider this non-fatal and continue
 			 * the search.  Lazy loaded dependencies need not exist
 			 * and their loading should only turn out to be fatal
 			 * if they are required to satisfy a relocation.
 			 *
-			 * If the file is already loaded and relocated we must
-			 * still inspect it for symbols, even though it might
-			 * have already been searched.  This lazy load operation
-			 * might have promoted the permissions of the object,
-			 * and thus made the object applicable for this symbol
-			 * search, whereas before the object might have been
-			 * skipped.
+			 * A successful lazy load can mean one of two things:
+			 *
+			 *  -	new objects have been loaded, in which case the
+			 * 	objects will have been analyzed, relocated, and
+			 * 	finally moved to the callers control list.
+			 *  -	the objects are already loaded, and this lazy
+			 *	load has simply associated the referenced object
+			 *	with it's lazy dependencies.
+			 *
+			 * If new objects are loaded, look in these objects
+			 * first.  Note, a new object can be the object being
+			 * referenced by this lazy load, however we can also
+			 * descend into multiple lazy loads as we relocate this
+			 * reference.
+			 *
+			 * If the symbol hasn't been found, use the referenced
+			 * objects handle, as it might have dependencies on
+			 * objects that are already loaded.  We only need to
+			 * look in any existing objects if the mode of those
+			 * objects has changed.  Existing objects would have
+			 * already been searched, however, a lazy load might
+			 * still cause the promotion of modes, and in this case
+			 * the handle associated with the object is used to
+			 * carry out the symbol search.
 			 */
-			if ((nlmp = elf_lazy_load(lmp, &sl, cnt,
-			    name, in_nfavl)) == NULL)
+			if ((nlmp = elf_lazy_load(lmp, &sl1, cnt, name,
+			    FLG_RT_PRIHDL, &ghp, in_nfavl)) == NULL)
 				continue;
+
+			if (NEXT_RT_MAP(llmp)) {
+				/*
+				 * Look in any new objects.
+				 */
+				sl1.sl_imap = NEXT_RT_MAP(llmp);
+				sl1.sl_flags &= ~LKUP_STDRELOC;
+
+				sym = lookup_sym(&sl1, _lmp, binfo, in_nfavl);
+			}
 
 			/*
-			 * If this object isn't yet a part of the dynamic list
-			 * then inspect it for the symbol.  If the symbol isn't
-			 * found add the object to the dynamic list so that we
-			 * can inspect its dependencies.
+			 * Use the objects handle to determine any promoted
+			 * objects.  Clear any modes regardless.  Note, there's
+			 * a possibility of overlap with the above search,
+			 * should a lazy load bring in new objects and
+			 * reference existing objects.
 			 */
-			if (FLAGS(nlmp) & FLG_RT_TMPLIST)
-				continue;
+			sl2 = sl1;
+			for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
+				if ((gdp->gd_flags & GPD_MODECHANGE) == 0)
+					continue;
 
-			sl.sl_imap = nlmp;
-			if (sym = lookup_sym(&sl, _lmp, binfo, in_nfavl))
-				break;
+				if ((sym == NULL) &&
+				    (gdp->gd_depend != NEXT_RT_MAP(llmp)) &&
+				    (gdp->gd_flags & GPD_DLSYM)) {
+
+					sl2.sl_imap = gdp->gd_depend;
+					sl2.sl_flags |= LKUP_FIRST;
+
+					sym = lookup_sym(&sl2, _lmp, binfo,
+					    in_nfavl);
+				}
+				gdp->gd_flags &= ~GPD_MODECHANGE;
+			}
+
+			/*
+			 * If the symbol has been found, cleanup and return.
+			 */
+			if (sym)
+				return (sym);
 
 			/*
 			 * Some dlsym() operations are already traversing a
 			 * link-map (dlopen(0)), and thus there's no need to
-			 * build our own dynamic dependency list.
+			 * save them on the dynamic dependency list.
 			 */
-			if ((sl.sl_flags & LKUP_NODESCENT) == 0) {
-				if (aplist_append(&alist, nlmp,
-				    AL_CNT_LAZYFIND) == NULL) {
-					elf_lazy_cleanup(alist);
-					return (NULL);
-				}
-				FLAGS(nlmp) |= FLG_RT_TMPLIST;
-			}
+			if (slp->sl_flags & LKUP_NODESCENT)
+				continue;
+
+			if (aplist_test(&alist, nlmp, AL_CNT_LAZYFIND) == NULL)
+				return (NULL);
 		}
-		if (sym)
-			break;
 	}
 
-	elf_lazy_cleanup(alist);
-	return (sym);
+	return (NULL);
 }
 
 /*

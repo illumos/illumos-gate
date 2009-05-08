@@ -34,6 +34,7 @@
  * (with different names) to avoid name space collisions.
  */
 #include	<stdio.h>
+#include	<sys/time.h>
 #include	<sys/types.h>
 #include	<sys/mman.h>
 #include	<sys/lwp.h>
@@ -3040,8 +3041,20 @@ enter(int flags)
 	if (rt_bind_guard(THR_FLG_RTLD | thr_flg_nolock | flags)) {
 		if (!thr_flg_nolock)
 			(void) rt_mutex_lock(&rtldlock);
-		if (rtld_flags & RT_FL_OPERATION)
+		if (rtld_flags & RT_FL_OPERATION) {
 			ld_entry_cnt++;
+
+			/*
+			 * Reset the diagnostic time information for each new
+			 * "operation".  Thus timing diagnostics are relative
+			 * to entering ld.so.1.
+			 */
+			if (DBG_ISTIME() &&
+			    (gettimeofday(&DBG_TOTALTIME, NULL) == 0)) {
+				DBG_DELTATIME = DBG_TOTALTIME;
+				DBG_ONRESET();
+			}
+		}
 		return (1);
 	}
 	return (0);

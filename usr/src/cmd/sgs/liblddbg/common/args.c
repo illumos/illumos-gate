@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,7 @@
 #include	"msg.h"
 
 void
-Dbg_args_opts(Lm_list *lml, int ndx, int c, char *optarg)
+Dbg_args_option(Lm_list *lml, int ndx, int c, char *optarg)
 {
 	if (DBG_NOTCLASS(DBG_C_ARGS))
 		return;
@@ -59,7 +59,7 @@ Dbg_args_Wldel(Lm_list *lml, int ndx, const char *opt)
 }
 
 void
-Dbg_args_files(Lm_list *lml, int ndx, char *file)
+Dbg_args_file(Lm_list *lml, int ndx, char *file)
 {
 	if (DBG_NOTCLASS(DBG_C_ARGS))
 		return;

@@ -262,7 +262,7 @@ hwcap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
 		DBG_CALL(Dbg_file_filtee(lml, NAME(flmp), fdp->fd_nname, 0));
 
 		nlmp = load_path(lml, nlmco, flmp, mode,
-		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej, in_nfavl);
+		    (flags | FLG_RT_PUBHDL), &ghp, fdp, &rej, in_nfavl);
 		if (nlmp == NULL)
 			continue;
 
@@ -316,7 +316,8 @@ hwcap_filtees(Alist **alpp, Aliste oidx, const char *dir, Aliste nlmco,
 		 * filter and filtee if necessary.
 		 */
 		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
-		if (nlmp && ghp && (hdl_add(ghp, flmp, GPD_FILTER) == 0))
+		if (nlmp && ghp &&
+		    (hdl_add(ghp, flmp, GPD_FILTER, NULL) == NULL))
 			nlmp = NULL;
 
 		/*

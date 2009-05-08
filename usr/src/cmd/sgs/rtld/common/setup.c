@@ -197,12 +197,21 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	/*
 	 * Now that ld.so has relocated itself, initialize our own 'environ' so
-	 * as to establish an address suitable for libc's hardware mul/div
-	 * magic (libc/sparc/crt/hwmuldiv.o).
+	 * as to establish an address suitable for any libc requirements.
 	 */
 	_environ = (char **)((ulong_t)auxv - sizeof (char *));
 	_init();
 	_environ = envp;
+
+	/*
+	 * Establish a base time.  Total time diagnostics start from entering
+	 * ld.so.1 here, however the base time is reset each time the ld.so.1
+	 * is re-entered.  Note also, there will be a large time associated
+	 * with the first diagnostic from ld.so.1, as bootstrapping ld.so.1
+	 * and establishing the liblddbg infrastructure takes some time.
+	 */
+	(void) gettimeofday(&DBG_TOTALTIME, NULL);
+	DBG_DELTATIME = DBG_TOTALTIME;
 
 	/*
 	 * Determine how ld.so.1 has been executed.
@@ -855,7 +864,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * that expects the old getpid() initialization handshake.
 	 */
 	if ((rpl_debug || prm_debug) && ((rtld_flags & RT_FL_DEBUGGER) == 0)) {
-		Dbg_desc	_dbg_desc = {0, 0, NULL};
+		Dbg_desc	_dbg_desc = {0};
+		struct timeval	total = DBG_TOTALTIME;
+		struct timeval	delta = DBG_DELTATIME;
 
 		if (rpl_debug) {
 			if (dbg_setup(rpl_debug, &_dbg_desc) == 0)
@@ -867,6 +878,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			(void) dbg_setup(prm_debug, &_dbg_desc);
 
 		*dbg_desc = _dbg_desc;
+		DBG_TOTALTIME = total;
+		DBG_DELTATIME = delta;
 	}
 
 	/*

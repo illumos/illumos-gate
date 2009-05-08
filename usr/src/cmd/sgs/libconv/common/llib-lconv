@@ -170,6 +170,8 @@ const char	*conv_sym_other_vis(uchar_t, Conv_fmt_flags_t,
 const char	*conv_syminfo_boundto(Half, Conv_fmt_flags_t, Conv_inv_buf_t *);
 const char	*conv_syminfo_flags(Half, Conv_fmt_flags_t,
 		    Conv_syminfo_flags_buf_t *);
+const char	*conv_time(struct timeval *, struct timeval *,
+		    Conv_time_buf_t *);
 Uts_desc	*conv_uts(void);
 const char	*conv_ver_flags(Half, Conv_fmt_flags_t, Conv_ver_flags_buf_t *);
 const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);

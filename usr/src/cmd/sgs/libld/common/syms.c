@@ -1091,6 +1091,8 @@ ld_sym_validate(Ofl_desc *ofl)
 	int		allow_ldynsym;
 	uchar_t		type;
 
+	DBG_CALL(Dbg_basic_validate(ofl->ofl_lml));
+
 	/*
 	 * If a symbol is undefined and this link-edit calls for no undefined
 	 * symbols to remain (this is the default case when generating an

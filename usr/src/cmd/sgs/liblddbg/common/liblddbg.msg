@@ -216,10 +216,19 @@
 #         demangle         show C++ symbol names in their demangled form
 #         detail           provide more information in conjunction with
 #                            other options
+#         dtime            prepend a time delta to diagnostics. The value
+#                            appears as seconds.fraction, and represents
+#                            the elapsed time since that last diagnostic.
 #         long             display long object names without truncation
 #         output=file      debug output is sent to the named file
 #                            instead of stderr. If file is empty (\"\"),
 #                            following output will be sent to stderr.
+#         ttime            prepend a time stamp to diagnostics. The value
+#                            appears as seconds.fraction, and represents
+#                            the time since entering ld or ld.so.1.
+#                            Note, all diagnostics induce a probe affect,
+#                            which should be taken into account when
+#                            interpreting dtime and ttime information.
 #
 
 # TRANSLATION_NOTE - The next series of messages makes the above output in C
@@ -234,24 +243,46 @@
 					  conjunction with"
 @ MSG_USE_R4_B2	"                           other options"
 
+# TRANSLATION_NOTE -- do not translate the first token "dtime".
+@ MSG_USE_R4_C	"        dtime            prepend a time delta to diagnostics. \
+					  The value"
+@ MSG_USE_R4_C2	"                           appears as seconds.fraction, and \
+					  represents"
+@ MSG_USE_R4_C3	"                           the elapsed time since that last \
+					  diagnostic."
+
 # TRANSLATION_NOTE -- do not translate the first token "long".
-@ MSG_USE_R4_C	"        long             display long object names without \
+@ MSG_USE_R4_D	"        long             display long object names without \
 					  truncation"
 
 # TRANSLATION_NOTE -- do not translate the first token "output".
-@ MSG_USE_R4_D	"        output=file      debug output is sent to the \
+@ MSG_USE_R4_E	"        output=file      debug output is sent to the \
 					  named file"
-@ MSG_USE_R4_D2	"                           instead of stderr. If file is \
+@ MSG_USE_R4_E2	"                           instead of stderr. If file is \
 					  empty (\"\"),"
-@ MSG_USE_R4_D3	"                           following output will be \
+@ MSG_USE_R4_E3	"                           following output will be \
 					    sent to stderr."
+
+# TRANSLATION_NOTE -- do not translate the first token "ttime".
+@ MSG_USE_R4_F	"        ttime            prepend a time stamp to diagnostics. \
+					  The value"
+@ MSG_USE_R4_F2	"                           appears as seconds.fraction, and \
+					  represents"
+@ MSG_USE_R4_F3	"                           the time since entering ld or \
+					  ld.so.1."
+@ MSG_USE_R4_F4 "                           Note all diagnostics induce a \
+					  probe affect,"
+@ MSG_USE_R4_F5 "                           which should be taken into \
+					  account when"
+@ MSG_USE_R4_F6 "                           interpreting dtime and ttime \
+                                          information."
 
 # TRANSLATION_NOTE - End of reference 4
 
 
 # TRANSLATION_NOTE - Use the following output in the C locale as reference 5.
 #
-#         lmid[=name]      Prepend link-map list id to diagnostics, and
+#         lmid[=name]      prepend link-map list id to diagnostics, and
 #                          optionally filter the lists: By default,
 #                          diagnostics are produced for all link-map
 #                          lists except that of the runtime linker
@@ -273,7 +304,7 @@
 
 
 # TRANSLATION_NOTE -- do not translate the first token "lmid".
-@ MSG_USE_R5_A	"        lmid[=name]      Prepend link-map list id to \
+@ MSG_USE_R5_A	"        lmid[=name]      prepend link-map list id to \
 					  diagnostics, and"
 @ MSG_USE_R5_A2	"                         optionally filter the lists: By \
 					  default,"
@@ -490,6 +521,16 @@
 # TRANSLATION_NOTE - End of reference 9
 
 
+# Basic processing (ld).
+
+@ MSG_BASIC_COLLECT	"collect relocations"
+@ MSG_BASIC_CREATE	"create output image"
+@ MSG_BASIC_FILES	"process files"
+@ MSG_BASIC_FINISHED	"processing finished"
+@ MSG_BASIC_OPTIONS	"process options"
+@ MSG_BASIC_RELOCATE	"relocate output image"
+@ MSG_BASIC_VALIDATE	"validating symbols"
+
 # Argument messages
 
 @ MSG_ARG_OPTION	"arg[%d]\toption=-%c"
@@ -638,8 +679,8 @@
 @ MSG_FIL_DEP_ORPHAN	"    file=%s;  object remains on orphan handle  %s"
 @ MSG_FIL_DEP_REINST	"    file=%s;  object reinstated  %s"
 
-@ MSG_FIL_HDL_CREATE	"handle=%s;  creating: 0x%llx"
-@ MSG_FIL_HDL_ADD	"handle=%s;  adding dependent objects:"
+@ MSG_FIL_HDL_CREATE	"handle=%s;  creating  %s  0x%llx:"
+@ MSG_FIL_HDL_ADD	"handle=%s;  adding dependent objects  %s:"
 @ MSG_FIL_HDL_DELETE	"handle=%s;  inspecting for deletion:"
 @ MSG_FIL_HDL_ORPHAN	"handle=%s;  deletion cannot be completed: moving to \
 			 orphan list:"
@@ -1352,6 +1393,9 @@
 @ MSG_TOK_FULLNAME	"fullname"
 @ MSG_TOK_CLASS		"class"
 @ MSG_TOK_LMID		"lmid"
+@ MSG_TOK_TTIME		"ttime"
+@ MSG_TOK_DTIME		"dtime"
+
 @ MSG_TOK_OUTFILE	"output"
 
 @ MSG_TOK_LMID_ALL	"ALL"

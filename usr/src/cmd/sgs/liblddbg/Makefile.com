@@ -19,17 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	liblddbg.a
 VERS =		.4
 
-COMOBJS =	args.o		audit.o		debug.o		syminfo.o \
-		tls.o
+COMOBJS =	args.o		audit.o		basic.o		debug.o \
+		syminfo.o	tls.o
 
 COMOBJS32 =	bindings32.o	cap32.o		dynamic32.o	elf32.o \
 		entry32.o	files32.o	got32.o 	libs32.o \

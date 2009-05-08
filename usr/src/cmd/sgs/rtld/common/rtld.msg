@@ -378,6 +378,7 @@
 @ MSG_EMG_ENOMEM	"internal: Not enough space"
 
 @ MSG_DBG_PID		"%5.5d: "
+@ MSG_DBG_RESET		"---------\n"
 @ MSG_DBG_UNDEF		"debug: "
 @ MSG_DBG_LMID		"%s: "
 @ MSG_DBG_THREAD	"%d: "

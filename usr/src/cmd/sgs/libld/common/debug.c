@@ -30,6 +30,7 @@
 #include	<strings.h>
 #include	<dlfcn.h>
 #include	<debug.h>
+#include	<conv.h>
 #include	"msg.h"
 
 /*
@@ -204,6 +205,22 @@ dbg_print(Lm_list *lml, const char *format, ...)
 		    dbg_ofile.fptr);
 	} else
 		(void) fputs(MSG_INTL(MSG_DBG_DFLT_FMT), dbg_ofile.fptr);
+
+	if (DBG_ISTIME()) {
+		Conv_time_buf_t	buf;
+		struct timeval	new;
+
+		if (gettimeofday(&new, NULL) == 0) {
+			if (DBG_ISTTIME())
+				(void) fputs(conv_time(&DBG_TOTALTIME, &new,
+				    &buf), stderr);
+			if (DBG_ISDTIME())
+				(void) fputs(conv_time(&DBG_DELTATIME, &new,
+				    &buf), stderr);
+
+			DBG_DELTATIME = new;
+		}
+	}
 
 	va_start(args, format);
 	(void) vfprintf(dbg_ofile.fptr, format, args);

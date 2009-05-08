@@ -47,7 +47,8 @@ COMOBJS=	arch.o			c_literal.o \
  		relocate_sparc.o 	sections.o \
    		segments.o    		strproc.o \
 		symbols.o  		syminfo.o \
-  		tokens.o  		version.o
+  		tokens.o  		time.o \
+		version.o
 
 ELFCAP_OBJS=	elfcap.o
 
@@ -65,7 +66,8 @@ BLTOBJS=	arch_msg.o		c_literal_msg.o \
 		relocate_i386_msg.o 	relocate_sparc_msg.o \
 		sections_msg.o 		segments_msg.o \
 		symbols_msg.o 		symbols_sparc_msg.o \
-		syminfo_msg.o 		version_msg.o
+		syminfo_msg.o 		time_msg.o \
+		version_msg.o
 
 
 OBJECTS =	$(COMOBJS) $(COMOBJS32) $(COMOBJS64) $(ELFCAP_OBJS) \

@@ -27,9 +27,9 @@
 /*
  * Remove objects.  Objects need removal from a process as part of:
  *
- *  o	a dlclose() request
+ *  -	a dlclose() request
  *
- *  o	tearing down a dlopen(), lazy-load, or filter hierarchy that failed to
+ *  -	tearing down a dlopen(), lazy-load, or filter hierarchy that failed to
  *	completely load
  *
  * Any other failure condition will result in process exit (in which case all
@@ -542,6 +542,13 @@ is_deletable(APlist **lmalp, APlist **ghalp, Rt_map *lmp)
 	 * handles we can ferret out these outsiders.
 	 */
 	for (APLIST_TRAVERSE(HANDLES(lmp), idx, ghp)) {
+		/*
+		 * If this is a private handle, then the handle isn't referenced
+		 * from outside of the group of objects being deleted, and can
+		 * be ignored when evaluating objects for deletion.
+		 */
+		if (ghp->gh_flags & GPH_PRIVATE)
+			continue;
 		if (aplist_test(ghalp, ghp, 0) != ALE_EXISTS)
 			return (0);
 	}
@@ -551,8 +558,7 @@ is_deletable(APlist **lmalp, APlist **ghalp, Rt_map *lmp)
 	 * objects selected for deletion, it can't be deleted.
 	 */
 	for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
-		if (aplist_test(lmalp, bdp->b_caller, 0) !=
-		    ALE_EXISTS)
+		if (aplist_test(lmalp, bdp->b_caller, 0) != ALE_EXISTS)
 			return (0);
 	}
 
@@ -612,12 +618,12 @@ gdp_collect(APlist **ghalpp, APlist **lmalpp, Grp_hdl *ghp1)
 		 *
 		 * An object is a candidate for deletion if:
 		 *
-		 *  .	the object hasn't yet been relocated, in which case
+		 *  -	the object hasn't yet been relocated, in which case
 		 *	we're here to clean up a failed load, or
-		 *  .	the object doesn't reside on the base link-map control
+		 *  -	the object doesn't reside on the base link-map control
 		 *	list, in which case a group of objects, typically
 		 *	lazily loaded, or filtees, need cleaning up, or
-		 *  .   the object isn't tagged as non-deletable.
+		 *  -	the object isn't tagged as non-deletable.
 		 */
 		if ((((FLAGS(lmp) & FLG_RT_RELOCED) == 0) ||
 		    (CNTL(lmp) != ALIST_OFF_DATA) ||
@@ -756,20 +762,14 @@ remove_collect(APlist *ghalp, APlist *lmalp)
 }
 
 /*
- * Remove a handle, leaving the associated objects intact.  Besides the classic
- * dlopen() usage, handles are used as a means of associating a group of objects
- * and promoting modes.  Once object promotion is completed, the handle should
- * be discarded while leaving the associated objects intact.  Leaving the handle
- * would prevent the object from being deleted (as it looks like it's in use
- * by another user).
+ * Remove a handle, leaving the associated objects intact.
  */
 void
-free_hdl(Grp_hdl *ghp, Rt_map *clmp, uint_t cdflags)
+free_hdl(Grp_hdl *ghp)
 {
-	Grp_desc	*gdp;
-	Aliste		idx;
-
 	if (--(ghp->gh_refcnt) == 0) {
+		Grp_desc	*gdp;
+		Aliste		idx;
 		uintptr_t	ndx;
 
 		for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
@@ -786,29 +786,6 @@ free_hdl(Grp_hdl *ghp, Rt_map *clmp, uint_t cdflags)
 		(void) aplist_delete_value(hdl_alp[ndx], ghp);
 
 		(void) free(ghp);
-
-	} else if (clmp) {
-		/*
-		 * It's possible that an RTLD_NOW promotion (via GPD_PROMOTE)
-		 * has associated a caller with a handle that is already in use.
-		 * In this case, find the caller and either remove the caller
-		 * from the handle, or if the caller is used for any other
-		 * reason, clear the promotion flag.
-		 */
-		for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
-			Rt_map	*lmp = gdp->gd_depend;
-
-			if (lmp != clmp)
-				continue;
-
-			if (gdp->gd_flags == cdflags) {
-				alist_delete(ghp->gh_depends, &idx);
-				(void) aplist_delete_value(GROUPS(lmp), ghp);
-			} else {
-				gdp->gd_flags &= ~cdflags;
-			}
-			return;
-		}
 	}
 }
 
@@ -865,12 +842,18 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Aliste lmco, const char *name)
 	if (HANDLES(lmp)) {
 		ghp = (Grp_hdl *)HANDLES(lmp)->apl_data[0];
 
+		/*
+		 * If this is a private handle, remove this state, so as to
+		 * prevent any attempt to remove the handle more than once.
+		 */
+		ghp->gh_flags &= ~GPH_PRIVATE;
+
 	} else if (lmc->lc_flags & LMC_FLG_RELOCATING) {
 		/*
 		 * Establish a handle, and should anything fail, fall through
 		 * to remove the link-map control list.
 		 */
-		if (((ghp = hdl_create(lml, lmc->lc_head, 0, 0,
+		if (((ghp = hdl_create(lml, lmc->lc_head, NULL, GPH_PUBLIC,
 		    GPD_ADDEPS, 0)) == NULL) ||
 		    (hdl_initialize(ghp, lmc->lc_head, 0, 0) == 0))
 			lmc->lc_flags &= ~LMC_FLG_RELOCATING;
@@ -887,7 +870,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Aliste lmco, const char *name)
 
 		if (ghp) {
 			ghp->gh_refcnt = 1;
-			free_hdl(ghp, 0, 0);
+			free_hdl(ghp);
 		}
 		return;
 	}
@@ -981,18 +964,18 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Aliste lmco, const char *name)
  * cised to make sure any filtees found aren't being used by filters outside of
  * the groups we've collect.  The series of events is basically:
  *
- *  o	Determine the groups (handles) that might be deletable.
+ *  -	Determine the groups (handles) that might be deletable.
  *
- *  o	Determine the objects of these handles that can be deleted.
+ *  -	Determine the objects of these handles that can be deleted.
  *
- *  o	Fire the fini's of those objects selected for deletion.
+ *  -	Fire the fini's of those objects selected for deletion.
  *
- *  o	Remove all inter-dependency linked lists while the objects link-maps
+ *  -	Remove all inter-dependency linked lists while the objects link-maps
  *	are still available.
  *
- *  o	Remove all deletable objects link-maps and unmap the objects themselves.
+ *  -	Remove all deletable objects link-maps and unmap the objects themselves.
  *
- *  o	Remove the handle descriptors for each deleted object, and hopefully
+ *  -	Remove the handle descriptors for each deleted object, and hopefully
  *	the whole handle.
  *
  * An handle that can't be deleted is added to an orphans list.  This list is
@@ -1257,6 +1240,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_DELETE));
 
 		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
+			Grp_hdl	*ghp3;
+			Aliste	idx3;
 			int	flag;
 
 			lmp = gdp->gd_depend;
@@ -1287,6 +1272,15 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 				flag = DBG_DEP_REMAIN;
 
 			DBG_CALL(Dbg_file_hdl_action(ghp, lmp, flag, 0));
+
+			/*
+			 * If this object contains any private handles, remove
+			 * them now.
+			 */
+			for (APLIST_TRAVERSE(HANDLES(lmp), idx3, ghp3)) {
+				if (ghp3->gh_flags & GPH_PRIVATE)
+					free_hdl(ghp3);
+			}
 		}
 	}
 

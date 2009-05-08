@@ -39,7 +39,7 @@
  * definition to which most users bind, ld.so.1 must provide its own definition,
  * and thus interposition is expected.  This item should be defined NODIRECT.
  */
-static Dbg_desc	_dbg_desc = { 0, 0, 0 };
+static Dbg_desc	_dbg_desc = { 0, 0, NULL, { 0, 0 }, { 0, 0 } };
 Dbg_desc	*dbg_desc = &_dbg_desc;
 
 int		_Dbg_cnt = 0;
@@ -54,6 +54,8 @@ static DBG_options _Dbg_options[] = {	/* Options accepted by both linkers */
 	{MSG_ORIG(MSG_TOK_DETAIL),	0,	DBG_E_DETAIL},
 	{MSG_ORIG(MSG_TOK_LONG),	0,	DBG_E_LONG},
 	{MSG_ORIG(MSG_TOK_HELP),	0,	DBG_E_HELP},
+	{MSG_ORIG(MSG_TOK_TTIME),	0,	DBG_E_TTIME},
+	{MSG_ORIG(MSG_TOK_DTIME),	0,	DBG_E_DTIME},
 
 	{MSG_ORIG(MSG_TOK_ALL),		DBG_C_ALL,	0},
 	{MSG_ORIG(MSG_TOK_BASIC),	DBG_C_BASIC,	0},
@@ -193,9 +195,18 @@ Dbg_help(void)
 	dbg_print(0, MSG_INTL(MSG_USE_R4_B));
 	dbg_print(0, MSG_INTL(MSG_USE_R4_B2));
 	dbg_print(0, MSG_INTL(MSG_USE_R4_C));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_C2));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_C3));
 	dbg_print(0, MSG_INTL(MSG_USE_R4_D));
-	dbg_print(0, MSG_INTL(MSG_USE_R4_D2));
-	dbg_print(0, MSG_INTL(MSG_USE_R4_D3));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_E));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_E2));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_E3));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_F));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_F2));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_F3));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_F4));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_F5));
+	dbg_print(0, MSG_INTL(MSG_USE_R4_F6));
 
 	Dbg_util_nl(0, DBG_NL_FRC);
 	dbg_print(0, MSG_INTL(MSG_USE_HDR_RTLD));

@@ -43,6 +43,7 @@
  *	start with the `Elf_' prefix.  These latter routines are the only
  *	routines used by the elfdump(1) utility.
  */
+#include <sys/times.h>
 #include <sgs.h>
 #include <libld.h>
 #include <rtld.h>
@@ -160,6 +161,10 @@ typedef struct {
 	uint_t		d_class;	/* debugging classes */
 	uint_t		d_extra;	/* extra public information */
 	APlist		*d_list;	/* accepted link-map list names */
+	struct timeval	d_totaltime;	/* total time since entry - */
+					/*	gettimeofday(3c) */
+	struct timeval	d_deltatime;	/* delta time since last diagnostic - */
+					/*	gettimeofday(3c) */
 } Dbg_desc;
 
 extern	Dbg_desc	*dbg_desc;
@@ -180,6 +185,9 @@ extern	Dbg_desc	*dbg_desc;
 #define	DBG_E_STDNL	0x00000008	/* standard newline indicator */
 #define	DBG_E_HELP	0x00000010	/* help requested */
 #define	DBG_E_HELP_EXIT	0x00000020	/* hint: user should exit after help */
+#define	DBG_E_TTIME	0x00000040	/* prepend total time */
+#define	DBG_E_DTIME	0x00000080	/* prepend delta time */
+#define	DBG_E_RESET	0x00000100	/* reset times */
 
 /* ld only */
 #define	DBG_E_SNAME	0x00001000	/* prepend simple name */
@@ -197,12 +205,25 @@ extern	Dbg_desc	*dbg_desc;
 #define	DBG_NOTDETAIL()	!(dbg_desc->d_extra & DBG_E_DETAIL)
 #define	DBG_NOTLONG()	!(dbg_desc->d_extra & DBG_E_LONG)
 
+#define	DBG_ISDEMANGLE() \
+			(dbg_desc->d_extra & DBG_E_DEMANGLE)
+
+#define	DBG_TOTALTIME	(dbg_desc->d_totaltime)
+#define	DBG_DELTATIME	(dbg_desc->d_deltatime)
+
+#define	DBG_ISTTIME()	(dbg_desc->d_extra & DBG_E_TTIME)
+#define	DBG_ISDTIME()	(dbg_desc->d_extra & DBG_E_DTIME)
+#define	DBG_ISTIME()	(dbg_desc->d_extra & (DBG_E_TTIME | DBG_E_DTIME))
+#define	DBG_NOTTIME()	!(dbg_desc->d_extra & (DBG_E_TTIME | DBG_E_DTIME))
+
+#define	DBG_ISRESET()	(dbg_desc->d_extra & DBG_E_RESET)
+#define	DBG_ONRESET()	(dbg_desc->d_extra |= DBG_E_RESET)
+#define	DBG_OFFRESET()	(dbg_desc->d_extra &= ~DBG_E_RESET)
+
 #define	DBG_ISSNAME()	(dbg_desc->d_extra & DBG_E_SNAME)
 #define	DBG_ISFNAME()	(dbg_desc->d_extra & DBG_E_FNAME)
 #define	DBG_ISCLASS()	(dbg_desc->d_extra & DBG_E_CLASS)
 #define	DBG_ISLMID()	(dbg_desc->d_extra & DBG_E_LMID)
-#define	DBG_ISDEMANGLE() \
-			(dbg_desc->d_extra & DBG_E_DEMANGLE)
 
 /*
  * Print routine, this must be supplied by the application.  The initial
@@ -648,8 +669,8 @@ extern	void		Dbg_help(void);
 /*
  * External Dbg_*() interface routines.
  */
-extern	void	Dbg_args_files(Lm_list *, int, char *);
-extern	void	Dbg_args_opts(Lm_list *, int, int, char *);
+extern	void	Dbg_args_file(Lm_list *, int, char *);
+extern	void	Dbg_args_option(Lm_list *, int, int, char *);
 extern	void	Dbg_args_str2chr(Lm_list *, int, const char *, int);
 extern	void	Dbg_args_Wldel(Lm_list *, int, const char *);
 extern	void	Dbg_audit_ignore(Rt_map *);
@@ -661,6 +682,14 @@ extern	void	Dbg_audit_symval(Lm_list *, const char *, const char *,
 extern	void	Dbg_audit_skip(Lm_list *, const char *, const char *);
 extern	void	Dbg_audit_terminate(Lm_list *, const char *);
 extern	void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
+
+extern	void	Dbg_basic_collect(Lm_list *);
+extern	void	Dbg_basic_create(Lm_list *);
+extern	void	Dbg_basic_finish(Lm_list *);
+extern	void	Dbg_basic_files(Lm_list *);
+extern	void	Dbg_basic_options(Lm_list *);
+extern	void	Dbg_basic_relocate(Lm_list *);
+extern	void	Dbg_basic_validate(Lm_list *);
 
 extern	void	Dbg_bind_global(Rt_map *, Addr, Off, Xword, Pltbindtype,
 		    Rt_map *, Addr, Off, const char *, uint_t);
@@ -885,9 +914,9 @@ extern	void	Dbg_util_intoolate(Rt_map *);
 extern	void	Dbg_util_lcinterface(Rt_map *, int, char *);
 extern	void	Dbg_util_nl(Lm_list *, int);
 extern	void	Dbg_util_no_init(Rt_map *);
-extern	void	Dbg_util_str(Lm_list *, const char *);
 extern	void	Dbg_util_scc_entry(Rt_map *, uint_t);
 extern	void	Dbg_util_scc_title(Lm_list *, int);
+extern	void	Dbg_util_str(Lm_list *, const char *);
 
 extern	void	Dbg_unused_file(Lm_list *, const char *, int, uint_t);
 extern	void	Dbg_unused_lcinterface(Rt_map *, Rt_map *, int);

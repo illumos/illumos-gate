@@ -447,7 +447,7 @@ _relocate_lmc(Lm_list *lml, Aliste lmco, Rt_map *nlmp, int *relocated,
 		DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
 		free(COPY_S(nlmp));
-		COPY_S(nlmp) = 0;
+		COPY_S(nlmp) = NULL;
 	}
 	return (1);
 }
@@ -689,17 +689,24 @@ _is_so_matched(const char *name, const char *str, int path)
  * Determine whether a search name matches one of the names associated with a
  * link-map.  A link-map contains several names:
  *
- *  .	a NAME() - typically the full pathname of an object that has been
- *	loaded.  For example, when looking for the dependency "libc.so.1", a
- *	search path is applied, with the eventual NAME() being "/lib/libc.so.1".
- *	The name of a dynamic executable can be a simple filename, such as
- *	"main", as this can be the name passed to exec() to start the process.
+ *  -	a NAME() - this is the basename of the dynamic executable that started
+ *	the process, and the path name of any dependencies used by the process.
+ *	Most executables are received as full path names, as exec() prepends a
+ *	search $PATH to locate the executable.  However, simple file names can
+ *	be received from exec() if the file is executed from the present working
+ *	directory.  Regardless, ld.so.1 maintains NAME() as the basename, as
+ *	this has always been the name used in diagnostics and error messages.
+ *	Most dependencies are full path names, as the typical search for a
+ *	dependency, say "libx.so.1", results in search paths being prepended to
+ *	the name, which eventually open "/lib/libx.so.1".  However, relative
+ *	path names can be supplied as dependencies, e.g. dlopen("../libx.so.1").
  *
- *  .	a PATHNAME() - this is maintained if the resolved NAME() is different
- * 	than NAME(), ie. a component of the original name is a symbolic link.
- *	This is also the resolved full pathname for a simple dynamic executable.
+ *  -	a PATHNAME() - this is the fully resolved path name of the object.  This
+ * 	name will differ from NAME() for all dynamic executables, and may differ
+ *	from the NAME() of dependencies, if the dependency is not a full path
+ * 	name, or the dependency resolves to a symbolic link.
  *
- *  .	an ALIAS() name - these are alternative names by which the object has
+ *  -	an ALIAS() name - these are alternative names by which the object has
  *	been found, ie. when dependencies are loaded through a variety of
  *	different symbolic links.
  *
@@ -739,12 +746,12 @@ is_so_matched(Rt_map *lmp, const char *name, int path)
  * environment.  Once a full path name has been established, the following
  * checks are made:
  *
- *  .	does the path exist in the link-map lists FullPathNode AVL tree?  if
+ *  -	does the path exist in the link-map lists FullPathNode AVL tree?  if
  *	so, the file is already loaded, and its associated link-map pointer
  *	is returned.
- *  .	does the path exist in the not-found AVL tree?  if so, this path has
+ *  -	does the path exist in the not-found AVL tree?  if so, this path has
  *	already been determined to not exist, and a failure is returned.
- *  .	a device/inode check, to ensure the same file isn't mapped multiple
+ *  -	a device/inode check, to ensure the same file isn't mapped multiple
  *	times through different paths.  See file_open().
  *
  * However, there are cases where a test for an existing file name needs to be
@@ -2147,12 +2154,13 @@ static int
 load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
     uint_t flags, Grp_hdl **hdl, Rt_map *nlmp)
 {
-	Aliste		idx;
+	Aliste		idx1;
 	Grp_hdl		*ghp;
 	int		promote;
+	uint_t		rdflags;
 
 	/*
-	 * If this dependency is associated with a required version insure that
+	 * If this dependency is associated with a required version ensure that
 	 * the version is present in the loaded file.
 	 */
 	if (((rtld_flags & RT_FL_NOVERSION) == 0) && THIS_IS_ELF(clmp) &&
@@ -2163,25 +2171,27 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	 * If this object has indicated that it should be isolated as a group
 	 * (DT_FLAGS_1 contains DF_1_GROUP - object was built with -B group),
 	 * or if the callers direct bindings indicate it should be isolated as
-	 * a group (DYNINFO flags contains FLG_DI_GROUP - dependency followed
+	 * a group (DYNINFO flags contains FLG_DI_GROUP - dependency following
 	 * -zgroupperm), establish the appropriate mode.
 	 *
 	 * The intent of an object defining itself as a group is to isolate the
 	 * relocation of the group within its own members, however, unless
 	 * opened through dlopen(), in which case we assume dlsym() will be used
-	 * to located symbols in the new object, we still need to associate it
-	 * with the caller for it to be bound with.  This is equivalent to a
-	 * dlopen(RTLD_GROUP) and dlsym() using the returned handle.
+	 * to locate symbols in the new object, we still need to associate the
+	 * new object with the caller so that the caller can bind to this new
+	 * object.  This is equivalent to a dlopen(RTLD_GROUP) and dlsym()
+	 * using the returned handle.
 	 */
 	if ((FLAGS(nlmp) | flags) & FLG_RT_SETGROUP) {
 		nmode &= ~RTLD_WORLD;
 		nmode |= RTLD_GROUP;
 
 		/*
-		 * If the object wasn't explicitly dlopen()'ed associate it with
+		 * If the object wasn't explicitly dlopen()'ed, in which case a
+		 * handle would have been requested, associate the object with
 		 * the parent.
 		 */
-		if ((flags & FLG_RT_HANDLE) == 0)
+		if ((flags & FLG_RT_PUBHDL) == 0)
 			nmode |= RTLD_PARENT;
 	}
 
@@ -2190,6 +2200,17 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	 */
 	promote = update_mode(nlmp, MODE(nlmp), nmode);
 	FLAGS(nlmp) |= flags;
+
+	/*
+	 * Establish the flags for any referenced dependency descriptors
+	 * (Grp_desc).
+	 *
+	 *  -	The referenced object is available for dlsym().
+	 *  -	The referenced object is available to relocate against.
+	 *  -	The referenced object should have it's dependencies
+	 *	added to this handle
+	 */
+	rdflags = (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS);
 
 	/*
 	 * If this is a global object, ensure the associated link-map list can
@@ -2201,57 +2222,81 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	/*
 	 * If we've been asked to establish a handle create one for this object.
 	 * Or, if this object has already been analyzed, but this reference
-	 * requires that the mode of the object be promoted, also create a
+	 * requires that the mode of the object be promoted, create a private
 	 * handle to propagate the new modes to all this objects dependencies.
 	 */
-	if (((FLAGS(nlmp) | flags) & FLG_RT_HANDLE) || (promote &&
-	    (FLAGS(nlmp) & FLG_RT_ANALYZED))) {
-		uint_t	oflags, hflags = 0, cdflags;
+	if ((FLAGS(nlmp) & (FLG_RT_PUBHDL | FLG_RT_PRIHDL)) ||
+	    (promote && (FLAGS(nlmp) & FLG_RT_ANALYZED))) {
+		uint_t	oflags, hflags, cdflags = 0;
 
 		/*
 		 * Establish any flags for the handle (Grp_hdl).
 		 *
-		 *  .	Use of the RTLD_FIRST flag indicates that only the first
+		 *  -	Public handles establish dependencies between objects
+		 *	that must be taken into account when dlclose()'ing
+		 *	objects.  Private handles provide for collecting
+		 *	dependencies, but do not affect dlclose().  Note that
+		 *	a handle may already exist, but the public/private
+		 *	state is set to trigger the required propagation of the
+		 *	handle's flags and any dependency gathering.
+		 *  -	Use of the RTLD_FIRST flag indicates that only the first
 		 *	dependency on the handle (the new object) can be used
 		 *	to satisfy dlsym() requests.
 		 */
+		if (FLAGS(nlmp) & FLG_RT_PUBHDL)
+			hflags = GPH_PUBLIC;
+		else
+			hflags = GPH_PRIVATE;
+
 		if (nmode & RTLD_FIRST)
-			hflags = GPH_FIRST;
+			hflags |= GPH_FIRST;
 
 		/*
 		 * Establish the flags for this callers dependency descriptor
 		 * (Grp_desc).
 		 *
-		 *  .	The creation of a handle associates a descriptor for the
-		 *	new object and descriptor for the parent (caller).
+		 *  -	The creation of a public handle creates a descriptor
+		 *	for the referenced object and the caller (parent).
 		 *	Typically, the handle is created for dlopen() or for
-		 *	filtering.  A handle may also be created to promote
-		 *	the callers modes (RTLD_NOW) to the new object.  In this
-		 *	latter case, the handle/descriptor are torn down once
-		 *	the mode propagation has occurred.
-		 *
-		 *  .	Use of the RTLD_PARENT flag indicates that the parent
+		 *	filtering.  A private handle does not need to maintain
+		 *	a descriptor to the parent.
+		 *  -	Use of the RTLD_PARENT flag indicates that the parent
 		 *	can be relocated against.
 		 */
-		if (((FLAGS(nlmp) | flags) & FLG_RT_HANDLE) == 0)
-			cdflags = GPD_PROMOTE;
-		else
-			cdflags = GPD_PARENT;
-		if (nmode & RTLD_PARENT)
-			cdflags |= GPD_RELOC;
+		if (FLAGS(nlmp) & FLG_RT_PUBHDL) {
+			cdflags |= GPD_PARENT;
+			if (nmode & RTLD_PARENT)
+				cdflags |= GPD_RELOC;
+		}
 
 		/*
-		 * Now that a handle is being created, remove this state from
-		 * the object so that it doesn't mistakenly get inherited by
-		 * a dependency.
+		 * Now that the handle flags have been established, remove any
+		 * handle definition from the referenced object so that the
+		 * definitions don't mistakenly get inherited by a dependency.
 		 */
 		oflags = FLAGS(nlmp);
-		FLAGS(nlmp) &= ~FLG_RT_HANDLE;
+		FLAGS(nlmp) &= ~(FLG_RT_PUBHDL | FLG_RT_PRIHDL);
 
 		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
-		if ((ghp = hdl_create(lml, nlmp, clmp, hflags,
-		    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS), cdflags)) == 0)
+		if ((ghp = hdl_create(lml, nlmp, clmp, hflags, rdflags,
+		    cdflags)) == NULL)
 			return (0);
+
+		/*
+		 * If the new link-map has been promoted, record this mode
+		 * change for possible rescan use.
+		 */
+		if (promote) {
+			Aliste		idx2;
+			Grp_desc	*gdp;
+
+			for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
+				if (gdp->gd_depend == nlmp) {
+					gdp->gd_flags |= GPD_MODECHANGE;
+					break;
+				}
+			}
+		}
 
 		/*
 		 * Add any dependencies that are already loaded, to the handle.
@@ -2263,25 +2308,17 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			*hdl = ghp;
 
 		/*
-		 * If we were asked to create a handle, we're done.
-		 */
-		if ((oflags | flags) & FLG_RT_HANDLE)
-			return (1);
-
-		/*
-		 * If the handle was created to promote modes from the parent
-		 * (caller) to the new object, then this relationship needs to
-		 * be removed to ensure the handle doesn't prevent the new
-		 * objects from being deleted if required.  If the parent is
-		 * the only dependency on the handle, then the handle can be
-		 * completely removed.  However, the handle may have already
-		 * existed, in which case only the parent descriptor can be
-		 * deleted from the handle, or at least the GPD_PROMOTE flag
-		 * removed from the descriptor.
+		 * If we were asked to create a public handle, we're done.
 		 *
-		 * Fall through to carry out any group processing.
+		 * If this is a private handle request, then the handle is left
+		 * intact with a GPH_PRIVATE identifier.  This handle is a
+		 * convenience for processing the dependencies of this object,
+		 * but does not affect how this object might be dlclose()'d.
+		 * For a private handle, fall through to carry out any group
+		 * processing.
 		 */
-		free_hdl(ghp, clmp, GPD_PROMOTE);
+		if (oflags & FLG_RT_PUBHDL)
+			return (1);
 	}
 
 	/*
@@ -2296,35 +2333,42 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	 * Traverse the list of groups our caller is a member of and add this
 	 * new link-map to those groups.
 	 */
-	DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
-	for (APLIST_TRAVERSE(GROUPS(clmp), idx, ghp)) {
-		Aliste		idx1;
+	for (APLIST_TRAVERSE(GROUPS(clmp), idx1, ghp)) {
+		Aliste		idx2;
 		Grp_desc	*gdp;
-		int		exist;
+		int		ale;
 		Rt_map		*dlmp1;
 		APlist		*lmalp = NULL;
+
+		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
 
 		/*
 		 * If the caller doesn't indicate that its dependencies should
 		 * be added to a handle, ignore it.  This case identifies a
 		 * parent of a dlopen(RTLD_PARENT) request.
 		 */
-		for (ALIST_TRAVERSE(ghp->gh_depends, idx1, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
 			if (gdp->gd_depend == clmp)
 				break;
 		}
 		if ((gdp->gd_flags & GPD_ADDEPS) == 0)
 			continue;
 
-		if ((exist = hdl_add(ghp, nlmp,
-		    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS))) == 0)
+		if ((gdp = hdl_add(ghp, nlmp, rdflags, &ale)) == NULL)
 			return (0);
+
+		/*
+		 * If the new link-map has been promoted, record this mode
+		 * change for possible rescan use.
+		 */
+		if (promote)
+			gdp->gd_flags |= GPD_MODECHANGE;
 
 		/*
 		 * If this member already exists then its dependencies will
 		 * have already been processed.
 		 */
-		if (exist == ALE_EXISTS)
+		if (ale == ALE_EXISTS)
 			continue;
 
 		/*
@@ -2344,8 +2388,8 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 		if (aplist_append(&lmalp, nlmp, AL_CNT_DEPCLCT) == NULL)
 			return (0);
 
-		for (APLIST_TRAVERSE(lmalp, idx1, dlmp1)) {
-			Aliste		idx2;
+		for (APLIST_TRAVERSE(lmalp, idx2, dlmp1)) {
+			Aliste		idx3;
 			Bnd_desc 	*bdp;
 
 			/*
@@ -2353,7 +2397,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			 * dynamic dependency list so they can be further
 			 * processed.
 			 */
-			for (APLIST_TRAVERSE(DEPENDS(dlmp1), idx2, bdp)) {
+			for (APLIST_TRAVERSE(DEPENDS(dlmp1), idx3, bdp)) {
 				Rt_map	*dlmp2 = bdp->b_depend;
 
 				if ((bdp->b_flags & BND_NEEDED) == 0)
@@ -2369,14 +2413,15 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			if (nlmp == dlmp1)
 				continue;
 
-			if ((exist = hdl_add(ghp, dlmp1,
-			    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS))) == 0) {
+			if ((gdp =
+			    hdl_add(ghp, dlmp1, rdflags, &ale)) == NULL) {
 				free(lmalp);
 				return (0);
 			}
 
-			if (exist == ALE_CREATE)
-				(void) update_mode(dlmp1, MODE(dlmp1), nmode);
+			if ((ale == ALE_CREATE) &&
+			    (update_mode(dlmp1, MODE(dlmp1), nmode)))
+				gdp->gd_flags |= GPD_MODECHANGE;
 		}
 		free(lmalp);
 	}
@@ -2860,7 +2905,7 @@ core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 }
 
 static Sym *
-_lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
+rescan_lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
     int *in_nfavl)
 {
 	Rt_map	*lmp;
@@ -2941,7 +2986,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			lmp = 0;
 			if (bound < SYMINFO_BT_LOWRESERVE)
 				lmp = elf_lazy_load(clmp, slp, bound,
-				    name, in_nfavl);
+				    name, 0, NULL, in_nfavl);
 
 			/*
 			 * If direct bindings have been disabled, and this isn't
@@ -3071,15 +3116,16 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		 * initial link-map.
 		 */
 		if (sl.sl_flags & LKUP_NEXT)
-			sym = _lazy_find_sym(clmp, &sl, dlmp, binfo, in_nfavl);
+			sym = rescan_lazy_find_sym(clmp, &sl, dlmp, binfo,
+			    in_nfavl);
 		else {
 			Aliste	idx;
 			Lm_cntl	*lmc;
 
 			for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 				sl.sl_flags |= LKUP_NOFALLBACK;
-				if ((sym = _lazy_find_sym(lmc->lc_head, &sl,
-				    dlmp, binfo, in_nfavl)) != 0)
+				if ((sym = rescan_lazy_find_sym(lmc->lc_head,
+				    &sl, dlmp, binfo, in_nfavl)) != NULL)
 					break;
 			}
 		}
@@ -3101,7 +3147,7 @@ Sym *
 lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 {
 	Rt_map		*clmp = slp->sl_cmap;
-	Sym		*rsym = slp->sl_rsym, *sym = 0;
+	Sym		*rsym = slp->sl_rsym, *sym = NULL;
 	uchar_t		rtype = slp->sl_rtype;
 	int		mode;
 
@@ -3161,9 +3207,9 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		/*
 		 * Try the symbol search again.  This retry can be necessary if:
 		 *
-		 *  .	a binding has been rejected because of binding to a
+		 *  -	a binding has been rejected because of binding to a
 		 *	singleton without going through a singleton search.
-		 *  .	a group binding has resulted in binding to a symbol
+		 *  -	a group binding has resulted in binding to a symbol
 		 *	that indicates no-direct binding.
 		 *
 		 * Reset the lookup data, and try again.

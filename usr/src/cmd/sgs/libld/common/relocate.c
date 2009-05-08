@@ -2138,6 +2138,8 @@ ld_reloc_init(Ofl_desc *ofl)
 	Is_desc		*isp;
 	Sym_desc	*sdp;
 
+	DBG_CALL(Dbg_basic_collect(ofl->ofl_lml));
+
 	/*
 	 * At this point we have finished processing all input symbols.  Make
 	 * sure we add any absolute (internal) symbols before continuing with
@@ -2380,6 +2382,8 @@ ld_reloc_process(Ofl_desc *ofl)
 	Word		ndx = 0;
 	ofl_flag_t	flags = ofl->ofl_flags;
 	Shdr		*shdr;
+
+	DBG_CALL(Dbg_basic_relocate(ofl->ofl_lml));
 
 	/*
 	 * Determine the index of the symbol table that will be referenced by

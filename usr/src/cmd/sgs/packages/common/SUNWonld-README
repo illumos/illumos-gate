@@ -1254,6 +1254,7 @@ Bugid   Risk Synopsis
 6805502 The addition of "inline" keywords to sgs code broke the lint
 	verification in S10
 6807864 ld.so.1 is susceptible to a fatal dlsym()/setlocale() race
+6826410 ld needs to sort sections using 32-bit sort keys
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.10_sparc	patch TXXXXXX-XX
@@ -1478,3 +1479,4 @@ Bugid   Risk Synopsis
 6806791 filter builds could be optimized (link-editor components only)
 6823371 calloc() uses suboptimal memset() causing 15% regression in SpecCPU2006
 	gcc code (link-editor components only)
+6831308 ld.so.1: symbol rescanning does a little too much work

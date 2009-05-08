@@ -53,7 +53,7 @@ extern	int	elf_copy_reloc(char *, Sym *, Rt_map *, void *, Sym *,
 extern	Sym	*elf_find_sym(Slookup *, Rt_map **, uint_t *, int *);
 extern	Sym	*elf_lazy_find_sym(Slookup *, Rt_map **, uint_t *, int *);
 extern	Rt_map	*elf_lazy_load(Rt_map *, Slookup *, uint_t, const char *,
-		    int *);
+		    uint_t, Grp_hdl **, int *);
 extern	Sym	*elf_lookup_filtee(Slookup *, Rt_map **, uint_t *, uint_t,
 		    int *);
 extern	int	elf_mach_flags_check(Rej_desc *, Ehdr *);

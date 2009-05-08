@@ -833,6 +833,7 @@ createargv(Ofl_desc *ofl, int *error)
 	return (ret);
 }
 
+static int	optitle = 0;
 /*
  * Parsing options pass1 for process_flags().
  */
@@ -855,7 +856,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 
 		switch (c) {
 		case '6':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 
 			/*
 			 * -64 is processed by ld to determine the output class.
@@ -871,12 +872,12 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			continue;
 
 		case 'a':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			aflag = TRUE;
 			break;
 
 		case 'b':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			bflag = TRUE;
 
 			/*
@@ -893,7 +894,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'c':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_config)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_ARG_MTONCE),
@@ -903,12 +904,12 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'C':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			demangle_flag = 1;
 			break;
 
 		case 'd':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if ((optarg[0] == 'n') && (optarg[1] == '\0')) {
 				if (dflag != SET_UNKNOWN)
 					eprintf(ofl->ofl_lml, ERR_WARNING,
@@ -932,7 +933,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'e':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_entry)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_MARG_MTONCE),
@@ -942,7 +943,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'f':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_filtees &&
 			    (!(ofl->ofl_flags & FLG_OF_AUX))) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -960,7 +961,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'F':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_filtees &&
 			    (ofl->ofl_flags & FLG_OF_AUX)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -977,7 +978,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'h':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_soname)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_MARG_MTONCE),
@@ -987,12 +988,12 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'i':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			ofl->ofl_flags |= FLG_OF_IGNENV;
 			break;
 
 		case 'I':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_interp)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_ARG_MTONCE),
@@ -1002,7 +1003,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'l':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			/*
 			 * For now, count any library as a shared object.  This
 			 * is used to size the internal symbol cache.  This
@@ -1013,12 +1014,12 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'm':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			ofl->ofl_flags |= FLG_OF_GENMAP;
 			break;
 
 		case 'o':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (ofl->ofl_name)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_MARG_MTONCE),
@@ -1028,7 +1029,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'p':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 
 			/*
 			 * Multiple instances of this option may occur.  Each
@@ -1044,7 +1045,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'P':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 
 			/*
 			 * Multiple instances of this option may occur.  Each
@@ -1060,12 +1061,12 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'r':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			rflag = TRUE;
 			break;
 
 		case 'R':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 
 			/*
 			 * Multiple instances of this option may occur.  Each
@@ -1081,21 +1082,21 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 's':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			sflag = TRUE;
 			break;
 
 		case 't':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			ofl->ofl_flags |= FLG_OF_NOWARN;
 			break;
 
 		case 'u':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			break;
 
 		case 'z':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 
 			/*
 			 * For specific help, print our usage message and exit
@@ -1343,12 +1344,18 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 
 			/*
 			 * A diagnostic can only be provided after dbg_setup().
+			 * As this is the first diagnostic that can be produced
+			 * by ld(1), issue a title for timing and basic output.
 			 */
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			if ((optitle == 0) && DBG_ENABLED) {
+				optitle++;
+				DBG_CALL(Dbg_basic_options(ofl->ofl_lml));
+			}
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			break;
 
 		case 'B':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (strcmp(optarg, MSG_ORIG(MSG_ARG_DIRECT)) == 0) {
 				if (Bdflag == SET_FALSE) {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -1393,27 +1400,27 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'G':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			Gflag = TRUE;
 			break;
 
 		case 'L':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			break;
 
 		case 'M':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (aplist_append(&(ofl->ofl_maps), optarg,
 			    AL_CNT_OFL_MAPFILES) == NULL)
 				return (S_ERROR);
 			break;
 
 		case 'N':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			break;
 
 		case 'Q':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if ((optarg[0] == 'n') && (optarg[1] == '\0')) {
 				if (Qflag != SET_UNKNOWN)
 					eprintf(ofl->ofl_lml, ERR_WARNING,
@@ -1437,14 +1444,14 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'S':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (aplist_append(&lib_support, optarg,
 			    AL_CNT_SUPPORT) == NULL)
 				return (S_ERROR);
 			break;
 
 		case 'V':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			if (!Vflag)
 				(void) fprintf(stderr, MSG_ORIG(MSG_STR_STRNL),
 				    ofl->ofl_sgsid);
@@ -1452,7 +1459,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case 'Y':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, optarg));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_LCOM), 2) == 0) {
 				if (Llibdir)
 					eprintf(ofl->ofl_lml, ERR_WARNING,
@@ -1485,7 +1492,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			break;
 
 		case '?':
-			DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c, NULL));
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, NULL));
 			(*error)++;
 			break;
 
@@ -1515,13 +1522,13 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 
 		switch (c) {
 			case 'l':
-				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
+				DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c,
 				    optarg));
 				if (ld_find_library(optarg, ofl) == S_ERROR)
 					return (S_ERROR);
 				break;
 			case 'B':
-				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
+				DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c,
 				    optarg));
 				if (strcmp(optarg,
 				    MSG_ORIG(MSG_STR_LD_DYNAMIC)) == 0) {
@@ -1539,13 +1546,13 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					ofl->ofl_flags &= ~FLG_OF_DYNLIBS;
 				break;
 			case 'L':
-				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
+				DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c,
 				    optarg));
 				if (ld_add_libdir(ofl, optarg) == S_ERROR)
 					return (S_ERROR);
 				break;
 			case 'N':
-				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
+				DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c,
 				    optarg));
 				/*
 				 * Record DT_NEEDED string
@@ -1569,19 +1576,19 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 
 				break;
 			case 'D':
-				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
+				DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c,
 				    optarg));
 				(void) dbg_setup(ofl, optarg, 3);
 				break;
 			case 'u':
-				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
+				DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c,
 				    optarg));
 				if (ld_sym_add_u(optarg, ofl,
 				    MSG_STR_COMMAND) == (Sym_desc *)S_ERROR)
 					return (S_ERROR);
 				break;
 			case 'z':
-				DBG_CALL(Dbg_args_opts(ofl->ofl_lml, ndx, c,
+				DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c,
 				    optarg));
 				if ((strncmp(optarg, MSG_ORIG(MSG_ARG_LD32),
 				    MSG_ARG_LD32_SIZE) == 0) ||
@@ -1808,7 +1815,7 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 			continue;
 		}
 
-		DBG_CALL(Dbg_args_files(ofl->ofl_lml, optind, path));
+		DBG_CALL(Dbg_args_file(ofl->ofl_lml, optind, path));
 
 		ifl = ld_process_open(path, path, &fd, ofl,
 		    (FLG_IF_CMDLINE | FLG_IF_NEEDED), &rej);
@@ -1839,9 +1846,11 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 uintptr_t
 ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 {
+	DBG_CALL(Dbg_basic_files(ofl->ofl_lml));
+
 	/*
 	 * Process command line files (taking into account any applicable
-	 * preceeding flags).  Return if any fatal errors have occurred.
+	 * preceding flags).  Return if any fatal errors have occurred.
 	 */
 	opterr = 0;
 	optind = 1;

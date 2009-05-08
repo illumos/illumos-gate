@@ -193,7 +193,7 @@ typedef union {
 } Conv_grphdl_flags_buf_t;
 
 /* conv_grpdesc_flags() */
-#define	CONV_GRPDESC_FLAGS_BUFSIZE	102
+#define	CONV_GRPDESC_FLAGS_BUFSIZE	91
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_GRPDESC_FLAGS_BUFSIZE];
@@ -251,8 +251,8 @@ typedef union {
 /* conv_phdr_flags() */
 #define	CONV_PHDR_FLAGS_BUFSIZE		57
 typedef union {
-	Conv_inv_buf_t		inv_buf;
-	char			buf[CONV_PHDR_FLAGS_BUFSIZE];
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_PHDR_FLAGS_BUFSIZE];
 } Conv_phdr_flags_buf_t;
 
 /* conv_sec_flags() */
@@ -354,7 +354,16 @@ typedef union {
 	char				buf[CONV_VER_FLAGS_BUFSIZE];
 } Conv_ver_flags_buf_t;
 
-
+/*
+ * conv_time()
+ *
+ * This size is based on the maximum "hour.min.sec.fraction: " time that
+ * would be expected of ld().
+ */
+#define	CONV_TIME_BUFSIZE		18
+typedef union {
+	char				buf[CONV_TIME_BUFSIZE];
+} Conv_time_buf_t;
 
 /*
  * Many conversion routines accept a fmt_flags argument of this type
@@ -852,6 +861,8 @@ extern	const char	*conv_syminfo_boundto(Half, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
 extern	const char	*conv_syminfo_flags(Half, Conv_fmt_flags_t,
 			    Conv_syminfo_flags_buf_t *);
+extern	const char	*conv_time(struct timeval *, struct timeval *,
+			    Conv_time_buf_t *);
 extern	Uts_desc	*conv_uts(void);
 extern	const char	*conv_ver_flags(Half, Conv_fmt_flags_t,
 			    Conv_ver_flags_buf_t *);

@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 pkginfo: ../common/pkginfo.tmpl awk_pkginfo
@@ -29,7 +26,7 @@ pkginfo: ../common/pkginfo.tmpl awk_pkginfo
 
 pkg: FRC
 	@ $(RM) -r $(PACKAGE)
-	pkgmk -l 20000 -f prototype_$(MACH) -d $(PKGARCHIVE) -r $(ROOT) \
+	pkgmk -f prototype_$(MACH) -d $(PKGARCHIVE) -r $(ROOT) \
 		-o $(PACKAGE) 2>&1 | egrep -v "$(SRC)|parametric paths may"
 	pkgtrans -o -s $(PKGARCHIVE) $(PACKAGE).tmp $(PACKAGE)
 	$(RM) -r $(PKGARCHIVE)/$(PACKAGE)

@@ -35,6 +35,7 @@
 #include	<string.h>
 #include	<thread.h>
 #include	<debug.h>
+#include	<conv.h>
 #include	"_rtld.h"
 #include	"_elf.h"
 #include	"msg.h"
@@ -272,8 +273,6 @@ dbg_print(Lm_list *lml, const char *format, ...)
 		}
 	}
 
-	prf.pr_buf = prf.pr_cur = buffer;
-	prf.pr_len = ERRSIZE;
 	prf.pr_fd = dbg_fd;
 
 	/*
@@ -281,6 +280,37 @@ dbg_print(Lm_list *lml, const char *format, ...)
 	 */
 	_pid = getpid();
 
+	/*
+	 * Each time ld.so.1 is entered, the diagnostic times are reset.  It is
+	 * useful to convey this reset as part of our diagnostics, but only if
+	 * other diagnostics will follow.  If a reset has preceded this
+	 * diagnostic, print a division line.
+	 */
+	if (DBG_ISRESET()) {
+		DBG_OFFRESET();
+
+		prf.pr_buf = prf.pr_cur = buffer;
+		prf.pr_len = ERRSIZE;
+
+		if (lml)
+			(void) bufprint(&prf, MSG_ORIG(MSG_DBG_PID), _pid);
+		else
+			(void) bufprint(&prf, MSG_ORIG(MSG_DBG_UNDEF));
+		prf.pr_cur--;
+
+		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_RESET));
+		(void) dowrite(&prf);
+	}
+
+	/*
+	 * Reestablish the buffer for standard printing.
+	 */
+	prf.pr_buf = prf.pr_cur = buffer;
+	prf.pr_len = ERRSIZE;
+
+	/*
+	 * Establish any diagnostic prefix strings.
+	 */
 	if (lml)
 		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_PID), _pid);
 	else
@@ -290,6 +320,25 @@ dbg_print(Lm_list *lml, const char *format, ...)
 	if (DBG_ISLMID() && lml && lml->lm_lmidstr) {
 		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_LMID), lml->lm_lmidstr);
 		prf.pr_cur--;
+	}
+	if (DBG_ISTIME()) {
+		struct timeval	new;
+
+		if (gettimeofday(&new, NULL) == 0) {
+			Conv_time_buf_t	buf;
+
+			if (DBG_ISTTIME()) {
+				(void) bufprint(&prf,
+				    conv_time(&DBG_TOTALTIME, &new, &buf));
+				prf.pr_cur--;
+			}
+			if (DBG_ISDTIME()) {
+				(void) bufprint(&prf,
+				    conv_time(&DBG_DELTATIME, &new, &buf));
+				prf.pr_cur--;
+			}
+			DBG_DELTATIME = new;
+		}
 	}
 	if (rtld_flags & RT_FL_THREADS) {
 		(void) bufprint(&prf, MSG_ORIG(MSG_DBG_THREAD), rt_thr_self());

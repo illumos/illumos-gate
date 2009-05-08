@@ -1,4 +1,7 @@
 #
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,27 +21,8 @@
 #
 # CDDL HEADER END
 #
+# Message file for cmd/sgs/libconv/common/time.c
 
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-
-@ MSG_GPH_PUBLIC	"GPH_PUBLIC"
-@ MSG_GPH_PRIVATE	"GPH_PRIVATE"
-@ MSG_GPH_ZERO		"GPH_ZERO"
-@ MSG_GPH_LDSO		"GPH_LDSO"
-@ MSG_GPH_FIRST		"GPH_FIRST"
-@ MSG_GPH_FILTEE	"GPH_FILTEE"
-@ MSG_GPH_INITIAL	"GPH_INITIAL"
-@ MSG_GPH_NOPENDLAZY	"GPH_NOPENDLAZY"
-
-@ MSG_GPD_DLSYM		"GPD_DLSYM"
-@ MSG_GPD_RELOC		"GPD_RELOC"
-@ MSG_GPD_ADDEPS	"GPD_ADDEPS"
-@ MSG_GPD_PARENT	"GPD_PARENT"
-@ MSG_GPD_FILTER	"GPD_FILTER"
-@ MSG_GPD_REMOVE	"GPD_REMOVE"
-@ MSG_GPD_MODECHANGE	"GPD_MODECHANGE"
-
-@ MSG_GBL_NULL		""
+@ MSG_TIME_HMSF		"%d.%d.%.2ld.%.6ld: "
+@ MSG_TIME_MSF		"%d.%.2ld.%.6ld: "
+@ MSG_TIME_SF		"%.2ld.%.6ld: "

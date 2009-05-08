@@ -35,6 +35,7 @@
  * ld -- link/editor main program
  */
 #include	<sys/types.h>
+#include	<sys/time.h>
 #include	<sys/mman.h>
 #include	<string.h>
 #include	<stdio.h>
@@ -114,6 +115,13 @@ ld_main(int argc, char **argv, Half mach)
 	Ofl_desc	*ofl;
 
 	/*
+	 * Establish a base time.  Total time diagnostics are relative to
+	 * entering the link-editor here.
+	 */
+	(void) gettimeofday(&DBG_TOTALTIME, NULL);
+	DBG_DELTATIME = DBG_TOTALTIME;
+
+	/*
 	 * Initialize signal handlers, and output file variables.  Establish a
 	 * default output ELF header to satisfy diagnostic requirements.
 	 */
@@ -186,10 +194,10 @@ ld_main(int argc, char **argv, Half mach)
 			do {
 				if (ld_sup_loadso(ofl, lib) == S_ERROR)
 					return (ld_exit(ofl));
+				DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
 			} while ((lib = strtok_r(NULL, sep, &lasts)) != NULL);
 		}
-		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 	}
 	if (lib_support) {
 		Aliste	idx;
@@ -200,9 +208,9 @@ ld_main(int argc, char **argv, Half mach)
 			    DBG_SUP_CMDLINE));
 			if (ld_sup_loadso(ofl, lib) == S_ERROR)
 				return (ld_exit(ofl));
+			DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 		}
 	}
-	DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
 	DBG_CALL(Dbg_ent_print(ofl->ofl_lml,
 	    ofl->ofl_dehdr->e_ident[EI_OSABI], ofl->ofl_dehdr->e_machine,
@@ -383,6 +391,7 @@ ld_main(int argc, char **argv, Half mach)
 	ld_sup_atexit(ofl, 0);
 
 	DBG_CALL(Dbg_statistics_ld(ofl));
+	DBG_CALL(Dbg_basic_finish(ofl->ofl_lml));
 
 	/*
 	 * Wrap up debug output file if one is open

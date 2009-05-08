@@ -63,6 +63,28 @@ typedef struct slookup	Slookup;
 /*
  * A binding descriptor.  Establishes the binding relationship between two
  * objects, the caller (originator) and the dependency (destination).
+ *
+ * Every relationship between two objects is tracked by a binding descriptor.
+ * This descriptor is referenced from a link-map's DEPENDS and CALLERS lists.
+ * Note, Aplist's are diagramed to fully expose the allocations required to
+ * establish the data structure relationships.
+ *
+ *                                  Bnd_desc
+ *                                 ----------
+ *                    ------------| b_caller |
+ *                   |            | b_depend | ----------
+ *                   |            |          |           |
+ *      Rt_map       |             ----------            |       Rt_map
+ *    ----------     |                ^ ^                |     ----------
+ *   |          | <--                 | |                 --> |          |
+ *   |          |        --------     | |                     |          |
+ *   | DEPENDS  | ----> |        |    | |     --------        |          |
+ *   |          |       |        |    | |    |        | <---- | CALLERS  |
+ *   |          |       |        | ---  |    |        |       |          |
+ *   |          |       |        |       --- |        |       |          |
+ *   |          |        --------            |        |       |          |
+ *    ----------          Aplist              --------         ----------
+ *                                             Aplist
  */
 typedef struct {
 	Rt_map		*b_caller;	/* caller (originator) of a binding */
@@ -75,8 +97,8 @@ typedef struct {
 #define	BND_NEEDED	0x0001		/* caller NEEDED the dependency */
 #define	BND_REFER	0x0002		/* caller relocation references the */
 					/*	dependency */
-#define	BND_FILTER	0x0004		/* pseudo binding to identify filter */
-
+#define	BND_FILTER	0x0004		/* binding identifies filter, used */
+					/*	for diagnostics only */
 /*
  * Private structure for communication between rtld_db and rtld.
  *
@@ -182,7 +204,7 @@ typedef struct {
  *   |          |       | lc_head | --      ------    |     ------
  *   |          |       | lc_tail | ------------------
  *   |          |       |---------|
- *                      | lc_head |
+ *    ----------        | lc_head |
  *                      | lc_tail |
  *                      |---------|
  *
@@ -393,31 +415,56 @@ struct lm_list32 {
  *
  * The capability of ld.so.1 to associate a group of objects, look for symbols
  * within that group, ensure that groups are isolated from one another (with
- * regard to relocations), and to unload a group, centers around a handle.  This
- * data structure is tracked from the link-map HANDLE(), and is the structure
- * returned from dlopen(), and similar object loading capabilities such as
- * filter/filtee processing.
+ * regard to relocations), and to unload a group, centers around a handle.
  *
- * A handle keeps track of all the dependencies of the associated object.
- * These dependencies may be added as objects are lazily loaded.  The core
- * dependencies on the handle are the ldd(1) list of the associated object.
- * The object assigned the handle, and the parent (or caller) who requested the
- * handle are also maintained as dependencies on the handle.
+ * Dependencies can be added to an existing handle as the dependencies are
+ * lazily loaded.  The core dependencies on the handle are the ldd(1) list of
+ * the referenced object.
+ *
+ * Handles can be created from:
+ *
+ *  -	a dlopen() request.  This associates a caller to a reference object,
+ * 	and the referenced objects dependencies.  This group of objects can
+ *	then be inspected for symbols (dlsym()).
+ *  -	a filtering request.  This associates a filter (caller) to a referenced
+ *	object (filtee).  The redirection of filter symbols to their filtee
+ *	counterpart is essentially a dlsym() using the filtee's handle.
+ *
+ * The handle created for these events is referred to as a public handle.  This
+ * handle tracks the referenced object, all of the dependencies of the
+ * referenced object, and the caller (parent).
  *
  * Presently, an object may have two handles, one requested with RTLD_FIRST
  * and one without.
  *
- * A handle may be referenced by any number of parents (callers).  A reference
+ * A handle may be referenced by any number of callers (parents).  A reference
  * count tracks the number.  A dlclose() operation drops the reference count,
  * and when the count is zero, the handle is used to determine the family of
  * objects to unload.  As bindings may occur to objects on the handle from
- * other handles, it may not be possible to remove a complete family of
- * objects or that handle itself.  Handles in this state are moved to an orphan
- * list.  A handle on the orphan list is taken off the orphan list if the
- * associated object is reopened.  Otherwise, the handle remains on the orphan
- * list for the duration of the process.  The orphan list is inspected any time
- * objects are unloaded, to determine if the orphaned objects can also be
- * unloaded.
+ * other handles, it may not be possible to remove a complete family of objects
+ * or the handle itself.  Handles in this state are moved to an orphan list.
+ * A handle on the orphan list is taken off the orphan list if the associated
+ * object is reopened.  Otherwise, the handle remains on the orphan list for
+ * the duration of the process.  The orphan list is inspected any time objects
+ * are unloaded, to determine if the orphaned objects can also be unloaded.
+ *
+ * Handles can also be created for internal uses:
+ *
+ *  -	to promote objects to RTLD_NOW.
+ *  -	to establish families for symbol binding fallback, required when lazy
+ *	loadable objects are still pending.
+ *
+ * The handle created for these events is referred to as a private handle.  This
+ * handle does not need to track the caller (parent), and because of this, does
+ * not need to be considered during dlclose() operations, as the handle can not
+ * be referenced by callers outside of the referenced objects family.
+ *
+ * Note, a private handle is essentially a subset of a public handle.  Should
+ * an internal operation require a private handle, and a public handle already
+ * exist, the public handle can be used.  Should an external operation require
+ * a public handle, and a private handle exist, the private handle is promoted
+ * to a public handle.  Any handle that gets created will remain in existence
+ * for the life time of the referenced object.
  *
  * Objects can be dlopened using RTLD_NOW.  This attribute requires that all
  * relocations of the object, and its dependencies are processed immediately,
@@ -427,9 +474,53 @@ struct lm_list32 {
  * RTLD_NOW request is made, then the object, and its dependencies, most undergo
  * additional relocation processing.   This promotion from lazy binding to
  * immediate binding is carried out using handles, as the handle defines the
- * dependencies that must be processed.  A temporary handle is created for this
- * purpose, and is discarded immediately after the promotion operation has been
- * completed.
+ * dependencies that must be processed.
+ *
+ * To ensure that objects within a lazy loadable environment can be relocated,
+ * no matter whether the objects have their dependencies described completely,
+ * a symbol lookup fallback is employed.  Any pending lazy loadable objects are
+ * loaded, and a handle established to search the object and it's dependencies
+ * for the required symbol.
+ *
+ * A group handle (and its associated group descriptors), is referenced from
+ * a link-map's HANDLES and GROUPS lists.  Note, Aplist's are diagramed to
+ * fully expose the allocations required to establish the data structure
+ * relationships.
+ *
+ *                                  Grp_desc
+ *                                   Alist
+ *                                 -----------
+ *                            --> |           |
+ *                           |    |-----------|
+ *                           |    | gd_depend | ---------
+ *                           |    |           |          |
+ *                           |    |-----------|          |
+ *                   --------|--- | gd_depend |          |
+ *                  |        |    | (parent)  |          |
+ *                  |        |    |-----------|          |
+ *                  |        |    | gd_depend |          |
+ *                  |        |    |           |          |
+ *                  |        |    |           |          |
+ *                  |        |     -----------           |
+ *                  |        |                           |
+ *                  |        |      Grp_hdl              |
+ *                  |        |    -----------            |
+ *                  |         -- | gh_depends |          |
+ *                  |  --------- | gh_ownlmp  |          |
+ *                  | |          |            |          |
+ *                  | |          |            |          |
+ *                  | |          |            |          |
+ *      Rt_map      | |           ------------           |       Rt_map
+ *    ----------    | |               ^ ^                |     ----------
+ *   |          | <-  |               | |                 --> |          |
+ *   |          | <---   --------     | |                     |          |
+ *   | HANDLES  | ----> |        |    | |     --------        |          |
+ *   |          |       |        |    | |    |        | <---- |  GROUPS  |
+ *   |          |       |        | ---  |    |        |       |          |
+ *   |          |       |        |       --- |        |       |          |
+ *   |          |        --------            |        |       |          |
+ *    ----------          Aplist              --------         ----------
+ *                                             Aplist
  */
 typedef struct {
 	Alist		*gh_depends;	/* handle dependency list */
@@ -439,15 +530,27 @@ typedef struct {
 	uint_t		gh_flags;	/* handle flags (GPH_ values) */
 } Grp_hdl;
 
-#define	GPH_ZERO	0x0001		/* special handle for dlopen(0) */
-#define	GPH_LDSO	0x0002		/* special handle for ld.so.1 */
-#define	GPH_FIRST	0x0004		/* dlsym() can only use originating */
-					/*	dependency */
-#define	GPH_FILTEE	0x0008		/* handle used to specify a filtee */
-#define	GPH_INITIAL	0x0010		/* handle is initialized */
-#define	GPH_NOPENDLAZY	0x0020		/* no pending lazy dependencies */
-					/*	remain for this handle */
+/*
+ * Define the two categories of handle.
+ */
+#define	GPH_PUBLIC	0x0001		/* handle returned to caller(s) */
+#define	GPH_PRIVATE	0x0002		/* handle used internally */
 
+/*
+ * Define any flags that affects how the handle is used.
+ */
+#define	GPH_ZERO	0x0010		/* special handle for dlopen(0) */
+#define	GPH_LDSO	0x0020		/* special handle for ld.so.1 */
+#define	GPH_FIRST	0x0040		/* dlsym() can only use originating */
+					/*	dependency */
+#define	GPH_FILTEE	0x0080		/* handle identifies a filtee, used */
+					/*	for diagnostics only */
+/*
+ * Define any state that is associated with the handle.
+ */
+#define	GPH_INITIAL	0x0100		/* handle is initialized */
+#define	GPH_NOPENDLAZY	0x0200		/* no pending lazy dependencies */
+					/*	remain for this handle */
 /*
  * Define a Group Descriptor.
  *
@@ -467,10 +570,10 @@ typedef struct {
 					/*	should be added to handle */
 #define	GPD_PARENT	0x0008		/* dependency is a parent */
 #define	GPD_FILTER	0x0010		/* dependency is our filter */
-#define	GPD_PROMOTE	0x0020		/* dependency is our RTLD_NOW */
-					/*	promoter */
-#define	GPD_REMOVE	0x1000		/* descriptor is a candidate for */
+#define	GPD_REMOVE	0x0100		/* descriptor is a candidate for */
 					/*	removal from the group */
+#define	GPD_MODECHANGE	0x0200		/* dependency mode has changed, e.g. */
+					/*	promoted to RTLD_GOBAL */
 
 /*
  * Define threading structures.  For compatibility with libthread (T1_VERSION 1
@@ -728,11 +831,11 @@ typedef struct rt_map32 {
 #define	MSK_RT_INTPOSE	0x01800000	/* mask for all interposer */
 					/*	possibilities */
 #define	FLG_RT_MOVE	0x02000000	/* object needs move operation */
-#define	FLG_RT_TMPLIST	0x04000000	/* object is part of a temporary list */
+#define	FLG_RT_RELOCING	0x04000000	/* object is being relocated */
 #define	FLG_RT_REGSYMS	0x08000000	/* object has DT_REGISTER entries */
 #define	FLG_RT_INITCLCT	0x10000000	/* init has been collected (tsort) */
-#define	FLG_RT_HANDLE	0x20000000	/* generate a handle for this object */
-#define	FLG_RT_RELOCING	0x40000000	/* object is being relocated */
+#define	FLG_RT_PUBHDL	0x20000000	/* generate a handle for this object */
+#define	FLG_RT_PRIHDL	0x40000000	/*	either public or private */
 
 #define	FL1_RT_COPYTOOK	0x00000001	/* copy relocation taken */
 
