@@ -2860,6 +2860,10 @@ hermon_mr_fast_mtt_write(hermon_state_t *state, hermon_rsrc_t *mtt,
 				    (i - start) * sizeof (hermon_hw_mtt_t),
 				    DDI_DMA_SYNC_FORDEV);
 
+				if ((addr + pagesize > endaddr) &&
+				    (cookie_cnt == 0))
+					return (DDI_SUCCESS);
+
 				hermon_index(index1, index2, rindx, icm_table,
 				    i);
 				start = i * sizeof (hermon_hw_mtt_t);
