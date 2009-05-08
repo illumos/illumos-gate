@@ -2155,17 +2155,28 @@ hermon_set_addr_path(hermon_state_t *state, ibt_adds_vect_t *av,
 	path->mlid	= av->av_src_path;
 	path->rlid	= av->av_dlid;
 
-	if (av->av_srate == IBT_SRATE_10) {
-		path->max_stat_rate = 8;  /* 4xSDR-10.0Gb/s injection rate */
-	} else if (av->av_srate == IBT_SRATE_20) {
-		path->max_stat_rate = 11; /* 4xDDR-20Gb/s injection rate */
-	} else if (av->av_srate == IBT_SRATE_2) {
-		path->max_stat_rate = 7;  /* 1xSDR-2.5Gb/s injection rate */
-	} else if (av->av_srate == IBT_SRATE_5) {
-		path->max_stat_rate = 10; /* 1xDDR-5Gb/s injection rate */
-	} else if (av->av_srate == IBT_SRATE_NOT_SPECIFIED) {
-		path->max_stat_rate = 0;	/* Max */
-	} else {
+	switch (av->av_srate) {
+	case IBT_SRATE_2:	/* 1xSDR-2.5Gb/s injection rate */
+		path->max_stat_rate = 7; break;
+	case IBT_SRATE_10:	/* 4xSDR-10.0Gb/s injection rate */
+		path->max_stat_rate = 8; break;
+	case IBT_SRATE_30:	/* 12xSDR-30Gb/s injection rate */
+		path->max_stat_rate = 9; break;
+	case IBT_SRATE_5:	/* 1xDDR-5Gb/s injection rate */
+		path->max_stat_rate = 10; break;
+	case IBT_SRATE_20:	/* 4xDDR-20Gb/s injection rate */
+		path->max_stat_rate = 11; break;
+	case IBT_SRATE_40:	/* 4xQDR-40Gb/s injection rate */
+		path->max_stat_rate = 12; break;
+	case IBT_SRATE_60:	/* 12xDDR-60Gb/s injection rate */
+		path->max_stat_rate = 13; break;
+	case IBT_SRATE_80:	/* 8xQDR-80Gb/s injection rate */
+		path->max_stat_rate = 14; break;
+	case IBT_SRATE_120:	/* 12xQDR-120Gb/s injection rate */
+		path->max_stat_rate = 15; break;
+	case IBT_SRATE_NOT_SPECIFIED:	/* Max */
+		path->max_stat_rate = 0; break;
+	default:
 		return (IBT_STATIC_RATE_INVALID);
 	}
 	if (hermon_srate_override != -1) /* for evaluating HCA firmware */
@@ -2258,21 +2269,30 @@ hermon_get_addr_path(hermon_state_t *state, hermon_hw_addr_path_t *path,
 	av->av_dlid	= path->rlid;
 
 	/* Set "av_ipd" value from max_stat_rate */
-	/* need to revisit for add'l rates - IBTF upgrade */
-	if (path->max_stat_rate	== 8) {
-		av->av_srate = IBT_SRATE_10; /* 4xSDR-10.0Gb/s injection rate */
-	} else if (path->max_stat_rate == 11) {
-		av->av_srate = IBT_SRATE_20; /* 4xDDR-20Gb/s injection rate */
-	} else if (path->max_stat_rate == 7) {
-		av->av_srate = IBT_SRATE_2;  /* 1xSDR-2.5Gb/s injection rate */
-	} else if (path->max_stat_rate == 10) {
-		av->av_srate = IBT_SRATE_5;  /* 1xDDR-5Gb/s injection rate */
-	} else if (path->max_stat_rate == 0) {
-		av->av_srate = IBT_SRATE_NOT_SPECIFIED;  /* Max */
-	} else {
-		av->av_srate = IBT_SRATE_1X; /* 1x injection rate */
+	switch (path->max_stat_rate) {
+	case 7:				/* 1xSDR-2.5Gb/s injection rate */
+		av->av_srate = IBT_SRATE_2; break;
+	case 8:				/* 4xSDR-10.0Gb/s injection rate */
+		av->av_srate = IBT_SRATE_10; break;
+	case 9:				/* 12xSDR-30Gb/s injection rate */
+		av->av_srate = IBT_SRATE_30; break;
+	case 10:			/* 1xDDR-5Gb/s injection rate */
+		av->av_srate = IBT_SRATE_5; break;
+	case 11:			/* 4xDDR-20Gb/s injection rate */
+		av->av_srate = IBT_SRATE_20; break;
+	case 12:			/* xQDR-40Gb/s injection rate */
+		av->av_srate = IBT_SRATE_40; break;
+	case 13:			/* 12xDDR-60Gb/s injection rate */
+		av->av_srate = IBT_SRATE_60; break;
+	case 14:			/* 8xQDR-80Gb/s injection rate */
+		av->av_srate = IBT_SRATE_80; break;
+	case 15:			/* 12xQDR-120Gb/s injection rate */
+		av->av_srate = IBT_SRATE_120; break;
+	case 0:				/* max */
+		av->av_srate = IBT_SRATE_10; break;
+	default:			/* 1x injection rate */
+		av->av_srate = IBT_SRATE_1X;
 	}
-
 
 	/*
 	 * Extract all "global" values regardless of the value in the GRH
