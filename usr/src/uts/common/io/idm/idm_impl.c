@@ -1012,8 +1012,47 @@ idm_wd_thread(void *arg)
 			idle_time = ddi_get_lbolt() - ic->ic_timestamp;
 
 			/*
+			 * If this connection is in FFP then grab a hold
+			 * and check the various timeout thresholds.  Otherwise
+			 * the connection is closing and we should just
+			 * move on to the next one.
+			 */
+			mutex_enter(&ic->ic_state_mutex);
+			if (ic->ic_ffp) {
+				idm_conn_hold(ic);
+			} else {
+				mutex_exit(&ic->ic_state_mutex);
+				continue;
+			}
+
+			/*
 			 * If there hasn't been any activity on this
-			 * connection for the specified period then
+			 * connection for the keepalive timeout period
+			 * and if the client has provided a keepalive
+			 * callback then call the keepalive callback.
+			 * This allows the client to take action to keep
+			 * the link alive (like send a nop PDU).
+			 */
+			if ((TICK_TO_SEC(idle_time) >=
+			    IDM_TRANSPORT_KEEPALIVE_IDLE_TIMEOUT) &&
+			    !ic->ic_keepalive) {
+				ic->ic_keepalive = B_TRUE;
+				if (ic->ic_conn_ops.icb_keepalive) {
+					mutex_exit(&ic->ic_state_mutex);
+					mutex_exit(&idm.idm_global_mutex);
+					(*ic->ic_conn_ops.icb_keepalive)(ic);
+					mutex_enter(&idm.idm_global_mutex);
+					mutex_enter(&ic->ic_state_mutex);
+				}
+			} else if ((TICK_TO_SEC(idle_time) <
+			    IDM_TRANSPORT_KEEPALIVE_IDLE_TIMEOUT)) {
+				/* Reset keepalive */
+				ic->ic_keepalive = B_FALSE;
+			}
+
+			/*
+			 * If there hasn't been any activity on this
+			 * connection for the failure timeout period then
 			 * drop the connection.  We expect the initiator
 			 * to keep the connection alive if it wants the
 			 * connection to stay open.
@@ -1026,25 +1065,23 @@ idm_wd_thread(void *arg)
 			 */
 			if (TICK_TO_SEC(idle_time) >
 			    IDM_TRANSPORT_FAIL_IDLE_TIMEOUT) {
-				/*
-				 * Only send the transport fail if we're in
-				 * FFP.  State machine timers should handle
-				 * problems in non-ffp states.
-				 */
-				if (ic->ic_ffp) {
-					mutex_exit(&idm.idm_global_mutex);
-					IDM_SM_LOG(CE_WARN, "idm_wd_thread: "
-					    "conn %p idle for %d seconds, "
-					    "sending CE_TRANSPORT_FAIL",
-					    (void *)ic, (int)idle_time);
-					idm_conn_event(ic, CE_TRANSPORT_FAIL,
-					    NULL);
-					mutex_enter(&idm.idm_global_mutex);
-				}
+				mutex_exit(&ic->ic_state_mutex);
+				mutex_exit(&idm.idm_global_mutex);
+				IDM_SM_LOG(CE_WARN, "idm_wd_thread: "
+				    "conn %p idle for %d seconds, "
+				    "sending CE_TRANSPORT_FAIL",
+				    (void *)ic, (int)idle_time);
+				idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
+				mutex_enter(&idm.idm_global_mutex);
+				mutex_enter(&ic->ic_state_mutex);
 			}
+
+			idm_conn_rele(ic);
+
+			mutex_exit(&ic->ic_state_mutex);
 		}
 
-		wake_time = lbolt + SEC_TO_TICK(IDM_WD_INTERVAL);
+		wake_time = ddi_get_lbolt() + SEC_TO_TICK(IDM_WD_INTERVAL);
 		(void) cv_timedwait(&idm.idm_wd_cv, &idm.idm_global_mutex,
 		    wake_time);
 	}

@@ -53,6 +53,12 @@ typedef enum {
 #define	IDM_WD_INTERVAL			5
 
 /*
+ * Timeout period before the client "keepalive" callback is invoked in
+ * seconds if the connection is idle.
+ */
+#define	IDM_TRANSPORT_KEEPALIVE_IDLE_TIMEOUT	20
+
+/*
  * Timeout period before a TRANSPORT_FAIL event is generated in seconds
  * if the connection is idle.
  */
@@ -161,6 +167,7 @@ typedef struct idm_conn_s {
 	idm_status_t		ic_conn_sm_status;
 
 	boolean_t		ic_ffp;
+	boolean_t		ic_keepalive;
 	uint32_t		ic_internal_cid;
 
 	uint32_t		ic_conn_flags;

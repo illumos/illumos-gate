@@ -83,6 +83,8 @@ static void
 sess_sm_new_state(iscsit_sess_t *ist, sess_event_ctx_t *ctx,
     iscsit_session_state_t new_state);
 
+static int
+iscsit_task_itt_compare(const void *void_task1, const void *void_task2);
 
 static uint16_t
 iscsit_tsih_alloc(void)
@@ -144,6 +146,8 @@ iscsit_sess_create(iscsit_tgt_t *tgt, iscsit_conn_t *ict,
 	    offsetof(sess_event_ctx_t, se_ctx_node));
 	list_create(&result->ist_conn_list, sizeof (iscsit_conn_t),
 	    offsetof(iscsit_conn_t, ict_sess_ln));
+	avl_create(&result->ist_task_list, iscsit_task_itt_compare,
+	    sizeof (iscsit_task_t), offsetof(iscsit_task_t, it_sess_ln));
 
 	result->ist_state = SS_Q1_FREE;
 	result->ist_last_state = SS_Q1_FREE;
@@ -247,6 +251,7 @@ iscsit_sess_destroy(iscsit_sess_t *ist)
 	if (ist->ist_target_alias)
 		kmem_free(ist->ist_target_alias,
 		    strlen(ist->ist_target_alias) + 1);
+	avl_destroy(&ist->ist_task_list);
 	list_destroy(&ist->ist_conn_list);
 	list_destroy(&ist->ist_events);
 	cv_destroy(&ist->ist_cv);
@@ -419,6 +424,19 @@ iscsit_sess_avl_compare(const void *void_sess1, const void *void_sess2)
 	return (0);
 }
 
+int
+iscsit_task_itt_compare(const void *void_task1, const void *void_task2)
+{
+	const iscsit_task_t	*task1 = void_task1;
+	const iscsit_task_t	*task2 = void_task2;
+
+	if (task1->it_itt < task2->it_itt)
+		return (-1);
+	else if (task1->it_itt > task2->it_itt)
+		return (1);
+
+	return (0);
+}
 
 /*
  * State machine

@@ -833,6 +833,7 @@ idm_buf_tx_to_ini_done(idm_task_t *idt, idm_buf_t *idb, idm_status_t status)
 
 	switch (idt->idt_state) {
 	case TASK_ACTIVE:
+		idt->idt_ic->ic_timestamp = ddi_get_lbolt();
 		idm_buf_unbind_in_locked(idt, idb);
 		mutex_exit(&idt->idt_mutex);
 		(*idb->idb_buf_cb)(idb, status);
@@ -903,6 +904,7 @@ idm_buf_rx_from_ini_done(idm_task_t *idt, idm_buf_t *idb, idm_status_t status)
 
 	switch (idt->idt_state) {
 	case TASK_ACTIVE:
+		idt->idt_ic->ic_timestamp = ddi_get_lbolt();
 		idm_buf_unbind_out_locked(idt, idb);
 		mutex_exit(&idt->idt_mutex);
 		(*idb->idb_buf_cb)(idb, status);
@@ -2100,6 +2102,12 @@ idm_refcnt_init(idm_refcnt_t *refcnt, void *referenced_obj)
 void
 idm_refcnt_destroy(idm_refcnt_t *refcnt)
 {
+	/*
+	 * Grab the mutex to there are no other lingering threads holding
+	 * the mutex before we destroy it (e.g. idm_refcnt_rele just after
+	 * the refcnt goes to zero if ir_waiting == REF_WAIT_ASYNC)
+	 */
+	mutex_enter(&refcnt->ir_mutex);
 	ASSERT(refcnt->ir_refcnt == 0);
 	cv_destroy(&refcnt->ir_cv);
 	mutex_destroy(&refcnt->ir_mutex);

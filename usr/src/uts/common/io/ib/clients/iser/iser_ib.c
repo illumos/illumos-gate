@@ -647,6 +647,14 @@ iser_ib_post_recv_async(ibt_channel_hdl_t chanhdl)
 	/* Pull our iSER channel handle from the private data */
 	chan = (iser_chan_t *)ibt_get_chan_private(chanhdl);
 
+	/*
+	 * Caller must check that chan->ic_conn->ic_stage indicates
+	 * the connection is active (not closing, not closed) and
+	 * it must hold the mutex cross the check and the call to this function
+	 */
+	ASSERT(mutex_owned(&chan->ic_conn->ic_lock));
+	ASSERT((chan->ic_conn->ic_stage >= ISER_CONN_STAGE_IC_CONNECTED) &&
+	    (chan->ic_conn->ic_stage <= ISER_CONN_STAGE_LOGGED_IN));
 	idm_conn_hold(chan->ic_conn->ic_idmc);
 	status = ddi_taskq_dispatch(iser_taskq, iser_ib_post_recv_task,
 	    (void *)chanhdl, DDI_NOSLEEP);

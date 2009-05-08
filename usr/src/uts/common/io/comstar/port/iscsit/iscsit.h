@@ -361,6 +361,7 @@ typedef struct {
 	uint16_t		ist_tpgt_tag;
 	uint32_t		ist_expcmdsn;
 	uint32_t		ist_maxcmdsn;
+	avl_tree_t		ist_task_list;
 } iscsit_sess_t;
 
 /* Update iscsit_ils_name table whenever login states are modified */
@@ -489,6 +490,7 @@ typedef struct iscsit_conn_s {
 	iscsit_op_params_t	ict_op;
 	uint16_t		ict_cid;
 	uint32_t		ict_statsn;
+	uint32_t		ict_keepalive_ttt;
 	struct iscsit_conn_s	*ict_reinstate_conn;
 	uint32_t		ict_reinstating:1,
 				ict_lost:1,
@@ -513,11 +515,13 @@ typedef struct {
 	idm_pdu_t		*it_tm_pdu;
 	uint32_t		it_stmf_abort:1,
 				it_aborted:1,
+				it_active:1,
 				it_tm_task:1,
 				it_tm_responded:1;
 	uint32_t		it_cmdsn;
 	uint32_t		it_itt;
 	uint32_t		it_ttt;
+	avl_node_t		it_sess_ln;
 } iscsit_task_t;
 
 typedef struct iscsit_isns_cfg {
@@ -602,6 +606,7 @@ idm_rx_pdu_error_cb_t	iscsit_rx_pdu_error;
 idm_task_cb_t		iscsit_task_aborted;
 idm_client_notify_cb_t	iscsit_client_notify;
 idm_build_hdr_cb_t	iscsit_build_hdr;
+idm_keepalive_cb_t	iscsit_keepalive;
 
 /*
  * lport entry points

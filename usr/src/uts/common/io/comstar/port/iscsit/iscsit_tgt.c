@@ -1941,6 +1941,7 @@ iscsit_portal_online(iscsit_portal_t *portal)
 			sr.sr_conn_ops.icb_client_notify =
 			    &iscsit_client_notify;
 			sr.sr_conn_ops.icb_build_hdr = &iscsit_build_hdr;
+			sr.sr_conn_ops.icb_keepalive = &iscsit_keepalive;
 
 			if (idm_tgt_svc_create(&sr, &svc) !=
 			    IDM_STATUS_SUCCESS) {

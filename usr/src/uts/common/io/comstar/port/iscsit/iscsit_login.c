@@ -1279,8 +1279,8 @@ login_sm_session_bind(iscsit_conn_t *ict)
 			    ((iscsit_global.global_svc_state != ISE_ENABLED) &&
 			    ((iscsit_global.global_svc_state != ISE_BUSY)))) {
 				SET_LOGIN_ERROR(ict,
-				    ISCSI_STATUS_CLASS_INITIATOR_ERR,
-				    ISCSI_LOGIN_STATUS_TGT_REMOVED);
+				    ISCSI_STATUS_CLASS_TARGET_ERR,
+				    ISCSI_LOGIN_STATUS_SVC_UNAVAILABLE);
 				mutex_exit(&tgt->target_mutex);
 				ISCSIT_GLOBAL_UNLOCK();
 				goto session_bind_error;

@@ -342,7 +342,9 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 	iser_qp->rq_level--;
 
 	if ((iser_qp->rq_taskqpending == B_FALSE) &&
-	    (iser_qp->rq_level <= iser_qp->rq_lwm)) {
+	    (iser_qp->rq_level <= iser_qp->rq_lwm) &&
+	    (iser_chan->ic_conn->ic_stage >= ISER_CONN_STAGE_IC_CONNECTED) &&
+	    (iser_chan->ic_conn->ic_stage <= ISER_CONN_STAGE_LOGGED_IN)) {
 		/* Set the pending flag and fire off a post_recv */
 		iser_qp->rq_taskqpending = B_TRUE;
 		mutex_exit(&iser_qp->qp_lock);
@@ -360,7 +362,6 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 	} else {
 		mutex_exit(&iser_qp->qp_lock);
 	}
-	mutex_exit(&iser_chan->ic_conn->ic_lock);
 
 	DTRACE_PROBE3(iser__recv__cqe, iser_chan_t *, iser_chan,
 	    ibt_wc_t *, &wc, ibt_wc_status_t, wc.wc_status);
@@ -369,7 +370,6 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 		 * Tell IDM that the channel has gone down,
 		 * unless he already knows.
 		 */
-		mutex_enter(&iser_chan->ic_conn->ic_lock);
 		switch (iser_chan->ic_conn->ic_stage) {
 		case ISER_CONN_STAGE_IC_DISCONNECTED:
 		case ISER_CONN_STAGE_IC_FREED:
@@ -388,6 +388,8 @@ iser_ib_poll_recv_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 		iser_msg_free(msg);
 		return (DDI_SUCCESS);
 	} else {
+		mutex_exit(&iser_chan->ic_conn->ic_lock);
+
 		/*
 		 * We have an iSER message in, let's handle it.
 		 * We will free the iser_msg_t later in this path,
