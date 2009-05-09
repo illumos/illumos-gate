@@ -1472,8 +1472,16 @@ sunstr_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *cr)
 	/* phys layer clones a device for us */
 	ASSERT((getminor(physdev) & AUDIO_MN_CLONE_MASK) != 0);
 
+	/*
+	 * Note: We don't need to retain the hold on the client
+	 * structure, because the client is logically "held" by the
+	 * open LDI handle.  We're just using this hold_by_devt to
+	 * locate the associated client.
+	 */
 	c = auclnt_hold_by_devt(physdev);
 	ASSERT(c != NULL);
+	auclnt_release(c);
+
 	if ((rv = auclnt_open(c, fmt, oflag)) != 0) {
 		goto fail;
 	}
@@ -1494,8 +1502,6 @@ sunstr_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *cr)
 		auclnt_start(auclnt_input_stream(c));
 	}
 
-	auclnt_release(c);
-
 	/* we just reuse same minor number that phys layer used */
 	*devp = makedevice(getmajor(*devp), getminor(physdev));
 
@@ -1511,7 +1517,6 @@ fail:
 		auclnt_close(c);
 	}
 	if (lh != NULL) {
-		auclnt_release(c);
 		(void) ldi_close(lh, flag, cr);
 	}
 
