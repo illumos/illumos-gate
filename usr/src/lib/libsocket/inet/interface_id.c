@@ -183,7 +183,7 @@ if_indextoname(uint32_t ifindex, char *ifname)
 		/*
 		 * Obtain the index value of each interface, and
 		 * match to see if the retrived index value matches
-		 * the given one. If so we have return the corresponding
+		 * the given one. If so we return the corresponding
 		 * device name of that interface.
 		 */
 		size_t	size;
@@ -197,8 +197,7 @@ if_indextoname(uint32_t ifindex, char *ifname)
 			    (char *)IPIF_SEPARATOR_CHAR);
 			lifrp->lifr_name[size] = '\0';
 			found = B_TRUE;
-			(void) strncpy(ifname, lifrp->lifr_name,
-			    size + 1);
+			(void) strncpy(ifname, lifrp->lifr_name, size + 1);
 			break;
 		}
 	}
@@ -287,24 +286,37 @@ if_nameindex(void)
 		size_t	size;
 
 		size = strcspn(lifrp->lifr_name, (char *)IPIF_SEPARATOR_CHAR);
-		lifrp->lifr_name[size] = '\0';
 		found = B_FALSE;
 		/*
 		 * Search the current array to see if this interface
-		 * already exists
+		 * already exists. Only compare the physical name.
 		 */
-
 		for (i = 0; i < physinterf_num; i++) {
-			if (strcmp(interface_entry[i].if_name,
-			    lifrp->lifr_name) == 0) {
+			if (strncmp(interface_entry[i].if_name,
+			    lifrp->lifr_name, size) == 0) {
 				found = B_TRUE;
 				break;
 			}
 		}
 
-allocate_new:
 		/* New one. Allocate an array element and fill it */
 		if (!found) {
+			/*
+			 * Obtain the index value for the interface
+			 */
+			interface_entry[physinterf_num].if_index =
+			    if_nametoindex(lifrp->lifr_name);
+
+			if (interface_entry[physinterf_num].if_index == 0) {
+				/* The interface went away. Skip this entry. */
+				continue;
+			}
+
+			/*
+			 * Truncate the name to ensure that it represents
+			 * a physical interface.
+			 */
+			lifrp->lifr_name[size] = '\0';
 			if ((interface_entry[physinterf_num].if_name =
 			    strdup(lifrp->lifr_name)) == NULL) {
 				int save_err;
@@ -316,12 +328,7 @@ allocate_new:
 				return (NULL);
 			}
 
-			/*
-			 * Obtain the index value for the interface
-			 */
-				interface_entry[physinterf_num].if_index =
-				    if_nametoindex(lifrp->lifr_name);
-				physinterf_num++;
+			physinterf_num++;
 		}
 	}
 
