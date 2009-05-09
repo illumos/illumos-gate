@@ -1192,7 +1192,7 @@ power_button_monitor(void *arg)
 		 *
 		 * ret greater than 0 means could not find process.
 		 */
-		ret = system("/usr/bin/pgrep -f -P 1 gnome-power-manager");
+		ret = system("/usr/bin/pgrep -fx gnome-power-manager");
 
 		if (ioctl(pfd.fd, PB_GET_EVENTS, &events) == -1) {
 			logerror("Failed to get power button events.");
