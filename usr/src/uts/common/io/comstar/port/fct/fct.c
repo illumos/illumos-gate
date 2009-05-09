@@ -1699,7 +1699,7 @@ fct_post_to_discovery_queue(fct_i_local_port_t *iport,
 		for (p = &irp->irp_els_list; *p != NULL;
 		    p = &((*p)->icmd_next))
 			;
-		}
+
 		*p = icmd;
 		atomic_or_32(&icmd->icmd_flags, ICMD_IN_IRP_QUEUE);
 	}
@@ -2854,7 +2854,7 @@ fct_q_for_termination_lock_held(fct_i_local_port_t *iport, fct_i_cmd_t *icmd,
 	for (ppicmd = &(iport->iport_abort_queue); *ppicmd != NULL;
 	    ppicmd = &((*ppicmd)->icmd_next))
 		;
-	}
+
 	*ppicmd = icmd;
 }
 
