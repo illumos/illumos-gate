@@ -117,7 +117,7 @@ user=head:subj:insert:ret
 #
 # Constraints - the string length; bear in mind, that any annotation of
 # primitives below longer than is specified, will be silently truncated 
-# to given/defined amount of characters in the bsmrecord(1M) runtime:
+# to given/defined amount of characters in the auditrecord(1M) runtime:
 #
 #     primitive <= max (non-truncated) string length
 #	case	<= unlimited; if necessary, text continues on a new line

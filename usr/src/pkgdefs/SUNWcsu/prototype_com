@@ -806,7 +806,7 @@ f none usr/sbin/auditstat 555 root bin
 l none usr/sbin/audlinks=./devfsadm
 s none usr/sbin/autopush=../../sbin/autopush
 s none usr/sbin/bootadm=../../sbin/bootadm
-f none usr/sbin/bsmrecord 555 root bin
+f none usr/sbin/auditrecord 555 root bin
 s none usr/sbin/cachefslog=../lib/fs/cachefs/cachefslog
 s none usr/sbin/cachefswssize=../lib/fs/cachefs/cachefswssize
 f none usr/sbin/cfgadm 555 root bin

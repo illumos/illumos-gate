@@ -8257,6 +8257,9 @@ mondo_loop() {
 	# Fix up audit permissions
 	fix_up_audit
 
+	# Remove bsmrecord.  Renamed to auditrecord.
+	rm -f $root/usr/sbin/bsmrecord
+
 	print "\nFor each file in conflict, your version has been restored."
 	print "The new versions are under $rootprefix/bfu.conflicts."
 	print "\nMAKE SURE YOU RESOLVE ALL CONFLICTS BEFORE REBOOTING.\n"

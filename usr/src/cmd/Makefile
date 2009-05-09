@@ -519,6 +519,7 @@ MSGSUBDIRS=		\
 	audio		\
 	audit		\
 	auditd		\
+	auditrecord	\
 	auths		\
 	autopush	\
 	avs		\
@@ -530,7 +531,6 @@ MSGSUBDIRS=		\
 	basename	\
 	bnu		\
 	bsmconv		\
-	bsmrecord	\
 	bsmunconv	\
 	busstat		\
 	cal		\
@@ -791,20 +791,20 @@ $(CLOSED_BUILD)DCSUBDIRS += \
 	$(CLOSED)/cmd/pax
 
 #
-# commands that belong only to the basic security module
+# commands that belong only to audit and device allocation
 #
-BSMSUBDIRS=		\
+AUDITSUBDIRS=		\
 	allocate	\
 	amt		\
 	audit		\
 	audit_warn	\
 	auditconfig	\
 	auditd		\
+	auditrecord	\
 	auditreduce	\
 	auditstat	\
 	praudit		\
 	bsmconv		\
-	bsmrecord	\
 	bsmunconv
 
 #
@@ -825,9 +825,10 @@ _dc :=		TARGET = _dc
 
 SUBDIRS = $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
-.PARALLEL:	$(BWOSDIRS) $(SUBDIRS) $(MSGSUBDIRS) $(BSMSUBDIRS)
+.PARALLEL:	$(BWOSDIRS) $(SUBDIRS) $(MSGSUBDIRS) $(AUDITSUBDIRS)
 
-all install clean clobber lint: $(FIRST_SUBDIRS) .WAIT $(SUBDIRS) $(BSMSUBDIRS)
+all install clean clobber lint: $(FIRST_SUBDIRS) .WAIT $(SUBDIRS) \
+	$(AUDITSUBDIRS)
 
 #
 # Manifests cannot be checked in parallel, because we are using
@@ -854,7 +855,7 @@ _dc: $(DCSUBDIRS)
 fs.d: fstyp
 ksh:	shcomp isaexec
 
-$(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(BSMSUBDIRS): FRC
+$(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(AUDITSUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \
 		cd $@; pwd; $(MAKE) $(TARGET); \
 	else \

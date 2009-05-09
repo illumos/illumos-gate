@@ -67,11 +67,11 @@ Use is subject to license terms.
 			omitted, the internal name is the same as the
 			external name.
 
-	title,		these tags are used by bsmrecord(1M) build to create
+	title,		these tags are used by auditrecord(1M) build to create
 	program,	audit_record_attr database from adt events.
 	see		Following example demonstrates their semantics:
 
-			bsmrecord -p passwd
+			auditrecord -p passwd
 			passwd		<-   <title>
 			  program     various              See passwd(1)
 			  		^-   <program>		^-   <see>
@@ -86,7 +86,7 @@ Use is subject to license terms.
 			If the length of string in any of the given
 			elements is longer than defined, the string is
 			silently truncated to the defined length in the
-			bsmrecord(1M) runtime: 
+			auditrecord(1M) runtime: 
 				
 				element	<= max (non-truncated) string length
 				title	<= 46
@@ -176,11 +176,11 @@ Use is subject to license terms.
 			If the type is an array, its length must be given
 			explicitly.
 
-	comment		Used by bsmrecord(1M) build to generate 
+	comment		Used by auditrecord(1M) build to generate 
 			audit_record_attr. Comment is explanation note
 			printed with token type. Colon (':') may not be
 			used in a comment. See example above for other
-			tags related to bsmrecord(1M).
+			tags related to auditrecord(1M).
 
 	token		Define allowed token names.
 			- id is the name of token; this name is used
@@ -190,7 +190,7 @@ Use is subject to license terms.
 			  "TSOL" is defined; it means that this data is
 			  to be used only in Trusted Solaris implementations.
 			See also example above for "token" tag relation to 
-			the bsmrecord(1M) output.
+			the auditrecord(1M) output.
 
 	msg_list	Define a set of text strings.
 			- id is the name to be used for this group of text
