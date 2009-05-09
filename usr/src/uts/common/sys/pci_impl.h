@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PCI_IMPL_H
 #define	_SYS_PCI_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dditypes.h>
 #include <sys/memlist.h>
@@ -109,6 +108,8 @@ struct pci_bus_resource {
 	boolean_t io_reprogram;	/* need io reprog on this bus */
 	boolean_t mem_reprogram;	/* need mem reprog on this bus */
 	boolean_t subtractive;	/* subtractive PPB */
+	uint_t mem_size;	/* existing children required MEM space size */
+	uint_t io_size;		/* existing children required I/O space size */
 };
 
 extern struct pci_bus_resource *pci_bus_res;
