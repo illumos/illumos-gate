@@ -9051,6 +9051,12 @@ tcp_mss_set(tcp_t *tcp, uint32_t mss, boolean_t do_ss)
 	if ((mss << 2) > tcp->tcp_xmit_hiwater)
 		tcp->tcp_xmit_hiwater = mss << 2;
 
+	/*
+	 * Set the xmit_lowater to at least twice of MSS.
+	 */
+	if ((mss << 1) > tcp->tcp_xmit_lowater)
+		tcp->tcp_xmit_lowater = mss << 1;
+
 	if (do_ss) {
 		/*
 		 * Either the tcp_cwnd is as yet uninitialized, or mss is
@@ -18843,13 +18849,15 @@ data_null:
 		goto done;
 	}
 
-	if (tcp->tcp_cork) {
-		/*
-		 * if the tcp->tcp_cork option is set, then we have to force
-		 * TCP not to send partial segment (smaller than MSS bytes).
-		 * We are calculating the usable now based on full mss and
-		 * will save the rest of remaining data for later.
-		 */
+	/*
+	 * If tcp_zero_win_probe is not set and the tcp->tcp_cork option
+	 * is set, then we have to force TCP not to send partial segment
+	 * (smaller than MSS bytes). We are calculating the usable now
+	 * based on full mss and will save the rest of remaining data for
+	 * later. When tcp_zero_win_probe is set, TCP needs to send out
+	 * something to do zero window probe.
+	 */
+	if (tcp->tcp_cork && !tcp->tcp_zero_win_probe) {
 		if (usable < mss)
 			goto done;
 		usable = (usable / mss) * mss;
