@@ -1354,6 +1354,8 @@ cmi_errno_t
 mc_scrubber_enable(mc_t *mc)
 {
 	mc_props_t *mcp = &mc->mc_props;
+	chipid_t chipid = (chipid_t)mcp->mcp_num;
+	uint32_t rev = (uint32_t)mcp->mcp_rev;
 	mc_cfgregs_t *mcr = &mc->mc_cfgregs;
 	union mcreg_scrubctl scrubctl;
 	union mcreg_dramscrublo dalo;
@@ -1419,8 +1421,8 @@ mc_scrubber_enable(mc_t *mc)
 		break;
 	}
 
-#ifdef	OPTERON_ERRATUM_99
 	/*
+	 * OPTERON_ERRATUM_99:
 	 * This erratum applies on revisions D and earlier.
 	 * This erratum also applies on revisions E and later,
 	 * if BIOS uses chip-select hoisting instead of DRAM hole
@@ -1430,16 +1432,15 @@ mc_scrubber_enable(mc_t *mc)
 	 * for the node are not contiguous.
 	 */
 	if (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE &&
-	    mc->mc_csdiscontig)
+	    mc->mc_csdiscontig) {
 		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled on revision "
 		    "%s chip %d because DRAM hole is present on this node",
 		    mc->mc_revname, chipid);
 		mc_scrub_rate_dram = AMD_NB_SCRUBCTL_RATE_NONE;
 	}
-#endif
 
-#ifdef OPTERON_ERRATUM_101
 	/*
+	 * OPTERON_ERRATUM_101:
 	 * This erratum applies on revisions D and earlier.
 	 *
 	 * If the DRAM Base Address register's IntlvEn field indicates that
@@ -1454,7 +1455,6 @@ mc_scrubber_enable(mc_t *mc)
 		    mc->mc_revname, chipid);
 		mc_scrub_rate_dram = AMD_NB_SCRUBCTL_RATE_NONE;
 	}
-#endif
 
 	if (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE) {
 		MCREG_FIELD_CMN(&scrubctl, DramScrub) = mc_scrub_rate_dram;
