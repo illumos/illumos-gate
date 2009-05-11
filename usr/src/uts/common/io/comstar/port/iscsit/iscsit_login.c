@@ -105,13 +105,13 @@ static idm_status_t
 login_sm_validate_ack(iscsit_conn_t *ict, idm_pdu_t *pdu);
 
 static boolean_t
-login_sm_is_last_response(iscsit_conn_t *ict);
+login_sm_is_last_response(idm_pdu_t *pdu);
 
 static void
 login_sm_handle_initial_login(iscsit_conn_t *ict, idm_pdu_t *pdu);
 
 static void
-login_sm_send_next_response(iscsit_conn_t *ict);
+login_sm_send_next_response(iscsit_conn_t *ict, idm_pdu_t *pdu);
 
 static void
 login_sm_process_request(iscsit_conn_t *ict);
@@ -125,7 +125,7 @@ login_sm_process_nvlist(iscsit_conn_t *ict);
 static idm_status_t
 login_sm_check_security(iscsit_conn_t *ict);
 
-static void
+static idm_pdu_t *
 login_sm_build_login_response(iscsit_conn_t *ict);
 
 static void
@@ -196,16 +196,6 @@ iscsit_login_sm_init(iscsit_conn_t *ict)
 
 	bzero(lsm, sizeof (iscsit_conn_login_t));
 
-	/* initialize the response pdu */
-	ict->ict_login_sm.icl_login_resp =
-	    idm_pdu_alloc(sizeof (iscsi_hdr_t), 0);
-	if (ict->ict_login_sm.icl_login_resp == NULL) {
-		return (IDM_STATUS_FAIL);
-	}
-	idm_pdu_init(ict->ict_login_sm.icl_login_resp,
-	    ict->ict_ic, ict, login_resp_complete_cb);
-	lsm->icl_login_resp->isp_flags |= IDM_PDU_LOGIN_TX;
-
 	(void) nvlist_alloc(&lsm->icl_negotiated_values, NV_UNIQUE_NAME,
 	    KM_SLEEP);
 
@@ -262,19 +252,20 @@ login_resp_complete_cb(idm_pdu_t *pdu, idm_status_t status)
 {
 	iscsit_conn_t *ict = pdu->isp_private;
 
-	ASSERT(ict->ict_login_sm.icl_login_resp == pdu);
 	/*
-	 * The icl_login_resp response buffer should only ever be used
-	 * during the LOGIN phase.
+	 * Check that this is a login pdu
 	 */
 	ASSERT((pdu->isp_flags & IDM_PDU_LOGIN_TX) != 0);
+	idm_pdu_free(pdu);
 
 	if ((status != IDM_STATUS_SUCCESS) ||
 	    (ict->ict_login_sm.icl_login_resp_err_class != 0)) {
+		/*
+		 * Transport or login error occurred.
+		 */
 		iscsit_login_sm_event(ict, ILE_LOGIN_ERROR, NULL);
-	} else if (login_sm_is_last_response(ict) == B_TRUE) {
-		iscsit_login_sm_event(ict, ILE_LOGIN_RESP_COMPLETE, NULL);
 	}
+	iscsit_conn_rele(ict);
 }
 
 void
@@ -285,11 +276,8 @@ iscsit_login_sm_fini(iscsit_conn_t *ict)
 	mutex_enter(&lsm->icl_mutex);
 	list_destroy(&lsm->icl_pdu_list);
 	list_destroy(&lsm->icl_login_events);
-	mutex_exit(&lsm->icl_mutex);
-	mutex_destroy(&lsm->icl_mutex);
 
 	kmem_free(lsm->icl_login_resp_tmpl, sizeof (iscsi_login_rsp_hdr_t));
-	idm_pdu_free(lsm->icl_login_resp);
 
 	/* clean up the login response idm text buffer */
 	if (lsm->icl_login_resp_itb != NULL) {
@@ -298,7 +286,7 @@ iscsit_login_sm_fini(iscsit_conn_t *ict)
 	}
 
 	nvlist_free(lsm->icl_negotiated_values);
-	iscsit_conn_rele(ict);
+	mutex_destroy(&lsm->icl_mutex);
 }
 
 void
@@ -326,6 +314,7 @@ iscsit_login_sm_event_locked(iscsit_conn_t *ict, iscsit_login_event_t event,
 	iscsit_conn_login_t *lsm = &ict->ict_login_sm;
 	login_event_ctx_t *ctx;
 
+	ASSERT(mutex_owned(&lsm->icl_mutex));
 	ctx = kmem_zalloc(sizeof (*ctx), KM_SLEEP);
 
 	ctx->le_ctx_event = event;
@@ -389,9 +378,10 @@ login_sm_complete(void *ict_void)
 	iscsit_conn_t *ict = ict_void;
 
 	/*
-	 * State machine has run to completion, release state machine resources
+	 * State machine has run to completion, resources
+	 * will be cleaned up when connection is destroyed.
 	 */
-	iscsit_login_sm_fini(ict);
+	iscsit_conn_rele(ict);
 }
 
 static void
@@ -412,6 +402,8 @@ login_sm_event_dispatch(iscsit_conn_login_t *lsm, iscsit_conn_t *ict,
 	case ILE_LOGIN_RCV:
 		/* Perform basic sanity checks on the header */
 		if (login_sm_req_pdu_check(ict, pdu) != IDM_STATUS_SUCCESS) {
+			idm_pdu_t *rpdu;
+
 			SET_LOGIN_ERROR(ict, ISCSI_STATUS_CLASS_INITIATOR_ERR,
 			    ISCSI_LOGIN_STATUS_INVALID_REQUEST);
 			/*
@@ -420,8 +412,8 @@ login_sm_event_dispatch(iscsit_conn_login_t *lsm, iscsit_conn_t *ict,
 			 */
 			if (ict->ict_login_sm.icl_login_resp_tmpl->opcode == 0)
 				login_sm_handle_initial_login(ict, pdu);
-			login_sm_build_login_response(ict);
-			login_sm_send_next_response(ict);
+			rpdu = login_sm_build_login_response(ict);
+			login_sm_send_next_response(ict, rpdu);
 			idm_pdu_complete(pdu, IDM_STATUS_SUCCESS);
 			kmem_free(ctx, sizeof (*ctx));
 			return;
@@ -550,7 +542,7 @@ login_sm_processing(iscsit_conn_t *ict, login_event_ctx_t *ctx)
 static void
 login_sm_responding(iscsit_conn_t *ict, login_event_ctx_t *ctx)
 {
-	idm_pdu_t *pdu;
+	idm_pdu_t *pdu, *rpdu;
 
 	switch (ctx->le_ctx_event) {
 	case ILE_LOGIN_RCV:
@@ -566,8 +558,8 @@ login_sm_responding(iscsit_conn_t *ict, login_event_ctx_t *ctx)
 		 * the login fails.
 		 */
 		if (login_sm_validate_ack(ict, pdu) == IDM_STATUS_SUCCESS) {
-			login_sm_build_login_response(ict);
-			login_sm_send_next_response(ict);
+			rpdu = login_sm_build_login_response(ict);
+			login_sm_send_next_response(ict, rpdu);
 		} else {
 			login_sm_new_state(ict, ctx, ILS_LOGIN_ERROR);
 		}
@@ -695,6 +687,7 @@ login_sm_new_state(iscsit_conn_t *ict, login_event_ctx_t *ctx,
     iscsit_login_state_t new_state)
 {
 	iscsit_conn_login_t *lsm = &ict->ict_login_sm;
+	idm_pdu_t *rpdu;
 
 	/*
 	 * Validate new state
@@ -730,7 +723,8 @@ login_sm_new_state(iscsit_conn_t *ict, login_event_ctx_t *ctx,
 		login_sm_process_request(ict);
 		break;
 	case ILS_LOGIN_RESPONDING:
-		login_sm_send_next_response(ict);
+		rpdu = login_sm_build_login_response(ict);
+		login_sm_send_next_response(ict, rpdu);
 		break;
 	case ILS_LOGIN_RESPONDED:
 		/* clean up the login response idm text buffer */
@@ -744,7 +738,9 @@ login_sm_new_state(iscsit_conn_t *ict, login_event_ctx_t *ctx,
 		break;
 	case ILS_LOGIN_DONE:
 	case ILS_LOGIN_ERROR:
-		/* Free login SM resources */
+		/*
+		 * Flag the terminal state for the dispatcher
+		 */
 		lsm->icl_login_complete = B_TRUE;
 		break;
 	case ILS_LOGIN_INIT: /* Initial state, can't return */
@@ -759,11 +755,22 @@ static void
 login_sm_send_ack(iscsit_conn_t *ict, idm_pdu_t *pdu)
 {
 	iscsit_conn_login_t	*lsm = &ict->ict_login_sm;
+	idm_pdu_t		*lack;
 
-	ASSERT((lsm->icl_login_resp->isp_flags & IDM_PDU_LOGIN_TX) != 0);
-	bcopy(lsm->icl_login_resp_tmpl,
-	    lsm->icl_login_resp->isp_hdr, sizeof (iscsi_hdr_t));
-	idm_pdu_tx(lsm->icl_login_resp);
+	/*
+	 * allocate the response pdu
+	 */
+	lack = idm_pdu_alloc(sizeof (iscsi_hdr_t), 0);
+	idm_pdu_init(lack, ict->ict_ic, ict, login_resp_complete_cb);
+	lack->isp_flags |= IDM_PDU_LOGIN_TX;
+
+	/*
+	 * copy the response template into the response pdu
+	 */
+	bcopy(lsm->icl_login_resp_tmpl, lack->isp_hdr, sizeof (iscsi_hdr_t));
+
+	iscsit_conn_hold(ict);
+	idm_pdu_tx(lack);
 }
 
 /*ARGSUSED*/
@@ -781,11 +788,10 @@ login_sm_validate_ack(iscsit_conn_t *ict, idm_pdu_t *pdu)
 }
 
 static boolean_t
-login_sm_is_last_response(iscsit_conn_t *ict)
+login_sm_is_last_response(idm_pdu_t *pdu)
 {
-	iscsit_conn_login_t	*lsm = &ict->ict_login_sm;
 
-	if (lsm->icl_login_resp->isp_hdr->flags & ISCSI_FLAG_LOGIN_CONTINUE) {
+	if (pdu->isp_hdr->flags & ISCSI_FLAG_LOGIN_CONTINUE) {
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -866,12 +872,11 @@ login_sm_handle_initial_login(iscsit_conn_t *ict, idm_pdu_t *pdu)
 }
 
 static void
-login_sm_send_next_response(iscsit_conn_t *ict)
+login_sm_send_next_response(iscsit_conn_t *ict, idm_pdu_t *pdu)
 {
-	idm_pdu_t *pdu = ict->ict_login_sm.icl_login_resp;
 	iscsi_login_rsp_hdr_t *lh_resp = (iscsi_login_rsp_hdr_t *)pdu->isp_hdr;
 
-	/* Tell the IDM layer this PDU is part of the login phase */
+	/* Make sure this PDU is part of the login phase */
 	ASSERT((pdu->isp_flags & IDM_PDU_LOGIN_TX) != 0);
 
 	/*
@@ -890,9 +895,17 @@ login_sm_send_next_response(iscsit_conn_t *ict)
 		    (ISCSI_LOGIN_NEXT_STAGE(lh_resp->flags) ==
 		    ISCSI_FULL_FEATURE_PHASE) &&
 		    !(lh_resp->flags & ISCSI_FLAG_LOGIN_CONTINUE)) {
-			iscsit_login_sm_event_locked(ict, ILE_LOGIN_FFP, NULL);
+			iscsit_login_sm_event(ict, ILE_LOGIN_FFP, NULL);
+		}
+		if (login_sm_is_last_response(pdu) == B_TRUE) {
+			/*
+			 * The last of a potentially mult-PDU response finished.
+			 */
+			iscsit_login_sm_event(ict, ILE_LOGIN_RESP_COMPLETE,
+			    NULL);
 		}
 
+		iscsit_conn_hold(ict);
 		iscsit_pdu_tx(pdu);
 	} else {
 		/*
@@ -912,7 +925,8 @@ login_sm_send_next_response(iscsit_conn_t *ict)
 		lh_resp->expcmdsn = htonl(ict->ict_login_sm.icl_cmdsn);
 		lh_resp->maxcmdsn = htonl(ict->ict_login_sm.icl_cmdsn + 1);
 
-		idm_pdu_tx(ict->ict_login_sm.icl_login_resp);
+		iscsit_conn_hold(ict);
+		idm_pdu_tx(pdu);
 	}
 
 }
@@ -999,9 +1013,33 @@ login_sm_process_request(iscsit_conn_t *ict)
 		goto request_fail;
 	}
 
-request_fail:
-	login_sm_build_login_response(ict);
+	/* clean up request_nvlist */
+	if (lsm->icl_request_nvlist != NULL) {
+		nvlist_free(lsm->icl_request_nvlist);
+		lsm->icl_request_nvlist = NULL;
+	}
+
+	/* convert any responses to textbuf form */
+	ASSERT(lsm->icl_login_resp_itb == NULL);
+	if (lsm->icl_response_nvlist) {
+		lsm->icl_login_resp_itb = idm_nvlist_to_itextbuf(
+		    lsm->icl_response_nvlist);
+		if (lsm->icl_login_resp_itb == NULL) {
+			/* Still need to send the resp so continue */
+			SET_LOGIN_ERROR(ict,
+			    ISCSI_STATUS_CLASS_TARGET_ERR,
+			    ISCSI_LOGIN_STATUS_NO_RESOURCES);
+		}
+		/* clean up response_nvlist */
+		nvlist_free(lsm->icl_response_nvlist);
+		lsm->icl_response_nvlist = NULL;
+	}
+
+	/* tell the state machine to send the textbuf */
 	iscsit_login_sm_event(ict, ILE_LOGIN_RESP_READY, NULL);
+	return;
+
+request_fail:
 
 	/* clean up request_nvlist and response_nvlist */
 	if (lsm->icl_request_nvlist != NULL) {
@@ -1907,56 +1945,50 @@ login_sm_check_security(iscsit_conn_t *ict)
 	return (idm_status);
 }
 
-static void
+static idm_pdu_t *
 login_sm_build_login_response(iscsit_conn_t *ict)
 {
 	iscsit_conn_login_t	*lsm = &ict->ict_login_sm;
 	iscsi_login_rsp_hdr_t	*lh;
 	int			transit, text_transit = 1;
+	idm_pdu_t		*login_resp;
 
 	/*
-	 * 1. Convert response nvlist to an idm text buffer that holds
-	 * response key-value pairs.
-	 * 2. Build a PDU to transmit the first login response PDU
-	 * 3. If there is more data, wait for an ack then goto step 2.
+	 * Create a response PDU and fill it with as much of
+	 * the response text that will fit.
 	 */
-	ASSERT(lsm->icl_login_resp != NULL);
 
-	if (lsm->icl_response_nvlist) {
-		if (lsm->icl_login_resp_itb == NULL) {
-			/* initialze the idm text buf to send pdus */
-			lsm->icl_login_resp_itb = idm_nvlist_to_itextbuf(
-			    lsm->icl_response_nvlist);
-			if (lsm->icl_login_resp_itb == NULL) {
-				SET_LOGIN_ERROR(ict,
-				    ISCSI_STATUS_CLASS_TARGET_ERR,
-				    ISCSI_LOGIN_STATUS_NO_RESOURCES);
-				/* Still need to send the resp so continue */
-			} else {
-				lsm->icl_login_resp_buf =
-				    idm_pdu_init_text_data(lsm->icl_login_resp,
-				    lsm->icl_login_resp_itb,
-				    ISCSI_DEFAULT_MAX_RECV_SEG_LEN,
-				    lsm->icl_login_resp_buf, &text_transit);
-			}
-		} else {
-			lsm->icl_login_resp_buf = idm_pdu_init_text_data(
-			    lsm->icl_login_resp, lsm->icl_login_resp_itb,
-			    ISCSI_DEFAULT_MAX_RECV_SEG_LEN,
-			    lsm->icl_login_resp_buf, &text_transit);
+	if (lsm->icl_login_resp_itb) {
+		/* allocate a pdu with space for text */
+		login_resp = idm_pdu_alloc(sizeof (iscsi_hdr_t),
+		    ISCSI_DEFAULT_MAX_RECV_SEG_LEN);
+		/* copy a chunk of text into the pdu */
+		lsm->icl_login_resp_buf = idm_pdu_init_text_data(
+		    login_resp, lsm->icl_login_resp_itb,
+		    ISCSI_DEFAULT_MAX_RECV_SEG_LEN,
+		    lsm->icl_login_resp_buf, &text_transit);
+		if (text_transit) {
+			/* text buf has been consumed */
+			idm_itextbuf_free(lsm->icl_login_resp_itb);
+			lsm->icl_login_resp_itb = NULL;
+			lsm->icl_login_resp_buf = NULL;
 		}
 	} else {
-		lsm->icl_login_resp->isp_data = NULL;
-		lsm->icl_login_resp->isp_datalen = 0;
+		/* allocate a pdu for just a header */
+		login_resp = idm_pdu_alloc(sizeof (iscsi_hdr_t), 0);
 	}
+	/* finish initializing the pdu */
+	idm_pdu_init(login_resp,
+	    ict->ict_ic, ict, login_resp_complete_cb);
+	login_resp->isp_flags |= IDM_PDU_LOGIN_TX;
 
 	/*
 	 * Use the BHS header values from the response template
 	 */
 	bcopy(lsm->icl_login_resp_tmpl,
-	    lsm->icl_login_resp->isp_hdr, sizeof (iscsi_login_rsp_hdr_t));
+	    login_resp->isp_hdr, sizeof (iscsi_login_rsp_hdr_t));
 
-	lh = (iscsi_login_rsp_hdr_t *)lsm->icl_login_resp->isp_hdr;
+	lh = (iscsi_login_rsp_hdr_t *)login_resp->isp_hdr;
 
 	/* Set error class/detail */
 	lh->status_class = lsm->icl_login_resp_err_class;
@@ -1990,9 +2022,10 @@ login_sm_build_login_response(iscsit_conn_t *ict)
 			lh->tsid = htons(ict->ict_sess->ist_tsih);
 		}
 	} else {
-		lsm->icl_login_resp->isp_data = 0;
-		lsm->icl_login_resp->isp_datalen = 0;
+		login_resp->isp_data = 0;
+		login_resp->isp_datalen = 0;
 	}
+	return (login_resp);
 }
 
 static kv_status_t

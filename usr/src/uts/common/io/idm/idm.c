@@ -1928,7 +1928,8 @@ idm_pdu_alloc_common(uint_t hdrlen, uint_t datalen, int sleepflag)
 		result->isp_hdrlen = hdrlen;
 		result->isp_hdrbuflen = hdrlen;
 		result->isp_transport_hdrlen = 0;
-		result->isp_data = (uint8_t *)result->isp_hdr + hdrlen;
+		if (datalen != 0)
+			result->isp_data = (uint8_t *)result->isp_hdr + hdrlen;
 		result->isp_datalen = datalen;
 		result->isp_databuflen = datalen;
 		result->isp_magic = IDM_PDU_MAGIC;

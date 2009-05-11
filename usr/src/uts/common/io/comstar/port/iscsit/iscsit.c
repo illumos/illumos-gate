@@ -218,8 +218,6 @@ static void iscsit_send_direct_scsi_resp(iscsit_conn_t *ict, idm_pdu_t *rx_pdu,
     uint8_t response, uint8_t cmd_status);
 static void iscsit_send_task_mgmt_resp(idm_pdu_t *tm_resp_pdu,
     uint8_t tm_status);
-static void iscsit_send_reject(iscsit_conn_t *ict, idm_pdu_t *rejected_pdu,
-    uint8_t reason);
 
 int
 _init(void)
@@ -1058,6 +1056,9 @@ iscsit_conn_accept(idm_conn_t *ic)
 	 */
 	if (iscsit_login_sm_init(ict) != IDM_STATUS_SUCCESS) {
 		iscsit_global_rele();
+		/*
+		 * Cleanup the ict after idm notifies us about this failure
+		 */
 		return (IDM_STATUS_FAIL);
 	}
 
@@ -1195,6 +1196,12 @@ iscsit_conn_destroy(idm_conn_t *ic)
 	ict->ict_ic = NULL;
 
 	idm_refcnt_wait_ref(&ict->ict_refcnt);
+
+	/* Reap the login state machine */
+	iscsit_login_sm_fini(ict);
+
+	/* Clean up any text command remnants */
+	iscsit_text_cmd_fini(ict);
 
 	mutex_destroy(&ict->ict_mutex);
 	idm_refcnt_destroy(&ict->ict_refcnt);

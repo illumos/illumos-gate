@@ -469,7 +469,6 @@ typedef struct {
 	uint8_t			icl_login_resp_err_class;
 	uint8_t			icl_login_resp_err_detail;
 	iscsi_login_rsp_hdr_t	*icl_login_resp_tmpl;
-	idm_pdu_t		*icl_login_resp;
 	nvlist_t		*icl_request_nvlist;
 	nvlist_t		*icl_response_nvlist;
 	nvlist_t		*icl_negotiated_values;
@@ -495,6 +494,15 @@ typedef struct iscsit_conn_s {
 	uint32_t		ict_reinstating:1,
 				ict_lost:1,
 				ict_destroyed:1;
+	/*
+	 * Parameters for processing text commands
+	 */
+	char			*ict_text_rsp_buf;
+	uint32_t		ict_text_rsp_len;
+	uint32_t		ict_text_rsp_valid_len;
+	uint32_t		ict_text_rsp_off;
+	uint32_t		ict_text_req_itt;	/* from initiator */
+	uint32_t		ict_text_rsp_ttt;
 } iscsit_conn_t;
 
 #define	ICT_FLAGS_DISCOVERY	0x00000001
@@ -595,6 +603,12 @@ iscsit_send_async_event(iscsit_conn_t *ict, uint8_t async_event);
 
 void
 iscsit_pdu_tx(idm_pdu_t *pdu);
+
+void
+iscsit_send_reject(iscsit_conn_t *ict, idm_pdu_t *rejected_pdu, uint8_t reason);
+
+void
+iscsit_text_cmd_fini(iscsit_conn_t *ict);
 
 /*
  * IDM conn ops

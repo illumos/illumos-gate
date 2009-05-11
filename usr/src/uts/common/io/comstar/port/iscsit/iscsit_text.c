@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,9 @@
 #define	IPADDRSTRLEN	INET6_ADDRSTRLEN	/* space for ipaddr string */
 #define	PORTALSTRLEN	(IPADDRSTRLEN+16)	/* add space for :port,tag */
 
+void
+iscsit_text_cmd_fini(iscsit_conn_t *ict);
+
 /*
  * The kernel inet_ntop() function formats ipv4 address fields with
  * leading zeros which the win2k initiator interprets as octal.
@@ -62,55 +65,246 @@ static void iscsit_v4_ntop(struct in_addr *in, char a[], int size)
 }
 
 static void
-iscsit_send_reject(idm_pdu_t *req_pdu, uint8_t reason_code)
+iscsit_bump_ttt(iscsit_conn_t *ict)
 {
-	idm_pdu_t		*reject_pdu;
-	iscsi_reject_rsp_hdr_t	*rej_hdr;
-
-	reject_pdu = idm_pdu_alloc(sizeof (iscsi_hdr_t), req_pdu->isp_hdrlen);
-	if (reject_pdu == NULL) {
-		/* Just give up.. the initiator will timeout */
-		idm_pdu_complete(req_pdu, IDM_STATUS_SUCCESS);
-		return;
-	}
-
-	/* Payload contains the header from the bad PDU */
-	idm_pdu_init(reject_pdu, req_pdu->isp_ic, NULL, NULL);
-	bcopy(req_pdu->isp_hdr, reject_pdu->isp_data, req_pdu->isp_hdrlen);
-
-	rej_hdr = (iscsi_reject_rsp_hdr_t *)reject_pdu->isp_hdr;
-	bzero(rej_hdr, sizeof (*rej_hdr));
-	rej_hdr->opcode = ISCSI_OP_REJECT_MSG;
-	rej_hdr->flags = ISCSI_FLAG_FINAL;
-	rej_hdr->reason = reason_code;
-	hton24(rej_hdr->dlength, req_pdu->isp_hdrlen);
-	rej_hdr->must_be_ff[0] = 0xff;
-	rej_hdr->must_be_ff[1] = 0xff;
-	rej_hdr->must_be_ff[2] = 0xff;
-	rej_hdr->must_be_ff[3] = 0xff;
-
-	iscsit_pdu_tx(reject_pdu);
-	idm_pdu_complete(req_pdu, IDM_STATUS_SUCCESS);
+	/*
+	 * Set the target task tag. The value will be zero when
+	 * the connection is created. Increment it and wrap it
+	 * back to one if we hit the reserved value.
+	 *
+	 * The TTT is fabricated since there is no real task associated
+	 * with a text request. The idm task range is reused here since
+	 * no real tasks can be started from a discovery session and
+	 * thus no conflicts are possible.
+	 */
+	if (++ict->ict_text_rsp_ttt == IDM_TASKIDS_MAX)
+		ict->ict_text_rsp_ttt = 1;
 }
 
 static void
-iscsit_add_target_portals(nvlist_t *nv_resp, iscsit_tgt_t *target)
+iscsit_text_resp_complete_cb(idm_pdu_t *pdu, idm_status_t status)
 {
-	iscsit_tpgt_t *tpg_list;
-	iscsit_tpg_t *tpg;
-	idm_addr_list_t *ipaddr_p;
+	iscsit_conn_t *ict = pdu->isp_private;
+
+	idm_pdu_free(pdu);
+	if (status != IDM_STATUS_SUCCESS) {
+		/*
+		 * Could not send the last text response.
+		 * Clear any state and bump the TTT so subsequent
+		 * requests will not match.
+		 */
+		iscsit_text_cmd_fini(ict);
+		iscsit_bump_ttt(ict);
+	}
+	iscsit_conn_rele(ict);
+}
+
+static void
+iscsit_text_reject(idm_pdu_t *req_pdu, uint8_t reason_code)
+{
+	iscsit_conn_t		*ict = req_pdu->isp_ic->ic_handle;
+
+	/*
+	 * A reject means abandoning this text request.
+	 * Cleanup any state from the request and increment the TTT
+	 * in case the initiator does not get the reject response
+	 * and attempts to resume this request.
+	 */
+	iscsit_text_cmd_fini(ict);
+	iscsit_bump_ttt(ict);
+	iscsit_send_reject(ict, req_pdu, reason_code);
+	idm_pdu_complete(req_pdu, IDM_STATUS_SUCCESS);
+
+}
+
+
+/*
+ * Add individual <TargetAddress=ipaddr> tuple to the nvlist
+ */
+static void
+iscsit_add_portal(struct sockaddr_storage *ss, int flip_v6, int tag,
+    nvlist_t *nv_resp)
+{
+	char ipaddr[IPADDRSTRLEN];	/* ip address string */
+	char ta_value[PORTALSTRLEN];	/* target address value */
+	struct sockaddr_in *sin;
+	struct in_addr *in;
+	struct sockaddr_in6 *sin6;
+	struct in6_addr *in6, flip_in6;
+
+	switch (ss->ss_family) {
+	case AF_INET:
+		sin = (struct sockaddr_in *)ss;
+		in = &sin->sin_addr;
+		iscsit_v4_ntop(in, ipaddr, sizeof (ipaddr));
+		(void) snprintf(ta_value, sizeof (ta_value), "%s:%d,%d",
+		    ipaddr, ntohs(sin->sin_port), tag);
+		break;
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)ss;
+		in6 = &sin6->sin6_addr;
+		if (flip_v6) {
+			uint16_t *v6_field_i = (uint16_t *)in6;
+			uint16_t *v6_field_o = (uint16_t *)&flip_in6;
+			int i;
+
+			/*
+			 * Ugh. The iSCSI config data is stored in host
+			 * order while the addresses retrieved from the
+			 * stack come back in network order. inet_ntop
+			 * expects network order.
+			 */
+			for (i = 0; i < 8; i++)
+				*v6_field_o++ = htons(*v6_field_i++);
+			in6 = &flip_in6;
+		}
+		(void) inet_ntop(AF_INET6, in6, ipaddr, sizeof (ipaddr));
+		(void) snprintf(ta_value, sizeof (ta_value), "[%s]:%d,%d",
+		    ipaddr, ntohs(sin6->sin6_port), tag);
+		break;
+	default:
+		ASSERT(0);
+		return;
+	}
+	(void) nvlist_add_string(nv_resp, "TargetAddress", ta_value);
+}
+
+/*
+ * Process the special case of the default portal group.
+ * Network addresses are obtained from the network stack and
+ * require some reformatting.
+ */
+static void
+iscsit_add_default_portals(iscsit_conn_t *ict, idm_addr_list_t *ipaddr_p,
+    nvlist_t *nv_resp)
+{
+	int pass, i;
 	idm_addr_t *tip;
-	iscsit_portal_t *portal;
-	int ipsize, i;
-	char *name = "TargetAddress";
-	char a[IPADDRSTRLEN];
-	char v[PORTALSTRLEN];
-	struct sockaddr_storage *ss;
+	struct sockaddr_storage ss;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
-	struct in_addr *in;
-	struct in6_addr *in6;
-	int type;
+
+	/*
+	 * If this request was received on one of the portals,
+	 * output that portal first. Most initiators will try to
+	 * connect on the first portal in the SendTargets response.
+	 * For example, this will avoid the confusing situation of a
+	 * discovery coming in on an IB interface and the initiator
+	 * then doing the normal login on an ethernet interface.
+	 */
+	sin = (struct sockaddr_in *)&ss;
+	sin6 = (struct sockaddr_in6 *)&ss;
+	for (pass = 1; pass <= 2; pass++) {
+		tip = &ipaddr_p->al_addrs[0];
+		for (i = 0; i < ipaddr_p->al_out_cnt; i++, tip++) {
+			/* Convert the address into sockaddr_storage format */
+			switch (tip->a_addr.i_insize) {
+			case sizeof (struct in_addr):
+				sin->sin_family = AF_INET;
+				sin->sin_port = htons(ISCSI_LISTEN_PORT);
+				sin->sin_addr = tip->a_addr.i_addr.in4;
+				break;
+			case sizeof (struct in6_addr):
+				sin6->sin6_family = AF_INET6;
+				sin6->sin6_port = htons(ISCSI_LISTEN_PORT);
+				sin6->sin6_addr = tip->a_addr.i_addr.in6;
+				break;
+			default:
+				ASSERT(0);
+				continue;
+			}
+			switch (pass) {
+			case 1:
+				/*
+				 * On the first pass, skip portals that
+				 * do not match the incoming connection.
+				 */
+				if (idm_ss_compare(&ss, &ict->ict_ic->ic_laddr,
+				    B_TRUE) != 0)
+					continue;
+				break;
+			case 2:
+				/*
+				 * On the second pass, process the
+				 * remaining portals.
+				 */
+				if (idm_ss_compare(&ss, &ict->ict_ic->ic_laddr,
+				    B_TRUE) == 0)
+					continue;
+				break;
+			}
+			/*
+			 * Add portal to the response list.
+			 * Do not byte swap v6 address.
+			 * By convention, the default portal group tag == 1
+			 */
+			iscsit_add_portal(&ss, 0, 1, nv_resp);
+		}
+	}
+}
+
+/*
+ * Process a portal group from the configuration database.
+ */
+static void
+iscsit_add_portals(iscsit_conn_t *ict, iscsit_tpgt_t *tpg_list,
+    nvlist_t *nv_resp)
+{
+	int pass;
+	iscsit_portal_t *portal, *next_portal;
+	iscsit_tpg_t *tpg;
+	struct sockaddr_storage *ss;
+
+	/*
+	 * As with the default portal group, output the portal used by
+	 * the incoming request first.
+	 */
+	tpg = tpg_list->tpgt_tpg;
+	for (pass = 1; pass <= 2; pass++) {
+		for (portal = avl_first(&tpg->tpg_portal_list);
+		    portal != NULL;
+		    portal = next_portal) {
+
+			next_portal = AVL_NEXT(&tpg->tpg_portal_list, portal);
+			ss = &portal->portal_addr;
+			switch (pass) {
+			case 1:
+				/*
+				 * On the first pass, skip portals that
+				 * do not match the incoming connection.
+				 */
+				if (idm_ss_compare(ss,
+				    &ict->ict_ic->ic_laddr, B_TRUE) != 0)
+					continue;
+				break;
+			case 2:
+				/*
+				 * On the second pass, process the
+				 * remaining portals.
+				 */
+				if (idm_ss_compare(ss,
+				    &ict->ict_ic->ic_laddr, B_TRUE) == 0)
+					continue;
+				break;
+			}
+			/*
+			 * Add portal to the response list.
+			 * Need to byte swap v6 address.
+			 */
+			iscsit_add_portal(ss, 1, tpg_list->tpgt_tag, nv_resp);
+		}
+	}
+}
+
+/*
+ * Process all the portal groups bound to a particular target.
+ */
+static void
+iscsit_add_tpgs(iscsit_conn_t *ict, iscsit_tgt_t *target, nvlist_t *nv_resp)
+{
+	iscsit_tpgt_t *tpg_list;
+	idm_addr_list_t *ipaddr_p;
+	int ipsize;
 
 
 	/*
@@ -118,132 +312,230 @@ iscsit_add_target_portals(nvlist_t *nv_resp, iscsit_tgt_t *target)
 	 */
 	mutex_enter(&target->target_mutex);
 	tpg_list = avl_first(&target->target_tpgt_list);
-	while (tpg_list != NULL) {
-		tpg = tpg_list->tpgt_tpg;
+
+	/* check for the default portal group */
+	if (tpg_list->tpgt_tpg == iscsit_global.global_default_tpg) {
 		/*
-		 * The default portal group will match any current interface.
-		 * A target cannot listen on other portal groups if it
-		 * listens on the default portal group.
+		 * The default portal group is a special case and will
+		 * return all reasonable interfaces on this node.
+		 *
+		 * A target cannot be bound to other portal groups
+		 * if it is bound to the default portal group.
 		 */
-		if (tpg == iscsit_global.global_default_tpg) {
-			/*
-			 * get the list of plumbed interfaces
-			 */
-			ipsize = idm_get_ipaddr(&ipaddr_p);
-			if (ipsize == 0) {
-				mutex_exit(&target->target_mutex);
-				return;
-			}
-			tip = &ipaddr_p->al_addrs[0];
-			for (i = 0; i < ipaddr_p->al_out_cnt; i++, tip++) {
-				if (tip->a_addr.i_insize ==
-				    sizeof (struct in_addr)) {
-					type = AF_INET;
-					in = &tip->a_addr.i_addr.in4;
-					iscsit_v4_ntop(in, a, sizeof (a));
-					(void) snprintf(v, sizeof (v),
-						"%s,1", a);
-				} else if (tip->a_addr.i_insize ==
-				    sizeof (struct in6_addr)) {
-					type = AF_INET6;
-					in6 = &tip->a_addr.i_addr.in6;
-					(void) inet_ntop(type, in6, a,
-						sizeof (a));
-					(void) snprintf(v, sizeof (v),
-						"[%s],1", a);
-				} else {
-					break;
-				}
-				/*
-				 * Add the TargetAddress=<addr> nvpair
-				 */
-				(void) nvlist_add_string(nv_resp, name, v);
-			}
+		ASSERT(AVL_NEXT(&target->target_tpgt_list, tpg_list) == NULL);
+
+		/*
+		 * get the list of local interface addresses
+		 */
+		ipsize = idm_get_ipaddr(&ipaddr_p);
+		if (ipsize > 0) {
+			/* convert the ip address list to nvlist format */
+			iscsit_add_default_portals(ict, ipaddr_p, nv_resp);
 			kmem_free(ipaddr_p, ipsize);
-			/*
-			 * Cannot listen on other portal groups.
-			 */
-			mutex_exit(&target->target_mutex);
-			return;
 		}
+		mutex_exit(&target->target_mutex);
+		return;
+	}
+
+	/*
+	 * Not the default portal group - process the user defined tpgs
+	 */
+	ASSERT(tpg_list != NULL);
+	while (tpg_list != NULL) {
+
+		ASSERT(tpg_list->tpgt_tpg != iscsit_global.global_default_tpg);
+
 		/*
 		 * Found a defined portal group - add each portal address.
+		 * As with the default portal group, make 2 passes over
+		 * the addresses in order to output the connection
+		 * address first.
 		 */
-		portal = avl_first(&tpg->tpg_portal_list);
-		while (portal != NULL) {
-			ss = &portal->portal_addr;
-			type = ss->ss_family;
-			switch (type) {
-			case AF_INET:
-				sin = (struct sockaddr_in *)ss;
-				in = &sin->sin_addr;
-				iscsit_v4_ntop(in, a, sizeof (a));
-				(void) snprintf(v, sizeof (v), "%s:%d,%d", a,
-				    ntohs(sin->sin_port),
-				    tpg_list->tpgt_tag);
-				(void) nvlist_add_string(nv_resp, name, v);
-				break;
-			case AF_INET6:
-				sin6 = (struct sockaddr_in6 *)ss;
-				in6 = &sin6->sin6_addr;
-				(void) inet_ntop(type, in6, a, sizeof (a));
-				(void) snprintf(v, sizeof (v), "[%s]:%d,%d", a,
-				    sin6->sin6_port,
-				    tpg_list->tpgt_tag);
-				(void) nvlist_add_string(nv_resp, name, v);
-				break;
-			default:
-				break;
-			}
-			portal = AVL_NEXT(&tpg->tpg_portal_list, portal);
-		}
+		iscsit_add_portals(ict, tpg_list, nv_resp);
+
 		tpg_list = AVL_NEXT(&target->target_tpgt_list, tpg_list);
 	}
 	mutex_exit(&target->target_mutex);
 }
 
-void
-iscsit_pdu_op_text_cmd(iscsit_conn_t	*ict, idm_pdu_t *rx_pdu)
+#ifdef DEBUG
+/*
+ * To test with smaller PDUs in order to force multi-PDU responses,
+ * set this value such that: 0 < test_max_len < 8192
+ */
+uint32_t iscsit_text_max_len = 0;
+#endif
+
+/*
+ * Format a text response PDU from the text buffer and send it.
+ */
+static void
+iscsit_send_next_text_response(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 {
 	iscsi_text_hdr_t *th_req = (iscsi_text_hdr_t *)rx_pdu->isp_hdr;
 	iscsi_text_rsp_hdr_t *th_resp;
+	idm_pdu_t	*resp;
+	uint32_t	len, remainder, max_len;
+	char 		*base;
+	int		final;
+
+	max_len = ISCSI_DEFAULT_MAX_RECV_SEG_LEN;
+#ifdef DEBUG
+	if (iscsit_text_max_len > 0 && iscsit_text_max_len < 8192)
+		max_len = iscsit_text_max_len;
+#endif
+	remainder = ict->ict_text_rsp_valid_len - ict->ict_text_rsp_off;
+	if (remainder <= max_len) {
+		len = remainder;
+		final = 1;
+	} else {
+		len = max_len;
+		final = 0;
+	}
+	/*
+	 * Allocate a PDU and copy in text response buffer
+	 */
+	resp = idm_pdu_alloc(sizeof (iscsi_hdr_t), len);
+	idm_pdu_init(resp, ict->ict_ic, ict, iscsit_text_resp_complete_cb);
+	base = ict->ict_text_rsp_buf + ict->ict_text_rsp_off;
+	bcopy(base, resp->isp_data, len);
+	/*
+	 * Fill in the response header
+	 */
+	th_resp = (iscsi_text_rsp_hdr_t *)resp->isp_hdr;
+	bzero(th_resp, sizeof (*th_resp));
+	th_resp->opcode = ISCSI_OP_TEXT_RSP;
+	th_resp->itt = th_req->itt;
+	hton24(th_resp->dlength, len);
+	if (final) {
+		th_resp->flags = ISCSI_FLAG_FINAL;
+		th_resp->ttt = ISCSI_RSVD_TASK_TAG;
+		kmem_free(ict->ict_text_rsp_buf, ict->ict_text_rsp_len);
+		ict->ict_text_rsp_buf = NULL;
+		ict->ict_text_rsp_len = 0;
+		ict->ict_text_rsp_valid_len = 0;
+		ict->ict_text_rsp_off = 0;
+	} else {
+		th_resp->flags = ISCSI_FLAG_TEXT_CONTINUE;
+		th_resp->ttt = ict->ict_text_rsp_ttt;
+		ict->ict_text_rsp_off += len;
+	}
+	/* Send the response on its way */
+	iscsit_conn_hold(ict);
+	iscsit_pdu_tx(resp);
+	/* Free the request pdu */
+	idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
+}
+
+/*
+ * Clean-up the text buffer if it exists.
+ */
+void
+iscsit_text_cmd_fini(iscsit_conn_t *ict)
+{
+	if (ict->ict_text_rsp_buf != NULL) {
+		ASSERT(ict->ict_text_rsp_len != 0);
+		kmem_free(ict->ict_text_rsp_buf, ict->ict_text_rsp_len);
+	}
+	ict->ict_text_rsp_buf = NULL;
+	ict->ict_text_rsp_len = 0;
+	ict->ict_text_rsp_valid_len = 0;
+	ict->ict_text_rsp_off = 0;
+}
+
+/*
+ * Process an iSCSI text command.
+ *
+ * This code only handles the common case of a text command
+ * containing the single tuple SendTargets=All issued during
+ * a discovery session. The request will always arrive in a
+ * single PDU, but the response may span multiple PDUs if the
+ * configuration is large. I.e. many targets and portals.
+ *
+ * The request is checked for correctness and then the response
+ * is generated from the global target into nvlist format. Then
+ * the nvlist is reformatted into idm textbuf format which reflects
+ * the iSCSI defined <name=value> specification. Finally, the
+ * textbuf is sent to the initiator in one or more text response PDUs
+ */
+void
+iscsit_pdu_op_text_cmd(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
+{
+	iscsi_text_hdr_t *th_req = (iscsi_text_hdr_t *)rx_pdu->isp_hdr;
 	nvlist_t *nv_resp;
-	char *textbuf;
-	char *kv_name, *kv_pair;
+	char *kv_pair;
 	int flags;
+	char *textbuf;
 	int textbuflen;
+	int validlen;
+	iscsit_tgt_t *target, *next_target;
 	int rc;
-	idm_pdu_t *resp;
 
 	flags =  th_req->flags;
 	if ((flags & ISCSI_FLAG_FINAL) != ISCSI_FLAG_FINAL) {
-		/* Cannot handle multi-PDU messages now */
-		iscsit_send_reject(rx_pdu, ISCSI_REJECT_CMD_NOT_SUPPORTED);
+		/* Cannot handle multi-PDU requests now */
+		iscsit_text_reject(rx_pdu, ISCSI_REJECT_CMD_NOT_SUPPORTED);
 		return;
 	}
 	if (th_req->ttt != ISCSI_RSVD_TASK_TAG) {
-		/* Last of a multi-PDU message */
-		iscsit_send_reject(rx_pdu, ISCSI_REJECT_CMD_NOT_SUPPORTED);
+		/*
+		 * This is the initiator acknowledging our last PDU and
+		 * indicating it is ready for the next PDU in the sequence.
+		 */
+		/*
+		 * There can only be one outstanding text request on a
+		 * connection. Make sure this one PDU has the current TTT.
+		 */
+		/* XXX combine the following 3 checks after testing */
+		if (th_req->ttt != ict->ict_text_rsp_ttt) {
+			/* Not part of this sequence */
+			iscsit_text_reject(rx_pdu,
+			    ISCSI_REJECT_CMD_NOT_SUPPORTED);
+			return;
+		}
+		/*
+		 * ITT should match what was saved from first PDU.
+		 */
+		if (th_req->itt != ict->ict_text_req_itt) {
+			/* Not part of this sequence */
+			iscsit_text_reject(rx_pdu,
+			    ISCSI_REJECT_CMD_NOT_SUPPORTED);
+			return;
+		}
+		/*
+		 * Cannot deal with more key/value pairs now.
+		 */
+		if (rx_pdu->isp_datalen != 0) {
+			iscsit_text_reject(rx_pdu,
+			    ISCSI_REJECT_CMD_NOT_SUPPORTED);
+			return;
+		}
+		iscsit_send_next_text_response(ict, rx_pdu);
 		return;
 	}
 
 	/*
-	 * At this point we have a single PDU text command
+	 * Initiator has started a new text request. Only
+	 * one can be active at a time, so abandon any previous
+	 * text request on this connection.
 	 */
+	iscsit_text_cmd_fini(ict);
 
+	/* Set the target task tag. */
+	iscsit_bump_ttt(ict);
+
+	/* Save the initiator task tag */
+	ict->ict_text_req_itt = th_req->itt;
+
+	/*
+	 * Make sure this is a proper SendTargets request
+	 */
 	textbuf = (char *)rx_pdu->isp_data;
 	textbuflen = rx_pdu->isp_datalen;
-	kv_name = "SendTargets=";
 	kv_pair = "SendTargets=All";
-	if (strncmp(kv_name, textbuf, strlen(kv_name)) != 0) {
-		/* Not a Sendtargets command */
-		iscsit_send_reject(rx_pdu, ISCSI_REJECT_CMD_NOT_SUPPORTED);
-		return;
-	}
-	if (strcmp(kv_pair, textbuf) == 0 &&
+	if (textbuflen >= strlen(kv_pair) &&
+	    strcmp(kv_pair, textbuf) == 0 &&
 	    ict->ict_op.op_discovery_session == B_TRUE) {
-		iscsit_tgt_t *target;
-		int validlen;
 
 		/*
 		 * Most common case of SendTargets=All during discovery.
@@ -252,26 +544,41 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t	*ict, idm_pdu_t *rx_pdu)
 		 * Create an nvlist for response.
 		 */
 		if (nvlist_alloc(&nv_resp, 0, KM_SLEEP) != 0) {
-			iscsit_send_reject(rx_pdu,
+			iscsit_text_reject(rx_pdu,
 			    ISCSI_REJECT_CMD_NOT_SUPPORTED);
 			return;
 		}
 
+		/*
+		 * Add all the targets to the response list.
+		 */
 		ISCSIT_GLOBAL_LOCK(RW_READER);
-		target = avl_first(&iscsit_global.global_target_list);
-		while (target != NULL) {
-			char *name = "TargetName";
-			char *val = target->target_name;
+		for (target = avl_first(&iscsit_global.global_target_list);
+		    target != NULL;
+		    target = next_target) {
+			char *key, *value;
+			iscsit_tgt_state_t state;
 
-			(void) nvlist_add_string(nv_resp, name, val);
-			iscsit_add_target_portals(nv_resp, target);
-			target = AVL_NEXT(&iscsit_global.global_target_list,
-			    target);
+			next_target = AVL_NEXT(
+			    &iscsit_global.global_target_list, target);
+
+			/* only report online and onlining targets */
+			state = target->target_state;
+			if (state != TS_ONLINING && state != TS_ONLINE &&
+			    state != TS_STMF_ONLINE)
+				continue;
+
+			key = "TargetName";
+			value = target->target_name;
+			if (nvlist_add_string(nv_resp, key, value) == 0) {
+				/* add the portal groups bound to this target */
+				iscsit_add_tpgs(ict, target, nv_resp);
+			}
 		}
 		ISCSIT_GLOBAL_UNLOCK();
 
 		/*
-		 * Convert the reponse nv list into text buffer.
+		 * Convert the response nvlist into an idm text buffer.
 		 */
 		textbuf = 0;
 		textbuflen = 0;
@@ -282,43 +589,26 @@ iscsit_pdu_op_text_cmd(iscsit_conn_t	*ict, idm_pdu_t *rx_pdu)
 		if (rc != 0) {
 			if (textbuf && textbuflen)
 				kmem_free(textbuf, textbuflen);
-			iscsit_send_reject(rx_pdu,
+			iscsit_text_reject(rx_pdu,
 			    ISCSI_REJECT_CMD_NOT_SUPPORTED);
 			return;
 		}
-		/*
-		 * Allocate a PDU and copy in text response buffer
-		 */
-		resp = idm_pdu_alloc(sizeof (iscsi_hdr_t), validlen);
-		idm_pdu_init(resp, ict->ict_ic, NULL, NULL);
-		bcopy(textbuf, resp->isp_data, validlen);
-		kmem_free(textbuf, textbuflen);
-		/*
-		 * Fill in the response header
-		 */
-		th_resp = (iscsi_text_rsp_hdr_t *)resp->isp_hdr;
-		bzero(th_resp, sizeof (*th_resp));
-		th_resp->opcode = ISCSI_OP_TEXT_RSP;
-		th_resp->flags = ISCSI_FLAG_FINAL;
-		th_resp->ttt = ISCSI_RSVD_TASK_TAG;
-		th_resp->itt = th_req->itt;
-		hton24(th_resp->dlength, validlen);
+		ict->ict_text_rsp_buf = textbuf;
+		ict->ict_text_rsp_len = textbuflen;
+		ict->ict_text_rsp_valid_len = validlen;
+		ict->ict_text_rsp_off = 0;
+		iscsit_send_next_text_response(ict, rx_pdu);
 	} else {
 		/*
 		 * Other cases to handle
 		 *    Discovery session:
 		 *	SendTargets=<target_name>
 		 *    Normal session
-		 *	SendTargets=<target_name> - should match session
 		 *	SendTargets=<NULL> - assume target name of session
 		 *    All others
 		 *	Error
 		 */
-		iscsit_send_reject(rx_pdu, ISCSI_REJECT_CMD_NOT_SUPPORTED);
+		iscsit_text_reject(rx_pdu, ISCSI_REJECT_CMD_NOT_SUPPORTED);
 		return;
 	}
-
-	/* Send the response on its way */
-	iscsit_pdu_tx(resp);
-	idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
 }

@@ -1364,7 +1364,7 @@ idm_nvlist_to_itextbuf(nvlist_t *nvl)
 }
 
 /*
- * Update the pdu data up to min of max_xfer_len or data left.
+ * Copy as much of the text buffer as will fit in the pdu.
  * The first call to this routine should send
  * a NULL bufptr. Subsequent calls send in the buffer returned.
  * Call this routine until the string returned is NULL
@@ -1384,8 +1384,12 @@ idm_pdu_init_text_data(idm_pdu_t *pdu, void *arg,
 	if (bufptr == NULL) {
 		/* first call - check the length */
 		if (itb->itb_offset <= max_xfer_len) {
-			idm_pdu_init_data(pdu, (uint8_t *)itb->itb_mem,
-			    itb->itb_offset);
+			/*
+			 * the entire text buffer fits in the pdu
+			 */
+			bcopy((uint8_t *)itb->itb_mem, pdu->isp_data,
+			    (size_t)itb->itb_offset);
+			pdu->isp_datalen = itb->itb_offset;
 			ihp->flags &= ~ISCSI_FLAG_TEXT_CONTINUE;
 			*transit = 1;
 			return (NULL);
@@ -1395,16 +1399,21 @@ idm_pdu_init_text_data(idm_pdu_t *pdu, void *arg,
 		end_ptr = &itb->itb_mem[max_xfer_len - 1];
 
 	} else {
-		if ((uintptr_t)&itb->itb_mem[itb->itb_offset] -
-		    (uintptr_t)bufptr <= max_xfer_len) {
-			idm_pdu_init_data(pdu, (uint8_t *)bufptr,
-			    (uintptr_t)&itb->itb_mem[itb->itb_offset] -
-			    (uintptr_t)bufptr);
+		uint_t len;
+
+		len =  (uintptr_t)&itb->itb_mem[itb->itb_offset] -
+		    (uintptr_t)bufptr;
+		if (len <= max_xfer_len) {
+			/*
+			 * the remaining text fits in the pdu
+			 */
+			bcopy(bufptr, pdu->isp_data, (size_t)len);
+			pdu->isp_datalen = len;
 			ihp->flags &= ~ISCSI_FLAG_TEXT_CONTINUE;
 			*transit = 1;
 			return (NULL);
 		}
-		/* we have more data then will fit in one pdu */
+		/* we still have more data then will fit in one pdu */
 		start_ptr = bufptr;
 		end_ptr = &bufptr[max_xfer_len - 1];
 	}
@@ -1421,8 +1430,9 @@ idm_pdu_init_text_data(idm_pdu_t *pdu, void *arg,
 			ptr--;
 		}
 	}
-	idm_pdu_init_data(pdu, (uint8_t *)start_ptr,
+	bcopy(start_ptr, pdu->isp_data,
 	    ((uintptr_t)ptr - (uintptr_t)start_ptr) + 1);
+	pdu->isp_datalen = ((uintptr_t)ptr - (uintptr_t)start_ptr) + 1;
 	ihp->flags |= ISCSI_FLAG_TEXT_CONTINUE;
 	*transit = 0;
 	return (++ptr);
