@@ -275,6 +275,15 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 	char *phy_type;
 	char *prop_val;
 	uint8_t portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+	uint32_t	val;
+	npi_status_t	rs;
+
+	/* For Opus NEM, skip xcvr checking if 10G Serdes link is up */
+	if (nxgep->mac.portmode == PORT_10G_SERDES &&
+	    nxgep->statsp->mac_stats.link_up) {
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+		return (status);
+	}
 
 	nxgep->mac.portmode = 0;
 	nxgep->xcvr_addr = 0;
@@ -328,6 +337,17 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 		}
 
 		nxgep->phy_absent = B_TRUE;
+
+		/* Check Serdes link to detect Opus NEM */
+		rs = npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
+		    XPCS_REG_STATUS, &val);
+
+		if (rs == 0 && val & XPCS_STATUS_LANE_ALIGN) {
+			nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+			nxgep->mac.portmode = PORT_10G_SERDES;
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "HSP 10G Serdes FOUND!!"));
+		}
 		goto check_phy_done;
 found_phy:
 		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
@@ -958,11 +978,7 @@ nxge_link_init(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_link_init: port<%d>", portn));
 #endif
-	if (nxgep->hot_swappable_phy && nxgep->phy_absent) {
-		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_link_init: "
-		    "Phy not present, cannot initialize link"));
-		return (status);
-	}
+	/* For Opus NEM, Serdes always needs to be initialized */
 
 	portmode = nxgep->mac.portmode;
 
@@ -1040,6 +1056,7 @@ nxge_xif_init(p_nxge_t nxgep)
 		if ((portmode == PORT_10G_FIBER) ||
 		    (portmode == PORT_10G_COPPER) ||
 		    (portmode == PORT_10G_TN1010) ||
+		    (portmode == PORT_HSP_MODE) ||
 		    (portmode == PORT_10G_SERDES))
 			xif_cfg |= CFG_XMAC_XIF_LFS;
 
@@ -1060,6 +1077,7 @@ nxge_xif_init(p_nxge_t nxgep)
 		if ((portmode == PORT_10G_FIBER) ||
 		    (portmode == PORT_10G_TN1010) ||
 		    (portmode == PORT_1G_TN1010) ||
+		    (portmode == PORT_HSP_MODE) ||
 		    (portmode == PORT_10G_SERDES)) {
 			/* Assume LED same for 1G and 10G */
 			if (statsp->mac_stats.link_up) {
@@ -1079,6 +1097,7 @@ nxge_xif_init(p_nxge_t nxgep)
 		if ((portmode == PORT_10G_FIBER) ||
 		    (portmode == PORT_10G_COPPER) ||
 		    (portmode == PORT_10G_TN1010) ||
+		    (portmode == PORT_HSP_MODE) ||
 		    (portmode == PORT_10G_SERDES)) {
 			SET_MAC_ATTR1(handle, ap, portn, MAC_PORT_MODE,
 			    MAC_XGMII_MODE, rs);
@@ -1215,6 +1234,7 @@ nxge_pcs_init(p_nxge_t nxgep)
 	} else if (portmode == PORT_10G_FIBER ||
 	    portmode == PORT_10G_COPPER ||
 	    portmode == PORT_10G_TN1010 ||
+	    portmode == PORT_HSP_MODE ||
 	    portmode == PORT_10G_SERDES) {
 		/* Use internal XPCS, bypass 1G PCS */
 		XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG, &val);
@@ -1482,6 +1502,7 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 
 	if (nxgep->mac.portmode == PORT_10G_FIBER ||
 	    nxgep->mac.portmode == PORT_10G_TN1010 ||
+	    nxgep->mac.portmode == PORT_HSP_MODE ||
 	    nxgep->mac.portmode == PORT_10G_SERDES) {
 		/* 0x0E01 */
 		tx_cfg_l.bits.entx = 1;
@@ -2555,13 +2576,14 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 
 	statsp = nxgep->statsp;
 
-	if (nxgep->mac.portmode == PORT_10G_SERDES) {
+	/* Disable Link LEDs, with or without PHY */
+	if (nxge_10g_link_led_off(nxgep) != NXGE_OK)
+		goto done;
+
+	/* Skip MDIO, if PHY absent */
+	if (nxgep->mac.portmode == PORT_10G_SERDES || nxgep->phy_absent) {
 		goto done;
 	}
-
-	/* Disable Link LEDs */
-	if (nxge_10g_link_led_off(nxgep) != NXGE_OK)
-		goto fail;
 
 	/* Set Clause 45 */
 	npi_mac_mif_set_indirect_mode(nxgep->npi_handle, B_TRUE);
@@ -2976,6 +2998,7 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 		if ((portmode == PORT_10G_FIBER) ||
 		    (portmode == PORT_10G_COPPER) ||
 		    (portmode == PORT_10G_TN1010) ||
+		    (portmode == PORT_HSP_MODE) ||
 		    (portmode == PORT_10G_SERDES)) {
 			SET_MAC_ATTR1(handle, ap, portn, XMAC_10G_PORT_IPG,
 			    XGMII_IPG_12_15, rs);
@@ -4979,6 +5002,17 @@ nxge_check_10g_link(p_nxge_t nxgep)
 			}
 
 phy_check_done:
+			/* Check back-to-back XAUI connect to detect Opus NEM */
+			rs = npi_xmac_xpcs_read(nxgep->npi_handle,
+			    nxgep->mac.portnum, XPCS_REG_STATUS, &val);
+			if (rs != 0)
+				goto fail;
+
+			link_up = B_FALSE;
+			if (val & XPCS_STATUS_LANE_ALIGN) {
+				link_up = B_TRUE;
+			}
+
 			if (nxgep->phy_absent) {
 				if (phy_present_now) {
 				/*
@@ -5003,6 +5037,17 @@ phy_check_done:
 							goto fail;
 						}
 					}
+				} else if (link_up) { /* XAUI linkup, no PHY */
+					/* 
+					 * This is the back-to-back XAUI
+					 * connect case for Opus NEM.
+					 */
+					nxgep->statsp->mac_stats.xcvr_inuse =
+					    XPCS_XCVR;
+					nxgep->mac.portmode = PORT_10G_SERDES;
+					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					    "HSP 10G Serdes DETECTED!!"));
+					break;
 				}
 
 				goto start_link_check;
@@ -5078,6 +5123,14 @@ phy_check_done:
 
 			nxge_link_is_down(nxgep);
 			nxgep->link_notify = B_FALSE;
+
+			if (nxgep->mac.portmode == PORT_10G_SERDES) {
+				/*
+				 * NEM was unplugged, set up xcvr table
+				 * to find another xcvr in the future.
+				 */
+				(void) nxge_xcvr_find(nxgep);
+			}
 		}
 	}
 
