@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -334,6 +334,8 @@ ds_port_add(md_t *mdp, mde_cookie_t port, mde_cookie_t chan)
 {
 	uint64_t	port_id;
 	uint64_t	ldc_id;
+	uint8_t		*ldcidsp;
+	int		len;
 
 	/* get the ID for this port */
 	if (md_get_prop_val(mdp, port, "id", &port_id) != 0) {
@@ -358,6 +360,15 @@ ds_port_add(md_t *mdp, mde_cookie_t port, mde_cookie_t chan)
 
 	if (ds_add_port(port_id, ldc_id, DS_DHDL_INVALID, NULL, 1) != 0)
 		return (-1);
+
+	/*
+	 * Identify the SP Port.  The SP port is the only one with
+	 * the "ldc-ids" property, and is only on the primary domain.
+	 */
+	if (ds_sp_port_id == DS_PORTID_INVALID &&
+	    md_get_prop_data(mdp, port, "ldc-ids", &ldcidsp, &len) == 0) {
+		ds_sp_port_id = port_id;
+	}
 
 	return (0);
 }

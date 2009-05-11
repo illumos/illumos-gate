@@ -61,6 +61,9 @@ ds_port_t	ds_ports[DS_MAX_PORTS];
 ds_portset_t	ds_allports;	/* all DS ports in the system */
 ds_portset_t	ds_nullport;	/* allows test against null portset */
 
+/* DS SP port id */
+uint64_t ds_sp_port_id = DS_PORTID_INVALID;
+
 /*
  * Table of registered services
  *
@@ -3152,7 +3155,6 @@ ds_portset_del_active_clients(char *service, ds_portset_t *portsp)
 	ds_portset_t ports;
 	int idx;
 	ds_svc_t *svc;
-	ds_svc_hdl_t hdl;
 
 	ASSERT(MUTEX_HELD(&ds_svcs.lock));
 
@@ -3170,15 +3172,10 @@ ds_portset_del_active_clients(char *service, ds_portset_t *portsp)
 	}
 
 	/*
-	 * Legacy "pri" client service should not try to make a
-	 * connection to the SP if the existing "pri" provider
-	 * service has a connection.
+	 * Never send a client reg req to the SP.
 	 */
-	if (strcmp(service, "pri") == 0 &&
-	    i_ds_hdl_lookup(service, 0, &hdl, 1) == 1 &&
-	    (svc = ds_get_svc(hdl)) != NULL && svc->state == DS_SVC_ACTIVE &&
-	    svc->port != NULL) {
-		DS_PORTSET_DEL(ports, PORTID(svc->port));
+	if (ds_sp_port_id != DS_PORTID_INVALID) {
+		DS_PORTSET_DEL(ports, ds_sp_port_id);
 	}
 	DS_PORTSET_DUP(*portsp, ports);
 }

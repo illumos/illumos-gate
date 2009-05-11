@@ -203,7 +203,6 @@ typedef struct ds_port {
 #define	PORTID(port)		((ulong_t)((port)->id))
 #define	PTR_TO_LONG(ptr)	((uint64_t)(ptr))
 
-
 /*
  * A DS portset is a bitmap that represents a collection of DS
  * ports. Each bit represent a particular port id.  We need
@@ -217,6 +216,11 @@ typedef struct ds_port {
 typedef ulong_t ds_portset_t[DS_PORTSET_SIZE];
 
 extern ds_portset_t ds_nullport;
+
+#define	DS_PORTID_INVALID		((uint64_t)-1)
+
+/* DS SP Port ID */
+extern uint64_t ds_sp_port_id;
 
 #define	DS_MAX_PORT_ID			(DS_MAX_PORTS - 1)
 
