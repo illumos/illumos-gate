@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,7 +237,7 @@ static const sp_ext_offset_t NO_OFFSET = 0ULL;
 static const uint_t NO_SEQUENCE_NUMBER = 0;
 static const int ONE_SOFT_PARTITION = 1;
 
-static unsigned long sp_parent_printed[BT_BITOUL(MD_MAXUNITS)];
+static unsigned long *sp_parent_printed[MD_MAXSETS];
 
 #define	TEST_SOFT_PARTITION_NAMEP NULL
 #define	TEST_SETNAMEP NULL
@@ -2279,6 +2279,8 @@ meta_sp_print(
 	md_sp_t		*msp;
 	md_unit_t	*mdp;
 	int		rval = 0;
+	set_t		setno;
+	minor_t		unit;
 
 	/* should always have the same set */
 	assert(sp != NULL);
@@ -2341,14 +2343,21 @@ meta_sp_print(
 		if ((mdp = meta_get_mdunit(sp, msp->compnamep, ep)) == NULL)
 			return (-1);
 
+		setno = MD_MIN2SET(MD_SID(mdp));
+		unit = MD_MIN2UNIT(MD_SID(mdp));
+
 		/* If info not already printed, recurse */
-		if (!BT_TEST(sp_parent_printed, MD_MIN2UNIT(MD_SID(mdp)))) {
+		if (sp_parent_printed[setno] == NULL ||
+		    !BT_TEST(sp_parent_printed[setno], unit)) {
 			if (meta_print_name(sp, msp->compnamep, nlpp, fname, fp,
 			    (options | PRINT_HEADER | PRINT_SUBDEVS),
 			    NULL, ep) != 0) {
 				return (-1);
 			}
-			BT_SET(sp_parent_printed, MD_MIN2UNIT(MD_SID(mdp)));
+			if (sp_parent_printed[setno] == NULL)
+				sp_parent_printed[setno] =
+				    Zalloc(BT_BITOUL(MD_MAXUNITS));
+			BT_SET(sp_parent_printed[setno], unit);
 		}
 	}
 	return (0);

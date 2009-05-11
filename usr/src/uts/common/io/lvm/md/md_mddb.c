@@ -9582,6 +9582,8 @@ mddb_getrecstatus(
 	return (e_err);
 }
 
+static int	mddb_commitrec_retries = 5;
+
 /*
  * Commit given record to disk.
  * If committing an optimized record, do not call
@@ -9610,6 +9612,8 @@ mddb_commitrec(
 	int				i, j;
 	int				rval;
 	int				hit_err = 0;
+	int				retry = mddb_commitrec_retries;
+	int				gave_up = 0;
 
 	s = mddb_setenter(DBSET(id), MDDB_NOINIT, NULL);
 	ASSERT(s != NULL);
@@ -9830,6 +9834,18 @@ mddb_commitrec(
 					if (!(writeoptrecord(s, dep)))
 						break;
 				}
+				if (--retry == 0) {
+					cmn_err(CE_WARN, "mddb_commitrec: "
+					    "giving up writing optimized "
+					    "resync record for "
+					    "diskset %s, device %s,%d "
+					    "blkno 0x%x, flags 0x%x\n",
+					    s->s_setname, recerr->r_driver_name,
+					    recerr->r_mnum, recerr->r_blkno,
+					    recerr->r_flags);
+					gave_up++;
+					break;
+				}
 			}
 			kmem_free(kres, sizeof (md_mn_kresult_t));
 			kmem_free(msg_recerr,
@@ -9848,6 +9864,8 @@ mddb_commitrec(
 			mddb_setexit(s);
 			if (md_get_setstatus(s->s_setno) & MD_SET_TOOFEW) {
 				return (MDDB_E_NOTNOW);
+			} else if (gave_up) {
+				return (MDDB_E_STALE);
 			} else {
 				return (0);
 			}
