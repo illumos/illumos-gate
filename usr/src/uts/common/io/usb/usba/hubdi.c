@@ -145,6 +145,8 @@ usb_log_handle_t	hubdi_log_handle;
 uint_t			hubdi_errlevel = USB_LOG_L4;
 uint_t			hubdi_errmask = (uint_t)-1;
 uint8_t			hubdi_min_pm_threshold = 5; /* seconds */
+extern int modrootloaded;
+
 
 /*
  * initialize private data
@@ -1286,8 +1288,6 @@ static int
 hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
     void *arg, dev_info_t **child)
 {
-	extern int modrootloaded;
-
 	hubd_t	*hubd = hubd_get_soft_state(dip);
 	int	rval, circ;
 
@@ -1299,18 +1299,62 @@ hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	}
 
 	/*
-	 * there must be a smarter way to do this but for
-	 * now, a hack for booting USB storage.
-	 *
 	 * NOTE: we want to delay the mountroot thread which
 	 * exclusively does a BUS_CONFIG_ONE, but not the
 	 * USB hotplug threads which do the asynchronous
-	 * enumeration exlusively via BUS_CONFIG_ALL. Having
-	 * a delay for USB hotplug threads negates the delay for
-	 * mountroot resulting in mountroot failing.
+	 * enumeration exlusively via BUS_CONFIG_ALL.
 	 */
 	if (!modrootloaded && op == BUS_CONFIG_ONE) {
-		delay(drv_usectohz(1000000));
+		dev_info_t *cdip;
+		int port, found;
+		char cname[80];
+		int i;
+		char *name, *addr;
+
+		(void) snprintf(cname, 80, "%s", (char *)arg);
+		/* split name into "name@addr" parts */
+		i_ddi_parse_name(cname, &name, &addr, NULL);
+		USB_DPRINTF_L2(DPRINT_MASK_PM, hubd->h_log_handle,
+		    "hubd_bus_config: op=%d (BUS_CONFIG_ONE)", op);
+
+		found = 0;
+
+		/*
+		 * Wait until the device node on the rootpath has
+		 * been enumerated by USB hotplug thread. Current
+		 * set 10 seconds timeout because if the device is
+		 * behind multiple hubs, hub config time at each
+		 * layer needs several hundred milliseconds and
+		 * all config time maybe take several seconds.
+		 */
+
+		for (i = 0; i < 100; i++) {
+			for (port = 1;
+			    port <= hubd->h_hub_descr.bNbrPorts; port++) {
+				mutex_enter(HUBD_MUTEX(hubd));
+				cdip = hubd->h_children_dips[port];
+				mutex_exit(HUBD_MUTEX(hubd));
+				if (!cdip || i_ddi_node_state(cdip) <
+				    DS_INITIALIZED)
+					continue;
+				if (strcmp(name, DEVI(cdip)->devi_node_name))
+					continue;
+				if (strcmp(addr, DEVI(cdip)->devi_addr))
+					continue;
+				found = 1;
+				break;
+			}
+			if (found)
+				break;
+			delay(drv_usectohz(100000));
+		}
+		if (found == 0) {
+			cmn_err(CE_WARN,
+			    "hubd_bus_config: failed for config child %s",
+			    (char *)arg);
+			return (NDI_FAILURE);
+		}
+
 	}
 	ndi_devi_enter(hubd->h_dip, &circ);
 	rval = ndi_busop_bus_config(dip, flag, op, arg, child, 0);
@@ -3867,7 +3911,37 @@ hubd_hotplug_thread(void *arg)
 		USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "hubd_hotplug_thread: onlining children");
 
-		(void) ndi_devi_online(hubd->h_dip, 0);
+		/*
+		 * When mountroot thread is doing BUS_CONFIG_ONE,
+		 * don't attach driver on irrelevant nodes, just
+		 * configure them to initialized status. Devfs
+		 * will induce the attach later.
+		 */
+		if (modrootloaded) {
+			(void) ndi_devi_online(hubd->h_dip, 0);
+		} else {
+			for (port = 1; port <= nports; port++) {
+				dev_info_t *dip = hubd->h_children_dips[port];
+				if (dip) {
+					int circ, rv;
+					dev_info_t *pdip = ddi_get_parent(dip);
+					ndi_devi_enter(pdip, &circ);
+					rv = i_ndi_config_node(dip,
+					    DS_INITIALIZED, 0);
+
+					if (rv != NDI_SUCCESS) {
+						USB_DPRINTF_L0(
+						    DPRINT_MASK_HOTPLUG,
+						    hubd->h_log_handle,
+						    "hubd_hotplug_thread:"
+						    "init node %s@%s failed",
+						    DEVI(dip)->devi_node_name,
+						    DEVI(dip)->devi_addr);
+					}
+					ndi_devi_exit(pdip, circ);
+				}
+			}
+		}
 	}
 
 	/* now check if any disconnected devices need to be cleaned up */
