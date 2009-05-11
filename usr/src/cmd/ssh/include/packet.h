@@ -11,7 +11,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,16 +59,11 @@ void     packet_put_bignum(BIGNUM * value);
 void     packet_put_bignum2(BIGNUM * value);
 void     packet_put_string(const void *buf, u_int len);
 void     packet_put_cstring(const char *str);
-void     packet_put_ascii_cstring(const char *str);
-void     packet_put_utf8_cstring(const u_char *str);
 void     packet_put_raw(const void *buf, u_int len);
 void     packet_send(void);
 
-#if 0
-/* If these are needed, then get rid of the #if 0 and this comment */
-void     packet_put_utf8_string(const u_char *buf, u_int len);
-void     packet_put_ascii_string(const char *str, u_int len);
-#endif
+void     packet_put_utf8_string(const char *str, uint_t len);
+void     packet_put_utf8_cstring(const char *str);
 
 int      packet_read(void);
 void     packet_read_expect(int type);
@@ -83,8 +78,7 @@ void     packet_get_bignum(BIGNUM * value);
 void     packet_get_bignum2(BIGNUM * value);
 void	*packet_get_raw(u_int *length_ptr);
 void	*packet_get_string(u_int *length_ptr);
-char	*packet_get_ascii_cstring();
-u_char	*packet_get_utf8_cstring();
+char	*packet_get_utf8_string(uint_t *length_ptr);
 void     packet_disconnect(const char *fmt,...) __attribute__((format(printf, 1, 2)));
 void     packet_send_debug(const char *fmt,...) __attribute__((format(printf, 1, 2)));
 

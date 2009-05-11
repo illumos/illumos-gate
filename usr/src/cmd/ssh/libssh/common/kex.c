@@ -575,6 +575,8 @@ kex_choose_conf(Kex *kex)
 			if (plangs && mlangs && *plangs && *mlangs) {
 				char *locale;
 
+				g11n_test_langtag(plangs, 1);
+
 				choose_lang(&locale, plangs, mlangs);
 				if (locale) {
 					g11n_setlocale(LC_ALL, locale);
@@ -603,6 +605,7 @@ kex_choose_conf(Kex *kex)
 				if (lang) {
 					session_lang = lang;
 					debug("Negotiated lang: %s", lang);
+					g11n_test_langtag(lang, 0);
 				}
 			}
 		}

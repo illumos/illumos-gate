@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -42,8 +42,6 @@
 
 #include "includes.h"
 RCSID("$OpenBSD: bufaux.c,v 1.27 2002/06/26 08:53:12 markus Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <langinfo.h>
 #include <openssl/bn.h>
@@ -368,45 +366,27 @@ buffer_get_string(Buffer *buffer, u_int *length_ptr)
 }
 
 char *
-buffer_get_ascii_cstring(Buffer *buffer)
+buffer_get_utf8_string(Buffer *buffer, uint_t *length_ptr)
 {
-	char *value;
-	u_char *p;
-	u_int len;
-	value = buffer_get_string(buffer, &len);
+	char	*value, *converted, *estr;
+	uint_t	len;
 
-	/* Look for NULL or high-bit set bytes */
-	for (p = (u_char *) value ;
-	     p && *p && (!(*p & 0x80)) && (p - (u_char *) value) < len ;
-	     p++) ;
+	if ((value = buffer_get_string(buffer, &len)) == NULL)
+		return (value);
 
-	/* If there were any, bomb */
-	if ((p - (u_char *) value) != len) {
-	    xfree(value);
-	    errno = EILSEQ;
-	    return NULL;
-	}
-	return value;
-}
-u_char *
-buffer_get_utf8_cstring(Buffer *buffer)
-{
-	u_char	*value, *converted, *estr;
-	u_int	len;
-	int	err;
-
-	if ((value = buffer_get_string(buffer, &len)) == NULL) {
-		return value;
+	converted = g11n_convert_from_utf8(value, &len, &estr);
+	if (converted == NULL) {
+		if (estr != NULL)
+			error("invalid UTF-8 sequence: %s", estr);
+		converted = value;
+	} else {
+		xfree(value);
 	}
 
-	converted = g11n_convert_from_utf8(value, &err, &estr);
+	if (length_ptr != NULL)
+		*length_ptr = len;
 
-	if (converted != value) xfree(value);
-
-	if (err)
-	    fatal("invalid UTF-8 sequence; %s", estr);
-
-	return converted;
+	return (converted);
 }
 
 /*
@@ -427,85 +407,32 @@ buffer_put_cstring(Buffer *buffer, const char *s)
 }
 
 /*
- * ASCII versions of the above
- */
-#if 0
-void
-buffer_put_ascii_string(Buffer *buffer, const void *buf, u_int len)
-{
-	u_char *p;
-	for (p = (u_char *) buf ;
-	     p && ((p - (u_char *) buf) < len) && *p && (!(*p & 0x80)) ;
-	     p++) ;
-
-	if ((p - (u_char *) buf) != len)
-		verbose("buffer_put_ascii_string: storing a non-ASCII string");
-	buffer_put_int(buffer, len);
-	buffer_append(buffer, buf, len);
-}
-#endif
-void
-buffer_put_ascii_cstring(Buffer *buffer, const char *s)
-{
-	u_char *estr;
-	if (s == NULL)
-		fatal("buffer_put_cstring: s == NULL");
-
-	if (!g11n_validate_ascii(s, strlen(s), &estr))
-	    verbose("buffer_put_ascii_cstring: non-ASCII string; %s", estr);
-
-	buffer_put_cstring(buffer, s);
-}
-
-/*
  * UTF-8 versions of the above.
  */
-
-#if 0
 void
-buffer_put_utf8_string(Buffer *buffer, const void *buf, u_int len)
+buffer_put_utf8_string(Buffer *buffer, const char *s, uint_t len)
 {
-	char *converted *estr;
+	char	*converted, *estr;
+	uint_t	nlen = len;
 
-	converted = g11n_convert_to_utf8(buf, &err, &estr);
+	converted = g11n_convert_to_utf8(s, &nlen, 0, &estr);
+	if (converted == NULL) {
+		if (estr != NULL)
+			error("Can't convert to UTF-8: %s", estr);
+		converted = (char *)s;
+	}
 
-	if (!converted && err)
-		fatal("buffer_put_utf8_string: input not a valid UTF-8 encoding; %s", estr);
+	buffer_put_string(buffer, converted, nlen);
 
-	if (err)
-		verbose("buffer_put_utf8_string: input not a valid UTF-8 encoding; %s", estr);
-
-	buffer_put_string(buffer, converted, strlen(converted));
-
-	if (converted != bug) xfree(converted);
-
-	return;
-}
-#endif
-void
-buffer_put_utf8_cstring(Buffer *buffer, const u_char *s)
-{
-	u_char *converted, *estr;
-	int err;
-
-	if (s == NULL)
-		fatal("buffer_put_cstring: s == NULL");
-
-	converted = g11n_convert_to_utf8(s, &err, &estr);
-
-	if (!converted && err)
-		fatal("buffer_put_utf8_string: input not a valid UTF-8 encoding; %s", estr);
-
-	if (err)
-		verbose("buffer_put_utf8_string: input not a valid UTF-8 encoding; %s", estr);
-
-	buffer_put_cstring(buffer, (const char *) converted);
-
-	if (converted != s) xfree(converted);
-
-	return;
+	if (converted != s)
+		xfree(converted);
 }
 
+void
+buffer_put_utf8_cstring(Buffer *buffer, const char *s)
+{
+	buffer_put_utf8_string(buffer, s, strlen(s));
+}
 
 /*
  * Returns a character from the buffer (0 - 255).

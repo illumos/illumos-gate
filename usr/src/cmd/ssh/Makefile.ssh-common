@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Common definitions for all of usr/src/cmd/ssh subdirs
@@ -31,7 +31,7 @@ TEXT_DOMAIN=SUNW_OST_OSCMD
 CFLAGS += $(CCVERBOSE)
 LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
-SSH_VERSION=\"Sun_SSH_1.3\"
+SSH_VERSION=\"Sun_SSH_1.4\"
 
 C99MODE= $(C99_ENABLE)
 

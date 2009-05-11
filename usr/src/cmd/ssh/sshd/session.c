@@ -1492,18 +1492,25 @@ do_child(Session *s, const char *command)
 	endpwent();
 
 	/*
+	 * Must switch to the new environment variables so that .ssh/rc,
+	 * /etc/ssh/sshrc, and xauth are run in the proper environment.
+	 */
+	environ = env;
+
+	/*
+	 * New environment has been installed. We need to update locale
+	 * so that error messages beyond this point have the proper
+	 * character encoding.
+	 */
+	(void) setlocale(LC_ALL, ""); 
+
+	/*
 	 * Close any extra open file descriptors so that we don\'t have them
 	 * hanging around in clients.  Note that we want to do this after
 	 * initgroups, because at least on Solaris 2.3 it leaves file
 	 * descriptors open.
 	 */
 	closefrom(STDERR_FILENO + 1);
-
-	/*
-	 * Must take new environment into use so that .ssh/rc,
-	 * /etc/ssh/sshrc and xauth are run in the proper environment.
-	 */
-	environ = env;
 
 #ifdef AFS
 	/* Try to get AFS tokens for the local cell. */

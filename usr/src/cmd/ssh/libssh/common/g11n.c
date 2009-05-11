@@ -18,17 +18,16 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <locale.h>
 #include <langinfo.h>
 #include <iconv.h>
 #include <ctype.h>
+#include <wctype.h>
 #include <strings.h>
 #include <string.h>
 #include <stdio.h>
@@ -36,6 +35,8 @@
 #include "includes.h"
 #include "xmalloc.h"
 #include "xlist.h"
+#include "compat.h"
+#include "log.h"
 
 #ifdef MIN
 #undef MIN
@@ -48,14 +49,17 @@
 /* two-char country code, '-' and two-char region code */
 #define	LANGTAG_MAX	5
 
-static uchar_t *do_iconv(iconv_t cd, uint_t *mul_ptr, const void *buf,
-    uint_t len, uint_t *outlen, int *err, uchar_t **err_str);
-
 static int locale_cmp(const void *d1, const void *d2);
 static char *g11n_locale2langtag(char *locale);
 
-uint_t g11n_validate_ascii(const char *str, uint_t len, uchar_t **error_str);
-uint_t g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str);
+static char *do_iconv(iconv_t cd, const char *s, uint_t *lenp, char **err_str);
+
+/*
+ * native_codeset records the codeset of the default system locale.
+ * It is used to convert the contents of file (eg /etc/issue) which is
+ * supposed to be in the codeset of default system locale.
+ */
+static char *native_codeset;
 
 /*
  * Convert locale string name into a language tag. The caller is responsible for
@@ -212,6 +216,13 @@ void
 g11n_setlocale(int category, const char *locale)
 {
 	char *curr;
+
+	if (native_codeset == NULL) {
+		/* set default locale, and record current codeset */
+		(void) setlocale(LC_ALL, "");
+		curr = nl_langinfo(CODESET);
+		native_codeset = xstrdup(curr);
+	}
 
 	/* we have one text domain - always set it */
 	(void) textdomain(TEXT_DOMAIN);
@@ -662,398 +673,274 @@ err:
 	return (result);
 }
 
-
 /*
- * Functions for validating ASCII and UTF-8 strings
+ * Functions for converting to UTF-8 from the local codeset and
+ * converting from UTF-8 to the local codeset.
  *
- * The error_str parameter is an optional pointer to a char variable
- * where to store a string suitable for use with error() or fatal() or
- * friends.
+ * The error_str parameter is an pointer to a char variable where to
+ * store a string suitable for use with error() or fatal() or friends.
+ * It is also used for an error indicator when NULL is returned.
  *
- * The return value is 0 if success, EILSEQ or EINVAL.
- *
+ * If conversion isn't necessary, *error_str is set to NULL, and
+ * NULL is returned.
+ * If conversion error occured, *error_str points to an error message,
+ * and NULL is returned.
  */
-uint_t
-g11n_validate_ascii(const char *str, uint_t len, uchar_t **error_str)
+char *
+g11n_convert_from_utf8(const char *str, uint_t *lenp, char **error_str)
 {
-	uchar_t *p;
+	static char *last_codeset;
+	static iconv_t cd = (iconv_t)-1;
+	char	*codeset;
 
-	for (p = (uchar_t *)str; p && *p && (!(*p & 0x80)); p++)
-		;
+	*error_str = NULL;
 
-	if (len && ((p - (uchar_t *)str) != len))
-		return (EILSEQ);
+	codeset = nl_langinfo(CODESET);
 
-	return (0);
-}
+	if (strcmp(codeset, "UTF-8") == 0)
+		return (NULL);
 
-uint_t
-g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str)
-{
-	uchar_t *p;
-	uint_t c, l;
-
-	if (len == 0)
-		len = strlen((const char *)str);
-
-	for (p = (uchar_t *)str; p && (p - str < len) && *p; ) {
-		/* 8-bit chars begin a UTF-8 sequence */
-		if (*p & 0x80) {
-			/* get sequence length and sanity check first byte */
-			if (*p < 0xc0)
-				return (EILSEQ);
-			else if (*p < 0xe0)
-				l = 2;
-			else if (*p < 0xf0)
-				l = 3;
-			else if (*p < 0xf8)
-				l = 4;
-			else if (*p < 0xfc)
-				l = 5;
-			else if (*p < 0xfe)
-				l = 6;
-			else
-				return (EILSEQ);
-
-			if ((p + l - str) >= len)
-				return (EILSEQ);
-
-			/* overlong detection - build codepoint */
-			c = *p & 0x3f;
-			/* shift c bits from first byte */
-			c = c << (6 * (l - 1));
-
-			if (l > 1) {
-				if (*(p + 1) && ((*(p + 1) & 0xc0) == 0x80))
-					c = c | ((*(p + 1) & 0x3f) <<
-					    (6 * (l - 2)));
-				else
-					return (EILSEQ);
-
-				if (c < 0x80)
-					return (EILSEQ);
-			}
-
-			if (l > 2) {
-				if (*(p + 2) && ((*(p + 2) & 0xc0) == 0x80))
-					c = c | ((*(p + 2) & 0x3f) <<
-					    (6 * (l - 3)));
-				else
-					return (EILSEQ);
-
-				if (c < 0x800)
-					return (EILSEQ);
-			}
-
-			if (l > 3) {
-				if (*(p + 3) && ((*(p + 3) & 0xc0) == 0x80))
-					c = c | ((*(p + 3) & 0x3f) <<
-					    (6 * (l - 4)));
-				else
-					return (EILSEQ);
-
-				if (c < 0x10000)
-					return (EILSEQ);
-			}
-
-			if (l > 4) {
-				if (*(p + 4) && ((*(p + 4) & 0xc0) == 0x80))
-					c = c | ((*(p + 4) & 0x3f) <<
-					    (6 * (l - 5)));
-				else
-					return (EILSEQ);
-
-				if (c < 0x200000)
-					return (EILSEQ);
-			}
-
-			if (l > 5) {
-				if (*(p + 5) && ((*(p + 5) & 0xc0) == 0x80))
-					c = c | (*(p + 5) & 0x3f);
-				else
-					return (EILSEQ);
-
-				if (c < 0x4000000)
-					return (EILSEQ);
-			}
-
-			/*
-			 * check for UTF-16 surrogates ifs other illegal
-			 * UTF-8 * points
-			 */
-			if (((c <= 0xdfff) && (c >= 0xd800)) ||
-			    (c == 0xfffe) || (c == 0xffff))
-				return (EILSEQ);
-			p += l;
+	if (last_codeset == NULL || strcmp(codeset, last_codeset) != 0) {
+		if (last_codeset != NULL) {
+			xfree(last_codeset);
+			last_codeset = NULL;
 		}
-		/* 7-bit chars are fine */
-		else
-			p++;
-	}
-	return (0);
-}
+		if (cd != (iconv_t)-1)
+			(void) iconv_close(cd);
 
-/*
- * Functions for converting to ASCII or UTF-8 from the local codeset
- * Functions for converting from ASCII or UTF-8 to the local codeset
- *
- * The error_str parameter is an optional pointer to a char variable
- * where to store a string suitable for use with error() or fatal() or
- * friends.
- *
- * The err parameter is an optional pointer to an integer where 0
- * (success) or EILSEQ or EINVAL will be stored (failure).
- *
- * These functions return NULL if the conversion fails.
- *
- */
-uchar_t *
-g11n_convert_from_ascii(const char *str, int *err_ptr, uchar_t **error_str)
-{
-	static uint_t initialized = 0;
-	static uint_t do_convert = 0;
-	iconv_t cd;
-	int err;
-
-	if (!initialized) {
-		/*
-		 * iconv_open() fails if the to/from codesets are the
-		 * same, and there are aliases of codesets to boot...
-		 */
-		if (strcmp("646", nl_langinfo(CODESET)) == 0 ||
-		    strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
-		    strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
-			initialized = 1;
-			do_convert = 0;
-		} else {
-			cd = iconv_open(nl_langinfo(CODESET), "646");
-			if (cd == (iconv_t)-1) {
-				if (err_ptr)
-					*err_ptr = errno;
-				if (error_str)
-					*error_str = (uchar_t *)"Cannot "
-					    "convert ASCII strings to the local"
-					    " codeset";
-			}
-			initialized = 1;
-			do_convert = 1;
-		}
-	}
-
-	if (!do_convert) {
-		if ((err = g11n_validate_ascii(str, 0, error_str))) {
-			if (err_ptr)
-				*err_ptr = err;
+		if ((cd = iconv_open(codeset, "UTF-8")) == (iconv_t)-1) {
+			*error_str = gettext("Cannot convert UTF-8 "
+			    "strings to the local codeset");
 			return (NULL);
-		} else
-			return ((uchar_t *)xstrdup(str));
-	}
-
-	return (do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
-}
-
-uchar_t *
-g11n_convert_from_utf8(const uchar_t *str, int *err_ptr, uchar_t **error_str)
-{
-	static uint_t initialized = 0;
-	static uint_t do_convert = 0;
-	iconv_t cd;
-	int err;
-
-	if (!initialized) {
-		/*
-		 * iconv_open() fails if the to/from codesets are the
-		 * same, and there are aliases of codesets to boot...
-		 */
-		if (strcmp("UTF-8", nl_langinfo(CODESET)) == 0 ||
-		    strcmp("UTF8",  nl_langinfo(CODESET)) == 0) {
-			initialized = 1;
-			do_convert = 0;
-		} else {
-			cd = iconv_open(nl_langinfo(CODESET), "UTF-8");
-			if (cd == (iconv_t)-1) {
-				if (err_ptr)
-					*err_ptr = errno;
-				if (error_str)
-					*error_str = (uchar_t *)"Cannot "
-					    "convert UTF-8 strings to the "
-					    "local codeset";
-			}
-			initialized = 1;
-			do_convert = 1;
 		}
+		last_codeset = xstrdup(codeset);
 	}
-
-	if (!do_convert) {
-		if ((err = g11n_validate_utf8(str, 0, error_str))) {
-			if (err_ptr)
-				*err_ptr = err;
-			return (NULL);
-		} else
-			return ((uchar_t *)xstrdup((char *)str));
-	}
-
-	return (do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
+	return (do_iconv(cd, str, lenp, error_str));
 }
 
 char *
-g11n_convert_to_ascii(const uchar_t *str, int *err_ptr, uchar_t **error_str)
+g11n_convert_to_utf8(const char *str, uint_t *lenp,
+    int native, char **error_str)
 {
-	static uint_t initialized = 0;
-	static uint_t do_convert = 0;
-	iconv_t cd;
+	static char *last_codeset;
+	static iconv_t cd = (iconv_t)-1;
+	char	*codeset;
 
-	if (!initialized) {
-		/*
-		 * iconv_open() fails if the to/from codesets are the
-		 * same, and there are aliases of codesets to boot...
-		 */
-		if (strcmp("646", nl_langinfo(CODESET)) == 0 ||
-		    strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
-		    strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
-			initialized = 1;
-			do_convert = 0;
-		} else {
-			cd = iconv_open("646", nl_langinfo(CODESET));
-			if (cd == (iconv_t)-1) {
-				if (err_ptr)
-					*err_ptr = errno;
-				if (error_str)
-					*error_str = (uchar_t *)"Cannot "
-					    "convert UTF-8 strings to the "
-					    "local codeset";
-			}
-			initialized = 1;
-			do_convert = 1;
+	*error_str = NULL;
+
+	if (native)
+		codeset = native_codeset;
+	else
+		codeset = nl_langinfo(CODESET);
+
+	if (strcmp(codeset, "UTF-8") == 0)
+		return (NULL);
+
+	if (last_codeset == NULL || strcmp(codeset, last_codeset) != 0) {
+		if (last_codeset != NULL) {
+			xfree(last_codeset);
+			last_codeset = NULL;
 		}
-	}
+		if (cd != (iconv_t)-1)
+			(void) iconv_close(cd);
 
-	if (!do_convert)
-		return (xstrdup((char *)str));
-
-	return ((char *)do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
-}
-
-uchar_t *
-g11n_convert_to_utf8(const uchar_t *str, int *err_ptr, uchar_t **error_str)
-{
-	static uint_t initialized = 0;
-	static uint_t do_convert = 0;
-	iconv_t cd;
-
-	if (!initialized) {
-		/*
-		 * iconv_open() fails if the to/from codesets are the
-		 * same, and there are aliases of codesets to boot...
-		 */
-		if (strcmp("UTF-8", nl_langinfo(CODESET)) == 0 ||
-		    strcmp("UTF8",  nl_langinfo(CODESET)) == 0) {
-			initialized = 1;
-			do_convert = 0;
-		} else {
-			cd = iconv_open("UTF-8", nl_langinfo(CODESET));
-			if (cd == (iconv_t)-1) {
-				if (err_ptr)
-					*err_ptr = errno;
-				if (error_str)
-					*error_str = (uchar_t *)"Cannot "
-					    "convert UTF-8 strings to the "
-					    "local codeset";
-			}
-			initialized = 1;
-			do_convert = 1;
+		if ((cd = iconv_open("UTF-8", codeset)) == (iconv_t)-1) {
+			*error_str = gettext("Cannot convert the "
+			    "local codeset strings to UTF-8");
+			return (NULL);
 		}
+		last_codeset = xstrdup(codeset);
 	}
-
-	if (!do_convert)
-		return ((uchar_t *)xstrdup((char *)str));
-
-	return (do_iconv(cd, NULL, str, 0, NULL, err_ptr, error_str));
+	return (do_iconv(cd, str, lenp, error_str));
 }
-
 
 /*
  * Wrapper around iconv()
  *
- * The caller is responsible for freeing the result and for handling
+ * The caller is responsible for freeing the result. NULL is returned when
  * (errno && errno != E2BIG) (i.e., EILSEQ, EINVAL, EBADF).
+ * The caller must ensure that the input string isn't NULL pointer.
  */
-static uchar_t *
-do_iconv(iconv_t cd, uint_t *mul_ptr, const void *buf, uint_t len,
-    uint_t *outlen, int *err, uchar_t **err_str)
+static char *
+do_iconv(iconv_t cd, const char *str, uint_t *lenp, char **err_str)
 {
-	size_t inbytesleft, outbytesleft, converted_size;
-	char *outbuf;
-	uchar_t *converted;
-	const char *inbuf;
-	uint_t mul = 0;
+	int	ilen, olen;
+	size_t	ileft, oleft;
+	char	*ostr, *optr;
+	const char *istr;
 
-	if (!buf || !(*(char *)buf))
-		return (NULL);
+	ilen = *lenp;
+	olen = ilen + 1;
 
-	if (len == 0)
-		len = strlen(buf);
+	ostr = NULL;
+	for (;;) {
+		olen *= 2;
+		oleft = olen;
+		ostr = optr = xrealloc(ostr, olen);
+		istr = (const char *)str;
+		if ((ileft = ilen) == 0)
+			break;
 
-	/* reset conversion descriptor */
-	/* XXX Do we need initial shift sequences for UTF-8??? */
-	(void) iconv(cd, NULL, &inbytesleft, &outbuf, &outbytesleft);
-	inbuf = (const char *) buf;
+		if (iconv(cd, &istr, &ileft, &optr, &oleft) != (size_t)-1) {
+			/* success: generate reset sequence */
+			if (iconv(cd, NULL, NULL,
+			    &optr, &oleft) == (size_t)-1 && errno == E2BIG) {
+				continue;
+			}
+			break;
+		}
+		/* failed */
+		if (errno != E2BIG) {
+			oleft = olen;
+			(void) iconv(cd, NULL, NULL, &ostr, &oleft);
+			xfree(ostr);
+			*err_str = gettext("Codeset conversion failed");
+			return (NULL);
+		}
+	}
+	olen = optr - ostr;
+	optr = xmalloc(olen + 1);
+	(void) memcpy(optr, ostr, olen);
+	xfree(ostr);
 
-	if (mul_ptr)
-		mul = *mul_ptr;
+	optr[olen] = '\0';
+	*lenp = olen;
 
-	converted_size = (len << mul);
-	outbuf = (char *)xmalloc(converted_size + 1); /* for null */
-	converted = (uchar_t *)outbuf;
-	outbytesleft = len;
+	return (optr);
+}
 
-	do {
-		if (iconv(cd, &inbuf, &inbytesleft, &outbuf, &outbytesleft) ==
-		    (size_t)-1) {
-			if (errno == E2BIG) {
-				/* UTF-8 codepoints are at most 8 bytes long */
-				if (mul > 2) {
-					if (err_str)
-						*err_str = (uchar_t *)
-						    "Conversion to UTF-8 failed"
-						    " due to preposterous space"
-						    " requirements";
-					if (err)
-						*err = EILSEQ;
-					return (NULL);
-				}
+/*
+ * A filter for output string. Control and unprintable characters
+ * are converted into visible form (eg "\ooo").
+ */
+char *
+g11n_filter_string(char *s)
+{
+	int	mb_cur_max = MB_CUR_MAX;
+	int	mblen, len;
+	char	*os = s;
+	wchar_t	wc;
+	char	*obuf, *op;
 
-				/*
-				 * re-alloc output and ensure that the outbuf
-				 * and outbytesleft values are adjusted
-				 */
-				converted = xrealloc(converted,
-				    converted_size << 1 + 1);
-				outbuf = (char *)converted + converted_size -
-				    outbytesleft;
-				converted_size = (len << ++(mul));
-				outbytesleft = converted_size - outbytesleft;
-			} else {
-				/*
-				 * let the caller deal with iconv() errors,
-				 * probably by calling fatal(); xfree() does
-				 * not set errno
-				 */
-				if (err)
-					*err = errno;
-				xfree(converted);
-				return (NULL);
+	/* all character may be converted into the form of \ooo */
+	obuf = op = xmalloc(strlen(s) * 4 + 1);
+
+	while (*s != '\0') {
+		mblen = mbtowc(&wc, s, mb_cur_max);
+		if (mblen <= 0) {
+			mblen = 1;
+			wc = (unsigned char)*s;
+		}
+		if (!iswprint(wc) &&
+		    wc != L'\n' && wc != L'\r' && wc != L'\t') {
+			/*
+			 * control chars which need to be replaced
+			 * with safe character sequence.
+			 */
+			while (mblen != 0) {
+				op += sprintf(op, "\\%03o",
+				    (unsigned char)*s++);
+				mblen--;
+			}
+		} else {
+			while (mblen != 0) {
+				*op++ = *s++;
+				mblen--;
 			}
 		}
-	} while (inbytesleft);
+	}
+	*op = '\0';
+	len = op - obuf + 1;
+	op = xrealloc(os, len);
+	(void) memcpy(op, obuf, len);
+	xfree(obuf);
+	return (op);
+}
 
-	*outbuf = '\0'; /* ensure null-termination */
-	if (outlen)
-		*outlen = converted_size - outbytesleft;
-	if (mul_ptr)
-		*mul_ptr = mul;
+/*
+ * Once we negotiated with a langtag, server need to map it to a system
+ * locale. That is done based on the locale supported on the server side.
+ * We know (with the locale supported on Solaris) how the langtag is
+ * mapped to. However, from the client point of view, there is no way to
+ * know exactly what locale(encoding) will be used.
+ *
+ * With the bug fix of SSH_BUG_STRING_ENCODING, it is guaranteed that the
+ * UTF-8 characters always come over the wire, so it is no longer the problem
+ * as long as both side has the bug fix. However if the server side doesn't
+ * have the fix, client can't safely perform the code conversion since the
+ * incoming character encoding is unknown.
+ *
+ * To alleviate this situation, we take an empirical approach to find
+ * encoding from langtag.
+ *
+ * If langtag has a subtag, we can directly map the langtag to UTF-8 locale
+ * (eg en-US can be mapped to en_US.UTF-8) with a few exceptions.
+ * Certain xx_YY locales don't support UTF-8 encoding (probably due to lack
+ * of L10N support ..). Those are:
+ *
+ * 	no_NO, no_NY, sr_SP, sr_YU
+ *
+ * They all use ISO8859-X encoding.
+ *
+ * For those "xx" langtags, some of them can be mapped to "xx.UTF-8",
+ * but others cannot. So we need to use the "xx" as the locale name.
+ * Those locales are:
+ *
+ * ar, ca, cs, da, et, fi, he, hu, ja, lt, lv, nl, no, pt, sh, th, tr
+ *
+ * Their encoding vary. They could be ISO8859-X or EUC or something else.
+ * So we don't perform code conversion for these langtags.
+ */
+static const char *non_utf8_langtag[] = {
+	"no-NO", "no-NY", "sr-SP", "sr-YU",
+	"ar", "ca", "cs", "da", "et", "fi", "he", "hu", "ja",
+	"lt", "lv", "nl", "no", "pt", "sh", "th", "tr", NULL};
 
-	return (converted);
+void
+g11n_test_langtag(const char *lang, int server)
+{
+	const char	**lp;
+
+	if (datafellows & SSH_BUG_LOCALES_NOT_LANGTAGS) {
+		/*
+		 * We negotiated with real locale name (not lang tag).
+		 * We shouldn't expect UTF-8, thus shouldn't do code
+		 * conversion.
+		 */
+		datafellows |= SSH_BUG_STRING_ENCODING;
+		return;
+	}
+
+	if (datafellows & SSH_BUG_STRING_ENCODING) {
+		if (server) {
+			/*
+			 * Whatever bug exists in the client side, server
+			 * side has nothing to do, since server has no way
+			 * to know what actual encoding is used on the client
+			 * side. For example, even if we negotiated with
+			 * en_US, client locale could be en_US.ISO8859-X or
+			 * en_US.UTF-8.
+			 */
+			return;
+		}
+		/*
+		 * We are on the client side. We'll check with known
+		 * locales to see if non-UTF8 characters could come in.
+		 */
+		for (lp = non_utf8_langtag; *lp != NULL; lp++) {
+			if (strcmp(lang, *lp) == 0)
+				break;
+		}
+		if (*lp == NULL) {
+			debug2("Server is expected to use UTF-8 locale");
+			datafellows &= ~SSH_BUG_STRING_ENCODING;
+		} else {
+			/*
+			 * Server is expected to use non-UTF8 encoding.
+			 */
+			debug2("Enforcing no code conversion: %s", lang);
+		}
+	}
 }
 
 /*

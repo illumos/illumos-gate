@@ -23,14 +23,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: auth2-chall.c,v 1.20 2002/06/30 21:59:45 deraadt Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ssh2.h"
 #include "auth.h"
@@ -242,11 +240,11 @@ send_userauth_info_request(Authctxt *authctxt)
 
 	packet_start(SSH2_MSG_USERAUTH_INFO_REQUEST);
 	packet_put_cstring(name);
-	packet_put_cstring(instr);
+	packet_put_utf8_cstring(instr);
 	packet_put_cstring("");		/* language not used */
 	packet_put_int(kbdintctxt->nreq);
 	for (i = 0; i < kbdintctxt->nreq; i++) {
-		packet_put_cstring(prompts[i]);
+		packet_put_utf8_cstring(prompts[i]);
 		packet_put_char(echo_on[i]);
 	}
 	packet_send();

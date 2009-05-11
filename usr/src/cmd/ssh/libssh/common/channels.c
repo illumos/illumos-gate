@@ -1367,7 +1367,7 @@ channel_post_connecting(Channel *c, fd_set * readset, fd_set * writeset)
 				packet_put_int(c->remote_id);
 				packet_put_int(SSH2_OPEN_CONNECT_FAILED);
 				if (!(datafellows & SSH_BUG_OPENFAILURE)) {
-					packet_put_cstring(strerror(err));
+					packet_put_utf8_cstring(strerror(err));
 					packet_put_cstring("");
 				}
 			} else {

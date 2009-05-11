@@ -59,7 +59,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1476,7 +1476,7 @@ client_input_channel_open(int type, u_int32_t seq, void *ctxt)
 		packet_put_int(rchan);
 		packet_put_int(SSH2_OPEN_ADMINISTRATIVELY_PROHIBITED);
 		if (!(datafellows & SSH_BUG_OPENFAILURE)) {
-			packet_put_cstring("open failed");
+			packet_put_utf8_cstring("open failed");
 			packet_put_cstring("");
 		}
 		packet_send();

@@ -1,13 +1,11 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	$OpenBSD: bufaux.h,v 1.18 2002/04/20 09:14:58 markus Exp $	*/
 
 #ifndef	_BUFAUX_H
 #define	_BUFAUX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,18 +47,11 @@ int     buffer_get_char(Buffer *);
 void    buffer_put_char(Buffer *, int);
 
 void   *buffer_get_string(Buffer *, u_int *);
-u_char *buffer_get_utf8_cstring(Buffer *);
-char   *buffer_get_ascii_cstring(Buffer *);
+char   *buffer_get_utf8_string(Buffer *, uint_t *);
 void    buffer_put_string(Buffer *, const void *, u_int);
 void	buffer_put_cstring(Buffer *, const char *);
-void	buffer_put_utf8_cstring(Buffer *, const u_char *);
-void	buffer_put_ascii_cstring(Buffer *, const char *);
-
-#if 0
-/* If these are needed, then get rid of the #if 0 and this comment */
-void	buffer_put_utf8_string(Buffer *, const u_char *, u_int);
-void	buffer_put_ascii_string(Buffer *, const char *, u_int);
-#endif
+void	buffer_put_utf8_string(Buffer *, const char *, uint_t len);
+void	buffer_put_utf8_cstring(Buffer *, const char *);
 
 #define buffer_skip_string(b) \
     do { u_int l = buffer_get_int(b); buffer_consume(b, l); } while(0)

@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: auth2-none.c,v 1.4 2002/06/27 10:35:47 deraadt Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "auth.h"
 #include "xmalloc.h"
@@ -50,9 +48,10 @@ char *
 auth2_read_banner(void)
 {
 	struct stat st;
-	char *banner = NULL;
+	char *banner, *ubanner, *errstr;
 	off_t len, n;
 	int fd;
+	uint_t ilen;
 
 	if ((fd = open(options.banner, O_RDONLY)) == -1)
 		return (NULL);
@@ -71,7 +70,23 @@ auth2_read_banner(void)
 	}
 	banner[n] = '\0';
 
-	return (banner);
+	if (datafellows & SSH_BUG_STRING_ENCODING) {
+		ubanner = banner;
+	} else {
+		ilen = (uint_t)n;
+		ubanner = g11n_convert_to_utf8(banner, &ilen, 1, &errstr);
+		if (ubanner == NULL) {
+			if (errstr != NULL) {
+				error("Can't convert banner contents "
+				    "to UTF-8: %s\n", errstr);
+			}
+			ubanner = banner;
+		} else {
+			xfree(banner);
+		}
+	}
+
+	return (ubanner);
 }
 
 static void
@@ -107,7 +122,7 @@ userauth_none(Authctxt *authctxt)
 	userauth_banner();
 #ifdef HAVE_CYGWIN
 	if (check_nt_auth(1, authctxt->pw) == 0)
-		return(0);
+		return (0);
 #endif
 	authctxt->method->authenticated = auth_password(authctxt, "");
 }

@@ -415,7 +415,6 @@ ssh_agent_sign(AuthenticationConnection *auth,
     u_char **sigp, u_int *lenp,
     u_char *data, u_int datalen)
 {
-	extern int datafellows;
 	Buffer msg;
 	u_char *blob;
 	u_int blen;

@@ -410,18 +410,21 @@ input_userauth_banner(int type, u_int32_t seq, void *ctxt)
 	char *msg, *lang;
 
 	debug3("input_userauth_banner");
-	msg = packet_get_string(NULL);
+	msg = packet_get_utf8_string(NULL);
 	lang = packet_get_string(NULL);
 	/*
 	 * Banner is a warning message according to RFC 4252. So, never print
 	 * a banner in error log level or lower. If the log level is higher,
 	 * use DisableBanner option to decide whether to display it or not.
 	 */
-	if (options.log_level > SYSLOG_LEVEL_ERROR)
+	if (options.log_level > SYSLOG_LEVEL_ERROR) {
 		if (options.disable_banner == 0 ||
 		    (options.disable_banner == SSH_NO_BANNER_IN_EXEC_MODE &&
-		    buffer_len(&command) == 0))
-		fprintf(stderr, "%s", msg);
+		    buffer_len(&command) == 0)) {
+			msg = g11n_filter_string(msg);
+			(void) fprintf(stderr, "%s", msg);
+		}
+	}
 	xfree(msg);
 	xfree(lang);
 }
@@ -970,12 +973,15 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, void *ctxt)
 		fatal("input_userauth_passwd_changereq: "
 		    "no authentication context");
 
-	info = packet_get_string(NULL);
-	lang = packet_get_string(NULL);
-	if (strlen(info) > 0)
+	info = packet_get_utf8_string(NULL);
+	if (strlen(info) != 0) {
+		info = g11n_filter_string(info);
 		log("%s", info);
+	}
 	xfree(info);
+	lang = packet_get_string(NULL);
 	xfree(lang);
+
 	packet_start(SSH2_MSG_USERAUTH_REQUEST);
 	packet_put_cstring(authctxt->server_user);
 	packet_put_cstring(authctxt->service);
@@ -1345,13 +1351,23 @@ input_userauth_info_req(int type, u_int32_t seq, void *ctxt)
 
 	authctxt->info_req_seen = 1;
 
+	/*
+	 * We assume that ASCII is used for user name although it is defined
+	 * by the protocol to use UTF-8 encoding. Therefore, we don't perform
+	 * code conversion from UTF-8 to native codeset for the user name
+	 * string.
+	 */
 	name = packet_get_string(NULL);
-	inst = packet_get_string(NULL);
+	inst = packet_get_utf8_string(NULL);
 	lang = packet_get_string(NULL);
-	if (strlen(name) > 0)
+	if (strlen(name) != 0) {
+		name = g11n_filter_string(name);
 		log("%s", name);
-	if (strlen(inst) > 0)
+	}
+	if (strlen(inst) != 0) {
+		inst = g11n_filter_string(inst);
 		log("%s", inst);
+	}
 	xfree(name);
 	xfree(inst);
 	xfree(lang);
@@ -1368,11 +1384,17 @@ input_userauth_info_req(int type, u_int32_t seq, void *ctxt)
 
 	debug2("input_userauth_info_req: num_prompts %d", num_prompts);
 	for (i = 0; i < num_prompts; i++) {
-		prompt = packet_get_string(NULL);
+		prompt = packet_get_utf8_string(NULL);
 		echo = packet_get_char();
 
+		prompt = g11n_filter_string(prompt);
 		response = read_passphrase(prompt, echo ? RP_ECHO : 0);
 
+		/*
+	 	 * We assume that ASCII is used for password as well. We
+		 * don't perform code conversion from native codeset to
+		 * UTF-8 for the password string.
+		 */
 		packet_put_cstring(response);
 		memset(response, 0, strlen(response));
 		xfree(response);

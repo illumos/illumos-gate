@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
 #define	_COMPAT_H
 
 /*	$OpenBSD: compat.h,v 1.33 2002/09/27 10:42:09 mickey Exp $	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,6 +73,8 @@ extern "C" {
 #define SSH_BUG_GSSKEX_HOSTKEY	0x20000000
 /* SSH_OLD_FORWARD_ADDR flag bumped up the SunSSH version to 1.2 */
 #define SSH_OLD_FORWARD_ADDR	0x40000000
+/* SSH_BUG_STRING_ENCODING flag bumped up the SunSSH version to 1.4 */
+#define SSH_BUG_STRING_ENCODING 0x80000000
 
 void     enable_compat13(void);
 void     enable_compat20(void);
@@ -84,7 +84,7 @@ char	*compat_cipher_proposal(char *);
 
 extern int compat13;
 extern int compat20;
-extern int datafellows;
+extern uint32_t datafellows;
 
 #ifdef __cplusplus
 }

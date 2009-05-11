@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@ RCSID("$OpenBSD: compat.c,v 1.65 2002/09/27 10:42:09 mickey Exp $");
 
 int compat13 = 0;
 int compat20 = 0;
-int datafellows = 0;
+uint32_t datafellows = 0;
 
 void
 enable_compat20(void)
@@ -59,7 +59,7 @@ compat_datafellows(const char *version)
 	int i;
 	static struct {
 		char	*pat;
-		int	bugs;
+		uint32_t bugs;
 	} check[] = {
 		{ "OpenSSH-2.0*,"
 		  "OpenSSH-2.1*,"
@@ -105,9 +105,12 @@ compat_datafellows(const char *version)
 					SSH_BUG_LOCALES_NOT_LANGTAGS|SSH_OLD_FORWARD_ADDR},
 		{ "Sun_SSH_1.0*",	SSH_BUG_NOREKEY|SSH_BUG_EXTEOF|
 					SSH_BUG_LOCALES_NOT_LANGTAGS|SSH_OLD_FORWARD_ADDR},
-		{ "Sun_SSH_1.1*",	SSH_OLD_FORWARD_ADDR},
-		{ "Sun_SSH_1.2*",	0 },
-		{ "Sun_SSH_1.3*",	0 },
+		{ "Sun_SSH_1.1.1*",	SSH_OLD_FORWARD_ADDR|SSH_BUG_STRING_ENCODING},
+		{ "Sun_SSH_1.1.2*",	SSH_OLD_FORWARD_ADDR},
+		{ "Sun_SSH_1.1*",	SSH_OLD_FORWARD_ADDR|SSH_BUG_STRING_ENCODING},
+		{ "Sun_SSH_1.2*",	SSH_BUG_STRING_ENCODING},
+		{ "Sun_SSH_1.3*",	SSH_BUG_STRING_ENCODING},
+		{ "Sun_SSH_1.4*",	0 },
 		{ "Sun_SSH_*",		0 },
 		{ "*MindTerm*",		0 },
 		{ "2.1.0*",		SSH_BUG_SIGBLOB|SSH_BUG_HMAC|

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,7 +109,7 @@ do_pam_kbdint(Authctxt *authctxt)
 			    " please change it now."));
 			packet_start(SSH2_MSG_USERAUTH_INFO_REQUEST);
 			packet_put_cstring("");		/* name */
-			packet_put_cstring(text);	/* instructions */
+			packet_put_utf8_cstring(text);	/* instructions */
 			packet_put_cstring("");		/* language, unused */
 			packet_put_int(0);
 			packet_send();
@@ -279,7 +279,7 @@ do_pam_conv_kbd_int(int num_msg, struct pam_message **msg,
 
 	packet_start(SSH2_MSG_USERAUTH_INFO_REQUEST);
 	packet_put_cstring("");	/* Name */
-	packet_put_cstring(text ? text : "");	/* Instructions */
+	packet_put_utf8_cstring(text ? text : "");	/* Instructions */
 	packet_put_cstring("");	/* Language */
 	packet_put_int(conv_ctxt->num_expected);
 
@@ -294,7 +294,7 @@ do_pam_conv_kbd_int(int num_msg, struct pam_message **msg,
 			continue;
 		
 		conv_ctxt->prompts[j++] = i;
-		packet_put_cstring(PAM_MSG_MEMBER(msg, i, msg));
+		packet_put_utf8_cstring(PAM_MSG_MEMBER(msg, i, msg));
 		packet_put_char(style == PAM_PROMPT_ECHO_ON);
 	}
 	packet_send();
@@ -379,6 +379,12 @@ input_userauth_info_response_pam(int type, u_int32_t seqnr, void *ctxt)
 	for (i = 0; i < nresp && i < conv_ctxt->num_expected ; i++) {
 		int j = conv_ctxt->prompts[i];
 
+		/*
+		 * We assume that ASCII charset is used for password
+		 * although the protocol requires UTF-8 encoding for the
+		 * password string. Therefore, we don't perform code
+		 * conversion for the string.
+		 */
 		resp = packet_get_string(&rlen);
 		if (i < conv_ctxt->num_expected) {
 			conv_ctxt->responses[j].resp_retcode = PAM_SUCCESS;

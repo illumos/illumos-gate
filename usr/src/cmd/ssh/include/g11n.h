@@ -18,14 +18,12 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_G11N_H
 #define	_G11N_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,24 +74,6 @@ char *g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales);
 void g11n_freelist(char **list);
 
 /*
- * Functions for validating ASCII and UTF-8 strings
- *
- * The error_str parameter is an optional pointer to a char variable
- * where to store a string suitable for use with error() or fatal() or
- * friends.
- *
- * The input string is expected to be a null-terminated string if the
- * len parameter is given a value of 0.
- *
- * The return value is 0 if success, EILSEQ or EINVAL.
- *
- */
-
-uint_t g11n_validate_ascii(const char *str, uint_t len, uchar_t **error_str);
-
-uint_t g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str);
-
-/*
  * Functions for converting to ASCII or UTF-8 from the local codeset
  * Functions for converting from ASCII or UTF-8 to the local codeset
  *
@@ -101,24 +81,15 @@ uint_t g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str);
  * where to store a string suitable for use with error() or fatal() or
  * friends.
  *
- * The err parameter is an optional pointer to an integer where 0
- * (success) or EILSEQ or EINVAL will be stored (failure).
- *
- * These functions return NULL if the conversion fails.
- *
  */
+extern char *g11n_convert_from_utf8(const char *str, uint_t *lenp,
+				char **error_str);
 
-uchar_t *g11n_convert_from_ascii(const char *str, int *err,
-    uchar_t **error_str);
+extern char *g11n_convert_to_utf8(const char *str, uint_t *lenp, int native,
+				char **error_str);
 
-uchar_t *g11n_convert_from_utf8(const uchar_t *str, int *err,
-    uchar_t **error_str);
-
-char *g11n_convert_to_ascii(const uchar_t *str, int *err,
-    uchar_t **error_str);
-
-uchar_t *g11n_convert_to_utf8(const uchar_t *str, int *err,
-    uchar_t **error_str);
+extern char *g11n_filter_string(char *);
+extern void g11n_test_langtag(const char *, int);
 
 #ifdef __cplusplus
 }
