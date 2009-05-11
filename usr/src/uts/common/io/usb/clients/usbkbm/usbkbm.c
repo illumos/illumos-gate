@@ -66,7 +66,7 @@ static boolean_t usbkbm_polled_keycheck(struct kbtrans_hardware *,
 static void usbkbm_poll_callback(usbkbm_state_t *, int, enum keystate);
 static void usbkbm_streams_callback(usbkbm_state_t *, int, enum keystate);
 static void usbkbm_unpack_usb_packet(usbkbm_state_t *, process_key_callback_t,
-			uchar_t *, int);
+			uchar_t *);
 static boolean_t usbkbm_is_modkey(uchar_t);
 static void usbkbm_reioctl(void	*);
 static int usbkbm_polled_getchar(cons_polledio_arg_t);
@@ -78,8 +78,7 @@ static enum kbtrans_message_response usbkbm_ioctl(queue_t *, mblk_t *);
 static int usbkbm_kioccmd(usbkbm_state_t *, mblk_t *, char, size_t *);
 static void	usbkbm_usb2pc_xlate(usbkbm_state_t *, int, enum keystate);
 static void	usbkbm_wrap_kbtrans(usbkbm_state_t *, int, enum keystate);
-static int	usbkbm_get_protocol(usbkbm_state_t *);
-static int	usbkbm_set_protocol(usbkbm_state_t *, uint16_t);
+static int	usbkbm_get_input_format(usbkbm_state_t *);
 static int	usbkbm_get_vid_pid(usbkbm_state_t *);
 
 /* stream qinit functions defined here */
@@ -492,37 +491,6 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 	qprocson(q);
 
-	if (ret = usbkbm_get_protocol(usbkbmd)) {
-
-		return (ret);
-	}
-
-	if (usbkbmd->protocol != SET_BOOT_PROTOCOL) {
-	/*
-	 * The current usbkbm only knows how to deal with boot-protocol mode,
-	 * so switch into boot-protocol mode now.
-	 */
-		if (ret = usbkbm_set_protocol(usbkbmd, SET_BOOT_PROTOCOL)) {
-
-			return (ret);
-		}
-	}
-
-	/*
-	 * USB keyboards are expected to send well-defined 8-byte data
-	 * packets in boot-protocol mode (the format of which is documented
-	 * in the HID specification).
-	 *
-	 * Note: We do not look at the interface's HID report descriptors to
-	 * derive the report size, because the HID report descriptor describes
-	 * the format of each report in report mode.  This format might be
-	 * different from the format used in boot-protocol mode.  The internal
-	 * USB keyboard in a recent version of the Apple MacBook Pro is one
-	 * example of a USB keyboard that uses different formats for
-	 * boot-protocol-mode reports and report-mode reports.
-	 */
-	usbkbmd->usbkbm_packet_size = USB_KBD_BOOT_PROTOCOL_PACKET_SIZE;
-
 	/* request hid report descriptor from HID */
 	mctlmsg.ioc_cmd = HID_GET_PARSER_HANDLE;
 	mctlmsg.ioc_count = 0;
@@ -557,23 +525,13 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		}
 	}
 
-	if (usbkbmd->usbkbm_report_descr != NULL) {
-		if (hidparser_get_country_code(usbkbmd->usbkbm_report_descr,
-		    (uint16_t *)&usbkbmd->usbkbm_layout) ==
-		    HIDPARSER_FAILURE) {
 
-			USB_DPRINTF_L3(PRINT_MASK_OPEN,
-			    usbkbm_log_handle, "get_country_code failed"
-			    "setting default layout(0)");
+	/* get the input format from the hid descriptor */
+	if (usbkbm_get_input_format(usbkbmd) != USB_SUCCESS) {
 
-			usbkbmd->usbkbm_layout = usbkbm_layout;
-		}
-	} else {
 		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
 		    "usbkbm: Invalid HID Descriptor Tree."
-		    "setting default layout(0)");
-
-		usbkbmd->usbkbm_layout = usbkbm_layout;
+		    "setting default report format");
 	}
 
 	/*
@@ -1150,9 +1108,21 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 	 * Ram them through the translator, only if there are
 	 * correct no. of bytes.
 	 */
-	if (MBLKL(mp) == usbkbmd->usbkbm_packet_size) {
+	if (MBLKL(mp) == usbkbmd->usbkbm_report_format.tlen) {
+		if (usbkbmd->usbkbm_report_format.keyid !=
+		    HID_REPORT_ID_UNDEFINED) {
+			if (*(mp->b_rptr) !=
+			    usbkbmd->usbkbm_report_format.keyid) {
+				freemsg(mp);
+
+				return;
+			} else {
+				/* We skip the report id prefix */
+				mp->b_rptr++;
+			}
+		}
 		usbkbm_unpack_usb_packet(usbkbmd, usbkbm_streams_callback,
-		    (uchar_t *)mp->b_rptr, usbkbmd->usbkbm_packet_size);
+		    mp->b_rptr);
 	}
 
 	freemsg(mp);
@@ -1184,11 +1154,6 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		    "usbkbm_mctl_receive HID_SET mctl");
 		freemsg(mp);
 		/* Setting of the LED is not waiting for this message */
-
-		break;
-	case HID_SET_PROTOCOL:
-		freemsg(mp);
-		usbkbmd->usbkbm_flags &= ~USBKBM_QWAIT;
 
 		break;
 	case HID_GET_PARSER_HANDLE:
@@ -1282,7 +1247,7 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		/* Indicate all keys have been released */
 		bzero(new_buffer, USBKBM_MAXPKTSIZE);
 		usbkbm_unpack_usb_packet(usbkbmd, usbkbm_streams_callback,
-		    new_buffer, usbkbmd->usbkbm_packet_size);
+		    new_buffer);
 		freemsg(mp);
 
 		break;
@@ -1296,15 +1261,6 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		    usbkbm_led_state);
 
 		freemsg(mp);
-
-		break;
-	case HID_GET_PROTOCOL:
-		if ((data != NULL) && (iocp->ioc_count == 1) &&
-		    (MBLKL(mp->b_cont) == iocp->ioc_count)) {
-			bcopy(data, &usbkbmd->protocol, iocp->ioc_count);
-		}
-		freemsg(mp);
-		usbkbmd->usbkbm_flags &= ~USBKBM_QWAIT;
 
 		break;
 	default:
@@ -1327,7 +1283,7 @@ usbkbm_streams_setled(struct kbtrans_hardware *kbtrans_hw, int state)
 	mblk_t		*mctl_ptr;
 	hid_req_t	*LED_report;
 	usbkbm_state_t	*usbkbmd;
-	uchar_t		led_state;
+	uchar_t		led_id, led_state;
 
 	usbkbm_led_state = (uchar_t)state;
 
@@ -1342,7 +1298,7 @@ usbkbm_streams_setled(struct kbtrans_hardware *kbtrans_hw, int state)
 	/*
 	 * Send the request to the hid driver to set LED.
 	 */
-
+	led_id = usbkbmd->usbkbm_report_format.keyid;
 	led_state = 0;
 
 	/*
@@ -1369,7 +1325,7 @@ usbkbm_streams_setled(struct kbtrans_hardware *kbtrans_hw, int state)
 	}
 
 	LED_report->hid_req_version_no = HID_VERSION_V_0;
-	LED_report->hid_req_wValue = REPORT_TYPE_OUTPUT;
+	LED_report->hid_req_wValue = REPORT_TYPE_OUTPUT | led_id;
 	LED_report->hid_req_wLength = sizeof (uchar_t);
 	LED_report->hid_req_data[0] = led_state;
 
@@ -1403,7 +1359,7 @@ usbkbm_polled_keycheck(struct kbtrans_hardware *hw,
 {
 	usbkbm_state_t			*usbkbmd;
 	uchar_t				*buffer;
-	unsigned			num_keys;
+	unsigned			size;
 	hid_polled_handle_t		hid_polled_handle;
 
 	usbkbmd = (usbkbm_state_t *)hw;
@@ -1421,15 +1377,14 @@ usbkbm_polled_keycheck(struct kbtrans_hardware *hw,
 	hid_polled_handle =
 	    usbkbmd->usbkbm_hid_callback.hid_polled_input_handle;
 
-	num_keys = (usbkbmd->usbkbm_hid_callback.hid_polled_read)
+	size = (usbkbmd->usbkbm_hid_callback.hid_polled_read)
 	    (hid_polled_handle, &buffer);
 
 	/*
-	 * If we don't get any characters back then indicate that, and we
-	 * are done.
+	 * If we don't get a valid input report then indicate that,
+	 * and we are done.
 	 */
-	if (num_keys == 0) {
-
+	if (size != usbkbmd->usbkbm_report_format.tlen) {
 		return (B_FALSE);
 	}
 
@@ -1438,8 +1393,15 @@ usbkbm_polled_keycheck(struct kbtrans_hardware *hw,
 	 * usbkbm_unpack_usb_packet so that it can be broken up into
 	 * individual key/state values.
 	 */
-	usbkbm_unpack_usb_packet(usbkbmd, usbkbm_poll_callback,
-	    buffer, num_keys);
+	if (usbkbmd->usbkbm_report_format.keyid != HID_REPORT_ID_UNDEFINED) {
+		if (*buffer != usbkbmd->usbkbm_report_format.keyid) {
+			return (B_FALSE);
+		} else {
+			/* We skip the report id prefix */
+			buffer++;
+		}
+	}
+	usbkbm_unpack_usb_packet(usbkbmd, usbkbm_poll_callback, buffer);
 
 	/*
 	 * If a scancode was returned as a result of this packet,
@@ -1645,11 +1607,12 @@ usbkbm_polled_ischar(cons_polledio_arg_t arg)
 static void
 usbkbm_polled_enter(cons_polledio_arg_t arg)
 {
-	usbkbm_state_t			*usbkbmd;
-	hid_polled_handle_t		hid_polled_handle;
-	uint_t				uindex;
+	usbkbm_state_t		*usbkbmd = (usbkbm_state_t *)arg;
+	hid_polled_handle_t	hid_polled_handle;
+	int			kbstart, kbend, uindex;
 
-	usbkbmd = (usbkbm_state_t *)arg;
+	kbstart = usbkbmd->usbkbm_report_format.kpos;
+	kbend = kbstart + usbkbmd->usbkbm_report_format.klen;
 
 	/*
 	 * Before switching to POLLED mode, copy the contents of
@@ -1657,7 +1620,7 @@ usbkbm_polled_enter(cons_polledio_arg_t arg)
 	 * usbkbm_pendingusbpacket field has currently processed
 	 * key events of the current OS mode usb keyboard packet.
 	 */
-	for (uindex = 2; uindex < USBKBM_MAXPKTSIZE; uindex ++) {
+	for (uindex = kbstart + 2; uindex < kbend; uindex++) {
 		usbkbmd->usbkbm_lastusbpacket[uindex] =
 		    usbkbmd->usbkbm_pendingusbpacket[uindex];
 
@@ -1680,11 +1643,12 @@ usbkbm_polled_enter(cons_polledio_arg_t arg)
 static void
 usbkbm_polled_exit(cons_polledio_arg_t arg)
 {
-	usbkbm_state_t			*usbkbmd;
-	hid_polled_handle_t		hid_polled_handle;
-	uint_t				uindex;
+	usbkbm_state_t		*usbkbmd = (usbkbm_state_t *)arg;
+	hid_polled_handle_t	hid_polled_handle;
+	int			kbstart, kbend, uindex;
 
-	usbkbmd = (usbkbm_state_t *)arg;
+	kbstart = usbkbmd->usbkbm_report_format.kpos;
+	kbend = kbstart + usbkbmd->usbkbm_report_format.klen;
 
 	/*
 	 * Before returning to OS mode, copy the contents of
@@ -1692,7 +1656,7 @@ usbkbm_polled_exit(cons_polledio_arg_t arg)
 	 * usbkbm_lastusbpacket field has processed key events
 	 * of the last POLLED mode usb keyboard packet.
 	 */
-	for (uindex = 2; uindex < USBKBM_MAXPKTSIZE; uindex ++) {
+	for (uindex = kbstart + 2; uindex < kbend; uindex ++) {
 		usbkbmd->usbkbm_pendingusbpacket[uindex] =
 		    usbkbmd->usbkbm_lastusbpacket[uindex];
 
@@ -1719,16 +1683,19 @@ usbkbm_polled_exit(cons_polledio_arg_t arg)
  */
 static void
 usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
-	uchar_t *usbpacket, int packet_size)
+	uchar_t *usbpacket)
 {
 	uchar_t		mkb;
 	uchar_t		lastmkb;
 	uchar_t		*lastusbpacket = usbkbmd->usbkbm_lastusbpacket;
+	int		packet_size, kbstart, kbend;
 	int		uindex, lindex, rollover;
 
-	mkb = usbpacket[0];
-
-	lastmkb = lastusbpacket[0];
+	packet_size = usbkbmd->usbkbm_report_format.tlen;
+	kbstart = usbkbmd->usbkbm_report_format.kpos;
+	kbend = kbstart + usbkbmd->usbkbm_report_format.klen;
+	mkb = usbpacket[kbstart];
+	lastmkb = lastusbpacket[kbstart];
 
 	for (uindex = 0; uindex < packet_size; uindex++) {
 
@@ -1788,12 +1755,12 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	}
 
 	/* save modifier bits */
-	lastusbpacket[0] = usbpacket[0];
+	lastusbpacket[kbstart] = usbpacket[kbstart];
 
 	/* Check Keyboard rollover error. */
-	if (usbpacket[2] == USB_ERRORROLLOVER) {
+	if (usbpacket[kbstart + 2] == USB_ERRORROLLOVER) {
 		rollover = 1;
-		for (uindex = 3; uindex < packet_size;
+		for (uindex = kbstart + 3; uindex < kbend;
 		    uindex++) {
 			if (usbpacket[uindex] != USB_ERRORROLLOVER) {
 				rollover = 0;
@@ -1808,13 +1775,13 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	}
 
 	/* check for released keys */
-	for (lindex = 2; lindex < packet_size; lindex++) {
+	for (lindex = kbstart + 2; lindex < kbend; lindex++) {
 		int released = 1;
 
 		if (lastusbpacket[lindex] == 0) {
 			continue;
 		}
-		for (uindex = 2; uindex < packet_size; uindex++)
+		for (uindex = kbstart + 2; uindex < kbend; uindex++)
 			if (usbpacket[uindex] == lastusbpacket[lindex]) {
 				released = 0;
 				break;
@@ -1825,7 +1792,7 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	}
 
 	/* check for new presses */
-	for (uindex = 2; uindex < packet_size; uindex++) {
+	for (uindex = kbstart + 2; uindex < kbend; uindex++) {
 		int newkey = 1;
 
 		usbkbmd->usbkbm_pendingusbpacket[uindex] = usbpacket[uindex];
@@ -1834,7 +1801,7 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 			continue;
 		}
 
-		for (lindex = 2; lindex < packet_size; lindex++) {
+		for (lindex = kbstart + 2; lindex < kbend; lindex++) {
 			if (usbpacket[uindex] == lastusbpacket[lindex]) {
 				newkey = 0;
 				break;
@@ -1864,7 +1831,7 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	 * packet, which is saved in the usbkbm_pendingusbpacket field
 	 * to the usbkbm_lastusbpacket field.
 	 */
-	for (uindex = 2; uindex < USBKBM_MAXPKTSIZE; uindex++) {
+	for (uindex = kbstart + 2; uindex < kbend; uindex++) {
 		lastusbpacket[uindex] =
 		    usbkbmd->usbkbm_pendingusbpacket[uindex];
 		usbkbmd->usbkbm_pendingusbpacket[uindex] = 0;
@@ -1920,53 +1887,6 @@ usbkbm_reioctl(void	*arg)
 	}
 }
 
-
-/*
- * usbkbm_set_protocol
- *	Issue an M_CTL to hid to set the desired protocol
- */
-static int
-usbkbm_set_protocol(usbkbm_state_t *usbkbmd, uint16_t protocol)
-{
-	struct iocblk mctlmsg;
-	hid_req_t buf;
-	mblk_t *mctl_ptr;
-	size_t len = sizeof (buf);
-	queue_t *q = usbkbmd->usbkbm_readq;
-
-	mctlmsg.ioc_cmd = HID_SET_PROTOCOL;
-	mctlmsg.ioc_count = 0;
-	buf.hid_req_version_no = HID_VERSION_V_0;
-	buf.hid_req_wValue = protocol;
-	buf.hid_req_wLength = 0;
-	mctl_ptr = usba_mk_mctl(mctlmsg, &buf, len);
-	if (mctl_ptr == NULL) {
-		usbkbmd->usbkbm_flags = 0;
-		(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
-		qprocsoff(q);
-		kmem_free(usbkbmd, sizeof (usbkbm_state_t));
-
-		return (ENOMEM);
-	}
-
-	usbkbmd->usbkbm_flags |= USBKBM_QWAIT;
-	putnext(usbkbmd->usbkbm_writeq, mctl_ptr);
-
-	while (usbkbmd->usbkbm_flags & USBKBM_QWAIT) {
-		if (qwait_sig(q) == 0) {
-			usbkbmd->usbkbm_flags = 0;
-			(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
-			qprocsoff(q);
-			kmem_free(usbkbmd, sizeof (usbkbm_state_t));
-
-			return (EINTR);
-		}
-	}
-
-	return (0);
-}
-
-
 /*
  * usbkbm_get_vid_pid
  *	Issue a M_CTL to hid to get the device info
@@ -2007,40 +1927,108 @@ usbkbm_get_vid_pid(usbkbm_state_t *usbkbmd)
 }
 
 /*
- * usbkbm_get_protocol
- *	Issue a M_CTL to hid to get the device info
+ * usbkbm_get_input_format() :
+ *     Get the input report format of keyboard
  */
 static int
-usbkbm_get_protocol(usbkbm_state_t *usbkbmd)
+usbkbm_get_input_format(usbkbm_state_t *usbkbmd)
 {
-	struct iocblk mctlmsg;
-	mblk_t *mctl_ptr;
-	queue_t *q = usbkbmd->usbkbm_readq;
 
-	mctlmsg.ioc_cmd = HID_GET_PROTOCOL;
-	mctlmsg.ioc_count = 0;
+	hidparser_rpt_t *kb_rpt;
+	uint_t i, kbd_page = 0, kpos = 0, klen = 0, limit = 0;
+	uint32_t rptcnt, rptsz;
+	usbkbm_report_format_t *kbd_fmt = &usbkbmd->usbkbm_report_format;
+	int rptid, rval;
 
-	mctl_ptr = usba_mk_mctl(mctlmsg, NULL, 0);
-	if (mctl_ptr == NULL) {
-		(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
-		qprocsoff(q);
-		kmem_free(usbkbmd, sizeof (usbkbm_state_t));
+	/* Setup default input report format */
+	kbd_fmt->keyid = HID_REPORT_ID_UNDEFINED;
+	kbd_fmt->tlen = USB_KBD_BOOT_PROTOCOL_PACKET_SIZE;
+	kbd_fmt->klen = kbd_fmt->tlen;
+	kbd_fmt->kpos = 0;
 
-		return (ENOMEM);
+	if (usbkbmd->usbkbm_report_descr == NULL) {
+		return (USB_FAILURE);
 	}
 
-	putnext(usbkbmd->usbkbm_writeq, mctl_ptr);
-	usbkbmd->usbkbm_flags |= USBKBM_QWAIT;
-	while (usbkbmd->usbkbm_flags & USBKBM_QWAIT) {
-		if (qwait_sig(q) == 0) {
-			usbkbmd->usbkbm_flags = 0;
-			(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
-			qprocsoff(q);
-			kmem_free(usbkbmd, sizeof (usbkbm_state_t));
+	/* Get keyboard layout */
+	if (hidparser_get_country_code(usbkbmd->usbkbm_report_descr,
+	    (uint16_t *)&usbkbmd->usbkbm_layout) == HIDPARSER_FAILURE) {
 
-			return (EINTR);
+		USB_DPRINTF_L3(PRINT_MASK_OPEN,
+		    usbkbm_log_handle, "get_country_code failed"
+		    "setting default layout(0)");
+
+		usbkbmd->usbkbm_layout = usbkbm_layout;
+	}
+
+	/* Get the id of the report which contains keyboard data */
+	if (hidparser_get_usage_attribute(
+	    usbkbmd->usbkbm_report_descr,
+	    0, /* Doesn't matter */
+	    HIDPARSER_ITEM_INPUT,
+	    HID_KEYBOARD_KEYPAD_KEYS,
+	    0,
+	    HIDPARSER_ITEM_REPORT_ID,
+	    &rptid) == HIDPARSER_NOT_FOUND) {
+
+		return (USB_SUCCESS);
+	}
+
+	/* Allocate hidparser report structure */
+	kb_rpt = kmem_zalloc(sizeof (hidparser_rpt_t), KM_SLEEP);
+
+	/*
+	 * Check what is the total length of the keyboard packet
+	 * and get the usages and their lengths in order
+	 */
+	rval = hidparser_get_usage_list_in_order(
+	    usbkbmd->usbkbm_report_descr,
+	    rptid,
+	    HIDPARSER_ITEM_INPUT,
+	    kb_rpt);
+	if (rval != HIDPARSER_SUCCESS) {
+
+		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
+		    "get_usage_list_in_order failed");
+		kmem_free(kb_rpt, sizeof (hidparser_rpt_t));
+		return (USB_FAILURE);
+	}
+
+	for (i = 0; i < kb_rpt->no_of_usages; i++) {
+		rptcnt = kb_rpt->usage_descr[i].rptcnt;
+		rptsz = kb_rpt->usage_descr[i].rptsz;
+
+		switch (kb_rpt->usage_descr[i].usage_page) {
+		case HID_KEYBOARD_KEYPAD_KEYS:
+			if (!kbd_page) {
+				kpos = limit;
+				kbd_page = 1;
+			}
+			klen += rptcnt * rptsz;
+			/*FALLTHRU*/
+		default:
+			limit += rptcnt * rptsz;
+			break;
 		}
 	}
 
-	return (0);
+	kmem_free(kb_rpt, sizeof (hidparser_rpt_t));
+
+	/* Invalid input report format */
+	if (!kbd_page || limit > USBKBM_MAXPKTSIZE * 8 ||
+	    kpos + klen > limit || (kpos % 8 != 0)) {
+
+		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
+		    "Invalid input report format: kbd_page (%d), limit (%d), "
+		    "kpos (%d), klen (%d)", kbd_page, limit, kpos, klen);
+		return (USB_FAILURE);
+	}
+
+	/* Set report format */
+	kbd_fmt->keyid = (uint8_t)rptid;
+	kbd_fmt->tlen = limit / 8 + 1;
+	kbd_fmt->klen = klen / 8;
+	kbd_fmt->kpos = kpos / 8;
+
+	return (USB_SUCCESS);
 }

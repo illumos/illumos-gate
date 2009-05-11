@@ -106,13 +106,23 @@ typedef struct poll_keystate {
 
 #define	USBKBM_MAXPKTSIZE	10	/* Maximum size of a packet */
 
+typedef struct usbkbm_report_format {
+	uint8_t	keyid;	/* report id of keyboard input */
+	uint_t	kpos;	/* keycode offset in the keyboard data */
+	uint_t	klen;	/* length of keycodes */
+	uint_t	tlen;	/* length of the input report (inc. report id) */
+} usbkbm_report_format_t;
+
 /* state structure for usbkbm */
 typedef struct  usbkbm_state {
 	struct kbtrans		*usbkbm_kbtrans;
 	queue_t			*usbkbm_readq;		/* read queue */
 	queue_t			*usbkbm_writeq;		/* write queue */
 	int			usbkbm_flags;
-	uint32_t		usbkbm_packet_size;	/* size usb packet */
+
+	/* Report format of keyboard data */
+	usbkbm_report_format_t	usbkbm_report_format;
+
 	/* Pointer to the parser handle */
 	hidparser_handle_t	usbkbm_report_descr;
 	uint16_t		usbkbm_layout;		/* keyboard layout */
