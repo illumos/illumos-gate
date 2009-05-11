@@ -31,13 +31,6 @@
  */
 
 /*
- * Values returned by the AUDIO_GETDEV ioctl()
- */
-#define	M1575_DEV_NAME			"SUNW,audio1575"
-#define	M1575_DEV_CONFIG		"onboard1"
-#define	M1575_DEV_VERSION		"a"
-
-/*
  * Driver supported configuration information
  */
 #define	M1575_NAME			"audio1575"
@@ -52,56 +45,18 @@
  */
 
 /* Misc. defines */
-#define	M1575_CONFIG_DEVICE_ID			M1575_IDNUM
-#define	M1575_CONFIG_VENDOR_ID			(0x10b9)
-#define	M1575_CONFIG_SUBSYSTEM_ID		M1575_IDNUM
-#define	M1575_CONFIG_SUBSYSTEM_VENDOR_ID	M1575_CONFIG_VENDOR_ID
-#define	M1575_AUDIO_PCICFG_SPACE	(0)
 #define	M1575_AUDIO_IO_SPACE		(1)
-#define	M1575_AUDIO_MEM_SPACE		(2)
 
 #define	M1575_LOOP_CTR			(100)
-
-/* Gain and attenuation shift values */
-#define	M1575_GAIN_SHIFT3		(3)
-#define	M1575_GAIN_SHIFT4		(4)
-#define	M1575_BYTE_SHIFT		(8)
 
 /* audio direction */
 #define	M1575_PLAY			(0)
 #define	M1575_REC			(1)
 
-#define	M1575_DMA_PCM_IN		(1)
-#define	M1575_DMA_PCM_OUT		(2)
-
-/* last AC97 saved register */
-#define	M1575_LAST_AC_REG		(0x3a)
-
-/* Restore audio flags */
-#define	M1575_INIT_RESTORE		(0)
-#define	M1575_INIT_NO_RESTORE		~M1575_INIT_RESTORE
-
-/* AC97 codec shadow reg to index macro */
-#define	M1575_CODEC_REG(r)		((r) >> 1)
-
-/* play and record sample buffer counts */
-#define	M1575_PLAY_BUFS			(2)
-#define	M1575_PLAY_BUF_MSK		(M1575_PLAY_BUFS - 1)
-#define	M1575_REC_BUFS			(4)
-#define	M1575_REC_BUF_MSK		(M1575_REC_BUFS - 1)
-
 /* Buffer Descriptor  List defines */
 #define	M1575_BD_NUMS			(32)
 #define	M1575_NUM_PORTS			(2)
 #define	M1575_MOD_SIZE			(16)
-
-/* default buffer size */
-#define	M1575_BSIZE			(8*1024)
-#define	M1575_MOD_SIZE			(16)
-#define	M1575_PLAY_BUF_SZ		(1024)
-#define	M1575_RECORD_BUF_SZ		(1024)
-#define	M1575_BUF_MIN			(512)
-#define	M1575_BUF_MAX			(8192)
 
 /* kstat interrupt counter define */
 #define	M1575_KIOP(X)			((kstat_intr_t *)(X->ksp->ks_data))
@@ -328,6 +283,18 @@
 /* Bits in System Control  Register */
 #define	M1575_SCR_WARMRST	0x00000001
 #define	M1575_SCR_COLDRST	0x00000002
+#define	M1575_SCR_SPDIF_SLOT	0x00300000	/* 1=7/8, 2=6/9, 3=10/11 */
+#define	M1575_SCR_RECMOD	0x000c0000	/* 0 = 16bit, 1=20 bit */
+#define	M1575_SCR_PCMMOD	0x00030000	/* 0 = 16bit, 1=20 bit */
+#define	M1575_SCR_6CHL_MASK	0x0000c000	/* FL, FR, C, BL, BR, LFE */
+#define	M1575_SCR_6CHL_0	0x00000000	/* channel ordering */
+#define	M1575_SCR_6CHL_1	0x00004000	/* FL, C, FR, BL, BR, LFE */
+#define	M1575_SCR_6CHL_2	0x00008000	/* FL, FR, C, LFE, BL, BR */
+#define	M1575_SCR_6CHL_3	0x0000c000	/* FL, C, FR, LFE, BL, BR */
+#define	M1575_SCR_CHAMOD_MASK	0x00000300	/* 2, 4, or 6 channel */
+#define	M1575_SCR_CHAMOD_2	0x00000000	/* 2 channel */
+#define	M1575_SCR_CHAMOD_4	0x00000100	/* 4 channel surround */
+#define	M1575_SCR_CHAMOD_6	0x00000200	/* 6 channel (5.1) surround */
 #define	M1575_SCR_DRENT		0x40000000
 #define	M1575_SCR_MSTRST	0x80000000
 
@@ -435,6 +402,7 @@ struct audio1575_state	{
 	kstat_t			*ksp;			/* kernel statistics */
 
 	boolean_t		suspended;		/* if DDI_SUSPENDed */
+	uint8_t			maxch;			/* maximum channels */
 };
 typedef struct audio1575_state audio1575_state_t;
 

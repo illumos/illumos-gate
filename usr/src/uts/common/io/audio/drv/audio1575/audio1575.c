@@ -43,8 +43,6 @@
  * the number of samples. This, combined with the 16-bit sample size,
  * gives the actual physical length of the buffer.
  *
- * TODO: System power management is not yet supported by the driver.
- *
  * 	NOTE:
  * 	This driver depends on the drv/audio, misc/ac97
  * 	modules being loaded first.
@@ -67,6 +65,7 @@
  */
 static int audio1575_ddi_attach(dev_info_t *, ddi_attach_cmd_t);
 static int audio1575_ddi_detach(dev_info_t *, ddi_detach_cmd_t);
+static int audio1575_ddi_quiesce(dev_info_t *);
 
 /*
  * Entry point routine prototypes
@@ -109,7 +108,7 @@ static int audio1575_resume(dev_info_t *);
 static int audio1575_detach(dev_info_t *);
 static int audio1575_suspend(dev_info_t *);
 
-static int audio1575_alloc_port(audio1575_state_t *, int);
+static int audio1575_alloc_port(audio1575_state_t *, int, uint8_t);
 static void audio1575_free_port(audio1575_port_t *);
 static void audio1575_start_port(audio1575_port_t *);
 static void audio1575_stop_port(audio1575_port_t *);
@@ -123,7 +122,7 @@ static uint16_t audio1575_read_ac97(void *, uint8_t);
 static int audio1575_chip_init(audio1575_state_t *);
 static int audio1575_map_regs(audio1575_state_t *);
 static void audio1575_unmap_regs(audio1575_state_t *);
-static void audio1575_dma_stop(audio1575_state_t *);
+static void audio1575_dma_stop(audio1575_state_t *, boolean_t);
 static void audio1575_pci_enable(audio1575_state_t *);
 static void audio1575_pci_disable(audio1575_state_t *);
 
@@ -151,7 +150,7 @@ static struct dev_ops audio1575_dev_ops = {
 	NULL,			/* devi_cb_ops */
 	NULL,			/* devo_bus_ops */
 	NULL,			/* devo_power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	audio1575_ddi_quiesce,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
@@ -348,6 +347,32 @@ audio1575_ddi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	return (DDI_FAILURE);
 }
+
+/*
+ * audio1575_ddi_quiesce()
+ *
+ * Description:
+ *	Implements the quiesce(9e) entry point.
+ *
+ * Arguments:
+ *	dev_info_t		*dip	Pointer to the device's dev_info struct
+ *
+ * Returns:
+ *	DDI_SUCCESS	The driver was quiesced
+ *	DDI_FAILURE	The driver couldn't be quiesced
+ */
+static int
+audio1575_ddi_quiesce(dev_info_t *dip)
+{
+	audio1575_state_t	*statep;
+
+	if ((statep = ddi_get_driver_private(dip)) == NULL)
+		return (DDI_FAILURE);
+
+	audio1575_dma_stop(statep, B_TRUE);
+	return (DDI_SUCCESS);
+}
+
 
 /*
  * audio1575_intr()
@@ -798,9 +823,28 @@ audio1575_reset_port(audio1575_port_t *port)
 
 	} else {
 
+		uint32_t	scr;
+
 		/* Uli FIFO madness ... */
 		SET32(M1575_FIFOCR1_REG, M1575_FIFOCR1_PCMORST);
 		SET32(M1575_DMACR_REG, M1575_DMACR_PCMOPAUSE);
+
+		/* configure the number of channels properly */
+		scr = GET32(M1575_SCR_REG);
+		scr &= ~(M1575_SCR_6CHL_MASK | M1575_SCR_CHAMOD_MASK);
+		scr |= M1575_SCR_6CHL_2;	/* select our proper ordering */
+		switch (port->nchan) {
+		case 2:
+			scr |= M1575_SCR_CHAMOD_2;
+			break;
+		case 4:
+			scr |= M1575_SCR_CHAMOD_4;
+			break;
+		case 6:
+			scr |= M1575_SCR_CHAMOD_6;
+			break;
+		}
+		PUT32(M1575_SCR_REG, scr);
 
 		PUT8(M1575_PCMOCR_REG, 0);
 		PUT8(M1575_PCMOCR_REG, M1575_CR_RR | M1575_CR_IOCE);
@@ -894,6 +938,7 @@ audio1575_attach(dev_info_t *dip)
 	uint32_t		devid;
 	const char		*name;
 	const char		*rev;
+	int			maxch;
 
 	/* allocate the soft state structure */
 	statep = kmem_zalloc(sizeof (*statep), KM_SLEEP);
@@ -943,16 +988,29 @@ audio1575_attach(dev_info_t *dip)
 	audio_dev_set_description(adev, name);
 	audio_dev_set_version(adev, rev);
 
-
-	/* allocate port structures */
-	if ((audio1575_alloc_port(statep, M1575_PLAY) != DDI_SUCCESS) ||
-	    (audio1575_alloc_port(statep, M1575_REC) != DDI_SUCCESS)) {
-		goto error;
-	}
-
 	statep->ac97 = ac97_alloc(dip, audio1575_read_ac97,
 	    audio1575_write_ac97, statep);
 	ASSERT(statep->ac97 != NULL);
+
+	/*
+	 * Override "max-channels" property to prevent configuration
+	 * of 4 or 6 (or possibly even 8!) channel audio.  The default
+	 * is to support as many channels as the hardware can do.
+	 */
+	maxch = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "max-channels", ac97_num_channels(statep->ac97));
+	if (maxch < 2) {
+		maxch = 2;
+	}
+
+	statep->maxch = min(maxch, 6) & ~1;
+
+	/* allocate port structures */
+	if ((audio1575_alloc_port(statep, M1575_PLAY, statep->maxch) !=
+	    DDI_SUCCESS) ||
+	    (audio1575_alloc_port(statep, M1575_REC, 2) != DDI_SUCCESS)) {
+		goto error;
+	}
 
 	if (audio1575_chip_init(statep) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "failed to init chip");
@@ -1112,13 +1170,15 @@ audio1575_setup_intr(audio1575_state_t *statep)
  *
  * Arguments:
  *	dev_info_t	*dip	Pointer to the device's devinfo
+ *	int		num	M1575_PLAY or M1575_REC
+ *	uint8_t		nchan	Number of channels (2 = stereo, 6 = 5.1, etc.)
  *
  * Returns:
  *	DDI_SUCCESS		Registers successfully mapped
  *	DDI_FAILURE		Registers not successfully mapped
  */
 static int
-audio1575_alloc_port(audio1575_state_t *statep, int num)
+audio1575_alloc_port(audio1575_state_t *statep, int num, uint8_t nchan)
 {
 	ddi_dma_cookie_t	cookie;
 	uint_t			count;
@@ -1140,20 +1200,18 @@ audio1575_alloc_port(audio1575_state_t *statep, int num)
 	port->num = num;
 	port->statep = statep;
 	port->started = B_FALSE;
+	port->nchan = nchan;
 
 	if (num == M1575_REC) {
 		prop = "record-interrupts";
 		dir = DDI_DMA_READ;
 		caps = ENGINE_INPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORKERNEL;
-		port->nchan = 2;
 	} else {
 		prop = "play-interrupts";
 		dir = DDI_DMA_WRITE;
 		caps = ENGINE_OUTPUT_CAP;
 		port->sync_dir = DDI_DMA_SYNC_FORDEV;
-		/* XXX: possibly support multichannel! */
-		port->nchan = 2;
 	}
 
 	port->intrs = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
@@ -1401,9 +1459,11 @@ audio1575_chip_init(audio1575_state_t *statep)
 	uint32_t		intrsr;
 	int 			i;
 	int			j;
+#ifdef	__sparc
 	uint8_t			clk_detect;
-	clock_t			ticks;
 	ddi_acc_handle_t	pcih;
+#endif
+	clock_t			ticks;
 
 	/*
 	 * clear the interrupt control and status register
@@ -1496,6 +1556,7 @@ audio1575_chip_init(audio1575_state_t *statep)
 		return (DDI_FAILURE);
 	}
 
+#ifdef	__sparc
 	/* Magic code from ULi to Turn on the AC_LINK clock */
 	pcih = statep->pcih;
 	pci_config_put8(pcih, M1575_PCIACD_REG, 0);
@@ -1510,6 +1571,7 @@ audio1575_chip_init(audio1575_state_t *statep)
 		audio_dev_warn(statep->adev, "No AC97 Clock Detected");
 		return (DDI_FAILURE);
 	}
+#endif
 
 	/* Magic code from Uli to Init FIFO1 and FIFO2 */
 	PUT32(M1575_FIFOCR1_REG, 0x81818181);
@@ -1519,7 +1581,7 @@ audio1575_chip_init(audio1575_state_t *statep)
 	/* Make sure that PCM in and PCM out are enabled */
 	SET32(M1575_INTFCR_REG, (M1575_INTFCR_PCMIENB | M1575_INTFCR_PCMOENB));
 
-	audio1575_dma_stop(statep);
+	audio1575_dma_stop(statep, B_FALSE);
 
 	return (DDI_SUCCESS);
 }
@@ -1534,7 +1596,7 @@ audio1575_chip_init(audio1575_state_t *statep)
  *	audio1575_state_t *statep	The device's state structure
  */
 static void
-audio1575_dma_stop(audio1575_state_t *statep)
+audio1575_dma_stop(audio1575_state_t *statep, boolean_t quiesce)
 {
 	uint32_t	intrsr;
 	int		i;
@@ -1554,7 +1616,8 @@ audio1575_dma_stop(audio1575_state_t *statep)
 	}
 
 	if (i >= M1575_LOOP_CTR) {
-		audio_dev_warn(statep->adev, "failed to stop DMA");
+		if (!quiesce)
+			audio_dev_warn(statep->adev, "failed to stop DMA");
 		return;
 	}
 
@@ -1880,7 +1943,7 @@ audio1575_suspend(dev_info_t *dip)
 	/*
 	 * stop all DMA operations
 	 */
-	audio1575_dma_stop(statep);
+	audio1575_dma_stop(statep, B_FALSE);
 
 	mutex_exit(&statep->lock);
 
@@ -1906,7 +1969,7 @@ audio1575_destroy(audio1575_state_t *statep)
 	ddi_acc_handle_t	pcih;
 
 	/* stop DMA engines */
-	audio1575_dma_stop(statep);
+	audio1575_dma_stop(statep, B_FALSE);
 
 	if (statep->regsh != NULL) {
 		/* reset the codec */

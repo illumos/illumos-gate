@@ -999,32 +999,6 @@ audio810_attach(dev_info_t *dip)
 	devid |= pci_config_get16(pcih, PCI_CONF_DEVID);
 	pci_config_teardown(&pcih);
 
-	/*
-	 * Override "max-channels" property to prevent configuration
-	 * of 4 or 6 (or possibly even 8!) channel audio.  The default
-	 * is to support as many channels as the hardware can do.
-	 *
-	 * (Hmmm... perhaps this should be driven in the common
-	 * framework.  The framework could even offer simplistic upmix
-	 * and downmix for various standard configs.)
-	 */
-	maxch = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "max-channels", 8);
-	if (maxch < 2) {
-		maxch = 2;
-	}
-
-	gsr = I810_BM_GET32(I810_REG_GSR);
-	if (gsr & I810_GSR_CAP6CH) {
-		nch = 6;
-	} else if (gsr & I810_GSR_CAP4CH) {
-		nch = 4;
-	} else {
-		nch = 2;
-	}
-
-	statep->maxch = (uint8_t)min(nch, maxch);
-	statep->maxch &= ~1;
 	name = "Unknown AC'97";
 	vers = "";
 
@@ -1124,10 +1098,9 @@ audio810_attach(dev_info_t *dip)
 	audio_dev_set_description(adev, name);
 	audio_dev_set_version(adev, vers);
 
-	/* allocate port structures */
-	if ((audio810_alloc_port(statep, I810_PCM_OUT, statep->maxch) !=
-	    DDI_SUCCESS) ||
-	    (audio810_alloc_port(statep, I810_PCM_IN, 2) != DDI_SUCCESS)) {
+	/* initialize audio controller and AC97 codec */
+	if (audio810_chip_init(statep) != DDI_SUCCESS) {
+		audio_dev_warn(adev, "failed to init chip");
 		goto error;
 	}
 
@@ -1139,15 +1112,43 @@ audio810_attach(dev_info_t *dip)
 		goto error;
 	}
 
-	/* initialize audio controller and AC97 codec */
-	if (audio810_chip_init(statep) != DDI_SUCCESS) {
-		audio_dev_warn(adev, "failed to init chip");
-		goto error;
-	}
-
 	/* initialize the AC'97 part */
 	if (ac97_init(statep->ac97, adev) != DDI_SUCCESS) {
 		audio_dev_warn(adev, "ac'97 initialization failed");
+		goto error;
+	}
+
+	/*
+	 * Override "max-channels" property to prevent configuration
+	 * of 4 or 6 (or possibly even 8!) channel audio.  The default
+	 * is to support as many channels as the hardware can do.
+	 *
+	 * (Hmmm... perhaps this should be driven in the common
+	 * framework.  The framework could even offer simplistic upmix
+	 * and downmix for various standard configs.)
+	 */
+	maxch = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "max-channels", ac97_num_channels(statep->ac97));
+	if (maxch < 2) {
+		maxch = 2;
+	}
+
+	gsr = I810_BM_GET32(I810_REG_GSR);
+	if (gsr & I810_GSR_CAP6CH) {
+		nch = 6;
+	} else if (gsr & I810_GSR_CAP4CH) {
+		nch = 4;
+	} else {
+		nch = 2;
+	}
+
+	statep->maxch = (uint8_t)min(nch, maxch);
+	statep->maxch &= ~1;
+
+	/* allocate port structures */
+	if ((audio810_alloc_port(statep, I810_PCM_OUT, statep->maxch) !=
+	    DDI_SUCCESS) ||
+	    (audio810_alloc_port(statep, I810_PCM_IN, 2) != DDI_SUCCESS)) {
 		goto error;
 	}
 

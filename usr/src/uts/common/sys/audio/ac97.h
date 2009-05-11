@@ -608,6 +608,7 @@ int ac97_init(ac97_t *, audio_dev_t *);
 void ac97_suspend(ac97_t *);
 void ac97_resume(ac97_t *);
 void ac97_reset(ac97_t *);
+int ac97_num_channels(ac97_t *);
 
 #endif	/* _KERNEL */
 

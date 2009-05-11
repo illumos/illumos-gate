@@ -98,6 +98,7 @@ struct ac97 {
 	ac97_rd_t	rd;	/* drivers port read routine */
 	ac97_wr_t	wr;	/* drivers port write routine */
 	char		name[128]; /* driver instance name */
+	uint8_t		nchan;
 
 	uint16_t	shadow[NUM_SHADOW];
 
@@ -131,6 +132,7 @@ struct ac97 {
 	list_t		ctrls;
 
 	uint64_t	inputs;
+
 };
 
 struct modlmisc ac97_modlmisc = {
@@ -1331,6 +1333,14 @@ ac97_resume(ac97_t *ac)
 	mutex_exit(&ac->ac_lock);
 }
 
+/*
+ * Return the number of channels supported by this codec.
+ */
+int
+ac97_num_channels(ac97_t *ac)
+{
+	return (ac->nchan);
+}
 
 /*
  * Register a control -- if it fails, it will generate a message to
@@ -1846,6 +1856,7 @@ int
 ac97_init(ac97_t *ac, struct audio_dev *d)
 {
 	uint32_t		vid1, vid2;
+	uint16_t		ear;
 	const char		*name = NULL;
 	const char		*vendor = NULL;
 	int			enh_bits;
@@ -1928,11 +1939,13 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 		}
 	}
 
+	/* Read EAR just once. */
+	ear = RD(AC97_EXTENDED_AUDIO_REGISTER);
+
 	/*
 	 * If not a headphone, is it 4CH_OUT (surround?)
 	 */
-	if ((!(ac->flags & AC97_FLAG_AUX_HP)) &&
-	    (RD(AC97_EXTENDED_AUDIO_REGISTER) & EAR_SDAC)) {
+	if ((!(ac->flags & AC97_FLAG_AUX_HP)) && (ear & EAR_SDAC)) {
 		if (ac97_probe_reg(ac, AC97_EXTENDED_LRS_VOLUME_REGISTER)) {
 			ac->flags |= AC97_FLAG_AUX_4CH;
 		}
@@ -1947,15 +1960,31 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 		}
 	}
 
+	/*
+	 * How many channels?
+	 */
+	ac->nchan = 2;
+	if (ear & EAR_SDAC) {
+		ac->nchan += 2;
+	}
+	if (ear & EAR_CDAC) {
+		ac->nchan++;
+	}
+	if (ear & EAR_LDAC) {
+		ac->nchan++;
+	}
+
 	ac->flags |= flags;
-	(void) snprintf(ac->name, sizeof (ac->name), "%s %s", vendor, name);
+	(void) snprintf(ac->name, sizeof (ac->name), "%s %s (%d channels)",
+	    vendor, name, ac->nchan);
 
 	(void) snprintf(buf, sizeof (buf), "AC'97 codec: %s", ac->name);
 	audio_dev_add_info(d, buf);
 
-	cmn_err(CE_CONT, "?%s#%d: AC'97 codec id %s (%x, caps %x)\n",
+	cmn_err(CE_CONT,
+	    "?%s#%d: AC'97 codec id %s (%x, %d channels, caps %x)\n",
 	    ddi_driver_name(ac->dip), ddi_get_instance(ac->dip),
-	    ac->name, ac->vid, ac->caps);
+	    ac->name, ac->vid, ac->nchan, ac->caps);
 
 	/*
 	 * Probe and register all known controls with framework

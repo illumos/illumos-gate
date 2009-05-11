@@ -43,7 +43,6 @@
 # SUNWaudd
 #
 f none kernel/drv/audiocs.conf 644 root sys
-f none kernel/drv/audio1575.conf 644 root sys
 d none kernel/drv/sparcv9 755 root sys
 f none kernel/drv/sparcv9/audio 755 root sys
 f none kernel/drv/sparcv9/audiocs 755 root sys

@@ -196,6 +196,7 @@ DRV_KMODS	+= ata
 DRV_KMODS	+= ath
 DRV_KMODS	+= atu
 DRV_KMODS	+= audio
+DRV_KMODS	+= audio1575
 DRV_KMODS	+= audio810
 DRV_KMODS	+= audioens
 DRV_KMODS	+= audiohd
