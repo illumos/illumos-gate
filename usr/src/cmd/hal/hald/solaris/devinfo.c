@@ -2,7 +2,7 @@
  *
  * devinfo.c : main file for libdevinfo-based device enumeration
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -141,6 +141,7 @@ static DevinfoDevHandler *devinfo_handlers[] = {
 	&devinfo_acpi_handler,
 	&devinfo_power_button_handler,
 	&devinfo_keyboard_handler,
+	&devinfo_mouse_handler,
 	&devinfo_default_handler,
 	NULL
 };
@@ -427,4 +428,3 @@ get_devlink(di_devlink_handle_t devlink_hdl, char *re, char *path)
 
         return (devlink_path);
 }
-

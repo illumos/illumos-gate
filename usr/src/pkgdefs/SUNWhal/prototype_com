@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -56,6 +55,7 @@ f none usr/lib/hal/hald-probe-network-printer 555 root bin
 f none usr/lib/hal/hald-probe-printer 555 root bin
 f none usr/lib/hal/hald-probe-storage 555 root bin
 f none usr/lib/hal/hald-probe-volume 555 root bin
+f none usr/lib/hal/hald-probe-xkb 555 root bin
 f none usr/lib/hal/hald-runner 555 root bin
 f none usr/lib/hal/hal-functions 555 root bin
 f none usr/lib/hal/hal-is-caller-privileged 555 root bin

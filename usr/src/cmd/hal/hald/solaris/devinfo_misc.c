@@ -2,14 +2,12 @@
  *
  * devinfo_misc : misc devices
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -31,7 +29,9 @@
 
 static HalDevice *devinfo_computer_add(HalDevice *, di_node_t, char *, char *);
 static HalDevice *devinfo_keyboard_add(HalDevice *, di_node_t, char *, char *);
+static HalDevice *devinfo_mouse_add(HalDevice *, di_node_t, char *, char *);
 static HalDevice *devinfo_default_add(HalDevice *, di_node_t, char *, char *);
+const gchar *devinfo_keyboard_get_prober(HalDevice *d, int *timeout);
 
 DevinfoDevHandler devinfo_computer_handler = {
 	devinfo_computer_add,
@@ -44,6 +44,15 @@ DevinfoDevHandler devinfo_computer_handler = {
 
 DevinfoDevHandler devinfo_keyboard_handler = {
 	devinfo_keyboard_add,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	devinfo_keyboard_get_prober
+};
+
+DevinfoDevHandler devinfo_mouse_handler = {
+	devinfo_mouse_add,
 	NULL,
 	NULL,
 	NULL,
@@ -119,18 +128,69 @@ devinfo_keyboard_add(HalDevice *parent, di_node_t node, char *devfs_path,
     char *device_type)
 {
 	HalDevice *d;
+	char	udi[HAL_PATH_MAX];
 
 	if (strcmp(di_node_name(node), "keyboard") != 0) {
 		return (NULL);
 	}
 
-	d = hal_device_new ();
+	d = hal_device_new();
 
-	devinfo_set_default_properties (d, parent, node, devfs_path);
-	hal_device_add_capability (d, "input.keyboard");
+	devinfo_set_default_properties(d, parent, node, devfs_path);
+
+	hal_device_add_capability(d, "input");
+	hal_device_add_capability(d, "input.keyboard");
+	hal_device_add_capability(d, "input.keys");
 	hal_device_add_capability(d, "button");
 
-	devinfo_add_enqueue (d, devfs_path, &devinfo_keyboard_handler);
+	hal_device_property_set_string(d, "info.subsystem", "input");
+	hal_device_property_set_string(d, "info.category", "input");
+	hal_device_property_set_string(d, "input.device", "/dev/kbd");
+	hal_device_property_set_string(d, "input.originating_device",
+	    hal_device_get_udi(d));
+
+	hal_util_compute_udi(hald_get_gdl(), udi, sizeof (udi),
+	    "%s_logicaldev_input", hal_device_get_udi(d));
+
+	hal_device_set_udi(d, udi);
+	hal_device_property_set_string(d, "info.udi", udi);
+
+	devinfo_add_enqueue(d, devfs_path, &devinfo_keyboard_handler);
+
+	return (d);
+}
+
+static HalDevice *
+devinfo_mouse_add(HalDevice *parent, di_node_t node, char *devfs_path,
+    char *device_type)
+{
+	HalDevice *d;
+	char	udi[HAL_PATH_MAX];
+
+	if (strcmp(di_node_name(node), "mouse") != 0) {
+		return (NULL);
+	}
+
+	d = hal_device_new();
+
+	devinfo_set_default_properties(d, parent, node, devfs_path);
+
+	hal_device_add_capability(d, "input");
+	hal_device_add_capability(d, "input.mouse");
+
+	hal_device_property_set_string(d, "info.subsystem", "input");
+	hal_device_property_set_string(d, "info.category", "input");
+	hal_device_property_set_string(d, "input.device", "/dev/mouse");
+	hal_device_property_set_string(d, "input.originating_device",
+	    hal_device_get_udi(d));
+
+	hal_util_compute_udi(hald_get_gdl(), udi, sizeof (udi),
+	    "%s_logicaldev_input", hal_device_get_udi(d));
+
+	hal_device_set_udi(d, udi);
+	hal_device_property_set_string(d, "info.udi", udi);
+
+	devinfo_add_enqueue(d, devfs_path, &devinfo_mouse_handler);
 
 	return (d);
 }

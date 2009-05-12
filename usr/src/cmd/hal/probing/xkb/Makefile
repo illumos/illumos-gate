@@ -22,19 +22,40 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#
 
-SUBDIRS = storage volume printer network-printer acpi xkb 
+PROG =		hald-probe-xkb
+OBJS =		probe-xkb.o logger.o
+SRCS =		probe-xkb.c
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
+include ../../../Makefile.cmd
+include ../../Makefile.hal
+
+ROOTCMDDIR =	$(ROOTLIB_HAL)
+
+LDLIBS +=	-lc -ldbus-1 -lhal
+
+CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
+CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../hald
+C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:
 
-all install clean clobber: $(SUBDIRS)
+all: $(PROG)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+logger.o: ../../hald/logger.c
+	$(COMPILE.c) -o $@ ../../hald/logger.c
+	$(POST_PROCESS_O)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTCMD)
+
+clean:
+	$(RM) $(OBJS) $(PROG)
 
 FRC:
+
+include ../../../Makefile.targ
