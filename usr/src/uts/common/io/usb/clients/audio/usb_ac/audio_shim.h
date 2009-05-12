@@ -40,14 +40,8 @@
 extern "C" {
 #endif
 
+
 typedef enum {DBG_WARN = 1, DBG_INFO, DBG_DETAIL} debug_level_t;
-
-void vdprint(debug_level_t lvl, const char *fmt, va_list adx);
-void dprint(debug_level_t lvl, const char *fmt, ...);
-void dwarn(const char *fmt, ...);
-void dinfo(const char *fmt, ...);
-void ddtl(const char *fmt, ...);
-
 
 int am_unregister(audiohdl_t handle);
 

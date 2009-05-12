@@ -532,7 +532,6 @@ usb_as_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
 	int		inst = USB_AS_MINOR_TO_INSTANCE(getminor(*devp));
 	usb_as_state_t	*uasp = ddi_get_soft_state(usb_as_statep, inst);
-	char		*nm = "usb_as_open";
 
 	if (uasp == NULL) {
 
@@ -540,13 +539,16 @@ usb_as_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	}
 
 	/* Do mux plumbing stuff */
-	dinfo("%s: %s\n", uasp->dstr, nm);
+	USB_DPRINTF_L4(PRINT_MASK_OPEN, uasp->usb_as_log_handle,
+	    "usb_as_open: start");
 
 	mutex_enter(&uasp->usb_as_mutex);
 
 	if (uasp->usb_as_flag == USB_AS_OPEN || credp != kcred) {
-		dwarn("%s: multiple opens or opens from userspace not "
-		    "supported\n", uasp->dstr);
+		USB_DPRINTF_L2(PRINT_MASK_OPEN, uasp->usb_as_log_handle,
+		    "usb_as_open:multiple opens or opens from userspace"
+		    " not supported");
+
 		mutex_exit(&uasp->usb_as_mutex);
 
 		return (ENXIO);
@@ -554,7 +556,8 @@ usb_as_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 	/* fail open on a disconnected device */
 	if (uasp->usb_as_dev_state == USB_DEV_DISCONNECTED) {
-		dinfo("%s: %s disconnected\n", uasp->dstr, nm);
+		USB_DPRINTF_L2(PRINT_MASK_OPEN, uasp->usb_as_log_handle,
+		    "usb_as_open: disconnected");
 		mutex_exit(&uasp->usb_as_mutex);
 
 		return (ENODEV);
@@ -570,7 +573,8 @@ usb_as_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	usb_as_pm_busy_component(uasp);
 	(void) pm_raise_power(uasp->usb_as_dip, 0, USB_DEV_OS_FULL_PWR);
 
-	dinfo("%s: %s done\n", uasp->dstr, nm);
+	USB_DPRINTF_L4(PRINT_MASK_OPEN, uasp->usb_as_log_handle,
+	    "usb_as_open:done");
 
 	return (0);
 }

@@ -46,9 +46,7 @@
 
 #include "audio_shim.h"
 
-extern void *usb_ac_statep;
 
-extern struct cb_ops audio_cb_ops;
 
 
 /*
@@ -338,7 +336,7 @@ static int ashim_ctrl_map_len =
 
 int ashim_debug = DBG_WARN;
 
-void
+static void
 vdprint(debug_level_t lvl, const char *fmt, va_list adx)
 {
 	if (ashim_debug < lvl)
@@ -347,17 +345,7 @@ vdprint(debug_level_t lvl, const char *fmt, va_list adx)
 	vcmn_err(CE_CONT, fmt, adx);
 }
 
-void
-dprint(debug_level_t lvl, const char *fmt, ...)
-{
-	va_list adx;
-
-	va_start(adx, fmt);
-	vdprint(lvl, fmt, adx);
-	va_end(adx);
-}
-
-void
+static void
 dwarn(const char *fmt, ...)
 {
 	va_list adx;
@@ -367,7 +355,7 @@ dwarn(const char *fmt, ...)
 	va_end(adx);
 }
 
-void
+static void
 dinfo(const char *fmt, ...)
 {
 	va_list adx;
@@ -377,7 +365,7 @@ dinfo(const char *fmt, ...)
 	va_end(adx);
 }
 
-void
+static void
 ddtl(const char *fmt, ...)
 {
 	va_list adx;
