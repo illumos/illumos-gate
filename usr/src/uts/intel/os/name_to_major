@@ -5,6 +5,7 @@ ip 3
 logindmux 4
 icmp 5
 openeepr 6
+hme 7
 clone 11
 sad 12
 mm 13
