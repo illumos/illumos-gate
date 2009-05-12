@@ -2329,16 +2329,17 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	 * We are removing a passive client, we haven't setup the datapath
 	 * for this yet, so nothing much to do.
 	 */
-	if ((mcip->mci_state_flags & MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) != 0) {
+	if ((mcip->mci_flags & MAC_CLIENT_FLAGS_PASSIVE_PRIMARY) != 0) {
 
 		ASSERT((mcip->mci_flent->fe_flags & FE_MC_NO_DATAPATH) != 0);
 		ASSERT(mcip->mci_p_unicast_list == muip);
+
+		mcip->mci_flags &= ~MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
 
 		mcip->mci_p_unicast_list = NULL;
 		mcip->mci_rx_p_fn = NULL;
 		mcip->mci_rx_p_arg = NULL;
 
-		mcip->mci_state_flags &= ~MAC_CLIENT_FLAGS_PASSIVE_PRIMARY;
 		mcip->mci_state_flags &= ~MCIS_UNICAST_HW;
 
 		if (mcip->mci_state_flags & MCIS_TAG_DISABLE)
