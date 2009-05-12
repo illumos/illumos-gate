@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -47,6 +47,7 @@ f none usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so 755 root sys
 d none usr/lib/dtrace 755 root bin
 f none usr/lib/dtrace/drti.o 644 root bin
 f none usr/lib/dtrace/errno.d 644 root bin
+f none usr/lib/dtrace/fc.d 644 root bin
 f none usr/lib/dtrace/io.d 644 root bin
 f none usr/lib/dtrace/ip.d 644 root bin
 f none usr/lib/dtrace/net.d 644 root bin
@@ -54,6 +55,7 @@ f none usr/lib/dtrace/nfs.d 644 root bin
 f none usr/lib/dtrace/procfs.d 644 root bin
 f none usr/lib/dtrace/regs.d 644 root bin
 f none usr/lib/dtrace/sched.d 644 root bin
+f none usr/lib/dtrace/scsi.d 644 root bin
 f none usr/lib/dtrace/signal.d 644 root bin
 f none usr/lib/dtrace/sysevent.d 644 root bin
 f none usr/lib/dtrace/unistd.d 644 root bin
