@@ -88,13 +88,14 @@ ld_map_out(Ofl_desc *ofl)
 			continue;
 
 		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
+			int	os_isdescs_idx;
 			Aliste	idx3;
 
 			(void) printf(MSG_INTL(MSG_ENT_MAP_ENTRY_1),
 			    osp->os_name, EC_ADDR(osp->os_shdr->sh_addr),
 			    EC_XWORD(osp->os_shdr->sh_size));
 
-			for (APLIST_TRAVERSE(osp->os_isdescs, idx3, isp)) {
+			OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx3, isp) {
 				Addr	addr;
 
 				/*

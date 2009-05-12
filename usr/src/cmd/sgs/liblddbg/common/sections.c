@@ -357,16 +357,18 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 		str = MSG_INTL(MSG_ORD_SORT_AFTER);
 
 	for (APLIST_TRAVERSE(ofl->ofl_ordered, idx1, osp)) {
+		int		os_isdescs_idx;
 		Aliste		idx2;
-		Sort_desc	*sort = osp->os_sort;
 
 		Dbg_util_nl(lml, DBG_NL_STD);
 		dbg_print(lml, str, osp->os_name);
 		dbg_print(lml, MSG_INTL(MSG_ORD_HDR_1),
-		    EC_WORD(sort->st_beforecnt), EC_WORD(sort->st_aftercnt),
-		    EC_WORD(sort->st_ordercnt));
+		    EC_WORD(aplist_nitems(osp->os_isdescs[OS_ISD_BEFORE])),
+		    EC_WORD(aplist_nitems(osp->os_isdescs[OS_ISD_ORDERED])),
+		    EC_WORD(aplist_nitems(osp->os_isdescs[OS_ISD_DEFAULT])),
+		    EC_WORD(aplist_nitems(osp->os_isdescs[OS_ISD_AFTER])));
 
-		for (APLIST_TRAVERSE(osp->os_isdescs, idx2, isp1)) {
+		OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx2, isp1) {
 			dbg_isec_name_buf_t	buf;
 			char			*alloc_mem;
 			const char		*isp1_str;

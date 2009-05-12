@@ -88,7 +88,11 @@
 #     the file specified by LD_DEBUG_OUTPUT is used. If LD_DEBUG_OUTPUT
 #     is used, the output file name is suffixed with the process id.
 #     An output file specified via the "output" token is used as
-#     specified, without a process id suffix.
+#     specified, without a process id suffix. Use of the "output"
+#     token with programs that call fork() results in each process
+#     writing debug output to the same file. The debug output will be
+#     jumbled and incomplete. LD_DEBUG_OUTPUT should be used in such
+#     cases to direct debug output for each process to a unique file.
 #
 #     All runtime linker diagnostics are prepended with the process
 #     id. If thread capabilities are enabled for the process, the
@@ -133,20 +137,33 @@
 # TRANSLATION_NOTE -- do not translate "output"
 @ MSG_USE_R2_L	"    An output file specified via the \"output\" token \
 		     is used as"
-@ MSG_USE_R2_M	"    specified, without a process id suffix."
+
+# TRANSLATION_NOTE -- do not translate "output"
+@ MSG_USE_R2_M	"    specified, without a process id suffix. Use \
+		     of the \"output\""
+
+# TRANSLATION_NOTE -- do not translate "fork"
+@ MSG_USE_R2_N	"    token with programs that call fork() results in \
+		     each process"
+@ MSG_USE_R2_O	"    writing debug output to the same file. The debug \
+		     output will be"
+@ MSG_USE_R2_P	"    jumbled and incomplete. LD_DEBUG_OUTPUT should be \
+		     used in such"
+@ MSG_USE_R2_Q	"    cases to direct debug output for each process to \
+		     a unique file."
 
 
-@ MSG_USE_R2_N	"    All runtime linker diagnostics are prepended with \
+@ MSG_USE_R2_R	"    All runtime linker diagnostics are prepended with \
 		 the process"
-@ MSG_USE_R2_O	"    id. If thread capabilities are enabled for the \
+@ MSG_USE_R2_S	"    id. If thread capabilities are enabled for the \
 		 process, the"
-@ MSG_USE_R2_P	"    thread id is also shown. All Solaris applications are \
+@ MSG_USE_R2_T	"    thread id is also shown. All Solaris applications are \
 		 thread"
-@ MSG_USE_R2_Q	"    capable, and a single threaded application may \
+@ MSG_USE_R2_U	"    capable, and a single threaded application may \
 		 use threads via"
-@ MSG_USE_R2_R	"    the libraries it links to. Diagnostics from such \
+@ MSG_USE_R2_V	"    the libraries it links to. Diagnostics from such \
 		 applications"
-@ MSG_USE_R2_S	"    reference thread id 1."
+@ MSG_USE_R2_W	"    reference thread id 1."
 
 # TRANSLATION_NOTE - End of reference 2
 
@@ -969,8 +986,8 @@
 
 @ MSG_ORD_SORT_BEFORE	"section=%s; requires output section reordering:"
 @ MSG_ORD_SORT_AFTER	"section=%s; output section reordered:"
-@ MSG_ORD_HDR_1		" number of SHN_BEGIN=%u, SHN_AFTER=%u, \
-			 sh_info/sh_link=%u"
+@ MSG_ORD_HDR_1		" number of SHN_BEGIN=%u, ordered=%u, default=%u, \
+			 SHN_AFTER=%u"
 @ MSG_ORD_TITLE_1	" %s=SHN_BEGIN: section=%s from %s"
 @ MSG_ORD_TITLE_2	" %s=SHN_AFTER: section=%s from %s"
 @ MSG_ORD_TITLE_3	" sort key=%u: section=%s from %s, %s=%s"

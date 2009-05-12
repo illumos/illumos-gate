@@ -156,16 +156,18 @@ Dbg_help(void)
 	dbg_print(0, MSG_INTL(MSG_USE_R2_K));
 	dbg_print(0, MSG_INTL(MSG_USE_R2_L));
 	dbg_print(0, MSG_INTL(MSG_USE_R2_M));
-
-	Dbg_util_nl(0, DBG_NL_FRC);
-	dbg_print(0, MSG_INTL(MSG_USE_R2_L));
-	dbg_print(0, MSG_INTL(MSG_USE_R2_M));
 	dbg_print(0, MSG_INTL(MSG_USE_R2_N));
 	dbg_print(0, MSG_INTL(MSG_USE_R2_O));
 	dbg_print(0, MSG_INTL(MSG_USE_R2_P));
 	dbg_print(0, MSG_INTL(MSG_USE_R2_Q));
+
+	Dbg_util_nl(0, DBG_NL_FRC);
 	dbg_print(0, MSG_INTL(MSG_USE_R2_R));
 	dbg_print(0, MSG_INTL(MSG_USE_R2_S));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_T));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_U));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_V));
+	dbg_print(0, MSG_INTL(MSG_USE_R2_W));
 
 	Dbg_util_nl(0, DBG_NL_FRC);
 	dbg_print(0, MSG_INTL(MSG_USE_R3_A));

@@ -511,9 +511,11 @@ ld_create_outfile(Ofl_desc *ofl)
 		shidx = 0;
 		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			Aliste	idx3;
+			int	os_isdescs_idx;
 
 			dataidx = 0;
-			for (APLIST_TRAVERSE(osp->os_isdescs, idx3, isp)) {
+
+			OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx3, isp) {
 				Elf_Data	*data;
 				Ifl_desc	*ifl = isp->is_file;
 

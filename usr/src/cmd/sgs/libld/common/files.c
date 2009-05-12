@@ -1853,75 +1853,68 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	}
 
 	/*
-	 * Now that all of input sections have been processed, place them
-	 * in the appropriate output sections.
+	 * Now that all of the input sections have been processed, place
+	 * them in the appropriate output sections.
 	 */
 	for (ndx = 1; ndx < ifl->ifl_shnum; ndx++) {
 		Is_desc	*isp;
-		Shdr	*shdr;
 
 		if (((isp = ifl->ifl_isdesc[ndx]) == NULL) ||
 		    ((isp->is_flags & FLG_IS_PLACE) == 0))
 			continue;
 
-		shdr = isp->is_shdr;
-
 		/*
 		 * Place all non-ordered sections within their appropriate
 		 * output section.
-		 *
-		 * Ordered sections are sorted based on the relative ordering
-		 * of the section pointed to by the sh_info entry.  An ordered
-		 * section, whose sh_link points to itself, must also be placed
-		 * in the output image so as to control the ordered processing
-		 * that follows (see FLG_IF_ORDERED below).
 		 */
-		if (((isp->is_flags & FLG_IS_ORDERED) == 0) ||
-		    ((ndx == shdr->sh_link) &&
-		    (shdr->sh_flags & SHF_ORDERED))) {
+		if ((isp->is_flags & FLG_IS_ORDERED) == 0) {
 			if (ld_place_section(ofl, isp,
-			    isp->is_keyident, 0) == (Os_desc *)S_ERROR)
+			    isp->is_keyident, NULL) == (Os_desc *)S_ERROR)
 				return (S_ERROR);
+			continue;
 		}
 
 		/*
-		 * If a section requires ordered processing, keep track of the
-		 * section index and count to optimize later section traversal.
+		 * Count the number of ordered sections and retain the first
+		 * ordered section index. This will be used to optimize the
+		 * ordered section loop that immediately follows this one.
 		 */
-		if (isp->is_flags & FLG_IS_ORDERED) {
-			ordcnt++;
-			if (ordndx == 0)
-				ordndx = ndx;
-		}
+		ordcnt++;
+		if (ordndx == 0)
+			ordndx = ndx;
 	}
 
 	/*
-	 * Some sections have special ordering requirements, that are based off
-	 * of the section pointed to by their sh_info entry.  This controlling
-	 * section will have been placed (above), and thus any ordered sections
-	 * can now be processed.
+	 * Having placed all the non-ordered sections, it is now
+	 * safe to place SHF_ORDERED/SHF_LINK_ORDER sections.
 	 */
 	if (ifl->ifl_flags & FLG_IF_ORDERED) {
-		Word	cnt = 0;
-
-		for (ndx = ordndx;
-		    (ndx < ifl->ifl_shnum) && (cnt < ordcnt); ndx++) {
+		for (ndx = ordndx; ndx < ifl->ifl_shnum; ndx++) {
 			Is_desc	*isp;
 
 			if (((isp = ifl->ifl_isdesc[ndx]) == NULL) ||
-			    ((isp->is_flags & FLG_IS_ORDERED) == 0))
+			    ((isp->is_flags &
+			    (FLG_IS_PLACE | FLG_IS_ORDERED)) !=
+			    (FLG_IS_PLACE | FLG_IS_ORDERED)))
 				continue;
 
+			/* ld_process_ordered() calls ld_place_section() */
 			if (ld_process_ordered(ifl, ofl, ndx) == S_ERROR)
 				return (S_ERROR);
+
+			/* If we've done them all, stop searching */
+			if (--ordcnt == 0)
+				break;
 		}
 	}
 
 	/*
-	 * If this is an explicit shared object determine if the user has
-	 * specified a control definition.  This descriptor may specify which
-	 * version definitions can be used from this object (it may also update
-	 * the dependency to USED and supply an alternative SONAME).
+	 * If this is a shared object explicitly specified on the command
+	 * line (as opposed to being a dependency of such an object),
+	 * determine if the user has specified a control definition. This
+	 * descriptor may specify which version definitions can be used
+	 * from this object. It may also update the dependency to USED and
+	 * supply an alternative SONAME.
 	 */
 	sdf = 0;
 	if (column && (ifl->ifl_flags & FLG_IF_NEEDED)) {

@@ -3123,7 +3123,7 @@ update_ogroup(Ofl_desc *ofl)
 		 * output GROUP sections - we know there is only one
 		 * item on the list.
 		 */
-		isp = (Is_desc *)osp->os_isdescs->apl_data[0];
+		isp = ld_os_first_isdesc(osp);
 
 		ifl = isp->is_file;
 		sdp = ifl->ifl_oldndx[isp->is_shdr->sh_info];
@@ -3192,7 +3192,7 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 	 * then there is no translation to do.  In this case we will assume that
 	 * if sh_link has a value, it's the right value.
 	 */
-	isp = (Is_desc *)osp->os_isdescs->apl_data[0];
+	isp = ld_os_first_isdesc(osp);
 	if ((ifl = isp->is_file) == NULL)
 		return (link);
 

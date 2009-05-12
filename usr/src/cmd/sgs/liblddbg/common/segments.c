@@ -123,6 +123,7 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 	Elf_Data	*data;
 	Shdr		*shdr;
 	const char	*empty = MSG_ORIG(MSG_STR_EMPTY);
+	int		os_isdescs_idx;
 
 	if (DBG_NOTCLASS(DBG_C_SEGMENTS))
 		return;
@@ -142,7 +143,7 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 	if (DBG_NOTDETAIL())
 		return;
 
-	for (APLIST_TRAVERSE(osp->os_isdescs, idx, isp)) {
+	OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx, isp) {
 		dbg_isec_name_buf_t	buf;
 		char			*alloc_mem;
 		const char		*file, *str;

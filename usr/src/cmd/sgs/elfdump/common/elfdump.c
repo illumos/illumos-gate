@@ -577,8 +577,9 @@ unwind_eh_frame(Cache *cache, Word shndx, Phdr *uphdr, Ehdr *ehdr,
 			    ehdr->e_ident, shdr->sh_addr, ndx);
 			/*LINTED:E_VAR_USED_BEFORE_SET*/
 			if ((tabndx != 0) && (initloc0 > initloc))
-				dbg_print(0, MSG_INTL(MSG_ERR_BADSORT),
-				    file, _cache->c_name, EC_WORD(tabndx));
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSORT), file,
+				    _cache->c_name, EC_WORD(tabndx));
 			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTABENT),
 			    EC_XWORD(initloc),
 			    EC_XWORD(dwarf_ehe_extract(data, &ndx,
@@ -727,7 +728,7 @@ unwind_exception_ranges(Cache *_cache, const char *file, int do_swap)
 		addr = SRELPTR(ret_addr);
 		/*LINTED:E_VAR_USED_BEFORE_SET*/
 		if ((i != 0) && (addr0 > addr))
-			dbg_print(0, MSG_INTL(MSG_ERR_BADSORT),
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSORT),
 			    file, _cache->c_name, EC_WORD(i));
 
 		(void) snprintf(index, MAXNDXSIZE, MSG_ORIG(MSG_FMT_INDEX),

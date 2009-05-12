@@ -155,7 +155,7 @@
 			(1 expected)\n"
 @ MSG_ERR_BADEHFRMPTR	"%s: section[%d: %s] FramePtr (%#llx) does not match \
 			 shdr[%d: %s].sh_addr (%#llx)\n"
-@ MSG_ERR_BADSORT	"%s: %s: index[%d]: invalid sort order"
+@ MSG_ERR_BADSORT	"%s: %s: index[%d]: invalid sort order\n"
 
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"

@@ -54,8 +54,8 @@ extern "C" {
 #endif
 
 /*
- * Define Dbg_*() interface flags.  These flags direct the debugging routine to
- * generate different diagnostics, thus the strings themselves are maintained
+ * Define Dbg_*() interface values.  These values direct the debugging routine
+ * to generate different diagnostics, thus the strings themselves are maintained
  * in the debugging library.
  */
 #define	DBG_SUP_ENVIRON		1

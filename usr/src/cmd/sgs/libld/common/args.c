@@ -666,13 +666,13 @@ check_flags(Ofl_desc * ofl, int argc)
 
 		for (APLIST_TRAVERSE(ofl->ofl_maptext, idx, isp)) {
 			if (ld_place_section(ofl, isp,
-			    ld_targ.t_id.id_text, 0) == (Os_desc *)S_ERROR)
+			    ld_targ.t_id.id_text, NULL) == (Os_desc *)S_ERROR)
 				return (S_ERROR);
 		}
 
 		for (APLIST_TRAVERSE(ofl->ofl_mapdata, idx, isp)) {
 			if (ld_place_section(ofl, isp,
-			    ld_targ.t_id.id_data, 0) == (Os_desc *)S_ERROR)
+			    ld_targ.t_id.id_data, NULL) == (Os_desc *)S_ERROR)
 				return (S_ERROR);
 		}
 	}

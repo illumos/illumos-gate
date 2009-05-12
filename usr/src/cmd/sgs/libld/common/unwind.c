@@ -364,7 +364,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	isp->is_indata = elfdata;
 
 	if ((ofl->ofl_unwindhdr = ld_place_section(ofl, isp,
-	    ld_targ.t_id.id_unwindhdr, 0)) == (Os_desc *)S_ERROR)
+	    ld_targ.t_id.id_unwindhdr, NULL)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -374,9 +374,10 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	 */
 	fde_cnt = 0;
 	for (APLIST_TRAVERSE(ofl->ofl_unwind, idx1, osp)) {
-		Aliste    idx2;
+		Aliste	idx2;
+		int	os_isdescs_idx;
 
-		for (APLIST_TRAVERSE(osp->os_isdescs, idx2, isp)) {
+		OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx2, isp) {
 			uchar_t		*data;
 			uint64_t	off = 0;
 

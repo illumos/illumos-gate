@@ -2089,8 +2089,7 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 			 */
 			reld.rel_flags |= FLG_REL_MOVETAB;
 			reld.rel_osdesc = ofl->ofl_osmove;
-			reld.rel_isdesc =
-			    ofl->ofl_osmove->os_isdescs->apl_data[0];
+			reld.rel_isdesc = ld_os_first_isdesc(ofl->ofl_osmove);
 
 			if (process_reld(ofl,
 			    rsect, &reld, rsndx, reloc) == S_ERROR)

@@ -599,9 +599,9 @@ struct is_desc {			/* input section descriptor */
 	Word		is_ordndx;	/* Index for section.  Used to decide */
 					/*	where to insert section when */
 					/* 	reordering sections */
-	Word		is_keyident;	/* key for SHF_ORDERED processing */
-					/*	and identifier used for */
-					/*	placing/ordering sections */
+	Word		is_keyident;	/* key for SHF_{ORDERED|LINK_ORDER} */
+					/*	processing and ident used for */
+					/*	 placing/ordering sections */
 	Word		is_flags;	/* Various flags */
 };
 
@@ -620,6 +620,34 @@ struct is_desc {			/* input section descriptor */
 #define	FLG_IS_EHFRAME	0x1000		/* section is .eh_frame */
 
 /*
+ * Output sections contain lists of input sections that are assigned to them.
+ * These items fall into 4 categories:
+ *	BEFORE - Ordered sections that specify SHN_BEFORE, in input order.
+ *	ORDERED - Ordered sections that are sorted using unsorted sections
+ *		as the sort key.
+ *	DEFAULT - Sections that are placed into the output section
+ *		in input order.
+ *	AFTER - Ordered sections that specify SHN_AFTER, in input order.
+ */
+#define	OS_ISD_BEFORE	0
+#define	OS_ISD_ORDERED	1
+#define	OS_ISD_DEFAULT	2
+#define	OS_ISD_AFTER	3
+#define	OS_ISD_NUM	4
+typedef APlist *os_isdecs_arr[OS_ISD_NUM];
+
+/*
+ * Convenience macro for traversing every input section associated
+ * with a given output section. The primary benefit of this macro
+ * is that it preserves a precious level of code indentation in the
+ * code that uses it.
+ */
+#define	OS_ISDESCS_TRAVERSE(_list_idx, _osp, _idx, _isp) \
+	for (_list_idx = 0; _list_idx < OS_ISD_NUM; _list_idx++) \
+		for (APLIST_TRAVERSE(_osp->os_isdescs[_list_idx], _idx, _isp))
+
+
+/*
  * Map file and output file processing structures
  */
 struct os_desc {			/* Output section descriptor */
@@ -629,9 +657,8 @@ struct os_desc {			/* Output section descriptor */
 	Os_desc		*os_relosdesc;	/* the output relocation section */
 	APlist		*os_relisdescs;	/* reloc input section descriptors */
 					/*	for this output section */
-	APlist		*os_isdescs;	/* list of input sections in output */
+	os_isdecs_arr	os_isdescs;	/* lists of input sections in output */
 	APlist		*os_mstrisdescs; /* FLG_IS_INSTRMRG input sections */
-	Sort_desc	*os_sort;	/* used for sorting sections */
 	Sg_desc		*os_sgdesc;	/* segment os_desc is placed on */
 	Elf_Data	*os_outdata;	/* output sections raw data */
 	avl_tree_t	*os_comdats;	/* AVL tree of COMDAT input sections */
@@ -650,18 +677,6 @@ struct os_desc {			/* Output section descriptor */
 #define	FLG_OS_KEY		0x01	/* section requires sort keys */
 #define	FLG_OS_OUTREL		0x02	/* output rel against this section */
 #define	FLG_OS_SECTREF		0x04	/* isps are not affected by -zignore */
-
-/*
- * For sorting sections.
- */
-struct sort_desc {
-	Is_desc		**st_order;
-	Word		st_ordercnt;
-	Is_desc		**st_before;
-	Word		st_beforecnt;
-	Is_desc		**st_after;
-	Word		st_aftercnt;
-};
 
 /*
  * Types of segment index.

@@ -335,7 +335,8 @@ typedef struct {
 #define	AL_CNT_OS_MSTRISDESCS	10	/* os_mstrisdescs */
 #define	AL_CNT_OS_RELISDESCS	100	/* os_relisdescs */
 #define	AL_CNT_OS_COMDATS	20	/* os_comdats */
-#define	AL_CNT_OS_ISDESCS	60	/* os_isdesc */
+#define	AL_CNT_OS_ISDESCS_BA	4	/* os_isdesc: BEFORE|AFTER */
+#define	AL_CNT_OS_ISDESCS	60	/* os_isdesc: ORDERED|DEFAULT */
 
 #define	AL_CNT_SG_OSDESC	40	/* sg_osdescs */
 #define	AL_CNT_SG_SECORDER	40	/* sg_secorder */
@@ -536,7 +537,6 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_add_rel_cache	ld64_add_rel_cache
 #define	ld_adj_movereloc	ld64_adj_movereloc
 #define	ld_am_I_partial		ld64_am_I_partial
-#define	ld_append_isp		ld64_append_isp
 #define	ld_ar_member		ld64_ar_member
 #define	ld_ar_setup		ld64_ar_setup
 #define	ld_assign_got_TLS	ld64_assign_got_TLS
@@ -561,6 +561,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_map_out		ld64_map_out
 #define	ld_map_parse		ld64_map_parse
 #define	ld_open_outfile		ld64_open_outfile
+#define	ld_os_first_isdesc	ld64_os_first_isdesc
 #define	ld_place_section	ld64_place_section
 #define	ld_process_archive	ld64_process_archive
 #define	ld_process_files	ld64_process_files
@@ -623,7 +624,6 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_add_rel_cache	ld32_add_rel_cache
 #define	ld_adj_movereloc	ld32_adj_movereloc
 #define	ld_am_I_partial		ld32_am_I_partial
-#define	ld_append_isp		ld32_append_isp
 #define	ld_ar_member		ld32_ar_member
 #define	ld_ar_setup		ld32_ar_setup
 #define	ld_assign_got_TLS	ld32_assign_got_TLS
@@ -649,6 +649,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_map_out		ld32_map_out
 #define	ld_map_parse		ld32_map_parse
 #define	ld_open_outfile		ld32_open_outfile
+#define	ld_os_first_isdesc	ld32_os_first_isdesc
 #define	ld_place_section	ld32_place_section
 #define	ld_process_archive	ld32_process_archive
 #define	ld_process_files	ld32_process_files
@@ -714,7 +715,6 @@ extern Rel_cache	*ld_add_rel_cache(Ofl_desc *, APlist **, size_t *,
 			    size_t, size_t);
 extern void 		ld_adj_movereloc(Ofl_desc *, Rel_desc *);
 extern Sym_desc * 	ld_am_I_partial(Rel_desc *, Xword);
-extern int		ld_append_isp(Ofl_desc *, Os_desc *, Is_desc *, int);
 extern void		ld_ar_member(Ar_desc *, Elf_Arsym *, Ar_aux *,
 			    Ar_mem *);
 extern Ar_desc		*ld_ar_setup(const char *, Elf *, Ofl_desc *);
@@ -755,7 +755,9 @@ extern uintptr_t	ld_map_parse(const char *, Ofl_desc *);
 
 extern uintptr_t	ld_open_outfile(Ofl_desc *);
 
-extern Os_desc		*ld_place_section(Ofl_desc *, Is_desc *, int, Word);
+extern Is_desc		*ld_os_first_isdesc(Os_desc *);
+extern Os_desc		*ld_place_section(Ofl_desc *, Is_desc *, int,
+			    const char *);
 extern uintptr_t	ld_process_archive(const char *, int, Ar_desc *,
 			    Ofl_desc *);
 extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);

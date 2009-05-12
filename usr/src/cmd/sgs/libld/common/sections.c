@@ -323,9 +323,9 @@ ignore_section_processing(Ofl_desc *ofl)
 
 		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx2, osp)) {
 			Aliste	idx3;
-			int	keep = 0;
+			int	keep = 0, os_isdescs_idx;
 
-			for (APLIST_TRAVERSE(osp->os_isdescs, idx3, isp)) {
+			OS_ISDESCS_TRAVERSE(os_isdescs_idx, osp, idx3, isp) {
 				ifl = isp->is_file;
 
 				/* Input section is tagged for discard? */
@@ -745,7 +745,8 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, uint_t ident)
 	 * Retain this .*bss input section as this will be where global symbol
 	 * references are added.
 	 */
-	if ((osp = ld_place_section(ofl, isec, ident, 0)) == (Os_desc *)S_ERROR)
+	if ((osp = ld_place_section(ofl, isec, ident, NULL)) ==
+	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -802,7 +803,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, APlist *alp)
 	if ((data->d_buf = libld_calloc(sizeof (Addr), entcount)) == NULL)
 		return (S_ERROR);
 
-	if (ld_place_section(ofl, isec, ld_targ.t_id.id_array, 0) ==
+	if (ld_place_section(ofl, isec, ld_targ.t_id.id_array, NULL) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -883,7 +884,7 @@ make_comment(Ofl_desc *ofl)
 	shdr->sh_addralign = 1;
 
 	return ((uintptr_t)ld_place_section(ofl, isec,
-	    ld_targ.t_id.id_note, 0));
+	    ld_targ.t_id.id_note, NULL));
 }
 
 /*
@@ -924,7 +925,7 @@ make_dynamic(Ofl_desc *ofl)
 		shdr->sh_flags |= SHF_ALLOC;
 
 	osp = ofl->ofl_osdynamic =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynamic, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynamic, NULL);
 
 	/*
 	 * Reserve entries for any needed dependencies.
@@ -1267,7 +1268,7 @@ ld_make_got(Ofl_desc *ofl)
 	shdr->sh_size = (Xword)size;
 	shdr->sh_entsize = ld_targ.t_m.m_got_entsize;
 
-	ofl->ofl_osgot = ld_place_section(ofl, isec, ld_targ.t_id.id_got, 0);
+	ofl->ofl_osgot = ld_place_section(ofl, isec, ld_targ.t_id.id_got, NULL);
 	if (ofl->ofl_osgot == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1322,7 +1323,7 @@ make_interp(Ofl_desc *ofl)
 	data->d_align = shdr->sh_addralign = 1;
 
 	ofl->ofl_osinterp =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_interp, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_interp, NULL);
 	return ((uintptr_t)ofl->ofl_osinterp);
 }
 
@@ -1375,7 +1376,7 @@ make_cap(Ofl_desc *ofl)
 	 * If we're not creating a relocatable object, save the output section
 	 * to trigger the creation of an associated program header.
 	 */
-	osec = ld_place_section(ofl, isec, ld_targ.t_id.id_cap, 0);
+	osec = ld_place_section(ofl, isec, ld_targ.t_id.id_cap, NULL);
 	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
 		ofl->ofl_oscap = osec;
 
@@ -1414,7 +1415,7 @@ make_plt(Ofl_desc *ofl)
 	shdr->sh_addralign = ld_targ.t_m.m_plt_align;
 	shdr->sh_entsize = ld_targ.t_m.m_plt_entsize;
 
-	ofl->ofl_osplt = ld_place_section(ofl, isec, ld_targ.t_id.id_plt, 0);
+	ofl->ofl_osplt = ld_place_section(ofl, isec, ld_targ.t_id.id_plt, NULL);
 	if (ofl->ofl_osplt == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1450,7 +1451,8 @@ make_hash(Ofl_desc *ofl)
 	 * Place the section first since it will affect the local symbol
 	 * count.
 	 */
-	ofl->ofl_oshash = ld_place_section(ofl, isec, ld_targ.t_id.id_hash, 0);
+	ofl->ofl_oshash =
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_hash, NULL);
 	if (ofl->ofl_oshash == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1509,7 +1511,7 @@ make_symtab(Ofl_desc *ofl)
 	 * count.
 	 */
 	ofl->ofl_ossymtab =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_symtab, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_symtab, NULL);
 	if (ofl->ofl_ossymtab == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1528,7 +1530,7 @@ make_symtab(Ofl_desc *ofl)
 			return (S_ERROR);
 
 		if ((ofl->ofl_ossymshndx = ld_place_section(ofl, xisec,
-		    ld_targ.t_id.id_symtab_ndx, 0)) == (Os_desc *)S_ERROR)
+		    ld_targ.t_id.id_symtab_ndx, NULL)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -1614,10 +1616,10 @@ make_dynsym(Ofl_desc *ofl)
 	 */
 	if (allow_ldynsym &&
 	    ((ofl->ofl_osldynsym = ld_place_section(ofl, lisec,
-	    ld_targ.t_id.id_ldynsym, 0)) == (Os_desc *)S_ERROR))
+	    ld_targ.t_id.id_ldynsym, NULL)) == (Os_desc *)S_ERROR))
 		return (S_ERROR);
 	ofl->ofl_osdynsym =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynsym, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynsym, NULL);
 	if (ofl->ofl_osdynsym == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1674,7 +1676,7 @@ make_dynsort(Ofl_desc *ofl)
 		return (S_ERROR);
 
 		if ((ofl->ofl_osdynsymsort = ld_place_section(ofl, isec,
-		    ld_targ.t_id.id_dynsort, 0)) == (Os_desc *)S_ERROR)
+		    ld_targ.t_id.id_dynsort, NULL)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -1686,7 +1688,7 @@ make_dynsort(Ofl_desc *ofl)
 		return (S_ERROR);
 
 		if ((ofl->ofl_osdyntlssort = ld_place_section(ofl, isec,
-		    ld_targ.t_id.id_dynsort, 0)) == (Os_desc *)S_ERROR)
+		    ld_targ.t_id.id_dynsort, NULL)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -1707,7 +1709,7 @@ make_dyn_shndx(Ofl_desc *ofl, const char *shname, Os_desc *symtab,
 	Shdr		*shdr, *dynshdr;
 	Elf_Data	*data;
 
-	dynsymisp = (Is_desc *)symtab->os_isdescs->apl_data[0];
+	dynsymisp = ld_os_first_isdesc(symtab);
 	dynshdr = dynsymisp->is_shdr;
 
 	if (new_section(ofl, SHT_SYMTAB_SHNDX, shname,
@@ -1716,7 +1718,7 @@ make_dyn_shndx(Ofl_desc *ofl, const char *shname, Os_desc *symtab,
 		return (S_ERROR);
 
 	if ((*ret_os = ld_place_section(ofl, isec,
-	    ld_targ.t_id.id_dynsym_ndx, 0)) == (Os_desc *)S_ERROR)
+	    ld_targ.t_id.id_dynsym_ndx, NULL)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	assert(*ret_os);
@@ -1769,7 +1771,7 @@ make_shstrtab(Ofl_desc *ofl)
 	 * headers to account for.
 	 */
 	ofl->ofl_osshstrtab =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_note, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_note, NULL);
 	if (ofl->ofl_osshstrtab == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -1813,7 +1815,7 @@ make_strtab(Ofl_desc *ofl)
 	shdr->sh_size = (Xword)size;
 
 	ofl->ofl_osstrtab =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_strtab, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_strtab, NULL);
 	return ((uintptr_t)ofl->ofl_osstrtab);
 }
 
@@ -1893,7 +1895,7 @@ make_dynstr(Ofl_desc *ofl)
 	shdr->sh_size = (Xword)size;
 
 	ofl->ofl_osdynstr =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynstr, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_dynstr, NULL);
 	return ((uintptr_t)ofl->ofl_osdynstr);
 }
 
@@ -1971,7 +1973,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 		shdr->sh_flags |= SHF_INFO_LINK;
 	}
 
-	rosp = ld_place_section(ofl, isec, ld_targ.t_id.id_rel, 0);
+	rosp = ld_place_section(ofl, isec, ld_targ.t_id.id_rel, NULL);
 	if (rosp == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -2038,7 +2040,7 @@ make_verneed(Ofl_desc *ofl)
 	shdr->sh_size = (Xword)ofl->ofl_verneedsz;
 
 	ofl->ofl_osverneed =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_version, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_version, NULL);
 	return ((uintptr_t)ofl->ofl_osverneed);
 }
 
@@ -2084,7 +2086,7 @@ make_verdef(Ofl_desc *ofl)
 	shdr->sh_size = (Xword)ofl->ofl_verdefsz;
 
 	ofl->ofl_osverdef =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_version, 0);
+	    ld_place_section(ofl, isec, ld_targ.t_id.id_version, NULL);
 	return ((uintptr_t)ofl->ofl_osverdef);
 }
 
@@ -2108,7 +2110,7 @@ make_sym_sec(Ofl_desc *ofl, const char *sectname, Word stype, int ident)
 	    S_ERROR)
 		return ((Os_desc *)S_ERROR);
 
-	return (ld_place_section(ofl, isec, ident, 0));
+	return (ld_place_section(ofl, isec, ident, NULL));
 }
 
 /*
@@ -2143,7 +2145,7 @@ ld_make_parexpn_data(Ofl_desc *ofl, size_t size, Xword align)
 	 * such global references are added and '-z nopartial' is in effect.
 	 */
 	ofl->ofl_isparexpn = isec;
-	osp = ld_place_section(ofl, isec, ld_targ.t_id.id_data, 0);
+	osp = ld_place_section(ofl, isec, ld_targ.t_id.id_data, NULL);
 	if (osp == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -2189,7 +2191,7 @@ ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 			mdp->md_oidx = cnt++;
 	}
 
-	if ((ofl->ofl_osmove = ld_place_section(ofl, isec, 0, 0)) ==
+	if ((ofl->ofl_osmove = ld_place_section(ofl, isec, 0, NULL)) ==
 	    (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
@@ -2457,7 +2459,7 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 		goto return_s_error;
 
 	/* Add the new section to the output image */
-	if (ld_place_section(ofl, mstrsec, osp->os_identndx, 0) ==
+	if (ld_place_section(ofl, mstrsec, osp->os_identndx, NULL) ==
 	    (Os_desc *)S_ERROR)
 		goto return_s_error;
 
@@ -2846,12 +2848,12 @@ ld_make_sections(Ofl_desc *ofl)
 		} else {
 			osp = ofl->ofl_osdynsym;
 		}
-		isec = (Is_desc *)osp->os_isdescs->apl_data[0];
+		isec = ld_os_first_isdesc(osp);
 		cnt = (isec->is_shdr->sh_size / isec->is_shdr->sh_entsize);
 
 		if (ofl->ofl_osversym) {
 			osp = ofl->ofl_osversym;
-			isec = (Is_desc *)osp->os_isdescs->apl_data[0];
+			isec = ld_os_first_isdesc(osp);
 			data = isec->is_indata;
 			shdr = osp->os_shdr;
 			size = cnt * shdr->sh_entsize;
@@ -2860,7 +2862,7 @@ ld_make_sections(Ofl_desc *ofl)
 		}
 		if (ofl->ofl_ossyminfo) {
 			osp = ofl->ofl_ossyminfo;
-			isec = (Is_desc *)osp->os_isdescs->apl_data[0];
+			isec = ld_os_first_isdesc(osp);
 			data = isec->is_indata;
 			shdr = osp->os_shdr;
 			size = cnt * shdr->sh_entsize;

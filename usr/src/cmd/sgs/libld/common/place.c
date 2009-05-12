@@ -72,42 +72,124 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 }
 
 /*
- * Append an input section to an output section
+ * Return the first input descriptor for a given output descriptor,
+ * or NULL if there are none.
+ */
+
+Is_desc *
+ld_os_first_isdesc(Os_desc *osp)
+{
+	int i;
+
+	for (i = 0; i < OS_ISD_NUM; i++) {
+		APlist *ap_isdesc = osp->os_isdescs[i];
+
+		if (aplist_nitems(ap_isdesc) > 0)
+			return ((Is_desc *)ap_isdesc->apl_data[0]);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Attach an input section to an output section
  *
  * entry:
  *	ofl - File descriptor
- *	isp - Input section descriptor
  *	osp - Output section descriptor
- *	mstr_only - True if should only append to the merge string section
- *		list.
+ *	isp - Input section descriptor
+ *	mapfile_sort - True (1) if segment supports mapfile specified ordering
+ *		of otherwise unordered input sections, and False (0) otherwise.
  *
  * exit:
- *	- If mstr_only is not true, the input section is appended to the
- *		end of the output section's list of input sections (os_isdescs).
+ *	- The input section has been attached to the output section
  *	- If the input section is a candidate for string table merging,
  *		then it is appended to the output section's list of merge
  *		candidates (os_mstridescs).
  *
  *	On success, returns True (1). On failure, False (0).
  */
-int
-ld_append_isp(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp, int mstr_only)
+static int
+os_attach_isp(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp, int mapfile_sort)
 {
-	if (!mstr_only &&
-	    (aplist_append(&(osp->os_isdescs), isp, AL_CNT_OS_ISDESCS) == NULL))
-		return (0);
+	Aliste	init_arritems;
+	int	os_isdescs_idx, do_append = 1;
+
+	if ((isp->is_flags & FLG_IS_ORDERED) == 0) {
+		init_arritems = AL_CNT_OS_ISDESCS;
+		os_isdescs_idx = OS_ISD_DEFAULT;
+
+		/*
+		 * If section ordering was specified for an unordered section
+		 * via the mapfile, then search in the OS_ISD_DEFAULT list
+		 * and insert it in the specified position. Ordered sections
+		 * are placed in ascending order before unordered sections
+		 * (sections with an is_ordndx value of zero).
+		 *
+		 * If no mapfile ordering was specified, we append it in
+		 * the usual way below.
+		 */
+		if (mapfile_sort && (isp->is_ordndx > 0)) {
+			APlist *ap_isdesc = osp->os_isdescs[OS_ISD_DEFAULT];
+			Aliste	idx2;
+			Is_desc	*isp2;
+
+			for (APLIST_TRAVERSE(ap_isdesc, idx2, isp2)) {
+				if (isp2->is_ordndx &&
+				    (isp2->is_ordndx <= isp->is_ordndx))
+						continue;
+
+				if (aplist_insert(
+				    &osp->os_isdescs[OS_ISD_DEFAULT],
+				    isp, init_arritems, idx2) == NULL)
+					return (0);
+				do_append = 0;
+				break;
+			}
+		}
+	} else {		/* Ordered section (via shdr flags) */
+		Word shndx;
+
+		/* SHF_ORDERED uses sh_info, SHF_LINK_ORDERED uses sh_link */
+		shndx = (isp->is_shdr->sh_flags & SHF_ORDERED) ?
+		    isp->is_shdr->sh_info : isp->is_shdr->sh_link;
+
+		if (shndx == SHN_BEFORE) {
+			init_arritems = AL_CNT_OS_ISDESCS_BA;
+			os_isdescs_idx = OS_ISD_BEFORE;
+		} else if (shndx == SHN_AFTER) {
+			init_arritems = AL_CNT_OS_ISDESCS_BA;
+			os_isdescs_idx = OS_ISD_AFTER;
+		} else {
+			init_arritems = AL_CNT_OS_ISDESCS;
+			os_isdescs_idx = OS_ISD_ORDERED;
+		}
+	}
 
 	/*
-	 * To be mergeable:
-	 *	- The SHF_MERGE|SHF_STRINGS flags must be set
-	 *	- String table compression must not be disabled (-znocompstrtab)
-	 *	- It must not be the generated section being built to
-	 *		replace the sections on this list.
+	 * If we didn't insert a section into the default list using
+	 * mapfile specified ordering above, then append the input
+	 * section to the appropriate list.
+	 */
+	if (do_append && aplist_append(&(osp->os_isdescs[os_isdescs_idx]),
+	    isp, init_arritems) == NULL)
+		return (0);
+	isp->is_osdesc = osp;
+
+	/*
+	 * A section can be merged if the following are true:
+	 * -	The SHF_MERGE|SHF_STRINGS flags must be set
+	 * -	String table compression must not be disabled (-znocompstrtab)
+	 * -	Mapfile ordering must not have been used.
+	 * -	The section must not be ordered via section header flags.
+	 * -	It must not be the generated section being built to
+	 *	replace the sections on this list.
 	 */
 	if (((isp->is_shdr->sh_flags & (SHF_MERGE | SHF_STRINGS)) !=
 	    (SHF_MERGE | SHF_STRINGS)) ||
 	    ((ofl->ofl_flags1 & FLG_OF1_NCSTTAB) != 0) ||
-	    ((isp->is_flags & FLG_IS_GNSTRMRG) != 0))
+	    !do_append ||
+	    ((isp->is_flags & (FLG_IS_ORDERED | FLG_IS_GNSTRMRG)) != 0))
 		return (1);
 
 	/*
@@ -332,10 +414,20 @@ gnu_linkonce_sec(const char *ostr)
 #undef	NSTR_CH3
 
 /*
- * Place a section into the appropriate segment.
+ * Place a section into the appropriate segment and output section.
+ *
+ * entry:
+ *	ofl - File descriptor
+ *	isp - Input section descriptor of section to be placed.
+ *	ident - Section identifier, used to order sections relative to
+ *		others within the output segment.
+ *	alt_os_name - If non-NULL, the name of the output section to place
+ *		isp into. If NULL, input sections go to an output section
+ *		with the same name as the input section.
  */
 Os_desc *
-ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
+ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident,
+    const char *alt_os_name)
 {
 	Ent_desc	*enp;
 	Sg_desc		*sgp;
@@ -485,12 +577,14 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	}
 
 	/*
-	 * By default, the output section for an input section has the same
-	 * section name as in the input sections name.  COMDAT, SHT_GROUP and
-	 * GNU name translations that follow, may indicate that a different
-	 * output section name be the target for this input section.
+	 * If our caller has supplied an alternative name for the output
+	 * section, then we defer to their request. Otherwise, the default
+	 * is to use the same name as that of the input section being placed.
+	 *
+	 * The COMDAT, SHT_GROUP and GNU name translations that follow have
+	 * the potential to alter this initial name.
 	 */
-	oname = (char *)isp->is_name;
+	oname = (char *)((alt_os_name == NULL) ? isp->is_name : alt_os_name);
 
 	/*
 	 * Solaris section names may follow the convention:
@@ -601,42 +695,10 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		enp->ec_flags |= FLG_EC_USED;
 
 	/*
-	 * If the link is not 0, then the input section is appended to the
-	 * defined output section.  The append occurs at the input section
-	 * pointed to by the link.
-	 */
-	if (link) {
-		uintptr_t	err;
-
-		osp = isp->is_file->ifl_isdesc[link]->is_osdesc;
-
-		/*
-		 * Process any COMDAT section, keeping the first and
-		 * discarding all others.
-		 */
-		if ((isp->is_flags & FLG_IS_COMDAT) &&
-		    ((err = add_comdat(ofl, osp, isp)) != 1))
-			return ((Os_desc *)err);
-
-		/*
-		 * Set alignment
-		 */
-		set_addralign(ofl, osp, isp);
-
-		if (ld_append_isp(ofl, osp, isp, 0) == 0)
-			return ((Os_desc *)S_ERROR);
-
-		isp->is_osdesc = osp;
-		sgp = osp->os_sgdesc;
-
-		DBG_CALL(Dbg_sec_added(ofl->ofl_lml, osp, sgp));
-		return (osp);
-	}
-
-	/*
-	 * Determine if section ordering is turned on.  If so, return the
-	 * appropriate os_txtndx.  This information is derived from the
-	 * Sg_desc->sg_segorder list that was built up from the Mapfile.
+	 * Determine if section ordering is turned on. If so, return the
+	 * appropriate ordering index for the section. This information
+	 * is derived from the Sg_desc->sg_segorder list that was built
+	 * up from the Mapfile.
 	 */
 	os_ndx = 0;
 	if (sgp->sg_secorder) {
@@ -652,14 +714,12 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	}
 
 	/*
-	 * Mask of section header flags to ignore when
-	 * matching sections. We are more strict with
-	 * relocatable objects, ignoring only the order
-	 * flags, and keeping sections apart if they differ
-	 * otherwise. This follows the policy that sections
-	 * in a relative object should only be merged if their
-	 * flags are the same, and avoids destroying information
-	 * prematurely. For final products however, we ignore all
+	 * Mask of section header flags to ignore when matching sections. We
+	 * are more strict with relocatable objects, ignoring only the order
+	 * flags, and keeping sections apart if they differ otherwise. This
+	 * follows the policy that sections in a relative object should only
+	 * be merged if their flags are the same, and avoids destroying
+	 * information prematurely. For final products however, we ignore all
 	 * flags that do not prevent a merge.
 	 */
 	shflagmask =
@@ -685,7 +745,6 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		    (_shdr->sh_flags & ~shflagmask)) &&
 		    (strcmp(oname, osp->os_name) == 0)) {
 			uintptr_t	err;
-			int		inserted;
 
 			/*
 			 * Process any COMDAT section, keeping the first and
@@ -709,41 +768,18 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 				ofl->ofl_flags |= FLG_OF_TLSPHDR;
 
 			/*
-			 * Determine whether this segment requires input section
-			 * ordering.  Sections that require ordering were
-			 * defined via a mapfile, and have an ordering index
-			 * assigned to them (is_ordndx).  Ordered sections are
-			 * placed in ascending order before unordered sections
-			 * (sections with a is_ordndx value of zero).
+			 * Insert the input section descriptor on the proper
+			 * output section descriptor list.
+			 *
+			 * If this segment requires input section ordering,
+			 * honor any mapfile specified ordering for otherwise
+			 * unordered sections by setting the mapfile_sort
+			 * argument of os_attach_isp() to True.
 			 */
-			inserted = 0;
-			if ((sgp->sg_flags & FLG_SG_ORDER) && isp->is_ordndx) {
-				Aliste	idx2;
-				Is_desc	*isp2;
 
-				for (APLIST_TRAVERSE(osp->os_isdescs,
-				    idx2, isp2)) {
-					if (isp2->is_ordndx &&
-					    (isp2->is_ordndx <= isp->is_ordndx))
-						continue;
-
-					if (aplist_insert(&(osp->os_isdescs),
-					    isp, AL_CNT_OS_ISDESCS,
-					    idx2) == NULL)
-						return ((Os_desc *)S_ERROR);
-					inserted ++;
-					break;
-				}
-			}
-			if (inserted == 0) {
-				if (aplist_append(&(osp->os_isdescs),
-				    isp, AL_CNT_OS_ISDESCS) == NULL)
-					return ((Os_desc *)S_ERROR);
-			}
-			if (ld_append_isp(ofl, osp, isp, 1) == 0)
+			if (os_attach_isp(ofl, osp, isp,
+			    (sgp->sg_flags & FLG_SG_ORDER) != 0) == 0)
 				return ((Os_desc *)S_ERROR);
-
-			isp->is_osdesc = osp;
 
 			/*
 			 * If this input section and file is associated to an
@@ -921,11 +957,10 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	 */
 	set_addralign(ofl, osp, isp);
 
-	if (ld_append_isp(ofl, osp, isp, 0) == 0)
+	if (os_attach_isp(ofl, osp, isp, 0) == 0)
 		return ((Os_desc *)S_ERROR);
 
 	DBG_CALL(Dbg_sec_created(ofl->ofl_lml, osp, sgp));
-	isp->is_osdesc = osp;
 
 	/*
 	 * Insert the new section at the offset given by iidx.  If no position
