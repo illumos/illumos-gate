@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -213,8 +211,19 @@ zprintf(zoneid_t zoneid, const char *fmt, ...)
 void
 vuprintf(const char *fmt, va_list adx)
 {
+	va_list adxcp;
+	va_copy(adxcp, adx);
+
+	/* Message the user tty, if any, and the global zone syslog */
 	cprintf(fmt, adx, SL_CONSOLE | SL_LOGONLY | SL_USER | SL_NOTE,
 	    "", "", caller(), 0, 0, 0, GLOBAL_ZONEID);
+
+	/* Now message the local zone syslog */
+	if (!INGLOBALZONE(curproc))
+		cprintf(fmt, adxcp, SL_CONSOLE | SL_LOGONLY | SL_NOTE,
+		    "", "", caller(), 0, 0, 0, getzoneid());
+
+	va_end(adxcp);
 }
 
 /*PRINTFLIKE1*/
@@ -224,8 +233,9 @@ uprintf(const char *fmt, ...)
 	va_list adx;
 
 	va_start(adx, fmt);
-	cprintf(fmt, adx, SL_CONSOLE | SL_LOGONLY | SL_USER | SL_NOTE,
-	    "", "", caller(), 0, 0, 0, GLOBAL_ZONEID);
+
+	vuprintf(fmt, adx);
+
 	va_end(adx);
 }
 

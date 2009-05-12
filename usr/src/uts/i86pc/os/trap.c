@@ -1354,8 +1354,11 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	case T_AST + USER:	/* profiling, resched, h/w error pseudo trap */
 		if (lwp->lwp_pcb.pcb_flags & ASYNC_HWERR) {
 			proc_t *p = ttoproc(curthread);
+			extern void print_msg_hwerr(ctid_t ct_id, proc_t *p);
 
 			lwp->lwp_pcb.pcb_flags &= ~ASYNC_HWERR;
+			print_msg_hwerr(p->p_ct_process->conp_contract.ct_id,
+			    p);
 			contract_process_hwerr(p->p_ct_process, p);
 			siginfo.si_signo = SIGKILL;
 			siginfo.si_code = SI_NOINFO;

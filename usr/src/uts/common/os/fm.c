@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1256,4 +1256,11 @@ fm_payload_stack_add(nvlist_t *payload, const pc_t *stack, int depth)
 
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_STACK,
 	    DATA_TYPE_STRING_ARRAY, depth, stkpp, NULL);
+}
+
+void
+print_msg_hwerr(ctid_t ct_id, proc_t *p)
+{
+	uprintf("Killed process %d (%s) in contract id %d "
+	    "due to hardware error\n", p->p_pid, p->p_user.u_comm, ct_id);
 }

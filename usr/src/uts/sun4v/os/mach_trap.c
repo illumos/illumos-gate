@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/trap.h>
 #include <sys/machtrap.h>
@@ -32,7 +30,6 @@
 #include <sys/panic.h>
 #include <sys/uadmin.h>
 #include <sys/kobj.h>
-#include <sys/contract/process_impl.h>
 #include <vm/hat_sfmmu.h>
 #include <sys/reboot.h>
 
@@ -77,50 +74,6 @@ mmu_print_sfsr(uint_t sfsr)
 
 	printf(" context 0x%x", X_FAULT_CTX(sfsr));
 	printf("\n");
-}
-
-
-/*
- * Handle an asynchronous hardware error, i.e. an E-$ parity error.
- * The policy is currently to send a hardware error contract event to
- * the process's process contract and to kill the process.  Eventually
- * we may want to instead send a special signal whose default
- * disposition is to generate the contract event.
- */
-void
-trap_async_hwerr(void)
-{
-	k_siginfo_t si;
-	proc_t *p = ttoproc(curthread);
-
-	errorq_drain(ue_queue); /* flush pending async error messages */
-
-	contract_process_hwerr(p->p_ct_process, p);
-
-	bzero(&si, sizeof (k_siginfo_t));
-	si.si_signo = SIGKILL;
-	si.si_code = SI_NOINFO;
-	trapsig(&si, 1);
-}
-
-/*
- * Handle bus error and bus timeout for a user process by sending SIGBUS
- * The type is either ASYNC_BERR or ASYNC_BTO.
- */
-void
-trap_async_berr_bto(int type, struct regs *rp)
-{
-	k_siginfo_t si;
-
-	errorq_drain(ue_queue); /* flush pending async error messages */
-	bzero(&si, sizeof (k_siginfo_t));
-
-	si.si_signo = SIGBUS;
-	si.si_code = (type == ASYNC_BERR ? BUS_OBJERR : BUS_ADRERR);
-	si.si_addr = (caddr_t)rp->r_pc; /* AFAR unavailable - future RFE */
-	si.si_errno = ENXIO;
-
-	trapsig(&si, 1);
 }
 
 /*
