@@ -811,13 +811,14 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		mb[1] = RD16_IO_REG(ha, mailbox[1]);
 		mb[2] = RD16_IO_REG(ha, mailbox[2]);
 		mb[3] = RD16_IO_REG(ha, mailbox[3]);
+		mb[7] = RD16_IO_REG(ha, mailbox[7]);
 
 		EL(ha, "%xh ISP System Error, isp_abort_needed\n mbx1=%xh, "
 		    "mbx2=%xh, mbx3=%xh, mbx4=%xh, mbx5=%xh, mbx6=%xh,\n "
 		    "mbx7=%xh, mbx8=%xh, mbx9=%xh, mbx10=%xh, mbx11=%xh, "
 		    "mbx12=%xh,\n", mb[0], mb[1], mb[2], mb[3],
 		    RD16_IO_REG(ha, mailbox[4]), RD16_IO_REG(ha, mailbox[5]),
-		    RD16_IO_REG(ha, mailbox[6]), RD16_IO_REG(ha, mailbox[7]),
+		    RD16_IO_REG(ha, mailbox[6]), mb[7],
 		    RD16_IO_REG(ha, mailbox[8]), RD16_IO_REG(ha, mailbox[9]),
 		    RD16_IO_REG(ha, mailbox[10]), RD16_IO_REG(ha, mailbox[11]),
 		    RD16_IO_REG(ha, mailbox[12]));
@@ -851,6 +852,12 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 
 		(void) ql_flash_errlog(ha, FLASH_ERRLOG_AEN_8002, mb[1],
 		    mb[2], mb[3]);
+
+		if (CFG_IST(ha, CFG_CTRL_81XX) && mb[7] & SE_MPI_RISC) {
+			ADAPTER_STATE_LOCK(ha);
+			ha->flags |= MPI_RESET_NEEDED;
+			ADAPTER_STATE_UNLOCK(ha);
+		}
 
 		*set_flags |= ISP_ABORT_NEEDED;
 		ha->xioctl->ControllerErrorCount++;
@@ -911,7 +918,6 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 	case MBA_LIP_F8:	/* Received a LIP F8. */
 	case MBA_LIP_RESET:	/* LIP reset occurred. */
 	case MBA_LIP_OCCURRED:	/* Loop Initialization Procedure */
-	/* case MBA_DCBX_STARTED: */
 		if (CFG_IST(ha, CFG_CTRL_81XX)) {
 			EL(ha, "%xh DCBX_STARTED received, mbx1=%xh, mbx2=%xh"
 			    "\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
@@ -991,9 +997,10 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_LOOP_DOWN:
-		EL(ha, "%xh Loop Down received, mbx1=%xh, mbx2=%xh, "
-		    "mbx3=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
-		    RD16_IO_REG(ha, mailbox[2]), RD16_IO_REG(ha, mailbox[3]));
+		EL(ha, "%xh Loop Down received, mbx1=%xh, mbx2=%xh, mbx3=%xh, "
+		    "mbx4=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
+		    RD16_IO_REG(ha, mailbox[2]), RD16_IO_REG(ha, mailbox[3]),
+		    RD16_IO_REG(ha, mailbox[4]));
 
 		if (!(ha->task_daemon_flags & LOOP_DOWN)) {
 			*set_flags |= LOOP_DOWN;
@@ -1179,6 +1186,11 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		EL(ha, "%xh IP HDR data split received\n", mb[0]);
 		break;
 
+	case MBA_ERROR_LOGGING_DISABLED:
+		EL(ha, "%xh error logging disabled received, "
+		    "mbx1=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]));
+		break;
+
 	case MBA_POINT_TO_POINT:
 	/* case MBA_DCBX_COMPLETED: */
 		if (CFG_IST(ha, CFG_CTRL_81XX)) {
@@ -1192,15 +1204,13 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 		break;
 
 	case MBA_FCF_CONFIG_ERROR:
-		EL(ha, "%xh FCF configuration Error received, mbx1=%xh, "
-		    "mbx2=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
-		    RD16_IO_REG(ha, mailbox[2]));
+		EL(ha, "%xh FCF configuration Error received, mbx1=%xh\n",
+		    mb[0], RD16_IO_REG(ha, mailbox[1]));
 		break;
 
-	case MBA_DCBX_PARAM_UPDATE:
-		EL(ha, "%xh DCBX parameters changed received, mbx1=%xh, "
-		    "mbx2=%xh\n", mb[0], RD16_IO_REG(ha, mailbox[1]),
-		    RD16_IO_REG(ha, mailbox[2]));
+	case MBA_DCBX_PARAM_CHANGED:
+		EL(ha, "%xh DCBX parameters changed received, mbx1=%xh\n",
+		    mb[0], RD16_IO_REG(ha, mailbox[1]));
 		break;
 
 	case MBA_CHG_IN_CONNECTION:

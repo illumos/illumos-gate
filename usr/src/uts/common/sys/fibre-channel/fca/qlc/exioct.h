@@ -67,6 +67,7 @@ extern "C" {
 #define	EXT_DEF_PORTID_SIZE_ACTUAL		3
 #define	EXT_DEF_MAX_STR_SIZE			128
 #define	EXT_DEF_SCSI_PASSTHRU_CDB_LENGTH	12
+#define	EXT_DEF_MAC_ADDRESS_SIZE		6
 
 #define	EXT_DEF_ADDR_MODE_32			1
 #define	EXT_DEF_ADDR_MODE_64			2
@@ -248,6 +249,7 @@ typedef union _ext_signature {
 #define	EXT_SC_QUERY_DRIVER	6
 #define	EXT_SC_QUERY_FW		7
 #define	EXT_SC_QUERY_CHIP	8
+#define	EXT_SC_QUERY_CNA_PORT	9
 
 /*
  * Get.
@@ -262,6 +264,7 @@ typedef union _ext_signature {
 #define	EXT_SC_GET_RISC_CODE		6
 #define	EXT_SC_GET_FLASH_RAM		7
 #define	EXT_SC_GET_BEACON_STATE		8
+#define	EXT_SC_GET_DCBX_PARAM		9
 
 /* 100 - 199 FC_INTF_TYPE */
 #define	EXT_SC_GET_LINK_STATUS		101	/* Currently Not Supported */
@@ -283,6 +286,7 @@ typedef union _ext_signature {
 /* 200 - 299 SCSI_INTF_TYPE */
 #define	EXT_SC_GET_SEL_TIMEOUT		201	/* Currently Not Supported */
 
+#define	EXT_DEF_DCBX_PARAM_BUF_SIZE	4096	/* Bytes */
 
 /*
  * Set.
@@ -636,6 +640,14 @@ typedef struct _EXT_CHIP {
 	UINT8	ChipRevID;	/* 1 */
 } EXT_CHIP, *PEXT_CHIP;		/* 80 */
 
+/* CNA properties */
+typedef struct _EXT_CNA_PORT {
+	UINT16	VLanId;						/* 2 */
+	UINT8	VNPortMACAddress[EXT_DEF_MAC_ADDRESS_SIZE];	/* 6 */
+	UINT16	FabricParam;					/* 2 */
+	UINT16	Reserved0;					/* 2 */
+	UINT32	Reserved[29];					/* 116 */
+} EXT_CNA_PORT, *PEXT_CNA_PORT;					/* 128 */
 
 /* Request Buffer for RNID */
 typedef struct _EXT_RNID_REQ {

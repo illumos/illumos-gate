@@ -347,7 +347,7 @@ ql_populate_hba_fru_details(ql_adapter_state_t *ha,
 		attrs->supported_speed = FC_HBA_PORTSPEED_4GBIT |
 		    FC_HBA_PORTSPEED_2GBIT | FC_HBA_PORTSPEED_1GBIT;
 		break;
-	case 0x8001:
+	case 0x8000:
 		attrs->supported_speed = FC_HBA_PORTSPEED_10GBIT;
 		break;
 	case 0x2500:
@@ -540,6 +540,15 @@ ql_setup_fruinfo(ql_adapter_state_t *ha)
 			ha->fru_hba_index = base_ha->fru_hba_index;
 		} else {
 			ha->fru_hba_index = ql_gfru_hba_index++;
+		}
+
+		if (CFG_IST(ha, CFG_CTRL_81XX)) {
+			/*
+			 * The FC functions on 81xx hbas are functions 2 and 3
+			 * while the Nic functions occupy 0 and 1.  Adjust
+			 * fru port index to be like previous FCAs.
+			 */
+			ha->fru_port_index -= 2;
 		}
 
 		GLOBAL_STATE_UNLOCK();

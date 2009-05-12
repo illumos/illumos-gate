@@ -88,6 +88,14 @@ extern "C" {
 #define	MBSS_MULTIPLE_OPEN_EXCH		0x0018
 #define	MBSS_IOCB_COUNT_ERR		0x0019
 #define	MBSS_CMD_AFTER_FW_INIT_ERR	0x001A
+#define	MBSS_NO_VIRTUAL_PORT_ID		0x001B
+#define	MBSS_INVALID_FCF_INDEX		0x0022
+#define	MBSS_MPI_PROCESSOR_ERR		0x0023
+#define	MBSS_SEMAPHORE_ERR		0x0024
+#define	MBSS_RANGE_ERR			0x0025
+#define	MBSS_TRANSFER_SIZE_TO_LARGE	0x0026
+#define	MBSS_CHECKSUM_ERR		0x0027
+#define	MBSS_CONFIGURATION_ERR		0x0028
 
 /*
  * ISP mailbox asynchronous event status codes
@@ -107,7 +115,6 @@ extern "C" {
 #define	MBA_PORT_UPDATE		0x8014  /* Port Database update. */
 #define	MBA_RSCN_UPDATE		0x8015  /* State Change Registration. */
 #define	MBA_LIP_F8		0x8016	/* Received a LIP F8. */
-#define	MBA_DCBX_STARTED	0x8016	/* DCBX started. */
 #define	MBA_LIP_ERROR		0x8017	/* Loop initialization errors. */
 #define	MBA_SECURITY_UPDATE	0x801B	/* FC-SP security update. */
 #define	MBA_SCSI_COMPLETION	0x8020  /* SCSI Command Complete. */
@@ -119,12 +126,13 @@ extern "C" {
 #define	MBA_IP_RCV_BUFFER_EMPTY 0x8026  /* IP receive buffer queue empty. */
 #define	MBA_IP_HDR_DATA_SPLIT   0x8027  /* IP header/data splitting feature */
 					/* used. */
+#define	MBA_ERROR_LOGGING_DISABLED	0x8029  /* Error Logging Disabled. */
 #define	MBA_POINT_TO_POINT	0x8030  /* Point to point mode. */
 #define	MBA_DCBX_COMPLETED	0x8030  /* DCBX completed. */
 #define	MBA_CMPLT_1_16BIT	0x8031	/* Completion 1 16bit IOSB. */
 #define	MBA_FCF_CONFIG_ERROR	0x8031	/* FCF configuration error. */
 #define	MBA_CMPLT_2_16BIT	0x8032	/* Completion 2 16bit IOSB. */
-#define	MBA_DCBX_PARAM_UPDATE	0x8032	/* DCBX parameters changed. */
+#define	MBA_DCBX_PARAM_CHANGED	0x8032	/* DCBX parameters changed. */
 #define	MBA_CMPLT_3_16BIT	0x8033	/* Completion 3 16bit IOSB. */
 #define	MBA_CMPLT_4_16BIT	0x8034	/* Completion 4 16bit IOSB. */
 #define	MBA_CMPLT_5_16BIT	0x8035	/* Completion 5 16bit IOSB. */
@@ -151,6 +159,13 @@ extern "C" {
 #define	MBX23_MBX_OR_ASYNC_EVENT	0x0
 #define	MBX23_RESPONSE_QUEUE_UPDATE	0x1
 #define	MBX23_SCSI_COMPLETION		0x2
+
+/*
+ * System Error event (0x8002) defines
+ */
+#define	SE_MPI_RISC	BIT_2
+#define	SE_NIC_1	BIT_1
+#define	SE_NIC_2	BIT_0
 
 /*
  * Menlo alert event defines
@@ -204,6 +219,7 @@ extern "C" {
 #define	MBC_ONLINE_SELF_TEST		0x46	/* Online self-test. */
 #define	MBC_ENHANCED_GET_PORT_DATABASE	0x47	/* Get Port Database + login */
 #define	MBC_INITIALIZE_MULTI_ID_FW	0x48	/* Initialize multi-id fw */
+#define	MBC_GET_DCBX_PARAMS		0x51	/* Get DCBX parameters */
 #define	MBC_RESET_LINK_STATUS		0x52	/* Reset Link Error Status */
 #define	MBC_EXECUTE_IOCB		0x54	/* 64 Bit Execute IOCB cmd. */
 #define	MBC_SEND_RNID_ELS		0x57	/* Send RNID ELS request */
@@ -241,6 +257,7 @@ extern "C" {
 #define	MBC_IDC_REQUEST			0x100	/* IDC request */
 #define	MBC_IDC_ACK			0x101	/* IDC acknowledge */
 #define	MBC_IDC_TIME_EXTEND		0x102	/* IDC extend time */
+#define	MBC_PORT_RESET			0x120	/* Port Reset */
 #define	MBC_SET_PORT_CONFIG		0x122	/* Set port configuration */
 #define	MBC_GET_PORT_CONFIG		0x123	/* Get port configuration */
 
@@ -427,13 +444,20 @@ typedef struct ql_mbx_data {
 #define	FO1_AE_AUTO_BYPASS		BIT_9
 #define	FO1_ENABLE_PURE_IOCB		BIT_10
 #define	FO1_AE_PLOGI_RJT		BIT_11
+#define	FO1_AE_IMMEDIATE_NOTIFY_IOCB	BIT_11
 #define	FO1_ENABLE_ABORT_SEQUENCE	BIT_12
 #define	FO1_AE_QUEUE_FULL		BIT_13
+#define	FO1_POST_NOTIFY_ACK_IOCB_2_ATIO	BIT_13
+#define	FO1_POST_NOTIFY_ACK_IOCB	BIT_14
 
+#define	FO2_ENABLE_SELECTIVE_CLASS_2	BIT_5
 #define	FO2_REV_LOOPBACK		BIT_1
 #define	FO2_ENABLE_ATIO_TYPE_3		BIT_0
 
+#define	FO3_NO_ABORT_IO_ON_LINK_DOWN	BIT_14
+#define	FO3_HOLD_STS_FOR_ABTS_RSP	BIT_12
 #define	FO3_STARTUP_OPTS_VALID		BIT_5
+#define	FO3_SEND_N2N_PRLI		BIT_4
 #define	FO3_AE_RND_ERROR		BIT_1
 #define	FO3_ENABLE_EMERG_IOCB		BIT_0
 
@@ -639,8 +663,8 @@ typedef struct port_database_24 {
 int ql_initialize_ip(ql_adapter_state_t *);
 int ql_shutdown_ip(ql_adapter_state_t *);
 int ql_online_selftest(ql_adapter_state_t *);
-int ql_loop_back(ql_adapter_state_t *, lbp_t *, uint32_t, uint32_t);
-int ql_echo(ql_adapter_state_t *, echo_t *);
+int ql_loop_back(ql_adapter_state_t *, uint16_t, lbp_t *, uint32_t, uint32_t);
+int ql_echo(ql_adapter_state_t *, uint16_t, echo_t *);
 int ql_send_change_request(ql_adapter_state_t *, uint16_t);
 int ql_send_lfa(ql_adapter_state_t *, lfa_cmd_t *);
 int ql_clear_aca(ql_adapter_state_t *, ql_tgt_t *, uint16_t);
@@ -686,9 +710,9 @@ int ql_get_firmware_state(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_get_adapter_id(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_get_fw_version(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_data_rate(ql_adapter_state_t *, ql_mbx_data_t *);
-int ql_diag_loopback(ql_adapter_state_t *, caddr_t, uint32_t, uint16_t,
-    uint32_t, ql_mbx_data_t *);
-int ql_diag_echo(ql_adapter_state_t *, caddr_t, uint32_t, uint16_t,
+int ql_diag_loopback(ql_adapter_state_t *, uint16_t, caddr_t, uint32_t,
+    uint16_t, uint32_t, ql_mbx_data_t *);
+int ql_diag_echo(ql_adapter_state_t *, uint16_t, caddr_t, uint32_t, uint16_t,
     ql_mbx_data_t *);
 int ql_serdes_param(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_get_timeout_parameters(ql_adapter_state_t *, uint16_t *);
@@ -701,11 +725,13 @@ int ql_restart_mpi(ql_adapter_state_t *);
 int ql_idc_request(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_idc_ack(ql_adapter_state_t *);
 int ql_idc_time_extend(ql_adapter_state_t *, ql_mbx_data_t *);
+int ql_port_reset(ql_adapter_state_t *);
 int ql_set_port_config(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_get_port_config(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_flash_access(ql_adapter_state_t *, uint16_t, uint32_t, uint32_t,
     uint32_t *);
 int ql_get_xgmac_stats(ql_adapter_state_t *, size_t, caddr_t);
+int ql_get_dcbx_params(ql_adapter_state_t *, uint32_t, caddr_t);
 /*
  * Mailbox command table initializer
  */
@@ -751,6 +777,7 @@ int ql_get_xgmac_stats(ql_adapter_state_t *, size_t, caddr_t);
 	{MBC_ONLINE_SELF_TEST, "MBC_ONLINE_SELF_TEST"},			\
 	{MBC_ENHANCED_GET_PORT_DATABASE, "MBC_ENHANCED_GET_PORT_DATABASE"},\
 	{MBC_INITIALIZE_MULTI_ID_FW, "MBC_INITIALIZE_MULTI_ID_FW"},	\
+	{MBC_GET_DCBX_PARAMS, "MBC_GET_DCBX_PARAMS"},			\
 	{MBC_RESET_LINK_STATUS, "MBC_RESET_LINK_STATUS"},		\
 	{MBC_EXECUTE_IOCB, "MBC_EXECUTE_IOCB"},				\
 	{MBC_SEND_RNID_ELS, "MBC_SEND_RNID_ELS"},			\
@@ -787,6 +814,7 @@ int ql_get_xgmac_stats(ql_adapter_state_t *, size_t, caddr_t);
 	{MBC_IDC_REQUEST, "MBC_IDC_REQUEST"},				\
 	{MBC_IDC_ACK, "MBC_IDC_ACK"},					\
 	{MBC_IDC_TIME_EXTEND, "MBC_IDC_TIME_EXTEND"},			\
+	{MBC_PORT_RESET, "MBC_PORT_RESET"},				\
 	{MBC_SET_PORT_CONFIG, "MBC_SET_PORT_CONFIG"},			\
 	{MBC_GET_PORT_CONFIG, "MBC_GET_PORT_CONFIG"},			\
 	{NULL, "Unsupported"}						\

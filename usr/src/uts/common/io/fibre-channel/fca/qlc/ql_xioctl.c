@@ -142,6 +142,7 @@ static void ql_qry_vport(ql_adapter_state_t *, EXT_IOCTL *, int);
 static void ql_access_flash(ql_adapter_state_t *, EXT_IOCTL *, int);
 static void ql_reset_cmd(ql_adapter_state_t *, EXT_IOCTL *);
 static void ql_update_flash_caches(ql_adapter_state_t *);
+static void ql_get_dcbx_parameters(ql_adapter_state_t *, EXT_IOCTL *, int);
 
 /* ******************************************************************** */
 /*			External IOCTL support.				*/
@@ -3397,10 +3398,10 @@ ql_diagnostic_loopback(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		QL_PRINT_9(CE_CONT, "(%d): F_PORT topology -- using echo\n",
 		    ha->instance);
 		plbrsp.CommandSent = INT_DEF_LB_ECHO_CMD;
-		rval = ql_diag_echo(ha, bp, plbreq.TransferCount, 0, &mr);
+		rval = ql_diag_echo(ha, 0, bp, plbreq.TransferCount, 0, &mr);
 	} else {
 		plbrsp.CommandSent = INT_DEF_LB_LOOPBACK_CMD;
-		rval = ql_diag_loopback(ha, bp, plbreq.TransferCount,
+		rval = ql_diag_loopback(ha, 0, bp, plbreq.TransferCount,
 		    plbreq.Options, plbreq.IterationCount, &mr);
 	}
 
@@ -3777,6 +3778,9 @@ ql_get_host_data(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	case EXT_SC_GET_FC4_STATISTICS:
 		out_size = sizeof (EXT_HBA_FC4STATISTICS);
 		break;
+	case EXT_SC_GET_DCBX_PARAM:
+		out_size = EXT_DEF_DCBX_PARAM_BUF_SIZE;
+		break;
 	case EXT_SC_GET_SCSI_ADDR:
 	case EXT_SC_GET_ERR_DETECTIONS:
 	case EXT_SC_GET_BUS_MODE:
@@ -3831,6 +3835,9 @@ ql_get_host_data(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		break;
 	case EXT_SC_GET_BEACON_STATE:
 		ql_get_led_state(ha, cmd, mode);
+		break;
+	case EXT_SC_GET_DCBX_PARAM:
+		ql_get_dcbx_parameters(ha, cmd, mode);
 		break;
 	}
 
@@ -6539,16 +6546,17 @@ ql_update_flash_caches(ql_adapter_state_t *ha)
 			continue;
 		}
 
+		CACHE_LOCK(ha2);
 		ql_fcache_rel(ha2->fcache);
+		ha2->fcache = NULL;
 
 		if (CFG_IST(ha, CFG_CTRL_242581)) {
-			CACHE_LOCK(ha2);
 			if (ha2->vcache != NULL) {
 				kmem_free(ha2->vcache, QL_24XX_VPD_SIZE);
 				ha2->vcache = NULL;
 			}
-			CACHE_UNLOCK(ha2);
 		}
+		CACHE_UNLOCK(ha2);
 
 		(void) ql_setup_fcache(ha2);
 	}
@@ -8423,4 +8431,69 @@ ql_reset_cmd(ql_adapter_state_t *ha, EXT_IOCTL *cmd)
 	}
 
 	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
+}
+/*
+ * ql_get_dcbx_parameters
+ *	Get DCBX parameters.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	cmd:	User space CT arguments pointer.
+ *	mode:	flags.
+ */
+static void
+ql_get_dcbx_parameters(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
+{
+	uint8_t		*tmp_buf;
+	int		rval;
+
+	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
+
+	if (!(CFG_IST(ha, CFG_CTRL_81XX))) {
+		EL(ha, "invalid request for HBA\n");
+		cmd->Status = EXT_STATUS_INVALID_REQUEST;
+		cmd->ResponseLen = 0;
+	}
+
+	if (cmd->ResponseLen < EXT_DEF_DCBX_PARAM_BUF_SIZE) {
+		cmd->Status = EXT_STATUS_BUFFER_TOO_SMALL;
+		cmd->DetailStatus = EXT_DEF_DCBX_PARAM_BUF_SIZE;
+		EL(ha, "failed, ResponseLen != %xh, Len=%xh\n",
+		    EXT_DEF_DCBX_PARAM_BUF_SIZE, cmd->ResponseLen);
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Allocate memory for command. */
+	tmp_buf = kmem_zalloc(cmd->ResponseLen, KM_SLEEP);
+	if (tmp_buf == NULL) {
+		EL(ha, "failed, kmem_zalloc\n");
+		cmd->Status = EXT_STATUS_NO_MEMORY;
+		cmd->ResponseLen = 0;
+		return;
+	}
+	/* Send command */
+	rval = ql_get_dcbx_params(ha, cmd->ResponseLen, (caddr_t)tmp_buf);
+	if (rval != QL_SUCCESS) {
+		/* error */
+		EL(ha, "failed, get_rnid_params_mbx=%xh\n", rval);
+		kmem_free(tmp_buf, cmd->ResponseLen);
+		cmd->Status = EXT_STATUS_ERR;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Copy the response */
+	if (ql_send_buffer_data((caddr_t)tmp_buf,
+	    (caddr_t)(uintptr_t)cmd->ResponseAdr,
+	    cmd->ResponseLen, mode) != cmd->ResponseLen) {
+		EL(ha, "failed, ddi_copyout\n");
+		kmem_free(tmp_buf, cmd->ResponseLen);
+		cmd->Status = EXT_STATUS_COPY_ERR;
+		cmd->ResponseLen = 0;
+	} else {
+		QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
+		kmem_free(tmp_buf, cmd->ResponseLen);
+	}
+
 }

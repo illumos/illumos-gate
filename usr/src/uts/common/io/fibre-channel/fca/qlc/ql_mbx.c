@@ -569,8 +569,9 @@ ql_online_selftest(ql_adapter_state_t *ha)
  *	Issue diagnostic loop back frame mailbox command.
  *
  * Input:
- *	ha = adapter state pointer.
- *	lb = loop back parameter structure pointer.
+ *	ha:	adapter state pointer.
+ *	findex:	FCF index.
+ *	lb:	loop back parameter structure pointer.
  *
  * Returns:
  *	ql local function return status code.
@@ -580,8 +581,8 @@ ql_online_selftest(ql_adapter_state_t *ha)
  */
 #ifndef apps_64bit
 int
-ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb, uint32_t h_xmit,
-    uint32_t h_rcv)
+ql_loop_back(ql_adapter_state_t *ha, uint16_t findex, lbp_t *lb,
+    uint32_t h_xmit, uint32_t h_rcv)
 {
 	int		rval;
 	mbx_cmd_t	mc = {0};
@@ -591,6 +592,7 @@ ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb, uint32_t h_xmit,
 
 	mcp->mb[0] = MBC_DIAGNOSTIC_LOOP_BACK;
 	mcp->mb[1] = lb->options;
+	mcp->mb[2] = findex;
 	mcp->mb[6] = LSW(h_rcv);
 	mcp->mb[7] = MSW(h_rcv);
 	mcp->mb[10] = LSW(lb->transfer_count);
@@ -606,7 +608,7 @@ ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb, uint32_t h_xmit,
 	mcp->mb[20] = LSW(h_xmit);
 	mcp->mb[21] = MSW(h_xmit);
 	mcp->out_mb = MBX_21|MBX_20|MBX_19|MBX_18|MBX_17|MBX_16|MBX_15|
-	    MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|MBX_1|MBX_0;
+	    MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_19|MBX_18|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = lb->iteration_count / 300;
 
@@ -627,7 +629,7 @@ ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb, uint32_t h_xmit,
 }
 #else
 int
-ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb)
+ql_loop_back(ql_adapter_state_t *ha, uint16_t findex, lbp_t *lb)
 {
 	int		rval;
 	mbx_cmd_t	mc = {0};
@@ -637,6 +639,7 @@ ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb)
 
 	mcp->mb[0] = MBC_DIAGNOSTIC_LOOP_BACK;
 	mcp->mb[1] = lb->options;
+	mcp->mb[2] = findex;
 	mcp->mb[6] = LSW(h_rcv);
 	mcp->mb[7] = MSW(h_rcv);
 	mcp->mb[6] = LSW(MSD(lb->receive_data_address));
@@ -660,7 +663,7 @@ ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb)
 	mcp->mb[20] = LSW(MSD(lb->transfer_data_address));
 	mcp->mb[21] = MSW(MSD(lb->transfer_data_address));
 	mcp->out_mb = MBX_21|MBX_20|MBX_19|MBX_18|MBX_17|MBX_16|MBX_15|
-	    MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|MBX_1|MBX_0;
+	    MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_19|MBX_18|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = lb->iteration_count / 300;
 
@@ -687,6 +690,7 @@ ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb)
  *
  * Input:
  *	ha:		adapter state pointer.
+ *	findex:		FCF index.
  *	echo_pt:	echo parameter structure pointer.
  *
  * Returns:
@@ -696,7 +700,7 @@ ql_loop_back(ql_adapter_state_t *ha, lbp_t *lb)
  *	Kernel context.
  */
 int
-ql_echo(ql_adapter_state_t *ha, echo_t *echo_pt)
+ql_echo(ql_adapter_state_t *ha, uint16_t findex, echo_t *echo_pt)
 {
 	int		rval;
 	mbx_cmd_t	mc = {0};
@@ -708,6 +712,7 @@ ql_echo(ql_adapter_state_t *ha, echo_t *echo_pt)
 	mcp->mb[1] = echo_pt->options;		/* command options; 64 bit */
 						/* addressing (bit 6) and */
 						/* real echo (bit 15 */
+	mcp->mb[2] = findex;
 
 	/*
 	 * I know this looks strange, using a field labled "not used"
@@ -749,8 +754,8 @@ ql_echo(ql_adapter_state_t *ha, echo_t *echo_pt)
 	mcp->mb[17] = MSW(echo_pt->receive_data_address.dmac_address);
 
 	mcp->out_mb = MBX_21|MBX_20|MBX_17|MBX_16|MBX_15|MBX_14|MBX_10|
-	    MBX_7|MBX_6|MBX_1|MBX_0;
-	mcp->in_mb = MBX_1|MBX_0;
+	    MBX_7|MBX_6|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_3|MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 
 	rval = ql_mailbox_command(ha, mcp);
@@ -2469,7 +2474,8 @@ ql_initiate_lip(ql_adapter_state_t *ha)
 
 	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_LIP_FULL_LOGIN;
-		mcp->mb[1] = BIT_4;
+		mcp->mb[1] = (uint16_t)(CFG_IST(ha, CFG_CTRL_81XX) ?
+		    BIT_1 : BIT_4);
 		mcp->mb[3] = ha->loop_reset_delay;
 		mcp->out_mb = MBX_3|MBX_2|MBX_1|MBX_0;
 	} else {
@@ -2558,7 +2564,8 @@ ql_lip_reset(ql_adapter_state_t *ha, uint16_t loop_id)
 
 	if (CFG_IST(ha, CFG_CTRL_242581)) {
 		mcp->mb[0] = MBC_LIP_FULL_LOGIN;
-		mcp->mb[1] = BIT_6;
+		mcp->mb[1] = (uint16_t)(CFG_IST(ha, CFG_CTRL_81XX) ?
+		    BIT_1 : BIT_6);
 		mcp->mb[3] = ha->loop_reset_delay;
 		mcp->out_mb = MBX_3|MBX_2|MBX_1|MBX_0;
 	} else {
@@ -3269,6 +3276,7 @@ ql_init_firmware(ql_adapter_state_t *ha)
 			mcp->mb[12] = MSW(MSD(addr));
 			mcp->mb[13] = LSW(MSD(addr));
 			mcp->mb[14] = sizeof (ql_ext_icb_8100_t);
+			mcp->mb[1] = BIT_0;
 		}
 		mcp->out_mb = MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|
 		    MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
@@ -3319,7 +3327,7 @@ ql_get_firmware_state(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 
 	mcp->mb[0] = MBC_GET_FIRMWARE_STATE;
 	mcp->out_mb = MBX_0;
-	mcp->in_mb = MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 	rval = ql_mailbox_command(ha, mcp);
 
@@ -3328,6 +3336,8 @@ ql_get_firmware_state(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 		mr->mb[1] = mcp->mb[1];
 		mr->mb[2] = mcp->mb[2];
 		mr->mb[3] = mcp->mb[3];
+		mr->mb[4] = mcp->mb[4];
+		mr->mb[5] = mcp->mb[5];
 	}
 
 	ha->sfp_stat = mcp->mb[2];
@@ -3516,6 +3526,7 @@ ql_data_rate(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
  *
  * Input:
  *	ha:	adapter state pointer.
+ *	findex:	FCF index.
  *	bp:	buffer pointer.
  *	size:	buffer size.
  *	opt:	command options.
@@ -3529,8 +3540,8 @@ ql_data_rate(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
  *	Kernel context.
  */
 int
-ql_diag_loopback(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
-    uint16_t opt, uint32_t it_cnt, ql_mbx_data_t *mr)
+ql_diag_loopback(ql_adapter_state_t *ha, uint16_t findex, caddr_t bp,
+    uint32_t size, uint16_t opt, uint32_t it_cnt, ql_mbx_data_t *mr)
 {
 	int		rval;
 	dma_mem_t	mem_desc;
@@ -3547,6 +3558,7 @@ ql_diag_loopback(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
 
 	mcp->mb[0] = MBC_DIAGNOSTIC_LOOP_BACK;
 	mcp->mb[1] = opt;
+	mcp->mb[2] = findex;
 	mcp->mb[6] = LSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[7] = MSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[10] = LSW(size);
@@ -3560,7 +3572,7 @@ ql_diag_loopback(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
 	mcp->mb[20] = LSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[21] = MSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->out_mb = MBX_21|MBX_20|MBX_19|MBX_18|MBX_17|MBX_16|MBX_15|
-	    MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_3|MBX_2|MBX_1|MBX_0;
+	    MBX_14|MBX_13|MBX_12|MBX_11|MBX_10|MBX_7|MBX_6|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_19|MBX_18|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = it_cnt / 300;
 	if (mcp->timeout < MAILBOX_TOV) {
@@ -3601,6 +3613,7 @@ ql_diag_loopback(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
  *
  * Input:
  *	ha:	adapter state pointer.
+ *	findex:	FCF index.
  *	bp:	buffer pointer.
  *	size:	buffer size.
  *	opt:	command options.
@@ -3613,8 +3626,8 @@ ql_diag_loopback(ql_adapter_state_t *ha, caddr_t bp, uint32_t size,
  *	Kernel context.
  */
 int
-ql_diag_echo(ql_adapter_state_t *ha, caddr_t bp, uint32_t size, uint16_t opt,
-    ql_mbx_data_t *mr)
+ql_diag_echo(ql_adapter_state_t *ha, uint16_t findex, caddr_t bp,
+    uint32_t size, uint16_t opt, ql_mbx_data_t *mr)
 {
 	int		rval;
 	dma_mem_t	mem_desc;
@@ -3630,7 +3643,9 @@ ql_diag_echo(ql_adapter_state_t *ha, caddr_t bp, uint32_t size, uint16_t opt,
 	}
 
 	mcp->mb[0] = MBC_ECHO;
-	mcp->mb[1] = opt;
+	mcp->mb[1] = (uint16_t)(CFG_IST(ha, CFG_CTRL_81XX) ? opt :
+	    (opt | BIT_6));
+	mcp->mb[2] = findex;
 	mcp->mb[6] = LSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[7] = MSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[10] = LSW(size);
@@ -3641,7 +3656,7 @@ ql_diag_echo(ql_adapter_state_t *ha, caddr_t bp, uint32_t size, uint16_t opt,
 	mcp->mb[20] = LSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->mb[21] = MSW(MSD(mem_desc.cookie.dmac_laddress));
 	mcp->out_mb = MBX_21|MBX_20|MBX_17|MBX_16|MBX_15|
-	    MBX_14|MBX_10|MBX_7|MBX_6|MBX_1|MBX_0;
+	    MBX_14|MBX_10|MBX_7|MBX_6|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 	rval = ql_mailbox_command(ha, mcp);
@@ -4273,6 +4288,39 @@ ql_idc_time_extend(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 }
 
 /*
+ * ql_port_reset
+ *	The Port Reset for the external 10G port associated with this function
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_port_reset(ql_adapter_state_t *ha)
+{
+	int		rval;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	mcp->mb[0] = MBC_PORT_RESET;
+	mcp->out_mb = MBX_0;
+	mcp->in_mb = MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+
+	return (rval);
+}
+
+/*
  * ql_set_port_config
  *	The Set Port Configuration command sets the configuration for the
  *      external 10G port associated with this function
@@ -4299,7 +4347,9 @@ ql_set_port_config(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 	mcp->mb[0] = MBC_SET_PORT_CONFIG;
 	mcp->mb[1] = mr->mb[1];
 	mcp->mb[2] = mr->mb[2];
-	mcp->out_mb = MBX_2|MBX_1|MBX_0;
+	mcp->mb[3] = mr->mb[3];
+	mcp->mb[4] = mr->mb[4];
+	mcp->out_mb = MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->in_mb = MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 	rval = ql_mailbox_command(ha, mcp);
@@ -4335,7 +4385,7 @@ ql_get_port_config(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 
 	mcp->mb[0] = MBC_GET_PORT_CONFIG;
 	mcp->out_mb = MBX_0;
-	mcp->in_mb = MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->timeout = MAILBOX_TOV;
 	rval = ql_mailbox_command(ha, mcp);
 
@@ -4343,11 +4393,13 @@ ql_get_port_config(ql_adapter_state_t *ha, ql_mbx_data_t *mr)
 		if (mr != NULL) {
 			mr->mb[1] = mcp->mb[1];
 			mr->mb[2] = mcp->mb[2];
+			mr->mb[3] = mcp->mb[3];
+			mr->mb[4] = mcp->mb[4];
 		}
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 	} else {
-		EL(ha, "status=%xh, mbx1=%xh, mbx2=%xh\n", rval, mcp->mb[1],
-		    mcp->mb[2]);
+		EL(ha, "status=%xh, mbx1=%xh, mbx2=%xh, mbx3=%xh, mbx4=%xh\n",
+		    rval, mcp->mb[1], mcp->mb[2], mcp->mb[3], mcp->mb[4]);
 	}
 
 	return (rval);
@@ -4463,6 +4515,65 @@ ql_get_xgmac_stats(ql_adapter_state_t *ha, size_t size, caddr_t bufp)
 	if (rval != QL_SUCCESS) {
 		EL(ha, "status=%xh, mbx1=%xh, mbx2=%xh\n", rval, mcp->mb[1],
 		    mcp->mb[2]);
+	} else {
+		/*EMPTY*/
+		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+	}
+
+	return (rval);
+}
+
+/*
+ * ql_get_dcbx_params
+ *	Issue get DCBX parameters mailbox command.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	size:	size of data buffer.
+ *	bufp:	data pointer for DMA data.
+ *
+ * Returns:
+ *	ql local function return status code.
+ *
+ * Context:
+ *	Kernel context.
+ */
+int
+ql_get_dcbx_params(ql_adapter_state_t *ha, uint32_t size, caddr_t bufp)
+{
+	int		rval;
+	dma_mem_t	mem_desc;
+	mbx_cmd_t	mc = {0};
+	mbx_cmd_t	*mcp = &mc;
+
+	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
+
+	if ((rval = ql_setup_mbox_dma_resources(ha, &mem_desc, size)) !=
+	    QL_SUCCESS) {
+		EL(ha, "failed=%xh\n", QL_MEMORY_ALLOC_FAILED);
+		return (QL_MEMORY_ALLOC_FAILED);
+	}
+
+	mcp->mb[0] = MBC_GET_DCBX_PARAMS;
+	mcp->mb[1] = 0;	/* Return all DCBX paramters */
+	mcp->mb[2] = MSW(LSD(mem_desc.cookie.dmac_laddress));
+	mcp->mb[3] = LSW(LSD(mem_desc.cookie.dmac_laddress));
+	mcp->mb[6] = MSW(MSD(mem_desc.cookie.dmac_laddress));
+	mcp->mb[7] = LSW(MSD(mem_desc.cookie.dmac_laddress));
+	mcp->mb[8] = (uint16_t)size;
+	mcp->out_mb = MBX_8|MBX_7|MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_2|MBX_1|MBX_0;
+	mcp->timeout = MAILBOX_TOV;
+	rval = ql_mailbox_command(ha, mcp);
+
+	if (rval == QL_SUCCESS) {
+		ql_get_mbox_dma_data(&mem_desc, bufp);
+	}
+
+	ql_free_dma_resource(ha, &mem_desc);
+
+	if (rval != QL_SUCCESS) {
+		EL(ha, "failed=%xh\n", rval);
 	} else {
 		/*EMPTY*/
 		QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);

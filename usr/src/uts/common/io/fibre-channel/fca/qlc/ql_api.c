@@ -135,6 +135,7 @@ static int ql_program_flash_address(ql_adapter_state_t *, uint32_t, uint8_t);
 static void ql_rst_aen(ql_adapter_state_t *);
 static void ql_restart_queues(ql_adapter_state_t *);
 static void ql_abort_queues(ql_adapter_state_t *);
+static void ql_abort_device_queues(ql_adapter_state_t *ha, ql_tgt_t *tq);
 static void ql_idle_check(ql_adapter_state_t *);
 static int ql_loop_resync(ql_adapter_state_t *);
 static size_t ql_24xx_ascii_fw_dump(ql_adapter_state_t *, caddr_t);
@@ -4159,7 +4160,7 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 				/* Loop must be up for external */
 				EL(ha, "failed, QL_DIAG_LPBDTA FC_TRAN_BUSY\n");
 				rval = FC_TRAN_BUSY;
-			} else if (ql_loop_back(ha, lb,
+			} else if (ql_loop_back(ha, 0, lb,
 			    buffer_xmt.cookie.dmac_notused,
 			    buffer_rcv.cookie.dmac_notused) == QL_SUCCESS) {
 				bzero((void *)cmd->pm_stat_buf,
@@ -4241,7 +4242,8 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 			 * real echo (bit 15)
 			 */
 			echo.options = BIT_15;
-			if (CFG_IST(ha, CFG_ENABLE_64BIT_ADDRESSING)) {
+			if (CFG_IST(ha, CFG_ENABLE_64BIT_ADDRESSING) &&
+			    !(CFG_IST(ha, CFG_CTRL_81XX))) {
 				echo.options = (uint16_t)
 				    (echo.options | BIT_6);
 			}
@@ -4303,7 +4305,7 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 			}
 
 			/* send the echo */
-			if (ql_echo(ha, &echo) == QL_SUCCESS) {
+			if (ql_echo(ha, 0, &echo) == QL_SUCCESS) {
 				ddi_rep_put8(buffer_rcv.acc_handle,
 				    (uint8_t *)buffer_rcv.bp + 4,
 				    (uint8_t *)cmd->pm_stat_buf,
@@ -10161,9 +10163,8 @@ ql_iidma(ql_adapter_state_t *ha)
 static void
 ql_abort_queues(ql_adapter_state_t *ha)
 {
-	ql_link_t		*link, *link1, *link2;
+	ql_link_t		*link;
 	ql_tgt_t		*tq;
-	ql_lun_t		*lq;
 	ql_srb_t		*sp;
 	uint16_t		index;
 	ql_adapter_state_t	*vha;
@@ -10184,7 +10185,11 @@ ql_abort_queues(ql_adapter_state_t *ha)
 			index = 1;
 		}
 		sp = ha->outstanding_cmds[index];
-		if (sp != NULL) {
+
+		/* skip devices capable of FCP2 retrys */
+		if ((sp != NULL) &&
+		    ((tq = sp->lun_queue->target_queue) != NULL) &&
+		    (!(tq->prli_svc_param_word_3 & PRLI_W3_RETRY))) {
 			ha->outstanding_cmds[index] = NULL;
 			sp->handle = 0;
 			sp->flags &= ~SRB_IN_TOKEN_ARRAY;
@@ -10211,58 +10216,77 @@ ql_abort_queues(ql_adapter_state_t *ha)
 			for (link = vha->dev[index].first; link != NULL;
 			    link = link->next) {
 				tq = link->base_address;
-
-				/*
-				 * Set port unavailable status for
-				 * all commands on device queue.
-				 */
-				DEVICE_QUEUE_LOCK(tq);
-
-				for (link1 = tq->lun_queues.first;
-				    link1 != NULL; link1 = link1->next) {
-					lq = link1->base_address;
-
-					link2 = lq->cmd.first;
-					while (link2 != NULL) {
-						sp = link2->base_address;
-
-						if (sp->flags & SRB_ABORT) {
-							link2 = link2->next;
-							continue;
-						}
-
-						/* Rem srb from dev cmd q. */
-						ql_remove_link(&lq->cmd,
-						    &sp->cmd);
-						sp->flags &=
-						    ~SRB_IN_DEVICE_QUEUE;
-
-						/* Release device queue lock */
-						DEVICE_QUEUE_UNLOCK(tq);
-
-						/* Set ending status. */
-						sp->pkt->pkt_reason =
-						    CS_PORT_UNAVAILABLE;
-
-						/*
-						 * Call done routine to handle
-						 * completions.
-						 */
-						ql_done(&sp->cmd);
-
-						/* Delay for system */
-						ql_delay(ha, 10000);
-
-						/* Acquire device queue lock */
-						DEVICE_QUEUE_LOCK(tq);
-						link2 = lq->cmd.first;
-					}
+				/* skip devices capable of FCP2 retrys */
+				if (!(tq->prli_svc_param_word_3 &
+				    PRLI_W3_RETRY)) {
+					/*
+					 * Set port unavailable status and
+					 * return all commands on a devices
+					 * queues.
+					 */
+					ql_abort_device_queues(ha, tq);
 				}
-				/* Release device queue lock. */
-				DEVICE_QUEUE_UNLOCK(tq);
 			}
 		}
 	}
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+}
+
+/*
+ * ql_abort_device_queues
+ *	Abort all commands on device queues.
+ *
+ * Input:
+ *	ha = adapter state pointer.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+static void
+ql_abort_device_queues(ql_adapter_state_t *ha, ql_tgt_t *tq)
+{
+	ql_link_t	*lun_link, *cmd_link;
+	ql_srb_t	*sp;
+	ql_lun_t	*lq;
+
+	QL_PRINT_10(CE_CONT, "(%d): started\n", ha->instance);
+
+	DEVICE_QUEUE_LOCK(tq);
+
+	for (lun_link = tq->lun_queues.first; lun_link != NULL;
+	    lun_link = lun_link->next) {
+		lq = lun_link->base_address;
+
+		cmd_link = lq->cmd.first;
+		while (cmd_link != NULL) {
+			sp = cmd_link->base_address;
+
+			if (sp->flags & SRB_ABORT) {
+				cmd_link = cmd_link->next;
+				continue;
+			}
+
+			/* Remove srb from device cmd queue. */
+			ql_remove_link(&lq->cmd, &sp->cmd);
+
+			sp->flags &= ~SRB_IN_DEVICE_QUEUE;
+
+			DEVICE_QUEUE_UNLOCK(tq);
+
+			/* Set ending status. */
+			sp->pkt->pkt_reason = CS_PORT_UNAVAILABLE;
+
+			/* Call done routine to handle completion. */
+			ql_done(&sp->cmd);
+
+			/* Delay for system */
+			ql_delay(ha, 10000);
+
+			DEVICE_QUEUE_LOCK(tq);
+			cmd_link = lq->cmd.first;
+		}
+	}
+	DEVICE_QUEUE_UNLOCK(tq);
 
 	QL_PRINT_10(CE_CONT, "(%d): done\n", ha->instance);
 }

@@ -52,7 +52,7 @@ DRVR_ALIASES_i386="\
 	pciex1077,2432 \
 	pciex1077,2532 \
 	pciex1077,5432 \
-	pciex1077,8001 \ 
+	pciex1077,8001 \
 	"
 
 HARDWARE_STRINGS_sparc="\
@@ -115,7 +115,7 @@ if [ -z "${BASEDIR}" ]; then
 fi
 
 
-# Remove existing definition, if it exists. 
+# Remove existing definition, if it exists.
 /usr/sbin/rem_drv -b "${BASEDIR}" ${DRVR_NAME} > /dev/null 2>&1
 
 # Check for hardware

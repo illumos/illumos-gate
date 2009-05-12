@@ -94,6 +94,7 @@ int8_t *adapter_state_flags[] = {
 	"VP_ENABLED",
 	"FDISC_ENABLED",
 	"FUNCTION_1",
+	"MPI_RESET_NEEDED",
 	NULL
 };
 

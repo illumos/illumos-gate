@@ -776,6 +776,7 @@ typedef struct ql_vp_cfg {
 /*
  * VP options.
  */
+#define	VPO_ENABLE_SNS_LOGIN_SCR	BIT_6
 #define	VPO_TARGET_MODE_DISABLED	BIT_5
 #define	VPO_INITIATOR_MODE_ENABLED	BIT_4
 #define	VPO_ENABLED			BIT_3
@@ -1627,6 +1628,7 @@ typedef struct ql_adapter_state {
 #define	VP_ENABLED			BIT_13
 #define	FDISC_ENABLED			BIT_14
 #define	FUNCTION_1			BIT_15
+#define	MPI_RESET_NEEDED		BIT_16
 
 /*
  * task daemon flags

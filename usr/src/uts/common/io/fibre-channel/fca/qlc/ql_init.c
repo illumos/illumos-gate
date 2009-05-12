@@ -3653,6 +3653,27 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 	    ~(MBX_BUSY_FLG | MBX_WANT_FLG | MBX_ABORT | MBX_INTERRUPT));
 	ha->mcp = NULL;
 
+	if (ha->flags & MPI_RESET_NEEDED) {
+		WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+		WRT16_IO_REG(ha, mailbox[0], MBC_RESTART_MPI);
+		WRT32_IO_REG(ha, hccr, HC24_SET_HOST_INT);
+		for (timer = 0; timer < 30000; timer++) {
+			stat = RD32_IO_REG(ha, intr_info_lo);
+			if (stat & BIT_15) {
+				if ((stat & 0xff) < 0x12) {
+					WRT32_IO_REG(ha, hccr,
+					    HC24_CLR_RISC_INT);
+					break;
+				}
+				WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
+			}
+			drv_usecwait(100);
+		}
+		ADAPTER_STATE_LOCK(ha);
+		ha->flags &= ~MPI_RESET_NEEDED;
+		ADAPTER_STATE_UNLOCK(ha);
+	}
+
 	/*
 	 * Set flash write-protection.
 	 */

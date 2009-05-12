@@ -1276,7 +1276,8 @@ typedef struct vp_modify_entry {
 	uint8_t  reserved_3[2];
 	uint8_t  second_port_name[8];
 	uint8_t  second_node_name[8];
-	uint8_t  reserved_4[8];
+	uint8_t  reserved_4[6];
+	uint16_t fcf_index;
 } vp_modify_entry_t;
 
 /*
@@ -1302,7 +1303,8 @@ typedef struct vp_control_entry {
 	uint8_t  vp_count;
 	uint8_t  vp_count_h;
 	uint8_t  vp_index[16];
-	uint8_t  reserved[32];
+	uint8_t  reserved[30];
+	uint16_t fcf_index;
 } vp_control_entry_t;
 
 /*
