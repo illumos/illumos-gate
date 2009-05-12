@@ -2220,6 +2220,48 @@ nge_chip_cyclic(void *arg)
 	nge_wake_factotum(ngep);
 }
 
+/*
+ * Get/Release semaphore of SMU
+ * For SMU enabled chipset
+ * When nge driver is attached, driver should acquire
+ * semaphore before PHY init and accessing MAC registers.
+ * When nge driver is unattached, driver should release
+ * semaphore.
+ */
+
+static int
+nge_smu_sema(nge_t *ngep, boolean_t acquire)
+{
+	nge_tx_en tx_en;
+	uint32_t tries;
+
+	if (acquire) {
+		for (tries = 0; tries < 5; tries++) {
+			tx_en.val = nge_reg_get32(ngep, NGE_TX_EN);
+			if (tx_en.bits.smu2mac == NGE_SMU_FREE)
+				break;
+			delay(drv_usectohz(1000000));
+		}
+		if (tx_en.bits.smu2mac != NGE_SMU_FREE)
+			return (DDI_FAILURE);
+		for (tries = 0; tries < 5; tries++) {
+			tx_en.val = nge_reg_get32(ngep, NGE_TX_EN);
+			tx_en.bits.mac2smu = NGE_SMU_GET;
+			nge_reg_put32(ngep, NGE_TX_EN, tx_en.val);
+			tx_en.val = nge_reg_get32(ngep, NGE_TX_EN);
+
+			if (tx_en.bits.mac2smu == NGE_SMU_GET &&
+			    tx_en.bits.smu2mac == NGE_SMU_FREE)
+				return (DDI_SUCCESS);
+			drv_usecwait(10);
+		}
+		return (DDI_FAILURE);
+	} else
+		nge_reg_put32(ngep, NGE_TX_EN, 0x0);
+
+	return (DDI_SUCCESS);
+
+}
 static void
 nge_unattach(nge_t *ngep)
 {
@@ -2252,6 +2294,10 @@ nge_unattach(nge_t *ngep)
 		mutex_enter(ngep->genlock);
 		nge_restore_mac_addr(ngep);
 		(void) nge_chip_stop(ngep, B_FALSE);
+		if (ngep->chipinfo.device == DEVICE_ID_MCP55_373 ||
+		    ngep->chipinfo.device == DEVICE_ID_MCP55_372) {
+			(void) nge_smu_sema(ngep, B_FALSE);
+		}
 		mutex_exit(ngep->genlock);
 	}
 
@@ -2457,6 +2503,14 @@ nge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	mutex_enter(ngep->genlock);
 
+	if (ngep->chipinfo.device == DEVICE_ID_MCP55_373 ||
+	    ngep->chipinfo.device == DEVICE_ID_MCP55_372) {
+		err = nge_smu_sema(ngep, B_TRUE);
+		if (err != DDI_SUCCESS) {
+			nge_problem(ngep, "nge_attach: nge_smu_sema() failed");
+			goto attach_fail;
+		}
+	}
 	/*
 	 * Initialise link state variables
 	 * Stop, reset & reinitialise the chip.

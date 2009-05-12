@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -463,11 +463,16 @@ typedef union _nge_tx_cntl {
  * for mcp55, it is a 32-bit register.
  */
 #define	NGE_TX_EN		0x084
+#define	NGE_SMU_FREE		0x0
+#define	NGE_SMU_GET		0xf
 typedef union _nge_tx_en {
-	uint8_t	val;
+	uint32_t	val;
 	struct {
-		uint8_t	tx_en:1;
-		uint8_t	resv1_7:7;
+		uint32_t	tx_en:1;
+		uint32_t	resv1_7:7;
+		uint32_t	smu2mac:4;
+		uint32_t	mac2smu:4;
+		uint32_t	resv16_31:16;
 	} bits;
 } nge_tx_en;
 

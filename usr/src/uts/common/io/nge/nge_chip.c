@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -701,34 +701,15 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * For mcp55, the bits 1:31 of NGE_RX_EN and NGE_TX_EN are
-	 * defined to be used by SMU. The newer PXE than 527 began to
-	 * support SMU and bit 24 of NGE_RX_EN/NGE_TX_EN are set
-	 * when leaving PXE to prevents the MAC from winning
-	 * arbitration to the main transmit/receive channels.
-	 */
-	if (ngep->chipinfo.device == DEVICE_ID_MCP55_373 ||
-	    ngep->chipinfo.device == DEVICE_ID_MCP55_372) {
+	/* Disable rx's machine */
+	rx_en.val = nge_reg_get8(ngep, NGE_RX_EN);
+	rx_en.bits.rx_en = NGE_CLEAR;
+	nge_reg_put8(ngep, NGE_RX_EN, rx_en.val);
 
-		/* Disable rx's machine */
-		nge_reg_put32(ngep, NGE_RX_EN, 0x0);
-
-		/* Disable tx's machine */
-		nge_reg_put32(ngep, NGE_TX_EN, 0x0);
-	} else {
-
-		/* Disable rx's machine */
-		rx_en.val = nge_reg_get8(ngep, NGE_RX_EN);
-		rx_en.bits.rx_en = NGE_CLEAR;
-		nge_reg_put8(ngep, NGE_RX_EN, rx_en.val);
-
-
-		/* Disable tx's machine */
-		tx_en.val = nge_reg_get8(ngep, NGE_TX_EN);
-		tx_en.bits.tx_en = NGE_CLEAR;
-		nge_reg_put8(ngep, NGE_TX_EN, tx_en.val);
-	}
+	/* Disable tx's machine */
+	tx_en.val = nge_reg_get8(ngep, NGE_TX_EN);
+	tx_en.bits.tx_en = NGE_CLEAR;
+	nge_reg_put8(ngep, NGE_TX_EN, tx_en.val);
 
 	/*
 	 * Clean the status of tx's state machine
