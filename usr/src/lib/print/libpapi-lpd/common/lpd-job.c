@@ -161,6 +161,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	char *user = "nobody";
 	uid_t uid = getuid();
 	struct passwd *pw;
+	char *h1;
 
 	if (svc == NULL)
 		return (PAPI_BAD_REQUEST);
@@ -170,6 +171,11 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 		return (PAPI_OK);
 
 	gethostname(host, sizeof (host));
+	if (papiAttributeListGetString(attributes, NULL,
+	    "job-originating-host-name", &h1) == PAPI_OK) {
+		papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
+		    "job-host", h1);
+	}
 	add_lpd_control_line(metadata, 'H', host);
 	papiAttributeListAddString(used, PAPI_ATTR_EXCL,
 	    "job-originating-host-name", host);

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: in.lpd.c 170 2006-05-20 05:58:49Z njacobs $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -179,7 +177,7 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 		case 'P':	/* RFC-1179 User */
 			++entry;
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"requesting-user-name", entry);
+			    "job-originating-user-name", entry);
 			papiServiceSetUserName(svc, entry);
 			break;
 		case 'M':	/* RFC-1179 Mail to User */

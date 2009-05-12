@@ -87,8 +87,17 @@ ipp_print_job(papi_service_t svc, papi_attribute_t **request,
 
 	/* copy any job-attributes-group attributes for the PAPI call */
 	if (papiAttributeListGetCollection(request, NULL,
-	    "job-attributes-group", &operational) == PAPI_OK)
+	    "job-attributes-group", &operational) == PAPI_OK) {
+		char *user = NULL;
+
 		copy_attributes(&job_attributes, operational);
+
+		if (papiAttributeListGetString(operational, NULL,
+		    "requesting-user-name", &user) == PAPI_OK) {
+			papiAttributeListAddString(&job_attributes,
+			    PAPI_ATTR_REPLACE, "requesting-user-name", user);
+		}
+	}
 
 	/* Set "job-originating-host-name" attribute if not set */
 	papiAttributeListGetString(job_attributes, NULL,
