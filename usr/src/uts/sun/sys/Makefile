@@ -35,7 +35,6 @@ cg6fbc.h		cg6reg.h		cg6tec.h \
 cg6thc.h		cg6var.h \
 dkmpio.h		dmaga.h	\
 fdreg.h			fdvar.h \
-hme.h			hme_mac.h 		hme_phy.h \
 memvar.h \
 obpdefs.h		pixrect.h  \
 pr_impl_util.h		pr_planegroups.h \

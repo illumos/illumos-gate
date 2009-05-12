@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -57,10 +57,8 @@ spdsock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 ce		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 eri		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 ge		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-hme		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 ibd		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 pcelx		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-qfe		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 aggr		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 vnic		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 softmac		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,9 +52,9 @@
 #include	<sys/policy.h>
 #include	<sys/ddi.h>
 #include	<sys/sunddi.h>
-#include	<sys/hme_phy.h>
-#include	<sys/hme_mac.h>
-#include	<sys/hme.h>
+#include	"hme_phy.h"
+#include	"hme_mac.h"
+#include	"hme.h"
 
 typedef void	(*fptrv_t)();
 
@@ -157,14 +157,6 @@ static	int	hme_ngu_enable =	1; /* to enable Never Give Up mode */
 static	int	hme_mifpoll_enable =	1; /* to enable mif poll */
 
 /*
- * The following variables are used for performance tuning.
- */
-
-#define	RX_BCOPY_MAX	(sizeof (struct ether_header) + 256)
-
-static	int	hme_rx_bcopy_max =	RX_BCOPY_MAX;
-
-/*
  * The following variables are used for configuring link-operation.
  * Later these parameters may be changed per interface using "ndd" command
  * These parameters may also be specified as properties using the .conf
@@ -261,20 +253,11 @@ static	char *ext_xcvr_msg =
 static	char *no_xcvr_msg =
 	"No transceiver found.";
 
-static	char *slave_slot_msg =
-	"Dev not used - dev in slave only slot";
-
 static	char *burst_size_msg =
 	"Could not identify the burst size";
 
 static	char *unk_rx_ringsz_msg =
 	"Unknown receive RINGSZ";
-
-static	char *lmac_addr_msg =
-	"Using local MAC address";
-
-static  char *lether_addr_msg =
-	"Local Ethernet address = %s";
 
 static  char *add_intr_fail_msg =
 	"ddi_add_intr(9F) failed";
@@ -293,15 +276,6 @@ static	char *mregs_4bmac_reg_fail_msg =
 
 static	char *mregs_4mif_reg_fail_msg =
 	"ddi_map_regs for mif reg failed";
-
-static  char *mif_read_fail_msg =
-	"MIF Read failure";
-
-static  char *mif_write_fail_msg =
-	"MIF Write failure";
-
-static  char *kstat_create_fail_msg =
-	"kstat_create failed";
 
 static  char *param_reg_fail_msg =
 	"parameter register error";
@@ -322,77 +296,6 @@ static	char *par_detect_anar_not_set_msg =
 	"External Transceiver: anar not set with speed selection";
 
 
-#ifdef	HME_DEBUG
-static  char *mregs_4config_fail_msg =
-	"ddi_regs_map_setup(9F) for config space failed";
-
-static  char *attach_fail_msg =
-	"Attach entry point failed";
-
-static  char *detach_bad_cmd_msg =
-	"Detach entry point rcv'd a bad command";
-
-static  char *phy_msg =
-	"Phy, Vendor Id: %x";
-
-static  char *no_phy_msg =
-	"No Phy/xcvr found";
-
-static  char *unk_rx_descr_sze_msg =
-	"Unknown Rx descriptor size %x.";
-
-static  char *disable_txmac_msg =
-	"Txmac could not be disabled.";
-
-static  char *disable_rxmac_msg =
-	"Rxmac could not be disabled.";
-
-static  char *config_space_fatal_msg =
-	"Configuration space failed in routine.";
-
-static  char *mregs_4soft_reset_fail_msg =
-	"ddi_regs_map_setup(9F) for soft reset failed";
-
-static  char *disable_erx_msg =
-	"Can not disable Rx.";
-
-static  char *disable_etx_msg =
-	"Can not disable Tx.";
-
-static  char *unk_tx_descr_sze_msg =
-	"Unknown Tx descriptor size %x.";
-
-static  char *alloc_tx_dmah_msg =
-	"Can not allocate Tx dma handle.";
-
-static  char *alloc_rx_dmah_msg =
-	"Can not allocate Rx dma handle.";
-
-static  char *phy_speed_bad_msg =
-	"The current Phy/xcvr speed is not valid";
-
-static  char *par_detect_fault_msg =
-	"Parallel Detection Fault";
-
-static  char *autoneg_speed_bad_msg =
-	"Autonegotiated speed is bad";
-
-#endif
-
-/*
- *	"MIF Read failure: data = %X";
- */
-
-/*
- * SunVTS Loopback messaging support
- *
- * static  char *loopback_val_default =
- *	"Loopback Value: Error In Value.";
- *
- * static  char *loopback_cmd_default =
- *	"Loopback Command: Error In Value.";
- */
-
 /* FATAL ERR msgs */
 /*
  * Function prototypes.
@@ -400,19 +303,22 @@ static  char *autoneg_speed_bad_msg =
 /* these two are global so that qfe can use them */
 int hmeattach(dev_info_t *, ddi_attach_cmd_t);
 int hmedetach(dev_info_t *, ddi_detach_cmd_t);
+int hmequiesce(dev_info_t *);
 static	boolean_t hmeinit_xfer_params(struct hme *);
 static	uint_t hmestop(struct hme *);
 static	void hmestatinit(struct hme *);
 static	int hmeallocthings(struct hme *);
+static	void hmefreethings(struct hme *);
+static	int hmeallocbuf(struct hme *, hmebuf_t *, int);
+static	int hmeallocbufs(struct hme *);
 static	void hmefreebufs(struct hme *);
-static  void *hmeallocb(size_t, uint_t);
 static	void hmeget_hm_rev_property(struct hme *);
 static	boolean_t hmestart(struct hme *, mblk_t *);
 static	uint_t hmeintr(caddr_t);
 static	void hmereclaim(struct hme *);
 static	int hmeinit(struct hme *);
 static	void hmeuninit(struct hme *hmep);
-static 	mblk_t *hmeread(struct hme *, volatile struct hme_rmd *, uint32_t);
+static 	mblk_t *hmeread(struct hme *, hmebuf_t *, uint32_t);
 static	void hmesavecntrs(struct hme *);
 static	void hme_fatal_err(struct hme *, uint_t);
 static	void hme_nonfatal_err(struct hme *, uint_t);
@@ -456,14 +362,10 @@ static	int hme_nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp);
 static	boolean_t hme_nd_load(caddr_t *nd_pparam, char *name,
     pfi_t get_pfi, pfi_t set_pfi, caddr_t data);
 
-static void hme_fault_msg(char *, uint_t, struct hme *, uint_t,
-    msg_t, char *, ...);
+static void hme_fault_msg(struct hme *, uint_t, msg_t, char *, ...);
 
 static void hme_check_acc_handle(char *, uint_t, struct hme *,
     ddi_acc_handle_t);
-
-static void hme_check_dma_handle(char *, uint_t, struct hme *,
-    ddi_dma_handle_t);
 
 /*
  * Nemo (GLDv3) Functions.
@@ -492,53 +394,19 @@ static mac_callbacks_t hme_m_callbacks = {
 };
 
 DDI_DEFINE_STREAM_OPS(hme_dev_ops, nulldev, nulldev, hmeattach, hmedetach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, hmequiesce);
 
 #define	HME_FAULT_MSG1(p, s, t, f) \
-    hme_fault_msg(__FILE__, __LINE__, (p), (s), (t), (f));
+    hme_fault_msg((p), (s), (t), (f));
 
 #define	HME_FAULT_MSG2(p, s, t, f, a) \
-    hme_fault_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a));
+    hme_fault_msg((p), (s), (t), (f), (a));
 
 #define	HME_FAULT_MSG3(p, s, t, f, a, b) \
-    hme_fault_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a), (b));
+    hme_fault_msg((p), (s), (t), (f), (a), (b));
 
 #define	HME_FAULT_MSG4(p, s, t, f, a, b, c) \
-    hme_fault_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a), (b), (c));
-
-#ifdef	HME_DEBUG
-static void	hme_debug_msg(char *, uint_t, struct hme *, uint_t,
-				msg_t, char *, ...);
-
-#define	HME_DEBUG_MSG1(p, s, t, f) \
-    hme_debug_msg(__FILE__, __LINE__, (p), (s), (t), (f))
-
-#define	HME_DEBUG_MSG2(p, s, t, f, a) \
-    hme_debug_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a))
-
-#define	HME_DEBUG_MSG3(p, s, t, f, a, b) \
-    hme_debug_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a), (b))
-
-#define	HME_DEBUG_MSG4(p, s, t, f, a, b, c) \
-    hme_debug_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a), (b), (c))
-
-#define	HME_DEBUG_MSG5(p, s, t, f, a, b, c, d) \
-    hme_debug_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a), (b), (c), (d))
-
-#define	HME_DEBUG_MSG6(p, s, t, f, a, b, c, d, e) \
-    hme_debug_msg(__FILE__, __LINE__, (p), (s), (t), (f), (a), (b), (c),  \
-		    (d), (e))
-
-#else
-
-#define	HME_DEBUG_MSG1(p, s, t, f)
-#define	HME_DEBUG_MSG2(p, s, t, f, a)
-#define	HME_DEBUG_MSG3(p, s, t, f, a, b)
-#define	HME_DEBUG_MSG4(p, s, t, f, a, b, c)
-#define	HME_DEBUG_MSG5(p, s, t, f, a, b, c, d)
-#define	HME_DEBUG_MSG6(p, s, t, f, a, b, c, d, e)
-
-#endif
+    hme_fault_msg((p), (s), (t), (f), (a), (b), (c));
 
 #define	CHECK_MIFREG() \
 	hme_check_acc_handle(__FILE__, __LINE__, hmep, hmep->hme_mifregh)
@@ -563,12 +431,17 @@ static void	hme_debug_msg(char *, uint_t, struct hme *, uint_t,
 #define	HMELIMADDRLO	((uint64_t)0x00000000)
 #define	HMELIMADDRHI	((uint64_t)0xffffffff)
 
+/*
+ * Note that rx and tx data buffers can be arbitrarily aligned, but
+ * that the descriptor rings need to be aligned on 2K boundaries, per
+ * the spec.
+ */
 static ddi_dma_attr_t hme_dma_attr = {
 	DMA_ATTR_V0,		/* version number. */
 	(uint64_t)HMELIMADDRLO,	/* low address */
 	(uint64_t)HMELIMADDRHI,	/* high address */
 	(uint64_t)0x00ffffff,	/* address counter max */
-	(uint64_t)1,		/* alignment */
+	(uint64_t)HME_HMDALIGN,	/* alignment */
 	(uint_t)0x00700070,	/* dlim_burstsizes for 32 and 64 bit xfers */
 	(uint32_t)0x1,		/* minimum transfer size */
 	(uint64_t)0x7fffffff,	/* maximum transfer size */
@@ -578,13 +451,11 @@ static ddi_dma_attr_t hme_dma_attr = {
 	0			/* attribute flags */
 };
 
-static ddi_dma_lim_t hme_dma_limits = {
-	(uint64_t)HMELIMADDRLO,	/* dlim_addr_lo */
-	(uint64_t)HMELIMADDRHI,	/* dlim_addr_hi */
-	(uint64_t)HMELIMADDRHI,	/* dlim_cntr_max */
-	(uint_t)0x00700070,	/* dlim_burstsizes for 32 and 64 bit xfers */
-	(uint32_t)0x1,		/* dlim_minxfer */
-	1024			/* dlim_speed */
+static ddi_device_acc_attr_t hme_buf_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_NEVERSWAP_ACC,
+	DDI_STRICTORDER_ACC,	/* probably could allow merging & caching */
+	DDI_DEFAULT_ACC,
 };
 
 static uchar_t pci_latency_timer = 0;
@@ -634,23 +505,19 @@ static struct modlinkage modlinkage = {
 #define	PUT_GLOBREG(reg, value) \
 	ddi_put32(hmep->hme_globregh, \
 		(uint32_t *)&hmep->hme_globregp->reg, value)
-#define	PUT_TMD(ptr, cookie, len, flags) \
-	ddi_put32(hmep->hme_mdm_h, (uint32_t *)&ptr->tmd_addr, cookie); \
-	ddi_put32(hmep->hme_mdm_h, (uint32_t *)&ptr->tmd_flags, \
-	    (uint_t)HMETMD_OWN | len | flags)
-#define	GET_TMD_FLAGS(ptr) \
-	ddi_get32(hmep->hme_mdm_h, (uint32_t *)&ptr->tmd_flags)
-#define	PUT_RMD(ptr, cookie) \
-	ddi_put32(hmep->hme_mdm_h, (uint32_t *)&ptr->rmd_addr, cookie); \
-	ddi_put32(hmep->hme_mdm_h, (uint32_t *)&ptr->rmd_flags, \
-	    (uint_t)(HMEBUFSIZE << HMERMD_BUFSIZE_SHIFT) | HMERMD_OWN)
-#define	GET_RMD_FLAGS(ptr) \
-	ddi_get32(hmep->hme_mdm_h, (uint32_t *)&ptr->rmd_flags)
+#define	PUT_TMD(ptr, paddr, len, flags)					\
+	ddi_put32(hmep->hme_tmd_acch, &hmep->hme_tmdp[ptr].tmd_addr, paddr); \
+	ddi_put32(hmep->hme_tmd_acch, &hmep->hme_tmdp[ptr].tmd_flags,	\
+	    len | flags)
+#define	GET_TMD_FLAGS(ptr)					\
+	ddi_get32(hmep->hme_tmd_acch, &hmep->hme_tmdp[ptr].tmd_flags)
+#define	PUT_RMD(ptr, paddr) \
+	ddi_put32(hmep->hme_rmd_acch, &hmep->hme_rmdp[ptr].rmd_addr, paddr); \
+	ddi_put32(hmep->hme_rmd_acch, &hmep->hme_rmdp[ptr].rmd_flags,	\
+	    (uint32_t)(HMEBUFSIZE << HMERMD_BUFSIZE_SHIFT) | HMERMD_OWN)
+#define	GET_RMD_FLAGS(ptr)					\
+	ddi_get32(hmep->hme_rmd_acch, &hmep->hme_rmdp[ptr].rmd_flags)
 
-#define	CLONE_RMD(old, new) \
-	new->rmd_addr = old->rmd_addr; /* This is actually safe */\
-	ddi_put32(hmep->hme_mdm_h, (uint32_t *)&new->rmd_flags, \
-	    (uint_t)(HMEBUFSIZE << HMERMD_BUFSIZE_SHIFT) | HMERMD_OWN)
 #define	GET_ROM8(offset) \
 	ddi_get8((hmep->hme_romh), (offset))
 
@@ -847,15 +714,10 @@ hme_bb_force_idle(struct hme *hmep)
 
 /* <<<<<<<<<<<<< Frame Register used for MII operations >>>>>>>>>>>>>>>>>>>> */
 
-#ifdef	HME_FRM_DEBUG
-int hme_frame_flag = 0;
-#endif
-
 /* Return 0 if OK, 1 if error (Transceiver does not talk management) */
 static uint_t
 hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
 {
-	volatile uint32_t *framerp = &hmep->hme_mifregp->mif_frame;
 	uint32_t	frame;
 	uint8_t		phyad;
 
@@ -866,34 +728,24 @@ hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
 		return (hme_bb_mii_read(hmep, regad, datap));
 
 	phyad = hmep->hme_phyad;
-#ifdef	HME_FRM_DEBUG
-	if (!hme_frame_flag) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-		    "Frame Register used for MII");
-		hme_frame_flag = 1;
-	}
-		HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-		"Frame Reg :mii_read: phyad = %X reg = %X ", phyad, regad);
-#endif
 
-	*framerp = HME_MIF_FRREAD | (phyad << HME_MIF_FRPHYAD_SHIFT) |
-	    (regad << HME_MIF_FRREGAD_SHIFT);
+	PUT_MIFREG(mif_frame,
+	    HME_MIF_FRREAD | (phyad << HME_MIF_FRPHYAD_SHIFT) |
+	    (regad << HME_MIF_FRREGAD_SHIFT));
 /*
  *	HMEDELAY((*framerp & HME_MIF_FRTA0), HMEMAXRSTDELAY);
  */
-	HMEDELAY((*framerp & HME_MIF_FRTA0), 300);
-	frame = *framerp;
+	HMEDELAY((GET_MIFREG(mif_frame) & HME_MIF_FRTA0), 300);
+	frame = GET_MIFREG(mif_frame);
 	CHECK_MIFREG();
 	if ((frame & HME_MIF_FRTA0) == 0) {
 
 
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-		    mif_read_fail_msg);
+		    "MIF Read failure");
 		return (1);
 	} else {
 		*datap = (uint16_t)(frame & HME_MIF_FRDATA);
-		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-		    "Frame Reg :mii_read: successful:data = %X ", *datap);
 		return (0);
 	}
 
@@ -902,7 +754,6 @@ hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
 static void
 hme_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
 {
-	volatile uint32_t *framerp = &hmep->hme_mifregp->mif_frame;
 	uint32_t frame;
 	uint8_t	phyad;
 
@@ -912,28 +763,20 @@ hme_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
 	}
 
 	phyad = hmep->hme_phyad;
-	HME_DEBUG_MSG4(hmep,  SEVERITY_UNKNOWN, NAUTONEG_MSG,
-	    "Frame Reg :mii_write: phyad = %X reg = %X data = %X",
-	    phyad, regad, data);
 
-	*framerp = HME_MIF_FRWRITE | (phyad << HME_MIF_FRPHYAD_SHIFT) |
-	    (regad << HME_MIF_FRREGAD_SHIFT) | data;
+	PUT_MIFREG(mif_frame,
+	    HME_MIF_FRWRITE | (phyad << HME_MIF_FRPHYAD_SHIFT) |
+	    (regad << HME_MIF_FRREGAD_SHIFT) | data);
 /*
  *	HMEDELAY((*framerp & HME_MIF_FRTA0), HMEMAXRSTDELAY);
  */
-	HMEDELAY((*framerp & HME_MIF_FRTA0), 300);
-	frame = *framerp;
+	HMEDELAY((GET_MIFREG(mif_frame) & HME_MIF_FRTA0), 300);
+	frame = GET_MIFREG(mif_frame);
 	CHECK_MIFREG();
 	if ((frame & HME_MIF_FRTA0) == 0) {
 		HME_FAULT_MSG1(hmep, SEVERITY_MID, NAUTONEG_MSG,
-		    mif_write_fail_msg);
+		    "MIF Write failure");
 	}
-#if HME_DEBUG
-	else {
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-		    "Frame Reg :mii_write: successful");
-	}
-#endif
 }
 
 /*
@@ -1004,8 +847,6 @@ hme_select_speed(struct hme *hmep, int speed)
 			}
 			break;
 		default:
-			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-			    "Default in select speed 100");
 			break;
 		}
 		break;
@@ -1020,14 +861,10 @@ hme_select_speed(struct hme *hmep, int speed)
 			}
 			break;
 		default:
-			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-			    "Default in select speed 10");
 			break;
 		}
 		break;
 	default:
-		HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-		    "Default in select speed : Neither speed");
 		return (0);
 	}
 
@@ -1128,9 +965,6 @@ hme_reset_transceiver(struct hme *hmep)
 
 reset_issued:
 
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, PHY_MSG,
-	    "reset_trans: reset complete.");
-
 	/*
 	 * Get the PHY id registers. We need this to implement work-arounds
 	 * for bugs in transceivers which use the National DP83840 PHY chip.
@@ -1143,9 +977,6 @@ reset_issued:
 	(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
 
 	hme_init_xcvr_info(hmep);
-	HME_DEBUG_MSG6(hmep, SEVERITY_UNKNOWN, PHY_MSG, "reset_trans: "
-	    "control = %x status = %x idr1 = %x idr2 = %x anar = %x",
-	    control, stat, hmep->hme_idr1, hmep->hme_idr2, anar);
 
 	hmep->hme_bmcr = control;
 	hmep->hme_anar = anar;
@@ -1196,10 +1027,6 @@ reset_issued:
 		if (n) {
 			hmep->hme_bmsr = stat;
 			hmep->hme_bmcr = control;
-
-			HME_DEBUG_MSG4(hmep, SEVERITY_NONE, PHY_MSG,
-			    "DP83840 Rev-C found: Modified bmsr = %x "
-			    "control = %X n = %x", stat, control, n);
 		}
 	}
 	hme_setup_link_default(hmep);
@@ -1231,8 +1058,6 @@ reset_issued:
 	goto start_again;	/* transceiver reset failure */
 
 setconn:
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, PHY_MSG,
-	    "reset_trans: isolate complete.");
 
 	/*
 	 * Work-around for the late-collision problem with 100m cables.
@@ -1240,10 +1065,6 @@ setconn:
 	 */
 	if (HME_DP83840) {
 		(void) hme_mii_read(hmep, HME_PHY_CSC, &csc);
-
-		HME_DEBUG_MSG3(hmep, SEVERITY_NONE, LATECOLL_MSG,
-		    "hme_reset_trans: CSC read = %x written = %x",
-		    csc, csc | PHY_CSCR_FCONN);
 
 		hme_mii_write(hmep, HME_PHY_CSC, (csc | PHY_CSCR_FCONN));
 	}
@@ -1296,8 +1117,6 @@ hme_check_transceiver(struct hme *hmep)
 	cfgsav = GET_MIFREG(mif_cfg);
 
 	if (hmep->hme_polling_on) {
-		HME_DEBUG_MSG2(hmep, SEVERITY_NONE, XCVR_MSG,
-		    "check_trans: polling_on: cfg = %X", cfgsav);
 
 		if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) {
 			if ((cfgsav & HME_MIF_CFGM1) && !hme_param_use_intphy) {
@@ -1311,8 +1130,6 @@ hme_check_transceiver(struct hme *hmep)
 		} else if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
 			stat = (GET_MIFREG(mif_bsts) >> 16);
 			if ((stat == 0x00) || (hme_param_use_intphy)) {
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    XCVR_MSG, "Extern Transcvr Disconnected");
 
 				hme_stop_mifpoll(hmep);
 				hmep->hme_phyad = HME_INTERNAL_PHYAD;
@@ -1325,9 +1142,6 @@ hme_check_transceiver(struct hme *hmep)
 		CHECK_MIFREG();
 		return;
 	}
-
-	HME_DEBUG_MSG2(hmep, SEVERITY_NONE, XCVR_MSG,
-	    "check_trans: polling_off: cfg = %X", cfgsav);
 
 	cfg = GET_MIFREG(mif_cfg);
 	if ((cfg & HME_MIF_CFGM1) && !hme_param_use_intphy) {
@@ -1486,7 +1300,7 @@ hme_setup_link_status(struct hme *hmep)
 static void
 hme_setup_link_control(struct hme *hmep)
 {
-	uint_t anar = PHY_SELECTOR;
+	uint16_t anar = PHY_SELECTOR;
 	uint32_t autoneg = ~HME_NOTUSR & hme_param_autoneg;
 	uint32_t anar_100T4 = ~HME_NOTUSR & hme_param_anar_100T4;
 	uint32_t anar_100fdx = ~HME_NOTUSR & hme_param_anar_100fdx;
@@ -1513,8 +1327,6 @@ hme_setup_link_control(struct hme *hmep)
 		if (anar_100T4) {
 			hmep->hme_forcespeed = HME_SPEED_100;
 			hmep->hme_fdx = HME_HALF_DUPLEX;
-			HME_DEBUG_MSG1(hmep, SEVERITY_NONE, NAUTONEG_MSG,
-			    "hme_link_control: force 100T4 hdx");
 
 		} else if (anar_100fdx) {
 			/* 100fdx needs to be checked first for 100BaseFX */
@@ -1524,8 +1336,6 @@ hme_setup_link_control(struct hme *hmep)
 		} else if (anar_100hdx) {
 			hmep->hme_forcespeed = HME_SPEED_100;
 			hmep->hme_fdx = HME_HALF_DUPLEX;
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-			    "hme_link_control: force 100 hdx");
 		} else if (anar_10hdx) {
 			/* 10hdx needs to be checked first for MII-AUI */
 			/* MII-AUI BugIds 1252776,4032280,4035106,4028558 */
@@ -1539,8 +1349,6 @@ hme_setup_link_control(struct hme *hmep)
 		} else {
 			hmep->hme_forcespeed = HME_SPEED_10;
 			hmep->hme_fdx = HME_HALF_DUPLEX;
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-			    "hme_link_control: force 10 hdx");
 		}
 	}
 }
@@ -1557,7 +1365,7 @@ hme_check_txhung(struct hme *hmep)
 		hmereclaim(hmep);
 
 	/* Something needs to be sent out but it is not going out */
-	if ((hmep->hme_tcurp != hmep->hme_tnextp) &&
+	if ((hmep->hme_txindex != hmep->hme_txreclaim) &&
 	    (hmep->hme_opackets == hmep->hmesave.hme_opackets))
 		hmep->hme_txhung++;
 	else
@@ -1592,8 +1400,6 @@ hme_check_link(void *arg)
 
 	hme_stop_timer(hmep);	/* acquire hme_linklock */
 
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-	    "link_check entered:");
 	/*
 	 * This condition was added to work around for
 	 * a problem with the Synoptics/Bay 28115 switch.
@@ -1627,8 +1433,6 @@ hme_check_link(void *arg)
 	if ((hmep->hme_flags & HMERUNNING) &&
 	    (hmep->hme_linkup) && (hme_check_txhung(hmep))) {
 
-		HME_DEBUG_MSG1(hmep, SEVERITY_LOW, XCVR_MSG,
-		    "txhung: re-init MAC");
 		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
 		(void) hmeinit(hmep);	/* To reset the transceiver and */
 					/* to init the interface */
@@ -1663,9 +1467,6 @@ hme_check_link(void *arg)
 		stat = (GET_MIFREG(mif_bsts) >> 16);
 
 		CHECK_MIFREG(); /* Verify */
-		HME_DEBUG_MSG4(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-		    "int_flag = %X old_stat = %X stat = %X",
-		    hmep->hme_mifpoll_flag, hmep->hme_mifpoll_data, stat);
 
 		if (!hmep->hme_mifpoll_flag) {
 			if (stat & PHY_BMSR_LNKSTS) {
@@ -1673,13 +1474,9 @@ hme_check_link(void *arg)
 				    HME_LINKCHECK_TIMER);
 				return;
 			}
-			HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-			    "hme_check_link:DOWN polled data = %X\n", stat);
 			hme_stop_mifpoll(hmep);
 
 			temp = (GET_MIFREG(mif_bsts) >> 16);
-			HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-			    "hme_check_link:after poll-stop: stat = %X", temp);
 		} else {
 			hmep->hme_mifpoll_flag = 0;
 		}
@@ -1697,12 +1494,8 @@ hme_check_link(void *arg)
 			return;
 		}
 	}
-	HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-	    "mifpoll_flag = %x first stat = %X", hmep->hme_mifpoll_flag, stat);
 
 	(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-	    "second stat = %X", stat);
 
 	/*
 	 * The PHY may have automatically renegotiated link speed and mode.
@@ -1748,10 +1541,6 @@ hme_disable_link_pulse(struct hme *hmep)
 
 	hme_mii_write(hmep, HME_PHY_BMCR, 0); /* force 10 Mbps */
 	(void) hme_mii_read(hmep, HME_PHY_NICR, &nicr);
-
-	HME_DEBUG_MSG3(hmep, SEVERITY_NONE, LINKPULSE_MSG,
-	    "hme_disable_link_pulse: NICR read = %x written = %x",
-	    nicr, nicr & ~PHY_NICR_LD);
 
 	hme_mii_write(hmep, HME_PHY_NICR, (nicr & ~PHY_NICR_LD));
 
@@ -1818,21 +1607,6 @@ hme_force_speed(void *arg)
 		}
 	} else {
 		if (hmep->hme_force_linkdown == HME_FORCE_LINKDOWN) {
-#ifdef	HME_100T4_DEBUG
-	{
-		uint16_t control, stat, aner, anlpar, anar;
-
-		(void) hme_mii_read(hmep, HME_PHY_BMCR, &control);
-		(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-		(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
-		(void) hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
-		(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
-		HME_DEBUG_MSG5(hmep, SEVERITY_NONE, XCVR_MSG,
-		    "hme_force_speed: begin:control ="
-		    "  %X stat = %X aner = %X anar = %X anlpar = %X",
-		    control, stat, aner, anar, anlpar);
-	}
-#endif
 			hmep->hme_force_linkdown = HME_LINKDOWN_STARTED;
 			hme_mii_write(hmep, HME_PHY_BMCR, PHY_BMCR_LPBK);
 			hme_start_timer(hmep, hme_force_speed, 10 * HME_TICKS);
@@ -1850,21 +1624,6 @@ hme_force_speed(void *arg)
 	}
 	if (linkup) {
 
-#ifdef	HME_100T4_DEBUG
-	{
-		uint16_t control, stat, aner, anlpar, anar;
-
-		(void) hme_mii_read(hmep, HME_PHY_BMCR, &control);
-		(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-		(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
-		(void) hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
-		(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
-		HME_DEBUG_MSG5(hmep, SEVERITY_NONE, XCVR_MSG,
-		    "hme_force_speed:end: control ="
-		    "%X stat = %X aner = %X anar = %X anlpar = %X",
-		    control, stat, aner, anar, anlpar);
-	}
-#endif
 		hmep->hme_linkup = 1;
 		hmep->hme_linkcheck = 1;
 		hmep->hme_ifspeed = hmep->hme_forcespeed;
@@ -1890,16 +1649,10 @@ hme_get_autoinfo(struct hme *hmep)
 	(void) hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
 	(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
 
-	HME_DEBUG_MSG4(hmep, SEVERITY_NONE, AUTONEG_MSG,
-	    "autoinfo: aner = %X anar = %X anlpar = %X", aner, anar, anlpar);
-
 	hmep->hme_anlpar = anlpar;
 	hmep->hme_aner = aner;
 
 	if (aner & PHY_ANER_LPNW) {
-
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    "hme_try_autoneg: Link Partner AN able");
 
 		tmp = anar & anlpar;
 		if (tmp & PHY_ANAR_TXFDX) {
@@ -1917,15 +1670,8 @@ hme_get_autoinfo(struct hme *hmep)
 		} else {
 			if (HME_DP83840) {
 
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    AUTONEG_MSG, "hme_try_autoneg: "
-				    "anar not set with speed selection");
-
 				hmep->hme_fdx = HME_HALF_DUPLEX;
 				(void) hme_mii_read(hmep, HME_PHY_AR, &ar);
-
-				HME_DEBUG_MSG2(hmep, SEVERITY_NONE,
-				    AUTONEG_MSG, "ar = %X", ar);
 
 				if (ar & PHY_AR_SPEED10)
 					hmep->hme_tryspeed = HME_SPEED_10;
@@ -1935,12 +1681,7 @@ hme_get_autoinfo(struct hme *hmep)
 				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
 				    AUTONEG_MSG, anar_not_set_msg);
 		}
-		HME_DEBUG_MSG2(hmep, SEVERITY_NONE, AUTONEG_MSG,
-		    " hme_try_autoneg: fdx = %d", hmep->hme_fdx);
 	} else {
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    " hme_try_autoneg: parallel detection done");
-
 		hmep->hme_fdx = HME_HALF_DUPLEX;
 		if (anlpar & PHY_ANLPAR_TX)
 			hmep->hme_tryspeed = HME_SPEED_100;
@@ -1948,15 +1689,8 @@ hme_get_autoinfo(struct hme *hmep)
 			hmep->hme_tryspeed = HME_SPEED_10;
 		else {
 			if (HME_DP83840) {
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    AUTONEG_MSG, " hme_try_autoneg: "
-				    "parallel detection: "
-				    "anar not set with speed selection");
 
 				(void) hme_mii_read(hmep, HME_PHY_AR, &ar);
-
-				HME_DEBUG_MSG2(hmep, SEVERITY_NONE,
-				    AUTONEG_MSG, "ar = %X", ar);
 
 				if (ar & PHY_AR_SPEED10)
 					hmep->hme_tryspeed = HME_SPEED_10;
@@ -1983,11 +1717,6 @@ hme_try_auto_negotiation(struct hme *hmep)
 {
 	uint16_t	stat;
 	uint16_t	aner;
-#ifdef	HME_AUTONEG_DEBUG
-	uint16_t	anar;
-	uint16_t	anlpar;
-	uint16_t	control;
-#endif
 
 	if (hmep->hme_autoneg == HME_HWAN_TRY) {
 		/* auto negotiation not initiated */
@@ -1999,11 +1728,6 @@ hme_try_auto_negotiation(struct hme *hmep)
 			goto hme_anfail;
 		}
 		if ((stat & PHY_BMSR_ACFG) == 0) { /* auto neg. not supported */
-
-			HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-			    " PHY status reg = %X", stat);
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-			    " Auto-negotiation not supported");
 
 			return (hmep->hme_autoneg = HME_HWAN_FAILED);
 		}
@@ -2059,36 +1783,9 @@ hme_try_auto_negotiation(struct hme *hmep)
 			hme_start_timer(hmep, hme_try_speed, HME_TICKS);
 			return (hmep->hme_autoneg = HME_HWAN_INPROGRESS);
 		}
-#ifdef	HME_AUTONEG_DEBUG
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    "Auto-negotiation not completed in 5 seconds");
-		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    " PHY status reg = %X", stat);
-
-		hme_mii_read(hmep, HME_PHY_BMCR, &control);
-		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    " PHY control reg = %x", control);
-
-		hme_mii_read(hmep, HME_PHY_ANAR, &anar);
-		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    " PHY anar reg = %x", anar);
-
-		hme_mii_read(hmep, HME_PHY_ANER, &aner);
-		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    " PHY aner reg = %x", aner);
-
-		hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
-		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    " PHY anlpar reg = %x", anlpar);
-#endif
 		if (HME_DP83840) {
 			(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
 			if (aner & PHY_ANER_MLF) {
-
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    AUTONEG_MSG,
-				    " hme_try_autoneg: MLF Detected"
-				    " after 5 seconds");
 
 				return (hmep->hme_autoneg = HME_HWAN_FAILED);
 			}
@@ -2096,9 +1793,6 @@ hme_try_auto_negotiation(struct hme *hmep)
 
 		goto hme_anfail;
 	}
-
-	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-	    "Auto-negotiate completed within %d 100ms time", hmep->hme_delay);
 
 	(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
 	if (aner & PHY_ANER_MLF) {
@@ -2116,8 +1810,6 @@ hme_try_auto_negotiation(struct hme *hmep)
 			hme_start_timer(hmep, hme_try_speed, HME_TICKS);
 			return (hmep->hme_autoneg = HME_HWAN_INPROGRESS);
 		}
-		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    "Link not Up in 10 seconds: stat = %X", stat);
 		goto hme_anfail;
 	} else {
 		hmep->hme_bmsr |= (PHY_BMSR_LNKSTS);
@@ -2126,14 +1818,13 @@ hme_try_auto_negotiation(struct hme *hmep)
 		hme_setup_link_status(hmep);
 		hme_start_mifpoll(hmep);
 		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-		if (hmep->hme_fdx != hmep->hme_macfdx)
+		if (hmep->hme_fdx != hmep->hme_macfdx) {
 			(void) hmeinit(hmep);
+		}
 		return (hmep->hme_autoneg = HME_HWAN_SUCCESFUL);
 	}
 
 hme_anfail:
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-	    "Retry Auto-negotiation.");
 	hme_start_timer(hmep, hme_try_speed, HME_TICKS);
 	return (hmep->hme_autoneg = HME_HWAN_TRY);
 }
@@ -2204,8 +1895,9 @@ hme_try_speed(void *arg)
 				hme_start_mifpoll(hmep);
 				hme_start_timer(hmep, hme_check_link,
 				    HME_LINKCHECK_TIMER);
-				if (hmep->hme_fdx != hmep->hme_macfdx)
+				if (hmep->hme_fdx != hmep->hme_macfdx) {
 					(void) hmeinit(hmep);
+				}
 			} else
 				hme_start_timer(hmep, hme_try_speed, HME_TICKS);
 			break;
@@ -2222,8 +1914,9 @@ hme_try_speed(void *arg)
 					hme_start_mifpoll(hmep);
 					hme_start_timer(hmep, hme_check_link,
 					    HME_LINKCHECK_TIMER);
-					if (hmep->hme_fdx != hmep->hme_macfdx)
+					if (hmep->hme_fdx != hmep->hme_macfdx) {
 						(void) hmeinit(hmep);
+					}
 				} else {
 					hmep->hme_linkup_10 = 1;
 					hmep->hme_tryspeed = HME_SPEED_100;
@@ -2240,8 +1933,6 @@ hme_try_speed(void *arg)
 				hme_start_timer(hmep, hme_try_speed, HME_TICKS);
 			break;
 		default:
-			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-			    "Default: Try speed");
 			break;
 		}
 		return;
@@ -2261,8 +1952,6 @@ hme_try_speed(void *arg)
 			hmep->hme_tryspeed = HME_SPEED_100;
 			break;
 		default:
-			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-			    "Default: Try speed");
 			break;
 		}
 	}
@@ -2326,41 +2015,20 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-
-
-#define	HMERINDEX(i)		(i % HMERPENDING)
-
-#define	DONT_FLUSH		-1
-
-/*
- * Allocate and zero-out "number" structures
- * each of type "structure" in kernel memory.
- */
-#define	HME_GETSTRUCT(structure, number)   \
-	((structure *)kmem_zalloc(\
-		(size_t)(sizeof (structure) * (number)), KM_SLEEP))
-
-/*
- * Translate a kernel virtual address to i/o address.
- */
-
-#define	HMEIOPBIOADDR(hmep, a) \
-	((uint32_t)((hmep)->hme_iopbiobase + \
-		((uintptr_t)(a) - (hmep)->hme_iopbkbase)))
-
 /*
  * ddi_dma_sync() a TMD or RMD descriptor.
  */
-#define	HMESYNCIOPB(hmep, a, size, who) \
-	(void) ddi_dma_sync((hmep)->hme_md_h, \
-		(off_t)((ulong_t)(a) - (hmep)->hme_iopbkbase), \
-		(size_t)(size), \
-		(who))
+#define	HMESYNCRMD(num, who)				\
+	(void) ddi_dma_sync(hmep->hme_rmd_dmah,		\
+	    (num * sizeof (struct hme_rmd)),		\
+	    sizeof (struct hme_rmd),			\
+	    who)
 
-#define	CHECK_IOPB() \
-	hme_check_dma_handle(__FILE__, __LINE__, hmep, hmep->hme_md_h)
-#define	CHECK_DMA(handle) \
-	hme_check_dma_handle(__FILE__, __LINE__, hmep, (handle))
+#define	HMESYNCTMD(num, who)				\
+	(void) ddi_dma_sync(hmep->hme_tmd_dmah,		\
+	    (num * sizeof (struct hme_tmd)),		\
+	    sizeof (struct hme_tmd),			\
+	    who)
 
 /*
  * Ethernet broadcast address definition.
@@ -2375,18 +2043,21 @@ static	struct ether_addr	etherbroadcastaddr = {
 #define	IS_BROADCAST(pkt) (bcmp(pkt, &etherbroadcastaddr, ETHERADDRL) == 0)
 #define	IS_MULTICAST(pkt) ((pkt[0] & 01) == 1)
 #define	BUMP_InNUcast(hmep, pkt) \
-		if (IS_BROADCAST(pkt)) { \
-			hmep->hme_brdcstrcv++; \
-		} else if (IS_MULTICAST(pkt)) { \
-			hmep->hme_multircv++; \
-		}
+	if (IS_MULTICAST(pkt)) {			       \
+		if (IS_BROADCAST(pkt)) {		       \
+			hmep->hme_brdcstrcv++;		       \
+		} else {				       \
+			hmep->hme_multircv++;		       \
+		}					       \
+	}
 #define	BUMP_OutNUcast(hmep, pkt) \
-		if (IS_BROADCAST(pkt)) { \
-			hmep->hme_brdcstxmt++; \
-		} else if (IS_MULTICAST(pkt)) { \
-			hmep->hme_multixmt++; \
-		}
-
+	if (IS_MULTICAST(pkt)) {			       \
+		if (IS_BROADCAST(pkt)) {		       \
+			hmep->hme_brdcstxmt++;		       \
+		} else {				       \
+			hmep->hme_multixmt++;		       \
+		}					       \
+	}
 
 static int
 hme_create_prop_from_kw(dev_info_t *dip, char *vpdname, char *vpdstr)
@@ -2394,11 +2065,6 @@ hme_create_prop_from_kw(dev_info_t *dip, char *vpdname, char *vpdstr)
 	char propstr[80];
 	int i, needprop = 0;
 	struct ether_addr local_mac;
-
-#ifdef HME_DEBUG
-	struct hme *hmep;
-	hmep = ddi_get_driver_private(dip);
-#endif
 
 	if (strcmp(vpdname, "NA") == 0) {
 		(void) strcpy(propstr, "local-mac-address");
@@ -2412,6 +2078,7 @@ hme_create_prop_from_kw(dev_info_t *dip, char *vpdname, char *vpdstr)
 	}
 
 	if (needprop == 1) {
+
 		if (strcmp(propstr, "local-mac-address") == 0) {
 			for (i = 0; i < ETHERADDRL; i++)
 				local_mac.ether_addr_octet[i] =
@@ -2420,18 +2087,12 @@ hme_create_prop_from_kw(dev_info_t *dip, char *vpdname, char *vpdstr)
 			    DDI_PROP_CANSLEEP, propstr,
 			    (char *)local_mac.ether_addr_octet, ETHERADDRL)
 			    != DDI_SUCCESS) {
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    AUTOCONFIG_MSG, "hme_create_newvpd_props: "
-				    "ddi_prop_create error");
 				return (DDI_FAILURE);
 			}
 		} else {
 			if (ddi_prop_create(DDI_DEV_T_NONE, dip,
 			    DDI_PROP_CANSLEEP, propstr, vpdstr,
 			    strlen(vpdstr)+1) != DDI_SUCCESS) {
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    AUTOCONFIG_MSG, "hme_create_newvpd_props: "
-				    "ddi_prop_create error");
 				return (DDI_FAILURE);
 			}
 		}
@@ -2474,8 +2135,6 @@ hme_get_oldvpd_props(dev_info_t *dip, int vpd_base)
 			kw_fieldstr[i] = GET_ROM8(&hmep->hme_romp[kw_ptr+i]);
 		kw_fieldstr[i] = '\0';
 		if (hme_create_prop_from_kw(dip, kw_namestr, kw_fieldstr)) {
-			HME_DEBUG_MSG2(hmep, SEVERITY_NONE, CONFIG_MSG,
-			    "cannot create_prop_from_kw %s", kw_namestr);
 			return (DDI_FAILURE);
 		}
 		kw_ptr += kw_len;
@@ -2483,8 +2142,6 @@ hme_get_oldvpd_props(dev_info_t *dip, int vpd_base)
 
 	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP, "model",
 	    "SUNW,cheerio", strlen("SUNW,cheerio")+1) != DDI_SUCCESS) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_NONE, AUTOCONFIG_MSG,
-		    "hme_get_oldvpd model: ddi_prop_create error");
 		return (DDI_FAILURE);
 	}
 	return (0);
@@ -2534,8 +2191,6 @@ hme_get_newvpd_props(dev_info_t *dip, int vpd_base)
 			kw_fieldstr[i] = '\0';
 			if (hme_create_prop_from_kw(dip, kw_namestr,
 			    kw_fieldstr)) {
-				HME_DEBUG_MSG2(hmep, SEVERITY_NONE, CONFIG_MSG,
-				"cannot create_prop_from_kw %s", kw_namestr);
 				return (DDI_FAILURE);
 			}
 			kw_ptr += kw_len;
@@ -2594,11 +2249,144 @@ hme_get_vpd_props(dev_info_t *dip)
 			return (1);
 		return (0);
 	} else if (v0 == 0x90) {
+		/* If we are are SUNW,qfe card, look for the Nth "NA" descr */
+		if ((GET_ROM8(&hmep->hme_romp[vpd_base + 12])  != 0x79) &&
+		    GET_ROM8(&hmep->hme_romp[vpd_base + 4 * 12]) == 0x79) {
+			vpd_base += hmep->hme_devno * 12;
+		}
 		if (hme_get_oldvpd_props(dip, vpd_base))
 			return (1);
 		return (0);
 	} else
 		return (1);	/* unknown start byte in VPD */
+}
+
+/*
+ * For x86, the BIOS doesn't map the PCI Rom register for the qfe
+ * cards, so we have to extract it from the ebus bridge that is
+ * function zero of the same device.  This is a bit of an ugly hack.
+ * (The ebus bridge leaves the entire ROM mapped at base address
+ * register 0x10.)
+ */
+
+typedef struct {
+	struct hme 		*hmep;
+	dev_info_t		*parent;
+	uint8_t			bus, dev;
+	ddi_acc_handle_t	acch;
+	caddr_t			romp;
+} ebus_rom_t;
+
+static int
+hme_mapebusrom(dev_info_t *dip, void *arg)
+{
+	int		*regs;
+	unsigned	nregs;
+	int		reg;
+	ebus_rom_t	*rom = arg;
+	struct hme	*hmep = rom->hmep;
+
+	/*
+	 * We only want to look at our peers.  Skip our parent.
+	 */
+	if (dip == rom->parent) {
+		return (DDI_WALK_PRUNESIB);
+	}
+
+	if ((ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0,
+	    "reg", &regs, &nregs)) != DDI_PROP_SUCCESS) {
+		return (DDI_WALK_PRUNECHILD);
+	}
+
+	if (nregs < 1) {
+		ddi_prop_free(regs);
+		return (DDI_WALK_PRUNECHILD);
+	}
+	reg = regs[0];
+	ddi_prop_free(regs);
+
+	/*
+	 * Look for function 0 on our bus and device.  If the device doesn't
+	 * match, it might be an alternate peer, in which case we don't want
+	 * to examine any of its children.
+	 */
+	if ((PCI_REG_BUS_G(reg) != rom->bus) ||
+	    (PCI_REG_DEV_G(reg) != rom->dev) ||
+	    (PCI_REG_FUNC_G(reg) != 0)) {
+		return (DDI_WALK_PRUNECHILD);
+	}
+
+	(void) ddi_regs_map_setup(dip, 1, &rom->romp, 0, 0, &hmep->hme_dev_attr,
+	    &rom->acch);
+	/*
+	 * If we can't map the registers, the caller will notice that
+	 * the acch is NULL.
+	 */
+	return (DDI_WALK_TERMINATE);
+}
+
+static int
+hmeget_promebus(dev_info_t *dip)
+{
+	ebus_rom_t	rom;
+	int		*regs;
+	unsigned	nregs;
+	struct hme	*hmep;
+
+	hmep = ddi_get_driver_private(dip);
+
+	bzero(&rom, sizeof (rom));
+
+	/*
+	 * For x86, the BIOS doesn't map the PCI Rom register for the qfe
+	 * cards, so we have to extract it from the eBus bridge that is
+	 * function zero.  This is a bit of an ugly hack.
+	 */
+	if ((ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0,
+	    "reg", &regs, &nregs)) != DDI_PROP_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	if (nregs < 5) {
+		ddi_prop_free(regs);
+		return (DDI_FAILURE);
+	}
+	rom.hmep = hmep;
+	rom.bus = PCI_REG_BUS_G(regs[0]);
+	rom.dev = PCI_REG_DEV_G(regs[0]);
+	hmep->hme_devno = rom.dev;
+	rom.parent = ddi_get_parent(dip);
+
+	/*
+	 * The implementation of ddi_walk_devs says that we must not
+	 * be called during autoconfiguration.  However, upon close
+	 * examination, one will find the following is true:
+	 *
+	 * 1) since we're called at attach time,
+	 *    DEVI_BUSY_OWNED(ddi_get_parent(dip)) is implicitly true.
+	 *
+	 * 2) we carefully ensure that we prune siblings for all cases
+	 *    except our own device, so we can't wind up walking down
+	 *    a changing sibling pointer.
+	 *
+	 * 3) since we are attaching, our peers will already have their
+	 *    dev_info nodes on the tree... hence our own sibling pointer
+	 *    (and those of our siblings) will be stable.
+	 *
+	 * 4) also, because of #3, our parents child pointer will be
+	 *    stable.
+	 *
+	 * So it should be safe to do this, because of our carefully
+	 * constructed restrictions.
+	 */
+	ddi_walk_devs(ddi_get_parent(dip), hme_mapebusrom, &rom);
+
+	if (rom.acch) {
+		hmep->hme_romh = rom.acch;
+		hmep->hme_romp = (unsigned char *)rom.romp;
+		return (DDI_SUCCESS);
+	}
+	return (DDI_FAILURE);
 }
 
 static int
@@ -2636,8 +2424,6 @@ hmeget_promprops(dev_info_t *dip)
 	 */
 	if (ddi_regs_map_setup(hmep->dip, 0, (caddr_t *)&cfg_ptr,
 	    0, 0, &hmep->hme_dev_attr, &cfg_handle)) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-		    "ddi_map_regs for config space failed");
 		return (DDI_FAILURE);
 	}
 
@@ -2655,22 +2441,22 @@ hmeget_promprops(dev_info_t *dip)
 	ddi_put32(cfg_handle, &cfg_ptr->base30, rom_bar | 1);
 
 
-	if (ddi_regs_map_setup(dip, 2, (caddr_t *)&(hmep->hme_romp), 0, 0,
-	    &hmep->hme_dev_attr, &hmep->hme_romh)) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_NONE, AUTOCONFIG_MSG,
-		    "reg mapping failed: Check reg property ");
+	if ((ddi_regs_map_setup(dip, 2, (caddr_t *)&(hmep->hme_romp), 0, 0,
+	    &hmep->hme_dev_attr, &hmep->hme_romh) != DDI_SUCCESS) &&
+	    (hmeget_promebus(dip) != DDI_SUCCESS)) {
+
 		if (cfg_ptr)
 			ddi_regs_map_free(&cfg_handle);
 		return (DDI_FAILURE);
 	} else {
 		if (hme_get_vpd_props(dip))
-			return (1);
+			return (DDI_FAILURE);
 	}
 	if (hmep->hme_romp)
 		ddi_regs_map_free(&hmep->hme_romh);
 	if (cfg_ptr)
 		ddi_regs_map_free(&cfg_handle);
-	return (0);	/* SUCCESS */
+	return (DDI_SUCCESS);
 
 }
 
@@ -2758,7 +2544,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Allocate soft device data structure
 	 */
-	hmep = HME_GETSTRUCT(struct hme, 1);
+	hmep = kmem_zalloc(sizeof (*hmep), KM_SLEEP);
 
 	/*
 	 * Might as well set up elements of data structure
@@ -2778,7 +2564,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (ddi_slaveonly(dip) == DDI_SUCCESS) {
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-		    slave_slot_msg);
+		    "Dev not used - dev in slave only slot");
 		goto error_state;
 	}
 
@@ -2956,8 +2742,6 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		if (ddi_regs_map_setup(hmep->dip, 0, (caddr_t *)&cfg_ptr,
 		    0, 0, &hmep->hme_dev_attr, &cfg_handle)) {
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-			    "hmeattach: ddi_map_regs for config space failed");
 			return (DDI_FAILURE);
 		}
 		/*
@@ -2979,7 +2763,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		hmeget_hm_rev_property(hmep);
 
 		/* get info via VPD */
-		if (hmeget_promprops(dip)) {
+		if (hmeget_promprops(dip) != DDI_SUCCESS) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
 			    "hmeattach: no promprops");
 		}
@@ -3035,6 +2819,17 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto error_intr;
 	}
 
+	if (hmeallocthings(hmep) != DDI_SUCCESS) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, CONFIG_MSG,
+		    "resource allocation failed");
+		goto error_intr;
+	}
+
+	if (hmeallocbufs(hmep) != DDI_SUCCESS) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, CONFIG_MSG,
+		    "buffer allocation failed");
+		goto error_intr;
+	}
 
 	hmestatinit(hmep);
 
@@ -3094,6 +2889,9 @@ error_unmap:
 	}
 
 error_state:
+	hmefreethings(hmep);
+	hmefreebufs(hmep);
+
 	if (hmep) {
 		kmem_free((caddr_t)hmep, sizeof (*hmep));
 		ddi_set_driver_private(dip, NULL);
@@ -3106,12 +2904,8 @@ int
 hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	struct hme *hmep;
-	int32_t	unval;
 
 	if ((hmep = ddi_get_driver_private(dip)) == NULL)
-		/*
-		 * No resources allocated
-		 */
 		return (DDI_FAILURE);
 
 	switch (cmd) {
@@ -3124,8 +2918,6 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_SUCCESS);
 
 	default:
-		HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, UNINIT_MSG,
-		    detach_bad_cmd_msg);
 		return (DDI_FAILURE);
 	}
 
@@ -3195,40 +2987,27 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_destroy(&hmep->hme_intrlock);
 	mutex_destroy(&hmep->hme_linklock);
 
-	if (hmep->hme_md_h != NULL) {
-		unval = ddi_dma_unbind_handle(hmep->hme_md_h);
-		if (unval == DDI_FAILURE)
-			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, DDI_MSG,
-			    "dma_unbind_handle failed");
-		ddi_dma_mem_free(&hmep->hme_mdm_h);
-		ddi_dma_free_handle(&hmep->hme_md_h);
-	}
-
+	hmefreethings(hmep);
 	hmefreebufs(hmep);
-
-	/*
-	 * dvma handle case.
-	 */
-	if (hmep->hme_dvmarh != NULL) {
-		dvma_release(hmep->hme_dvmarh);
-		dvma_release(hmep->hme_dvmaxh);
-		hmep->hme_dvmarh = hmep->hme_dvmaxh = NULL;
-	}
-
-	/*
-	 * dma handle case.
-	 */
-	if (hmep->hme_dmarh != NULL) {
-		kmem_free(hmep->hme_dmaxh,
-		    (HME_TMDMAX + HMERPENDING) * (sizeof (ddi_dma_handle_t)));
-		hmep->hme_dmarh = hmep->hme_dmaxh = NULL;
-	}
 
 	hme_param_cleanup(hmep);
 
 	ddi_set_driver_private(dip, NULL);
 	kmem_free(hmep, sizeof (struct hme));
 
+	return (DDI_SUCCESS);
+}
+
+int
+hmequiesce(dev_info_t *dip)
+{
+	struct hme *hmep;
+
+	if ((hmep = ddi_get_driver_private(dip)) == NULL)
+		return (DDI_FAILURE);
+
+	hme_stop_mifpoll(hmep);
+	(void) hmestop(hmep);
 	return (DDI_SUCCESS);
 }
 
@@ -3284,8 +3063,6 @@ hmeinit_xfer_params(struct hme *hmep)
 	 */
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
 	    "transfer-speed", (caddr_t)&i, &prop_len) == DDI_PROP_SUCCESS) {
-		HME_DEBUG_MSG2(hmep, SEVERITY_LOW, PROP_MSG,
-		    "params:  transfer-speed property = %X", i);
 		hme_param_autoneg = 0;	/* force speed */
 		hme_param_anar_100T4 = 0;
 		hme_param_anar_100fdx = 0;
@@ -3304,8 +3081,6 @@ hmeinit_xfer_params(struct hme *hmep)
 	 */
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "ipg1",
 	    (caddr_t)&hme_ipg1_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		HME_DEBUG_MSG2(hmep, SEVERITY_LOW, PROP_MSG,
-		    "params: hme_ipg1 property = %X", hme_ipg1_conf);
 		hme_param_ipg1 = hme_ipg1_conf & HME_MASK_8BIT;
 	}
 
@@ -3369,8 +3144,6 @@ hmeinit_xfer_params(struct hme *hmep)
 	else if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
 	    "link-pulse-disabled", (caddr_t)&i, &prop_len)
 	    == DDI_PROP_SUCCESS) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, PROP_MSG,
-		    "params:  link-pulse-disable property found.");
 		hmep->hme_link_pulse_disabled = 1;
 	}
 	return (B_TRUE);
@@ -3402,8 +3175,6 @@ hmestop(struct hme *hmep)
 
 	HMEDELAY((GET_GLOBREG(reset) == 0), HMEMAXRSTDELAY);
 	if (GET_GLOBREG(reset)) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, UNINIT_MSG,
-		    "cannot stop hme - failed to access device");
 		return (1);
 	}
 
@@ -3462,10 +3233,6 @@ hmestat_kstat_update(kstat_t *ksp, int rw)
 	 * Debug kstats
 	 */
 	hkp->hk_inits.value.ul		= hmep->inits;
-	hkp->hk_rxinits.value.ul	= hmep->rxinits;
-	hkp->hk_txinits.value.ul	= hmep->txinits;
-	hkp->hk_dmarh_inits.value.ul	= hmep->dmarh_init;
-	hkp->hk_dmaxh_inits.value.ul	= hmep->dmaxh_init;
 	hkp->hk_phyfail.value.ul	= hmep->phyfail;
 
 	/*
@@ -3492,7 +3259,7 @@ hmestatinit(struct hme *hmep)
 	    "driver_info", "net", KSTAT_TYPE_NAMED,
 	    sizeof (struct hmekstat) / sizeof (kstat_named_t), 0)) == NULL) {
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, INIT_MSG,
-		    kstat_create_fail_msg);
+		    "kstat_create failed");
 		return;
 	}
 
@@ -3553,14 +3320,6 @@ hmestatinit(struct hme *hmep)
 	 * Debugging kstats
 	 */
 	kstat_named_init(&hkp->hk_inits,		"inits",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_rxinits,		"rxinits",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_txinits,		"txinits",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_dmarh_inits,		"dmarh_inits",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_dmaxh_inits,		"dmaxh_inits",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_phyfail,		"phy_failures",
 	    KSTAT_DATA_ULONG);
@@ -3744,8 +3503,9 @@ hme_m_multicst(void *arg, boolean_t add, const uint8_t *macaddr)
 	}
 	mutex_exit(&hmep->hme_intrlock);
 
-	if (doinit)
+	if (doinit) {
 		(void) hmeinit(hmep);
+	}
 
 	return (0);
 }
@@ -3983,7 +3743,7 @@ hme_cksum(void *data, int len)
 
 	/* pick up residual byte ... assume even half-word allocations */
 	if (len % 2) {
-		sum += (*words & 0xff00);
+		sum += (*words & htons(0xff00));
 	}
 
 	sum = (sum >> 16) + (sum & 0xffff);
@@ -3993,19 +3753,12 @@ hme_cksum(void *data, int len)
 }
 
 static boolean_t
-hmestart_dma(struct hme *hmep, mblk_t *mp)
+hmestart(struct hme *hmep, mblk_t *mp)
 {
-	volatile	struct	hme_tmd	*tmdp1 = NULL;
-	volatile	struct	hme_tmd	*tmdp2 = NULL;
-	volatile	struct	hme_tmd	*ntmdp = NULL;
-	mblk_t  *bp;
-	uint32_t len1, len2;
-	uint32_t temp_addr;
-	int32_t	syncval;
-	ulong_t i, j;
-	ddi_dma_cookie_t c;
-	uint_t cnt;
-	boolean_t retval = B_TRUE;
+	uint32_t	len;
+	boolean_t	retval = B_TRUE;
+	hmebuf_t	*tbuf;
+	uint32_t	txptr;
 
 	uint32_t	csflags = 0;
 	uint32_t	flags;
@@ -4036,31 +3789,13 @@ hmestart_dma(struct hme *hmep, mblk_t *mp)
 		goto bad;
 	}
 
-	if (hmep->hme_tnextp > hmep->hme_tcurp) {
-		if ((hmep->hme_tnextp - hmep->hme_tcurp) > HMETPENDING)
-			hmereclaim(hmep);
-	} else {
-		i = hmep->hme_tcurp - hmep->hme_tnextp;
-		if (i && (i < (HME_TMDMAX - HMETPENDING)))
-			hmereclaim(hmep);
+	if (hmep->hme_txindex != hmep->hme_txreclaim) {
+		hmereclaim(hmep);
 	}
-	tmdp1 = hmep->hme_tnextp;
-	if ((ntmdp = NEXTTMD(hmep, tmdp1)) == hmep->hme_tcurp)
+	if ((hmep->hme_txindex - HME_TMDMAX) == hmep->hme_txreclaim)
 		goto notmds;
-
-	i = tmdp1 - hmep->hme_tmdp;
-
-	/*
-	 * here we deal with 3 cases.
-	 *	1. pkt has exactly one mblk
-	 *	2. pkt has exactly two mblks
-	 *	3. pkt has more than 2 mblks. Since this almost
-	 *		always never happens, we copy all of them
-	 *		into a msh with one mblk.
-	 * for each mblk in the message, we allocate a tmd and
-	 * figure out the tmd index. The index is then used to bind
-	 * a DMA handle to the mblk and set up an IO mapping..
-	 */
+	txptr = hmep->hme_txindex % HME_TMDMAX;
+	tbuf = &hmep->hme_tbuf[txptr];
 
 	/*
 	 * Note that for checksum offload, the hardware cannot
@@ -4069,382 +3804,54 @@ hmestart_dma(struct hme *hmep, mblk_t *mp)
 	 * a software checksum.
 	 */
 
-	ASSERT(mp->b_wptr >= mp->b_rptr);
-	len1 = mp->b_wptr - mp->b_rptr;
-	bp = mp->b_cont;
+	len = msgsize(mp);
+	if (len < 64) {
+		/* zero fill the padding */
+		bzero(tbuf->kaddr, 64);
+	}
+	mcopymsg(mp, tbuf->kaddr);
 
-	if (bp == NULL && (len1 >= 64)) {
-		len2 = 0;
-
-		HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, TX_MSG,
-		    "hmestart: 1 buf: len = %ld b_rptr = %p",
-		    len1, mp->b_rptr);
-	} else if ((bp->b_cont == NULL) &&
-	    ((len2 = bp->b_wptr - bp->b_rptr) >= 4) &&
-	    ((len1 + len2) >= 64)) {
-
-		ASSERT(bp->b_wptr >= bp->b_rptr);
-
-		tmdp2 = ntmdp;
-		if ((ntmdp = NEXTTMD(hmep, tmdp2)) == hmep->hme_tcurp)
-			goto notmds;
-		j = tmdp2 - hmep->hme_tmdp;
-
-		HME_DEBUG_MSG5(hmep, SEVERITY_UNKNOWN, TX_MSG,
-		    "hmestart: 2 buf: len = %ld b_rptr = %p, "
-		    "len = %ld b_rptr = %p",
-		    len1, mp->b_rptr, len2, bp->b_rptr);
-	} else {
-		len1 = msgsize(mp);
-		if ((bp = hmeallocb(len1, BPRI_HI)) == NULL) {
-			hmep->hme_allocbfail++;
-			goto bad;
-		}
-
-		mcopymsg(mp, bp->b_rptr);
-		mp = bp;
-
-		bp = NULL;
-		len2 = 0;
-
-		if ((csflags != 0) && (len1 < 64)) {
-			uint16_t sum;
-			sum = hme_cksum(mp->b_rptr + start_offset,
-			    len1 - start_offset);
-			bcopy(&sum, mp->b_rptr + stuff_offset, sizeof (sum));
-			csflags = 0;
-		}
-
-		HME_DEBUG_MSG3(hmep, SEVERITY_NONE, TX_MSG,
-		    "hmestart: > 1 buf: len = %ld b_rptr = %p",
-		    len1, mp->b_rptr);
+	if ((csflags != 0) && (len < 64)) {
+		uint16_t sum;
+		sum = hme_cksum(tbuf->kaddr + start_offset,
+		    len - start_offset);
+		bcopy(&sum, tbuf->kaddr + stuff_offset, sizeof (sum));
+		csflags = 0;
 	}
 
-
-	if (ddi_dma_alloc_handle(hmep->dip, &hme_dma_attr, DDI_DMA_DONTWAIT,
-	    NULL, &hmep->hme_dmaxh[i])) {
-		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-		    "ddi_dma_alloc_handle failed");
-		goto done;
-	}
-
-	if (ddi_dma_addr_bind_handle(hmep->hme_dmaxh[i], NULL,
-	    (caddr_t)mp->b_rptr, len1, DDI_DMA_RDWR, DDI_DMA_DONTWAIT,
-	    NULL, &c, &cnt) != DDI_DMA_MAPPED) {
-		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-		    "ddi_dma_addr_bind_handle failed");
-		ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
-		goto done;
-	}
-
-	/* apparently they don't handle multiple cookies */
-	if (cnt > 1) {
-		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		    "dmaxh crossed page boundary - failed");
-		(void) ddi_dma_unbind_handle(hmep->hme_dmaxh[i]);
-		ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
-		goto done;
-	}
-
-	syncval = ddi_dma_sync(hmep->hme_dmaxh[i], (off_t)0, len1,
-	    DDI_DMA_SYNC_FORDEV);
-	if (syncval == DDI_FAILURE)
+	if (ddi_dma_sync(tbuf->dmah, 0, len, DDI_DMA_SYNC_FORDEV) ==
+	    DDI_FAILURE) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, DDI_MSG,
 		    "ddi_dma_sync failed");
-
-	if (bp) {
-		temp_addr = c.dmac_address;
-		if (ddi_dma_alloc_handle(hmep->dip, &hme_dma_attr,
-		    DDI_DMA_DONTWAIT, NULL, &hmep->hme_dmaxh[j])) {
-			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-			    "ddi_dma_alloc_handle failed");
-			goto done;
-		}
-
-		if (ddi_dma_addr_bind_handle(hmep->hme_dmaxh[j], NULL,
-		    (caddr_t)bp->b_rptr, len2, DDI_DMA_RDWR, DDI_DMA_DONTWAIT,
-		    NULL, &c, &cnt) != DDI_DMA_MAPPED) {
-			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-			    "ddi_dma_addr_bind_handle failed");
-			ddi_dma_free_handle(&hmep->hme_dmaxh[j]);
-			ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
-			goto done;
-		}
-
-		/* apparently they don't handle multiple cookies */
-		if (cnt > 1) {
-			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-			    "dmaxh crossed page boundary - failed");
-			(void) ddi_dma_unbind_handle(hmep->hme_dmaxh[i]);
-			ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
-			(void) ddi_dma_unbind_handle(hmep->hme_dmaxh[j]);
-			ddi_dma_free_handle(&hmep->hme_dmaxh[j]);
-			goto done;
-		}
-
-		syncval = ddi_dma_sync(hmep->hme_dmaxh[j], 0, len2,
-		    DDI_DMA_SYNC_FORDEV);
-		if (syncval == DDI_FAILURE)
-			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, DDI_MSG,
-			    "ddi_dma_sync failed");
 	}
-
-	if (bp) {
-		PUT_TMD(tmdp2, c.dmac_address, len2, HMETMD_EOP);
-		HMESYNCIOPB(hmep, tmdp2, sizeof (struct hme_tmd),
-		    DDI_DMA_SYNC_FORDEV);
-
-		PUT_TMD(tmdp1, temp_addr, len1, HMETMD_SOP | csflags);
-		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-		    DDI_DMA_SYNC_FORDEV);
-		mp->b_cont = NULL;
-		hmep->hme_tmblkp[i] = mp;
-		hmep->hme_tmblkp[j] = bp;
-	} else {
-		PUT_TMD(tmdp1, c.dmac_address, len1,
-		    HMETMD_SOP | HMETMD_EOP | csflags);
-		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-		    DDI_DMA_SYNC_FORDEV);
-		hmep->hme_tmblkp[i] = mp;
-	}
-	CHECK_IOPB();
-
-	hmep->hme_tnextp = ntmdp;
-	PUT_ETXREG(txpend, HMET_TXPEND_TDMD);
-	CHECK_ETXREG();
-
-	mutex_exit(&hmep->hme_xmitlock);
-
-	hmep->hme_starts++;
-	return (B_TRUE);
-
-bad:
-	mutex_exit(&hmep->hme_xmitlock);
-	freemsg(mp);
-	return (B_TRUE);
-
-notmds:
-	hmep->hme_notmds++;
-	hmep->hme_wantw = B_TRUE;
-	hmep->hme_tnextp = tmdp1;
-	hmereclaim(hmep);
-	retval = B_FALSE;
-done:
-	mutex_exit(&hmep->hme_xmitlock);
-
-	return (retval);
-
-
-}
-
-/*
- * Start transmission.
- * Return B_TRUE on success,
- * otherwise put msg on wq, set 'want' flag and return B_FALSE.
- */
-static boolean_t
-hmestart(struct hme *hmep, mblk_t *mp)
-{
-	volatile struct hme_tmd *tmdp1 = NULL;
-	volatile struct hme_tmd *tmdp2 = NULL;
-	volatile struct hme_tmd *ntmdp = NULL;
-	mblk_t  *bp;
-	uint32_t len1, len2;
-	uint32_t temp_addr;
-	uint32_t i, j;
-	ddi_dma_cookie_t c;
-	boolean_t retval = B_TRUE;
-
-	uint32_t	csflags = 0;
-	uint32_t	flags;
-	uint32_t	start_offset;
-	uint32_t	stuff_offset;
 
 	/*
 	 * update MIB II statistics
 	 */
-	BUMP_OutNUcast(hmep, mp->b_rptr);
+	BUMP_OutNUcast(hmep, tbuf->kaddr);
 
-	if (hmep->hme_dvmaxh == NULL)
-		return (hmestart_dma(hmep, mp));
+	PUT_TMD(txptr, tbuf->paddr, len,
+	    HMETMD_OWN | HMETMD_SOP | HMETMD_EOP | csflags);
 
-	hcksum_retrieve(mp, NULL, NULL, &start_offset, &stuff_offset,
-	    NULL, NULL, &flags);
+	HMESYNCTMD(txptr, DDI_DMA_SYNC_FORDEV);
+	hmep->hme_txindex++;
 
-	if (flags & HCK_PARTIALCKSUM) {
-		if (get_ether_type(mp->b_rptr) == ETHERTYPE_VLAN) {
-			start_offset += sizeof (struct ether_header) + 4;
-			stuff_offset += sizeof (struct ether_header) + 4;
-		} else {
-			start_offset += sizeof (struct ether_header);
-			stuff_offset += sizeof (struct ether_header);
-		}
-		csflags = HMETMD_CSENABL |
-		    (start_offset << HMETMD_CSSTART_SHIFT) |
-		    (stuff_offset << HMETMD_CSSTUFF_SHIFT);
-	}
-
-	mutex_enter(&hmep->hme_xmitlock);
-
-	if (hmep->hme_flags & HMESUSPENDED) {
-		/*
-		 * If trying to send while suspended, just drop the packet
-		 * on the floor.  Ethernet is best effort only.
-		 */
-		hmep->hme_carrier_errors++;
-		hmep->hme_oerrors++;
-		goto bad;
-	}
-
-	/*
-	 * reclaim if there are more than HMETPENDING descriptors
-	 * to be reclaimed.
-	 */
-	if (hmep->hme_tnextp > hmep->hme_tcurp) {
-		if ((hmep->hme_tnextp - hmep->hme_tcurp) > HMETPENDING) {
-			hmereclaim(hmep);
-		}
-	} else {
-		i = hmep->hme_tcurp - hmep->hme_tnextp;
-		if (i && (i < (HME_TMDMAX - HMETPENDING))) {
-			hmereclaim(hmep);
-		}
-	}
-
-	tmdp1 = hmep->hme_tnextp;
-	if ((ntmdp = NEXTTMD(hmep, tmdp1)) == hmep->hme_tcurp)
-		goto notmds;
-
-	i = tmdp1 - hmep->hme_tmdp;
-
-	/*
-	 * here we deal with 3 cases.
-	 *	1. pkt has exactly one mblk
-	 *	2. pkt has exactly two mblks
-	 *	3. pkt has more than 2 mblks. Since this almost
-	 *		always never happens, we copy all of them
-	 *		into a msh with one mblk.
-	 * for each mblk in the message, we allocate a tmd and
-	 * figure out the tmd index. This index also passed to
-	 * dvma_kaddr_load(), which establishes the IO mapping
-	 * for the mblk data. This index is used as a index into
-	 * the ptes reserved by dvma_reserve
-	 */
-
-	/*
-	 * Note that for checksum offload, the hardware cannot
-	 * generate correct checksums if the packet is smaller than
-	 * 64-bytes.  In such a case, we bcopy the packet and use
-	 * a software checksum.
-	 */
-
-	bp = mp->b_cont;
-
-	len1 = mp->b_wptr - mp->b_rptr;
-	if (bp == NULL && (len1 >= 64)) {
-		dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)mp->b_rptr,
-		    len1, 2 * i, &c);
-		dvma_sync(hmep->hme_dvmaxh, 2 * i, DDI_DMA_SYNC_FORDEV);
-
-		PUT_TMD(tmdp1, c.dmac_address, len1,
-		    HMETMD_SOP | HMETMD_EOP | csflags);
-
-		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-		    DDI_DMA_SYNC_FORDEV);
-		hmep->hme_tmblkp[i] = mp;
-
-	} else {
-
-		if ((bp != NULL) && (bp->b_cont == NULL) &&
-		    ((len2 = bp->b_wptr - bp->b_rptr) >= 4) &&
-		    ((len1 + len2) >= 64)) {
-			/*
-			 * Check with HW: The minimum len restriction
-			 * different for 64-bit burst ?
-			 */
-			tmdp2 = ntmdp;
-			if ((ntmdp = NEXTTMD(hmep, tmdp2)) == hmep->hme_tcurp)
-				goto notmds;
-			j = tmdp2 - hmep->hme_tmdp;
-			mp->b_cont = NULL;
-			hmep->hme_tmblkp[i] = mp;
-			hmep->hme_tmblkp[j] = bp;
-			dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)mp->b_rptr,
-			    len1, 2 * i, &c);
-			dvma_sync(hmep->hme_dvmaxh, 2 * i,
-			    DDI_DMA_SYNC_FORDEV);
-
-			temp_addr = c.dmac_address;
-			dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)bp->b_rptr,
-			    len2, 2 * j, &c);
-			dvma_sync(hmep->hme_dvmaxh, 2 * j,
-			    DDI_DMA_SYNC_FORDEV);
-
-			PUT_TMD(tmdp2, c.dmac_address, len2,
-			    HMETMD_EOP | csflags);
-
-			HMESYNCIOPB(hmep, tmdp2, sizeof (struct hme_tmd),
-			    DDI_DMA_SYNC_FORDEV);
-
-			PUT_TMD(tmdp1, temp_addr, len1, HMETMD_SOP | csflags);
-
-			HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-			    DDI_DMA_SYNC_FORDEV);
-
-		} else {
-			len1 = msgsize(mp);
-
-			if ((bp = hmeallocb(len1, BPRI_HI)) == NULL) {
-				hmep->hme_allocbfail++;
-				hmep->hme_noxmtbuf++;
-				goto bad;
-			}
-
-			mcopymsg(mp, bp->b_rptr);
-			mp = bp;
-			hmep->hme_tmblkp[i] = mp;
-
-			if ((csflags) && (len1 < 64)) {
-				uint16_t sum;
-				sum = hme_cksum(bp->b_rptr + start_offset,
-				    len1 - start_offset);
-				bcopy(&sum, bp->b_rptr + stuff_offset,
-				    sizeof (sum));
-				csflags = 0;
-			}
-
-			dvma_kaddr_load(hmep->hme_dvmaxh,
-			    (caddr_t)mp->b_rptr, len1, 2 * i, &c);
-			dvma_sync(hmep->hme_dvmaxh, 2 * i,
-			    DDI_DMA_SYNC_FORDEV);
-			PUT_TMD(tmdp1, c.dmac_address, len1,
-			    HMETMD_SOP | HMETMD_EOP | csflags);
-			HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-			    DDI_DMA_SYNC_FORDEV);
-		}
-	}
-	CHECK_IOPB();
-
-	hmep->hme_tnextp = ntmdp;
 	PUT_ETXREG(txpend, HMET_TXPEND_TDMD);
 	CHECK_ETXREG();
 
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, TX_MSG,
-	    "hmestart:  Transmitted a frame");
-
 	mutex_exit(&hmep->hme_xmitlock);
-
 
 	hmep->hme_starts++;
 	return (B_TRUE);
+
 bad:
 	mutex_exit(&hmep->hme_xmitlock);
 	freemsg(mp);
 	return (B_TRUE);
+
 notmds:
 	hmep->hme_notmds++;
 	hmep->hme_wantw = B_TRUE;
-	hmep->hme_tnextp = tmdp1;
 	hmereclaim(hmep);
 	retval = B_FALSE;
 done:
@@ -4493,12 +3900,8 @@ static int hme_palen = 32;
 static int
 hmeinit(struct hme *hmep)
 {
-	mblk_t		*bp;
-	uint32_t	i;
-	int		ret;
-	int		alloc_ret;	/* hmeallocthings() return value   */
-	ddi_dma_cookie_t dma_cookie;
-	uint_t dmac_cnt;
+	uint32_t		i;
+	int			ret;
 
 	/*
 	 * Lock sequence:
@@ -4555,20 +3958,6 @@ hmeinit(struct hme *hmep)
 	(void) hmestop(hmep);
 
 	/*
-	 * Allocate data structures.
-	 */
-	alloc_ret = hmeallocthings(hmep);
-	if (alloc_ret) {
-		/*
-		 * Failed
-		 */
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-		goto init_fail;
-	}
-
-	hmefreebufs(hmep);
-
-	/*
 	 * Clear all descriptors.
 	 */
 	bzero(hmep->hme_rmdp, HME_RMDMAX * sizeof (struct hme_rmd));
@@ -4577,73 +3966,21 @@ hmeinit(struct hme *hmep)
 	/*
 	 * Hang out receive buffers.
 	 */
-	for (i = 0; i < HMERPENDING; i++) {
-		if ((bp = hmeallocb(HMEBUFSIZE, BPRI_LO)) == NULL) {
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, INIT_MSG,
-			    "allocb failed");
-			hme_start_timer(hmep, hme_check_link,
-			    HME_LINKCHECK_TIMER);
-			goto init_fail;
-		}
-
-		/*
-		 * dvma case
-		 */
-		if (hmep->hme_dvmarh != NULL) {
-			dvma_kaddr_load(hmep->hme_dvmarh, (caddr_t)bp->b_rptr,
-			    (uint_t)HMEBUFSIZE, 2 * i, &dma_cookie);
-		} else {
-		/*
-		 * dma case
-		 */
-			if (ddi_dma_alloc_handle(hmep->dip, &hme_dma_attr,
-			    DDI_DMA_DONTWAIT, NULL, &hmep->hme_dmarh[i])
-			    != DDI_SUCCESS) {
-				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-				"ddi_dma_alloc_handle of bufs failed");
-				hme_start_timer(hmep, hme_check_link,
-				    HME_LINKCHECK_TIMER);
-				goto init_fail;
-			}
-
-			if (ddi_dma_addr_bind_handle(hmep->hme_dmarh[i], NULL,
-			    (caddr_t)bp->b_rptr, HMEBUFSIZE, DDI_DMA_RDWR,
-			    DDI_DMA_DONTWAIT, NULL, &dma_cookie, &dmac_cnt)
-			    != DDI_DMA_MAPPED) {
-				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-				"ddi_dma_addr_bind_handle of bufs failed");
-				hme_start_timer(hmep, hme_check_link,
-				    HME_LINKCHECK_TIMER);
-				goto init_fail;
-			}
-			/* apparently they don't handle multiple cookies */
-			if (dmac_cnt > 1) {
-				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-				    "dmarh crossed page boundary - failed");
-				hme_start_timer(hmep, hme_check_link,
-				    HME_LINKCHECK_TIMER);
-				goto init_fail;
-			}
-		}
-		PUT_RMD((&hmep->hme_rmdp[i]), dma_cookie.dmac_address);
-
-		hmep->hme_rmblkp[i] = bp;	/* save for later use */
+	for (i = 0; i < HME_RMDMAX; i++) {
+		PUT_RMD(i, hmep->hme_rbuf[i].paddr);
 	}
 
 	/*
 	 * DMA sync descriptors.
 	 */
-	HMESYNCIOPB(hmep, hmep->hme_rmdp, (HME_RMDMAX * sizeof (struct hme_rmd)
-	    + HME_TMDMAX * sizeof (struct hme_tmd)), DDI_DMA_SYNC_FORDEV);
-	CHECK_IOPB();
+	(void) ddi_dma_sync(hmep->hme_rmd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
+	(void) ddi_dma_sync(hmep->hme_tmd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
 
 	/*
 	 * Reset RMD and TMD 'walking' pointers.
 	 */
-	hmep->hme_rnextp = hmep->hme_rmdp;
-	hmep->hme_rlastp = hmep->hme_rmdp + HMERPENDING - 1;
-	hmep->hme_tcurp = hmep->hme_tmdp;
-	hmep->hme_tnextp = hmep->hme_tmdp;
+	hmep->hme_rxindex = 0;
+	hmep->hme_txindex = hmep->hme_txreclaim = 0;
 
 	/*
 	 * This is the right place to initialize MIF !!!
@@ -4728,8 +4065,6 @@ hmeinit(struct hme *hmep)
 	PUT_MACREG(ipg1, hme_param_ipg1);
 	PUT_MACREG(ipg2, hme_param_ipg2);
 
-	HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, IPG_MSG,
-	    "hmeinit: ipg1 = %d ipg2 = %d", hme_param_ipg1, hme_param_ipg2);
 	PUT_MACREG(rseed,
 	    ((hmep->hme_ouraddr.ether_addr_octet[0] << 8) & 0x3) |
 	    hmep->hme_ouraddr.ether_addr_octet[1]);
@@ -4769,8 +4104,8 @@ hmeinit(struct hme *hmep)
 	 * Initialize HME Global registers, ETX registers and ERX registers.
 	 */
 
-	PUT_ETXREG(txring, (uint32_t)HMEIOPBIOADDR(hmep, hmep->hme_tmdp));
-	PUT_ERXREG(rxring, (uint32_t)HMEIOPBIOADDR(hmep, hmep->hme_rmdp));
+	PUT_ETXREG(txring, hmep->hme_tmd_paddr);
+	PUT_ERXREG(rxring, hmep->hme_rmd_paddr);
 
 	/*
 	 * ERX registers can be written only if they have even no. of bits set.
@@ -4780,16 +4115,11 @@ hmeinit(struct hme *hmep)
 	 */
 	{
 		uint32_t temp;
-		temp  = ((uint32_t)HMEIOPBIOADDR(hmep, hmep->hme_rmdp));
+		temp  = hmep->hme_rmd_paddr;
 
 		if (GET_ERXREG(rxring) != temp)
 			PUT_ERXREG(rxring, (temp | 4));
 	}
-
-	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, ERX_MSG, "rxring written = %X",
-	    ((uint32_t)HMEIOPBIOADDR(hmep, hmep->hme_rmdp)));
-	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, ERX_MSG, "rxring read = %X",
-	    GET_ERXREG(rxring));
 
 	PUT_GLOBREG(config, (hmep->hme_config |
 	    (hmep->hme_64bit_xfer << HMEG_CONFIG_64BIT_SHIFT)));
@@ -4832,8 +4162,6 @@ hmeinit(struct hme *hmep)
 
 	PUT_ERXREG(config, i);
 
-	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, INIT_MSG,
-	    "erxp->config = %X", GET_ERXREG(config));
 	/*
 	 * Bug related to the parity handling in ERX. When erxp-config is
 	 * read back.
@@ -4968,8 +4296,70 @@ hmeburstsizes(struct hme *hmep)
 	else
 		hmep->hme_config = HMEG_CONFIG_BURST16;
 
-	HME_DEBUG_MSG2(hmep, SEVERITY_NONE, INIT_MSG,
-	    "hme_config = 0x%X", hmep->hme_config);
+	return (DDI_SUCCESS);
+}
+
+static int
+hmeallocbuf(struct hme *hmep, hmebuf_t *buf, int dir)
+{
+	ddi_dma_cookie_t	dmac;
+	size_t			len;
+	unsigned		ccnt;
+
+	if (ddi_dma_alloc_handle(hmep->dip, &hme_dma_attr,
+	    DDI_DMA_DONTWAIT, NULL, &buf->dmah) != DDI_SUCCESS) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate buf dma handle - failed");
+		return (DDI_FAILURE);
+	}
+
+	if (ddi_dma_mem_alloc(buf->dmah, ROUNDUP(HMEBUFSIZE, 512),
+	    &hme_buf_attr, DDI_DMA_STREAMING, DDI_DMA_DONTWAIT, NULL,
+	    &buf->kaddr, &len, &buf->acch) != DDI_SUCCESS) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate buf memory - failed");
+		return (DDI_FAILURE);
+	}
+
+	if (ddi_dma_addr_bind_handle(buf->dmah, NULL, buf->kaddr,
+	    len, dir | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    &dmac, &ccnt) != DDI_DMA_MAPPED) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot map buf for dma - failed");
+		return (DDI_FAILURE);
+	}
+	buf->paddr = dmac.dmac_address;
+
+	/* apparently they don't handle multiple cookies */
+	if (ccnt > 1) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "too many buf dma cookies");
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+static int
+hmeallocbufs(struct hme *hmep)
+{
+	hmep->hme_tbuf = kmem_zalloc(HME_TMDMAX * sizeof (hmebuf_t), KM_SLEEP);
+	hmep->hme_rbuf = kmem_zalloc(HME_RMDMAX * sizeof (hmebuf_t), KM_SLEEP);
+
+	/* Alloc RX buffers. */
+	for (int i = 0; i < HME_RMDMAX; i++) {
+		if (hmeallocbuf(hmep, &hmep->hme_rbuf[i], DDI_DMA_READ) !=
+		    DDI_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+	}
+
+	/* Alloc TX buffers. */
+	for (int i = 0; i < HME_TMDMAX; i++) {
+		if (hmeallocbuf(hmep, &hmep->hme_tbuf[i], DDI_DMA_WRITE) !=
+		    DDI_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+	}
 	return (DDI_SUCCESS);
 }
 
@@ -4977,75 +4367,42 @@ static void
 hmefreebufs(struct hme *hmep)
 {
 	int i;
-	int32_t	freeval;
+
+	if (hmep->hme_rbuf == NULL)
+		return;
 
 	/*
-	 * Free and dvma_unload pending xmit and recv buffers.
+	 * Free and unload pending xmit and recv buffers.
 	 * Maintaining the 1-to-1 ordered sequence of
-	 * Always unload anything before loading it again.
-	 * Never unload anything twice.  Always unload
-	 * before freeing the buffer.  We satisfy these
-	 * requirements by unloading only those descriptors
-	 * which currently have an mblk associated with them.
-	 */
-	/*
-	 * Keep the ddi_dma_free() before the freeb()
-	 * with the dma handles.
-	 * Race condition with snoop.
-	 */
-	if (hmep->hme_dmarh) {
-		/* dma case */
-		for (i = 0; i < HME_TMDMAX; i++) {
-			if (hmep->hme_dmaxh[i]) {
-				freeval = ddi_dma_unbind_handle(
-				    hmep->hme_dmaxh[i]);
-				if (freeval == DDI_FAILURE)
-					HME_FAULT_MSG1(hmep, SEVERITY_HIGH,
-					    FREE_MSG, "ddi_dma_unbind_handle"
-					    " failed");
-				ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
-				hmep->hme_dmaxh[i] = NULL;
-			}
-		}
-		for (i = 0; i < HMERPENDING; i++) {
-			if (hmep->hme_dmarh[i]) {
-				freeval = ddi_dma_unbind_handle(
-				    hmep->hme_dmarh[i]);
-				if (freeval == DDI_FAILURE)
-					HME_FAULT_MSG1(hmep, SEVERITY_HIGH,
-					    FREE_MSG, "ddi_dma_unbind_handle"
-					    " failure");
-				ddi_dma_free_handle(&hmep->hme_dmarh[i]);
-				hmep->hme_dmarh[i] = NULL;
-			}
-		}
-	}
-	/*
-	 * This was generated when only a dma handle is expected.
-	 * else HME_FAULT_MSG1(NULL, SEVERITY_HIGH, FREE_MSG,
-	 *		"hme: Expected a dma read handle:failed");
+	 * We have written the routine to be idempotent.
 	 */
 
 	for (i = 0; i < HME_TMDMAX; i++) {
-		if (hmep->hme_tmblkp[i]) {
-			if (hmep->hme_dvmaxh != NULL)
-				dvma_unload(hmep->hme_dvmaxh,
-				    2 * i, DONT_FLUSH);
-			freeb(hmep->hme_tmblkp[i]);
-			hmep->hme_tmblkp[i] = NULL;
+		hmebuf_t *tbuf = &hmep->hme_tbuf[i];
+		if (tbuf->paddr) {
+			(void) ddi_dma_unbind_handle(tbuf->dmah);
+		}
+		if (tbuf->kaddr) {
+			ddi_dma_mem_free(&tbuf->acch);
+		}
+		if (tbuf->dmah) {
+			ddi_dma_free_handle(&tbuf->dmah);
 		}
 	}
-
 	for (i = 0; i < HME_RMDMAX; i++) {
-		if (hmep->hme_rmblkp[i]) {
-			if (hmep->hme_dvmarh != NULL)
-				dvma_unload(hmep->hme_dvmarh, 2 * HMERINDEX(i),
-				    DDI_DMA_SYNC_FORKERNEL);
-			freeb(hmep->hme_rmblkp[i]);
-			hmep->hme_rmblkp[i] = NULL;
+		hmebuf_t *rbuf = &hmep->hme_rbuf[i];
+		if (rbuf->paddr) {
+			(void) ddi_dma_unbind_handle(rbuf->dmah);
+		}
+		if (rbuf->kaddr) {
+			ddi_dma_mem_free(&rbuf->acch);
+		}
+		if (rbuf->dmah) {
+			ddi_dma_free_handle(&rbuf->dmah);
 		}
 	}
-
+	kmem_free(hmep->hme_rbuf, HME_RMDMAX * sizeof (hmebuf_t));
+	kmem_free(hmep->hme_tbuf, HME_TMDMAX * sizeof (hmebuf_t));
 }
 
 /*
@@ -5085,9 +4442,6 @@ hme_start_mifpoll(struct hme *hmep)
 		    (uint16_t)~(PHY_BMSR_LNKSTS | PHY_BMSR_JABDET));
 
 	CHECK_MIFREG();
-	HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-	    "mifpoll started: mif_cfg = %X mif_bsts = %X",
-	    cfg, GET_MIFREG(mif_bsts));
 }
 
 static void
@@ -5113,7 +4467,7 @@ hmeuninit(struct hme *hmep)
 	/*
 	 * Allow up to 'HMEDRAINTIME' for pending xmit's to complete.
 	 */
-	HMEDELAY((hmep->hme_tcurp == hmep->hme_tnextp), HMEDRAINTIME);
+	HMEDELAY((hmep->hme_txindex == hmep->hme_txreclaim), HMEDRAINTIME);
 
 	hme_stop_timer(hmep);   /* acquire hme_linklock */
 	mutex_exit(&hmep->hme_linklock);
@@ -5139,136 +4493,105 @@ hmeuninit(struct hme *hmep)
 static int
 hmeallocthings(struct hme *hmep)
 {
-	uintptr_t a;
-	int		size;
-	int		rval;
-	size_t		real_len;
-	uint_t		cookiec;
-
-	/*
-	 * Return if resources are already allocated.
-	 */
-	if (hmep->hme_rmdp)
-		return (0);
+	int			size;
+	int			rval;
+	size_t			real_len;
+	uint_t			cookiec;
+	ddi_dma_cookie_t	dmac;
+	dev_info_t		*dip = hmep->dip;
 
 	/*
 	 * Allocate the TMD and RMD descriptors and extra for page alignment.
 	 */
-	size = (HME_RMDMAX * sizeof (struct hme_rmd)
-	    + HME_TMDMAX * sizeof (struct hme_tmd));
-	size = ROUNDUP(size, hmep->pagesize) + hmep->pagesize;
 
-	rval = ddi_dma_alloc_handle(hmep->dip, &hme_dma_attr,
-	    DDI_DMA_DONTWAIT, 0, &hmep->hme_md_h);
+	rval = ddi_dma_alloc_handle(dip, &hme_dma_attr, DDI_DMA_DONTWAIT, NULL,
+	    &hmep->hme_rmd_dmah);
 	if (rval != DDI_SUCCESS) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
 		    "cannot allocate rmd handle - failed");
-		return (1);
+		return (DDI_FAILURE);
 	}
-
-	rval = ddi_dma_mem_alloc(hmep->hme_md_h, size, &hmep->hme_dev_attr,
-	    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, 0,
-	    (caddr_t *)&hmep->hme_iopbkbase, &real_len, &hmep->hme_mdm_h);
+	size = HME_RMDMAX * sizeof (struct hme_rmd);
+	rval = ddi_dma_mem_alloc(hmep->hme_rmd_dmah, size,
+	    &hmep->hme_dev_attr, DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    &hmep->hme_rmd_kaddr, &real_len, &hmep->hme_rmd_acch);
 	if (rval != DDI_SUCCESS) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		    "cannot allocate trmd dma mem - failed");
-		ddi_dma_free_handle(&hmep->hme_md_h);
-		return (1);
+		    "cannot allocate rmd dma mem - failed");
+		return (DDI_FAILURE);
 	}
-
-	hmep->hme_iopbkbase = ROUNDUP(hmep->hme_iopbkbase, hmep->pagesize);
-	size = (HME_RMDMAX * sizeof (struct hme_rmd)
-	    + HME_TMDMAX * sizeof (struct hme_tmd));
-
-	rval = ddi_dma_addr_bind_handle(hmep->hme_md_h, NULL,
-	    (caddr_t)hmep->hme_iopbkbase, size,
-	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, 0,
-	    &hmep->hme_md_c, &cookiec);
+	hmep->hme_rmdp = (void *)(hmep->hme_rmd_kaddr);
+	rval = ddi_dma_addr_bind_handle(hmep->hme_rmd_dmah, NULL,
+	    hmep->hme_rmd_kaddr, size, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_DONTWAIT, NULL, &dmac, &cookiec);
 	if (rval != DDI_DMA_MAPPED) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		    "cannot allocate trmd dma - failed");
-		ddi_dma_mem_free(&hmep->hme_mdm_h);
-		ddi_dma_free_handle(&hmep->hme_md_h);
-		return (1);
+		    "cannot allocate rmd dma - failed");
+		return (DDI_FAILURE);
 	}
-
+	hmep->hme_rmd_paddr = dmac.dmac_address;
 	if (cookiec != 1) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		    "trmds crossed page boundary - failed");
-		if (ddi_dma_unbind_handle(hmep->hme_md_h) == DDI_FAILURE)
-			return (2);
-		ddi_dma_mem_free(&hmep->hme_mdm_h);
-		ddi_dma_free_handle(&hmep->hme_md_h);
-		return (1);
+		    "too many rmd cookies - failed");
+		return (DDI_FAILURE);
 	}
 
-	hmep->hme_iopbiobase = hmep->hme_md_c.dmac_address;
-
-	a = hmep->hme_iopbkbase;
-	a = ROUNDUP(a, HME_HMDALIGN);
-	hmep->hme_rmdp = (struct hme_rmd *)a;
-	a += HME_RMDMAX * sizeof (struct hme_rmd);
-	hmep->hme_tmdp = (struct hme_tmd *)a;
-	/*
-	 * dvma_reserve() reserves DVMA space for private man
-	 * device driver.
-	 */
-	if ((dvma_reserve(hmep->dip, &hme_dma_limits, (HME_TMDMAX * 2),
-	    &hmep->hme_dvmaxh)) != DDI_SUCCESS) {
-		/*
-		 * Specifically we reserve n (HME_TMDMAX + HME_RMDMAX)
-		 * pagetable entries. Therefore we have 2 ptes for each
-		 * descriptor. Since the ethernet buffers are 1518 bytes
-		 * so they can at most use 2 ptes.
-		 * Will do a ddi_dma_addr_setup for each bufer
-		 */
-		/*
-		 * We will now do a dma, due to the fact that
-		 * dvma_reserve failied.
-		 */
-		hmep->hme_dmaxh = (ddi_dma_handle_t *)
-		    kmem_zalloc(((HME_TMDMAX +  HMERPENDING) *
-		    (sizeof (ddi_dma_handle_t))), KM_SLEEP);
-			hmep->hme_dmarh = hmep->hme_dmaxh + HME_TMDMAX;
-			hmep->hme_dvmaxh = hmep->hme_dvmarh = NULL;
-			hmep->dmaxh_init++;
-			hmep->dmarh_init++;
-
-	} else {
-		/*
-		 * Reserve dvma space for the receive side. If
-		 * this call fails, we have to release the resources
-		 * and fall back to the dma case.
-		 */
-		if ((dvma_reserve(hmep->dip, &hme_dma_limits,
-		    (HMERPENDING * 2), &hmep->hme_dvmarh)) != DDI_SUCCESS) {
-			(void) dvma_release(hmep->hme_dvmaxh);
-
-			hmep->hme_dmaxh = (ddi_dma_handle_t *)
-			    kmem_zalloc(((HME_TMDMAX +  HMERPENDING) *
-			    (sizeof (ddi_dma_handle_t))), KM_SLEEP);
-			hmep->hme_dmarh = hmep->hme_dmaxh + HME_TMDMAX;
-			hmep->hme_dvmaxh = hmep->hme_dvmarh = NULL;
-			hmep->dmaxh_init++;
-			hmep->dmarh_init++;
-		}
+	rval = ddi_dma_alloc_handle(dip, &hme_dma_attr, DDI_DMA_DONTWAIT, NULL,
+	    &hmep->hme_tmd_dmah);
+	if (rval != DDI_SUCCESS) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate tmd handle - failed");
+		return (DDI_FAILURE);
+	}
+	size = HME_TMDMAX * sizeof (struct hme_rmd);
+	rval = ddi_dma_mem_alloc(hmep->hme_tmd_dmah, size,
+	    &hmep->hme_dev_attr, DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    &hmep->hme_tmd_kaddr, &real_len, &hmep->hme_tmd_acch);
+	if (rval != DDI_SUCCESS) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate tmd dma mem - failed");
+		return (DDI_FAILURE);
+	}
+	hmep->hme_tmdp = (void *)(hmep->hme_tmd_kaddr);
+	rval = ddi_dma_addr_bind_handle(hmep->hme_tmd_dmah, NULL,
+	    hmep->hme_tmd_kaddr, size, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_DONTWAIT, NULL, &dmac, &cookiec);
+	if (rval != DDI_DMA_MAPPED) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate tmd dma - failed");
+		return (DDI_FAILURE);
+	}
+	hmep->hme_tmd_paddr = dmac.dmac_address;
+	if (cookiec != 1) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "too many tmd cookies - failed");
+		return (DDI_FAILURE);
 	}
 
-	/*
-	 * Keep handy limit values for RMD, TMD, and Buffers.
-	 */
-	hmep->hme_rmdlimp = &((hmep->hme_rmdp)[HME_RMDMAX]);
-	hmep->hme_tmdlimp = &((hmep->hme_tmdp)[HME_TMDMAX]);
-
-	/*
-	 * Zero out xmit and rcv holders.
-	 */
-	bzero(hmep->hme_tmblkp, sizeof (hmep->hme_tmblkp));
-	bzero(hmep->hme_rmblkp, sizeof (hmep->hme_rmblkp));
-
-	return (0);
+	return (DDI_SUCCESS);
 }
 
+static void
+hmefreethings(struct hme *hmep)
+{
+	if (hmep->hme_rmd_paddr) {
+		(void) ddi_dma_unbind_handle(hmep->hme_rmd_dmah);
+		hmep->hme_rmd_paddr = 0;
+	}
+	if (hmep->hme_rmd_acch)
+		ddi_dma_mem_free(&hmep->hme_rmd_acch);
+	if (hmep->hme_rmd_dmah)
+		ddi_dma_free_handle(&hmep->hme_rmd_dmah);
+
+	if (hmep->hme_tmd_paddr) {
+		(void) ddi_dma_unbind_handle(hmep->hme_tmd_dmah);
+		hmep->hme_tmd_paddr = 0;
+	}
+	if (hmep->hme_tmd_acch)
+		ddi_dma_mem_free(&hmep->hme_tmd_acch);
+	if (hmep->hme_tmd_dmah)
+		ddi_dma_free_handle(&hmep->hme_tmd_dmah);
+}
 
 /*
  *	First check to see if it our device interrupting.
@@ -5279,7 +4602,6 @@ hmeintr(caddr_t arg)
 	struct hme	*hmep = (void *)arg;
 	uint32_t	hmesbits;
 	uint32_t	mif_status;
-	uint32_t	dummy_read;
 	uint32_t	serviced = DDI_INTR_UNCLAIMED;
 	uint32_t	num_reads = 0;
 	uint32_t	rflags;
@@ -5298,8 +4620,6 @@ hmeintr(caddr_t arg)
 	hmesbits = GET_GLOBREG(status);
 	CHECK_GLOBREG();
 
-	HME_DEBUG_MSG3(hmep, SEVERITY_NONE, INTR_MSG,
-	    "hmeintr: start:  hmep %X status = %X", hmep, hmesbits);
 	/*
 	 * Note: TINT is sometimes enabled in thr hmereclaim()
 	 */
@@ -5332,38 +4652,26 @@ hmeintr(caddr_t arg)
 			KIOIP->intrs[KSTAT_INTR_HARD]++;
 		mutex_exit(&hmep->hme_intrlock);
 		hmeuninit(hmep);
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,  INTR_MSG,
-		    "hmeintr: hme not running");
 		return (serviced);
 	}
 
 	if (hmesbits & (HMEG_STATUS_FATAL_ERR | HMEG_STATUS_NONFATAL_ERR)) {
 		if (hmesbits & HMEG_STATUS_FATAL_ERR) {
 
-			HME_DEBUG_MSG2(hmep, SEVERITY_MID, INTR_MSG,
-			    "hmeintr: fatal error:hmesbits = %X", hmesbits);
 			if (hmep->hme_intrstats)
 				KIOIP->intrs[KSTAT_INTR_HARD]++;
 			hme_fatal_err(hmep, hmesbits);
-
-			HME_DEBUG_MSG2(hmep, SEVERITY_MID, INTR_MSG,
-			    "fatal %x: re-init MAC", hmesbits);
 
 			mutex_exit(&hmep->hme_intrlock);
 			(void) hmeinit(hmep);
 			return (serviced);
 		}
-		HME_DEBUG_MSG2(hmep, SEVERITY_MID, INTR_MSG,
-		    "hmeintr: non-fatal error:hmesbits = %X", hmesbits);
 		hme_nonfatal_err(hmep, hmesbits);
 	}
 
 	if (hmesbits & HMEG_STATUS_MIF_INTR) {
 		mif_status = (GET_MIFREG(mif_bsts) >> 16);
 		if (!(mif_status & PHY_BMSR_LNKSTS)) {
-
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, INTR_MSG,
-			    "hmeintr: mif interrupt: Link Down");
 
 			if (hmep->hme_intrstats)
 				KIOIP->intrs[KSTAT_INTR_HARD]++;
@@ -5400,23 +4708,15 @@ hmeintr(caddr_t arg)
 
 		if (mif_status & (PHY_BMSR_JABDET)) {
 
-			HME_DEBUG_MSG1(hmep, SEVERITY_LOW, INTR_MSG,
-			    "jabber detected");
-
 			/* national phy only defines this at 10 Mbps */
 			if (hme_param_speed == 0) { /* 10 Mbps speed ? */
 				hmep->hme_jab++;
-
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    INTR_MSG, "mif interrupt: Jabber");
 
 				/* treat jabber like a fatal error */
 				hmep->hme_linkcheck = 0; /* force PHY reset */
 				mutex_exit(&hmep->hme_intrlock);
 				(void) hmeinit(hmep);
 
-				HME_DEBUG_MSG1(hmep, SEVERITY_LOW, INTR_MSG,
-				    "jabber: re-init PHY & MAC");
 				return (serviced);
 			}
 		}
@@ -5426,47 +4726,47 @@ hmeintr(caddr_t arg)
 	if (hmesbits & (HMEG_STATUS_TX_ALL | HMEG_STATUS_TINT)) {
 		mutex_enter(&hmep->hme_xmitlock);
 
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, TX_MSG,
-		    "hmeintr: packet transmitted");
 		hmereclaim(hmep);
 		mutex_exit(&hmep->hme_xmitlock);
 	}
 
 	if (hmesbits & HMEG_STATUS_RINT) {
-		volatile struct	hme_rmd	*rmdp;
 
 		/*
 		 * This dummy PIO is required to flush the SBus
 		 * Bridge buffers in QFE.
 		 */
-		dummy_read = GET_GLOBREG(config);
-#ifdef	lint
-		dummy_read = dummy_read;
-#endif
-
-		rmdp = hmep->hme_rnextp;
-
-		HME_DEBUG_MSG2(hmep, SEVERITY_NONE, INTR_MSG,
-		    "hmeintr: packet received: rmdp = %X", rmdp);
+		(void) GET_GLOBREG(config);
 
 		/*
-		 * Sync RMD before looking at it.
+		 * Loop through each RMD no more than once.
 		 */
-		HMESYNCIOPB(hmep, rmdp, sizeof (struct hme_rmd),
-		    DDI_DMA_SYNC_FORKERNEL);
+		while (num_reads++ < HME_RMDMAX) {
+			hmebuf_t *rbuf;
+			int rxptr;
 
-		/*
-		 * Loop through each RMD.
-		 */
-		while ((((rflags = GET_RMD_FLAGS(rmdp)) & HMERMD_OWN) == 0) &&
-		    (num_reads++ < HMERPENDING)) {
+			rxptr = hmep->hme_rxindex % HME_RMDMAX;
+			HMESYNCRMD(rxptr, DDI_DMA_SYNC_FORKERNEL);
 
-			mp = hmeread(hmep, rmdp, rflags);
+			rflags = GET_RMD_FLAGS(rxptr);
+			if (rflags & HMERMD_OWN) {
+				/*
+				 * Chip still owns it.  We're done.
+				 */
+				break;
+			}
 
 			/*
-			 * Increment to next RMD.
+			 * Retrieve the packet.
 			 */
-			hmep->hme_rnextp = rmdp = NEXTRMD(hmep, rmdp);
+			rbuf = &hmep->hme_rbuf[rxptr];
+			mp = hmeread(hmep, rbuf, rflags);
+
+			/*
+			 * Return ownership of the RMD.
+			 */
+			PUT_RMD(rxptr, rbuf->paddr);
+			HMESYNCRMD(rxptr, DDI_DMA_SYNC_FORDEV);
 
 			if (mp != NULL) {
 				*tail = mp;
@@ -5474,12 +4774,10 @@ hmeintr(caddr_t arg)
 			}
 
 			/*
-			 * Sync the next RMD before looking at it.
+			 * Advance to the next RMD.
 			 */
-			HMESYNCIOPB(hmep, rmdp, sizeof (struct hme_rmd),
-			    DDI_DMA_SYNC_FORKERNEL);
+			hmep->hme_rxindex++;
 		}
-		CHECK_IOPB();
 	}
 
 	if (hmep->hme_intrstats)
@@ -5499,86 +4797,47 @@ hmeintr(caddr_t arg)
 static void
 hmereclaim(struct hme *hmep)
 {
-	volatile struct	hme_tmd	*tmdp;
-	int	i;
-	int32_t	freeval;
-	int			nbytes;
-
-	tmdp = hmep->hme_tcurp;
-
-	/*
-	 * Sync TMDs before looking at them.
-	 */
-	if (hmep->hme_tnextp > hmep->hme_tcurp) {
-		nbytes = ((hmep->hme_tnextp - hmep->hme_tcurp)
-		    * sizeof (struct hme_tmd));
-		HMESYNCIOPB(hmep, tmdp, nbytes, DDI_DMA_SYNC_FORKERNEL);
-	} else {
-		nbytes = ((hmep->hme_tmdlimp - hmep->hme_tcurp)
-		    * sizeof (struct hme_tmd));
-		HMESYNCIOPB(hmep, tmdp, nbytes, DDI_DMA_SYNC_FORKERNEL);
-		nbytes = ((hmep->hme_tnextp - hmep->hme_tmdp)
-		    * sizeof (struct hme_tmd));
-		HMESYNCIOPB(hmep, hmep->hme_tmdp, nbytes,
-		    DDI_DMA_SYNC_FORKERNEL);
-	}
-	CHECK_IOPB();
+	boolean_t	reclaimed = B_FALSE;
 
 	/*
 	 * Loop through each TMD.
 	 */
-	while ((GET_TMD_FLAGS(tmdp) & (HMETMD_OWN)) == 0 &&
-	    (tmdp != hmep->hme_tnextp)) {
+	while (hmep->hme_txindex > hmep->hme_txreclaim) {
+
+		int		reclaim;
+		uint32_t	flags;
+
+		reclaim = hmep->hme_txreclaim % HME_TMDMAX;
+		HMESYNCTMD(reclaim, DDI_DMA_SYNC_FORKERNEL);
+
+		flags = GET_TMD_FLAGS(reclaim);
+		if (flags & HMETMD_OWN) {
+			/*
+			 * Chip still owns it.  We're done.
+			 */
+			break;
+		}
 
 		/*
-		 * count a chained packet only once.
+		 * Count a chained packet only once.
 		 */
-		if (GET_TMD_FLAGS(tmdp) & (HMETMD_SOP)) {
+		if (flags & HMETMD_SOP) {
 			hmep->hme_opackets++;
 		}
 
 		/*
 		 * MIB II
 		 */
-		hmep->hme_obytes += GET_TMD_FLAGS(tmdp) & HMETMD_BUFSIZE;
+		hmep->hme_obytes += flags & HMETMD_BUFSIZE;
 
-		i = tmdp - hmep->hme_tmdp;
-
-		HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, TX_MSG,
-		    "reclaim: tmdp = %X index = %d", tmdp, i);
-		/*
-		 * dvma handle case.
-		 */
-		if (hmep->hme_dvmaxh != NULL)
-			dvma_unload(hmep->hme_dvmaxh, 2 * i,
-			    (uint_t)DONT_FLUSH);
-		/*
-		 * dma handle case.
-		 */
-		else if (hmep->hme_dmaxh) {
-			CHECK_DMA(hmep->hme_dmaxh[i]);
-			freeval = ddi_dma_unbind_handle(hmep->hme_dmaxh[i]);
-			if (freeval == DDI_FAILURE)
-				HME_FAULT_MSG1(hmep, SEVERITY_LOW, TX_MSG,
-				    "reclaim:ddi_dma_unbind_handle failure");
-			ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
-			hmep->hme_dmaxh[i] = NULL;
-		} else HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-		    "reclaim: expected dmaxh");
-
-		if (hmep->hme_tmblkp[i]) {
-			freeb(hmep->hme_tmblkp[i]);
-			hmep->hme_tmblkp[i] = NULL;
-		}
-
-		tmdp = NEXTTMD(hmep, tmdp);
+		reclaimed = B_TRUE;
+		hmep->hme_txreclaim++;
 	}
 
-	if (tmdp != hmep->hme_tcurp) {
+	if (reclaimed) {
 		/*
 		 * we could reclaim some TMDs so turn off interrupts
 		 */
-		hmep->hme_tcurp = tmdp;
 		if (hmep->hme_wantw) {
 			PUT_GLOBREG(intmask,
 			    HMEG_MASK_INTR | HMEG_MASK_TINT |
@@ -5607,75 +4866,53 @@ hme_fatal_err(struct hme *hmep, uint_t hmesbits)
 {
 
 	if (hmesbits & HMEG_STATUS_SLV_PAR_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus slave parity error");
 		hmep->hme_slvparerr++;
 	}
 
 	if (hmesbits & HMEG_STATUS_SLV_ERR_ACK) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus slave error ack");
 		hmep->hme_slverrack++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_TAG_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "tx tag error");
 		hmep->hme_txtagerr++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_PAR_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus tx parity error");
 		hmep->hme_txparerr++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_LATE_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus tx late error");
 		hmep->hme_txlaterr++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_ERR_ACK) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus tx error ack");
 		hmep->hme_txerrack++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_EOP_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "chained packet descriptor error");
 		hmep->hme_eoperr++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_TAG_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "rx tag error");
 		hmep->hme_rxtagerr++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_PAR_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus rx parity error");
 		hmep->hme_rxparerr++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_LATE_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus rx late error");
 		hmep->hme_rxlaterr++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_ERR_ACK) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-		    "sbus rx error ack");
 		hmep->hme_rxerrack++;
 		hmep->hme_ierrors++;
 	}
@@ -5689,46 +4926,33 @@ hme_nonfatal_err(struct hme *hmep, uint_t hmesbits)
 {
 
 	if (hmesbits & HMEG_STATUS_RX_DROP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "rx pkt dropped/no free descriptor error");
 		hmep->hme_missed++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_DEFTIMR_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "defer timer expired");
 		hmep->hme_defer_xmts++;
 	}
 
 	if (hmesbits & HMEG_STATUS_FSTCOLC_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "first collision counter expired");
 		hmep->hme_fstcol += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_LATCOLC_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "late collision");
 		hmep->hme_tlcol += 256;
 		hmep->hme_oerrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_EXCOLC_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "retry error");
 		hmep->hme_excol += 256;
 		hmep->hme_oerrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_NRMCOLC_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "first collision counter expired");
 		hmep->hme_coll += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_MXPKTSZ_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG, "babble");
 		hmep->hme_babl++;
 		hmep->hme_oerrors++;
 	}
@@ -5738,74 +4962,49 @@ hme_nonfatal_err(struct hme *hmep, uint_t hmesbits)
 	 * be reinitialized. Comments?
 	 */
 	if (hmesbits & HMEG_STATUS_TXFIFO_UNDR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "tx fifo underflow");
 		hmep->hme_uflo++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_SQE_TST_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "sqe test error");
 		hmep->hme_sqe_errors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RCV_CNT_EXP) {
 		if (hmep->hme_rxcv_enable) {
-			HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-			    "code violation counter expired");
 			hmep->hme_cvc += 256;
 		}
 	}
 
 	if (hmesbits & HMEG_STATUS_RXFIFO_OVFL) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "rx fifo overflow");
 		hmep->hme_oflo++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_LEN_CNT_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "length error counter expired");
 		hmep->hme_lenerr += 256;
 		hmep->hme_ierrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_ALN_CNT_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "rx framing/alignment error");
 		hmep->hme_align_errors += 256;
 		hmep->hme_ierrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_CRC_CNT_EXP) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-		    "rx crc error");
 		hmep->hme_fcs_errors += 256;
 		hmep->hme_ierrors += 256;
 	}
 }
 
 static mblk_t *
-hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp, uint32_t rflags)
+hmeread(struct hme *hmep, hmebuf_t *rbuf, uint32_t rflags)
 {
-	long rmdi;
-	ulong_t	dvma_rmdi;
-	mblk_t	*bp, *nbp;
-	volatile struct	hme_rmd	*nrmdp;
-	t_uscalar_t type;
-	uint32_t len;
-	int32_t	syncval;
-	long	nrmdi;
+	mblk_t		*bp;
+	uint32_t	len;
+	t_uscalar_t	type;
 
-	rmdi = rmdp - hmep->hme_rmdp;
-	bp = hmep->hme_rmblkp[rmdi];
-	nrmdp = NEXTRMD(hmep, hmep->hme_rlastp);
-	hmep->hme_rlastp = nrmdp;
-	nrmdi = nrmdp - hmep->hme_rmdp;
 	len = (rflags & HMERMD_BUFSIZE) >> HMERMD_BUFSIZE_SHIFT;
-	dvma_rmdi = HMERINDEX(rmdi);
 
 	/*
 	 * Check for short packet
@@ -5823,12 +5022,6 @@ hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp, uint32_t rflags)
 			hmep->hme_toolong_errors++;
 		}
 		hmep->hme_ierrors++;
-		CLONE_RMD(rmdp, nrmdp);
-		hmep->hme_rmblkp[nrmdi] = bp;
-		hmep->hme_rmblkp[rmdi] = NULL;
-		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-		    DDI_DMA_SYNC_FORDEV);
-		CHECK_IOPB();
 		return (NULL);
 	}
 
@@ -5836,256 +5029,52 @@ hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp, uint32_t rflags)
 	 * Sync the received buffer before looking at it.
 	 */
 
-	if (hmep->hme_dmarh[dvma_rmdi] == NULL) {
-		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, RX_MSG,
-		    "read: null handle!");
-		return (NULL);
-	}
-
-	syncval = ddi_dma_sync(hmep->hme_dmarh[dvma_rmdi], 0,
-	    len + HME_FSTBYTE_OFFSET, DDI_DMA_SYNC_FORCPU);
-	if (syncval == DDI_FAILURE)
-		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, RX_MSG,
-		    "read: ddi_dma_sync failure");
-	CHECK_DMA(hmep->hme_dmarh[dvma_rmdi]);
+	(void) ddi_dma_sync(rbuf->dmah, 0, 0, DDI_DMA_SYNC_FORKERNEL);
 
 	/*
 	 * copy the packet data and then recycle the descriptor.
 	 */
 
-	if ((nbp = allocb(len + HME_FSTBYTE_OFFSET, BPRI_HI)) != NULL) {
-
-		DB_TYPE(nbp) = M_DATA;
-		bcopy(bp->b_rptr, nbp->b_rptr, len + HME_FSTBYTE_OFFSET);
-
-		CLONE_RMD(rmdp, nrmdp);
-		hmep->hme_rmblkp[nrmdi] = bp;
-		hmep->hme_rmblkp[rmdi] = NULL;
-		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-		    DDI_DMA_SYNC_FORDEV);
-		CHECK_IOPB();
-
-		hmep->hme_ipackets++;
-
-		bp = nbp;
-
-		/*  Add the First Byte offset to the b_rptr and copy */
-		bp->b_rptr += HME_FSTBYTE_OFFSET;
-		bp->b_wptr = bp->b_rptr + len;
-
-		/*
-		 * update MIB II statistics
-		 */
-		BUMP_InNUcast(hmep, bp->b_rptr);
-		hmep->hme_rbytes += len;
-
-		type = get_ether_type(bp->b_rptr);
-
-		/*
-		 * TCP partial checksum in hardware
-		 */
-		if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {
-			uint16_t cksum = ~rflags & HMERMD_CKSUM;
-			uint_t end = len - sizeof (struct ether_header);
-			(void) hcksum_assoc(bp, NULL, NULL, 0,
-			    0, end, cksum, HCK_PARTIALCKSUM, 0);
-		}
-
-		return (bp);
-
-	} else {
-		CLONE_RMD(rmdp, nrmdp);
-		hmep->hme_rmblkp[nrmdi] = bp;
-		hmep->hme_rmblkp[rmdi] = NULL;
-		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-		    DDI_DMA_SYNC_FORDEV);
-		CHECK_IOPB();
+	if ((bp = allocb(len + HME_FSTBYTE_OFFSET, BPRI_HI)) == NULL) {
 
 		hmep->hme_allocbfail++;
 		hmep->hme_norcvbuf++;
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, RX_MSG,
-		    "allocb failure");
 
 		return (NULL);
 	}
-}
 
-static mblk_t *
-hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp, uint32_t rflags)
-{
-	long    rmdi;
-	mblk_t  *bp, *nbp;
-	uint_t		dvma_rmdi, dvma_nrmdi;
-	volatile	struct  hme_rmd *nrmdp;
-	t_uscalar_t	type;
-	uint32_t len;
-	uint16_t cksum;
-	long    nrmdi;
-	ddi_dma_cookie_t	c;
+	bcopy(rbuf->kaddr, bp->b_rptr, len + HME_FSTBYTE_OFFSET);
 
-	if (hmep->hme_dvmaxh == NULL) {
-		return (hmeread_dma(hmep, rmdp, rflags));
-	}
+	hmep->hme_ipackets++;
 
-	rmdi = rmdp - hmep->hme_rmdp;
-	dvma_rmdi = HMERINDEX(rmdi);
-	bp = hmep->hme_rmblkp[rmdi];
-	nrmdp = NEXTRMD(hmep, hmep->hme_rlastp);
-	hmep->hme_rlastp = nrmdp;
-	nrmdi = nrmdp - hmep->hme_rmdp;
-	dvma_nrmdi = HMERINDEX(rmdi);
-
-	ASSERT(dvma_rmdi == dvma_nrmdi);
+	/*  Add the First Byte offset to the b_rptr and copy */
+	bp->b_rptr += HME_FSTBYTE_OFFSET;
+	bp->b_wptr = bp->b_rptr + len;
 
 	/*
-	 * HMERMD_OWN has been cleared by the Happymeal hardware.
+	 * update MIB II statistics
 	 */
-	len = (rflags & HMERMD_BUFSIZE) >> HMERMD_BUFSIZE_SHIFT;
-	cksum = ~rflags & HMERMD_CKSUM;
+	BUMP_InNUcast(hmep, bp->b_rptr);
+	hmep->hme_rbytes += len;
+
+	type = get_ether_type(bp->b_rptr);
 
 	/*
-	 * check for overflow packet also. The processing is the
-	 * same for both the cases - reuse the buffer. Update the Buffer
-	 * overflow counter.
+	 * TCP partial checksum in hardware
 	 */
-	if ((len < ETHERMIN) || (rflags & HMERMD_OVFLOW) ||
-	    (len > (ETHERMAX + 4))) {
-		if (len < ETHERMIN)
-			hmep->hme_runt++;
-
-		else {
-			hmep->hme_buff++;
-			hmep->hme_toolong_errors++;
-		}
-
-		hmep->hme_ierrors++;
-		CLONE_RMD(rmdp, nrmdp);
-		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-		    DDI_DMA_SYNC_FORDEV);
-		CHECK_IOPB();
-		hmep->hme_rmblkp[nrmdi] = bp;
-		hmep->hme_rmblkp[rmdi] = NULL;
-		return (NULL);
+	if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {
+		uint16_t cksum = ~rflags & HMERMD_CKSUM;
+		uint_t end = len - sizeof (struct ether_header);
+		(void) hcksum_assoc(bp, NULL, NULL, 0,
+		    0, end, htons(cksum), HCK_PARTIALCKSUM, 0);
 	}
 
-	/*
-	 * Copy small incoming packets to reduce memory consumption. The
-	 * performance loss is compensated by the reduced overhead for
-	 * DMA setup. The extra bytes before the actual data are copied
-	 * to maintain the alignment of the payload.
-	 */
-	if ((len <= hme_rx_bcopy_max) &&
-	    ((nbp = allocb(len + HME_FSTBYTE_OFFSET, BPRI_LO)) != NULL)) {
-		dvma_sync(hmep->hme_dvmarh, 2 * dvma_rmdi,
-		    DDI_DMA_SYNC_FORKERNEL);
-
-		bcopy(bp->b_rptr, nbp->b_wptr, len + HME_FSTBYTE_OFFSET);
-		nbp->b_rptr += HME_FSTBYTE_OFFSET;
-		nbp->b_wptr = nbp->b_rptr + len;
-
-		CLONE_RMD(rmdp, nrmdp);
-		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-		    DDI_DMA_SYNC_FORDEV);
-		CHECK_IOPB();
-		hmep->hme_rmblkp[nrmdi] = bp;
-		hmep->hme_rmblkp[rmdi] = NULL;
-		hmep->hme_ipackets++;
-
-		bp = nbp;
-	} else {
-		dvma_unload(hmep->hme_dvmarh, 2 * dvma_rmdi,
-		    DDI_DMA_SYNC_FORKERNEL);
-
-		if ((nbp = hmeallocb(HMEBUFSIZE, BPRI_LO))) {
-			dvma_kaddr_load(hmep->hme_dvmarh,
-			    (caddr_t)nbp->b_rptr, HMEBUFSIZE, 2 * dvma_nrmdi,
-			    &c);
-
-			PUT_RMD(nrmdp, c.dmac_address);
-			HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-			    DDI_DMA_SYNC_FORDEV);
-			CHECK_IOPB();
-
-			hmep->hme_rmblkp[nrmdi] = nbp;
-			hmep->hme_rmblkp[rmdi] = NULL;
-			hmep->hme_ipackets++;
-
-			/*
-			 * Add the First Byte offset to the b_rptr
-			 */
-			bp->b_rptr += HME_FSTBYTE_OFFSET;
-			bp->b_wptr = bp->b_rptr + len;
-		} else {
-			dvma_kaddr_load(hmep->hme_dvmarh,
-			    (caddr_t)bp->b_rptr, HMEBUFSIZE, 2 * dvma_nrmdi,
-			    &c);
-			PUT_RMD(nrmdp, c.dmac_address);
-			hmep->hme_rmblkp[nrmdi] = bp;
-			hmep->hme_rmblkp[rmdi] = NULL;
-			HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-			    DDI_DMA_SYNC_FORDEV);
-			CHECK_IOPB();
-
-			hmep->hme_allocbfail++;
-			hmep->hme_norcvbuf++;
-			HME_DEBUG_MSG1(hmep, SEVERITY_LOW, RX_MSG,
-			    "allocb fail");
-
-			bp = NULL;
-		}
-	}
-
-	if (bp != NULL) {
-
-		/*
-		 * update MIB II statistics
-		 */
-		BUMP_InNUcast(hmep, bp->b_rptr);
-		hmep->hme_rbytes += len;
-
-		type = get_ether_type(bp->b_rptr);
-
-		/*
-		 * TCP partial checksum in hardware
-		 */
-		if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {
-			uint_t end = len - sizeof (struct ether_header);
-			(void) hcksum_assoc(bp, NULL, NULL, 0,
-			    0, end, cksum, HCK_PARTIALCKSUM, 0);
-		}
-	}
 	return (bp);
 }
 
-#ifdef  HME_DEBUG
 /*VARARGS*/
 static void
-hme_debug_msg(char *file, uint_t line, struct hme *hmep, uint_t severity,
-		msg_t type, char *fmt, ...)
-{
-	char	msg_buffer[255];
-	va_list	ap;
-
-#ifdef	HIGH_SEVERITY
-	if (severity != SEVERITY_HIGH)
-		return;
-#endif
-	if (hme_debug_level >= type) {
-		va_start(ap, fmt);
-		vsnprintf(msg_buffer, sizeof (msg_buffer), fmt, ap);
-
-		cmn_err(CE_CONT, "D: %s (%d): %s\n",
-		    msg_string[type], line, msg_buffer);
-		va_end(ap);
-	}
-}
-#endif
-
-/*VARARGS*/
-/* ARGSUSED */
-static void
-hme_fault_msg(char *file, uint_t line, struct hme *hmep, uint_t severity,
-		msg_t type, char *fmt, ...)
+hme_fault_msg(struct hme *hmep, uint_t severity, msg_t type, char *fmt, ...)
 {
 	char	msg_buffer[255];
 	va_list	ap;
@@ -6180,7 +5169,7 @@ hme_param_cleanup(struct hme *hmep)
 static int
 hme_param_get(queue_t *q, mblk_t *mp, caddr_t cp)
 {
-	hmeparam_t *hmepa = (hmeparam_t *)cp;
+	hmeparam_t *hmepa = (void *)cp;
 
 	(void) mi_mpprintf(mp, "%d", hmepa->hme_param_val);
 	return (0);
@@ -6246,14 +5235,14 @@ hme_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp)
 {
 	char *end;
 	size_t new_value;
-	hmeparam_t *hmepa = (hmeparam_t *)cp;
+	hmeparam_t *hmepa = (void *)cp;
 
 	new_value = mi_strtol(value, &end, 10);
 	if (end == value || new_value < hmepa->hme_param_min ||
 	    new_value > hmepa->hme_param_max) {
 			return (EINVAL);
 	}
-	hmepa->hme_param_val = new_value;
+	hmepa->hme_param_val = (uint32_t)new_value;
 	return (0);
 
 }
@@ -6264,7 +5253,7 @@ hme_nd_free(caddr_t *nd_pparam)
 {
 	ND	*nd;
 
-	if ((nd = (ND *)(*nd_pparam)) != NULL) {
+	if ((nd = (void *)(*nd_pparam)) != NULL) {
 		if (nd->nd_tbl)
 			mi_free((char *)nd->nd_tbl);
 		mi_free((char *)nd);
@@ -6286,8 +5275,8 @@ hme_nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp)
 	if (!nd_param)
 		return (B_FALSE);
 
-	nd = (ND *)nd_param;
-	iocp = (IOCP)mp->b_rptr;
+	nd = (void *)nd_param;
+	iocp = (void *)mp->b_rptr;
 	if ((iocp->ioc_count == 0) || !(mp1 = mp->b_cont)) {
 		mp->b_datap->db_type = M_IOCACK;
 		iocp->ioc_count = 0;
@@ -6400,8 +5389,8 @@ hme_nd_load(caddr_t *nd_pparam, char *name, pfi_t get_pfi,
 	if (!nd_pparam)
 		return (B_FALSE);
 
-	if ((nd = (ND *)(*nd_pparam)) == NULL) {
-		if ((nd = (ND *)mi_alloc(sizeof (ND), BPRI_MED)) == NULL)
+	if ((nd = (void *)(*nd_pparam)) == NULL) {
+		if ((nd = (void *)mi_alloc(sizeof (ND), BPRI_MED)) == NULL)
 			return (B_FALSE);
 		bzero(nd, sizeof (ND));
 		*nd_pparam = (caddr_t)nd;
@@ -6479,7 +5468,7 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 			hmep->hme_addrflags = HME_FACTADDR_PRESENT;
 			ether_bcopy(prop, &hmep->hme_factaddr);
 			HME_FAULT_MSG2(hmep, SEVERITY_NONE, DISPLAY_MSG,
-			    lether_addr_msg,
+			    "Local Ethernet address = %s",
 			    ether_sprintf(&hmep->hme_factaddr));
 		}
 		kmem_free(prop, prop_len);
@@ -6499,6 +5488,12 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 		kmem_free(prop, prop_len);
 	}
 
+#ifdef	__sparc
+	/*
+	 * On sparc, we might be able to use the mac address from the
+	 * system.  However, on all other systems, we need to use the
+	 * address from the PROM.
+	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, 0, "local-mac-address?",
 	    (caddr_t)&prop, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((strncmp("true", prop, prop_len) == 0) &&
@@ -6507,7 +5502,7 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 			ether_bcopy(&hmep->hme_factaddr, &hmep->hme_ouraddr);
 			kmem_free(prop, prop_len);
 			HME_FAULT_MSG1(hmep, SEVERITY_NONE, DISPLAY_MSG,
-			    lmac_addr_msg);
+			    "Using local MAC address");
 			return;
 		}
 		kmem_free(prop, prop_len);
@@ -6517,6 +5512,9 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 	 * Get the system ethernet address.
 	 */
 	(void) localetheraddr((struct ether_addr *)NULL, &hmep->hme_ouraddr);
+#else
+	ether_bcopy(&hmep->hme_factaddr, &hmep->hme_ouraddr);
+#endif
 }
 
 /* ARGSUSED */
@@ -6524,25 +5522,4 @@ static void
 hme_check_acc_handle(char *file, uint_t line, struct hme *hmep,
     ddi_acc_handle_t handle)
 {
-}
-
-/* ARGSUSED */
-static void
-hme_check_dma_handle(char *file, uint_t line, struct hme *hmep,
-    ddi_dma_handle_t handle)
-{
-}
-
-static void *
-hmeallocb(size_t size, uint_t pri)
-{
-	mblk_t  *mp;
-
-	if ((mp = allocb(size + 3 * HMEBURSTSIZE, pri)) == NULL) {
-		return (NULL);
-	}
-	mp->b_wptr = (uchar_t *)ROUNDUP2(mp->b_wptr, HMEBURSTSIZE);
-	mp->b_rptr = mp->b_wptr;
-
-	return (mp);
 }

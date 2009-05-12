@@ -41,7 +41,6 @@
 #	Section 1a: C object build rules
 #
 
-$(OBJS_DIR)/hme.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -50,7 +49,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/audio/drv/audiocs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/eri.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/eri/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -71,10 +69,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/targets/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/esp.o	:=	CFLAGS += -dalign
-$(OBJS_DIR)/fas.o	:=	CFLAGS += -dalign
-$(OBJS_DIR)/fas_callbacks.o :=	CFLAGS += -dalign
-$(OBJS_DIR)/sf.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/scsi/adapters/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

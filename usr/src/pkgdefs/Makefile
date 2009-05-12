@@ -58,7 +58,6 @@ sparc_SUBDIRS= \
 	SUNWfruip.u \
 	SUNWfsr \
 	SUNWfsu \
-	SUNWhmd    \
 	SUNWhmdu   \
 	SUNWidn.u \
 	SUNWifp  \
@@ -271,6 +270,7 @@ COMMON_SUBDIRS= \
 	SUNWhalr \
 	SUNWhea  \
 	SUNWhermon  \
+	SUNWhmd    \
 	SUNWhwdata \
 	SUNWhxge \
 	SUNWib \

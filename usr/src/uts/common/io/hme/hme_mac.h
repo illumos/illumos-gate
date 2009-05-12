@@ -19,18 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_HME_MAC_H
-#define	_SYS_HME_MAC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef	__cplusplus
-extern "C" {
-#endif
+#ifndef	HME_MAC_H
+#define	HME_MAC_H
 
 /*
  * HOST MEMORY DATA STRUCTURES
@@ -44,8 +38,8 @@ extern "C" {
  * The transmit and receiver Descriptor Rings are organized as "wrap-around
  * descriptors of programmable size.
  */
-#define	HME_TMDMAX	(256)	/* Transmit descriptor ring size */
-#define	HME_RMDMAX	(256)	/* Receive descriptor ring size */
+#define	HME_TMDMAX	(64)	/* Transmit descriptor ring size */
+#define	HME_RMDMAX	(64)	/* Receive descriptor ring size */
 
 /* Transmit descriptor structure */
 
@@ -104,9 +98,6 @@ struct hme_rmd {
 					/* 1 - owned by hardware */
 
 #define	HMERMD_BUFSIZE_SHIFT 16	/* buffer/data size bit position */
-
-/* The free receive data buffers must be 64-byte aligned */
-#define	HME_RMD_BUFALIGN	64
 
 /* ************************************************************************* */
 
@@ -276,11 +267,6 @@ struct hme_etx {
     uint_t txbuf_ptr;		/* Transmit Data Buffer Pointer */
 };
 
-struct hme_txfifo_aperture {
-    uint_t txfifo_loapert[512];	/* TxFIFO Lower Aperture */
-    uint_t txfifo_hiapert[512];	/* TxFIFO Higher Aperture */
-};
-
 /*
  * ETX Transmit Pending Command Register - RW
  * This 1-bit command must be issued by the software for every packet that the
@@ -343,11 +329,6 @@ struct hme_erx {
     uint_t rxfifo_rd_ptr;	/* RxFIFO Read pointer */
     uint_t rxfifo_pkt_cnt;	/* RxFIFO Packet Counter */
     uint_t state_mach;		/* ERX State Machine Register */
-};
-
-struct hme_rxfifo_aperture {
-    uint_t rxfifo_loapert[512];	/* RxFIFO Lower Aperture */
-    uint_t rxfifo_hiapert[512];	/* RxFIFO Higher Aperture */
 };
 
 /*
@@ -669,8 +650,4 @@ struct hme_mif {
 		} \
 	}
 
-#ifdef	__cplusplus
-}
-#endif
-
-#endif	/* _SYS_HME_MAC_H */
+#endif	/* HME_MAC_H */

@@ -63,8 +63,6 @@ FD_OBJS += fd.o
 
 MS_OBJS +=	ms.o
 
-HME_OBJS +=	hme.o
-
 ERI_OBJS +=	eri.o
 
 QFE_OBJS +=	qfe.o

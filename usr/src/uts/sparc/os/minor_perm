@@ -9,7 +9,6 @@ pcelx:* 0666 root sys
 clone:ibd 0666 root sys
 ibd:* 0666 root sys
 clone:eri 0666 root sys
-clone:hme 0666 root sys
 arp:arp 0666 root sys
 icmp:icmp 0666 root sys
 icmp6:icmp6 0666 root sys

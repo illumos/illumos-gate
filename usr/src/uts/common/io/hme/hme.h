@@ -19,42 +19,24 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_HME_H
 #define	_SYS_HME_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#define	HME_IOC		0x60201ae1	/* random */
-typedef struct {
-	int		cmd;
-	int		reserved[4];
-} hme_ioc_hdr_t;
-
-/* cmd */
-#define	HME_IOC_GET_SPEED	0x100
-#define	HME_IOC_SET_SPEED	0x110
 
 /* mode */
 #define	HME_AUTO_SPEED	0
 #define	HME_FORCE_SPEED	1
 
 /* speed */
-#define	HME_SPEED_10		10
+#define	HME_SPEED_10	10
 #define	HME_SPEED_100	100
-
-typedef struct {
-	hme_ioc_hdr_t	hdr;
-	int		mode;
-	int		speed;
-} hme_ioc_cmd_t;
 
 /* half-duplex or full-duplex mode */
 
@@ -161,26 +143,6 @@ static hmeparam_t	hme_param_arr[] = {
  * ordered on minor device number.
  */
 
-/*
- * Maximum number of receive descriptors posted to the chip.
- */
-#define	HMERPENDING	64
-
-/*
- * Maximum number of transmit descriptors for lazy reclaim.
- */
-#define	HMETPENDING	64
-
-/*
- * Return the address of an adjacent descriptor in the given ring.
- */
-#define	NEXTRMD(hmep, rmdp)	(((rmdp) + 1) == (hmep)->hme_rmdlimp	\
-	? (hmep)->hme_rmdp : ((rmdp) + 1))
-#define	NEXTTMD(hmep, tmdp)	(((tmdp) + 1) == (hmep)->hme_tmdlimp	\
-	? (hmep)->hme_tmdp : ((tmdp) + 1))
-#define	PREVTMD(hmep, tmdp)	((tmdp) == (hmep)->hme_tmdp		\
-	? ((hmep)->hme_tmdlimp - 1) : ((tmdp) - 1))
-
 #define	MSECOND(t)	t
 #define	SECOND(t)	t*1000
 #define	HME_TICKS	MSECOND(100)
@@ -225,6 +187,13 @@ struct	hmesave {
 	ulong_t		hme_starts;
 	uint32_t	hme_opackets;
 };
+
+typedef struct {
+	ddi_dma_handle_t	dmah;
+	ddi_acc_handle_t	acch;
+	caddr_t			kaddr;
+	uint32_t		paddr;
+} hmebuf_t;
 
 /*
  * HME Device Channel instance state information.
@@ -303,16 +272,18 @@ struct	hme {
 	boolean_t		hme_wantw;	/* xmit: out of resources */
 	boolean_t		hme_started;	/* mac layer started */
 
+	uint8_t			hme_devno;
+
 	uint16_t		hme_ladrf[4];	/* 64 bit multicast filter */
 	uint32_t		hme_ladrf_refcnt[64];
 	boolean_t		hme_promisc;
 	uint32_t		hme_multi;	/* refcount on mcast addrs */
 
-	volatile struct	hme_global	*hme_globregp;	/* HME global regs */
-	volatile struct	hme_etx		*hme_etxregp;	/* HME ETX regs */
-	volatile struct	hme_erx		*hme_erxregp;	/* HME ERX regs */
-	volatile struct	hme_bmac	*hme_bmacregp;	/* BigMAC registers */
-	volatile struct	hme_mif		*hme_mifregp;	/* HME transceiver */
+	struct	hme_global	*hme_globregp;	/* HME global regs */
+	struct	hme_etx		*hme_etxregp;	/* HME ETX regs */
+	struct	hme_erx		*hme_erxregp;	/* HME ERX regs */
+	struct	hme_bmac	*hme_bmacregp;	/* BigMAC registers */
+	struct	hme_mif		*hme_mifregp;	/* HME transceiver */
 	unsigned char		*hme_romp;	/* fcode rom pointer */
 
 	kmutex_t	hme_xmitlock;		/* protect xmit-side fields */
@@ -321,16 +292,24 @@ struct	hme {
 	ddi_iblock_cookie_t	hme_cookie;	/* interrupt cookie */
 
 	struct	hme_rmd	*hme_rmdp;	/* receive descriptor ring start */
-	struct	hme_rmd	*hme_rmdlimp;	/* receive descriptor ring end */
 	struct	hme_tmd	*hme_tmdp;	/* transmit descriptor ring start */
-	struct	hme_tmd	*hme_tmdlimp;	/* transmit descriptor ring end */
-	volatile struct	hme_rmd	*hme_rnextp;	/* next chip rmd */
-	volatile struct	hme_rmd	*hme_rlastp;	/* last free rmd */
-	volatile struct	hme_tmd	*hme_tnextp;	/* next free tmd */
-	volatile struct	hme_tmd	*hme_tcurp;	/* next tmd to reclaim (used) */
 
-	mblk_t	*hme_tmblkp[HME_TMDMAX];	/* hmebuf associated with TMD */
-	mblk_t	*hme_rmblkp[HME_RMDMAX];	/* hmebuf associated with RMD */
+	ddi_dma_handle_t	hme_rmd_dmah;
+	ddi_acc_handle_t	hme_rmd_acch;
+	caddr_t			hme_rmd_kaddr;
+	uint32_t		hme_rmd_paddr;
+
+	ddi_dma_handle_t	hme_tmd_dmah;
+	ddi_acc_handle_t	hme_tmd_acch;
+	caddr_t			hme_tmd_kaddr;
+	uint32_t		hme_tmd_paddr;
+
+	uint64_t		hme_rxindex;
+	uint64_t		hme_txindex;
+	uint64_t		hme_txreclaim;
+
+	hmebuf_t		*hme_tbuf;	/* hmebuf associated with TMD */
+	hmebuf_t		*hme_rbuf;	/* hmebuf associated with RMD */
 
 	ddi_device_acc_attr_t	hme_dev_attr;
 	ddi_acc_handle_t	hme_globregh;   /* HME global regs */
@@ -338,9 +317,6 @@ struct	hme {
 	ddi_acc_handle_t	hme_erxregh;    /* HME ERX regs */
 	ddi_acc_handle_t	hme_bmacregh;   /* BigMAC registers */
 	ddi_acc_handle_t	hme_mifregh;    /* HME transceiver */
-	ddi_dma_cookie_t	hme_md_c;	/* trmd dma cookie */
-	ddi_acc_handle_t	hme_mdm_h;	/* trmd memory handle */
-	ddi_dma_handle_t	hme_md_h;	/* trmdp dma handle */
 	ddi_acc_handle_t	hme_romh;	/* rom handle */
 
 	ddi_acc_handle_t	pci_config_handle; /* HME PCI config */
@@ -351,21 +327,7 @@ struct	hme {
 	 */
 	ddi_dma_handle_t	hme_iopbhandle;
 	ulong_t			hme_iopbkbase;
-	ulong_t			hme_iopbiobase;
-
-	/*
-	 * these are handles for the dvma resources reserved
-	 * by dvma_reserve
-	 */
-	ddi_dma_handle_t	hme_dvmarh;	/* dvma recv handle */
-	ddi_dma_handle_t	hme_dvmaxh;	/* dvma xmit handle */
-
-	/*
-	 * these are used if dvma reserve fails, and we have to fall
-	 * back on the older ddi_dma_addr_setup routines
-	 */
-	ddi_dma_handle_t	*hme_dmarh;
-	ddi_dma_handle_t	*hme_dmaxh;
+	uint32_t		hme_iopbiobase;
 
 	kstat_t	*hme_ksp;	/* kstat pointer */
 	kstat_t	*hme_intrstats;	/* kstat interrupt counter */
@@ -437,10 +399,6 @@ struct	hme {
 	 * Debuging kstats
 	 */
 	uint32_t inits;
-	uint32_t rxinits;
-	uint32_t txinits;
-	uint32_t dmarh_init;
-	uint32_t dmaxh_init;
 	uint32_t phyfail;
 	uint32_t asic_rev;
 };
@@ -480,10 +438,6 @@ struct	hmekstat {
 	struct kstat_named	hk_norbufs;	/* rx buf errors */
 
 	struct kstat_named	hk_inits;		/* global inits */
-	struct kstat_named	hk_rxinits;		/* recv inits */
-	struct kstat_named	hk_txinits;		/* xmit inits */
-	struct	kstat_named	hk_dmarh_inits;	/* dma read handle inits */
-	struct	kstat_named	hk_dmaxh_inits;	/* dma xmit handle inits */
 	struct	kstat_named	hk_phyfail;		/* phy failures */
 
 	struct	kstat_named	hk_asic_rev;		/* asic_rev */
