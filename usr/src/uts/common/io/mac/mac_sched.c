@@ -296,7 +296,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 	ASSERT(MUTEX_HELD(&(mac_srs)->srs_lock));			\
 	if (!((mac_srs)->srs_state & SRS_PROC) &&			\
 		(mac_srs)->srs_tid == NULL) {				\
-		if (mac_latency_optimize ||				\
+		if (((mac_srs)->srs_state & SRS_LATENCY_OPT) ||		\
 			(mac_srs_worker_wakeup_ticks == 0))		\
 			cv_signal(&(mac_srs)->srs_async);		\
 		else							\

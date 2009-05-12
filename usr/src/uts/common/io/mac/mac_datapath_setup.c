@@ -1928,8 +1928,9 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		    (srs_rx->sr_lowat >> 1) ? mac_soft_ring_poll_thres :
 		    (srs_rx->sr_lowat >> 1);
 		if (mac_latency_optimize)
-			mac_srs->srs_state |=
-			    (SRS_LATENCY_OPT|SRS_SOFTRING_QUEUE);
+			mac_srs->srs_state |= SRS_LATENCY_OPT;
+		else
+			mac_srs->srs_state |= SRS_SOFTRING_QUEUE;
 	}
 
 	mac_srs->srs_worker = thread_create(NULL, 0,
