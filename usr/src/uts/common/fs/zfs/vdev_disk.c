@@ -487,6 +487,7 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 	size = P2ALIGN_TYPED(s, sizeof (vdev_label_t), uint64_t);
 	label = kmem_alloc(sizeof (vdev_label_t), KM_SLEEP);
 
+	*config = NULL;
 	for (l = 0; l < VDEV_LABELS; l++) {
 		uint64_t offset, state, txg = 0;
 
@@ -521,6 +522,8 @@ vdev_disk_read_rootlabel(char *devpath, char *devid, nvlist_t **config)
 
 	kmem_free(label, sizeof (vdev_label_t));
 	(void) ldi_close(vd_lh, FREAD, kcred);
+	if (*config == NULL)
+		error = EIDRM;
 
 	return (error);
 }

@@ -857,6 +857,7 @@ get_line_from_config (char *cmdline, int maxlen, int read_from_file)
   return pos;
 }
 
+extern int findroot_func (char *arg, int flags);
 
 /* This is the starting function in C.  */
 void
@@ -946,11 +947,21 @@ cmain (void)
 	      if (! is_opened)
 		{
 		  is_opened = grub_open (config_file);
-		  errnum = ERR_NONE;
 		}
+	      /*
+	       * we're not going to get very far if we weren't able to
+	       * open the config file and this isn't a valid filesystem,
+	       * so look for the config file somewhere else
+	       */
+	      if (!is_opened && errnum == ERR_FSYS_MOUNT &&
+		(findroot_func(config_file, 0) == 0)) {
+		  is_opened = grub_open (config_file);
+	      }
 
-	      if (! is_opened)
+	      if (! is_opened) {
+	        errnum = ERR_NONE;
 		break;
+	      }
 
 	      /* This is necessary, because the menu must be overrided.  */
 	      reset ();

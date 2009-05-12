@@ -2390,9 +2390,11 @@ spa_get_rootconf(char *devpath, char *devid, nvlist_t **bestconf)
 
 		cpath = NULL;
 		cdevid = NULL;
-		if (nvlist_lookup_string(child[c], ZPOOL_CONFIG_PHYS_PATH,
-		    &cpath) != 0 && nvlist_lookup_string(child[c],
-		    ZPOOL_CONFIG_DEVID, &cdevid) != 0)
+		(void) nvlist_lookup_string(child[c], ZPOOL_CONFIG_PHYS_PATH,
+		    &cpath);
+		(void) nvlist_lookup_string(child[c], ZPOOL_CONFIG_DEVID,
+		    &cdevid);
+		if (cpath == NULL && cdevid == NULL)
 			return (EINVAL);
 		if ((spa_check_rootconf(cpath, cdevid, NULL,
 		    &tmptxg) == 0) && (tmptxg > txg)) {
