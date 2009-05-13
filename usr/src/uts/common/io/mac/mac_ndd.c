@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +116,7 @@ mac_ndd_get_names(mac_impl_t *mip, mblk_t *mp)
 			    0, mip->mi_type->mt_mapping[i].mp_valsize,
 			    &value, &permflags);
 			if (status != 0)
-				return (-1);
+				continue;
 		}
 		if (!mac_add_name(mp, mip->mi_type->mt_mapping[i].mp_name,
 		    permflags))
