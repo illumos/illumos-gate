@@ -1126,9 +1126,21 @@ scsi_hba_attach_setup(
 	 * not specify SCSI_HBA_HBA in its scsi_hba_attach_setup call. An
 	 * HBA driver that does not manage iports should not set SCSA_HBA_HBA.
 	 */
-	if (!(tran->tran_hba_flags & SCSI_HBA_HBA) &&
-	    (scsa_tran_setup(self, tran) != DDI_SUCCESS))
-		goto fail;
+	if (tran->tran_hba_flags & SCSI_HBA_HBA) {
+		/*
+		 * Set the 'ddi-config-driver-node' property on the nexus
+		 * node that notify attach_driver_nodes() to configure all
+		 * immediate children so that nodes which bind to the
+		 * same driver as parent are able to be added into per-driver
+		 * list.
+		 */
+		if (ndi_prop_create_boolean(DDI_DEV_T_NONE,
+		    self, "ddi-config-driver-node") != DDI_PROP_SUCCESS)
+			goto fail;
+	} else {
+		if (scsa_tran_setup(self, tran) != DDI_SUCCESS)
+			goto fail;
+	}
 
 	return (DDI_SUCCESS);
 

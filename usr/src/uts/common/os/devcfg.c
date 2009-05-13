@@ -6866,6 +6866,7 @@ attach_driver_nodes(major_t major)
 	struct devnames *dnp;
 	dev_info_t *dip;
 	int error = DDI_FAILURE;
+	int circ;
 
 	dnp = &devnamesp[major];
 	LOCK_DEV_OPS(&dnp->dn_lock);
@@ -6875,6 +6876,19 @@ attach_driver_nodes(major_t major)
 		UNLOCK_DEV_OPS(&dnp->dn_lock);
 		if (i_ddi_attach_node_hierarchy(dip) == DDI_SUCCESS)
 			error = DDI_SUCCESS;
+		/*
+		 * Set the 'ddi-config-driver-node' property on a nexus
+		 * node to cause attach_driver_nodes() to configure all
+		 * immediate children of the nexus. This property should
+		 * be set on nodes with immediate children that bind to
+		 * the same driver as parent.
+		 */
+		if ((error == DDI_SUCCESS) && (ddi_prop_exists(DDI_DEV_T_ANY,
+		    dip, DDI_PROP_DONTPASS, "ddi-config-driver-node"))) {
+			ndi_devi_enter(dip, &circ);
+			(void) ndi_devi_config(dip, NDI_NO_EVENT);
+			ndi_devi_exit(dip, circ);
+		}
 		LOCK_DEV_OPS(&dnp->dn_lock);
 		ndi_rele_devi(dip);
 		dip = ddi_get_next(dip);
