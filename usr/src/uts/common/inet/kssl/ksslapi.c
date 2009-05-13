@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -83,6 +81,7 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 	kssl_endpt_type_t ret;
 	kssl_entry_t *ep;
 	sin_t *sin;
+	sin6_t *sin6;
 	struct T_bind_req *tbr;
 	ipaddr_t v4addr;
 	in_port_t in_port;
@@ -95,18 +94,28 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 
 	ret = KSSL_NO_PROXY;
 
+	sin = (sin_t *)(bindmp->b_rptr + tbr->ADDR_offset);
 
 	switch (tbr->ADDR_length) {
 	case sizeof (sin_t):
-		sin = (sin_t *)(bindmp->b_rptr + tbr->ADDR_length);
 		in_port = ntohs(sin->sin_port);
 		v4addr = sin->sin_addr.s_addr;
 		break;
 
 	case sizeof (sin6_t):
-		/* Future support of IPv6 goes here */
+		/*
+		 * Handle any IPv4-mapped IPv6 address for now.
+		 * Support of IPv6 will be added later.
+		 */
+		sin6 = (sin6_t *)sin;
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+			in_port = ntohs(sin6->sin6_port);
+			IN6_V4MAPPED_TO_IPADDR(&sin6->sin6_addr, v4addr);
+			break;
+		}
+
+		/* fallthrough for normal IPv6 address */
 	default:
-		/* Should ASSERT() here? */
 		return (ret);
 	}
 
