@@ -31,7 +31,8 @@ MACHDATAFILES += i.sdconf
 CLOBBERFILES += $(MACHDATAFILES)
 
 LICENSEFILES += $(OSBL)
-LICENSEFILES += ../../../closed/uts/intel/io/iprb/THIRDPARTYLICENSE
+$(CLOSED_BUILD)LICENSEFILES += \
+	../../../closed/uts/intel/io/iprb/THIRDPARTYLICENSE
 
 .KEEP_STATE:
 
