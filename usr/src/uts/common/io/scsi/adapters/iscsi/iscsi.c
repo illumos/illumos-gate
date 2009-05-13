@@ -1729,6 +1729,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		kmem_free(ils, sizeof (*ils));
 		if (rtn != 0) {
 			kmem_free(initiator_node_name, ISCSI_MAX_NAME_LEN);
+			initiator_node_name = NULL;
 			break;
 		}
 
@@ -1810,12 +1811,12 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			    isns_scn_callback);
 			iscsid_do_isns_query(ihp);
 
-			/* Done using the name and alias - free them. */
-			kmem_free(initiator_node_name, ISCSI_MAX_NAME_LEN);
-			initiator_node_name = NULL;
 			kmem_free(initiator_node_alias, ISCSI_MAX_NAME_LEN);
 			initiator_node_alias = NULL;
 		}
+
+		kmem_free(initiator_node_name, ISCSI_MAX_NAME_LEN);
+		initiator_node_name = NULL;
 		break;
 
 	/*

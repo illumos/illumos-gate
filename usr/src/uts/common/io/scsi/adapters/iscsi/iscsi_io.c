@@ -428,10 +428,11 @@ static void
 iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
     uint8_t *data)
 {
-	uint32_t		dlength	= 0;
+	int32_t			dlength		= 0;
 	struct scsi_arq_status	*arqstat	= NULL;
 	size_t			senselen	= 0;
-	int			statuslen	= 0;
+	int32_t			statuslen	= 0;
+	int32_t			senselen_to	= 0;
 	struct scsi_pkt		*pkt;
 
 	pkt = icmdp->cmd_un.scsi.pkt;
@@ -512,7 +513,6 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 			    STATUS_GOOD;
 
 			arqstat->sts_rqpkt_reason = CMD_CMPLT;
-
 			statuslen = icmdp->cmd_un.scsi.statuslen;
 
 			if (senselen == 0) {
@@ -533,9 +533,13 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 				pkt->pkt_state |= STATE_XARQ_DONE;
 			}
 
+			senselen_to =  pkt->pkt_scblen -
+			    sizeof (struct scsi_arq_status) +
+			    sizeof (struct scsi_extended_sense);
+
 			/* copy auto request sense */
-			dlength = min(senselen, statuslen);
-			if (dlength) {
+			dlength = min(senselen, senselen_to);
+			if (dlength > 0) {
 				bcopy(&data[2], (uchar_t *)&arqstat->
 				    sts_sensedata, dlength);
 			}
