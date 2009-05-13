@@ -1336,7 +1336,7 @@ extern void redo_register_provider(kcf_provider_desc_t *);
 extern void kcf_rnd_init();
 extern boolean_t kcf_rngprov_check(void);
 extern int kcf_rnd_get_pseudo_bytes(uint8_t *, size_t);
-extern int kcf_rnd_get_bytes(uint8_t *, size_t, boolean_t, boolean_t);
+extern int kcf_rnd_get_bytes(uint8_t *, size_t, boolean_t);
 extern int random_add_pseudo_entropy(uint8_t *, size_t, uint_t);
 extern void kcf_rnd_chpoll(short, int, short *, struct pollhead **);
 extern void kcf_rnd_schedule_timeout(boolean_t);

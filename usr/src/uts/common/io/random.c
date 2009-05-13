@@ -239,7 +239,7 @@ rnd_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		switch (devno) {
 		case DEVRANDOM:
 			error = kcf_rnd_get_bytes(random_bytes, len,
-			    uiop->uio_fmode & (FNDELAY|FNONBLOCK), B_TRUE);
+			    uiop->uio_fmode & (FNDELAY|FNONBLOCK));
 			break;
 		case DEVURANDOM:
 			error = kcf_rnd_get_pseudo_bytes(random_bytes, len);

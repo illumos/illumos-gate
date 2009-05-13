@@ -195,15 +195,8 @@ rngprov_seed(uint8_t *buf, int len, uint_t entropy_est, uint32_t flags)
 	}
 }
 
-/* Boot-time tunable for experimentation. */
-int kcf_limit_hwrng = 1;
-
-
 /*
  * This routine is called for blocking reads.
- *
- * The argument from_user_api indicates whether the caller is
- * from userland coming via the /dev/random driver.
  *
  * The argument is_taskq_thr indicates whether the caller is
  * the taskq thread dispatched by the timeout handler routine.
@@ -217,8 +210,7 @@ int kcf_limit_hwrng = 1;
  * if no provider is found. ptr and need are unchanged.
  */
 static int
-rngprov_getbytes(uint8_t *ptr, size_t need, boolean_t from_user_api,
-    boolean_t is_taskq_thr)
+rngprov_getbytes(uint8_t *ptr, size_t need, boolean_t is_taskq_thr)
 {
 	int rv;
 	int prov_cnt = 0;
@@ -231,19 +223,6 @@ rngprov_getbytes(uint8_t *ptr, size_t need, boolean_t from_user_api,
 	    list, CRYPTO_FG_RANDOM, B_FALSE, 0)) != NULL) {
 
 		prov_cnt++;
-		/*
-		 * Typically a hardware RNG is a multi-purpose
-		 * crypto card and hence we do not want to overload the card
-		 * just for random numbers. The following check is to prevent
-		 * a user process from hogging the hardware RNG. Note that we
-		 * still use the hardware RNG from the periodically run
-		 * taskq thread.
-		 */
-		if (pd->pd_prov_type == CRYPTO_HW_PROVIDER && from_user_api &&
-		    kcf_limit_hwrng == 1) {
-			ASSERT(is_taskq_thr == B_FALSE);
-			goto try_next;
-		}
 
 		KCF_WRAP_RANDOM_OPS_PARAMS(&params, KCF_OP_RANDOM_GENERATE,
 		    pd->pd_sid, ptr, need, 0, 0);
@@ -261,7 +240,6 @@ rngprov_getbytes(uint8_t *ptr, size_t need, boolean_t from_user_api,
 		}
 
 		if (is_taskq_thr || rv != CRYPTO_SUCCESS) {
-try_next:
 			/* Add pd to the linked list of providers tried. */
 			if (kcf_insert_triedlist(&list, pd, KM_SLEEP) == NULL) {
 				KCF_PROV_REFRELE(pd);
@@ -307,7 +285,7 @@ notify_done(void *arg, int rv)
  * if no provider is found. ptr and len are unchanged.
  */
 static int
-rngprov_getbytes_nblk(uint8_t *ptr, size_t len, boolean_t from_user_api)
+rngprov_getbytes_nblk(uint8_t *ptr, size_t len)
 {
 	int rv, blen, total_bytes;
 	uchar_t *rndbuf;
@@ -328,10 +306,6 @@ rngprov_getbytes_nblk(uint8_t *ptr, size_t len, boolean_t from_user_api)
 		prov_cnt ++;
 		switch (pd->pd_prov_type) {
 		case CRYPTO_HW_PROVIDER:
-			/* See comments in rngprov_getbytes() */
-			if (from_user_api && kcf_limit_hwrng == 1)
-				goto try_next;
-
 			/*
 			 * We have to allocate a buffer here as we can not
 			 * assume that the input buffer will remain valid
@@ -405,7 +379,6 @@ rngprov_getbytes_nblk(uint8_t *ptr, size_t len, boolean_t from_user_api)
 		}
 
 		if (rv != CRYPTO_SUCCESS) {
-try_next:
 			/* Add pd to the linked list of providers tried. */
 			if (kcf_insert_triedlist(&list, pd, KM_NOSLEEP) ==
 			    NULL) {
@@ -438,7 +411,7 @@ rngprov_task(void *arg)
 	uchar_t tbuf[MAXEXTRACTBYTES];
 
 	ASSERT(len <= MAXEXTRACTBYTES);
-	(void) rngprov_getbytes(tbuf, len, B_FALSE, B_TRUE);
+	(void) rngprov_getbytes(tbuf, len, B_TRUE);
 }
 
 /*
@@ -450,8 +423,7 @@ rngprov_task(void *arg)
  * releases the lock before return).
  */
 static int
-rnd_get_bytes(uint8_t *ptr, size_t len, extract_type_t how,
-    boolean_t from_user_api)
+rnd_get_bytes(uint8_t *ptr, size_t len, extract_type_t how)
 {
 	int bytes;
 	size_t got;
@@ -470,8 +442,7 @@ rnd_get_bytes(uint8_t *ptr, size_t len, extract_type_t how,
 
 	switch (how) {
 	case BLOCKING_EXTRACT:
-		if ((got = rngprov_getbytes(ptr, len, from_user_api,
-		    B_FALSE)) == -1)
+		if ((got = rngprov_getbytes(ptr, len, B_FALSE)) == -1)
 			break;	/* No provider found */
 
 		if (got == len)
@@ -482,8 +453,7 @@ rnd_get_bytes(uint8_t *ptr, size_t len, extract_type_t how,
 
 	case NONBLOCK_EXTRACT:
 	case ALWAYS_EXTRACT:
-		if ((got = rngprov_getbytes_nblk(ptr, len,
-		    from_user_api)) == -1) {
+		if ((got = rngprov_getbytes_nblk(ptr, len)) == -1) {
 			/* No provider found */
 			if (how == NONBLOCK_EXTRACT) {
 				return (EAGAIN);
@@ -544,15 +514,14 @@ rnd_get_bytes(uint8_t *ptr, size_t len, extract_type_t how,
 }
 
 int
-kcf_rnd_get_bytes(uint8_t *ptr, size_t len, boolean_t noblock,
-    boolean_t from_user_api)
+kcf_rnd_get_bytes(uint8_t *ptr, size_t len, boolean_t noblock)
 {
 	extract_type_t how;
 	int error;
 
 	how = noblock ? NONBLOCK_EXTRACT : BLOCKING_EXTRACT;
 	mutex_enter(&rndpool_lock);
-	if ((error = rnd_get_bytes(ptr, len, how, from_user_api)) != 0)
+	if ((error = rnd_get_bytes(ptr, len, how)) != 0)
 		return (error);
 
 	BUMP_RND_STATS(rs_rndOut, len);
@@ -660,7 +629,7 @@ rnd_generate_pseudo_bytes(rndmag_pad_t *rmp, uint8_t *ptr, size_t len)
 
 			/* Get a new chunk of entropy */
 			(void) rnd_get_bytes((uint8_t *)rmp->rm_mag.rm_key,
-			    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
+			    HMAC_KEYSIZE, ALWAYS_EXTRACT);
 
 			rmp->rm_mag.rm_olimit = PRNG_MAXOBLOCKS/2;
 			rmp->rm_mag.rm_ofuzz = PRNG_MAXOBLOCKS/4;
@@ -840,17 +809,17 @@ rnd_alloc_magazines()
 		 * be used, but shall be saved for comparison.
 		 */
 		(void) rnd_get_bytes(discard_buf,
-		    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
+		    HMAC_KEYSIZE, ALWAYS_EXTRACT);
 		bcopy(discard_buf, rmp->rm_mag.rm_previous,
 		    HMAC_KEYSIZE);
 		/* rnd_get_bytes() will call mutex_exit(&rndpool_lock) */
 		mutex_enter(&rndpool_lock);
 		(void) rnd_get_bytes((uint8_t *)rmp->rm_mag.rm_key,
-		    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
+		    HMAC_KEYSIZE, ALWAYS_EXTRACT);
 		/* rnd_get_bytes() will call mutex_exit(&rndpool_lock) */
 		mutex_enter(&rndpool_lock);
 		(void) rnd_get_bytes((uint8_t *)rmp->rm_mag.rm_seed,
-		    HMAC_KEYSIZE, ALWAYS_EXTRACT, B_FALSE);
+		    HMAC_KEYSIZE, ALWAYS_EXTRACT);
 	}
 }
 
@@ -1050,5 +1019,5 @@ random_get_bytes(uint8_t *ptr, size_t len)
 
 	if (len < 1)
 		return (0);
-	return (kcf_rnd_get_bytes(ptr, len, B_TRUE, B_FALSE));
+	return (kcf_rnd_get_bytes(ptr, len, B_TRUE));
 }
