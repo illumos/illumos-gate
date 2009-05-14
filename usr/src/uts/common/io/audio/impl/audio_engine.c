@@ -607,6 +607,15 @@ again:
 	e->e_flags |= (ENGINE_OPEN | (flags & (ENGINE_OUTPUT | ENGINE_INPUT)));
 
 	/*
+	 * Start the output callback to populate the engine on
+	 * startup.  This avoids a false underrun when we're first
+	 * starting up.
+	 */
+	if (flags & ENGINE_OUTPUT) {
+		auimpl_output_callback(e);
+	}
+
+	/*
 	 * Start the engine up now.
 	 *
 	 * AC3: Note that this will need to be modified for AC3, since
