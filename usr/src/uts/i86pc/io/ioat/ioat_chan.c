@@ -1024,9 +1024,13 @@ ioat_cmd_post(void *private, dcopy_cmd_t cmd)
 static void
 ioat_cmd_post_dca(ioat_channel_ring_t *ring, uint32_t dca_id)
 {
+	ioat_chan_dca_desc_t *saved_prev;
 	ioat_chan_dca_desc_t *desc;
 	ioat_chan_dca_desc_t *prev;
 	ioat_channel_t channel;
+	uint64_t next_desc_phys;
+	off_t prev_offset;
+	off_t next_offset;
 
 
 	channel = ring->cr_chan;
@@ -1051,19 +1055,14 @@ ioat_cmd_post_dca(ioat_channel_ring_t *ring, uint32_t dca_id)
 		desc->dd_cntx = dca_id;
 	}
 
-	/* Put the descriptors physical address in the previous descriptor */
-	/*LINTED:E_TRUE_LOGICAL_EXPR*/
-	ASSERT(sizeof (ioat_chan_dca_desc_t) == 64);
-
-	/* sync the current desc */
-	(void) ddi_dma_sync(channel->ic_desc_dma_handle,
-	    ring->cr_desc_next << 6, 64, DDI_DMA_SYNC_FORDEV);
-
-	/* update the previous desc and sync it too */
-	prev->dd_next_desc = ring->cr_phys_desc +
-	    (ring->cr_desc_next << 6);
-	(void) ddi_dma_sync(channel->ic_desc_dma_handle,
-	    ring->cr_desc_prev << 6, 64, DDI_DMA_SYNC_FORDEV);
+	/*
+	 * save next desc and prev offset for when we link the two
+	 * descriptors together.
+	 */
+	saved_prev = prev;
+	prev_offset = ring->cr_desc_prev << 6;
+	next_offset = ring->cr_desc_next << 6;
+	next_desc_phys = ring->cr_phys_desc + next_offset;
 
 	/* save the current desc_next and desc_last for the completion */
 	ring->cr_desc_prev = ring->cr_desc_next;
@@ -1087,10 +1086,24 @@ ioat_cmd_post_dca(ioat_channel_ring_t *ring, uint32_t dca_id)
 		    &ring->cr_desc[ring->cr_desc_prev];
 		desc->dd_ctrl = 0;
 		desc->dd_next_desc = 0x0;
-
+		(void) ddi_dma_sync(channel->ic_desc_dma_handle,
+		    ring->cr_desc_next << 6, 64, DDI_DMA_SYNC_FORDEV);
 		prev->dd_next_desc = ring->cr_phys_desc +
 		    (ring->cr_desc_next << 6);
 	}
+
+	/* Put the descriptors physical address in the previous descriptor */
+	/*LINTED:E_TRUE_LOGICAL_EXPR*/
+	ASSERT(sizeof (ioat_chan_dca_desc_t) == 64);
+
+	/* sync the current desc */
+	(void) ddi_dma_sync(channel->ic_desc_dma_handle, next_offset, 64,
+	    DDI_DMA_SYNC_FORDEV);
+
+	/* update the previous desc and sync it too */
+	saved_prev->dd_next_desc = next_desc_phys;
+	(void) ddi_dma_sync(channel->ic_desc_dma_handle, prev_offset, 64,
+	    DDI_DMA_SYNC_FORDEV);
 }
 
 
@@ -1102,9 +1115,13 @@ static void
 ioat_cmd_post_copy(ioat_channel_ring_t *ring, uint64_t src_addr,
     uint64_t dest_addr, uint32_t size, uint32_t ctrl)
 {
+	ioat_chan_dma_desc_t *saved_prev;
 	ioat_chan_dma_desc_t *desc;
 	ioat_chan_dma_desc_t *prev;
 	ioat_channel_t channel;
+	uint64_t next_desc_phy;
+	off_t prev_offset;
+	off_t next_offset;
 
 
 	channel = ring->cr_chan;
@@ -1121,19 +1138,14 @@ ioat_cmd_post_copy(ioat_channel_ring_t *ring, uint64_t src_addr,
 	desc->dd_dest_paddr = dest_addr;
 	desc->dd_next_desc = 0x0;
 
-	/* Put the descriptors physical address in the previous descriptor */
-	/*LINTED:E_TRUE_LOGICAL_EXPR*/
-	ASSERT(sizeof (ioat_chan_dma_desc_t) == 64);
-
-	/* sync the current desc */
-	(void) ddi_dma_sync(channel->ic_desc_dma_handle,
-	    ring->cr_desc_next << 6, 64, DDI_DMA_SYNC_FORDEV);
-
-	/* update the previous desc and sync it too */
-	prev->dd_next_desc = ring->cr_phys_desc +
-	    (ring->cr_desc_next << 6);
-	(void) ddi_dma_sync(channel->ic_desc_dma_handle,
-	    ring->cr_desc_prev << 6, 64, DDI_DMA_SYNC_FORDEV);
+	/*
+	 * save next desc and prev offset for when we link the two
+	 * descriptors together.
+	 */
+	saved_prev = prev;
+	prev_offset = ring->cr_desc_prev << 6;
+	next_offset = ring->cr_desc_next << 6;
+	next_desc_phy = ring->cr_phys_desc + next_offset;
 
 	/* increment next/gen so it points to the next free desc */
 	ring->cr_desc_prev = ring->cr_desc_next;
@@ -1158,10 +1170,24 @@ ioat_cmd_post_copy(ioat_channel_ring_t *ring, uint64_t src_addr,
 		desc->dd_size = 0;
 		desc->dd_ctrl = 0;
 		desc->dd_next_desc = 0x0;
-
+		(void) ddi_dma_sync(channel->ic_desc_dma_handle,
+		    ring->cr_desc_next << 6, 64, DDI_DMA_SYNC_FORDEV);
 		prev->dd_next_desc = ring->cr_phys_desc +
 		    (ring->cr_desc_next << 6);
 	}
+
+	/* Put the descriptors physical address in the previous descriptor */
+	/*LINTED:E_TRUE_LOGICAL_EXPR*/
+	ASSERT(sizeof (ioat_chan_dma_desc_t) == 64);
+
+	/* sync the current desc */
+	(void) ddi_dma_sync(channel->ic_desc_dma_handle, next_offset, 64,
+	    DDI_DMA_SYNC_FORDEV);
+
+	/* update the previous desc and sync it too */
+	saved_prev->dd_next_desc = next_desc_phy;
+	(void) ddi_dma_sync(channel->ic_desc_dma_handle, prev_offset, 64,
+	    DDI_DMA_SYNC_FORDEV);
 }
 
 
