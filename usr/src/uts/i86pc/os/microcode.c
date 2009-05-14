@@ -160,7 +160,8 @@ ucode_free_space(cpu_t *cp)
 void
 ucode_cleanup()
 {
-	ASSERT(ucode);
+	if (ucode == NULL)
+		return;
 
 	ucode->file_reset(&ucodefile, -1);
 }
@@ -1141,6 +1142,7 @@ ucode_check(cpu_t *cp)
 			ucode = &ucode_intel;
 			break;
 		default:
+			ucode = NULL;
 			return;
 		}
 
