@@ -27,6 +27,7 @@
 #pragma	D depends_on library net.d
 #pragma	D depends_on library scsi.d
 #pragma	D depends_on module genunix
+#pragma	D depends_on module fct
 
 /*
  * FC port information.

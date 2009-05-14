@@ -24,6 +24,9 @@
  * Use is subject to license terms.
  */
 
+#pragma	D depends_on module genunix
+#pragma	D depends_on module stmf
+
 /*
  * The scsicmd_t structure should be used by providers
  * to represent a SCSI command block (cdb).
