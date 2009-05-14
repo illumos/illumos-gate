@@ -1092,8 +1092,10 @@ configure_v4_lease(dhcp_smach_t *dsmp)
 		return (B_FALSE);
 	}
 
-	lif->lif_dad_wait = B_TRUE;
-	dsmp->dsm_lif_wait++;
+	if (!lif->lif_dad_wait) {
+		lif->lif_dad_wait = _B_TRUE;
+		dsmp->dsm_lif_wait++;
+	}
 
 	if (ack->opts[CD_BROADCASTADDR] != NULL &&
 	    ack->opts[CD_BROADCASTADDR]->len == sizeof (inaddr)) {

@@ -603,6 +603,10 @@ remove_lif(dhcp_lif_t *lif)
 				dlp->dl_smach->dsm_lif_down--;
 				lif->lif_declined = NULL;
 			}
+			if (lif->lif_dad_wait) {
+				lif->lif_dad_wait = _B_FALSE;
+				dlp->dl_smach->dsm_lif_wait--;
+			}
 			lif->lif_lease = NULL;
 			release_lif(lif);
 		}
@@ -879,6 +883,12 @@ canonize_lif(dhcp_lif_t *lif, boolean_t dhcponly)
 		    lif->lif_name);
 	}
 
+	/* Clearing the address means that we're no longer waiting on DAD */
+	if (lif->lif_dad_wait) {
+		lif->lif_dad_wait = _B_FALSE;
+		lif->lif_lease->dl_smach->dsm_lif_wait--;
+	}
+
 	if (lif->lif_flags & IFF_POINTOPOINT) {
 		if (ioctl(fd, SIOCSLIFDSTADDR, &lifr) == -1) {
 			dhcpmsg(MSG_ERR,
@@ -925,7 +935,8 @@ canonize_lif(dhcp_lif_t *lif, boolean_t dhcponly)
 /*
  * plumb_lif(): Adds the LIF to the system.  This is used for all
  *		DHCPv6-derived interfaces.  The returned LIF has a hold
- *		on it.
+ *		on it.  The caller (configure_v6_leases) deals with the DAD
+ *		wait counters.
  *
  *   input: dhcp_lif_t *: the interface to unplumb
  *  output: none
@@ -1045,7 +1056,8 @@ unplumb_lif(dhcp_lif_t *lif)
 
 	/*
 	 * Special case: if we're "unplumbing" the main LIF for DHCPv4, then
-	 * just canonize it and remove it from the lease.
+	 * just canonize it and remove it from the lease.  The DAD wait flags
+	 * are handled by canonize_lif or by remove_lif.
 	 */
 	if ((dlp = lif->lif_lease) != NULL && dlp->dl_smach->dsm_lif == lif) {
 		canonize_lif(lif, B_TRUE);
