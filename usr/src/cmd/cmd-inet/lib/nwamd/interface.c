@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -636,10 +636,10 @@ takedowninterface(const char *ifname, libnwam_diag_cause_t cause)
 		 * interface without a lease to release, so we have to drop in
 		 * that case.  So try release first, then fall back to drop.
 		 */
-		if (start_child(IFCONFIG, ifname, "dhcp", "release", NULL)
-		    != 0) {
-			(void) start_child(IFCONFIG, ifname, "dhcp", "drop",
-			    NULL);
+		if (start_child(IFCONFIG, ifname, "dhcp", "wait", "2",
+		    "release", NULL) != 0) {
+			(void) start_child(IFCONFIG, ifname, "dhcp", "wait",
+			    "2", "drop", NULL);
 		}
 	} else {
 		if (flags & IFF_UP)

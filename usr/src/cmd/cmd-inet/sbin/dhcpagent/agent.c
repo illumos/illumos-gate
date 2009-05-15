@@ -518,11 +518,16 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 
 	if (dsmp == NULL) {
 		/*
-		 * If the user asked for the primary DHCP interface, but there
-		 * is none, then report failure.
+		 * If the user asked for the primary DHCP interface by giving
+		 * an empty string and there is no primary, then check if we're
+		 * handling dhcpinfo.  If so, then simulate primary selection.
+		 * Otherwise, report failure.
 		 */
 		if (ifname[0] == '\0') {
-			error = DHCP_IPC_E_NOPRIMARY;
+			if (ia.ia_cmd == DHCP_GET_TAG)
+				dsmp = info_primary_smach(isv6);
+			if (dsmp == NULL)
+				error = DHCP_IPC_E_NOPRIMARY;
 
 		/*
 		 * If there's no interface, and we're starting up, then create
@@ -747,6 +752,7 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		uint_t		optlen;
 		boolean_t	did_alloc = B_FALSE;
 		PKT_LIST	*ack = dsmp->dsm_ack;
+		int		i;
 
 		/*
 		 * verify the request makes sense.
@@ -766,6 +772,12 @@ load_option:
 
 		case DSYM_SITE:			/* FALLTHRU */
 		case DSYM_STANDARD:
+			for (i = 0; i < dsmp->dsm_pillen; i++) {
+				if (dsmp->dsm_pil[i] == optnum.code)
+					break;
+			}
+			if (i < dsmp->dsm_pillen)
+				break;
 			if (isv6) {
 				opt = dhcpv6_pkt_option(ack, NULL, optnum.code,
 				    NULL);

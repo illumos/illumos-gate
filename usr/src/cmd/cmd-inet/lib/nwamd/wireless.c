@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -357,36 +357,60 @@ add_wlan_entry(const char *ifname, const char *essid, const char *bssid,
 /*
  * Remove entries that are no longer seen on the network.  The caller does not
  * hold wifi_mutex, but is the only thread that can modify the wlan list.
+ *
  * Retain connected entries, as lack of visibility in a scan may just be a
  * temporary condition (driver problem) and may not reflect an actual
- * disconnect.
+ * disconnect, but only if there are no scanned connected entries.
  */
 static boolean_t
 clear_unscanned_entries(const char *ifname)
 {
 	struct wireless_lan *wlan, *wlput;
-	boolean_t dropped;
+	boolean_t has_unscanned_connected;
+	boolean_t copied_scanned_connected;
+	uint_t dropcnt;
 
 	if (pthread_mutex_lock(&wifi_mutex) != 0)
 		return (B_FALSE);
 	wlput = wlans;
-	dropped = B_FALSE;
+	dropcnt = 0;
+	has_unscanned_connected = copied_scanned_connected = B_FALSE;
 	for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
-		if (strcmp(ifname, wlan->wl_if_name) != 0 || wlan->scanned ||
-		    wlan->connected) {
+		if (strcmp(ifname, wlan->wl_if_name) != 0) {
+			if (wlput != wlan)
+				*wlput = *wlan;
+			wlput++;
+		} else if (wlan->scanned) {
+			if (wlan->connected)
+				copied_scanned_connected = B_TRUE;
 			if (wlput != wlan)
 				*wlput = *wlan;
 			wlput++;
 		} else {
+			if (wlan->connected)
+				has_unscanned_connected = B_TRUE;
 			dprintf("dropping unseen AP %s %s", wlan->essid,
 			    wlan->bssid);
-			dropped = B_TRUE;
+			dropcnt++;
 			free_wireless_lan(wlan);
+		}
+	}
+	if (has_unscanned_connected && !copied_scanned_connected) {
+		for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
+			if (strcmp(ifname, wlan->wl_if_name) == 0 &&
+			    wlan->connected) {
+				dprintf("keeping unscanned but connected AP "
+				    "%s %s", wlan->essid, wlan->bssid);
+				if (wlput != wlan)
+					*wlput = *wlan;
+				wlput++;
+				dropcnt--;
+			}
 		}
 	}
 	wireless_lan_used = wlput - wlans;
 	(void) pthread_mutex_unlock(&wifi_mutex);
-	return (dropped);
+	return (dropcnt != 0);
 }
 
 /*
@@ -928,8 +952,11 @@ get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 		wlan->scanned = B_TRUE;
 		wlan->attrs = *attrp;
 		retv = B_TRUE;
-	} else if (add_wlan_entry(ifname, essid_name, bssid_name, attrp) !=
-	    NULL) {
+	} else if ((wlan = add_wlan_entry(ifname, essid_name, bssid_name,
+	    attrp)) != NULL) {
+		/* search cannot return NULL at this point due to add */
+		wlan->connected =
+		    find_wlan_entry(ifname, essid_name, "")->connected;
 		retv = B_TRUE;
 	} else {
 		retv = B_FALSE;
@@ -2206,7 +2233,7 @@ return_vals_t
 handle_wireless_lan(const char *ifname)
 {
 	wireless_if_t *wip;
-	struct wireless_lan *cur_wlan, *max_wlan;
+	struct wireless_lan *cur_wlan, *max_wlan, *strong_wlan = NULL;
 	struct wireless_lan *most_recent;
 	boolean_t many_present;
 	dladm_wlan_strength_t strongest = DLADM_WLAN_STRENGTH_VERY_WEAK;
@@ -2252,8 +2279,10 @@ handle_wireless_lan(const char *ifname)
 	 */
 	for (; cur_wlan < max_wlan; cur_wlan++) {
 		/* Find the AP with the highest signal. */
-		if (cur_wlan->attrs.wa_strength > strongest)
+		if (cur_wlan->attrs.wa_strength > strongest) {
 			strongest = cur_wlan->attrs.wa_strength;
+			strong_wlan = cur_wlan;
+		}
 
 		if (known_wifi_nets_lookup(cur_wlan->essid, cur_wlan->bssid,
 		    NULL))
@@ -2279,10 +2308,18 @@ handle_wireless_lan(const char *ifname)
 				most_recent = cur_wlan;
 			} else if (strcmp(cur_wlan->essid,
 			    most_recent->essid) != 0) {
+				if (!many_present)
+					dprintf("both %s and %s are known and "
+					    "present on %s", cur_wlan->essid,
+					    most_recent->essid, ifname);
 				many_present = B_TRUE;
 			} else if (cur_wlan->attrs.wa_strength >
 			    most_recent->attrs.wa_strength) {
 				if (most_recent->connected) {
+					dprintf("found better BSS %s for ESS "
+					    "%s; disconnecting %s on %s",
+					    cur_wlan->bssid, cur_wlan->essid,
+					    most_recent->bssid, ifname);
 					(void) dladm_wlan_disconnect(dld_handle,
 					    wip->wi_linkid);
 					most_recent->connected = B_FALSE;
@@ -2290,6 +2327,18 @@ handle_wireless_lan(const char *ifname)
 					wip->wi_wireless_done = B_FALSE;
 				}
 				most_recent = cur_wlan;
+			} else if (cur_wlan->attrs.wa_strength <
+			    most_recent->attrs.wa_strength &&
+			    cur_wlan->connected) {
+				dprintf("found better BSS %s for ESS %s; "
+				    "disconnecting %s on %s",
+				    most_recent->bssid, most_recent->essid,
+				    cur_wlan->bssid, ifname);
+				(void) dladm_wlan_disconnect(dld_handle,
+				    wip->wi_linkid);
+				cur_wlan->connected = B_FALSE;
+				report_wlan_disconnect(cur_wlan);
+				wip->wi_wireless_done = B_FALSE;
 			}
 		}
 
@@ -2300,8 +2349,20 @@ handle_wireless_lan(const char *ifname)
 		cur_wlan->cooked_key = NULL;
 	}
 
-	if (most_recent != NULL && !many_present &&
-	    most_recent->attrs.wa_strength >= strongest) {
+	/*
+	 * The Three Rules:
+	 *
+	 *	1.  If no known AP is in range, then seek help.
+	 *
+	 *	2.  If two or more known APs are in range, then seek help.
+	 *
+	 *	3.  If a known AP is in range, and its signal strength is "weak"
+	 *	    or lower, and the strongest available is "very good" or
+	 *	    better, then seek help.
+	 */
+	if (most_recent != NULL && (!many_present || most_recent->connected) &&
+	    (most_recent->attrs.wa_strength > DLADM_WLAN_STRENGTH_WEAK ||
+	    strongest < DLADM_WLAN_STRENGTH_VERY_GOOD)) {
 		if (most_recent->connected) {
 			dprintf("%s already connected to %s", ifname,
 			    most_recent->essid);
@@ -2328,8 +2389,16 @@ handle_wireless_lan(const char *ifname)
 			}
 		}
 	} else if (request_wlan_selection(ifname, wlans, wireless_lan_used)) {
-		dprintf("%s is unknown and not connected; requested help",
-		    ifname);
+		if (most_recent == NULL)
+			dprintf("%s has no known WLANs; requested help",
+			    ifname);
+		else if (many_present && !most_recent->connected)
+			dprintf("%s has multiple known WLANs and is not "
+			    "connected; requested help", ifname);
+		else
+			dprintf("%s has known WLAN %s, but not strongest %s; "
+			    "requested help", ifname, most_recent->essid,
+			    strong_wlan->essid);
 		connect_result = WAITING;
 	} else {
 		dprintf("%s has no connected AP or GUI; try auto", ifname);
@@ -2393,18 +2462,21 @@ print_wireless_status(void)
 {
 	wireless_if_t *wip;
 	struct wireless_lan *wlan;
+	char strength[DLADM_STRSIZE];
 
 	if (pthread_mutex_lock(&wifi_mutex) == 0) {
 		for (wip = (wireless_if_t *)wi_list.q_forw;
 		    wip != (wireless_if_t *)&wi_list;
 		    wip = (wireless_if_t *)wip->wi_links.q_forw) {
+			(void) dladm_wlan_strength2str(&wip->wi_strength,
+			    strength);
 			dprintf("WIF %s linkid %d scan %srunning "
-			    "wireless %sdone %sneed key strength %d",
+			    "wireless %sdone %sneed key strength %s",
 			    wip->wi_name, wip->wi_linkid,
 			    wip->wi_scan_running ? "" : "not ",
 			    wip->wi_wireless_done ? "" : "not ",
 			    wip->wi_need_key ? "" : "don't ",
-			    wip->wi_strength);
+			    strength);
 		}
 		for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
 			dprintf("WLAN I/F %s ESS %s BSS %s signal %s key %sset "

@@ -353,6 +353,10 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 
 	ack = dsmp->dsm_ack;
 	router_list = ack->opts[CD_ROUTER];
+	for (i = 0; i < dsmp->dsm_pillen; i++) {
+		if (dsmp->dsm_pil[i] == CD_ROUTER)
+			router_list = NULL;
+	}
 	lif = dsmp->dsm_lif;
 	if (router_list != NULL &&
 	    (router_list->len % sizeof (ipaddr_t)) == 0 &&

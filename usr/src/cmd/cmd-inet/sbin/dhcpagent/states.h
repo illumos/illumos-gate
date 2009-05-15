@@ -98,6 +98,8 @@ struct dhcp_smach_s {
 
 	uint16_t	*dsm_prl;	/* if non-NULL, param request list */
 	uint_t		dsm_prllen;	/* param request list len */
+	uint16_t	*dsm_pil;	/* if non-NULL, param ignore list */
+	uint_t		dsm_pillen;	/* param ignore list len */
 
 	uint_t		dsm_nrouters;	/* the number of default routers */
 	struct in_addr	*dsm_routers;	/* an array of default routers */
@@ -288,6 +290,7 @@ void		release_smach(dhcp_smach_t *);
 void		remove_smach(dhcp_smach_t *);
 dhcp_smach_t	*next_smach(dhcp_smach_t *, boolean_t);
 dhcp_smach_t	*primary_smach(boolean_t);
+dhcp_smach_t	*info_primary_smach(boolean_t);
 void		make_primary(dhcp_smach_t *);
 dhcp_smach_t	*lookup_smach(const char *, boolean_t);
 dhcp_smach_t	*lookup_smach_by_uindex(uint16_t, dhcp_smach_t *, boolean_t);

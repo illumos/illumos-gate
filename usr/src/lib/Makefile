@@ -549,7 +549,7 @@ libcmdutils:	libavl
 libcontract:	libnvpair
 libdevid:	libdevinfo
 libdevinfo:	libnvpair libsec
-libdhcpagent:	libsocket libdhcputil libuuid libdlpi
+libdhcpagent:	libsocket libdhcputil libuuid libdlpi libcontract
 libdhcpsvc:	libinetutil
 libdhcputil:	libnsl libgen libinetutil libdlpi
 libdladm:	libdevinfo libinetutil libsocket libscf librcm libnvpair \

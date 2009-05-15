@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -59,7 +57,9 @@ static struct dhcp_default defaults[] = {
 	{ "PARAM_REQUEST_LIST",  NULL,	 0,   0   },
 	{ "REQUEST_HOSTNAME",	 "1",	 0,   0	  },
 	{ "DEBUG_LEVEL",	 "0",	 0,   3   },
-	{ "VERBOSE",		 "0",	 0,   0   }
+	{ "VERBOSE",		 "0",	 0,   0   },
+	{ "VERIFIED_LEASE_ONLY", "0",	 0,   0	  },
+	{ "PARAM_IGNORE_LIST",	 NULL,	 0,   0   }
 };
 
 /*

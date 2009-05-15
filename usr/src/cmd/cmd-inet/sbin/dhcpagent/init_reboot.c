@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * INIT_REBOOT state of the DHCP client state machine.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -248,11 +246,24 @@ stop_init_reboot(dhcp_smach_t *dsmp, unsigned int n_requests)
 				dsmp->dsm_send_timeout = maxabs - nowabs;
 			return (B_FALSE);
 		}
-		dhcpmsg(MSG_INFO, "no Reply to Confirm, using remainder of "
-		    "existing lease on %s", dsmp->dsm_name);
 	} else {
 		if (n_requests < DHCP_MAX_REQUESTS)
 			return (B_FALSE);
+	}
+
+	if (df_get_bool(dsmp->dsm_name, dsmp->dsm_isv6,
+	    DF_VERIFIED_LEASE_ONLY)) {
+		dhcpmsg(MSG_INFO,
+		    "unable to verify existing lease on %s; restarting",
+		    dsmp->dsm_name);
+		dhcp_selecting(dsmp);
+		return (B_TRUE);
+	}
+
+	if (dsmp->dsm_isv6) {
+		dhcpmsg(MSG_INFO, "no Reply to Confirm, using remainder of "
+		    "existing lease on %s", dsmp->dsm_name);
+	} else {
 		dhcpmsg(MSG_INFO, "no ACK/NAK to INIT_REBOOT REQUEST, "
 		    "using remainder of existing lease on %s", dsmp->dsm_name);
 	}

@@ -38,7 +38,6 @@
 #include <netinet/if_ether.h>
 #include <arpa/inet.h>
 #include <dhcpmsg.h>
-#include <dhcp_inittab.h>
 
 #include "agent.h"
 #include "interface.h"

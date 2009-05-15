@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -32,18 +30,18 @@
 
 # All parameters can be tuned for a specific interface by prepending
 # the interface name to the parameter name.  For example, to make
-# RELEASE_ON_SIGTERM happen on all interfaces except hme0, specify:
+# VERIFIED_LEASE_ONLY happen on all interfaces except hme0, specify:
 #
-# hme0.RELEASE_ON_SIGTERM=no
-# RELEASE_ON_SIGTERM=yes
+# hme0.VERIFIED_LEASE_ONLY=no
+# VERIFIED_LEASE_ONLY=yes
 #
 # An interface name alone specifies IPv4 DHCP.  For DHCPv6, append ".v6".
 # Some examples:
 #
-# hme0.RELEASE_ON_SIGTERM=no	specify hme0 v4 behavior
-# hme0.v6.RELEASE_ON_SIGTERM=no	specify hme0 v6 behavior
-# RELEASE_ON_SIGTERM=no		match all v4 interfaces
-# .v6.RELEASE_ON_SIGTERM=no	match all v6 interfaces
+# hme0.VERIFIED_LEASE_ONLY=no		specify hme0 v4 behavior
+# hme0.v6.VERIFIED_LEASE_ONLY=no	specify hme0 v6 behavior
+# VERIFIED_LEASE_ONLY=no		match all v4 interfaces
+# .v6.VERIFIED_LEASE_ONLY=no		match all v6 interfaces
 
 # By default, when the DHCP agent is sent a SIGTERM (typically when
 # the system is shut down), all managed addresses are dropped rather
@@ -55,16 +53,21 @@
 # does not answer (and the lease has not yet expired), then the client
 # will use the original address.
 #
-# By uncommenting the following parameter-value pairs, all managed
-# interfaces are released on SIGTERM instead.  In that case, the DHCP
-# server is notified that the address is available for use.  Further,
-# if DHCP is later restarted on the interface, the client will not
-# request its previous address from the server, nor will it attempt to
-# reuse the previous lease.  This behavior is often preferred for
-# roaming systems.
+# Similarly, when the system is suspended and then woken up or when
+# the link status transitions from down to up, DHCP will ask the server
+# to continue to use the managed address, in case the lease has changed.
 #
-# RELEASE_ON_SIGTERM=yes
-# .v6.RELEASE_ON_SIGTERM=yes
+# By uncommenting the following parameter-value pairs, all managed
+# addresses are released on SIGTERM instead, and any that may have been
+# saved but cannot be verified will not be used.  When SIGTERM is
+# received, the DHCP server is notified that the address is available
+# for use, and the address will not be saved for a later restart.  If
+# DHCP receives SIGTHAW or a link-up event, DHCP will attempt to verify
+# the previous lease, but if unable to do so, it will not attempt to
+# use that lease.  This behavior is often preferred for roaming systems.
+#
+# VERIFIED_LEASE_ONLY=yes
+# .v6.VERIFIED_LEASE_ONLY=yes
 
 # By default, the DHCP agent waits 3 seconds to collect OFFER
 # responses to a DISCOVER.  If it receives no OFFERs in this time, it
@@ -106,7 +109,8 @@
 # server when the DHCP agent sends requests.  However, if desired, this
 # can be changed by altering the following parameter-value pair.  The
 # numbers correspond to the values defined in the IANA bootp-dhcp-parameters
-# registry at the time of this writing.
+# registry at the time of this writing.  Site and standard option names from
+# /etc/dhcp/inittab are also accepted.
 #
 PARAM_REQUEST_LIST=1,3,6,12,15,28,43
 
@@ -114,5 +118,13 @@ PARAM_REQUEST_LIST=1,3,6,12,15,28,43
 # DNS addresses (23), DNS search list (24), NIS addresses (27), and
 # NIS domain (29).  This may be changed by altering the following parameter-
 # value pair.  The numbers correspond to the values defined in the IANA
-# dhcpv6-parameters registry at the time of this writing.
+# dhcpv6-parameters registry at the time of this writing.  Site and standard
+# option names from /etc/dhcp/inittab6 are also accepted.
 .v6.PARAM_REQUEST_LIST=7,12,23,24,27,29
+
+# The parameter ignore list allows you to instruct the DHCP client to discard
+# optional parameters received from the DHCP server.  The format is the same
+# as the request list above.  When discarded, a parameter will not be acted
+# on by the DHCP client or returned to users via the dhcpinfo(1) command.
+PARAM_IGNORE_LIST=
+.v6.PARAM_IGNORE_LIST=

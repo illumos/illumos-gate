@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <net/if.h>
@@ -255,13 +256,39 @@ dhcp_ipc_recv_request(int fd, dhcp_ipc_request_t **request, int msec)
  *   input: int: the file descriptor to get the message from
  *	    dhcp_ipc_reply_t **: address of a pointer to store the reply
  *				 (dynamically allocated)
+ *	    int32_t: timeout (in seconds), or DHCP_IPC_WAIT_FOREVER,
+ *		     or DHCP_IPC_WAIT_DEFAULT
  *  output: int: 0 on success, DHCP_IPC_E_* otherwise
  */
 
 static int
-dhcp_ipc_recv_reply(int fd, dhcp_ipc_reply_t **reply)
+dhcp_ipc_recv_reply(int fd, dhcp_ipc_reply_t **reply, int32_t timeout)
 {
-	return (dhcp_ipc_recv_msg(fd, (void **)reply, DHCP_IPC_REPLY_SIZE, -1));
+	/*
+	 * If the caller doesn't want to wait forever, and the amount of time
+	 * he wants to wait is expressible as an integer number of milliseconds
+	 * (as needed by the msg function), then we wait that amount of time
+	 * plus an extra two seconds for the daemon to do its work.  The extra
+	 * two seconds is arbitrary; it should allow plenty of time for the
+	 * daemon to respond within the existing timeout, as specified in the
+	 * original request, so the only time we give up is when the daemon is
+	 * stopped or otherwise malfunctioning.
+	 *
+	 * Note that the wait limit (milliseconds in an 'int') is over 24 days,
+	 * so it's unlikely that any request will actually be that long, and
+	 * it's unlikely that anyone will care if we wait forever on a request
+	 * for a 30 day timer.  The point is to protect against daemon
+	 * malfunction in the usual cases, not to provide an absolute command
+	 * timer.
+	 */
+	if (timeout == DHCP_IPC_WAIT_DEFAULT)
+		timeout = DHCP_IPC_DEFAULT_WAIT;
+	if (timeout != DHCP_IPC_WAIT_FOREVER && timeout < INT_MAX / 1000 - 2)
+		timeout = (timeout + 2) * 1000;
+	else
+		timeout = -1;
+	return (dhcp_ipc_recv_msg(fd, (void **)reply, DHCP_IPC_REPLY_SIZE,
+	    timeout));
 }
 
 /*
@@ -375,7 +402,7 @@ dhcp_ipc_make_request(dhcp_ipc_request_t *request, dhcp_ipc_reply_t **reply,
 
 	retval = dhcp_ipc_send_request(fd, request);
 	if (retval == 0)
-		retval = dhcp_ipc_recv_reply(fd, reply);
+		retval = dhcp_ipc_recv_reply(fd, reply, timeout);
 
 	(void) dhcp_ipc_close(fd);
 

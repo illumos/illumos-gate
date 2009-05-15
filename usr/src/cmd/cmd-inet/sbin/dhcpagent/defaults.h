@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	DEFAULTS_H
 #define	DEFAULTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -54,7 +52,9 @@ enum {
 	DF_PARAM_REQUEST_LIST,	/* our parameter request list */
 	DF_REQUEST_HOSTNAME,	/* request hostname associated with interface */
 	DF_DEBUG_LEVEL,		/* set debug level (undocumented) */
-	DF_VERBOSE		/* set verbose mode (undocumented) */
+	DF_VERBOSE,		/* set verbose mode (undocumented) */
+	DF_VERIFIED_LEASE_ONLY,	/* send RELEASE on SIGTERM and need verify */
+	DF_PARAM_IGNORE_LIST	/* our parameter ignore list */
 };
 
 #define	DHCP_AGENT_DEFAULTS	"/etc/default/dhcpagent"
