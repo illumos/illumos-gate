@@ -6858,18 +6858,18 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			squeue_t *sqp;
 
 			/*
-			 * For fused tcp loopback, assign the eager's
-			 * squeue to be that of the active connect's.
-			 * Note that we don't check for IP_FF_LOOPBACK
-			 * here since this routine gets called only
-			 * for loopback (unlike the IPv6 counterpart).
+			 * If the queue belongs to a conn, and fused tcp
+			 * loopback is enabled, assign the eager's squeue
+			 * to be that of the active connect's. Note that
+			 * we don't check for IP_FF_LOOPBACK here since this
+			 * routine gets called only for loopback (unlike the
+			 * IPv6 counterpart).
 			 */
-			ASSERT(Q_TO_CONN(q) != NULL);
 			if (do_tcp_fusion &&
+			    CONN_Q(q) && IPCL_IS_TCP(Q_TO_CONN(q)) &&
 			    !CONN_INBOUND_POLICY_PRESENT(connp, ipss) &&
 			    !secure &&
-			    !IPP_ENABLED(IPP_LOCAL_IN, ipst) && !ip_policy &&
-			    IPCL_IS_TCP(Q_TO_CONN(q))) {
+			    !IPP_ENABLED(IPP_LOCAL_IN, ipst) && !ip_policy) {
 				ASSERT(Q_TO_CONN(q)->conn_sqp != NULL);
 				sqp = Q_TO_CONN(q)->conn_sqp;
 			} else {

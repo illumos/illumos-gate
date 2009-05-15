@@ -3480,18 +3480,20 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 
 	tcph = (tcph_t *)&mp->b_rptr[hdr_len];
 	if ((tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG)) == TH_SYN) {
-		if (connp->conn_flags & IPCL_TCP) {
+		if (IPCL_IS_TCP(connp)) {
 			squeue_t *sqp;
 
 			/*
-			 * For fused tcp loopback, assign the eager's
-			 * squeue to be that of the active connect's.
+			 * If the queue belongs to a conn, and fused tcp
+			 * loopback is enabled, assign the eager's squeue
+			 * to be that of the active connect's.
 			 */
 			if ((flags & IP_FF_LOOPBACK) && do_tcp_fusion &&
+			    CONN_Q(q) && IPCL_IS_TCP(Q_TO_CONN(q)) &&
 			    !CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) &&
 			    !secure &&
 			    !IP6_IN_IPP(flags, ipst)) {
-				ASSERT(Q_TO_CONN(q) != NULL);
+				ASSERT(Q_TO_CONN(q)->conn_sqp != NULL);
 				sqp = Q_TO_CONN(q)->conn_sqp;
 			} else {
 				sqp = IP_SQUEUE_GET(lbolt);
