@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DCOPY_H
 #define	_SYS_DCOPY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -148,12 +146,27 @@ void dcopy_query_channel(dcopy_handle_t handle, dcopy_query_channel_t *query);
  *    Generate an interrupt when command completes. This flag is required if
  *    the caller is going to call dcopy_cmd_poll(() with DCOPY_POLL_BLOCK set
  *    for this command.
+ * DCOPY_CMD_NOWAIT
+ *    Return error instead of busy waiting if resource is not available.
+ * DCOPY_CMD_NOSRCSNP
+ *    Disable source cache snooping.
+ * DCOPY_CMD_NODSTSNP
+ *    Disable destination cache snooping.
+ * DCOPY_CMD_LOOP
+ *    For CBv1, generate a loop descriptor list, used to support FIPE driver.
+ * DCOPY_CMD_SYNC
+ *    Reserved for internal use.
  */
 #define	DCOPY_CMD_NOFLAGS	(0)
 #define	DCOPY_CMD_QUEUE		(1 << 0)
 #define	DCOPY_CMD_NOSTAT	(1 << 1)
 #define	DCOPY_CMD_DCA		(1 << 2)
 #define	DCOPY_CMD_INTR		(1 << 3)
+#define	DCOPY_CMD_NOWAIT	(1 << 4)
+#define	DCOPY_CMD_NOSRCSNP	(1 << 5)
+#define	DCOPY_CMD_NODSTSNP	(1 << 6)
+#define	DCOPY_CMD_LOOP		(1 << 7)
+#define	DCOPY_CMD_SYNC		(1 << 30)
 
 typedef struct dcopy_cmd_copy_s {
 	uint64_t	cc_source; /* Source physical address */

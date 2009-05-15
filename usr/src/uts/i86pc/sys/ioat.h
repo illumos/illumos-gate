@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +144,8 @@ typedef struct ioat_chan_dca_desc_s {
 #define	IOAT_DESC_DMACTRL_NULL	0x20
 #define	IOAT_DESC_CTRL_FENCE	0x10
 #define	IOAT_DESC_CTRL_CMPL	0x8
+#define	IOAT_DESC_CTRL_NODSTSNP	0x4
+#define	IOAT_DESC_CTRL_NOSRCSNP	0x2
 #define	IOAT_DESC_CTRL_INTR	0x1
 typedef struct ioat_chan_dma_desc_s {
 	uint32_t	dd_size;
@@ -167,6 +169,7 @@ typedef enum {
 typedef struct ioat_cmd_private_s {
 	uint64_t	ip_generation;
 	uint64_t	ip_index;
+	uint64_t	ip_start;
 	dcopy_cmd_t	ip_next;
 } ioat_cmd_private_t;
 

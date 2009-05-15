@@ -130,6 +130,7 @@ i386_SUBDIRS= \
 	SUNWgrub \
 	SUNWgrubS \
 	SUNWdcopy \
+	SUNWfipe \
 	SUNWipw \
 	SUNWiwh	\
 	SUNWiwi \
