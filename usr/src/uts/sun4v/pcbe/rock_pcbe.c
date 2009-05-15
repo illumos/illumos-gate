@@ -505,6 +505,23 @@ static struct modlinkage modl = {
 	&modlpcbe,
 };
 
+/*
+ * Below two structures are used to pass data from program_*_sampler() to
+ * program_a_sampler()
+ */
+struct	asi {
+	uint64_t	va;
+	uint64_t	value;
+};
+
+typedef struct	_s {
+	char		name[32];	/* User friendly name */
+	int		asi_config_num;	/* Num of ASIs to be configured */
+	struct	asi	asi_config[10];	/* ASIs that gets configured */
+	int		asi_sample_num;	/* Num of data return ASIs */
+	uint64_t	asi_sample[10];	/* Data return ASIs when sampled */
+} program_sampler_data_t;
+
 /* Local Function prototypes */
 static void rk_pcbe_stop_synthetic(rk_pcbe_config_t *pic);
 static void rk_pcbe_release(rk_pcbe_config_t *pic);
@@ -514,11 +531,16 @@ static int rk_pcbe_program_normal(rk_pcbe_config_t *pic);
 static int rk_pcbe_program_synthetic(rk_pcbe_config_t *pic);
 static int program_l2_sampler(rk_pcbe_config_t *pic);
 static int program_instr_sampler(rk_pcbe_config_t *pic);
+static int program_a_sampler(rk_pcbe_config_t *pic,
+			program_sampler_data_t *sdata);
 
+static int rk_pcbe_sample_internal(rk_pcbe_config_t *pic, uint64_t *diffp);
 static int rk_pcbe_sample_synthetic(rk_pcbe_config_t *pic, int64_t *diffp);
 static int sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp);
 static int sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp);
 static int sample_mccdesr(rk_pcbe_config_t *pic, int64_t *diffp);
+static int synthesize_sample_count(rk_pcbe_config_t *pic, uint64_t sample_count,
+	uint64_t sample_hit_count, char *name, int64_t *diffp);
 
 static int alloc_ringbuffer(rk_pcbe_config_t *pic, uint32_t size,
 							uint32_t num_samples);
@@ -1258,6 +1280,7 @@ rk_pcbe_allstop(void)
 {
 	int 			i;
 	rk_pcbe_config_t	*pic;
+	uint64_t		diff;
 
 	for (i = 0; i <  NUM_PCBE_COUNTERS; i++) {
 		pic = active_pics[i][CPU->cpu_id];
@@ -1284,20 +1307,25 @@ rk_pcbe_allstop(void)
 		pic->state = STATE_STOPPED;
 
 		/*
-		 * If running in lwp context, and context is invalid or
-		 * if we get here when both cpu as well as lwp contexts
-		 * are invalid, then release the counter. This is can happen
-		 * when the lwp that pcbe is monitoring is terminated. In
-		 * this situation, pcbe_free is called directly after allstop
-		 * without calling pcbe_sample. pcbe_free may get executed on
-		 * a differnt strand. If the free-ing strand is not the one that
-		 * programmed this pic, HV does not allow that operaion and will
-		 * return H_ENOACCESS. To prevent this, the counter is released
-		 * if the lwp that pcbe is minitoring disappears.
+		 * If running in lwp context, kcpc ensures a cpu that
+		 * executed pcbe_program will be the one that executes
+		 * pcbe_allstop. However, pcbe_free may be executed on
+		 * a different strand. HV puts a restriction that the
+		 * strand that programmed the counter should be the one
+		 * that releases it. Therefore, when counters are bound
+		 * to thread context, counters are released everytime
+		 * they are stopped.
 		 */
-		if ((curthread->t_cpc_ctx &&
-		    curthread->t_cpc_ctx->kc_flags & KCPC_CTX_INVALID) || (
-		    curthread->t_cpc_ctx == NULL && CPU->cpu_cpc_ctx == NULL)) {
+		if (CPU->cpu_cpc_ctx == NULL) {
+			/*
+			 * If counter is being released, cache the current
+			 * sample since we cannot sample a counter that has
+			 * been released.
+			 */
+			if (rk_pcbe_sample_internal(pic, &diff) == H_EOK)
+				pic->pcbe_pic = diff;
+			else
+				pic->pcbe_pic = 0;
 			rk_pcbe_release(pic);
 		}
 	}
@@ -1307,58 +1335,40 @@ static void
 rk_pcbe_sample(void *token)
 {
 	rk_pcbe_config_t	*pic = NULL;
-	uint64_t		*pic_data, counter_value;
+	uint64_t		*pic_data;
 	int			rc;
-	int64_t			diff;
+	uint64_t		diff;
 
 	while ((pic = (rk_pcbe_config_t *)
 	    kcpc_next_config(token, pic, &pic_data)) != NULL) {
 
-		if (pic == NULL || pic->inuse != B_TRUE ||
-		    pic->state == STATE_RELEASED) {
-			*pic_data = (uint64_t)0;
+		if (pic->inuse != B_TRUE) {
+			continue;
+		}
+
+		/*
+		 * If counter is already released, then return the
+		 * cached value
+		 */
+		if (pic->state == STATE_RELEASED) {
+			*pic_data += pic->pcbe_pic;
+			pic->pcbe_pic = 0;
 			continue;
 		}
 
 		ASSERT(CPU->cpu_id == pic->cpu);
 
-		if (pic->counter_type == NORMAL_COUNTER) {
-			rc = (int)hv_rk_perf_count_get((uint64_t)(pic->counter |
-			    pic->src_type), &counter_value);
-			if (rc == H_EOK) {
-				counter_value &= COUNTER_MASK(pic);
-				diff = counter_value - pic->pcbe_pic;
-				/*
-				 * When counter overflows the overflow handler
-				 * (rk_pcbe_overflow_bitmap) would have added
-				 * MAX count value to pic->pcbe_pic. Therefore
-				 * -ve implies that the counter has overflowed.
-				 * The actual count amounts to,
-				 * (counter_value - (pic->pcbe_pic - MAX)) + MAX
-				 * => counter_value - pic->pcbe_pic + (2 * MAX)
-				 * => diff + (2 * MAX)
-				 */
-				if (diff < 0) {
-					diff +=
-					    (0x1ULL << (pic->counter_bits + 1));
-				}
-				pic->pcbe_pic = counter_value;
-			}
-		} else {
-			/*
-			 * Difference returned by synthetic counters will
-			 * be always +ve
-			 */
-			rc = rk_pcbe_sample_synthetic(pic, &diff);
+		rc = rk_pcbe_sample_internal(pic, &diff);
+
+		if (pic->state == STATE_STOPPED) {
+			pic->pcbe_pic = 0;
+			rk_pcbe_release(pic);
 		}
 
-		*pic_data += diff;
-		if (pic->state == STATE_STOPPED)
-			rk_pcbe_release(pic);
-
-		if (rc != H_EOK) {
+		if (rc == H_EOK) {
+			*pic_data += diff;
+		} else  {
 			kcpc_invalidate_config(token);
-			continue;
 		}
 	}
 }
@@ -1505,6 +1515,49 @@ rk_pcbe_free_synthetic(rk_pcbe_config_t *pic)
 	}
 }
 
+static int
+rk_pcbe_sample_internal(rk_pcbe_config_t *pic, uint64_t *data)
+{
+	uint64_t		counter_value;
+	int			rc;
+	int64_t			diff;
+
+		if (pic->counter_type == NORMAL_COUNTER) {
+			rc = (int)hv_rk_perf_count_get((uint64_t)(pic->counter |
+			    pic->src_type), &counter_value);
+			if (rc == H_EOK) {
+				counter_value &= COUNTER_MASK(pic);
+				diff = counter_value - pic->pcbe_pic;
+				pic->pcbe_pic = counter_value;
+				/*
+				 * When counter overflows the overflow handler
+				 * (rk_pcbe_overflow_bitmap) would have added
+				 * MAX count value to pic->pcbe_pic. Therefore
+				 * -ve implies that the counter has overflowed.
+				 * The actual count amounts to,
+				 * (counter_value - (pic->pcbe_pic - MAX)) + MAX
+				 * => counter_value - pic->pcbe_pic + (2 * MAX)
+				 * => diff + (2 * MAX)
+				 */
+				if (diff < 0) {
+					diff +=
+					    (0x1ULL << (pic->counter_bits + 1));
+				}
+			}
+		} else {
+			/*
+			 * Difference returned by synthetic counters will
+			 * be always +ve
+			 */
+			rc = rk_pcbe_sample_synthetic(pic, &diff);
+		}
+
+		if (rc == H_EOK)
+			*data = (uint64_t)diff;
+
+		return ((int)rc);
+}
+
 /* All sample_synthetic code may be executed at TL=1 */
 static int
 rk_pcbe_sample_synthetic(rk_pcbe_config_t *pic, int64_t *diffp)
@@ -1584,55 +1637,36 @@ program_l2_sampler(rk_pcbe_config_t *pic)
 #define	L2_TXN_INFO_FILTER_MASK		(L2_ALL_EVT << L2_ALL_EVT_SHIFT) | \
 					(L2_ALL_TXNS << L2_TXN_SHIFT)
 
-	uint64_t	l2_load_valist[] = {ASI_PERF_L2_TXN_INFO};
-	uint64_t	ringbuf_pa, l2_load_valist_pa, counter, rc;
-	int		hv_call_cnt = 1, ret = 0;
-	char		*funcname = "program_l2_sampler";
+	program_sampler_data_t	sdata;
+	int			i = 0;
 
-	counter = (uint64_t)(pic->counter | pic->src_type);
+	(void) strcpy(sdata.name, "program_l2_sampler");
+	pic->flags = L2_ALL_TXNS; /* For L2 counter */
 
-	if (pic->sampler.ring_buffer == NULL) {
-		rc = alloc_ringbuffer(pic, sizeof (l2_load_valist),
-		    num_ringbuf_entries);
-		if (rc != 0)
-			return ((int)rc);
-		pic->sampler.sample_size = sizeof (l2_load_valist);
-		pic->flags = L2_ALL_TXNS; /* For L2 counter */
-		PRINT_PIC(pic, "After Configuration (S)");
-	}
-	ringbuf_pa = va_to_pa(pic->sampler.ring_buffer);
-	rc = hv_rk_perf_sample_init(counter, ringbuf_pa);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
 	/*
 	 * If (((Reported EA ^ MATCH) & MASK) == 0) then sample is taken
 	 */
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_L2_EA_MASK, 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_L2_EA_MASK;
+	sdata.asi_config[i].value = 0;
+	i++;
 
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_L2_EA_MATCH, 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_L2_EA_MATCH;
+	sdata.asi_config[i].value = 0;
+	i++;
 
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_L2_CC,
-	    pic->sampler.frequency);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_L2_CC;
+	sdata.asi_config[i].value = pic->sampler.frequency;
+	i++;
 
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_L2_TXN_INFO_FILTER,
-	    L2_TXN_INFO_FILTER_MASK);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_L2_TXN_INFO_FILTER;
+	sdata.asi_config[i].value = L2_TXN_INFO_FILTER_MASK;
 
-	l2_load_valist_pa = va_to_pa(l2_load_valist);
-	ret |= rk_pcbe_program_normal(pic); /* Reset to zero & start counting */
+	sdata.asi_config_num = i + 1;
 
-	rc = hv_rk_perf_sample_start(counter, pic->sampler.frequency,
-	    sizeof (l2_load_valist), l2_load_valist_pa);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-	return (ret);
+	sdata.asi_sample[0] = ASI_PERF_L2_TXN_INFO;
+	sdata.asi_sample_num = 1;
+
+	return (program_a_sampler(pic, &sdata));
 }
 
 static int
@@ -1647,13 +1681,11 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 
 	rk_pcbe_ringbuf_t	*ringbuf = pic->sampler.ring_buffer;
 	uint32_t	value, target;
-	uint64_t	total_count = 0, hit_count = 0, ovf_count, rc;
 	uint64_t	*head, *tail;
 	uint32_t	sample_count = 0, sample_hit_count = 0;
 	uint32_t	size = pic->sampler.sample_size;
-	int		hv_call_cnt = 1, ret = 0;
-	char		*funcname = "sample_l2_sampler";
 	uint8_t		ds, evt;
+	int		ret;
 
 	head =  RINGBUF_GET_HEAD(ringbuf);
 	tail =  RINGBUF_GET_TAIL(ringbuf);
@@ -1729,60 +1761,9 @@ sample_l2_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	}
 	RINGBUF_SET_HEAD(ringbuf, head);
 
-	/*
-	 * Since ring buffer is consumed, clear pending sample count.
-	 * Sample count is discarded, therefore reusing a variable.
-	 */
-	rc = hv_rk_perf_sample_pending((uint64_t)(pic->counter |
-	    pic->src_type), &total_count);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	ret = synthesize_sample_count(pic, sample_count, sample_hit_count,
+	    "sample_l2_sampler", diffp);
 
-	/* Check if the counter overflowed */
-	rc = hv_rk_perf_count_overflow((uint64_t)(pic->counter |
-	    pic->src_type), &ovf_count);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
-	if (rc != 0)
-		ovf_count = 0;
-
-	rc = hv_rk_perf_count_get((uint64_t)(pic->counter |
-	    pic->src_type), &total_count);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-	DBG_PRINT(("CPU-%d: Total Count: %lu\n", CPU->cpu_id, total_count));
-
-	if (rc != H_EOK)
-		total_count = 0;
-
-	total_count &= COUNTER_MASK(pic);
-
-	/*
-	 * Reset it to zero so that we need not maintain old value
-	 */
-	rc = hv_rk_perf_count_set((uint64_t)(pic->counter | pic->src_type), 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
-	/*
-	 * ovf_count > 0 means, counter has hit max, ovf_count times
-	 * before counting total_count of l2 transactions. Therefore
-	 * add total_count to ovf_count times max count value.
-	 */
-	while (ovf_count--)
-		total_count += (0x1ULL << pic->counter_bits);
-
-	if (sample_count > 0)
-		hit_count = (sample_hit_count * total_count) / sample_count;
-
-	*diffp = (int64_t)hit_count;
-	DBG_PRINT(("CPU-%d: sample_l2_sampler. hit_count: %lu, *diffp: %ld\n",
-	    CPU->cpu_id, hit_count, *diffp));
-	if (*diffp < 0) {
-		cmn_err(CE_WARN, "CPU-%d Negative l2 count. hit_count: %lu, "
-		    "*diffp: %ld\n", CPU->cpu_id, hit_count, *diffp);
-	}
 	return (ret);
 }
 
@@ -1804,78 +1785,56 @@ program_instr_sampler(rk_pcbe_config_t *pic)
 #define	IS_CC_FILTER_TOF_MASK		0x8
 #define	IS_CC_LATENCY_FREQ_SHIFT	22
 
-	uint64_t	instr_sampler_valist[] =
-			    {ASI_PERF_IS_INFO, ASI_PERF_IS_CONTEXT};
-	uint64_t	ringbuf_pa, instr_sampler_valist_pa, counter, rc;
-	int		hv_call_cnt = 1, ret = 0;
-	char		*funcname = "program_instr_sampler";
 
-	counter = (uint64_t)(pic->counter | pic->src_type);
+	program_sampler_data_t	sdata;
+	int			i = 0;
 
-	if (pic->sampler.ring_buffer == NULL) {
-		rc = alloc_ringbuffer(pic, sizeof (instr_sampler_valist),
-		    num_ringbuf_entries);
-		if (rc != 0)
-			return ((int)rc);
-		pic->sampler.sample_size = sizeof (instr_sampler_valist);
-		PRINT_PIC(pic, "After Configuration (S)");
-	}
-
-	ringbuf_pa = va_to_pa(pic->sampler.ring_buffer);
-	rc = hv_rk_perf_sample_init(counter, ringbuf_pa);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
+	(void) strcpy(sdata.name, "program_instr_sampler");
 	/*
 	 * If (((Reported Value ^ MATCH) & MASK) == 0) then sample is taken;
 	 */
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_IS_PC_MASK, 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_IS_PC_MASK;
+	sdata.asi_config[i].value = 0;
+	i++;
 
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_IS_PC_MATCH, 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_IS_PC_MATCH;
+	sdata.asi_config[i].value = 0;
+	i++;
 
 	/*
 	 * Set CLAT_MASK to 0xFFF, meaning, drop instruction samples
 	 * whose latency is zero, means, sample all of them, because
 	 * all instructions has at least a latency of 1 cycle.
 	 */
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_IS_CONTEXT_FILTER,
-	    (uint64_t)(IS_CC_FILTER_TGTF_MASK | IS_CC_FILTER_TOF_MASK |
-	    pic->sampler.flags));
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_IS_CONTEXT_FILTER;
+	sdata.asi_config[i].value = (uint64_t)(IS_CC_FILTER_TGTF_MASK |
+	    IS_CC_FILTER_TOF_MASK | pic->sampler.flags);
+	i++;
 
 	/*
 	 * Even though frequency is set when started, it has to be
 	 * specified here, because, if left zero, then a PET is
 	 * immediately generated since the candidate counter is zero.
 	 */
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_IS_CC_LATENCY_MASK,
-	    (((uint64_t)pic->sampler.frequency) << IS_CC_LATENCY_FREQ_SHIFT) |
-	    IS_BHR_LATENCY_CLAT_MASK);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_IS_CC_LATENCY_MASK;
+	sdata.asi_config[i].value = ((((uint64_t)pic->sampler.frequency) <<
+	    IS_CC_LATENCY_FREQ_SHIFT) | IS_BHR_LATENCY_CLAT_MASK);
+	i++;
 
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_IS_INFO_MASK, 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_IS_INFO_MASK;
+	sdata.asi_config[i].value = 0;
+	i++;
 
-	rc = hv_rk_perf_sample_config(counter, ASI_PERF_IS_INFO_MATCH, 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	sdata.asi_config[i].va = ASI_PERF_IS_INFO_MATCH;
+	sdata.asi_config[i].value = 0;
 
-	instr_sampler_valist_pa = va_to_pa(instr_sampler_valist);
-	ret |= rk_pcbe_program_normal(pic); /* Reset to zero & start counting */
+	sdata.asi_config_num = i + 1;
 
-	/* Start sampling */
-	rc = hv_rk_perf_sample_start(counter, pic->sampler.frequency,
-	    sizeof (instr_sampler_valist), instr_sampler_valist_pa);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-	return (ret);
+	sdata.asi_sample[0] = ASI_PERF_IS_INFO;
+	sdata.asi_sample[1] = ASI_PERF_IS_CONTEXT;
+	sdata.asi_sample_num = 2;
+
+	return (program_a_sampler(pic, &sdata));
 }
 
 static int
@@ -1892,10 +1851,8 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	uint32_t	size = pic->sampler.sample_size;
 	uint32_t	value, target, shift, mask;
 	uint32_t	sample_count = 0, sample_hit_count = 0;
-	uint64_t	total_count = 0, hit_count = 0, ovf_count, rc;
 	uint64_t	*head, *tail;
-	int		hv_call_cnt = 1, ret = 0;
-	char		*funcname = "sample_instr_sampler";
+	int		ret;
 
 	switch (GROUP(pic->sampler.syn_counter)) {
 	case I_GROUP_MODE:
@@ -1926,6 +1883,10 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 
 	/* Consume samples */
 	while (head != tail) {
+		/*
+		 * Data returned will be in the same order as the asi_list
+		 * passed to hypervisor during hv_rk_perf_sample_start call.
+		 */
 		uint64_t	rawvalue = *head;
 		uint64_t	context = *(head + 1);
 		uint8_t		tl = (uint8_t)((context >> 2) & 7);
@@ -2023,59 +1984,9 @@ sample_instr_sampler(rk_pcbe_config_t *pic, int64_t *diffp)
 	}
 	RINGBUF_SET_HEAD(ringbuf, head);
 
-	/*
-	 * Since ring buffer is consumed, clear pending sample count.
-	 * Sample count is discarded, therefore reusing a variable.
-	 */
-	rc = hv_rk_perf_sample_pending((uint64_t)(pic->counter |
-	    pic->src_type), &total_count);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
+	ret = synthesize_sample_count(pic, sample_count, sample_hit_count,
+	    "sample_instr_sampler", diffp);
 
-	/* Check if the counter overflowed */
-	rc = hv_rk_perf_count_overflow((uint64_t)(pic->counter |
-	    pic->src_type), &ovf_count);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
-	if (rc != H_EOK)
-		ovf_count = 0;
-
-	rc = hv_rk_perf_count_get((uint64_t)(pic->counter |
-	    pic->src_type), &total_count);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
-	if (rc != H_EOK)
-		total_count = 0;
-
-	total_count &= COUNTER_MASK(pic);
-
-	/*
-	 * Reset it to zero so that we need not maintain old value
-	 */
-	rc = hv_rk_perf_count_set((uint64_t)(pic->counter | pic->src_type), 0);
-	ret |= (int)rc;
-	print_hv_error(rc, &hv_call_cnt, funcname, pic);
-
-	/*
-	 * ovf_count > 0 means, counter has hit max, ovf_count times
-	 * before counting total_count of instructions. Therefore
-	 * add total_count to ovf_count times max count value.
-	 */
-	while (ovf_count--)
-		total_count += (0x1ULL << pic->counter_bits);
-
-	if (sample_count > 0)
-		hit_count = (sample_hit_count * total_count) / sample_count;
-
-	*diffp = (int64_t)hit_count;
-	DBG_PRINT(("CPU-%d: sample_instr_load. hit_count: %lu, *diffp: %ld\n",
-	    CPU->cpu_id, hit_count, *diffp));
-	if (*diffp < 0) {
-		cmn_err(CE_WARN, "CPU-%d Negative instr count. hit_count: %lu, "
-		    "*diffp: %ld\n", CPU->cpu_id, hit_count, *diffp);
-	}
 	return (ret);
 }
 
@@ -2104,6 +2015,141 @@ sample_mccdesr(rk_pcbe_config_t *pic, int64_t *diffp)
 		    CPU->cpu_id, pic->pcbe_picno, pic->counter);
 	}
 	return ((int)rc);
+}
+
+static int
+program_a_sampler(rk_pcbe_config_t *pic, program_sampler_data_t *sdata)
+{
+	uint64_t	ringbuf_pa, asi_list_pa, counter, rc;
+	int		hv_call_cnt = 1, ret = 0, need_init = 0, i;
+	uint64_t	temp_pcbe_pic = 0;
+
+	counter = (uint64_t)(pic->counter | pic->src_type);
+
+	if (pic->sampler.ring_buffer == NULL) {
+		pic->sampler.sample_size = sdata->asi_sample_num *
+		    sizeof (uint64_t);
+		rc = alloc_ringbuffer(pic, pic->sampler.sample_size,
+		    num_ringbuf_entries);
+		if (rc != 0)
+			return ((int)rc);
+		need_init = 1;
+		PRINT_PIC(pic, "After Configuration (S)");
+	}
+
+	if (need_init || pic->state == STATE_RELEASED) {
+		ringbuf_pa = va_to_pa(pic->sampler.ring_buffer);
+		rc = hv_rk_perf_sample_init(counter, ringbuf_pa);
+		print_hv_error(rc, &hv_call_cnt, sdata->name, pic);
+		if (rc != H_EOK)
+			return ((int)rc);
+	}
+
+	/*
+	 * If (((Reported Value ^ MATCH) & MASK) == 0) then sample is taken;
+	 */
+	for (i = 0; i < sdata->asi_config_num; i++) {
+		rc = hv_rk_perf_sample_config(counter, sdata->asi_config[i].va,
+		    sdata->asi_config[i].value);
+		ret |= (int)rc;
+		print_hv_error(rc, &hv_call_cnt, sdata->name, pic);
+	}
+
+	/*
+	 * pic->pcbe_pic is used to hold preset value in case of synthetic
+	 * counters
+	 */
+	if (pic->pcbe_pic > 0) {
+		temp_pcbe_pic = pic->pcbe_pic;
+		pic->pcbe_pic = 0;
+	}
+	ret |= rk_pcbe_program_normal(pic); /* Reset to zero & start counting */
+	pic->pcbe_pic = temp_pcbe_pic;
+
+	/*
+	 * Start sampling
+	 *
+	 * Data returned in the ringbuffer by the hypervisor will be in the
+	 * same order as it is programmed
+	 */
+	asi_list_pa = va_to_pa(sdata->asi_sample);
+	rc = hv_rk_perf_sample_start(counter, pic->sampler.frequency,
+	    sdata->asi_sample_num * sizeof (uint64_t), asi_list_pa);
+	ret |= (int)rc;
+	print_hv_error(rc, &hv_call_cnt, sdata->name, pic);
+	return (ret);
+}
+
+static int
+synthesize_sample_count(rk_pcbe_config_t *pic, uint64_t sample_count,
+	uint64_t sample_hit_count, char *name, int64_t *diffp)
+{
+
+	uint64_t	total_count, rc, ovf_count, hit_count = 0;
+	int		hv_call_cnt = 1, ret = 0;
+	/*
+	 * Since ring buffer is consumed, clear pending sample count.
+	 * Sample count is discarded, therefore reusing a variable.
+	 */
+	rc = hv_rk_perf_sample_pending((uint64_t)(pic->counter |
+	    pic->src_type), &total_count);
+	ret |= (int)rc;
+	print_hv_error(rc, &hv_call_cnt, name, pic);
+
+	/* Check if the counter overflowed */
+	rc = hv_rk_perf_count_overflow((uint64_t)(pic->counter |
+	    pic->src_type), &ovf_count);
+	ret |= (int)rc;
+	print_hv_error(rc, &hv_call_cnt, name, pic);
+
+	if (rc != H_EOK)
+		ovf_count = 0;
+
+	rc = hv_rk_perf_count_get((uint64_t)(pic->counter |
+	    pic->src_type), &total_count);
+	ret |= (int)rc;
+	print_hv_error(rc, &hv_call_cnt, name, pic);
+
+	if (rc != H_EOK)
+		total_count = 0;
+
+	total_count &= COUNTER_MASK(pic);
+
+	/*
+	 * Reset it to zero so that we need not maintain old value
+	 */
+	rc = hv_rk_perf_count_set((uint64_t)(pic->counter | pic->src_type), 0);
+	ret |= (int)rc;
+	print_hv_error(rc, &hv_call_cnt, name, pic);
+
+	/*
+	 * ovf_count > 0 means, counter has hit max, ovf_count times
+	 * before counting total_count of instructions. Therefore
+	 * add total_count to ovf_count times max count value.
+	 */
+	if (ovf_count)
+		total_count += (ovf_count * (0x1ULL << pic->counter_bits));
+
+	if (sample_count > 0)
+		hit_count = (sample_hit_count * total_count) / sample_count;
+
+	*diffp = (int64_t)hit_count;
+	DBG_PRINT(("CPU-%d: sample_instr_load. hit_count: %lu, *diffp: %ld\n",
+	    CPU->cpu_id, hit_count, *diffp));
+	if (*diffp < 0) {
+		cmn_err(CE_WARN, "CPU-%d Negative instr count. hit_count: %lu, "
+		    "*diffp: %ld\n", CPU->cpu_id, hit_count, *diffp);
+	}
+
+	if (pic->pcbe_pic) {
+		*diffp += pic->pcbe_pic;	/* Add the preset value */
+	/*
+	 * pic->pcbe_pic is used to hold preset value in case of synthetic
+	 * counters
+	 */
+		pic->pcbe_pic = 0;
+	}
+	return (ret);
 }
 
 static int
