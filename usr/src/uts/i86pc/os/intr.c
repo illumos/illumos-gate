@@ -25,6 +25,7 @@
  */
 
 #include <sys/cpuvar.h>
+#include <sys/cpu_event.h>
 #include <sys/regset.h>
 #include <sys/psw.h>
 #include <sys/types.h>
@@ -76,7 +77,7 @@ ulong_t laststi[NCPU];
 
 /*
  * This variable tracks the last place events were disabled on each cpu
- * it assists in debugging when asserts that interupts are enabled trip.
+ * it assists in debugging when asserts that interrupts are enabled trip.
  */
 ulong_t lastcli[NCPU];
 
@@ -931,12 +932,7 @@ do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 	ttp->ttr_vector = 0xff;
 #endif	/* TRAPTRACE */
 
-#if !defined(__xpv)
-	/*
-	 * Handle any pending TLB flushing
-	 */
-	tlb_service();
-#endif
+	cpu_idle_exit(CPU_IDLE_CB_FLAG_INTR);
 
 	/*
 	 * If it's a softint go do it now.

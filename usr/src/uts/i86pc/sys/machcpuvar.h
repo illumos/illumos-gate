@@ -131,7 +131,6 @@ struct	machcpu {
 	void (*mcpu_idle_cpu)(void);	/* idle function */
 	uint16_t mcpu_idle_type;	/* CPU next idle type */
 	uint16_t max_cstates;		/* supported max cstates */
-	uint32_t curr_cstate;		/* current cstate */
 
 	struct cpu_ucode_info	*mcpu_ucode_info;
 

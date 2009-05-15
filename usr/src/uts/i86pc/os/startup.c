@@ -2016,6 +2016,7 @@ startup_end(void)
 {
 	int i;
 	extern void setx86isalist(void);
+	extern void cpu_event_init(void);
 
 	PRM_POINT("startup_end() starting...");
 
@@ -2030,6 +2031,11 @@ startup_end(void)
 	 * Perform CPC initialization for this CPU.
 	 */
 	kcpc_hw_init(CPU);
+
+	/*
+	 * Initialize cpu event framework.
+	 */
+	cpu_event_init();
 
 #if defined(OPTERON_WORKAROUND_6323525)
 	if (opteron_workaround_6323525)
@@ -2125,6 +2131,7 @@ void
 post_startup(void)
 {
 	extern void cpupm_init(cpu_t *);
+	extern void cpu_event_init_cpu(cpu_t *);
 
 	/*
 	 * Set the system wide, processor-specific flags to be passed
@@ -2184,6 +2191,7 @@ post_startup(void)
 
 	maxmem = freemem;
 
+	cpu_event_init_cpu(CPU);
 	cpupm_init(CPU);
 
 	add_cpunode2devtree(CPU->cpu_id, CPU->cpu_m.mcpu_cpi);

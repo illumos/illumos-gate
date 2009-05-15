@@ -31,16 +31,17 @@
 #define	_CPUIDLE_H
 
 #include <sys/cpupm.h>
+#include <sys/cpu.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 #define	CPU_MAX_CSTATES	8
 
-#define	CPU_ACPI_C0	0
-#define	CPU_ACPI_C1	1
-#define	CPU_ACPI_C2	2
-#define	CPU_ACPI_C3	3
+#define	CPU_ACPI_C0	IDLE_STATE_C0
+#define	CPU_ACPI_C1	IDLE_STATE_C1
+#define	CPU_ACPI_C2	IDLE_STATE_C2
+#define	CPU_ACPI_C3	IDLE_STATE_C3
 
 #define	BM_CTL		0x1
 #define	BM_RLD		0x2
@@ -64,7 +65,6 @@ extern void cstate_wakeup(cpu_t *, int);
 extern boolean_t cpu_deep_cstates_supported(void);
 extern void cpu_wakeup(cpu_t *, int);
 extern void cpu_wakeup_mwait(cpu_t *, int);
-extern void cpu_dtrace_idle_probe(uint_t);
 extern void cpuidle_manage_cstates(void *);
 extern boolean_t cstate_timer_callback(int code);
 

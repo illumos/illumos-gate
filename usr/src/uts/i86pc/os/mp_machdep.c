@@ -36,6 +36,7 @@
 #include <sys/x86_archext.h>
 #include <sys/cpupart.h>
 #include <sys/cpuvar.h>
+#include <sys/cpu_event.h>
 #include <sys/cmt.h>
 #include <sys/cpu.h>
 #include <sys/disp.h>
@@ -370,18 +371,28 @@ cpu_idle_adaptive(void)
 	(*CPU->cpu_m.mcpu_idle_cpu)();
 }
 
-void
-cpu_dtrace_idle_probe(uint_t cstate)
+/*
+ * Function called by CPU idle notification framework to check whether CPU
+ * has been awakened. It will be called with interrupt disabled.
+ * If CPU has been awakened, call cpu_idle_exit() to notify CPU idle
+ * notification framework.
+ */
+/*ARGSUSED*/
+static void
+cpu_idle_check_wakeup(void *arg)
 {
-	cpu_t		*cpup = CPU;
-	struct machcpu	*mcpu = &(cpup->cpu_m);
-
-	mcpu->curr_cstate = cstate;
-	DTRACE_PROBE1(idle__state__transition, uint_t, cstate);
+	/*
+	 * Toggle interrupt flag to detect pending interrupts.
+	 * If interrupt happened, do_interrupt() will notify CPU idle
+	 * notification framework so no need to call cpu_idle_exit() here.
+	 */
+	sti();
+	SMT_PAUSE();
+	cli();
 }
 
 /*
- * Idle the present CPU until awoken via an interrupt
+ * Idle the present CPU until wakened via an interrupt
  */
 void
 cpu_idle(void)
@@ -407,7 +418,7 @@ cpu_idle(void)
 	 *
 	 * When a thread becomes runnable, it is placed on the queue
 	 * and then the halted CPU bitmap is checked to determine who
-	 * (if anyone) should be awoken. We therefore need to first
+	 * (if anyone) should be awakened. We therefore need to first
 	 * add ourselves to the bitmap, and and then check if there
 	 * is any work available. The order is important to prevent a race
 	 * that can lead to work languishing on a run queue somewhere while
@@ -479,11 +490,11 @@ cpu_idle(void)
 		return;
 	}
 
-	cpu_dtrace_idle_probe(IDLE_STATE_C1);
-
-	mach_cpu_idle();
-
-	cpu_dtrace_idle_probe(IDLE_STATE_C0);
+	if (cpu_idle_enter(IDLE_STATE_C1, 0,
+	    cpu_idle_check_wakeup, NULL) == 0) {
+		mach_cpu_idle();
+		cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+	}
 
 	/*
 	 * We're no longer halted
@@ -560,7 +571,37 @@ cpu_wakeup(cpu_t *cpu, int bound)
 
 #ifndef __xpv
 /*
- * Idle the present CPU until awoken via touching its monitored line
+ * Function called by CPU idle notification framework to check whether CPU
+ * has been awakened. It will be called with interrupt disabled.
+ * If CPU has been awakened, call cpu_idle_exit() to notify CPU idle
+ * notification framework.
+ */
+static void
+cpu_idle_mwait_check_wakeup(void *arg)
+{
+	volatile uint32_t *mcpu_mwait = (volatile uint32_t *)arg;
+
+	ASSERT(arg != NULL);
+	if (*mcpu_mwait != MWAIT_HALTED) {
+		/*
+		 * CPU has been awakened, notify CPU idle notification system.
+		 */
+		cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+	} else {
+		/*
+		 * Toggle interrupt flag to detect pending interrupts.
+		 * If interrupt happened, do_interrupt() will notify CPU idle
+		 * notification framework so no need to call cpu_idle_exit()
+		 * here.
+		 */
+		sti();
+		SMT_PAUSE();
+		cli();
+	}
+}
+
+/*
+ * Idle the present CPU until awakened via touching its monitored line
  */
 void
 cpu_idle_mwait(void)
@@ -632,13 +673,13 @@ cpu_idle_mwait(void)
 	 */
 	i86_monitor(mcpu_mwait, 0, 0);
 	if (*mcpu_mwait == MWAIT_HALTED) {
-		cpu_dtrace_idle_probe(IDLE_STATE_C1);
-
-		tlb_going_idle();
-		i86_mwait(0, 0);
-		tlb_service();
-
-		cpu_dtrace_idle_probe(IDLE_STATE_C0);
+		if (cpu_idle_enter(IDLE_STATE_C1, 0,
+		    cpu_idle_mwait_check_wakeup, (void *)mcpu_mwait) == 0) {
+			if (*mcpu_mwait == MWAIT_HALTED) {
+				i86_mwait(0, 0);
+			}
+			cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+		}
 	}
 
 	/*
@@ -803,7 +844,7 @@ mach_get_platform(int owner)
 
 	/*
 	 * Save the version of the PSM module, in case we need to
-	 * bahave differently based on version.
+	 * behave differently based on version.
 	 */
 	mach_ver[0] = mach_ver[owner];
 

@@ -36,6 +36,7 @@
 #include <sys/cpu_acpi.h>
 #include <sys/cpu_idle.h>
 #include <sys/cpupm.h>
+#include <sys/cpu_event.h>
 #include <sys/hpet.h>
 #include <sys/archsystm.h>
 #include <vm/hat_i86.h>
@@ -253,6 +254,74 @@ cstate_wakeup(cpu_t *cp, int bound)
 }
 
 /*
+ * Function called by CPU idle notification framework to check whether CPU
+ * has been awakened. It will be called with interrupt disabled.
+ * If CPU has been awakened, call cpu_idle_exit() to notify CPU idle
+ * notification framework.
+ */
+static void
+acpi_cpu_mwait_check_wakeup(void *arg)
+{
+	volatile uint32_t *mcpu_mwait = (volatile uint32_t *)arg;
+
+	ASSERT(arg != NULL);
+	if (*mcpu_mwait != MWAIT_HALTED) {
+		/*
+		 * CPU has been awakened, notify CPU idle notification system.
+		 */
+		cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+	} else {
+		/*
+		 * Toggle interrupt flag to detect pending interrupts.
+		 * If interrupt happened, do_interrupt() will notify CPU idle
+		 * notification framework so no need to call cpu_idle_exit()
+		 * here.
+		 */
+		sti();
+		SMT_PAUSE();
+		cli();
+	}
+}
+
+static void
+acpi_cpu_mwait_ipi_check_wakeup(void *arg)
+{
+	volatile uint32_t *mcpu_mwait = (volatile uint32_t *)arg;
+
+	ASSERT(arg != NULL);
+	if (*mcpu_mwait != MWAIT_WAKEUP_IPI) {
+		/*
+		 * CPU has been awakened, notify CPU idle notification system.
+		 */
+		cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+	} else {
+		/*
+		 * Toggle interrupt flag to detect pending interrupts.
+		 * If interrupt happened, do_interrupt() will notify CPU idle
+		 * notification framework so no need to call cpu_idle_exit()
+		 * here.
+		 */
+		sti();
+		SMT_PAUSE();
+		cli();
+	}
+}
+
+/*ARGSUSED*/
+static void
+acpi_cpu_check_wakeup(void *arg)
+{
+	/*
+	 * Toggle interrupt flag to detect pending interrupts.
+	 * If interrupt happened, do_interrupt() will notify CPU idle
+	 * notification framework so no need to call cpu_idle_exit() here.
+	 */
+	sti();
+	SMT_PAUSE();
+	cli();
+}
+
+/*
  * enter deep c-state handler
  */
 static void
@@ -267,6 +336,7 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	uint32_t		cs_type = cstate->cs_type;
 	int			hset_update = 1;
 	boolean_t		using_timer;
+	cpu_idle_check_wakeup_t check_func = &acpi_cpu_check_wakeup;
 
 	/*
 	 * Set our mcpu_mwait here, so we can tell if anyone tries to
@@ -274,10 +344,13 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	 * attempt to set our mcpu_mwait until we add ourself to the haltset.
 	 */
 	if (mcpu_mwait) {
-		if (type == ACPI_ADR_SPACE_SYSTEM_IO)
+		if (type == ACPI_ADR_SPACE_SYSTEM_IO) {
 			*mcpu_mwait = MWAIT_WAKEUP_IPI;
-		else
+			check_func = &acpi_cpu_mwait_ipi_check_wakeup;
+		} else {
 			*mcpu_mwait = MWAIT_HALTED;
+			check_func = &acpi_cpu_mwait_check_wakeup;
+		}
 	}
 
 	/*
@@ -397,13 +470,14 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 		 */
 		i86_monitor(mcpu_mwait, 0, 0);
 		if ((*mcpu_mwait & ~MWAIT_WAKEUP_IPI) == MWAIT_HALTED) {
-			cpu_dtrace_idle_probe(CPU_ACPI_C1);
-
-			tlb_going_idle();
-			i86_mwait(0, 0);
-			tlb_service();
-
-			cpu_dtrace_idle_probe(CPU_ACPI_C0);
+			if (cpu_idle_enter(IDLE_STATE_C1, 0,
+			    check_func, (void *)mcpu_mwait) == 0) {
+				if ((*mcpu_mwait & ~MWAIT_WAKEUP_IPI) ==
+				    MWAIT_HALTED) {
+					i86_mwait(0, 0);
+				}
+				cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+			}
 		}
 
 		/*
@@ -416,8 +490,6 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 		return;
 	}
 
-	cpu_dtrace_idle_probe((uint_t)cs_type);
-
 	if (type == ACPI_ADR_SPACE_FIXED_HARDWARE) {
 		/*
 		 * We're on our way to being halted.
@@ -426,25 +498,31 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 		 */
 		i86_monitor(mcpu_mwait, 0, 0);
 		if (*mcpu_mwait == MWAIT_HALTED) {
-			uint32_t eax = cstate->cs_address;
-			uint32_t ecx = 1;
-
-			tlb_going_idle();
-			i86_mwait(eax, ecx);
-			tlb_service();
+			if (cpu_idle_enter((uint_t)cs_type, 0,
+			    check_func, (void *)mcpu_mwait) == 0) {
+				if (*mcpu_mwait == MWAIT_HALTED) {
+					i86_mwait(cstate->cs_address, 1);
+				}
+				cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+			}
 		}
 	} else if (type == ACPI_ADR_SPACE_SYSTEM_IO) {
 		uint32_t value;
 		ACPI_TABLE_FADT *gbl_FADT;
 
 		if (*mcpu_mwait == MWAIT_WAKEUP_IPI) {
-			tlb_going_idle();
-			(void) cpu_acpi_read_port(cstate->cs_address,
-			    &value, 8);
-			acpica_get_global_FADT(&gbl_FADT);
-			(void) cpu_acpi_read_port(
-			    gbl_FADT->XPmTimerBlock.Address, &value, 32);
-			tlb_service();
+			if (cpu_idle_enter((uint_t)cs_type, 0,
+			    check_func, (void *)mcpu_mwait) == 0) {
+				if (*mcpu_mwait == MWAIT_WAKEUP_IPI) {
+					(void) cpu_acpi_read_port(
+					    cstate->cs_address, &value, 8);
+					acpica_get_global_FADT(&gbl_FADT);
+					(void) cpu_acpi_read_port(
+					    gbl_FADT->XPmTimerBlock.Address,
+					    &value, 32);
+				}
+				cpu_idle_exit(CPU_IDLE_CB_FLAG_IDLE);
+			}
 		}
 	}
 
@@ -454,8 +532,6 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 	 */
 	(void) cstate_use_timer(&lapic_expire, CSTATE_USING_LAT);
 	sti();
-
-	cpu_dtrace_idle_probe(CPU_ACPI_C0);
 
 	/*
 	 * We're no longer halted

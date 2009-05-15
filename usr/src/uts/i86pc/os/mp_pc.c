@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Welcome to the world of the "real mode platter".
@@ -106,7 +104,7 @@ mach_cpucontext_alloc(struct cpu *cp)
 
 	/*
 	 * Allocate space for stack, tss, gdt and idt. We round the size
-	 * alloated for cpu_tables up, so that the TSS is on a unique page.
+	 * allotted for cpu_tables up, so that the TSS is on a unique page.
 	 * This is more efficient when running in virtual machines.
 	 */
 	ct = kmem_zalloc(P2ROUNDUP(sizeof (*ct), PAGESIZE), KM_SLEEP);
@@ -257,9 +255,7 @@ mach_cpu_halt(char *msg)
 void
 mach_cpu_idle(void)
 {
-	tlb_going_idle();
 	i86_halt();
-	tlb_service();
 }
 
 void

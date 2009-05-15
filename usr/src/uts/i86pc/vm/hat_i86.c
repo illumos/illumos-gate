@@ -138,7 +138,7 @@ int	enable_1gpg = 1;
 
 /*
  * AMD shanghai processors provide better management of 1gb ptes in its tlb.
- * By default, 1g page suppport will be disabled for pre-shanghai AMD
+ * By default, 1g page support will be disabled for pre-shanghai AMD
  * processors that don't have optimal tlb support for the 1g page size.
  * chk_optimal_1gtlb can be set to 0 to force 1g page support on sub-optimal
  * processors.
@@ -1299,7 +1299,7 @@ hati_pte_map(
 	int		rv = 0;
 
 	/*
-	 * Is this a consistant (ie. need mapping list lock) mapping?
+	 * Is this a consistent (ie. need mapping list lock) mapping?
 	 */
 	is_consist = (pp != NULL && (flags & HAT_LOAD_NOCONSIST) == 0);
 
@@ -1991,20 +1991,13 @@ tlb_going_idle(void)
 
 /*
  * Service a delayed TLB flush if coming out of being idle.
+ * It will be called from cpu idle notification with interrupt disabled.
  */
 void
 tlb_service(void)
 {
-	ulong_t flags = getflags();
 	ulong_t tlb_info;
 	ulong_t found;
-
-	/*
-	 * Be sure interrupts are off while doing this so that
-	 * higher level interrupts correctly wait for flushes to finish.
-	 */
-	if (flags & PS_IE)
-		flags = intr_clear();
 
 	/*
 	 * We only have to do something if coming out of being idle.
@@ -2024,12 +2017,6 @@ tlb_service(void)
 		if (tlb_info & TLB_INVAL_ALL)
 			flush_all_tlb_entries();
 	}
-
-	/*
-	 * Restore interrupt enable control bit.
-	 */
-	if (flags & PS_IE)
-		sti();
 }
 #endif /* !__xpv */
 
@@ -3178,7 +3165,7 @@ hat_reserve(struct as *as, caddr_t addr, size_t len)
 
 /*
  * Called when all mappings to a page should have write permission removed.
- * Mostly stolem from hat_pagesync()
+ * Mostly stolen from hat_pagesync()
  */
 static void
 hati_page_clrwrt(struct page *pp)
@@ -3311,8 +3298,8 @@ hat_page_clrattr(struct page *pp, uint_t flag)
 
 /*
  *	If flag is specified, returns 0 if attribute is disabled
- *	and non zero if enabled.  If flag specifes multiple attributs
- *	then returns 0 if ALL atriibutes are disabled.  This is an advisory
+ *	and non zero if enabled.  If flag specifes multiple attributes
+ *	then returns 0 if ALL attributes are disabled.  This is an advisory
  *	call.
  */
 uint_t
