@@ -338,6 +338,11 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			break;
 
 		case ZPOOL_PROP_BOOTFS:
+			/*
+			 * If the pool version is less than SPA_VERSION_BOOTFS,
+			 * or the pool is still being created (version == 0),
+			 * the bootfs property cannot be set.
+			 */
 			if (spa_version(spa) < SPA_VERSION_BOOTFS) {
 				error = ENOTSUP;
 				break;
@@ -641,7 +646,7 @@ spa_deactivate(spa_t *spa)
 	ASSERT(spa->spa_sync_on == B_FALSE);
 	ASSERT(spa->spa_dsl_pool == NULL);
 	ASSERT(spa->spa_root_vdev == NULL);
-
+	ASSERT(spa->spa_async_zio_root == NULL);
 	ASSERT(spa->spa_state != POOL_STATE_UNINITIALIZED);
 
 	txg_list_destroy(&spa->spa_vdev_txg_list);
@@ -1175,10 +1180,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	/*
 	 * Create "The Godfather" zio to hold all async IOs
 	 */
-	if (spa->spa_async_zio_root == NULL)
-		spa->spa_async_zio_root = zio_root(spa, NULL, NULL,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE |
-		    ZIO_FLAG_GODFATHER);
+	spa->spa_async_zio_root = zio_root(spa, NULL, NULL,
+	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE | ZIO_FLAG_GODFATHER);
 
 	/*
 	 * Parse the configuration into a vdev tree.  We explicitly set the
@@ -2085,7 +2088,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_uberblock.ub_txg = txg - 1;
 
 	if (props && (error = spa_prop_validate(spa, props))) {
-		spa_unload(spa);
 		spa_deactivate(spa);
 		spa_remove(spa);
 		mutex_exit(&spa_namespace_lock);
@@ -2102,10 +2104,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	/*
 	 * Create "The Godfather" zio to hold all async IOs
 	 */
-	if (spa->spa_async_zio_root == NULL)
-		spa->spa_async_zio_root = zio_root(spa, NULL, NULL,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE |
-		    ZIO_FLAG_GODFATHER);
+	spa->spa_async_zio_root = zio_root(spa, NULL, NULL,
+	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE | ZIO_FLAG_GODFATHER);
 
 	/*
 	 * Create the root vdev.
@@ -2541,6 +2541,11 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 	spa_activate(spa, spa_mode_global);
 
 	/*
+	 * Don't start async tasks until we know everything is healthy.
+	 */
+	spa_async_suspend(spa);
+
+	/*
 	 * Pass off the heavy lifting to spa_load().  Pass TRUE for mosconfig
 	 * because the user-supplied config is actually the one to trust when
 	 * doing an import.
@@ -2584,6 +2589,8 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 		mutex_exit(&spa_namespace_lock);
 		return (error);
 	}
+
+	spa_async_resume(spa);
 
 	/*
 	 * Override any spares and level 2 cache devices as specified by
