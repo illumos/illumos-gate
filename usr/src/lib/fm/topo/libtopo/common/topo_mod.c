@@ -650,6 +650,17 @@ topo_mod_devinfo(topo_mod_t *mod)
 	return (topo_hdl_devinfo(mod->tm_hdl));
 }
 
+smbios_hdl_t *
+topo_mod_smbios(topo_mod_t *mod)
+{
+	topo_hdl_t *thp = mod->tm_hdl;
+
+	if (thp->th_smbios == NULL)
+		thp->th_smbios = smbios_open(NULL, SMB_VERSION, 0, NULL);
+
+	return (thp->th_smbios);
+}
+
 di_prom_handle_t
 topo_mod_prominfo(topo_mod_t *mod)
 {
@@ -704,12 +715,11 @@ topo_mod_csn(topo_mod_t *mod)
 	smbios_info_t s2;
 	id_t id;
 
-	if ((shp = smbios_open(NULL, SMB_VERSION, 0, NULL)) != NULL) {
+	if ((shp = topo_mod_smbios(mod)) != NULL) {
 		if ((id = smbios_info_system(shp, &s1)) != SMB_ERR &&
 		    smbios_info_common(shp, id, &s2) != SMB_ERR) {
 			(void) strlcpy(csn, s2.smbi_serial, MAXNAMELEN);
 		}
-		smbios_close(shp);
 
 		if (strcmp(csn, SMB_DEFAULT1) == 0 ||
 		    strcmp(csn, SMB_DEFAULT2) == 0)

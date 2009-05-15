@@ -160,10 +160,10 @@ xmlattr_to_type(topo_mod_t *mp, xmlNodePtr xn, xmlChar *attr)
 	} else if (xmlStrcmp(str, (xmlChar *)String) == 0) {
 		rv = TOPO_TYPE_STRING;
 	} else {
-		xmlFree(str);
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
-		    "Unrecognized type attribute value.\n");
+		    "Unrecognized type attribute value '%s'.\n", str);
 		(void) topo_mod_seterrno(mp, ETOPO_PRSR_BADTYPE);
+		xmlFree(str);
 		return (TOPO_TYPE_INVALID);
 	}
 	xmlFree(str);
@@ -940,7 +940,8 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 	char *key;
 
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
-	    "pad_process beneath %s\n", topo_node_name(ptn));
+	    "pad_process beneath %s=%d\n", topo_node_name(ptn),
+	    topo_node_instance(ptn));
 	if (new == NULL) {
 		for (cn = pxn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
@@ -1170,18 +1171,19 @@ fac_process(topo_mod_t *mp, xmlNodePtr pn, tf_rdata_t *rd, tnode_t *ptn)
 	topo_pgroup_info_t pgi;
 
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
-	    "fac_process() called\n");
+	    "fac_process() called for %s=%d\n", topo_node_name(ptn),
+	    topo_node_instance(ptn));
 
 	for (cn = pn->xmlChildrenNode; cn != NULL; cn = cn->next) {
 
 		if (xmlStrcmp(cn->name, (xmlChar *)Facility) != 0)
 			continue;
 
-		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
-		    "facility processing\n");
-
 		if ((fname = xmlGetProp(cn, (xmlChar *)Name)) == NULL)
 			goto facdone;
+
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+		    "processing facility node '%s'\n", fname);
 
 		if ((ftype = xmlGetProp(cn, (xmlChar *)Type)) == NULL)
 			goto facdone;
@@ -1679,12 +1681,8 @@ topo_xml_walk(topo_mod_t *mp,
 			    "topo_xml_walk: Ignoring nameless xmlnode\n");
 			continue;
 		}
-		if (xmlStrcmp(curr->name, (xmlChar *)Range) != 0) {
-			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
-			    "topo_xml_walk: Ignoring non-range %s.\n",
-			    curr->name);
+		if (xmlStrcmp(curr->name, (xmlChar *)Range) != 0)
 			continue;
-		}
 		if ((rdp = tf_rdata_new(mp, xinfo, curr, troot)) == NULL) {
 			/*
 			 * Range processing error, continue walk

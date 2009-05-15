@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +121,7 @@ struct topo_hdl {
 	int th_dbout;			/* Debug channel */
 	ipmi_handle_t *th_ipmi;		/* IPMI handle */
 	pthread_mutex_t th_ipmi_lock;	/* IPMI lock */
+	smbios_hdl_t *th_smbios;	/* SMBIOS handle */
 };
 
 #define	TOPO_UUID_SIZE	37	/* libuuid limit + 1 */

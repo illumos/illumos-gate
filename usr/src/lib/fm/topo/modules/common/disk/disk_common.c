@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Functions in this file are shared between the disk and ses enumerators.
@@ -294,15 +292,13 @@ error:	err = topo_mod_seterrno(mod, err);
 }
 
 /*
- * Manufacturing strings can contain characters that are invalid for use in hc
- * authority names.  This trims leading and trailing whitespace, and
- * substitutes any characters known to be bad.
+ * Trim leading and trailing whitespace from the string.
  */
-char *
-disk_auth_clean(topo_mod_t *mod, const char *begin)
+static char *
+disk_trim_whitespace(topo_mod_t *mod, const char *begin)
 {
 	const char *end;
-	char *buf, *str;
+	char *buf;
 	size_t count;
 
 	if (begin == NULL)
@@ -321,8 +317,27 @@ disk_auth_clean(topo_mod_t *mod, const char *begin)
 
 	(void) strlcpy(buf, begin, count + 1);
 
-	while ((str = strpbrk(buf, " :=")) != NULL)
-		*str = '-';
+	return (buf);
+}
+
+/*
+ * Manufacturing strings can contain characters that are invalid for use in hc
+ * authority names.  This trims leading and trailing whitespace, and
+ * substitutes any characters known to be bad.
+ */
+char *
+disk_auth_clean(topo_mod_t *mod, const char *str)
+{
+	char *buf, *p;
+
+	if (str == NULL)
+		return (NULL);
+
+	if ((buf = topo_mod_strdup(mod, str)) == NULL)
+		return (NULL);
+
+	while ((p = strpbrk(buf, " :=")) != NULL)
+		*p = '-';
 
 	return (buf);
 }
@@ -693,22 +708,22 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	/* cache various bits of optional information about the disk */
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
 	    INQUIRY_VENDOR_ID, &s) > 0) {
-		if ((dnode->ddn_mfg = topo_mod_strdup(mod, s)) == NULL)
+		if ((dnode->ddn_mfg = disk_trim_whitespace(mod, s)) == NULL)
 			goto error;
 	}
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
 	    INQUIRY_PRODUCT_ID, &s) > 0) {
-		if ((dnode->ddn_model = topo_mod_strdup(mod, s)) == NULL)
+		if ((dnode->ddn_model = disk_trim_whitespace(mod, s)) == NULL)
 			goto error;
 	}
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
 	    INQUIRY_REVISION_ID, &s) > 0) {
-		if ((dnode->ddn_firm = topo_mod_strdup(mod, s)) == NULL)
+		if ((dnode->ddn_firm = disk_trim_whitespace(mod, s)) == NULL)
 			goto error;
 	}
 	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
 	    INQUIRY_SERIAL_NO, &s) > 0) {
-		if ((dnode->ddn_serial = topo_mod_strdup(mod, s)) == NULL)
+		if ((dnode->ddn_serial = disk_trim_whitespace(mod, s)) == NULL)
 			goto error;
 	}
 	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node,
@@ -749,22 +764,17 @@ error:
 static int
 disk_walk_di_nodes(di_node_t node, void *arg)
 {
-	ddi_devid_t	devid = NULL;
-	char		*devidstr;
+	char			*devidstr = NULL;
 
 	/* only interested in nodes that have devids */
-	devid = (ddi_devid_t)di_devid(node);
-	if (devid == NULL)
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    DEVID_PROP_NAME, &devidstr) < 0) {
 		return (DI_WALK_CONTINUE);
-
-	/* ... with a string representation of the devid */
-	devidstr = devid_str_encode(devid, NULL);
-	if (devidstr == NULL)
-		return (DI_WALK_CONTINUE);
+	}
 
 	/* create/find the devid scsi topology node */
 	(void) disk_di_node_add(node, devidstr, arg);
-	devid_str_free(devidstr);
+
 	return (DI_WALK_CONTINUE);
 }
 
@@ -775,7 +785,7 @@ disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
 	di_devlink_handle_t	devhdl;
 	disk_cbdata_t		dcb;
 
-	if ((devtree = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
+	if ((devtree = topo_mod_devinfo(mod)) == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "disk_list_gather: "
 		    "di_init failed");
 		return (-1);
@@ -784,7 +794,6 @@ disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
 	if ((devhdl = di_devlink_init(NULL, 0)) == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "disk_list_gather: "
 		    "di_devlink_init failed");
-		di_fini(devtree);
 		return (-1);
 	}
 
@@ -797,7 +806,6 @@ disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
 	    disk_walk_di_nodes);
 
 	(void) di_devlink_fini(&devhdl);
-	di_fini(devtree);
 
 	return (0);
 }

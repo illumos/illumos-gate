@@ -32,6 +32,7 @@
 #include <libipmi.h>
 #include <libnvpair.h>
 #include <libdevinfo.h>
+#include <smbios.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -119,6 +120,7 @@ extern void topo_method_unregister_all(topo_mod_t *, tnode_t *);
 extern di_node_t topo_mod_devinfo(topo_mod_t *);
 extern ipmi_handle_t *topo_mod_ipmi_hold(topo_mod_t *);
 extern void topo_mod_ipmi_rele(topo_mod_t *);
+extern smbios_hdl_t *topo_mod_smbios(topo_mod_t *);
 extern di_prom_handle_t topo_mod_prominfo(topo_mod_t *);
 extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 
