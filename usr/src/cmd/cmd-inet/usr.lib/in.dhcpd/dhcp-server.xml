@@ -80,7 +80,7 @@
 			<method_credential
 				user='root'
 				group='root'
-				privileges='all'
+				privileges='zone,net_icmpaccess,sys_ip_config'
 			/>
 		</method_context>
 	</exec_method>
