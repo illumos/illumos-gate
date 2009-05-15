@@ -1040,8 +1040,8 @@ smb_tree_is_connected(smb_tree_t *tree)
 /*
  * smb_tree_get_odir
  *
- * Find the next open odir in the tree's list of odirs, and obtain
- * a hold on it. (A hold can only be obtained on an open odir.)
+ * Find the next odir in the tree's list of odirs, and obtain a
+ * hold on it.
  * If the specified odir is NULL the search starts at the beginning
  * of the tree's odir list, otherwise the search starts after the
  * specified odir.

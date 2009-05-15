@@ -71,39 +71,57 @@
  *    +-------------------------+
  *    |  SMB_ODIR_STATE_OPEN    |<----------- open / creation
  *    +-------------------------+
- *		    |
- *		    | close
- *		    |
- *		    v
+ *	    |            ^
+ *	    | (first)    | (last)
+ *	    | lookup     | release
+ *	    v            |
  *    +-------------------------+
- *    | SMB_ODIR_STATE_CLOSING  |
+ *    | SMB_ODIR_STATE_IN_USE   |----
+ *    +-------------------------+   | lookup / release / read
+ *	    |                ^-------
+ *	    | close
+ *	    |
+ *	    v
  *    +-------------------------+
- *		    |
- *		    | last release
- *		    |
- *		    v
+ *    | SMB_ODIR_STATE_CLOSING  |----
+ *    +-------------------------+   | close / release / read
+ *	    |                ^-------
+ *	    | (last) release
+ *	    |
+ *	    v
  *    +-------------------------+
  *    | SMB_ODIR_STATE_CLOSED   |----------> deletion
  *    +-------------------------+
  *
  *
  * SMB_ODIR_STATE_OPEN
+ * - the odir exists in the list of odirs of its tree
+ * - lookup is valid in this state. It will place a hold on the odir
+ *   by incrementing the reference count and the odir will transition
+ *   to SMB_ODIR_STATE_IN_USE
+ * - read/close/release not valid in this state
+ *
+ * SMB_ODIR_STATE_IN_USE
  * - the odir exists in the list of odirs of its tree.
- * - references will be given out if the odir is looked up
+ * - lookup is valid in this state. It will place a hold on the odir
+ *   by incrementing the reference count.
+ * - if the last hold is released the odir will transition
+ *   back to SMB_ODIR_STATE_OPEN
  * - if a close is received the odir will transition to
  *   SMB_ODIR_STATE_CLOSING.
  *
  * SMB_ODIR_STATE_CLOSING
  * - the odir exists in the list of odirs of its tree.
- * - references will NOT be given out if the odir is looked up.
- * - when the last reference is released (refcnt == 0) the
- *   odir will transition to SMB_ODIR_STATE_CLOSED.
+ * - lookup will fail in this state.
+ * - when the last hold is released the odir will transition
+ *   to SMB_ODIR_STATE_CLOSED.
  *
  * SMB_ODIR_STATE_CLOSED
  * - the odir exists in the list of odirs of its tree.
  * - there are no users of the odir (refcnt == 0)
- * - references will NOT be given out if the odir is looked up.
  * - the odir is being removed from the tree's list and deleted.
+ * - lookup will fail in this state.
+ * - read/close/release not valid in this state
  *
  * Comments
  * --------
@@ -137,7 +155,7 @@
  *
  * smb_odir_t *odir = smb_tree_lookup_odir(odid)
  *	Find the odir corresponding to the specified odid in the tree's
- *	list of odirs.
+ *	list of odirs. Place a hold on the odir.
  *
  * smb_odir_read(..., smb_odirent_t *odirent)
  *	Find the next directory entry in the odir and return it in odirent.
@@ -150,11 +168,13 @@
  *	Find the next named stream entry in the odir. Return the details of
  *	the named stream in smb_streaminfo_t.
  *
+ * smb_odir_close(smb_odir_t *odir)
+ *  Close the odir.
+ *  The caller of close must have a hold on the odir being closed.
+ *  The hold should be released after closing.
+ *
  * smb_odir_release(smb_odir_t *odir)
  *	Release the hold on the odir, obtained by lookup.
- *
- * smb_odir_close(smb_odir_t *odir)
- *	Close the odir and remove it from the tree's list of odirs.
  *
  *
  * Odir Internals
@@ -363,6 +383,8 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 
 /*
  * smb_odir_hold
+ *
+ * A hold will only be granted if the odir is open or in_use.
  */
 boolean_t
 smb_odir_hold(smb_odir_t *od)
@@ -371,12 +393,22 @@ smb_odir_hold(smb_odir_t *od)
 	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
 
 	mutex_enter(&od->d_mutex);
-	if (od->d_state != SMB_ODIR_STATE_OPEN) {
+
+	switch (od->d_state) {
+	case SMB_ODIR_STATE_OPEN:
+		od->d_refcnt++;
+		od->d_state = SMB_ODIR_STATE_IN_USE;
+		break;
+	case SMB_ODIR_STATE_IN_USE:
+		od->d_refcnt++;
+		break;
+	case SMB_ODIR_STATE_CLOSING:
+	case SMB_ODIR_STATE_CLOSED:
+	default:
 		mutex_exit(&od->d_mutex);
 		return (B_FALSE);
 	}
 
-	od->d_refcnt++;
 	mutex_exit(&od->d_mutex);
 	return (B_TRUE);
 }
@@ -388,8 +420,7 @@ smb_odir_hold(smb_odir_t *od)
  * results in a refcnt of 0, the odir may be removed from
  * the tree's list of odirs and deleted.  The odir's state is
  * set to SMB_ODIR_STATE_CLOSED prior to exiting the mutex and
- * deleting it. This ensure that nobody else can ontain a reference
- * to it while we are deleting it.
+ * deleting the odir.
  */
 void
 smb_odir_release(smb_odir_t *od)
@@ -398,11 +429,15 @@ smb_odir_release(smb_odir_t *od)
 	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
 
 	mutex_enter(&od->d_mutex);
-	ASSERT(od->d_refcnt);
+	ASSERT(od->d_refcnt > 0);
 
 	switch (od->d_state) {
 	case SMB_ODIR_STATE_OPEN:
+		break;
+	case SMB_ODIR_STATE_IN_USE:
 		od->d_refcnt--;
+		if (od->d_refcnt == 0)
+			od->d_state = SMB_ODIR_STATE_OPEN;
 		break;
 	case SMB_ODIR_STATE_CLOSING:
 		od->d_refcnt--;
@@ -414,9 +449,7 @@ smb_odir_release(smb_odir_t *od)
 		}
 		break;
 	case SMB_ODIR_STATE_CLOSED:
-		break;
 	default:
-		ASSERT(0);
 		break;
 	}
 
@@ -430,17 +463,22 @@ void
 smb_odir_close(smb_odir_t *od)
 {
 	ASSERT(od);
-	ASSERT(od->d_refcnt);
+	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
 
 	mutex_enter(&od->d_mutex);
-	if (od->d_state != SMB_ODIR_STATE_OPEN) {
-		mutex_exit(&od->d_mutex);
-		return;
+	ASSERT(od->d_refcnt > 0);
+	switch (od->d_state) {
+	case SMB_ODIR_STATE_OPEN:
+		break;
+	case SMB_ODIR_STATE_IN_USE:
+		od->d_state = SMB_ODIR_STATE_CLOSING;
+		break;
+	case SMB_ODIR_STATE_CLOSING:
+	case SMB_ODIR_STATE_CLOSED:
+	default:
+		break;
 	}
-	od->d_state = SMB_ODIR_STATE_CLOSING;
 	mutex_exit(&od->d_mutex);
-
-	smb_odir_release(od);
 }
 
 /*
@@ -470,9 +508,15 @@ smb_odir_read(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(odirent);
 
 	mutex_enter(&od->d_mutex);
+	ASSERT(od->d_refcnt > 0);
 
-	ASSERT(od->d_state == SMB_ODIR_STATE_OPEN);
-	if (od->d_state != SMB_ODIR_STATE_OPEN) {
+	switch (od->d_state) {
+	case SMB_ODIR_STATE_IN_USE:
+	case SMB_ODIR_STATE_CLOSING:
+		break;
+	case SMB_ODIR_STATE_OPEN:
+	case SMB_ODIR_STATE_CLOSED:
+	default:
 		mutex_exit(&od->d_mutex);
 		return (-1);
 	}
@@ -540,9 +584,15 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(fileinfo);
 
 	mutex_enter(&od->d_mutex);
+	ASSERT(od->d_refcnt > 0);
 
-	ASSERT(od->d_state == SMB_ODIR_STATE_OPEN);
-	if (od->d_state != SMB_ODIR_STATE_OPEN) {
+	switch (od->d_state) {
+	case SMB_ODIR_STATE_IN_USE:
+	case SMB_ODIR_STATE_CLOSING:
+		break;
+	case SMB_ODIR_STATE_OPEN:
+	case SMB_ODIR_STATE_CLOSED:
+	default:
 		mutex_exit(&od->d_mutex);
 		return (-1);
 	}
@@ -621,9 +671,15 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 	ASSERT(sinfo);
 
 	mutex_enter(&od->d_mutex);
+	ASSERT(od->d_refcnt > 0);
 
-	ASSERT(od->d_state == SMB_ODIR_STATE_OPEN);
-	if (od->d_state != SMB_ODIR_STATE_OPEN) {
+	switch (od->d_state) {
+	case SMB_ODIR_STATE_IN_USE:
+	case SMB_ODIR_STATE_CLOSING:
+		break;
+	case SMB_ODIR_STATE_OPEN:
+	case SMB_ODIR_STATE_CLOSED:
+	default:
 		mutex_exit(&od->d_mutex);
 		return (-1);
 	}
@@ -794,7 +850,7 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 	bzero(od, sizeof (smb_odir_t));
 
 	mutex_init(&od->d_mutex, NULL, MUTEX_DEFAULT, NULL);
-	od->d_refcnt = 1;
+	od->d_refcnt = 0;
 	od->d_state = SMB_ODIR_STATE_OPEN;
 	od->d_magic = SMB_ODIR_MAGIC;
 	od->d_opened_by_pid = sr->smb_pid;
@@ -838,7 +894,6 @@ smb_odir_delete(smb_odir_t *od)
 	ASSERT(od);
 	ASSERT(od->d_magic == SMB_ODIR_MAGIC);
 	ASSERT(od->d_state == SMB_ODIR_STATE_CLOSED);
-	ASSERT(od->d_refcnt == 0);
 
 	smb_llist_enter(&od->d_tree->t_odir_list, RW_WRITER);
 	smb_llist_remove(&od->d_tree->t_odir_list, od);

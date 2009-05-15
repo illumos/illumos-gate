@@ -818,8 +818,8 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 	}
 	kmem_free(odirent, sizeof (smb_odirent_t));
 
-	smb_odir_release(od);
 	smb_odir_close(od);
+	smb_odir_release(od);
 	return (rc);
 }
 

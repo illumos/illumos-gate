@@ -319,15 +319,16 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (od == NULL)
 		return (SDRC_ERROR);
 	count = smb_trans2_find_entries(sr, xa, od, &args, &eos);
-	smb_odir_release(od);
 
 	if (count == -1) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		return (SDRC_ERROR);
 	}
 
 	if (count == 0) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		smbsr_errno(sr, ENOENT);
 		return (SDRC_ERROR);
 	}
@@ -336,6 +337,8 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	    (eos && (args.fa_fflag & SMB_FIND_CLOSE_AT_EOS))) {
 		smb_odir_close(od);
 	} /* else leave odir open for trans2_find_next2 */
+
+	smb_odir_release(od);
 
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwwww",
 	    odid, count, (eos) ? 1 : 0, 0, 0);
@@ -449,10 +452,10 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	}
 	smb_odir_resume_at(od, &odir_resume);
 	count = smb_trans2_find_entries(sr, xa, od, &args, &eos);
-	smb_odir_release(od);
 
 	if (count == -1) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		return (SDRC_ERROR);
 	}
 
@@ -461,6 +464,7 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 		smb_odir_close(od);
 	} /* else leave odir open for trans2_find_next2 */
 
+	smb_odir_release(od);
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
 	    count, (eos) ? 1 : 0, 0, 0);
 

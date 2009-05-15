@@ -349,15 +349,16 @@ smb_com_search(smb_request_t *sr)
 		count++;
 		index++;
 	}
-	smb_odir_release(od);
 
 	if (rc != 0) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		return (SDRC_ERROR);
 	}
 
 	if (count == 0 && find_first) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
 		    ERRDOS, ERROR_NO_MORE_FILES);
 		return (SDRC_ERROR);
@@ -367,9 +368,11 @@ smb_com_search(smb_request_t *sr)
 	if (smb_mbc_poke(&sr->reply, sr->cur_reply_offset, "bwwbw",
 	    1, count, rc+3, 5, rc) < 0) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		return (SDRC_ERROR);
 	}
 
+	smb_odir_release(od);
 	return (SDRC_SUCCESS);
 }
 
@@ -482,15 +485,16 @@ smb_com_find(smb_request_t *sr)
 		count++;
 		index++;
 	}
-	smb_odir_release(od);
 
 	if (rc != 0) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		return (SDRC_ERROR);
 	}
 
 	if (count == 0 && find_first) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
 		    ERRDOS, ERROR_NO_MORE_FILES);
 		return (SDRC_ERROR);
@@ -500,9 +504,11 @@ smb_com_find(smb_request_t *sr)
 	if (smb_mbc_poke(&sr->reply, sr->cur_reply_offset, "bwwbw",
 	    1, count, rc+3, 5, rc) < 0) {
 		smb_odir_close(od);
+		smb_odir_release(od);
 		return (SDRC_ERROR);
 	}
 
+	smb_odir_release(od);
 	return (SDRC_SUCCESS);
 }
 
@@ -563,8 +569,8 @@ smb_com_find_close(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	smb_odir_release(od);
 	smb_odir_close(od);
+	smb_odir_release(od);
 
 	if (smbsr_encode_result(sr, 1, 3, "bwwbw", 1, 0, 3, 5, 0))
 		return (SDRC_ERROR);
@@ -656,8 +662,8 @@ smb_com_find_unique(struct smb_request *sr)
 		index++;
 	}
 
-	smb_odir_release(od);
 	smb_odir_close(od);
+	smb_odir_release(od);
 
 	if (rc != 0)
 		return (SDRC_ERROR);

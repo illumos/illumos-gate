@@ -527,8 +527,8 @@ smb_encode_stream_info(
 	kmem_free(sinfo, sizeof (smb_streaminfo_t));
 	kmem_free(sinfo_next, sizeof (smb_streaminfo_t));
 	if (od) {
-		smb_odir_release(od);
 		smb_odir_close(od);
+		smb_odir_release(od);
 	}
 }
 

@@ -307,8 +307,8 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 		if (smb_delete_check_attr(sr, err) != 0) {
 			smb_node_release(fqi->fq_fnode);
 			if (err->status == NT_STATUS_CANNOT_DELETE) {
-				smb_odir_release(od);
 				smb_odir_close(od);
+				smb_odir_release(od);
 				return (-1);
 			}
 			if ((err->status == NT_STATUS_FILE_IS_A_DIRECTORY) &&
@@ -327,14 +327,14 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 			continue;
 		}
 
-		smb_odir_release(od);
 		smb_odir_close(od);
+		smb_odir_release(od);
 		smb_node_release(fqi->fq_fnode);
 		return (-1);
 	}
 
-	smb_odir_release(od);
 	smb_odir_close(od);
+	smb_odir_release(od);
 
 	if ((rc != 0) && (rc != ENOENT)) {
 		smbsr_map_errno(rc, err);
