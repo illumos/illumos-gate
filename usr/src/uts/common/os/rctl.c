@@ -510,7 +510,7 @@ rctl_add_legacy_limit(const char *name, const char *mname, const char *lname,
 	rctl_add_default_limit(name, qty, RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
 }
 
-static rctl_set_t *
+rctl_set_t *
 rctl_entity_obtain_rset(rctl_dict_entry_t *rcd, struct proc *p)
 {
 	rctl_set_t *rset = NULL;
@@ -1445,7 +1445,7 @@ tearoff_rewalk_list:
 	mutex_exit(&set->rcs_lock);
 }
 
-static int
+int
 rctl_set_find(rctl_set_t *set, rctl_hndl_t hndl, rctl_t **rctl)
 {
 	uint_t index = hndl % rctl_set_size;

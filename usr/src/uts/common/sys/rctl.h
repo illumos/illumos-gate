@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_RCTL_H
 #define	_SYS_RCTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/kmem.h>
 #include <sys/resource.h>
@@ -208,6 +206,9 @@ int rcop_no_test(struct rctl *, struct proc *, rctl_entity_p_t *,
 int rcop_absolute_test(struct rctl *, struct proc *, rctl_entity_p_t *,
     struct rctl_val *, rctl_qty_t, uint_t);
 
+#define	RCTLOP_NO_USAGE(r) \
+	(r->rc_dict_entry->rcd_ops->rco_get_usage == rcop_no_usage)
+
 extern rctl_ops_t rctl_default_ops;
 extern rctl_ops_t rctl_absolute_ops;
 
@@ -291,6 +292,7 @@ int rctl_val_cmp(rctl_val_t *, rctl_val_t *, int);
 int rctl_val_list_insert(rctl_val_t **, rctl_val_t *);
 
 rctl_set_t *rctl_set_create(void);
+rctl_set_t *rctl_entity_obtain_rset(rctl_dict_entry_t *, struct proc *);
 rctl_alloc_gp_t *rctl_set_init_prealloc(rctl_entity_t);
 rctl_set_t *rctl_set_init(rctl_entity_t, struct proc *, rctl_entity_p_t *,
     rctl_set_t *, rctl_alloc_gp_t *);
@@ -300,6 +302,7 @@ rctl_set_t *rctl_set_dup(rctl_set_t *, struct proc *, struct proc *,
     rctl_entity_p_t *, rctl_set_t *, rctl_alloc_gp_t *, int);
 void rctl_set_reset(rctl_set_t *, struct proc *, rctl_entity_p_t *);
 void rctl_set_tearoff(rctl_set_t *, struct proc *);
+int rctl_set_find(rctl_set_t *, rctl_hndl_t, rctl_t **);
 void rctl_set_free(rctl_set_t *);
 
 void rctl_prealloc_destroy(rctl_alloc_gp_t *);

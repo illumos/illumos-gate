@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -207,13 +205,16 @@ rctl_invalid_value(rctl_dict_entry_t *rde, rctl_val_t *rval)
  *
  * Overview
  *   rctlsys_get() is the implementation of the core logic of getrctl(2), the
- *   public system call for fetching resource control values.  Two mutually
- *   exclusive flag values are supported:  RCTL_FIRST and RCTL_NEXT.  When
- *   RCTL_FIRST is presented, the value of old_rblk is ignored, and the first
- *   value in the resource control value sequence for the named control is
- *   transformed and placed in the user memory location at new_rblk.  In the
- *   RCTL_NEXT case, the value of old_rblk is examined, and the next value in
- *   the sequence is transformed and placed at new_rblk.
+ *   public system call for fetching resource control values.  Three mutually
+ *   exclusive flag values are supported: RCTL_USAGE, RCTL_FIRST and RCTL_NEXT.
+ *   When RCTL_USAGE is presented, the current usage for the resource control
+ *   is returned in new_blk if the resource control provides an implementation
+ *   of the usage operation.  When RCTL_FIRST is presented, the value of
+ *   old_rblk is ignored, and the first value in the resource control value
+ *   sequence for the named control is transformed and placed in the user
+ *   memory location at new_rblk.  In the RCTL_NEXT case, the value of old_rblk
+ *   is examined, and the next value in the sequence is transformed and placed
+ *   at new_rblk.
  */
 static long
 rctlsys_get(char *name, rctl_opaque_t *old_rblk, rctl_opaque_t *new_rblk,
@@ -261,12 +262,45 @@ rctlsys_get(char *name, rctl_opaque_t *old_rblk, rctl_opaque_t *new_rblk,
 
 	kmem_free(kname, MAXPATHLEN);
 
-	nval = kmem_cache_alloc(rctl_val_cache, KM_SLEEP);
+	if (action != RCTL_USAGE)
+		nval = kmem_cache_alloc(rctl_val_cache, KM_SLEEP);
 
 	if (action == RCTL_USAGE) {
-		kmem_cache_free(rctl_val_cache, nval);
+		rctl_set_t *rset;
+		rctl_t *rctl;
+		rctl_qty_t usage;
+
+		mutex_enter(&curproc->p_lock);
+		if ((rset = rctl_entity_obtain_rset(krde, curproc)) == NULL) {
+			mutex_exit(&curproc->p_lock);
+			kmem_free(krde, sizeof (rctl_dict_entry_t));
+			return (set_errno(ESRCH));
+		}
+		mutex_enter(&rset->rcs_lock);
+		if (rctl_set_find(rset, hndl, &rctl) == -1) {
+			mutex_exit(&rset->rcs_lock);
+			mutex_exit(&curproc->p_lock);
+			kmem_free(krde, sizeof (rctl_dict_entry_t));
+			return (set_errno(ESRCH));
+		}
+		if (RCTLOP_NO_USAGE(rctl)) {
+			mutex_exit(&rset->rcs_lock);
+			mutex_exit(&curproc->p_lock);
+			kmem_free(krde, sizeof (rctl_dict_entry_t));
+			return (set_errno(ENOTSUP));
+		}
+		usage = RCTLOP_GET_USAGE(rctl, curproc);
+		mutex_exit(&rset->rcs_lock);
+		mutex_exit(&curproc->p_lock);
+
+		nblk = kmem_alloc(sizeof (rctl_opaque_t), KM_SLEEP);
+		bzero(nblk, sizeof (rctl_opaque_t));
+		nblk->rcq_value = usage;
+
+		ret = copyout(nblk, new_rblk, sizeof (rctl_opaque_t));
+		kmem_free(nblk, sizeof (rctl_opaque_t));
 		kmem_free(krde, sizeof (rctl_dict_entry_t));
-		return (set_errno(ENOTSUP));
+		return (ret == 0 ? 0 : set_errno(EFAULT));
 	} else if (action == RCTL_FIRST) {
 
 		mutex_enter(&curproc->p_lock);
