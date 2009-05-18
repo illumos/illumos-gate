@@ -48,6 +48,10 @@ typedef enum {
 #define	ZFS_TYPE_DATASET	\
 	(ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME | ZFS_TYPE_SNAPSHOT)
 
+#define	ZAP_MAXNAMELEN 256
+#define	ZAP_MAXVALUELEN (1024 * 8)
+#define	ZAP_OLDMAXVALUELEN 1024
+
 /*
  * Dataset properties are identified by these constants and must be added to
  * the end of this list to ensure that external consumers are not affected
@@ -106,6 +110,7 @@ typedef enum {
 	ZFS_PROP_USEDCHILD,
 	ZFS_PROP_USEDREFRESERV,
 	ZFS_PROP_USERACCOUNTING,	/* not exposed to the user */
+	ZFS_PROP_STMF_SHAREINFO,	/* not exposed to the user */
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -273,14 +278,15 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_13			13ULL
 #define	SPA_VERSION_14			14ULL
 #define	SPA_VERSION_15			15ULL
+#define	SPA_VERSION_16			16ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
- * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
+ * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_15
-#define	SPA_VERSION_STRING		"15"
+#define	SPA_VERSION			SPA_VERSION_16
+#define	SPA_VERSION_STRING		"16"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -317,6 +323,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_USED_BREAKDOWN	SPA_VERSION_13
 #define	SPA_VERSION_PASSTHROUGH_X	SPA_VERSION_14
 #define	SPA_VERSION_USERSPACE		SPA_VERSION_15
+#define	SPA_VERSION_STMF_PROP		SPA_VERSION_16
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -324,7 +331,7 @@ typedef enum zfs_cache_type {
  * also update the version_table[] and help message in zfs_prop.c.
  *
  * When changing, be sure to teach GRUB how to read the new format!
- * See usr/src/grub/grub-0.95/stage2/{zfs-include/,fsys_zfs*}
+ * See usr/src/grub/grub-0.97/stage2/{zfs-include/,fsys_zfs*}
  */
 #define	ZPL_VERSION_1			1ULL
 #define	ZPL_VERSION_2			2ULL

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_ZAP_H
 #define	_SYS_ZAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ZAP - ZFS Attribute Processor
@@ -86,9 +84,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#define	ZAP_MAXNAMELEN 256
-#define	ZAP_MAXVALUELEN 1024
 
 /*
  * The matchtype specifies which entry will be accessed.

@@ -314,6 +314,9 @@ zfs_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_DATASET, "NAME");
 	register_hidden(ZFS_PROP_ISCSIOPTIONS, "iscsioptions", PROP_TYPE_STRING,
 	    PROP_INHERIT, ZFS_TYPE_VOLUME, "ISCSIOPTIONS");
+	register_hidden(ZFS_PROP_STMF_SHAREINFO, "stmf_sbd_lu",
+	    PROP_TYPE_STRING, PROP_INHERIT, ZFS_TYPE_VOLUME,
+	    "STMF_SBD_LU");
 	register_hidden(ZFS_PROP_GUID, "guid", PROP_TYPE_NUMBER, PROP_READONLY,
 	    ZFS_TYPE_DATASET, "GUID");
 	register_hidden(ZFS_PROP_USERACCOUNTING, "useraccounting",

@@ -3450,7 +3450,7 @@ zpool_do_upgrade(int argc, char **argv)
 
 
 	/* check options */
-	while ((c = getopt(argc, argv, "avV:")) != -1) {
+	while ((c = getopt(argc, argv, ":avV:")) != -1) {
 		switch (c) {
 		case 'a':
 			cb.cb_all = B_TRUE;
@@ -3466,6 +3466,11 @@ zpool_do_upgrade(int argc, char **argv)
 				    gettext("invalid version '%s'\n"), optarg);
 				usage(B_FALSE);
 			}
+			break;
+		case ':':
+			(void) fprintf(stderr, gettext("missing argument for "
+			    "'%c' option\n"), optopt);
+			usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -3529,6 +3534,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 13  snapused property\n"));
 		(void) printf(gettext(" 14  passthrough-x aclinherit\n"));
 		(void) printf(gettext(" 15  user/group space accounting\n"));
+		(void) printf(gettext(" 16  stmf property support\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

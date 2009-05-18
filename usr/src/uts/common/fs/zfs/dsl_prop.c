@@ -464,6 +464,7 @@ dsl_prop_set(const char *dsname, const char *propname,
     int intsz, int numints, const void *buf)
 {
 	dsl_dataset_t *ds;
+	uint64_t version;
 	int err;
 	struct prop_set_arg psa;
 
@@ -473,15 +474,19 @@ dsl_prop_set(const char *dsname, const char *propname,
 	 */
 	if (strlen(propname) >= ZAP_MAXNAMELEN)
 		return (ENAMETOOLONG);
-	if (intsz * numints >= ZAP_MAXVALUELEN)
-		return (E2BIG);
 
 	err = dsl_dataset_hold(dsname, FTAG, &ds);
 	if (err)
 		return (err);
 
+	version = spa_version(ds->ds_dir->dd_pool->dp_spa);
+	if (intsz * numints >= (version < SPA_VERSION_STMF_PROP ?
+	    ZAP_OLDMAXVALUELEN : ZAP_MAXVALUELEN)) {
+		dsl_dataset_rele(ds, FTAG);
+		return (E2BIG);
+	}
 	if (dsl_dataset_is_snapshot(ds) &&
-	    spa_version(ds->ds_dir->dd_pool->dp_spa) < SPA_VERSION_SNAP_PROPS) {
+	    version < SPA_VERSION_SNAP_PROPS) {
 		dsl_dataset_rele(ds, FTAG);
 		return (ENOTSUP);
 	}
@@ -501,28 +506,35 @@ int
 dsl_props_set(const char *dsname, nvlist_t *nvl)
 {
 	dsl_dataset_t *ds;
+	uint64_t version;
 	nvpair_t *elem = NULL;
 	int err;
 
+	if (err = dsl_dataset_hold(dsname, FTAG, &ds))
+		return (err);
 	/*
 	 * Do these checks before the syncfunc, since it can't fail.
 	 */
+	version = spa_version(ds->ds_dir->dd_pool->dp_spa);
 	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
-		if (strlen(nvpair_name(elem)) >= ZAP_MAXNAMELEN)
+		if (strlen(nvpair_name(elem)) >= ZAP_MAXNAMELEN) {
+			dsl_dataset_rele(ds, FTAG);
 			return (ENAMETOOLONG);
+		}
 		if (nvpair_type(elem) == DATA_TYPE_STRING) {
 			char *valstr;
 			VERIFY(nvpair_value_string(elem, &valstr) == 0);
-			if (strlen(valstr) >= ZAP_MAXVALUELEN)
+			if (strlen(valstr) >= (version <
+			    SPA_VERSION_STMF_PROP ?
+			    ZAP_OLDMAXVALUELEN : ZAP_MAXVALUELEN)) {
+				dsl_dataset_rele(ds, FTAG);
 				return (E2BIG);
+			}
 		}
 	}
 
-	if (err = dsl_dataset_hold(dsname, FTAG, &ds))
-		return (err);
-
 	if (dsl_dataset_is_snapshot(ds) &&
-	    spa_version(ds->ds_dir->dd_pool->dp_spa) < SPA_VERSION_SNAP_PROPS) {
+	    version < SPA_VERSION_SNAP_PROPS) {
 		dsl_dataset_rele(ds, FTAG);
 		return (ENOTSUP);
 	}
