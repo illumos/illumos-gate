@@ -38,7 +38,7 @@ typedef struct ibcm_dest_s {
 	ib_svc_id_t	d_sid;
 	ibt_srv_data_t	d_sdata;
 	ib_pkey_t	d_pkey;
-	uint_t		d_tag;	/* 0 = Unicast, 1 = Multicast, 2 = LoopBack */
+	uint_t		d_tag;	/* 0 = Unicast, 1 = Multicast */
 } ibcm_dest_t;
 
 /* Holds Destination information needed to fill in ibt_path_info_t. */
@@ -71,9 +71,6 @@ static ibt_status_t ibcm_saa_path_rec(ibcm_path_tqargs_t *,
 
 static ibt_status_t ibcm_update_cep_info(sa_path_record_t *,
     ibtl_cm_port_list_t *, ibtl_cm_hca_port_t *, ibt_cep_path_t *);
-
-static ibt_status_t ibcm_fillin_loopbackinfo(ibtl_cm_port_list_t *,
-    uint8_t index, ibcm_dinfo_t *, ibt_path_info_t *);
 
 static ibt_status_t ibcm_saa_service_rec(ibcm_path_tqargs_t *,
     ibtl_cm_port_list_t *, ibcm_dinfo_t *);
@@ -927,10 +924,7 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_path_rec: numpath %d extra %d dest %d",
 	    num_path, extra, dinfo->num_dest);
 
-	/*
-	 * Find out whether we need to get PathRecord for a MGID as DGID or
-	 * qualifies for a LoopBack.
-	 */
+	/* Find out whether we need to get PathRecord for a MGID as DGID. */
 	for (idx = 0; idx < dinfo->num_dest; idx++) {
 		ib_gid_t	dgid = dinfo->dest[idx].d_gid;
 
@@ -963,36 +957,6 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 				extra--;
 
 			rec_found += num_path_plus;
-		} else {
-			/*
-			 * Check out whether we are looking for loop-back path
-			 * info. In this case, we should not contact SA Access
-			 * for Path Records, but instead we need to "synthesize"
-			 * a loop back path record.
-			 */
-			for (i = 0; i < sl->p_count; i++) {
-				if ((sl[i].p_sgid.gid_prefix ==
-				    dgid.gid_prefix) &&
-				    (sl[i].p_sgid.gid_guid == dgid.gid_guid)) {
-
-					dinfo->dest[idx].d_tag = 2;
-
-					/* Yes, it's loop back case. */
-					retval = ibcm_fillin_loopbackinfo(
-					    &sl[i], idx, dinfo,
-					    &p_arg->paths[rec_found]);
-					if (retval != IBT_SUCCESS)
-						break;
-
-					/*
-					 * We update only one record for
-					 * loop-back case.
-					 */
-					rec_found++;
-					if (rec_found == *max_count)
-						break;
-				}
-			}
 		}
 		if (rec_found == *max_count)
 			break;
@@ -1292,15 +1256,6 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 					    pathrec_req.SGID.gid_prefix,
 					    dinfo->dest[k].d_gid.gid_prefix);
 					continue;
-				} else if (pathrec_req.SGID.gid_guid ==
-				    pathrec_req.DGID.gid_guid) {
-					IBTF_DPRINTF_L3(cmlog,
-					    "ibcm_get_single_pathrec: Why "
-					    "LoopBack request came here!!!! "
-					    "GID(%llX:%llX)",
-					    pathrec_req.SGID.gid_prefix,
-					    pathrec_req.SGID.gid_guid);
-					continue;
 				}
 
 				pathrec_req.DGID = dinfo->dest[k].d_gid;
@@ -1475,7 +1430,7 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	gid_s_ptr = gid_ptr;
 
 	/* SGID */
-	for (i = 0; i < sl->p_count; i++) {
+	for (i = 0; i < sgid_cnt; i++) {
 		*gid_ptr = sl[i].p_sgid;
 
 		IBTF_DPRINTF_L3(cmlog, "ibcm_get_multi_pathrec: SGID[%d] = "
@@ -1885,97 +1840,6 @@ get_mpr_end:
 	*num_path = found;	/* Update the return count. */
 
 	return (retval);
-}
-
-
-/*
- * Here we "synthesize" loop back path record information.
- *
- * Currently the synthesize values are assumed as follows:
- *    SLID, DLID = Base LID from Query HCA Port.
- *    FlowLabel, HopLimit, TClass = 0, as GRH is False.
- *    RawTraffic = 0.
- *    P_Key = first valid one in P_Key table as obtained from Query HCA Port.
- *    SL = as from Query HCA Port.
- *    MTU = from Query HCA Port.
- *    Rate = 2 (arbitrary).
- *    PacketLifeTime = 0 (4.096 usec).
- */
-static ibt_status_t
-ibcm_fillin_loopbackinfo(ibtl_cm_port_list_t *sl, uint8_t index,
-    ibcm_dinfo_t *dinfo, ibt_path_info_t *paths)
-{
-	ibt_status_t	retval;
-	ib_pkey_t	pkey = 0;
-
-	IBTF_DPRINTF_L3(cmlog, "ibcm_fillin_loopbackinfo(%p, %p)", sl, dinfo);
-
-	/* Synthesize path record with appropriate loop back information. */
-	if (dinfo->p_key)
-		pkey = dinfo->p_key;
-	else
-		pkey = dinfo->dest[index].d_pkey;
-	if (pkey) {
-		/* Convert P_Key to P_Key_Index */
-		retval = ibt_pkey2index_byguid(sl->p_hca_guid, sl->p_port_num,
-		    pkey, &paths->pi_prim_cep_path.cep_pkey_ix);
-		if (retval != IBT_SUCCESS) {
-			/* Failed to get pkey_index from pkey */
-			IBTF_DPRINTF_L2(cmlog, "ibcm_fillin_loopbackinfo: "
-			    "Pkey2Index (P_Key = %X) conversion failed: %d",
-			    pkey, retval);
-			return (retval);
-		}
-	} else {
-		paths->pi_prim_cep_path.cep_pkey_ix =
-		    ibtl_cm_get_1st_full_pkey_ix(sl->p_hca_guid,
-		    sl->p_port_num);
-		IBTF_DPRINTF_L3(cmlog, "ibcm_fillin_loopbackinfo: "
-		    "1st Full Member P_Key_ix = %d",
-		    paths->pi_prim_cep_path.cep_pkey_ix);
-	}
-
-	paths->pi_hca_guid = sl->p_hca_guid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_dgid =
-	    dinfo->dest[index].d_gid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_sgid = sl->p_sgid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_srate	= IBT_SRATE_1X;
-	paths->pi_prim_cep_path.cep_adds_vect.av_srvl	= 0; /* SL */
-
-	paths->pi_prim_cep_path.cep_adds_vect.av_send_grh = B_FALSE;
-	paths->pi_prim_cep_path.cep_adds_vect.av_flow	= 0;
-	paths->pi_prim_cep_path.cep_adds_vect.av_tclass	= 0;
-	paths->pi_prim_cep_path.cep_adds_vect.av_hop 	= 0;
-
-	/* SLID and DLID will be equal to BLID. */
-	paths->pi_prim_cep_path.cep_adds_vect.av_dlid = sl->p_base_lid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_src_path = 0;
-	paths->pi_prim_cep_path.cep_adds_vect.av_sgid_ix = sl->p_sgid_ix;
-	paths->pi_prim_cep_path.cep_adds_vect.av_port_num = sl->p_port_num;
-	paths->pi_prim_cep_path.cep_hca_port_num = sl->p_port_num;
-	paths->pi_prim_cep_path.cep_timeout = 0; /* To be filled in by CM. */
-	paths->pi_path_mtu = sl->p_mtu;		/* MTU */
-	paths->pi_prim_pkt_lt = 0;		/* Packet Life Time. */
-	paths->pi_alt_pkt_lt = 0;		/* Packet Life Time. */
-
-	paths->pi_sid = dinfo->dest[index].d_sid;
-
-	if (paths->pi_sid != 0)
-		bcopy(&dinfo->dest[index].d_sdata, &paths->pi_sdata,
-		    sizeof (ibt_srv_data_t));
-
-	IBTF_DPRINTF_L3(cmlog, "ibcm_fillin_loopbackinfo: HCA %llX:%d SID %llX"
-	    "\n\t SGID %llX:%llX DGID %llX:%llX", paths->pi_hca_guid,
-	    paths->pi_prim_cep_path.cep_hca_port_num, paths->pi_sid,
-	    sl->p_sgid.gid_prefix, sl->p_sgid.gid_guid,
-	    dinfo->dest[index].d_gid.gid_prefix,
-	    dinfo->dest[index].d_gid.gid_guid);
-
-	/* Set Alternate Path to invalid state. */
-	paths->pi_alt_cep_path.cep_hca_port_num = 0;
-	paths->pi_alt_cep_path.cep_adds_vect.av_dlid = 0;
-
-	return (IBT_SUCCESS);
 }
 
 
@@ -3161,7 +3025,6 @@ typedef struct ibcm_ip_path_tqargs_s {
 
 typedef struct ibcm_ip_dest_s {
 	ib_gid_t	d_gid;
-	uint_t		d_tag;	/* 0 = Unicast, 2 = LoopBack */
 	ibt_ip_addr_t	d_ip;
 } ibcm_ip_dest_t;
 
@@ -3180,8 +3043,6 @@ static ibt_status_t ibcm_get_ip_spr(ibcm_ip_path_tqargs_t *,
 static ibt_status_t ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *,
     ibtl_cm_port_list_t *, ibcm_ip_dinfo_t *dinfo,
     uint8_t *, ibt_path_info_t *);
-static ibt_status_t ibcm_fillin_ip_lbpr(ibtl_cm_port_list_t *, uint8_t index,
-    ibcm_ip_dinfo_t *, ibt_path_info_t *);
 
 /*
  * Perform SA Access to retrieve Path Records.
@@ -3191,10 +3052,8 @@ ibcm_saa_ip_pr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
     ibcm_ip_dinfo_t *dinfo, uint8_t *max_count)
 {
 	uint8_t		num_path = *max_count;
-	uint8_t		num_path_plus;
-	uint_t		extra, idx, rec_found = 0;
+	uint_t		rec_found = 0;
 	ibt_status_t	retval = IBT_SUCCESS;
-	int		dgid_present = 0;
 	uint8_t		i, j;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr(%p, %p, %p, 0x%X, %d)",
@@ -3205,89 +3064,28 @@ ibcm_saa_ip_pr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 		return (IBT_INVALID_PARAM);
 	}
 
-	/*
-	 * Of the total needed "X" number of paths to "Y" number of destination
-	 * we need to get X/Y plus X%Y extra paths to each destination,
-	 * We do this so that we can choose the required number of path records
-	 * for the specific destination.
-	 */
-	num_path /= dinfo->num_dest;
-	extra = (*max_count % dinfo->num_dest);
+	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: MultiSM=%X, #SRC=%d, "
+	    "#Dest=%d, #Path %d", sl->p_multi, sl->p_count, dinfo->num_dest,
+	    num_path);
 
-	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: numpath %d extra %d dest %d",
-	    num_path, extra, dinfo->num_dest);
-
-	/*
-	 * Find out whether we need to get PathRecord that qualifies for a
-	 * LoopBack.
-	 */
-	for (idx = 0; idx < dinfo->num_dest; idx++) {
-		ib_gid_t	dgid = dinfo->dest[idx].d_gid;
-
-		IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: DGID[%d]: %llX:%llX",
-		    idx, dgid.gid_prefix, dgid.gid_guid);
-
+	if ((sl->p_multi != IBTL_CM_SIMPLE_SETUP) ||
+	    ((dinfo->num_dest == 1) && (sl->p_count == 1))) {
 		/*
-		 * For loop-back path record, we should NOT contact SA Access.
-		 * But instead we need to "synthesize" a loop back path record.
+		 * Use SinglePathRec if we are dealing w/ MultiSM or
+		 * request is for one SGID to one DGID.
 		 */
-		for (i = 0; i < sl->p_count; i++) {
-			if ((sl[i].p_sgid.gid_prefix == dgid.gid_prefix) &&
-			    (sl[i].p_sgid.gid_guid == dgid.gid_guid)) {
-
-				dinfo->dest[idx].d_tag = 2;
-
-				/* Yes, it's loop back case. */
-				retval = ibcm_fillin_ip_lbpr(&sl[i], idx,
-				    dinfo, &p_arg->paths[rec_found]);
-				if (retval != IBT_SUCCESS)
-					break;
-
-				/*
-				 * We update only one record for loop-back case.
-				 */
-				rec_found++;
-				if (rec_found == *max_count)
-					break;
-			}
-		}
-		if (rec_found == *max_count)
-			break;
+		retval = ibcm_get_ip_spr(p_arg, sl, dinfo,
+		    &num_path, &p_arg->paths[rec_found]);
+	} else {
+		/* MultiPathRec will be used for other queries. */
+		retval = ibcm_get_ip_mpr(p_arg, sl, dinfo,
+		    &num_path, &p_arg->paths[rec_found]);
 	}
-
-	for (i = 0; i < dinfo->num_dest; i++)
-		if (dinfo->dest[i].d_tag == 0)
-			dgid_present++;
-
-	num_path_plus = *max_count - rec_found;
-
-	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: Recfound: %d, need to find "
-	    "%d, GID present %d", rec_found, num_path_plus, dgid_present);
-
-	if ((dgid_present != 0) && (num_path_plus > 0)) {
-		IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: MultiSM=%X, #SRC=%d, "
-		    "Dest=%d", sl->p_multi, sl->p_count, dgid_present);
-
-		if ((sl->p_multi != IBTL_CM_SIMPLE_SETUP) ||
-		    ((dgid_present == 1) && (sl->p_count == 1))) {
-			/*
-			 * Use SinglePathRec if we are dealing w/ MultiSM or
-			 * request is for one SGID to one DGID.
-			 */
-			retval = ibcm_get_ip_spr(p_arg, sl, dinfo,
-			    &num_path_plus, &p_arg->paths[rec_found]);
-		} else {
-			/* MultiPathRec will be used for other queries. */
-			retval = ibcm_get_ip_mpr(p_arg, sl, dinfo,
-			    &num_path_plus, &p_arg->paths[rec_found]);
-		}
-
-		if ((retval != IBT_SUCCESS) && (retval != IBT_INSUFF_DATA))
-			IBTF_DPRINTF_L2(cmlog, "ibcm_saa_ip_pr: "
-			    "Failed to get PathRec: Status %d", retval);
-		else
-			rec_found += num_path_plus;
-	}
+	if ((retval != IBT_SUCCESS) && (retval != IBT_INSUFF_DATA))
+		IBTF_DPRINTF_L2(cmlog, "ibcm_saa_ip_pr: "
+		    "Failed to get PathRec: Status %d", retval);
+	else
+		rec_found += num_path;
 
 	if (rec_found == 0)  {
 		if (retval == IBT_SUCCESS)
@@ -3479,22 +3277,12 @@ ibcm_get_ip_spr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 		saa_handle = sl[i].p_saa_hdl;
 
 		for (k = 0; k < dinfo->num_dest; k++) {
-			if (dinfo->dest[k].d_tag != 0)
-				continue;
-
 			if (pathrec_req.SGID.gid_prefix !=
 			    dinfo->dest[k].d_gid.gid_prefix) {
 				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: "
 				    "SGID_pfx=%llX DGID_pfx=%llX doesn't match",
 				    pathrec_req.SGID.gid_prefix,
 				    dinfo->dest[k].d_gid.gid_prefix);
-				continue;
-			} else if (pathrec_req.SGID.gid_guid ==
-			    pathrec_req.DGID.gid_guid) {
-				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: Why "
-				    "LoopBack request came here! GID %llX:%llX",
-				    pathrec_req.SGID.gid_prefix,
-				    pathrec_req.SGID.gid_guid);
 				continue;
 			}
 
@@ -3611,11 +3399,7 @@ ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr(%p, %p, %p, %d)",
 	    attrp, sl, dinfo, *num_path);
 
-	for (i = 0, dgid_cnt = 0; i < dinfo->num_dest; i++) {
-		if (dinfo->dest[i].d_tag == 0)
-			dgid_cnt++;
-	}
-
+	dgid_cnt = dinfo->num_dest;
 	sgid_cnt = sl->p_count;
 
 	if ((sgid_cnt == 0) || (dgid_cnt == 0)) {
@@ -3646,7 +3430,7 @@ ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	gid_s_ptr = gid_ptr;
 
 	/* SGID */
-	for (i = 0; i < sl->p_count; i++) {
+	for (i = 0; i < sgid_cnt; i++) {
 		*gid_ptr = sl[i].p_sgid;
 
 		IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: SGID[%d] = %llX:%llX",
@@ -3661,15 +3445,12 @@ ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 	c_mask = SA_MPR_COMPMASK_SGIDCOUNT;
 
 	/* DGIDs */
-	for (i = 0; i < dinfo->num_dest; i++) {
-		if (dinfo->dest[i].d_tag == 0) {
-			*gid_ptr = dinfo->dest[i].d_gid;
+	for (i = 0; i < dgid_cnt; i++) {
+		*gid_ptr = dinfo->dest[i].d_gid;
 
-			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: DGID[%d] = "
-			    "%llX:%llX", i, gid_ptr->gid_prefix,
-			    gid_ptr->gid_guid);
-			gid_ptr++;
-		}
+		IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: DGID[%d] = "
+		    "%llX:%llX", i, gid_ptr->gid_prefix, gid_ptr->gid_guid);
+		gid_ptr++;
 	}
 
 	mpr_req->DGIDCount = dgid_cnt;
@@ -3955,63 +3736,6 @@ get_ip_mpr_end:
 	return (retval);
 }
 
-
-/*
- * Here we "synthesize" loop back path record information.
- *
- * Currently the synthesize values are assumed as follows:
- *    SLID, DLID = Base LID from Query HCA Port.
- *    FlowLabel, HopLimit, TClass = 0, as GRH is False.
- *    RawTraffic = 0.
- *    P_Key = first valid one in P_Key table as obtained from Query HCA Port.
- *    SL = as from Query HCA Port.
- *    MTU = from Query HCA Port.
- *    Rate = 2 (arbitrary).
- *    PacketLifeTime = 0 (4.096 usec).
- */
-static ibt_status_t
-ibcm_fillin_ip_lbpr(ibtl_cm_port_list_t *sl, uint8_t idx,
-    ibcm_ip_dinfo_t *dinfo, ibt_path_info_t *paths)
-{
-	IBTF_DPRINTF_L3(cmlog, "ibcm_fillin_ip_lbpr(%p, %p)", sl, dinfo);
-
-	/* Synthesize path record with appropriate loop back information. */
-	paths->pi_prim_cep_path.cep_pkey_ix =
-	    ibtl_cm_get_1st_full_pkey_ix(sl->p_hca_guid, sl->p_port_num);
-	paths->pi_hca_guid = sl->p_hca_guid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_dgid = dinfo->dest[idx].d_gid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_sgid = sl->p_sgid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_srate	= IBT_SRATE_1X;
-	paths->pi_prim_cep_path.cep_adds_vect.av_srvl	= 0; /* SL */
-
-	paths->pi_prim_cep_path.cep_adds_vect.av_send_grh = B_FALSE;
-	paths->pi_prim_cep_path.cep_adds_vect.av_flow	= 0;
-	paths->pi_prim_cep_path.cep_adds_vect.av_tclass	= 0;
-	paths->pi_prim_cep_path.cep_adds_vect.av_hop 	= 0;
-
-	/* SLID and DLID will be equal to BLID. */
-	paths->pi_prim_cep_path.cep_adds_vect.av_dlid = sl->p_base_lid;
-	paths->pi_prim_cep_path.cep_adds_vect.av_src_path = 0;
-	paths->pi_prim_cep_path.cep_adds_vect.av_sgid_ix = sl->p_sgid_ix;
-	paths->pi_prim_cep_path.cep_adds_vect.av_port_num = sl->p_port_num;
-	paths->pi_prim_cep_path.cep_hca_port_num = sl->p_port_num;
-	paths->pi_prim_cep_path.cep_timeout = 0; /* To be filled in by CM. */
-	paths->pi_path_mtu = sl->p_mtu;		/* MTU */
-	paths->pi_prim_pkt_lt = 0;		/* Packet Life Time. */
-	paths->pi_alt_pkt_lt = 0;		/* Packet Life Time. */
-
-	IBTF_DPRINTF_L3(cmlog, "ibcm_fillin_ip_lbpr: HCA %llX:%d \n "
-	    "SGID %llX:%llX DGID %llX:%llX", paths->pi_hca_guid,
-	    paths->pi_prim_cep_path.cep_hca_port_num, sl->p_sgid.gid_prefix,
-	    sl->p_sgid.gid_guid, dinfo->dest[idx].d_gid.gid_prefix,
-	    dinfo->dest[idx].d_gid.gid_guid);
-
-	/* Set Alternate Path to invalid state. */
-	paths->pi_alt_cep_path.cep_hca_port_num = 0;
-	paths->pi_alt_cep_path.cep_adds_vect.av_dlid = 0;
-
-	return (IBT_SUCCESS);
-}
 
 static void
 ibcm_process_get_ip_paths(void *tq_arg)
