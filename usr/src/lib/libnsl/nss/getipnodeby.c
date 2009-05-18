@@ -635,10 +635,15 @@ static int
 __ai_addrconfig(int af)
 {
 	struct lifnum	lifn;
+	struct lifconf	lifc;
+	struct lifreq	*lifp, *buf = NULL;
+	size_t		bufsize;
 	hrtime_t	now, *then;
 	static hrtime_t	then4, then6; /* the last time we updated ifnum# */
 	static int	ifnum4 = -1, ifnum6 = -1;
 	int		*num;
+	int 		nlifr, count = 0;
+
 
 	switch (af) {
 	case AF_INET:
@@ -671,14 +676,73 @@ __ai_addrconfig(int af)
 		 * 'lifn_flags' to zero.
 		 */
 		lifn.lifn_flags = 0;
+again:
 		if (nss_ioctl(af, SIOCGLIFNUM, &lifn) < 0)
-			return (-1);
+			goto fail;
 
-		*num = lifn.lifn_count;
+		if (lifn.lifn_count == 0) {
+			*num = 0;
+			*then = now;
+			return (*num);
+		}
+
+		/*
+		 * Pad the interface count to detect when additional
+		 * interfaces have been configured between SIOCGLIFNUM
+		 * and SIOCGLIFCONF.
+		 */
+		lifn.lifn_count += 4;
+
+		bufsize = lifn.lifn_count * sizeof (struct lifreq);
+		if ((buf = realloc(buf, bufsize)) == NULL)
+			goto fail;
+
+		lifc.lifc_family = af;
+		lifc.lifc_flags = 0;
+		lifc.lifc_len = bufsize;
+		lifc.lifc_buf = (caddr_t)buf;
+		if (nss_ioctl(af, SIOCGLIFCONF, &lifc) < 0)
+			goto fail;
+
+		nlifr = lifc.lifc_len / sizeof (struct lifreq);
+		if (nlifr >= lifn.lifn_count)
+			goto again;
+		/*
+		 * Do not include any loopback addresses, 127.0.0.1 for AF_INET
+		 * and ::1 for AF_INET6, while counting the number of available
+		 * IPv4 or IPv6 addresses. (RFC 3493 requires this, whenever
+		 * AI_ADDRCONFIG flag is set)
+		 */
+		for (lifp = buf; lifp < buf + nlifr; lifp++) {
+			switch (af) {
+			case AF_INET: {
+				struct sockaddr_in *in;
+
+				in = (struct sockaddr_in *)&lifp->lifr_addr;
+				if (ntohl(in->sin_addr.s_addr) ==
+				    INADDR_LOOPBACK) {
+					count++;
+				}
+				break;
+			}
+			case AF_INET6: {
+				struct sockaddr_in6 *in6;
+
+				in6 = (struct sockaddr_in6 *)&lifp->lifr_addr;
+				if (IN6_IS_ADDR_LOOPBACK(&in6->sin6_addr))
+					count++;
+				break;
+			}
+			}
+		}
+		*num = nlifr - count;
 		*then = now;
+		free(buf);
 	}
-
 	return (*num);
+fail:
+	free(buf);
+	return (-1);
 }
 
 /*
