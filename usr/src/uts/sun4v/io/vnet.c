@@ -102,6 +102,7 @@ static void vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err);
 /* Exported to vnet_gen */
 int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
 void vnet_link_update(vnet_t *vnetp, link_state_t link_state);
+void vnet_dds_cleanup_hio(vnet_t *vnetp);
 
 static kstat_t *vnet_hio_setup_kstats(char *ks_mod, char *ks_name,
     vnet_res_t *vresp);
@@ -128,6 +129,7 @@ extern int vdds_init(vnet_t *vnetp);
 extern void vdds_cleanup(vnet_t *vnetp);
 extern void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
 extern void vdds_cleanup_hybrid_res(void *arg);
+extern void vdds_cleanup_hio(vnet_t *vnetp);
 
 #define	DRV_NAME	"vnet"
 #define	VNET_FDBE_REFHOLD(p)						\
@@ -1342,6 +1344,15 @@ vnet_send_dds_msg(vnet_t *vnetp, void *dmsg)
 }
 
 /*
+ * vnet_cleanup_hio -- an interface called by vgen to cleanup hio resources.
+ */
+void
+vnet_dds_cleanup_hio(vnet_t *vnetp)
+{
+	vdds_cleanup_hio(vnetp);
+}
+
+/*
  * vnet_handle_res_err -- A callback function called by a resource
  *	to report an error. For example, vgen can call to report
  *	an LDC down/reset event. This will trigger cleanup of associated
@@ -1353,7 +1364,6 @@ vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err)
 {
 	vnet_res_t *vresp = (vnet_res_t *)vrh;
 	vnet_t *vnetp = vresp->vnetp;
-	int rv;
 
 	if (vnetp == NULL) {
 		return;
@@ -1362,13 +1372,8 @@ vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err)
 	    (vresp->type != VIO_NET_RES_HYBRID)) {
 		return;
 	}
-	rv = ddi_taskq_dispatch(vnetp->taskqp, vdds_cleanup_hybrid_res,
-	    vnetp, DDI_NOSLEEP);
-	if (rv != DDI_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "vnet%d:Failed to dispatch task to cleanup hybrid resource",
-		    vnetp->instance);
-	}
+
+	vdds_cleanup_hio(vnetp);
 }
 
 /*

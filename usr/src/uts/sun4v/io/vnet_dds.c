@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,7 @@ int vdds_init(vnet_t *vnetp);
 void vdds_cleanup(vnet_t *vnetp);
 void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
 void vdds_cleanup_hybrid_res(void *arg);
+void vdds_cleanup_hio(vnet_t *vnetp);
 
 /* Support functions to create/destory Hybrid device */
 static dev_info_t *vdds_create_niu_node(uint64_t cookie,
@@ -271,6 +272,22 @@ vdds_cleanup_hybrid_res(void *arg)
 	 */
 	mutex_exit(&vdds->lock);
 	DBG1(vdds, "Hybrid device cleanup complete");
+}
+
+/*
+ * vdds_cleanup_hio -- An interface to cleanup the hio resources before
+ *	resetting the vswitch port.
+ */
+void
+vdds_cleanup_hio(vnet_t *vnetp)
+{
+	vnet_dds_info_t *vdds = &vnetp->vdds_info;
+
+	/* Wait for any pending vdds tasks to complete */
+	ddi_taskq_wait(vdds->dds_taskqp);
+	vdds_cleanup_hybrid_res(vnetp);
+	/* Wait for the cleanup task to complete */
+	ddi_taskq_wait(vdds->dds_taskqp);
 }
 
 /*

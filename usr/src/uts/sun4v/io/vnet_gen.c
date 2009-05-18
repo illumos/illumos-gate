@@ -122,7 +122,7 @@ static int vgen_update_port(vgen_t *vgenp, md_t *curr_mdp,
 static uint64_t	vgen_port_stat(vgen_port_t *portp, uint_t stat);
 static void vgen_port_reset(vgen_port_t *portp);
 static void vgen_reset_vsw_port(vgen_t *vgenp);
-
+static void vgen_ldc_reset(vgen_ldc_t *ldcp);
 static int vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id);
 static void vgen_ldc_detach(vgen_ldc_t *ldcp);
 static int vgen_alloc_tx_ring(vgen_ldc_t *ldcp);
@@ -224,6 +224,7 @@ static int vgen_dds_rx(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
 
 /* externs */
 extern void vnet_dds_rx(void *arg, void *dmsg);
+extern void vnet_dds_cleanup_hio(vnet_t *vnetp);
 extern int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
 extern void vnet_link_update(vnet_t *vnetp, link_state_t link_state);
 
@@ -2378,9 +2379,12 @@ vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 	if (updated & MD_pls) {
 		/* enable/disable physical link state updates */
 		vnetp->pls_update = pls_update;
+		mutex_exit(&vgenp->lock);
 
 		/* reset vsw-port to re-negotiate with the updated prop. */
 		vgen_reset_vsw_port(vgenp);
+
+		mutex_enter(&vgenp->lock);
 	}
 }
 
@@ -4011,7 +4015,7 @@ ldc_cb_ret:
 		 * If the timeout handler did run, then it would just
 		 * return as cancel_htid is set.
 		 */
-		DBG2(vgenp, ldcp, "calling cance_htid =0x%X \n", cancel_htid);
+		DBG2(vgenp, ldcp, "cancel_htid =0x%X \n", cancel_htid);
 		(void) untimeout(cancel_htid);
 		mutex_enter(&ldcp->cblock);
 		/* clear it only if its the same as the one we cancelled */
@@ -4087,7 +4091,6 @@ vgen_evt_read:
 				 * If sid mismatch is detected,
 				 * reset the channel.
 				 */
-				ldcp->need_ldc_reset = B_TRUE;
 				goto vgen_evtread_error;
 			}
 		}
@@ -4137,7 +4140,7 @@ vgen_evtread_error:
 		}
 		vgen_handle_evt_reset(ldcp);
 	} else if (rv) {
-		vgen_handshake_retry(ldcp);
+		vgen_ldc_reset(ldcp);
 	}
 
 	/*
@@ -4157,8 +4160,7 @@ vgen_evtread_error:
 			 * If the timeout handler did run, then it would just
 			 * return as cancel_htid is set.
 			 */
-			DBG2(vgenp, ldcp, "calling cance_htid =0x%X \n",
-			    cancel_htid);
+			DBG2(vgenp, ldcp, "cancel_htid =0x%X \n", cancel_htid);
 			(void) untimeout(cancel_htid);
 
 			/*
@@ -4665,8 +4667,7 @@ vgen_vlan_unaware_port_reset(vgen_port_t *portp)
 	 */
 	if (ldcp->hphase == VH_DONE && VGEN_VER_LT(ldcp, 1, 3) &&
 	    (portp->nvids != 0 || portp->pvid != vnetp->pvid)) {
-		ldcp->need_ldc_reset = B_TRUE;
-		vgen_handshake_retry(ldcp);
+		vgen_ldc_reset(ldcp);
 	}
 
 	mutex_exit(&ldcp->cblock);
@@ -4695,8 +4696,7 @@ vgen_port_reset(vgen_port_t *portp)
 
 	mutex_enter(&ldcp->cblock);
 
-	ldcp->need_ldc_reset = B_TRUE;
-	vgen_handshake_retry(ldcp);
+	vgen_ldc_reset(ldcp);
 
 	mutex_exit(&ldcp->cblock);
 
@@ -5934,6 +5934,15 @@ vgen_handle_ctrlmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		break;
 
 	case VIO_DDS_INFO:
+		/*
+		 * If we are in the process of resetting the vswitch channel,
+		 * drop the dds message. A new handshake will be initiated
+		 * when the channel comes back up after the reset and dds
+		 * negotiation can then continue.
+		 */
+		if (ldcp->need_ldc_reset == B_TRUE) {
+			break;
+		}
 		rv = vgen_dds_rx(ldcp, tagp);
 		break;
 
@@ -6828,8 +6837,7 @@ vgen_ldc_watchdog(void *arg)
 		}
 #endif
 		mutex_enter(&ldcp->cblock);
-		ldcp->need_ldc_reset = B_TRUE;
-		vgen_handshake_retry(ldcp);
+		vgen_ldc_reset(ldcp);
 		mutex_exit(&ldcp->cblock);
 		if (ldcp->need_resched) {
 			vio_net_tx_update_t vtx_update =
@@ -6876,7 +6884,6 @@ vgen_check_datamsg_seq(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		    "next_rxseq(0x%lx) != seq_num(0x%lx)\n",
 		    ldcp->next_rxseq, seq_num);
 
-		ldcp->need_ldc_reset = B_TRUE;
 		return (EINVAL);
 
 	}
@@ -6916,8 +6923,7 @@ vgen_hwatchdog(void *arg)
 	vgen_ldc_t *ldcp = (vgen_ldc_t *)arg;
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 
-	DWARN(vgenp, ldcp,
-	    "handshake timeout ldc(%lx) phase(%x) state(%x)\n",
+	DWARN(vgenp, ldcp, "handshake timeout phase(%x) state(%x)\n",
 	    ldcp->hphase, ldcp->hstate);
 
 	mutex_enter(&ldcp->cblock);
@@ -6927,8 +6933,7 @@ vgen_hwatchdog(void *arg)
 		return;
 	}
 	ldcp->htid = 0;
-	ldcp->need_ldc_reset = B_TRUE;
-	vgen_handshake_retry(ldcp);
+	vgen_ldc_reset(ldcp);
 	mutex_exit(&ldcp->cblock);
 }
 
@@ -7195,6 +7200,37 @@ vgen_dsend_exit:
 	RW_EXIT(&plistp->rwlock);
 	return (rv);
 
+}
+
+static void
+vgen_ldc_reset(vgen_ldc_t *ldcp)
+{
+	vnet_t	*vnetp = LDC_TO_VNET(ldcp);
+	vgen_t	*vgenp = LDC_TO_VGEN(ldcp);
+
+	ASSERT(MUTEX_HELD(&ldcp->cblock));
+
+	if (ldcp->need_ldc_reset == B_TRUE) {
+		/* another thread is already in the process of resetting */
+		return;
+	}
+
+	/* Set the flag to indicate reset is in progress */
+	ldcp->need_ldc_reset = B_TRUE;
+
+	if (ldcp->portp == vgenp->vsw_portp) {
+		mutex_exit(&ldcp->cblock);
+		/*
+		 * Now cleanup any HIO resources; the above flag also tells
+		 * the code that handles dds messages to drop any new msgs
+		 * that arrive while we are cleaning up and resetting the
+		 * channel.
+		 */
+		vnet_dds_cleanup_hio(vnetp);
+		mutex_enter(&ldcp->cblock);
+	}
+
+	vgen_handshake_retry(ldcp);
 }
 
 #if DEBUG
