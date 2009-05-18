@@ -330,10 +330,8 @@ typedef struct mac_capab_aggr_s {
 
 typedef enum {
 	MAC_NOTE_LINK,
-	MAC_NOTE_PROMISC,
 	MAC_NOTE_UNICST,
 	MAC_NOTE_TX,
-	MAC_NOTE_RESOURCE,
 	MAC_NOTE_DEVPROMISC,
 	MAC_NOTE_FASTPATH_FLUSH,
 	MAC_NOTE_SDU_SIZE,
@@ -346,14 +344,6 @@ typedef void		(*mac_notify_t)(void *, mac_notify_type_t);
 typedef void		(*mac_rx_t)(void *, mac_resource_handle_t, mblk_t *,
 			    boolean_t);
 typedef	mblk_t		*(*mac_receive_t)(void *, int);
-
-/*
- * MAC promiscuous types
- */
-typedef enum {
-	MAC_PROMISC = 0x01,		/* MAC instance is promiscuous */
-	MAC_DEVPROMISC = 0x02		/* Device is promiscuous */
-} mac_promisc_type_t;
 
 /*
  * MAC resource types
@@ -588,7 +578,6 @@ extern int			mac_maxsdu_update(mac_handle_t, uint_t);
 
 extern void 			mac_unicst_update(mac_handle_t,
 				    const uint8_t *);
-extern void			mac_resource_update(mac_handle_t);
 extern void			mac_capab_update(mac_handle_t);
 extern int			mac_pdata_update(mac_handle_t, void *,
 				    size_t);

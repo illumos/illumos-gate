@@ -70,10 +70,8 @@ typedef struct mac_notify_default_cb_s {
 
 mac_notify_default_cb_t mac_notify_cb_list[] = {
 	{ MAC_NOTE_LINK,		mac_fanout_recompute},
-	{ MAC_NOTE_PROMISC,		NULL},
 	{ MAC_NOTE_UNICST,		NULL},
 	{ MAC_NOTE_TX,			NULL},
-	{ MAC_NOTE_RESOURCE,		NULL},
 	{ MAC_NOTE_DEVPROMISC,		NULL},
 	{ MAC_NOTE_FASTPATH_FLUSH,	NULL},
 	{ MAC_NOTE_SDU_SIZE,		NULL},
@@ -778,19 +776,6 @@ mac_unicst_update(mac_handle_t mh, const uint8_t *addr)
 	 * Send a MAC_NOTE_UNICST notification.
 	 */
 	i_mac_notify(mip, MAC_NOTE_UNICST);
-}
-
-/*
- * The provider's hw resources (e.g. rings grouping) has changed.
- * Notify the MAC framework to trigger a re-negotiation of the capabilities.
- */
-void
-mac_resource_update(mac_handle_t mh)
-{
-	/*
-	 * Send a MAC_NOTE_RESOURCE notification.
-	 */
-	i_mac_notify((mac_impl_t *)mh, MAC_NOTE_RESOURCE);
 }
 
 /*

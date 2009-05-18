@@ -2588,8 +2588,7 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	 * MAC_PROMISC_FLAGS_NO_PHYS is set.
 	 */
 	if ((flags & MAC_PROMISC_FLAGS_NO_PHYS) == 0) {
-		if ((rc = i_mac_promisc_set(mip, B_TRUE, MAC_DEVPROMISC))
-		    != 0) {
+		if ((rc = i_mac_promisc_set(mip, B_TRUE)) != 0) {
 			mac_stop((mac_handle_t)mip);
 			i_mac_perim_exit(mip);
 			return (rc);
@@ -2632,6 +2631,7 @@ mac_promisc_remove(mac_promisc_handle_t mph)
 	mac_client_impl_t *mcip = mpip->mpi_mcip;
 	mac_impl_t *mip = mcip->mci_mip;
 	mac_cb_info_t *mcbi;
+	int rv;
 
 	i_mac_perim_enter(mip);
 
@@ -2641,8 +2641,10 @@ mac_promisc_remove(mac_promisc_handle_t mph)
 	 * to close the mac end point and we can't have stale callbacks.
 	 */
 	if (!(mpip->mpi_no_phys)) {
-		(void) mac_promisc_set((mac_handle_t)mip, B_FALSE,
-		    MAC_DEVPROMISC);
+		if ((rv = i_mac_promisc_set(mip, B_FALSE)) != 0) {
+			cmn_err(CE_WARN, "%s: failed to switch OFF promiscuous"
+			    " mode because of error 0x%x", mip->mi_name, rv);
+		}
 	}
 	mcbi = &mip->mi_promisc_cb_info;
 	mutex_enter(mcbi->mcbi_lockp);

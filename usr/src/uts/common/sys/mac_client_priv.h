@@ -53,8 +53,7 @@ extern boolean_t mac_rx_bypass_set(mac_client_handle_t, mac_direct_rx_t,
 
 extern const mac_info_t *mac_info(mac_handle_t);
 extern boolean_t mac_info_get(const char *, mac_info_t *);
-extern int mac_promisc_set(mac_handle_t, boolean_t, mac_promisc_type_t);
-extern boolean_t mac_promisc_get(mac_handle_t, mac_promisc_type_t);
+extern boolean_t mac_promisc_get(mac_handle_t);
 
 extern int mac_start(mac_handle_t);
 extern void mac_stop(mac_handle_t);

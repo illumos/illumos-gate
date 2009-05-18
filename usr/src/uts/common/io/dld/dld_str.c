@@ -1684,7 +1684,7 @@ str_notify(void *arg, mac_notify_type_t type)
 		/*
 		 * Send the appropriate DL_NOTIFY_IND.
 		 */
-		if (mac_promisc_get(mh, MAC_DEVPROMISC))
+		if (mac_promisc_get(mh))
 			str_notify_promisc_on_phys(dsp);
 		else
 			str_notify_promisc_off_phys(dsp);
@@ -1734,7 +1734,6 @@ str_notify(void *arg, mac_notify_type_t type)
 		}
 		break;
 
-	case MAC_NOTE_RESOURCE:
 	case MAC_NOTE_CAPAB_CHG:
 		/*
 		 * This notification is sent whenever the MAC resources
@@ -1756,9 +1755,6 @@ str_notify(void *arg, mac_notify_type_t type)
 		break;
 
 	case MAC_NOTE_MARGIN:
-		break;
-
-	case MAC_NOTE_PROMISC:
 		break;
 
 	default:

@@ -356,7 +356,6 @@ struct mac_impl_s {
 	uint_t			mi_active;		/* SL */
 	link_state_t		mi_linkstate;		/* none */
 	link_state_t		mi_lastlinkstate;	/* none */
-	uint_t			mi_promisc;		/* SL */
 	uint_t			mi_devpromisc;		/* SL */
 	kmutex_t		mi_lock;
 	uint8_t			mi_addr[MAXMACADDRLEN];	/* mi_rw_lock */
@@ -663,7 +662,7 @@ extern void mac_rx_group_unmark(mac_group_t *, uint_t);
 extern void mac_tx_client_flush(mac_client_impl_t *);
 extern void mac_tx_client_block(mac_client_impl_t *);
 extern void mac_tx_client_unblock(mac_client_impl_t *);
-extern int i_mac_promisc_set(mac_impl_t *, boolean_t, mac_promisc_type_t);
+extern int i_mac_promisc_set(mac_impl_t *, boolean_t);
 extern void i_mac_promisc_walker_cleanup(mac_impl_t *);
 extern mactype_t *mactype_getplugin(const char *);
 extern void mac_addr_factory_init(mac_impl_t *);

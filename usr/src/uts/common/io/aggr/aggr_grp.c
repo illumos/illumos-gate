@@ -871,8 +871,6 @@ bail:
 		}
 	}
 
-	if (rc == 0)
-		mac_resource_update(grp->lg_mh);
 	mac_perim_exit(mph);
 	AGGR_GRP_REFRELE(grp);
 	return (rc);
@@ -1380,8 +1378,6 @@ bail:
 		mac_unicst_update(grp->lg_mh, grp->lg_addr);
 	if (link_state_update)
 		mac_link_update(grp->lg_mh, grp->lg_link_state);
-	if (rc == 0)
-		mac_resource_update(grp->lg_mh);
 
 	mac_perim_exit(mph);
 	AGGR_GRP_REFRELE(grp);

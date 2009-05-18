@@ -449,7 +449,6 @@ extern void 			mac_unicst_update(mac_handle_t,
 extern void			mac_tx_update(mac_handle_t);
 extern void			mac_tx_ring_update(mac_handle_t,
 				    mac_ring_handle_t);
-extern void			mac_resource_update(mac_handle_t);
 extern void			mac_capab_update(mac_handle_t);
 extern int			mac_pdata_update(mac_handle_t, void *,
 				    size_t);
