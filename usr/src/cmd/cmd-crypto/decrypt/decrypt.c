@@ -433,6 +433,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	char *outfilename = NULL;
 	boolean_t errflag = B_TRUE;
 	boolean_t inoutsame = B_FALSE;	/* if both input & output are same */
+	boolean_t leavefilealone = B_FALSE;
 	CK_BYTE_PTR	pivbuf = NULL_PTR;
 	CK_ULONG	ivlen = 0L;
 	int		mech_match = 0;
@@ -717,6 +718,8 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 				cryptoerror(LOG_STDERR, gettext(
 				    "cannot open output file %s"),
 				    outfilename);
+				/* Cannot open file, should leave it alone */
+				leavefilealone = B_TRUE;
 				goto cleanup;
 			}
 		}
@@ -977,8 +980,8 @@ cleanup:
 		}
 	}
 
-	/* If error occurred, remove the output file */
-	if (errflag && outfilename != NULL) {
+	/* If error occurred and the file was new, remove the output file */
+	if (errflag && (outfilename != NULL) && !leavefilealone) {
 		(void) unlink(outfilename);
 	}
 
