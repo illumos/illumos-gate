@@ -121,27 +121,22 @@ ld_main(int argc, char **argv, Half mach)
 	(void) gettimeofday(&DBG_TOTALTIME, NULL);
 	DBG_DELTATIME = DBG_TOTALTIME;
 
-	/*
-	 * Initialize signal handlers, and output file variables.  Establish a
-	 * default output ELF header to satisfy diagnostic requirements.
-	 */
+	/* Output file descriptor */
 	if ((ofl = libld_calloc(1, sizeof (Ofl_desc))) == 0)
 		return (1);
 
-	/* Initilize target state */
+	/* Initialize target state */
 	if (ld_init_target(NULL, mach) != 0)
 		return (1);
 
 	/*
-	 * Set up the output ELF header, and initialize the machine
-	 * and class details.
+	 * Set up the default output ELF header to satisfy diagnostic
+	 * requirements, and initialize the machine and class details.
 	 */
 	ofl->ofl_dehdr = &def_ehdr;
 	def_ehdr.e_ident[EI_CLASS] = ld_targ.t_m.m_class;
 	def_ehdr.e_ident[EI_DATA] = ld_targ.t_m.m_data;
 	def_ehdr.e_machine = ld_targ.t_m.m_mach;
-
-	ld_init(ofl);
 
 	/*
 	 * Build up linker version string
@@ -170,6 +165,9 @@ ld_main(int argc, char **argv, Half mach)
 	 */
 	if (ofl->ofl_flags1 & FLG_OF1_DONE)
 		return (0);
+
+	/* Initialize signal handler */
+	ld_init_sighandler(ofl);
 
 	/*
 	 * Determine whether any support libraries should be loaded,

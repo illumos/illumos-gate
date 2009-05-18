@@ -51,6 +51,9 @@
  *
  *    -z norelaxreloc		suppress the automatic addition of relaxed
  *				relocations to GNU linkonce/COMDAT sections.
+ *
+ *    -z nosighandler		suppress the registration of the signal handler
+ *				used to manage SIGBUS.
  */
 #include	<sys/link.h>
 #include	<stdio.h>
@@ -116,6 +119,7 @@ usage_mesg(Boolean detail)
 	if (detail == FALSE)
 		return;
 
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_3));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_6));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_A));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_B));
@@ -843,7 +847,7 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 	int	c, ndx = optind;
 
 	/*
-	 * The -64 and -ztarget options are special, in that we validate
+	 * The -32, -64 and -ztarget options are special, in that we validate
 	 * them, but otherwise ignore them. libld.so (this code) is called
 	 * from the ld front end program. ld has already examined the
 	 * arguments to determine the output class and machine type of the
@@ -855,6 +859,22 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 	while ((c = ld_getopt(ofl->ofl_lml, ndx, argc, argv)) != -1) {
 
 		switch (c) {
+		case '3':
+			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
+
+			/*
+			 * -32 is processed by ld to determine the output class.
+			 * Here we sanity check the option incase some other
+			 * -3* option is mistakenly passed to us.
+			 */
+			if (optarg[0] != '2') {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_ARG_ILLEGAL),
+				    MSG_ORIG(MSG_ARG_3), optarg);
+				ofl->ofl_flags |= FLG_OF_FATAL;
+			}
+			continue;
+
 		case '6':
 			DBG_CALL(Dbg_args_option(ofl->ofl_lml, ndx, c, optarg));
 
@@ -1255,6 +1275,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_GLOBAUDIT)) == 0) {
 				ofl->ofl_dtflags_1 |= DF_1_GLOBAUDIT;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_NOSIGHANDLER)) == 0) {
+				ofl->ofl_flags1 |= FLG_OF1_NOSGHND;
 
 			/*
 			 * Check archive group usage

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -58,6 +58,7 @@
 @ MSG_STR_LDDIAG	"ld: "
 @ MSG_STR_ELFDIAG	": %s"
 
+@ MSG_ARG_TWO		"2"
 @ MSG_ARG_FOUR		"4"
 @ MSG_ARG_ALTEXEC64	"altexec64"
 @ MSG_ARG_TARGET	"target="

@@ -130,12 +130,27 @@ handler(int sig, siginfo_t *sip, void *utp)
  * Establish a signal handler for all signals we're interested in.
  */
 void
-ld_init(Ofl_desc *ofl)
+ld_init_sighandler(Ofl_desc *ofl)
 {
 	struct sigaction	nact, oact;
 	Signals *		sigs;
 
 	Ofl = ofl;
+
+	/*
+	 * Our heavy use of mmap() means that we are susceptible to
+	 * receiving a SIGBUS in low diskspace situations. The main
+	 * purpose of the signal handler is to handle that situation
+	 * gracefully, so that out of disk errors don't drop a core file.
+	 *
+	 * In rare cases, this will prevent us from getting a core from a
+	 * SIGBUS triggered by an internal alignment error in libld.
+	 * If -znosighandler is set, return without registering the
+	 * handler. This is primarily of use for debugging problems in
+	 * the field, and is not of general interest.
+	 */
+	if (ofl->ofl_flags1 & FLG_OF1_NOSGHND)
+		return;
 
 	/*
 	 * For each signal we're interested in set up a signal handler that

@@ -550,7 +550,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_get_group		ld64_get_group
 #define	ld_group_process	ld64_group_process
 #define	ld_lib_setup		ld64_lib_setup
-#define	ld_init			ld64_init
+#define	ld_init_sighandler	ld64_init_sighandler
 #define	ld_lcm			ld64_lcm
 #define	ld_make_bss		ld64_make_bss
 #define	ld_make_data		ld64_make_data
@@ -638,7 +638,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_get_group		ld32_get_group
 #define	ld_group_process	ld32_group_process
 #define	ld_lib_setup		ld32_lib_setup
-#define	ld_init			ld32_init
+#define	ld_init_sighandler	ld32_init_sighandler
 #define	ld_lcm			ld32_lcm
 #define	ld_make_bss		ld32_make_bss
 #define	ld_make_data		ld32_make_data
@@ -740,7 +740,7 @@ extern uintptr_t	ld_group_process(Is_desc *, Ofl_desc *);
 
 extern uintptr_t	ld_lib_setup(Ofl_desc *);
 
-extern void		ld_init(Ofl_desc *);
+extern void		ld_init_sighandler(Ofl_desc *);
 
 extern Xword		ld_lcm(Xword, Xword);
 

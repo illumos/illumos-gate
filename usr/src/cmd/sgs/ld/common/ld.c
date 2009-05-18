@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,8 @@
 #include	<libintl.h>
 #include	<locale.h>
 #include	<fcntl.h>
+#include	<ar.h>
+#include	<gelf.h>
 #include	"conv.h"
 #include	"libld.h"
 #include	"machdep.h"
@@ -47,6 +49,40 @@
  * have to suffer the R_SPARC_COPY overhead of the __ctype[] array.
  */
 extern int	isspace(int);
+
+/*
+ * We examine ELF objects, and archives containing ELF objects, in order
+ * to determine the ELFCLASS of the resulting object and/or the linker to be
+ * used. We want to avoid the overhead of libelf for this, at least until
+ * we are certain that we need it, so we start by reading bytes from
+ * the beginning of the file. This type defines the buffer used to read
+ * these initial bytes.
+ *
+ * A plain ELF object will start with an ELF header, whereas an archive
+ * starts with a magic string (ARMAG) that is SARMAG bytes long. Any valid
+ * ELF file or archive will contain more bytes than this buffer, so any
+ * file shorter than this can be safely assummed not to be of interest.
+ *
+ * The ELF header for ELFCLASS32 and ELFCLASS64 are identical up through the
+ * the e_version field, and all the information we require is found in this
+ * common prefix. Furthermore, this cannot change, as the layout of an ELF
+ * header is fixed by the ELF ABI. Hence, the ehdr part of this union is
+ * not a full ELF header, but only the class-independent prefix that we need.
+ *
+ * As this is a raw (non-libelf) read, we are responsible for handling any
+ * byte order difference between the object and the system running this
+ * program when we read any datum larger than a byte (i.e. e_machine) from
+ * this header.
+ */
+typedef union {
+	struct {	/* Must match start of ELFxx_Ehdr in <sys/elf.h> */
+		uchar_t		e_ident[EI_NIDENT];	/* ident bytes */
+		Half		e_type;			/* file type */
+		Half		e_machine;		/* target machine */
+	} ehdr;
+	char			armag[SARMAG];
+} FILE_HDR;
+
 
 /*
  * Print a message to stdout
@@ -97,23 +133,101 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 
 
 /*
- * Determine:
- *	- ELFCLASS of resulting object (aoutclass)
- *	- Whether we need the 32 or 64-bit libld (ldclass)
- *	- ELF machine type of resulting object (m_mach)
+ * Examine the first object in an archive to determine its ELFCLASS
+ * and machine type.
+ *
+ * entry:
+ *	fd - Open file descriptor for file
+ *	elf - libelf ELF descriptor
+ *	class_ret, mach_ret - Address of variables to receive ELFCLASS
+ *		and machine type.
+ *
+ * exit:
+ *	On success, *class_ret and *mach_ret are filled in, and True (1)
+ *	is returned. On failure, False (0) is returned.
  */
 static int
-process_args(int argc, char **argv, uchar_t *aoutclass, uchar_t *ldclass,
+archive(int fd, Elf *elf, uchar_t *class_ret, Half *mach_ret)
+{
+	Elf_Cmd		cmd = ELF_C_READ;
+	Elf_Arhdr	*arhdr;
+	Elf		*_elf = NULL;
+	int		found = 0;
+
+	/*
+	 * Process each item within the archive until we find the first
+	 * ELF object, or alternatively another archive to recurse into.
+	 * Stop after analyzing the first plain object found.
+	 */
+	while (!found && ((_elf = elf_begin(fd, cmd, elf)) != NULL)) {
+		if ((arhdr = elf_getarhdr(_elf)) == NULL)
+			return (0);
+		if (*arhdr->ar_name != '/') {
+			switch (elf_kind(_elf)) {
+			case ELF_K_AR:
+				found = archive(fd, _elf, class_ret, mach_ret);
+				break;
+			case ELF_K_ELF:
+				if (gelf_getclass(_elf) == ELFCLASS64) {
+					Elf64_Ehdr *ehdr;
+
+					if ((ehdr = elf64_getehdr(_elf)) ==
+					    NULL)
+						break;
+					*class_ret = ehdr->e_ident[EI_CLASS];
+					*mach_ret = ehdr->e_machine;
+				} else {
+					Elf32_Ehdr *ehdr;
+
+					if ((ehdr = elf32_getehdr(_elf)) ==
+					    NULL)
+						break;
+					*class_ret = ehdr->e_ident[EI_CLASS];
+					*mach_ret = ehdr->e_machine;
+				}
+				found = 1;
+				break;
+			}
+		}
+
+		cmd = elf_next(_elf);
+		(void) elf_end(_elf);
+	}
+
+	return (found);
+}
+
+/*
+ * Determine:
+ *	- ELFCLASS of resulting object (class)
+ *	- Whether user specified class of the linker (ldclass)
+ *	- ELF machine type of resulting object (m_mach)
+ *
+ * In order of priority, we determine this information as follows:
+ *
+ * -	Command line options (-32, -64, -z altexec64, -z target).
+ * -	From the first plain object seen on the command line. (This is
+ *	by far the most common case.)
+ * -	From the first object contained within the first archive
+ *	on the command line.
+ * -	If all else fails, we assume a 32-bit object for the native machine.
+ *
+ * entry:
+ *	argc, argv - Command line argument vector
+ *	class_ret - Address of variable to receive ELFCLASS of output object
+ *	ldclass_ret - Address of variable to receive ELFCLASS of
+ *		linker to use. This will be ELFCLASS32/ELFCLASS64 if one
+ *		is explicitly specified, and ELFCLASSNONE otherwise.
+ *		ELFCLASSNONE therefore means that we should use the best
+ *		link-editor that the system/kernel will allow.
+ */
+static int
+process_args(int argc, char **argv, uchar_t *class_ret, uchar_t *ldclass_ret,
     Half *mach)
 {
-#if	defined(_LP64)
-	uchar_t lclass = ELFCLASS64;
-#else
-	uchar_t	lclass = ELFCLASSNONE;
-#endif
-	uchar_t	aclass = ELFCLASSNONE;
-	Half	mach32 = EM_NONE, mach64 = EM_NONE;
-	int	c;
+	uchar_t	ldclass = ELFCLASSNONE, class = ELFCLASSNONE, ar_class;
+	Half	mach32 = EM_NONE, mach64 = EM_NONE, ar_mach;
+	int	c, ar_found = 0;
 
 	/*
 	 * In general, libld.so is responsible for processing the
@@ -122,8 +236,21 @@ process_args(int argc, char **argv, uchar_t *aoutclass, uchar_t *ldclass,
 	 * class/machine of the output object. We examine the options
 	 * here looking for the following:
 	 *
-	 *	-64
-	 *		Produce an ELFCLASS64 object. Use the 64-bit linker.
+	 *	-32	Produce an ELFCLASS32 object. This is the default, so
+	 *		-32 is only needed when linking entirely from archives,
+	 *		and the first archive contains a mix of 32 and 64-bit
+	 *		objects, and the first object in that archive is 64-bit.
+	 *		We do not expect this option to get much use, but it
+	 *		ensures that the user can handle any situation.
+	 *
+	 *	-64	Produce an ELFCLASS64 object. (Note that this will
+	 *		indirectly cause the use of the 64-bit linker if
+	 *		the system is 64-bit capable). The most common need
+	 *		for this option is when linking a filter object entirely
+	 *		from a mapfile. The less common case is when linking
+	 *		entirely from archives, and the first archive contains
+	 *		a mix of 32 and 64-bit objects, and the first object
+	 *		in that archive is 32-bit.
 	 *
 	 *	-z altexec64
 	 *		Use the 64-bit linker regardless of the class
@@ -131,24 +258,32 @@ process_args(int argc, char **argv, uchar_t *aoutclass, uchar_t *ldclass,
 	 *
 	 *	-z target=platform
 	 *		Produce output object for the specified platform.
+	 *		This option is needed when producing an object
+	 *		for a non-native target entirely from a mapfile,
+	 *		or when linking entirely from an archive containing
+	 *		objects for multiple targets, and the first object
+	 *		in the archive is not for the desired target.
 	 *
-	 * The -64 and -ztarget options are used when the only input to
-	 * ld() is a mapfile or archive, and a 64-bit or non-native output
-	 * object is required.
-	 *
-	 * If we've already processed a 32-bit object and we find -64, we have
-	 * an error condition, but let this fall through to libld to obtain the
-	 * default error message.
+	 * If we've already processed an object and we find -32/-64, and
+	 * the object is of the wrong class, we have an error condition.
+	 * We ignore it here, and let it fall through to libld, where the
+	 * proper diagnosis and error message will occur.
 	 */
 	opterr = 0;
 	optind = 1;
 getmore:
 	while ((c = ld_getopt(0, optind, argc, argv)) != -1) {
 		switch (c) {
+		case '3':
+			if (strncmp(optarg, MSG_ORIG(MSG_ARG_TWO),
+			    MSG_ARG_TWO_SIZE) == 0)
+				class = ELFCLASS32;
+			break;
+
 		case '6':
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_FOUR),
 			    MSG_ARG_FOUR_SIZE) == 0)
-				aclass = ELFCLASS64;
+				class = ELFCLASS64;
 			break;
 
 		case 'z':
@@ -156,7 +291,7 @@ getmore:
 			/* -z altexec64 */
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_ALTEXEC64),
 			    MSG_ARG_ALTEXEC64_SIZE) == 0) {
-				lclass = ELFCLASS64;
+				ldclass = ELFCLASS64;
 				break;
 			}
 #endif
@@ -185,11 +320,15 @@ getmore:
 
 	/*
 	 * Continue to look for the first ELF object to determine the class of
-	 * objects to operate on.
+	 * objects to operate on. At the same time, look for the first archive
+	 * of ELF objects --- if no plain ELF object is specified, the type
+	 * of the first ELF object in the first archive will be used. If
+	 * there is no object, and no archive, then we fall back to a 32-bit
+	 * object for the native machine.
 	 */
 	for (; optind < argc; optind++) {
 		int		fd;
-		Elf32_Ehdr	ehdr32;
+		FILE_HDR	hdr;
 
 		/*
 		 * If we detect some more options return to getopt().
@@ -212,11 +351,18 @@ getmore:
 		 * may be additional options that might affect our
 		 * class/machine decision.
 		 */
-		if ((aclass != ELFCLASSNONE) && (mach32 != EM_NONE))
+		if ((class != ELFCLASSNONE) && (mach32 != EM_NONE))
 			continue;
 
 		/*
-		 * Open the file and determine the files ELF class.
+		 * Open the file and determine if it is an object. We are
+		 * looking for ELF objects, or archives of ELF objects.
+		 *
+		 * Plain objects are simple, and are the common case, so
+		 * we examine them directly and avoid the map-unmap-map
+		 * that would occur if we used libelf. Archives are too
+		 * complex to be worth accessing directly, so if we identify
+		 * an archive, we use libelf on it and accept the cost.
 		 */
 		if ((fd = open(argv[optind], O_RDONLY)) == -1) {
 			int err = errno;
@@ -226,37 +372,20 @@ getmore:
 			return (1);
 		}
 
-		/*
-		 * Note that we read an entire 32-bit ELF header struct
-		 * here, even though we have yet to determine that the
-		 * file is an ELF object or that it is ELFCLASS32. We
-		 * do this because:
-		 *	- Any valid ELF object of any class must
-		 *		have at least this number of bytes in it,
-		 *		since an ELF header is manditory, and since
-		 *		a 32-bit header is smaller than a 64-bit one.
-		 *	- The 32 and 64-bit ELF headers are identical
-		 *		up through the e_version field, so we can
-		 *		obtain the e_machine value of a 64-bit
-		 *		object via the e_machine value we read into
-		 *		the 32-bit version. This cannot change, because
-		 *		the layout of an ELF header is fixed by the ABI.
-		 *
-		 * Note however that we do have to worry about the byte
-		 * order difference between the object and the system
-		 * running this program when we read the e_machine value,
-		 * since it is a multi-byte value;
-		 */
-		if ((read(fd, &ehdr32, sizeof (ehdr32)) == sizeof (ehdr32)) &&
-		    (ehdr32.e_ident[EI_MAG0] == ELFMAG0) &&
-		    (ehdr32.e_ident[EI_MAG1] == ELFMAG1) &&
-		    (ehdr32.e_ident[EI_MAG2] == ELFMAG2) &&
-		    (ehdr32.e_ident[EI_MAG3] == ELFMAG3)) {
-			if (aclass == ELFCLASSNONE) {
-				aclass = ehdr32.e_ident[EI_CLASS];
-				if ((aclass != ELFCLASS32) &&
-				    (aclass != ELFCLASS64))
-					aclass = ELFCLASSNONE;
+		if (pread(fd, &hdr, sizeof (hdr), 0) != sizeof (hdr)) {
+			(void) close(fd);
+			continue;
+		}
+
+		if ((hdr.ehdr.e_ident[EI_MAG0] == ELFMAG0) &&
+		    (hdr.ehdr.e_ident[EI_MAG1] == ELFMAG1) &&
+		    (hdr.ehdr.e_ident[EI_MAG2] == ELFMAG2) &&
+		    (hdr.ehdr.e_ident[EI_MAG3] == ELFMAG3)) {
+			if (class == ELFCLASSNONE) {
+				class = hdr.ehdr.e_ident[EI_CLASS];
+				if ((class != ELFCLASS32) &&
+				    (class != ELFCLASS64))
+					class = ELFCLASSNONE;
 			}
 
 			if (mach32 == EM_NONE) {
@@ -273,34 +402,52 @@ getmore:
 				 * combination, libld will catch it.
 				 */
 				mach32 = mach64 =
-				    (ld_elfdata == ehdr32.e_ident[EI_DATA]) ?
-				    ehdr32.e_machine :
-				    BSWAP_HALF(ehdr32.e_machine);
+				    (ld_elfdata == hdr.ehdr.e_ident[EI_DATA]) ?
+				    hdr.ehdr.e_machine :
+				    BSWAP_HALF(hdr.ehdr.e_machine);
 			}
+		} else if (!ar_found &&
+		    (memcmp(&hdr.armag, ARMAG, SARMAG) == 0)) {
+			Elf	*elf;
+
+			(void) elf_version(EV_CURRENT);
+			if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
+				(void) close(fd);
+				continue;
+			}
+			if (elf_kind(elf) == ELF_K_AR)
+				ar_found =
+				    archive(fd, elf, &ar_class, &ar_mach);
+			(void) elf_end(elf);
 		}
 
 		(void) close(fd);
 	}
 
 	/*
-	 * If we couldn't establish a class, default to 32-bit.
+	 * ELFCLASS of output object: If we did not establish a class from a
+	 * command option, or from the first plain object, then use the class
+	 * from the first archive, and failing that, default to 32-bit.
 	 */
-	if (aclass == ELFCLASSNONE)
-		aclass = ELFCLASS32;
-	*aoutclass = aclass;
+	if (class == ELFCLASSNONE)
+		class = ar_found ? ar_class : ELFCLASS32;
+	*class_ret = class;
 
-	if (lclass == ELFCLASSNONE)
-		lclass = ELFCLASS32;
-	*ldclass = lclass;
+	/* ELFCLASS of link-editor to use */
+	*ldclass_ret = ldclass;
 
 	/*
-	 * Use the machine type that goes with the class we've determined.
-	 * If we didn't find a usable machine type, use the native
-	 * machine.
+	 * Machine type of output object: If we did not establish a machine
+	 * type from the command line, or from the first plain object, then
+	 * use the machine established by the first archive, and failing that,
+	 * use the native machine.
 	 */
-	*mach = (aclass == ELFCLASS64) ? mach64 : mach32;
+	*mach = (class == ELFCLASS64) ? mach64 : mach32;
 	if (*mach == EM_NONE)
-		*mach = (aclass == ELFCLASS64) ? M_MACH_64 : M_MACH_32;
+		if (ar_found)
+			*mach = ar_mach;
+		else
+			*mach = (class == ELFCLASS64) ? M_MACH_64 : M_MACH_32;
 
 	return (0);
 }
@@ -488,7 +635,7 @@ int
 main(int argc, char **argv, char **envp)
 {
 	char		**oargv = argv;
-	uchar_t 	aoutclass, ldclass, checkclass;
+	uchar_t 	class, ldclass, checkclass;
 	Half		mach;
 
 	/*
@@ -517,36 +664,40 @@ main(int argc, char **argv, char **envp)
 	 *	- link-editor class
 	 *	- target machine
 	 */
-	if (process_args(argc, argv, &aoutclass, &ldclass, &mach))
+	if (process_args(argc, argv, &class, &ldclass, &mach))
 		return (1);
 
 	/*
-	 * If we're processing 64-bit objects, or the user specifically asked
-	 * for a 64-bit link-editor, determine if a 64-bit ld() can be executed.
-	 * Bail if a 64-bit ld() was explicitly asked for, but one could not be
-	 * found.
+	 * Unless a 32-bit link-editor was explicitly requested, try
+	 * to exec the 64-bit version.
 	 */
-	if ((aoutclass == ELFCLASS64) || (ldclass == ELFCLASS64))
+	if (ldclass != ELFCLASS32)
 		checkclass = conv_check_native(oargv, envp);
 
+	/*
+	 * If an attempt to exec the 64-bit link-editor fails:
+	 * -	Bail if the 64-bit linker was explicitly requested
+	 * -	Continue quietly if the 64-bit linker was not requested.
+	 *	This is undoubtedly due to hardware/kernel limitations,
+	 *	and therefore represents the best we can do. Note that
+	 *	the 32-bit linker is capable of linking anything the
+	 *	64-bit version is, subject to a 4GB limit on memory, and
+	 *	2GB object size.
+	 */
 	if ((ldclass == ELFCLASS64) && (checkclass != ELFCLASS64)) {
 		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_64));
 		return (1);
 	}
 
-	/*
-	 * Reset the getopt(3c) error message flag, and call the generic entry
-	 * point using the appropriate class.
-	 */
-	if (aoutclass == ELFCLASS64)
+	/* Call the libld entry point for the specified ELFCLASS */
+	if (class == ELFCLASS64)
 		return (ld64_main(argc, argv, mach));
 	else
 		return (ld32_main(argc, argv, mach));
 }
 
 /*
- * Exported interfaces required by our dependencies.  libld and friends bind to
- * the different implementations of these provided by either ld or ld.so.1.
+ * We supply this function for the msg module
  */
 const char *
 _ld_msg(Msg mid)

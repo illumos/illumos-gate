@@ -376,6 +376,7 @@ struct ofl_desc {
 #define	FLG_OF1_RLXREL	0x00000400	/* -z relaxreloc flag set */
 #define	FLG_OF1_IGNORE	0x00000800	/* ignore unused dependencies */
 
+#define	FLG_OF1_NOSGHND	0x00001000	/* -z nosighandler flag set */
 #define	FLG_OF1_TEXTOFF 0x00002000	/* text relocations are ok */
 #define	FLG_OF1_ABSEXEC	0x00004000	/* -zabsexec set */
 #define	FLG_OF1_LAZYLD	0x00008000	/* lazy loading of objects enabled */

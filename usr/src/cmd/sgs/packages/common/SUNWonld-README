@@ -1481,3 +1481,6 @@ Bugid   Risk Synopsis
 	gcc code (link-editor components only)
 6831308 ld.so.1: symbol rescanning does a little too much work
 6837777 ld ordered section code uses too much memory and works too hard
+6841199 Undo 10 year old workaround and use 64-bit ld on 32-bit objects
+6784790 ld should examine archives to determine output object class/machine
+	PSARC/2009/305 ld -32 option
