@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +93,7 @@ static int bscv_close(dev_t, int, int, cred_t *);
 static void bscv_full_stop(bscv_soft_state_t *);
 
 static void bscv_enter(bscv_soft_state_t *);
+static int bscv_tryenter(bscv_soft_state_t *ssp);
 static void bscv_exit(bscv_soft_state_t *);
 #ifdef DEBUG
 static int bscv_held(bscv_soft_state_t *);
@@ -398,6 +399,15 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
+#ifdef DEBUG
+/* Tracing is enabled if value is non-zero. */
+static int bscv_trace_flag = 1;
+
+#define	BSCV_TRACE   if (bscv_trace_flag != 0)	bscv_trace
+#else
+#define	BSCV_TRACE
+#endif
+
 /*
  * kernel accessible routines. These routines are necessarily global so the
  * driver can be loaded, and unloaded successfully
@@ -640,7 +650,7 @@ bscv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_init(&ssp->prog_mu, NULL, MUTEX_DRIVER, NULL);
 		ssp->progress |= BSCV_LOCKS;
 
-		bscv_trace(ssp, 'A', "bscv_attach",
+		BSCV_TRACE(ssp, 'A', "bscv_attach",
 		    "bscv_attach: mutexes and condition vars initialised");
 
 		/* Map in physical communication channels */
@@ -685,7 +695,7 @@ bscv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			(void) bscv_cleanup(ssp);
 			return (DDI_FAILURE);
 		}
-		bscv_trace(ssp, 'A', "bscv_attach",
+		BSCV_TRACE(ssp, 'A', "bscv_attach",
 		    "bscv_attach: device minor nodes created");
 		ssp->progress |= BSCV_NODES;
 
@@ -745,28 +755,18 @@ bscv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /*
  * function	- bscv_reset
- * description	- routine called when system is being stopped - used to disable
- *		  the watchdog.
+ * description	- routine that implements the obsolete devo_reset entry point.
+ *		  MAN page declares that devo_quiesce subsumes devo_reset
+ *		  functionality.
  * inputs	- device information structure, DDI_RESET command
  * outputs	- DDI_SUCCESS or DDI_FAILURE
  */
 static int
 bscv_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 {
-	bscv_soft_state_t *ssp;
-	int	instance;
-
 	switch (cmd) {
 	case DDI_RESET_FORCE:
-
-		instance = ddi_get_instance(dip);
-		ssp = ddi_get_soft_state(bscv_statep, instance);
-		if (ssp == NULL) {
-			return (DDI_FAILURE);
-		}
-		bscv_full_stop(ssp);
-		return (DDI_SUCCESS);
-
+		return (bscv_quiesce(dip));
 	default:
 		return (DDI_FAILURE);
 	}
@@ -794,7 +794,13 @@ bscv_quiesce(dev_info_t *dip)
 	if (ssp == NULL) {
 		return (DDI_FAILURE);
 	}
+#ifdef DEBUG
+	/* Disable tracing, as we are executing at High-Interrupt level */
+	bscv_trace_flag = 0;
+#endif
+	/* quiesce the device */
 	bscv_full_stop(ssp);
+
 	return (DDI_SUCCESS);
 }
 
@@ -827,7 +833,7 @@ bscv_open(dev_t *devp, int flag, int otype, cred_t *cred)
 	if (ssp == NULL) {
 		return (ENXIO);	/* not attached yet */
 	}
-	bscv_trace(ssp, 'O', "bscv_open", "instance 0x%x", instance);
+	BSCV_TRACE(ssp, 'O', "bscv_open", "instance 0x%x", instance);
 
 	if (otype != OTYP_CHR) {
 		return (EINVAL);
@@ -858,7 +864,7 @@ bscv_close(dev_t dev, int flag, int otype, cred_t *cred)
 	if (ssp == NULL) {
 		return (ENXIO);
 	}
-	bscv_trace(ssp, 'O', "bscv_close", "instance 0x%x", instance);
+	BSCV_TRACE(ssp, 'O', "bscv_close", "instance 0x%x", instance);
 
 	return (0);
 }
@@ -888,19 +894,19 @@ bscv_map_regs(bscv_soft_state_t *ssp)
 
 	/* Check for sanity of nelements */
 	if (retval != DDI_PROP_SUCCESS) {
-		bscv_trace(ssp, 'A', "bscv_map_regs", "lookup reg returned"
+		BSCV_TRACE(ssp, 'A', "bscv_map_regs", "lookup reg returned"
 		    " 0x%x", retval);
 		goto cleanup_exit;
 	} else if (nelements % LOMBUS_REGSPEC_SIZE != 0) {
-		bscv_trace(ssp, 'A', "bscv_map_regs", "nelements %d not"
+		BSCV_TRACE(ssp, 'A', "bscv_map_regs", "nelements %d not"
 		    " a multiple of %d", nelements, LOMBUS_REGSPEC_SIZE);
 		goto cleanup_exit;
 	} else if (nelements > BSCV_MAXCHANNELS * LOMBUS_REGSPEC_SIZE) {
-		bscv_trace(ssp, 'A', "bscv_map_regs", "nelements %d too large"
+		BSCV_TRACE(ssp, 'A', "bscv_map_regs", "nelements %d too large"
 		    ", probably a misconfiguration", nelements);
 		goto cleanup_exit;
 	} else if (nelements < BSCV_MINCHANNELS * LOMBUS_REGSPEC_SIZE) {
-		bscv_trace(ssp, 'A', "bscv_map_regs", "nelements %d too small"
+		BSCV_TRACE(ssp, 'A', "bscv_map_regs", "nelements %d too small"
 		    ", need to have at least a general and a wdog channel",
 		    nelements);
 		goto cleanup_exit;
@@ -917,7 +923,7 @@ bscv_map_regs(bscv_soft_state_t *ssp)
 		    (caddr_t *)&ssp->channel[i].regs,
 		    0, 0, &ssp->attr, &ssp->channel[i].handle);
 		if (retval != DDI_SUCCESS) {
-			bscv_trace(ssp, 'A', "bscv_map_regs", "map failure"
+			BSCV_TRACE(ssp, 'A', "bscv_map_regs", "map failure"
 			    " 0x%x on space %d", retval, i);
 
 			/* Rewind all current mappings - avoiding failed one */
@@ -989,8 +995,7 @@ bscv_map_chan_logical_physical(bscv_soft_state_t *ssp)
 /*
  * function	- bscv_full_stop
  * description	- gracefully shut the lom down during panic or reboot.
- *		  Disables the watchdog, setup up serial event reporting
- *		  and stops the event daemon running.
+ *		  Disables the watchdog and sets up serial event reporting.
  * inputs	- soft state pointer
  * outputs	- none
  */
@@ -999,16 +1004,19 @@ bscv_full_stop(bscv_soft_state_t *ssp)
 {
 	uint8_t bits2set = 0;
 	uint8_t bits2clear = 0;
+	int obtained_lock;
 
-	bscv_trace(ssp, 'W', "bscv_full_stop",
+	BSCV_TRACE(ssp, 'W', "bscv_full_stop",
 	    "turning off watchdog");
 
-	if (!ddi_in_panic()) {
-		/* Stop the event daemon if we are not panicking. */
-		(void) bscv_pause_event_daemon(ssp);
-	}
-
-	bscv_enter(ssp);
+	/*
+	 * Obtain the softstate lock only if it is not already owned,
+	 * as this function can be called from a High-level interrupt
+	 * context.  As a result, our thread cannot sleep.
+	 * At end of function, our thread releases the lock only if
+	 * it acquired the lock.
+	 */
+	obtained_lock = (bscv_tryenter(ssp) != 0);
 
 #if defined(__i386) || defined(__amd64)
 	if (ddi_in_panic()) {
@@ -1035,7 +1043,10 @@ bscv_full_stop(bscv_soft_state_t *ssp)
 	bscv_setclear8_volatile(ssp, chan_general,
 	    EBUS_IDX_ALARM, bits2set, bits2clear);
 
-	bscv_exit(ssp);
+	/* Do not free the lock if our thread did not obtain it. */
+	if (obtained_lock != 0) {
+		bscv_exit(ssp);
+	}
 }
 
 /*
@@ -1054,9 +1065,10 @@ bscv_full_stop(bscv_soft_state_t *ssp)
  *
  * locking primitives
  *
- * bscv_enter() - acquires an I/O lock for the calling thread.
- * bscv_exit() - releases an I/O lock acquired by bscv_enter().
- * bscv_held() - used to assert ownership of an I/O lock.
+ * bscv_enter()    - acquires an I/O lock for the calling thread.
+ * bscv_tryenter() - conditionally acquires an I/O lock for calling thread.
+ * bscv_exit()     - releases an I/O lock acquired by bscv_enter().
+ * bscv_held()     - used to assert ownership of an I/O lock.
  *
  * normal I/O routines
  *
@@ -1137,16 +1149,28 @@ bscv_full_stop(bscv_soft_state_t *ssp)
 static void
 bscv_enter(bscv_soft_state_t *ssp)
 {
-	bscv_trace(ssp, '@', "bscv_enter", "");
+	BSCV_TRACE(ssp, '@', "bscv_enter", "");
 	mutex_enter(&ssp->cmd_mutex);
 	ssp->had_session_error = B_FALSE;
+}
+
+static int
+bscv_tryenter(bscv_soft_state_t *ssp)
+{
+	int rv;
+
+	BSCV_TRACE(ssp, '@', "bscv_tryenter", "");
+	if ((rv = mutex_tryenter(&ssp->cmd_mutex)) != 0) {
+		ssp->had_session_error = B_FALSE;
+	}
+	return (rv);
 }
 
 static void
 bscv_exit(bscv_soft_state_t *ssp)
 {
 	mutex_exit(&ssp->cmd_mutex);
-	bscv_trace(ssp, '@', "bscv_exit", "");
+	BSCV_TRACE(ssp, '@', "bscv_exit", "");
 }
 
 #ifdef DEBUG
@@ -1169,7 +1193,7 @@ bscv_put8(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, uint8_t val)
 		return;
 	}
 
-	bscv_trace(ssp, '@', "bscv_put8",
+	BSCV_TRACE(ssp, '@', "bscv_put8",
 	    "addr 0x%x.%02x <= 0x%02x", addr >> 8, addr & 0xff, val);
 
 	for (num_failures = 0;
@@ -1192,7 +1216,7 @@ bscv_put8(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, uint8_t val)
 		    addr >> 8, addr & 0xff, num_failures);
 		bscv_set_fault(ssp);
 	} else if (num_failures > 0) {
-		bscv_trace(ssp, 'R', "bscv_put8",
+		BSCV_TRACE(ssp, 'R', "bscv_put8",
 		    "addr 0x%x.%02x retried write %d times, succeeded",
 		    addr >> 8, addr & 0xff, num_failures);
 	}
@@ -1202,7 +1226,7 @@ static void
 bscv_put16(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, uint16_t val)
 {
 	ASSERT(bscv_held(ssp));
-	bscv_trace(ssp, '@', "bscv_put16",
+	BSCV_TRACE(ssp, '@', "bscv_put16",
 	    "addr 0x%x.%02x <= %04x", addr >> 8, addr & 0xff, val);
 	bscv_put8(ssp, chan, addr, val >> 8);
 	bscv_put8(ssp, chan, addr + 1, val & 0xff);
@@ -1212,7 +1236,7 @@ static void
 bscv_put32(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, uint32_t val)
 {
 	ASSERT(bscv_held(ssp));
-	bscv_trace(ssp, '@', "bscv_put32",
+	BSCV_TRACE(ssp, '@', "bscv_put32",
 	    "addr 0x%x.%02x <= %08x", addr >> 8, addr & 0xff, val);
 	bscv_put8(ssp, chan, addr, (val >> 24) & 0xff);
 	bscv_put8(ssp, chan, addr + 1, (val >> 16) & 0xff);
@@ -1253,12 +1277,12 @@ bscv_get8(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr)
 		    addr >> 8, addr & 0xff, num_failures);
 		bscv_set_fault(ssp);
 	} else if (num_failures > 0) {
-		bscv_trace(ssp, 'R', "bscv_get8",
+		BSCV_TRACE(ssp, 'R', "bscv_get8",
 		    "addr 0x%x.%02x retried read %d times, succeeded",
 		    addr >> 8, addr & 0xff, num_failures);
 	}
 
-	bscv_trace(ssp, '@', "bscv_get8",
+	BSCV_TRACE(ssp, '@', "bscv_get8",
 	    "addr 0x%x.%02x => %02x", addr >> 8, addr & 0xff, retval);
 	return (retval);
 }
@@ -1273,7 +1297,7 @@ bscv_get16(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr)
 	retval = bscv_get8(ssp, chan, addr) << 8;
 	retval |= bscv_get8(ssp, chan, addr + 1);
 
-	bscv_trace(ssp, '@', "bscv_get16",
+	BSCV_TRACE(ssp, '@', "bscv_get16",
 	    "addr 0x%x.%02x => %04x", addr >> 8, addr & 0xff, retval);
 	return (retval);
 }
@@ -1290,7 +1314,7 @@ bscv_get32(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr)
 	retval |= bscv_get8(ssp, chan, addr + 2) << 8;
 	retval |= bscv_get8(ssp, chan, addr + 3);
 
-	bscv_trace(ssp, '@', "bscv_get32",
+	BSCV_TRACE(ssp, '@', "bscv_get32",
 	    "addr 0x%x.%02x => %08x", addr >> 8, addr & 0xff, retval);
 	return (retval);
 }
@@ -1307,7 +1331,7 @@ bscv_setclear8(bscv_soft_state_t *ssp, int chan,
 	val = ssp->lom_regs[addr] | set;
 	val &= ~clear;
 
-	bscv_trace(ssp, '@', "bscv_setclear8",
+	BSCV_TRACE(ssp, '@', "bscv_setclear8",
 	    "addr 0x%x.%02x, set %02x, clear %02x => %02x",
 	    addr >> 8, addr & 0xff,
 	    set, clear, val);
@@ -1330,7 +1354,7 @@ bscv_setclear8_volatile(bscv_soft_state_t *ssp, int chan,
 		return;
 	}
 
-	bscv_trace(ssp, '@', "bscv_setclear8_volatile",
+	BSCV_TRACE(ssp, '@', "bscv_setclear8_volatile",
 	    "addr 0x%x.%02x => set %02x clear %02x",
 	    addr >> 8, addr & 0xff, set, clear);
 
@@ -1365,7 +1389,7 @@ bscv_setclear8_volatile(bscv_soft_state_t *ssp, int chan,
 			bscv_set_fault(ssp);
 		}
 	} else if (num_failures > 0) {
-		bscv_trace(ssp, 'R', "bscv_setclear8_volatile",
+		BSCV_TRACE(ssp, 'R', "bscv_setclear8_volatile",
 		    "addr 0x%x.%02x retried write %d times, succeeded",
 		    addr >> 8, addr & 0xff, num_failures);
 	}
@@ -1431,7 +1455,7 @@ bscv_get8_locked(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, int *res)
 	retval = bscv_get8(ssp, chan, addr);
 	bscv_locked_result(ssp, res);
 	bscv_exit(ssp);
-	bscv_trace(ssp, '@', "bscv_get8_locked",
+	BSCV_TRACE(ssp, '@', "bscv_get8_locked",
 	    "addr 0x%x.%02x => %02x", addr >> 8, addr & 0xff, retval);
 	return (retval);
 }
@@ -1458,7 +1482,7 @@ static void
 bscv_clear_fault(bscv_soft_state_t *ssp)
 {
 	ASSERT(bscv_held(ssp));
-	bscv_trace(ssp, 'J', "bscv_clear_fault", "clearing fault flag");
+	BSCV_TRACE(ssp, 'J', "bscv_clear_fault", "clearing fault flag");
 	ssp->had_fault = B_FALSE;
 	ssp->had_session_error = B_FALSE;
 }
@@ -1467,7 +1491,7 @@ static void
 bscv_set_fault(bscv_soft_state_t *ssp)
 {
 	ASSERT(bscv_held(ssp));
-	bscv_trace(ssp, 'J', "bscv_set_fault", "setting fault flag");
+	BSCV_TRACE(ssp, 'J', "bscv_set_fault", "setting fault flag");
 	ssp->had_fault = B_TRUE;
 }
 
@@ -1481,7 +1505,7 @@ bscv_session_error(bscv_soft_state_t *ssp)
 static int
 bscv_retcode(bscv_soft_state_t *ssp)
 {
-	bscv_trace(ssp, '@', "bscv_retcode",
+	BSCV_TRACE(ssp, '@', "bscv_retcode",
 	    "code 0x%x", ssp->command_error);
 	return (ssp->command_error);
 }
@@ -1527,7 +1551,7 @@ bscv_put8_once(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, uint8_t val)
 		return;
 	} else if (ssp->nchannels == 0) {
 		/* Didn't manage to map handles so ddi_{get,put}* broken */
-		bscv_trace(ssp, '@', "bscv_put8_once",
+		BSCV_TRACE(ssp, '@', "bscv_put8_once",
 		    "nchannels is 0x0 so cannot do IO");
 		return;
 	}
@@ -1566,7 +1590,7 @@ bscv_put8_once(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr, uint8_t val)
 		 */
 	}
 
-	bscv_trace(ssp, '@', "bscv_put8_once",
+	BSCV_TRACE(ssp, '@', "bscv_put8_once",
 	    "addr 0x%x.%02x <= 0x%02x", addr >> 8, addr & 0xff, val);
 }
 
@@ -1585,7 +1609,7 @@ bscv_get8_once(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr)
 		return (0xff);
 	} else if (ssp->nchannels == 0) {
 		/* Didn't manage to map handles so ddi_{get,put}* broken */
-		bscv_trace(ssp, '@', "bscv_get8_once",
+		BSCV_TRACE(ssp, '@', "bscv_get8_once",
 		    "nchannels is 0x0 so cannot do IO");
 		return (0xff);
 	}
@@ -1630,7 +1654,7 @@ bscv_get8_once(bscv_soft_state_t *ssp, int chan, bscv_addr_t addr)
 		}
 	}
 
-	bscv_trace(ssp, '@', "bscv_get8_once",
+	BSCV_TRACE(ssp, '@', "bscv_get8_once",
 	    "addr 0x%x.%02x => 0x%02x", addr >> 8, addr & 0xff, val);
 	return (val);
 }
@@ -1645,7 +1669,7 @@ bscv_probe(bscv_soft_state_t *ssp, int chan, uint32_t *fault)
 		 * Failed to map handles, so cannot do any IO.  Set the
 		 * fault indicator and return a dummy value.
 		 */
-		bscv_trace(ssp, '@', "bscv_probe",
+		BSCV_TRACE(ssp, '@', "bscv_probe",
 		    "nchannels is 0x0 so cannot do any IO");
 		*fault = LOMBUS_ERR_REG_NUM;
 		return ((~(int8_t)0));
@@ -1661,7 +1685,7 @@ bscv_probe(bscv_soft_state_t *ssp, int chan, uint32_t *fault)
 	async_reg = ddi_get32(ssp->channel[chan].handle,
 	    (uint32_t *)BSC_NEXUS_ADDR(ssp, chan, 0, LOMBUS_ASYNC_REG));
 
-	bscv_trace(ssp, '@', "bscv_probe",
+	BSCV_TRACE(ssp, '@', "bscv_probe",
 	    "async status 0x%x, fault 0x%x", async_reg, *fault);
 	return (async_reg);
 }
@@ -1678,7 +1702,7 @@ bscv_resync_comms(bscv_soft_state_t *ssp, int chan)
 		 * Didn't manage to map handles so ddi_{get,put}* broken.
 		 * Therefore, there is no way to resync comms.
 		 */
-		bscv_trace(ssp, '@', "bscv_resync_comms",
+		BSCV_TRACE(ssp, '@', "bscv_resync_comms",
 		    "nchannels is 0x0 so not possible to resync comms");
 		return;
 	}
@@ -1754,7 +1778,7 @@ bscv_window_setup(bscv_soft_state_t *ssp)
 	 */
 	ssp->eventlog_size = EBUS_LOG_END - ssp->eventlog_start;
 
-	bscv_trace(ssp, 'I', "bscv_window_setup", "eeprom size 0x%x log_start"
+	BSCV_TRACE(ssp, 'I', "bscv_window_setup", "eeprom size 0x%x log_start"
 	    " 0x%x log_size 0x%x", ssp->eeprom_size, ssp->eventlog_start,
 	    ssp->eventlog_size);
 
@@ -1770,7 +1794,7 @@ bscv_window_setup(bscv_soft_state_t *ssp)
 		ssp->eeinfo_valid = B_TRUE;
 	}
 
-	bscv_trace(ssp, 'I', "bscv_window_setup", "returning eeinfo_valid %s",
+	BSCV_TRACE(ssp, 'I', "bscv_window_setup", "returning eeinfo_valid %s",
 	    ssp->eeinfo_valid ? "true" : "false");
 	return (ssp->eeinfo_valid);
 }
@@ -1805,7 +1829,7 @@ bscv_eerw(bscv_soft_state_t *ssp, uint32_t eeoffset, uint8_t *buf,
 		this_page = blk_addr >> 8;
 		bscv_put8(ssp, chan_eeprom, EBUS_IDX_EEPROM_PAGESEL, this_page);
 
-		bscv_trace(ssp, 'M', "lom_eerw",
+		BSCV_TRACE(ssp, 'M', "lom_eerw",
 		    "%s data @0x%x.%02x, size 0x%x, 0x%x bytes remaining",
 		    is_write ? "writing" : "reading",
 		    this_page, page_idx, blk_size, remaining - blk_size);
@@ -1837,7 +1861,7 @@ bscv_is_null_event(bscv_soft_state_t *ssp, lom_event_t *e)
 		/*
 		 * This marks a NULL event.
 		 */
-		bscv_trace(ssp, 'E', "bscv_is_null_event",
+		BSCV_TRACE(ssp, 'E', "bscv_is_null_event",
 		    "EVENT_SUBSYS_NONE/EVENT_NONE null event");
 		return (B_TRUE);
 	} else if (e->ev_subsys == 0xff && e->ev_event == 0xff) {
@@ -1846,13 +1870,13 @@ bscv_is_null_event(bscv_soft_state_t *ssp, lom_event_t *e)
 		 * a manually cleared event log at the BSC prompt.  Only
 		 * a test/diagnosis environment is likely to show this.
 		 */
-		bscv_trace(ssp, 'E', "bscv_is_null_event", "0xffff null event");
+		BSCV_TRACE(ssp, 'E', "bscv_is_null_event", "0xffff null event");
 		return (B_TRUE);
 	} else {
 		/*
 		 * Not a NULL event.
 		 */
-		bscv_trace(ssp, 'E', "bscv_is_null_event", "returning False");
+		BSCV_TRACE(ssp, 'E', "bscv_is_null_event", "returning False");
 		return (B_FALSE);
 	}
 }
@@ -2058,7 +2082,7 @@ bscv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		break;
 
 	default:
-		bscv_trace(ssp, 'I', "bscv_ioctl", "Invalid IOCTL 0x%x", cmd);
+		BSCV_TRACE(ssp, 'I', "bscv_ioctl", "Invalid IOCTL 0x%x", cmd);
 		res = EINVAL;
 	}
 	return (res);
@@ -2506,7 +2530,7 @@ bscv_ioc_eventlog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	 */
 	(void) bscv_get8(ssp, chan_general, EBUS_IDX_UNREAD_EVENTS);
 	next_offset = bscv_get16(ssp, chan_general, EBUS_IDX_LOG_PTR_HI);
-	bscv_trace(ssp, 'I', "bscv_ioc_eventlog2", "log_ptr_hi 0x%x",
+	BSCV_TRACE(ssp, 'I', "bscv_ioc_eventlog2", "log_ptr_hi 0x%x",
 	    next_offset);
 
 	events_recorded = 0;
@@ -2522,7 +2546,7 @@ bscv_ioc_eventlog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		if (next_offset <= ssp->eventlog_start) {
 			/* Wrap to the end of the buffer */
 			next_offset = ssp->eventlog_start + ssp->eventlog_size;
-			bscv_trace(ssp, 'I', "bscv_ioc_eventlog2", "wrapping"
+			BSCV_TRACE(ssp, 'I', "bscv_ioc_eventlog2", "wrapping"
 			    " around to end of buffer; next_offset 0x%x",
 			    next_offset);
 		}
@@ -2531,7 +2555,7 @@ bscv_ioc_eventlog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		if (bscv_eerw(ssp, next_offset, (uint8_t *)&event,
 		    sizeof (event), B_FALSE /* read */) != 0) {
 			/* Fault reading data - stop */
-			bscv_trace(ssp, 'I', "bscv_ioc_eventlog2", "read"
+			BSCV_TRACE(ssp, 'I', "bscv_ioc_eventlog2", "read"
 			    " failure for offset 0x%x", next_offset);
 			res = EIO;
 			break;
@@ -2541,7 +2565,7 @@ bscv_ioc_eventlog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 			/*
 			 * No more events in this log so give up.
 			 */
-			bscv_trace(ssp, 'I', "bscv_ioc_eventlog2", "no more"
+			BSCV_TRACE(ssp, 'I', "bscv_ioc_eventlog2", "no more"
 			    " events left at offset 0x%x", next_offset);
 			break;
 		}
@@ -2682,7 +2706,7 @@ bscv_ioc_test(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 	testarg = (test & 0xff00) >> 8;
 	testnum = test & 0xff;
 
-	bscv_trace(ssp, 'F', "bscv_ioc_test",
+	BSCV_TRACE(ssp, 'F', "bscv_ioc_test",
 	    "LOMIOCTEST data 0x%x (test 0x%x, arg 0x%x)",
 	    test, (EBUS_IDX_SELFTEST0 + testnum), testarg);
 
@@ -2722,7 +2746,7 @@ bscv_ioc_test(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		break;
 	}
 
-	bscv_trace(ssp, 'F', "bscv_ioc_test",
+	BSCV_TRACE(ssp, 'F', "bscv_ioc_test",
 	    "LOMIOCTEST status 0x%x, res 0x%x", test, res);
 	if ((res == 0) &&
 	    (ddi_copyout((caddr_t)&test, (caddr_t)arg, sizeof (test),
@@ -2770,7 +2794,7 @@ bscv_ioc_mprog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		bscv_exit(ssp);
 		return (EIO);
 	} else if ((base_addr + data_size) > eeprom_size) {
-		bscv_trace(ssp, 'M', "bscv_ioc_mprog2",
+		BSCV_TRACE(ssp, 'M', "bscv_ioc_mprog2",
 		    "Request extends past end of eeprom");
 		bscv_exit(ssp);
 		return (ENXIO);
@@ -2778,14 +2802,14 @@ bscv_ioc_mprog2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 
 	bscv_put8(ssp, chan_general, EBUS_IDX_CMD_RES, EBUS_CMD_UNLOCK1);
 	if (bscv_faulty(ssp)) {
-		bscv_trace(ssp, 'M', "bscv_ioc_mprog2", "ML1 Write failed");
+		BSCV_TRACE(ssp, 'M', "bscv_ioc_mprog2", "ML1 Write failed");
 		bscv_exit(ssp);
 		return (EIO);
 	}
 
 	bscv_put8(ssp, chan_general, EBUS_IDX_CMD_RES, EBUS_CMD_UNLOCK2);
 	if (bscv_faulty(ssp)) {
-		bscv_trace(ssp, 'M', "bscv_ioc_mprog2", "ML2 Write failed");
+		BSCV_TRACE(ssp, 'M', "bscv_ioc_mprog2", "ML2 Write failed");
 		bscv_exit(ssp);
 		return (EIO);
 	}
@@ -2845,7 +2869,7 @@ bscv_ioc_mread2(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		bscv_exit(ssp);
 		return (EIO);
 	} else if ((base_addr + data_size) > eeprom_size) {
-		bscv_trace(ssp, 'M', "bscv_ioc_mread2",
+		BSCV_TRACE(ssp, 'M', "bscv_ioc_mread2",
 		    "Request extends past end of eeprom");
 		bscv_exit(ssp);
 		return (ENXIO);
@@ -2891,7 +2915,7 @@ bscv_get_state_changes(bscv_soft_state_t *ssp)
 		bscv_status(ssp, change, detail);
 	}
 
-	bscv_trace(ssp, 'D', "bscv_get_state_changes",
+	BSCV_TRACE(ssp, 'D', "bscv_get_state_changes",
 	    "loop index %d ssp->cssp_prog 0x%x", i, ssp->cssp_prog);
 }
 
@@ -2920,7 +2944,7 @@ bscv_event_daemon(void *arg)
 	clock_t poll_period = BSC_EVENT_POLL_NORMAL;
 	int fault_cnt = 0;
 
-	bscv_trace(ssp, 'D', "bscv_event_daemon",
+	BSCV_TRACE(ssp, 'D', "bscv_event_daemon",
 	    "bscv_event_daemon: started");
 
 	/* Acquire task daemon lock. */
@@ -2939,7 +2963,7 @@ bscv_event_daemon(void *arg)
 			/* Probe and Check faults */
 			bscv_enter(ssp);
 			async_reg = bscv_probe(ssp, chan_general, &fault);
-			bscv_trace(ssp, 'D', "bscv_event_daemon",
+			BSCV_TRACE(ssp, 'D', "bscv_event_daemon",
 			    "process event: async_reg 0x%x, fault 0x%x",
 			    async_reg, fault);
 
@@ -3026,7 +3050,7 @@ bscv_event_daemon(void *arg)
 		 */
 		if (strcmp(ssp->last_nodename, utsname.nodename) != 0) {
 
-			bscv_trace(ssp, 'X', "bscv_event_daemon",
+			BSCV_TRACE(ssp, 'X', "bscv_event_daemon",
 			    "utsname.nodename='%s' possible change detected",
 			    utsname.nodename);
 			ssp->nodename_change = B_TRUE;
@@ -3068,12 +3092,12 @@ bscv_event_daemon(void *arg)
 				bscv_event_process(ssp, do_events);
 			}
 			if (do_nodename) {
-				bscv_trace(ssp, 'D', "bscv_event_daemon",
+				BSCV_TRACE(ssp, 'D', "bscv_event_daemon",
 				    "do_nodename task");
 				bscv_setup_hostname(ssp);
 			}
 			if (do_watchdog) {
-				bscv_trace(ssp, 'D', "bscv_event_daemon",
+				BSCV_TRACE(ssp, 'D', "bscv_event_daemon",
 				    "do_watchdog task");
 				bscv_setup_watchdog(ssp);
 			}
@@ -3095,7 +3119,7 @@ bscv_event_daemon(void *arg)
 				 * us doing useful work in the event daemon.
 				 * If we don't sleep then we may livelock.
 				 */
-				bscv_trace(ssp, 'D', "bscv_event_daemon",
+				BSCV_TRACE(ssp, 'D', "bscv_event_daemon",
 				    "had session error - sleeping");
 				ssp->event_sleep = B_TRUE;
 			}
@@ -3146,7 +3170,7 @@ bscv_event_daemon(void *arg)
 	    ~(TASK_STOP_FLG | TASK_ALIVE_FLG | TASK_EVENT_CONSUMER_FLG);
 	mutex_exit(&ssp->task_mu);
 
-	bscv_trace(ssp, 'D', "bscv_event_daemon",
+	BSCV_TRACE(ssp, 'D', "bscv_event_daemon",
 	    "exiting.");
 }
 
@@ -3226,7 +3250,7 @@ bscv_pause_event_daemon(bscv_soft_state_t *ssp)
 		return (BSCV_SUCCESS);
 	}
 
-	bscv_trace(ssp, 'D', "bscv_pause_event_daemon",
+	BSCV_TRACE(ssp, 'D', "bscv_pause_event_daemon",
 	    "Attempting to pause event daemon");
 
 	mutex_enter(&ssp->task_mu);
@@ -3250,12 +3274,12 @@ bscv_pause_event_daemon(bscv_soft_state_t *ssp)
 	if ((ssp->task_flags & TASK_SLEEPING_FLG) ||
 	    !(ssp->task_flags & TASK_ALIVE_FLG)) {
 		mutex_exit(&ssp->task_mu);
-		bscv_trace(ssp, 'D', "bscv_pause_event_daemon",
+		BSCV_TRACE(ssp, 'D', "bscv_pause_event_daemon",
 		    "Pause event daemon - success");
 		return (BSCV_SUCCESS);
 	}
 	mutex_exit(&ssp->task_mu);
-	bscv_trace(ssp, 'D', "bscv_pause_event_daemon",
+	BSCV_TRACE(ssp, 'D', "bscv_pause_event_daemon",
 	    "Pause event daemon - failed");
 	return (BSCV_FAILURE);
 }
@@ -3280,7 +3304,7 @@ bscv_resume_event_daemon(bscv_soft_state_t *ssp)
 	cv_signal(&ssp->task_cv);
 	mutex_exit(&ssp->task_mu);
 
-	bscv_trace(ssp, 'D', "bscv_pause_event_daemon",
+	BSCV_TRACE(ssp, 'D', "bscv_pause_event_daemon",
 	    "Event daemon resumed");
 }
 
@@ -3341,7 +3365,7 @@ bscv_event_process(bscv_soft_state_t *ssp, boolean_t do_events)
 		currptr %= ssp->eventlog_size;
 		currptr += ssp->eventlog_start;
 
-		bscv_trace(ssp, 'E', "bscv_event_process",
+		BSCV_TRACE(ssp, 'E', "bscv_event_process",
 		    "processing %d events from 0x%x in 0x%x:0x%x",
 		    count, currptr,
 		    ssp->eventlog_start,
@@ -3452,7 +3476,7 @@ bscv_event_validate(bscv_soft_state_t *ssp, uint32_t newptr, uint8_t unread)
 		 * see it!
 		 */
 		count = (newptr - oldptr) / sizeof (lom_event_t);
-		bscv_trace(ssp, 'E', "bscv_event_process",
+		BSCV_TRACE(ssp, 'E', "bscv_event_process",
 		    "bscv_event_process: lom reported "
 		    "more events (%d) than expected (%d).",
 		    unread, count);
@@ -3460,7 +3484,7 @@ bscv_event_validate(bscv_soft_state_t *ssp, uint32_t newptr, uint8_t unread)
 	} else {
 		/* Less messages - perhaps the lom has been reset */
 		count = (newptr - oldptr) / sizeof (lom_event_t);
-		bscv_trace(ssp, 'E', "bscv_event_process",
+		BSCV_TRACE(ssp, 'E', "bscv_event_process",
 		    "lom reported less events (%d) than expected (%d)"
 		    " - the lom may have been reset",
 		    unread, count);
@@ -3576,10 +3600,10 @@ bscv_build_eventstring(bscv_soft_state_t *ssp, lom_event_t *event,
 	uint8_t eventtype;
 	bsctime_t bsctm;
 
-	bscv_trace(ssp, 'S', "bscv_build_eventstring", "event %2x%2x%2x%2x",
+	BSCV_TRACE(ssp, 'S', "bscv_build_eventstring", "event %2x%2x%2x%2x",
 	    event->ev_subsys, event->ev_event,
 	    event->ev_resource, event->ev_detail);
-	bscv_trace(ssp, 'S', "bscv_build_eventstring", "time %2x%2x%2x%2x",
+	BSCV_TRACE(ssp, 'S', "bscv_build_eventstring", "time %2x%2x%2x%2x",
 	    event->ev_data[0], event->ev_data[1],
 	    event->ev_data[2], event->ev_data[3]);
 
@@ -3942,7 +3966,7 @@ bscv_status(bscv_soft_state_t *ssp, uint8_t state_chng, uint8_t dev_no)
 
 	ASSERT(bscv_held(ssp));
 
-	bscv_trace(ssp, 'D', "bscv_status", "state_chng 0x%x dev_no 0x%x",
+	BSCV_TRACE(ssp, 'D', "bscv_status", "state_chng 0x%x dev_no 0x%x",
 	    state_chng, dev_no);
 
 	/*
@@ -3957,7 +3981,7 @@ bscv_status(bscv_soft_state_t *ssp, uint8_t state_chng, uint8_t dev_no)
 		 */
 		if (dev_no == EBUS_DETAIL_FLASH) {
 			ssp->cssp_prog = B_TRUE;
-			bscv_trace(ssp, 'D', "bscv_status",
+			BSCV_TRACE(ssp, 'D', "bscv_status",
 			    "ssp->cssp_prog changed to 0x%x",
 			    ssp->cssp_prog);
 			/*
@@ -3967,16 +3991,16 @@ bscv_status(bscv_soft_state_t *ssp, uint8_t state_chng, uint8_t dev_no)
 			 * BSC during this period.
 			 */
 			delay(BSC_EVENT_POLL_NORMAL);
-			bscv_trace(ssp, 'D', "bscv_status",
+			BSCV_TRACE(ssp, 'D', "bscv_status",
 			    "completed delay");
 		} else if (dev_no == EBUS_DETAIL_RESET) {
 			/*
 			 * The bsc has reset
 			 */
-			bscv_trace(ssp, 'D', "bscv_status",
+			BSCV_TRACE(ssp, 'D', "bscv_status",
 			    "BSC reset occured, re-synching");
 			(void) bscv_attach_common(ssp);
-			bscv_trace(ssp, 'D', "bscv_status",
+			BSCV_TRACE(ssp, 'D', "bscv_status",
 			    "completed attach_common");
 		}
 
@@ -4048,47 +4072,47 @@ bscv_generic_sysevent(bscv_soft_state_t *ssp, char *class, char *subclass,
 	int rv;
 	nvlist_t *attr_list;
 
-	bscv_trace(ssp, 'E', "bscv_generic_sysevent", "%s/%s:(%s,%s,%d) %s",
+	BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent", "%s/%s:(%s,%s,%d) %s",
 	    class, subclass, fru_id, res_id, fru_state, msg);
 
 
 	if (nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, KM_SLEEP)) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent",
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent",
 		    "nvlist alloc failure");
 		return;
 	}
 	if (nvlist_add_uint32(attr_list, ENV_VERSION, 1)) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent",
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent",
 		    "nvlist ENV_VERSION failure");
 		nvlist_free(attr_list);
 		return;
 	}
 	if (nvlist_add_string(attr_list, ENV_FRU_ID, fru_id)) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent",
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent",
 		    "nvlist ENV_FRU_ID failure");
 		nvlist_free(attr_list);
 		return;
 	}
 	if (nvlist_add_string(attr_list, ENV_FRU_RESOURCE_ID, res_id)) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent",
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent",
 		    "nvlist ENV_FRU_RESOURCE_ID failure");
 		nvlist_free(attr_list);
 		return;
 	}
 	if (nvlist_add_string(attr_list, ENV_FRU_DEVICE, ENV_RESERVED_ATTR)) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent",
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent",
 		    "nvlist ENV_FRU_DEVICE failure");
 		nvlist_free(attr_list);
 		return;
 	}
 	if (nvlist_add_int32(attr_list, ENV_FRU_STATE, fru_state)) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent",
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent",
 		    "nvlist ENV_FRU_STATE failure");
 		nvlist_free(attr_list);
 		return;
 	}
 	if (nvlist_add_string(attr_list, ENV_MSG, msg)) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent",
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent",
 		    "nvlist ENV_MSG failure");
 		nvlist_free(attr_list);
 		return;
@@ -4098,7 +4122,7 @@ bscv_generic_sysevent(bscv_soft_state_t *ssp, char *class, char *subclass,
 	    subclass, attr_list, NULL, DDI_SLEEP);
 
 	if (rv == DDI_SUCCESS) {
-		bscv_trace(ssp, 'E', "bscv_generic_sysevent", "sent sysevent");
+		BSCV_TRACE(ssp, 'E', "bscv_generic_sysevent", "sent sysevent");
 	} else {
 		cmn_err(CE_WARN, "!cannot deliver sysevent");
 	}
@@ -4122,7 +4146,7 @@ bscv_sysevent(bscv_soft_state_t *ssp, lom_event_t *event)
 	char *res_id;
 	int32_t fru_state = 0;
 
-	bscv_trace(ssp, 'E', "bscv_sysevent", "processing event");
+	BSCV_TRACE(ssp, 'E', "bscv_sysevent", "processing event");
 
 	ASSERT(event != NULL);
 
@@ -4247,7 +4271,7 @@ bscv_sysevent(bscv_soft_state_t *ssp, lom_event_t *event)
 	}
 
 	if (class == NULL || subclass == NULL) {
-		bscv_trace(ssp, 'E', "bscv_sysevent", "class/subclass NULL");
+		BSCV_TRACE(ssp, 'E', "bscv_sysevent", "class/subclass NULL");
 		return;
 	}
 
@@ -4295,7 +4319,7 @@ bscv_prog(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 		return (EFAULT);
 	}
 
-	bscv_trace(ssp, 'U', "bscv_prog",
+	BSCV_TRACE(ssp, 'U', "bscv_prog",
 	    "index 0x%x size 0x%x", prog->index, prog->size);
 
 	mutex_enter(&ssp->prog_mu);
@@ -4338,7 +4362,7 @@ bscv_prog(bscv_soft_state_t *ssp, intptr_t arg, int mode)
 static int
 bscv_check_loader_config(bscv_soft_state_t *ssp, boolean_t is_image2)
 {
-	bscv_trace(ssp, 'U', "bscv_check_loader_config",
+	BSCV_TRACE(ssp, 'U', "bscv_check_loader_config",
 	    "loader_running %d, is_image2 %d",
 	    ssp->loader_running, is_image2);
 
@@ -4378,7 +4402,7 @@ bscv_get_pagesize(bscv_soft_state_t *ssp)
 	pagesize = bscv_get32(ssp, chan_prog,
 	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PAGE0));
 
-	bscv_trace(ssp, 'U', "bscv_get_pagesize", "pagesize 0x%x", pagesize);
+	BSCV_TRACE(ssp, 'U', "bscv_get_pagesize", "pagesize 0x%x", pagesize);
 
 	return (pagesize);
 }
@@ -4430,11 +4454,11 @@ bscv_leave_programming_mode(bscv_soft_state_t *ssp, boolean_t with_jmp)
 
 	if (with_jmp) {
 		reg = EBUS_PROGRAM_PCR_PROGOFF_JUMPTOADDR;
-		bscv_trace(ssp, 'U', "bscv_leave_programming_mode",
+		BSCV_TRACE(ssp, 'U', "bscv_leave_programming_mode",
 		    "jumptoaddr");
 	} else {
 		reg = EBUS_PROGRAM_PCR_PRGMODE_OFF;
-		bscv_trace(ssp, 'U', "bscv_leave_programming_mode",
+		BSCV_TRACE(ssp, 'U', "bscv_leave_programming_mode",
 		    "prgmode_off");
 	}
 
@@ -4451,7 +4475,7 @@ bscv_set_jump_to_addr(bscv_soft_state_t *ssp, uint32_t loadaddr)
 	bscv_put32(ssp, chan_prog,
 	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PADR0), loadaddr);
 
-	bscv_trace(ssp, 'U', "bscv_set_jump_to_addr",
+	BSCV_TRACE(ssp, 'U', "bscv_set_jump_to_addr",
 	    "set jump to loadaddr 0x%x", loadaddr);
 }
 
@@ -4471,7 +4495,7 @@ bscv_erase_once(bscv_soft_state_t *ssp, uint32_t loadaddr, uint32_t image_size)
 	/*
 	 * start at 0
 	 */
-	bscv_trace(ssp, 'U', "bscv_erase_once", "sending erase command");
+	BSCV_TRACE(ssp, 'U', "bscv_erase_once", "sending erase command");
 
 	bscv_put32(ssp, chan_prog,
 	    BSCVA(EBUS_CMD_SPACE_PROGRAM, EBUS_PROGRAM_PADR0),
@@ -4559,7 +4583,7 @@ bscv_do_page_data_once(bscv_soft_state_t *ssp, uint32_t index,
 
 	ASSERT(bscv_held(ssp));
 
-	bscv_trace(ssp, 'P', "bscv_do_page_data_once", "index 0x%x", index);
+	BSCV_TRACE(ssp, 'P', "bscv_do_page_data_once", "index 0x%x", index);
 
 	/* write PSIZ bytes to PDAT */
 	if (index + pagesize < image_size) {
@@ -4568,7 +4592,7 @@ bscv_do_page_data_once(bscv_soft_state_t *ssp, uint32_t index,
 		    pagesize, DDI_DEV_NO_AUTOINCR, B_TRUE /* write */);
 		size = pagesize;
 	} else {
-		bscv_trace(ssp, 'P', "bscv_do_page_once",
+		BSCV_TRACE(ssp, 'P', "bscv_do_page_once",
 		    "Sending last block, last 0x%x bytes",
 		    (image_size % pagesize));
 		size = (image_size - index);
@@ -4616,7 +4640,7 @@ static uint8_t bscv_do_page(bscv_soft_state_t *ssp, uint32_t loadaddr,
 	uint8_t retval;
 	uint16_t checksum;
 
-	bscv_trace(ssp, 'P', "bscv_do_page", "index 0x%x", index);
+	BSCV_TRACE(ssp, 'P', "bscv_do_page", "index 0x%x", index);
 
 	while (retryable--) {
 		/*
@@ -4638,7 +4662,7 @@ static uint8_t bscv_do_page(bscv_soft_state_t *ssp, uint32_t loadaddr,
 		 * Send down the data for the page
 		 */
 
-		bscv_trace(ssp, 'P', "bscv_do_page", "sending data for page");
+		BSCV_TRACE(ssp, 'P', "bscv_do_page", "sending data for page");
 
 		retval = bscv_do_page_data_once(ssp, index, image_size,
 		    pagesize, imagep, &checksum);
@@ -4651,7 +4675,7 @@ static uint8_t bscv_do_page(bscv_soft_state_t *ssp, uint32_t loadaddr,
 			    index, checksum, is_image2 ? "main" : "loader");
 	}
 
-	bscv_trace(ssp, 'U', "bscv_do_page", "Returning 0x%x for index 0x%x,"
+	BSCV_TRACE(ssp, 'U', "bscv_do_page", "Returning 0x%x for index 0x%x,"
 	    " checksum 0x%x, %s image", retval, index, checksum,
 	    is_image2 ? "main" : "loader");
 
@@ -4665,13 +4689,13 @@ bscv_do_pages(bscv_soft_state_t *ssp, uint32_t loadaddr, uint32_t image_size,
 	uint8_t retval;
 	uint32_t index;
 
-	bscv_trace(ssp, 'P', "bscv_do_pages", "entered");
+	BSCV_TRACE(ssp, 'P', "bscv_do_pages", "entered");
 
 	for (index = 0; index < image_size; index += pagesize) {
 		retval = bscv_do_page(ssp, loadaddr, index, image_size,
 		    pagesize, imagep, is_image2);
 		if (bscv_faulty(ssp) || !PSR_SUCCESS(retval)) {
-			bscv_trace(ssp, 'U', "bscv_do_pages",
+			BSCV_TRACE(ssp, 'U', "bscv_do_pages",
 			    "Failed to program lom (status 0x%x)", retval);
 			break;
 		}
@@ -4688,7 +4712,7 @@ bscv_prog_image(bscv_soft_state_t *ssp, boolean_t is_image2,
 	int res = 0;
 	uint8_t retval;
 
-	bscv_trace(ssp, 'U', "bscv_prog_image",
+	BSCV_TRACE(ssp, 'U', "bscv_prog_image",
 	    "image 0x%x, imagep %p, size 0x%x",
 	    is_image2 ? 2 : 1, imagep, image_size);
 
@@ -4710,7 +4734,7 @@ bscv_prog_image(bscv_soft_state_t *ssp, boolean_t is_image2,
 		res = EIO;
 		goto BSCV_PROG_IMAGE_END;
 	}
-	bscv_trace(ssp, 'U', "bscv_prog_image", "entered programming mode");
+	BSCV_TRACE(ssp, 'U', "bscv_prog_image", "entered programming mode");
 
 	/*
 	 * Only issue an erase if we are downloading the image.  The loader
@@ -4725,7 +4749,7 @@ bscv_prog_image(bscv_soft_state_t *ssp, boolean_t is_image2,
 			res = EIO;
 			goto BSCV_PROG_IMAGE_END;
 		} else {
-			bscv_trace(ssp, 'U', "bscv_prog_image",
+			BSCV_TRACE(ssp, 'U', "bscv_prog_image",
 			    "erase complete - programming...");
 
 		}
@@ -4736,7 +4760,7 @@ bscv_prog_image(bscv_soft_state_t *ssp, boolean_t is_image2,
 	retval = bscv_do_pages(ssp, loadaddr, image_size, pagesize, imagep,
 	    is_image2);
 	if (bscv_faulty(ssp) || !PSR_SUCCESS(retval)) {
-		bscv_trace(ssp, 'U', "bscv_prog_image",
+		BSCV_TRACE(ssp, 'U', "bscv_prog_image",
 		    "Failed to program lom (status 0x%x)", retval);
 		res = EIO;
 		goto BSCV_PROG_IMAGE_END;
@@ -4759,13 +4783,13 @@ BSCV_PROG_IMAGE_END:
 		bscv_set_jump_to_addr(ssp, 0);
 
 		if (res != 0) {
-			bscv_trace(ssp, 'U', "bscv_prog_image",
+			BSCV_TRACE(ssp, 'U', "bscv_prog_image",
 			    "got error 0x%x - leaving programming mode",
 			    res);
 			cmn_err(CE_WARN, "programming error 0x%x, %s image",
 			    res, is_image2 ? "main" : "loader");
 		} else {
-			bscv_trace(ssp, 'U', "bscv_prog_image",
+			BSCV_TRACE(ssp, 'U', "bscv_prog_image",
 			    "programming complete - leaving programming mode");
 		}
 
@@ -4789,7 +4813,7 @@ bscv_prog_receive_image(bscv_soft_state_t *ssp, lom_prog_t *prog,
 	lom_prog_data_t *prog_data;
 
 	if ((prog->index & 0x7FFF) != ssp->prog_index) {
-		bscv_trace(ssp, 'U', "bscv_prog_receive_image",
+		BSCV_TRACE(ssp, 'U', "bscv_prog_receive_image",
 		    "Got wrong buffer 0x%x, expected 0x%x",
 		    prog->index & 0x7fff, ssp->prog_index);
 		return (EINVAL);
@@ -4893,7 +4917,7 @@ bscv_prog_stop_lom(bscv_soft_state_t *ssp)
 	}
 
 	if (bscv_pause_event_daemon(ssp) == BSCV_FAILURE) {
-		bscv_trace(ssp, 'Q', "bscv_prog_stop_lom",
+		BSCV_TRACE(ssp, 'Q', "bscv_prog_stop_lom",
 		    "failed to pause event daemon thread");
 		return (EAGAIN);
 	}
@@ -5004,7 +5028,7 @@ bscv_attach_common(bscv_soft_state_t *ssp)
 {
 	ASSERT(bscv_held(ssp));
 
-	bscv_trace(ssp, 'A', "bscv_attach_common:", "");
+	BSCV_TRACE(ssp, 'A', "bscv_attach_common:", "");
 
 	/*
 	 * Set the threshold for reporting messages to the console to
@@ -5117,7 +5141,7 @@ bscv_cleanup(bscv_soft_state_t *ssp)
 		 * flag we just have to carry on.
 		 */
 
-		bscv_trace(ssp, 'W', "bscv_cleanup",
+		BSCV_TRACE(ssp, 'W', "bscv_cleanup",
 		    "bscv_cleanup - disable wdog");
 		if (bscv_get8_cached(ssp, EBUS_IDX_WDOG_CTRL) &
 		    EBUS_WDOG_ENABLE) {
@@ -5183,7 +5207,7 @@ static void bscv_setup_capability(bscv_soft_state_t *ssp)
 	ssp->cap1 = bscv_get8(ssp, chan_general, EBUS_IDX_CAP1);
 	ssp->cap2 = bscv_get8(ssp, chan_general, EBUS_IDX_CAP2);
 	if (!bscv_faulty(ssp)) {
-		bscv_trace(ssp, 'A', "bscv_setup_capability",
+		BSCV_TRACE(ssp, 'A', "bscv_setup_capability",
 		    "Capability flags cap0=0x%x cap1=0x%x, cap2=0x%x",
 		    ssp->cap0, ssp->cap1, ssp->cap2);
 	} else {
@@ -5208,7 +5232,7 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 
 	ASSERT(bscv_held(ssp));
 
-	bscv_trace(ssp, 'A', "bscv_probe_check", "");
+	BSCV_TRACE(ssp, 'A', "bscv_probe_check", "");
 
 	if (!ssp->prog_mode_only) {
 		/*
@@ -5223,7 +5247,7 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 		if (bscv_faulty(ssp)) {
 			ssp->prog_mode_only = B_TRUE;
 		} else if (probeval != 0xAA) {
-			bscv_trace(ssp, 'A', "bscv_probe_check",
+			BSCV_TRACE(ssp, 'A', "bscv_probe_check",
 			    "LOMlite out of sync");
 
 			/*
@@ -5233,7 +5257,7 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 			probeval = bscv_get8(ssp, chan_general,
 			    EBUS_IDX_PROBEAA);
 			if (bscv_faulty(ssp)) {
-				bscv_trace(ssp, 'A', "bscv_probe_check",
+				BSCV_TRACE(ssp, 'A', "bscv_probe_check",
 				    "Init readAA1 failed");
 				ssp->prog_mode_only = B_TRUE;
 			} else if (probeval != 0xAA) {
@@ -5241,7 +5265,7 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 				 * OK that is twice we are out so I
 				 * guess the LOMlite is in trouble
 				 */
-				bscv_trace(ssp, 'A', "bscv_probe_check",
+				BSCV_TRACE(ssp, 'A', "bscv_probe_check",
 				    "Init readAA probe failed - got 0x%x",
 				    probeval);
 				ssp->prog_mode_only = B_TRUE;
@@ -5259,7 +5283,7 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 	if (!ssp->prog_mode_only) {
 		(void) bscv_get8(ssp, chan_general, EBUS_IDX_STATE_CHNG);
 		if (bscv_faulty(ssp)) {
-			bscv_trace(ssp, 'A', "bscv_probe_check",
+			BSCV_TRACE(ssp, 'A', "bscv_probe_check",
 			    "Read of state change register failed");
 			ssp->prog_mode_only = B_TRUE;
 		}
@@ -5281,7 +5305,7 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 				break;
 			}
 			if (bscv_faulty(ssp)) {
-				bscv_trace(ssp, 'A', "bscv_probe_check",
+				BSCV_TRACE(ssp, 'A', "bscv_probe_check",
 				    "Initial read or register %2x failed", i);
 				ssp->prog_mode_only = B_TRUE;
 				/* Might as well give up now! */
@@ -5298,10 +5322,10 @@ static int bscv_probe_check(bscv_soft_state_t *ssp)
 		if ((bscv_get8_cached(ssp, EBUS_IDX_PROBE55) != 0x55) ||
 		    (bscv_get8_cached(ssp, EBUS_IDX_PROBEAA) != 0xAA)) {
 
-			bscv_trace(ssp, 'A', "bscv_probe_check",
+			BSCV_TRACE(ssp, 'A', "bscv_probe_check",
 			    "LOMlite Probe failed");
 			for (i = 0; i < 0x8; i++) {
-				bscv_trace(ssp, 'A', "bscv_probe_check",
+				BSCV_TRACE(ssp, 'A', "bscv_probe_check",
 				    "%2x %2x %2x %2x %2x %2x %2x %2x %2x "
 				    "%2x %2x %2x %2x %2x %2x %2x %2x %2x",
 				    bscv_get8_cached(ssp, i),
@@ -5480,7 +5504,7 @@ bscv_wdog_do_pat(bscv_soft_state_t *ssp)
 	ddi_put8(ssp->channel[chan_wdogpat].handle,
 	    ssp->channel[chan_wdogpat].regs, pat);
 
-	bscv_trace(ssp, 'W', "bscv_wdog_pat", "patted the dog with seq %d",
+	BSCV_TRACE(ssp, 'W', "bscv_wdog_pat", "patted the dog with seq %d",
 	    pat);
 }
 
@@ -5543,13 +5567,13 @@ bscv_wdog_cfg(struct bscv_idi_info info)
 	}
 
 	if (sizeof (bscv_wdog_t) != info.size) {
-		bscv_trace(ssp, 'W', "bscv_wdog_set", "data passed in is size"
+		BSCV_TRACE(ssp, 'W', "bscv_wdog_set", "data passed in is size"
 		    " %d instead of %d", info.size,
 		    sizeof (bscv_wdog_t));
 		return (B_FALSE);
 	}
 
-	bscv_trace(ssp, 'W', "bscv_wdog_cfg", "enable_wdog %s, "
+	BSCV_TRACE(ssp, 'W', "bscv_wdog_cfg", "enable_wdog %s, "
 	    "wdog_timeout_s %d, reset_system_on_timeout %s",
 	    ((bscv_wdog_t *)info.data)->enable_wdog ? "enabled" : "disabled",
 	    ((bscv_wdog_t *)info.data)->wdog_timeout_s,
@@ -5603,7 +5627,7 @@ bscv_write_wdog_cfg(bscv_soft_state_t *ssp,
 	/* have the event daemon set the timeout value and whether to reset */
 	ssp->watchdog_change = B_TRUE;
 
-	bscv_trace(ssp, 'W', "bscv_wdog_cfg",
+	BSCV_TRACE(ssp, 'W', "bscv_wdog_cfg",
 	    "configured the dog with cfg 0x%x", cfg);
 }
 
@@ -5691,7 +5715,7 @@ static void bscv_setup_hostname(bscv_soft_state_t *ssp)
 	    ((hostlen != nodelen) || (strcmp((const char *)&lom_nodename,
 	    (const char *)&host_nodename)) ||
 	    (hostlen == 0))) {
-		bscv_trace(ssp, 'A', "bscv_setup_hostname",
+		BSCV_TRACE(ssp, 'A', "bscv_setup_hostname",
 		    "nodename(%s,%d) != bsc label(%s,%d)",
 		    host_nodename, nodelen, lom_nodename, hostlen);
 
@@ -5761,7 +5785,7 @@ bscv_read_hostname(bscv_soft_state_t *ssp, char *lom_nodename)
 		    num_failures);
 		ssp->had_fault = B_TRUE;
 	} else if (num_failures > 0) {
-		bscv_trace(ssp, 'R', "bscv_read_hostname",
+		BSCV_TRACE(ssp, 'R', "bscv_read_hostname",
 		    "retried %d times, succeeded", num_failures);
 	}
 }
@@ -5818,7 +5842,7 @@ bscv_write_hostname(bscv_soft_state_t *ssp,
 		    num_failures);
 		ssp->had_fault = B_TRUE;
 	} else if (num_failures > 0) {
-		bscv_trace(ssp, 'R', "bscv_write_hostname",
+		BSCV_TRACE(ssp, 'R', "bscv_write_hostname",
 		    "retried %d times, succeeded", num_failures);
 	}
 }
@@ -5861,7 +5885,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 		ssp->volts.num = MAX_VOLTS;
 	}
 
-	bscv_trace(ssp, 'A', "bscv_setup_static_info",
+	BSCV_TRACE(ssp, 'A', "bscv_setup_static_info",
 	    "num volts %d", ssp->volts.num);
 	(void) bscv_read_env_name(ssp,
 	    EBUS_CMD_SPACE2,
@@ -5908,7 +5932,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 		    ssp->temps.num_ov, MAX_TEMPS);
 		ssp->temps.num_ov = MAX_TEMPS;
 	}
-	bscv_trace(ssp, 'A', "bscv_setup_static_info",
+	BSCV_TRACE(ssp, 'A', "bscv_setup_static_info",
 	    "num temps %d, over temps %d",
 	    ssp->temps.num, ssp->temps.num_ov);
 
@@ -5978,7 +6002,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 		    ssp->sflags.num, MAX_STATS);
 		ssp->sflags.num = MAX_STATS;
 	}
-	bscv_trace(ssp, 'A', "bscv_setup_static_info",
+	BSCV_TRACE(ssp, 'A', "bscv_setup_static_info",
 	    "num sflags %d", ssp->sflags.num);
 
 	(void) bscv_read_env_name(ssp,
@@ -6016,7 +6040,7 @@ bscv_setup_static_info(bscv_soft_state_t *ssp)
 		}
 	}
 
-	bscv_trace(ssp, 'A', "bscv_setup_static_info",
+	BSCV_TRACE(ssp, 'A', "bscv_setup_static_info",
 	    "num fans %d", ssp->num_fans);
 
 	(void) bscv_read_env_name(ssp,
@@ -6063,7 +6087,7 @@ bscv_read_env_name(bscv_soft_state_t *ssp,
 
 	ASSERT(bscv_held(ssp));
 
-	bscv_trace(ssp, 'A', "bscv_read_env_name",
+	BSCV_TRACE(ssp, 'A', "bscv_read_env_name",
 	    "bscv_read_env_name, space %d, start 0x%x, end 0x%x, numnames %d",
 	    addr_space, addr_start, addr_end, numnames);
 
@@ -6218,7 +6242,7 @@ bscv_inform_bsc(bscv_soft_state_t *ssp, uint32_t state)
 {
 	ASSERT(bscv_held(ssp));
 
-	bscv_trace(ssp, 'X', "bscv_inform_bsc",
+	BSCV_TRACE(ssp, 'X', "bscv_inform_bsc",
 	    "bscv_inform_bsc: state=%d", state);
 
 	bscv_put32(ssp, chan_general,
@@ -6253,7 +6277,7 @@ bscv_watchdog_cfg_request(bscv_soft_state_t *ssp, uint8_t new_state)
 	ASSERT(new_state == WDOG_ON || new_state == WDOG_OFF);
 
 	watchdog_activated = new_state;
-	bscv_trace(ssp, 'X', "bscv_watchdog_cfg_request",
+	BSCV_TRACE(ssp, 'X', "bscv_watchdog_cfg_request",
 	    "watchdog_activated=%d", watchdog_activated);
 	bscv_write_wdog_cfg(ssp,
 	    bscv_watchdog_timeout_seconds,
@@ -6271,7 +6295,7 @@ bscv_watchdog_cfg_request(bscv_soft_state_t *ssp, uint8_t new_state)
 static uint_t
 bscv_set_watchdog_timer(bscv_soft_state_t *ssp, uint_t timeoutval)
 {
-	bscv_trace(ssp, 'X', "bscv_set_watchdog_timer:",
+	BSCV_TRACE(ssp, 'X', "bscv_set_watchdog_timer:",
 	    "timeout=%d", timeoutval);
 
 	/*
@@ -6300,7 +6324,7 @@ bscv_set_watchdog_timer(bscv_soft_state_t *ssp, uint_t timeoutval)
 static void
 bscv_clear_watchdog_timer(bscv_soft_state_t *ssp)
 {
-	bscv_trace(ssp, 'X', "bscv_clear_watchdog_timer", "");
+	BSCV_TRACE(ssp, 'X', "bscv_clear_watchdog_timer", "");
 
 	if (bscv_watchdog_available && watchdog_activated) {
 		bscv_watchdog_enable = 0;
@@ -6320,7 +6344,7 @@ bscv_panic_callback(void *arg, int code)
 {
 	bscv_soft_state_t *ssp = (bscv_soft_state_t *)arg;
 
-	bscv_trace(ssp, 'X', "bscv_panic_callback",
+	BSCV_TRACE(ssp, 'X', "bscv_panic_callback",
 	    "disabling watchdog");
 
 	bscv_clear_watchdog_timer(ssp);
@@ -6348,7 +6372,7 @@ bscv_watchdog_cyclic_add(bscv_soft_state_t *ssp)
 	ssp->periodic_id = ddi_periodic_add(bscv_watchdog_pat_request, ssp,
 	    WATCHDOG_PAT_INTERVAL, DDI_IPL_10);
 
-	bscv_trace(ssp, 'X', "bscv_watchdog_cyclic_add:",
+	BSCV_TRACE(ssp, 'X', "bscv_watchdog_cyclic_add:",
 	    "cyclic added");
 }
 
@@ -6366,7 +6390,7 @@ bscv_watchdog_cyclic_remove(bscv_soft_state_t *ssp)
 	}
 	ddi_periodic_delete(ssp->periodic_id);
 	ssp->periodic_id = NULL;
-	bscv_trace(ssp, 'X', "bscv_watchdog_cyclic_remove:",
+	BSCV_TRACE(ssp, 'X', "bscv_watchdog_cyclic_remove:",
 	    "cyclic removed");
 }
 #endif /* __i386 || __amd64 */
