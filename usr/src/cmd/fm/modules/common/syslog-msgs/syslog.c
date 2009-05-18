@@ -197,12 +197,18 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		return; /* event is not to be messaged */
 	}
 
-
 	if ((msg = fmd_msg_gettext_nv(syslog_msghdl, NULL, nvl)) == NULL) {
 		fmd_hdl_debug(hdl, "failed to format message");
 		syslog_stats.bad_code.fmds_value.ui64++;
 		return; /* libfmd_msg error */
 	}
+
+	syslog_ctl.pri &= LOG_FACMASK;
+	if (strcmp(class, FM_LIST_RESOLVED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
+		syslog_ctl.pri |= LOG_NOTICE;
+	else
+		syslog_ctl.pri |= LOG_ERR;
 
 	syslog_emit(hdl, msg);
 	free(msg);
