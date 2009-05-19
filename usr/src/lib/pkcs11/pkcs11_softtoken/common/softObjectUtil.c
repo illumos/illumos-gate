@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -416,7 +416,7 @@ object_delay_free(soft_object_t *objp)
 }
 
 static void
-soft_delete_object_cleanup(soft_object_t *objp)
+soft_delete_object_cleanup(soft_object_t *objp, boolean_t force)
 {
 	/* Acquire the lock on the object. */
 	(void) pthread_mutex_lock(&objp->object_mutex);
@@ -436,7 +436,14 @@ soft_delete_object_cleanup(soft_object_t *objp)
 	 * the object deleting thread must wait for the non-deleting
 	 * operation to be completed before it can proceed the delete
 	 * operation.
+	 *
+	 * Unless we are being forced to shut everything down, this only
+	 * happens if the libraries _fini() is running not of someone
+	 * explicitly called C_Finalize().
 	 */
+	if (force)
+		objp->obj_refcnt = 0;
+
 	while (objp->obj_refcnt != 0) {
 		/*
 		 * We set the OBJECT_REFCNT_WAITING flag before we put
@@ -498,7 +505,8 @@ soft_delete_object_cleanup(soft_object_t *objp)
  * that lock before returning to caller.
  */
 void
-soft_delete_object(soft_session_t *sp, soft_object_t *objp, boolean_t lock_held)
+soft_delete_object(soft_session_t *sp, soft_object_t *objp,
+	boolean_t force, boolean_t lock_held)
 {
 
 	/*
@@ -529,7 +537,7 @@ soft_delete_object(soft_session_t *sp, soft_object_t *objp, boolean_t lock_held)
 		(void) pthread_mutex_unlock(&sp->session_mutex);
 	}
 
-	soft_delete_object_cleanup(objp);
+	soft_delete_object_cleanup(objp, force);
 }
 
 
@@ -538,7 +546,7 @@ soft_delete_object(soft_session_t *sp, soft_object_t *objp, boolean_t lock_held)
  * on the session.
  */
 void
-soft_delete_all_objects_in_session(soft_session_t *sp)
+soft_delete_all_objects_in_session(soft_session_t *sp, boolean_t force)
 {
 	soft_object_t *objp = sp->object_list;
 	soft_object_t *objp1;
@@ -552,7 +560,7 @@ soft_delete_all_objects_in_session(soft_session_t *sp)
 		 * with a TRUE boolean argument indicating that
 		 * the caller holds the lock on the session.
 		 */
-		soft_delete_object(sp, objp, B_TRUE);
+		soft_delete_object(sp, objp, force, B_TRUE);
 
 		objp = objp1;
 	}
@@ -880,7 +888,7 @@ soft_delete_token_object(soft_object_t *objp, boolean_t persistent,
 	if (!lock_held)
 		(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
 
-	soft_delete_object_cleanup(objp);
+	soft_delete_object_cleanup(objp, B_FALSE);
 }
 
 void
@@ -1229,7 +1237,7 @@ delete_all_objs_in_list(soft_object_t *list)
 	objp = list;
 	while (objp) {
 		objp_next = objp->next;
-		soft_delete_object_cleanup(objp);
+		soft_delete_object_cleanup(objp, B_FALSE);
 		objp = objp_next;
 	}
 }

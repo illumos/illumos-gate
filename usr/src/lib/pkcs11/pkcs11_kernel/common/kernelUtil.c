@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 #include <stdlib.h>
 #include <string.h>
@@ -156,7 +155,7 @@ crypto2pkcs11_error_number(uint_t n)
  * Serialize writes to the hash table. We don't need a per bucket lock as
  * there are only a few writes and we don't need the lock for reads.
  */
-static pthread_mutex_t mechhash_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mechhash_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static CK_RV
 kmech_hash_insert(CK_MECHANISM_TYPE type, crypto_mech_type_t kmech)

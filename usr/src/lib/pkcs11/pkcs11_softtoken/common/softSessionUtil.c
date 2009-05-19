@@ -337,7 +337,7 @@ soft_delete_session(soft_session_t *session_p,
 	/*
 	 * Remove all the objects created in this session.
 	 */
-	soft_delete_all_objects_in_session(session_p);
+	soft_delete_all_objects_in_session(session_p, force);
 
 	/*
 	 * Mark session as no longer valid. This can only be done after all
@@ -726,7 +726,16 @@ soft_acquire_all_session_mutexes()
 
 	/* Iterate through sessions acquiring all mutexes */
 	while (session_p) {
+		soft_object_t *object_p;
+
 		(void) pthread_mutex_lock(&session_p->session_mutex);
+		object_p = session_p->object_list;
+
+		/* Lock also all objects related to session */
+		while (object_p) {
+			(void) pthread_mutex_lock(&object_p->object_mutex);
+			object_p = object_p->next;
+		}
 		session_p = session_p->next;
 	}
 }
@@ -742,6 +751,13 @@ soft_release_all_session_mutexes()
 		 * N.B. Ideally, should go in opposite order to guarantee
 		 * lock-order requirements but there is no tail pointer.
 		 */
+		soft_object_t *object_p = session_p->object_list;
+
+		/* Unlock also all objects related to session */
+		while (object_p) {
+			(void) pthread_mutex_unlock(&object_p->object_mutex);
+			object_p = object_p->next;
+		}
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
 		session_p = session_p->next;
 	}

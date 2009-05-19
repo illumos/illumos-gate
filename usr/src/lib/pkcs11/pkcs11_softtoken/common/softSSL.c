@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <strings.h>
@@ -904,7 +902,7 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 			    random_data->pServerRandom, ServerRandomLen,
 			    random_data->pClientRandom, ClientRandomLen,
 			    export_keys + MD5_HASH_SIZE, B_FALSE);
-			    new_tmpl[n].pValue = export_keys + MD5_HASH_SIZE;
+			new_tmpl[n].pValue = export_keys + MD5_HASH_SIZE;
 		} else
 			new_tmpl[n].pValue = kb;
 	}
@@ -1029,7 +1027,7 @@ soft_delete_derived_key(soft_session_t *sp, soft_object_t *key)
 	if (IS_TOKEN_OBJECT(key))
 		soft_delete_token_object(key, B_FALSE, B_FALSE);
 	else
-		soft_delete_object(sp, key, B_FALSE);
+		soft_delete_object(sp, key, B_FALSE, B_FALSE);
 }
 
 /*

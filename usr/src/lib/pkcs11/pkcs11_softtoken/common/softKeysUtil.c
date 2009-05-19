@@ -316,7 +316,8 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		if (IS_TOKEN_OBJECT(secret_key))
 			soft_delete_token_object(secret_key, B_FALSE, B_FALSE);
 		else
-			soft_delete_object(session_p, secret_key, B_FALSE);
+			soft_delete_object(session_p, secret_key,
+			    B_FALSE, B_FALSE);
 
 		return (CKR_HOST_MEMORY);
 	}
@@ -382,7 +383,8 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		if (IS_TOKEN_OBJECT(secret_key))
 			soft_delete_token_object(secret_key, B_FALSE, B_FALSE);
 		else
-			soft_delete_object(session_p, secret_key, B_FALSE);
+			soft_delete_object(session_p, secret_key,
+			    B_FALSE, B_FALSE);
 
 	if (IS_TOKEN_OBJECT(secret_key)) {
 		/*
@@ -454,7 +456,8 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		if (IS_TOKEN_OBJECT(public_key))
 			soft_delete_token_object(public_key, B_FALSE, B_FALSE);
 		else
-			soft_delete_object(session_p, public_key, B_FALSE);
+			soft_delete_object(session_p, public_key,
+			    B_FALSE, B_FALSE);
 		return (rv);
 	}
 
@@ -492,8 +495,10 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 			soft_delete_token_object(public_key, B_FALSE, B_FALSE);
 			soft_delete_token_object(private_key, B_FALSE, B_FALSE);
 		} else {
-			soft_delete_object(session_p, public_key, B_FALSE);
-			soft_delete_object(session_p, private_key, B_FALSE);
+			soft_delete_object(session_p, public_key,
+			    B_FALSE, B_FALSE);
+			soft_delete_object(session_p, private_key,
+			    B_FALSE, B_FALSE);
 		}
 	}
 
@@ -866,7 +871,7 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 				    B_FALSE);
 			else
 				soft_delete_object(session_p, secret_key,
-				    B_FALSE);
+				    B_FALSE, B_FALSE);
 			return (rv);
 		}
 
@@ -898,7 +903,7 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 				    B_FALSE);
 			else
 				soft_delete_object(session_p, secret_key,
-				    B_FALSE);
+				    B_FALSE, B_FALSE);
 			return (rv);
 		}
 
@@ -955,7 +960,7 @@ common:
 				    B_FALSE);
 			else
 				soft_delete_object(session_p, secret_key,
-				    B_FALSE);
+				    B_FALSE, B_FALSE);
 			return (rv);
 		}
 
@@ -970,7 +975,7 @@ common:
 				    B_FALSE);
 			else
 				soft_delete_object(session_p, secret_key,
-				    B_FALSE);
+				    B_FALSE, B_FALSE);
 			return (rv);
 		}
 
@@ -988,7 +993,7 @@ common:
 				    B_FALSE);
 			else
 				soft_delete_object(session_p, secret_key,
-				    B_FALSE);
+				    B_FALSE, B_FALSE);
 			return (rv);
 		}
 
@@ -1001,7 +1006,7 @@ common:
 				    B_FALSE);
 			else
 				soft_delete_object(session_p, secret_key,
-				    B_FALSE);
+				    B_FALSE, B_FALSE);
 			return (CKR_HOST_MEMORY);
 		}
 
@@ -1314,7 +1319,8 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 	dkLen = OBJ_SEC_VALUE_LEN(secret_key);  /* length of desired key */
 
 	if (dkLen > ((((u_longlong_t)1)<<32)-1)*hLen) {
-		(void) soft_delete_object(session_p, hmac_key, B_FALSE);
+		(void) soft_delete_object(session_p, hmac_key, B_FALSE,
+		    B_FALSE);
 		return (CKR_KEY_SIZE_RANGE);
 	}
 
@@ -1330,7 +1336,8 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 	/* Step 3 */
 	salt = (CK_BYTE *)malloc(params->ulSaltSourceDataLen + 4);
 	if (salt == NULL) {
-		(void) soft_delete_object(session_p, hmac_key, B_FALSE);
+		(void) soft_delete_object(session_p, hmac_key, B_FALSE,
+		    B_FALSE);
 		return (CKR_HOST_MEMORY);
 	}
 	/*
@@ -1377,7 +1384,7 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 
 		keydata += hLen;
 	}
-	(void) soft_delete_object(session_p, hmac_key, B_FALSE);
+	(void) soft_delete_object(session_p, hmac_key, B_FALSE, B_FALSE);
 	free(salt);
 
 	return (rv);
@@ -1820,7 +1827,7 @@ cleanup_unwrap:
 	if (IS_TOKEN_OBJECT(new_objp))
 		soft_delete_token_object(new_objp, persistent, B_FALSE);
 	else
-		soft_delete_object(session_p, new_objp, B_FALSE);
+		soft_delete_object(session_p, new_objp, B_FALSE, B_FALSE);
 
 	return (rv);
 }

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SOFTOBJECT_H
 #define	_SOFTOBJECT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -799,7 +797,7 @@ CK_RV soft_add_object(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
 	CK_ULONG *objecthandle_p, soft_session_t *sp);
 
 void soft_delete_object(soft_session_t *sp, soft_object_t *objp,
-	boolean_t lock_held);
+	boolean_t force, boolean_t lock_held);
 
 void soft_cleanup_extra_attr(soft_object_t *object_p);
 

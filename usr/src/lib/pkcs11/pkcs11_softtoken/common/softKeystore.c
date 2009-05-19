@@ -2010,7 +2010,8 @@ soft_gen_crypt_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	secret_key = (soft_object_t *)hKey;
 	keylen = OBJ_SEC_VALUE_LEN(secret_key);
 	if ((OBJ_SEC_VALUE(secret_key) = malloc(keylen)) == NULL) {
-		soft_delete_object(&token_session, secret_key, B_FALSE);
+		soft_delete_object(&token_session, secret_key,
+		    B_FALSE, B_FALSE);
 		return (CKR_HOST_MEMORY);
 	}
 
@@ -2018,7 +2019,8 @@ soft_gen_crypt_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	    secret_key);
 
 	if (rv != CKR_OK)
-		soft_delete_object(&token_session, secret_key, B_FALSE);
+		soft_delete_object(&token_session, secret_key,
+		    B_FALSE, B_FALSE);
 	else
 		*key = secret_key;
 
@@ -2133,7 +2135,8 @@ soft_gen_hmac_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	secret_key = (soft_object_t *)hKey;
 	keylen = OBJ_SEC_VALUE_LEN(secret_key);
 	if ((OBJ_SEC_VALUE(secret_key) = malloc(keylen)) == NULL) {
-		soft_delete_object(&token_session, secret_key, B_FALSE);
+		soft_delete_object(&token_session, secret_key,
+		    B_FALSE, B_FALSE);
 		return (CKR_HOST_MEMORY);
 	}
 
@@ -2141,7 +2144,8 @@ soft_gen_hmac_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	    secret_key);
 
 	if (rv != CKR_OK)
-		soft_delete_object(&token_session, secret_key, B_FALSE);
+		soft_delete_object(&token_session, secret_key,
+		    B_FALSE, B_FALSE);
 	else
 		*key = secret_key;
 

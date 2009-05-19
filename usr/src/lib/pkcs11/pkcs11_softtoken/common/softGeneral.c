@@ -480,7 +480,17 @@ softtoken_fork_parent()
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
 }
 
-/* Release in opposite order to softtoken_fork_prepare(). */
+/*
+ * Release in opposite order to softtoken_fork_prepare().
+ *
+ * Note: This never happens when softtoken is loaded by libpkcs11.so.1 because
+ *       the libpkcs11 afterfork child handler is run first and it calls dlclose
+ *       which removes the softtoken afterfork handler.  dlclose also causes
+ *       softtoken_fini to be called at a time when all of the mutexes are
+ *       already locked. Fortunately, the softtoken_fini is called from the same
+ *       thread that locked them in the first place so the mutex_lock calls just
+ *       return EDEADLK instead of blocking forever.
+ */
 void
 softtoken_fork_child()
 {

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -112,6 +110,8 @@ static struct CK_FUNCTION_LIST functionList = {
 boolean_t kernel_initialized = B_FALSE;
 static boolean_t kernel_atfork_initialized = B_FALSE;
 static pid_t kernel_pid = 0;
+
+extern pthread_mutex_t mechhash_mutex;
 
 int kernel_fd = -1;
 
@@ -474,12 +474,14 @@ kernel_fork_prepare()
 	    &obj_delay_freed.obj_to_be_free_mutex);
 	(void) pthread_mutex_lock(
 	    &ses_delay_freed.ses_to_be_free_mutex);
+	(void) pthread_mutex_lock(&mechhash_mutex);
 }
 
 /* Release in opposite order to kernel_fork_prepare(). */
 void
 kernel_fork_parent()
 {
+	(void) pthread_mutex_unlock(&mechhash_mutex);
 	(void) pthread_mutex_unlock(
 	    &ses_delay_freed.ses_to_be_free_mutex);
 	(void) pthread_mutex_unlock(
@@ -492,6 +494,7 @@ kernel_fork_parent()
 void
 kernel_fork_child()
 {
+	(void) pthread_mutex_unlock(&mechhash_mutex);
 	(void) pthread_mutex_unlock(
 	    &ses_delay_freed.ses_to_be_free_mutex);
 	(void) pthread_mutex_unlock(

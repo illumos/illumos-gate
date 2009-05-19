@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <pthread.h>
 #include <syslog.h>
@@ -485,6 +482,7 @@ kernel_acquire_all_slots_mutexes()
 	kernel_session_t *session_p;
 
 	(void) pthread_mutex_lock(&delete_sessions_mutex);
+
 	for (slotID = 0; slotID < slot_count; slotID++) {
 		pslot = slot_table[slotID];
 		(void) pthread_mutex_lock(&pslot->sl_mutex);
@@ -492,7 +490,17 @@ kernel_acquire_all_slots_mutexes()
 		/* Iterate through sessions acquiring all mutexes */
 		session_p = pslot->sl_sess_list;
 		while (session_p) {
+			struct object *objp;
+
 			(void) pthread_mutex_lock(&session_p->session_mutex);
+			(void) pthread_mutex_lock(&session_p->ses_free_mutex);
+
+			objp = session_p->object_list;
+			while (objp) {
+				(void) pthread_mutex_lock(&objp->object_mutex);
+				objp = objp->next;
+			}
+
 			session_p = session_p->next;
 		}
 	}
@@ -512,6 +520,16 @@ kernel_release_all_slots_mutexes()
 		/* Iterate through sessions releasing all mutexes */
 		session_p = pslot->sl_sess_list;
 		while (session_p) {
+			struct object *objp;
+
+			objp = session_p->object_list;
+			while (objp) {
+				(void) pthread_mutex_unlock(
+				    &objp->object_mutex);
+				objp = objp->next;
+			}
+
+			(void) pthread_mutex_unlock(&session_p->ses_free_mutex);
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
 			session_p = session_p->next;
 		}

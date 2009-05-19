@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -392,7 +392,7 @@ kernel_remove_object_from_session(kernel_object_t *objp, kernel_session_t *sp)
 }
 
 static void
-kernel_delete_object_cleanup(kernel_object_t *objp)
+kernel_delete_object_cleanup(kernel_object_t *objp, boolean_t wrapper_only)
 {
 	/* Acquire the lock on the object. */
 	(void) pthread_mutex_lock(&objp->object_mutex);
@@ -412,7 +412,15 @@ kernel_delete_object_cleanup(kernel_object_t *objp)
 	 * the object deleting thread must wait for the non-deleting
 	 * operation to be completed before it can proceed the delete
 	 * operation.
+	 *
+	 * Unless we are being forced to shut everything down, this only
+	 * happens if the library's _fini() is running not if someone
+	 * explicitly called C_Finalize().
 	 */
+	if (wrapper_only) {
+		objp->obj_refcnt = 0;
+	}
+
 	while (objp->obj_refcnt != 0) {
 		/*
 		 * We set the OBJECT_REFCNT_WAITING flag before we put
@@ -485,7 +493,7 @@ kernel_delete_session_object(kernel_session_t *sp, kernel_object_t *objp,
 	if (rv != CKR_OK)
 		return (rv);
 
-	kernel_delete_object_cleanup(objp);
+	kernel_delete_object_cleanup(objp, wrapper_only);
 
 	/* Destroy the object. */
 	if (objp->is_lib_obj) {
@@ -828,7 +836,7 @@ kernel_delete_token_object(kernel_slot_t *pslot, kernel_session_t *sp,
 		(void) pthread_mutex_unlock(&pslot->sl_mutex);
 	}
 
-	kernel_delete_object_cleanup(objp);
+	kernel_delete_object_cleanup(objp, wrapper_only);
 
 	if (!wrapper_only) {
 		obj_destroy.od_session = sp->k_session;
