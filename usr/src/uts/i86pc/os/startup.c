@@ -2193,8 +2193,7 @@ post_startup(void)
 
 	cpu_event_init_cpu(CPU);
 	cpupm_init(CPU);
-
-	add_cpunode2devtree(CPU->cpu_id, CPU->cpu_m.mcpu_cpi);
+	(void) mach_cpu_create_device_node(CPU, NULL);
 
 	pg_init();
 }

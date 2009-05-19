@@ -2535,6 +2535,17 @@ cpuid_get_clogid(cpu_t *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_clogid);
 }
 
+uint32_t
+cpuid_get_apicid(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	if (cpu->cpu_m.mcpu_cpi->cpi_maxeax < 1) {
+		return (UINT32_MAX);
+	} else {
+		return (cpu->cpu_m.mcpu_cpi->cpi_apicid);
+	}
+}
+
 void
 cpuid_get_addrsize(cpu_t *cpu, uint_t *pabits, uint_t *vabits)
 {
@@ -3466,84 +3477,43 @@ x86_which_cacheinfo(struct cpuid_info *cpi)
 	return (-1);
 }
 
-/*
- * create a node for the given cpu under the prom root node.
- * Also, create a cpu node in the device tree.
- */
-static dev_info_t *cpu_nex_devi = NULL;
-static kmutex_t cpu_node_lock;
-
-/*
- * Called from post_startup() and mp_startup()
- */
 void
-add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
+cpuid_set_cpu_properties(void *dip, processorid_t cpu_id,
+    struct cpuid_info *cpi)
 {
 	dev_info_t *cpu_devi;
 	int create;
 
-	mutex_enter(&cpu_node_lock);
-
-	/*
-	 * create a nexus node for all cpus identified as 'cpu_id' under
-	 * the root node.
-	 */
-	if (cpu_nex_devi == NULL) {
-		if (ndi_devi_alloc(ddi_root_node(), "cpus",
-		    (pnode_t)DEVI_SID_NODEID, &cpu_nex_devi) != NDI_SUCCESS) {
-			mutex_exit(&cpu_node_lock);
-			return;
-		}
-		(void) ndi_devi_online(cpu_nex_devi, 0);
-	}
-
-	/*
-	 * create a child node for cpu identified as 'cpu_id'
-	 */
-	cpu_devi = ddi_add_child(cpu_nex_devi, "cpu", DEVI_SID_NODEID,
-	    cpu_id);
-	if (cpu_devi == NULL) {
-		mutex_exit(&cpu_node_lock);
-		return;
-	}
+	cpu_devi = (dev_info_t *)dip;
 
 	/* device_type */
-
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, cpu_devi,
 	    "device_type", "cpu");
 
 	/* reg */
-
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 	    "reg", cpu_id);
 
 	/* cpu-mhz, and clock-frequency */
-
 	if (cpu_freq > 0) {
 		long long mul;
 
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 		    "cpu-mhz", cpu_freq);
-
 		if ((mul = cpu_freq * 1000000LL) <= INT_MAX)
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 			    "clock-frequency", (int)mul);
 	}
 
-	(void) ndi_devi_online(cpu_devi, 0);
-
 	if ((x86_feature & X86_CPUID) == 0) {
-		mutex_exit(&cpu_node_lock);
 		return;
 	}
 
 	/* vendor-id */
-
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, cpu_devi,
 	    "vendor-id", cpi->cpi_vendorstr);
 
 	if (cpi->cpi_maxeax == 0) {
-		mutex_exit(&cpu_node_lock);
 		return;
 	}
 
@@ -3558,7 +3528,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	    "stepping-id", CPI_STEP(cpi));
 
 	/* type */
-
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 		create = 1;
@@ -3572,7 +3541,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 		    "type", CPI_TYPE(cpi));
 
 	/* ext-family */
-
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 	case X86_VENDOR_AMD:
@@ -3587,7 +3555,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 		    "ext-family", CPI_FAMILY_XTD(cpi));
 
 	/* ext-model */
-
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 		create = IS_EXTENDED_MODEL_INTEL(cpi);
@@ -3604,7 +3571,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 		    "ext-model", CPI_MODEL_XTD(cpi));
 
 	/* generation */
-
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_AMD:
 		/*
@@ -3621,7 +3587,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 		    "generation", BITX((cpi)->cpi_extd[1].cp_eax, 11, 8));
 
 	/* brand-id */
-
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 		/*
@@ -3644,7 +3609,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	}
 
 	/* chunks, and apic-id */
-
 	switch (cpi->cpi_vendor) {
 		/*
 		 * first available on Pentium IV and Opteron (K8)
@@ -3673,13 +3637,11 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	}
 
 	/* cpuid-features */
-
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 	    "cpuid-features", CPI_FEATURES_EDX(cpi));
 
 
 	/* cpuid-features-ecx */
-
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 		create = IS_NEW_F6(cpi) || cpi->cpi_family >= 0xf;
@@ -3693,7 +3655,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 		    "cpuid-features-ecx", CPI_FEATURES_ECX(cpi));
 
 	/* ext-cpuid-features */
-
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_Intel:
 	case X86_VENDOR_AMD:
@@ -3738,8 +3699,6 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	default:
 		break;
 	}
-
-	mutex_exit(&cpu_node_lock);
 }
 
 struct l2info {

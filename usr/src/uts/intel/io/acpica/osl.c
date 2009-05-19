@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 /*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
+/*
  * ACPI CA OSL for Solaris x86
  */
 
@@ -52,12 +56,12 @@ static int CompressEisaID(char *np);
 
 static void scan_d2a_map(void);
 static void scan_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus);
-static void acpica_tag_devinfo(dev_info_t *dip, ACPI_HANDLE acpiobj);
 
 static int acpica_query_bbn_problem(void);
 static int acpica_find_pcibus(int busno, ACPI_HANDLE *rh);
 static int acpica_eval_hid(ACPI_HANDLE dev, char *method, int *rint);
 static ACPI_STATUS acpica_set_devinfo(ACPI_HANDLE, dev_info_t *);
+static ACPI_STATUS acpica_unset_devinfo(ACPI_HANDLE);
 static void acpica_devinfo_handler(ACPI_HANDLE, UINT32, void *);
 
 /*
@@ -94,16 +98,24 @@ static char *acpi_table_path = "/boot/acpi/tables/";
 static int scanning_d2a_map = 0;
 static int d2a_done = 0;
 
+/* features supported by ACPICA and ACPI device configuration. */
+uint64_t acpica_core_features = 0;
+static uint64_t acpica_devcfg_features = 0;
+
 /* set by acpi_poweroff() in PSMs and appm_ioctl() in acpippm for S3 */
 int acpica_use_safe_delay = 0;
 
 /* CPU mapping data */
 struct cpu_map_item {
+	processorid_t	cpu_id;
 	UINT32		proc_id;
+	UINT32		apic_id;
 	ACPI_HANDLE	obj;
 };
 
+static kmutex_t cpu_map_lock;
 static struct cpu_map_item **cpu_map = NULL;
+static int cpu_map_count_max = 0;
 static int cpu_map_count = 0;
 static int cpu_map_built = 0;
 
@@ -1058,10 +1070,36 @@ AcpiOsGetTimer(void)
 	return ((gethrtime() + 50) / 100);
 }
 
+static struct AcpiOSIFeature_s {
+	uint64_t	control_flag;
+	const char	*feature_name;
+} AcpiOSIFeatures[] = {
+	{ ACPI_FEATURE_OSI_MODULE,	"Module Device" },
+	{ 0,				"Processor Device" }
+};
+
 /*ARGSUSED*/
 ACPI_STATUS
-AcpiOsValidateInterface(char *interface)
+AcpiOsValidateInterface(char *feature)
 {
+	int i;
+
+	ASSERT(feature != NULL);
+	for (i = 0; i < sizeof (AcpiOSIFeatures) / sizeof (AcpiOSIFeatures[0]);
+	    i++) {
+		if (strcmp(feature, AcpiOSIFeatures[i].feature_name) != 0) {
+			continue;
+		}
+		/* Check whether required core features are available. */
+		if (AcpiOSIFeatures[i].control_flag != 0 &&
+		    acpica_get_core_feature(AcpiOSIFeatures[i].control_flag) !=
+		    AcpiOSIFeatures[i].control_flag) {
+			break;
+		}
+		/* Feature supported. */
+		return (AE_OK);
+	}
+
 	return (AE_SUPPORT);
 }
 
@@ -1184,62 +1222,126 @@ AcpiOsGetLine(char *Buffer)
 	return (0);
 }
 
-
-
-
 /*
  * Device tree binding
  */
+static ACPI_STATUS
+acpica_find_pcibus_walker(ACPI_HANDLE hdl, UINT32 lvl, void *ctxp, void **rvpp)
+{
+	_NOTE(ARGUNUSED(lvl));
+
+	int sta, hid, bbn;
+	int busno = (intptr_t)ctxp;
+	ACPI_HANDLE *hdlp = (ACPI_HANDLE *)rvpp;
+
+	/* Check whether device exists. */
+	if (ACPI_SUCCESS(acpica_eval_int(hdl, "_STA", &sta)) &&
+	    !(sta & (ACPI_STA_DEVICE_PRESENT | ACPI_STA_DEVICE_FUNCTIONING))) {
+		/*
+		 * Skip object if device doesn't exist.
+		 * According to ACPI Spec,
+		 * 1) setting either bit 0 or bit 3 means that device exists.
+		 * 2) Absence of _STA method means all status bits set.
+		 */
+		return (AE_CTRL_DEPTH);
+	}
+
+	if (ACPI_FAILURE(acpica_eval_hid(hdl, "_HID", &hid)) ||
+	    (hid != HID_PCI_BUS && hid != HID_PCI_EXPRESS_BUS)) {
+		/* Non PCI/PCIe host bridge. */
+		return (AE_OK);
+	}
+
+	if (acpi_has_broken_bbn) {
+		ACPI_BUFFER rb;
+		rb.Pointer = NULL;
+		rb.Length = ACPI_ALLOCATE_BUFFER;
+
+		/* Decree _BBN == n from PCI<n> */
+		if (AcpiGetName(hdl, ACPI_SINGLE_NAME, &rb) != AE_OK) {
+			return (AE_CTRL_TERMINATE);
+		}
+		bbn = ((char *)rb.Pointer)[3] - '0';
+		AcpiOsFree(rb.Pointer);
+		if (bbn == busno || busno == 0) {
+			*hdlp = hdl;
+			return (AE_CTRL_TERMINATE);
+		}
+	} else if (ACPI_SUCCESS(acpica_eval_int(hdl, "_BBN", &bbn))) {
+		if (bbn == busno) {
+			*hdlp = hdl;
+			return (AE_CTRL_TERMINATE);
+		}
+	} else if (busno == 0) {
+		*hdlp = hdl;
+		return (AE_CTRL_TERMINATE);
+	}
+
+	return (AE_CTRL_DEPTH);
+}
 
 static int
 acpica_find_pcibus(int busno, ACPI_HANDLE *rh)
 {
 	ACPI_HANDLE sbobj, busobj;
-	int hid, bbn;
 
 	/* initialize static flag by querying ACPI namespace for bug */
 	if (acpi_has_broken_bbn == -1)
 		acpi_has_broken_bbn = acpica_query_bbn_problem();
 
-	busobj = NULL;
-	AcpiGetHandle(NULL, "\\_SB", &sbobj);
-	while (AcpiGetNextObject(ACPI_TYPE_DEVICE, sbobj, busobj,
-	    &busobj) == AE_OK) {
-		if (acpica_eval_hid(busobj, "_HID", &hid) == AE_OK &&
-		    (hid == HID_PCI_BUS || hid == HID_PCI_EXPRESS_BUS)) {
-			if (acpi_has_broken_bbn) {
-				ACPI_BUFFER rb;
-				rb.Pointer = NULL;
-				rb.Length = ACPI_ALLOCATE_BUFFER;
-
-				/* Decree _BBN == n from PCI<n> */
-				if (AcpiGetName(busobj, ACPI_SINGLE_NAME, &rb)
-				    != AE_OK) {
-					return (AE_ERROR);
-				}
-				bbn = ((char *)rb.Pointer)[3] - '0';
-				AcpiOsFree(rb.Pointer);
-				if (bbn == busno || busno == 0) {
-					*rh = busobj;
-					return (AE_OK);
-				}
-			} else {
-				if (acpica_eval_int(busobj, "_BBN", &bbn) ==
-				    AE_OK) {
-					if (bbn == busno) {
-						*rh = busobj;
-						return (AE_OK);
-					}
-				} else if (busno == 0) {
-					*rh = busobj;
-					return (AE_OK);
-				}
-			}
+	if (ACPI_SUCCESS(AcpiGetHandle(NULL, "\\_SB", &sbobj))) {
+		busobj = NULL;
+		(void) AcpiWalkNamespace(ACPI_TYPE_DEVICE, sbobj, UINT32_MAX,
+		    acpica_find_pcibus_walker, (void *)(intptr_t)busno,
+		    (void **)&busobj);
+		if (busobj != NULL) {
+			*rh = busobj;
+			return (AE_OK);
 		}
 	}
+
 	return (AE_ERROR);
 }
 
+static ACPI_STATUS
+acpica_query_bbn_walker(ACPI_HANDLE hdl, UINT32 lvl, void *ctxp, void **rvpp)
+{
+	_NOTE(ARGUNUSED(lvl));
+	_NOTE(ARGUNUSED(rvpp));
+
+	int sta, hid, bbn;
+	int *cntp = (int *)ctxp;
+
+	/* Check whether device exists. */
+	if (ACPI_SUCCESS(acpica_eval_int(hdl, "_STA", &sta)) &&
+	    !(sta & (ACPI_STA_DEVICE_PRESENT | ACPI_STA_DEVICE_FUNCTIONING))) {
+		/*
+		 * Skip object if device doesn't exist.
+		 * According to ACPI Spec,
+		 * 1) setting either bit 0 or bit 3 means that device exists.
+		 * 2) Absence of _STA method means all status bits set.
+		 */
+		return (AE_CTRL_DEPTH);
+	}
+
+	if (ACPI_FAILURE(acpica_eval_hid(hdl, "_HID", &hid)) ||
+	    (hid != HID_PCI_BUS && hid != HID_PCI_EXPRESS_BUS)) {
+		/* Non PCI/PCIe host bridge. */
+		return (AE_OK);
+	} else if (ACPI_SUCCESS(acpica_eval_int(hdl, "_BBN", &bbn)) &&
+	    bbn == 0 && ++(*cntp) > 1) {
+		/*
+		 * If we find more than one bus with a 0 _BBN
+		 * we have the problem that BigBear's BIOS shows
+		 */
+		return (AE_CTRL_TERMINATE);
+	} else {
+		/*
+		 * Skip children of PCI/PCIe host bridge.
+		 */
+		return (AE_CTRL_DEPTH);
+	}
+}
 
 /*
  * Look for ACPI problem where _BBN is zero for multiple PCI buses
@@ -1249,31 +1351,17 @@ acpica_find_pcibus(int busno, ACPI_HANDLE *rh)
 static int
 acpica_query_bbn_problem(void)
 {
-	ACPI_HANDLE sbobj, busobj;
-	int hid, bbn;
+	ACPI_HANDLE sbobj;
 	int zerobbncnt;
+	void *rv;
 
-	busobj = NULL;
 	zerobbncnt = 0;
-
-	AcpiGetHandle(NULL, "\\_SB", &sbobj);
-
-	while (AcpiGetNextObject(ACPI_TYPE_DEVICE, sbobj, busobj,
-	    &busobj) == AE_OK) {
-		if ((acpica_eval_hid(busobj, "_HID", &hid) == AE_OK) &&
-		    (hid == HID_PCI_BUS || hid == HID_PCI_EXPRESS_BUS) &&
-		    (acpica_eval_int(busobj, "_BBN", &bbn) == AE_OK)) {
-			if (bbn == 0) {
-			/*
-			 * If we find more than one bus with a 0 _BBN
-			 * we have the problem that BigBear's BIOS shows
-			 */
-				if (++zerobbncnt > 1)
-					return (1);
-			}
-		}
+	if (ACPI_SUCCESS(AcpiGetHandle(NULL, "\\_SB", &sbobj))) {
+		(void) AcpiWalkNamespace(ACPI_TYPE_DEVICE, sbobj, UINT32_MAX,
+		    acpica_query_bbn_walker, &zerobbncnt, &rv);
 	}
-	return (0);
+
+	return (zerobbncnt > 1 ? 1 : 0);
 }
 
 static const char hextab[] = "0123456789ABCDEF";
@@ -1381,61 +1469,45 @@ acpica_eval_hid(ACPI_HANDLE dev, char *method, int *rint)
 /*
  * Create linkage between devinfo nodes and ACPI nodes
  */
-static void
+ACPI_STATUS
 acpica_tag_devinfo(dev_info_t *dip, ACPI_HANDLE acpiobj)
 {
 	ACPI_STATUS status;
 	ACPI_BUFFER rb;
 
 	/*
-	 * Tag the ACPI node with the dip
-	 */
-	status = acpica_set_devinfo(acpiobj, dip);
-	ASSERT(status == AE_OK);
-
-	/*
 	 * Tag the devinfo node with the ACPI name
 	 */
 	rb.Pointer = NULL;
 	rb.Length = ACPI_ALLOCATE_BUFFER;
-	if (AcpiGetName(acpiobj, ACPI_FULL_PATHNAME, &rb) == AE_OK) {
+	status = AcpiGetName(acpiobj, ACPI_FULL_PATHNAME, &rb);
+	if (ACPI_FAILURE(status)) {
+		cmn_err(CE_WARN, "acpica: could not get ACPI path!");
+	} else {
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
 		    "acpi-namespace", (char *)rb.Pointer);
 		AcpiOsFree(rb.Pointer);
-	} else {
-		cmn_err(CE_WARN, "acpica: could not get ACPI path!");
+
+		/*
+		 * Tag the ACPI node with the dip
+		 */
+		status = acpica_set_devinfo(acpiobj, dip);
+		ASSERT(ACPI_SUCCESS(status));
 	}
+
+	return (status);
 }
 
-static void
-acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj)
+/*
+ * Destroy linkage between devinfo nodes and ACPI nodes
+ */
+ACPI_STATUS
+acpica_untag_devinfo(dev_info_t *dip, ACPI_HANDLE acpiobj)
 {
-	int	cpu_id;
+	(void) acpica_unset_devinfo(acpiobj);
+	(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, "acpi-namespace");
 
-	/*
-	 * Special case: if we're a uppc system, there won't be
-	 * a CPU map yet.  So we create one and use the passed-in
-	 * processor as CPU 0
-	 */
-	if (cpu_map == NULL) {
-		cpu_map = kmem_zalloc(sizeof (cpu_map[0]) * NCPU, KM_SLEEP);
-		cpu_map[0] = kmem_zalloc(sizeof (*cpu_map[0]), KM_SLEEP);
-		cpu_map[0]->obj = obj;
-		cpu_map_count = 1;
-		return;
-	}
-
-	for (cpu_id = 0; cpu_id < NCPU; cpu_id++) {
-		if (cpu_map[cpu_id] == NULL)
-			continue;
-
-		if (cpu_map[cpu_id]->proc_id == acpi_id) {
-			if (cpu_map[cpu_id]->obj == NULL)
-				cpu_map[cpu_id]->obj = obj;
-			break;
-		}
-	}
-
+	return (AE_OK);
 }
 
 /*
@@ -1444,6 +1516,8 @@ acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj)
 ACPI_STATUS
 acpica_get_handle_cpu(int cpu_id, ACPI_HANDLE *rh)
 {
+	int i;
+
 	/*
 	 * if cpu_map itself is NULL, we're a uppc system and
 	 * acpica_build_processor_map() hasn't been called yet.
@@ -1455,11 +1529,26 @@ acpica_get_handle_cpu(int cpu_id, ACPI_HANDLE *rh)
 			return (AE_ERROR);
 	}
 
-	if ((cpu_id < 0) || (cpu_map[cpu_id] == NULL) ||
-	    (cpu_map[cpu_id]->obj == NULL))
+	if (cpu_id < 0) {
 		return (AE_ERROR);
+	}
 
+	/*
+	 * search object with cpuid in cpu_map
+	 */
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->cpu_id == cpu_id) {
+			break;
+		}
+	}
+	if (i >= cpu_map_count || (cpu_map[i]->obj == NULL)) {
+		mutex_exit(&cpu_map_lock);
+		return (AE_ERROR);
+	}
 	*rh = cpu_map[cpu_id]->obj;
+	mutex_exit(&cpu_map_lock);
+
 	return (AE_OK);
 }
 
@@ -1512,11 +1601,10 @@ acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
 		}
 		AcpiOsFree(rb.Pointer);
 	}
+	(void) acpica_add_processor_to_map(acpi_id, obj, UINT32_MAX);
 
-	acpica_add_processor_to_map(acpi_id, obj);
 	return (AE_OK);
 }
-
 
 static void
 scan_d2a_map(void)
@@ -1543,7 +1631,8 @@ scan_d2a_map(void)
 	    dip = ddi_get_next_sibling(dip)) {
 
 		/* prune non-PCI nodes */
-		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS,
 		    "device_type", &device_type_prop) != DDI_PROP_SUCCESS)
 			continue;
 
@@ -1632,9 +1721,9 @@ scan_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus)
 			acpica_tag_devinfo(dcld, acld);
 
 			/* if we find a bridge, recurse from here */
-			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dcld, 0,
-			    "device_type", &device_type_prop) ==
-			    DDI_PROP_SUCCESS) {
+			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dcld,
+			    DDI_PROP_DONTPASS, "device_type",
+			    &device_type_prop) == DDI_PROP_SUCCESS) {
 				if ((strcmp("pci", device_type_prop) == 0) ||
 				    (strcmp("pciex", device_type_prop) == 0))
 					scan_d2a_subtree(dcld, acld, bus);
@@ -1731,6 +1820,14 @@ acpica_set_devinfo(ACPI_HANDLE obj, dev_info_t *dip)
 	return (status);
 }
 
+/*
+ * Unset the dev_info_t associated with the ACPI node.
+ */
+static ACPI_STATUS
+acpica_unset_devinfo(ACPI_HANDLE obj)
+{
+	return (AcpiDetachData(obj, acpica_devinfo_handler));
+}
 
 /*
  *
@@ -1741,27 +1838,8 @@ acpica_devinfo_handler(ACPI_HANDLE obj, UINT32 func, void *data)
 	/* noop */
 }
 
-
-/*
- *
- */
-void
-acpica_map_cpu(processorid_t cpuid, UINT32 proc_id)
-{
-	struct cpu_map_item *item;
-
-	if (cpu_map == NULL)
-		cpu_map = kmem_zalloc(sizeof (item) * NCPU, KM_SLEEP);
-
-	item = kmem_zalloc(sizeof (*item), KM_SLEEP);
-	item->proc_id = proc_id;
-	item->obj = NULL;
-	cpu_map[cpuid] = item;
-	cpu_map_count++;
-}
-
-void
-acpica_build_processor_map()
+ACPI_STATUS
+acpica_build_processor_map(void)
 {
 	ACPI_STATUS status;
 	void *rv;
@@ -1770,7 +1848,16 @@ acpica_build_processor_map()
 	 * shouldn't be called more than once anyway
 	 */
 	if (cpu_map_built)
-		return;
+		return (AE_OK);
+
+	/*
+	 * ACPI device configuration driver has built mapping information
+	 * among processor id and object handle, no need to probe again.
+	 */
+	if (acpica_get_devcfg_feature(ACPI_DEVCFG_CPU)) {
+		cpu_map_built = 1;
+		return (AE_OK);
+	}
 
 	/*
 	 * Look for Processor objects
@@ -1792,6 +1879,339 @@ acpica_build_processor_map()
 	    &rv);
 	ASSERT(status == AE_OK);
 	cpu_map_built = 1;
+
+	return (status);
+}
+
+/*
+ * Grow cpu map table on demand.
+ */
+static void
+acpica_grow_cpu_map(void)
+{
+	if (cpu_map_count == cpu_map_count_max) {
+		size_t sz;
+		struct cpu_map_item **new_map;
+
+		ASSERT(cpu_map_count_max < INT_MAX / 2);
+		cpu_map_count_max += max_ncpus;
+		new_map = kmem_zalloc(sizeof (cpu_map[0]) * cpu_map_count_max,
+		    KM_SLEEP);
+		if (cpu_map_count != 0) {
+			ASSERT(cpu_map != NULL);
+			sz = sizeof (cpu_map[0]) * cpu_map_count;
+			kcopy(cpu_map, new_map, sz);
+			kmem_free(cpu_map, sz);
+		}
+		cpu_map = new_map;
+	}
+}
+
+/*
+ * Maintain mapping information among (cpu id, ACPI processor id, APIC id,
+ * ACPI handle). The mapping table will be setup in two steps:
+ * 1) acpica_add_processor_to_map() builds mapping among APIC id, ACPI
+ *    processor id and ACPI object handle.
+ * 2) acpica_map_cpu() builds mapping among cpu id and ACPI processor id.
+ * On system with ACPI device configuration for CPU enabled, acpica_map_cpu()
+ * will be called before acpica_add_processor_to_map(), otherwise
+ * acpica_map_cpu() will be called after acpica_add_processor_to_map().
+ */
+ACPI_STATUS
+acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj, UINT32 apic_id)
+{
+	int i;
+	ACPI_STATUS rc = AE_OK;
+	struct cpu_map_item *item = NULL;
+
+	ASSERT(obj != NULL);
+	if (obj == NULL) {
+		return (AE_ERROR);
+	}
+
+	mutex_enter(&cpu_map_lock);
+
+	/*
+	 * Special case for uppc
+	 * If we're a uppc system and ACPI device configuration for CPU has
+	 * been disabled, there won't be a CPU map yet because uppc psm doesn't
+	 * call acpica_map_cpu(). So create one and use the passed-in processor
+	 * as CPU 0
+	 */
+	if (cpu_map == NULL &&
+	    !acpica_get_devcfg_feature(ACPI_DEVCFG_CPU)) {
+		acpica_grow_cpu_map();
+		ASSERT(cpu_map != NULL);
+		item = kmem_zalloc(sizeof (*item), KM_SLEEP);
+		item->cpu_id = 0;
+		item->proc_id = acpi_id;
+		item->apic_id = apic_id;
+		item->obj = obj;
+		cpu_map[0] = item;
+		cpu_map_count = 1;
+		mutex_exit(&cpu_map_lock);
+		return (AE_OK);
+	}
+
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->obj == obj) {
+			rc = AE_ALREADY_EXISTS;
+			break;
+		} else if (cpu_map[i]->proc_id == acpi_id) {
+			ASSERT(item == NULL);
+			item = cpu_map[i];
+		}
+	}
+
+	if (rc == AE_OK) {
+		if (item != NULL) {
+			/*
+			 * ACPI alias objects may cause more than one objects
+			 * with the same ACPI processor id, only remember the
+			 * the first object encountered.
+			 */
+			if (item->obj == NULL) {
+				item->obj = obj;
+				item->apic_id = apic_id;
+			} else {
+				rc = AE_ALREADY_EXISTS;
+			}
+		} else if (cpu_map_count >= INT_MAX / 2) {
+			rc = AE_NO_MEMORY;
+		} else {
+			acpica_grow_cpu_map();
+			ASSERT(cpu_map != NULL);
+			ASSERT(cpu_map_count < cpu_map_count_max);
+			item = kmem_zalloc(sizeof (*item), KM_SLEEP);
+			item->cpu_id = -1;
+			item->proc_id = acpi_id;
+			item->apic_id = apic_id;
+			item->obj = obj;
+			cpu_map[cpu_map_count] = item;
+			cpu_map_count++;
+		}
+	}
+
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_remove_processor_from_map(UINT32 acpi_id)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->proc_id != acpi_id) {
+			continue;
+		}
+		cpu_map[i]->obj = NULL;
+		/* Free item if no more reference to it. */
+		if (cpu_map[i]->cpu_id == -1) {
+			kmem_free(cpu_map[i], sizeof (struct cpu_map_item));
+			cpu_map[i] = NULL;
+			cpu_map_count--;
+			if (i != cpu_map_count) {
+				cpu_map[i] = cpu_map[cpu_map_count];
+				cpu_map[cpu_map_count] = NULL;
+			}
+		}
+		rc = AE_OK;
+		break;
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_map_cpu(processorid_t cpuid, UINT32 acpi_id)
+{
+	int i;
+	ACPI_STATUS rc = AE_OK;
+	struct cpu_map_item *item = NULL;
+
+	ASSERT(cpuid != -1);
+	if (cpuid == -1) {
+		return (AE_ERROR);
+	}
+
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->cpu_id == cpuid) {
+			rc = AE_ALREADY_EXISTS;
+			break;
+		} else if (cpu_map[i]->proc_id == acpi_id) {
+			ASSERT(item == NULL);
+			item = cpu_map[i];
+		}
+	}
+	if (rc == AE_OK) {
+		if (item != NULL) {
+			if (item->cpu_id == -1) {
+				item->cpu_id = cpuid;
+			} else {
+				rc = AE_ALREADY_EXISTS;
+			}
+		} else if (cpu_map_count >= INT_MAX / 2) {
+			rc = AE_NO_MEMORY;
+		} else {
+			acpica_grow_cpu_map();
+			ASSERT(cpu_map != NULL);
+			ASSERT(cpu_map_count < cpu_map_count_max);
+			item = kmem_zalloc(sizeof (*item), KM_SLEEP);
+			item->cpu_id = cpuid;
+			item->proc_id = acpi_id;
+			item->apic_id = UINT32_MAX;
+			item->obj = NULL;
+			cpu_map[cpu_map_count] = item;
+			cpu_map_count++;
+		}
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_unmap_cpu(processorid_t cpuid)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	ASSERT(cpuid != -1);
+	if (cpuid == -1) {
+		return (rc);
+	}
+
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->cpu_id != cpuid) {
+			continue;
+		}
+		cpu_map[i]->cpu_id = -1;
+		/* Free item if no more reference. */
+		if (cpu_map[i]->obj == NULL) {
+			kmem_free(cpu_map[i], sizeof (struct cpu_map_item));
+			cpu_map[i] = NULL;
+			cpu_map_count--;
+			if (i != cpu_map_count) {
+				cpu_map[i] = cpu_map[cpu_map_count];
+				cpu_map[cpu_map_count] = NULL;
+			}
+		}
+		rc = AE_OK;
+		break;
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_get_cpu_object_by_cpuid(processorid_t cpuid, ACPI_HANDLE *hdlp)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	ASSERT(cpuid != -1);
+	if (cpuid == -1) {
+		return (rc);
+	}
+
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->cpu_id == cpuid && cpu_map[i]->obj != NULL) {
+			*hdlp = cpu_map[i]->obj;
+			rc = AE_OK;
+			break;
+		}
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_get_cpu_object_by_procid(UINT32 procid, ACPI_HANDLE *hdlp)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->proc_id == procid && cpu_map[i]->obj != NULL) {
+			*hdlp = cpu_map[i]->obj;
+			rc = AE_OK;
+			break;
+		}
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+ACPI_STATUS
+acpica_get_cpu_object_by_apicid(UINT32 apicid, ACPI_HANDLE *hdlp)
+{
+	int i;
+	ACPI_STATUS rc = AE_NOT_EXIST;
+
+	ASSERT(apicid != UINT32_MAX);
+	if (apicid == UINT32_MAX) {
+		return (rc);
+	}
+
+	mutex_enter(&cpu_map_lock);
+	for (i = 0; i < cpu_map_count; i++) {
+		if (cpu_map[i]->apic_id == apicid && cpu_map[i]->obj != NULL) {
+			*hdlp = cpu_map[i]->obj;
+			rc = AE_OK;
+			break;
+		}
+	}
+	mutex_exit(&cpu_map_lock);
+
+	return (rc);
+}
+
+void
+acpica_set_core_feature(uint64_t features)
+{
+	atomic_or_64(&acpica_core_features, features);
+}
+
+void
+acpica_clear_core_feature(uint64_t features)
+{
+	atomic_and_64(&acpica_core_features, ~features);
+}
+
+uint64_t
+acpica_get_core_feature(uint64_t features)
+{
+	return (acpica_core_features & features);
+}
+
+void
+acpica_set_devcfg_feature(uint64_t features)
+{
+	atomic_or_64(&acpica_devcfg_features, features);
+}
+
+void
+acpica_clear_devcfg_feature(uint64_t features)
+{
+	atomic_and_64(&acpica_devcfg_features, ~features);
+}
+
+uint64_t
+acpica_get_devcfg_feature(uint64_t features)
+{
+	return (acpica_devcfg_features & features);
 }
 
 void

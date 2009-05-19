@@ -55,6 +55,7 @@ extern void mach_cpu_idle(void);
 extern void mach_cpu_halt(char *);
 extern int mach_cpu_start(cpu_t *, void *);
 extern int mach_cpuid_start(processorid_t, void *);
+extern int mach_cpu_create_device_node(cpu_t *, dev_info_t **);
 
 extern int Cpudelay;
 extern void setcpudelay(void);

@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #ifndef _SYS_ACPICA_H
 #define	_SYS_ACPICA_H
@@ -116,20 +120,50 @@ typedef struct iflag {
 #define	HID_PCI_BUS		0x30AD041
 #define	HID_PCI_EXPRESS_BUS	0x080AD041
 
+/* ACPICA subsystem has been fully initialized except SCI interrupt. */
+#define	ACPI_FEATURE_FULL_INIT	0x1
+/* ACPI SCI interrupt has been enabled. */
+#define	ACPI_FEATURE_SCI_EVENT	0x2
+/* ACPI device configuration has been enabled. */
+#define	ACPI_FEATURE_DEVCFG	0x4
+/* ACPI _OSI method should report support of ACPI Module Device. */
+#define	ACPI_FEATURE_OSI_MODULE	0x8
+
+/* ACPI device configuration features. */
+#define	ACPI_DEVCFG_CPU		0x1
+#define	ACPI_DEVCFG_MEMORY	0x2
+#define	ACPI_DEVCFG_CONTAINER	0x4
+
 /*
  * Function prototypes
  */
 extern ACPI_STATUS acpica_get_sci(int *, iflag_t *);
 extern int acpica_get_bdf(dev_info_t *, int *, int *, int *);
-extern ACPI_STATUS acpica_get_devinfo(ACPI_HANDLE, dev_info_t **);
-extern ACPI_STATUS acpica_get_handle(dev_info_t *, ACPI_HANDLE *);
-extern ACPI_STATUS acpica_get_handle_cpu(int, ACPI_HANDLE *);
 extern ACPI_STATUS acpica_eval_int(ACPI_HANDLE, char *, int *);
-extern void acpica_map_cpu(processorid_t, UINT32);
-extern void acpica_build_processor_map();
 extern void acpica_ddi_save_resources(dev_info_t *);
 extern void acpica_ddi_restore_resources(dev_info_t *);
 extern void acpica_get_global_FADT(ACPI_TABLE_FADT **);
+
+extern ACPI_STATUS acpica_tag_devinfo(dev_info_t *, ACPI_HANDLE);
+extern ACPI_STATUS acpica_untag_devinfo(dev_info_t *, ACPI_HANDLE);
+extern ACPI_STATUS acpica_get_devinfo(ACPI_HANDLE, dev_info_t **);
+extern ACPI_STATUS acpica_get_handle(dev_info_t *, ACPI_HANDLE *);
+extern ACPI_STATUS acpica_get_handle_cpu(int, ACPI_HANDLE *);
+extern ACPI_STATUS acpica_build_processor_map(void);
+extern ACPI_STATUS acpica_add_processor_to_map(UINT32, ACPI_HANDLE, UINT32);
+extern ACPI_STATUS acpica_remove_processor_from_map(UINT32);
+extern ACPI_STATUS acpica_map_cpu(processorid_t, UINT32);
+extern ACPI_STATUS acpica_unmap_cpu(processorid_t);
+extern ACPI_STATUS acpica_get_cpu_object_by_cpuid(processorid_t, ACPI_HANDLE *);
+extern ACPI_STATUS acpica_get_cpu_object_by_procid(UINT32, ACPI_HANDLE *);
+extern ACPI_STATUS acpica_get_cpu_object_by_apicid(UINT32, ACPI_HANDLE *);
+
+extern uint64_t acpica_get_core_feature(uint64_t);
+extern void acpica_set_core_feature(uint64_t);
+extern void acpica_clear_core_feature(uint64_t);
+extern uint64_t acpica_get_devcfg_feature(uint64_t);
+extern void acpica_set_devcfg_feature(uint64_t);
+extern void acpica_clear_devcfg_feature(uint64_t);
 
 #ifdef __cplusplus
 }

@@ -909,6 +909,9 @@ acpi_probe(char *modname)
 	if (apic_acpi_enter_apicmode() != PSM_FAILURE) {
 		build_reserved_irqlist((uchar_t *)apic_reserved_irqlist);
 		apic_enable_acpi = 1;
+		if (apic_sci_vect > 0) {
+			acpica_set_core_feature(ACPI_FEATURE_SCI_EVENT);
+		}
 		if (apic_use_acpi_madt_only) {
 			cmn_err(CE_CONT,
 			    "?Using ACPI for CPU/IOAPIC information ONLY\n");

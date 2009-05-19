@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 /*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
+/*
  * Solaris x86 ACPI CA services
  */
 
@@ -208,7 +212,8 @@ acpica_check_bios_date(int yy, int mm, int dd)
 	int bios_year, bios_month, bios_day;
 
 	/* If firmware has no bios, skip the check */
-	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), 0, "bios-free"))
+	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), DDI_PROP_DONTPASS,
+	    "bios-free"))
 		return (TRUE);
 
 	/*
@@ -321,8 +326,8 @@ acpica_process_user_options()
 	/*
 	 * fetch the optional options property
 	 */
-	acpi_user_options = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(), 0,
-	    "acpi-user-options", 0);
+	acpi_user_options = ddi_prop_get_int(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "acpi-user-options", 0);
 
 	/*
 	 * Note that 'off' has precedence over 'on'
@@ -388,40 +393,40 @@ acpica_init()
 		return (AE_ERROR);
 
 	mutex_enter(&acpica_module_lock);
+	if (acpica_init_state == ACPICA_INITIALIZED) {
+		mutex_exit(&acpica_module_lock);
+		return (AE_OK);
+	}
 
-	if (acpica_init_state == ACPICA_NOT_INITIALIZED) {
-		if (ACPI_FAILURE(status = AcpiLoadTables()))
-			goto error;
+	if (ACPI_FAILURE(status = AcpiLoadTables()))
+		goto error;
 
-		if (ACPI_FAILURE(status = acpica_install_handlers()))
-			goto error;
+	if (ACPI_FAILURE(status = acpica_install_handlers()))
+		goto error;
 
-		if (ACPI_FAILURE(status = AcpiEnableSubsystem(
-		    acpi_init_level)))
-			goto error;
+	if (ACPI_FAILURE(status = AcpiEnableSubsystem(acpi_init_level)))
+		goto error;
 
-		/* do after AcpiEnableSubsystem() so GPEs are initialized */
-		acpica_ec_init();	/* initialize EC if present */
+	/* do after AcpiEnableSubsystem() so GPEs are initialized */
+	acpica_ec_init();	/* initialize EC if present */
 
-		if (ACPI_FAILURE(status = AcpiInitializeObjects(0)))
-			goto error;
+	if (ACPI_FAILURE(status = AcpiInitializeObjects(0)))
+		goto error;
 
-		acpica_init_state = ACPICA_INITIALIZED;
-		/*
-		 * If we are running on the Xen hypervisor as dom0 we need to
-		 * find the ioapics so we can prevent ACPI from trying to
-		 * access them.
-		 */
-		if (get_hwenv() == HW_XEN_PV && is_controldom())
-			acpica_find_ioapics();
-		acpica_init_kstats();
+	acpica_init_state = ACPICA_INITIALIZED;
+
+	/*
+	 * If we are running on the Xen hypervisor as dom0 we need to
+	 * find the ioapics so we can prevent ACPI from trying to
+	 * access them.
+	 */
+	if (get_hwenv() == HW_XEN_PV && is_controldom())
+		acpica_find_ioapics();
+	acpica_init_kstats();
 error:
-		if (acpica_init_state != ACPICA_INITIALIZED) {
-			cmn_err(CE_NOTE, "!failed to initialize"
-			    " ACPI services");
-		}
-	} else
-		status = AE_OK;
+	if (acpica_init_state != ACPICA_INITIALIZED) {
+		cmn_err(CE_NOTE, "!failed to initialize ACPI services");
+	}
 
 	/*
 	 * Set acpi-status to 13 if acpica has been initialized successfully.
@@ -429,8 +434,14 @@ error:
 	 * and value were chosen in order to remain compatible with acpi_intp.
 	 */
 	e_ddi_prop_update_int(DDI_DEV_T_NONE, ddi_root_node(), "acpi-status",
-	    (status == AE_OK) ? (ACPI_BOOT_INIT | ACPI_BOOT_ENABLE |
+	    (ACPI_SUCCESS(status)) ? (ACPI_BOOT_INIT | ACPI_BOOT_ENABLE |
 	    ACPI_BOOT_BOOTCONF) : 0);
+
+	/* Mark acpica subsystem as fully initialized. */
+	if (ACPI_SUCCESS(status) &&
+	    acpi_init_level == ACPI_FULL_INITIALIZATION) {
+		acpica_set_core_feature(ACPI_FEATURE_FULL_INIT);
+	}
 
 	mutex_exit(&acpica_module_lock);
 	return (status);

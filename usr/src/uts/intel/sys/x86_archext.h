@@ -619,6 +619,7 @@ extern int cpuid_get_chipid(struct cpu *);
 extern id_t cpuid_get_coreid(struct cpu *);
 extern int cpuid_get_pkgcoreid(struct cpu *);
 extern int cpuid_get_clogid(struct cpu *);
+extern uint32_t cpuid_get_apicid(struct cpu *);
 extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);
@@ -639,7 +640,8 @@ extern uint_t cpuid_pass1(struct cpu *);
 extern void cpuid_pass2(struct cpu *);
 extern void cpuid_pass3(struct cpu *);
 extern uint_t cpuid_pass4(struct cpu *);
-extern void add_cpunode2devtree(processorid_t, struct cpuid_info *);
+extern void cpuid_set_cpu_properties(void *, processorid_t,
+    struct cpuid_info *);
 
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
 extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);

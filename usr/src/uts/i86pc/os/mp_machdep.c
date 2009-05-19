@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 #define	PSMI_1_6
 #include <sys/smp_impldefs.h>
@@ -55,6 +59,8 @@
 #include <sys/kdi_machimpl.h>
 #include <sys/sdt.h>
 #include <sys/hpet.h>
+#include <sys/sunddi.h>
+#include <sys/sunndi.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -85,6 +91,8 @@ static void cpu_wakeup(cpu_t *, int);
 void cpu_idle_mwait(void);
 static void cpu_wakeup_mwait(cpu_t *, int);
 #endif
+static int mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp);
+
 /*
  *	External reference functions
  */
@@ -143,6 +151,8 @@ int (*psm_state)(psm_state_request_t *) = (int (*)(psm_state_request_t *))
 
 void (*notify_error)(int, char *) = (void (*)(int, char *))return_instr;
 void (*hrtime_tick)(void)	= return_instr;
+
+int (*psm_cpu_create_devinfo)(cpu_t *, dev_info_t **) = mach_cpu_create_devinfo;
 
 /*
  * True if the generic TSC code is our source of hrtime, rather than whatever
@@ -1457,6 +1467,95 @@ mach_cpuid_start(processorid_t id, void *ctx)
 		return (0);
 #endif
 	return ((*pops->psm_cpu_start)(id, ctx));
+}
+
+/*
+ * Default handler to create device node for CPU.
+ * One reference count will be held on created device node.
+ */
+static int
+mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp)
+{
+	int rv, circ;
+	dev_info_t *dip;
+	static kmutex_t cpu_node_lock;
+	static dev_info_t *cpu_nex_devi = NULL;
+
+	ASSERT(cp != NULL);
+	ASSERT(dipp != NULL);
+	*dipp = NULL;
+
+	if (cpu_nex_devi == NULL) {
+		mutex_enter(&cpu_node_lock);
+		/* First check whether cpus exists. */
+		cpu_nex_devi = ddi_find_devinfo("cpus", -1, 0);
+		/* Create cpus if it doesn't exist. */
+		if (cpu_nex_devi == NULL) {
+			ndi_devi_enter(ddi_root_node(), &circ);
+			rv = ndi_devi_alloc(ddi_root_node(), "cpus",
+			    (pnode_t)DEVI_SID_NODEID, &dip);
+			if (rv != NDI_SUCCESS) {
+				mutex_exit(&cpu_node_lock);
+				cmn_err(CE_CONT,
+				    "?failed to create cpu nexus device.\n");
+				return (PSM_FAILURE);
+			}
+			ASSERT(dip != NULL);
+			(void) ndi_devi_online(dip, 0);
+			ndi_devi_exit(ddi_root_node(), circ);
+			cpu_nex_devi = dip;
+		}
+		mutex_exit(&cpu_node_lock);
+	}
+
+	/*
+	 * create a child node for cpu identified as 'cpu_id'
+	 */
+	ndi_devi_enter(cpu_nex_devi, &circ);
+	dip = ddi_add_child(cpu_nex_devi, "cpu", DEVI_SID_NODEID, cp->cpu_id);
+	if (dip == NULL) {
+		cmn_err(CE_CONT,
+		    "?failed to create device node for cpu%d.\n", cp->cpu_id);
+		rv = PSM_FAILURE;
+	} else {
+		*dipp = dip;
+		(void) ndi_hold_devi(dip);
+		rv = PSM_SUCCESS;
+	}
+	ndi_devi_exit(cpu_nex_devi, circ);
+
+	return (rv);
+}
+
+/*
+ * Create cpu device node in device tree and online it.
+ * Return created dip with reference count held if requested.
+ */
+int
+mach_cpu_create_device_node(struct cpu *cp, dev_info_t **dipp)
+{
+	int rv;
+	dev_info_t *dip = NULL;
+
+	ASSERT(psm_cpu_create_devinfo != NULL);
+	rv = psm_cpu_create_devinfo(cp, &dip);
+	if (rv == PSM_SUCCESS) {
+		cpuid_set_cpu_properties(dip, cp->cpu_id, cp->cpu_m.mcpu_cpi);
+		/* Recursively attach driver for parent nexus device. */
+		if (i_ddi_attach_node_hierarchy(ddi_get_parent(dip)) ==
+		    DDI_SUCCESS) {
+			/* Configure cpu itself and descendants. */
+			(void) ndi_devi_online(dip,
+			    NDI_ONLINE_ATTACH | NDI_CONFIG);
+		}
+		if (dipp != NULL) {
+			*dipp = dip;
+		} else {
+			(void) ndi_rele_devi(dip);
+		}
+	}
+
+	return (rv);
 }
 
 /*ARGSUSED*/

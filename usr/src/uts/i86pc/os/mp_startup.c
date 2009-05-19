@@ -1607,7 +1607,6 @@ mp_startup(void)
 #ifndef __xpv
 	cpupm_init(cp);
 #endif
-	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
 
 	/*
 	 * Processor group initialization for this CPU is dependent on the
@@ -1664,6 +1663,8 @@ mp_startup(void)
 	 */
 	cmn_err(CE_CONT, "!cpu%d initialization complete - online\n",
 	    cp->cpu_id);
+
+	(void) mach_cpu_create_device_node(cp, NULL);
 
 	/*
 	 * Now we are done with the startup thread, so free it up.
