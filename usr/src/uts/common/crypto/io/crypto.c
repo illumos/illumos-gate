@@ -424,6 +424,8 @@ crypto_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	crypto_minors_table_count = 0;
 	for (i = 0; i < max_ncpus; i++)
 		mutex_destroy(&crypto_locks[i].kl_lock);
+	kmem_free(crypto_locks, max_ncpus * sizeof (kcf_lock_withpad_t));
+	crypto_locks = NULL;
 
 	vmem_destroy(crypto_arena);
 	crypto_arena = NULL;
