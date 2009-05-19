@@ -213,7 +213,7 @@ get_routeadm_property()
 	propval=`/sbin/routeadm -l $1 | /usr/bin/nawk -v PROP=$2 \
 	    '($1 == PROP) { for (i = 3; i < NF; i++) printf $i" "; \
 	    if (NF >= 3) {printf $NF}}'`
-	echo "$propval"	
+	echo "$propval"
 }
 
 #
@@ -240,28 +240,7 @@ get_daemon_option_from_property()
 {
 	propval=`get_routeadm_property $1 $2`
 	if [ "$propval" != "$4" ]; then
-		echo "-${3} \"$propval\""
-	fi
-}
-
-#
-# get_daemon_ordered_multivalue_option_from_property_quoted inst_fmri prop
-# option
-#
-# Returns appropriate daemon option and associated values. Values are
-# quoted, i.e. -A "value1 has spaces" -A "value2 has spaces"
-#
-get_daemon_ordered_multivalue_option_from_property_quoted()
-{
-	# get property values, removing trailing delimiter.
-	propvals=`get_routeadm_property $1 $2 | \
-	    /usr/bin/nawk '{sub(/;[ \t]*$/, ""); print }'`
-	# Substitute switch for internal delimiters, quoting values.
-	fixed_propvals=`/usr/bin/echo $propvals | \
-	    /usr/bin/nawk -v SWITCH="\" -${3} \"" \
-	    '{sub(/;/, SWITCH); print }'`
-	if [ -n "$fixed_propvals" ]; then
-		echo "-${3} \"$fixed_propvals\""
+		echo "-${3} $propval"
 	fi
 }
 
