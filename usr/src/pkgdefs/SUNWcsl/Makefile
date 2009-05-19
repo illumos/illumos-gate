@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -28,7 +28,7 @@ include ../Makefile.com
 .KEEP_STATE:
 
 LICENSEFILES_i386 = lic_AMD 
-LICENSEFILES += $(LICENSEFILES_$(MACH)) \
+LICENSEFILES += $(OSBL) $(LICENSEFILES_$(MACH)) \
 	../../common/mpi/THIRDPARTYLICENSE \
 	../../lib/libast/THIRDPARTYLICENSE \
 	../../lib/libbsdmalloc/THIRDPARTYLICENSE \
