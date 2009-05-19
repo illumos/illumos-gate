@@ -514,11 +514,11 @@ error:
 CK_RV
 object_flatten(OBJECT    * obj,
 	CK_BYTE  ** data,
-	CK_ULONG  * len)
+	UINT32  *len)
 {
 	CK_BYTE    * buf = NULL;
-	CK_ULONG	tmpl_len, total_len;
-	CK_ULONG	offset;
+	CK_ULONG_32	tmpl_len, total_len;
+	CK_ULONG_32	offset;
 	CK_ULONG_32	count;
 	long	 rc;
 
@@ -560,12 +560,6 @@ object_flatten(OBJECT    * obj,
 	return (CKR_OK);
 }
 
-
-
-// object_free()
-//
-// does what it says...
-//
 CK_BBOOL
 object_free(OBJECT *obj)
 {

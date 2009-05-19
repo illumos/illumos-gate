@@ -521,16 +521,13 @@ build_attribute(CK_ATTRIBUTE_TYPE  type,
 	return (CKR_OK);
 }
 
-
-//
-//
 CK_RV
 add_pkcs_padding(CK_BYTE  * ptr,
-	CK_ULONG   block_size,
-	CK_ULONG   data_len,
-CK_ULONG   total_len)
+	UINT32   block_size,
+	UINT32   data_len,
+	UINT32   total_len)
 {
-	CK_ULONG i, pad_len;
+	UINT32 i, pad_len;
 	CK_BYTE  pad_value;
 
 	pad_len = block_size - (data_len % block_size);
@@ -540,32 +537,27 @@ CK_ULONG   total_len)
 		return (CKR_FUNCTION_FAILED);
 	}
 	for (i = 0; i < pad_len; i++)
-	ptr[i] = pad_value;
+		ptr[i] = pad_value;
 
 	return (CKR_OK);
 }
 
-
-//
-//
 CK_RV
-strip_pkcs_padding(CK_BYTE   * ptr,
-	CK_ULONG    total_len,
-	CK_ULONG  * data_len) {
+strip_pkcs_padding(
+	CK_BYTE *ptr,
+	UINT32  total_len,
+	UINT32  *data_len)
+{
 	CK_BYTE  pad_value;
 
 	pad_value = ptr[total_len - 1];
 
-	// thus, we have 'pad_value' bytes of 'pad_value' appended to the end
-	//
-	 *data_len = total_len - pad_value;
+	/* We have 'pad_value' bytes of 'pad_value' appended to the end */
+	*data_len = total_len - pad_value;
 
 	return (CKR_OK);
 }
 
-
-//
-//
 CK_RV
 remove_leading_zeros(CK_ATTRIBUTE *attr)
 {
@@ -639,7 +631,7 @@ detach_shm()
 
 CK_RV
 compute_sha(CK_BYTE  *data,
-	CK_ULONG   len,
+	CK_ULONG_32   len,
 	CK_BYTE  * hash)
 {
 	SHA1_CTX	ctx;

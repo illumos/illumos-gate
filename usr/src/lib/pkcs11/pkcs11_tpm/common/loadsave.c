@@ -684,10 +684,11 @@ save_public_token_object(OBJECT *obj)
 	FILE	*fp = NULL;
 	CK_BYTE	*cleartxt = NULL;
 	CK_BYTE	fname[MAXPATHLEN];
-	CK_ULONG	cleartxt_len;
+	UINT32	cleartxt_len;
 	CK_BBOOL	flag = FALSE;
 	CK_RV	rc;
 	UINT32	total_len;
+
 	char *p = get_tpm_keystore_path();
 
 	if (p == NULL)
@@ -714,10 +715,10 @@ save_public_token_object(OBJECT *obj)
 
 	set_perm(fileno(fp));
 
-	total_len = cleartxt_len + sizeof (CK_ULONG) + sizeof (CK_BBOOL);
+	total_len = cleartxt_len + sizeof (UINT32) + sizeof (CK_BBOOL);
 
-	(void) fwrite(&total_len, sizeof (UINT32), 1, fp);
-	(void) fwrite(&flag, sizeof (CK_BBOOL), 1, fp);
+	(void) fwrite(&total_len, sizeof (total_len), 1, fp);
+	(void) fwrite(&flag, sizeof (flag), 1, fp);
 	(void) fwrite(cleartxt, cleartxt_len, 1, fp);
 
 	(void) lockfile(fileno(fp), F_UNLCK);
@@ -744,10 +745,11 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	CK_BYTE	*ptr = NULL;
 	CK_BYTE	fname[100];
 	CK_BYTE	hash_sha[SHA1_DIGEST_LENGTH];
-	CK_ULONG obj_data_len, cleartxt_len, ciphertxt_len;
-	UINT32	padded_len;
 	CK_BBOOL	flag;
 	CK_RV	rc;
+	CK_ULONG ciphertxt_len;
+	UINT32 cleartxt_len;
+	UINT32 padded_len;
 	UINT32	obj_data_len_32;
 	UINT32	total_len;
 	UINT32	chunksize, blocks;
@@ -756,8 +758,7 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	if (p == NULL)
 		return (CKR_FUNCTION_FAILED);
 
-	rc = object_flatten(obj, &obj_data, &obj_data_len);
-	obj_data_len_32 = obj_data_len;
+	rc = object_flatten(obj, &obj_data, &obj_data_len_32);
 	if (rc != CKR_OK) {
 		goto error;
 	}
@@ -765,12 +766,12 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	 * format for the object file:
 	 *    private flag
 	 *	---- begin encrypted part	<--+
-	 *	length of object data		|
+	 *	length of object data (4 bytes)	|
 	 *	object data			+---- sensitive part
 	 *	SHA of (object data)		|
 	 *	---- end encrypted part		<--+
 	 */
-	if ((rc = compute_sha(obj_data, obj_data_len, hash_sha)) != CKR_OK)
+	if ((rc = compute_sha(obj_data, obj_data_len_32, hash_sha)) != CKR_OK)
 		goto error;
 
 	/*
@@ -781,7 +782,7 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	 */
 	chunksize = RSA_BLOCK_SIZE - (2 * SHA1_DIGEST_LENGTH + 2) - 5;
 
-	cleartxt_len = sizeof (CK_ULONG) + obj_data_len_32 + SHA1_DIGEST_LENGTH;
+	cleartxt_len = sizeof (UINT32) + obj_data_len_32 + SHA1_DIGEST_LENGTH;
 
 	blocks = cleartxt_len / chunksize + ((cleartxt_len % chunksize) > 0);
 	padded_len   = RSA_BLOCK_SIZE * blocks;
@@ -796,8 +797,8 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	ciphertxt_len = padded_len;
 
 	ptr = cleartxt;
-	(void) memcpy(ptr, &obj_data_len_32, sizeof (CK_ULONG));
-	ptr += sizeof (CK_ULONG);
+	(void) memcpy(ptr, &obj_data_len_32, sizeof (UINT32));
+	ptr += sizeof (UINT32);
 	(void) memcpy(ptr,  obj_data, obj_data_len_32);
 	ptr += obj_data_len_32;
 	(void) memcpy(ptr, hash_sha, SHA1_DIGEST_LENGTH);
@@ -828,7 +829,7 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 
 	set_perm(fileno(fp));
 
-	total_len = sizeof (UINT32) + sizeof (CK_BBOOL) + ciphertxt_len;
+	total_len = sizeof (UINT32) + sizeof (CK_BBOOL) + (UINT32)ciphertxt_len;
 
 	flag = TRUE;
 
@@ -1038,14 +1039,15 @@ restore_private_token_object(
 	CK_BYTE * obj_data  = NULL;
 	CK_BYTE *ptr = NULL;
 	CK_BYTE hash_sha[SHA1_DIGEST_LENGTH];
-	CK_ULONG cleartxt_len, obj_data_len;
+	UINT32 cleartxt_len;
+	UINT32 obj_data_len;
 	CK_RV rc;
 
 	/*
 	 * format for the object data:
 	 *    (private flag has already been read at this point)
 	 *    ---- begin encrypted part
-	 *	length of object data
+	 *	length of object data (4 bytes)
 	 *	object data
 	 *	SHA of object data
 	 *    ---- end encrypted part
@@ -1075,15 +1077,16 @@ restore_private_token_object(
 
 	ptr = cleartxt;
 
-	bcopy(ptr, &obj_data_len, sizeof (CK_ULONG));
-	ptr += sizeof (CK_ULONG);
+	bcopy(ptr, &obj_data_len, sizeof (UINT32));
+	ptr += sizeof (UINT32);
 	obj_data = ptr;
 
 	if ((rc = compute_sha(ptr, obj_data_len, hash_sha)) != CKR_OK)
 		goto done;
 	ptr += obj_data_len;
 
-	if (memcmp(ptr, hash_sha, SHA1_DIGEST_LENGTH) != 0) {
+	if (memcmp((const void *)ptr, (const void *)hash_sha,
+	    (size_t)SHA1_DIGEST_LENGTH) != 0) {
 		rc = CKR_FUNCTION_FAILED;
 		goto done;
 	}

@@ -615,16 +615,16 @@ CK_RV load_token_data(TSS_HCONTEXT, TOKEN_DATA *);
 CK_RV save_token_data(TOKEN_DATA *);
 void copy_slot_info(CK_SLOT_ID, CK_SLOT_INFO_PTR);
 
-CK_RV compute_sha(CK_BYTE *, CK_ULONG, CK_BYTE *);
+CK_RV compute_sha(CK_BYTE *, CK_ULONG_32, CK_BYTE *);
 
 CK_RV parity_is_odd(CK_BYTE);
 
 CK_RV build_attribute(CK_ATTRIBUTE_TYPE,
 	CK_BYTE *, CK_ULONG, CK_ATTRIBUTE **);
 
-CK_RV add_pkcs_padding(CK_BYTE *, CK_ULONG, CK_ULONG, CK_ULONG);
+CK_RV add_pkcs_padding(CK_BYTE *, UINT32, UINT32, UINT32);
 
-CK_RV strip_pkcs_padding(CK_BYTE *, CK_ULONG, CK_ULONG *);
+CK_RV strip_pkcs_padding(CK_BYTE *, UINT32, UINT32 *);
 
 CK_RV remove_leading_zeros(CK_ATTRIBUTE *);
 
@@ -1005,7 +1005,7 @@ CK_RV object_copy(CK_ATTRIBUTE *,
 
 CK_RV object_flatten(OBJECT *,
 	CK_BYTE **,
-	CK_ULONG *);
+	CK_ULONG_32 *);
 
 CK_BBOOL object_free(OBJECT *);
 
