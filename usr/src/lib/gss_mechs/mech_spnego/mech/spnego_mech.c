@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * A module that implements the spnego security mechanism.
@@ -27,8 +27,6 @@
  * peers using the GSS-API.
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -41,9 +39,8 @@
 
 /* der routines defined in libgss */
 extern unsigned int der_length_size(OM_uint32);
-extern int get_der_length(uchar_t **, OM_uint32, OM_uint32*);
-extern int put_der_length(OM_uint32, uchar_t **, OM_uint32);
-
+extern int get_der_length(unsigned char **, OM_uint32, unsigned int*);
+extern int put_der_length(OM_uint32, unsigned char **, unsigned int);
 
 /* private routines for spnego_mechanism */
 static spnego_token_t make_spnego_token(char *);
@@ -71,7 +68,7 @@ static gss_OID
 negotiate_mech_type(OM_uint32 *, gss_OID_set, gss_OID_set,
 		OM_uint32 *, bool_t *);
 static int
-g_get_tag_and_length(unsigned char **, uchar_t, int, int *);
+g_get_tag_and_length(unsigned char **, int, unsigned int, unsigned int *);
 
 static int
 make_spnego_tokenInit_msg(spnego_gss_ctx_id_t, gss_OID_set,
@@ -304,7 +301,7 @@ spnego_gss_init_sec_context(void *ct,
 	gss_cred_id_t *credlistptr = NULL, credlist;
 	gss_qop_t *qop_state = NULL;
 	unsigned char *ptr;
-	int len;
+	unsigned int len;
 
 	dsyslog("Entering init_sec_context\n");
 
@@ -709,7 +706,8 @@ spnego_gss_accept_sec_context(void *ct,
 	unsigned char *ptr;
 	unsigned char *bufstart;
 	int bodysize;
-	int err, len;
+	int err;
+	unsigned int len;
 	OM_uint32 negResult;
 	OM_uint32 minor_stat;
 	OM_uint32 mstat;
@@ -1742,22 +1740,16 @@ static gss_buffer_t
 get_input_token(unsigned char **buff_in, int buff_length)
 {
 	gss_buffer_t input_token;
-	unsigned int bytes;
+	unsigned int len;
 
-	if (**buff_in != OCTET_STRING)
+	if (g_get_tag_and_length(buff_in, OCTET_STRING, buff_length, &len) < 0)
 		return (NULL);
 
-	(*buff_in)++;
 	input_token = (gss_buffer_t)malloc(sizeof (gss_buffer_desc));
-
 	if (input_token == NULL)
 		return (NULL);
 
-	input_token->length = get_der_length(buff_in, buff_length, &bytes);
-	if ((int)input_token->length == -1) {
-		free(input_token);
-		return (NULL);
-	}
+	input_token->length = len;
 	input_token->value = malloc(input_token->length);
 
 	if (input_token->value == NULL) {
@@ -1808,8 +1800,8 @@ get_mech_set(OM_uint32 *minor_status, unsigned char **buff_in, int buff_length)
 {
 	gss_OID_set returned_mechSet;
 	OM_uint32 major_status;
-	OM_uint32 length;
-	OM_uint32 bytes;
+	int length;
+	unsigned int bytes;
 	OM_uint32 set_length;
 	uchar_t		*start;
 	int i;
@@ -1821,23 +1813,26 @@ get_mech_set(OM_uint32 *minor_status, unsigned char **buff_in, int buff_length)
 	(*buff_in)++;
 
 	length = get_der_length(buff_in, buff_length, &bytes);
+	if (length < 0 || buff_length - bytes < (unsigned int)length)
+		return NULL;
 
 	major_status = gss_create_empty_oid_set(minor_status,
 	    &returned_mechSet);
 	if (major_status != GSS_S_COMPLETE)
 		return (NULL);
 
-	for (set_length = 0, i = 0; set_length < length; i++) {
+	for (set_length = 0, i = 0; set_length < (unsigned int)length; i++) {
 		gss_OID_desc *temp = get_mech_oid(minor_status, buff_in,
 		    buff_length - (*buff_in - start));
-		if (temp != NULL) {
-			major_status = gss_add_oid_set_member(minor_status,
-			    temp, &returned_mechSet);
-			if (major_status == GSS_S_COMPLETE) {
+		if (temp == NULL)
+			break;
+
+		major_status = gss_add_oid_set_member(minor_status,
+		    temp, &returned_mechSet);
+		if (major_status == GSS_S_COMPLETE) {
 				set_length +=
 				    returned_mechSet->elements[i].length +2;
 				generic_gss_release_oid(minor_status, &temp);
-			}
 		}
 	}
 
@@ -1893,7 +1888,7 @@ put_mech_set(uchar_t **buf_out, gss_OID_set mechSet, int buflen)
 static OM_uint32
 get_req_flags(unsigned char **buff_in, int *bodysize, OM_uint32 *req_flags)
 {
-	int len;
+	unsigned int len;
 	uchar_t *start = *buff_in;
 
 	/* It is OK if no ReqFlags data is sent. */
@@ -1923,7 +1918,7 @@ static OM_uint32
 get_negResult(unsigned char **buff_in, int bodysize)
 {
 	unsigned char *iptr = *buff_in;
-	int len;
+	unsigned int len;
 	unsigned int bytes;
 	OM_uint32 result;
 	/*
@@ -2325,6 +2320,8 @@ make_spnego_tokenTarg_msg(OM_uint32 status, gss_OID mech_wanted,
 
 	if (outbuf == GSS_C_NO_BUFFER)
 		return (GSS_S_DEFECTIVE_TOKEN);
+	if (sendtoken == INIT_TOKEN_SEND && mech_wanted == GSS_C_NO_OID)
+		return (GSS_S_DEFECTIVE_TOKEN);
 
 	outbuf->length = 0;
 	outbuf->value = NULL;
@@ -2584,23 +2581,26 @@ g_make_token_header(gss_OID mech,
 }
 
 static int
-g_get_tag_and_length(unsigned char **buf, uchar_t tag, int buflen, int *outlen)
+g_get_tag_and_length(unsigned char **buf, int tag,
+		unsigned int buflen, unsigned int *outlen)
 {
 	unsigned char *ptr = *buf;
 	int ret = -1; /* pessimists, assume failure ! */
-	OM_uint32 encoded_len;
+	unsigned int encoded_len;
+	int tmplen = 0;
 
-	if (buflen > 0 && *ptr == tag) {
+	*outlen = 0;
+	if (buflen > 1 && *ptr == tag) {
 		ptr++;
-		*outlen = get_der_length(&ptr, buflen, &encoded_len);
-		if (*outlen < 0)
-			ret = *outlen;
-		if ((ptr + *outlen) > (*buf + buflen))
+		tmplen = get_der_length(&ptr, buflen - 1, &encoded_len);
+		if (tmplen < 0) {
 			ret = -1;
-		else
+		} else if ((unsigned int)tmplen > buflen - (ptr - *buf)) {
+			ret = -1;
+		} else
 			ret = 0;
 	}
-
+	*outlen = (unsigned int)tmplen;
 	*buf = ptr;
 	return (ret);
 }
@@ -2610,7 +2610,7 @@ g_verify_neg_token_init(unsigned char **buf_in, int cur_size)
 {
 	unsigned char *buf = *buf_in;
 	unsigned char *endptr = buf + cur_size;
-	int seqsize;
+	unsigned int seqsize;
 	int ret = 0;
 	unsigned int bytes;
 

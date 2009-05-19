@@ -1,4 +1,3 @@
-
 /*
  * src/lib/krb5/asn.1/asn1_decode.c
  * 
@@ -232,6 +231,7 @@ asn1_error_code asn1_decode_generaltime(asn1buf *buf, time_t *val)
 
   if(length != 15) return ASN1_BAD_LENGTH;
   retval = asn1buf_remove_charstring(buf,15,&s);
+  if (retval) return retval;
   /* Time encoding: YYYYMMDDhhmmssZ */
   if(s[14] != 'Z') {
       free(s);

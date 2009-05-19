@@ -1,9 +1,7 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Coding Buffer Implementation */
 
@@ -85,11 +83,11 @@ asn1_error_code asn1buf_wrap_data(asn1buf *buf, const krb5_data *code)
 
 asn1_error_code asn1buf_imbed(asn1buf *subbuf, const asn1buf *buf, const unsigned int length, const int indef)
 {
+  if (buf->next > buf->bound + 1) return ASN1_OVERRUN;
   subbuf->base = subbuf->next = buf->next;
   if (!indef) {
+      if (length > (size_t)(buf->bound + 1 - buf->next)) return ASN1_OVERRUN;
       subbuf->bound = subbuf->base + length - 1;
-      if (subbuf->bound > buf->bound)
-	  return ASN1_OVERRUN;
   } else /* constructed indefinite */
       subbuf->bound = buf->bound;
   return 0;
@@ -207,6 +205,7 @@ asn1_error_code asn1buf_remove_octetstring(asn1buf *buf, const unsigned int len,
 {
   int i;
 
+  if (buf->next > buf->bound + 1) return ASN1_OVERRUN;
   if (len > buf->bound + 1 - buf->next) return ASN1_OVERRUN;
   if (len == 0) {
       *s = 0;
@@ -225,6 +224,7 @@ asn1_error_code asn1buf_remove_charstring(asn1buf *buf, const unsigned int len, 
 {
   int i;
 
+  if (buf->next > buf->bound + 1) return ASN1_OVERRUN;
   if (len > buf->bound + 1 - buf->next) return ASN1_OVERRUN;
   if (len == 0) {
       *s = 0;
