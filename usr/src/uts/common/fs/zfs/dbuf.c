@@ -1912,6 +1912,19 @@ dmu_buf_get_user(dmu_buf_t *db_fake)
 	return (db->db_user_ptr);
 }
 
+boolean_t
+dmu_buf_freeable(dmu_buf_t *dbuf)
+{
+	boolean_t res = B_FALSE;
+	dmu_buf_impl_t *db = (dmu_buf_impl_t *)dbuf;
+
+	if (db->db_blkptr)
+		res = dsl_dataset_block_freeable(db->db_objset->os_dsl_dataset,
+		    db->db_blkptr->blk_birth);
+
+	return (res);
+}
+
 static void
 dbuf_check_blkptr(dnode_t *dn, dmu_buf_impl_t *db)
 {

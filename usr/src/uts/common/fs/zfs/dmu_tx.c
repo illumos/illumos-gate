@@ -696,12 +696,9 @@ dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name)
 		}
 	}
 
-	/*
-	 * 3 blocks overwritten: target leaf, ptrtbl block, header block
-	 * 3 new blocks written if adding: new split leaf, 2 grown ptrtbl blocks
-	 */
-	dmu_tx_count_write(txh, dn->dn_maxblkid * dn->dn_datablksz,
-	    (3 + (add ? 3 : 0)) * dn->dn_datablksz);
+	err = zap_count_write(&dn->dn_objset->os, dn->dn_object, name, add,
+	    &txh->txh_space_towrite, &txh->txh_space_tooverwrite,
+	    txh->txh_dnode->dn_datablkshift);
 
 	/*
 	 * If the modified blocks are scattered to the four winds,
@@ -709,7 +706,10 @@ dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name)
 	 */
 	epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
 	for (nblocks = dn->dn_maxblkid >> epbs; nblocks != 0; nblocks >>= epbs)
-		txh->txh_space_towrite += 3 << dn->dn_indblkshift;
+		if (dn->dn_objset->os_dsl_dataset->ds_phys->ds_prev_snap_obj)
+			txh->txh_space_towrite += 3 << dn->dn_indblkshift;
+		else
+			txh->txh_space_tooverwrite += 3 << dn->dn_indblkshift;
 }
 
 void

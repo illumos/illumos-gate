@@ -229,7 +229,7 @@ dsl_dataset_prev_snap_txg(dsl_dataset_t *ds)
 	return (MAX(ds->ds_phys->ds_prev_snap_txg, trysnap));
 }
 
-int
+boolean_t
 dsl_dataset_block_freeable(dsl_dataset_t *ds, uint64_t blk_birth)
 {
 	return (blk_birth > dsl_dataset_prev_snap_txg(ds));
