@@ -627,8 +627,10 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 	char *fnamep;
 	int rv = 0;
 
-	if (S_ISLNK(tlm_acls->acl_attr.st_mode))
+	if (S_ISLNK(tlm_acls->acl_attr.st_mode) ||
+	    S_ISFIFO(tlm_acls->acl_attr.st_mode)) {
 		return (TLM_NO_SOURCE_FILE);
+	}
 
 	fullname = ndmp_malloc(TLM_MAX_PATH_NAME);
 	if (fullname == NULL) {
@@ -863,12 +865,15 @@ tlm_output_file(char *dir, char *name, char *chkdir,
 	pos = tlm_get_data_offset(local_commands);
 	NDMP_LOG(LOG_DEBUG, "pos: %10lld  [%s]", pos, name);
 
-	if (S_ISLNK(tlm_acls->acl_attr.st_mode)) {
-		file_size = tlm_readlink(fullname, snapname, linkname,
-		    TLM_MAX_PATH_NAME-1);
-		if (file_size < 0) {
-			real_size = -ENOENT;
-			goto err_out;
+	if (S_ISLNK(tlm_acls->acl_attr.st_mode) ||
+	    S_ISFIFO(tlm_acls->acl_attr.st_mode)) {
+		if (S_ISLNK(tlm_acls->acl_attr.st_mode)) {
+			file_size = tlm_readlink(fullname, snapname, linkname,
+			    TLM_MAX_PATH_NAME-1);
+			if (file_size < 0) {
+				real_size = -ENOENT;
+				goto err_out;
+			}
 		}
 
 		/*

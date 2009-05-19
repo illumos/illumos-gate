@@ -2548,10 +2548,12 @@ is_tape_unit_ready(char *adptnm, int dev_id)
 	int fd = 0;
 
 	try = TUR_MAX_TRY;
-	if (dev_id <= 0)
-		fd = open(adptnm, O_RDONLY | O_NDELAY);
-	else
+	if (dev_id <= 0) {
+		if ((fd = open(adptnm, O_RDONLY | O_NDELAY)) < 0)
+			return (FALSE);
+	} else {
 		fd = dev_id;
+	}
 	do {
 		if (scsi_test_unit_ready(fd) >= 0) {
 			NDMP_LOG(LOG_DEBUG, "Unit is ready");
