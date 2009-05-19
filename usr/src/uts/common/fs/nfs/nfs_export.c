@@ -64,7 +64,7 @@
 #include <nfs/lm.h>
 #include <sys/sunddi.h>
 
-#define	EXPTABLESIZE 16
+treenode_t *ns_root;
 
 struct exportinfo *exptable[EXPTABLESIZE];
 

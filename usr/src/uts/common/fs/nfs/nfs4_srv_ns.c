@@ -18,11 +18,9 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 
@@ -647,18 +645,8 @@ treeclimb_export(struct exportinfo *exip)
 		 */
 		va.va_mask = AT_NODEID;
 		error = VOP_GETATTR(vp, &va, 0, CRED(), NULL);
-		if (error) {
-			if (new_exi && new_exi != exip) {
-				/*
-				 * This exportinfo is not connected with
-				 * treenode yet. Free it here.
-				 */
-				(void) export_unlink(&new_exi->exi_fsid,
-				    &new_exi->exi_fid, new_exi->exi_vp, NULL);
-				exi_rele(new_exi);
-			}
+		if (error)
 			break;
-		}
 
 		/*
 		 *  Add this directory fid to visible list
@@ -714,22 +702,28 @@ treeclimb_export(struct exportinfo *exip)
 	 * 2. pseudo_exportfs() which can fail only in vop_fid_pseudo()
 	 * 3. VOP_GETATTR()
 	 * 4. VOP_LOOKUP()
-	 * To cleanup, free pseudo exportinfos, visibles and treenodes.
+	 * We must free pseudo exportinfos, visibles and treenodes.
+	 * Visibles are referenced from treenode_t::tree_vis and
+	 * exportinfo_t::exi_visible. To avoid double freeing, only
+	 * exi_visible pointer is used, via exi_rele(), for the clean-up.
 	 */
 	if (error) {
+		/* Free unconnected visibles, if there are any. */
+		if (vis_head)
+			free_visible(vis_head);
+
+		/* Connect unconnected exportinfo, if there is any. */
+		if (new_exi && new_exi != exip)
+			tree_head = tree_prepend_node(tree_head, 0, new_exi);
+
 		while (tree_head) {
 			treenode_t *t2 = tree_head;
 			exportinfo_t *e  = tree_head->tree_exi;
-			exp_visible_t *v = tree_head->tree_vis;
 			/* exip will be freed in exportfs() */
 			if (e && e != exip) {
 				(void) export_unlink(&e->exi_fsid, &e->exi_fid,
 				    e->exi_vp, NULL);
 				exi_rele(e);
-			}
-			if (v) {
-				VN_RELE(v->vis_vp);
-				kmem_free(v, sizeof (*v));
 			}
 			tree_head = tree_head->tree_child_first;
 			kmem_free(t2, sizeof (*t2));

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -350,7 +350,7 @@ struct exp_visible;
  * treenode_t::tree_exi ---------  exportinfo_t::exi_tree
  * treenode_t::tree_vis ......... exp_visible_t::vis_tree
  */
-/* Access to treenodei_t is under under protection of exported_lock RW_LOCK */
+/* Access to treenode_t is under protection of exported_lock RW_LOCK */
 typedef struct treenode {
 	/* support for generic n-ary trees */
 	struct treenode *tree_parent;
@@ -373,7 +373,7 @@ typedef struct treenode {
 	((t)->tree_exi && !PSEUDO((t)->tree_exi))
 
 /* Root of nfs pseudo namespace */
-treenode_t *ns_root;
+extern treenode_t *ns_root;
 
 #define	EXPTABLESIZE	16
 
@@ -437,6 +437,13 @@ typedef struct secinfo secinfo_t;
  * The vis_count field records the number of paths in this filesystem
  * that use this directory. The vis_exported field is non-zero if the
  * entry is an exported directory (leaf node).
+ *
+ * exp_visible itself is not reference counted. Each exp_visible is
+ * referenced twice:
+ * 1) from treenode::tree_vis
+ * 2) linked from exportinfo::exi_visible
+ * The 'owner' of exp_visible is the exportinfo structure. exp_visible should
+ * be always freed only from exportinfo_t, never from treenode::tree_vis.
  */
 
 struct exp_visible {
