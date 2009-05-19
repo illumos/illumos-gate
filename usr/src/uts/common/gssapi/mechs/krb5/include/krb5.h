@@ -172,6 +172,8 @@
 #endif
 #endif
 
+KRB5INT_BEGIN_DECLS
+
 #if TARGET_OS_MAC 
 #    pragma options align=mac68k 
 #endif
@@ -2835,6 +2837,11 @@ KRB5INT_END_DECLS
 
 #endif /* KRB5_GENERAL__ */
 
+/*
+ * Solaris Kerberos: the following differs from the MIT krb5.hin as that file is
+ * processed to produce their krb5.h.  We do not process a krb5.hin so our
+ * krb5.h is manually edited.
+ */
 
 /*
  * krb5_err.h:
@@ -3245,9 +3252,5 @@ KRB5INT_END_DECLS
 
 /* for compatibility with older versions... */
 #define asn1_err_base ERROR_TABLE_BASE_asn1
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif		/* _KRB5_H */
