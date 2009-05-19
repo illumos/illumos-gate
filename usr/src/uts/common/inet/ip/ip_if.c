@@ -3728,7 +3728,8 @@ ill_forward_set_on_ill(ill_t *ill, boolean_t enable)
 	if (ill->ill_isv6)
 		ill_set_nce_router_flags(ill, enable);
 	/* Notify routing socket listeners of this change. */
-	ip_rts_ifmsg(ill->ill_ipif, RTSQ_DEFAULT);
+	if (ill->ill_ipif != NULL)
+		ip_rts_ifmsg(ill->ill_ipif, RTSQ_DEFAULT);
 }
 
 /*
@@ -17501,6 +17502,7 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	phyint_t *phyi;
 	ip_stack_t *ipst;
 	struct lifreq *lifr = if_req;
+	uint64_t new_flags;
 
 	ASSERT(ipif != NULL);
 	ip1dbg(("ip_sioctl_slifname %s\n", lifr->lifr_name));
@@ -17520,18 +17522,6 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	if (ill->ill_name[0] != '\0')
 		return (EALREADY);
-
-	/*
-	 * Set all the flags. Allows all kinds of override. Provide some
-	 * sanity checking by not allowing IFF_BROADCAST and IFF_MULTICAST
-	 * unless there is either multicast/broadcast support in the driver
-	 * or it is a pt-pt link.
-	 */
-	if (lifr->lifr_flags & (IFF_PROMISC|IFF_ALLMULTI)) {
-		/* Meaningless to IP thus don't allow them to be set. */
-		ip1dbg(("ip_setname: EINVAL 1\n"));
-		return (EINVAL);
-	}
 
 	/*
 	 * If there's another ill already with the requested name, ensure
@@ -17557,59 +17547,60 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	}
 
 	/*
-	 * For a DL_STYLE2 driver (ill_needs_attach), we would not have the
-	 * ill_bcast_addr_length info.
+	 * We start off as IFF_IPV4 in ipif_allocate and become
+	 * IFF_IPV4 or IFF_IPV6 here depending  on lifr_flags value.
+	 * The only flags that we read from user space are IFF_IPV4,
+	 * IFF_IPV6, IFF_XRESOLV and IFF_BROADCAST.
+	 *
+	 * This ill has not been inserted into the global list.
+	 * So we are still single threaded and don't need any lock
+	 *
+	 * Saniy check the flags.
 	 */
-	if (!ill->ill_needs_attach &&
-	    ((lifr->lifr_flags & IFF_MULTICAST) &&
-	    !(lifr->lifr_flags & IFF_POINTOPOINT) &&
-	    ill->ill_bcast_addr_length == 0)) {
-		/* Link not broadcast/pt-pt capable i.e. no multicast */
-		ip1dbg(("ip_setname: EINVAL 2\n"));
-		return (EINVAL);
-	}
+
 	if ((lifr->lifr_flags & IFF_BROADCAST) &&
 	    ((lifr->lifr_flags & IFF_IPV6) ||
 	    (!ill->ill_needs_attach && ill->ill_bcast_addr_length == 0))) {
-		/* Link not broadcast capable or IPv6 i.e. no broadcast */
-		ip1dbg(("ip_setname: EINVAL 3\n"));
+		ip1dbg(("ip_sioctl_slifname: link not broadcast capable "
+		    "or IPv6 i.e., no broadcast \n"));
 		return (EINVAL);
 	}
-	if (lifr->lifr_flags & IFF_UP) {
-		/* Can only be set with SIOCSLIFFLAGS */
-		ip1dbg(("ip_setname: EINVAL 4\n"));
-		return (EINVAL);
-	}
-	if ((lifr->lifr_flags & (IFF_IPV6|IFF_IPV4)) != IFF_IPV6 &&
-	    (lifr->lifr_flags & (IFF_IPV6|IFF_IPV4)) != IFF_IPV4) {
-		ip1dbg(("ip_setname: EINVAL 5\n"));
+
+	new_flags =
+	    lifr->lifr_flags & (IFF_IPV6|IFF_IPV4|IFF_XRESOLV|IFF_BROADCAST);
+
+	if ((new_flags ^ (IFF_IPV6|IFF_IPV4)) == 0) {
+		ip1dbg(("ip_sioctl_slifname: flags must be exactly one of "
+		    "IFF_IPV4 or IFF_IPV6\n"));
 		return (EINVAL);
 	}
 	/*
 	 * Only allow the IFF_XRESOLV flag to be set on IPv6 interfaces.
 	 */
-	if ((lifr->lifr_flags & IFF_XRESOLV) &&
-	    !(lifr->lifr_flags & IFF_IPV6) &&
+	if ((new_flags & IFF_XRESOLV) && !(new_flags & IFF_IPV6) &&
 	    !(ipif->ipif_isv6)) {
-		ip1dbg(("ip_setname: EINVAL 6\n"));
+		ip1dbg(("ip_sioctl_slifname: XRESOLV only allowed on "
+		    "IPv6 interface\n"));
 		return (EINVAL);
 	}
 
 	/*
-	 * The user has done SIOCGLIFFLAGS prior to this ioctl and hence
-	 * we have all the flags here. So, we assign rather than we OR.
-	 * We can't OR the flags here because we don't want to set
-	 * both IFF_IPV4 and IFF_IPV6. We start off as IFF_IPV4 in
-	 * ipif_allocate and become IFF_IPV4 or IFF_IPV6 here depending
-	 * on lifr_flags value here.
+	 * We always start off as IPv4, so only need to check for IPv6.
 	 */
-	/*
-	 * This ill has not been inserted into the global list.
-	 * So we are still single threaded and don't need any lock
-	 */
-	ipif->ipif_flags = lifr->lifr_flags & IFF_LOGINT_FLAGS & ~IFF_DUPLICATE;
-	ill->ill_flags = lifr->lifr_flags & IFF_PHYINTINST_FLAGS;
-	ill->ill_phyint->phyint_flags = lifr->lifr_flags & IFF_PHYINT_FLAGS;
+	if ((new_flags & IFF_IPV6) != 0) {
+		ill->ill_flags |= ILLF_IPV6;
+		ill->ill_flags &= ~ILLF_IPV4;
+	}
+
+	if ((new_flags & IFF_BROADCAST) != 0)
+		ipif->ipif_flags |= IPIF_BROADCAST;
+	else
+		ipif->ipif_flags &= ~IPIF_BROADCAST;
+
+	if ((new_flags & IFF_XRESOLV) != 0)
+		ill->ill_flags |= ILLF_XRESOLV;
+	else
+		ill->ill_flags &= ~ILLF_XRESOLV;
 
 	/* We started off as V4. */
 	if (ill->ill_flags & ILLF_IPV6) {

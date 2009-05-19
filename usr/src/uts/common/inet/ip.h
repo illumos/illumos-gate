@@ -2893,9 +2893,6 @@ typedef struct ip_pktinfo {
 #define	ILL_CAN_WAIT(ill, q)	\
 	(((q) != NULL) && !((ill)->ill_state_flags & (ILL_CONDEMNED)))
 
-#define	ILL_CAN_LOOKUP_WALKER(ill)	\
-	(!((ill)->ill_state_flags & ILL_CONDEMNED))
-
 #define	IPIF_CAN_LOOKUP(ipif)	\
 	(!((ipif)->ipif_state_flags & (IPIF_CONDEMNED | IPIF_CHANGING)) || \
 	IAM_WRITER_IPIF(ipif))

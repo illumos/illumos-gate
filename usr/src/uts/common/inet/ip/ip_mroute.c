@@ -3232,6 +3232,7 @@ ip_mroute_vif(mblk_t *mp, ip_stack_t *ipst)
 		if (!snmp_append_data(mp, (char *)&vi, sizeof (vi))) {
 			ip0dbg(("ip_mroute_vif: failed %ld bytes\n",
 			    (size_t)sizeof (vi)));
+			mutex_exit(&ipst->ips_numvifs_mutex);
 			return (0);
 		}
 	}

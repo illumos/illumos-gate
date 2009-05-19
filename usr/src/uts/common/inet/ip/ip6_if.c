@@ -2448,6 +2448,8 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 		if (IS_UNDER_IPMP(ill))
 			continue;
 
+		if (ill->ill_ipif == NULL)
+			continue;
 		/*
 		 * For source address selection, we treat the ipif list as
 		 * circular and continue until we get back to where we

@@ -1355,8 +1355,10 @@ ndp_query(ill_t *ill, struct lif_nd_req *lnr)
 	if (nce == NULL)
 		return (ESRCH);
 	/* If in INCOMPLETE state, no link layer address is available yet */
-	if (nce->nce_state == ND_INCOMPLETE)
-		goto done;
+	if (!NCE_ISREACHABLE(nce)) {
+		NCE_REFRELE(nce);
+		return (ESRCH);
+	}
 	dl = (dl_unitdata_req_t *)nce->nce_res_mp->b_rptr;
 	if (ill->ill_flags & ILLF_XRESOLV)
 		lnr->lnr_hdw_len = dl->dl_dest_addr_length;
@@ -1370,7 +1372,6 @@ ndp_query(ill_t *ill, struct lif_nd_req *lnr)
 		lnr->lnr_flags = NDF_ISROUTER_ON;
 	if (nce->nce_flags & NCE_F_ANYCAST)
 		lnr->lnr_flags |= NDF_ANYCAST_ON;
-done:
 	NCE_REFRELE(nce);
 	return (0);
 }
