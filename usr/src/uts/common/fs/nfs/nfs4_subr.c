@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,8 +27,6 @@
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All Rights Reserved
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -1213,7 +1211,7 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 	CLIENT *client;
 	struct chtab *ch;
 	cred_t *cr = icr;
-	struct rpc_err rpcerr;
+	struct rpc_err rpcerr, rpcerr_tmp;
 	enum clnt_stat status;
 	int error;
 	struct timeval wait;
@@ -1440,20 +1438,35 @@ nfs4_rfscall(mntinfo4_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 				break;
 
 			timeo = backoff(timeo);
+			CLNT_GETERR(client, &rpcerr_tmp);
+
 			mutex_enter(&mi->mi_lock);
 			if (!(mi->mi_flags & MI4_PRINTED)) {
 				mi->mi_flags |= MI4_PRINTED;
 				mutex_exit(&mi->mi_lock);
-				nfs4_queue_fact(RF_SRV_NOT_RESPOND, mi, 0, 0, 0,
-				    FALSE, NULL, 0, NULL);
+				if ((status == RPC_CANTSEND) &&
+				    (rpcerr_tmp.re_errno == ENOBUFS))
+					nfs4_queue_fact(RF_SENDQ_FULL, mi, 0,
+					    0, 0, FALSE, NULL, 0, NULL);
+				else
+					nfs4_queue_fact(RF_SRV_NOT_RESPOND, mi,
+					    0, 0, 0, FALSE, NULL, 0, NULL);
 			} else
 				mutex_exit(&mi->mi_lock);
 
 			if (*doqueue && nfs_has_ctty()) {
 				*doqueue = 0;
-				if (!(mi->mi_flags & MI4_NOPRINT))
-					nfs4_queue_fact(RF_SRV_NOT_RESPOND, mi,
-					    0, 0, 0, FALSE, NULL, 0, NULL);
+				if (!(mi->mi_flags & MI4_NOPRINT)) {
+					if ((status == RPC_CANTSEND) &&
+					    (rpcerr_tmp.re_errno == ENOBUFS))
+						nfs4_queue_fact(RF_SENDQ_FULL,
+						    mi, 0, 0, 0, FALSE, NULL,
+						    0, NULL);
+					else
+						nfs4_queue_fact(
+						    RF_SRV_NOT_RESPOND, mi, 0,
+						    0, 0, FALSE, NULL, 0, NULL);
+				}
 			}
 		}
 	} while (tryagain);

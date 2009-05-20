@@ -745,7 +745,8 @@ typedef enum {
 	RF_SRV_OK,
 	RF_SRVS_NOT_RESPOND,
 	RF_SRVS_OK,
-	RF_DELMAP_CB_ERR
+	RF_DELMAP_CB_ERR,
+	RF_SENDQ_FULL
 } nfs4_fact_type_t;
 
 typedef enum {

@@ -290,6 +290,13 @@ extern ts_label_t *getflabel_cipso(vfs_t *);
  */
 #define	IS_RECOVERABLE_ERROR(error)	!((error == EINTR) || (error == EIO))
 
+#ifdef DEBUG
+#define	SRV_QFULL_MSG	"send queue to NFS%d server %s is full; still trying\n"
+#define	SRV_NOTRESP_MSG	"NFS%d server %s not responding still trying\n"
+#else
+#define	SRV_QFULL_MSG	"send queue to NFS server %s is full still trying\n"
+#define	SRV_NOTRESP_MSG	"NFS server %s not responding still trying\n"
+#endif
 /*
  * Common handle get program for NFS, NFS ACL, and NFS AUTH client.
  */
@@ -928,7 +935,7 @@ rfscall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 	struct chtab *ch;
 	cred_t *cr = icr;
 	enum clnt_stat status;
-	struct rpc_err rpcerr;
+	struct rpc_err rpcerr, rpcerr_tmp;
 	struct timeval wait;
 	int timeo;		/* in units of hz */
 	int my_rsize, my_wsize;
@@ -938,6 +945,7 @@ rfscall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 	servinfo_t *svp;
 	struct nfs_clnt *nfscl;
 	zoneid_t zoneid = getzoneid();
+	char *msg;
 #ifdef DEBUG
 	char *bufp;
 #endif
@@ -1219,18 +1227,23 @@ failoverretry:
 
 			tryagain = TRUE;
 			timeo = backoff(timeo);
+
+			CLNT_GETERR(client, &rpcerr_tmp);
+			if ((status == RPC_CANTSEND) &&
+			    (rpcerr_tmp.re_errno == ENOBUFS))
+				msg = SRV_QFULL_MSG;
+			else
+				msg = SRV_NOTRESP_MSG;
+
 			mutex_enter(&mi->mi_lock);
 			if (!(mi->mi_flags & MI_PRINTED)) {
 				mi->mi_flags |= MI_PRINTED;
 				mutex_exit(&mi->mi_lock);
 #ifdef DEBUG
-				zprintf(zoneid,
-			"NFS%d server %s not responding still trying\n",
-				    mi->mi_vers, svp->sv_hostname);
-#else
-				zprintf(zoneid,
-			"NFS server %s not responding still trying\n",
+				zprintf(zoneid, msg, mi->mi_vers,
 				    svp->sv_hostname);
+#else
+				zprintf(zoneid, msg, svp->sv_hostname);
 #endif
 			} else
 				mutex_exit(&mi->mi_lock);
@@ -1238,13 +1251,10 @@ failoverretry:
 				*douprintf = 0;
 				if (!(mi->mi_flags & MI_NOPRINT))
 #ifdef DEBUG
-					uprintf(
-			    "NFS%d server %s not responding still trying\n",
-					    mi->mi_vers, svp->sv_hostname);
-#else
-					uprintf(
-			    "NFS server %s not responding still trying\n",
+					uprintf(msg, mi->mi_vers,
 					    svp->sv_hostname);
+#else
+					uprintf(msg, svp->sv_hostname);
 #endif
 			}
 

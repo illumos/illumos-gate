@@ -353,6 +353,8 @@ set_fact(nfs4_fact_type_t id, nfs4_rfact_t *fp, nfsstat4 stat4,
 		else
 			fp->rf_char1 = NULL;
 		break;
+	case RF_SENDQ_FULL:
+		break;
 	default:
 		zcmn_err(getzoneid(), CE_NOTE, "illegal fact %d", id);
 		break;
@@ -404,6 +406,7 @@ successful_comm(nfs4_debug_msg_t *msgp)
 			return (1);
 		case RF_SRV_NOT_RESPOND:
 		case RF_SRVS_NOT_RESPOND:
+		case RF_SENDQ_FULL:
 			return (0);
 		default:
 			return (0);
@@ -546,6 +549,8 @@ mntinfo4_t *mi)
 		case RF_SRVS_NOT_RESPOND:
 			break;
 		case RF_DELMAP_CB_ERR:
+			break;
+		case RF_SENDQ_FULL:
 			break;
 		default:
 			zcmn_err(getzoneid(), CE_NOTE,
@@ -1126,6 +1131,12 @@ queue_print_fact(nfs4_debug_msg_t *msg, int dump)
 		    nfs4_stat_to_str(fp->rf_stat4), fp->rf_char1,
 		    (void *)fp->rf_rp1);
 		break;
+	case RF_SENDQ_FULL:
+		zcmn_err(zoneid, CE_NOTE, "![NFS4][Server: %s][Mntpt: %s]"
+		    "send queue to NFS server %s is full; still trying\n",
+		    msg->msg_srv, msg->msg_mntpt, msg->msg_srv);
+		break;
+
 	default:
 		zcmn_err(zoneid, CE_WARN, "!queue_print_fact: illegal fact %d",
 		    fp->rf_type);
@@ -1193,6 +1204,7 @@ id_to_dump_solo_fact(nfs4_fact_type_t id)
 	case RF_SRV_OK:
 	case RF_SRVS_NOT_RESPOND:
 	case RF_SRVS_OK:
+	case RF_SENDQ_FULL:
 		return (1);
 	default:
 		return (0);

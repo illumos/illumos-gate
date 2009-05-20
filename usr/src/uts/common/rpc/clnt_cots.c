@@ -763,7 +763,7 @@ clnt_cots_kcallit(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	struct netbuf *retryaddr;
 	struct cm_xprt *cm_entry = NULL;
 	queue_t *wq;
-	int len;
+	int len, waitsecs, max_waitsecs;
 	int mpsize;
 	int refreshes = REFRESHES;
 	int interrupted;
@@ -778,7 +778,6 @@ clnt_cots_kcallit(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 
 	RPCLOG(2, "clnt_cots_kcallit: wait.tv_sec: %ld\n", wait.tv_sec);
 	RPCLOG(2, "clnt_cots_kcallit: wait.tv_usec: %ld\n", wait.tv_usec);
-
 	/*
 	 * Bug ID 1240234:
 	 * Look out for zero length timeouts. We don't want to
@@ -1081,21 +1080,51 @@ call_again:
 	    tidu_size);
 
 	wq = cm_entry->x_wq;
+	waitsecs = 0;
+
+dispatch_again:
 	status = clnt_dispatch_send(wq, mp, call, p->cku_xid,
 	    (p->cku_flags & CKU_ONQUEUE));
 
-	if (status == RPC_CANTSEND) {
+	if ((status == RPC_CANTSEND) && (call->call_reason == ENOBUFS)) {
+		/*
+		 * QFULL condition, allow some time for queue to drain
+		 * and try again. Give up after waiting for all timeout
+		 * specified for the call, or zone is going away.
+		 */
+		max_waitsecs = wait.tv_sec ? wait.tv_sec : clnt_cots_min_tout;
+		if ((waitsecs++ < max_waitsecs) &&
+		    !(zone_status_get(curproc->p_zone) >=
+		    ZONE_IS_SHUTTING_DOWN)) {
+
+			/* wait 1 sec for queue to drain */
+			if (clnt_delay(drv_usectohz(1000000),
+			    h->cl_nosignal) == EINTR) {
+				p->cku_err.re_errno = EINTR;
+				p->cku_err.re_status = RPC_INTR;
+
+				goto cots_done;
+			}
+
+			/* and try again */
+			goto dispatch_again;
+		}
 		p->cku_err.re_status = status;
-		p->cku_err.re_errno = EIO;
+		p->cku_err.re_errno = call->call_reason;
 		DTRACE_PROBE(krpc__e__clntcots__kcallit__cantsend);
 
-		/*
-		 * Allow for processing of the QFULL queue.
-		 */
-		delay_first = TRUE;
-		ticks = clnt_cots_min_tout * drv_usectohz(1000000);
-
 		goto cots_done;
+	}
+
+	if (waitsecs) {
+		/* adjust timeout to account for time wait to send */
+		wait.tv_sec -= waitsecs;
+		if (wait.tv_sec < 0) {
+			/* pick up reply on next retry */
+			wait.tv_sec = 0;
+		}
+		DTRACE_PROBE2(clnt_cots__sendwait, CLIENT *, h,
+		    int, waitsecs);
 	}
 
 	RPCLOG(64, "clnt_cots_kcallit: sent call for xid 0x%x\n",
@@ -2888,7 +2917,7 @@ clnt_dispatch_send(queue_t *q, mblk_t *mp, calllist_t *e, uint_t xid,
 
 	if (!canput(q)) {
 		e->call_status = RPC_CANTSEND;
-		e->call_reason = EIO;
+		e->call_reason = ENOBUFS;
 		return (RPC_CANTSEND);
 	}
 
