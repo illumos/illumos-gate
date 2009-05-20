@@ -4741,8 +4741,7 @@ vhci_update_pathinfo(struct scsi_device *psd,  mdi_pathinfo_t *pip,
 		    vlun->svl_fops_ctpriv);
 		if (((vhci->vhci_conf_flags & VHCI_CONF_FLAGS_AUTO_FAILBACK) ==
 		    VHCI_CONF_FLAGS_AUTO_FAILBACK) &&
-		    ((strcmp(pclass, best_pclass) == 0) ||
-		    mdi_pi_get_preferred(pip) == 1) &&
+		    (strcmp(pclass, best_pclass) == 0) &&
 		    ((MDI_PI_OLD_STATE(pip) == MDI_PATHINFO_STATE_OFFLINE)||
 		    (MDI_PI_OLD_STATE(pip) == MDI_PATHINFO_STATE_INIT))) {
 			VHCI_DEBUG(1, (CE_NOTE, NULL, "%s pathclass path: %p"
