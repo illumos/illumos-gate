@@ -1868,7 +1868,7 @@ consconfig_setmodes(dev_t dev, struct termios *termiosp)
 
 	/*
 	 * The IEEE 1275 standard specifies that /aliases string property
-	 * values should be null-terminated.  Unfortunatly the reality
+	 * values should be null-terminated.  Unfortunately the reality
 	 * is that most aren't and the OBP can't easily be modified to
 	 * add null termination to these strings.  So we'll add the
 	 * null termination here.  If the string already contains a
@@ -1880,6 +1880,9 @@ consconfig_setmodes(dev_t dev, struct termios *termiosp)
 	/* Clear out options we will be setting */
 	termiosp->c_cflag &=
 	    ~(CSIZE | CBAUD | CBAUDEXT | PARODD | PARENB | CSTOPB);
+
+	/* Clear options which potentially conflict with new settings */
+	termiosp->c_cflag &= ~(CIBAUD | CIBAUDEXT);
 
 	/*
 	 * Now, parse the string. Wish I could use sscanf().
