@@ -12227,6 +12227,14 @@ fcp_cp_pinfo(struct fcp_port *pptr, fc_ulp_port_info_t *pinfo)
 	pptr->port_fcp_dma = pinfo->port_fcp_dma;
 	bcopy(&pinfo->port_nwwn, &pptr->port_nwwn, sizeof (la_wwn_t));
 	bcopy(&pinfo->port_pwwn, &pptr->port_pwwn, sizeof (la_wwn_t));
+
+	/* Clear FMA caps to avoid fm-capability ereport */
+	if (pptr->port_cmd_dma_attr.dma_attr_flags & DDI_DMA_FLAGERR)
+		pptr->port_cmd_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+	if (pptr->port_data_dma_attr.dma_attr_flags & DDI_DMA_FLAGERR)
+		pptr->port_data_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
+	if (pptr->port_resp_dma_attr.dma_attr_flags & DDI_DMA_FLAGERR)
+		pptr->port_resp_dma_attr.dma_attr_flags &= ~DDI_DMA_FLAGERR;
 }
 
 /*
