@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <syslog.h>
 #include <pwd.h>
@@ -56,7 +54,6 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	char	*kva_value;
 	char	*username;
 	char	*auser;
-	char	*ruser;
 	char	*rhost;
 	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 	struct passwd *pw_entry, pwd;
@@ -67,11 +64,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int allow_remote = 0;
 
 	(void) pam_get_item(pamh, PAM_USER, (void **)&username);
-
 	(void) pam_get_item(pamh, PAM_AUSER, (void **)&auser);
-
-	(void) pam_get_item(pamh, PAM_RUSER, (void **)&ruser);
-
 	(void) pam_get_item(pamh, PAM_RHOST, (void **)&rhost);
 
 	for (i = 0; i < argc; i++) {
@@ -87,18 +80,17 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	if (debug) {
+		char	*ruser;
 		char	*service;
 
+		(void) pam_get_item(pamh, PAM_RUSER, (void **)&ruser);
 		(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
 		__pam_log(LOG_AUTH | LOG_DEBUG, "pam_roles:pam_sm_acct_mgmt: "
-			"service = %s, allow_remote = %d, user = %s auser = %s "
-			"ruser = %s rhost = %s\n",
-			(service) ? service : "not set",
-			allow_remote,
-			(username) ? username : "not set",
-			(auser) ? auser: "not set",
-			(ruser) ? ruser: "not set",
-			(rhost) ? rhost: "not set");
+		    "service = %s, allow_remote = %d, user = %s auser = %s "
+		    "ruser = %s rhost = %s\n", (service) ? service : "not set",
+		    allow_remote, (username) ? username : "not set",
+		    (auser) ? auser: "not set", (ruser) ? ruser: "not set",
+		    (rhost) ? rhost: "not set");
 	}
 
 	if (username == NULL)
@@ -142,18 +134,6 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		/* authenticated requesting user */
 
 		user_entry = getusernam(auser);
-	} else if ((ruser != NULL && *ruser != '\0') &&
-	    (rhost == NULL || *rhost == '\0')) {
-		/*
-		 * PAM_RUSER is set but PAM_RHOST is not; this is
-		 * used by SMC and is a temporary solution until SMC
-		 * is converted to use the proper PAM_AUSER to specify
-		 * the "come-from" username.
-		 */
-		if (strcmp(username, ruser) == 0) {
-			return (PAM_IGNORE);
-		}
-		user_entry = getusernam(ruser);
 	} else {
 		/* user is implied by real UID */
 
@@ -192,7 +172,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		free_userattr(user_entry);
 		(void) strlcpy(messages[0], dgettext(TEXT_DOMAIN,
 		    "Roles can only be assumed by authorized users"),
-			sizeof (messages[0]));
+		    sizeof (messages[0]));
 		(void) __pam_display_msg(pamh, PAM_ERROR_MSG, 1, messages,
 		    NULL);
 		return (PAM_PERM_DENIED);
