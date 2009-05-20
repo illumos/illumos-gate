@@ -599,7 +599,7 @@ client_process_net_input(fd_set * readset)
 			/* Received EOF.  The remote host has closed the connection. */
 			snprintf(buf, sizeof buf,
 				 gettext("Connection to %.300s closed "
-					 "by remote host.\r\n"),
+					 "by remote host.\n"),
 				 host);
 			buffer_append(&stderr_buffer, buf, strlen(buf));
 			quit_pending = 1;
@@ -616,7 +616,7 @@ client_process_net_input(fd_set * readset)
 			/* An error has encountered.  Perhaps there is a network problem. */
 			snprintf(buf, sizeof buf,
 				 gettext("Read from remote host "
-					 "%.300s: %.100s\r\n"),
+					 "%.300s: %.100s\n"),
 				 host, strerror(errno));
 			buffer_append(&stderr_buffer, buf, strlen(buf));
 			quit_pending = 1;
@@ -778,7 +778,7 @@ process_escapes(Buffer *bin, Buffer *bout, Buffer *berr, char *buf, int len)
 				/* Suspend the program. */
 				/* Print a message to that effect to the user. */
 				snprintf(string, sizeof string,
-					 gettext("%c^Z [suspend ssh]\r\n"),
+					 gettext("%c^Z [suspend ssh]\n"),
 					 escape_char);
 				buffer_append(berr, string, strlen(string));
 
@@ -791,7 +791,7 @@ process_escapes(Buffer *bin, Buffer *bout, Buffer *berr, char *buf, int len)
 			case 'B':
 				if (compat20) {
 					snprintf(string, sizeof string,
-						gettext("%cB [sent break]\r\n"),
+						gettext("%cB [sent break]\n"),
 						escape_char);
 					buffer_append(berr, string,
 						strlen(string));
@@ -854,18 +854,18 @@ process_escapes(Buffer *bin, Buffer *bout, Buffer *berr, char *buf, int len)
 
 			case '?':
 				snprintf(string, sizeof string, gettext(
-"%c?\r\n\
-Supported escape sequences:\r\n\
-%c.  - terminate connection\r\n\
-%cB  - send break\r\n\
-%cC  - open a command line\r\n\
-%cR  - Request rekey (SSH protocol 2 only)\r\n\
-%c^Z - suspend ssh\r\n\
-%c#  - list forwarded connections\r\n\
-%c&  - background ssh (when waiting for connections to terminate)\r\n\
-%c?  - this message\r\n\
-%c%c  - send the escape character by typing it twice\r\n\
-(Note that escapes are only recognized immediately after newline.)\r\n"),
+"%c?\n\
+Supported escape sequences:\n\
+%c.  - terminate connection\n\
+%cB  - send break\n\
+%cC  - open a command line\n\
+%cR  - Request rekey (SSH protocol 2 only)\n\
+%c^Z - suspend ssh\n\
+%c#  - list forwarded connections\n\
+%c&  - background ssh (when waiting for connections to terminate)\n\
+%c?  - this message\n\
+%c%c  - send the escape character by typing it twice\n\
+(Note that escapes are only recognized immediately after newline.)\n"),
 				    escape_char, escape_char, escape_char, escape_char,
 				    escape_char, escape_char, escape_char, escape_char,
 				    escape_char, escape_char);
@@ -1253,7 +1253,7 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 	 */
 	if (have_pty && options.log_level != SYSLOG_LEVEL_QUIET) {
 		snprintf(buf, sizeof buf,
-			 gettext("Connection to %.64s closed.\r\n"),
+			 gettext("Connection to %.64s closed.\n"),
 			 host);
 		buffer_append(&stderr_buffer, buf, strlen(buf));
 	}

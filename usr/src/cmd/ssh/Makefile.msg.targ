@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,28 +18,13 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-### SSH needs xgettext GNU extensions, primarily the --keyword= / -k
-### option.  Until the Solaris xgettext is so extended SUNWssh's ssh.po
-### file is built manually and is checked in to SCCS.
-###
-### To build ssh.po manually using the GNU xgettext command you can:
-###
-### sccs edit ssh.po
-### make _msg_manual XGETTEXT=/opt/sfw/bin/xgettext
-### <edit _messages.po, remove header, add copyright, ident keywords>
-### mv _messages.po ssh.po
-### sccs delget ssh.po
-###
-### NOTE: Tools from /opt/sfw/ may not be used in the build process; do
-###       NOT change the _msg target to do this.
-###
 POFILE = _messages.po
-XGETFLAGS = -o $(POFILE_DIR)/$(POFILE) --foreign-user --strict -j -n -E --width=72 \
+XGETFLAGS = -o $(POFILE_DIR)/$(POFILE) --foreign-user --strict -j -n -E \
+	    --width=72 \
+	    --omit-header \
 	    --keyword=fatal \
 	    --keyword=error \
 	    --keyword=verbose \

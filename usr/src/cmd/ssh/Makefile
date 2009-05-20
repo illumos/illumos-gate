@@ -72,17 +72,11 @@ all install: THIRDPARTYLICENSE
 check: $(CHECKHDRS)
 
 # See Makefile.msg.targ for $(MSGFILE) update instructions
-_msg_manual:
+_msg:
 	$(RM) $(POFILE)
 	$(TOUCH) $(POFILE)
-	$(MAKE) $(POFILE)
-	$(SED) "/^domain/d" $(POFILE) > $(MSGFILE)
-
-_msg:
-	$(RM) $(MSGDOMAIN)/$(MSGFILE)
-	@# Uncomment when /bin/xgettext gets GNU extensions
-	@# See Makefile.msg.targ for $(MSGFILE) update instructions
-	@#$(MAKE) _msg_manual
+	$(MAKE) $(POFILE) XGETTEXT=/usr/bin/gxgettext
+	$(CP) $(POFILE) $(MSGFILE)
 	$(CP) $(MSGFILE) $(MSGDOMAIN)
 
 $(SUBDIRS):     FRC
