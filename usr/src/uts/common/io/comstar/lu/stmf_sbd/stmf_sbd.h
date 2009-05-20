@@ -205,9 +205,11 @@ typedef struct sbd_lu {
 	uint32_t	sl_data_fname_alloc_size; /* for an explicit alloc */
 	uint32_t	sl_alias_alloc_size;
 	uint8_t		sl_serial_no_alloc_size;
+	uint64_t	sl_meta_offset;
 
 	/* zfs metadata */
-	vnode_t		*sl_zfs_meta_vp;
+	krwlock_t	sl_zfs_meta_lock;
+	char		*sl_zfs_meta;
 
 	/* Backing store */
 	char		*sl_data_filename;

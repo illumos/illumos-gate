@@ -38,6 +38,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/sdt.h>
 #include <sys/dkio.h>
+#include <sys/zfs_ioctl.h>
 
 #include <stmf.h>
 #include <lpif.h>
@@ -46,6 +47,7 @@
 #include <sbd_impl.h>
 #include <stmf_sbd_ioctl.h>
 
+#define	SBD_IS_ZVOL(zvol)	(strncmp("/dev/zvol", zvol, 9))
 
 extern sbd_status_t sbd_pgr_meta_write(sbd_lu_t *sl);
 extern sbd_status_t sbd_pgr_meta_load(sbd_lu_t *sl);
@@ -70,14 +72,15 @@ int sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 char *sbd_get_zvol_name(sbd_lu_t *sl);
 sbd_status_t sbd_create_zfs_meta_object(sbd_lu_t *sl);
 sbd_status_t sbd_open_zfs_meta(sbd_lu_t *sl);
-void sbd_close_zfs_meta(sbd_lu_t *sl);
 sbd_status_t sbd_read_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz,
     uint64_t off);
 sbd_status_t sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz,
     uint64_t off);
-int sbd_is_zvol(char *path, vnode_t *vp);
-int sbd_is_sbd_zvol(char *path, vnode_t *vp);
+int sbd_is_zvol(char *path);
+int sbd_zvolget(char *zvol_name, char **comstarprop);
+int sbd_zvolset(char *zvol_name, char *comstarprop);
 
+static ldi_ident_t	sbd_zfs_ident;
 static stmf_lu_provider_t *sbd_lp;
 static sbd_lu_t		*sbd_lu_list = NULL;
 static kmutex_t		sbd_lock;
@@ -151,6 +154,7 @@ _init(void)
 	sbd_lp->lp_instance = 0;
 	sbd_lp->lp_name = sbd_name;
 	sbd_lp->lp_cb = sbd_lp_cb;
+	sbd_zfs_ident = ldi_ident_from_anon();
 
 	if (stmf_register_lu_provider(sbd_lp) != STMF_SUCCESS) {
 		(void) mod_remove(&modlinkage);
@@ -204,6 +208,7 @@ _fini(void)
 	}
 	stmf_free(sbd_lp);
 	mutex_destroy(&sbd_lock);
+	ldi_ident_release(sbd_zfs_ident);
 	return (0);
 }
 
@@ -765,11 +770,11 @@ sbd_swap_lu_info_1_1(sbd_lu_info_1_1_t *sli)
 sbd_status_t
 sbd_load_section_hdr(sbd_lu_t *sl, sm_section_hdr_t *sms)
 {
-	sm_section_hdr_t h;
-	uint64_t st;
-	sbd_status_t ret;
+	sm_section_hdr_t	h;
+	uint64_t		st;
+	sbd_status_t 		ret;
 
-	for (st = SBD_META_OFFSET + sizeof (sbd_meta_start_t);
+	for (st = sl->sl_meta_offset + sizeof (sbd_meta_start_t);
 	    st < sl->sl_meta_size_used; st += h.sms_size) {
 		if ((ret = sbd_read_meta(sl, st, sizeof (sm_section_hdr_t),
 		    (uint8_t *)&h)) != SBD_SUCCESS) {
@@ -800,10 +805,11 @@ sbd_load_meta_start(sbd_lu_t *sl)
 
 	/* Fake meta params initially */
 	sl->sl_total_meta_size = (uint64_t)-1;
-	sl->sl_meta_size_used = SBD_META_OFFSET + sizeof (sbd_meta_start_t);
+	sl->sl_meta_size_used = sl->sl_meta_offset + sizeof (sbd_meta_start_t);
 
 	sm = kmem_zalloc(sizeof (*sm), KM_SLEEP);
-	ret = sbd_read_meta(sl, SBD_META_OFFSET, sizeof (*sm), (uint8_t *)sm);
+	ret = sbd_read_meta(sl, sl->sl_meta_offset, sizeof (*sm),
+	    (uint8_t *)sm);
 	if (ret != SBD_SUCCESS) {
 		goto load_meta_start_failed;
 	}
@@ -849,7 +855,8 @@ sbd_write_meta_start(sbd_lu_t *sl, uint64_t meta_size, uint64_t meta_size_used)
 	sm->sm_ver_subminor = SBD_VER_SUBMINOR;
 	sm->sm_chksum = sbd_calc_sum((uint8_t *)sm, sizeof (*sm) - 1);
 
-	ret = sbd_write_meta(sl, SBD_META_OFFSET, sizeof (*sm), (uint8_t *)sm);
+	ret = sbd_write_meta(sl, sl->sl_meta_offset, sizeof (*sm),
+	    (uint8_t *)sm);
 	kmem_free(sm, sizeof (*sm));
 
 	return (ret);
@@ -954,7 +961,7 @@ write_meta_section_again:
 	 */
 	unused_start = 0;
 	s = 0;
-	for (off = SBD_META_OFFSET + sizeof (sbd_meta_start_t);
+	for (off = sl->sl_meta_offset + sizeof (sbd_meta_start_t);
 	    off < sl->sl_meta_size_used; off += t.sms_size) {
 		ret = sbd_read_meta(sl, off, sizeof (t), (uint8_t *)&t);
 		if (ret != SBD_SUCCESS)
@@ -1032,28 +1039,6 @@ write_meta_section_again:
 		}
 	}
 	return (ret);
-}
-
-sbd_status_t
-sbd_delete_meta_section(sbd_lu_t *sl, sm_section_hdr_t *sms, uint16_t sms_id)
-{
-	/* Delete sms, if sms is NULL, search by sms_id */
-
-	sm_section_hdr_t hdr;
-	sbd_status_t ret;
-
-	if (sms == NULL) {
-		sms = &hdr;
-		sms->sms_data_order = SMS_DATA_ORDER;
-		sms->sms_id = sms_id;
-		ret = sbd_load_section_hdr(sl, sms);
-		if (ret != SBD_SUCCESS) {
-			return (ret);
-		}
-	}
-	sms->sms_id = SMS_ID_UNUSED;
-	return (sbd_write_meta(sl, sms->sms_offset,
-	    sizeof (sm_section_hdr_t), (uint8_t *)sms));
 }
 
 sbd_status_t
@@ -1314,7 +1299,10 @@ sbd_close_delete_lu(sbd_lu_t *sl, int ret)
 	if (((sl->sl_flags & SL_SHARED_META) == 0) &&
 	    (sl->sl_flags & SL_META_OPENED)) {
 		if (sl->sl_flags & SL_ZFS_META) {
-			sbd_close_zfs_meta(sl);
+			rw_destroy(&sl->sl_zfs_meta_lock);
+			if (sl->sl_zfs_meta) {
+				kmem_free(sl->sl_zfs_meta, ZAP_MAXVALUELEN / 2);
+			}
 		} else {
 			flag = FREAD | FWRITE | FOFFMAX | FEXCL;
 			(void) VOP_CLOSE(sl->sl_meta_vp, flag, 1, 0,
@@ -1416,6 +1404,7 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	sl->sl_data_filename = p;
 	(void) strcpy(sl->sl_data_filename, namebuf + slu->slu_data_fname_off);
 	p += strlen(sl->sl_data_filename) + 1;
+	sl->sl_meta_offset = SBD_META_OFFSET;
 	if (slu->slu_meta_fname_valid) {
 		sl->sl_alias = sl->sl_name = sl->sl_meta_filename = p;
 		(void) strcpy(sl->sl_meta_filename, namebuf +
@@ -1423,8 +1412,9 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 		p += strlen(sl->sl_meta_filename) + 1;
 	} else {
 		sl->sl_alias = sl->sl_name = sl->sl_data_filename;
-		if (sbd_is_zvol(sl->sl_data_filename, NULL)) {
+		if (sbd_is_zvol(sl->sl_data_filename)) {
 			sl->sl_flags |= SL_ZFS_META;
+			sl->sl_meta_offset = 0;
 		} else {
 			sl->sl_flags |= SL_SHARED_META;
 			sl->sl_data_offset = SHARED_META_DATA_SIZE;
@@ -1535,7 +1525,7 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	if (sl->sl_flags & SL_ZFS_META) {
 		if (sbd_create_zfs_meta_object(sl) != SBD_SUCCESS) {
 			*err_ret = SBD_RET_ZFS_META_CREATE_FAILED;
-			ret = EIO;
+			ret = ENOMEM;
 			goto scm_err_out;
 		}
 		sl->sl_meta_blocksize_shift = 0;
@@ -1565,7 +1555,7 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 		goto scm_err_out;
 	}
 over_meta_create:
-	sl->sl_total_meta_size = SBD_META_OFFSET + sizeof (sbd_meta_start_t);
+	sl->sl_total_meta_size = sl->sl_meta_offset + sizeof (sbd_meta_start_t);
 	sl->sl_total_meta_size +=
 	    (((uint64_t)1) << sl->sl_meta_blocksize_shift) - 1;
 	sl->sl_total_meta_size &=
@@ -1600,7 +1590,7 @@ over_meta_open:
 		ret = EIO;
 		goto scm_err_out;
 	}
-	sl->sl_meta_size_used = SBD_META_OFFSET + sizeof (sbd_meta_start_t);
+	sl->sl_meta_size_used = sl->sl_meta_offset + sizeof (sbd_meta_start_t);
 
 	if (sbd_write_lu_info(sl) != SBD_SUCCESS) {
 		*err_ret = SBD_RET_META_CREATION_FAILED;
@@ -1711,7 +1701,7 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 		*err_ret = SBD_RET_META_FILE_LOOKUP_FAILED;
 		goto sim_err_out;
 	}
-	if (sbd_is_sbd_zvol(sl->sl_meta_filename, sl->sl_meta_vp)) {
+	if (sbd_is_zvol(sl->sl_meta_filename)) {
 		sl->sl_flags |= SL_ZFS_META;
 		sl->sl_data_filename = sl->sl_meta_filename;
 	}
@@ -1724,11 +1714,11 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	}
 	if (sl->sl_flags & SL_ZFS_META) {
 		if (sbd_open_zfs_meta(sl) != SBD_SUCCESS) {
-			ret = EIO;
-			*err_ret = SBD_RET_META_FILE_OPEN_FAILED;
-			goto sim_err_out;
+			/* let see if metadata is in the 64k block */
+			sl->sl_flags &= ~SL_ZFS_META;
 		}
-	} else {
+	}
+	if (!(sl->sl_flags & SL_ZFS_META)) {
 		/* metadata is always writable */
 		flag = FREAD | FWRITE | FOFFMAX | FEXCL;
 		if ((ret = vn_open(sl->sl_meta_filename, UIO_SYSSPACE, flag, 0,
@@ -1742,6 +1732,7 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	} else {
 		sl->sl_meta_blocksize_shift = 9;
 	}
+	sl->sl_meta_offset = (sl->sl_flags & SL_ZFS_META) ? 0 : SBD_META_OFFSET;
 	sl->sl_flags |= SL_META_OPENED;
 
 	sret = sbd_load_meta_start(sl);
@@ -1810,9 +1801,9 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 		    SLI_META_FNAME_VALID)) == 0) {
 			*err_ret = SBD_RET_NO_META;
 			ret = EIO;
+			kmem_free(zvol_name, strlen(zvol_name) + 1);
 			goto sim_err_out;
 		}
-		zvol_name = sbd_get_zvol_name(sl);
 		if (strcmp(zvol_name, (char *)sli_buf_copy +
 		    sli->sli_meta_fname_offset) != 0)
 			same_zvol = 0;
@@ -2456,23 +2447,6 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 	return (0);
 }
 
-int
-sbd_path_to_zfs_meta(char *src, char *dst)
-{
-	if (strncmp(src, "/dev/zvol", 9) != 0)
-		return (0);
-
-	src += 14;
-	if (*src == '/')
-		src++;
-	(void) strcpy(dst, "/var/tmp/");
-	(void) strcat(dst, src);
-	*(strrchr(dst, '/')) = '_';
-	(void) strcat(dst, ".mat");
-
-	return (1);
-}
-
 char *
 sbd_get_zvol_name(sbd_lu_t *sl)
 {
@@ -2484,7 +2458,7 @@ sbd_get_zvol_name(sbd_lu_t *sl)
 	else
 		src = sl->sl_meta_filename;
 	/* There has to be a better way */
-	if (strncmp(src, "/dev/zvol", 9) != 0) {
+	if (SBD_IS_ZVOL(src) != 0) {
 		ASSERT(0);
 	}
 	src += 14;
@@ -2495,122 +2469,138 @@ sbd_get_zvol_name(sbd_lu_t *sl)
 	return (p);
 }
 
+/*
+ * this function creates a local metadata zvol property
+ */
 sbd_status_t
 sbd_create_zfs_meta_object(sbd_lu_t *sl)
 {
-	int flag;
-	int ret;
-	char zmt[40];
-
-	ASSERT(sl->sl_zfs_meta_vp == NULL);
-	ASSERT(sl->sl_data_filename);
-	if (!sbd_path_to_zfs_meta(sl->sl_data_filename, zmt)) {
-		stmf_trace(0, "--- sbd_path_to_zfs_meta failed for %s", zmt);
+	/*
+	 * -allocate 1/2 the property size, the zfs property
+	 *  is 8k in size and stored as ascii hex string, all
+	 *  we needed is 4k buffer to store the binary data.
+	 * -initialize reader/write lock
+	 */
+	if ((sl->sl_zfs_meta = kmem_zalloc(ZAP_MAXVALUELEN / 2, KM_SLEEP))
+	    == NULL)
 		return (SBD_FAILURE);
-	}
-
-	flag = FREAD | FWRITE | FOFFMAX | FEXCL | FCREAT | FTRUNC;
-	if ((ret = vn_open(zmt, UIO_SYSSPACE, flag, 0600, &sl->sl_zfs_meta_vp,
-	    CRCREAT, 0)) != 0) {
-		stmf_trace(0, "--- vn_open failed for create, ret = %d", ret);
-		return (SBD_FAILURE);
-	}
+	rw_init(&sl->sl_zfs_meta_lock, NULL, RW_DRIVER, NULL);
 	return (SBD_SUCCESS);
 }
 
+static char
+ctoi(char c)
+{
+	if ((c >= '0') && (c <= '9'))
+		c -= '0';
+	else if ((c >= 'A') && (c <= 'F'))
+		c = c - 'A' + 10;
+	else if ((c >= 'a') && (c <= 'f'))
+		c = c - 'a' + 10;
+	else
+		c = -1;
+	return (c);
+}
+
+/*
+ * read zvol property and convert to binary
+ */
 sbd_status_t
 sbd_open_zfs_meta(sbd_lu_t *sl)
 {
-	int flag;
-	char zmt[40];
+	char		*meta = NULL, cl, ch;
+	int		i;
+	char		*tmp, *ptr;
+	uint64_t	rc = SBD_SUCCESS;
+	int		len;
+	char		*file;
 
-	ASSERT(sl->sl_zfs_meta_vp == NULL);
-	ASSERT(sl->sl_data_filename);
-	if (!sbd_path_to_zfs_meta(sl->sl_data_filename, zmt)) {
+	if (sbd_create_zfs_meta_object(sl) == SBD_FAILURE)
 		return (SBD_FAILURE);
+
+	rw_enter(&sl->sl_zfs_meta_lock, RW_WRITER);
+	file = sbd_get_zvol_name(sl);
+	if (sbd_zvolget(file, &meta)) {
+		rc = SBD_FAILURE;
+		goto done;
 	}
-
-	flag = FREAD | FWRITE | FOFFMAX | FEXCL;
-	if (vn_open(zmt, UIO_SYSSPACE, flag, 0,
-	    &sl->sl_zfs_meta_vp, 0, 0) != 0) {
-		return (SBD_FAILURE);
+	tmp = meta;
+	/* convert ascii hex to binary meta */
+	len = strlen(meta);
+	ptr = sl->sl_zfs_meta;
+	for (i = 0; i < len; i += 2) {
+		ch = ctoi(*tmp++);
+		cl = ctoi(*tmp++);
+		if (ch == -1 || cl == -1) {
+			rc = SBD_FAILURE;
+			break;
+		}
+		*ptr++ = (ch << 4) + cl;
 	}
-	return (SBD_SUCCESS);
-}
-
-void
-sbd_close_zfs_meta(sbd_lu_t *sl)
-{
-	int flag;
-
-	flag = FREAD | FWRITE | FOFFMAX | FEXCL;
-	(void) VOP_CLOSE(sl->sl_zfs_meta_vp, flag, 1, 0, CRED(), NULL);
-	VN_RELE(sl->sl_zfs_meta_vp);
-	sl->sl_zfs_meta_vp = NULL;
+done:
+	rw_exit(&sl->sl_zfs_meta_lock);
+	if (meta)
+		kmem_free(meta, len + 1);
+	kmem_free(file, strlen(file) + 1);
+	return (rc);
 }
 
 sbd_status_t
 sbd_read_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz, uint64_t off)
 {
-	int ret;
-	long resid;
-
-	ASSERT(sl->sl_zfs_meta_vp);
-	ret = vn_rdwr(UIO_READ, sl->sl_zfs_meta_vp, (caddr_t)buf, (ssize_t)sz,
-	    (offset_t)off, UIO_SYSSPACE, FSYNC, RLIM64_INFINITY, CRED(),
-	    &resid);
-	if (ret || resid) {
-		return (SBD_FAILURE);
-	}
+	ASSERT(sl->sl_zfs_meta);
+	rw_enter(&sl->sl_zfs_meta_lock, RW_READER);
+	bcopy(&sl->sl_zfs_meta[off], buf, sz);
+	rw_exit(&sl->sl_zfs_meta_lock);
 	return (SBD_SUCCESS);
 }
 
 sbd_status_t
 sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz, uint64_t off)
 {
-	int ret;
-	long resid;
+	char		*ptr, *ah_meta;
+	char		*dp = NULL;
+	int		i, num;
+	char		*file;
 
-	ASSERT(sl->sl_zfs_meta_vp);
-	ret = vn_rdwr(UIO_WRITE, sl->sl_zfs_meta_vp, (caddr_t)buf, (ssize_t)sz,
-	    (offset_t)off, UIO_SYSSPACE, FSYNC, RLIM64_INFINITY, CRED(),
-	    &resid);
-	if (ret || resid) {
-		return (SBD_FAILURE);
+	ASSERT(sl->sl_zfs_meta);
+	if ((off + sz) > (ZAP_MAXVALUELEN / 2 - 1)) {
+		return (SBD_META_CORRUPTED);
 	}
+	ptr = ah_meta = kmem_zalloc(ZAP_MAXVALUELEN, KM_SLEEP);
+	rw_enter(&sl->sl_zfs_meta_lock, RW_WRITER);
+	bcopy(buf, &sl->sl_zfs_meta[off], sz);
+	/* convert local copy to ascii hex */
+	dp = sl->sl_zfs_meta;
+	for (i = 0; i < sl->sl_total_meta_size; i++, dp++) {
+		num = ((*dp) >> 4) & 0xF;
+		*ah_meta++ = (num < 10) ? (num + '0') : (num + ('a' - 10));
+		num = (*dp) & 0xF;
+		*ah_meta++ = (num < 10) ? (num + '0') : (num + ('a' - 10));
+	}
+	*ah_meta = NULL;
+	file = sbd_get_zvol_name(sl);
+	if (sbd_zvolset(file, (char *)ptr)) {
+		rw_exit(&sl->sl_zfs_meta_lock);
+		kmem_free(ah_meta, ZAP_MAXVALUELEN);
+		kmem_free(file, strlen(file) + 1);
+		return (SBD_META_CORRUPTED);
+	}
+	rw_exit(&sl->sl_zfs_meta_lock);
+	kmem_free(ptr, ZAP_MAXVALUELEN);
+	kmem_free(file, strlen(file) + 1);
 	return (SBD_SUCCESS);
 }
 
-/* zvol metadata code to still be implemented */
 int
-/* LINTED E_FUNC_ARG_UNUSED */
-sbd_is_zvol(char *path, vnode_t *vp)
+sbd_is_zvol(char *path)
 {
-	return (0);
-#if 0
 	int is_zfs = 0;
-	vnode_t *zvp;
-	vattr_t vattr;
 
-	if (vp != NULL) {
-		zvp = vp;
-		goto over_zvp_open;
-	}
-	if (lookupname(path, UIO_SYSSPACE, FOLLOW, NULLVPP, &zvp) != 0) {
-		return (0);
-	}
-over_zvp_open:
-	vattr.va_mask = AT_RDEV;
-	if (VOP_GETATTR(zvp, &vattr, 0, kcred, NULL) == 0) {
-		is_zfs = (getmajor(vattr.va_rdev) ==
-		    ddi_name_to_major(ZFS_DRIVER)) ? 1 : 0;
-	}
-	if (vp == NULL) {
-		VN_RELE(zvp);
-	}
+	if (SBD_IS_ZVOL(path) == 0)
+		is_zfs = 1;
 
 	return (is_zfs);
-#endif
 }
 
 /*
@@ -2676,26 +2666,101 @@ sbd_wcd_get(int *wcd, sbd_lu_t *sl)
 	}
 }
 
-
-/*
- * check for a zvol with sbd metadata object.
- */
 int
-sbd_is_sbd_zvol(char *path, vnode_t *vp)
+sbd_zvolget(char *zvol_name, char **comstarprop)
 {
-	char zmt[40];
-	vnode_t *zvp;
+	ldi_handle_t	zfs_lh;
+	nvlist_t	*nv = NULL, *nv2;
+	zfs_cmd_t	*zc;
+	char		*ptr;
+	int size = 1024;
+	int unused;
+	int rc;
 
-	if (!sbd_is_zvol(path, vp)) {
-		return (0);
-	}
-	if (!sbd_path_to_zfs_meta(path, zmt)) {
-		return (0);
+	if ((rc = ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred,
+	    &zfs_lh, sbd_zfs_ident)) != 0) {
+		cmn_err(CE_WARN, "ldi_open %d", rc);
+		return (ENXIO);
 	}
 
-	if (lookupname(zmt, UIO_SYSSPACE, FOLLOW, NULLVPP, &zvp) != 0) {
-		return (0);
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	(void) strlcpy(zc->zc_name, zvol_name, sizeof (zc->zc_name));
+again:
+	zc->zc_nvlist_dst = (uint64_t)(intptr_t)kmem_alloc(size,
+	    KM_SLEEP);
+	zc->zc_nvlist_dst_size = size;
+	rc = ldi_ioctl(zfs_lh, ZFS_IOC_OBJSET_STATS, (intptr_t)zc,
+	    FKIOCTL, kcred, &unused);
+	/*
+	 * ENOMEM means the list is larger than what we've allocated
+	 * ldi_ioctl will fail with ENOMEM only once
+	 */
+	if (rc == ENOMEM) {
+		int newsize;
+		newsize = zc->zc_nvlist_dst_size;
+		kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
+		size = newsize;
+		goto again;
+	} else if (rc != 0) {
+		goto out;
 	}
-	VN_RELE(zvp);
-	return (1);
+	rc = nvlist_unpack((char *)(uintptr_t)zc->zc_nvlist_dst,
+	    zc->zc_nvlist_dst_size, &nv, 0);
+	ASSERT(rc == 0);	/* nvlist_unpack should not fail */
+	if ((rc = nvlist_lookup_nvlist(nv, "stmf_sbd_lu", &nv2)) == 0) {
+		rc = nvlist_lookup_string(nv2, ZPROP_VALUE, &ptr);
+		if (rc != 0) {
+			cmn_err(CE_WARN, "couldn't get value");
+		} else {
+			*comstarprop = kmem_alloc(strlen(ptr) + 1,
+			    KM_SLEEP);
+			(void) strcpy(*comstarprop, ptr);
+		}
+	}
+out:
+	if (nv != NULL)
+		nvlist_free(nv);
+	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
+	kmem_free(zc, sizeof (zfs_cmd_t));
+	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);
+
+	return (rc);
+}
+
+int
+sbd_zvolset(char *zvol_name, char *comstarprop)
+{
+	ldi_handle_t	zfs_lh;
+	nvlist_t	*nv;
+	char		*packed = NULL;
+	size_t		len;
+	zfs_cmd_t	*zc;
+	int unused;
+	int rc;
+
+	if ((rc = ldi_open_by_name("/dev/zfs", FREAD | FWRITE, kcred,
+	    &zfs_lh, sbd_zfs_ident)) != 0) {
+		cmn_err(CE_WARN, "ldi_open %d", rc);
+		return (ENXIO);
+	}
+	(void) nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP);
+	(void) nvlist_add_string(nv, "stmf_sbd_lu", comstarprop);
+	if ((rc = nvlist_pack(nv, &packed, &len, NV_ENCODE_NATIVE, KM_SLEEP))) {
+		goto out;
+	}
+
+	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	(void) strlcpy(zc->zc_name, zvol_name, sizeof (zc->zc_name));
+	zc->zc_nvlist_src = (uint64_t)(intptr_t)packed;
+	zc->zc_nvlist_src_size = len;
+	rc = ldi_ioctl(zfs_lh, ZFS_IOC_SET_PROP, (intptr_t)zc,
+	    FKIOCTL, kcred, &unused);
+	if (rc != 0) {
+		cmn_err(CE_NOTE, "ioctl failed %d", rc);
+	}
+	kmem_free(zc, sizeof (zfs_cmd_t));
+out:
+	nvlist_free(nv);
+	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);
+	return (rc);
 }
