@@ -168,7 +168,7 @@ static kcondvar_t services_to_run;	/* wake up background service thread */
 static kcondvar_t syncqs_to_run;	/* wake up background service thread */
 
 /*
- * List of queues scheduled for background processing dueue to lack of resources
+ * List of queues scheduled for background processing due to lack of resources
  * in the task queues. Protected by service_queue lock;
  */
 static struct queue *qhead;
@@ -208,7 +208,7 @@ static void	str_stack_fini(netstackid_t stackid, void *arg);
 extern void	time_to_wait(clock_t *, clock_t);
 
 /*
- * run_queues is no longer used, but is kept in case some 3-d party
+ * run_queues is no longer used, but is kept in case some 3rd party
  * module/driver decides to use it.
  */
 int run_queues = 0;
@@ -224,13 +224,13 @@ int run_queues = 0;
 int sq_max_size = 10000;
 
 /*
- * the number of ciputctrl structures per syncq and stream we create when
+ * The number of ciputctrl structures per syncq and stream we create when
  * needed.
  */
 int n_ciputctrl;
 int max_n_ciputctrl = 16;
 /*
- * if n_ciputctrl is < min_n_ciputctrl don't even create ciputctrl_cache.
+ * If n_ciputctrl is < min_n_ciputctrl don't even create ciputctrl_cache.
  */
 int min_n_ciputctrl = 2;
 
@@ -329,7 +329,7 @@ struct kmem_cache *ciputctrl_cache = NULL;
 
 static linkinfo_t *linkinfo_list;
 
-/* global esballoc throttling queue */
+/* Global esballoc throttling queue */
 static esb_queue_t	system_esbq;
 
 /*
@@ -339,7 +339,7 @@ int		esbq_max_qlen = 0x16;	/* throttled queue length */
 clock_t		esbq_timeout = 0x8;	/* timeout to process esb queue */
 
 /*
- * routines to handle esballoc queuing.
+ * Routines to handle esballoc queueing.
  */
 static void esballoc_process_queue(esb_queue_t *);
 static void esballoc_enqueue_mblk(mblk_t *);
@@ -476,7 +476,7 @@ struct  qinit passthru_winit = {
 		ASSERT((qp->q_sqprev == NULL) && (qp->q_sqnext == NULL)); \
 		/* Head and tail may only be NULL simultaneously */	\
 		EQUIV(sq->sq_head, sq->sq_tail);			\
-		/* Queue may be only enqueyed on its syncq */		\
+		/* Queue may be only enqueued on its syncq */		\
 		ASSERT(sq == qp->q_syncq);				\
 		/* Check the correctness of SQ_MESSAGES flag */		\
 		EQUIV(sq->sq_head, (sq->sq_flags & SQ_MESSAGES));	\
@@ -644,7 +644,7 @@ struct  qinit passthru_winit = {
 }
 
 /*
- * constructor/destructor routines for the stream head cache
+ * Constructor/destructor routines for the stream head cache
  */
 /* ARGSUSED */
 static int
@@ -682,7 +682,7 @@ stream_head_destructor(void *buf, void *cdrarg)
 }
 
 /*
- * constructor/destructor routines for the queue cache
+ * Constructor/destructor routines for the queue cache
  */
 /* ARGSUSED */
 static int
@@ -773,7 +773,7 @@ queue_destructor(void *buf, void *cdrarg)
 }
 
 /*
- * constructor/destructor routines for the syncq cache
+ * Constructor/destructor routines for the syncq cache
  */
 /* ARGSUSED */
 static int
@@ -1333,7 +1333,7 @@ disable_svc(queue_t *qp)
 	mutex_exit(QLOCK(wqp));
 }
 
-/* allow service procedures to be called again */
+/* Allow service procedures to be called again */
 void
 enable_svc(queue_t *qp)
 {
@@ -1379,7 +1379,7 @@ remove_runlist(queue_t *qp)
 
 
 /*
- * wait for any pending service processing to complete.
+ * Wait for any pending service processing to complete.
  * The removal of queues from the runlist is not atomic with the
  * clearing of the QENABLED flag and setting the INSERVICE flag.
  * consequently it is possible for remove_runlist in strclose
@@ -1402,14 +1402,14 @@ wait_svc(queue_t *qp)
 		remove_runlist(wqp);
 	}
 	/*
-	 * Wait till the syncqs associated with the queue
-	 * will dissapear from background processing list.
+	 * Wait till the syncqs associated with the queue disappear from the
+	 * background processing list.
 	 * This only needs to be done for non-PERMOD perimeters since
 	 * for PERMOD perimeters the syncq may be shared and will only be freed
 	 * when the last module/driver is unloaded.
 	 * If for PERMOD perimeters queue was on the syncq list, removeq()
 	 * should call propagate_syncq() or drain_syncq() for it. Both of these
-	 * function remove the queue from its syncq list, so sqthread will not
+	 * functions remove the queue from its syncq list, so sqthread will not
 	 * try to access the queue.
 	 */
 	if (!(qp->q_flag & QPERMOD)) {
@@ -1682,7 +1682,7 @@ getendq(queue_t *q)
 }
 
 /*
- * wait for the syncq count to drop to zero.
+ * Wait for the syncq count to drop to zero.
  * sq could be either outer or inner.
  */
 
@@ -1828,7 +1828,7 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 	 * routines assert that STPLEX is not set. After link_addpassthru()
 	 * nothing may come from below since the pass queue syncq is blocked.
 	 * Note also that STPLEX should be cleared before the call to
-	 * link_remmpassthru() since when messages start flowing to the stream
+	 * link_rempassthru() since when messages start flowing to the stream
 	 * head (e.g. because of message propagation from the pass queue) stream
 	 * head I/O routines may be called with STPLEX flag set.
 	 *
@@ -2191,14 +2191,14 @@ munlink(stdata_t *stp, linkinfo_t *linkp, int flag, cred_t *crp, int *rvalp,
 	}
 
 	/*
-	 * flush_syncq changes states only when there is some messages to
-	 * free. ie when it returns non-zero value to return.
+	 * flush_syncq changes states only when there are some messages to
+	 * free, i.e. when it returns non-zero value to return.
 	 */
 	ASSERT(flush_syncq(rq->q_syncq, rq) == 0);
 	ASSERT(flush_syncq(wrq->q_syncq, wrq) == 0);
 
 	/*
-	 * No body else should know about this queue now.
+	 * Nobody else should know about this queue now.
 	 * If the mux did not process the messages before
 	 * acking the I_UNLINK, free them now.
 	 */
@@ -3562,7 +3562,7 @@ putnextctl_wait(queue_t *q, int type)
 }
 
 /*
- * run any possible bufcalls.
+ * Run any possible bufcalls.
  */
 void
 runbufcalls(void)
@@ -3629,7 +3629,7 @@ runbufcalls(void)
 
 
 /*
- * actually run queue's service routine.
+ * Actually run queue's service routine.
  */
 static void
 runservice(queue_t *q)
@@ -3838,9 +3838,9 @@ done:
  * This routine assumes that SQLOCK is held.
  * NOTE that the lock order is to have the SQLOCK first,
  * so if the service_syncq lock is held, we need to release it
- * before aquiring the SQLOCK (mostly relevant for the background
+ * before acquiring the SQLOCK (mostly relevant for the background
  * thread, and this seems to be common among the STREAMS global locks).
- * Note the the sq_svcflags are protected by the SQLOCK.
+ * Note that the sq_svcflags are protected by the SQLOCK.
  */
 void
 sqenable(syncq_t *sq)
@@ -3916,7 +3916,7 @@ sqenable(syncq_t *sq)
  * Note: fifo_close() depends on the mblk_t on the queue being freed
  * asynchronously. The asynchronous freeing of messages breaks the
  * recursive call chain of fifo_close() while there are I_SENDFD type of
- * messages refering other file pointers on the queue. Then when
+ * messages referring to other file pointers on the queue. Then when
  * closing pipes it can avoid stack overflow in case of daisy-chained
  * pipes, and also avoid deadlock in case of fifonode_t pairs (which
  * share the same fifolock_t).
@@ -4190,15 +4190,15 @@ backenable(queue_t *q, uchar_t pri)
 	queue_t	*nq;
 
 	/*
-	 * our presence might not prevent other modules in our own
+	 * Our presence might not prevent other modules in our own
 	 * stream from popping/pushing since the caller of getq might not
 	 * have a claim on the queue (some drivers do a getq on somebody
 	 * else's queue - they know that the queue itself is not going away
-	 * but the framework has to guarantee q_next in that stream.)
+	 * but the framework has to guarantee q_next in that stream).
 	 */
 	claimstr(q);
 
-	/* find nearest back queue with service proc */
+	/* Find nearest back queue with service proc */
 	for (nq = backq(q); nq && !nq->q_qinfo->qi_srvp; nq = backq(nq)) {
 		ASSERT(STRMATED(q->q_stream) || STREAM(q) == STREAM(nq));
 	}
@@ -4208,7 +4208,7 @@ backenable(queue_t *q, uchar_t pri)
 		/*
 		 * backenable can be called either with no locks held
 		 * or with the stream frozen (the latter occurs when a module
-		 * calls rmvq with the stream frozen.) If the stream is frozen
+		 * calls rmvq with the stream frozen). If the stream is frozen
 		 * by the caller the caller will hold all qlocks in the stream.
 		 * Note that a frozen stream doesn't freeze a mated stream,
 		 * so we explicitly check for that.
@@ -4238,7 +4238,7 @@ backenable(queue_t *q, uchar_t pri)
  * Will return 0 if non error is set (or if the exported error routines
  * do not return an error).
  *
- * If there is both a read and write error to check we prefer the read error.
+ * If there is both a read and write error to check, we prefer the read error.
  * Also, give preference to recorded errno's over the error functions.
  * The flags that are handled are:
  *	STPLEX		return EINVAL
@@ -4246,7 +4246,7 @@ backenable(queue_t *q, uchar_t pri)
  *	STWRERR		return sd_werror (and clear if STWRERRNONPERSIST)
  *	STRHUP		return sd_werror
  *
- * If the caller indicates that the operation is a peek a nonpersistent error
+ * If the caller indicates that the operation is a peek, a nonpersistent error
  * is not cleared.
  */
 int
@@ -4308,7 +4308,7 @@ strgeterr(stdata_t *stp, int32_t flags_to_check, int ispeek)
 
 
 /*
- * single-thread open/close/push/pop
+ * Single-thread open/close/push/pop
  * for twisted streams also
  */
 int
@@ -4500,17 +4500,17 @@ strendplumb(stdata_t *stp)
 /*
  * Get all the locks necessary to change q_next.
  *
- * Wait for sd_refcnt to reach 0 and, if sqlist is present, wait for  the
+ * Wait for sd_refcnt to reach 0 and, if sqlist is present, wait for the
  * sq_count of each syncq in the list to drop to sq_rmqcount, indicating that
- * the only threads inside the sqncq are threads currently calling removeq().
+ * the only threads inside the syncq are threads currently calling removeq().
  * Since threads calling removeq() are in the process of removing their queues
  * from the stream, we do not need to worry about them accessing a stale q_next
  * pointer and thus we do not need to wait for them to exit (in fact, waiting
  * for them can cause deadlock).
  *
  * This routine is subject to starvation since it does not set any flag to
- * prevent threads from entering a module in the stream(i.e. sq_count can
- * increase on some syncq while it is waiting on some other syncq.)
+ * prevent threads from entering a module in the stream (i.e. sq_count can
+ * increase on some syncq while it is waiting on some other syncq).
  *
  * Assumes that only one thread attempts to call strlock for a given
  * stream. If this is not the case the two threads would deadlock.
@@ -4548,7 +4548,7 @@ retry:
 		STRLOCKMATES(stp);
 		/*
 		 * Note that the selection of locking order is not
-		 * important, just that they are always aquired in
+		 * important, just that they are always acquired in
 		 * the same order.  To assure this, we choose this
 		 * order based on the value of the pointer, and since
 		 * the pointer will not change for the life of this
@@ -4978,7 +4978,7 @@ removeq(queue_t *qp)
  * If maxcnt is not -1 it assumes that caller has "maxcnt" claim(s) on the
  * sync queue and waits until sq_count reaches maxcnt.
  *
- * if maxcnt is -1 there's no need to grab sq_putlocks since the caller
+ * If maxcnt is -1 there's no need to grab sq_putlocks since the caller
  * does not care about putnext threads that are in the middle of calling put
  * entry points.
  *
@@ -5043,7 +5043,7 @@ blocksq(syncq_t *sq, ushort_t flag, int maxcnt)
  * and drain_syncq is not called. Instead we rely on the qwriter_outer thread
  * to handle the queued qwriter operations.
  *
- * no need to grab sq_putlocks here. See comment in strsubr.h that explains when
+ * No need to grab sq_putlocks here. See comment in strsubr.h that explains when
  * sq_putlocks are used.
  */
 static void
@@ -5078,7 +5078,7 @@ unblocksq(syncq_t *sq, uint16_t resetflag, int isouter)
  * Does not drain the syncq. Use emptysq() for that.
  * Returns 1 if SQ_QUEUED is set. Otherwise 0.
  *
- * no need to grab sq_putlocks here. See comment in strsubr.h that explains when
+ * No need to grab sq_putlocks here. See comment in strsubr.h that explains when
  * sq_putlocks are used.
  */
 static int
@@ -5103,7 +5103,7 @@ dropsq(syncq_t *sq, uint16_t resetflag)
 /*
  * Empty all the messages on a syncq.
  *
- * no need to grab sq_putlocks here. See comment in strsubr.h that explains when
+ * No need to grab sq_putlocks here. See comment in strsubr.h that explains when
  * sq_putlocks are used.
  */
 static void
@@ -5277,7 +5277,7 @@ strunblock(queue_t *q)
 	 * Have to drop the SQ_FROZEN flag on all the syncqs before
 	 * starting to drain them; otherwise the draining might
 	 * cause a freezestr in some module on the stream (which
-	 * would deadlock.)
+	 * would deadlock).
 	 */
 	stp = STREAM(q);
 	ASSERT(stp != NULL);
@@ -5344,10 +5344,10 @@ leaveq(queue_t *q)
  * Wait if SQ_QUEUED is set to preserve ordering between messages and qwriter
  * calls and the running of open, close and service procedures.
  *
- * if c_inner bit is set no need to grab sq_putlocks since we don't care
+ * If c_inner bit is set no need to grab sq_putlocks since we don't care
  * if other threads have entered or are entering put entry point.
  *
- * if c_inner bit is set it might have been posible to use
+ * If c_inner bit is set it might have been possible to use
  * sq_putlocks/sq_putcounts instead of SQLOCK/sq_count (e.g. to optimize
  * open/close path for IP) but since the count may need to be decremented in
  * qwait() we wouldn't know which counter to decrement. Currently counter is
@@ -5466,13 +5466,12 @@ entersq(syncq_t *sq, int entrypoint)
 }
 
 /*
- * leave a syncq. announce to framework that closes may proceed.
- * c_inner and c_outer specifies which concurrency bits
- * to check.
+ * Leave a syncq. Announce to framework that closes may proceed.
+ * c_inner and c_outer specify which concurrency bits to check.
  *
- * must never be called from driver or module put entry point.
+ * Must never be called from driver or module put entry point.
  *
- * no need to grab sq_putlocks here. See comment in strsubr.h that explains when
+ * No need to grab sq_putlocks here. See comment in strsubr.h that explains when
  * sq_putlocks are used.
  */
 void
@@ -5486,7 +5485,7 @@ leavesq(syncq_t *sq, int entrypoint)
 #endif
 
 	/*
-	 * decrement ref count, drain the syncq if possible, and wake up
+	 * Decrement ref count, drain the syncq if possible, and wake up
 	 * any waiting close.
 	 */
 	ASSERT(sq);
@@ -5537,7 +5536,7 @@ leavesq(syncq_t *sq, int entrypoint)
 /*
  * Prevent q_next from changing in this stream by incrementing sq_count.
  *
- * no need to grab sq_putlocks here. See comment in strsubr.h that explains when
+ * No need to grab sq_putlocks here. See comment in strsubr.h that explains when
  * sq_putlocks are used.
  */
 void
@@ -5554,7 +5553,7 @@ claimq(queue_t *qp)
 /*
  * Undo claimq.
  *
- * no need to grab sq_putlocks here. See comment in strsubr.h that explains when
+ * No need to grab sq_putlocks here. See comment in strsubr.h that explains when
  * sq_putlocks are used.
  */
 void
@@ -5679,7 +5678,7 @@ free_syncq(syncq_t *sq)
  *	SQ_BLOCKED	Set to prevent traversing of sq_next,sq_prev while
  *			inner syncqs are added to or removed from the
  *			outer perimeter.
- *	SQ_QUEUED	sq_head/tail has messages or eventsqueued.
+ *	SQ_QUEUED	sq_head/tail has messages or events queued.
  *
  *	SQ_WRITER	A thread is currently traversing all the inner syncqs
  *			setting the SQ_WRITER flag.
@@ -5744,14 +5743,14 @@ retry:
 
 	/*
 	 * Get everybody out of the syncqs sequentially.
-	 * Note that we don't actually need to aqiure the PUTLOCKS, since
+	 * Note that we don't actually need to acquire the PUTLOCKS, since
 	 * we have already cleared the fastbit, and set QWRITER.  By
 	 * definition, the count can not increase since putnext will
-	 * take the slowlock path (and the purpose of aquiring the
+	 * take the slowlock path (and the purpose of acquiring the
 	 * putlocks was to make sure it didn't increase while we were
 	 * waiting).
 	 *
-	 * Note that we still aquire the PUTLOCKS to be safe.
+	 * Note that we still acquire the PUTLOCKS to be safe.
 	 */
 	if (wait_needed) {
 		for (sq = outer->sq_onext; sq != outer; sq = sq->sq_onext) {
@@ -5949,9 +5948,9 @@ queue_writer(syncq_t *outer, void (*func)(), queue_t *q, mblk_t *mp)
  * by the qwriter_outer_thread.
  *
  * This routine can only be called from put or service procedures plus
- * asynchronous callback routines that have properly entered to
- * queue (with entersq.) Thus qwriter(OUTER) assumes the caller has one claim
- * on the syncq associated with q.
+ * asynchronous callback routines that have properly entered the queue (with
+ * entersq). Thus qwriter(OUTER) assumes the caller has one claim on the syncq
+ * associated with q.
  */
 void
 qwriter_outer(queue_t *q, mblk_t *mp, void (*func)())
@@ -6093,7 +6092,7 @@ write_now(syncq_t *outer)
 	while ((mp = outer->sq_evhead) != NULL) {
 		/*
 		 * queues cannot be placed on the queuelist on the outer
-		 * perimiter.
+		 * perimeter.
 		 */
 		ASSERT(!(outer->sq_flags & SQ_MESSAGES));
 		ASSERT((outer->sq_flags & SQ_EVENTS));
@@ -6259,7 +6258,7 @@ sqfill_events(syncq_t *sq, queue_t *q, mblk_t *mp, void (*func)())
 	}
 	/*
 	 * We have set SQ_EVENTS, so threads will have to
-	 * unwind out of the perimiter, and new entries will
+	 * unwind out of the perimeter, and new entries will
 	 * not grab a putlock.  But we still need to know
 	 * how many threads have already made a claim to the
 	 * syncq, so grab the putlocks, and sum the counts.
@@ -6321,7 +6320,7 @@ sqfill_events(syncq_t *sq, queue_t *q, mblk_t *mp, void (*func)())
 	 * If anything happened while we were running the
 	 * events (or was there before), we need to process
 	 * them now.  We shouldn't be exclusive sine we
-	 * released the perimiter above (plus, we asserted
+	 * released the perimeter above (plus, we asserted
 	 * for it).
 	 */
 	if (!(sq->sq_flags & SQ_STAYAWAY) && (sq->sq_flags & SQ_QUEUED))
@@ -6333,7 +6332,7 @@ sqfill_events(syncq_t *sq, queue_t *q, mblk_t *mp, void (*func)())
 /*
  * Perform delayed processing. The caller has to make sure that it is safe
  * to enter the syncq (e.g. by checking that none of the SQ_STAYAWAY bits are
- * set.)
+ * set).
  *
  * Assume that the caller has NO claims on the syncq.  However, a claim
  * on the syncq does not indicate that a thread is draining the syncq.
@@ -6407,7 +6406,7 @@ drain_syncq(syncq_t *sq)
 	}
 
 	/*
-	 * If this is not a concurrent put perimiter, we need to
+	 * If this is not a concurrent put perimeter, we need to
 	 * become exclusive to drain.  Also, if not CIPUT, we would
 	 * not have acquired a putlock, so we don't need to check
 	 * the putcounts.  If not entering with a claim, we test
@@ -6475,7 +6474,7 @@ drain_syncq(syncq_t *sq)
 			sq_run_events(sq);
 
 			/*
-			 * If this is a CIPUT perimiter, we need
+			 * If this is a CIPUT perimeter, we need
 			 * to drop the SQ_EXCL flag so we can properly
 			 * continue draining the syncq.
 			 */
@@ -6501,9 +6500,9 @@ drain_syncq(syncq_t *sq)
 		 * q_draining is protected by QLOCK which we do not hold.
 		 * But if it was set, then a thread was draining, and if it gets
 		 * cleared, then it was because the thread has successfully
-		 * drained the syncq, or a GOAWAY state occured. For the GOAWAY
+		 * drained the syncq, or a GOAWAY state occurred. For the GOAWAY
 		 * state to happen, a thread needs the SQLOCK which we hold, and
-		 * if there was such a flag, we whould have already seen it.
+		 * if there was such a flag, we would have already seen it.
 		 */
 
 		for (qp = sq->sq_head;
@@ -6519,7 +6518,7 @@ drain_syncq(syncq_t *sq)
 		 * We have a queue to work on, and we hold the
 		 * SQLOCK and one claim, call qdrain_syncq.
 		 * This means we need to release the SQLOCK and
-		 * aquire the QLOCK (OK since we have a claim).
+		 * acquire the QLOCK (OK since we have a claim).
 		 * Note that qdrain_syncq will actually dequeue
 		 * this queue from the sq_head list when it is
 		 * convinced all the work is done and release
@@ -6559,7 +6558,7 @@ drain_syncq(syncq_t *sq)
 	ASSERT((sq->sq_head == NULL) || (flags & SQ_GOAWAY) ||
 	    (type & SQ_CI) || sq->sq_head->q_draining);
 
-	/* Drop SQ_EXCL for non-CIPUT perimiters */
+	/* Drop SQ_EXCL for non-CIPUT perimeters */
 	if (!(type & SQ_CIPUT))
 		flags &= ~SQ_EXCL;
 	ASSERT((flags & SQ_EXCL) == 0);
@@ -6599,12 +6598,11 @@ drain_syncq(syncq_t *sq)
  * and eventually
  * 	qwait(_sig)
  *
- * If called from drain_syncq, we found it in the list
- * of queue's needing service, so there is work to be done (or it
- * wouldn't be on the list).
+ * If called from drain_syncq, we found it in the list of queues needing
+ * service, so there is work to be done (or it wouldn't be in the list).
  *
  * If called from some putnext variation, it was because the
- * perimiter is open, but messages are blocking a putnext and
+ * perimeter is open, but messages are blocking a putnext and
  * there is not a thread working on it.  Now a thread could start
  * working on it while we are getting ready to do so ourself, but
  * the thread would set the q_draining flag, and we can spin out.
@@ -6626,7 +6624,6 @@ void
 qdrain_syncq(syncq_t *sq, queue_t *q)
 {
 	mblk_t		*bp;
-	boolean_t	do_clr;
 #ifdef DEBUG
 	uint16_t	count;
 #endif
@@ -6637,9 +6634,9 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 	ASSERT(MUTEX_HELD(QLOCK(q)));
 	ASSERT(MUTEX_NOT_HELD(SQLOCK(sq)));
 	/*
-	 * For non-CIPUT perimiters, we should be called with the
-	 * exclusive bit set already.  For non-CIPUT perimiters we
-	 * will be doing a concurrent drain, so it better not be set.
+	 * For non-CIPUT perimeters, we should be called with the exclusive bit
+	 * set already. For CIPUT perimeters, we will be doing a concurrent
+	 * drain, so it better not be set.
 	 */
 	ASSERT((sq->sq_flags & (SQ_EXCL|SQ_CIPUT)));
 	ASSERT(!((sq->sq_type & SQ_CIPUT) && (sq->sq_flags & SQ_EXCL)));
@@ -6665,39 +6662,46 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 #endif /* DEBUG */
 
 	/*
-	 * The first thing to do here, is find out if a thread is already
-	 * draining this queue or the queue is closing. If so, we are done,
-	 * just return. Also, if there are no messages, we are done as well.
-	 * Note that we check the q_sqhead since there is s window of
-	 * opportunity for us to enter here because Q_SQQUEUED was set, but is
-	 * not anymore.
+	 * The first thing to do is find out if a thread is already draining
+	 * this queue. If so, we are done, just return.
 	 */
-	if (q->q_draining || (q->q_sqhead == NULL)) {
+	if (q->q_draining) {
 		mutex_exit(QLOCK(q));
 		return;
 	}
 
 	/*
-	 * If the perimiter is exclusive, there is nothing we can
-	 * do right now, go away.
-	 * Note that there is nothing to prevent this case from changing
-	 * right after this check, but the spin-out will catch it.
+	 * If the perimeter is exclusive, there is nothing we can do right now,
+	 * go away. Note that there is nothing to prevent this case from
+	 * changing right after this check, but the spin-out will catch it.
 	 */
 
 	/* Tell other threads that we are draining this queue */
 	q->q_draining = 1;	/* Protected by QLOCK */
 
-	for (bp = q->q_sqhead; bp != NULL; bp = q->q_sqhead) {
+	/*
+	 * If there is nothing to do, clear QFULL as necessary. This caters for
+	 * the case where an empty queue was enqueued onto the syncq.
+	 */
+	if (q->q_sqhead == NULL) {
+		ASSERT(q->q_syncqmsgs == 0);
+		mutex_exit(QLOCK(q));
+		clr_qfull(q);
+		mutex_enter(QLOCK(q));
+	}
 
+	/*
+	 * Note that q_sqhead must be re-checked here in case another message
+	 * was enqueued whilst QLOCK was dropped during the call to clr_qfull.
+	 */
+	for (bp = q->q_sqhead; bp != NULL; bp = q->q_sqhead) {
 		/*
-		 * Because we can enter this routine just because
-		 * a putnext is blocked, we need to spin out if
-		 * the perimiter wants to go exclusive as well
-		 * as just blocked. We need to spin out also if
-		 * events are queued on the syncq.
-		 * Don't check for SQ_EXCL, because non-CIPUT
-		 * perimiters would set it, and it can't become
-		 * exclusive while we hold a claim.
+		 * Because we can enter this routine just because a putnext is
+		 * blocked, we need to spin out if the perimeter wants to go
+		 * exclusive as well as just blocked. We need to spin out also
+		 * if events are queued on the syncq.
+		 * Don't check for SQ_EXCL, because non-CIPUT perimeters would
+		 * set it, and it can't become exclusive while we hold a claim.
 		 */
 		if (sq->sq_flags & (SQ_STAYAWAY | SQ_EVENTS)) {
 			break;
@@ -6739,40 +6743,32 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 		(void) (*q->q_qinfo->qi_putp)(q, bp);
 
 		mutex_enter(QLOCK(q));
-		/*
-		 * We should decrement q_syncqmsgs only after executing the
-		 * put procedure to avoid a possible race with putnext().
-		 * In putnext() though it sees Q_SQQUEUED is set, there is
-		 * an optimization which allows putnext to call the put
-		 * procedure directly if (q_syncqmsgs == 0) and thus
-		 * a message reodering could otherwise occur.
-		 */
-		q->q_syncqmsgs--;
 
 		/*
-		 * Clear QFULL in the next service procedure queue if
-		 * this is the last message destined to that queue.
+		 * q_syncqmsgs should only be decremented after executing the
+		 * put procedure to avoid message re-ordering. This is due to an
+		 * optimisation in putnext() which can call the put procedure
+		 * directly if it sees q_syncqmsgs == 0 (despite Q_SQQUEUED
+		 * being set).
 		 *
-		 * It would make better sense to have some sort of
-		 * tunable for the low water mark, but these symantics
-		 * are not yet defined.  So, alas, we use a constant.
+		 * We also need to clear QFULL in the next service procedure
+		 * queue if this is the last message destined for that queue.
+		 *
+		 * It would make better sense to have some sort of tunable for
+		 * the low water mark, but these semantics are not yet defined.
+		 * So, alas, we use a constant.
 		 */
-		do_clr = (q->q_syncqmsgs == 0);
-		mutex_exit(QLOCK(q));
-
-		if (do_clr)
+		if (--q->q_syncqmsgs == 0) {
+			mutex_exit(QLOCK(q));
 			clr_qfull(q);
+			mutex_enter(QLOCK(q));
+		}
 
-		mutex_enter(QLOCK(q));
 		/*
 		 * Always clear SQ_EXCL when CIPUT in order to handle
-		 * qwriter(INNER).
-		 */
-		/*
-		 * The putp() can call qwriter and get exclusive access
-		 * IFF this is the only claim.  So, we need to test for
-		 * this possibility so we can aquire the mutex and clear
-		 * the bit.
+		 * qwriter(INNER). The putp() can call qwriter and get exclusive
+		 * access IFF this is the only claim. So, we need to test for
+		 * this possibility, acquire the mutex and clear the bit.
 		 */
 		if ((sq->sq_type & SQ_CIPUT) && (sq->sq_flags & SQ_EXCL)) {
 			mutex_enter(SQLOCK(sq));
@@ -6782,9 +6778,9 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 	}
 
 	/*
-	 * We should either have no queues on the syncq, or we were
-	 * told to goaway by a waiter (which we will wake up at the
-	 * end of this function).
+	 * We should either have no messages on this queue, or we were told to
+	 * goaway by a waiter (which we will wake up at the end of this
+	 * function).
 	 */
 	ASSERT((q->q_sqhead == NULL) ||
 	    (sq->sq_flags & (SQ_STAYAWAY | SQ_EVENTS)));
@@ -6792,11 +6788,9 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 	ASSERT(MUTEX_HELD(QLOCK(q)));
 	ASSERT(MUTEX_NOT_HELD(SQLOCK(sq)));
 
-	/*
-	 * Remove the q from the syncq list if all the messages are
-	 * drained.
-	 */
+	/* Remove the q from the syncq list if all the messages are drained. */
 	if (q->q_sqhead == NULL) {
+		ASSERT(q->q_syncqmsgs == 0);
 		mutex_enter(SQLOCK(sq));
 		if (q->q_sqflags & Q_SQQUEUED)
 			SQRM_Q(sq, q);
@@ -6808,17 +6802,16 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 	}
 
 	/*
-	 * Remember, the q_draining flag is used to let another
-	 * thread know that there is a thread currently draining
-	 * the messages for a queue.  Since we are now done with
-	 * this queue (even if there may be messages still there),
-	 * we need to clear this flag so some thread will work
-	 * on it if needed.
+	 * Remember, the q_draining flag is used to let another thread know
+	 * that there is a thread currently draining the messages for a queue.
+	 * Since we are now done with this queue (even if there may be messages
+	 * still there), we need to clear this flag so some thread will work on
+	 * it if needed.
 	 */
 	ASSERT(q->q_draining);
 	q->q_draining = 0;
 
-	/* called with a claim, so OK to drop all locks. */
+	/* Called with a claim, so OK to drop all locks. */
 	mutex_exit(QLOCK(q));
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_DRAIN_SYNCQ_END,
@@ -6828,12 +6821,11 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 
 
 /*
- * This is the mate to qdrain_syncq, except that it is putting the
- * message onto the the queue instead draining.  Since the
- * message is destined for the queue that is selected, there is
- * no need to identify the function because the message is
- * intended for the put routine for the queue.  But this
- * routine will do it anyway just in case (but only for debug kernels).
+ * This is the mate to qdrain_syncq, except that it is putting the message onto
+ * the queue instead of draining. Since the message is destined for the queue
+ * that is selected, there is no need to identify the function because the
+ * message is intended for the put routine for the queue. For debug kernels,
+ * this routine will do it anyway just in case.
  *
  * After the message is enqueued on the syncq, it calls putnext_tail()
  * which will schedule a background thread to actually process the message.
@@ -6863,7 +6855,7 @@ qfill_syncq(syncq_t *sq, queue_t *q, mblk_t *mp)
 	 * to call on the drain.  In the new syncq, we have the context
 	 * of the queue that we are draining, so call it's putproc and
 	 * don't rely on the saved values.  But for debug this is still
-	 * usefull information.
+	 * useful information.
 	 */
 	mp->b_prev = (mblk_t *)q->q_qinfo->qi_putp;
 	mp->b_queue = q;
@@ -6873,7 +6865,7 @@ qfill_syncq(syncq_t *sq, queue_t *q, mblk_t *mp)
 	/*
 	 * Enqueue the message on the list.
 	 * SQPUT_MP() accesses q_syncqmsgs.  We are already holding QLOCK to
-	 * protect it.  So its ok to acquire SQLOCK after SQPUT_MP().
+	 * protect it.  So it's ok to acquire SQLOCK after SQPUT_MP().
 	 */
 	SQPUT_MP(q, mp);
 	mutex_enter(SQLOCK(sq));
@@ -6925,11 +6917,11 @@ qfill_syncq(syncq_t *sq, queue_t *q, mblk_t *mp)
  * a queue (qp != NULL).
  * Return non-zero if one or more messages were freed.
  *
- * no need to grab sq_putlocks here. See comment in strsubr.h that explains when
+ * No need to grab sq_putlocks here. See comment in strsubr.h that explains when
  * sq_putlocks are used.
  *
  * NOTE: This function assumes that it is called from the close() context and
- * that all the queues in the syncq are going aay. For this reason it doesn't
+ * that all the queues in the syncq are going away. For this reason it doesn't
  * acquire QLOCK for modifying q_sqhead/q_sqtail fields. This assumption is
  * currently valid, but it is useful to rethink this function to behave properly
  * in other cases.
@@ -7231,9 +7223,9 @@ propagate_syncq(queue_t *qp)
  * and drain_syncq will run it later.
  *
  * This routine can only be called from put or service procedures plus
- * asynchronous callback routines that have properly entered to
- * queue (with entersq.) Thus qwriter_inner assumes the caller has one claim
- * on the syncq associated with q.
+ * asynchronous callback routines that have properly entered the queue (with
+ * entersq). Thus qwriter_inner assumes the caller has one claim on the syncq
+ * associated with q.
  */
 void
 qwriter_inner(queue_t *q, mblk_t *mp, void (*func)())
@@ -7375,7 +7367,7 @@ qcallbwrapper(void *arg)
 		ASSERT(sq->sq_needexcl != 0);	/* wraparound */
 		waitflags |= SQ_MESSAGES;
 	}
-	/* Can not handle exlusive entry at outer perimeter */
+	/* Can not handle exclusive entry at outer perimeter */
 	ASSERT(type & SQ_COCB);
 
 	while ((sq->sq_flags & waitflags) || (!(type & SQ_CICB) &&count != 0)) {
@@ -7435,14 +7427,14 @@ qcallbwrapper(void *arg)
 }
 
 /*
- * no need to grab sq_putlocks here. See comment in strsubr.h that
+ * No need to grab sq_putlocks here. See comment in strsubr.h that
  * explains when sq_putlocks are used.
  *
  * sq_count (or one of the sq_putcounts) has already been
  * decremented by the caller, and if SQ_QUEUED, we need to call
  * drain_syncq (the global syncq drain).
  * If putnext_tail is called with the SQ_EXCL bit set, we are in
- * one of two states, non-CIPUT perimiter, and we need to clear
+ * one of two states, non-CIPUT perimeter, and we need to clear
  * it, or we went exclusive in the put procedure.  In any case,
  * we want to clear the bit now, and it is probably easier to do
  * this at the beginning of this function (remember, we hold
@@ -7742,7 +7734,7 @@ strsetuio(stdata_t *stp)
 
 	if (stp->sd_flag & STPLEX) {
 		/*
-		 * Not stremahead, but a mux, so no Synchronous STREAMS.
+		 * Not streamhead, but a mux, so no Synchronous STREAMS.
 		 */
 		stp->sd_struiowrq = NULL;
 		stp->sd_struiordq = NULL;
@@ -7813,7 +7805,7 @@ pass_wput(queue_t *q, mblk_t *mp)
  * The blocked passq is unblocked once the LINK/I_UNLINK has
  * been acked or nacked or if a message is generated and sent
  * down muxs write put procedure.
- * see pass_wput().
+ * See pass_wput().
  *
  * After the new queue is inserted, all messages coming from below are
  * blocked. The call to strlock will ensure that all activity in the stream head
@@ -7911,8 +7903,8 @@ str_cv_wait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int nosigs)
  *
  * This routine waits until the mark is known by waiting for one of these
  * three events:
- *	The stream head read queue becoming non-empty (including an EOF)
- *	The STRATMARK flag being set. (Due to a MSGMARKNEXT message.)
+ *	The stream head read queue becoming non-empty (including an EOF).
+ *	The STRATMARK flag being set (due to a MSGMARKNEXT message).
  *	The STRNOTATMARK flag being set (which indicates that the transport
  *	has sent a MSGNOTMARKNEXT message to indicate that it is not at
  *	the mark).
@@ -8662,7 +8654,7 @@ copymsgchain(mblk_t *mp)
 #undef QLOCK
 
 /*
- * replacement for QLOCK macro for those that can't use it.
+ * Replacement for QLOCK macro for those that can't use it.
  */
 kmutex_t *
 QLOCK(queue_t *q)
