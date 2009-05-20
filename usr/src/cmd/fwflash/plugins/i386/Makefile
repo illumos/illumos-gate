@@ -50,7 +50,9 @@ LDLIBS	+= -ldevinfo -lumem -lc
 DYNFLAGS += -Bdynamic
 LIBS=   $(DYNLIB)
 
-BUILD.SO=	$(LD) -o $@ -G $(DYNFLAGS)
+BUILD.SO=	$(LD) -o $@ $(HERMON_LDFLAGS) -G $(DYNFLAGS)
+
+hermon-MELLANOX.so := HERMON_LDFLAGS += -N/usr/lib/fwflash/identify/hermon.so
 
 %.o: ../vendor/%.c
 	$(COMPILE.c) $<
