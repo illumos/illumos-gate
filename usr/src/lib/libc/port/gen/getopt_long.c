@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,8 +64,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma weak _getopt_clip = getopt_clip
 #pragma weak _getopt_long = getopt_long
@@ -495,7 +493,6 @@ getopt_internal(int nargc, char * const *nargv, const char *options,
 	if (posixly_correct) {
 		flags &= ~FLAG_PERMUTE;
 		flags &= ~FLAG_ALLARGS;
-		flags &= ~FLAG_OPTIONAL_ARGS;
 	}
 
 	/*

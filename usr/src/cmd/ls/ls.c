@@ -18,8 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
+ * Copyright 2009 Jason King.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +34,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * List files or directories
@@ -48,6 +52,7 @@
 #include <string.h>
 #include <locale.h>
 #include <curses.h>
+#include <term.h>
 #include <termios.h>
 #include <stdlib.h>
 #include <widec.h>
@@ -64,6 +69,8 @@
 #include <libnvpair.h>
 #include <libcmdutils.h>
 #include <attr.h>
+#include <getopt.h>
+#include <inttypes.h>
 
 #ifndef STANDALONE
 #define	TERMINFO
@@ -107,10 +114,13 @@
  * note that %F and %z are from the ISO C99 standard and are
  * not present in older C libraries
  */
-#define	FORMAT1	 " %b %e  %Y "
-#define	FORMAT2  " %b %e %H:%M "
-#define	FORMAT3  " %b %e %T %Y "
-#define	FORMAT4  " %%F %%T.%.09ld %%z "
+#define	FORMAT_OLD	" %b %e  %Y "
+#define	FORMAT_NEW	" %b %e %H:%M "
+#define	FORMAT_LONG	" %b %e %T %Y "
+#define	FORMAT_ISO_FULL	" %%F %%T.%.09ld %%z "
+#define	FORMAT_ISO_LONG	" %F %R "
+#define	FORMAT_ISO_NEW	" %m-%d %H:%M "
+#define	FORMAT_ISO_OLD	" %F "
 
 #undef BUFSIZ
 #define	BUFSIZ 4096
@@ -166,6 +176,43 @@ struct dchain {
 	struct dchain *dc_next;	/* next directory in the chain */
 };
 
+#define	LSA_NONE	(0)
+#define	LSA_BOLD	(1L << 0)
+#define	LSA_UNDERSCORE	(1L << 1)
+#define	LSA_BLINK	(1L << 2)
+#define	LSA_REVERSE	(1L << 3)
+#define	LSA_CONCEALED	(1L << 4)
+
+/* these should be ordered most general to most specific */
+typedef enum LS_CFTYPE {
+	LS_NORMAL,
+	LS_FILE,
+	LS_EXEC,
+	LS_DIR,
+	LS_LINK,
+	LS_FIFO,
+	LS_SOCK,
+	LS_DOOR,
+	LS_BLK,
+	LS_CHR,
+	LS_PORT,
+	LS_STICKY,
+	LS_ORPHAN,
+	LS_SETGID,
+	LS_SETUID,
+	LS_OTHER_WRITABLE,
+	LS_STICKY_OTHER_WRITABLE,
+	LS_PAT
+} ls_cftype_t;
+
+typedef struct ls_color {
+	char		*sfx;
+	ls_cftype_t	ftype;
+	int		attr;
+	int		fg;
+	int		bg;
+} ls_color_t;
+
 /*
  * A numbuf_t is used when converting a number to a string representation
  */
@@ -207,6 +254,9 @@ static char 		*number_to_scaled_string(numbuf_t buf,
 			    long scale);
 static void		record_ancestry(char *, struct stat *, struct lbuf *,
 			    int, struct ditem *);
+static void		ls_color_init(void);
+static void		ls_start_color(struct lbuf *);
+static void		ls_end_color(void);
 
 static int		aflg;
 static int		atflg;
@@ -228,8 +278,11 @@ static int		rflg = 1; /* init to 1 for special use in compar */
 static int		sflg;
 static int		tflg;
 static int		uflg;
+static int		Uflg;
+static int		wflg;
 static int		xflg;
 static int		Aflg;
+static int		Bflg;
 static int		Cflg;
 static int		Eflg;
 static int		Fflg;
@@ -252,15 +305,18 @@ static int		alltm;
 static long		hscale;
 static mode_t		flags;
 static int		err = 0;	/* Contains return code */
+static int		colorflg;
+static int		file_typeflg;
 
 static uid_t		lastuid	= (uid_t)-1;
 static gid_t		lastgid = (gid_t)-1;
 static char		*lastuname = NULL;
 static char		*lastgname = NULL;
 
-/* statreq > 0 if any of sflg, (n)lflg, tflg, Sflg are on */
+/* statreq > 0 if any of sflg, (n)lflg, tflg, Sflg, colorflg are on */
 static int		statreq;
 
+static uint64_t		block_size = 1;
 static char		*dotp = ".";
 
 static u_longlong_t 	tblocks; /* number of blocks of files in a directory */
@@ -275,7 +331,24 @@ static int		curcol;
 
 static struct	winsize	win;
 
+/* if time_fmt_new is left NULL, time_fmt_old is used for all times */
+static const char	*time_fmt_old = FORMAT_OLD;	/* non-recent files */
+static const char	*time_fmt_new = FORMAT_NEW;	/* recent files */
+static int		time_custom;	/* != 0 if a custom format */
 static char	time_buf[FMTSIZE];	/* array to hold day and time */
+
+static int		lsc_debug;
+static ls_color_t	*lsc_match;
+static ls_color_t	*lsc_colors;
+static size_t		lsc_ncolors;
+static char		*lsc_bold;
+static char		*lsc_underline;
+static char		*lsc_blink;
+static char		*lsc_reverse;
+static char		*lsc_concealed;
+static char		*lsc_none;
+static char		*lsc_setfg;
+static char		*lsc_setbg;
 
 #define	NOTWORKINGDIR(d, l)	(((l) < 2) || \
 				    (strcmp((d) + (l) - 2, "/.") != 0))
@@ -286,8 +359,7 @@ static char	time_buf[FMTSIZE];	/* array to hold day and time */
 static int get_sysxattr(char *, struct lbuf *);
 static void set_sysattrb_display(char *, boolean_t, struct lbuf *);
 static void set_sysattrtm_display(char *, struct lbuf *);
-static void format_time(const char *, time_t);
-static void format_etime(const char *, time_t, time_t);
+static void format_time(time_t, time_t);
 static void print_time(struct lbuf *);
 static void format_attrtime(struct lbuf *);
 static void *xmalloc(size_t, struct lbuf *);
@@ -295,6 +367,36 @@ static void free_sysattr(struct lbuf *);
 static nvpair_t *pair;
 static nvlist_t	*response;
 static int acl_err;
+
+const struct option long_options[] = {
+	{ "all", no_argument, NULL, 'a' },
+	{ "almost-all", no_argument, NULL, 'A' },
+	{ "escape", no_argument, NULL, 'b' },
+	{ "classify", no_argument, NULL, 'F' },
+	{ "human-readable", no_argument, NULL, 'h' },
+	{ "dereference", no_argument, NULL, 'L' },
+	{ "dereference-command-line", no_argument, NULL, 'H' },
+	{ "ignore-backups", no_argument, NULL, 'B' },
+	{ "inode", no_argument, NULL, 'i' },
+	{ "numeric-uid-gid", no_argument, NULL, 'n' },
+	{ "no-group", no_argument, NULL, 'o' },
+	{ "hide-control-chars", no_argument, NULL, 'q' },
+	{ "reverse", no_argument, NULL, 'r' },
+	{ "recursive", no_argument, NULL, 'R' },
+	{ "size", no_argument, NULL, 's' },
+	{ "width", required_argument, NULL, 'w' },
+
+	/* no short options for these */
+	{ "block-size", required_argument, NULL, 0 },
+	{ "full-time", no_argument, NULL, 0 },
+	{ "si", no_argument, NULL, 0 },
+	{ "color", optional_argument, NULL, 0 },
+	{ "colour", optional_argument, NULL, 0},
+	{ "file-type", no_argument, NULL, 0 },
+	{ "time-style", required_argument, NULL, 0 },
+
+	{0, 0, 0, 0}
+};
 
 int
 main(int argc, char *argv[])
@@ -304,6 +406,7 @@ main(int argc, char *argv[])
 	int		width;
 	int		amino = 0;
 	int		opterr = 0;
+	int		option_index = 0;
 	struct lbuf	*ep;
 	struct lbuf	lb;
 	struct ditem	*myinfo;
@@ -327,9 +430,259 @@ main(int argc, char *argv[])
 		mflg = 0;
 	}
 
-	while ((c = getopt(argc, argv,
-	    "aAbcCdeEfFghHilLmnopqrRsStux1@vV/:%:")) != EOF)
+	while ((c = getopt_long(argc, argv,
+	    "+aAbBcCdeEfFghHiklLmnopqrRsStuUw:x1@vV/:%:", long_options,
+	    &option_index)) != -1)
 		switch (c) {
+		case 0:
+			/* non-short options */
+			if (strcmp(long_options[option_index].name,
+			    "color") == 0 ||
+			    strcmp(long_options[option_index].name,
+			    "colour") == 0) {
+				if (optarg == NULL ||
+				    strcmp(optarg, "always") == 0 ||
+				    strcmp(optarg, "yes") == 0 ||
+				    strcmp(optarg, "force") == 0) {
+					colorflg++;
+					statreq++;
+					continue;
+				}
+
+				if ((strcmp(optarg, "auto") == 0 ||
+				    strcmp(optarg, "tty") == 0 ||
+				    strcmp(optarg, "if-tty") == 0) &&
+				    isatty(1) == 1) {
+					colorflg++;
+					statreq++;
+					continue;
+				}
+
+				if (strcmp(optarg, "never") == 0 ||
+				    strcmp(optarg, "no") == 0 ||
+				    strcmp(optarg, "none") == 0) {
+					colorflg = 0;
+					continue;
+				}
+				(void) fprintf(stderr,
+				    gettext("Invalid argument '%s' for "
+				    "--color\n"), optarg);
+				++opterr;
+				continue;
+			}
+
+			if (strcmp(long_options[option_index].name,
+			    "si") == 0) {
+				hflg++;
+				hscale = 1000;
+				continue;
+			}
+
+			if (strcmp(long_options[option_index].name,
+			    "block-size") == 0) {
+				size_t scale_len = strlen(optarg);
+				uint64_t scale = 1;
+				uint64_t kilo = 1024;
+				char scale_c;
+
+				if (scale_len == 0) {
+					(void) fprintf(stderr, gettext(
+					    "Invalid block size \'%s\'\n"),
+					    optarg);
+					exit(1);
+				}
+
+				scale_c = optarg[scale_len - 1];
+				if (scale_c == 'B') {
+					/* need at least digit, scale, B */
+					if (scale_len < 3) {
+						(void) fprintf(stderr, gettext(
+						    "Invalid block size "
+						    "\'%s\'\n"), optarg);
+						exit(1);
+					}
+					kilo = 1000;
+					scale_c = optarg[scale_len - 2];
+					if (isdigit(scale_c)) {
+						(void) fprintf(stderr,
+						    gettext("Invalid block size"
+						    " \'%s\'\n"), optarg);
+						exit(1);
+					}
+					/*
+					 * make optarg[scale_len - 1] point to
+					 * the scale factor
+					 */
+					--scale_len;
+				}
+
+				switch (scale_c) {
+				case 'y':
+				case 'Y':
+					scale *= kilo;
+					/*FALLTHROUGH*/
+				case 'Z':
+				case 'z':
+					scale *= kilo;
+					/*FALLTHROUGH*/
+				case 'E':
+				case 'e':
+					scale *= kilo;
+					/*FALLTHROUGH*/
+				case 'P':
+				case 'p':
+					scale *= kilo;
+					/*FALLTHROUGH*/
+				case 'T':
+				case 't':
+					scale *= kilo;
+					/*FALLTHROUGH*/
+				case 'G':
+				case 'g':
+					scale *= kilo;
+					/*FALLTHROUGH*/
+				case 'M':
+				case 'm':
+					scale *= kilo;
+					/*FALLTHROUGH*/
+				case 'K':
+				case 'k':
+					scale *= kilo;
+					break;
+				default:
+					if (!isdigit(scale_c)) {
+						(void) fprintf(stderr,
+						    gettext("Invalid character "
+						    "following block size in "
+						    "\'%s\'\n"), optarg);
+						exit(1);
+					}
+				}
+
+				/* NULL out scale constant if present */
+				if (scale > 1 && !isdigit(scale_c))
+					optarg[scale_len - 1] = '\0';
+
+				/* Based on testing, this is what GNU ls does */
+				block_size = strtoll(optarg, NULL, 0) * scale;
+				if (block_size < 1) {
+					(void) fprintf(stderr,
+					    gettext("Invalid block size "
+					    "\'%s\'\n"), optarg);
+					exit(1);
+				}
+				continue;
+			}
+
+			if (strcmp(long_options[option_index].name,
+			    "file-type") == 0) {
+				file_typeflg++;
+				Fflg++;
+				statreq++;
+				continue;
+			}
+
+
+			if (strcmp(long_options[option_index].name,
+			    "full-time") == 0) {
+				Eflg++;
+				statreq++;
+				eflg = 0;
+				time_fmt_old = FORMAT_ISO_FULL;
+				time_fmt_new = FORMAT_ISO_FULL;
+				continue;
+			}
+
+			if (strcmp(long_options[option_index].name,
+			    "time-style") == 0) {
+				/* like -E, but doesn't imply -l */
+				if (strcmp(optarg, "full-iso") == 0) {
+					Eflg++;
+					statreq++;
+					eflg = 0;
+					time_fmt_old = FORMAT_ISO_FULL;
+					time_fmt_new = FORMAT_ISO_FULL;
+					continue;
+				}
+				if (strcmp(optarg, "long-iso") == 0) {
+					statreq++;
+					Eflg = 0;
+					eflg = 0;
+					time_fmt_old = FORMAT_ISO_LONG;
+					time_fmt_new = FORMAT_ISO_LONG;
+					continue;
+				}
+				if (strcmp(optarg, "iso") == 0) {
+					statreq++;
+					Eflg = 0;
+					eflg = 0;
+					time_fmt_old = FORMAT_ISO_OLD;
+					time_fmt_new = FORMAT_ISO_NEW;
+					continue;
+				}
+				/* should be the default */
+				if (strcmp(optarg, "locale") == 0) {
+					time_fmt_old = FORMAT_OLD;
+					time_fmt_new = FORMAT_NEW;
+					continue;
+				}
+				if (optarg[0] == '+') {
+					char	*told, *tnew;
+					char	*p;
+					size_t	timelen = strlen(optarg);
+
+					p = strchr(optarg, '\n');
+					if (p != NULL)
+						*p++ = '\0';
+
+					/*
+					 * Time format requires a leading and
+					 * trailing space
+					 * Add room for 3 spaces + 2 nulls
+					 * The + in optarg is replaced with
+					 * a space.
+					 */
+					timelen += 2 + 3;
+					told = malloc(timelen);
+					if (told == NULL) {
+						perror("Out of memory");
+						exit(1);
+					}
+
+					(void) memset(told, 0, timelen);
+					told[0] = ' ';
+					(void) strlcat(told, &optarg[1],
+					    timelen);
+					(void) strlcat(told, " ", timelen);
+
+					if (p != NULL) {
+						size_t tnew_len;
+
+						tnew = told + strlen(told) + 1;
+						tnew_len = timelen -
+						    strlen(told) - 1;
+
+						tnew[0] = ' ';
+						(void) strlcat(tnew, p,
+						    tnew_len);
+						(void) strlcat(tnew, " ",
+						    tnew_len);
+						time_fmt_new =
+						    (const char *)tnew;
+					} else {
+						time_fmt_new =
+						    (const char *)told;
+					}
+
+					time_fmt_old = (const char *)told;
+					time_custom = 1;
+					continue;
+				}
+				continue;
+			}
+
+			continue;
+
 		case 'a':
 			aflg++;
 			continue;
@@ -339,6 +692,9 @@ main(int argc, char *argv[])
 		case 'b':
 			bflg = 1;
 			qflg = 0;
+			continue;
+		case 'B':
+			Bflg = 1;
 			continue;
 		case 'c':
 			uflg = 0;
@@ -363,12 +719,16 @@ main(int argc, char *argv[])
 			lflg++;
 			statreq++;
 			Eflg = 0;
+			time_fmt_old = FORMAT_LONG;
+			time_fmt_new = FORMAT_LONG;
 			continue;
 		case 'E':
 			Eflg++;
 			lflg++;
 			statreq++;
 			eflg = 0;
+			time_fmt_old = FORMAT_ISO_FULL;
+			time_fmt_new = FORMAT_ISO_FULL;
 			continue;
 		case 'f':
 			fflg++;
@@ -393,6 +753,9 @@ main(int argc, char *argv[])
 			continue;
 		case 'i':
 			iflg++;
+			continue;
+		case 'k':
+			block_size = 1024;
 			continue;
 		case 'l':
 			lflg++;
@@ -449,13 +812,20 @@ main(int argc, char *argv[])
 			continue;
 		case 'S':
 			tflg = 0;
+			Uflg = 0;
 			Sflg++;
 			statreq++;
 			continue;
 		case 't':
 			Sflg = 0;
+			Uflg = 0;
 			tflg++;
 			statreq++;
+			continue;
+		case 'U':
+			Sflg = 0;
+			tflg = 0;
+			Uflg++;
 			continue;
 		case 'u':
 			cflg = 0;
@@ -479,6 +849,10 @@ main(int argc, char *argv[])
 			Cflg = 0;
 			xflg = 0;
 			mflg = 0;
+			continue;
+		case 'w':
+			wflg++;
+			num_cols = atoi(optarg);
 			continue;
 		case 'x':
 			xflg = 1;
@@ -573,9 +947,10 @@ main(int argc, char *argv[])
 			opterr++;
 			continue;
 		}
+
 	if (opterr) {
 		(void) fprintf(stderr, gettext(
-		    "usage: ls -aAbcCdeEfFghHilLmnopqrRsStuxvV1@/%[c | v]"
+		    "usage: ls -aAbBcCdeEfFghHiklLmnopqrRsStuUwxvV1@/%[c | v]"
 		    "%%[atime | crtime | ctime | mtime | all]"
 		    " [files]\n"));
 		exit(2);
@@ -607,7 +982,7 @@ main(int argc, char *argv[])
 		Cflg = mflg = 0;
 	}
 
-	if (Cflg || mflg) {
+	if (!wflg && (Cflg || mflg)) {
 		char *clptr;
 		if ((clptr = getenv("COLUMNS")) != NULL)
 			num_cols = atoi(clptr);
@@ -617,10 +992,11 @@ main(int argc, char *argv[])
 				num_cols = (win.ws_col == 0 ? 80 : win.ws_col);
 		}
 #endif
-		if (num_cols < 20 || num_cols > 1000)
-			/* assume it is an error */
-			num_cols = 80;
 	}
+
+	if (num_cols < 20 || num_cols > 1000)
+		/* assume it is an error */
+		num_cols = 80;
 
 	/* allocate space for flist and the associated	*/
 	/* data structures (lbufs)			*/
@@ -698,12 +1074,17 @@ main(int argc, char *argv[])
 			err = 2;
 	}
 	colwidth = fixedwidth + filewidth;
-	qsort(flist, (unsigned)nargs, sizeof (struct lbuf *),
-	    (int (*)(const void *, const void *))compar);
+	if (!Uflg)
+		qsort(flist, (unsigned)nargs, sizeof (struct lbuf *),
+		    (int (*)(const void *, const void *))compar);
 	for (i = 0; i < nargs; i++) {
 		if (flist[i]->ltype == 'd' && dflg == 0 || fflg)
 			break;
 	}
+
+	if (colorflg)
+		ls_color_init();
+
 	pem(&flist[0], &flist[i], 0);
 	for (; i < nargs; i++) {
 		pdirectory(flist[i]->ln.namep, Rflg ||
@@ -731,6 +1112,7 @@ main(int argc, char *argv[])
 			free(dtemp);
 		}
 	}
+
 	return (err);
 }
 
@@ -772,7 +1154,7 @@ pdirectory(char *name, int title, int lp, int cdetect, struct ditem *myinfo)
 	rddir(name, myinfo);
 	if (nomocore)
 		return;
-	if (fflg == 0)
+	if (fflg == 0 && Uflg == 0)
 		qsort(&flist[lp], (unsigned)(nfiles - lp),
 		    sizeof (struct lbuf *),
 		    (int (*)(const void *, const void *))compar);
@@ -906,22 +1288,18 @@ pentry(struct lbuf *ap)
 			curcol += printf("%7s",
 			    number_to_scaled_string(hbuf, p->lsize, hscale));
 		} else {
-			curcol += printf((p->lsize < (off_t)10000000) ?
-			    "%7lld" : "%lld", p->lsize);
+			uint64_t bsize = p->lsize / block_size;
+
+			/*
+			 * Round up only when using blocks > 1 byte, otherwise
+			 * 'normal' sizes display 1 byte too large.
+			 */
+			if (p->lsize % block_size != 0)
+				bsize++;
+
+			curcol += printf("%7" PRIu64, bsize);
 		}
-		if (eflg)
-			format_time(FORMAT3, p->lmtime.tv_sec);
-		else if (Eflg)
-			/* fill in nanoseconds first */
-			format_etime(FORMAT4, p->lmtime.tv_sec,
-			    p->lmtime.tv_nsec);
-		else {
-			if ((p->lmtime.tv_sec < year) ||
-			    (p->lmtime.tv_sec > now))
-				format_time(FORMAT1, p->lmtime.tv_sec);
-			else
-				format_time(FORMAT2, p->lmtime.tv_sec);
-		}
+		format_time(p->lmtime.tv_sec, p->lmtime.tv_nsec);
 		/* format extended system attribute time */
 		if (tmflg && crtm)
 			format_attrtime(p);
@@ -948,7 +1326,8 @@ pentry(struct lbuf *ap)
 			dmark = "@";
 		else if (p->ltype == 's')
 			dmark = "=";
-		else if (p->lflags & (S_IXUSR|S_IXGRP|S_IXOTH))
+		else if (!file_typeflg &&
+		    (p->lflags & (S_IXUSR|S_IXGRP|S_IXOTH)))
 			dmark = "*";
 		else
 			dmark = "";
@@ -959,6 +1338,10 @@ pentry(struct lbuf *ap)
 		(void) strcpy(buf + 4, p->flinkto);
 		dmark = buf;
 	}
+
+	if (colorflg)
+		ls_start_color(p);
+
 	if (p->lflags & ISARG) {
 		if (qflg || bflg)
 			pprintf(p->ln.namep, dmark);
@@ -976,6 +1359,9 @@ pentry(struct lbuf *ap)
 			curcol += strcol((unsigned char *)dmark);
 		}
 	}
+
+	if (colorflg)
+		ls_end_color();
 
 	/* Display extended system attributes */
 	if (saflg) {
@@ -1149,6 +1535,10 @@ rddir(char *dir, struct ditem *myinfo)
 				 */
 				continue;
 
+			/* skip entries ending in ~ if -B was given */
+			if (Bflg &&
+			    dentry->d_name[strlen(dentry->d_name) - 1] == '~')
+				continue;
 			if (Cflg || mflg) {
 				width = strcol((unsigned char *)dentry->d_name);
 				if (width > filewidth)
@@ -1404,6 +1794,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 				 * Print error message in case of dangling link.
 				 */
 				perror(file);
+				err = 2;
 			}
 			nfiles--;
 			return (NULL);
@@ -1418,6 +1809,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 		    ((statb.st_mode & S_IFMT) != S_IFDIR)) {
 			if (lstat(file, &statb) < 0) {
 				perror(file);
+				err = 2;
 			}
 		}
 
@@ -2175,31 +2567,31 @@ set_sysattrtm_display(char *name, struct lbuf *rep)
 }
 
 void
-format_time(const char *format, time_t sec)
+format_time(time_t sec, time_t nsec)
 {
+	const char *fstr = time_fmt_new;
+	char fmt_buf[FMTSIZE];
 
+	if (Eflg) {
+		(void) snprintf(fmt_buf, FMTSIZE, fstr, nsec);
+		(void) strftime(time_buf, sizeof (time_buf), fmt_buf,
+		    localtime(&sec));
+		return;
+	}
+
+	if (sec < year || sec > now)
+		fstr = time_fmt_old;
+
+	/* if a custom time was specified, shouldn't be localized */
 	(void) strftime(time_buf, sizeof (time_buf),
-	    dcgettext(NULL, format, LC_TIME),
+	    (time_custom == 0) ? dcgettext(NULL, fstr, LC_TIME) : fstr,
 	    localtime(&sec));
 }
 
 void
-format_etime(const char *format, time_t sec, time_t nsec)
-{
-	char fmt_buf[FMTSIZE];
-
-	(void) snprintf(fmt_buf, FMTSIZE,
-	    format, nsec);
-	(void) strftime(time_buf, sizeof (time_buf),
-	    fmt_buf, localtime(&sec));
-}
-
-/* Format timestamp extended system attributes */
-
-void
 format_attrtime(struct lbuf *p)
 {
-	int	tmattr = 0;
+	int tmattr = 0;
 	int i;
 
 	if (p->extm != NULL) {
@@ -2210,71 +2602,511 @@ format_attrtime(struct lbuf *p)
 			}
 		}
 	}
+
 	if (tmattr) {
-		if (Eflg)
-			format_etime(FORMAT4, (time_t)p->extm[i].stm,
-			    (time_t)p->extm[i].nstm);
-		else  {
-			if ((p->lmtime.tv_sec < year) ||
-			    (p->lmtime.tv_sec > now))
-				format_time(FORMAT1,
-				    (time_t)p->extm[i].stm);
-			else
-				format_time(FORMAT2,
-				    (time_t)p->extm[i].stm);
+		const char *old_save = time_fmt_old;
+		const char *new_save = time_fmt_new;
+
+		/* Eflg always sets format to FORMAT_ISO_FULL */
+		if (!Eflg && !time_custom) {
+			time_fmt_old = FORMAT_OLD;
+			time_fmt_new = FORMAT_NEW;
 		}
+
+		format_time((time_t)p->extm[i].stm, (time_t)p->extm[i].nstm);
+
+		time_fmt_old = old_save;
+		time_fmt_new = new_save;
 	}
 }
 
 void
 print_time(struct lbuf *p)
 {
+	const char *old_save = time_fmt_old;
+	const char *new_save = time_fmt_new;
+
 	int i = 0;
 
+	if (!Eflg) {
+		time_fmt_old = FORMAT_LONG;
+		time_fmt_new = FORMAT_LONG;
+	}
+
 	new_line();
-	if (Eflg) {
-		format_etime(FORMAT4, p->lat.tv_sec, p->lat.tv_nsec);
-		(void) printf("		timestamp: atime	%s\n",
-		    time_buf);
-		format_etime(FORMAT4, p->lct.tv_sec, p->lct.tv_nsec);
-		(void) printf("		timestamp: ctime	%s\n",
-		    time_buf);
-		format_etime(FORMAT4, p->lmt.tv_sec, p->lmt.tv_nsec);
-		(void) printf("		timestamp: mtime	%s\n",
-		    time_buf);
-		if (p->extm != NULL) {
-			while (p->extm[i].nstm != 0 && i < sacnt) {
-				format_etime(FORMAT4, p->extm[i].stm,
-				    p->extm[i].nstm);
-				if (p->extm[i].name != NULL) {
-					(void) printf("		timestamp:"
-					    " %s	%s\n",
-					    p->extm[i].name, time_buf);
-				}
-				i++;
+	format_time(p->lat.tv_sec, p->lat.tv_nsec);
+	(void) printf("         timestamp: atime        %s\n", time_buf);
+	format_time(p->lct.tv_sec, p->lct.tv_nsec);
+	(void) printf("         timestamp: ctime        %s\n", time_buf);
+	format_time(p->lmt.tv_sec, p->lmt.tv_nsec);
+	(void) printf("         timestamp: mtime        %s\n", time_buf);
+	if (p->extm != NULL) {
+		while (p->extm[i].nstm != 0 && i < sacnt) {
+			format_time(p->extm[i].stm, p->extm[i].nstm);
+			if (p->extm[i].name != NULL) {
+				(void) printf("         timestamp:"
+				    " %s        %s\n",
+				    p->extm[i].name, time_buf);
 			}
+			i++;
+		}
+	}
+
+	time_fmt_old = old_save;
+	time_fmt_new = new_save;
+}
+
+/*
+ * Check if color definition applies to entry, returns 1 if yes, 0 if no
+ */
+static int
+color_match(struct lbuf *entry, ls_color_t *color)
+{
+	switch (color->ftype) {
+	case LS_PAT:
+	{
+		char	*fname;
+		size_t	fname_len, sfx_len;
+
+		if (entry->lflags & ISARG)
+			fname = entry->ln.namep;
+		else
+			fname = entry->ln.lname;
+
+		fname_len = strlen(fname);
+		sfx_len = strlen(color->sfx);
+		if (sfx_len > fname_len)
+			return (0);
+
+		if (strcmp(color->sfx, fname + fname_len - sfx_len) == 0)
+			return (1);
+		else
+			return (0);
+	}
+
+	case LS_NORMAL:
+		return (1);
+
+	case LS_FILE:
+		return ((entry->ltype == '-'));
+
+	case LS_DIR:
+		return ((entry->ltype == 'd'));
+
+	case LS_LINK:
+		return ((entry->ltype == 'l'));
+
+	case LS_FIFO:
+		return ((entry->ltype == 'p'));
+
+	case LS_SOCK:
+		return ((entry->ltype == 's'));
+
+	case LS_DOOR:
+		return ((entry->ltype == 'D'));
+
+	case LS_BLK:
+		return ((entry->ltype == 'b'));
+
+	case LS_CHR:
+		return ((entry->ltype == 'c'));
+
+	case LS_PORT:
+		return ((entry->ltype == 'P'));
+
+	case LS_ORPHAN:
+	{
+		struct stat st;
+		int rc;
+
+		if (entry->ltype != 'l')
+			return (0);
+		if (entry->flinkto == NULL)
+			return (1);
+
+		if (entry->lflags & ISARG)
+			rc = stat(entry->ln.namep, &st);
+		else
+			rc = stat(entry->ln.lname, &st);
+
+		if (rc == -1 && errno == ENOENT)
+			return (1);
+
+		return (0);
+	}
+
+	case LS_SETUID:
+		return (entry->ltype != 'l' && (entry->lflags & (S_ISUID)));
+
+	case LS_SETGID:
+		return (entry->ltype != 'l' && (entry->lflags & (S_ISGID)));
+
+	case LS_STICKY_OTHER_WRITABLE:
+		return (entry->ltype != 'l' &&
+		    (entry->lflags & (S_IWOTH|S_ISVTX)));
+
+	case LS_OTHER_WRITABLE:
+		return (entry->ltype != 'l' && (entry->lflags & (S_IWOTH)));
+
+	case LS_STICKY:
+		return (entry->ltype != 'l' && (entry->lflags & (S_ISVTX)));
+
+	case LS_EXEC:
+		return (entry->ltype != 'l' &&
+		    (entry->lflags & (S_IXUSR|S_IXGRP|S_IXOTH)));
+	}
+
+	return (0);
+}
+
+static void
+dump_color(ls_color_t *c)
+{
+	if (c == NULL)
+		return;
+
+	(void) printf("\n\ttype: ");
+	switch (c->ftype) {
+	case LS_NORMAL:
+		(void) printf("LS_NORMAL");
+		break;
+	case LS_FILE:
+		(void) printf("LS_FILE");
+		break;
+	case LS_EXEC:
+		(void) printf("LS_EXEC");
+		break;
+	case LS_DIR:
+		(void) printf("LS_DIR");
+		break;
+	case LS_LINK:
+		(void) printf("LS_LINK");
+		break;
+
+	case LS_FIFO:
+		(void) printf("LS_FIFO");
+		break;
+
+	case LS_SOCK:
+		(void) printf("LS_SOCK");
+		break;
+
+	case LS_DOOR:
+		(void) printf("LS_DOOR");
+		break;
+
+	case LS_BLK:
+		(void) printf("LS_BLK");
+		break;
+
+	case LS_CHR:
+		(void) printf("LS_CHR");
+		break;
+
+	case LS_PORT:
+		(void) printf("LS_PORT");
+		break;
+
+	case LS_STICKY:
+		(void) printf("LS_STICKY");
+		break;
+
+	case LS_ORPHAN:
+		(void) printf("LS_ORPHAN");
+		break;
+
+	case LS_SETGID:
+		(void) printf("LS_SETGID");
+		break;
+
+	case LS_SETUID:
+		(void) printf("LS_SETUID");
+		break;
+
+	case LS_OTHER_WRITABLE:
+		(void) printf("LS_OTHER_WRITABLE");
+		break;
+
+	case LS_STICKY_OTHER_WRITABLE:
+		(void) printf("LS_STICKY_OTHER_WRITABLE");
+		break;
+
+	case LS_PAT:
+		(void) printf("LS_PAT\n");
+		(void) printf("\tpattern: %s", c->sfx);
+		break;
+	}
+	(void) printf("\n");
+	(void) printf("\tattr: %d\n", c->attr);
+	(void) printf("\tfg: %d\n", c->fg);
+	(void) printf("\tbg: %d\n", c->bg);
+	(void) printf("\t");
+}
+
+static ls_color_t *
+get_color_attr(struct lbuf *l)
+{
+	int i;
+
+	/*
+	 * Colors are sorted from most general lsc_colors[0] to most specific
+	 * lsc_colors[lsc_ncolors - 1] by ls_color_init().  Start search with
+	 * most specific color rule and work towards most general.
+	 */
+	for (i = lsc_ncolors - 1; i >= 0; --i)
+		if (color_match(l, &lsc_colors[i]))
+			return (&lsc_colors[i]);
+
+	return (NULL);
+}
+
+static void
+ls_tprint(char *str, long int p1, long int p2, long int p3, long int p4,
+    long int p5, long int p6, long int p7, long int p8, long int p9)
+{
+	char *s;
+
+	if (str == NULL)
+		return;
+
+	s = tparm(str, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+
+	if (s != NULL)
+		(void) putp(s);
+}
+
+static void
+ls_start_color(struct lbuf *l)
+{
+	ls_color_t *c = get_color_attr(l);
+
+	if (c == NULL)
+		return;
+
+	if (lsc_debug)
+		lsc_match = c;
+
+	if (c->attr & LSA_BOLD)
+		ls_tprint(lsc_bold, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	if (c->attr & LSA_UNDERSCORE)
+		ls_tprint(lsc_underline, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	if (c->attr & LSA_BLINK)
+		ls_tprint(lsc_blink, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	if (c->attr & LSA_REVERSE)
+		ls_tprint(lsc_reverse, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	if (c->attr & LSA_CONCEALED)
+		ls_tprint(lsc_concealed, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	if (c->attr == LSA_NONE)
+		ls_tprint(lsc_none, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+	if (c->fg != -1)
+		ls_tprint(lsc_setfg, c->fg, 0, 0, 0, 0, 0, 0, 0, 0);
+	if (c->bg != -1)
+		ls_tprint(lsc_setbg, c->bg, 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+static void
+ls_end_color()
+{
+	ls_tprint(lsc_none, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+	if (lsc_debug)
+		dump_color(lsc_match);
+}
+
+static void
+new_color_entry(char *colorstr)
+{
+	static const struct {
+		const char	*s;
+		ls_cftype_t	stype;
+	} type_map[] = {
+		{ "no", LS_NORMAL },
+		{ "fi", LS_FILE },
+		{ "di", LS_DIR },
+		{ "ln", LS_LINK },
+		{ "pi", LS_FIFO },
+		{ "so", LS_SOCK },
+		{ "do", LS_DOOR },
+		{ "bd", LS_BLK },
+		{ "cd", LS_CHR },
+		{ "or", LS_ORPHAN },
+		{ "su", LS_SETUID },
+		{ "sg", LS_SETGID },
+		{ "tw", LS_STICKY_OTHER_WRITABLE },
+		{ "ow", LS_OTHER_WRITABLE },
+		{ "st", LS_STICKY },
+		{ "ex", LS_EXEC },
+		{ "po", LS_PORT },
+		{ NULL, LS_NORMAL }
+	};
+
+	char		*p, *lasts;
+	int		i;
+	int		color, attr;
+
+	p = strtok_r(colorstr, "=", &lasts);
+	if (p == NULL) {
+		colorflg = 0;
+		return;
+	}
+
+	if (p[0] == '*') {
+		lsc_colors[lsc_ncolors].ftype = LS_PAT;
+		/* don't include the * in the suffix */
+		if ((lsc_colors[lsc_ncolors].sfx = strdup(p + 1)) == NULL) {
+			colorflg = 0;
+			return;
 		}
 	} else {
-		format_time(FORMAT3, p->lat.tv_sec);
-		(void) printf("		timestamp: atime	%s\n",
-		    time_buf);
-		format_time(FORMAT3, p->lct.tv_sec);
-		(void) printf("		timestamp: ctime	%s\n",
-		    time_buf);
-		format_time(FORMAT3, p->lmt.tv_sec);
-		(void) printf("		timestamp: mtime	%s\n",
-		    time_buf);
-		if (p->extm != NULL) {
-			while (p->extm[i].stm != 0 && i < sacnt) {
-				format_time(FORMAT3, p->extm[i].stm);
-				if (p->extm[i].name != NULL) {
-					(void) printf("		timestamp:"
-					    " %s	%s\n",
-					    p->extm[i].name, time_buf);
-				}
-				i++;
+		lsc_colors[lsc_ncolors].sfx = NULL;
+
+		for (i = 0; type_map[i].s != NULL; ++i) {
+			if (strncmp(type_map[i].s, p, 2) == 0)
+				break;
+		}
+
+		/* ignore unknown file types */
+		if (type_map[i].s == NULL)
+			return;
+
+		lsc_colors[lsc_ncolors].ftype = type_map[i].stype;
+	}
+
+	attr = LSA_NONE;
+	lsc_colors[lsc_ncolors].fg = -1;
+	lsc_colors[lsc_ncolors].bg = -1;
+	for (p = strtok_r(NULL, ";", &lasts); p != NULL;
+	    p = strtok_r(NULL, ";", &lasts)) {
+		color = strtol(p, NULL, 10);
+
+		if (color < 10) {
+			switch (color) {
+			case 0:
+				attr = LSA_NONE;
+				continue;
+			case 1:
+				attr |= LSA_BOLD;
+				continue;
+			case 4:
+				attr |= LSA_UNDERSCORE;
+				continue;
+			case 5:
+				attr |= LSA_BLINK;
+				continue;
+			case 7:
+				attr |= LSA_REVERSE;
+				continue;
+			case 8:
+				attr |= LSA_CONCEALED;
+				continue;
+			default:
+				continue;
 			}
 		}
+
+		if (color < 40)
+			lsc_colors[lsc_ncolors].fg = color - 30;
+		else
+			lsc_colors[lsc_ncolors].bg = color - 40;
+	}
+
+	lsc_colors[lsc_ncolors].attr = attr;
+	++lsc_ncolors;
+}
+
+static int
+ls_color_compare(const void *p1, const void *p2)
+{
+	const ls_color_t *c1 = (const ls_color_t *)p1;
+	const ls_color_t *c2 = (const ls_color_t *)p2;
+
+	int ret = c1->ftype - c2->ftype;
+
+	if (ret != 0)
+		return (ret);
+
+	if (c1->ftype != LS_PAT)
+		return (ret);
+
+	return (strcmp(c1->sfx, c2->sfx));
+}
+
+static void
+ls_color_init()
+{
+	static char *default_colorstr = "no=00:fi=00:di=01;34:ln=01;36:po=01;35"
+	    ":pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01"
+	    ":su=37;41:sg=30;43:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31"
+	    ":*.tgz=01;31:*.arj=01;31:*.taz=01;31:*.lzh=01;31:*.zip=01;31"
+	    ":*.z=01;31:*.Z=01;31:*.gz=01;31:*.bz2=01;31:*.deb=01;31"
+	    ":*.rpm=01;31:*.jar=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35"
+	    ":*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35"
+	    ":*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35"
+	    ":*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.avi=01;35:*.fli=01;35"
+	    ":*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.flac=01;35"
+	    ":*.mp3=01;35:*.mpc=01;35:*.ogg=01;35:*.wav=01;35";
+
+	char    *colorstr;
+	char    *p, *lasts;
+	size_t  color_sz;
+	int	termret;
+
+	(void) setupterm(NULL, 1, &termret);
+	if (termret != 1)
+		return;
+
+	if ((colorstr = getenv("LS_COLORS")) == NULL)
+		colorstr = default_colorstr;
+
+	color_sz = 0;
+	for (p = strchr(colorstr, ':'); p != NULL && *p != '\0';
+	    p = strchr(++p, ':'))
+		++color_sz;
+
+	lsc_colors = calloc(color_sz, sizeof (ls_color_t));
+	if (lsc_colors == NULL) {
+		free(colorstr);
+		return;
+	}
+
+	for (p = strtok_r(colorstr, ":", &lasts);
+	    p != NULL && lsc_ncolors < color_sz;
+	    p = strtok_r(NULL, ":", &lasts))
+		new_color_entry(p);
+
+	qsort((void *)lsc_colors, lsc_ncolors, sizeof (ls_color_t),
+	    ls_color_compare);
+
+	if ((lsc_bold = tigetstr("bold")) == (char *)-1)
+		lsc_bold = NULL;
+
+	if ((lsc_underline = tigetstr("smul")) == (char *)-1)
+		lsc_underline = NULL;
+
+	if ((lsc_blink = tigetstr("blink")) == (char *)-1)
+		lsc_blink = NULL;
+
+	if ((lsc_reverse = tigetstr("rev")) == (char *)-1)
+		lsc_reverse = NULL;
+
+	if ((lsc_concealed = tigetstr("prot")) == (char *)-1)
+		lsc_concealed = NULL;
+
+	if ((lsc_none = tigetstr("sgr0")) == (char *)-1)
+		lsc_none = NULL;
+
+	if ((lsc_setfg = tigetstr("setaf")) == (char *)-1)
+		lsc_setfg = NULL;
+
+	if ((lsc_setbg = tigetstr("setab")) == (char *)-1)
+		lsc_setbg = NULL;
+
+	if (getenv("_LS_COLOR_DEBUG") != NULL) {
+		int i;
+
+		lsc_debug = 1;
+		for (i = 0; i < lsc_ncolors; ++i)
+			dump_color(&lsc_colors[i]);
 	}
 }
 
