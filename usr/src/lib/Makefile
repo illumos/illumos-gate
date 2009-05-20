@@ -259,6 +259,10 @@ SUBDIRS += \
 	mpapi		\
 	$($(MACH)_SUBDIRS)
 
+i386_SUBDIRS=		\
+	libntfs		\
+	libparted
+
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
 	libc_psr	.WAIT	\

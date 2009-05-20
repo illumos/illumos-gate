@@ -173,8 +173,13 @@ $SkipUnusedSearchPath = qr{
 	/usr/sfw/lib.*\ from\ .*libdbus-glib-1\.so\.2 |		# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libglib-2\.0\.so\.0 |		# non-OSNet
 	/usr/X11/lib.*\ from\ .*libglib-2\.0\.so\.0 |		# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libgmodule-2\.0\.so\.0 |	# non-OSNet
+	/usr/X11/lib.*\ from\ .*libgmodule-2\.0\.so\.0 |	# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libgnomevfs-2\.so\.0 |		# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libgobject-2\.0\.so\.0 |	# non-OSNet
 	/usr/X11/lib.*\ from\ .*libgobject-2\.0\.so\.0 |	# non-OSNet
+	/usr/sfw/lib.*\ from\ .*libgthread-2\.0\.so\.0 |	# non-OSNet
+	/usr/X11/lib.*\ from\ .*libgthread-2\.0\.so\.0 |	# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8 |	# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.5 |		# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1 |		# non-OSNet

@@ -485,7 +485,9 @@ i386_SUBDIRS=		\
 	biosdev		\
 	diskscan	\
 	lms		\
+	ntfsprogs	\
 	OWconfig	\
+	parted		\
 	rtc		\
 	ucodeadm	\
 	xvm
