@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -458,7 +458,7 @@ typedef struct ipsacq_s {
  */
 #define	IACQF_LOWEST_SEQ 0x80000000
 
-#define	SADB_AGE_INTERVAL_DEFAULT 1000
+#define	SADB_AGE_INTERVAL_DEFAULT 8000
 
 /*
  * ACQUIRE fanout.  Protect each linkage with a lock.
