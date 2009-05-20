@@ -1884,6 +1884,13 @@ tavor_port_query(tavor_state_t *state, uint_t port, ibt_hca_portinfo_t *pi)
 	pi->p_sm_lid		= portinfo.MasterSMLID;
 	pi->p_linkstate		= portinfo.PortState;
 	pi->p_port_num		= portinfo.LocalPortNum;
+	pi->p_phys_state	= portinfo.PortPhysicalState;
+	pi->p_width_supported	= portinfo.LinkWidthSupported;
+	pi->p_width_enabled	= portinfo.LinkWidthEnabled;
+	pi->p_width_active	= portinfo.LinkWidthActive;
+	pi->p_speed_supported	= portinfo.LinkSpeedSupported;
+	pi->p_speed_enabled	= portinfo.LinkSpeedEnabled;
+	pi->p_speed_active	= portinfo.LinkSpeedActive;
 	pi->p_mtu		= portinfo.MTUCap;
 	pi->p_lmc		= portinfo.LMC;
 	pi->p_max_vl		= portinfo.VLCap;

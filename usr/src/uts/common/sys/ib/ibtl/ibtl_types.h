@@ -561,6 +561,42 @@ typedef enum ibt_port_caps_e {
 } ibt_port_caps_t;
 
 
+/* LinkWidth fields from PortInfo */
+typedef uint8_t ib_link_width_t;
+
+/*
+ * When reading LinkWidthSupported and LinkWidthEnabled, these
+ * values will be OR-ed together. See IB spec 14.2.5.6 for allowed
+ * combinations. For LinkWidthActive, only one will be returned.
+ */
+#define	IBT_LINK_WIDTH_1X	(1)
+#define	IBT_LINK_WIDTH_4X	(2)
+#define	IBT_LINK_WIDTH_8X	(4)
+#define	IBT_LINK_WIDTH_12X	(8)
+
+/* LinkSpeed fields from PortInfo */
+typedef uint8_t ib_link_speed_t;
+
+/*
+ * When reading LinkSpeedSupported and LinkSpeedEnabled, these
+ * values will be OR-ed together. See IB spec 14.2.5.6 for allowed
+ * combinations. For LinkSpeedActive, only one will be returned.
+ */
+#define	IBT_LINK_SPEED_SDR	(1)
+#define	IBT_LINK_SPEED_DDR	(2)
+#define	IBT_LINK_SPEED_QDR	(4)
+
+/* PortPhysicalState field from PortInfo */
+typedef uint8_t ib_port_phys_state_t;
+
+#define	IBT_PORT_PHYS_STATE_SLEEP	(1)
+#define	IBT_PORT_PHYS_STATE_POLLING	(2)
+#define	IBT_PORT_PHYS_STATE_DISABLED	(3)
+#define	IBT_PORT_PHYS_STATE_TRAINING	(4)
+#define	IBT_PORT_PHYS_STATE_UP		(5)
+#define	IBT_PORT_PHYS_STATE_RECOVERY	(6)
+#define	IBT_PORT_PHYS_STATE_TEST	(7)
+
 /*
  * HCA port attributes structure definition. The number of ports per HCA
  * can be found from the "ibt_hca_attr_t" structure.
@@ -583,11 +619,18 @@ typedef struct ibt_hca_portinfo_s {
 	ib_qkey_cntr_t		p_qkey_violations; /* Bad Q_Key cnt */
 	ib_pkey_cntr_t		p_pkey_violations; /* Optional bad P_Key cnt */
 	uint8_t			p_sm_sl:4;	/* SM Service level */
+	ib_port_phys_state_t	p_phys_state;
 	ib_lid_t		p_sm_lid;	/* SM LID */
 	ibt_port_state_t	p_linkstate;	/* Port state */
 	uint8_t			p_port_num;
+	ib_link_width_t		p_width_supported;
+	ib_link_width_t		p_width_enabled;
+	ib_link_width_t		p_width_active;
 	ib_mtu_t		p_mtu;		/* Max transfer unit - pkt */
 	uint8_t			p_lmc:3;	/* Local mask control */
+	ib_link_speed_t		p_speed_supported;
+	ib_link_speed_t		p_speed_enabled;
+	ib_link_speed_t		p_speed_active;
 	ib_gid_t		*p_sgid_tbl;	/* SGID Table */
 	uint_t			p_sgid_tbl_sz;	/* Size of SGID table */
 	uint16_t		p_pkey_tbl_sz;	/* Size of P_Key table */
