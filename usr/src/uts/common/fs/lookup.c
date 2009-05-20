@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,22 +68,23 @@ lookupname(
 	vnode_t **dirvpp,
 	vnode_t **compvpp)
 {
-	return (lookupnameat(fnamep, seg, followlink, dirvpp, compvpp, NULL));
+	return (lookupnameatcred(fnamep, seg, followlink, dirvpp, compvpp, NULL,
+	    CRED()));
 }
-
 
 /*
  * Lookup the user file name,
  * Handle allocation and freeing of pathname buffer, return error.
  */
 int
-lookupnameat(
+lookupnameatcred(
 	char *fnamep,			/* user pathname */
 	enum uio_seg seg,		/* addr space that name is in */
 	enum symfollow followlink,	/* follow sym links */
 	vnode_t **dirvpp,		/* ret for ptr to parent dir vnode */
 	vnode_t **compvpp,		/* ret for ptr to component vnode */
-	vnode_t *startvp)		/* start path search from vp */
+	vnode_t *startvp,		/* start path search from vp */
+	cred_t *cr)			/* credential */
 {
 	char namebuf[TYPICALMAXPATHLEN];
 	struct pathname lookpn;
@@ -93,8 +94,8 @@ lookupnameat(
 	if (error == 0) {
 		if (audit_active)
 			audit_lookupname();
-		error = lookuppnat(&lookpn, NULL, followlink,
-		    dirvpp, compvpp, startvp);
+		error = lookuppnatcred(&lookpn, NULL, followlink,
+		    dirvpp, compvpp, startvp, cr);
 	}
 	if (error == ENAMETOOLONG) {
 		/*
@@ -102,17 +103,22 @@ lookupnameat(
 		 */
 		if (error = pn_get(fnamep, seg, &lookpn))
 			return (error);
-		error = lookuppnat(&lookpn, NULL, followlink,
-		    dirvpp, compvpp, startvp);
+		error = lookuppnatcred(&lookpn, NULL, followlink,
+		    dirvpp, compvpp, startvp, cr);
 		pn_free(&lookpn);
 	}
 
 	return (error);
 }
 
-/*
- * Lookup the user file name from a given vp,
- */
+int
+lookupnameat(char *fnamep, enum uio_seg seg, enum symfollow followlink,
+    vnode_t **dirvpp, vnode_t **compvpp, vnode_t *startvp)
+{
+	return (lookupnameatcred(fnamep, seg, followlink, dirvpp, compvpp,
+	    startvp, CRED()));
+}
+
 int
 lookuppn(
 	struct pathname *pnp,
@@ -121,17 +127,22 @@ lookuppn(
 	vnode_t **dirvpp,
 	vnode_t **compvpp)
 {
-	return (lookuppnat(pnp, rpnp, followlink, dirvpp, compvpp, NULL));
+	return (lookuppnatcred(pnp, rpnp, followlink, dirvpp, compvpp, NULL,
+	    CRED()));
 }
 
+/*
+ * Lookup the user file name from a given vp, using a specific credential.
+ */
 int
-lookuppnat(
+lookuppnatcred(
 	struct pathname *pnp,		/* pathname to lookup */
 	struct pathname *rpnp,		/* if non-NULL, return resolved path */
 	enum symfollow followlink,	/* (don't) follow sym links */
 	vnode_t **dirvpp,		/* ptr for parent vnode */
 	vnode_t **compvpp,		/* ptr for entry vnode */
-	vnode_t *startvp)		/* start search from this vp */
+	vnode_t *startvp,		/* start search from this vp */
+	cred_t *cr)			/* user credential */
 {
 	vnode_t *vp;	/* current directory vp */
 	vnode_t *rootvp;
@@ -165,7 +176,16 @@ lookuppnat(
 	}
 
 	return (lookuppnvp(pnp, rpnp, followlink, dirvpp,
-	    compvpp, rootvp, vp, CRED()));
+	    compvpp, rootvp, vp, cr));
+}
+
+int
+lookuppnat(struct pathname *pnp, struct pathname *rpnp,
+    enum symfollow followlink, vnode_t **dirvpp, vnode_t **compvpp,
+    vnode_t *startvp)
+{
+	return (lookuppnatcred(pnp, rpnp, followlink, dirvpp, compvpp, startvp,
+	    CRED()));
 }
 
 /* Private flag to do our getcwd() dirty work */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +33,6 @@
 
 #ifndef _SYS_PATHNAME_H
 #define	_SYS_PATHNAME_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/vnode.h>
 #include <sys/cred.h>
@@ -87,10 +84,14 @@ extern int lookupname(char *, enum uio_seg, enum symfollow,
 		vnode_t **, vnode_t **);
 extern int lookupnameat(char *, enum uio_seg, enum symfollow,
 		vnode_t **, vnode_t **, vnode_t *);
+extern int lookupnameatcred(char *, enum uio_seg, enum symfollow,
+		vnode_t **, vnode_t **, vnode_t *, cred_t *);
 extern int lookuppn(struct pathname *, struct pathname *, enum symfollow,
 		vnode_t **, vnode_t **);
 extern int lookuppnat(struct pathname *, struct pathname *, enum symfollow,
 		vnode_t **, vnode_t **, vnode_t *);
+extern int lookuppnatcred(struct pathname *, struct pathname *, enum symfollow,
+		vnode_t **, vnode_t **, vnode_t *, cred_t *);
 
 extern int lookuppnvp(struct pathname *, struct pathname *, int follow,
 		vnode_t **, vnode_t **, vnode_t *, vnode_t *, cred_t *);
