@@ -1384,17 +1384,18 @@ vnet_dispatch_res_task(vnet_t *vnetp)
 {
 	int rv;
 
-	WRITE_ENTER(&vnetp->vrwlock);
-	if (vnetp->flags & VNET_STARTED) {
-		rv = ddi_taskq_dispatch(vnetp->taskqp, vnet_res_start_task,
-		    vnetp, DDI_NOSLEEP);
-		if (rv != DDI_SUCCESS) {
-			cmn_err(CE_WARN,
-			    "vnet%d:Can't dispatch start resource task",
-			    vnetp->instance);
-		}
+	/*
+	 * Dispatch the task. It could be the case that vnetp->flags does
+	 * not have VNET_STARTED set. This is ok as vnet_rest_start_task()
+	 * can abort the task when the task is started.
+	 */
+	rv = ddi_taskq_dispatch(vnetp->taskqp, vnet_res_start_task,
+	    vnetp, DDI_NOSLEEP);
+	if (rv != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "vnet%d:Can't dispatch start resource task",
+		    vnetp->instance);
 	}
-	RW_EXIT(&vnetp->vrwlock);
 }
 
 /*
