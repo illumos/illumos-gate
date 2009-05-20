@@ -39,6 +39,7 @@
 #include <papi.h>
 #include <uri.h>
 #include "common.h"
+#include "lp.h"
 
 static void
 usage(char *program)
@@ -600,70 +601,96 @@ printer_query(char *name, int (*report)(papi_service_t, char *, papi_printer_t,
 					int, int), papi_encryption_t encryption,
 		int verbose, int description)
 {
-	int result = 0;
+	int result = 0, i = 0;
 	papi_status_t status;
 	papi_service_t svc = NULL;
+	char **list = getlist(name, LP_WS, LP_SEP);
 
-	status = papiServiceCreate(&svc, name, NULL, NULL, cli_auth_callback,
-	    encryption, NULL);
-	if (status != PAPI_OK) {
-		if (status == PAPI_NOT_FOUND)
-			fprintf(stderr, gettext("%s: unknown printer\n"),
-			    name ? name : "(NULL)");
-		else
-			fprintf(stderr, gettext(
-			    "Failed to contact service for %s: %s\n"),
-			    name ? name : "(NULL)",
-			    verbose_papi_message(svc, status));
-		papiServiceDestroy(svc);
-		return (-1);
+	if (list == NULL) {
+		list = (char **)malloc(sizeof (char *));
+		list[0] = name;
 	}
 
-	if (name == NULL) { /* all */
-		char **interest = interest_list(svc);
+	/*
+	 * The for loop executes once for every printer
+	 * entry in list. If list is NULL that implies
+	 * name is also NULL, the loop runs only one time.
+	 */
 
-		if (interest != NULL) {
-			int i;
+	for (i = 0; name == NULL || list[i] != NULL; i++) {
+		name = list[i];
 
-			for (i = 0; interest[i] != NULL; i++)
-				result += printer_query(interest[i], report,
-				    encryption, verbose,
-				    description);
-		}
-	} else {
-		papi_printer_t printer = NULL;
-		char **keys = NULL;
-
-		/*
-		 * Limit the query to only required data to reduce the need
-		 * to go remote for information.
-		 */
-		if (report == report_device)
-			keys = report_device_keys;
-		else if (report == report_class)
-			keys = report_class_keys;
-		else if (report == report_accepting)
-			keys = report_accepting_keys;
-		else if ((report == report_printer) && (verbose == 0))
-			keys = report_printer_keys;
-
-		status = papiPrinterQuery(svc, name, keys, NULL, &printer);
+		status = papiServiceCreate(&svc, name, NULL, NULL,
+		    cli_auth_callback, encryption, NULL);
 		if (status != PAPI_OK) {
-			fprintf(stderr, gettext(
-			    "Failed to get printer info for %s: %s\n"),
-			    name, verbose_papi_message(svc, status));
+			if (status == PAPI_NOT_FOUND)
+				fprintf(stderr,
+				    gettext("%s: unknown printer\n"),
+				    name ? name : "(NULL)");
+			else
+				fprintf(stderr, gettext(
+				    "Failed to contact service for %s: %s\n"),
+				    name ? name : "(NULL)",
+				    verbose_papi_message(svc, status));
 			papiServiceDestroy(svc);
-			return (-1);
+			result--;
+			continue;
 		}
 
-		if (printer != NULL)
-			result = report(svc, name, printer, verbose,
-			    description);
+		if (name == NULL) { /* all */
+			char **interest = interest_list(svc);
 
-		papiPrinterFree(printer);
+			if (interest != NULL) {
+				int i;
+
+				for (i = 0; interest[i] != NULL; i++)
+					result += printer_query(interest[i],
+					    report, encryption, verbose,
+					    description);
+			}
+		} else {
+			papi_printer_t printer = NULL;
+			char **keys = NULL;
+
+			/*
+			 * Limit the query to only required data
+			 * to reduce the need to go remote for
+			 * information.
+			 */
+			if (report == report_device)
+				keys = report_device_keys;
+			else if (report == report_class)
+				keys = report_class_keys;
+			else if (report == report_accepting)
+				keys = report_accepting_keys;
+			else if ((report == report_printer) && (verbose == 0))
+				keys = report_printer_keys;
+
+			status = papiPrinterQuery(svc, name, keys,
+			    NULL, &printer);
+			if (status != PAPI_OK) {
+				fprintf(stderr, gettext(
+				    "Failed to get printer info for %s: %s\n"),
+				    name, verbose_papi_message(svc, status));
+				papiServiceDestroy(svc);
+				result--;
+				continue;
+			}
+
+			if (printer != NULL)
+				result += report(svc, name, printer, verbose,
+				    description);
+
+			papiPrinterFree(printer);
+		}
+
+		papiServiceDestroy(svc);
+
+		if (name == NULL)
+			break;
 	}
 
-	papiServiceDestroy(svc);
+	freelist(list);
 
 	return (result);
 }
@@ -944,9 +971,11 @@ job_query(char *request, int (*report)(char *, papi_job_t, int, int),
 			id = job_to_be_queried(svc, printer, id);
 
 			if (id > 0)
-				status = papiJobQuery(svc, printer, id, NULL, &job);
+				status = papiJobQuery(svc, printer, id,
+				    NULL, &job);
 			else
-				status = papiJobQuery(svc, printer, rid, NULL, &job);
+				status = papiJobQuery(svc, printer, rid,
+				    NULL, &job);
 
 			if (status != PAPI_OK) {
 				if (!print_flag)

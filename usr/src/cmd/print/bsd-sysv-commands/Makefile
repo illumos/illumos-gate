@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../Makefile.sp
@@ -55,11 +54,14 @@ MANIFEST=	rfc1179.xml
 ROOTMANIFESTDIR=	$(ROOTSVCAPPLICATIONPRINT)
 $(ROOTMANIFEST)		:= FILEMODE= 444
 
+LPLIB	=	$(SRC)/cmd/lp/lib
+LIBLP	=	$(LPLIB)/lp/liblp.a
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I.
 CPPFLAGS +=	-I../../../lib/print/libpapi-common/common
 CPPFLAGS +=	-I$(ROOT)/usr/include
-LDLIBS +=	-lpapi -lc
+CPPFLAGS +=	-I../../lp/include
+LDLIBS +=	$(LIBLP) -lpapi -lc
 in.lpd:=	CFLAGS +=	-DSOLARIS_PRIVATE_POST_0_9
 in.lpd:=	LDLIBS +=	-lnsl -lsocket
 
