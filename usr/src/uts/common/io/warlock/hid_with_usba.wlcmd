@@ -114,6 +114,10 @@ root	hubd_cpr_post_user_callb
 root	ohci_intr
 root	ehci_intr
 
+root	ohci_quiesce
+root	uhci_quiesce
+root	ehci_quiesce
+
 root	usba_dbuf_tail
 root	usb_log
 root	hubd_restore_state_cb

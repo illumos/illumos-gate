@@ -665,11 +665,8 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	hidp->hid_km = B_FALSE;
-
 	/* create internal path for virtual */
 	if (strcmp(minor_name, "mouse") == 0) {
-		hidp->hid_km = B_TRUE;	/* mouse */
 		if (ddi_create_internal_pathname(dip, "internal_mouse", S_IFCHR,
 		    HID_CONSTRUCT_INTERNAL_MINOR(instance)) != DDI_SUCCESS) {
 
@@ -678,7 +675,6 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (strcmp(minor_name, "keyboard") == 0) {
-		hidp->hid_km = B_TRUE;	/* keyboard */
 		if (ddi_create_internal_pathname(dip, "internal_keyboard",
 		    S_IFCHR, HID_CONSTRUCT_INTERNAL_MINOR(instance)) !=
 		    DDI_SUCCESS) {
@@ -809,8 +805,8 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 *	device is already disconnnected.
 	 */
 	mutex_enter(&hidp->hid_mutex);
-	if (!hidp->hid_km || (HID_IS_INTERNAL_OPEN(minor) &&
-	    (hidp->hid_dev_state == USB_DEV_DISCONNECTED))) {
+	if (HID_IS_INTERNAL_OPEN(minor) &&
+	    (hidp->hid_dev_state == USB_DEV_DISCONNECTED)) {
 		mutex_exit(&hidp->hid_mutex);
 		return (ENODEV);
 	}

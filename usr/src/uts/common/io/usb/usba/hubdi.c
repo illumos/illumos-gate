@@ -1329,11 +1329,10 @@ hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		 */
 
 		for (i = 0; i < 100; i++) {
+			mutex_enter(HUBD_MUTEX(hubd));
 			for (port = 1;
 			    port <= hubd->h_hub_descr.bNbrPorts; port++) {
-				mutex_enter(HUBD_MUTEX(hubd));
 				cdip = hubd->h_children_dips[port];
-				mutex_exit(HUBD_MUTEX(hubd));
 				if (!cdip || i_ddi_node_state(cdip) <
 				    DS_INITIALIZED)
 					continue;
@@ -1344,6 +1343,8 @@ hubd_bus_config(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 				found = 1;
 				break;
 			}
+			mutex_exit(HUBD_MUTEX(hubd));
+
 			if (found)
 				break;
 			delay(drv_usectohz(100000));
@@ -3921,7 +3922,11 @@ hubd_hotplug_thread(void *arg)
 			(void) ndi_devi_online(hubd->h_dip, 0);
 		} else {
 			for (port = 1; port <= nports; port++) {
-				dev_info_t *dip = hubd->h_children_dips[port];
+				dev_info_t *dip;
+
+				mutex_enter(HUBD_MUTEX(hubd));
+				dip = hubd->h_children_dips[port];
+				mutex_exit(HUBD_MUTEX(hubd));
 				if (dip) {
 					int circ, rv;
 					dev_info_t *pdip = ddi_get_parent(dip);

@@ -509,10 +509,7 @@ static int	ohci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 static int	ohci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int	ohci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
-
-#ifndef	__sparc
 static int	ohci_quiesce(dev_info_t *dip);
-#endif	/* __sparc */
 
 static int	ohci_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
 				void *arg, void **result);
@@ -547,11 +544,7 @@ static struct dev_ops ohci_ops = {
 	&ohci_cb_ops,			/* Driver operations */
 	&usba_hubdi_busops,		/* Bus operations */
 	usba_hubdi_root_hub_power,	/* Power */
-#ifdef	__sparc
-	ddi_quiesce_not_supported,	/* Quiesce */
-#else
 	ohci_quiesce,			/* Quiesce */
-#endif	/* __sparc */
 };
 
 /*
@@ -11297,8 +11290,16 @@ ohci_print_td(
  *
  * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
  * DDI_FAILURE indicates an error condition and should almost never happen.
+ *
+ * define as a wrapper for sparc, or warlock will complain.
  */
-#ifndef	__sparc
+#ifdef	__sparc
+int
+ohci_quiesce(dev_info_t *dip)
+{
+	return (ddi_quiesce_not_supported(dip));
+}
+#else
 int
 ohci_quiesce(dev_info_t *dip)
 {

@@ -180,8 +180,6 @@ typedef struct hid_state {
 	kmutex_t		hid_mutex;	/* for general locking */
 	int			hid_instance;	/* instance number */
 
-	boolean_t		hid_km;		/* for virtual keyboard/mouse */
-
 	/* Attach/detach flags */
 	int			hid_attach_flags;
 
@@ -246,7 +244,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dip))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_pm))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_data))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_instance))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_km))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_interrupt_pipe))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_ep_intr_descr))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_default_pipe))
