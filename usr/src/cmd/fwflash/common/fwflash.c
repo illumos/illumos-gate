@@ -83,7 +83,7 @@ static int fwflash_in_write = 0;
  * actually of any use - it doesn't line up with Mercurial's
  * concept of the changeset.
  */
-#define	FWFLASH_VERSION		"v1.7"
+#define	FWFLASH_VERSION		"v1.8"
 #define	FWFLASH_PROG_NAME	"fwflash"
 
 static int get_fileopts(char *options);
@@ -323,7 +323,7 @@ flash_load_plugins()
 		logmsg(MSG_ERROR,
 		    gettext("Unable to malloc %d bytes while "
 		    "trying to load plugins: %s\n"),
-		    sizeof (struct fw_plugin) + 1, strerror(errno));
+		    sizeof (struct fw_plugin), strerror(errno));
 		return (FWFLASH_FAILURE);
 	}
 
@@ -399,7 +399,8 @@ flash_load_plugins()
 			    MAXMODCONFNAME) != 0) {
 				char *tempnm = calloc(1, MAXMODCONFNAME);
 
-				memcpy(tempnm, plugdir->d_name, MAXMODCONFNAME);
+				(void) memcpy(tempnm, plugdir->d_name,
+				    MAXMODCONFNAME);
 				(void) strlcpy(tmpplug->drvname,
 				    strtok(tempnm, "."),
 				    strlen(plugdir->d_name) + 1);
@@ -444,6 +445,28 @@ flash_load_plugins()
 			continue;
 		}
 
+		if ((sym = dlsym(tmpplug->handle, "plugin_version"))
+		    != NULL) {
+			if ((*(int *)sym) >= FWPLUGIN_VERSION_2) {
+				if ((sym = dlsym(tmpplug->handle,
+				    "fw_cleanup")) != NULL) {
+					tmpplug->fw_cleanup =
+					    (void (*)(struct devicelist *))sym;
+				} else {
+					logmsg(MSG_ERROR,
+					    gettext("ERROR: v2 plugin (%s) "
+					    "has no fw_cleanup function\n"),
+					    tmpplug->filename);
+					CLOSEFREE();
+					continue;
+				}
+			} else {
+				logmsg(MSG_INFO,
+				    "Identification plugin %s defined "
+				    "plugin_version < FWPLUGIN_VERSION_2 !");
+			}
+		}
+
 		if ((tmpelem->drvname = calloc(1, MAXMODCONFNAME))
 		    == NULL) {
 			logmsg(MSG_ERROR,
@@ -482,12 +505,11 @@ flash_load_plugins()
 		logmsg(MSG_ERROR,
 		    gettext("Error reading directory entry in %s\n"),
 		    fwplugdirpath);
-		(void) closedir(dirp);
 		rval = errno;
 	}
 
-	(void) free(fwplugdirpath);
-	(void) free(plugdir);
+	free(fwplugdirpath);
+	free(plugdir);
 	(void) closedir(dirp);
 	return (rval);
 }
@@ -522,11 +544,15 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 		verifier->imgsize = 0;
 		verifier->flashbuf = 0; /* set by the verifier function */
 
-		if (verifier->imgfile != NULL)
-			(void) free(verifier->imgfile);
+		if (verifier->imgfile != NULL) {
+			free(verifier->imgfile);
+			verifier->imgfile = NULL;
+		}
 
-		if (verifier->fwimage != NULL)
-			(void) free(verifier->fwimage);
+		if (verifier->fwimage != NULL) {
+			free(verifier->fwimage);
+			verifier->fwimage = NULL;
+		}
 	} else {
 		if ((fwvrfydirpath = calloc(1, MAXPATHLEN + 1)) == NULL) {
 			logmsg(MSG_ERROR,
@@ -539,20 +565,24 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 			logmsg(MSG_ERROR,
 			    gettext("Unable to allocate space "
 			    "for a firmware verifier file(2)"));
+			free(fwvrfydirpath);
 			return (rv);
 		}
 
-	/*
-	 * Since SCSI devices can have a vendor id of up to 8 left-aligned
-	 * and _space-padded_ characters, we first need to strip off any
-	 * space characters before we try to make a filename out of it
-	 */
+		/*
+		 * Since SCSI devices can have a vendor id of up to 8
+		 * left-aligned and _space-padded_ characters, we first need to
+		 * strip off any space characters before we try to make a
+		 * filename out of it
+		 */
 		clean = strtok(vendorid, " ");
 		if (clean == NULL) {
 			/* invalid vendorid, something's really wrong */
 			logmsg(MSG_ERROR,
 			    gettext("Invalid vendorid (null) specified for "
 			    "device\n"));
+			free(filename);
+			free(fwvrfydirpath);
 			return (rv);
 		}
 
@@ -572,14 +602,39 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 			    "for a firmware verifier structure"));
 			free(filename);
 			free(fwvrfydirpath);
-			return (FWFLASH_FAILURE);
+			return (rv);
 		}
 
 		errno = 0; /* false positive removal */
 
-		(void) snprintf(filename, strlen(fwvrfydirpath) +
-		    strlen(drv) + 7 + strlen(clean), "%s/%s-%s.so\0",
+		(void) snprintf(filename, MAXPATHLEN, "%s/%s-%s.so",
 		    fwvrfydirpath, drv, clean);
+		if ((vrfy->handle = dlopen(filename, RTLD_NOW)) == NULL) {
+			logmsg(MSG_INFO, gettext(dlerror()));
+			logmsg(MSG_INFO,
+			    gettext("\nUnable to open verification plugin "
+			    "%s. Looking for %s-GENERIC plugin instead.\n"),
+			    filename, drv);
+
+			/* Try the drv-GENERIC.so form, _then_ die */
+			bzero(filename, strlen(filename) + 1);
+			(void) snprintf(filename, MAXPATHLEN,
+			    "%s/%s-GENERIC.so", fwvrfydirpath, drv);
+
+			if ((vrfy->handle = dlopen(filename, RTLD_NOW))
+			    == NULL) {
+				logmsg(MSG_INFO, gettext(dlerror()));
+				logmsg(MSG_ERROR,
+				    gettext("\nUnable to open either "
+				    "verification plugin %s/%s-%s.so or "
+				    "generic plugin %s.\nUnable to verify "
+				    "firmware image. Aborting.\n"),
+				    fwvrfydirpath, drv, clean, filename);
+				free(filename);
+				free(fwvrfydirpath);
+				return (rv);
+			}
+		}
 
 		if ((vrfy->filename = calloc(1, strlen(filename) + 1))
 		    == NULL) {
@@ -589,22 +644,9 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 			free(filename);
 			free(fwvrfydirpath);
 			free(vrfy->handle);
-			return (FWFLASH_FAILURE);
+			return (rv);
 		}
-
 		(void) strlcpy(vrfy->filename, filename, strlen(filename) + 1);
-
-		if ((vrfy->handle = dlopen(filename, RTLD_NOW)) == NULL) {
-			logmsg(MSG_ERROR, gettext(dlerror()));
-			logmsg(MSG_ERROR,
-			    gettext("Unable to open verification plugin "
-			    "%s. Unable to verify firmware image. "
-			    "Aborting.\n"),
-			    filename);
-			free(filename);
-			free(fwvrfydirpath);
-			return (FWFLASH_FAILURE);
-		}
 
 		if ((vrfysym = dlsym(vrfy->handle, "vendorvrfy")) == NULL) {
 			logmsg(MSG_ERROR,
@@ -614,7 +656,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 			free(filename);
 			free(fwvrfydirpath);
 			free(vrfy);
-			return (FWFLASH_FAILURE);
+			return (rv);
 		} else {
 			vrfy->vendorvrfy =
 			    (int (*)(struct devicelist *))vrfysym;
@@ -628,13 +670,13 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 			    "plugin %s\n"), filename);
 			(void) dlclose(vrfy->handle);
 			free(vrfy);
-			return (NULL);
+			return (rv);
 		} else {
 			if (strncmp(vendorid, (char *)vrfysym,
 			    strlen(vendorid)) != 0) {
 				logmsg(MSG_INFO,
 				    "Using a sym-linked (%s -> %s) "
-				    "verification plugin",
+				    "verification plugin\n",
 				    vendorid, vrfysym);
 				vrfy->vendor = calloc(1, strlen(vendorid) + 1);
 			} else {
@@ -645,8 +687,9 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 		}
 
 		verifier = vrfy; /* a convenience variable */
+		free(filename);
+		free(fwvrfydirpath);
 	}
-
 
 	/*
 	 * We don't do any verification that the fw image file is in
@@ -694,7 +737,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg)
 		    "(got %d bytes, expected %d bytes) from "
 		    "firmware image file %s: %s\n"),
 		    rv, verifier->imgsize,
-		    filename, strerror(errno));
+		    verifier->filename, strerror(errno));
 		rv = FWFLASH_FAILURE;
 	} else {
 		rv = FWFLASH_SUCCESS;
@@ -714,7 +757,8 @@ cleanup:
 		free(verifier->filename);
 		free(verifier->vendor);
 
-		if (!(fwflash_arg_list & FWFLASH_READ_FLAG))
+		if (!(fwflash_arg_list & FWFLASH_READ_FLAG) &&
+		    verifier->fwimage)
 			free(verifier->fwimage);
 
 		verifier->filename = NULL;
@@ -753,7 +797,7 @@ flash_device_list()
 	struct pluginlist *plugins;
 
 	/* we open rootnode here, and close it in fwflash_intr */
-	if ((rootnode = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
+	if ((rootnode = di_init("/", DINFOCPYALL|DINFOFORCE)) == DI_NODE_NIL) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to take device tree snapshot: %s\n"),
 		    strerror(errno));
@@ -898,7 +942,6 @@ fwflash_update(char *device, char *filename, int flags)
 	    filename, device);
 
 	TAILQ_FOREACH(curdev, fw_devices, nextdev) {
-
 		if (strcmp(curdev->access_devname, realfile) == 0) {
 			found++;
 			rv = fwflash_load_verifier(curdev->drvname,
@@ -953,7 +996,7 @@ fwflash_update(char *device, char *filename, int flags)
 		    gettext("Device %s does not appear "
 		    "to be flashable\n"),
 		    ((strncmp(device, realfile, strlen(device)) == 0) ?
-		    device : realfile));
+		    realfile : device));
 
 	if (needsfree)
 		free(realfile);
@@ -1060,10 +1103,10 @@ fwflash_intr(int sig)
 	struct devicelist *thisdev;
 	struct pluginlist *thisplug;
 
-
 	(void) signal(SIGINT, SIG_IGN);
 	(void) signal(SIGTERM, SIG_IGN);
 	(void) signal(SIGABRT, SIG_IGN);
+
 	if (fwflash_in_write) {
 		(void) fprintf(stderr,
 		    gettext("WARNING: firmware image may be corrupted\n\t"));
@@ -1083,15 +1126,23 @@ fwflash_intr(int sig)
 	 */
 	if (fw_devices != NULL) {
 		TAILQ_FOREACH(thisdev, fw_devices, nextdev) {
-			/* free the components first */
-			free(thisdev->access_devname);
-			free(thisdev->drvname);
-			free(thisdev->classname);
-			if (thisdev->ident != NULL)
-				free(thisdev->ident);
-
-			thisdev->ident = NULL;
-			thisdev->plugin = NULL; /* we free this elsewhere */
+			if (thisdev->plugin->fw_cleanup != NULL) {
+				/*
+				 * If we've got a cleanup routine, it
+				 * cleans up _everything_ for thisdev
+				 */
+				thisdev->plugin->fw_cleanup(thisdev);
+			} else {
+				/* free the components first */
+				free(thisdev->access_devname);
+				free(thisdev->drvname);
+				free(thisdev->classname);
+				if (thisdev->ident != NULL)
+					free(thisdev->ident);
+				/* We don't free address[] for old plugins */
+				thisdev->ident = NULL;
+				thisdev->plugin = NULL;
+			}
 			/* CONSTCOND */
 			TAILQ_REMOVE(fw_devices, thisdev, nextdev);
 		}
@@ -1111,6 +1162,7 @@ fwflash_intr(int sig)
 			thisplug->plugin->fw_writefw = NULL;
 			thisplug->plugin->fw_identify = NULL;
 			thisplug->plugin->fw_devinfo = NULL;
+			thisplug->plugin->fw_cleanup = NULL;
 			(void) dlclose(thisplug->plugin->handle);
 			thisplug->plugin->handle = NULL;
 			free(thisplug->plugin);
@@ -1135,6 +1187,9 @@ fwflash_intr(int sig)
 		free(verifier);
 	}
 	di_fini(rootnode);
+
+	if (sig > 0)
+		exit(FWFLASH_FAILURE);
 }
 
 static void
@@ -1159,8 +1214,8 @@ confirm_target(struct devicelist *thisdev, char *file)
 	(void) fflush(stdin);
 	(void) printf(gettext("About to update firmware on %s\n"),
 	    thisdev->access_devname);
-	(void) printf(gettext("with file %s. Do you want to continue? "
-	    "(Y/N): "), file);
+	(void) printf(gettext("with file %s.\n"
+	    "Do you want to continue? (Y/N): "), file);
 
 	resp = getchar();
 	if (resp == 'Y' || resp == 'y') {
@@ -1227,8 +1282,8 @@ get_fileopts(char *options)
  * code reuse - cheerfully borrowed from stmsboot_util.c
  */
 void
-logmsg(int severity, const char *msg, ...) {
-
+logmsg(int severity, const char *msg, ...)
+{
 	va_list ap;
 
 	if ((severity > MSG_INFO) ||

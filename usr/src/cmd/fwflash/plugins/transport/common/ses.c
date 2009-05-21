@@ -133,7 +133,6 @@ static char *sgensuffix = ":ses";
 
 
 static ses_target_t *ses_target;
-static int internalstatus;
 
 extern di_node_t rootnode;
 extern int errno;
@@ -150,7 +149,7 @@ int fw_devinfo(struct devicelist *thisdev);
 
 
 /* helper functions */
-static void print_updated_status(ses_node_t *np, void *arg);
+static int print_updated_status(ses_node_t *np, void *arg);
 static int get_status(nvlist_t *props, ucode_status_t *sp);
 static int sendimg(ses_node_t *np, void *data);
 static int scsi_writebuf();
@@ -191,7 +190,7 @@ fw_readfw(struct devicelist *flashdev, char *filename)
 int
 fw_writefw(struct devicelist *flashdev)
 {
-	int rv;
+	int rv = FWFLASH_FAILURE;
 	nvlist_t *nvl;
 	ses_snap_t *snapshot;
 	ses_node_t *targetnode;
@@ -244,7 +243,6 @@ fw_writefw(struct devicelist *flashdev)
 	}
 
 	snapshot = ses_snap_hold(ses_target);
-	internalstatus = FWFLASH_FAILURE;
 
 	if ((targetnode = ses_snap_primary_enclosure(snapshot)) == NULL) {
 		logmsg(MSG_ERROR,
@@ -271,7 +269,7 @@ fw_writefw(struct devicelist *flashdev)
 cancel:
 	nvlist_free(nvl);
 
-	return (internalstatus);
+	return (rv);
 }
 
 
@@ -555,7 +553,6 @@ int
 fw_devinfo(struct devicelist *thisdev)
 {
 
-
 	fprintf(stdout, gettext("Device[%d] %s\n  Class [%s]\n"),
 	    thisdev->index, thisdev->access_devname, thisdev->classname);
 
@@ -593,16 +590,14 @@ get_status(nvlist_t *props, ucode_status_t *sp)
 		sp->us_status = -1ULL;
 		(void) snprintf(sp->us_desc, sizeof (sp->us_desc),
 		    "not supported");
-		internalstatus = FWFLASH_FAILURE;
-		return (-1);
+		return (FWFLASH_FAILURE);
 	}
 
 	if (nvlist_lookup_uint64(props, SES_EN_PROP_UCODE_A,
 	    &astatus) != 0) {
 		logmsg(MSG_ERROR,
 		    gettext("\nError: Unable to retrieve current status\n"));
-		internalstatus = FWFLASH_FAILURE;
-		return (-1);
+		return (FWFLASH_FAILURE);
 	}
 
 	for (i = 0; i < NUCODE_STATUS; i++) {
@@ -615,7 +610,8 @@ get_status(nvlist_t *props, ucode_status_t *sp)
 	if (i == NUCODE_STATUS) {
 		(void) snprintf(sp->us_desc, sizeof (sp->us_desc),
 		    "unknown (0x%02x)", (int)status);
-		sp->us_iserr = sp->us_pending = B_FALSE;
+		sp->us_iserr = sp->us_pending = B_TRUE;
+		return (FWFLASH_FAILURE);
 	} else {
 		/* LINTED */
 		(void) snprintf(sp->us_desc, sizeof (sp->us_desc),
@@ -624,11 +620,11 @@ get_status(nvlist_t *props, ucode_status_t *sp)
 		sp->us_pending = ucode_statdesc_table[i].us_pending;
 	}
 
-	return (0);
+	return (FWFLASH_SUCCESS);
 }
 
 
-static void
+static int
 print_updated_status(ses_node_t *np, void *arg)
 {
 	ucode_wait_t *uwp = arg;
@@ -637,13 +633,11 @@ print_updated_status(ses_node_t *np, void *arg)
 
 
 	if ((props = ses_node_props(np)) == NULL) {
-		internalstatus = FWFLASH_FAILURE;
-		return;
+		return (FWFLASH_FAILURE);
 	}
 
-	if (get_status(props, &status) != 0)
-		/* internalstatus is already set to FWFLASH_FAILURE */
-		return;
+	if (get_status(props, &status) != FWFLASH_SUCCESS)
+		return (FWFLASH_FAILURE);
 
 	if (status.us_status != uwp->uw_prevstatus)
 		(void) printf("%30s: %s\n", "status", status.us_desc);
@@ -655,10 +649,9 @@ print_updated_status(ses_node_t *np, void *arg)
 		logmsg(MSG_INFO,
 		    "libses: status.us_iserr: 0x%0x\n",
 		    status.us_iserr);
-		internalstatus = FWFLASH_FAILURE;
-	} else
-		internalstatus = FWFLASH_SUCCESS;
-
+		return (FWFLASH_FAILURE);
+	}
+	return (FWFLASH_SUCCESS);
 }
 
 /*ARGSUSED*/
@@ -699,7 +692,7 @@ sendimg(ses_node_t *np, void *data)
 
 	ret = get_status(props, &statdesc);
 	(void) printf("%30s: %s\n", "current status", statdesc.us_desc);
-	if (ret != 0) {
+	if (ret != FWFLASH_SUCCESS) {
 		return (FWFLASH_FAILURE);
 	}
 
@@ -717,7 +710,7 @@ sendimg(ses_node_t *np, void *data)
 		return (scsi_writebuf());
 
 
-	if (ses_node_ctl(np, SES_CTL_OP_DL_UCODE, arg) != 0) {
+	if (ses_node_ctl(np, SES_CTL_OP_DL_UCODE, arg) != FWFLASH_SUCCESS) {
 		(void) printf("failed!\n");
 		(void) printf("%s\n", ses_errmsg());
 		return (FWFLASH_FAILURE);
@@ -728,16 +721,18 @@ sendimg(ses_node_t *np, void *data)
 	wait.uw_prevstatus = -1ULL;
 	wait.uw_oldnp = np;
 
-	if ((newsnap = ses_snap_new(ses_target)) == NULL)
+	if ((newsnap = ses_snap_new(ses_target)) == NULL) {
 		logmsg(MSG_ERROR,
 		    "failed to update SES snapshot: %s",
 		    ses_errmsg());
+		return (FWFLASH_FAILURE);
+	}
 
 	print_updated_status(ses_snap_primary_enclosure(newsnap),
 	    &wait);
 	ses_snap_rele(newsnap);
 
-	return (internalstatus);
+	return (FWFLASH_SUCCESS);
 }
 
 static int
@@ -759,10 +754,18 @@ scsi_writebuf()
 	    (void *)verifier->fwimage, (size_t)verifier->imgsize);
 
 	wb_cdb = (spc3_write_buffer_cdb_t *)libscsi_action_get_cdb(action);
+
 	wb_cdb->wbc_mode = SPC3_WB_MODE_DATA;
 	wb_cdb->wbc_bufferid = verifier->flashbuf;
-	SCSI_WRITE24(&wb_cdb->wbc_buffer_offset, 0);
-	SCSI_WRITE24(&wb_cdb->wbc_parameter_list_len, verifier->imgsize);
+
+	wb_cdb->wbc_buffer_offset[0] = 0;
+	wb_cdb->wbc_buffer_offset[1] = 0;
+	wb_cdb->wbc_buffer_offset[2] = 0;
+
+	wb_cdb->wbc_parameter_list_len[0] =
+	    (verifier->imgsize & 0xff0000) >> 16;
+	wb_cdb->wbc_parameter_list_len[1] = (verifier->imgsize & 0xff00) >> 8;
+	wb_cdb->wbc_parameter_list_len[2] = (verifier->imgsize & 0xff);
 
 	ret = libscsi_exec(action, target);
 	samstatus = libscsi_action_get_status(action);
@@ -771,9 +774,9 @@ scsi_writebuf()
 	    "\nscsi_writebuffer: ret 0x%0x, samstatus 0x%0x\n",
 	    ret, samstatus);
 
-	if ((ret != 0) || samstatus != 0) {
+	if ((ret != FWFLASH_SUCCESS) || samstatus != SAM4_STATUS_GOOD) {
 		libscsi_action_free(action);
-		return (ret);
+		return (FWFLASH_FAILURE);
 	} else {
 		(void) printf("ok\n");
 	}
@@ -789,7 +792,6 @@ scsi_writebuf()
 		(void) printf("Status: UNKNOWN\n");
 
 	if (samstatus == SAM4_STATUS_GOOD) {
-		internalstatus = FWFLASH_SUCCESS;
 		return (FWFLASH_SUCCESS);
 	}
 

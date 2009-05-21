@@ -24,7 +24,7 @@
 # cmd/fwflash/plugins/i386
 #
 
-SRCS=		tavor-MELLANOX.c hermon-MELLANOX.c
+SRCS=		tavor-MELLANOX.c hermon-MELLANOX.c sd-GENERIC.c
 OBJECTS=	$(SRCS:%.c=%.o)
 PLUGINS=	$(SRCS:%.c=%.so)
 POFILES=	$(SRCS:%.c=%.po)
@@ -82,7 +82,8 @@ $(VERIFYPOFILE):	$(POFILES)
 
 install: $(ROOTLIBFWFLASHVERIFY) \
 	$(ROOTLIBFWFLASHVERIFY)/tavor-MELLANOX.so \
-	$(ROOTLIBFWFLASHVERIFY)/hermon-MELLANOX.so
+	$(ROOTLIBFWFLASHVERIFY)/hermon-MELLANOX.so \
+	$(ROOTLIBFWFLASHVERIFY)/sd-GENERIC.so
 
 clean:
 	$(RM) $(OBJECTS)

@@ -24,7 +24,7 @@
 # cmd/fwflash/plugins/transport/sparc
 #
 
-SRCS=		ses.c tavor.c hermon.c
+SRCS=		ses.c tavor.c hermon.c sd.c
 
 OBJECTS= 	$(SRCS:%.c=%.o)
 PLUGINS= 	$(SRCS:%.c=%.so)
@@ -63,6 +63,7 @@ install: all $(ROOTLIBFWFLASHPLUGINS) \
 	$(ROOTLIBFWFLASHPLUGINS)/ses.so \
 	$(ROOTLIBFWFLASHPLUGINS)/tavor.so \
 	$(ROOTLIBFWFLASHPLUGINS)/hermon.so \
+	$(ROOTLIBFWFLASHPLUGINS)/sd.so \
 	$(ROOTLIBFWFLASHPLUGINS)/$(SLINKS)
 
 clobber clean:

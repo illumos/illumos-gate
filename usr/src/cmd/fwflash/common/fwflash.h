@@ -57,6 +57,7 @@ int fwflash_debug;
  */
 
 #define	FWPLUGIN_VERSION_1	1
+#define	FWPLUGIN_VERSION_2	2
 
 struct devicelist;
 
@@ -120,6 +121,16 @@ struct fw_plugin {
 	 * All identification plugins must support this operation.
 	 */
 	int (*fw_devinfo)(struct devicelist *thisdev);
+
+	/*
+	 * Function entry point to allow the plugin to clean up its
+	 * data structure use IF plugin_version == FWPLUGIN_VERSION_2.
+	 *
+	 * If this function is not defined in the plugin, that is not
+	 * an error condition unless the plugin_version variable is
+	 * defined.
+	 */
+	void (*fw_cleanup)(struct devicelist *thisdev);
 };
 
 
@@ -173,7 +184,7 @@ struct vpr {
 struct fwfile {
 	/*
 	 * The fully qualified filename. No default location for
-	 * for the firmware image file is mandated.
+	 * the firmware image file is mandated.
 	 */
 	char *filename;
 
