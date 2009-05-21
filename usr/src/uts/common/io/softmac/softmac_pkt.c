@@ -92,38 +92,6 @@ failed:
 
 #define	ACKTIMEOUT	(10 * hz)
 
-/*
- * Serialize control message processing.
- */
-static void
-softmac_serialize_enter(softmac_lower_t *slp)
-{
-	mutex_enter(&slp->sl_ctl_mutex);
-	while (slp->sl_ctl_inprogress)
-		cv_wait(&slp->sl_ctl_cv, &slp->sl_ctl_mutex);
-
-	ASSERT(!slp->sl_ctl_inprogress);
-	ASSERT(!slp->sl_pending_ioctl);
-	ASSERT(slp->sl_pending_prim == DL_PRIM_INVAL);
-
-	slp->sl_ctl_inprogress = B_TRUE;
-	mutex_exit(&slp->sl_ctl_mutex);
-}
-
-static void
-softmac_serialize_exit(softmac_lower_t *slp)
-{
-	mutex_enter(&slp->sl_ctl_mutex);
-
-	ASSERT(slp->sl_ctl_inprogress);
-	ASSERT(!slp->sl_pending_ioctl);
-	ASSERT(slp->sl_pending_prim == DL_PRIM_INVAL);
-
-	slp->sl_ctl_inprogress = B_FALSE;
-	cv_broadcast(&slp->sl_ctl_cv);
-	mutex_exit(&slp->sl_ctl_mutex);
-}
-
 static int
 dlpi_get_errno(t_uscalar_t error, t_uscalar_t unix_errno)
 {
@@ -135,9 +103,13 @@ softmac_output(softmac_lower_t *slp, mblk_t *mp, t_uscalar_t dl_prim,
     t_uscalar_t ack, mblk_t **mpp)
 {
 	union DL_primitives	*dlp;
+	mac_perim_handle_t	mph;
 	int			err = 0;
 
-	softmac_serialize_enter(slp);
+	mac_perim_enter_by_mh(slp->sl_softmac->smac_mh, &mph);
+
+	ASSERT(!slp->sl_pending_ioctl);
+	ASSERT(slp->sl_pending_prim == DL_PRIM_INVAL);
 
 	/*
 	 * Record the pending DLPI primitive.
@@ -185,14 +157,16 @@ softmac_output(softmac_lower_t *slp, mblk_t *mp, t_uscalar_t dl_prim,
 	else
 		freemsg(mp);
 
-	softmac_serialize_exit(slp);
+	mac_perim_exit(mph);
 	return (err);
 }
 
 void
 softmac_ioctl_tx(softmac_lower_t *slp, mblk_t *mp, mblk_t **mpp)
 {
-	softmac_serialize_enter(slp);
+	mac_perim_handle_t	mph;
+
+	mac_perim_enter_by_mh(slp->sl_softmac->smac_mh, &mph);
 
 	/*
 	 * Record that ioctl processing is currently in progress.
@@ -213,7 +187,7 @@ softmac_ioctl_tx(softmac_lower_t *slp, mblk_t *mp, mblk_t **mpp)
 	ASSERT(mpp != NULL && mp != NULL);
 	*mpp = mp;
 
-	softmac_serialize_exit(slp);
+	mac_perim_exit(mph);
 }
 
 int

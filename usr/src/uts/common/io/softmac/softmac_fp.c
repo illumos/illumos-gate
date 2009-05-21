@@ -671,6 +671,8 @@ softmac_wput_single_nondata(softmac_upper_t *sup, mblk_t *mp)
 		 */
 		if (dbtype == M_IOCTL)
 			miocnak(sup->su_wq, mp, 0, EINVAL);
+		else
+			freemsg(mp);
 
 		/*
 		 * This stream is either IP or ARP. See whether

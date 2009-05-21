@@ -1300,17 +1300,19 @@ done:
 int
 dls_devnet_setzid(const char *link, zoneid_t zid)
 {
-	dls_devnet_t	*ddp;
-	int		err;
-	zoneid_t	old_zid;
+	dls_devnet_t		*ddp;
+	int			err;
+	zoneid_t		old_zid;
 	mac_perim_handle_t	mph;
 
 	if ((err = dls_devnet_hold_by_name(link, &ddp)) != 0)
 		return (err);
 
 	err = mac_perim_enter_by_macname(ddp->dd_mac, &mph);
-	if (err != 0)
+	if (err != 0) {
+		dls_devnet_rele(ddp);
 		return (err);
+	}
 
 	if ((old_zid = ddp->dd_zid) == zid) {
 		mac_perim_exit(mph);

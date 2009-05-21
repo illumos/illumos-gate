@@ -667,7 +667,8 @@ net_reconfigure ()
 	# Is this a reconfigure boot?  If not, then there's nothing
 	# for us to do.
 	#
-	reconfig=`svcprop -c -p system/reconfigure system/svc/restarter:default`
+	reconfig=`svcprop -c -p system/reconfigure \
+	    system/svc/restarter:default 2>/dev/null`
 	if [ $? -ne 0 -o "$reconfig" = false ]; then
 		return 0
 	fi

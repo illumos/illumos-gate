@@ -254,8 +254,6 @@ softmac_cmn_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		slp->sl_wq = WR(rq);
 		cv_init(&slp->sl_cv, NULL, CV_DRIVER, NULL);
 		mutex_init(&slp->sl_mutex, NULL, MUTEX_DRIVER, NULL);
-		cv_init(&slp->sl_ctl_cv, NULL, CV_DRIVER, NULL);
-		mutex_init(&slp->sl_ctl_mutex, NULL, MUTEX_DRIVER, NULL);
 		slp->sl_pending_prim = DL_PRIM_INVAL;
 		rq->q_ptr = WR(rq)->q_ptr = slp;
 		qprocson(rq);
@@ -289,14 +287,11 @@ softmac_mod_close(queue_t *rq)
 	slp->sl_lh = NULL;
 
 	ASSERT(slp->sl_ack_mp == NULL);
-	ASSERT(slp->sl_ctl_inprogress == B_FALSE);
 	ASSERT(slp->sl_pending_prim == DL_PRIM_INVAL);
 	ASSERT(slp->sl_pending_ioctl == B_FALSE);
 
 	cv_destroy(&slp->sl_cv);
 	mutex_destroy(&slp->sl_mutex);
-	cv_destroy(&slp->sl_ctl_cv);
-	mutex_destroy(&slp->sl_ctl_mutex);
 
 	kmem_free(slp, sizeof (*slp));
 	return (0);

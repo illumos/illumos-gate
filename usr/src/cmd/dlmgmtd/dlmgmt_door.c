@@ -459,7 +459,6 @@ dlmgmt_upcall_getattr(void *argp, void *retp)
 	dlmgmt_upcall_arg_getattr_t	*getattr = argp;
 	dlmgmt_getattr_retval_t		*retvalp = retp;
 	dlmgmt_link_t			*linkp;
-	int				err = 0;
 
 	/*
 	 * Hold the reader lock to access the link
@@ -469,7 +468,7 @@ dlmgmt_upcall_getattr(void *argp, void *retp)
 		/*
 		 * The link does not exist.
 		 */
-		err = ENOENT;
+		retvalp->lr_err = ENOENT;
 		goto done;
 	}
 
@@ -477,7 +476,6 @@ dlmgmt_upcall_getattr(void *argp, void *retp)
 
 done:
 	dlmgmt_table_unlock();
-	retvalp->lr_err = err;
 }
 
 static void
