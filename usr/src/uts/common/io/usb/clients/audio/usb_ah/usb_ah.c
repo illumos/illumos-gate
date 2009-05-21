@@ -582,7 +582,7 @@ usb_ah_cp_mblk(mblk_t *mp)
 	bcopy(iocp, (struct iocblk *)bp1->b_datap->db_base,
 	    sizeof (struct iocblk));
 
-	bp1->b_datap->db_type = M_CTL;
+	bp1->b_datap->db_type = M_PROTO;
 	bp1->b_wptr += sizeof (struct iocblk);
 
 	ASSERT(mp->b_cont != NULL);

@@ -4511,10 +4511,14 @@ usb_ac_mux_unplumbing(usb_ac_state_t *uacp)
 			USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 			    "usb_ac_mux_unplumbing:[%d] - closing", i);
 
-			/* must close stream first before destroying thread */
+			/*
+			 * ldi_close will cause panic if ldi_getmsg
+			 * is not finished. ddi_taskq_destroy will wait
+			 * for the thread to complete.
+			 */
+			usb_ac_unplumb(acp);
 			(void) ldi_close(lh, FREAD|FWRITE, kcred);
 
-			usb_ac_unplumb(acp);
 
 			USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 			    "usb_ac_mux_unplumbing: [%d] - unplumbed", i);

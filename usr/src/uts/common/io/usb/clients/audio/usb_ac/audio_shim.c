@@ -561,6 +561,13 @@ ashim_add_eng(ashim_state_t *statep, int dir)
 
 	engp->flags = ENG_ENABLED;
 
+	/*
+	 * Set the format for this engine
+	 */
+	if (ashim_set_fmt(statep, dir, &engp->fmt) != AUDIO_SUCCESS) {
+		audio_dev_warn(af_devp, "set format failed, dir = %d\n", dir);
+		goto OUT;
+	}
 	rv = AUDIO_SUCCESS;
 
 OUT:
@@ -1239,8 +1246,8 @@ ashim_add_controls(ashim_state_t *statep)
 		}
 
 		if (ashim_ctrl_test(statep, ctrlp)) {
-			dinfo("%s: control %s tested invalid, ignoring\n",
-			    statep->dstr, ctrlp->acd.acd_name);
+			dwarn("%s: i= %d, control %s tested invalid\n",
+			    statep->dstr, i, ctrlp->acd.acd_name);
 
 			ashim_ctrl_fini(ctrlp);
 			ashim_ctrl_free(ctrlp);
@@ -1623,10 +1630,6 @@ ashim_af_open(void *arg, int flag,
 
 	mutex_enter(&engp->lock);
 
-	if (ashim_set_fmt(statep, dir, &engp->fmt) != AUDIO_SUCCESS) {
-		audio_dev_warn(statep->af_devp, "set format failed");
-		goto OUT;
-	}
 
 	engp->intrate = (engp->af_eflags & ENGINE_OUTPUT_CAP) ?
 	    statep->ad_infop->ad_play.ad_int_rate :
@@ -1906,10 +1909,19 @@ am_hw_state_change(audiohdl_t handle, int cmd, int dir, int value,
 		    "not found for HW state change command %d", dcmd, cmd);
 		return (AUDIO_FAILURE);
 	}
+	ASSERT(value != 0);
 
 	mutex_enter(&ctrlp->lock);
 
 	delta = D2F_GAIN(value);
+
+	/*
+	 * Value got from device can be scaled to 0,
+	 * set the delta to -1 or 1.
+	 */
+	if (delta == 0) {
+		delta = (value < 0)?-1:1;
+	}
 	left = AUDIO_CTRL_STEREO_LEFT(ctrlp->cval) + delta;
 	right = AUDIO_CTRL_STEREO_RIGHT(ctrlp->cval) + delta;
 
