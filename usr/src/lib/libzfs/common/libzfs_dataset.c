@@ -2123,7 +2123,7 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 
 		errno = 0;
 		*ridp = strtoull(cp, &end, 10);
-		if (errno == 0 || *end != '\0')
+		if (errno != 0 || *end != '\0')
 			return (EINVAL);
 	} else if (!isdigit(*cp)) {
 		/*

@@ -1136,6 +1136,10 @@ zfs_domount(vfs_t *vfsp, char *osname)
 			goto out;
 		xattr_changed_cb(zfsvfs, pval);
 		zfsvfs->z_issnap = B_TRUE;
+
+		mutex_enter(&zfsvfs->z_os->os->os_user_ptr_lock);
+		dmu_objset_set_user(zfsvfs->z_os, zfsvfs);
+		mutex_exit(&zfsvfs->z_os->os->os_user_ptr_lock);
 	} else {
 		error = zfsvfs_setup(zfsvfs, B_TRUE);
 	}
