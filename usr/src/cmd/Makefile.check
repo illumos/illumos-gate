@@ -142,8 +142,7 @@ MANIFEST_SUBDIRS=			\
 	vscan/vscand			\
 	xvm/ipagent			\
 	ypcmd/yppasswd			\
-	ypcmd/ypupdated			\
-	xntpd/xntpd
+	ypcmd/ypupdated
 
 $(CLOSED_BUILD)MANIFEST_SUBDIRS +=		\
 	$(CLOSED)/cmd/smartcard/daemon		\

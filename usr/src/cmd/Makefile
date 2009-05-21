@@ -445,7 +445,6 @@ COMMON_SUBDIRS=		\
 	wracct		\
 	write		\
 	wusbadm		\
-	xntpd		\
 	xargs		\
 	xstr		\
 	yes		\

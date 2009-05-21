@@ -1,6 +1,5 @@
 usr/src/cmd/cmd-crypto/etc/Makefile
 usr/src/cmd/crypt/crypt.c
-usr/src/cmd/xntpd/libntp/authdes.c
 usr/src/cmd/gss/gssd/gssd_clnt_stubs.c
 usr/src/cmd/gss/gssd/gssd_proc.c
 usr/src/cmd/gss/gssd/gssdtest.c

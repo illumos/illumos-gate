@@ -245,7 +245,6 @@ EXPORT_SRC:
 	@cd cmd/gss/gssd;         pwd; $(MAKE) EXPORT_SRC
 	@cd cmd/krb5/kadmin;  pwd; $(MAKE) EXPORT_SRC
 	@cd cmd/sendmail/src; pwd; $(MAKE) EXPORT_SRC
-	@cd cmd/xntpd;	  pwd; $(MAKE) EXPORT_SRC
 	@cd common/crypto/aes;	  pwd; $(MAKE) EXPORT_SRC
 	@cd common/crypto/arcfour; pwd; $(MAKE) EXPORT_SRC
 	@cd common/crypto/blowfish;	  pwd; $(MAKE) EXPORT_SRC

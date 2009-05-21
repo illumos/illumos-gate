@@ -355,8 +355,6 @@ COMMON_SUBDIRS= \
 	SUNWnfscu \
 	SUNWnisr  \
 	SUNWnisu  \
-	SUNWntpr  \
-	SUNWntpu  \
 	SUNWnwamintr \
 	SUNWnwamintu \
 	SUNWocf \
