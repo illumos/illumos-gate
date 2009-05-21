@@ -857,6 +857,7 @@ _dc: $(DCSUBDIRS)
 #
 fs.d: fstyp
 ksh:	shcomp isaexec
+print:	lp
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(AUDITSUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \
