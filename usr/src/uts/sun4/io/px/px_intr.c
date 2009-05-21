@@ -299,18 +299,22 @@ px_msiq_intr(caddr_t arg)
 	 * If triggered, we should always have at least one valid record.
 	 */
 	for (i = 0; i < msiq_p->msiq_recs2process; i++) {
+		msiq_rec_type_t rec_type;
+
 		/* Read next MSIQ record */
 		px_lib_get_msiq_rec(dip, curr_head_p, msiq_rec_p);
 
+		rec_type = msiq_rec_p->msiq_rec_type;
+
 		DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: MSIQ RECORD, "
 		    "msiq_rec_type 0x%llx msiq_rec_rid 0x%llx\n",
-		    msiq_rec_p->msiq_rec_type, msiq_rec_p->msiq_rec_rid);
+		    rec_type, msiq_rec_p->msiq_rec_rid);
 
-		if (!msiq_rec_p->msiq_rec_type)
+		if (!rec_type)
 			goto next_rec;
 
 		/* Check MSIQ record type */
-		switch (msiq_rec_p->msiq_rec_type) {
+		switch (rec_type) {
 		case MSG_REC:
 			msg_code = msiq_rec_p->msiq_rec_data.msg.msg_code;
 			DBG(DBG_MSIQ_INTR, dip, "px_msiq_intr: PCIE MSG "
@@ -331,7 +335,7 @@ px_msiq_intr(caddr_t arg)
 			cmn_err(CE_WARN, "%s%d: px_msiq_intr: 0x%x MSIQ "
 			    "record type is not supported",
 			    ddi_driver_name(dip), ddi_get_instance(dip),
-			    msiq_rec_p->msiq_rec_type);
+			    rec_type);
 
 			goto next_rec;
 		}
@@ -343,12 +347,12 @@ px_msiq_intr(caddr_t arg)
 		for (j = 0, ih_p = ipil_p->ipil_ih_start;
 		    ih_p && (j < ipil_p->ipil_ih_size) &&
 		    ((ih_p->ih_msg_code != msg_code) ||
-		    (ih_p->ih_rec_type != msiq_rec_p->msiq_rec_type));
+		    (ih_p->ih_rec_type != rec_type));
 		    ih_p = ih_p->ih_next, j++)
 			;
 
 		if ((ih_p->ih_msg_code == msg_code) &&
-		    (ih_p->ih_rec_type == msiq_rec_p->msiq_rec_type)) {
+		    (ih_p->ih_rec_type == rec_type)) {
 			dev_info_t *dip = ih_p->ih_dip;
 			uint_t (*handler)() = ih_p->ih_handler;
 			caddr_t arg1 = ih_p->ih_handler_arg1;
@@ -367,9 +371,10 @@ px_msiq_intr(caddr_t arg)
 			 * This should be fixed when PCIE MESSAGES as a whole
 			 * is architected correctly.
 			 */
-			if ((msg_code == PCIE_MSG_CODE_ERR_COR) ||
+			if ((rec_type == MSG_REC) &&
+			    ((msg_code == PCIE_MSG_CODE_ERR_COR) ||
 			    (msg_code == PCIE_MSG_CODE_ERR_NONFATAL) ||
-			    (msg_code == PCIE_MSG_CODE_ERR_FATAL)) {
+			    (msg_code == PCIE_MSG_CODE_ERR_FATAL))) {
 				ret = px_err_fabric_intr(px_p, msg_code,
 				    msiq_rec_p->msiq_rec_rid);
 			} else
