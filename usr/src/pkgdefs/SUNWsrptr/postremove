@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -22,82 +23,21 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# MDB modules used for debugging user processes that every ISA's build
-# subdirectory will need to build.
 #
- 
-COMMON_MODULES_PROC = \
-	dof \
-	libavl \
-	libc \
-	libnvpair \
-	libproc \
-	libsysevent \
-	libtopo \
-	libumem \
-	libuutil \
-	libzpool \
-	mdb_ds \
-	mdb_test
 
-#
-# MDB modules used for debugging user processes which are only 32-bit
-#
-COMMON_MODULES_PROC_32BIT = \
-	svc.configd \
-	svc.startd
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
 
-#
-# MDB modules used for debugging kernels.
-#
-COMMON_MODULES_KVM = \
-	arp \
-	cpc \
-	crypto	\
-	dtrace	\
-	emlxs \
-	fcip \
-	fcp \
-	fctl \
-	genunix \
-	hook \
-	neti \
-	idm \
-	ii \
-	ip \
-	ipc \
-	ipp \
-	krtld \
-	lofs \
-	logindmux \
-	mac \
-	md \
-	nca \
-	nsctl \
-	nsmb \
-	ptm \
-	qlc \
-	random \
-	rdc \
-	s1394 \
-	scsi_vhci \
-	sctp \
-	sd \
-	sdbc \
-	smbfs \
-	smbsrv \
-	sockfs \
-	specfs \
-	sppp \
-	srpt \
-	stmf \
-	sv \
-	ufs \
-	usba \
-	zfs
+DRVR_NAME=srpt
+BASEDIR_OPT=
 
-CLOSED_COMMON_MODULES_KVM = \
-	mpt \
-	nfs
+# Unload and remove the driver 
+if [ "${BASEDIR:=/}" != "/" ]
+then
+        BASEDIR_OPT="-b $BASEDIR"
+fi
 
-include $(SRC)/Makefile.master
+
+/usr/sbin/rem_drv ${BASEDIR_OPT} ${DRVR_NAME}
+
+exit 0

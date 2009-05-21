@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,86 +17,32 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# MDB modules used for debugging user processes that every ISA's build
-# subdirectory will need to build.
+# This package information file defines software dependencies associated
+# with the pkg.  You can define three types of pkg dependencies with this file:
+#	 P indicates a prerequisite for installation
+#	 I indicates an incompatible package
+#	 R indicates a reverse dependency
+# <pkg.abbr> see pkginfo(4), PKG parameter
+# <name> see pkginfo(4), NAME parameter
+# <version> see pkginfo(4), VERSION parameter
+# <arch> see pkginfo(4), ARCH parameter
+# <type> <pkg.abbr> <name>
+# 	(<arch>)<version>
+# 	(<arch>)<version>
+# 	...
+# <type> <pkg.abbr> <name>
+# ...
 #
- 
-COMMON_MODULES_PROC = \
-	dof \
-	libavl \
-	libc \
-	libnvpair \
-	libproc \
-	libsysevent \
-	libtopo \
-	libumem \
-	libuutil \
-	libzpool \
-	mdb_ds \
-	mdb_test
 
-#
-# MDB modules used for debugging user processes which are only 32-bit
-#
-COMMON_MODULES_PROC_32BIT = \
-	svc.configd \
-	svc.startd
-
-#
-# MDB modules used for debugging kernels.
-#
-COMMON_MODULES_KVM = \
-	arp \
-	cpc \
-	crypto	\
-	dtrace	\
-	emlxs \
-	fcip \
-	fcp \
-	fctl \
-	genunix \
-	hook \
-	neti \
-	idm \
-	ii \
-	ip \
-	ipc \
-	ipp \
-	krtld \
-	lofs \
-	logindmux \
-	mac \
-	md \
-	nca \
-	nsctl \
-	nsmb \
-	ptm \
-	qlc \
-	random \
-	rdc \
-	s1394 \
-	scsi_vhci \
-	sctp \
-	sd \
-	sdbc \
-	smbfs \
-	smbsrv \
-	sockfs \
-	specfs \
-	sppp \
-	srpt \
-	stmf \
-	sv \
-	ufs \
-	usba \
-	zfs
-
-CLOSED_COMMON_MODULES_KVM = \
-	mpt \
-	nfs
-
-include $(SRC)/Makefile.master
+P SUNWcar	Core Architecture, (Root)
+P SUNWcakr	Core Solaris Kernel Architecture (Root)
+P SUNWkvm	Core Architecture, (Kvm)
+P SUNWcsr	Core Solaris, (Root)
+P SUNWckr	Core Solaris Kernel (Root)
+P SUNWcnetr	Core Solaris Network Infrastructure (Root)
+P SUNWcsu	Core Solaris, (Usr)
+P SUNWcsd	Core Solaris Devices
+P SUNWcsl	Core Solaris Libraries

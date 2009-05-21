@@ -22,82 +22,22 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# MDB modules used for debugging user processes that every ISA's build
-# subdirectory will need to build.
 #
- 
-COMMON_MODULES_PROC = \
-	dof \
-	libavl \
-	libc \
-	libnvpair \
-	libproc \
-	libsysevent \
-	libtopo \
-	libumem \
-	libuutil \
-	libzpool \
-	mdb_ds \
-	mdb_test
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
 
-#
-# MDB modules used for debugging user processes which are only 32-bit
-#
-COMMON_MODULES_PROC_32BIT = \
-	svc.configd \
-	svc.startd
+#!search <pathname pathname ...>	# where to find pkg objects
+#!include <filename>			# include another 'prototype' file
+#!default <mode> <owner> <group>	# default used if not specified on entry
+#!<param>=<value>			# puts parameter in pkg environment
 
-#
-# MDB modules used for debugging kernels.
-#
-COMMON_MODULES_KVM = \
-	arp \
-	cpc \
-	crypto	\
-	dtrace	\
-	emlxs \
-	fcip \
-	fcp \
-	fctl \
-	genunix \
-	hook \
-	neti \
-	idm \
-	ii \
-	ip \
-	ipc \
-	ipp \
-	krtld \
-	lofs \
-	logindmux \
-	mac \
-	md \
-	nca \
-	nsctl \
-	nsmb \
-	ptm \
-	qlc \
-	random \
-	rdc \
-	s1394 \
-	scsi_vhci \
-	sctp \
-	sd \
-	sdbc \
-	smbfs \
-	smbsrv \
-	sockfs \
-	specfs \
-	sppp \
-	srpt \
-	stmf \
-	sv \
-	ufs \
-	usba \
-	zfs
+i copyright
+i pkginfo 
+i depend
 
-CLOSED_COMMON_MODULES_KVM = \
-	mpt \
-	nfs
-
-include $(SRC)/Makefile.master
+d none usr 755 root sys
+d none usr/lib 755 root bin
+d none usr/lib/mdb 755 root sys
+d none usr/lib/mdb/kvm 755 root sys

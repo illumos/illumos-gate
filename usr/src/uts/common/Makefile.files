@@ -631,6 +631,8 @@ IBCM_OBJS +=	ibcm_impl.o ibcm_sm.o ibcm_ti.o ibcm_utils.o ibcm_path.o \
 
 IBDM_OBJS +=	ibdm.o
 
+IBDMA_OBJS +=	ibdma.o
+
 IBMF_OBJS +=	ibmf.o ibmf_impl.o ibmf_dr.o ibmf_wqe.o ibmf_ud_dest.o ibmf_mod.o \
 		ibmf_send.o ibmf_recv.o ibmf_handlers.o ibmf_trans.o \
 		ibmf_timers.o ibmf_msg.o ibmf_utils.o ibmf_rmpp.o \
@@ -875,6 +877,8 @@ EMLXS_FW_OBJS +=	emlxs_fw.o
 FCT_OBJS += discovery.o fct.o
 
 QLT_OBJS += 2400.o 2500.o qlt.o qlt_dma.o
+
+SRPT_OBJS += srpt_mod.o srpt_ch.o srpt_cm.o srpt_ioc.o srpt_stp.o
 
 FCOE_OBJS += fcoe.o fcoe_eth.o fcoe_fc.o
 

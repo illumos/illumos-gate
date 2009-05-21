@@ -22,82 +22,28 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# MDB modules used for debugging user processes that every ISA's build
-# subdirectory will need to build.
 #
- 
-COMMON_MODULES_PROC = \
-	dof \
-	libavl \
-	libc \
-	libnvpair \
-	libproc \
-	libsysevent \
-	libtopo \
-	libumem \
-	libuutil \
-	libzpool \
-	mdb_ds \
-	mdb_test
-
 #
-# MDB modules used for debugging user processes which are only 32-bit
+# This required package information file describes characteristics of the
+# package, such as package abbreviation, full package name, package version,
+# and package architecture.
 #
-COMMON_MODULES_PROC_32BIT = \
-	svc.configd \
-	svc.startd
-
-#
-# MDB modules used for debugging kernels.
-#
-COMMON_MODULES_KVM = \
-	arp \
-	cpc \
-	crypto	\
-	dtrace	\
-	emlxs \
-	fcip \
-	fcp \
-	fctl \
-	genunix \
-	hook \
-	neti \
-	idm \
-	ii \
-	ip \
-	ipc \
-	ipp \
-	krtld \
-	lofs \
-	logindmux \
-	mac \
-	md \
-	nca \
-	nsctl \
-	nsmb \
-	ptm \
-	qlc \
-	random \
-	rdc \
-	s1394 \
-	scsi_vhci \
-	sctp \
-	sd \
-	sdbc \
-	smbfs \
-	smbsrv \
-	sockfs \
-	specfs \
-	sppp \
-	srpt \
-	stmf \
-	sv \
-	ufs \
-	usba \
-	zfs
-
-CLOSED_COMMON_MODULES_KVM = \
-	mpt \
-	nfs
-
-include $(SRC)/Makefile.master
+PKG="SUNWibdmar"
+NAME="Sun InfiniBand Device Management Agent (Root)"
+ARCH="ISA"
+CATEGORY="system"
+BASEDIR=/
+SUNW_PKGVERS="1.0"
+SUNW_PKGTYPE="root"
+CLASSES="none"
+DESC="Sun InfiniBand Device Management Agent (Root)"
+SUNW_PRODNAME="SunOS"
+SUNW_PRODVERS="RELEASE/VERSION"
+VERSION="ONVERS,REV=0.0.0"
+VENDOR="Sun Microsystems, Inc."
+HOTLINE="Please contact your local service provider"
+EMAIL=""
+MAXINST="1000"
+SUNW_PKG_ALLZONES="true"
+SUNW_PKG_HOLLOW="true"
+SUNW_PKG_THISZONE="false"

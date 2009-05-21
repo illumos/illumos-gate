@@ -18,86 +18,47 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# MDB modules used for debugging user processes that every ISA's build
-# subdirectory will need to build.
-#
- 
-COMMON_MODULES_PROC = \
-	dof \
-	libavl \
-	libc \
-	libnvpair \
-	libproc \
-	libsysevent \
-	libtopo \
-	libumem \
-	libuutil \
-	libzpool \
-	mdb_ds \
-	mdb_test
 
-#
-# MDB modules used for debugging user processes which are only 32-bit
-#
-COMMON_MODULES_PROC_32BIT = \
-	svc.configd \
-	svc.startd
+PROG =	svc-srpt
 
-#
-# MDB modules used for debugging kernels.
-#
-COMMON_MODULES_KVM = \
-	arp \
-	cpc \
-	crypto	\
-	dtrace	\
-	emlxs \
-	fcip \
-	fcp \
-	fctl \
-	genunix \
-	hook \
-	neti \
-	idm \
-	ii \
-	ip \
-	ipc \
-	ipp \
-	krtld \
-	lofs \
-	logindmux \
-	mac \
-	md \
-	nca \
-	nsctl \
-	nsmb \
-	ptm \
-	qlc \
-	random \
-	rdc \
-	s1394 \
-	scsi_vhci \
-	sctp \
-	sd \
-	sdbc \
-	smbfs \
-	smbsrv \
-	sockfs \
-	specfs \
-	sppp \
-	srpt \
-	stmf \
-	sv \
-	ufs \
-	usba \
-	zfs
+include ../Makefile.cmd
 
-CLOSED_COMMON_MODULES_KVM = \
-	mpt \
-	nfs
+SRPTBASE = ../../uts/common/io/comstar/port/srpt
 
-include $(SRC)/Makefile.master
+OBJS = srptsvc.o
+SRCS =	$(OBJS:%.o=%.c)
+
+CPPFLAGS += -I$(SRPTBASE)
+
+MANIFEST    = target.xml
+SVCMETHOD   = svc-srpt
+
+ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)/ibsrp
+$(ROOTMANIFESTDIR)/$(MANIFEST)	:= OWNER = root
+$(ROOTMANIFESTDIR)/$(MANIFEST)	:= GROUP = bin
+$(ROOTMANIFESTDIR)/$(MANIFEST)	:= FILEMODE = 0444
+
+.KEEP_STATE:
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
+	$(CSTYLE) -pPc $(SRCS:%=%)
+
+clean:
+	$(RM) $(OBJS)
+
+lint:	lint_SRCS
+
+include ../Makefile.targ

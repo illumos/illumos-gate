@@ -306,6 +306,7 @@ DRV_KMODS	+= ncall nsctl sdbc nskern sv
 DRV_KMODS	+= ii rdc rdcsrv rdcstub 
 DRV_KMODS	+= iscsi
 DRV_KMODS	+= emlxs
+DRV_KMODS	+= srpt
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ifp
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= uata
@@ -392,6 +393,7 @@ MISC_KMODS	+= kcf
 MISC_KMODS	+= ksocket
 MISC_KMODS	+= ibcm
 MISC_KMODS	+= ibdm
+MISC_KMODS	+= ibdma
 MISC_KMODS	+= ibmf
 MISC_KMODS	+= ibtl
 MISC_KMODS	+= idm

@@ -277,6 +277,7 @@ COMMON_SUBDIRS= \
 	SUNWhwdata \
 	SUNWhxge \
 	SUNWib \
+	SUNWibdmar \
 	SUNWibsdpu \
 	SUNWibsdp \
 	SUNWiir \
@@ -470,6 +471,8 @@ COMMON_SUBDIRS= \
 	SUNWspsvu \
 	SUNWsra  \
 	SUNWsrh  \
+	SUNWsrptr  \
+	SUNWsrptu  \
 	SUNWsshcu \
 	SUNWsshr \
 	SUNWsshu \

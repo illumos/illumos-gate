@@ -22,82 +22,22 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# MDB modules used for debugging user processes that every ISA's build
-# subdirectory will need to build.
-#
- 
-COMMON_MODULES_PROC = \
-	dof \
-	libavl \
-	libc \
-	libnvpair \
-	libproc \
-	libsysevent \
-	libtopo \
-	libumem \
-	libuutil \
-	libzpool \
-	mdb_ds \
-	mdb_test
 
-#
-# MDB modules used for debugging user processes which are only 32-bit
-#
-COMMON_MODULES_PROC_32BIT = \
-	svc.configd \
-	svc.startd
+MODULE = srpt.so
+MDBTGT = kvm
 
-#
-# MDB modules used for debugging kernels.
-#
-COMMON_MODULES_KVM = \
-	arp \
-	cpc \
-	crypto	\
-	dtrace	\
-	emlxs \
-	fcip \
-	fcp \
-	fctl \
-	genunix \
-	hook \
-	neti \
-	idm \
-	ii \
-	ip \
-	ipc \
-	ipp \
-	krtld \
-	lofs \
-	logindmux \
-	mac \
-	md \
-	nca \
-	nsctl \
-	nsmb \
-	ptm \
-	qlc \
-	random \
-	rdc \
-	s1394 \
-	scsi_vhci \
-	sctp \
-	sd \
-	sdbc \
-	smbfs \
-	smbsrv \
-	sockfs \
-	specfs \
-	sppp \
-	srpt \
-	stmf \
-	sv \
-	ufs \
-	usba \
-	zfs
+MODSRCS = srpt.c
 
-CLOSED_COMMON_MODULES_KVM = \
-	mpt \
-	nfs
+UTSBASE = ../../../../../uts
+COMSTARBASE = $(UTSBASE)/common/io/comstar
+SRPTBASE = $(COMSTARBASE)/port/srpt
 
-include $(SRC)/Makefile.master
+include ../../../../Makefile.cmd
+include ../../../../Makefile.cmd.64
+include ../../Makefile.amd64
+include ../../../Makefile.module
+
+CPPFLAGS += -I$(UTSBASE)/common -I$(UTSBASE)/common/sys -I$(SRPTBASE)
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all

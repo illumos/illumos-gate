@@ -378,6 +378,7 @@ COMMON_SUBDIRS=		\
 	split		\
 	sqlite		\
 	srchtxt		\
+	srptsvc		\
 	ssh		\
 	stat		\
 	stmfadm		\
