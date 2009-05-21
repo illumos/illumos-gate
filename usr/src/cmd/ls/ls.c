@@ -3058,7 +3058,11 @@ ls_color_init()
 	if ((colorstr = getenv("LS_COLORS")) == NULL)
 		colorstr = default_colorstr;
 
-	color_sz = 0;
+	/*
+	 * Determine the size of lsc_colors.  color_sz can be > lsc_ncolors
+	 * if there are invalid entries passed in the string (they are ignored)
+	 */
+	color_sz = 1;
 	for (p = strchr(colorstr, ':'); p != NULL && *p != '\0';
 	    p = strchr(++p, ':'))
 		++color_sz;
