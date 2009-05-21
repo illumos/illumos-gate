@@ -37,7 +37,7 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+SUNW_8.1 {
     global:
 	close_stdout;
 	error;
@@ -140,11 +140,6 @@ SUNW_1.1 {
 	xmalloc;
 	xrealloc;
 	xstrdup;
-};
-
-SUNWprivate_1.1 {
-    global:
-	SUNWprivate_1.1;
     local:
 	*;
 };

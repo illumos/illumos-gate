@@ -37,7 +37,8 @@
 # MAPFILE HEADER END
 #
 
-SUNW_1.1 {
+SUNW_10.1 {
+    global:
 	AT_UNNAMED;
 	NTFS_INDEX_I30;
 	NTFS_INDEX_O;
@@ -127,12 +128,6 @@ SUNW_1.1 {
 	ntfs_volume_alloc;
 	ntfs_volume_startup;
 	ntfs_volume_write_flags;
-    global:
-};
-
-SUNWprivate_1.1 {
-    global:
-	SUNWprivate_1.1;
     local:
 	*;
 };
