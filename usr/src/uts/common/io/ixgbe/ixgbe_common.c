@@ -1479,8 +1479,8 @@ ixgbe_update_uc_addr_list_generic(struct ixgbe_hw *hw, u8 *addr_list,
 	hw->addr_ctrl.overflow_promisc = 0;
 
 	/* Zero out the other receive addresses */
-	DEBUGOUT1("Clearing RAR[1-%d]\n", hw->addr_ctrl.rar_used_count);
-	for (i = 1; i <= hw->addr_ctrl.rar_used_count; i++) {
+	DEBUGOUT1("Clearing RAR[1-%d]\n", uc_addr_in_use);
+	for (i = 1; i <= uc_addr_in_use; i++) {
 		IXGBE_WRITE_REG(hw, IXGBE_RAL(i), 0);
 		IXGBE_WRITE_REG(hw, IXGBE_RAH(i), 0);
 	}

@@ -642,6 +642,8 @@ ixgbe_alloc_tcb_lists(ixgbe_tx_ring_t *tx_ring)
 			ixgbe_error(ixgbe, "Allocate tx dma buffer failed");
 			goto alloc_tcb_lists_fail;
 		}
+
+		tcb->last_index = MAX_TX_RING_SIZE;
 	}
 
 	return (IXGBE_SUCCESS);

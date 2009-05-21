@@ -91,6 +91,8 @@ extern "C" {
 #define	MAX_COOKIE			18
 #define	MIN_NUM_TX_DESC			2
 
+#define	IXGBE_TX_DESC_LIMIT		32	/* tx desc limitation	*/
+
 #define	IXGBE_ADAPTER_REGSET		1	/* map adapter registers */
 
 /*
@@ -162,13 +164,6 @@ extern "C" {
 #define	DEFAULT_TX_HEAD_WB_ENABLE	B_TRUE
 
 #define	IXGBE_LSO_MAXLEN		65535
-
-#define	DEFAULT_TX_HCKSUM_ENABLE	B_TRUE
-#define	DEFAULT_RX_HCKSUM_ENABLE	B_TRUE
-#define	DEFAULT_LSO_ENABLE		B_TRUE
-#define	DEFAULT_TX_HEAD_WB_ENABLE	B_TRUE
-
-#define	IXGBE_LSO_MAXLEN	65535
 
 #define	TX_DRAIN_TIME			200
 #define	RX_DRAIN_TIME			200
@@ -483,6 +478,7 @@ typedef struct dma_buffer {
  */
 typedef struct tx_control_block {
 	single_link_t		link;
+	uint32_t		last_index; /* last descriptor of the pkt */
 	uint32_t		frag_num;
 	uint32_t		desc_num;
 	mblk_t			*mp;
@@ -570,6 +566,7 @@ typedef struct ixgbe_tx_ring {
 	uint32_t		stat_fail_no_tcb;
 	uint32_t		stat_fail_dma_bind;
 	uint32_t		stat_reschedule;
+	uint32_t		stat_break_tbd_limit;
 	uint32_t		stat_lso_header_fail;
 #endif
 
