@@ -1728,6 +1728,12 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, boolean_t istmp)
 		 */
 		return (zfs_error(hdl, EZFS_NOREPLICAS, msg));
 
+	case EEXIST:
+		/*
+		 * The log device has unplayed logs
+		 */
+		return (zfs_error(hdl, EZFS_UNPLAYED_LOGS, msg));
+
 	default:
 		return (zpool_standard_error(hdl, errno, msg));
 	}
