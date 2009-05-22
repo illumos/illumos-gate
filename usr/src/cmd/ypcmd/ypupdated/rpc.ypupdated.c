@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NIS update service
@@ -58,6 +56,7 @@ void ypupdate_prog();
 void detachfromtty();
 
 static int addr2netname(char *, SVCXPRT *);
+static int issock();
 
 int insecure;
 extern SVCXPRT *svctcp_create(int, uint_t, uint_t);
@@ -69,7 +68,6 @@ main(argc, argv)
 	char *argv[];
 {
 	char *cmd;
-	static int issock();
 	int connmaxrec = RPC_MAXDATASIZE;
 	struct stat filestat;
 

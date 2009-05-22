@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,9 @@
 /*
  *	db_index_c.x
  *
- *  Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
-
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if RPC_HDR
 %#ifndef _DB_INDEX_H
@@ -101,7 +98,7 @@ typedef struct db_index * db_index_p;
 %  void init( db_key_desc * );
 %
 %/* Moves an index from an xdr index */
-%  db_status db_index::move_xdr_db_index(db_index *orig);
+%  db_status move_xdr_db_index(db_index *orig);
 %
 %/* Dumps this index to named file. */
 %  int dump( char *);

@@ -319,6 +319,8 @@ struct msg_text {
 	int	ml_offset;
 };
 
+extern struct msg_text adt_msg_text[];
+
 extern void adt_write_syslog(const char *, int);
 extern void adt_token_open(struct adt_event_state *);
 extern int adt_token_close(struct adt_event_state *);

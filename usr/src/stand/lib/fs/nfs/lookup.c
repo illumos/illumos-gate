@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the file lookup code for NFS.
@@ -47,7 +45,7 @@
 #include <sys/t_lock.h>
 #include "clnt.h"
 #include <rpcsvc/mount.h>
-#include <pathname.h>
+#include <st_pathname.h>
 #include <sys/errno.h>
 #include <sys/promif.h>
 #include "nfs_inet.h"
@@ -72,7 +70,7 @@ static int next_inum = 1;	/* Next dummy i-node number	*/
  * return the file handle of said file.
  */
 
-static int lookuppn(struct pathname *pnp, struct nfs_file *cfile,
+static int stlookuppn(struct st_pathname *pnp, struct nfs_file *cfile,
 			bool_t needroothandle);
 
 /*
@@ -82,22 +80,23 @@ static int lookuppn(struct pathname *pnp, struct nfs_file *cfile,
 int
 lookup(char *pathname, struct nfs_file *cur_file, bool_t needroothandle)
 {
-	struct pathname pnp;
+	struct st_pathname pnp;
 	int error;
 
 	static char lkup_path[NFS_MAXPATHLEN];	/* pn_alloc doesn't */
 
 	pnp.pn_buf = &lkup_path[0];
 	bzero(pnp.pn_buf, NFS_MAXPATHLEN);
-	error = pn_get(pathname, &pnp);
+	error = stpn_get(pathname, &pnp);
 	if (error)
 		return (error);
-	error = lookuppn(&pnp, cur_file, needroothandle);
+	error = stlookuppn(&pnp, cur_file, needroothandle);
 	return (error);
 }
 
 static int
-lookuppn(struct pathname *pnp, struct nfs_file *cfile, bool_t needroothandle)
+stlookuppn(struct st_pathname *pnp, struct nfs_file *cfile,
+bool_t needroothandle)
 {
 	char component[NFS_MAXNAMLEN+1];	/* buffer for component */
 	int nlink = 0;
@@ -116,11 +115,11 @@ begin:
 	 * continuing from the current directory.
 	 */
 	component[0] = '\0';
-	if (pn_peekchar(pnp) == '/') {
+	if (stpn_peekchar(pnp) == '/') {
 		if (!needroothandle)
 			*cfile = roothandle;
 		dino = root_inum;
-		pn_skipslash(pnp);
+		stpn_skipslash(pnp);
 	}
 
 next:
@@ -134,7 +133,7 @@ next:
 	/*
 	 * Process the next component of the pathname.
 	 */
-	error = pn_stripcomponent(pnp, component);
+	error = stpn_stripcomponent(pnp, component);
 	if (error)
 		goto bad;
 
@@ -172,8 +171,7 @@ next:
 	dprintf("lookup: component %s pathleft %s\n", component, pnp->pn_path);
 #endif
 	if ((cino == 0) ||
-	    ((cdp = (struct nfs_file *)get_icache(mac_get_dev(), cino)) ==
-									0)) {
+	    ((cdp = (struct nfs_file *)get_icache(mac_get_dev(), cino)) == 0)) {
 		struct nfs_file *lkp;
 
 		/*
@@ -193,7 +191,7 @@ next:
 			break;
 		default:
 			printf("lookup: NFS Version %d not supported\n",
-							cfile->version);
+			    cfile->version);
 			lkp = NULL;
 			break;
 		}
@@ -258,7 +256,7 @@ next:
 	 * front of the remaining pathname.
 	 */
 	if (cfile_is_lnk(cdp)) {
-		struct pathname linkpath;
+		struct st_pathname linkpath;
 		static char path_tmp[NFS_MAXPATHLEN];	/* used for symlinks */
 		char *pathp;
 
@@ -281,7 +279,7 @@ next:
 			break;
 		default:
 			printf("getsymlink: NFS Version %d not supported\n",
-							cdp->version);
+			    cdp->version);
 			error = ENOTSUP;
 			break;
 		}
@@ -289,11 +287,11 @@ next:
 		if (error)
 			goto bad;
 
-		pn_get(pathp, &linkpath);
+		stpn_get(pathp, &linkpath);
 
-		if (pn_pathleft(&linkpath) == 0)
-			(void) pn_set(&linkpath, ".");
-		error = pn_combine(pnp, &linkpath); /* linkpath before pn */
+		if (stpn_pathleft(&linkpath) == 0)
+			(void) stpn_set(&linkpath, ".");
+		error = stpn_combine(pnp, &linkpath); /* linkpath before pn */
 		if (error)
 			goto bad;
 		goto begin;
@@ -311,14 +309,14 @@ skip:
 	 * If no more components, return last directory (if wanted)  and
 	 * last component (if wanted).
 	 */
-	if (pn_pathleft(pnp) == 0) {
-		(void) pn_set(pnp, component);
+	if (stpn_pathleft(pnp) == 0) {
+		(void) stpn_set(pnp, component);
 		return (0);
 	}
 	/*
 	 * skip over slashes from end of last component
 	 */
-	pn_skipslash(pnp);
+	stpn_skipslash(pnp);
 	goto next;
 bad:
 	/*

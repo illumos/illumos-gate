@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -114,7 +111,7 @@ tgetch(int interpret)
 
 		/* Check for arrow and function keys */
 		if (interpret && cur_term->funckeystarter[inp])
-		    collapse = _getkey(interpret - 1, &inp);
+			collapse = _getkey(interpret - 1, &inp);
 	}
 
 	/* Collapse the input queue to remove the escape */
@@ -176,6 +173,9 @@ _readchar()
 extern	char	*_asciify();
 #endif	/* DEBUG */
 
+static int get_xterm_mouse(int, int *);
+static void _map_button(chtype *);
+
 /*
  * This algorithm is a "learning" algorithm. The premise is
  * that keys used once are like to be used again and again.
@@ -192,8 +192,8 @@ _getkey(int blockpeek, chtype *inp)
 	int		key, num_keys = cur_term->_ksz;
 	int		i;
 	chtype		*inputQ = cur_term->_input_queue;
-	char		*chars_onQ = &(cur_term->_chars_on_queue),
-			flag = cur_term->funckeystarter[*inp];
+	char		*chars_onQ = &(cur_term->_chars_on_queue);
+	char		flag = cur_term->funckeystarter[*inp];
 	int		first, collapse = 1;
 
 
@@ -221,7 +221,7 @@ _getkey(int blockpeek, chtype *inp)
 				if (*chars_onQ == i) {
 					(*chars_onQ)++;
 					inputQ[i] = (blockpeek) ?
-						_pk() : _fpk();
+					    _pk() : _fpk();
 					switch ((int)inputQ[i]) {
 					case -2:
 			/*
@@ -266,7 +266,6 @@ _getkey(int blockpeek, chtype *inp)
 			if (kp[key]->_keyval == KEY_MOUSE) {
 				MOUSE_STATUS old_mouse;
 				int rc;
-				static int get_xterm_mouse(int, int *);
 
 				old_mouse = Mouse_status;
 
@@ -339,7 +338,6 @@ _getkey(int blockpeek, chtype *inp)
 			    (MOUSE_Y_POS == LINES) &&
 			    (SP->slk != (SLK_MAP *) NULL) &&
 			    (SP->_map_mbe_to_key  != 0)) {
-				static void _map_button(chtype *);
 				_map_button(inp);
 			}
 
@@ -546,15 +544,15 @@ _fpk(void)
 	/* restore the user alarms */
 	(void) signal(SIGALRM, oldsig);
 	if (sig_caught && oldalarm > 1)
-	    oldalarm--;
+		oldalarm--;
 	(void) alarm(oldalarm);
 	if (rc == 1)			/* got a character */
-	    return (c);
+		return (c);
 	else
-	    if (sig_caught)		/* timed out */
-		return (-2);
-	    else			/* EOF or got interrupted */
-		return (-1);
+		if (sig_caught)		/* timed out */
+			return (-2);
+		else			/* EOF or got interrupted */
+			return (-1);
 }
 #else	/* FIONREAD */
 /*

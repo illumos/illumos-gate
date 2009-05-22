@@ -23,11 +23,9 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include "uucp.h"
@@ -164,6 +162,9 @@ repphone(char *arg, char *phone, char *trstr)
 static uint_t saved_mode;
 static char saved_dcname[20];
 
+static int pop_push(int);
+static void setdevcfg(char *, char *);
+static void ttygenbrk(int);
 /*
  * processdev - Process a line from the Devices file
  *
@@ -178,12 +179,9 @@ processdev(char *flds[], char *dev[])
 	struct caller	*ca;
 	char *args[D_MAX+1], dcname[20];
 	char **sdev;
-	static int pop_push(int);
-	static void setdevcfg(char *, char *);
 	int nullfd;
 	char *phonecl;			/* clear phone string */
 	char phoneex[2*(MAXPH+2)];	/* expanded phone string */
-	static void ttygenbrk(int);
 	struct termio tty_orig;
 	int ret_orig = -1;
 
@@ -230,7 +228,7 @@ processdev(char *flds[], char *dev[])
 		 */
 		if (*dev[D_LINE] != '/') {
 			(void) snprintf(dcname, sizeof (dcname),
-							"/dev/%s", dev[D_LINE]);
+			    "/dev/%s", dev[D_LINE]);
 		} else {
 			(void) strcpy(dcname, dev[D_LINE]);
 		}
@@ -276,7 +274,7 @@ processdev(char *flds[], char *dev[])
 			if (fcntl(dcf, F_SETFL,
 			    (fcntl(dcf, F_GETFL, 0) & ~O_NDELAY)) < 0) {
 				DEBUG(7, "clear O_NDELAY failed, errno %d\n",
-								errno);
+				    errno);
 				Uerror = SS_DEVICE_FAILED;
 				goto bad;
 			}
@@ -393,6 +391,11 @@ translate(char *ttab, char *str)
 }
 
 #define	MAXLINE	512
+
+static void dialreset(void);
+#ifndef SMALL
+static char *currdial(void);
+#endif
 /*
  * Get the information about the dialer.
  * gdial(type, arps, narps)
@@ -409,10 +412,6 @@ gdial(char *type, char *arps[], int narps)
 {
 	static char *info;	/* dynamically allocated MAXLINE */
 	int na;
-	static void dialreset(void);
-#ifndef SMALL
-	static char *currdial(void);
-#endif
 
 	DEBUG(2, "gdial(%s) called\n", type);
 	if (info == NULL) {
@@ -429,11 +428,11 @@ gdial(char *type, char *arps[], int narps)
 		if ((na = getargs(info, arps, narps)) == 0)
 			continue;
 		if (EQUALS(arps[0], type)) {
-		    DEBUG(5, "Trying caller script '%s'", type);
-		    DEBUG(5, " from '%s'.\n", currdial());
-		    dialreset();
-		    bsfix(arps);
-		    return (na);
+			DEBUG(5, "Trying caller script '%s'", type);
+			DEBUG(5, " from '%s'.\n", currdial());
+			dialreset();
+			bsfix(arps);
+			return (na);
 		}
 	}
 	DEBUG(1, "%s not found in Dialers file\n", type);
@@ -460,6 +459,7 @@ static void tfaillog(int fd, const char *s);
 #define	CONNECT_ATTEMPTS	3
 #define	TFREE(p, type)	if ((p)) (void) t_free((char *)(p), (type))
 
+static struct netbuf	*stoa(char *, struct netbuf *);
 /*
  * returns fd to remote uucp daemon
  */
@@ -475,12 +475,11 @@ tlicall(char *flds[], char *dev[])
 	struct t_info	tinfo;
 	struct t_call	*sndcall = 0, *rcvcall = 0;
 
-	static struct netbuf	*stoa(char *, struct netbuf *);
 
 	if (dev[D_LINE][0] != '/') {
 		/*	dev holds device name relative to /dev	*/
 		(void) snprintf(devname, sizeof (devname),
-							"/dev/%s", dev[D_LINE]);
+		    "/dev/%s", dev[D_LINE]);
 	} else {
 		/*	dev holds full path name of device	*/
 		(void) strcpy(devname, dev[D_LINE]);
@@ -560,11 +559,11 @@ tlicall(char *flds[], char *dev[])
 	 */
 
 	DEBUG(5, "t_connect to addr \"%s\"\n",
-		strecpy(addrbuf, dev[D_ARG], "\\"));
+	    strecpy(addrbuf, dev[D_ARG], "\\"));
 
 	if (dev[D_ARG][0] == '\\' && (dev[D_ARG][1] == 'x' ||
-			dev[D_ARG][1] == 'X' || dev[D_ARG][1] == 'o' ||
-			dev[D_ARG][1] == 'O')) {
+	    dev[D_ARG][1] == 'X' || dev[D_ARG][1] == 'o' ||
+	    dev[D_ARG][1] == 'O')) {
 		if (stoa(dev[D_ARG], &(sndcall->addr)) == NULL) {
 			DEBUG(5, "tlicall: stoa failed\n%s", "");
 			logent("tlicall", "string-to-address failed");
@@ -578,7 +577,7 @@ tlicall(char *flds[], char *dev[])
 		}
 	} else {
 		for (i = j = 0; i < BUFSIZ && dev[D_ARG][i] != NULLCHAR;
-								++i, ++j) {
+		    ++i, ++j) {
 			if (dev[D_ARG][i] == '\\' && dev[D_ARG][i+1] == 'N') {
 				addrbuf[j] = NULLCHAR;
 				++i;

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for C++ Audio Library (libAudio.a) 
 
@@ -38,7 +36,7 @@ CFLAGS += $(CCVERBOSE)
 
 LINTFLAGS += -m -v -u
 
-AR=     /usr/ccs/bin/ar cq
+AR=     /usr/ccs/bin/ar
 RANLIB= /usr/ccs/bin/ranlib
 RM=     /usr/bin/rm -f
 
@@ -88,7 +86,7 @@ install all: $(libaudio)
 
 $(libaudio): $(COBJS) $(CCOBJS)
 	$(RM) -f $@
-	$(AR) $@ $(COBJS) $(CCOBJS)
+	$(AR) cq $@ $(COBJS) $(CCOBJS)
 	test ! -f $(RANLIB) || $(RANLIB) $@
 
 clean:

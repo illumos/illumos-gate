@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,15 +20,13 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <curses.h>
 #define	_SYS_TERMIO_H		/* sys/termio.h is included by curses.h */
@@ -69,6 +66,7 @@ static int pack();
 static int unpack();
 static int keysave();
 static int keyvalid();
+static void regetkey();
 
 /*
  *	scram -- Scramble an object and pack all its parts into an OEU package
@@ -77,7 +75,6 @@ int
 scram(file)
 register char *file;
 {
-	static void regetkey();
 
 	strcpy(Keyprompt, "Please enter scramble key: ");
 	strcpy(Srcfile, file);
@@ -124,7 +121,6 @@ token t;
 {
 	struct ott_entry *entry, *path_to_ott();
 	struct stat buf;
-	static void regetkey();
 
 	if (t == TOK_CANCEL)
 		return (SUCCESS);
@@ -343,7 +339,7 @@ struct ott_entry *entry;
 		n = m + m;
 		tempstr[0] = Keycheck[n];
 		tempstr[1] = Keycheck[n+1];
-		buf[m] = (int) strtol(tempstr, NULL, 16);
+		buf[m] = (int)strtol(tempstr, NULL, 16);
 	}
 
 	if (cryptit(buf) == FAIL)
@@ -371,7 +367,7 @@ mkencrypart()
 	unsigned int left, right;
 	time_t clock;	/* EFT abs k16 */
 
-	clock = time((time_t *) 0);	/* EFT abs k16 */
+	clock = time((time_t *)0);	/* EFT abs k16 */
 	right = clock & 0177;
 	buf[0] = right;
 

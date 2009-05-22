@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * routines in this module are meant to be called by other libvolmgt
@@ -56,6 +54,8 @@
 #define	NULL_PATH		"/dev/null"
 
 
+static int	vol_getmntdev(FILE *, struct mnttab *, dev_t,
+			    struct dk_cinfo *);
 
 /*
  * This is an ON Consolidation Private interface.
@@ -72,8 +72,6 @@
 int
 _dev_mounted(char *path)
 {
-	static int	vol_getmntdev(FILE *, struct mnttab *, dev_t,
-			    struct dk_cinfo *);
 	int		fd = -1;
 	struct dk_cinfo	info;
 	static FILE 	*fp = NULL;		/* mnttab file pointer */
@@ -123,6 +121,9 @@ dun:
 }
 
 
+static int	call_unmount_prog(int, int, char *, int, char *,
+			    char *);
+static int	get_media_info(char *, char **, int *, char **);
 /*
  * This is an ON Consolidation Private interface.
  *
@@ -133,9 +134,6 @@ dun:
 int
 _dev_unmount(char *path)
 {
-	static int	call_unmount_prog(int, int, char *, int, char *,
-			    char *);
-	static int	get_media_info(char *, char **, int *, char **);
 	char		*bn = NULL;		/* block name */
 	char		*mtype = NULL;		/* media type */
 	char		*spcl = NULL;		/* special dev. path */
@@ -160,7 +158,7 @@ _dev_unmount(char *path)
 		absname = pathbuf;
 
 	volume_is_not_managed = !volmgt_running() ||
-		(!volmgt_ownspath(absname) && volmgt_symname(bn) == NULL);
+	    (!volmgt_ownspath(absname) && volmgt_symname(bn) == NULL);
 
 	free(pathbuf);
 
@@ -405,12 +403,12 @@ vol_basename(char *path)
 	return (path);
 }
 
+static int	vol_getmntdev(FILE *, struct mnttab *, dev_t,
+			    struct dk_cinfo *);
 
 static int
 get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 {
-	static int	vol_getmntdev(FILE *, struct mnttab *, dev_t,
-			    struct dk_cinfo *);
 	FILE		*fp = NULL;
 	int		fd = -1;
 	char		*cn = NULL;		/* char spcl pathname */
@@ -465,7 +463,7 @@ get_media_info(char *path, char **mtypep, int *mnump, char **spclp)
 
 		if (!volmgt_running() ||
 		    (!volmgt_ownspath(*spclp) &&
-			volmgt_symname(*spclp) == NULL)) {
+		    volmgt_symname(*spclp) == NULL)) {
 			ret_val = TRUE;		/* success (if limited) */
 			goto dun;
 		}

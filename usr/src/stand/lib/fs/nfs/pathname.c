@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +32,10 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
-#include <pathname.h>
+#include <st_pathname.h>
 #include <sys/promif.h>
 #include <sys/salib.h>
 #include <sys/bootdebug.h>
@@ -65,7 +63,7 @@
  * NOTE: if buf is NULL, failure occurs.
  */
 int
-pn_alloc(struct pathname *pnp)
+stpn_alloc(struct st_pathname *pnp)
 {
 	if (pnp->pn_buf == NULL)
 		return (-1);
@@ -78,9 +76,9 @@ pn_alloc(struct pathname *pnp)
  * Pull a pathname from user user or kernel space
  */
 int
-pn_get(char *str, struct pathname *pnp)
+stpn_get(char *str, struct st_pathname *pnp)
 {
-	if (pn_alloc(pnp) != 0)
+	if (stpn_alloc(pnp) != 0)
 		return (-1);
 	bcopy(str, pnp->pn_path, strlen(str));
 	pnp->pn_pathlen = strlen(str);		/* don't count null byte */
@@ -91,7 +89,7 @@ pn_get(char *str, struct pathname *pnp)
  * Set pathname to argument string.
  */
 int
-pn_set(struct pathname *pnp, char *path)
+stpn_set(struct st_pathname *pnp, char *path)
 {
 	pnp->pn_path = pnp->pn_buf;
 	pnp->pn_pathlen = strlen(pnp->pn_path); /* don't count null byte */
@@ -107,7 +105,7 @@ pn_set(struct pathname *pnp, char *path)
  * for symbolic link processing.
  */
 int
-pn_combine(struct pathname *pnp, struct pathname *sympnp)
+stpn_combine(struct st_pathname *pnp, struct st_pathname *sympnp)
 {
 
 	if (pnp->pn_pathlen + sympnp->pn_pathlen >= MAXPATHLEN)
@@ -129,7 +127,7 @@ pn_combine(struct pathname *pnp, struct pathname *sympnp)
  * i.e., don't strip it out of pnp.
  */
 int
-pn_getcomponent(struct pathname *pnp, char *component, int flags)
+stpn_getcomponent(struct st_pathname *pnp, char *component, int flags)
 {
 	char *cp;
 	int l;
@@ -156,7 +154,7 @@ pn_getcomponent(struct pathname *pnp, char *component, int flags)
  * skip over consecutive slashes in the pathname
  */
 void
-pn_skipslash(struct pathname *pnp)
+stpn_skipslash(struct st_pathname *pnp)
 {
 	while ((pnp->pn_pathlen != 0) && (*pnp->pn_path == '/')) {
 		pnp->pn_path++;
@@ -170,7 +168,7 @@ pn_skipslash(struct pathname *pnp)
  */
 /*ARGSUSED*/
 void
-pn_free(struct pathname *pnp)
+stpn_free(struct st_pathname *pnp)
 {
 	/* nop */
 	dprintf("pn_free(): you shouldn't be calling pn_free()!\n");

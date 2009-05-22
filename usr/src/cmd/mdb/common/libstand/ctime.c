@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,8 +8,6 @@
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This localtime is a modified version of offtime from libc, which does not
@@ -149,6 +147,8 @@ localtime(const time_t *clock)
 #define	dysize(A) (((A)%4)? 365: 366)
 #define	CBUFSIZ 26
 
+static char *ct_numb();
+
 /*
  * POSIX.1c standard version of the function asctime_r.
  * User gets it via static asctime_r from the header file.
@@ -159,7 +159,6 @@ __posix_asctime_r(const struct tm *t, char *cbuf)
 	const char *Date = "Day Mon 00 00:00:00 1900\n";
 	const char *Day  = "SunMonTueWedThuFriSat";
 	const char *Month = "JanFebMarAprMayJunJulAugSepOctNovDec";
-	static char *ct_numb();
 	const char *ncp;
 	const int *tp;
 	char *cp;

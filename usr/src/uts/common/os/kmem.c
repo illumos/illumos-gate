@@ -2953,10 +2953,11 @@ kmem_cache_update(kmem_cache_t *cp)
 		    (task_func_t *)kmem_cache_scan, cp, TQ_NOSLEEP);
 }
 
+static void kmem_update(void *);
+
 static void
 kmem_update_timeout(void *dummy)
 {
-	static void kmem_update(void *);
 
 	(void) timeout(kmem_update, dummy, kmem_reap_interval);
 }

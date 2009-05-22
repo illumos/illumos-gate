@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _PATHNAME_H
-#define	_PATHNAME_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* from SunOS4.1 2.12 */
+#ifndef _ST_PATHNAME_H
+#define	_ST_PATHNAME_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -42,7 +40,7 @@ extern "C" {
  * is also assembled in this structure.
  */
 
-struct pathname {
+struct st_pathname {
 	char	*pn_buf;		/* underlying storage */
 	char	*pn_path;		/* remaining pathname */
 	uint_t	pn_pathlen;		/* remaining length */
@@ -50,30 +48,25 @@ struct pathname {
 
 #define	PN_STRIP 0x00		/* Strip next component off pn */
 #define	PN_PEEK	0x01  		/* Only peek at next pn component */
-#define	pn_peekcomponent(PNP, COMP) pn_getcomponent(PNP, COMP, PN_PEEK)
-#define	pn_stripcomponent(PNP, COMP) pn_getcomponent(PNP, COMP, PN_STRIP)
+#define	stpn_peekcomponent(PNP, COMP) stpn_getcomponent(PNP, COMP, PN_PEEK)
+#define	stpn_stripcomponent(PNP, COMP) stpn_getcomponent(PNP, COMP, PN_STRIP)
 
-#define	pn_peekchar(PNP) 	(((PNP)->pn_pathlen != 0) ? \
+#define	stpn_peekchar(PNP) 	(((PNP)->pn_pathlen != 0) ? \
 				    *((PNP)->pn_path) : (char)0)
-#define	pn_pathleft(PNP)	((PNP)->pn_pathlen)
-#define	pn_getpath(PNP)		((PNP)->pn_path)
-#define	pn_copy(PNP1, PNP2)	(pn_set(PNP2, pn_getpath(PNP1)))
+#define	stpn_pathleft(PNP)	((PNP)->pn_pathlen)
+#define	stpn_getpath(PNP)		((PNP)->pn_path)
+#define	stpn_copy(PNP1, PNP2)	(stpn_set(PNP2, stpn_getpath(PNP1)))
 
-extern int	pn_alloc();		/* allocat buffer for pathname */
-extern int	pn_get();		/* allocate buf and copy path into it */
-#ifdef notneeded
-extern int	pn_getchar();		/* get next pathname char */
-#endif
-extern int	pn_set();		/* set pathname to string */
-extern int	pn_combine();		/* combine to pathnames (for symlink) */
-extern int	pn_getcomponent();	/* get next component of pathname */
-extern void	pn_skipslash();		/* skip over slashes */
-extern void	pn_free();		/* free pathname buffer */
-extern int	pn_append();		/* Append string to pathname */
-extern int	pn_getlast();		/* Get last component of pathname */
+extern int	stpn_alloc();		/* allocate buffer for pathname */
+extern int	stpn_get();		/* allocate buf and copy path into it */
+extern int	stpn_set();		/* set pathname to string */
+extern int	stpn_combine();		/* combine to pathnames (for symlink) */
+extern int	stpn_getcomponent();	/* get next component of pathname */
+extern void	stpn_skipslash();		/* skip over slashes */
+extern void	stpn_free();		/* free pathname buffer */
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif /* _PATHNAME_H */
+#endif /* _ST_PATHNAME_H */

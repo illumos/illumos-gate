@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,11 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+    
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -27,7 +31,6 @@
  * Copyright  (c) 1985 AT&T
  *	All Rights Reserved
  */
-#ident	"%Z%%M%	%I%	%E% SMI"       /* SVr4.0 1.11 */
 
 #include <stdio.h>
 #include <ctype.h>
@@ -39,6 +42,7 @@
 
 static token _fixed();
 static token _virtual();
+static int emptyrow();
 
 #define SCROLLSIZE	((Cfld->rows - 2 <= 0) ? 1 : Cfld->rows - 2)
 #define HALFSIZE	(int)(Cfld->rows / 2)
@@ -58,7 +62,6 @@ token tok;
 {
 	register token rettok;
 	register int col;
-	static int emptyrow();
 
 	rettok = TOK_NOP;
 	switch (tok) {

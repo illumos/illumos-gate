@@ -33,14 +33,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SMBFS_SMBFS_H
 #define	_SMBFS_SMBFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * FS-specific VFS structures for smbfs.
@@ -52,6 +50,7 @@
 
 #include <sys/list.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/fs/smbfs_mount.h>
 
 

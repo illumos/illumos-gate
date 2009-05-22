@@ -265,6 +265,8 @@ initialize()
 	Initialized = TRUE;
 }
 
+static	void	free_defs();
+
 /*
  *	open_all - open devices in pmtab if the entry is
  *	         - valid, fd = 0, and pid = 0
@@ -274,7 +276,6 @@ open_all()
 {
 	struct	pmtab	*tp;
 	int	check_modtime;
-	static	void	free_defs();
 	sigset_t cset;
 	sigset_t tset;
 

@@ -646,6 +646,14 @@ print_ar_files(int fd, Elf * elf_file, char *filename)
 	} /* end while */
 }
 
+static void print_header(int);
+#ifndef XPG4
+static void print_with_uflag(SYM *, char *);
+#endif
+static void print_with_pflag(int, Elf *, unsigned int, SYM *, char *);
+static void print_with_Pflag(int, Elf *, unsigned int, SYM *);
+static void print_with_otherflags(int, Elf *, unsigned int,
+		SYM *, char *);
 /*
  * Print the symbol table according to the flags that were
  * set, if any.  Input is an opened ELF file, the section name,
@@ -670,15 +678,7 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 		8,		/* FMT_T_HEX */
 		11,		/* FMT_T_OCT */
 	};
-	static void print_header(int);
 	int ndigits;
-#ifndef XPG4
-	static void print_with_uflag(SYM *, char *);
-#endif
-	static void print_with_pflag(int, Elf *, unsigned int, SYM *, char *);
-	static void print_with_Pflag(int, Elf *, unsigned int, SYM *);
-	static void print_with_otherflags(int, Elf *, unsigned int,
-	    SYM *, char *);
 
 	/*
 	 * Determine # of digits to use for each numeric value.
