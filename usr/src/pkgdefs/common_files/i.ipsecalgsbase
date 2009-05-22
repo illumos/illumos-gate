@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.	 All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
  
 while read src dest
 do
@@ -68,6 +67,9 @@ do
 		    $dest.$$ > $dest.2.$$
 		mv $dest.2.$$ $dest
 		rm $dest.$$
+
+		# Set correct permissions
+		chmod 0644 $dest
 	fi
 done
 exit 0

@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 merge_ipnodes() {
@@ -467,6 +466,9 @@ deliver_hosts() {
 			continue
 		fi
 	fi
+
+	# Set correct permissions on hosts file
+	chmod 0644 $dest
 }
 	
 # main

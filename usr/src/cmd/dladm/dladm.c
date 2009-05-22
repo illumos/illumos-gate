@@ -6342,8 +6342,7 @@ do_show_ether(int argc, char **argv, const char *use)
 
 	if (state.es_link == NULL) {
 		(void) dladm_walk_datalink_id(show_etherprop, handle, &state,
-		    DATALINK_CLASS_PHYS, DL_ETHER,
-		    DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
+		    DATALINK_CLASS_PHYS, DL_ETHER, DLADM_OPT_ACTIVE);
 	} else {
 		if (!link_is_ether(state.es_link, &linkid))
 			die("invalid link specified");

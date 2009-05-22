@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -65,13 +65,13 @@ d none etc/inet/ike 755 root sys
 f none etc/inet/ike/config.sample 444 root sys
 d none etc/inet/ike/crls 755 root sys
 d none etc/inet/ike/publickeys 755 root sys
-e ipsecalgsbase etc/inet/ipsecalgs 444 root sys
+e ipsecalgsbase etc/inet/ipsecalgs 644 root sys
 f none etc/inet/ipsecinit.sample 444 root sys
 d none etc/inet/secret 700 root sys
 e preserve etc/inet/secret/ike.preshared 600 root sys
 d none etc/inet/secret/ike.privatekeys 700 root sys
 f none etc/inet/secret/ipseckeys.sample 600 root sys
-e sock2path etc/inet/sock2path 444 root sys
+e sock2path etc/inet/sock2path 644 root sys
 s none etc/sock2path=./inet/sock2path
 d none sbin 755 root sys
 f none sbin/dladm 555 root bin

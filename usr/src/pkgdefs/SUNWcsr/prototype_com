@@ -162,14 +162,14 @@ s none etc/grpck=../usr/sbin/grpck
 s none etc/halt=../usr/sbin/halt
 s none etc/hosts=./inet/hosts
 d none etc/inet 755 root sys
-e hosts etc/inet/hosts 444 root sys
+e hosts etc/inet/hosts 644 root sys
 s none etc/inet/ipnodes=./hosts
-e inetdconf etc/inet/inetd.conf 444 root sys
-e preserve etc/inet/ipaddrsel.conf 444 root sys
-e preserve etc/inet/netmasks 444 root sys
-e preserve etc/inet/networks 444 root sys
-e services etc/inet/protocols 444 root sys
-e services etc/inet/services 444 root sys
+e inetdconf etc/inet/inetd.conf 644 root sys
+e preserve etc/inet/ipaddrsel.conf 644 root sys
+e preserve etc/inet/netmasks 644 root sys
+e preserve etc/inet/networks 644 root sys
+e services etc/inet/protocols 644 root sys
+e services etc/inet/services 644 root sys
 f none etc/inet/wanboot.conf.sample 444 root sys
 s none etc/inetd.conf=./inet/inetd.conf
 s none etc/init=../sbin/init

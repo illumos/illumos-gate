@@ -18,20 +18,16 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
 
 SYMPROG= hosts inetd.conf networks protocols services netmasks sock2path
 
 # New /etc/inet files shouldn't have /etc entries.
-PROG= datemsk.ndpd ipaddrsel.conf ipsecalgs ipsecinit.sample \
-    ipqosconf.1.sample ipqosconf.2.sample ipqosconf.3.sample \
-    wanboot.conf.sample
-ETCPROG= $(SYMPROG) $(PROG)
+EDITPROG= ipaddrsel.conf ipsecalgs
+PROG= datemsk.ndpd ipsecinit.sample ipqosconf.1.sample ipqosconf.2.sample \
+    ipqosconf.3.sample wanboot.conf.sample
+ETCPROG= $(SYMPROG) $(EDITPROG) $(PROG)
 SUBDIRS= default dhcp init.d ike nca ppp secret
 
 include ../../Makefile.cmd
@@ -45,6 +41,7 @@ INETVARDIR=	$(ROOTVAR)/inet
 DIRS= 		$(INETETCDIR) $(INETVARDIR)
 SYMDIR= 	inet
 ETCINETPROG=	$(ETCPROG:%=$(INETETCDIR)/%)
+EDITFILES=	$(SYMPROG:%=$(INETETCDIR)/%) $(EDITPROG:%=$(INETETCDIR)/%)
 # Only old /etc/inet files get symlinks in /etc.
 SYMETCPROG=	$(SYMPROG:%=sym_%)
 SYMIPNODES=	$(INETETCDIR)/ipnodes
@@ -54,6 +51,8 @@ OWNER= root
 GROUP= sys
 
 .KEEP_STATE:
+
+$(EDITFILES) := FILEMODE= 0644
 
 all: $(ETCPROG) $(SUBDIRS)
 

@@ -4108,13 +4108,22 @@ cleanup_kerberos_mechanisms()
 mpxiodisableno='^[ 	]*mpxio-disable[ 	]*=[ 	]*"no"[ 	]*;'
 mpxiodisableyes='^[ 	]*mpxio-disable[ 	]*=[ 	]*"yes"[ 	]*;'
 
-#
-# fix up audit permissions
-#
-fix_up_audit()
+fix_up_perms()
 {
+	#
+	# fix up audit permissions
+	#
 	chmod 644 $root/etc/security/audit_control
 	chmod 644 $root/etc/security/audit_user
+
+	#
+	# fix up /etc/inet config file permissions
+	#
+	INETFILES="hosts networks netmasks protocols services \
+	    inetd.conf ipaddrsel.conf sock2path ipsecalgs"
+	for file in ${INETFILES}; do
+		chmod 644 $root/etc/inet/$file
+	done
 }
 
 #
@@ -8254,8 +8263,8 @@ mondo_loop() {
 		fi
 	fi
 
-	# Fix up audit permissions
-	fix_up_audit
+	# Fix up audit & /etc/inet config file permissions
+	fix_up_perms
 
 	# Remove bsmrecord.  Renamed to auditrecord.
 	rm -f $root/usr/sbin/bsmrecord

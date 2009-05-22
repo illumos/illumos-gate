@@ -118,7 +118,7 @@ static dld_ioc_macprop_t *i_dladm_buf_alloc_by_id(size_t, datalink_id_t,
 static dld_ioc_macprop_t *i_dladm_get_public_prop(dladm_handle_t, datalink_id_t,
 			    char *, uint_t, dladm_status_t *, uint_t *);
 
-static dladm_status_t i_dladm_set_prop(dladm_handle_t, datalink_id_t,
+static dladm_status_t i_dladm_set_private_prop(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t, uint_t);
 static dladm_status_t i_dladm_get_priv_prop(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t *, dladm_prop_type_t,
@@ -710,8 +710,8 @@ i_dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 	if (!found) {
 		if (prop_name[0] == '_') {
 			/* other private properties */
-			status = i_dladm_set_prop(handle, linkid, prop_name,
-			    prop_val, val_cnt, flags);
+			status = i_dladm_set_private_prop(handle, linkid,
+			    prop_name, prop_val, val_cnt, flags);
 		} else  {
 			status = DLADM_STATUS_NOTFOUND;
 		}
@@ -736,6 +736,10 @@ dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 		return (DLADM_STATUS_BADARG);
 	}
 
+	/*
+	 * Check for valid link property against the flags passed
+	 * and set the link property when active flag is passed.
+	 */
 	status = i_dladm_set_linkprop(handle, linkid, prop_name, prop_val,
 	    val_cnt, flags);
 	if (status != DLADM_STATUS_OK)
@@ -2688,7 +2692,7 @@ i_dladm_flowctl_get(dladm_handle_t handle, prop_desc_t *pdp,
 
 /* ARGSUSED */
 static dladm_status_t
-i_dladm_set_prop(dladm_handle_t handle, datalink_id_t linkid,
+i_dladm_set_private_prop(dladm_handle_t handle, datalink_id_t linkid,
     const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags)
 
 {
@@ -2705,6 +2709,9 @@ i_dladm_set_prop(dladm_handle_t handle, datalink_id_t linkid,
 	p = dladm_name2prop(prop_name);
 	if (p->pp_id != MAC_PROP_PRIVATE)
 		return (DLADM_STATUS_BADARG);
+
+	if (!(flags & DLADM_OPT_ACTIVE))
+		return (DLADM_STATUS_OK);
 
 	/*
 	 * private properties: all parsing is done in the kernel.
