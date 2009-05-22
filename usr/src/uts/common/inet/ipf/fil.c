@@ -2247,7 +2247,6 @@ u_32_t *passp;
 	return fr;
 }
 
-
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_check                                                    */
 /* Returns:     int -  0 == packet allowed through,                         */
@@ -2591,10 +2590,74 @@ ipf_stack_t *ifs;
 					dst = 1;
 				else
 					dst = 0;
+#if defined(_KERNEL) && (SOLARIS2 >= 10)
+				/*
+				 * Assume it's possible to enter insane rule:
+				 * 	pass return-icmp in proto udp ...
+				 * then we have no other option than to forward
+				 * packet on loopback and give up any attempt
+				 * to create a fake response.
+				 */
+				if (IPF_IS_LOOPBACK(qpi->qpi_flags) &&
+				    FR_ISBLOCK(pass)) {
+
+					if (fr_make_icmp(fin) == 0) {
+						IPF_BUMP(
+						ifs->ifs_frstats[out].fr_ret);
+					}
+					/* 
+					 * we drop packet silently in case we
+					 * failed assemble fake response for it
+					 */
+					else if (*mp != NULL) {
+						FREE_MB_T(*mp);
+						m = *mp = NULL;
+					}
+
+					IPF_BUMP(
+					    ifs->ifs_frstats[out].fr_block);
+					RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+					
+					return (0);
+				}
+#endif	/* _KERNEL && SOLARIS2 >= 10 */
+
 				(void) fr_send_icmp_err(ICMP_UNREACH, fin, dst);
-				IPF_BUMP(ifs->ifs_frstats[0].fr_ret);
+				IPF_BUMP(ifs->ifs_frstats[out].fr_ret);
+
 			} else if (((pass & FR_RETMASK) == FR_RETRST) &&
 				   !(fin->fin_flx & FI_SHORT)) {
+
+#if defined(_KERNEL) && (SOLARIS2 >= 10)
+				/*
+				 * Assume it's possible to enter insane rule:
+				 * 	pass return-rst in proto tcp ...
+				 * then we have no other option than to forward
+				 * packet on loopback and give up any attempt
+				 * to create a fake response.
+				 */
+				if (IPF_IS_LOOPBACK(qpi->qpi_flags) &&
+				    FR_ISBLOCK(pass)) {
+					if (fr_make_rst(fin) == 0) {
+						IPF_BUMP(
+						ifs->ifs_frstats[out].fr_ret);
+					}
+					else if (mp != NULL) {
+					/* 
+					 * we drop packet silently in case we
+					 * failed assemble fake response for it
+					 */
+						FREE_MB_T(*mp);
+						m = *mp = NULL;
+					}
+
+					IPF_BUMP(
+					    ifs->ifs_frstats[out].fr_block);
+					RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+					
+					return (0);
+				 }
+#endif /* _KERNEL && _SOLARIS2 >= 10 */
 				if (fr_send_reset(fin) == 0) {
 					IPF_BUMP(ifs->ifs_frstats[1].fr_ret);
 				}

@@ -235,6 +235,8 @@ typedef unsigned int	u_32_t;
 #  define	KMUTEX_T		kmutex_t
 #  if SOLARIS2 >= 10
 #   include <sys/sdt.h>
+
+#   define IPF_IS_LOOPBACK(f)	((f) & FI_NOCKSUM)
 #  endif /* SOLARIS2 >= 10 */
 #  if SOLARIS2 >= 6
 #   if SOLARIS2 == 6
@@ -2464,6 +2466,10 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define DTRACE_PROBE2(_x_, _t1_, _a1_, _t2_, _a2_)
 # define DTRACE_PROBE3(_x_, _t1_, _a1_, _t2_, _a2_, _t3_, _a3_)
 # define DTRACE_PROBE4(_x_, _t1_, _a1_, _t2_, _a2_, _t3_, _a3_, _t4_, _a4_)
+#endif
+
+#ifndef IPF_IS_LOOPBACK
+# define IPF_IS_LOOPBACK(x)	0
 #endif
 
 #endif	/* __IP_COMPAT_H__ */

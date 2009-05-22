@@ -2112,3 +2112,499 @@ int ipf_nic_event_v6(hook_event_token_t event, hook_data_t info, void *arg)
 
 	return 0;
 }
+
+/*
+ * Functions fr_make_rst(), fr_make_icmp_v4(), fr_make_icmp_v6()
+ * are needed in Solaris kernel only. We don't need them in
+ * ipftest to pretend the ICMP/RST packet was sent as a response.
+ */
+#if defined(_KERNEL) && (SOLARIS2 >= 10)
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_make_rst                                                 */
+/* Returns:     int - 0 on success, -1 on failure			    */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* We must alter the original mblks passed to IPF from IP stack via	    */
+/* FW_HOOKS. FW_HOOKS interface is powerfull, but it has some limitations.  */
+/* IPF can basicaly do only these things with mblk representing the packet: */
+/*	leave it as it is (pass the packet)				    */
+/*                                                                          */
+/*	discard it (block the packet)					    */
+/*                                                                          */
+/*	alter it (i.e. NAT)						    */
+/*                                                                          */
+/* As you can see IPF can not simply discard the mblk and supply a new one  */
+/* instead to IP stack via FW_HOOKS.					    */
+/*                                                                          */
+/* The return-rst action for packets coming via NIC is handled as follows:  */
+/*	mblk with packet is discarded					    */
+/*                                                                          */
+/*	new mblk with RST response is constructed and injected to network   */
+/*                                                                          */
+/* IPF can't inject packets to loopback interface, this is just another	    */
+/* limitation we have to deal with here. The only option to send RST	    */
+/* response to offending TCP packet coming via loopback is to alter it.	    */
+/*									    */
+/* The fr_make_rst() function alters TCP SYN/FIN packet intercepted on	    */
+/* loopback interface into TCP RST packet. fin->fin_mp is pointer to	    */
+/* mblk L3 (IP) and L4 (TCP/UDP) packet headers.			    */
+/* ------------------------------------------------------------------------ */
+int fr_make_rst(fin)
+fr_info_t *fin;
+{
+	uint16_t tmp_port;
+	int rv = -1;
+	uint32_t old_ack;
+	tcphdr_t *tcp = NULL;
+	struct in_addr tmp_src;
+#ifdef USE_INET6
+	struct in6_addr	tmp_src6;
+#endif
+	
+	ASSERT(fin->fin_p == IPPROTO_TCP);
+
+	/*
+	 * We do not need to adjust chksum, since it is not being checked by
+	 * Solaris IP stack for loopback clients.
+	 */
+	if ((fin->fin_v == 4) && (fin->fin_p == IPPROTO_TCP) &&
+	    ((tcp = (tcphdr_t *) fin->fin_dp) != NULL)) {
+
+		if (tcp->th_flags & (TH_SYN | TH_FIN)) {
+			/* Swap IPv4 addresses. */
+			tmp_src = fin->fin_ip->ip_src;
+			fin->fin_ip->ip_src = fin->fin_ip->ip_dst;
+			fin->fin_ip->ip_dst = tmp_src;
+
+			rv = 0;
+		}
+		else
+			tcp = NULL;
+	}
+#ifdef USE_INET6
+	else if ((fin->fin_v == 6) && (fin->fin_p == IPPROTO_TCP) &&
+	    ((tcp = (tcphdr_t *) fin->fin_dp) != NULL)) {
+		/*
+		 * We are relying on fact the next header is TCP, which is true
+		 * for regular TCP packets coming in over loopback.
+		 */
+		if (tcp->th_flags & (TH_SYN | TH_FIN)) {
+			/* Swap IPv6 addresses. */
+			tmp_src6 = fin->fin_ip6->ip6_src;
+			fin->fin_ip6->ip6_src = fin->fin_ip6->ip6_dst;
+			fin->fin_ip6->ip6_dst = tmp_src6;
+
+			rv = 0;
+		}
+		else
+			tcp = NULL;
+	}
+#endif
+
+	if (tcp != NULL) {
+		/* 
+		 * Adjust TCP header:
+		 *	swap ports,
+		 *	set flags,
+		 *	set correct ACK number
+		 */
+		tmp_port = tcp->th_sport;
+		tcp->th_sport = tcp->th_dport;
+		tcp->th_dport = tmp_port;
+		old_ack = tcp->th_ack;
+		tcp->th_ack = htonl(ntohl(tcp->th_seq) + 1);
+		tcp->th_seq = old_ack;
+		tcp->th_flags = TH_RST | TH_ACK;
+	}
+
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_make_icmp_v4                                             */
+/* Returns:     int - 0 on success, -1 on failure			    */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* Please read comment at fr_make_icmp() wrapper function to get an idea    */
+/* what is going to happen here and why. Once you read the comment there,   */
+/* continue here with next paragraph.					    */
+/*									    */
+/* To turn IPv4 packet into ICMPv4 response packet, these things must	    */
+/* happen here:								    */
+/*	(1) Original mblk is copied (duplicated).			    */
+/*                                                                          */
+/*	(2) ICMP header is created.					    */
+/*                                                                          */
+/*	(3) Link ICMP header with copy of original mblk, we have ICMPv4	    */
+/*	    data ready then.						    */
+/*                                                                          */
+/*      (4) Swap IP addresses in original mblk and adjust IP header data.   */
+/*                                                                          */
+/*	(5) The mblk containing original packet is trimmed to contain IP    */
+/*	    header only and ICMP chksum is computed.			    */
+/*                                                                          */
+/*	(6) The ICMP header we have from (3) is linked to original mblk,    */
+/*	    which now contains new IP header. If original packet was spread */
+/*	    over several mblks, only the first mblk is kept.		    */
+/* ------------------------------------------------------------------------ */
+static int fr_make_icmp_v4(fin)
+fr_info_t *fin;
+{
+	struct in_addr tmp_src;
+	struct icmp *icmp;
+	mblk_t *mblk_icmp;
+	mblk_t *mblk_ip;
+	size_t icmp_pld_len;	/* octets to append to ICMP header */
+	size_t orig_iphdr_len;	/* length of IP header only */
+	uint32_t sum;
+	uint16_t *buf;
+	int len;
+
+
+	if (fin->fin_v != 4)
+		return (-1);
+
+	/*
+	 * If we are dealing with TCP, then packet must be SYN/FIN to be routed
+	 * by IP stack. If it is not SYN/FIN, then we must drop it silently.
+	 */
+	if ((fin->fin_p == IPPROTO_TCP) && 
+	    !(fin->fin_flx & (TH_SYN | TH_FIN)))
+		return (-1);
+
+	/*
+	 * Step (1)
+	 *
+	 * Make copy of original mblk.
+	 *
+	 * We want to copy as much data as necessary, not less, not more.  The
+	 * ICMPv4 payload length for unreachable messages is:
+	 *	original IP header + 8 bytes of L4 (if there are any).
+	 *
+	 * We determine if there are at least 8 bytes of L4 data following IP
+	 * header first.
+	 */
+	icmp_pld_len = (fin->fin_dlen > ICMPERR_ICMPHLEN) ?
+		ICMPERR_ICMPHLEN : fin->fin_dlen;
+	/*
+	 * Since we don't want to copy more data than necessary, we must trim
+	 * the original mblk here.  The right way (STREAMish) would be to use
+	 * adjmsg() to trim it.  However we would have to calculate the length
+	 * argument for adjmsg() from pointers we already have here.
+	 *
+	 * Since we have pointers and offsets, it's faster and easier for
+	 * us to just adjust pointers by hand instead of using adjmsg().
+	 */
+	fin->fin_m->b_wptr = (unsigned char *) fin->fin_dp;
+	fin->fin_m->b_wptr += icmp_pld_len;
+	icmp_pld_len = fin->fin_m->b_wptr - (unsigned char *) fin->fin_ip;
+
+	/*
+	 * Also we don't want to copy any L2 stuff, which might precede IP
+	 * header, so we have have to set b_rptr to point to the start of IP
+	 * header.
+	 */
+	fin->fin_m->b_rptr += fin->fin_ipoff;
+	if ((mblk_ip = copyb(fin->fin_m)) == NULL)
+		return (-1);
+	fin->fin_m->b_rptr -= fin->fin_ipoff;
+
+	/*
+	 * Step (2)
+	 *
+	 * Create an ICMP header, which will be appened to original mblk later.
+	 * ICMP header is just another mblk.
+	 */
+	mblk_icmp = (mblk_t *) allocb(ICMPERR_ICMPHLEN, BPRI_HI);
+	if (mblk_icmp == NULL) {
+		FREE_MB_T(mblk_ip);
+		return (-1);
+	}
+
+	MTYPE(mblk_icmp) = M_DATA;
+	icmp = (struct icmp *) mblk_icmp->b_wptr;
+	icmp->icmp_type = ICMP_UNREACH;
+	icmp->icmp_code = fin->fin_icode & 0xFF;
+	icmp->icmp_void = 0;
+	icmp->icmp_cksum = 0;
+	mblk_icmp->b_wptr += ICMPERR_ICMPHLEN;
+
+	/*
+	 * Step (3)
+	 *
+	 * Complete ICMP packet - link ICMP header with L4 data from original
+	 * IP packet.
+	 */
+	linkb(mblk_icmp, mblk_ip);
+
+	/*
+	 * Step (4)
+	 *
+	 * Swap IP addresses and change IP header fields accordingly in
+	 * original IP packet.
+	 *
+	 * There is a rule option return-icmp as a dest for physical
+	 * interfaces. This option becomes useless for loopback, since IPF box
+	 * uses same address as a loopback destination. We ignore the option
+	 * here, the ICMP packet will always look like as it would have been
+	 * sent from the original destination host.
+	 */
+	tmp_src = fin->fin_ip->ip_src;
+	fin->fin_ip->ip_src = fin->fin_ip->ip_dst;
+	fin->fin_ip->ip_dst = tmp_src;
+	fin->fin_ip->ip_p = IPPROTO_ICMP;
+	fin->fin_ip->ip_sum = 0;
+
+	/*
+	 * Step (5)
+	 *
+	 * We trim the orignal mblk to hold IP header only.
+	 */
+	fin->fin_m->b_wptr = fin->fin_dp;
+	orig_iphdr_len = fin->fin_m->b_wptr -
+			    (fin->fin_m->b_rptr + fin->fin_ipoff);
+	fin->fin_ip->ip_len = htons(icmp_pld_len + ICMPERR_ICMPHLEN +
+			    orig_iphdr_len);
+
+	/*
+	 * ICMP chksum calculation. The data we are calculating chksum for are
+	 * spread over two mblks, therefore we have to use two for loops.
+	 *
+	 * First for loop computes chksum part for ICMP header.
+	 */
+	buf = (uint16_t *) icmp;
+	len = ICMPERR_ICMPHLEN;
+	for (sum = 0; len > 1; len -= 2)
+		sum += *buf++;
+
+	/*
+	 * Here we add chksum part for ICMP payload.
+	 */
+	len = icmp_pld_len;
+	buf = (uint16_t *) mblk_ip->b_rptr;
+	for (; len > 1; len -= 2)
+		sum += *buf++;
+
+	/*
+	 * Chksum is done.
+	 */
+	sum = (sum >> 16) + (sum & 0xffff);
+	sum += (sum >> 16);
+	icmp->icmp_cksum = ~sum; 
+
+	/*
+	 * Step (6)
+	 *
+	 * Release all packet mblks, except the first one.
+	 */
+	if (fin->fin_m->b_cont != NULL) {
+		FREE_MB_T(fin->fin_m->b_cont);
+	}
+
+	/*
+	 * Append ICMP payload to first mblk, which already contains new IP
+	 * header.
+	 */
+	linkb(fin->fin_m, mblk_icmp);
+
+	return (0);
+}
+
+#ifdef USE_INET6
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_make_icmp_v6                                             */
+/* Returns:     int - 0 on success, -1 on failure			    */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*									    */
+/* Please read comment at fr_make_icmp() wrapper function to get an idea    */
+/* what and why is going to happen here. Once you read the comment there,   */
+/* continue here with next paragraph.					    */
+/*									    */
+/* This function turns IPv6 packet (UDP, TCP, ...) into ICMPv6 response.    */
+/* The algorithm is fairly simple:					    */
+/*	1) We need to get copy of complete mblk.			    */
+/*									    */
+/*	2) New ICMPv6 header is created.				    */
+/*									    */
+/*	3) The copy of original mblk with packet is linked to ICMPv6	    */
+/*	   header.							    */
+/*									    */
+/*	4) The checksum must be adjusted.				    */
+/*									    */
+/*	5) IP addresses in original mblk are swapped and IP header data	    */
+/*	   are adjusted (protocol number).				    */
+/*									    */
+/*	6) Original mblk is trimmed to hold IPv6 header only, then it is    */
+/*	   linked with the ICMPv6 data we got from (3).			    */
+/* ------------------------------------------------------------------------ */
+static int fr_make_icmp_v6(fin)
+fr_info_t *fin;
+{
+	struct icmp6_hdr *icmp6;
+	struct in6_addr	tmp_src6;
+	size_t icmp_pld_len;
+	mblk_t *mblk_ip, *mblk_icmp;
+
+	if (fin->fin_v != 6)
+		return (-1);
+
+	/*
+	 * If we are dealing with TCP, then packet must SYN/FIN to be routed by
+	 * IP stack. If it is not SYN/FIN, then we must drop it silently.
+	 */
+	if (fin->fin_p == IPPROTO_TCP &&
+	    !(fin->fin_flx & (TH_SYN | TH_FIN)))
+		return (-1);
+
+	/*
+	 * Step (1)
+	 *
+	 * We need to copy complete packet in case of IPv6, no trimming is
+	 * needed (except the L2 headers).
+	 */
+	icmp_pld_len = M_LEN(fin->fin_m);
+	fin->fin_m->b_rptr += fin->fin_ipoff;
+	if ((mblk_ip = copyb(fin->fin_m)) == NULL)
+		return (-1);
+	fin->fin_m->b_rptr -= fin->fin_ipoff;
+
+	/*
+	 * Step (2)
+	 *
+	 * Allocate and create ICMP header.
+	 */
+	mblk_icmp = (mblk_t *) allocb(sizeof (struct icmp6_hdr),
+			BPRI_HI);
+
+	if (mblk_icmp == NULL)
+		return (-1);
+	
+	MTYPE(mblk_icmp) = M_DATA;
+	icmp6 =  (struct icmp6_hdr *) mblk_icmp->b_wptr;
+	icmp6->icmp6_type = ICMP6_DST_UNREACH;
+	icmp6->icmp6_code = fin->fin_icode & 0xFF;
+	icmp6->icmp6_data32[0] = 0;
+	mblk_icmp->b_wptr += sizeof (struct icmp6_hdr);
+	
+	/*
+	 * Step (3)
+	 *
+	 * Link the copy of IP packet to ICMP header.
+	 */
+	linkb(mblk_icmp, mblk_ip);
+
+	/* 
+	 * Step (4)
+	 *
+	 * Calculate chksum - this is much more easier task than in case of
+	 * IPv4  - ICMPv6 chksum only covers IP addresses, and payload length.
+	 * We are making compensation just for change of packet length.
+	 */
+	icmp6->icmp6_cksum = icmp_pld_len + sizeof (struct icmp6_hdr);
+
+	/*
+	 * Step (5)
+	 *
+	 * Swap IP addresses.
+	 */
+	tmp_src6 = fin->fin_ip6->ip6_src;
+	fin->fin_ip6->ip6_src = fin->fin_ip6->ip6_dst;
+	fin->fin_ip6->ip6_dst = tmp_src6;
+
+	/*
+	 * and adjust IP header data.
+	 */
+	fin->fin_ip6->ip6_nxt = IPPROTO_ICMPV6;
+	fin->fin_ip6->ip6_plen = htons(icmp_pld_len + sizeof (struct icmp6_hdr));
+
+	/*
+	 * Step (6)
+	 *
+	 * We must release all linked mblks from original packet and keep only
+	 * the first mblk with IP header to link ICMP data.
+	 */
+	fin->fin_m->b_wptr = (unsigned char *) fin->fin_ip6 + sizeof (ip6_t);
+
+	if (fin->fin_m->b_cont != NULL) {
+		FREE_MB_T(fin->fin_m->b_cont);
+	}
+
+	/*
+	 * Append ICMP payload to IP header.
+	 */
+	linkb(fin->fin_m, mblk_icmp);
+
+	return (0);
+}
+#endif	/* USE_INET6 */
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_make_icmp                                                */
+/* Returns:     int - 0 on success, -1 on failure			    */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* We must alter the original mblks passed to IPF from IP stack via	    */
+/* FW_HOOKS. The reasons why we must alter packet are discussed within	    */
+/* comment at fr_make_rst() function.					    */
+/*									    */
+/* The fr_make_icmp() function acts as a wrapper, which passes the code	    */
+/* execution to	fr_make_icmp_v4() or fr_make_icmp_v6() depending on	    */
+/* protocol version. However there are some details, which are common to    */
+/* both IP versions. The details are going to be explained here.	    */
+/*                                                                          */
+/* The packet looks as follows:						    */
+/*    xxx | IP hdr | IP payload    ...	| 				    */
+/*    ^   ^        ^            	^				    */
+/*    |   |        |            	|				    */
+/*    |   |        |		fin_m->b_wptr = fin->fin_dp + fin->fin_dlen */
+/*    |   |        |							    */
+/*    |   |        `- fin_m->fin_dp (in case of IPv4 points to L4 header)   */
+/*    |   |								    */
+/*    |   `- fin_m->b_rptr + fin_ipoff (fin_ipoff is most likely 0 in case  */
+/*    |      of loopback)						    */
+/*    |   								    */
+/*    `- fin_m->b_rptr -  points to L2 header in case of physical NIC	    */
+/*                                                                          */
+/* All relevant IP headers are pulled up into the first mblk. It happened   */
+/* well in advance before the matching rule was found (the rule, which took */
+/* us here, to fr_make_icmp() function).				    */
+/*                                                                          */
+/* Both functions will turn packet passed in fin->fin_m mblk into a new	    */
+/* packet. New packet will be represented as chain of mblks.		    */
+/* orig mblk |- b_cont ---.						    */
+/*    ^                    `-> ICMP hdr |- b_cont--.			    */
+/*    |	                          ^	            `-> duped orig mblk	    */
+/*    |                           |				^	    */
+/*    `- The original mblk        |				|	    */
+/*       will be trimmed to       |				|	    */
+/*       to contain IP header     |				|	    */
+/*       only                     |				|	    */
+/*                                |				|	    */
+/*                                `- This is newly		|           */
+/*                                   allocated mblk to		|	    */
+/*                                   hold ICMPv6 data.		|	    */
+/*								|	    */
+/*								|	    */
+/*								|	    */
+/*	    This is the copy of original mblk, it will contain -'	    */
+/*	    orignal IP  packet in case of ICMPv6. In case of		    */
+/*	    ICMPv4 it will contain up to 8 bytes of IP payload		    */
+/*	    (TCP/UDP/L4) data from original packet.			    */
+/* ------------------------------------------------------------------------ */
+int fr_make_icmp(fin)
+fr_info_t *fin;
+{
+	int rv;
+	
+	if (fin->fin_v == 4)
+		rv = fr_make_icmp_v4(fin);
+#ifdef USE_INET6
+	else if (fin->fin_v == 6)
+		rv = fr_make_icmp_v6(fin);
+#endif
+	else
+		rv = -1;
+
+	return (rv);
+}
+#endif	/* _KERNEL && SOLARIS2 >= 10 */
