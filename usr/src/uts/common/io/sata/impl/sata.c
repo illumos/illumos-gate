@@ -774,7 +774,7 @@ sata_hba_attach(dev_info_t *dip, sata_hba_tran_t *sata_tran,
 	    sizeof (taskq_name) - strlen(taskq_name),
 	    "-%d", DEVI(dip)->devi_instance);
 	sata_hba_inst->satahba_taskq = taskq_create(taskq_name, 1,
-	    minclsyspri, 1, sata_tran->sata_tran_hba_num_cports,
+	    minclsyspri, 1, sata_tran->sata_tran_hba_num_cports * 4,
 	    TASKQ_DYNAMIC);
 
 	hba_attach_state |= HBA_ATTACH_STAGE_SETUP;
@@ -9803,28 +9803,12 @@ sata_free_local_buffer(sata_pkt_txlate_t *spx)
 	spx->txlt_sata_pkt->satapkt_cmd.satacmd_num_dma_cookies = 0;
 	spx->txlt_sata_pkt->satapkt_cmd.satacmd_dma_cookie_list = NULL;
 
-	if (spx->txlt_buf_dma_handle != NULL) {
-		/* Free DMA resources */
-		(void) ddi_dma_unbind_handle(spx->txlt_buf_dma_handle);
-		ddi_dma_free_handle(&spx->txlt_buf_dma_handle);
-		spx->txlt_buf_dma_handle = 0;
-
-		if (spx->txlt_dma_cookie_list != &spx->txlt_dma_cookie) {
-			kmem_free(spx->txlt_dma_cookie_list,
-			    spx->txlt_dma_cookie_list_len *
-			    sizeof (ddi_dma_cookie_t));
-			spx->txlt_dma_cookie_list = NULL;
-			spx->txlt_dma_cookie_list_len = 0;
-		}
-	}
+	sata_common_free_dma_rsrcs(spx);
 
 	/* Free buffer */
 	scsi_free_consistent_buf(spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp);
 	spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp = NULL;
 }
-
-
-
 
 /*
  * Allocate sata_pkt
