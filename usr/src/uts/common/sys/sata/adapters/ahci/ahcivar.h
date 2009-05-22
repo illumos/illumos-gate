@@ -283,10 +283,13 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_NCQ			0x4
 /* Power Management (PM) */
 #define	AHCI_CAP_PM			0x8
-/* 32-bit DMA addressing */
-#define	AHCI_CAP_32BIT_DMA		0x10
+/* 32-bit DMA addressing for buffer block */
+#define	AHCI_CAP_BUF_32BIT_DMA		0x10
 /* Supports Command List Override */
 #define	AHCI_CAP_SCLO			0x20
+/* 32-bit DMA addressing for communication memory descriptors */
+#define	AHCI_CAP_COMMU_32BIT_DMA	0x40
+
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */

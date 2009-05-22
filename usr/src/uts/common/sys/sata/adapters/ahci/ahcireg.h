@@ -558,7 +558,7 @@ typedef struct ahci_rcvd_fis {
 	ahci_fis_unknown_t		ahcirf_unknown_fis;
 
 	/* offset 0xa0h - Reserved */
-	uint32_t			ahcirf_fis_rsvd4[15];
+	uint32_t			ahcirf_fis_rsvd4[24];
 } ahci_rcvd_fis_t;
 
 /* physical region description table (PRDT) item structure */

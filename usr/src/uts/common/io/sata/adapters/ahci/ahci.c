@@ -308,8 +308,12 @@ static int ahci_watchdog_tick;
 static size_t ahci_cmd_table_size;
 
 /*
- * ahci_dma_prdt_number, ahci_msi_enabled and ahci_64bit_dma_addressed
- * are global variables, and can be changed via /etc/system file.
+ * The below global variables are tunable via /etc/system
+ *
+ *	ahci_dma_prdt_number
+ *	ahci_msi_enabled
+ *	ahci_buf_64bit_dma
+ *	ahci_commu_64bit_dma
  */
 
 /* The number of Physical Region Descriptor Table(PRDT) in Command Table */
@@ -318,8 +322,28 @@ int ahci_dma_prdt_number = AHCI_PRDT_NUMBER;
 /* AHCI MSI is tunable */
 boolean_t ahci_msi_enabled = B_TRUE;
 
-/* 64-bit dma addressing is tunable */
-boolean_t ahci_64bit_dma_addressed = B_TRUE;
+/*
+ * 64-bit dma addressing for data buffer is tunable
+ *
+ * The variable controls only the below value:
+ *	DBAU (upper 32-bits physical address of data block)
+ */
+boolean_t ahci_buf_64bit_dma = B_TRUE;
+
+/*
+ * 64-bit dma addressing for communication system descriptors is tunable
+ *
+ * The variable controls the below three values:
+ *
+ *	PxCLBU (upper 32-bits for the command list base physical address)
+ *	PxFBU (upper 32-bits for the received FIS base physical address)
+ *	CTBAU (upper 32-bits of command table base)
+ */
+boolean_t ahci_commu_64bit_dma = B_TRUE;
+
+/*
+ * End of global tunable variable definition
+ */
 
 #if AHCI_DEBUG
 uint32_t ahci_debug_flags = 0;
@@ -632,7 +656,8 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Check whether HBA supports 64bit DMA addressing */
 	if (!(cap_status & AHCI_HBA_CAP_S64A)) {
-		ahci_ctlp->ahcictl_cap |= AHCI_CAP_32BIT_DMA;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_BUF_32BIT_DMA;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
 		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
 		    "hba does not support 64-bit addressing");
 	}
@@ -657,9 +682,9 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Check the pci configuration space, and set caps. We also
 	 * handle the hardware defect in this function.
 	 *
-	 * For example, force ATI SB600/SB700/SB750 to use 32-bit dma
-	 * addressing since it doesn't support 64-bit dma though their
-	 * registers declare they support.
+	 * For example, force ATI SB600 to use 32-bit dma addressing
+	 * since it doesn't support 64-bit dma though its CAP register
+	 * declares it support.
 	 */
 	if (ahci_config_space_init(ahci_ctlp) == AHCI_FAILURE) {
 		cmn_err(CE_WARN, "!ahci%d: ahci_config_space_init failed",
@@ -752,10 +777,14 @@ intr_done:
 	ahci_ctlp->ahcictl_cmd_list_dma_attr = cmd_list_dma_attr;
 	ahci_ctlp->ahcictl_cmd_table_dma_attr = cmd_table_dma_attr;
 
-	if ((ahci_64bit_dma_addressed == B_FALSE) ||
-	    (ahci_ctlp->ahcictl_cap & AHCI_CAP_32BIT_DMA)) {
+	if ((ahci_buf_64bit_dma == B_FALSE) ||
+	    (ahci_ctlp->ahcictl_cap & AHCI_CAP_BUF_32BIT_DMA)) {
 		ahci_ctlp->ahcictl_buffer_dma_attr.dma_attr_addr_hi =
 		    0xffffffffull;
+	}
+
+	if ((ahci_commu_64bit_dma == B_FALSE) ||
+	    (ahci_ctlp->ahcictl_cap & AHCI_CAP_COMMU_32BIT_DMA)) {
 		ahci_ctlp->ahcictl_rcvd_fis_dma_attr.dma_attr_addr_hi =
 		    0xffffffffull;
 		ahci_ctlp->ahcictl_cmd_list_dma_attr.dma_attr_addr_hi =
@@ -2908,17 +2937,8 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp,
 			    port, ahci_portp->ahciport_port_state);
 			return (AHCI_FAILURE);
 		}
-
-		/* Is there any device attached? */
-		if (ahci_portp->ahciport_device_type == SATA_DTYPE_NONE) {
-
-			/* Do not waste time on empty port */
-			AHCIDBG1(AHCIDBG_INIT|AHCIDBG_INFO, ahci_ctlp,
-			    "ahci_initialize_port: No device is found "
-			    "at port %d", port);
-			goto out;
-		}
 	}
+
 	ahci_portp->ahciport_port_state = SATA_STATE_READY;
 
 	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "port %d is ready now.", port);
@@ -2931,10 +2951,11 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp,
 	 */
 	if (ahci_ctlp->ahcictl_flags & AHCI_ATTACH) {
 		/*
-		 * Till now we can assure a device attached to that HBA port
-		 * and work correctly. Now try to get the device signature.
+		 * Try to get the device signature if the port is
+		 * not empty.
 		 */
-		ahci_find_dev_signature(ahci_ctlp, ahci_portp, port);
+		if (ahci_portp->ahciport_device_type != SATA_DTYPE_NONE)
+			ahci_find_dev_signature(ahci_ctlp, ahci_portp, port);
 	} else {
 
 		/*
@@ -2985,7 +3006,8 @@ out:
 }
 
 /*
- *  Check the hardware defects and the power management capability.
+ *  Handle hardware defect, and check the capabilities. For example,
+ *  power management capabilty and MSI capability.
  */
 static int
 ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
@@ -3032,22 +3054,42 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	}
 
 	/*
-	 * ATI SB600 (1002,4380) and SB700/750 (1002,4391) AHCI chipsets don't
-	 * support 64-bit DMA addressing though they declare the support,
-	 * so we need to set AHCI_CAP_32BIT_DMA flag to force 32-bit DMA.
+	 * AMD/ATI SB600 (1002,4380) AHCI chipset doesn't support 64-bit DMA
+	 * addressing for both data buffer and communication memory descriptors
+	 * though S64A bit of CAP register declares the support.
 	 */
-	if (venid == 0x1002 && (devid == 0x4380 || devid == 0x4391)) {
+	if (venid == 0x1002 && devid == 0x4380) {
 		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
-		    "ATI SB600/700/750 cannot do 64-bit DMA though CAP "
-		    "indicates support, so force it to use 32-bit DMA");
-		ahci_ctlp->ahcictl_cap |= AHCI_CAP_32BIT_DMA;
+		    "ATI SB600 cannot do 64-bit DMA for both data buffer "
+		    "and communication memory descriptors though CAP indicates "
+		    "support, so force it to use 32-bit DMA");
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_BUF_32BIT_DMA;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
 	}
 
-	/* ASUS M3N-HT (NVidia 780a) does not support MSI */
+	/*
+	 * AMD/ATI SB700/750 (1002,4391) AHCI chipset doesn't support 64-bit
+	 * DMA addressing for communication memory descriptors though S64A bit
+	 * of CAP register declares the support. However, it does support
+	 * 64-bit DMA for data buffer.
+	 */
+	if (venid == 0x1002 && devid == 0x4391) {
+		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
+		    "ATI SB700/750 cannot do 64-bit DMA for communication "
+		    "memory descriptors though CAP indicates support, "
+		    "so force it to use 32-bit DMA");
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
+	}
+
+	/*
+	 * nVidia MCP78 AHCI controller (pci10de,0ad4) will be forced to use
+	 * Fixed interrupt until the known CR 6766472 (MSIs do not function
+	 * on most Nvidia boards) is fixed.
+	 */
 	if (venid == 0x10de && devid == 0x0ad4) {
 		AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
-		    "ASUS M3N-HT (NVidia 780a) does not support MSI "
-		    "interrupts, so force it to use fixed interrupts.");
+		    "Force nVidia MCP78 AHCI controller to use "
+		    "fixed interrupts");
 		ahci_msi_enabled = B_FALSE;
 	}
 
@@ -3327,11 +3369,15 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 		/* We are effectively timing out after 1 sec. */
 		if (loop_count++ > AHCI_POLLRATE_PORT_SOFTRESET) {
+			AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+			    "the first SRST FIS is timed out, "
+			    "loop_count = %d", loop_count);
 			goto out;
 		}
+
 		/* Wait for 10 millisec */
 		delay(AHCI_10MS_TICKS);
-	} while (port_cmd_issue	& AHCI_SLOT_MASK(ahci_ctlp) & (0x1 << slot));
+	} while (port_cmd_issue & AHCI_SLOT_MASK(ahci_ctlp) & (0x1 << slot));
 
 	AHCIDBG3(AHCIDBG_POLL_LOOP, ahci_ctlp,
 	    "ahci_software_reset: 1st loop count: %d, "
@@ -3382,11 +3428,15 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 
 		/* We are effectively timing out after 1 sec. */
 		if (loop_count++ > AHCI_POLLRATE_PORT_SOFTRESET) {
+			AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+			    "the second SRST FIS is timed out, "
+			    "loop_count = %d", loop_count);
 			goto out;
 		}
+
 		/* Wait for 10 millisec */
 		delay(AHCI_10MS_TICKS);
-	} while (port_cmd_issue	& AHCI_SLOT_MASK(ahci_ctlp) & (0x1 << slot));
+	} while (port_cmd_issue & AHCI_SLOT_MASK(ahci_ctlp) & (0x1 << slot));
 
 	AHCIDBG3(AHCIDBG_POLL_LOOP, ahci_ctlp,
 	    "ahci_software_reset: 2nd loop count: %d, "
@@ -3438,7 +3488,6 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 	AHCIDBG1(AHCIDBG_INIT|AHCIDBG_ENTRY, ahci_ctlp,
 	    "Port %d port resetting...", port);
 	ahci_portp->ahciport_port_state = 0;
-	ahci_portp->ahciport_device_type = SATA_DTYPE_UNKNOWN;
 
 	cap_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_GLOBAL_CAP(ahci_ctlp));
@@ -3849,9 +3898,9 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp,
 	/* Issue a software reset to get the signature */
 	if (ahci_software_reset(ahci_ctlp, ahci_portp, port)
 	    != AHCI_SUCCESS) {
-		AHCIDBG1(AHCIDBG_INFO, ahci_ctlp,
+		AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
 		    "ahci_find_dev_signature: software reset failed "
-		    "at port %d. cannot get signature.", port);
+		    "at port %d, cannot get signature.", port);
 		ahci_portp->ahciport_port_state = SATA_PSTATE_FAILED;
 		return;
 	}
@@ -7100,7 +7149,7 @@ ahci_watchdog_handler(ahci_ctl_t *ahci_ctlp)
 
 	mutex_enter(&ahci_ctlp->ahcictl_mutex);
 
-	AHCIDBG0(AHCIDBG_TIMEOUT|AHCIDBG_ENTRY, ahci_ctlp,
+	AHCIDBG0(AHCIDBG_ENTRY, ahci_ctlp,
 	    "ahci_watchdog_handler entered");
 
 	for (port = 0; port < ahci_ctlp->ahcictl_num_ports; port++) {
@@ -7180,9 +7229,18 @@ ahci_watchdog_handler(ahci_ctl_t *ahci_ctlp)
 				if (watched_cycles <= max_life_cycles)
 					goto next;
 
-				AHCIDBG1(AHCIDBG_ERRS|AHCIDBG_TIMEOUT,
-				    ahci_ctlp, "the current slot is %d",
-				    current_slot);
+#if AHCI_DEBUG
+				if (NCQ_CMD_IN_PROGRESS(ahci_portp)) {
+					AHCIDBG1(AHCIDBG_ERRS|AHCIDBG_TIMEOUT,
+					    ahci_ctlp, "watchdog: the current "
+					    "tags is 0x%x", current_tags);
+				} else {
+					AHCIDBG1(AHCIDBG_ERRS|AHCIDBG_TIMEOUT,
+					    ahci_ctlp, "watchdog: the current "
+					    "slot is %d", current_slot);
+				}
+#endif
+
 				/*
 				 * We need to check whether the HBA has
 				 * begun to execute the command, if not,
