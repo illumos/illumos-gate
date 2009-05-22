@@ -19,12 +19,15 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Start/Stop method script for the Sun Solstice Enterprise Master Agent
 #
-# Start method script for the Sun Solstice Enterprise Master Agent
+# Command line arguments
+# $1 = start/stop string
+# $2 = The primary process contract ID, if any, that under which the
+# service instance is executing.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -34,26 +37,54 @@ SNMP_CONFDIR=/etc/snmp/conf
 SNMP_RSRC=${SNMP_CONFDIR}/snmpdx.rsrc
 SNMP_BIN=/usr/lib/snmp/snmpdx
 
-if [ ! -f $SNMP_RSRC ]; then
-	echo "Configuration file $SNMP_RSRC does not exist. Not starting snmpdx"
-	exit $SMF_EXIT_ERR_CONFIG
-fi
+case "$1" in
+    start)
 
-if [ ! -x $SNMP_BIN ]; then
-	echo "$SNMP_BIN not found. Not starting snmpdx"
-	exit $SMF_EXIT_ERR_CONFIG
-fi
+	if [ ! -f $SNMP_RSRC ]; then
+		echo "Configuration file $SNMP_RSRC does not exist. "\
+		    "Not starting snmpdx"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
 
-if /usr/bin/egrep -sv '^[	  ]*(#|$)' ${SNMP_RSRC} 2> /dev/null ; then
-	:
-else
-	# Do not start snmpdx if snmpdx.rsrc contents are
-	# trivial.
-	echo "$SNMP_RSRC contains no definitions. Not starting snmpdx."
-	exit $SMF_EXIT_ERR_CONFIG
-fi
+	if [ ! -x $SNMP_BIN ]; then
+		echo "$SNMP_BIN not found. Not starting snmpdx"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
 
-#
-# Since snmpdx isn't SMF_EXIT_*-aware, report any failures generically.
-#
-${SNMP_BIN} -y -c ${SNMP_CONFDIR} || exit 1
+	if /usr/bin/egrep -sv '^[	  ]*(#|$)'\
+	    ${SNMP_RSRC} 2> /dev/null ; then
+		:
+	else
+		# Do not start snmpdx if snmpdx.rsrc contents are
+		# trivial.
+		echo "$SNMP_RSRC contains no definitions. Not starting snmpdx."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	#
+	# Since snmpdx isn't SMF_EXIT_*-aware, report any failures generically.
+	#
+	${SNMP_BIN} -y -c ${SNMP_CONFDIR} || exit $SMF_EXIT_ERR_FATAL
+	;;
+    stop)
+	# Kill any processes in the service contract
+	smf_kill_contract $2 TERM 1 5
+	ret=$?
+	[ $ret -eq 1 ] && exit $SMF_EXIT_ERR_FATAL
+
+	#
+	# Some processes in the contract may not handle SIGTERM.
+	# If the contract did not empty after TERM, move on to KILL.
+	#
+	if [ $ret -eq 2 ] ; then
+		smf_kill_contract $2 KILL 1
+		[ $? -ne 0 ] && exit $SMF_EXIT_ERR_FATAL
+	fi
+	;;
+    *)
+	echo "Usage: $0 { start | stop }"
+	exit $SMF_EXIT_ERR_FATAL
+	;;
+esac 
+
+exit $SMF_EXIT_OK

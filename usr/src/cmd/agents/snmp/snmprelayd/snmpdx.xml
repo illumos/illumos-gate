@@ -20,10 +20,8 @@
    
     CDDL HEADER END
    
-    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
-
-    ident	"%Z%%M%	%I%	%E% SMI"
 
     Service manifest for the Sun Solstice Enterprise Master Agent
 -->
@@ -73,15 +71,15 @@
 	<exec_method
         	type='method'
 		name='start'
-		exec='/lib/svc/method/svc-snmpdx'
+		exec='/lib/svc/method/svc-snmpdx %m'
 		timeout_seconds='60'>
 	</exec_method>
 
 	<exec_method
         	type='method'
 		name='stop'
-		exec=':kill'
-		timeout_seconds='10'>
+		exec='/lib/svc/method/svc-snmpdx %m %{restarter/contract}'
+		timeout_seconds='30'>
 	</exec_method>
 
 	<property_group name='general' type='framework'>
