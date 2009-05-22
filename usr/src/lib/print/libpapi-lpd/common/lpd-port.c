@@ -296,7 +296,7 @@ static int
 massage_control_data(char *data, int id)
 {
 	char *line, *iter = NULL;
-	char *ptr, *datacpy;
+	char *ptr, *mod_ptr, *datacpy;
 	char host[BUFSIZ];
 	int host_present = 0;
 
@@ -342,14 +342,26 @@ massage_control_data(char *data, int id)
 				free(datacpy);
 				return (-1);
 			}
-			if ((ptr[0] == 'd') && (ptr[1] == 'f') &&
-			    (ptr[3] == 'X') && (ptr[4] == 'X') &&
-			    (ptr[5] == 'X')) {
-				ptr[3] = '0' + (id / 100) % 10;
-				ptr[4] = '0' + (id / 10) % 10;
-				ptr[5] = '0' + id % 10;
 
-				if (strncmp(&ptr[6], host, strlen(host)) != 0) {
+			/*
+			 * As ptr is a copy of the string (df?XXX...) the code
+			 * needs to work on the original, hence the need for
+			 * mod_ptr. No need to check for a NULL mod_ptr
+			 * because the required string must already exist as
+			 * ptr is a copy of the original data.
+			 */
+
+			mod_ptr = strstr(data, ptr);
+
+			if ((mod_ptr[0] == 'd') && (mod_ptr[1] == 'f') &&
+			    (mod_ptr[3] == 'X') && (mod_ptr[4] == 'X') &&
+			    (mod_ptr[5] == 'X')) {
+				mod_ptr[3] = '0' + (id / 100) % 10;
+				mod_ptr[4] = '0' + (id / 10) % 10;
+				mod_ptr[5] = '0' + id % 10;
+
+				if (strncmp(&mod_ptr[6], host, strlen(host))
+				    != 0) {
 					free(datacpy);
 					return (-1);
 				}
