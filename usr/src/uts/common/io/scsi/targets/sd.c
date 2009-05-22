@@ -8505,12 +8505,16 @@ sd_unit_detach(dev_info_t *devi)
 	 * Unregister and free device id if it was not registered
 	 * by the transport.
 	 */
-	if (un->un_f_devid_transport_defined == FALSE) {
+	if (un->un_f_devid_transport_defined == FALSE)
 		ddi_devid_unregister(devi);
-		if (un->un_devid) {
-			ddi_devid_free(un->un_devid);
-			un->un_devid = NULL;
-		}
+
+	/*
+	 * free the devid structure if allocated before (by ddi_devid_init()
+	 * or ddi_devid_get()).
+	 */
+	if (un->un_devid) {
+		ddi_devid_free(un->un_devid);
+		un->un_devid = NULL;
 	}
 
 	/*

@@ -12827,8 +12827,14 @@ sata_target_devid_register(dev_info_t *dip, sata_drive_info_t *sdinfo)
 
 	/* initialize/register devid */
 	if ((rval = ddi_devid_init(dip, DEVID_ATA_SERIAL,
-	    (ushort_t)(modlen + serlen), hwid, &devid)) == DDI_SUCCESS)
+	    (ushort_t)(modlen + serlen), hwid, &devid)) == DDI_SUCCESS) {
 		rval = ddi_devid_register(dip, devid);
+		/*
+		 * Free up the allocated devid buffer.
+		 * NOTE: This doesn't mean unregistering devid.
+		 */
+		ddi_devid_free(devid);
+	}
 
 	if (rval != DDI_SUCCESS)
 		cmn_err(CE_WARN, "sata: failed to create devid for the disk"
