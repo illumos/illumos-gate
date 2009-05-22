@@ -923,7 +923,9 @@ sctp_update_saddrs(sctp_ipif_t *oipif, sctp_ipif_t *nipif, int idx,
  * Given an ipif, walk the hash list in the global ipif table and for
  * any other SCTP ipif with the same address and non-zero reference, walk
  * the SCTP list and update the saddr list, if required, to point to the
- * new SCTP ipif.
+ * new SCTP ipif. If it is a loopback interface, then there could be
+ * multiple interfaces with 127.0.0.1 if there are zones configured, so
+ * check the zoneid in addition to the address.
  */
 void
 sctp_chk_and_updt_saddr(int hindex, sctp_ipif_t *ipif, sctp_stack_t *sctps)
@@ -939,7 +941,9 @@ sctp_chk_and_updt_saddr(int hindex, sctp_ipif_t *ipif, sctp_stack_t *sctps)
 		rw_enter(&sipif->sctp_ipif_lock, RW_WRITER);
 		if (sipif->sctp_ipif_id != ipif->sctp_ipif_id &&
 		    IN6_ARE_ADDR_EQUAL(&sipif->sctp_ipif_saddr,
-		    &ipif->sctp_ipif_saddr) && sipif->sctp_ipif_refcnt > 0) {
+		    &ipif->sctp_ipif_saddr) && sipif->sctp_ipif_refcnt > 0 &&
+		    (!SCTP_IS_IPIF_LOOPBACK(ipif) || ipif->sctp_ipif_zoneid ==
+		    sipif->sctp_ipif_zoneid)) {
 			/*
 			 * There can only be one address up at any time
 			 * and we are here because ipif has been brought
