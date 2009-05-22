@@ -1,9 +1,27 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lib/gssapi/generic/oid_ops.c
@@ -58,7 +76,7 @@ gss_OID	*oid;
 	if (minor_status)
 		*minor_status = 0;
 
-	if (*oid == GSS_C_NO_OID)
+	if (oid == NULL || *oid == GSS_C_NO_OID)
 		return (GSS_S_COMPLETE);
 
 	/*
@@ -245,13 +263,18 @@ gss_buffer_t oid_str;
 	unsigned char *cp;
 	char *bp;
 
-	if (minor_status)
+	if (minor_status != NULL)
 		*minor_status = 0;
+
+	if (oid_str != GSS_C_NO_BUFFER) {
+		oid_str->length = 0;
+		oid_str->value = NULL;
+	}
 
 	if (oid == GSS_C_NO_OID || oid->length == 0 || oid->elements == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
 
-	if (oid_str == NULL)
+	if (oid_str == GSS_C_NO_BUFFER)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
 	/* First determine the size of the string */
@@ -331,8 +354,11 @@ gss_OID *oid;
 	int index;
 	unsigned char *op;
 
-	if (minor_status)
+	if (minor_status != NULL)
 		*minor_status = 0;
+
+	if (oid != NULL)
+		*oid = GSS_C_NO_OID;
 
 	if (GSS_EMPTY_BUFFER(oid_str))
 		return (GSS_S_CALL_INACCESSIBLE_READ);
@@ -482,16 +508,17 @@ gss_copy_oid_set(
 	OM_uint32 major = GSS_S_COMPLETE;
 	OM_uint32 index;
 
-	if (minor_status)
+	if (minor_status != NULL)
 		*minor_status = 0;
 
-	if (oidset == NULL)
+	if (new_oidset != NULL)
+		*new_oidset = GSS_C_NO_OID_SET;
+
+	if (oidset == GSS_C_NO_OID_SET)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
 
 	if (new_oidset == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-	*new_oidset = NULL;
 
 	if ((copy = (gss_OID_set_desc *) calloc(1, sizeof (*copy))) == NULL) {
 		major = GSS_S_FAILURE;

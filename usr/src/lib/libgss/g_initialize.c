@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions to initialize the gssapi library and
@@ -189,14 +187,16 @@ gss_OID_set *mechSet;
 	int count, i, j;
 	gss_OID curItem;
 
-	if (!minorStatus)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+	/* Initialize outputs. */
 
-	*minorStatus = 0;
+	if (minorStatus != NULL)
+		*minorStatus = 0;
 
+	if (mechSet != NULL)
+		*mechSet = GSS_C_NO_OID_SET;
 
-	/* check output parameter */
-	if (mechSet == NULL)
+	/* Validate arguments. */
+	if (minorStatus == NULL || mechSet == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
 	fileName = MECH_CONF;

@@ -20,11 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine for gss_accept_sec_context
@@ -36,6 +34,53 @@
 #endif
 #include <string.h>
 #include <errno.h>
+
+static OM_uint32
+val_acc_sec_ctx_args(
+	OM_uint32 *minor_status,
+	gss_ctx_id_t *context_handle,
+	gss_buffer_t input_token_buffer,
+	gss_name_t *src_name,
+	gss_OID *mech_type,
+	gss_buffer_t output_token,
+	gss_cred_id_t *d_cred)
+{
+
+	/* Initialize outputs. */
+
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (src_name != NULL)
+		*src_name = GSS_C_NO_NAME;
+
+	if (mech_type != NULL)
+		*mech_type = GSS_C_NO_OID;
+
+	if (output_token != GSS_C_NO_BUFFER) {
+		output_token->length = 0;
+		output_token->value = NULL;
+	}
+
+	if (d_cred != NULL)
+		*d_cred = GSS_C_NO_CREDENTIAL;
+
+	/* Validate arguments. */
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (context_handle == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (input_token_buffer == GSS_C_NO_BUFFER)
+		return (GSS_S_CALL_INACCESSIBLE_READ);
+
+	if (output_token == GSS_C_NO_BUFFER)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	return (GSS_S_COMPLETE);
+}
 
 OM_uint32
 gss_accept_sec_context(minor_status,
@@ -76,25 +121,16 @@ gss_cred_id_t			*d_cred; /* delegated cred handle */
 	OM_uint32	flags;
 	gss_mechanism	mech;
 
-	/* check parameters first */
-	if (minor_status == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	*minor_status = 0;
+	status = val_acc_sec_ctx_args(minor_status,
+				context_handle,
+				input_token_buffer,
+				src_name,
+				mech_type,
+				output_token,
+				d_cred);
+	if (status != GSS_S_COMPLETE)
+		return (status);
 
-	if (context_handle == NULL || output_token == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-	/* clear optional fields */
-	output_token->value = NULL;
-	output_token->length = 0;
-	if (src_name)
-		*src_name = NULL;
-
-	if (mech_type)
-		*mech_type = NULL;
-
-	if (d_cred)
-		*d_cred = NULL;
 	/*
 	 * if context_handle is GSS_C_NO_CONTEXT, allocate a union context
 	 * descriptor to hold the mech type information as well as the

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine for gss_export_sec_context
@@ -37,6 +34,36 @@
 #include <stdlib.h>
 #endif
 #include <string.h>
+
+static OM_uint32 val_exp_sec_ctx_args(
+	OM_uint32 *minor_status,
+	gss_ctx_id_t *context_handle,
+	gss_buffer_t interprocess_token)
+{
+
+	/* Initialize outputs. */
+
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (interprocess_token != GSS_C_NO_BUFFER) {
+		interprocess_token->length = 0;
+		interprocess_token->value = NULL;
+	}
+
+	/* Validate arguments. */
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (context_handle == NULL || *context_handle == GSS_C_NO_CONTEXT)
+		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CONTEXT);
+
+	if (interprocess_token == GSS_C_NO_BUFFER)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	return (GSS_S_COMPLETE);
+}
 
 OM_uint32
 gss_export_sec_context(minor_status,
@@ -55,15 +82,10 @@ gss_buffer_t interprocess_token;
 	gss_buffer_desc		token;
 	char			*buf;
 
-	if (minor_status == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	*minor_status = 0;
-
-	if (context_handle == NULL || *context_handle == GSS_C_NO_CONTEXT)
-		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CONTEXT);
-
-	if (interprocess_token == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_READ);
+	status = val_exp_sec_ctx_args(minor_status,
+				context_handle, interprocess_token);
+	if (status != GSS_S_COMPLETE)
+		return (status);
 
 	/*
 	 * select the approprate underlying mechanism routine and

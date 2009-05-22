@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996,1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine gss_unseal
@@ -53,21 +50,26 @@ int *			qop_state;
 	gss_union_ctx_id_t	ctx;
 	gss_mechanism		mech;
 
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (output_message_buffer != GSS_C_NO_BUFFER) {
+		output_message_buffer->length = 0;
+		output_message_buffer->value = NULL;
+	}
+
 	if (minor_status == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	*minor_status = 0;
 
 	if (context_handle == GSS_C_NO_CONTEXT)
 		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CONTEXT);
 
-	if (GSS_EMPTY_BUFFER(input_message_buffer))
+	if (input_message_buffer == GSS_C_NO_BUFFER ||
+	    GSS_EMPTY_BUFFER(input_message_buffer))
 		return (GSS_S_CALL_INACCESSIBLE_READ);
 
-	if (output_message_buffer == NULL)
+	if (output_message_buffer == GSS_C_NO_BUFFER)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-	output_message_buffer->length = 0;
-	output_message_buffer->value = NULL;
 
 	/*
 	 * select the approprate underlying mechanism routine and

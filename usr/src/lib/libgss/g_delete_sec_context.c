@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996,1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine for gss_delete_sec_context
@@ -35,6 +32,34 @@
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
+
+static OM_uint32
+val_del_sec_ctx_args(
+	OM_uint32 *minor_status,
+	gss_ctx_id_t *context_handle,
+	gss_buffer_t output_token)
+{
+
+	/* Initialize outputs. */
+
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (output_token != GSS_C_NO_BUFFER) {
+		output_token->length = 0;
+		output_token->value = NULL;
+	}
+
+	/* Validate arguments. */
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (context_handle == NULL || *context_handle == GSS_C_NO_CONTEXT)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE | GSS_S_NO_CONTEXT);
+
+	return (GSS_S_COMPLETE);
+}
 
 OM_uint32
 gss_delete_sec_context(minor_status,
@@ -50,12 +75,11 @@ gss_buffer_t			output_token;
 	gss_union_ctx_id_t	ctx;
 	gss_mechanism		mech;
 
-	if (minor_status == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-	/* if the context_handle is Null, return NO_CONTEXT error */
-	if (context_handle == NULL || *context_handle == GSS_C_NO_CONTEXT)
-		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CONTEXT);
+	status = val_del_sec_ctx_args(minor_status,
+				context_handle,
+				output_token);
+	if (status != GSS_S_COMPLETE)
+		return (status);
 
 	/*
 	 * select the approprate underlying mechanism routine and

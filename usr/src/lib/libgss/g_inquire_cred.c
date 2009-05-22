@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine for gss_inquire_cred
@@ -58,16 +55,20 @@ gss_OID_set *mechanisms;
 	gss_name_t		internal_name;
 	int			i;
 
-	/* check parms and set to defaults */
+	/* Initialize outputs. */
+
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (name != NULL)
+		*name = GSS_C_NO_NAME;
+
+	if (mechanisms != NULL)
+		*mechanisms = GSS_C_NO_OID_SET;
+
+	/* Validate arguments. */
 	if (minor_status == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	*minor_status = 0;
-
-	if (name)
-		*name = NULL;
-
-	if (mechanisms)
-		*mechanisms = NULL;
 
 	if (cred_handle == GSS_C_NO_CREDENTIAL) {
 	/*
@@ -222,6 +223,14 @@ gss_inquire_cred_by_mech(minor_status, cred_handle, mech_type, name,
 	OM_uint32		status, temp_minor_status;
 	gss_name_t		internal_name;
 
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (name != NULL)
+		*name = GSS_C_NO_NAME;
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
 	mech = __gss_get_mechanism(mech_type);
 	if (!mech)

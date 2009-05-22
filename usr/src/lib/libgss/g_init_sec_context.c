@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine for gss_init_sec_context
@@ -33,6 +30,45 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static OM_uint32
+val_init_sec_ctx_args(
+	OM_uint32 *minor_status,
+	gss_ctx_id_t *context_handle,
+	gss_name_t target_name,
+	gss_OID *actual_mech_type,
+	gss_buffer_t output_token)
+{
+
+	/* Initialize outputs. */
+
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (actual_mech_type != NULL)
+		*actual_mech_type = GSS_C_NO_OID;
+
+	if (output_token != GSS_C_NO_BUFFER) {
+		output_token->length = 0;
+		output_token->value = NULL;
+	}
+
+	/* Validate arguments. */
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (context_handle == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE | GSS_S_NO_CONTEXT);
+
+	if (target_name == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_BAD_NAME);
+
+	if (output_token == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	return (GSS_S_COMPLETE);
+}
 
 OM_uint32
 gss_init_sec_context(minor_status,
@@ -73,26 +109,13 @@ OM_uint32 *			time_rec;
 	gss_mechanism		mech;
 	gss_cred_id_t		input_cred_handle;
 
-	if (minor_status == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	*minor_status = 0;
-
-	/* clear output values */
-	if (actual_mech_type)
-		*actual_mech_type = NULL;
-
-	if (context_handle == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE | GSS_S_NO_CONTEXT);
-
-	if (target_name == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_BAD_NAME);
-
-	if (output_token == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-	output_token->value = NULL;
-	output_token->length = 0;
-
+	status = val_init_sec_ctx_args(minor_status,
+				context_handle,
+				target_name,
+				actual_mech_type,
+				output_token);
+	if (status != GSS_S_COMPLETE)
+		return (status);
 
 	if (req_mech_type)
 		mech_type = (gss_OID)req_mech_type;

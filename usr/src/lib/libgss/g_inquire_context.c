@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine for gss_inquire_context
@@ -32,6 +29,40 @@
 
 #include <mechglueP.h>
 #include <stdlib.h>
+
+static OM_uint32
+val_inq_ctx_args(
+	OM_uint32 *minor_status,
+	gss_ctx_id_t context_handle,
+	gss_name_t *src_name,
+	gss_name_t *targ_name,
+	gss_OID *mech_type)
+{
+
+	/* Initialize outputs. */
+
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (src_name != NULL)
+		*src_name = GSS_C_NO_NAME;
+
+	if (targ_name != NULL)
+		*targ_name = GSS_C_NO_NAME;
+
+	if (mech_type != NULL)
+		*mech_type = GSS_C_NO_OID;
+
+	/* Validate arguments. */
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (context_handle == GSS_C_NO_CONTEXT)
+		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CONTEXT);
+
+	return (GSS_S_COMPLETE);
+}
 
 /* Last argument new for V2 */
 OM_uint32
@@ -62,24 +93,13 @@ int *open;
 	OM_uint32		status, temp_minor;
 	gss_name_t localTargName = NULL, localSourceName = NULL;
 
-	if (!minor_status)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-	*minor_status = 0;
-
-	/* if the context_handle is Null, return NO_CONTEXT error */
-	if (context_handle == GSS_C_NO_CONTEXT)
-		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_NO_CONTEXT);
-
-	/* set all output value to NULL */
-	if (src_name)
-		*src_name = NULL;
-
-	if (targ_name)
-		*targ_name = NULL;
-
-	if (mech_type)
-		*mech_type = NULL;
+	status = val_inq_ctx_args(minor_status,
+				context_handle,
+				src_name,
+				targ_name,
+				mech_type);
+	if (status != GSS_S_COMPLETE)
+		return (status);
 
 	/*
 	 * select the approprate underlying mechanism routine and

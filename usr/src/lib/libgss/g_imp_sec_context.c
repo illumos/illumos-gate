@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  glue routine gss_export_sec_context
@@ -35,6 +32,37 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
+static OM_uint32
+val_imp_sec_ctx_args(
+	OM_uint32 *minor_status,
+	gss_buffer_t interprocess_token,
+	gss_ctx_id_t *context_handle)
+{
+
+	/* Initialize outputs. */
+	if (minor_status != NULL)
+		*minor_status = 0;
+
+	if (context_handle != NULL)
+		*context_handle = GSS_C_NO_CONTEXT;
+
+	/* Validate arguments. */
+
+	if (minor_status == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (context_handle == NULL)
+		return (GSS_S_CALL_INACCESSIBLE_WRITE);
+
+	if (interprocess_token == GSS_C_NO_BUFFER)
+		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_DEFECTIVE_TOKEN);
+
+	if (GSS_EMPTY_BUFFER(interprocess_token))
+		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_DEFECTIVE_TOKEN);
+
+	return (GSS_S_COMPLETE);
+}
 
 OM_uint32
 gss_import_sec_context(minor_status,
@@ -53,17 +81,12 @@ gss_ctx_id_t 		*context_handle;
 	gss_buffer_desc		token;
 	gss_mechanism		mech;
 
-	if (minor_status == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE);
-	*minor_status = 0;
+	status = val_imp_sec_ctx_args(minor_status,
+				interprocess_token, context_handle);
+	if (status != GSS_S_COMPLETE)
+		return (status);
 
-	if (context_handle == NULL)
-		return (GSS_S_CALL_INACCESSIBLE_WRITE | GSS_S_NO_CONTEXT);
-	*context_handle = GSS_C_NO_CONTEXT;
-
-	if (GSS_EMPTY_BUFFER(interprocess_token))
-		return (GSS_S_CALL_INACCESSIBLE_READ | GSS_S_DEFECTIVE_TOKEN);
-
+	/* Initial value needed below. */
 	status = GSS_S_FAILURE;
 
 	ctx = (gss_union_ctx_id_t)malloc(sizeof (gss_union_ctx_id_desc));
