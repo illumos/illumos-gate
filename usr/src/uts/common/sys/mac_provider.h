@@ -259,7 +259,7 @@ typedef enum {
 	MAC_RING_TYPE_TX	/* Transmit ring */
 } mac_ring_type_t;
 
-#define	MAX_RINGS_PER_GROUP	32
+#define	MAX_RINGS_PER_GROUP	128
 
 /*
  * Grouping type of a ring group

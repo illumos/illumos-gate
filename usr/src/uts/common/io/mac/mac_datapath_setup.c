@@ -1842,7 +1842,17 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		/* First rx SRS, clear the bw structure */
 		if (flent->fe_rx_srs_cnt == 0)
 			bzero(mac_srs->srs_bw, sizeof (mac_bw_ctl_t));
-		ASSERT(flent->fe_rx_srs_cnt < MAX_RINGS_PER_GROUP);
+
+		/*
+		 * It is better to panic here rather than just assert because
+		 * on a non-debug kernel we might end up courrupting memory
+		 * and making it difficult to debug.
+		 */
+		if (flent->fe_rx_srs_cnt >= MAX_RINGS_PER_GROUP) {
+			panic("Array Overrun detected due to MAC client %p "
+			    " having more rings than %d", (void *)mcip,
+			    MAX_RINGS_PER_GROUP);
+		}
 		flent->fe_rx_srs[flent->fe_rx_srs_cnt] = mac_srs;
 		flent->fe_rx_srs_cnt++;
 	}
