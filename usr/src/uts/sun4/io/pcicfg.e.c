@@ -675,6 +675,7 @@ pcicfg_pcie_device_type(dev_info_t *dip, ddi_acc_handle_t handle)
 	/* check for all PCIe device_types */
 	if ((port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
 	    (port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+	    (port_type == PCIE_PCIECAP_DEV_TYPE_ROOT) ||
 	    (port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
 		return (DDI_SUCCESS);
 

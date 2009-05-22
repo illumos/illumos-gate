@@ -312,6 +312,17 @@ pxb_probe(register dev_info_t *devi)
 	return (DDI_PROBE_SUCCESS);
 }
 
+static boolean_t
+pxb_is_pcie_device_type(dev_info_t *dip)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+
+	if (PCIE_IS_SW(bus_p) || PCIE_IS_RP(bus_p) || PCIE_IS_PCI2PCIE(bus_p))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
 /*ARGSUSED*/
 static int
 pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
@@ -407,9 +418,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/*
 	 * Make sure the "device_type" property exists.
 	 */
-	if ((bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
-	    (bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
-	    (bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
+	if (pxb_is_pcie_device_type(devi))
 		(void) strcpy(device_type, "pciex");
 	else
 		(void) strcpy(device_type, "pci");
