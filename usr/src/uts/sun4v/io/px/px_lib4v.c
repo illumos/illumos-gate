@@ -333,7 +333,7 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 	int		i, err = DDI_SUCCESS;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: dip 0x%p tsbid 0x%llx "
-	    "pages 0x%x attr 0x%x addr 0x%p pfn_index 0x%llx flags 0x%x\n",
+	    "pages 0x%x attr 0x%llx addr 0x%p pfn_index 0x%llx flags 0x%x\n",
 	    dip, tsbid, pages, attr, addr, pfn_index, flags);
 
 	if ((pfns = pfn_p = kmem_zalloc((pages * sizeof (io_page_list_t)),
@@ -379,7 +379,7 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 			}
 
 			DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: tsb_num 0x%x "
-			    "tsb_index 0x%lx ttes_to_map 0x%lx attr 0x%x "
+			    "tsb_index 0x%lx ttes_to_map 0x%lx attr 0x%llx "
 			    "ra 0x%p ttes_mapped 0x%x\n", tsb_num,
 			    tsb_index + (pfn_p - pfns), ttes2map, attr,
 			    ra | ((uintptr_t)pfn_p & MMU_PAGE_OFFSET),
@@ -444,8 +444,8 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
 		return ((ret == H_ENOMAP) ? DDI_DMA_NOMAPPING:DDI_FAILURE);
 	}
 
-	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getmap: attr 0x%x r_addr 0x%llx\n",
-	    *attr_p, *r_addr_p);
+	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getmap: attr 0x%llx "
+	    "r_addr 0x%llx\n", *attr_p, *r_addr_p);
 
 	return (DDI_SUCCESS);
 }
@@ -488,7 +488,7 @@ px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
 	uint64_t	ret;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getbypass: dip 0x%p ra 0x%llx "
-	    "attr 0x%x\n", dip, ra, attr);
+	    "attr 0x%llx\n", dip, ra, attr);
 
 	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), ra,
 	    attr, io_addr_p)) != H_EOK) {

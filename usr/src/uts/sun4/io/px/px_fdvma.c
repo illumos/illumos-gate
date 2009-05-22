@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	px_dvma_addr_t dvma_addr, dvma_pg;
 	uint32_t offset;
 	size_t npages, pg_index;
-	uint64_t attr;
+	io_attributes_t attr;
 
 	offset = (uint32_t)(uintptr_t)a & MMU_PAGE_OFFSET;
 	npages = MMU_BTOPR(len + offset);

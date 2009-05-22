@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_DMA_H
 #define	_SYS_PX_DMA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -237,9 +235,14 @@ extern int px_dma_ctl(dev_info_t *dip, dev_info_t *rdip,
 
 #define	PX_GET_MP_TTE(tte) \
 	(((uint64_t)(uintptr_t)(tte) >> 5) << (32 + 5) | \
-			((uint32_t)(uintptr_t)(tte)) & 0x16)
+	    ((uint32_t)(uintptr_t)(tte)) & (PCI_MAP_ATTR_READ | \
+	    PCI_MAP_ATTR_WRITE | PCI_MAP_ATTR_RO | \
+	    PCI_MAP_ATTR_PHFUN_MASK))
+
 #define	PX_SAVE_MP_TTE(mp, tte)	\
-	(mp)->dmai_tte = (caddr_t)((uintptr_t)HI32(tte) | ((tte) & 0x16))
+	(mp)->dmai_tte = (caddr_t)((uintptr_t)HI32(tte) | ((tte) & \
+	    (PCI_MAP_ATTR_READ | PCI_MAP_ATTR_WRITE | \
+	    PCI_MAP_ATTR_RO | PCI_MAP_ATTR_PHFUN_MASK)))
 
 #define	PX_GET_MP_PFN1(mp, page_no) \
 	(((px_iopfn_t *)(mp)->dmai_pfnlst)[page_no])

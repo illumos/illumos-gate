@@ -510,7 +510,7 @@ px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
 	uint64_t	ret;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: dip 0x%p tsbid 0x%llx "
-	    "pages 0x%x attr 0x%x addr 0x%p pfn_index 0x%llx flags 0x%x\n",
+	    "pages 0x%x attr 0x%llx addr 0x%p pfn_index 0x%llx flags 0x%x\n",
 	    dip, tsbid, pages, attr, addr, pfn_index, flags);
 
 	if ((ret = hvio_iommu_map(px_p->px_dev_hdl, pxu_p, tsbid, pages,
@@ -565,8 +565,8 @@ px_lib_iommu_getmap(dev_info_t *dip, tsbid_t tsbid, io_attributes_t *attr_p,
 		return ((ret == H_ENOMAP) ? DDI_DMA_NOMAPPING:DDI_FAILURE);
 	}
 
-	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getmap: attr 0x%x r_addr 0x%llx\n",
-	    *attr_p, *r_addr_p);
+	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getmap: attr 0x%llx "
+	    "r_addr 0x%llx\n", *attr_p, *r_addr_p);
 
 	return (DDI_SUCCESS);
 }
@@ -602,7 +602,7 @@ px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
 	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_getbypass: dip 0x%p ra 0x%llx "
-	    "attr 0x%x\n", dip, ra, attr);
+	    "attr 0x%llx\n", dip, ra, attr);
 
 	if ((ret = hvio_iommu_getbypass(DIP_TO_HANDLE(dip), pxu_p, ra,
 	    attr, io_addr_p)) != H_EOK) {

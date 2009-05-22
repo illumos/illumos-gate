@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_IOAPI_H
 #define	_SYS_PX_IOAPI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -214,14 +212,17 @@ typedef uint64_t pci_device_t;
 #define	PCI_TSBID_TO_TSBINDEX(tsbid) \
 	((tsbid >> PCI_TSB_INDEX) & PCI_TSB_INDEX_MASK)
 
-typedef enum io_attributes {
-	PCI_MAP_ATTR_READ 	= 0x1ull,
-	PCI_MAP_ATTR_WRITE 	= 0x2ull,
-	PCI_MAP_ATTR_RO		= 0x4ull
-} io_attributes_t;
+typedef	uint64_t io_attributes_t;
+
+#define	PCI_MAP_ATTR_READ	0x1ull
+#define	PCI_MAP_ATTR_WRITE	0x2ull
+#define	PCI_MAP_ATTR_RO		0x4ull
 
 #define	PCI_MAP_ATTR_PHFUN	4
 #define	PCI_MAP_ATTR_BDF	16
+
+#define	PCI_MAP_ATTR_PHFUN_MASK	0x30
+#define	PCI_MAP_ATTR_BDF_MASK	0xffff0000
 
 #define	PX_ADD_ATTR_EXTNS(attr, bdf) \
 	(attr | (bdf << PCI_MAP_ATTR_BDF))

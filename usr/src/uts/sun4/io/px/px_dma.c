@@ -776,7 +776,7 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 	uint_t npages = PX_DMA_WINNPGS(mp);
 	px_dvma_addr_t dvma_pg, dvma_pg_index;
 	void *dvma_addr;
-	uint64_t tte = PX_GET_TTE_ATTR(mp->dmai_rflags,
+	io_attributes_t attr = PX_GET_TTE_ATTR(mp->dmai_rflags,
 	    mp->dmai_attr.dma_attr_flags);
 	int sleep = dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP;
 	dev_info_t *dip = mp->dmai_rdip;
@@ -817,7 +817,7 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 
 	mp->dmai_mapping = mp->dmai_roffset | MMU_PTOB(dvma_pg);
 	mp->dmai_offset = 0;
-	PX_SAVE_MP_TTE(mp, tte);	/* mp->dmai_tte = tte */
+	PX_SAVE_MP_TTE(mp, attr);	/* mp->dmai_tte = tte */
 
 	if ((ret = px_mmu_map_pages(mmu_p,
 	    mp, dvma_pg, npages, 0)) != DDI_SUCCESS) {
