@@ -2493,7 +2493,7 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 		}
 
 		/* PCIx registers */
-		if (PCIE_IS_PCIX(bus_p)) {
+		if (PCIE_IS_PCIX(bus_p) && !PCIE_IS_BDG(bus_p)) {
 			fm_payload_set(ereport,
 			    "pcix_status", DATA_TYPE_UINT32,
 			    PCIX_ERR_REG(pfd_p)->pcix_status,
