@@ -98,21 +98,21 @@
 #define	TITLE_LINE		1
 #define	BLANK_LINE		1
 #define	NEXT_LINE		1
-#define	PTOP_BAR_NSLOTS		10
-#define	PTOP_BAR_LENGTH		40
+#define	PT_BAR_NSLOTS		10
+#define	PT_BAR_LENGTH		40
 
 /*
  * Available op modes
  */
-#define	PTOP_MODE_DEFAULT	0x01
-#define	PTOP_MODE_DUMP		0x02
-#define	PTOP_MODE_VERBOSE	0x04
-#define	PTOP_MODE_CPU		0x08
+#define	PT_MODE_DEFAULT		0x01
+#define	PT_MODE_DUMP		0x02
+#define	PT_MODE_VERBOSE		0x04
+#define	PT_MODE_CPU		0x08
 
-#define	PTOP_ON_DEFAULT		(g_op_mode & PTOP_MODE_DEFAULT)
-#define	PTOP_ON_DUMP		(g_op_mode & PTOP_MODE_DUMP)
-#define	PTOP_ON_VERBOSE		(g_op_mode & PTOP_MODE_VERBOSE)
-#define	PTOP_ON_CPU		(g_op_mode & PTOP_MODE_CPU)
+#define	PT_ON_DEFAULT		(g_op_mode & PT_MODE_DEFAULT)
+#define	PT_ON_DUMP		(g_op_mode & PT_MODE_DUMP)
+#define	PT_ON_VERBOSE		(g_op_mode & PT_MODE_VERBOSE)
+#define	PT_ON_CPU		(g_op_mode & PT_MODE_CPU)
 
 /*
  * Structures and typedefs
@@ -135,7 +135,7 @@ typedef struct state_info {
 	char		name[STATE_NAME_MAX];
 	hrtime_t	total_time;
 	hrtime_t	last_time;
-	double		events;
+	uint64_t	events;
 } state_info_t;
 
 typedef struct freq_state_info {
@@ -145,6 +145,7 @@ typedef struct freq_state_info {
 
 typedef struct cpu_power_info {
 	uint64_t	current_pstate;
+	uint64_t	speed_accounted;
 	hrtime_t	time_accounted;
 	hrtime_t	dtrace_time;
 } cpu_power_info_t;
@@ -157,7 +158,7 @@ typedef struct turbo_info {
 	uint64_t	t_acnt;
 } turbo_info_t;
 
-typedef	void		(suggestion_func)(void);
+typedef	void			(suggestion_func)(void);
 
 /*
  * Global variables
@@ -170,7 +171,7 @@ extern int			g_bit_depth;
  * Event accounting
  */
 extern int 			g_total_events;
-extern int 			g_tog_p_events;
+extern int 			g_top_events;
 
 /*
  * Interval
@@ -188,7 +189,6 @@ extern boolean_t		g_gui;
  * Event info array
  */
 extern event_info_t    		g_event_info[EVENT_NUM_MAX];
-extern event_info_t		*g_p_event;
 
 /*
  * Lookup table, sequential CPU id to Solaris CPU id
@@ -216,16 +216,16 @@ extern freq_state_info_t	g_pstate_info[NSTATES];
 extern uint_t			g_ncpus;
 extern uint_t			g_ncpus_observed;
 
-extern char 			g_status_bar_slots[PTOP_BAR_NSLOTS]
-	[PTOP_BAR_LENGTH];
+extern char 			g_status_bar_slots[PT_BAR_NSLOTS]
+	[PT_BAR_LENGTH];
 
 extern cpu_power_info_t		*g_cpu_power_states;
 
 /*
  * Turbo mode related information
  */
-extern boolean_t	g_turbo_supported;
-extern double		g_turbo_ratio;
+extern boolean_t		g_turbo_supported;
+extern double			g_turbo_ratio;
 
 extern char 			g_suggestion_key;
 extern suggestion_func 		*g_suggestion_activate;
@@ -247,8 +247,8 @@ extern char			**g_argv;
 /*
  * Platform specific messages
  */
-extern const char *g_msg_idle_state;
-extern const char *g_msg_freq_state;
+extern const char 		*g_msg_idle_state;
+extern const char 		*g_msg_freq_state;
 /*
  * Suggestions related
  */
@@ -272,12 +272,12 @@ extern int		event_compare(const void *, const void *);
 extern void 		show_title_bar(void);
 extern void 		setup_windows(void);
 extern void 		initialize_curses(void);
-extern void		show_acpi_power_line(uint32_t flag, double rate,
-    double rem_cap, double cap, uint32_t state);
+extern void		show_acpi_power_line(uint32_t, double, double, double,
+	uint32_t);
 extern void 		show_cstates();
-extern void 		show_wakeups(double interval);
-extern void 		show_eventstats(double interval);
-extern void 		show_suggestion(char *sug);
+extern void 		show_wakeups(double);
+extern void 		show_eventstats(double);
+extern void 		show_suggestion(char *);
 extern void 		cleanup_curses(void);
 extern void		update_windows(void);
 
@@ -285,8 +285,8 @@ extern void		update_windows(void);
  * Suggestions
  */
 extern void 		pick_suggestion(void);
-extern void 		add_suggestion(char *text, int weight, char key,
-    char *keystring, suggestion_func *func);
+extern void 		add_suggestion(char *, int, char, char *,
+	suggestion_func *);
 extern void 		reset_suggestions(void);
 extern void 		print_all_suggestions(void);
 extern void 		print_battery(void);
@@ -295,9 +295,9 @@ extern void 		print_battery(void);
  * DTrace stats
  */
 extern int 		pt_cpufreq_stat_prepare(void);
-extern int 		pt_cpufreq_stat_collect(double interval);
+extern int 		pt_cpufreq_stat_collect(double);
 extern int 		pt_cpuidle_stat_prepare(void);
-extern int 		pt_cpuidle_stat_collect(double interval);
+extern int 		pt_cpuidle_stat_collect(double);
 extern int 		pt_events_stat_prepare(void);
 extern int 		pt_events_stat_collect(void);
 

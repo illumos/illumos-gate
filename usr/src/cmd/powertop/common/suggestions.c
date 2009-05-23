@@ -147,7 +147,7 @@ pick_suggestion(void)
 		if (running > value) {
 			if (ptr->keystring)
 				(void) strncpy(g_status_bar_slots[8],
-				    ptr->keystring, PTOP_BAR_LENGTH);
+				    ptr->keystring, PT_BAR_LENGTH);
 
 			g_suggestion_key 	= ptr->key;
 			g_suggestion_activate 	= ptr->func;

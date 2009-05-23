@@ -215,5 +215,5 @@ const char *g_dtp_events_c =
 /*
  * i386 platform specific display messages
  */
-const char *g_msg_idle_state = "C-states (idle power states)";
+const char *g_msg_idle_state = "C-states (idle power)";
 const char *g_msg_freq_state = "P-states (frequencies)";

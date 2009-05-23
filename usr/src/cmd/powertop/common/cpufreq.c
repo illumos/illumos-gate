@@ -44,7 +44,7 @@
 #include <errno.h>
 #include "powertop.h"
 
-#define	HZ2MHZ(speed)	((speed) / 1000000)
+#define	HZ2MHZ(speed)	((speed) / MICROSEC)
 #define	DTP_ARG_COUNT	2
 #define	DTP_ARG_LENGTH	5
 
@@ -76,7 +76,7 @@ static const char *dtp_cpufreq =
 "/last[(processorid_t)arg0] != 0/"
 "{"
 "	this->cpu = (processorid_t)arg0;"
-"	this->oldspeed = (uint32_t)(arg1/1000000);"
+"	this->oldspeed = (uint64_t)arg1;"
 "	@times[this->cpu, this->oldspeed] = sum(timestamp - last[this->cpu]);"
 "	last[this->cpu] = timestamp;"
 "}"
@@ -84,7 +84,7 @@ static const char *dtp_cpufreq =
 "/last[(processorid_t)arg0] == 0/"
 "{"
 "	this->cpu = (processorid_t)arg0;"
-"	this->oldspeed = (uint32_t)(arg1/1000000);"
+"	this->oldspeed = (uint64_t)arg1;"
 "	@times[this->cpu, this->oldspeed] = sum(timestamp - begin);"
 "	last[this->cpu] = timestamp;"
 "}";
@@ -105,7 +105,7 @@ static const char *dtp_cpufreq_c =
 " last != 0/"
 "{"
 "	this->cpu = (processorid_t)arg0;"
-"	this->oldspeed = (uint32_t)(arg1/1000000);"
+"	this->oldspeed = (uint64_t)arg1;"
 "	@times[this->cpu, this->oldspeed] = sum(timestamp - last);"
 "	last = timestamp;"
 "}"
@@ -114,7 +114,7 @@ static const char *dtp_cpufreq_c =
 " last == 0/"
 "{"
 "	this->cpu = (processorid_t)arg0;"
-"	this->oldspeed = (uint32_t)(arg1/1000000);"
+"	this->oldspeed = (uint64_t)arg1;"
 "	@times[this->cpu, this->oldspeed] = sum(timestamp - begin);"
 "	last = timestamp;"
 "}";
@@ -139,7 +139,7 @@ pt_cpufreq_setup(void)
 
 	(void) snprintf(dtp_argv[0], 5, "%d\0", g_ncpus_observed);
 
-	if (PTOP_ON_CPU) {
+	if (PT_ON_CPU) {
 		if ((dtp_argv[1] = malloc(sizeof (char) * DTP_ARG_LENGTH))
 		    == NULL) {
 			free(dtp_argv[0]);
@@ -238,7 +238,7 @@ pt_cpufreq_stat_prepare(void)
 	 * Execute different scripts (defined above) depending on
 	 * user specified options. Default mode uses dtp_cpufreq.
 	 */
-	if (PTOP_ON_CPU)
+	if (PT_ON_CPU)
 		prog_ptr = (char *)dtp_cpufreq_c;
 	else
 		prog_ptr = (char *)dtp_cpufreq;
@@ -292,7 +292,7 @@ pt_cpufreq_stat_prepare(void)
 int
 pt_cpufreq_stat_collect(double interval)
 {
-	int	i, ret;
+	int i, ret;
 
 	/*
 	 * Zero out the interval time reported by DTrace for
@@ -322,10 +322,10 @@ pt_cpufreq_stat_collect(double interval)
 	}
 
 	switch (g_op_mode) {
-	case PTOP_MODE_CPU:
+	case PT_MODE_CPU:
 		pt_cpufreq_stat_account(interval, g_observed_cpu);
 		break;
-	case PTOP_MODE_DEFAULT:
+	case PT_MODE_DEFAULT:
 	default:
 		for (i = 0; i < g_ncpus_observed; i++)
 			pt_cpufreq_stat_account(interval, i);
@@ -338,20 +338,29 @@ pt_cpufreq_stat_collect(double interval)
 static void
 pt_cpufreq_stat_account(double interval, uint_t cpu)
 {
+	cpu_power_info_t 	*cpu_pow;
 	uint64_t 		speed;
 	hrtime_t 		duration;
-	cpu_power_info_t 	*cpu_pow;
 	int			i;
 
 	cpu_pow = &g_cpu_power_states[cpu];
 	speed = cpu_pow->current_pstate;
 
-	duration = (hrtime_t)((interval * NANOSEC)) - cpu_pow->dtrace_time;
+	duration = (hrtime_t)(interval * NANOSEC) - cpu_pow->dtrace_time;
+
+	/*
+	 * 'duration' may be a negative value when we're using or forcing a
+	 * small interval, and the amount of time already accounted ends up
+	 * being larger than the the former.
+	 */
+	if (duration < 0)
+		return;
 
 	for (i = 0; i < g_npstates; i++) {
 		if (g_pstate_info[i].speed == speed) {
 			g_pstate_info[i].total_time += duration;
 			cpu_pow->time_accounted += duration;
+			cpu_pow->speed_accounted = speed;
 		}
 	}
 }
@@ -362,18 +371,18 @@ pt_cpufreq_stat_account(double interval, uint_t cpu)
 static int
 pt_cpufreq_snapshot(void)
 {
-	kstat_ctl_t 		*kc;
-	int 			ret;
-	uint_t			i;
+	kstat_ctl_t 	*kc;
+	int 		ret;
+	uint_t		i;
 
 	if ((kc = kstat_open()) == NULL)
 		return (errno);
 
 	switch (g_op_mode) {
-	case PTOP_MODE_CPU:
+	case PT_MODE_CPU:
 		ret = pt_cpufreq_snapshot_cpu(kc, g_observed_cpu);
 		break;
-	case PTOP_MODE_DEFAULT:
+	case PT_MODE_DEFAULT:
 	default:
 		for (i = 0; i < g_ncpus_observed; i++)
 			if ((ret = pt_cpufreq_snapshot_cpu(kc, i)) != 0)
@@ -429,30 +438,30 @@ pt_cpufreq_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 {
 	dtrace_aggdesc_t 	*aggdesc = data->dtada_desc;
 	dtrace_recdesc_t 	*cpu_rec, *speed_rec;
-	cpu_power_info_t 	*cpu_pow;
+	cpu_power_info_t 	*cp;
 	int32_t 		cpu;
 	uint64_t 		speed;
-	hrtime_t 		dt_state_time = 0;
+	hrtime_t 		res;
 	int 			i;
 
 	if (strcmp(aggdesc->dtagd_name, "times") == 0) {
 		cpu_rec = &aggdesc->dtagd_rec[1];
 		speed_rec = &aggdesc->dtagd_rec[2];
 
-		for (i = 0; i < g_ncpus; i++) {
-			/* LINTED - alignment */
-			dt_state_time += *((hrtime_t *)(data->dtada_percpu[i]));
-		}
-
 		/* LINTED - alignment */
 		cpu = *(int32_t *)(data->dtada_data + cpu_rec->dtrd_offset);
+
+		/* LINTED - alignment */
+		res = *((hrtime_t *)(data->dtada_percpu[cpu]));
+
 		/* LINTED - alignment */
 		speed = *(uint64_t *)(data->dtada_data +
 		    speed_rec->dtrd_offset);
 
-		if (speed == 0) {
+		if (speed == 0)
 			speed = max_cpufreq;
-		}
+		else
+			speed = HZ2MHZ(speed);
 
 		/*
 		 * We have an aggregation record for "cpu" being at "speed"
@@ -464,25 +473,28 @@ pt_cpufreq_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 		 * that happened during prior powertop samplings, so subtract
 		 * out time already accounted.
 		 */
-		cpu_pow = &g_cpu_power_states[cpu];
+		cp = &g_cpu_power_states[cpu];
 
 		for (i = 0; i < g_npstates; i++) {
 			if (g_pstate_info[i].speed == speed) {
-				if (cpu_pow->time_accounted > 0) {
-					if (dt_state_time == 0)
-						continue;
-					if (dt_state_time >
-					    cpu_pow->time_accounted) {
-						dt_state_time -=
-						    cpu_pow->time_accounted;
-						cpu_pow->time_accounted = 0;
+
+				if (cp->time_accounted > 0 &&
+				    cp->speed_accounted == speed) {
+					if (res > cp->time_accounted) {
+						res -= cp->time_accounted;
+						cp->time_accounted = 0;
+						cp->speed_accounted = 0;
+					} else {
+						return (DTRACE_AGGWALK_NEXT);
 					}
 				}
-				g_pstate_info[i].total_time += dt_state_time;
-				cpu_pow->dtrace_time += dt_state_time;
+
+				g_pstate_info[i].total_time += res;
+				cp->dtrace_time += res;
 			}
 		}
 	}
+
 	return (DTRACE_AGGWALK_NEXT);
 }
 

@@ -41,6 +41,8 @@
 #include <dtrace.h>
 #include "powertop.h"
 
+#define	S2NS(x)		((x) * (NANOSEC))
+
 static dtrace_hdl_t 	*dtp;
 
 /*
@@ -58,7 +60,7 @@ static const char *dtp_cpuidle =
 "/arg0 == 0 && self->start/"
 "{"
 "	@number[self->state] = count();"
-"	@times[self->state] = sum((timestamp - self->start)/1000000);"
+"	@times[self->state] = sum(timestamp - self->start);"
 "	self->start = 0;"
 "	self->state = 0;"
 "}";
@@ -80,7 +82,7 @@ static const char *dtp_cpuidle_c =
 " arg0 == 0 && self->start/"
 "{"
 "	@number[self->state] = count();"
-"	@times[self->state] = sum((timestamp - self->start)/1000000);"
+"	@times[self->state] = sum(timestamp - self->start);"
 "	self->start = 0;"
 "	self->state = 0;"
 "}";
@@ -109,7 +111,7 @@ pt_cpuidle_stat_prepare(void)
 	 * Execute different scripts (defined above) depending on
 	 * user specified options.
 	 */
-	if (PTOP_ON_CPU)
+	if (PT_ON_CPU)
 		prog_ptr = (char *)dtp_cpuidle_c;
 	else
 		prog_ptr = (char *)dtp_cpuidle;
@@ -168,8 +170,8 @@ pt_cpuidle_stat_collect(double interval)
 	 * time out of the default bucket as it processes aggregation
 	 * records for time spent in other states.
 	 */
-	g_cstate_info[0].total_time = (long)(interval * g_ncpus_observed *
-	    1000);
+	g_cstate_info[0].total_time = (uint64_t)S2NS(interval *
+	    g_ncpus_observed);
 
 	if (dtrace_status(dtp) == -1)
 		return (-1);
@@ -242,6 +244,8 @@ pt_cpuidle_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 			g_cstate_info[state].total_time += n;
 			if (g_cstate_info[0].total_time >= n)
 				g_cstate_info[0].total_time -= n;
+			else
+				g_cstate_info[0].total_time = 0;
 		}
 
 	return (DTRACE_AGGWALK_NEXT);

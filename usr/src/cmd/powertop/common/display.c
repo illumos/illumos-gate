@@ -51,12 +51,12 @@ static WINDOW 	*suggestion_window;
 static WINDOW 	*status_bar_window;
 
 #define	print(win, y, x, fmt, args...)				\
-	if (PTOP_ON_DUMP)					\
+	if (PT_ON_DUMP)						\
 		(void) printf(fmt, ## args);			\
 	else							\
 		(void) mvwprintw(win, y, x, fmt, ## args);
 
-char 		g_status_bar_slots[PTOP_BAR_NSLOTS][PTOP_BAR_LENGTH];
+char 		g_status_bar_slots[PT_BAR_NSLOTS][PT_BAR_LENGTH];
 char 		g_suggestion_key;
 
 static int	maxx, maxy;
@@ -214,7 +214,7 @@ show_title_bar(void)
 	(void) wrefresh(title_bar_window);
 	(void) werase(status_bar_window);
 
-	for (i = 0; i < PTOP_BAR_NSLOTS; i++) {
+	for (i = 0; i < PT_BAR_NSLOTS; i++) {
 		if (strlen(g_status_bar_slots[i]) == 0)
 			continue;
 		(void) wattron(status_bar_window, A_REVERSE);
@@ -233,13 +233,13 @@ show_cstates(void)
 	double		total_pstates = 0.0, avg, res;
 	uint64_t	p0_speed, p1_speed;
 
-	if (!PTOP_ON_DUMP) {
+	if (!PT_ON_DUMP) {
 		(void) werase(cstate_window);
 		(void) wattrset(cstate_window, COLOR_PAIR(PT_COLOR_DEFAULT));
 		(void) wbkgd(cstate_window, COLOR_PAIR(PT_COLOR_DEFAULT));
 	}
 
-	print(cstate_window, 0, 0, "%s\tAvg residency\n", g_msg_idle_state);
+	print(cstate_window, 0, 0, "%s\tAvg\tresidency\n", g_msg_idle_state);
 	res =  (((double)g_cstate_info[0].total_time / g_total_c_time)) * 100;
 	(void) sprintf(c, "C0 (cpu running)\t\t(%.1f%%)\n", (float)res);
 	print(cstate_window, 1, 0, "%s", c);
@@ -251,7 +251,7 @@ show_cstates(void)
 		 */
 		if (g_cstate_info[i].events > 0)
 			avg = (((double)g_cstate_info[i].total_time/
-			    g_ncpus_observed)/g_cstate_info[i].events);
+			    MICROSEC)/g_cstate_info[i].events);
 		else
 			avg = 0;
 
@@ -263,7 +263,7 @@ show_cstates(void)
 		print(cstate_window, i + 1, 0, "%s", c);
 	}
 
-	print(cstate_window, 0, 48, "%s", g_msg_freq_state);
+	print(cstate_window, 0, 48, "%s\n", g_msg_freq_state);
 
 	if (g_npstates < 2) {
 		(void) sprintf(c, "%4lu Mhz\t%.1f%%",
@@ -272,7 +272,7 @@ show_cstates(void)
 	} else {
 		for (i = 0; i < g_npstates; i++) {
 			total_pstates += (double)(g_pstate_info[i].total_time/
-			    g_ncpus_observed/1000000);
+			    g_ncpus_observed/MICROSEC);
 		}
 
 		/*
@@ -282,7 +282,7 @@ show_cstates(void)
 			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
 			    (long)g_pstate_info[i].speed,
 			    100 * (g_pstate_info[i].total_time/g_ncpus_observed/
-			    1000000/total_pstates));
+			    MICROSEC/total_pstates));
 			print(cstate_window, i+1, 48, "%s\n", c);
 		}
 
@@ -319,17 +319,17 @@ show_cstates(void)
 			(void) sprintf(c, "%4lu Mhz(turbo)\t%.1f%%",
 			    (long)p0_speed,
 			    100 * (g_pstate_info[i].total_time/
-			    g_ncpus_observed/1000000/total_pstates));
+			    g_ncpus_observed/MICROSEC/total_pstates));
 		} else {
 			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
 			    (long)g_pstate_info[i].speed,
 			    100 * (g_pstate_info[i].total_time/
-			    g_ncpus_observed/1000000/total_pstates));
+			    g_ncpus_observed/MICROSEC/total_pstates));
 		}
 		print(cstate_window, i+1, 48, "%s\n", c);
 	}
 
-	if (!PTOP_ON_DUMP)
+	if (!PT_ON_DUMP)
 		(void) wnoutrefresh(cstate_window);
 }
 
@@ -341,7 +341,7 @@ show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
 
 	(void) sprintf(buffer,  _("no ACPI power usage estimate available"));
 
-	if (!PTOP_ON_DUMP)
+	if (!PT_ON_DUMP)
 		(void) werase(acpi_power_window);
 	if (flag) {
 		char *c;
@@ -369,7 +369,7 @@ show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
 
 	}
 	print(acpi_power_window, 0, 0, "%s\n", buffer);
-	if (!PTOP_ON_DUMP)
+	if (!PT_ON_DUMP)
 		(void) wnoutrefresh(acpi_power_window);
 }
 
@@ -378,9 +378,9 @@ show_wakeups(double interval)
 {
 	char		c[100];
 	int		i, event_sum = 0;
-	event_info_t	*g_p_event = g_event_info;
+	event_info_t	*event = g_event_info;
 
-	if (!PTOP_ON_DUMP) {
+	if (!PT_ON_DUMP) {
 		(void) werase(wakeup_window);
 		(void) wbkgd(wakeup_window, COLOR_PAIR(PT_COLOR_RED));
 		(void) wattron(wakeup_window, A_BOLD);
@@ -389,8 +389,8 @@ show_wakeups(double interval)
 	/*
 	 * calculate the actual total event number
 	 */
-	for (i = 0; i < g_tog_p_events; i++, g_p_event++)
-		event_sum += g_p_event->total_count;
+	for (i = 0; i < g_top_events; i++, event++)
+		event_sum += event->total_count;
 
 	/*
 	 * g_total_events is the sum of the number of Cx->C0 transition,
@@ -406,7 +406,7 @@ show_wakeups(double interval)
 	    "%.1fs", (double)(g_total_events/interval), interval);
 	print(wakeup_window, 0, 0, "%s\n", c);
 
-	if (!PTOP_ON_DUMP)
+	if (!PT_ON_DUMP)
 		(void) wnoutrefresh(wakeup_window);
 }
 
@@ -416,9 +416,9 @@ show_eventstats(double interval)
 	char		c[100];
 	int		i;
 	double		events;
-	event_info_t	*g_p_event = g_event_info;
+	event_info_t	*event = g_event_info;
 
-	if (!PTOP_ON_DUMP) {
+	if (!PT_ON_DUMP) {
 		(void) werase(eventstat_window);
 		(void) wattrset(eventstat_window, COLOR_PAIR(PT_COLOR_DEFAULT));
 		(void) wbkgd(eventstat_window, COLOR_PAIR(PT_COLOR_DEFAULT));
@@ -427,13 +427,13 @@ show_eventstats(double interval)
 	/*
 	 * Sort the event report list
 	 */
-	if (g_tog_p_events > EVENT_NUM_MAX)
-		g_tog_p_events = EVENT_NUM_MAX;
+	if (g_top_events > EVENT_NUM_MAX)
+		g_top_events = EVENT_NUM_MAX;
 
-	qsort((void *)g_event_info, g_tog_p_events, sizeof (event_info_t),
+	qsort((void *)g_event_info, g_top_events, sizeof (event_info_t),
 	    event_compare);
 
-	if (PTOP_ON_CPU)
+	if (PT_ON_CPU)
 		(void) sprintf(c, "Top causes for wakeups on CPU %d:\n",
 		    g_observed_cpu);
 	else
@@ -441,24 +441,24 @@ show_eventstats(double interval)
 
 	print(eventstat_window, 0, 0, "%s", c);
 
-	for (i = 0; i < g_tog_p_events; i++, g_p_event++) {
+	for (i = 0; i < g_top_events; i++, event++) {
 
-		if (g_total_events > 0 && g_p_event->total_count > 0)
-			events = (double)g_p_event->total_count/
+		if (g_total_events > 0 && event->total_count > 0)
+			events = (double)event->total_count/
 			    (double)g_total_events;
 		else
 			continue;
 
 		(void) sprintf(c, "%4.1f%% (%5.1f)", 100 * events,
-		    (double)g_p_event->total_count/interval);
+		    (double)event->total_count/interval);
 		print(eventstat_window, i+1, 0, "%s", c);
 		print(eventstat_window, i+1, 16, "%20s :",
-		    g_p_event->offender_name);
+		    event->offender_name);
 		print(eventstat_window, i+1, 40, "%-64s\n",
-		    g_p_event->offense_name);
+		    event->offense_name);
 	}
 
-	if (!PTOP_ON_DUMP)
+	if (!PT_ON_DUMP)
 		(void) wnoutrefresh(eventstat_window);
 }
 

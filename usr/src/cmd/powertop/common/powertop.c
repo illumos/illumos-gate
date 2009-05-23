@@ -55,7 +55,7 @@ double 			g_interval;
 double			g_displaytime;
 
 int			g_bit_depth;
-int 			g_total_events, g_tog_p_events;
+int 			g_total_events, g_top_events;
 int			g_npstates, g_max_cstate, g_longest_cstate;
 uint_t			g_ncpus;
 uint_t			g_ncpus_observed;
@@ -69,7 +69,6 @@ boolean_t		g_gui;
 uint_t			g_observed_cpu;
 
 event_info_t    	g_event_info[EVENT_NUM_MAX];
-event_info_t		*g_p_event;
 state_info_t		g_cstate_info[NSTATES];
 freq_state_info_t	g_pstate_info[NSTATES];
 cpu_power_info_t	*g_cpu_power_states;
@@ -120,7 +119,7 @@ main(int argc, char **argv)
 
 	g_ticktime = g_ticktime_usr = INTERVAL_DEFAULT;
 	g_displaytime 	= 0.0;
-	g_op_mode	= PTOP_MODE_DEFAULT;
+	g_op_mode	= PT_MODE_DEFAULT;
 	g_gui		= B_FALSE;
 	g_max_cstate	= 0;
 	g_argv		= NULL;
@@ -135,10 +134,10 @@ main(int argc, char **argv)
 
 		switch (c) {
 		case 'd':
-			if (PTOP_ON_DUMP)
+			if (PT_ON_DUMP)
 				usage();
 
-			g_op_mode |= PTOP_MODE_DUMP;
+			g_op_mode |= PT_MODE_DUMP;
 			dump_count = (int)strtod(optarg, &endptr);
 
 			if (dump_count <= 0 || *endptr != NULL)
@@ -157,16 +156,16 @@ main(int argc, char **argv)
 				usage();
 			break;
 		case 'v':
-			if (PTOP_ON_CPU || PTOP_ON_VERBOSE)
+			if (PT_ON_CPU || PT_ON_VERBOSE)
 				usage();
 
-			g_op_mode |= PTOP_MODE_VERBOSE;
+			g_op_mode |= PT_MODE_VERBOSE;
 			break;
 		case 'c':
-			if (PTOP_ON_CPU || PTOP_ON_VERBOSE)
+			if (PT_ON_CPU || PT_ON_VERBOSE)
 				usage();
 
-			g_op_mode |= PTOP_MODE_CPU;
+			g_op_mode |= PT_MODE_CPU;
 			g_observed_cpu = (uint_t)strtod(optarg, &endptr);
 
 			if (g_observed_cpu >= g_ncpus)
@@ -229,7 +228,7 @@ main(int argc, char **argv)
 	(void) printf(_("Collecting data for %.2f second(s) \n"),
 	    (float)g_ticktime);
 
-	if (!PTOP_ON_DUMP)
+	if (!PT_ON_DUMP)
 		g_gui = B_TRUE;
 
 	last = gethrtime();
@@ -248,9 +247,9 @@ main(int argc, char **argv)
 		FD_SET(0, &rfds);
 
 		tv.tv_sec 	= (long)g_ticktime;
-		tv.tv_usec 	= (long)((g_ticktime - tv.tv_sec) * 1000000);
+		tv.tv_usec 	= (long)((g_ticktime - tv.tv_sec) * MICROSEC);
 
-		if (!PTOP_ON_DUMP)
+		if (!PT_ON_DUMP)
 			key = select(1, &rfds, NULL, NULL, &tv);
 		else
 			key = select(1, NULL, NULL, NULL, &tv);
@@ -260,7 +259,7 @@ main(int argc, char **argv)
 		g_interval 	= (double)(now - last)/NANOSEC;
 		last 		= now;
 
-		g_tog_p_events 	= 0;
+		g_top_events 	= 0;
 		g_total_events 	= 0;
 
 		(void) memset(g_event_info, 0,
@@ -311,7 +310,7 @@ main(int argc, char **argv)
 		 * Initialize curses if we're not dumping and
 		 * haven't already done it
 		 */
-		if (!PTOP_ON_DUMP) {
+		if (!PT_ON_DUMP) {
 			if (!ncursesinited) {
 				initialize_curses();
 				ncursesinited++;
@@ -334,7 +333,7 @@ main(int argc, char **argv)
 
 		g_displaytime = g_displaytime - g_ticktime;
 
-		if (key && !PTOP_ON_DUMP) {
+		if (key && !PT_ON_DUMP) {
 			keychar = toupper(fgetc(stdin));
 
 			switch (keychar) {
@@ -365,7 +364,7 @@ main(int argc, char **argv)
 			dump_count--;
 
 		/* Exits if user requested a dump */
-		if (PTOP_ON_DUMP && !dump_count) {
+		if (PT_ON_DUMP && !dump_count) {
 			print_all_suggestions();
 			exit(EXIT_SUCCESS);
 		}
@@ -375,7 +374,7 @@ main(int argc, char **argv)
 			pick_suggestion();
 
 		/* Refresh display */
-		if (!PTOP_ON_DUMP) {
+		if (!PT_ON_DUMP) {
 			show_title_bar();
 			update_windows();
 		}
@@ -386,7 +385,7 @@ main(int argc, char **argv)
 		 * specified an interval we skip this bit and keep it fixed.
 		 */
 		last_time = (((double)g_cstate_info[g_longest_cstate].total_time
-		    /g_ncpus)/g_cstate_info[g_longest_cstate].events);
+		    /MICROSEC/g_ncpus)/g_cstate_info[g_longest_cstate].events);
 
 		if (!user_interval)
 			if (last_time < INTERVAL_DEFAULT ||

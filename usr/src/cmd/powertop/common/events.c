@@ -43,22 +43,23 @@
 #include "powertop.h"
 
 static dtrace_hdl_t *dtp;
+static event_info_t *event;
 
 /*ARGSUSED*/
 static int
-walk(const dtrace_aggdata_t *data, void *arg)
+pt_events_walk(const dtrace_aggdata_t *data, void *arg)
 {
 	dtrace_aggdesc_t 	*aggdesc = data->dtada_desc;
 	dtrace_recdesc_t 	*rec1, *rec2, *rec3;
 	dtrace_syminfo_t 	dts;
-	char 			*offense_name;
+	GElf_Sym 		sym;
 	uint64_t		offender_addr;
+	uint64_t 		n = 0;
 	int32_t 		*instance, *offender_cpu;
 	int 			i;
-	uint64_t 		n = 0;
-	GElf_Sym 		sym;
+	char 			*offense_name;
 
-	if (g_tog_p_events >= EVENT_NUM_MAX)
+	if (g_top_events >= EVENT_NUM_MAX)
 		return (0);
 
 	rec1 = &aggdesc->dtagd_rec[1];
@@ -72,16 +73,16 @@ walk(const dtrace_aggdata_t *data, void *arg)
 
 		/* LINTED - alignment */
 		instance = (int32_t *)(data->dtada_data + rec2->dtrd_offset);
-		(void) snprintf((char *)(g_p_event->offender_name),
+		(void) snprintf((char *)(event->offender_name),
 		    EVENT_NAME_MAX, "%s", "<interrupt>");
-		(void) snprintf((char *)(g_p_event->offense_name),
+		(void) snprintf((char *)(event->offense_name),
 		    EVENT_NAME_MAX, "%s#%d", offense_name, *instance);
 	/*
 	 * Report kernel events
 	 */
 	} else if (strcmp(aggdesc->dtagd_name, "events_k") == 0) {
 
-		(void) snprintf((char *)(g_p_event->offender_name),
+		(void) snprintf((char *)(event->offender_name),
 		    EVENT_NAME_MAX, "%s", "<kernel>");
 
 		/*
@@ -108,11 +109,11 @@ walk(const dtrace_aggdata_t *data, void *arg)
 		 */
 		if (offender_addr != NULL && dtrace_lookup_by_addr(dtp,
 		    offender_addr, &sym, &dts) == 0) {
-			(void) snprintf((char *)(g_p_event->offense_name),
+			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "%s`%s", dts.dts_object,
 			    dts.dts_name);
 		} else {
-			(void) snprintf((char *)(g_p_event->offense_name),
+			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "0x%llx", offender_addr);
 		}
 	/*
@@ -121,9 +122,9 @@ walk(const dtrace_aggdata_t *data, void *arg)
 	} else if (strcmp(aggdesc->dtagd_name, "events_u") == 0) {
 		offense_name = data->dtada_data + rec1->dtrd_offset;
 
-		(void) snprintf((char *)(g_p_event->offender_name),
+		(void) snprintf((char *)(event->offender_name),
 		    EVENT_NAME_MAX, "%s", offense_name);
-		(void) snprintf((char *)(g_p_event->offense_name),
+		(void) snprintf((char *)(event->offense_name),
 		    EVENT_NAME_MAX, "<scheduled timeout expiration>");
 	/*
 	 * Report cross calls
@@ -131,7 +132,7 @@ walk(const dtrace_aggdata_t *data, void *arg)
 	} else if (strcmp(aggdesc->dtagd_name, "events_x") == 0) {
 		offense_name = data->dtada_data + rec1->dtrd_offset;
 
-		(void) snprintf((char *)(g_p_event->offender_name),
+		(void) snprintf((char *)(event->offender_name),
 		    EVENT_NAME_MAX, "%s", offense_name);
 
 		switch (g_bit_depth) {
@@ -152,11 +153,11 @@ walk(const dtrace_aggdata_t *data, void *arg)
 		 */
 		if (offender_addr != NULL && dtrace_lookup_by_addr(dtp,
 		    offender_addr, &sym, &dts) == 0) {
-			(void) snprintf((char *)(g_p_event->offense_name),
+			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "<xcalls> %s`%s",
 			    dts.dts_object, dts.dts_name);
 		} else {
-			(void) snprintf((char *)(g_p_event->offense_name),
+			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "<xcalls>");
 		}
 	/*
@@ -167,7 +168,7 @@ walk(const dtrace_aggdata_t *data, void *arg)
 		rec3 = &aggdesc->dtagd_rec[3];
 		offense_name = data->dtada_data + rec1->dtrd_offset;
 
-		(void) snprintf((char *)(g_p_event->offender_name),
+		(void) snprintf((char *)(event->offender_name),
 		    EVENT_NAME_MAX, "%s", offense_name);
 
 		switch (g_bit_depth) {
@@ -191,11 +192,11 @@ walk(const dtrace_aggdata_t *data, void *arg)
 		 */
 		if (offender_addr != NULL && dtrace_lookup_by_addr(dtp,
 		    offender_addr, &sym, &dts) == 0) {
-			(void) snprintf((char *)(g_p_event->offense_name),
+			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "<xcalls> %s`%s (CPU %d)",
 			    dts.dts_object, dts.dts_name, *offender_cpu);
 		} else {
-			(void) snprintf((char *)(g_p_event->offense_name),
+			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "<xcalls> (CPU %d)",
 			    *offender_cpu);
 		}
@@ -203,20 +204,21 @@ walk(const dtrace_aggdata_t *data, void *arg)
 	 * Report unknown events
 	 */
 	} else {
-		(void) snprintf((char *)(g_p_event->offender_name),
+		(void) snprintf((char *)(event->offender_name),
 		    EVENT_NAME_MAX, "%s", "<unknown>");
-		(void) snprintf((char *)(g_p_event->offense_name),
+		(void) snprintf((char *)(event->offense_name),
 		    EVENT_NAME_MAX, "%s", "<unknown>");
 	}
 
-	for (i = 0; i < g_ncpus; i++)
+	for (i = 0; i < g_ncpus; i++) {
 		/* LINTED - alignment */
 		n += *((uint64_t *)(data->dtada_percpu[i]));
+	}
 
-	g_p_event->total_count = n;
+	event->total_count = n;
 
-	g_p_event++;
-	g_tog_p_events++;
+	event++;
+	g_top_events++;
 
 	return (DTRACE_AGGWALK_NEXT);
 }
@@ -226,11 +228,11 @@ pt_events_stat_prepare(void)
 {
 	dtrace_prog_t 		*prog;
 	dtrace_proginfo_t 	info;
-	int 			err;
 	dtrace_optval_t 	statustime;
+	int 			err;
 	char			*prog_ptr;
 
-	g_p_event = g_event_info;
+	event = g_event_info;
 
 	if ((dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
 		pt_error("%s : cannot open dtrace library: %s\n", __FILE__,
@@ -242,10 +244,10 @@ pt_events_stat_prepare(void)
 	 * Execute different scripts (defined in the platform specific file)
 	 * depending on user specified options.
 	 */
-	if (PTOP_ON_VERBOSE) {
+	if (PT_ON_VERBOSE) {
 		prog_ptr = (char *)g_dtp_events_v;
 	} else {
-		if (PTOP_ON_CPU)
+		if (PT_ON_CPU)
 			prog_ptr = (char *)g_dtp_events_c;
 		else
 			prog_ptr = (char *)g_dtp_events;
@@ -293,8 +295,8 @@ pt_events_stat_prepare(void)
 int
 pt_events_stat_collect(void)
 {
-	g_p_event 	= g_event_info;
-	g_tog_p_events 	= 0;
+	g_top_events = 0;
+	event = g_event_info;
 
 	if (dtrace_status(dtp) == -1)
 		return (-1);
@@ -302,7 +304,7 @@ pt_events_stat_collect(void)
 	if (dtrace_aggregate_snap(dtp) != 0)
 		pt_error("%s : failed to add to aggregate", __FILE__);
 
-	if (dtrace_aggregate_walk_keyvarsorted(dtp, walk, NULL) != 0)
+	if (dtrace_aggregate_walk_keyvarsorted(dtp, pt_events_walk, NULL) != 0)
 		pt_error("%s : failed to sort aggregate", __FILE__);
 
 	dtrace_aggregate_clear(dtp);
