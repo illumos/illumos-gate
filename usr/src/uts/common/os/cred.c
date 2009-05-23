@@ -131,7 +131,7 @@ get_ephemeral_zsd(zone_t *zone)
 	return (eph_zsd);
 }
 
-static cred_t *crdup_flags(cred_t *, int);
+static cred_t *crdup_flags(const cred_t *, int);
 static cred_t *cralloc_flags(int);
 
 /*
@@ -419,7 +419,7 @@ crcopy_to(cred_t *oldcr, cred_t *newcr)
  *	The old cred is not freed.
  */
 static cred_t *
-crdup_flags(cred_t *cr, int flgs)
+crdup_flags(const cred_t *cr, int flgs)
 {
 	cred_t *newcr;
 
@@ -1023,19 +1023,33 @@ newcred_from_bslabel(bslabel_t *blabel, uint32_t doi, int flags)
  * by a caller without affecting other users
  */
 cred_t *
-copycred_from_bslabel(cred_t *cr, bslabel_t *blabel, uint32_t doi, int flags)
+copycred_from_tslabel(const cred_t *cr, ts_label_t *label, int flags)
 {
-	ts_label_t *lbl = labelalloc(blabel, doi, flags);
 	cred_t *newcr = NULL;
 
+	if ((newcr = crdup_flags(cr, flags)) != NULL) {
+		if (newcr->cr_label != NULL)
+			label_rele(newcr->cr_label);
+		label_hold(label);
+		newcr->cr_label = label;
+	}
+
+	return (newcr);
+}
+
+/*
+ * Derive a new cred from the existing cred, but with a different label.
+ */
+cred_t *
+copycred_from_bslabel(const cred_t *cr, bslabel_t *blabel,
+    uint32_t doi, int flags)
+{
+	ts_label_t *lbl = labelalloc(blabel, doi, flags);
+	cred_t  *newcr = NULL;
+
 	if (lbl != NULL) {
-		if ((newcr = crdup_flags(cr, flags)) != NULL) {
-			if (newcr->cr_label != NULL)
-				label_rele(newcr->cr_label);
-			newcr->cr_label = lbl;
-		} else {
-			label_rele(lbl);
-		}
+		newcr = copycred_from_tslabel(cr, lbl, flags);
+		label_rele(lbl);
 	}
 
 	return (newcr);

@@ -2458,6 +2458,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	boolean_t	ipsec_policy_set = B_FALSE;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 	ts_label_t	*tsl = NULL;
+	cred_t		*effective_cred = NULL;
 
 	if (mpp)
 		mp = *mpp;
@@ -2466,8 +2467,6 @@ ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
 	}
-	if (cr != NULL)
-		tsl = crgetlabel(cr);
 
 	src_ire = dst_ire = NULL;
 	/*
@@ -2476,6 +2475,43 @@ ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	connp->conn_fully_bound = B_FALSE;
 
 	zoneid = connp->conn_zoneid;
+
+	/*
+	 * Check whether Trusted Solaris policy allows communication with this
+	 * host, and pretend that the destination is unreachable if not.
+	 *
+	 * This is never a problem for TCP, since that transport is known to
+	 * compute the label properly as part of the tcp_rput_other T_BIND_ACK
+	 * handling.  If the remote is unreachable, it will be detected at that
+	 * point, so there's no reason to check it here.
+	 *
+	 * Note that for sendto (and other datagram-oriented friends), this
+	 * check is done as part of the data path label computation instead.
+	 * The check here is just to make non-TCP connect() report the right
+	 * error.
+	 */
+	if (is_system_labeled() && !IPCL_IS_TCP(connp)) {
+		if ((error = tsol_check_dest(cr, v6dst, IPV6_VERSION,
+		    connp->conn_mac_exempt, &effective_cred)) != 0) {
+			if (ip_debug > 2) {
+				pr_addr_dbg(
+				    "ip_bind_connected: no label for dst %s\n",
+				    AF_INET6, v6dst);
+			}
+			goto bad_addr;
+		}
+
+		/*
+		 * tsol_check_dest() may have created a new cred with
+		 * a modified security label. Use that cred if it exists
+		 * for ire lookups.
+		 */
+		if (effective_cred == NULL) {
+			tsl = crgetlabel(cr);
+		} else {
+			tsl = crgetlabel(effective_cred);
+		}
+	}
 
 	if (IN6_IS_ADDR_MULTICAST(v6dst)) {
 		ipif_t *ipif;
@@ -2551,33 +2587,6 @@ ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 				goto bad_addr;
 			}
 		}
-	}
-
-	/*
-	 * We now know that routing will allow us to reach the destination.
-	 * Check whether Trusted Solaris policy allows communication with this
-	 * host, and pretend that the destination is unreachable if not.
-	 *
-	 * This is never a problem for TCP, since that transport is known to
-	 * compute the label properly as part of the tcp_rput_other T_BIND_ACK
-	 * handling.  If the remote is unreachable, it will be detected at that
-	 * point, so there's no reason to check it here.
-	 *
-	 * Note that for sendto (and other datagram-oriented friends), this
-	 * check is done as part of the data path label computation instead.
-	 * The check here is just to make non-TCP connect() report the right
-	 * error.
-	 */
-	if (dst_ire != NULL && is_system_labeled() &&
-	    !IPCL_IS_TCP(connp) &&
-	    tsol_compute_label_v6(cr, v6dst, NULL,
-	    connp->conn_mac_exempt, ipst) != 0) {
-		error = EHOSTUNREACH;
-		if (ip_debug > 2) {
-			pr_addr_dbg("ip_bind_connected: no label for dst %s\n",
-			    AF_INET6, v6dst);
-		}
-		goto bad_addr;
 	}
 
 	/*
@@ -2890,6 +2899,8 @@ refrele_and_quit:
 		IRE_REFRELE(md_dst_ire);
 	if (ill_held && dst_ill != NULL)
 		ill_refrele(dst_ill);
+	if (effective_cred != NULL)
+		crfree(effective_cred);
 	return (error);
 }
 
@@ -9243,13 +9254,15 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	if (is_system_labeled() && DB_TYPE(mp) == M_DATA &&
 	    (connp == NULL || !connp->conn_ulp_labeled)) {
 		cred_t		*cr;
+		pid_t		pid;
 
 		if (connp != NULL) {
 			ASSERT(CONN_CRED(connp) != NULL);
-			err = tsol_check_label_v6(BEST_CRED(mp, connp),
-			    &mp, connp->conn_mac_exempt, ipst);
-		} else if ((cr = msg_getcred(mp, NULL)) != NULL) {
-			err = tsol_check_label_v6(cr, &mp, B_FALSE, ipst);
+			cr = BEST_CRED(mp, connp, &pid);
+			err = tsol_check_label_v6(cr, &mp,
+			    connp->conn_mac_exempt, ipst, pid);
+		} else if ((cr = msg_getcred(mp, &pid)) != NULL) {
+			err = tsol_check_label_v6(cr, &mp, B_FALSE, ipst, pid);
 		}
 		if (mctl_present)
 			first_mp->b_cont = mp;

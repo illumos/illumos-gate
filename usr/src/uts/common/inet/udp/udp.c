@@ -878,6 +878,14 @@ udp_close_free(conn_t *connp)
 		udp->udp_sticky_hdrs = NULL;
 		udp->udp_sticky_hdrs_len = 0;
 	}
+	if (udp->udp_last_cred != NULL) {
+		crfree(udp->udp_last_cred);
+		udp->udp_last_cred = NULL;
+	}
+	if (udp->udp_effective_cred != NULL) {
+		crfree(udp->udp_effective_cred);
+		udp->udp_effective_cred = NULL;
+	}
 
 	ip6_pkt_free(&udp->udp_sticky_ipp);
 
@@ -4521,6 +4529,14 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 					mlp.tme_flags |= MIB2_TMEF_PRIVATE;
 				needattr = B_TRUE;
 			}
+			if (connp->conn_anon_mlp) {
+				mlp.tme_flags |= MIB2_TMEF_ANONMLP;
+				needattr = B_TRUE;
+			}
+			if (connp->conn_mac_exempt) {
+				mlp.tme_flags |= MIB2_TMEF_MACEXEMPT;
+				needattr = B_TRUE;
+			}
 
 			/*
 			 * Create an IPv4 table entry for IPv4 entries and also
@@ -4821,14 +4837,15 @@ retry:
 }
 
 static int
-udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst,
-    boolean_t *update_lastdst)
+udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
 {
 	int err;
+	cred_t *cred;
+	cred_t *orig_cred = NULL;
+	cred_t *effective_cred = NULL;
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
 	udp_t *udp = Q_TO_UDP(wq);
 	udp_stack_t	*us = udp->udp_us;
-	cred_t			*cr;
 
 	/*
 	 * All Solaris components should pass a db_credp
@@ -4836,27 +4853,66 @@ udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst,
 	 * On production kernels we return an error to be robust against
 	 * random streams modules sitting on top of us.
 	 */
-	cr = msg_getcred(mp, NULL);
-	ASSERT(cr != NULL);
-	if (cr == NULL)
+	cred = orig_cred = msg_getcred(mp, NULL);
+	ASSERT(cred != NULL);
+	if (cred == NULL)
 		return (EINVAL);
 
-	/* Note that we use the cred/label from the message to handle MLP */
-	err = tsol_compute_label(cr, dst,
-	    opt_storage, udp->udp_connp->conn_mac_exempt,
-	    us->us_netstack->netstack_ip);
-	if (err == 0) {
-		err = tsol_update_options(&udp->udp_ip_snd_options,
-		    &udp->udp_ip_snd_options_len, &udp->udp_label_len,
-		    opt_storage);
+	/*
+	 * Verify the destination is allowed to receive packets at
+	 * the security label of the message data. tsol_check_dest()
+	 * may create a new effective cred for this message with a
+	 * modified label or label flags. Note that we use the cred/label
+	 * from the message to handle MLP
+	 */
+	if ((err = tsol_check_dest(cred, &dst, IPV4_VERSION,
+	    udp->udp_connp->conn_mac_exempt, &effective_cred)) != 0)
+		goto done;
+	if (effective_cred != NULL)
+		cred = effective_cred;
+
+	/*
+	 * Calculate the security label to be placed in the text
+	 * of the message (if any).
+	 */
+	if ((err = tsol_compute_label(cred, dst, opt_storage,
+	    us->us_netstack->netstack_ip)) != 0)
+		goto done;
+
+	/*
+	 * Insert the security label in the cached ip options,
+	 * removing any old label that may exist.
+	 */
+	if ((err = tsol_update_options(&udp->udp_ip_snd_options,
+	    &udp->udp_ip_snd_options_len, &udp->udp_label_len,
+	    opt_storage)) != 0)
+		goto done;
+
+	/*
+	 * Save the destination address and creds we used to
+	 * generate the security label text.
+	 */
+	if (cred != udp->udp_effective_cred) {
+		if (udp->udp_effective_cred != NULL)
+			crfree(udp->udp_effective_cred);
+		crhold(cred);
+		udp->udp_effective_cred = cred;
 	}
+	if (orig_cred != udp->udp_last_cred) {
+		if (udp->udp_last_cred != NULL)
+			crfree(udp->udp_last_cred);
+		crhold(orig_cred);
+		udp->udp_last_cred = orig_cred;
+	}
+done:
+	if (effective_cred != NULL)
+		crfree(effective_cred);
+
 	if (err != 0) {
 		DTRACE_PROBE4(
 		    tx__ip__log__info__updatelabel__udp,
 		    char *, "queue(1) failed to update options(2) on mp(3)",
 		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
-	} else {
-		*update_lastdst = B_TRUE;
 	}
 	return (err);
 }
@@ -4994,6 +5050,9 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	 * destination and are updated atomically.
 	 */
 	if (is_system_labeled()) {
+		cred_t	*credp;
+		pid_t	cpid;
+
 		/* Using UDP MLP requires SCM_UCRED from user */
 		if (connp->conn_mlp_type != mlptSingle &&
 		    !attrs.udpattr_credset) {
@@ -5001,23 +5060,33 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 			DTRACE_PROBE4(
 			    tx__ip__log__info__output__udp,
 			    char *, "MLP mp(1) lacks SCM_UCRED attr(2) on q(3)",
-			    mblk_t *, mp1, udpattrs_t *, &attrs, queue_t *, q);
-			*error = ECONNREFUSED;
+			    mblk_t *, mp, udpattrs_t *, &attrs, queue_t *, q);
+			*error = EINVAL;
 			goto done;
 		}
 		/*
-		 * update label option for this UDP socket if
-		 * - the destination has changed, or
-		 * - the UDP socket is MLP
+		 * Update label option for this UDP socket if
+		 * - the destination has changed,
+		 * - the UDP socket is MLP, or
+		 * - the cred attached to the mblk changed.
 		 */
-		if ((!IN6_IS_ADDR_V4MAPPED(&udp->udp_v6lastdst) ||
+		credp = msg_getcred(mp, &cpid);
+		if (!IN6_IS_ADDR_V4MAPPED(&udp->udp_v6lastdst) ||
 		    V4_PART_OF_V6(udp->udp_v6lastdst) != v4dst ||
-		    connp->conn_mlp_type != mlptSingle) &&
-		    (*error = udp_update_label(q, mp, v4dst, &update_lastdst))
-		    != 0) {
-			mutex_exit(&connp->conn_lock);
-			goto done;
+		    connp->conn_mlp_type != mlptSingle ||
+		    credp != udp->udp_last_cred) {
+			if ((*error = udp_update_label(q, mp, v4dst)) != 0) {
+				mutex_exit(&connp->conn_lock);
+				goto done;
+			}
+			update_lastdst = B_TRUE;
 		}
+
+		/*
+		 * Attach the effective cred to the mblk to ensure future
+		 * routing decisions will be based on it's label.
+		 */
+		mblk_setcred(mp, udp->udp_effective_cred, cpid);
 	}
 	if (update_lastdst) {
 		IN6_IPADDR_TO_V4MAPPED(v4dst, &udp->udp_v6lastdst);
@@ -5049,7 +5118,6 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 			mp->b_cont = mp1;
 		else
 			mp = mp1;
-
 		ipha = (ipha_t *)(mp1->b_wptr - ip_hdr_length);
 	}
 	ip_hdr_length -= (UDPH_SIZE + (insert_spi ? sizeof (uint32_t) : 0));
@@ -5605,14 +5673,15 @@ bail:
 }
 
 static boolean_t
-udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst,
-    boolean_t *update_lastdst)
+udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst)
 {
 	udp_t *udp = Q_TO_UDP(wq);
 	int err;
+	cred_t *cred;
+	cred_t *orig_cred;
+	cred_t *effective_cred = NULL;
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
 	udp_stack_t		*us = udp->udp_us;
-	cred_t			*cr;
 
 	/*
 	 * All Solaris components should pass a db_credp
@@ -5620,26 +5689,66 @@ udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst,
 	 * On production kernels we return an error to be robust against
 	 * random streams modules sitting on top of us.
 	 */
-	cr = msg_getcred(mp, NULL);
-	ASSERT(cr != NULL);
-	if (cr == NULL)
+	cred = orig_cred = msg_getcred(mp, NULL);
+	ASSERT(cred != NULL);
+	if (cred == NULL)
 		return (EINVAL);
 
-	/* Note that we use the cred/label from the message to handle MLP */
-	err = tsol_compute_label_v6(cr,
-	    dst, opt_storage, udp->udp_connp->conn_mac_exempt,
-	    us->us_netstack->netstack_ip);
-	if (err == 0) {
-		err = tsol_update_sticky(&udp->udp_sticky_ipp,
-		    &udp->udp_label_len_v6, opt_storage);
+	/*
+	 * Verify the destination is allowed to receive packets at
+	 * the security label of the message data. tsol_check_dest()
+	 * may create a new effective cred for this message with a
+	 * modified label or label flags. Note that we use the
+	 * cred/label from the message to handle MLP.
+	 */
+	if ((err = tsol_check_dest(cred, dst, IPV6_VERSION,
+	    udp->udp_connp->conn_mac_exempt, &effective_cred)) != 0)
+		goto done;
+	if (effective_cred != NULL)
+		cred = effective_cred;
+
+	/*
+	 * Calculate the security label to be placed in the text
+	 * of the message (if any).
+	 */
+	if ((err = tsol_compute_label_v6(cred, dst, opt_storage,
+	    us->us_netstack->netstack_ip)) != 0)
+		goto done;
+
+	/*
+	 * Insert the security label in the cached ip options,
+	 * removing any old label that may exist.
+	 */
+	if ((err = tsol_update_sticky(&udp->udp_sticky_ipp,
+	    &udp->udp_label_len_v6, opt_storage)) != 0)
+		goto done;
+
+	/*
+	 * Save the destination address and cred we used to
+	 * generate the security label text.
+	 */
+	if (cred != udp->udp_effective_cred) {
+		if (udp->udp_effective_cred != NULL)
+			crfree(udp->udp_effective_cred);
+		crhold(cred);
+		udp->udp_effective_cred = cred;
 	}
+	if (orig_cred != udp->udp_last_cred) {
+		if (udp->udp_last_cred != NULL)
+			crfree(udp->udp_last_cred);
+		crhold(orig_cred);
+		udp->udp_last_cred = orig_cred;
+	}
+
+done:
+	if (effective_cred != NULL)
+		crfree(effective_cred);
+
 	if (err != 0) {
 		DTRACE_PROBE4(
 		    tx__ip__log__drop__updatelabel__udp6,
 		    char *, "queue(1) failed to update options(2) on mp(3)",
 		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
-	} else {
-		*update_lastdst = B_TRUE;
 	}
 	return (err);
 }
@@ -6097,6 +6206,9 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 	 * destination and are updated atomically.
 	 */
 	if (is_system_labeled()) {
+		cred_t  *credp;
+		pid_t   cpid;
+
 		/* Using UDP MLP requires SCM_UCRED from user */
 		if (connp->conn_mlp_type != mlptSingle &&
 		    !attrs.udpattr_credset) {
@@ -6104,25 +6216,35 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 			    tx__ip__log__info__output__udp6,
 			    char *, "MLP mp(1) lacks SCM_UCRED attr(2) on q(3)",
 			    mblk_t *, mp1, udpattrs_t *, &attrs, queue_t *, q);
-			*error = ECONNREFUSED;
+			*error = EINVAL;
 			rw_exit(&udp->udp_rwlock);
 			mutex_exit(&connp->conn_lock);
 			goto done;
 		}
 		/*
 		 * update label option for this UDP socket if
-		 * - the destination has changed, or
-		 * - the UDP socket is MLP
+		 * - the destination has changed,
+		 * - the UDP socket is MLP, or
+		 * - the cred attached to the mblk changed.
 		 */
-		if ((opt_present ||
+		credp = msg_getcred(mp, &cpid);
+		if (opt_present ||
 		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6lastdst, &ip6_dst) ||
-		    connp->conn_mlp_type != mlptSingle) &&
-		    (*error = udp_update_label_v6(q, mp, &ip6_dst,
-		    &update_lastdst)) != 0) {
-			rw_exit(&udp->udp_rwlock);
-			mutex_exit(&connp->conn_lock);
-			goto done;
+		    connp->conn_mlp_type != mlptSingle ||
+		    credp != udp->udp_last_cred) {
+			if ((*error = udp_update_label_v6(q, mp, &ip6_dst))
+			    != 0) {
+				rw_exit(&udp->udp_rwlock);
+				mutex_exit(&connp->conn_lock);
+				goto done;
+			}
+			update_lastdst = B_TRUE;
 		}
+		/*
+		 * Attach the effective cred to the mblk to ensure future
+		 * routing decisions will be based on it's label.
+		 */
+		mblk_setcred(mp, udp->udp_effective_cred, cpid);
 	}
 
 	if (update_lastdst) {
@@ -8398,9 +8520,27 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		mlpport = connp->conn_anon_port ? PMAPPORT : port;
 		mlptype = tsol_mlp_port_type(zone, IPPROTO_UDP, mlpport,
 		    addrtype);
+
+		/*
+		 * It is a coding error to attempt to bind an MLP port
+		 * without first setting SOL_SOCKET/SCM_UCRED.
+		 */
 		if (mlptype != mlptSingle &&
-		    (connp->conn_mlp_type == mlptSingle ||
-		    secpolicy_net_bindmlp(cr) != 0)) {
+		    connp->conn_mlp_type == mlptSingle) {
+			rw_enter(&udp->udp_rwlock, RW_WRITER);
+			udp->udp_pending_op = -1;
+			rw_exit(&udp->udp_rwlock);
+			connp->conn_anon_port = B_FALSE;
+			connp->conn_mlp_type = mlptSingle;
+			return (EINVAL);
+		}
+
+		/*
+		 * It is an access violation to attempt to bind an MLP port
+		 * without NET_BINDMLP privilege.
+		 */
+		if (mlptype != mlptSingle &&
+		    secpolicy_net_bindmlp(cr) != 0) {
 			if (udp->udp_debug) {
 				(void) strlog(UDP_MOD_ID, 0, 1,
 				    SL_ERROR|SL_TRACE,

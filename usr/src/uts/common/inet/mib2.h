@@ -950,6 +950,9 @@ typedef struct mib2_transportMLPEntry {
 
 #define	MIB2_TMEF_PRIVATE	0x00000001	/* MLP on private addresses */
 #define	MIB2_TMEF_SHARED	0x00000002	/* MLP on shared addresses */
+#define	MIB2_TMEF_ANONMLP	0x00000004	/* Anonymous MLP port */
+#define	MIB2_TMEF_MACEXEMPT	0x00000008	/* MAC-Exempt port */
+#define	MIB2_TMEF_IS_LABELED	0x00000010	/* tme_doi & tme_label exists */
 
 /*
  * List of IPv4 source addresses being filtered per interface

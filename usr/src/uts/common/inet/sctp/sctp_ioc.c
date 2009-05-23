@@ -273,6 +273,7 @@ sctp_str_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	/*
 	 * connp->conn_cred is crfree()ed in ipcl_conn_destroy()
 	 */
+	ASSERT(connp->conn_cred == NULL);
 	connp->conn_cred = credp;
 	crhold(connp->conn_cred);
 

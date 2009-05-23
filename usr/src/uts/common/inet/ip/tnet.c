@@ -687,6 +687,9 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
+	if (mp->b_cont != NULL && !pullupmsg(mp, -1))
+		return (B_FALSE);
+
 	if (version == IPV4_VERSION) {
 		ipha = (const ipha_t *)mp->b_rptr;
 		src = &ipha->ipha_src;
@@ -1477,6 +1480,7 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	ipaddr_t	*gw;
 	ip_stack_t	*ipst = ire->ire_ipst;
 	cred_t		*credp;
+	pid_t		pid;
 
 	ASSERT(ire != NULL && mp != NULL);
 	ASSERT(ire->ire_stq != NULL);
@@ -1676,11 +1680,11 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 		goto keep_label;
 
 
-	credp = msg_getcred(mp, NULL);
+	credp = msg_getcred(mp, &pid);
 	if ((af == AF_INET &&
-	    tsol_check_label(credp, &mp, B_FALSE, ipst) != 0) ||
+	    tsol_check_label(credp, &mp, B_FALSE, ipst, pid) != 0) ||
 	    (af == AF_INET6 &&
-	    tsol_check_label_v6(credp, &mp, B_FALSE, ipst) != 0)) {
+	    tsol_check_label_v6(credp, &mp, B_FALSE, ipst, pid) != 0)) {
 		mp = NULL;
 		goto keep_label;
 	}

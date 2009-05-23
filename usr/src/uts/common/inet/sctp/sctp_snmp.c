@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -617,10 +615,20 @@ done:
 				mlp.tme_flags |= MIB2_TMEF_PRIVATE;
 			needattr = B_TRUE;
 		}
-		if (connp->conn_peercred != NULL) {
+		if (connp->conn_anon_mlp) {
+			mlp.tme_flags |= MIB2_TMEF_ANONMLP;
+			needattr = B_TRUE;
+		}
+		if (connp->conn_mac_exempt) {
+			mlp.tme_flags |= MIB2_TMEF_MACEXEMPT;
+			needattr = B_TRUE;
+		}
+		if (connp->conn_fully_bound &&
+		    connp->conn_effective_cred != NULL) {
 			ts_label_t *tsl;
 
-			tsl = crgetlabel(connp->conn_peercred);
+			tsl = crgetlabel(connp->conn_effective_cred);
+			mlp.tme_flags |= MIB2_TMEF_IS_LABELED;
 			mlp.tme_doi = label2doi(tsl);
 			mlp.tme_label = *label2bslabel(tsl);
 			needattr = B_TRUE;

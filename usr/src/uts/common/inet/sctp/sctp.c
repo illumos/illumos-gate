@@ -1489,6 +1489,7 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 	sctp->sctp_cpid = curproc->p_pid;
 	sctp->sctp_open_time = lbolt64;
 
+	ASSERT(sctp_connp->conn_cred == NULL);
 	sctp_connp->conn_cred = credp;
 	crhold(credp);
 
@@ -2356,6 +2357,10 @@ sctp_conn_clear(conn_t *connp)
 		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
 	if (connp->conn_ipsec_opt_mp != NULL)
 		freemsg(connp->conn_ipsec_opt_mp);
+	if (connp->conn_cred != NULL)
+		crfree(connp->conn_cred);
+	if (connp->conn_effective_cred != NULL)
+		crfree(connp->conn_effective_cred);
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
 	netstack_rele(connp->conn_netstack);

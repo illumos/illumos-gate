@@ -672,9 +672,9 @@ ipcl_conn_destroy(conn_t *connp)
 
 	DTRACE_PROBE1(conn__destroy, conn_t *, connp);
 
-	if (connp->conn_peercred != NULL) {
-		crfree(connp->conn_peercred);
-		connp->conn_peercred = NULL;
+	if (connp->conn_effective_cred != NULL) {
+		crfree(connp->conn_effective_cred);
+		connp->conn_effective_cred = NULL;
 	}
 
 	if (connp->conn_cred != NULL) {
@@ -1094,6 +1094,9 @@ check_exempt_conflict_v4(conn_t *connp, ip_stack_t *ipst)
 		/* If neither is exempt, then there's no conflict */
 		if (!connp->conn_mac_exempt && !tconn->conn_mac_exempt)
 			continue;
+		/* We are only concerned about sockets for a different zone */
+		if (connp->conn_zoneid == tconn->conn_zoneid)
+			continue;
 		/* If both are bound to different specific addrs, ok */
 		if (connp->conn_src != INADDR_ANY &&
 		    tconn->conn_src != INADDR_ANY &&
@@ -1121,6 +1124,9 @@ check_exempt_conflict_v6(conn_t *connp, ip_stack_t *ipst)
 			continue;
 		/* If neither is exempt, then there's no conflict */
 		if (!connp->conn_mac_exempt && !tconn->conn_mac_exempt)
+			continue;
+		/* We are only concerned about sockets for a different zone */
+		if (connp->conn_zoneid == tconn->conn_zoneid)
 			continue;
 		/* If both are bound to different addrs, ok */
 		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6) &&
@@ -1604,7 +1610,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH(connp, protocol, ipha->ipha_dst,
 			    lport) && (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt)))
+			    (unlabeled && connp->conn_mac_exempt &&
+			    shared_addr)))
 				break;
 		}
 
@@ -1680,7 +1687,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 			if (IPCL_UDP_MATCH(connp, lport, ipha->ipha_dst,
 			    fport, ipha->ipha_src) &&
 			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt)))
+			    (unlabeled && connp->conn_mac_exempt &&
+			    shared_addr)))
 				break;
 		}
 
@@ -1803,7 +1811,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 			if (IPCL_BIND_MATCH_V6(connp, protocol,
 			    ip6h->ip6_dst, lport) &&
 			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt)))
+			    (unlabeled && connp->conn_mac_exempt &&
+			    shared_addr)))
 				break;
 		}
 
@@ -1878,7 +1887,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 			if (IPCL_UDP_MATCH_V6(connp, lport, ip6h->ip6_dst,
 			    fport, ip6h->ip6_src) &&
 			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt)))
+			    (unlabeled && connp->conn_mac_exempt &&
+			    shared_addr)))
 				break;
 		}
 
@@ -2020,7 +2030,7 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 		}
 
 		if (IPCL_ZONE_MATCH(connp, zoneid) ||
-		    (unlabeled && connp->conn_mac_exempt))
+		    (unlabeled && connp->conn_mac_exempt && shared_addr))
 			break;
 	}
 	/*
@@ -2342,7 +2352,7 @@ ipcl_conn_cleanup(conn_t *connp)
 	ASSERT(connp->conn_idl == NULL);
 #endif
 	ASSERT(connp->conn_ipsec_opt_mp == NULL);
-	ASSERT(connp->conn_peercred == NULL);
+	ASSERT(connp->conn_effective_cred == NULL);
 	ASSERT(connp->conn_netstack == NULL);
 
 	ASSERT(connp->conn_helper_info == NULL);

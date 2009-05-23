@@ -3242,7 +3242,7 @@ extern void	icmp_time_exceeded(queue_t *, mblk_t *, uint8_t, zoneid_t,
 extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t,
     ip_stack_t *);
 extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t, zoneid_t, ip_stack_t *);
-cred_t		*ip_best_cred(mblk_t *, conn_t *);
+cred_t		*ip_best_cred(mblk_t *, conn_t *, pid_t *);
 extern mblk_t	*ip_bind_v4(queue_t *, mblk_t *, conn_t *);
 extern	boolean_t ip_bind_ipsec_policy_set(conn_t *, mblk_t *);
 extern	int	ip_bind_laddr_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t,

@@ -143,6 +143,8 @@ typedef	struct icmp_s {
 	uint_t		icmp_label_len;		/* length of security label */
 	uint_t		icmp_label_len_v6;	/* sec. part of sticky opt */
 	in6_addr_t 	icmp_v6lastdst;		/* most recent destination */
+	cred_t		*icmp_last_cred;	/* most recent credentials */
+	cred_t		*icmp_effective_cred;	/* cred with effective label */
 	icmp_stack_t	*icmp_is;		/* Stack instance */
 	size_t		icmp_xmit_hiwat;
 	size_t		icmp_xmit_lowat;

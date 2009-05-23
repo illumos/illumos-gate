@@ -4309,18 +4309,19 @@ ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags, zoneid_t zoneid,
 /*
  * Used to determine the most accurate cred_t to use for TX.
  * First priority is SCM_UCRED having set the label in the message,
- * which is used for MLP on UDP. Second priority is the peers label (aka
- * conn_peercred), which is needed for MLP on TCP/SCTP. Last priority is the
- * open credentials.
+ * which is used for MLP on UDP. Second priority is the open credentials
+ * with the peer's label (aka conn_effective_cred), which is needed for
+ * MLP on TCP/SCTP and for MAC-Exempt. Last priority is the open credentials.
  */
 cred_t *
-ip_best_cred(mblk_t *mp, conn_t *connp)
+ip_best_cred(mblk_t *mp, conn_t *connp, pid_t *pidp)
 {
 	cred_t *cr;
 
-	cr = msg_getcred(mp, NULL);
+	cr = msg_getcred(mp, pidp);
 	if (cr != NULL && crgetlabel(cr) != NULL)
 		return (cr);
+	*pidp = NOPID;
 	return (CONN_CRED(connp));
 }
 
@@ -4809,6 +4810,7 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	boolean_t	ire_requested = B_FALSE;
 	boolean_t	ipsec_policy_set = B_FALSE;
 	ts_label_t	*tsl = NULL;
+	cred_t		*effective_cred = NULL;
 
 	if (mpp)
 		mp = *mpp;
@@ -4817,8 +4819,6 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
 	}
-	if (cr != NULL)
-		tsl = crgetlabel(cr);
 
 	src_ire = dst_ire = NULL;
 
@@ -4828,6 +4828,44 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	connp->conn_fully_bound = B_FALSE;
 
 	zoneid = IPCL_ZONEID(connp);
+
+	/*
+	 * Check whether Trusted Solaris policy allows communication with this
+	 * host, and pretend that the destination is unreachable if not.
+	 *
+	 * This is never a problem for TCP, since that transport is known to
+	 * compute the label properly as part of the tcp_rput_other T_BIND_ACK
+	 * handling.  If the remote is unreachable, it will be detected at that
+	 * point, so there's no reason to check it here.
+	 *
+	 * Note that for sendto (and other datagram-oriented friends), this
+	 * check is done as part of the data path label computation instead.
+	 * The check here is just to make non-TCP connect() report the right
+	 * error.
+	 */
+	if (is_system_labeled() && !IPCL_IS_TCP(connp)) {
+		if ((error = tsol_check_dest(cr, &dst_addr, IPV4_VERSION,
+		    connp->conn_mac_exempt, &effective_cred)) != 0) {
+			if (ip_debug > 2) {
+				pr_addr_dbg(
+				    "ip_bind_connected_v4:"
+				    " no label for dst %s\n",
+				    AF_INET, &dst_addr);
+			}
+			goto bad_addr;
+		}
+
+		/*
+		 * tsol_check_dest() may have created a new cred with
+		 * a modified security label. Use that cred if it exists
+		 * for ire lookups.
+		 */
+		if (effective_cred == NULL) {
+			tsl = crgetlabel(cr);
+		} else {
+			tsl = crgetlabel(effective_cred);
+		}
+	}
 
 	if (CLASSD(dst_addr)) {
 		/* Pick up an IRE_BROADCAST */
@@ -4901,34 +4939,6 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 				error = EHOSTUNREACH;
 			goto bad_addr;
 		}
-	}
-
-	/*
-	 * We now know that routing will allow us to reach the destination.
-	 * Check whether Trusted Solaris policy allows communication with this
-	 * host, and pretend that the destination is unreachable if not.
-	 *
-	 * This is never a problem for TCP, since that transport is known to
-	 * compute the label properly as part of the tcp_rput_other T_BIND_ACK
-	 * handling.  If the remote is unreachable, it will be detected at that
-	 * point, so there's no reason to check it here.
-	 *
-	 * Note that for sendto (and other datagram-oriented friends), this
-	 * check is done as part of the data path label computation instead.
-	 * The check here is just to make non-TCP connect() report the right
-	 * error.
-	 */
-	if (dst_ire != NULL && is_system_labeled() &&
-	    !IPCL_IS_TCP(connp) &&
-	    tsol_compute_label(cr, dst_addr, NULL,
-	    connp->conn_mac_exempt, ipst) != 0) {
-		error = EHOSTUNREACH;
-		if (ip_debug > 2) {
-			pr_addr_dbg("ip_bind_connected_v4:"
-			    " no label for dst %s\n",
-			    AF_INET, &dst_addr);
-		}
-		goto bad_addr;
 	}
 
 	/*
@@ -5265,6 +5275,8 @@ bad_addr:
 		IRE_REFRELE(md_dst_ire);
 	if (lso_dst_ire != NULL)
 		IRE_REFRELE(lso_dst_ire);
+	if (effective_cred != NULL)
+		crfree(effective_cred);
 	return (error);
 }
 
@@ -7337,7 +7349,7 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		while ((connp != NULL) &&
 		    (!IPCL_UDP_MATCH(connp, dstport, dst, srcport, src) ||
 		    (!IPCL_ZONE_MATCH(connp, zoneid) &&
-		    !(unlabeled && connp->conn_mac_exempt)))) {
+		    !(unlabeled && connp->conn_mac_exempt && shared_addr)))) {
 			/*
 			 * We keep searching since the conn did not match,
 			 * or its zone did not match and it is not either
@@ -20474,7 +20486,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	ipif_t		*dst_ipif;
 	boolean_t	multirt_need_resolve = B_FALSE;
 	mblk_t		*copy_mp = NULL;
-	int		err;
+	int		err = 0;
 	zoneid_t	zoneid;
 	boolean_t	need_decref = B_FALSE;
 	boolean_t	ignore_dontroute = B_FALSE;
@@ -20559,8 +20571,12 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	if (is_system_labeled() &&
 	    (ipha->ipha_version_and_hdr_length & 0xf0) == (IPV4_VERSION << 4) &&
 	    !connp->conn_ulp_labeled) {
-		err = tsol_check_label(BEST_CRED(mp, connp), &mp,
-		    connp->conn_mac_exempt, ipst);
+		cred_t	*credp;
+		pid_t	pid;
+
+		credp = BEST_CRED(mp, connp, &pid);
+		err = tsol_check_label(credp, &mp,
+		    connp->conn_mac_exempt, ipst, pid);
 		ipha = (ipha_t *)mp->b_rptr;
 		if (err != 0) {
 			first_mp = mp;
@@ -21044,17 +21060,26 @@ hdrtoosmall:
 		}
 
 		/* This function assumes that mp points to an IPv4 packet. */
-		if (is_system_labeled() && q->q_next == NULL &&
+		if (is_system_labeled() &&
 		    (*mp->b_rptr & 0xf0) == (IPV4_VERSION << 4) &&
-		    !connp->conn_ulp_labeled) {
-			err = tsol_check_label(BEST_CRED(mp, connp), &mp,
-			    connp->conn_mac_exempt, ipst);
+		    (connp == NULL || !connp->conn_ulp_labeled)) {
+			cred_t	*credp;
+			pid_t	pid;
+
+			if (connp != NULL) {
+				credp = BEST_CRED(mp, connp, &pid);
+				err = tsol_check_label(credp, &mp,
+				    connp->conn_mac_exempt, ipst, pid);
+			} else if ((credp = msg_getcred(mp, &pid)) != NULL) {
+				err = tsol_check_label(credp, &mp,
+				    B_FALSE, ipst, pid);
+			}
 			ipha = (ipha_t *)mp->b_rptr;
-			if (first_mp != NULL)
+			if (mctl_present)
 				first_mp->b_cont = mp;
+			else
+				first_mp = mp;
 			if (err != 0) {
-				if (first_mp == NULL)
-					first_mp = mp;
 				if (err == EINVAL)
 					goto icmp_parameter_problem;
 				ip2dbg(("ip_wput: label check failed (%d)\n",

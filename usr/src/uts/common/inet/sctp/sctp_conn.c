@@ -64,7 +64,8 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	uint_t			sctp_options;
 	conn_t			*aconnp;
 	conn_t			*lconnp;
-	cred_t			*cr;
+	cred_t			*credp;
+	ts_label_t		*tslp;
 	sctp_stack_t	*sctps = listener->sctp_sctps;
 
 	sctph = (sctp_hdr_t *)(cr_pkt->b_rptr + ip_hdr_len);
@@ -76,20 +77,31 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	ich = (sctp_chunk_hdr_t *)(iack + 1);
 	init = (sctp_init_chunk_t *)(ich + 1);
 
+	/*
+	 * If this is an MLP connection, packets are to be
+	 * exchanged using the security label of the received
+	 * Cookie packet instead of the server application's label.
+	 * Create an effective cred for the connection by attaching
+	 * the received packet's security label to the server
+	 * application's cred.
+	 */
+	aconnp = acceptor->sctp_connp;
+	lconnp = listener->sctp_connp;
+	ASSERT(aconnp->conn_effective_cred == NULL);
+	if (lconnp->conn_mlp_type != mlptSingle &&
+	    (credp = msg_getcred(cr_pkt, NULL)) != NULL &&
+	    (tslp = crgetlabel(credp)) != NULL) {
+		if ((aconnp->conn_effective_cred = copycred_from_tslabel(
+		    aconnp->conn_cred, tslp, KM_NOSLEEP)) == NULL)
+			return (ENOMEM);
+	}
+
 	/* acceptor isn't in any fanouts yet, so don't need to hold locks */
 	ASSERT(acceptor->sctp_faddrs == NULL);
 	err = sctp_get_addrparams(acceptor, listener, cr_pkt, ich,
 	    &sctp_options);
 	if (err != 0)
 		return (err);
-
-	aconnp = acceptor->sctp_connp;
-	lconnp = listener->sctp_connp;
-	if (lconnp->conn_mlp_type != mlptSingle) {
-		cr = aconnp->conn_peercred = msg_getcred(cr_pkt, NULL);
-		if (cr != NULL)
-			crhold(cr);
-	}
 
 	if ((err = sctp_set_hdraddrs(acceptor)) != 0)
 		return (err);

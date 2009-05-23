@@ -692,7 +692,7 @@ static void	tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2);
 static void	tcp_random_init(void);
 int		tcp_random(void);
 static void	tcp_tli_accept(tcp_t *tcp, mblk_t *mp);
-static void	tcp_accept_swap(tcp_t *listener, tcp_t *acceptor,
+static int	tcp_accept_swap(tcp_t *listener, tcp_t *acceptor,
 		    tcp_t *eager);
 static int	tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp);
 static in_port_t tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
@@ -1652,9 +1652,9 @@ tcp_cleanup(tcp_t *tcp)
 		crfree(connp->conn_cred);
 		connp->conn_cred = NULL;
 	}
-	if (connp->conn_peercred != NULL) {
-		crfree(connp->conn_peercred);
-		connp->conn_peercred = NULL;
+	if (connp->conn_effective_cred != NULL) {
+		crfree(connp->conn_effective_cred);
+		connp->conn_effective_cred = NULL;
 	}
 	ipcl_conn_cleanup(connp);
 	connp->conn_flags = IPCL_TCPCONN;
@@ -1891,6 +1891,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	mblk_t	*ok_mp;
 	mblk_t	*mp1;
 	tcp_stack_t	*tcps = listener->tcp_tcps;
+	int	error;
 
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tcr)) {
 		tcp_err_ack(listener, mp, TPROTO, 0);
@@ -2145,7 +2146,15 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	 * the tcp_accept_swap is done since it would be dangerous to
 	 * let the application start using the new fd prior to the swap.
 	 */
-	tcp_accept_swap(listener, acceptor, eager);
+	error = tcp_accept_swap(listener, acceptor, eager);
+	if (error != 0) {
+		CONN_DEC_REF(acceptor->tcp_connp);
+		CONN_DEC_REF(eager->tcp_connp);
+		freemsg(ok_mp);
+		/* Original mp has been freed by now, so use mp1 */
+		tcp_err_ack(listener, mp1, TSYSERR, error);
+		return;
+	}
 
 	/*
 	 * tcp_accept_swap unlinks eager from listener but does not drop
@@ -2346,10 +2355,11 @@ finish:
  *
  * See the block comment on top of tcp_accept() and tcp_wput_accept().
  */
-static void
+static int
 tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 {
 	conn_t	*econnp, *aconnp;
+	cred_t	*effective_cred = NULL;
 
 	ASSERT(eager->tcp_rq == listener->tcp_rq);
 	ASSERT(eager->tcp_detached && !acceptor->tcp_detached);
@@ -2357,6 +2367,27 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	ASSERT(!TCP_IS_SOCKET(acceptor));
 	ASSERT(!TCP_IS_SOCKET(eager));
 	ASSERT(!TCP_IS_SOCKET(listener));
+
+	econnp = eager->tcp_connp;
+	aconnp = acceptor->tcp_connp;
+
+	/*
+	 * Trusted Extensions may need to use a security label that is
+	 * different from the acceptor's label on MLP and MAC-Exempt
+	 * sockets. If this is the case, the required security label
+	 * already exists in econnp->conn_effective_cred. Use this label
+	 * to generate a new effective cred for the acceptor.
+	 *
+	 * We allow for potential application level retry attempts by
+	 * checking for transient errors before modifying eager.
+	 */
+	if (is_system_labeled() &&
+	    aconnp->conn_cred != NULL && econnp->conn_effective_cred != NULL) {
+		effective_cred = copycred_from_tslabel(aconnp->conn_cred,
+		    crgetlabel(econnp->conn_effective_cred), KM_NOSLEEP);
+		if (effective_cred == NULL)
+			return (ENOMEM);
+	}
 
 	acceptor->tcp_detached = B_TRUE;
 	/*
@@ -2376,9 +2407,6 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	eager->tcp_rq = acceptor->tcp_rq;
 	eager->tcp_wq = acceptor->tcp_wq;
 
-	econnp = eager->tcp_connp;
-	aconnp = acceptor->tcp_connp;
-
 	eager->tcp_rq->q_ptr = econnp;
 	eager->tcp_wq->q_ptr = econnp;
 
@@ -2397,22 +2425,24 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 
 	econnp->conn_dev = aconnp->conn_dev;
 	econnp->conn_minor_arena = aconnp->conn_minor_arena;
+
 	ASSERT(econnp->conn_minor_arena != NULL);
 	if (eager->tcp_cred != NULL)
 		crfree(eager->tcp_cred);
 	eager->tcp_cred = econnp->conn_cred = aconnp->conn_cred;
+	if (econnp->conn_effective_cred != NULL)
+		crfree(econnp->conn_effective_cred);
+	econnp->conn_effective_cred = effective_cred;
+	aconnp->conn_cred = NULL;
+	ASSERT(aconnp->conn_effective_cred == NULL);
+
 	ASSERT(econnp->conn_netstack == aconnp->conn_netstack);
 	ASSERT(eager->tcp_tcps == acceptor->tcp_tcps);
-
-	aconnp->conn_cred = NULL;
 
 	econnp->conn_zoneid = aconnp->conn_zoneid;
 	econnp->conn_allzones = aconnp->conn_allzones;
 
-	econnp->conn_mac_exempt = aconnp->conn_mac_exempt;
 	aconnp->conn_mac_exempt = B_FALSE;
-
-	ASSERT(aconnp->conn_peercred == NULL);
 
 	/* Do the IPC initialization */
 	CONN_INC_REF(econnp);
@@ -2423,6 +2453,7 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 
 	/* Done with old IPC. Drop its ref on its connp */
 	CONN_DEC_REF(aconnp);
+	return (0);
 }
 
 
@@ -5055,7 +5086,6 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
 		int added;
 
 		if (tsol_compute_label(cr, tcp->tcp_remote, optbuf,
-		    connp->conn_mac_exempt,
 		    tcp->tcp_tcps->tcps_netstack->netstack_ip) != 0)
 			return (B_FALSE);
 
@@ -5080,7 +5110,6 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
 		uchar_t optbuf[TSOL_MAX_IPV6_OPTION];
 
 		if (tsol_compute_label_v6(cr, &tcp->tcp_remote_v6, optbuf,
-		    connp->conn_mac_exempt,
 		    tcp->tcp_tcps->tcps_netstack->netstack_ip) != 0)
 			return (B_FALSE);
 		if (tsol_update_sticky(&tcp->tcp_sticky_ipp,
@@ -5396,31 +5425,71 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	econnp->conn_cred = eager->tcp_cred = credp = connp->conn_cred;
 	crhold(credp);
 
-	/*
-	 * If the caller has the process-wide flag set, then default to MAC
-	 * exempt mode.  This allows read-down to unlabeled hosts.
-	 */
-	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		econnp->conn_mac_exempt = B_TRUE;
-
+	ASSERT(econnp->conn_effective_cred == NULL);
 	if (is_system_labeled()) {
 		cred_t *cr;
+		ts_label_t *tsl;
 
-		if (connp->conn_mlp_type != mlptSingle) {
-			cr = econnp->conn_peercred = msg_getcred(mp, NULL);
-			if (cr != NULL)
-				crhold(cr);
-			else
-				cr = econnp->conn_cred;
-			DTRACE_PROBE2(mlp_syn_accept, conn_t *,
-			    econnp, cred_t *, cr)
+		/*
+		 * If this is an MLP connection or a MAC-Exempt connection
+		 * with an unlabeled node, packets are to be
+		 * exchanged using the security label of the received
+		 * SYN packet instead of the server application's label.
+		 */
+		if ((cr = msg_getcred(mp, NULL)) != NULL &&
+		    (tsl = crgetlabel(cr)) != NULL &&
+		    (connp->conn_mlp_type != mlptSingle ||
+		    (connp->conn_mac_exempt == B_TRUE &&
+		    (tsl->tsl_flags & TSLF_UNLABELED)))) {
+			if ((econnp->conn_effective_cred =
+			    copycred_from_tslabel(econnp->conn_cred,
+			    tsl, KM_NOSLEEP)) != NULL) {
+				DTRACE_PROBE2(
+				    syn_accept_peerlabel,
+				    conn_t *, econnp, cred_t *,
+				    econnp->conn_effective_cred);
+			} else {
+				DTRACE_PROBE3(
+				    tx__ip__log__error__set__eagercred__tcp,
+				    char *,
+				    "SYN mp(1) label on eager connp(2) failed",
+				    mblk_t *, mp, conn_t *, econnp);
+				goto error3;
+			}
 		} else {
-			cr = econnp->conn_cred;
 			DTRACE_PROBE2(syn_accept, conn_t *,
-			    econnp, cred_t *, cr)
+			    econnp, cred_t *, econnp->conn_cred)
 		}
 
-		if (!tcp_update_label(eager, cr)) {
+		/*
+		 * Verify the destination is allowed to receive packets
+		 * at the security label of the SYN-ACK we are generating.
+		 * tsol_check_dest() may create a new effective cred for
+		 * this connection with a modified label or label flags.
+		 */
+		if (IN6_IS_ADDR_V4MAPPED(&econnp->conn_remv6)) {
+			uint32_t dst;
+			IN6_V4MAPPED_TO_IPADDR(&econnp->conn_remv6, dst);
+			err = tsol_check_dest(CONN_CRED(econnp), &dst,
+			    IPV4_VERSION, B_FALSE, &cr);
+		} else {
+			err = tsol_check_dest(CONN_CRED(econnp),
+			    &econnp->conn_remv6, IPV6_VERSION,
+			    B_FALSE, &cr);
+		}
+		if (err != 0)
+			goto error3;
+		if (cr != NULL) {
+			if (econnp->conn_effective_cred != NULL)
+				crfree(econnp->conn_effective_cred);
+			econnp->conn_effective_cred = cr;
+		}
+
+		/*
+		 * Generate the security label to be used in the text of
+		 * this connection's outgoing packets.
+		 */
+		if (!tcp_update_label(eager, CONN_CRED(econnp))) {
 			DTRACE_PROBE3(
 			    tx__ip__log__error__connrequest__tcp,
 			    char *, "eager connp(1) label on SYN mp(2) failed",
@@ -6098,6 +6167,23 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 		goto failed;
 	}
 
+	/*
+	 * Verify the destination is allowed to receive packets
+	 * at the security label of the connection we are initiating.
+	 * tsol_check_dest() may create a new effective cred for this
+	 * connection with a modified label or label flags.
+	 */
+	if (is_system_labeled()) {
+		ASSERT(tcp->tcp_connp->conn_effective_cred == NULL);
+		if ((error = tsol_check_dest(CONN_CRED(tcp->tcp_connp),
+		    &dstaddr, IPV4_VERSION, tcp->tcp_connp->conn_mac_exempt,
+		    &tcp->tcp_connp->conn_effective_cred)) != 0) {
+			if (error != EHOSTUNREACH)
+				error = -TSYSERR;
+			goto failed;
+		}
+	}
+
 	tcp->tcp_ipha->ipha_dst = dstaddr;
 	IN6_IPADDR_TO_V4MAPPED(dstaddr, &tcp->tcp_remote_v6);
 
@@ -6280,6 +6366,23 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 	    (dstport == tcp->tcp_lport)) {
 		error = -TBADADDR;
 		goto failed;
+	}
+
+	/*
+	 * Verify the destination is allowed to receive packets
+	 * at the security label of the connection we are initiating.
+	 * check_dest may create a new effective cred for this
+	 * connection with a modified label or label flags.
+	 */
+	if (is_system_labeled()) {
+		ASSERT(tcp->tcp_connp->conn_effective_cred == NULL);
+		if ((error = tsol_check_dest(CONN_CRED(tcp->tcp_connp),
+		    dstaddrp, IPV6_VERSION, tcp->tcp_connp->conn_mac_exempt,
+		    &tcp->tcp_connp->conn_effective_cred)) != 0) {
+			if (error != EHOSTUNREACH)
+				error = -TSYSERR;
+			goto failed;
+		}
 	}
 
 	tcp->tcp_ip6h->ip6_dst = *dstaddrp;
@@ -7411,6 +7514,11 @@ tcp_reinit(tcp_t *tcp)
 	ipcl_hash_remove(tcp->tcp_connp);
 	conn_delete_ire(tcp->tcp_connp, NULL);
 	tcp_ipsec_cleanup(tcp);
+
+	if (tcp->tcp_connp->conn_effective_cred != NULL) {
+		crfree(tcp->tcp_connp->conn_effective_cred);
+		tcp->tcp_connp->conn_effective_cred = NULL;
+	}
 
 	if (tcp->tcp_conn_req_max != 0) {
 		/*
@@ -15811,10 +15919,20 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 					mlp.tme_flags |= MIB2_TMEF_PRIVATE;
 				needattr = B_TRUE;
 			}
-			if (connp->conn_peercred != NULL) {
+			if (connp->conn_anon_mlp) {
+				mlp.tme_flags |= MIB2_TMEF_ANONMLP;
+				needattr = B_TRUE;
+			}
+			if (connp->conn_mac_exempt) {
+				mlp.tme_flags |= MIB2_TMEF_MACEXEMPT;
+				needattr = B_TRUE;
+			}
+			if (connp->conn_fully_bound &&
+			    connp->conn_effective_cred != NULL) {
 				ts_label_t *tsl;
 
-				tsl = crgetlabel(connp->conn_peercred);
+				tsl = crgetlabel(connp->conn_effective_cred);
+				mlp.tme_flags |= MIB2_TMEF_IS_LABELED;
 				mlp.tme_doi = label2doi(tsl);
 				mlp.tme_label = *label2bslabel(tsl);
 				needattr = B_TRUE;
@@ -16445,7 +16563,7 @@ tcp_timer(void *arg)
 	 * But we assume that SYN's are not dropped for loopback connections.
 	 */
 	if (tcp->tcp_state == TCPS_SYN_SENT) {
-		mblk_setcred(mp, tcp->tcp_cred, tcp->tcp_cpid);
+		mblk_setcred(mp, CONN_CRED(tcp->tcp_connp), tcp->tcp_cpid);
 	}
 
 	tcp->tcp_csuna = tcp->tcp_snxt;
@@ -18364,12 +18482,12 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	 * both getpeerucred and TX.
 	 * If this is a SYN then the caller already set db_credp so
 	 * that getpeerucred will work. But if TX is in use we might have
-	 * a conn_peercred which is different, and we need to use that cred
-	 * to make TX use the correct label and label dependent route.
+	 * a conn_effective_cred which is different, and we need to use that
+	 * cred to make TX use the correct label and label dependent route.
 	 */
 	if (is_system_labeled()) {
 		cr = msg_getcred(mp, &cpid);
-		if (cr == NULL || connp->conn_peercred != NULL)
+		if (cr == NULL || connp->conn_effective_cred != NULL)
 			mblk_setcred(mp, CONN_CRED(connp), cpid);
 	}
 
@@ -21922,6 +22040,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	queue_t		*q = tcps->tcps_g_q;
 	tcp_t		*tcp;
 	cred_t		*cr;
+	pid_t		pid;
 	mblk_t		*nmp;
 	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
 
@@ -22070,18 +22189,18 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 	}
 
 	/* IP trusts us to set up labels when required. */
-	if (is_system_labeled() && (cr = msg_getcred(mp, NULL)) != NULL &&
+	if (is_system_labeled() && (cr = msg_getcred(mp, &pid)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		int err;
 
 		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION)
 			err = tsol_check_label(cr, &mp,
 			    tcp->tcp_connp->conn_mac_exempt,
-			    tcps->tcps_netstack->netstack_ip);
+			    tcps->tcps_netstack->netstack_ip, pid);
 		else
 			err = tsol_check_label_v6(cr, &mp,
 			    tcp->tcp_connp->conn_mac_exempt,
-			    tcps->tcps_netstack->netstack_ip);
+			    tcps->tcps_netstack->netstack_ip, pid);
 		if (mctl_present)
 			ipsec_mp->b_cont = mp;
 		else
@@ -25513,6 +25632,8 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
 	mblk_t	*lsoi;
 	int	retval;
 	tcph_t	*tcph;
+	cred_t	*ecr;
+	ts_label_t	*tsl;
 	uint32_t	mss;
 	queue_t	*q = tcp->tcp_rq;
 	conn_t	*connp = tcp->tcp_connp;
@@ -25673,11 +25794,49 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
 		syn_mp = tcp_xmit_mp(tcp, NULL, 0, NULL, NULL,
 		    tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 		if (syn_mp) {
+			/*
+			 * cr contains the cred from the thread calling
+			 * connect().
+			 *
+			 * If no thread cred is available, use the
+			 * socket creator's cred instead. If still no
+			 * cred, drop the request rather than risk a
+			 * panic on production systems.
+			 */
 			if (cr == NULL) {
-				cr = tcp->tcp_cred;
+				cr = CONN_CRED(connp);
 				pid = tcp->tcp_cpid;
+				ASSERT(cr != NULL);
+				if (cr != NULL) {
+					mblk_setcred(syn_mp, cr, pid);
+				} else {
+					error = ECONNABORTED;
+					goto ipcl_rm;
+				}
+
+			/*
+			 * If an effective security label exists for
+			 * the connection, create a copy of the thread's
+			 * cred but with the effective label attached.
+			 */
+			} else if (is_system_labeled() &&
+			    connp->conn_effective_cred != NULL &&
+			    (tsl = crgetlabel(connp->
+			    conn_effective_cred)) != NULL) {
+				if ((ecr = copycred_from_tslabel(cr,
+				    tsl, KM_NOSLEEP)) == NULL) {
+					error = ENOMEM;
+					goto ipcl_rm;
+				}
+				mblk_setcred(syn_mp, ecr, pid);
+				crfree(ecr);
+
+			/*
+			 * Default to using the thread's cred unchanged.
+			 */
+			} else {
+				mblk_setcred(syn_mp, cr, pid);
 			}
-			mblk_setcred(syn_mp, cr, pid);
 			tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
 		}
 	after_syn_sent:

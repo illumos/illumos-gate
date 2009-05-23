@@ -316,7 +316,7 @@ struct conn_s {
 	in6_addr_t	conn_nexthop_v6;	/* nexthop IP address */
 	uchar_t		conn_broadcast_ttl; 	/* IP_BROADCAST_TTL */
 #define	conn_nexthop_v4	V4_PART_OF_V6(conn_nexthop_v6)
-	cred_t		*conn_peercred;		/* Peer TX label, if any */
+	cred_t		*conn_effective_cred;	/* Effective TX credentials */
 	int		conn_rtaware; 		/* RT_AWARE sockopt value */
 	kcondvar_t	conn_sq_cv;		/* For non-STREAMS socket IO */
 	kthread_t	*conn_sq_caller;	/* Caller of squeue sync ops */
@@ -343,15 +343,15 @@ struct conn_s {
 
 /*
  * These two macros are used by TX. First priority is SCM_UCRED having
- * set the label in the mblk. Second priority is the peers label (aka
- * conn_peercred). Last priority is the open credentials.
- * BEST_CRED takes all three into account in the above order.
+ * set the label in the mblk. Second priority is the open credentials with
+ * peer's label (aka conn_effective_cred). Last priority is the open
+ * credentials. BEST_CRED takes all three into account in the above order.
  * CONN_CRED is for connection-oriented cases when we don't need to look
  * at the mblk.
  */
-#define	CONN_CRED(connp) ((connp)->conn_peercred == NULL ? \
-	(connp)->conn_cred : (connp)->conn_peercred)
-#define	BEST_CRED(mp, connp) ip_best_cred(mp, connp)
+#define	CONN_CRED(connp) ((connp)->conn_effective_cred == NULL ? \
+	(connp)->conn_cred : (connp)->conn_effective_cred)
+#define	BEST_CRED(mp, connp, pidp) ip_best_cred(mp, connp, pidp)
 
 /*
  * connf_t - connection fanout data.

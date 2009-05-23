@@ -4235,9 +4235,10 @@ ah_auth_in_done(mblk_t *ipsec_in)
 			*dest = *(dest - newpos);
 	}
 	/*
-	 * The db_credp should be in mp (if needed) and never in phdr_mp
+	 * If a db_credp exists in phdr_mp, it must also exist in mp.
 	 */
-	ASSERT(msg_getcred(phdr_mp, NULL) == NULL);
+	ASSERT(DB_CRED(phdr_mp) == NULL ||
+	    msg_getcred(mp, NULL) != NULL);
 
 	freeb(phdr_mp);
 	ipsec_in->b_cont = mp;

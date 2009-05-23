@@ -843,6 +843,17 @@ icmp_close_free(conn_t *connp)
 		icmp->icmp_sticky_hdrs = NULL;
 		icmp->icmp_sticky_hdrs_len = 0;
 	}
+
+	if (icmp->icmp_last_cred != NULL) {
+		crfree(icmp->icmp_last_cred);
+		icmp->icmp_last_cred = NULL;
+	}
+
+	if (icmp->icmp_effective_cred != NULL) {
+		crfree(icmp->icmp_effective_cred);
+		icmp->icmp_effective_cred = NULL;
+	}
+
 	ip6_pkt_free(&icmp->icmp_sticky_ipp);
 
 	/*
@@ -4232,9 +4243,16 @@ icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
 	ipha_t	*ipha;
 	int	ip_hdr_length;
 	int	tp_hdr_len;
+	int	error;
+	uchar_t	ip_snd_opt[IP_MAX_OPT_LENGTH];
+	uint32_t ip_snd_opt_len = 0;
 	mblk_t	*mp1;
 	uint_t	pkt_len;
 	ip_opt_info_t optinfo;
+	pid_t	cpid;
+	cred_t	*cr;
+
+	rw_enter(&icmp->icmp_rwlock, RW_READER);
 
 	optinfo.ip_opt_flags = 0;
 	optinfo.ip_opt_ill_index = 0;
@@ -4245,12 +4263,57 @@ icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
 			ASSERT(icmp != NULL);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 			freemsg(mp);
+			rw_exit(&icmp->icmp_rwlock);
 			return (0);
 		}
 		ipha = (ipha_t *)mp->b_rptr;
 	}
 	ipha->ipha_version_and_hdr_length =
 	    (IP_VERSION<<4) | (ip_hdr_length>>2);
+
+	/*
+	 * Check if our saved options are valid; update if not.
+	 * TSOL Note: Since we are not in WRITER mode, ICMP packets
+	 * to different destination may require different labels,
+	 * or worse, ICMP packets to same IP address may require
+	 * different labels due to use of shared all-zones address.
+	 * We use conn_lock to ensure that lastdst, ip_snd_options,
+	 * and ip_snd_options_len are consistent for the current
+	 * destination and are updated atomically.
+	 */
+	mutex_enter(&connp->conn_lock);
+	if (is_system_labeled()) {
+		/*
+		 * Recompute the Trusted Extensions security label if
+		 * we're not going to the same destination as last
+		 * time or the cred attached to the received mblk
+		 * changed.
+		 */
+		cr = msg_getcred(mp, &cpid);
+		if (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
+		    V4_PART_OF_V6(icmp->icmp_v6lastdst) != ipha->ipha_dst ||
+		    cr != icmp->icmp_last_cred) {
+			error = icmp_update_label(icmp, mp, ipha->ipha_dst);
+			if (error != 0) {
+				mutex_exit(&connp->conn_lock);
+				rw_exit(&icmp->icmp_rwlock);
+				return (error);
+			}
+		}
+		/*
+		 * Apply credentials with modified security label if they
+		 * exist. icmp_update_label() may have generated these
+		 * credentials for packets to unlabeled remote nodes.
+		 */
+		if (icmp->icmp_effective_cred != NULL)
+			mblk_setcred(mp, icmp->icmp_effective_cred, cpid);
+	}
+
+	if (icmp->icmp_ip_snd_options_len > 0) {
+		ip_snd_opt_len = icmp->icmp_ip_snd_options_len;
+		bcopy(icmp->icmp_ip_snd_options, ip_snd_opt, ip_snd_opt_len);
+	}
+	mutex_exit(&connp->conn_lock);
 
 	/*
 	 * For the socket of SOCK_RAW type, the checksum is provided in the
@@ -4290,6 +4353,7 @@ icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
 				freemsg(mp);
+				rw_exit(&icmp->icmp_rwlock);
 				return (0);
 			}
 			ipha = (ipha_t *)mp->b_rptr;
@@ -4300,12 +4364,14 @@ icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
 		 * then send an error and abort the processing.
 		 */
 		pkt_len = ntohs(ipha->ipha_length)
-		    + icmp->icmp_ip_snd_options_len;
+		    + ip_snd_opt_len;
 		if (pkt_len > IP_MAXPACKET) {
+			rw_exit(&icmp->icmp_rwlock);
 			return (EMSGSIZE);
 		}
 		if (!(mp1 = allocb(ip_hdr_length + is->is_wroff_extra +
 		    tp_hdr_len, BPRI_LO))) {
+			rw_exit(&icmp->icmp_rwlock);
 			return (ENOMEM);
 		}
 		mp1->b_rptr += is->is_wroff_extra;
@@ -4320,8 +4386,7 @@ icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
 
 		/* Add options */
 		ipha = (ipha_t *)mp1->b_rptr;
-		bcopy(icmp->icmp_ip_snd_options, &ipha[1],
-		    icmp->icmp_ip_snd_options_len);
+		bcopy(ip_snd_opt, &ipha[1], ip_snd_opt_len);
 
 		/* Drop IP header and transport header from original */
 		(void) adjmsg(mp, IP_SIMPLE_HDR_LENGTH + tp_hdr_len);
@@ -4349,6 +4414,8 @@ icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
 		}
 	}
 
+	rw_exit(&icmp->icmp_rwlock);
+
 	ip_output_options(connp, mp, q, IP_WPUT, &optinfo);
 	return (0);
 }
@@ -4360,7 +4427,9 @@ icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
 	icmp_stack_t		*is = icmp->icmp_is;
 	conn_t			*connp = icmp->icmp_connp;
-	cred_t			*cr;
+	cred_t	*cred;
+	cred_t	*msg_cred;
+	cred_t	*effective_cred;
 
 	/*
 	 * All Solaris components should pass a db_credp
@@ -4368,19 +4437,63 @@ icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 	 * On production kernels we return an error to be robust against
 	 * random streams modules sitting on top of us.
 	 */
-	cr = msg_getcred(mp, NULL);
-	ASSERT(cr != NULL);
-	if (cr == NULL)
+	cred = msg_cred = msg_getcred(mp, NULL);
+	ASSERT(cred != NULL);
+	if (cred == NULL)
 		return (EINVAL);
 
-	err = tsol_compute_label(cr, dst,
-	    opt_storage, connp->conn_mac_exempt,
-	    is->is_netstack->netstack_ip);
-	if (err == 0) {
-		err = tsol_update_options(&icmp->icmp_ip_snd_options,
-		    &icmp->icmp_ip_snd_options_len, &icmp->icmp_label_len,
-		    opt_storage);
+	/*
+	 * Verify the destination is allowed to receive packets at
+	 * the security label of the message data. check_dest()
+	 * may create a new effective cred for this message
+	 * with a modified label or label flags.
+	 */
+	if ((err = tsol_check_dest(cred, &dst, IPV4_VERSION,
+	    connp->conn_mac_exempt, &effective_cred)) != 0)
+		goto done;
+	if (effective_cred != NULL)
+		cred = effective_cred;
+
+	/*
+	 * Calculate the security label to be placed in the text
+	 * of the message (if any).
+	 */
+	if ((err = tsol_compute_label(cred, dst, opt_storage,
+	    is->is_netstack->netstack_ip)) != 0)
+		goto done;
+
+	/*
+	 * Insert the security label in the cached ip options,
+	 * removing any old label that may exist.
+	 */
+	if ((err = tsol_update_options(&icmp->icmp_ip_snd_options,
+	    &icmp->icmp_ip_snd_options_len, &icmp->icmp_label_len,
+	    opt_storage)) != 0)
+		goto done;
+
+	/*
+	 * Save the destination address and cred we used to generate
+	 * the security label text.
+	 */
+	IN6_IPADDR_TO_V4MAPPED(dst, &icmp->icmp_v6lastdst);
+	if (cred != icmp->icmp_effective_cred) {
+		if (icmp->icmp_effective_cred != NULL)
+			crfree(icmp->icmp_effective_cred);
+		crhold(cred);
+		icmp->icmp_effective_cred = cred;
 	}
+
+	if (msg_cred != icmp->icmp_last_cred) {
+		if (icmp->icmp_last_cred != NULL)
+			crfree(icmp->icmp_last_cred);
+		crhold(msg_cred);
+		icmp->icmp_last_cred = msg_cred;
+	}
+
+done:
+	if (effective_cred != NULL)
+		crfree(effective_cred);
+
 	if (err != 0) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		DTRACE_PROBE4(
@@ -4389,7 +4502,6 @@ icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 		    icmp_t *, icmp, char *, opt_storage, mblk_t *, mp);
 		return (err);
 	}
-	IN6_IPADDR_TO_V4MAPPED(dst, &icmp->icmp_v6lastdst);
 	return (0);
 }
 
@@ -4402,7 +4514,6 @@ static void
 icmp_wput(queue_t *q, mblk_t *mp)
 {
 	uchar_t	*rptr = mp->b_rptr;
-	ipha_t	*ipha;
 	mblk_t	*mp1;
 #define	tudr ((struct T_unitdata_req *)rptr)
 	size_t	ip_len;
@@ -4425,32 +4536,6 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	case M_DATA:
 		if (icmp->icmp_hdrincl) {
 			ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
-			ipha = (ipha_t *)mp->b_rptr;
-			if (mp->b_wptr - mp->b_rptr < IP_SIMPLE_HDR_LENGTH) {
-				if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
-					BUMP_MIB(&is->is_rawip_mib,
-					    rawipOutErrors);
-					freemsg(mp);
-					return;
-				}
-				ipha = (ipha_t *)mp->b_rptr;
-			}
-			/*
-			 * If this connection was used for v6 (inconceivable!)
-			 * or if we have a new destination, then it's time to
-			 * figure a new label.
-			 */
-			if (is_system_labeled() &&
-			    (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
-			    V4_PART_OF_V6(icmp->icmp_v6lastdst) !=
-			    ipha->ipha_dst)) {
-				error = icmp_update_label(icmp, mp,
-				    ipha->ipha_dst);
-				if (error != 0) {
-					icmp_ud_err(q, mp, error);
-					return;
-				}
-			}
 			error = icmp_wput_hdrincl(q, connp, mp, icmp, NULL);
 			if (error != 0)
 				icmp_ud_err(q, mp, error);
@@ -4602,6 +4687,10 @@ raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
 	icmp_stack_t *is = icmp->icmp_is;
 	int	ip_hdr_length;
 	ip_opt_info_t	optinfo;
+	uchar_t	ip_snd_opt[IP_MAX_OPT_LENGTH];
+	uint32_t ip_snd_opt_len = 0;
+	pid_t	cpid;
+	cred_t	*cr;
 
 	optinfo.ip_opt_flags = 0;
 	optinfo.ip_opt_ill_index = 0;
@@ -4615,22 +4704,58 @@ raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
 	if (v4dst == INADDR_ANY)
 		v4dst = htonl(INADDR_LOOPBACK);
 
-	/* Check if our saved options are valid; update if not */
-	if (is_system_labeled() &&
-	    (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
-	    V4_PART_OF_V6(icmp->icmp_v6lastdst) != v4dst)) {
-		int error = icmp_update_label(icmp, mp, v4dst);
-
-		if (error != 0)
-			return (error);
-	}
-
 	/* Protocol 255 contains full IP headers */
 	if (icmp->icmp_hdrincl)
 		return (icmp_wput_hdrincl(q, connp, mp, icmp, pktinfop));
 
+	rw_enter(&icmp->icmp_rwlock, RW_READER);
+
+	/*
+	 * Check if our saved options are valid; update if not.
+	 * TSOL Note: Since we are not in WRITER mode, ICMP packets
+	 * to different destination may require different labels,
+	 * or worse, ICMP packets to same IP address may require
+	 * different labels due to use of shared all-zones address.
+	 * We use conn_lock to ensure that lastdst, ip_snd_options,
+	 * and ip_snd_options_len are consistent for the current
+	 * destination and are updated atomically.
+	 */
+	mutex_enter(&connp->conn_lock);
+	if (is_system_labeled()) {
+
+		/*
+		 * Recompute the Trusted Extensions security label if we're not
+		 * going to the same destination as last time or the cred
+		 * attached to the received mblk changed.
+		 */
+		cr = msg_getcred(mp, &cpid);
+		if (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
+		    V4_PART_OF_V6(icmp->icmp_v6lastdst) != v4dst ||
+		    cr != icmp->icmp_last_cred) {
+			int error = icmp_update_label(icmp, mp, v4dst);
+			if (error != 0) {
+				mutex_exit(&connp->conn_lock);
+				rw_exit(&icmp->icmp_rwlock);
+				return (error);
+			}
+		}
+		/*
+		 * Apply credentials with modified security label if they
+		 * exist. icmp_update_label() may have generated these
+		 * credentials for packets to unlabeled remote nodes.
+		 */
+		if (icmp->icmp_effective_cred != NULL)
+			mblk_setcred(mp, icmp->icmp_effective_cred, cpid);
+	}
+
+	if (icmp->icmp_ip_snd_options_len > 0) {
+		ip_snd_opt_len = icmp->icmp_ip_snd_options_len;
+		bcopy(icmp->icmp_ip_snd_options, ip_snd_opt, ip_snd_opt_len);
+	}
+	mutex_exit(&connp->conn_lock);
+
 	/* Add an IP header */
-	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + icmp->icmp_ip_snd_options_len;
+	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + ip_snd_opt_len;
 	ipha = (ipha_t *)&mp->b_rptr[-ip_hdr_length];
 	if ((uchar_t *)ipha < mp->b_datap->db_base ||
 	    mp->b_datap->db_ref != 1 ||
@@ -4639,6 +4764,7 @@ raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
 		if (!(mp1 = allocb(ip_hdr_length + is->is_wroff_extra,
 		    BPRI_LO))) {
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+			rw_exit(&icmp->icmp_rwlock);
 			return (ENOMEM);
 		}
 		mp1->b_cont = mp;
@@ -4704,6 +4830,7 @@ raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
 	 */
 	if (ip_len > IP_MAXPACKET) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+		rw_exit(&icmp->icmp_rwlock);
 		return (EMSGSIZE);
 	}
 	ipha->ipha_length = htons((uint16_t)ip_len);
@@ -4720,8 +4847,8 @@ raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
 
 	/* Copy in options if any */
 	if (ip_hdr_length > IP_SIMPLE_HDR_LENGTH) {
-		bcopy(icmp->icmp_ip_snd_options,
-		    &ipha[1], icmp->icmp_ip_snd_options_len);
+		bcopy(ip_snd_opt,
+		    &ipha[1], ip_snd_opt_len);
 		/*
 		 * Massage source route putting first source route in ipha_dst.
 		 * Ignore the destination in the T_unitdata_req.
@@ -4729,7 +4856,9 @@ raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
 		(void) ip_massage_options(ipha, is->is_netstack);
 	}
 
+	rw_exit(&icmp->icmp_rwlock);
 	BUMP_MIB(&is->is_rawip_mib, rawipOutDatagrams);
+
 	ip_output_options(connp, mp, q, IP_WPUT, &optinfo);
 	return (0);
 }
@@ -4741,7 +4870,9 @@ icmp_update_label_v6(icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
 	icmp_stack_t		*is = icmp->icmp_is;
 	conn_t			*connp = icmp->icmp_connp;
-	cred_t			*cr;
+	cred_t	*cred;
+	cred_t	*msg_cred;
+	cred_t	*effective_cred;
 
 	/*
 	 * All Solaris components should pass a db_credp
@@ -4749,18 +4880,62 @@ icmp_update_label_v6(icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 	 * On production kernels we return an error to be robust against
 	 * random streams modules sitting on top of us.
 	 */
-	cr = msg_getcred(mp, NULL);
-	ASSERT(cr != NULL);
-	if (cr == NULL)
+	cred = msg_cred = msg_getcred(mp, NULL);
+	ASSERT(cred != NULL);
+	if (cred == NULL)
 		return (EINVAL);
 
-	err = tsol_compute_label_v6(cr, dst,
-	    opt_storage, connp->conn_mac_exempt,
-	    is->is_netstack->netstack_ip);
-	if (err == 0) {
-		err = tsol_update_sticky(&icmp->icmp_sticky_ipp,
-		    &icmp->icmp_label_len_v6, opt_storage);
+	/*
+	 * Verify the destination is allowed to receive packets at
+	 * the security label of the message data. check_dest()
+	 * may create a new effective cred for this message
+	 * with a modified label or label flags.
+	 */
+	if ((err = tsol_check_dest(cred, dst, IPV6_VERSION,
+	    connp->conn_mac_exempt, &effective_cred)) != 0)
+		goto done;
+	if (effective_cred != NULL)
+		cred = effective_cred;
+
+	/*
+	 * Calculate the security label to be placed in the text
+	 * of the message (if any).
+	 */
+	if ((err = tsol_compute_label_v6(cred, dst, opt_storage,
+	    is->is_netstack->netstack_ip)) != 0)
+		goto done;
+
+	/*
+	 * Insert the security label in the cached ip options,
+	 * removing any old label that may exist.
+	 */
+	if ((err = tsol_update_sticky(&icmp->icmp_sticky_ipp,
+	    &icmp->icmp_label_len_v6, opt_storage)) != 0)
+		goto done;
+
+	/*
+	 * Save the destination address and cred we used to generate
+	 * the security label text.
+	 */
+	icmp->icmp_v6lastdst = *dst;
+	if (cred != icmp->icmp_effective_cred) {
+		if (icmp->icmp_effective_cred != NULL)
+			crfree(icmp->icmp_effective_cred);
+		crhold(cred);
+		icmp->icmp_effective_cred = cred;
 	}
+
+	if (msg_cred != icmp->icmp_last_cred) {
+		if (icmp->icmp_last_cred != NULL)
+			crfree(icmp->icmp_last_cred);
+		crhold(msg_cred);
+		icmp->icmp_last_cred = msg_cred;
+	}
+
+done:
+	if (effective_cred != NULL)
+		crfree(effective_cred);
+
 	if (err != 0) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		DTRACE_PROBE4(
@@ -4769,8 +4944,6 @@ icmp_update_label_v6(icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 		    icmp_t *, icmp, char *, opt_storage, mblk_t *, mp);
 		return (err);
 	}
-
-	icmp->icmp_v6lastdst = *dst;
 	return (0);
 }
 
@@ -4790,12 +4963,18 @@ raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp, sin6_t *sin6,
 	icmp_t			*icmp = connp->conn_icmp;
 	icmp_stack_t		*is = icmp->icmp_is;
 	ip6_pkt_t		*tipp;
+	ip6_hbh_t		*hopoptsptr = NULL;
+	uint_t			hopoptslen = 0;
 	uint32_t		csum = 0;
 	uint_t			ignore = 0;
 	uint_t			option_exists = 0, is_sticky = 0;
 	uint8_t			*cp;
 	uint8_t			*nxthdr_ptr;
 	in6_addr_t		ip6_dst;
+	pid_t			cpid;
+	cred_t			*cr;
+
+	rw_enter(&icmp->icmp_rwlock, RW_READER);
 
 	/*
 	 * If the local address is a mapped address return
@@ -4806,6 +4985,7 @@ raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp, sin6_t *sin6,
 	 */
 	if (IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6src)) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+		rw_exit(&icmp->icmp_rwlock);
 		return (EADDRNOTAVAIL);
 	}
 
@@ -4828,17 +5008,42 @@ raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp, sin6_t *sin6,
 		ip6_dst = ipv6_loopback;
 
 	/*
-	 * If we're not going to the same destination as last time, then
-	 * recompute the label required.  This is done in a separate routine to
-	 * avoid blowing up our stack here.
+	 * Check if our saved options are valid; update if not.
+	 * TSOL Note: Since we are not in WRITER mode, ICMP packets
+	 * to different destination may require different labels,
+	 * or worse, ICMP packets to same IP address may require
+	 * different labels due to use of shared all-zones address.
+	 * We use conn_lock to ensure that lastdst, sticky ipp_hopopts,
+	 * and sticky ipp_hopoptslen are consistent for the current
+	 * destination and are updated atomically.
 	 */
-	if (is_system_labeled() &&
-	    !IN6_ARE_ADDR_EQUAL(&icmp->icmp_v6lastdst, &ip6_dst)) {
-		int error = 0;
+	mutex_enter(&connp->conn_lock);
+	if (is_system_labeled()) {
+		/*
+		 * Recompute the Trusted Extensions security label if we're
+		 * not going to the same destination as last time or the cred
+		 * attached to the received mblk changed. This is done in a
+		 * separate routine to avoid blowing up our stack here.
+		 */
+		cr = msg_getcred(mp, &cpid);
+		if (!IN6_ARE_ADDR_EQUAL(&icmp->icmp_v6lastdst, &ip6_dst) ||
+		    cr != icmp->icmp_last_cred) {
+			int error = 0;
+			error = icmp_update_label_v6(icmp, mp, &ip6_dst);
+			if (error != 0) {
+				mutex_exit(&connp->conn_lock);
+				rw_exit(&icmp->icmp_rwlock);
+				return (error);
+			}
+		}
 
-		error = icmp_update_label_v6(icmp, mp, &ip6_dst);
-		if (error != 0)
-			return (error);
+		/*
+		 * Apply credentials with modified security label if they exist.
+		 * icmp_update_label_v6() may have generated these credentials
+		 * for MAC-Exempt connections.
+		 */
+		if (icmp->icmp_effective_cred != NULL)
+			mblk_setcred(mp, icmp->icmp_effective_cred, cpid);
 	}
 
 	/*
@@ -4854,6 +5059,7 @@ raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp, sin6_t *sin6,
 	if ((icmp->icmp_sticky_ipp.ipp_fields == 0) &&
 	    (ipp->ipp_fields == 0)) {
 		/* No sticky options nor ancillary data. */
+		mutex_exit(&connp->conn_lock);
 		goto no_options;
 	}
 
@@ -4870,9 +5076,21 @@ raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp, sin6_t *sin6,
 		} else if (icmp->icmp_sticky_ipp.ipp_fields & IPPF_HOPOPTS) {
 			option_exists |= IPPF_HOPOPTS;
 			is_sticky |= IPPF_HOPOPTS;
-			ip_hdr_len += icmp->icmp_sticky_ipp.ipp_hopoptslen;
+			ASSERT(icmp->icmp_sticky_ipp.ipp_hopoptslen != 0);
+			hopoptsptr = kmem_alloc(
+			    icmp->icmp_sticky_ipp.ipp_hopoptslen, KM_NOSLEEP);
+			if (hopoptsptr == NULL) {
+				mutex_exit(&connp->conn_lock);
+				rw_exit(&icmp->icmp_rwlock);
+				return (ENOMEM);
+			}
+			hopoptslen = icmp->icmp_sticky_ipp.ipp_hopoptslen;
+			bcopy(icmp->icmp_sticky_ipp.ipp_hopopts, hopoptsptr,
+			    hopoptslen);
+			ip_hdr_len += hopoptslen;
 		}
 	}
+	mutex_exit(&connp->conn_lock);
 
 	if (!(ignore & IPPF_RTHDR)) {
 		if (ipp->ipp_fields & IPPF_RTHDR) {
@@ -5022,6 +5240,8 @@ no_options:
 		mp1 = allocb(ip_hdr_len + is->is_wroff_extra, BPRI_LO);
 		if (!mp1) {
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+			kmem_free(hopoptsptr, hopoptslen);
+			rw_exit(&icmp->icmp_rwlock);
 			return (ENOMEM);
 		}
 		mp1->b_cont = mp;
@@ -5138,13 +5358,19 @@ no_options:
 	if (option_exists & IPPF_HOPOPTS) {
 		/* Hop-by-hop options */
 		ip6_hbh_t *hbh = (ip6_hbh_t *)cp;
-		tipp = ANCIL_OR_STICKY_PTR(IPPF_HOPOPTS);
 
 		*nxthdr_ptr = IPPROTO_HOPOPTS;
 		nxthdr_ptr = &hbh->ip6h_nxt;
 
-		bcopy(tipp->ipp_hopopts, cp, tipp->ipp_hopoptslen);
-		cp += tipp->ipp_hopoptslen;
+		if (hopoptslen == 0) {
+			tipp = ANCIL_OR_STICKY_PTR(IPPF_HOPOPTS);
+			bcopy(tipp->ipp_hopopts, cp, tipp->ipp_hopoptslen);
+			cp += tipp->ipp_hopoptslen;
+		} else {
+			bcopy(hopoptsptr, cp, hopoptslen);
+			cp += hopoptslen;
+			kmem_free(hopoptsptr, hopoptslen);
+		}
 	}
 	/*
 	 * En-route destination options
@@ -5224,6 +5450,7 @@ no_options:
 				 */
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
+				rw_exit(&icmp->icmp_rwlock);
 				return (EPROTO);
 			}
 			/*
@@ -5233,6 +5460,7 @@ no_options:
 			if (rth->ip6r_len & 0x1) {
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
+				rw_exit(&icmp->icmp_rwlock);
 				return (EPROTO);
 			}
 			/*
@@ -5251,6 +5479,7 @@ no_options:
 			if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_dst)) {
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
+				rw_exit(&icmp->icmp_rwlock);
 				return (EADDRNOTAVAIL);
 			}
 		}
@@ -5268,6 +5497,7 @@ no_options:
 	 */
 	if (ip_len > IP_MAXPACKET) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+		rw_exit(&icmp->icmp_rwlock);
 		return (EMSGSIZE);
 	}
 	if (icmp->icmp_proto == IPPROTO_ICMPV6 || icmp->icmp_raw_checksum) {
@@ -5292,6 +5522,7 @@ no_options:
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
 				freemsg(mp);
+				rw_exit(&icmp->icmp_rwlock);
 				return (0);
 			}
 			ip6i = (ip6i_t *)mp->b_rptr;
@@ -5316,6 +5547,7 @@ no_options:
 	ip6h->ip6_plen = (uint16_t)ip_len;
 
 	/* We're done. Pass the packet to IP */
+	rw_exit(&icmp->icmp_rwlock);
 	BUMP_MIB(&is->is_rawip_mib, rawipOutDatagrams);
 	ip_output_v6(icmp->icmp_connp, mp, q, IP_WPUT);
 	return (0);

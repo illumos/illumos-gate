@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * from "tnet.h	7.44	02/10/09 SMI; TSOL 2.x"
@@ -27,8 +27,6 @@
 
 #ifndef	_SYS_TSOL_TNET_H
 #define	_SYS_TSOL_TNET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -48,13 +46,16 @@ extern "C" {
 
 extern int tsol_tnrh_chk(tsol_tpent_t *, bslabel_t *, int);
 extern tsol_tnrhc_t *find_rhc(const void *, uchar_t, boolean_t);
-extern int tsol_compute_label(const cred_t *, ipaddr_t, uchar_t *, boolean_t,
+extern int tsol_check_dest(const cred_t *, const void *, uchar_t, boolean_t,
+    cred_t **);
+extern int tsol_compute_label(const cred_t *, ipaddr_t, uchar_t *, 
     ip_stack_t *);
 extern int tsol_compute_label_v6(const cred_t *, const in6_addr_t *, uchar_t *,
-    boolean_t, ip_stack_t *);
-extern int tsol_check_label(const cred_t *, mblk_t **, boolean_t, ip_stack_t *);
-extern int tsol_check_label_v6(const cred_t *, mblk_t **, boolean_t,
     ip_stack_t *);
+extern int tsol_check_label(const cred_t *, mblk_t **, boolean_t,
+    ip_stack_t *, pid_t);
+extern int tsol_check_label_v6(const cred_t *, mblk_t **, boolean_t,
+    ip_stack_t *, pid_t);
 extern int tsol_prepend_option(uchar_t *, ipha_t *, int);
 extern int tsol_prepend_option_v6(uchar_t *, ip6_t *, int);
 extern int tsol_remove_secopt(ipha_t *, int);

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -97,6 +95,22 @@ labelalloc(const bslabel_t *val, uint32_t doi, int flag)
 			bzero(&lab->tsl_label, sizeof (bslabel_t));
 		else
 			bcopy(val, &lab->tsl_label,  sizeof (bslabel_t));
+	}
+	return (lab);
+}
+
+/*
+ * Duplicate an existing ts_label_t to a new one, with only
+ * the current reference.
+ */
+ts_label_t *
+labeldup(const ts_label_t *val, int flag)
+{
+	ts_label_t *lab = kmem_cache_alloc(tslabel_cache, flag);
+
+	if (lab != NULL) {
+		bcopy(val, lab, sizeof (ts_label_t));
+		lab->tsl_ref = 1;
 	}
 	return (lab);
 }

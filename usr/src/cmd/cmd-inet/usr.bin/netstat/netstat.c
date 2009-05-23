@@ -292,6 +292,8 @@ static const char *filter_keys[NFILTERKEYS] = {
 	"af", "outif", "dst", "flags"
 };
 
+static m_label_t *zone_security_label = NULL;
+
 /* Flags on routes */
 #define	FLF_A		0x00000001
 #define	FLF_B		0x00000002
@@ -526,6 +528,18 @@ main(int argc, char **argv)
 		exit(0);
 	}
 
+	/*
+	 * Get this process's security label if the -R switch is set.
+	 * We use this label as the current zone's security label.
+	 */
+	if (RSECflag) {
+		zone_security_label = m_label_alloc(MAC_LABEL);
+		if (zone_security_label == NULL)
+			fatal(errno, "m_label_alloc() failed");
+		if (getplabel(zone_security_label) < 0)
+			fatal(errno, "getplabel() failed");
+	}
+
 	/* Get data structures: priming before iteration */
 	if (family_selected(AF_INET) || family_selected(AF_INET6)) {
 		sd = mibopen();
@@ -632,6 +646,8 @@ main(int argc, char **argv)
 	} /* 'for' loop 1 ends */
 	mibfree(item);
 	(void) close(sd);
+	if (zone_security_label != NULL)
+		m_label_free(zone_security_label);
 
 	return (0);
 }
@@ -4503,12 +4519,13 @@ gather_attrs(const mib_item_t *item, int group, int mib_id, int esize)
 static void
 print_transport_label(const mib2_transportMLPEntry_t *attr)
 {
-	if (!RSECflag || attr == NULL)
+	if (!RSECflag || attr == NULL ||
+	    !(attr->tme_flags & MIB2_TMEF_IS_LABELED))
 		return;
 
 	if (bisinvalid(&attr->tme_label))
 		(void) printf("   INVALID\n");
-	else
+	else if (!blequal(&attr->tme_label, zone_security_label))
 		(void) printf("   %s\n", sl_to_str(&attr->tme_label));
 }
 

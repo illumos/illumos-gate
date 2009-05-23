@@ -185,6 +185,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	ts_label_t	*tsl;
 	conn_t		*connp;
 	cred_t		*cr = NULL;
+	pid_t		pid;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 	ip_stack_t	*ipst;
 
@@ -272,15 +273,15 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 
 	ipst = sctps->sctps_netstack->netstack_ip;
 	connp = sctp->sctp_connp;
-	if (is_system_labeled() && (cr = msg_getcred(inmp, NULL)) != NULL &&
+	if (is_system_labeled() && (cr = msg_getcred(inmp, &pid)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		int err;
 		boolean_t exempt = connp->conn_mac_exempt;
 
 		if (isv4)
-			err = tsol_check_label(cr, &hmp, exempt, ipst);
+			err = tsol_check_label(cr, &hmp, exempt, ipst, pid);
 		else
-			err = tsol_check_label_v6(cr, &hmp, exempt, ipst);
+			err = tsol_check_label_v6(cr, &hmp, exempt, ipst, pid);
 		if (err != 0) {
 			freemsg(hmp);
 			return;

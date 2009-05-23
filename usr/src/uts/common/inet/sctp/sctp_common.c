@@ -484,9 +484,12 @@ sctp_compare_faddrsets(sctp_faddr_t *a1, sctp_faddr_t *a2)
 }
 
 /*
- * Returns 0 on success, -1 on memory allocation failure. If sleep
- * is true, this function should never fail.  The boolean parameter
- * first decides whether the newly created faddr structure should be
+ * Returns 0 on success, ENOMEM on memory allocation failure, EHOSTUNREACH
+ * if the connection credentials fail remote host accreditation or
+ * if the new destination does not support the previously established
+ * connection security label. If sleep is true, this function should
+ * never fail for a memory allocation failure. The boolean parameter
+ * "first" decides whether the newly created faddr structure should be
  * added at the beginning of the list or at the end.
  *
  * Note: caller must hold conn fanout lock.
@@ -496,54 +499,48 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 {
 	sctp_faddr_t	*faddr;
 	mblk_t		*timer_mp;
+	int		err;
 
 	if (is_system_labeled()) {
-		ts_label_t *tsl;
-		tsol_tpc_t *rhtp;
-		int retv;
+		cred_t *effective_cred;
 
-		tsl = crgetlabel(CONN_CRED(sctp->sctp_connp));
-		ASSERT(tsl != NULL);
-
-		/* find_tpc automatically does the right thing with IPv4 */
-		rhtp = find_tpc(addr, IPV6_VERSION, B_FALSE);
-		if (rhtp == NULL)
-			return (EACCES);
-
-		retv = EACCES;
-		if (tsl->tsl_doi == rhtp->tpc_tp.tp_doi) {
-			switch (rhtp->tpc_tp.host_type) {
-			case UNLABELED:
-				/*
-				 * Can talk to unlabeled hosts if any of the
-				 * following are true:
-				 *   1. zone's label matches the remote host's
-				 *	default label,
-				 *   2. mac_exempt is on and the zone dominates
-				 *	the remote host's label, or
-				 *   3. mac_exempt is on and the socket is from
-				 *	the global zone.
-				 */
-				if (blequal(&rhtp->tpc_tp.tp_def_label,
-				    &tsl->tsl_label) ||
-				    (sctp->sctp_mac_exempt &&
-				    (sctp->sctp_zoneid == GLOBAL_ZONEID ||
-				    bldominates(&tsl->tsl_label,
-				    &rhtp->tpc_tp.tp_def_label))))
-					retv = 0;
-				break;
-			case SUN_CIPSO:
-				if (_blinrange(&tsl->tsl_label,
-				    &rhtp->tpc_tp.tp_sl_range_cipso) ||
-				    blinlset(&tsl->tsl_label,
-				    rhtp->tpc_tp.tp_sl_set_cipso))
-					retv = 0;
-				break;
-			}
+		/*
+		 * Verify the destination is allowed to receive packets
+		 * at the security label of the connection we are initiating.
+		 *
+		 * tsol_check_dest() will create a new effective cred for
+		 * this connection with a modified label or label flags only
+		 * if there are changes from the original cred.
+		 *
+		 * conn_effective_cred may be non-NULL if a previous
+		 * faddr was already added or if this is a server
+		 * accepting a connection on a multi-label port.
+		 *
+		 * Accept whatever label we get if this is the first
+		 * destination address for this connection. The security
+		 * label and label flags must match any previuous settings
+		 * for all subsequent destination addresses.
+		 */
+		if (IN6_IS_ADDR_V4MAPPED(addr)) {
+			uint32_t dst;
+			IN6_V4MAPPED_TO_IPADDR(addr, dst);
+			err = tsol_check_dest(CONN_CRED(sctp->sctp_connp),
+			    &dst, IPV4_VERSION, sctp->sctp_mac_exempt,
+			    &effective_cred);
+		} else {
+			err = tsol_check_dest(CONN_CRED(sctp->sctp_connp),
+			    addr, IPV6_VERSION, sctp->sctp_mac_exempt,
+			    &effective_cred);
 		}
-		TPC_RELE(rhtp);
-		if (retv != 0)
-			return (retv);
+		if (err != 0)
+			return (err);
+		if (sctp->sctp_faddrs == NULL &&
+		    sctp->sctp_connp->conn_effective_cred == NULL) {
+			sctp->sctp_connp->conn_effective_cred = effective_cred;
+		} else if (effective_cred != NULL) {
+			crfree(effective_cred);
+			return (EHOSTUNREACH);
+		}
 	}
 
 	if ((faddr = kmem_cache_alloc(sctp_kmem_faddr_cache, sleep)) == NULL)
@@ -1084,7 +1081,6 @@ sctp_v4_label(sctp_t *sctp)
 	int added;
 
 	if (tsol_compute_label(cr, sctp->sctp_ipha->ipha_dst, optbuf,
-	    sctp->sctp_mac_exempt,
 	    sctp->sctp_sctps->sctps_netstack->netstack_ip) != 0)
 		return (EACCES);
 
@@ -1115,7 +1111,6 @@ sctp_v6_label(sctp_t *sctp)
 	const cred_t *cr = CONN_CRED(sctp->sctp_connp);
 
 	if (tsol_compute_label_v6(cr, &sctp->sctp_ip6h->ip6_dst, optbuf,
-	    sctp->sctp_mac_exempt,
 	    sctp->sctp_sctps->sctps_netstack->netstack_ip) != 0)
 		return (EACCES);
 	if (tsol_update_sticky(&sctp->sctp_sticky_ipp, &sctp->sctp_v6label_len,

@@ -486,6 +486,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	boolean_t		initcollision = B_FALSE;
 	boolean_t		linklocal = B_FALSE;
 	cred_t			*cr;
+	pid_t			pid;
 	ts_label_t		*initlabel;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
@@ -593,9 +594,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	 * added to cover this possibility.
 	 */
 	if (sctp->sctp_connp->conn_mlp_type != mlptSingle) {
-		pid_t cpid;
-
-		cr = msg_getcred(initmp, &cpid);
+		cr = msg_getcred(initmp, &pid);
 		if (cr == NULL || (initlabel = crgetlabel(cr)) == NULL) {
 			sctp_send_abort(sctp, sctp_init2vtag(ch),
 			    SCTP_ERR_UNKNOWN, NULL, 0, initmp, 0, B_FALSE);
@@ -609,7 +608,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 			return;
 		}
 		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra,
-		    cr, cpid);
+		    cr, pid);
 		crfree(cr);
 	} else {
 		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra,
@@ -777,7 +776,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 	iackmp->b_cont = errmp;		/*  OK if NULL */
 
-	if (is_system_labeled() && (cr = msg_getcred(iackmp, NULL)) != NULL &&
+	if (is_system_labeled() && (cr = msg_getcred(iackmp, &pid)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		conn_t *connp = sctp->sctp_connp;
 		int err;
@@ -785,11 +784,11 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 		if (isv4)
 			err = tsol_check_label(cr, &iackmp,
 			    connp->conn_mac_exempt,
-			    sctps->sctps_netstack->netstack_ip);
+			    sctps->sctps_netstack->netstack_ip, pid);
 		else
 			err = tsol_check_label_v6(cr, &iackmp,
 			    connp->conn_mac_exempt,
-			    sctps->sctps_netstack->netstack_ip);
+			    sctps->sctps_netstack->netstack_ip, pid);
 		if (err != 0) {
 			sctp_send_abort(sctp, sctp_init2vtag(ch),
 			    SCTP_ERR_AUTH_ERR, NULL, 0, initmp, 0, B_FALSE);
