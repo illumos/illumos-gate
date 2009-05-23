@@ -529,6 +529,24 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->nge_split = NGE_SPLIT_32;
 		break;
 
+	case DEVICE_ID_MCP77_760:
+		dev_param_p->msi = B_FALSE;
+		dev_param_p->msi_x = B_FALSE;
+		dev_param_p->vlan = B_FALSE;
+		dev_param_p->advanced_pm = B_TRUE;
+		dev_param_p->mac_addr_order = B_TRUE;
+		dev_param_p->tx_pause_frame = B_FALSE;
+		dev_param_p->rx_pause_frame = B_FALSE;
+		dev_param_p->jumbo = B_FALSE;
+		dev_param_p->tx_rx_64byte = B_TRUE;
+		dev_param_p->rx_hw_checksum = B_FALSE;
+		dev_param_p->tx_hw_checksum = 0;
+		dev_param_p->desc_type = DESC_HOT;
+		dev_param_p->rx_desc_num = NGE_RECV_SLOTS_DESC_1024;
+		dev_param_p->tx_desc_num = NGE_SEND_SLOTS_DESC_1024;
+		dev_param_p->nge_split = NGE_SPLIT_32;
+		break;
+
 	default:
 		dev_param_p->msi = B_FALSE;
 		dev_param_p->msi_x = B_FALSE;
@@ -697,7 +715,7 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 			break;
 	}
 	if (tries == 10000) {
-		ngep->nge_chip_state = NGE_CHIP_FAULT;
+		ngep->nge_chip_state = NGE_CHIP_ERROR;
 		return (DDI_FAILURE);
 	}
 
@@ -723,7 +741,7 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 		tx_sta.sta_val = nge_reg_get32(ngep, NGE_TX_STA);
 	}
 	if (tries == 1000) {
-		ngep->nge_chip_state = NGE_CHIP_FAULT;
+		ngep->nge_chip_state = NGE_CHIP_ERROR;
 		return (DDI_FAILURE);
 	}
 	nge_reg_put32(ngep, NGE_TX_STA,  tx_sta.sta_val);
@@ -740,7 +758,7 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 		rx_sta.sta_val = nge_reg_get32(ngep, NGE_RX_STA);
 	}
 	if (tries == 1000) {
-		ngep->nge_chip_state = NGE_CHIP_FAULT;
+		ngep->nge_chip_state = NGE_CHIP_ERROR;
 		return (DDI_FAILURE);
 	}
 	nge_reg_put32(ngep, NGE_RX_STA, rx_sta.sta_val);
@@ -954,7 +972,6 @@ nge_chip_reset(nge_t *ngep)
 	uint8_t i;
 	uint32_t regno;
 	uint64_t mac = 0;
-	uint64_t mac_tmp = 0;
 	nge_uni_addr1 uaddr1;
 	nge_cp_cntl ee_cntl;
 	nge_soft_misc soft_misc;
@@ -991,37 +1008,25 @@ nge_chip_reset(nge_t *ngep)
 		mac = uaddr1.addr_bits.addr;
 		mac <<= 32;
 		mac |= nge_reg_get32(ngep, NGE_UNI_ADDR0);
-		if (mac != 0ULL && mac != ~0ULL) {
-			/*
-			 * workaround for the MAC address reversed issue
-			 * on some motherboards
-			 */
-			if (ngep->dev_spec_param.mac_addr_order &&
-			    (ngep->mac_addr_reversion ||
-			    (mac & LOW_24BITS_MASK) == REVERSE_MAC_ELITE ||
-			    (mac & LOW_24BITS_MASK) == REVERSE_MAC_GIGABYTE ||
-			    (mac & LOW_24BITS_MASK) == REVERSE_MAC_ASUS)) {
-				for (i = 0; i < ETHERADDRL; i ++) {
-					mac_tmp <<= 8;
-					mac_tmp += (mac & 0xffULL);
+			ngep->chipinfo.hw_mac_addr = mac;
+			if (ngep->dev_spec_param.mac_addr_order) {
+				for (i = 0; i < ETHERADDRL; i++) {
+					ngep->chipinfo.vendor_addr.addr[i] =
+					    (uchar_t)mac;
+					ngep->cur_uni_addr.addr[i] =
+					    (uchar_t)mac;
 					mac >>= 8;
 				}
-				mac = mac_tmp;
-				nge_reg_put32(ngep,
-				    NGE_UNI_ADDR0, (uint32_t)mac);
-				nge_reg_put32(ngep,
-				    NGE_UNI_ADDR1, (uint32_t)(mac>>32));
-			}
-
-			ngep->chipinfo.hw_mac_addr = mac;
-			for (i = ETHERADDRL; i-- != 0; ) {
-				ngep->chipinfo.vendor_addr.addr[i] =
-				    (uchar_t)mac;
-				ngep->cur_uni_addr.addr[i] = (uchar_t)mac;
-				mac >>= 8;
+			} else {
+				for (i = ETHERADDRL; i-- != 0; ) {
+					ngep->chipinfo.vendor_addr.addr[i] =
+					    (uchar_t)mac;
+					ngep->cur_uni_addr.addr[i] =
+					    (uchar_t)mac;
+					mac >>= 8;
+				}
 			}
 			ngep->chipinfo.vendor_addr.set = 1;
-		}
 	}
 	pci_config_put8(ngep->cfg_handle, PCI_CONF_CACHE_LINESZ,
 	    ngep->chipinfo.clsize);
@@ -1106,7 +1111,8 @@ nge_chip_reset(nge_t *ngep)
 	    ngep->chipinfo.device == DEVICE_ID_MCP55_372 ||
 	    ngep->chipinfo.device == DEVICE_ID_MCP55_373 ||
 	    ngep->chipinfo.device == DEVICE_ID_MCP61_3EE ||
-	    ngep->chipinfo.device == DEVICE_ID_MCP61_3EF) {
+	    ngep->chipinfo.device == DEVICE_ID_MCP61_3EF ||
+	    ngep->chipinfo.device == DEVICE_ID_MCP77_760) {
 
 		pm_cntl2.cntl_val = nge_reg_get32(ngep, NGE_PM_CNTL2);
 		/* bring phy out of coma mode */

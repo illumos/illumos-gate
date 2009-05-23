@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -752,7 +752,6 @@ typedef struct nge {
 	boolean_t		poll;
 	boolean_t		ch_intr_mode;
 	boolean_t		intr_moderation;
-	uint32_t		mac_addr_reversion;
 	uint32_t		recv_count;
 	uint32_t		quiet_time;
 	uint32_t		busy_time;
