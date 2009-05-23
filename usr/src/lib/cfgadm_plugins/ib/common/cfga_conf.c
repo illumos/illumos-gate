@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include "cfga_ib.h"
 #include "cfga_conf.h"
@@ -151,7 +147,8 @@ ib_lex(char *val, char **errmsg)
 	char		*cp = val;
 	ib_token_t	token;
 
-	while ((ch = GETC(file_buf, ibcfg_cntr)) == ' ' || ch == '\t');
+	while ((ch = GETC(file_buf, ibcfg_cntr)) == ' ' || ch == '\t')
+		;
 
 	/* make a note of the beginning of token */
 	ibcfg_btoken = ibcfg_cntr - 1;
@@ -525,16 +522,14 @@ ib_get_services(char **errmsg)
 					    (cfgvar == IB_VPPA_SERVICE) ||
 					    (cfgvar == IB_HCASVC_SERVICE)) {
 						if (ib_service_record_valid(
-						    llptr)) {
-						    if (ib_service_record_add(
-							(char *)llptr, cfgvar)
-							!= CFGA_IB_OK)
-								return (E_O_F);
-							parse_state =
-								IB_CONFIG_VAR;
+						    llptr) &&
+						    ib_service_record_add(
+						    (char *)llptr, cfgvar) !=
+						    CFGA_IB_OK) {
+							return (E_O_F);
 						} else {
 							parse_state =
-								IB_CONFIG_VAR;
+							    IB_CONFIG_VAR;
 						}
 					} else if ((cfgvar == IB_NAME) ||
 					    (cfgvar == IB_CLASS)) {
@@ -984,8 +979,9 @@ ib_delete_service(char **errmsg)
 	}
 
 	if (num_svcs == 1) {
-		(void) snprintf(sbuf, 9, "\"\"; ");
-		skip_len = 2;
+		(void) snprintf(sbuf, 9, "\"\"");
+		sbuf_len = 2;
+		skip_len = 0;
 	} else {
 		if (service_type == IB_PORT_SERVICE) {
 			for (recp = ibcfg_port_head; recp; recp = recp->next) {
@@ -1011,12 +1007,12 @@ ib_delete_service(char **errmsg)
 			}
 		}
 		skip_len = 4;
+		sbuf_len = strlen(sbuf);
+		sbuf[sbuf_len - 2] = '\0';
+		sbuf_len -= 2;
 	}
 
 	tot_len = strlen(service_name) + skip_len;
-	sbuf_len = strlen(sbuf);
-	if (sbuf[sbuf_len - 2] == ',')
-		sbuf[sbuf_len - 2] = ';';
 
 	tmpnamef = tmpnam(ibconf_file);
 	DPRINTF("ib_delete_service: tmpnamef = %s\n", tmpnamef);
@@ -1057,7 +1053,7 @@ ib_delete_service(char **errmsg)
 
 	/* Write the rest of the file as it was */
 	if (write(ibcfg_tmpfd, file_buf + ibcfg_brec + sbuf_len + tot_len,
-	    ibcfg_st.st_size - ibcfg_brec - sbuf_len - skip_len) == -1) {
+	    ibcfg_st.st_size - ibcfg_brec - sbuf_len - tot_len) == -1) {
 		DPRINTF("ib_delete_service: write %s file failed 3\n",
 		    ibconf_file);
 		close(ibcfg_tmpfd);

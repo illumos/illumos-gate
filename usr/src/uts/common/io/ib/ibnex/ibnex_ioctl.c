@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2351,8 +2351,7 @@ ibnex_vppa_conf_entry_delete(char *msg, char *service)
 
 	/* find matching index */
 	for (i = 0; i < nsvcs; i++) {
-		if (strncmp(ibnex.ibnex_vppa_comm_svc_names[i], service,
-		    strlen(service)))
+		if (strcmp(ibnex.ibnex_vppa_comm_svc_names[i], service))
 			continue;
 		found = B_TRUE;
 		match_ndx = i;
@@ -2437,8 +2436,7 @@ ibnex_port_conf_entry_delete(char *msg, char *service)
 
 	/* find matching index */
 	for (i = 0; i < nsvcs; i++) {
-		if (strncmp(ibnex.ibnex_comm_svc_names[i], service,
-		    strlen(service)))
+		if (strcmp(ibnex.ibnex_comm_svc_names[i], service))
 			continue;
 		found = B_TRUE;
 		match_ndx = i;
@@ -2517,8 +2515,7 @@ ibnex_hcasvc_conf_entry_delete(char *msg, char *service)
 
 	/* find matching index */
 	for (i = 0; i < nsvcs; i++) {
-		if (strncmp(ibnex.ibnex_hcasvc_comm_svc_names[i], service,
-		    strlen(service)))
+		if (strcmp(ibnex.ibnex_hcasvc_comm_svc_names[i], service))
 			continue;
 		found = B_TRUE;
 		match_ndx = i;
