@@ -2315,11 +2315,13 @@ iscsid_thread_boot_wd(iscsi_thread_t *thread, void *p)
 			}
 			if ((ihp->hba_persistent_loaded == B_TRUE) &&
 			    (reconfigured == B_FALSE)) {
-				(void) iscsi_reconfig_boot_sess(ihp);
-				iscsid_poke_discovery(ihp,
-				    iSCSIDiscoveryMethodUnknown);
-				(void) iscsid_login_tgt(ihp, NULL,
-				    iSCSIDiscoveryMethodUnknown, NULL);
+				if (iscsi_chk_bootlun_mpxio(ihp) == B_TRUE) {
+					(void) iscsi_reconfig_boot_sess(ihp);
+					iscsid_poke_discovery(ihp,
+					    iSCSIDiscoveryMethodUnknown);
+					(void) iscsid_login_tgt(ihp, NULL,
+					    iSCSIDiscoveryMethodUnknown, NULL);
+				}
 				reconfigured = B_TRUE;
 			}
 			break;

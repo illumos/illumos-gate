@@ -425,7 +425,13 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			ihp->hba_sig	= ISCSI_SIG_HBA;
 			ihp->hba_tran	= tran;
 			ihp->hba_dip	= dip;
-			ihp->hba_service_status = ISCSI_SERVICE_DISABLED;
+			if (iscsiboot_prop == NULL) {
+				ihp->hba_service_status =
+				    ISCSI_SERVICE_DISABLED;
+			} else {
+				ihp->hba_service_status =
+				    ISCSI_SERVICE_ENABLED;
+			}
 			ihp->hba_service_client_count = 0;
 
 			mutex_enter(&iscsi_oid_mutex);
