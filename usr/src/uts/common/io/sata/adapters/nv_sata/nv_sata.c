@@ -199,7 +199,21 @@ static ddi_dma_attr_t buffer_dma_attr = {
 	4,			/* dma_attr_align */
 	1,			/* dma_attr_burstsizes. */
 	1,			/* dma_attr_minxfer */
-	0xffffffffull,		/* dma_attr_max xfer including all cookies */
+	0xffffffffull,		/* dma_attr_maxxfer including all cookies */
+	0xffffffffull,		/* dma_attr_seg */
+	NV_DMA_NSEGS,		/* dma_attr_sgllen */
+	512,			/* dma_attr_granular */
+	0,			/* dma_attr_flags */
+};
+static ddi_dma_attr_t buffer_dma_40bit_attr = {
+	DMA_ATTR_V0,		/* dma_attr_version */
+	0,			/* dma_attr_addr_lo: lowest bus address */
+	0xffffffffffull,	/* dma_attr_addr_hi: */
+	NV_BM_64K_BOUNDARY - 1,	/* dma_attr_count_max i.e for one cookie */
+	4,			/* dma_attr_align */
+	1,			/* dma_attr_burstsizes. */
+	1,			/* dma_attr_minxfer */
+	NV_BM_64K_BOUNDARY - 1,	/* dma_attr_maxxfer including all cookies */
 	0xffffffffull,		/* dma_attr_seg */
 	NV_DMA_NSEGS,		/* dma_attr_sgllen */
 	512,			/* dma_attr_granular */
@@ -525,18 +539,11 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		attach_state |= ATTACH_PROGRESS_CONF_HANDLE;
 
 		/*
-		 * If a device is attached after a suspend/resume, sometimes
-		 * the command register is zero, as it might not be set by
-		 * BIOS or a parent.  Set it again here.
+		 * Set the PCI command register: enable IO/MEM/Master.
 		 */
 		command = pci_config_get16(pci_conf_handle, PCI_CONF_COMM);
-
-		if (command == 0) {
-			cmn_err(CE_WARN, "nv_sata%d: restoring PCI command"
-			    " register", inst);
-			pci_config_put16(pci_conf_handle, PCI_CONF_COMM,
-			    PCI_COMM_IO|PCI_COMM_MAE|PCI_COMM_ME);
-		}
+		pci_config_put16(pci_conf_handle, PCI_CONF_COMM,
+		    command|PCI_COMM_IO|PCI_COMM_MAE|PCI_COMM_ME);
 
 		subclass = pci_config_get8(pci_conf_handle, PCI_CONF_SUBCLASS);
 
@@ -704,16 +711,11 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		/*
-		 * If a device is attached after a suspend/resume, sometimes
-		 * the command register is zero, as it might not be set by
-		 * BIOS or a parent.  Set it again here.
+		 * Set the PCI command register: enable IO/MEM/Master.
 		 */
 		command = pci_config_get16(pci_conf_handle, PCI_CONF_COMM);
-
-		if (command == 0) {
-			pci_config_put16(pci_conf_handle, PCI_CONF_COMM,
-			    PCI_COMM_IO|PCI_COMM_MAE|PCI_COMM_ME);
-		}
+		pci_config_put16(pci_conf_handle, PCI_CONF_COMM,
+		    command|PCI_COMM_IO|PCI_COMM_MAE|PCI_COMM_ME);
 
 		/*
 		 * Need to set bit 2 to 1 at config offset 0x50
@@ -859,11 +861,7 @@ nv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
-		/*
-		 * The PM functions for suspend and resume are incomplete
-		 * and need additional work.  It may or may not work in
-		 * the current state.
-		 */
+
 		NVLOG((NVDBG_INIT, nvc, NULL, "nv_detach: DDI_SUSPEND"));
 
 		for (i = 0; i < NV_MAX_PORTS(nvc); i++) {
@@ -2253,20 +2251,20 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 			uint32_t reg32;
 			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
 			    "rev id is %X and"
-			    " is capable of 40-bit addressing",
+			    " is capable of 40-bit DMA addressing",
 			    nvc->nvc_revid));
-			buffer_dma_attr.dma_attr_addr_hi = 0xffffffffffull;
+			nvc->dma_40bit = B_TRUE;
 			reg32 = pci_config_get32(pci_conf_handle,
 			    NV_SATA_CFG_20);
 			pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
 			    reg32 |NV_40BIT_PRD);
 		} else {
 			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
-			    "40-bit dma disabled by nv_sata_40bit_dma"));
+			    "40-bit DMA disabled by nv_sata_40bit_dma"));
 		}
 	} else {
-		NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "rev is %X and is "
-		    "not capable of 40-bit addressing", nvc->nvc_revid));
+		nv_cmn_err(CE_NOTE, nvp->nvp_ctlp, nvp, "rev id is %X and is "
+		    "not capable of 40-bit DMA addressing", nvc->nvc_revid);
 	}
 }
 
@@ -2392,7 +2390,10 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	stran.sata_tran_hba_rev = SATA_TRAN_HBA_REV_2;
 	stran.sata_tran_hba_dip = nvc->nvc_dip;
-	stran.sata_tran_hba_dma_attr = &buffer_dma_attr;
+	if (nvc->dma_40bit == B_TRUE)
+		stran.sata_tran_hba_dma_attr = &buffer_dma_40bit_attr;
+	else
+		stran.sata_tran_hba_dma_attr = &buffer_dma_attr;
 	stran.sata_tran_hba_num_cports = NV_NUM_CPORTS;
 	stran.sata_tran_hba_features_support =
 	    SATA_CTLF_HOTPLUG | SATA_CTLF_ASN | SATA_CTLF_ATAPI;
@@ -2697,6 +2698,9 @@ ck804_intr(caddr_t arg1, caddr_t arg2)
 	nv_ctl_t *nvc = (nv_ctl_t *)arg1;
 	uint8_t intr_status;
 	ddi_acc_handle_t bar5_hdl = nvc->nvc_bar_hdl[5];
+
+	if (nvc->nvc_state & NV_CTRL_SUSPEND)
+		return (DDI_INTR_UNCLAIMED);
 
 	intr_status = ddi_get8(bar5_hdl, nvc->nvc_ck804_int_status);
 
@@ -3062,6 +3066,9 @@ mcp5x_intr(caddr_t arg1, caddr_t arg2)
 {
 	nv_ctl_t *nvc = (nv_ctl_t *)arg1;
 	int ret;
+
+	if (nvc->nvc_state & NV_CTRL_SUSPEND)
+		return (DDI_INTR_UNCLAIMED);
 
 	ret = mcp5x_intr_port(&(nvc->nvc_port[0]));
 	ret |= mcp5x_intr_port(&(nvc->nvc_port[1]));
@@ -5297,10 +5304,6 @@ mcp5x_set_intr(nv_port_t *nvp, int flag)
 }
 
 
-/*
- * The PM functions for suspend and resume are incomplete and need additional
- * work.  It may or may not work in the current state.
- */
 static void
 nv_resume(nv_port_t *nvp)
 {
@@ -5310,7 +5313,6 @@ nv_resume(nv_port_t *nvp)
 
 	if (nvp->nvp_state & NV_PORT_INACTIVE) {
 		mutex_exit(&nvp->nvp_mutex);
-
 		return;
 	}
 
@@ -5319,6 +5321,7 @@ nv_resume(nv_port_t *nvp)
 	    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
 #endif
 
+	/* Enable interrupt */
 	(*(nvp->nvp_ctlp->nvc_set_intr))(nvp, NV_INTR_CLEAR_ALL|NV_INTR_ENABLE);
 
 	/*
@@ -5326,18 +5329,13 @@ nv_resume(nv_port_t *nvp)
 	 * drive, and/or a drive may have been added or removed.
 	 * Force a reset which will cause a probe and re-establish
 	 * any state needed on the drive.
-	 * nv_reset(nvp);
 	 */
-
 	nv_reset(nvp);
 
 	mutex_exit(&nvp->nvp_mutex);
 }
 
-/*
- * The PM functions for suspend and resume are incomplete and need additional
- * work.  It may or may not work in the current state.
- */
+
 static void
 nv_suspend(nv_port_t *nvp)
 {
@@ -5352,19 +5350,21 @@ nv_suspend(nv_port_t *nvp)
 
 	if (nvp->nvp_state & NV_PORT_INACTIVE) {
 		mutex_exit(&nvp->nvp_mutex);
-
 		return;
 	}
 
-	(*(nvp->nvp_ctlp->nvc_set_intr))(nvp, NV_INTR_DISABLE);
-
 	/*
-	 * power may have been removed to the port and the
-	 * drive, and/or a drive may have been added or removed.
-	 * Force a reset which will cause a probe and re-establish
-	 * any state needed on the drive.
-	 * nv_reset(nvp);
+	 * Stop the timeout handler.
+	 * (It will be restarted in nv_reset() during nv_resume().)
 	 */
+	if (nvp->nvp_timeout_id) {
+		(void) untimeout(nvp->nvp_timeout_id);
+		nvp->nvp_timeout_id = 0;
+	}
+
+	/* Disable interrupt */
+	(*(nvp->nvp_ctlp->nvc_set_intr))(nvp,
+	    NV_INTR_CLEAR_ALL|NV_INTR_DISABLE);
 
 	mutex_exit(&nvp->nvp_mutex);
 }

@@ -97,6 +97,7 @@ typedef struct nv_ctl {
 	void		(*nvc_set_intr)(nv_port_t *nvp, int flag);
 	int		nvc_state;	/* state flags of ctrl see below */
 	uint8_t		nvc_revid;	/* PCI revid of device */
+	boolean_t	dma_40bit;	/* 40bit DMA support */
 
 #ifdef SGPIO_SUPPORT
 	int		nvc_mcp5x_flag;	/* is the controller MCP51/MCP55 */
