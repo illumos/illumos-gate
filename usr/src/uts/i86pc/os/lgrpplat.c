@@ -112,6 +112,23 @@
  * to node IDs.  However, the proximity domain IDs may not map to the
  * equivalent node ID since we want to keep the node IDs numbered from 0 to
  * <number of nodes - 1> to minimize cost of searching and potentially space.
+ *
+ * The code below really tries to do the above.  However, the virtual memory
+ * system expects the memnodes which describe the physical address range for
+ * each NUMA node to be arranged in ascending order by physical address.  (:-(
+ * Otherwise, the kernel will panic in different semi-random places in the VM
+ * system (see CR#6816963).
+ *
+ * Consequently, this module has to try to sort the nodes in ascending order by
+ * each node's starting physical address to try to meet this "constraint" in
+ * the VM system (see lgrp_plat_node_sort()).  Also, the lowest numbered
+ * proximity domain ID in the system is deteremined and used to make the lowest
+ * numbered proximity domain map to node 0 in hopes that the proximity domains
+ * are sorted in ascending order by physical address already even if their IDs
+ * don't start at 0 (see NODE_DOMAIN_HASH() and lgrp_plat_srat_domains()).
+ * Finally, it is important to note that these workarounds may not be
+ * sufficient if/when memory hotplugging is supported and the VM system may
+ * ultimately need to be fixed to handle this....
  */
 
 
@@ -162,10 +179,13 @@
 #define	LGRP_PLAT_PROBE_VENDOR		0x4	/* probe vendor ID register */
 
 /*
- * Hash proximity domain ID into node to domain mapping table using to minimize
- * span of entries used
+ * Hash proximity domain ID into node to domain mapping table "mod" number of
+ * nodes to minimize span of entries used and try to have lowest numbered
+ * proximity domain be node 0
  */
-#define	NODE_DOMAIN_HASH(domain, node_cnt)	((domain) % node_cnt)
+#define	NODE_DOMAIN_HASH(domain, node_cnt) \
+	((lgrp_plat_prox_domain_min == UINT32_MAX) ? (domain) % node_cnt : \
+	    ((domain) - lgrp_plat_prox_domain_min) % node_cnt)
 
 
 /*
@@ -269,6 +289,11 @@ static lgrp_plat_probe_stats_t		lgrp_plat_probe_stats;
 static lgrp_plat_probe_mem_config_t	lgrp_plat_probe_mem_config;
 
 /*
+ * Lowest proximity domain ID seen in ACPI SRAT
+ */
+static uint32_t				lgrp_plat_prox_domain_min = UINT32_MAX;
+
+/*
  * Error code from processing ACPI SRAT
  */
 static int				lgrp_plat_srat_error = 0;
@@ -286,9 +311,19 @@ static int				nlgrps_alloc;
 
 
 /*
+ * Enable finding and using minimum proximity domain ID when hashing
+ */
+int			lgrp_plat_domain_min_enable = 1;
+
+/*
  * Number of nodes in system
  */
 uint_t			lgrp_plat_node_cnt = 1;
+
+/*
+ * Enable sorting nodes in ascending order by starting physical address
+ */
+int			lgrp_plat_node_sort_enable = 1;
 
 /*
  * Configuration Parameters for Probing
@@ -388,6 +423,10 @@ static int	lgrp_plat_node_memory_update(node_domain_map_t *node_domain,
     int node_cnt, node_phys_addr_map_t *node_memory, uint64_t start,
     uint64_t end, uint32_t domain);
 
+static void	lgrp_plat_node_sort(node_domain_map_t *node_domain,
+    int node_cnt, cpu_node_map_t *cpu_node, int cpu_count,
+    node_phys_addr_map_t *node_memory);
+
 static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
     lgrp_plat_probe_mem_config_t *probe_mem_config,
     lgrp_plat_latency_stats_t *lat_stats,
@@ -399,10 +438,12 @@ static int	lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
     node_phys_addr_map_t *node_memory, lgrp_plat_latency_stats_t *lat_stats);
 
 static int	lgrp_plat_process_srat(struct srat *tp,
-    node_domain_map_t *node_domain, cpu_node_map_t *cpu_node, int cpu_count,
+    uint32_t *prox_domain_min, node_domain_map_t *node_domain,
+    cpu_node_map_t *cpu_node, int cpu_count,
     node_phys_addr_map_t *node_memory);
 
-static int	lgrp_plat_srat_domains(struct srat *tp);
+static int	lgrp_plat_srat_domains(struct srat *tp,
+    uint32_t *prox_domain_min);
 
 static void	lgrp_plat_2level_setup(node_phys_addr_map_t *node_memory,
     lgrp_plat_latency_stats_t *lat_stats);
@@ -724,6 +765,7 @@ lgrp_plat_init(void)
 		int	retval;
 
 		retval = lgrp_plat_process_srat(srat_ptr,
+		    &lgrp_plat_prox_domain_min,
 		    lgrp_plat_node_domain, lgrp_plat_cpu_node,
 		    lgrp_plat_apic_ncpus, lgrp_plat_node_memory);
 		if (retval <= 0) {
@@ -1805,6 +1847,150 @@ lgrp_plat_node_memory_update(node_domain_map_t *node_domain, int node_cnt,
 
 
 /*
+ * Have to sort node by starting physical address because VM system (physical
+ * page free list management) assumes and expects memnodes to be sorted in
+ * ascending order by physical address.  If not, the kernel will panic in
+ * potentially a number of different places.  (:-(
+ * NOTE: This workaround will not be sufficient if/when hotplugging memory is
+ *	 supported on x86/x64.
+ */
+static void
+lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
+    cpu_node_map_t *cpu_node, int cpu_count, node_phys_addr_map_t *node_memory)
+{
+	boolean_t	found;
+	int		i;
+	int		j;
+	int		n;
+	boolean_t	sorted;
+	boolean_t	swapped;
+
+	if (!lgrp_plat_node_sort_enable || node_cnt <= 1 ||
+	    node_domain == NULL || node_memory == NULL)
+		return;
+
+	/*
+	 * Sorted already?
+	 */
+	sorted = B_TRUE;
+	for (i = 0; i < node_cnt - 1; i++) {
+		/*
+		 * Skip entries that don't exist
+		 */
+		if (!node_memory[i].exists)
+			continue;
+
+		/*
+		 * Try to find next existing entry to compare against
+		 */
+		found = B_FALSE;
+		for (j = i + 1; j < node_cnt; j++) {
+			if (node_memory[j].exists) {
+				found = B_TRUE;
+				break;
+			}
+		}
+
+		/*
+		 * Done if no more existing entries to compare against
+		 */
+		if (found == B_FALSE)
+			break;
+
+		/*
+		 * Not sorted if starting address of current entry is bigger
+		 * than starting address of next existing entry
+		 */
+		if (node_memory[i].start > node_memory[j].start) {
+			sorted = B_FALSE;
+			break;
+		}
+	}
+
+	/*
+	 * Don't need to sort if sorted already
+	 */
+	if (sorted == B_TRUE)
+		return;
+
+	/*
+	 * Just use bubble sort since number of nodes is small
+	 */
+	n = node_cnt;
+	do {
+		swapped = B_FALSE;
+		n--;
+		for (i = 0; i < n; i++) {
+			/*
+			 * Skip entries that don't exist
+			 */
+			if (!node_memory[i].exists)
+				continue;
+
+			/*
+			 * Try to find next existing entry to compare against
+			 */
+			found = B_FALSE;
+			for (j = i + 1; j <= n; j++) {
+				if (node_memory[j].exists) {
+					found = B_TRUE;
+					break;
+				}
+			}
+
+			/*
+			 * Done if no more existing entries to compare against
+			 */
+			if (found == B_FALSE)
+				break;
+
+			if (node_memory[i].start > node_memory[j].start) {
+				node_phys_addr_map_t	save_addr;
+				node_domain_map_t	save_node;
+
+				/*
+				 * Swap node to proxmity domain ID assignments
+				 */
+				bcopy(&node_domain[i], &save_node,
+				    sizeof (node_domain_map_t));
+				bcopy(&node_domain[j], &node_domain[i],
+				    sizeof (node_domain_map_t));
+				bcopy(&save_node, &node_domain[j],
+				    sizeof (node_domain_map_t));
+
+				/*
+				 * Swap node to physical memory assignments
+				 */
+				bcopy(&node_memory[i], &save_addr,
+				    sizeof (node_phys_addr_map_t));
+				bcopy(&node_memory[j], &node_memory[i],
+				    sizeof (node_phys_addr_map_t));
+				bcopy(&save_addr, &node_memory[j],
+				    sizeof (node_phys_addr_map_t));
+				swapped = B_TRUE;
+			}
+		}
+	} while (swapped == B_TRUE);
+
+	/*
+	 * Check to make sure that CPUs assigned to correct node IDs now since
+	 * node to proximity domain ID assignments may have been changed above
+	 */
+	if (n == node_cnt - 1 || cpu_node == NULL || cpu_count < 1)
+		return;
+	for (i = 0; i < cpu_count; i++) {
+		int		node;
+
+		node = lgrp_plat_domain_to_node(node_domain, node_cnt,
+		    cpu_node[i].prox_domain);
+		if (cpu_node[i].node != node)
+			cpu_node[i].node = node;
+	}
+
+}
+
+
+/*
  * Return time needed to probe from current CPU to memory in given node
  */
 static hrtime_t
@@ -2058,8 +2244,9 @@ lgrp_plat_process_slit(struct slit *tp, uint_t node_cnt,
  * of nodes
  */
 static int
-lgrp_plat_process_srat(struct srat *tp, node_domain_map_t *node_domain,
-    cpu_node_map_t *cpu_node, int cpu_count, node_phys_addr_map_t *node_memory)
+lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
+    node_domain_map_t *node_domain, cpu_node_map_t *cpu_node, int cpu_count,
+    node_phys_addr_map_t *node_memory)
 {
 	struct srat_item	*srat_end;
 	int			i;
@@ -2078,7 +2265,7 @@ lgrp_plat_process_srat(struct srat *tp, node_domain_map_t *node_domain,
 	 * SRAT and return if number of nodes is 1 or less since don't need to
 	 * read SRAT then
 	 */
-	node_cnt = lgrp_plat_srat_domains(tp);
+	node_cnt = lgrp_plat_srat_domains(tp, prox_domain_min);
 	if (node_cnt == 1)
 		return (1);
 	else if (node_cnt <= 0)
@@ -2172,6 +2359,14 @@ lgrp_plat_process_srat(struct srat *tp, node_domain_map_t *node_domain,
 	if (proc_entry_count < cpu_count)
 		return (-5);
 
+	/*
+	 * Need to sort nodes by starting physical address since VM system
+	 * assumes and expects memnodes to be sorted in ascending order by
+	 * physical address
+	 */
+	lgrp_plat_node_sort(node_domain, node_cnt, cpu_node, cpu_count,
+	    node_memory);
+
 	return (node_cnt);
 }
 
@@ -2180,9 +2375,10 @@ lgrp_plat_process_srat(struct srat *tp, node_domain_map_t *node_domain,
  * Return number of proximity domains given in ACPI SRAT
  */
 static int
-lgrp_plat_srat_domains(struct srat *tp)
+lgrp_plat_srat_domains(struct srat *tp, uint32_t *prox_domain_min)
 {
 	int			domain_cnt;
+	uint32_t		domain_min;
 	struct srat_item	*end;
 	int			i;
 	struct srat_item	*item;
@@ -2191,6 +2387,64 @@ lgrp_plat_srat_domains(struct srat *tp)
 
 	if (tp == NULL || !lgrp_plat_srat_enable)
 		return (1);
+
+	/*
+	 * Walk through SRAT to find minimum proximity domain ID
+	 */
+	domain_min = UINT32_MAX;
+	item = tp->list;
+	end = (struct srat_item *)(tp->hdr.len + (uintptr_t)tp);
+	while (item < end) {
+		uint32_t	domain;
+
+		switch (item->type) {
+		case SRAT_PROCESSOR:	/* CPU entry */
+			if (!(item->i.p.flags & SRAT_ENABLED)) {
+				item = (struct srat_item *)((uintptr_t)item +
+				    item->len);
+				continue;
+			}
+			domain = item->i.p.domain1;
+			for (i = 0; i < 3; i++) {
+				domain += item->i.p.domain2[i] <<
+				    ((i + 1) * 8);
+			}
+			break;
+
+		case SRAT_MEMORY:	/* memory entry */
+			if (!(item->i.m.flags & SRAT_ENABLED)) {
+				item = (struct srat_item *)((uintptr_t)item +
+				    item->len);
+				continue;
+			}
+			domain = item->i.m.domain;
+			break;
+
+		case SRAT_X2APIC:	/* x2apic CPU entry */
+			if (!(item->i.xp.flags & SRAT_ENABLED)) {
+				item = (struct srat_item *)((uintptr_t)item +
+				    item->len);
+				continue;
+			}
+			domain = item->i.xp.domain;
+			break;
+
+		default:
+			item = (struct srat_item *)((uintptr_t)item +
+			    item->len);
+			continue;
+		}
+
+		/*
+		 * Keep track of minimum proximity domain ID
+		 */
+		if (domain < domain_min)
+			domain_min = domain;
+
+		item = (struct srat_item *)((uintptr_t)item + item->len);
+	}
+	if (lgrp_plat_domain_min_enable && prox_domain_min != NULL)
+		*prox_domain_min = domain_min;
 
 	/*
 	 * Walk through SRAT, examining each CPU and memory entry to determine
@@ -2207,8 +2461,11 @@ lgrp_plat_srat_domains(struct srat *tp)
 
 		switch (item->type) {
 		case SRAT_PROCESSOR:	/* CPU entry */
-			if (!(item->i.p.flags & SRAT_ENABLED))
-				break;
+			if (!(item->i.p.flags & SRAT_ENABLED)) {
+				item = (struct srat_item *)((uintptr_t)item +
+				    item->len);
+				continue;
+			}
 			domain = item->i.p.domain1;
 			for (i = 0; i < 3; i++) {
 				domain += item->i.p.domain2[i] <<
@@ -2217,19 +2474,27 @@ lgrp_plat_srat_domains(struct srat *tp)
 			break;
 
 		case SRAT_MEMORY:	/* memory entry */
-			if (!(item->i.m.flags & SRAT_ENABLED))
-				break;
+			if (!(item->i.m.flags & SRAT_ENABLED)) {
+				item = (struct srat_item *)((uintptr_t)item +
+				    item->len);
+				continue;
+			}
 			domain = item->i.m.domain;
 			break;
 
 		case SRAT_X2APIC:	/* x2apic CPU entry */
-			if (!(item->i.xp.flags & SRAT_ENABLED))
-				break;
+			if (!(item->i.xp.flags & SRAT_ENABLED)) {
+				item = (struct srat_item *)((uintptr_t)item +
+				    item->len);
+				continue;
+			}
 			domain = item->i.xp.domain;
 			break;
 
 		default:
-			break;
+			item = (struct srat_item *)((uintptr_t)item +
+			    item->len);
+			continue;
 		}
 
 		/*
