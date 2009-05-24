@@ -1129,6 +1129,7 @@ fcoet_process_sol_flogi_rsp(fcoe_frame_t *frm)
 	int ret = FCOE_SUCCESS;
 	fcoet_exchange_t	*xch = FRM2TFM(frm)->tfm_xch;
 	fct_els_t		*els = CMD2ELS(xch->xch_cmd);
+	fcoet_soft_state_t	*ss = FRM2SS(frm);
 
 	if (els->els_resp_payload[0] == ELS_OP_ACC) {
 		/*
@@ -1137,7 +1138,20 @@ fcoet_process_sol_flogi_rsp(fcoe_frame_t *frm)
 		 * initial intel implementation will always assign address for
 		 * you even you are in back-to-back mode (direct P2P).
 		 */
-		mutex_enter(&xch->xch_ss->ss_watch_mutex);
+		mutex_enter(&ss->ss_watch_mutex);
+		if (ss->ss_flags & SS_FLAG_PORT_DISABLED ||
+		    (ss->ss_sol_flogi_state != SFS_FLOGI_INIT &&
+		    ss->ss_sol_flogi_state != SFS_FLOGI_CHECK_TIMEOUT &&
+		    ss->ss_sol_flogi_state != SFS_ABTS_INIT)) {
+			/*
+			 * The status is not correct, this response may be
+			 * obsolete.
+			 */
+			mutex_exit(&ss->ss_watch_mutex);
+			FCOET_LOG("fcoet_process_sol_flogi_rsp",
+			    "FLOGI response is obsolete");
+			return (FCOE_FAILURE);
+		}
 		if (xch->xch_flags & XCH_FLAG_NONFCP_REQ_SENT) {
 			xch->xch_cmd->cmd_lportid = FRM_D_ID(frm);
 			xch->xch_ss->ss_link_info.portid =
@@ -1178,7 +1192,7 @@ fcoet_process_sol_flogi_rsp(fcoe_frame_t *frm)
 			    "FLOGI xch_flags/%x", xch->xch_flags);
 			ret = FCOE_FAILURE;
 		}
-		mutex_exit(&xch->xch_ss->ss_watch_mutex);
+		mutex_exit(&ss->ss_watch_mutex);
 	} else {
 		FCOET_LOG("fcoet_process_sol_flogi_rsp", "FLOGI is rejected");
 		ret = FCOE_FAILURE;

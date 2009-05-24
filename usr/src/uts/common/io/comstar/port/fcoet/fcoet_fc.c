@@ -575,6 +575,12 @@ fcoet_ctl(struct fct_local_port *port, int cmd, void *arg)
 				this_ss->ss_state = FCT_STATE_OFFLINE;
 			}
 		}
+		/*
+		 * Notify the watchdog to do clear work
+		 */
+		mutex_enter(&this_ss->ss_watch_mutex);
+		cv_signal(&this_ss->ss_watch_cv);
+		mutex_exit(&this_ss->ss_watch_mutex);
 		fct_ctl(port->port_lport, FCT_CMD_PORT_OFFLINE_COMPLETE, &st);
 		break;
 
