@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,11 +277,6 @@ typedef struct fst_node {
 	fs_fhandle_t *tn_fh;
 	struct stat64 *tn_st;
 } fst_node_t;
-
-typedef struct path_list {
-	char *pl_path;
-	struct path_list *pl_next;
-} path_list_t;
 
 extern int traverse_post(fs_traverse_t *);
 extern int traverse_pre(fs_traverse_t *);

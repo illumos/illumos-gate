@@ -987,11 +987,9 @@ extern void ndmp_stop_remote_reader();
 
 extern boolean_t match(char *, char *);
 extern char *trim_whitespace(char *);
-extern int fs_getstat(char *, struct fs_fhandle *, struct stat64 *,
-    path_list_t *);
+extern int fs_getstat(char *, struct fs_fhandle *, struct stat64 *);
 extern int fs_readdir(struct fs_fhandle *, char *, long *,
-    char *, int *, struct fs_fhandle *, struct stat64 *,
-    path_list_t *);
+    char *, int *, struct fs_fhandle *, struct stat64 *);
 extern int iscreated(ndmp_lbr_params_t *nlp, char *name, tlm_acls_t *tacl,
     time_t t);
 

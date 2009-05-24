@@ -198,75 +198,18 @@ new_tsp(char *path)
 }
 
 /*
- * Initialize a list for path names
- */
-path_list_t *
-fs_init_pathlist()
-{
-	path_list_t *pl_head;
-
-	pl_head = ndmp_malloc(sizeof (path_list_t));
-	return (pl_head);
-}
-
-/*
- * Free the list of path names
- */
-void
-fs_free_pathlist(path_list_t *pl_head)
-{
-	path_list_t *p = pl_head;
-
-	while (p) {
-		p = pl_head->pl_next;
-		free(pl_head->pl_path);
-		free(pl_head);
-		pl_head = p;
-	}
-}
-
-/*
- * Add a path in the list of path names
- */
-char *
-fs_add_pathlist(char *path, path_list_t **pp)
-{
-	char *tpath;
-
-	if (*pp) {
-		(*pp)->pl_path = strdup(path);
-		if ((*pp)->pl_path == NULL)
-			return (NULL);
-		tpath = (*pp)->pl_path;
-		(*pp)->pl_next = ndmp_malloc(sizeof (path_list_t));
-		if ((*pp)->pl_next == NULL)
-			return (NULL);
-		*pp = (*pp)->pl_next;
-		(*pp)->pl_path = NULL;
-		(*pp)->pl_next = NULL;
-		return (tpath);
-	}
-	return (NULL);
-}
-
-/*
  * Create a file handle and get stats for the given path
  */
 int
-fs_getstat(char *path, fs_fhandle_t *fh, struct stat64 *st, path_list_t **pl)
+fs_getstat(char *path, fs_fhandle_t *fh, struct stat64 *st)
 {
 	if (lstat64(path, st) == -1)
 		return (errno);
 
 	fh->fh_fid = st->st_ino;
 
-	if (!S_ISDIR(st->st_mode)) {
+	if (!S_ISDIR(st->st_mode))
 		fh->fh_fpath = NULL;
-		return (0);
-	}
-
-	if (pl)
-		fh->fh_fpath = fs_add_pathlist(path, pl);
 	else
 		fh->fh_fpath = strdup(path);
 	return (0);
@@ -279,7 +222,7 @@ fs_getstat(char *path, fs_fhandle_t *fh, struct stat64 *st, path_list_t **pl)
 static int
 fs_getdents(int fildes, struct dirent *buf, size_t *nbyte,
     char *pn_path, long *dpos, longlong_t *cookie,
-    long *n_entries, dent_arg_t *darg, path_list_t **pl)
+    long *n_entries, dent_arg_t *darg)
 {
 	struct dirent *ptr;
 	char file_path[PATH_MAX + 1];
@@ -304,13 +247,22 @@ fs_getdents(int fildes, struct dirent *buf, size_t *nbyte,
 		/* LINTED improper alignment */
 		ptr = (struct dirent *)p;
 		*dpos =  ptr->d_off;
+
+		if (rootfs_dot_or_dotdot(ptr->d_name))
+			goto skip_entry;
+
 		(void) snprintf(file_path, PATH_MAX, "%s/", pn_path);
 		(void) strlcat(file_path, ptr->d_name, PATH_MAX);
 		(void) memset(&fh, 0, sizeof (fs_fhandle_t));
 
-		rv = fs_getstat(file_path, &fh, &st, pl);
+		rv = lstat64(file_path, &st);
 		if (rv != 0)
 			break;
+
+		fh.fh_fid = st.st_ino;
+
+		if (S_ISDIR(st.st_mode))
+			goto skip_entry;
 
 		rv = fs_populate_dents(darg, strlen(ptr->d_name),
 		    (char *)ptr->d_name, n_entries, &st, &fh);
@@ -320,6 +272,7 @@ fs_getdents(int fildes, struct dirent *buf, size_t *nbyte,
 			break;
 		}
 
+skip_entry:
 		p = p + ptr->d_reclen;
 		len -= ptr->d_reclen;
 	} while (len);
@@ -335,8 +288,7 @@ fs_getdents(int fildes, struct dirent *buf, size_t *nbyte,
  */
 int
 fs_readdir(fs_fhandle_t *ts_fh, char *path, long *dpos,
-    char *nm, int *el, fs_fhandle_t *efh, struct stat64 *est,
-    path_list_t **pl)
+    char *nm, int *el, fs_fhandle_t *efh, struct stat64 *est)
 {
 	struct dirent *dp;
 	char  file_path[PATH_MAX + 1];
@@ -354,7 +306,7 @@ fs_readdir(fs_fhandle_t *ts_fh, char *path, long *dpos,
 		(void) snprintf(file_path, PATH_MAX, "%s/", path);
 		(void) strlcat(file_path, dp->d_name, PATH_MAX);
 
-		rv = fs_getstat(file_path, efh, est, pl);
+		rv = fs_getstat(file_path, efh, est);
 		if (rv == 0) {
 			*dpos = telldir(dirp);
 			(void) strlcpy(nm, dp->d_name, NAME_MAX);
@@ -388,7 +340,6 @@ traverse_post(struct fs_traverse *ftp)
 	struct stat64 pst, est;
 	traverse_state_t *tsp;
 	struct fst_node pn, en; /* parent and entry nodes */
-	path_list_t *plhead, *plist;
 
 	if (!ftp || !ftp->ft_path || !*ftp->ft_path || !ftp->ft_callbk) {
 		NDMP_LOG(LOG_DEBUG, "Invalid argument");
@@ -417,7 +368,7 @@ traverse_post(struct fs_traverse *ftp)
 	}
 	(void) strcpy(path, ftp->ft_lpath);
 	(void) memset(&pfh, 0, sizeof (pfh));
-	rv = fs_getstat(ftp->ft_lpath, &pfh, &pst, NULL);
+	rv = fs_getstat(ftp->ft_lpath, &pfh, &pst);
 
 	if (rv != 0) {
 		NDMP_LOG(LOG_DEBUG,
@@ -459,13 +410,6 @@ traverse_post(struct fs_traverse *ftp)
 	pn.tn_fh = &tsp->ts_fh;
 	pn.tn_st = &tsp->ts_st;
 
-	if ((plist = fs_init_pathlist()) == NULL) {
-		errno = ENOMEM;
-		free(pfh.fh_fpath);
-		return (-1);
-	}
-	plhead = plist;
-
 	rv = 0;
 	next_dir = 1;
 	do {
@@ -482,10 +426,10 @@ traverse_post(struct fs_traverse *ftp)
 			el = NAME_MAX;
 			rv = fs_readdir(&tsp->ts_fh, pn.tn_path,
 			    &tsp->ts_dpos, nm, &el,
-			    &efh, &est, &plist);
+			    &efh, &est);
 
 			if (rv != 0) {
-				efh.fh_fpath = NULL;
+				free(efh.fh_fpath);
 				traverse_stats.fss_readdir_err++;
 
 				NDMP_LOG(LOG_DEBUG,
@@ -508,7 +452,7 @@ traverse_post(struct fs_traverse *ftp)
 			nm[el] = '\0';
 
 			if (rootfs_dot_or_dotdot(nm)) {
-				efh.fh_fpath = NULL;
+				free(efh.fh_fpath);
 				continue;
 			}
 
@@ -523,7 +467,7 @@ traverse_post(struct fs_traverse *ftp)
 				    path, nm);
 				if (STOP_ONLONG(ftp))
 					rv = ENAMETOOLONG;
-				efh.fh_fpath = NULL;
+				free(efh.fh_fpath);
 				continue;
 			}
 
@@ -536,7 +480,7 @@ traverse_post(struct fs_traverse *ftp)
 				assert(tsp != NULL);
 				if (cstack_push(sp, tsp, 0)) {
 					rv = ENOMEM;
-					efh.fh_fpath = NULL;
+					free(efh.fh_fpath);
 					break;
 				}
 				traverse_stats.fss_pushes++;
@@ -561,7 +505,7 @@ traverse_post(struct fs_traverse *ftp)
 
 				tsp = new_tsp(path);
 				if (!tsp) {
-					efh.fh_fpath = NULL;
+					free(efh.fh_fpath);
 					rv = ENOMEM;
 				} else {
 					next_dir = 1;
@@ -584,7 +528,7 @@ traverse_post(struct fs_traverse *ftp)
 				en.tn_fh = &efh;
 				en.tn_st = &est;
 				rv = CALLBACK(&pn, &en);
-				efh.fh_fpath = NULL;
+				free(efh.fh_fpath);
 				if (VERBOSE(ftp))
 					NDMP_LOG(LOG_DEBUG,
 					    "CALLBACK(%s/%s): %d",
@@ -635,7 +579,7 @@ traverse_post(struct fs_traverse *ftp)
 			en.tn_st = &est;
 
 			rv = CALLBACK(&pn, &en);
-			efh.fh_fpath = NULL;
+			free(efh.fh_fpath);
 			if (VERBOSE(ftp))
 				NDMP_LOG(LOG_DEBUG, "CALLBACK(%s/%s): %d",
 				    pn.tn_path, en.tn_path, rv);
@@ -645,8 +589,10 @@ traverse_post(struct fs_traverse *ftp)
 			 */
 		}
 
-		if (rv != 0 && tsp)
+		if (rv != 0 && tsp) {
+			free(tsp->ts_fh.fh_fpath);
 			free(tsp);
+		}
 
 	} while (rv == 0);
 
@@ -672,11 +618,10 @@ traverse_post(struct fs_traverse *ftp)
 	while (!cstack_pop(sp, (void **)&tsp, (int *)NULL)) {
 		traverse_stats.fss_stack_residue++;
 
+		free(tsp->ts_fh.fh_fpath);
 		free(tsp);
 	}
 
-	fs_free_pathlist(plhead);
-	free(pfh.fh_fpath);
 	cstack_delete(sp);
 	return (rv);
 }
@@ -698,14 +643,13 @@ static int
 traverse_level_nondir(struct fs_traverse *ftp,
     traverse_state_t *tsp, struct fst_node *pnp, dent_arg_t *darg)
 {
-	int pl; /* patth length */
+	int pl; /* path length */
 	int rv;
 	struct fst_node en; /* entry node */
 	longlong_t cookie_verf;
 	fs_dent_info_t *dent;
 	struct dirent *buf;
 	size_t len = 0;
-	path_list_t *plhead, *plist;
 	int fd;
 
 	rv = 0;
@@ -720,12 +664,6 @@ traverse_level_nondir(struct fs_traverse *ftp,
 		free(buf);
 		return (errno);
 	}
-	if ((plist = fs_init_pathlist()) == NULL) {
-		free(buf);
-		(void) close(fd);
-		return (errno);
-	}
-	plhead = plist;
 
 	while (rv == 0) {
 		long i, n_entries;
@@ -733,7 +671,7 @@ traverse_level_nondir(struct fs_traverse *ftp,
 		darg->da_end = 0;
 		n_entries = 0;
 		rv = fs_getdents(fd, buf, &len, pnp->tn_path, &tsp->ts_dpos,
-		    &cookie_verf, &n_entries, darg, &plist);
+		    &cookie_verf, &n_entries, darg);
 		if (n_entries == 0)
 			break;
 		if (rv != 0) {
@@ -759,11 +697,6 @@ traverse_level_nondir(struct fs_traverse *ftp,
 		for (i = 0; i < n_entries; i++, dent = (fs_dent_info_t *)
 		    ((char *)dent + dent->fd_len)) {
 
-			if (rootfs_dot_or_dotdot(dent->fd_name)) {
-				dent->fd_fh.fh_fpath = NULL;
-				continue;
-			}
-
 			if (VERBOSE(ftp))
 				NDMP_LOG(LOG_DEBUG, "i %u dname: \"%s\"",
 				    dent->fd_fh.fh_fid, dent->fd_name);
@@ -775,6 +708,7 @@ traverse_level_nondir(struct fs_traverse *ftp,
 				    pnp->tn_path, dent->fd_name);
 				if (STOP_ONLONG(ftp))
 					rv = -ENAMETOOLONG;
+				free(dent->fd_fh.fh_fpath);
 				continue;
 			}
 
@@ -796,13 +730,10 @@ traverse_level_nondir(struct fs_traverse *ftp,
 					traverse_stats.fss_nondir_skipped++;
 					break;
 				}
-			} else  {
-				dent->fd_fh.fh_fpath = NULL;
 			}
 		}
 	}
 
-	fs_free_pathlist(plhead);
 	free(buf);
 	(void) close(fd);
 	return (rv);
@@ -827,7 +758,6 @@ traverse_level(struct fs_traverse *ftp)
 	traverse_state_t *tsp;
 	struct fst_node pn, en;  /* parent and entry nodes */
 	dent_arg_t darg;
-	path_list_t *plhead, *plist;
 
 	if (!ftp || !ftp->ft_path || !*ftp->ft_path || !ftp->ft_callbk) {
 		NDMP_LOG(LOG_DEBUG, "Invalid argument");
@@ -853,7 +783,7 @@ traverse_level(struct fs_traverse *ftp)
 	}
 	(void) strcpy(path, ftp->ft_lpath);
 	(void) memset(&pfh, 0, sizeof (pfh));
-	rv = fs_getstat(ftp->ft_lpath, &pfh, &pst, NULL);
+	rv = fs_getstat(ftp->ft_lpath, &pfh, &pst);
 	if (rv != 0) {
 		NDMP_LOG(LOG_DEBUG,
 		    "Error %d on fs_getstat(%s)", rv, ftp->ft_path);
@@ -906,15 +836,6 @@ traverse_level(struct fs_traverse *ftp)
 	pn.tn_fh = &tsp->ts_fh;
 	pn.tn_st = &tsp->ts_st;
 
-	if ((plist = fs_init_pathlist()) == NULL) {
-		cstack_delete(sp);
-		free(pfh.fh_fpath);
-		free(tsp);
-		errno = ENOMEM;
-		return (-1);
-	}
-	plhead = plist;
-
 	/* call the callback function on the path itself */
 	traverse_stats.fss_dir_calls++;
 	rv = CALLBACK(&pn, &en);
@@ -942,6 +863,7 @@ traverse_level(struct fs_traverse *ftp)
 			rv = traverse_level_nondir(ftp, tsp, &pn, &darg);
 			if (rv < 0) {
 				NEGATE(rv);
+				free(tsp->ts_fh.fh_fpath);
 				free(tsp);
 				break;
 			}
@@ -971,7 +893,7 @@ traverse_level(struct fs_traverse *ftp)
 			el = NAME_MAX;
 			rv = fs_readdir(&tsp->ts_fh, pn.tn_path,
 			    &tsp->ts_dpos, nm, &el, &efh,
-			    &est, &plist);
+			    &est);
 			if (rv != 0) {
 				traverse_stats.fss_readdir_err++;
 
@@ -991,7 +913,7 @@ traverse_level(struct fs_traverse *ftp)
 			nm[el] = '\0';
 
 			if (rootfs_dot_or_dotdot(nm)) {
-				efh.fh_fpath = NULL;
+				free(efh.fh_fpath);
 				continue;
 			}
 
@@ -1011,14 +933,12 @@ traverse_level(struct fs_traverse *ftp)
 				    path, nm);
 				if (STOP_ONLONG(ftp))
 					rv = ENAMETOOLONG;
-				efh.fh_fpath = NULL;
+				free(efh.fh_fpath);
 				continue;
 			}
 
-			if (!S_ISDIR(est.st_mode)) {
-				efh.fh_fpath = NULL;
+			if (!S_ISDIR(est.st_mode))
 				continue;
-			}
 
 			/*
 			 * Call the callback function for the new
@@ -1034,10 +954,12 @@ traverse_level(struct fs_traverse *ftp)
 
 			if (rv < 0) {
 				NEGATE(rv);
+				free(efh.fh_fpath);
 				break;
 			}
 			if (rv == FST_SKIP) {
 				traverse_stats.fss_dir_skipped++;
+				free(efh.fh_fpath);
 				rv = 0;
 				continue;
 			}
@@ -1046,9 +968,9 @@ traverse_level(struct fs_traverse *ftp)
 			 * Push the current directory on to the stack and
 			 * dive into the entry found.
 			 */
-			if (cstack_push(sp, tsp, 0))
+			if (cstack_push(sp, tsp, 0)) {
 				rv = ENOMEM;
-			else {
+			} else {
 				traverse_stats.fss_pushes++;
 
 				lp = tsp->ts_end;
@@ -1079,8 +1001,10 @@ traverse_level(struct fs_traverse *ftp)
 		if (next_dir)
 			continue;
 skip_dir:
-		if (tsp)
+		if (tsp) {
+			free(tsp->ts_fh.fh_fpath);
 			free(tsp);
+		}
 
 		if (rv == SKIP_ENTRY)
 			rv = 0;
@@ -1108,12 +1032,11 @@ skip_dir:
 	while (!cstack_pop(sp, (void **)&tsp, (int *)NULL)) {
 		traverse_stats.fss_stack_residue++;
 
+		free(tsp->ts_fh.fh_fpath);
 		free(tsp);
 	}
 end:
 	free(darg.da_buf);
-	free(pfh.fh_fpath);
-	fs_free_pathlist(plhead);
 	cstack_delete(sp);
 	return (rv);
 }

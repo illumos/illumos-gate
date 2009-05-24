@@ -694,7 +694,7 @@ backup_work(char *bk_path, tlm_job_stats_t *job_stats,
 	}
 
 	(void) memset(&ret_fh, 0, sizeof (ret_fh));
-	erc = fs_getstat(first_name, &ret_fh, &ret_attr, NULL);
+	erc = fs_getstat(first_name, &ret_fh, &ret_attr);
 	if (erc != 0) {
 		NDMP_LOG(LOG_ERR, "Path %s not found.", first_name);
 		free(dname);
@@ -768,8 +768,7 @@ backup_work(char *bk_path, tlm_job_stats_t *job_stats,
 			(void) memset(&ret_fh, 0, sizeof (ret_fh));
 			erc = fs_readdir(&p_dir_info->fd_dir_fh,
 			    p_dir_info->fd_dir_name, &dpos,
-			    dname, &dname_size, &ret_fh, &ret_attr,
-			    NULL);
+			    dname, &dname_size, &ret_fh, &ret_attr);
 			if (erc == 0) {
 				fileid = ret_fh.fh_fid;
 			} else {
