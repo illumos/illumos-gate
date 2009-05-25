@@ -268,6 +268,20 @@ extern cpu_core_t cpu_core[];
 #define	CPU_ON_INTR(cpup) ((cpup)->cpu_intr_actv >> (LOCK_LEVEL + 1))
 
 /*
+ * Check to see if an interrupt thread might be active at a given ipl.
+ * If so return true.
+ * We must be conservative--it is ok to give a false yes, but a false no
+ * will cause disaster.  (But if the situation changes after we check it is
+ * ok--the caller is trying to ensure that an interrupt routine has been
+ * exited).
+ * This is used when trying to remove an interrupt handler from an autovector
+ * list in avintr.c.
+ */
+#define	INTR_ACTIVE(cpup, level)	\
+	((level) <= LOCK_LEVEL ? 	\
+	((cpup)->cpu_intr_actv & (1 << (level))) : (CPU_ON_INTR(cpup)))
+
+/*
  * CPU_PSEUDO_RANDOM() returns a per CPU value that changes each time one
  * looks at it. It's meant as a cheap mechanism to be incorporated in routines
  * wanting to avoid biasing, but where true randomness isn't needed (just

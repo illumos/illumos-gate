@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_AVINTR_H
 #define	_SYS_AVINTR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mutex.h>
 #include <sys/dditypes.h>
@@ -97,7 +96,6 @@ extern int rem_avsoftintr(void *intr_id, int lvl, avfunc xxintr);
 extern int av_softint_movepri(void *intr_id, int old_lvl);
 extern void update_avsoftintr_args(void *intr_id, int lvl, caddr_t arg2);
 extern void rem_avintr(void *intr_id, int lvl, avfunc xxintr, int vect);
-extern void wait_till_seen(int ipl);
 extern uint_t softlevel1(caddr_t, caddr_t);
 
 #endif	/* _KERNEL */

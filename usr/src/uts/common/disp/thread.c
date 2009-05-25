@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1705,25 +1705,6 @@ tsd_realloc(void *old, size_t osize, size_t nsize)
 		kmem_free(old, osize);
 	}
 	return (new);
-}
-
-/*
- * Check to see if an interrupt thread might be active at a given ipl.
- * If so return true.
- * We must be conservative--it is ok to give a false yes, but a false no
- * will cause disaster.  (But if the situation changes after we check it is
- * ok--the caller is trying to ensure that an interrupt routine has been
- * exited).
- * This is used when trying to remove an interrupt handler from an autovector
- * list in avintr.c.
- */
-int
-intr_active(struct cpu *cp, int level)
-{
-	if (level <= LOCK_LEVEL)
-		return (cp->cpu_thread != cp->cpu_dispthread);
-	else
-		return (CPU_ON_INTR(cp));
 }
 
 /*
