@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,18 +48,30 @@ pci_label_physlot_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 	const char *rlabel = NULL;
 	int n, p, i;
 
+	topo_mod_dprintf(mod, "%s: doing a lookup for platform=%s\n",
+	    __func__, platform);
+
 	if ((n = did_physlot(dp)) < 0 || Physlot_Names == NULL ||
 	    platform == NULL)
 		return (NULL);
 
+	topo_mod_dprintf(mod, "%s: doing a lookup for physlot=%d\n",
+	    __func__, n);
+
 	for (p = 0; p < Physlot_Names->psn_nplats; p++) {
+		topo_mod_dprintf(mod, "%s: comparing against platform=%s\n",
+		    __func__, Physlot_Names->psn_names[p].pnm_platform);
 		if (strcmp(Physlot_Names->psn_names[p].pnm_platform,
 		    platform) != 0)
 			continue;
+		topo_mod_dprintf(mod, "%s: found lookup table for this "
+		    "platform\n", __func__);
 		for (i = 0; i < Physlot_Names->psn_names[p].pnm_nnames; i++) {
 			physnm_t ps;
 			ps = Physlot_Names->psn_names[p].pnm_names[i];
 			if (ps.ps_num == n) {
+				topo_mod_dprintf(mod, "%s: matched entry=%d, "
+				    "label=%s\n", __func__, i, ps.ps_label);
 				rlabel = ps.ps_label;
 				break;
 			}
@@ -67,8 +79,8 @@ pci_label_physlot_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 		break;
 	}
 	if (rlabel != NULL) {
-		topo_mod_dprintf(mod, "pci_label_physlot_lookup: "
-		    "label=%s\n", rlabel);
+		topo_mod_dprintf(mod, "%s: returning label=%s\n",
+		    __func__, rlabel);
 	}
 	return (rlabel);
 }
@@ -77,32 +89,58 @@ pci_label_physlot_lookup(topo_mod_t *mod, char *platform, did_t *dp)
  * Do a platform specific label lookup based on slot name.
  */
 static const char *
-pci_label_slotname_lookup(topo_mod_t *mod, char *platform, const char *label)
+pci_label_slotname_lookup(topo_mod_t *mod, char *platform,
+    const char *label, did_t *dp)
 {
 	const char *rlabel = label;
-	int s, i;
+	int s, i, ret;
 
-	if (Slot_Rewrites == NULL)
+	if (Slot_Rewrites == NULL || platform == NULL)
 		return (rlabel);
 
+	topo_mod_dprintf(mod, "%s: doing a lookup for platform=%s\n",
+	    __func__, platform);
+
 	for (s = 0; s < Slot_Rewrites->srw_nplats; s++) {
+		topo_mod_dprintf(mod, "%s: comparing against platform=%s\n",
+		    __func__, Slot_Rewrites->srw_platrewrites[s].prw_platform);
 		if (strcmp(Slot_Rewrites->srw_platrewrites[s].prw_platform,
 		    platform) != 0)
 			continue;
+		topo_mod_dprintf(mod, "%s: found lookup table for this "
+		    "platform\n", __func__);
 		for (i = 0;
 		    i < Slot_Rewrites->srw_platrewrites[s].prw_nrewrites;
 		    i++) {
 			slot_rwd_t rw;
 			rw = Slot_Rewrites->srw_platrewrites[s].prw_rewrites[i];
 			if (strcmp(rw.srw_obp, label) == 0) {
-				rlabel = rw.srw_new;
+				topo_mod_dprintf(mod, "%s: matched entry=%d, "
+				    "old_label=%s, new_label=%s\n",
+				    __func__, i, rw.srw_obp, rw.srw_new);
+				/*
+				 * If a test function is specified then call
+				 * it to do an additional check.
+				 */
+				if (rw.srw_test != NULL) {
+					topo_mod_dprintf(mod,
+					    "%s: calling test function=%p\n",
+					    __func__, rw.srw_test);
+					if (ret = rw.srw_test(mod, dp))
+						rlabel = rw.srw_new;
+					topo_mod_dprintf(mod,
+					    "%s: test function return=%d\n",
+					    __func__, ret);
+				} else {
+					rlabel = rw.srw_new;
+				}
 				break;
 			}
 		}
 		break;
 	}
 	assert(rlabel != NULL);
-	topo_mod_dprintf(mod, "pci_label_slotname_lookup: label=%s\n", rlabel);
+	topo_mod_dprintf(mod, "%s: returning label=%s\n", __func__, rlabel);
 	return (rlabel);
 }
 
@@ -114,37 +152,61 @@ pci_label_missing_lookup(topo_mod_t *mod, char *platform, did_t *dp)
 {
 	const char *rlabel = NULL;
 	int board, bridge, rc, bus, dev;
-	int p, i;
+	int p, i, ret;
 
-	if (Missing_Names == NULL)
+	if (Missing_Names == NULL || platform == NULL)
 		return (NULL);
+
 	bridge = did_bridge(dp);
 	board = did_board(dp);
 	rc = did_rc(dp);
 	did_BDF(dp, &bus, &dev, NULL);
 
-	topo_mod_dprintf(mod, "Missing a name for %d, %d, %d, %d, %d ?\n",
-	    board, bridge, rc, bus, dev);
+	topo_mod_dprintf(mod, "%s: doing a lookup for platform=%s, "
+	    "board=%d, bridge=%d, rc=%d, bus=%d, dev=%d\n",
+	    __func__, platform, board, bridge, rc, bus, dev);
 
 	for (p = 0; p < Missing_Names->mn_nplats; p++) {
+		topo_mod_dprintf(mod, "%s: comparing against platform=%s\n",
+		    __func__, Missing_Names->mn_names[p].pdl_platform);
 		if (strcmp(Missing_Names->mn_names[p].pdl_platform,
 		    platform) != 0)
 			continue;
+		topo_mod_dprintf(mod, "%s: found lookup table for this "
+		    "platform\n", __func__);
 		for (i = 0; i < Missing_Names->mn_names[p].pdl_nnames; i++) {
 			devlab_t m;
 			m = Missing_Names->mn_names[p].pdl_names[i];
 			if (m.dl_board == board && m.dl_bridge == bridge &&
 			    m.dl_rc == rc && m.dl_bus == bus &&
 			    m.dl_dev == dev) {
-				rlabel = m.dl_label;
+				topo_mod_dprintf(mod, "%s: matched entry=%d, "
+				    "label=%s\n", __func__, i, m.dl_label);
+				/*
+				 * If a test function is specified then call
+				 * it to do an additional test.
+				 */
+				if (m.dl_test != NULL) {
+					topo_mod_dprintf(mod,
+					    "%s: calling test function=%p\n",
+					    __func__, m.dl_test);
+					if (ret = m.dl_test(mod, dp))
+						rlabel = m.dl_label;
+					topo_mod_dprintf(mod,
+					    "%s: test function return=%d\n",
+					    __func__, ret);
+				} else {
+					rlabel = m.dl_label;
+				}
+
 				break;
 			}
 		}
 		break;
 	}
 	if (rlabel != NULL) {
-		topo_mod_dprintf(mod, "pci_label_missing_lookup: "
-		    "label=%s\n", rlabel);
+		topo_mod_dprintf(mod, "%s: match found, label=%s\n",
+		    __func__, rlabel);
 	}
 	return (rlabel);
 }
@@ -162,9 +224,11 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 	size_t len;
 
 	did_BDF(dp, &b, &d, &f);
-	topo_mod_dprintf(mod, "pci_slot_label_lookup: entry: node=%p: "
-	    "node_name=%s[%d], dp=%p, dp_bdf=%d/%d/%d, pdp=%p \n", node,
-	    topo_node_name(node), topo_node_instance(node), dp, b, d, f, pdp);
+
+	topo_mod_dprintf(mod, "%s: entry: node=%p, node_name=%s, "
+	    "node_inst=%d, dp=%p, dp_bdf=%d/%d/%d, pdp=%p\n",
+	    __func__, node, topo_node_name(node), topo_node_instance(node),
+	    dp, b, d, f, pdp);
 
 	/*
 	 * If this device has a physical slot number then check if
@@ -184,9 +248,9 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 	 */
 	if (did_physlot(pdp) >= 0) {
 
-		topo_mod_dprintf(mod, "pci_slot_label_lookup: node=%p: "
-		    "node has a physical slot=%d, checking ancestors "
-		    "for slots\n", node, did_physlot(pdp));
+		topo_mod_dprintf(mod, "%s: node=%p: node has a physical "
+		    "slot=%d, checking ancestors for slots\n",
+		    __func__, node, did_physlot(pdp));
 
 		/*
 		 * Get this device's physical slot name.
@@ -219,24 +283,23 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 				apdp = adp = NULL;
 			}
 
-			topo_mod_dprintf(mod, "pci_slot_label_lookup: "
-			    "node=%p: checking next two ancestors: anode=%p, "
-			    "adp=%p apnode=%p, apdp=%p\n",
-			    node, anode, adp, apnode, apdp);
+			topo_mod_dprintf(mod, "%s: node=%p: checking next "
+			    "two ancestors: anode=%p, adp=%p "
+			    "apnode=%p, apdp=%p\n",
+			    __func__, node, anode, adp, apnode, apdp);
 			if ((anode != NULL) && (adp != NULL)) {
 				did_BDF(adp, &b, &d, &f);
-				topo_mod_dprintf(mod, "pci_slot_label_lookup: "
-				    "node=%p: anode_name=%s[%d] "
-				    "anode_bdf=%d/%d/%d\n",
-				    node, topo_node_name(anode),
+				topo_mod_dprintf(mod, "%s: node=%p: "
+				    "anode_name=%s[%d], anode_bdf=%d/%d/%d\n",
+				    __func__, node, topo_node_name(anode),
 				    topo_node_instance(anode), b, d, f);
 			}
 			if ((apnode != NULL) && (apdp != NULL)) {
 				did_BDF(apdp, &b, &d, &f);
-				topo_mod_dprintf(mod, "pci_slot_label_lookup: "
-				    "node=%p: apnode_name=%s[%d] "
+				topo_mod_dprintf(mod, "%s: node=%p: "
+				    "apnode_name=%s[%d], "
 				    "apnode_bdf=%d/%d/%d\n",
-				    node, topo_node_name(apnode),
+				    __func__, node, topo_node_name(apnode),
 				    topo_node_instance(apnode), b, d, f);
 			}
 
@@ -257,22 +320,20 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 				if (topo_node_label(anode, &ancestor_l,
 				    &err) != 0) {
 					topo_mod_dprintf(mod,
-					    "pci_slot_label_lookup: "
-					    "node=%p: topo_node_label() "
-					    "FAILED!", node);
+					    "%s: node=%p: topo_node_label() "
+					    "FAILED!", __func__, node);
 					(void) topo_mod_seterrno(mod, err);
 					return (NULL);
 				}
 				done++;
-				topo_mod_dprintf(mod,
-				    "pci_slot_label_lookup: node=%p: "
-				    "found ancestor with a slot, "
-				    "label=%s ", node, ancestor_l);
+				topo_mod_dprintf(mod, "%s: node=%p: found "
+				    "ancestor with a slot, label=%s ",
+				    __func__, node, ancestor_l);
 			}
 		}
 		if (ancestor_l == NULL) {
-			topo_mod_dprintf(mod, "pci_slot_label_lookup: "
-			    "node=%p: no ancestor slot found\n", node);
+			topo_mod_dprintf(mod, "%s: node=%p: no ancestor "
+			    "slot found\n", __func__, node);
 		}
 	}
 
@@ -282,9 +343,9 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 	 * this node's label. Otherwise, do a full slot label lookup.
 	 */
 	if (ancestor_l && l) {
-		topo_mod_dprintf(mod, "pci_slot_label_lookup: node=%p: "
-		    "will concatenate: ancestor_l=%s and l=%s\n",
-		    node, ancestor_l, l);
+		topo_mod_dprintf(mod, "%s: node=%p: concatenating "
+		    "ancestor_l=%s and l=%s\n",
+		    __func__, node, ancestor_l, l);
 		len = strlen(ancestor_l) + strlen(l) + 2;
 		new_l = alloca(len);
 		(void) snprintf(new_l, len, "%s/%s", ancestor_l, l);
@@ -325,7 +386,7 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 		    == NULL) {
 			if ((l = (char *)did_physlot_name(pdp, d)) != NULL) {
 				l = (char *)
-				    pci_label_slotname_lookup(mod, pp, l);
+				    pci_label_slotname_lookup(mod, pp, l, dp);
 			} else {
 				l = (char *)
 				    pci_label_missing_lookup(mod, pp, dp);
@@ -345,8 +406,8 @@ pci_slot_label_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp, did_t *pdp)
 		did_slot_label_set(dp, l);
 	}
 
-	topo_mod_dprintf(mod, "pci_slot_label_lookup: exit: "
-	    "node=%p: label=%s\n", node, (l ? l : "NULL"));
+	topo_mod_dprintf(mod, "%s: exit: node=%p: label=%s\n",
+	    __func__, node, (l ? l : "NULL"));
 
 	return (l);
 }
@@ -378,7 +439,7 @@ pci_label_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 
 	if (nvlist_lookup_uint64(in, TOPO_METH_LABEL_ARG_NVL, &ptr) != 0) {
 		topo_mod_dprintf(mod,
-		    "label method argument not found.\n");
+		    "%s: label method argument not found.\n", __func__);
 		return (-1);
 	}
 	dp = (did_t *)(uintptr_t)ptr;
@@ -421,7 +482,7 @@ pci_fru_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 
 	if (nvlist_lookup_uint64(in, "nv1", &ptr) != 0) {
 		topo_mod_dprintf(mod,
-		    "label method argument not found.\n");
+		    "%s: label method argument not found.\n", __func__);
 		return (-1);
 	}
 	dp = (did_t *)(uintptr_t)ptr;
@@ -435,8 +496,8 @@ pci_fru_cmn(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out)
 		nvlist_t *rnvl;
 
 		if (topo_node_resource(node, &rnvl, &err) < 0 || rnvl == NULL) {
-			topo_mod_dprintf(mod, "pci_fru_compute error: %s\n",
-			    topo_strerror(topo_mod_errno(mod)));
+			topo_mod_dprintf(mod, "%s: error: %s\n",
+			    __func__, topo_strerror(topo_mod_errno(mod)));
 			return (topo_mod_seterrno(mod, err));
 		}
 		*out = rnvl;

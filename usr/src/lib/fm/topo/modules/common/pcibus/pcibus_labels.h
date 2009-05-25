@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,8 +60,9 @@ typedef struct physlot_names {
  * with a different label B prior to attaching the label to a topology node.
  */
 typedef struct slot_rwd {
-	const char *srw_obp;		/* slot name found */
-	const char *srw_new;		/* replacement slot name */
+	const char *srw_obp;			/* slot name found */
+	const char *srw_new;			/* replacement slot name */
+	int (*srw_test)(topo_mod_t *, did_t *);	/* test function */
 } slot_rwd_t;
 
 typedef struct plat_rwd {
@@ -81,12 +82,13 @@ typedef struct slotnm_rewrite {
  * really an indication that there's a bug in the platform OBP.
  */
 typedef struct devlab {
-	int dl_board;
-	int dl_bridge;
-	int dl_rc;
-	int dl_bus;
-	int dl_dev;
-	const char *dl_label;
+	int dl_board;				/* board number */
+	int dl_bridge;				/* hostbridge number */
+	int dl_rc;				/* root complex number */
+	int dl_bus;				/* bus number */
+	int dl_dev;				/* device number */
+	const char *dl_label;			/* label to use */
+	int (*dl_test)(topo_mod_t *, did_t *);	/* test function */
 } devlab_t;
 
 typedef struct pdevlabs {

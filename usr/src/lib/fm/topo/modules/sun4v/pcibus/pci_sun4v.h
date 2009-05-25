@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Data for label lookup based on physical slot number.
+ *
+ * Platforms may need entries here if the PCIe slot labels
+ * provided by firmware are missing or are incorrect.
+ */
 
 physnm_t t200_pnms[] = {
 	/* Slot #, Label */
@@ -158,38 +165,23 @@ physlot_names_t PhyslotNMs = {
 	plat_pnames
 };
 
+/*
+ * Data for label lookup based on device info.
+ *
+ * Platforms need entries here if there is no physical slot number
+ * (i.e. pci), and slot labels provided by firmware are missing.
+ */
+
 devlab_t t200_missing[] = {
-	/* board, bridge, root-complex, bus, dev, label */
-	{ 0, 0, 1 - TO_PCI, 6, 1, "PCIX1" },
-	{ 0, 0, 1 - TO_PCI, 6, 2, "PCIX0" }
+	/* board, bridge, root-complex, bus, dev, label, test func */
+	{ 0, 0, 1 - TO_PCI, 6, 1, "PCIX1", NULL },
+	{ 0, 0, 1 - TO_PCI, 6, 2, "PCIX0", NULL }
 };
 
 pdevlabs_t plats_missing[] = {
 	{ "Sun-Fire-T200",
 	    sizeof (t200_missing) / sizeof (devlab_t),
 	    t200_missing },
-	{ "SPARC-Enterprise-T5120",
-	    0,
-	    NULL },
-	{ "SPARC-Enterprise-T5220",
-	    0,
-	    NULL },
-	{ "T5140",
-	    0,
-	    NULL },
-	{ "T5240",
-	    0,
-	    NULL },
-	{ "T5440",
-	    0,
-	    NULL },
-	{ "Netra-T5220",
-	    0,
-	    NULL },
-	{ "Netra-T5440",
-	    0,
-	    NULL }
-
 };
 
 missing_names_t Missing = {

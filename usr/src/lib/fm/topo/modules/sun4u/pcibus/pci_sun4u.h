@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PCI_SUN4U_H
 #define	_PCI_SUN4U_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pcibus_labels.h>
 
@@ -35,21 +33,46 @@
 extern "C" {
 #endif
 
+#define	XMITS_COMPAT	"pci108e,8002"	/* compatible property for XMits */
+
+/*
+ * Functions for platforms that need a label lookup
+ * test in addition to the standard ones provided.
+ */
+extern	int	sunfire_test_func(topo_mod_t *, did_t *);
+
+/*
+ * Data for label lookup based on existing slot label.
+ *
+ * Platforms may need entries here if the slot labels
+ * provided by firmware are incorrect.
+ */
+
 slot_rwd_t v240_rewrites[] = {
-	/* From OPB, Should Be */
-	{ "PCI3", "PCI0" },
-	{ "PCI1", "PCI2" },
-	{ "PCI2", "PCI1" }
+	/* from OBP, should be, test func */
+	{ "PCI3", "PCI0", NULL },
+	{ "PCI1", "PCI2", NULL },
+	{ "PCI2", "PCI1", NULL }
+};
+
+slot_rwd_t sunfire_rewrites[] = {
+	{ "slot 2", "slot 3", sunfire_test_func },
+	{ "slot 3", "slot 2", sunfire_test_func },
+	{ "slot 6", "slot 7", sunfire_test_func },
+	{ "slot 7", "slot 6", sunfire_test_func }
 };
 
 plat_rwd_t plat_rewrites[] = {
-	{ "SUNW,Sun-Fire-V240",
+	{ "Sun-Fire-V240",
 	    sizeof (v240_rewrites) / sizeof (slot_rwd_t),
-	    v240_rewrites }
+	    v240_rewrites },
+	{ "Sun-Fire",
+	    sizeof (sunfire_rewrites) / sizeof (slot_rwd_t),
+	    sunfire_rewrites }
 };
 
 slotnm_rewrite_t SlotRWs = {
-	1,
+	sizeof (plat_rewrites) / sizeof (plat_rwd_t),
 	plat_rewrites
 };
 

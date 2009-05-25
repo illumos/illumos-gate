@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 .KEEP_STATE:
@@ -63,6 +61,7 @@ LINTFILES = $(SRCS:%.c=%.ln)
 APIMAP = ../../../libtopo/common/topo_mod.map
 MAPFILES =		# use APIMAP instead
 
+C99MODE  = $(C99_ENABLE)
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG)
 
