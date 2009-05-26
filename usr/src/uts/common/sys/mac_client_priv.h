@@ -83,6 +83,7 @@ extern	boolean_t mac_perim_held(mac_handle_t);
 
 extern	uint16_t mac_client_vid(mac_client_handle_t);
 extern int mac_vnic_unicast_set(mac_client_handle_t, const uint8_t *);
+extern boolean_t mac_client_is_vlan_vnic(mac_client_handle_t);
 
 extern void mac_client_poll_enable(mac_client_handle_t);
 extern void mac_client_poll_disable(mac_client_handle_t);

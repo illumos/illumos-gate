@@ -61,7 +61,7 @@ static void	dld_wput_nondata(dld_str_t *, mblk_t *);
 static void	str_mdata_raw_put(dld_str_t *, mblk_t *);
 static mblk_t	*i_dld_ether_header_update_tag(mblk_t *, uint_t, uint16_t,
     link_tagmode_t);
-static mblk_t	*i_dld_ether_header_strip_tag(mblk_t *);
+static mblk_t	*i_dld_ether_header_strip_tag(mblk_t *, boolean_t);
 
 static uint32_t		str_count;
 static kmem_cache_t	*str_cachep;
@@ -1089,7 +1089,7 @@ dld_str_detach(dld_str_t *dsp)
  * mp must be a VLAN tagged packet.
  */
 static mblk_t *
-i_dld_ether_header_strip_tag(mblk_t *mp)
+i_dld_ether_header_strip_tag(mblk_t *mp, boolean_t keep_pri)
 {
 	mblk_t *newmp;
 	struct ether_vlan_header *evhp;
@@ -1106,7 +1106,7 @@ i_dld_ether_header_strip_tag(mblk_t *mp)
 	evhp = (struct ether_vlan_header *)mp->b_rptr;
 
 	tci = ntohs(evhp->ether_tci);
-	if (VLAN_PRI(tci) == 0) {
+	if (VLAN_PRI(tci) == 0 || !keep_pri) {
 		/*
 		 * Priority is 0, strip the tag.
 		 */
@@ -1174,7 +1174,12 @@ dld_str_rx_raw(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		 */
 		if (is_ethernet &&
 		    mac_client_vid(dsp->ds_mch) != VLAN_ID_NONE) {
-			newmp = i_dld_ether_header_strip_tag(mp);
+			/*
+			 * The priority should be kept only for VLAN
+			 * data-links.
+			 */
+			newmp = i_dld_ether_header_strip_tag(mp,
+			    mac_client_is_vlan_vnic(dsp->ds_mch));
 			if (newmp == NULL) {
 				freemsg(mp);
 				goto next;

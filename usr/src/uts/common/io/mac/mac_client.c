@@ -458,6 +458,18 @@ mac_client_vid(mac_client_handle_t mch)
 }
 
 /*
+ * Return whether the specified MAC client corresponds to a VLAN VNIC.
+ */
+boolean_t
+mac_client_is_vlan_vnic(mac_client_handle_t mch)
+{
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
+
+	return (((mcip->mci_state_flags & MCIS_IS_VNIC) != 0) &&
+	    ((mcip->mci_flent->fe_type & FLOW_PRIMARY_MAC) != 0));
+}
+
+/*
  * Return the link speed associated with the specified MAC client.
  *
  * The link speed of a MAC client is equal to the smallest value of
