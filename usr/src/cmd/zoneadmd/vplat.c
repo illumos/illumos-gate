@@ -2216,6 +2216,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 	char *slashp = strchr(nwiftabptr->zone_nwif_address, '/');
 	int s;
 	boolean_t got_netmask = B_FALSE;
+	boolean_t is_loopback = B_FALSE;
 	char addrstr4[INET_ADDRSTRLEN];
 	int res;
 
@@ -2267,45 +2268,28 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		goto bad;
 	}
 
+	/*
+	 * Loopback interface will use the default netmask assigned, if no
+	 * netmask is found.
+	 */
 	if (strcmp(nwiftabptr->zone_nwif_physical, "lo0") == 0) {
-		got_netmask = B_TRUE;	/* default setting will be correct */
-	} else {
-		if (af == AF_INET) {
-			/*
-			 * The IPv4 netmask can be determined either
-			 * directly if a prefix length was supplied with
-			 * the address or via the netmasks database.  Not
-			 * being able to determine it is a common failure,
-			 * but it often is not fatal to operation of the
-			 * interface.  In that case, a warning will be
-			 * printed after the rest of the interface's
-			 * parameters have been configured.
-			 */
-			(void) memset(&netmask4, 0, sizeof (netmask4));
-			if (slashp != NULL) {
-				if (addr2netmask(slashp + 1, V4_ADDR_LEN,
-				    (uchar_t *)&netmask4.sin_addr) != 0) {
-					*slashp = '/';
-					zerror(zlogp, B_FALSE,
-					    "%s: invalid prefix length in %s",
-					    lifr.lifr_name,
-					    nwiftabptr->zone_nwif_address);
-					goto bad;
-				}
-				got_netmask = B_TRUE;
-			} else if (getnetmaskbyaddr(in4,
-			    &netmask4.sin_addr) == 0) {
-				got_netmask = B_TRUE;
-			}
-			if (got_netmask) {
-				netmask4.sin_family = af;
-				(void) memcpy(&lifr.lifr_addr, &netmask4,
-				    sizeof (netmask4));
-			}
-		} else {
-			(void) memset(&netmask6, 0, sizeof (netmask6));
-			if (addr2netmask(slashp + 1, V6_ADDR_LEN,
-			    (uchar_t *)&netmask6.sin6_addr) != 0) {
+		is_loopback = B_TRUE;
+	}
+	if (af == AF_INET) {
+		/*
+		 * The IPv4 netmask can be determined either
+		 * directly if a prefix length was supplied with
+		 * the address or via the netmasks database.  Not
+		 * being able to determine it is a common failure,
+		 * but it often is not fatal to operation of the
+		 * interface.  In that case, a warning will be
+		 * printed after the rest of the interface's
+		 * parameters have been configured.
+		 */
+		(void) memset(&netmask4, 0, sizeof (netmask4));
+		if (slashp != NULL) {
+			if (addr2netmask(slashp + 1, V4_ADDR_LEN,
+			    (uchar_t *)&netmask4.sin_addr) != 0) {
 				*slashp = '/';
 				zerror(zlogp, B_FALSE,
 				    "%s: invalid prefix length in %s",
@@ -2314,33 +2298,53 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 				goto bad;
 			}
 			got_netmask = B_TRUE;
-			netmask6.sin6_family = af;
-			(void) memcpy(&lifr.lifr_addr, &netmask6,
-			    sizeof (netmask6));
+		} else if (getnetmaskbyaddr(in4,
+		    &netmask4.sin_addr) == 0) {
+			got_netmask = B_TRUE;
 		}
-		if (got_netmask &&
-		    ioctl(s, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0) {
-			zerror(zlogp, B_TRUE, "%s: could not set netmask",
-			    lifr.lifr_name);
+		if (got_netmask) {
+			netmask4.sin_family = af;
+			(void) memcpy(&lifr.lifr_addr, &netmask4,
+			    sizeof (netmask4));
+		}
+	} else {
+		(void) memset(&netmask6, 0, sizeof (netmask6));
+		if (addr2netmask(slashp + 1, V6_ADDR_LEN,
+		    (uchar_t *)&netmask6.sin6_addr) != 0) {
+			*slashp = '/';
+			zerror(zlogp, B_FALSE,
+			    "%s: invalid prefix length in %s",
+			    lifr.lifr_name,
+			    nwiftabptr->zone_nwif_address);
 			goto bad;
 		}
+		got_netmask = B_TRUE;
+		netmask6.sin6_family = af;
+		(void) memcpy(&lifr.lifr_addr, &netmask6,
+		    sizeof (netmask6));
+	}
+	if (got_netmask &&
+	    ioctl(s, SIOCSLIFNETMASK, (caddr_t)&lifr) < 0) {
+		zerror(zlogp, B_TRUE, "%s: could not set netmask",
+		    lifr.lifr_name);
+		goto bad;
+	}
 
-		/*
-		 * This doesn't set the broadcast address at all. Rather, it
-		 * gets, then sets the interface's address, relying on the fact
-		 * that resetting the address will reset the broadcast address.
-		 */
-		if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) < 0) {
-			zerror(zlogp, B_TRUE, "%s: could not get address",
-			    lifr.lifr_name);
-			goto bad;
-		}
-		if (ioctl(s, SIOCSLIFADDR, (caddr_t)&lifr) < 0) {
-			zerror(zlogp, B_TRUE,
-			    "%s: could not reset broadcast address",
-			    lifr.lifr_name);
-			goto bad;
-		}
+	/*
+	 * This doesn't set the broadcast address at all. Rather, it
+	 * gets, then sets the interface's address, relying on the fact
+	 * that resetting the address will reset the broadcast address.
+	 */
+	if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) < 0) {
+		zerror(zlogp, B_TRUE, "%s: could not get address",
+		    lifr.lifr_name);
+		goto bad;
+	}
+	if (ioctl(s, SIOCSLIFADDR, (caddr_t)&lifr) < 0) {
+		zerror(zlogp, B_TRUE,
+		    "%s: could not reset broadcast address",
+		    lifr.lifr_name);
+		goto bad;
 	}
 
 	if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
@@ -2383,7 +2387,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		goto bad;
 	}
 
-	if (!got_netmask) {
+	if (!got_netmask && !is_loopback) {
 		/*
 		 * A common, but often non-fatal problem, is that the system
 		 * cannot find the netmask for an interface address. This is
