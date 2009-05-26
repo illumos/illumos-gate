@@ -260,11 +260,10 @@ struct rib_hca_s {
 	krwlock_t	avl_rw_lock;
 	volatile bool_t avl_init;
 	kmutex_t	cache_allocation;
-	ddi_taskq_t *reg_cache_clean_up;
+	ddi_taskq_t	*cleanup_helper;
 	ib_svc_id_t	srv_id;
 	ibt_srv_hdl_t 	srv_hdl;
 	uint_t		reg_state;
-
 };
 
 
@@ -336,6 +335,14 @@ struct rib_qp_s {
 	uint_t			n_posted_rbufs;
 	kcondvar_t 		posted_rbufs_cv;
 	kmutex_t		posted_rbufs_lock;
+
+	/*
+	 * Number of SENDs pending completion
+	 */
+
+	uint_t			n_send_rbufs;
+	kcondvar_t 		send_rbufs_cv;
+	kmutex_t		send_rbufs_lock;
 
 	/*
 	 * RPC reply

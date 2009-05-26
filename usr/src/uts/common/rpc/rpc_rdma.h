@@ -333,6 +333,10 @@ typedef enum {
 	C_REMOTE_DOWN	= 0x00000020
 } conn_c_state;
 
+/* c_flags */
+#define	C_CLOSE_NOTNEEDED	0x00000001	/* just free the channel */
+#define	C_CLOSE_PENDING		0x00000002	/* a close in progress */
+
 /*
  * RDMA Connection information
  */
@@ -345,6 +349,7 @@ typedef struct conn {
 	struct conn	*c_prev;	/* prev in list of connections */
 	caddr_t		c_private;	/* transport specific stuff */
 	conn_c_state	c_state;	/* state of connection */
+	int		c_flags;	/* flags for connection management */
 	rdma_cc_type_t	c_cc_type;	/* client or server, for credit cntrl */
 	union {
 		rdma_clnt_cred_ctrl_t	c_clnt_cc;
@@ -352,6 +357,8 @@ typedef struct conn {
 	} rdma_conn_cred_ctrl_u;
 	kmutex_t	c_lock;		/* protect c_state and c_ref fields */
 	kcondvar_t	c_cv;		/* to signal when pending is done */
+	timeout_id_t	c_timeout;	/* timeout id for untimeout() */
+	time_t		c_last_used;	/* last time any activity on the conn */
 } CONN;
 
 
