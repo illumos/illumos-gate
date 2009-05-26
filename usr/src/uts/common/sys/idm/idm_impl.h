@@ -139,6 +139,9 @@ typedef struct idm_svc_s {
 	idm_svc_req_t		is_svc_req;
 } idm_svc_t;
 
+#define	ISCSI_MAX_TSIH_LEN	6	/* 0x%04x */
+#define	ISCSI_MAX_ISID_LEN	ISCSI_ISID_LEN * 2
+
 typedef struct idm_conn_s {
 	list_node_t		ic_list_node;
 	void			*ic_handle;
@@ -147,6 +150,16 @@ typedef struct idm_conn_s {
 	idm_sockaddr_t 		ic_ini_dst_addr;
 	struct sockaddr_storage	ic_laddr;	/* conn local address */
 	struct sockaddr_storage	ic_raddr;	/* conn remote address */
+
+	/*
+	 * the target_name, initiator_name, initiator session
+	 * identifier and target session identifying handle
+	 * are only used for target connections.
+	 */
+	char			ic_target_name[ISCSI_MAX_NAME_LEN + 1];
+	char			ic_initiator_name[ISCSI_MAX_NAME_LEN + 1];
+	char			ic_tsih[ISCSI_MAX_TSIH_LEN + 1];
+	char			ic_isid[ISCSI_MAX_ISID_LEN + 1];
 	idm_conn_state_t	ic_state;
 	idm_conn_state_t	ic_last_state;
 	sm_audit_buf_t		ic_state_audit;

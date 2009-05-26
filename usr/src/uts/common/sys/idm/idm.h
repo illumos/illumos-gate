@@ -340,6 +340,15 @@ idm_conn_hold(idm_conn_t *ic);
 void
 idm_conn_rele(idm_conn_t *ic);
 
+void
+idm_conn_set_target_name(idm_conn_t *ic, char *target_name);
+
+void
+idm_conn_set_initiator_name(idm_conn_t *ic, char *initiator_name);
+
+void
+idm_conn_set_isid(idm_conn_t *ic, uint8_t isid[ISCSI_ISID_LEN]);
+
 /*
  * Target data transfer services
  */
@@ -359,6 +368,8 @@ idm_buf_tx_to_ini_done(idm_task_t *idt, idm_buf_t *idb, idm_status_t status);
 void
 idm_buf_rx_from_ini_done(idm_task_t *idt, idm_buf_t *idb, idm_status_t status);
 
+#define	XFER_BUF_TX_TO_INI	0
+#define	XFER_BUF_RX_FROM_INI	1
 /*
  * Shared Initiator/Target Services
  */

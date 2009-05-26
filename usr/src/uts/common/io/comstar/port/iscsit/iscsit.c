@@ -1318,7 +1318,6 @@ iscsit_xfer_scsi_data(scsi_task_t *task, stmf_data_buf_t *dbuf,
 	 */
 	ASSERT(ibuf->ibuf_is_immed == B_FALSE);
 	if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {
-
 		/*
 		 * IDM will call iscsit_build_hdr so lock now to serialize
 		 * access to the SN values.  We need to lock here to enforce
@@ -1851,6 +1850,10 @@ iscsit_op_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		bcopy(ahs_hdr->ahs_extscb, task->task_cdb + 16, addl_cdb_len);
 	}
 
+	DTRACE_ISCSI_3(scsi__command, idm_conn_t *, ic,
+	    iscsi_scsi_cmd_hdr_t *, (iscsi_scsi_cmd_hdr_t *)rx_pdu->isp_hdr,
+	    scsi_task_t *, task);
+
 	/*
 	 * Copy the transport header into the task handle from the PDU
 	 * handle. The transport header describes this task's remote tagged
@@ -1881,7 +1884,19 @@ iscsit_op_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		    rx_pdu->isp_datalen;
 		ibuf->ibuf_stmf_buf->db_sglist[0].seg_addr = rx_pdu->isp_data;
 
+		DTRACE_ISCSI_8(xfer__start, idm_conn_t *, ic,
+		    uintptr_t, ibuf->ibuf_stmf_buf->db_sglist[0].seg_addr,
+		    uint32_t, ibuf->ibuf_stmf_buf->db_relative_offset,
+		    uint64_t, 0, uint32_t, 0, uint32_t, 0, /* no raddr */
+		    uint32_t, rx_pdu->isp_datalen, int, XFER_BUF_TX_TO_INI);
+
 		stmf_post_task(task, ibuf->ibuf_stmf_buf);
+
+		DTRACE_ISCSI_8(xfer__done, idm_conn_t *, ic,
+		    uintptr_t, ibuf->ibuf_stmf_buf->db_sglist[0].seg_addr,
+		    uint32_t, ibuf->ibuf_stmf_buf->db_relative_offset,
+		    uint64_t, 0, uint32_t, 0, uint32_t, 0, /* no raddr */
+		    uint32_t, rx_pdu->isp_datalen, int, XFER_BUF_TX_TO_INI);
 	} else {
 		stmf_post_task(task, NULL);
 		idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);

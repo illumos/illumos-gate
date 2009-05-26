@@ -30,6 +30,7 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/byteorder.h>
+#include <sys/sdt.h>
 
 #include <sys/ib/clients/iser/iser.h>
 
@@ -426,6 +427,12 @@ iser_xfer_buf_to_ini(idm_task_t *idt, idm_buf_t *buf)
 	bcopy(&wr, &iser_buf->buf_wr, sizeof (ibt_send_wr_t));
 #endif
 
+	DTRACE_ISCSI_8(xfer__start, idm_conn_t *, idt->idt_ic,
+	    uintptr_t, buf->idb_buf, uint32_t, buf->idb_bufoffset,
+	    uint64_t, reg_raddr, uint32_t, buf->idb_bufoffset,
+	    uint32_t,  reg_rkey,
+	    uint32_t, buf->idb_xfer_len, int, XFER_BUF_TX_TO_INI);
+
 	status = ibt_post_send(iser_chan->ic_chanhdl, &wr, 1, NULL);
 	if (status != IBT_SUCCESS) {
 		ISER_LOG(CE_NOTE, "iser_xfer_buf_to_ini: ibt_post_send "
@@ -505,6 +512,12 @@ iser_xfer_buf_from_ini(idm_task_t *idt, idm_buf_t *buf)
 #ifdef DEBUG
 	bcopy(&wr, &iser_buf->buf_wr, sizeof (ibt_send_wr_t));
 #endif
+
+	DTRACE_ISCSI_8(xfer__start, idm_conn_t *, idt->idt_ic,
+	    uintptr_t, buf->idb_buf, uint32_t, buf->idb_bufoffset,
+	    uint64_t, reg_raddr, uint32_t, buf->idb_bufoffset,
+	    uint32_t,  reg_rkey,
+	    uint32_t, buf->idb_xfer_len, int, XFER_BUF_RX_FROM_INI);
 
 	status = ibt_post_send(iser_chan->ic_chanhdl, &wr, 1, NULL);
 	if (status != IBT_SUCCESS) {

@@ -29,6 +29,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/cpuvar.h>
+#include <sys/sdt.h>
 
 #include <sys/socket.h>
 #include <sys/strsubr.h>
@@ -77,12 +78,17 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 	 */
 	switch (IDM_PDU_OPCODE(pdu)) {
 	case ISCSI_OP_LOGIN_CMD:
+		DTRACE_ISCSI_2(login__command, idm_conn_t *, ic,
+		    iscsi_login_hdr_t *, (iscsi_login_hdr_t *)pdu->isp_hdr);
 		idm_conn_rx_pdu_event(ic, CE_LOGIN_RCV, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_LOGIN_RSP:
 		idm_parse_login_rsp(ic, pdu, /* RX */ B_TRUE);
 		break;
 	case ISCSI_OP_LOGOUT_CMD:
+		DTRACE_ISCSI_2(logout__command, idm_conn_t *, ic,
+		    iscsi_logout_hdr_t *,
+		    (iscsi_logout_hdr_t *)pdu->isp_hdr);
 		idm_parse_logout_req(ic, pdu, /* RX */ B_TRUE);
 		break;
 	case ISCSI_OP_LOGOUT_RSP:
@@ -127,17 +133,43 @@ idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
 		 * we can reject the SCSI command with a protocol error.
 		 *
 		 * This scenario only applies to the target.
+		 *
+		 * Handle dtrace probe in iscsit so we can find all the
+		 * pieces of the CDB
 		 */
+		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
+		break;
 	case ISCSI_OP_SCSI_DATA:
+		DTRACE_ISCSI_2(data__receive, idm_conn_t *, ic,
+		    iscsi_data_hdr_t *,
+		    (iscsi_data_hdr_t *)pdu->isp_hdr);
+		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
+		break;
+	case ISCSI_OP_SCSI_TASK_MGT_MSG:
+		DTRACE_ISCSI_2(task__command, idm_conn_t *, ic,
+		    iscsi_scsi_task_mgt_hdr_t *,
+		    (iscsi_scsi_task_mgt_hdr_t *)pdu->isp_hdr);
+		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
+		break;
+	case ISCSI_OP_NOOP_OUT:
+		DTRACE_ISCSI_2(nop__receive, idm_conn_t *, ic,
+		    iscsi_nop_out_hdr_t *,
+		    (iscsi_nop_out_hdr_t *)pdu->isp_hdr);
+		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
+		break;
+	case ISCSI_OP_TEXT_CMD:
+		DTRACE_ISCSI_2(text__command, idm_conn_t *, ic,
+		    iscsi_text_hdr_t *,
+		    (iscsi_text_hdr_t *)pdu->isp_hdr);
+		idm_conn_rx_pdu_event(ic, CE_MISC_RX, (uintptr_t)pdu);
+		break;
+	/* Initiator PDU's */
 	case ISCSI_OP_SCSI_DATA_RSP:
 	case ISCSI_OP_RTT_RSP:
 	case ISCSI_OP_SNACK_CMD:
 	case ISCSI_OP_NOOP_IN:
-	case ISCSI_OP_NOOP_OUT:
-	case ISCSI_OP_TEXT_CMD:
 	case ISCSI_OP_TEXT_RSP:
 	case ISCSI_OP_REJECT_MSG:
-	case ISCSI_OP_SCSI_TASK_MGT_MSG:
 	case ISCSI_OP_SCSI_TASK_MGT_RSP:
 		/* Validate received PDU against current state */
 		idm_conn_rx_pdu_event(ic, CE_MISC_RX,
@@ -164,11 +196,33 @@ idm_pdu_rx_forward_ffp(idm_conn_t *ic, idm_pdu_t *pdu)
 	case ISCSI_OP_SCSI_CMD:
 		(*ic->ic_conn_ops.icb_rx_scsi_cmd)(ic, pdu);
 		return (B_TRUE);
+	case ISCSI_OP_SCSI_DATA:
+		DTRACE_ISCSI_2(data__receive, idm_conn_t *, ic,
+		    iscsi_data_hdr_t *,
+		    (iscsi_data_hdr_t *)pdu->isp_hdr);
+		(*ic->ic_transport_ops->it_rx_dataout)(ic, pdu);
+		return (B_TRUE);
+	case ISCSI_OP_SCSI_TASK_MGT_MSG:
+		DTRACE_ISCSI_2(task__command, idm_conn_t *, ic,
+		    iscsi_scsi_task_mgt_hdr_t *,
+		    (iscsi_scsi_task_mgt_hdr_t *)pdu->isp_hdr);
+		(*ic->ic_conn_ops.icb_rx_misc)(ic, pdu);
+		return (B_TRUE);
+	case ISCSI_OP_NOOP_OUT:
+		DTRACE_ISCSI_2(nop__receive, idm_conn_t *, ic,
+		    iscsi_nop_out_hdr_t *,
+		    (iscsi_nop_out_hdr_t *)pdu->isp_hdr);
+		(*ic->ic_conn_ops.icb_rx_misc)(ic, pdu);
+		return (B_TRUE);
+	case ISCSI_OP_TEXT_CMD:
+		DTRACE_ISCSI_2(text__command, idm_conn_t *, ic,
+		    iscsi_text_hdr_t *,
+		    (iscsi_text_hdr_t *)pdu->isp_hdr);
+		(*ic->ic_conn_ops.icb_rx_misc)(ic, pdu);
+		return (B_TRUE);
+		/* Initiator only */
 	case ISCSI_OP_SCSI_RSP:
 		(*ic->ic_conn_ops.icb_rx_scsi_rsp)(ic, pdu);
-		return (B_TRUE);
-	case ISCSI_OP_SCSI_DATA:
-		(*ic->ic_transport_ops->it_rx_dataout)(ic, pdu);
 		return (B_TRUE);
 	case ISCSI_OP_SCSI_DATA_RSP:
 		(*ic->ic_transport_ops->it_rx_datain)(ic, pdu);
@@ -176,11 +230,8 @@ idm_pdu_rx_forward_ffp(idm_conn_t *ic, idm_pdu_t *pdu)
 	case ISCSI_OP_RTT_RSP:
 		(*ic->ic_transport_ops->it_rx_rtt)(ic, pdu);
 		return (B_TRUE);
-	case ISCSI_OP_SCSI_TASK_MGT_MSG:
 	case ISCSI_OP_SCSI_TASK_MGT_RSP:
-	case ISCSI_OP_TEXT_CMD:
 	case ISCSI_OP_TEXT_RSP:
-	case ISCSI_OP_NOOP_OUT:
 	case ISCSI_OP_NOOP_IN:
 		(*ic->ic_conn_ops.icb_rx_misc)(ic, pdu);
 		return (B_TRUE);
@@ -400,6 +451,10 @@ idm_conn_create_common(idm_conn_type_t conn_type, idm_transport_type_t tt,
 	ic = kmem_zalloc(sizeof (idm_conn_t), KM_SLEEP);
 
 	/* Initialize data */
+	ic->ic_target_name[0] = '\0';
+	ic->ic_initiator_name[0] = '\0';
+	ic->ic_isid[0] = '\0';
+	ic->ic_tsih[0] = '\0';
 	ic->ic_conn_type = conn_type;
 	ic->ic_conn_ops = *conn_ops;
 	ic->ic_transport_ops = it->it_ops;

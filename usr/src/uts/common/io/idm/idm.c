@@ -1773,26 +1773,44 @@ idm_pdu_tx(idm_pdu_t *pdu)
 		switch (IDM_PDU_OPCODE(pdu)) {
 		case ISCSI_OP_SCSI_RSP:
 			/* Target only */
+			DTRACE_ISCSI_2(scsi__response, idm_conn_t *, ic,
+			    iscsi_scsi_rsp_hdr_t *,
+			    (iscsi_scsi_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_SCSI_TASK_MGT_RSP:
 			/* Target only */
+			DTRACE_ISCSI_2(task__response, idm_conn_t *, ic,
+			    iscsi_text_rsp_hdr_t *,
+			    (iscsi_text_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_SCSI_DATA_RSP:
 			/* Target only */
+			DTRACE_ISCSI_2(data__send, idm_conn_t *, ic,
+			    iscsi_data_rsp_hdr_t *,
+			    (iscsi_data_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_RTT_RSP:
 			/* Target only */
+			DTRACE_ISCSI_2(data__request, idm_conn_t *, ic,
+			    iscsi_rtt_hdr_t *,
+			    (iscsi_rtt_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_NOOP_IN:
 			/* Target only */
+			DTRACE_ISCSI_2(nop__send, idm_conn_t *, ic,
+			    iscsi_nop_in_hdr_t *,
+			    (iscsi_nop_in_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_TEXT_RSP:
 			/* Target only */
+			DTRACE_ISCSI_2(text__response, idm_conn_t *, ic,
+			    iscsi_text_rsp_hdr_t *,
+			    (iscsi_text_rsp_hdr_t *)pdu->isp_hdr);
 			idm_pdu_tx_forward(ic, pdu);
 			return;
 		case ISCSI_OP_TEXT_CMD:
@@ -1827,15 +1845,24 @@ idm_pdu_tx(idm_pdu_t *pdu)
 		idm_conn_tx_pdu_event(ic, CE_LOGIN_SND, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_LOGIN_RSP:
+		DTRACE_ISCSI_2(login__response, idm_conn_t *, ic,
+		    iscsi_login_rsp_hdr_t *,
+		    (iscsi_login_rsp_hdr_t *)pdu->isp_hdr);
 		idm_parse_login_rsp(ic, pdu, /* Is RX */ B_FALSE);
 		break;
 	case ISCSI_OP_LOGOUT_CMD:
 		idm_parse_logout_req(ic, pdu, /* Is RX */ B_FALSE);
 		break;
 	case ISCSI_OP_LOGOUT_RSP:
+		DTRACE_ISCSI_2(logout__response, idm_conn_t *, ic,
+		    iscsi_logout_rsp_hdr_t *,
+		    (iscsi_logout_rsp_hdr_t *)pdu->isp_hdr);
 		idm_parse_logout_rsp(ic, pdu, /* Is RX */ B_FALSE);
 		break;
 	case ISCSI_OP_ASYNC_EVENT:
+		DTRACE_ISCSI_2(async__send, idm_conn_t *, ic,
+		    iscsi_async_evt_hdr_t *,
+		    (iscsi_async_evt_hdr_t *)pdu->isp_hdr);
 		async_evt = (iscsi_async_evt_hdr_t *)pdu->isp_hdr;
 		switch (async_evt->async_event) {
 		case ISCSI_ASYNC_EVENT_REQUEST_LOGOUT:
@@ -1860,26 +1887,44 @@ idm_pdu_tx(idm_pdu_t *pdu)
 		break;
 	case ISCSI_OP_SCSI_RSP:
 		/* Target only */
+		DTRACE_ISCSI_2(scsi__response, idm_conn_t *, ic,
+		    iscsi_scsi_rsp_hdr_t *,
+		    (iscsi_scsi_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_SCSI_TASK_MGT_RSP:
 		/* Target only */
+		DTRACE_ISCSI_2(task__response, idm_conn_t *, ic,
+		    iscsi_scsi_task_mgt_rsp_hdr_t *,
+		    (iscsi_scsi_task_mgt_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_SCSI_DATA_RSP:
 		/* Target only */
+		DTRACE_ISCSI_2(data__send, idm_conn_t *, ic,
+		    iscsi_data_rsp_hdr_t *,
+		    (iscsi_data_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_RTT_RSP:
 		/* Target only */
+		DTRACE_ISCSI_2(data__request, idm_conn_t *, ic,
+		    iscsi_rtt_hdr_t *,
+		    (iscsi_rtt_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_NOOP_IN:
 		/* Target only */
+		DTRACE_ISCSI_2(nop__send, idm_conn_t *, ic,
+		    iscsi_nop_in_hdr_t *,
+		    (iscsi_nop_in_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 	case ISCSI_OP_TEXT_RSP:
 		/* Target only */
+		DTRACE_ISCSI_2(text__response, idm_conn_t *, ic,
+		    iscsi_text_rsp_hdr_t *,
+		    (iscsi_text_rsp_hdr_t *)pdu->isp_hdr);
 		idm_conn_tx_pdu_event(ic, CE_MISC_TX, (uintptr_t)pdu);
 		break;
 		/* Initiator only */
@@ -2261,6 +2306,26 @@ idm_conn_rele(idm_conn_t *ic)
 	idm_refcnt_rele(&ic->ic_refcnt);
 }
 
+void
+idm_conn_set_target_name(idm_conn_t *ic, char *target_name)
+{
+	(void) strlcpy(ic->ic_target_name, target_name, ISCSI_MAX_NAME_LEN + 1);
+}
+
+void
+idm_conn_set_initiator_name(idm_conn_t *ic, char *initiator_name)
+{
+	(void) strlcpy(ic->ic_initiator_name, initiator_name,
+	    ISCSI_MAX_NAME_LEN + 1);
+}
+
+void
+idm_conn_set_isid(idm_conn_t *ic, uint8_t isid[ISCSI_ISID_LEN])
+{
+	(void) snprintf(ic->ic_isid, ISCSI_MAX_ISID_LEN + 1,
+	    "%02x%02x%02x%02x%02x%02x",
+	    isid[0], isid[1], isid[2], isid[3], isid[4], isid[5]);
+}
 
 static int
 _idm_init(void)

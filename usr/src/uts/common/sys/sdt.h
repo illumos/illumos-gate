@@ -129,6 +129,16 @@ extern "C" {
 	    (uintptr_t)(arg6), (uintptr_t)(arg7));			\
 }
 
+#define	DTRACE_PROBE8(name, type1, arg1, type2, arg2, type3, arg3,	\
+    type4, arg4, type5, arg5, type6, arg6, type7, arg7, type8, arg8) {	\
+	extern void __dtrace_probe_##name(uintptr_t, uintptr_t,		\
+	    uintptr_t, uintptr_t, uintptr_t, uintptr_t,			\
+	    uintptr_t, uintptr_t);					\
+	__dtrace_probe_##name((uintptr_t)(arg1), (uintptr_t)(arg2),	\
+	    (uintptr_t)(arg3), (uintptr_t)(arg4), (uintptr_t)(arg5),	\
+	    (uintptr_t)(arg6), (uintptr_t)(arg7), (uintptr_t)(arg8));	\
+}
+
 #define	DTRACE_SCHED(name)						\
 	DTRACE_PROBE(__sched_##name);
 
@@ -179,6 +189,40 @@ extern "C" {
     type3, arg3, type4, arg4)						\
 	DTRACE_PROBE4(__io_##name, type1, arg1, type2, arg2, 		\
 	    type3, arg3, type4, arg4);
+
+#define	DTRACE_ISCSI_2(name, type1, arg1, type2, arg2)			\
+	DTRACE_PROBE2(__iscsi_##name, type1, arg1, type2, arg2);
+
+#define	DTRACE_ISCSI_3(name, type1, arg1, type2, arg2, type3, arg3)	\
+	DTRACE_PROBE3(__iscsi_##name, type1, arg1, type2, arg2, type3, arg3);
+
+#define	DTRACE_ISCSI_4(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4)						\
+	DTRACE_PROBE4(__iscsi_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4);
+
+#define	DTRACE_ISCSI_5(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5)				\
+	DTRACE_PROBE5(__iscsi_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5);
+
+#define	DTRACE_ISCSI_6(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5, type6, arg6)			\
+	DTRACE_PROBE6(__iscsi_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5, type6, arg6);
+
+#define	DTRACE_ISCSI_7(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5, type6, arg6, type7, arg7)	\
+	DTRACE_PROBE7(__iscsi_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5, type6, arg6,		\
+	    type7, arg7);
+
+#define	DTRACE_ISCSI_8(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5, type6, arg6,			\
+    type7, arg7, type8, arg8)						\
+	DTRACE_PROBE8(__iscsi_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5, type6, arg6,		\
+	    type7, arg7, type8, arg8);
 
 #define	DTRACE_NFSV3_3(name, type1, arg1, type2, arg2, 			\
     type3, arg3)							\

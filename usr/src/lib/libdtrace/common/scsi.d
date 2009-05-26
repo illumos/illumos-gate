@@ -44,3 +44,21 @@ translator scsicmd_t < scsi_task_t *T > {
 	ic_len = T->task_cdb_length;
 	ic_cdb = T->task_cdb;
 };
+
+/*
+ * The xferinfo_t structure can be used by providers to
+ * represent transfer information related to a single
+ * buffer. The members describing the remote memory
+ * are only valid if the transport layer is an RDMA-
+ * capable transport like Infiniband
+ */
+typedef struct xferinfo {
+	uintptr_t xfer_laddr;   /* local buffer address */
+	uint32_t xfer_loffset;
+	uint32_t xfer_lkey;     /* access control to local memory */
+	uintptr_t xfer_raddr;   /* remote virtual address */
+	uint32_t xfer_roffset;  /* offset from the remote address */
+	uint32_t xfer_rkey;     /* access control to remote virtual address */
+	uint32_t xfer_len;      /* transfer length */
+	uint32_t xfer_type;     /* Read (0) or Write (1) */
+} xferinfo_t;

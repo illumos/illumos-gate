@@ -77,6 +77,7 @@ DLIBSRCS += \
 	fc.d \
 	io.d \
 	ip.d \
+	iscsit.d \
 	net.d \
 	nfs.d \
 	procfs.d \

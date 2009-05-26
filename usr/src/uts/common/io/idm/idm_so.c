@@ -1256,6 +1256,12 @@ idm_so_free_task_rsrc(idm_task_t *idt)
 			/*
 			 * idm_buf_rx_from_ini_done releases idt->idt_mutex
 			 */
+			DTRACE_ISCSI_8(xfer__done, idm_conn_t *, idt->idt_ic,
+			    uintptr_t, idb->idb_buf,
+			    uint32_t, idb->idb_bufoffset,
+			    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+			    uint32_t, idb->idb_xfer_len,
+			    int, XFER_BUF_RX_FROM_INI);
 			idm_buf_rx_from_ini_done(idt, idb, IDM_STATUS_ABORTED);
 			mutex_enter(&idt->idt_mutex);
 		}
@@ -1273,6 +1279,12 @@ idm_so_free_task_rsrc(idm_task_t *idt)
 			/*
 			 * idm_buf_tx_to_ini_done releases idt->idt_mutex
 			 */
+			DTRACE_ISCSI_8(xfer__done, idm_conn_t *, idt->idt_ic,
+			    uintptr_t, idb->idb_buf,
+			    uint32_t, idb->idb_bufoffset,
+			    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+			    uint32_t, idb->idb_xfer_len,
+			    int, XFER_BUF_TX_TO_INI);
 			idm_buf_tx_to_ini_done(idt, idb, IDM_STATUS_ABORTED);
 			mutex_enter(&idt->idt_mutex);
 		}
@@ -1566,6 +1578,11 @@ idm_so_rx_dataout(idm_conn_t *ic, idm_pdu_t *pdu)
 		/*
 		 * idm_buf_rx_from_ini_done releases idt->idt_mutex
 		 */
+		DTRACE_ISCSI_8(xfer__done, idm_conn_t *, idt->idt_ic,
+		    uintptr_t, idb->idb_buf, uint32_t, idb->idb_bufoffset,
+		    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+		    uint32_t, idb->idb_xfer_len,
+		    int, XFER_BUF_RX_FROM_INI);
 		idm_buf_rx_from_ini_done(idt, idb, IDM_STATUS_SUCCESS);
 		idm_pdu_complete(pdu, IDM_STATUS_SUCCESS);
 		return;
@@ -2164,12 +2181,22 @@ idm_so_buf_tx_to_ini(idm_task_t *idt, idm_buf_t *idb)
 	 */
 	mutex_enter(&so_conn->ic_tx_mutex);
 
+	DTRACE_ISCSI_8(xfer__start, idm_conn_t *, idt->idt_ic,
+	    uintptr_t, idb->idb_buf, uint32_t, idb->idb_bufoffset,
+	    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+	    uint32_t, idb->idb_xfer_len, int, XFER_BUF_TX_TO_INI);
+
 	if (!so_conn->ic_tx_thread_running) {
 		mutex_exit(&so_conn->ic_tx_mutex);
 		/*
 		 * Don't release idt->idt_mutex since we're supposed to hold
 		 * in when calling idm_buf_tx_to_ini_done
 		 */
+		DTRACE_ISCSI_8(xfer__done, idm_conn_t *, idt->idt_ic,
+		    uintptr_t, idb->idb_buf, uint32_t, idb->idb_bufoffset,
+		    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+		    uint32_t, idb->idb_xfer_len,
+		    int, XFER_BUF_TX_TO_INI);
 		idm_buf_tx_to_ini_done(idt, idb, IDM_STATUS_ABORTED);
 		return (IDM_STATUS_FAIL);
 	}
@@ -2217,6 +2244,11 @@ idm_so_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb)
 	iscsi_rtt_hdr_t		*rtt;
 
 	ASSERT(mutex_owned(&idt->idt_mutex));
+
+	DTRACE_ISCSI_8(xfer__start, idm_conn_t *, idt->idt_ic,
+	    uintptr_t, idb->idb_buf, uint32_t, idb->idb_bufoffset,
+	    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+	    uint32_t, idb->idb_xfer_len, int, XFER_BUF_RX_FROM_INI);
 
 	pdu = kmem_cache_alloc(idm.idm_sotx_pdu_cache, KM_SLEEP);
 	pdu->isp_ic = idt->idt_ic;
@@ -2442,6 +2474,13 @@ idm_so_send_buf_region(idm_task_t *idt, idm_buf_t *idb,
 			bhs->flags = ISCSI_FLAG_FINAL; /* F bit set to 1 */
 		}
 
+		/* Instrument the data-send DTrace probe. */
+		if (IDM_PDU_OPCODE(pdu) == ISCSI_OP_SCSI_DATA_RSP) {
+			DTRACE_ISCSI_2(data__send,
+			    idm_conn_t *, idt->idt_ic,
+			    iscsi_data_rsp_hdr_t *,
+			    (iscsi_data_rsp_hdr_t *)pdu->isp_hdr);
+		}
 		/* setup data */
 		pdu->isp_data	=  (uint8_t *)idb->idb_buf + data_offset;
 		pdu->isp_datalen = (uint_t)chunk;
@@ -2617,6 +2656,13 @@ idm_sotx_thread(void *arg)
 				 * idm_buf_tx_to_ini_done releases
 				 * idt->idt_mutex
 				 */
+				DTRACE_ISCSI_8(xfer__done,
+				    idm_conn_t *, idt->idt_ic,
+				    uintptr_t, idb->idb_buf,
+				    uint32_t, idb->idb_bufoffset,
+				    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+				    uint32_t, idb->idb_xfer_len,
+				    int, XFER_BUF_TX_TO_INI);
 				idm_buf_tx_to_ini_done(idt, idb, status);
 			} else {
 				idm_so_send_rtt_data_done(idt, idb);
@@ -2672,6 +2718,13 @@ tx_bail:
 				 * idm_buf_tx_to_ini_done releases
 				 * idt->idt_mutex
 				 */
+				DTRACE_ISCSI_8(xfer__done,
+				    idm_conn_t *, idt->idt_ic,
+				    uintptr_t, idb->idb_buf,
+				    uint32_t, idb->idb_bufoffset,
+				    uint64_t, 0, uint32_t, 0, uint32_t, 0,
+				    uint32_t, idb->idb_xfer_len,
+				    int, XFER_BUF_TX_TO_INI);
 				idm_buf_tx_to_ini_done(idt, idb,
 				    IDM_STATUS_ABORTED);
 			} else {

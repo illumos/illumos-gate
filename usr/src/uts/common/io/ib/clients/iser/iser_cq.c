@@ -87,6 +87,7 @@ iser_ib_poll_send_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 	ibt_status_t	status;
 	iser_conn_t	*iser_conn;
 	idm_status_t	idm_status;
+	iser_mr_t	*mr;
 
 	iser_conn = iser_chan->ic_conn;
 
@@ -155,6 +156,8 @@ iser_ib_poll_send_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 			if (wr->iw_buf != NULL) {
 				/* Invoke buffer callback */
 				idb = wr->iw_buf;
+				mr = ((iser_buf_t *)
+				    idb->idb_buf_private)->iser_mr;
 #ifdef DEBUG
 				bcopy(&wc[i],
 				    &((iser_buf_t *)idb->idb_buf_private)->
@@ -163,9 +166,25 @@ iser_ib_poll_send_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 				idt = idb->idb_task_binding;
 				mutex_enter(&idt->idt_mutex);
 				if (wr->iw_type == ISER_WR_RDMAW) {
+					DTRACE_ISCSI_8(xfer__done,
+					    idm_conn_t *, idt->idt_ic,
+					    uintptr_t, idb->idb_buf,
+					    uint32_t, idb->idb_bufoffset,
+					    uint64_t, mr->is_mrva, uint32_t, 0,
+					    uint32_t, mr->is_mrrkey,
+					    uint32_t, idb->idb_xfer_len,
+					    int, XFER_BUF_TX_TO_INI);
 					idm_buf_tx_to_ini_done(idt, idb,
 					    IDM_STATUS_FAIL);
 				} else { /* ISER_WR_RDMAR */
+					DTRACE_ISCSI_8(xfer__done,
+					    idm_conn_t *, idt->idt_ic,
+					    uintptr_t, idb->idb_buf,
+					    uint32_t, idb->idb_bufoffset,
+					    uint64_t, mr->is_mrva, uint32_t, 0,
+					    uint32_t, mr->is_mrrkey,
+					    uint32_t, idb->idb_xfer_len,
+					    int, XFER_BUF_RX_FROM_INI);
 					idm_buf_rx_from_ini_done(idt, idb,
 					    IDM_STATUS_FAIL);
 				}
@@ -241,6 +260,7 @@ iser_ib_poll_send_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 			 * the buffer will be freed there.
 			 */
 			idb = wr->iw_buf;
+			mr = ((iser_buf_t *)idb->idb_buf_private)->iser_mr;
 #ifdef DEBUG
 			bcopy(&wc[i],
 			    &((iser_buf_t *)idb->idb_buf_private)->buf_wc,
@@ -250,8 +270,24 @@ iser_ib_poll_send_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 
 			mutex_enter(&idt->idt_mutex);
 			if (wr->iw_type == ISER_WR_RDMAW) {
+				DTRACE_ISCSI_8(xfer__done,
+				    idm_conn_t *, idt->idt_ic,
+				    uintptr_t, idb->idb_buf,
+				    uint32_t, idb->idb_bufoffset,
+				    uint64_t, mr->is_mrva, uint32_t, 0,
+				    uint32_t, mr->is_mrrkey,
+				    uint32_t, idb->idb_xfer_len,
+				    int, XFER_BUF_TX_TO_INI);
 				idm_buf_tx_to_ini_done(idt, idb, idm_status);
 			} else {
+				DTRACE_ISCSI_8(xfer__done,
+				    idm_conn_t *, idt->idt_ic,
+				    uintptr_t, idb->idb_buf,
+				    uint32_t, idb->idb_bufoffset,
+				    uint64_t, mr->is_mrva, uint32_t, 0,
+				    uint32_t, mr->is_mrrkey,
+				    uint32_t, idb->idb_xfer_len,
+				    int, XFER_BUF_RX_FROM_INI);
 				idm_buf_rx_from_ini_done(idt, idb, idm_status);
 			}
 

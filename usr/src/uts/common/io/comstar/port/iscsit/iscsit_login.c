@@ -1092,6 +1092,7 @@ login_sm_validate_initial_parameters(iscsit_conn_t *ict)
 		goto initial_params_done;
 	}
 	lsm->icl_initiator_name = string_val;
+	idm_conn_set_initiator_name(ict->ict_ic, lsm->icl_initiator_name);
 	if ((nvrc = nvlist_remove(lsm->icl_request_nvlist,
 	    "InitiatorName", DATA_TYPE_STRING)) != 0) {
 		goto initial_params_done;
@@ -1141,6 +1142,7 @@ login_sm_validate_initial_parameters(iscsit_conn_t *ict)
 			goto initial_params_done;
 		}
 		lsm->icl_target_name = string_val;
+		idm_conn_set_target_name(ict->ict_ic, lsm->icl_target_name);
 		if ((nvrc = nvlist_remove(lsm->icl_request_nvlist,
 		    "TargetName", DATA_TYPE_STRING)) != 0) {
 			goto initial_params_done;
@@ -1151,6 +1153,10 @@ login_sm_validate_initial_parameters(iscsit_conn_t *ict)
 		 */
 		goto initial_params_done;
 	}
+
+	idm_conn_set_isid(ict->ict_ic, lsm->icl_isid);
+	(void) snprintf(ict->ict_ic->ic_tsih, ISCSI_MAX_TSIH_LEN + 1, "0x%04x",
+	    lsm->icl_tsih);
 
 	IDM_SM_LOG(CE_NOTE, "conn %p: initiator=%s", (void *)ict->ict_ic,
 	    (lsm->icl_initiator_name == NULL) ? "N/A" :
