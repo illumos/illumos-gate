@@ -5267,15 +5267,18 @@ zone_get_brand(char *zone_name, char *brandname, size_t rp_sz)
 		if (zone_getattr(myzoneid, ZONE_ATTR_NAME, myzone,
 		    sizeof (myzone)) < 0)
 			return (Z_NO_ZONE);
-		if (strncmp(zone_name, myzone, MAXNAMELEN) != NULL)
-			return (Z_NO_ZONE);
+		if (!zonecfg_is_scratch(myzone)) {
+			if (strncmp(zone_name, myzone, MAXNAMELEN) != 0)
+				return (Z_NO_ZONE);
+		}
 		err = zone_getattr(myzoneid, ZONE_ATTR_BRAND, brandname, rp_sz);
 		if (err < 0)
 			return ((errno == EFAULT) ? Z_TOO_BIG : Z_INVAL);
+
 		return (Z_OK);
 	}
 
-	if (strcmp(zone_name, "global") == NULL) {
+	if (strcmp(zone_name, "global") == 0) {
 		(void) strlcpy(brandname, NATIVE_BRAND_NAME, rp_sz);
 		return (Z_OK);
 	}
