@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -885,20 +883,33 @@ ufs__fiolfs(
 	if (!vp || !vp->v_vfsp || !vp->v_vfsp->vfs_data)
 		return (EIO);
 
-	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED) /* has been unmounted */
+	vfsp = vp->v_vfsp;
+
+	if (vfsp->vfs_flag & VFS_UNMOUNTED) /* has been unmounted */
 		return (EIO);
 
 	/* take the lock and check again */
-	vfs_lock_wait(vp->v_vfsp);
-	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED) {
-		vfs_unlock(vp->v_vfsp);
+	vfs_lock_wait(vfsp);
+	if (vfsp->vfs_flag & VFS_UNMOUNTED) {
+		vfs_unlock(vfsp);
 		return (EIO);
 	}
 
-	vfsp = vp->v_vfsp;
+	/*
+	 * Can't wlock or ro/elock fs with accounting or local swap file
+	 * We need to check for this before we grab the ul_lock to avoid
+	 * deadlocks with the accounting framework.
+	 */
+	if ((LOCKFS_IS_WLOCK(lockfsp) || LOCKFS_IS_ELOCK(lockfsp) ||
+	    LOCKFS_IS_ROELOCK(lockfsp)) && !from_log) {
+		if (ufs_checkaccton(vp) || ufs_checkswapon(vp)) {
+			vfs_unlock(vfsp);
+			return (EDEADLK);
+		}
+	}
+
 	ufsvfsp = (struct ufsvfs *)vfsp->vfs_data;
 	ulp = &ufsvfsp->vfs_ulockfs;
-
 	head = (ulockfs_info_t *)tsd_get(ufs_lockfs_key);
 	SEARCH_ULOCKFSP(head, ulp, info);
 
@@ -1026,17 +1037,6 @@ ufs__fiolfs(
 	if (info && (info->flags & ULOCK_INFO_FALLOCATE)) {
 		if (ULOCKFS_IS_WLOCK(ulp))
 			ULOCKFS_SET_FWLOCK(ulp);
-	}
-
-	/*
-	 * can't wlock or (ro)elock fs with accounting or local swap file
-	 */
-	if ((ULOCKFS_IS_WLOCK(ulp) || ULOCKFS_IS_ELOCK(ulp) ||
-	    ULOCKFS_IS_ROELOCK(ulp)) && !from_log) {
-		if (error = ufs_checkaccton(vp))
-			goto errout;
-		if (error = ufs_checkswapon(vp))
-			goto errout;
 	}
 
 	/*
