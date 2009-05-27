@@ -406,8 +406,8 @@ typedef struct rdmaops {
 	rdma_stat	(*rdma_reachable)(int addr_type, struct netbuf *,
 						void **handle);
 	/* Connection */
-	rdma_stat	(*rdma_get_conn)(struct netbuf *, int addr_type,
-						void *, CONN **);
+	rdma_stat	(*rdma_get_conn)(struct netbuf *, struct netbuf *,
+					int addr_type, void *, CONN **);
 	rdma_stat	(*rdma_rel_conn)(CONN *);
 	/* Server side listner start and stop routines */
 	void		(*rdma_svc_listen)(struct rdma_svc_data *);
@@ -452,8 +452,8 @@ extern rdma_svc_wait_t rdma_wait;
 #define	RDMA_REACHABLE(rdma_ops, addr_type, addr, handle)	\
 	(*(rdma_ops)->rdma_reachable)(addr_type, addr, handle)
 
-#define	RDMA_GET_CONN(rdma_ops, addr, addr_type, handle, conn)	\
-	(*(rdma_ops)->rdma_get_conn)(addr, addr_type, handle, conn)
+#define	RDMA_GET_CONN(rdma_ops, saddr, daddr, addr_type, handle, conn)	\
+	(*(rdma_ops)->rdma_get_conn)(saddr, daddr, addr_type, handle, conn)
 
 #define	RDMA_REL_CONN(conn)	\
 	(*(conn)->c_rdmamod->rdma_ops->rdma_rel_conn)(conn)

@@ -168,33 +168,33 @@ struct rib_cq_s {
 };
 
 /*
+ * Each registered service's data structure.
+ */
+typedef struct rib_service_s rib_service_t;
+struct rib_service_s {
+	uint32_t		srv_type;	/* i.e, NFS, NLM, v4CBD */
+	ibt_srv_hdl_t		srv_hdl;	/* from ibt_register call */
+	ib_svc_id_t		srv_id;
+	rib_service_t		*next;
+};
+
+/*
  * RPCIB plugin state
  */
 typedef struct rpcib_state {
 	ibt_clnt_hdl_t		ibt_clnt_hdl;
 	uint32_t		hca_count;
 	uint32_t		nhca_inited;
-	ib_guid_t		*hca_guids;
-	rib_hca_t		*hcas;
+	rib_hca_t		*hcas_list;
+	krwlock_t		hcas_list_lock;	/* protects hcas_list */
 	int			refcount;
 	kmutex_t		open_hca_lock;
-	rib_hca_t		*hca;		/* the hca being used */
 	queue_t			*q;		/* up queue for a serv_type */
-	uint32_t		service_type;	/* NFS, NLM, etc */
 	void			*private;
+	rib_service_t		*service_list;
+	krwlock_t		service_list_lock;
+	kmutex_t		listen_lock;
 } rpcib_state_t;
-
-/*
- * Each registered service's data structure.
- * Each HCA has a list of these structures, which are the registered
- * services on this HCA.
- */
-typedef struct rib_service rib_service_t;
-struct rib_service {
-	uint32_t		srv_type;	/* i.e, NFS, NLM, v4CBD */
-	ibt_srv_hdl_t		srv_hdl;	/* from ibt_register call */
-	rib_service_t		*srv_next;
-};
 
 /*
  * Connection lists
@@ -209,6 +209,14 @@ enum hca_state {
 	HCA_INITED,		/* hca in up and running state */
 };
 
+typedef struct rib_hca_service_s rib_hca_service_t;
+struct rib_hca_service_s {
+	ib_svc_id_t	srv_id;
+	ib_gid_t	gid;
+	ibt_sbind_hdl_t	sbind_hdl;
+	rib_hca_service_t *next;
+};
+
 /*
  * RPCIB per HCA structure
  */
@@ -221,6 +229,8 @@ struct rib_hca_s {
 	ibt_hca_hdl_t		hca_hdl;	/* HCA handle */
 	ibt_hca_attr_t		hca_attrs;	/* HCA attributes */
 	ibt_pd_hdl_t		pd_hdl;
+	rib_hca_service_t	*bound_services;
+	krwlock_t		bound_services_lock;
 	ib_guid_t		hca_guid;
 	uint32_t		hca_nports;
 	ibt_hca_portinfo_t	*hca_ports;
@@ -229,15 +239,6 @@ struct rib_hca_s {
 	krwlock_t		state_lock;	/* protects state field */
 	bool_t			inuse;		/* indicates HCA usage */
 	kmutex_t		inuse_lock;	/* protects inuse field */
-	/*
-	 * List of services registered on all ports available
-	 * on this HCA. Only one consumer of KRPC can register
-	 * its services at one time or tear them down at one
-	 * time.
-	 */
-	rib_service_t	*service_list;
-	krwlock_t		service_list_lock;
-
 
 	rib_conn_list_t		cl_conn_list;	/* client conn list */
 	rib_conn_list_t		srv_conn_list;	/* server conn list */
@@ -259,11 +260,20 @@ struct rib_hca_s {
 	kmutex_t	avl_lock;
 	krwlock_t	avl_rw_lock;
 	volatile bool_t avl_init;
-	kmutex_t	cache_allocation;
+	kmutex_t	cache_allocation_lock;
 	ddi_taskq_t	*cleanup_helper;
 	ib_svc_id_t	srv_id;
 	ibt_srv_hdl_t 	srv_hdl;
 	uint_t		reg_state;
+
+	volatile uint64_t	cache_allocation;
+	uint64_t	cache_hits;
+	uint64_t	cache_misses;
+	uint64_t	cache_cold_misses;
+	uint64_t	cache_hot_misses;
+	uint64_t	cache_misses_above_the_limit;
+
+	struct rib_hca_s *next;
 };
 
 

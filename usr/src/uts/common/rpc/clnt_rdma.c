@@ -116,6 +116,7 @@ typedef struct cku_private {
 	CLIENT			cku_client;	/* client handle */
 	rdma_mod_t		*cku_rd_mod;	/* underlying RDMA mod */
 	void			*cku_rd_handle;	/* underlying RDMA device */
+	struct netbuf		cku_srcaddr;	/* source address for retries */
 	struct netbuf		cku_addr;	/* remote netbuf address */
 	int			cku_addrfmly;	/* for finding addr_type */
 	struct rpc_err		cku_err;	/* error status */
@@ -267,6 +268,9 @@ clnt_rdma_kcreate(char *proto, void *handle, struct netbuf *raddr, int family,
 	 * Set up the rpc information
 	 */
 	p->cku_cred = cred;
+	p->cku_srcaddr.buf = kmem_zalloc(raddr->maxlen, KM_SLEEP);
+	p->cku_srcaddr.maxlen = raddr->maxlen;
+	p->cku_srcaddr.len = 0;
 	p->cku_addr.buf = kmem_zalloc(raddr->maxlen, KM_SLEEP);
 	p->cku_addr.maxlen = raddr->maxlen;
 	p->cku_addr.len = raddr->len;
@@ -282,6 +286,7 @@ clnt_rdma_kdestroy(CLIENT *h)
 {
 	struct cku_private *p = htop(h);
 
+	kmem_free(p->cku_srcaddr.buf, p->cku_srcaddr.maxlen);
 	kmem_free(p->cku_addr.buf, p->cku_addr.maxlen);
 	kmem_free(p, sizeof (*p));
 }
@@ -324,6 +329,8 @@ clnt_rdma_kinit(CLIENT *h, char *proto, void *handle, struct netbuf *raddr,
 		p->cku_addr.buf = kmem_zalloc(raddr->maxlen, KM_SLEEP);
 		p->cku_addr.maxlen = raddr->maxlen;
 	}
+
+	p->cku_srcaddr.len = 0;
 
 	p->cku_addr.len = raddr->len;
 	bcopy(raddr->buf, p->cku_addr.buf, raddr->len);
@@ -646,8 +653,8 @@ call_again:
 	if (p->cku_xid == 0)
 		p->cku_xid = alloc_xid();
 
-	status = RDMA_GET_CONN(p->cku_rd_mod->rdma_ops, &p->cku_addr,
-	    p->cku_addrfmly, p->cku_rd_handle, &conn);
+	status = RDMA_GET_CONN(p->cku_rd_mod->rdma_ops, &p->cku_srcaddr,
+	    &p->cku_addr, p->cku_addrfmly, p->cku_rd_handle, &conn);
 	rw_exit(&rdma_lock);
 
 	/*
@@ -702,6 +709,18 @@ call_again:
 
 		return (p->cku_err.re_status);
 	}
+
+	if (p->cku_srcaddr.maxlen < conn->c_laddr.len) {
+		if ((p->cku_srcaddr.maxlen != 0) &&
+		    (p->cku_srcaddr.buf != NULL))
+			kmem_free(p->cku_srcaddr.buf, p->cku_srcaddr.maxlen);
+		p->cku_srcaddr.buf = kmem_zalloc(conn->c_laddr.maxlen,
+		    KM_SLEEP);
+		p->cku_srcaddr.maxlen = conn->c_laddr.maxlen;
+	}
+
+	p->cku_srcaddr.len = conn->c_laddr.len;
+	bcopy(conn->c_laddr.buf, p->cku_srcaddr.buf, conn->c_laddr.len);
 
 	clnt_check_credit(conn);
 
