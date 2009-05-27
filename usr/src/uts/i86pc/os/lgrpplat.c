@@ -348,6 +348,16 @@ int			lgrp_plat_srat_enable = 1;
 int			lgrp_plat_slit_enable = 1;
 
 /*
+ * mnode_xwa: set to non-zero value to initiate workaround if large pages are
+ * found to be crossing memory node boundaries. The workaround will eliminate
+ * a base size page at the end of each memory node boundary to ensure that
+ * a large page with constituent pages that span more than 1 memory node
+ * can never be formed.
+ *
+ */
+int	mnode_xwa = 1;
+
+/*
  * Static array to hold lgroup statistics
  */
 struct lgrp_stats	lgrp_stats[NLGRP];
@@ -468,6 +478,7 @@ plat_build_mem_nodes(struct memlist *list)
 	pfn_t		cur_end;	/* end addr of subrange */
 	pfn_t		start;		/* start addr of whole range */
 	pfn_t		end;		/* end addr of whole range */
+	pgcnt_t		endcnt;		/* pages to sacrifice */
 
 	/*
 	 * Boot install lists are arranged <addr, len>, ...
@@ -525,11 +536,21 @@ plat_build_mem_nodes(struct memlist *list)
 			 * End of current subrange should not span memnodes
 			 */
 			cur_end = end;
+			endcnt = 0;
 			if (lgrp_plat_node_memory[node].exists &&
-			    cur_end > lgrp_plat_node_memory[node].end)
+			    cur_end > lgrp_plat_node_memory[node].end) {
 				cur_end = lgrp_plat_node_memory[node].end;
+				if (mnode_xwa > 1) {
+					/*
+					 * sacrifice the last page in each
+					 * node to eliminate large pages
+					 * that span more than 1 memory node.
+					 */
+					endcnt = 1;
+				}
+			}
 
-			mem_node_add_slice(cur_start, cur_end);
+			mem_node_add_slice(cur_start, cur_end - endcnt);
 
 			/*
 			 * Next subrange starts after end of current one
@@ -609,8 +630,15 @@ plat_mnode_xcheck(pfn_t pfncnt)
 
 			ASSERT((ea - sa) == pfncnt);
 			if (sa >= lgrp_plat_node_memory[basenode].start &&
-			    ea <= (lgrp_plat_node_memory[node].end + 1))
-				return (1);
+			    ea <= (lgrp_plat_node_memory[node].end + 1)) {
+				/*
+				 * large page found to cross mnode boundary.
+				 * Return Failure if workaround not enabled.
+				 */
+				if (mnode_xwa == 0)
+					return (1);
+				mnode_xwa++;
+			}
 		}
 		prevnode = node;
 	}

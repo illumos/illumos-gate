@@ -2325,11 +2325,14 @@ kphysm_init(
 	struct memlist	*pmem;
 	struct memseg	*cur_memseg;
 	pfn_t		base_pfn;
+	pfn_t		end_pfn;
 	pgcnt_t		num;
 	pgcnt_t		pages_done = 0;
 	uint64_t	addr;
 	uint64_t	size;
 	extern pfn_t	ddiphysmin;
+	extern int	mnode_xwa;
+	int		ms = 0, me = 0;
 
 	ASSERT(page_hash != NULL && page_hashsz != 0);
 
@@ -2386,39 +2389,75 @@ kphysm_init(
 		}
 
 		/*
-		 * Build the memsegs entry
+		 * mnode_xwa is greater than 1 when large pages regions can
+		 * cross memory node boundaries. To prevent the formation
+		 * of these large pages, configure the memsegs based on the
+		 * memory node ranges which had been made non-contiguous.
 		 */
-		cur_memseg->pages = pp;
-		cur_memseg->epages = pp + num;
-		cur_memseg->pages_base = base_pfn;
-		cur_memseg->pages_end = base_pfn + num;
+		if (mnode_xwa > 1) {
 
-		/*
-		 * Insert into memseg list in decreasing pfn range order.
-		 * Low memory is typically more fragmented such that this
-		 * ordering keeps the larger ranges at the front of the list
-		 * for code that searches memseg.
-		 * This ASSERTS that the memsegs coming in from boot are in
-		 * increasing physical address order and not contiguous.
-		 */
-		if (memsegs != NULL) {
-			ASSERT(cur_memseg->pages_base >= memsegs->pages_end);
-			cur_memseg->next = memsegs;
+			end_pfn = base_pfn + num - 1;
+			ms = PFN_2_MEM_NODE(base_pfn);
+			me = PFN_2_MEM_NODE(end_pfn);
+
+			if (ms != me) {
+				/*
+				 * current range spans more than 1 memory node.
+				 * Set num to only the pfn range in the start
+				 * memory node.
+				 */
+				num = mem_node_config[ms].physmax - base_pfn
+				    + 1;
+				ASSERT(end_pfn > mem_node_config[ms].physmax);
+			}
 		}
-		memsegs = cur_memseg;
 
-		/*
-		 * add_physmem() initializes the PSM part of the page
-		 * struct by calling the PSM back with add_physmem_cb().
-		 * In addition it coalesces pages into larger pages as
-		 * it initializes them.
-		 */
-		add_physmem(pp, num, base_pfn);
-		cur_memseg++;
-		availrmem_initial += num;
-		availrmem += num;
+		for (;;) {
+			/*
+			 * Build the memsegs entry
+			 */
+			cur_memseg->pages = pp;
+			cur_memseg->epages = pp + num;
+			cur_memseg->pages_base = base_pfn;
+			cur_memseg->pages_end = base_pfn + num;
 
-		pp += num;
+			/*
+			 * Insert into memseg list in decreasing pfn range
+			 * order. Low memory is typically more fragmented such
+			 * that this ordering keeps the larger ranges at the
+			 * front of the list for code that searches memseg.
+			 * This ASSERTS that the memsegs coming in from boot
+			 * are in increasing physical address order and not
+			 * contiguous.
+			 */
+			if (memsegs != NULL) {
+				ASSERT(cur_memseg->pages_base >=
+				    memsegs->pages_end);
+				cur_memseg->next = memsegs;
+			}
+			memsegs = cur_memseg;
+
+			/*
+			 * add_physmem() initializes the PSM part of the page
+			 * struct by calling the PSM back with add_physmem_cb().
+			 * In addition it coalesces pages into larger pages as
+			 * it initializes them.
+			 */
+			add_physmem(pp, num, base_pfn);
+			cur_memseg++;
+			availrmem_initial += num;
+			availrmem += num;
+
+			pp += num;
+			if (ms >= me)
+				break;
+
+			/* process next memory node range */
+			ms++;
+			base_pfn = mem_node_config[ms].physbase;
+			num = MIN(mem_node_config[ms].physmax,
+			    end_pfn) - base_pfn + 1;
+		}
 	}
 
 	PRM_DEBUG(availrmem_initial);
