@@ -43,9 +43,7 @@
 extern uint32_t nxge_no_link_notify;
 extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
-extern boolean_t nxge_jumbo_enable;
 extern uint32_t nxge_jumbo_mtu;
-
 
 typedef enum {
 	CHECK_LINK_RESCHEDULE,
@@ -5038,7 +5036,7 @@ phy_check_done:
 						}
 					}
 				} else if (link_up) { /* XAUI linkup, no PHY */
-					/* 
+					/*
 					 * This is the back-to-back XAUI
 					 * connect case for Opus NEM.
 					 */

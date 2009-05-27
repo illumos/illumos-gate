@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +53,6 @@ static nxge_status_t nxge_check_xaui_xfp(p_nxge_t nxgep);
 
 extern uint32_t nxge_rx_mode;
 extern uint32_t nxge_jumbo_mtu;
-extern boolean_t nxge_jumbo_enable;
 
 static void
 nxge_rtrace_ioctl(p_nxge_t, queue_t *, mblk_t *, struct iocblk *);
@@ -97,24 +97,21 @@ void
 nxge_hw_id_init(p_nxge_t nxgep)
 {
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_hw_id_init"));
+
 	/*
 	 * Set up initial hardware parameters required such as mac mtu size.
 	 */
 	nxgep->mac.is_jumbo = B_FALSE;
+
 	/*
 	 * Set the maxframe size to 1522 (1518 + 4) to account for
 	 * VLAN tagged packets.
 	 */
-	nxgep->mac.minframesize = NXGE_MIN_MAC_FRAMESIZE; /* 64   */
-	nxgep->mac.maxframesize = NXGE_MAX_MAC_FRAMESIZE; /* 1522 */
-	if (nxgep->param_arr[param_accept_jumbo].value || nxge_jumbo_enable) {
-		nxgep->mac.maxframesize = (uint16_t)nxge_jumbo_mtu;
-		nxgep->mac.is_jumbo = B_TRUE;
-	}
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-	    "==> nxge_hw_id_init: maxframesize %d",
-	    nxgep->mac.maxframesize));
+	nxgep->mac.minframesize = NXGE_MIN_MAC_FRAMESIZE;	/* 64 */
+	nxgep->mac.maxframesize = NXGE_MAX_MAC_FRAMESIZE;	/* 1522 */
 
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_hw_id_init: maxframesize %d",
+	    nxgep->mac.maxframesize));
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_hw_id_init"));
 }
 

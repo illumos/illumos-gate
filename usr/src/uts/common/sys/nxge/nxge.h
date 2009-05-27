@@ -125,7 +125,6 @@ typedef enum {
 	param_ipg0,
 	param_ipg1,
 	param_ipg2,
-	param_accept_jumbo,
 	param_txdma_weight,
 	param_txdma_channels_begin,
 

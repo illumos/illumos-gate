@@ -105,14 +105,33 @@ nxge_tx_ring_send(void *arg, mblk_t *mp)
 	channel = nxgep->pt_config.hw_config.tdc.start + nrhp->index;
 	tx_ring_p = nxgep->tx_rings->rings[channel];
 
+	/*
+	 * We may be in a transition from offlined DMA to onlined
+	 * DMA.
+	 */
+	if (tx_ring_p == NULL) {
+		ASSERT(tx_ring_p != NULL);
+		freemsg(mp);
+		return ((mblk_t *)NULL);
+	}
+
+	/*
+	 * Valid DMA?
+	 */
 	ASSERT(nxgep == tx_ring_p->nxgep);
 
-#ifdef DEBUG
-	if (isLDOMservice(nxgep)) {
+	/*
+	 * Make sure DMA is not offlined.
+	 */
+	if (isLDOMservice(nxgep) && tx_ring_p->tx_ring_offline) {
 		ASSERT(!tx_ring_p->tx_ring_offline);
+		freemsg(mp);
+		return ((mblk_t *)NULL);
 	}
-#endif
 
+	/*
+	 * Transmit the packet.
+	 */
 	status = nxge_start(nxgep, tx_ring_p, mp);
 	if (status) {
 		nxge_tx_ring_dispatch(tx_ring_p);

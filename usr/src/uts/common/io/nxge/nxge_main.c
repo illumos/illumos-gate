@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -102,7 +103,6 @@ uint32_t 	nxge_bcopy_thresh = TX_BCOPY_MAX;
 uint32_t 	nxge_dvma_thresh = TX_FASTDVMA_MIN;
 uint32_t 	nxge_dma_stream_thresh = TX_STREAM_MIN;
 uint32_t	nxge_jumbo_mtu	= TX_JUMBO_MTU;
-boolean_t	nxge_jumbo_enable = B_FALSE;
 nxge_tx_mode_t	nxge_tx_scheme = NXGE_USE_SERIAL;
 
 /* MAX LSO size */
@@ -309,7 +309,6 @@ mac_priv_prop_t nxge_priv_props[] = {
 	{"_fw_version", MAC_PROP_PERM_READ},
 	{"_port_mode", MAC_PROP_PERM_READ},
 	{"_hot_swap_phy", MAC_PROP_PERM_READ},
-	{"_accept_jumbo", MAC_PROP_PERM_RW},
 	{"_rxdma_intr_time", MAC_PROP_PERM_RW},
 	{"_rxdma_intr_pkts", MAC_PROP_PERM_RW},
 	{"_class_opt_ipv4_tcp", MAC_PROP_PERM_RW},
@@ -529,7 +528,6 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int		status = DDI_SUCCESS;
 	uint8_t		portn;
 	nxge_mmac_t	*mmac_info;
-	p_nxge_param_t	param_arr;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_attach"));
 
@@ -733,6 +731,11 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_prop_free(regp);
 	}
 
+	/*
+	 * Set the defaults for the MTU size.
+	 */
+	nxge_hw_id_init(nxgep);
+
 	if (isLDOMguest(nxgep)) {
 		uchar_t *prop_val;
 		uint_t prop_len;
@@ -775,9 +778,6 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "max-frame-size", NXGE_MTU_DEFAULT_MAX);
 		if ((max_frame_size > NXGE_MTU_DEFAULT_MAX) &&
 		    (max_frame_size <= TX_JUMBO_MTU)) {
-			param_arr = nxgep->param_arr;
-
-			param_arr[param_accept_jumbo].value = 1;
 			nxgep->mac.is_jumbo = B_TRUE;
 			nxgep->mac.maxframesize = (uint16_t)max_frame_size;
 			nxgep->mac.default_mtu = nxgep->mac.maxframesize -
@@ -816,7 +816,6 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto nxge_attach_fail;
 	}
 
-	nxge_hw_id_init(nxgep);
 
 	if (!isLDOMguest(nxgep))
 		nxge_hw_init_niu_common(nxgep);
@@ -1216,8 +1215,9 @@ nxge_map_regs(p_nxge_t nxgep)
 #if !defined(_BIG_ENDIAN)
 		/* workarounds for x86 systems */
 		pci_offset = 0x80 + PCIE_DEVCTL;
-		pcie_devctl = 0x0;
-		pcie_devctl &= PCIE_DEVCTL_ENABLE_NO_SNOOP;
+		pcie_devctl = pci_config_get16(dev_regs->nxge_pciregh,
+		    pci_offset);
+		pcie_devctl &= ~PCIE_DEVCTL_ENABLE_NO_SNOOP;
 		pcie_devctl |= PCIE_DEVCTL_RO_EN;
 		pci_config_put16(dev_regs->nxge_pciregh, pci_offset,
 		    pcie_devctl);
@@ -4515,18 +4515,14 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 				err = 0;
 				break;
 			}
+
 			if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
 				err = EBUSY;
 				break;
 			}
-			if (new_mtu < NXGE_DEFAULT_MTU ||
-			    new_mtu > NXGE_MAXIMUM_MTU) {
-				err = EINVAL;
-				break;
-			}
 
-			if ((new_mtu > NXGE_DEFAULT_MTU) &&
-			    !nxgep->mac.is_jumbo) {
+			if ((new_mtu < NXGE_DEFAULT_MTU) ||
+			    (new_mtu > NXGE_MAXIMUM_MTU)) {
 				err = EINVAL;
 				break;
 			}
@@ -4550,6 +4546,11 @@ nxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			}
 
 			nxgep->mac.default_mtu = new_mtu;
+			if (new_mtu > NXGE_DEFAULT_MTU)
+				nxgep->mac.is_jumbo = B_TRUE;
+			else
+				nxgep->mac.is_jumbo = B_FALSE;
+
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_m_setprop: set MTU: %d maxframe %d",
 			    new_mtu, nxgep->mac.maxframesize));
@@ -4755,42 +4756,6 @@ nxge_set_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 	    "==> nxge_set_priv_prop: name %s", pr_name));
-
-	if (strcmp(pr_name, "_accept_jumbo") == 0) {
-		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
-		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-		    "<== nxge_set_priv_prop: name %s "
-		    "pr_val %s result %d "
-		    "param %d is_jumbo %d",
-		    pr_name, pr_val, result,
-		    param_arr[param_accept_jumbo].value,
-		    nxgep->mac.is_jumbo));
-
-		if (result > 1 || result < 0) {
-			err = EINVAL;
-		} else {
-			if (nxgep->mac.is_jumbo ==
-			    (uint32_t)result) {
-				NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-				    "no change (%d %d)",
-				    nxgep->mac.is_jumbo,
-				    result));
-				return (0);
-			}
-		}
-
-		param_arr[param_accept_jumbo].value = result;
-		nxgep->mac.is_jumbo = B_FALSE;
-		if (result) {
-			nxgep->mac.is_jumbo = B_TRUE;
-		}
-
-		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-		    "<== nxge_set_priv_prop: name %s (value %d) is_jumbo %d",
-		    pr_name, result, nxgep->mac.is_jumbo));
-
-		return (err);
-	}
 
 	/* Blanking */
 	if (strcmp(pr_name, "_rxdma_intr_time") == 0) {
@@ -5165,24 +5130,6 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 		goto done;
 	}
 
-
-	/* accept jumbo */
-	if (strcmp(pr_name, "_accept_jumbo") == 0) {
-		if (is_default)
-			(void) snprintf(valstr, sizeof (valstr),  "%d", 0);
-		else
-			(void) snprintf(valstr, sizeof (valstr),
-			    "%d", nxgep->mac.is_jumbo);
-		err = 0;
-		NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-		    "==> nxge_get_priv_prop: name %s (value %d (%d, %d))",
-		    pr_name,
-		    (uint32_t)param_arr[param_accept_jumbo].value,
-		    nxgep->mac.is_jumbo,
-		    nxge_jumbo_enable));
-
-		goto done;
-	}
 
 	/* Receive Interrupt Blanking Parameters */
 	if (strcmp(pr_name, "_rxdma_intr_time") == 0) {

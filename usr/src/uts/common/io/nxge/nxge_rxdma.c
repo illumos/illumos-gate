@@ -53,7 +53,6 @@ extern uint32_t nxge_mblks_pending;
  * ISR doing Rx Processing.
  */
 extern uint32_t nxge_max_rx_pkts;
-boolean_t nxge_jumbo_enable;
 
 /*
  * Tunables to manage the receive buffer blocks.
@@ -115,7 +114,6 @@ nxge_status_t nxge_disable_rxdma_channel(p_nxge_t, uint16_t);
 
 static p_rx_msg_t nxge_allocb(size_t, uint32_t, p_nxge_dma_common_t);
 static void nxge_freeb(p_rx_msg_t);
-static mblk_t *nxge_rx_pkts_vring(p_nxge_t, uint_t, rx_dma_ctl_stat_t);
 static nxge_status_t nxge_rx_err_evnts(p_nxge_t, int, rx_dma_ctl_stat_t);
 
 static nxge_status_t nxge_rxdma_handle_port_errors(p_nxge_t,
@@ -1829,7 +1827,7 @@ nxge_rx_intr(void *arg1, void *arg2)
 	npi_handle_t		handle;
 	rx_dma_ctl_stat_t	cs;
 	p_rx_rcr_ring_t		rcr_ring;
-	mblk_t			*mp;
+	mblk_t			*mp = NULL;
 
 	if (ldvp == NULL) {
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
@@ -1928,7 +1926,9 @@ nxge_rx_intr(void *arg1, void *arg2)
 	    cs.bits.hdw.rcrto,
 	    cs.bits.hdw.rcrthres));
 
-	mp = nxge_rx_pkts_vring(nxgep, ldvp->vdma_index, cs);
+	if (rcr_ring->poll_flag == 0) {
+		mp = nxge_rx_pkts(nxgep, rcr_ring, cs, -1);
+	}
 
 	/* error events. */
 	if (cs.value & RX_DMA_CTL_STAT_ERROR) {
@@ -1992,7 +1992,7 @@ nxge_rx_intr(void *arg1, void *arg2)
 	}
 	MUTEX_EXIT(&rcr_ring->lock);
 
-	if (mp) {
+	if (mp != NULL) {
 		if (!isLDOMguest(nxgep))
 			mac_rx_ring(nxgep->mach, rcr_ring->rcr_mac_handle, mp,
 			    rcr_ring->rcr_gen_num);
@@ -2012,76 +2012,6 @@ nxge_rx_intr(void *arg1, void *arg2)
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_intr: DDI_INTR_CLAIMED"));
 	return (DDI_INTR_CLAIMED);
 }
-
-/*
- * Process the packets received in the specified logical device
- * and pass up a chain of message blocks to the upper layer.
- * The RCR ring lock must be held before calling this function.
- */
-static mblk_t *
-nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, rx_dma_ctl_stat_t cs)
-{
-	p_mblk_t		mp;
-	p_rx_rcr_ring_t		rcrp;
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts_vring"));
-	rcrp = nxgep->rx_rcr_rings->rcr_rings[vindex];
-
-	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
-	    "==> nxge_rx_pkts_vring: (calling nxge_rx_pkts)rdc %d "
-	    "rcr_mac_handle $%p ", rcrp->rdc, rcrp->rcr_mac_handle));
-	if ((mp = nxge_rx_pkts(nxgep, rcrp, cs, -1)) == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		    "<== nxge_rx_pkts_vring: no mp"));
-		return (NULL);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts_vring: $%p",
-	    mp));
-
-#ifdef  NXGE_DEBUG
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		    "==> nxge_rx_pkts_vring:calling mac_rx "
-		    "LEN %d mp $%p mp->b_cont $%p mp->b_next $%p rcrp $%p "
-		    "mac_handle $%p",
-		    mp->b_wptr - mp->b_rptr,
-		    mp, mp->b_cont, mp->b_next,
-		    rcrp, rcrp->rcr_mac_handle));
-
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		    "==> nxge_rx_pkts_vring: dump packets "
-		    "(mp $%p b_rptr $%p b_wptr $%p):\n %s",
-		    mp,
-		    mp->b_rptr,
-		    mp->b_wptr,
-		    nxge_dump_packet((char *)mp->b_rptr,
-		    mp->b_wptr - mp->b_rptr)));
-		if (mp->b_cont) {
-			NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			    "==> nxge_rx_pkts_vring: dump b_cont packets "
-			    "(mp->b_cont $%p b_rptr $%p b_wptr $%p):\n %s",
-			    mp->b_cont,
-			    mp->b_cont->b_rptr,
-			    mp->b_cont->b_wptr,
-			    nxge_dump_packet((char *)mp->b_cont->b_rptr,
-			    mp->b_cont->b_wptr - mp->b_cont->b_rptr)));
-		}
-		if (mp->b_next) {
-			NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			    "==> nxge_rx_pkts_vring: dump next packets "
-			    "(b_rptr $%p): %s",
-			    mp->b_next->b_rptr,
-			    nxge_dump_packet((char *)mp->b_next->b_rptr,
-			    mp->b_next->b_wptr - mp->b_next->b_rptr)));
-		}
-#endif
-	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
-	    "<== nxge_rx_pkts_vring: returning rdc %d rcr_mac_handle $%p ",
-	    rcrp->rdc, rcrp->rcr_mac_handle));
-
-	return (mp);
-}
-
 
 /*
  * This routine is the main packet receive processing function.
@@ -3902,7 +3832,7 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 
 	rbrp->block_size = nxgep->rx_default_block_size;
 
-	if (!nxge_jumbo_enable && !nxgep->param_arr[param_accept_jumbo].value) {
+	if (!nxgep->mac.is_jumbo) {
 		rbrp->pkt_buf_size2 = RBR_BUFSZ2_2K;
 		rbrp->pkt_buf_size2_bytes = RBR_BUFSZ2_2K_BYTES;
 		rbrp->npi_pkt_buf_size2 = SIZE_2KB;

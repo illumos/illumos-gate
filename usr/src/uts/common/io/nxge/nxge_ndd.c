@@ -248,9 +248,6 @@ static nxge_param_t	nxge_param_arr[] = {
 	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_DONT_SHOW,
 		0, 255,	4, 4, "ipg2", "ipg2"},
 
-	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
-		0, 1, 0, 0, "accept-jumbo", "accept_jumbo"},
-
 	/* Transmit DMA channels */
 	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ |
 		NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,

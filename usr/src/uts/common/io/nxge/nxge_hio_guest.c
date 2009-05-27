@@ -408,8 +408,15 @@ nxge_hio_vr_add(nxge_t *nxge)
 	if ((*vio->__register)(mac_info, VIO_NET_RES_HYBRID,
 	    nxge->hio_mac_addr, mac_addr, &vr->vhp, &vio->cb)) {
 		NXGE_DEBUG_MSG((nxge, HIO_CTL, "HIO registration() failed"));
+		KMEM_FREE(mac_info->m_src_addr, MAXMACADDRLEN);
+		KMEM_FREE(mac_info->m_dst_addr, MAXMACADDRLEN);
+		mac_free(mac_info);
 		return (NXGE_ERROR);
 	}
+
+	KMEM_FREE(mac_info->m_src_addr, MAXMACADDRLEN);
+	KMEM_FREE(mac_info->m_dst_addr, MAXMACADDRLEN);
+	mac_free(mac_info);
 
 	nxge->hio_vr = vr;	/* For faster lookups. */
 

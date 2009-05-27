@@ -730,6 +730,8 @@ nxge_hio_intr_uninit(
 	}
 
 	interrupts->intr_registered = B_FALSE;
+	KMEM_FREE(interrupts->htable, interrupts->intr_size);
+	interrupts->htable = NULL;
 
 	if (nxge->ldgvp == NULL)
 		goto nxge_hio_intr_uninit_exit;
@@ -746,6 +748,9 @@ nxge_hio_intr_uninit(
 		    sizeof (nxge_ldv_t) * NXGE_INT_MAX_LDS);
 		control->ldvp = 0;
 	}
+
+	KMEM_FREE(control, sizeof (nxge_ldgv_t));
+	nxge->ldgvp = NULL;
 
 nxge_hio_intr_uninit_exit:
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_intr_uninit"));

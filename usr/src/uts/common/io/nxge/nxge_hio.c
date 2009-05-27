@@ -2057,6 +2057,7 @@ nxge_hio_tdc_share(
 	 * Wait until this channel is idle.
 	 */
 	ring = nxge->tx_rings->rings[channel];
+	ASSERT(ring != NULL);
 
 	(void) atomic_swap_32(&ring->tx_ring_offline, NXGE_TX_RING_OFFLINING);
 	if (ring->tx_ring_busy) {

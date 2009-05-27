@@ -2349,6 +2349,11 @@ nxge_unmap_txdma_channel(p_nxge_t nxgep, uint16_t channel)
 
 	nxge_free_txb(nxgep, channel);
 
+	/*
+	 * Cleanup the reference to the ring now that it does not exist.
+	 */
+	nxgep->tx_rings->rings[channel] = NULL;
+
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "<== nxge_unmap_txdma_channel"));
 }
 
