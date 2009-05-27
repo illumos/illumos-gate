@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <assert.h>
@@ -688,6 +688,7 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 		fmd_xprt_post(hdl, fab_fmd_xprt, erpt, 0);
 		if (fmd_xprt_error(hdl, fab_fmd_xprt))
 			goto done;
+		xmlFree(fmri);
 	} else {
 		fmd_hdl_debug(hdl, "Cannot find Target FMRI addr:0x%llx",
 		    tgt_addr);
@@ -695,6 +696,8 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 
 	return;
 done:
+	if (fmri)
+		xmlFree(fmri);
 	fmd_hdl_debug(hdl, "Failed to send Target PCI ereport\n");
 }
 
@@ -1607,6 +1610,9 @@ fab_hc2dev(fmd_hdl_t *hdl, nvlist_t *detector, char **dev_path,
 	    fab_xpathCtx);
 	fmd_hdl_free(hdl, query, FAB_HC2DEV_QUERY_SIZE(query_size));
 
+	if (xpathObj == NULL)
+		goto fail;
+
 	fmd_hdl_debug(hdl, "xpathObj 0x%p type %d\n", xpathObj,
 	    xpathObj->type);
 	nodes = xpathObj->nodesetval;
@@ -1616,10 +1622,12 @@ fab_hc2dev(fmd_hdl_t *hdl, nvlist_t *detector, char **dev_path,
 		fmd_hdl_debug(hdl, "HC Dev Path: %s\n", temp);
 		*dev_path_size = strlen(temp) + 1;
 		*dev_path = fmd_hdl_alloc(hdl, *dev_path_size, FMD_SLEEP);
-		(void) strcpy(*dev_path,
-		    (char *)xmlNodeGetContent(nodes->nodeTab[0]));
+		(void) strlcpy(*dev_path, (char *)temp, *dev_path_size);
+		xmlFree(temp);
+		xmlXPathFreeObject(xpathObj);
 		return (B_TRUE);
 	}
+	xmlXPathFreeObject(xpathObj);
 fail:
 	return (B_FALSE);
 }
@@ -1676,6 +1684,7 @@ static char *
 fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf) {
 	xmlXPathObjectPtr xpathObj;
 	xmlNodeSetPtr	nodes;
+	xmlChar 	*retval;
 	char		query[500];
 	int		bus, dev, fn;
 	char		rcpath[255];
@@ -1713,13 +1722,17 @@ fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf) {
 
 	xpathObj = xmlXPathEvalExpression((const xmlChar *)query, fab_xpathCtx);
 
+	if (xpathObj == NULL)
+		goto fail;
+
 	fmd_hdl_debug(hdl, "xpathObj 0x%p type %d\n", xpathObj, xpathObj->type);
 
 	nodes = xpathObj->nodesetval;
 	if (nodes) {
-		fmd_hdl_debug(hdl, "BDF Dev Path: %s\n",
-		    xmlNodeGetContent(nodes->nodeTab[0]));
-		return ((char *)xmlNodeGetContent(nodes->nodeTab[0]));
+		retval = xmlNodeGetContent(nodes->nodeTab[0]);
+		fmd_hdl_debug(hdl, "BDF Dev Path: %s\n", retval);
+		xmlXPathFreeObject(xpathObj);
+		return ((char *)retval);
 	}
 fail:
 	return (NULL);
@@ -1730,6 +1743,7 @@ fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr) {
 	xmlXPathObjectPtr xpathObj;
 	xmlNodeSetPtr nodes;
 	xmlNodePtr devNode;
+	char *retval;
 	char query[500];
 	int size, i, j;
 	uint32_t prop[50];
@@ -1749,6 +1763,9 @@ fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr) {
 	fmd_hdl_debug(hdl, "xpathObj query %s\n", query);
 
 	xpathObj = xmlXPathEvalExpression((const xmlChar *)query, fab_xpathCtx);
+
+	if (xpathObj == NULL)
+		goto fail;
 
 	fmd_hdl_debug(hdl, "xpathObj 0x%p type %d\n", xpathObj, xpathObj->type);
 
@@ -1797,12 +1814,15 @@ propgroup:
 	for (devNode = devNode->children; devNode; devNode = devNode->next) {
 		if (STRCMP(devNode->name, "propval") &&
 		    STRCMP(GET_PROP(devNode, "name"), "dev")) {
-			fmd_hdl_debug(hdl, "Addr Dev Path: %s\n",
-			    GET_PROP(devNode, "value"));
-			return (GET_PROP(devNode, "value"));
+			retval = GET_PROP(devNode, "value");
+			fmd_hdl_debug(hdl, "Addr Dev Path: %s\n", retval);
+			xmlXPathFreeObject(xpathObj);
+			return (retval);
 		}
 	}
 fail:
+	if (xpathObj != NULL)
+		xmlXPathFreeObject(xpathObj);
 	return (NULL);
 }
 
