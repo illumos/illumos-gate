@@ -196,11 +196,32 @@ softmac_capab_perim(softmac_upper_t *sup, void *data, uint_t flags)
 	return (0);
 }
 
-/* ARGSUSED */
 static mac_tx_notify_handle_t
-softmac_client_tx_notify(void *txcb, mac_tx_notify_t func, void *arg)
+softmac_client_tx_notify(softmac_upper_t *sup, mac_tx_notify_t func, void *arg)
 {
-	return (NULL);
+	ASSERT(MUTEX_HELD(&sup->su_mutex));
+
+	if (func != NULL) {
+		sup->su_tx_notify_func = func;
+		sup->su_tx_notify_arg = arg;
+	} else {
+		/*
+		 * Wait for all tx_notify_func call to be done.
+		 */
+		while (sup->su_tx_inprocess != 0)
+			cv_wait(&sup->su_cv, &sup->su_mutex);
+
+		sup->su_tx_notify_func = NULL;
+		sup->su_tx_notify_arg = NULL;
+	}
+	return ((mac_tx_notify_handle_t)sup);
+}
+
+static boolean_t
+softmac_tx_is_flow_blocked(softmac_upper_t *sup, mac_tx_cookie_t cookie)
+{
+	ASSERT(cookie == (mac_tx_cookie_t)sup);
+	return (sup->su_tx_busy);
 }
 
 static int
@@ -223,15 +244,10 @@ softmac_capab_direct(softmac_upper_t *sup, void *data, uint_t flags)
 		slp->sl_rxinfo = &sup->su_direct_rxinfo;
 		direct->di_tx_df = (uintptr_t)softmac_fastpath_wput_data;
 		direct->di_tx_dh = sup;
-
-		/*
-		 * We relying on the STREAM flow-control to backenable
-		 * the IP stream. Therefore, no notify callback needs to
-		 * be registered. But IP requires this to be a valid function
-		 * pointer.
-		 */
+		direct->di_tx_fctl_df = (uintptr_t)softmac_tx_is_flow_blocked;
+		direct->di_tx_fctl_dh = sup;
 		direct->di_tx_cb_df = (uintptr_t)softmac_client_tx_notify;
-		direct->di_tx_cb_dh = NULL;
+		direct->di_tx_cb_dh = sup;
 		sup->su_direct = B_TRUE;
 		return (0);
 
@@ -933,9 +949,16 @@ softmac_fastpath_tear(softmac_upper_t *sup)
 	while (sup->su_tx_inprocess != 0)
 		cv_wait(&sup->su_cv, &sup->su_mutex);
 
+	/*
+	 * Note that this function is called either when the stream is closed,
+	 * or the stream is unbound (fastpath-slowpath-switch). Therefore,
+	 * No need to call the tx_notify callback.
+	 */
+	sup->su_tx_notify_func = NULL;
+	sup->su_tx_notify_arg = NULL;
 	if (sup->su_tx_busy) {
 		ASSERT(sup->su_tx_flow_mp == NULL);
-		sup->su_tx_flow_mp = getq(sup->su_wq);
+		VERIFY((sup->su_tx_flow_mp = getq(sup->su_wq)) != NULL);
 		sup->su_tx_busy = B_FALSE;
 	}
 
@@ -995,18 +1018,22 @@ softmac_fastpath_wput_data(softmac_upper_t *sup, mblk_t *mp, uintptr_t f_hint,
 		return (NULL);
 	}
 
-	if ((flag & MAC_DROP_ON_NO_DESC) != 0) {
-		freemsg(mp);
-		return ((mac_tx_cookie_t)wq);
-	}
-
 	if (sup->su_tx_busy) {
-		putnext(wq, mp);
-		return ((mac_tx_cookie_t)wq);
+		if ((flag & MAC_DROP_ON_NO_DESC) != 0)
+			freemsg(mp);
+		else
+			putnext(wq, mp);
+		return ((mac_tx_cookie_t)sup);
 	}
 
 	mutex_enter(&sup->su_mutex);
 	if (!sup->su_tx_busy) {
+		/*
+		 * If DLD_CAPAB_DIRECT is enabled, the notify callback will be
+		 * called when the flow control can be disabled. Otherwise,
+		 * put the tx_flow_mp into the wq to make use of the old
+		 * streams flow control.
+		 */
 		ASSERT(sup->su_tx_flow_mp != NULL);
 		(void) putq(sup->su_wq, sup->su_tx_flow_mp);
 		sup->su_tx_flow_mp = NULL;
@@ -1014,8 +1041,12 @@ softmac_fastpath_wput_data(softmac_upper_t *sup, mblk_t *mp, uintptr_t f_hint,
 		qenable(wq);
 	}
 	mutex_exit(&sup->su_mutex);
-	putnext(wq, mp);
-	return ((mac_tx_cookie_t)wq);
+
+	if ((flag & MAC_DROP_ON_NO_DESC) != 0)
+		freemsg(mp);
+	else
+		putnext(wq, mp);
+	return ((mac_tx_cookie_t)sup);
 }
 
 boolean_t

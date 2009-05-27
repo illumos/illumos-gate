@@ -180,6 +180,8 @@ softmac_upper_destructor(void *buf, void *arg)
 	ASSERT(!sup->su_tx_busy);
 	ASSERT(!sup->su_bound);
 	ASSERT(!sup->su_taskq_scheduled);
+	ASSERT(sup->su_tx_notify_func == NULL);
+	ASSERT(sup->su_tx_notify_arg == NULL);
 	ASSERT(list_is_empty(&sup->su_req_list));
 
 	list_destroy(&sup->su_req_list);
@@ -656,10 +658,22 @@ softmac_drv_wsrv(queue_t *wq)
 	} else if (sup->su_tx_busy && SOFTMAC_CANPUTNEXT(sup->su_slp->sl_wq)) {
 		/*
 		 * The flow-conctol of the dedicated-lower-stream is
-		 * relieved, relieve the flow-control of the
-		 * upper-stream too.
+		 * relieved. If DLD_CAPAB_DIRECT is enabled, call tx_notify
+		 * callback to relieve the flow-control of the specific client,
+		 * otherwise relieve the flow-control of all the upper-stream
+		 * using the traditional STREAM mechanism.
 		 */
-		sup->su_tx_flow_mp = getq(wq);
+		if (sup->su_tx_notify_func != NULL) {
+			sup->su_tx_inprocess++;
+			mutex_exit(&sup->su_mutex);
+			sup->su_tx_notify_func(sup->su_tx_notify_arg,
+			    (mac_tx_cookie_t)sup);
+			mutex_enter(&sup->su_mutex);
+			if (--sup->su_tx_inprocess == 0)
+				cv_signal(&sup->su_cv);
+		}
+		ASSERT(sup->su_tx_flow_mp == NULL);
+		VERIFY((sup->su_tx_flow_mp = getq(wq)) != NULL);
 		sup->su_tx_busy = B_FALSE;
 	}
 	mutex_exit(&sup->su_mutex);

@@ -323,6 +323,12 @@ typedef struct softmac_upper_s {
 	 * Whether this stream is already scheduled in softmac_taskq_list.
 	 */
 	boolean_t		su_taskq_scheduled;	/* softmac_taskq_lock */
+
+	/*
+	 * The DLD_CAPAB_DIRECT related notify callback.
+	 */
+	mac_tx_notify_t		su_tx_notify_func;	/* su_mutex */
+	void			*su_tx_notify_arg;	/* su_mutex */
 } softmac_upper_t;
 
 #define	SOFTMAC_EQ_PENDING(sup, mp) {					\

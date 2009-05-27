@@ -3054,6 +3054,9 @@ ill_capability_direct_enable(ill_t *ill)
 		idd->idd_tx_cb_dh = direct.di_tx_cb_dh;
 		idd->idd_tx_fctl_df = (ip_dld_fctl_t)direct.di_tx_fctl_df;
 		idd->idd_tx_fctl_dh = direct.di_tx_fctl_dh;
+		ASSERT(idd->idd_tx_cb_df != NULL);
+		ASSERT(idd->idd_tx_fctl_df != NULL);
+		ASSERT(idd->idd_tx_df != NULL);
 		/*
 		 * One time registration of flow enable callback function
 		 */
