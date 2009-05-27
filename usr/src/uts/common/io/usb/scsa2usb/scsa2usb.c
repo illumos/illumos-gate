@@ -288,6 +288,14 @@ static struct blacklist {
 	{MS_IOMEGA_VID, MS_IOMEGA_PID_CLIK, 0,
 	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_START_STOP},
 
+	/* Kingston DataTraveler Stick / PNY Attache Stick */
+	{MS_TOSHIBA_VID, MS_TOSHIBA_PID0, 0,
+	    SCSA2USB_ATTRS_GET_LUN},
+
+	/* PNY Floppy drive */
+	{MS_PNY_VID, MS_PNY_PID0, 0,
+	    SCSA2USB_ATTRS_GET_LUN},
+
 	/* SMSC floppy Device - and its clones */
 	{MS_SMSC_VID, X, 0, SCSA2USB_ATTRS_START_STOP},
 
@@ -1692,7 +1700,7 @@ scsa2usb_create_luns(scsa2usb_state_t *scsa2usbp)
 	 * control request to them.
 	 */
 	if ((scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_GET_LUN) == 0) {
-		USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 		    "get_max_lun cmd not supported");
 	} else {
 		if (SCSA2USB_IS_BULK_ONLY(scsa2usbp)) {

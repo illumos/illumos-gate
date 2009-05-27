@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,12 @@ extern "C" {
 
 #define	MS_ALCOR_VID	0x58f	/* Vendor ID of Alcor Micro Corp */
 #define	MS_ALCOR_PID0	0x6387	/* PID for 6387 flash disk */
+
+#define	MS_TOSHIBA_VID	0x930	/* Vendor ID of Toshiba Corp */
+#define	MS_TOSHIBA_PID0	0x6545	/* Kingston DataTraveler / PNY Attache Stick */
+
+#define	MS_PNY_VID	0x154b	/* Vendor ID of PNY Corp */
+#define	MS_PNY_PID0	0x16	/* PNY floppy drive */
 
 /*
  * The AMI virtual floppy device is not a real USB storage device, but
