@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -464,7 +463,7 @@ devfs_bootdev_set_list(const char *dev_name, const uint_t options)
 		while (prom_list && prom_list[i]) {
 			if (!(options & BOOTDEV_PROMDEV)) {
 				ret = prom_dev_to_alias(prom_list[i], 0,
-					&alias_list);
+				    &alias_list);
 				if (ret < 0) {
 					free(prom_path);
 					prom_list_free(prom_list);
@@ -938,12 +937,12 @@ process_bootdev(const char *bootdevice, const char *default_root,
 
 		/* now we have a prom device path - convert to a devfs name */
 		if (devfs_prom_to_dev_name(prom_path, ret_buf) < 0) {
-		    continue;
+			continue;
 		}
 
 		/* append any default minor names necessary */
 		if (process_minor_name(ret_buf, default_root) < 0) {
-		    continue;
+			continue;
 		}
 		found = 1;
 
@@ -1021,17 +1020,17 @@ process_minor_name(char *dev_path, const char *root)
 			/* make sure to squash the digit */
 			*cp = '\0';
 			switch (n) {
-			    case 0:	(void) strcat(dev_path, "q");
+			case 0:	(void) strcat(dev_path, "q");
 					break;
-			    case 1:	(void) strcat(dev_path, "r");
+			case 1:	(void) strcat(dev_path, "r");
 					break;
-			    case 2:	(void) strcat(dev_path, "s");
+			case 2:	(void) strcat(dev_path, "s");
 					break;
-			    case 3:	(void) strcat(dev_path, "t");
+			case 3:	(void) strcat(dev_path, "t");
 					break;
-			    case 4:	(void) strcat(dev_path, "u");
+			case 4:	(void) strcat(dev_path, "u");
 					break;
-			    default:	(void) strcat(dev_path, "a");
+			default: (void) strcat(dev_path, "a");
 					break;
 			}
 		}
@@ -1771,6 +1770,9 @@ prom_srch_aliases_by_def(char *promdev_def, struct name_list **exact_list,
 	char alias_buf[MAXNAMELEN];
 	int found = 0;
 
+	if ((ret = prom_find_aliases_node(prom_fd)) < 0)
+		return (0);
+
 	(void) memset(oppbuf.buf, 0, BUFSIZE);
 	opp->oprom_size = MAXPROPSIZE;
 	*ip = 0;
@@ -2191,8 +2193,8 @@ alias_to_prom_dev(char *alias, char *ret_buf)
 			if (options_ptr == NULL) {
 				options_ptr = strchr(alias_buf, ':');
 				if (options_ptr != NULL) {
-				    *options_ptr = '\0';
-				    (void) strlcpy(options, ++options_ptr,
+					*options_ptr = '\0';
+					(void) strlcpy(options, ++options_ptr,
 					    sizeof (options));
 				}
 			}
