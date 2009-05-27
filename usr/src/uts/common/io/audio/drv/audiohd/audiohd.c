@@ -509,6 +509,15 @@ audiohd_init_play_path(audiohd_path_t *path)
 			    path->adda_wid,
 			    AUDIOHDC_VERB_SET_SPDIF_LCL,
 			    ctrl8);
+			/*
+			 * We find that on intel ICH10 chipset with codec
+			 * ALC888, audio is scratchy if we set the tag on the
+			 * SPDIF path. So we just return here without setting
+			 * the tag for the path as a workaround.
+			 */
+			if (codec->vid == AUDIOHD_CODECID_ALC888) {
+				return;
+			}
 		}
 	}
 	wid = path->pin_wid[0];
@@ -1036,12 +1045,6 @@ audiohd_set_pin_volume(audiohd_state_t *statep, audiohda_device_type_t type)
 	audiohd_ctrl_t			*control;
 
 	switch (type) {
-		case DTYPE_LINEOUT:
-			control = statep->controls[CTL_FRONT];
-			if (control == NULL)
-				return;
-			val = control->val;
-			break;
 		case DTYPE_SPEAKER:
 			control = statep->controls[CTL_SPEAKER];
 			if (control == NULL)
@@ -1108,6 +1111,12 @@ audiohd_set_pin_volume_by_color(audiohd_state_t *statep,
 	audiohd_ctrl_t		*control;
 
 	switch (color) {
+		case AUDIOHD_PIN_GREEN:
+			control = statep->controls[CTL_FRONT];
+			if (control == NULL)
+				return;
+			val = control->val;
+			break;
 		case AUDIOHD_PIN_BLACK:
 			control = statep->controls[CTL_REAR];
 			if (control == NULL)
@@ -1465,7 +1474,7 @@ audiohd_set_front(void *arg, uint64_t val)
 
 	mutex_enter(&statep->hda_mutex);
 	pc->val = val;
-	audiohd_set_pin_volume(statep, DTYPE_LINEOUT);
+	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_GREEN);
 	mutex_exit(&statep->hda_mutex);
 
 	return (0);
@@ -1808,9 +1817,7 @@ audiohd_add_controls(audiohd_state_t *statep)
 			wid = path->pin_wid[j];
 			widget = codec->widget[wid];
 			pin = (audiohd_pin_t *)widget->priv;
-			if (pin->device == DTYPE_LINEOUT) {
-				ADD_CTRL(CTL_FRONT, 0x4b4b);
-			} else if (pin->device == DTYPE_SPEAKER) {
+			if (pin->device == DTYPE_SPEAKER) {
 				ADD_CTRL(CTL_SPEAKER, 0x4b4b);
 			} else if (pin->device == DTYPE_HP_OUT) {
 				ADD_CTRL(CTL_HEADPHONE, 0x4b4b);
@@ -1823,7 +1830,9 @@ audiohd_add_controls(audiohd_state_t *statep)
 			}
 			clr = (pin->config >> AUDIOHD_PIN_CLR_OFF) &
 			    AUDIOHD_PIN_CLR_MASK;
-			if (clr == AUDIOHD_PIN_BLACK &&
+			if (clr == AUDIOHD_PIN_GREEN) {
+				ADD_CTRL(CTL_FRONT, 0x4b4b);
+			} else if (clr == AUDIOHD_PIN_BLACK &&
 			    pin->device != DTYPE_HP_OUT &&
 			    pin->device != DTYPE_MIC_IN) {
 				ADD_CTRL(CTL_REAR, 0x4b4b);
@@ -3607,7 +3616,8 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 		return (uint32_t)(AUDIO_FAILURE);
 
 	/* we don't share widgets */
-	if (widget->path_flags & AUDIOHD_PATH_ADC)
+	if (widget->path_flags & AUDIOHD_PATH_ADC ||
+	    widget->path_flags & AUDIOHD_PATH_DAC)
 		return (uint32_t)(AUDIO_FAILURE);
 
 	switch (widget->type) {
@@ -3950,7 +3960,7 @@ static void
 audiohd_finish_input_path(hda_codec_t *codec)
 {
 	audiohd_state_t		*statep = codec->soft_statep;
-	audiohd_path_t	*path;
+	audiohd_path_t		*path;
 	audiohd_widget_t	*w, *wsum;
 	uint_t			caddr = codec->index;
 	wid_t			wid;
@@ -4087,7 +4097,7 @@ static int
 audiohd_find_inpin_for_monitor(hda_codec_t *codec,
     audiohd_path_t *path, wid_t id, int mixer)
 {
-	wid_t wid;
+	wid_t 			wid;
 	audiohd_widget_t	*widget;
 	audiohd_pin_t		*pin;
 	int 			i, find = 0;
