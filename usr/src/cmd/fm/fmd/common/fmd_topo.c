@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * FMD Topology Handling
@@ -85,15 +83,17 @@ fmd_topo_update(void)
 		fmd_panic("failed to open topology library: %s",
 		    topo_strerror(err));
 
+	ftp = fmd_alloc(sizeof (fmd_topo_t), FMD_SLEEP);
+	ftp->ft_hdl = tp;
+	ftp->ft_time_begin = fmd_time_gethrtime();
+
 	if ((id = topo_snap_hold(tp, NULL, &err)) == NULL)
 		fmd_panic("failed to get topology snapshot: %s",
 		    topo_strerror(err));
 
 	topo_hdl_strfree(tp, id);
 
-	ftp = fmd_alloc(sizeof (fmd_topo_t), FMD_SLEEP);
-	ftp->ft_hdl = tp;
-	ftp->ft_time = fmd_time_gethrtime();
+	ftp->ft_time_end = fmd_time_gethrtime();
 	fmd.d_stats->ds_topo_gen.fmds_value.ui64++;
 
 	/*

@@ -123,6 +123,8 @@ fmd_dr_event(sysevent_t *sep)
 	    strcmp(class, EC_DEV_REMOVE) == 0) {
 		if (strcmp(subclass, ESC_DISK) != 0)
 			return;
+
+		update_topo = B_TRUE;
 	}
 
 	/*
@@ -144,7 +146,7 @@ fmd_dr_event(sysevent_t *sep)
 	 */
 	sysevent_get_time(sep, &evtime);
 	prev = fmd_topo_hold();
-	if (evtime <= prev->ft_time &&
+	if (evtime <= prev->ft_time_begin &&
 	    fmd.d_clockops == &fmd_timeops_native) {
 		fmd_topo_rele(prev);
 		return;
@@ -155,6 +157,6 @@ fmd_dr_event(sysevent_t *sep)
 		fmd_topo_update();
 
 	ftp = fmd_topo_hold();
-	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time, NULL, ftp);
+	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time_end, NULL, ftp);
 	fmd_modhash_dispatch(fmd.d_mod_hash, e);
 }

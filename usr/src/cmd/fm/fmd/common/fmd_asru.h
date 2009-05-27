@@ -147,13 +147,13 @@ extern void fmd_asru_hash_apply(fmd_asru_hash_t *,
     void (*)(fmd_asru_t *, void *), void *);
 extern void fmd_asru_al_hash_apply(fmd_asru_hash_t *,
     void (*)(fmd_asru_link_t *, void *), void *);
-extern void fmd_asru_hash_apply_by_asru(fmd_asru_hash_t *, char *,
+extern void fmd_asru_hash_apply_by_asru(fmd_asru_hash_t *, const char *,
     void (*)(fmd_asru_link_t *, void *), void *);
-extern void fmd_asru_hash_apply_by_label(fmd_asru_hash_t *, char *,
+extern void fmd_asru_hash_apply_by_label(fmd_asru_hash_t *, const char *,
     void (*)(fmd_asru_link_t *, void *), void *);
-extern void fmd_asru_hash_apply_by_fru(fmd_asru_hash_t *, char *,
+extern void fmd_asru_hash_apply_by_fru(fmd_asru_hash_t *, const char *,
     void (*)(fmd_asru_link_t *, void *), void *);
-extern void fmd_asru_hash_apply_by_rsrc(fmd_asru_hash_t *, char *,
+extern void fmd_asru_hash_apply_by_rsrc(fmd_asru_hash_t *, const char *,
     void (*)(fmd_asru_link_t *, void *), void *);
 extern void fmd_asru_hash_apply_by_case(fmd_asru_hash_t *, fmd_case_t *,
     void (*)(fmd_asru_link_t *, void *), void *);

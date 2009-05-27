@@ -870,7 +870,7 @@ fmd_asru_al_hash_apply(fmd_asru_hash_t *ahp,
 }
 
 static void
-fmd_asru_do_hash_apply(fmd_asru_hash_t *ahp, char *name,
+fmd_asru_do_hash_apply(fmd_asru_hash_t *ahp, const char *name,
     void (*func)(fmd_asru_link_t *, void *), void *arg,
     fmd_asru_link_t **hash, size_t match_offset, size_t next_offset)
 {
@@ -912,7 +912,7 @@ fmd_asru_do_hash_apply(fmd_asru_hash_t *ahp, char *name,
 }
 
 void
-fmd_asru_hash_apply_by_asru(fmd_asru_hash_t *ahp, char *name,
+fmd_asru_hash_apply_by_asru(fmd_asru_hash_t *ahp, const char *name,
     void (*func)(fmd_asru_link_t *, void *), void *arg)
 {
 	fmd_asru_do_hash_apply(ahp, name, func, arg, ahp->ah_asru_hash,
@@ -930,7 +930,7 @@ fmd_asru_hash_apply_by_case(fmd_asru_hash_t *ahp, fmd_case_t *cp,
 }
 
 void
-fmd_asru_hash_apply_by_fru(fmd_asru_hash_t *ahp, char *name,
+fmd_asru_hash_apply_by_fru(fmd_asru_hash_t *ahp, const char *name,
     void (*func)(fmd_asru_link_t *, void *), void *arg)
 {
 	fmd_asru_do_hash_apply(ahp, name, func, arg, ahp->ah_fru_hash,
@@ -939,7 +939,7 @@ fmd_asru_hash_apply_by_fru(fmd_asru_hash_t *ahp, char *name,
 }
 
 void
-fmd_asru_hash_apply_by_rsrc(fmd_asru_hash_t *ahp, char *name,
+fmd_asru_hash_apply_by_rsrc(fmd_asru_hash_t *ahp, const char *name,
     void (*func)(fmd_asru_link_t *, void *), void *arg)
 {
 	fmd_asru_do_hash_apply(ahp, name, func, arg, ahp->ah_rsrc_hash,
@@ -948,7 +948,7 @@ fmd_asru_hash_apply_by_rsrc(fmd_asru_hash_t *ahp, char *name,
 }
 
 void
-fmd_asru_hash_apply_by_label(fmd_asru_hash_t *ahp, char *name,
+fmd_asru_hash_apply_by_label(fmd_asru_hash_t *ahp, const char *name,
     void (*func)(fmd_asru_link_t *, void *), void *arg)
 {
 	fmd_asru_do_hash_apply(ahp, name, func, arg, ahp->ah_label_hash,

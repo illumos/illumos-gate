@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _FMD_TOPO_H
 #define	_FMD_TOPO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +41,8 @@ typedef struct fmd_topo {
 	fmd_list_t ft_list;
 	topo_hdl_t *ft_hdl;
 	uint32_t ft_refcount;
-	hrtime_t ft_time;
+	hrtime_t ft_time_begin;
+	hrtime_t ft_time_end;
 } fmd_topo_t;
 
 extern void fmd_topo_update(void);
