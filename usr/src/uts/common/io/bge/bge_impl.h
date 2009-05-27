@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -632,6 +632,8 @@ typedef struct {
 
 	uint32_t		rx_ticks_norm;
 	uint32_t		rx_count_norm;
+	uint32_t		tx_ticks_norm;
+	uint32_t		tx_count_norm;
 } chip_id_t;
 
 #define	CHIP_FLAG_SUPPORTED	0x80
@@ -1147,6 +1149,7 @@ void bge_reg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits);
 void bge_mbx_put(bge_t *bgep, bge_regno_t regno, uint64_t value);
 void bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma);
 int bge_chip_id_init(bge_t *bgep);
+void bge_chip_coalesce_update(bge_t *bgep);
 int bge_chip_start(bge_t *bgep, boolean_t reset_phy);
 void bge_chip_stop(bge_t *bgep, boolean_t fault);
 #ifndef __sparc

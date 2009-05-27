@@ -56,8 +56,8 @@ extern "C" {
 #define	DEVICE_ID_5701			0x1645
 #define	DEVICE_ID_5702			0x16a6
 #define	DEVICE_ID_5702fe		0x164d
-#define	DEVICE_ID_5703C			0x1647
-#define	DEVICE_ID_5703S			0x16a7
+#define	DEVICE_ID_5703C			0x16a7
+#define	DEVICE_ID_5703S			0x1647
 #define	DEVICE_ID_5703			0x16c7
 #define	DEVICE_ID_5704C			0x1648
 #define	DEVICE_ID_5704S			0x16a8

@@ -1965,6 +1965,8 @@ bge_chip_id_init(bge_t *bgep)
 	cidp->mbuf_hi_water = bge_mbuf_hi_water;
 	cidp->rx_ticks_norm = bge_rx_ticks_norm;
 	cidp->rx_count_norm = bge_rx_count_norm;
+	cidp->tx_ticks_norm = bge_tx_ticks_norm;
+	cidp->tx_count_norm = bge_tx_count_norm;
 
 	if (cidp->rx_rings == 0 || cidp->rx_rings > BGE_RECV_RINGS_MAX)
 		cidp->rx_rings = BGE_RECV_RINGS_DEFAULT;
@@ -3567,6 +3569,19 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 int bge_chip_start(bge_t *bgep, boolean_t reset_phys);
 #pragma	no_inline(bge_chip_start)
 
+void
+bge_chip_coalesce_update(bge_t *bgep)
+{
+	bge_reg_put32(bgep, SEND_COALESCE_MAX_BD_REG,
+	    bgep->chipid.tx_count_norm);
+	bge_reg_put32(bgep, SEND_COALESCE_TICKS_REG,
+	    bgep->chipid.tx_ticks_norm);
+	bge_reg_put32(bgep, RCV_COALESCE_MAX_BD_REG,
+	    bgep->chipid.rx_count_norm);
+	bge_reg_put32(bgep, RCV_COALESCE_TICKS_REG,
+	    bgep->chipid.rx_ticks_norm);
+}
+
 int
 bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 {
@@ -3828,10 +3843,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Steps 59-62: initialise Host Coalescing parameters
 	 */
-	bge_reg_put32(bgep, SEND_COALESCE_MAX_BD_REG, bge_tx_count_norm);
-	bge_reg_put32(bgep, SEND_COALESCE_TICKS_REG, bge_tx_ticks_norm);
-	bge_reg_put32(bgep, RCV_COALESCE_MAX_BD_REG, bge_rx_count_norm);
-	bge_reg_put32(bgep, RCV_COALESCE_TICKS_REG, bge_rx_ticks_norm);
+	bge_chip_coalesce_update(bgep);
 	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
 		bge_reg_put32(bgep, SEND_COALESCE_INT_BD_REG,
 		    bge_tx_count_intr);

@@ -545,7 +545,6 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5703:
 	case MHCR_CHIP_ASIC_REV_5704:
 	case MHCR_CHIP_ASIC_REV_5705:
-	case MHCR_CHIP_ASIC_REV_5721_5751:
 	case MHCR_CHIP_ASIC_REV_5752:
 	case MHCR_CHIP_ASIC_REV_5714:
 	case MHCR_CHIP_ASIC_REV_5715:
@@ -556,6 +555,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5700:
 	case MHCR_CHIP_ASIC_REV_5701:
 	case MHCR_CHIP_ASIC_REV_5723:
+	case MHCR_CHIP_ASIC_REV_5721_5751:
 		/*
 		 * Just a plain reset; the "check" code breaks these chips
 		 */

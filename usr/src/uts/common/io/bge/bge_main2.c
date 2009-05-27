@@ -37,7 +37,7 @@ static char bge_ident[] = "Broadcom Gb Ethernet";
 /*
  * Make sure you keep the version ID up to date!
  */
-static char bge_version[] = "Broadcom Gb Ethernet v1.06";
+static char bge_version[] = "Broadcom Gb Ethernet v1.07";
 
 /*
  * Property names
@@ -1183,20 +1183,53 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 		}
 		return (err);
 	}
-	if (strcmp(pr_name, "_intr_coalesce_blank_time") == 0) {
+	if (strcmp(pr_name, "_rx_intr_coalesce_blank_time") == 0) {
 		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0)
 			return (EINVAL);
-
-		bgep->chipid.rx_ticks_norm = (uint32_t)result;
-		return (0);
+		if (result < 0)
+			err = EINVAL;
+		else {
+			bgep->chipid.rx_ticks_norm = (uint32_t)result;
+			bge_chip_coalesce_update(bgep);
+		}
+		return (err);
 	}
 
-	if (strcmp(pr_name, "_intr_coalesce_pkt_cnt") == 0) {
+	if (strcmp(pr_name, "_rx_intr_coalesce_pkt_cnt") == 0) {
 		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0)
 			return (EINVAL);
 
-		bgep->chipid.rx_count_norm = (uint32_t)result;
-		return (0);
+		if (result < 0)
+			err = EINVAL;
+		else {
+			bgep->chipid.rx_count_norm = (uint32_t)result;
+			bge_chip_coalesce_update(bgep);
+		}
+		return (err);
+	}
+	if (strcmp(pr_name, "_tx_intr_coalesce_blank_time") == 0) {
+		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0)
+			return (EINVAL);
+		if (result < 0)
+			err = EINVAL;
+		else {
+			bgep->chipid.tx_ticks_norm = (uint32_t)result;
+			bge_chip_coalesce_update(bgep);
+		}
+		return (err);
+	}
+
+	if (strcmp(pr_name, "_tx_intr_coalesce_pkt_cnt") == 0) {
+		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0)
+			return (EINVAL);
+
+		if (result < 0)
+			err = EINVAL;
+		else {
+			bgep->chipid.tx_count_norm = (uint32_t)result;
+			bge_chip_coalesce_update(bgep);
+		}
+		return (err);
 	}
 	return (ENOTSUP);
 }
