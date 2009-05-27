@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_RSRC_INFO_H
 #define	_RSRC_INFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libnvpair.h>
 
@@ -69,11 +67,14 @@ extern "C" {
  * 	Value	- DATA_TYPE_INT32
  * 	Name	- RI_CPU_ECACHE
  * 	Value 	_ DATA_TYPE_INT32
+ * 	Name	- RI_CPU_ECACHE_KBYTE
+ * 	Value 	_ DATA_TYPE_INT32
  */
 #define	RI_CPU_ID	"ri.cpu_id"
 #define	RI_CPU_STATE	"ri.cpu_state"
 #define	RI_CPU_SPEED	"ri.cpu_speed"
 #define	RI_CPU_ECACHE	"ri.cpu_ecache"
+#define	RI_CPU_ECACHE_KBYTE "ri.cpu_ecache_kbyte"
 
 /*
  * Memory properties

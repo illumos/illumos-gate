@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implementation of ri_init routine for obtaining mapping
@@ -90,6 +88,7 @@ typedef int32_t		cpuid_t;
 
 typedef struct {
 	int	cpuid_max;	/* maximum cpuid value */
+	int	ecache_curr;	/* cached during tree walk */
 	int	*ecache_sizes;	/* indexed by cpuid */
 } ecache_info_t;
 
@@ -372,7 +371,7 @@ rcm_init(rcmd_t *rcm, apd_t apd_tbl[], int napds, int flags)
 	rcm->ms_sysmb = (int)((ii+MBYTE-1) / MBYTE);
 
 	if (flags & RI_INCLUDE_QUERY)
-	    rv = rcm_query_init(rcm, apd_tbl, napds);
+		rv = rcm_query_init(rcm, apd_tbl, napds);
 
 	return (rv);
 }
@@ -488,6 +487,7 @@ find_cpu_nodes(di_node_t node, void *arg)
 	di_arg_t		*di_arg = (di_arg_t *)arg;
 	ecache_info_t		*ec = di_arg->ecache_info;
 	di_prom_handle_t	ph = di_arg->ph;
+	int			walk_child = 0;
 
 	if (node == DI_NODE_NIL) {
 		return (DI_WALK_TERMINATE);
@@ -522,16 +522,30 @@ find_cpu_nodes(di_node_t node, void *arg)
 	 * Panther has both L2 and L3, so check for L3 first to differentiate
 	 * from Jaguar, which has only L2.
 	 */
-	if (prop_lookup_int(node, ph, PROP_CPUID, &cpuid) == 0 &&
-	    (prop_lookup_int(node, ph, PROP_ECACHE_SIZE, &ecache) == 0 ||
+	if (prop_lookup_int(node, ph, PROP_ECACHE_SIZE, &ecache) == 0 ||
 	    prop_lookup_int(node, ph, PROP_L3_CACHE_SIZE, &ecache) == 0 ||
-	    prop_lookup_int(node, ph, PROP_L2_CACHE_SIZE, &ecache) == 0)) {
-		assert(ec != NULL && ec->ecache_sizes != NULL &&
-		    *cpuid <= ec->cpuid_max);
-		ec->ecache_sizes[*cpuid] = *ecache;
+	    prop_lookup_int(node, ph, PROP_L2_CACHE_SIZE, &ecache) == 0) {
+		/*
+		 * On some platforms the cache property is in the core
+		 * node while the cpuid is in the child cpu node.  It may
+		 * be needed while processing this node or a child node.
+		 */
+		ec->ecache_curr = *ecache;
+		walk_child = 1;
 	}
 
-	return (DI_WALK_PRUNECHILD);
+	if (prop_lookup_int(node, ph, PROP_CPUID, &cpuid) == 0) {
+
+		assert(ec != NULL && ec->ecache_sizes != NULL &&
+		    *cpuid <= ec->cpuid_max);
+
+		if (ec->ecache_curr != 0) {
+			ec->ecache_sizes[*cpuid] = ec->ecache_curr;
+
+		}
+	}
+
+	return (walk_child ? DI_WALK_CONTINUE : DI_WALK_PRUNECHILD);
 }
 
 /*
@@ -955,7 +969,8 @@ static int
 i_cpu_cm_info(processorid_t cpuid, int speed, int ecache_cfga, ri_ap_t *ap,
     rcmd_t *rcm)
 {
-	int		ecache = 0;
+	int		ecache_mb = 0;
+	int		ecache_kb = 0;
 	char		*state, buf[32];
 	processor_info_t cpu_info;
 	ri_dev_t	*cpu = NULL;
@@ -980,10 +995,12 @@ i_cpu_cm_info(processorid_t cpuid, int speed, int ecache_cfga, ri_ap_t *ap,
 	if (rcm->ecache_info.ecache_sizes != NULL) {
 		assert(rcm->ecache_info.cpuid_max != 0 &&
 		    cpuid <= rcm->ecache_info.cpuid_max);
-		ecache = rcm->ecache_info.ecache_sizes[cpuid] / MBYTE;
+		ecache_mb = rcm->ecache_info.ecache_sizes[cpuid] / MBYTE;
+		ecache_kb = rcm->ecache_info.ecache_sizes[cpuid] / KBYTE;
 	}
-	if (ecache == 0) {
-		ecache = ecache_cfga;
+
+	if (ecache_mb == 0) {
+		ecache_mb = ecache_cfga;
 	}
 
 	dprintf((stderr, "i_cpu_cm_info: cpu(%d) ecache=%d MB\n",
@@ -991,11 +1008,26 @@ i_cpu_cm_info(processorid_t cpuid, int speed, int ecache_cfga, ri_ap_t *ap,
 
 	if (nvlist_add_int32(cpu->conf_props, RI_CPU_ID, cpuid) != 0 ||
 	    nvlist_add_int32(cpu->conf_props, RI_CPU_SPEED, speed) != 0 ||
-	    nvlist_add_int32(cpu->conf_props, RI_CPU_ECACHE, ecache) != 0 ||
+	    nvlist_add_int32(cpu->conf_props, RI_CPU_ECACHE, ecache_mb) != 0 ||
 	    nvlist_add_string(cpu->conf_props, RI_CPU_STATE, state) != 0) {
 		dprintf((stderr, "nvlist_add fail\n"));
 		ri_dev_free(cpu);
 		return (-1);
+	}
+
+	/*
+	 * Report cache size in kilobyte units if available.  This info is
+	 * added to support processors with cache sizes that are non-integer
+	 * megabyte multiples.
+	 */
+	if (ecache_kb != 0) {
+		if (nvlist_add_int32(cpu->conf_props, RI_CPU_ECACHE_KBYTE,
+		    ecache_kb) != 0)  {
+			dprintf((stderr, "nvlist_add fail: %s\n",
+			    RI_CPU_ECACHE_KBYTE));
+			ri_dev_free(cpu);
+			return (-1);
+		}
 	}
 
 	(void) snprintf(buf, sizeof (buf), "%s%d", RCM_CPU, cpuid);
