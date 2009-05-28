@@ -74,12 +74,15 @@
  * each PG can have at most one parent, and siblings are the group of PGs
  * sharing the same parent.
  *
- * On NUMA systems, the CMT load balancing algorithm balances across the
- * CMT PGs within their respective lgroups. On UMA based system, there
- * exists a top level group of PGs to balance across. On NUMA systems multiple
- * top level groups are instantiated, where the top level balancing begins by
- * balancng across the CMT PGs within their respective (per lgroup) top level
- * groups.
+ * On UMA based systems, the CMT load balancing algorithm begins by balancing
+ * load across the group of top level PGs in the system hierarchy.
+ * On NUMA systems, the CMT load balancing algorithm balances load across the
+ * group of top level PGs in each leaf lgroup...but for root homed threads,
+ * is willing to balance against all the top level PGs in the system.
+ *
+ * Groups of top level PGs are maintained to implement the above, one for each
+ * leaf lgroup (containing the top level PGs in that lgroup), and one (for the
+ * root lgroup) that contains all the top level PGs in the system.
  */
 static cmt_lgrp_t	*cmt_lgrps = NULL;	/* cmt_lgrps list head */
 static cmt_lgrp_t	*cpu0_lgrp = NULL;	/* boot CPU's initial lgrp */
@@ -90,7 +93,8 @@ static int		is_cpu0 = 1; /* true if this is boot CPU context */
 
 /*
  * Array of hardware sharing relationships that are blacklisted.
- * PGs won't be instantiated for blacklisted hardware sharing relationships.
+ * CMT scheduling optimizations won't be performed for blacklisted sharing
+ * relationships.
  */
 static int		cmt_hw_blacklisted[PGHW_NUM_COMPONENTS];
 
@@ -296,6 +300,13 @@ pg_cmt_hier_rank(pg_cmt_t *pg1, pg_cmt_t *pg2)
 static void
 cmt_callback_init(pg_t *pg)
 {
+	/*
+	 * Stick with the default callbacks if there isn't going to be
+	 * any CMT thread placement optimizations implemented.
+	 */
+	if (((pg_cmt_t *)pg)->cmt_policy == CMT_NO_POLICY)
+		return;
+
 	switch (((pghw_t *)pg)->pghw_hw) {
 	case PGHW_POW_ACTIVE:
 		pg->pg_cb.thread_swtch = cmt_ev_thread_swtch_pwr;
@@ -515,12 +526,12 @@ pg_cmt_cpu_init(cpu_t *cp, cpu_pg_t *pgdata)
 			continue;
 
 		/*
-		 * Continue if the hardware sharing relationship has been
-		 * blacklisted.
+		 * We will still create the PGs for hardware sharing
+		 * relationships that have been blacklisted, but won't
+		 * implement CMT thread placement optimizations against them.
 		 */
-		if (cmt_hw_blacklisted[hw]) {
-			continue;
-		}
+		if (cmt_hw_blacklisted[hw] == 1)
+			policy = CMT_NO_POLICY;
 
 		/*
 		 * Find (or create) the PG associated with
@@ -1391,7 +1402,7 @@ pg_cmt_policy_name(pg_t *pg)
 
 /*
  * Prune PG, and all other instances of PG's hardware sharing relationship
- * from the PG hierarchy.
+ * from the CMT PG hierarchy.
  *
  * This routine operates on the CPU specific processor group data (for the CPUs
  * in the PG being pruned), and may be invoked from a context where one CPU's
@@ -1442,7 +1453,13 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 	hwset = pghw_set_lookup(hw);
 
 	/*
-	 * Blacklist the hardware so that future groups won't be created.
+	 * Blacklist the hardware so future processor groups of this type won't
+	 * participate in CMT thread placement.
+	 *
+	 * XXX
+	 * For heterogeneous system configurations, this might be overkill.
+	 * We may only need to blacklist the illegal PGs, and other instances
+	 * of this hardware sharing relationship may be ok.
 	 */
 	cmt_hw_blacklisted[hw] = 1;
 
@@ -1472,6 +1489,7 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 			    pg->cmt_siblings != &cmt_root->cl_pgs) {
 				group_expand(&cmt_root->cl_pgs,
 				    GROUP_SIZE(&cmt_root->cl_pgs) + cap_needed);
+				cmt_root->cl_npgs += cap_needed;
 			}
 		}
 	}
@@ -1500,6 +1518,13 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 			(void) group_remove(&cmt_root->cl_pgs, pg,
 			    GRP_NORESIZE);
 		}
+
+		/*
+		 * Indicate that no CMT policy will be implemented across
+		 * this PG.
+		 */
+		pg->cmt_policy = CMT_NO_POLICY;
+
 		/*
 		 * Move PG's children from it's children set to it's parent's
 		 * children set. Note that the parent's children set, and PG's
@@ -1520,6 +1545,14 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 					r = group_add(pg->cmt_siblings, child,
 					    GRP_NORESIZE);
 					ASSERT(r == 0);
+
+					if (pg->cmt_parent == NULL &&
+					    pg->cmt_siblings !=
+					    &cmt_root->cl_pgs) {
+						r = group_add(&cmt_root->cl_pgs,
+						    child, GRP_NORESIZE);
+						ASSERT(r == 0);
+					}
 				}
 			}
 			group_empty(pg->cmt_children);
@@ -1564,8 +1597,10 @@ pg_cmt_prune(pg_cmt_t *pg_bad, pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 
 			/*
 			 * Update the CPU's lineages
+			 *
+			 * Remove the PG from the CPU's group used for CMT
+			 * scheduling.
 			 */
-			(void) group_remove(&cpd->pgs, pg, GRP_NORESIZE);
 			(void) group_remove(&cpd->cmt_pgs, pg, GRP_NORESIZE);
 		}
 	}
@@ -1770,8 +1805,20 @@ handle_error:
 		 * to do CMT thread placement across lgroups, as this would
 		 * conflict with policies implementing MPO thread affinity.
 		 *
-		 * The handling for this falls through to the next case.
+		 * If the PG is of a sharing relationship type known to
+		 * legitimately span lgroups, specify that no CMT thread
+		 * placement policy should be implemented, and prune the PG
+		 * from the existing CMT PG hierarchy.
+		 *
+		 * Otherwise, fall though to the case below for handling.
 		 */
+		if (((pghw_t *)pg)->pghw_hw == PGHW_CHIP) {
+			if (pg_cmt_prune(pg, lineage, sz, pgdata) == 0) {
+				cmt_lineage_status = CMT_LINEAGE_REPAIRED;
+				goto revalidate;
+			}
+		}
+		/*LINTED*/
 	case CMT_LINEAGE_NON_PROMOTABLE:
 		/*
 		 * We've detected a PG that already exists in another CPU's
