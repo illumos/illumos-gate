@@ -1980,14 +1980,13 @@ typedef struct ill_s {
 		ill_logical_down : 1,
 		ill_is_6to4tun : 1,	/* Interface is a 6to4 tunnel */
 
-		ill_promisc_on_phys : 1, /* phys interface in promisc mode */
 		ill_dl_up : 1,
 		ill_up_ipifs : 1,
 		ill_note_link : 1,	/* supports link-up notification */
 		ill_capab_reneg : 1, /* capability renegotiation to be done */
 		ill_dld_capab_inprog : 1, /* direct dld capab call in prog */
 		ill_need_recover_multicast : 1,
-		ill_pad_to_bit_31 : 17;
+		ill_pad_to_bit_31 : 18;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t

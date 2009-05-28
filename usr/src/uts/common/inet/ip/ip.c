@@ -16303,20 +16303,26 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			}
 			break;
 		}
-		case DL_NOTE_PROMISC_ON_PHYS:
+		case DL_NOTE_PROMISC_ON_PHYS: {
+			phyint_t *phyint = ill->ill_phyint;
+
 			IPSECHW_DEBUG(IPSECHW_PKT, ("ip_rput_dlpi_writer: "
 			    "got a DL_NOTE_PROMISC_ON_PHYS\n"));
-			mutex_enter(&ill->ill_lock);
-			ill->ill_promisc_on_phys = B_TRUE;
-			mutex_exit(&ill->ill_lock);
+			mutex_enter(&phyint->phyint_lock);
+			phyint->phyint_flags |= PHYI_PROMISC;
+			mutex_exit(&phyint->phyint_lock);
 			break;
-		case DL_NOTE_PROMISC_OFF_PHYS:
+		}
+		case DL_NOTE_PROMISC_OFF_PHYS: {
+			phyint_t *phyint = ill->ill_phyint;
+
 			IPSECHW_DEBUG(IPSECHW_PKT, ("ip_rput_dlpi_writer: "
 			    "got a DL_NOTE_PROMISC_OFF_PHYS\n"));
-			mutex_enter(&ill->ill_lock);
-			ill->ill_promisc_on_phys = B_FALSE;
-			mutex_exit(&ill->ill_lock);
+			mutex_enter(&phyint->phyint_lock);
+			phyint->phyint_flags &= ~PHYI_PROMISC;
+			mutex_exit(&phyint->phyint_lock);
 			break;
+		}
 		case DL_NOTE_CAPAB_RENEG:
 			/*
 			 * Something changed on the driver side.
@@ -26418,6 +26424,7 @@ ipsec_out_is_accelerated(mblk_t *ipsec_mp, ipsa_t *sa, ill_t *ill, ire_t *ire)
 	mblk_t *data_mp;
 	uint_t plen, overhead;
 	ip_stack_t	*ipst;
+	phyint_t	*phyint;
 
 	if ((sa->ipsa_flags & IPSA_F_HW) == 0)
 		return;
@@ -26425,6 +26432,8 @@ ipsec_out_is_accelerated(mblk_t *ipsec_mp, ipsa_t *sa, ill_t *ill, ire_t *ire)
 	if (ill == NULL)
 		return;
 	ipst = ill->ill_ipst;
+	phyint = ill->ill_phyint;
+
 	/*
 	 * Destination address is a broadcast or multicast.  Punt.
 	 */
@@ -26468,7 +26477,7 @@ ipsec_out_is_accelerated(mblk_t *ipsec_mp, ipsa_t *sa, ill_t *ill, ire_t *ire)
 	 * accelerate the packet since it will bounce back up to the
 	 * listeners in the clear.
 	 */
-	if (ill->ill_promisc_on_phys) {
+	if (phyint->phyint_flags & PHYI_PROMISC) {
 		IPSECHW_DEBUG(IPSECHW_PKT, ("ipsec_out_check_is_accelerated: "
 		    "ill in promiscous mode, don't accelerate packet\n"));
 		return;

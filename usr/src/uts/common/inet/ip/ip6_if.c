@@ -2851,6 +2851,7 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	((dl_notify_req_t *)notify_mp->b_rptr)->dl_notifications =
 	    (DL_NOTE_PHYS_ADDR | DL_NOTE_SDU_SIZE | DL_NOTE_FASTPATH_FLUSH |
 	    DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN | DL_NOTE_CAPAB_RENEG |
+	    DL_NOTE_PROMISC_ON_PHYS | DL_NOTE_PROMISC_OFF_PHYS |
 	    DL_NOTE_REPLUMB);
 
 	phys_mp = ip_dlpi_alloc(sizeof (dl_phys_addr_req_t) +

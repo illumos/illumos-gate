@@ -2070,37 +2070,10 @@ ill_capability_dld_reset_fill(ill_t *ill, mblk_t *mp)
 }
 
 /*
- * Send a DL_NOTIFY_REQ to the specified ill to enable
- * DL_NOTE_PROMISC_ON/OFF_PHYS notifications.
- * Invoked by ill_capability_ipsec_ack() before enabling IPsec hardware
- * acceleration.
- * Returns B_TRUE on success, B_FALSE if the message could not be sent.
- */
-static boolean_t
-ill_enable_promisc_notify(ill_t *ill)
-{
-	mblk_t *mp;
-	dl_notify_req_t *req;
-
-	IPSECHW_DEBUG(IPSECHW_PKT, ("ill_enable_promisc_notify:\n"));
-
-	mp = ip_dlpi_alloc(sizeof (dl_notify_req_t), DL_NOTIFY_REQ);
-	if (mp == NULL)
-		return (B_FALSE);
-
-	req = (dl_notify_req_t *)mp->b_rptr;
-	req->dl_notifications = DL_NOTE_PROMISC_ON_PHYS |
-	    DL_NOTE_PROMISC_OFF_PHYS;
-
-	ill_dlpi_send(ill, mp);
-
-	return (B_TRUE);
-}
-
-/*
  * Allocate an IPsec capability request which will be filled by our
  * caller to turn on support for one or more algorithms.
  */
+/* ARGSUSED */
 static mblk_t *
 ill_alloc_ipsec_cap_req(ill_t *ill, dl_capability_sub_t *isub)
 {
@@ -2110,16 +2083,6 @@ ill_alloc_ipsec_cap_req(ill_t *ill, dl_capability_sub_t *isub)
 	dl_capab_ipsec_t	*icip;
 	uint8_t			*ptr;
 	icip = (dl_capab_ipsec_t *)(isub + 1);
-
-	/*
-	 * The first time around, we send a DL_NOTIFY_REQ to enable
-	 * PROMISC_ON/OFF notification from the provider. We need to
-	 * do this before enabling the algorithms to avoid leakage of
-	 * cleartext packets.
-	 */
-
-	if (!ill_enable_promisc_notify(ill))
-		return (NULL);
 
 	/*
 	 * Allocate new mblk which will contain a new capability
