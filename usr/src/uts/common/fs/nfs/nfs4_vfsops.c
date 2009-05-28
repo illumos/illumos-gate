@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3112,7 +3112,8 @@ nfs4setclientid_otw(mntinfo4_t *mi, struct servinfo4 *svp,  cred_t *cr,
 		return;
 
 	/* getattr lease_time res */
-	if (res.array_len >= 2) {
+	if ((res.array_len >= 2) &&
+	    (res.array[1].nfs_resop4_u.opgetattr.status == NFS4_OK)) {
 		garp = &res.array[1].nfs_resop4_u.opgetattr.ga_res;
 
 #ifndef _LP64
