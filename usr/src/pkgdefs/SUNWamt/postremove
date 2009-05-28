@@ -38,11 +38,6 @@ then
 		exit 1 	
 	fi
 
-	rm /dev/heci
-	if [ $? -ne 0 ]; then
-		echo "\nFailed to rm /dev/heci!\n" >&2
-		exit 1
-	fi
-
+	rm -f /dev/heci
 fi
 exit 0

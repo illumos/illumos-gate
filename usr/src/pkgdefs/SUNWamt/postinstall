@@ -41,7 +41,8 @@ DRVALIAS="\"pci8086,2974\" \
 	\"pci8086,29a4\" \
 	\"pci8086,29b4\" \
 	\"pci8086,29c4\" \
-	\"pci8086,2e04\""
+	\"pci8086,2e04\" \
+	\"pci8086,2e14\""
 
 #
 # Select the correct add_drv options to execute.
