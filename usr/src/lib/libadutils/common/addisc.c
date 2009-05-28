@@ -274,8 +274,8 @@ ad_disc_compare_ds(idmap_ad_disc_ds_t *ds1, idmap_ad_disc_ds_t *ds2)
 	for (i = 0; i < num_ds1; i++) {
 		match = B_FALSE;
 		for (j = 0; j < num_ds2; j++) {
-			if (strcmp(ds1[i].host, ds2[i].host) == 0 &&
-			    ds1[i].port == ds2[i].port) {
+			if (strcmp(ds1[i].host, ds2[j].host) == 0 &&
+			    ds1[i].port == ds2[j].port) {
 				match = B_TRUE;
 				break;
 			}
@@ -330,7 +330,7 @@ ad_disc_compare_trusteddomains(ad_disc_trusteddomains_t *td1,
 	for (i = 0; i < num_td1; i++) {
 		match = B_FALSE;
 		for (j = 0; j < num_td2; j++) {
-			if (u8_strcmp(td1[i].domain, td2[i].domain, 0,
+			if (u8_strcmp(td1[i].domain, td2[j].domain, 0,
 			    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
 			    err == 0) {
 				match = B_TRUE;
@@ -389,10 +389,10 @@ ad_disc_compare_domainsinforest(ad_disc_domainsinforest_t *df1,
 	for (i = 0; i < num_df1; i++) {
 		match = B_FALSE;
 		for (j = 0; j < num_df2; j++) {
-			if (u8_strcmp(df1[i].domain, df2[i].domain, 0,
+			if (u8_strcmp(df1[i].domain, df2[j].domain, 0,
 			    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
 			    err == 0 &&
-			    strcmp(df1[i].sid, df2[i].sid) == 0) {
+			    strcmp(df1[i].sid, df2[j].sid) == 0) {
 				match = B_TRUE;
 				break;
 			}
@@ -1003,31 +1003,20 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 
 /*
  * This functions finds all the domains in a forest.
- * It first finds all the naming contexts by finding the
- * root DSE attribute namingContext. For each naming context
- * it performes an entry search looking for Domain object class
- * returning the attribute objectSid.
  */
 ad_disc_domainsinforest_t *
 ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 {
-	int		scope = LDAP_SCOPE_BASE;
-	char		*attrs[2];
-	char		*root_attrs[2];
+	static char	*attrs[] = {
+		"objectSid",
+		NULL,
+	};
 	int		rc;
 	LDAPMessage	*result = NULL;
 	LDAPMessage	*entry;
-	char		*filter;
-	char		**nc = NULL;
-	struct berval	**sid_ber;
-	int		num = 0;
+	int		ndomains = 0;
+	int		nresults;
 	ad_disc_domainsinforest_t *domains = NULL;
-	ad_disc_domainsinforest_t *tmp;
-	int		i;
-	char 		*name;
-	adutils_sid_t	sid;
-	char		*sid_str;
-
 
 	if (*ld == NULL)
 		*ld = ldap_lookup_init(globalCatalogs);
@@ -1035,93 +1024,75 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 	if (*ld == NULL)
 		return (NULL);
 
-	root_attrs[0] = "namingContexts";
-	root_attrs[1] = NULL;
+	logger(LOG_DEBUG, "Looking for domains in forest...");
+	/* Find domains */
+	rc = ldap_search_s(*ld, "", LDAP_SCOPE_SUBTREE,
+	    "(objectClass=Domain)", attrs, 0, &result);
+	if (rc != LDAP_SUCCESS)
+		goto err;
 
-	attrs[0] = "objectSid";
-	attrs[1] = NULL;
+	nresults = ldap_count_entries(*ld, result);
+	domains = calloc(nresults + 1, sizeof (*domains));
+	if (domains == NULL)
+		goto err;
 
-	filter = "(objectclass=Domain)";
+	for (entry = ldap_first_entry(*ld, result);
+	    entry != NULL;
+	    entry = ldap_next_entry(*ld, entry)) {
+		struct berval	**sid_ber;
+		adutils_sid_t	sid;
+		char		*sid_str;
+		char 		*name;
 
-	/* Find naming contexts */
-	rc = ldap_search_s(*ld, LDAP_ROOT_DSE, scope, "(objectClass=*)",
-	    root_attrs, 0, &result);
-	if (rc == LDAP_SUCCESS) {
-		entry = ldap_first_entry(*ld, result);
-		if (entry != NULL) {
-			nc = ldap_get_values(*ld, entry, "namingContexts");
-		}
+		sid_ber = ldap_get_values_len(*ld, entry,
+		    "objectSid");
+		if (sid_ber == NULL)
+			continue;
+
+		rc = adutils_getsid(sid_ber[0], &sid);
+		ldap_value_free_len(sid_ber);
+		if (rc < 0)
+			goto err;
+
+		if ((sid_str = adutils_sid2txt(&sid)) == NULL)
+			goto err;
+
+		strcpy(domains[ndomains].sid, sid_str);
+		free(sid_str);
+
+		name = DN_to_DNS(ldap_get_dn(*ld, entry));
+		if (name == NULL)
+			goto err;
+
+		strcpy(domains[ndomains].domain, name);
+		free(name);
+
+		logger(LOG_DEBUG, "    found %s", domains[ndomains].domain);
+
+		ndomains++;
 	}
+
+	if (ndomains == 0)
+		goto err;
+
+	if (ndomains < nresults) {
+		ad_disc_domainsinforest_t *tmp;
+		tmp = realloc(domains, (ndomains+1) * sizeof (*domains));
+		if (tmp == NULL)
+			goto err;
+		domains = tmp;
+	}
+
 	if (result != NULL)
 		ldap_msgfree(result);
-	if (nc == NULL)
-		return (NULL);
-
-	/* Find domains */
-	for (i = 0; nc[i] != NULL; i++) {
-		rc = ldap_search_s(*ld, nc[i], scope, filter, attrs, 0,
-		    &result);
-		if (rc == LDAP_SUCCESS) {
-			entry = ldap_first_entry(*ld, result);
-			if (entry != NULL) {
-				sid_ber = ldap_get_values_len(*ld, entry,
-				    "objectSid");
-				if (sid_ber != NULL) {
-					num++;
-					tmp = realloc(domains,
-					    (num + 1) *
-					    sizeof (ad_disc_domainsinforest_t));
-					if (tmp == NULL) {
-						if (domains != NULL)
-							free(domains);
-						ldap_value_free_len(sid_ber);
-						ldap_msgfree(result);
-						ldap_value_free(nc);
-						return (NULL);
-					}
-					domains = tmp;
-					memset(&domains[num], 0,
-					    sizeof (ad_disc_domainsinforest_t));
-
-					if (adutils_getsid(sid_ber[0], &sid)
-					    < 0) {
-						free(domains);
-						ldap_value_free_len(sid_ber);
-						ldap_msgfree(result);
-						ldap_value_free(nc);
-						return (NULL);
-					}
-					if ((sid_str = adutils_sid2txt(&sid))
-					    == NULL) {
-						free(domains);
-						ldap_value_free_len(sid_ber);
-						ldap_msgfree(result);
-						ldap_value_free(nc);
-						return (NULL);
-					}
-
-					ldap_value_free_len(sid_ber);
-					strcpy(domains[num - 1].sid, sid_str);
-					free(sid_str);
-
-					name = DN_to_DNS(nc[i]);
-					if (name == NULL) {
-						free(domains);
-						ldap_msgfree(result);
-						ldap_value_free(nc);
-						return (NULL);
-					}
-					strcpy(domains[num - 1].domain, name);
-					free(name);
-				}
-			}
-		}
-		if (result != NULL)
-			ldap_msgfree(result);
-	}
-	ldap_value_free(nc);
 
 	return (domains);
+
+err:
+	free(domains);
+	if (result != NULL)
+		ldap_msgfree(result);
+	return (NULL);
 }
 
 
@@ -1235,6 +1206,7 @@ validate_DomainName(ad_disc_t ctx)
 	idmap_ad_disc_ds_t *domain_controller = NULL;
 	char *dname, *srvname;
 	uint32_t ttl = 0;
+	int len;
 
 	if (is_valid(&ctx->domain_name))
 		return (&ctx->domain_name);
@@ -1268,8 +1240,9 @@ validate_DomainName(ad_disc_t ctx)
 	}
 
 	/* Eat any trailing dot */
-	if (*(dname + strlen(dname)) == '.')
-		*(dname + strlen(dname)) = '\0';
+	len = strlen(dname);
+	if (len > 0 && dname[len-1] == '.')
+		dname[len-1] = '\0';
 
 	update_item(&ctx->domain_name, dname, AD_STATE_AUTO, ttl);
 
