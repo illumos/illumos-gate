@@ -363,11 +363,6 @@ COMMON_SUBDIRS= \
 	SUNWocfr \
 	SUNWonfmes \
 	SUNWonzfs \
-	SUNWopenssl-man \
-	SUNWopenssl-libraries \
-	SUNWopenssl-include \
-	SUNWopenssl-commands \
-	SUNWopensslr \
 	SUNWosdem \
 	SUNWypr \
 	SUNWypu \

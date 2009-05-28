@@ -24,7 +24,6 @@
 # Common definitions for all of usr/src/cmd/ssh subdirs
 #
 
-include $(SRC)/lib/openssl/Makefile.openssl
 
 TEXT_DOMAIN=SUNW_OST_OSCMD
 

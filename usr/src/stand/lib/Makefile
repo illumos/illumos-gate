@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include Makefile.com
 
 i386_SUBDIRS = fs/pcfs fs/compfs
-sparc_SUBDIRS = md5 nvpair scrypt wanboot crypto ssl
+sparc_SUBDIRS = md5 nvpair scrypt openssl .WAIT wanboot crypto ssl
 SUBDIRS = fakeboot fs/hsfs fs/nfs fs/ufs inet sa sock tcpstubs xdr \
 	tcp $($(MACH)_SUBDIRS)
 
@@ -41,9 +38,10 @@ SUBDIRS = fakeboot fs/hsfs fs/nfs fs/ufs inet sa sock tcpstubs xdr \
 # If someone can come up with a more elegant way to strip these
 # directories out, please make it so.
 #
-LINTSUBDIRS1 = $(SUBDIRS:ssl=)
-LINTSUBDIRS2 = $(LINTSUBDIRS1:crypto=)
-LINTSUBDIRS  = $(LINTSUBDIRS2:fakeboot=)
+LINTSUBDIRS1 = $(SUBDIRS:openssl=)
+LINTSUBDIRS2 = $(LINTSUBDIRS1:ssl=)
+LINTSUBDIRS3 = $(LINTSUBDIRS2:crypto=)
+LINTSUBDIRS  = $(LINTSUBDIRS3:fakeboot=)
 
 #
 # We can get away with this since we're only building .a's, and by the

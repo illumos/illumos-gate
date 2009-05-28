@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Makefile for KMF Plugins
@@ -30,7 +30,6 @@ VERS=		.1
 OBJECTS=	openssl_spi.o
 
 include	$(SRC)/lib/Makefile.lib
-include $(SRC)/lib/openssl/Makefile.openssl
 
 LIBLINKS=	$(DYNLIB:.so.1=.so)
 KMFINC=		-I../../../include -I../../../ber_der/inc

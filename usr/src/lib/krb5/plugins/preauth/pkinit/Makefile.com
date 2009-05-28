@@ -55,10 +55,8 @@ POFILES = generic.po
 #override liblink
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKS)$(VERS) $@
 
-include $(SRC)/lib/openssl/Makefile.openssl
 
-CPPFLAGS += 	$(OPENSSL_CPPFLAGS) \
-		-I$(SRC)/lib/krb5 \
+CPPFLAGS += 	-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/krb5/kdb \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/krb5/os \
@@ -68,8 +66,8 @@ CPPFLAGS += 	$(OPENSSL_CPPFLAGS) \
 		-I$(SRC)
 
 CFLAGS +=	$(CCVERBOSE) -I..
-DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) $(OPENSSL_DYNFLAGS) -znodelete
-LDLIBS +=	-L $(ROOTLIBDIR) $(OPENSSL_LDFLAGS) -lcrypto -lc
+DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) -znodelete
+LDLIBS +=	-L $(ROOTLIBDIR) -lcrypto -lc
 
 ROOTLIBDIR= $(ROOT)/usr/lib/krb5/plugins/preauth
 

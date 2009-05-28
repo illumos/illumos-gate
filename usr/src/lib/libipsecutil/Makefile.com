@@ -27,7 +27,6 @@ VERS =		.1
 OBJECTS =	ipsec_util.o algs.o ipsec_libssl_setup.o
 
 include ../../Makefile.lib
-include $(SRC)/lib/openssl/Makefile.openssl
 
 LIBS +=		$(DYNLIB) $(LINTLIB)
 
@@ -38,7 +37,6 @@ LDLIBS +=	-ltecla -lsocket -lnsl -lc
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
-CPPFLAGS +=	$(OPENSSL_BUILD_CPPFLAGS)
 
 .KEEP_STATE:
 

@@ -38,14 +38,13 @@
 SYMLINKS=	$(SYM.ROOT.SYS) $(SYM.ROOT.BIN) $(SYM.OTHERS)
 
 TARGETDIRS=	$(ROOT.SYS) $(ROOT.BIN) $(ROOT.SYS2) \
-		$(UUCP.UUCP) $(OTHERS) $(ROOT.SFW) $(ROOT.OTHER) \
+		$(UUCP.UUCP) $(OTHERS) $(ROOT.OTHER) \
 		$(SYM.USRCCSLIB) $(SYM.USRLIB)
 
 $(BUILD64)	TARGETDIRS += $(ROOT.SYS64.2) $(ROOT.BIN64) \
-		$(ROOT.SFW64) \
 		$(SYM.USRCCSLIB64) $(SYM.USRLIB64)
 
-$(BUILD64)	SYMLINKS += $(SYM.ROOT.BIN64) $(SYM.ROOT.SFW64)
+$(BUILD64)	SYMLINKS += $(SYM.ROOT.BIN64)
 
 TARGETDIRS	+= $(SYMLINKS)
 
@@ -197,9 +196,6 @@ ROOT.SYS= \
 
 # EXPORT DELETE START
 XROOT.BIN= \
-	/etc/openssl \
-	/etc/openssl/certs \
-	/etc/openssl/private \
 	/usr/lib/inet/wanboot
 # EXPORT DELETE END
 
@@ -255,7 +251,6 @@ ROOT.BIN= \
 	/usr/include/kerberosv5 \
 	/usr/include/libmilter \
 	/usr/include/libpolkit \
-	/usr/include/openssl \
 	/usr/include/sasl \
 	/usr/include/scsi \
 	/usr/include/security \
@@ -438,14 +433,6 @@ UUCP.UUCP= \
 	/var/spool/uucppublic \
 	/var/uucp
 
-ROOT.SFW= \
-	/usr/sfw/bin \
-	/usr/sfw/lib
-
-ROOT.SFW64= \
-	/usr/sfw/bin/$(MACH64) \
-	/usr/sfw/lib/$(MACH64)
-
 OTHERS=  \
 	/dev/term  \
 	/tmp  \
@@ -532,12 +519,8 @@ SYM.ROOT.BIN64= \
 	/var/ld/64 \
 	/usr/ucblib/64
 
-SYM.ROOT.SFW64= \
-	/usr/sfw/lib/64
-
 SYM.OTHERS=  \
 	/etc/log  \
-	/etc/sfw/openssl \
 	/usr/mail  \
 	/usr/tmp
 
@@ -622,7 +605,6 @@ $(ROOT)/root:=		DIRMODE= 700
 
 $(ROOT)/var/krb5/rcache/root:=	DIRMODE= 700
 
-$(ROOT)/etc/openssl/private:=	DIRMODE= 700
 
 #
 # These permissions must match the ones set
@@ -660,7 +642,6 @@ $(ROOT)/etc/lib/ld.so.1:=		LINKDEST=../../lib/ld.so.1
 $(ROOT)/etc/lib/libdl.so.1:=		LINKDEST=../../lib/libdl.so.1
 $(ROOT)/etc/lib/nss_files.so.1:=	LINKDEST=../../lib/nss_files.so.1
 $(ROOT)/etc/log:=			LINKDEST=../var/adm/log
-$(ROOT)/etc/sfw/openssl:=		LINKDEST=../openssl
 $(ROOT)/usr/mail:=			LINKDEST=../var/mail
 $(ROOT)/usr/news:=			LINKDEST=../var/news
 $(ROOT)/usr/preserve:=			LINKDEST=../var/preserve
@@ -693,7 +674,6 @@ $(BUILD64) $(ROOT)/usr/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/security/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/xpg4/lib/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/var/ld/64:=		LINKDEST=$(MACH64)
-$(BUILD64) $(ROOT)/usr/sfw/lib/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/ucblib/64:=	LINKDEST=$(MACH64)
 
 # Installing a directory symlink calls for overriding INS.dir to install

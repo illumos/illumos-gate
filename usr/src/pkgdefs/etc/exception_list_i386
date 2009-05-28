@@ -626,15 +626,12 @@ var/krb5				i386
 var/svc/manifest/network/security/kadmin.xml	i386
 var/svc/manifest/network/security/krb5_prop.xml	i386
 var/svc/manifest/network/security/krb5kdc.xml	i386
-etc/sfw/openssl/certs			i386
-etc/sfw/openssl/private			i386
 #
 # these are "removed" from the source product build because the only
 # packages that currently deliver them are removed.
 # they really should't be in here.
 #
 etc/sfw					i386
-usr/sfw/bin				i386
 #
 # Entries for the libmech_krb5 symlink, which has been included
 # for build purposes only, not delivered to customers.

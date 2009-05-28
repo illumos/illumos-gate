@@ -18,11 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-
-include $(SRC)/lib/openssl/Makefile.openssl
 
 LIBRARY = libwanboot.a
 LOCOBJS = http_aux.o bootinfo_aux.o
@@ -38,9 +36,11 @@ LDLIBS += -lcrypto -lsock -linet -lssl -lnvpair
 
 CPPFLAGS += -I$(CMNNETDIR)/dhcp -I$(TOPDIR)/common/net/wanboot/crypt \
 	-I../inet $(DHCPCPPFLAGS) $(SOCKCPPFLAGS)
+
 #
-# several objects need access to openssl headers, now in /usr/include
+# several objects need access to openssl headers, now in ../openssl
 #
-CPPFLAGS += -I$(ROOT)/usr/include
+CPPFLAGS += -I..
+
 
 include ../Makefile.targ

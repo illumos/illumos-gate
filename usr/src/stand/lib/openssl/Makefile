@@ -23,7 +23,6 @@
 #
 
 include $(SRC)/lib/Makefile.lib
-include ../Makefile.com
 
 HDRS= \
 	aes.h \
@@ -95,171 +94,175 @@ HDRS= \
 	ui_compat.h \
 	x509.h \
 	x509_vfy.h \
-	x509v3.h
+	x509v3.h \
+	kssl.h \
+	ssl.h \
+	ssl2.h \
+	ssl3.h \
+	ssl23.h \
+	tls1.h \
+	dtls1.h \
+	e_os2.h
+
 
 OPENSSL_SRC =	../../../common/openssl
-HDRDIR =	$(OPENSSL_SRC)/crypto
-ROOTHDRDIR =	$(ROOT)/usr/include/openssl
+HDRCRYPTODIR =	$(OPENSSL_SRC)/crypto
+HDRSSLDIR =	$(OPENSSL_SRC)/ssl
+HDRDIR = $(OPENSSL_SRC)
 
-SUBDIRS =	$(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+ROOTHDRDIR = ../openssl
 
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-install :=	TARGET= install
-lint :=		TARGET= lint
+all clobber lint:
 
-.KEEP_STATE:
-.PARALLEL:
+CLOBBERFILES += $(HDRS)
 
-all clean clobber install lint: $(SUBDIRS)
+install: $(ROOTHDRS)
 
-install_h:	$(ROOTHDRS)
-
-_msg:
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-$(ROOTHDRDIR)/%: $(HDRDIR)/aes/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/asn1/%
+$(ROOTHDRDIR)/%: $(HDRSSLDIR)/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/bf/%
+$(ROOTHDRDIR)/%: $(HDRDIR)/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/bio/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/aes/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/bn/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/asn1/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/buffer/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/bf/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/cast/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/bio/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/comp/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/bn/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/conf/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/buffer/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/des/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/cast/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/dh/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/comp/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/dsa/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/conf/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/dso/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/des/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/ec/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/dh/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/ecdh/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/dsa/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/ecdsa/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/dso/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/engine/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/ec/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/err/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/ecdh/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/evp/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/ecdsa/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/hmac/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/engine/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/idea/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/err/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/krb5/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/evp/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/lhash/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/hmac/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/md2/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/idea/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/md4/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/krb5/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/md5/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/lhash/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/mdc2/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/md2/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/objects/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/md4/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/ocsp/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/md5/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/pem/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/mdc2/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/pkcs12/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/objects/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/pkcs7/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/ocsp/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/pqueue/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/pem/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/rand/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/pkcs12/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/rc2/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/pkcs7/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/rc4/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/pqueue/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/rc5/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/rand/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/ripemd/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/rc2/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/rsa/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/rc4/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/sha/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/rc5/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/stack/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/ripemd/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/store/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/rsa/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/txt_db/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/sha/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/ui/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/stack/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/x509/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/store/%
 	 $(INS.file)
 
-$(ROOTHDRDIR)/%: $(HDRDIR)/x509v3/%
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/txt_db/%
+	 $(INS.file)
+
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/ui/%
+	 $(INS.file)
+
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/x509/%
+	 $(INS.file)
+
+$(ROOTHDRDIR)/%: $(HDRCRYPTODIR)/x509v3/%
 	 $(INS.file)
 
 

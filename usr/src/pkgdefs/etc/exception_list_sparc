@@ -636,9 +636,6 @@ var/svc/manifest/network/security/krb5kdc.xml	sparc
 # they really should't be in here.
 #
 etc/sfw					sparc
-usr/sfw/bin				sparc
-usr/sfw/lib/64				sparc
-usr/sfw/lib/sparcv9			sparc
 #
 # Entries for the libmech_krb5 symlink, which has been included
 # for build purposes only, not delivered to customers.

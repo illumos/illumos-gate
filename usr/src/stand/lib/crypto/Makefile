@@ -19,11 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # See the README file in this directory for a description of how to cull
 # objects unused by the standalone boot applications from the OBJECTS list.
 #
@@ -151,7 +149,6 @@ OBJECTS = cryptlib.o	mem.o		mem_dbg.o	ex_data.o	\
 	$($(MACH)_OBJECTS)
 
 
-include $(SRC)/lib/openssl/Makefile.openssl
 include ../Makefile.com
 
 SRCDIR = $(TOPDIR)/common/openssl/crypto

@@ -100,18 +100,23 @@ LINTFLAGS = -nmsF -erroff=E_BAD_PTR_CAST_ALIGN \
 #
 # CPPFLAGS values that *must* be included whenever linking with or
 # building libssl or libcrypto.
-# This overrides the restrictions for the standlone build, some of these
-# may be repeats from OPENSSL_NO_XXX but they are explicit here because
-# we are not just excluding for legal reasons but for size as well.
+# Exclusions here are for both legal and size reasons.
 #
 OPENSSL_SRC = ../../../common/openssl
 OPENSSL_BUILD_CPPFLAGS_sparc = -DB_ENDIAN
-OPENSSL_BUILD_CPPFLAGS = $(OPENSSL_NO_XXX) -DOPENSSL_NO_HW \
+OPENSSL_BUILD_CPPFLAGS = -DOPENSSL_NO_ECDH -DOPENSSL_NO_ECDSA \
+			-DOPENSSL_NO_HW_4758_CCA -DOPENSSL_NO_HW_AEP \
+			-DOPENSSL_NO_HW_ATALLA -DOPENSSL_NO_HW_CHIL \
+			-DOPENSSL_NO_HW_CSWIFT -DOPENSSL_NO_HW_GMP \
+			-DOPENSSL_NO_HW_NURON -DOPENSSL_NO_HW_PADLOCK \
+			-DOPENSSL_NO_HW_SUREWARE -DOPENSSL_NO_HW_UBSEC \
+			-DOPENSSL_NO_HW \
 			-DOPENSSL_NO_MD2 -DOPENSSL_NO_MD4 -DOPENSSL_NO_MDC2 \
 			-DOPENSSL_NO_RIPEMD -DOPENSSL_NO_RC3 -DOPENSSL_NO_RC4 \
 			-DOPENSSL_NO_EC -DOPENSSL_NO_RC5 -DOPENSSL_NO_IDEA \
 			-DOPENSSL_NO_CAST -DOPENSSL_NO_AES \
 			-DDEVRANDOM=\"/dev/urandom\" \
+			-I.. \
 			$(OPENSSL_BUILD_CPPFLAGS_$(MACH)) \
 			-I$(ROOT)/usr/include \
 			-I$(OPENSSL_SRC) -I$(OPENSSL_SRC)/crypto

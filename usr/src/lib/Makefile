@@ -192,7 +192,6 @@ SUBDIRS += \
 	librestart	\
 	libsched	\
 	libelfsign	\
-	openssl		\
 	pkcs11		.WAIT	\
 	libpctx		.WAIT	\
 	libcpc		\
@@ -461,7 +460,6 @@ HDRSUBDIRS=		\
 	hal		\
 	policykit	\
 	lvm		\
-	openssl		\
 	pkcs11		\
 	passwdutil	\
 	../cmd/sendmail/libmilter	\
@@ -569,7 +567,7 @@ libelfsign:	libcryptoutil libkmf
 libidmap:	libadutils libldap5 libavl libsldap
 libinetcfg:	libnsl libsocket libdlpi
 libiscsit:	libc libnvpair libstmf libuuid libnsl
-libkmf:		libcryptoutil pkcs11 openssl
+libkmf:		libcryptoutil pkcs11
 libnsl:		libmd5 libscf
 libmapid:	libresolv
 libnwam:	libdoor
@@ -596,7 +594,7 @@ libproject:	libpool libproc libsecdb
 libtsnet:	libnsl libtsol libsecdb
 libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
-		libdhcputil openssl
+		libdhcputil
 libwanbootutil:	libnsl
 pam_modules:	libproject passwdutil $(SMARTCARD) smbsrv
 libscf:		libuutil libmd libgen libsmbios
@@ -604,7 +602,7 @@ libinetsvc:	libscf
 librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
 ../cmd/sgs/libelf:	../cmd/sgs/libconv
-pkcs11:		libcryptoutil openssl
+pkcs11:		libcryptoutil
 print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevinfo libdevid libgen libnvpair libuutil libiscsitgt \

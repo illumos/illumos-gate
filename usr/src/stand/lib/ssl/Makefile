@@ -19,11 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libssl.a
 
@@ -41,7 +39,6 @@ CMNOBJS = s3_both.o	s3_clnt.o	s3_enc.o	s3_lib.o	\
 
 OBJECTS = $(LOCOBJS) $(COMPOBJS) $(CMNOBJS)
 
-include $(SRC)/lib/openssl/Makefile.openssl
 include ../Makefile.com
 
 CMNDIR	= $(TOPDIR)/common/openssl/ssl
