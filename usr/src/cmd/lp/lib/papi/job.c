@@ -171,16 +171,64 @@ authorized(service_t *svc, int32_t id)
 				result = PAPI_OK;
 			else {
 				/*
-				 * user request r->user might contain the
+				 * user and r->user might contain the
 				 * host info also
 				 */
-				char *token;
-				token = strtok(r->user, "@");
+				char *token1 = strtok(r->user, "@");
+				char *token2 = strtok(NULL, "@");
+				char *token3 = strtok(user, "@");
+				char *token4 = strtok(NULL, "@");
 
-				if (token != NULL) {
-					if (strcmp(user, token) == 0)
+				/*
+				 * token1 and token3 contain usernames
+				 * token2 and token4 contain hostnames
+				 */
+				if ((token1 == NULL) || (token3 == NULL))
+					result = PAPI_NOT_AUTHORIZED;
+				else if ((token4 != NULL) &&
+				    (strcmp(token4, "localhost") == 0) &&
+				    (strcmp(token3, "root") == 0) ||
+				    (strcmp(token3, "lp") == 0)) {
+					/*
+					 * root/lp user on server can
+					 * cancel any requset
+					 */
+					result = PAPI_OK;
+				} else if (strcmp(token1, token3) == 0) {
+					/*
+					 * usernames are same
+					 * compare the hostnames
+					 */
+					if ((token4 != NULL) &&
+					    (token2 != NULL) &&
+					    (strcmp(token4, "localhost") ==
+					    0)) {
+						/*
+						 * Its server machine
+						 */
+						static char host[256];
+						if (gethostname(host,
+						    sizeof (host)) == 0) {
+							if ((host != NULL) &&
+							    (strcmp(host,
+							    token2) == 0))
+								result =
+								    PAPI_OK;
+						}
+
+					} else if ((token4 != NULL) &&
+					    (token2 != NULL) &&
+					    (strcmp(token4, token2) == 0)) {
 						result = PAPI_OK;
-					free(token);
+					} else if ((token4 == NULL) &&
+					    (token2 != NULL)) {
+						/*
+						 * When the request is sent from
+						 * client to server using ipp
+						 * token4 is NULL
+						 */
+						result = PAPI_OK;
+					}
 				}
 			}
 		}

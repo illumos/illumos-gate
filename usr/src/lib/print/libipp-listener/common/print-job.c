@@ -51,6 +51,7 @@ ipp_print_job(papi_service_t svc, papi_attribute_t **request,
 	ssize_t rc;
 	char buf[BUFSIZ];
 	char *host = NULL;
+	int fp = -1;
 	char *keys[] = { "attributes-natural-language", "attributes-charset",
 			"printer-uri", NULL };
 
@@ -99,46 +100,49 @@ ipp_print_job(papi_service_t svc, papi_attribute_t **request,
 		}
 	}
 
-	/* Set "job-originating-host-name" attribute if not set */
-	papiAttributeListGetString(job_attributes, NULL,
-	    "job-originating-host-name", &host);
+	/* Set "job-originating-host-name" in next block */
+	(void) papiAttributeListGetInteger(request, NULL,
+	    "peer-socket", &fp);
 
-	if (host == NULL) {
-		int fd = -1;
-		(void) papiAttributeListGetInteger(request, NULL,
-		    "peer-socket", &fd);
+	if (fp != -1) {
+		struct sockaddr_in peer;
+		socklen_t peer_len = sizeof (peer);
 
-		if (fd != -1) {
-			struct sockaddr_in peer;
-			int peer_len;
+		/* who is our peer ? */
+		if (getpeername(fp, (struct sockaddr *)&peer,
+		    &peer_len) == 0) {
+			struct hostent *he;
+			int error_num;
 
-			peer_len = sizeof (peer);
-			if (getpeername(fd, (struct sockaddr *)&peer,
-			    &peer_len) == 0) {
-				struct hostent *he;
-				int error_num;
+			/*
+			 * get their name or return a string containing
+			 * their address
+			 */
+			if ((he = getipnodebyaddr((const char *)&peer.sin_addr,
+			    sizeof (peer.sin_addr), peer.sin_family,
+			    &error_num)) == NULL) {
+				char tmp_buf[INET6_ADDRSTRLEN];
+				papiAttributeListAddString(
+				    &job_attributes,
+				    PAPI_ATTR_REPLACE,
+				    "job-originating-host-name",
+				    (char *)inet_ntop(peer.sin_family,
+				    &peer.sin_addr, tmp_buf,
+				    sizeof (tmp_buf)));
 
-				he = getipnodebyaddr(&peer.sin_addr,
-				    sizeof (peer.sin_addr),
-				    peer.sin_family, &error_num);
-
-				if ((he != NULL) && (he->h_name != NULL)) {
+			} else {
+				if (is_localhost(he->h_name) != 0)
+					papiAttributeListAddString(
+					    &job_attributes,
+					    PAPI_ATTR_REPLACE,
+					    "job-originating-host-name",
+					    "localhost");
+				else if (he->h_name != NULL)
 					papiAttributeListAddString(
 					    &job_attributes,
 					    PAPI_ATTR_REPLACE,
 					    "job-originating-host-name",
 					    he->h_name);
-				} else {
-					/*
-					 * Node-name could not be read
-					 * so set the ip-address
-					 */
-					papiAttributeListAddString(
-					    &job_attributes,
-					    PAPI_ATTR_REPLACE,
-					    "job-originating-host-name",
-					    inet_ntoa(peer.sin_addr));
-				}
 			}
 		}
 	}
