@@ -1126,7 +1126,27 @@ main(int ac, char *av[])
 	ac = c;
 
 	/* preprocess argument list looking for '-l' or '-R' so it can trail */
-	while ((c = getopt(ac, argv, "LEDf:S:stc:p:a:drs:v:l:o:R:u:")) != EOF)
+	while ((c = getopt(ac, argv, "LEDf:S:stc:p:a:drs:v:l:o:R:u:")) != EOF) {
+		switch (c) {    /* these may or may not have an option */
+		case 'a':
+		case 'c':
+		case 'p':
+		case 'o':
+		case 'R':
+		case 'u':
+		case 'v':
+		case 'l':
+		case 'f':
+		case 'S':
+			if (optarg[0] == '-') {
+				/* this check stop a possible infinite loop */
+				if ((optind > 1) && (argv[optind-1][1] != c))
+					optind--;
+				optarg = NULL;
+			} else if (strcmp(optarg, "all") == 0)
+				optarg = NULL;
+		}
+
 		switch (c) {
 		case 'l':
 			if ((optarg == NULL) || (optarg[0] == '-'))
@@ -1145,6 +1165,7 @@ main(int ac, char *av[])
 		default:
 			break;
 		}
+	}
 	optind = 1;
 
 	/* process command line arguments */
