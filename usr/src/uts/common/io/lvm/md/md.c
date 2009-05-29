@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1931,6 +1931,7 @@ mdioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred_p,
 	 */
 	else if ((MD_MIN2SET(mnum) >= md_nsets) ||
 	    (MD_MIN2UNIT(mnum) >= md_nunits) ||
+	    (md_set[MD_MIN2SET(mnum)].s_ui == NULL) ||
 	    ((ui = MDI_UNIT(mnum)) == NULL)) {
 		err = ENXIO;
 	} else if (md_ops[ui->ui_opsindex]->md_ioctl == NULL) {
