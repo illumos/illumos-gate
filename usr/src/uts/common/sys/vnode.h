@@ -1139,6 +1139,7 @@ extern int	fop_vnevent(vnode_t *, vnevent_t, vnode_t *, char *,
  * Flags for VOP_READDIR
  */
 #define	V_RDDIR_ENTFLAGS	0x01	/* request dirent flags */
+#define	V_RDDIR_ACCFILTER	0x02	/* filter out inaccessible dirents */
 
 /*
  * Flags for VOP_RWLOCK/VOP_RWUNLOCK

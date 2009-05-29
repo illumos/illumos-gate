@@ -460,6 +460,7 @@ COMMON_SUBDIRS=		\
 	zonecfg		\
 	zonename	\
 	zpool		\
+	zlook		\
 	ztest
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += \

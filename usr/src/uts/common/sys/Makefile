@@ -835,7 +835,8 @@ FSHDRS=				\
 	ufs_quota.h		\
 	ufs_snap.h              \
 	ufs_trans.h		\
-	zfs.h
+	zfs.h			\
+	zut.h
 
 PCMCIAHDRS=		\
 	pcata.h		\

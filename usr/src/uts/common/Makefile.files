@@ -1340,6 +1340,9 @@ ZFS_OBJS +=			\
 	zfs_vnops.o		\
 	zvol.o
 
+ZUT_OBJS +=			\
+	zut.o
+
 #
 #			streams modules
 #

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,6 +296,7 @@ typedef	uint64_t	vfs_feature_t;
 #define	VFSFT_ACLONCREATE	0x100000010	/* Supports ACL on create */
 #define	VFSFT_ACEMASKONACCESS	0x100000020	/* Can use ACEMASK for access */
 #define	VFSFT_SYSATTR_VIEWS	0x100000040	/* Supports sysattr view i/f */
+#define	VFSFT_ACCESS_FILTER	0x100000080	/* dirents filtered by access */
 
 /*
  * Argument structure for mount(2).

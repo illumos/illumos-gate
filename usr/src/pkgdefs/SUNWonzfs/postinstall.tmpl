@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -21,13 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-!include prototype_com
-#
-d none kernel/drv/sparcv9 755 root sys
-f none kernel/drv/sparcv9/zut 755 root sys
-d none usr/sbin/sparcv9 755 root bin
-f none usr/sbin/sparcv9/zinject 555 root bin
-d none usr/bin/sparcv9 755 root bin
-f none usr/bin/sparcv9/zlook 555 root bin
-f none usr/bin/sparcv9/ztest 555 root bin
+
+include drv_utils
+
+pkg_drvadd -m '* 0666 root sys' zut || exit 1

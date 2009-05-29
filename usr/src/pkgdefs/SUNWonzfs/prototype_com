@@ -18,19 +18,31 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 i pkginfo
 i copyright
 i depend
+i postinstall
+i preremove
 #
 # SUNWonzfs
 #
+d none kernel 755 root sys
+d none kernel/drv 0755 root sys
+f none kernel/drv/zut.conf 644 root sys
 d none usr 755 root sys
-d none usr/sbin 755 root bin
-l none usr/sbin/zinject=../../usr/lib/isaexec
 d none usr/bin 755 root bin
 l none usr/bin/ztest=../../usr/lib/isaexec
+l none usr/bin/zlook=../../usr/lib/isaexec
+d none usr/include 755 root bin
+d none usr/include/sys 755 root bin
+d none usr/include/sys/fs 755 root bin
+f none usr/include/sys/fs/zut.h 644 root bin
+d none usr/lib 755 root bin
+d none usr/lib/devfsadm 755 root sys
+d none usr/lib/devfsadm/linkmod 755 root sys
+f none usr/lib/devfsadm/linkmod/SUNW_zut_link.so 755 root sys
+d none usr/sbin 755 root bin
+l none usr/sbin/zinject=../../usr/lib/isaexec

@@ -247,7 +247,7 @@ const char *const PATHCONFname[] = {
 	"_PC_CASE_BEHAVIOR",		/* 22 */
 	"_PC_SATTR_ENABLED",		/* 23 */
 	"_PC_SATTR_EXISTS",		/* 24 */
-	NULL,				/* 25 */
+	"_PC_ACCESS_FILTERING",		/* 25 */
 	NULL,				/* 26 */
 	NULL,				/* 27 */
 	NULL,				/* 28 */

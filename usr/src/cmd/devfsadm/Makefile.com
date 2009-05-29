@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../../Makefile.cmd
@@ -66,7 +64,8 @@ LINK_OBJS_CMN =			\
 	md_link.o		\
 	dtrace_link.o		\
 	vscan_link.o		\
-	zfs_link.o
+	zfs_link.o		\
+	zut_link.o
 
 LINK_OBJS =	$(LINK_OBJS_CMN) \
 		$(LINK_OBJS_$(MACH))

@@ -18,18 +18,21 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 !include prototype_com
 #
+f none kernel/drv/zut 755 root sys
+d none kernel/drv/amd64 755 root sys
+f none kernel/drv/amd64/zut 755 root sys
 d none usr/sbin/amd64 755 root bin
 f none usr/sbin/amd64/zinject 555 root bin
 d none usr/sbin/i86 755 root bin
 f none usr/sbin/i86/zinject 555 root bin
 d none usr/bin/amd64 755 root bin
+f none usr/bin/amd64/zlook 555 root bin
 f none usr/bin/amd64/ztest 555 root bin
 d none usr/bin/i86 755 root bin
+f none usr/bin/i86/zlook 555 root bin
 f none usr/bin/i86/ztest 555 root bin

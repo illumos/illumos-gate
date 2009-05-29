@@ -2164,46 +2164,17 @@ done:
 }
 
 /*
- * working_mode returns the permissions that were not granted
+ * Check accesses of interest (AoI) against attributes of the dataset
+ * such as read-only.  Returns zero if no AoI conflict with dataset
+ * attributes, otherwise an appropriate errno is returned.
  */
 static int
-zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
-    boolean_t *check_privs, boolean_t skipaclchk, cred_t *cr)
+zfs_zaccess_dataset_check(znode_t *zp, uint32_t v4_mode)
 {
-	zfs_acl_t	*aclp;
-	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
-	int		error;
-	uid_t		uid = crgetuid(cr);
-	uint64_t 	who;
-	uint16_t	type, iflags;
-	uint16_t	entry_type;
-	uint32_t	access_mask;
-	uint32_t	deny_mask = 0;
-	zfs_ace_hdr_t	*acep = NULL;
-	boolean_t	checkit;
-	uid_t		fowner;
-	uid_t		gowner;
-
-	/*
-	 * Short circuit empty requests
-	 */
-	if (v4_mode == 0)
-		return (0);
-
-	*check_privs = B_TRUE;
-
-	if (zfsvfs->z_replay) {
-		*working_mode = 0;
-		return (0);
-	}
-
-	*working_mode = v4_mode;
-
 	if ((v4_mode & WRITE_MASK) &&
 	    (zp->z_zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) &&
 	    (!IS_DEVVP(ZTOV(zp)) ||
 	    (IS_DEVVP(ZTOV(zp)) && (v4_mode & WRITE_MASK_ATTRS)))) {
-		*check_privs = B_FALSE;
 		return (EROFS);
 	}
 
@@ -2215,31 +2186,64 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 	    (zp->z_phys->zp_flags & (ZFS_READONLY | ZFS_IMMUTABLE))) ||
 	    (ZTOV(zp)->v_type == VDIR &&
 	    (zp->z_phys->zp_flags & ZFS_IMMUTABLE)))) {
-		*check_privs = B_FALSE;
 		return (EPERM);
 	}
 
 	if ((v4_mode & (ACE_DELETE | ACE_DELETE_CHILD)) &&
 	    (zp->z_phys->zp_flags & ZFS_NOUNLINK)) {
-		*check_privs = B_FALSE;
 		return (EPERM);
 	}
 
 	if (((v4_mode & (ACE_READ_DATA|ACE_EXECUTE)) &&
 	    (zp->z_phys->zp_flags & ZFS_AV_QUARANTINED))) {
-		*check_privs = B_FALSE;
 		return (EACCES);
 	}
 
-	/*
-	 * The caller requested that the ACL check be skipped.  This
-	 * would only happen if the caller checked VOP_ACCESS() with a
-	 * 32 bit ACE mask and already had the appropriate permissions.
-	 */
-	if (skipaclchk) {
-		*working_mode = 0;
-		return (0);
-	}
+	return (0);
+}
+
+/*
+ * The primary usage of this function is to loop through all of the
+ * ACEs in the znode, determining what accesses of interest (AoI) to
+ * the caller are allowed or denied.  The AoI are expressed as bits in
+ * the working_mode parameter.  As each ACE is processed, bits covered
+ * by that ACE are removed from the working_mode.  This removal
+ * facilitates two things.  The first is that when the working mode is
+ * empty (= 0), we know we've looked at all the AoI. The second is
+ * that the ACE interpretation rules don't allow a later ACE to undo
+ * something granted or denied by an earlier ACE.  Removing the
+ * discovered access or denial enforces this rule.  At the end of
+ * processing the ACEs, all AoI that were found to be denied are
+ * placed into the working_mode, giving the caller a mask of denied
+ * accesses.  Returns:
+ *	0		if all AoI granted
+ *	EACCESS 	if the denied mask is non-zero
+ *	other error	if abnormal failure (e.g., IO error)
+ *
+ * A secondary usage of the function is to determine if any of the
+ * AoI are granted.  If an ACE grants any access in
+ * the working_mode, we immediately short circuit out of the function.
+ * This mode is chosen by setting anyaccess to B_TRUE.  The
+ * working_mode is not a denied access mask upon exit if the function
+ * is used in this manner.
+ */
+static int
+zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
+    boolean_t anyaccess, cred_t *cr)
+{
+	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
+	zfs_acl_t	*aclp;
+	int		error;
+	uid_t		uid = crgetuid(cr);
+	uint64_t 	who;
+	uint16_t	type, iflags;
+	uint16_t	entry_type;
+	uint32_t	access_mask;
+	uint32_t	deny_mask = 0;
+	zfs_ace_hdr_t	*acep = NULL;
+	boolean_t	checkit;
+	uid_t		fowner;
+	uid_t		gowner;
 
 	zfs_fuid_map_ids(zp, cr, &fowner, &gowner);
 
@@ -2253,11 +2257,17 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 
 	while (acep = zfs_acl_next_ace(aclp, acep, &who, &access_mask,
 	    &iflags, &type)) {
+		uint32_t mask_matched;
 
 		if (!zfs_acl_valid_ace_type(type, iflags))
 			continue;
 
 		if (ZTOV(zp)->v_type == VDIR && (iflags & ACE_INHERIT_ONLY_ACE))
+			continue;
+
+		/* Skip ACE if it does not affect any AoI */
+		mask_matched = (access_mask & *working_mode);
+		if (!mask_matched)
 			continue;
 
 		entry_type = (iflags & ACE_TYPE_FLAGS);
@@ -2298,14 +2308,24 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 		}
 
 		if (checkit) {
-			uint32_t mask_matched = (access_mask & *working_mode);
-
-			if (mask_matched) {
-				if (type == DENY)
-					deny_mask |= mask_matched;
-
-				*working_mode &= ~mask_matched;
+			if (type == DENY) {
+				DTRACE_PROBE3(zfs__ace__denies,
+				    znode_t *, zp,
+				    zfs_ace_hdr_t *, acep,
+				    uint32_t, mask_matched);
+				deny_mask |= mask_matched;
+			} else {
+				DTRACE_PROBE3(zfs__ace__allows,
+				    znode_t *, zp,
+				    zfs_ace_hdr_t *, acep,
+				    uint32_t, mask_matched);
+				if (anyaccess) {
+					mutex_exit(&zp->z_acl_lock);
+					zfs_acl_free(aclp);
+					return (0);
+				}
 			}
+			*working_mode &= ~mask_matched;
 		}
 
 		/* Are we done? */
@@ -2325,6 +2345,69 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 	}
 
 	return (0);
+}
+
+/*
+ * Return true if any access whatsoever granted, we don't actually
+ * care what access is granted.
+ */
+boolean_t
+zfs_has_access(znode_t *zp, cred_t *cr)
+{
+	uint32_t have = ACE_ALL_PERMS;
+
+	if (zfs_zaccess_aces_check(zp, &have, B_TRUE, cr) != 0) {
+		uid_t		owner;
+
+		owner = zfs_fuid_map_id(zp->z_zfsvfs,
+		    zp->z_phys->zp_uid, cr, ZFS_OWNER);
+
+		return (
+		    secpolicy_vnode_access(cr, ZTOV(zp), owner, VREAD) == 0 ||
+		    secpolicy_vnode_access(cr, ZTOV(zp), owner, VWRITE) == 0 ||
+		    secpolicy_vnode_access(cr, ZTOV(zp), owner, VEXEC) == 0 ||
+		    secpolicy_vnode_chown(cr, B_TRUE) == 0 ||
+		    secpolicy_vnode_chown(cr, B_FALSE) == 0 ||
+		    secpolicy_vnode_setdac(cr, owner) == 0 ||
+		    secpolicy_vnode_remove(cr) == 0);
+	}
+	return (B_TRUE);
+}
+
+static int
+zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
+    boolean_t *check_privs, boolean_t skipaclchk, cred_t *cr)
+{
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	int err;
+
+	*working_mode = v4_mode;
+	*check_privs = B_TRUE;
+
+	/*
+	 * Short circuit empty requests
+	 */
+	if (v4_mode == 0 || zfsvfs->z_replay) {
+		*working_mode = 0;
+		return (0);
+	}
+
+	if ((err = zfs_zaccess_dataset_check(zp, v4_mode)) != 0) {
+		*check_privs = B_FALSE;
+		return (err);
+	}
+
+	/*
+	 * The caller requested that the ACL check be skipped.  This
+	 * would only happen if the caller checked VOP_ACCESS() with a
+	 * 32 bit ACE mask and already had the appropriate permissions.
+	 */
+	if (skipaclchk) {
+		*working_mode = 0;
+		return (0);
+	}
+
+	return (zfs_zaccess_aces_check(zp, working_mode, B_FALSE, cr));
 }
 
 static int

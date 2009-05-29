@@ -311,6 +311,7 @@ extern "C" {
 #define	_PC_CASE_BEHAVIOR	22
 #define	_PC_SATTR_ENABLED	23
 #define	_PC_SATTR_EXISTS	24
+#define	_PC_ACCESS_FILTERING	25
 
 /*
  * Large File Summit names

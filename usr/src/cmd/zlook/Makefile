@@ -18,16 +18,35 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-!include prototype_com
-#
-d none kernel/drv/sparcv9 755 root sys
-f none kernel/drv/sparcv9/zut 755 root sys
-d none usr/sbin/sparcv9 755 root bin
-f none usr/sbin/sparcv9/zinject 555 root bin
-d none usr/bin/sparcv9 755 root bin
-f none usr/bin/sparcv9/zlook 555 root bin
-f none usr/bin/sparcv9/ztest 555 root bin
+
+PROG:sh=	basename `pwd`
+
+include ../Makefile.cmd
+
+$(INTEL_BLD)SUBDIRS	= $(MACH)
+$(BUILD64)SUBDIRS	+= $(MACH64)
+
+all	:=	TARGET = all
+install	:=	TARGET = install
+clean	:=	TARGET = clean
+clobber	:=	TARGET = clobber
+lint	:=	TARGET = lint
+
+.KEEP_STATE:
+
+all clean clobber lint:	$(SUBDIRS)
+
+install:	$(SUBDIRS)
+	-$(RM) $(ROOTPROG)
+	-$(LN) $(ISAEXEC) $(ROOTPROG)
+
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include ../Makefile.targ

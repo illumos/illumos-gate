@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1210,7 +1210,8 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 		 * subsequent call refers to the static entries or to those
 		 * in an underlying fs.
 		 */
-		ASSERT(*eofp);
+		if (*eofp == 0)
+			return (EINVAL);
 		reset_off = 1;
 	}
 

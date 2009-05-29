@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -509,6 +509,10 @@ fs_pathconf(
 
 	case _PC_SATTR_ENABLED:
 	case _PC_SATTR_EXISTS:
+		val = 0;
+		break;
+
+	case _PC_ACCESS_FILTERING:
 		val = 0;
 		break;
 

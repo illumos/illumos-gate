@@ -321,6 +321,7 @@ COMMON_SUBDIRS = \
 	cmd/zonecfg \
 	cmd/zonename \
 	cmd/zpool \
+	cmd/zlook \
 	cmd/ztest \
 	lib/abi \
 	lib/auditd_plugins \
