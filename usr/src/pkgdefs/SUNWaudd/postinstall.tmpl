@@ -35,12 +35,12 @@ pkg_drvadd -n austr || EXIT=1
 pkg_drvadd -n -i '"pci1274,1371" "pci1274,5880"' audioens || EXIT=1
 pkg_drvadd -n -i '"pci1274,5000"' audiopci || EXIT=1
 pkg_drvadd -n -i '"pci10b9,5451"' audiots || EXIT=1
+pkg_drvadd -n -i '"pci10b9,5455"' audio1575 || EXIT=1
 
 case "${ARCH}" in
     sparc)
 
 	pkg_drvadd -n -i '"SUNW,CS4231"' audiocs || EXIT=1
-	pkg_drvadd -n -i '"pci10b9,5455"' audio1575 || EXIT=1
 	;;
     i386)
 	;;
