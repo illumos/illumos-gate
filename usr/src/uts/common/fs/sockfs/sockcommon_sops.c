@@ -1501,12 +1501,13 @@ retry:
 		if ((flags & MSG_WAITALL) && !(msg->msg_flags & MSG_EOR) &&
 		    uiop->uio_resid != saved_resid && uiop->uio_resid > 0) {
 			mutex_exit(&so->so_lock);
+			flags |= MSG_NOMARK;
 			goto retry;
 		}
 
 		goto out_locked;
 	}
-	/* strsock_proto has already verified length and alignment */
+	/* so_queue_msg has already verified length and alignment */
 	tpr = (union T_primitives *)mctlp->b_rptr;
 	dprintso(so, 1, ("so_recvmsg: type %d\n", tpr->type));
 	switch (tpr->type) {
@@ -1531,6 +1532,7 @@ retry:
 		if ((flags & MSG_WAITALL) && !(msg->msg_flags & MSG_EOR) &&
 		    uiop->uio_resid != saved_resid && uiop->uio_resid > 0) {
 			mutex_exit(&so->so_lock);
+			flags |= MSG_NOMARK;
 			goto retry;
 		}
 		goto out_locked;
@@ -1700,6 +1702,7 @@ retry:
 		    controllen == 0 &&
 		    uiop->uio_resid != saved_resid && uiop->uio_resid > 0) {
 			mutex_exit(&so->so_lock);
+			flags |= MSG_NOMARK;
 			goto retry;
 		}
 		goto out_locked;

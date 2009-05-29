@@ -677,6 +677,14 @@ again1:
 		ASSERT(so_check_length(so));
 	}
 #endif
+	if (so->so_state & SS_RCVATMARK) {
+		/* Check whether the caller is OK to read past the mark */
+		if (flags & MSG_NOMARK) {
+			mutex_exit(&so->so_lock);
+			return (EWOULDBLOCK);
+		}
+		reset_atmark = B_TRUE;
+	}
 	/*
 	 * First move messages from the dump area to processing area
 	 */
@@ -708,9 +716,6 @@ again1:
 	 */
 	mutex_exit(&so->so_lock);
 
-	if (so->so_state & SS_RCVATMARK) {
-		reset_atmark = B_TRUE;
-	}
 	if (new_msg_head != NULL) {
 		so_process_new_message(so, new_msg_head, new_msg_last_head);
 	}

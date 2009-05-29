@@ -234,9 +234,9 @@ so_notify_oobdata(struct sonode *so, boolean_t oob_inline)
 	if (so->so_direct != NULL)
 		SOD_UIOAFINI(so->so_direct);
 
+	SO_WAKEUP_READER(so);
+
 	if (IS_KERNEL_SOCKET(so)) {
-		if (oob_inline)
-			SO_WAKEUP_READER(so);
 		KSOCKET_CALLBACK(so, oobdata, 0);
 		mutex_exit(&so->so_lock);
 	} else {
@@ -246,8 +246,6 @@ so_notify_oobdata(struct sonode *so, boolean_t oob_inline)
 			mutex_exit(&so->so_lock);
 			pollwakeup(&so->so_poll_list,
 			    POLLRDBAND|POLLIN|POLLRDNORM);
-
-			SO_WAKEUP_READER(so);
 		} else {
 			mutex_exit(&so->so_lock);
 			pollwakeup(&so->so_poll_list, POLLRDBAND);
