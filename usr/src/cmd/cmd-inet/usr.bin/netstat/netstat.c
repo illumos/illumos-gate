@@ -4276,7 +4276,7 @@ v6_addr_match(const Ip6Address *addr, int masklen, const filter_t *fp)
 	int fmasklen;
 	int i;
 	char **app;
-	char *aptr;
+	const uint8_t *aptr;
 
 	if (fp->u.a.f_address == NULL) {
 		if (IN6_IS_ADDR_UNSPECIFIED(&fp->u.a.f_mask))	/* any */
@@ -4301,8 +4301,8 @@ v6_addr_match(const Ip6Address *addr, int masklen, const filter_t *fp)
 		masklen = fmasklen;
 	}
 	/* 'for' loop 1b: */
-	for (app = fp->u.a.f_address->h_addr_list; (aptr = *app) != NULL;
-	    app++) {
+	for (app = fp->u.a.f_address->h_addr_list;
+	    (aptr = (uint8_t *)*app) != NULL; app++) {
 		/* LINTED: (note 1) */
 		if (IN6_IS_ADDR_V4MAPPED((in6_addr_t *)aptr))
 			continue; /* 'for' loop 1b */
