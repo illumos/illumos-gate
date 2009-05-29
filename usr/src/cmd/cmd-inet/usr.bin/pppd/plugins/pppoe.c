@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -403,6 +403,26 @@ handle_pppoe_input(const ppptun_atype *pma, struct strbuf *ctrl,
 }
 
 /*
+ * Handle an action code passed up from the driver.
+ */
+static int
+handle_action(struct ppptun_control *ptc, struct strbuf *ctrl,
+    struct strbuf *data)
+{
+	switch (ptc->ptc_action) {
+	case PTCA_CONTROL:
+		return (handle_pppoe_input(&ptc->ptc_address, ctrl, data));
+
+	case PTCA_BADCTRL:
+		warn("bad control message; session %u on %s", ptc->ptc_rsessid,
+		    ptc->ptc_name);
+		return (0);
+	}
+
+	return (-1);
+}
+
+/*
  * sys-solaris has just read in a packet; grovel through it and see if
  * it's something we need to handle ourselves.
  */
@@ -418,10 +438,8 @@ pppoe_sys_read_packet(int retv, struct strbuf *ctrl, struct strbuf *data,
 		/* ptc_discrim is the first uint32_t of the structure. */
 		if (ptc->ptc_discrim == PPPOE_DISCRIM) {
 			retv = -1;
-			if (ctrl->len == sizeof (*ptc) &&
-			    ptc->ptc_action == PTCA_CONTROL)
-				retv = handle_pppoe_input(&ptc->ptc_address,
-				    ctrl, data);
+			if (ctrl->len == sizeof (*ptc))
+				retv = handle_action(ptc, ctrl, data);
 			if (retv < 0)
 				errno = EAGAIN;
 			return (retv);

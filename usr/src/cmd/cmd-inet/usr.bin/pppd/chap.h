@@ -1,8 +1,8 @@
 /*
  * chap.h - Challenge Handshake Authentication Protocol definitions.
  *
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Copyright (c) 1993 The Australian National University.
  * All rights reserved.
@@ -35,8 +35,6 @@
  *
  * $Id: chap.h,v 1.8 1999/11/15 01:44:41 paulus Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __CHAP_INCLUDE__
 #define __CHAP_INCLUDE__
@@ -96,6 +94,7 @@ typedef struct chap_state {
     u_char stat_length;		/* Length of status message (MS-CHAP) */
     char *resp_name;		/* Our name to send with response */
     char *stat_message;		/* per-algorithm status message (MS-CHAP) */
+    int rename_count;		/* number of peer renames seen */
 } chap_state;
 
 

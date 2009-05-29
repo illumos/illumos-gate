@@ -1,4 +1,7 @@
 /*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
     ipv6cp.h - PPP IPV6 Control Protocol.
     Copyright (C) 1999  Tommi Komulainen <Tommi.Komulainen@iki.fi>
 
@@ -93,7 +96,7 @@
  * $Id: ipv6cp.h,v 1.3 1999/09/30 19:57:45 masputra Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <netinet/ip6.h>
 
 /*
  * Options.
@@ -126,3 +129,5 @@ extern ipv6cp_options ipv6cp_allowoptions[];
 extern ipv6cp_options ipv6cp_hisoptions[];
 
 extern struct protent ipv6cp_protent;
+
+#define IP6_HDRLEN	(sizeof (struct ip6_hdr))	/* bytes */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,6 +120,7 @@ int secpolicy_pcfs_modify_bootpartition(const cred_t *);
 int secpolicy_ponline(const cred_t *);
 int secpolicy_pool(const cred_t *);
 int secpolicy_power_mgmt(const cred_t *);
+int secpolicy_ppp_config(const cred_t *);
 int secpolicy_proc_access(const cred_t *);
 int secpolicy_proc_excl_open(const cred_t *);
 int secpolicy_proc_owner(const cred_t *, const cred_t *, int);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
     ipv6cp.c - PPP IPV6 Control Protocol.
@@ -96,7 +96,6 @@
  * $Id: ipv6cp.c,v 1.9 2000/04/15 01:27:11 masputra Exp $ 
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define RCSID	"$Id: ipv6cp.c,v 1.9 2000/04/15 01:27:11 masputra Exp $"
 
 /*
@@ -1119,7 +1118,6 @@ ipv6_demand_conf(u)
     if (!sifnpmode(u, PPP_IPV6, NPMODE_QUEUE))
 	return 0;
 
-    notice("ipv6_demand_conf");
     notice("local  LL address %s", llv6_ntoa(wo->ourid));
     notice("remote LL address %s", llv6_ntoa(wo->hisid));
 
@@ -1496,20 +1494,8 @@ ipv6cp_printpkt(p, plen, printer, arg)
  * We don't bring the link up for IP fragments or for TCP FIN packets
  * with no data.
  */
-#define IP6_HDRLEN	40	/* bytes */
-#define IP6_NHDR_FRAG	44	/* fragment IPv6 header */
-#define IPPROTO_TCP	6
 #define TCP_HDRLEN	20
 #define TH_FIN		0x01
-
-/*
- * We use these macros because the IP header may be at an odd address,
- * and some compilers might use word loads to get th_off or ip_hl.
- */
-
-#define get_ip6nh(x)	(((unsigned char *)(x))[6])
-#define get_tcpoff(x)	(((unsigned char *)(x))[12] >> 4)
-#define get_tcpflags(x)	(((unsigned char *)(x))[13])
 
 static int
 ipv6_active_pkt(pkt, len)
@@ -1517,20 +1503,41 @@ ipv6_active_pkt(pkt, len)
     int len;
 {
     u_char *tcp;
+    struct in6_addr addr;
+    char fromstr[26];
+    char tostr[26];
 
     len -= PPP_HDRLEN;
     pkt += PPP_HDRLEN;
-    if (len < IP6_HDRLEN)
+    if (len < IP6_HDRLEN) {
+	dbglog("IPv6 packet of length %d is not activity", len);
 	return 0;
-    if (get_ip6nh(pkt) == IP6_NHDR_FRAG)
+    }
+    (void) BCOPY(get_ip6src(pkt), &addr, sizeof (addr));
+    (void) inet_ntop(AF_INET6, &addr, fromstr, 26);
+    (void) BCOPY(get_ip6dst(pkt), &addr, sizeof (addr));
+    (void) inet_ntop(AF_INET6, &addr, tostr, 26);
+    if (get_ip6nh(pkt) == IPPROTO_FRAGMENT) {
+	dbglog("IPv6 fragment from %s->%s is not activity", fromstr, tostr);
 	return 0;
-    if (get_ip6nh(pkt) != IPPROTO_TCP)
+    }
+    if (get_ip6nh(pkt) != IPPROTO_TCP) {
+	info("IPv6 proto %d from %s->%s is activity", get_ip6nh(pkt), fromstr,
+	    tostr);
 	return 1;
-    if (len < IP6_HDRLEN + TCP_HDRLEN)
+    }
+    if (len < IP6_HDRLEN + TCP_HDRLEN) {
+	dbglog("Bad TCP length %d<%d+%d %s->%s is not activity", len,
+	    IP6_HDRLEN, TCP_HDRLEN, fromstr, tostr);
 	return 0;
+    }
     tcp = pkt + IP6_HDRLEN;
     if ((get_tcpflags(tcp) & TH_FIN) != 0 &&
-	len == IP6_HDRLEN + get_tcpoff(tcp) * 4)
+	len == IP6_HDRLEN + get_tcpoff(tcp) * 4) {
+	dbglog("Empty TCP FIN %s->%s is not activity", fromstr, tostr);
 	return 0;
+    }
+    info("TCP %d data %s%s->%s is activity", len - IP6_HDRLEN - TCP_HDRLEN,
+	tcp_flag_decode(get_tcpflags(tcp)), fromstr, tostr);
     return 1;
 }

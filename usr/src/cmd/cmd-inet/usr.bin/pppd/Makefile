@@ -1,7 +1,5 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/cmd-inet/usr.bin/pppd/Makefile
@@ -78,8 +76,6 @@ mschap_test:	mschap_test.o chap_ms.o
 	@echo "  xx xx xx xx xx xx xx xx"
 	@echo "  00"
 
-LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 
 SRCS=		$(OBJS:%.o=%.c)

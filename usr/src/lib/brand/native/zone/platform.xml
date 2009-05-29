@@ -112,6 +112,8 @@
 	<device match="sctp" ip-type="exclusive" />
 	<device match="sctp6" ip-type="exclusive" />
 	<device match="spdsock" ip-type="exclusive" />
+	<device match="sppp" ip-type="exclusive" />
+	<device match="sppptun" ip-type="exclusive" />
 
 	<!-- Renamed devices to create under /dev -->
 	<device match="zcons/%z/zoneconsole" name="zconsole" />

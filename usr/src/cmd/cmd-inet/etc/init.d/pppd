@@ -43,10 +43,12 @@ case "$1" in
 	if [ -f $PPPDIR/pppoe.if ] && [ -x /usr/sbin/sppptun ]; then
 		sed -e 's/^#.*//;s/\([^\\]\)#.*/\1/;s/[	 ]*$//;s/^[	]*//' \
 		    $PPPDIR/pppoe.if | \
-		while read intf; do
+		while read intf saps sapd; do
 			if [ "$intf" ]; then
-				/usr/sbin/sppptun plumb pppoe $intf
-				/usr/sbin/sppptun plumb pppoed $intf
+				[ -z "$saps" ] || saps="-s $saps"
+				/usr/sbin/sppptun plumb $saps pppoe $intf
+				[ -z "$sapd" ] || sapd="-s $sapd"
+				/usr/sbin/sppptun plumb $sapd pppoed $intf
 			fi
 		done
 	fi
@@ -76,7 +78,7 @@ case "$1" in
 	if [ -f $PPPDIR/pppoe.if ] && [ -x /usr/sbin/sppptun ]; then
 		sed -e 's/^#.*//;s/\([^\\]\)#.*/\1/;s/[	 ]*$//;s/^[	]*//' \
 		    $PPPDIR/pppoe.if | \
-		while read intf; do
+		while read intf rest; do
 			if [ "$intf" ]; then
 				/usr/sbin/sppptun unplumb ${intf}:pppoe
 				/usr/sbin/sppptun unplumb ${intf}:pppoed

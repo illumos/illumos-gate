@@ -1,7 +1,7 @@
 /*
  * spppcomp.c - STREAMS module for kernel-level compression and CCP support.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -46,7 +46,6 @@
  * performance and scalability.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define	RCSID	"$Id: spppcomp.c,v 1.0 2000/05/08 01:10:12 masputra Exp $"
 
 #include <sys/types.h>
@@ -102,10 +101,10 @@ static const char buildtime[] = "Built " __DATE__ " at " __TIME__
 
 static int	spppcomp_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	spppcomp_close(queue_t *, int, cred_t *);
-static int	spppcomp_rput(queue_t *, mblk_t *);
-static int	spppcomp_rsrv(queue_t *);
-static int	spppcomp_wput(queue_t *, mblk_t *);
-static int	spppcomp_wsrv(queue_t *);
+static void	spppcomp_rput(queue_t *, mblk_t *);
+static void	spppcomp_rsrv(queue_t *);
+static void	spppcomp_wput(queue_t *, mblk_t *);
+static void	spppcomp_wsrv(queue_t *);
 
 #define	PPPCOMP_MI_MINPSZ	(0)
 #define	PPPCOMP_MI_MAXPSZ	(INFPSZ)
@@ -122,8 +121,8 @@ static struct module_info spppcomp_modinfo = {
 };
 
 static struct qinit spppcomp_rinit = {
-	spppcomp_rput,		/* qi_putp */
-	spppcomp_rsrv,		/* qi_srvp */
+	(int (*)())spppcomp_rput, /* qi_putp */
+	(int (*)())spppcomp_rsrv, /* qi_srvp */
 	spppcomp_open,		/* qi_qopen */
 	spppcomp_close,		/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -132,8 +131,8 @@ static struct qinit spppcomp_rinit = {
 };
 
 static struct qinit spppcomp_winit = {
-	spppcomp_wput,		/* qi_putp */
-	spppcomp_wsrv,		/* qi_srvp */
+	(int (*)())spppcomp_wput, /* qi_putp */
+	(int (*)())spppcomp_wsrv, /* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -236,17 +235,13 @@ spppcomp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	sppp_comp_t	*cp;
 
-	ASSERT(q != NULL);
-	ASSERT(devp != NULL);
-
 	if (q->q_ptr != NULL) {
 		return (0);
 	}
 	if (sflag != MODOPEN) {
 		return (EINVAL);
 	}
-	cp = (sppp_comp_t *)kmem_zalloc(sizeof (sppp_comp_t), KM_SLEEP);
-	ASSERT(cp != NULL);
+	cp = kmem_zalloc(sizeof (sppp_comp_t), KM_SLEEP);
 	q->q_ptr = WR(q)->q_ptr = (caddr_t)cp;
 
 	cp->cp_mru = PPP_MRU;
@@ -274,11 +269,7 @@ spppcomp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 static int
 spppcomp_close(queue_t *q, int flag, cred_t *credp)
 {
-	sppp_comp_t	*cp;
-
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	cp = (sppp_comp_t *)q->q_ptr;
+	sppp_comp_t	*cp = q->q_ptr;
 
 	qprocsoff(q);
 
@@ -321,16 +312,11 @@ spppcomp_close(queue_t *q, int flag, cred_t *credp)
  *	most processing will be performed here in-line, and deferral
  *	occurs only when necessary.
  */
-static int
+static void
 spppcomp_wput(queue_t *q, mblk_t *mp)
 {
-	sppp_comp_t	*cp;
+	sppp_comp_t *cp = q->q_ptr;
 	int flag;
-
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	cp = (sppp_comp_t *)q->q_ptr;
-	ASSERT(mp != NULL && mp->b_rptr != NULL);
 
 	switch (MTYPE(mp)) {
 	case M_DATA:
@@ -340,14 +326,14 @@ spppcomp_wput(queue_t *q, mblk_t *mp)
 #ifdef SPC_DEBUG
 			cp->cp_out_queued++;
 #endif
-			(void) putq(q, mp);
+			if (!putq(q, mp))
+				freemsg(mp);
 		} else {
 #ifdef SPC_DEBUG
 			cp->cp_out_handled++;
 #endif
-			if ((mp = spppcomp_outpkt(q, mp)) != NULL) {
+			if ((mp = spppcomp_outpkt(q, mp)) != NULL)
 				putnext(q, mp);
-			}
 		}
 		break;
 	case M_IOCTL:
@@ -382,10 +368,12 @@ spppcomp_wput(queue_t *q, mblk_t *mp)
 		putnext(q, mp);
 		break;
 	default:
-		putnext(q, mp);
+		if (bcanputnext(q, mp->b_band))
+			putnext(q, mp);
+		else if (!putq(q, mp))
+			freemsg(mp);
 		break;
 	}
-	return (0);
 }
 
 /*
@@ -397,17 +385,12 @@ spppcomp_wput(queue_t *q, mblk_t *mp)
  * Description:
  *    Write-side service procedure.
  */
-static int
+static void
 spppcomp_wsrv(queue_t *q)
 {
 	mblk_t		*mp;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-
 	while ((mp = getq(q)) != NULL) {
-		/* We should only place M_DATA on the service queue. */
-		ASSERT(MTYPE(mp) == M_DATA);
 		/*
 		 * If the module below us is flow-controlled, then put
 		 * this message back on the queue again.
@@ -416,11 +399,10 @@ spppcomp_wsrv(queue_t *q)
 			(void) putbq(q, mp);
 			break;
 		}
-		if ((mp = spppcomp_outpkt(q, mp)) != NULL) {
+		if (MTYPE(mp) != M_DATA ||
+		    (mp = spppcomp_outpkt(q, mp)) != NULL)
 			putnext(q, mp);
-		}
 	}
-	return (0);
 }
 
 /*
@@ -440,12 +422,7 @@ spppcomp_outpkt(queue_t *q, mblk_t *mp)
 	mblk_t		*zmp;
 	int		len;
 	ushort_t	proto;
-	sppp_comp_t	*cp;
-
-	ASSERT(q != NULL);
-	ASSERT(mp != NULL);
-	cp = (sppp_comp_t *)q->q_ptr;
-	ASSERT(cp != NULL);
+	sppp_comp_t	*cp = q->q_ptr;
 
 	/*
 	 * If the entire data size of the mblk is less than the length of the
@@ -716,7 +693,7 @@ msg_oerror:
 static int
 spppcomp_inner_ioctl(queue_t *q, mblk_t *mp)
 {
-	sppp_comp_t	*cp;
+	sppp_comp_t	*cp = q->q_ptr;
 	int		flags;
 	int		mask;
 	int		rc;
@@ -731,12 +708,6 @@ spppcomp_inner_ioctl(queue_t *q, mblk_t *mp)
 	struct compressor *ccomp;
 	struct iocblk	*iop;
 	void		*xtemp;
-
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	cp = (sppp_comp_t *)q->q_ptr;
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_rptr != NULL);
 
 	iop = (struct iocblk *)mp->b_rptr;
 	rc = EINVAL;
@@ -966,10 +937,6 @@ spppcomp_getcstat(queue_t *q, mblk_t *mp, sppp_comp_t *cp)
 	mblk_t		*mpnext;
 	struct ppp_comp_stats	*csp;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_rptr != NULL);
 	ASSERT(cp != NULL);
 
 	mpnext = allocb(sizeof (struct ppp_comp_stats), BPRI_MED);
@@ -1011,10 +978,6 @@ spppcomp_ioctl(queue_t *q, mblk_t *mp, sppp_comp_t *cp)
 	struct iocblk	*iop;
 	int flag;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_rptr != NULL);
 	ASSERT(cp != NULL);
 
 	iop = (struct iocblk *)mp->b_rptr;
@@ -1080,17 +1043,11 @@ spppcomp_ioctl(queue_t *q, mblk_t *mp, sppp_comp_t *cp)
 static int
 spppcomp_mctl(queue_t *q, mblk_t *mp)
 {
-	sppp_comp_t		*cp;
+	sppp_comp_t		*cp = q->q_ptr;
 	kstat_t			*ksp;
 	char			unit[32];
 	const char **cpp;
 	kstat_named_t *knt;
-
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	cp = (sppp_comp_t *)q->q_ptr;
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_rptr != NULL);
 
 	switch (*mp->b_rptr) {
 	case PPPCTL_MTU:
@@ -1187,19 +1144,14 @@ spppcomp_mctl(queue_t *q, mblk_t *mp)
  *	more and we're in an interrupt context (on the theory that
  *	we're hogging the CPU in this case).
  */
-static int
+static void
 spppcomp_rput(queue_t *q, mblk_t *mp)
 {
-	sppp_comp_t		*cp;
+	sppp_comp_t		*cp = q->q_ptr;
 	struct iocblk		*iop;
 	struct ppp_stats64	*psp;
 	boolean_t		inter;
 	hrtime_t		curtime;
-
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	cp = (sppp_comp_t *)q->q_ptr;
-	ASSERT(mp != NULL);
 
 	switch (MTYPE(mp)) {
 	case M_DATA:
@@ -1239,12 +1191,12 @@ spppcomp_rput(queue_t *q, mblk_t *mp)
 #ifdef SPC_DEBUG
 			cp->cp_in_queued++;
 #endif
-			(void) putq(q, mp);
+			if (!putq(q, mp))
+				freemsg(mp);
 		}
 		break;
 	case M_IOCACK:
 		iop = (struct iocblk *)mp->b_rptr;
-		ASSERT(iop != NULL);
 		/*
 		 * Bundled with pppstats; no need to handle PPPIO_GETSTAT
 		 * here since we'll never see it.
@@ -1308,10 +1260,12 @@ spppcomp_rput(queue_t *q, mblk_t *mp)
 		break;
 
 	default:
-		putnext(q, mp);
+		if (bcanputnext(q, mp->b_band))
+			putnext(q, mp);
+		else if (!putq(q, mp))
+			freemsg(mp);
 		break;
 	}
-	return (0);
 }
 
 /*
@@ -1329,17 +1283,12 @@ spppcomp_rput(queue_t *q, mblk_t *mp)
  *	it will put the unprocessed data on the queue for later
  *	handling.
  */
-static int
+static void
 spppcomp_rsrv(queue_t *q)
 {
 	mblk_t		*mp;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-
 	while ((mp = getq(q)) != NULL) {
-		/* We should only place M_DATA on the service queue. */
-		ASSERT(MTYPE(mp) == M_DATA);
 		/*
 		 * If the module above us is flow-controlled, then put
 		 * this message back on the queue again.
@@ -1348,10 +1297,10 @@ spppcomp_rsrv(queue_t *q)
 			(void) putbq(q, mp);
 			break;
 		}
-		if ((mp = spppcomp_inpkt(q, mp)) != NULL)
+		if (MTYPE(mp) != M_DATA ||
+		    (mp = spppcomp_inpkt(q, mp)) != NULL)
 			putnext(q, mp);
 	}
-	return (0);
 }
 
 /*
@@ -1373,12 +1322,7 @@ spppcomp_inpkt(queue_t *q, mblk_t *mp)
 	uchar_t		*dp;
 	int		len;
 	int		hlen;
-	sppp_comp_t	*cp;
-
-	ASSERT(q != NULL);
-	ASSERT(mp != NULL);
-	cp = (sppp_comp_t *)q->q_ptr;
-	ASSERT(cp != NULL);
+	sppp_comp_t	*cp = q->q_ptr;
 
 	len = msgsize(mp);
 
@@ -1685,11 +1629,6 @@ comp_ccp(queue_t *q, mblk_t *mp, sppp_comp_t *cp, boolean_t rcvd)
 	int	clen;
 	uchar_t	*dp;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
-	ASSERT(cp != NULL);
-
 	len = msgsize(mp);
 	if (len < PPP_HDRLEN + CCP_HDRLEN) {
 		return;
@@ -1771,18 +1710,15 @@ comp_ccp(queue_t *q, mblk_t *mp, sppp_comp_t *cp, boolean_t rcvd)
 static int
 spppcomp_kstat_update(kstat_t *ksp, int rw)
 {
-	register sppp_comp_t		*cp;
-	register spppcomp_kstats_t	*cpkp;
-	register struct vjstat		*sp;
-	register struct pppstat64	*psp;
+	sppp_comp_t		*cp = ksp->ks_private;
+	spppcomp_kstats_t	*cpkp;
+	struct vjstat		*sp;
+	struct pppstat64	*psp;
 	struct ppp_comp_stats		csp;
 
 	if (rw == KSTAT_WRITE) {
 		return (EACCES);
 	}
-
-	cp = (sppp_comp_t *)ksp->ks_private;
-	ASSERT(cp != NULL);
 
 	cpkp = (spppcomp_kstats_t *)ksp->ks_data;
 	bzero((caddr_t)&csp, sizeof (struct ppp_comp_stats));

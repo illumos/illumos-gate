@@ -1,7 +1,7 @@
 /*
  * main.c - Point-to-Point Protocol main module
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -31,7 +31,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define RCSID	"$Id: main.c,v 1.97 2000/04/24 02:54:16 masputra Exp $"
 
 #include <stdio.h>
@@ -1079,12 +1078,14 @@ setup_signals()
      * Install a handler for other signals which would otherwise
      * cause pppd to exit without cleaning up.
      */
-/*CONSTANTCONDITION*/ SIGNAL(SIGABRT, bad_signal);
 /*CONSTANTCONDITION*/ SIGNAL(SIGALRM, bad_signal);
+/*CONSTANTCONDITION*/ SIGNAL(SIGQUIT, bad_signal);
+
+/* Do not hook any of these signals on Solaris; allow core dump instead */
+#ifndef SOL2
+/*CONSTANTCONDITION*/ SIGNAL(SIGABRT, bad_signal);
 /*CONSTANTCONDITION*/ SIGNAL(SIGFPE, bad_signal);
 /*CONSTANTCONDITION*/ SIGNAL(SIGILL, bad_signal);
-/*CONSTANTCONDITION*/ SIGNAL(SIGPIPE, bad_signal);
-/*CONSTANTCONDITION*/ SIGNAL(SIGQUIT, bad_signal);
 #ifndef DEBUG
 /*CONSTANTCONDITION*/ SIGNAL(SIGSEGV, bad_signal);
 #endif
@@ -1114,6 +1115,7 @@ setup_signals()
 #endif
 #ifdef SIGXFSZ
 /*CONSTANTCONDITION*/ SIGNAL(SIGXFSZ, bad_signal);
+#endif
 #endif
 
     /*

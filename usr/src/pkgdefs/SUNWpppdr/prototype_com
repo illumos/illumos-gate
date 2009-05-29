@@ -1,8 +1,6 @@
 #
-# Copyright 2000, 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -36,6 +34,7 @@ e preserve etc/ppp/pap-secrets 0600 root sys
 e preserve etc/ppp/chap-secrets 0600 root sys
 d none etc/ppp/peers 0755 root sys
 f none etc/ppp/peers/myisp.tmpl 0644 root sys
+d none etc/ppp/plugins 0755 root sys
 d none etc/init.d 755 root sys
 e initd etc/init.d/pppd 744 root sys
 d none etc/rc0.d 755 root sys

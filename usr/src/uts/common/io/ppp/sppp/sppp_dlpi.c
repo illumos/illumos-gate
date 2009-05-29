@@ -1,7 +1,7 @@
 /*
  * sppp_dlpi.c - Solaris STREAMS PPP multiplexing pseudo-driver DLPI handlers
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -45,7 +45,6 @@
  * for improved performance and scalability.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define	RCSID	"$Id: sppp_dlpi.c,v 1.0 2000/05/08 01:10:12 masputra Exp $"
 
 #include <sys/types.h>
@@ -60,6 +59,7 @@
 #include <sys/dlpi.h>
 #include <sys/ddi.h>
 #include <sys/kstat.h>
+#include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <sys/ethernet.h>
 #include <net/ppp_defs.h>
@@ -269,7 +269,7 @@ sppp_dlpi_pinfoinit(void)
 	dl_pinfo[DL_UNBIND_REQ].pi_funcp = sppp_dlunbindreq;
 
 	dl_pinfo[DL_INFO_REQ].pi_minlen = sizeof (dl_info_req_t);
-	dl_pinfo[DL_INFO_REQ].pi_state = 0;	/* special handling */
+	dl_pinfo[DL_INFO_REQ].pi_state = -1;	/* special handling */
 	dl_pinfo[DL_INFO_REQ].pi_funcp = sppp_dlinforeq;
 
 	dl_pinfo[DL_UNITDATA_REQ].pi_minlen = sizeof (dl_unitdata_req_t);
@@ -277,15 +277,15 @@ sppp_dlpi_pinfoinit(void)
 	dl_pinfo[DL_UNITDATA_REQ].pi_funcp = sppp_dlunitdatareq;
 
 	dl_pinfo[DL_PROMISCON_REQ].pi_minlen = sizeof (dl_promiscon_req_t);
-	dl_pinfo[DL_PROMISCON_REQ].pi_state = 0; /* special handling */
+	dl_pinfo[DL_PROMISCON_REQ].pi_state = -1; /* special handling */
 	dl_pinfo[DL_PROMISCON_REQ].pi_funcp = sppp_dlpromisconreq;
 
 	dl_pinfo[DL_PROMISCOFF_REQ].pi_minlen = sizeof (dl_promiscoff_req_t);
-	dl_pinfo[DL_PROMISCOFF_REQ].pi_state = 0; /* special handling */
+	dl_pinfo[DL_PROMISCOFF_REQ].pi_state = -1; /* special handling */
 	dl_pinfo[DL_PROMISCOFF_REQ].pi_funcp = sppp_dlpromiscoffreq;
 
 	dl_pinfo[DL_PHYS_ADDR_REQ].pi_minlen = sizeof (dl_phys_addr_req_t);
-	dl_pinfo[DL_PHYS_ADDR_REQ].pi_state = 0; /* special handling */
+	dl_pinfo[DL_PHYS_ADDR_REQ].pi_state = -1; /* special handling */
 	dl_pinfo[DL_PHYS_ADDR_REQ].pi_funcp = sppp_dlphyreq;
 }
 
@@ -330,8 +330,8 @@ sppp_mproto(queue_t *q, mblk_t *mp, spppstr_t *sps)
 			    "bad mproto: primitive len %d < %d\n", len,
 			    dpi->pi_minlen));
 			error = DL_BADPRIM;
-		} else if ((dpi->pi_state != 0) &&
-		    (sps->sps_dlstate != dpi->pi_state)) {
+		} else if (dpi->pi_state != -1 &&
+		    sps->sps_dlstate != dpi->pi_state) {
 			DBGERROR((CE_CONT,
 			    "bad state %d != %d for primitive %d\n",
 			    sps->sps_dlstate, dpi->pi_state, prim));
@@ -404,13 +404,13 @@ static void
 sppp_dl_attach_upper(queue_t *q, mblk_t *mp)
 {
 	sppa_t		*ppa;
-	spppstr_t	*sps;
+	spppstr_t	*sps = q->q_ptr;
 	union DL_primitives *dlp;
+	int		err = ENOMEM;
+	cred_t		*cr;
+	zoneid_t	zoneid;
 
-	ASSERT(q != NULL && q->q_ptr != NULL);
-	sps = (spppstr_t *)q->q_ptr;
 	ASSERT(!IS_SPS_PIOATTACH(sps));
-	ASSERT(mp != NULL && mp->b_rptr != NULL);
 	dlp = (union DL_primitives *)mp->b_rptr;
 
 	/* If there's something here, it's detached. */
@@ -418,20 +418,27 @@ sppp_dl_attach_upper(queue_t *q, mblk_t *mp)
 		sppp_remove_ppa(sps);
 	}
 
+	if ((cr = msg_getcred(mp, NULL)) == NULL)
+		zoneid = sps->sps_zoneid;
+	else
+		zoneid = crgetzoneid(cr);
+
 	ppa = sppp_find_ppa(dlp->attach_req.dl_ppa);
-	if (ppa == NULL)
-		ppa = sppp_create_ppa(dlp->attach_req.dl_ppa);
+	if (ppa == NULL) {
+		ppa = sppp_create_ppa(dlp->attach_req.dl_ppa, zoneid);
+	} else if (ppa->ppa_zoneid != zoneid) {
+		ppa = NULL;
+		err = EPERM;
+	}
 
 	/*
-	 * If we can't find it, then it's either because the requestor
-	 * has supplied a wrong dl_ppa to be attached to, or because
-	 * the control stream for the specified ppa has been closed
-	 * before we get here.
+	 * If we can't find or create it, then it's either because we're out of
+	 * memory or because the requested PPA is owned by a different zone.
 	 */
 	if (ppa == NULL) {
 		DBGERROR((CE_CONT, "DLPI attach: cannot create ppa %u\n",
 		    dlp->attach_req.dl_ppa));
-		dlerrorack(q, mp, dlp->dl_primitive, DL_SYSERR, ENOMEM);
+		dlerrorack(q, mp, dlp->dl_primitive, DL_SYSERR, err);
 		return;
 	}
 	/*
@@ -548,7 +555,7 @@ sppp_dlbindreq(queue_t *q, mblk_t *mp, spppstr_t *sps)
 		DBGERROR((CE_CONT, "DLPI bind: no attached ppa\n"));
 		error = DL_OUTSTATE;
 	} else if ((req_sap != ETHERTYPE_IP) && (req_sap != ETHERTYPE_IPV6) &&
-		(req_sap != ETHERTYPE_ALLSAP)) {
+	    (req_sap != ETHERTYPE_ALLSAP)) {
 		DBGERROR((CE_CONT, "DLPI bind: unknown SAP %x\n", req_sap));
 		error = DL_BADADDR;
 	}
@@ -588,7 +595,7 @@ sppp_dl_bind(queue_t *q, mblk_t *mp)
 	ASSERT(ppa != NULL);
 	req_sap = dlp->bind_req.dl_sap;
 	ASSERT((req_sap == ETHERTYPE_IP) || (req_sap == ETHERTYPE_IPV6) ||
-		(req_sap == ETHERTYPE_ALLSAP));
+	    (req_sap == ETHERTYPE_ALLSAP));
 
 	if (req_sap == ETHERTYPE_IP) {
 		sap = PPP_IP;
@@ -701,7 +708,7 @@ sppp_dl_unbind(queue_t *q, mblk_t *mp)
 		msg = NULL;
 		saydown = (ppa->ppa_ctl != NULL &&
 		    (sps->sps_npmode == NPMODE_PASS ||
-			sps->sps_npmode == NPMODE_QUEUE));
+		    sps->sps_npmode == NPMODE_QUEUE));
 		if (sap == PPP_IP) {
 			ppa->ppa_ip_cache = NULL;
 			if (saydown)

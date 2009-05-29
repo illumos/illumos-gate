@@ -1,7 +1,7 @@
 /*
  * pppd.h - PPP daemon global declarations.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -32,8 +32,6 @@
  *
  * $Id: pppd.h,v 1.54 2000/04/15 10:10:25 paulus Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef __PPPD_H__
 #define __PPPD_H__
@@ -912,15 +910,18 @@ extern void (*device_pipe_hook) __P((int pipefd));
  */
 
 #define net_short(x)	(((x)[0] << 8) + (x)[1])
-#define	net_long(x)	((net_short(x) << 16) + \
-			net_short((unsigned char *)(x) + 2))
+#define	native_long(x)	(htonl((net_short(x) << 16) + \
+			net_short((unsigned char *)(x) + 2)))
 #define get_ipv(x)	((((unsigned char *)(x))[0] >> 4) & 0xF)
 #define get_iphl(x)	(((unsigned char *)(x))[0] & 0xF)
 #define	get_iplen(x)	net_short((unsigned char *)(x) + 2)
 #define get_ipoff(x)	net_short((unsigned char *)(x) + 6)
 #define get_ipproto(x)	(((unsigned char *)(x))[9])
-#define	get_ipsrc(x)	net_long((unsigned char *)(x) + 12)
-#define	get_ipdst(x)	net_long((unsigned char *)(x) + 16)
+#define	get_ipsrc(x)	native_long((unsigned char *)(x) + 12)
+#define	get_ipdst(x)	native_long((unsigned char *)(x) + 16)
+#define get_ip6nh(x)	(((unsigned char *)(x))[6])
+#define get_ip6src(x)	(((unsigned char *)(x))+8)
+#define get_ip6dst(x)	(((unsigned char *)(x))+24)
 /* Ports for both UDP and TCP are first */
 #define	get_sport(x)	net_short(x)
 #define	get_dport(x)	net_short((unsigned char *)(x) + 2)

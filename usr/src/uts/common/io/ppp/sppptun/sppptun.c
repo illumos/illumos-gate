@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,7 +448,7 @@ sppptun_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 		char *cp;
 
 		/* ordinary users have no need to push this module */
-		if (secpolicy_net_config(credp, B_FALSE) != 0)
+		if (secpolicy_ppp_config(credp) != 0)
 			return (EPERM);
 
 		tll = kmem_zalloc(sizeof (tunll_t), KM_SLEEP);
@@ -456,6 +456,7 @@ sppptun_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 		tll->tll_index = tunll_index++;
 
 		tll->tll_wq = WR(q);
+		tll->tll_zoneid = crgetzoneid(credp);
 
 		/* Insert at end of list */
 		insque(&tll->tll_next, tunll_list.q_back);
@@ -514,6 +515,7 @@ sppptun_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 			return (ENOSR);
 		tcl->tcl_rq = q;		/* save read queue pointer */
 		tcl->tcl_flags |= TCLF_ISCLIENT;	/* sanity check */
+		tcl->tcl_zoneid = crgetzoneid(credp);
 
 		q->q_ptr = WR(q)->q_ptr = (caddr_t)tcl;
 		*devp = makedevice(getmajor(*devp), tcl->tcl_lsessid);
@@ -539,17 +541,18 @@ make_control(tuncl_t *tclabout, tunll_t *tllabout, int action, tuncl_t *tclto)
 	if (mp != NULL) {
 		MTYPE(mp) = M_PROTO;
 		ptc = (struct ppptun_control *)mp->b_wptr;
+		bzero(ptc, sizeof (*ptc));
 		mp->b_wptr += sizeof (*ptc);
 		if (tclabout != NULL) {
 			ptc->ptc_rsessid = tclabout->tcl_rsessid;
 			ptc->ptc_address = tclabout->tcl_address;
-		} else {
-			bzero(ptc, sizeof (*ptc));
 		}
 		ptc->ptc_discrim = tclto->tcl_ctlval;
 		ptc->ptc_action = action;
-		(void) strncpy(ptc->ptc_name, tllabout->tll_name,
-		    sizeof (ptc->ptc_name));
+		if (tllabout != NULL) {
+			(void) strncpy(ptc->ptc_name, tllabout->tll_name,
+			    sizeof (ptc->ptc_name));
+		}
 	}
 	return (mp);
 }
@@ -797,7 +800,8 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 
 	*mpp = NULL;
 	if (!(tcl->tcl_flags & TCLF_ISCLIENT)) {
-		merror(q, mp, EINVAL);
+		/* This should never happen on a lower layer stream */
+		freemsg(mp);
 		return (NULL);
 	}
 
@@ -815,7 +819,8 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 			KCINCR(cks_octrl_drop);
 			DTRACE_PROBE2(sppptun__bad__control, tuncl_t *, tcl,
 			    mblk_t *, mp);
-			merror(q, mp, EINVAL);
+			send_control(tcl, tcl->tcl_ctrl_tll, PTCA_BADCTRL, tcl);
+			freemsg(mp);
 			return (NULL);
 		}
 		ptc = (struct ppptun_control *)mp->b_rptr;
@@ -846,18 +851,22 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 		}
 
 		/* Don't allow empty control packets. */
+		tll = tcl->tcl_ctrl_tll;
 		if (mp->b_cont == NULL) {
 			KCINCR(cks_octrl_drop);
-			merror(q, mp, EINVAL);
+			DTRACE_PROBE2(sppptun__bad__control, tuncl_t *, tcl,
+			    mblk_t *, mp);
+			send_control(tcl, tll, PTCA_BADCTRL, tcl);
+			freemsg(mp);
 			return (NULL);
 		}
-		tll = tcl->tcl_ctrl_tll;
 	}
 
 	if (tll == NULL || (lowerq = tll->tll_wq) == NULL) {
 		DTRACE_PROBE3(sppptun__cannot__send, tuncl_t *, tcl,
 		    tunll_t *, tll, mblk_t *, mp);
-		merror(q, mp, ENXIO);
+		send_control(tcl, tll, PTCA_UNPLUMB, tcl);
+		freemsg(mp);
 		if (isdata) {
 			tcl->tcl_stats.ppp_oerrors++;
 		} else {
@@ -919,7 +928,7 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 			ether_copy(tcl->tcl_address.pta_pppoe.ptma_mac,
 			    edestp->addr);
 			/* DLPI SAPs are in host byte order! */
-			edestp->type = ETHERTYPE_PPPOES;
+			edestp->type = tll->tll_sap;
 
 			/* Make sure the protocol field isn't compressed. */
 			len = (*mp->b_rptr & 1);
@@ -969,7 +978,7 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 
 			edestp = (ether_dest_t *)(dur + 1);
 			/* DLPI SAPs are in host byte order! */
-			edestp->type = ETHERTYPE_PPPOED;
+			edestp->type = tll->tll_sap;
 
 			/*
 			 * If destination isn't set yet, then we have to
@@ -1070,13 +1079,14 @@ save_for_close(tunll_t *tll, mblk_t *mp)
  * perimeters.
  */
 static tunll_t *
-tll_lookup_on_name(char *dname)
+tll_lookup_on_name(const char *dname, zoneid_t zoneid)
 {
 	tunll_t *tll;
 
 	tll = TO_TLL(tunll_list.q_forw);
 	for (; tll != TO_TLL(&tunll_list); tll = TO_TLL(tll->tll_next))
-		if (strcmp(dname, tll->tll_name) == 0)
+		if (tll->tll_zoneid == zoneid &&
+		    strcmp(dname, tll->tll_name) == 0)
 			return (tll);
 	return (NULL);
 }
@@ -1106,6 +1116,7 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 	mblk_t *mptmp;
 	ppptun_atype *pap;
 	struct ppp_stats64 *psp;
+	zoneid_t zoneid;
 
 	iop = (struct iocblk *)mp->b_rptr;
 	tcl = NULL;
@@ -1163,29 +1174,13 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		ptn = (union ppptun_name *)mp->b_cont->b_rptr;
 		ptn->ptn_name[sizeof (ptn->ptn_name) - 1] = '\0';
 
-		if ((tll = tll_lookup_on_name(ptn->ptn_name)) != NULL) {
+		tll = tll_lookup_on_name(ptn->ptn_name, tll->tll_zoneid);
+		if (tll != NULL) {
 			rc = EEXIST;
 			break;
 		}
 		tll = (tunll_t *)q->q_ptr;
 		(void) strcpy(tll->tll_name, ptn->ptn_name);
-		break;
-
-	case PPPTUN_GNAME:
-		/* This is done on the *module* (lower level) side. */
-		if (tll == NULL) {
-			rc = EINVAL;
-			break;
-		}
-		if (mp->b_cont != NULL)
-			freemsg(mp->b_cont);
-		if ((mp->b_cont = allocb(sizeof (*ptn), BPRI_HI)) == NULL) {
-			rc = ENOSR;
-			break;
-		}
-		ptn = (union ppptun_name *)mp->b_cont->b_rptr;
-		bcopy(tll->tll_name, ptn->ptn_name, sizeof (ptn->ptn_name));
-		len = sizeof (*ptn);
 		break;
 
 	case PPPTUN_SINFO:
@@ -1197,7 +1192,8 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		}
 		pti = (struct ppptun_info *)mp->b_cont->b_rptr;
 		if (pti->pti_name[0] != '\0')
-			tll = tll_lookup_on_name(pti->pti_name);
+			tll = tll_lookup_on_name(pti->pti_name,
+			    tcl == NULL ? tll->tll_zoneid : tcl->tcl_zoneid);
 		if (tll == NULL) {
 			/* Driver (client) side must have name */
 			if (tcl != NULL && pti->pti_name[0] == '\0')
@@ -1246,11 +1242,15 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 			rc = EINVAL;
 			break;
 		}
+		zoneid = tcl == NULL ? tll->tll_zoneid : tcl->tcl_zoneid;
 		ptn = (union ppptun_name *)mp->b_cont->b_rptr;
 		i = ptn->ptn_index;
 		tll = TO_TLL(tunll_list.q_forw);
-		while (--i >= 0 && tll != TO_TLL(&tunll_list))
+		while (tll != TO_TLL(&tunll_list)) {
+			if (tll->tll_zoneid == zoneid && --i < 0)
+				break;
 			tll = TO_TLL(tll->tll_next);
+		}
 		if (tll != TO_TLL(&tunll_list)) {
 			bcopy(tll->tll_name, ptn->ptn_name,
 			    sizeof (ptn->ptn_name));
@@ -1384,7 +1384,7 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		}
 		ptn = (union ppptun_name *)mp->b_cont->b_rptr;
 		ptn->ptn_name[sizeof (ptn->ptn_name) - 1] = '\0';
-		tll = tll_lookup_on_name(ptn->ptn_name);
+		tll = tll_lookup_on_name(ptn->ptn_name, tcl->tcl_zoneid);
 		if (tll == NULL) {
 			rc = ESRCH;
 			break;
@@ -1462,12 +1462,23 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		}
 		ptn = (union ppptun_name *)mp->b_cont->b_rptr;
 		ptn->ptn_name[sizeof (ptn->ptn_name) - 1] = '\0';
-		tll = tll_lookup_on_name(ptn->ptn_name);
+		tll = tll_lookup_on_name(ptn->ptn_name, tcl->tcl_zoneid);
 		if (tll == NULL || tll->tll_defcl != tcl) {
 			rc = ESRCH;
 			break;
 		}
 		tll->tll_defcl = NULL;
+		break;
+
+	case PPPTUN_SSAP:
+		/* This is done on the *module* (lower level) side. */
+		if (tll == NULL || mp->b_cont == NULL ||
+		    iop->ioc_count != sizeof (uint_t)) {
+			rc = EINVAL;
+			break;
+		}
+
+		tll->tll_sap = *(uint_t *)mp->b_cont->b_rptr;
 		break;
 
 	default:
@@ -1508,7 +1519,6 @@ sppptun_ioctl(queue_t *q, mblk_t *mp)
 	case PPPIO_GETSTAT:
 	case PPPIO_GETSTAT64:
 	case PPPTUN_SNAME:
-	case PPPTUN_GNAME:
 	case PPPTUN_SINFO:
 	case PPPTUN_GINFO:
 	case PPPTUN_GNNAME:
@@ -1520,6 +1530,7 @@ sppptun_ioctl(queue_t *q, mblk_t *mp)
 	case PPPTUN_SCTL:
 	case PPPTUN_GCTL:
 	case PPPTUN_DCTL:
+	case PPPTUN_SSAP:
 		qwriter(q, mp, sppptun_inner_ioctl, PERIM_INNER);
 		return;
 

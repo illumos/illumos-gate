@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,9 @@
 /*
  * PPPoE Client-mode "chat" utility for use with Solaris PPP 4.0.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -623,7 +620,7 @@ send_padi(int localid)
 	ppptun_atype destaddr;
 
 	poep = poe_mkheader(pkt_output, POECODE_PADI, 0);
-	(void) poe_add_str(poep, POETT_SERVICE, "");
+	(void) poe_add_str(poep, POETT_SERVICE, service);
 	(void) poe_add_long(poep, POETT_UNIQ, localid);
 	(void) memset(&destaddr, '\0', sizeof (destaddr));
 	(void) memcpy(destaddr.pta_pppoe.ptma_mac, ether_bcast,
@@ -802,7 +799,7 @@ save_message(const poemsg_t *pmsg)
 	char *cp;
 
 	newmsg = (poemsg_t *)malloc(sizeof (*pmsg) + pmsg->poemsg_len +
-		strlen(pmsg->poemsg_iname) + 1);
+	    strlen(pmsg->poemsg_iname) + 1);
 	if (newmsg != NULL) {
 		newmsg->poemsg_next = NULL;
 		newmsg->poemsg_data = (const poep_t *)(newmsg + 1);
@@ -868,7 +865,7 @@ send_padr(poesm_t *psm, const poemsg_t *pado)
 			}
 			if (service[0] == '\0' ||
 			    (tlen == strlen(service) &&
-				memcmp(service, POET_DATA(tagp), tlen) == 0)) {
+			    memcmp(service, POET_DATA(tagp), tlen) == 0)) {
 				(void) poe_tag_copy(poep, tagp);
 				hassvc = B_TRUE;
 			}
@@ -895,7 +892,7 @@ send_padr(poesm_t *psm, const poemsg_t *pado)
 		tagp = POET_NEXT(tagp);
 	}
 	if (!hassvc) {
-		if (haswild)
+		if (haswild && service[0] == '\0')
 			(void) poe_add_str(poep, POETT_SERVICE, "");
 		else
 			return (1);
@@ -1313,7 +1310,7 @@ get_sequence(const poemsg_t *pmsg)
  * events occur.
  */
 static int
-use_server(poemsg_t *pado)
+use_server(poemsg_t *pado, const ppptun_atype *pap)
 {
 	struct server_filter *sfp;
 	const uchar_t *sndp;
@@ -1321,6 +1318,7 @@ use_server(poemsg_t *pado)
 	const uchar_t *maskp;
 	int i;
 	int passmatched;
+	int tlen;
 	const uint8_t *tagp;
 	int ttyp;
 
@@ -1331,12 +1329,29 @@ use_server(poemsg_t *pado)
 	ttyp = POETT_END;
 	while (poe_tagcheck(pado->poemsg_data, pado->poemsg_len, tagp)) {
 		ttyp = POET_GET_TYPE(tagp);
-		if (ttyp == POETT_END || ttyp == POETT_SERVICE)
+		if (ttyp == POETT_END)
 			break;
+		if (ttyp == POETT_SERVICE) {
+			/*
+			 * If the user has requested a specific service, then
+			 * this selection is exclusive.  We never use the
+			 * wildcard for this.
+			 */
+			tlen = POET_GET_LENG(tagp);
+			if (service[0] == '\0' || (strlen(service) == tlen &&
+			    memcmp(service, POET_DATA(tagp), tlen) == 0))
+				break;
+			/* just in case we run off the end */
+			ttyp = POETT_END;
+		}
 		tagp = POET_NEXT(tagp);
 	}
-	if (ttyp != POETT_SERVICE)
+	if (ttyp != POETT_SERVICE) {
+		if (verbose)
+			logerr("%s: Discard unusable offer from %s; service "
+			    "'%s' not seen\n", myname, ehost(pap), service);
 		return (-1);
+	}
 
 	passmatched = 0;
 	for (sfp = sfhead; sfp != NULL; sfp = sfp->sf_next) {
@@ -1365,8 +1380,12 @@ use_server(poemsg_t *pado)
 		if (!sfp->sf_isexcept)
 			return (PCSME_RPADOP);
 	}
-	if (onlyflag)
+	if (onlyflag) {
+		if (verbose)
+			logerr("%s: Discard unusable offer from %s; server not "
+			    "matched\n", myname, ehost(pap));
 		return (-1);
+	}
 	return (PCSME_RPADO);
 }
 
@@ -1480,9 +1499,8 @@ find_server(int localid)
 		if ((poep->poep_code == POECODE_PADT ||
 		    poep->poep_code == POECODE_PADS) &&
 		    (psm.poesm_firstoff == NULL ||
-			memcmp(&psm.poesm_firstoff->poemsg_sender,
-			    &pmsg.poemsg_sender,
-			    sizeof (pmsg.poemsg_sender)) != 0)) {
+		    memcmp(&psm.poesm_firstoff->poemsg_sender,
+		    &pmsg.poemsg_sender, sizeof (pmsg.poemsg_sender)) != 0)) {
 			if (verbose) {
 				logerr("%s: Unexpected peer %s", myname,
 				    ehost(&ptc->ptc_address));
@@ -1534,7 +1552,7 @@ find_server(int localid)
 			if (retv != 0)
 				break;
 			/* Ignore offers from servers we don't want. */
-			if ((retv = use_server(&pmsg)) < 0)
+			if ((retv = use_server(&pmsg, &ptc->ptc_address)) < 0)
 				break;
 			/* Dispatch either RPADO or RAPDO+ event. */
 			handle_event(&psm, retv, &pmsg);

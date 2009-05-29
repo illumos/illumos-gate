@@ -78,6 +78,7 @@
 #include <sys/ethernet.h>
 #include <sys/ser_sync.h>
 #include <libdlpi.h>
+#include <arpa/inet.h>
 
 #include "pppd.h"
 #include "fsm.h"
@@ -1553,9 +1554,12 @@ dump_packet(uchar_t *buf, int len)
 	char sbuf[32];
 	uint32_t src, dst;
 	struct protoent *pep;
+	struct in6_addr addr;
+	char fromstr[INET6_ADDRSTRLEN];
+	char tostr[INET6_ADDRSTRLEN];
 
 	if (len < 4) {
-		dbglog("strange link activity: %.*B", len, buf);
+		notice("strange link activity: %.*B", len, buf);
 		return;
 	}
 	bp = buf;
@@ -1565,9 +1569,10 @@ dump_packet(uchar_t *buf, int len)
 	if (!(proto & 1))
 		proto = (proto << 8) + *bp++;
 	len -= bp-buf;
-	if (proto == PPP_IP) {
-		if (len < 20 || get_ipv(bp) != 4 || get_iphl(bp) < 5) {
-			dbglog("strange IP packet activity: %16.*B", len, buf);
+	switch (proto) {
+	case PPP_IP:
+		if (len < IP_HDRLEN || get_ipv(bp) != 4 || get_iphl(bp) < 5) {
+			notice("strange IP packet activity: %16.*B", len, buf);
 			return;
 		}
 		src = get_ipsrc(bp);
@@ -1583,7 +1588,7 @@ dump_packet(uchar_t *buf, int len)
 		if ((get_ipoff(bp) & IP_OFFMASK) != 0) {
 			len -= get_iphl(bp) * 4;
 			bp += get_iphl(bp) * 4;
-			dbglog("%s fragment from %I->%I: %8.*B", cp, src, dst,
+			notice("%s fragment from %I->%I: %8.*B", cp, src, dst,
 			    len, bp);
 		} else {
 			if (len > get_iplen(bp))
@@ -1592,20 +1597,60 @@ dump_packet(uchar_t *buf, int len)
 			bp += get_iphl(bp) * 4;
 			offs = proto == IPPROTO_TCP ? (get_tcpoff(bp)*4) : 8;
 			if (proto == IPPROTO_TCP || proto == IPPROTO_UDP)
-				dbglog("%s data:%d %I:%d->%I:%d: %8.*B", cp,
-				    len-offs, src, get_sport(bp), dst,
-				    get_dport(bp), len-offs, bp+offs);
+				notice("%s data:%d %s%I:%d->%I:%d: %8.*B", cp,
+				    len-offs,
+				    proto == IPPROTO_TCP ?
+				    tcp_flag_decode(get_tcpflags(bp)) : "",
+				    src, get_sport(bp), dst, get_dport(bp),
+				    len-offs, bp+offs);
 			else
-				dbglog("%s %d bytes %I->%I: %8.*B", cp, len,
+				notice("%s %d bytes %I->%I: %8.*B", cp, len,
 				    src, dst, len, bp);
 		}
+		return;
+
+	case PPP_IPV6:
+		if (len < IP6_HDRLEN) {
+			notice("strange IPv6 activity: %16.*B", len, buf);
+			return;
+		}
+		(void) BCOPY(get_ip6src(bp), &addr, sizeof (addr));
+		(void) inet_ntop(AF_INET6, &addr, fromstr, sizeof (fromstr));
+		(void) BCOPY(get_ip6dst(bp), &addr, sizeof (addr));
+		(void) inet_ntop(AF_INET6, &addr, tostr, sizeof (tostr));
+		proto = get_ip6nh(bp);
+		if (proto == IPPROTO_FRAGMENT) {
+			notice("IPv6 fragment from %s->%s", fromstr,
+			    tostr);
+			return;
+		}
+		if ((pep = getprotobynumber(proto)) != NULL) {
+			cp = pep->p_name;
+		} else {
+			(void) slprintf(sbuf, sizeof (sbuf), "IPv6 proto %d",
+			    proto);
+			cp = sbuf;
+		}
+		len -= IP6_HDRLEN;
+		bp += IP6_HDRLEN;
+		offs = proto == IPPROTO_TCP ? (get_tcpoff(bp)*4) : 8;
+		if (proto == IPPROTO_TCP || proto == IPPROTO_UDP)
+			notice("%s data:%d %s[%s]%d->[%s]%d: %8.*B", cp,
+			    len-offs,
+			    proto == IPPROTO_TCP ?
+			    tcp_flag_decode(get_tcpflags(bp)) : "",
+			    fromstr, get_sport(bp), tostr, get_dport(bp),
+			    len-offs, bp+offs);
+		else
+			notice("%s %d bytes %s->%s: %8.*B", cp, len,
+			    fromstr, tostr, len, bp);
 		return;
 	}
 	if ((cp = protocol_name(proto)) == NULL) {
 		(void) slprintf(sbuf, sizeof (sbuf), "0x#X", proto);
 		cp = (const char *)sbuf;
 	}
-	dbglog("link activity: %s %16.*B", cp, len, bp);
+	notice("link activity: %s %16.*B", cp, len, bp);
 }
 
 /*
@@ -1785,7 +1830,7 @@ read_packet(buf)
 				lcp_lowerup(0);
 				return (0);
 			case PPP_LINKSTAT_NEEDUP:
-				if (data.len > 0 && debug)
+				if (data.len > 0)
 					dump_packet(buf, data.len);
 				return (-1);	/* Demand dial */
 			case PPP_LINKSTAT_IPV4_UNBOUND:

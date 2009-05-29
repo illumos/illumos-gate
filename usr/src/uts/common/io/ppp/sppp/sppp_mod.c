@@ -1,7 +1,7 @@
 /*
  * sppp_mod.c - modload support for PPP pseudo-device driver.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -104,7 +104,7 @@ static struct qinit sppp_uwinit = {
 
 static struct qinit sppp_lrinit = {
 	(int (*)())sppp_lrput,	/* qi_putp */
-	NULL,			/* qi_srvp */
+	(int (*)())sppp_lrsrv,	/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -209,6 +209,7 @@ _mi_driver_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
 	}
+	_mi_dip = dip;
 	if (ddi_create_minor_node(dip, PPP_DRV_NAME, S_IFCHR,
 	    0, DDI_PSEUDO, CLONE_DEV) == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
@@ -231,6 +232,7 @@ _mi_driver_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 	ddi_remove_minor_node(dip, NULL);
+	_mi_dip = NULL;
 	return (DDI_SUCCESS);
 }
 
@@ -243,7 +245,7 @@ _mi_driver_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /* ARGSUSED */
 static int
 _mi_driver_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	int	rc;
 

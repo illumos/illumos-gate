@@ -1,7 +1,7 @@
 /*
  * sppp.h - Solaris STREAMS PPP multiplexing pseudo-driver definitions
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -82,7 +82,7 @@ extern "C" {
  */
 struct  sppp_dlpi_pinfo_t {
 	int	pi_minlen;		/* minimum primitive length */
-	uint_t	pi_state;		/* acceptable starting state */
+	int	pi_state;		/* acceptable starting state */
 	int	(*pi_funcp)();		/* function() to call */
 };
 
@@ -204,6 +204,8 @@ typedef struct spppstr {
 	 */
 	t_uscalar_t	sps_dlstate;	/* current DLPI state */
 	mblk_t		*sps_hangup;	/* preallocated M_HANGUP message */
+
+	zoneid_t	sps_zoneid;	/* zone in which we were opened */
 } spppstr_t;
 
 /*
@@ -322,6 +324,8 @@ typedef struct sppa {
 	kmutex_t	ppa_npmutex;	/* protects the 2 fields below */
 	uint32_t 	ppa_npflag;	/* network protocols blocked */
 	uint32_t 	ppa_holdpkts[3]; /* # of packets blocked per np */
+
+	zoneid_t	ppa_zoneid;	/* zone where PPA is in use */
 } sppa_t;
 
 /* bit position (in ppa_npflag) for each ppp_protocol that can be blocked */
@@ -360,6 +364,7 @@ extern mblk_t	*sppp_dladdud(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);
 extern void	sppp_dlpi_pinfoinit(void);
 extern void	sppp_dlprsendup(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);
 extern void	sppp_lrput(queue_t *, mblk_t *);
+extern void	sppp_lrsrv(queue_t *);
 extern void	sppp_lwsrv(queue_t *);
 extern int	sppp_mproto(queue_t *, mblk_t *, spppstr_t *);
 extern int	sppp_open(queue_t *, dev_t *, int, int, cred_t *);
@@ -367,7 +372,7 @@ extern void	sppp_uwput(queue_t *, mblk_t *);
 extern void	sppp_uwsrv(queue_t *);
 extern void	sppp_remove_ppa(spppstr_t *sps);
 extern sppa_t	*sppp_find_ppa(uint32_t ppa_id);
-extern sppa_t	*sppp_create_ppa(uint32_t ppa_id);
+extern sppa_t	*sppp_create_ppa(uint32_t ppa_id, zoneid_t zoneid);
 
 #ifdef	__cplusplus
 }

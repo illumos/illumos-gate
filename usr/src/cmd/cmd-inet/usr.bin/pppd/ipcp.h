@@ -1,8 +1,8 @@
 /*
  * ipcp.h - IP Control Protocol definitions.
  *
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Copyright (c) 1989 Carnegie Mellon University.
  * All rights reserved.
@@ -21,8 +21,6 @@
  *
  * $Id: ipcp.h,v 1.13 1999/03/02 05:35:09 paulus Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Options.
@@ -75,6 +73,7 @@ extern ipcp_options ipcp_allowoptions[];
 extern ipcp_options ipcp_hisoptions[];
 
 extern char *ip_ntoa __P((u_int32_t));
+extern char *tcp_flag_decode __P((int));
 
 extern struct protent ipcp_protent;
 extern bool ipcp_from_hostname;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
  * sppptun.h - ioctl and other miscellaneous definitions for PPP
  * tunneling STREAMS module
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * See also:
@@ -35,8 +34,6 @@
 
 #ifndef __SPPPTUN_H
 #define	__SPPPTUN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -59,7 +56,6 @@ extern "C" {
  * of the PPP tunnel multiplexor.
  */
 #define	PPPTUN_SNAME	_PPPTUN(1)	/* set interface name (mod) */
-#define	PPPTUN_GNAME	_PPPTUN(2)	/* get interface name (mod) */
 #define	PPPTUN_SINFO	_PPPTUN(3)	/* set multiplex ID/style */
 #define	PPPTUN_GINFO	_PPPTUN(4)	/* get multiplex ID/style */
 #define	PPPTUN_GNNAME	_PPPTUN(5)	/* get Nth interface name */
@@ -71,6 +67,7 @@ extern "C" {
 #define	PPPTUN_SCTL	_PPPTUN(11)	/* set control channel by name */
 #define	PPPTUN_GCTL	_PPPTUN(12)	/* get control channel name */
 #define	PPPTUN_DCTL	_PPPTUN(13)	/* remove control channel */
+#define	PPPTUN_SSAP	_PPPTUN(14)	/* set SAP value; uint_t */
 
 /* Lower layer link name size */
 #define	PPPTUNNAMSIZ	32
@@ -160,6 +157,7 @@ struct ppptun_control {
 #define	PTCA_CONTROL	2		/* Inbound control message */
 #define	PTCA_DISCONNECT	3		/* Client disconnected */
 #define	PTCA_UNPLUMB	4		/* Lower stream unplumbed (no addr) */
+#define	PTCA_BADCTRL	5		/* Malformed control message */
 
 #ifdef	__cplusplus
 }

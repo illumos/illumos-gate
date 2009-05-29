@@ -22,11 +22,9 @@
  * sppptun.c - Solaris STREAMS PPP multiplexing tunnel driver
  * installer.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +53,7 @@ struct attach_data {
 	ppptun_lname appstr;    /* String to append to interface name (PPA) */
 	ppptun_atype localaddr; /* Local interface address */
 	uint_t locallen;	/* Length of local address */
+	uint_t sap;		/* SAP for PPPoE */
 };
 
 /* Per-protocol plumbing data */
@@ -75,7 +74,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-	    "Usage:\n\t%s plumb [<protocol> <device>]\n"
+	    "Usage:\n\t%s plumb [-s <sap>] [<protocol> <device>]\n"
 	    "\t%s unplumb <interface-name>\n"
 	    "\t%s query\n"), myname, myname, myname);
 	exit(1);
@@ -85,11 +84,11 @@ usage(void)
  * General DLPI function.  This is called indirectly through
  * the protos structure for the selected lower stream protocol.
  */
+/* ARGSUSED */
 static int
 sppp_dlpi(struct protos *prot, char *linkname, struct attach_data *adata)
 {
 	int retv;
-	uint_t ppa;
 	dlpi_handle_t dh;
 
 	if (verbose)
@@ -102,10 +101,11 @@ sppp_dlpi(struct protos *prot, char *linkname, struct attach_data *adata)
 
 	if (verbose) {
 		(void) printf(gettext("binding to Ethertype %04X\n"),
-		    prot->protval);
+		    adata->sap);
 	}
-	if ((retv = dlpi_bind(dh, prot->protval, NULL)) != DLPI_SUCCESS) {
-		(void) fprintf(stderr, gettext("%s: failed binding on %s: %s"),
+	if ((retv = dlpi_bind(dh, adata->sap, NULL)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr,
+		    gettext("%s: failed binding on %s: %s\n"),
 		    myname, linkname, dlpi_strerror(retv));
 		dlpi_close(dh);
 		return (-1);
@@ -115,21 +115,20 @@ sppp_dlpi(struct protos *prot, char *linkname, struct attach_data *adata)
 	if ((retv = dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR, &adata->localaddr,
 	    &adata->locallen)) != DLPI_SUCCESS) {
 		(void) fprintf(stderr, gettext("%s: failed getting physical"
-		    " address on %s: %s"), myname, linkname,
+		    " address on %s: %s\n"), myname, linkname,
 		    dlpi_strerror(retv));
 		dlpi_close(dh);
 		return (-1);
 	}
 
-	/* Store ppa to append to interface name. */
-	if ((retv = dlpi_parselink(linkname, NULL, &ppa)) != DLPI_SUCCESS) {
-		(void) fprintf(stderr, gettext("%s: failed parsing linkname on"
-		    " %s: %s"), myname, linkname, dlpi_strerror(retv));
+	if (strlcpy(adata->appstr, linkname, sizeof (adata->appstr)) >=
+	    sizeof (adata->appstr)) {
+		(void) fprintf(stderr,
+		    gettext("%s: interface name too long: %s\n"),
+		    myname, linkname);
 		dlpi_close(dh);
 		return (-1);
 	}
-
-	(void) snprintf(adata->appstr, sizeof (adata->appstr), "%d", ppa);
 
 	return (dlpi_fd(dh));
 }
@@ -184,11 +183,12 @@ strioctl(int fd, int cmd, void *ptr, int ilen, int olen, const char *iocname)
 static int
 plumb_it(int argc, char **argv)
 {
-	int devfd, muxfd, muxid;
+	int opt, devfd, muxfd, muxid;
 	struct ppptun_info pti;
 	char *cp, *linkname;
 	struct protos *prot;
 	struct attach_data adata;
+	uint_t sap = 0;
 
 	/* If no protocol requested, then list known protocols. */
 	if (optind == argc) {
@@ -196,6 +196,17 @@ plumb_it(int argc, char **argv)
 		for (prot = proto_list; prot->name != NULL; prot++)
 			(void) printf("\t%s\t%s\n", prot->name, prot->desc);
 		return (0);
+	}
+
+	/* Parse plumbing flags */
+	while ((opt = getopt(argc, argv, "s:")) != EOF) {
+		switch (opt) {
+		case 's':
+			sap = strtoul(optarg, NULL, 16);
+			break;
+		default:
+			usage();
+		}
 	}
 
 	/* If missing protocol or device, then abort. */
@@ -212,6 +223,8 @@ plumb_it(int argc, char **argv)
 		    myname, cp);
 		return (1);
 	}
+
+	adata.sap = sap == 0 ? prot->protval : sap;
 
 	/* Get interface. */
 	linkname = argv[optind];
@@ -238,21 +251,14 @@ plumb_it(int argc, char **argv)
 		return (1);
 	}
 
-	/* Get the name of the newly-created lower stream. */
-	if (verbose)
-		(void) printf(gettext("getting new interface name\n"));
-	if (strioctl(devfd, PPPTUN_GNAME, pti.pti_name, 0,
-	    sizeof (pti.pti_name), "PPPTUN_GNAME") < 0)
-		return (1);
-	if (verbose)
-		(void) printf(gettext("got interface %s\n"), pti.pti_name);
-
 	/* Convert stream name to protocol-specific name. */
-	if ((cp = strchr(pti.pti_name, ':')) != NULL)
-		*cp = '\0';
-	(void) snprintf(pti.pti_name+strlen(pti.pti_name),
-	    sizeof (pti.pti_name)-strlen(pti.pti_name), "%s:%s", adata.appstr,
-	    prot->name);
+	if (snprintf(pti.pti_name, sizeof (pti.pti_name), "%s:%s",
+	    adata.appstr, prot->name) >= sizeof (pti.pti_name)) {
+		(void) fprintf(stderr,
+		    gettext("%s: stream name too long: %s:%s\n"),
+		    myname, adata.appstr, prot->name);
+		return (1);
+	}
 
 	/* Change the lower stream name. */
 	if (verbose)
@@ -274,6 +280,15 @@ plumb_it(int argc, char **argv)
 		(void) printf(gettext("send down local address\n"));
 	if (strioctl(devfd, PPPTUN_LCLADDR, &adata.localaddr, adata.locallen,
 	    0, "PPPTUN_LCLADDR") < 0)
+		return (1);
+
+	/*
+	 * And set the SAP value.
+	 */
+	if (verbose)
+		(void) printf(gettext("send down SAP %x\n"), adata.sap);
+	if (strioctl(devfd, PPPTUN_SSAP, &adata.sap, sizeof (adata.sap), 0,
+	    "PPPTUN_SSAP") < 0)
 		return (1);
 
 	/* Link the lower stream under the tunnel device. */

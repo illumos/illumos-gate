@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ *  You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stropts.h>
@@ -94,12 +91,12 @@ sps_format(uintptr_t addr, const spppstr_t *sps, uint_t *qfmt)
 	if (*qfmt)
 		mdb_printf("%?p ", sps->sps_rq);
 	if (sps->sps_ppa == NULL) {
-		mdb_printf("unset    ");
+		mdb_printf("?       unset     ");
 	} else if (mdb_vread(&ppa, sizeof (ppa), (uintptr_t)sps->sps_ppa) ==
 	    -1) {
-		mdb_printf("?%p ", sps->sps_ppa);
+		mdb_printf("?      ?%p ", sps->sps_ppa);
 	} else {
-		mdb_printf("sppp%-5d ", ppa.ppa_ppa_id);
+		mdb_printf("%-6d sppp%-5d ", ppa.ppa_zoneid, ppa.ppa_ppa_id);
 	}
 	if (IS_SPS_CONTROL(sps)) {
 		mdb_printf("Control\n");
@@ -124,7 +121,7 @@ sps_format(uintptr_t addr, const spppstr_t *sps, uint_t *qfmt)
 		if (illaddr != 0) {
 			if (mdb_vread(&ill, sizeof (ill), illaddr) == -1 ||
 			    mdb_vread(&ipif, sizeof (ipif),
-				(uintptr_t)ill.ill_ipif) == -1) {
+			    (uintptr_t)ill.ill_ipif) == -1) {
 				illaddr = 0;
 			}
 		}
@@ -186,11 +183,11 @@ sppp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
 		if (qfmt) {
-			mdb_printf("%<u>%?s %?s %9s %s%</u>\n", "Address",
-			    "RecvQ", "Interface", "Type");
+			mdb_printf("%<u>%?s %?s %-6s %-9s %s%</u>\n", "Address",
+			    "RecvQ", "ZoneID", "Interface", "Type");
 		} else {
-			mdb_printf("%<u>%?s %9s %s%</u>\n", "Address",
-			    "Interface", "Type");
+			mdb_printf("%<u>%?s %-6s %-9s %s%</u>\n", "Address",
+			    "ZoneID", "Interface", "Type");
 		}
 	}
 
@@ -240,8 +237,8 @@ sppa_walk_step(mdb_walk_state_t *wsp)
 static int
 ppa_format(uintptr_t addr, const sppa_t *ppa, uint_t *qfmt)
 {
-	mdb_printf("%?p sppp%-5d %?p %?p\n", addr, ppa->ppa_ppa_id,
-	    ppa->ppa_ctl, ppa->ppa_lower_wq);
+	mdb_printf("%?p %-6d sppp%-5d %?p %?p\n", addr, ppa->ppa_zoneid,
+	    ppa->ppa_ppa_id, ppa->ppa_ctl, ppa->ppa_lower_wq);
 
 	return (WALK_NEXT);
 }
@@ -254,8 +251,8 @@ sppa(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	sppa_t ppa;
 
 	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
-		mdb_printf("%<u>%?s %9s %?s %?s%</u>\n", "Address",
-		    "Interface", "Control", "LowerQ");
+		mdb_printf("%<u>%?s %-6s %-9s %?s %?s%</u>\n", "Address",
+		    "ZoneID", "Interface", "Control", "LowerQ");
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
@@ -417,7 +414,8 @@ tuncl_walk_step(mdb_walk_state_t *wsp)
 static int
 tuncl_format(uintptr_t addr, const tuncl_t *tcl, uint_t *qfmt)
 {
-	mdb_printf("%?p %?p %?p", addr, tcl->tcl_data_tll, tcl->tcl_ctrl_tll);
+	mdb_printf("%?p %-6d %?p %?p", addr, tcl->tcl_zoneid, tcl->tcl_data_tll,
+	    tcl->tcl_ctrl_tll);
 	mdb_printf(" %-2d %04X %04X ", tcl->tcl_style,
 	    tcl->tcl_lsessid, tcl->tcl_rsessid);
 	if (tcl->tcl_flags & TCLF_DAEMON) {
@@ -437,8 +435,8 @@ tuncl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	tuncl_t tcl;
 
 	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
-		mdb_printf("%<u>%?s %?s %?s Ty LSes RSes %s%</u>\n", "Address",
-		    "Data", "Control", "Interface");
+		mdb_printf("%<u>%?s %-6s %?s %?s Ty LSes RSes %s%</u>\n",
+		    "Address", "ZoneID", "Data", "Control", "Interface");
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
@@ -536,7 +534,8 @@ tunll_walk_step(mdb_walk_state_t *wsp)
 static int
 tunll_format(uintptr_t addr, const tunll_t *tll, uint_t *qfmt)
 {
-	mdb_printf("%?p %-14s %?p", addr, tll->tll_name, tll->tll_defcl);
+	mdb_printf("%?p %-6d %-14s %?p", addr, tll->tll_zoneid, tll->tll_name,
+	    tll->tll_defcl);
 	if (tll->tll_style == PTS_PPPOE) {
 		mdb_printf(" %x:%x:%x:%x:%x:%x",
 		    tll->tll_lcladdr.pta_pppoe.ptma_mac[0],
@@ -559,8 +558,8 @@ tunll(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	tunll_t tll;
 
 	if ((flags & DCMD_LOOPFIRST) || !(flags & DCMD_LOOP)) {
-		mdb_printf("%<u>%?s %-14s %?s %s%</u>\n", "Address",
-		    "Interface Name", "Daemon", "Local Address");
+		mdb_printf("%<u>%?s %-6s %-14s %?s %s%</u>\n", "Address",
+		    "ZoneID", "Interface Name", "Daemon", "Local Address");
 	}
 
 	if (flags & DCMD_ADDRSPEC) {

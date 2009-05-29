@@ -1,7 +1,7 @@
 /*
  * lcp.c - PPP Link Control Protocol.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1989 Carnegie Mellon University.
@@ -20,7 +20,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define RCSID	"$Id: lcp.c,v 1.54 2000/04/27 03:51:18 masputra Exp $"
 
 /*
@@ -248,6 +247,7 @@ int absmax_mtu = PPP_MAXMTU;
 static int lcp_echos_pending = 0;	/* Number of outstanding echo msgs */
 static int lcp_echo_number   = 0;	/* ID number of next echo frame */
 static int lcp_echo_timer_running = 0;  /* set if a timer is running */
+static bool lcp_echo_accm_test = 0;	/* flag if still testing ACCM */
 static int lcp_echo_badreplies = 0;	/* number of bad replies from peer */
 /*
  * The maximum number of bad replies we tolerate before bringing the
@@ -2849,24 +2849,22 @@ LcpLinkFailure (f)
     char *close_message;
 
     if (f->state == OPENED) {
+	if (lcp_echo_badreplies > LCP_ECHO_MAX_BADREPLIES) {
+	    info("Received %d bad echo-replies", lcp_echo_badreplies);
+	    close_message = "Receiving malformed Echo-Replies";
+	} else if (lcp_echo_accm_test) {
 	    /*
 	     * If this is an asynchronous line and we've missed all of
 	     * the initial echo requests, then this is probably due to
 	     * a bad ACCM.
 	     */
-	if (!sync_serial && lcp_echos_pending >= ACCM_TEST_FAILS &&
-	    lcp_echo_number <= ACCM_TEST_FAILS && use_accm_test != 0) {
 	    notice("Peer not responding to initial Echo-Requests.");
 	    notice("Negotiated asyncmap may be incorrect for this link.");
 	    close_message = "Peer not responding; perhaps bad asyncmap";
-	} else if (lcp_echo_fails != 0 &&
-	    lcp_echos_pending >= lcp_echo_fails) {
+	} else {
 	    info("No response to %d echo-requests", lcp_echos_pending);
 	    notice("Serial link appears to be disconnected.");
 	    close_message = "Peer not responding";
-	} else {
-	    info("Received %d bad echo-replies", lcp_echo_badreplies);
-	    close_message = "Receiving malformed Echo-Replies";
 	}
 
 	lcp_close(f->unit, close_message);
@@ -2922,7 +2920,6 @@ lcp_received_echo_reply (f, id, inp, len)
     int len;
 {
     u_int32_t magic;
-    static int sayonce = 1;
 
     /* Check the magic number - don't count replies from ourselves. */
     if (len < 4) {
@@ -2939,10 +2936,9 @@ lcp_received_echo_reply (f, id, inp, len)
     /* Reset the number of outstanding echo frames */
     lcp_echos_pending = 0;
 
-    if (!sync_serial && lcp_echo_number <= ACCM_TEST_FAILS && sayonce &&
-	use_accm_test != 0) {
+    if (lcp_echo_accm_test) {
 	dbglog("lcp: validated asyncmap setting");
-	sayonce = 0;
+	lcp_echo_accm_test = 0;
 	if (lcp_echo_fails == 0)
 	    lcp_echo_interval = 0;
     }
@@ -2962,11 +2958,17 @@ LcpSendEchoRequest (f)
     int i;
 
     /*
-     * Detect the failure of the peer at this point.
+     * Detect the failure of the peer at this point.  If we're not currently
+     * performing the ACCM test, then we just check for the user's echo-failure
+     * point.  If we are performing the ACCM test, then use ACCM_TEST_FAILS if
+     * the user hasn't specified a different failure point.
      */
-    if ((lcp_echo_fails != 0 && lcp_echos_pending >= lcp_echo_fails) ||
-	(!sync_serial && lcp_echos_pending >= ACCM_TEST_FAILS &&
-	 use_accm_test != 0)) {
+    i = lcp_echo_fails;
+    if (i == 0)
+	i = ACCM_TEST_FAILS;
+    if ((!lcp_echo_accm_test && lcp_echo_fails != 0 &&
+	lcp_echos_pending >= lcp_echo_fails) ||
+	(lcp_echo_accm_test && lcp_echos_pending >= i)) {
 	LcpLinkFailure(f);
 	lcp_echos_pending = 0;
 	lcp_echo_badreplies = 0;
@@ -2980,7 +2982,7 @@ LcpSendEchoRequest (f)
 	pktp = pkt;
 	PUTLONG(lcp_magic, pktp);
 	/* Send some test packets so we can fail the link early. */
-	if (!sync_serial && lcp_echo_number <= ACCM_TEST_FAILS) {
+	if (lcp_echo_accm_test) {
 	    switch (use_accm_test) {
 	    case 1:
 		/* Only the characters covered by negotiated ACCM */
@@ -3013,7 +3015,8 @@ lcp_echo_lowerup (unit)
     lcp_echos_pending      = 0;
     lcp_echo_number        = 0;
     lcp_echo_timer_running = 0;
-  
+    lcp_echo_accm_test     = !sync_serial && use_accm_test;
+
     /* If a timeout interval is specified then start the timer */
     LcpEchoCheck(f);
 }

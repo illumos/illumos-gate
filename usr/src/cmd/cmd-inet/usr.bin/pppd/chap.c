@@ -1,8 +1,8 @@
 /*
  * chap.c - Challenge Handshake Authentication Protocol.
  *
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Copyright (c) 1993 The Australian National University.
  * All rights reserved.
@@ -36,7 +36,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define RCSID	"$Id: chap.c,v 1.24 1999/11/15 01:51:50 paulus Exp $"
 
 /*
@@ -495,9 +494,17 @@ ChapReceiveChallenge(cstate, inp, id, len)
 	(void) strlcpy(cstate->peercname, rhostname,
 	    sizeof (cstate->peercname));
     } else if (strcmp(rhostname, cstate->peercname) != 0) {
-	fake_response = 1;
-	warn("CHAP: peer challenge name changed from '%q' to '%q'",
-	    cstate->peercname, rhostname);
+	if (++cstate->rename_count == 1) {
+	    info("CHAP: peer challenge name changed from '%q' to '%q'",
+		cstate->peercname, rhostname);
+	    (void) strlcpy(cstate->peercname, rhostname,
+		sizeof (cstate->peercname));
+	} else {
+	    fake_response = 1;
+	    if (cstate->rename_count == 2)
+		warn("CHAP: peer challenge name changed again to '%q'",
+		    rhostname);
+	}
     }
 
     /* get secret for authenticating ourselves with the specified host */

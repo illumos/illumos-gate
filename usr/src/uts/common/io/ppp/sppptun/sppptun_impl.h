@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,6 +107,10 @@ struct tunll_s {
 
 	tll_kstats_t tll_kstats;	/* current statistics */
 	kstat_t *tll_ksp;		/* pointer to kstats allocation */
+
+	uint_t tll_sap;			/* SAP for PPPoE */
+
+	zoneid_t tll_zoneid;
 };
 
 /*
@@ -141,6 +145,8 @@ struct tuncl_s {
 	struct pppstat64 tcl_stats;	/* Standard PPP statistics */
 	tcl_kstats_t tcl_kstats;	/* current statistics */
 	kstat_t *tcl_ksp;		/* pointer to kstats allocation */
+
+	zoneid_t tcl_zoneid;
 };
 
 #define	TO_TLL(p) \

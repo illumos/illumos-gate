@@ -1,7 +1,7 @@
 /*
  * sppp.c - Solaris STREAMS PPP multiplexing pseudo-driver
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -65,6 +65,7 @@
 #include <sys/strsun.h>
 #include <sys/ethernet.h>
 #include <sys/policy.h>
+#include <sys/zone.h>
 #include <net/ppp_defs.h>
 #include <net/pppio.h>
 #include "sppp.h"
@@ -182,6 +183,7 @@ sppp_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 	sps->sps_sap = -1;		/* no sap bound to stream */
 	sps->sps_dlstate = DL_UNATTACHED; /* dlpi state is unattached */
 	sps->sps_npmode = NPMODE_DROP;	/* drop all packets initially */
+	sps->sps_zoneid = crgetzoneid(credp);
 	q->q_ptr = WR(q)->q_ptr = (caddr_t)sps;
 	/*
 	 * We explicitly disable the automatic queue scheduling for the
@@ -229,7 +231,7 @@ sppp_free_ppa(sppa_t *ppa)
  * Create a new PPA.  Caller must be exclusive on outer perimeter.
  */
 sppa_t *
-sppp_create_ppa(uint32_t ppa_id)
+sppp_create_ppa(uint32_t ppa_id, zoneid_t zoneid)
 {
 	sppa_t *ppa;
 	sppa_t *curppa;
@@ -267,6 +269,7 @@ sppp_create_ppa(uint32_t ppa_id)
 	}
 	ppa->ppa_kstats = ksp;		/* chain kstat structure */
 	ppa->ppa_ppa_id = ppa_id;	/* record ppa id */
+	ppa->ppa_zoneid = zoneid;	/* zone that owns this PPA */
 	ppa->ppa_mtu = PPP_MAXMTU;	/* 65535-(PPP_HDRLEN+PPP_FCSLEN) */
 	ppa->ppa_mru = PPP_MAXMRU;	/* 65000 */
 
@@ -779,7 +782,7 @@ sppp_uwput(queue_t *q, mblk_t *mp)
 			break;			/* 32 bit interface gone */
 		default:
 			if (iop->ioc_cr == NULL ||
-			    secpolicy_net_config(iop->ioc_cr, B_FALSE) != 0) {
+			    secpolicy_ppp_config(iop->ioc_cr) != 0) {
 				error = EPERM;
 				break;
 			} else if ((ppa == NULL) ||
@@ -1051,6 +1054,11 @@ sppp_inner_ioctl(queue_t *q, mblk_t *mp)
 			error = ENOENT;
 			break;
 		}
+		if (iop->ioc_cr == NULL ||
+		    ppa->ppa_zoneid != crgetzoneid(iop->ioc_cr)) {
+			error = EPERM;
+			break;
+		}
 		/*
 		 * Preallocate the hangup message so that we're always
 		 * able to send this upstream in the event of a
@@ -1084,7 +1092,7 @@ sppp_inner_ioctl(queue_t *q, mblk_t *mp)
 	case PPPIO_BLOCKNP:
 	case PPPIO_UNBLOCKNP:
 		if (iop->ioc_cr == NULL ||
-		    secpolicy_net_config(iop->ioc_cr, B_FALSE) != 0) {
+		    secpolicy_ppp_config(iop->ioc_cr) != 0) {
 			error = EPERM;
 			break;
 		}
@@ -1116,7 +1124,7 @@ sppp_inner_ioctl(queue_t *q, mblk_t *mp)
 		break;
 	case PPPIO_DEBUG:
 		if (iop->ioc_cr == NULL ||
-		    secpolicy_net_config(iop->ioc_cr, B_FALSE) != 0) {
+		    secpolicy_ppp_config(iop->ioc_cr) != 0) {
 			error = EPERM;
 			break;
 		} else if (iop->ioc_count != sizeof (uint32_t)) {
@@ -1293,7 +1301,7 @@ sppp_inner_ioctl(queue_t *q, mblk_t *mp)
 static void
 sppp_outer_ioctl(queue_t *q, mblk_t *mp)
 {
-	spppstr_t	*sps;
+	spppstr_t	*sps = q->q_ptr;
 	spppstr_t	*nextsib;
 	queue_t		*lwq;
 	sppa_t		*ppa;
@@ -1302,9 +1310,7 @@ sppp_outer_ioctl(queue_t *q, mblk_t *mp)
 	int		count = 0;
 	uint32_t	ppa_id;
 	mblk_t		*nmp;
-
-	ASSERT(q != NULL && q->q_ptr != NULL);
-	ASSERT(mp != NULL && mp->b_rptr != NULL);
+	zoneid_t	zoneid;
 
 	sps = (spppstr_t *)q->q_ptr;
 	ppa = sps->sps_ppa;
@@ -1340,6 +1346,14 @@ sppp_outer_ioctl(queue_t *q, mblk_t *mp)
 				qenable(WR(nextsib->sps_rq));
 			}
 		}
+
+		/*
+		 * Also unblock (run once) our lower read-side queue.  This is
+		 * where packets received while doing the I_LINK may be
+		 * languishing; see sppp_lrsrv.
+		 */
+		qenable(RD(lwq));
+
 		/*
 		 * Send useful information down to the modules which are now
 		 * linked below this driver (for this particular ppa). Only
@@ -1412,7 +1426,7 @@ sppp_outer_ioctl(queue_t *q, mblk_t *mp)
 		 * a control stream.
 		 */
 		if (iop->ioc_cr == NULL ||
-		    secpolicy_net_config(iop->ioc_cr, B_FALSE) != 0) {
+		    secpolicy_ppp_config(iop->ioc_cr) != 0) {
 			error = EPERM;
 			break;
 		} else if (IS_SPS_CONTROL(sps) || IS_SPS_PIOATTACH(sps) ||
@@ -1440,9 +1454,11 @@ sppp_outer_ioctl(queue_t *q, mblk_t *mp)
 		 */
 		if (ppa_id == (uint32_t)-1)
 			ppa_id = 0;
+		zoneid = crgetzoneid(iop->ioc_cr);
 		for (ppa = ppa_list; ppa != NULL; ppa = ppa->ppa_nextppa) {
 			if (ppa_id == (uint32_t)-2) {
-				if (ppa->ppa_ctl == NULL)
+				if (ppa->ppa_ctl == NULL &&
+				    ppa->ppa_zoneid == zoneid)
 					break;
 			} else {
 				if (ppa_id < ppa->ppa_ppa_id)
@@ -1459,7 +1475,7 @@ sppp_outer_ioctl(queue_t *q, mblk_t *mp)
 			/* Clear timestamp and lastmod flags */
 			ppa->ppa_flags = 0;
 		} else {
-			ppa = sppp_create_ppa(ppa_id);
+			ppa = sppp_create_ppa(ppa_id, zoneid);
 			if (ppa == NULL) {
 				error = ENOMEM;
 				break;
@@ -1801,6 +1817,26 @@ sppp_lrput(queue_t *q, mblk_t *mp)
 	} else if ((q = sppp_recv(q, &mp, sps)) != NULL) {
 		putnext(q, mp);
 	}
+}
+
+/*
+ * sppp_lrsrv()
+ *
+ * MT-Perimeters:
+ *    exclusive inner, shared outer.
+ *
+ * Description:
+ *    Lower read-side service procedure.  This is run once after the I_LINK
+ *    occurs in order to clean up any packets that came in while we were
+ *    transferring in the lower stream.  Otherwise, it's not used.
+ */
+void
+sppp_lrsrv(queue_t *q)
+{
+	mblk_t *mp;
+
+	while ((mp = getq(q)) != NULL)
+		sppp_lrput(q, mp);
 }
 
 /*

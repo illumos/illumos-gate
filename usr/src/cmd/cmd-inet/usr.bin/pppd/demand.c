@@ -1,7 +1,7 @@
 /*
  * demand.c - Support routines for demand-dialling.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1993 The Australian National University.
@@ -20,7 +20,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #define RCSID	"$Id: demand.c,v 1.13 2000/04/15 01:27:11 masputra Exp $"
 
 #include <stdio.h>
@@ -360,12 +359,15 @@ active_packet(p, len)
 		return 0;
 	    }
 	    if (protp->active_pkt == NULL) {
-		dbglog("%s: no active test; bringing up link", protp->name);
+		notice("%s: no active test; bringing up link", protp->name);
 		return 1;
 	    }
 	    i = (*protp->active_pkt)(p, len);
-	    dbglog("%s: active test; %sbringing up link", protp->name,
-		i != 0 ? "" : "not ");
+	    if (i != 0)
+		    notice("%s: active test; bringing up link", protp->name);
+	    else
+		    dbglog("%s: active test; not bringing up link",
+			protp->name);
 	    return i;
 	}
     }

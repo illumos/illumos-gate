@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2287,4 +2287,18 @@ secpolicy_dld_ioctl(const cred_t *cr, const char *dld_priv, const char *msg)
 	/* priv_getbyname() returns -ve errno */
 	return (-rv);
 
+}
+
+/*
+ * secpolicy_ppp_config
+ *
+ * Determine if the subject has sufficient privileges to configure PPP and
+ * PPP-related devices.
+ */
+int
+secpolicy_ppp_config(const cred_t *cr)
+{
+	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_NET_CONFIG, B_FALSE))
+		return (secpolicy_net_config(cr, B_FALSE));
+	return (PRIV_POLICY(cr, PRIV_SYS_PPP_CONFIG, B_FALSE, EPERM, NULL));
 }

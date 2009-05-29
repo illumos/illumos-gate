@@ -21,11 +21,9 @@
 /*
  * PPPoE Server-mode daemon option parsing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -851,7 +849,7 @@ dispatch_keyword(struct parse_state *psp, const char *keybuf)
 	for (kep = key_list; kep->kwe_word != NULL; kep++) {
 		if (kep->kwe_in == psp->ps_state &&
 		    (*kep->kwe_word == '\0' ||
-			strcasecmp(kep->kwe_word, keybuf) == 0)) {
+		    strcasecmp(kep->kwe_word, keybuf) == 0)) {
 			if (kep->kwe_func != NULL)
 				retv = (*kep->kwe_func)(psp->ps_csvc, keybuf);
 			psp->ps_state = kep->kwe_out;
@@ -1419,9 +1417,8 @@ organize_state(struct parse_state *psp)
 						if ((*se2pp)->se_name ==
 						    slp->sl_entry.se_name ||
 						    strcmp((*se2pp)->
-							se_name,
-							slp->sl_entry.
-							se_name) == 0)
+						    se_name, slp->sl_entry.
+						    se_name) == 0)
 							break;
 					/*
 					 * We retain a service if it's
@@ -1627,7 +1624,7 @@ get_device_list(struct parse_state *psp, int tunfd)
 	for (dlpp = &psp->ps_star; (dlp = *dlpp) != NULL; ) {
 		for (dla = dlalt; dla != NULL; dla = dla->dl_next)
 			if (strcmp(dla->dl_name, dlp->dl_name) == 0)
-			    break;
+				break;
 		if (dla == NULL) {
 			*dlpp = dlp->dl_next;
 			free(dlp);
@@ -1959,10 +1956,6 @@ locate_service(poep_t *poep, int plen, const char *iname, ppptun_atype *pap,
 				break;
 			}
 			seppe = sepp + dep->de_nservices;
-			/* Clients's requested service must appear in reply. */
-			if (tlen != 0 || (ispadi &&
-				    !(glob_svc.se_flags & SEF_NOWILD)))
-				(void) poe_tag_copy(opoe, tagp);
 			if (tlen == 0) {
 				/*
 				 * If config specifies "nowild" in a
@@ -1976,29 +1969,43 @@ locate_service(poep_t *poep, int plen, const char *iname, ppptun_atype *pap,
 					sepp = seppe;
 				while (sepp < seppe) {
 					sep = *sepp++;
-					if ((ispadi || !(sep->se_flags &
-						    SEF_NOWILD)) &&
-					    allow_service(sep, pap)) {
-						nsvcs++;
-						*srvp = (void *)sep;
-						if (poep->poep_code ==
-						    POECODE_PADR)
-							break;
-						if (sep->se_name[0] == '\0')
-							continue;
-						(void) poe_add_str(opoe,
-						    POETT_SERVICE,
-						    sep->se_name);
-					}
+					if (sep->se_name[0] == '\0' ||
+					    (sep->se_flags & SEF_NOWILD) ||
+					    !allow_service(sep, pap))
+						continue;
+					*srvp = (void *)sep;
+					/*
+					 * RFC requires that PADO includes the
+					 * wildcard service request in response
+					 * to PADI.
+					 */
+					if (ispadi && nsvcs == 0 &&
+					    !(glob_svc.se_flags & SEF_NOWILD))
+						(void) poe_tag_copy(opoe, tagp);
+					nsvcs++;
+					(void) poe_add_str(opoe, POETT_SERVICE,
+					    sep->se_name);
+					/* If PADR, then one is enough */
+					if (!ispadi)
+						break;
 				}
+				/* Just for generating error messages */
+				if (nsvcs == 0)
+					(void) poe_tag_copy(opoe, tagp);
 			} else {
+				/*
+				 * Clients's requested service must appear in
+				 * reply.
+				 */
+				(void) poe_tag_copy(opoe, tagp);
+
 				/* Requested specific service; find it. */
 				cp = (char *)POET_DATA(tagp);
 				while (sepp < seppe) {
 					sep = *sepp++;
 					if (strlen(sep->se_name) == tlen &&
 					    strncasecmp(sep->se_name, cp,
-						tlen) == 0) {
+					    tlen) == 0) {
 						if (allow_service(sep, pap)) {
 							nsvcs++;
 							*srvp = (void *)sep;
@@ -2276,7 +2283,7 @@ dump_configuration(FILE *fp)
 	    "Global debug level %d, log to %s; current level %d\n",
 	    glob_svc.se_debug,
 	    ((glob_svc.se_log == NULL || *glob_svc.se_log == '\0') ?
-		"syslog" : glob_svc.se_log),
+	    "syslog" : glob_svc.se_log),
 	    log_level);
 	if (cur_options == NULL) {
 		(void) fprintf(fp, "No current configuration.\n");
