@@ -155,7 +155,7 @@ static void Reconfigure(mDNS *m)
 	mDNS_SetPrimaryInterfaceInfo(m, NULL, NULL, NULL);
 	mDNS_DeleteDNSServers(m);
 	if (ParseDNSServers(m, uDNS_SERVERS_FILE) < 0)
-		LogMsg("Unable to parse DNS server list. Unicast DNS-SD unavailable");
+		LogMsgNoIdent("Unable to parse DNS server list. Unicast DNS-SD unavailable");
 	ReadDDNSSettingsFromConfFile(m, CONFIG_FILE, &DynDNSHostname, &DynDNSZone, NULL);
 	FindDefaultRouteIP(&DynDNSIP);
 	if (DynDNSHostname.c[0]) mDNS_AddDynDNSHostName(m, &DynDNSHostname, NULL, NULL);
