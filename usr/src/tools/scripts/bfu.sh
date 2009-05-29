@@ -7530,7 +7530,6 @@ mondo_loop() {
 	fi
 
 	# Remove old OpenSSL stuff from SUNWwbint
-	rm -rf $usr/include/openssl
 	rm -rf $usr/lib/openssl
 
 	#Remove ufs logging module - now merged into ufs module
