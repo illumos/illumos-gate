@@ -868,6 +868,15 @@ xattr_dir_close(vnode_t *vpp, int flags, int count, offset_t off, cred_t *cr,
 	return (0);
 }
 
+/*
+ * Retrieve the attributes on an xattr directory.  If there is a "real"
+ * xattr directory, use that.  Otherwise, get the attributes (represented
+ * by PARENT_ATTRMASK) from the "parent" node and fill in the rest.  Note
+ * that VOP_GETATTR() could turn off bits in the va_mask.
+ */
+
+#define	PARENT_ATTRMASK	(AT_UID|AT_GID|AT_RDEV|AT_CTIME|AT_MTIME)
+
 /* ARGSUSED */
 static int
 xattr_dir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
@@ -876,7 +885,6 @@ xattr_dir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	timestruc_t now;
 	vnode_t *pvp;
 	int error;
-	vattr_t pvattr;
 
 	error = xattr_dir_realdir(vp, &pvp, LOOKUP_XATTR, cr, ct);
 	if (error == 0) {
@@ -892,16 +900,36 @@ xattr_dir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 	/*
 	 * There is no real xattr directory.  Cobble together
-	 * an entry using info from the parent object.
+	 * an entry using info from the parent object (if needed)
+	 * plus information common to all xattrs.
 	 */
-	pvp = gfs_file_parent(vp);
-	(void) memset(&pvattr, 0, sizeof (pvattr));
-	pvattr.va_mask = AT_UID|AT_GID|AT_RDEV|AT_CTIME|AT_MTIME;
-	error = VOP_GETATTR(pvp, &pvattr, 0, cr, ct);
-	if (error) {
-		return (error);
+	if (vap->va_mask & PARENT_ATTRMASK) {
+		vattr_t pvattr;
+		uint_t  off_bits;
+
+		pvp = gfs_file_parent(vp);
+		(void) memset(&pvattr, 0, sizeof (pvattr));
+		pvattr.va_mask = PARENT_ATTRMASK;
+		error = VOP_GETATTR(pvp, &pvattr, 0, cr, ct);
+		if (error) {
+			return (error);
+		}
+
+		/*
+		 * VOP_GETATTR() might have turned off some bits in
+		 * pvattr.va_mask.  This means that the underlying
+		 * file system couldn't process those attributes.
+		 * We need to make sure those bits get turned off
+		 * in the vattr_t structure that gets passed back
+		 * to the caller.  Figure out which bits were turned
+		 * off (if any) then set pvattr.va_mask before it
+		 * gets copied to the vattr_t that the caller sees.
+		 */
+		off_bits = (pvattr.va_mask ^ PARENT_ATTRMASK) & PARENT_ATTRMASK;
+		pvattr.va_mask = vap->va_mask & ~off_bits;
+		*vap = pvattr;
 	}
-	*vap = pvattr;
+
 	vap->va_type = VDIR;
 	vap->va_mode = MAKEIMODE(vap->va_type, S_ISVTX | 0777);
 	vap->va_fsid = vp->v_vfsp->vfs_dev;

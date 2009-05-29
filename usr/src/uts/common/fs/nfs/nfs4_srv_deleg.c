@@ -820,17 +820,10 @@ retry:
 nfsstat4
 rfs4_vop_getattr(vnode_t *vp, vattr_t *vap, int flag, cred_t *cr)
 {
-	uint_t mask;
+
 	int error;
 
-	mask = vap->va_mask;
 	error = VOP_GETATTR(vp, vap, flag, cr, NULL);
-	/*
-	 * Some file systems clobber va_mask. it is probably wrong of
-	 * them to do so, nonethless we practice defensive coding.
-	 * See bug id 4276830.
-	 */
-	vap->va_mask = mask;
 	return (puterrno4(error));
 }
 
