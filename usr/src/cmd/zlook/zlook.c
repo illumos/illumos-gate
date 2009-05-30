@@ -124,7 +124,7 @@ print_entries(zut_readdir_t *r)
 	dirent64_t *dp;
 	char *bufstart;
 
-	dp = (dirent64_t *)r->zr_buf;
+	dp = (dirent64_t *)(intptr_t)r->zr_buf;
 	bufstart = (char *)dp;
 	while ((char *)dp < bufstart + r->zr_bytes) {
 		int i = 0;
