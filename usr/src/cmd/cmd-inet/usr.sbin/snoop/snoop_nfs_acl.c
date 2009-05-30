@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS */
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -208,7 +205,7 @@ interpret_nfs_acl2(int flags, int type, int xid, int vers, int proc,
 
 		if (type == CALL) {
 			(void) sprintf(line, "NFS_ACL C %s",
-				procnames_short_v2[proc]);
+			    procnames_short_v2[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case ACLPROC2_GETACL:
@@ -225,7 +222,7 @@ interpret_nfs_acl2(int flags, int type, int xid, int vers, int proc,
 			case ACLPROC2_ACCESS:
 				fh = sum_nfsfh();
 				(void) sprintf(line, "%s (%s)", fh,
-						sum_access2());
+				    sum_access2());
 				break;
 			case ACLPROC2_GETXATTRDIR:
 				fh = sum_nfsfh();
@@ -239,7 +236,7 @@ interpret_nfs_acl2(int flags, int type, int xid, int vers, int proc,
 			check_retransmit(line, (ulong_t)xid);
 		} else {
 			(void) sprintf(line, "NFS_ACL R %s ",
-				procnames_short_v2[proc]);
+			    procnames_short_v2[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case ACLPROC2_GETACL:
@@ -256,7 +253,7 @@ interpret_nfs_acl2(int flags, int type, int xid, int vers, int proc,
 					skip_fattr();
 					line += strlen(line);
 					(void) sprintf(line, " (%s)",
-							sum_access2());
+					    sum_access2());
 				}
 				break;
 			case ACLPROC2_GETXATTRDIR:
@@ -275,7 +272,7 @@ interpret_nfs_acl2(int flags, int type, int xid, int vers, int proc,
 		show_header("NFS_ACL:  ", "Sun NFS_ACL", len);
 		show_space();
 		(void) sprintf(get_line(0, 0), "Proc = %d (%s)",
-			proc, procnames_long_v2[proc]);
+		    proc, procnames_long_v2[proc]);
 		if (type == CALL)
 			aclcall2(proc);
 		else
@@ -302,7 +299,7 @@ interpret_nfs_acl3(int flags, int type, int xid, int vers, int proc,
 
 		if (type == CALL) {
 			(void) sprintf(line, "NFS_ACL C %s",
-				procnames_short_v3[proc]);
+			    procnames_short_v3[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case ACLPROC3_GETACL:
@@ -325,7 +322,7 @@ interpret_nfs_acl3(int flags, int type, int xid, int vers, int proc,
 			check_retransmit(line, (ulong_t)xid);
 		} else {
 			(void) sprintf(line, "NFS_ACL R %s ",
-				procnames_short_v3[proc]);
+			    procnames_short_v3[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case ACLPROC3_GETACL:
@@ -350,7 +347,7 @@ interpret_nfs_acl3(int flags, int type, int xid, int vers, int proc,
 		show_header("NFS_ACL:  ", "Sun NFS_ACL", len);
 		show_space();
 		(void) sprintf(get_line(0, 0), "Proc = %d (%s)",
-			proc, procnames_long_v3[proc]);
+		    proc, procnames_long_v3[proc]);
 		if (type == CALL)
 			aclcall3(proc);
 		else
@@ -377,7 +374,7 @@ interpret_nfs_acl4(int flags, int type, int xid, int vers, int proc,
 
 		if (type == CALL) {
 			(void) sprintf(line, "NFS_ACL C %s",
-				procnames_short_v4[proc]);
+			    procnames_short_v4[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case ACLPROC4_GETACL:
@@ -395,7 +392,7 @@ interpret_nfs_acl4(int flags, int type, int xid, int vers, int proc,
 			check_retransmit(line, (ulong_t)xid);
 		} else {
 			(void) sprintf(line, "NFS_ACL R %s ",
-				procnames_short_v4[proc]);
+			    procnames_short_v4[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case ACLPROC4_GETACL:
@@ -414,7 +411,7 @@ interpret_nfs_acl4(int flags, int type, int xid, int vers, int proc,
 		show_header("NFS_ACL:  ", "Sun NFS_ACL", len);
 		show_space();
 		(void) sprintf(get_line(0, 0), "Proc = %d (%s)",
-			proc, procnames_long_v4[proc]);
+		    proc, procnames_long_v4[proc]);
 		if (type == CALL)
 			aclcall4(proc);
 		else
@@ -446,7 +443,7 @@ detail_nfsstat4()
 	status = sum_nfsstat4(buff);
 
 	(void) sprintf(get_line(pos, getxdr_pos()), "Status = %d (%s)",
-		status, buff);
+	    status, buff);
 
 	return ((int)status);
 }
@@ -613,17 +610,17 @@ detail_access2()
 
 	bits = showxdr_u_long("Access bits = 0x%08x");
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS2_READ, "Read", "(no read)"));
+	    getflag(bits, ACCESS2_READ, "Read", "(no read)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS2_LOOKUP, "Lookup", "(no lookup)"));
+	    getflag(bits, ACCESS2_LOOKUP, "Lookup", "(no lookup)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS2_MODIFY, "Modify", "(no modify)"));
+	    getflag(bits, ACCESS2_MODIFY, "Modify", "(no modify)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS2_EXTEND, "Extend", "(no extend)"));
+	    getflag(bits, ACCESS2_EXTEND, "Extend", "(no extend)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS2_DELETE, "Delete", "(no delete)"));
+	    getflag(bits, ACCESS2_DELETE, "Delete", "(no delete)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(bits, ACCESS2_EXECUTE, "Execute", "(no execute)"));
+	    getflag(bits, ACCESS2_EXECUTE, "Execute", "(no execute)"));
 }
 
 static char *
@@ -660,13 +657,13 @@ detail_mask()
 
 	mask = showxdr_u_long("Mask = 0x%lx");
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(mask, NA_ACL, "aclent", "(no aclent)"));
+	    getflag(mask, NA_ACL, "aclent", "(no aclent)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(mask, NA_ACLCNT, "aclcnt", "(no aclcnt)"));
+	    getflag(mask, NA_ACLCNT, "aclcnt", "(no aclcnt)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(mask, NA_DFACL, "dfaclent", "(no dfaclent)"));
+	    getflag(mask, NA_DFACL, "dfaclent", "(no dfaclent)"));
 	(void) sprintf(get_line(0, 0), "	%s",
-		getflag(mask, NA_DFACLCNT, "dfaclcnt", "(no dfaclcnt)"));
+	    getflag(mask, NA_DFACLCNT, "dfaclcnt", "(no dfaclcnt)"));
 }
 
 static void
@@ -696,51 +693,51 @@ detail_aclent()
 		switch (type) {
 		case NA_USER:
 			(void) sprintf(get_line(0, 0), "\tuser:%s:%s",
-					detail_uname(id), detail_perm(perm));
+			    detail_uname(id), detail_perm(perm));
 			break;
 		case NA_USER_OBJ:
 			(void) sprintf(get_line(0, 0), "\tuser::%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		case NA_GROUP:
 			(void) sprintf(get_line(0, 0), "\tgroup:%s:%s",
-					detail_gname(id), detail_perm(perm));
+			    detail_gname(id), detail_perm(perm));
 			break;
 		case NA_GROUP_OBJ:
 			(void) sprintf(get_line(0, 0), "\tgroup::%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		case NA_CLASS_OBJ:
 			(void) sprintf(get_line(0, 0), "\tmask:%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		case NA_OTHER_OBJ:
 			(void) sprintf(get_line(0, 0), "\tother:%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		case NA_DEF_USER:
 			(void) sprintf(get_line(0, 0), "\tdefault:user:%s:%s",
-					detail_uname(id), detail_perm(perm));
+			    detail_uname(id), detail_perm(perm));
 			break;
 		case NA_DEF_USER_OBJ:
 			(void) sprintf(get_line(0, 0), "\tdefault:user::%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		case NA_DEF_GROUP:
 			(void) sprintf(get_line(0, 0), "\tdefault:group:%s:%s",
-					detail_gname(id), detail_perm(perm));
+			    detail_gname(id), detail_perm(perm));
 			break;
 		case NA_DEF_GROUP_OBJ:
 			(void) sprintf(get_line(0, 0), "\tdefault:group::%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		case NA_DEF_CLASS_OBJ:
 			(void) sprintf(get_line(0, 0), "\tdefault:mask:%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		case NA_DEF_OTHER_OBJ:
 			(void) sprintf(get_line(0, 0), "\tdefault:other:%s",
-					detail_perm(perm));
+			    detail_perm(perm));
 			break;
 		default:
 			(void) sprintf(get_line(0, 0), "\tunrecognized entry");
@@ -791,7 +788,7 @@ static char *
 detail_perm(ushort_t perm)
 {
 
-	if (perm > sizeof (perms) / sizeof (perms[0]))
+	if (perm >= sizeof (perms) / sizeof (perms[0]))
 		return ("?");
 	return (perms[perm]);
 }

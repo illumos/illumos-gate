@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -431,7 +429,7 @@ show_options(unsigned char  *cp, int len)
 				++start;
 				for (i = 0; i < items; i++) {
 					if (IS_P2ALIGNED(start,
-							sizeof (ushort_t))) {
+					    sizeof (ushort_t))) {
 						/* LINTED: improper alignment */
 						s_buf = *(ushort_t *)start;
 					} else {
@@ -552,15 +550,15 @@ show_options(unsigned char  *cp, int len)
 					prmpt = option_types[*start];
 				} else {
 					entry = inittab_getbycode(
-						ITAB_CAT_STANDARD|ITAB_CAT_SITE,
-						ITAB_CONS_SNOOP, *start);
+					    ITAB_CAT_STANDARD|ITAB_CAT_SITE,
+					    ITAB_CONS_SNOOP, *start);
 					if (entry == NULL) {
 						if (*start >= DHCP_SITE_OPT &&
 						    *start <= DHCP_END_SITE) {
 							prmpt = "Site Option";
 						} else {
 							prmpt = "Unrecognized "
-								"Option";
+							    "Option";
 						}
 					} else {
 						prmpt = entry->ds_name;
@@ -575,8 +573,8 @@ show_options(unsigned char  *cp, int len)
 		default:
 			opt_len = *start++;
 			entry = inittab_getbycode(
-					ITAB_CAT_STANDARD|ITAB_CAT_SITE,
-					ITAB_CONS_SNOOP, save);
+			    ITAB_CAT_STANDARD|ITAB_CAT_SITE,
+			    ITAB_CONS_SNOOP, save);
 			if (entry == NULL) {
 				if (save >= DHCP_SITE_OPT &&
 				    save <= DHCP_END_SITE)
@@ -591,7 +589,7 @@ show_options(unsigned char  *cp, int len)
 					prmpt = entry->ds_name;
 				}
 				decoded_opt = inittab_decode(entry, start,
-						opt_len, B_TRUE);
+				    opt_len, B_TRUE);
 			}
 			if (decoded_opt == NULL) {
 				(void) sprintf(get_line(0, 0),
@@ -601,7 +599,7 @@ show_options(unsigned char  *cp, int len)
 				display_ascii_hex("\tValue =", &start);
 			} else {
 				(void) sprintf(get_line(0, 0), "%s = %s", prmpt,
-					decoded_opt);
+				    decoded_opt);
 				start += opt_len;
 				free(decoded_opt);
 			}
@@ -626,7 +624,7 @@ show_msgtype(unsigned char type)
 		"DHCPACK",    "DHCPNAK",      "DHCPRELEASE", "DHCPINFORM"
 	};
 
-	if (type > (sizeof (types) / sizeof (*types)) || types[type] == NULL)
+	if (type >= (sizeof (types) / sizeof (*types)) || types[type] == NULL)
 		return ("UNKNOWN");
 
 	return (types[type]);
@@ -706,7 +704,7 @@ display_ascii_hex(char *msg, unsigned char **opt)
 	int printable;
 	char	buffer[512];
 	char  *line, *tmp, *ap, *fmt;
-	int	i, j, len = **opt;
+	int	i, len = **opt;
 
 	line = get_line(0, 0);
 
@@ -730,24 +728,23 @@ display_ascii_hex(char *msg, unsigned char **opt)
 
 	if (!printable) {
 		for (tmp = (char *)(*opt), ap = buffer;
-		    (tmp < (char *)&((*opt)[len])) && (ap < &buffer[512]);
+		    (tmp < (char *)&((*opt)[len])) && ((ap + 5) < &buffer[512]);
 		    tmp++) {
 			ap += sprintf(ap, "0x%02X ", *(uchar_t *)(tmp));
 		}
+		/* Truncate the trailing space */
 		*(--ap) = '\0';
-		i = ap - buffer;
+		/* More bytes to print in hex but no space in buffer */
+		if (tmp < (char *)&((*opt)[len])) {
+			i = ap - buffer;
+			buffer[i - 1] = '.';
+			buffer[i - 2] = '.';
+			buffer[i - 3] = '.';
+		}
 		fmt = "%s\t%s (unprintable)";
 	} else {
-		i = strlen(buffer);
 		fmt = "%s\t\"%s\"";
 	}
 	(*opt) += len;
-	j = strlen(msg) + (MAXLINE / 2) - 30;
-	if (i > j) {
-		buffer[j - 1] = '.';
-		buffer[j - 2] = '.';
-		buffer[j - 3] = '.';
-		buffer[j] = '\0';
-	}
 	(void) sprintf(line, fmt, msg, buffer);
 }
