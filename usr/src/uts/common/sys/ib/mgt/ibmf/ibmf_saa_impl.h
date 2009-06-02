@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_MGT_IBMF_IBMF_SAA_IMPL_H
 #define	_SYS_IB_MGT_IBMF_IBMF_SAA_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * saa_impl.h
@@ -43,7 +41,8 @@ extern "C" {
 #define	SAA_MAD_BASE_VERSION		1
 #define	SAA_MAD_CLASS_VERSION		2
 #define	IBMF_SAA_RETRANS_RETRIES 	2
-#define	IBMF_SAA_MAX_SUBNET_TIMEOUT 	17
+#define	IBMF_SAA_MAX_SUBNET_TIMEOUT 	20
+#define	IBMF_SAA_MAX_RESP_TIME		20
 #define	IBMF_SAA_MAX_BUSY_RETRY_COUNT	10
 #define	IBMF_SAA_MAX_WAIT_TIME_IN_SECS	60
 #define	IBMF_SAA_TRANS_WAIT_TIME_IN_SECS 240

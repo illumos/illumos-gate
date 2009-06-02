@@ -74,6 +74,8 @@ static int ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp);
 
 int	ibmf_saa_max_wait_time = IBMF_SAA_MAX_WAIT_TIME_IN_SECS;
 int	ibmf_saa_trans_wait_time = IBMF_SAA_TRANS_WAIT_TIME_IN_SECS;
+int	ibmf_saa_max_resp_time = IBMF_SAA_MAX_RESP_TIME;
+int	ibmf_saa_max_subnet_timeout = IBMF_SAA_MAX_SUBNET_TIMEOUT;
 
 /*
  * ibmf_saa_impl_init:
@@ -1257,6 +1259,21 @@ ibmf_saa_impl_get_cpi_cb(void *arg, size_t length, char *buffer, int status)
 
 		resp_time_value = classportinfo->RespTimeValue & 0x1f;
 
+		/*
+		 * Because some subnet managers might not provide sane
+		 * value for "resp_time_value", we limit it here.  In
+		 * case this limit is too restrictive (very large fabric),
+		 * we allow the limit to be raised (/etc/system).
+		 */
+		if (resp_time_value > ibmf_saa_max_resp_time) {
+			cmn_err(CE_CONT, "!ibmf_saa_max_resp_time (%d) "
+			    "exceeded.", ibmf_saa_max_resp_time);
+			cmn_err(CE_CONT, "!Reducing subnet administrator "
+			    "resp_time value from %d to %d.",
+			    resp_time_value, ibmf_saa_max_resp_time);
+			resp_time_value = ibmf_saa_max_resp_time;
+		}
+
 		sa_cap_mask = classportinfo->CapabilityMask;
 
 		IBMF_TRACE_3(IBMF_TNF_DEBUG, DPRINT_L3,
@@ -2028,8 +2045,8 @@ ibmf_saa_impl_new_smlid_retry(saa_port_t *saa_portp, ibmf_msg_t *msgp,
 		saa_portp->saa_pt_timeout = subnet_timeout;
 
 		/* place upper bound on subnet timeout in case of faulty SM */
-		if (saa_portp->saa_pt_timeout > IBMF_SAA_MAX_SUBNET_TIMEOUT)
-			saa_portp->saa_pt_timeout = IBMF_SAA_MAX_SUBNET_TIMEOUT;
+		if (saa_portp->saa_pt_timeout > ibmf_saa_max_subnet_timeout)
+			saa_portp->saa_pt_timeout = ibmf_saa_max_subnet_timeout;
 
 		/* increment the reference count to account for the cpi call */
 		saa_portp->saa_pt_reference_count++;
@@ -2173,8 +2190,8 @@ ibmf_saa_impl_revert_to_qp1(saa_port_t *saa_portp, ibmf_msg_t *msgp,
 	saa_portp->saa_pt_timeout = subnet_timeout;
 
 	/* place upper bound on subnet timeout in case of faulty SM */
-	if (saa_portp->saa_pt_timeout > IBMF_SAA_MAX_SUBNET_TIMEOUT)
-		saa_portp->saa_pt_timeout = IBMF_SAA_MAX_SUBNET_TIMEOUT;
+	if (saa_portp->saa_pt_timeout > ibmf_saa_max_subnet_timeout)
+		saa_portp->saa_pt_timeout = ibmf_saa_max_subnet_timeout;
 
 	/* increment the reference count to account for the cpi call */
 	saa_portp->saa_pt_reference_count++;
@@ -3508,10 +3525,8 @@ ibmf_saa_impl_set_transaction_params(saa_port_t *saa_portp,
 	/* place upper bound on subnet timeout in case of faulty SM */
 	saa_portp->saa_pt_timeout = portinfop->p_subnet_timeout;
 
-	if (saa_portp->saa_pt_timeout > IBMF_SAA_MAX_SUBNET_TIMEOUT) {
-
-		saa_portp->saa_pt_timeout = IBMF_SAA_MAX_SUBNET_TIMEOUT;
-	}
+	if (saa_portp->saa_pt_timeout > ibmf_saa_max_subnet_timeout)
+		saa_portp->saa_pt_timeout = ibmf_saa_max_subnet_timeout;
 
 	IBMF_TRACE_4(IBMF_TNF_DEBUG, DPRINT_L3,
 	    ibmf_saa_impl_set_transaction_params,
