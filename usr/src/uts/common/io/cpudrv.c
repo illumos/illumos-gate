@@ -853,7 +853,8 @@ cpudrv_comp_create(cpudrv_devstate_t *cpudsp)
 /*
  * Marks a component busy and calls pm_raise_power().
  */
-#define	CPUDRV_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm, new_level) { \
+#define	CPUDRV_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm, new_spd) { \
+	int ret; \
 	/* \
 	 * Mark driver and PM framework busy first so framework doesn't try \
 	 * to bring CPU to lower speed when we need to be at higher speed. \
@@ -862,13 +863,16 @@ cpudrv_comp_create(cpudrv_devstate_t *cpudsp)
 	mutex_exit(&(cpudsp)->lock); \
 	DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: instance %d: " \
 	    "pm_raise_power called to %d\n", ddi_get_instance((dip)), \
-		(new_level))); \
-	if (pm_raise_power((dip), CPUDRV_COMP_NUM, (new_level)) != \
-	    DDI_SUCCESS) { \
+		(new_spd->pm_level))); \
+	ret = pm_raise_power((dip), CPUDRV_COMP_NUM, (new_spd->pm_level)); \
+	if (ret != DDI_SUCCESS) { \
 		cmn_err(CE_WARN, "cpudrv_monitor: instance %d: can't " \
 		    "raise CPU power level", ddi_get_instance((dip))); \
 	} \
 	mutex_enter(&(cpudsp)->lock); \
+	if (ret == DDI_SUCCESS && cpudsp->cpudrv_pm.cur_spd == NULL) { \
+		cpudsp->cpudrv_pm.cur_spd = new_spd; \
+	} \
 }
 
 /*
@@ -974,7 +978,7 @@ cpudrv_monitor(void *arg)
 		DPRINTF(D_PM_MONITOR, ("cpudrv_monitor: instance %d: "
 		    "cur_spd is unknown\n", ddi_get_instance(dip)));
 		CPUDRV_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm,
-		    CPUDRV_TOPSPEED(cpupm)->pm_level);
+		    CPUDRV_TOPSPEED(cpupm));
 		/*
 		 * We just changed the speed. Wait till at least next
 		 * call to this routine before proceeding ahead.
@@ -1079,7 +1083,7 @@ cpudrv_monitor(void *arg)
 		} else {
 			new_spd = cur_spd->up_spd;
 			CPUDRV_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm,
-			    new_spd->pm_level);
+			    new_spd);
 		}
 	} else if ((user_cnt <= cur_spd->user_lwm) &&
 	    (idle_cnt >= cur_spd->idle_hwm) || !CPU_ACTIVE(cpudsp->cp)) {
