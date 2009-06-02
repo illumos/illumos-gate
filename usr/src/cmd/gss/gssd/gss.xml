@@ -2,15 +2,14 @@
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
- Common Development and Distribution License, Version 1.0 only
- (the "License").  You may not use this file except in compliance
- with the License.
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
 
  You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -70,8 +67,9 @@
 	    <method_context>
 		<method_credential
 			user='root'
-			group='root'
-			privileges='basic,!file_link_any,!proc_info,!proc_session,net_privaddr,file_chown,file_dac_read,file_dac_write'
+			group='nogroup'
+			privileges='basic,!file_link_any,!proc_info,!proc_session,net_privaddr,file_chown,file_dac_read,file_dac_write,proc_setid'
+			limit_privileges='basic,!file_link_any,!proc_info,!proc_session,net_privaddr,file_chown,file_dac_read,file_dac_write,proc_setid'
 		/>
 	    </method_context>
 	</exec_method>

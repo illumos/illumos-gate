@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1248,7 +1248,7 @@ krb5_fcc_open_nounlink(char *filename, int open_flag, int *ret_fd, int *new)
 	  }
      }
 
-     fd = THREEPARAMOPEN(filename, open_flag | O_NONBLOCK, 0600);
+     fd = THREEPARAMOPEN(filename, open_flag | O_NONBLOCK | O_NOFOLLOW, 0600);
      if (fd == -1) {
 	  if (errno == ENOENT) {
 	       fd = THREEPARAMOPEN(filename,
@@ -1399,7 +1399,8 @@ fcc_retry:
 	  if (retval == 0 && f == -1)
 	       goto fcc_retry;
      } else {
-	  f = THREEPARAMOPEN (data->filename, open_flag | O_BINARY, 0600);
+	  f = THREEPARAMOPEN (data->filename, open_flag | O_BINARY | O_NOFOLLOW,
+	      0600);
      }
     if (f == NO_FILE)
 	return krb5_fcc_interpret (context, errno);

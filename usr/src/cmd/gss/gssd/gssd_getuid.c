@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  Routines to set gssd value of uid and replace getuid libsys call.
@@ -34,18 +32,88 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <libintl.h>
+#include <priv.h>
+#include <errno.h>
+#include <syslog.h>
 
 static uid_t krb5_cc_uid;
+#define	LOWPRIVS	"basic,!file_link_any,!proc_info,!proc_session," \
+			"!proc_fork,!proc_exec"
+
+static priv_set_t *lowprivs = NULL;
+static priv_set_t *highprivs = NULL;
+
+/*
+ * NOTE WELL: This assumes gssd is NOT multi-threaded.  Do NOT add -A to
+ * the rpcgen argument list in the Makefile unless you also remove this
+ * assumption.
+ */
 
 void
 set_gssd_uid(uid_t uid)
 {
-	/*
-	 * set the value of krb5_cc_uid, so it can be retrieved when
-	 * app_krb5_user_uid() is called by the underlying mechanism libraries.
-	 */
+	/* Initialize */
+	if (lowprivs == NULL) {
+		/* L, P & I shall not change in gssd; we manipulate P though */
+		if ((highprivs = priv_allocset()) == NULL ||
+		    (lowprivs = priv_str_to_set(LOWPRIVS, ",", NULL)) == NULL) {
+			printf(gettext(
+			    "fatal: can't allocate privilege set (%s)\n"),
+			    strerror(ENOMEM));
+			syslog(LOG_ERR, "Fatal: can't allocate privilege "
+			    "set (%s)"), strerror(ENOMEM);
+			exit(1);
+		}
+		/* P has the privs we need when we need privs */
+		(void) getppriv(PRIV_PERMITTED, highprivs);
+
+		/*
+		 * In case "basic" grows privs not excluded in LOWPRIVS
+		 * but excluded in the service's method_context
+		 */
+		priv_intersect(highprivs, lowprivs);
+
+		(void) setpflags(PRIV_AWARE, 1);
+	}
+
 	printf(gettext("set_gssd_uid called with uid = %d\n"), uid);
+
+	/*
+	 * nfsd runs as UID 1, so upcalls triggered by nfsd will cause uid to
+	 * 1 here, but nfsd's upcalls need to run as root with privs here.
+	 */
+	if (uid == 1)
+		uid = 0;
+
+	/*
+	 * Set the value of krb5_cc_uid, so it can be retrieved when
+	 * app_krb5_user_uid() is called by the underlying mechanism
+	 * libraries.  This should go away soon.
+	 */
 	krb5_cc_uid = uid;
+
+	/* Claw privs back */
+	(void) setppriv(PRIV_SET, PRIV_EFFECTIVE, highprivs);
+
+	/*
+	 * Switch uid and set the saved set-uid to 0 so setuid(0) will work
+	 * later.
+	 */
+	if (setuid(0) != 0 ||
+	    (uid != 0 && setreuid(uid, -1) != 0) ||
+	    (uid != 0 && seteuid(uid) != 0)) {
+
+		/* Not enough privs, so bail! */
+		printf(gettext(
+		    "fatal: gssd is running with insufficient privilege\n"));
+		syslog(LOG_ERR, "Fatal: gssd is running with insufficient "
+		    "privilege.");
+		exit(1);
+	}
+
+	/* Temporarily drop privs, but only if uid != 0 */
+	if (uid != 0)
+		(void) setppriv(PRIV_SET, PRIV_EFFECTIVE, lowprivs);
 }
 
 uid_t
@@ -60,6 +128,6 @@ app_krb5_user_uid(void)
 	 * in files and directories specific to the user
 	 */
 	printf(gettext(
-		"getuid called and returning gsssd_uid = %d\n"), krb5_cc_uid);
+	    "getuid called and returning krb5_cc_uid = %d\n"), krb5_cc_uid);
 	return (krb5_cc_uid);
 }
