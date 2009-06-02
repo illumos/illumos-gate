@@ -48,6 +48,9 @@
 
 #define	RESET_MODULE(barg)	((barg)->gb_module[0] = 0)
 
+#define	BPROP_ZFSBOOTFS	"zfs-bootfs"
+#define	BPROP_BOOTPATH	"bootpath"
+
 #if defined(__i386)
 static const char cpuid_dev[] = "/dev/cpu/self/cpuid";
 
@@ -104,7 +107,8 @@ barg_bootfs_var(const grub_barg_t *barg, char *var, int sz)
 
 	assert(barg);
 	if (strcmp(barg->gb_root.gr_fstyp, MNTTYPE_ZFS) == 0) {
-		n = snprintf(var, sz, "zfs-bootfs=%s,bootpath=\"%s\"",
+		n = snprintf(var, sz,
+		    BPROP_ZFSBOOTFS "=%s," BPROP_BOOTPATH "=\"%s\"",
 		    barg->gb_root.gr_fs[GRBM_ZFS_BOOTFS].gfs_dev,
 		    barg->gb_root.gr_physpath);
 	} else	{
@@ -151,6 +155,102 @@ expand_var(char *arg, size_t argsz, const char *var, size_t varsz,
 	if (ret == 0)
 		bcopy(buf, arg, argsz);
 	return (ret);
+}
+
+/*
+ * Searches first occurence of boot-property 'bprop' in str.
+ * str supposed to be in format:
+ * " [-B prop=[value][,prop=[value]]...]
+ */
+static const char *
+find_bootprop(const char *str, const char *bprop)
+{
+	const char *s;
+	size_t bplen, len;
+
+	assert(str);
+	assert(bprop);
+
+	bplen = strlen(bprop);
+	s = str;
+
+	while ((str = strstr(s, " -B")) != NULL ||
+	    (str = strstr(s, "\t-B")) != NULL) {
+		s = str + 3;
+		len = strspn(s, " \t");
+
+		/* empty -B option, skip it */
+		if (len != 0 && s[len] == '-')
+			continue;
+
+		s += len;
+		do {
+			len = strcspn(s, "= \t");
+			if (s[len] !=  '=')
+				break;
+
+			/* boot property we are looking for? */
+			if (len == bplen && strncmp(s, bprop, bplen) == 0)
+				return (s);
+
+			s += len;
+
+			/* skip boot property value */
+			while ((s = strpbrk(s + 1, "\"\', \t")) != NULL) {
+
+				/* skip quoted */
+				if (s[0] == '\"' || s[0] == '\'') {
+					if ((s = strchr(s + 1, s[0])) == NULL) {
+						/* unbalanced quotes */
+						return (s);
+					}
+				}
+				else
+					break;
+			}
+
+			/* no more boot properties */
+			if (s == NULL)
+				return (s);
+
+			/* no more boot properties in that -B block */
+			if (s[0] != ',')
+				break;
+
+			s += strspn(s, ",");
+		} while (s[0] != ' ' && s[0] != '\t');
+	}
+	return (NULL);
+}
+
+/*
+ * Add bootpath property to str if
+ * 	1. zfs-bootfs property is set explicitly
+ * and
+ * 	2. bootpath property is not set
+ */
+static int
+update_bootpath(char *str, size_t strsz, const char *bootpath)
+{
+	size_t n;
+	char *buf;
+	const char *bfs;
+
+	/* zfs-bootfs is not specified, or bootpath is allready set */
+	if ((bfs = find_bootprop(str, BPROP_ZFSBOOTFS)) == NULL ||
+	    find_bootprop(str, BPROP_BOOTPATH) != NULL)
+		return (0);
+
+	n = bfs - str;
+	buf = alloca(strsz);
+
+	bcopy(str, buf, n);
+	if (snprintf(buf + n, strsz - n, BPROP_BOOTPATH "=\"%s\",%s",
+	    bootpath, bfs) >= strsz - n)
+		return (E2BIG);
+
+	bcopy(buf, str, strsz);
+	return (0);
 }
 
 static int
@@ -242,8 +342,13 @@ dollar_kernel(const grub_line_t *lp, grub_barg_t *barg)
 	    ZFS_BOOT_VAR, strlen(ZFS_BOOT_VAR), bootfs, bfslen)) != 0)
 		return (ret);
 
-	ret = expand_var(barg->gb_kernel, sizeof (barg->gb_kernel),
-	    ISADIR_VAR, strlen(ISADIR_VAR), isadir, isalen);
+	if ((ret = expand_var(barg->gb_kernel, sizeof (barg->gb_kernel),
+	    ISADIR_VAR, strlen(ISADIR_VAR), isadir, isalen)) != 0)
+		return (ret);
+
+	if (strcmp(barg->gb_root.gr_fstyp, MNTTYPE_ZFS) == 0)
+		ret = update_bootpath(barg->gb_kernel, sizeof (barg->gb_kernel),
+		    barg->gb_root.gr_physpath);
 
 	return (ret);
 }
