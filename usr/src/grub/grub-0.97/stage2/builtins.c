@@ -3721,13 +3721,6 @@ partnew_func (char *arg, int flags)
   if (! rawread (current_drive, 0, 0, SECTOR_SIZE, mbr))
     return 1;
 
-  /* Check if the new partition will fit in the disk.  */
-  if (new_start + new_len > buf_geom.total_sectors)
-    {
-      errnum = ERR_GEOM;
-      return 1;
-    }
-
   /* Store the partition information in the MBR.  */
   lba_to_chs (new_start, &start_cl, &start_ch, &start_dh);
   lba_to_chs (new_start + new_len - 1, &end_cl, &end_ch, &end_dh);

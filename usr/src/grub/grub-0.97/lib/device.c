@@ -236,7 +236,8 @@ get_drive_geometry (struct geometry *geom, char **map, int drive)
     geom->cylinders = dkg.dkg_ncyl;
     geom->heads = dkg.dkg_nhead;
     geom->sectors = dkg.dkg_nsect;
-    geom->total_sectors = dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect;
+    geom->total_sectors = (unsigned long long)dkg.dkg_ncyl * dkg.dkg_nhead
+	* dkg.dkg_nsect;
 
     goto success;
   }
@@ -270,7 +271,8 @@ partially. This is not fatal."
     if (! fstat (fd, &st) && st.st_blocks)
       geom->total_sectors = st.st_blocks >> SECTOR_BITS;
     else
-      geom->total_sectors = geom->cylinders * geom->heads * geom->sectors;
+      geom->total_sectors = (unsigned long long)geom->cylinders *
+	geom->heads * geom->sectors;
   }
 
  success:

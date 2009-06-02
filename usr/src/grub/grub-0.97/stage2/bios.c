@@ -96,7 +96,7 @@ biosdisk (int read, int drive, struct geometry *geometry,
 	    return err;
 	  
 	  geometry->flags &= ~BIOSDISK_FLAG_LBA_EXTENSION;
-	  geometry->total_sectors = (geometry->cylinders
+	  geometry->total_sectors = ((unsigned long long)geometry->cylinders
 				     * geometry->heads
 				     * geometry->sectors);
 	  return biosdisk (read, drive, geometry, sector, nsec, segment);
@@ -174,7 +174,7 @@ get_cdinfo (int drive, struct geometry *geometry)
           geometry->heads = cdrp.heads;
           geometry->sectors = cdrp.sectors & 0x3F;
           geometry->sector_size = SECTOR_SIZE;
-          geometry->total_sectors = (geometry->cylinders
+          geometry->total_sectors = ((unsigned long long)geometry->cylinders
 				     * geometry->heads
 				     * geometry->sectors);
           return -1;
@@ -216,7 +216,7 @@ get_diskinfo (int drive, struct geometry *geometry)
     {
       /* hard disk or CD-ROM */
       int version;
-      unsigned long total_sectors = 0;
+      unsigned long long total_sectors = 0;
       
       version = check_int13_extensions (drive);
 
@@ -278,16 +278,14 @@ get_diskinfo (int drive, struct geometry *geometry)
 		 so I omit the check for now. - okuji  */
 	      /* if (drp.flags & (1 << 1)) */
 	       
-	      /* FIXME: when the 2TB limit becomes critical, we must
-		 change the type of TOTAL_SECTORS to unsigned long
-		 long.  */
 	      if (drp.total_sectors)
-		total_sectors = drp.total_sectors & ~0L;
+		total_sectors = drp.total_sectors;
 	      else
 		/* Some buggy BIOSes doesn't return the total sectors
 		   correctly but returns zero. So if it is zero, compute
 		   it by C/H/S returned by the LBA BIOS call.  */
-		total_sectors = drp.cylinders * drp.heads * drp.sectors;
+		total_sectors = (unsigned long long)drp.cylinders *
+		    drp.heads * drp.sectors;
 	    }
 	}
 
@@ -302,7 +300,7 @@ get_diskinfo (int drive, struct geometry *geometry)
 
       if (! total_sectors)
 	{
-	  total_sectors = (geometry->cylinders
+	  total_sectors = ((unsigned long long)geometry->cylinders
 			   * geometry->heads
 			   * geometry->sectors);
 	}
@@ -331,7 +329,7 @@ get_diskinfo (int drive, struct geometry *geometry)
       if (err)
 	return err;
 
-      geometry->total_sectors = (geometry->cylinders
+      geometry->total_sectors = ((unsigned long long)geometry->cylinders
 				 * geometry->heads
 				 * geometry->sectors);
       geometry->sector_size = SECTOR_SIZE;

@@ -69,6 +69,7 @@ extern char *grub_scratch_mem;
  */
 
 #define MAXINT     0x7FFFFFFF
+#define	MAXUINT		0xFFFFFFFF
 
 /* Maximum command line size. Before you blindly increase this value,
    see the comment in char_io.c (get_cmdline).  */
@@ -705,7 +706,7 @@ struct geometry
   /* The number of sectors */
   unsigned long sectors;
   /* The total number of sectors */
-  unsigned long total_sectors;
+  unsigned long long total_sectors;
   /* Device sector size */
   unsigned long sector_size;
   /* Flags */

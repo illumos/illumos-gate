@@ -185,13 +185,6 @@ rawread(int drive, unsigned int sector, int byte_offset, int byte_len,
 	  sector_size_bits = log2 (buf_geom.sector_size);
 	}
 
-      /* Make sure that SECTOR is valid.  */
-      if (sector >= buf_geom.total_sectors)
-	{
-	  errnum = ERR_GEOM;
-	  return 0;
-	}
-      
       slen = ((byte_offset + byte_len + buf_geom.sector_size - 1)
 	      >> sector_size_bits);
       
@@ -874,7 +867,8 @@ real_open_partition (int flags)
       buf_drive = current_drive;
       buf_track = BUF_CACHE_INVALID;
     }
-  part_length = buf_geom.total_sectors;
+  part_length =
+    (buf_geom.total_sectors > MAXUINT) ? MAXUINT : buf_geom.total_sectors;
 
   /* If this is the whole disk, return here.  */
   if (! flags && current_partition == 0xFFFFFF)
