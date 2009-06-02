@@ -1296,10 +1296,8 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 	 * a dynamic property method on the FRU.  In order to ensure the serial
 	 * number is persisted properly in the ASRU cache, we'll fetch the
 	 * property, if it exists, and add it to the resource and fru fmris.
-	 * On AMD Family 0x10 models we fallback on a generic memory topology
-	 * with chip-select nodes and no DIMM nodes, see /usr/src/lib/fm/topo
-	 * /modules/i86pc/chip/chip_amd.c hence fru fmri will be unavailable.
-	 * In that case resource fmri will contain the serial number.
+	 * If the DE has not listed a fru in the suspect, see if we can
+	 * retrieve the serial from the resource instead.
 	 */
 	if (fru != NULL) {
 		(void) topo_fmri_serial(thp, fru, &serial, &err);
