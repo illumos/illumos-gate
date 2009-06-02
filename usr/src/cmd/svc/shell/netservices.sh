@@ -19,11 +19,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 DT_CHANGED=0
 
@@ -287,6 +285,12 @@ set_printing $keyword
 #
 ln -sf ./$profile /var/svc/profile/generic.xml
 svccfg apply /var/svc/profile/generic.xml
+
+#
+# Create a hash entry so that manifest_import is aware of the
+# profile being applied and does not reapply the profile on reboot.
+#
+SVCCFG_CHECKHASH="TRUE" /lib/svc/bin/prophist hash /var/svc/profile/generic.xml
 if [ $profile = "generic_open.xml" ]
 then
 	# generic_open may not start inetd services on upgraded systems

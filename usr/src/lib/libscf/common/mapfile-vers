@@ -281,6 +281,7 @@ SUNWprivate_1.1 {
 	scf_encode32;
 	scf_general_pg_setup;
 	_scf_handle_decorations;
+	scf_is_compatible_type;
 	_scf_notify_add_pgname;
 	_scf_notify_add_pgtype;
 	_scf_notify_wait;

@@ -1458,7 +1458,8 @@ again:
 }
 
 static int
-refresh_running_snapshot(void *entity) {
+refresh_running_snapshot(void *entity)
+{
 	scf_snapshot_t *snap;
 	int r;
 
@@ -1491,7 +1492,8 @@ refresh_entity(int isservice, void *entity, const char *fmri,
 	int r;
 
 	if (!isservice) {
-		if (est->sc_repo_filename == NULL) {
+		if (est->sc_repo_filename == NULL &&
+		    est->sc_repo_doorname == NULL) {
 			if (_smf_refresh_instance_i(entity) == 0) {
 				if (g_verbose)
 					warn(gettext("Refreshed %s.\n"), fmri);
@@ -1567,7 +1569,8 @@ refresh_entity(int isservice, void *entity, const char *fmri,
 			}
 		}
 
-		if (est->sc_repo_filename != NULL) {
+		if (est->sc_repo_filename != NULL ||
+		    est->sc_repo_doorname != NULL) {
 			r = refresh_running_snapshot(inst);
 			switch (r) {
 			case 0:
@@ -1627,7 +1630,7 @@ private_refresh(void)
 	int issvc;
 	int r;
 
-	if (est->sc_repo_filename == NULL)
+	if (est->sc_repo_filename == NULL && est->sc_repo_doorname == NULL)
 		return;
 
 	assert(cur_svc != NULL);
@@ -9709,9 +9712,10 @@ lscf_validate_fmri(const char *fmri)
 			    scf_strerror(scf_err));
 			goto cleanup;
 		}
-		if (err != 0)
+		if (err != 0) {
 			/* error message displayed by scf_walk_fmri */
 			goto cleanup;
+		}
 	}
 
 	ret = scf_tmpl_validate_fmri(g_hndl, inst_fmri, snapbuf, &errs,
@@ -9755,6 +9759,7 @@ lscf_validate_fmri(const char *fmri)
 	}
 	if (errs != NULL)
 		scf_tmpl_errors_destroy(errs);
+
 cleanup:
 	free(inst_fmri);
 	free(snapbuf);

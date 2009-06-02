@@ -532,6 +532,13 @@ scf_instance_delete_prop(scf_instance_t *, const char *, const char *);
 void scf_get_boot_config(uint8_t *);
 int scf_is_fastboot_default(void);
 
+/*
+ * scf_is_compatible_type()
+ * Return true if the second type is the same type, or a subtype of the
+ * first.
+ */
+int scf_is_compatible_type(scf_type_t, scf_type_t);
+
 #ifdef	__cplusplus
 }
 #endif

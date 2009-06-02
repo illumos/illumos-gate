@@ -78,6 +78,8 @@ typedef uint32_t restarter_event_type_t;
 
 #define	RESTARTER_FLAG_DEBUG		1
 
+#define	RESTARTER_ERRMSGSZ		1024
+
 /*
  * Event types
  *	RESTARTER_EVENT_TYPE_ADD_INSTANCE
@@ -216,7 +218,7 @@ int restarter_remove_contract(scf_instance_t *, ctid_t,
 ssize_t restarter_state_to_string(restarter_instance_state_t, char *, size_t);
 restarter_instance_state_t restarter_string_to_state(char *);
 
-#define	RESTARTER_METHOD_CONTEXT_VERSION	6
+#define	RESTARTER_METHOD_CONTEXT_VERSION	7
 
 struct method_context {
 	/* Stable */
@@ -240,10 +242,29 @@ struct method_context {
 	ssize_t		pwbufsz;
 };
 
+/*
+ * An error structure that contains a message string, and a type
+ * that can be used to determine course of action by the reciever
+ * of the error structure.
+ *
+ * type - usually will be an errno equivalent but could contain
+ * 	defined error types for exampe SCF_ERROR_XXX
+ * msg - must be at the end of the structure as if the message is
+ * 	longer than EMSGSIZE we will reallocate the structure to
+ * 	handle the overflow
+ */
+typedef struct mc_error {
+	int	destroy;	/* Flag to indicate destruction steps */
+	int	type;		/* Type of error for decision making */
+	int	size;		/* The size of the error message string */
+	char 	msg[RESTARTER_ERRMSGSZ];
+} mc_error_t;
+
 int restarter_rm_libs_loadable(void);
 /* instance, restarter name, method name, command line, structure pointer */
-const char *restarter_get_method_context(uint_t, scf_instance_t *,
+mc_error_t *restarter_get_method_context(uint_t, scf_instance_t *,
     scf_snapshot_t *, const char *, const char *, struct method_context **);
+void restarter_mc_error_destroy(mc_error_t *);
 int restarter_set_method_context(struct method_context *, const char **);
 void restarter_free_method_context(struct method_context *);
 

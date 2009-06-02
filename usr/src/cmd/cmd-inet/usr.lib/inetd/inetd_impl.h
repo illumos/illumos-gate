@@ -300,7 +300,7 @@ extern boolean_t socket_info_equal(const socket_info_t *, const socket_info_t *,
 extern boolean_t method_info_equal(const method_info_t *,
     const method_info_t *);
 extern struct method_context *read_method_context(const char *, const char *,
-    const char *, const char **);
+    const char *);
 extern void destroy_instance_cfg(instance_cfg_t *);
 extern instance_cfg_t *read_instance_cfg(const char *);
 extern boolean_t bind_config_equal(const basic_cfg_t *, const basic_cfg_t *);

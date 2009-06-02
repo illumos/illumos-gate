@@ -604,7 +604,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	scf_handle_t *h;
 	scf_snapshot_t *snap;
 	const char *mname;
-	const char *errstr;
+	mc_error_t *m_error;
 	struct method_context *mcp;
 	int result = 0, timeout_fired = 0;
 	int sig, r;
@@ -750,11 +750,12 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	log_framework(LOG_DEBUG, "%s: forking to run method %s\n",
 	    inst->ri_i.i_fmri, method);
 
-	errstr = restarter_get_method_context(RESTARTER_METHOD_CONTEXT_VERSION,
+	m_error = restarter_get_method_context(RESTARTER_METHOD_CONTEXT_VERSION,
 	    inst->ri_m_inst, snap, mname, method, &mcp);
 
-	if (errstr != NULL) {
-		log_instance(inst, B_TRUE, "%s", errstr);
+	if (m_error != NULL) {
+		log_instance(inst, B_TRUE, "%s", m_error->msg);
+		restarter_mc_error_destroy(m_error);
 		result = EINVAL;
 		goto out;
 	}

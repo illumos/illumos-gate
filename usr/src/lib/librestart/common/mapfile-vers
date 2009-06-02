@@ -67,6 +67,7 @@ SUNWprivate_1.1 {
 	restarter_inst_reset_ractions_aux_fmri;
 	restarter_inst_reset_aux_fmri;
 	restarter_inst_set_aux_fmri;
+	restarter_mc_error_destroy;
     local:
 	*;
 };

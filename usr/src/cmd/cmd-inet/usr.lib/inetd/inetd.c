@@ -2975,7 +2975,6 @@ run_method(instance_t *instance, instance_method_t method,
 	pid_t			child_pid;
 	method_info_t		*mi;
 	struct method_context	*mthd_ctxt = NULL;
-	const char		*errstr;
 	int			sig = 0;
 	int			ret;
 	instance_cfg_t		*cfg = instance->config;
@@ -3047,12 +3046,8 @@ run_method(instance_t *instance, instance_method_t method,
 	 * modify the instances state if things go wrong.
 	 */
 	if ((mthd_ctxt = read_method_context(instance->fmri,
-	    methods[method].name, mi->exec_path, &errstr)) == NULL) {
-		error_msg(gettext("Failed to retrieve method context for the "
-		    "%s method of instance %s: %s"), methods[method].name,
-		    instance->fmri, errstr);
+	    methods[method].name, mi->exec_path)) == NULL)
 		goto prefork_failure;
-	}
 
 	/*
 	 * Perform some basic checks before we fork to limit the possibility

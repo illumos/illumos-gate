@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <repcache_protocol.h>
 #include "scf_type.h"
@@ -266,7 +264,7 @@ scf_proto_underlying_type(rep_protocol_value_type_t t)
 }
 
 int
-scf_is_compatible_type(rep_protocol_value_type_t base,
+scf_is_compatible_protocol_type(rep_protocol_value_type_t base,
     rep_protocol_value_type_t new)
 {
 	rep_protocol_value_type_t t, cur;

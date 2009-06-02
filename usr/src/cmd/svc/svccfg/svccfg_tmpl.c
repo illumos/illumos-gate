@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1913,10 +1913,18 @@ load_general_templates(entity_t *svc)
 		 * not be in the repository yet.  In this case we
 		 * continue on without it.
 		 */
+		if (r == EINVAL)
+			warn(gettext("WARNING: restarter FMRI %s is invalid\n"),
+			    restarter);
+
+		if (r == ENOTSUP)
+			warn(gettext("WARNING: restarter FMRI %s is not valid; "
+			    "instance fmri required.\n"), restarter);
+
 		if (r == ENOMEM)
 			uu_die(emesg_nomem);
-		else
-			svc->sc_u.sc_service.sc_restarter = NULL;
+
+		svc->sc_u.sc_service.sc_restarter = NULL;
 	}
 	if (is_global == 0) {
 		if ((r = load_instance(SCF_INSTANCE_GLOBAL, "global",
@@ -1961,6 +1969,14 @@ load_instance_restarter(entity_t *i)
 		 * in the repository yet.  In this case we continue on
 		 * without it.
 		 */
+		if (r == EINVAL)
+			warn(gettext("WARNING: restarter FMRI %s is invalid\n"),
+			    restarter);
+
+		if (r == ENOTSUP)
+			warn(gettext("WARNING: restarter FMRI %s is not valid; "
+			    "instance fmri required.\n"), restarter);
+
 		if (r == ENOMEM)
 			uu_die(emesg_nomem);
 	}
@@ -2484,7 +2500,8 @@ prop_pattern_type(pgroup_t *pattern, scf_type_t *type)
 static int
 property_is_type(property_t *prop, scf_type_t type)
 {
-	return (prop->sc_value_type == type);
+	return (scf_is_compatible_type(type, prop->sc_value_type) ==
+	    SCF_SUCCESS);
 }
 
 /*

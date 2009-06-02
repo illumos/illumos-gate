@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines used by inetd to read inetd's configuration from the repository,
@@ -630,14 +628,16 @@ read_error:
  * 'errstr' is set to point at an appropriate error string.
  */
 struct method_context *
-read_method_context(const char *inst_fmri, const char *method, const char *path,
-    const char **errstr)
+read_method_context(const char *inst_fmri, const char *method, const char *path)
 {
 	scf_instance_t			*scf_inst = NULL;
 	struct method_context		*ret;
 	uint_t				retries;
-	const char			*tmpstr;
+	mc_error_t			*tmperr;
+	char				*fail;
 
+	fail = gettext("Failed to retrieve method context for the %s method of "
+	    "instance %s : %s");
 	for (retries = 0; retries <= REP_OP_RETRIES; retries++) {
 		if (make_handle_bound(rep_handle) == -1)
 			goto inst_failure;
@@ -659,11 +659,12 @@ read_method_context(const char *inst_fmri, const char *method, const char *path,
 	if (retries > REP_OP_RETRIES)
 		goto inst_failure;
 
-	if ((tmpstr = restarter_get_method_context(
+	if ((tmperr = restarter_get_method_context(
 	    RESTARTER_METHOD_CONTEXT_VERSION, scf_inst, NULL, method, path,
 	    &ret)) != NULL) {
 		ret = NULL;
-		*errstr = tmpstr;
+		error_msg(fail, method, inst_fmri, tmperr->msg);
+		restarter_mc_error_destroy(tmperr);
 	}
 
 	scf_instance_destroy(scf_inst);
@@ -675,7 +676,8 @@ inst_failure:
 	 * since we don't call bind_textdomain_codeset() or
 	 * setlocale(3C) after initialization.
 	 */
-	*errstr = gettext("failed to get instance from repository");
+	error_msg(fail, method, inst_fmri,
+	    gettext("failed to get instance from repository"));
 	return (NULL);
 }
 

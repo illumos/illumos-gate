@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1199,6 +1199,12 @@ load_instance(const char *fmri, const char *name, entity_t **inst_ptr)
 		case SCF_ERROR_DELETED:
 		case SCF_ERROR_NOT_FOUND:
 			rc = ENOENT;
+			goto errout;
+		case SCF_ERROR_INVALID_ARGUMENT:
+			rc = EINVAL;
+			goto errout;
+		case SCF_ERROR_CONSTRAINT_VIOLATED:
+			rc = ENOTSUP;
 			goto errout;
 		default:
 			bad_error("scf_handle_decode_fmri", scf_error());

@@ -3533,10 +3533,26 @@ scf_property_is_type(const scf_property_t *prop, scf_type_t base_arg)
 	(void) pthread_mutex_unlock(&h->rh_lock);
 
 	if (ret == SCF_SUCCESS) {
-		if (!scf_is_compatible_type(base, type))
+		if (!scf_is_compatible_protocol_type(base, type))
 			return (scf_set_error(SCF_ERROR_TYPE_MISMATCH));
 	}
 	return (ret);
+}
+
+int
+scf_is_compatible_type(scf_type_t base_arg, scf_type_t type_arg)
+{
+	rep_protocol_value_type_t base = scf_type_to_protocol_type(base_arg);
+	rep_protocol_value_type_t type = scf_type_to_protocol_type(type_arg);
+
+	if (base == REP_PROTOCOL_TYPE_INVALID ||
+	    type == REP_PROTOCOL_TYPE_INVALID)
+		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
+
+	if (!scf_is_compatible_protocol_type(base, type))
+		return (scf_set_error(SCF_ERROR_TYPE_MISMATCH));
+
+	return (SCF_SUCCESS);
 }
 
 ssize_t
@@ -4187,7 +4203,8 @@ scf_entry_add_value(scf_transaction_entry_t *entry, scf_value_t *v)
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
-	if (!scf_is_compatible_type(entry->entry_type, v->value_type)) {
+	if (!scf_is_compatible_protocol_type(entry->entry_type,
+	    v->value_type)) {
 		(void) pthread_mutex_unlock(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_TYPE_MISMATCH));
 	}
@@ -4360,7 +4377,7 @@ scf_value_is_type(const scf_value_t *val, scf_type_t base_arg)
 		return (scf_set_error(SCF_ERROR_NOT_SET));
 	if (base == REP_PROTOCOL_TYPE_INVALID)
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
-	if (!scf_is_compatible_type(base, t))
+	if (!scf_is_compatible_protocol_type(base, t))
 		return (scf_set_error(SCF_ERROR_TYPE_MISMATCH));
 
 	return (SCF_SUCCESS);
@@ -4378,7 +4395,7 @@ scf_value_check_type(const scf_value_t *val, rep_protocol_value_type_t t)
 		(void) scf_set_error(SCF_ERROR_NOT_SET);
 		return (0);
 	}
-	if (!scf_is_compatible_type(t, val->value_type)) {
+	if (!scf_is_compatible_protocol_type(t, val->value_type)) {
 		(void) scf_set_error(SCF_ERROR_TYPE_MISMATCH);
 		return (0);
 	}
