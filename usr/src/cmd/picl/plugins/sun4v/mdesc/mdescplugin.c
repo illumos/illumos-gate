@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The MDESC picl plugin serves 2 different functionalities.
@@ -47,6 +45,7 @@ mde_cookie_t	rootnode;
 
 void mdescplugin_init(void);
 void mdescplugin_fini(void);
+static void signal_devtree(void);
 
 extern int add_cpu_prop(picl_nodehdl_t node, void *args);
 extern int disk_discovery(void);
@@ -150,6 +149,11 @@ dr_handler(const char *ename, const void *earg, size_t size, void *cookie)
 
 	mdesc_devfini(mdp);
 	nvlist_free(nvlp);
+
+	/*
+	 * Signal the devtree plugin to add more cpu properties.
+	 */
+	signal_devtree();
 }
 
 /*
