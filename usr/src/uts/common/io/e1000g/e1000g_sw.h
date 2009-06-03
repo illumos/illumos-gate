@@ -88,7 +88,7 @@ extern "C" {
 
 #define	LAST_RAR_ENTRY			(E1000_RAR_ENTRIES - 1)
 #define	MAX_NUM_UNICAST_ADDRESSES	E1000_RAR_ENTRIES
-#define	MAX_NUM_MULTICAST_ADDRESSES	256
+#define	MCAST_ALLOC_SIZE		256
 
 /*
  * MAX_COOKIES = max_LSO_packet_size(65535 + ethernet_header_len)/page_size
@@ -121,6 +121,7 @@ extern "C" {
 #define	MAX_INTR_THROTTLING		65535
 #define	MAX_RX_BCOPY_THRESHOLD		E1000_RX_BUFFER_SIZE_2K
 #define	MAX_TX_BCOPY_THRESHOLD		E1000_TX_BUFFER_SIZE_2K
+#define	MAX_MCAST_NUM			8192
 
 #define	MIN_NUM_TX_DESCRIPTOR		80
 #define	MIN_NUM_RX_DESCRIPTOR		80
@@ -134,6 +135,7 @@ extern "C" {
 #define	MIN_INTR_THROTTLING		0
 #define	MIN_RX_BCOPY_THRESHOLD		0
 #define	MIN_TX_BCOPY_THRESHOLD		ETHERMIN
+#define	MIN_MCAST_NUM			8
 
 #define	DEFAULT_NUM_RX_DESCRIPTOR	2048
 #define	DEFAULT_NUM_TX_DESCRIPTOR	2048
@@ -921,7 +923,9 @@ typedef struct e1000g {
 	e1000g_ether_addr_t unicst_addr[MAX_NUM_UNICAST_ADDRESSES];
 
 	uint32_t mcast_count;
-	struct ether_addr mcast_table[MAX_NUM_MULTICAST_ADDRESSES];
+	uint32_t mcast_max_num;
+	uint32_t mcast_alloc_count;
+	struct ether_addr *mcast_table;
 
 	ulong_t sys_page_sz;
 #ifdef __sparc

@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.9";
+static char e1000g_version[] = "Driver Ver. 5.3.10";
 
 /*
  * Proto types for DDI entry points
@@ -93,6 +93,7 @@ static boolean_t e1000g_tx_drain(struct e1000g *);
 static void e1000g_init_unicst(struct e1000g *);
 static int e1000g_unicst_set(struct e1000g *, const uint8_t *, int);
 static int e1000g_alloc_rx_data(struct e1000g *);
+static void e1000g_release_multicast(struct e1000g *);
 
 /*
  * Local routines
@@ -1010,6 +1011,8 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 			ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 		}
 	}
+
+	e1000g_release_multicast(Adapter);
 
 	if (Adapter->attach_progress & ATTACH_PROGRESS_REGS_MAP) {
 		if (Adapter->osdep.reg_handle != NULL)
@@ -2348,16 +2351,46 @@ static int
 multicst_add(struct e1000g *Adapter, const uint8_t *multiaddr)
 {
 	struct e1000_hw *hw = &Adapter->shared;
+	struct ether_addr *newtable;
+	size_t new_len;
+	size_t old_len;
 	int res = 0;
 
 	if ((multiaddr[0] & 01) == 0) {
 		res = EINVAL;
+		e1000g_log(Adapter, CE_WARN, "Illegal multicast address");
 		goto done;
 	}
 
-	if (Adapter->mcast_count >= MAX_NUM_MULTICAST_ADDRESSES) {
+	if (Adapter->mcast_count >= Adapter->mcast_max_num) {
 		res = ENOENT;
+		e1000g_log(Adapter, CE_WARN,
+		    "Adapter requested more than %d mcast addresses",
+		    Adapter->mcast_max_num);
 		goto done;
+	}
+
+
+	if (Adapter->mcast_count == Adapter->mcast_alloc_count) {
+		old_len = Adapter->mcast_alloc_count *
+		    sizeof (struct ether_addr);
+		new_len = (Adapter->mcast_alloc_count + MCAST_ALLOC_SIZE) *
+		    sizeof (struct ether_addr);
+
+		newtable = kmem_alloc(new_len, KM_NOSLEEP);
+		if (newtable == NULL) {
+			res = ENOMEM;
+			e1000g_log(Adapter, CE_WARN,
+			    "Not enough memory to alloc mcast table");
+			goto done;
+		}
+
+		if (Adapter->mcast_table != NULL) {
+			bcopy(Adapter->mcast_table, newtable, old_len);
+			kmem_free(Adapter->mcast_table, old_len);
+		}
+		Adapter->mcast_alloc_count += MCAST_ALLOC_SIZE;
+		Adapter->mcast_table = newtable;
 	}
 
 	bcopy(multiaddr,
@@ -2390,6 +2423,9 @@ static int
 multicst_remove(struct e1000g *Adapter, const uint8_t *multiaddr)
 {
 	struct e1000_hw *hw = &Adapter->shared;
+	struct ether_addr *newtable;
+	size_t new_len;
+	size_t old_len;
 	unsigned i;
 
 	for (i = 0; i < Adapter->mcast_count; i++) {
@@ -2401,6 +2437,23 @@ multicst_remove(struct e1000g *Adapter, const uint8_t *multiaddr)
 			}
 			Adapter->mcast_count--;
 			break;
+		}
+	}
+
+	if ((Adapter->mcast_alloc_count - Adapter->mcast_count) >
+	    MCAST_ALLOC_SIZE) {
+		old_len = Adapter->mcast_alloc_count *
+		    sizeof (struct ether_addr);
+		new_len = (Adapter->mcast_alloc_count - MCAST_ALLOC_SIZE) *
+		    sizeof (struct ether_addr);
+
+		newtable = kmem_alloc(new_len, KM_NOSLEEP);
+		if (newtable != NULL) {
+			bcopy(Adapter->mcast_table, newtable, new_len);
+			kmem_free(Adapter->mcast_table, old_len);
+
+			Adapter->mcast_alloc_count -= MCAST_ALLOC_SIZE;
+			Adapter->mcast_table = newtable;
 		}
 	}
 
@@ -2423,6 +2476,20 @@ multicst_remove(struct e1000g *Adapter, const uint8_t *multiaddr)
 	}
 
 	return (0);
+}
+
+static void
+e1000g_release_multicast(struct e1000g *Adapter)
+{
+	rw_enter(&Adapter->chip_lock, RW_WRITER);
+
+	if (Adapter->mcast_table != NULL) {
+		kmem_free(Adapter->mcast_table,
+		    Adapter->mcast_alloc_count * sizeof (struct ether_addr));
+		Adapter->mcast_table = NULL;
+	}
+
+	rw_exit(&Adapter->chip_lock);
 }
 
 /*
@@ -2453,18 +2520,9 @@ e1000g_setup_multicast(struct e1000g *Adapter)
 
 	mc_addr_list = (uint8_t *)Adapter->mcast_table;
 
-	if (Adapter->mcast_count > MAX_NUM_MULTICAST_ADDRESSES) {
-		E1000G_DEBUGLOG_1(Adapter, CE_WARN,
-		    "Adapter requested more than %d MC Addresses.\n",
-		    MAX_NUM_MULTICAST_ADDRESSES);
-		mc_addr_count = MAX_NUM_MULTICAST_ADDRESSES;
-	} else {
-		/*
-		 * Set the number of MC addresses that we are being
-		 * requested to use
-		 */
-		mc_addr_count = Adapter->mcast_count;
-	}
+	ASSERT(Adapter->mcast_count <= Adapter->mcast_max_num);
+
+	mc_addr_count = Adapter->mcast_count;
 	/*
 	 * The Wiseman 2.0 silicon has an errata by which the receiver will
 	 * hang  while writing to the receive address registers if the receiver
@@ -3702,6 +3760,13 @@ e1000g_get_conf(struct e1000g *Adapter)
 	Adapter->mem_workaround_82546 =
 	    e1000g_get_prop(Adapter, "mem_workaround_82546",
 	    0, 1, DEFAULT_MEM_WORKAROUND_82546);
+
+	/*
+	 * Max number of multicast addresses
+	 */
+	Adapter->mcast_max_num =
+	    e1000g_get_prop(Adapter, "mcast_max_num",
+	    MIN_MCAST_NUM, MAX_MCAST_NUM, hw->mac.mta_reg_count * 32);
 }
 
 /*
