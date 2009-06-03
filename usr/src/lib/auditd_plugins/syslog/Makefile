@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/lib/Makefile.lib
@@ -30,8 +29,8 @@ include $(SRC)/lib/Makefile.lib
 SUBDIRS = $(MACH)
 
 TEXT_DOMAIN=	SUNW_OST_OSCMD
-POFILE= audit_syslog.po
-MSGFILES=	`$(GREP) -l gettext *.[ch]`
+POFILE= 	audit_syslog.po
+MSGFILES=	sysplugin.c
 
 all	:=	TARGET= all
 clean	:=	TARGET= clean
@@ -43,13 +42,16 @@ lint	:=	TARGET= lint
 
 all clean clobber install lint: $(SUBDIRS)
 
-$(POFILE): pofile_MSGFILES
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
 
 _msg: $(MSGDOMAINPOFILE)
 
-include $(SRC)/Makefile.msg.targ
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include $(SRC)/lib/Makefile.targ
+include $(SRC)/Makefile.msg.targ
