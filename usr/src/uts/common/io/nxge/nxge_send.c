@@ -203,7 +203,7 @@ nxge_m_tx(void *arg, mblk_t *mp)
 int
 nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 {
-	int 			status = 0;
+	int 			dma_status, status = 0;
 	p_tx_desc_t 		tx_desc_ring_vp;
 	npi_handle_t		npi_desc_handle;
 	nxge_os_dma_handle_t 	tx_desc_dma_handle;
@@ -708,11 +708,11 @@ start_again:
 			}
 
 			dma_handle = tx_msg_p->dma_handle;
-			status = ddi_dma_addr_bind_handle(dma_handle, NULL,
+			dma_status = ddi_dma_addr_bind_handle(dma_handle, NULL,
 			    (caddr_t)b_rptr, len, dma_flags,
 			    DDI_DMA_DONTWAIT, NULL,
 			    &dma_cookie, &ncookies);
-			if (status == DDI_DMA_MAPPED) {
+			if (dma_status == DDI_DMA_MAPPED) {
 				dma_ioaddr = dma_cookie.dmac_laddress;
 				len = (int)dma_cookie.dmac_size;
 				clen = (uint32_t)dma_cookie.dmac_size;
@@ -802,6 +802,7 @@ start_again:
 					mp = nmp;
 					goto nxge_start_fail_lso;
 				} else {
+					status = 1;
 					goto nxge_start_fail2;
 				}
 			}
@@ -886,14 +887,15 @@ nxge_start_control_header_only:
 			    "==> nxge_start(14): pull msg - "
 			    "len %d pkt_len %d ngathers %d",
 			    len, pkt_len, ngathers));
-			/* Pull all message blocks from b_cont */
+
+			/*
+			 * Just give up on this packet.
+			 */
 			if (is_lso) {
 				mp = nmp_lso_save;
 				goto nxge_start_fail_lso;
 			}
-			if ((msgpullup(mp, -1)) == NULL) {
-				goto nxge_start_fail2;
-			}
+			status = 0;
 			goto nxge_start_fail2;
 		}
 	} /* while (nmp) */
@@ -1147,12 +1149,11 @@ nxge_start_control_header_only:
 nxge_start_fail_lso:
 	status = 0;
 	good_packet = B_FALSE;
-	if (mp != NULL) {
+	if (mp != NULL)
 		freemsg(mp);
-	}
-	if (mp_chain != NULL) {
-		freemsg(mp_chain);
-	}
+	if (mp_chain != NULL)
+		freemsgchain(mp_chain);
+
 	if (!lso_again && !ngathers) {
 		if (isLDOMservice(nxgep)) {
 			tx_ring_p->tx_ring_busy = B_FALSE;
