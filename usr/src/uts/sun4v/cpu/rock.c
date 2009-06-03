@@ -56,12 +56,13 @@
 #include <sys/rock_hypervisor_api.h>
 #include <sys/hsvc.h>
 #include <vm/hat_sfmmu.h>
+#include <sys/mutex_impl.h>
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
 uint8_t	enable_tm = 1;
 
 char cpu_module_name[] = "SUNW,UltraSPARC-AT10";
-static	boolean_t	hsvc_tm_available = B_TRUE;
+boolean_t	hsvc_tm_available = B_TRUE;
 
 static	hsvc_info_t rock_tm_hsvc = {
 	HSVC_REV_1,		/* HSVC rev num */
@@ -86,6 +87,8 @@ static	hsvc_info_t rock_mmu_ext_hsvc = {
 static void encode_pgsz_order(uint64_t, int, int, uint16_t *, uchar_t *);
 static void set_pgsz_order(uchar_t, uchar_t, uint64_t *, int *, int *,
     sfmmu_t *);
+
+extern	void rock_mutex_delay(void);
 
 /*
  * External /etc/system tunable, for controlling whether shared or private pages
@@ -273,6 +276,7 @@ void
 cpu_init_private(struct cpu *cp)
 {
 	cpu_map_exec_units(cp);
+	mutex_delay = rock_mutex_delay;
 }
 
 /*ARGSUSED*/
@@ -289,6 +293,18 @@ cpu_uninit_private(struct cpu *cp)
 void
 cpu_feature_init(void)
 {
+	static	int	set_mutex_backoff_tunables = 0;
+	/*
+	 * Set constants for mutex_backoff only once.
+	 * On Rock, setting this to 8 gives the best performance,
+	 * even for multi-chip systems.
+	 */
+	if (! set_mutex_backoff_tunables) {
+		mutex_backoff_base = 1;
+		mutex_cap_factor = 8;
+		set_mutex_backoff_tunables = 1;
+	}
+
 	/*
 	 * Enable or disable for each cpu if hypervisor API is negotiated.
 	 */

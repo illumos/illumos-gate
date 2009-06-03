@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,13 @@ label/**/0:								; \
 	mov	tmp2, %o7	/* restore callee's return address */	; \
 label/**/1:
 
+#ifdef	ATOMIC_SIMPLE_BO_ENABLE
+/*
+ * For some processors, simple limit has proved benefical
+ */
+#define ATOMIC_BACKOFF_CPU(val, limit, ncpu, cas_cnt, label)		\
+	set	1 << ATOMIC_BO_ENABLE_SHIFT, limit
+#else
 /*
  * For the kernel, we take into consideration of cas failures
  * and also scale the backoff limit w.r.t. the number of cpus.
@@ -104,6 +111,7 @@ label/**/0:								; \
 	mov	%g0, cas_cnt						; \
 	mov	1, val							; \
 label/**/1:
+#endif	/* ATOMIC_SIMPLE_BO_ENABLE */
 #endif	/* ATOMIC_BO_ENABLE_SHIFT */
 
 #else	/* _KERNEL */
@@ -129,10 +137,17 @@ label/**/0:
  * The cas_cnt counts the cas instruction failure and is
  * initialized to 0.
  */
+#ifdef	ATOMIC_SIMPLE_BO_ENABLE
+#define ATOMIC_BACKOFF_INIT(val, ncpu, cas_cnt)	\
+	mov	1, val
+
+#else /* If not defined ATOMIC_SIMPLE_BO_ENABLE */
 #define ATOMIC_BACKOFF_INIT(val, ncpu, cas_cnt)	\
 	mov	1, val				; \
 	mov	%g0, ncpu			; \
 	mov	%g0, cas_cnt
+
+#endif	/* ATOMIC_SIMPLE_BO_ENABLE */
 
 #define ATOMIC_BACKOFF_BRANCH(cr, backoff, loop) \
 	bne,a,pn cr, backoff
@@ -152,7 +167,8 @@ label/**/_1:								; \
 	bgu,pn	%xcc, label/**/_20 /* branch to middle of DELAY_SPIN */	; \
 	  nop								; \
 	ba	retlabel						; \
-	  sllx  val, 1, val
+	sllx	val, 1, val
+
 #else	/* ATOMIC_BO_ENABLE_SHIFT */
 #define ATOMIC_BACKOFF_INIT(val, ncpu, cas_cnt)
 

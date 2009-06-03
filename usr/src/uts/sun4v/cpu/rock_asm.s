@@ -114,6 +114,13 @@ void
 cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 {}
 
+void
+cpu_atomic_delay(void)
+{}
+
+void
+rock_mutex_delay(void)
+{}
 #else	/* lint */
 
 /*
@@ -433,4 +440,47 @@ fp_zero_zero:
 	restore
 	SET_SIZE(cpu_inv_tsb)
 
+/*
+ * This is CPU specific delay routine for atomic backoff.
+ * It is used in case of Rock CPU. The rd instruction uses
+ * less resources than casx on these CPUs.
+ */
+	.align	32
+	ENTRY(cpu_atomic_delay)
+	rd	%ccr, %g0
+	rd	%ccr, %g0
+	retl
+	rd	%ccr, %g0
+	SET_SIZE(cpu_atomic_delay)
+
+/*
+ * Delay to last ~100 nano seconds on a 2.1 GHz. Membars
+ * should be linear and not in a loop to avoid impact
+ * on the sibling strand (BR pipeline is shared by
+ * two sibling strands).
+ */
+	.align	64
+	ENTRY(rock_mutex_delay)
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	membar	#Halt
+	retl
+	membar	#Halt
+	SET_SIZE(rock_mutex_delay)
 #endif /* lint */

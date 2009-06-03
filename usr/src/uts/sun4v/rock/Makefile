@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the UltraSPARC-AT10 cpu module.
@@ -62,15 +62,21 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE)
 
 #
+# The ATOMIC_BO_ENABLE_SHIFT enables backoff in atomic routines.
+# ATOMIC_SIMPLE_BO_ENABLE enables simple backoff required for rock
+#
+ATOMIC_BO_FLAG = -DATOMIC_BO_ENABLE_SHIFT=14 -DATOMIC_SIMPLE_BO_ENABLE
+
+#
 # lint pass one enforcement
 #
-CFLAGS += $(CCVERBOSE)
+CFLAGS += $(CCVERBOSE) $(ATOMIC_BO_FLAG)
 
 #
 # cpu-module-specific flags
 #
-CPPFLAGS +=    -DCPU_MODULE
-AS_CPPFLAGS += -DCPU_MODULE -DCUSTOM_FPZERO
+CPPFLAGS +=    -DCPU_MODULE $(ATOMIC_BO_FLAG)
+AS_CPPFLAGS += -DCPU_MODULE -DCUSTOM_FPZERO $(ATOMIC_BO_FLAG)
 LINTFLAGS   += -DCUSTOM_FPZERO
 
 #

@@ -188,7 +188,7 @@ NIAGARACPU_OBJS = niagara.o niagara_copy.o common_asm.o niagara_perfctr.o
 NIAGARACPU_OBJS += niagara_asm.o atomic.o
 NIAGARA2CPU_OBJS = niagara2.o niagara_copy.o common_asm.o niagara_perfctr.o
 NIAGARA2CPU_OBJS += niagara2_asm.o atomic.o
-ROCKCPU_OBJS = rock.o rock_copy.o common_asm.o rock_atomic.o rock_asm.o 
+ROCKCPU_OBJS = rock.o rock_copy.o common_asm.o rock_asm.o atomic.o
 
 #
 #			platform module
