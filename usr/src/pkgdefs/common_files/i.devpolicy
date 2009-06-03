@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #  NOTE:  When a change is made to the source file for
@@ -50,7 +50,7 @@ do
 	rm -f $dest.$$
 
 	# potential additions
-	additions="aggr bge dnet keysock ibd icmp icmp6 ipnet ipsecah ipsecesp openeepr random spdsock vni ipf pfil scsi_vhci"
+	additions="keysock icmp icmp6 ipnet ipsecah ipsecesp openeepr random spdsock ipf pfil scsi_vhci"
 
 	for dev in $additions
 	do
@@ -71,7 +71,7 @@ do
 	done
 
 	# potential deletions
-	deletions="elx dld dld:ctl aggr:ctl vnic:ctl le"
+	deletions="aggr aggr:ctl bge ce dld dld:ctl dnet elx elxl eri ge hme ibd iprb le pcelx qfe softmac spwr vni vnic vnic:ctl"
 
 	for dev in $deletions
 	do

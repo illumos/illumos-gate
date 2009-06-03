@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -192,6 +192,7 @@ dbri:*
 SUNW,DBRId:*
 SUNW,DBRIe:*
 SUNW,DBRIf:*
+vni:*
 EOF
 }
 
@@ -324,7 +325,7 @@ pfil:*
 bl:*
 sctp:*
 sctp6:*
-vni:*
+dlpistub:*
 cpuid:self
 ntwdt:*
 dld:*

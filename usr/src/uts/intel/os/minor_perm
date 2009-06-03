@@ -107,7 +107,7 @@ ipf:* 0666 root sys
 bl:* 0666 root sys
 sctp:* 0666 root sys
 sctp6:* 0666 root sys
-vni:* 0666 root sys
+dlpistub:* 0666 root sys
 cpuid:self 0644 root sys
 bmc:bmc 0666 root sys
 dld:* 0666 root sys

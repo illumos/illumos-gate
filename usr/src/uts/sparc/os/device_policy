@@ -51,21 +51,6 @@ keysock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 ipsecah		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 ipsecesp	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 spdsock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
-#
-# Raw network interface access permissions
-#
-ce		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-eri		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-ge		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-ibd		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-pcelx		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-aggr		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-vnic		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-softmac		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-#
-# Virtual network interface access permission
-#
-vni		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 
 #
 # IP observability device access permission

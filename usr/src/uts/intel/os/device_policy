@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -49,22 +49,6 @@ keysock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 ipsecah		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 ipsecesp	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 spdsock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
-#
-# Raw network interface access permissions
-#
-dnet		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-elxl		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-ibd		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-iprb		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-pcelx		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-spwr		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-aggr		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-vnic		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-softmac		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
-#
-# Virtual network interface access permission
-#
-vni		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 
 #
 # IP observability device access permission

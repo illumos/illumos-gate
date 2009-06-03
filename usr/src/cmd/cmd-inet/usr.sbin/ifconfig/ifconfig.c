@@ -4476,21 +4476,26 @@ ifaddr_op(ifaddrlistx_t *ifaddrp, boolean_t up)
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifrl) == -1)
 		return (_B_FALSE);
 
-	if (up) {
+	if (up)
 		lifrl.lifr_flags |= IFF_UP;
-	} else {
-		/*
-		 * If we've been asked to bring down an IFF_DUPLICATE address,
-		 * then get the address and set it.  This will cause IP to
-		 * clear IFF_DUPLICATE and stop the automatic recovery timer.
-		 */
-		if (lifrl.lifr_flags & IFF_DUPLICATE) {
-			return (ioctl(fd, SIOCGLIFADDR, &lifrl) != -1 &&
-			    ioctl(fd, SIOCSLIFADDR, &lifrl) != -1);
-		}
+	else
 		lifrl.lifr_flags &= ~IFF_UP;
+
+	if (ioctl(fd, SIOCSLIFFLAGS, &lifrl) == -1)
+		return (_B_FALSE);
+
+	/*
+	 * If we're trying to bring the address down, ensure that DAD activity
+	 * (observable by IFF_DUPLICATE) has also been stopped.
+	 */
+	if (!up && ioctl(fd, SIOCGLIFFLAGS, &lifrl) != -1 &&
+	    lifrl.lifr_flags & IFF_DUPLICATE) {
+		if (ioctl(fd, SIOCGLIFADDR, &lifrl) == -1 ||
+		    ioctl(fd, SIOCSLIFADDR, &lifrl) == -1) {
+			return (_B_FALSE);
+		}
 	}
-	return (ioctl(fd, SIOCSLIFFLAGS, &lifrl) == 0);
+	return (_B_TRUE);
 }
 
 static boolean_t

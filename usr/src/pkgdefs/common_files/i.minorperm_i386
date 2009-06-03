@@ -204,6 +204,7 @@ profile:profile
 asy:[a-z]
 asy:[a-z],cu
 i2o_bs:*
+vni:*
 EOF
 }
 
@@ -281,7 +282,7 @@ pfil:*
 bl:*
 sctp:*
 sctp6:*
-vni:*
+dlpistub:*
 cpuid:self
 clone:bge
 clone:igb
