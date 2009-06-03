@@ -2824,6 +2824,12 @@ nfs4_fwrite:
 			resid = uiop->uio_resid;
 			offset = uiop->uio_loffset;
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
 			goto bottom;
 		}
 
@@ -2866,6 +2872,12 @@ nfs4_fwrite:
 
 		if (rp->r_flags & R4STALE) {
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
 			break;
 		}
 
@@ -9573,8 +9585,15 @@ write_again:
 				mutex_exit(&rp->r_statelock);
 			}
 			crfree(cred_otw);
-		} else
+		} else {
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
+		}
 	}
 
 	if (error != 0 && error != NFS_EOF)

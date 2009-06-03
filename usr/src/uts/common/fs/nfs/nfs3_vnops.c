@@ -747,6 +747,12 @@ nfs3_fwrite:
 			resid = uiop->uio_resid;
 			offset = uiop->uio_loffset;
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
 			goto bottom;
 		}
 		bufsize = MIN(uiop->uio_resid, mi->mi_stsize);
@@ -783,6 +789,12 @@ nfs3_fwrite:
 
 		if (rp->r_flags & RSTALE) {
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
 			break;
 		}
 
@@ -4393,8 +4405,15 @@ nfs3_bio(struct buf *bp, stable_how *stab_comm, cred_t *cr)
 				mutex_exit(&rp->r_statelock);
 			}
 			crfree(cred);
-		} else
+		} else {
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
+		}
 	}
 
 	if (error != 0 && error != NFS_EOF)

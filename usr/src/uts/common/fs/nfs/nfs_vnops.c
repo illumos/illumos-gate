@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989 AT&T.
@@ -646,6 +646,12 @@ nfs_fwrite:
 			resid = uiop->uio_resid;
 			offset = uiop->uio_loffset;
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
 			goto bottom;
 		}
 		bufsize = MIN(uiop->uio_resid, mi->mi_curwrite);
@@ -675,6 +681,12 @@ nfs_fwrite:
 
 		if (rp->r_flags & RSTALE) {
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
 			break;
 		}
 
@@ -3484,8 +3496,15 @@ nfs_bio(struct buf *bp, cred_t *cr)
 				mutex_exit(&rp->r_statelock);
 			}
 			crfree(cred);
-		} else
+		} else {
 			error = rp->r_error;
+			/*
+			 * A close may have cleared r_error, if so,
+			 * propagate ESTALE error return properly
+			 */
+			if (error == 0)
+				error = ESTALE;
+		}
 	}
 
 	if (error != 0 && error != NFS_EOF)
