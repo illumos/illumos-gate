@@ -94,7 +94,7 @@ extern "C" {
 #define	IGB_NO_FREE_SLOT		-1
 
 #define	MAX_NUM_UNICAST_ADDRESSES	E1000_RAR_ENTRIES
-#define	MAX_NUM_MULTICAST_ADDRESSES	256
+#define	MCAST_ALLOC_COUNT		256
 #define	MAX_COOKIE			18
 #define	MIN_NUM_TX_DESC			2
 
@@ -124,6 +124,7 @@ extern "C" {
 #define	MAX_TX_RECYCLE_THRESHOLD	DEFAULT_TX_RING_SIZE
 #define	MAX_TX_OVERLOAD_THRESHOLD	DEFAULT_TX_RING_SIZE
 #define	MAX_TX_RESCHED_THRESHOLD	DEFAULT_TX_RING_SIZE
+#define	MAX_MCAST_NUM			8192
 
 /*
  * Minimum values for user configurable parameters
@@ -143,6 +144,7 @@ extern "C" {
 #define	MIN_TX_RECYCLE_THRESHOLD	MIN_NUM_TX_DESC
 #define	MIN_TX_OVERLOAD_THRESHOLD	MIN_NUM_TX_DESC
 #define	MIN_TX_RESCHED_THRESHOLD	MIN_NUM_TX_DESC
+#define	MIN_MCAST_NUM			8
 
 /*
  * Default values for user configurable parameters
@@ -162,6 +164,7 @@ extern "C" {
 #define	DEFAULT_TX_RECYCLE_THRESHOLD	(MAX_COOKIE + 1)
 #define	DEFAULT_TX_OVERLOAD_THRESHOLD	MIN_NUM_TX_DESC
 #define	DEFAULT_TX_RESCHED_THRESHOLD	128
+#define	DEFAULT_MCAST_NUM		4096
 
 #define	IGB_LSO_MAXLEN			65535
 
@@ -220,6 +223,7 @@ extern "C" {
 #define	PROP_RX_COPY_THRESHOLD		"rx_copy_threshold"
 #define	PROP_RX_LIMIT_PER_INTR		"rx_limit_per_intr"
 #define	PROP_INTR_THROTTLING		"intr_throttling"
+#define	PROP_MCAST_MAX_NUM		"mcast_max_num"
 
 #define	IGB_LB_NONE			0
 #define	IGB_LB_EXTERNAL			1
@@ -730,7 +734,9 @@ typedef struct igb {
 	uint32_t		unicst_total;
 	igb_ether_addr_t	unicst_addr[MAX_NUM_UNICAST_ADDRESSES];
 	uint32_t		mcast_count;
-	struct ether_addr	mcast_table[MAX_NUM_MULTICAST_ADDRESSES];
+	uint32_t		mcast_alloc_count;
+	uint32_t		mcast_max_num;
+	struct ether_addr	*mcast_table;
 
 	/*
 	 * Kstat definitions

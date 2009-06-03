@@ -29,7 +29,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.6";
+static char igb_version[] = "igb 1.1.7";
 
 /*
  * Local function protoypes
@@ -112,7 +112,7 @@ static int igb_fm_error_cb(dev_info_t *, ddi_fm_error_t *,
     const void *);
 static void igb_fm_init(igb_t *);
 static void igb_fm_fini(igb_t *);
-
+static void igb_release_multicast(igb_t *);
 
 static struct cb_ops igb_cb_ops = {
 	nulldev,		/* cb_open */
@@ -689,6 +689,11 @@ igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 		if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
 			ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
 	}
+
+	/*
+	 * Free multicast table
+	 */
+	igb_release_multicast(igb);
 
 	/*
 	 * Free register handle
@@ -2438,14 +2443,42 @@ igb_unicst_set(igb_t *igb, const uint8_t *mac_addr,
 int
 igb_multicst_add(igb_t *igb, const uint8_t *multiaddr)
 {
+	struct ether_addr *new_table;
+	size_t new_len;
+	size_t old_len;
+
 	ASSERT(mutex_owned(&igb->gen_lock));
 
 	if ((multiaddr[0] & 01) == 0) {
+		igb_error(igb, "Illegal multicast address");
 		return (EINVAL);
 	}
 
-	if (igb->mcast_count >= MAX_NUM_MULTICAST_ADDRESSES) {
+	if (igb->mcast_count >= igb->mcast_max_num) {
+		igb_error(igb, "Adapter requested more than %d mcast addresses",
+		    igb->mcast_max_num);
 		return (ENOENT);
+	}
+
+	if (igb->mcast_count == igb->mcast_alloc_count) {
+		old_len = igb->mcast_alloc_count *
+		    sizeof (struct ether_addr);
+		new_len = (igb->mcast_alloc_count + MCAST_ALLOC_COUNT) *
+		    sizeof (struct ether_addr);
+
+		new_table = kmem_alloc(new_len, KM_NOSLEEP);
+		if (new_table == NULL) {
+			igb_error(igb,
+			    "Not enough memory to alloc mcast table");
+			return (ENOMEM);
+		}
+
+		if (igb->mcast_table != NULL) {
+			bcopy(igb->mcast_table, new_table, old_len);
+			kmem_free(igb->mcast_table, old_len);
+		}
+		igb->mcast_alloc_count += MCAST_ALLOC_COUNT;
+		igb->mcast_table = new_table;
 	}
 
 	bcopy(multiaddr,
@@ -2471,6 +2504,9 @@ igb_multicst_add(igb_t *igb, const uint8_t *multiaddr)
 int
 igb_multicst_remove(igb_t *igb, const uint8_t *multiaddr)
 {
+	struct ether_addr *new_table;
+	size_t new_len;
+	size_t old_len;
 	int i;
 
 	ASSERT(mutex_owned(&igb->gen_lock));
@@ -2487,6 +2523,22 @@ igb_multicst_remove(igb_t *igb, const uint8_t *multiaddr)
 		}
 	}
 
+	if ((igb->mcast_alloc_count - igb->mcast_count) >
+	    MCAST_ALLOC_COUNT) {
+		old_len = igb->mcast_alloc_count *
+		    sizeof (struct ether_addr);
+		new_len = (igb->mcast_alloc_count - MCAST_ALLOC_COUNT) *
+		    sizeof (struct ether_addr);
+
+		new_table = kmem_alloc(new_len, KM_NOSLEEP);
+		if (new_table != NULL) {
+			bcopy(igb->mcast_table, new_table, new_len);
+			kmem_free(igb->mcast_table, old_len);
+			igb->mcast_alloc_count -= MCAST_ALLOC_COUNT;
+			igb->mcast_table = new_table;
+		}
+	}
+
 	/*
 	 * Update the multicast table in the hardware
 	 */
@@ -2498,6 +2550,16 @@ igb_multicst_remove(igb_t *igb, const uint8_t *multiaddr)
 	}
 
 	return (0);
+}
+
+static void
+igb_release_multicast(igb_t *igb)
+{
+	if (igb->mcast_table != NULL) {
+		kmem_free(igb->mcast_table,
+		    igb->mcast_alloc_count * sizeof (struct ether_addr));
+		igb->mcast_table = NULL;
+	}
 }
 
 /*
@@ -2514,8 +2576,7 @@ igb_setup_multicst(igb_t *igb)
 	struct e1000_hw *hw = &igb->hw;
 
 	ASSERT(mutex_owned(&igb->gen_lock));
-
-	ASSERT(igb->mcast_count <= MAX_NUM_MULTICAST_ADDRESSES);
+	ASSERT(igb->mcast_count <= igb->mcast_max_num);
 
 	mc_addr_list = (uint8_t *)igb->mcast_table;
 	mc_addr_count = igb->mcast_count;
@@ -2731,6 +2792,13 @@ igb_get_conf(igb_t *igb)
 	    igb->capab->min_intr_throttle,
 	    igb->capab->max_intr_throttle,
 	    igb->capab->def_intr_throttle);
+
+	/*
+	 * Max number of multicast addresses
+	 */
+	igb->mcast_max_num =
+	    igb_get_prop(igb, PROP_MCAST_MAX_NUM,
+	    MIN_MCAST_NUM, MAX_MCAST_NUM, DEFAULT_MCAST_NUM);
 }
 
 /*
