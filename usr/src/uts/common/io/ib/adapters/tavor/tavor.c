@@ -3489,6 +3489,11 @@ tavor_quiesce(dev_info_t *dip)
 	/* start fastreboot */
 	state->ts_quiescing = B_TRUE;
 
+	/* If it's in maintenance mode, do nothing but return with SUCCESS */
+	if (!TAVOR_IS_OPERATIONAL(state->ts_operational_mode)) {
+		return (DDI_SUCCESS);
+	}
+
 	/* Shutdown HCA ports */
 	if (tavor_hca_ports_shutdown(state,
 	    state->ts_cfg_profile->cp_num_ports) != TAVOR_CMD_SUCCESS) {

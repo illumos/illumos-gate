@@ -926,6 +926,10 @@ hermon_init_failure(hermon_state_t *state)
 	if (!(hermon_get_state(state) & HCA_PIO_FM))
 		return (B_FALSE);
 
+	/* check if fatal errors occur during attach */
+	if (state->hs_fm_async_fatal)
+		return (B_TRUE);
+
 	hdl = hermon_get_uarhdl(state);
 	/* Get the PIO error against UAR I/O space */
 	ddi_fm_acc_err_get(hdl, &derr, DDI_FME_VERSION);
@@ -1448,7 +1452,14 @@ hermon_inter_err_chk(void *arg)
 
 	if (word != 0) {
 		HERMON_FMANOTE(state, HERMON_FMA_INTERNAL);
-		hermon_fm_ereport(state, HCA_IBA_ERR, HCA_ERR_FATAL);
+		/* if fm_disable is on, Hermon FM functions don't work */
+		if (state->hs_fm_disable) {
+			cmn_err(CE_PANIC,
+			    "Hermon Fatal Internal Error. "
+			    "Hermon state=0x%p", (void *)state);
+		} else {
+			hermon_fm_ereport(state, HCA_IBA_ERR, HCA_ERR_FATAL);
+		}
 	}
 
 	/* issue the ereport pended in the interrupt context */

@@ -1735,14 +1735,14 @@ ibnex_bus_unconfig(dev_info_t *parent,
 			    ndp; ndp = ndp->node_next) {
 				dip = ndp->node_dip;
 				if (dip && (ddi_driver_major(dip) == major)) {
-					ibnex_offline_childdip(dip);
+					(void) ibnex_offline_childdip(dip);
 				}
 			}
 			for (ndp = ibnex.ibnex_pseudo_node_head;
 			    ndp; ndp = ndp->node_next) {
 				dip = ndp->node_dip;
 				if (dip && (ddi_driver_major(dip) == major)) {
-					ibnex_offline_childdip(dip);
+					(void) ibnex_offline_childdip(dip);
 				}
 			}
 		}

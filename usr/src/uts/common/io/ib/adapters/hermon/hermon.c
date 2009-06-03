@@ -56,8 +56,10 @@ int hermon_verbose = 0;
 /* Hermon HCA State Pointer */
 void *hermon_statep;
 
-int	debug_vpd = 0;
+int debug_vpd = 0;
 
+/* Disable the internal error-check polling thread */
+int hermon_no_inter_err_chk = 0;
 
 /*
  * The Hermon "userland resource database" is common to instances of the
@@ -1659,8 +1661,11 @@ hermon_hw_init(hermon_state_t *state)
 	/*
 	 * Invoke a polling thread to check the error buffer periodically.
 	 */
-	state->hs_fm_poll_thread = ddi_periodic_add(hermon_inter_err_chk,
-	    (void *)state, FM_POLL_INTERVAL, DDI_IPL_0);
+	if (!hermon_no_inter_err_chk) {
+		state->hs_fm_poll_thread = ddi_periodic_add(
+		    hermon_inter_err_chk, (void *)state, FM_POLL_INTERVAL,
+		    DDI_IPL_0);
+	}
 
 	cleanup = HERMON_DRV_CLEANUP_LEVEL5;
 
@@ -4621,6 +4626,11 @@ hermon_quiesce(dev_info_t *dip)
 
 	/* start fastreboot */
 	state->hs_quiescing = B_TRUE;
+
+	/* If it's in maintenance mode, do nothing but return with SUCCESS */
+	if (!HERMON_IS_OPERATIONAL(state->hs_operational_mode)) {
+		return (DDI_SUCCESS);
+	}
 
 	/* suppress Hermon FM ereports */
 	if (hermon_get_state(state) & HCA_EREPORT_FM) {
