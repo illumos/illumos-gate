@@ -644,6 +644,10 @@ i_ldc_rxq_drain(ldc_chan_t *ldcp)
 		return (EIO);
 	}
 
+	/* If the queue is already empty just return success. */
+	if (rx_head == rx_tail)
+		return (0);
+
 	/* flush contents by setting the head = tail */
 	return (i_ldc_set_rx_head(ldcp, rx_tail));
 }
@@ -788,7 +792,7 @@ i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 		drv_usecwait(ldc_delay);
 	}
 
-	cmn_err(CE_WARN, "ldc_rx_set_qhead: (0x%lx) cannot set qhead 0x%lx",
+	cmn_err(CE_WARN, "ldc_set_rx_qhead: (0x%lx) cannot set qhead 0x%lx",
 	    ldcp->id, head);
 	mutex_enter(&ldcp->tx_lock);
 	i_ldc_reset(ldcp, B_TRUE);
