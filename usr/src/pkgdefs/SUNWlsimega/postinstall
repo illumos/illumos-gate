@@ -1,9 +1,8 @@
 #!/sbin/sh
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Function: check_add_drv()
@@ -113,4 +112,4 @@ check_add_drv()
 # "amr" driver contains entry "pci1000,532"
 # "ncrs" contains entry "pci1000,2"
 
-check_add_drv -i '"pci1028,13" "pci1000,407" "pci1000,407.1000.532" "pci1000,408" "pci1000,408.1000.2" "pci1000,1960"' -b "$BASEDIR" -c scsi lsimega
+check_add_drv -i '"pci1028,13" "pci1000,407" "pci1000,407.1000.532" "pci1000,408" "pci1000,408.1000.2" "pci1000,409" "pci1000,1960"' -b "$BASEDIR" -c scsi lsimega
