@@ -287,6 +287,7 @@ COMMON_SUBDIRS= \
 	SUNWimac \
 	SUNWimar \
 	SUNWimacr \
+	SUNWinstallint \
 	SUNWintgige \
 	SUNWiotu  \
 	SUNWioth  \
@@ -378,12 +379,14 @@ COMMON_SUBDIRS= \
 	SUNWpcu	\
 	SUNWpcwl \
 	SUNWpd    \
-	SUNWpolkit \
 	SUNWperl584core \
 	SUNWperl584usr \
 	SUNWpiclh \
 	SUNWpiclu \
 	SUNWpiclr \
+	SUNWpkgcmdsr \
+	SUNWpkgcmdsu \
+	SUNWpolkit \
 	SUNWpool \
 	SUNWpoold \
 	SUNWpoolr \

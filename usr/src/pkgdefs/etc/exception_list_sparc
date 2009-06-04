@@ -487,6 +487,14 @@ lib/llib-ldhcputil.ln			sparc
 lib/libdhcpagent.so			sparc
 lib/libdhcputil.so			sparc
 #
+# These files are installed in the proto area by the build of libinstzones
+# and libpkg
+#
+usr/lib/llib-linstzones			sparc
+usr/lib/llib-linstzones.ln		sparc    
+usr/lib/llib-lpkg			sparc
+usr/lib/llib-lpkg.ln			sparc
+#
 # These files are installed in the proto area by the build of libinetcfg.
 # Only the shared object is shipped.
 #

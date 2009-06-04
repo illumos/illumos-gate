@@ -484,6 +484,14 @@ lib/llib-ldhcputil.ln			i386
 lib/libdhcpagent.so			i386
 lib/libdhcputil.so			i386
 #
+# These files are installed in the proto area by the build of libinstzones
+# and libpkg
+#
+usr/lib/llib-linstzones			i386
+usr/lib/llib-linstzones.ln		i386
+usr/lib/llib-lpkg			i386
+usr/lib/llib-lpkg.ln			i386
+#
 # These files are installed in the proto area by the build of libinetcfg.
 # Only the shared object is shipped.
 #

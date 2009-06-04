@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Definitions common to command source.
@@ -56,6 +56,10 @@ ROOTLIBXEN=		$(ROOT)/usr/lib/xen/bin
 ROOTLIBZONES=		$(ROOT)/lib/zones
 
 ROOTSHLIB=	$(ROOT)/usr/share/lib
+ROOTPKGBIN=	$(ROOT)/usr/sadm/install/bin
+ROOTCLASS_SCR_DIR= $(ROOT)/usr/sadm/install/scripts
+ROOTADMIN_SRC_DIR= $(ROOT)/var/sadm/install/admin
+
 ROOTSHLIBCCS=	$(ROOTSHLIB)/ccs
 ROOTSBIN=	$(ROOT)/sbin
 ROOTUSRSBIN=	$(ROOT)/usr/sbin
@@ -94,8 +98,8 @@ ROOTMAN1M=	$(ROOTMAN)/man1m
 ROOTMAN3=	$(ROOTMAN)/man3
 ROOTVARSMB=	$(ROOT)/var/smb
 
-#
 
+#
 # Like ROOTLIBDIR in $(SRC)/Makefile.lib, any lower-level Makefiles that
 # put their binaries in a non-standard location should reset this and use
 # $(ROOTCMD) in their `install' target. By default we set this to a bogus
@@ -134,6 +138,8 @@ ROOTLIBPROG=	$(PROG:%=$(ROOTLIB)/%)
 ROOTLIBSHFILES= $(SHFILES:%=$(ROOTLIB)/%)
 ROOTSHLIBPROG=	$(PROG:%=$(ROOTSHLIB)/%)
 ROOTSBINPROG=	$(PROG:%=$(ROOTSBIN)/%)
+ROOTPKGBINPROG= $(PROG:%=$(ROOTPKGBIN)/%)
+ROOTCLASS_SCR_FILES= $(SCRIPTS:%=$(ROOTCLASS_SCR_DIR)/%)
 ROOTUSRSBINPROG=$(PROG:%=$(ROOTUSRSBIN)/%)
 ROOTUSRSBINSCRIPT=$(SCRIPT:%=$(ROOTUSRSBIN)/%)
 ROOTETCPROG=	$(PROG:%=$(ROOTETC)/%)
@@ -197,6 +203,8 @@ $(ROOTETCZONESFILES) :=	FILEMODE = 0444
 ROOTLIBZONESFILES=	$(LIBZONESFILES:%=$(ROOTLIBZONES)/%)
 $(ROOTLIBZONESFILES) :=	FILEMODE = 0555
 
+ROOTADMIN_SRC_FILE= $(ADMINFILE:%=$(ROOTADMIN_SRC_DIR)/%)
+$(ROOTADMIN_SRC_FILE) := FILEMODE = 0444
 
 #
 # Directories for smf(5) service manifests and profiles.
@@ -300,6 +308,15 @@ $(ROOTBIN32)/%: %
 	$(INS.file)
 
 $(ROOTSHLIB)/%: %
+	$(INS.file)
+
+$(ROOTPKGBIN)/%: %
+	$(INS.file)
+
+$(ROOTCLASS_SCR_DIR)/%: %
+	$(INS.file)
+
+$(ROOTADMIN_SRC_DIR)/%: %
 	$(INS.file)
 
 $(ROOTSBIN)/%: %

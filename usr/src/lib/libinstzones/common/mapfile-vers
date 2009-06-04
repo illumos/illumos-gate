@@ -1,0 +1,94 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+SUNWprivate {
+    global:
+	UmountAllZones;
+	z_add_inherited_file_system;
+	z_brands_are_implemented;
+	z_canoninplace;
+	z_createMountTable;
+	z_create_zone_admin_file;
+	z_destroyMountTable;
+	z_ExecCmdArray;
+	z_ExecCmdList;
+	z_free_brand_list;
+	z_free_inherited_file_systems;
+	z_free_zone_list;
+	z_get_inherited_file_systems;
+	z_get_nonglobal_zone_list;
+	z_get_nonglobal_zone_list_by_brand;
+	z_get_zonename;
+	z_global_only;
+	z_isPathWritable;
+	z_is_zone_branded;
+	z_is_zone_brand_in_list;
+	z_lock_this_zone;
+	z_lock_zones;
+	z_make_brand_list;
+	z_make_zone_root;
+	z_mount_in_lz;
+	z_non_global_zones_exist;
+	z_on_zone_spec;
+	z_path_canonize;
+	z_path_is_inherited;
+	z_resolve_lofs;
+	z_running_in_global_zone;
+	z_set_output_functions;
+	z_set_zone_root;
+	z_set_zone_spec;
+	z_umount_lz_mount;
+	z_unlock_this_zone;
+	z_unlock_zones;
+	z_verify_zone_spec;
+	z_zlist_change_zone_state;
+	z_zlist_get_current_state;
+	z_zlist_get_inherited_pkg_dirs;
+	z_zlist_get_original_state;
+	z_zlist_get_scratch;
+	z_zlist_get_zonename;
+	z_zlist_get_zonepath;
+	z_zlist_is_zone_runnable;
+	z_zlist_restore_zone_state;
+	z_zone_exec;
+  local:
+	*;
+};
+

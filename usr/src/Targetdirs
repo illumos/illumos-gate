@@ -159,6 +159,8 @@ ROOT.SYS= \
 	/var/log \
 	/var/log/pool \
 	/var/sadm \
+	/var/sadm/pkg \
+	/var/sadm/security \
 	/var/opt \
 	/var/run \
 	/var/smb \
@@ -313,6 +315,7 @@ ROOT.BIN= \
 	/usr/proc/bin \
 	/usr/sadm \
 	/usr/sadm/install \
+	/usr/sadm/install/bin \
 	/usr/sadm/install/scripts \
 	/usr/sadm/sysadm \
 	/usr/sadm/sysadm/add-ons \
@@ -340,7 +343,11 @@ ROOT.BIN= \
 	/var/news \
 	/var/preserve \
 	/var/saf \
-	/var/spool
+	/var/sadm/install \
+	/var/sadm/install/admin \
+	/var/sadm/install/logs \
+	/var/spool \
+	/var/spool/pkg
 
 sparcv9_ROOT.BIN64= \
 	/platform/sun4u/lib \
@@ -585,6 +592,7 @@ $(ROOT)/etc/mail/cf/sh \
 $(ROOT)/usr/mail \
 $(ROOT)/var/mail  :=	GROUP= mail
 
+
 $(ROOT)/etc/dladm :=		OWNER= dladm
 $(ROOT)/etc/dladm :=		GROUP= sys
 
@@ -604,6 +612,15 @@ $(ROOT)/var/tmp:=	DIRMODE= 1777
 $(ROOT)/root:=		DIRMODE= 700
 
 $(ROOT)/var/krb5/rcache/root:=	DIRMODE= 700
+
+
+#
+# These permissions must match those set
+# in pkgdefs.
+#
+$(ROOT)/var/sadm/pkg \
+$(ROOT)/var/sadm/security \
+$(ROOT)/var/sadm/install/logs :=	DIRMODE= 555
 
 
 #

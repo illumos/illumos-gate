@@ -157,7 +157,10 @@ SUBDIRS += \
 	libnsctl	\
 	libunistat	\
 	libdscfg	\
-	librdc
+	librdc		\
+	libinstzones	\
+	libpkg
+
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/smartcard
 SUBDIRS += \
@@ -322,10 +325,12 @@ MSGSUBDIRS=		\
 	libinetcfg	\
 	libipmp		\
 	libinetutil	\
+	libinstzones	\
 	libnsl		\
 	libpam		\
 	libpicl		\
 	libpool		\
+	libpkg		\
 	libpp		\
 	libscf		\
 	libsasl		\
@@ -574,6 +579,8 @@ libnwam:	libdoor
 librdc:		libsocket libnsl libnsctl libunistat libdscfg
 libuuid:	libdlpi
 libinetutil:	libsocket
+libinstzones:	libzonecfg libcontract
+libpkg:		libwanboot libscf libadm
 libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd
 sasl_plugins:	pkcs11 libgss libsocket libsasl

@@ -1,0 +1,223 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+SUNWprivate {
+    global:
+	add_cache;
+	attrdefault;
+	attrpreset;
+	averify;
+	backoff;
+	basepath;
+	canonize;
+	canonize_slashes;
+	cgrgid;
+	cgrnam;
+	check_cert;
+	check_cert_and_key;
+	checksum_off;
+	checksum_on;
+	ckparam;
+	ckvolseq;
+	clgrgid;
+	clgrnam;
+	close_keystore;
+	clpwnam;
+	clpwuid;
+	compute_checksum;
+	cpwnam;
+	cpwuid;
+	cverify;
+	delete_cert_and_keys;
+	devtype;
+	disable_attribute_check;
+	ds_close;
+	ds_fd_open;
+	ds_findpkg;
+	ds_getinfo;
+	ds_getpkg;
+	ds_ginit;
+	ds_init;
+	ds_next;
+	ds_order;
+	ds_putinfo;
+	ds_readbuf;
+	ds_skiptoend;
+	ds_validate_signature;
+	e_ExecCmdArray;
+	e_ExecCmdList;
+	echo_out;
+	ecleanup;
+	enable_local_fs;
+	epclose;
+	epopen;
+	esystem;
+	find_ca_certs;
+	find_cl_certs;
+	find_key_cert_pair;
+	fmkdir;
+	fverify;
+	getErrbufAddr;
+	getErrbufSize;
+	getErrstr;
+	get_categories;
+	get_cert_chain;
+	get_disable_attribute_check;
+	get_endof_string;
+	get_prog_name;
+	get_proxy_port;
+	get_signature;
+	get_startof_string;
+	get_subject_display_name;
+	getmapmode;
+	gpkglist;
+	gpkgmap;
+	gpkgmapvfp;
+	holdcinfo;
+	init_cache;
+	isFdRemote;
+	isFstypeRemote;
+	isPathRemote;
+	is_not_valid_category;
+	is_not_valid_length;
+	is_web_install;
+	iscpio;
+	isdir;
+	isfile;
+	logerr;
+	lookup_cache;
+	mappath;
+	mapvar;
+	merge_ca_cert;
+	merge_cert_and_key;
+	nonABI_symlinks;
+	open_keystore;
+	path_valid;
+	pkg_passphrase_cb;
+	pkgalias;
+	pkgerr;
+	pkgerr_add;
+	pkgerr_clear;
+	pkgerr_dump;
+	pkgerr_free;
+	pkgerr_get;
+	pkgerr_new;
+	pkgerr_num;
+	pkgexecl;
+	pkgexecv;
+	pkghead;
+	pkglist_cont;
+	pkgmount;
+	pkgstrAddToken;
+	pkgstrContainsToken;
+	pkgstrConvertPathToBasename;
+	pkgstrConvertPathToDirname;
+	pkgstrConvertUllToTimeString_r;
+	pkgstrExpandTokens;
+	pkgstrGetToken;
+	pkgstrGetToken_r;
+	pkgstrLocatePathBasename;
+	pkgstrNumTokens;
+	pkgstrPrintf;
+	pkgstrPrintf_r;
+	pkgstrRemoveLeadingWhitespace;
+	pkgstrRemoveToken;
+	pkgstrScaleNumericString;
+	pkgtrans;
+	pkgumount;
+	ppkgmap;
+	print_cert;
+	print_certs;
+	progerr;
+	putcfile;
+	putcvfpfile;
+	reset_backoff;
+	restore_local_fs;
+	rpterr;
+	rrmdir;
+	sec_init;
+	setErrstr;
+	set_memalloc_failure_func;
+	set_nonABI_symlinks;
+	set_passphrase_passarg;
+	set_passphrase_prompt;
+	set_prog_name;
+	set_web_install;
+	setmapmode;
+	srchcfile;
+	strip_port;
+	sunw_PKCS12_contents;
+	sunw_PKCS12_create;
+	sunw_check_cert_times;
+	sunw_check_keys;
+	sunw_evp_pkey_free;
+	sunw_find_fname;
+	sunw_find_localkeyid;
+	sunw_get_cert_fname;
+	sunw_get_pkey_fname;
+	sunw_get_pkey_localkeyid;
+	sunw_set_fname;
+	sunw_set_localkeyid;
+	sunw_split_certs;
+	sunw_PEM_contents;
+	tputcfent;
+	validate_signature;
+	vfpCheckpointFile;
+	vfpCheckpointOpen;
+	vfpClearModified;
+	vfpClose;
+	vfpGetModified;
+	vfpOpen;
+	vfpRewind;
+	vfpSafePwrite;
+	vfpSafeWrite;
+	vfpSetFlags;
+	vfpSetModified;
+	vfpSetSize;
+	vfpTruncate;
+	vfpWriteToFile;
+	web_cleanup;
+	web_session_control;
+	xmalloc;
+	xrealloc;
+	xstrdup;
+    local:
+	*;
+};
