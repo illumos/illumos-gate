@@ -51,6 +51,8 @@ usr/src/cmd/man/src/util/solbookv2/THIRDPARTYLICENSE
 usr/src/cmd/mdb/common/libstand/THIRDPARTYLICENSE
 usr/src/cmd/mt/THIRDPARTYLICENSE
 usr/src/cmd/ndmpd/LICENSE
+usr/src/cmd/ntfsprogs/THIRDPARTYLICENSE
+usr/src/cmd/parted/THIRDPARTYLICENSE
 usr/src/cmd/perl/5.8.4/distrib/ext/Cwd/THIRDPARTYLICENSE
 usr/src/cmd/perl/THIRDPARTYLICENSE
 usr/src/cmd/refer/THIRDPARTYLICENSE
@@ -92,6 +94,8 @@ usr/src/lib/libinetutil/common/THIRDPARTYLICENSE
 usr/src/lib/libkmf/THIRDPARTYLICENSE
 usr/src/lib/libldap5/THIRDPARTYLICENSE
 usr/src/lib/libmp/common/THIRDPARTYLICENSE
+usr/src/lib/libntfs/THIRDPARTYLICENSE
+usr/src/lib/libparted/THIRDPARTYLICENSE
 usr/src/lib/libpkg/THIRDPARTYLICENSE
 usr/src/lib/libpp/THIRDPARTYLICENSE
 usr/src/lib/libresolv/THIRDPARTYLICENSE
