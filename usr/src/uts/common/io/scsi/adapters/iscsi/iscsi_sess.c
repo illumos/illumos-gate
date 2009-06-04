@@ -85,6 +85,7 @@ static iscsi_status_t iscsi_sess_testunitready(iscsi_sess_t *isp);
 static iscsi_status_t iscsi_sess_reportluns(iscsi_sess_t *isp);
 static void iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num,
     uint8_t lun_addr_type);
+static void iscsi_sess_update_busy_luns(iscsi_sess_t *isp, boolean_t clear);
 
 /*
  * +--------------------------------------------------------------------+
@@ -199,6 +200,7 @@ clean_failed_sess:
 	isp->sess_sig			= ISCSI_SIG_SESS;
 	isp->sess_state			= ISCSI_SESS_STATE_FREE;
 	mutex_init(&isp->sess_state_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&isp->sess_reset_mutex, NULL, MUTEX_DRIVER, NULL);
 	isp->sess_hba			= ihp;
 	isp->sess_enum_in_progress	= B_FALSE;
 
@@ -215,6 +217,7 @@ clean_failed_sess:
 	isp->sess_last_err		= NoError;
 	isp->sess_tsid			= 0;
 	isp->sess_type			= type;
+	isp->sess_reset_in_progress	= B_FALSE;
 	idm_sm_audit_init(&isp->sess_state_audit);
 
 	/* copy default driver login parameters */
@@ -291,6 +294,7 @@ iscsi_sess_cleanup2:
 	iscsi_destroy_queue(&isp->sess_queue_completion);
 	iscsi_destroy_queue(&isp->sess_queue_pending);
 	mutex_destroy(&isp->sess_state_mutex);
+	mutex_destroy(&isp->sess_reset_mutex);
 	kmem_free(isp, sizeof (iscsi_sess_t));
 
 	return (NULL);
@@ -571,6 +575,7 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 	rw_destroy(&isp->sess_conn_list_rwlock);
 	mutex_destroy(&isp->sess_cmdsn_mutex);
 	mutex_destroy(&isp->sess_state_mutex);
+	mutex_destroy(&isp->sess_reset_mutex);
 	kmem_free(isp, sizeof (iscsi_sess_t));
 
 	return (rval);
@@ -1217,6 +1222,12 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 			iscsi_thread_destroy(isp->sess_ic_thread);
 		}
 
+		mutex_enter(&isp->sess_reset_mutex);
+		isp->sess_reset_in_progress = B_FALSE;
+		mutex_exit(&isp->sess_reset_mutex);
+		/* update busy luns if needed */
+		iscsi_sess_update_busy_luns(isp, B_TRUE);
+
 		mutex_enter(&isp->sess_state_mutex);
 		break;
 
@@ -1398,6 +1409,12 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 			mutex_exit(&isp->sess_state_mutex);
 			iscsi_thread_destroy(isp->sess_ic_thread);
 		}
+
+		mutex_enter(&isp->sess_reset_mutex);
+		isp->sess_reset_in_progress = B_FALSE;
+		mutex_exit(&isp->sess_reset_mutex);
+		/* update busy luns if needed */
+		iscsi_sess_update_busy_luns(isp, B_TRUE);
 
 		mutex_enter(&isp->sess_state_mutex);
 		break;
@@ -2173,6 +2190,15 @@ iscsi_sess_flush(iscsi_sess_t *isp)
 	mutex_enter(&isp->sess_queue_pending.mutex);
 	icmdp = isp->sess_queue_pending.head;
 	while (icmdp != NULL) {
+
+		if (isp->sess_state == ISCSI_SESS_STATE_FAILED) {
+			mutex_enter(&icmdp->cmd_mutex);
+			if (icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) {
+				icmdp->cmd_un.scsi.pkt_stat |= STAT_ABORTED;
+			}
+			mutex_exit(&icmdp->cmd_mutex);
+		}
+
 		iscsi_cmd_state_machine(icmdp,
 		    ISCSI_CMD_EVENT_E7, isp);
 		icmdp = isp->sess_queue_pending.head;
@@ -2241,4 +2267,27 @@ iscsi_sess_get_by_target(uint32_t target_oid, iscsi_hba_t *ihp,
 		rval = EFAULT;
 	}
 	return (rval);
+}
+
+static void
+iscsi_sess_update_busy_luns(iscsi_sess_t *isp, boolean_t clear)
+{
+	iscsi_lun_t	*ilp;
+	iscsi_hba_t	*ihp;
+
+	ASSERT(isp != NULL);
+	ihp = isp->sess_hba;
+	ASSERT(ihp != NULL);
+
+	rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
+	ilp = isp->sess_lun_list;
+	while (ilp != NULL) {
+		if (clear == B_TRUE) {
+			ilp->lun_state &= ~ISCSI_LUN_STATE_BUSY;
+		} else {
+			ilp->lun_state |= ISCSI_LUN_STATE_BUSY;
+		}
+		ilp = ilp->lun_next;
+	}
+	rw_exit(&isp->sess_lun_list_rwlock);
 }

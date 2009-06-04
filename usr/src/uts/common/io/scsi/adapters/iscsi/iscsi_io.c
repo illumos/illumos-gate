@@ -33,6 +33,7 @@
 #include <netinet/tcp.h>	/* TCP_NODELAY */
 #include <sys/socketvar.h>	/* _ALLOC_SLEEP */
 #include <sys/strsun.h>		/* DB_TYPE() */
+#include <sys/scsi/generic/sense.h>
 
 #include "iscsi.h"		/* iscsi driver */
 #include <sys/iscsi_protocol.h>	/* iscsi protocol */
@@ -106,6 +107,9 @@ static void iscsi_handle_nop(iscsi_conn_t *icp, uint32_t itt, uint32_t ttt);
 
 static void iscsi_timeout_checks(iscsi_sess_t *isp);
 static void iscsi_nop_checks(iscsi_sess_t *isp);
+static boolean_t iscsi_decode_sense(uint8_t *sense_data);
+static void iscsi_flush_cmd_after_reset(uint32_t cmd_sn, uint16_t lun_num,
+    iscsi_conn_t *icp);
 
 /*
  * This file contains the main guts of the iSCSI protocol layer.
@@ -424,7 +428,7 @@ iscsi_cmd_rsp_chk(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp)
 	}
 }
 
-static void
+static boolean_t
 iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
     uint8_t *data)
 {
@@ -434,6 +438,7 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 	int32_t			statuslen	= 0;
 	int32_t			senselen_to	= 0;
 	struct scsi_pkt		*pkt;
+	boolean_t		affect		= B_FALSE;
 
 	pkt = icmdp->cmd_un.scsi.pkt;
 	dlength = n2h24(issrhp->dlength);
@@ -542,6 +547,9 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 			if (dlength > 0) {
 				bcopy(&data[2], (uchar_t *)&arqstat->
 				    sts_sensedata, dlength);
+
+				affect = iscsi_decode_sense(
+				    (uint8_t *)&arqstat->sts_sensedata);
 			}
 			break;
 		}
@@ -570,6 +578,8 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 			pkt->pkt_scbp[0] = issrhp->cmd_status;
 		}
 	}
+
+	return (affect);
 }
 
 /*
@@ -628,6 +638,9 @@ iscsi_rx_process_cmd_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 	struct scsi_pkt		*pkt	= NULL;
 	idm_status_t		rval;
 	struct buf		*bp;
+	boolean_t		flush	= B_FALSE;
+	uint32_t		cmd_sn	= 0;
+	uint16_t		lun_num = 0;
 
 	/* make sure we get status in order */
 	mutex_enter(&icp->conn_queue_active.mutex);
@@ -725,10 +738,18 @@ iscsi_rx_process_cmd_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 	} else {
 		/* success */
 		iscsi_cmd_rsp_chk(icmdp, issrhp);
-		iscsi_cmd_rsp_cmd_status(icmdp, issrhp, data);
+		flush = iscsi_cmd_rsp_cmd_status(icmdp, issrhp, data);
+		if (flush == B_TRUE) {
+			cmd_sn = icmdp->cmd_sn;
+			ASSERT(icmdp->cmd_lun != NULL);
+			lun_num = icmdp->cmd_lun->lun_num;
+		}
 	}
 
 	iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E3, isp);
+	if (flush == B_TRUE) {
+		iscsi_flush_cmd_after_reset(cmd_sn, lun_num, icp);
+	}
 	mutex_exit(&icp->conn_queue_active.mutex);
 	return (IDM_STATUS_SUCCESS);
 }
@@ -1205,11 +1226,24 @@ iscsi_rx_process_task_mgt_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 				break;
 			}
 			/* FALLTHRU */
+		case SCSI_TCP_TM_RESP_REJECTED:
+			/*
+			 * If the target rejects our reset task,
+			 * we should record the response and complete
+			 * this command with the result.
+			 */
+			if (icmdp->cmd_type == ISCSI_CMD_TYPE_RESET) {
+				icmdp->cmd_un.reset.response =
+				    istmrhp->response;
+				iscsi_cmd_state_machine(icmdp,
+				    ISCSI_CMD_EVENT_E3, isp);
+				break;
+			}
+			/* FALLTHRU */
 		case SCSI_TCP_TM_RESP_NO_LUN:
 		case SCSI_TCP_TM_RESP_TASK_ALLEGIANT:
 		case SCSI_TCP_TM_RESP_NO_FAILOVER:
 		case SCSI_TCP_TM_RESP_IN_PRGRESS:
-		case SCSI_TCP_TM_RESP_REJECTED:
 		default:
 			/*
 			 * Something is out of sync.  Flush
@@ -1801,11 +1835,12 @@ iscsi_tx_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 
 static void
 iscsi_tx_init_hdr(iscsi_sess_t *isp, iscsi_conn_t *icp,
-    iscsi_text_hdr_t *ihp, int opcode, uint32_t cmd_itt)
+    iscsi_text_hdr_t *ihp, int opcode, iscsi_cmd_t *icmdp)
 {
 	ihp->opcode		= opcode;
-	ihp->itt		= cmd_itt;
+	ihp->itt		= icmdp->cmd_itt;
 	mutex_enter(&isp->sess_cmdsn_mutex);
+	icmdp->cmd_sn		= isp->sess_cmdsn;
 	ihp->cmdsn		= htonl(isp->sess_cmdsn);
 	isp->sess_cmdsn++;
 	mutex_exit(&isp->sess_cmdsn_mutex);
@@ -2075,7 +2110,7 @@ iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	}
 
 	iscsi_tx_init_hdr(isp, icp, (iscsi_text_hdr_t *)ihp,
-	    ISCSI_OP_SCSI_CMD, icmdp->cmd_itt);
+	    ISCSI_OP_SCSI_CMD, icmdp);
 
 	idm_pdu_init(pdu, icp->conn_ic, (void *)icmdp, &iscsi_tx_done);
 	idm_pdu_init_hdr(pdu, (uint8_t *)ihp, len);
@@ -2098,6 +2133,8 @@ iscsi_tx_scsi(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	mutex_exit(&isp->sess_queue_pending.mutex);
 
 	idm_pdu_tx(pdu);
+
+	icmdp->cmd_misc_flags |= ISCSI_CMD_MISCFLAG_SENT;
 
 	return (rval);
 }
@@ -2132,6 +2169,7 @@ iscsi_tx_pdu(iscsi_conn_t *icp, int opcode, void *hdr, int hdrlen,
 
 	mutex_exit(&icp->conn_sess->sess_queue_pending.mutex);
 	idm_pdu_tx(tx_pdu);
+	icmdp->cmd_misc_flags |= ISCSI_CMD_MISCFLAG_SENT;
 }
 
 
@@ -2159,6 +2197,7 @@ iscsi_tx_nop(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	inohp->itt	= icmdp->cmd_itt;
 	inohp->ttt	= icmdp->cmd_ttt;
 	mutex_enter(&isp->sess_cmdsn_mutex);
+	icmdp->cmd_sn	= isp->sess_cmdsn;
 	inohp->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
 	inohp->expstatsn	= htonl(icp->conn_expstatsn);
@@ -2188,6 +2227,7 @@ iscsi_tx_abort(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	istmh = kmem_zalloc(sizeof (iscsi_scsi_task_mgt_hdr_t), KM_SLEEP);
 	ASSERT(istmh != NULL);
 	mutex_enter(&isp->sess_cmdsn_mutex);
+	icmdp->cmd_sn	= isp->sess_cmdsn;
 	istmh->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
 	istmh->expstatsn = htonl(icp->conn_expstatsn);
@@ -2225,6 +2265,7 @@ iscsi_tx_reset(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	ASSERT(istmh != NULL);
 	istmh->opcode	= ISCSI_OP_SCSI_TASK_MGT_MSG | ISCSI_OP_IMMEDIATE;
 	mutex_enter(&isp->sess_cmdsn_mutex);
+	icmdp->cmd_sn	= isp->sess_cmdsn;
 	istmh->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
 	istmh->expstatsn	= htonl(icp->conn_expstatsn);
@@ -2276,6 +2317,7 @@ iscsi_tx_logout(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	ilh->itt		= icmdp->cmd_itt;
 	ilh->cid		= icp->conn_cid;
 	mutex_enter(&isp->sess_cmdsn_mutex);
+	icmdp->cmd_sn	= isp->sess_cmdsn;
 	ilh->cmdsn	= htonl(isp->sess_cmdsn);
 	mutex_exit(&isp->sess_cmdsn_mutex);
 	ilh->expstatsn	= htonl(icp->conn_expstatsn);
@@ -2314,7 +2356,7 @@ iscsi_tx_text(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	hton24(ith->dlength, icmdp->cmd_un.text.data_len);
 	ith->ttt		= icmdp->cmd_un.text.ttt;
 	iscsi_tx_init_hdr(isp, icp, (iscsi_text_hdr_t *)ith,
-	    ISCSI_OP_TEXT_CMD, icmdp->cmd_itt);
+	    ISCSI_OP_TEXT_CMD, icmdp);
 	bcopy(icmdp->cmd_un.text.lun, ith->rsvd4, sizeof (ith->rsvd4));
 
 	iscsi_tx_pdu(icp, ISCSI_OP_TEXT_CMD, ith, sizeof (iscsi_text_hdr_t),
@@ -2351,11 +2393,11 @@ iscsi_handle_abort(void *arg)
 	ASSERT(icmdp->cmd_un.scsi.abort_icmdp == NULL);
 
 	new_icmdp = iscsi_cmd_alloc(icp, KM_SLEEP);
-	new_icmdp->cmd_type		= ISCSI_CMD_TYPE_ABORT;
-	new_icmdp->cmd_lun		= icmdp->cmd_lun;
-	new_icmdp->cmd_un.abort.icmdp	= icmdp;
-	new_icmdp->cmd_conn		= icmdp->cmd_conn;
-	icmdp->cmd_un.scsi.abort_icmdp	= new_icmdp;
+	new_icmdp->cmd_type		    = ISCSI_CMD_TYPE_ABORT;
+	new_icmdp->cmd_lun		    = icmdp->cmd_lun;
+	new_icmdp->cmd_un.abort.icmdp	    = icmdp;
+	new_icmdp->cmd_conn		    = icmdp->cmd_conn;
+	icmdp->cmd_un.scsi.abort_icmdp	    = new_icmdp;
 
 	/* pending queue mutex is already held by timeout_checks */
 	iscsi_cmd_state_machine(new_icmdp, ISCSI_CMD_EVENT_E1, isp);
@@ -2425,7 +2467,7 @@ iscsi_handle_nop(iscsi_conn_t *icp, uint32_t itt, uint32_t ttt)
 }
 
 /*
- * iscsi_handle_reset -
+ * iscsi_handle_reset - send reset request to the target
  *
  */
 iscsi_status_t
@@ -2437,6 +2479,29 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 
 	ASSERT(isp != NULL);
 
+	if (level == RESET_LUN) {
+		rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
+		ASSERT(ilp != NULL);
+		if (ilp->lun_state & ISCSI_LUN_STATE_BUSY) {
+			rw_exit(&isp->sess_lun_list_rwlock);
+			return (ISCSI_STATUS_SUCCESS);
+		}
+		ilp->lun_state |= ISCSI_LUN_STATE_BUSY;
+		rw_exit(&isp->sess_lun_list_rwlock);
+	} else {
+		mutex_enter(&isp->sess_reset_mutex);
+		if (isp->sess_reset_in_progress == B_TRUE) {
+			/*
+			 * If the reset is in progress, it is unnecessary
+			 * to send reset to the target redunantly.
+			 */
+			mutex_exit(&isp->sess_reset_mutex);
+			return (ISCSI_STATUS_SUCCESS);
+		}
+		isp->sess_reset_in_progress = B_TRUE;
+		mutex_exit(&isp->sess_reset_mutex);
+	}
+
 	bzero(&icmd, sizeof (iscsi_cmd_t));
 	icmd.cmd_sig		= ISCSI_SIG_CMD;
 	icmd.cmd_state		= ISCSI_CMD_STATE_FREE;
@@ -2445,6 +2510,8 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 	icmd.cmd_un.reset.level	= level;
 	icmd.cmd_result		= ISCSI_STATUS_SUCCESS;
 	icmd.cmd_completed	= B_FALSE;
+	icmd.cmd_un.reset.response = SCSI_TCP_TM_RESP_COMPLETE;
+
 	mutex_init(&icmd.cmd_mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&icmd.cmd_completion, NULL, CV_DRIVER, NULL);
 	/*
@@ -2456,6 +2523,17 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 	if (!ISCSI_SESS_STATE_FULL_FEATURE(isp->sess_state)) {
 		/* We aren't connected to the target fake success */
 		mutex_exit(&isp->sess_state_mutex);
+
+		if (level == RESET_LUN) {
+			rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
+			ilp->lun_state &= ~ISCSI_LUN_STATE_BUSY;
+			rw_exit(&isp->sess_lun_list_rwlock);
+		} else {
+			mutex_enter(&isp->sess_reset_mutex);
+			isp->sess_reset_in_progress = B_FALSE;
+			mutex_exit(&isp->sess_reset_mutex);
+		}
+
 		return (ISCSI_STATUS_SUCCESS);
 	}
 
@@ -2483,13 +2561,74 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 		icp = isp->sess_conn_list;
 		while (icp != NULL) {
 			iscsi_cmd_t *t_icmdp = NULL;
+			iscsi_cmd_t *next_icmdp = NULL;
 
 			mutex_enter(&icp->conn_queue_active.mutex);
 			t_icmdp = icp->conn_queue_active.head;
 			while (t_icmdp != NULL) {
-				iscsi_cmd_state_machine(t_icmdp,
-				    ISCSI_CMD_EVENT_E7, isp);
-				t_icmdp = icp->conn_queue_active.head;
+				next_icmdp = t_icmdp->cmd_next;
+				mutex_enter(&t_icmdp->cmd_mutex);
+				if (!(t_icmdp->cmd_misc_flags &
+				    ISCSI_CMD_MISCFLAG_SENT)) {
+					/*
+					 * Although this command is in the
+					 * active queue, it has not been sent.
+					 * Skip it.
+					 */
+					mutex_exit(&t_icmdp->cmd_mutex);
+					t_icmdp = next_icmdp;
+					continue;
+				}
+				if (level == RESET_LUN) {
+					if (icmd.cmd_lun == NULL ||
+					    t_icmdp->cmd_lun == NULL ||
+					    (icmd.cmd_lun->lun_num !=
+					    t_icmdp->cmd_lun->lun_num)) {
+						mutex_exit(&t_icmdp->cmd_mutex);
+						t_icmdp = next_icmdp;
+						continue;
+					}
+				}
+
+				if (icmd.cmd_sn == t_icmdp->cmd_sn) {
+					/*
+					 * This command may be replied with
+					 * UA sense key later. So currently
+					 * it is not a suitable time to flush
+					 * it. Mark its flag with FLUSH. There
+					 * is no harm to keep it for a while.
+					 */
+					t_icmdp->cmd_misc_flags |=
+					    ISCSI_CMD_MISCFLAG_FLUSH;
+					if (t_icmdp->cmd_type ==
+					    ISCSI_CMD_TYPE_SCSI) {
+						t_icmdp->cmd_un.scsi.pkt_stat |=
+						    STAT_BUS_RESET;
+					}
+					mutex_exit(&t_icmdp->cmd_mutex);
+				} else if ((icmd.cmd_sn > t_icmdp->cmd_sn) ||
+				    ((t_icmdp->cmd_sn - icmd.cmd_sn) >
+				    ISCSI_CMD_SN_WRAP)) {
+					/*
+					 * This reset request must act on all
+					 * the commnds from the same session
+					 * having a CmdSN lower than the task
+					 * mangement CmdSN. So flush these
+					 * commands here.
+					 */
+					if (t_icmdp->cmd_type ==
+					    ISCSI_CMD_TYPE_SCSI) {
+						t_icmdp->cmd_un.scsi.pkt_stat |=
+						    STAT_BUS_RESET;
+					}
+					mutex_exit(&t_icmdp->cmd_mutex);
+					iscsi_cmd_state_machine(t_icmdp,
+					    ISCSI_CMD_EVENT_E7, isp);
+				} else {
+					mutex_exit(&t_icmdp->cmd_mutex);
+				}
+
+				t_icmdp = next_icmdp;
 			}
 
 			mutex_exit(&icp->conn_queue_active.mutex);
@@ -2501,6 +2640,16 @@ iscsi_handle_reset(iscsi_sess_t *isp, int level, iscsi_lun_t *ilp)
 	/* clean up */
 	cv_destroy(&icmd.cmd_completion);
 	mutex_destroy(&icmd.cmd_mutex);
+
+	if (level == RESET_LUN) {
+		rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
+		ilp->lun_state &= ~ISCSI_LUN_STATE_BUSY;
+		rw_exit(&isp->sess_lun_list_rwlock);
+	} else {
+		mutex_enter(&isp->sess_reset_mutex);
+		isp->sess_reset_in_progress = B_FALSE;
+		mutex_exit(&isp->sess_reset_mutex);
+	}
 
 	return (rval);
 }
@@ -3227,16 +3376,31 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 			if (icmdp->cmd_lbolt_timeout == 0)
 				continue;
 
-			/* Skip if command is not active */
-			if (icmdp->cmd_state != ISCSI_CMD_STATE_ACTIVE)
+			/*
+			 * Skip if command is not active or not needed
+			 * to flush.
+			 */
+			if (icmdp->cmd_state != ISCSI_CMD_STATE_ACTIVE &&
+			    !(icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_FLUSH))
 				continue;
 
 			/* Skip if timeout still in the future */
 			if (now <= icmdp->cmd_lbolt_timeout)
 				continue;
 
-			/* timeout */
-			iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E6, isp);
+			if (icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_FLUSH) {
+				/*
+				 * This command is left during target reset,
+				 * we can flush it now.
+				 */
+				iscsi_cmd_state_machine(icmdp,
+				    ISCSI_CMD_EVENT_E7, isp);
+			} else if (icmdp->cmd_state == ISCSI_CMD_STATE_ACTIVE) {
+				/* timeout */
+				iscsi_cmd_state_machine(icmdp,
+				    ISCSI_CMD_EVENT_E6, isp);
+			}
+
 		}
 		mutex_exit(&icp->conn_queue_active.mutex);
 		mutex_exit(&isp->sess_queue_pending.mutex);
@@ -3299,3 +3463,91 @@ iscsi_nop_checks(iscsi_sess_t *isp)
  * | End of wd routines						|
  * +--------------------------------------------------------------------+
  */
+
+/*
+ * iscsi_flush_cmd_after_reset - flush commands after reset
+ *
+ * Here we will flush all the commands in the same connection whose cmdsn is
+ * less than the one received with the Unit Attention.
+ */
+static void
+iscsi_flush_cmd_after_reset(uint32_t cmd_sn, uint16_t lun_num,
+    iscsi_conn_t *icp)
+{
+	iscsi_cmd_t	*t_icmdp    = NULL;
+	iscsi_cmd_t	*next_icmdp = NULL;
+
+	ASSERT(icp != NULL);
+
+	t_icmdp = icp->conn_queue_active.head;
+	while (t_icmdp != NULL) {
+		next_icmdp = t_icmdp->cmd_next;
+		mutex_enter(&t_icmdp->cmd_mutex);
+		/*
+		 * We will flush the commands whose cmdsn is less than the one
+		 * got Unit Attention.
+		 * Here we will check for wrap by subtracting and compare to
+		 * 1/2 of a 32 bit number, if greater then we wrapped.
+		 */
+		if ((t_icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_SENT) &&
+		    ((cmd_sn > t_icmdp->cmd_sn) ||
+		    ((t_icmdp->cmd_sn - cmd_sn) >
+		    ISCSI_CMD_SN_WRAP))) {
+			if (t_icmdp->cmd_lun != NULL &&
+			    t_icmdp->cmd_lun->lun_num == lun_num) {
+				t_icmdp->cmd_misc_flags |=
+				    ISCSI_CMD_MISCFLAG_FLUSH;
+				if (t_icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) {
+					t_icmdp->cmd_un.scsi.pkt_stat |=
+					    STAT_BUS_RESET;
+				}
+			}
+		}
+		mutex_exit(&t_icmdp->cmd_mutex);
+		t_icmdp = next_icmdp;
+	}
+}
+
+/*
+ * iscsi_decode_sense - decode the sense data in the cmd response
+ *
+ * Here we only care about Unit Attention with 0x29.
+ */
+static boolean_t
+iscsi_decode_sense(uint8_t *sense_data)
+{
+	uint8_t	sense_key   = 0;
+	uint8_t	asc	    = 0;
+	boolean_t affect    = B_FALSE;
+
+	ASSERT(sense_data != NULL);
+
+	sense_key = scsi_sense_key(sense_data);
+	switch (sense_key) {
+		case KEY_UNIT_ATTENTION:
+			asc = scsi_sense_asc(sense_data);
+			switch (asc) {
+				case ISCSI_SCSI_RESET_SENSE_CODE:
+					/*
+					 * POWER ON, RESET, OR BUS_DEVICE RESET
+					 * OCCURRED
+					 */
+					affect = B_TRUE;
+					break;
+				default:
+					/*
+					 * Currently we don't care
+					 * about other sense key.
+					 */
+					break;
+			}
+			break;
+		default:
+			/*
+			 * Currently we don't care
+			 * about other sense key.
+			 */
+			break;
+	}
+	return (affect);
+}

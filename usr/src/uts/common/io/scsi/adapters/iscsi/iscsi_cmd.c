@@ -336,6 +336,9 @@ iscsi_cmd_state_free(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				    iscsi_cmd_timeout_factor);
 			else
 				icmdp->cmd_lbolt_timeout = 0;
+
+			icmdp->cmd_un.scsi.pkt_stat &=
+			    ISCSI_CMD_PKT_STAT_INIT;
 		} else {
 			icmdp->cmd_lbolt_timeout = icmdp->cmd_lbolt_pending +
 			    SEC_TO_TICK(ISCSI_INTERNAL_CMD_TIMEOUT *
@@ -636,7 +639,7 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				    CMD_TIMEOUT, STAT_TIMEOUT);
 			} else {
 				ISCSI_CMD_SET_REASON_STAT(icmdp,
-				    CMD_TRAN_ERR, 0);
+				    CMD_TRAN_ERR, icmdp->cmd_un.scsi.pkt_stat);
 			}
 			iscsi_enqueue_completed_cmd(isp, icmdp);
 			break;
@@ -792,7 +795,7 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				 * when we complete the command.
 				 */
 				ISCSI_CMD_SET_REASON_STAT(
-				    t_icmdp, CMD_TIMEOUT, STAT_TIMEOUT);
+				    t_icmdp, CMD_TIMEOUT, STAT_ABORTED);
 				idm_task_abort(icp->conn_ic, t_icmdp->cmd_itp,
 				    AT_TASK_MGMT_ABORT);
 			} else {
@@ -811,9 +814,17 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			mutex_exit(&isp->sess_cmdsn_mutex);
 
 			/*
-			 * Complete the abort/reset successfully.
+			 * Complete the abort/reset command.
 			 */
-			ISCSI_CMD_ISSUE_CALLBACK(icmdp, ISCSI_STATUS_SUCCESS);
+			if (icmdp->cmd_un.reset.response !=
+			    SCSI_TCP_TM_RESP_COMPLETE) {
+				ISCSI_CMD_ISSUE_CALLBACK(icmdp,
+				    ISCSI_STATUS_CMD_FAILED);
+			} else {
+				ISCSI_CMD_ISSUE_CALLBACK(icmdp,
+				    ISCSI_STATUS_SUCCESS);
+			}
+
 			break;
 
 		case ISCSI_CMD_TYPE_LOGOUT:
@@ -1014,8 +1025,8 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			mutex_enter(&icp->conn_queue_idm_aborting.mutex);
 			iscsi_enqueue_idm_aborting_cmd(icmdp->cmd_conn, icmdp);
 			mutex_exit(&icp->conn_queue_idm_aborting.mutex);
-
-			ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
+			ISCSI_CMD_SET_REASON_STAT(icmdp,
+			    CMD_TRAN_ERR, icmdp->cmd_un.scsi.pkt_stat);
 			idm_task_abort(icp->conn_ic, icmdp->cmd_itp,
 			    AT_TASK_MGMT_ABORT);
 			break;
@@ -1111,7 +1122,8 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		iscsi_task_cleanup(ISCSI_OP_SCSI_RSP, icmdp);
 		iscsi_sess_release_scsi_itt(icmdp);
 
-		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
+		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR,
+		    icmdp->cmd_un.scsi.pkt_stat);
 		iscsi_enqueue_completed_cmd(isp, icmdp);
 		break;
 
@@ -1193,7 +1205,9 @@ iscsi_cmd_state_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			    ISCSI_CMD_EVENT_E10, arg);
 		}
 
-		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
+		ISCSI_CMD_SET_REASON_STAT(icmdp,
+		    CMD_TRAN_ERR, icmdp->cmd_un.scsi.pkt_stat);
+
 		idm_task_abort(icmdp->cmd_conn->conn_ic, icmdp->cmd_itp,
 		    AT_TASK_MGMT_ABORT);
 		break;
@@ -1205,7 +1219,8 @@ iscsi_cmd_state_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		iscsi_task_cleanup(ISCSI_OP_SCSI_RSP, icmdp);
 		iscsi_sess_release_scsi_itt(icmdp);
 
-		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR, 0);
+		ISCSI_CMD_SET_REASON_STAT(icmdp, CMD_TRAN_ERR,
+		    icmdp->cmd_un.scsi.pkt_stat);
 		iscsi_enqueue_completed_cmd(isp, icmdp);
 		break;
 
@@ -1261,8 +1276,10 @@ iscsi_cmd_state_idm_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event,
 	case ISCSI_CMD_EVENT_E7:
 		/*
 		 * We have already requested IDM to stop processing this
-		 * command so ignore this request.
+		 * command so just update the pkt_statistics.
 		 */
+		ISCSI_CMD_SET_REASON_STAT(icmdp,
+		    CMD_TRAN_ERR, icmdp->cmd_un.scsi.pkt_stat);
 		break;
 
 	/* -E9: IDM is no longer processing this command */

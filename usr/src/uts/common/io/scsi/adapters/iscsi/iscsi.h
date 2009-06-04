@@ -380,6 +380,16 @@ typedef enum iscsi_cmd_text_stage {
 #define	ISCSI_CMD_MISCFLAG_FREE		0x2
 #define	ISCSI_CMD_MISCFLAG_STUCK	0x4
 #define	ISCSI_CMD_MISCFLAG_XARQ 	0x8
+#define	ISCSI_CMD_MISCFLAG_SENT		0x10
+#define	ISCSI_CMD_MISCFLAG_FLUSH	0x20
+
+/*
+ * 1/2 of a 32 bit number, used for checking CmdSN
+ * wrapped.
+ */
+#define	ISCSI_CMD_SN_WRAP		0x80000000
+
+#define	ISCSI_CMD_PKT_STAT_INIT		0
 
 /*
  * iSCSI cmd/pkt Structure
@@ -430,6 +440,10 @@ typedef struct iscsi_cmd {
 			 * another R2T to handle.
 			 */
 			boolean_t		r2t_more;
+			/*
+			 * It is used to record pkt_statistics temporarily.
+			 */
+			uint_t			pkt_stat;
 		} scsi;
 		/* ISCSI_CMD_TYPE_ABORT */
 		struct {
@@ -439,6 +453,7 @@ typedef struct iscsi_cmd {
 		/* ISCSI_CMD_TYPE_RESET */
 		struct {
 			int			level;
+			uint8_t			response;
 		} reset;
 		/* ISCSI_CMD_TYPE_NOP */
 		struct {
@@ -497,6 +512,8 @@ typedef struct iscsi_cmd {
 	idm_pdu_t		cmd_pdu;
 
 	sm_audit_buf_t		cmd_state_audit;
+
+	uint32_t		cmd_sn;
 } iscsi_cmd_t;
 
 
@@ -528,12 +545,15 @@ typedef struct iscsi_lun {
 	uchar_t			lun_type;
 } iscsi_lun_t;
 
-#define	ISCSI_LUN_STATE_CLEAR	0		/* used to clear all states */
-#define	ISCSI_LUN_STATE_OFFLINE	1
-#define	ISCSI_LUN_STATE_ONLINE	2
-#define	ISCSI_LUN_STATE_INVALID	4		/* offline failed */
+#define	ISCSI_LUN_STATE_CLEAR	    0		/* used to clear all states */
+#define	ISCSI_LUN_STATE_OFFLINE	    1
+#define	ISCSI_LUN_STATE_ONLINE	    2
+#define	ISCSI_LUN_STATE_INVALID	    4		/* offline failed */
+#define	ISCSI_LUN_STATE_BUSY	    8		/* logic unit is in reset */
 
-#define	ISCSI_LUN_CAP_RESET   0x01
+#define	ISCSI_LUN_CAP_RESET	    0x01
+
+#define	ISCSI_SCSI_RESET_SENSE_CODE 0x29
 
 /*
  *
@@ -959,6 +979,10 @@ typedef struct iscsi_sess {
 	iscsi_thread_t		*sess_wd_thread;
 
 	sm_audit_buf_t		sess_state_audit;
+
+	kmutex_t		sess_reset_mutex;
+
+	boolean_t		sess_reset_in_progress;
 } iscsi_sess_t;
 
 /*

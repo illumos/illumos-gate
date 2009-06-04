@@ -1068,7 +1068,7 @@ iscsi_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 static int
 iscsi_tran_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 {
-	return (iscsi_i_commoncap(ap, cap, 0, whom, 1));
+	return (iscsi_i_commoncap(ap, cap, value, whom, 1));
 }
 
 

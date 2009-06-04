@@ -913,6 +913,13 @@ iscsi_conn_flush_active_cmds(iscsi_conn_t *icp)
 	/* Flush active queue */
 	icmdp = icp->conn_queue_active.head;
 	while (icmdp != NULL) {
+
+		mutex_enter(&icmdp->cmd_mutex);
+		if (icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) {
+			icmdp->cmd_un.scsi.pkt_stat |= STAT_ABORTED;
+		}
+		mutex_exit(&icmdp->cmd_mutex);
+
 		iscsi_cmd_state_machine(icmdp,
 		    ISCSI_CMD_EVENT_E7, isp);
 		icmdp = icp->conn_queue_active.head;
