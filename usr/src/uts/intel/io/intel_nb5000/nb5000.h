@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -287,6 +287,8 @@ extern "C" {
 	EMASK_FBD_M11|EMASK_FBD_M10|EMASK_FBD_M9|EMASK_FBD_M8|EMASK_FBD_M7| \
 	EMASK_FBD_M6|EMASK_FBD_M5|EMASK_FBD_M4)
 
+#define	ERR_INT_ALL	(nb_chipset == INTEL_NB_5400 ? 0xffffffff : 0xff)
+
 #define	ERR_FAT_INT_B14	0x0400	/* B14Msk SF Scrub DBE */
 #define	ERR_FAT_INT_B12	0x0100	/* B12Msk Parity Protected register */
 #define	ERR_FAT_INT_B25	0x0080	/* B25Msk illegal HISMM/TSEG access */
@@ -346,6 +348,7 @@ extern "C" {
 #define	EMASK_INT_7300	(EMASK_INT_B3|EMASK_INT_B1)
 /* MCH 7300 errata 17,20 & 21 */
 #define	EMASK_INT_7300_STEP_0	(EMASK_INT_B7|EMASK_INT_B3|EMASK_INT_B1)
+#define	EMASK_INT_5400 0
 
 #define	EMASK_INT_FATAL (EMASK_INT_B7|EMASK_INT_B4|EMASK_INT_B3|EMASK_INT_B2| \
 	EMASK_INT_B1)
@@ -730,12 +733,12 @@ extern "C" {
 	nb_pci_getb(0, 16, 2, 0xc2, ip) : \
 	(uint16_t)nb_pci_getb(0, 16, 2, 0xc1, ip))
 #define	NERR_FAT_INT_RD(ip)	((nb_chipset == INTEL_NB_5400) ? \
-	((uint16_t)nb_pci_getb(0, 16, 2, 0xc4, ip) << 8) | \
-	nb_pci_getb(0, 16, 2, 0xc5, ip) : \
+	((uint16_t)nb_pci_getb(0, 16, 2, 0xc5, ip) << 8) | \
+	nb_pci_getb(0, 16, 2, 0xc4, ip) : \
 	(uint16_t)nb_pci_getb(0, 16, 2, 0xc2, ip))
 #define	NERR_NF_INT_RD(ip)	((nb_chipset == INTEL_NB_5400) ? \
-	((uint16_t)nb_pci_getb(0, 16, 2, 0xc6, ip) << 8) | \
-	nb_pci_getb(0, 16, 2, 0xc7, ip) : \
+	((uint16_t)nb_pci_getb(0, 16, 2, 0xc7, ip) << 8) | \
+	nb_pci_getb(0, 16, 2, 0xc6, ip) : \
 	(uint16_t)nb_pci_getb(0, 16, 2, 0xc3, ip))
 #define	EMASK_INT_RD()		((nb_chipset == INTEL_NB_5400) ? \
 	nb_pci_getl(0, 16, 2, 0xd0, 0) : nb_pci_getb(0, 16, 2, 0xcc, 0))

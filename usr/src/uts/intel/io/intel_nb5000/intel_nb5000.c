@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,6 +362,9 @@ intel_int_err(uint16_t err_fat_int, uint16_t err_nf_int)
 		nerr++;
 	}
 
+	if (rt)
+		err_nf_int &= ~ERR_NF_INT_B18;
+
 	sz = sizeof (nf_int_error_code) / sizeof (struct mch_error_code);
 
 	for (i = 0; i < sz; i++) {
@@ -379,10 +382,11 @@ intel_int_err(uint16_t err_fat_int, uint16_t err_nf_int)
 	return (rt);
 }
 
-static void
+static int
 log_int_err(nb_regs_t *rp, int *interpose)
 {
 	int t = 0;
+	int rt = 0;
 
 	rp->flag = NB_REG_LOG_INT;
 	rp->nb.int_regs.ferr_fat_int = FERR_FAT_INT_RD(interpose);
@@ -412,6 +416,14 @@ log_int_err(nb_regs_t *rp, int *interpose)
 		NRECSF_WR();
 		RECSF_WR();
 	}
+	if (rp->nb.int_regs.ferr_fat_int == 0 &&
+	    rp->nb.int_regs.nerr_fat_int == 0 &&
+	    (rp->nb.int_regs.ferr_nf_int == ERR_NF_INT_B18 ||
+	    (rp->nb.int_regs.ferr_nf_int == 0 &&
+	    rp->nb.int_regs.nerr_nf_int == ERR_NF_INT_B18))) {
+		rt = 1;
+	}
+	return (rt);
 }
 
 static void
@@ -1016,6 +1028,7 @@ log_ferr(uint64_t ferr, uint32_t *nerrp, nb_logout_t *log, int willpanic)
 	nb_regs_t *rp = &log->nb_regs;
 	uint32_t nerr = *nerrp;
 	int interpose = 0;
+	int spurious = 0;
 
 	log->acl_timestamp = gethrtime_waitfree();
 	if ((ferr & (GE_PCIEX_FATAL | GE_PCIEX_NF)) != 0) {
@@ -1034,7 +1047,7 @@ log_ferr(uint64_t ferr, uint32_t *nerrp, nb_logout_t *log, int willpanic)
 		log_dma_err(rp, &interpose);
 		*nerrp = nerr & ~(GE_DMA_FATAL | GE_DMA_NF);
 	} else if ((ferr & (GE_INT_FATAL | GE_INT_NF)) != 0) {
-		log_int_err(rp, &interpose);
+		spurious = log_int_err(rp, &interpose);
 		*nerrp = nerr & ~(GE_INT_FATAL | GE_INT_NF);
 	} else if (nb_chipset == INTEL_NB_5400 &&
 	    (ferr & (GE_FERR_THERMAL_FATAL | GE_FERR_THERMAL_NF)) != 0) {
@@ -1045,8 +1058,10 @@ log_ferr(uint64_t ferr, uint32_t *nerrp, nb_logout_t *log, int willpanic)
 		log->type = "inject";
 	else
 		log->type = "error";
-	errorq_dispatch(nb_queue, log, sizeof (nb_logout_t),
-	    willpanic ? ERRORQ_SYNC : ERRORQ_ASYNC);
+	if (!spurious) {
+		errorq_dispatch(nb_queue, log, sizeof (nb_logout_t),
+		    willpanic ? ERRORQ_SYNC : ERRORQ_ASYNC);
+	}
 }
 
 static void
@@ -1055,6 +1070,7 @@ log_nerr(uint32_t *errp, nb_logout_t *log, int willpanic)
 	uint32_t err;
 	nb_regs_t *rp = &log->nb_regs;
 	int interpose = 0;
+	int spurious = 0;
 
 	err = *errp;
 	log->acl_timestamp = gethrtime_waitfree();
@@ -1074,15 +1090,17 @@ log_nerr(uint32_t *errp, nb_logout_t *log, int willpanic)
 		log_dma_err(rp, &interpose);
 		*errp = err & ~(GE_DMA_FATAL | GE_DMA_NF);
 	} else if ((err & (GE_INT_FATAL | GE_INT_NF)) != 0) {
-		log_int_err(rp, &interpose);
+		spurious = log_int_err(rp, &interpose);
 		*errp = err & ~(GE_INT_FATAL | GE_INT_NF);
 	}
 	if (interpose)
 		log->type = "inject";
 	else
 		log->type = "error";
-	errorq_dispatch(nb_queue, log, sizeof (nb_logout_t),
-	    willpanic ? ERRORQ_SYNC : ERRORQ_ASYNC);
+	if (!spurious) {
+		errorq_dispatch(nb_queue, log, sizeof (nb_logout_t),
+		    willpanic ? ERRORQ_SYNC : ERRORQ_ASYNC);
+	}
 }
 
 /*ARGSUSED*/

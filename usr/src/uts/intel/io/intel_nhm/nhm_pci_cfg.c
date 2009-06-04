@@ -70,6 +70,7 @@ nhm_pci_cfg_setup(dev_info_t *dip)
 			}
 		}
 	}
+	ddi_prop_remove_all(dip);
 }
 
 void

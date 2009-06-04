@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,10 +70,10 @@ kmutex_t nb_mutex;
 
 static int nb_dimm_slots;
 
-static uint8_t nb_err0_int;
-static uint8_t nb_err1_int;
-static uint8_t nb_err2_int;
-static uint8_t nb_mcerr_int;
+static uint32_t nb_err0_int;
+static uint32_t nb_err1_int;
+static uint32_t nb_err2_int;
+static uint32_t nb_mcerr_int;
 static uint32_t nb_emask_int;
 
 static uint32_t nb_err0_fbd;
@@ -100,7 +100,7 @@ static uint32_t emask_rp_pex[NB_PCI_DEV];
 static uint32_t docmd_pex[NB_PCI_DEV];
 static uint32_t uncerrsev[NB_PCI_DEV];
 
-static uint8_t l_mcerr_int;
+static uint32_t l_mcerr_int;
 static uint32_t l_mcerr_fbd;
 static uint16_t l_mcerr_fsb;
 static uint16_t l_mcerr_thr;
@@ -118,7 +118,7 @@ int nb5000_reset_emask_fsb = 1;
 uint_t nb5000_mask_poll_fsb = EMASK_FSB_NF;
 uint_t nb5000_mask_bios_fsb = EMASK_FSB_FATAL;
 
-uint_t nb5400_emask_int = 0;
+uint_t nb5400_emask_int = EMASK_INT_5400;
 
 uint_t nb7300_emask_int = EMASK_INT_7300;
 uint_t nb7300_emask_int_step0 = EMASK_INT_7300_STEP_0;
@@ -134,12 +134,7 @@ int nb5000_reset_uncor_pex = 0;
 uint_t nb5000_mask_uncor_pex = 0;
 int nb5000_reset_cor_pex = 0;
 uint_t nb5000_mask_cor_pex = 0xffffffff;
-int nb_set_docmd = 1;
 uint32_t nb5000_rp_pex = 0x1;
-uint32_t nb5000_docmd_pex_mask = DOCMD_PEX_MASK;
-uint32_t nb5400_docmd_pex_mask = DOCMD_5400_PEX_MASK;
-uint32_t nb5000_docmd_pex = DOCMD_PEX;
-uint32_t nb5400_docmd_pex = DOCMD_5400_PEX;
 
 int nb_mask_mc_set;
 
@@ -523,13 +518,22 @@ find_dimms_per_channel()
 	return (rt);
 }
 
+struct smb_dimm_rec {
+	int dimms;
+	int slots;
+	int populated;
+	nb_dimm_t **dimmpp;
+};
+
 static int
 dimm_label(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 {
-	nb_dimm_t ***dimmpp = arg;
+	struct smb_dimm_rec *rp = (struct smb_dimm_rec *)arg;
+	nb_dimm_t ***dimmpp;
 	nb_dimm_t *dimmp;
 	smbios_memdevice_t md;
 
+	dimmpp = &rp->dimmpp;
 	if (sp->smbstr_type == SMB_TYPE_MEMDEVICE) {
 		if (*dimmpp >= &nb_dimms[nb_dimm_slots])
 			return (-1);
@@ -537,6 +541,12 @@ dimm_label(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 		if (smbios_info_memdevice(shp, sp->smbstr_id, &md) == 0 &&
 		    md.smbmd_dloc != NULL) {
 			if (md.smbmd_size) {
+				if (dimmp == NULL &&
+				    (rp->slots == nb_dimm_slots ||
+				    rp->dimms < rp->populated)) {
+					(*dimmpp)++;
+					return (0);
+				}
 				/*
 				 * if there is no physical dimm for this smbios
 				 * record it is because this system has less
@@ -545,9 +555,10 @@ dimm_label(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 				 * smbios record belongs too
 				 */
 				while (dimmp == NULL) {
+					(*dimmpp)++;
 					if (*dimmpp >= &nb_dimms[nb_dimm_slots])
 						return (-1);
-					dimmp = *(++(*dimmpp));
+					dimmp = **dimmpp;
 				}
 				(void) snprintf(dimmp->label,
 				    sizeof (dimmp->label), "%s", md.smbmd_dloc);
@@ -558,14 +569,40 @@ dimm_label(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 	return (0);
 }
 
+static int
+check_memdevice(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
+{
+	struct smb_dimm_rec *rp = (struct smb_dimm_rec *)arg;
+	smbios_memdevice_t md;
+
+	if (sp->smbstr_type == SMB_TYPE_MEMDEVICE) {
+		if (smbios_info_memdevice(shp, sp->smbstr_id, &md) == 0) {
+			rp->slots++;
+			if (md.smbmd_size) {
+				rp->populated++;
+			}
+		}
+	}
+	return (0);
+}
+
 void
 nb_smbios()
 {
-	nb_dimm_t **dimmpp;
+	struct smb_dimm_rec r;
+	int i;
 
 	if (ksmbios != NULL && nb_no_smbios == 0) {
-		dimmpp = nb_dimms;
-		(void) smbios_iter(ksmbios, dimm_label, &dimmpp);
+		r.dimms = 0;
+		r.slots = 0;
+		r.populated = 0;
+		r.dimmpp = nb_dimms;
+		for (i = 0; i < nb_dimm_slots; i++) {
+			if (nb_dimms[i] != NULL)
+				r.dimms++;
+		}
+		(void) smbios_iter(ksmbios, check_memdevice, &r);
+		(void) smbios_iter(ksmbios, dimm_label, &r);
 	}
 }
 
@@ -650,7 +687,6 @@ static void
 nb_pex_init()
 {
 	int i = 0; /* ESI port */
-	uint32_t mask;
 	uint16_t regw;
 
 	emask_uncor_pex[i] = EMASK_UNCOR_PEX_RD(i);
@@ -663,18 +699,9 @@ nb_pex_init()
 		EMASK_UNCOR_PEX_WR(i, nb5000_mask_uncor_pex);
 	if (nb5000_reset_cor_pex)
 		EMASK_COR_PEX_WR(i, nb5000_mask_cor_pex);
-	if (nb_set_docmd) {
-		if (nb_chipset == INTEL_NB_5400) {
-			/* disable masking of ERR pins used by DOCMD */
-			PEX_ERR_PIN_MASK_WR(i, 0x10);
-
-			mask = (docmd_pex[i] & nb5400_docmd_pex_mask) |
-			    (nb5400_docmd_pex & ~nb5400_docmd_pex_mask);
-		} else {
-			mask = (docmd_pex[i] & nb5000_docmd_pex_mask) |
-			    (nb5000_docmd_pex & ~nb5000_docmd_pex_mask);
-		}
-		PEX_ERR_DOCMD_WR(i, mask);
+	if (nb_chipset == INTEL_NB_5400) {
+		/* disable masking of ERR pins used by DOCMD */
+		PEX_ERR_PIN_MASK_WR(i, 0x10);
 	}
 
 	/* RP error message (CE/NFE/FE) detect mask */
@@ -712,10 +739,10 @@ nb_pex_fini()
 void
 nb_int_init()
 {
-	uint8_t err0_int;
-	uint8_t err1_int;
-	uint8_t err2_int;
-	uint8_t mcerr_int;
+	uint32_t err0_int;
+	uint32_t err1_int;
+	uint32_t err2_int;
+	uint32_t mcerr_int;
 	uint32_t emask_int;
 	uint16_t stepping;
 
@@ -731,11 +758,11 @@ nb_int_init()
 	nb_mcerr_int = mcerr_int;
 	nb_emask_int = emask_int;
 
-	ERR0_INT_WR(0xff);
-	ERR1_INT_WR(0xff);
-	ERR2_INT_WR(0xff);
-	MCERR_INT_WR(0xff);
-	EMASK_INT_WR(0xff);
+	ERR0_INT_WR(ERR_INT_ALL);
+	ERR1_INT_WR(ERR_INT_ALL);
+	ERR2_INT_WR(ERR_INT_ALL);
+	MCERR_INT_WR(ERR_INT_ALL);
+	EMASK_INT_WR(ERR_INT_ALL);
 
 	mcerr_int &= ~nb5000_mask_bios_int;
 	mcerr_int |= nb5000_mask_bios_int & (~err0_int | ~err1_int | ~err2_int);
@@ -770,11 +797,11 @@ nb_int_init()
 void
 nb_int_fini()
 {
-	ERR0_INT_WR(0xff);
-	ERR1_INT_WR(0xff);
-	ERR2_INT_WR(0xff);
-	MCERR_INT_WR(0xff);
-	EMASK_INT_WR(0xff);
+	ERR0_INT_WR(ERR_INT_ALL);
+	ERR1_INT_WR(ERR_INT_ALL);
+	ERR2_INT_WR(ERR_INT_ALL);
+	MCERR_INT_WR(ERR_INT_ALL);
+	EMASK_INT_WR(ERR_INT_ALL);
 
 	ERR0_INT_WR(nb_err0_int);
 	ERR1_INT_WR(nb_err1_int);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -408,11 +408,11 @@ inb_mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	if (inb_dip == NULL) {
 		inb_dip = dip;
-		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip, "model",
-		    inb_mc_name());
 		nb_no_smbios = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 		    DDI_PROP_DONTPASS, "no-smbios", 0);
 		nb_pci_cfg_setup(dip);
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip, "model",
+		    inb_mc_name());
 		if (nb_dev_init()) {
 			nb_pci_cfg_free();
 			inb_dip = NULL;

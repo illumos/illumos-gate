@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@ nb_pci_cfg_setup(dev_info_t *dip)
 			    "intel_nb5000: pci_config_setup failed");
 		reg.pci_phys_hi += 1 << PCI_REG_DEV_SHIFT;
 	}
+	ddi_prop_remove_all(dip);
 }
 
 void

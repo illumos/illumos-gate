@@ -186,9 +186,9 @@ inhm_mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	if (inhm_dip == NULL) {
 		inhm_dip = dip;
+		nhm_pci_cfg_setup(dip);
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip, "model",
 		    inhm_mc_name());
-		nhm_pci_cfg_setup(dip);
 		if (nhm_dev_init()) {
 			nhm_pci_cfg_free();
 			inhm_dip = NULL;
