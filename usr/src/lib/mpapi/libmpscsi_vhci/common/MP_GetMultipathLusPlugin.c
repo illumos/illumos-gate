@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,21 +61,27 @@ static int getOidList(di_node_t root_node, MP_OID_LIST *pOidList)
 
 		if (haveList && (numNodes < pOidList->oidCount)) {
 
+			/* skip the node which is not online */
+			if (di_state(sv_child_node) != 0) {
+				sv_child_node = di_sibling_node(sv_child_node);
+				continue;
+			}
+
 			instNum =
-			(MP_UINT64)di_instance(sv_child_node);
+			    (MP_UINT64)di_instance(sv_child_node);
 
 			log(LOG_INFO, "getOidList()",
 			    " - instance number is: %llx",
 			    instNum);
 
 			pOidList->oids[numNodes].objectType =
-			MP_OBJECT_TYPE_MULTIPATH_LU;
+			    MP_OBJECT_TYPE_MULTIPATH_LU;
 
 			pOidList->oids[numNodes].ownerId =
-			g_pluginOwnerID;
+			    g_pluginOwnerID;
 
 			pOidList->oids[numNodes].objectSequenceNumber =
-			instNum;
+			    instNum;
 		}
 
 		++numNodes;
@@ -147,10 +153,10 @@ MP_GetMultipathLusPlugin(MP_OID_LIST **ppList)
 		}
 
 		pOidList->oids[0].objectType =
-		MP_OBJECT_TYPE_MULTIPATH_LU;
+		    MP_OBJECT_TYPE_MULTIPATH_LU;
 
 		pOidList->oids[0].ownerId =
-		g_pluginOwnerID;
+		    g_pluginOwnerID;
 
 		*ppList = pOidList;
 

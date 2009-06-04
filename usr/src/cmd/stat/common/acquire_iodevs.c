@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "statcommon.h"
 #include "dsr.h"
@@ -696,7 +694,7 @@ get_lti(char *s,
 {
 	int  num = 0;
 
-	num = sscanf(s, "%[a-z]%d%*[.]%[a-z]%d%*[.]%[a-z]%d", lname, l,
+	num = sscanf(s, "%[a-z]%d%*[.]%[a-z]%d%*[.]%[a-z_]%d", lname, l,
 	    tname, t, iname, i);
 	return ((num == 6) ? 1 : 0);
 }
