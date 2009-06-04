@@ -38,7 +38,6 @@
  * operations from a supplied menu or from the command line. Diagnostic
  * options are also available.
  */
- 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -871,7 +870,7 @@ main(int argc, char *argv[])
 		if (io_ifdisk) {
 			(void) fprintf(stderr, "\n");
 			(void) fprintf(stderr, "Press Enter to continue.\n");
-			(void) gets(s);
+			(void) fgets(s, sizeof (s), stdin);
 		}
 	}
 
@@ -1000,7 +999,7 @@ dev_mboot_write(off_t sect, char *buff, int bootsiz)
 		print_Table();
 		if (io_ifdisk) {
 			(void) fprintf(stderr, "Press Enter to continue.\n");
-			(void) gets(s);
+			(void) fgets(s, sizeof (s), stdin);
 		}
 	}
 
@@ -1971,15 +1970,16 @@ stage0(void)
 	for (;;) {
 		(void) printf(Q_LINE);
 		(void) printf("Enter Selection: ");
-		(void) gets(s);
+		(void) fgets(s, sizeof (s), stdin);
 		rm_blanks(s);
-		while (!((s[0] > '0') && (s[0] < '7') && (s[1] == 0))) {
+		while (!((s[0] > '0') && (s[0] < '7') &&
+		    ((s[1] == '\0') || (s[1] == '\n')))) {
 			(void) printf(E_LINE); /* Clear any previous error */
 			(void) printf(
 			    "Enter a one-digit number between 1 and 6.");
 			(void) printf(Q_LINE);
 			(void) printf("Enter Selection: ");
-			(void) gets(s);
+			(void) fgets(s, sizeof (s), stdin);
 			rm_blanks(s);
 		}
 		(void) printf(E_LINE);
@@ -2096,9 +2096,9 @@ pcreate(void)
 		    "   5=DOS12     6=DOS16       7=DOSEXT     8=DOSBIG\n"
 		    "   9=DOS16LBA  A=x86 Boot    B=Diagnostic C=FAT32\n"
 		    "   D=FAT32LBA  E=DOSEXTLBA   F=EFI        0=Exit? ");
-		(void) gets(s);
+		(void) fgets(s, sizeof (s), stdin);
 		rm_blanks(s);
-		if (s[1] != 0) {
+		if ((s[1] != '\0') && (s[1] != '\n')) {
 			(void) printf(E_LINE);
 			(void) printf("Invalid selection, try again.");
 			continue;
@@ -2305,11 +2305,11 @@ specify(uchar_t tsystid)
 	(void) printf(
 	    "Specify the percentage of disk to use for this partition\n"
 	    "(or type \"c\" to specify the size in cylinders). ");
-	(void) gets(s);
+	(void) fgets(s, sizeof (s), stdin);
 	rm_blanks(s);
 	if (s[0] != 'c') {	/* Specify size in percentage of disk */
 		i = 0;
-		while (s[i] != '\0') {
+		while ((s[i] != '\0') && (s[i] != '\n')) {
 			if (s[i] < '0' || s[i] > '9') {
 				(void) printf(E_LINE);
 				(void) printf("Invalid percentage value "
@@ -2569,9 +2569,10 @@ pchange(void)
 			    "Specify the partition number to boot from"
 			    " (or specify 0 for none): ");
 			}
-		(void) gets(s);
+		(void) fgets(s, sizeof (s), stdin);
 		rm_blanks(s);
-		if ((s[1] != 0) || (s[0] < '0') || (s[0] > '4')) {
+		if (((s[1] != '\0') && (s[1] != '\n')) ||
+		    (s[0] < '0') || (s[0] > '4')) {
 			(void) printf(E_LINE);
 			(void) printf(
 			    "Invalid response, please specify a number"
@@ -2687,14 +2688,15 @@ pdelete(void)
 DEL1:	(void) printf(Q_LINE);
 	(void) printf("Specify the partition number to delete"
 	    " (or enter 0 to exit): ");
-	(void) gets(s);
+	(void) fgets(s, sizeof (s), stdin);
 	rm_blanks(s);
 	if ((s[0] == '0')) {	/* exit delete command */
 		(void) printf(E_LINE);	/* clear error message */
 		return (1);
 	}
 	/* Accept only a single digit between 1 and 4 */
-	if (s[1] != 0 || (i = atoi(s)) < 1 || i > FD_NUMPART) {
+	if (((s[1] != '\0') && (s[1] != '\n')) ||
+	    (i = atoi(s)) < 1 || i > FD_NUMPART) {
 		(void) printf(E_LINE);
 		(void) printf("Invalid response, retry the operation.\n");
 		goto DEL1;
@@ -2777,9 +2779,11 @@ getcyl(void)
 {
 int slen, i, j;
 unsigned int cyl;
-	(void) gets(s);
+	(void) fgets(s, sizeof (s), stdin);
 	rm_blanks(s);
 	slen = strlen(s);
+	if (s[slen - 1] == '\n')
+		slen--;
 	j = 1;
 	cyl = 0;
 	for (i = slen - 1; i >= 0; i--) {
@@ -3494,9 +3498,10 @@ yesno(void)
 	char	s[80];
 
 	for (;;) {
-		(void) gets(s);
+		(void) fgets(s, sizeof (s), stdin);
 		rm_blanks(s);
-		if ((s[1] != 0) || ((s[0] != 'y') && (s[0] != 'n'))) {
+		if (((s[1] != '\0') && (s[1] != '\n')) ||
+		    ((s[0] != 'y') && (s[0] != 'n'))) {
 			(void) printf(E_LINE);
 			(void) printf("Please answer with \"y\" or \"n\": ");
 			continue;
