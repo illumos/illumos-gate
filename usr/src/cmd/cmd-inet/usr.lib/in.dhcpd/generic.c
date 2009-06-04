@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,9 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,7 +177,7 @@ static int
 nm_cmp(const void *n1, const void *n2)
 {
 	void *v1 = (void *) (((NNODE *)n1)->net.s_addr &
-				((NNODE *)n2)->mask.s_addr);
+	    ((NNODE *)n2)->mask.s_addr);
 	void *v2 = (void *) ((NNODE *)n2)->net.s_addr;
 
 	return (memcmp(&v1, &v2, sizeof (struct in_addr)));
@@ -273,8 +271,8 @@ load_options(int flags, PKT_LIST *c_plp, PKT *r_pktp, int replen, uchar_t *optp,
 	ushort_t	code;
 	uint_t		vend_len;
 	uchar_t		len, *vp, *vdata, *data, *endp, *main_optp, *opt_endp;
-	uchar_t		overload = DHCP_OVRLD_CLR,
-			    using_overload = DHCP_OVRLD_CLR;
+	uchar_t		overload = DHCP_OVRLD_CLR;
+	uchar_t		using_overload = DHCP_OVRLD_CLR;
 	boolean_t	srv_using_file = B_FALSE, clnt_ovrld_file = B_FALSE;
 	boolean_t	echo_clnt_file;
 
@@ -488,7 +486,9 @@ load_options(int flags, PKT_LIST *c_plp, PKT *r_pktp, int replen, uchar_t *optp,
 					using_overload |= DHCP_OVRLD_FILE;
 					break;
 				}
-			} else {
+			}
+			/* Skip the option if it's too long to fit */
+			if (len < (endp - optp - 1)) {
 				/* Load options. */
 				*optp++ = (uchar_t)code;
 				*optp++ = len;
@@ -587,7 +587,7 @@ load_options(int flags, PKT_LIST *c_plp, PKT *r_pktp, int replen, uchar_t *optp,
 		} else {
 			dhcpmsg(LOG_ERR,
 			    "Unrecognized option with code: %d %d\n", cat,
-				code);
+			    code);
 		}
 	}
 
