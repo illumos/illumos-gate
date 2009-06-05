@@ -601,8 +601,16 @@ vnet_m_stop(void *arg)
 
 	WRITE_ENTER(&vnetp->vrwlock);
 	if (vnetp->flags & VNET_STARTED) {
-		vnet_stop_resources(vnetp);
+		/*
+		 * Set the flags appropriately; this should prevent starting of
+		 * any new resources that are added(see vnet_res_start_task()),
+		 * while we release the vrwlock in vnet_stop_resources() before
+		 * stopping each resource.
+		 */
 		vnetp->flags &= ~VNET_STARTED;
+		vnetp->flags |= VNET_STOPPING;
+		vnet_stop_resources(vnetp);
+		vnetp->flags &= ~VNET_STOPPING;
 	}
 	RW_EXIT(&vnetp->vrwlock);
 
@@ -1284,16 +1292,21 @@ int vio_net_resource_reg(mac_register_t *macp, vio_net_res_type_t type,
 void
 vio_net_resource_unreg(vio_net_handle_t vhp)
 {
-	vnet_res_t *vresp = (vnet_res_t *)vhp;
-	vnet_t *vnetp = vresp->vnetp;
-	vnet_res_t *vrp;
-	kstat_t *ksp = NULL;
+	vnet_res_t	*vresp = (vnet_res_t *)vhp;
+	vnet_t		*vnetp = vresp->vnetp;
+	vnet_res_t	*vrp;
+	kstat_t		*ksp = NULL;
 
 	DBG1(NULL, "Resource Registerig hdl=0x%p", vhp);
 
 	ASSERT(vnetp != NULL);
+	/*
+	 * Remove the resource from fdb; this ensures
+	 * there are no references to the resource.
+	 */
 	vnet_fdbe_del(vnetp, vresp);
 
+	/* Now remove the resource from the list */
 	WRITE_ENTER(&vnetp->vrwlock);
 	if (vresp == vnetp->vres_list) {
 		vnetp->vres_list = vresp->nextp;
@@ -1387,7 +1400,8 @@ vnet_dispatch_res_task(vnet_t *vnetp)
 	/*
 	 * Dispatch the task. It could be the case that vnetp->flags does
 	 * not have VNET_STARTED set. This is ok as vnet_rest_start_task()
-	 * can abort the task when the task is started.
+	 * can abort the task when the task is started. See related comments
+	 * in vnet_m_stop() and vnet_stop_resources().
 	 */
 	rv = ddi_taskq_dispatch(vnetp->taskqp, vnet_res_start_task,
 	    vnetp, DDI_NOSLEEP);
@@ -1427,6 +1441,8 @@ vnet_start_resources(vnet_t *vnetp)
 
 	DBG1(vnetp, "enter\n");
 
+	ASSERT(RW_WRITE_HELD(&vnetp->vrwlock));
+
 	for (vresp = vnetp->vres_list; vresp != NULL; vresp = vresp->nextp) {
 		/* skip if it is already started */
 		if (vresp->flags & VNET_STARTED) {
@@ -1456,21 +1472,44 @@ static void
 vnet_stop_resources(vnet_t *vnetp)
 {
 	vnet_res_t	*vresp;
-	vnet_res_t	*nvresp;
 	mac_register_t	*macp;
 	mac_callbacks_t	*cbp;
 
 	DBG1(vnetp, "enter\n");
 
+	ASSERT(RW_WRITE_HELD(&vnetp->vrwlock));
+
 	for (vresp = vnetp->vres_list; vresp != NULL; ) {
-		nvresp = vresp->nextp;
 		if (vresp->flags & VNET_STARTED) {
+			/*
+			 * Release the lock while invoking mc_stop() of the
+			 * underlying resource. We hold a reference to this
+			 * resource to prevent being removed from the list in
+			 * vio_net_resource_unreg(). Note that new resources
+			 * can be added to the head of the list while the lock
+			 * is released, but they won't be started, as
+			 * VNET_STARTED flag has been cleared for the vnet
+			 * device in vnet_m_stop(). Also, while the lock is
+			 * released a resource could be removed from the list
+			 * in vio_net_resource_unreg(); but that is ok, as we
+			 * re-acquire the lock and only then access the forward
+			 * link (vresp->nextp) to continue with the next
+			 * resource.
+			 */
+			vresp->flags &= ~VNET_STARTED;
+			vresp->flags |= VNET_STOPPING;
 			macp = &vresp->macreg;
 			cbp = macp->m_callbacks;
+			VNET_FDBE_REFHOLD(vresp);
+			RW_EXIT(&vnetp->vrwlock);
+
 			cbp->mc_stop(macp->m_driver);
-			vresp->flags &= ~VNET_STARTED;
+
+			WRITE_ENTER(&vnetp->vrwlock);
+			vresp->flags &= ~VNET_STOPPING;
+			VNET_FDBE_REFRELE(vresp);
 		}
-		vresp = nvresp;
+		vresp = vresp->nextp;
 	}
 	DBG1(vnetp, "exit\n");
 }

@@ -3343,18 +3343,18 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 		DWARN(vgenp, ldcp, "ldc_set_cb_mode failed\n");
 	}
 
-	if (vgenp->vsw_portp == ldcp->portp) {
-		vio_net_report_err_t rep_err =
-		    ldcp->portp->vcb.vio_net_report_err;
-		rep_err(ldcp->portp->vhp, VIO_NET_RES_DOWN);
-	}
-
 	/*
 	 * clear handshake done bit and wait for pending tx and cb to finish.
 	 * release locks before untimeout(9F) is invoked to cancel timeouts.
 	 */
 	ldcp->hphase &= ~(VH_DONE);
 	LDC_UNLOCK(ldcp);
+
+	if (vgenp->vsw_portp == ldcp->portp) {
+		vio_net_report_err_t rep_err =
+		    ldcp->portp->vcb.vio_net_report_err;
+		rep_err(ldcp->portp->vhp, VIO_NET_RES_DOWN);
+	}
 
 	/* cancel handshake watchdog timeout */
 	if (ldcp->htid) {

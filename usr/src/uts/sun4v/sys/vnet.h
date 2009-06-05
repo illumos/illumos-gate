@@ -54,6 +54,16 @@ extern "C" {
 #define	VNET_MATCH_RES(vresp, vnetp)	\
 	(ether_cmp(vresp->local_macaddr, vnetp->curr_macaddr) == 0)
 
+/*
+ * Flags used to indicate the state of the vnet device and its associated
+ * resources.
+ */
+typedef enum vnet_flags {
+	VNET_STOPPED = 0x0,
+	VNET_STARTED = 0x1,
+	VNET_STOPPING = 0x2
+} vnet_flags_t;
+
 typedef struct vnet_hio_stats {
 	/* Link Input/Output stats */
 	uint64_t	ipackets;	/* # rx packets */
@@ -103,7 +113,7 @@ typedef struct vnet_res {
 	vio_net_res_type_t	type;		/* resource type */
 	ether_addr_t		local_macaddr;	/* resource's macaddr */
 	ether_addr_t		rem_macaddr;	/* resource's remote macaddr */
-	uint32_t		flags;		/* resource flags */
+	vnet_flags_t		flags;		/* resource flags */
 	uint32_t		refcnt;		/* reference count */
 	struct	vnet		*vnetp;		/* back pointer to vnet */
 	kstat_t			*ksp;		/* hio kstats */
@@ -178,15 +188,13 @@ typedef struct vnet {
 
 	link_state_t		link_state;	/* link status */
 	boolean_t		pls_update;	/* phys link state update ? */
-	uint32_t		flags;		/* interface flags */
+	vnet_flags_t		flags;		/* interface flags */
 	vnet_res_t		*hio_fp;	/* Hybrid IO resource */
 	vnet_res_t		*vres_list;	/* Resource list */
 	vnet_dds_info_t		vdds_info;	/* DDS related info */
 	krwlock_t		vrwlock;	/* Resource list lock */
 	ddi_taskq_t		*taskqp;	/* Resource taskq */
 } vnet_t;
-
-#define	VNET_STARTED	0x01
 
 #ifdef DEBUG
 /*
