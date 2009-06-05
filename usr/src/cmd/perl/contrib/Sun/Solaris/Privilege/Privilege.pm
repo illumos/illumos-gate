@@ -19,7 +19,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,7 +40,7 @@ XSLoader::load(__PACKAGE__, $VERSION);
 
 our (@EXPORT_OK, %EXPORT_TAGS);
 my @constants = qw(PRIV_STR_SHORT PRIV_STR_LIT PRIV_STR_PORT PRIV_ON PRIV_OFF
-	PRIV_SET PRIV_AWARE PRIV_DEBUG);
+	PRIV_SET PRIV_AWARE PRIV_AWARE_RESET PRIV_DEBUG);
 my @syscalls = qw(setppriv getppriv setpflags getpflags);
 my @libcalls = qw(priv_addset priv_copyset priv_delset
     priv_emptyset priv_fillset priv_intersect priv_inverse priv_ineffect

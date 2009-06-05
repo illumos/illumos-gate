@@ -1,9 +1,7 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /****************************************************************************    
   Copyright (c) 1999,2000 WU-FTPD Development Group.  
@@ -198,11 +196,10 @@ FILE *ftpd_popen(char *program, char *type, int closestderr)
 	/* begin CERT suggested fixes */
 	close(0);
 	i = geteuid();
-	delay_signaling();	/* we can't allow any signals while euid==0: kinch */
-	seteuid(0);
+	setid_priv_on(0);
 	setgid(getegid());
 	setuid(i);
-	enable_signaling();	/* we can allow signals once again: kinch */
+	setid_priv_off(i);
 	/* end CERT suggested fixes */
 	execv(gargv[0], gargv);
 	perror(gargv[0]);

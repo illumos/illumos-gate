@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -238,7 +236,8 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 
 	if (val > 1 || (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
 	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
-	    flag != __PROC_PROTECT && flag != PRIV_XPOLICY)) {
+	    flag != __PROC_PROTECT && flag != PRIV_XPOLICY &&
+	    flag != PRIV_AWARE_RESET)) {
 		return (EINVAL);
 	}
 
@@ -262,10 +261,13 @@ setpflags(uint_t flag, uint_t val, cred_t *tcr)
 
 	newflags = CR_FLAGS(pcr);
 
-	if (val != 0)
+	if (val != 0) {
+		if (flag == PRIV_AWARE)
+			newflags &= ~PRIV_AWARE_RESET;
 		newflags |= flag;
-	else
+	} else {
 		newflags &= ~flag;
+	}
 
 	/* No change */
 	if (CR_FLAGS(pcr) == newflags) {
@@ -342,7 +344,7 @@ getpflags(uint_t flag, const cred_t *cr)
 {
 	if (flag != PRIV_DEBUG && flag != PRIV_AWARE &&
 	    flag != NET_MAC_AWARE && flag != NET_MAC_AWARE_INHERIT &&
-	    flag != PRIV_XPOLICY)
+	    flag != PRIV_XPOLICY && flag != PRIV_AWARE_RESET)
 		return ((uint_t)-1);
 
 	return ((CR_FLAGS(cr) & flag) != 0);

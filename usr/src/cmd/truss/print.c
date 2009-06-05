@@ -2275,6 +2275,7 @@ prt_pfl(private_t *pri, int raw, long val)
 		case PRIV_DEBUG:	s = "PRIV_DEBUG";	break;
 		case PRIV_AWARE:	s = "PRIV_AWARE";	break;
 		case PRIV_XPOLICY:	s = "PRIV_XPOLICY";	break;
+		case PRIV_AWARE_RESET:  s = "PRIV_AWARE_RESET"; break;
 		case NET_MAC_AWARE:	s =  "NET_MAC_AWARE";	break;
 		case NET_MAC_AWARE_INHERIT:
 			s = "NET_MAC_AWARE_INHERIT";

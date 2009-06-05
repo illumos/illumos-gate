@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Program to examine or set process privileges.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -649,6 +647,7 @@ static struct {
 	{ PRIV_DEBUG, "PRIV_DEBUG" },
 	{ PRIV_AWARE, "PRIV_AWARE" },
 	{ PRIV_AWARE_INHERIT, "PRIV_AWARE_INHERIT" },
+	{ PRIV_AWARE_RESET, "PRIV_AWARE_RESET" },
 	{ PRIV_XPOLICY, "PRIV_XPOLICY" },
 	{ NET_MAC_AWARE, "NET_MAC_AWARE" },
 	{ NET_MAC_AWARE_INHERIT, "NET_MAC_AWARE_INHERIT" },

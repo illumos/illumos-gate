@@ -596,18 +596,23 @@ adt_done:
 		}
 		if (!priv_issubset(lim, tset))
 			priv_intersect(tset, lim);
-		/*
-		 * In order not to suprise certain applications, we
-		 * need to retain privilege awareness and thus we must
-		 * also set P and E.
-		 */
-		if (setppriv(PRIV_SET, PRIV_LIMIT, lim) != 0 ||
-		    setppriv(PRIV_SET, PRIV_PERMITTED, lim) != 0) {
+		if (setppriv(PRIV_SET, PRIV_LIMIT, lim) != 0) {
 			syslog(LOG_AUTH | LOG_ERR,
 			    "pam_setcred: setppriv(limitpriv) failed: %m");
 			ret = PAM_CRED_ERR;
+			goto out;
 		}
+		/*
+		 * In order not to surprise certain applications, we
+		 * need to get rid of privilege awareness and thus we must
+		 * set this flag which will cause a reset on set*uid().
+		 */
+		(void) setpflags(PRIV_AWARE_RESET, 1);
 	}
+	/*
+	 * This may fail but we do not care as this will be reset later
+	 * when the uids are set to their final values.
+	 */
 	(void) setpflags(PRIV_AWARE, 0);
 
 out:

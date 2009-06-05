@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * 	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -136,6 +134,9 @@ retry_locked:
 		newcr->cr_suid = uid;
 		newcr->cr_uid = uid;
 		crsetsid(newcr, ksp, KSID_USER);
+
+		priv_reset_PA(newcr, B_TRUE);
+
 		ASSERT(uid != oldruid ? uidchge : 1);
 		mutex_exit(&p->p_crlock);
 	} else {
@@ -230,6 +231,7 @@ retry:
 		p->p_cred = newcr;
 		newcr->cr_uid = uid;
 		crsetsid(newcr, ksp, KSID_USER);
+		priv_reset_PA(newcr, B_FALSE);
 		mutex_exit(&p->p_crlock);
 		if (do_nocd) {
 			mutex_enter(&p->p_lock);
@@ -364,6 +366,7 @@ retry_locked:
 		    cr->cr_suid != newcr->cr_suid))
 			do_nocd = 1;
 
+		priv_reset_PA(newcr, ruid != -1 && euid != -1 && ruid == euid);
 		crfree(cr);
 	}
 	mutex_exit(&p->p_crlock);

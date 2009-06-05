@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PRIV_H
 #define	_SYS_PRIV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from TSOL 8 */
 
 #include <sys/types.h>
 #include <sys/cred.h>
@@ -137,11 +135,12 @@ typedef struct priv_impl_info {
 #define	__PROC_PROTECT			0x0008		/* Private */
 #define	NET_MAC_AWARE			0x0010		/* Is MAC aware */
 #define	NET_MAC_AWARE_INHERIT		0x0020		/* Inherit MAC aware */
+#define	PRIV_AWARE_RESET		0x0040		/* Reset on setuid() */
 #define	PRIV_XPOLICY			0x0080		/* Extended policy */
 
 /* user-settable flags: */
 #define	PRIV_USER	(PRIV_DEBUG | NET_MAC_AWARE | NET_MAC_AWARE_INHERIT |\
-			    PRIV_XPOLICY)
+			    PRIV_XPOLICY | PRIV_AWARE_RESET)
 
 /*
  * Header of the privilege info data structure; multiple structures can
@@ -234,6 +233,7 @@ extern void priv_inverse(priv_set_t *);
 
 extern void priv_set_PA(cred_t *);
 extern void priv_adjust_PA(cred_t *);
+extern void priv_reset_PA(cred_t *, boolean_t);
 extern boolean_t priv_can_clear_PA(const cred_t *);
 
 extern int setpflags(uint_t, uint_t, cred_t *);

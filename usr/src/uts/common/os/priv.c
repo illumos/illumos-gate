@@ -614,18 +614,19 @@ out:
 }
 
 /*
- * Set the privilege aware bit, adding L to E/P if
- * necessasry.
+ * Set the privilege aware bit, adding L to E/P if necessary.
+ * Each time we set it, we also clear PRIV_AWARE_RESET.
  */
 void
 priv_set_PA(cred_t *cr)
 {
 	ASSERT(cr->cr_ref <= 2);
 
-	if (CR_FLAGS(cr) & PRIV_AWARE)
+	if ((CR_FLAGS(cr) & (PRIV_AWARE|PRIV_AWARE_RESET)) == PRIV_AWARE)
 		return;
 
 	CR_FLAGS(cr) |= PRIV_AWARE;
+	CR_FLAGS(cr) &= ~PRIV_AWARE_RESET;
 
 	if (cr->cr_uid == 0)
 		priv_union(&CR_LPRIV(cr), &CR_EPRIV(cr));
@@ -661,8 +662,10 @@ priv_adjust_PA(cred_t *cr)
 	ASSERT(cr->cr_ref <= 2);
 
 	if (!(CR_FLAGS(cr) & PRIV_AWARE) ||
-	    !priv_can_clear_PA(cr))
+	    !priv_can_clear_PA(cr)) {
+		CR_FLAGS(cr) &= ~PRIV_AWARE_RESET;
 		return;
+	}
 
 	if (CR_FLAGS(cr) & PRIV_AWARE_INHERIT)
 		return;
@@ -679,5 +682,50 @@ priv_adjust_PA(cred_t *cr)
 		priv_intersect(&CR_IPRIV(cr), &CR_PPRIV(cr));
 	}
 
-	CR_FLAGS(cr) &= ~PRIV_AWARE;
+	CR_FLAGS(cr) &= ~(PRIV_AWARE|PRIV_AWARE_RESET);
+}
+
+/*
+ * Reset privilege aware bit if so requested by setting the PRIV_AWARE_RESET
+ * flag.
+ */
+void
+priv_reset_PA(cred_t *cr, boolean_t finalize)
+{
+	ASSERT(cr->cr_ref <= 2);
+
+	if ((CR_FLAGS(cr) & (PRIV_AWARE|PRIV_AWARE_RESET)) !=
+	    (PRIV_AWARE|PRIV_AWARE_RESET)) {
+		CR_FLAGS(cr) &= ~PRIV_AWARE_RESET;
+		return;
+	}
+
+	/*
+	 * When PRIV_AWARE_RESET is enabled, any change of uids causes
+	 * a change to the P and E sets.  Bracketing with
+	 * seteuid(0) ... seteuid(uid)/setreuid(-1, 0) .. setreuid(-1, uid)
+	 * will cause the privilege sets "do the right thing.".
+	 * When the change of the uid is "final", e.g., by using setuid(uid),
+	 * or setreuid(uid, uid) or when the last set*uid() call causes all
+	 * uids to be the same, we set P and E to I & L, like when you exec.
+	 * We make an exception when all the uids are 0; this is required
+	 * when we login as root as in that particular case we cannot
+	 * make a distinction between seteuid(0) and seteuid(uid).
+	 * We rely on seteuid/setreuid/setuid to tell us with the
+	 * "finalize" argument that we no longer expect new uid changes,
+	 * cf. setreuid(uid, uid) and setuid(uid).
+	 */
+	if (cr->cr_suid == cr->cr_ruid && cr->cr_suid == cr->cr_uid) {
+		if (finalize || cr->cr_uid != 0) {
+			CR_EPRIV(cr) = CR_IPRIV(cr);
+			priv_intersect(&CR_LPRIV(cr), &CR_EPRIV(cr));
+			CR_PPRIV(cr) = CR_EPRIV(cr);
+			CR_FLAGS(cr) &= ~(PRIV_AWARE|PRIV_AWARE_RESET);
+		} else {
+			CR_EPRIV(cr) = CR_PPRIV(cr);
+		}
+	} else if (cr->cr_uid != 0 && (cr->cr_ruid == 0 || cr->cr_suid == 0)) {
+		CR_EPRIV(cr) = CR_IPRIV(cr);
+		priv_intersect(&CR_LPRIV(cr), &CR_EPRIV(cr));
+	}
 }
