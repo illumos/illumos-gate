@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <stdio.h>
@@ -117,7 +115,7 @@ unlock_db(void)
  * database_present()
  *
  * returns 0 if the database files are found, and the database size is
- * greater than 0
+ * greater than 0 and the database version matches the current version.
  */
 int
 database_present(char *path)
@@ -126,6 +124,7 @@ database_present(char *path)
 	char dict_hwm[PATH_MAX];
 	char dict_pwd[PATH_MAX];
 	char dict_pwi[PATH_MAX];
+	PWDICT *dict;
 
 	(void) snprintf(dict_hwm, sizeof (dict_hwm), "%s/%s", path,
 	    DICT_DATABASE_HWM);
@@ -139,6 +138,13 @@ database_present(char *path)
 	    stat(dict_pwi, &st) == -1)
 		return (NO_DICTDATABASE);
 
+	/* verify database version number by trying to open it */
+	if ((dict = PWOpen(path, "r")) == NULL) {
+		/* the files are there, but an outdated version */
+		PWRemove(path);
+		return (NO_DICTDATABASE);
+	}
+	(void) PWClose(dict);
 	return (0);
 }
 

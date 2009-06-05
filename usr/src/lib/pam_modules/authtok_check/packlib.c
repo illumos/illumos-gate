@@ -1,9 +1,7 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This program is copyright Alec Muffett 1993. The author disclaims all
@@ -195,10 +193,10 @@ PutPW(PWDICT *pwp, char *string)
 
 	if ((pwp->flags & PFOR_FLUSH) || !(pwp->count % NUMWORDS)) {
 		int i;
-		int32 datum;
+		uint32_t datum;
 		register char *ostr;
 
-		datum = (int32) ftell(pwp->dfp);
+		datum = (uint32_t)ftell(pwp->dfp);
 
 		(void) fwrite((char *)&datum, sizeof (datum), 1, pwp->ifp);
 
@@ -214,10 +212,10 @@ PutPW(PWDICT *pwp, char *string)
 			nstr = pwp->data[i];
 
 			if (nstr[0]) {
-				for (j = 0;
-				    ostr[j] && nstr[j] && (ostr[j] == nstr[j]);
-				    j++);
-					(void) putc(j & 0xff, pwp->dfp);
+				for (j = 0; ostr[j] && nstr[j] &&
+				    (ostr[j] == nstr[j]); j++)
+					;
+				(void) putc(j & 0xff, pwp->dfp);
 				(void) fputs(nstr + j, pwp->dfp);
 			}
 			(void) putc(0, pwp->dfp);
@@ -232,17 +230,17 @@ PutPW(PWDICT *pwp, char *string)
 }
 
 char *
-GetPW(PWDICT *pwp, int32 number)
+GetPW(PWDICT *pwp, uint32_t number)
 {
-	int32 datum;
+	uint32_t datum;
 	register int i;
 	register char *ostr;
 	register char *nstr;
 	register char *bptr;
 	char buffer[NUMWORDS * MAXWORDLEN];
 	static char data[NUMWORDS][MAXWORDLEN];
-	static int32 prevblock = 0xffffffff;
-	int32 thisblock;
+	static uint32_t prevblock = 0xffffffff;
+	uint32_t thisblock;
 
 	thisblock = number / NUMWORDS;
 
@@ -251,7 +249,7 @@ GetPW(PWDICT *pwp, int32 number)
 	}
 
 	if (fseek(pwp->ifp, sizeof (struct pi_header) +
-	    (thisblock * sizeof (int32)), 0)) {
+	    (thisblock * sizeof (uint32_t)), 0)) {
 		return (NULL);
 	}
 
@@ -271,7 +269,8 @@ GetPW(PWDICT *pwp, int32 number)
 
 	bptr = buffer;
 
-	for (ostr = data[0]; *(ostr++) = *(bptr++); /* nothing */);
+	for (ostr = data[0]; *(ostr++) = *(bptr++); /* nothing */)
+		;
 
 	ostr = data[0];
 
@@ -279,7 +278,8 @@ GetPW(PWDICT *pwp, int32 number)
 		nstr = data[i];
 		(void) strcpy(nstr, ostr);
 		ostr = nstr + *(bptr++);
-		while (*(ostr++) = *(bptr++));
+		while (*(ostr++) = *(bptr++))
+			;
 
 		ostr = nstr;
 	}
@@ -287,7 +287,7 @@ GetPW(PWDICT *pwp, int32 number)
 	return (data[number % NUMWORDS]);
 }
 
-int32
+uint32_t
 FindPW(PWDICT *pwp, char *string)
 {
 	int lwm;

@@ -1,12 +1,9 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #ifndef _PACKER_H
 #define	_PACKER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,9 +35,6 @@ extern "C" {
 #define	TRUNCSTRINGSIZE	(PATH_MAX/4)
 #define	STRINGSIZE	PATH_MAX
 
-typedef unsigned char int8;
-typedef unsigned short int int16;
-typedef unsigned long int int32;
 #ifndef NUMWORDS
 #define	NUMWORDS 	16
 #endif
@@ -49,10 +43,10 @@ typedef unsigned long int int32;
 
 struct pi_header
 {
-	int32 pih_magic;
-	int32 pih_numwords;
-	int16 pih_blocklen;
-	int16 pih_pad;
+	uint32_t pih_magic;
+	uint32_t pih_numwords;
+	uint16_t pih_blocklen;
+	uint16_t pih_pad;
 };
 
 typedef struct
@@ -61,21 +55,21 @@ typedef struct
 	FILE *dfp;
 	FILE *wfp;
 
-	int32 flags;
+	uint32_t flags;
 #define	PFOR_WRITE	0x0001
 #define	PFOR_FLUSH	0x0002
 #define	PFOR_USEHWMS	0x0004
 
-	int32 hwms[256];
+	uint32_t hwms[256];
 
 	struct pi_header header;
 
-	int count;
+	uint32_t count;
 	char data[NUMWORDS][MAXWORDLEN];
 } PWDICT;
 
 #define	PW_WORDS(x) ((x)->header.pih_numwords)
-#define	PIH_MAGIC 0x70775631
+#define	PIH_MAGIC 0x70775632
 
 void PWRemove(char *);
 PWDICT *PWOpen(char *, char *);
@@ -86,12 +80,12 @@ char *Mangle(char *, char *);
 #define	STRCMP(a, b)		strcmp((a), (b))
 
 char	*Trim(register char *);
-int32	FindPW(PWDICT *, char *);
+uint32_t	FindPW(PWDICT *, char *);
 int	PWClose(PWDICT *);
 int	PutPW(PWDICT *, char *);
 char	Chop(register char *);
 char	Chomp(register char *);
-char	*GetPW(PWDICT *, int32);
+char	*GetPW(PWDICT *, uint32_t);
 
 #define	DATABASE_OPEN_FAIL		-1
 #define	DICTIONARY_WORD			2

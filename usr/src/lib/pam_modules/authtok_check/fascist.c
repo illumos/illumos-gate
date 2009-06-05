@@ -1,9 +1,7 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This program is copyright Alec Muffett 1993. The author disclaims all
@@ -388,9 +386,9 @@ static char *r_destructors[] = {
 int
 FascistLook(PWDICT *pwp, char *instring)
 {
-int i;
+	int i;
 	char *password;
-	int32 notfound;
+	uint32_t notfound;
 	char rpassword[PATH_MAX];
 
 	notfound = PW_WORDS(pwp);
@@ -408,27 +406,27 @@ int i;
 	 */
 
 	for (i = 0; r_destructors[i]; i++) {
-	char *a;
+		char *a;
 
 		if (!(a = Mangle(password, r_destructors[i]))) {
-		    continue;
+			continue;
 		}
 
 		if (FindPW(pwp, a) != notfound) {
-		    return (DICTIONARY_WORD);
+			return (DICTIONARY_WORD);
 		}
 	}
 
 	(void) strlcpy(password, Reverse(password), PATH_MAX);
 
 	for (i = 0; r_destructors[i]; i++) {
-	char *a;
+		char *a;
 
 		if (!(a = Mangle(password, r_destructors[i]))) {
 			continue;
 		}
 		if (FindPW(pwp, a) != notfound) {
-		    return (REVERSE_DICTIONARY_WORD);
+			return (REVERSE_DICTIONARY_WORD);
 		}
 	}
 
