@@ -144,9 +144,30 @@ xdr_writeargs(XDR *xdrs, struct nfswriteargs *wa)
 			wa->wa_begoff = IXDR_GET_U_INT32(ptr);
 			wa->wa_offset = IXDR_GET_U_INT32(ptr);
 			wa->wa_totcount = IXDR_GET_U_INT32(ptr);
-			if (xdrs->x_ops == &xdrmblk_ops)
+			wa->wa_mblk = NULL;
+			wa->wa_data = NULL;
+			wa->wa_rlist = NULL;
+			wa->wa_conn = NULL;
+			if (xdrs->x_ops == &xdrmblk_ops) {
 				return (xdrmblk_getmblk(xdrs, &wa->wa_mblk,
 				    &wa->wa_count));
+			} else {
+				if (xdrs->x_ops == &xdrrdmablk_ops) {
+					if (xdrrdma_getrdmablk(xdrs,
+					    &wa->wa_rlist,
+					    &wa->wa_count,
+					    &wa->wa_conn,
+					    NFS_MAXDATA) == TRUE)
+					return (xdrrdma_read_from_client(
+					    wa->wa_rlist,
+					    &wa->wa_conn,
+					    wa->wa_count));
+
+					wa->wa_rlist = NULL;
+					wa->wa_conn = NULL;
+				}
+			}
+
 			/*
 			 * It is just as efficient to xdr_bytes
 			 * an array of unknown length as to inline copy it.

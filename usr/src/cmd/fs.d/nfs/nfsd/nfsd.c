@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 /* LINTLIBRARY */
 /* PROTOLIB1 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* NFS server */
 
@@ -497,11 +495,15 @@ main(int ac, char *av[])
 	 * destructor thread.
 	 *
 	 * start rdma services and block in the kernel.
+	 * (only if proto or provider is not set to TCP or UDP)
 	 */
-	if (svcrdma(NFS_SVCPOOL_ID, nfs_server_vers_min, nfs_server_vers_max,
-	    nfs_server_delegation)) {
-		fprintf(stderr, "Can't set up RDMA creator thread : %s",
-		    strerror(errno));
+	if ((proto == NULL) && (provider == NULL)) {
+		if (svcrdma(NFS_SVCPOOL_ID, nfs_server_vers_min,
+		    nfs_server_vers_max, nfs_server_delegation)) {
+			fprintf(stderr,
+			    "Can't set up RDMA creator thread : %s",
+			    strerror(errno));
+		}
 	}
 
 	/*

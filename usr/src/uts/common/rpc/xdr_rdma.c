@@ -430,8 +430,8 @@ xdrrdma_getbytes(XDR *xdrs, caddr_t addr, int len)
 	uint32_t	cur_offset = 0;
 	uint32_t	total_segments = 0;
 	uint32_t	actual_segments = 0;
-	uint32_t	status;
-	uint32_t	alen;
+	uint32_t	status = RDMA_SUCCESS;
+	uint32_t	alen = 0;
 	uint32_t	xpoff;
 
 	while (cle) {
@@ -456,8 +456,13 @@ xdrrdma_getbytes(XDR *xdrs, caddr_t addr, int len)
 	if (cle != NULL && cle->c_xdroff == xpoff) {
 		for (actual_segments = 0;
 		    actual_segments < total_segments; actual_segments++) {
+
 			if (total_len <= 0)
 				break;
+
+			if (status != RDMA_SUCCESS)
+				goto out;
+
 			cle->u.c_daddr = (uint64)(uintptr_t)addr + cur_offset;
 			alen = 0;
 			if (cle->c_len > total_len) {
@@ -495,10 +500,17 @@ xdrrdma_getbytes(XDR *xdrs, caddr_t addr, int len)
 			}
 			cl = *cle;
 			cl.c_next = NULL;
-			if (clist_register(xdrp->xp_conn, &cl, CLIST_REG_DST)
-			    != RDMA_SUCCESS) {
-				return (FALSE);
+			status = clist_register(xdrp->xp_conn, &cl,
+			    CLIST_REG_DST);
+			if (status != RDMA_SUCCESS) {
+				retval = FALSE;
+				/*
+				 * Deregister the previous chunks
+				 * before return
+				 */
+				goto out;
 			}
+
 			cle->c_dmemhandle = cl.c_dmemhandle;
 			cle->c_dsynchandle = cl.c_dsynchandle;
 
@@ -516,9 +528,10 @@ xdrrdma_getbytes(XDR *xdrs, caddr_t addr, int len)
 				    krpc__i__xdrrdma_getblk_readfailed,
 				    int, status);
 				retval = FALSE;
-				goto out;
 			}
+
 			cle = cle->c_next;
+
 		}
 
 		/*
@@ -532,19 +545,29 @@ xdrrdma_getbytes(XDR *xdrs, caddr_t addr, int len)
 			retval = FALSE;
 		}
 out:
+
 		/*
 		 * Deregister the chunks
 		 */
 		cle = cls;
-		cl = *cle;
-		cl.c_next = NULL;
-		cl.c_len = cur_offset;
-		(void) clist_deregister(xdrp->xp_conn, &cl);
+		while (actual_segments != 0) {
+			cl = *cle;
+			cl.c_next = NULL;
+
+			cl.c_regtype = CLIST_REG_DST;
+			(void) clist_deregister(xdrp->xp_conn, &cl);
+
+			cle = cle->c_next;
+			actual_segments--;
+		}
+
 		if (alen) {
+			cle = *(xdrp->xp_rcl_next);
 			cle->w.c_saddr =
 			    (uint64)(uintptr_t)cle->w.c_saddr + cle->c_len;
 			cle->c_len = alen - cle->c_len;
 		}
+
 		return (retval);
 	}
 

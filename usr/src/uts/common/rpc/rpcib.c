@@ -302,6 +302,8 @@ static rdma_stat rib_ping_srv(int addr_type, struct netbuf *, rpcib_ping_t *);
 static rdma_stat rib_conn_get(struct netbuf *, struct netbuf *,
 	int addr_type, void *, CONN **);
 static rdma_stat rib_conn_release(CONN *conn);
+static rdma_stat rib_connect(struct netbuf *, struct netbuf *, int,
+	rpcib_ping_t *, CONN **);
 static rdma_stat rib_getinfo(rdma_info_t *info);
 
 static rib_lrc_entry_t *rib_get_cache_buf(CONN *conn, uint32_t len);
@@ -1436,7 +1438,7 @@ static void
 rib_attach_hca()
 {
 	mutex_enter(&rib_stat->open_hca_lock);
-	rpcib_open_hcas(rib_stat);
+	(void) rpcib_open_hcas(rib_stat);
 	rib_listen(NULL);
 	mutex_exit(&rib_stat->open_hca_lock);
 }
@@ -1548,12 +1550,16 @@ rib_reachable(int addr_type, struct netbuf *raddr, void **handle)
 {
 	rdma_stat	status;
 	rpcib_ping_t	rpt;
+	struct netbuf	saddr;
+	CONN		*conn;
 
-	bzero(&rpt, sizeof (rpcib_ping_t));
-	status = rib_ping_srv(addr_type, raddr, &rpt);
+	bzero(&saddr, sizeof (struct netbuf));
+	status = rib_connect(&saddr, raddr, addr_type, &rpt, &conn);
 
 	if (status == RDMA_SUCCESS) {
 		*handle = (void *)rpt.hca;
+		/* release the reference */
+		(void) rib_conn_release(conn);
 		return (RDMA_SUCCESS);
 	} else {
 		*handle = NULL;
@@ -4134,6 +4140,18 @@ rib_rm_conn(CONN *cn, rib_conn_list_t *connlist)
 	return (RDMA_SUCCESS);
 }
 
+/* ARGSUSED */
+static rdma_stat
+rib_conn_get(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
+    int addr_type, void *handle, CONN **conn)
+{
+	rdma_stat status;
+	rpcib_ping_t rpt;
+
+	status = rib_connect(s_svcaddr, d_svcaddr, addr_type, &rpt, conn);
+	return (status);
+}
+
 /*
  * rib_find_hca_connection
  *
@@ -4260,14 +4278,13 @@ again:
  */
 /* ARGSUSED */
 static rdma_stat
-rib_conn_get(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
-    int addr_type, void *handle, CONN **conn)
+rib_connect(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
+    int addr_type, rpcib_ping_t *rpt, CONN **conn)
 {
 	CONN *cn;
 	int status;
 	rib_hca_t *hca;
 	rib_qp_t *qp;
-	rpcib_ping_t rpt;
 	int s_addr_len;
 	char *s_addr_buf;
 
@@ -4290,22 +4307,23 @@ rib_conn_get(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
 	/*
 	 * No existing connection found, establish a new connection.
 	 */
-	bzero(&rpt, sizeof (rpcib_ping_t));
+	bzero(rpt, sizeof (rpcib_ping_t));
 
-	status = rib_ping_srv(addr_type, d_svcaddr, &rpt);
+	status = rib_ping_srv(addr_type, d_svcaddr, rpt);
 	if (status != RDMA_SUCCESS) {
 		return (RDMA_FAILED);
 	}
-	hca = rpt.hca;
+	hca = rpt->hca;
 
-	if (rpt.srcip.family == AF_INET) {
-		s_addr_len = sizeof (rpt.srcip.un.ip4addr);
-		s_addr_buf = (char *)&rpt.srcip.un.ip4addr;
-	} else if (rpt.srcip.family == AF_INET6) {
-		s_addr_len = sizeof (rpt.srcip.un.ip6addr);
-		s_addr_buf = (char *)&rpt.srcip.un.ip6addr;
-	} else
+	if (rpt->srcip.family == AF_INET) {
+		s_addr_len = sizeof (rpt->srcip.un.ip4addr);
+		s_addr_buf = (char *)&rpt->srcip.un.ip4addr;
+	} else if (rpt->srcip.family == AF_INET6) {
+		s_addr_len = sizeof (rpt->srcip.un.ip6addr);
+		s_addr_buf = (char *)&rpt->srcip.un.ip6addr;
+	} else {
 		return (RDMA_FAILED);
+	}
 
 	/*
 	 * Channel to server doesn't exist yet, create one.
@@ -4332,7 +4350,7 @@ rib_conn_get(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
 	 * WRITER lock.
 	 */
 	(void) rib_add_connlist(cn, &hca->cl_conn_list);
-	status = rib_conn_to_srv(hca, qp, &rpt);
+	status = rib_conn_to_srv(hca, qp, rpt);
 	mutex_enter(&cn->c_lock);
 	if (status == RDMA_SUCCESS) {
 		cn->c_state = C_CONNECTED;
