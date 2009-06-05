@@ -1140,11 +1140,12 @@ vdev_validate(char *nv)
 }
 
 /*
- * Get a list of valid vdev pathname from the boot device.
+ * Get a valid vdev pathname/devid from the boot device.
  * The caller should already allocate MAXPATHLEN memory for bootpath and devid.
  */
-int
-vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath)
+static int
+vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath,
+    int is_spare)
 {
 	char type[16];
 
@@ -1165,6 +1166,15 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath)
 		if (guid != inguid)
 			return (ERR_NO_BOOTPATH);
 
+		/* for a spare vdev, pick the disk labeled with "is_spare" */
+		if (is_spare) {
+			uint64_t spare = 0;
+			(void) nvlist_lookup_value(nv, ZPOOL_CONFIG_IS_SPARE,
+			    &spare, DATA_TYPE_UINT64, NULL);
+			if (!spare)
+				return (ERR_NO_BOOTPATH);
+		}
+
 		if (nvlist_lookup_value(nv, ZPOOL_CONFIG_PHYS_PATH,
 		    bootpath, DATA_TYPE_STRING, NULL) != 0)
 			bootpath[0] = '\0';
@@ -1179,7 +1189,9 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath)
 
 		return (0);
 
-	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
+	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0 ||
+	    strcmp(type, VDEV_TYPE_REPLACING) == 0 ||
+	    (is_spare = (strcmp(type, VDEV_TYPE_SPARE) == 0))) {
 		int nelm, i;
 		char *child;
 
@@ -1192,7 +1204,7 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath)
 
 			child_i = nvlist_array(child, i);
 			if (vdev_get_bootpath(child_i, inguid, devid,
-			    bootpath) == 0)
+			    bootpath, is_spare) == 0)
 				return (0);
 		}
 	}
@@ -1259,7 +1271,7 @@ check_pool_label(int label, char *stack, char *outdevid, char *outpath)
 	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_GUID, &diskguid,
 	    DATA_TYPE_UINT64, NULL))
 		return (ERR_FSYS_CORRUPT);
-	if (vdev_get_bootpath(nv, diskguid, outdevid, outpath))
+	if (vdev_get_bootpath(nv, diskguid, outdevid, outpath, 0))
 		return (ERR_NO_BOOTPATH);
 	return (0);
 }

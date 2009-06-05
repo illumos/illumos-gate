@@ -1051,7 +1051,9 @@ zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t size,
 	int numerrors = 0;
 
 	for (c = 0; c < vd->vdev_children; c++) {
-		ASSERT(vd->vdev_ops == &vdev_mirror_ops);
+		ASSERT(vd->vdev_ops == &vdev_mirror_ops ||
+		    vd->vdev_ops == &vdev_replacing_ops ||
+		    vd->vdev_ops == &vdev_spare_ops);
 		int err = zvol_dumpio_vdev(vd->vdev_child[c],
 		    addr, offset, size, doread, isdump);
 		if (err != 0) {

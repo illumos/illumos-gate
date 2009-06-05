@@ -373,6 +373,9 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	} else if (alloctype == VDEV_ALLOC_L2CACHE) {
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) != 0)
 			return (EINVAL);
+	} else if (alloctype == VDEV_ALLOC_ROOTPOOL) {
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) != 0)
+			return (EINVAL);
 	}
 
 	/*
@@ -475,13 +478,23 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	 * If we're a leaf vdev, try to load the DTL object and other state.
 	 */
 	if (vd->vdev_ops->vdev_op_leaf &&
-	    (alloctype == VDEV_ALLOC_LOAD || alloctype == VDEV_ALLOC_L2CACHE)) {
+	    (alloctype == VDEV_ALLOC_LOAD || alloctype == VDEV_ALLOC_L2CACHE ||
+	    alloctype == VDEV_ALLOC_ROOTPOOL)) {
 		if (alloctype == VDEV_ALLOC_LOAD) {
 			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_DTL,
 			    &vd->vdev_dtl_smo.smo_object);
 			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_UNSPARE,
 			    &vd->vdev_unspare);
 		}
+
+		if (alloctype == VDEV_ALLOC_ROOTPOOL) {
+			uint64_t spare = 0;
+
+			if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPARE,
+			    &spare) == 0 && spare)
+				spa_spare_add(vd);
+		}
+
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE,
 		    &vd->vdev_offline);
 

@@ -239,6 +239,7 @@ typedef struct vdev_label {
 #define	VDEV_ALLOC_ADD		1
 #define	VDEV_ALLOC_SPARE	2
 #define	VDEV_ALLOC_L2CACHE	3
+#define	VDEV_ALLOC_ROOTPOOL	4
 
 /*
  * Allocate or free a vdev

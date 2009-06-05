@@ -1619,7 +1619,7 @@ find_common (char *arg, char *root, int for_root, int flags)
         grub_sprintf(bootsign, "%s/%s", BOOTSIGN_DIR, arg);
 	filename = bootsign;
 	goto harddisk;
-  } else if (for_root) {
+  } else if (for_root && !grub_strchr(arg, '/')) {
 	/* Boot signature without partition/slice information */
         grub_sprintf(bootsign, "%s/%s", BOOTSIGN_DIR, arg);
 	filename = bootsign;
@@ -4159,11 +4159,6 @@ findroot_func (char *arg, int flags)
   }
 
   if (arg[0] == '\0') {
-  	errnum = ERR_BAD_ARGUMENT;
-	return 1;
-  }
-
-  if (grub_strchr(arg, '/')) {
   	errnum = ERR_BAD_ARGUMENT;
 	return 1;
   }

@@ -1504,10 +1504,10 @@ vdev_online(nvlist_t *nv)
 }
 
 /*
- * Helper function for zpool_get_config_physpath().
+ * Helper function for zpool_get_physpaths().
  */
 static int
-vdev_get_physpath(nvlist_t *config, char *physpath, size_t physpath_size,
+vdev_get_one_physpath(nvlist_t *config, char *physpath, size_t physpath_size,
     size_t *bytes_written)
 {
 	size_t bytes_left, pos, rsz;
@@ -1535,6 +1535,57 @@ vdev_get_physpath(nvlist_t *config, char *physpath, size_t physpath_size,
 	return (0);
 }
 
+static int
+vdev_get_physpaths(nvlist_t *nv, char *physpath, size_t phypath_size,
+    size_t *rsz, boolean_t is_spare)
+{
+	char *type;
+	int ret;
+
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
+		return (EZFS_INVALCONFIG);
+
+	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
+		/*
+		 * An active spare device has ZPOOL_CONFIG_IS_SPARE set.
+		 * For a spare vdev, we only want to boot from the active
+		 * spare device.
+		 */
+		if (is_spare) {
+			uint64_t spare = 0;
+			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPARE,
+			    &spare);
+			if (!spare)
+				return (EZFS_INVALCONFIG);
+		}
+
+		if (vdev_online(nv)) {
+			if ((ret = vdev_get_one_physpath(nv, physpath,
+			    phypath_size, rsz)) != 0)
+				return (ret);
+		}
+	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0 ||
+	    strcmp(type, VDEV_TYPE_REPLACING) == 0 ||
+	    (is_spare = (strcmp(type, VDEV_TYPE_SPARE) == 0))) {
+		nvlist_t **child;
+		uint_t count;
+		int i, ret;
+
+		if (nvlist_lookup_nvlist_array(nv,
+		    ZPOOL_CONFIG_CHILDREN, &child, &count) != 0)
+			return (EZFS_INVALCONFIG);
+
+		for (i = 0; i < count; i++) {
+			ret = vdev_get_physpaths(child[i], physpath,
+			    phypath_size, rsz, is_spare);
+			if (ret == EZFS_NOSPC)
+				return (ret);
+		}
+	}
+
+	return (EZFS_POOL_INVALARG);
+}
+
 /*
  * Get phys_path for a root pool config.
  * Return 0 on success; non-zero on failure.
@@ -1545,10 +1596,8 @@ zpool_get_config_physpath(nvlist_t *config, char *physpath, size_t phypath_size)
 	size_t rsz;
 	nvlist_t *vdev_root;
 	nvlist_t **child;
-	nvlist_t **child2;
 	uint_t count;
 	char *type;
-	int j, ret;
 
 	rsz = 0;
 
@@ -1569,40 +1618,8 @@ zpool_get_config_physpath(nvlist_t *config, char *physpath, size_t phypath_size)
 	    pool_uses_efi(vdev_root))
 		return (EZFS_POOL_INVALARG);
 
-	if (nvlist_lookup_string(child[0], ZPOOL_CONFIG_TYPE, &type) != 0)
-		return (EZFS_INVALCONFIG);
-
-	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-		if (vdev_online(child[0])) {
-			if ((ret = vdev_get_physpath(child[0], physpath,
-			    phypath_size, &rsz)) != 0)
-				return (ret);
-		}
-	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
-
-		if (nvlist_lookup_nvlist_array(child[0],
-		    ZPOOL_CONFIG_CHILDREN, &child2, &count) != 0)
-			return (EZFS_INVALCONFIG);
-
-		for (j = 0; j < count; j++) {
-			if (nvlist_lookup_string(child2[j], ZPOOL_CONFIG_TYPE,
-			    &type) != 0)
-				return (EZFS_INVALCONFIG);
-
-			if (strcmp(type, VDEV_TYPE_DISK) != 0)
-				return (EZFS_POOL_INVALARG);
-
-			if (vdev_online(child2[j])) {
-				ret = vdev_get_physpath(child2[j],
-				    physpath, phypath_size, &rsz);
-
-				if (ret == EZFS_NOSPC)
-					return (ret);
-			}
-		}
-	} else {
-		return (EZFS_POOL_INVALARG);
-	}
+	(void) vdev_get_physpaths(child[0], physpath, phypath_size, &rsz,
+	    B_FALSE);
 
 	/* No online devices */
 	if (rsz == 0)
@@ -1938,6 +1955,14 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 			(void) fprintf(stderr, dgettext(TEXT_DOMAIN, "Please "
 			    "be sure to invoke %s to make '%s' bootable.\n"),
 			    BOOTCMD, new_disk);
+
+			/*
+			 * XXX need a better way to prevent user from
+			 * booting up a half-baked vdev.
+			 */
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN, "Make "
+			    "sure to wait until resilver is done "
+			    "before rebooting.\n"));
 		}
 		return (0);
 	}

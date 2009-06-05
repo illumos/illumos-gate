@@ -2279,29 +2279,36 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 #ifdef _KERNEL
 /*
- * Build a "root" vdev for a top level vdev read in from a rootpool
- * device label.
+ * Get the root pool information from the root disk, then import the root pool
+ * during the system boot up time.
  */
-static void
-spa_build_rootpool_config(nvlist_t *config)
+extern int vdev_disk_read_rootlabel(char *, char *, nvlist_t **);
+
+static nvlist_t *
+spa_generate_rootconf(char *devpath, char *devid, uint64_t *guid)
 {
+	nvlist_t *config;
 	nvlist_t *nvtop, *nvroot;
 	uint64_t pgid;
+
+	if (vdev_disk_read_rootlabel(devpath, devid, &config) != 0)
+		return (NULL);
 
 	/*
 	 * Add this top-level vdev to the child array.
 	 */
-	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &nvtop)
-	    == 0);
-	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &pgid)
-	    == 0);
+	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvtop) == 0);
+	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
+	    &pgid) == 0);
+	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_GUID, guid) == 0);
 
 	/*
 	 * Put this pool's top-level vdevs into a root vdev.
 	 */
 	VERIFY(nvlist_alloc(&nvroot, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-	VERIFY(nvlist_add_string(nvroot, ZPOOL_CONFIG_TYPE, VDEV_TYPE_ROOT)
-	    == 0);
+	VERIFY(nvlist_add_string(nvroot, ZPOOL_CONFIG_TYPE,
+	    VDEV_TYPE_ROOT) == 0);
 	VERIFY(nvlist_add_uint64(nvroot, ZPOOL_CONFIG_ID, 0ULL) == 0);
 	VERIFY(nvlist_add_uint64(nvroot, ZPOOL_CONFIG_GUID, pgid) == 0);
 	VERIFY(nvlist_add_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
@@ -2313,129 +2320,42 @@ spa_build_rootpool_config(nvlist_t *config)
 	 */
 	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, nvroot) == 0);
 	nvlist_free(nvroot);
+	return (config);
 }
 
 /*
- * Get the root pool information from the root disk, then import the root pool
- * during the system boot up time.
+ * Walk the vdev tree and see if we can find a device with "better"
+ * configuration. A configuration is "better" if the label on that
+ * device has a more recent txg.
  */
-extern int vdev_disk_read_rootlabel(char *, char *, nvlist_t **);
-
-int
-spa_check_rootconf(char *devpath, char *devid, nvlist_t **bestconf,
-    uint64_t *besttxg)
+static void
+spa_alt_rootvdev(vdev_t *vd, vdev_t **avd, uint64_t *txg)
 {
-	nvlist_t *config;
-	uint64_t txg;
-	int error;
+	int c;
 
-	if (error = vdev_disk_read_rootlabel(devpath, devid, &config))
-		return (error);
+	for (c = 0; c < vd->vdev_children; c++)
+		spa_alt_rootvdev(vd->vdev_child[c], avd, txg);
 
-	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG, &txg) == 0);
+	if (vd->vdev_ops->vdev_op_leaf) {
+		nvlist_t *label;
+		uint64_t label_txg;
 
-	if (bestconf != NULL)
-		*bestconf = config;
-	else
-		nvlist_free(config);
-	*besttxg = txg;
-	return (0);
-}
+		if (vdev_disk_read_rootlabel(vd->vdev_physpath, vd->vdev_devid,
+		    &label) != 0)
+			return;
 
-boolean_t
-spa_rootdev_validate(nvlist_t *nv)
-{
-	uint64_t ival;
+		VERIFY(nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_TXG,
+		    &label_txg) == 0);
 
-	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE, &ival) == 0 ||
-	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_FAULTED, &ival) == 0 ||
-	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_REMOVED, &ival) == 0)
-		return (B_FALSE);
-
-	return (B_TRUE);
-}
-
-
-/*
- * Given the boot device's physical path or devid, check if the device
- * is in a valid state.  If so, return the configuration from the vdev
- * label.
- */
-int
-spa_get_rootconf(char *devpath, char *devid, nvlist_t **bestconf)
-{
-	nvlist_t *conf = NULL;
-	uint64_t txg = 0;
-	nvlist_t *nvtop, **child;
-	char *type;
-	char *bootpath = NULL;
-	uint_t children, c;
-	char *tmp;
-	int error;
-
-	if (devpath && ((tmp = strchr(devpath, ' ')) != NULL))
-		*tmp = '\0';
-	if (error = spa_check_rootconf(devpath, devid, &conf, &txg)) {
-		cmn_err(CE_NOTE, "error reading device label");
-		return (error);
-	}
-	if (txg == 0) {
-		cmn_err(CE_NOTE, "this device is detached");
-		nvlist_free(conf);
-		return (EINVAL);
-	}
-
-	VERIFY(nvlist_lookup_nvlist(conf, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvtop) == 0);
-	VERIFY(nvlist_lookup_string(nvtop, ZPOOL_CONFIG_TYPE, &type) == 0);
-
-	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-		if (spa_rootdev_validate(nvtop)) {
-			goto out;
-		} else {
-			nvlist_free(conf);
-			return (EINVAL);
+		/*
+		 * Do we have a better boot device?
+		 */
+		if (label_txg > *txg) {
+			*txg = label_txg;
+			*avd = vd;
 		}
+		nvlist_free(label);
 	}
-
-	ASSERT(strcmp(type, VDEV_TYPE_MIRROR) == 0);
-
-	VERIFY(nvlist_lookup_nvlist_array(nvtop, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
-
-	/*
-	 * Go thru vdevs in the mirror to see if the given device
-	 * has the most recent txg. Only the device with the most
-	 * recent txg has valid information and should be booted.
-	 */
-	for (c = 0; c < children; c++) {
-		char *cdevid, *cpath;
-		uint64_t tmptxg;
-
-		cpath = NULL;
-		cdevid = NULL;
-		(void) nvlist_lookup_string(child[c], ZPOOL_CONFIG_PHYS_PATH,
-		    &cpath);
-		(void) nvlist_lookup_string(child[c], ZPOOL_CONFIG_DEVID,
-		    &cdevid);
-		if (cpath == NULL && cdevid == NULL)
-			return (EINVAL);
-		if ((spa_check_rootconf(cpath, cdevid, NULL,
-		    &tmptxg) == 0) && (tmptxg > txg)) {
-			txg = tmptxg;
-			VERIFY(nvlist_lookup_string(child[c],
-			    ZPOOL_CONFIG_PATH, &bootpath) == 0);
-		}
-	}
-
-	/* Does the best device match the one we've booted from? */
-	if (bootpath) {
-		cmn_err(CE_NOTE, "try booting from '%s'", bootpath);
-		return (EINVAL);
-	}
-out:
-	*bestconf = conf;
-	return (0);
 }
 
 /*
@@ -2453,24 +2373,25 @@ out:
 int
 spa_import_rootpool(char *devpath, char *devid)
 {
-	nvlist_t *conf = NULL;
+	spa_t *spa;
+	vdev_t *rvd, *bvd, *avd = NULL;
+	nvlist_t *config, *nvtop;
+	uint64_t guid, txg;
 	char *pname;
 	int error;
-	spa_t *spa;
 
 	/*
-	 * Get the vdev pathname and configuation from the most
-	 * recently updated vdev (highest txg).
+	 * Read the label from the boot device and generate a configuration.
 	 */
-	if (error = spa_get_rootconf(devpath, devid, &conf))
-		goto msg_out;
+	if ((config = spa_generate_rootconf(devpath, devid, &guid)) == NULL) {
+		cmn_err(CE_NOTE, "Can not read the pool label from '%s'",
+		    devpath);
+		return (EIO);
+	}
 
-	/*
-	 * Add type "root" vdev to the config.
-	 */
-	spa_build_rootpool_config(conf);
-
-	VERIFY(nvlist_lookup_string(conf, ZPOOL_CONFIG_POOL_NAME, &pname) == 0);
+	VERIFY(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
+	    &pname) == 0);
+	VERIFY(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG, &txg) == 0);
 
 	mutex_enter(&spa_namespace_lock);
 	if ((spa = spa_lookup(pname)) != NULL) {
@@ -2482,24 +2403,72 @@ spa_import_rootpool(char *devpath, char *devid)
 	}
 
 	spa = spa_add(pname, NULL);
-
 	spa->spa_is_root = B_TRUE;
-	VERIFY(nvlist_dup(conf, &spa->spa_config, 0) == 0);
+
+	/*
+	 * Build up a vdev tree based on the boot device's label config.
+	 */
+	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvtop) == 0);
+	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
+	error = spa_config_parse(spa, &rvd, nvtop, NULL, 0,
+	    VDEV_ALLOC_ROOTPOOL);
+	spa_config_exit(spa, SCL_ALL, FTAG);
+	if (error) {
+		mutex_exit(&spa_namespace_lock);
+		nvlist_free(config);
+		cmn_err(CE_NOTE, "Can not parse the config for pool '%s'",
+		    pname);
+		return (error);
+	}
+
+	/*
+	 * Get the boot vdev.
+	 */
+	if ((bvd = vdev_lookup_by_guid(rvd, guid)) == NULL) {
+		cmn_err(CE_NOTE, "Can not find the boot vdev for guid %llu",
+		    (u_longlong_t)guid);
+		error = ENOENT;
+		goto out;
+	}
+
+	/*
+	 * Determine if there is a better boot device.
+	 */
+	avd = bvd;
+	spa_alt_rootvdev(rvd, &avd, &txg);
+	if (avd != bvd) {
+		cmn_err(CE_NOTE, "The boot device is 'degraded'. Please "
+		    "try booting from '%s'", avd->vdev_path);
+		error = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * If the boot device is part of a spare vdev then ensure that
+	 * we're booting off the active spare.
+	 */
+	if (bvd->vdev_parent->vdev_ops == &vdev_spare_ops &&
+	    !bvd->vdev_isspare) {
+		cmn_err(CE_NOTE, "The boot device is currently spared. Please "
+		    "try booting from '%s'",
+		    bvd->vdev_parent->vdev_child[1]->vdev_path);
+		error = EINVAL;
+		goto out;
+	}
+
+	VERIFY(nvlist_dup(config, &spa->spa_config, 0) == 0);
+	error = 0;
+out:
+	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
+	vdev_free(rvd);
+	spa_config_exit(spa, SCL_ALL, FTAG);
 	mutex_exit(&spa_namespace_lock);
 
-	nvlist_free(conf);
-	return (0);
-
-msg_out:
-	cmn_err(CE_NOTE, "\n"
-	    "  ***************************************************  \n"
-	    "  *  This device is not bootable!                   *  \n"
-	    "  *  It is either offlined or detached or faulted.  *  \n"
-	    "  *  Please try to boot from a different device.    *  \n"
-	    "  ***************************************************  ");
-
+	nvlist_free(config);
 	return (error);
 }
+
 #endif
 
 /*
