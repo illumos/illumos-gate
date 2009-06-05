@@ -64,6 +64,7 @@
 #include <sys/sunddi.h>
 #include <sys/atomic.h>
 #include <sys/signal.h>
+#include <sys/byteorder.h>
 #include <sys/fs/dv_node.h>	/* devfs_clean */
 
 #include "mr_sas.h"
@@ -81,6 +82,7 @@
  */
 static void	*mrsas_state = NULL;
 static int 	debug_level_g = CL_NONE;
+boolean_t mrsas_relaxed_ordering = B_TRUE;
 
 #pragma weak scsi_hba_open
 #pragma weak scsi_hba_close
@@ -583,6 +585,11 @@ mrsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			tran->tran_sync_pkt	= mrsas_tran_sync_pkt;
 			tran->tran_bus_config	= mrsas_tran_bus_config;
 
+			if (mrsas_relaxed_ordering)
+				mrsas_generic_dma_attr.dma_attr_flags |=
+				    DDI_DMA_RELAXED_ORDERING;
+
+
 			tran_dma_attr = mrsas_generic_dma_attr;
 			tran_dma_attr.dma_attr_sgllen = instance->max_num_sge;
 
@@ -937,7 +944,6 @@ mrsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	struct mrsas_instance	*instance;
 	struct mrsas_ioctl	*ioctl;
 	struct mrsas_aen	aen;
-	int i;
 	con_log(CL_ANN1, (CE_NOTE, "chkpnt:%s:%d", __func__, __LINE__));
 
 	instance = ddi_get_soft_state(mrsas_state, MINOR2INST(getminor(dev)));
@@ -954,56 +960,44 @@ mrsas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	switch ((uint_t)cmd) {
 		case MRSAS_IOCTL_FIRMWARE:
-			for (i = 0; i < sizeof (struct mrsas_ioctl); i++) {
-				if (ddi_copyin((uint8_t *)arg+i,
-				    (uint8_t *)ioctl+i, 1, mode)) {
-					con_log(CL_ANN, (CE_WARN, "mrsas_ioctl "
-					    "ERROR IOCTL copyin"));
-					kmem_free(ioctl,
-					    sizeof (struct mrsas_ioctl));
-					return (EFAULT);
-				}
+			if (ddi_copyin((void *)arg, ioctl,
+			    sizeof (struct mrsas_ioctl), mode)) {
+				con_log(CL_ANN, (CE_WARN, "mrsas_ioctl: "
+				    "ERROR IOCTL copyin"));
+				kmem_free(ioctl, sizeof (struct mrsas_ioctl));
+				return (EFAULT);
 			}
+
 			if (ioctl->control_code == MRSAS_DRIVER_IOCTL_COMMON) {
 				rval = handle_drv_ioctl(instance, ioctl, mode);
 			} else {
 				rval = handle_mfi_ioctl(instance, ioctl, mode);
 			}
-			for (i = 0; i < sizeof (struct mrsas_ioctl) - 1; i++) {
-				if (ddi_copyout((uint8_t *)ioctl+i,
-				    (uint8_t *)arg+i, 1, mode)) {
-					con_log(CL_ANN, (CE_WARN,
-					    "mrsas_ioctl: ddi_copyout "
-					    "failed"));
-					rval = 1;
-					break;
-				}
+
+			if (ddi_copyout((void *)ioctl, (void *)arg,
+			    (sizeof (struct mrsas_ioctl) - 1), mode)) {
+				con_log(CL_ANN, (CE_WARN,
+				    "mrsas_ioctl: copy_to_user failed"));
+				rval = 1;
 			}
 
 			break;
 		case MRSAS_IOCTL_AEN:
-			for (i = 0; i < sizeof (struct mrsas_aen); i++) {
-				if (ddi_copyin((uint8_t *)arg+i,
-				    (uint8_t *)&aen+i, 1, mode)) {
-					con_log(CL_ANN, (CE_WARN,
-					    "mrsas_ioctl: "
-					    "ERROR AEN copyin"));
-					kmem_free(ioctl,
-					    sizeof (struct mrsas_ioctl));
-					return (EFAULT);
-				}
+			if (ddi_copyin((void *) arg, &aen,
+			    sizeof (struct mrsas_aen), mode)) {
+				con_log(CL_ANN, (CE_WARN,
+				    "mrsas_ioctl: ERROR AEN copyin"));
+				kmem_free(ioctl, sizeof (struct mrsas_ioctl));
+				return (EFAULT);
 			}
 
 			rval = handle_mfi_aen(instance, &aen);
-			for (i = 0; i < sizeof (struct mrsas_aen); i++) {
-				if (ddi_copyout((uint8_t *)&aen + i,
-				    (uint8_t *)arg + i, 1, mode)) {
-					con_log(CL_ANN, (CE_WARN,
-					    "mrsas_ioctl: "
-					    "ddi_copyout failed"));
-					rval = 1;
-					break;
-				}
+
+			if (ddi_copyout((void *) &aen, (void *)arg,
+			    sizeof (struct mrsas_aen), mode)) {
+				con_log(CL_ANN, (CE_WARN,
+				    "mrsas_ioctl: copy_to_user failed"));
+				rval = 1;
 			}
 
 			break;
@@ -1562,7 +1556,7 @@ mrsas_isr(struct mrsas_instance *instance)
 	    != DDI_SUCCESS) {
 		mrsas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
 		ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
-		return (DDI_INTR_UNCLAIMED);
+		return (DDI_INTR_CLAIMED);
 	}
 
 	producer = ddi_get32(instance->mfi_internal_dma_obj.acc_handle,
@@ -1574,7 +1568,7 @@ mrsas_isr(struct mrsas_instance *instance)
 	    producer, consumer));
 	if (producer == consumer) {
 		con_log(CL_ANN1, (CE_WARN, "producer = consumer case"));
-		return (DDI_INTR_UNCLAIMED);
+		return (DDI_INTR_CLAIMED);
 	}
 	mutex_enter(&instance->completed_pool_mtx);
 
@@ -1706,7 +1700,6 @@ create_mfi_frame_pool(struct mrsas_instance *instance)
 	uint16_t	sge_sz;
 	uint32_t	sgl_sz;
 	uint32_t	tot_frame_size;
-
 	struct mrsas_cmd	*cmd;
 
 	max_cmd = instance->max_fw_cmds;
@@ -2015,9 +2008,15 @@ get_ctrl_info(struct mrsas_instance *instance,
 
 	if (!instance->func_ptr->issue_cmd_in_poll_mode(instance, cmd)) {
 		ret = 0;
+		ctrl_info->max_request_size = ddi_get32(
+		    cmd->frame_dma_obj.acc_handle, &ci->max_request_size);
+		ctrl_info->ld_present_count = ddi_get16(
+		    cmd->frame_dma_obj.acc_handle, &ci->ld_present_count);
 		ddi_rep_get8(cmd->frame_dma_obj.acc_handle,
-		    (uint8_t *)ctrl_info, (uint8_t *)ci,
-		    sizeof (struct mrsas_ctrl_info), DDI_DEV_AUTOINCR);
+		    (uint8_t *)(ctrl_info->product_name),
+		    (uint8_t *)(ci->product_name), 80 * sizeof (char),
+		    DDI_DEV_AUTOINCR);
+		/* should get more members of ci with ddi_get when needed */
 	} else {
 		con_log(CL_ANN, (CE_WARN, "get_ctrl_info: Ctrl info failed"));
 		ret = -1;
@@ -2382,7 +2381,7 @@ get_seq_num(struct mrsas_instance *instance,
 	dma_obj_t			dcmd_dma_obj;
 	struct mrsas_cmd		*cmd;
 	struct mrsas_dcmd_frame		*dcmd;
-
+	struct mrsas_evt_log_info *eli_tmp;
 	cmd = get_mfi_pkt(instance);
 
 	if (!cmd) {
@@ -2439,10 +2438,9 @@ get_seq_num(struct mrsas_instance *instance,
 		    "failed to issue MRSAS_DCMD_CTRL_EVENT_GET_INFO");
 		ret = DDI_FAILURE;
 	} else {
-		/* copy the data back into callers buffer */
-		ddi_rep_get8(cmd->frame_dma_obj.acc_handle, (uint8_t *)eli,
-		    (uint8_t *)dcmd_dma_obj.buffer,
-		    sizeof (struct mrsas_evt_log_info), DDI_DEV_AUTOINCR);
+		eli_tmp = (struct mrsas_evt_log_info *)dcmd_dma_obj.buffer;
+		eli->newest_seq_num = ddi_get32(cmd->frame_dma_obj.acc_handle,
+		    &eli_tmp->newest_seq_num);
 		ret = DDI_SUCCESS;
 	}
 
@@ -2477,8 +2475,9 @@ start_mfi_aen(struct mrsas_instance *instance)
 
 	/* register AEN with FW for latest sequence number plus 1 */
 	class_locale.members.reserved	= 0;
-	class_locale.members.locale	= MR_EVT_LOCALE_ALL;
+	class_locale.members.locale	= LE_16(MR_EVT_LOCALE_ALL);
 	class_locale.members.class	= MR_EVT_CLASS_INFO;
+	class_locale.word	= LE_32(class_locale.word);
 	ret = register_mfi_aen(instance, eli.newest_seq_num + 1,
 	    class_locale.word);
 
@@ -2679,7 +2678,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 
 	if (mlist_empty(&instance->completed_pool_list)) {
 		mutex_exit(&instance->completed_pool_mtx);
-		return (DDI_INTR_UNCLAIMED);
+		return (DDI_INTR_CLAIMED);
 	}
 
 	instance->softint_running = 1;
@@ -2702,7 +2701,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 		    DDI_SUCCESS) {
 			mrsas_fm_ereport(instance, DDI_FM_DEVICE_NO_RESPONSE);
 			ddi_fm_service_impact(instance->dip, DDI_SERVICE_LOST);
-			return (DDI_INTR_UNCLAIMED);
+			return (DDI_INTR_CLAIMED);
 		}
 
 		hdr = &cmd->frame->hdr;
@@ -2822,7 +2821,7 @@ mrsas_softintr(struct mrsas_instance *instance)
 					    acmd->cmd_scblen -
 					    offsetof(struct scsi_arq_status,
 					    sts_sensedata), DDI_DEV_AUTOINCR);
-				}
+			}
 				break;
 			case MFI_STAT_LD_OFFLINE:
 			case MFI_STAT_DEVICE_NOT_FOUND:
@@ -3896,7 +3895,7 @@ issue_mfi_smp(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	model = ddi_model_convert_from(mode & FMODELS);
 	if (model == DDI_MODEL_ILP32) {
 		con_log(CL_ANN1, (CE_NOTE,
-		    "handle_drv_ioctl: DDI_MODEL_ILP32"));
+		    "issue_mfi_smp: DDI_MODEL_ILP32"));
 
 		sge32 = &smp->sgl[0].sge32[0];
 		ddi_put32(acc_handle, &sge32[0].length, response_xferlen);
@@ -3908,7 +3907,7 @@ issue_mfi_smp(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	} else {
 #ifdef _ILP32
 		con_log(CL_ANN1, (CE_NOTE,
-		    "handle_drv_ioctl: DDI_MODEL_ILP32"));
+		    "issue_mfi_smp: DDI_MODEL_ILP32"));
 		sge32 = &smp->sgl[0].sge32[0];
 		ddi_put32(acc_handle, &sge32[0].length, response_xferlen);
 		ddi_put32(acc_handle, &sge32[0].phys_addr,
@@ -4252,19 +4251,16 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 		    "MRSAS_DRIVER_IOCTL_DRIVER_VERSION"));
 
 		fill_up_drv_ver(&dv);
-		for (i = 0; i < xferlen; i++) {
-			if (ddi_copyout((uint8_t *)&dv + i, (uint8_t *)ubuf + i,
-			    1, mode)) {
-				con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
-				    "MRSAS_DRIVER_IOCTL_DRIVER_VERSION"
-				    " : copy to user space failed"));
-				kdcmd->cmd_status = 1;
-				rval = DDI_FAILURE;
-				break;
-			}
-		}
-		if (i == xferlen)
+
+		if (ddi_copyout(&dv, ubuf, xferlen, mode)) {
+			con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+			    "MRSAS_DRIVER_IOCTL_DRIVER_VERSION : "
+			    "copy to user space failed"));
+			kdcmd->cmd_status = 1;
+			rval = 1;
+		} else {
 			kdcmd->cmd_status = 0;
+		}
 		break;
 	case MRSAS_DRIVER_IOCTL_PCI_INFORMATION:
 		con_log(CL_ANN1, (CE_NOTE, "handle_drv_ioctl: "
@@ -4292,21 +4288,16 @@ handle_drv_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 			pci_conf_buf[i] =
 			    pci_config_get8(instance->pci_handle, i);
 		}
-		for (i = 0; i < xferlen; i++) {
-			if (ddi_copyout((uint8_t *)&pi + i, (uint8_t *)ubuf + i,
-			    1, mode)) {
-				con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
-				    "MRSAS_DRIVER_IOCTL_PCI_INFORMATION"
-				    " : copy to user space failed"));
-				kdcmd->cmd_status = 1;
-				rval = DDI_FAILURE;
-				break;
-			}
-		}
 
-		if (i == xferlen)
+		if (ddi_copyout(&pi, ubuf, xferlen, mode)) {
+			con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
+			    "MRSAS_DRIVER_IOCTL_PCI_INFORMATION : "
+			    "copy to user space failed"));
+			kdcmd->cmd_status = 1;
+			rval = 1;
+		} else {
 			kdcmd->cmd_status = 0;
-
+		}
 		break;
 	default:
 		con_log(CL_ANN, (CE_WARN, "handle_drv_ioctl: "
@@ -4347,7 +4338,7 @@ handle_mfi_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 
 	hdr = (struct mrsas_header *)&ioctl->frame[0];
 
-	switch (hdr->cmd) {
+	switch (ddi_get8(cmd->frame_dma_obj.acc_handle, &hdr->cmd)) {
 	case MFI_CMD_OP_DCMD:
 		rval = issue_mfi_dcmd(instance, ioctl, cmd, mode);
 		break;
@@ -4415,12 +4406,14 @@ register_mfi_aen(struct mrsas_instance *instance, uint32_t seq_num,
 	 * old and current and re-issue to the FW
 	 */
 
-	curr_aen.word = class_locale_word;
+	curr_aen.word = LE_32(class_locale_word);
+	curr_aen.members.locale = LE_16(curr_aen.members.locale);
 	aen_cmd = instance->aen_cmd;
 	if (aen_cmd) {
 		prev_aen.word = ddi_get32(aen_cmd->frame_dma_obj.acc_handle,
 		    &aen_cmd->frame->dcmd.mbox.w[1]);
-
+		prev_aen.word = LE_32(prev_aen.word);
+		prev_aen.members.locale = LE_16(prev_aen.members.locale);
 		/*
 		 * A class whose enum value is smaller is inclusive of all
 		 * higher values. If a PROGRESS (= -1) was previously
@@ -4488,6 +4481,8 @@ register_mfi_aen(struct mrsas_instance *instance, uint32_t seq_num,
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->opcode,
 	    MR_DCMD_CTRL_EVENT_WAIT);
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->mbox.w[0], seq_num);
+	curr_aen.members.locale = LE_16(curr_aen.members.locale);
+	curr_aen.word = LE_32(curr_aen.word);
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->mbox.w[1],
 	    curr_aen.word);
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &dcmd->sgl.sge32[0].phys_addr,
@@ -4723,6 +4718,7 @@ static int
 intr_ack_ppc(struct mrsas_instance *instance)
 {
 	uint32_t	status;
+	int ret = DDI_INTR_CLAIMED;
 
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: called"));
 
@@ -4732,9 +4728,17 @@ intr_ack_ppc(struct mrsas_instance *instance)
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: status = 0x%x", status));
 
 	if (!(status & MFI_REPLY_2108_MESSAGE_INTR)) {
-		return (DDI_INTR_UNCLAIMED);
+		ret = DDI_INTR_UNCLAIMED;
 	}
 
+	if (mrsas_check_acc_handle(instance->regmap_handle) != DDI_SUCCESS) {
+		ddi_fm_service_impact(instance->dip, DDI_SERVICE_UNAFFECTED);
+		ret = DDI_INTR_UNCLAIMED;
+	}
+
+	if (ret == DDI_INTR_UNCLAIMED) {
+		return (ret);
+	}
 	/* clear the interrupt by writing back the same value */
 	WR_OB_DOORBELL_CLEAR(status, instance);
 
@@ -4743,7 +4747,7 @@ intr_ack_ppc(struct mrsas_instance *instance)
 
 	con_log(CL_ANN1, (CE_NOTE, "intr_ack_ppc: interrupt cleared"));
 
-	return (DDI_INTR_CLAIMED);
+	return (ret);
 }
 
 static int

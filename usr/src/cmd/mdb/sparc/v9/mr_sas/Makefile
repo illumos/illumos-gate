@@ -18,32 +18,25 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
+MODULE = mr_sas.so
+MDBTGT = kvm
 
-#!search <pathname pathname ...>        # where to find pkg objects
-#!include <filename>                    # include another 'prototype' file
-#!default <mode> <owner> <group>        # default used if not specified on entry
-#!<param>=<value>                       # puts parameter in pkg environment
+MODSRCS = mr_sas.c
 
-#
-# Include ISA independent files (prototype_com)
-#
-!include prototype_com
+MRSASBASE = ../../../../../uts/common/io/mr_sas
 
-#
-# List files which are Sparc specific here
-#
-# source locations relative to the prototype file
-#
-# SUNWmrsas
-#
-d none kernel/drv/sparcv9	0755	root	sys
-f none kernel/drv/sparcv9/mr_sas 0755	root	sys
+include ../../../../Makefile.cmd
+include ../../../../Makefile.cmd.64
+include ../../Makefile.sparcv9
+include ../../../Makefile.module
+
+CPPFLAGS += -I$(SRC)/uts/common
+CPPFLAGS += -I$(SRC)/uts/common/sys/scsi
+CPPFLAGS += -I$(SRC)/uts/common/sys/scsi/adapters
+CPPFLAGS += -I$(MRSASBASE)
+CPPFLAGS += -D KMDB_MODULE

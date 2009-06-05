@@ -37,7 +37,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #ifndef	_MR_SAS_H_
 #define	_MR_SAS_H_
 
@@ -51,8 +50,8 @@ extern "C" {
 /*
  * MegaRAID SAS2.0 Driver meta data
  */
-#define	MRSAS_VERSION				"LSIv2.0"
-#define	MRSAS_RELDATE				"Jan 9, 2009"
+#define	MRSAS_VERSION				"LSIv2.1"
+#define	MRSAS_RELDATE				"May 11, 2009"
 
 #define	MRSAS_TRUE				1
 #define	MRSAS_FALSE				0
@@ -1648,6 +1647,7 @@ struct mrsas_aen {
 #define	DDI_VENDOR_LSI		"LSI"
 #endif /* DDI_VENDOR_LSI */
 
+#ifndef	KMDB_MODULE
 static int	mrsas_getinfo(dev_info_t *, ddi_info_cmd_t,  void *, void **);
 static int	mrsas_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	mrsas_reset(dev_info_t *, ddi_reset_cmd_t);
@@ -1758,6 +1758,7 @@ static void	mrsas_issue_evt_taskq(struct mrsas_eventinfo *);
 static int	mrsas_service_evt(struct mrsas_instance *, int, int, int,
 			uint64_t);
 static int	mrsas_mode_sense_build(struct scsi_pkt *);
+#endif	/* KMDB_MODULE */
 
 #ifdef	__cplusplus
 }

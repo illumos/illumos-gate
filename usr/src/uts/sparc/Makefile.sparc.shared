@@ -257,6 +257,7 @@ DRV_KMODS	+= aac
 DRV_KMODS	+= igb
 DRV_KMODS	+= ixgbe
 DRV_KMODS	+= vr
+DRV_KMODS	+= mr_sas
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
 #

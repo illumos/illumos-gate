@@ -43,6 +43,7 @@ f none kernel/kmdb/amd64/mac 555 root sys
 f none kernel/kmdb/amd64/md 555 root sys
 f none kernel/kmdb/amd64/mdb_ds 555 root sys
 f none kernel/kmdb/amd64/mpt 555 root sys
+f none kernel/kmdb/amd64/mr_sas 555 root sys
 f none kernel/kmdb/amd64/nca 555 root sys
 f none kernel/kmdb/amd64/neti 555 root sys
 f none kernel/kmdb/amd64/nfs 555 root sys
@@ -75,6 +76,7 @@ f none kernel/kmdb/mac 555 root sys
 f none kernel/kmdb/md 555 root sys
 f none kernel/kmdb/mdb_ds 555 root sys
 f none kernel/kmdb/mpt 555 root sys
+f none kernel/kmdb/mr_sas 555 root sys
 f none kernel/kmdb/nca 555 root sys
 f none kernel/kmdb/neti 555 root sys
 f none kernel/kmdb/nfs 555 root sys

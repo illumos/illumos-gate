@@ -124,7 +124,13 @@ check_add_drv()
 
 # We should all use main PCI ID entries.
 
-check_add_drv -i \
-	'"pciex1000,78"
-	"pciex1000,79"' \
-	-c scsi-self-identifying mr_sas
+ARCH=`uname -p`
+if [ ${ARCH} = "i386" ]; then
+    DRVALIAS='"pciex1000,78" "pciex1000,79"'
+fi
+
+if [ ${ARCH} = "sparc" ]; then
+   DRVALIAS='"pci1000,78" "pci1000,79" "pciex1000,78" "pciex1000,79"'
+fi
+
+check_add_drv -i "$DRVALIAS" -c scsi-self-identifying mr_sas

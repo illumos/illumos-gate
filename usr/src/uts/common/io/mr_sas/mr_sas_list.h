@@ -70,7 +70,7 @@ typedef struct mlist_head mlist_t;
 	(ptr)->next = (ptr); (ptr)->prev = (ptr); \
 }
 
-
+#ifndef	KMDB_MODULE
 /*
  * Insert a new entry between two known consecutive entries.
  *
@@ -173,7 +173,7 @@ static void mlist_splice(struct mlist_head *list, struct mlist_head *head)
 		at->prev = last;
 	}
 }
-
+#endif /* KMDB_MODULE */
 
 /*
  * mlist_entry - get the struct for this entry
