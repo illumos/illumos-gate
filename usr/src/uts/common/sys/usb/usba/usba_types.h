@@ -234,6 +234,7 @@ typedef struct usba_wireless_data {
 	usb_uwb_cap_descr_t	*uwb_descr;	/* UWB capability descr */
 } usba_wireless_data_t;
 
+
 /*
  * This	structure uniquely identifies a USB device
  * with all interfaces,	or just one interface of a USB device.
@@ -355,6 +356,7 @@ typedef struct usba_device {
 
 _NOTE(MUTEX_PROTECTS_DATA(usba_device::usb_mutex, usba_device))
 _NOTE(MUTEX_PROTECTS_DATA(usba_device::usb_mutex, usba_evdata))
+_NOTE(MUTEX_PROTECTS_DATA(usba_device::usb_mutex, usba_wireless_data))
 
 _NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
 				usba_evdata::ev_rm_cb_id))
@@ -364,6 +366,13 @@ _NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
 				usba_evdata::ev_suspend_cb_id))
 _NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
 				usba_evdata::ev_resume_cb_id))
+
+_NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
+				usba_wireless_data::wusb_bos))
+_NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
+				usba_wireless_data::wusb_bos_length))
+_NOTE(SCHEME_PROTECTS_DATA("chg at attach only",
+				usba_wireless_data::uwb_descr))
 
 /* this should be really stable data */
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_serialno_str))
@@ -398,9 +407,14 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_client_ev_cb_list))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_dip))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_is_wireless))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_wireless_data))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(usba_device::usb_is_wa))
 _NOTE(SCHEME_PROTECTS_DATA("set at device creation",
 					usba_device::usb_shared_taskq))
 
+_NOTE(SCHEME_PROTECTS_DATA("local use only",
+				usb_key_descr::bDescriptorType))
+_NOTE(SCHEME_PROTECTS_DATA("local use only",
+				usb_key_descr::bLength))
 /*
  * serialization in drivers
  */

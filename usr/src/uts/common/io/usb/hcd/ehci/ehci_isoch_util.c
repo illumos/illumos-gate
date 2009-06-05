@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -668,7 +668,6 @@ ehci_deallocate_itd(
 	    "ehci_deallocate_itd: old_itd = 0x%p", (void *)old_itd);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
-	ASSERT(Get_ITD(old_itd->itd_trans_wrapper) == itw->itw_id);
 
 	/* If it has been marked RECLAIM it has already been removed */
 	if (Get_ITD(old_itd->itd_state) != EHCI_ITD_RECLAIM) {

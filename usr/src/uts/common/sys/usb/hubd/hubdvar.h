@@ -260,6 +260,8 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hubd::h_default_pipe
 		hubd::h_hubpm
 		hubd::h_dip
 		hubd::h_ignore_pwr_budget
+		hubd::h_hub_descr
+		hubd::h_cleanup_child
 ))
 
 _NOTE(SCHEME_PROTECTS_DATA("stable data", usb_ep_descr))

@@ -46,6 +46,7 @@ root	usb_get_if_number
 root	usb_parse_CV_cfg_descr
 root	usb_parse_CV_ep_descr
 root	usb_parse_CV_if_descr
+root	usb_parse_comp_ep_descr
 root	usb_pipe_get_private
 root	usb_get_current_frame_number
 root	usb_get_max_isoc_pkts
@@ -191,6 +192,7 @@ add ehci_trans_wrapper::tw_handle_qtd targets ehci_handle_ctrl_qtd
 add ehci_trans_wrapper::tw_handle_qtd targets ehci_handle_bulk_qtd
 add ehci_trans_wrapper::tw_handle_qtd targets ehci_handle_intr_qtd
 
+add hubd::h_cleanup_child targets warlock_dummy
 add usba_hcdi_ops::usba_hcdi_console_input_init targets \
                                                 ohci_hcdi_polled_input_init
 add usba_hcdi_ops::usba_hcdi_console_input_fini targets \

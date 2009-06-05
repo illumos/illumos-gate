@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one ohci_state
 one ehci_state
@@ -45,6 +44,7 @@ root	usb_get_dev_descr
 root	usb_parse_CV_cfg_descr
 root	usb_parse_CV_ep_descr
 root	usb_parse_CV_if_descr
+root	usb_parse_comp_ep_descr
 root	usb_pipe_get_private
 root	usb_get_max_isoc_pkts
 root	usb_pipe_set_private
@@ -109,6 +109,9 @@ root    hubd_pre_suspend_event_cb
 root    hubd_reconnect_event_cb
 root	hubd_root_hub_cleanup_thread
 root	hubd_bus_power
+root	ehci_quiesce
+root	uhci_quiesce
+root	ohci_quiesce
 
 ### specify the ugen root functions
 root    ugen_skel_disconnect_ev_cb
@@ -126,6 +129,7 @@ add usb_ctrl_req::ctrl_cb targets warlock_dummy
 add usb_ctrl_req::ctrl_exc_cb targets warlock_dummy
 add usb_intr_req::intr_cb targets warlock_dummy
 add usb_intr_req::intr_exc_cb targets warlock_dummy
+add hubd::h_cleanup_child targets warlock_dummy
 
 add usba_pm_req::cb targets warlock_dummy
 add ohci_trans_wrapper::tw_handle_td targets ohci_handle_bulk_td

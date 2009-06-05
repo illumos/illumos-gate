@@ -68,6 +68,7 @@ typedef struct wusb_dev_info {
 _NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_dev_info::wdev_addr))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_dev_info::wdev_uwb_descr))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_dev_info::wdev_hc))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_dev_info::wdev_secrt_data))
 
 /*
  * According to WUSB 1.0 spec, WUSB hosts can support up to 127 devices.
@@ -150,8 +151,31 @@ _NOTE(MUTEX_PROTECTS_DATA(wusb_hc_data_t::hc_mutex, wusb_dev_info_t))
 _NOTE(MUTEX_PROTECTS_DATA(wusb_hc_data_t::hc_mutex, wusb_hc_data_t))
 
 _NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::hc_num_ports))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::hc_num_mmcies))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::hc_dip))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::hc_gtk))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::add_mmc_ie))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::rem_mmc_ie))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::set_cluster_id))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::set_encrypt))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::set_gtk))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::set_ptk))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::set_num_dnts))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::set_stream_idx))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::set_wusb_mas))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::stop_ch))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::create_child))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::destroy_child))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::disconnect_dev))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::reconnect_dev))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(wusb_hc_data_t::get_time))
 
+_NOTE(SCHEME_PROTECTS_DATA("local use only",
+				wusb_ie_host_disconnect::bLength))
+_NOTE(SCHEME_PROTECTS_DATA("local use only",
+				wusb_ie_host_disconnect::bIEIdentifier))
+_NOTE(SCHEME_PROTECTS_DATA("local use only",
+				wusb_ccm_nonce::sfn))
 /*
  * WUSB 1.0 4.3.8.5 says the range of cluster id is in 0x80-0xfe,
  * we limit the maximum WUSB host controller numbers to 31 now,
@@ -258,7 +282,7 @@ wusb_cc_t *wusb_hc_cc_matched(wusb_hc_cc_list_t *cc_list, uint8_t *cdid);
 
 /* security functions */
 int	wusb_dev_set_encrypt(usb_pipe_handle_t ph, uint8_t value);
-int	wusb_enable_dev_encrypt(wusb_dev_info_t *dev_info);
+int	wusb_enable_dev_encrypt(wusb_hc_data_t *hc, wusb_dev_info_t *dev_info);
 int	wusb_dev_set_key(usb_pipe_handle_t ph, uint8_t key_index,
 	usb_key_descr_t *key, size_t klen);
 int	wusb_hc_set_encrypt(wusb_hc_data_t *hc_data, usb_port_t port,

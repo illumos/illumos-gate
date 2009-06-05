@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one scsa2usb_state
 
@@ -33,7 +32,6 @@ root	scsa2usb_scsi_getcap scsa2usb_scsi_setcap scsa2usb_scsi_init_pkt
 root	scsa2usb_scsi_destroy_pkt
 root	scsa2usb_reconnect_event_cb
 root	scsa2usb_disconnect_event_cb
-root	scsa2usb_null_free
 root	scsa2usb_panic_callb
 root	scsa2usb_work_thread
 

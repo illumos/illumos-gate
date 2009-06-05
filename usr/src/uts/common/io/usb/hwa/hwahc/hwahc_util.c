@@ -288,8 +288,12 @@ hwahc_pipe_cleanup(hwahc_state_t *hwahcp, usba_pipe_handle_data_t *ph)
 
 		/* if active, abort the requests */
 		if (hdl->rp_state == WA_RPIPE_STATE_ACTIVE) {
+			mutex_exit(&hdl->rp_mutex);
+			mutex_exit(&hwahcp->hwahc_mutex);
 			rval = wusb_wa_rpipe_abort(hwahcp->hwahc_dip,
 			    hwahcp->hwahc_default_pipe, hdl);
+			mutex_enter(&hwahcp->hwahc_mutex);
+			mutex_enter(&hdl->rp_mutex);
 		}
 		mutex_exit(&hdl->rp_mutex);
 
@@ -303,7 +307,10 @@ hwahc_pipe_cleanup(hwahc_state_t *hwahcp, usba_pipe_handle_data_t *ph)
 	switch (pp->pp_state) {
 	case HWAHC_PIPE_STATE_CLOSE:
 		completion_reason = USB_CR_PIPE_CLOSING;
+
+		mutex_exit(&hwahcp->hwahc_mutex);
 		(void) wusb_wa_rpipe_reset(hwahcp->hwahc_dip, ph, hdl, 0);
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		break;
 	case HWAHC_PIPE_STATE_RESET:
@@ -487,18 +494,14 @@ hwahc_hcdi_pipe_open(
 
 	mutex_exit(&hwahcp->hwahc_mutex);
 	/* target the rpipe to the endpoint */
-	mutex_enter(&wa->wa_mutex);
 	rval = wusb_wa_set_rpipe_target(hwahcp->hwahc_dip, wa,
 	    hwahcp->hwahc_default_pipe, ph, pp->pp_rp);
-	mutex_exit(&wa->wa_mutex);
 	mutex_enter(&hwahcp->hwahc_mutex);
 
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_HCDI, hwahcp->hwahc_log_handle,
 		    "hwahc_hcdi_pipe_open: set target for rpipe failed");
-		mutex_enter(&wa->wa_mutex);
 		wusb_wa_release_rpipe(wa, pp->pp_rp);
-		mutex_exit(&wa->wa_mutex);
 		kmem_free(pp, sizeof (hwahc_pipe_private_t));
 		mutex_exit(&hwahcp->hwahc_mutex);
 
@@ -536,7 +539,6 @@ hwahc_hcdi_pipe_close(
 	hwahc_state_t		*hwahcp;
 	hwahc_pipe_private_t	*pp;
 	usb_ep_descr_t		*epdt = &ph->p_ep;
-	wusb_wa_data_t		*wa;
 
 	hwahcp = hwahc_obtain_state(ph->p_usba_device->usb_root_hub_dip);
 
@@ -559,10 +561,7 @@ hwahc_hcdi_pipe_close(
 	wusb_wa_clear_dev_ep(ph); /* clear the remote dev's endpoint */
 	mutex_enter(&hwahcp->hwahc_mutex);
 
-	wa = &hwahcp->hwahc_wa_data;
-	mutex_enter(&wa->wa_mutex);
 	wusb_wa_release_rpipe(&hwahcp->hwahc_wa_data, pp->pp_rp);
-	mutex_exit(&wa->wa_mutex);
 
 	mutex_enter(&ph->p_mutex);
 	cv_destroy(&pp->pp_xfer_cmpl_cv);

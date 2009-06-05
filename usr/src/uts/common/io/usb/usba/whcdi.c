@@ -54,6 +54,7 @@ static kmutex_t whcdi_mutex;
 /* use 0-30 bit as wusb cluster_id bitmaps */
 static uint32_t cluster_id_mask = 0;
 
+_NOTE(MUTEX_PROTECTS_DATA(whcdi_mutex, cluster_id_mask))
 
 usb_log_handle_t	whcdi_log_handle;
 uint_t			whcdi_errlevel = USB_LOG_L4;
@@ -105,10 +106,9 @@ wusb_hc_get_cluster_id()
 		/* set the bitmask */
 		cluster_id_mask |= (1 << i);
 		id = WUSB_MIN_CLUSTER_ID + i;
-		mutex_exit(&whcdi_mutex);
-
 		USB_DPRINTF_L3(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "new cluster id %d, mask %d", id, cluster_id_mask);
+		mutex_exit(&whcdi_mutex);
 
 		return (id);
 	}
@@ -244,7 +244,9 @@ wusb_hc_set_cluster_id(wusb_hc_data_t *hc_data, uint8_t cluster_id)
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "Set_Cluster_ID fails: rval=%d ", rval);
 	} else {
+		mutex_enter(&hc_data->hc_mutex);
 		hc_data->hc_cluster_id = cluster_id;
+		mutex_exit(&hc_data->hc_mutex);
 	}
 
 	return (rval);
@@ -321,13 +323,17 @@ wusb_hc_remove_mmc_ie(wusb_hc_data_t *hc_data, uint8_t iehdl)
 	dev_info_t	*dip = hc_data->hc_dip;
 	int		rval;
 
+	ASSERT(mutex_owned(&hc_data->hc_mutex));
+
 	if ((iehdl >= hc_data->hc_num_mmcies) ||
 	    (hc_data->hc_mmcie_list[iehdl] == NULL)) {
 
 		return (USB_FAILURE);
 	}
 
+	mutex_exit(&hc_data->hc_mutex);
 	rval = hc_data->rem_mmc_ie(dip, iehdl);
+	mutex_enter(&hc_data->hc_mutex);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "Remove_MMC_IE fails: rval=%d ", rval);
@@ -402,6 +408,7 @@ wusb_hc_rem_ie(wusb_hc_data_t *hc_data, wusb_ie_header_t *ieh)
 	int	i;
 	int16_t	iehdl = -1;
 
+	mutex_enter(&hc_data->hc_mutex);
 	for (i = 0; i < hc_data->hc_num_mmcies; i++) {
 		if (hc_data->hc_mmcie_list[i] == ieh) {
 			iehdl = (int16_t)i;
@@ -413,12 +420,15 @@ wusb_hc_rem_ie(wusb_hc_data_t *hc_data, wusb_ie_header_t *ieh)
 	if (iehdl == -1) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_rem_ie: IE(%p) iehdl not found", (void *)ieh);
+		mutex_exit(&hc_data->hc_mutex);
 
 		return;
 	}
 
 	(void) wusb_hc_remove_mmc_ie(hc_data, (uint8_t)iehdl);
+
 	wusb_hc_free_iehdl(hc_data, (uint8_t)iehdl);
+	mutex_exit(&hc_data->hc_mutex);
 }
 
 /* Add Host Info IE */
@@ -430,6 +440,8 @@ wusb_hc_add_host_info(wusb_hc_data_t *hc_data, uint8_t stream_idx)
 	int			rval;
 
 	hinfo = kmem_zalloc(sizeof (wusb_ie_host_info_t), KM_SLEEP);
+
+	mutex_enter(&hc_data->hc_mutex);
 
 	hinfo->bIEIdentifier = WUSB_IE_HOSTINFO;
 	hinfo->bLength = sizeof (wusb_ie_host_info_t);
@@ -446,6 +458,7 @@ wusb_hc_add_host_info(wusb_hc_data_t *hc_data, uint8_t stream_idx)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_add_host_info: get ie handle fails");
+		mutex_exit(&hc_data->hc_mutex);
 
 		return (rval);
 	}
@@ -453,15 +466,19 @@ wusb_hc_add_host_info(wusb_hc_data_t *hc_data, uint8_t stream_idx)
 	USB_DPRINTF_L3(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_hc_add_host_info: iehdl=%d", iehdl);
 
+	mutex_exit(&hc_data->hc_mutex);
 	rval = wusb_hc_add_mmc_ie(hc_data, 10, 1, iehdl,
 	    sizeof (wusb_ie_host_info_t), (uint8_t *)hinfo);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_add_host_info: add host info mmc ie fails");
+		mutex_enter(&hc_data->hc_mutex);
 		wusb_hc_free_iehdl(hc_data, iehdl);
+		mutex_exit(&hc_data->hc_mutex);
 
 		return (rval);
 	}
+
 
 	return (USB_SUCCESS);
 }
@@ -667,8 +684,7 @@ wusb_hc_send_keepalive_ie(wusb_hc_data_t *hc_data, uint8_t addr)
 	uint8_t			iehdl;
 	int			rval;
 
-	ASSERT(mutex_owned(&hc_data->hc_mutex));
-
+	mutex_enter(&hc_data->hc_mutex);
 	/*
 	 * the scheme ensures each time only one device addr
 	 * is set each time
@@ -684,6 +700,7 @@ wusb_hc_send_keepalive_ie(wusb_hc_data_t *hc_data, uint8_t addr)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_send_keepalive_ie: get ie handle fails");
+		mutex_exit(&hc_data->hc_mutex);
 
 		return (rval);
 	}
@@ -701,7 +718,6 @@ wusb_hc_send_keepalive_ie(wusb_hc_data_t *hc_data, uint8_t addr)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_send_keepalive_ie: add keepalive ie fails");
-		mutex_enter(&hc_data->hc_mutex);
 
 		/* no need to free the ack iehdl since it is reused */
 		return (rval);
@@ -719,6 +735,7 @@ wusb_hc_send_keepalive_ie(wusb_hc_data_t *hc_data, uint8_t addr)
 	mutex_enter(&hc_data->hc_mutex);
 	(void) wusb_hc_remove_mmc_ie(hc_data, iehdl);
 	wusb_hc_free_iehdl(hc_data, iehdl);
+	mutex_exit(&hc_data->hc_mutex);
 
 	return (USB_SUCCESS);
 }
@@ -1212,6 +1229,7 @@ wusb_test_write(wusb_dev_info_t *dev_info)
 {
 	int16_t		value;
 	int		i, rval;
+	usb_pipe_handle_t dev_ph;
 
 	value = wusb_get_ccm_encryption_value(&dev_info->wdev_secrt_data);
 	if (value == -1) {
@@ -1224,7 +1242,11 @@ wusb_test_write(wusb_dev_info_t *dev_info)
 	for (i = 0; i < 1; i++) {
 		USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_test_write %d start:", i);
-		rval = wusb_dev_set_encrypt(dev_info->wdev_ph, (uint8_t)value);
+		mutex_enter(&dev_info->wdev_hc->hc_mutex);
+		dev_ph = dev_info->wdev_ph;
+		mutex_exit(&dev_info->wdev_hc->hc_mutex);
+
+		rval = wusb_dev_set_encrypt(dev_ph, (uint8_t)value);
 		if (rval != USB_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 			    "wusb_test_write: %dth set encryption failed", i);
@@ -1237,10 +1259,12 @@ wusb_test_write(wusb_dev_info_t *dev_info)
 
 /* enable CCM encryption on the device */
 int
-wusb_enable_dev_encrypt(wusb_dev_info_t *dev_info)
+wusb_enable_dev_encrypt(wusb_hc_data_t *hc_data, wusb_dev_info_t *dev_info)
 {
 	int16_t		value;
 	int		rval;
+	usb_pipe_handle_t ph;
+
 	USB_DPRINTF_L3(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_enable_dev_encrypt:enter");
 
@@ -1252,7 +1276,11 @@ wusb_enable_dev_encrypt(wusb_dev_info_t *dev_info)
 		return (USB_FAILURE);
 	}
 
-	rval = wusb_dev_set_encrypt(dev_info->wdev_ph, (uint8_t)value);
+	mutex_enter(&hc_data->hc_mutex);
+	ph = dev_info->wdev_ph;
+	mutex_exit(&hc_data->hc_mutex);
+
+	rval = wusb_dev_set_encrypt(ph, (uint8_t)value);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_enable_dev_encrypt: set encryption failed");
@@ -1275,6 +1303,7 @@ wusb_hc_auth_dev(wusb_hc_data_t *hc_data, usb_port_t port,
 {
 	wusb_dev_info_t		*dev_info;
 	usb_pipe_handle_t	child_ph;
+	dev_info_t		*child_dip;
 
 	ASSERT(mutex_owned(&hc_data->hc_mutex));
 
@@ -1288,6 +1317,7 @@ wusb_hc_auth_dev(wusb_hc_data_t *hc_data, usb_port_t port,
 		return (USB_INVALID_ARGS);
 	}
 	child_ph = dev_info->wdev_ph;
+	child_dip = hc_data->hc_children_dips[port];
 
 	mutex_exit(&hc_data->hc_mutex);
 	/* get device security descrs */
@@ -1304,7 +1334,7 @@ wusb_hc_auth_dev(wusb_hc_data_t *hc_data, usb_port_t port,
 	 * enable CCM encryption on the device, this needs to be done
 	 * before 4-way handshake. [WUSB 1.0/7.3.2.5]
 	 */
-	if (wusb_enable_dev_encrypt(dev_info) != USB_SUCCESS) {
+	if (wusb_enable_dev_encrypt(hc_data, dev_info) != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_auth_dev: set encryption failed");
 
@@ -1312,11 +1342,12 @@ wusb_hc_auth_dev(wusb_hc_data_t *hc_data, usb_port_t port,
 		return (USB_FAILURE);
 	}
 
-	mutex_enter(&hc_data->hc_mutex);
 
 	/* this seems to relieve the non-response issue somehow */
-	usb_pipe_close(hc_data->hc_children_dips[port], dev_info->wdev_ph,
+	usb_pipe_close(child_dip, child_ph,
 	    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, NULL, NULL);
+
+	mutex_enter(&hc_data->hc_mutex);
 	dev_info->wdev_ph = NULL;
 
 	/* unauthenticated state */
@@ -1346,7 +1377,7 @@ wusb_hc_auth_dev(wusb_hc_data_t *hc_data, usb_port_t port,
 	    (void *)dev_info->wdev_cc);
 
 	mutex_exit(&hc_data->hc_mutex);
-	if (usb_pipe_open(hc_data->hc_children_dips[port], NULL, NULL,
+	if (usb_pipe_open(child_dip, NULL, NULL,
 	    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, &child_ph) !=
 	    USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
@@ -1369,8 +1400,7 @@ wusb_hc_auth_dev(wusb_hc_data_t *hc_data, usb_port_t port,
 		    port);
 
 		/* perhaps resetting the device is better */
-		usb_pipe_reset(hc_data->hc_children_dips[port],
-		    child_ph,
+		usb_pipe_reset(child_dip, child_ph,
 		    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED,
 		    NULL, NULL);
 		(void) wusb_dev_set_encrypt(child_ph, 0);
@@ -1658,8 +1688,11 @@ wusb_hc_handle_port_connect(wusb_hc_data_t *hc_data, usb_port_t port,
 
 error:
 	if (dev_info->wdev_ph != NULL) {
-		usb_pipe_close(child_dip, dev_info->wdev_ph,
+		mutex_exit(&hc_data->hc_mutex);
+		usb_pipe_close(child_dip, child_ph,
 		    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, NULL, NULL);
+		mutex_enter(&hc_data->hc_mutex);
+
 		dev_info->wdev_ph = NULL;
 	}
 
@@ -1674,9 +1707,10 @@ error:
 			    "failure to remove child node");
 		}
 
-		/* no need to unset address for WUSB */
-		child_ud->usb_addr = 0;
+		mutex_exit(&hc_data->hc_mutex);
 		usba_free_usba_device(child_ud);
+		mutex_enter(&hc_data->hc_mutex);
+
 		hc_data->hc_children_dips[port] = NULL;
 		hc_data->hc_usba_devices[port] = NULL;
 	}
@@ -2096,8 +2130,10 @@ wusb_hc_send_host_disconnect(wusb_hc_data_t *hc_data)
 	disconn_ie->bIEIdentifier = WUSB_IE_HOST_DISCONNECT;
 	disconn_ie->bLength = sizeof (wusb_ie_host_disconnect_t);
 
+	mutex_enter(&hc_data->hc_mutex);
 	rval = wusb_hc_get_iehdl(hc_data, (wusb_ie_header_t *)disconn_ie,
 	    &iehdl);
+	mutex_exit(&hc_data->hc_mutex);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_send_host_disconnect: get ie handle fails");
@@ -2112,15 +2148,21 @@ wusb_hc_send_host_disconnect(wusb_hc_data_t *hc_data)
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_hc_send_host_disconnect: add host "
 		    "disconnect ie fails");
+		mutex_enter(&hc_data->hc_mutex);
 		wusb_hc_free_iehdl(hc_data, iehdl);
+		mutex_exit(&hc_data->hc_mutex);
 		kmem_free(disconn_ie, sizeof (wusb_ie_host_disconnect_t));
 
 		return (rval);
 	}
 
 	delay(drv_usectohz(100000));	/* WUSB 1.0/7.5.5 */
+
+	mutex_enter(&hc_data->hc_mutex);
 	(void) wusb_hc_remove_mmc_ie(hc_data, iehdl);
 	wusb_hc_free_iehdl(hc_data, iehdl);
+	mutex_exit(&hc_data->hc_mutex);
+
 	kmem_free(disconn_ie, sizeof (wusb_ie_host_disconnect_t));
 
 	return (USB_SUCCESS);
@@ -2435,6 +2477,8 @@ wusb_hc_set_ptk(wusb_hc_data_t *hc_data, uint8_t *key_data, usb_port_t port)
 	int		rval;
 	uint8_t		*p;
 
+	ASSERT(mutex_owned(&hc_data->hc_mutex));
+
 	if ((key_data == NULL) || (dev_info == NULL)) {
 
 		return (USB_INVALID_ARGS);
@@ -2449,6 +2493,8 @@ wusb_hc_set_ptk(wusb_hc_data_t *hc_data, uint8_t *key_data, usb_port_t port)
 	p = &key_descr->KeyData[0];
 	(void) memcpy(p, key_data, 16);
 
+	mutex_exit(&hc_data->hc_mutex);
+
 	if ((rval = hc_data->set_ptk(dip, key_descr, klen, port)) !=
 	    USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
@@ -2456,6 +2502,7 @@ wusb_hc_set_ptk(wusb_hc_data_t *hc_data, uint8_t *key_data, usb_port_t port)
 	}
 
 	kmem_free(key_descr, klen);
+	mutex_enter(&hc_data->hc_mutex);
 
 	return (rval);
 }
@@ -2649,20 +2696,26 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 	uchar_t			adata2[] = "out-of-bandMIC";
 	uchar_t			bdata[32], keyout[32], mic[8];
 	int			rval;
+	usb_pipe_handle_t	w_ph;
 
 	USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_4way_handshake: port = %d", port);
 
+	mutex_enter(&hc_data->hc_mutex);
 	dev_info = hc_data->hc_dev_infos[port];
 	if (dev_info == NULL) {
+		mutex_exit(&hc_data->hc_mutex);
 
 		return (USB_FAILURE);
 	}
 	cc = dev_info->wdev_cc;
 	if (dev_info->wdev_ph == NULL || cc == NULL) {
+		mutex_exit(&hc_data->hc_mutex);
 
 		return (USB_FAILURE);
 	}
+
+	w_ph = dev_info->wdev_ph;
 
 	hs = (wusb_hndshk_data_t *)kmem_zalloc(
 	    3 * sizeof (wusb_hndshk_data_t), KM_SLEEP);
@@ -2683,6 +2736,7 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 	    != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "Nonce generation failed: %d", rval);
+		mutex_exit(&hc_data->hc_mutex);
 
 		goto done;
 	}
@@ -2691,7 +2745,8 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 	USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_4way_handshake: shake 1.............");
 
-	rval = wusb_handshake(dev_info->wdev_ph, &(hs[0]), 1);
+	mutex_exit(&hc_data->hc_mutex);
+	rval = wusb_handshake(w_ph, &(hs[0]), 1);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "handshake 1 failed, rval = %d", rval);
@@ -2702,7 +2757,7 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 	/* handshake 2 */
 	USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_4way_handshake: shake 2.............");
-	rval = wusb_handshake(dev_info->wdev_ph, &(hs[1]), 2);
+	rval = wusb_handshake(w_ph, &(hs[1]), 2);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "handshake 2 failed, rval = %d", rval);
@@ -2721,10 +2776,14 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 	/* derived session keys, refer to WUSB 1.0/6.5.1 */
 	n.sfn = 0;
 	n.tkid = tkid[0] | (tkid[1]<<8) | (tkid[2] << 16);
+
+	mutex_enter(&hc_data->hc_mutex);
 	n.daddr = dev_info->wdev_addr;
+
 	n.saddr = hc_data->hc_addr;
 	bcopy(hs[0].Nonce, bdata, 16);
 	bcopy(hs[1].Nonce, bdata + 16, 16);
+	mutex_exit(&hc_data->hc_mutex);
 
 	rval = PRF_256(cc->CK, 16, &n, adata1, 14, bdata, 32, keyout);
 	if (rval != 0) {
@@ -2769,7 +2828,7 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 
 	USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_4way_handshake: shake 3.............");
-	rval = wusb_handshake(dev_info->wdev_ph, &(hs[2]), 3);
+	rval = wusb_handshake(w_ph, &(hs[2]), 3);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "handshake 3 failed, rval = %d", rval);
@@ -2777,12 +2836,14 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 		goto done;
 	}
 
+	mutex_enter(&hc_data->hc_mutex);
 	/* set PTK for host */
 	(void) memcpy(dev_info->wdev_ptk, keyout + 16, 16);
 
 	USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_4way_handshake: set ptk .............");
 	rval = wusb_hc_set_ptk(hc_data, dev_info->wdev_ptk, port);
+	mutex_exit(&hc_data->hc_mutex);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "set ptk for host failed, rval = %d", rval);
@@ -2809,7 +2870,7 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 	 * set GTK for device
 	 * GTK is initialized when hc_data is inited
 	 */
-	rval = wusb_dev_set_key(dev_info->wdev_ph, 2 << 4,
+	rval = wusb_dev_set_key(w_ph, 2 << 4,
 	    &hc_data->hc_gtk, hc_data->hc_gtk.bLength);
 done:
 	kmem_free(hs, 3 * sizeof (wusb_hndshk_data_t));

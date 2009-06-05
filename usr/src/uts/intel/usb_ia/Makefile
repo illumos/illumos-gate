@@ -20,10 +20,9 @@
 #
 #
 # uts/intel/usb_ia/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the usb_ia driver kernel module.
 #
@@ -106,7 +105,7 @@ TEST		= test
 #
 #	lock_lint rules
 #
-USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
+USBA_FILES = $(USBA_WITHOUT_WUSB_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)

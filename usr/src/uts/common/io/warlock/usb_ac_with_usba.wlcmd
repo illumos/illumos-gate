@@ -47,6 +47,7 @@ root	usb_get_if_number
 root	usb_parse_CV_cfg_descr
 root	usb_parse_CV_ep_descr
 root	usb_parse_CV_if_descr
+root	usb_parse_comp_ep_descr
 root	usb_pipe_get_private
 root	usb_get_current_frame_number
 root	usb_get_max_isoc_pkts
@@ -93,6 +94,10 @@ root	usb_reset_device
 root	hcdi_autoclearing
 root	hcdi_cb_thread
 root    hcdi_shared_cb_thread
+
+root    ohci_quiesce
+root    uhci_quiesce
+root    ehci_quiesce
 
 root 	usb_ugen_attach
 root    usb_ugen_close
@@ -164,6 +169,7 @@ root usb_ac_stop_play
 root usb_ac_stop_record
 root usb_ac_teardown
 
+add hubd::h_cleanup_child targets warlock_dummy
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_close
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_reset
 

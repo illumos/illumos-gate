@@ -21,7 +21,7 @@
 #
 # uts/sparc/hid/Makefile
 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -111,7 +111,7 @@ TEST		= test
 #
 #	lock_lint rules
 #
-USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
+USBA_FILES = $(USBA_WITHOUT_WUSB_OBJS:%.o=../usba/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)

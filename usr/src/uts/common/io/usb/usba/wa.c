@@ -106,9 +106,11 @@ wusb_wa_rpipes_init(wusb_wa_data_t *wa_data)
 		mutex_init(&hdl->rp_mutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(&hdl->rp_cv, NULL, CV_DRIVER, NULL);
 
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*hdl));
 		hdl->rp_state = WA_RPIPE_STATE_FREE;
 		hdl->rp_refcnt = 0;
 		hdl->rp_timeout_list = NULL;
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*hdl));
 	}
 }
 
@@ -148,6 +150,8 @@ wusb_wa_data_init(dev_info_t *dip, wusb_wa_data_t *wa_data, wusb_wa_cb_t *cbs,
 
 		return (USB_INVALID_ARGS);
 	}
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*wa_data));
 
 	/* get inf descr and ept descrs from altif data */
 	altif_data = &dev_data->dev_curr_cfg->
@@ -227,6 +231,8 @@ wusb_wa_data_init(dev_info_t *dip, wusb_wa_data_t *wa_data, wusb_wa_cb_t *cbs,
 
 	mutex_init(&wa_data->wa_mutex, NULL, MUTEX_DRIVER, NULL);
 
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*wa_data));
+
 	return (USB_SUCCESS);
 }
 
@@ -234,11 +240,13 @@ wusb_wa_data_init(dev_info_t *dip, wusb_wa_data_t *wa_data, wusb_wa_cb_t *cbs,
 void
 wusb_wa_data_fini(wusb_wa_data_t *wa_data)
 {
+	mutex_enter(&wa_data->wa_mutex);
 	if (wa_data->wa_rpipe_hdl) {
 		wusb_wa_rpipes_fini(wa_data);
 		kmem_free(wa_data->wa_rpipe_hdl, wa_data->wa_num_rpipes *
 		    sizeof (wusb_wa_rpipe_hdl_t));
 	}
+	mutex_exit(&wa_data->wa_mutex);
 	mutex_destroy(&wa_data->wa_mutex);
 }
 
@@ -354,6 +362,9 @@ wusb_wa_get_rpipe_descrs(wusb_wa_data_t *wa_data, usb_pipe_handle_t ph,
 		return (USB_INVALID_ARGS);
 	}
 
+	/* called at initialization, no other threads yet */
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*wa_data));
+
 	for (i = 0; i < wa_data->wa_num_rpipes; i++) {
 		rval = wusb_wa_get_rpipe_descr(dip, ph, i,
 		    &wa_data->wa_rpipe_hdl[i].rp_descr, mask, handle);
@@ -366,6 +377,7 @@ wusb_wa_get_rpipe_descrs(wusb_wa_data_t *wa_data, usb_pipe_handle_t ph,
 			return (rval);
 		}
 	}
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*wa_data));
 
 	return (USB_SUCCESS);
 }
@@ -836,15 +848,16 @@ wusb_wa_get_rpipe(wusb_wa_data_t *wa_data, usb_pipe_handle_t ph,
 int
 wusb_wa_release_rpipe(wusb_wa_data_t *wa, wusb_wa_rpipe_hdl_t *hdl)
 {
-	ASSERT(mutex_owned(&wa->wa_mutex));
 	if (hdl == NULL) {
 
 		return (USB_FAILURE);
 	}
 
+	mutex_enter(&wa->wa_mutex);
 	mutex_enter(&hdl->rp_mutex);
 	if (hdl->rp_refcnt == 0) {
 		mutex_exit(&hdl->rp_mutex);
+		mutex_exit(&wa->wa_mutex);
 
 		return (USB_FAILURE);
 	}
@@ -860,6 +873,7 @@ wusb_wa_release_rpipe(wusb_wa_data_t *wa, wusb_wa_rpipe_hdl_t *hdl)
 	}
 
 	mutex_exit(&hdl->rp_mutex);
+	mutex_exit(&wa->wa_mutex);
 
 	return (USB_SUCCESS);
 }
@@ -1037,7 +1051,6 @@ wusb_wa_set_rpipe_target(dev_info_t *dip, wusb_wa_data_t *wa,
 	uint16_t		maxsize;
 	uint16_t		seg_len;
 
-	ASSERT(mutex_owned(&wa->wa_mutex));
 
 	USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_wa_set_rpipe_target: ph_data = 0x%p rp_hdl = 0x%p",
@@ -1078,6 +1091,7 @@ wusb_wa_set_rpipe_target(dev_info_t *dip, wusb_wa_data_t *wa,
 		return (USB_FAILURE);
 	}
 
+	mutex_enter(&wa->wa_mutex);
 	usba_device = usba_get_usba_device(ph_data->p_dip);
 
 	mutex_enter(&hdl->rp_mutex);
@@ -1106,6 +1120,7 @@ wusb_wa_set_rpipe_target(dev_info_t *dip, wusb_wa_data_t *wa,
 		/* WA don't have so many blocks to fulfill this reqirement */
 		if (wa->wa_avail_blocks < blockcnt) {
 			mutex_exit(&hdl->rp_mutex);
+			mutex_exit(&wa->wa_mutex);
 
 			return (USB_FAILURE);
 		}
@@ -1156,6 +1171,8 @@ wusb_wa_set_rpipe_target(dev_info_t *dip, wusb_wa_data_t *wa,
 	hdl->rp_descr.wNumTransactionErrors = 0;
 	mutex_exit(&hdl->rp_mutex);
 
+	mutex_exit(&wa->wa_mutex);
+
 	/* set rpipe descr */
 	rval = wusb_wa_set_rpipe_descr(dip, ph, &hdl->rp_descr);
 	if (rval != USB_SUCCESS) {
@@ -1199,17 +1216,19 @@ wusb_wa_rpipe_abort(dev_info_t *dip, usb_pipe_handle_t ph,
 	usb_cb_flags_t	cb_flags;
 	int		rval;
 
-	ASSERT(mutex_owned(&hdl->rp_mutex));
+	mutex_enter(&hdl->rp_mutex);
 
 	USB_DPRINTF_L4(DPRINT_MASK_WHCDI, whcdi_log_handle,
 	    "wusb_wa_rpipe_abort: rp_hdl = 0x%p", (void *)hdl);
 
 	/* only abort when there is active transfer */
 	if (hdl->rp_state != WA_RPIPE_STATE_ACTIVE) {
+		mutex_exit(&hdl->rp_mutex);
 
 		return (USB_SUCCESS);
 	}
 
+	mutex_exit(&hdl->rp_mutex);
 	rval = usb_pipe_sync_ctrl_xfer(dip, ph,
 	    WA_CLASS_RPIPE_REQ_OUT_TYPE,
 	    WA_REQ_ABORT_RPIPE,
@@ -2098,6 +2117,7 @@ wusb_wa_free_segs(wusb_wa_trans_wrapper_t *wr)
 		return;
 	}
 
+
 	for (i = 0; i < wr->wr_nsegs; i++) {
 		seg = &wr->wr_seg_array[i];
 
@@ -2204,8 +2224,10 @@ wusb_wa_abort_req(wusb_wa_data_t *wa_data, wusb_wa_trans_wrapper_t *wr,
 	p[7] = (uint8_t)(id >> 24);
 	req->bulk_data->b_wptr += WA_ABORT_REQ_LEN;
 
+	mutex_exit(&wr->wr_rp->rp_mutex);
 	rval = usb_pipe_bulk_xfer(wa_data->wa_bulkout_ph, req,
 	    USB_FLAGS_SLEEP);
+	mutex_enter(&wr->wr_rp->rp_mutex);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_wa_abort_req: send abort req failed, rval = %d",
@@ -2360,9 +2382,13 @@ wusb_wa_xfer_timeout_handler(void *arg)
 		wr->wr_state = WR_TIMEOUT;
 
 		wa_data = wr->wr_wa_data;
+
+		mutex_exit(&hdl->rp_mutex);
 		rval = wusb_wa_get_rpipe_status(wa_data->wa_dip,
 		    wa_data->wa_default_pipe, hdl->rp_descr.wRPipeIndex,
 		    &rp_status);
+		mutex_enter(&hdl->rp_mutex);
+
 		if (rval != USB_SUCCESS) {
 			/* reset WA perhaps? */
 			hdl->rp_state = WA_RPIPE_STATE_ERROR;
@@ -2389,8 +2415,10 @@ wusb_wa_xfer_timeout_handler(void *arg)
 			USB_DPRINTF_L3(DPRINT_MASK_WHCDI, whcdi_log_handle,
 			    "wusb_wa_xfer_timeout_handler: rp not idle");
 
+			mutex_exit(&hdl->rp_mutex);
 			rval = wusb_wa_rpipe_abort(wa_data->wa_dip,
 			    wa_data->wa_default_pipe, hdl);
+			mutex_enter(&hdl->rp_mutex);
 
 			USB_DPRINTF_L3(DPRINT_MASK_WHCDI,
 			    whcdi_log_handle,
@@ -2549,8 +2577,10 @@ wusb_wa_wr_xfer(wusb_wa_data_t *wa_data, wusb_wa_rpipe_hdl_t *hdl,
 		req = wr->wr_seg_array[i].seg_trans_reqp;
 		ASSERT(req != NULL);
 
+		mutex_exit(&hdl->rp_mutex);
 		/* send ith transfer request */
 		rval = usb_pipe_bulk_xfer(wa_data->wa_bulkout_ph, req, 0);
+		mutex_enter(&hdl->rp_mutex);
 		if (rval != USB_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 			    "wusb_wa_wr_xfer: send transfer request %d failed,"
@@ -2595,8 +2625,10 @@ wusb_wa_wr_xfer(wusb_wa_data_t *wa_data, wusb_wa_rpipe_hdl_t *hdl,
 		}
 
 		wr->wr_seg_array[i].seg_data_req_state = 1; /* submitted */
+		mutex_exit(&hdl->rp_mutex);
 		/* send ith data asynchronously */
 		rval = usb_pipe_bulk_xfer(wa_data->wa_bulkout_ph, req, 0);
+		mutex_enter(&hdl->rp_mutex);
 		if (rval != USB_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_MASK_WHCDI, whcdi_log_handle,
 			    "wusb_wa_wr_xfer: send transfer data %d failed",
@@ -3222,9 +3254,7 @@ wusb_wa_handle_error(wusb_wa_data_t *wa_data, wusb_wa_trans_wrapper_t *wr,
 		USB_DPRINTF_L3(DPRINT_MASK_WHCDI, whcdi_log_handle,
 		    "wusb_wa_handle_error: segment err, abort other segs");
 
-		mutex_exit(&wr->wr_rp->rp_mutex);
 		wusb_wa_abort_req(wa_data, wr, wr->wr_id);
-		mutex_enter(&wr->wr_rp->rp_mutex);
 	}
 
 	wusb_wa_stop_xfer_timer(wr);

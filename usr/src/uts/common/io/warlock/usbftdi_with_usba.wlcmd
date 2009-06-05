@@ -47,6 +47,7 @@ root usb_get_if_number
 root usb_parse_CV_cfg_descr
 root usb_parse_CV_ep_descr
 root usb_parse_CV_if_descr
+root usb_parse_comp_ep_descr
 root usb_pipe_get_private
 root usb_get_current_frame_number
 root usb_get_max_isoc_pkts
@@ -143,6 +144,9 @@ root usb_fail_checkpoint
 
 root ohci_intr
 root ehci_intr
+root ohci_quiesce
+root uhci_quiesce
+root ehci_quiesce
 
 ### specify the uftdi root functions
 
@@ -194,6 +198,7 @@ add ds_ops::ds_in_pipe targets uftdi_in_pipe
 add uftdi_state::uf_cb.cb_tx targets usbser_tx_cb
 add uftdi_state::uf_cb.cb_rx targets usbser_rx_cb
 
+add hubd::h_cleanup_child targets warlock_dummy
 add usb_ctrl_req::ctrl_cb	targets warlock_dummy
 add usb_ctrl_req::ctrl_exc_cb	targets warlock_dummy
 add usb_bulk_req::bulk_cb	targets uftdi_bulkin_cb

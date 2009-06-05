@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one	ohci_state
 one	ehci_state
@@ -51,6 +50,7 @@ root	usb_get_if_number
 root	usb_parse_CV_cfg_descr
 root	usb_parse_CV_ep_descr
 root	usb_parse_CV_if_descr
+root	usb_parse_comp_ep_descr
 root	usb_pipe_get_private
 root	usb_get_current_frame_number
 root	usb_get_max_isoc_pkts
@@ -125,6 +125,9 @@ root	hubd_root_hub_cleanup_thread
 
 root	ohci_intr
 root	ehci_intr
+root    ohci_quiesce
+root    uhci_quiesce
+root    ehci_quiesce
 
 root    usba_dbuf_tail
 root	usb_log
@@ -142,6 +145,7 @@ root	usb_fail_checkpoint
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_close
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_reset
 
+add hubd::h_cleanup_child targets warlock_dummy
 add usb_isoc_req::isoc_cb		targets warlock_dummy
 add usb_isoc_req::isoc_exc_cb		targets warlock_dummy
 add usba_pipe_async_req::callback	targets warlock_dummy
@@ -169,7 +173,6 @@ root	scsa2usb_scsi_tgt_init scsa2usb_scsi_tgt_probe scsa2usb_scsi_tgt_free
 
 root	scsa2usb_reconnect_event_cb
 root	scsa2usb_disconnect_event_cb
-root	scsa2usb_null_free
 root	scsa2usb_work_thread
 root	scsa2usb_panic_callb
 

@@ -765,7 +765,9 @@ hwahc_cleanup(dev_info_t *dip, hwahc_state_t *hwahcp)
 
 	if (hwahcp->hwahc_flags & HWAHC_WA_STARTED) {
 		/* can be combined with wusb_wa_data_fini() */
+		mutex_exit(&hwahcp->hwahc_mutex);
 		hwahc_wa_stop(hwahcp);
+		mutex_enter(&hwahcp->hwahc_mutex);
 	}
 
 	if (hwahcp->hwahc_flags & HWAHC_HC_INITED) {
@@ -2409,13 +2411,17 @@ hwahc_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		if (hc_data->hc_children_state[port] & WUSB_CHILD_ZAP) {
 			wusb_dev_info_t		*dev_info;
 			wusb_secrt_data_t	*csecrt_data;
+			usba_device_t		*child_ud;
 
 			USB_DPRINTF_L3(PRINT_MASK_EVENTS,
 			    hwahcp->hwahc_log_handle,
 			    "hwahc_bus_unconfig: physically zap port %d", port);
 
+			child_ud = hc_data->hc_usba_devices[port];
+			mutex_exit(&hc_data->hc_mutex);
 			/* zap the dip and usba_device structure as well */
-			usba_free_usba_device(hc_data->hc_usba_devices[port]);
+			usba_free_usba_device(child_ud);
+			mutex_enter(&hc_data->hc_mutex);
 			hc_data->hc_usba_devices[port] = NULL;
 
 			/* dip freed in usba_destroy_child_devi */
@@ -3689,8 +3695,10 @@ hwahc_hc_channel_suspend(hwahc_state_t *hwahcp)
 		return (USB_SUCCESS);
 	}
 
+	mutex_exit(&hwahcp->hwahc_mutex);
 	/* suspend host, refer to WUSB 1.0 spec 8.5.3.14 */
 	rval = wusb_hc_stop_ch(&hwahcp->hwahc_hc_data, 10000); /* 10ms */
+	mutex_enter(&hwahcp->hwahc_mutex);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_PM, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_channel_suspend: wusb channel stop fails");
@@ -3940,8 +3948,8 @@ hwahc_hc_initial_start(hwahc_state_t *hwahcp)
 		return (rval);
 	}
 
-	/* reset wire adapter */
 	mutex_exit(&hwahcp->hwahc_mutex);
+	/* reset wire adapter */
 	rval = wusb_wa_reset(&hwahcp->hwahc_wa_data,
 	    hwahcp->hwahc_default_pipe);
 	mutex_enter(&hwahcp->hwahc_mutex);
@@ -3967,12 +3975,14 @@ hwahc_hc_initial_start(hwahc_state_t *hwahcp)
 		}
 	}
 
+	mutex_exit(&hwahcp->hwahc_mutex);
 	/* set cluster id for the wusb channel */
 	rval = wusb_hc_set_cluster_id(&hwahcp->hwahc_hc_data, cluster_id);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_initial_start: set cluster id %d fails",
 		    cluster_id);
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		goto err;
 	}
@@ -3985,6 +3995,7 @@ hwahc_hc_initial_start(hwahc_state_t *hwahcp)
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_initial_start: set stream idx %d fails",
 		    stream_idx);
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		goto err;
 	}
@@ -3996,16 +4007,17 @@ hwahc_hc_initial_start(hwahc_state_t *hwahcp)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_initial_start: set num dnts fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		goto err;
 	}
 
 	/* set host info IE */
 	rval = wusb_hc_add_host_info(&hwahcp->hwahc_hc_data, stream_idx);
-
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_initial_start: add hostinfo ie fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		goto err;
 	}
@@ -4014,7 +4026,7 @@ hwahc_hc_initial_start(hwahc_state_t *hwahcp)
 	(void) memset(mas, 0xff, WUSB_SET_WUSB_MAS_LEN);
 	mas[0] = 0xf0;	/* the first 4 slots are for beacons */
 	rval = wusb_hc_set_wusb_mas(&hwahcp->hwahc_hc_data, mas);
-
+	mutex_enter(&hwahcp->hwahc_mutex);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_initial_start: set wusb mas fails");
@@ -4030,29 +4042,28 @@ hwahc_hc_initial_start(hwahc_state_t *hwahcp)
 	random_get_pseudo_bytes(dft_gtkid, 3);
 
 	/* set default GTK, need a way to dynamically compute it */
+	mutex_exit(&hwahcp->hwahc_mutex);
 	rval = wusb_hc_set_gtk(&hwahcp->hwahc_hc_data, dft_gtk, dft_gtkid);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_initial_start: set gtk fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		goto err;
 	}
 
 	/* enable wire adapter */
-	mutex_exit(&hwahcp->hwahc_mutex);
 	rval = wusb_wa_enable(&hwahcp->hwahc_wa_data,
 	    hwahcp->hwahc_default_pipe);
-	mutex_enter(&hwahcp->hwahc_mutex);
-
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_initial_start: enable wa fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		goto err;
 	}
 
 	/* Start Notification endpoint */
-	mutex_exit(&hwahcp->hwahc_mutex);
 	rval = wusb_wa_start_nep(&hwahcp->hwahc_wa_data, USB_FLAGS_SLEEP);
 
 	if (rval != USB_SUCCESS) {
@@ -4104,7 +4115,9 @@ err:
 		wusb_hc_free_cluster_id(cluster_id);
 	}
 
+	mutex_exit(&hwahcp->hwahc_mutex);
 	(void) uwb_stop_beacon(hwahcp->hwahc_dip);
+	mutex_enter(&hwahcp->hwahc_mutex);
 
 	return (rval);
 }
@@ -4159,7 +4172,6 @@ hwahc_hc_final_stop(hwahc_state_t *hwahcp)
 		mutex_exit(&hwahcp->hwahc_mutex);
 		(void) wusb_wa_disable(&hwahcp->hwahc_wa_data,
 		    hwahcp->hwahc_default_pipe);
-		mutex_enter(&hwahcp->hwahc_mutex);
 
 		/* stop beaconing. Not necessary to unreserve mas */
 		(void) uwb_stop_beacon(hwahcp->hwahc_dip);
@@ -4167,12 +4179,11 @@ hwahc_hc_final_stop(hwahc_state_t *hwahcp)
 		wusb_hc_rem_host_info(&hwahcp->hwahc_hc_data);
 
 		/* Manually remove all connected children */
-		mutex_exit(&hwahcp->hwahc_mutex);
 		hwahc_run_callbacks(hwahcp, USBA_EVENT_TAG_HOT_REMOVAL);
-		mutex_enter(&hwahcp->hwahc_mutex);
 
 		/* delete all the children */
 		(void) hwahc_cleanup_child(hwahcp->hwahc_dip);
+		mutex_enter(&hwahcp->hwahc_mutex);
 	}
 
 	/*
@@ -4233,11 +4244,13 @@ hwahc_hc_channel_start(hwahc_state_t *hwahcp)
 	/* set stream idx */
 	stream_idx = 1;
 
+	mutex_exit(&hwahcp->hwahc_mutex);
 	rval = wusb_hc_set_stream_idx(&hwahcp->hwahc_hc_data, stream_idx);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_channel_start: set stream idx %d fails",
 		    stream_idx);
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		return (rval);
 	}
@@ -4250,6 +4263,7 @@ hwahc_hc_channel_start(hwahc_state_t *hwahcp)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_channel_start: set wusb mas fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		return (rval);
 	}
@@ -4261,10 +4275,12 @@ hwahc_hc_channel_start(hwahc_state_t *hwahcp)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_channel_start: add hostinfo ie fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		return (rval);
 	}
 
+	mutex_enter(&hwahcp->hwahc_mutex);
 	hwahcp->hwahc_hw_state = HWAHC_HW_STARTED;
 	hwahcp->hwahc_hc_soft_state = HWAHC_CTRL_OPERATIONAL_STATE;
 
@@ -4317,10 +4333,11 @@ hwahc_hc_channel_stop(hwahc_state_t *hwahcp)
 	/* send host disconect IE so that the children know to disconnect */
 	mutex_exit(&hwahcp->hwahc_mutex);
 	rval = wusb_hc_send_host_disconnect(&hwahcp->hwahc_hc_data);
-	mutex_enter(&hwahcp->hwahc_mutex);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_channel_stop: send host disconnect ie fails");
+
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		return (rval);
 	}
@@ -4335,6 +4352,7 @@ hwahc_hc_channel_stop(hwahc_state_t *hwahcp)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_channel_stop: set stream idx 0 fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		return (rval);
 	}
@@ -4346,9 +4364,12 @@ hwahc_hc_channel_stop(hwahc_state_t *hwahcp)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 		    "hwahc_hc_channel_stop: set null wusb mas fails");
+		mutex_enter(&hwahcp->hwahc_mutex);
 
 		return (rval);
 	}
+
+	mutex_enter(&hwahcp->hwahc_mutex);
 	(void) memcpy(hwahcp->hwahc_hc_data.hc_mas, mas, WUSB_SET_WUSB_MAS_LEN);
 
 	hwahcp->hwahc_hw_state = HWAHC_HW_CH_STOPPED;
@@ -4897,6 +4918,7 @@ hwahc_stop_result_thread(hwahc_state_t *hwahcp)
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, hwahcp->hwahc_log_handle,
 	    "hwahc_stop_result_thread: reset hwa bulk-in pipe");
+	mutex_exit(&hwahcp->hwahc_mutex);
 	usb_pipe_reset(wa_data->wa_dip, wa_data->wa_bulkin_ph,
 	    USB_FLAGS_SLEEP, NULL, NULL);
 
@@ -4908,6 +4930,7 @@ hwahc_stop_result_thread(hwahc_state_t *hwahcp)
 	    "hwahc_stop_result_thread: close hwa bulk-in pipe");
 	usb_pipe_close(wa_data->wa_dip, wa_data->wa_bulkin_ph,
 	    USB_FLAGS_SLEEP, NULL, NULL);
+	mutex_enter(&hwahcp->hwahc_mutex);
 
 	mutex_enter(&wa_data->wa_mutex);
 	wa_data->wa_bulkin_ph = NULL;
@@ -5178,8 +5201,10 @@ hwahc_handle_dn(hwahc_state_t *hwahcp, hwa_notif_dn_recvd_t *dn_notif)
 		mutex_enter(&hc_data->hc_mutex);
 		if (dn_notif->bSourceDeviceAddr ==
 		    hc_data->hc_alive_ie.bDeviceAddress[0]) {
+			mutex_exit(&hc_data->hc_mutex);
 			wusb_hc_rem_ie(hc_data,
 			    (wusb_ie_header_t *)&hc_data->hc_alive_ie);
+			mutex_enter(&hc_data->hc_mutex);
 		}
 		mutex_exit(&hc_data->hc_mutex);
 
@@ -5441,12 +5466,15 @@ hwahc_trust_timeout_handler(void *arg)
 {
 	wusb_dev_info_t *dev = (wusb_dev_info_t *)arg;
 	usb_port_t port;
+	uint16_t   dev_addr;
 	wusb_hc_data_t *hc_data = dev->wdev_hc;
 	uint8_t	retry = 3;
+	int rval;
 
 	mutex_enter(&hc_data->hc_mutex);
 
 	dev->wdev_trust_timer = 0;
+	dev_addr = dev->wdev_addr;
 
 	if (dev->wdev_active == 1) {
 	/* device is active during the past period. Restart the timer */
@@ -5454,8 +5482,12 @@ hwahc_trust_timeout_handler(void *arg)
 	} else {
 		/* send a KeepAlive IE to query the device */
 		for (retry = 0; retry < 3; retry++) {
-			if (wusb_hc_send_keepalive_ie(hc_data,
-			    dev->wdev_addr) == USB_SUCCESS) {
+			mutex_exit(&hc_data->hc_mutex);
+			rval = wusb_hc_send_keepalive_ie(hc_data,
+			    dev_addr);
+			mutex_enter(&hc_data->hc_mutex);
+
+			if (rval == USB_SUCCESS) {
 				break;
 			}
 			/* retry 3 times if fail to send KeepAlive IE */

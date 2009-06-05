@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,7 +21,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 
 one ohci_state
@@ -51,6 +50,7 @@ root	usb_get_if_number
 root	usb_parse_CV_cfg_descr
 root	usb_parse_CV_ep_descr
 root	usb_parse_CV_if_descr
+root    usb_parse_comp_ep_descr
 root	usb_pipe_reset
 root	usb_pipe_get_private
 root	usb_get_current_frame_number
@@ -142,6 +142,9 @@ root	hcdi_autoclearing
 root	hcdi_cb_thread
 root    hcdi_shared_cb_thread
 
+root	ohci_quiesce
+root	uhci_quiesce
+root	ehci_quiesce
 
 root	usba_pipe_do_async_func_thread
 root	usba_get_hc_dma_attr
@@ -152,6 +155,7 @@ root    usba_taskq_destroy
 root	usba_mk_mctl
 root	usb_fail_checkpoint
 
+add hubd::h_cleanup_child targets warlock_dummy
 add usb_bulk_req::bulk_cb	targets warlock_dummy
 add usb_bulk_req::bulk_exc_cb	targets warlock_dummy
 add usb_ctrl_req::ctrl_cb	targets warlock_dummy
