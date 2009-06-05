@@ -1462,8 +1462,10 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 			    "STATE: OFFLINE --> ONLINE");
 
+			mutex_enter(&EMLXS_PORT_LOCK);
 			port->fct_flags |= FCT_STATE_NOT_ACKED;
 			port->fct_flags |= FCT_STATE_PORT_ONLINE;
+			mutex_exit(&EMLXS_PORT_LOCK);
 
 			if (hba->state <= FC_LINK_DOWN) {
 				/* Try to bring the link up */
@@ -1493,8 +1495,10 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 			emlxs_fct_unsol_flush(port);
 
 			/* Declare this port offline now */
+			mutex_enter(&EMLXS_PORT_LOCK);
 			port->fct_flags |= FCT_STATE_NOT_ACKED;
 			port->fct_flags &= ~FCT_STATE_PORT_ONLINE;
+			mutex_exit(&EMLXS_PORT_LOCK);
 
 			/* Take link down and hold it down */
 			(void) emlxs_reset_link(hba, 0);
@@ -1509,13 +1513,17 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 		break;
 
 	case FCT_ACK_PORT_OFFLINE_COMPLETE:
+		mutex_enter(&EMLXS_PORT_LOCK);
 		port->fct_flags &= ~FCT_STATE_NOT_ACKED;
+		mutex_exit(&EMLXS_PORT_LOCK);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 		    "STATE: OFFLINE ack");
 		break;
 
 	case FCT_ACK_PORT_ONLINE_COMPLETE:
+		mutex_enter(&EMLXS_PORT_LOCK);
 		port->fct_flags &= ~FCT_STATE_NOT_ACKED;
+		mutex_exit(&EMLXS_PORT_LOCK);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 		    "STATE: ONLINE ack");
 		break;
@@ -1530,18 +1538,25 @@ emlxs_fct_ctl(fct_local_port_t *fct_port, int cmd, void *arg)
 extern int
 emlxs_fct_port_shutdown(emlxs_port_t *port)
 {
+	emlxs_hba_t *hba = HBA;
 	fct_local_port_t *fct_port;
-	int i;
+	int i = 0;
 
+	mutex_enter(&EMLXS_PORT_LOCK);
 	fct_port = port->fct_port;
 	if (!fct_port) {
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return (0);
 	}
+
+	port->fct_flags |= FCT_STATE_NOT_ACKED;
+	mutex_exit(&EMLXS_PORT_LOCK);
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg, "fct_port_shutdown");
 	MODSYM(fct_port_shutdown) (fct_port, STMF_RFLAG_STAY_OFFLINED,
 	    "emlxs shutdown");
 
-	i = 0;
+	mutex_enter(&EMLXS_PORT_LOCK);
 	while (port->fct_flags & FCT_STATE_NOT_ACKED) {
 		i++;
 		if (i > 300) {	/* 30 seconds */
@@ -1549,8 +1564,13 @@ emlxs_fct_port_shutdown(emlxs_port_t *port)
 			    "fct_port_shutdown failed to ACK");
 			break;
 		}
+
+		mutex_exit(&EMLXS_PORT_LOCK);
 		delay(drv_usectohz(100000));	/* 100 msec */
+		mutex_enter(&EMLXS_PORT_LOCK);
 	}
+	mutex_exit(&EMLXS_PORT_LOCK);
+
 	return (1);
 }
 
@@ -1558,19 +1578,26 @@ emlxs_fct_port_shutdown(emlxs_port_t *port)
 extern int
 emlxs_fct_port_initialize(emlxs_port_t *port)
 {
+	emlxs_hba_t *hba = HBA;
 	fct_local_port_t *fct_port;
-	int i;
+	int i = 0;
 
+	mutex_enter(&EMLXS_PORT_LOCK);
 	fct_port = port->fct_port;
 	if (!fct_port) {
+		mutex_exit(&EMLXS_PORT_LOCK);
 		return (0);
 	}
+
+	port->fct_flags |= FCT_STATE_NOT_ACKED;
+	mutex_exit(&EMLXS_PORT_LOCK);
+
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_detail_msg,
 	    "fct_port_initialize");
 	MODSYM(fct_port_initialize) (fct_port, STMF_RFLAG_STAY_OFFLINED,
 	    "emlxs initialize");
 
-	i = 0;
+	mutex_enter(&EMLXS_PORT_LOCK);
 	while (port->fct_flags & FCT_STATE_NOT_ACKED) {
 		i++;
 		if (i > 300) {	/* 30 seconds */
@@ -1578,8 +1605,13 @@ emlxs_fct_port_initialize(emlxs_port_t *port)
 			    "fct_port_initialize failed to ACK");
 			break;
 		}
+
+		mutex_exit(&EMLXS_PORT_LOCK);
 		delay(drv_usectohz(100000));	/* 100 msec */
+		mutex_enter(&EMLXS_PORT_LOCK);
 	}
+	mutex_exit(&EMLXS_PORT_LOCK);
+
 	return (1);
 }
 
@@ -1859,6 +1891,7 @@ emlxs_fct_register_remote_port(fct_local_port_t *fct_port,
 	emlxs_node_t *ndlp;
 	SERV_PARM sparam;
 	uint32_t *iptr;
+	uint64_t addr;
 
 #ifdef FCT_API_TRACE
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_api_msg,
@@ -1907,13 +1940,15 @@ emlxs_fct_register_remote_port(fct_local_port_t *fct_port,
 			 * The PLOGI ACC reply will trigger a REG_LOGIN
 			 * update later
 			 */
+			addr = (uint64_t)((unsigned long)fct_cmd);
+
 			iptr = (uint32_t *)&sp->portName;
-			iptr[0] = putPaddrHigh(fct_cmd);
-			iptr[1] = putPaddrLow(fct_cmd);
+			iptr[0] = putPaddrHigh(addr);
+			iptr[1] = putPaddrLow(addr);
 
 			iptr = (uint32_t *)&sp->nodeName;
-			iptr[0] = putPaddrHigh(fct_cmd);
-			iptr[1] = putPaddrLow(fct_cmd);
+			iptr[0] = putPaddrHigh(addr);
+			iptr[1] = putPaddrLow(addr);
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fct_debug_msg,

@@ -101,10 +101,8 @@ typedef struct dfc_brdinfo
 } dfc_brdinfo_t;
 
 
-#define	putPaddrLow(addr)	((uint32_t)(((unsigned long)(addr)) \
-					& 0xffffffff))
-#define	putPaddrHigh(addr)	((uint32_t)(((uint64_t)(unsigned long)(addr))  \
-					>> 32))
+#define	putPaddrLow(addr)	((uint32_t)(((uint64_t)(addr)) & 0xffffffff))
+#define	putPaddrHigh(addr)	((uint32_t)(((uint64_t)(addr)) >> 32))
 #define	getPaddr(high, low)	((uint64_t)((((uint64_t)(high)) << 32) \
 					| (((uint64_t)(low)) & 0xffffffff)))
 

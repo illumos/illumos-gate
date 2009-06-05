@@ -297,10 +297,8 @@ extern void ddi_fm_acc_err_clear();
 #define	DEFAULT_BURSTSIZE	(BURSTSIZE_MASK)	/* all burst sizes */
 #endif	/* BURSTSIZE */
 
-#define	putPaddrLow(addr)	((uint32_t)(((unsigned long)(addr)) \
-					& 0xffffffff))
-#define	putPaddrHigh(addr)	((uint32_t)(((uint64_t)(unsigned long)(addr))  \
-					>> 32))
+#define	putPaddrLow(addr)	((uint32_t)(((uint64_t)(addr)) & 0xffffffff))
+#define	putPaddrHigh(addr)	((uint32_t)(((uint64_t)(addr)) >> 32))
 #define	getPaddr(high, low)	((uint64_t)((((uint64_t)(high)) << 32) \
 					| (((uint64_t)(low)) & 0xffffffff)))
 

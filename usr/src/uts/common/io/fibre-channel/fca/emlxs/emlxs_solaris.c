@@ -5002,7 +5002,7 @@ emlxs_quiesce(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
-	if (emlxs_sli_hba_reset(hba, 0, 0) == 0) {
+	if (emlxs_sli_hba_reset(hba, 1, 1) == 0) {
 		return (rval);
 	} else {
 		return (DDI_FAILURE);

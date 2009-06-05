@@ -1039,11 +1039,11 @@ emlxs_sli4_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 } /* emlxs_sli4_bde_setup */
 
 
+#ifdef SFCT_SUPPORT
 /* Only used for FCP Data xfers */
 uint32_t
 emlxs_sli2_fct_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-#ifdef SFCT_SUPPORT
 	emlxs_hba_t *hba = HBA;
 	scsi_task_t *fct_task;
 	MATCHMAP *bmp;
@@ -1137,21 +1137,21 @@ emlxs_sli2_fct_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 	iocb->ulpBdeCount = 1;
 	iocb->ulpLe = 1;
 	sbp->bmp = bmp;
-#endif /* SFCT_SUPPORT */
 
 	return (0);
 
 }  /* emlxs_sli2_fct_bde_setup */
+#endif /* SFCT_SUPPORT */
 
 
 
 #ifdef SLI3_SUPPORT
 
+#ifdef SFCT_SUPPORT
 /*ARGSUSED*/
 uint32_t
 emlxs_sli3_fct_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
-#ifdef SFCT_SUPPORT
 	scsi_task_t *fct_task;
 	ULP_BDE64 *bde;
 	IOCB *iocb;
@@ -1216,11 +1216,11 @@ emlxs_sli3_fct_bde_setup(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	iocb->ulpBdeCount = 0;
 	iocb->ulpLe = 0;
-#endif /* SFCT_SUPPORT */
 
 	return (0);
 
 }  /* emlxs_sli3_fct_bde_setup */
+#endif /* SFCT_SUPPORT */
 
 #endif /* SLI3_SUPPORT */
 
@@ -3674,15 +3674,16 @@ emlxs_handle_rcv_seq(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 	case FC_ELS_RING:
 		/* If this is a target port, then let fct handle this */
-		if (port->tgt_mode) {
-#ifdef SFCT_SUPPORT
-			(void) emlxs_fct_handle_unsol_els(port, rp, iocbq, mp,
-			    size);
-#endif /* SFCT_SUPPORT */
-		} else {
+		if (port->ini_mode) {
 			(void) emlxs_els_handle_unsol_req(port, rp, iocbq, mp,
 			    size);
 		}
+#ifdef SFCT_SUPPORT
+		else if (port->tgt_mode) {
+			(void) emlxs_fct_handle_unsol_els(port, rp, iocbq, mp,
+			    size);
+		}
+#endif /* SFCT_SUPPORT */
 		break;
 
 	case FC_CT_RING:
@@ -4701,44 +4702,53 @@ emlxs_mb_handle_cmd(emlxs_hba_t *hba, MAILBOX *mb)
 			bcopy((caddr_t)mp->virt, (caddr_t)&hba->sparam,
 			    sizeof (SERV_PARM));
 
+			/* Initialize the node name and port name only once */
 			bzero(null_wwn, 8);
-			/* Initialize thenode name and port name only once */
-			if ((bcmp((caddr_t)&hba->wwnn, (caddr_t)null_wwn, 8) ==
-			    0) && (bcmp((caddr_t)&hba->wwpn,
+			if ((bcmp((caddr_t)&hba->wwnn,
+			    (caddr_t)null_wwn, 8) == 0) &&
+			    (bcmp((caddr_t)&hba->wwpn,
 			    (caddr_t)null_wwn, 8) == 0)) {
 				bcopy((caddr_t)&hba->sparam.nodeName,
 				    (caddr_t)&hba->wwnn, sizeof (NAME_TYPE));
 
 				bcopy((caddr_t)&hba->sparam.portName,
 				    (caddr_t)&hba->wwpn, sizeof (NAME_TYPE));
-
-				/* Initialize the physical port */
-				bcopy((caddr_t)&hba->sparam,
-				    (caddr_t)&port->sparam, sizeof (SERV_PARM));
-				bcopy((caddr_t)&hba->wwpn, (caddr_t)&port->wwpn,
-				    sizeof (NAME_TYPE));
-				bcopy((caddr_t)&hba->wwnn, (caddr_t)&port->wwnn,
+			} else {
+				bcopy((caddr_t)&hba->wwnn,
+				    (caddr_t)&hba->sparam.nodeName,
 				    sizeof (NAME_TYPE));
 
-				/* Initialize the virtual ports */
-				for (i = 1; i < MAX_VPORTS; i++) {
-					vport = &VPORT(i);
-					if (vport->flag & EMLXS_PORT_BOUND) {
-						continue;
-					}
+				bcopy((caddr_t)&hba->wwpn,
+				    (caddr_t)&hba->sparam.portName,
+				    sizeof (NAME_TYPE));
+			}
 
-					bcopy((caddr_t)&hba->sparam,
-					    (caddr_t)&vport->sparam,
-					    sizeof (SERV_PARM));
+			/* Initialize the physical port */
+			bcopy((caddr_t)&hba->sparam,
+			    (caddr_t)&port->sparam, sizeof (SERV_PARM));
+			bcopy((caddr_t)&hba->wwpn, (caddr_t)&port->wwpn,
+			    sizeof (NAME_TYPE));
+			bcopy((caddr_t)&hba->wwnn, (caddr_t)&port->wwnn,
+			    sizeof (NAME_TYPE));
 
-					bcopy((caddr_t)&vport->wwnn,
-					    (caddr_t)&vport->sparam.nodeName,
-					    sizeof (NAME_TYPE));
-
-					bcopy((caddr_t)&vport->wwpn,
-					    (caddr_t)&vport->sparam.portName,
-					    sizeof (NAME_TYPE));
+			/* Initialize the virtual ports */
+			for (i = 1; i < MAX_VPORTS; i++) {
+				vport = &VPORT(i);
+				if (vport->flag & EMLXS_PORT_BOUND) {
+					continue;
 				}
+
+				bcopy((caddr_t)&hba->sparam,
+				    (caddr_t)&vport->sparam,
+				    sizeof (SERV_PARM));
+
+				bcopy((caddr_t)&vport->wwnn,
+				    (caddr_t)&vport->sparam.nodeName,
+				    sizeof (NAME_TYPE));
+
+				bcopy((caddr_t)&vport->wwpn,
+				    (caddr_t)&vport->sparam.portName,
+				    sizeof (NAME_TYPE));
 			}
 		}
 		break;

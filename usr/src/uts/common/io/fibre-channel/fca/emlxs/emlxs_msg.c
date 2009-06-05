@@ -1547,6 +1547,7 @@ emlxs_get_dfc_eventinfo(emlxs_port_t *port, HBA_EVENTINFO *eventinfo,
 	fc_affected_id_t *aid;
 	uint32_t max_events;
 	uint32_t events;
+	uint8_t format;
 	emlxs_hba_event_t *hba_event;
 
 	if (!eventinfo || !eventcount || !missed) {
@@ -1694,8 +1695,9 @@ emlxs_get_dfc_eventinfo(emlxs_port_t *port, HBA_EVENTINFO *eventinfo,
 				/* word[1] is the RSCN payload command */
 
 				aid = (fc_affected_id_t *)&word[2];
+				format = aid->aff_format;
 
-				switch (aid->aff_format) {
+				switch (format) {
 				case 0:	/* Port */
 					eventinfo->Event.RSCN_EventInfo.
 					    NPortPage =
