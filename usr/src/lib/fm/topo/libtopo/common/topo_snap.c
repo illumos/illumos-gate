@@ -233,6 +233,8 @@ topo_close(topo_hdl_t *thp)
 		topo_hdl_strfree(thp, thp->th_rootdir);
 	if (thp->th_ipmi != NULL)
 		ipmi_close(thp->th_ipmi);
+	if (thp->th_smbios != NULL)
+		smbios_close(thp->th_smbios);
 
 	/*
 	 * Clean-up snapshot
