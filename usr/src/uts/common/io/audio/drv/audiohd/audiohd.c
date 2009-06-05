@@ -4867,7 +4867,7 @@ audiohd_reset_pins_ur_cap(audiohd_state_t *statep)
 	uint32_t		urctrl;
 	int			i;
 
-	for (i = 0; i <= AUDIOHD_CODEC_MAX; i++) {
+	for (i = 0; i < AUDIOHD_CODEC_MAX; i++) {
 		codec = statep->codec[i];
 		if (!codec)
 			continue;
