@@ -2667,8 +2667,10 @@ connmgr_connect(
 			e->call_status = RPC_INTR;
 		else if (error == ETIME)
 			e->call_status = RPC_TIMEDOUT;
-		else if (error == EPROTO)
+		else if (error == EPROTO) {
 			e->call_status = RPC_SYSTEMERROR;
+			e->call_reason = EPROTO;
+		}
 
 		RPCLOG(8, "connmgr_connect: can't connect, status: "
 		    "%s\n", clnt_sperrno(e->call_status));
@@ -3022,6 +3024,7 @@ done_xid_copy:
 		if (e->call_zoneid != zoneid) {
 			mutex_exit(&e->call_lock);
 			mutex_exit(&chtp->ct_lock);
+			RPCLOG0(1, "clnt_dispatch_notify: incorrect zoneid\n");
 			return (FALSE);
 		}
 

@@ -2210,6 +2210,8 @@ done_xid_copy:
 		if (e->call_zoneid != zoneid) {
 			mutex_exit(&e->call_lock);
 			mutex_exit(&chtp->ct_lock);
+			RPCLOG0(8, "clnt_dispatch_notify (clts): incorrect "
+			    "zoneid\n");
 			freemsg(mp);
 			return;
 		}

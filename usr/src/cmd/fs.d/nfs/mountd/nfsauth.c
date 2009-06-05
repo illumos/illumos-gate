@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ nfsauth_access(auth_req *argp, auth_res *result)
 	nbuf.buf = argp->req_client.n_bytes;
 
 	if (nbuf.len == 0 || nbuf.buf == NULL)
-		return;
+		goto done;
 
 	if (netdir_getbyaddr(nconf, &clnames, &nbuf)) {
 		host = &tmp[0];
@@ -92,6 +92,17 @@ nfsauth_access(auth_req *argp, auth_res *result)
 			    tmp, INET6_ADDRSTRLEN);
 		}
 		clnames = anon_client(host);
+	}
+	/*
+	 * Both netdir_getbyaddr() and anon_client() can return a NULL
+	 * clnames.  This has been seen when the DNS entry for the client
+	 * name does not have the correct format or a reverse lookup DNS
+	 * entry cannot be found for the client's IP address.
+	 */
+	if (clnames == NULL) {
+		syslog(LOG_ERR, "Could not find DNS entry for %s",
+		    argp->req_netid);
+		goto done;
 	}
 
 	/*
