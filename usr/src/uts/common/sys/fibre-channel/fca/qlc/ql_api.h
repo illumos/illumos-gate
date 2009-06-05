@@ -1607,6 +1607,12 @@ typedef struct ql_adapter_state {
 	uint16_t		idc_mb[8];
 	uint8_t			restart_mpi_timer;
 	uint8_t			flash_acc_timer;
+
+	/* VLAN ID and MAC address */
+	uint8_t			fcoe_vnport_mac[6];
+	uint16_t		fabric_params;
+	uint16_t		fcoe_vlan_id;
+	uint16_t		fcoe_fcf_idx;
 } ql_adapter_state_t;
 
 /*

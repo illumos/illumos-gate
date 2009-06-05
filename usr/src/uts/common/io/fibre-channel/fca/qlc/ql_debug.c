@@ -216,8 +216,8 @@ ql_el_msg(ql_adapter_state_t *ha, const char *fn, int ce, ...)
 	 * skipping the NULL.
 	 */
 	if (tracing) {
-		rval += 1;
-		ha->el_trace_desc->next = (uint16_t)rval;
+		uint16_t next = (uint16_t)(rval += 1);
+		ha->el_trace_desc->next += next;
 		TRACE_BUFFER_UNLOCK(ha);
 	}
 

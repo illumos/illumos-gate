@@ -393,14 +393,14 @@ typedef struct _EXT_HBA_PORT {
 	UINT16	Bus;				/* 2 */
 	UINT16	Lun;				/* 2 */
 	UINT8	WWPN[EXT_DEF_WWN_NAME_SIZE];	/* 8 */
-	UINT8	Id  [EXT_DEF_PORTID_SIZE];	/* 4; 3 bytes valid Port Id. */
+	UINT8	Id[EXT_DEF_PORTID_SIZE];	/* 4; 3 bytes valid Port Id. */
 	UINT8	PortSupportedFC4Types;		/* 1 */
 	UINT8	PortActiveFC4Types;		/* 1 */
 	UINT8	FabricName[EXT_DEF_WWN_NAME_SIZE];	/* 8 */
 	UINT16	LinkState2;			/* 2; sfp status */
 	UINT16	LinkState3;			/* 2; reserved field */
 	UINT8	Reserved[6];			/* 6 */
-} EXT_HBA_PORT, *PEXT_HBA_PORT;			/* 62 */
+} EXT_HBA_PORT, *PEXT_HBA_PORT;			/* 64 */
 
 /* FC-4 Instrumentation */
 typedef struct _EXT_HBA_FC4Statistics {
@@ -477,6 +477,7 @@ typedef struct _EXT_LOOPBACK_RSP {
 #define	IIDMA_RATE_2GB		0x1
 #define	IIDMA_RATE_4GB		0x3
 #define	IIDMA_RATE_8GB		0x4
+#define	IIDMA_RATE_10GB		0x13
 #define	IIDMA_RATE_UNKNOWN	0xffff
 
 /* IIDMA Mode values */
@@ -648,6 +649,9 @@ typedef struct _EXT_CNA_PORT {
 	UINT16	Reserved0;					/* 2 */
 	UINT32	Reserved[29];					/* 116 */
 } EXT_CNA_PORT, *PEXT_CNA_PORT;					/* 128 */
+
+/* Fabric Parameters */
+#define	EXT_DEF_MAC_ADDR_MODE_FPMA	0x8000
 
 /* Request Buffer for RNID */
 typedef struct _EXT_RNID_REQ {

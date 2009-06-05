@@ -3073,6 +3073,18 @@ ql_configure_hba(ql_adapter_state_t *ha)
 			    mr.mb[7] & GID_FP_NPIV_SUPPORT) {
 				ha->flags |= FDISC_ENABLED;
 			}
+			/* Get VLAN ID, mac address */
+			if (CFG_IST(ha, CFG_CTRL_81XX)) {
+				ha->fabric_params = mr.mb[7];
+				ha->fcoe_vlan_id = (uint16_t)(mr.mb[9] & 0xfff);
+				ha->fcoe_fcf_idx = mr.mb[10];
+				ha->fcoe_vnport_mac[0] = MSB(mr.mb[11]);
+				ha->fcoe_vnport_mac[1] = LSB(mr.mb[11]);
+				ha->fcoe_vnport_mac[2] = MSB(mr.mb[12]);
+				ha->fcoe_vnport_mac[3] = LSB(mr.mb[12]);
+				ha->fcoe_vnport_mac[4] = MSB(mr.mb[13]);
+				ha->fcoe_vnport_mac[5] = LSB(mr.mb[13]);
+			}
 			break;
 		default:
 			QL_PRINT_2(CE_CONT, "(%d,%d): UNKNOWN topology=%xh, "

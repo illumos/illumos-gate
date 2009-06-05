@@ -87,6 +87,7 @@ static void ql_diagnostic_loopback(ql_adapter_state_t *, EXT_IOCTL *, int);
 static void ql_send_els_rnid(ql_adapter_state_t *, EXT_IOCTL *, int);
 static void ql_set_host_data(ql_adapter_state_t *, EXT_IOCTL *, int);
 static void ql_get_host_data(ql_adapter_state_t *, EXT_IOCTL *, int);
+static void ql_qry_cna_port(ql_adapter_state_t *, EXT_IOCTL *, int);
 
 static int ql_lun_count(ql_adapter_state_t *, ql_tgt_t *);
 static int ql_report_lun(ql_adapter_state_t *, ql_tgt_t *);
@@ -143,6 +144,7 @@ static void ql_access_flash(ql_adapter_state_t *, EXT_IOCTL *, int);
 static void ql_reset_cmd(ql_adapter_state_t *, EXT_IOCTL *);
 static void ql_update_flash_caches(ql_adapter_state_t *);
 static void ql_get_dcbx_parameters(ql_adapter_state_t *, EXT_IOCTL *, int);
+static void ql_get_xgmac_statistics(ql_adapter_state_t *, EXT_IOCTL *, int);
 
 /* ******************************************************************** */
 /*			External IOCTL support.				*/
@@ -295,6 +297,7 @@ ql_xioctl(ql_adapter_state_t *ha, int cmd, intptr_t arg, int mode,
 	case EXT_CC_VPORT_CMD:
 	case EXT_CC_ACCESS_FLASH:
 	case EXT_CC_RESET_FW:
+	case EXT_CC_MENLO_MANAGE_INFO:
 		rval = ql_sdm_ioctl(ha, cmd, (void *)arg, mode);
 		break;
 	default:
@@ -724,6 +727,9 @@ ql_query(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		break;
 	case EXT_SC_QUERY_CHIP:
 		ql_qry_chip(ha, cmd, mode);
+		break;
+	case EXT_SC_QUERY_CNA_PORT:
+		ql_qry_cna_port(ha, cmd, mode);
 		break;
 	case EXT_SC_QUERY_DISC_LUN:
 	default:
@@ -7950,7 +7956,16 @@ ql_menlo_manage_info(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
-	if ((CFG_IST(ha, CFG_CTRL_MENLO)) == 0) {
+
+	/* The call is only supported for Schultz right now */
+	if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		ql_get_xgmac_statistics(ha, cmd, mode);
+		QL_PRINT_9(CE_CONT, "(%d): CFG_CTRL_81XX done\n",
+		    ha->instance);
+		return;
+	}
+
+	if (!CFG_IST(ha, CFG_CTRL_81XX) || !CFG_IST(ha, CFG_CTRL_MENLO)) {
 		EL(ha, "failed, invalid request for HBA\n");
 		cmd->Status = EXT_STATUS_INVALID_REQUEST;
 		cmd->ResponseLen = 0;
@@ -8432,6 +8447,7 @@ ql_reset_cmd(ql_adapter_state_t *ha, EXT_IOCTL *cmd)
 
 	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
 }
+
 /*
  * ql_get_dcbx_parameters
  *	Get DCBX parameters.
@@ -8453,19 +8469,11 @@ ql_get_dcbx_parameters(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		EL(ha, "invalid request for HBA\n");
 		cmd->Status = EXT_STATUS_INVALID_REQUEST;
 		cmd->ResponseLen = 0;
-	}
-
-	if (cmd->ResponseLen < EXT_DEF_DCBX_PARAM_BUF_SIZE) {
-		cmd->Status = EXT_STATUS_BUFFER_TOO_SMALL;
-		cmd->DetailStatus = EXT_DEF_DCBX_PARAM_BUF_SIZE;
-		EL(ha, "failed, ResponseLen != %xh, Len=%xh\n",
-		    EXT_DEF_DCBX_PARAM_BUF_SIZE, cmd->ResponseLen);
-		cmd->ResponseLen = 0;
 		return;
 	}
 
 	/* Allocate memory for command. */
-	tmp_buf = kmem_zalloc(cmd->ResponseLen, KM_SLEEP);
+	tmp_buf = kmem_zalloc(EXT_DEF_DCBX_PARAM_BUF_SIZE, KM_SLEEP);
 	if (tmp_buf == NULL) {
 		EL(ha, "failed, kmem_zalloc\n");
 		cmd->Status = EXT_STATUS_NO_MEMORY;
@@ -8473,11 +8481,12 @@ ql_get_dcbx_parameters(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 	/* Send command */
-	rval = ql_get_dcbx_params(ha, cmd->ResponseLen, (caddr_t)tmp_buf);
+	rval = ql_get_dcbx_params(ha, EXT_DEF_DCBX_PARAM_BUF_SIZE,
+	    (caddr_t)tmp_buf);
 	if (rval != QL_SUCCESS) {
 		/* error */
-		EL(ha, "failed, get_rnid_params_mbx=%xh\n", rval);
-		kmem_free(tmp_buf, cmd->ResponseLen);
+		EL(ha, "failed, get_dcbx_params_mbx=%xh\n", rval);
+		kmem_free(tmp_buf, EXT_DEF_DCBX_PARAM_BUF_SIZE);
 		cmd->Status = EXT_STATUS_ERR;
 		cmd->ResponseLen = 0;
 		return;
@@ -8486,14 +8495,165 @@ ql_get_dcbx_parameters(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	/* Copy the response */
 	if (ql_send_buffer_data((caddr_t)tmp_buf,
 	    (caddr_t)(uintptr_t)cmd->ResponseAdr,
-	    cmd->ResponseLen, mode) != cmd->ResponseLen) {
+	    EXT_DEF_DCBX_PARAM_BUF_SIZE, mode) != EXT_DEF_DCBX_PARAM_BUF_SIZE) {
 		EL(ha, "failed, ddi_copyout\n");
-		kmem_free(tmp_buf, cmd->ResponseLen);
 		cmd->Status = EXT_STATUS_COPY_ERR;
 		cmd->ResponseLen = 0;
 	} else {
+		cmd->ResponseLen = EXT_DEF_DCBX_PARAM_BUF_SIZE;
 		QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
-		kmem_free(tmp_buf, cmd->ResponseLen);
+	}
+	kmem_free(tmp_buf, EXT_DEF_DCBX_PARAM_BUF_SIZE);
+
+}
+
+/*
+ * ql_qry_cna_port
+ *	Performs EXT_SC_QUERY_CNA_PORT subfunction.
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	cmd:	EXT_IOCTL cmd struct pointer.
+ *	mode:	flags.
+ *
+ * Returns:
+ *	None, request status indicated in cmd->Status.
+ *
+ * Context:
+ *	Kernel context.
+ */
+static void
+ql_qry_cna_port(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
+{
+	EXT_CNA_PORT	cna_port = {0};
+
+	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
+
+	if (!(CFG_IST(ha, CFG_CTRL_81XX))) {
+		EL(ha, "invalid request for HBA\n");
+		cmd->Status = EXT_STATUS_INVALID_REQUEST;
+		cmd->ResponseLen = 0;
+		return;
 	}
 
+	if (cmd->ResponseLen < sizeof (EXT_CNA_PORT)) {
+		cmd->Status = EXT_STATUS_BUFFER_TOO_SMALL;
+		cmd->DetailStatus = sizeof (EXT_CNA_PORT);
+		EL(ha, "failed, ResponseLen < EXT_CNA_PORT, Len=%xh\n",
+		    cmd->ResponseLen);
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	cna_port.VLanId = ha->fcoe_vlan_id;
+	cna_port.FabricParam = ha->fabric_params;
+	bcopy(ha->fcoe_vnport_mac, cna_port.VNPortMACAddress,
+	    EXT_DEF_MAC_ADDRESS_SIZE);
+
+	if (ddi_copyout((void *)&cna_port,
+	    (void *)(uintptr_t)(cmd->ResponseAdr),
+	    sizeof (EXT_CNA_PORT), mode) != 0) {
+		cmd->Status = EXT_STATUS_COPY_ERR;
+		cmd->ResponseLen = 0;
+		EL(ha, "failed, ddi_copyout\n");
+	} else {
+		cmd->ResponseLen = sizeof (EXT_CNA_PORT);
+		QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
+	}
+}
+
+/*
+ * ql_get_xgmac_statistics
+ *	Get XgMac information
+ *
+ * Input:
+ *	ha:	adapter state pointer.
+ *	cmd:	EXT_IOCTL cmd struct pointer.
+ *	mode:	flags.
+ *
+ * Returns:
+ *	None, request status indicated in cmd->Status.
+ *
+ * Context:
+ *	Kernel context.
+ */
+static void
+ql_get_xgmac_statistics(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
+{
+	int			rval;
+	uint32_t		size;
+	int8_t			*tmp_buf;
+	EXT_MENLO_MANAGE_INFO	info;
+
+	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
+
+	/*  Verify the size of request structure. */
+	if (cmd->RequestLen < sizeof (EXT_MENLO_MANAGE_INFO)) {
+		/* Return error */
+		EL(ha, "RequestLen=%d < %d\n", cmd->RequestLen,
+		    sizeof (EXT_MENLO_MANAGE_INFO));
+		cmd->Status = EXT_STATUS_INVALID_PARAM;
+		cmd->DetailStatus = EXT_DSTATUS_REQUEST_LEN;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Get manage info request. */
+	if (ddi_copyin((caddr_t)(uintptr_t)cmd->RequestAdr,
+	    (caddr_t)&info, sizeof (EXT_MENLO_MANAGE_INFO), mode) != 0) {
+		EL(ha, "failed, ddi_copyin\n");
+		cmd->Status = EXT_STATUS_COPY_ERR;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	size = info.TotalByteCount;
+	if (!size) {
+		/* parameter error */
+		cmd->Status = EXT_STATUS_INVALID_PARAM;
+		cmd->DetailStatus = 0;
+		EL(ha, "failed, size=%xh\n", size);
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	/* Allocate memory for command. */
+	tmp_buf = kmem_zalloc(size, KM_SLEEP);
+	if (tmp_buf == NULL) {
+		EL(ha, "failed, kmem_zalloc\n");
+		cmd->Status = EXT_STATUS_NO_MEMORY;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	if (!(info.Operation & MENLO_OP_GET_INFO)) {
+		EL(ha, "Invalid request for 81XX\n");
+		kmem_free(tmp_buf, size);
+		cmd->Status = EXT_STATUS_ERR;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	rval = ql_get_xgmac_stats(ha, size, (caddr_t)tmp_buf);
+
+	if (rval != QL_SUCCESS) {
+		/* error */
+		EL(ha, "failed, get_xgmac_stats =%xh\n", rval);
+		kmem_free(tmp_buf, size);
+		cmd->Status = EXT_STATUS_ERR;
+		cmd->ResponseLen = 0;
+		return;
+	}
+
+	if (ql_send_buffer_data(tmp_buf, (caddr_t)(uintptr_t)info.pDataBytes,
+	    size, mode) != size) {
+		EL(ha, "failed, ddi_copyout\n");
+		cmd->Status = EXT_STATUS_COPY_ERR;
+		cmd->ResponseLen = 0;
+	} else {
+		cmd->ResponseLen = info.TotalByteCount;
+		QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
+	}
+	kmem_free(tmp_buf, size);
+	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
 }

@@ -1167,9 +1167,33 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			cmn_err(CE_NOTE, "!%s(%d): Firmware not loaded",
 			    QL_NAME, ha->instance);
 		} else {
-			cmn_err(CE_NOTE, "!%s(%d): Firmware version %d.%d.%d",
-			    QL_NAME, ha->instance, ha->fw_major_version,
+			int	rval;
+			char	ver_fmt[256];
+
+			rval = (int)snprintf(ver_fmt, (size_t)sizeof (ver_fmt),
+			    "Firmware version %d.%d.%d", ha->fw_major_version,
 			    ha->fw_minor_version, ha->fw_subminor_version);
+
+			if (CFG_IST(ha, CFG_CTRL_81XX)) {
+				rval = (int)snprintf(ver_fmt + rval,
+				    (size_t)sizeof (ver_fmt),
+				    ", MPI fw version %d.%d.%d",
+				    ha->mpi_fw_major_version,
+				    ha->mpi_fw_minor_version,
+				    ha->mpi_fw_subminor_version);
+
+				if (ha->subsys_id == 0x17B ||
+				    ha->subsys_id == 0x17D) {
+					(void) snprintf(ver_fmt + rval,
+					    (size_t)sizeof (ver_fmt),
+					    ", PHY fw version %d.%d.%d",
+					    ha->phy_fw_major_version,
+					    ha->phy_fw_minor_version,
+					    ha->phy_fw_subminor_version);
+				}
+			}
+			cmn_err(CE_NOTE, "!%s(%d): %s",
+			    QL_NAME, ha->instance, ver_fmt);
 		}
 
 		ha->k_stats = kstat_create(QL_NAME, instance, "statistics",
@@ -1745,7 +1769,7 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		    sizeof (*ha->outstanding_cmds) * MAX_OUTSTANDING_COMMANDS);
 
 		if (ha->n_port != NULL) {
-			kmem_free(&ha->n_port, sizeof (ql_n_port_info_t));
+			kmem_free(ha->n_port, sizeof (ql_n_port_info_t));
 		}
 
 		if (ha->devpath != NULL) {
