@@ -448,8 +448,18 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 					 * this a mispredicted power state
 					 * transition due to a transient
 					 * idle period.
+					 *
+					 * Note: The presence of enough
+					 * transient work across the domain can
+					 * result in frequent transient idle
+					 * periods. We don't want the ti
+					 * governor being installed as a side
+					 * effect of transient work, so the ti
+					 * governor is left alone if the tw
+					 * governor is already installed.
 					 */
-					if (++dom->cpd_ti >=
+					if (dom->cpd_tw_governed == B_FALSE &&
+					    ++dom->cpd_ti >=
 					    cpupm_mispredict_thresh) {
 						/*
 						 * There's enough transient
