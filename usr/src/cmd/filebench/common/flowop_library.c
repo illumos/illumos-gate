@@ -758,7 +758,7 @@ static int
 flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 {
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == NULL)
+	if (!filebench_shm->shm_eventgen_enabled)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -768,7 +768,7 @@ flowoplib_eventlimit(threadflow_t *threadflow, flowop_t *flowop)
 	}
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz != NULL) {
+	while (filebench_shm->shm_eventgen_enabled) {
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q > 0) {
 			filebench_shm->shm_eventgen_q--;
@@ -821,7 +821,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == NULL)
+	if (!filebench_shm->shm_eventgen_enabled)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -876,7 +876,7 @@ flowoplib_iopslimit(threadflow_t *threadflow, flowop_t *flowop)
 	events = iops;
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz != NULL) {
+	while (filebench_shm->shm_eventgen_enabled) {
 
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q >= events) {
@@ -909,7 +909,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == NULL)
+	if (!filebench_shm->shm_eventgen_enabled)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -950,7 +950,7 @@ flowoplib_opslimit(threadflow_t *threadflow, flowop_t *flowop)
 	events = ops;
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz != NULL) {
+	while (filebench_shm->shm_eventgen_enabled) {
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q >= events) {
 			filebench_shm->shm_eventgen_q -= events;
@@ -984,7 +984,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	uint64_t events;
 
 	/* Immediately bail if not set/enabled */
-	if (filebench_shm->shm_eventgen_hz == NULL)
+	if (!filebench_shm->shm_eventgen_enabled)
 		return (FILEBENCH_OK);
 
 	if (flowop->fo_initted == 0) {
@@ -1043,7 +1043,7 @@ flowoplib_bwlimit(threadflow_t *threadflow, flowop_t *flowop)
 	    (u_longlong_t)bytes, (u_longlong_t)events);
 
 	flowop_beginop(threadflow, flowop);
-	while (filebench_shm->shm_eventgen_hz != NULL) {
+	while (filebench_shm->shm_eventgen_enabled) {
 		(void) ipc_mutex_lock(&filebench_shm->shm_eventgen_lock);
 		if (filebench_shm->shm_eventgen_q >= events) {
 			filebench_shm->shm_eventgen_q -= events;

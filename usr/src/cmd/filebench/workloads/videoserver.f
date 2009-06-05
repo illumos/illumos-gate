@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This workloads emulates a video server. It has two filesets, one of videos
@@ -33,6 +33,7 @@
 # 10 seconds. Thus the write bandwidth will be set as $filesize/$repintval.
 
 set $dir=/tmp
+set $eventrate=96
 set $filesize=10g
 set $nthreads=48
 set $numactivevids=32
@@ -45,9 +46,8 @@ set $passvidsname=passivevids
 set $actvidsname=activevids
 #
 set $repintval=10
-set $srvbwrate=96
 
-eventgen rate=$srvbwrate
+eventgen rate=$eventrate
 
 define fileset name=$actvidsname,path=$dir,size=$filesize,entries=$numactivevids,dirwidth=4,prealloc,paralloc,reuse=$reuseit
 define fileset name=$passvidsname,path=$dir,size=$filesize,entries=$numpassivevids,dirwidth=20,prealloc=50,paralloc,reuse=$reuseit
@@ -73,15 +73,15 @@ define process name=vidreaders,instances=1
   }
 }
 
-echo  "Video Server Version 1.0 personality successfully loaded"
+echo  "Video Server Version 1.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>              defaults to $dir"
+usage "       set \$eventrate=<value>      defaults to $eventrate"
 usage "       set \$filesize=<size>        defaults to $filesize"
 usage "       set \$nthreads=<value>       defaults to $nthreads"
 usage "       set \$writeiosize=<value>    defaults to $writeiosize"
 usage "       set \$readiosize=<value>     defaults to $readiosize"
 usage "       set \$numactivevids=<value>  defaults to $numactivevids"
 usage "       set \$numpassivevids=<value> defaults to $numpassivevids"
-usage "       set \$srvbwrate=<value>      defaults to $srvbwrate"
 usage " "
 usage "       run runtime (e.g. run 60)"
 

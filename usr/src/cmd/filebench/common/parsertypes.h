@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FB_PARSERTYPES_H
 #define	_FB_PARSERTYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "config.h"
 
@@ -68,8 +66,8 @@ typedef struct cmd {
 	char		*cmd_tgt1;
 	char		*cmd_tgt2;
 	char		*cmd_tgt3;
-	char		*cmd_tgt4;
 	char		*thread_name;
+	int		cmd_subtype;
 	uint64_t	cmd_qty;
 	struct cmd	*cmd_list;
 	struct cmd	*cmd_next;

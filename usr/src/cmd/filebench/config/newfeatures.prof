@@ -42,6 +42,12 @@ CONFIG seqwrite_randvar_tabular {
         personality = filemicro_seqwriterandvartab;
 }
 
+CONFIG rate_limit_copy {
+	function = generic;
+	personality = ratelimcopyfiles;
+	eventrate = 20;
+}
+
 CONFIG list_dirs_test {
 	function = generic;
 	personality = listdirs;
@@ -69,7 +75,7 @@ CONFIG video_server_test {
 	numactivevids = 4;
 	numpassivevids = 20;
 	nthreads = 6;
-	srvbwrate = 12;
+	eventrate = 12;
 	repintval = 20;
 	passvidsname = bigfileset;
 	actvidsname = u2fileset;
@@ -79,6 +85,12 @@ CONFIG video_server_test {
 CONFIG file_indexing_test {
         function = generic;
         personality = randomfileaccess;
+	warmuptime = 120;
+}
+
+CONFIG network_file_system {
+        function = generic;
+        personality = networkfs;
 	warmuptime = 120;
 }
 

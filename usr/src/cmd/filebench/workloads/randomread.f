@@ -19,17 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# $dir - directory for datafiles
+# $eventrate - event generator rate (0 == free run)
+# $filesize - size of data file
+# $iosize - size of each read
+# $nthreads - number of worker threads
 
 set $dir=/tmp
-set $nthreads=1
-set $iosize=8k
+set $eventrate=0
 set $filesize=1m
+set $iosize=8k
+set $nthreads=1
 set $workingset=0
 set $directio=0
+
+eventgen rate=$eventrate
 
 define file name=largefile1,path=$dir,size=$filesize,prealloc,reuse,paralloc
 
@@ -42,8 +49,9 @@ define process name=rand-read,instances=1
   }
 }
 
-echo "Random Read Version 2.0 IO personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo "Random Read Version 2.1 IO personality successfully loaded"
+usage "Usage: set \$dir=<dir>         defaults to $dir"
+usage "       set \$eventrate=<value> defaults to $eventrate"
 usage "       set \$filesize=<size>   defaults to $filesize"
 usage "       set \$iosize=<value>    defaults to $iosize"
 usage "       set \$nthreads=<value>  defaults to $nthreads"

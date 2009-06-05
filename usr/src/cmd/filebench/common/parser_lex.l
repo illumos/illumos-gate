@@ -220,6 +220,10 @@ rand48			{ return FSV_RAND48; }
 <INITIAL>=			{ return FSK_ASSIGN; }
 <INITIAL>\,			{ return FSK_SEPLST; }
 <INITIAL>in                     { return FSK_IN; }
+<INITIAL>\+                     { return FSK_PLUS; }
+<INITIAL>\-                     { return FSK_MINUS; }
+<INITIAL>\*                     { return FSK_MULTIPLY; }
+<INITIAL>\/                     { return FSK_DIVIDE; }
 
 <INITIAL>[0-9]+	{
                                 errno = 0;

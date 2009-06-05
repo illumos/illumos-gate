@@ -119,8 +119,11 @@ static void parser_flowop_create(cmd_t *);
 static void parser_fileset_create(cmd_t *);
 
 /* set commands */
-static void parser_set_integer(char *, fbint_t);
-static void parser_set_var(char *, char *);
+static void parser_set_integer(cmd_t *cmd);
+static void parser_set_var(cmd_t *cmd);
+static void parser_set_var_op_int(cmd_t *cmd);
+static void parser_set_int_op_var(cmd_t *cmd);
+static void parser_set_var_op_var(cmd_t *cmd);
 
 /* Shutdown Commands */
 static void parser_proc_shutdown(cmd_t *);
@@ -185,7 +188,7 @@ static void parser_version(cmd_t *cmd);
 %token FSE_DIRECTORY FSE_COMMAND FSE_FILESET FSE_XMLDUMP FSE_RAND FSE_MODE
 %token FSE_MULTI FSE_MULTIDUMP
 %token FSK_SEPLST FSK_OPENLST FSK_CLOSELST FSK_ASSIGN FSK_IN FSK_QUOTE
-%token FSK_DIRSEPLST
+%token FSK_DIRSEPLST FSK_PLUS FSK_MINUS FSK_MULTIPLY FSK_DIVIDE
 %token FSA_SIZE FSA_PREALLOC FSA_PARALLOC FSA_PATH FSA_REUSE
 %token FSA_PROCESS FSA_MEMSIZE FSA_RATE FSA_CACHED FSA_READONLY FSA_TRUSTTREE
 %token FSA_IOSIZE FSA_FILE FSA_WSS FSA_NAME FSA_RANDOM FSA_INSTANCES
@@ -226,6 +229,7 @@ static void parser_version(cmd_t *cmd);
 %type <cmd> thread echo_command usage_command help_command vars_command
 %type <cmd> version_command enable_command multisync_command
 %type <cmd> warmup_command fscheck_command fsflush_command
+%type <cmd> set_integer_command set_other_command
 
 %type <attr> files_attr_op files_attr_ops pt_attr_op pt_attr_ops
 %type <attr> fo_attr_op fo_attr_ops ev_attr_op ev_attr_ops
@@ -242,7 +246,7 @@ static void parser_version(cmd_t *cmd);
 %type <ival> randvar_attr_name FSA_TYPE randtype_name randvar_attr_param
 %type <ival> randsrc_name FSA_RANDSRC randvar_attr_tsp em_attr_name
 %type <ival> FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC
-%type <ival> fscheck_attr_name FSA_FSTYPE
+%type <ival> fscheck_attr_name FSA_FSTYPE binary_op
 
 %type <rndtb>  probtabentry_list probtabentry
 %type <avd> var_int_val
@@ -790,18 +794,68 @@ debug_command: FSC_DEBUG FSV_VAL_INT
 		yydebug = 1;
 };
 
-set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
+set_command:
+   set_integer_command
+ | set_other_command;
+
+set_integer_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 {
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
-	var_assign_integer($2, $4);
+	$$->cmd_tgt1 = $2;
+	$$->cmd_qty = $4;
 	if (parentscript) {
-		$$->cmd_tgt1 = $2;
 		parser_vars($$);
 	}
-	$$->cmd = NULL;
+	$$->cmd = parser_set_integer;
+}| FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VARIABLE
+{
+	if (($$ = alloc_cmd()) == NULL)
+		YYERROR;
+	var_assign_var($2, $4);
+	$$->cmd_tgt1 = $2;
+	$$->cmd_tgt2 = $4;
+	if (parentscript) {
+		parser_vars($$);
+	}
+	$$->cmd = parser_set_var;
 }
-| FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_BOOLEAN
+| set_integer_command binary_op FSV_VAL_INT
+{
+	if ($1->cmd == parser_set_integer) {
+		switch ($2) {
+		case FSK_PLUS:
+			var_assign_integer($1->cmd_tgt1, $1->cmd_qty + $3);
+			break;
+		case FSK_MINUS:
+			var_assign_integer($1->cmd_tgt1, $1->cmd_qty - $3);
+			break;
+		case FSK_MULTIPLY:
+			var_assign_integer($1->cmd_tgt1, $1->cmd_qty * $3);
+			break;
+		case FSK_DIVIDE:
+			var_assign_integer($1->cmd_tgt1, $1->cmd_qty / $3);
+			break;
+		}
+		$$->cmd = NULL;
+	} else {
+		$1->cmd_qty = $3;
+		$1->cmd_subtype = $2;
+		$1->cmd = parser_set_var_op_int;
+	}
+}
+| set_integer_command binary_op FSV_VARIABLE
+{
+	$1->cmd_tgt3 = $3;
+	$1->cmd_subtype = $2;
+	if ($1->cmd == parser_set_integer) {
+		$$->cmd = parser_set_int_op_var;
+	} else {
+		$1->cmd = parser_set_var_op_var;
+	}
+};
+
+set_other_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_BOOLEAN
 {
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
@@ -827,16 +881,6 @@ set_command: FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VAL_INT
 	if (($$ = alloc_cmd()) == NULL)
 		YYERROR;
 	var_assign_string($2, $4);
-	if (parentscript) {
-		$$->cmd_tgt1 = $2;
-		parser_vars($$);
-	}
-	$$->cmd = NULL;
-}| FSC_SET FSV_VARIABLE FSK_ASSIGN FSV_VARIABLE
-{
-	if (($$ = alloc_cmd()) == NULL)
-		YYERROR;
-	var_assign_var($2, $4);
 	if (parentscript) {
 		$$->cmd_tgt1 = $2;
 		parser_vars($$);
@@ -1479,6 +1523,12 @@ fscheck_attr_op: fscheck_attr_name FSK_ASSIGN FSV_STRING
 	$$->attr_avd = avd_str_alloc($3);
 	$$->attr_name = $1;
 };
+
+binary_op:
+   FSK_PLUS {$$ = FSK_PLUS;}
+ | FSK_MINUS {$$ = FSK_MINUS;}
+ | FSK_MULTIPLY {$$ = FSK_MULTIPLY;}
+ | FSK_DIVIDE {$$ = FSK_DIVIDE;};
 
 files_attr_name: attrs_define_file
 |attrs_define_fileset;
@@ -3236,9 +3286,9 @@ parser_vars(cmd_t *cmd)
  * variable, or the appropriate field of a random variable
  */
 static void
-parser_set_integer(char *name, fbint_t integer)
+parser_set_integer(cmd_t *cmd)
 {
-	var_assign_integer(name, integer);
+	var_assign_integer(cmd->cmd_tgt1, cmd->cmd_qty);
 }
 
 /*
@@ -3247,9 +3297,100 @@ parser_set_integer(char *name, fbint_t integer)
  * random variable from another variable
  */
 static void
-parser_set_var(char *dst_name, char *src_name)
+parser_set_var(cmd_t *cmd)
 {
-	var_assign_var(dst_name, src_name);
+	var_assign_var(cmd->cmd_tgt1, cmd->cmd_tgt2);
+}
+
+/*
+ * Used by the set command to set up for a binary operation of a
+ * variable from a var, with an integer
+ */
+static void
+parser_set_var_op_int(cmd_t *cmd)
+{
+	printf("parser_set_var_op_int: Called\n");
+	switch (cmd->cmd_subtype) {
+	case FSK_PLUS:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_INT_SUM_IV,
+		    cmd->cmd_tgt2, cmd->cmd_qty);
+		break;
+
+	case FSK_MINUS:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_IV_DIF_INT,
+		    cmd->cmd_tgt2, cmd->cmd_qty);
+		break;
+
+	case FSK_MULTIPLY:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_INT_MUL_IV,
+		    cmd->cmd_tgt2, cmd->cmd_qty);
+		break;
+
+	case FSK_DIVIDE:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_IV_DIV_INT,
+		    cmd->cmd_tgt2, cmd->cmd_qty);
+		break;
+	}
+}
+
+/*
+ * Used by the set command to set up for a binary operation of an
+ * integer with a variable from a var
+ */
+static void
+parser_set_int_op_var(cmd_t *cmd)
+{
+	switch (cmd->cmd_subtype) {
+	case FSK_PLUS:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_INT_SUM_IV,
+		    cmd->cmd_tgt3, cmd->cmd_qty);
+		break;
+
+	case FSK_MINUS:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_INT_DIF_IV,
+		    cmd->cmd_tgt3, cmd->cmd_qty);
+		break;
+
+	case FSK_MULTIPLY:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_INT_MUL_IV,
+		    cmd->cmd_tgt3, cmd->cmd_qty);
+		break;
+
+	case FSK_DIVIDE:
+		var_assign_op_var_int(cmd->cmd_tgt1, VAR_IND_INT_DIV_IV,
+		    cmd->cmd_tgt3, cmd->cmd_qty);
+		break;
+	}
+}
+
+/*
+ * Used by the set command to set up for a binary operation of two
+ * variables from other vars.
+ */
+static void
+parser_set_var_op_var(cmd_t *cmd)
+{
+	switch (cmd->cmd_subtype) {
+	case FSK_PLUS:
+		var_assign_op_var_var(cmd->cmd_tgt1, VAR_IND_IV_SUM_IV,
+		    cmd->cmd_tgt2, cmd->cmd_tgt3);
+		break;
+
+	case FSK_MINUS:
+		var_assign_op_var_var(cmd->cmd_tgt1, VAR_IND_IV_DIF_IV,
+		    cmd->cmd_tgt2, cmd->cmd_tgt3);
+		break;
+
+	case FSK_MULTIPLY:
+		var_assign_op_var_var(cmd->cmd_tgt1, VAR_IND_IV_MUL_IV,
+		    cmd->cmd_tgt2, cmd->cmd_tgt3);
+		break;
+
+	case FSK_DIVIDE:
+		var_assign_op_var_var(cmd->cmd_tgt1, VAR_IND_IV_DIV_IV,
+		    cmd->cmd_tgt2, cmd->cmd_tgt3);
+		break;
+	}
 }
 
 

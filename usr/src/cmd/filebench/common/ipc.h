@@ -152,6 +152,7 @@ typedef struct filebench_shm {
 	/*
 	 * Event generator state
 	 */
+	int		shm_eventgen_enabled; /* event gen in operation */
 	avd_t		shm_eventgen_hz;   /* number of events per sec. */
 	uint64_t	shm_eventgen_q;    /* count of unclaimed events */
 	pthread_mutex_t	shm_eventgen_lock; /* lock protecting count */

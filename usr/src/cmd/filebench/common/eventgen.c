@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2008 Denis Cheng
@@ -79,6 +79,7 @@ eventgen_thread(void)
 	hrtime_t last;
 
 	last = gethrtime();
+	filebench_shm->shm_eventgen_enabled = FALSE;
 
 	/* CONSTCOND */
 	while (1) {
@@ -91,6 +92,11 @@ eventgen_thread(void)
 			continue;
 		} else {
 			rate = avd_get_int(filebench_shm->shm_eventgen_hz);
+			if (rate > 0) {
+				filebench_shm->shm_eventgen_enabled = TRUE;
+			} else {
+				continue;
+			}
 		}
 
 		/* Sleep for 10xperiod */

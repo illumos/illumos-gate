@@ -19,25 +19,27 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-# $iosize - iosize for database block access
 # $dir - directory for datafiles
+# $eventrate - event generator rate (0 == free run)
+# $iosize - iosize for database block access
 # $nshadows - number of shadow processes
 # $ndbwriters - number of database writers
 
 set $dir=/tmp
-set $runtime=30
+set $eventrate=0
 set $iosize=2k
 set $nshadows=200
 set $ndbwriters=10
+set $runtime=30
 set $usermode=20000
 set $memperthread=1m
 
 debug 1
+eventgen rate=$eventrate
 
 # Define a datafile and logfile
 define file name=aux.df,path=$dir,size=251m,reuse,prealloc,paralloc
@@ -251,8 +253,10 @@ define process name=shadow,instances=$nshadows
   }
 }
 
-echo "Tpcso Version 2.0 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo "Tpcso Version 2.1 personality successfully loaded"
+usage "Usage: set \$dir=<dir>         defaults to $dir"
+usage " "
+usage "       set \$eventrate=<value> defaults to $eventrate"
 usage " "
 usage "       set \$iosize=<value>    defaults to $iosize, typically 2k or 8k"
 usage " "

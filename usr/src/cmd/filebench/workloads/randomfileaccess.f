@@ -18,17 +18,17 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# 
+# Exercises the indexed attribute of the fileset_pick() function. 
 # 
 
 set $dir=/tmp
 set $cached=false
 set $meandirwidth=20
 set $nthreads=5
-set $nfiles=100000
+set $nfiles=10000
 set $sync=false
 
 define randvar name=$wrtiosize, min=512, round=512, type=gamma, mean=16k
@@ -53,7 +53,7 @@ define randvar name=$filesize, type=tabular, min=1k, randtable =
 
 define randvar name=$fileidx, type=gamma, min=0, gamma=100
 
-define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=60,cached=$cached
+define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=100,cached=$cached
 
 define process name=netclient,instances=1
 {
@@ -67,16 +67,11 @@ define process name=netclient,instances=1
     flowop readwholefile name=readfile1,iosize=$rdiosize,fd=2
     flowop readwholefile name=readfile2,iosize=$rdiosize,fd=3
     flowop closefile name=closefile2,fd=2
-    flowop createfile name=newfile1,filesetname=bigfileset,indexed=$fileidx,fd=1
-    flowop writewholefile name=writefile1,iosize=$wrtiosize,srcfd=1,fd=1
     flowop closefile name=closefile3,fd=3
-    flowop deletefile name=deletefile1,filesetname=bigfileset,fd=2
-    flowop statfile name=statfile1,filesetname=bigfileset,fd=1
-    flowop closefile name=closefile4,fd=1
   }
 }
 
-echo  "NetworkServer Version 1.0 personality successfully loaded"
+echo  "NetworkServer Version 1.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>            defaults to $dir"
 usage "       set \$cached=<bool>        defaults to $cached"
 usage "       set \$wrtiosize.type=<type>   defaults to $wrtiosize.type"

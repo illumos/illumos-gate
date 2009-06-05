@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2008 Denis Cheng
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,6 +39,9 @@
 #include "fb_random.h"
 
 static var_t *var_find_dynamic(char *name);
+static boolean_t var_get_bool(var_t *var);
+static fbint_t var_get_int(var_t *var);
+static double var_get_dbl(var_t *var);
 
 /*
  * The filebench variables system has attribute value descriptors (avd_t)
@@ -152,7 +153,6 @@ var_get_type_string(var_t *ivp)
 fbint_t
 avd_get_int(avd_t avd)
 {
-	var_t *ivp;
 	randdist_t *rndp;
 
 	if (avd == NULL)
@@ -169,21 +169,7 @@ avd_get_int(avd_t avd)
 			return (0);
 
 	case AVD_IND_VAR:
-		if ((ivp = avd->avd_val.varptr) == NULL)
-			return (0);
-
-		if (VAR_HAS_INTEGER(ivp))
-			return (ivp->var_val.integer);
-
-		if (VAR_HAS_RANDDIST(ivp)) {
-			if ((rndp = ivp->var_val.randptr) != NULL)
-				return ((fbint_t)rndp->rnd_get(rndp));
-		}
-
-		filebench_log(LOG_ERROR,
-		    "Attempt to get integer from %s var $%s",
-		    var_get_type_string(ivp), ivp->var_name);
-		return (0);
+		return (var_get_int(avd->avd_val.varptr));
 
 	case AVD_IND_RANDVAR:
 		if ((rndp = avd->avd_val.randptr) == NULL)
@@ -207,7 +193,6 @@ avd_get_int(avd_t avd)
 double
 avd_get_dbl(avd_t avd)
 {
-	var_t *ivp;
 	randdist_t *rndp;
 
 	if (avd == NULL)
@@ -233,22 +218,7 @@ avd_get_dbl(avd_t avd)
 			return (0.0);
 
 	case AVD_IND_VAR:
-		ivp = avd->avd_val.varptr;
-
-		if (ivp && VAR_HAS_INTEGER(ivp))
-			return ((double)ivp->var_val.integer);
-
-		if (ivp && VAR_HAS_DOUBLE(ivp))
-			return (ivp->var_val.dbl_flt);
-
-		if (ivp && VAR_HAS_RANDDIST(ivp)) {
-			if ((rndp = ivp->var_val.randptr) != NULL)
-				return (rndp->rnd_get(rndp));
-		}
-		filebench_log(LOG_ERROR,
-		    "Attempt to get double float from %s var $%s",
-		    var_get_type_string(ivp), ivp->var_name);
-		return (0.0);
+		return (var_get_dbl(avd->avd_val.varptr));
 
 	case AVD_IND_RANDVAR:
 		if ((rndp = avd->avd_val.randptr) == NULL) {
@@ -270,8 +240,6 @@ avd_get_dbl(avd_t avd)
 boolean_t
 avd_get_bool(avd_t avd)
 {
-	var_t *ivp;
-
 	if (avd == NULL)
 		return (0);
 
@@ -300,23 +268,7 @@ avd_get_bool(avd_t avd)
 		return (FALSE);
 
 	case AVD_IND_VAR:
-		if ((ivp = avd->avd_val.varptr) == NULL)
-			return (0);
-
-		if (VAR_HAS_BOOLEAN(ivp))
-			return (ivp->var_val.boolean);
-
-		if (VAR_HAS_INTEGER(ivp)) {
-			if (ivp->var_val.boolean)
-				return (TRUE);
-			else
-				return (FALSE);
-		}
-
-		filebench_log(LOG_ERROR,
-		    "Attempt to get boolean from %s var $%s",
-		    var_get_type_string(ivp), ivp->var_name);
-		return (FALSE);
+		return (var_get_bool(avd->avd_val.varptr));
 
 	default:
 		filebench_log(LOG_ERROR,
@@ -465,7 +417,11 @@ avd_alloc_var_ptr(var_t *var)
 
 	case VAR_TYPE_INDVAR_SET:
 		avd->avd_type = AVD_IND_VAR;
-		avd->avd_val.varptr = var->var_val.varptr;
+		if ((var->var_type & VAR_INDVAR_MASK) == VAR_IND_ASSIGN)
+			avd->avd_val.varptr = var->var_varptr1;
+		else
+			avd->avd_val.varptr = var;
+
 		break;
 
 	default:
@@ -666,6 +622,29 @@ var_find_list(char *name, var_t *var_list)
 }
 
 /*
+ * Searches for the named var and returns it if found. If not
+ * found it allocates a new variable
+ */
+static var_t *
+var_find_alloc(char *name)
+{
+	var_t *var;
+
+	if (name == NULL) {
+		filebench_log(LOG_ERROR,
+		    "var_find_alloc: Var name not supplied");
+		return (NULL);
+	}
+
+	name += 1;
+
+	if ((var = var_find(name)) == NULL) {
+			var = var_alloc(name);
+	}
+	return (var);
+}
+
+/*
  * Searches for the named var, and, if found, sets its
  * var_val.boolean's value to that of the supplied boolean.
  * If not found, the routine allocates a new var and sets
@@ -678,19 +657,7 @@ var_assign_boolean(char *name, boolean_t bool)
 {
 	var_t *var;
 
-	if (name == NULL) {
-		filebench_log(LOG_ERROR,
-		    "var_assign_boolean: Name not supplied");
-		return (0);
-	}
-
-	name += 1;
-
-	if ((var = var_find(name)) == NULL) {
-			var = var_alloc(name);
-	}
-
-	if (var == NULL) {
+	if ((var = var_find_alloc(name)) == NULL) {
 		filebench_log(LOG_ERROR, "Cannot assign variable %s",
 		    name);
 		return (-1);
@@ -723,19 +690,7 @@ var_assign_integer(char *name, fbint_t integer)
 {
 	var_t *var;
 
-	if (name == NULL) {
-		filebench_log(LOG_ERROR,
-		    "var_assign_integer: Name not supplied");
-		return (0);
-	}
-
-	name += 1;
-
-	if ((var = var_find(name)) == NULL) {
-			var = var_alloc(name);
-	}
-
-	if (var == NULL) {
+	if ((var = var_find_alloc(name)) == NULL) {
 		filebench_log(LOG_ERROR, "Cannot assign variable %s",
 		    name);
 		return (-1);
@@ -753,6 +708,201 @@ var_assign_integer(char *name, fbint_t integer)
 	    name, (u_longlong_t)integer);
 
 	return (0);
+}
+
+/*
+ * Add, subtract, multiply or divide two integers based on optype
+ * passed from caller.
+ */
+static fbint_t
+var_binary_integer_op(var_t *var)
+{
+	fbint_t result;
+	fbint_t src1, src2;
+
+	if (var == NULL)
+		return (0);
+
+	switch (var->var_type & VAR_INDBINOP_MASK) {
+	case VAR_IND_BINOP_INT:
+		src2 = var->var_val.integer;
+		break;
+
+	case VAR_IND_BINOP_DBL:
+		src2 = (fbint_t)var->var_val.dbl_flt;
+		break;
+
+	case VAR_IND_BINOP_VAR:
+		if (var->var_val.varptr2 != NULL)
+			src2 = var_get_int(var->var_val.varptr2);
+		else
+			src2 = 0;
+		break;
+	}
+
+	if (var->var_varptr1 != NULL)
+		src1 = var_get_int(var->var_varptr1);
+	else
+		src1 = 0;
+
+	switch (var->var_type & VAR_INDVAR_MASK) {
+	case VAR_IND_VAR_SUM_VC:
+		result = src1 + src2;
+		break;
+
+	case VAR_IND_VAR_DIF_VC:
+		result = src1 - src2;
+		break;
+
+	case VAR_IND_C_DIF_VAR:
+		result = src2 - src1;
+		break;
+
+	case VAR_IND_VAR_MUL_VC:
+		result = src1 * src2;
+		break;
+
+	case VAR_IND_VAR_DIV_VC:
+		result = src1 / src2;
+		break;
+
+	case VAR_IND_C_DIV_VAR:
+		result = src2 / src1;
+		break;
+
+	default:
+		filebench_log(LOG_DEBUG_IMPL,
+		    "var_binary_integer_op: Called with unknown IND_TYPE");
+		result = 0;
+		break;
+	}
+	return (result);
+}
+
+/*
+ * Add, subtract, multiply or divide two double precision floating point
+ * numbers based on optype passed from caller.
+ */
+static double
+var_binary_dbl_flt_op(var_t *var)
+{
+	double result;
+	double src1, src2;
+
+	if (var == NULL)
+		return (0.0);
+
+	switch (var->var_type & VAR_INDBINOP_MASK) {
+	case VAR_IND_BINOP_INT:
+		src2 = (double)var->var_val.integer;
+		break;
+
+	case VAR_IND_BINOP_DBL:
+		src2 = var->var_val.dbl_flt;
+		break;
+
+	case VAR_IND_BINOP_VAR:
+		if (var->var_val.varptr2 != NULL)
+			src2 = var_get_dbl(var->var_val.varptr2);
+		else
+			src2 = 0;
+		break;
+	}
+
+	if (var->var_varptr1 != NULL)
+		src1 = var_get_dbl(var->var_varptr1);
+	else
+		src1 = 0;
+
+	switch (var->var_type & VAR_INDVAR_MASK) {
+	case VAR_IND_VAR_SUM_VC:
+		result = src1 + src2;
+		break;
+
+	case VAR_IND_VAR_DIF_VC:
+		result = src1 - src2;
+		break;
+
+	case VAR_IND_C_DIF_VAR:
+		result = src2 - src1;
+		break;
+
+	case VAR_IND_VAR_MUL_VC:
+		result = src1 * src2;
+		break;
+
+	case VAR_IND_C_DIV_VAR:
+		result = src2 / src1;
+		break;
+
+	case VAR_IND_VAR_DIV_VC:
+		result = src1 / src2;
+		break;
+
+	default:
+		filebench_log(LOG_DEBUG_IMPL,
+		    "var_binary_dbl_flt_op: Called with unknown IND_TYPE");
+		result = 0;
+		break;
+	}
+	return (result);
+}
+
+/*
+ * Perform a binary operation on a variable and an integer
+ */
+int
+var_assign_op_var_int(char *name, int optype, char *src1, fbint_t src2)
+{
+	var_t *var;
+	var_t *var_src1;
+
+	if ((var_src1 = var_find(src1+1)) == NULL)
+		return (FILEBENCH_ERROR);
+
+	if ((var = var_find_alloc(name)) == NULL)
+		return (FILEBENCH_ERROR);
+
+	if ((var->var_type & VAR_TYPE_MASK) == VAR_TYPE_RANDOM) {
+		filebench_log(LOG_ERROR,
+		    "Cannot assign integer to random variable %s", name);
+		return (FILEBENCH_ERROR);
+	}
+
+	VAR_SET_BINOP_INDVAR(var, var_src1, optype);
+
+	var->var_val.integer = src2;
+
+	return (FILEBENCH_OK);
+}
+
+int
+var_assign_op_var_var(char *name, int optype, char *src1, char *src2)
+{
+	var_t *var;
+	var_t *var_src1;
+	var_t *var_src2;
+
+	if ((var_src1 = var_find(src1+1)) == NULL)
+		return (FILEBENCH_ERROR);
+
+	if ((var_src2 = var_find(src2+1)) == NULL)
+		return (FILEBENCH_ERROR);
+
+	if ((var = var_find_alloc(name)) == NULL)
+		return (FILEBENCH_ERROR);
+
+	if ((var->var_type & VAR_TYPE_MASK) == VAR_TYPE_RANDOM) {
+		filebench_log(LOG_ERROR,
+		    "Cannot assign integer to random variable %s", name);
+		return (FILEBENCH_ERROR);
+	}
+
+	VAR_SET_BINOP_INDVAR(var, var_src1, optype);
+
+	var->var_val.varptr2 = var_src2;
+
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -853,27 +1003,12 @@ var_ref_attr(char *name)
 	return (avd_alloc_var_ptr(var));
 }
 
-
 /*
- * Searches for the named var, and if found copies the var_val.string,
- * if it exists, a decimal number string representation of
- * var_val.integer, the state of var_val.boolean, or the type of random
- * distribution employed, into a malloc'd bit of memory using fb_stralloc().
- * Returns a pointer to the created string, or NULL on failure.
+ * Converts the contents of a var to a string
  */
-char *
-var_to_string(char *name)
+static char *
+var_get_string(var_t *var)
 {
-	var_t *var;
-	char tmp[128];
-
-	name += 1;
-
-	if ((var = var_find(name)) == NULL)
-		var = var_find_dynamic(name);
-
-	if (var == NULL)
-		return (NULL);
 
 	if ((var->var_type & VAR_TYPE_MASK) == VAR_TYPE_RANDOM) {
 		switch (var->var_val.randptr->rnd_type & RAND_TYPE_MASK) {
@@ -899,12 +1034,139 @@ var_to_string(char *name)
 	}
 
 	if (VAR_HAS_INTEGER(var)) {
+		char tmp[128];
+
 		(void) snprintf(tmp, sizeof (tmp), "%llu",
 		    (u_longlong_t)var->var_val.integer);
 		return (fb_stralloc(tmp));
 	}
 
+	if (VAR_HAS_INDVAR(var)) {
+		var_t *ivp;
+
+		if ((ivp = var->var_varptr1) != NULL) {
+			return (var_get_string(ivp));
+		}
+	}
+
+	if (VAR_HAS_BINOP(var)) {
+		char tmp[128];
+
+		(void) snprintf(tmp, sizeof (tmp), "%llu",
+		    var_binary_integer_op(var));
+		return (fb_stralloc(tmp));
+	}
+
 	return (fb_stralloc("No default"));
+}
+
+/*
+ * Searches for the named var, and if found copies the var_val.string,
+ * if it exists, a decimal number string representation of
+ * var_val.integer, the state of var_val.boolean, or the type of random
+ * distribution employed, into a malloc'd bit of memory using fb_stralloc().
+ * Returns a pointer to the created string, or NULL on failure.
+ */
+char *
+var_to_string(char *name)
+{
+	var_t *var;
+
+	name += 1;
+
+	if ((var = var_find(name)) == NULL)
+		var = var_find_dynamic(name);
+
+	if (var == NULL)
+		return (NULL);
+
+	return (var_get_string(var));
+}
+
+/*
+ * Returns the boolean from the supplied var_t "var".
+ */
+static boolean_t
+var_get_bool(var_t *var)
+{
+	if (var == NULL)
+		return (0);
+
+	if (VAR_HAS_BOOLEAN(var))
+		return (var->var_val.boolean);
+
+	if (VAR_HAS_INTEGER(var)) {
+		if (var->var_val.integer == 0)
+			return (FALSE);
+		else
+			return (TRUE);
+	}
+
+	filebench_log(LOG_ERROR,
+	    "Attempt to get boolean from %s var $%s",
+	    var_get_type_string(var), var->var_name);
+	return (FALSE);
+}
+
+/*
+ * Returns the fbint_t from the supplied var_t "var".
+ */
+static fbint_t
+var_get_int(var_t *var)
+{
+	randdist_t *rndp;
+
+	if (var == NULL)
+		return (0);
+
+	if (VAR_HAS_INTEGER(var))
+		return (var->var_val.integer);
+
+	if (VAR_HAS_RANDDIST(var)) {
+		if ((rndp = var->var_val.randptr) != NULL)
+			return ((fbint_t)rndp->rnd_get(rndp));
+	}
+
+	if (VAR_HAS_BINOP(var))
+		return (var_binary_integer_op(var));
+
+	filebench_log(LOG_ERROR,
+	    "Attempt to get integer from %s var $%s",
+	    var_get_type_string(var), var->var_name);
+	return (0);
+}
+
+/*
+ * Returns the floating point value of a variable pointed to by the
+ * supplied var_t "var". Intended to get the actual (double) value
+ * supplied by the random variable.
+ */
+static double
+var_get_dbl(var_t *var)
+{
+	randdist_t *rndp;
+
+	if (var == NULL)
+		return (0.0);
+
+	if (VAR_HAS_INTEGER(var))
+		return ((double)var->var_val.integer);
+
+	if (VAR_HAS_DOUBLE(var))
+		return (var->var_val.dbl_flt);
+
+	if (VAR_HAS_RANDDIST(var)) {
+		if ((rndp = var->var_val.randptr) != NULL)
+			return (rndp->rnd_get(rndp));
+	}
+
+	if (VAR_HAS_BINOP(var))
+		return (var_binary_dbl_flt_op(var));
+
+	filebench_log(LOG_ERROR,
+	    "Attempt to get double float from %s var $%s",
+	    var_get_type_string(var), var->var_name);
+	return (0.0);
 }
 
 /*
@@ -922,13 +1184,13 @@ var_to_boolean(char *name)
 	if ((var = var_find(name)) == NULL)
 		var = var_find_dynamic(name);
 
-	if ((var != NULL) && VAR_HAS_BOOLEAN(var))
-		return (var->var_val.boolean);
+	if (var != NULL)
+		return (var_get_bool(var));
 
 	filebench_log(LOG_ERROR,
 	    "Variable %s referenced before set", name);
 
-	return (0);
+	return (FALSE);
 }
 
 /*
@@ -946,13 +1208,37 @@ var_to_integer(char *name)
 	if ((var = var_find(name)) == NULL)
 		var = var_find_dynamic(name);
 
-	if ((var != NULL) && VAR_HAS_INTEGER(var))
-		return (var->var_val.integer);
+	if (var != NULL)
+		return (var_get_int(var));
 
 	filebench_log(LOG_ERROR,
 	    "Variable %s referenced before set", name);
 
 	return (0);
+}
+
+/*
+ * Searches for the named var, and if found returns the value,
+ * of var_val.dbl_flt. If the var is not found, or the
+ * floating value has not been set, logs an error and returns 0.0.
+ */
+double
+var_to_double(char *name)
+{
+	var_t *var;
+
+	name += 1;
+
+	if ((var = var_find(name)) == NULL)
+		var = var_find_dynamic(name);
+
+	if (var != NULL)
+		return (var_get_dbl(var));
+
+	filebench_log(LOG_ERROR,
+	    "Variable %s referenced before set", name);
+
+	return (0.0);
 }
 
 /*
@@ -1074,7 +1360,7 @@ var_copy(var_t *dst_var, var_t *src_var) {
 	}
 
 	if (VAR_HAS_INDVAR(src_var)) {
-		VAR_SET_INDVAR(dst_var, src_var->var_val.varptr);
+		VAR_SET_INDVAR(dst_var, src_var->var_varptr1);
 		filebench_log(LOG_DEBUG_SCRIPT,
 		    "Assign var %s to var %s", dst_var->var_name,
 		    src_var->var_name);
@@ -1586,7 +1872,7 @@ var_update_comp_lvars(var_t *newlvar, var_t *proto_comp_vars,
 	if (VAR_HAS_INDVAR(proto_lvar)) {
 		var_t *uplvp;
 
-		uplvp = (var_t *)proto_lvar->var_val.varptr;
+		uplvp = (var_t *)proto_lvar->var_varptr1;
 
 		/* search for more current uplvar on comp master list */
 		if (mstr_lvars) {
@@ -1596,6 +1882,6 @@ var_update_comp_lvars(var_t *newlvar, var_t *proto_comp_vars,
 		}
 
 		if (VAR_HAS_INDVAR(uplvp))
-			VAR_SET_INDVAR(newlvar, uplvp->var_val.varptr);
+			VAR_SET_INDVAR(newlvar, uplvp->var_varptr1);
 	}
 }

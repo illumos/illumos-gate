@@ -19,17 +19,19 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-
-# $iosize - iosize for database block access
 # $dir - directory for datafiles
+# $eventrate - event generator rate (0 == free run)
+# $iosize - iosize for database block access
 # $nshadows - number of shadow processes
 # $ndbwriters - number of database writers
-#
+# $nfiles - number of data files
+# $nlogfiles - number of log files
+
 set $dir=/tmp
+set $eventrate=0
 set $runtime=30
 set $iosize=2k
 set $nshadows=200
@@ -43,6 +45,8 @@ set $logfilesize=10m
 set $nfiles=10
 set $nlogfiles=1
 set $directio=0
+
+eventgen rate = $eventrate
 
 # Define a datafile and logfile
 define fileset name=datafiles,path=$dir,size=$filesize,filesizegamma=0,entries=$nfiles,dirwidth=1024,prealloc=100,cached=$cached,reuse
@@ -86,8 +90,10 @@ define process name=shadow,instances=$nshadows
   }
 }
 
-echo "OLTP Version 2.2 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo "OLTP Version 2.3 personality successfully loaded"
+usage "Usage: set \$dir=<dir>         defaults to $dir"
+usage " "
+usage "       set \$eventrate=<value> defaults to $eventrate"
 usage " "
 usage "       set \$filesize=<size>   defaults to $filesize, n.b. there are ten files of this size"
 usage " "

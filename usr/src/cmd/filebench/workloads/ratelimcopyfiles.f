@@ -19,29 +19,37 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # RateLimCopyFiles.f uses the iopslimit flowop with the target attribute
 # set to the writewholefile flowop to limit the rate to one writewholefile
 # operation per event. Without the target attribute set, the limit will
 # be one writewholefile OR readwholefile operation per event, so in effect
 # it will run at half the rate. Without the target attribute, this workload
-# is identical to copyfiles.f. Note that you do have to enable the event
-# generator for any of the rate limiting flowops to take effect, for example
-# by typing:
-#     eventget rate=10
-# at the go_filebench prompt to get ten events per second.
+# is identical to copyfiles.f. Set the event generator rate by setting
+# the $eventrate variable, for instance by typing:
+#     set $eventrate=20
+# at the go_filebench prompt to get twenty events per second.
 #
+
+# $dir - directory for datafiles
+# $eventrate - event generator rate (0 == free run)
+# $filesize - size of data file
+# $iosize - size of each I/O request
+# $nfiles - number of files in the fileset
+# $nthreads - number of worker threads
+
 set $dir=/tmp
+set $eventrate=10
 set $dirwidth=20
 set $filesize=16k
 set $iosize=1m
 set $nfiles=1000
 set $nthreads=1
 
+eventgen rate=$eventrate
 set mode quit firstdone
 
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc=100
@@ -61,8 +69,9 @@ define process name=filereader,instances=1
   }
 }
 
-echo  "RateLimCopyFiles Version 1.0 personality successfully loaded"
-usage "Usage: set \$dir=<dir>"
+echo  "RateLimCopyFiles Version 1.1 personality successfully loaded"
+usage "Usage: set \$dir=<dir>         defaults to $dir"
+usage "       set \$eventrate=<value> defaults to $eventrate"
 usage "       set \$filesize=<size>   defaults to $filesize"
 usage "       set \$nfiles=<value>    defaults to $nfiles"
 usage "       set \$iosize=<size>     defaults to $iosize"
