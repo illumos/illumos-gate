@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <errno.h>
@@ -40,7 +38,7 @@ common_digest_init(CK_SESSION_HANDLE hSession,
 {
 	CK_RV rv;
 	kernel_session_t *session_p;
-	boolean_t ses_lock_held = B_TRUE;
+	boolean_t ses_lock_held = B_FALSE;
 	crypto_digest_init_t digest_init;
 	crypto_mech_type_t k_mech_type;
 	int r;
@@ -68,6 +66,7 @@ common_digest_init(CK_SESSION_HANDLE hSession,
 
 	/* Acquire the session lock */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 
 	/*
 	 * This active flag will remain ON until application calls either
@@ -88,6 +87,7 @@ common_digest_init(CK_SESSION_HANDLE hSession,
 
 	digest_init.di_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
+	ses_lock_held = B_FALSE;
 	digest_init.di_mech.cm_type = k_mech_type;
 	digest_init.di_mech.cm_param = pMechanism->pParameter;
 
@@ -112,6 +112,7 @@ common_digest_init(CK_SESSION_HANDLE hSession,
 
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
+		ses_lock_held = B_TRUE;
 		session_p->digest.flags &= ~CRYPTO_OPERATION_ACTIVE;
 		/*
 		 * Decrement the session reference count.
@@ -126,7 +127,6 @@ common_digest_init(CK_SESSION_HANDLE hSession,
 	 * Decrement the session reference count.
 	 * We do not hold the session lock.
 	 */
-	ses_lock_held = B_FALSE;
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
 }
@@ -143,7 +143,7 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 {
 	CK_RV rv;
 	kernel_session_t *session_p;
-	boolean_t ses_lock_held = B_TRUE;
+	boolean_t ses_lock_held = B_FALSE;
 	crypto_digest_t digest;
 	int r;
 
@@ -165,6 +165,7 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 
 	/* Acquire the session lock */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 
 	/* Application must call C_DigestInit before calling C_Digest */
 	if (!(session_p->digest.flags & CRYPTO_OPERATION_ACTIVE)) {
@@ -201,14 +202,17 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		CK_MECHANISM_PTR pMechanism;
 
 		opp = &(session_p->digest);
-		if (opp->context == NULL)
+		if (opp->context == NULL) {
+			REFRELE(session_p, ses_lock_held);
 			return (CKR_ARGUMENTS_BAD);
+		}
 		pMechanism = &(opp->mech);
 
 		if ((ulDataLen < SLOT_THRESHOLD(session_p)) ||
 		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
 			session_p->digest.flags |= CRYPTO_EMULATE_USING_SW;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 
 			rv = do_soft_digest(get_spp(opp), pMechanism,
 			    pData, ulDataLen, pDigest, pulDigestLen,
@@ -218,15 +222,19 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		    CRYPTO_EMULATE_INIT_DONE)) {
 			session_p->digest.flags |= CRYPTO_EMULATE_INIT_DONE;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
+
 			rv = common_digest_init(hSession, pMechanism, B_FALSE);
 			if (rv != CKR_OK)
 				goto clean_exit;
 			(void) pthread_mutex_lock(&session_p->session_mutex);
+			ses_lock_held = B_TRUE;
 		}
 	}
 
 	digest.cd_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
+	ses_lock_held = B_FALSE;
 	digest.cd_datalen =  ulDataLen;
 	digest.cd_databuf = (char *)pData;
 	digest.cd_digestbuf = (char *)pDigest;
@@ -257,7 +265,6 @@ done:
 		 * Decrement the session reference count.
 		 * We do not hold the session lock.
 		 */
-		ses_lock_held = B_FALSE;
 		REFRELE(session_p, ses_lock_held);
 		return (rv);
 	}
@@ -269,6 +276,7 @@ clean_exit:
 	 * digest operation.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 
 	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
@@ -290,7 +298,7 @@ C_DigestUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 
 	CK_RV rv;
 	kernel_session_t *session_p;
-	boolean_t ses_lock_held = B_TRUE;
+	boolean_t ses_lock_held = B_FALSE;
 	crypto_digest_update_t digest_update;
 	int r;
 
@@ -312,6 +320,7 @@ C_DigestUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 
 	/* Acquire the session lock */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 
 	/*
 	 * Application must call C_DigestInit before calling
@@ -332,12 +341,14 @@ C_DigestUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 
 	if (session_p->digest.flags & CRYPTO_EMULATE) {
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		ses_lock_held = B_FALSE;
 		rv = emulate_update(session_p, pPart, ulPartLen, OP_DIGEST);
 		goto done;
 	}
 
 	digest_update.du_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
+	ses_lock_held = B_FALSE;
 	digest_update.du_datalen =  ulPartLen;
 	digest_update.du_databuf = (char *)pPart;
 
@@ -358,7 +369,6 @@ done:
 		 * Decrement the session reference count.
 		 * We do not hold the session lock.
 		 */
-		ses_lock_held = B_FALSE;
 		REFRELE(session_p, ses_lock_held);
 		return (CKR_OK);
 	}
@@ -369,6 +379,7 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
 
@@ -390,7 +401,7 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 	CK_RV		rv;
 	kernel_session_t	*session_p;
 	kernel_object_t	*key_p;
-	boolean_t ses_lock_held = B_TRUE;
+	boolean_t ses_lock_held = B_FALSE;
 	CK_BYTE_PTR	pPart;
 	CK_ULONG	ulPartLen;
 	crypto_digest_key_t digest_key;
@@ -412,6 +423,7 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 	HANDLE2OBJECT(hKey, key_p, rv);
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
+		ses_lock_held = B_TRUE;
 		REINIT_OPBUF(&session_p->digest);
 		session_p->digest.flags = 0;
 		REFRELE(session_p, ses_lock_held);
@@ -429,6 +441,8 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 	 * C_DigestKey.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
+
 	if (!(session_p->digest.flags & CRYPTO_OPERATION_ACTIVE)) {
 		/*
 		 * Decrement the session reference count.
@@ -452,6 +466,7 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 		digest_key.dk_session = session_p->k_session;
 	}
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
+	ses_lock_held = B_FALSE;
 
 	if (!key_p->is_lib_obj) {
 		if (session_p->digest.flags & CRYPTO_EMULATE) {
@@ -485,13 +500,16 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 		}
 
 		(void) pthread_mutex_lock(&session_p->session_mutex);
+		ses_lock_held = B_TRUE;
 		if (session_p->digest.flags & CRYPTO_EMULATE) {
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 			rv = emulate_update(session_p, pPart,
 			    ulPartLen, OP_DIGEST);
 			goto done;
 		}
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		ses_lock_held = B_FALSE;
 
 		digest_update.du_datalen = ulPartLen;
 		digest_update.du_databuf = (char *)pPart;
@@ -516,7 +534,6 @@ done:
 		 * We do not hold the session lock.
 		 */
 		OBJ_REFRELE(key_p);
-		ses_lock_held = B_FALSE;
 		REFRELE(session_p, ses_lock_held);
 		return (CKR_OK);
 	}
@@ -528,6 +545,7 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
 
@@ -548,7 +566,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 
 	CK_RV rv;
 	kernel_session_t *session_p;
-	boolean_t ses_lock_held = B_TRUE;
+	boolean_t ses_lock_held = B_FALSE;
 	crypto_digest_final_t digest_final;
 	int r;
 
@@ -570,6 +588,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 
 	/* Acquire the session lock */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 
 	/*
 	 * Application must call C_DigestInit before calling
@@ -589,6 +608,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 	if (session_p->digest.flags & CRYPTO_EMULATE_USING_SW) {
 		if (session_p->digest.flags & CRYPTO_EMULATE_UPDATE_DONE) {
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 			rv = do_soft_digest(get_spp(&session_p->digest),
 			    NULL, NULL, NULL, pDigest, pulDigestLen, OP_FINAL);
 		} else {
@@ -599,6 +619,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 			 */
 			digest_buf_t *bufp = session_p->digest.context;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 			if (bufp == NULL || bufp->buf == NULL) {
 				rv = CKR_ARGUMENTS_BAD;
 				goto clean_exit;
@@ -628,6 +649,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 
 	digest_final.df_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
+	ses_lock_held = B_FALSE;
 	digest_final.df_digestlen = *pulDigestLen;
 	digest_final.df_digestbuf = (char *)pDigest;
 
@@ -656,7 +678,6 @@ done:
 		 * Decrement the session reference count.
 		 * We do not hold the session lock.
 		 */
-		ses_lock_held = B_FALSE;
 		REFRELE(session_p, ses_lock_held);
 		return (rv);
 	}
@@ -664,6 +685,7 @@ done:
 clean_exit:
 	/* Terminates the active digest operation */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
 

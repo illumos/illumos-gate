@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <security/cryptoki.h>
@@ -226,6 +224,7 @@ C_Sign(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
 			session_p->sign.flags |= CRYPTO_EMULATE_USING_SW;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 
 			rv = do_soft_hmac_sign(get_spp(&session_p->sign),
 			    pData, ulDataLen,
@@ -278,10 +277,10 @@ clean_exit:
 	 * sign operation.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 
 	REINIT_OPBUF(&session_p->sign);
 	session_p->sign.flags = 0;
-	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);
@@ -328,6 +327,7 @@ C_SignUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 
 	if (session_p->sign.flags & CRYPTO_EMULATE) {
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		ses_lock_held = B_FALSE;
 		rv = emulate_update(session_p, pPart, ulPartLen, OP_SIGN);
 		goto done;
 	}
@@ -361,9 +361,9 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 	REINIT_OPBUF(&session_p->sign);
 	session_p->sign.flags = 0;
-	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);
@@ -410,6 +410,7 @@ C_SignFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 	if (session_p->sign.flags & CRYPTO_EMULATE_USING_SW) {
 		if (session_p->sign.flags & CRYPTO_EMULATE_UPDATE_DONE) {
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 			rv = do_soft_hmac_sign(get_spp(&session_p->sign),
 			    NULL, 0, pSignature, pulSignatureLen, OP_FINAL);
 		} else {
@@ -420,6 +421,7 @@ C_SignFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 			 */
 			digest_buf_t *bufp = session_p->sign.context;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 			if (bufp == NULL || bufp->buf == NULL) {
 				rv = CKR_ARGUMENTS_BAD;
 				goto clean_exit;
@@ -483,9 +485,9 @@ done:
 clean_exit:
 	/* Terminates the active sign operation */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 	REINIT_OPBUF(&session_p->sign);
 	session_p->sign.flags = 0;
-	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);
@@ -673,8 +675,8 @@ clean_exit:
 	 * sign operation.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
-	session_p->sign.flags = 0;
 	ses_lock_held = B_TRUE;
+	session_p->sign.flags = 0;
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);

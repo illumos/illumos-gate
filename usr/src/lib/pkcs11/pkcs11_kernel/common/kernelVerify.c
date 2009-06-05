@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <errno.h>
@@ -225,6 +223,7 @@ C_Verify(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
 			session_p->verify.flags |= CRYPTO_EMULATE_USING_SW;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 
 			rv = do_soft_hmac_verify(get_spp(&session_p->verify),
 			    pData, ulDataLen,
@@ -260,10 +259,10 @@ clean_exit:
 	 * verify operation.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 
 	REINIT_OPBUF(&session_p->verify);
 	session_p->verify.flags = 0;
-	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);
@@ -310,6 +309,7 @@ C_VerifyUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 
 	if (session_p->verify.flags & CRYPTO_EMULATE) {
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		ses_lock_held = B_FALSE;
 		rv = emulate_update(session_p, pPart, ulPartLen, OP_VERIFY);
 		goto done;
 	}
@@ -344,9 +344,9 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 	REINIT_OPBUF(&session_p->verify);
 	session_p->verify.flags = 0;
-	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);
@@ -388,6 +388,7 @@ C_VerifyFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 	if (session_p->verify.flags & CRYPTO_EMULATE_USING_SW) {
 		if (session_p->verify.flags & CRYPTO_EMULATE_UPDATE_DONE) {
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 			rv = do_soft_hmac_verify(get_spp(&session_p->verify),
 			    NULL, 0, pSignature, ulSignatureLen,
 			    OP_FINAL);
@@ -397,6 +398,8 @@ C_VerifyFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 			 * C_VerifyFinal() call took the C_Verify() path as
 			 * it never returns CKR_BUFFER_TOO_SMALL.
 			 */
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			ses_lock_held = B_FALSE;
 			rv = CKR_ARGUMENTS_BAD;
 		}
 		goto clean_exit;
@@ -438,9 +441,9 @@ C_VerifyFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 clean_exit:
 	/* Always terminate the active verify operation */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	ses_lock_held = B_TRUE;
 	REINIT_OPBUF(&session_p->verify);
 	session_p->verify.flags = 0;
-	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
 
 	return (rv);
