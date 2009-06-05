@@ -39,6 +39,7 @@ static HalDevice *devinfo_usb_if_add(HalDevice *d, di_node_t node, gchar *devfs_
 static HalDevice *devinfo_usb_scsa2usb_add(HalDevice *d, di_node_t node);
 static HalDevice *devinfo_usb_printer_add(HalDevice *usbd, di_node_t node);
 static HalDevice *devinfo_usb_input_add(HalDevice *usbd, di_node_t node);
+static HalDevice *devinfo_usb_video4linux_add(HalDevice *usbd, di_node_t node);
 const gchar *devinfo_printer_prnio_get_prober(HalDevice *d, int *timeout);
 const gchar *devinfo_keyboard_get_prober(HalDevice *d, int *timeout);
 static void set_usb_properties(HalDevice *d, di_node_t node, gchar *devfs_path, char *driver_name);
@@ -92,25 +93,26 @@ is_usb_node(di_node_t node)
 }
 
 static char *
-get_hid_devlink(char *devfs_path)
+get_usb_devlink(char *devfs_path, const char *dir_name)
 {
 	char *result = NULL;
 	DIR *dp;
 
-	if ((dp = opendir("/dev/usb")) != NULL) {
+	if ((dp = opendir(dir_name)) != NULL) {
 		struct dirent *ep;
 
 		while ((ep = readdir(dp)) != NULL) {
 			char path[MAXPATHLEN], lpath[MAXPATHLEN];
 
-			snprintf(path, sizeof (path), "/dev/usb/%s",
-			    ep->d_name);
+			strncpy(path, dir_name, strlen(dir_name));
+			strncat(path, ep->d_name, strlen(ep->d_name));
 			memset(lpath, 0, sizeof (lpath));
 			if ((readlink(path, lpath, sizeof (lpath)) > 0) &&
 			    (strstr(lpath, devfs_path) != NULL)) {
 				result = strdup(path);
 				break;
 			}
+			memset(path, 0, sizeof (path));
 		}
 		closedir(dp);
 	}
@@ -225,6 +227,11 @@ devinfo_usb_add(HalDevice *parent, di_node_t node, char *devfs_path, char *devic
 				di_devlink_fini(&hdl);
 			}
 			nd = devinfo_usb_input_add(d, node);
+		} else if (strcmp(driver_name, "usbvc") == 0) {
+			if (hdl = di_devlink_init(devfs_path, DI_MAKE_LINK)) {
+				di_devlink_fini(&hdl);
+			}
+			nd = devinfo_usb_video4linux_add(d, node);
 		}
 	}
 
@@ -321,7 +328,7 @@ parse_usb_if_descr(di_node_t node, int ifnum)
 			if (p == NULL)
 				goto out;
 			*p = '\0';
-			
+
 			if ((tmp_node = di_init (devpath, DINFOCPYALL)) == DI_NODE_NIL)
 				goto out;
 
@@ -448,15 +455,16 @@ get_dev_link_path(di_node_t node, char *nodetype, char *re, char **devlink, char
 		if (strcmp(di_minor_nodetype(minor), nodetype) == 0) {
 			*devlink = get_devlink(devlink_hdl, re, *minor_path);
 			/*
-			 * During hotplugging, devlink could be NULL for hid
+			 * During hotplugging, devlink could be NULL for usb
 			 * devices due to devlink database has not yet been
 			 * updated when hal try to read from it although the
 			 * actually dev link path has been created. In such a
 			 * situation, we will read the devlink name from
 			 * /dev/usb directory.
 			 */
-			if ((*devlink == NULL) && (strstr(re, "hid") != NULL)) {
-				*devlink = get_hid_devlink(*minor_path);
+			if ((*devlink == NULL) &&
+			    ((strstr(re, "hid") != NULL) || (strstr(re, "video") != NULL))) {
+				*devlink = get_usb_devlink(*minor_path, "/dev/usb/");
 			}
 
 			if (*devlink != NULL) {
@@ -469,6 +477,69 @@ get_dev_link_path(di_node_t node, char *nodetype, char *re, char **devlink, char
 		*minor_path = NULL;
 	}
 	di_devlink_fini (&devlink_hdl);
+}
+
+static HalDevice *
+devinfo_usb_video4linux_add(HalDevice *usbd, di_node_t node)
+{
+	HalDevice *d = NULL;
+	int	major;
+	di_minor_t minor;
+	dev_t	devt;
+	char	*devlink = NULL;
+	char	*dev_videolink = NULL;
+	char	*minor_path = NULL;
+	char	*minor_name = NULL;
+	char	udi[HAL_PATH_MAX];
+	char	*s;
+
+	get_dev_link_path(node, "usb_video",
+	    "^usb/video+",  &devlink, &minor_path, &minor_name);
+
+	if ((minor_path == NULL) || (devlink == NULL)) {
+
+		goto out;
+	}
+
+	HAL_DEBUG(("devlink %s, minor_name %s", devlink, minor_name));
+	if (strcmp(minor_name, "usbvc") != 0) {
+
+		goto out;
+	}
+
+	d = hal_device_new();
+
+	devinfo_set_default_properties(d, usbd, node, minor_path);
+	hal_device_property_set_string(d, "info.subsystem", "video4linux");
+	hal_device_property_set_string(d, "info.category", "video4linux");
+
+	hal_device_add_capability(d, "video4linux");
+
+	/* Get logic link under /dev (/dev/video+) */
+	dev_videolink = get_usb_devlink(strstr(devlink, "usb"), "/dev/");
+
+	hal_device_property_set_string(d, "video4linux.device", dev_videolink);
+
+	hal_util_compute_udi(hald_get_gdl(), udi, sizeof (udi),
+	    "%s_video4linux", hal_device_get_udi(usbd));
+
+	hal_device_set_udi(d, udi);
+	hal_device_property_set_string(d, "info.udi", udi);
+	PROP_STR(d, node, s, "usb-product-name", "info.product");
+
+	devinfo_add_enqueue(d, minor_path, &devinfo_usb_handler);
+
+
+out:
+	if (devlink) {
+		free(devlink);
+	}
+
+	if (minor_path) {
+		di_devfs_path_free(minor_path);
+	}
+
+	return (d);
 }
 
 static HalDevice *
@@ -497,7 +568,7 @@ devinfo_usb_input_add(HalDevice *usbd, di_node_t node)
 
 		goto out;
 	}
-	
+
 	d = hal_device_new();
 
 	devinfo_set_default_properties(d, usbd, node, minor_path);
@@ -520,7 +591,7 @@ devinfo_usb_input_add(HalDevice *usbd, di_node_t node)
 
 	hal_util_compute_udi(hald_get_gdl(), udi, sizeof (udi),
 	    "%s_logicaldev_input", hal_device_get_udi(usbd));
-	    
+
 	hal_device_set_udi(d, udi);
 	hal_device_property_set_string(d, "info.udi", udi);
 
