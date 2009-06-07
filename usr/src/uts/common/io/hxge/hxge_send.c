@@ -86,7 +86,7 @@ hxge_tx_ring_send(void *arg, mblk_t *mp)
 static int
 hxge_start(p_hxge_t hxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 {
-	int 			status = 0;
+	int 			dma_status, status = 0;
 	p_tx_desc_t 		tx_desc_ring_vp;
 	hpi_handle_t		hpi_desc_handle;
 	hxge_os_dma_handle_t 	tx_desc_dma_handle;
@@ -447,11 +447,11 @@ start_again:
 			}
 
 			dma_handle = tx_msg_p->dma_handle;
-			status = ddi_dma_addr_bind_handle(dma_handle, NULL,
+			dma_status = ddi_dma_addr_bind_handle(dma_handle, NULL,
 			    (caddr_t)b_rptr, len, dma_flags,
 			    DDI_DMA_DONTWAIT, NULL,
 			    &dma_cookie, &ncookies);
-			if (status == DDI_DMA_MAPPED) {
+			if (dma_status == DDI_DMA_MAPPED) {
 				dma_ioaddr = dma_cookie.dmac_laddress;
 				len = (int)dma_cookie.dmac_size;
 				clen = (uint32_t)dma_cookie.dmac_size;
@@ -525,6 +525,7 @@ start_again:
 				good_packet = B_FALSE;
 				tdc_stats->tx_dma_bind_fail++;
 				tx_msg_p->flags.dma_type = USE_NONE;
+				status = 1;
 				goto hxge_start_fail2;
 			}
 		} /* ddi dvma */
@@ -598,10 +599,6 @@ hxge_start_control_header_only:
 			    "==> hxge_start(14): pull msg - "
 			    "len %d pkt_len %d ngathers %d",
 			    len, pkt_len, ngathers));
-			/* Pull all message blocks from b_cont */
-			if ((msgpullup(mp, -1)) == NULL) {
-				goto hxge_start_fail2;
-			}
 			goto hxge_start_fail2;
 		}
 	} /* while (nmp) */

@@ -1134,7 +1134,7 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	rdc_stat_t		cs;
 	uint_t			serviced = DDI_INTR_UNCLAIMED;
 	p_rx_rcr_ring_t		ring;
-	mblk_t			*mp;
+	mblk_t			*mp = NULL;
 
 	if (ldvp == NULL) {
 		HXGE_DEBUG_MSG((NULL, RX_INT_CTL,
@@ -1167,6 +1167,11 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	channel = ldvp->vdma_index;
 	ring = hxgep->rx_rcr_rings->rcr_rings[channel];
 	rhp = &hxgep->rx_ring_handles[channel];
+	ldgp = ldvp->ldgp;
+
+	ASSERT(ring != NULL);
+	ASSERT(ring->ldgp == ldgp);
+	ASSERT(ring->ldvp == ldvp);
 
 	MUTEX_ENTER(&ring->lock);
 
@@ -1179,7 +1184,6 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 		return (DDI_INTR_CLAIMED);
 	}
 
-	ldgp = ldvp->ldgp;
 	RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
 	cs.bits.ptrread = 0;
 	cs.bits.pktread = 0;
@@ -1189,16 +1193,20 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	    "cs 0x%016llx rcrto 0x%x rcrthres %x",
 	    channel, cs.value, cs.bits.rcr_to, cs.bits.rcr_thres));
 
-	mp = hxge_rx_pkts(hxgep, ldvp->vdma_index, ldvp, ring, cs, -1);
+	/*
+	 * Process packets, if we are not in polling mode. The MAC layer
+	 * under load will be operating in polling mode for RX traffic.
+	 */
+	if (ring->poll_flag == 0) {
+		mp = hxge_rx_pkts(hxgep, ldvp->vdma_index, ldvp, ring, cs, -1);
+	}
 	serviced = DDI_INTR_CLAIMED;
-	MUTEX_EXIT(&ring->lock);
 
 	/* error events. */
 	if (cs.value & RDC_STAT_ERROR) {
 		(void) hxge_rx_err_evnts(hxgep, ldvp->vdma_index, ldvp, cs);
 	}
 
-hxge_intr_exit:
 	/*
 	 * Enable the mailbox update interrupt if we want to use mailbox. We
 	 * probably don't need to use mailbox as it only saves us one pio read.
@@ -1214,7 +1222,6 @@ hxge_intr_exit:
 	/*
 	 * Rearm this logical group if this is a single device group.
 	 */
-	MUTEX_ENTER(&ring->lock);
 	if (ring->poll_flag) {
 		if (ldgp->nldvs == 1) {
 			ld_intr_mgmt_t mgm;
