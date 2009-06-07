@@ -235,17 +235,15 @@ sun_find_xkbnames(int kb_type, int kb_layout, char **xkb_keymap,
 		/* record default entry if/when found */
 		if (*type == '*') {
 			if (defkeymap == NULL) {
-				defkeymap = keymap;
-				defmodel = model;
-				defxkblay = xkblay;
+				defkeymap = strdup(keymap);
+				defmodel = strdup(model);
+				defxkblay = strdup(xkblay);
 			}
 		} else if (atoi(type) == kb_type) {
-			if (*type == '*') {
-				if (defkeymap == NULL) {
-					defkeymap = keymap;
-					defmodel = model;
-					defxkblay = xkblay;
-				}
+			if (*layout == '*') {
+				defkeymap = strdup(keymap);
+				defmodel = strdup(model);
+				defxkblay = strdup(xkblay);
 			} else if (atoi(layout) == kb_layout) {
 				found_keytable = 1;
 				break;
@@ -329,12 +327,18 @@ main(int argc, char *argv[])
 		goto out;
 	}
 
-	libhal_changeset_set_property_string(cs,
-	    "input.x11_options.XkbModel", xkbmodel);
-	libhal_changeset_set_property_string(cs,
-	    "input.x11_options.XkbLayout", xkblayout);
+	/*
+	 * If doesn't find matching entry in xkbtable.map, using default
+	 * values setting in 10-x11-input.fdi
+	 */
+	if ((xkbmodel != NULL) && (xkblayout != NULL)) {
+		libhal_changeset_set_property_string(cs,
+		    "input.x11_options.XkbModel", xkbmodel);
+		libhal_changeset_set_property_string(cs,
+		    "input.x11_options.XkbLayout", xkblayout);
 
-	libhal_device_commit_changeset(ctx, cs, &error);
+		libhal_device_commit_changeset(ctx, cs, &error);
+	}
 
 	ret = 0;
 
