@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,12 +391,13 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 
 	/*
 	 * Sanity check - aggregations can only be created over Ethernet
-	 * physical links.
+	 * physical links and simnets.
 	 */
 	for (i = 0; i < nports; i++) {
 		if ((dladm_datalink_id2info(handle, ports[i].lp_linkid, NULL,
 		    &class, &media, NULL, 0) != DLADM_STATUS_OK) ||
-		    (class != DATALINK_CLASS_PHYS) || (media != DL_ETHER)) {
+		    !((class == DATALINK_CLASS_PHYS) ||
+		    (class == DATALINK_CLASS_SIMNET)) || (media != DL_ETHER)) {
 			return (DLADM_STATUS_BADARG);
 		}
 	}
@@ -1119,7 +1120,8 @@ dladm_aggr_create(dladm_handle_t handle, const char *name, uint16_t key,
 	for (i = 0; i < nports; i++) {
 		if ((dladm_datalink_id2info(handle, ports[i].lp_linkid, NULL,
 		    &class, &media, NULL, 0) != DLADM_STATUS_OK) ||
-		    !((class == DATALINK_CLASS_PHYS) && (media == DL_ETHER))) {
+		    !((class == DATALINK_CLASS_PHYS || class ==
+		    DATALINK_CLASS_SIMNET) && (media == DL_ETHER))) {
 			return (DLADM_STATUS_BADARG);
 		}
 	}

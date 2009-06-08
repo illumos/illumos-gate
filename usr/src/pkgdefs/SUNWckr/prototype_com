@@ -111,6 +111,7 @@ f none kernel/drv/rts.conf 644 root sys
 f none kernel/drv/sad.conf 644 root sys
 e scsivhciconf kernel/drv/scsi_vhci.conf 644 root sys
 e preserve kernel/drv/sgen.conf 644 root sys
+f none kernel/drv/simnet.conf 644 root sys
 f none kernel/drv/spdsock.conf 644 root sys
 e preserve kernel/drv/st.conf 644 root sys
 f none kernel/drv/sy.conf 644 root sys

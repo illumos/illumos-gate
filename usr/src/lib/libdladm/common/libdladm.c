@@ -40,6 +40,45 @@
 
 static char	dladm_rootdir[MAXPATHLEN] = "/";
 
+typedef struct media_type_desc {
+	uint32_t	media_type;
+#define	MAX_MEDIA_TYPE_STRING	32
+	const char	media_type_str[MAX_MEDIA_TYPE_STRING];
+} media_type_t;
+
+static media_type_t media_type_table[] =  {
+	{ DL_ETHER,	"Ethernet" },
+	{ DL_WIFI,	"WiFi" },
+	{ DL_IB,	"Infiniband" },
+	{ DL_IPV4,	"IPv4Tunnel" },
+	{ DL_IPV6,	"IPv6Tunnel" },
+	{ DL_CSMACD,	"CSMA/CD" },
+	{ DL_TPB,	"TokenBus" },
+	{ DL_TPR,	"TokenRing" },
+	{ DL_METRO,	"MetroNet" },
+	{ DL_HDLC,	"HDLC" },
+	{ DL_CHAR,	"SyncCharacter" },
+	{ DL_CTCA,	"CTCA" },
+	{ DL_FDDI, 	"FDDI" },
+	{ DL_FC, 	"FiberChannel" },
+	{ DL_ATM, 	"ATM" },
+	{ DL_IPATM, 	"ATM(ClassicIP)" },
+	{ DL_X25, 	"X.25" },
+	{ DL_IPX25, 	"X.25(ClassicIP)" },
+	{ DL_ISDN, 	"ISDN" },
+	{ DL_HIPPI, 	"HIPPI" },
+	{ DL_100VG, 	"100BaseVGEthernet" },
+	{ DL_100VGTPR, 	"100BaseVGTokenRing" },
+	{ DL_ETH_CSMA, 	"IEEE802.3" },
+	{ DL_100BT, 	"100BaseT" },
+	{ DL_FRAME, 	"FrameRelay" },
+	{ DL_MPFRAME, 	"MPFrameRelay" },
+	{ DL_ASYNC, 	"AsyncCharacter" },
+	{ DL_IPNET, 	"IPNET" },
+	{ DL_OTHER, 	"Other" }
+};
+#define	MEDIATYPECOUNT	(sizeof (media_type_table) / sizeof (media_type_t))
+
 dladm_status_t
 dladm_open(dladm_handle_t *handle)
 {
@@ -528,6 +567,9 @@ dladm_class2str(datalink_class_t class, char *buf)
 	case DATALINK_CLASS_ETHERSTUB:
 		s = "etherstub";
 		break;
+	case DATALINK_CLASS_SIMNET:
+		s = "simnet";
+		break;
 	default:
 		s = "unknown";
 		break;
@@ -543,100 +585,38 @@ dladm_class2str(datalink_class_t class, char *buf)
 const char *
 dladm_media2str(uint32_t media, char *buf)
 {
-	const char *s;
+	const char *s = "--";
+	media_type_t *mt;
+	int idx;
 
-	switch (media) {
-	case DL_ETHER:
-		s = "Ethernet";
-		break;
-	case DL_WIFI:
-		s = "WiFi";
-		break;
-	case DL_IB:
-		s = "Infiniband";
-		break;
-	case DL_IPV4:
-		s = "IPv4Tunnel";
-		break;
-	case DL_IPV6:
-		s = "IPv6Tunnel";
-		break;
-	case DL_CSMACD:
-		s = "CSMA/CD";
-		break;
-	case DL_TPB:
-		s = "TokenBus";
-		break;
-	case DL_TPR:
-		s = "TokenRing";
-		break;
-	case DL_METRO:
-		s = "MetroNet";
-		break;
-	case DL_HDLC:
-		s = "HDLC";
-		break;
-	case DL_CHAR:
-		s = "SyncCharacter";
-		break;
-	case DL_CTCA:
-		s = "CTCA";
-		break;
-	case DL_FDDI:
-		s = "FDDI";
-		break;
-	case DL_FC:
-		s = "FiberChannel";
-		break;
-	case DL_ATM:
-		s = "ATM";
-		break;
-	case DL_IPATM:
-		s = "ATM(ClassicIP)";
-		break;
-	case DL_X25:
-		s = "X.25";
-		break;
-	case DL_IPX25:
-		s = "X.25(ClassicIP)";
-		break;
-	case DL_ISDN:
-		s = "ISDN";
-		break;
-	case DL_HIPPI:
-		s = "HIPPI";
-		break;
-	case DL_100VG:
-		s = "100BaseVGEthernet";
-		break;
-	case DL_100VGTPR:
-		s = "100BaseVGTokenRing";
-		break;
-	case DL_ETH_CSMA:
-		s = "IEEE802.3";
-		break;
-	case DL_100BT:
-		s = "100BaseT";
-		break;
-	case DL_FRAME:
-		s = "FrameRelay";
-		break;
-	case DL_MPFRAME:
-		s = "MPFrameRelay";
-		break;
-	case DL_ASYNC:
-		s = "AsyncCharacter";
-		break;
-	case DL_IPNET:
-		s = "IPNET";
-		break;
-	default:
-		s = "--";
-		break;
+	for (idx = 0; idx < MEDIATYPECOUNT; idx++) {
+		mt = media_type_table + idx;
+		if (mt->media_type == media) {
+			s = mt->media_type_str;
+			break;
+		}
 	}
 
 	(void) snprintf(buf, DLADM_STRSIZE, "%s", s);
 	return (buf);
+}
+
+/*
+ * Given a physical link media type string, returns its media type constant.
+ */
+uint32_t
+dladm_str2media(const char *buf)
+{
+	media_type_t *mt;
+	int idx;
+
+	for (idx = 0; idx < MEDIATYPECOUNT; idx++) {
+		mt = media_type_table + idx;
+		if (strcasecmp(buf, mt->media_type_str) == 0)
+			return (mt->media_type);
+	}
+
+	return (DL_OTHER);
 }
 
 dladm_status_t

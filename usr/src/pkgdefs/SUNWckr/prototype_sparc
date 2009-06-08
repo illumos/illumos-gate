@@ -125,6 +125,7 @@ f none kernel/drv/sparcv9/sctp 755 root sys
 f none kernel/drv/sparcv9/sctp6 755 root sys
 f none kernel/drv/sparcv9/sd 755 root sys
 f none kernel/drv/sparcv9/sgen 755 root sys
+f none kernel/drv/sparcv9/simnet 755 root sys
 f none kernel/drv/sparcv9/softmac 755 root sys
 f none kernel/drv/sparcv9/spdsock 755 root sys
 f none kernel/drv/sparcv9/st 755 root sys

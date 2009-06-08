@@ -106,6 +106,7 @@ usr/include/libdlvnic.h		sparc
 usr/include/libdlvlan.h		sparc
 usr/include/libdlmgmt.h		sparc
 usr/include/libdlstat.h		sparc
+usr/include/libdlsim.h		sparc
 lib/libdladm.so			sparc
 lib/llib-ldladm.ln		sparc
 lib/sparcv9/libdladm.so		sparc
@@ -668,6 +669,8 @@ usr/platform/sun4u/include/sys/fcode.h		sparc
 #
 usr/include/net/pppoe.h			sparc
 usr/include/net/sppptun.h		sparc
+#
+usr/include/net/simnet.h		sparc
 usr/include/net/wpa.h			sparc
 # Private net80211 headers
 usr/include/sys/net80211.h		sparc

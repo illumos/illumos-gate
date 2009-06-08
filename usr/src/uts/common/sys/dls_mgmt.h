@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,12 +42,13 @@ typedef enum {
 	DATALINK_CLASS_VLAN		= 0x02,
 	DATALINK_CLASS_AGGR		= 0x04,
 	DATALINK_CLASS_VNIC		= 0x08,
-	DATALINK_CLASS_ETHERSTUB	= 0x10
+	DATALINK_CLASS_ETHERSTUB	= 0x10,
+	DATALINK_CLASS_SIMNET		= 0x20
 } datalink_class_t;
 
 #define	DATALINK_CLASS_ALL	(DATALINK_CLASS_PHYS |	\
 	DATALINK_CLASS_VLAN | DATALINK_CLASS_AGGR | DATALINK_CLASS_VNIC | \
-	DATALINK_CLASS_ETHERSTUB)
+	DATALINK_CLASS_ETHERSTUB | DATALINK_CLASS_SIMNET)
 
 /*
  * A combination of flags and media.

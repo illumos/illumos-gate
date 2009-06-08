@@ -164,6 +164,7 @@ clone:vnet 0666 root sys
 clone:afe 0666 root sys
 clone:mxfe 0666 root sys
 clone:rtls 0666 root sys
+clone:simnet 0666 root sys
 clone:vnic 0666 root sys
 bge:* 0666 root sys
 igb:* 0666 root sys
@@ -180,6 +181,7 @@ vsw:* 0666 root sys
 vnet:* 0666 root sys
 mxfe:* 0666 root sys
 rtls:* 0666 root sys
+simnet:* 0666 root sys
 vnic:* 0666 root sys
 physmem:* 0600 root sys
 sdp:sdp 0666 root sys

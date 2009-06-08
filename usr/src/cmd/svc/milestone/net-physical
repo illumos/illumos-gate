@@ -58,11 +58,14 @@ if smf_is_globalzone; then
 	fi
 
 	#
-	# Bring up link aggregations and initialize security objects.
+	# Bring up simnets, link aggregations and initialize security objects.
 	# Note that link property initialization is deferred until after
 	# IP interfaces are plumbed to ensure that the links will not
-	# be unloaded (and the property settings lost).
+	# be unloaded (and the property settings lost). We should bring
+	# up simnets prior to VLANs/Aggrs to enable creation of VLANs/Aggrs
+	# over simnets.
 	#
+	/sbin/dladm up-simnet
 	/sbin/dladm up-aggr
 	/sbin/dladm up-vlan
 	/sbin/dladm init-secobj

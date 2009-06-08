@@ -137,6 +137,7 @@ f none kernel/drv/scsi_vhci 755 root sys
 f none kernel/drv/sctp 755 root sys
 f none kernel/drv/sctp6 755 root sys
 f none kernel/drv/sgen 755 root sys
+f none kernel/drv/simnet 755 root sys
 f none kernel/drv/smbios 755 root sys
 f none kernel/drv/smbios.conf 644 root sys
 f none kernel/drv/softmac 755 root sys
@@ -355,6 +356,7 @@ f none kernel/drv/amd64/sctp 755 root sys
 f none kernel/drv/amd64/sctp6 755 root sys
 f none kernel/drv/amd64/sd 755 root sys
 f none kernel/drv/amd64/sgen 755 root sys
+f none kernel/drv/amd64/simnet 755 root sys
 f none kernel/drv/amd64/smbios 755 root sys
 f none kernel/drv/amd64/softmac 755 root sys
 f none kernel/drv/amd64/spdsock 755 root sys

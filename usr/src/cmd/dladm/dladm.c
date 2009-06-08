@@ -54,6 +54,7 @@
 #include <libdlvlan.h>
 #include <libdlvnic.h>
 #include <libdlether.h>
+#include <libdlsim.h>
 #include <libinetutil.h>
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
@@ -162,6 +163,8 @@ static cmdfunc_t do_show_ether;
 static cmdfunc_t do_create_vnic, do_delete_vnic, do_show_vnic;
 static cmdfunc_t do_up_vnic;
 static cmdfunc_t do_create_etherstub, do_delete_etherstub, do_show_etherstub;
+static cmdfunc_t do_create_simnet, do_modify_simnet;
+static cmdfunc_t do_delete_simnet, do_show_simnet, do_up_simnet;
 static cmdfunc_t do_show_usage;
 
 static void 	do_up_vnic_common(int, char **, const char *, boolean_t);
@@ -282,6 +285,15 @@ static cmd_t	cmds[] = {
 	    "    delete-etherstub [-t] <link>"				},
 	{ "show-etherstub",	do_show_etherstub,
 	    "    show-etherstub   [-t] [<link>]\n"			},
+	{ "create-simnet",	do_create_simnet,
+	    "    create-simnet [-t] [-m <media>] <link>"		},
+	{ "modify-simnet",	do_modify_simnet,
+	    "    modify-simnet [-t] [-p <peer>] <link>"			},
+	{ "delete-simnet",	do_delete_simnet,
+	    "    delete-simnet [-t] <link>"				},
+	{ "show-simnet",	do_show_simnet,
+	    "    show-simnet   [-pP] [-o <field>,...] [<link>]\n"	},
+	{ "up-simnet",		do_up_simnet,		NULL		},
 	{ "show-usage",		do_show_usage,
 	    "    show-usage       [-a] [-d | -F <format>] "
 	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
@@ -380,6 +392,14 @@ static const struct option usage_opts[] = {
 	{"format",	required_argument,	0, 'F'	},
 	{"start",	required_argument,	0, 's'	},
 	{"stop",	required_argument,	0, 'e'	},
+	{ 0, 0, 0, 0 }
+};
+
+static const struct option simnet_lopts[] = {
+	{"temporary",	no_argument,		0, 't'	},
+	{"root-dir",	required_argument,	0, 'R'	},
+	{"media",	required_argument,	0, 'm'	},
+	{"peer",	required_argument,	0, 'p'	},
 	{ 0, 0, 0, 0 }
 };
 
@@ -804,7 +824,7 @@ typedef struct vnic_fields_buf_s
 	char vnic_link[DLPI_LINKNAME_MAX];
 	char vnic_over[DLPI_LINKNAME_MAX];
 	char vnic_speed[6];
-	char vnic_macaddr[19];
+	char vnic_macaddr[18];
 	char vnic_macaddrtype[19];
 	char vnic_vid[6];
 } vnic_fields_buf_t;
@@ -816,12 +836,35 @@ static ofmt_field_t vnic_fields[] = {
 	offsetof(vnic_fields_buf_t, vnic_over),	print_default_cb},
 { "SPEED",		7,
 	offsetof(vnic_fields_buf_t, vnic_speed), print_default_cb},
-{ "MACADDRESS",		21,
+{ "MACADDRESS",		18,
 	offsetof(vnic_fields_buf_t, vnic_macaddr), print_default_cb},
 { "MACADDRTYPE",	20,
 	offsetof(vnic_fields_buf_t, vnic_macaddrtype), print_default_cb},
 { "VID",		7,
 	offsetof(vnic_fields_buf_t, vnic_vid), print_default_cb},
+{ NULL,			0, 0, NULL}}
+;
+
+/*
+ * structures for 'dladm show-simnet'
+ */
+typedef struct simnet_fields_buf_s
+{
+	char simnet_name[DLPI_LINKNAME_MAX];
+	char simnet_media[DLADM_STRSIZE];
+	char simnet_macaddr[18];
+	char simnet_otherlink[DLPI_LINKNAME_MAX];
+} simnet_fields_buf_t;
+
+static ofmt_field_t simnet_fields[] = {
+{ "LINK",		12,
+	offsetof(simnet_fields_buf_t, simnet_name), print_default_cb},
+{ "MEDIA",		20,
+	offsetof(simnet_fields_buf_t, simnet_media), print_default_cb},
+{ "MACADDRESS",		18,
+	offsetof(simnet_fields_buf_t, simnet_macaddr), print_default_cb},
+{ "OTHERLINK",		12,
+	offsetof(simnet_fields_buf_t, simnet_otherlink), print_default_cb},
 { NULL,			0, 0, NULL}}
 ;
 
@@ -1246,7 +1289,7 @@ do_show_usage(int argc, char *argv[], const char *use)
 static void
 do_create_aggr(int argc, char *argv[], const char *use)
 {
-	char			option;
+	int			option;
 	int			key = 0;
 	uint32_t		policy = AGGR_POLICY_L4;
 	aggr_lacp_mode_t	lacp_mode = AGGR_LACP_OFF;
@@ -1463,7 +1506,7 @@ i_dladm_aggr_get_linkid(const char *altroot, const char *arg,
 static void
 do_delete_aggr(int argc, char *argv[], const char *use)
 {
-	char			option;
+	int			option;
 	char			*altroot = NULL;
 	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
 	dladm_status_t		status;
@@ -1504,7 +1547,7 @@ done:
 static void
 do_add_aggr(int argc, char *argv[], const char *use)
 {
-	char			option;
+	int			option;
 	uint_t			n, ndev, nlink;
 	char			*altroot = NULL;
 	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
@@ -1602,7 +1645,7 @@ done:
 static void
 do_remove_aggr(int argc, char *argv[], const char *use)
 {
-	char				option;
+	int				option;
 	dladm_aggr_port_attr_db_t	port[MAXPORT];
 	uint_t				n, ndev, nlink;
 	char				*devs[MAXPORT];
@@ -1679,7 +1722,7 @@ done:
 static void
 do_modify_aggr(int argc, char *argv[], const char *use)
 {
-	char			option;
+	int			option;
 	uint32_t		policy = AGGR_POLICY_L4;
 	aggr_lacp_mode_t	lacp_mode = AGGR_LACP_OFF;
 	aggr_lacp_timer_t	lacp_timer = AGGR_LACP_TIMER_SHORT;
@@ -1807,7 +1850,7 @@ do_create_vlan(int argc, char *argv[], const char *use)
 	datalink_id_t		linkid;
 	datalink_id_t		dev_linkid;
 	int			vid = 0;
-	char			option;
+	int			option;
 	uint32_t		flags = (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
 	char			*altroot = NULL;
 	char			vlan[MAXLINKNAMELEN];
@@ -1895,7 +1938,7 @@ do_create_vlan(int argc, char *argv[], const char *use)
 static void
 do_delete_vlan(int argc, char *argv[], const char *use)
 {
-	char		option;
+	int		option;
 	uint32_t	flags = (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
 	char		*altroot = NULL;
 	datalink_id_t	linkid;
@@ -1944,7 +1987,7 @@ do_up_vlan(int argc, char *argv[], const char *use)
 static void
 do_rename_link(int argc, char *argv[], const char *use)
 {
-	char		option;
+	int		option;
 	char		*link1, *link2;
 	char		*altroot = NULL;
 	dladm_status_t	status;
@@ -2089,30 +2132,31 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 	dladm_status_t	status = DLADM_STATUS_OK;
 	char		tmpbuf[MAXLINKNAMELEN];
 
-	(void) sprintf(lbuf->link_over, "");
-	if (class == DATALINK_CLASS_VLAN) {
+	lbuf->link_over[0] = '\0';
+
+	switch (class) {
+	case DATALINK_CLASS_VLAN: {
 		dladm_vlan_attr_t	vinfo;
 
 		status = dladm_vlan_info(handle, linkid, &vinfo, flags);
 		if (status != DLADM_STATUS_OK)
-			goto done;
+			break;
 		status = dladm_datalink_id2info(handle, vinfo.dv_linkid, NULL,
 		    NULL, NULL, lbuf->link_over, sizeof (lbuf->link_over));
-		if (status != DLADM_STATUS_OK)
-			goto done;
-	} else if (class == DATALINK_CLASS_AGGR) {
+		break;
+	}
+
+	case DATALINK_CLASS_AGGR: {
 		dladm_aggr_grp_attr_t	ginfo;
 		int			i;
 
-		(void) sprintf(lbuf->link_over, "");
-
 		status = dladm_aggr_info(handle, linkid, &ginfo, flags);
 		if (status != DLADM_STATUS_OK)
-			goto done;
+			break;
 
 		if (ginfo.lg_nports == 0) {
 			status = DLADM_STATUS_BADVAL;
-			goto done;
+			break;
 		}
 		for (i = 0; i < ginfo.lg_nports; i++) {
 			status = dladm_datalink_id2info(handle,
@@ -2120,7 +2164,7 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 			    tmpbuf, sizeof (tmpbuf));
 			if (status != DLADM_STATUS_OK) {
 				free(ginfo.lg_ports);
-				goto done;
+				break;
 			}
 			(void) strlcat(lbuf->link_over, tmpbuf,
 			    sizeof (lbuf->link_over));
@@ -2130,18 +2174,33 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 			}
 		}
 		free(ginfo.lg_ports);
-	} else if (class == DATALINK_CLASS_VNIC) {
+		break;
+	}
+
+	case DATALINK_CLASS_VNIC: {
 		dladm_vnic_attr_t	vinfo;
 
-		if ((status = dladm_vnic_info(handle, linkid, &vinfo, flags)) !=
-		    DLADM_STATUS_OK ||
-		    (status = dladm_datalink_id2info(handle, vinfo.va_link_id,
-		    NULL, NULL, NULL, lbuf->link_over,
-		    sizeof (lbuf->link_over)) != DLADM_STATUS_OK)) {
-			goto done;
-		}
+		status = dladm_vnic_info(handle, linkid, &vinfo, flags);
+		if (status == DLADM_STATUS_OK)
+			status = dladm_datalink_id2info(handle,
+			    vinfo.va_link_id, NULL, NULL, NULL, lbuf->link_over,
+			    sizeof (lbuf->link_over));
+		break;
 	}
-done:
+
+	case DATALINK_CLASS_SIMNET: {
+		dladm_simnet_attr_t	slinfo;
+
+		status = dladm_simnet_info(handle, linkid, &slinfo, flags);
+		if (status == DLADM_STATUS_OK &&
+		    slinfo.sna_peer_link_id != DATALINK_INVALID_LINKID)
+			status = dladm_datalink_id2info(handle,
+			    slinfo.sna_peer_link_id, NULL, NULL, NULL,
+			    lbuf->link_over, sizeof (lbuf->link_over));
+		break;
+	}
+	}
+
 	return (status);
 }
 
@@ -3641,7 +3700,7 @@ do_create_vnic(int argc, char *argv[], const char *use)
 	boolean_t		l_arg = B_FALSE;
 	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
 	char			*altroot = NULL;
-	char			option;
+	int			option;
 	char			*endp = NULL;
 	dladm_status_t		status;
 	vnic_mac_addr_type_t	mac_addr_type = VNIC_MAC_ADDR_TYPE_AUTO;
@@ -3801,7 +3860,7 @@ static void
 do_delete_vnic_common(int argc, char *argv[], const char *use,
     boolean_t etherstub)
 {
-	char option;
+	int option;
 	uint32_t flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
 	datalink_id_t linkid;
 	char *altroot = NULL;
@@ -4223,7 +4282,7 @@ do_create_etherstub(int argc, char *argv[], const char *use)
 {
 	uint32_t flags;
 	char *altroot = NULL;
-	char option;
+	int option;
 	dladm_status_t status;
 	char name[MAXLINKNAMELEN];
 	uchar_t mac_addr[ETHERADDRL];
@@ -4265,8 +4324,6 @@ do_create_etherstub(int argc, char *argv[], const char *use)
 	    NULL, flags);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "etherstub creation failed");
-
-
 }
 
 static void
@@ -4280,6 +4337,312 @@ static void
 do_show_etherstub(int argc, char *argv[], const char *use)
 {
 	do_show_vnic_common(argc, argv, use, B_TRUE);
+}
+
+/* ARGSUSED */
+static void
+do_up_simnet(int argc, char *argv[], const char *use)
+{
+	(void) dladm_simnet_up(handle, DATALINK_ALL_LINKID, 0);
+}
+
+static void
+do_create_simnet(int argc, char *argv[], const char *use)
+{
+	uint32_t flags;
+	char *altroot = NULL;
+	char *media = NULL;
+	uint32_t mtype = DL_ETHER;
+	int option;
+	dladm_status_t status;
+	char name[MAXLINKNAMELEN];
+
+	name[0] = '\0';
+	flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":tR:m:",
+	    simnet_lopts, NULL)) != -1) {
+		switch (option) {
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		case 'm':
+			media = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
+	}
+
+	/* the simnet id is the required operand */
+	if (optind != (argc - 1))
+		usage();
+
+	if (strlcpy(name, argv[optind], MAXLINKNAMELEN) >= MAXLINKNAMELEN)
+		die("link name too long '%s'", argv[optind]);
+
+	if (!dladm_valid_linkname(name))
+		die("invalid link name '%s'", name);
+
+	if (media != NULL) {
+		mtype = dladm_str2media(media);
+		if (mtype != DL_ETHER && mtype != DL_WIFI)
+			die("media type '%s' is not supported", media);
+	}
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	status = dladm_simnet_create(handle, name, mtype, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "simnet creation failed");
+}
+
+static void
+do_delete_simnet(int argc, char *argv[], const char *use)
+{
+	int option;
+	uint32_t flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	datalink_id_t linkid;
+	char *altroot = NULL;
+	dladm_status_t status;
+	dladm_simnet_attr_t slinfo;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":tR:", simnet_lopts,
+	    NULL)) != -1) {
+		switch (option) {
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
+	}
+
+	/* get simnet name (required last argument) */
+	if (optind != (argc - 1))
+		usage();
+
+	if (!dladm_valid_linkname(argv[optind]))
+		die("invalid link name '%s'", argv[optind]);
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	status = dladm_name2info(handle, argv[optind], &linkid, NULL, NULL,
+	    NULL);
+	if (status != DLADM_STATUS_OK)
+		die("simnet '%s' not found", argv[optind]);
+
+	if ((status = dladm_simnet_info(handle, linkid, &slinfo,
+	    flags)) != DLADM_STATUS_OK)
+		die_dlerr(status, "failed to retrieve simnet information");
+
+	status = dladm_simnet_delete(handle, linkid, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "simnet deletion failed");
+}
+
+static void
+do_modify_simnet(int argc, char *argv[], const char *use)
+{
+	int option;
+	uint32_t flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	datalink_id_t linkid;
+	datalink_id_t peer_linkid;
+	char *altroot = NULL;
+	dladm_status_t status;
+	boolean_t p_arg = B_FALSE;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":tR:p:", simnet_lopts,
+	    NULL)) != -1) {
+		switch (option) {
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		case 'p':
+			if (p_arg)
+				die_optdup(option);
+			p_arg = B_TRUE;
+			if (strcasecmp(optarg, "none") == 0)
+				peer_linkid = DATALINK_INVALID_LINKID;
+			else if (dladm_name2info(handle, optarg, &peer_linkid,
+			    NULL, NULL, NULL) != DLADM_STATUS_OK)
+				die("invalid peer link name '%s'", optarg);
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
+	}
+
+	/* get simnet name (required last argument) */
+	if (optind != (argc - 1))
+		usage();
+
+	/* Nothing to do if no peer link argument */
+	if (!p_arg)
+		return;
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	status = dladm_name2info(handle, argv[optind], &linkid, NULL, NULL,
+	    NULL);
+	if (status != DLADM_STATUS_OK)
+		die("invalid link name '%s'", argv[optind]);
+
+	status = dladm_simnet_modify(handle, linkid, peer_linkid, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "simnet modification failed");
+}
+
+static dladm_status_t
+print_simnet(show_state_t *state, datalink_id_t linkid)
+{
+	dladm_simnet_attr_t	slinfo;
+	uint32_t		flags;
+	dladm_status_t		status;
+	simnet_fields_buf_t	slbuf;
+	char			mstr[ETHERADDRL * 3];
+
+	bzero(&slbuf, sizeof (slbuf));
+	if ((status = dladm_datalink_id2info(handle, linkid, &flags, NULL, NULL,
+	    slbuf.simnet_name, sizeof (slbuf.simnet_name)))
+	    != DLADM_STATUS_OK)
+		return (status);
+
+	if (!(state->ls_flags & flags))
+		return (DLADM_STATUS_NOTFOUND);
+
+	if ((status = dladm_simnet_info(handle, linkid, &slinfo,
+	    state->ls_flags)) != DLADM_STATUS_OK)
+		return (status);
+
+	if (slinfo.sna_peer_link_id != DATALINK_INVALID_LINKID &&
+	    (status = dladm_datalink_id2info(handle, slinfo.sna_peer_link_id,
+	    NULL, NULL, NULL, slbuf.simnet_otherlink,
+	    sizeof (slbuf.simnet_otherlink))) !=
+	    DLADM_STATUS_OK)
+		return (status);
+
+	if (slinfo.sna_mac_len > sizeof (slbuf.simnet_macaddr))
+		return (DLADM_STATUS_BADVAL);
+
+	(void) strlcpy(slbuf.simnet_macaddr,
+	    dladm_aggr_macaddr2str(slinfo.sna_mac_addr, mstr),
+	    sizeof (slbuf.simnet_macaddr));
+	(void) dladm_media2str(slinfo.sna_type, slbuf.simnet_media);
+
+	ofmt_print(state->ls_ofmt, &slbuf);
+	return (status);
+}
+
+/* ARGSUSED */
+static int
+show_simnet(dladm_handle_t dh, datalink_id_t linkid, void *arg)
+{
+	show_state_t		*state = arg;
+
+	state->ls_status = print_simnet(state, linkid);
+	return (DLADM_WALK_CONTINUE);
+}
+
+static void
+do_show_simnet(int argc, char *argv[], const char *use)
+{
+	int		option;
+	uint32_t	flags = DLADM_OPT_ACTIVE;
+	boolean_t	p_arg = B_FALSE;
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	show_state_t	state;
+	dladm_status_t	status;
+	boolean_t	o_arg = B_FALSE;
+	ofmt_handle_t	ofmt;
+	ofmt_status_t	oferr;
+	char		*all_fields = "link,media,macaddress,otherlink";
+	char		*fields_str = all_fields;
+	uint_t		ofmtflags = 0;
+
+	bzero(&state, sizeof (state));
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":pPo:",
+	    show_lopts, NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			if (p_arg)
+				die_optdup(option);
+
+			p_arg = B_TRUE;
+			state.ls_parsable = p_arg;
+			break;
+		case 'P':
+			if (flags != DLADM_OPT_ACTIVE)
+				die_optdup(option);
+
+			flags = DLADM_OPT_PERSIST;
+			break;
+		case 'o':
+			o_arg = B_TRUE;
+			fields_str = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	if (p_arg && !o_arg)
+		die("-p requires -o");
+
+	if (strcasecmp(fields_str, "all") == 0) {
+		if (p_arg)
+			die("\"-o all\" is invalid with -p");
+		fields_str = all_fields;
+	}
+
+	/* get link name (optional last argument) */
+	if (optind == (argc-1)) {
+		if ((status = dladm_name2info(handle, argv[optind], &linkid,
+		    NULL, NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+	} else if (optind != argc) {
+		usage();
+	}
+
+	state.ls_flags = flags;
+	state.ls_donefirst = B_FALSE;
+	if (state.ls_parsable)
+		ofmtflags |= OFMT_PARSABLE;
+	oferr = ofmt_open(fields_str, simnet_fields, ofmtflags, 0, &ofmt);
+	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+	state.ls_ofmt = ofmt;
+
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_simnet, handle, &state,
+		    DATALINK_CLASS_SIMNET, DATALINK_ANY_MEDIATYPE, flags);
+	} else {
+		(void) show_simnet(handle, linkid, &state);
+		if (state.ls_status != DLADM_STATUS_OK) {
+			ofmt_close(ofmt);
+			die_dlerr(state.ls_status, "failed to show simnet %s",
+			    argv[optind]);
+		}
+	}
+	ofmt_close(ofmt);
 }
 
 static void
@@ -4812,7 +5175,8 @@ do_display_wifi(int argc, char **argv, int cmd, const char *use)
 
 	if (linkid == DATALINK_ALL_LINKID) {
 		(void) dladm_walk_datalink_id(callback, handle, &state,
-		    DATALINK_CLASS_PHYS, DL_WIFI, DLADM_OPT_ACTIVE);
+		    DATALINK_CLASS_PHYS | DATALINK_CLASS_SIMNET,
+		    DL_WIFI, DLADM_OPT_ACTIVE);
 	} else {
 		(void) (*callback)(handle, linkid, &state);
 	}
@@ -5036,7 +5400,8 @@ do_connect_wifi(int argc, char **argv, const char *use)
 		wcattr.wc_linkid = DATALINK_INVALID_LINKID;
 		wcattr.wc_count = 0;
 		(void) dladm_walk_datalink_id(do_count_wlan, handle, &wcattr,
-		    DATALINK_CLASS_PHYS, DL_WIFI, DLADM_OPT_ACTIVE);
+		    DATALINK_CLASS_PHYS | DATALINK_CLASS_SIMNET,
+		    DL_WIFI, DLADM_OPT_ACTIVE);
 		if (wcattr.wc_count == 0) {
 			die("no wifi links are available");
 		} else if (wcattr.wc_count > 1) {
@@ -5119,8 +5484,9 @@ do_disconnect_wifi(int argc, char **argv, const char *use)
 			wcattr.wc_linkid = linkid;
 			wcattr.wc_count = 0;
 			(void) dladm_walk_datalink_id(do_count_wlan, handle,
-			    &wcattr, DATALINK_CLASS_PHYS, DL_WIFI,
-			    DLADM_OPT_ACTIVE);
+			    &wcattr,
+			    DATALINK_CLASS_PHYS | DATALINK_CLASS_SIMNET,
+			    DL_WIFI, DLADM_OPT_ACTIVE);
 			if (wcattr.wc_count == 0) {
 				die("no wifi links are available");
 			} else if (wcattr.wc_count > 1) {
@@ -5130,8 +5496,9 @@ do_disconnect_wifi(int argc, char **argv, const char *use)
 			linkid = wcattr.wc_linkid;
 		} else {
 			(void) dladm_walk_datalink_id(do_all_disconnect_wifi,
-			    handle, NULL, DATALINK_CLASS_PHYS, DL_WIFI,
-			    DLADM_OPT_ACTIVE);
+			    handle, NULL,
+			    DATALINK_CLASS_PHYS | DATALINK_CLASS_SIMNET,
+			    DL_WIFI, DLADM_OPT_ACTIVE);
 			return;
 		}
 	}

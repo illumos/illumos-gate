@@ -84,6 +84,7 @@
 #include <sys/ptms.h>
 #include <sys/aggr.h>
 #include <sys/dld.h>
+#include <net/simnet.h>
 #include <sys/vnic.h>
 #include <sys/fs/zfs.h>
 #include <inet/kssl/kssl.h>
@@ -977,6 +978,16 @@ const struct ioc {
 		"dld_ioc_walkflow"},
 	{ (uint_t)DLDIOC_USAGELOG,		"DLDIOC_USAGELOG",
 		"dld_ioc_usagelog"},
+
+	/* simnet ioctls */
+	{ (uint_t)SIMNET_IOC_CREATE,		"SIMNET_IOC_CREATE",
+		"simnet_ioc_create"},
+	{ (uint_t)SIMNET_IOC_DELETE,		"SIMNET_IOC_DELETE",
+		"simnet_ioc_delete"},
+	{ (uint_t)SIMNET_IOC_INFO,		"SIMNET_IOC_INFO",
+		"simnet_ioc_info"},
+	{ (uint_t)SIMNET_IOC_MODIFY,		"SIMNET_IOC_MODIFY",
+		"simnet_ioc_info"},
 
 	/* vnic ioctls */
 	{ (uint_t)VNIC_IOC_CREATE,		"VNIC_IOC_CREATE",

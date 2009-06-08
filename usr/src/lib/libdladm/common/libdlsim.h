@@ -23,16 +23,36 @@
  * Use is subject to license terms.
  */
 
-/*LINTLIBRARY*/
-/*PROTOLIB1*/
+#ifndef _LIBDLSIM_H
+#define	_LIBDLSIM_H
 
-#include <libdllink.h>
-#include <libdlaggr.h>
-#include <libdlwlan.h>
-#include <libdlvnic.h>
-#include <libdlvlan.h>
-#include <libdlmgmt.h>
-#include <libdlflow.h>
-#include <libdlstat.h>
-#include <libdlether.h>
-#include <libdlsim.h>
+#include <sys/mac.h>
+#include <libdladm_impl.h>
+#include <net/simnet.h>
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+typedef struct dladm_simnet_attr {
+	datalink_id_t		sna_link_id;
+	datalink_id_t		sna_peer_link_id;
+	uchar_t			sna_mac_addr[MAXMACADDRLEN];
+	uint_t			sna_mac_len;
+	uint_t			sna_type;
+} dladm_simnet_attr_t;
+
+dladm_status_t dladm_simnet_create(dladm_handle_t, const char *,
+    uint_t, uint32_t);
+dladm_status_t dladm_simnet_delete(dladm_handle_t, datalink_id_t, uint32_t);
+dladm_status_t dladm_simnet_modify(dladm_handle_t, datalink_id_t,
+    datalink_id_t, uint32_t);
+dladm_status_t dladm_simnet_info(dladm_handle_t, datalink_id_t,
+    dladm_simnet_attr_t *, uint32_t);
+dladm_status_t dladm_simnet_up(dladm_handle_t, datalink_id_t, uint32_t);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif /* _LIBDLSIM_H */

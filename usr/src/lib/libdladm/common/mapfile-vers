@@ -113,6 +113,7 @@ SUNWprivate_1.1 {
 	dladm_vlan_info;
 	dladm_class2str;
 	dladm_media2str;
+	dladm_str2media;
 	dladm_rename_link;
 	dladm_phys_info;
 	dladm_phys_delete;
@@ -199,6 +200,12 @@ SUNWprivate_1.1 {
 	dladm_ether_pause2str;
 	dladm_ether_spdx2str;
 	dladm_ether_info_done;
+
+	dladm_simnet_create;
+	dladm_simnet_modify;
+	dladm_simnet_delete;
+	dladm_simnet_info;
+	dladm_simnet_up;
     local:
 	*;
 };

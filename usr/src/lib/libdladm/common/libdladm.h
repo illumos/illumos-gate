@@ -208,6 +208,7 @@ extern const char	*dladm_status2str(dladm_status_t, char *);
 extern dladm_status_t	dladm_set_rootdir(const char *);
 extern const char	*dladm_class2str(datalink_class_t, char *);
 extern const char	*dladm_media2str(uint32_t, char *);
+extern uint32_t		dladm_str2media(const char *);
 extern boolean_t	dladm_valid_linkname(const char *);
 extern boolean_t	dladm_str2interval(char *, uint32_t *);
 extern dladm_status_t	dladm_str2bw(char *, uint64_t *);

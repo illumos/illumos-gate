@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -28,7 +28,7 @@ VERS    = .1
 OBJECTS = libdladm.o secobj.o linkprop.o libdllink.o libdlaggr.o \
 	libdlwlan.o libdlvnic.o libdlmgmt.o libdlvlan.o \
 	flowattr.o flowprop.o propfuncs.o libdlflow.o libdlstat.o \
-	usage.o libdlether.o
+	usage.o libdlether.o libdlsim.o
 
 include ../../Makefile.lib
 

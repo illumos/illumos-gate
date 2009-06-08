@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +94,12 @@ extern void		dladm_free_args(dladm_arg_list_t *);
 #define	FHWRINGS	"hwrings"	/* boolean_t */
 
 /*
+ * Set for simlinks only
+ */
+#define	FSIMNETTYPE	"simnettype"	/* uint64_t */
+#define	FSIMNETPEER	"simnetpeer"	/* uint64_t */
+
+/*
  * Common fields
  */
 #define	FMACADDR	"macaddr"	/* string */
@@ -106,7 +112,7 @@ extern void		dladm_free_args(dladm_arg_list_t *);
 				FFIXMACADDR, FFORCE, FLACPMODE, FLACPTIMER, \
 				FMADDRTYPE, FMADDRLEN, FMADDRSLOT, \
 				FMADDRPREFIXLEN, FHWRINGS, \
-				FMACADDR
+				FMACADDR, FSIMNETTYPE, FSIMNETPEER
 
 /*
  * Data structures used for implementing temporary properties

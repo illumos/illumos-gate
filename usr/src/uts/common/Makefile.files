@@ -624,6 +624,8 @@ NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
 
+SIMNET_OBJS +=	simnet.o
+
 IB_OBJS +=	ibnex.o ibnex_ioctl.o
 
 IBCM_OBJS +=	ibcm_impl.o ibcm_sm.o ibcm_ti.o ibcm_utils.o ibcm_path.o \

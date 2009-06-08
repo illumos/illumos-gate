@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,11 +56,13 @@ extern "C" {
 #define	DLD_IOC		0x0D1D
 #define	AGGR_IOC	0x0A66
 #define	VNIC_IOC	0x0171
+#define	SIMNET_IOC	0x5132
 
 /* GLDv3 modules use these macros to generate unique ioctl commands */
-#define	DLDIOC(cmdid)	DLD_IOC_CMD(DLD_IOC, (cmdid))
-#define	AGGRIOC(cmdid)	DLD_IOC_CMD(AGGR_IOC, (cmdid))
-#define	VNICIOC(cmdid)	DLD_IOC_CMD(VNIC_IOC, (cmdid))
+#define	DLDIOC(cmdid)		DLD_IOC_CMD(DLD_IOC, (cmdid))
+#define	AGGRIOC(cmdid)		DLD_IOC_CMD(AGGR_IOC, (cmdid))
+#define	VNICIOC(cmdid)		DLD_IOC_CMD(VNIC_IOC, (cmdid))
+#define	SIMNETIOC(cmdid)	DLD_IOC_CMD(SIMNET_IOC, (cmdid))
 
 #ifdef _KERNEL
 
