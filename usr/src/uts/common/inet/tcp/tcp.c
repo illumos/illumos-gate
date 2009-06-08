@@ -6826,7 +6826,7 @@ tcp_eager_kill(void *arg, mblk_t *mp, void *arg2)
 		CONN_DEC_REF(listener->tcp_connp);
 	}
 
-	if (eager->tcp_state > TCPS_BOUND)
+	if (eager->tcp_state != TCPS_CLOSED)
 		tcp_close_detached(eager);
 }
 
@@ -12360,8 +12360,7 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 		conn_ind->OPT_length = 0;
 		conn_ind->OPT_offset = 0;
 	}
-	if (listener->tcp_state == TCPS_CLOSED ||
-	    TCP_IS_DETACHED(listener)) {
+	if (listener->tcp_state != TCPS_LISTEN) {
 		/*
 		 * If listener has closed, it would have caused a
 		 * a cleanup/blowoff to happen for the eager. We
@@ -17519,19 +17518,12 @@ tcp_send_pending(void *arg, mblk_t *mp, void *arg2)
 	bcopy(mp->b_rptr + conn_ind->OPT_offset, &tcp,
 	    conn_ind->OPT_length);
 
-	if (listener->tcp_state == TCPS_CLOSED ||
-	    TCP_IS_DETACHED(listener)) {
+	if (listener->tcp_state != TCPS_LISTEN) {
 		/*
 		 * If listener has closed, it would have caused a
-		 * a cleanup/blowoff to happen for the eager.
-		 *
-		 * We need to drop the ref on eager that was put
-		 * tcp_rput_data() before trying to send the conn_ind
-		 * to listener. The conn_ind was deferred in tcp_send_conn_ind
-		 * and tcp_wput_accept() is sending this deferred conn_ind but
-		 * listener is closed so we drop the ref.
+		 * a cleanup/blowoff to happen for the eager, so
+		 * we don't need to do anything more.
 		 */
-		CONN_DEC_REF(tcp->tcp_connp);
 		freemsg(mp);
 		return;
 	}

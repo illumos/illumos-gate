@@ -7000,7 +7000,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 	if (IPCL_IS_TCP(connp)) {
 		/* do not drain, certain use cases can blow the stack */
 		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, connp->conn_recv,
-		    connp, ip_squeue_flag, SQTAG_IP_FANOUT_TCP);
+		    connp, SQ_NODRAIN, SQTAG_IP_FANOUT_TCP);
 	} else {
 		/* Not TCP; must be SOCK_RAW, IPPROTO_TCP */
 		(connp->conn_recv)(connp, first_mp, NULL);
