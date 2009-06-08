@@ -330,6 +330,42 @@ report_class(papi_service_t svc, char *name, papi_printer_t printer,
 	return (0);
 }
 
+static int
+get_remote_hostname(papi_attribute_t **attrs, char **host)
+{
+	char *uri = NULL;
+	uri_t *u;
+	char *nodename;
+
+	*host = NULL;
+	(void) papiAttributeListGetString(attrs, NULL,
+	    "job-originating-host-name", host);
+	(void) papiAttributeListGetString(attrs, NULL,
+	    "printer-uri-supported", &uri);
+	if (*host == NULL) {
+		if (uri != NULL) {
+			if (uri_from_string(uri, &u) == 0) {
+				if (u->host == NULL) {
+					uri_free(u);
+					return (0);
+				}
+				*host = strdup(u->host);
+				uri_free(u);
+			} else {
+				return (0);
+			}
+		} else {
+			return (0);
+		}
+	}
+	nodename = localhostname();
+	if ((strcasecmp(*host, "localhost") == 0) ||
+	    (strcasecmp(*host, nodename) == 0)) {
+		return (0);
+	}
+	return (1);
+}
+
 static char *report_printer_keys[] = { "printer-name",
 			"printer-uri-supported", "printer-state",
 			"printer-up-time", "printer-state-time",
@@ -438,7 +474,15 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 	if (verbose == 1) {
 		void *iter;
 		char *str;
+		char *host = NULL;
 
+		if ((get_remote_hostname(attrs, &host)) != 0) {
+			(void) printf(
+			    gettext("\tRemote Name: %s\n\tRemote Server: "
+			    "%s\n"), name, host);
+			free(host);
+			return (0);
+		}
 		str = "";
 		(void) papiAttributeListGetString(attrs, NULL,
 		    "form-ready", &str);
