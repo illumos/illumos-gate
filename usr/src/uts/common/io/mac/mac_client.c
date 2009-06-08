@@ -1792,7 +1792,6 @@ bail:
 	if (nactiveclients_added)
 		mip->mi_nactiveclients--;
 
-	kmem_free(muip, sizeof (mac_unicast_impl_t));
 	return (err);
 }
 
@@ -1864,8 +1863,6 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	 */
 	if ((mcip->mci_state_flags & MCIS_IS_VNIC) && is_primary &&
 	    !is_vnic_primary) {
-		mac_unicast_impl_t	*muip;
-
 		/*
 		 * The address is being set by the upper MAC client
 		 * of a VNIC. The MAC address was already set by the
@@ -2470,6 +2467,8 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 				mcip->mci_rx_p_fn = NULL;
 				mcip->mci_rx_p_arg = NULL;
 			}
+		} else {
+			kmem_free(muip, sizeof (mac_unicast_impl_t));
 		}
 	}
 	i_mac_perim_exit(mip);
