@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Simple doors name server cache daemon
@@ -39,6 +37,7 @@
 #include <sys/stat.h>
 #include <tsol/label.h>
 #include <zone.h>
+#include <signal.h>
 #include "cache.h"
 #include "nscd_log.h"
 #include "nscd_selfcred.h"
@@ -436,6 +435,13 @@ gettext("%s already running.... no administration option specified\n"),
 			detachfromtty();
 		}
 	} else { /* NSCD_FORKER */
+		/*
+		 * To avoid PUN (Per User Nscd) processes from becoming
+		 * zombies after they exit, the forking nscd should
+		 * ignore the SIGCLD signal so that it does not
+		 * need to wait for every child PUN to exit.
+		 */
+		(void) signal(SIGCLD, SIG_IGN);
 		(void) open("/dev/null", O_RDWR, 0);
 		(void) dup(0);
 		if (_logfd != 2)
