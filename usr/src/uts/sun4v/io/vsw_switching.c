@@ -75,7 +75,7 @@ void vsw_setup_switching_thread(void *arg);
 int vsw_setup_switching_start(vsw_t *vswp);
 void vsw_setup_switching_stop(vsw_t *vswp);
 int vsw_setup_switching(vsw_t *);
-void vsw_setup_layer2_post_process(vsw_t *vswp);
+void vsw_setup_switching_post_process(vsw_t *vswp);
 void vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller,
     vsw_port_t *port, mac_resource_handle_t mrh);
 static	int vsw_setup_layer2(vsw_t *);
@@ -139,7 +139,8 @@ extern int vsw_mac_multicast_add(vsw_t *vswp, vsw_port_t *port,
     mcst_addr_t *mcst_p, int type);
 extern void vsw_mac_multicast_remove(vsw_t *vswp, vsw_port_t *port,
     mcst_addr_t *mcst_p, int type);
-extern void vsw_physlink_state_update(vsw_t *vswp);
+extern void vsw_mac_link_update(vsw_t *vswp, link_state_t link_state);
+extern void vsw_physlink_update_ports(vsw_t *vswp);
 
 /*
  * Tunables used in this file.
@@ -214,7 +215,7 @@ vsw_setup_switching_thread(void *arg)
 		mutex_exit(&vswp->sw_thr_lock);
 		rv = vsw_setup_switching(vswp);
 		if (rv == 0) {
-			vsw_setup_layer2_post_process(vswp);
+			vsw_setup_switching_post_process(vswp);
 		}
 		mutex_enter(&vswp->sw_thr_lock);
 		if (rv != EAGAIN) {
@@ -674,11 +675,13 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 }
 
 /*
- * Setup mac addrs and hio resources for layer 2 switching only.
+ * Additional initializations that are needed for the specific switching mode.
  */
 void
-vsw_setup_layer2_post_process(vsw_t *vswp)
+vsw_setup_switching_post_process(vsw_t *vswp)
 {
+	link_state_t	link_state = LINK_STATE_UP;
+
 	if (vswp->smode & VSW_LAYER2) {
 		/*
 		 * Program unicst, mcst addrs of vsw
@@ -689,9 +692,15 @@ vsw_setup_layer2_post_process(vsw_t *vswp)
 		/* Start HIO for ports that have already connected */
 		vsw_hio_start_ports(vswp);
 
+		if (vswp->pls_update == B_TRUE) {
+			link_state = vswp->phys_link_state;
+		}
+
 		/* Update physical link info to any ports already connected */
-		vsw_physlink_state_update(vswp);
+		vsw_physlink_update_ports(vswp);
 	}
+
+	vsw_mac_link_update(vswp, link_state);
 }
 
 /*

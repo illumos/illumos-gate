@@ -116,7 +116,7 @@ static int vsw_m_unicst(void *arg, const uint8_t *);
 static int vsw_m_multicst(void *arg, boolean_t, const uint8_t *);
 static int vsw_m_promisc(void *arg, boolean_t);
 static mblk_t *vsw_m_tx(void *arg, mblk_t *);
-static void vsw_mac_link_update(vsw_t *vswp, link_state_t link_state);
+void vsw_mac_link_update(vsw_t *vswp, link_state_t link_state);
 void vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
     mblk_t *mp, vsw_macrx_flags_t flags);
 void vsw_physlink_state_update(vsw_t *vswp);
@@ -145,7 +145,7 @@ extern int vsw_mac_open(vsw_t *vswp);
 extern void vsw_mac_close(vsw_t *vswp);
 extern void vsw_mac_cleanup_ports(vsw_t *vswp);
 extern void vsw_unset_addrs(vsw_t *vswp);
-extern void vsw_setup_layer2_post_process(vsw_t *vswp);
+extern void vsw_setup_switching_post_process(vsw_t *vswp);
 extern void vsw_create_vlans(void *arg, int type);
 extern void vsw_destroy_vlans(void *arg, int type);
 extern void vsw_vlan_add_ids(void *arg, int type);
@@ -1989,17 +1989,16 @@ vsw_linkprop_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 	}
 }
 
-static void
+void
 vsw_mac_link_update(vsw_t *vswp, link_state_t link_state)
 {
 	READ_ENTER(&vswp->if_lockrw);
-	if ((vswp->if_state & VSW_IF_UP) == 0) {
-		RW_EXIT(&vswp->if_lockrw);
-		return;
-	}
-	RW_EXIT(&vswp->if_lockrw);
 
-	mac_link_update(vswp->if_mh, link_state);
+	if (vswp->if_state & VSW_IF_REG) {
+		mac_link_update(vswp->if_mh, link_state);
+	}
+
+	RW_EXIT(&vswp->if_lockrw);
 }
 
 void
@@ -2183,7 +2182,10 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 			 * Phys link state update is now enabled. Send up an
 			 * update based on the current phys link state.
 			 */
-			vsw_mac_link_update(vswp, vswp->phys_link_state);
+			if (vswp->smode & VSW_LAYER2) {
+				vsw_mac_link_update(vswp,
+				    vswp->phys_link_state);
+			}
 		}
 
 	}
@@ -2258,7 +2260,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 			goto fail_update;
 		}
 
-		vsw_setup_layer2_post_process(vswp);
+		vsw_setup_switching_post_process(vswp);
 	} else if (updated & MD_macaddr) {
 		/*
 		 * We enter here if only MD_macaddr is exclusively updated.
