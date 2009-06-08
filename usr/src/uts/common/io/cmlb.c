@@ -1827,7 +1827,10 @@ cmlb_resync_geom_caches(struct cmlb_lun *cl, diskaddr_t capacity,
 
 	spc = pgeomp->g_nhead * pgeomp->g_nsect;
 	pgeomp->g_capacity = capacity;
-	pgeomp->g_ncyl = pgeomp->g_capacity / spc;
+	if (spc == 0)
+		pgeomp->g_ncyl = 0;
+	else
+		pgeomp->g_ncyl = pgeomp->g_capacity / spc;
 	pgeomp->g_acyl = 0;
 
 	/*
@@ -2815,7 +2818,8 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 		phys_spc = cl->cl_g.dkg_nhead * cl->cl_g.dkg_nsect;
 	}
 
-	ASSERT(phys_spc != 0);
+	if (phys_spc == 0)
+		return;
 	cl->cl_g.dkg_pcyl = cl->cl_solaris_size / phys_spc;
 	if (cl->cl_alter_behavior & CMLB_FAKE_LABEL_ONE_PARTITION) {
 		/* disable devid */
