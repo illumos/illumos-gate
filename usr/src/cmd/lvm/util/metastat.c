@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <errno.h>
@@ -756,6 +755,7 @@ delete_hotspares_impl(mdsetname_t *sp, mdhspname_t *hspnp, md_hsp_t *hspp)
 
 			if (meta_hs_delete(sp, hspnp, nlp, 0, &e) != NULL) {
 				mde_perror(&e, "");
+				mdclrerror(&e);
 			} else {
 				deleted_hs++;
 			}
@@ -810,6 +810,7 @@ md_probe_ioctl(mdsetname_t *sp, mdnamelist_t *nlp, int ndevs, char *drvname)
 
 	if (metaioctl(MD_IOCPROBE_DEV, iocp, &(iocp->mde), NULL) != 0)
 			retval = -1;
+	Free((void *)(uintptr_t)iocp->mnum_list);
 	return (retval);
 }
 /*
@@ -1007,6 +1008,8 @@ probe_mirror_devs(mdsetname_t *sp)
 		cnt = get_toplevel_mds(sp, &nlp, &toplp);
 		if (cnt && (md_probe_ioctl(sp, toplp, cnt, MD_MIRROR) < 0))
 				perror("MD_IOCPROBE_DEV");
+	} else {
+		mdclrerror(&e);
 	}
 	metafreenamelist(nlp);
 	metafreenamelist(toplp);
@@ -1032,6 +1035,8 @@ probe_raid_devs(mdsetname_t *sp)
 
 		if (cnt && (md_probe_ioctl(sp, toplp, cnt, MD_RAID) < 0))
 			perror("MD_IOCPROBE_DEV");
+	} else {
+		mdclrerror(&e);
 	}
 	metafreenamelist(nlp);
 	metafreenamelist(toplp);
@@ -1090,6 +1095,8 @@ probe_trans_devs(mdsetname_t *sp)
 			perror("MD_IOCPROBE_DEV");
 		metafreenamelist(trans_stripelp);
 		metafreenamelist(nlp);
+	} else {
+		mdclrerror(&e);
 	}
 }
 
@@ -1103,21 +1110,16 @@ void
 probe_hotspare_devs(mdsetname_t *sp)
 {
 	mdhspnamelist_t *hspnlp = NULL;
-	int		cnt;
 	mdhspnamelist_t	*p;
 	md_hsp_t	*hspp;
 	md_error_t	e = mdnullerror;
 
-	if ((cnt = meta_get_hsp_names(sp, &hspnlp, 0, &e)) < 0) {
-		mderror(&e, MDE_UNIT_NOT_FOUND, NULL);
-		return;
-	} else if (cnt == 0) {
-		mderror(&e, MDE_NO_HSPS, NULL);
+	if (meta_get_hsp_names(sp, &hspnlp, 0, &e) <= 0) {
+		mdclrerror(&e);
 		return;
 	}
 	for (p = hspnlp; (p != NULL); p = p->next) {
 		mdhspname_t	*hspnp = p->hspnamep;
-
 
 		if ((hspp = meta_get_hsp(sp, hspnp, &e)) == NULL)
 			continue;
@@ -1127,6 +1129,7 @@ probe_hotspare_devs(mdsetname_t *sp)
 		}
 	}
 	metafreehspnamelist(hspnlp);
+	mdclrerror(&e);
 }
 
 static void
@@ -1297,6 +1300,7 @@ print_concise_diskset(mdsetname_t *sp)
 		(void) printf("\n");
 	}
 
+	mdclrerror(&error);
 	metafreehspnamelist(hsp_list);
 	}
 }
@@ -1366,6 +1370,7 @@ print_concise_mirror(int indent, mdsetname_t *sp, md_mirror_t *mirror)
 			    mirror->submirrors[i].submirnamep->dev,
 			    &tstate, &error);
 
+		mdclrerror(&error);
 		state = get_sm_state(mirror, i, status, tstate);
 		if (state != NULL)
 			(void) printf(" (%s)", state);
@@ -1416,6 +1421,7 @@ print_concise_raid(int indent, mdsetname_t *sp, md_raid_t *raid)
 			uint_t tstate = 0;
 
 			(void) meta_get_tstate(namep->dev, &tstate, &error);
+			mdclrerror(&error);
 			col_state = get_raid_col_state(colp, tstate);
 
 		} else {
@@ -1484,6 +1490,7 @@ print_concise_stripe(int indent, mdsetname_t *sp, md_stripe_t *stripe)
 				uint_t tstate = 0;
 				(void) meta_get_tstate(comp->compnamep->dev,
 				    &tstate, &error);
+				mdclrerror(&error);
 				comp_state = get_stripe_state(comp, tstate);
 			} else {
 			if (top_tstate != 0)
@@ -1585,8 +1592,10 @@ print_concise_md(int indent, mdsetname_t *sp, mdname_t *np)
 	if (np == NULL || !metaismeta(np))
 		return;
 
-	if ((u = meta_get_mdunit(sp, np, &error)) == NULL)
+	if ((u = meta_get_mdunit(sp, np, &error)) == NULL) {
+		mdclrerror(&error);
 		return;
+	}
 
 	switch (u->c.un_type) {
 		case MD_DEVICE:
@@ -1617,6 +1626,7 @@ print_concise_md(int indent, mdsetname_t *sp, mdname_t *np)
 		default:
 			return;
 	}
+	mdclrerror(&error);
 }
 
 /*

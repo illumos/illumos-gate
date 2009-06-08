@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "md_monitord.h"
 
@@ -83,6 +82,7 @@ delete_hotspares_impl(mdhspname_t *hspnp, md_hsp_t *hspp, boolean_e verbose)
 
 			if (meta_hs_delete(sp, hspnp, nlp, 0, &e) != NULL) {
 				mde_perror(&e, "");
+				mdclrerror(&e);
 			} else {
 				deleted_hs++;
 			}
@@ -149,6 +149,8 @@ md_probe_ioctl(mdnamelist_t *nlp, int ndevs, char *drvname, boolean_e verbose)
 		if (metaioctl(MD_IOCPROBE_DEV, iocp, &(iocp->mde), NULL) != 0)
 			retval = -1;
 	}
+
+	Free((void *)(uintptr_t)iocp->mnum_list);
 	return (retval);
 }
 /*
@@ -204,6 +206,7 @@ get_toplevel_mds(mdnamelist_t **lpp, mdnamelist_t **top_pp, boolean_e verbose)
 
 	while (p) {
 		if ((mdp = meta_get_unit(sp, p->namep, &e)) == NULL) {
+			mdclrerror(&e);
 			if (verbose == True)
 				monitord_print(6, gettext(
 				    "......error on (%d)%s\n"), i,
@@ -243,6 +246,7 @@ get_namelist(mdnamelist_t **transdevlist, mdnamelist_t **devlist,
 	while (np) {
 		if ((type_name = metagetmiscname(np->namep, &e)) == NULL) {
 			*devlist = NULL;
+			mdclrerror(&e);
 			return (-1);
 		}
 		if (strcmp(type_name, dev_type) == 0) {
@@ -334,6 +338,8 @@ create_trans_compslist(mdnamelist_t **lpp, mdnamelist_t **top_pp,
 				ntoptrans++;
 			}
 			p = p->next;
+		} else {
+			mdclrerror(&e);
 		}
 	}
 	*top_pp = toplp;
@@ -363,6 +369,8 @@ probe_mirror_devs(boolean_e verbose)
 			    "mirror components %d ioctl error\n"),
 			    cnt);
 
+	} else {
+		mdclrerror(&e);
 	}
 
 	metafreenamelist(nlp);
@@ -392,7 +400,8 @@ probe_raid_devs(boolean_e verbose)
 			    "probe_raid_devs: "
 			    "RAID-5 components %d ioctl error\n"),
 			    cnt);
-
+	} else {
+		mdclrerror(&e);
 	}
 
 	metafreenamelist(nlp);
@@ -470,8 +479,9 @@ probe_trans_devs(boolean_e verbose)
 
 		metafreenamelist(trans_stripelp);
 		metafreenamelist(nlp);
+	} else {
+		mdclrerror(&e);
 	}
-
 }
 
 /*
@@ -484,18 +494,15 @@ void
 probe_hotspare_devs(boolean_e verbose)
 {
 	mdhspnamelist_t *hspnlp = NULL;
-	int		cnt;
 	mdhspnamelist_t	*p;
 	md_hsp_t	*hspp;
 	md_error_t	e = mdnullerror;
 
-	if ((cnt = meta_get_hsp_names(sp, &hspnlp, 0, &e)) < 0) {
-		mderror(&e, MDE_UNIT_NOT_FOUND, NULL);
-		return;
-	} else if (cnt == 0) {
-		mderror(&e, MDE_NO_HSPS, NULL);
+	if (meta_get_hsp_names(sp, &hspnlp, 0, &e) <= 0) {
+		mdclrerror(&e);
 		return;
 	}
+
 	for (p = hspnlp; (p != NULL); p = p->next) {
 		mdhspname_t	*hspnp = p->hspnamep;
 
@@ -513,5 +520,6 @@ probe_hotspare_devs(boolean_e verbose)
 			delete_hotspares_impl(hspnp, hspp, verbose);
 		}
 	}
+	mdclrerror(&e);
 	metafreehspnamelist(hspnlp);
 }

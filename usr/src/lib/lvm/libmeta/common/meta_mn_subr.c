@@ -19,9 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -232,8 +233,9 @@ meta_mn_send_command(
 	} else {
 		send_message_type = MD_MN_MSG_BC_CMD;
 	}
-	err = mdmn_send_message(sp->setno, send_message_type,
-	    send_message_flags, 0, cmd, 1024, &resp, ep);
+	err = mdmn_send_message(
+	    sp->setno, send_message_type, send_message_flags, 0,
+	    cmd, 1024, &resp, ep);
 
 	free(cmd);
 
@@ -371,6 +373,7 @@ meta_read_nodelist(
 	if ((fp = fopen(META_MNSET_NODELIST, "r")) == NULL) {
 		mndiskset_membershiplist_t	*nlp;
 		struct hostent *hp;
+		int err = 0;
 
 		/* return this node with id of 1 */
 		nlp = *tailp = Zalloc(sizeof (*nlp));
@@ -385,24 +388,28 @@ meta_read_nodelist(
 
 		/* retrieve info about our host */
 		if ((hp = gethostbyname(buf)) == NULL) {
-			return (mdsyserror(ep, EADDRNOTAVAIL, buf));
-		}
-		/* We only do IPv4 addresses, for now */
-		if (hp->h_addrtype != AF_INET) {
-			return (mdsyserror(ep, EPFNOSUPPORT, buf));
-		}
-		/* We take the first address only */
-		if (*hp->h_addr_list) {
-			struct in_addr in;
-
-			(void) memcpy(&in.s_addr, *hp->h_addr_list,
-			    sizeof (struct in_addr));
-			(void) strncpy(nlp->msl_node_addr, inet_ntoa(in),
-			    MD_MAX_NODENAME);
+			err = EADDRNOTAVAIL;
 		} else {
-			return (mdsyserror(ep, EADDRNOTAVAIL, buf));
-		}
+			/* We only do IPv4 addresses, for now */
+			if (hp->h_addrtype != AF_INET) {
+				err = EPFNOSUPPORT;
+			}
+			/* We take the first address only */
+			if (*hp->h_addr_list) {
+				struct in_addr in;
 
+				(void) memcpy(&in.s_addr, *hp->h_addr_list,
+				    sizeof (struct in_addr));
+				(void) strncpy(nlp->msl_node_addr,
+				    inet_ntoa(in), MD_MAX_NODENAME);
+			} else {
+				err = EADDRNOTAVAIL;
+			}
+		}
+		if (err) {
+			meta_free_nodelist(*nl);
+			return (mdsyserror(ep, err, buf));
+		}
 		return (0);
 	}
 
@@ -480,9 +487,10 @@ meta_read_nodelist(
 	}
 
 	/* close file */
-	if ((fp) && (fclose(fp) != 0))
+	if ((fp) && (fclose(fp) != 0)) {
+		meta_free_nodelist(*nl);
 		return (mdsyserror(ep, errno, META_MNSET_NODELIST));
-
+	}
 	return (0);
 }
 
