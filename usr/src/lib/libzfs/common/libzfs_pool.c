@@ -42,6 +42,7 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/zio.h>
 #include <strings.h>
+#include <dlfcn.h>
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
@@ -54,6 +55,10 @@ static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
 #else
 #define	BOOTCMD	"installboot(1M)"
 #endif
+
+#define	DISK_ROOT	"/dev/dsk"
+#define	RDISK_ROOT	"/dev/rdsk"
+#define	BACKUP_SLICE	"s2"
 
 /*
  * ====================================================================
@@ -626,6 +631,12 @@ zpool_expand_proplist(zpool_handle_t *zhp, zprop_list_t **plp)
 	return (0);
 }
 
+
+/*
+ * Don't start the slice at the default block of 34; many storage
+ * devices will use a stripe width of 128k, so start there instead.
+ */
+#define	NEW_START_BLOCK	256
 
 /*
  * Validate the given pool name, optionally putting an extended error message in
@@ -1369,46 +1380,90 @@ zpool_scrub(zpool_handle_t *zhp, pool_scrub_type_t type)
 }
 
 /*
+ * Find a vdev that matches the search criteria specified. We use the
+ * the nvpair name to determine how we should look for the device.
  * 'avail_spare' is set to TRUE if the provided guid refers to an AVAIL
  * spare; but FALSE if its an INUSE spare.
  */
 static nvlist_t *
-vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
-    boolean_t *avail_spare, boolean_t *l2cache, boolean_t *log)
+vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
+    boolean_t *l2cache, boolean_t *log)
 {
 	uint_t c, children;
 	nvlist_t **child;
-	uint64_t theguid, present;
-	char *path;
-	uint64_t wholedisk = 0;
 	nvlist_t *ret;
 	uint64_t is_log;
+	char *srchkey;
+	nvpair_t *pair = nvlist_next_nvpair(search, NULL);
 
-	verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &theguid) == 0);
+	/* Nothing to look for */
+	if (search == NULL || pair == NULL)
+		return (NULL);
 
-	if (search == NULL &&
-	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT, &present) == 0) {
-		/*
-		 * If the device has never been present since import, the only
-		 * reliable way to match the vdev is by GUID.
-		 */
-		if (theguid == guid)
-			return (nv);
-	} else if (search != NULL &&
-	    nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
-		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
-		    &wholedisk);
-		if (wholedisk) {
-			/*
-			 * For whole disks, the internal path has 's0', but the
-			 * path passed in by the user doesn't.
-			 */
-			if (strlen(search) == strlen(path) - 2 &&
-			    strncmp(search, path, strlen(search)) == 0)
-				return (nv);
-		} else if (strcmp(search, path) == 0) {
-			return (nv);
+	/* Obtain the key we will use to search */
+	srchkey = nvpair_name(pair);
+
+	switch (nvpair_type(pair)) {
+	case DATA_TYPE_UINT64: {
+		uint64_t srchval, theguid, present;
+
+		verify(nvpair_value_uint64(pair, &srchval) == 0);
+		if (strcmp(srchkey, ZPOOL_CONFIG_GUID) == 0) {
+			if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
+			    &present) == 0) {
+				/*
+				 * If the device has never been present since
+				 * import, the only reliable way to match the
+				 * vdev is by GUID.
+				 */
+				verify(nvlist_lookup_uint64(nv,
+				    ZPOOL_CONFIG_GUID, &theguid) == 0);
+				if (theguid == srchval)
+					return (nv);
+			}
 		}
+		break;
+	}
+
+	case DATA_TYPE_STRING: {
+		char *srchval, *val;
+
+		verify(nvpair_value_string(pair, &srchval) == 0);
+		if (nvlist_lookup_string(nv, srchkey, &val) != 0)
+			break;
+
+		/*
+		 * Search for the requested value. We special case the search
+		 * for ZPOOL_CONFIG_PATH when it's a wholedisk. Otherwise,
+		 * all other searches are simple string compares.
+		 */
+		if (strcmp(srchkey, ZPOOL_CONFIG_PATH) == 0 && val) {
+			uint64_t wholedisk = 0;
+
+			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
+			    &wholedisk);
+			if (wholedisk) {
+				/*
+				 * For whole disks, the internal path has 's0',
+				 * but the path passed in by the user doesn't.
+				 */
+				if (strlen(srchval) == strlen(val) - 2 &&
+				    strncmp(srchval, val, strlen(srchval)) == 0)
+					return (nv);
+				break;
+			}
+		}
+
+		/*
+		 * Common case
+		 */
+		if (strcmp(srchval, val) == 0)
+			return (nv);
+		break;
+	}
+
+	default:
+		break;
 	}
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
@@ -1416,7 +1471,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 		return (NULL);
 
 	for (c = 0; c < children; c++) {
-		if ((ret = vdev_to_nvlist_iter(child[c], search, guid,
+		if ((ret = vdev_to_nvlist_iter(child[c], search,
 		    avail_spare, l2cache, NULL)) != NULL) {
 			/*
 			 * The 'is_log' value is only set for the toplevel
@@ -1437,7 +1492,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
 	    &child, &children) == 0) {
 		for (c = 0; c < children; c++) {
-			if ((ret = vdev_to_nvlist_iter(child[c], search, guid,
+			if ((ret = vdev_to_nvlist_iter(child[c], search,
 			    avail_spare, l2cache, NULL)) != NULL) {
 				*avail_spare = B_TRUE;
 				return (ret);
@@ -1448,7 +1503,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
 	    &child, &children) == 0) {
 		for (c = 0; c < children; c++) {
-			if ((ret = vdev_to_nvlist_iter(child[c], search, guid,
+			if ((ret = vdev_to_nvlist_iter(child[c], search,
 			    avail_spare, l2cache, NULL)) != NULL) {
 				*l2cache = B_TRUE;
 				return (ret);
@@ -1459,24 +1514,48 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 	return (NULL);
 }
 
+/*
+ * Given a physical path (minus the "/devices" prefix), find the
+ * associated vdev.
+ */
+nvlist_t *
+zpool_find_vdev_by_physpath(zpool_handle_t *zhp, const char *ppath,
+    boolean_t *avail_spare, boolean_t *l2cache, boolean_t *log)
+{
+	nvlist_t *search, *nvroot, *ret;
+
+	verify(nvlist_alloc(&search, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	verify(nvlist_add_string(search, ZPOOL_CONFIG_PHYS_PATH, ppath) == 0);
+
+	verify(nvlist_lookup_nvlist(zhp->zpool_config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) == 0);
+
+	*avail_spare = B_FALSE;
+	ret = vdev_to_nvlist_iter(nvroot, search, avail_spare, l2cache, log);
+	nvlist_free(search);
+
+	return (ret);
+}
+
 nvlist_t *
 zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
     boolean_t *l2cache, boolean_t *log)
 {
 	char buf[MAXPATHLEN];
-	const char *search;
 	char *end;
-	nvlist_t *nvroot;
+	nvlist_t *nvroot, *search, *ret;
 	uint64_t guid;
+
+	verify(nvlist_alloc(&search, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	guid = strtoull(path, &end, 10);
 	if (guid != 0 && *end == '\0') {
-		search = NULL;
+		verify(nvlist_add_uint64(search, ZPOOL_CONFIG_GUID, guid) == 0);
 	} else if (path[0] != '/') {
 		(void) snprintf(buf, sizeof (buf), "%s%s", "/dev/dsk/", path);
-		search = buf;
+		verify(nvlist_add_string(search, ZPOOL_CONFIG_PATH, buf) == 0);
 	} else {
-		search = path;
+		verify(nvlist_add_string(search, ZPOOL_CONFIG_PATH, path) == 0);
 	}
 
 	verify(nvlist_lookup_nvlist(zhp->zpool_config, ZPOOL_CONFIG_VDEV_TREE,
@@ -1486,8 +1565,10 @@ zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
 	*l2cache = B_FALSE;
 	if (log != NULL)
 		*log = B_FALSE;
-	return (vdev_to_nvlist_iter(nvroot, search, guid, avail_spare,
-	    l2cache, log));
+	ret = vdev_to_nvlist_iter(nvroot, search, avail_spare, l2cache, log);
+	nvlist_free(search);
+
+	return (ret);
 }
 
 static int
@@ -1668,6 +1749,45 @@ is_guid_type(zpool_handle_t *zhp, uint64_t guid, const char *type)
 }
 
 /*
+ * If the device has being dynamically expanded then we need to relabel
+ * the disk to use the new unallocated space.
+ */
+static int
+zpool_relabel_disk(libzfs_handle_t *hdl, const char *name)
+{
+	char path[MAXPATHLEN];
+	char errbuf[1024];
+	int fd, error;
+	int (*_efi_use_whole_disk)(int);
+
+	if ((_efi_use_whole_disk = (int (*)(int))dlsym(RTLD_DEFAULT,
+	    "efi_use_whole_disk")) == NULL)
+		return (-1);
+
+	(void) snprintf(path, sizeof (path), "%s/%s", RDISK_ROOT, name);
+
+	if ((fd = open(path, O_RDWR | O_NDELAY)) < 0) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "cannot "
+		    "relabel '%s': unable to open device"), name);
+		return (zfs_error(hdl, EZFS_OPENFAILED, errbuf));
+	}
+
+	/*
+	 * It's possible that we might encounter an error if the device
+	 * does not have any unallocated space left. If so, we simply
+	 * ignore that error and continue on.
+	 */
+	error = _efi_use_whole_disk(fd);
+	(void) close(fd);
+	if (error && error != VT_ENOSPC) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "cannot "
+		    "relabel '%s': unable to read disk capacity"), name);
+		return (zfs_error(hdl, EZFS_NOCAP, errbuf));
+	}
+	return (0);
+}
+
+/*
  * Bring the specified vdev online.   The 'flags' parameter is a set of the
  * ZFS_ONLINE_* flags.
  */
@@ -1678,15 +1798,20 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 	zfs_cmd_t zc = { 0 };
 	char msg[1024];
 	nvlist_t *tgt;
-	boolean_t avail_spare, l2cache;
+	boolean_t avail_spare, l2cache, islog;
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 
-	(void) snprintf(msg, sizeof (msg),
-	    dgettext(TEXT_DOMAIN, "cannot online %s"), path);
+	if (flags & ZFS_ONLINE_EXPAND) {
+		(void) snprintf(msg, sizeof (msg),
+		    dgettext(TEXT_DOMAIN, "cannot expand %s"), path);
+	} else {
+		(void) snprintf(msg, sizeof (msg),
+		    dgettext(TEXT_DOMAIN, "cannot online %s"), path);
+	}
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
-	    NULL)) == NULL)
+	    &islog)) == NULL)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
@@ -1694,6 +1819,31 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 	if (avail_spare ||
 	    is_guid_type(zhp, zc.zc_guid, ZPOOL_CONFIG_SPARES) == B_TRUE)
 		return (zfs_error(hdl, EZFS_ISSPARE, msg));
+
+	if (flags & ZFS_ONLINE_EXPAND ||
+	    zpool_get_prop_int(zhp, ZPOOL_PROP_AUTOEXPAND, NULL)) {
+		char *pathname = NULL;
+		uint64_t wholedisk = 0;
+
+		(void) nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk);
+		verify(nvlist_lookup_string(tgt, ZPOOL_CONFIG_PATH,
+		    &pathname) == 0);
+
+		/*
+		 * XXX - L2ARC 1.0 devices can't support expansion.
+		 */
+		if (l2cache) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "cannot expand cache devices"));
+			return (zfs_error(hdl, EZFS_VDEVNOTSUP, msg));
+		}
+
+		if (wholedisk) {
+			pathname += strlen(DISK_ROOT) + 1;
+			(void) zpool_relabel_disk(zhp->zpool_hdl, pathname);
+		}
+	}
 
 	zc.zc_cookie = VDEV_STATE_ONLINE;
 	zc.zc_obj = flags;
@@ -2877,14 +3027,6 @@ zpool_obj_to_path(zpool_handle_t *zhp, uint64_t dsobj, uint64_t obj,
 	}
 	free(mntpnt);
 }
-
-#define	RDISK_ROOT	"/dev/rdsk"
-#define	BACKUP_SLICE	"s2"
-/*
- * Don't start the slice at the default block of 34; many storage
- * devices will use a stripe width of 128k, so start there instead.
- */
-#define	NEW_START_BLOCK	256
 
 /*
  * Read the EFI label from the config, if a label does not exist then

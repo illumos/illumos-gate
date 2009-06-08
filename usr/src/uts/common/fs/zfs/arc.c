@@ -124,6 +124,7 @@
 #include <sys/arc.h>
 #include <sys/refcount.h>
 #include <sys/vdev.h>
+#include <sys/vdev_impl.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
 #include <vm/anon.h>
@@ -4535,7 +4536,7 @@ l2arc_vdev_present(vdev_t *vd)
  * validated the vdev and opened it.
  */
 void
-l2arc_add_vdev(spa_t *spa, vdev_t *vd, uint64_t start, uint64_t end)
+l2arc_add_vdev(spa_t *spa, vdev_t *vd)
 {
 	l2arc_dev_t *adddev;
 
@@ -4549,8 +4550,8 @@ l2arc_add_vdev(spa_t *spa, vdev_t *vd, uint64_t start, uint64_t end)
 	adddev->l2ad_vdev = vd;
 	adddev->l2ad_write = l2arc_write_max;
 	adddev->l2ad_boost = l2arc_write_boost;
-	adddev->l2ad_start = start;
-	adddev->l2ad_end = end;
+	adddev->l2ad_start = VDEV_LABEL_START_SIZE;
+	adddev->l2ad_end = VDEV_LABEL_START_SIZE + vdev_get_min_asize(vd);
 	adddev->l2ad_hand = adddev->l2ad_start;
 	adddev->l2ad_evict = adddev->l2ad_start;
 	adddev->l2ad_first = B_TRUE;

@@ -742,6 +742,27 @@ zvol_set_volsize(const char *name, major_t maj, uint64_t volsize)
 		}
 	}
 
+	/*
+	 * Generate a LUN expansion event.
+	 */
+	if (error == 0) {
+		sysevent_id_t eid;
+		nvlist_t *attr;
+		char *physpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+
+		(void) snprintf(physpath, MAXPATHLEN, "%s%uc", ZVOL_PSEUDO_DEV,
+		    zv->zv_minor);
+
+		VERIFY(nvlist_alloc(&attr, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY(nvlist_add_string(attr, DEV_PHYS_PATH, physpath) == 0);
+
+		(void) ddi_log_sysevent(zfs_dip, SUNW_VENDOR, EC_DEV_STATUS,
+		    ESC_DEV_DLE, attr, &eid, DDI_SLEEP);
+
+		nvlist_free(attr);
+		kmem_free(physpath, MAXPATHLEN);
+	}
+
 out:
 	if (state.zv_objset)
 		dmu_objset_close(state.zv_objset);

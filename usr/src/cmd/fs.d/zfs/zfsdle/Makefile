@@ -24,24 +24,41 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS=	fstyp zfsdle
+FSTYPE=		zfs
+LIBPROG=	zfsdle
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-catalog:=       TARGET= catalog
+include ../../../../lib/Makefile.lib
+include ../../Makefile.fstype
+
+OBJS=		zfsdle.o
+SRCS=		$(OBJS:%.o=%.c)
+SUBDIRS=	etc
+
+all :=		TARGET = all
+install :=	TARGET = install
+clean :=	TARGET = clean
+clobber :=	TARGET = clobber
+lint :=		TARGET = lint
+
+CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+LDLIBS += -lnvpair -lzfs -lc
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+all: $(SUBDIRS) $(LIBPROG)
 
-all install clean clobber lint: $(SUBDIRS)
+install: .WAIT $(SUBDIRS)
 
-catalog:
+lint: lint_SRCS
 
-$(SUBDIRS):	FRC
+cstyle:
+	$(CSTYLE) $(SRCS)
+
+clean:     
+	${RM} $(OBJS)
+
+clobber: clean
+
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
-
 FRC:

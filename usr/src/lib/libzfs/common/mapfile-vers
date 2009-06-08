@@ -149,6 +149,7 @@ SUNWprivate_1.1 {
 	zpool_find_import_byname;
 	zpool_find_import_cached;
 	zpool_find_vdev;
+	zpool_find_vdev_by_physpath;
 	zpool_get_config;
 	zpool_get_errlog;
 	zpool_get_handle;

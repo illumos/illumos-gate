@@ -169,6 +169,7 @@ struct spa {
 	int		spa_minref;		/* num refs when first opened */
 	int		spa_mode;		/* FREAD | FWRITE */
 	spa_log_state_t spa_log_state;		/* log state */
+	uint64_t	spa_autoexpand;		/* lun expansion on/off */
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.

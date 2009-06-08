@@ -84,9 +84,8 @@ vdev_default_asize(vdev_t *vd, uint64_t psize)
 {
 	uint64_t asize = P2ROUNDUP(psize, 1ULL << vd->vdev_top->vdev_ashift);
 	uint64_t csize;
-	uint64_t c;
 
-	for (c = 0; c < vd->vdev_children; c++) {
+	for (int c = 0; c < vd->vdev_children; c++) {
 		csize = vdev_psize_to_asize(vd->vdev_child[c], psize);
 		asize = MAX(asize, csize);
 	}
@@ -95,40 +94,47 @@ vdev_default_asize(vdev_t *vd, uint64_t psize)
 }
 
 /*
- * Get the replaceable or attachable device size.
- * If the parent is a mirror or raidz, the replaceable size is the minimum
- * psize of all its children. For the rest, just return our own psize.
- *
- * e.g.
- *			psize	rsize
- * root			-	-
- *	mirror/raidz	-	-
- *	    disk1	20g	20g
- *	    disk2 	40g	20g
- *	disk3 		80g	80g
+ * Get the minimum allocatable size. We define the allocatable size as
+ * the vdev's asize rounded to the nearest metaslab. This allows us to
+ * replace or attach devices which don't have the same physical size but
+ * can still satisfy the same number of allocations.
  */
 uint64_t
-vdev_get_rsize(vdev_t *vd)
+vdev_get_min_asize(vdev_t *vd)
 {
-	vdev_t *pvd, *cvd;
-	uint64_t c, rsize;
-
-	pvd = vd->vdev_parent;
+	vdev_t *pvd = vd->vdev_parent;
 
 	/*
-	 * If our parent is NULL or the root, just return our own psize.
+	 * The our parent is NULL (inactive spare or cache) or is the root,
+	 * just return our own asize.
 	 */
-	if (pvd == NULL || pvd->vdev_parent == NULL)
-		return (vd->vdev_psize);
+	if (pvd == NULL)
+		return (vd->vdev_asize);
 
-	rsize = 0;
+	/*
+	 * The top-level vdev just returns the allocatable size rounded
+	 * to the nearest metaslab.
+	 */
+	if (vd == vd->vdev_top)
+		return (P2ALIGN(vd->vdev_asize, 1ULL << vd->vdev_ms_shift));
 
-	for (c = 0; c < pvd->vdev_children; c++) {
-		cvd = pvd->vdev_child[c];
-		rsize = MIN(rsize - 1, cvd->vdev_psize - 1) + 1;
-	}
+	/*
+	 * The allocatable space for a raidz vdev is N * sizeof(smallest child),
+	 * so each child must provide at least 1/Nth of its asize.
+	 */
+	if (pvd->vdev_ops == &vdev_raidz_ops)
+		return (pvd->vdev_min_asize / pvd->vdev_children);
 
-	return (rsize);
+	return (pvd->vdev_min_asize);
+}
+
+void
+vdev_set_min_asize(vdev_t *vd)
+{
+	vd->vdev_min_asize = vdev_get_min_asize(vd);
+
+	for (int c = 0; c < vd->vdev_children; c++)
+		vdev_set_min_asize(vd->vdev_child[c]);
 }
 
 vdev_t *
@@ -149,13 +155,12 @@ vdev_lookup_top(spa_t *spa, uint64_t vdev)
 vdev_t *
 vdev_lookup_by_guid(vdev_t *vd, uint64_t guid)
 {
-	int c;
 	vdev_t *mvd;
 
 	if (vd->vdev_guid == guid)
 		return (vd);
 
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++)
 		if ((mvd = vdev_lookup_by_guid(vd->vdev_child[c], guid)) !=
 		    NULL)
 			return (mvd);
@@ -251,17 +256,17 @@ vdev_compact_children(vdev_t *pvd)
 {
 	vdev_t **newchild, *cvd;
 	int oldc = pvd->vdev_children;
-	int newc, c;
+	int newc;
 
 	ASSERT(spa_config_held(pvd->vdev_spa, SCL_ALL, RW_WRITER) == SCL_ALL);
 
-	for (c = newc = 0; c < oldc; c++)
+	for (int c = newc = 0; c < oldc; c++)
 		if (pvd->vdev_child[c])
 			newc++;
 
 	newchild = kmem_alloc(newc * sizeof (vdev_t *), KM_SLEEP);
 
-	for (c = newc = 0; c < oldc; c++) {
+	for (int c = newc = 0; c < oldc; c++) {
 		if ((cvd = pvd->vdev_child[c]) != NULL) {
 			newchild[newc] = cvd;
 			cvd->vdev_id = newc++;
@@ -526,7 +531,6 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 void
 vdev_free(vdev_t *vd)
 {
-	int c;
 	spa_t *spa = vd->vdev_spa;
 
 	/*
@@ -540,7 +544,7 @@ vdev_free(vdev_t *vd)
 	/*
 	 * Free all children.
 	 */
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++)
 		vdev_free(vd->vdev_child[c]);
 
 	ASSERT(vd->vdev_child == NULL);
@@ -670,14 +674,12 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 static void
 vdev_top_update(vdev_t *tvd, vdev_t *vd)
 {
-	int c;
-
 	if (vd == NULL)
 		return;
 
 	vd->vdev_top = tvd;
 
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++)
 		vdev_top_update(tvd, vd->vdev_child[c]);
 }
 
@@ -696,6 +698,7 @@ vdev_add_parent(vdev_t *cvd, vdev_ops_t *ops)
 	mvd = vdev_alloc_common(spa, cvd->vdev_id, 0, ops);
 
 	mvd->vdev_asize = cvd->vdev_asize;
+	mvd->vdev_min_asize = cvd->vdev_min_asize;
 	mvd->vdev_ashift = cvd->vdev_ashift;
 	mvd->vdev_state = cvd->vdev_state;
 
@@ -998,7 +1001,6 @@ vdev_open(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
 	int error;
-	int c;
 	uint64_t osize = 0;
 	uint64_t asize, psize;
 	uint64_t ashift = 0;
@@ -1012,6 +1014,7 @@ vdev_open(vdev_t *vd)
 	vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
 	vd->vdev_cant_read = B_FALSE;
 	vd->vdev_cant_write = B_FALSE;
+	vd->vdev_min_asize = vdev_get_min_asize(vd);
 
 	if (!vd->vdev_removed && vd->vdev_faulted) {
 		ASSERT(vd->vdev_children == 0);
@@ -1049,12 +1052,13 @@ vdev_open(vdev_t *vd)
 		vd->vdev_state = VDEV_STATE_HEALTHY;
 	}
 
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++) {
 		if (vd->vdev_child[c]->vdev_state != VDEV_STATE_HEALTHY) {
 			vdev_set_state(vd, B_TRUE, VDEV_STATE_DEGRADED,
 			    VDEV_AUX_NONE);
 			break;
 		}
+	}
 
 	osize = P2ALIGN(osize, (uint64_t)sizeof (vdev_label_t));
 
@@ -1079,6 +1083,15 @@ vdev_open(vdev_t *vd)
 
 	vd->vdev_psize = psize;
 
+	/*
+	 * Make sure the allocatable size hasn't shrunk.
+	 */
+	if (asize < vd->vdev_min_asize) {
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_BAD_LABEL);
+		return (EINVAL);
+	}
+
 	if (vd->vdev_asize == 0) {
 		/*
 		 * This is the first-ever open, so use the computed values.
@@ -1095,25 +1108,18 @@ vdev_open(vdev_t *vd)
 			    VDEV_AUX_BAD_LABEL);
 			return (EINVAL);
 		}
-
-		/*
-		 * Make sure the device hasn't shrunk.
-		 */
-		if (asize < vd->vdev_asize) {
-			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_BAD_LABEL);
-			return (EINVAL);
-		}
-
-		/*
-		 * If all children are healthy and the asize has increased,
-		 * then we've experienced dynamic LUN growth.
-		 */
-		if (vd->vdev_state == VDEV_STATE_HEALTHY &&
-		    asize > vd->vdev_asize) {
-			vd->vdev_asize = asize;
-		}
 	}
+
+	/*
+	 * If all children are healthy and the asize has increased,
+	 * then we've experienced dynamic LUN growth.  If automatic
+	 * expansion is enabled then use the additional space.
+	 */
+	if (vd->vdev_state == VDEV_STATE_HEALTHY && asize > vd->vdev_asize &&
+	    (vd->vdev_expanding || spa->spa_autoexpand))
+		vd->vdev_asize = asize;
+
+	vdev_set_min_asize(vd);
 
 	/*
 	 * Ensure we can issue some IO before declaring the
@@ -1152,12 +1158,11 @@ int
 vdev_validate(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
-	int c;
 	nvlist_t *label;
 	uint64_t guid, top_guid;
 	uint64_t state;
 
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++)
 		if (vdev_validate(vd->vdev_child[c]) != 0)
 			return (EBADF);
 
@@ -1243,7 +1248,7 @@ vdev_close(vdev_t *vd)
 	vdev_cache_purge(vd);
 
 	/*
-	 * We record the previous state before we close it, so  that if we are
+	 * We record the previous state before we close it, so that if we are
 	 * doing a reopen(), we don't generate FMA ereports if we notice that
 	 * it's still faulted.
 	 */
@@ -1275,12 +1280,8 @@ vdev_reopen(vdev_t *vd)
 		(void) vdev_validate_aux(vd);
 		if (vdev_readable(vd) && vdev_writeable(vd) &&
 		    vd->vdev_aux == &spa->spa_l2cache &&
-		    !l2arc_vdev_present(vd)) {
-			uint64_t size = vdev_get_rsize(vd);
-			l2arc_add_vdev(spa, vd,
-			    VDEV_LABEL_START_SIZE,
-			    size - VDEV_LABEL_START_SIZE);
-		}
+		    !l2arc_vdev_present(vd))
+			l2arc_add_vdev(spa, vd);
 	} else {
 		(void) vdev_validate(vd);
 	}
@@ -1320,26 +1321,14 @@ vdev_create(vdev_t *vd, uint64_t txg, boolean_t isreplacing)
 	return (0);
 }
 
-/*
- * The is the latter half of vdev_create().  It is distinct because it
- * involves initiating transactions in order to do metaslab creation.
- * For creation, we want to try to create all vdevs at once and then undo it
- * if anything fails; this is much harder if we have pending transactions.
- */
 void
-vdev_init(vdev_t *vd, uint64_t txg)
+vdev_metaslab_set_size(vdev_t *vd)
 {
 	/*
 	 * Aim for roughly 200 metaslabs per vdev.
 	 */
 	vd->vdev_ms_shift = highbit(vd->vdev_asize / 200);
 	vd->vdev_ms_shift = MAX(vd->vdev_ms_shift, SPA_MAXBLOCKSHIFT);
-
-	/*
-	 * Initialize the vdev's metaslabs.  This can't fail because
-	 * there's nothing to read when creating all new metaslabs.
-	 */
-	VERIFY(vdev_metaslab_init(vd, txg) == 0);
 }
 
 void
@@ -1897,7 +1886,7 @@ vdev_degrade(spa_t *spa, uint64_t guid)
 int
 vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 {
-	vdev_t *vd;
+	vdev_t *vd, *tvd, *pvd, *rvd = spa->spa_root_vdev;
 
 	spa_vdev_state_enter(spa);
 
@@ -1907,12 +1896,25 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
+	tvd = vd->vdev_top;
 	vd->vdev_offline = B_FALSE;
 	vd->vdev_tmpoffline = B_FALSE;
 	vd->vdev_checkremove = !!(flags & ZFS_ONLINE_CHECKREMOVE);
 	vd->vdev_forcefault = !!(flags & ZFS_ONLINE_FORCEFAULT);
-	vdev_reopen(vd->vdev_top);
+
+	/* XXX - L2ARC 1.0 does not support expansion */
+	if (!vd->vdev_aux) {
+		for (pvd = vd; pvd != rvd; pvd = pvd->vdev_parent)
+			pvd->vdev_expanding = !!(flags & ZFS_ONLINE_EXPAND);
+	}
+
+	vdev_reopen(tvd);
 	vd->vdev_checkremove = vd->vdev_forcefault = B_FALSE;
+
+	if (!vd->vdev_aux) {
+		for (pvd = vd; pvd != rvd; pvd = pvd->vdev_parent)
+			pvd->vdev_expanding = B_FALSE;
+	}
 
 	if (newstate)
 		*newstate = vd->vdev_state;
@@ -1922,6 +1924,13 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 	    vd->vdev_parent->vdev_child[0] == vd)
 		vd->vdev_unspare = B_TRUE;
 
+	if ((flags & ZFS_ONLINE_EXPAND) || spa->spa_autoexpand) {
+
+		/* XXX - L2ARC 1.0 does not support expansion */
+		if (vd->vdev_aux)
+			return (spa_vdev_state_exit(spa, vd, ENOTSUP));
+		spa_async_request(spa, SPA_ASYNC_CONFIG_UPDATE);
+	}
 	return (spa_vdev_state_exit(spa, vd, 0));
 }
 
@@ -2105,7 +2114,9 @@ vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 	vs->vs_scrub_errors = vd->vdev_spa->spa_scrub_errors;
 	vs->vs_timestamp = gethrtime() - vs->vs_timestamp;
 	vs->vs_state = vd->vdev_state;
-	vs->vs_rsize = vdev_get_rsize(vd);
+	vs->vs_rsize = vdev_get_min_asize(vd);
+	if (vd->vdev_ops->vdev_op_leaf)
+		vs->vs_rsize += VDEV_LABEL_START_SIZE + VDEV_LABEL_END_SIZE;
 	mutex_exit(&vd->vdev_stat_lock);
 
 	/*
@@ -2258,10 +2269,9 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 void
 vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
 {
-	int c;
 	vdev_stat_t *vs = &vd->vdev_stat;
 
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++)
 		vdev_scrub_stat_update(vd->vdev_child[c], type, complete);
 
 	mutex_enter(&vd->vdev_stat_lock);
@@ -2472,11 +2482,10 @@ vdev_propagate_state(vdev_t *vd)
 	vdev_t *rvd = spa->spa_root_vdev;
 	int degraded = 0, faulted = 0;
 	int corrupted = 0;
-	int c;
 	vdev_t *child;
 
 	if (vd->vdev_children > 0) {
-		for (c = 0; c < vd->vdev_children; c++) {
+		for (int c = 0; c < vd->vdev_children; c++) {
 			child = vd->vdev_child[c];
 
 			if (!vdev_readable(child) ||
@@ -2651,8 +2660,6 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 boolean_t
 vdev_is_bootable(vdev_t *vd)
 {
-	int c;
-
 	if (!vd->vdev_ops->vdev_op_leaf) {
 		char *vdev_type = vd->vdev_ops->vdev_op_type;
 
@@ -2667,7 +2674,7 @@ vdev_is_bootable(vdev_t *vd)
 		return (B_FALSE);
 	}
 
-	for (c = 0; c < vd->vdev_children; c++) {
+	for (int c = 0; c < vd->vdev_children; c++) {
 		if (!vdev_is_bootable(vd->vdev_child[c]))
 			return (B_FALSE);
 	}
@@ -2677,14 +2684,14 @@ vdev_is_bootable(vdev_t *vd)
 void
 vdev_load_log_state(vdev_t *vd, nvlist_t *nv)
 {
-	uint_t c, children;
+	uint_t children;
 	nvlist_t **child;
 	uint64_t val;
 	spa_t *spa = vd->vdev_spa;
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) == 0) {
-		for (c = 0; c < children; c++)
+		for (int c = 0; c < children; c++)
 			vdev_load_log_state(vd->vdev_child[c], child[c]);
 	}
 
@@ -2700,5 +2707,20 @@ vdev_load_log_state(vdev_t *vd, nvlist_t *nv)
 		vd->vdev_offline = val;
 		vdev_reopen(vd->vdev_top);
 		spa_config_exit(spa, SCL_STATE_ALL, FTAG);
+	}
+}
+
+/*
+ * Expand a vdev if possible.
+ */
+void
+vdev_expand(vdev_t *vd, uint64_t txg)
+{
+	ASSERT(vd->vdev_top == vd);
+	ASSERT(spa_config_held(vd->vdev_spa, SCL_ALL, RW_WRITER) == SCL_ALL);
+
+	if ((vd->vdev_asize >> vd->vdev_ms_shift) > vd->vdev_ms_count) {
+		VERIFY(vdev_metaslab_init(vd, txg) == 0);
+		vdev_config_dirty(vd);
 	}
 }

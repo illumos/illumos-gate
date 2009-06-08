@@ -2635,10 +2635,14 @@ zpool_do_online(int argc, char **argv)
 	zpool_handle_t *zhp;
 	int ret = 0;
 	vdev_state_t newstate;
+	int flags = 0;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "t")) != -1) {
+	while ((c = getopt(argc, argv, "et")) != -1) {
 		switch (c) {
+		case 'e':
+			flags |= ZFS_ONLINE_EXPAND;
+			break;
 		case 't':
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -2666,7 +2670,7 @@ zpool_do_online(int argc, char **argv)
 		return (1);
 
 	for (i = 1; i < argc; i++) {
-		if (zpool_vdev_online(zhp, argv[i], 0, &newstate) == 0) {
+		if (zpool_vdev_online(zhp, argv[i], flags, &newstate) == 0) {
 			if (newstate != VDEV_STATE_HEALTHY) {
 				(void) printf(gettext("warning: device '%s' "
 				    "onlined, but remains in faulted state\n"),

@@ -344,6 +344,7 @@ extern void spa_inject_delref(spa_t *spa);
 #define	SPA_ASYNC_PROBE		0x04
 #define	SPA_ASYNC_RESILVER_DONE	0x08
 #define	SPA_ASYNC_RESILVER	0x10
+#define	SPA_ASYNC_AUTOEXPAND	0x20
 
 /* device manipulation */
 extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot);

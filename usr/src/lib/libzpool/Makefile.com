@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= libzpool.a
@@ -63,7 +61,7 @@ C99LMODE=	-Xc99=%all
 
 CFLAGS +=	-g $(CCVERBOSE) $(CNOGLOBAL)
 CFLAGS64 +=	-g $(CCVERBOSE) $(CNOGLOBAL)
-LDLIBS +=	-lumem -lavl -lnvpair -lz -lc
+LDLIBS +=	-lumem -lavl -lnvpair -lz -lc -lsysevent
 CPPFLAGS +=	$(INCS)
 
 .KEEP_STATE:

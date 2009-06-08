@@ -59,6 +59,7 @@ extern "C" {
 #include <atomic.h>
 #include <dirent.h>
 #include <time.h>
+#include <libsysevent.h>
 #include <sys/note.h>
 #include <sys/types.h>
 #include <sys/cred.h>
@@ -73,6 +74,7 @@ extern "C" {
 #include <sys/kstat.h>
 #include <sys/u8_textprep.h>
 #include <sys/sysevent/eventdefs.h>
+#include <sys/sysevent/dev.h>
 
 /*
  * Debugging
@@ -540,6 +542,10 @@ typedef struct ksiddomain {
 
 ksiddomain_t *ksid_lookupdomain(const char *);
 void ksiddomain_rele(ksiddomain_t *);
+
+#define	DDI_SLEEP	KM_SLEEP
+#define	ddi_log_sysevent(_a, _b, _c, _d, _e, _f, _g) \
+	sysevent_post_event(_c, _d, _b, "libzpool", _e, _f)
 
 #ifdef	__cplusplus
 }

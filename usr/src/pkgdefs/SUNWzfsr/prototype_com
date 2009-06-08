@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # packaging files
@@ -39,6 +37,9 @@ d none etc/fs 755 root sys
 d none etc/fs/zfs 755 root sys
 s none etc/fs/zfs/mount=../../../sbin/zfs
 s none etc/fs/zfs/umount=../../../sbin/zfs
+d none etc/sysevent 755 root sys
+d none etc/sysevent/config 755 root sys
+f none etc/sysevent/config/SUNW,EC_dev_status,ESC_dev_dle,sysevent.conf 644 root sys
 d none etc/zfs 755 root sys
 d none lib 755 root bin
 s none lib/libzfs.so=libzfs.so.1

@@ -954,7 +954,7 @@ ztest_vdev_aux_add_remove(ztest_args_t *za)
 		 * of devices that have pending state changes.
 		 */
 		if (ztest_random(2) == 0)
-			(void) vdev_online(spa, guid, B_FALSE, NULL);
+			(void) vdev_online(spa, guid, 0, NULL);
 
 		error = spa_vdev_remove(spa, guid, B_FALSE);
 		if (error != 0 && error != EBUSY)
@@ -1032,7 +1032,7 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	}
 
 	oldguid = oldvd->vdev_guid;
-	oldsize = vdev_get_rsize(oldvd);
+	oldsize = vdev_get_min_asize(oldvd);
 	oldvd_is_log = oldvd->vdev_top->vdev_islog;
 	(void) strcpy(oldpath, oldvd->vdev_path);
 	pvd = oldvd->vdev_parent;
@@ -1068,7 +1068,7 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	}
 
 	if (newvd) {
-		newsize = vdev_get_rsize(newvd);
+		newsize = vdev_get_min_asize(newvd);
 	} else {
 		/*
 		 * Make newsize a little bigger or smaller than oldsize.
@@ -1144,49 +1144,202 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 }
 
 /*
+ * Callback function which expands the physical size of the vdev.
+ */
+vdev_t *
+grow_vdev(vdev_t *vd, void *arg)
+{
+	spa_t *spa = vd->vdev_spa;
+	size_t *newsize = arg;
+	size_t fsize;
+	int fd;
+
+	ASSERT(spa_config_held(spa, SCL_STATE, RW_READER) == SCL_STATE);
+	ASSERT(vd->vdev_ops->vdev_op_leaf);
+
+	if ((fd = open(vd->vdev_path, O_RDWR)) == -1)
+		return (vd);
+
+	fsize = lseek(fd, 0, SEEK_END);
+	(void) ftruncate(fd, *newsize);
+
+	if (zopt_verbose >= 6) {
+		(void) printf("%s grew from %lu to %lu bytes\n",
+		    vd->vdev_path, (ulong_t)fsize, (ulong_t)*newsize);
+	}
+	(void) close(fd);
+	return (NULL);
+}
+
+/*
+ * Callback function which expands a given vdev by calling vdev_online().
+ */
+/* ARGSUSED */
+vdev_t *
+online_vdev(vdev_t *vd, void *arg)
+{
+	spa_t *spa = vd->vdev_spa;
+	vdev_t *tvd = vd->vdev_top;
+	vdev_t *pvd = vd->vdev_parent;
+	uint64_t guid = vd->vdev_guid;
+
+	ASSERT(spa_config_held(spa, SCL_STATE, RW_READER) == SCL_STATE);
+	ASSERT(vd->vdev_ops->vdev_op_leaf);
+
+	/* Calling vdev_online will initialize the new metaslabs */
+	spa_config_exit(spa, SCL_STATE, spa);
+	(void) vdev_online(spa, guid, ZFS_ONLINE_EXPAND, NULL);
+	spa_config_enter(spa, SCL_STATE, spa, RW_READER);
+
+	/*
+	 * Since we dropped the lock we need to ensure that we're
+	 * still talking to the original vdev. It's possible this
+	 * vdev may have been detached/replaced while we were
+	 * trying to online it.
+	 */
+	if (vd != vdev_lookup_by_guid(tvd, guid) || vd->vdev_parent != pvd) {
+		if (zopt_verbose >= 6) {
+			(void) printf("vdev %p has disappeared, was "
+			    "guid %llu\n", (void *)vd, (u_longlong_t)guid);
+		}
+		return (vd);
+	}
+	return (NULL);
+}
+
+/*
+ * Traverse the vdev tree calling the supplied function.
+ * We continue to walk the tree until we either have walked all
+ * children or we receive a non-NULL return from the callback.
+ * If a NULL callback is passed, then we just return back the first
+ * leaf vdev we encounter.
+ */
+vdev_t *
+vdev_walk_tree(vdev_t *vd, vdev_t *(*func)(vdev_t *, void *), void *arg)
+{
+	if (vd->vdev_ops->vdev_op_leaf) {
+		if (func == NULL)
+			return (vd);
+		else
+			return (func(vd, arg));
+	}
+
+	for (uint_t c = 0; c < vd->vdev_children; c++) {
+		vdev_t *cvd = vd->vdev_child[c];
+		if ((cvd = vdev_walk_tree(cvd, func, arg)) != NULL)
+			return (cvd);
+	}
+	return (NULL);
+}
+
+/*
  * Verify that dynamic LUN growth works as expected.
  */
 void
 ztest_vdev_LUN_growth(ztest_args_t *za)
 {
 	spa_t *spa = za->za_spa;
-	char dev_name[MAXPATHLEN];
-	uint64_t leaves = MAX(zopt_mirrors, 1) * zopt_raidz;
-	uint64_t vdev;
-	size_t fsize;
-	int fd;
+	vdev_t *vd, *tvd = NULL;
+	size_t psize, newsize;
+	uint64_t spa_newsize, spa_cursize, ms_count;
 
 	(void) mutex_lock(&ztest_shared->zs_vdev_lock);
+	mutex_enter(&spa_namespace_lock);
+	spa_config_enter(spa, SCL_STATE, spa, RW_READER);
 
-	/*
-	 * Pick a random leaf vdev.
-	 */
-	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-	vdev = ztest_random(spa->spa_root_vdev->vdev_children * leaves);
-	spa_config_exit(spa, SCL_VDEV, FTAG);
+	while (tvd == NULL || tvd->vdev_islog) {
+		uint64_t vdev;
 
-	(void) sprintf(dev_name, ztest_dev_template, zopt_dir, zopt_pool, vdev);
-
-	if ((fd = open(dev_name, O_RDWR)) != -1) {
-		/*
-		 * Determine the size.
-		 */
-		fsize = lseek(fd, 0, SEEK_END);
-
-		/*
-		 * If it's less than 2x the original size, grow by around 3%.
-		 */
-		if (fsize < 2 * zopt_vdev_size) {
-			size_t newsize = fsize + ztest_random(fsize / 32);
-			(void) ftruncate(fd, newsize);
-			if (zopt_verbose >= 6) {
-				(void) printf("%s grew from %lu to %lu bytes\n",
-				    dev_name, (ulong_t)fsize, (ulong_t)newsize);
-			}
-		}
-		(void) close(fd);
+		vdev = ztest_random(spa->spa_root_vdev->vdev_children);
+		tvd = spa->spa_root_vdev->vdev_child[vdev];
 	}
 
+	/*
+	 * Determine the size of the first leaf vdev associated with
+	 * our top-level device.
+	 */
+	vd = vdev_walk_tree(tvd, NULL, NULL);
+	ASSERT3P(vd, !=, NULL);
+	ASSERT(vd->vdev_ops->vdev_op_leaf);
+
+	psize = vd->vdev_psize;
+
+	/*
+	 * We only try to expand the vdev if it's less than 4x its
+	 * original size and it has a valid psize.
+	 */
+	if (psize == 0 || psize >= 4 * zopt_vdev_size) {
+		spa_config_exit(spa, SCL_STATE, spa);
+		mutex_exit(&spa_namespace_lock);
+		(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
+		return;
+	}
+	ASSERT(psize > 0);
+	newsize = psize + psize / 8;
+	ASSERT3U(newsize, >, psize);
+
+	if (zopt_verbose >= 6) {
+		(void) printf("Expanding vdev %s from %lu to %lu\n",
+		    vd->vdev_path, (ulong_t)psize, (ulong_t)newsize);
+	}
+
+	spa_cursize = spa_get_space(spa);
+	ms_count = tvd->vdev_ms_count;
+
+	/*
+	 * Growing the vdev is a two step process:
+	 *	1). expand the physical size (i.e. relabel)
+	 *	2). online the vdev to create the new metaslabs
+	 */
+	if (vdev_walk_tree(tvd, grow_vdev, &newsize) != NULL ||
+	    vdev_walk_tree(tvd, online_vdev, NULL) != NULL ||
+	    tvd->vdev_state != VDEV_STATE_HEALTHY) {
+		if (zopt_verbose >= 5) {
+			(void) printf("Could not expand LUN because "
+			    "some vdevs were not healthy\n");
+		}
+		(void) spa_config_exit(spa, SCL_STATE, spa);
+		mutex_exit(&spa_namespace_lock);
+		(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
+		return;
+	}
+
+	(void) spa_config_exit(spa, SCL_STATE, spa);
+	mutex_exit(&spa_namespace_lock);
+
+	/*
+	 * Expanding the LUN will update the config asynchronously,
+	 * thus we must wait for the async thread to complete any
+	 * pending tasks before proceeding.
+	 */
+	mutex_enter(&spa->spa_async_lock);
+	while (spa->spa_async_thread != NULL || spa->spa_async_tasks)
+		cv_wait(&spa->spa_async_cv, &spa->spa_async_lock);
+	mutex_exit(&spa->spa_async_lock);
+
+	spa_config_enter(spa, SCL_STATE, spa, RW_READER);
+	spa_newsize = spa_get_space(spa);
+
+	/*
+	 * Make sure we were able to grow the pool.
+	 */
+	if (ms_count >= tvd->vdev_ms_count ||
+	    spa_cursize >= spa_newsize) {
+		(void) printf("Top-level vdev metaslab count: "
+		    "before %llu, after %llu\n",
+		    (u_longlong_t)ms_count,
+		    (u_longlong_t)tvd->vdev_ms_count);
+		fatal(0, "LUN expansion failed: before %llu, "
+		    "after %llu\n", spa_cursize, spa_newsize);
+	} else if (zopt_verbose >= 5) {
+		char oldnumbuf[6], newnumbuf[6];
+
+		nicenum(spa_cursize, oldnumbuf);
+		nicenum(spa_newsize, newnumbuf);
+		(void) printf("%s grew from %s to %s\n",
+		    spa->spa_name, oldnumbuf, newnumbuf);
+	}
+	spa_config_exit(spa, SCL_STATE, spa);
 	(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
 }
 

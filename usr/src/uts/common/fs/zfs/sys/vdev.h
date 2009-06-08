@@ -50,7 +50,6 @@ extern int vdev_open(vdev_t *);
 extern int vdev_validate(vdev_t *);
 extern void vdev_close(vdev_t *);
 extern int vdev_create(vdev_t *, uint64_t txg, boolean_t isreplace);
-extern void vdev_init(vdev_t *, uint64_t txg);
 extern void vdev_reopen(vdev_t *);
 extern int vdev_validate_aux(vdev_t *vd);
 extern zio_t *vdev_probe(vdev_t *vd, zio_t *pio);
@@ -71,6 +70,8 @@ extern boolean_t vdev_resilver_needed(vdev_t *vd,
 
 extern int vdev_metaslab_init(vdev_t *vd, uint64_t txg);
 extern void vdev_metaslab_fini(vdev_t *vd);
+extern void vdev_metaslab_set_size(vdev_t *);
+extern void vdev_expand(vdev_t *vd, uint64_t txg);
 
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
 extern void vdev_clear_stats(vdev_t *vd);
