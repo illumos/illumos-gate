@@ -1564,6 +1564,7 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 			state = ND_REACHABLE;
 			flags |= NCE_F_UNSOL_ADV;
 		}
+retry:
 		/*
 		 * Create an nce for the local address. We pass a match_illgrp
 		 * of B_TRUE because the local address must be unique across
@@ -1597,6 +1598,12 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 		case EEXIST:
 			ip1dbg(("ipif_ndp_up: NCE already exists for %s\n",
 			    ill->ill_name));
+			if (!(nce->nce_flags & NCE_F_PERMANENT)) {
+				ndp_delete(nce);
+				NCE_REFRELE(nce);
+				nce = NULL;
+				goto retry;
+			}
 			if ((ipif->ipif_flags & IPIF_POINTOPOINT) == 0) {
 				NCE_REFRELE(nce);
 				goto fail;
