@@ -1730,7 +1730,7 @@ libhal_drive_find_all_volumes (LibHalContext *hal_ctx, LibHalDrive *drive, int *
 		goto out;
 	}
 
-	result = malloc (sizeof (char *) * num_udis);
+	result = malloc (sizeof (char *) * (num_udis + 1));
 	if (result == NULL)
 		goto out;
 

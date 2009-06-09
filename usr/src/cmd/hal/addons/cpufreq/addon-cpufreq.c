@@ -2,14 +2,13 @@
  *
  * addon-cpufreq.c : Routines to support CPUFreq interface
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  ***************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -100,7 +99,7 @@ const char *cpufreq_introspect_xml = \
 		<type=\"i\" direction=\"out\"/>\n \
 	</method>\n \
 	<method name= \"GetCPUFreqAvailableGovernors\">\n \
-		<<type=\"s\" direction=\"out\"/>\n \
+		<type=\"s\" direction=\"out\"/>\n \
 	</method>\n";
 
 /*

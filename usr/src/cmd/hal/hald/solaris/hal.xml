@@ -1,12 +1,10 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
 
         Licensed under the Academic Free License version 2.1
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -80,7 +78,7 @@
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='hal' section='1M' manpath='/usr/man' />
+			<manpage title='hald' section='1M' manpath='/usr/man' />
 		</documentation>
 	</template>
 

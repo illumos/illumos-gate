@@ -116,6 +116,7 @@ main (int argc, char *argv[])
 	dbus_bool_t bool_value = TRUE;
 	dbus_bool_t remove = FALSE;
 	dbus_bool_t is_version = FALSE;
+	dbus_bool_t udi_exists = FALSE;
 	int type = PROP_INVALID;
 	DBusError error;
 
@@ -239,11 +240,27 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
+	 /* check UDI exists */
+	udi_exists = libhal_device_exists (hal_ctx, udi, &error);
+	if (!udi_exists) {
+		fprintf (stderr, "error: UDI %s does not exist\n", udi);
+		return 1;
+	}
+	if (dbus_error_is_set(&error)) {
+		fprintf (stderr, "error: libhal_device_exists: %s: %s\n", error.name, error.message);
+		dbus_error_free (&error);
+		return 1;   
+	}
+
 	if (remove) {
 		rc = libhal_device_remove_property (hal_ctx, udi, key, &error);
 		if (!rc) {
-			fprintf (stderr, "error: libhal_device_remove_property: %s: %s\n", error.name, error.message);
-			LIBHAL_FREE_DBUS_ERROR (&error);
+			if (dbus_error_is_set(&error)) {
+			        fprintf (stderr, "error: libhal_device_remove_property: %s: %s\n", error.name, error.message);
+				dbus_error_free (&error);
+			} else {
+				fprintf (stderr, "error: libhal_device_remove_property: invalid params.\n");
+			}
 			return 1;
 		}
 	} else {
@@ -274,8 +291,12 @@ main (int argc, char *argv[])
 			break;
 		}
 		if (!rc) {
-			fprintf (stderr, "error: libhal_device_set_property: %s: %s\n", error.name, error.message);
-			dbus_error_free (&error);
+			if (dbus_error_is_set(&error)) {
+			        fprintf (stderr, "error: libhal_device_set_property: %s: %s\n", error.name, error.message);
+				dbus_error_free (&error);
+			} else {
+				fprintf (stderr, "error: libhal_device_set_property: invalid params.\n");
+			}
 			return 1;
 		}
 	}

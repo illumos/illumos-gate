@@ -2,7 +2,7 @@
  *
  * probe-volume.c : probe volumes
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -35,6 +35,7 @@
 #include <sys/fs/hsfs_spec.h>
 #include <sys/fs/hsfs_isospec.h>
 #include <priv.h>
+#include <sys/u8_textprep.h>
 
 #include <libhal.h>
 #include <cdutils.h>
@@ -79,6 +80,7 @@ set_fstyp_properties (LibHalContext *ctx, const char *udi, const char *fstype, n
 	char *uuid = NULL;
 	char *label_orig = NULL;
 	char *label = NULL;
+	int  err;
 	LibHalChangeSet *cs;
 
 	dbus_error_init (&error);
@@ -95,9 +97,12 @@ set_fstyp_properties (LibHalContext *ctx, const char *udi, const char *fstype, n
 	if (label_orig != NULL) {
 		label = rtrim_copy(label_orig, 0);
 	}
-	if ((label != NULL) && (label[0] != '\0')) {
-		libhal_changeset_set_property_string (cs, "volume.label", label);
-		libhal_changeset_set_property_string (cs, "info.product", label);
+	/* Check if label is utf8 format */
+	if ((label != NULL) && (label[0] != '\0') &&
+	    (u8_validate(label, strlen(label), (char **)NULL,
+	    U8_VALIDATE_ENTIRE, &err) != -1)) {
+	        libhal_changeset_set_property_string (cs, "volume.label", label);
+	        libhal_changeset_set_property_string (cs, "info.product", label);
 	} else {
 		libhal_changeset_set_property_string (cs, "volume.label", "");
 		snprintf (buf, sizeof (buf), "Volume (%s)", fstype);

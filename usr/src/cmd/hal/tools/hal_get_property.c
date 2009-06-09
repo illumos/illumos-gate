@@ -88,6 +88,7 @@ main (int argc, char *argv[])
 	dbus_bool_t is_hex = FALSE;
 	dbus_bool_t is_verbose = FALSE;
 	dbus_bool_t is_version = FALSE;
+	dbus_bool_t udi_exists = FALSE;
 	char *str;
 	DBusError error;
 
@@ -165,17 +166,34 @@ main (int argc, char *argv[])
 	if (!libhal_ctx_init (hal_ctx, &error)) {
 		if (dbus_error_is_set(&error)) {
 			fprintf (stderr, "error: libhal_ctx_init: %s: %s\n", error.name, error.message);
-			LIBHAL_FREE_DBUS_ERROR (&error);
+			dbus_error_free (&error);
 		}
 		fprintf (stderr, "Could not initialise connection to hald.\n"
 				 "Normally this means the HAL daemon (hald) is not running or not ready.\n");
 		return 1;
 	}
 
+        /* check UDI exists */
+	udi_exists = libhal_device_exists (hal_ctx, udi, &error);
+	if (!udi_exists) {
+		fprintf (stderr, "error: UDI %s does not exist\n", udi);
+		return 1;
+	}
+        if (dbus_error_is_set(&error)) {
+		fprintf (stderr, "error: libhal_device_exists: %s: %s\n", error.name, error.message);
+		dbus_error_free (&error);
+		return 1;
+	}
+
+
 	type = libhal_device_get_property_type (hal_ctx, udi, key, &error);
 	if (type == LIBHAL_PROPERTY_TYPE_INVALID) {
-		fprintf (stderr, "error: libhal_device_get_property_type: %s: %s\n", error.name, error.message);
-		LIBHAL_FREE_DBUS_ERROR (&error);
+		if (dbus_error_is_set(&error)) {
+		        fprintf (stderr, "error: libhal_device_get_property_type: %s: %s\n", error.name, error.message);
+			dbus_error_free (&error);
+		} else {
+		        fprintf (stderr, "error: libhal_device_get_property_type: invalid params.\n");
+		}
 		return 1;
 	}
 	/* emit the value to stdout */
