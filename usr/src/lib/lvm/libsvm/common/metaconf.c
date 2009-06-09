@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <ctype.h>
@@ -92,7 +89,7 @@ write_targ_nm_table(char *path)
 	}
 
 	while (fgets(buf, PATH_MAX, targfp) != NULL &&
-				(retval == RET_SUCCESS)) {
+	    (retval == RET_SUCCESS)) {
 		/* remove a new-line character for md_targ_nm_table */
 		if ((cp = strchr(buf, '\n')) != NULL)
 			*cp = 0;
@@ -141,6 +138,7 @@ write_xlate_to_mdconf(char *path)
 	char		edevname[PATH_MAX];
 	char		targname[PATH_MAX];
 	char		diskdir[PATH_MAX];
+	char		linkpath[PATH_MAX];
 	int		first_devid = 1;
 	int		ret = RET_SUCCESS;
 
@@ -157,20 +155,47 @@ write_xlate_to_mdconf(char *path)
 
 	/* special case to write the first tuple in the table */
 	while (((dp = readdir(dirp)) != (struct dirent *)0) &&
-						(ret != RET_ERROR)) {
+	    (ret != RET_ERROR)) {
 		if ((strcmp(dp->d_name, ".") == 0) ||
 		    (strcmp(dp->d_name, "..") == 0))
 			continue;
 
 		if ((strlen(diskdir) + strlen(dp->d_name) + 2) > PATH_MAX) {
-		    continue;
+			continue;
 		}
 
 		(void) snprintf(targname, sizeof (targname), "%s/%s",
 		    diskdir, dp->d_name);
 
-		if (stat(targname, &statb_dev) != 0) {
-		    continue;
+		/*
+		 * stat /devices to see if it's a devfs based file system
+		 * On Solaris 10 and up, the devfs has been built on the
+		 * fly for the mini-root. We need to adjust the path
+		 * accordingly.
+		 * If it's not devfs, just use the targname as it is.
+		 */
+
+		if (stat("/devices", &statb_dev) != 0) {
+			continue;
+		}
+
+		if (strncmp("devfs", statb_dev.st_fstype, 5) == 0) {
+			if (readlink(targname, linkpath,
+			    sizeof (linkpath)) == -1) {
+				continue;
+			}
+			/*
+			 * turn ../../devices/<path> into /devices/<path>
+			 * and stat that into statb_dev
+			 */
+			if (stat(strstr(linkpath, "/devices"),
+			    &statb_dev) != 0) {
+				continue;
+			}
+		} else {
+			if (stat(targname, &statb_dev) != 0) {
+				continue;
+			}
 		}
 
 		if ((devname = strstr(targname, DISK_DIR)) == NULL) {
@@ -188,13 +213,13 @@ write_xlate_to_mdconf(char *path)
 
 		if (first_devid) {
 			if (fprintf(fptr, "md_xlate_ver=\"%s\";\n"
-				"md_xlate=%lu,%lu", VERSION,
-				statb_edev.st_rdev, statb_dev.st_rdev) < 0)
+			    "md_xlate=%lu,%lu", VERSION,
+			    statb_edev.st_rdev, statb_dev.st_rdev) < 0)
 				ret = RET_ERROR;
 			first_devid = 0;
 		}
 		if (fprintf(fptr, ",%lu,%lu", statb_edev.st_rdev,
-			statb_dev.st_rdev) < 0)
+		    statb_dev.st_rdev) < 0)
 			ret = RET_ERROR;
 	} /* end while */
 
