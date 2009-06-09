@@ -36,6 +36,7 @@
 #include <sys/atomic.h>
 #include <sys/sysmacros.h>
 #include <sys/ib/ibtl/ibti.h>
+#include <sys/sdt.h>
 
 #include "srp.h"
 #include "srpt_impl.h"
@@ -725,6 +726,7 @@ srpt_ioc_svc_bind(srpt_target_port_t *tgt, uint_t portnum)
 	uint_t			qportnum;
 	ib_gid_t		new_gid;
 	srpt_ioc_t		*ioc;
+	srpt_session_t		sess;
 
 	ASSERT(tgt != NULL);
 	ASSERT(tgt->tp_ioc != NULL);
@@ -793,6 +795,15 @@ srpt_ioc_svc_bind(srpt_target_port_t *tgt, uint_t portnum)
 		SRPT_DPRINTF_L1("ioc_svc_bind, bind error (%d)", status);
 		return (status);
 	}
+	port->hwp_gid.gid_prefix = new_gid.gid_prefix;
+	port->hwp_gid.gid_guid = new_gid.gid_guid;
+
+	/* setting up a transient structure for the dtrace probe. */
+	bzero(&sess, sizeof (srpt_session_t));
+	ALIAS_STR(sess.ss_t_gid, new_gid.gid_prefix, new_gid.gid_guid);
+	EUI_STR(sess.ss_t_name, tgt->tp_ibt_svc_id);
+
+	DTRACE_SRP_1(service__up, srpt_session_t, &sess);
 
 	return (IBT_SUCCESS);
 }
@@ -804,6 +815,7 @@ void
 srpt_ioc_svc_unbind(srpt_target_port_t *tgt, uint_t portnum)
 {
 	srpt_hw_port_t		*port;
+	srpt_session_t		sess;
 
 	if (tgt == NULL) {
 		SRPT_DPRINTF_L2("ioc_svc_unbind, SCSI target does not exist");
@@ -816,11 +828,21 @@ srpt_ioc_svc_unbind(srpt_target_port_t *tgt, uint_t portnum)
 	}
 	port = &tgt->tp_hw_port[portnum-1];
 
+	/* setting up a transient structure for the dtrace probe. */
+	bzero(&sess, sizeof (srpt_session_t));
+	ALIAS_STR(sess.ss_t_gid, port->hwp_gid.gid_prefix,
+	    port->hwp_gid.gid_guid);
+	EUI_STR(sess.ss_t_name, tgt->tp_ibt_svc_id);
+
+	DTRACE_SRP_1(service__down, srpt_session_t, &sess);
+
 	if (tgt->tp_ibt_svc_hdl != NULL && port->hwp_bind_hdl != NULL) {
 		SRPT_DPRINTF_L2("ioc_svc_unbind, unregister current bind");
 		ibt_unbind_service(tgt->tp_ibt_svc_hdl, port->hwp_bind_hdl);
 	}
 	port->hwp_bind_hdl = NULL;
+	port->hwp_gid.gid_prefix = 0;
+	port->hwp_gid.gid_guid = 0;
 }
 
 /*

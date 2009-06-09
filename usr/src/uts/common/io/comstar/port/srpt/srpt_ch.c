@@ -618,6 +618,10 @@ srpt_ch_data_comp(srpt_channel_t *ch, stmf_data_buf_t *stmf_dbuf,
 		stmf_dbuf->db_xfer_status = STMF_FAILURE;
 	}
 
+	DTRACE_SRP_7(xfer__done, srpt_channel_t, ch,
+	    ibt_wr_ds_t, &(dbuf->db_sge), ibt_send_wr_t, 0,
+	    uint32_t, stmf_dbuf->db_data_size, uint32_t, 0, uint32_t, 0,
+	    uint32_t, (stmf_dbuf->db_flags & DB_DIRECTION_TO_RPORT) ? 1 : 0);
 	stmf_data_xfer_done(dbuf->db_iu->iu_stmf_task, stmf_dbuf, 0);
 }
 
@@ -833,6 +837,8 @@ srpt_ch_srp_cmd(srpt_channel_t *ch, srpt_iu_t *iu)
 	ibt_status_t		status;
 	uint8_t			addlen;
 
+
+	DTRACE_SRP_2(task__command, srpt_channel_t, ch, srp_cmd_req_t, cmd);
 	iu->iu_ch  = ch;
 	iu->iu_tag = cmd->cr_tag;
 
@@ -1048,6 +1054,8 @@ srpt_ch_srp_cmd(srpt_channel_t *ch, srpt_iu_t *iu)
 	 * remain in the session's list until STMF is informed by SRP that
 	 * it is done with the task.
 	 */
+	DTRACE_SRP_3(scsi__command, srpt_channel_t, iu->iu_ch,
+	    scsi_task_t, iu->iu_stmf_task, srp_cmd_req_t, cmd);
 	srpt_stp_add_task(ch->ch_session, iu);
 
 	SRPT_DPRINTF_L3("ch_srp_cmd, new task (%p) posted",
@@ -1143,6 +1151,14 @@ srpt_ch_srp_task_mgmt(srpt_channel_t *ch, srpt_iu_t *iu)
 
 	SRPT_DPRINTF_L3("ch_srp_task_mgmt, SRP TASK MGMT func(%d)",
 	    tsk->tm_function);
+
+	/*
+	 * Both tag and lun fileds have the same corresponding offsets
+	 * in both srp_tsk_mgmt_t and srp_cmd_req_t structures.  The
+	 * casting will allow us to use the same dtrace translator.
+	 */
+	DTRACE_SRP_2(task__command, srpt_channel_t, ch,
+	    srp_cmd_req_t, (srp_cmd_req_t *)tsk);
 
 	iu->iu_ch  = ch;
 	iu->iu_tag = tsk->tm_tag;

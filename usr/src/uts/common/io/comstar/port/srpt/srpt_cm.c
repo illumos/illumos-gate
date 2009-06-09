@@ -72,6 +72,8 @@ srpt_cm_req_hdlr(srpt_target_port_t *tgt, ibt_cm_event_t *event,
 	srp_login_rej_t		login_rej;
 	srp_login_rsp_t		login_rsp;
 	srpt_channel_t		*ch = NULL;
+	char			remote_gid[SRPT_ALIAS_LEN];
+	char			local_gid[SRPT_ALIAS_LEN];
 
 	ASSERT(tgt != NULL);
 	req = &event->cm_event.req;
@@ -106,8 +108,15 @@ srpt_cm_req_hdlr(srpt_target_port_t *tgt, ibt_cm_event_t *event,
 	 */
 	bcopy(event->cm_priv_data, &login,  sizeof (login));
 
+	ALIAS_STR(local_gid,
+	    req->req_prim_addr.av_sgid.gid_prefix,
+	    req->req_prim_addr.av_sgid.gid_guid);
+	ALIAS_STR(remote_gid,
+	    req->req_prim_addr.av_dgid.gid_prefix,
+	    req->req_prim_addr.av_dgid.gid_guid);
+
 	ch = srpt_stp_login(tgt, &login, &login_rsp,
-	    &login_rej, req->req_prim_hca_port);
+	    &login_rej, req->req_prim_hca_port, local_gid, remote_gid);
 	if (ch != NULL) {
 		bcopy(&login_rsp, ret_priv_data,  SRP_LOGIN_RSP_SIZE);
 		ret_args->cm_ret_len = SRP_LOGIN_RSP_SIZE;

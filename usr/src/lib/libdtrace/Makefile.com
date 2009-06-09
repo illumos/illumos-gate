@@ -85,6 +85,7 @@ DLIBSRCS += \
 	sched.d \
 	signal.d \
 	scsi.d \
+	srp.d \
 	sysevent.d \
 	unistd.d
 

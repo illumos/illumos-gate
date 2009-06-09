@@ -57,6 +57,7 @@ f none usr/lib/dtrace/regs.d 644 root bin
 f none usr/lib/dtrace/sched.d 644 root bin
 f none usr/lib/dtrace/scsi.d 644 root bin
 f none usr/lib/dtrace/iscsit.d 644 root bin
+f none usr/lib/dtrace/srp.d 644 root bin
 f none usr/lib/dtrace/signal.d 644 root bin
 f none usr/lib/dtrace/sysevent.d 644 root bin
 f none usr/lib/dtrace/unistd.d 644 root bin

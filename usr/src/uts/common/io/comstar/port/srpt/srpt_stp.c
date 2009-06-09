@@ -583,6 +583,10 @@ srpt_stp_xfer_data(struct scsi_task *task, struct stmf_data_buf *dbuf,
 		 * If this task is being aborted or has been aborted,
 		 * do not post additional I/O.
 		 */
+		DTRACE_SRP_7(xfer__start, srpt_channel_t, ch,
+		    ibt_wr_ds_t, &(db->db_sge), ibt_send_wr_t, &wr, uint32_t,
+		    rdma_len, uint32_t, xferred_len, uint32_t, desc_offset,
+		    uint32_t, wr.wr_opcode == IBT_WRC_RDMAR ? 0 : 1);
 		mutex_enter(&iu->iu_lock);
 		if ((iu->iu_flags & (SRPT_IU_SRP_ABORTING |
 		    SRPT_IU_STMF_ABORTING | SRPT_IU_ABORTED)) != 0) {
@@ -626,7 +630,6 @@ srpt_stp_xfer_data(struct scsi_task *task, struct stmf_data_buf *dbuf,
 			rw_exit(&iu->iu_ch->ch_rwlock);
 			return (STMF_FAILURE);
 		}
-
 		xferred_len += rdma_len;
 		xfer_len    -= rdma_len;
 		desc_offset  = 0;
@@ -677,6 +680,10 @@ srpt_stp_send_mgmt_response(srpt_iu_t *iu, uint8_t srp_rsp,
 	SRPT_DPRINTF_L4("stp_send_mgmt_response, sending on ch(%p),"
 	    " iu(%p), mgmt status(%d)", (void *)iu->iu_ch,
 	    (void *)iu, srp_rsp);
+
+	DTRACE_SRP_4(task__response, srpt_channel_t, iu->iu_ch,
+	    srp_rsp_t, iu->iu_buf, scsi_task_t, iu->iu_stmf_task,
+	    int8_t, srp_rsp);
 
 	status = srpt_ch_post_send(iu->iu_ch, iu, rsp_length, fence);
 	if (status != IBT_SUCCESS) {
@@ -744,6 +751,10 @@ srpt_stp_send_response(srpt_iu_t *iu, uint8_t scsi_status,
 	    " iu(%p), length(%d)", (void *)iu->iu_ch,
 	    (void *)iu, rsp_length);
 
+	DTRACE_SRP_4(task__response, srpt_channel_t, iu->iu_ch,
+	    srp_rsp_t, iu->iu_buf, scsi_task_t, iu->iu_stmf_task,
+	    uint8_t, scsi_status);
+
 	status = srpt_ch_post_send(iu->iu_ch, iu, rsp_length, fence);
 	if (status != IBT_SUCCESS) {
 		SRPT_DPRINTF_L2("stp_send_response, post response err(%d)",
@@ -782,6 +793,11 @@ srpt_stp_send_status(struct scsi_task *task, uint32_t ioflags)
 	    task->task_scsi_status,
 	    task->task_sense_length,
 	    (void *)task->task_sense_data);
+
+	DTRACE_SRP_4(scsi__response, srpt_channel_t, iu->iu_ch,
+	    srp_rsp_t, iu->iu_buf, scsi_task_t, task,
+	    int8_t, task->task_scsi_status);
+
 
 	/*
 	 * Indicate future aborts can not be initiated (although
@@ -1132,7 +1148,8 @@ srpt_stp_free_scsi_devid_desc(scsi_devid_desc_t *sdd)
  */
 srpt_session_t *
 srpt_stp_alloc_session(srpt_target_port_t *tgt,
-	uint8_t *i_id, uint8_t *t_id, uint8_t port)
+	uint8_t *i_id, uint8_t *t_id, uint8_t port,
+	char *local_gid, char *remote_gid)
 {
 	stmf_status_t		status;
 	srpt_session_t		*ss;
@@ -1176,11 +1193,16 @@ srpt_stp_alloc_session(srpt_target_port_t *tgt,
 	 * the administrator to identify multiple unique sessions originating
 	 * from the same initiator.
 	 */
-	(void) sprintf(ss->ss_alias, "%016llx:%016llx",
-	    (u_longlong_t)BE_IN64(&ss->ss_i_id[0]),
-	    (u_longlong_t)BE_IN64(&ss->ss_i_id[8]));
+	(void) strlcpy(ss->ss_i_gid, remote_gid, SRPT_ALIAS_LEN);
+	(void) strlcpy(ss->ss_t_gid, local_gid, SRPT_ALIAS_LEN);
+	EUI_STR(ss->ss_i_name, BE_IN64(&ss->ss_i_id[8]));
+	EUI_STR(ss->ss_t_name, BE_IN64(&ss->ss_t_id[0]));
+	ALIAS_STR(ss->ss_i_alias, BE_IN64(&ss->ss_i_id[0]),
+	    BE_IN64(&ss->ss_i_id[8]));
+	ALIAS_STR(ss->ss_t_alias, BE_IN64(&ss->ss_t_id[0]),
+	    BE_IN64(&ss->ss_t_id[8]));
 
-	stmf_ss->ss_rport_alias = ss->ss_alias;
+	stmf_ss->ss_rport_alias = ss->ss_i_alias;
 
 	status = stmf_register_scsi_session(tgt->tp_lport, stmf_ss);
 	if (status != STMF_SUCCESS) {
@@ -1237,7 +1259,7 @@ srpt_stp_free_session(srpt_session_t *session)
 srpt_channel_t *
 srpt_stp_login(srpt_target_port_t *tgt, srp_login_req_t *login,
 	srp_login_rsp_t *login_rsp, srp_login_rej_t *login_rej,
-	uint8_t login_port)
+	uint8_t login_port, char *local_gid, char *remote_gid)
 {
 	uint32_t	reason;
 	uint32_t	req_it_ui_len;
@@ -1246,11 +1268,31 @@ srpt_stp_login(srpt_target_port_t *tgt, srp_login_req_t *login,
 	srpt_channel_t	*ch = NULL;
 	srpt_channel_t	*next_ch = NULL;
 	srpt_session_t	*session = NULL;
+	srpt_session_t	sess;
 
 	ASSERT(tgt != NULL);
 	ASSERT(login != NULL);
 	ASSERT(login_rsp != NULL);
 	ASSERT(login_rej != NULL);
+
+	/* Store the string representation of connection info */
+	/* for Dtrace probes */
+	bzero(&sess, sizeof (srpt_session_t));
+	(void) strlcpy(sess.ss_i_gid, remote_gid, SRPT_ALIAS_LEN);
+	(void) strlcpy(sess.ss_t_gid, local_gid, SRPT_ALIAS_LEN);
+	EUI_STR(sess.ss_i_name,
+	    BE_IN64(&login->lreq_initiator_port_id[8]));
+	EUI_STR(sess.ss_t_name,
+	    BE_IN64(&login->lreq_target_port_id[0]));
+	ALIAS_STR(sess.ss_i_alias,
+	    BE_IN64(&login->lreq_initiator_port_id[0]),
+	    BE_IN64(&login->lreq_initiator_port_id[8]));
+	ALIAS_STR(sess.ss_t_alias,
+	    BE_IN64(&login->lreq_target_port_id[0]),
+	    BE_IN64(&login->lreq_target_port_id[8]));
+
+	DTRACE_SRP_2(login__command, srpt_session_t, &sess,
+	    srp_login_req_t, login);
 
 	/*
 	 * The target lock taken here serializes logins to this target
@@ -1258,6 +1300,8 @@ srpt_stp_login(srpt_target_port_t *tgt, srp_login_req_t *login,
 	 * operation to transition the target state while a login is
 	 * being processed.
 	 */
+	bzero(login_rsp, sizeof (srp_login_rsp_t));
+	bzero(login_rej, sizeof (srp_login_rej_t));
 	mutex_enter(&tgt->tp_lock);
 	ioc = tgt->tp_ioc;
 	if (ioc == NULL) {
@@ -1389,7 +1433,8 @@ srpt_stp_login(srpt_target_port_t *tgt, srp_login_req_t *login,
 		/* Create the new session for this SRP login */
 		session = srpt_stp_alloc_session(tgt,
 		    login->lreq_initiator_port_id,
-		    login->lreq_target_port_id, login_port);
+		    login->lreq_target_port_id, login_port,
+		    local_gid, remote_gid);
 		if (session == NULL) {
 			SRPT_DPRINTF_L2("stp_login, session allocation"
 			    " failed");
@@ -1441,11 +1486,18 @@ srpt_stp_login(srpt_target_port_t *tgt, srp_login_req_t *login,
 	mutex_exit(&tgt->tp_lock);
 	SRPT_DPRINTF_L2("stp_login, login successful");
 
+	DTRACE_SRP_3(login__response, srpt_session_t, &sess,
+	    srp_login_rsp_t, login_rsp, srp_login_rej_t, login_rej)
+
 	return (ch);
 
 reject_login:
 	srpt_format_login_rej(login, login_rej, reason);
 	mutex_exit(&tgt->tp_lock);
+
+	DTRACE_SRP_3(login__response, srpt_session_t, &sess,
+	    srp_login_rsp_t, login_rsp, srp_login_rej_t, login_rej);
+
 	return (NULL);
 }
 
@@ -1458,8 +1510,8 @@ reject_login:
 void
 srpt_stp_logout(srpt_channel_t *ch)
 {
-	SRPT_DPRINTF_L2("stp_logout, invoked for ch (%p)",
-	    (void *)ch);
+	DTRACE_SRP_1(logout__command, srpt_channel_t, ch);
+	SRPT_DPRINTF_L2("stp_logout, invoked for ch (%p)", (void *)ch);
 	srpt_ch_disconnect(ch);
 }
 
@@ -1470,8 +1522,6 @@ static void
 srpt_format_login_rej(srp_login_req_t *req, srp_login_rej_t *rej,
 	uint32_t reason)
 {
-	bzero(rej, sizeof (srp_login_rej_t));
-
 	rej->lrej_type   = SRP_IU_LOGIN_REJ;
 	rej->lrej_reason = h2b32(reason);
 	rej->lrej_tag    = req->lreq_tag;
@@ -1486,8 +1536,6 @@ static void
 srpt_format_login_rsp(srp_login_req_t *req, srp_login_rsp_t *rsp,
 	uint8_t flags)
 {
-	bzero(rsp, sizeof (srp_login_rsp_t));
-
 	rsp->lrsp_type   = SRP_IU_LOGIN_RSP;
 	rsp->lrsp_req_limit_delta = h2b32((uint32_t)srpt_send_msg_depth);
 	rsp->lrsp_tag    = req->lreq_tag;

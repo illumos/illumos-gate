@@ -46,6 +46,15 @@
 extern "C" {
 #endif
 
+/* Format the session identifier */
+#define	ALIAS_STR(s, a, b)						\
+	((void) snprintf((s), sizeof ((s)), "%016llx:%016llx",		\
+	    (u_longlong_t)(a), (u_longlong_t)(b)))
+
+/* Format the EUI name */
+#define	EUI_STR(s, a)							\
+	((void) snprintf((s), sizeof ((s)), "eui.%016llX", (u_longlong_t)(a)))
+
 /*
  * We should/could consider making some of these values tunables.
  * Specifically, SEND_MSG_SIZE and SEND_MSG_DEPTH.
@@ -65,6 +74,8 @@ enum {
 };
 
 struct srpt_target_port_s;
+
+#define	SRPT_ALIAS_LEN	(SRP_PORT_ID_LEN * 2 + 2)
 
 /*
  * SRP Session - represents a SCSI I_T_Nexus.
@@ -115,8 +126,14 @@ typedef struct srpt_session_s {
 	uint8_t				ss_t_id[SRP_PORT_ID_LEN];
 
 	/* So we can see the full 128-bit initiator login from stmfadm */
-	char				ss_alias[SRP_PORT_ID_LEN * 2 + 2];
+	char				ss_i_alias[SRPT_ALIAS_LEN];
 	uint8_t				ss_hw_port;
+
+	char				ss_t_alias[SRPT_ALIAS_LEN];
+	char				ss_i_name[SRPT_EUI_ID_LEN + 1];
+	char				ss_t_name[SRPT_EUI_ID_LEN + 1];
+	char				ss_i_gid[SRPT_ALIAS_LEN];
+	char				ss_t_gid[SRPT_ALIAS_LEN];
 } srpt_session_t;
 
 /*

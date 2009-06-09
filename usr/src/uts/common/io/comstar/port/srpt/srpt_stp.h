@@ -46,12 +46,14 @@ stmf_status_t srpt_stp_free_port(srpt_target_port_t *tgt);
 stmf_status_t srpt_stp_deregister_port(srpt_target_port_t *tgt);
 
 srpt_session_t *srpt_stp_alloc_session(srpt_target_port_t *tgt,
-	uint8_t *i_id, uint8_t *t_id, uint8_t port);
+	uint8_t *i_id, uint8_t *t_id, uint8_t port,
+	char *local_gid, char *remote_gid);
 void srpt_stp_free_session(srpt_session_t *session);
 
 srpt_channel_t *srpt_stp_login(srpt_target_port_t *tgt,
 	srp_login_req_t *login, srp_login_rsp_t *login_rsp,
-	srp_login_rej_t *login_rej, uint8_t login_port);
+	srp_login_rej_t *login_rej, uint8_t login_port,
+	char *local_gid, char *remote_gid);
 
 void srpt_stp_logout(srpt_channel_t *ch);
 

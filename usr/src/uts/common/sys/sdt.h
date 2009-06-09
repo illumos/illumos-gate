@@ -319,7 +319,34 @@ extern "C" {
 	DTRACE_PROBE5(__fc_##name, type1, arg1, type2, arg2, type3, arg3, \
 	    type4, arg4, type5, arg5);
 
+#define	DTRACE_SRP_1(name, type1, arg1)					\
+	DTRACE_PROBE1(__srp_##name, type1, arg1);
 
+#define	DTRACE_SRP_2(name, type1, arg1, type2, arg2)			\
+	DTRACE_PROBE2(__srp_##name, type1, arg1, type2, arg2);
+
+#define	DTRACE_SRP_3(name, type1, arg1, type2, arg2, type3, arg3)	\
+	DTRACE_PROBE3(__srp_##name, type1, arg1, type2, arg2, type3, arg3);
+
+#define	DTRACE_SRP_4(name, type1, arg1, type2, arg2, type3, arg3,	\
+	    type4, arg4)						\
+	DTRACE_PROBE4(__srp_##name, type1, arg1, type2, arg2, 		\
+	    type3, arg3, type4, arg4);
+
+#define	DTRACE_SRP_5(name, type1, arg1, type2, arg2, type3, arg3,	\
+	    type4, arg4, type5, arg5)					\
+	DTRACE_PROBE5(__srp_##name, type1, arg1, type2, arg2, 		\
+	    type3, arg3, type4, arg4, type5, arg5);
+
+#define	DTRACE_SRP_6(name, type1, arg1, type2, arg2, type3, arg3,	\
+	    type4, arg4, type5, arg5, type6, arg6)			\
+	DTRACE_PROBE6(__srp_##name, type1, arg1, type2, arg2, 		\
+	    type3, arg3, type4, arg4, type5, arg5, type6, arg6);
+
+#define	DTRACE_SRP_7(name, type1, arg1, type2, arg2, type3, arg3,	\
+	    type4, arg4, type5, arg5, type6, arg6, type7, arg7)		\
+	DTRACE_PROBE7(__srp_##name, type1, arg1, type2, arg2, 		\
+	    type3, arg3, type4, arg4, type5, arg5, type6, arg6, type7, arg7);
 
 #endif /* _KERNEL */
 
