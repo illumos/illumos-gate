@@ -178,6 +178,73 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 }
 
 /*
+ * Executes map and unmap command for shares.
+ */
+uint32_t
+smb_kshare_exec(door_handle_t dhdl, char *sharename, smb_execsub_info_t *subs,
+    int exec_type)
+{
+	door_arg_t arg;
+	char *buf;
+	int bufsz;
+	unsigned int used;
+	smb_dr_ctx_t *dec_ctx;
+	smb_dr_ctx_t *enc_ctx;
+	uint32_t rc;
+	int opcode = SMB_SHROP_EXEC;
+
+	bufsz = (2 * sizeof (int)) + strlen(sharename) + strlen(subs->e_winname)
+	    + strlen(subs->e_userdom) + strlen(subs->e_cli_netbiosname) +
+	    (2 * sizeof (smb_inaddr_t)) + sizeof (uid_t) +
+	    sizeof (smb_execsub_info_t);
+
+	buf = kmem_alloc(bufsz, KM_SLEEP);
+
+	enc_ctx = smb_dr_encode_start(buf, bufsz);
+	smb_dr_put_uint32(enc_ctx, opcode);
+	smb_dr_put_string(enc_ctx, sharename);
+	smb_dr_put_string(enc_ctx, subs->e_winname);
+	smb_dr_put_string(enc_ctx, subs->e_userdom);
+	smb_dr_put_buf(enc_ctx, (uchar_t *)&subs->e_srv_ipaddr,
+	    sizeof (smb_inaddr_t));
+	smb_dr_put_buf(enc_ctx, (uchar_t *)&subs->e_cli_ipaddr,
+	    sizeof (smb_inaddr_t));
+	smb_dr_put_string(enc_ctx, subs->e_cli_netbiosname);
+	smb_dr_put_int32(enc_ctx, subs->e_uid);
+	smb_dr_put_int32(enc_ctx, exec_type);
+
+	if (smb_dr_encode_finish(enc_ctx, &used) != 0) {
+		kmem_free(buf, bufsz);
+		return (NERR_InternalError);
+	}
+
+	arg.data_ptr = buf;
+	arg.data_size = used;
+	arg.desc_ptr = NULL;
+	arg.desc_num = 0;
+	arg.rbuf = buf;
+	arg.rsize = bufsz;
+
+	if (door_ki_upcall_limited(dhdl, &arg, NULL, SIZE_MAX, 0) != 0) {
+		kmem_free(buf, bufsz);
+		return (NERR_InternalError);
+	}
+
+	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
+	if (smb_kshare_chk_dsrv_status(opcode, dec_ctx) != 0) {
+		kmem_free(buf, bufsz);
+		return (NERR_InternalError);
+	}
+
+	rc = smb_dr_get_uint32(dec_ctx);
+	if (smb_dr_decode_finish(dec_ctx) != 0)
+		rc = NERR_InternalError;
+
+	kmem_free(buf, bufsz);
+	return (rc);
+}
+
+/*
  * This is a special interface that will be utilized by ZFS to cause
  * a share to be added/removed
  *

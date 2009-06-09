@@ -492,23 +492,24 @@ struct mslm_NetFileClose {
 
 /*
  ***********************************************************************
- * NetShareGetInfo: netname is the name of a share.
+ * NetShareGetInfo/NetShareSetInfo: netname is the name of a share.
  *
  * Levels:
- *  1      Sets information about the shared resource: name, type
- *         of resource and a comment.
- *  2      Sets information about the shared resource: name, type,
- *         permissions, password and number of connections.
- *  501    Sets information about the shared resource: name, type
- *         of resource and a comment.
- *  502    Sets information about the shared resource, including
- *         the name, type, permissions, number of connections etc.
- *  503    Contains information about the shared resource;
- *         identical to 502 except for the addition of a servername.
- *  1004   Specifies a comment for the shared resource.
- *  1005   Specifies a set of flags describing the shared resource.
- *  1006   Specifies the maximum number of concurrent connections
- *         that the shared resource can accommodate.
+ *  0      The share name.
+ *  1      Information about the shared resource: name, type of resource
+ *         and a comment.
+ *  2      Information about the shared resource: name, type, permissions,
+ *         password and number of connections.
+ *  501    Information about the shared resource: name, type of resource
+ *         and a comment.
+ *  502    Information about the shared resource, including the name, type,
+ *         permissions, number of connections etc.
+ *  503    Contains information about the shared resource; identical to 502
+ *         except for the addition of a servername.
+ *  1004   A comment for the shared resource.
+ *  1005   A set of flags describing the shared resource.
+ *  1006   The maximum number of concurrent connections that the shared
+ *         resource can accommodate.
  *  1501   Specifies the SECURITY_DESCRIPTOR for the share.
  *
  * Windows Me/98/95 supports level 50, which is similar to level 1.
@@ -544,10 +545,15 @@ struct mslm_NetFileClose {
  *
  * 0x0800  SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM
  *         The server will filter directory entries based on the access
- *         permissions of the client. This flag is only supported on
- *         servers running Windows Server 2003 SP1.
- *         Note: The access-based enumeration (ABE) flag may also
- *         appear as SHI1005_FLAGS_ENFORCE_NAMESPACE_ACCESS.
+ *         permissions of the client.  The access-based enumeration (ABE)
+ *         flag may also appear as SHI1005_FLAGS_ENFORCE_NAMESPACE_ACCESS.
+ *
+ * Support for Access-based Enumeration (ABE) was added to Windows in
+ * Windows Server 2003 Service Pack 1. ABE filters directory contents
+ * (and other shared resources) returned via a share based on a user's
+ * access rights, i.e. a user would not see objects that are
+ * inaccessible to that user. ABE requests are made using info level
+ * 1005 with the value 0x0800 in the flags field.
  ***********************************************************************
  */
 
@@ -556,6 +562,61 @@ struct mslm_NetFileClose {
 #define	CSC_CACHE_AUTO_REINT	0x10
 #define	CSC_CACHE_VDO		0x20
 #define	CSC_CACHE_NONE		0x30
+
+#define	MLSM_SID_AUTH_MAX	6
+/*
+ * Definition for a SID. The ndl compiler does not allow a typedef of
+ * a structure containing variable size members.
+ */
+struct mslm_sid {
+	BYTE		revision;
+	BYTE		sub_auth_count;
+	BYTE		authority[MLSM_SID_AUTH_MAX];
+  SIZE_IS(sub_auth_count)
+	DWORD		sub_authority[ANY_SIZE_ARRAY];
+};
+
+struct mslm_ace_hdr {
+	BYTE		type;
+	BYTE		flags;
+	WORD		size;
+};
+typedef struct mslm_ace_hdr mslm_ace_hdr_t;
+
+struct mslm_ace {
+	mslm_ace_hdr_t	header;
+	DWORD		mask;
+	struct mslm_sid	*sid;
+};
+typedef struct mslm_ace mslm_ace_t;
+
+struct mslm_acl {
+	BYTE		revision;
+	BYTE		sbz1;
+	WORD		size;
+	WORD		ace_count;
+	WORD		sbz2;
+    SIZE_IS(ace_count)
+	mslm_ace_t	ace[ANY_SIZE_ARRAY];
+};
+
+/*
+ * SRVSVC definition of a security_descriptor.
+ */
+struct mslm_security_descriptor {
+	BYTE revision;
+	BYTE sbz1;
+	WORD control;
+	DWORD offset_owner;
+	DWORD offset_group;
+	DWORD offset_sacl;
+	DWORD offset_dacl;
+	struct mslm_sid *owner;
+	struct mslm_sid *group;
+	struct mslm_acl *sacl;
+	struct mslm_acl *dacl;
+};
+typedef struct mslm_security_descriptor mslm_security_descriptor_t;
 
 struct mslm_NetShareInfo_0 {
 	LPTSTR shi0_netname;
@@ -598,7 +659,8 @@ struct mslm_NetShareInfo_502 {
 	LPTSTR shi502_path;
 	LPTSTR shi502_passwd;
 	DWORD shi502_reserved;
-	DWORD shi502_security_descriptor;
+    SIZE_IS(shi502_reserved)
+	LPBYTE shi502_security_descriptor;
 };
 
 struct mslm_NetShareInfo_503 {
@@ -612,7 +674,8 @@ struct mslm_NetShareInfo_503 {
 	LPTSTR shi503_passwd;
 	LPTSTR shi503_servername;
 	DWORD shi503_reserved;
-	DWORD shi503_security_descriptor;
+    SIZE_IS(shi503_reserved)
+	LPBYTE shi503_security_descriptor;
 };
 
 struct mslm_NetShareInfo_1004 {
@@ -627,23 +690,31 @@ struct mslm_NetShareInfo_1006 {
 	DWORD shi1006_max_uses;
 };
 
-union mlsm_NetShareGetInfoResUnion {
+struct mslm_NetShareInfo_1501 {
+	DWORD shi1501_reserved;
+    SIZE_IS(shi1501_reserved)
+	LPBYTE shi1501_security_descriptor;
+};
+
+union mlsm_NetShareInfoResUnion {
 	CASE(0)		struct mslm_NetShareInfo_0 *info0;
 	CASE(1)		struct mslm_NetShareInfo_1 *info1;
 	CASE(2)		struct mslm_NetShareInfo_2 *info2;
 	CASE(501)	struct mslm_NetShareInfo_501 *info501;
 	CASE(502)	struct mslm_NetShareInfo_502 *info502;
+	CASE(503)	struct mslm_NetShareInfo_503 *info503;
 	CASE(1004)	struct mslm_NetShareInfo_1004 *info1004;
 	CASE(1005)	struct mslm_NetShareInfo_1005 *info1005;
 	CASE(1006)	struct mslm_NetShareInfo_1006 *info1006;
+	CASE(1501)	struct mslm_NetShareInfo_1501 *info1501;
 	DEFAULT	char *nullptr;
 };
 
 
-struct mlsm_NetShareGetInfoRes {
+struct mlsm_NetShareInfoRes {
 	DWORD switch_value;
   SWITCH(switch_value)
-	union mlsm_NetShareGetInfoResUnion ru;
+	union mlsm_NetShareInfoResUnion ru;
 };
 
 
@@ -652,38 +723,18 @@ struct mlsm_NetShareGetInfo {
 	IN	LPTSTR servername;
 	IN REFERENCE	LPTSTR netname;
 	IN	DWORD level;
-	OUT	struct mlsm_NetShareGetInfoRes result;
+	OUT	struct mlsm_NetShareInfoRes result;
 	OUT	DWORD status;
 };
 
 
-/*
- ***********************************************************************
- * NetShareSetInfo: netname is the name of a share.
- * The levels and shi1005_flags are as described for NetShareGetInfo.
- *
- * Support for Access-based Enumeration (ABE) was added to Windows in
- * Windows Server 2003 Service Pack 1. ABE filters directory contents
- * (and other shared resources) returned via a share based on a user's
- * access rights, i.e. a user would not see objects that are
- * inaccessible to that user. ABE requests are made using info level
- * 1005 with the value 0x0800 in the flags field (see NetShareGetInfo).
- ***********************************************************************
- */
 OPERATION(SRVSVC_OPNUM_NetShareSetInfo)
 struct mlsm_NetShareSetInfo {
 	IN	LPTSTR servername;
 	IN REFERENCE	LPTSTR netname;
 	IN	DWORD level;
-/*
- * This should accept all the same levels as NetShareGetInfo
- * but we always return ACCESS_DENIED for now. So there's no
- * point in unmarshalling the share information.
- *
- *	IN	struct mlsm_NetShareGetInfoRes result;
- */
-	OUT	DWORD parm_err_ptr;
-	OUT	DWORD parm_err;
+	IN	struct mlsm_NetShareInfoRes result;
+	INOUT	DWORD *parm_err;
 	OUT	DWORD status;
 };
 
@@ -861,9 +912,43 @@ struct mslm_SESSION_INFO_1 {
 };
 INFONRES_RESULT(mslm_SESSION_INFO, 1)
 
+struct mslm_SESSION_INFO_2 {
+	LPTSTR sesi2_cname;
+	LPTSTR sesi2_uname;
+	DWORD  sesi2_nopens;
+	DWORD  sesi2_time;
+	DWORD  sesi2_itime;
+	DWORD  sesi2_uflags;
+	LPTSTR sesi2_cltype_name;
+};
+INFONRES_RESULT(mslm_SESSION_INFO, 2)
+
+struct mslm_SESSION_INFO_10 {
+	LPTSTR sesi10_cname;
+	LPTSTR sesi10_uname;
+	DWORD  sesi10_time;
+	DWORD  sesi10_itime;
+};
+INFONRES_RESULT(mslm_SESSION_INFO, 10)
+
+struct mslm_SESSION_INFO_502 {
+	LPTSTR sesi502_cname;
+	LPTSTR sesi502_uname;
+	DWORD  sesi502_nopens;
+	DWORD  sesi502_time;
+	DWORD  sesi502_itime;
+	DWORD  sesi502_uflags;
+	LPTSTR sesi502_cltype_name;
+	LPTSTR sesi502_transport;
+};
+INFONRES_RESULT(mslm_SESSION_INFO, 502)
+
 INFONRES_DEFINITION(mslm_NetSessionEnum,
 	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 0)
-	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 1))
+	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 1)
+	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 2)
+	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 10)
+	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 502))
 
 OPERATION(SRVSVC_OPNUM_NetSessionEnum)
 struct mslm_NetSessionEnum {
@@ -1019,7 +1104,6 @@ struct mslm_NetSessionDel {
 #define SV_VISIBLE      0
 
 
-/* Let's get some info already */
 struct mslm_SERVER_INFO_100 {
 	DWORD		sv100_platform_id;
 	LPTSTR		sv100_name;
@@ -1050,10 +1134,78 @@ struct mslm_SERVER_INFO_102 {
 	LPTSTR		sv102_userpath;
 };
 
+struct mslm_SERVER_INFO_502 {
+	DWORD sv502_sessopens;
+	DWORD sv502_sessvcs;
+	DWORD sv502_opensearch;
+	DWORD sv502_sizreqbuf;
+	DWORD sv502_initworkitems;
+	DWORD sv502_maxworkitems;
+	DWORD sv502_rawworkitems;
+	DWORD sv502_irpstacksize;
+	DWORD sv502_maxrawbuflen;
+	DWORD sv502_sessusers;
+	DWORD sv502_sessconns;
+	DWORD sv502_maxpagedmemoryusage;
+	DWORD sv502_maxnonpagedmemoryusage;
+	DWORD sv502_enablesoftcompat;
+	DWORD sv502_enableforcedlogoff;
+	DWORD sv502_timesource;
+	DWORD sv502_acceptdownlevelapis;
+	DWORD sv502_lmannounce;
+};
+
+struct mslm_SERVER_INFO_503 {
+	DWORD sv503_sessopens;
+	DWORD sv503_sessvcs;
+	DWORD sv503_opensearch;
+	DWORD sv503_sizreqbuf;
+	DWORD sv503_initworkitems;
+	DWORD sv503_maxworkitems;
+	DWORD sv503_rawworkitems;
+	DWORD sv503_irpstacksize;
+	DWORD sv503_maxrawbuflen;
+	DWORD sv503_sessusers;
+	DWORD sv503_sessconns;
+	DWORD sv503_maxpagedmemoryusage;
+	DWORD sv503_maxnonpagedmemoryusage;
+	DWORD sv503_enablesoftcompat;
+	DWORD sv503_enableforcedlogoff;
+	DWORD sv503_timesource;
+	DWORD sv503_acceptdownlevelapis;
+	DWORD sv503_lmannounce;
+	LPTSTR sv503_domain;
+	DWORD sv503_maxcopyreadlen;
+	DWORD sv503_maxcopywritelen;
+	DWORD sv503_minkeepsearch;
+	DWORD sv503_maxkeepsearch;
+	DWORD sv503_minkeepcomplsearch;
+	DWORD sv503_maxkeepcomplsearch;
+	DWORD sv503_threadcountadd;
+	DWORD sv503_numblockthreads;
+	DWORD sv503_scavtimeout;
+	DWORD sv503_minrcvqueue;
+	DWORD sv503_minfreeworkitems;
+	DWORD sv503_xactmemsize;
+	DWORD sv503_threadpriority;
+	DWORD sv503_maxmpxct;
+	DWORD sv503_oplockbreakwait;
+	DWORD sv503_oplockbreakresponsewait;
+	DWORD sv503_enableoplocks;
+	DWORD sv503_enableoplockforceclose;
+	DWORD sv503_enablefcbopens;
+	DWORD sv503_enableraw;
+	DWORD sv503_enablesharednetdrives;
+	DWORD sv503_minfreeconnections;
+	DWORD sv503_maxfreeconnections;
+};
+
 union mslm_NetServerGetInfo_ru {
 	CASE(100)	struct mslm_SERVER_INFO_100 *bufptr100;
 	CASE(101)	struct mslm_SERVER_INFO_101 *bufptr101;
 	CASE(102)	struct mslm_SERVER_INFO_102 *bufptr102;
+	CASE(502)	struct mslm_SERVER_INFO_502 *bufptr502;
+	CASE(503)	struct mslm_SERVER_INFO_503 *bufptr503;
 	DEFAULT		char *nullptr;
 };
 
@@ -1176,6 +1328,7 @@ INFONRES_RESULT(mslm_NetShareInfo,502)
 union mslm_NetShareAddInfo_u {
 	CASE(2)     struct mslm_NetShareInfo_2 *info2;
 	CASE(502)   struct mslm_NetShareInfo_502 *info502;
+	DEFAULT	char *nullptr;
 };
 
 struct mslm_NetShareAddInfo {
@@ -1227,6 +1380,14 @@ struct mslm_NetShareDel {
 	IN	LPTSTR servername;
 	IN REFERENCE	LPTSTR netname;
 	/* IN	DWORD reserved; */
+	OUT	DWORD status;
+};
+
+OPERATION(SRVSVC_OPNUM_NetShareCheck)
+struct mslm_NetShareCheck {
+	IN	LPTSTR servername;
+	IN REFERENCE	LPTSTR path;
+	OUT	DWORD stype;
 	OUT	DWORD status;
 };
 
@@ -1338,7 +1499,7 @@ union srvsvc_interface {
     CASE(SRVSVC_OPNUM_NetShareGetInfo)
 	struct mlsm_NetShareGetInfo	NetShareGetInfo;
     CASE(SRVSVC_OPNUM_NetShareSetInfo)
-	struct mlsm_NetShareGetInfo	NetShareSetInfo;
+	struct mlsm_NetShareSetInfo	NetShareSetInfo;
     CASE(SRVSVC_OPNUM_NetSessionDel)
 	struct mslm_NetSessionDel	NetSessionDel;
     CASE(SRVSVC_OPNUM_NetSessionEnum)
@@ -1353,6 +1514,8 @@ union srvsvc_interface {
 	struct mslm_NetShareAdd		NetShareAdd;
     CASE(SRVSVC_OPNUM_NetShareDel)
 	struct mslm_NetShareDel		NetShareDel;
+    CASE(SRVSVC_OPNUM_NetShareCheck)
+	struct mslm_NetShareCheck	NetShareCheck;
     CASE(SRVSVC_OPNUM_NetShareEnum)
 	struct mslm_NetShareEnum	NetShareEnum;
     CASE(SRVSVC_OPNUM_NetShareEnumSticky)

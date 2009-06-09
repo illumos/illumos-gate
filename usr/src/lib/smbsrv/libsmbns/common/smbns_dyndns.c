@@ -111,7 +111,6 @@ static int dyndns_clear_rev_zone(char *);
 static void dyndns_msgid_init(void);
 static int dyndns_get_msgid(void);
 static void dyndns_syslog(int, int, const char *);
-static int dyndns_getnameinfo(smb_inaddr_t *, char *, int, int);
 
 int
 dyndns_start(void)
@@ -1172,7 +1171,7 @@ dyndns_get_sec_context(const char *hostname, smb_inaddr_t *dns_ip)
 	oid = GSS_C_NO_OID;
 	key_name = (char *)hostname;
 
-	if (dyndns_getnameinfo(dns_ip, dns_hostname,
+	if (smb_getnameinfo(dns_ip, dns_hostname,
 	    sizeof (dns_hostname), 0)) {
 		return (NULL);
 	}
@@ -1186,33 +1185,6 @@ dyndns_get_sec_context(const char *hostname, smb_inaddr_t *dns_ip)
 
 	(void) close(s);
 	return (gss_context);
-}
-
-static int
-dyndns_getnameinfo(smb_inaddr_t *dns_ip, char *dns_hostname,
-    int hostlen, int flags)
-{
-	socklen_t salen;
-	struct sockaddr_in6 sin6;
-	struct sockaddr_in sin;
-	void *sp;
-
-	if (dns_ip->a_family == AF_INET) {
-		salen = sizeof (struct sockaddr_in);
-		sin.sin_family = dns_ip->a_family;
-		sin.sin_port = 0;
-		sin.sin_addr.s_addr = dns_ip->a_ipv4;
-		sp = &sin;
-	} else {
-		salen = sizeof (struct sockaddr_in6);
-		sin6.sin6_family = dns_ip->a_family;
-		sin6.sin6_port = 0;
-		(void) memcpy(&sin6.sin6_addr.s6_addr, &dns_ip->a_ipv6,
-		    sizeof (sin6.sin6_addr.s6_addr));
-		sp = &sin6;
-	}
-	return (getnameinfo((struct sockaddr *)sp, salen,
-	    dns_hostname, hostlen, NULL, 0, flags));
 }
 
 /*
@@ -1764,9 +1736,9 @@ dyndns_search_entry(int update_zone, const char *hostname, const char *ip_addr,
 			return (1);
 		}
 	} else {
-		if (dyndns_getnameinfo(&ipaddr, dns_hostname, NI_MAXHOST, 0)) {
+		if (smb_getnameinfo(&ipaddr, dns_hostname, NI_MAXHOST, 0))
 			return (NULL);
-		}
+
 		if (strncasecmp(dns_hostname, hostname,
 		    strlen(hostname)) == 0) {
 			*is_match = 1;

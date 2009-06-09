@@ -54,6 +54,8 @@
 
 #define	SMB_CSC_BUFSZ		64
 
+#define	SMB_VALID_SUB_CHRS	"UDhMLmIiSPu"	/* substitution characters */
+
 /* internal functions */
 static int smb_share_init(void);
 static void smb_share_fini(void);
@@ -75,8 +77,11 @@ static int range_check_validator(int, char *);
 static int range_check_validator_zero_ok(int, char *);
 static int string_length_check_validator(int, char *);
 static int true_false_validator(int, char *);
-static int ip_address_validator_empty_ok(int, char *);
+static int ipv4_validator(int, char *);
+static int ip_validator(int, char *);
 static int path_validator(int, char *);
+static int cmd_validator(int, char *);
+static int disposition_validator(int, char *);
 
 static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
@@ -162,6 +167,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_NONE,		OPT_TYPE_ACCLIST },
 	{ SHOPT_CATIA,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_CSC,		OPT_TYPE_CSC },
+	{ SHOPT_GUEST,		OPT_TYPE_BOOLEAN },
 	{ NULL, NULL }
 };
 
@@ -765,28 +771,20 @@ smb_validate_property(sa_handle_t handle, sa_property_t property,
 				ret = SA_BAD_VALUE;
 			break;
 		case OPT_TYPE_BOOLEAN:
-			if (strlen(value) == 0 ||
-			    strcasecmp(value, "true") == 0 ||
-			    strcmp(value, "1") == 0 ||
-			    strcasecmp(value, "false") == 0 ||
-			    strcmp(value, "0") == 0) {
-				ret = SA_OK;
-			} else {
-				ret = SA_BAD_VALUE;
-			}
+			ret = true_false_validator(0, value);
 			break;
 		case OPT_TYPE_NAME:
 			/*
 			 * Make sure no invalid characters
 			 */
-			if (validresource(value) == B_FALSE)
+			if (!validresource(value))
 				ret = SA_BAD_VALUE;
 			break;
 		case OPT_TYPE_STRING:
 			/* whatever is here should be ok */
 			break;
 		case OPT_TYPE_CSC:
-			if (validcsc(value) == B_FALSE)
+			if (!validcsc(value))
 				ret = SA_BAD_VALUE;
 			break;
 		case OPT_TYPE_ACCLIST: {
@@ -865,9 +863,9 @@ struct smb_proto_option_defs {
 	{ SMB_CI_KEEPALIVE, 20, 5400, range_check_validator_zero_ok,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_WINS_SRV1, 0, MAX_VALUE_BUFLEN,
-	    ip_address_validator_empty_ok, SMB_REFRESH_REFRESH },
+	    ipv4_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_WINS_SRV2, 0, MAX_VALUE_BUFLEN,
-	    ip_address_validator_empty_ok, SMB_REFRESH_REFRESH },
+	    ipv4_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_WINS_EXCL, 0, MAX_VALUE_BUFLEN,
 	    interface_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_SIGNING_ENABLE, 0, 0, true_false_validator,
@@ -877,13 +875,18 @@ struct smb_proto_option_defs {
 	{ SMB_CI_RESTRICT_ANON, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
 	{ SMB_CI_DOMAIN_SRV, 0, MAX_VALUE_BUFLEN,
-	    ip_address_validator_empty_ok, 0 },
+	    ip_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_ADS_SITE, 0, MAX_VALUE_BUFLEN,
 	    string_length_check_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_DYNDNS_ENABLE, 0, 0, true_false_validator, 0 },
 	{ SMB_CI_AUTOHOME_MAP, 0, MAX_VALUE_BUFLEN, path_validator, 0 },
 	{ SMB_CI_IPV6_ENABLE, 0, 0, true_false_validator,
 	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_MAP, 0, MAX_VALUE_BUFLEN, cmd_validator, SMB_REFRESH_REFRESH },
+	{ SMB_CI_UNMAP, 0, MAX_VALUE_BUFLEN, cmd_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_DISPOSITION, 0, MAX_VALUE_BUFLEN,
+	    disposition_validator, SMB_REFRESH_REFRESH },
 };
 
 #define	SMB_OPT_NUM \
@@ -964,21 +967,43 @@ true_false_validator(int index, char *value)
 }
 
 /*
- * Check IP address.
+ * Check IP v4 address.
  */
 /*ARGSUSED*/
 static int
-ip_address_validator_empty_ok(int index, char *value)
+ipv4_validator(int index, char *value)
 {
 	char sbytes[16];
-	int len;
 
 	if (value == NULL)
 		return (SA_OK);
-	len = strlen(value);
-	if (len == 0)
+
+	if (strlen(value) == 0)
 		return (SA_OK);
+
 	if (inet_pton(AF_INET, value, (void *)sbytes) != 1)
+		return (SA_BAD_VALUE);
+
+	return (SA_OK);
+}
+
+/*
+ * Check IP v4/v6 address.
+ */
+/*ARGSUSED*/
+static int
+ip_validator(int index, char *value)
+{
+	char sbytes[INET6_ADDRSTRLEN];
+
+	if (value == NULL)
+		return (SA_OK);
+
+	if (strlen(value) == 0)
+		return (SA_OK);
+
+	if (inet_pton(AF_INET, value, (void *)sbytes) != 1 &&
+	    inet_pton(AF_INET6, value, (void *)sbytes) != 1)
 		return (SA_BAD_VALUE);
 
 	return (SA_OK);
@@ -1476,7 +1501,7 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 	sa_share_t share;
 	sa_group_t group;
 	sa_resource_t resource;
-	char *cscopt;
+	char *opt;
 
 	if (si == NULL)
 		return (SA_INVALID_NAME);
@@ -1508,11 +1533,16 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 
 	if (si->shr_cmnt[0] != '\0')
 		(void) sa_set_resource_description(resource, si->shr_cmnt);
+
 	if (si->shr_container[0] != '\0')
 		(void) sa_set_resource_attr(resource, SHOPT_AD_CONTAINER,
 		    si->shr_container);
-	if ((cscopt = smb_csc_name(si)) != NULL)
-		(void) sa_set_resource_attr(resource, SHOPT_CSC, cscopt);
+
+	if ((opt = smb_csc_name(si)) != NULL)
+		(void) sa_set_resource_attr(resource, SHOPT_CSC, opt);
+
+	opt = (si->shr_flags & SMB_SHRF_GUEST_OK) ? "true" : "false";
+	(void) sa_set_resource_attr(resource, SHOPT_GUEST, opt);
 
 	return (SA_OK);
 }
@@ -2013,6 +2043,18 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		}
 	}
 
+	prop = sa_get_property(opts, SHOPT_GUEST);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			if ((strcasecmp(val, "true") == 0) ||
+			    (strcmp(val, "1") == 0))
+				si->shr_flags |= SMB_SHRF_GUEST_OK;
+			else if (strcasecmp(val, "false") == 0)
+				si->shr_flags &= ~SMB_SHRF_GUEST_OK;
+			free(val);
+		}
+	}
+
 	prop = sa_get_property(opts, SHOPT_RO);
 	if (prop != NULL) {
 		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
@@ -2141,4 +2183,72 @@ smb_get_defaultgrp(sa_handle_t handle)
 	}
 
 	return (group);
+}
+
+/*
+ * Checks to see if the command args are the supported substitution specifier.
+ * i.e. <cmd> %U %S
+ */
+static int
+cmd_validator(int index, char *value)
+{
+	char cmd[MAXPATHLEN];
+	char *ptr, *v;
+	boolean_t skip_cmdname;
+
+	if (string_length_check_validator(index, value) != SA_OK)
+		return (SA_BAD_VALUE);
+
+	if (*value == '\0')
+		return (SA_OK);
+
+	(void) strlcpy(cmd, value, sizeof (cmd));
+
+	ptr = cmd;
+	skip_cmdname = B_TRUE;
+	do {
+		if ((v = strsep(&ptr, " ")) == NULL)
+			break;
+
+		if (*v != '\0') {
+
+			if (skip_cmdname) {
+				skip_cmdname = B_FALSE;
+				continue;
+			}
+
+			if ((strlen(v) != 2) || *v != '%')
+				return (SA_BAD_VALUE);
+
+			if (strpbrk(v, SMB_VALID_SUB_CHRS) == NULL)
+				return (SA_BAD_VALUE);
+		}
+
+	} while (v != NULL);
+
+	/*
+	 * If skip_cmdname is still true then the string contains
+	 * only spaces.  Don't allow such a string.
+	 */
+	if (skip_cmdname)
+		return (SA_BAD_VALUE);
+
+	return (SA_OK);
+}
+
+/*ARGSUSED*/
+static int
+disposition_validator(int index, char *value)
+{
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+
+	if (*value == '\0')
+		return (SA_OK);
+
+	if ((strcasecmp(value, SMB_SHR_DISP_CONT_STR) == 0) ||
+	    (strcasecmp(value, SMB_SHR_DISP_TERM_STR) == 0))
+		return (SA_OK);
+
+	return (SA_BAD_VALUE);
 }

@@ -1943,6 +1943,7 @@ smb_send_name_query_response(struct addr_entry *addr,
 	unsigned short		attr;
 	unsigned char 		data[MAX_DATAGRAM_LENGTH];
 	unsigned char 		*scan = data;
+	uint32_t		ret_addr;
 
 	packet.name_trn_id = original_packet->name_trn_id;
 	packet.info = NAME_QUERY_RESPONSE | (rcode & NAME_RCODE_MASK);
@@ -1973,11 +1974,11 @@ smb_send_name_query_response(struct addr_entry *addr,
 			    NAME_ATTR_OWNER_NODE_TYPE);
 
 			BE_OUT16(scan, attr); scan += 2;
-
-			*scan++ = raddr->sin.sin_addr.s_addr;
-			*scan++ = raddr->sin.sin_addr.s_addr >> 8;
-			*scan++ = raddr->sin.sin_addr.s_addr >> 16;
-			*scan++ = raddr->sin.sin_addr.s_addr >> 24;
+			ret_addr = LE_32(raddr->sin.sin_addr.s_addr);
+			*scan++ = ret_addr;
+			*scan++ = ret_addr >> 8;
+			*scan++ = ret_addr >> 16;
+			*scan++ = ret_addr >> 24;
 
 			answer.rdlength += 6;
 			raddr = raddr->forw;
@@ -2557,6 +2558,7 @@ smb_name_Bnode_delete_name(struct name_entry *name)
 	unsigned char 		data[MAX_DATAGRAM_LENGTH];
 	unsigned char 		*scan = data;
 	uint32_t		attr;
+	uint32_t		ret_addr;
 
 	/* build packet */
 	question.name = name;
@@ -2576,11 +2578,11 @@ smb_name_Bnode_delete_name(struct name_entry *name)
 		    NAME_ATTR_OWNER_NODE_TYPE);
 
 		BE_OUT16(scan, attr); scan += 2;
-
-		*scan++ = raddr->sin.sin_addr.s_addr;
-		*scan++ = raddr->sin.sin_addr.s_addr >> 8;
-		*scan++ = raddr->sin.sin_addr.s_addr >> 16;
-		*scan++ = raddr->sin.sin_addr.s_addr >> 24;
+		ret_addr = LE_32(raddr->sin.sin_addr.s_addr);
+		*scan++ = ret_addr;
+		*scan++ = ret_addr >> 8;
+		*scan++ = ret_addr >> 16;
+		*scan++ = ret_addr >> 24;
 
 		additional.rdlength += 6;
 	} while (raddr != &name->addr_list);
@@ -2993,6 +2995,7 @@ smb_name_Pnode_delete_name(struct name_entry *name)
 	unsigned char 		data[MAX_DATAGRAM_LENGTH];
 	unsigned char 		*scan = data;
 	uint32_t		attr;
+	uint32_t		ret_addr;
 
 	/* build packet */
 	question.name = name;
@@ -3013,11 +3016,11 @@ smb_name_Pnode_delete_name(struct name_entry *name)
 		    NAME_ATTR_OWNER_NODE_TYPE);
 
 		BE_OUT16(scan, attr); scan += 2;
-
-		*scan++ = raddr->sin.sin_addr.s_addr;
-		*scan++ = raddr->sin.sin_addr.s_addr >> 8;
-		*scan++ = raddr->sin.sin_addr.s_addr >> 16;
-		*scan++ = raddr->sin.sin_addr.s_addr >> 24;
+		ret_addr = LE_32(raddr->sin.sin_addr.s_addr);
+		*scan++ = ret_addr;
+		*scan++ = ret_addr >> 8;
+		*scan++ = ret_addr >> 16;
+		*scan++ = ret_addr >> 24;
 
 		additional.rdlength = 6;
 		raddr = raddr->forw;

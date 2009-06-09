@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMB_NETBIOS_H_
 #define	_SMB_NETBIOS_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <synch.h>
@@ -679,6 +677,6 @@ int smb_browser_load_transact_header(unsigned char *, int, int, int, char *);
 
 /* Netlogon function */
 void smb_netlogon_receive(struct datagram *, char *, unsigned char *, int);
-void smb_netlogon_request(struct name_entry *, int, char *);
+void smb_netlogon_request(struct name_entry *, char *);
 
 #endif /* _SMB_NETBIOS_H_ */

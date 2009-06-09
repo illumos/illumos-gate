@@ -350,7 +350,7 @@ smb_idmap_batch_getsid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
 
 	case SMB_IDMAP_EVERYONE:
 		/* Everyone S-1-1-0 */
-		sim->sim_domsid = "S-1-1";
+		sim->sim_domsid = strdup("S-1-1");
 		sim->sim_rid = 0;
 		sim->sim_stat = IDMAP_SUCCESS;
 		stat = IDMAP_SUCCESS;
@@ -387,8 +387,7 @@ smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 	for (i = 0, sim = sib->sib_maps; i < sib->sib_nmap; i++, sim++) {
 		if (sim->sim_stat != IDMAP_SUCCESS) {
 			if (sib->sib_flags == SMB_IDMAP_SID2ID) {
-				smb_tracef("[%d] %s-%d (%d)",
-				    sim->sim_idtype, sim->sim_domsid,
+				smb_tracef("[%d] %d (%d)", sim->sim_idtype,
 				    sim->sim_rid, sim->sim_stat);
 			}
 			return (sim->sim_stat);

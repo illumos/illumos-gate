@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_SMB_COMMON_DOOR_H
 #define	_SMBSRV_SMB_COMMON_DOOR_H
-
-#pragma ident	"@(#)smb_common_door.h	1.3	08/08/07 SMI"
 
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_xdr.h>
@@ -65,14 +63,11 @@ extern char *smb_dr_encode_common(uint_t reserved, void *data, xdrproc_t proc,
 
 /* user-space encode functions */
 extern char *smb_dr_encode_res_token(smb_token_t *token, size_t *len);
-extern char *smb_dr_encode_kshare(smb_dr_kshare_t *, size_t *);
 
 /* user-space decode functions */
 extern netr_client_t *smb_dr_decode_arg_get_token(char *buf, size_t len);
 extern char *smb_dr_decode_string(char *buf, size_t len);
 
-/* user-space free functions */
-extern void smb_dr_ulist_free(smb_dr_ulist_t *ulist);
 #endif /* _KERNEL */
 
 /*

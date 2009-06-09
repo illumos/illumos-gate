@@ -89,7 +89,7 @@ ndr_pipe_open(int fid, uint8_t *data, uint32_t datalen)
 		return (ENOMEM);
 	}
 
-	if (smb_opipe_context_decode(&np->np_ctx, data, datalen) == -1) {
+	if (smb_opipe_context_decode(&np->np_ctx, data, datalen, NULL) == -1) {
 		ndr_pipe_release(np);
 		(void) mutex_unlock(&ndr_pipe_lock);
 		return (EINVAL);

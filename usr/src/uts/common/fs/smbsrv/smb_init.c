@@ -194,37 +194,42 @@ smb_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
 
 /* ARGSUSED */
 static int
-smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
+smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
     int *retval)
 {
+	smb_ioc_t	*ioc;
+	smb_ioc_header_t ioc_hdr;
+	uint32_t	crc;
+	boolean_t	copyout = B_FALSE;
 	int		rc = 0;
-	smb_io_t	smb_io;
-	uint32_t	crc1;
-	uint32_t	crc2;
 
-	if (ddi_copyin((smb_io_t *)argp, &smb_io, sizeof (smb_io), flag) ||
-	    (smb_io.sio_version != SMB_IOC_VERSION))
+	if (ddi_copyin((const void *)argp, &ioc_hdr, sizeof (smb_ioc_header_t),
+	    flags) || (ioc_hdr.version != SMB_IOC_VERSION))
 		return (EFAULT);
 
-	crc1 = smb_io.sio_crc;
-	smb_io.sio_crc = 0;
-	crc2 = smb_crc_gen((uint8_t *)&smb_io, sizeof (smb_io_t));
-
-	if (crc1 != crc2)
+	crc = ioc_hdr.crc;
+	ioc_hdr.crc = 0;
+	if (smb_crc_gen((uint8_t *)&ioc_hdr, sizeof (ioc_hdr)) != crc)
 		return (EFAULT);
+
+	ioc = kmem_alloc(ioc_hdr.len, KM_SLEEP);
+	if (ddi_copyin((const void *)argp, ioc, ioc_hdr.len, flags)) {
+		kmem_free(ioc, ioc_hdr.len);
+		return (EFAULT);
+	}
 
 	switch (cmd) {
 	case SMB_IOC_CONFIG:
-		rc = smb_server_configure(&smb_io.sio_data.cfg);
+		rc = smb_server_configure(&ioc->ioc_cfg);
 		break;
 	case SMB_IOC_START:
-		rc = smb_server_start(&smb_io.sio_data.start);
+		rc = smb_server_start(&ioc->ioc_start);
 		break;
 	case SMB_IOC_NBT_LISTEN:
-		rc = smb_server_nbt_listen(smb_io.sio_data.error);
+		rc = smb_server_nbt_listen(&ioc->ioc_listen);
 		break;
 	case SMB_IOC_TCP_LISTEN:
-		rc = smb_server_tcp_listen(smb_io.sio_data.error);
+		rc = smb_server_tcp_listen(&ioc->ioc_listen);
 		break;
 	case SMB_IOC_NBT_RECEIVE:
 		rc = smb_server_nbt_receive();
@@ -233,13 +238,32 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 		rc = smb_server_tcp_receive();
 		break;
 	case SMB_IOC_GMTOFF:
-		rc = smb_server_set_gmtoff(smb_io.sio_data.gmtoff);
+		rc = smb_server_set_gmtoff(&ioc->ioc_gmt);
+		break;
+	case SMB_IOC_SHARE:
+		rc = smb_server_share_export(&ioc->ioc_share);
+		break;
+	case SMB_IOC_UNSHARE:
+		rc = smb_server_share_unexport(&ioc->ioc_share);
+		break;
+	case SMB_IOC_USER_NUMBER:
+		rc = smb_server_user_number(&ioc->ioc_unum);
+		copyout = B_TRUE;
+		break;
+	case SMB_IOC_USER_LIST:
+		rc = smb_server_user_list(&ioc->ioc_ulist);
+		copyout = B_TRUE;
 		break;
 	default:
 		rc = ENOTTY;
 		break;
 	}
-
+	if ((rc == 0) && copyout) {
+		if (ddi_copyout((const void *)ioc, (void *)argp, ioc_hdr.len,
+		    flags))
+			rc = EFAULT;
+	}
+	kmem_free(ioc, ioc_hdr.len);
 	return (rc);
 }
 

@@ -115,10 +115,10 @@ typedef struct netr_info {
 
 typedef struct netr_client {
 	uint16_t logon_level;
-	char *username;
-	char *domain;
-	char *real_username;
-	char *real_domain;
+	char *username;		/* request username */
+	char *domain;		/* request domain */
+	char *e_username;	/* effective username */
+	char *e_domain;		/* effective domain */
 	char *workstation;
 	smb_inaddr_t ipaddr;
 	struct {

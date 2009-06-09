@@ -103,7 +103,7 @@ smb_com_close_and_tree_disconnect(smb_request_t *sr)
 
 	smb_ofile_close(sr->fid_ofile, sr->arg.timestamp);
 	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
-	smb_tree_disconnect(sr->tid_tree);
+	smb_tree_disconnect(sr->tid_tree, B_TRUE);
 
 	if (smbsr_encode_empty_result(sr) != 0)
 		return (SDRC_ERROR);

@@ -32,10 +32,9 @@
 #include <smbsrv/smb_common_door.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/libmlsvc.h>
+#include <smbsrv/libsmbns.h>
 #include "smbd.h"
 
-static char *smb_dop_set_downcall_fd(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 static char *smb_dop_user_auth_logon(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 static char *smb_dop_user_nonauth_logon(char *argp, size_t arg_size,
@@ -43,11 +42,8 @@ static char *smb_dop_user_nonauth_logon(char *argp, size_t arg_size,
 static char *smb_dop_user_auth_logoff(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 
-static char *smb_dop_user_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-
-static char *smb_dop_lookup_sid(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
+static char *smb_dop_lookup_sid(char *, size_t, door_desc_t *, uint_t,
+    size_t *, int *);
 static char *smb_dop_lookup_name(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 static char *smb_dop_join(char *argp, size_t arg_size,
@@ -61,15 +57,15 @@ static char *smb_dop_vss_get_snapshots(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 static char *smb_dop_vss_map_gmttoken(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
+static char *smb_dop_ads_find_host(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 
 /* SMB daemon's door operation table */
 smb_dr_op_t smb_doorsrv_optab[] =
 {
 	smb_dop_user_auth_logon,
-	smb_dop_set_downcall_fd,
 	smb_dop_user_nonauth_logon,
 	smb_dop_user_auth_logoff,
-	smb_dop_user_list,
 	smb_dop_lookup_sid,
 	smb_dop_lookup_name,
 	smb_dop_join,
@@ -77,6 +73,7 @@ smb_dr_op_t smb_doorsrv_optab[] =
 	smb_dop_vss_get_count,
 	smb_dop_vss_get_snapshots,
 	smb_dop_vss_map_gmttoken,
+	smb_dop_ads_find_host
 };
 
 /*ARGSUSED*/
@@ -181,86 +178,6 @@ smb_dop_user_auth_logon(char *argp, size_t arg_size, door_desc_t *dp,
 
 	smb_token_destroy(token);
 	return (buf);
-}
-
-/*
- * Set the downcall file descriptor.
- */
-/*ARGSUSED*/
-static char *
-smb_dop_set_downcall_fd(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *buf = NULL;
-	uint32_t stat;
-
-	*rbufsize = 0;
-	*err = 0;
-
-	if (n_desc == 1) {
-		mlsvc_set_door_fd(dp->d_data.d_desc.d_descriptor);
-		stat = SMB_DR_OP_SUCCESS;
-	} else {
-		stat = SMB_DR_OP_ERR;
-	}
-
-	if ((buf = smb_dr_set_res_stat(stat, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-
-	return (buf);
-}
-
-/*
- * smb_dr_op_users
- *
- * This function will obtain information on the connected users
- * starting at the given offset by making a door down-call. The
- * information will then be returned to the user-space door client.
- *
- * At most 50 users (i.e. SMB_DR_MAX_USER) will be returned via this
- * function. The user-space door client might need to make multiple
- * calls to retrieve information on all connected users.
- */
-/*ARGSUSED*/
-char *
-smb_dop_user_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	smb_dr_ulist_t *ulist;
-	uint32_t offset;
-	char *rbuf = NULL;
-	int cnt = 0;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-	if (smb_dr_decode_common(argp, arg_size, xdr_uint32_t, &offset) != 0) {
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	ulist = malloc(sizeof (smb_dr_ulist_t));
-	if (!ulist) {
-		*err = SMB_DR_OP_ERR_EMPTYBUF;
-		return (NULL);
-	}
-
-	cnt = mlsvc_get_user_list(offset, ulist);
-	if (cnt < 0) {
-		*err = SMB_DR_OP_ERR_EMPTYBUF;
-		free(ulist);
-		return (NULL);
-	}
-
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, ulist,
-	    xdr_smb_dr_ulist_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-
-	smb_dr_ulist_free(ulist);
-	return (rbuf);
 }
 
 /*ARGSUSED*/
@@ -536,5 +453,42 @@ smb_dop_vss_map_gmttoken(char *argp, size_t arg_size,
 
 	xdr_free(xdr_smb_dr_map_gmttoken_t, (char *)&request);
 	free(snapname);
+	return (rbuf);
+}
+
+/*ARGSUSED*/
+static char *
+smb_dop_ads_find_host(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
+{
+	smb_ads_host_info_t *hinfo = NULL;
+	char *hostname;
+	char *fqdn = NULL;
+	char *rbuf = NULL;
+
+	*err = SMB_DR_OP_SUCCESS;
+	*rbufsize = 0;
+
+	/* Decode */
+	if ((fqdn = smb_dr_decode_string(argp, arg_size)) == 0) {
+		*err = SMB_DR_OP_ERR_DECODE;
+		return (NULL);
+	}
+
+	if ((hinfo = smb_ads_find_host(fqdn, NULL)) == NULL)
+		hostname = "";
+	else
+		hostname = hinfo->name;
+
+	xdr_free(xdr_string, (char *)&fqdn);
+
+	/* Encode the result and return */
+	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, hostname,
+	    rbufsize)) == NULL) {
+		*err = SMB_DR_OP_ERR_ENCODE;
+		*rbufsize = 0;
+	}
+
+	free(hinfo);
 	return (rbuf);
 }

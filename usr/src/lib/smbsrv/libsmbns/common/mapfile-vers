@@ -47,6 +47,8 @@ SUNWprivate {
 	smb_ads_add_share;
 	smb_ads_build_unc_name;
 	smb_ads_close;
+	smb_ads_find_host;
+	smb_ads_fini;
 	smb_ads_init;
 	smb_ads_join;
 	smb_ads_join_errmsg;

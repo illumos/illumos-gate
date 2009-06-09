@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,23 +185,6 @@ smb_dr_encode_res_token(smb_token_t *token, size_t *len)
 	return (buf);
 }
 
-char *
-smb_dr_encode_kshare(smb_dr_kshare_t *kshare, size_t *buflen)
-{
-	smb_dr_bytes_t res;
-	char *buf = NULL;
-
-	res.bytes_val = smb_kshare_mkselfrel(kshare, &res.bytes_len);
-	if (!res.bytes_val)
-		return (NULL);
-
-	buf = smb_dr_encode_common(SMB_KDR_SHARE, &res, xdr_smb_dr_bytes_t,
-	    buflen);
-
-	free(res.bytes_val);
-	return (buf);
-}
-
 /*
  * smb_kshare_mkselfrel
  *
@@ -282,25 +265,4 @@ smb_dr_decode_arg_get_token(char *buf, size_t len)
 	    arg.bytes_len);
 	xdr_free(xdr_smb_dr_bytes_t, (char *)&arg);
 	return (clnt_info);
-}
-
-void
-smb_dr_ulist_free(smb_dr_ulist_t *ulist)
-{
-	int i;
-	smb_opipe_context_t *uinfo;
-
-	if (!ulist)
-		return;
-
-	for (i = 0; i < ulist->dul_cnt; i++) {
-		uinfo = &ulist->dul_users[i];
-
-		if (!uinfo)
-			continue;
-
-		xdr_free(xdr_smb_dr_ulist_t, (char *)ulist);
-	}
-
-	free(ulist);
 }

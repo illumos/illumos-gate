@@ -1133,9 +1133,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_fsops.o				\
 		smb_init.o				\
 		smb_kdoor_encdec.o			\
-		smb_kdoor_ops.o				\
 		smb_kdoor_clnt.o			\
-		smb_kdoor_srv.o				\
 		smb_kshare.o				\
 		smb_lock.o				\
 		smb_lock_byte_range.o			\

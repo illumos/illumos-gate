@@ -26,7 +26,6 @@
 #ifndef	_LIBMLSVC_H
 #define	_LIBMLSVC_H
 
-#include <uuid/uuid.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -56,23 +55,15 @@ extern uint32_t mlsvc_lookup_sid(smb_sid_t *, char **);
  * information.
  */
 
-typedef struct smb_domain {
-	char	d_dc[MAXHOSTNAMELEN];
-	char	d_nbdomain[NETBIOS_NAME_SZ];
-	char	d_fqdomain[MAXHOSTNAMELEN];
-	char	d_forest[MAXHOSTNAMELEN];
-	char	d_guid[UUID_PRINTABLE_STRING_LENGTH];
-} smb_domain_t;
 extern boolean_t smb_locate_dc(char *, char *, smb_domain_t *);
 extern boolean_t smb_domain_getinfo(smb_domain_t *);
 
 
-extern int mlsvc_get_door_fd(void);
 extern uint64_t mlsvc_get_num_users(void);
-extern int mlsvc_get_user_list(int, smb_dr_ulist_t *);
+extern int mlsvc_get_user_list(smb_ulist_t *);
 extern void dssetup_clear_domain_info(void);
 extern int mlsvc_init(void);
-extern void mlsvc_set_door_fd(int);
+extern void mlsvc_fini(void);
 extern int mlsvc_set_share(int, char *, char *);
 extern DWORD mlsvc_netlogon(char *, char *);
 extern DWORD mlsvc_join(smb_domain_t *, char *, char *);

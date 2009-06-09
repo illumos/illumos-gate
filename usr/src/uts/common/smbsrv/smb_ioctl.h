@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <smbsrv/smbinfo.h>
 
 #define	SMB_IOC_VERSION		0x534D4201	/* SMB1 */
@@ -44,27 +45,82 @@ extern "C" {
 #define	SMB_IOC_NBT_RECEIVE	_IOW(SMB_IOC_BASE, 5, int)
 #define	SMB_IOC_TCP_RECEIVE	_IOW(SMB_IOC_BASE, 6, int)
 #define	SMB_IOC_GMTOFF		_IOW(SMB_IOC_BASE, 7, int)
+#define	SMB_IOC_SHARE		_IOW(SMB_IOC_BASE, 8, int)
+#define	SMB_IOC_UNSHARE		_IOW(SMB_IOC_BASE, 9, int)
+#define	SMB_IOC_USER_NUMBER	_IOW(SMB_IOC_BASE, 10, int)
+#define	SMB_IOC_USER_LIST	_IOW(SMB_IOC_BASE, 11, int)
 
-#pragma	pack(1)
+typedef struct smb_ioc_header {
+	uint32_t	version;
+	uint32_t	crc;
+	uint32_t	len;
+	int		cmd;
+} smb_ioc_header_t;
 
-typedef struct {
-	uint32_t	sio_version;
-	uint32_t	sio_crc;
+typedef	struct {
+	smb_ioc_header_t hdr;
+	int32_t 	offset;
+} smb_ioc_gmt_t;
 
-	union {
-		int32_t		gmtoff;
-		int		error;
-		smb_kmod_cfg_t	cfg;
+typedef struct smb_ioc_share {
+	smb_ioc_header_t hdr;
+	char		path[MAXPATHLEN];
+	char		name[MAXNAMELEN];
+} smb_ioc_share_t;
 
-		struct smb_io_start {
-			int	opipe;
-			int	lmshrd;
-			int	udoor;
-		} start;
-	} sio_data;
-} smb_io_t;
+typedef	struct smb_ioc_listen {
+	smb_ioc_header_t hdr;
+	int		error;
+} smb_ioc_listen_t;
 
-#pragma	pack()
+typedef	struct smb_ioc_start {
+	smb_ioc_header_t hdr;
+	int		opipe;
+	int		lmshrd;
+	int		udoor;
+} smb_ioc_start_t;
+
+typedef	struct smb_ioc_usernum {
+	smb_ioc_header_t hdr;
+	uint32_t	num;
+} smb_ioc_usernum_t;
+
+typedef	struct smb_ioc_ulist {
+	smb_ioc_header_t hdr;
+	uint32_t	cookie;
+	uint32_t	num;
+	uint32_t	data_len;
+	uint8_t		data[1];
+} smb_ioc_ulist_t;
+
+typedef struct smb_ioc_cfg {
+	smb_ioc_header_t hdr;
+	uint32_t	maxworkers;
+	uint32_t	maxconnections;
+	uint32_t	keepalive;
+	int32_t		restrict_anon;
+	int32_t		signing_enable;
+	int32_t		signing_required;
+	int32_t		oplock_enable;
+	int32_t		sync_enable;
+	int32_t		secmode;
+	int32_t		ipv6_enable;
+	char		nbdomain[NETBIOS_NAME_SZ];
+	char		fqdn[SMB_PI_MAX_DOMAIN];
+	char		hostname[SMB_PI_MAX_HOST];
+	char		system_comment[SMB_PI_MAX_COMMENT];
+} smb_ioc_cfg_t;
+
+typedef union smb_ioc {
+	smb_ioc_header_t	ioc_hdr;
+	smb_ioc_gmt_t		ioc_gmt;
+	smb_ioc_cfg_t		ioc_cfg;
+	smb_ioc_start_t		ioc_start;
+	smb_ioc_listen_t	ioc_listen;
+	smb_ioc_usernum_t	ioc_unum;
+	smb_ioc_ulist_t		ioc_ulist;
+	smb_ioc_share_t		ioc_share;
+} smb_ioc_t;
 
 uint32_t smb_crc_gen(uint8_t *, size_t);
 

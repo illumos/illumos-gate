@@ -51,7 +51,6 @@ extern void smbd_user_nonauth_logon(uint32_t);
 extern void smbd_user_auth_logoff(uint32_t);
 extern uint32_t smbd_join(smb_joininfo_t *);
 
-extern int smbd_ioctl(int, smb_io_t *);
 extern void smbd_set_secmode(int);
 
 extern int smbd_vss_get_count(const char *, uint32_t *);
@@ -66,7 +65,6 @@ typedef struct smbd {
 	uid_t		s_uid;		/* UID of current daemon */
 	gid_t		s_gid;		/* GID of current daemon */
 	int		s_fg;		/* Run in foreground */
-	int		s_drv_fd;	/* Handle for SMB kernel driver */
 	boolean_t	s_shutting_down; /* shutdown control */
 	volatile uint_t	s_sigval;
 	volatile uint_t	s_refreshes;
@@ -79,6 +77,7 @@ typedef struct smbd {
 	boolean_t	s_tcp_listener_running;
 	pthread_t	s_nbt_listener_id;
 	pthread_t	s_tcp_listener_id;
+	boolean_t	s_fatal_error;
 } smbd_t;
 
 #ifdef __cplusplus

@@ -256,9 +256,8 @@ static int
 samr_s_LookupDomain(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_LookupDomain *param = arg;
-	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char *domain_name;
-	smb_sid_t *sid = NULL;
+	nt_domain_t di;
 
 	if ((domain_name = (char *)param->domain_name.str) == NULL) {
 		bzero(param, sizeof (struct samr_LookupDomain));
@@ -266,34 +265,20 @@ samr_s_LookupDomain(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
-	if (smb_ishostname(domain_name)) {
-		sid = nt_domain_local_sid();
-	} else if (utf8_strcasecmp(resource_domain, domain_name) == 0) {
-		/*
-		 * We should not be asked to provide
-		 * the domain SID for the primary domain.
-		 */
-		sid = NULL;
-	} else {
-		sid = smb_wka_get_sid(domain_name);
-	}
-
-	if (sid) {
-		param->sid = (struct samr_sid *)NDR_SIDDUP(mxa, sid);
-
-		if (param->sid == NULL) {
-			bzero(param, sizeof (struct samr_LookupDomain));
-			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
-			return (NDR_DRC_OK);
-		}
-
-		param->status = NT_STATUS_SUCCESS;
-	} else {
-		param->sid = NULL;
+	if (!nt_domain_lookup_name(domain_name, &di)) {
+		bzero(param, sizeof (struct samr_LookupDomain));
 		param->status = NT_SC_ERROR(NT_STATUS_NO_SUCH_DOMAIN);
+		return (NDR_DRC_OK);
 	}
 
+	param->sid = (struct samr_sid *)NDR_SIDDUP(mxa, di.di_binsid);
+	if (param->sid == NULL) {
+		bzero(param, sizeof (struct samr_LookupDomain));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
+	}
+
+	param->status = NT_STATUS_SUCCESS;
 	return (NDR_DRC_OK);
 }
 
@@ -385,7 +370,7 @@ samr_s_OpenDomain(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_OpenDomain *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
-	nt_domain_t *domain;
+	nt_domain_t domain;
 
 	if (samr_hdlookup(mxa, id, SAMR_KEY_CONNECT) == NULL) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
@@ -393,20 +378,20 @@ samr_s_OpenDomain(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	if ((domain = nt_domain_lookup_sid((smb_sid_t *)param->sid)) == NULL) {
+	if (!nt_domain_lookup_sid((smb_sid_t *)param->sid, &domain)) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 		return (NDR_DRC_OK);
 	}
 
-	if ((domain->type != NT_DOMAIN_BUILTIN) &&
-	    (domain->type != NT_DOMAIN_LOCAL)) {
+	if ((domain.di_type != NT_DOMAIN_BUILTIN) &&
+	    (domain.di_type != NT_DOMAIN_LOCAL)) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 		return (NDR_DRC_OK);
 	}
 
-	id = samr_hdalloc(mxa, SAMR_KEY_DOMAIN, domain->type, 0);
+	id = samr_hdalloc(mxa, SAMR_KEY_DOMAIN, domain.di_type, 0);
 	if (id) {
 		bcopy(id, &param->domain_handle, sizeof (samr_handle_t));
 		param->status = 0;
@@ -710,9 +695,9 @@ samr_s_QueryUserGroups(void *arg, ndr_xa_t *mxa)
 	ndr_handle_t *hd;
 	samr_keydata_t *data;
 	smb_sid_t *user_sid = NULL;
-	smb_sid_t *dom_sid;
 	smb_group_t grp;
 	smb_giter_t gi;
+	nt_domain_t di;
 	uint32_t status;
 	int size;
 	int ngrp_max;
@@ -725,20 +710,18 @@ samr_s_QueryUserGroups(void *arg, ndr_xa_t *mxa)
 	data = (samr_keydata_t *)hd->nh_data;
 	switch (data->kd_type) {
 	case NT_DOMAIN_BUILTIN:
-		if ((dom_sid = smb_wka_get_sid("builtin")) == NULL) {
-			status = NT_STATUS_INTERNAL_ERROR;
+	case NT_DOMAIN_LOCAL:
+		if (!nt_domain_lookup_type(data->kd_type, &di)) {
+			status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
 			goto query_error;
 		}
-		break;
-	case NT_DOMAIN_LOCAL:
-		dom_sid = nt_domain_local_sid();
 		break;
 	default:
 		status = NT_STATUS_INVALID_HANDLE;
 		goto query_error;
 	}
 
-	user_sid = smb_sid_splice(dom_sid, data->kd_rid);
+	user_sid = smb_sid_splice(di.di_binsid, data->kd_rid);
 	if (user_sid == NULL) {
 		status = NT_STATUS_NO_MEMORY;
 		goto query_error;

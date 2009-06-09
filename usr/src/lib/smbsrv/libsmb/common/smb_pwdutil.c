@@ -98,7 +98,7 @@ typedef struct smb_pwbuf {
 #define	SMB_PWD_GETF_NOPWD	2	/* password is not needed */
 
 static smb_pwbuf_t *smb_pwd_fgetent(FILE *, smb_pwbuf_t *, uint32_t);
-static int smb_pwd_fputent(FILE *, smb_pwbuf_t *);
+static int smb_pwd_fputent(FILE *, const smb_pwbuf_t *);
 static int smb_pwd_chgpwent(smb_passwd_t *, const char *, int);
 static int smb_pwd_update(const char *, const char *, int);
 
@@ -695,11 +695,11 @@ smb_pwd_chgpwent(smb_passwd_t *smbpw, const char *password, int control)
 		*smbpw->pw_lmhash = '\0';
 	} else {
 		smbpw->pw_flags |= SMB_PWF_LM;
-		(void) smb_auth_lm_hash((char *)password, smbpw->pw_lmhash);
+		(void) smb_auth_lm_hash(password, smbpw->pw_lmhash);
 	}
 
 	smbpw->pw_flags |= SMB_PWF_NT;
-	(void) smb_auth_ntlm_hash((char *)password, smbpw->pw_nthash);
+	(void) smb_auth_ntlm_hash(password, smbpw->pw_nthash);
 	return (SMB_PWE_SUCCESS);
 }
 
@@ -711,7 +711,7 @@ smb_pwd_chgpwent(smb_passwd_t *smbpw, const char *password, int control)
  * file.
  */
 static int
-smb_pwd_fputent(FILE *fp, smb_pwbuf_t *pwbuf)
+smb_pwd_fputent(FILE *fp, const smb_pwbuf_t *pwbuf)
 {
 	smb_passwd_t *pw = pwbuf->pw_pwd;
 	char hex_nthash[SMBAUTH_HEXHASH_SZ+1];

@@ -41,51 +41,6 @@
 #include <smbsrv/smb_common_door.h>
 
 /*
- * This function will return information on the connected users
- * starting at the given offset.
- *
- * At most 50 users (i.e. SMB_DR_MAX_USER) will be returned via this
- * function. Multiple calls might be needed to obtain all connected
- * users.
- *
- * smb_dr_ulist_free must be called to free memory allocated for the
- * account and workstation fields of each user in the returned list.
- */
-int
-smb_api_ulist(int offset, smb_dr_ulist_t *users)
-{
-	door_arg_t arg;
-	char *buf;
-	size_t len;
-	int rc = -1;
-	uint_t opcode = SMB_DR_USER_LIST;
-	int fd;
-
-	bzero(users, sizeof (smb_dr_ulist_t));
-
-	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
-		return (-1);
-
-	buf = smb_dr_encode_common(opcode, &offset, xdr_uint32_t, &len);
-	if (buf == NULL) {
-		(void) close(fd);
-		return (-1);
-	}
-
-	smb_dr_clnt_setup(&arg, buf, len);
-
-	if (smb_dr_clnt_call(fd, &arg) == 0) {
-		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
-		len = arg.rsize - SMB_DR_DATA_OFFSET;
-		rc = smb_dr_decode_common(buf, len, xdr_smb_dr_ulist_t, users);
-	}
-
-	smb_dr_clnt_cleanup(&arg);
-	(void) close(fd);
-	return (rc);
-}
-
-/*
  * smb_lookup_sid
  *
  * Tries to get the account name associated with the given SID
@@ -315,4 +270,65 @@ xdr_smb_dr_joininfo_t(XDR *xdrs, smb_joininfo_t *objp)
 		return (FALSE);
 
 	return (TRUE);
+}
+
+/*
+ * Parameters:
+ *   fqdn (input) - fully-qualified domain name
+ *   srvbuf (output) - fully-qualified hostname of the AD server found
+ *                  by this function.
+ *   srvbuflen (input) - length of the 'buf'
+ *
+ * Return:
+ *   B_TRUE if an AD server is found. Otherwise, returns B_FALSE;
+ *
+ * The buffer passed in should be big enough to hold a fully-qualified
+ * hostname (MAXHOSTNAMELEN); otherwise, a truncated string will be
+ * returned. On error, an empty string will be returned.
+ */
+boolean_t
+smb_find_ads_server(char *fqdn, char *srvbuf, int srvbuflen)
+{
+	door_arg_t arg;
+	char *buf;
+	size_t len;
+	int opcode = SMB_DR_ADS_FIND_HOST;
+	char *server = NULL;
+	int fd;
+	boolean_t found = B_FALSE;
+
+	if (!srvbuf)
+		return (B_FALSE);
+
+	*srvbuf = '\0';
+
+	if (!fqdn)
+		return (B_FALSE);
+
+	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
+		return (B_FALSE);
+
+	if ((buf = smb_dr_encode_string(opcode, fqdn, &len)) == 0) {
+		(void) close(fd);
+		return (B_FALSE);
+	}
+
+	smb_dr_clnt_setup(&arg, buf, len);
+
+	if (smb_dr_clnt_call(fd, &arg) == 0) {
+		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
+		len = arg.rsize - SMB_DR_DATA_OFFSET;
+		if ((server = smb_dr_decode_string(buf, len)) != NULL) {
+			if (*server != '\0') {
+				(void) strlcpy(srvbuf, server, srvbuflen);
+				found = B_TRUE;
+			}
+			xdr_free(xdr_string, (char *)&server);
+		}
+	}
+
+	smb_dr_clnt_cleanup(&arg);
+	(void) close(fd);
+
+	return (found);
 }

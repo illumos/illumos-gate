@@ -182,6 +182,7 @@ static boolean_t smb_lgrp_chkname(char *);
 static boolean_t smb_lgrp_chkmember(uint16_t);
 static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, smb_sid_t **);
 static int smb_lgrp_getgid(uint32_t rid, gid_t *gid);
+static boolean_t smb_lgrp_exists(char *);
 
 /*
  * smb_lgrp_add
@@ -911,9 +912,13 @@ smb_lgrp_start(void)
 		wka = smb_wka_lookup_name(supported_bg[i]);
 		if (wka == NULL)
 			continue;
-		rc = smb_lgrp_add(wka->wka_name, wka->wka_desc);
-		if (rc != SMB_LGRP_SUCCESS)
-			syslog(LOG_DEBUG, "failed to add %s", wka->wka_name);
+		if (!smb_lgrp_exists(wka->wka_name)) {
+			rc = smb_lgrp_add(wka->wka_name, wka->wka_desc);
+			if (rc != SMB_LGRP_SUCCESS) {
+				syslog(LOG_DEBUG, "failed to add %s",
+				    wka->wka_name);
+			}
+		}
 	}
 
 	return (SMB_LGRP_SUCCESS);
@@ -2251,4 +2256,30 @@ smb_lgrp_getgid(uint32_t rid, gid_t *gid)
 	smb_sid_free(sid);
 
 	return ((rc == IDMAP_SUCCESS) ? SMB_LGRP_SUCCESS : SMB_LGRP_NOT_FOUND);
+}
+
+/*
+ * smb_lgrp_exists
+ *
+ * Returns B_TRUE if the local group with the given name exists.
+ * Otherwise, returns B_FALSE.
+ */
+static boolean_t
+smb_lgrp_exists(char *gname)
+{
+	sqlite *db;
+	boolean_t rc;
+
+	(void) trim_whitespace(gname);
+	if (!smb_lgrp_chkname(gname))
+		return (B_FALSE);
+
+	db = smb_lgrp_db_open(SMB_LGRP_DB_ORD);
+	if (db == NULL)
+		return (B_FALSE);
+
+	rc = smb_lgrp_gtbl_exists(db, gname);
+	smb_lgrp_db_close(db);
+
+	return (rc);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ dssetup_get_domain_info(ds_primary_domain_info_t *ds_info)
 	if (!smb_domain_getinfo(&di))
 		return (-1);
 
-	if (ndr_rpc_bind(&handle, di.d_dc, di.d_nbdomain,
+	if (ndr_rpc_bind(&handle, di.d_dc, di.d_info.di_nbname,
 	    MLSVC_ANON_USER, "DSSETUP") != 0)
 		return (-1);
 

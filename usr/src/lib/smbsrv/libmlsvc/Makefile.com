@@ -55,6 +55,7 @@ OBJS_COMMON =		\
 	smb_share.o	\
 	spoolss_svc.o	\
 	srvsvc_clnt.o	\
+	srvsvc_sd.o	\
 	srvsvc_svc.o	\
 	svcctl_scm.o	\
 	svcctl_svc.o	\
@@ -83,7 +84,7 @@ INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lresolv -lnsl -lpkcs11 -lscf	\
-	-luutil -lc -lzfs
+	-luutil -lzfs -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 

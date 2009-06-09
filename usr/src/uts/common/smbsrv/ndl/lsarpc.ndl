@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -380,6 +380,29 @@ struct mslsa_EnumTrustedDomain {
 	OUT	DWORD status;
 };
 
+struct mslsa_TrustedDomainInfoEx {
+	mslsa_string_t		dns_name;
+	mslsa_string_t		nb_name;
+	struct mslsa_sid	*sid;
+	DWORD			trust_direction;
+	DWORD			trust_type;
+	DWORD			trust_attrs;
+};
+
+struct mslsa_EnumTrustedDomainBufEx {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslsa_TrustedDomainInfoEx *info;
+};
+
+OPERATION(LSARPC_OPNUM_EnumTrustedDomainsEx)
+struct mslsa_EnumTrustedDomainEx {
+	IN	mslsa_handle_t handle;
+	INOUT	DWORD enum_context;
+	IN	DWORD max_length;
+	OUT REFERENCE	struct mslsa_EnumTrustedDomainBufEx *enum_buf;
+	OUT	DWORD status;
+};
 
 /*
  ***********************************************************************
@@ -881,6 +904,8 @@ union lsarpc_interface {
 		struct mslsa_QuerySecurityObject	QuerySecurityObj;
 	CASE(LSARPC_OPNUM_EnumerateAccounts)
 		struct mslsa_EnumerateAccounts		EnumAccounts;
+	CASE(LSARPC_OPNUM_EnumTrustedDomainsEx)
+		struct mslsa_EnumTrustedDomainEx	EnumTrustedDomainEx;
 	CASE(LSARPC_OPNUM_EnumTrustedDomain)
 		struct mslsa_EnumTrustedDomain		EnumTrustedDomain;
 	CASE(LSARPC_OPNUM_OpenAccount)

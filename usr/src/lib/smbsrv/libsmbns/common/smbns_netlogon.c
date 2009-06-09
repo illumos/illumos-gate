@@ -44,15 +44,14 @@
 
 #include <smbsrv/mailslot.h>
 #include <smbsrv/libsmbns.h>
-#include <smbns_ads.h>
 #include <smbns_browser.h>
 #include <smbns_netbios.h>
 
 static void smb_netlogon_query(struct name_entry *server, char *mailbox,
     char *domain);
 
-static void smb_netlogon_samlogon(struct name_entry *server, char *mailbox,
-    char *domain);
+static void smb_netlogon_samlogon(struct name_entry *, char *,
+    char *, smb_sid_t *);
 
 static void smb_netlogon_send(struct name_entry *name, char *domain,
     unsigned char *buffer, int count);
@@ -80,9 +79,11 @@ extern cond_t ntdomain_cv;
  * in smb_netlogon_receive.
  */
 void
-smb_netlogon_request(struct name_entry *server, int protocol, char *domain)
+smb_netlogon_request(struct name_entry *server, char *domain)
 {
-	nt_domain_t *ntdp;
+	nt_domain_t di;
+	smb_sid_t *sid = NULL;
+	int protocol = NETLOGON_PROTO_NETLOGON;
 
 	if (domain == NULL || *domain == '\0')
 		return;
@@ -92,15 +93,19 @@ smb_netlogon_request(struct name_entry *server, int protocol, char *domain)
 	    sizeof (ntdomain_info.n_domain));
 	(void) mutex_unlock(&ntdomain_mtx);
 
-	ntdp = nt_domain_lookup_name(domain);
-	if (ntdp && (protocol == NETLOGON_PROTO_SAMLOGON))
-		smb_netlogon_samlogon(server,
-		    MAILSLOT_NETLOGON_SAMLOGON_RDC,
-		    domain);
+	smb_config_getdomaininfo(di.di_nbname, NULL, di.di_sid, NULL, NULL);
+	if (utf8_strcasecmp(di.di_nbname, domain) == 0) {
+		if ((sid = smb_sid_fromstr(di.di_sid)) != NULL)
+			protocol = NETLOGON_PROTO_SAMLOGON;
+	}
+
+	if (protocol == NETLOGON_PROTO_SAMLOGON)
+		smb_netlogon_samlogon(server, MAILSLOT_NETLOGON_SAMLOGON_RDC,
+		    domain, sid);
 	else
-		smb_netlogon_query(server,
-		    MAILSLOT_NETLOGON_RDC,
-		    domain);
+		smb_netlogon_query(server, MAILSLOT_NETLOGON_RDC, domain);
+
+	smb_sid_free(sid);
 }
 
 /*
@@ -344,11 +349,10 @@ smb_netlogon_query(struct name_entry *server,
 static void
 smb_netlogon_samlogon(struct name_entry *server,
 			char *mailbox,
-			char *domain)
+			char *domain,
+			smb_sid_t *domain_sid)
 {
 	smb_msgbuf_t mb;
-	nt_domain_t *ntdp;
-	smb_sid_t *domain_sid;
 	unsigned domain_sid_len;
 	char *username;
 	unsigned char buffer[MAX_DATAGRAM_LENGTH];
@@ -360,14 +364,6 @@ smb_netlogon_samlogon(struct name_entry *server,
 
 	syslog(LOG_DEBUG, "NetLogonSamLogonReq: %s", domain);
 
-	if ((ntdp = nt_domain_lookup_name(domain)) == 0) {
-		syslog(LOG_ERR, "NetLogonSamLogonReq[%s]: no sid", domain);
-		return;
-	}
-
-	domain_sid = ntdp->sid;
-	domain_sid_len = smb_sid_len(domain_sid);
-
 	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0)
 		return;
 
@@ -378,6 +374,7 @@ smb_netlogon_samlogon(struct name_entry *server,
 	username = alloca(name_length);
 	(void) snprintf(username, name_length, "%s$", hostname);
 
+	domain_sid_len = smb_sid_len(domain_sid);
 	/*
 	 * Add 2 to wide-char equivalent strlen to cover the
 	 * two zero bytes that terminate the wchar string.

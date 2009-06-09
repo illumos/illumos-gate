@@ -265,7 +265,13 @@ smb_sid_indomain(smb_sid_t *domain_sid, smb_sid_t *sid)
 boolean_t
 smb_sid_islocal(smb_sid_t *sid)
 {
-	return (smb_sid_indomain(nt_domain_local_sid(), sid));
+	nt_domain_t di;
+	boolean_t islocal = B_FALSE;
+
+	if (nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di))
+		islocal = smb_sid_indomain(di.di_binsid, sid);
+
+	return (islocal);
 }
 #endif /* _KERNEL */
 

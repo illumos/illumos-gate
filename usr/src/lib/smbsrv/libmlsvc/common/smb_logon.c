@@ -33,6 +33,7 @@
 #include <time.h>
 #include <syslog.h>
 #include <assert.h>
+#include <synch.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
@@ -41,17 +42,28 @@
 #include <smbsrv/smb_token.h>
 #include <lsalib.h>
 
+static smb_account_t smb_guest;
+static smb_account_t smb_domusers;
+static rwlock_t smb_logoninit_rwl;
+
 extern uint32_t netlogon_logon(netr_client_t *, smb_token_t *);
 static uint32_t smb_logon_domain(netr_client_t *, smb_token_t *);
 static uint32_t smb_logon_local(netr_client_t *, smb_token_t *);
+static uint32_t smb_logon_guest(netr_client_t *, smb_token_t *);
 static uint32_t smb_logon_anon(netr_client_t *, smb_token_t *);
 
+static uint32_t smb_token_auth_local(netr_client_t *, smb_token_t *,
+    smb_passwd_t *);
+
 static uint32_t smb_token_setup_local(smb_passwd_t *, smb_token_t *);
+static uint32_t smb_token_setup_guest(netr_client_t *, smb_token_t *);
 static uint32_t smb_token_setup_anon(smb_token_t *token);
 
 static boolean_t smb_token_is_member(smb_token_t *, smb_sid_t *);
 static uint32_t smb_token_setup_wingrps(smb_token_t *);
 static smb_posix_grps_t *smb_token_create_pxgrps(uid_t);
+
+static void smb_guest_account(char *, size_t);
 
 /* Consolidation private function from Network Repository */
 extern int _getgroupsbymember(const char *, gid_t[], int, int);
@@ -320,14 +332,6 @@ smb_token_create_privs(smb_token_t *token)
 static void
 smb_token_set_flags(smb_token_t *token)
 {
-	uint32_t rid;
-
-	(void) smb_sid_getrid(token->tkn_user.i_sid, &rid);
-	if (rid == DOMAIN_USER_RID_GUEST) {
-		token->tkn_flags |= SMB_ATF_GUEST;
-		return;
-	}
-
 	if (smb_token_is_member(token, smb_wka_get_sid("Administrators")))
 		token->tkn_flags |= SMB_ATF_ADMIN;
 
@@ -371,6 +375,42 @@ smb_token_setup_common(smb_token_t *token)
 	return (NT_STATUS_SUCCESS);
 }
 
+uint32_t
+smb_logon_init(void)
+{
+	uint32_t status;
+
+	(void) rw_wrlock(&smb_logoninit_rwl);
+	status = smb_sam_lookup_name(NULL, "guest", SidTypeUser, &smb_guest);
+	if (status != NT_STATUS_SUCCESS) {
+		(void) rw_unlock(&smb_logoninit_rwl);
+		return (status);
+	}
+
+	status = smb_sam_lookup_name(NULL, "domain users", SidTypeGroup,
+	    &smb_domusers);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_account_free(&smb_guest);
+		bzero(&smb_guest, sizeof (smb_account_t));
+		(void) rw_unlock(&smb_logoninit_rwl);
+		return (status);
+	}
+
+	(void) rw_unlock(&smb_logoninit_rwl);
+	return (status);
+}
+
+void
+smb_logon_fini(void)
+{
+	(void) rw_wrlock(&smb_logoninit_rwl);
+	smb_account_free(&smb_guest);
+	smb_account_free(&smb_domusers);
+	bzero(&smb_guest, sizeof (smb_account_t));
+	bzero(&smb_domusers, sizeof (smb_account_t));
+	(void) rw_unlock(&smb_logoninit_rwl);
+}
+
 /*
  * smb_logon
  *
@@ -396,9 +436,12 @@ smb_logon(netr_client_t *clnt)
 		status = smb_logon_local(clnt, token);
 		if (status != NT_STATUS_SUCCESS) {
 			if ((status == NT_STATUS_INVALID_LOGON_TYPE) ||
-			    (*clnt->real_domain == '\0'))
+			    (*clnt->e_domain == '\0'))
 				status = smb_logon_domain(clnt, token);
 		}
+
+		if (status == NT_STATUS_NO_SUCH_USER)
+			status = smb_logon_guest(clnt, token);
 	}
 
 	if (status == NT_STATUS_SUCCESS) {
@@ -424,7 +467,7 @@ smb_logon_domain(netr_client_t *clnt, smb_token_t *token)
 		if (status == NT_STATUS_CANT_ACCESS_DOMAIN_INFO) {
 			if ((status = netlogon_logon(clnt, token)) != 0) {
 				syslog(LOG_INFO, "SmbLogon[%s\\%s]: %s",
-				    clnt->real_domain, clnt->real_username,
+				    clnt->e_domain, clnt->e_username,
 				    xlate_nt_status(status));
 				return (status);
 			}
@@ -444,70 +487,58 @@ smb_logon_domain(netr_client_t *clnt, smb_token_t *token)
 static uint32_t
 smb_logon_local(netr_client_t *clnt, smb_token_t *token)
 {
+	char guest[SMB_USERNAME_MAXLEN];
 	smb_passwd_t smbpw;
-	boolean_t lm_ok, nt_ok;
 	uint32_t status;
-	nt_domain_t *domain;
+	nt_domain_t domain;
+	boolean_t isguest;
 
 	/* Make sure this is not a domain user */
 	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
-		domain = nt_domain_lookup_name(clnt->real_domain);
-		if (domain && (domain->type != NT_DOMAIN_LOCAL))
-			return (NT_STATUS_INVALID_LOGON_TYPE);
+		if (nt_domain_lookup_name(clnt->e_domain, &domain)) {
+			if (domain.di_type != NT_DOMAIN_LOCAL)
+				return (NT_STATUS_INVALID_LOGON_TYPE);
+		}
 	}
 
-	if (smb_pwd_getpwnam(clnt->real_username, &smbpw) == NULL) {
-		/*
-		 * If user doesn't have entry either in smbpasswd
-		 * or passwd it's considered as an invalid user.
-		 */
-		status = NT_STATUS_NO_SUCH_USER;
-		syslog(LOG_NOTICE, "SmbLogon[%s\\%s]: %s",
-		    clnt->real_domain, clnt->real_username,
-		    xlate_nt_status(status));
-		return (status);
-	}
-	if (smbpw.pw_flags & SMB_PWF_DISABLE)
-		return (NT_STATUS_ACCOUNT_DISABLED);
+	smb_guest_account(guest, SMB_USERNAME_MAXLEN);
+	isguest = (utf8_strcasecmp(guest, clnt->e_username) == 0);
 
-	nt_ok = lm_ok = B_FALSE;
-	if ((smbpw.pw_flags & SMB_PWF_LM) &&
-	    (clnt->lm_password.lm_password_len != 0)) {
-		lm_ok = smb_auth_validate_lm(
-		    clnt->challenge_key.challenge_key_val,
-		    clnt->challenge_key.challenge_key_len,
-		    &smbpw,
-		    clnt->lm_password.lm_password_val,
-		    clnt->lm_password.lm_password_len,
-		    clnt->domain,
-		    clnt->username);
-		token->tkn_session_key = NULL;
+	status = smb_token_auth_local(clnt, token, &smbpw);
+	if (status == NT_STATUS_SUCCESS) {
+		if (isguest)
+			status = smb_token_setup_guest(clnt, token);
+		else
+			status = smb_token_setup_local(&smbpw, token);
 	}
 
-	if (!lm_ok && (clnt->nt_password.nt_password_len != 0)) {
-		token->tkn_session_key = malloc(SMBAUTH_SESSION_KEY_SZ);
-		if (token->tkn_session_key == NULL)
-			return (NT_STATUS_NO_MEMORY);
-		nt_ok = smb_auth_validate_nt(
-		    clnt->challenge_key.challenge_key_val,
-		    clnt->challenge_key.challenge_key_len,
-		    &smbpw,
-		    clnt->nt_password.nt_password_val,
-		    clnt->nt_password.nt_password_len,
-		    clnt->domain,
-		    clnt->username,
-		    (uchar_t *)token->tkn_session_key);
+	return (status);
+}
+
+/*
+ * If there's a local guest account with password or if
+ * guest is mapped to a local account with password then
+ * it should be authenticated
+ */
+static uint32_t
+smb_logon_guest(netr_client_t *clnt, smb_token_t *token)
+{
+	char guest[SMB_USERNAME_MAXLEN];
+	smb_passwd_t smbpw;
+	char *temp;
+	uint32_t status;
+
+	smb_guest_account(guest, SMB_USERNAME_MAXLEN);
+	temp = clnt->e_username;
+	clnt->e_username = guest;
+
+	status = smb_token_auth_local(clnt, token, &smbpw);
+	if ((status == NT_STATUS_SUCCESS) ||
+	    (status == NT_STATUS_NO_SUCH_USER)) {
+		status = smb_token_setup_guest(clnt, token);
 	}
 
-	if (!nt_ok && !lm_ok) {
-		status = NT_STATUS_WRONG_PASSWORD;
-		syslog(LOG_NOTICE, "SmbLogon[%s\\%s]: %s",
-		    clnt->real_domain, clnt->real_username,
-		    xlate_nt_status(status));
-		return (status);
-	}
-
-	status = smb_token_setup_local(&smbpw, token);
+	clnt->e_username = temp;
 	return (status);
 }
 
@@ -527,6 +558,58 @@ smb_logon_anon(netr_client_t *clnt, smb_token_t *token)
 	}
 
 	return (NT_STATUS_INVALID_LOGON_TYPE);
+}
+
+static uint32_t
+smb_token_auth_local(netr_client_t *clnt, smb_token_t *token,
+    smb_passwd_t *smbpw)
+{
+	boolean_t lm_ok, nt_ok;
+	uint32_t status = NT_STATUS_SUCCESS;
+
+	if (smb_pwd_getpwnam(clnt->e_username, smbpw) == NULL)
+		return (NT_STATUS_NO_SUCH_USER);
+
+	if (smbpw->pw_flags & SMB_PWF_DISABLE)
+		return (NT_STATUS_ACCOUNT_DISABLED);
+
+	nt_ok = lm_ok = B_FALSE;
+	if ((smbpw->pw_flags & SMB_PWF_LM) &&
+	    (clnt->lm_password.lm_password_len != 0)) {
+		lm_ok = smb_auth_validate_lm(
+		    clnt->challenge_key.challenge_key_val,
+		    clnt->challenge_key.challenge_key_len,
+		    smbpw,
+		    clnt->lm_password.lm_password_val,
+		    clnt->lm_password.lm_password_len,
+		    clnt->domain,
+		    clnt->username);
+		token->tkn_session_key = NULL;
+	}
+
+	if (!lm_ok && (clnt->nt_password.nt_password_len != 0)) {
+		token->tkn_session_key = malloc(SMBAUTH_SESSION_KEY_SZ);
+		if (token->tkn_session_key == NULL)
+			return (NT_STATUS_NO_MEMORY);
+		nt_ok = smb_auth_validate_nt(
+		    clnt->challenge_key.challenge_key_val,
+		    clnt->challenge_key.challenge_key_len,
+		    smbpw,
+		    clnt->nt_password.nt_password_val,
+		    clnt->nt_password.nt_password_len,
+		    clnt->domain,
+		    clnt->username,
+		    (uchar_t *)token->tkn_session_key);
+	}
+
+	if (!nt_ok && !lm_ok) {
+		status = NT_STATUS_WRONG_PASSWORD;
+		syslog(LOG_NOTICE, "SmbLogon[%s\\%s]: %s",
+		    clnt->e_domain, clnt->e_username,
+		    xlate_nt_status(status));
+	}
+
+	return (status);
 }
 
 /*
@@ -592,15 +675,37 @@ smb_token_setup_local(smb_passwd_t *smbpw, smb_token_t *token)
 }
 
 /*
- * Setup access token for an anonymous connection
+ * Setup access token for guest connections
+ */
+static uint32_t
+smb_token_setup_guest(netr_client_t *clnt, smb_token_t *token)
+{
+	token->tkn_account_name = strdup(clnt->e_username);
+
+	(void) rw_rdlock(&smb_logoninit_rwl);
+	token->tkn_domain_name = strdup(smb_guest.a_domain);
+	token->tkn_user.i_sid = smb_sid_dup(smb_guest.a_sid);
+	token->tkn_primary_grp.i_sid = smb_sid_dup(smb_domusers.a_sid);
+	(void) rw_unlock(&smb_logoninit_rwl);
+	token->tkn_flags = SMB_ATF_GUEST;
+
+	if (token->tkn_account_name == NULL ||
+	    token->tkn_domain_name == NULL ||
+	    token->tkn_user.i_sid == NULL ||
+	    token->tkn_primary_grp.i_sid == NULL)
+		return (NT_STATUS_NO_MEMORY);
+
+	return (smb_token_setup_wingrps(token));
+}
+
+/*
+ * Setup access token for anonymous connections
  */
 static uint32_t
 smb_token_setup_anon(smb_token_t *token)
 {
-	char nbname[NETBIOS_NAME_SZ];
 	smb_sid_t *user_sid;
 
-	(void) smb_getnetbiosname(nbname, sizeof (nbname));
 	token->tkn_account_name = strdup("Anonymous");
 	token->tkn_domain_name = strdup("NT Authority");
 	user_sid = smb_wka_get_sid("Anonymous");
@@ -794,14 +899,50 @@ smb_token_setup_wingrps(smb_token_t *token)
 		return (status);
 	}
 
-	if ((token->tkn_flags & SMB_ATF_ANON) == 0) {
-		status = smb_wka_token_groups(B_FALSE, &tkn_grps);
-		if (status != NT_STATUS_SUCCESS) {
-			smb_ids_free(&tkn_grps);
-			return (status);
-		}
+	status = smb_wka_token_groups(token->tkn_flags, &tkn_grps);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_ids_free(&tkn_grps);
+		return (status);
 	}
 
 	token->tkn_win_grps = tkn_grps;
 	return (status);
+}
+
+/*
+ * Returns the guest account name in the provided buffer.
+ *
+ * By default the name would be "guest" unless there's
+ * a idmap name-based rule which maps the guest to a local
+ * Solaris user in which case the name of that user is
+ * returned.
+ */
+static void
+smb_guest_account(char *guest, size_t buflen)
+{
+	idmap_stat stat;
+	uid_t guest_uid;
+	struct passwd pw;
+	char pwbuf[1024];
+	int idtype;
+
+	/* default Guest account name */
+	(void) rw_rdlock(&smb_logoninit_rwl);
+	(void) strlcpy(guest, smb_guest.a_name, buflen);
+
+	idtype = SMB_IDMAP_USER;
+	stat = smb_idmap_getid(smb_guest.a_sid, &guest_uid, &idtype);
+	(void) rw_unlock(&smb_logoninit_rwl);
+
+	if (stat != IDMAP_SUCCESS)
+		return;
+
+	if ((guest_uid > INT32_MAX) && (guest_uid != UINT32_MAX))
+		/* Ephemeral ID, return the default name */
+		return;
+
+	if (getpwuid_r(guest_uid, &pw, pwbuf, sizeof (pwbuf)) == NULL)
+		return;
+
+	(void) strlcpy(guest, pw.pw_name, buflen);
 }

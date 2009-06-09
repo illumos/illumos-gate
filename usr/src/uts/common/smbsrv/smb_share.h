@@ -26,17 +26,12 @@
 #ifndef _SMB_SHARE_H
 #define	_SMB_SHARE_H
 
-/*
- * This file defines the LanMan (CIFS/SMB) resource share interface.
- */
-
 #include <sys/param.h>
 #include <smbsrv/string.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/smb_common_door.h>
-#include <netinet/in.h>
 
 #ifndef _KERNEL
 #include <libshare.h>
@@ -49,25 +44,47 @@ extern "C" {
 #endif
 
 /*
- * Share-specific client-side caching (CSC) options:
- * disabled	The client MUST NOT cache any files from this share.
- * manual	The client should not automatically cache every file that it
- *		opens from this share.
- * auto		The client may cache every file that it opens from this share.
- * vdo		The client may cache every file that it opens from this share
- *		and satisfy file requests from its local cache.
+ * Share Properties:
+ *
+ * name			Advertised name of the share
+ *
+ * ad-container		Active directory container in which the share
+ * 			will be published
+ *
+ * csc			Client-side caching (CSC) options applied to this share
+ * 	disabled	The client MUST NOT cache any files
+ * 	manual		The client should not automatically cache every file
+ * 			that it	opens
+ * 	auto		The client may cache every file that it opens
+ * 	vdo		The client may cache every file that it opens
+ *			and satisfy file requests from its local cache.
+ *
+ * catia		CATIA character substitution
+ *
+ * guestok		Determines whether guest access is allowed
+ *
+ * next three properties use access-list a al NFS
+ *
+ * ro			list of hosts that will have read-only access
+ * rw			list of hosts that will have read/write access
+ * none			list of hosts that won't be allowed access
  */
 #define	SHOPT_AD_CONTAINER	"ad-container"
-#define	SHOPT_NAME		"name"	/* name is a pseudo property */
-#define	SHOPT_CSC		"csc"	/* client-side caching (CSC) options */
-#define	SHOPT_CATIA		"catia"	/* CATIA character substitution */
-/* next three properties use access-list a al NFS */
-#define	SHOPT_RO		"ro"	/* share is read-only */
-#define	SHOPT_RW		"rw"	/* share defaults to read-write */
-#define	SHOPT_NONE		"none"	/* share doesn't allow access */
+#define	SHOPT_NAME		"name"
+#define	SHOPT_CSC		"csc"
+#define	SHOPT_CATIA		"catia"
+#define	SHOPT_GUEST		"guestok"
+#define	SHOPT_RO		"ro"
+#define	SHOPT_RW		"rw"
+#define	SHOPT_NONE		"none"
 
 #define	SMB_DEFAULT_SHARE_GROUP	"smb"
 #define	SMB_PROTOCOL_NAME	"smb"
+
+#define	SMB_SHR_MAP		0
+#define	SMB_SHR_UNMAP		1
+#define	SMB_SHR_DISP_CONT_STR	"continue"
+#define	SMB_SHR_DISP_TERM_STR	"terminate"
 
 /*
  * RAP protocol share related commands only understand
@@ -105,6 +122,12 @@ extern "C" {
  * SMB_SHRF_ACC_ALL	All of the access bits
  * SMB_SHRF_ADMIN	Admin share
  * SMB_SHRF_CATIA	CATIA character translation on/off
+ * SMB_SHRF_GUEST_OK	Guest access on/off
+ *
+ * SMB_SHRF_MAP		Map command is specified
+ * SMB_SHRF_UNMAP	Unmap command is specified
+ * SMB_SHRF_DISP_TERM	Disposition is set to terminate
+ * SMB_SHRF_EXEC_MASK	All of the exec bits
  *
  * All autohome shares are transient but not all transient shares are autohome.
  * IPC$ and drive letter shares (e.g. d$, e$, etc) are transient but
@@ -130,7 +153,13 @@ extern "C" {
 
 #define	SMB_SHRF_ADMIN		0x1000
 #define	SMB_SHRF_CATIA		0x2000
+#define	SMB_SHRF_GUEST_OK	0x4000
 
+/* Exec Flags */
+#define	SMB_SHRF_MAP		0x10000
+#define	SMB_SHRF_UNMAP		0x20000
+#define	SMB_SHRF_DISP_TERM	0x40000
+#define	SMB_SHRF_EXEC_MASK	0x70000
 
 /*
  * refcnt is currently only used for autohome.  autohome needs a refcnt
@@ -188,6 +217,15 @@ typedef struct smb_enumshare_info {
 	uint16_t	es_datasize;
 } smb_enumshare_info_t;
 
+typedef struct smb_execsub_info {
+	char		*e_winname;
+	char		*e_userdom;
+	smb_inaddr_t	e_srv_ipaddr;
+	smb_inaddr_t	e_cli_ipaddr;
+	char		*e_cli_netbiosname;
+	uid_t		e_uid;
+} smb_execsub_info_t;
+
 /*
  * LanMan share API (for both SMB kernel module and GUI/CLI sub-system)
  *
@@ -215,6 +253,7 @@ uint32_t smb_shr_get(char *, smb_share_t *);
 uint32_t smb_shr_modify(smb_share_t *);
 uint32_t smb_shr_get_realpath(const char *, char *, int);
 void smb_shr_hostaccess(smb_share_t *, smb_inaddr_t *);
+int smb_shr_exec(char *, smb_execsub_info_t *, int);
 
 boolean_t smb_shr_exists(char *);
 int smb_shr_is_special(char *);
@@ -225,6 +264,7 @@ boolean_t smb_shr_chkname(char *);
 sa_handle_t smb_shr_sa_enter(void);
 void smb_shr_sa_exit(void);
 void smb_shr_sa_csc_option(const char *, smb_share_t *);
+char *smb_shr_sa_csc_name(const smb_share_t *);
 void smb_shr_sa_catia_option(const char *, smb_share_t *);
 
 /*
@@ -245,6 +285,7 @@ uint32_t smb_kshare_getinfo(door_handle_t, char *, smb_share_t *,
     smb_inaddr_t *);
 int smb_kshare_upcall(door_handle_t, void *, boolean_t);
 uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
+uint32_t smb_kshare_exec(door_handle_t, char *, smb_execsub_info_t *, int);
 
 #endif
 
@@ -264,6 +305,7 @@ uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 #define	SMB_SHROP_MODIFY		6
 #define	SMB_SHROP_LIST			7
 #define	SMB_SHROP_ENUM			8
+#define	SMB_SHROP_EXEC			9
 
 /*
  * Door server status

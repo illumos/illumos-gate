@@ -186,9 +186,9 @@ xdr_netr_client_t(xdrs, objp)
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->domain, ~0))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->real_username, ~0))
+	if (!xdr_string(xdrs, &objp->e_username, ~0))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->real_domain, ~0))
+	if (!xdr_string(xdrs, &objp->e_domain, ~0))
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->workstation, ~0))
 		return (FALSE);

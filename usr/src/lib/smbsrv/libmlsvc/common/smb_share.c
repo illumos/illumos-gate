@@ -37,6 +37,12 @@
 #include <assert.h>
 #include <libshare.h>
 #include <libzfs.h>
+#include <priv_utils.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <signal.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
@@ -50,6 +56,16 @@
 #define	SMB_SHR_ERROR_THRESHOLD		3
 
 #define	SMB_SHR_CSC_BUFSZ		64
+
+static struct {
+	char *value;
+	uint32_t flag;
+} cscopt[] = {
+	{ "disabled",	SMB_SHRF_CSC_DISABLED },
+	{ "manual",	SMB_SHRF_CSC_MANUAL },
+	{ "auto",	SMB_SHRF_CSC_AUTO },
+	{ "vdo",	SMB_SHRF_CSC_VDO }
+};
 
 /*
  * Cache functions and vars
@@ -167,6 +183,14 @@ static void smb_shr_unpublish(const char *, const char *);
 static uint32_t smb_shr_lookup(char *, smb_share_t *);
 static uint32_t smb_shr_addipc(void);
 static void smb_shr_set_oemname(smb_share_t *);
+static int smb_shr_enable_all_privs(void);
+static int smb_shr_expand_subs(char **, smb_share_t *, smb_execsub_info_t *);
+static char **smb_shr_tokenize_cmd(char *);
+static void smb_shr_sig_abnormal_term(int);
+static void smb_shr_sig_child(int);
+static void smb_shr_get_exec_info(void);
+static void smb_shr_set_exec_flags(smb_share_t *);
+static void smb_shr_sa_guest_option(const char *, smb_share_t *);
 
 
 /*
@@ -179,6 +203,11 @@ typedef struct smb_sa_handle {
 } smb_sa_handle_t;
 
 static smb_sa_handle_t smb_sa_handle;
+
+static int smb_shr_exec_flags;
+static char smb_shr_exec_map[MAXPATHLEN];
+static char smb_shr_exec_unmap[MAXPATHLEN];
+static mutex_t smb_shr_exec_mtx;
 
 /*
  * Creates and initializes the cache and starts the publisher
@@ -266,6 +295,8 @@ smb_shr_load(void)
 	rc = pthread_create(&load_thr, &tattr, smb_shr_sa_loadall, 0);
 	(void) pthread_attr_destroy(&tattr);
 
+	smb_shr_get_exec_info();
+
 	return (rc);
 }
 
@@ -320,6 +351,7 @@ smb_shr_iterate(smb_shriter_t *shi)
 		if ((cached_si = smb_shr_cache_iterate(shi)) != NULL) {
 			share = &shi->si_share;
 			bcopy(cached_si, share, sizeof (smb_share_t));
+			smb_shr_set_exec_flags(share);
 		}
 		smb_shr_cache_unlock();
 	}
@@ -550,7 +582,7 @@ smb_shr_modify(smb_share_t *new_si)
 	boolean_t adc_changed = B_FALSE;
 	char old_container[MAXPATHLEN];
 	uint32_t catia;
-	uint32_t cscopt;
+	uint32_t cscflg;
 	uint32_t access;
 
 	assert(new_si != NULL);
@@ -584,9 +616,14 @@ smb_shr_modify(smb_share_t *new_si)
 	si->shr_flags &= ~SMB_SHRF_CATIA;
 	si->shr_flags |= catia;
 
-	cscopt = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
+	cscflg = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
 	si->shr_flags &= ~SMB_SHRF_CSC_MASK;
-	si->shr_flags |= cscopt;
+	si->shr_flags |= cscflg;
+
+	if (new_si->shr_flags & SMB_SHRF_GUEST_OK)
+		si->shr_flags |= SMB_SHRF_GUEST_OK;
+	else
+		si->shr_flags &= ~SMB_SHRF_GUEST_OK;
 
 	access = (new_si->shr_flags & SMB_SHRF_ACC_ALL);
 	si->shr_flags &= ~SMB_SHRF_ACC_ALL;
@@ -875,6 +912,113 @@ smb_shr_list(int offset, smb_shrlist_t *list)
 }
 
 /*
+ * Executes the map/unmap command associated with a share.
+ *
+ * Returns 0 on success.  Otherwise non-zero for errors.
+ */
+int
+smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
+{
+	char cmd[MAXPATHLEN], **cmd_tokens, *path, *ptr;
+	pid_t child_pid;
+	int child_status;
+	struct sigaction pact, cact;
+	smb_share_t si;
+
+	if (smb_shr_get(share, &si) != 0)
+		return (-1);
+
+	*cmd = '\0';
+
+	(void) mutex_lock(&smb_shr_exec_mtx);
+
+	switch (exec_type) {
+	case SMB_SHR_MAP:
+		(void) strlcpy(cmd, smb_shr_exec_map, sizeof (cmd));
+		break;
+	case SMB_SHR_UNMAP:
+		(void) strlcpy(cmd, smb_shr_exec_unmap, sizeof (cmd));
+		break;
+	default:
+		(void) mutex_unlock(&smb_shr_exec_mtx);
+		return (-1);
+	}
+
+	(void) mutex_unlock(&smb_shr_exec_mtx);
+
+	if (*cmd == '\0')
+		return (0);
+
+	pact.sa_handler = smb_shr_sig_child;
+	pact.sa_flags = 0;
+	(void) sigemptyset(&pact.sa_mask);
+	sigaction(SIGCHLD, &pact, NULL);
+
+	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
+
+	if ((child_pid = fork()) == -1) {
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
+		return (-1);
+	}
+
+	if (child_pid == 0) {
+
+		/* child process */
+
+		cact.sa_handler = smb_shr_sig_abnormal_term;
+		cact.sa_flags = 0;
+		(void) sigemptyset(&cact.sa_mask);
+		sigaction(SIGTERM, &cact, NULL);
+		sigaction(SIGABRT, &cact, NULL);
+		sigaction(SIGSEGV, &cact, NULL);
+
+		if (priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_PROC_EXEC,
+		    PRIV_FILE_DAC_EXECUTE, NULL))
+			_exit(-1);
+
+		if (smb_shr_enable_all_privs())
+			_exit(-1);
+
+		(void) trim_whitespace(cmd);
+		(void) strcanon(cmd, " ");
+
+		if ((cmd_tokens = smb_shr_tokenize_cmd(cmd)) != NULL) {
+
+			if (smb_shr_expand_subs(cmd_tokens, &si, subs) != 0) {
+				free(cmd_tokens[0]);
+				free(cmd_tokens);
+				_exit(-1);
+			}
+
+			ptr = cmd;
+			path = strsep(&ptr, " ");
+
+			(void) execv(path, cmd_tokens);
+		}
+
+		_exit(-1);
+	}
+
+	/* parent process */
+
+	while (waitpid(child_pid, &child_status, 0) < 0) {
+		if (errno != EINTR)
+			break;
+
+		/* continue if waitpid got interrupted by a signal */
+		errno = 0;
+		continue;
+	}
+
+	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
+
+	if (WIFEXITED(child_status))
+		return (WEXITSTATUS(child_status));
+
+	return (child_status);
+}
+
+/*
  * ============================================
  * Private helper/utility functions
  * ============================================
@@ -896,6 +1040,7 @@ smb_shr_lookup(char *sharename, smb_share_t *si)
 		cached_si = smb_shr_cache_findent(sharename);
 		if (cached_si != NULL) {
 			bcopy(cached_si, si, sizeof (smb_share_t));
+			smb_shr_set_exec_flags(si);
 			status = NERR_Success;
 		}
 
@@ -1390,6 +1535,14 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		}
 	}
 
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_GUEST);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_guest_option(val, si);
+			free(val);
+		}
+	}
+
 	prop = (sa_property_t)sa_get_property(opts, SHOPT_NONE);
 	if (prop != NULL) {
 		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
@@ -1437,16 +1590,6 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 void
 smb_shr_sa_csc_option(const char *value, smb_share_t *si)
 {
-	struct {
-		char *value;
-		uint32_t flag;
-	} cscopt[] = {
-		{ "disabled",	SMB_SHRF_CSC_DISABLED },
-		{ "manual",	SMB_SHRF_CSC_MANUAL },
-		{ "auto",	SMB_SHRF_CSC_AUTO },
-		{ "vdo",	SMB_SHRF_CSC_VDO }
-	};
-
 	int i;
 
 	for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
@@ -1472,6 +1615,23 @@ smb_shr_sa_csc_option(const char *value, smb_share_t *si)
 }
 
 /*
+ * Return the option name for the first CSC flag (there should be only
+ * one) encountered in the share flags.
+ */
+char *
+smb_shr_sa_csc_name(const smb_share_t *si)
+{
+	int i;
+
+	for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
+		if (si->shr_flags & cscopt[i].flag)
+			return (cscopt[i].value);
+	}
+
+	return (NULL);
+}
+
+/*
  * set SMB_SHRF_CATIA in accordance with catia property value
  */
 void
@@ -1481,6 +1641,19 @@ smb_shr_sa_catia_option(const char *value, smb_share_t *si)
 		si->shr_flags |= SMB_SHRF_CATIA;
 	} else {
 		si->shr_flags &= ~SMB_SHRF_CATIA;
+	}
+}
+
+/*
+ * set SMB_SHRF_GUEST_OK in accordance with guestok property value
+ */
+static void
+smb_shr_sa_guest_option(const char *value, smb_share_t *si)
+{
+	if ((strcasecmp(value, "true") == 0) || (strcmp(value, "1") == 0)) {
+		si->shr_flags |= SMB_SHRF_GUEST_OK;
+	} else {
+		si->shr_flags &= ~SMB_SHRF_GUEST_OK;
 	}
 }
 
@@ -1856,4 +2029,280 @@ smb_shr_zfs_rename(smb_share_t *from, smb_share_t *to)
 
 	zfs_close(zfshd);
 	libzfs_fini(libhd);
+}
+
+/*
+ * Enable all privileges in the inheritable set to execute command.
+ */
+static int
+smb_shr_enable_all_privs(void)
+{
+	priv_set_t *pset;
+
+	pset = priv_allocset();
+	if (pset == NULL)
+		return (-1);
+
+	if (getppriv(PRIV_LIMIT, pset)) {
+		priv_freeset(pset);
+		return (-1);
+	}
+
+	if (setppriv(PRIV_ON, PRIV_INHERITABLE, pset)) {
+		priv_freeset(pset);
+		return (-1);
+	}
+
+	priv_freeset(pset);
+	return (0);
+}
+
+/*
+ * Tokenizes the command string and returns the list of tokens in an array.
+ *
+ * Returns NULL if there are no tokens.
+ */
+static char **
+smb_shr_tokenize_cmd(char *cmdstr)
+{
+	char *cmd, *buf, *bp, *value;
+	char **argv, **ap;
+	int argc, i;
+
+	if (cmdstr == NULL || *cmdstr == '\0')
+		return (NULL);
+
+	if ((buf = malloc(MAXPATHLEN)) == NULL)
+		return (NULL);
+
+	(void) strlcpy(buf, cmdstr, MAXPATHLEN);
+
+	for (argc = 2, bp = cmdstr; *bp != '\0'; ++bp)
+		if (*bp == ' ')
+			++argc;
+
+	if ((argv = calloc(argc, sizeof (char *))) == NULL) {
+		free(buf);
+		return (NULL);
+	}
+
+	ap = argv;
+	for (bp = buf, i = 0; i < argc; ++i) {
+		do {
+			if ((value = strsep(&bp, " ")) == NULL)
+				break;
+		} while (*value == '\0');
+
+		if (value == NULL)
+			break;
+
+		*ap++ = value;
+	}
+
+	/* get the filename of the command from the path */
+	if ((cmd = strrchr(argv[0], '/')) != NULL)
+		(void) strlcpy(argv[0], ++cmd, strlen(argv[0]));
+
+	return (argv);
+}
+
+/*
+ * Expands the command string for the following substitution tokens:
+ *
+ * %U - Windows username
+ * %D - Name of the domain or workgroup of %U
+ * %h - The server hostname
+ * %M - The client hostname
+ * %L - The server NetBIOS name
+ * %m - The client NetBIOS name. This option is only valid for NetBIOS
+ *      connections (port 139).
+ * %I - The IP address of the client machine
+ * %i - The local IP address to which the client is connected
+ * %S - The name of the share
+ * %P - The root directory of the share
+ * %u - The UID of the Unix user
+ *
+ * Returns 0 on success.  Otherwise -1.
+ */
+static int
+smb_shr_expand_subs(char **cmd_toks, smb_share_t *si, smb_execsub_info_t *subs)
+{
+	char *fmt, *sub_chr, *ptr;
+	boolean_t unknown;
+	char hostname[MAXHOSTNAMELEN];
+	char ip_str[INET6_ADDRSTRLEN];
+	char name[SMB_PI_MAX_HOST];
+	mts_wchar_t wbuf[SMB_PI_MAX_HOST];
+	unsigned int cpid = oem_get_smb_cpid();
+	int i;
+
+	if (cmd_toks == NULL || *cmd_toks == NULL)
+		return (-1);
+
+	for (i = 1; cmd_toks[i]; i++) {
+		fmt = cmd_toks[i];
+		if (*fmt == '%') {
+			sub_chr = fmt + 1;
+			unknown = B_FALSE;
+
+			switch (*sub_chr) {
+			case 'U':
+				ptr = strdup(subs->e_winname);
+				break;
+			case 'D':
+				ptr = strdup(subs->e_userdom);
+				break;
+			case 'h':
+				if (gethostname(hostname, MAXHOSTNAMELEN) != 0)
+					unknown = B_TRUE;
+				else
+					ptr = strdup(hostname);
+				break;
+			case 'M':
+				if (smb_getnameinfo(&subs->e_cli_ipaddr,
+				    hostname, sizeof (hostname), 0) != 0)
+					unknown = B_TRUE;
+				else
+					ptr = strdup(hostname);
+				break;
+			case 'L':
+				if (smb_getnetbiosname(hostname,
+				    NETBIOS_NAME_SZ) != 0)
+					unknown = B_TRUE;
+				else
+					ptr = strdup(hostname);
+				break;
+			case 'm':
+				if (*subs->e_cli_netbiosname == '\0')
+					unknown = B_TRUE;
+				else {
+					(void) mts_mbstowcs(wbuf,
+					    subs->e_cli_netbiosname,
+					    SMB_PI_MAX_HOST - 1);
+
+					if (unicodestooems(name, wbuf,
+					    SMB_PI_MAX_HOST, cpid) == 0)
+						(void) strlcpy(name,
+						    subs->e_cli_netbiosname,
+						    SMB_PI_MAX_HOST);
+
+					ptr = strdup(name);
+				}
+				break;
+			case 'I':
+				if (smb_inet_ntop(&subs->e_cli_ipaddr, ip_str,
+				    SMB_IPSTRLEN(subs->e_cli_ipaddr.a_family))
+				    != NULL)
+					ptr = strdup(ip_str);
+				else
+					unknown = B_TRUE;
+				break;
+			case 'i':
+				if (smb_inet_ntop(&subs->e_srv_ipaddr, ip_str,
+				    SMB_IPSTRLEN(subs->e_srv_ipaddr.a_family))
+				    != NULL)
+					ptr = strdup(ip_str);
+				else
+					unknown = B_TRUE;
+				break;
+			case 'S':
+				ptr = strdup(si->shr_name);
+				break;
+			case 'P':
+				ptr = strdup(si->shr_path);
+				break;
+			case 'u':
+				(void) snprintf(name, sizeof (name), "%u",
+				    subs->e_uid);
+				ptr = strdup(name);
+				break;
+			default:
+				/* unknown sub char */
+				unknown = B_TRUE;
+				break;
+			}
+
+			if (unknown)
+				ptr = strdup("");
+
+		} else  /* first char of cmd's arg is not '%' char */
+			ptr = strdup("");
+
+		cmd_toks[i] = ptr;
+
+		if (ptr == NULL) {
+			for (i = 1; cmd_toks[i]; i++)
+				free(cmd_toks[i]);
+
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static void
+smb_shr_sig_abnormal_term(int sig_val)
+{
+	/*
+	 * Calling _exit() prevents parent process from getting SIGTERM/SIGINT
+	 * signal.
+	 */
+	_exit(-1);
+}
+
+/*ARGSUSED*/
+static void
+smb_shr_sig_child(int sig_val)
+{
+	/*
+	 * Catch the signal and allow the exit status of the child process
+	 * to be available for reaping.
+	 */
+}
+
+/*
+ *  Gets the exec bit flags for each share.
+ */
+static void
+smb_shr_get_exec_info(void)
+{
+	char buf[MAXPATHLEN];
+
+	(void) mutex_lock(&smb_shr_exec_mtx);
+
+	smb_shr_exec_flags = 0;
+
+	*smb_shr_exec_map = '\0';
+	(void) smb_config_getstr(SMB_CI_MAP, smb_shr_exec_map,
+	    sizeof (smb_shr_exec_map));
+	if (*smb_shr_exec_map != '\0')
+		smb_shr_exec_flags |= SMB_SHRF_MAP;
+
+	*smb_shr_exec_unmap = '\0';
+	(void) smb_config_getstr(SMB_CI_UNMAP, smb_shr_exec_unmap,
+	    sizeof (smb_shr_exec_unmap));
+	if (*smb_shr_exec_unmap != '\0')
+		smb_shr_exec_flags |= SMB_SHRF_UNMAP;
+
+	*buf = '\0';
+	(void) smb_config_getstr(SMB_CI_DISPOSITION, buf, sizeof (buf));
+	if (*buf != '\0')
+		if (strcasecmp(buf, SMB_SHR_DISP_TERM_STR) == 0)
+			smb_shr_exec_flags |= SMB_SHRF_DISP_TERM;
+
+	(void) mutex_unlock(&smb_shr_exec_mtx);
+}
+
+/*
+ *  Sets the exec bit flags for each share.
+ */
+static void
+smb_shr_set_exec_flags(smb_share_t *si)
+{
+	(void) mutex_lock(&smb_shr_exec_mtx);
+	si->shr_flags &= ~SMB_SHRF_EXEC_MASK;
+	si->shr_flags |= smb_shr_exec_flags;
+	(void) mutex_unlock(&smb_shr_exec_mtx);
 }

@@ -33,6 +33,35 @@ static uint32_t smb_sam_lookup_user(char *, smb_sid_t **);
 static uint32_t smb_sam_lookup_group(char *, smb_sid_t **);
 
 /*
+ * Local well-known accounts data structure table and prototypes
+ */
+typedef struct smb_lwka {
+	uint32_t	lwka_rid;
+	char		*lwka_name;
+	uint16_t	lwka_type;
+} smb_lwka_t;
+
+static smb_lwka_t lwka_tbl[] = {
+	{ 500, "Administrator", SidTypeUser },
+	{ 501, "Guest", SidTypeUser },
+	{ 502, "KRBTGT", SidTypeUser },
+	{ 512, "Domain Admins", SidTypeGroup },
+	{ 513, "Domain Users", SidTypeGroup },
+	{ 514, "Domain Guests", SidTypeGroup },
+	{ 516, "Domain Controllers", SidTypeGroup },
+	{ 517, "Cert Publishers", SidTypeGroup },
+	{ 518, "Schema Admins", SidTypeGroup },
+	{ 519, "Enterprise Admins", SidTypeGroup },
+	{ 520, "Global Policy Creator Owners", SidTypeGroup },
+	{ 533, "RAS and IAS Servers", SidTypeGroup }
+};
+
+#define	SMB_LWKA_NUM	(sizeof (lwka_tbl)/sizeof (lwka_tbl[0]))
+
+static smb_lwka_t *smb_lwka_lookup_name(char *);
+static smb_lwka_t *smb_lwka_lookup_sid(smb_sid_t *);
+
+/*
  * Looks up the given name in local account databases:
  *
  * SMB Local users are looked up in /var/smb/smbpasswd
@@ -67,57 +96,83 @@ uint32_t
 smb_sam_lookup_name(char *domain, char *name, uint16_t type,
     smb_account_t *account)
 {
-	char hostname[MAXHOSTNAMELEN];
+	nt_domain_t di;
 	smb_sid_t *sid;
 	uint32_t status;
+	smb_lwka_t *lwka;
 
 	bzero(account, sizeof (smb_account_t));
-	(void) smb_getnetbiosname(hostname, sizeof (hostname));
 
 	if (domain != NULL) {
-		if (!smb_ishostname(domain))
+		if (!nt_domain_lookup_name(domain, &di) ||
+		    (di.di_type != NT_DOMAIN_LOCAL))
 			return (NT_STATUS_NOT_FOUND);
 
 		/* Only Netbios hostname is accepted */
-		if (utf8_strcasecmp(domain, hostname) != 0)
+		if (utf8_strcasecmp(domain, di.di_nbname) != 0)
 			return (NT_STATUS_NONE_MAPPED);
+	} else {
+		if (!nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di))
+			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 	}
 
-	switch (type) {
-	case SidTypeUser:
-		status = smb_sam_lookup_user(name, &sid);
-		if (status != NT_STATUS_SUCCESS)
-			return (status);
-		break;
+	if (utf8_strcasecmp(name, di.di_nbname) == 0) {
+		/* This is the local domain name */
+		account->a_type = SidTypeDomain;
+		account->a_name = strdup("");
+		account->a_domain = strdup(di.di_nbname);
+		account->a_sid = smb_sid_dup(di.di_binsid);
+		account->a_domsid = smb_sid_dup(di.di_binsid);
+		account->a_rid = (uint32_t)-1;
 
-	case SidTypeAlias:
-		status = smb_sam_lookup_group(name, &sid);
-		if (status != NT_STATUS_SUCCESS)
-			return (status);
-		break;
+		if (!smb_account_validate(account)) {
+			smb_account_free(account);
+			return (NT_STATUS_NO_MEMORY);
+		}
 
-	case SidTypeUnknown:
-		type = SidTypeUser;
-		status = smb_sam_lookup_user(name, &sid);
-		if (status == NT_STATUS_SUCCESS)
+		return (NT_STATUS_SUCCESS);
+	}
+
+	if ((lwka = smb_lwka_lookup_name(name)) != NULL) {
+		sid = smb_sid_splice(di.di_binsid, lwka->lwka_rid);
+		type = lwka->lwka_type;
+	} else {
+		switch (type) {
+		case SidTypeUser:
+			status = smb_sam_lookup_user(name, &sid);
+			if (status != NT_STATUS_SUCCESS)
+				return (status);
 			break;
 
-		if (status == NT_STATUS_NONE_MAPPED)
-			return (status);
+		case SidTypeAlias:
+			status = smb_sam_lookup_group(name, &sid);
+			if (status != NT_STATUS_SUCCESS)
+				return (status);
+			break;
 
-		type = SidTypeAlias;
-		status = smb_sam_lookup_group(name, &sid);
-		if (status != NT_STATUS_SUCCESS)
-			return (status);
-		break;
+		case SidTypeUnknown:
+			type = SidTypeUser;
+			status = smb_sam_lookup_user(name, &sid);
+			if (status == NT_STATUS_SUCCESS)
+				break;
 
-	default:
-		return (NT_STATUS_INVALID_PARAMETER);
+			if (status == NT_STATUS_NONE_MAPPED)
+				return (status);
+
+			type = SidTypeAlias;
+			status = smb_sam_lookup_group(name, &sid);
+			if (status != NT_STATUS_SUCCESS)
+				return (status);
+			break;
+
+		default:
+			return (NT_STATUS_INVALID_PARAMETER);
+		}
 	}
 
 	account->a_name = strdup(name);
 	account->a_sid = sid;
-	account->a_domain = strdup(hostname);
+	account->a_domain = strdup(di.di_nbname);
 	account->a_domsid = smb_sid_split(sid, &account->a_rid);
 	account->a_type = type;
 
@@ -153,6 +208,8 @@ smb_sam_lookup_sid(smb_sid_t *sid, smb_account_t *account)
 	char hostname[MAXHOSTNAMELEN];
 	smb_passwd_t smbpw;
 	smb_group_t grp;
+	smb_lwka_t *lwka;
+	nt_domain_t di;
 	uint32_t rid;
 	uid_t id;
 	int id_type;
@@ -160,35 +217,62 @@ smb_sam_lookup_sid(smb_sid_t *sid, smb_account_t *account)
 
 	bzero(account, sizeof (smb_account_t));
 
-	if (!smb_sid_islocal(sid))
+	if (!nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di))
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+
+	if (smb_sid_cmp(sid, di.di_binsid)) {
+		/* This is the local domain SID */
+		account->a_type = SidTypeDomain;
+		account->a_name = strdup("");
+		account->a_domain = strdup(di.di_nbname);
+		account->a_sid = smb_sid_dup(sid);
+		account->a_domsid = smb_sid_dup(sid);
+		account->a_rid = (uint32_t)-1;
+
+		if (!smb_account_validate(account)) {
+			smb_account_free(account);
+			return (NT_STATUS_NO_MEMORY);
+		}
+
+		return (NT_STATUS_SUCCESS);
+	}
+
+	if (!smb_sid_indomain(di.di_binsid, sid)) {
+		/* This is not a local SID */
 		return (NT_STATUS_NOT_FOUND);
+	}
 
-	id_type = SMB_IDMAP_UNKNOWN;
-	if (smb_idmap_getid(sid, &id, &id_type) != IDMAP_SUCCESS)
-		return (NT_STATUS_NONE_MAPPED);
+	if ((lwka = smb_lwka_lookup_sid(sid)) != NULL) {
+		account->a_type = lwka->lwka_type;
+		account->a_name = strdup(lwka->lwka_name);
+	} else {
+		id_type = SMB_IDMAP_UNKNOWN;
+		if (smb_idmap_getid(sid, &id, &id_type) != IDMAP_SUCCESS)
+			return (NT_STATUS_NONE_MAPPED);
 
-	switch (id_type) {
-	case SMB_IDMAP_USER:
-		account->a_type = SidTypeUser;
-		if (smb_pwd_getpwuid(id, &smbpw) == NULL)
-			return (NT_STATUS_NO_SUCH_USER);
+		switch (id_type) {
+		case SMB_IDMAP_USER:
+			account->a_type = SidTypeUser;
+			if (smb_pwd_getpwuid(id, &smbpw) == NULL)
+				return (NT_STATUS_NO_SUCH_USER);
 
-		account->a_name = strdup(smbpw.pw_name);
-		break;
+			account->a_name = strdup(smbpw.pw_name);
+			break;
 
-	case SMB_IDMAP_GROUP:
-		account->a_type = SidTypeAlias;
-		(void) smb_sid_getrid(sid, &rid);
-		rc = smb_lgrp_getbyrid(rid, SMB_LGRP_LOCAL, &grp);
-		if (rc != SMB_LGRP_SUCCESS)
-			return (NT_STATUS_NO_SUCH_ALIAS);
+		case SMB_IDMAP_GROUP:
+			account->a_type = SidTypeAlias;
+			(void) smb_sid_getrid(sid, &rid);
+			rc = smb_lgrp_getbyrid(rid, SMB_LGRP_LOCAL, &grp);
+			if (rc != SMB_LGRP_SUCCESS)
+				return (NT_STATUS_NO_SUCH_ALIAS);
 
-		account->a_name = strdup(grp.sg_name);
-		smb_lgrp_free(&grp);
-		break;
+			account->a_name = strdup(grp.sg_name);
+			smb_lgrp_free(&grp);
+			break;
 
-	default:
-		return (NT_STATUS_NONE_MAPPED);
+		default:
+			return (NT_STATUS_NONE_MAPPED);
+		}
 	}
 
 	if (smb_getnetbiosname(hostname, MAXHOSTNAMELEN) == 0)
@@ -382,4 +466,35 @@ smb_sam_lookup_group(char *name, smb_sid_t **sid)
 	smb_lgrp_free(&grp);
 
 	return ((*sid == NULL) ? NT_STATUS_NO_MEMORY : NT_STATUS_SUCCESS);
+}
+
+static smb_lwka_t *
+smb_lwka_lookup_name(char *name)
+{
+	int i;
+
+	for (i = 0; i < SMB_LWKA_NUM; i++) {
+		if (utf8_strcasecmp(name, lwka_tbl[i].lwka_name) == 0)
+			return (&lwka_tbl[i]);
+	}
+
+	return (NULL);
+}
+
+static smb_lwka_t *
+smb_lwka_lookup_sid(smb_sid_t *sid)
+{
+	uint32_t rid;
+	int i;
+
+	(void) smb_sid_getrid(sid, &rid);
+	if (rid > 999)
+		return (NULL);
+
+	for (i = 0; i < SMB_LWKA_NUM; i++) {
+		if (rid == lwka_tbl[i].lwka_rid)
+			return (&lwka_tbl[i]);
+	}
+
+	return (NULL);
 }

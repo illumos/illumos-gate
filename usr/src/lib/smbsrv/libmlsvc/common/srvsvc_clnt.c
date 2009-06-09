@@ -68,7 +68,7 @@ srvsvc_open(char *server, char *domain, char *username, mlsvc_handle_t *handle)
 			return (-1);
 
 		server = di.d_dc;
-		domain = di.d_nbdomain;
+		domain = di.d_info.di_nbname;
 	}
 
 	if (username == NULL)
@@ -361,7 +361,7 @@ srvsvc_timesync(void)
 	if (!smb_domain_getinfo(&di))
 		return;
 
-	if (srvsvc_net_remote_tod(di.d_dc, di.d_nbdomain, &tv, &tm) != 0)
+	if (srvsvc_net_remote_tod(di.d_dc, di.d_info.di_nbname, &tv, &tm) != 0)
 		return;
 
 	if (settimeofday(&tv, 0))
@@ -385,7 +385,7 @@ srvsvc_gettime(unsigned long *t)
 	if (!smb_domain_getinfo(&di))
 		return (-1);
 
-	if (srvsvc_net_remote_tod(di.d_dc, di.d_nbdomain, &tv, &tm) != 0)
+	if (srvsvc_net_remote_tod(di.d_dc, di.d_info.di_nbname, &tv, &tm) != 0)
 		return (-1);
 
 	*t = tv.tv_sec;
@@ -495,7 +495,7 @@ srvsvc_net_test(char *server, char *domain, char *netname)
 
 	if (smb_domain_getinfo(&di)) {
 		server = di.d_dc;
-		domain = di.d_nbdomain;
+		domain = di.d_info.di_nbname;
 	}
 
 	(void) srvsvc_net_share_get_info(server, domain, netname);

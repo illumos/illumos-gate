@@ -123,7 +123,7 @@ netlogon_logon_private(netr_client_t *clnt, smb_token_t *token)
 	}
 
 	do {
-		status = netr_open(di.d_dc, di.d_nbdomain, &netr_handle);
+		status = netr_open(di.d_dc, di.d_info.di_nbname, &netr_handle);
 		if (status != 0)
 			return (status);
 
@@ -182,12 +182,12 @@ netr_setup_token(struct netr_validation_info3 *info3, netr_client_t *clnt,
 		return (NT_STATUS_NO_MEMORY);
 
 	username = (info3->EffectiveName.str)
-	    ? (char *)info3->EffectiveName.str : clnt->real_username;
+	    ? (char *)info3->EffectiveName.str : clnt->e_username;
 
 	if (info3->LogonDomainName.str) {
 		domain = (char *)info3->LogonDomainName.str;
-	} else if (*clnt->real_domain != '\0') {
-		domain = clnt->real_domain;
+	} else if (*clnt->e_domain != '\0') {
+		domain = clnt->e_domain;
 	} else {
 		(void) smb_getdomainname(nbdomain, sizeof (nbdomain));
 		domain = nbdomain;
@@ -602,7 +602,10 @@ netr_setup_token_wingrps(struct netr_validation_info3 *info3,
 		return (status);
 	}
 
-	status = smb_wka_token_groups(netr_isadmin(info3), &tkn_grps);
+	if (netr_isadmin(info3))
+		token->tkn_flags |= SMB_ATF_ADMIN;
+
+	status = smb_wka_token_groups(token->tkn_flags, &tkn_grps);
 	if (status == NT_STATUS_SUCCESS)
 		token->tkn_win_grps = tkn_grps;
 	else
@@ -675,13 +678,13 @@ netr_setup_domain_groups(struct netr_validation_info3 *info3, smb_ids_t *gids)
 static boolean_t
 netr_isadmin(struct netr_validation_info3 *info3)
 {
-	nt_domain_t *domain;
+	nt_domain_t di;
 	int i;
 
-	if ((domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY)) == NULL)
+	if (!nt_domain_lookup_sid((smb_sid_t *)info3->LogonDomainId, &di))
 		return (B_FALSE);
 
-	if (!smb_sid_cmp((smb_sid_t *)info3->LogonDomainId, domain->sid))
+	if (di.di_type != NT_DOMAIN_PRIMARY)
 		return (B_FALSE);
 
 	if ((info3->UserId == DOMAIN_USER_RID_ADMIN) ||

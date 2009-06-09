@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioccom.h>
+#include <sys/corectl.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -60,11 +61,14 @@
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
 #define	SMB_DBDIR "/var/smb"
 
-extern void *smbd_nbt_listener(void *);
-extern void *smbd_tcp_listener(void *);
+static void *smbd_nbt_listener(void *);
+static void *smbd_tcp_listener(void *);
+static void *smbd_nbt_receiver(void *);
+static void *smbd_tcp_receiver(void *);
 
 static int smbd_daemonize_init(void);
 static void smbd_daemonize_fini(int, int);
+static int smb_init_daemon_priv(int, uid_t, gid_t);
 
 static int smbd_kernel_bind(void);
 static void smbd_kernel_unbind(void);
@@ -90,8 +94,17 @@ static void smbd_refresh_fini(void);
 static void *smbd_refresh_monitor(void *);
 static void smbd_refresh_dc(void);
 
+static void *smbd_nbt_receiver(void *);
+static void *smbd_nbt_listener(void *);
+
+static void *smbd_tcp_receiver(void *);
+static void *smbd_tcp_listener(void *);
+
 static int smbd_start_listeners(void);
 static void smbd_stop_listeners(void);
+static int smbd_kernel_start(void);
+
+static void smbd_fatal_error(const char *);
 
 static pthread_t refresh_thr;
 static pthread_cond_t refresh_cond;
@@ -209,7 +222,7 @@ main(int argc, char *argv[])
 
 	smbd_service_fini();
 	closelog();
-	return (SMF_EXIT_OK);
+	return ((smbd.s_fatal_error) ? SMF_EXIT_ERR_FATAL : SMF_EXIT_OK);
 }
 
 /*
@@ -230,10 +243,7 @@ smbd_daemonize_init(void)
 	 * Reset privileges to the minimum set required. We continue
 	 * to run as root to create and access files in /var.
 	 */
-	rc = __init_daemon_priv(PU_RESETGROUPS | PU_LIMITPRIVS,
-	    smbd.s_uid, smbd.s_gid,
-	    PRIV_NET_MAC_AWARE, PRIV_NET_PRIVADDR, PRIV_PROC_AUDIT,
-	    PRIV_SYS_DEVICES, PRIV_SYS_SMB, NULL);
+	rc = smb_init_daemon_priv(PU_RESETGROUPS, smbd.s_uid, smbd.s_gid);
 
 	if (rc != 0) {
 		smbd_report("insufficient privileges");
@@ -284,7 +294,6 @@ smbd_daemonize_init(void)
 	}
 
 	openlog(smbd.s_pname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
-	smbd.s_pid = getpid();
 	(void) setsid();
 	(void) sigprocmask(SIG_SETMASK, &oset, NULL);
 	(void) chdir("/");
@@ -294,9 +303,80 @@ smbd_daemonize_init(void)
 	return (pfds[1]);
 }
 
+/*
+ * This function is based on __init_daemon_priv() and replaces
+ * __init_daemon_priv() since we want smbd to have all privileges so that it
+ * can execute map/unmap commands with all privileges during share
+ * connection/disconnection.  Unused privileges are disabled until command
+ * execution.  The permitted and the limit set contains all privileges.  The
+ * inheritable set contains no privileges.
+ */
+
+static const char root_cp[] = "/core.%f.%t";
+static const char daemon_cp[] = "/var/tmp/core.%f.%t";
+
+static int
+smb_init_daemon_priv(int flags, uid_t uid, gid_t gid)
+{
+	priv_set_t *perm = NULL;
+	int ret = -1;
+	char buf[1024];
+
+	/*
+	 * This is not a significant failure: it allows us to start programs
+	 * with sufficient privileges and with the proper uid.   We don't
+	 * care enough about the extra groups in that case.
+	 */
+	if (flags & PU_RESETGROUPS)
+		(void) setgroups(0, NULL);
+
+	if (gid != (gid_t)-1 && setgid(gid) != 0)
+		goto end;
+
+	perm = priv_allocset();
+	if (perm == NULL)
+		goto end;
+
+	/* E = P */
+	(void) getppriv(PRIV_PERMITTED, perm);
+	(void) setppriv(PRIV_SET, PRIV_EFFECTIVE, perm);
+
+	/* Now reset suid and euid */
+	if (uid != (uid_t)-1 && setreuid(uid, uid) != 0)
+		goto end;
+
+	/* I = 0 */
+	priv_emptyset(perm);
+	ret = setppriv(PRIV_SET, PRIV_INHERITABLE, perm);
+end:
+	priv_freeset(perm);
+
+	if (core_get_process_path(buf, sizeof (buf), getpid()) == 0 &&
+	    strcmp(buf, "core") == 0) {
+
+		if ((uid == (uid_t)-1 ? geteuid() : uid) == 0) {
+			(void) core_set_process_path(root_cp, sizeof (root_cp),
+			    getpid());
+		} else {
+			(void) core_set_process_path(daemon_cp,
+			    sizeof (daemon_cp), getpid());
+		}
+	}
+	(void) setpflags(__PROC_PROTECT, 0);
+
+	return (ret);
+}
+
+/*
+ * Most privileges, except the ones that are required for smbd, are turn off
+ * in the effective set.  They will be turn on when needed for command
+ * execution during share connection/disconnection.
+ */
 static void
 smbd_daemonize_fini(int fd, int exit_status)
 {
+	priv_set_t *pset;
+
 	/*
 	 * Now that we're running, if a pipe fd was specified, write an exit
 	 * status to it to indicate that our parent process can safely detach.
@@ -314,8 +394,28 @@ smbd_daemonize_fini(int fd, int exit_status)
 		(void) close(fd);
 	}
 
-	__fini_daemon_priv(PRIV_PROC_FORK, PRIV_PROC_EXEC, PRIV_PROC_SESSION,
-	    PRIV_FILE_LINK_ANY, PRIV_PROC_INFO, NULL);
+	pset = priv_allocset();
+	if (pset == NULL)
+		return;
+
+	priv_emptyset(pset);
+
+	/* list of privileges for smbd */
+	(void) priv_addset(pset, PRIV_NET_MAC_AWARE);
+	(void) priv_addset(pset, PRIV_NET_PRIVADDR);
+	(void) priv_addset(pset, PRIV_PROC_AUDIT);
+	(void) priv_addset(pset, PRIV_SYS_DEVICES);
+	(void) priv_addset(pset, PRIV_SYS_SMB);
+
+	priv_inverse(pset);
+
+	/* turn off unneeded privileges */
+	(void) setppriv(PRIV_OFF, PRIV_EFFECTIVE, pset);
+
+	priv_freeset(pset);
+
+	/* reenable core dumps */
+	__fini_daemon_priv(NULL);
 }
 
 /*
@@ -325,10 +425,8 @@ static int
 smbd_service_init(void)
 {
 	int	rc;
-	char	nb_domain[NETBIOS_NAME_SZ];
 
-	smbd.s_drv_fd = -1;
-
+	smbd.s_pid = getpid();
 	if ((mkdir(SMB_DBDIR, 0700) < 0) && (errno != EEXIST)) {
 		smbd_report("mkdir %s: %s", SMB_DBDIR, strerror(errno));
 		return (1);
@@ -362,9 +460,6 @@ smbd_service_init(void)
 	else
 		smbd_report("NetBIOS services started");
 
-	(void) smb_getdomainname(nb_domain, NETBIOS_NAME_SZ);
-	(void) utf8_strupr(nb_domain);
-
 	/* Get the ID map client handle */
 	if ((rc = smb_idmap_start()) != 0) {
 		smbd_report("no idmap handle");
@@ -372,7 +467,7 @@ smbd_service_init(void)
 	}
 
 	smbd.s_secmode = smb_config_get_secmode();
-	if ((rc = nt_domain_init(nb_domain, smbd.s_secmode)) != 0) {
+	if ((rc = nt_domain_init(smbd.s_secmode)) != 0) {
 		if (rc == SMB_DOMAIN_NOMACHINE_SID) {
 			smbd_report(
 			    "no machine SID: check idmap configuration");
@@ -457,7 +552,9 @@ smbd_service_fini(void)
 	smb_lgrp_stop();
 	smb_ccache_remove(SMB_CCACHE_PATH);
 	smb_pwd_fini();
-	nt_domain_unlink();
+	nt_domain_fini();
+	mlsvc_fini();
+	smb_ads_fini();
 }
 
 
@@ -514,9 +611,8 @@ smbd_refresh_fini()
 static void *
 smbd_refresh_monitor(void *arg)
 {
-	smb_io_t	smb_io;
-
-	bzero(&smb_io, sizeof (smb_io));
+	smb_kmod_cfg_t	cfg;
+	int		error;
 
 	while (!smbd.s_shutting_down) {
 		(void) pthread_mutex_lock(&refresh_mutex);
@@ -527,7 +623,8 @@ smbd_refresh_monitor(void *arg)
 
 		if (smbd.s_shutting_down) {
 			syslog(LOG_DEBUG, "shutting down");
-			exit(SMF_EXIT_OK);
+			exit((smbd.s_fatal_error) ? SMF_EXIT_ERR_FATAL :
+			    SMF_EXIT_OK);
 		}
 
 		/*
@@ -570,24 +667,24 @@ smbd_refresh_monitor(void *arg)
 			break;
 		}
 
-		if (smbd.s_drv_fd == -1) {
-			if (smbd_kernel_bind()) {
+		if (!smbd.s_kbound) {
+			error = smbd_kernel_bind();
+			if (error != 0)
 				smbd_report("kernel bind error: %s",
-				    strerror(errno));
-			} else {
+				    strerror(error));
+			else
 				(void) smb_shr_load();
-			}
+
 			continue;
 		}
 
 		(void) smb_shr_load();
 
-		smb_load_kconfig(&smb_io.sio_data.cfg);
-
-		if (smbd_ioctl(SMB_IOC_CONFIG, &smb_io) < 0) {
-			smbd_report("configuration update ioctl: %s",
-			    strerror(errno));
-		}
+		smb_load_kconfig(&cfg);
+		error = smb_kmod_setcfg(&cfg);
+		if (error < 0)
+			smbd_report("configuration update failed: %s",
+			    strerror(error));
 	}
 
 	return (NULL);
@@ -663,49 +760,46 @@ smbd_already_running(void)
 static int
 smbd_kernel_bind(void)
 {
-	smb_io_t	smb_io;
-	int		rc;
-
-	bzero(&smb_io, sizeof (smb_io));
+	int rc;
 
 	smbd_kernel_unbind();
 
-	if ((smbd.s_drv_fd = open(DRV_DEVICE_PATH, 0)) < 0) {
-		smbd.s_drv_fd = -1;
-		return (errno);
+	rc = smb_kmod_bind();
+	if (rc == 0) {
+		rc = smbd_kernel_start();
+		if (rc != 0)
+			smb_kmod_unbind();
+		else
+			smbd.s_kbound = B_TRUE;
 	}
+	return (rc);
+}
 
-	smb_load_kconfig(&smb_io.sio_data.cfg);
+static int
+smbd_kernel_start(void)
+{
+	smb_kmod_cfg_t	cfg;
+	int		rc;
 
-	if (smbd_ioctl(SMB_IOC_CONFIG, &smb_io) < 0) {
-		(void) close(smbd.s_drv_fd);
-		smbd.s_drv_fd = -1;
-		return (errno);
-	}
-	smb_io.sio_data.gmtoff = smbd_gmtoff();
-	if (smbd_ioctl(SMB_IOC_GMTOFF, &smb_io) < 0) {
-		(void) close(smbd.s_drv_fd);
-		smbd.s_drv_fd = -1;
-		return (errno);
-	}
-	smb_io.sio_data.start.opipe = smbd.s_door_opipe;
-	smb_io.sio_data.start.lmshrd = smbd.s_door_lmshr;
-	smb_io.sio_data.start.udoor = smbd.s_door_srv;
-	if (smbd_ioctl(SMB_IOC_START, &smb_io) < 0) {
-		(void) close(smbd.s_drv_fd);
-		smbd.s_drv_fd = -1;
-		return (errno);
-	}
+	smb_load_kconfig(&cfg);
+	rc = smb_kmod_setcfg(&cfg);
+	if (rc != 0)
+		return (rc);
+
+	rc = smb_kmod_setgmtoff(smbd_gmtoff());
+	if (rc != 0)
+		return (rc);
+
+	rc = smb_kmod_start(smbd.s_door_opipe, smbd.s_door_lmshr,
+	    smbd.s_door_srv);
+	if (rc != 0)
+		return (rc);
 
 	rc = smbd_start_listeners();
-	if (rc == 0) {
-		smbd.s_kbound = B_TRUE;
-		return (0);
-	}
-	smbd_stop_listeners();
-	(void) close(smbd.s_drv_fd);
-	smbd.s_drv_fd = -1;
-	return (rc);
+	if (rc != 0)
+		return (rc);
+
+	return (0);
 }
 
 /*
@@ -714,22 +808,9 @@ smbd_kernel_bind(void)
 static void
 smbd_kernel_unbind(void)
 {
-	if (smbd.s_drv_fd != -1) {
-		smbd_stop_listeners();
-		(void) close(smbd.s_drv_fd);
-		smbd.s_drv_fd = -1;
-		smbd.s_kbound = B_FALSE;
-	}
-}
-
-int
-smbd_ioctl(int cmd, smb_io_t *smb_io)
-{
-	smb_io->sio_version = SMB_IOC_VERSION;
-	smb_io->sio_crc = 0;
-	smb_io->sio_crc = smb_crc_gen((uint8_t *)smb_io, sizeof (smb_io_t));
-
-	return (ioctl(smbd.s_drv_fd, cmd, smb_io));
+	smbd_stop_listeners();
+	smb_kmod_unbind();
+	smbd.s_kbound = B_FALSE;
 }
 
 /*
@@ -763,23 +844,20 @@ smbd_localtime_init(void)
 static void *
 smbd_localtime_monitor(void *arg)
 {
-	smb_io_t smb_io;
 	struct tm local_tm;
 	time_t secs;
 	int32_t gmtoff, last_gmtoff = -1;
 	int timeout;
-
-	bzero(&smb_io, sizeof (smb_io));
+	int error;
 
 	for (;;) {
 		gmtoff = smbd_gmtoff();
 
-		if ((last_gmtoff != gmtoff) && (smbd.s_drv_fd != -1)) {
-			smb_io.sio_data.gmtoff = gmtoff;
-			if (smbd_ioctl(SMB_IOC_GMTOFF, &smb_io) < 0) {
-				smbd_report("localtime ioctl: %s",
-				    strerror(errno));
-			}
+		if ((last_gmtoff != gmtoff) && smbd.s_kbound) {
+			error = smb_kmod_setgmtoff(gmtoff);
+			if (error != 0)
+				smbd_report("localtime set failed: %s",
+				    strerror(error));
 		}
 
 		/*
@@ -955,6 +1033,92 @@ smbd_stop_listeners(void)
 		(void) pthread_join(smbd.s_tcp_listener_id, &status);
 		smbd.s_tcp_listener_running = B_FALSE;
 	}
+}
+
+/*
+ * Perform fatal error exit.
+ */
+static void
+smbd_fatal_error(const char *msg)
+{
+	if (msg == NULL)
+		msg = "Fatal error";
+
+	smbd_report("%s", msg);
+	smbd.s_fatal_error = B_TRUE;
+	(void) kill(smbd.s_pid, SIGTERM);
+}
+
+/*ARGSUSED*/
+static void *
+smbd_nbt_receiver(void *arg)
+{
+	(void) smb_kmod_nbtreceive();
+	return (NULL);
+}
+
+/*ARGSUSED*/
+static void *
+smbd_nbt_listener(void *arg)
+{
+	pthread_attr_t	tattr;
+	sigset_t	set;
+	sigset_t	oset;
+	pthread_t	tid;
+	int		error = 0;
+
+	(void) sigfillset(&set);
+	(void) sigdelset(&set, SIGTERM);
+	(void) sigdelset(&set, SIGINT);
+	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+
+	while (smb_kmod_nbtlisten(error) == 0)
+		error = pthread_create(&tid, &tattr, smbd_nbt_receiver, NULL);
+
+	(void) pthread_attr_destroy(&tattr);
+
+	if (!smbd.s_shutting_down)
+		smbd_fatal_error("NBT listener thread terminated unexpectedly");
+
+	return (NULL);
+}
+
+/*ARGSUSED*/
+static void *
+smbd_tcp_receiver(void *arg)
+{
+	(void) smb_kmod_tcpreceive();
+	return (NULL);
+}
+
+/*ARGSUSED*/
+static void *
+smbd_tcp_listener(void *arg)
+{
+	pthread_attr_t	tattr;
+	sigset_t	set;
+	sigset_t	oset;
+	pthread_t	tid;
+	int		error = 0;
+
+	(void) sigfillset(&set);
+	(void) sigdelset(&set, SIGTERM);
+	(void) sigdelset(&set, SIGINT);
+	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+
+	while (smb_kmod_tcplisten(error) == 0)
+		error = pthread_create(&tid, &tattr, smbd_tcp_receiver, NULL);
+
+	(void) pthread_attr_destroy(&tattr);
+
+	if (!smbd.s_shutting_down)
+		smbd_fatal_error("TCP listener thread terminated unexpectedly");
+
+	return (NULL);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -679,7 +679,7 @@ smb_user_disconnect_trees(
 	tree = smb_user_get_tree(&user->u_tree_list, NULL);
 	while (tree) {
 		ASSERT(tree->t_user == user);
-		smb_tree_disconnect(tree);
+		smb_tree_disconnect(tree, B_TRUE);
 		smb_tree_release(tree);
 		tree = smb_user_get_tree(&user->u_tree_list, NULL);
 	}
@@ -704,7 +704,7 @@ smb_user_disconnect_share(
 	while (tree) {
 		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 		smb_session_cancel_requests(user->u_session, tree, NULL);
-		smb_tree_disconnect(tree);
+		smb_tree_disconnect(tree, B_TRUE);
 		next = smb_user_lookup_share(user, sharename, tree);
 		smb_tree_release(tree);
 		tree = next;

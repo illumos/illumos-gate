@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -392,7 +392,7 @@ smb_com_tree_disconnect(smb_request_t *sr)
 	sr->user_cr = smb_user_getcred(sr->uid_user);
 
 	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
-	smb_tree_disconnect(sr->tid_tree);
+	smb_tree_disconnect(sr->tid_tree, B_TRUE);
 
 	if (smbsr_encode_empty_result(sr))
 		return (SDRC_ERROR);

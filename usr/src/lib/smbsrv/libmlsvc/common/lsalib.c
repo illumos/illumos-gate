@@ -130,21 +130,16 @@ lsa_lookup_sid(smb_sid_t *sid, smb_account_t *info)
 }
 
 /*
- * lsa_query_primary_domain_info
- *
  * Obtains the primary domain SID and name from the specified server
- * (domain controller). The information is stored in the NT domain
- * database by the lower level lsar_query_info_policy call. The caller
- * should query the database to obtain a reference to the primary
- * domain information.
+ * (domain controller).
  *
  * The requested information will be returned via 'info' argument.
- * Caller must call lsa_free_info() when done.
  *
  * Returns NT status codes.
  */
 DWORD
-lsa_query_primary_domain_info(char *server, char *domain, lsa_info_t *info)
+lsa_query_primary_domain_info(char *server, char *domain,
+    nt_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
@@ -161,21 +156,16 @@ lsa_query_primary_domain_info(char *server, char *domain, lsa_info_t *info)
 }
 
 /*
- * lsa_query_account_domain_info
- *
  * Obtains the account domain SID and name from the current server
- * (domain controller). The information is stored in the NT domain
- * database by the lower level lsar_query_info_policy call. The caller
- * should query the database to obtain a reference to the account
- * domain information.
+ * (domain controller).
  *
  * The requested information will be returned via 'info' argument.
- * Caller must invoke lsa_free_info() to when done.
  *
  * Returns NT status codes.
  */
 DWORD
-lsa_query_account_domain_info(char *server, char *domain, lsa_info_t *info)
+lsa_query_account_domain_info(char *server, char *domain,
+    nt_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
@@ -198,12 +188,11 @@ lsa_query_account_domain_info(char *server, char *domain, lsa_info_t *info)
  * (domain controller).
  *
  * The requested information will be returned via 'info' argument.
- * Caller must call lsa_free_info() when done.
  *
  * Returns NT status codes.
  */
 DWORD
-lsa_query_dns_domain_info(char *server, char *domain, lsa_info_t *info)
+lsa_query_dns_domain_info(char *server, char *domain, nt_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
@@ -220,20 +209,17 @@ lsa_query_dns_domain_info(char *server, char *domain, lsa_info_t *info)
 }
 
 /*
- * lsa_enum_trusted_domains
- *
- * Enumerate the trusted domains in our primary domain. The information
- * is stored in the NT domain database by the lower level
- * lsar_enum_trusted_domains call. The caller should query the database
- * to obtain a reference to the trusted domain information.
+ * Enumerate the trusted domains of  primary domain.
+ * This is the basic enumaration call which only returns the
+ * NetBIOS name of the domain and its SID.
  *
  * The requested information will be returned via 'info' argument.
- * Caller must call lsa_free_info() when done.
  *
  * Returns NT status codes.
  */
 DWORD
-lsa_enum_trusted_domains(char *server, char *domain, lsa_info_t *info)
+lsa_enum_trusted_domains(char *server, char *domain,
+    smb_trusted_domains_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD enum_context;
@@ -259,40 +245,41 @@ lsa_enum_trusted_domains(char *server, char *domain, lsa_info_t *info)
 }
 
 /*
- * lsa_free_info
+ * Enumerate the trusted domains of the primary domain.
+ * This is the extended enumaration call which besides
+ * NetBIOS name of the domain and its SID, it will return
+ * the FQDN plus some trust information which is not used.
+ *
+ * The requested information will be returned via 'info' argument.
+ *
+ * Returns NT status codes.
  */
-void
-lsa_free_info(lsa_info_t *info)
+DWORD
+lsa_enum_trusted_domains_ex(char *server, char *domain,
+    smb_trusted_domains_t *info)
 {
-	lsa_trusted_domainlist_t *list;
-	int i;
+	mlsvc_handle_t domain_handle;
+	DWORD enum_context;
+	DWORD status;
+	char *user = smbrdr_ipc_get_user();
 
-	if (!info)
-		return;
+	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	switch (info->i_type) {
-	case LSA_INFO_PRIMARY_DOMAIN:
-		smb_sid_free(info->i_domain.di_primary.n_sid);
-		break;
+	enum_context = 0;
 
-	case LSA_INFO_ACCOUNT_DOMAIN:
-		smb_sid_free(info->i_domain.di_account.n_sid);
-		break;
-
-	case LSA_INFO_DNS_DOMAIN:
-		smb_sid_free(info->i_domain.di_dns.d_sid);
-		break;
-
-	case LSA_INFO_TRUSTED_DOMAINS:
-		list = &info->i_domain.di_trust;
-		for (i = 0; i < list->t_num; i++)
-			smb_sid_free(list->t_domains[i].n_sid);
-		free(list->t_domains);
-		break;
-
-	case LSA_INFO_NONE:
-		break;
+	status = lsar_enum_trusted_domains_ex(&domain_handle, &enum_context,
+	    info);
+	if (status == MLSVC_NO_MORE_DATA) {
+		/*
+		 * MLSVC_NO_MORE_DATA indicates that we
+		 * have all of the available information.
+		 */
+		status = NT_STATUS_SUCCESS;
 	}
+
+	(void) lsar_close(&domain_handle);
+	return (status);
 }
 
 /*
@@ -355,7 +342,8 @@ lsa_lookup_name_domain(char *account_name, smb_account_t *info)
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if (lsar_open(dinfo.d_dc, dinfo.d_nbdomain, user, &domain_handle) != 0)
+	if (lsar_open(dinfo.d_dc, dinfo.d_info.di_nbname, user,
+	    &domain_handle) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	status = lsar_lookup_names2(&domain_handle, account_name, info);
@@ -396,7 +384,7 @@ lsa_lookup_privs(char *account_name, char *target_name, smb_account_t *ainfo)
 	if (!smb_domain_getinfo(&dinfo))
 		return (-1);
 
-	if ((lsar_open(dinfo.d_dc, dinfo.d_nbdomain, user,
+	if ((lsar_open(dinfo.d_dc, dinfo.d_info.di_nbname, user,
 	    &domain_handle)) != 0)
 		return (-1);
 
@@ -538,7 +526,8 @@ lsa_lookup_sid_domain(smb_sid_t *sid, smb_account_t *ainfo)
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if (lsar_open(dinfo.d_dc, dinfo.d_nbdomain, user, &domain_handle) != 0)
+	if (lsar_open(dinfo.d_dc, dinfo.d_info.di_nbname, user,
+	    &domain_handle) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	status = lsar_lookup_sids2(&domain_handle, (struct mslsa_sid *)sid,

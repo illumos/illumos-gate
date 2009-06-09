@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +79,7 @@ samr_open(char *server, char *domain, char *username, DWORD access_mask,
 			return (-1);
 
 		server = di.d_dc;
-		domain = di.d_nbdomain;
+		domain = di.d_info.di_nbname;
 	}
 
 	if (username == NULL)
@@ -292,12 +292,12 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	len = strlen(server) + strlen(dinfo.d_fqdomain) + 4;
+	len = strlen(server) + strlen(dinfo.d_info.di_fqname) + 4;
 	arg.servername = ndr_rpc_malloc(samr_handle, len);
 
-	if (*dinfo.d_fqdomain != '\0')
+	if (*dinfo.d_info.di_fqname != '\0')
 		(void) snprintf((char *)arg.servername, len, "\\\\%s.%s",
-		    server, dinfo.d_fqdomain);
+		    server, dinfo.d_info.di_fqname);
 	else
 		(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 

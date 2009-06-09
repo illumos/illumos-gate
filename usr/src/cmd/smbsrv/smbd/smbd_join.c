@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +101,8 @@ smbd_set_netlogon_cred(void)
 	char sam_acct[SMB_SAMACCT_MAXLEN];
 	char *ipc_usr, *dom;
 	boolean_t new_domain = B_FALSE;
-	smb_domain_t dinfo;
+	smb_domain_t domain;
+	nt_domain_t *di;
 
 	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
 		return (B_FALSE);
@@ -124,18 +125,19 @@ smbd_set_netlogon_cred(void)
 	if (utf8_strcasecmp(ipc_usr, sam_acct))
 		return (B_FALSE);
 
-	if (!smb_domain_getinfo(&dinfo))
-		(void) smb_getfqdomainname(dinfo.d_fqdomain, MAXHOSTNAMELEN);
+	di = &domain.d_info;
+	if (!smb_domain_getinfo(&domain))
+		(void) smb_getfqdomainname(di->di_fqname, MAXHOSTNAMELEN);
 
 	(void) smb_config_getstr(SMB_CI_KPASSWD_DOMAIN, kpasswd_domain,
 	    sizeof (kpasswd_domain));
 
 	if (*kpasswd_domain != '\0' &&
-	    utf8_strcasecmp(kpasswd_domain, dinfo.d_fqdomain)) {
+	    utf8_strcasecmp(kpasswd_domain, di->di_fqname)) {
 		dom = kpasswd_domain;
 		new_domain = B_TRUE;
 	} else {
-		dom = dinfo.d_fqdomain;
+		dom = di->di_fqname;
 	}
 
 	/*
@@ -143,12 +145,12 @@ smbd_set_netlogon_cred(void)
 	 * currently cached or the SMB daemon has previously discovered a DC
 	 * that is different than the kpasswd server.
 	 */
-	if (new_domain || utf8_strcasecmp(dinfo.d_dc, kpasswd_srv) != 0) {
-		if (*dinfo.d_dc != '\0')
-			mlsvc_disconnect(dinfo.d_dc);
+	if (new_domain || utf8_strcasecmp(domain.d_dc, kpasswd_srv) != 0) {
+		if (*domain.d_dc != '\0')
+			mlsvc_disconnect(domain.d_dc);
 
-		if (!smb_locate_dc(dom, kpasswd_srv, &dinfo)) {
-			if (!smb_locate_dc(dinfo.d_fqdomain, "", &dinfo)) {
+		if (!smb_locate_dc(dom, kpasswd_srv, &domain)) {
+			if (!smb_locate_dc(di->di_fqname, "", &domain)) {
 				smbrdr_ipc_commit();
 				return (B_FALSE);
 			}
@@ -156,14 +158,16 @@ smbd_set_netlogon_cred(void)
 	}
 
 	smbrdr_ipc_commit();
-	if (mlsvc_netlogon(dinfo.d_dc, dinfo.d_nbdomain)) {
+	if (mlsvc_netlogon(domain.d_dc, di->di_nbname)) {
 		syslog(LOG_ERR,
 		    "failed to establish NETLOGON credential chain");
 		return (B_TRUE);
 	} else {
 		if (new_domain) {
-			smb_config_setdomaininfo(dinfo.d_nbdomain,
-			    dinfo.d_fqdomain, dinfo.d_forest, dinfo.d_guid);
+			smb_config_setdomaininfo(di->di_nbname, di->di_fqname,
+			    di->di_sid,
+			    di->di_u.di_dns.ddi_forest,
+			    di->di_u.di_dns.ddi_guid);
 			(void) smb_config_setstr(SMB_CI_KPASSWD_DOMAIN, "");
 		}
 	}
@@ -205,7 +209,8 @@ static void *
 smbd_locate_dc_thread(void *arg)
 {
 	char domain[MAXHOSTNAMELEN];
-	smb_domain_t new_dinfo;
+	smb_domain_t new_domain;
+	nt_domain_t *di;
 
 	if (!smb_match_netlogon_seqnum()) {
 		(void) smbd_set_netlogon_cred();
@@ -215,10 +220,13 @@ smbd_locate_dc_thread(void *arg)
 			(void) utf8_strupr(domain);
 		}
 
-		if (smb_locate_dc(domain, "", &new_dinfo))
-			smb_config_setdomaininfo(new_dinfo.d_nbdomain,
-			    new_dinfo.d_fqdomain, new_dinfo.d_forest,
-			    new_dinfo.d_guid);
+		if (smb_locate_dc(domain, "", &new_domain)) {
+			di = &new_domain.d_info;
+			smb_config_setdomaininfo(di->di_nbname, di->di_fqname,
+			    di->di_sid,
+			    di->di_u.di_dns.ddi_forest,
+			    di->di_u.di_dns.ddi_guid);
+		}
 	}
 
 	return (NULL);
@@ -271,19 +279,12 @@ static uint32_t
 smbd_join_workgroup(smb_joininfo_t *info)
 {
 	char nb_domain[SMB_PI_MAX_DOMAIN];
-	smb_domain_t dinfo;
 
 	(void) smb_config_getstr(SMB_CI_DOMAIN_NAME, nb_domain,
 	    sizeof (nb_domain));
 
 	smbd_set_secmode(SMB_SECMODE_WORKGRP);
-
-	bzero(&dinfo, sizeof (smb_domain_t));
-	(void) strlcpy(dinfo.d_nbdomain, info->domain_name,
-	    sizeof (dinfo.d_nbdomain));
-	smb_config_setdomaininfo(dinfo.d_nbdomain, dinfo.d_fqdomain,
-	    dinfo.d_forest, dinfo.d_guid);
-
+	smb_config_setdomaininfo(info->domain_name, "", "", "", "");
 
 	if (strcasecmp(nb_domain, info->domain_name))
 		smb_browser_reconfig();
@@ -298,6 +299,7 @@ smbd_join_domain(smb_joininfo_t *info)
 	unsigned char passwd_hash[SMBAUTH_HASH_SZ];
 	char dc[MAXHOSTNAMELEN];
 	smb_domain_t domain_info;
+	nt_domain_t *di;
 
 	/*
 	 * Ensure that any previous membership of this domain has
@@ -320,15 +322,16 @@ smbd_join_domain(smb_joininfo_t *info)
 	(void) smbd_get_kpasswd_srv(dc, sizeof (dc));
 	/* info->domain_name could either be NetBIOS domain name or FQDN */
 	if (smb_locate_dc(info->domain_name, dc, &domain_info)) {
-
 		status = mlsvc_join(&domain_info, info->domain_username,
 		    info->domain_passwd);
 
 		if (status == NT_STATUS_SUCCESS) {
+			di = &domain_info.d_info;
 			smbd_set_secmode(SMB_SECMODE_DOMAIN);
-			smb_config_setdomaininfo(domain_info.d_nbdomain,
-			    domain_info.d_fqdomain, domain_info. d_forest,
-			    domain_info.d_guid);
+			smb_config_setdomaininfo(di->di_nbname, di->di_fqname,
+			    di->di_sid,
+			    di->di_u.di_dns.ddi_forest,
+			    di->di_u.di_dns.ddi_guid);
 			smbrdr_ipc_commit();
 			return (status);
 		}

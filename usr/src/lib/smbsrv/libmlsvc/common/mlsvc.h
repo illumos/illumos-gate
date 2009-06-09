@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_MLSVC_H
 #define	_SMBSRV_MLSVC_H
 
+#include <smbsrv/smb_share.h>
 #include <smbsrv/ndl/netlogon.ndl>
 
 #ifdef __cplusplus
@@ -52,6 +53,13 @@ DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
 int netr_setup_authenticator(netr_info_t *, struct netr_authenticator *,
     struct netr_authenticator *);
 DWORD netr_validate_chain(netr_info_t *, struct netr_authenticator *);
+
+/* Generic functions to get/set windows Security Descriptors */
+uint32_t srvsvc_sd_get(smb_share_t *, uint8_t *, uint32_t *);
+uint32_t srvsvc_sd_set(smb_share_t *, uint8_t *);
+
+uint32_t smb_logon_init(void);
+void smb_logon_fini(void);
 
 #ifdef __cplusplus
 }

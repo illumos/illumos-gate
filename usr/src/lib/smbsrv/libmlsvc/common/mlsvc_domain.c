@@ -47,53 +47,32 @@
 #include <lsalib.h>
 
 /*
- * Domain cache states
- */
-#define	SMB_DCACHE_STATE_INVALID	0
-#define	SMB_DCACHE_STATE_UPDATING	1
-#define	SMB_DCACHE_STATE_VALID		2
-
-typedef struct smb_domain_cache {
-	uint32_t	c_state;
-	smb_domain_t	c_cache;
-	mutex_t		c_mtx;
-	cond_t		c_cv;
-} smb_domain_cache_t;
-
-static smb_domain_cache_t smb_dcache;
-
-/* functions to manipulate the domain cache */
-static void smb_dcache_init(void);
-static void smb_dcache_updating(void);
-static void smb_dcache_invalid(void);
-static void smb_dcache_valid(smb_domain_t *);
-static void smb_dcache_set(uint32_t, smb_domain_t *);
-
-/*
  * DC Locator
  */
 #define	SMB_DCLOCATOR_TIMEOUT	45
 #define	SMB_IS_FQDN(domain)	(strchr(domain, '.') != NULL)
 
 typedef struct smb_dclocator {
-	char sdl_domain[SMB_PI_MAX_DOMAIN];
-	char sdl_dc[MAXHOSTNAMELEN];
-	boolean_t sdl_locate;
-	mutex_t sdl_mtx;
-	cond_t sdl_cv;
-	uint32_t sdl_status;
+	char		sdl_domain[SMB_PI_MAX_DOMAIN];
+	char		sdl_dc[MAXHOSTNAMELEN];
+	boolean_t	sdl_locate;
+	mutex_t		sdl_mtx;
+	cond_t		sdl_cv;
+	uint32_t	sdl_status;
 } smb_dclocator_t;
 
 static smb_dclocator_t smb_dclocator;
 static pthread_t smb_dclocator_thr;
 
 static void *smb_dclocator_main(void *);
-static boolean_t smb_dc_discovery(char *, char *, smb_domain_t *);
-static boolean_t smb_match_domains(char *, char *, uint32_t);
+static void smb_domain_update(char *, char *);
+static boolean_t smb_domain_query_dns(char *, char *, smb_domain_t *);
+static boolean_t smb_domain_query_nbt(char *, char *, smb_domain_t *);
+static boolean_t smb_domain_match(char *, char *, uint32_t);
 static uint32_t smb_domain_query(char *, char *, smb_domain_t *);
-static void smb_domain_update_tabent(int, lsa_nt_domaininfo_t *);
-static void smb_domain_populate_table(char *, char *);
-static boolean_t smb_domain_use_config(char *, smb_domain_t *);
+static void smb_domain_enum_trusted(char *, char *, smb_trusted_domains_t *);
+static uint32_t smb_domain_use_config(char *, nt_domain_t *);
+static void smb_domain_free(smb_domain_t *di);
 
 /*
  * ===================================================================
@@ -114,7 +93,6 @@ smb_dclocator_init(void)
 	pthread_attr_t tattr;
 	int rc;
 
-	smb_dcache_init();
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 	rc = pthread_create(&smb_dclocator_thr, &tattr,
@@ -158,8 +136,7 @@ smb_locate_dc(char *domain, char *dc, smb_domain_t *dp)
 		smb_dclocator.sdl_locate = B_TRUE;
 		(void) strlcpy(smb_dclocator.sdl_domain, domain,
 		    SMB_PI_MAX_DOMAIN);
-		(void) strlcpy(smb_dclocator.sdl_dc, dc,
-		    MAXHOSTNAMELEN);
+		(void) strlcpy(smb_dclocator.sdl_dc, dc, MAXHOSTNAMELEN);
 		(void) cond_broadcast(&smb_dclocator.sdl_cv);
 	}
 
@@ -176,125 +153,20 @@ smb_locate_dc(char *domain, char *dc, smb_domain_t *dp)
 	if (dp == NULL)
 		dp = &domain_info;
 	rc = smb_domain_getinfo(dp);
+
 	(void) mutex_unlock(&smb_dclocator.sdl_mtx);
 
 	return (rc);
 }
 
 /*
- * smb_domain_getinfo
- *
- * If the DC discovery process is underway, this function will wait on
- * a condition variable until the state of SMB domain cache sets to
- * either VALID/INVALID.
- *
- * Returns a copy of the domain cache.
+ * Returns a copy of primary domain information plus
+ * the selected domain controller
  */
 boolean_t
 smb_domain_getinfo(smb_domain_t *dp)
 {
-	timestruc_t to;
-	int err;
-	boolean_t rc;
-
-	(void) mutex_lock(&smb_dcache.c_mtx);
-	to.tv_sec = SMB_DCLOCATOR_TIMEOUT;
-	to.tv_nsec = 0;
-	while (smb_dcache.c_state == SMB_DCACHE_STATE_UPDATING) {
-		err = cond_reltimedwait(&smb_dcache.c_cv, &smb_dcache.c_mtx,
-		    &to);
-		if (err == ETIME)
-			break;
-	}
-
-	if (smb_dcache.c_state == SMB_DCACHE_STATE_VALID) {
-		bcopy(&smb_dcache.c_cache, dp, sizeof (smb_domain_t));
-		rc = B_TRUE;
-	} else {
-		bzero(dp, sizeof (smb_domain_t));
-		rc = B_FALSE;
-	}
-
-	(void) mutex_unlock(&smb_dcache.c_mtx);
-	return (rc);
-}
-
-
-/*
- * =====================================================================
- * Private functions used by DC locator thread to manipulate the domain
- * cache.
- * ======================================================================
- */
-
-static void
-smb_dcache_init(void)
-{
-	(void) mutex_lock(&smb_dcache.c_mtx);
-	smb_dcache.c_state = SMB_DCACHE_STATE_INVALID;
-	bzero(&smb_dcache.c_cache, sizeof (smb_domain_t));
-	(void) mutex_unlock(&smb_dcache.c_mtx);
-}
-
-/*
- * Set the cache state to UPDATING
- */
-static void
-smb_dcache_updating(void)
-{
-	smb_dcache_set(SMB_DCACHE_STATE_UPDATING, NULL);
-}
-
-/*
- * Set the cache state to INVALID
- */
-static void
-smb_dcache_invalid(void)
-{
-	smb_dcache_set(SMB_DCACHE_STATE_INVALID, NULL);
-}
-
-/*
- * Set the cache state to VALID and populate the cache
- */
-static void
-smb_dcache_valid(smb_domain_t *dp)
-{
-	smb_dcache_set(SMB_DCACHE_STATE_VALID, dp);
-}
-
-/*
- * This function will update both the state and the contents of the
- * SMB domain cache.  If one attempts to set the state to
- * SMB_DCACHE_STATE_UPDATING, the domain cache will be updated based
- * on 'dp' argument. Otherwise, 'dp' is ignored.
- */
-static void
-smb_dcache_set(uint32_t state, smb_domain_t *dp)
-{
-	(void) mutex_lock(&smb_dcache.c_mtx);
-	switch (state) {
-	case  SMB_DCACHE_STATE_INVALID:
-		break;
-
-	case SMB_DCACHE_STATE_UPDATING:
-		bzero(&smb_dcache.c_cache, sizeof (smb_domain_t));
-		break;
-
-	case SMB_DCACHE_STATE_VALID:
-		assert(dp);
-		bcopy(dp, &smb_dcache.c_cache, sizeof (smb_domain_t));
-		break;
-
-	default:
-		(void) mutex_unlock(&smb_dcache.c_mtx);
-		return;
-
-	}
-
-	smb_dcache.c_state = state;
-	(void) cond_broadcast(&smb_dcache.c_cv);
-	(void) mutex_unlock(&smb_dcache.c_mtx);
+	return (nt_domain_get_primary(dp));
 }
 
 /*
@@ -304,22 +176,11 @@ smb_dcache_set(uint32_t state, smb_domain_t *dp)
  */
 
 /*
- * smb_dclocator_main
- *
  * This is the DC discovery thread: it gets woken up whenever someone
  * wants to locate a domain controller.
  *
- * The state of the SMB domain cache will be initialized to
- * SMB_DCACHE_STATE_UPDATING when the discovery process starts and will be
- * transitioned to SMB_DCACHE_STATE_VALID/INVALID depending on the outcome of
- * the discovery.
- *
- * If the discovery process is underway, callers of smb_domain_getinfo()
- * will wait on a condition variable until the state of SMB domain cache
- * sets to either VALID/INVALID.
- *
- * Upon success, the SMB domain cache will be populated with the discovered DC
- * and domain info.
+ * Upon success, the SMB domain cache will be populated with the discovered
+ * DC and domain info.
  */
 /*ARGSUSED*/
 static void *
@@ -327,7 +188,6 @@ smb_dclocator_main(void *arg)
 {
 	char domain[SMB_PI_MAX_DOMAIN];
 	char sought_dc[MAXHOSTNAMELEN];
-	smb_domain_t dinfo;
 
 	for (;;) {
 		(void) mutex_lock(&smb_dclocator.sdl_mtx);
@@ -341,11 +201,7 @@ smb_dclocator_main(void *arg)
 		(void) strlcpy(sought_dc, smb_dclocator.sdl_dc, MAXHOSTNAMELEN);
 		(void) mutex_unlock(&smb_dclocator.sdl_mtx);
 
-		smb_dcache_updating();
-		if (smb_dc_discovery(domain, sought_dc, &dinfo))
-			smb_dcache_valid(&dinfo);
-		else
-			smb_dcache_invalid();
+		smb_domain_update(domain, sought_dc);
 
 		(void) mutex_lock(&smb_dclocator.sdl_mtx);
 		smb_dclocator.sdl_locate = B_FALSE;
@@ -358,19 +214,61 @@ smb_dclocator_main(void *arg)
 }
 
 /*
- * smb_dc_discovery
- *
- * If FQDN is specified, DC discovery will be done via DNS query only.
- * If NetBIOS name of a domain is specified, DC discovery thread will
- * use netlogon protocol to locate a DC. Upon failure, it will
+ * Discovers a domain controller for the specified domain either via
+ * DNS or NetBIOS. After the domain controller is discovered successfully
+ * primary and trusted domain infromation will be queried using RPC queries.
+ * If the RPC queries fail, the domain information stored in SMF might be used
+ * if the the discovered domain is the same as the previously joined domain.
+ * If everything is successful domain cache will be updated with all the
+ * obtained information.
+ */
+static void
+smb_domain_update(char *domain, char *server)
+{
+	smb_domain_t di;
+	boolean_t query_ok;
+
+	bzero(&di, sizeof (smb_domain_t));
+
+	nt_domain_start_update();
+
+	if (SMB_IS_FQDN(domain))
+		query_ok = smb_domain_query_dns(domain, server, &di);
+	else
+		query_ok = smb_domain_query_nbt(domain, server, &di);
+
+	if (query_ok)
+		nt_domain_update(&di);
+
+	nt_domain_end_update();
+
+	smb_domain_free(&di);
+
+	if (query_ok)
+		nt_domain_save();
+}
+
+/*
+ * Discovers a DC for the specified domain via DNS. If a DC is found
+ * primary and trusted domains information will be queried.
+ */
+static boolean_t
+smb_domain_query_dns(char *domain, char *server, smb_domain_t *di)
+{
+	uint32_t status;
+	if (!smb_ads_lookup_msdcs(domain, server, di->d_dc, MAXHOSTNAMELEN))
+		return (B_FALSE);
+
+	status = smb_domain_query(domain, di->d_dc, di);
+	return (status == NT_STATUS_SUCCESS);
+}
+
+/*
+ * Discovers a DC for the specified domain using NETLOGON protocol.
+ * If a DC cannot be found using NETLOGON then it will
  * try to resolve it via DNS, i.e. find out if it is the first label
  * of a DNS domain name. If the corresponding DNS name is found, DC
  * discovery will be done via DNS query.
- *
- * Once the domain controller is found, it then queries the DC for domain
- * information. If the LSA queries fail, the domain information stored in
- * SMF might be used to set the SMB domain cache if the the discovered domain
- * is the same as the previously joined domain.
  *
  * If the fully-qualified domain name is derived from the DNS config
  * file, the NetBIOS domain name specified by the user will be compared
@@ -379,33 +277,30 @@ smb_dclocator_main(void *arg)
  * actually for another domain, whose first label of its FQDN somehow
  * matches with the NetBIOS name of the domain we're interested in.
  */
-static boolean_t
-smb_dc_discovery(char *domain, char *server, smb_domain_t *dinfo)
-{
-	char derived_dnsdomain[MAXHOSTNAMELEN];
-	boolean_t netlogon_ok = B_FALSE;
 
-	*derived_dnsdomain = '\0';
-	if (!SMB_IS_FQDN(domain)) {
-		if (smb_browser_netlogon(domain, dinfo->d_dc, MAXHOSTNAMELEN))
-			netlogon_ok = B_TRUE;
-		else if (!smb_match_domains(domain, derived_dnsdomain,
+static boolean_t
+smb_domain_query_nbt(char *domain, char *server, smb_domain_t *di)
+{
+	char dnsdomain[MAXHOSTNAMELEN];
+	uint32_t status;
+
+	*dnsdomain = '\0';
+
+	if (!smb_browser_netlogon(domain, di->d_dc, MAXHOSTNAMELEN)) {
+		if (!smb_domain_match(domain, dnsdomain, MAXHOSTNAMELEN))
+			return (B_FALSE);
+
+		if (!smb_ads_lookup_msdcs(dnsdomain, server, di->d_dc,
 		    MAXHOSTNAMELEN))
 			return (B_FALSE);
 	}
 
-	if (!netlogon_ok && !smb_ads_lookup_msdcs(
-	    (SMB_IS_FQDN(domain) ? domain : derived_dnsdomain), server,
-	    dinfo->d_dc, MAXHOSTNAMELEN))
+	status = smb_domain_query(domain, di->d_dc, di);
+	if (status != NT_STATUS_SUCCESS)
 		return (B_FALSE);
 
-	if ((smb_domain_query(domain, dinfo->d_dc, dinfo)
-	    != NT_STATUS_SUCCESS) &&
-	    (!smb_domain_use_config(domain, dinfo)))
-			return (B_FALSE);
-
-	if (*derived_dnsdomain != '\0' &&
-	    utf8_strcasecmp(domain, dinfo->d_nbdomain))
+	if ((*dnsdomain != '\0') &&
+	    utf8_strcasecmp(domain, di->d_info.di_nbname))
 		return (B_FALSE);
 
 	/*
@@ -414,11 +309,9 @@ smb_dc_discovery(char *domain, char *server, smb_domain_t *dinfo)
 	 * if we previously locate a DC via NetBIOS. On success,
 	 * ADS cache will be populated.
 	 */
-	if (netlogon_ok) {
-		if (smb_ads_lookup_msdcs(dinfo->d_fqdomain, server,
-		    dinfo->d_dc, MAXHOSTNAMELEN) == 0)
-			return (B_FALSE);
-	}
+	if (smb_ads_lookup_msdcs(di->d_info.di_fqname, server,
+	    di->d_dc, MAXHOSTNAMELEN) == 0)
+		return (B_FALSE);
 
 	return (B_TRUE);
 }
@@ -429,7 +322,7 @@ smb_dc_discovery(char *domain, char *server, smb_domain_t *dinfo)
  * If a match is found, it'll be returned in the passed buffer.
  */
 static boolean_t
-smb_match_domains(char *nb_domain, char *buf, uint32_t len)
+smb_domain_match(char *nb_domain, char *buf, uint32_t len)
 {
 	struct __res_state res_state;
 	int i;
@@ -470,132 +363,84 @@ smb_match_domains(char *nb_domain, char *buf, uint32_t len)
 }
 
 /*
- * smb_domain_query
+ * Obtain primary and trusted domain information using LSA queries.
  *
- * If the the NetBIOS name of an AD domain doesn't match with the
- * first label of its fully-qualified DNS name, it is not possible
- * to derive one name format from another.
- * The missing domain info can be obtained via LSA query, DNS domain info.
+ * Disconnect any existing connection with the domain controller.
+ * This will ensure that no stale connection will be used, it will
+ * also pickup any configuration changes in either side by trying
+ * to establish a new connection.
  *
  * domain - either NetBIOS or fully-qualified domain name
- *
  */
 static uint32_t
-smb_domain_query(char *domain, char *server, smb_domain_t *dp)
+smb_domain_query(char *domain, char *server, smb_domain_t *di)
 {
-	uint32_t rc;
-	lsa_info_t info;
+	uint32_t status;
 
-	rc = lsa_query_dns_domain_info(server, domain, &info);
-	if (rc == NT_STATUS_SUCCESS) {
-		lsa_dns_domaininfo_t *dnsinfo = &info.i_domain.di_dns;
-		(void) strlcpy(dp->d_nbdomain, dnsinfo->d_nbdomain,
-		    sizeof (dp->d_nbdomain));
-		(void) strlcpy(dp->d_fqdomain, dnsinfo->d_fqdomain,
-		    sizeof (dp->d_fqdomain));
-		(void) strlcpy(dp->d_forest, dnsinfo->d_forest,
-		    sizeof (dp->d_forest));
-		ndr_uuid_unparse((ndr_uuid_t *)&dnsinfo->d_guid, dp->d_guid);
-		smb_sid_free(dnsinfo->d_sid);
+	mlsvc_disconnect(server);
+
+	status = lsa_query_dns_domain_info(server, domain, &di->d_info);
+	if (status != NT_STATUS_SUCCESS) {
+		status = smb_domain_use_config(domain, &di->d_info);
+		if (status != NT_STATUS_SUCCESS)
+			status = lsa_query_primary_domain_info(server, domain,
+			    &di->d_info);
 	}
 
-	smb_domain_populate_table(domain, server);
-	return (rc);
+	if (status == NT_STATUS_SUCCESS)
+		smb_domain_enum_trusted(domain, server, &di->d_trusted);
+
+	return (status);
 }
 
 /*
- * smb_domain_populate_table
+ * Obtain trusted domains information using LSA queries.
  *
- * Populates the domain tablele with primary, account and trusted
- * domain info.
  * domain - either NetBIOS or fully-qualified domain name.
  */
 static void
-smb_domain_populate_table(char *domain, char *server)
+smb_domain_enum_trusted(char *domain, char *server, smb_trusted_domains_t *list)
 {
-	lsa_info_t info;
-	lsa_nt_domaininfo_t *nt_info;
-	int i;
+	uint32_t status;
 
-	if (lsa_query_primary_domain_info(server, domain, &info)
-	    == NT_STATUS_SUCCESS) {
-		nt_domain_flush(NT_DOMAIN_PRIMARY);
-
-		nt_info = &info.i_domain.di_primary;
-		smb_domain_update_tabent(NT_DOMAIN_PRIMARY, nt_info);
-		lsa_free_info(&info);
-	}
-
-	if (lsa_query_account_domain_info(server, domain, &info)
-	    == NT_STATUS_SUCCESS) {
-		nt_domain_flush(NT_DOMAIN_ACCOUNT);
-
-		nt_info = &info.i_domain.di_account;
-		smb_domain_update_tabent(NT_DOMAIN_ACCOUNT, nt_info);
-		lsa_free_info(&info);
-	}
-
-	if (lsa_enum_trusted_domains(server, domain, &info)
-	    == NT_STATUS_SUCCESS) {
-		lsa_trusted_domainlist_t *list = &info.i_domain.di_trust;
-
-		nt_domain_flush(NT_DOMAIN_TRUSTED);
-
-		for (i = 0; i < list->t_num; i++) {
-			nt_info = &list->t_domains[i];
-			smb_domain_update_tabent(NT_DOMAIN_TRUSTED, nt_info);
-		}
-
-		lsa_free_info(&info);
-	}
-
-	nt_domain_save();
-}
-
-static void
-smb_domain_update_tabent(int domain_type, lsa_nt_domaininfo_t *info)
-{
-	nt_domain_t *entry;
-
-	entry = nt_domain_new(domain_type, info->n_domain, info->n_sid);
-	(void) nt_domain_add(entry);
+	status = lsa_enum_trusted_domains_ex(server, domain, list);
+	if (status != NT_STATUS_SUCCESS)
+		(void) lsa_enum_trusted_domains(server, domain, list);
 }
 
 /*
- * smb_domain_use_config
- *
  * If the domain to be discovered matches the current domain (i.e the
  * value of either domain or fqdn configuration), the output parameter
  * 'dinfo' will be set to the information stored in SMF.
  */
-static boolean_t
-smb_domain_use_config(char *domain, smb_domain_t *dinfo)
+static uint32_t
+smb_domain_use_config(char *domain, nt_domain_t *dinfo)
 {
-	smb_domain_t orig;
 	boolean_t use;
 
+	bzero(dinfo, sizeof (nt_domain_t));
+
 	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
-		return (B_FALSE);
+		return (NT_STATUS_UNSUCCESSFUL);
 
-	smb_config_getdomaininfo(orig.d_nbdomain, orig.d_fqdomain,
-	    orig.d_forest, orig.d_guid);
+	smb_config_getdomaininfo(dinfo->di_nbname, dinfo->di_fqname,
+	    NULL, NULL, NULL);
 
-	if (SMB_IS_FQDN(domain)) {
-		use = (utf8_strcasecmp(orig.d_fqdomain, domain) == 0);
-	} else {
-		use = (utf8_strcasecmp(orig.d_nbdomain, domain) == 0);
-	}
+	if (SMB_IS_FQDN(domain))
+		use = (utf8_strcasecmp(dinfo->di_fqname, domain) == 0);
+	else
+		use = (utf8_strcasecmp(dinfo->di_nbname, domain) == 0);
 
-	if (use) {
-		(void) strlcpy(dinfo->d_nbdomain, orig.d_nbdomain,
-		    sizeof (dinfo->d_nbdomain));
-		(void) strlcpy(dinfo->d_fqdomain, orig.d_fqdomain,
-		    sizeof (dinfo->d_fqdomain));
-		(void) strlcpy(dinfo->d_forest, orig.d_forest,
-		    sizeof (dinfo->d_forest));
-		(void) bcopy(orig.d_guid, dinfo->d_guid,
-		    sizeof (dinfo->d_guid));
-	}
+	if (use)
+		smb_config_getdomaininfo(NULL, NULL, dinfo->di_sid,
+		    dinfo->di_u.di_dns.ddi_forest,
+		    dinfo->di_u.di_dns.ddi_guid);
 
-	return (use);
+	return ((use) ? NT_STATUS_SUCCESS : NT_STATUS_UNSUCCESSFUL);
+}
+
+static void
+smb_domain_free(smb_domain_t *di)
+{
+	free(di->d_trusted.td_domains);
 }

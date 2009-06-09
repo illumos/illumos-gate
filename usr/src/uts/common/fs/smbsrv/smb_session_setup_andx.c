@@ -377,21 +377,6 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	if (sinfo.ssi_vcnumber == 0)
 		smb_server_reconnection_check(sr->sr_server, sr->session);
 
-	sr->session->smb_msg_size = sinfo.ssi_maxbufsize;
-
-	if ((sinfo.ssi_cspwlen == 0) &&
-	    (sinfo.ssi_cipwlen == 0 ||
-	    (sinfo.ssi_cipwlen == 1 && *sinfo.ssi_cipwd == 0))) {
-		sinfo.ssi_user = "anonymous";
-	} else if (*sinfo.ssi_user == '\0') {
-		if (sinfo.ssi_cipwd)
-			kmem_free(sinfo.ssi_cipwd, sinfo.ssi_cipwlen + 1);
-		if (sinfo.ssi_cspwd)
-			kmem_free(sinfo.ssi_cspwd, sinfo.ssi_cspwlen + 1);
-		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		return (SDRC_ERROR);
-	}
-
 	auth_res = smb_authenticate(sr, &sinfo, &session_key);
 
 	if (sinfo.ssi_cipwd)
@@ -407,6 +392,8 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	if (native_lm == NATIVE_LM_WIN2000)
 		sinfo.ssi_capabilities |= CAP_LARGE_FILES |
 		    CAP_LARGE_READX | CAP_LARGE_WRITEX;
+
+	sr->session->smb_msg_size = sinfo.ssi_maxbufsize;
 	sr->session->capabilities = sinfo.ssi_capabilities;
 
 	/*
@@ -496,6 +483,15 @@ smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
 
 	bzero(&clnt_info, sizeof (netr_client_t));
 
+	if ((sinfo->ssi_cspwlen == 0) &&
+	    (sinfo->ssi_cipwlen == 0 ||
+	    (sinfo->ssi_cipwlen == 1 && *sinfo->ssi_cipwd == 0))) {
+		clnt_info.e_username = "anonymous";
+	} else {
+		clnt_info.e_username = sinfo->ssi_user;
+	}
+	clnt_info.e_domain = sinfo->ssi_domain;
+
 	/*
 	 * Handle user@domain format.
 	 *
@@ -503,16 +499,13 @@ smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
 	 * should keep the request data as is. This is important
 	 * for some forms of authentication.
 	 */
-	clnt_info.real_username = sinfo->ssi_user;
-	clnt_info.real_domain = sinfo->ssi_domain;
-
 	if (*sinfo->ssi_domain == '\0') {
 		buflen = strlen(sinfo->ssi_user) + 1;
 		buf = smb_kstrdup(sinfo->ssi_user, buflen);
 		if ((p = strchr(buf, '@')) != NULL) {
 			*p = '\0';
-			clnt_info.real_username = buf;
-			clnt_info.real_domain = p + 1;
+			clnt_info.e_username = buf;
+			clnt_info.e_domain = p + 1;
 		}
 	}
 
@@ -525,10 +518,10 @@ smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
 	 */
 	if (security == SMB_SECMODE_WORKGRP) {
 		user = smb_session_dup_user(sr->session, hostname,
-		    clnt_info.real_username);
-	} else if (*clnt_info.real_domain != '\0') {
-		user = smb_session_dup_user(sr->session, clnt_info.real_domain,
-		    clnt_info.real_username);
+		    clnt_info.e_username);
+	} else if (*clnt_info.e_domain != '\0') {
+		user = smb_session_dup_user(sr->session, clnt_info.e_domain,
+		    clnt_info.e_username);
 	} else {
 		need_lookup = B_TRUE;
 	}

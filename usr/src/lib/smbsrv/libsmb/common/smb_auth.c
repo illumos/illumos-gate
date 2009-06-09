@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,7 @@ static uint64_t unix_micro_to_nt_time(struct timeval *unix_time);
  * Returns the length of dst in bytes.
  */
 int
-smb_auth_qnd_unicode(mts_wchar_t *dst, char *src, int length)
+smb_auth_qnd_unicode(mts_wchar_t *dst, const char *src, int length)
 {
 	int i;
 
@@ -99,7 +99,7 @@ smb_auth_lmupr(unsigned char *lm_pwd)
  *    make a 16-byte hash.
  */
 int
-smb_auth_lm_hash(char *password, unsigned char *lm_hash)
+smb_auth_lm_hash(const char *password, unsigned char *lm_hash)
 {
 	unsigned char lm_pwd[SMBAUTH_LM_PWD_SZ];
 
@@ -146,7 +146,7 @@ smb_auth_lm_response(unsigned char *hash,
  * The result will contain a 16-byte NTLM hash.
  */
 int
-smb_auth_ntlm_hash(char *password, unsigned char *hash)
+smb_auth_ntlm_hash(const char *password, unsigned char *hash)
 {
 	mts_wchar_t *unicode_password;
 	int length;

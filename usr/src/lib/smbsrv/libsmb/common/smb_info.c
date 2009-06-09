@@ -216,37 +216,6 @@ smb_getdomainname(char *buf, size_t buflen)
 }
 
 /*
- * smb_getdomainsid
- *
- * Returns the domain SID if the system is in domain mode.
- * Otherwise returns NULL.
- *
- * Note: Callers are responsible for freeing a returned SID.
- */
-smb_sid_t *
-smb_getdomainsid(void)
-{
-	char buf[MAXHOSTNAMELEN];
-	smb_sid_t *sid;
-	int security_mode;
-	int rc;
-
-	security_mode = smb_config_get_secmode();
-	if (security_mode != SMB_SECMODE_DOMAIN)
-		return (NULL);
-
-	*buf = '\0';
-	rc = smb_config_getstr(SMB_CI_DOMAIN_SID, buf, MAXHOSTNAMELEN);
-	if ((rc != SMBD_SMF_OK) || (*buf == '\0'))
-		return (NULL);
-
-	if ((sid = smb_sid_fromstr(buf)) == NULL)
-		return (NULL);
-
-	return (sid);
-}
-
-/*
  * smb_getfqdomainname
  *
  * In the system is in domain mode, the dns_domain property value
@@ -494,6 +463,7 @@ smb_get_nameservers(smb_inaddr_t *ips, int sz)
 	res_ndestroy(&res_state);
 	return (i);
 }
+
 /*
  * smb_gethostbyname
  *
@@ -537,30 +507,4 @@ smb_gethostbyaddr(const char *addr, int len, int type, int *err_num)
 	h = getipnodebyaddr(addr, len, type, err_num);
 
 	return (h);
-}
-
-/*
- * Check to see if the given name is the hostname.
- * It checks the hostname returned by OS and also both
- * fully qualified and NetBIOS forms of the host name.
- */
-boolean_t
-smb_ishostname(const char *name)
-{
-	char hostname[MAXHOSTNAMELEN];
-	int rc;
-
-	if (strchr(name, '.') != NULL)
-		rc = smb_getfqhostname(hostname, MAXHOSTNAMELEN);
-	else {
-		if (strlen(name) < NETBIOS_NAME_SZ)
-			rc = smb_getnetbiosname(hostname, MAXHOSTNAMELEN);
-		else
-			rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
-	}
-
-	if (rc != 0)
-		return (B_FALSE);
-
-	return (utf8_strcasecmp(name, hostname) == 0);
 }

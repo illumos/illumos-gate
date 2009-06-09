@@ -1332,22 +1332,15 @@ boolean_t
 smb_browser_netlogon(char *domain, char *dc, uint32_t dc_len)
 {
 	smb_hostinfo_t *hinfo;
-	int protocol;
 	boolean_t found = B_FALSE;
 	timestruc_t to;
 	int err;
-
-	if (smb_config_getbool(SMB_CI_DOMAIN_MEMB))
-		protocol = NETLOGON_PROTO_SAMLOGON;
-	else
-		protocol = NETLOGON_PROTO_NETLOGON;
 
 	(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
 	hinfo = list_head(&smb_binfo.bi_hlist);
 	while (hinfo) {
 		if ((hinfo->hi_nic.nic_smbflags & SMB_NICF_ALIAS) == 0)
-			smb_netlogon_request(&hinfo->hi_netname, protocol,
-			    domain);
+			smb_netlogon_request(&hinfo->hi_netname, domain);
 		hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
 	}
 	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);

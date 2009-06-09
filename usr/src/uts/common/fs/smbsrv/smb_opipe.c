@@ -56,7 +56,6 @@ static kcondvar_t smb_opipe_door_cv;
 
 static int smb_opipe_door_call(smb_opipe_t *);
 static int smb_opipe_door_upcall(smb_opipe_t *);
-static void smb_user_context_fini(smb_opipe_context_t *);
 
 /*
  * smb_opipe_open
@@ -209,7 +208,7 @@ smb_opipe_do_open(smb_request_t *sr, smb_opipe_t *opipe)
 	buf += len;
 	buflen -= len;
 
-	if (smb_opipe_context_encode(ctx, buf, buflen) == -1)
+	if (smb_opipe_context_encode(ctx, buf, buflen, NULL) == -1)
 		return (-1);
 
 	return (smb_opipe_door_call(opipe));
@@ -653,7 +652,7 @@ smb_user_context_init(smb_user_t *user, smb_opipe_context_t *ctx)
 	    ctx->oc_workstation_len);
 }
 
-static void
+void
 smb_user_context_fini(smb_opipe_context_t *ctx)
 {
 	if (ctx) {
@@ -664,16 +663,5 @@ smb_user_context_fini(smb_opipe_context_t *ctx)
 		if (ctx->oc_workstation)
 			kmem_free(ctx->oc_workstation, ctx->oc_workstation_len);
 		bzero(ctx, sizeof (smb_opipe_context_t));
-	}
-}
-
-void
-smb_user_list_free(smb_dr_ulist_t *userlist)
-{
-	int i;
-
-	if (userlist) {
-		for (i = 0; i < userlist->dul_cnt; i++)
-			smb_user_context_fini(&userlist->dul_users[i]);
 	}
 }

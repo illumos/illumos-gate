@@ -31,7 +31,6 @@ SRCS=				\
 	smbd_join.c		\
 	smbd_logon.c		\
 	smbd_main.c		\
-	smbd_net.c		\
 	smbd_opipe_doorsvc.c	\
 	smbd_share_doorsvc.c	\
 	smbd_vss.c

@@ -322,7 +322,7 @@ void smb_opipe_door_fini(void);
 int smb_opipe_door_open(int);
 void smb_opipe_door_close(void);
 void smb_user_context_init(smb_user_t *, smb_opipe_context_t *);
-void smb_user_list_free(smb_dr_ulist_t *);
+void smb_user_context_fini(smb_opipe_context_t *);
 
 /*
  * SMB server functions (file smb_server.c)
@@ -331,21 +331,23 @@ int smb_server_svc_init(void);
 int smb_server_svc_fini(void);
 int smb_server_create(void);
 int smb_server_delete(void);
-int smb_server_configure(smb_kmod_cfg_t *cfg);
-int smb_server_start(struct smb_io_start *);
-int smb_server_nbt_listen(int);
-int smb_server_tcp_listen(int);
+int smb_server_configure(smb_ioc_cfg_t *);
+int smb_server_start(smb_ioc_start_t *);
+int smb_server_nbt_listen(smb_ioc_listen_t *);
+int smb_server_tcp_listen(smb_ioc_listen_t *);
 int smb_server_nbt_receive(void);
 int smb_server_tcp_receive(void);
 uint32_t smb_server_get_user_count(void);
 uint32_t smb_server_get_session_count(void);
-int smb_server_dr_ulist_get(int, smb_dr_ulist_t *, int);
-int smb_server_share_export(char *);
-int smb_server_share_unexport(char *, char *);
-int smb_server_set_gmtoff(int32_t goff);
+int smb_server_share_export(smb_ioc_share_t *);
+int smb_server_share_unexport(smb_ioc_share_t *);
+int smb_server_set_gmtoff(smb_ioc_gmt_t *);
+int smb_server_user_number(smb_ioc_usernum_t *);
+int smb_server_user_list(smb_ioc_ulist_t *);
 
 void smb_server_reconnection_check(smb_server_t *, smb_session_t *);
 void smb_server_get_cfg(smb_server_t *, smb_kmod_cfg_t *);
+
 
 /*
  * SMB node functions (file smb_node.c)
@@ -579,12 +581,11 @@ cred_t *smb_user_getprivcred(smb_user_t *);
  * SMB tree functions (file smb_tree.c)
  */
 smb_tree_t *smb_tree_connect(smb_request_t *);
-void smb_tree_disconnect(smb_tree_t *);
+void smb_tree_disconnect(smb_tree_t *, boolean_t);
 void smb_tree_close_pid(smb_tree_t *, uint16_t);
 boolean_t smb_tree_has_feature(smb_tree_t *, uint_t);
 boolean_t smb_tree_hold(smb_tree_t *);
 void smb_tree_release(smb_tree_t *);
-void smb_dr_ulist_free(smb_dr_ulist_t *ulist);
 smb_odir_t *smb_tree_lookup_odir(smb_tree_t *, uint16_t);
 boolean_t smb_tree_is_connected(smb_tree_t *);
 #define	SMB_TREE_GET_TID(tree)		((tree)->t_tid)
@@ -707,27 +708,9 @@ uint32_t smb_ofun_to_crdisposition(uint16_t ofun);
 /* 100's of ns between 1/1/1970 and 1/1/1601 */
 #define	NT_TIME_BIAS	(134774LL * 24LL * 60LL * 60LL * 10000000LL)
 
-void smb_sd_init(smb_sd_t *, uint8_t);
-void smb_sd_term(smb_sd_t *);
-uint32_t smb_sd_get_secinfo(smb_sd_t *);
-uint32_t smb_sd_len(smb_sd_t *, uint32_t);
-uint32_t smb_sd_tofs(smb_sd_t *, smb_fssd_t *);
 uint32_t smb_sd_read(smb_request_t *, smb_sd_t *, uint32_t);
 uint32_t smb_sd_write(smb_request_t *, smb_sd_t *, uint32_t);
 
-void smb_fssd_init(smb_fssd_t *, uint32_t, uint32_t);
-void smb_fssd_term(smb_fssd_t *);
-
-void smb_acl_sort(smb_acl_t *);
-void smb_acl_free(smb_acl_t *);
-smb_acl_t *smb_acl_alloc(uint8_t, uint16_t, uint16_t);
-smb_acl_t *smb_acl_from_zfs(acl_t *, uid_t, gid_t);
-uint32_t smb_acl_to_zfs(smb_acl_t *, uint32_t, int, acl_t **);
-uint16_t smb_acl_len(smb_acl_t *);
-boolean_t smb_acl_isvalid(smb_acl_t *, int);
-
-void smb_fsacl_free(acl_t *);
-acl_t *smb_fsacl_alloc(int, int);
 acl_t *smb_fsacl_inherit(acl_t *, int, int, uid_t);
 acl_t *smb_fsacl_merge(acl_t *, acl_t *);
 void smb_fsacl_split(acl_t *, acl_t **, acl_t **, int);

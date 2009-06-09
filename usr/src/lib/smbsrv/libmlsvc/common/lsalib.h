@@ -45,53 +45,16 @@
 extern "C" {
 #endif
 
-typedef struct lsa_nt_domaininfo {
-	smb_sid_t	*n_sid;
-	char		n_domain[NETBIOS_NAME_SZ];
-} lsa_nt_domaininfo_t;
-
-typedef struct lsa_trusted_domainlist {
-	uint32_t		t_num;
-	lsa_nt_domaininfo_t	*t_domains;
-} lsa_trusted_domainlist_t;
-
-typedef struct lsa_dns_domaininfo {
-	smb_sid_t	*d_sid;
-	char		d_nbdomain[NETBIOS_NAME_SZ];
-	char		d_fqdomain[MAXHOSTNAMELEN];
-	char		d_forest[MAXHOSTNAMELEN];
-	mslsa_guid_t	d_guid;
-} lsa_dns_domaininfo_t;
-
-typedef enum lsa_info_type {
-	LSA_INFO_NONE,
-	LSA_INFO_PRIMARY_DOMAIN,
-	LSA_INFO_ACCOUNT_DOMAIN,
-	LSA_INFO_DNS_DOMAIN,
-	LSA_INFO_TRUSTED_DOMAINS
-} lsa_info_type_t;
-
-typedef struct lsa_info {
-	lsa_info_type_t		i_type;
-	union {
-		lsa_nt_domaininfo_t		di_primary;
-		lsa_nt_domaininfo_t		di_account;
-		lsa_dns_domaininfo_t		di_dns;
-		lsa_trusted_domainlist_t	di_trust;
-	} i_domain;
-} lsa_info_t;
-
 /*
  * lsalib.c
  */
 uint32_t lsa_lookup_name(char *, uint16_t, smb_account_t *);
 uint32_t lsa_lookup_sid(smb_sid_t *, smb_account_t *);
-void lsa_free_info(lsa_info_t *);
-DWORD lsa_query_primary_domain_info(char *, char *, lsa_info_t *);
-DWORD lsa_query_account_domain_info(char *, char *, lsa_info_t *);
-DWORD lsa_query_dns_domain_info(char *, char *, lsa_info_t *);
-DWORD lsa_enum_trusted_domains(char *, char *, lsa_info_t *);
-
+DWORD lsa_query_primary_domain_info(char *, char *, nt_domain_t *);
+DWORD lsa_query_account_domain_info(char *, char *, nt_domain_t *);
+DWORD lsa_query_dns_domain_info(char *, char *, nt_domain_t *);
+DWORD lsa_enum_trusted_domains(char *, char *, smb_trusted_domains_t *);
+DWORD lsa_enum_trusted_domains_ex(char *, char *, smb_trusted_domains_t *);
 
 /*
  * lsar_open.c
@@ -105,7 +68,7 @@ int lsar_close(mlsvc_handle_t *);
  * lsar_lookup.c
  */
 int lsar_query_security_desc(mlsvc_handle_t *);
-DWORD lsar_query_info_policy(mlsvc_handle_t *, WORD, lsa_info_t *);
+DWORD lsar_query_info_policy(mlsvc_handle_t *, WORD, nt_domain_t *);
 uint32_t lsar_lookup_names(mlsvc_handle_t *, char *, smb_account_t *);
 uint32_t lsar_lookup_names2(mlsvc_handle_t *, char *, smb_account_t *);
 uint32_t lsar_lookup_sids(mlsvc_handle_t *, struct mslsa_sid *,
@@ -115,7 +78,10 @@ uint32_t lsar_lookup_sids2(mlsvc_handle_t *, struct mslsa_sid *,
 
 int lsar_enum_accounts(mlsvc_handle_t *, DWORD *,
     struct mslsa_EnumAccountBuf *);
-DWORD lsar_enum_trusted_domains(mlsvc_handle_t *, DWORD *, lsa_info_t *);
+DWORD lsar_enum_trusted_domains(mlsvc_handle_t *, DWORD *,
+    smb_trusted_domains_t *);
+DWORD lsar_enum_trusted_domains_ex(mlsvc_handle_t *, DWORD *,
+    smb_trusted_domains_t *);
 int lsar_enum_privs_account(mlsvc_handle_t *, smb_account_t *);
 int lsar_lookup_priv_value(mlsvc_handle_t *, char *, struct  ms_luid *);
 int lsar_lookup_priv_name(mlsvc_handle_t *, struct  ms_luid *, char *, int);

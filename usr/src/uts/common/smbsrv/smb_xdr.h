@@ -66,8 +66,6 @@ typedef struct smb_dr_bytes {
 	uint8_t *bytes_val;
 } smb_dr_bytes_t;
 
-#define	SMB_DR_MAX_USERS	50
-
 #define	SMB_OPIPE_HDR_MAGIC	0x4F484452	/* OHDR */
 #define	SMB_OPIPE_DOOR_BUFSIZE	(30 * 1024)
 
@@ -108,23 +106,24 @@ typedef struct smb_opipe_context {
 	uint32_t oc_flags;
 } smb_opipe_context_t;
 
-typedef struct smb_dr_ulist {
-	uint32_t dul_cnt;
-	smb_opipe_context_t dul_users[SMB_DR_MAX_USERS];
-} smb_dr_ulist_t;
+typedef struct smb_ulist {
+	uint32_t ul_cnt;
+	smb_opipe_context_t *ul_users;
+} smb_ulist_t;
 
 /* xdr routines for common door arguments/results */
 extern bool_t xdr_smb_dr_string_t(XDR *, smb_dr_string_t *);
 extern bool_t xdr_smb_dr_bytes_t(XDR *, smb_dr_bytes_t *);
-extern bool_t xdr_smb_dr_ulist_t(XDR *, smb_dr_ulist_t *);
 extern bool_t xdr_smb_dr_kshare_t(XDR *, smb_dr_kshare_t *);
 extern bool_t xdr_smb_inaddr_t(XDR *, smb_inaddr_t *);
 
 int smb_opipe_hdr_encode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
 int smb_opipe_hdr_decode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
 bool_t smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp);
-int smb_opipe_context_encode(smb_opipe_context_t *, uint8_t *, uint32_t);
-int smb_opipe_context_decode(smb_opipe_context_t *, uint8_t *, uint32_t);
+int smb_opipe_context_encode(smb_opipe_context_t *, uint8_t *, uint32_t,
+    uint_t *);
+int smb_opipe_context_decode(smb_opipe_context_t *, uint8_t *, uint32_t,
+    uint_t *);
 bool_t smb_opipe_context_xdr(XDR *, smb_opipe_context_t *);
 /*
  * VSS Door Structures

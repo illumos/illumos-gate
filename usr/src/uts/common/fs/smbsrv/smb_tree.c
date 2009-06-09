@@ -169,6 +169,7 @@
 #include <sys/vfs.h>
 #include <sys/stat.h>
 #include <sys/varargs.h>
+#include <sys/cred_impl.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/smb_fsops.h>
@@ -193,6 +194,7 @@ static void smb_tree_get_flags(const smb_share_t *, vfs_t *, smb_tree_t *);
 static void smb_tree_log(smb_request_t *, const char *, const char *, ...);
 static void smb_tree_close_odirs(smb_tree_t *, uint16_t);
 static smb_odir_t *smb_tree_get_odir(smb_tree_t *, smb_odir_t *);
+static void smb_tree_set_execsub_info(smb_tree_t *, smb_execsub_info_t *);
 
 /*
  * Extract the share name and share type and connect as appropriate.
@@ -243,9 +245,10 @@ smb_tree_connect(smb_request_t *sr)
  * Disconnect a tree.
  */
 void
-smb_tree_disconnect(
-    smb_tree_t	*tree)
+smb_tree_disconnect(smb_tree_t *tree, boolean_t do_exec)
 {
+	smb_execsub_info_t subs;
+
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
 	mutex_enter(&tree->t_mutex);
@@ -259,19 +262,31 @@ smb_tree_disconnect(
 		mutex_exit(&tree->t_mutex);
 		atomic_dec_32(&tree->t_server->sv_open_trees);
 
-		/*
-		 * The files opened under this tree are closed.
-		 */
-		smb_ofile_close_all(tree);
-		/*
-		 * The directories opened under this tree are closed.
-		 */
-		smb_tree_close_odirs(tree, 0);
+		if (do_exec) {
+			/*
+			 * The files opened under this tree are closed.
+			 */
+			smb_ofile_close_all(tree);
+			/*
+			 * The directories opened under this tree are closed.
+			 */
+			smb_tree_close_odirs(tree, 0);
+		}
+
 		mutex_enter(&tree->t_mutex);
 		tree->t_state = SMB_TREE_STATE_DISCONNECTED;
 	}
 
 	mutex_exit(&tree->t_mutex);
+
+	if (do_exec && tree->t_state == SMB_TREE_STATE_DISCONNECTED &&
+	    tree->t_shr_flags & SMB_SHRF_UNMAP) {
+
+		(void) smb_tree_set_execsub_info(tree, &subs);
+
+		(void) smb_kshare_exec(tree->t_server->sv_lmshrd,
+		    (char *)tree->t_sharename, &subs, SMB_SHR_UNMAP);
+	}
 }
 
 /*
@@ -429,6 +444,7 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	uint32_t		access = 0; /* read/write is assumed */
 	uint32_t		hostaccess = ACE_ALL_PERMS;
 	uint32_t		aclaccess;
+	smb_execsub_info_t	subs;
 
 	ASSERT(user);
 	u_cred = user->u_cred;
@@ -448,6 +464,17 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 		kmem_free(si, sizeof (smb_share_t));
 		return (NULL);
+	}
+
+	if (user->u_flags & SMB_USER_FLAG_GUEST) {
+		if ((si->shr_flags & SMB_SHRF_GUEST_OK) == 0) {
+			smb_tree_log(sr, sharename,
+			    "access denied: guest disabled");
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV,
+			    ERRaccess);
+			kmem_free(si, sizeof (smb_share_t));
+			return (NULL);
+		}
 	}
 
 	/*
@@ -555,11 +582,33 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	tree = smb_tree_alloc(user, si, STYPE_DISKTREE, snode,
 	    hostaccess & aclaccess);
 
+	smb_node_release(snode);
+
 	if (tree == NULL)
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
+	else {
 
-	smb_node_release(snode);
+		tree->t_shr_flags = si->shr_flags;
+
+		if (tree->t_shr_flags & SMB_SHRF_MAP) {
+			(void) smb_tree_set_execsub_info(tree, &subs);
+
+			rc = smb_kshare_exec(sr->sr_server->sv_lmshrd,
+			    (char *)sharename, &subs, SMB_SHR_MAP);
+
+			if (rc != 0 && tree->t_shr_flags & SMB_SHRF_DISP_TERM) {
+				smb_tree_disconnect(tree, B_FALSE);
+				smb_tree_release(tree);
+				smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV,
+				    ERRaccess);
+				kmem_free(si, sizeof (smb_share_t));
+				return (NULL);
+			}
+		}
+	}
+
 	kmem_free(si, sizeof (smb_share_t));
+
 	return (tree);
 }
 
@@ -1103,4 +1152,15 @@ smb_tree_close_odirs(smb_tree_t *tree, uint16_t pid)
 
 		od = next_od;
 	}
+}
+
+static void
+smb_tree_set_execsub_info(smb_tree_t *tree, smb_execsub_info_t *subs)
+{
+		subs->e_winname = tree->t_user->u_name;
+		subs->e_userdom = tree->t_user->u_domain;
+		subs->e_srv_ipaddr = tree->t_session->local_ipaddr;
+		subs->e_cli_ipaddr = tree->t_session->ipaddr;
+		subs->e_cli_netbiosname = tree->t_session->workstation;
+		subs->e_uid = tree->t_user->u_cred->cr_uid;
 }

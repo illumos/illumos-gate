@@ -37,7 +37,7 @@ static char *wka_nbdomain[] = {
 	"NT Pseudo Domain",
 	"NT Authority",
 	"Builtin",
-	"Internet$",
+	"Internet$"
 };
 
 /*
@@ -208,28 +208,57 @@ smb_wka_get_domain(int idx)
 	return (NULL);
 }
 
+/*
+ * This function adds well known groups to groups in a user's
+ * access token (gids).
+ *
+ * "Network" SID is added for all users connecting over CIFS.
+ *
+ * "Authenticated Users" SID is added for all users except Guest
+ * and Anonymous.
+ *
+ * "Guests" SID is added for guest users and Administrators SID
+ * is added for admin users.
+ */
 uint32_t
-smb_wka_token_groups(boolean_t isadmin, smb_ids_t *gids)
+smb_wka_token_groups(uint32_t flags, smb_ids_t *gids)
 {
-	static char *grps[] =
-		{"Authenticated Users", "NETWORK", "Administrators"};
 	smb_id_t *id;
-	int gcnt, i;
 	int total_cnt;
 
-	gcnt = (isadmin) ? 3 : 2;
-	total_cnt = gids->i_cnt + gcnt;
+	total_cnt = gids->i_cnt + 3;
 
 	gids->i_ids = realloc(gids->i_ids, total_cnt * sizeof (smb_id_t));
 	if (gids->i_ids == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
 	id = gids->i_ids + gids->i_cnt;
-	for (i = 0; i < gcnt; i++, gids->i_cnt++, id++) {
-		id->i_sid = smb_sid_dup(smb_wka_get_sid(grps[i]));
+	id->i_sid = smb_sid_dup(smb_wka_get_sid("Network"));
+	id->i_attrs = 0x7;
+	if (id->i_sid == NULL)
+		return (NT_STATUS_NO_MEMORY);
+	id++;
+	gids->i_cnt++;
+
+	if ((flags & SMB_ATF_ANON) == 0) {
+		if (flags & SMB_ATF_GUEST)
+			id->i_sid = smb_sid_dup(smb_wka_get_sid("Guests"));
+		else
+			id->i_sid =
+			    smb_sid_dup(smb_wka_get_sid("Authenticated Users"));
 		id->i_attrs = 0x7;
 		if (id->i_sid == NULL)
 			return (NT_STATUS_NO_MEMORY);
+		id++;
+		gids->i_cnt++;
+	}
+
+	if (flags & SMB_ATF_ADMIN) {
+		id->i_sid = smb_sid_dup(smb_wka_get_sid("Administrators"));
+		id->i_attrs = 0x7;
+		if (id->i_sid == NULL)
+			return (NT_STATUS_NO_MEMORY);
+		gids->i_cnt++;
 	}
 
 	return (NT_STATUS_SUCCESS);

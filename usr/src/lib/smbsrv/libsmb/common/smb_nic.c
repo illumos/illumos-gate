@@ -340,8 +340,8 @@ smb_nic_addhost(const char *host, const char *cmnt,
 			return (-1);
 	}
 
-	ifname = (char *)if_names;
-	for (i = 0; i < if_num; i++, ifname++) {
+	for (i = 0; i < if_num; i++) {
+		ifname = (char *)if_names[i];
 		if ((ifname == NULL) || (*ifname == '\0'))
 			return (-1);
 		buflen += strlen(ifname) + 1;

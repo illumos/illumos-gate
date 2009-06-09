@@ -45,6 +45,7 @@ OBJS_SHARED = 			\
 	smb_xdr_utils.o
 
 OBJS_COMMON = 			\
+	smb_acl.o		\
 	smb_api_door_calls.o	\
 	smb_auth.o 		\
 	smb_cfg.o		\
@@ -56,6 +57,7 @@ OBJS_COMMON = 			\
 	smb_ht.o		\
 	smb_idmap.o		\
 	smb_info.o		\
+	smb_kmod.o		\
 	smb_list.o		\
 	smb_lgrp.o		\
 	smb_mac.o		\
@@ -65,6 +67,7 @@ OBJS_COMMON = 			\
 	smb_privilege.o		\
 	smb_sam.o		\
 	smb_scfutil.o		\
+	smb_sd.o		\
 	smb_util.o		\
 	smb_wksids.o
 
@@ -76,7 +79,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lsocket -lresolv
+LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lsec -lsocket -lresolv
 LDLIBS +=	-lidmap -lavl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 

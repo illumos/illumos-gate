@@ -41,15 +41,14 @@
 SUNWprivate {
     global:
 	dssetup_clear_domain_info;
-	mlsvc_get_door_fd;
 	mlsvc_get_num_users;
 	mlsvc_get_user_list;
+	mlsvc_fini;
 	mlsvc_init;
 	mlsvc_join;
 	mlsvc_lookup_name;
 	mlsvc_lookup_sid;
 	mlsvc_netlogon;
-	mlsvc_set_door_fd;
 	mlsvc_set_share;
 	smb_autohome_add;
 	smb_autohome_remove;
@@ -59,6 +58,7 @@ SUNWprivate {
 	smb_shr_add;
 	smb_shr_chkname;
 	smb_shr_count;
+	smb_shr_exec;
 	smb_shr_get;
 	smb_shr_hostaccess;
 	smb_shr_iterate;
@@ -68,6 +68,7 @@ SUNWprivate {
 	smb_shr_modify;
 	smb_shr_remove;
 	smb_shr_rename;
+	smb_shr_sa_csc_name;
 	smb_shr_start;
 	smb_shr_stop;
 	smb_token_destroy;

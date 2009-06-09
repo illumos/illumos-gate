@@ -146,19 +146,20 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 	DWORD status;
 	char machine_passwd[NETR_MACHINE_ACCT_PASSWD_MAX];
 	smb_adjoin_status_t err;
+	nt_domain_t *domain;
 
 	machine_passwd[0] = '\0';
 
-	(void) utf8_strupr(dinfo->d_nbdomain);
+	domain = &dinfo->d_info;
 
 	mlsvc_disconnect(dinfo->d_dc);
 
-	erc = mlsvc_logon(dinfo->d_dc, dinfo->d_nbdomain, user);
+	erc = mlsvc_logon(dinfo->d_dc, domain->di_nbname, user);
 
 	if (erc == AUTH_USER_GRANT) {
 		if (mlsvc_ntjoin_support == B_FALSE) {
 
-			if ((err = smb_ads_join(dinfo->d_fqdomain, user,
+			if ((err = smb_ads_join(domain->di_fqname, user,
 			    plain_text, machine_passwd,
 			    sizeof (machine_passwd))) == SMB_ADJOIN_SUCCESS) {
 				status = NT_STATUS_SUCCESS;
@@ -174,7 +175,7 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 			}
 
 			status = sam_create_trust_account(dinfo->d_dc,
-			    dinfo->d_nbdomain, &auth);
+			    domain->di_nbname, &auth);
 			if (status == NT_STATUS_SUCCESS) {
 				(void) smb_getnetbiosname(machine_passwd,
 				    sizeof (machine_passwd));
@@ -191,7 +192,7 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 				return (NT_STATUS_UNSUCCESSFUL);
 			}
 
-			status = mlsvc_netlogon(dinfo->d_dc, dinfo->d_nbdomain);
+			status = mlsvc_netlogon(dinfo->d_dc, domain->di_nbname);
 		}
 	} else {
 		status = NT_STATUS_LOGON_FAILURE;

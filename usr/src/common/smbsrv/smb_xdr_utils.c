@@ -164,7 +164,7 @@ smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp)
  */
 int
 smb_opipe_context_encode(smb_opipe_context_t *ctx, uint8_t *buf,
-    uint32_t buflen)
+    uint32_t buflen, uint_t *pbytes_encoded)
 {
 	XDR xdrs;
 	int rc = 0;
@@ -173,6 +173,9 @@ smb_opipe_context_encode(smb_opipe_context_t *ctx, uint8_t *buf,
 
 	if (!smb_opipe_context_xdr(&xdrs, ctx))
 		rc = -1;
+
+	if (pbytes_encoded != NULL)
+		*pbytes_encoded = xdr_getpos(&xdrs);
 
 	xdr_destroy(&xdrs);
 	return (rc);
@@ -183,17 +186,19 @@ smb_opipe_context_encode(smb_opipe_context_t *ctx, uint8_t *buf,
  */
 int
 smb_opipe_context_decode(smb_opipe_context_t *ctx, uint8_t *buf,
-    uint32_t buflen)
+    uint32_t buflen, uint_t *pbytes_decoded)
 {
 	XDR xdrs;
 	int rc = 0;
 
-	bzero(ctx, sizeof (smb_opipe_context_t));
 	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
 
+	bzero(ctx, sizeof (smb_opipe_context_t));
 	if (!smb_opipe_context_xdr(&xdrs, ctx))
 		rc = -1;
 
+	if (pbytes_decoded != NULL)
+		*pbytes_decoded = xdr_getpos(&xdrs);
 	xdr_destroy(&xdrs);
 	return (rc);
 }
@@ -240,19 +245,6 @@ smb_opipe_context_xdr(XDR *xdrs, smb_opipe_context_t *objp)
 	if (!xdr_int64_t(xdrs, &objp->oc_logon_time))
 		return (FALSE);
 	if (!xdr_uint32_t(xdrs, &objp->oc_flags))
-		return (FALSE);
-	return (TRUE);
-}
-
-bool_t
-xdr_smb_dr_ulist_t(xdrs, objp)
-	XDR *xdrs;
-	smb_dr_ulist_t *objp;
-{
-	if (!xdr_uint32_t(xdrs, &objp->dul_cnt))
-		return (FALSE);
-	if (!xdr_vector(xdrs, (char *)objp->dul_users, SMB_DR_MAX_USERS,
-		sizeof (smb_opipe_context_t), (xdrproc_t)smb_opipe_context_xdr))
 		return (FALSE);
 	return (TRUE);
 }

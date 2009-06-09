@@ -152,6 +152,8 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	smb_enumshare_info_t esi;
 	int offset;
 	smb_inaddr_t ipaddr;
+	int exec_type;
+	smb_execsub_info_t subs;
 
 	if ((cookie != SMB_SHARE_DSRV_COOKIE) || (ptr == NULL) ||
 	    (size < sizeof (uint32_t))) {
@@ -275,6 +277,40 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			    (unsigned char *)esi.es_buf, esi.es_bufsize);
 			free(esi.es_buf);
 		}
+		break;
+
+	case SMB_SHROP_EXEC:
+		sharename = smb_dr_get_string(dec_ctx);
+		subs.e_winname = smb_dr_get_string(dec_ctx);
+		subs.e_userdom = smb_dr_get_string(dec_ctx);
+		(void) smb_dr_get_buf(dec_ctx,
+		    (unsigned char *)&subs.e_srv_ipaddr, sizeof (smb_inaddr_t));
+		(void) smb_dr_get_buf(dec_ctx,
+		    (unsigned char *)&subs.e_cli_ipaddr, sizeof (smb_inaddr_t));
+		subs.e_cli_netbiosname = smb_dr_get_string(dec_ctx);
+		subs.e_uid = smb_dr_get_int32(dec_ctx);
+		exec_type = smb_dr_get_int32(dec_ctx);
+		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
+			smb_dr_free_string(sharename);
+			smb_dr_free_string(subs.e_winname);
+			smb_dr_free_string(subs.e_userdom);
+			smb_dr_free_string(subs.e_cli_netbiosname);
+			goto decode_error;
+		}
+
+		rc = smb_shr_exec(sharename, &subs, exec_type);
+
+		if (rc != 0)
+			syslog(LOG_NOTICE, "Failed to execute %s" \
+			    " command.\n",
+			    (exec_type == SMB_SHR_UNMAP) ? "unmap" : "map");
+
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
+		smb_dr_put_uint32(enc_ctx, rc);
+		smb_dr_free_string(sharename);
+		smb_dr_free_string(subs.e_winname);
+		smb_dr_free_string(subs.e_userdom);
+		smb_dr_free_string(subs.e_cli_netbiosname);
 		break;
 
 	default:

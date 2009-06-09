@@ -59,6 +59,7 @@ static int lsarpc_s_CloseHandle(void *arg, ndr_xa_t *);
 static int lsarpc_s_QuerySecurityObject(void *arg, ndr_xa_t *);
 static int lsarpc_s_EnumAccounts(void *arg, ndr_xa_t *);
 static int lsarpc_s_EnumTrustedDomain(void *arg, ndr_xa_t *);
+static int lsarpc_s_EnumTrustedDomainsEx(void *arg, ndr_xa_t *);
 static int lsarpc_s_OpenAccount(void *arg, ndr_xa_t *);
 static int lsarpc_s_EnumPrivsAccount(void *arg, ndr_xa_t *);
 static int lsarpc_s_LookupPrivValue(void *arg, ndr_xa_t *);
@@ -87,6 +88,7 @@ static ndr_stub_table_t lsarpc_stub_table[] = {
 	{ lsarpc_s_QuerySecurityObject,	  LSARPC_OPNUM_QuerySecurityObject },
 	{ lsarpc_s_EnumAccounts,	  LSARPC_OPNUM_EnumerateAccounts },
 	{ lsarpc_s_EnumTrustedDomain,	  LSARPC_OPNUM_EnumTrustedDomain },
+	{ lsarpc_s_EnumTrustedDomainsEx,  LSARPC_OPNUM_EnumTrustedDomainsEx },
 	{ lsarpc_s_OpenAccount,		  LSARPC_OPNUM_OpenAccount },
 	{ lsarpc_s_EnumPrivsAccount,	  LSARPC_OPNUM_EnumPrivsAccount },
 	{ lsarpc_s_LookupPrivValue,	  LSARPC_OPNUM_LookupPrivValue },
@@ -275,6 +277,40 @@ lsarpc_s_EnumTrustedDomain(void *arg, ndr_xa_t *mxa)
 	return (NDR_DRC_OK);
 }
 
+/*
+ * lsarpc_s_EnumTrustedDomainsEx
+ *
+ * This is the server side function for handling requests to enumerate
+ * the list of trusted domains: currently held in the NT domain database.
+ * This call requires an OpenPolicy2 handle. The enum_context is used to
+ * support multiple enumeration calls to obtain the complete list.
+ * It should be set to 0 on the first call and passed unchanged on
+ * subsequent calls until there are no more accounts - the server will
+ * return NT_SC_WARNING(MLSVC_NO_MORE_DATA).
+ *
+ * For now just set the status to access-denied. Note that we still have
+ * to provide a valid address for enum_buf because it's a reference and
+ * the marshalling rules require that references must not be null.
+ */
+static int
+lsarpc_s_EnumTrustedDomainsEx(void *arg, ndr_xa_t *mxa)
+{
+	struct mslsa_EnumTrustedDomainEx *param = arg;
+	struct mslsa_EnumTrustedDomainBufEx *enum_buf;
+
+	bzero(param, sizeof (struct mslsa_EnumTrustedDomainEx));
+
+	enum_buf = NDR_NEW(mxa, struct mslsa_EnumTrustedDomainBufEx);
+	if (enum_buf == NULL) {
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
+	}
+
+	bzero(enum_buf, sizeof (struct mslsa_EnumTrustedDomainBufEx));
+	param->enum_buf = enum_buf;
+	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	return (NDR_DRC_OK);
+}
 
 /*
  * lsarpc_s_OpenAccount
@@ -601,29 +637,22 @@ static DWORD
 lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
     ndr_xa_t *mxa)
 {
-	char domain_name[MAXHOSTNAMELEN];
-	smb_sid_t *sid = NULL;
-	int security_mode;
+	nt_domain_t di;
+	boolean_t found;
 	int rc;
 
 	bzero(info, sizeof (struct mslsa_PrimaryDomainInfo));
 
-	security_mode = smb_config_get_secmode();
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
+		found = nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di);
+	else
+		found = nt_domain_lookup_type(NT_DOMAIN_PRIMARY, &di);
 
-	if (security_mode != SMB_SECMODE_DOMAIN) {
-		rc = smb_getnetbiosname(domain_name, sizeof (domain_name));
-		sid = smb_sid_dup(nt_domain_local_sid());
-	} else {
-		rc = smb_getdomainname(domain_name, sizeof (domain_name));
-		sid = smb_getdomainsid();
-	}
-
-	if ((sid == NULL) || (rc != 0))
+	if (!found)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	rc = NDR_MSTRING(mxa, domain_name, (ndr_mstring_t *)&info->name);
-	info->sid = (struct mslsa_sid *)NDR_SIDDUP(mxa, sid);
-	free(sid);
+	rc = NDR_MSTRING(mxa, di.di_nbname, (ndr_mstring_t *)&info->name);
+	info->sid = (struct mslsa_sid *)NDR_SIDDUP(mxa, di.di_binsid);
 
 	if ((rc == -1) || (info->sid == NULL))
 		return (NT_STATUS_NO_MEMORY);
@@ -646,20 +675,16 @@ static DWORD
 lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *info,
     ndr_xa_t *mxa)
 {
-	char domain_name[NETBIOS_NAME_SZ];
-	smb_sid_t *domain_sid;
+	nt_domain_t di;
 	int rc;
 
 	bzero(info, sizeof (struct mslsa_AccountDomainInfo));
 
-	if (smb_getnetbiosname(domain_name, NETBIOS_NAME_SZ) != 0)
-		return (NT_STATUS_NO_MEMORY);
+	if (!nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di))
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if ((domain_sid = nt_domain_local_sid()) == NULL)
-		return (NT_STATUS_NO_MEMORY);
-
-	rc = NDR_MSTRING(mxa, domain_name, (ndr_mstring_t *)&info->name);
-	info->sid = (struct mslsa_sid *)NDR_SIDDUP(mxa, domain_sid);
+	rc = NDR_MSTRING(mxa, di.di_nbname, (ndr_mstring_t *)&info->name);
+	info->sid = (struct mslsa_sid *)NDR_SIDDUP(mxa, di.di_binsid);
 
 	if ((rc == -1) || (info->sid == NULL))
 		return (NT_STATUS_NO_MEMORY);
@@ -796,10 +821,12 @@ lsarpc_s_LookupSids(void *arg, ndr_xa_t *mxa)
 		if (result != NT_STATUS_SUCCESS)
 			goto lookup_sid_failed;
 
-		if (NDR_MSTRING(mxa, account.a_name,
-		    (ndr_mstring_t *)&name->name) == -1) {
-			result = NT_STATUS_NO_MEMORY;
-			goto lookup_sid_failed;
+		if (*account.a_name != '\0') {
+			if (NDR_MSTRING(mxa, account.a_name,
+			    (ndr_mstring_t *)&name->name) == -1) {
+				result = NT_STATUS_NO_MEMORY;
+				goto lookup_sid_failed;
+			}
 		}
 		name->sid_name_use = account.a_type;
 
@@ -937,10 +964,12 @@ lsarpc_s_LookupSids2(void *arg, ndr_xa_t *mxa)
 		if (result != NT_STATUS_SUCCESS)
 			goto lookup_sid_failed;
 
-		if (NDR_MSTRING(mxa, account.a_name,
-		    (ndr_mstring_t *)&name->name) == -1) {
-			result = NT_STATUS_NO_MEMORY;
-			goto lookup_sid_failed;
+		if (*account.a_name != '\0') {
+			if (NDR_MSTRING(mxa, account.a_name,
+			    (ndr_mstring_t *)&name->name) == -1) {
+				result = NT_STATUS_NO_MEMORY;
+				goto lookup_sid_failed;
+			}
 		}
 		name->sid_name_use = account.a_type;
 

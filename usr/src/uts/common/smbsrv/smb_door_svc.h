@@ -76,23 +76,16 @@ extern smb_dr_op_t smb_doorsrv_optab[];
  */
 enum smb_dr_opcode_t {
 	SMB_DR_USER_AUTH_LOGON,
-	SMB_DR_SET_DWNCALL_DESC,
 	SMB_DR_USER_NONAUTH_LOGON,
 	SMB_DR_USER_AUTH_LOGOFF,
-	SMB_DR_USER_LIST,
 	SMB_DR_LOOKUP_SID,
 	SMB_DR_LOOKUP_NAME,
 	SMB_DR_JOIN,
 	SMB_DR_GET_DCINFO,
 	SMB_DR_VSS_GET_COUNT,
 	SMB_DR_VSS_GET_SNAPSHOTS,
-	SMB_DR_VSS_MAP_GMTTOKEN
-};
-
-enum smb_kdr_opcode_t {
-	SMB_KDR_USER_NUM,
-	SMB_KDR_USER_LIST,
-	SMB_KDR_SHARE
+	SMB_DR_VSS_MAP_GMTTOKEN,
+	SMB_DR_ADS_FIND_HOST
 };
 
 /*
@@ -122,20 +115,6 @@ typedef struct smb_kdoor_cb_arg {
 } smb_kdoor_cb_arg_t;
 
 /*
- * SMB kernel door server
- * ------------------------
- * NOTE: smb_kdoor_srv_init()/smb_kdoor_srv_fini() are noops.
- */
-int smb_kdoor_srv_start(void);
-int smb_kdoor_srv_set_downcall(void);
-void smb_kdoor_srv_stop(void);
-int smb_kdr_is_valid_opcode(int);
-
-char *smb_kdr_op_user_num(char *, size_t, size_t *, int *);
-char *smb_kdr_op_users(char *, size_t, size_t *, int *);
-char *smb_kdr_op_share(char *, size_t, size_t *, int *);
-
-/*
  * SMB kernel door client
  * ------------------------
  * NOTE: smb_kdoor_clnt_init()/smb_kdoor_clnt_fini() are noops.
@@ -151,7 +130,6 @@ void smb_kdoor_clnt_free(char *, size_t, char *, size_t);
  * SMB upcalls
  */
 smb_token_t *smb_get_token(netr_client_t *);
-int smb_set_downcall_desc(door_desc_t *, uint_t);
 void smb_user_nonauth_logon(uint32_t);
 void smb_user_auth_logoff(uint32_t);
 uint32_t smb_upcall_vss_get_count(char *);

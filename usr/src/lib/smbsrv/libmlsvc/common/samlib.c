@@ -399,22 +399,17 @@ sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
 static struct samr_sid *
 sam_get_domain_sid(mlsvc_handle_t *samr_handle, char *server, char *domain_name)
 {
-	struct samr_sid *sid;
+	struct samr_sid *sid = NULL;
+	smb_domain_t domain;
 
 	if (ndr_rpc_server_os(samr_handle) == NATIVE_OS_WIN2000) {
-		nt_domain_t *ntdp;
-		lsa_info_t account_domain;
-
-		if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
-			if (lsa_query_account_domain_info(server,
-			    domain_name, &account_domain) != NT_STATUS_SUCCESS)
+		if (!smb_domain_getinfo(&domain)) {
+			if (lsa_query_account_domain_info(server, domain_name,
+			    &domain.d_info) != NT_STATUS_SUCCESS)
 				return (NULL);
-
-			sid = (struct samr_sid *)
-			    account_domain.i_domain.di_account.n_sid;
-		} else {
-			sid = (struct samr_sid *)smb_sid_dup(ntdp->sid);
 		}
+
+		sid = (struct samr_sid *)smb_sid_fromstr(domain.d_info.di_sid);
 	} else {
 		sid = (struct samr_sid *)samr_lookup_domain(samr_handle,
 		    domain_name);

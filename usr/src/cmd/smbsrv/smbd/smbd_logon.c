@@ -96,8 +96,8 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		uid = ADT_NO_ATTRIB;
 		gid = ADT_NO_ATTRIB;
 		sid = NT_NULL_SIDSTR;
-		username = clnt->real_username;
-		domain = clnt->real_domain;
+		username = clnt->e_username;
+		domain = clnt->e_domain;
 		status = ADT_FAILURE;
 		retval = ADT_FAIL_VALUE_AUTH;
 	} else {

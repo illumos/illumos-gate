@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 /* ADS typedef/data structures and functions */
-#define	SMB_ADS_MAXBUFLEN 100
+
 
 typedef struct smb_ads_handle {
 	char *user;		/* admin user to create share in ADS */
@@ -46,6 +46,14 @@ typedef struct smb_ads_handle {
 	char *site;		/* local ADS site */
 	LDAP *ld;		/* LDAP handle */
 } smb_ads_handle_t;
+
+typedef struct smb_ads_host_info {
+	char name[MAXHOSTNAMELEN];  /* fully qualified hostname */
+	int port;		/* ldap port */
+	int priority;		/* DNS SRV record priority */
+	int weight;		/* DNS SRV record weight */
+	smb_inaddr_t ipaddr;	/* network byte order */
+} smb_ads_host_info_t;
 
 /*
  * The possible return status of the adjoin routine.
@@ -70,6 +78,7 @@ typedef enum smb_adjoin_status {
 
 /* ADS functions */
 extern void smb_ads_init(void);
+extern void smb_ads_fini(void);
 extern void smb_ads_refresh(void);
 extern smb_ads_handle_t *smb_ads_open(void);
 extern void smb_ads_close(smb_ads_handle_t *);
@@ -85,6 +94,7 @@ extern int smb_ads_add_share(smb_ads_handle_t *, const char *, const char *,
 extern smb_adjoin_status_t smb_ads_join(char *, char *, char *, char *, int);
 extern void smb_ads_join_errmsg(smb_adjoin_status_t);
 extern boolean_t smb_ads_lookup_msdcs(char *, char *, char *, uint32_t);
+extern smb_ads_host_info_t *smb_ads_find_host(char *, char *);
 
 /* DYNDNS functions */
 extern int dyndns_start(void);

@@ -690,6 +690,9 @@ smb_netgroup_match(struct nd_hostservlist *clnames, char  *glist, int grc)
 
 /*
  * Resolve the ZFS dataset from a path.
+ * Returns,
+ *	0  = On success.
+ *	-1 = Failure to open /etc/mnttab file or to get ZFS dataset.
  */
 int
 smb_getdataset(const char *path, char *dataset, size_t len)
@@ -712,9 +715,13 @@ smb_getdataset(const char *path, char *dataset, size_t len)
 		resetmnttab(fp);
 		(void) memset(&mntpref, '\0', sizeof (mntpref));
 		mntpref.mnt_mountp = tmppath;
-		mntpref.mnt_fstype = "zfs";
 
 		if (getmntany(fp, &mnttab, &mntpref) == 0) {
+			if (mnttab.mnt_fstype == NULL)
+				break;
+
+			if (strcmp(mnttab.mnt_fstype, "zfs") != 0)
+				break;
 			/*
 			 * Ensure that there are no leading slashes
 			 * (required for zfs_open).
@@ -745,4 +752,77 @@ smb_getdataset(const char *path, char *dataset, size_t len)
 
 	(void) fclose(fp);
 	return (rc);
+}
+
+/*
+ * Returns the hostname given the IP address.  Wrapper for getnameinfo.
+ */
+int
+smb_getnameinfo(smb_inaddr_t *ip, char *hostname, int hostlen, int flags)
+{
+	socklen_t salen;
+	struct sockaddr_in6 sin6;
+	struct sockaddr_in sin;
+	void *sp;
+
+	if (ip->a_family == AF_INET) {
+		salen = sizeof (struct sockaddr_in);
+		sin.sin_family = ip->a_family;
+		sin.sin_port = 0;
+		sin.sin_addr.s_addr = ip->a_ipv4;
+		sp = &sin;
+	} else {
+		salen = sizeof (struct sockaddr_in6);
+		sin6.sin6_family = ip->a_family;
+		sin6.sin6_port = 0;
+		(void) memcpy(&sin6.sin6_addr.s6_addr, &ip->a_ipv6,
+		    sizeof (sin6.sin6_addr.s6_addr));
+		sp = &sin6;
+	}
+	return (getnameinfo((struct sockaddr *)sp, salen,
+	    hostname, hostlen, NULL, 0, flags));
+}
+
+smb_ulist_t *
+smb_ulist_alloc(void)
+{
+	smb_ulist_t *ulist;
+
+	ulist = malloc(sizeof (smb_ulist_t));
+	if (ulist != NULL) {
+		ulist->ul_cnt = 0;
+		ulist->ul_users = NULL;
+	}
+	return (ulist);
+}
+
+void
+smb_ulist_free(smb_ulist_t *ulist)
+{
+	if (ulist != NULL) {
+		smb_ulist_cleanup(ulist);
+		free(ulist);
+	}
+}
+
+void
+smb_ulist_cleanup(smb_ulist_t *ulist)
+{
+	smb_opipe_context_t *ctx;
+
+	if (ulist->ul_users != NULL) {
+		ctx = ulist->ul_users;
+		while (ulist->ul_cnt != 0) {
+			free(ctx->oc_domain);
+			free(ctx->oc_account);
+			free(ctx->oc_workstation);
+			ctx->oc_domain = NULL;
+			ctx->oc_account = NULL;
+			ctx->oc_workstation = NULL;
+			ulist->ul_cnt--;
+			ctx++;
+		}
+		free(ulist->ul_users);
+		ulist->ul_users = NULL;
+	}
 }

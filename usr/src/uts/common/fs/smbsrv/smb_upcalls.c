@@ -83,22 +83,6 @@ smb_get_token(netr_client_t *clnt_info)
 
 }
 
-int
-smb_set_downcall_desc(door_desc_t *dp, uint_t n_desc)
-{
-	char *arg, *rsp;
-	size_t arg_size, rsp_size;
-
-	arg = smb_dr_set_opcode(SMB_DR_SET_DWNCALL_DESC, &arg_size);
-	if (arg == NULL)
-		return (-1);
-
-	rsp = smb_kdoor_clnt_upcall(arg, arg_size, dp, n_desc, &rsp_size);
-
-	smb_kdoor_clnt_free(arg, arg_size, rsp, rsp_size);
-	return ((rsp == NULL) ? -1 : 0);
-}
-
 /*
  * This returns the number of snapshots for the dataset
  * of the path provided.

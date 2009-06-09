@@ -55,6 +55,7 @@ typedef struct smb_cfg_param {
  * config parameter flags
  */
 #define	SMB_CF_PROTECTED	0x01
+#define	SMB_CF_EXEC		0x02
 
 /* idmap SMF fmri and Property Group */
 #define	IDMAP_FMRI_PREFIX		"system/idmap"
@@ -93,10 +94,6 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_WINS_SRV2, "wins_server_2", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_WINS_EXCL, "wins_exclude", SCF_TYPE_ASTRING, 0},
 
-	/* RPC services configuration */
-	{SMB_CI_SRVSVC_SHRSET_ENABLE, "srvsvc_sharesetinfo_enable",
-	    SCF_TYPE_BOOLEAN, 0},
-
 	/* Kmod specific configuration */
 	{SMB_CI_MAX_WORKERS, "max_workers", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_MAX_CONNECTIONS, "max_connections", SCF_TYPE_INTEGER, 0},
@@ -131,7 +128,10 @@ static smb_cfg_param_t smb_cfg_table[] =
 	    0},
 	{SMB_CI_NETLOGON_SEQNUM, "netlogon_seqnum", SCF_TYPE_INTEGER,
 	    0},
-	{SMB_CI_IPV6_ENABLE, "ipv6_enable", SCF_TYPE_BOOLEAN, 0}
+	{SMB_CI_IPV6_ENABLE, "ipv6_enable", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_MAP, "map", SCF_TYPE_ASTRING, SMB_CF_EXEC},
+	{SMB_CI_UNMAP, "unmap", SCF_TYPE_ASTRING, SMB_CF_EXEC},
+	{SMB_CI_DISPOSITION, "disposition", SCF_TYPE_ASTRING, SMB_CF_EXEC}
 
 	/* SMB_CI_MAX */
 };
@@ -354,6 +354,7 @@ smb_config_getstr(smb_cfg_id_t id, char *cbuf, int bufsz)
 	smb_scfhandle_t *handle;
 	smb_cfg_param_t *cfg;
 	int rc = SMBD_SMF_OK;
+	char *pg;
 
 	*cbuf = '\0';
 	cfg = smb_config_getent(id);
@@ -381,7 +382,9 @@ smb_config_getstr(smb_cfg_id_t id, char *cbuf, int bufsz)
 			free(tmp);
 		}
 	} else {
-		rc = smb_smf_create_service_pgroup(handle, SMBD_PG_NAME);
+		pg = (cfg->sc_flags & SMB_CF_EXEC) ? SMBD_EXEC_PG_NAME :
+		    SMBD_PG_NAME;
+		rc = smb_smf_create_service_pgroup(handle, pg);
 		if (rc == SMBD_SMF_OK)
 			rc = smb_smf_get_string_property(handle, cfg->sc_name,
 			    cbuf, bufsz);
@@ -398,15 +401,25 @@ smb_config_getip(smb_cfg_id_t sc_id, smb_inaddr_t *ipaddr)
 	int rc;
 	char ipstr[INET6_ADDRSTRLEN];
 
+	if (ipaddr == NULL)
+		return (SMBD_SMF_INVALID_ARG);
+
+	bzero(ipaddr, sizeof (smb_inaddr_t));
 	rc = smb_config_getstr(sc_id, ipstr, sizeof (ipstr));
 	if (rc == SMBD_SMF_OK) {
-		rc = inet_pton(AF_INET, ipstr, ipaddr);
-		if (rc == 0) {
-			rc = inet_pton(AF_INET6, ipstr, ipaddr);
-			if (rc == 0)
-				bzero(ipaddr, sizeof (smb_inaddr_t));
+		if (inet_pton(AF_INET, ipstr, &ipaddr->a_ipv4) == 1) {
+			ipaddr->a_family = AF_INET;
+			return (SMBD_SMF_OK);
+		}
+
+		if (inet_pton(AF_INET6, ipstr, &ipaddr->a_ipv6) == 1) {
+			ipaddr->a_family = AF_INET6;
+			rc = SMBD_SMF_OK;
+		} else {
+			rc = SMBD_SMF_INVALID_ARG;
 		}
 	}
+
 	return (rc);
 }
 
@@ -521,12 +534,19 @@ smb_config_setstr(smb_cfg_id_t id, char *value)
 	cfg = smb_config_getent(id);
 	assert(cfg->sc_type == SCF_TYPE_ASTRING);
 
-	if (cfg->sc_flags & SMB_CF_PROTECTED) {
-		pg = SMBD_PROTECTED_PG_NAME;
+	protected = B_FALSE;
+
+	switch (cfg->sc_flags) {
+	case SMB_CF_PROTECTED:
 		protected = B_TRUE;
-	} else {
+		pg = SMBD_PROTECTED_PG_NAME;
+		break;
+	case SMB_CF_EXEC:
+		pg = SMBD_EXEC_PG_NAME;
+		break;
+	default:
 		pg = SMBD_PG_NAME;
-		protected = B_FALSE;
+		break;
 	}
 
 	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
@@ -779,20 +799,42 @@ smb_config_getent(smb_cfg_id_t id)
 }
 
 void
-smb_config_getdomaininfo(char *domain, char *fqdn, char *forest, char *guid)
+smb_config_getdomaininfo(char *domain, char *fqdn, char *sid, char *forest,
+    char *guid)
 {
-	(void) smb_config_getstr(SMB_CI_DOMAIN_NAME, domain, NETBIOS_NAME_SZ);
-	(void) smb_config_getstr(SMB_CI_DOMAIN_FQDN, fqdn, MAXHOSTNAMELEN);
-	(void) smb_config_getstr(SMB_CI_DOMAIN_FOREST, forest, MAXHOSTNAMELEN);
-	(void) smb_config_getstr(SMB_CI_DOMAIN_GUID, guid,
-	    UUID_PRINTABLE_STRING_LENGTH);
+	if (domain)
+		(void) smb_config_getstr(SMB_CI_DOMAIN_NAME, domain,
+		    NETBIOS_NAME_SZ);
+
+	if (fqdn)
+		(void) smb_config_getstr(SMB_CI_DOMAIN_FQDN, fqdn,
+		    MAXHOSTNAMELEN);
+
+	if (sid)
+		(void) smb_config_getstr(SMB_CI_DOMAIN_SID, sid,
+		    SMB_SID_STRSZ);
+
+	if (forest)
+		(void) smb_config_getstr(SMB_CI_DOMAIN_FOREST, forest,
+		    MAXHOSTNAMELEN);
+
+	if (guid)
+		(void) smb_config_getstr(SMB_CI_DOMAIN_GUID, guid,
+		    UUID_PRINTABLE_STRING_LENGTH);
 }
 
 void
-smb_config_setdomaininfo(char *domain, char *fqdn, char *forest, char *guid)
+smb_config_setdomaininfo(char *domain, char *fqdn, char *sid, char *forest,
+    char *guid)
 {
-	(void) smb_config_setstr(SMB_CI_DOMAIN_NAME, domain);
-	(void) smb_config_setstr(SMB_CI_DOMAIN_FQDN, fqdn);
-	(void) smb_config_setstr(SMB_CI_DOMAIN_FOREST, forest);
-	(void) smb_config_setstr(SMB_CI_DOMAIN_GUID, guid);
+	if (domain)
+		(void) smb_config_setstr(SMB_CI_DOMAIN_NAME, domain);
+	if (fqdn)
+		(void) smb_config_setstr(SMB_CI_DOMAIN_FQDN, fqdn);
+	if (sid)
+		(void) smb_config_setstr(SMB_CI_DOMAIN_SID, sid);
+	if (forest)
+		(void) smb_config_setstr(SMB_CI_DOMAIN_FOREST, forest);
+	if (guid)
+		(void) smb_config_setstr(SMB_CI_DOMAIN_GUID, guid);
 }

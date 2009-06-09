@@ -92,7 +92,7 @@ file.
 			<method_credential
 				user='root'
 				group='sys'
-				privileges='basic,net_mac_aware,net_privaddr,proc_audit,sys_devices,sys_smb' />
+				privileges='all' />
 		</method_context>
 	</exec_method>
 
@@ -167,8 +167,6 @@ file.
 			value='' override='true'/>
 		<propval name='wins_exclude' type='astring'
 			value='' override='true'/>
-		<propval name='srvsvc_sharesetinfo_enable' type='boolean'
-			value='false' override='true'/>
 		<propval name='max_workers' type='integer'
 			value='1024' override='true'/>
 		<propval name='max_connections' type='integer'
@@ -207,6 +205,17 @@ file.
 			value='0' override='true'/>
 		<propval name='ipv6_enable' type='boolean'
 			value='false' override='true'/>
+	</property_group>
+
+	<!-- SMB service-specific shares exec configuration defaults -->
+	<property_group name='exec' type='application'>
+		<stability value='Evolving' />
+		<propval name='map' type='astring'
+			value='' override='true'/>
+		<propval name='unmap' type='astring'
+			value='' override='true'/>
+		<propval name='disposition' type='astring'
+			value='' override='true'/>
 	</property_group>
 
 	<!-- 6. Identify faults to be ignored. -->
