@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,7 +160,6 @@ meta_efi_to_mdvtoc(struct dk_gpt *gpt, mdvtoc_t *mdvp)
 static void
 meta_mdvtoc_to_efi(mdvtoc_t *mdvp, struct dk_gpt **gpt)
 {
-	char		typename[EFI_PART_NAME_LEN];
 	uint_t		i;
 	uint_t		lastpart;
 	size_t		size;
@@ -193,8 +192,8 @@ meta_mdvtoc_to_efi(mdvtoc_t *mdvp, struct dk_gpt **gpt)
 		 */
 		if (((*gpt)->efi_parts[i].p_tag == V_RESERVED) &&
 		    (mdvp->typename != NULL)) {
-			(void) strlcpy((*gpt)->efi_parts[i].p_name, typename,
-			    EFI_PART_NAME_LEN);
+			(void) strlcpy((*gpt)->efi_parts[i].p_name,
+			    mdvp->typename, EFI_PART_NAME_LEN);
 		}
 	}
 }
