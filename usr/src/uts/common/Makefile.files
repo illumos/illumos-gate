@@ -434,6 +434,8 @@ AUDIO1575_OBJS += audio1575.o
 
 AUDIO810_OBJS += audio810.o
 
+AUDIOCMI_OBJS += audiocmi.o
+
 AUDIOHD_OBJS +=	audiohd.o
 
 AUDIOIXP_OBJS += audioixp.o
