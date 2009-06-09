@@ -1573,7 +1573,33 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 			if (isModulus && isPubExpo) {
 				/*
-				 * Copy big integer attribute value to the
+				 * Derive modulus_bits attribute from modulus.
+				 * Save modulus_bits integer value to the
+				 * designated place in the public key object.
+				 */
+				n.malloced = 0;
+#ifdef  __sparcv9
+				if (big_init(&n, (int)CHARLEN2BIGNUMLEN(
+				    modulus.big_value_len)) != BIG_OK) {
+#else   /* !__sparcv9 */
+				if (big_init(&n, CHARLEN2BIGNUMLEN(
+				    modulus.big_value_len)) != BIG_OK) {
+#endif  /* __sparcv9 */
+					rv = CKR_HOST_MEMORY;
+					big_finish(&n);
+					goto fail_cleanup;
+				}
+				bytestring2bignum(&n, modulus.big_value,
+				    modulus.big_value_len);
+
+				modulus_bits = big_bitlength(&n);
+				KEY_PUB_RSA_MOD_BITS(pbk) = modulus_bits;
+				big_finish(&n);
+
+				/*
+				 * After modulus_bits has been computed,
+				 * it is safe to move modulus and pubexpo
+				 * big integer attribute value to the
 				 * designated place in the public key object.
 				 */
 				copy_bigint_attr(&modulus,
@@ -1585,33 +1611,6 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 				rv = CKR_TEMPLATE_INCOMPLETE;
 				goto fail_cleanup;
 			}
-
-			/*
-			 * Derive modulus_bits attribute from modulus.
-			 * Copy big integer attribute value to the
-			 * designated place in the public key object.
-			 */
-			n.malloced = 0;
-#ifdef  __sparcv9
-			if (big_init(&n,
-			    (int)CHARLEN2BIGNUMLEN(modulus.big_value_len))
-			    != BIG_OK) {
-#else   /* !__sparcv9 */
-			if (big_init(&n,
-			    CHARLEN2BIGNUMLEN(modulus.big_value_len))
-			    != BIG_OK) {
-#endif  /* __sparcv9 */
-				rv = CKR_HOST_MEMORY;
-				big_finish(&n);
-				goto fail_cleanup;
-			}
-			bytestring2bignum(&n, modulus.big_value,
-			    modulus.big_value_len);
-
-			modulus_bits = big_bitlength(&n);
-			KEY_PUB_RSA_MOD_BITS(pbk) = modulus_bits;
-
-			big_finish(&n);
 		} else {
 			/* mode is SOFT_GEN_KEY */
 
