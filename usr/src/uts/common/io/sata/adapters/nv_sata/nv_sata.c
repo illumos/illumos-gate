@@ -2390,10 +2390,6 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 
 	stran.sata_tran_hba_rev = SATA_TRAN_HBA_REV_2;
 	stran.sata_tran_hba_dip = nvc->nvc_dip;
-	if (nvc->dma_40bit == B_TRUE)
-		stran.sata_tran_hba_dma_attr = &buffer_dma_40bit_attr;
-	else
-		stran.sata_tran_hba_dma_attr = &buffer_dma_attr;
 	stran.sata_tran_hba_num_cports = NV_NUM_CPORTS;
 	stran.sata_tran_hba_features_support =
 	    SATA_CTLF_HOTPLUG | SATA_CTLF_ASN | SATA_CTLF_ATAPI;
@@ -2452,6 +2448,14 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 * initialize register by calling chip specific reg initialization
 	 */
 	(*(nvc->nvc_reg_init))(nvc, pci_conf_handle);
+
+	/* initialize the hba dma attribute */
+	if (nvc->dma_40bit == B_TRUE)
+		nvc->nvc_sata_hba_tran.sata_tran_hba_dma_attr =
+		    &buffer_dma_40bit_attr;
+	else
+		nvc->nvc_sata_hba_tran.sata_tran_hba_dma_attr =
+		    &buffer_dma_attr;
 
 	return (NV_SUCCESS);
 }
@@ -4035,11 +4039,12 @@ nv_start_dma(nv_port_t *nvp, int slot)
 	for (idx = 0; idx < sg_count; idx++, srcp++) {
 		uint32_t size;
 
-		ASSERT(srcp->dmac_size <= UINT16_MAX);
-
 		nv_put32(sghdl, dstp++, srcp->dmac_address);
 
+		/* Set the number of bytes to transfer, 0 implies 64KB */
 		size = srcp->dmac_size;
+		if (size == 0x10000)
+			size = 0;
 
 		/*
 		 * If this is a 40-bit address, copy bits 32-40 of the
