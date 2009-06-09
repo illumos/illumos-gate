@@ -231,8 +231,10 @@ typedef struct mac_srs_rx_s {
 	uint32_t		sr_poll_goto_sleep;
 	/* Worker thread goes back to draining the queue */
 	uint32_t		sr_drain_again;
-	/* More Packets in queue so signal the worker thread to drain */
+	/* More Packets in queue so signal the poll thread to drain */
 	uint32_t		sr_drain_poll_sig;
+	/* More Packets in queue so signal the worker thread to drain */
+	uint32_t		sr_drain_worker_sig;
 	/* Poll thread is already running so worker has nothing to do */
 	uint32_t		sr_drain_poll_running;
 	/* We have packets already queued so keep polling */

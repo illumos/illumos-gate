@@ -1693,23 +1693,39 @@ again:
 		mutex_enter(&mac_srs->srs_lock);
 	}
 
-	if (!(mac_srs->srs_state & (SRS_LATENCY_OPT|SRS_BLANK|SRS_PAUSE))) {
+	if (!(mac_srs->srs_state & (SRS_BLANK|SRS_PAUSE)) &&
+	    (mac_srs->srs_first != NULL)) {
 		/*
-		 * In case we are optimizing for throughput, we
-		 * should try and keep the worker thread running
-		 * as much as possible. Send the poll thread down
-		 * to check one more time if something else
-		 * arrived. In the meanwhile, if poll thread had
-		 * collected something due to earlier signal,
-		 * process it now.
+		 * More packets arrived while we were clearing the
+		 * SRS. This can be possible because of one of
+		 * three conditions below:
+		 * 1) The driver is using multiple worker threads
+		 *    to send the packets to us.
+		 * 2) The driver has a race in switching
+		 *    between interrupt and polling mode or
+		 * 3) Packets are arriving in this SRS via the
+		 *    S/W classification as well.
+		 *
+		 * We should switch to polling mode and see if we
+		 * need to send the poll thread down. Also, signal
+		 * the worker thread to process whats just arrived.
 		 */
+		MAC_SRS_POLLING_ON(mac_srs);
 		if (srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_lowat) {
 			srs_rx->sr_drain_poll_sig++;
 			MAC_SRS_POLL_RING(mac_srs);
 		}
-		if (mac_srs->srs_first != NULL) {
+
+		/*
+		 * If we didn't signal the poll thread, we need
+		 * to deal with the pending packets ourselves.
+		 */
+		if (proc_type == SRS_WORKER) {
 			srs_rx->sr_drain_again++;
 			goto again;
+		} else {
+			srs_rx->sr_drain_worker_sig++;
+			cv_signal(&mac_srs->srs_async);
 		}
 	}
 
