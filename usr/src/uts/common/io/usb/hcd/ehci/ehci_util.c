@@ -2060,10 +2060,16 @@ ehci_cpr_suspend(ehci_state_t	*ehcip)
 	if (ehcip->ehci_polled_kbd_count == 0 || force_ehci_off != 0) {
 		Set_OpReg(ehci_command,
 		    Get_OpReg(ehci_command) & ~EHCI_CMD_HOST_CTRL_RUN);
+
+		drv_usecwait(EHCI_RESET_TIMEWAIT);
 	}
 
 	/* Set host controller soft state to suspend */
 	ehcip->ehci_hc_soft_state = EHCI_CTLR_SUSPEND_STATE;
+
+	/* Reset the host controller. This can poweroff downstream ports */
+	Set_OpReg(ehci_command,
+	    Get_OpReg(ehci_command) | EHCI_CMD_HOST_CTRL_RESET);
 
 	mutex_exit(&ehcip->ehci_int_mutex);
 
