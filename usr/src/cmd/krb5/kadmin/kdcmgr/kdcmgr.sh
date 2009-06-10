@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -290,8 +290,6 @@ function ping_check {
 
 function check_host {
 
-	host=$(echo "$host"|tr '[A-Z]' '[a-z]')
-
 	echo "$host">$TMP_FILE
 	if egrep -s '[^.]\.[^.]+$' $TMP_FILE; then
 		# do nothing, host is in fqhn format
@@ -503,7 +501,45 @@ function setup_slave {
 	$SVCADM enable -r -s krb5kdc
 }
 
+function kdb5_destroy {
+	typeset status=0
+	typeset arg=
+
+	[[ -n $REALM ]] && arg="-r $REALM"
+	printf "$(gettext "yes")\n" | kdb5_util $arg destroy > /dev/null 2>&1
+
+	status=$?
+	[[ $status -eq 0 ]] && return $status
+
+	# Could mean that the admin could have already removed part of the
+	# configuration.  Better to check to see if anything else should be
+	# destroyed.  We check by looking at any other stash files in /var/krb5
+	stashfiles=`ls $STASH`
+	for stash in $stashfiles
+	do
+		realm=${stash#*.k5.}
+		[[ -z $realm ]] && continue
+
+		printf "$(gettext "Found non-default realm: %s")\n" $realm
+		query "$(gettext "Do you wish to destroy realm"): $realm ?"
+		if [[ $answer == yes ]]; then
+			printf "$(gettext "yes")\n" | kdb5_util -r $realm destroy > /dev/null 2>&1
+			status=$?
+			if [[ $status -ne 0 ]]; then
+				printf "$(gettext "Could not destroy realm: %s")\n" $realm
+				return $status
+			fi
+		else
+			printf "$(gettext "%s will not be destroyed").\n" $realm
+			status=0
+		fi
+	done
+
+	return $status
+}
+
 function destroy_kdc {
+	typeset status
 
 	# Check first to see if this is an existing KDC or server
 	if [[ -f $KRB5KT || -f $PRINCDB || -f $OLDPRINCDB ]]
@@ -526,8 +562,12 @@ function destroy_kdc {
 		return
 	fi
 
-	printf "$(gettext "yes")\n" | kdb5_util destroy > /dev/null 2>&1
+	kdb5_destroy
+	status=$?
+ 
 	rm -f $KRB5KT
+
+	[[ $status -ne 0 ]] && cleanup 1
 }
 
 function kadm5_acl_configed {
@@ -588,6 +628,10 @@ function status_kdc {
 
 # Start of Main script
 
+typeset -u REALM
+typeset -l host
+typeset -l fqhn
+
 # Defaults
 KRB5_KDC_CONF=/etc/krb5/kdc.conf
 KRB5_KRB_CONF=/etc/krb5/krb5.conf
@@ -627,7 +671,7 @@ fqhn=`$KDCRES`
 if [[ -n "$fqhn" ]]; then
 	:
 elif [[ -n $(hostname) && -n $(domainname) ]]; then
-	fqhn=$(hostname|cut -f1 -d'.').$(domainname|cut -f2- -d'.'|/usr/ucb/tr 'A-Z' 'a-z')
+	fqhn=$(hostname|cut -f1 -d'.').$(domainname|cut -f2- -d'.')
 else
 	printf "$(gettext "Error: can not determine full hostname (FQHN).  Aborting")\n"
 	printf "$(gettext "Note, trying to use hostname and domainname to get FQHN").\n"
@@ -693,7 +737,6 @@ if [[ -z $REALM ]]; then
 	read REALM
 	checkval="REALM"; check_value $REALM
 fi
-REALM=$(echo "$REALM"|tr '[a-z]' '[A-Z]')
 
 if [[ -z $master && -z $slave ]]; then
 	query "$(gettext "Is this machine to be configured as a master?"): \c"
