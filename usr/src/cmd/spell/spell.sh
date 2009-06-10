@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,11 +22,9 @@
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
 
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 
-#	Copyright (c) 1998, 2000 by Sun Microsystems, Inc.
-#	All rights reserved.
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.11	*/
 #	spell program
 # B_SPELL flags, D_SPELL dictionary, F_SPELL input files, H_SPELL history,
 # S_SPELL stop, V_SPELL data for -v
@@ -117,7 +114,7 @@ fi
 
 (cat $F_SPELL; printf "\n";) | eval $L_SPELL |\
  eval $DEROFF |\
- /usr/bin/tr -cs "[A-Z][a-z][0-9]\'\&\.\,\;\?\:" "[\012*]" |\
+ LC_ALL=C /usr/bin/tr -cs "[A-Z][a-z][0-9]\'\&\.\,\;\?\:" "[\012*]" |\
  /usr/bin/sed '1,$s/^[^A-Za-z0-9]*//' | /usr/bin/sed '1,$s/[^A-Za-z0-9]*$//' |\
  /usr/bin/sed -n "/[A-Za-z]/p" | /usr/bin/sort -u +0 |\
  $SPELLPROG ${S_SPELL:-/usr/lib/spell/hstop} 1 |\
