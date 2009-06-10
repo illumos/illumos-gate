@@ -1,8 +1,7 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * lib/krb5/krb/init_ctx.c
@@ -79,11 +78,17 @@ pid_t __krb5_current_pid; /* fork safety: contains the current process ID */
    configure KDCs to issue TGTs with des-mdX keys and then not accept
    them.  This'll be fixed, but for better compatibility, let's prefer
    des-crc for now.  */
+/*
+ * Solaris Kerberos:
+ * Added arcfour-hmac-md5-exp as default enc type.
+ * Changed des3-hmac-sha1 to des3-cbc-sha1-kd, as specified in RFC3961.
+ */
 #define DEFAULT_ETYPE_LIST	\
 	"aes256-cts-hmac-sha1-96 " \
 	"aes128-cts-hmac-sha1-96 " \
-	"des3-hmac-sha1 " \
+	"des3-cbc-sha1-kd " \
 	"arcfour-hmac-md5 " \
+	"arcfour-hmac-md5-exp " \
 	"des-cbc-md5 " \
 	"des-cbc-crc"
 
