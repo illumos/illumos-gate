@@ -1555,6 +1555,101 @@ gcpu_cmci_throttle(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
 }
 #endif
 
+static void
+clear_mc(int first, int last, int ismc, boolean_t clrstatus,
+    cmi_hdl_t hdl, gcpu_logout_t *gcl, gcpu_logout_t *pgcl)
+{
+	int i;
+	gcpu_bank_logout_t *gbl, *pgbl;
+	uint64_t status;
+
+	for (i = first, gbl = &gcl->gcl_data[first]; i < last; i++, gbl++) {
+		status = gbl->gbl_status;
+		if (status == 0)
+			continue;
+		if (clrstatus == B_FALSE)
+			goto serialize;
+
+		/*
+		 * For i86xpv we always clear status in order to invalidate
+		 * the interposed telemetry.
+		 *
+		 * For native machine checks we always clear status here.  For
+		 * native polls we must be a little more cautious since there
+		 * is an outside chance that we may clear telemetry from a
+		 * shared MCA bank on which a sibling core is machine checking.
+		 *
+		 * For polled observations of errors that look like they may
+		 * produce a machine check (UC/PCC and ENabled, although these
+		 * do not guarantee a machine check on error occurence)
+		 * we will not clear the status at this wakeup unless
+		 * we saw the same status at the previous poll.	 We will
+		 * always process and log the current observations - it
+		 * is only the clearing of MCi_STATUS which may be
+		 * deferred until the next wakeup.
+		 */
+		if (isxpv || ismc || !IS_MCE_CANDIDATE(status)) {
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC(i, STATUS), 0ULL);
+			goto serialize;
+		}
+
+		/*
+		 * We have a polled observation of a machine check
+		 * candidate.  If we saw essentially the same status at the
+		 * last poll then clear the status now since this appears
+		 * not to be a #MC candidate after all.	 If we see quite
+		 * different status now then do not clear, but reconsider at
+		 * the next poll.  In no actual machine check clears
+		 * the status in the interim then the status should not
+		 * keep changing forever (meaning we'd never clear it)
+		 * since before long we'll simply have latched the highest-
+		 * priority error and set the OVerflow bit.  Nonetheless
+		 * we count how many times we defer clearing and after
+		 * a while insist on clearing the status.
+		 */
+		pgbl = &pgcl->gcl_data[i];
+		if (pgbl->gbl_clrdefcnt != 0) {
+			/* We deferred clear on this bank at last wakeup */
+			if (STATUS_EQV(status, pgcl->gcl_data[i].gbl_status) ||
+			    pgbl->gbl_clrdefcnt > 5) {
+				/*
+				 * Status is unchanged so clear it now and,
+				 * since we have already logged this info,
+				 * avoid logging it again.
+				 */
+				gbl->gbl_status = 0;
+				(void) cmi_hdl_wrmsr(hdl,
+				    IA32_MSR_MC(i, STATUS), 0ULL);
+			} else {
+				/* Record deferral for next wakeup */
+				gbl->gbl_clrdefcnt = pgbl->gbl_clrdefcnt + 1;
+			}
+		} else {
+			/* Record initial deferral for next wakeup */
+			gbl->gbl_clrdefcnt = 1;
+			gcpu_deferrred_polled_clears++;
+		}
+
+serialize:
+		{
+#ifdef __xpv
+			;
+#else
+			/*
+			 * Intel Vol 3A says to execute a serializing
+			 * instruction here, ie CPUID.	Well WRMSR is also
+			 * defined to be serializing, so the status clear above
+			 * should suffice.  To be a good citizen, and since
+			 * some clears are deferred, we'll execute a CPUID
+			 * instruction here.
+			 */
+			struct cpuid_regs tmp;
+			(void) __cpuid_insn(&tmp);
+#endif
+		}
+	}
+}
+
 /*ARGSUSED5*/
 void
 gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
@@ -1563,7 +1658,7 @@ gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
 	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
 	gcpu_mca_t *mca = &gcpu->gcpu_mca;
 	int nbanks = mca->gcpu_mca_nbanks;
-	gcpu_bank_logout_t *gbl, *pgbl;
+	gcpu_bank_logout_t *gbl;
 	gcpu_logout_t *gcl, *pgcl;
 	int ismc = (rp != NULL);
 	int ispoll = !ismc;
@@ -1572,6 +1667,9 @@ gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
 	uint64_t mcg_status;
 	uint64_t disp;
 	uint64_t cap;
+	int first = 0;
+	int last = 0;
+	int willpanic = 0;
 
 	if (cmi_hdl_rdmsr(hdl, IA32_MSR_MCG_STATUS, &mcg_status) !=
 	    CMI_SUCCESS || cmi_hdl_rdmsr(hdl, IA32_MSR_MCG_CAP, &cap) !=
@@ -1637,6 +1735,10 @@ retry:
 		if (!(status & MSR_MC_STATUS_VAL))
 			continue;
 
+		if (first == 0)
+			first = i;
+		last = i;
+
 		addr = -1;
 		misc = 0;
 
@@ -1686,88 +1788,6 @@ retry:
 		gbl->gbl_status = status;
 		gbl->gbl_addr = addr;
 		gbl->gbl_misc = misc;
-
-		if (clrstatus == B_FALSE)
-			goto serialize;
-
-		/*
-		 * For i86xpv we always clear status in order to invalidate
-		 * the interposed telemetry.
-		 *
-		 * For native machine checks we always clear status here.  For
-		 * native polls we must be a little more cautious since there
-		 * is an outside chance that we may clear telemetry from a
-		 * shared MCA bank on which a sibling core is machine checking.
-		 *
-		 * For polled observations of errors that look like they may
-		 * produce a machine check (UC/PCC and ENabled, although these
-		 * do not guarantee a machine check on error occurence)
-		 * we will not clear the status at this wakeup unless
-		 * we saw the same status at the previous poll.  We will
-		 * always process and log the current observations - it
-		 * is only the clearing of MCi_STATUS which may be
-		 * deferred until the next wakeup.
-		 */
-		if (isxpv || ismc || !IS_MCE_CANDIDATE(status)) {
-			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC(i, STATUS), 0ULL);
-			goto serialize;
-		}
-
-		/*
-		 * We have a polled observation of a machine check
-		 * candidate.  If we saw essentially the same status at the
-		 * last poll then clear the status now since this appears
-		 * not to be a #MC candidate after all.  If we see quite
-		 * different status now then do not clear, but reconsider at
-		 * the next poll.  In no actual machine check clears
-		 * the status in the interim then the status should not
-		 * keep changing forever (meaning we'd never clear it)
-		 * since before long we'll simply have latched the highest-
-		 * priority error and set the OVerflow bit.  Nonetheless
-		 * we count how many times we defer clearing and after
-		 * a while insist on clearing the status.
-		 */
-		pgbl = &pgcl->gcl_data[i];
-		if (pgbl->gbl_clrdefcnt != 0) {
-			/* We deferred clear on this bank at last wakeup */
-			if (STATUS_EQV(status, pgcl->gcl_data[i].gbl_status) ||
-			    pgbl->gbl_clrdefcnt > 5) {
-				/*
-				 * Status is unchanged so clear it now and,
-				 * since we have already logged this info,
-				 * avoid logging it again.
-				 */
-				gbl->gbl_status = 0;
-				nerr--;
-				(void) cmi_hdl_wrmsr(hdl,
-				    IA32_MSR_MC(i, STATUS), 0ULL);
-			} else {
-				/* Record deferral for next wakeup */
-				gbl->gbl_clrdefcnt = pgbl->gbl_clrdefcnt + 1;
-			}
-		} else {
-			/* Record initial deferral for next wakeup */
-			gbl->gbl_clrdefcnt = 1;
-			gcpu_deferrred_polled_clears++;
-		}
-
-serialize:
-		{
-#ifdef __xpv
-			;
-#else
-			/*
-			 * Intel Vol 3A says to execute a serializing
-			 * instruction here, ie CPUID.  Well WRMSR is also
-			 * defined to be serializing, so the status clear above
-			 * should suffice.  To be a good citizen, and since
-			 * some clears are deferred, we'll execute a CPUID
-			 * instruction here.
-			 */
-			struct cpuid_regs tmp;
-			(void) __cpuid_insn(&tmp);
-#endif
-		}
 	}
 
 	if (gcpu_mca_stack_flag)
@@ -1781,6 +1801,11 @@ serialize:
 	 */
 	if (nerr != 0) {
 		disp = gcpu_mca_process(hdl, rp, nerr, gcpu, gcl, ismc, mcesp);
+
+		willpanic = (ismc && cmi_mce_response(rp, disp) == 0);
+
+		if (!willpanic)
+			clear_mc(first, last, ismc, clrstatus, hdl, gcl, pgcl);
 	} else {
 		disp = 0;
 		if (mcesp) {
@@ -1806,7 +1831,6 @@ serialize:
 	 * a chance to log errors.
 	 */
 	if (ismc) {
-		int willpanic = (cmi_mce_response(rp, disp) == 0);
 		cmi_mc_logout(hdl, 1, willpanic);
 	}
 }

@@ -383,7 +383,7 @@ intel_int_err(uint16_t err_fat_int, uint16_t err_nf_int)
 }
 
 static int
-log_int_err(nb_regs_t *rp, int *interpose)
+log_int_err(nb_regs_t *rp, int willpanic, int *interpose)
 {
 	int t = 0;
 	int rt = 0;
@@ -401,20 +401,25 @@ log_int_err(nb_regs_t *rp, int *interpose)
 	rp->nb.int_regs.nrecsf = NRECSF_RD();
 	rp->nb.int_regs.recsf = RECSF_RD();
 
-	if (rp->nb.int_regs.ferr_fat_int || *interpose)
-		FERR_FAT_INT_WR(rp->nb.int_regs.ferr_fat_int);
-	if (rp->nb.int_regs.ferr_nf_int || *interpose)
-		FERR_NF_INT_WR(rp->nb.int_regs.ferr_nf_int);
-	if (rp->nb.int_regs.nerr_fat_int)
-		NERR_FAT_INT_WR(rp->nb.int_regs.nerr_fat_int);
-	if (rp->nb.int_regs.nerr_nf_int)
-		NERR_NF_INT_WR(rp->nb.int_regs.nerr_nf_int);
-	/* if interpose write read-only registers to clear from pcii cache */
-	if (*interpose) {
-		NRECINT_WR();
-		RECINT_WR();
-		NRECSF_WR();
-		RECSF_WR();
+	if (!willpanic) {
+		if (rp->nb.int_regs.ferr_fat_int || *interpose)
+			FERR_FAT_INT_WR(rp->nb.int_regs.ferr_fat_int);
+		if (rp->nb.int_regs.ferr_nf_int || *interpose)
+			FERR_NF_INT_WR(rp->nb.int_regs.ferr_nf_int);
+		if (rp->nb.int_regs.nerr_fat_int)
+			NERR_FAT_INT_WR(rp->nb.int_regs.nerr_fat_int);
+		if (rp->nb.int_regs.nerr_nf_int)
+			NERR_NF_INT_WR(rp->nb.int_regs.nerr_nf_int);
+		/*
+		 * if interpose write read-only registers to clear from pcii
+		 * cache
+		 */
+		if (*interpose) {
+			NRECINT_WR();
+			RECINT_WR();
+			NRECSF_WR();
+			RECSF_WR();
+		}
 	}
 	if (rp->nb.int_regs.ferr_fat_int == 0 &&
 	    rp->nb.int_regs.nerr_fat_int == 0 &&
@@ -427,7 +432,7 @@ log_int_err(nb_regs_t *rp, int *interpose)
 }
 
 static void
-log_thermal_err(nb_regs_t *rp, int *interpose)
+log_thermal_err(nb_regs_t *rp, int willpanic, int *interpose)
 {
 	int t = 0;
 
@@ -442,18 +447,20 @@ log_thermal_err(nb_regs_t *rp, int *interpose)
 	rp->nb.thr_regs.ctsts = CTSTS_RD();
 	rp->nb.thr_regs.thrtsts = THRTSTS_RD();
 
-	if (rp->nb.thr_regs.ferr_fat_thr || *interpose)
-		FERR_FAT_THR_WR(rp->nb.thr_regs.ferr_fat_thr);
-	if (rp->nb.thr_regs.nerr_fat_thr || *interpose)
-		NERR_FAT_THR_WR(rp->nb.thr_regs.nerr_fat_thr);
-	if (rp->nb.thr_regs.ferr_nf_thr || *interpose)
-		FERR_NF_THR_WR(rp->nb.thr_regs.ferr_nf_thr);
-	if (rp->nb.thr_regs.nerr_nf_thr || *interpose)
-		NERR_NF_THR_WR(rp->nb.thr_regs.nerr_nf_thr);
+	if (!willpanic) {
+		if (rp->nb.thr_regs.ferr_fat_thr || *interpose)
+			FERR_FAT_THR_WR(rp->nb.thr_regs.ferr_fat_thr);
+		if (rp->nb.thr_regs.nerr_fat_thr || *interpose)
+			NERR_FAT_THR_WR(rp->nb.thr_regs.nerr_fat_thr);
+		if (rp->nb.thr_regs.ferr_nf_thr || *interpose)
+			FERR_NF_THR_WR(rp->nb.thr_regs.ferr_nf_thr);
+		if (rp->nb.thr_regs.nerr_nf_thr || *interpose)
+			NERR_NF_THR_WR(rp->nb.thr_regs.nerr_nf_thr);
 
-	if (*interpose) {
-		CTSTS_WR(rp->nb.thr_regs.ctsts);
-		THRTSTS_WR(rp->nb.thr_regs.thrtsts);
+		if (*interpose) {
+			CTSTS_WR(rp->nb.thr_regs.ctsts);
+			THRTSTS_WR(rp->nb.thr_regs.thrtsts);
+		}
 	}
 }
 
@@ -515,7 +522,7 @@ intel_fsb_err(int fsb, uint8_t err_fat_fsb, uint8_t err_nf_fsb)
 }
 
 static void
-log_fsb_err(uint64_t ferr, nb_regs_t *rp, int *interpose)
+log_fsb_err(uint64_t ferr, nb_regs_t *rp, int willpanic, int *interpose)
 {
 	uint8_t fsb;
 	int t = 0;
@@ -534,15 +541,20 @@ log_fsb_err(uint64_t ferr, nb_regs_t *rp, int *interpose)
 	rp->nb.fsb_regs.nrecfsb = NRECFSB_RD(fsb);
 	rp->nb.fsb_regs.nrecfsb_addr = NRECADDR_RD(fsb);
 	rp->nb.fsb_regs.recfsb = RECFSB_RD(fsb);
-	if (rp->nb.fsb_regs.ferr_fat_fsb || *interpose)
-		FERR_FAT_FSB_WR(fsb, rp->nb.fsb_regs.ferr_fat_fsb);
-	if (rp->nb.fsb_regs.ferr_nf_fsb || *interpose)
-		FERR_NF_FSB_WR(fsb, rp->nb.fsb_regs.ferr_nf_fsb);
-	/* if interpose write read-only registers to clear from pcii cache */
-	if (*interpose) {
-		NRECFSB_WR(fsb);
-		NRECADDR_WR(fsb);
-		RECFSB_WR(fsb);
+	if (!willpanic) {
+		if (rp->nb.fsb_regs.ferr_fat_fsb || *interpose)
+			FERR_FAT_FSB_WR(fsb, rp->nb.fsb_regs.ferr_fat_fsb);
+		if (rp->nb.fsb_regs.ferr_nf_fsb || *interpose)
+			FERR_NF_FSB_WR(fsb, rp->nb.fsb_regs.ferr_nf_fsb);
+		/*
+		 * if interpose write read-only registers to clear from pcii
+		 * cache
+		 */
+		if (*interpose) {
+			NRECFSB_WR(fsb);
+			NRECADDR_WR(fsb);
+			RECFSB_WR(fsb);
+		}
 	}
 }
 
@@ -867,7 +879,7 @@ intel_pex_5400_err(uint32_t pex_fat, uint32_t pex_nf_cor)
 }
 
 static void
-log_pex_err(uint64_t ferr, nb_regs_t *rp, int *interpose)
+log_pex_err(uint64_t ferr, nb_regs_t *rp, int willpanic, int *interpose)
 {
 	uint8_t pex = (uint8_t)-1;
 	int t = 0;
@@ -894,24 +906,26 @@ log_pex_err(uint64_t ferr, nb_regs_t *rp, int *interpose)
 	rp->nb.pex_regs.corerrsts = CORERRSTS_RD(pex);
 	rp->nb.pex_regs.pexdevsts = PEXDEVSTS_RD(pex);
 
-	if (rp->nb.pex_regs.pex_fat_ferr || *interpose)
-		PEX_FAT_FERR_WR(pex, rp->nb.pex_regs.pex_fat_ferr);
-	if (rp->nb.pex_regs.pex_fat_nerr)
-		PEX_FAT_NERR_WR(pex, rp->nb.pex_regs.pex_fat_nerr);
-	if (rp->nb.pex_regs.pex_nf_corr_ferr || *interpose)
-		PEX_NF_FERR_WR(pex, rp->nb.pex_regs.pex_nf_corr_ferr);
-	if (rp->nb.pex_regs.pex_nf_corr_nerr)
-		PEX_NF_NERR_WR(pex, rp->nb.pex_regs.pex_nf_corr_nerr);
-	if (*interpose)
-		UNCERRSTS_WR(pex, rp->nb.pex_regs.uncerrsts);
-	if (*interpose)
-		RPERRSTS_WR(pex, rp->nb.pex_regs.rperrsts);
-	if (*interpose)
-		PEXDEVSTS_WR(pex, 0);
+	if (!willpanic) {
+		if (rp->nb.pex_regs.pex_fat_ferr || *interpose)
+			PEX_FAT_FERR_WR(pex, rp->nb.pex_regs.pex_fat_ferr);
+		if (rp->nb.pex_regs.pex_fat_nerr)
+			PEX_FAT_NERR_WR(pex, rp->nb.pex_regs.pex_fat_nerr);
+		if (rp->nb.pex_regs.pex_nf_corr_ferr || *interpose)
+			PEX_NF_FERR_WR(pex, rp->nb.pex_regs.pex_nf_corr_ferr);
+		if (rp->nb.pex_regs.pex_nf_corr_nerr)
+			PEX_NF_NERR_WR(pex, rp->nb.pex_regs.pex_nf_corr_nerr);
+		if (*interpose)
+			UNCERRSTS_WR(pex, rp->nb.pex_regs.uncerrsts);
+		if (*interpose)
+			RPERRSTS_WR(pex, rp->nb.pex_regs.rperrsts);
+		if (*interpose)
+			PEXDEVSTS_WR(pex, 0);
+	}
 }
 
 static void
-log_fat_fbd_err(nb_regs_t *rp, int *interpose)
+log_fat_fbd_err(nb_regs_t *rp, int willpanic, int *interpose)
 {
 	int channel, branch;
 	int t = 0;
@@ -939,26 +953,31 @@ log_fat_fbd_err(nb_regs_t *rp, int *interpose)
 	rp->nb.fat_fbd_regs.badrama = BADRAMA_RD(branch);
 	rp->nb.fat_fbd_regs.badramb = BADRAMB_RD(branch);
 	rp->nb.fat_fbd_regs.badcnt = BADCNT_RD(branch);
-	if (rp->nb.fat_fbd_regs.ferr_fat_fbd || *interpose)
-		FERR_FAT_FBD_WR(rp->nb.fat_fbd_regs.ferr_fat_fbd);
-	if (rp->nb.fat_fbd_regs.nerr_fat_fbd)
-		NERR_FAT_FBD_WR(rp->nb.fat_fbd_regs.nerr_fat_fbd);
-	/* if interpose write read-only registers to clear from pcii cache */
-	if (*interpose) {
-		NRECMEMA_WR(branch);
-		NRECMEMB_WR(branch);
-		NRECFGLOG_WR(branch);
-		NRECFBDA_WR(branch);
-		NRECFBDB_WR(branch);
-		NRECFBDC_WR(branch);
-		NRECFBDD_WR(branch);
-		NRECFBDE_WR(branch);
-		NRECFBDF_WR(branch);
+	if (!willpanic) {
+		if (rp->nb.fat_fbd_regs.ferr_fat_fbd || *interpose)
+			FERR_FAT_FBD_WR(rp->nb.fat_fbd_regs.ferr_fat_fbd);
+		if (rp->nb.fat_fbd_regs.nerr_fat_fbd)
+			NERR_FAT_FBD_WR(rp->nb.fat_fbd_regs.nerr_fat_fbd);
+		/*
+		 * if interpose write read-only registers to clear from pcii
+		 * cache
+		 */
+		if (*interpose) {
+			NRECMEMA_WR(branch);
+			NRECMEMB_WR(branch);
+			NRECFGLOG_WR(branch);
+			NRECFBDA_WR(branch);
+			NRECFBDB_WR(branch);
+			NRECFBDC_WR(branch);
+			NRECFBDD_WR(branch);
+			NRECFBDE_WR(branch);
+			NRECFBDF_WR(branch);
+		}
 	}
 }
 
 static void
-log_nf_fbd_err(nb_regs_t *rp, int *interpose)
+log_nf_fbd_err(nb_regs_t *rp, int willpanic, int *interpose)
 {
 	int channel, branch;
 	int t = 0;
@@ -1003,22 +1022,27 @@ log_nf_fbd_err(nb_regs_t *rp, int *interpose)
 	rp->nb.nf_fbd_regs.badrama = BADRAMA_RD(branch);
 	rp->nb.nf_fbd_regs.badramb = BADRAMB_RD(branch);
 	rp->nb.nf_fbd_regs.badcnt = BADCNT_RD(branch);
-	if (rp->nb.nf_fbd_regs.ferr_nf_fbd || *interpose)
-		FERR_NF_FBD_WR(rp->nb.nf_fbd_regs.ferr_nf_fbd);
-	if (rp->nb.nf_fbd_regs.nerr_nf_fbd)
-		NERR_NF_FBD_WR(rp->nb.nf_fbd_regs.nerr_nf_fbd);
-	/* if interpose write read-only registers to clear from pcii cache */
-	if (*interpose) {
-		RECMEMA_WR(branch);
-		RECMEMB_WR(branch);
-		RECFGLOG_WR(branch);
-		RECFBDA_WR(branch);
-		RECFBDB_WR(branch);
-		RECFBDC_WR(branch);
-		RECFBDD_WR(branch);
-		RECFBDE_WR(branch);
-		RECFBDF_WR(branch);
-		SPCPS_WR(branch);
+	if (!willpanic) {
+		if (rp->nb.nf_fbd_regs.ferr_nf_fbd || *interpose)
+			FERR_NF_FBD_WR(rp->nb.nf_fbd_regs.ferr_nf_fbd);
+		if (rp->nb.nf_fbd_regs.nerr_nf_fbd)
+			NERR_NF_FBD_WR(rp->nb.nf_fbd_regs.nerr_nf_fbd);
+		/*
+		 * if interpose write read-only registers to clear from pcii
+		 * cache
+		 */
+		if (*interpose) {
+			RECMEMA_WR(branch);
+			RECMEMB_WR(branch);
+			RECFGLOG_WR(branch);
+			RECFBDA_WR(branch);
+			RECFBDB_WR(branch);
+			RECFBDC_WR(branch);
+			RECFBDD_WR(branch);
+			RECFBDE_WR(branch);
+			RECFBDF_WR(branch);
+			SPCPS_WR(branch);
+		}
 	}
 }
 
@@ -1032,26 +1056,26 @@ log_ferr(uint64_t ferr, uint32_t *nerrp, nb_logout_t *log, int willpanic)
 
 	log->acl_timestamp = gethrtime_waitfree();
 	if ((ferr & (GE_PCIEX_FATAL | GE_PCIEX_NF)) != 0) {
-		log_pex_err(ferr, rp, &interpose);
+		log_pex_err(ferr, rp, willpanic, &interpose);
 		*nerrp = nerr & ~(GE_PCIEX_FATAL | GE_PCIEX_NF);
 	} else if ((ferr & GE_FBD_FATAL) != 0) {
-		log_fat_fbd_err(rp, &interpose);
+		log_fat_fbd_err(rp, willpanic, &interpose);
 		*nerrp = nerr & ~GE_NERR_FBD_FATAL;
 	} else if ((ferr & GE_FBD_NF) != 0) {
-		log_nf_fbd_err(rp, &interpose);
+		log_nf_fbd_err(rp, willpanic, &interpose);
 		*nerrp = nerr & ~GE_NERR_FBD_NF;
 	} else if ((ferr & (GE_FERR_FSB_FATAL | GE_FERR_FSB_NF)) != 0) {
-		log_fsb_err(ferr, rp, &interpose);
+		log_fsb_err(ferr, rp, willpanic, &interpose);
 		*nerrp = nerr & ~(GE_NERR_FSB_FATAL | GE_NERR_FSB_NF);
 	} else if ((ferr & (GE_DMA_FATAL | GE_DMA_NF)) != 0) {
 		log_dma_err(rp, &interpose);
 		*nerrp = nerr & ~(GE_DMA_FATAL | GE_DMA_NF);
 	} else if ((ferr & (GE_INT_FATAL | GE_INT_NF)) != 0) {
-		spurious = log_int_err(rp, &interpose);
+		spurious = log_int_err(rp, willpanic, &interpose);
 		*nerrp = nerr & ~(GE_INT_FATAL | GE_INT_NF);
 	} else if (nb_chipset == INTEL_NB_5400 &&
 	    (ferr & (GE_FERR_THERMAL_FATAL | GE_FERR_THERMAL_NF)) != 0) {
-		log_thermal_err(rp, &interpose);
+		log_thermal_err(rp, willpanic, &interpose);
 		*nerrp = nerr & ~(GE_FERR_THERMAL_FATAL | GE_FERR_THERMAL_NF);
 	}
 	if (interpose)
@@ -1075,22 +1099,23 @@ log_nerr(uint32_t *errp, nb_logout_t *log, int willpanic)
 	err = *errp;
 	log->acl_timestamp = gethrtime_waitfree();
 	if ((err & (GE_PCIEX_FATAL | GE_PCIEX_NF)) != 0) {
-		log_pex_err(err, rp, &interpose);
+		log_pex_err(err, rp, willpanic, &interpose);
 		*errp = err & ~(GE_PCIEX_FATAL | GE_PCIEX_NF);
 	} else if ((err & GE_NERR_FBD_FATAL) != 0) {
-		log_fat_fbd_err(rp, &interpose);
+		log_fat_fbd_err(rp, willpanic, &interpose);
 		*errp = err & ~GE_NERR_FBD_FATAL;
 	} else if ((err & GE_NERR_FBD_NF) != 0) {
-		log_nf_fbd_err(rp, &interpose);
+		log_nf_fbd_err(rp, willpanic, &interpose);
 		*errp = err & ~GE_NERR_FBD_NF;
 	} else if ((err & (GE_NERR_FSB_FATAL | GE_NERR_FSB_NF)) != 0) {
-		log_fsb_err(GE_NERR_TO_FERR_FSB(err), rp, &interpose);
+		log_fsb_err(GE_NERR_TO_FERR_FSB(err), rp, willpanic,
+		    &interpose);
 		*errp = err & ~(GE_NERR_FSB_FATAL | GE_NERR_FSB_NF);
 	} else if ((err & (GE_DMA_FATAL | GE_DMA_NF)) != 0) {
 		log_dma_err(rp, &interpose);
 		*errp = err & ~(GE_DMA_FATAL | GE_DMA_NF);
 	} else if ((err & (GE_INT_FATAL | GE_INT_NF)) != 0) {
-		spurious = log_int_err(rp, &interpose);
+		spurious = log_int_err(rp, willpanic, &interpose);
 		*errp = err & ~(GE_INT_FATAL | GE_INT_NF);
 	}
 	if (interpose)
