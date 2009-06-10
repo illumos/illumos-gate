@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,8 +37,8 @@
 static char *whoami = NULL;
 
 static void kt_add_entry(krb5_context ctx, krb5_keytab kt,
-	const krb5_principal princ, krb5_enctype enctype, krb5_kvno kvno,
-	const char *pw);
+	const krb5_principal princ, const krb5_principal sprinc,
+	krb5_enctype enctype, krb5_kvno kvno, const char *pw);
 
 static krb5_error_code kt_remove_entries(krb5_context ctx, krb5_keytab kt,
 	const krb5_principal princ);
@@ -57,7 +55,7 @@ main(int argc, char **argv)
 	krb5_ccache cc = NULL;
 	krb5_keytab kt = NULL;
 	krb5_kvno kvno = 1;
-	krb5_principal victim;
+	krb5_principal victim, salt;
 	char c, *vprincstr, *ktname, *token, *lasts, *newpw;
 	int result_code, i, len, nflag = 0;
 	krb5_data result_code_string, result_string;
@@ -82,7 +80,7 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	while ((c = getopt(argc, argv, "v:c:k:e:n")) != -1) {
+	while ((c = getopt(argc, argv, "v:c:k:e:ns:")) != -1) {
 		switch (c) {
 		case 'n':
 			nflag++;
@@ -146,6 +144,16 @@ main(int argc, char **argv)
 			break;
 		case 'v':
 			kvno = (krb5_kvno) atoi(optarg);
+			break;
+		case 's':
+			vprincstr = optarg;
+			code = krb5_parse_name(ctx, vprincstr, &salt);
+			if (code != 0) {
+				com_err(whoami, code,
+				    gettext("krb5_parse_name(%s) failed"),
+				    vprincstr);
+				exit(1);
+			}
 			break;
 		default:
 			usage();
@@ -237,7 +245,7 @@ main(int argc, char **argv)
 		goto error;
 
 	for (i = 0; i < enctype_count; i++)
-		kt_add_entry(ctx, kt, victim, enctypes[i], kvno, newpw);
+		kt_add_entry(ctx, kt, victim, salt, enctypes[i], kvno, newpw);
 
 error:
 	if (kt != NULL)
@@ -319,7 +327,8 @@ kt_remove_entries(krb5_context ctx, krb5_keytab kt, const krb5_principal princ)
 static
 void
 kt_add_entry(krb5_context ctx, krb5_keytab kt, const krb5_principal princ,
-	krb5_enctype enctype, krb5_kvno kvno, const char *pw)
+	const krb5_principal sprinc, krb5_enctype enctype, krb5_kvno kvno,
+	const char *pw)
 {
 	krb5_keytab_entry *entry;
 	krb5_data password, salt;
@@ -342,7 +351,7 @@ kt_add_entry(krb5_context ctx, krb5_keytab kt, const krb5_principal princ,
 	password.length = strlen(pw);
 	password.data = (char *)pw;
 
-	if ((code = krb5_principal2salt(ctx, princ, &salt)) != 0) {
+	if ((code = krb5_principal2salt(ctx, sprinc, &salt)) != 0) {
 		com_err(whoami, code,
 		    gettext("Could not compute salt for %s"), enctype);
 		return;

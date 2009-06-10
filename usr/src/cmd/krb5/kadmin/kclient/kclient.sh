@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This script is used to setup the Kerberos client by
@@ -31,12 +31,11 @@
 # bringover a master krb5.conf copy from a specified location.
 
 function cleanup {
-	integer ret=$1
 
-	kdestroy -q 1> $TMP_FILE 2>&1
+	kdestroy -q > $TMP_FILE 2>&1
 	rm -r $TMPDIR > /dev/null 2>&1
 
-	exit $ret
+	exit $1
 }
 function exiting {
 	
@@ -47,8 +46,8 @@ function exiting {
 
 function error_message {
 
-        printf -- "---------------------------------------------------\n"
-        printf "$(gettext "Setup FAILED").\n\n"
+        printf -- "---------------------------------------------------\n" >&2
+        printf "$(gettext "Setup FAILED").\n\n" >&2
 
         cleanup 1
 }
@@ -58,7 +57,7 @@ function check_bin {
 	typeset bin=$1
 
 	if [[ ! -x $bin ]]; then
-		printf "$(gettext "Could not access/execute %s").\n" $bin
+		printf "$(gettext "Could not access/execute %s").\n" $bin >&2
 		error_message
 	fi
 }
@@ -195,7 +194,7 @@ function writeup_krb5_conf {
 
 	exec 3>$KRB5_CONFIG
 	if [[ $? -ne 0 ]]; then
-		printf "\n$(gettext "Can not write to %s, exiting").\n" $KRB5_CONFIG
+		printf "\n$(gettext "Can not write to %s, exiting").\n" $KRB5_CONFIG >&2
 		error_message
 	fi
 
@@ -865,7 +864,7 @@ function write_ads_krb5conf {
 
 	exec 3>$KRB5_CONFIG
 	if [[ $? -ne 0 ]]; then
-		printf "\n$(gettext "Can not write to %s, exiting").\n" $KRB5_CONFIG
+		printf "\n$(gettext "Can not write to %s, exiting").\n" $KRB5_CONFIG >&2
 		error_message
 	fi
 
@@ -899,7 +898,7 @@ function getForestName {
 		grep ^schemaNamingContext|read j schemaNamingContext
 
 	if [[ $? -ne 0 ]]; then
-		printf "$(gettext "Can't find forest").\n"
+		printf "$(gettext "Can't find forest").\n" >&2
 		error_message
 	fi
 	schemaNamingContext=${schemaNamingContext#CN=Schema,CN=Configuration,}
@@ -939,9 +938,14 @@ function getGC {
 	gc=$ForestDnsZones
 }
 
+#
+# The local variables used to calculate the IP address are of type unsigned
+# integer (-ui), as this is required to restrict the integer to 32b.
+# Starting in ksh88, Solaris has incorrectly assummed that -i represents 64b.
+#
 function ipAddr2num {
 	typeset OIFS
-	typeset -i16 num byte
+	typeset -ui16 num
 
 	if [[ "$1" != +([0-9]).+([0-9]).+([0-9]).+([0-9]) ]]
 	then
@@ -959,9 +963,14 @@ function ipAddr2num {
 	print -- $num
 }
 
+#
+# The local variables used to calculate the IP address are of type unsigned
+# integer (-ui), as this is required to restrict the integer to 32b.
+# Starting in ksh88, Solaris has incorrectly assummed that -i represents 64b.
+#
 function num2ipAddr {
-	typeset -i16 num
-	typeset -i10 a b c d
+	typeset -ui16 num
+	typeset -ui10 a b c d
 
 	num=$1
 	a=$((num>>24        ))
@@ -971,8 +980,13 @@ function num2ipAddr {
 	print -- $a.$b.$c.$d
 }
 
+#
+# The local variables used to calculate the IP address are of type unsigned
+# integer (-ui), as this is required to restrict the integer to 32b.
+# Starting in ksh88, Solaris has incorrectly assummed that -i represents 64b.
+#
 function netmask2length {
-	typeset -i16 netmask
+	typeset -ui16 netmask
 	typeset -i len
 
 	netmask=$1
@@ -985,9 +999,14 @@ function netmask2length {
 	print $len
 }
 
+#
+# The local variables used to calculate the IP address are of type unsigned
+# integer (-ui), as this is required to restrict the integer to 32b.
+# Starting in ksh88, Solaris has incorrectly assummed that -i represents 64b.
+#
 function getSubnets {
-	typeset -i16 addr netmask
-	typeset -i16 classa=16\#ff000000
+	typeset -ui16 addr netmask
+	typeset -ui16 classa=16\#ff000000
 
 	ifconfig -a|while read line
 	do
@@ -1112,7 +1131,7 @@ function compareDomains {
 		query "$(gettext "Do you want the client to join a new domain") ?"
 		printf "\n"
 		if [[ $answer != yes ]]; then
-			printf "$(gettext "Client will not be joined to the new domain").\n"
+			printf "$(gettext "Client will not be joined to the new domain").\n" >&2
 			error_message
 		fi
 	fi
@@ -1129,7 +1148,7 @@ function getKDCDC {
 		if [[ -n $dc ]]; then
 			KDC=$dc
 		else
-			printf "$(gettext "Could not find domain controller server for '%s'.  Exiting").\n" $realm
+			printf "$(gettext "Could not find domain controller server for '%s'.  Exiting").\n" $realm >&2
 			error_message
 		fi
 	fi
@@ -1150,7 +1169,7 @@ function join_domain {
 	fi
 
 	if ! discover_domain; then
-		printf "$(gettext "Can not find realm") '%s'.\n" $realm
+		printf "$(gettext "Can not find realm") '%s'.\n" $realm >&2
 		error_message
 	fi
 
@@ -1192,7 +1211,7 @@ function join_domain {
 
 	kinit $cprinc@$realm
 	if [[ $? -ne 0 ]]; then
-		printf "$(gettext "Could not authenticate %s.  Exiting").\n" $cprinc@$realm
+		printf "$(gettext "Could not authenticate %s.  Exiting").\n" $cprinc@$realm >&2
 		error_message
 	fi
 
@@ -1218,7 +1237,7 @@ function join_domain {
 	fi
 
 	if [[ ${#GCs} -eq 0 ]]; then
-		printf "$(gettext "Could not find global catalogs.  Exiting").\n"
+		printf "$(gettext "Could not find global catalogs.  Exiting").\n" >&2
 		error_message
 	fi
 
@@ -1233,7 +1252,7 @@ function join_domain {
 	 domainControllerFunctionality| grep ^domainControllerFunctionality| \
 	 read j level
 	if [[ $? -ne 0 ]]; then
-		printf "$(gettext "Search for domain functionality failed, exiting").\n"
+		printf "$(gettext "Search for domain functionality failed, exiting").\n" >&2
 		error_message
 	fi
 	# Longhorn and above can't perform an init auth from service
@@ -1246,7 +1265,7 @@ function join_domain {
 	then
 		:
 	else
-		printf "$(gettext "Search for node failed, exiting").\n"
+		printf "$(gettext "Search for node failed, exiting").\n" >&2
 		error_message
 	fi
 	ldapsearch -R -T -h "$dc" $ldap_args -b "$baseDN" -s sub \
@@ -1287,13 +1306,13 @@ function join_domain {
 		if $recreate; then
 			ldapdelete -h "$dc" $ldap_args "$dn" > /dev/null 2>&1
 			if [[ $? -ne 0 ]]; then
-				printf "$(gettext "Error in deleting object: %s").\n" ${sub_dn#$dn}
+				printf "$(gettext "Error in deleting object: %s").\n" ${sub_dn#$dn} >&2
 				error_message
 			fi
 		elif $modify_existing; then
 			: # Nothing to delete
 		else
-			printf "$(gettext "A machine account already exists").\n"
+			printf "$(gettext "A machine account already exists").\n" >&2
 			error_message
 		fi
 	fi
@@ -1318,7 +1337,7 @@ EOF
 		printf "$(gettext "A machine account already exists; updating it").\n"
 		ldapadd -h "$dc" $ldap_args -f "$object" > /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
-			printf "$(gettext "Failed to create the AD object via LDAP").\n"
+			printf "$(gettext "Failed to create the AD object via LDAP").\n" >&2
 			error_message
 		fi
 	else
@@ -1337,7 +1356,7 @@ EOF
 
 		ldapadd -h "$dc" $ldap_args -f "$object" > /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
-			printf "$(gettext "Failed to create the AD object via LDAP").\n"
+			printf "$(gettext "Failed to create the AD object via LDAP").\n" >&2
 			error_message
 		fi
 	fi
@@ -1378,7 +1397,7 @@ EOF
 	printf "%s" $newpw | $KSETPW ${netbios_nodename}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
-		printf "$(gettext "Failed to set account password").\n"
+		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
@@ -1416,15 +1435,14 @@ EOF
 	fi
 	if encrypt -l | $grep -q ^des
 	then
-		((val=val+1+2))
-		enctypes[${#enctypes[@]}]=des-cbc-crc
+		((val=val+2))
 		enctypes[${#enctypes[@]}]=des-cbc-md5
 	fi
 
 	if [[ ${#enctypes[@]} -eq 0 ]]
 	then
 		printf "$(gettext "No enctypes are supported").\n"
-		printf "$(gettext "Please enable arcfour or 1DES, then re-join; see cryptoadm(1M)").\n"
+		printf "$(gettext "Please enable arcfour or 1DES, then re-join; see cryptoadm(1M)").\n" >&2
 		error_message
 	fi
 
@@ -1462,7 +1480,7 @@ userAccountControl: $userAccountControl
 EOF
 	ldapmodify -h "$dc" $ldap_args -f "$object" >/dev/null 2>&1
 	if [[ $? -ne 0 ]]; then
-		printf "$(gettext "ldapmodify failed to modify account attribute").\n"
+		printf "$(gettext "ldapmodify failed to modify account attribute").\n" >&2
 		error_message
 	fi
 
@@ -1483,41 +1501,63 @@ add: servicePrincipalName
 servicePrincipalName: nfs/${fqdn}
 servicePrincipalName: HTTP/${fqdn}
 servicePrincipalName: root/${fqdn}
+servicePrincipalName: cifs/${fqdn}
 EOF
 	ldapmodify -h "$dc" $ldap_args -f "$object" >/dev/null 2>&1
 	if [[ $? -ne 0 ]]; then
-		printf "$(gettext "ldapmodify failed to modify account attribute").\n"
+		printf "$(gettext "ldapmodify failed to modify account attribute").\n" >&2
 		error_message
 	fi
 
-	printf "%s" $newpw | $KSETPW -n -v $kvno -k "$new_keytab" "${args[@]}" host/${fqdn}@${realm} > /dev/null 2>&1
+	#
+	# In Windows, unlike MIT based implementations we salt the keys with
+	# the UPN, which is based on the host/fqdn@realm elements, not with the
+	# individual SPN strings.
+	#
+	salt=host/${fqdn}@${realm}
+
+	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" host/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
-		printf "$(gettext "Failed to set account password").\n"
+		printf "$(gettext "Failed to set account password").\n" >&2
+		error_message
+	fi
+
+	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" HOST/${fqdn}@${realm} > /dev/null 2>&1
+	if [[ $? -ne 0 ]]
+	then
+		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
 	# Could be setting ${netbios_nodename}@${realm}, but for now no one
 	# is requesting this.
 
-	print "%s" $newpw | $KSETPW -n -v $kvno -k "$new_keytab" "${args[@]}" nfs/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" nfs/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
-		printf "$(gettext "Failed to set account password").\n"
+		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
-	print "%s" $newpw | $KSETPW -n -v $kvno -k "$new_keytab" "${args[@]}" HTTP/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" HTTP/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
-		printf "$(gettext "Failed to set account password").\n"
+		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
-	print "%s" $newpw | $KSETPW -n -v $kvno -k "$new_keytab" "${args[@]}" root/${fqdn}@${realm} > /dev/null 2>&1
+	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" root/${fqdn}@${realm} > /dev/null 2>&1
 	if [[ $? -ne 0 ]]
 	then
-		printf "$(gettext "Failed to set account password").\n"
+		printf "$(gettext "Failed to set account password").\n" >&2
+		error_message
+	fi
+
+	printf "%s" $newpw | $KSETPW -n -s $salt -v $kvno -k "$new_keytab" "${args[@]}" cifs/${fqdn}@${realm} > /dev/null 2>&1
+	if [[ $? -ne 0 ]]
+	then
+		printf "$(gettext "Failed to set account password").\n" >&2
 		error_message
 	fi
 
@@ -1564,6 +1604,10 @@ typeset -l hostname KDC
 export TMPDIR="/var/run/kclient"
 
 mkdir $TMPDIR > /dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+	printf "\n$(gettext "Can not create directory: %s")\n\n" $TMPDIR >&2
+	exit 1
+fi
 
 TMP_FILE=$(mktemp -q -t kclient-tmpfile.XXXXXX)
 export KRB5_CONFIG=$(mktemp -q -t kclient-krb5conf.XXXXXX)
@@ -1571,8 +1615,8 @@ export KRB5CCNAME=$(mktemp -q -t kclient-krb5ccache.XXXXXX)
 new_keytab=$(mktemp -q -t kclient-krb5keytab.XXXXXX) 
 if [[ -z $TMP_FILE || -z $KRB5_CONFIG || -z $KRB5CCNAME || -z $new_keytab ]]
 then
-	printf "\n$(gettext "Can not create temporary file, exiting").\n" >&2
-	error_message
+	printf "\n$(gettext "Can not create temporary files, exiting").\n\n" >&2
+	exit 1
 fi
 
 #
