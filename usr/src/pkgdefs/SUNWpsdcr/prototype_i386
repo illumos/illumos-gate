@@ -57,8 +57,6 @@ f none kernel/drv/fd 755 root sys
 f none kernel/drv/fd.conf 644 root sys
 f none kernel/drv/fdc.conf 644 root sys
 f none kernel/drv/fdc 755 root sys
-f none kernel/drv/logi 755 root sys
-f none kernel/drv/msm 755 root sys
 f none kernel/drv/ncrs 755 root sys
 f none kernel/drv/ncrs.conf 644 root sys
 d none kernel/misc 755 root sys
@@ -77,7 +75,6 @@ f none kernel/drv/amd64/cmdk 755 root sys
 f none kernel/drv/amd64/ecpp 755 root sys
 f none kernel/drv/amd64/fd 755 root sys
 f none kernel/drv/amd64/fdc 755 root sys
-f none kernel/drv/amd64/logi 755 root sys
 d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/dadk 755 root sys
 f none kernel/misc/amd64/gda 755 root sys

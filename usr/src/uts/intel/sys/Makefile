@@ -97,24 +97,18 @@ HDRS	=			\
 CLOSEDHDRS = \
 	memtest.h
 
-SUBHDRS	=			\
-	dktp/mscsi.h
-
 ROOTDIR=	$(ROOT)/usr/include/sys
 SCSIDIR=	$(ROOTDIR)/scsi
 SCSIDIRS=	$(SCSIDIR) $(SCSIDIR)/conf $(SCSIDIR)/generic \
 		$(SCSIDIR)/impl $(SCSIDIR)/targets
-DKTPDIR=	$(ROOTDIR)/dktp
-DKTPDIRS=	$(DKTPDIR)
 ROOTFSDIR=	$(ROOTDIR)/fs
 ROOTDIRS=	$(ROOTDIR) $(ROOTFSDIR)
 
-ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%) $(SUBHDRS:%=$(ROOTDIR)/%)
+ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
 $(CLOSED_BUILD)ROOTHDRS += $(CLOSEDHDRS:%=$(ROOTDIR)/%)
 
 CHECKHDRS= 			\
-	$(HDRS:%.h=%.check)	\
-	$(SUBHDRS:%.h=%.check)
+	$(HDRS:%.h=%.check)
 
 $(CLOSED_BUILD)CHECKHDRS += $(CLOSEDHDRS:%.h=$(CLOSED)/uts/intel/sys/%.check)
 

@@ -47,8 +47,6 @@ i386_HDRS=			\
 	fdc.h			\
 	fdmedia.h		\
 	mouse.h			\
-	mse.h			\
-	vuidmice.h		\
 	ucode.h
 
 sparc_HDRS= 			\

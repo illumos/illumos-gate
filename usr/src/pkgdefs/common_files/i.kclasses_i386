@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -61,6 +59,7 @@ do
 		    -e '/^mcis[	].*scsi/d' \
 		    -e '/^mega[ 	].*scsi/d' \
 		    -e '/^mlx[ 	].*dada/d' \
+		    -e '/^mscsi[	].*scsi/d' \
 		    -e '/^smartii[ 	].*dada/d' \
 		    -e '/^trantor[	].*scsi/d' \
 		    -e '/^corvette[	].*scsi/d' \
@@ -78,10 +77,6 @@ do
 		grep '^pci_pci[ 	].*pci' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then
 			echo 'pci_pci pci' >> $dest
-		fi
-		grep '^mscsi[ 	].*scsi' $dest > /dev/null 2>&1
-		if [ $? != 0 ] ; then
-			echo 'mscsi scsi' >> $dest
 		fi
 		grep '^mpt[ 	].*scsi' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then

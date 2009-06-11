@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -58,7 +56,6 @@ f none usr/include/sys/dktp/dadk.h 644 root bin
 f none usr/include/sys/dktp/fctypes.h 644 root bin
 f none usr/include/sys/dktp/flowctrl.h 644 root bin
 f none usr/include/sys/dktp/gda.h 644 root bin
-f none usr/include/sys/dktp/mscsi.h 644 root bin
 f none usr/include/sys/dktp/quetypes.h 644 root bin
 f none usr/include/sys/dktp/queue.h 644 root bin
 f none usr/include/sys/dktp/tgcom.h 644 root bin
@@ -69,5 +66,3 @@ f none usr/include/sys/fdc.h 644 root bin
 f none usr/include/sys/fdmedia.h 644 root bin
 f none usr/include/sys/mii.h 644 root bin
 f none usr/include/sys/miipriv.h 644 root bin
-f none usr/include/sys/mse.h 644 root bin
-f none usr/include/sys/vuidmice.h 644 root bin

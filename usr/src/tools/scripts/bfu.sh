@@ -7448,19 +7448,28 @@ mondo_loop() {
 	rm -f $root/kernel/drv/amd64/cpqhpc
 
 	#
-	# Remove 64-bit i2o_bs, i2o_msg, i2o_scsi, pci_to_i2o, mscsi, ncrs,
-	# msm, spwr, bscv, bscbus
+	# Remove 64-bit i2o_bs, i2o_msg, i2o_scsi, pci_to_i2o, ncrs,
+	# spwr, bscv, bscbus
 	#
 	rm -f $root/kernel/drv/amd64/i2o_bs
 	rm -f $root/kernel/misc/amd64/i2o_msg
 	rm -f $root/kernel/drv/amd64/i2o_scsi
 	rm -f $root/kernel/drv/amd64/pci_to_i2o
-	rm -f $root/platform/i86pc/kernel/drv/amd64/mscsi
 	rm -f $root/kernel/drv/amd64/ncrs
-	rm -f $root/platform/i86pc/kernel/drv/amd64/msm
 	rm -f $root/kernel/drv/amd64/spwr
 	rm -f $root/platform/i86pc/kernel/drv/amd64/bscv
 	rm -f $root/platform/i86pc/kernel/drv/amd64/bscbus
+
+	# Remove obsolete bus mice drivers
+	rm -f $root/kernel/drv/msm
+	rm -f $root/platform/i86pc/kernel/drv/amd64/msm
+	rm -f $root/kernel/drv/logi
+	rm -f $root/kernel/drv/amd64/logi
+
+	# Remove mscsi
+	rm -f $root/kernel/drv/mscsi
+	rm -f $root/kernel/drv/mscsi.conf
+	rm -f $root/platform/i86pc/kernel/drv/amd64/mscsi
 
 	# Remove obsolete pfil modules, binaries, and configuration files
 	rm -f $root/kernel/drv/pfil

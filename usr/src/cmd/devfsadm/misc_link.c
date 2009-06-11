@@ -116,7 +116,7 @@ static devfsadm_create_t misc_cbt[] = {
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, node_name
 	},
 	{ "pseudo", "ddi_pseudo",
-	    "(^kdmouse$)|(^logi$)|(^rootprop$)|(^msm$)",
+	    "(^kdmouse$)|(^rootprop$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_0, node_name
 	},
 	{ "pseudo", "ddi_pseudo", "tod",

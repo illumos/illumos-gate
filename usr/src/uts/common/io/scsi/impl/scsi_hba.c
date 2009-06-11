@@ -1424,7 +1424,6 @@ scsi_busctl_reportdev(dev_info_t *child)
  *	The node may be either a:
  *	    o	probe/barrier SID node
  *	    o	a dynamic SID target node
- *	    o	a dynamic SID mscsi node
  *
  * driver.conf node: The situation for this nexus is different than most.
  *	Typically a driver.conf node definition is used to either define a

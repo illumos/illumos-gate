@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * 3-Byte Mouse Protocol
@@ -33,7 +31,7 @@
 #include <sys/stream.h>
 #include <sys/strsun.h>
 #include <sys/vuid_event.h>
-#include <sys/vuidmice.h>
+#include "vuidmice.h"
 
 #define	VUID_BUT(b)		BUT((b*2)+1)
 

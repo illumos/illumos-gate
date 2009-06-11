@@ -51,13 +51,11 @@ lofi:* 0600 root sys
 lofi:ctl 0644 root sys
 log:conslog 0666 root sys
 log:log 0640 root sys
-logi:l 0666 root sys
 mm:allkmem 0600 root sys
 mm:kmem 0640 root sys
 mm:mem 0640 root sys
 mm:null 0666 root sys
 mm:zero 0666 root sys
-msm:l 0666 root sys
 openeepr:openprom 0640 root sys
 profile:profile 0644 root sys
 ptc:* 0666 root sys

@@ -18,9 +18,7 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,87 +29,6 @@ EXIT=0
 ARCH="`uname -p`"
 NAMEMAJOR="$BASEDIR/etc/name_to_major"
 DRIVER_ALIASES="$BASEDIR/etc/driver_aliases"
-#
-# Routine to remove current entries for a device in /devices,
-# /dev, and /etc/path_to_inst.
-#
-RmDevice()
-{
-	rm -f $1
-
-	linkslist=`find dev -type l -print`
-	for l in $linkslist
-	do
-		dorm=`ls -l $l | grep $1`
-		if [ "$dorm"X != "X" ]
-		then
-			rm -f $l
-		fi
-	done
-
-	instname=`expr $1 : devices'\(.*'$m'.*\):.*`
-	cp $BASEDIR/etc/path_to_inst /tmp/p2i.$$
-	cat /tmp/p2i.$$ | 
-	    sed '\?'$instname'?d' > /tmp/np2i.$$
-	if [ -s /tmp/np2i.$$ ]
-	then
-		mv /tmp/np2i.$$ $BASEDIR/etc/path_to_inst
-		chmod 444 $BASEDIR/etc/path_to_inst
-		chown root $BASEDIR/etc/path_to_inst
-		chgrp sys $BASEDIR/etc/path_to_inst
-	fi
-	rm /tmp/p2i.$$
-}
-
-#
-# Several mouse drivers on the Intel platform will have different
-# device names with SunOS 5.6 than with previous releases.  We want to
-# remove the old names at this time so that the configuration reboot
-# will cleanly create the new device names.
-#
-if [ "${ARCH}" = "i386" ]
-then
-
-	for m in logi msm kdmouse asy
-	do
-		cd ${BASEDIR}
-		devlist=`find devices -name $m"*" -print`
-
-		for d in $devlist
-		do
-			prefix=`expr $d : '\(.*'$m'\).*'`
-			fulldev=`basename $d`
-			ioaddr=`expr $fulldev : $m'@\(.*\),.*'`
-
-			#
-			# Chance to bail now if we don't appear to need
-			# to do the conversion.
-			#
-			if [ "$ioaddr" = "1" ]
-			then
-				continue
-			else
-				if [ "$ioaddr" != "" ]
-				then
-					RmDevice $d
-				fi
-			fi
-		done
-	done
-	
-	touch ${BASEDIR}/reconfigure
-
-	DELCONF1="platform/i86pc/kernel/drv/logi.conf"
-	DELCONF2="platform/i86pc/kernel/drv/msm.conf"
-
-	if [ -f $BASEDIR/$DELCONF1 ] ; then
-		rm $BASEDIR/$DELCONF1
-	fi
-
-	if [ -f $BASEDIR/$DELCONF2 ] ; then
-		rm $BASEDIR/$DELCONF2
-	fi
-fi
 
 # add_drv ecpp driver if not already installed
 modnum=`grep -c ecpp ${NAMEMAJOR}`

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -39,7 +37,7 @@
 #include <sys/cmn_err.h>
 #include <sys/sad.h>
 #include <sys/vuid_event.h>
-#include <sys/vuidmice.h>
+#include "vuidmice.h"
 #include <sys/vuid_wheel.h>
 #include <sys/msio.h>
 
