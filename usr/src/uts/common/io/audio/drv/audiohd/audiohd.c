@@ -25,6 +25,7 @@
 
 #include <sys/audio/audio_driver.h>
 #include <sys/note.h>
+#include <sys/beep.h>
 #include <sys/pci.h>
 #include "audiohd.h"
 
@@ -77,6 +78,21 @@ static void audiohd_get_channels(audiohd_state_t *statep);
 static void audiohd_init_path(audiohd_state_t *statep);
 static void audiohd_del_controls(audiohd_state_t *statep);
 static void audiohd_destroy(audiohd_state_t *statep);
+static void audiohd_beep_on(void *arg);
+static void audiohd_beep_off(void *arg);
+static void audiohd_beep_freq(void *arg, int freq);
+static wid_t audiohd_find_beep(hda_codec_t *codec, wid_t wid, int depth);
+static void audiohd_build_beep_path(hda_codec_t *codec);
+static void audiohd_build_beep_amp(hda_codec_t *codec);
+static void  audiohd_finish_beep_path(hda_codec_t *codec);
+static void audiohd_do_set_beep_volume(audiohd_state_t *statep,
+    audiohd_path_t *path, uint64_t val);
+static void audiohd_set_beep_volume(audiohd_state_t *statep);
+static int audiohd_set_beep(void *arg, uint64_t val);
+
+static	int	audiohd_beep;
+static	int	audiohd_beep_divider;
+static	int	audiohd_beep_vol = 1;
 
 static ddi_device_acc_attr_t hda_dev_accattr = {
 	DDI_DEVICE_ATTR_V0,
@@ -119,7 +135,8 @@ enum {
 	CTL_CD,
 	CTL_MONGAIN,
 	CTL_MONSRC,
-	CTL_RECSRC
+	CTL_RECSRC,
+	CTL_BEEP
 };
 
 static void
@@ -328,6 +345,24 @@ audiohd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (audio_dev_unregister(statep->adev) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
+	mutex_enter(&statep->hda_mutex);
+	audiohd_stop_dma(statep);
+	audiohd_disable_intr(statep);
+	mutex_exit(&statep->hda_mutex);
+	ddi_remove_intr(dip, 0, statep->hda_intr_cookie);
+	if (statep->hda_ksp)
+		kstat_delete(statep->hda_ksp);
+	audiohd_free_port(statep);
+	if (audiohd_beep)
+		(void) beep_fini();
+	audiohd_destroy_codec(statep);
+	audiohd_del_controls(statep);
+	audiohd_fini_controller(statep);
+	audiohd_fini_pci(statep);
+	mutex_destroy(&statep->hda_mutex);
+	if (statep->adev)
+		audio_dev_free(statep->adev);
+	kmem_free(statep, sizeof (*statep));
 	audiohd_destroy(statep);
 	return (DDI_SUCCESS);
 }
@@ -1292,6 +1327,119 @@ audiohd_set_monitor_gain(audiohd_state_t *statep)
 }
 
 static void
+audiohd_set_beep_volume(audiohd_state_t *statep)
+{
+	int			i;
+	audiohd_path_t		*path;
+	hda_codec_t		*codec;
+	uint64_t		val;
+	uint_t			tmp;
+	audiohd_ctrl_t		*control;
+	uint32_t		vid;
+
+	control = statep->controls[CTL_BEEP];
+	if (control == NULL)
+		return;
+	val = control->val;
+	for (i = 0; i < statep->pathnum; i++) {
+		path = statep->path[i];
+		if (!path || path->path_type != BEEP)
+			continue;
+		codec = path->codec;
+		vid = codec->vid;
+		vid = vid >> 16;
+
+		switch (vid) {
+		case  AUDIOHD_VID_SIGMATEL:
+			/*
+			 * Sigmatel HD codec specific operation.
+			 * There is a workaround,
+			 * Due to Sigmatel HD codec hardware problem,
+			 * which it can't mute beep when volume is 0.
+			 * So add global value audiohd_beep_vol,
+			 * Set freq to 0 when volume is 0.
+			 */
+			tmp = val * path->gain_bits / 100;
+			if (tmp == 0) {
+				audiohd_beep_vol = 0;
+			} else {
+				audiohd_beep_vol = tmp;
+				(void) audioha_codec_verb_get(
+				    statep,
+				    codec->index,
+				    path->beep_wid,
+				    AUDIOHDC_VERB_SET_BEEP_VOL,
+				    tmp);
+			}
+			break;
+
+		default:
+			/* Common operation based on audiohd spec */
+			audiohd_do_set_beep_volume(statep, path, val);
+			break;
+		}
+	}
+}
+
+static void
+audiohd_do_set_beep_volume(audiohd_state_t *statep, audiohd_path_t *path,
+    uint64_t val)
+{
+	uint8_t		l, r;
+	uint_t		tmp;
+	int		gain;
+
+	if (val == 0) {
+		(void) audioha_codec_4bit_verb_get(
+		    statep,
+		    path->codec->index,
+		    path->mute_wid,
+		    AUDIOHDC_VERB_SET_AMP_MUTE,
+		    path->mute_dir |
+		    AUDIOHDC_AMP_SET_LNR |
+		    AUDIOHDC_AMP_SET_MUTE);
+		return;
+	}
+
+	r = (val & 0xff);
+	l = r;
+
+	tmp = l * path->gain_bits / 100;
+	(void) audioha_codec_4bit_verb_get(statep,
+	    path->codec->index,
+	    path->gain_wid,
+	    AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_SET_LEFT | path->gain_dir |
+	    tmp);
+	tmp = r * path->gain_bits / 100;
+	(void) audioha_codec_4bit_verb_get(statep,
+	    path->codec->index,
+	    path->gain_wid,
+	    AUDIOHDC_VERB_SET_AMP_MUTE,
+	    AUDIOHDC_AMP_SET_RIGHT | path->gain_dir |
+	    tmp);
+	if (path->mute_wid != path->gain_wid) {
+		gain = AUDIOHDC_GAIN_MAX;
+		(void) audioha_codec_4bit_verb_get(
+		    statep,
+		    path->codec->index,
+		    path->mute_wid,
+		    AUDIOHDC_VERB_SET_AMP_MUTE,
+		    path->mute_dir |
+		    AUDIOHDC_AMP_SET_LEFT |
+		    gain);
+		(void) audioha_codec_4bit_verb_get(
+		    statep,
+		    path->codec->index,
+		    path->mute_wid,
+		    AUDIOHDC_VERB_SET_AMP_MUTE,
+		    path->mute_dir |
+		    AUDIOHDC_AMP_SET_RIGHT |
+		    gain);
+	}
+}
+
+static void
 audiohd_restore_volume(audiohd_state_t *statep)
 {
 	audiohd_set_pin_volume(statep, DTYPE_LINEOUT);
@@ -1591,6 +1739,25 @@ audiohd_set_mongain(void *arg, uint64_t val)
 	return (0);
 }
 
+static int
+audiohd_set_beep(void *arg, uint64_t val)
+{
+	audiohd_ctrl_t  *pc = arg;
+	audiohd_state_t *statep = pc->statep;
+
+	val &= 0xff;
+
+	if (val > 100)
+		return (EINVAL);
+
+	mutex_enter(&statep->hda_mutex);
+	pc->val = val;
+	audiohd_set_beep_volume(statep);
+	mutex_exit(&statep->hda_mutex);
+
+	return (0);
+}
+
 #define	PLAYCTL	(AUDIO_CTRL_FLAG_RW | AUDIO_CTRL_FLAG_PLAY)
 #define	RECCTL	(AUDIO_CTRL_FLAG_RW | AUDIO_CTRL_FLAG_REC)
 #define	MONCTL	(AUDIO_CTRL_FLAG_RW | AUDIO_CTRL_FLAG_MONITOR)
@@ -1598,6 +1765,7 @@ audiohd_set_mongain(void *arg, uint64_t val)
 #define	MONVOL	(MONCTL | AUDIO_CTRL_FLAG_MONVOL)
 #define	MAINVOL	(PLAYCTL | AUDIO_CTRL_FLAG_MAINVOL)
 #define	RECVOL	(RECCTL | AUDIO_CTRL_FLAG_RECVOL)
+#define	RWCTL	AUDIO_CTRL_FLAG_RW
 
 static audiohd_ctrl_t *
 audiohd_alloc_ctrl(audiohd_state_t *statep, uint32_t num, uint64_t val)
@@ -1732,6 +1900,15 @@ audiohd_alloc_ctrl(audiohd_state_t *statep, uint32_t num, uint64_t val)
 		}
 		fn = audiohd_set_recsrc;
 		break;
+
+	case CTL_BEEP:
+		desc.acd_name = AUDIO_CTRL_ID_BEEP;
+		desc.acd_type =	AUDIO_CTRL_TYPE_MONO;
+		desc.acd_minvalue = 0;
+		desc.acd_maxvalue = 100;
+		desc.acd_flags = RWCTL;
+		fn = audiohd_set_beep;
+		break;
 	}
 
 	pc->val = val;
@@ -1811,6 +1988,15 @@ audiohd_add_controls(audiohd_state_t *statep)
 		if (!path)
 			continue;
 		codec = path->codec;
+		if (path->path_type == BEEP) {
+			widget = codec->widget[path->beep_wid];
+			if (widget->type == WTYPE_BEEP &&
+			    path->gain_wid != 0) {
+				ADD_CTRL(CTL_BEEP, 0x4b4b);
+				break;
+			}
+		}
+
 		for (j = 0; j < path->pin_nums; j++) {
 			wid = path->pin_wid[j];
 			widget = codec->widget[wid];
@@ -1877,6 +2063,49 @@ audiohd_quiesce(dev_info_t *dip)
 
 	return (DDI_SUCCESS);
 }
+
+static void
+audiohd_beep_on(void *arg)
+{
+	hda_codec_t *codec = ((audiohd_widget_t *)arg)->codec;
+	audiohd_state_t *statep = codec->soft_statep;
+	int caddr = codec->index;
+	wid_t wid = ((audiohd_widget_t *)arg)->wid_wid;
+
+	(void) audioha_codec_verb_get(statep, caddr, wid,
+	    AUDIOHDC_VERB_SET_BEEP_GEN, audiohd_beep_divider);
+}
+
+static void
+audiohd_beep_off(void *arg)
+{
+	hda_codec_t *codec = ((audiohd_widget_t *)arg)->codec;
+	audiohd_state_t *statep = codec->soft_statep;
+	int caddr = codec->index;
+	wid_t wid = ((audiohd_widget_t *)arg)->wid_wid;
+
+	(void) audioha_codec_verb_get(statep, caddr, wid,
+	    AUDIOHDC_VERB_SET_BEEP_GEN, AUDIOHDC_MUTE_BEEP_GEN);
+}
+
+static void
+audiohd_beep_freq(void *arg, int freq)
+{
+	_NOTE(ARGUNUSED(arg));
+	if (freq == 0) {
+		audiohd_beep_divider = 0;
+	} else {
+		if (freq > AUDIOHDC_MAX_BEEP_GEN)
+			freq = AUDIOHDC_MAX_BEEP_GEN;
+		else if (freq < AUDIOHDC_MIX_BEEP_GEN)
+			freq = AUDIOHDC_MIX_BEEP_GEN;
+		audiohd_beep_divider = AUDIOHDC_SAMPR48000 / freq;
+	}
+
+	if (audiohd_beep_vol == 0)
+		audiohd_beep_divider = 0;
+}
+
 /*
  * audiohd_init_state()
  *
@@ -2688,6 +2917,21 @@ audiohd_create_widgets(hda_codec_t *codec)
 			audiohd_get_pin_config(widget);
 			break;
 		case WTYPE_BEEP:
+			/*
+			 * Get the audiohd_beep_switch value from audiohd.conf,
+			 * which is for turning on/off widget beep.
+			 */
+			audiohd_beep = ddi_prop_get_int(DDI_DEV_T_ANY,
+			    statep->hda_dip,
+			    DDI_PROP_DONTPASS, "audiohd_beep", 1);
+
+			if (audiohd_beep) {
+				(void) beep_fini();
+				(void) beep_init((void *) widget,
+				    audiohd_beep_on,
+				    audiohd_beep_off,
+				    audiohd_beep_freq);
+			}
 			break;
 		default:
 			break;
@@ -4440,6 +4684,314 @@ audiohd_build_monitor_amp(hda_codec_t *codec)
 	}
 }
 
+/*
+ * audiohd_find_beep()
+ * Description:
+ *      Find a beep for a beep path. Then the play data can be sent to the out
+ *      put pin through the beep path.
+ *
+ * Arguments:
+ *      hda_codec_t     *codec          where the beep widget exists
+ *      wid_t           wid             the no. of a widget
+ *      int             depth           the depth of search
+ *
+ * Return:
+ *      1) wid of Beep widget;
+ *      2) 0 if no path
+ */
+static wid_t
+audiohd_find_beep(hda_codec_t *codec, wid_t wid, int depth)
+{
+	audiohd_widget_t	*widget = codec->widget[wid];
+	wid_t   		wbeep = (uint32_t)(DDI_FAILURE);
+	wid_t   		retval;
+
+	if (depth > AUDIOHD_MAX_DEPTH)
+		return (uint32_t)(DDI_FAILURE);
+
+	if (widget == NULL)
+		return (uint32_t)(DDI_FAILURE);
+
+	switch (widget->type) {
+	case WTYPE_BEEP:
+		widget->path_flags |= AUDIOHD_PATH_BEEP;
+		wbeep = widget->wid_wid;
+		break;
+
+	case WTYPE_AUDIO_MIX:
+	case WTYPE_AUDIO_SEL:
+		for (int i = 0; i < widget->nconns; i++) {
+			retval = audiohd_find_beep(codec,
+			    widget->avail_conn[i], depth + 1);
+			if (retval != (uint32_t)DDI_FAILURE) {
+				if (widget->selconn != AUDIOHD_NULL_CONN)
+					continue;
+				widget->selconn = i;
+				wbeep = retval;
+				widget->path_flags |= AUDIOHD_PATH_BEEP;
+				return (wbeep);
+			}
+		}
+	default:
+		break;
+	}
+
+	return (wbeep);
+}       /* audiohd_find_beep() */
+
+/*
+ * audiohd_build_beep_path()
+ *
+ * Description:
+ *      Search an beep path for each pin in the codec.
+ * Arguments:
+ *      hda_codec_t     *codec          where the beep path exists
+ */
+static void
+audiohd_build_beep_path(hda_codec_t *codec)
+{
+	audiohd_pin_t		*pin;
+	audiohd_widget_t	*widget;
+	audiohd_path_t		*path;
+	wid_t			wid;
+	audiohd_state_t		*statep;
+	int			i;
+	boolean_t		beeppath = B_FALSE;
+
+	statep = codec->soft_statep;
+
+	for (pin = codec->first_pin; pin; pin = pin->next) {
+		if ((pin->cap & AUDIOHD_PIN_CAP_MASK) == 0)
+			continue;
+		if ((pin->config & AUDIOHD_PIN_CONF_MASK) ==
+		    AUDIOHD_PIN_NO_CONN)
+			continue;
+		if ((pin->device != DTYPE_LINEOUT) &&
+		    (pin->device != DTYPE_SPEAKER) &&
+		    (pin->device != DTYPE_SPDIF_OUT) &&
+		    (pin->device != DTYPE_HP_OUT))
+			continue;
+		widget = codec->widget[pin->wid];
+
+		widget->inamp_cap = 0;
+		for (i = 0; i < widget->nconns; i++) {
+			/*
+			 * If a beep found, the return value is the wid of the
+			 * widget on the path, or the return value is
+			 * DDI_FAILURE
+			 */
+			wid = audiohd_find_beep(codec,
+			    widget->avail_conn[i], 0);
+			/*
+			 * A beep was not found
+			 */
+			if (wid == (wid_t)DDI_FAILURE)
+				continue;
+			if (widget->selconn != AUDIOHD_NULL_CONN)
+				continue;
+			path = (audiohd_path_t *)
+			    kmem_zalloc(sizeof (audiohd_path_t),
+			    KM_SLEEP);
+			path->beep_wid = wid;
+			path->pin_wid[0] = widget->wid_wid;
+			path->pin_nums = 1;
+			path->path_type = BEEP;
+			beeppath = 1;
+			path->codec = codec;
+			path->statep = statep;
+			widget->path_flags |= AUDIOHD_PATH_BEEP;
+			widget->selconn = i;
+			statep->path[statep->pathnum++] = path;
+
+			break;
+		}
+	}
+
+	if (!beeppath) {
+		for (int i = 0; i < AUDIOHD_CODEC_MAX; i++) {
+			codec = statep->codec[i];
+			if (!codec)
+				continue;
+			for (wid = codec->first_wid; wid <= codec->last_wid;
+			    wid++) {
+				widget = codec->widget[wid];
+				if (widget->type == WTYPE_BEEP) {
+					path = (audiohd_path_t *)
+					    kmem_zalloc(sizeof (audiohd_path_t),
+					    KM_SLEEP);
+					path->beep_wid = wid;
+					path->pin_nums = 0;
+					path->path_type = BEEP;
+					beeppath = 1;
+					path->codec = codec;
+					path->statep = statep;
+					widget->path_flags |= AUDIOHD_PATH_BEEP;
+					statep->path[statep->pathnum++] = path;
+					break;
+				}
+			}
+		}
+	}
+}       /* audiohd_build_beep_path() */
+
+/*
+ * audiohd_build_beep_amp
+ *
+ * Description:
+ *      Find the gain control and mute control widget
+ */
+static void
+audiohd_build_beep_amp(hda_codec_t *codec)
+{
+	audiohd_path_t		*path;
+	audiohd_widget_t	*widget, *wpin, *wbeep;
+	wid_t			wid;
+	int			i, j;
+	uint32_t		gain;
+
+	for (i = 0; i < codec->soft_statep->pathnum; i++) {
+		path = codec->soft_statep->path[i];
+		if (path == NULL || path->path_type != BEEP ||
+		    path->codec != codec)
+			continue;
+		if (path->pin_nums == 0) {
+			path->mute_wid = path->beep_wid;
+			path->mute_dir = AUDIOHDC_AMP_SET_OUTPUT;
+			wbeep = codec->widget[path->beep_wid];
+			gain = (wbeep->outamp_cap &
+			    AUDIOHDC_AMP_CAP_STEP_NUMS);
+			if (gain) {
+				path->gain_dir = AUDIOHDC_AMP_SET_OUTPUT;
+				path->gain_bits = gain;
+				path->gain_wid = path->beep_wid;
+			}
+			path->gain_bits >>= AUDIOHD_GAIN_OFF;
+			break;
+		}
+		for (j = 0; j < path->pin_nums; j++) {
+			wid = path->pin_wid[j];
+			wpin = codec->widget[wid];
+			wbeep = codec->widget[path->beep_wid];
+
+			widget = wpin;
+			while (widget) {
+				if (widget->out_weight == 0 &&
+				    widget->outamp_cap &
+				    AUDIOHDC_AMP_CAP_MUTE_CAP) {
+					path->mute_wid = widget->wid_wid;
+					path->mute_dir =
+					    AUDIOHDC_AMP_SET_OUTPUT;
+					break;
+				}
+				if (widget->selconn == AUDIOHD_NULL_CONN)
+					break;
+				wid = widget->avail_conn[widget->selconn];
+				widget = codec->widget[wid];
+			}
+
+			gain = 0;
+			widget = wpin;
+			while (widget) {
+				if (widget->out_weight == 0 &&
+				    widget->outamp_cap &
+				    AUDIOHDC_AMP_CAP_STEP_NUMS) {
+					gain = (widget->outamp_cap &
+					    AUDIOHDC_AMP_CAP_STEP_NUMS);
+					if (gain && gain > path->gain_bits) {
+						path->gain_dir =
+						    AUDIOHDC_AMP_SET_OUTPUT;
+						path->gain_bits = gain;
+						path->gain_wid =
+						    widget->wid_wid;
+					}
+				}
+				if (widget->selconn == AUDIOHD_NULL_CONN)
+					break;
+				wid = widget->avail_conn[widget->selconn];
+				widget = codec->widget[wid];
+			}
+			path->gain_bits >>= AUDIOHD_GAIN_OFF;
+		}
+	}
+}       /* audiohd_build_beep_amp */
+
+/*
+ * audiohd_finish_beep_path()
+ *
+ * Description:
+ *      Enable the widgets on the beep path
+ */
+static void
+audiohd_finish_beep_path(hda_codec_t *codec)
+{
+	audiohd_state_t		*statep = codec->soft_statep;
+	audiohd_path_t		*path;
+	audiohd_widget_t	*widget;
+	uint_t			caddr = codec->index;
+	wid_t			wid;
+	int			i, j;
+
+	for (i = 0; i < codec->soft_statep->pathnum; i++) {
+		path = codec->soft_statep->path[i];
+		if (!path || path->path_type != BEEP || path->codec != codec)
+			continue;
+		for (j = 0; j < path->pin_nums; j++) {
+			wid = path->pin_wid[j];
+			widget = codec->widget[wid];
+
+			(void) audioha_codec_verb_get(statep, caddr, wid,
+			    AUDIOHDC_VERB_SET_CONN_SEL, widget->selconn);
+
+			wid = widget->avail_conn[widget->selconn];
+			widget = codec->widget[wid];
+
+			while (widget) {
+				/*
+				 * Set all amplifiers in this path to
+				 * the maximum
+				 * volume and unmute them.
+				 */
+				if (widget->out_weight != 0)
+					continue;
+				if (widget->outamp_cap) {
+					(void) audioha_codec_4bit_verb_get(
+					    statep,
+					    caddr,
+					    wid, AUDIOHDC_VERB_SET_AMP_MUTE,
+					    AUDIOHDC_AMP_SET_LR_OUTPUT |
+					    AUDIOHDC_GAIN_MAX);
+					}
+				if (widget->inamp_cap) {
+					(void) audioha_codec_4bit_verb_get(
+					    statep,
+					    caddr,
+					    wid, AUDIOHDC_VERB_SET_AMP_MUTE,
+					    AUDIOHDC_AMP_SET_LR_INPUT |
+					    AUDIOHDC_GAIN_MAX |
+					    (widget->selconn <<
+					    AUDIOHDC_AMP_SET_INDEX_OFFSET));
+				}
+
+				if (widget->selconn == AUDIOHD_NULL_CONN)
+					break;
+				/*
+				 * Accoding to HD spec, mixer doesn't support
+				 * "select connection"
+				 */
+				if ((widget->type != WTYPE_AUDIO_MIX) &&
+				    (widget->nconns > 1))
+					(void) audioha_codec_verb_get(statep,
+					    caddr,
+					    wid,
+					    AUDIOHDC_VERB_SET_CONN_SEL,
+					    widget->selconn);
+
+				wid = widget->avail_conn[widget->selconn];
+				widget = codec->widget[wid];
+			}
+		}
+	}
+}       /* audiohd_finish_beep_path */
 
 /*
  * audiohd_build_path()
@@ -4467,6 +5019,10 @@ audiohd_build_path(audiohd_state_t *statep)
 			audiohd_build_monitor_path(statep->codec[i]);
 			audiohd_build_monitor_amp(statep->codec[i]);
 			audiohd_finish_monitor_path(statep->codec[i]);
+
+			audiohd_build_beep_path(statep->codec[i]);
+			audiohd_build_beep_amp(statep->codec[i]);
+			audiohd_finish_beep_path(statep->codec[i]);
 		}
 	}
 }	/* audiohd_build_path */

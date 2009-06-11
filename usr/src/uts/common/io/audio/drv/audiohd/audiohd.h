@@ -35,6 +35,7 @@ extern "C" {
 #define	AUDIOHD_VID_INTEL	0x8086
 #define	AUDIOHD_VID_ATI		0x1002
 #define	AUDIOHD_VID_NVIDIA	0x10de
+#define	AUDIOHD_VID_SIGMATEL	0x8384
 
 /*
  * specific codec id used by specific vendors
@@ -321,6 +322,11 @@ extern "C" {
 #define	AUDIOHDC_12BIT_VERB_MASK	0xfffff000
 #define	AUDIOHDC_4BIT_VERB_MASK		0xfffffff0
 
+#define	AUDIOHDC_SAMPR48000		48000
+#define	AUDIOHDC_MAX_BEEP_GEN		12000
+#define	AUDIOHDC_MIX_BEEP_GEN		47
+#define	AUDIOHDC_MUTE_BEEP_GEN		0x0
+
 /*
  * 12-bit verbs
  */
@@ -348,6 +354,7 @@ extern "C" {
 #define	AUDIOHDC_VERB_EXEC_PIN_SENSE		0x709
 
 #define	AUDIOHDC_VERB_GET_BEEP_GEN		0xf0a
+#define	AUDIOHDC_VERB_SET_BEEP_GEN		0x70a
 
 #define	AUDIOHDC_VERB_GET_EAPD			0xf0c
 #define	AUDIOHDC_VERB_SET_EAPD			0x70c
@@ -384,6 +391,7 @@ extern "C" {
 
 #define	AUDIOHDC_VERB_GET_AMP_MUTE		0xb
 #define	AUDIOHDC_VERB_SET_AMP_MUTE		0x3
+#define	AUDIOHDC_VERB_SET_BEEP_VOL		0x3A0
 
 /*
  * parameters of nodes
@@ -538,13 +546,14 @@ enum audiohd_pin_color {
 	AUDIOHD_PIN_OTHER = 0xf,
 };
 
-#define	CTRL_NUM	15
+#define	CTRL_NUM	16
 
 /* values for audiohd_widget.path_flags */
 #define	AUDIOHD_PATH_DAC	(1 << 0)
 #define	AUDIOHD_PATH_ADC	(1 << 1)
 #define	AUDIOHD_PATH_MON	(1 << 2)
 #define	AUDIOHD_PATH_NOMON	(1 << 3)
+#define	AUDIOHD_PATH_BEEP	(1 << 4)
 
 typedef struct audiohd_path		audiohd_path_t;
 typedef struct audiohd_widget	audiohd_widget_t;
@@ -625,10 +634,12 @@ struct audiohd_widget {
 typedef enum {
 	PLAY = 0,
 	RECORD = 1,
+	BEEP = 2,
 } path_type_t;
 
 struct audiohd_path {
 	wid_t			adda_wid;
+	wid_t			beep_wid;
 
 	wid_t			pin_wid[AUDIOHD_MAX_PINS];
 	int			sum_selconn[AUDIOHD_MAX_PINS];
@@ -713,6 +724,7 @@ struct audiohd_pin {
 	uint32_t	assoc;
 	uint32_t	seq;
 	wid_t		adc_dac_wid; /* AD/DA wid which can route to this pin */
+	wid_t		beep_wid;
 	int		no_phys_conn;
 	enum audiohda_device_type	device;
 
