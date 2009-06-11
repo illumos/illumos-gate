@@ -44,9 +44,6 @@ extern "C" {
 #define	AUDIOHD_CODECID_SONY1	0x10ec0260
 #define	AUDIOHD_CODECID_SONY2	0x10ec0262
 
-#define	AUDIO_SUCCESS		(0)
-#define	AUDIO_FAILURE		(-1)
-
 #define	AUDIOHD_INTS		50
 #define	AUDIOHD_MAX_INTS	1500
 #define	AUDIOHD_MIN_INTS	32
@@ -774,6 +771,7 @@ struct audiohd_state {
 	uint32_t	hda_flags;
 
 	boolean_t	soft_volume;
+	boolean_t	intr_added;
 
 	caddr_t				hda_reg_base;
 	ddi_acc_handle_t		hda_pci_handle;
@@ -887,13 +885,13 @@ struct audiohd_state {
 	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
+		return (DDI_FAILURE); \
 	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, \
 	    (lTmp | AUDIOHDC_PIN_CONTROL_OUT_ENABLE | \
 	    AUDIOHDC_PIN_CONTROL_HP_ENABLE)); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
+		return (DDI_FAILURE); \
 }
 
 /*
@@ -906,12 +904,12 @@ struct audiohd_state {
 	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
+		return (DDI_FAILURE); \
 	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, \
 	    (lTmp & ~AUDIOHDC_PIN_CONTROL_OUT_ENABLE)); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
+		return (DDI_FAILURE); \
 }
 
 /*
@@ -934,12 +932,12 @@ struct audiohd_state {
 	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
+		return (DDI_FAILURE); \
 	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, \
 	    (lTmp & ~AUDIOHDC_PIN_CONTROL_IN_ENABLE)); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
+		return (DDI_FAILURE); \
 }
 
 /*
@@ -951,7 +949,7 @@ struct audiohd_state {
 	    caddr, wid, AUDIOHDC_VERB_SET_AMP_MUTE, \
 	    AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX) == \
 	    AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
+		return (DDI_FAILURE); \
 }
 
 #ifdef __cplusplus
