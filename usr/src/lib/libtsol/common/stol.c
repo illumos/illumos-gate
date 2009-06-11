@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <errno.h>
@@ -158,12 +156,14 @@ convert_id(m_label_type_t t)
  *				the parse string.
  *			L_NO_CORRECTION, s must be correct and full by the
  *				label_encoding rules.
+ *			L_CHECK_AR, for non-hex s, MAC_LABEL, check the l_e AR
  *
  *	Exit	l = parsed label value.
  *		e = index into string of error.
  *		  = M_BAD_STRING (-3 L_BAD_LABEL) or could be zero,
  *		    indicates entire string,
  *	        e = M_BAD_LABEL (-2 L_BAD_CLASSIFICATION), problems with l
+ *		e = M_OUTSIDE_AR (-4 unrelated to L_BAD_* return values)
  *
  *	Returns	 0, success.
  *		-1, failure
@@ -189,6 +189,7 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 	int		err = M_BAD_LABEL;
 	int		id = convert_id(t);
 	boolean_t	new = B_FALSE;
+	uint_t		lf = (f & ~L_CHECK_AR);	/* because L_DEFAULT == 0 */
 
 	if (st == NULL) {
 		errno = ENOMEM;
@@ -205,7 +206,7 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 		_LOW_LABEL(*l, id);
 		new = B_TRUE;
 	} else if (_MTYPE(*l, SUN_INVALID_ID) &&
-	    ((f == L_NO_CORRECTION) || (f == L_DEFAULT))) {
+	    ((lf == L_NO_CORRECTION) || (lf == L_DEFAULT))) {
 		_LOW_LABEL(*l, id);
 		new = B_TRUE;
 	} else if (!(_MTYPE(*l, SUN_MAC_ID) || _MTYPE(*l, SUN_CLR_ID))) {
@@ -248,7 +249,7 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 	} else if (IS_HIGH(s)) {
 		_HIGH_LABEL(*l, id);
 		goto goodlabel;
-	} else if (IS_HEX(f, s)) {
+	} else if (IS_HEX(lf, s)) {
 		if (htol(s, *l) != 0) {
 			/* whole string in error */
 			err = 0;
@@ -279,6 +280,8 @@ str_to_label(const char *str, m_label_t **l, const m_label_type_t t, uint_t f,
 	 *		   L_BAD_CLASSIFICATION (-2) == bad input
 	 *			classification: class
 	 *		   L_BAD_LABEL (-3) == either string or input label bad
+	 *		   M_OUTSIDE_AR (-4) == resultant MAC_LABEL is out
+	 *			l_e accreditation range
 	 *		   O'E == offset in string 0 == entire string.
 	 */
 	if (__call_labeld(&callp, &bufsize, &datasize) == SUCCESS) {

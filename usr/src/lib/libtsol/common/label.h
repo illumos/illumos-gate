@@ -205,9 +205,11 @@ typedef enum _m_label_type {
 #define	L_DEFAULT		0x0
 #define	L_MODIFY_EXISTING	0x1	/* start parsing with existing label */
 #define	L_NO_CORRECTION		0x2	/* must be correct by l_e rules */
+#define	L_CHECK_AR		0x10	/* must be in l_e AR */
 
 /* EINVAL sub codes */
 
+#define	M_OUTSIDE_AR		-4	/* not in l_e AR */
 #define	M_BAD_STRING		-3	/* DIA L_BAD_LABEL */
 	/* bad requested label type, bad previous label type */
 #define	M_BAD_LABEL		-2	/* DIA L_BAD_CLASSIFICATION, */
