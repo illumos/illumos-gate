@@ -38,8 +38,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: auth-passwd.c,v 1.27 2002/05/24 16:45:16 stevesk Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "packet.h"
 #include "log.h"
 #include "servconf.h"
@@ -57,11 +55,6 @@ RCSID("$OpenBSD: auth-passwd.c,v 1.27 2002/05/24 16:45:16 stevesk Exp $");
 #  include <hpsecurity.h>
 #  include <prot.h>
 # endif
-# ifdef HAVE_SECUREWARE
-#  include <sys/security.h>
-#  include <sys/audit.h>
-#  include <prot.h>
-# endif /* HAVE_SECUREWARE */
 # if defined(HAVE_SHADOW_H) && !defined(DISABLE_SHADOW)
 #  include <shadow.h>
 # endif
@@ -107,9 +100,6 @@ auth_password(Authctxt *authctxt, const char *password)
 	char *encrypted_password;
 	char *pw_password;
 	char *salt;
-#if defined(__hpux) || defined(HAVE_SECUREWARE)
-	struct pr_passwd *spw;
-#endif /* __hpux || HAVE_SECUREWARE */
 #if defined(HAVE_SHADOW_H) && !defined(DISABLE_SHADOW)
 	struct spwd *spw;
 #endif
@@ -192,16 +182,6 @@ auth_password(Authctxt *authctxt, const char *password)
 		pw_password = spw->pwa_passwd;
 #endif /* defined(HAVE_GETPWANAM) && !defined(DISABLE_SHADOW) */
 
-#ifdef HAVE_SECUREWARE
-	if ((spw = getprpwnam(pw->pw_name)) != NULL)
-		pw_password = spw->ufld.fd_encrypt;
-#endif /* HAVE_SECUREWARE */
-
-#if defined(__hpux) && !defined(HAVE_SECUREWARE)
-	if (iscomsec() && (spw = getprpwnam(pw->pw_name)) != NULL)
-		pw_password = spw->ufld.fd_encrypt;
-#endif /* defined(__hpux) && !defined(HAVE_SECUREWARE) */
-
 	/* Check for users with no password. */
 	if ((password[0] == '\0') && (pw_password[0] == '\0'))
 		return 1;
@@ -217,18 +197,7 @@ auth_password(Authctxt *authctxt, const char *password)
 	else
 		encrypted_password = crypt(password, salt);
 #else /* HAVE_MD5_PASSWORDS */
-# if defined(__hpux) && !defined(HAVE_SECUREWARE)
-	if (iscomsec())
-		encrypted_password = bigcrypt(password, salt);
-	else
-		encrypted_password = crypt(password, salt);
-# else
-#  ifdef HAVE_SECUREWARE
-	encrypted_password = bigcrypt(password, salt);
-#  else
 	encrypted_password = crypt(password, salt);
-#  endif /* HAVE_SECUREWARE */
-# endif /* __hpux && !defined(HAVE_SECUREWARE) */
 #endif /* HAVE_MD5_PASSWORDS */
 
 	/* Authentication is accepted if the encrypted passwords are identical. */

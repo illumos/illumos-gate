@@ -857,7 +857,7 @@ process_escapes(Buffer *bin, Buffer *bout, Buffer *berr, char *buf, int len)
 "%c?\n\
 Supported escape sequences:\n\
 %c.  - terminate connection\n\
-%cB  - send break\n\
+%cB  - send break (SSH protocol 2 only)\n\
 %cC  - open a command line\n\
 %cR  - Request rekey (SSH protocol 2 only)\n\
 %c^Z - suspend ssh\n\

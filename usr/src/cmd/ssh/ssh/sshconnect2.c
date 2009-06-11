@@ -1625,7 +1625,6 @@ static char *preferred = NULL;
 static Authmethod *
 authmethod_get(char *authlist)
 {
-
 	char *name = NULL;
 	u_int next;
 
@@ -1657,8 +1656,10 @@ authmethod_get(char *authlist)
 		    authmethod_is_enabled(current)) {
 			debug3("authmethod_is_enabled %s", name);
 			debug("Next authentication method: %s", name);
+			xfree(name);
 			return current;
 		}
+		xfree(name);
 	}
 }
 

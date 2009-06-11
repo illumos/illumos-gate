@@ -89,16 +89,16 @@ BSDgetopt(nargc, nargv, ostr)
 		if (!*place)
 			++BSDoptind;
 		if (BSDopterr && *ostr != ':')
-			(void)fprintf(stderr,
-			    "%s: illegal option -- %c\n", __progname, BSDoptopt);
+			(void) fprintf(stderr,
+			    gettext("%s: illegal option -- %c\n"), __progname,
+			    BSDoptopt);
 		return (BADCH);
 	}
 	if (*++oli != ':') {			/* don't need argument */
 		BSDoptarg = NULL;
 		if (!*place)
 			++BSDoptind;
-	}
-	else {					/* need an argument */
+	} else {				/* need an argument */
 		if (*place)			/* no white space */
 			BSDoptarg = place;
 		else if (nargc <= ++BSDoptind) {	/* no arg */
@@ -106,13 +106,14 @@ BSDgetopt(nargc, nargv, ostr)
 			if (*ostr == ':')
 				return (BADARG);
 			if (BSDopterr)
-				(void)fprintf(stderr,
+				(void) fprintf(stderr,
 				    "%s: option requires an argument -- %c\n",
 				    __progname, BSDoptopt);
 			return (BADCH);
-		}
-	 	else				/* white space */
+		/* white space */
+		} else
 			BSDoptarg = nargv[BSDoptind];
+
 		place = EMSG;
 		++BSDoptind;
 	}
@@ -120,5 +121,3 @@ BSDgetopt(nargc, nargv, ostr)
 }
 
 #endif /* !defined(HAVE_GETOPT) || !defined(HAVE_OPTRESET) */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"

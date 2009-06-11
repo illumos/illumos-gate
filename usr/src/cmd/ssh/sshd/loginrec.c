@@ -1,8 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Copyright (c) 2000 Andre Lucas.  All rights reserved.
  * Portions copyright (c) 1998 Todd C. Miller
  * Portions copyright (c) 1996 Jason Downs
@@ -32,6 +28,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /**
@@ -168,8 +168,6 @@
 #include "atomicio.h"
 
 RCSID("$Id: loginrec.c,v 1.44 2002/09/26 00:38:49 tim Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_UTIL_H
 #  include <util.h>
@@ -458,28 +456,6 @@ login_write (struct logininfo *li)
 #endif
 	return 0;
 }
-
-#ifdef LOGIN_NEEDS_UTMPX
-int
-login_utmp_only(struct logininfo *li)
-{
-	li->type = LTYPE_LOGIN; 
-	login_set_current_time(li);
-# ifdef USE_UTMP
-	utmp_write_entry(li);
-# endif
-# ifdef USE_WTMP
-	wtmp_write_entry(li);
-# endif
-# ifdef USE_UTMPX
-	(void) utmpx_write_entry(li);
-# endif
-# ifdef USE_WTMPX
-	(void) wtmpx_write_entry(li);
-# endif
-	return 0;
-}
-#endif
 
 /**
  ** getlast_entry: Call low-level functions to retrieve the last login

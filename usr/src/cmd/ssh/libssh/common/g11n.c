@@ -576,6 +576,9 @@ g11n_langtag_set_locale_set_intersect(char *langtag_set, char **locale_set)
 	char *s;
 	uint_t do_append, n_langtags, n_locales, n_results, max_results;
 
+	if (locale_set == NULL)
+		return (NULL);
+
 	/* count lang tags and locales */
 	for (n_locales = 0, p = locale_set; p && *p; p++)
 		n_locales++;
@@ -668,7 +671,7 @@ g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales)
 	xfree_split_list(results);
 
 err:
-	if (locales != srvr_locales)
+	if (locales != NULL && locales != srvr_locales)
 		g11n_freelist(locales);
 	return (result);
 }

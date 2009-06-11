@@ -11,7 +11,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1210,14 +1210,13 @@ parse_forward(int long_form, Forward *fwd, const char *fwdspec)
 		break;
 	}
 
-	xfree(p);
-
 	if (fwd->listen_port == 0 || (fwd->connect_port == 0 && i > 2))
 		goto fail_free;
 
+	xfree(p);
 	return (i);
 
- fail_free:
+fail_free:
 	if (p != NULL)
 		xfree(p);
 	if (fwd->connect_host != NULL)

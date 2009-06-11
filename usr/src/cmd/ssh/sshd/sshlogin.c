@@ -38,14 +38,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: sshlogin.c,v 1.5 2002/08/29 15:57:25 stevesk Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "loginrec.h"
 #include "log.h"
@@ -73,8 +71,8 @@ get_last_login_time(uid_t uid, const char *logname,
 }
 
 /*
- * Records that the user has logged in.  I these parts of operating systems
- * were more standardized.
+ * Records that the user has logged in.  If only these parts of operating
+ * systems were more standardized.
  */
 void
 record_login(pid_t pid, const char *ttyname, const char *progname,
@@ -113,20 +111,6 @@ record_login(pid_t pid, const char *ttyname, const char *progname,
   (void) login_login(li);
   login_free_entry(li);
 }
-
-#ifdef LOGIN_NEEDS_UTMPX
-void
-record_utmp_only(pid_t pid, const char *ttyname, const char *user,
-		 const char *host, struct sockaddr * addr)
-{
-  struct logininfo *li;
-
-  li = login_alloc_entry(pid, user, host, ttyname, NULL);
-  login_set_addr(li, addr, sizeof(struct sockaddr));
-  (void) login_utmp_only(li);
-  login_free_entry(li);
-}
-#endif
 
 /* Records that the user has logged out. */
 void

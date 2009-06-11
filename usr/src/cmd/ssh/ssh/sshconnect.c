@@ -12,7 +12,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -315,7 +315,7 @@ timeout_connect(int sockfd, const struct sockaddr *serv_addr,
  */
 int
 ssh_connect(const char *host, struct sockaddr_storage * hostaddr,
-    u_short port, int family, int connection_attempts,
+    ushort_t port, int family, int connection_attempts,
     int needpriv, const char *proxy_command)
 {
 	int gaierr;
@@ -966,12 +966,12 @@ accept_host_key(char *host, struct sockaddr *hostaddr, Key *host_key)
  */
 void
 ssh_login(Sensitive *sensitive, const char *orighost,
-    struct sockaddr *hostaddr, struct passwd *pw)
+    struct sockaddr *hostaddr, char *pw_name)
 {
 	char *host, *cp;
 	char *server_user, *local_user;
 
-	local_user = xstrdup(pw->pw_name);
+	local_user = xstrdup(pw_name);
 	server_user = options.user ? options.user : local_user;
 
 	/* Convert the user-supplied hostname into all lowercase. */
@@ -1009,6 +1009,9 @@ ssh_login(Sensitive *sensitive, const char *orighost,
 		ssh_kex(host, hostaddr);
 		ssh_userauth1(local_user, server_user, host, sensitive);
 	}
+
+	xfree(host);
+	xfree(local_user);
 }
 
 void

@@ -1,15 +1,3 @@
-/*	$OpenBSD: tildexpand.h,v 1.4 2001/06/26 17:27:25 markus Exp $	*/
-
-#ifndef	_TILDEXPAND_H
-#define	_TILDEXPAND_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -21,6 +9,15 @@ extern "C" {
  * incompatible with the protocol description in the RFC file, it must be
  * called by a name other than "ssh" or "Secure Shell".
  */
+
+/*	$OpenBSD: tildexpand.h,v 1.4 2001/06/26 17:27:25 markus Exp $	*/
+
+#ifndef	_TILDEXPAND_H
+#define	_TILDEXPAND_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 char	*tilde_expand_filename(const char *, uid_t);
 

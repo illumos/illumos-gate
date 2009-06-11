@@ -27,8 +27,6 @@
 #ifndef	_SYS_TREE_H
 #define	_SYS_TREE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -384,8 +382,7 @@ struct type *name##_RB_REMOVE(struct name *, struct type *);		\
 struct type *name##_RB_INSERT(struct name *, struct type *);		\
 struct type *name##_RB_FIND(struct name *, struct type *);		\
 struct type *name##_RB_NEXT(struct name *, struct type *);		\
-struct type *name##_RB_MINMAX(struct name *, int);			\
-									\
+struct type *name##_RB_MINMAX(struct name *, int);
 
 /* Main rb operation.
  * Moves node close to the key of elm to top

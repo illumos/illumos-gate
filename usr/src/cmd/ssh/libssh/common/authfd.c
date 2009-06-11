@@ -99,7 +99,7 @@ ssh_get_authentication_socket(void)
 		return -1;
 
 	/* close on exec */
-	if (fcntl(sock, F_SETFD, 1) == -1) {
+	if (fcntl(sock, F_SETFD, FD_CLOEXEC) == -1) {
 		close(sock);
 		return -1;
 	}

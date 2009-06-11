@@ -1,8 +1,4 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -15,11 +11,13 @@
  * incompatible with the protocol description in the RFC file, it must be
  * called by a name other than "ssh" or "Secure Shell".
  */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "includes.h"
 RCSID("$OpenBSD: sshconnect1.c,v 1.52 2002/08/08 13:50:23 aaron Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <openssl/bn.h>
 #include <openssl/md5.h>
@@ -1275,7 +1273,7 @@ ssh_userauth1(const char *local_user, const char *server_user, char *host,
 			goto success;
 	}
 	/* All authentication methods have failed.  Exit with an error message. */
-	fatal("Permission denied.");
+	fatal("Permission denied (all authentication methods have failed).");
 	/* NOTREACHED */
 
  success:

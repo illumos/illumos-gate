@@ -105,9 +105,6 @@ void	do_exec_pty(Session *, const char *);
 void	do_exec_no_pty(Session *, const char *);
 void	do_exec(Session *, const char *);
 void	do_login(Session *, const char *);
-#ifdef LOGIN_NEEDS_UTMPX
-static void	do_pre_login(Session *s);
-#endif
 void	do_child(Session *, const char *);
 void	do_motd(void);
 int	check_quietlogin(Session *, const char *);
@@ -656,22 +653,10 @@ do_exec_pty(Session *s, const char *command)
 		close(ttyfd);
 
 		/* record login, etc. similar to login(1) */
-#if !defined(HAVE_OSF_SIA)
-		if (!(options.use_login && command == NULL)) {
-#ifdef _UNICOS
-			cray_init_job(s->pw); /* set up cray jid and tmpdir */
-#endif /* _UNICOS */
-			do_login(s, command);
-		}
-# ifdef LOGIN_NEEDS_UTMPX
-		else
-			do_pre_login(s);
-# endif
-#endif /* !HAVE_OSF_SIA */
+		do_login(s, command);
 
 		/*
-		 * do_pre_login() will have completed the record_login(), so
-		 * close the pipe to the parent so it can re-enter its event
+		 * Close the pipe to the parent so it can re-enter its event
 		 * loop and service the ptm; if enough debug messages get
 		 * written to the pty before this happens there will be a
 		 * deadlock.
@@ -727,34 +712,6 @@ do_exec_pty(Session *s, const char *command)
 		/* server_loop _has_ closed ptyfd and fdout. */
 	}
 }
-
-#ifdef LOGIN_NEEDS_UTMPX
-static void
-do_pre_login(Session *s)
-{
-	socklen_t fromlen;
-	struct sockaddr_storage from;
-	pid_t pid = getpid();
-
-	/*
-	 * Get IP address of client. If the connection is not a socket, let
-	 * the address be 0.0.0.0.
-	 */
-	memset(&from, 0, sizeof(from));
-	fromlen = sizeof(from);
-	if (packet_connection_is_on_socket()) {
-		if (getpeername(packet_get_connection_in(),
-		    (struct sockaddr *) & from, &fromlen) < 0) {
-			debug("getpeername: %.100s", strerror(errno));
-			fatal_cleanup();
-		}
-	}
-
-	record_utmp_only(pid, s->tty, s->pw->pw_name,
-	    get_remote_name_or_ip(utmp_len, options.verify_reverse_mapping),
-	    (struct sockaddr *)&from);
-}
-#endif
 
 /*
  * This is called to fork and execute a command.  If another command is
@@ -1068,47 +1025,45 @@ do_setup_env(Session *s, const char *shell)
 	ssh_gssapi_do_child(xxx_gssctxt, &env,&envsize);
 #endif
 
-	if (!options.use_login) {
-		/* Set basic environment. */
-		child_set_env(&env, &envsize, "USER", pw->pw_name);
-		child_set_env(&env, &envsize, "LOGNAME", pw->pw_name);
-		child_set_env(&env, &envsize, "HOME", pw->pw_dir);
+	/* Set basic environment. */
+	child_set_env(&env, &envsize, "USER", pw->pw_name);
+	child_set_env(&env, &envsize, "LOGNAME", pw->pw_name);
+	child_set_env(&env, &envsize, "HOME", pw->pw_dir);
 #ifdef HAVE_LOGIN_CAP
-		if (setusercontext(lc, pw, pw->pw_uid, LOGIN_SETPATH) < 0)
-			child_set_env(&env, &envsize, "PATH", _PATH_STDPATH);
-		else
-			child_set_env(&env, &envsize, "PATH", getenv("PATH"));
+	if (setusercontext(lc, pw, pw->pw_uid, LOGIN_SETPATH) < 0)
+		child_set_env(&env, &envsize, "PATH", _PATH_STDPATH);
+	else
+		child_set_env(&env, &envsize, "PATH", getenv("PATH"));
 #else /* HAVE_LOGIN_CAP */
 # ifndef HAVE_CYGWIN
-		/*
-		 * There's no standard path on Windows. The path contains
-		 * important components pointing to the system directories,
-		 * needed for loading shared libraries. So the path better
-		 * remains intact here.
-		 */
+	/*
+	 * There's no standard path on Windows. The path contains
+	 * important components pointing to the system directories,
+	 * needed for loading shared libraries. So the path better
+	 * remains intact here.
+	 */
 #  ifdef SUPERUSER_PATH
-		child_set_env(&env, &envsize, "PATH", 
-		    s->pw->pw_uid == 0 ? SUPERUSER_PATH : _PATH_STDPATH);
+	child_set_env(&env, &envsize, "PATH", 
+	    s->pw->pw_uid == 0 ? SUPERUSER_PATH : _PATH_STDPATH);
 #  else 
-		child_set_env(&env, &envsize, "PATH", _PATH_STDPATH);
+	child_set_env(&env, &envsize, "PATH", _PATH_STDPATH);
 #  endif /* SUPERUSER_PATH */
 # endif /* HAVE_CYGWIN */
 #endif /* HAVE_LOGIN_CAP */
 
-		pm_len = strlen(path_maildir);
-		if (path_maildir[pm_len - 1] == '/' && pm_len > 1)
-			path_maildir[pm_len - 1] = NULL;
-		snprintf(buf, sizeof buf, "%.200s/%.50s",
-			 path_maildir, pw->pw_name);
-		child_set_env(&env, &envsize, "MAIL", buf);
+	pm_len = strlen(path_maildir);
+	if (path_maildir[pm_len - 1] == '/' && pm_len > 1)
+		path_maildir[pm_len - 1] = NULL;
+	snprintf(buf, sizeof buf, "%.200s/%.50s",
+		 path_maildir, pw->pw_name);
+	child_set_env(&env, &envsize, "MAIL", buf);
 
-		/* Normal systems set SHELL by default. */
-		child_set_env(&env, &envsize, "SHELL", shell);
+	/* Normal systems set SHELL by default. */
+	child_set_env(&env, &envsize, "SHELL", shell);
 
 #ifdef HAVE_DEFOPEN
-		deflt_do_setup_env(s, shell, &env, &envsize);
+	deflt_do_setup_env(s, shell, &env, &envsize);
 #endif /* HAVE_DEFOPEN */
-	}
 
 #define PASS_ENV(x) \
 	if (getenv(x)) \
@@ -1135,21 +1090,19 @@ do_setup_env(Session *s, const char *shell)
 		copy_environment(s->env, &env, &envsize);
 
 	/* Set custom environment options from RSA authentication. */
-	if (!options.use_login) {
-		while (custom_environment) {
-			struct envstring *ce = custom_environment;
-			char *str = ce->s;
+	while (custom_environment) {
+		struct envstring *ce = custom_environment;
+		char *str = ce->s;
 
-			for (i = 0; str[i] != '=' && str[i]; i++)
-				;
-			if (str[i] == '=') {
-				str[i] = 0;
-				child_set_env(&env, &envsize, str, str + i + 1);
-			}
-			custom_environment = ce->next;
-			xfree(ce->s);
-			xfree(ce);
+		for (i = 0; str[i] != '=' && str[i]; i++)
+			;
+		if (str[i] == '=') {
+			str[i] = 0;
+			child_set_env(&env, &envsize, str, str + i + 1);
 		}
+		custom_environment = ce->next;
+		xfree(ce->s);
+		xfree(ce);
 	}
 
 	/* SSH_CLIENT deprecated */
@@ -1217,7 +1170,7 @@ do_setup_env(Session *s, const char *shell)
 		    auth_sock_name);
 
 	/* read $HOME/.ssh/environment. */
-	if (options.permit_user_env && !options.use_login) {
+	if (options.permit_user_env) {
 		snprintf(buf, sizeof buf, "%.200s/.ssh/environment",
 		    strcmp(pw->pw_dir, "/") ? pw->pw_dir : "");
 		read_environment_file(&env, &envsize, buf);
@@ -1427,28 +1380,14 @@ do_child(Session *s, const char *command)
 	extern char **environ;
 	char **env;
 	char *argv[ARGV_MAX];
-	const char *shell, *shell0, *hostname = NULL;
+	const char *shell, *shell0;
 	struct passwd *pw = s->pw;
 
 	/* remove hostkey from the child's memory */
 	destroy_sensitive_data();
 
-	/* login(1) is only called if we execute the login shell */
-	if (options.use_login && command != NULL)
-		options.use_login = 0;
-
-#ifdef _UNICOS
-	cray_setup(pw->pw_uid, pw->pw_name, command);
-#endif /* _UNICOS */
-
-	/*
-	 * Login(1) does this as well, and it needs uid 0 for the "-h"
-	 * switch, so we let login(1) to this for us.
-	 */
-	if (!options.use_login) {
-		do_nologin(pw);
-		chroot_if_needed(pw);
-	}
+	do_nologin(pw);
+	chroot_if_needed(pw);
 
 	/*
 	 * Get the shell from the password data.  An empty shell field is
@@ -1461,10 +1400,6 @@ do_child(Session *s, const char *command)
 
 	env = do_setup_env(s, shell);
 
-	/* we have to stash the hostname before we close our socket. */
-	if (options.use_login)
-		hostname = get_remote_name_or_ip(utmp_len,
-		    options.verify_reverse_mapping);
 	/*
 	 * Close the connection descriptors; note that this is the child, and
 	 * the server will still have the socket open, and it is important
@@ -1533,8 +1468,7 @@ do_child(Session *s, const char *command)
 			    strerror(errno));
 	}
 
-	if (!options.use_login)
-		do_rc_files(s, shell);
+	do_rc_files(s, shell);
 
 	/* restore SIGPIPE for child */
 	signal(SIGPIPE,  SIG_DFL);
@@ -1560,11 +1494,6 @@ do_child(Session *s, const char *command)
 		optind = optreset = 1;
 		__progname = argv[0];
 		exit(sftp_server_main(i, argv, s->pw));
-	}
-
-	if (options.use_login) {
-		launch_login(pw, hostname);
-		/* NEVERREACHED */
 	}
 
 	/* Get the last component of the shell name. */
@@ -2222,7 +2151,7 @@ session_pty_cleanup2(void *session)
 
 	/* Record that the user has logged out. */
 	if (s->pid != 0) {
-		debug3("Recording SSHv2 channel login in utmpx/wtmpx");
+		debug3("Recording SSHv2 channel logout in utmpx/wtmpx");
 #ifdef ALTPRIVSEP
 		altprivsep_record_logout(s->pid);
 #endif /* ALTPRIVSEP */
@@ -2488,11 +2417,6 @@ session_setup_x11fwd(Session *s)
 	if (!options.xauth_location ||
 	    (stat(options.xauth_location, &st) == -1)) {
 		packet_send_debug("No xauth program; cannot forward with spoofing.");
-		return 0;
-	}
-	if (options.use_login) {
-		packet_send_debug("X11 forwarding disabled; "
-		    "not compatible with UseLogin=yes.");
 		return 0;
 	}
 	if (s->display != NULL) {

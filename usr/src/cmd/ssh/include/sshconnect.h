@@ -1,20 +1,4 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*	$OpenBSD: sshconnect.h,v 1.17 2002/06/19 00:27:55 deraadt Exp $	*/
-
-#ifndef	_SSHCONNECT_H
-#define	_SSHCONNECT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-/*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +21,19 @@ extern "C" {
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*	$OpenBSD: sshconnect.h,v 1.17 2002/06/19 00:27:55 deraadt Exp $	*/
+
+#ifndef	_SSHCONNECT_H
+#define	_SSHCONNECT_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct Sensitive Sensitive;
 struct Sensitive {
@@ -46,11 +43,11 @@ struct Sensitive {
 };
 
 int
-ssh_connect(const char *, struct sockaddr_storage *, u_short, int, int,
+ssh_connect(const char *, struct sockaddr_storage *, ushort_t, int, int,
     int, const char *);
 
 void
-ssh_login(Sensitive *, const char *, struct sockaddr *, struct passwd *);
+ssh_login(Sensitive *, const char *, struct sockaddr *, char *);
 
 int	 verify_host_key(char *, struct sockaddr *, Key *);
 int	 accept_host_key(char *, struct sockaddr *, Key *);
@@ -67,15 +64,15 @@ void	 ssh_put_password(char *);
 /*
  * Macros to raise/lower permissions.
  */
-#define PRIV_START do {				\
+#define	PRIV_START do {				\
 	int save_errno = errno;			\
-	(void)seteuid(original_effective_uid);	\
+	(void) seteuid(original_effective_uid);	\
 	errno = save_errno;			\
 } while (0)
 
-#define PRIV_END do {				\
+#define	PRIV_END do {				\
 	int save_errno = errno;			\
-	(void)seteuid(original_real_uid);	\
+	(void) seteuid(original_real_uid);	\
 	errno = save_errno;			\
 } while (0)
 

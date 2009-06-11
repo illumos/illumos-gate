@@ -39,7 +39,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,7 +223,7 @@ int
 main(int ac, char **av)
 {
 	int i, opt, exit_status;
-	char *p, *cp, buf[256];
+	char *p, *cp, buf[256], *pw_name, *pw_dir;
 	struct stat st;
 	struct passwd *pw;
 	int dummy;
@@ -262,14 +262,37 @@ main(int ac, char **av)
 			fatal("setrlimit failed: %.100s", strerror(errno));
 	}
 #endif
-	/* Get user data. */
+	/*
+	 * Get user data. It may happen that NIS or LDAP connection breaks down
+	 * during the user's session. We should try to do our best and use the
+	 * HOME and LOGNAME variables. Remember that the SSH client might be the
+	 * only tool available to fix the problem with the naming services.
+	 */
 	pw = getpwuid(original_real_uid);
-	if (!pw) {
-		log("You don't exist, go away!");
-		exit(1);
+	if (pw == NULL) {
+		if ((pw_dir = getenv("HOME")) == NULL) {
+			log("User account's password entry not found and HOME "
+			    "not set. Set it manually and try again. "
+			    "Exiting.");
+			exit(1);
+		}
+		log("User account's password entry not found, using "
+		    "the HOME variable.");
+
+		if ((pw_name = getenv("LOGNAME")) == NULL) {
+			log("Need a local user name but LOGNAME is not set. "
+			   "Set it manually and try again. Exiting.");
+			exit(1);
+		}
+		log("Local user name '%s' set from the LOGNAME variable.",
+		    pw_name);
+
+		pw_dir = xstrdup(pw_dir);
+		pw_name = xstrdup(pw_name);
+	} else {
+		pw_name = xstrdup(pw->pw_name);
+		pw_dir = xstrdup(pw->pw_dir);
 	}
-	/* Take a copy of the returned structure. */
-	pw = pwcopy(pw);
 
 	/*
 	 * Set our umask to something reasonable, as some files are created
@@ -585,7 +608,7 @@ again:
 			fatal("Can't open user config file %.100s: "
 			    "%.100s", config, strerror(errno));
 	} else  {
-		snprintf(buf, sizeof buf, "%.100s/%.100s", pw->pw_dir,
+		snprintf(buf, sizeof buf, "%.100s/%.100s", pw_dir,
 		    _PATH_SSH_USER_CONFFILE);
 		(void)read_config_file(buf, host, &options);
 
@@ -604,7 +627,7 @@ again:
 	seed_rng();
 
 	if (options.user == NULL)
-		options.user = xstrdup(pw->pw_name);
+		options.user = xstrdup(pw_name);
 
 	if (options.hostname != NULL)
 		host = options.hostname;
@@ -699,7 +722,9 @@ again:
 	 * Now that we are back to our own permissions, create ~/.ssh
 	 * directory if it doesn\'t already exist.
 	 */
-	snprintf(buf, sizeof buf, "%.100s%s%.100s", pw->pw_dir, strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
+	snprintf(buf, sizeof buf, "%.100s%s%.100s", pw_dir,
+	    strcmp(pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
+	xfree(pw_dir);
 	if (stat(buf, &st) < 0)
 		if (mkdir(buf, 0700) < 0)
 			error("Could not create directory '%.200s'.", buf);
@@ -721,7 +746,8 @@ again:
 	signal(SIGPIPE, SIG_IGN); /* ignore SIGPIPE early */
 
 	/* Log into the remote system.  This never returns if the login fails. */
-	ssh_login(&sensitive_data, host, (struct sockaddr *)&hostaddr, pw);
+	ssh_login(&sensitive_data, host, (struct sockaddr *)&hostaddr, pw_name);
+	xfree(pw_name);
 
 	/* We no longer need the private host keys.  Clear them now. */
 	if (sensitive_data.nkeys != 0) {

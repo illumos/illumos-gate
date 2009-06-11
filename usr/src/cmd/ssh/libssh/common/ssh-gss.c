@@ -21,7 +21,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -741,7 +741,7 @@ ssh_gssapi_import_name(Gssctxt *ctx, const char *server_host)
 	    SSH_GSS_HOSTBASED_SERVICE, server_host);
 
 	debug3("%s: snprintf() returned %d, expected %d", __func__, ret,
-	    name_buf.length + 1);
+	    name_buf.length);
 
 	ctx->major = gss_import_name(&ctx->minor, &name_buf,
 	    GSS_C_NT_HOSTBASED_SERVICE, &ctx->desired_name);

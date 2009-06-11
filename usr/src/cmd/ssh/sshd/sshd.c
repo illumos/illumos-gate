@@ -53,10 +53,6 @@ RCSID("$OpenBSD: sshd.c,v 1.260 2002/09/27 10:42:09 mickey Exp $");
 #include <openssl/md5.h>
 
 #include <openssl/rand.h>
-#ifdef HAVE_SECUREWARE
-#include <sys/security.h>
-#include <prot.h>
-#endif
 
 #include "ssh.h"
 #include "ssh1.h"
@@ -846,10 +842,6 @@ main(int ac, char **av)
 	__progname = get_progname(av[0]);
 
 	(void) g11n_setlocale(LC_ALL, "");
-
-#ifdef HAVE_SECUREWARE
-	(void)set_auth_parameters(ac, av);
-#endif
 
 	init_rng();
 
@@ -1951,7 +1943,7 @@ prepare_for_ssh2_kex(void)
 	if (locales != NULL)
 		g11n_freelist(locales);
 
-	if ((myproposal[PROPOSAL_LANG_STOC] != NULL) || 
+	if ((myproposal[PROPOSAL_LANG_STOC] != NULL) &&
 	    (strcmp(myproposal[PROPOSAL_LANG_STOC], "")) != 0)
 		myproposal[PROPOSAL_LANG_CTOS] =
 			xstrdup(myproposal[PROPOSAL_LANG_STOC]);
@@ -1963,9 +1955,16 @@ prepare_for_ssh2_kex(void)
 
 	kex = kex_setup(NULL, myproposal, kex_hook);
 
-	if (myproposal[PROPOSAL_LANG_STOC] != NULL)
+	/*
+	 * Note that the my_srv_proposal variable (ie., myproposal) is staticly
+	 * initialized with "" for the language fields; we must not xfree such
+	 * strings.
+	 */
+	if (myproposal[PROPOSAL_LANG_STOC] != NULL &&
+	    strcmp(myproposal[PROPOSAL_LANG_STOC], "") != 0)
 		xfree(myproposal[PROPOSAL_LANG_STOC]);
-	if (myproposal[PROPOSAL_LANG_CTOS] != NULL)
+	if (myproposal[PROPOSAL_LANG_CTOS] != NULL &&
+	    strcmp(myproposal[PROPOSAL_LANG_STOC], "") != 0)
 		xfree(myproposal[PROPOSAL_LANG_CTOS]);
 
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
