@@ -3229,7 +3229,7 @@ if_report_ip4(mib2_ipAddrEntry_t *ap,
 	char dstbuf[MAXHOSTNAMELEN + 1];
 
 	if (ksp_not_null) {
-		(void) printf("%-5s %-5u",
+		(void) printf("%-5s %-4u ",
 		    ifname, ap->ipAdEntInfo.ae_mtu);
 		if (ap->ipAdEntInfo.ae_flags & IFF_POINTOPOINT)
 			(void) pr_addr(ap->ipAdEntInfo.ae_pp_dst_addr,
@@ -3252,7 +3252,7 @@ if_report_ip4(mib2_ipAddrEntry_t *ap,
 		statptr->ipackets = ap->ipAdEntInfo.ae_ibcnt;
 		statptr->opackets = ap->ipAdEntInfo.ae_obcnt;
 
-		(void) printf("%-5s %-5u", logintname, ap->ipAdEntInfo.ae_mtu);
+		(void) printf("%-5s %-4u ", logintname, ap->ipAdEntInfo.ae_mtu);
 		if (ap->ipAdEntInfo.ae_flags & IFF_POINTOPOINT)
 			(void) pr_addr(ap->ipAdEntInfo.ae_pp_dst_addr, abuf,
 			sizeof (abuf));
@@ -3277,7 +3277,7 @@ if_report_ip6(mib2_ipv6AddrEntry_t *ap6,
 	char dstbuf[MAXHOSTNAMELEN + 1];
 
 	if (ksp_not_null) {
-		(void) printf("%-5s %-5u", ifname, ap6->ipv6AddrInfo.ae_mtu);
+		(void) printf("%-5s %-4u ", ifname, ap6->ipv6AddrInfo.ae_mtu);
 		if (ap6->ipv6AddrInfo.ae_flags &
 		    IFF_POINTOPOINT) {
 			(void) pr_addr6(&ap6->ipv6AddrInfo.ae_pp_dst_addr,
@@ -3302,7 +3302,7 @@ if_report_ip6(mib2_ipv6AddrEntry_t *ap6,
 		statptr->ipackets = ap6->ipv6AddrInfo.ae_ibcnt;
 		statptr->opackets = ap6->ipv6AddrInfo.ae_obcnt;
 
-		(void) printf("%-5s %-5u", logintname,
+		(void) printf("%-5s %-4u ", logintname,
 		    ap6->ipv6AddrInfo.ae_mtu);
 		if (ap6->ipv6AddrInfo.ae_flags & IFF_POINTOPOINT)
 			(void) pr_addr6(&ap6->ipv6AddrInfo.ae_pp_dst_addr,
