@@ -993,6 +993,32 @@ vdev_probe(vdev_t *vd, zio_t *zio)
 	return (NULL);
 }
 
+static void
+vdev_open_child(void *arg)
+{
+	vdev_t *vd = arg;
+
+	vd->vdev_open_thread = curthread;
+	vd->vdev_open_error = vdev_open(vd);
+	vd->vdev_open_thread = NULL;
+}
+
+void
+vdev_open_children(vdev_t *vd)
+{
+	taskq_t *tq;
+	int children = vd->vdev_children;
+
+	tq = taskq_create("vdev_open", children, minclsyspri,
+	    children, children, TASKQ_PREPOPULATE);
+
+	for (int c = 0; c < children; c++)
+		VERIFY(taskq_dispatch(tq, vdev_open_child, vd->vdev_child[c],
+		    TQ_SLEEP) != NULL);
+
+	taskq_destroy(tq);
+}
+
 /*
  * Prepare a virtual device for access.
  */
@@ -1005,8 +1031,8 @@ vdev_open(vdev_t *vd)
 	uint64_t asize, psize;
 	uint64_t ashift = 0;
 
-	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
-
+	ASSERT(vd->vdev_open_thread == curthread ||
+	    spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
 	ASSERT(vd->vdev_state == VDEV_STATE_CLOSED ||
 	    vd->vdev_state == VDEV_STATE_CANT_OPEN ||
 	    vd->vdev_state == VDEV_STATE_OFFLINE);

@@ -559,9 +559,7 @@ vdev_raidz_reconstruct_pq(raidz_map_t *rm, int x, int y)
 static int
 vdev_raidz_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 {
-	vdev_t *cvd;
 	uint64_t nparity = vd->vdev_nparity;
-	int c, error;
 	int lasterror = 0;
 	int numerrors = 0;
 
@@ -573,11 +571,13 @@ vdev_raidz_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 		return (EINVAL);
 	}
 
-	for (c = 0; c < vd->vdev_children; c++) {
-		cvd = vd->vdev_child[c];
+	vdev_open_children(vd);
 
-		if ((error = vdev_open(cvd)) != 0) {
-			lasterror = error;
+	for (int c = 0; c < vd->vdev_children; c++) {
+		vdev_t *cvd = vd->vdev_child[c];
+
+		if (cvd->vdev_open_error) {
+			lasterror = cvd->vdev_open_error;
 			numerrors++;
 			continue;
 		}
@@ -599,9 +599,7 @@ vdev_raidz_open(vdev_t *vd, uint64_t *asize, uint64_t *ashift)
 static void
 vdev_raidz_close(vdev_t *vd)
 {
-	int c;
-
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++)
 		vdev_close(vd->vdev_child[c]);
 }
 
