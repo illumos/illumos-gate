@@ -430,16 +430,11 @@ fct_get_adapter_port_attr(fct_i_local_port_t *ilport, uint8_t *pwwn,
 	    sizeof (port_attr->PortWWN));
 	bzero(port_attr->FabricName, sizeof (port_attr->FabricName));
 	port_attr->PortFcId = iport->iport_link_info.portid;
-	switch (iport->iport_state) {
-		case FCT_STATE_ONLINE:
-			port_attr->PortState = FC_HBA_PORTSTATE_ONLINE;
-			break;
-		case FCT_STATE_OFFLINE:
-			port_attr->PortState = FC_HBA_PORTSTATE_OFFLINE;
-			break;
-		default:
-			port_attr->PortState = FC_HBA_PORTSTATE_UNKNOWN;
-			break;
+	if ((iport->iport_link_state & S_LINK_ONLINE) ||
+	    (iport->iport_link_state & S_RCVD_LINK_UP)) {
+		port_attr->PortState = FC_HBA_PORTSTATE_ONLINE;
+	} else {
+		port_attr->PortState = FC_HBA_PORTSTATE_OFFLINE;
 	}
 	switch (iport->iport_link_info.port_topology) {
 		case PORT_TOPOLOGY_PT_TO_PT:
