@@ -49,6 +49,7 @@ uint32_t sbd_get_tptid_length_for_devid(scsi_devid_desc_t *);
 uint32_t sbd_devid_desc_to_tptid(scsi_devid_desc_t *, scsi_transport_id_t *);
 scsi_devid_desc_t *sbd_tptid_to_devid_desc(scsi_transport_id_t *, uint32_t *);
 char *sbd_get_devid_string(sbd_lu_t *);
+void sbd_base16_str_to_binary(char *c, int, uint8_t *);
 
 sbd_status_t sbd_pgr_meta_load(sbd_lu_t *);
 sbd_status_t sbd_pgr_meta_write(sbd_lu_t *);
@@ -94,6 +95,7 @@ extern void sbd_handle_short_read_transfers(scsi_task_t *task,
 	uint32_t cmd_xfer_size);
 extern uint16_t stmf_scsilib_get_lport_rtid(scsi_devid_desc_t *devid);
 extern scsi_devid_desc_t *stmf_scsilib_get_devid_desc(uint16_t rtpid);
+extern char sbd_ctoi(char c);
 
 /*
  *
@@ -1063,6 +1065,7 @@ sbd_pgr_in_report_capabilities(scsi_task_t *task,
 	ASSERT(task->task_cdb[0] == SCMD_PERSISTENT_RESERVE_IN);
 	ASSERT(pgr != NULL);
 
+	bzero(&buf, sizeof (buf));
 	buf.ptpl_c		= 1;   /* Persist Through Power Loss C */
 	buf.atp_c		= 1;   /* All Target Ports Capable */
 	buf.sip_c		= 1;   /* Specify Initiator Ports Capable */
@@ -1136,6 +1139,7 @@ sbd_pgr_in_read_full_status(scsi_task_t *task,
 		key = key->pgr_key_next;
 		++i;
 	}
+	ASSERT(offset <= (uint8_t *)buf + buf_size);
 
 	sbd_handle_short_read_transfers(task, initial_dbuf, (uint8_t *)buf,
 	    cdb_len, buf_size);
@@ -1229,12 +1233,10 @@ sbd_pgr_out_register(scsi_task_t *task, stmf_data_buf_t *dbuf)
 			    STMF_SAA_PARAM_LIST_LENGTH_ERROR);
 			return;
 		}
-		tpdmax = plist->apd + adnlen;
-		tpdlen = adnlen - 4;
+		tpdmax = plist->apd + adnlen + 4;
+		tpdlen = adnlen;
 		max_tpdnum = tpdlen / sizeof (scsi_transport_id_t);
-		newdevids = kmem_zalloc(sizeof (scsi_devid_desc_t **),
-		    KM_SLEEP);
-		*newdevids  = kmem_zalloc(sizeof (scsi_devid_desc_t *) *
+		newdevids  = kmem_zalloc(sizeof (scsi_devid_desc_t *) *
 		    max_tpdnum, KM_SLEEP);
 		tpdnum = 0;
 		/* Check the validity of given TransportIDs */
@@ -1272,9 +1274,8 @@ sbd_pgr_out_register(scsi_task_t *task, stmf_data_buf_t *dbuf)
 			kmem_free(rpt, sizeof (scsi_devid_desc_t) - 1 +
 			    rpt->ident_length);
 		}
-		kmem_free(*newdevids,
+		kmem_free(newdevids,
 		    sizeof (scsi_devid_desc_t *) * max_tpdnum);
-		kmem_free(newdevids, sizeof (scsi_devid_desc_t **));
 		if (tpdlen != 0) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
 			    STMF_SAA_INVALID_FIELD_IN_CDB);
@@ -1783,6 +1784,8 @@ sbd_tptid_to_devid_desc(scsi_transport_id_t *tptid, uint32_t *tptid_len)
 
 	struct scsi_fc_transport_id	*fcid;
 	struct iscsi_transport_id	*iscsiid;
+	struct scsi_srp_transport_id	*srpid;
+	char	eui_str[20+1];
 
 	switch (tptid->protocol_id) {
 
@@ -1792,15 +1795,12 @@ sbd_tptid_to_devid_desc(scsi_transport_id_t *tptid, uint32_t *tptid_len)
 			return (NULL);
 		}
 		*tptid_len -= 24;
-		ident_len = 8;
+		ident_len = 20; /* wwn.XXXXXXXXXXXXXXXX */
 		fcid	= (scsi_fc_transport_id_t *)tptid;
 		sz	= sizeof (scsi_devid_desc_t) - 1 + ident_len;
 		devid	= (scsi_devid_desc_t *)kmem_zalloc(sz, KM_SLEEP);
-		(void) memcpy(devid->ident, fcid->port_name, ident_len);
-		/* LINTED E_ASSIGN_NARROW_CONV */
-		devid->ident_length	= ident_len;
-		devid->protocol_id	= tptid->protocol_id;
-		devid->code_set		= CODE_SET_BINARY;
+		stmf_wwn_to_devid_desc(devid, fcid->port_name,
+		    PROTOCOL_FIBRE_CHANNEL);
 		return (devid);
 
 	case PROTOCOL_iSCSI:
@@ -1823,6 +1823,25 @@ sbd_tptid_to_devid_desc(scsi_transport_id_t *tptid, uint32_t *tptid_len)
 		devid->code_set		= CODE_SET_ASCII;
 		return (devid);
 
+	case PROTOCOL_SRP:
+		if (*tptid_len < 24 || tptid->format_code != 0) {
+			return (NULL);
+		}
+		*tptid_len -= 24;
+		srpid	= (scsi_srp_transport_id_t *)tptid;
+		ident_len = sizeof (eui_str) - 1; /* eui.XXXXXXXXXXXXXXXX */
+		sz	= sizeof (scsi_devid_desc_t) - 1 + ident_len;
+		devid	= (scsi_devid_desc_t *)kmem_zalloc(sz, KM_SLEEP);
+		/* ASSUME: initiator-extension of srp_name is zero */
+		(void) snprintf(eui_str, sizeof (eui_str), "eui.%016llX",
+		    (u_longlong_t)BE_IN64(srpid->srp_name));
+		bcopy(eui_str, devid->ident, ident_len);
+		/* LINTED E_ASSIGN_NARROW_CONV */
+		devid->ident_length	= ident_len;
+		devid->protocol_id	= tptid->protocol_id;
+		devid->code_set		= CODE_SET_ASCII;
+		return (devid);
+
 	default:
 		cmn_err(CE_NOTE, "sbd_tptid_to_devid_desc: received unknown"
 		    "protocol id 0x%x", tptid->protocol_id);
@@ -1833,22 +1852,25 @@ sbd_tptid_to_devid_desc(scsi_transport_id_t *tptid, uint32_t *tptid_len)
 /*
  * Changes devid_desc to corresponding TransportID format
  * Returns : Total length used by TransportID
- * Note    :- No buffer lenghth checking
+ * Note    :- No buffer length checking
  */
 uint32_t
 sbd_devid_desc_to_tptid(scsi_devid_desc_t *devid, scsi_transport_id_t *tptid)
 {
 	struct scsi_fc_transport_id	*fcid;
 	struct iscsi_transport_id	*iscsiid;
+	struct scsi_srp_transport_id	*srpid;
 	uint32_t ident_len,  sz = 0;
 
 	switch (devid->protocol_id) {
 	case PROTOCOL_FIBRE_CHANNEL:
 		fcid = (scsi_fc_transport_id_t *)tptid;
-		ident_len = 8;
 		tptid->format_code = 0;
 		tptid->protocol_id = devid->protocol_id;
-		(void) memcpy(fcid->port_name, devid->ident, ident_len);
+		/* convert from "wwn.XXXXXXXXXXXXXXXX" to 8-byte binary */
+		ASSERT(strncmp("wwn.", (char *)devid->ident, 4) == 0);
+		sbd_base16_str_to_binary((char *)devid->ident + 4, 16,
+		    fcid->port_name);
 		sz = 24;
 		break;
 
@@ -1862,9 +1884,21 @@ sbd_devid_desc_to_tptid(scsi_devid_desc_t *devid, scsi_transport_id_t *tptid)
 		sz = ALIGNED_TO_WORD_BOUNDARY(4 + ident_len);
 		break;
 
+	case PROTOCOL_SRP:
+		srpid = (scsi_srp_transport_id_t *)tptid;
+		tptid->format_code = 0;
+		tptid->protocol_id = devid->protocol_id;
+		/* convert from "eui.XXXXXXXXXXXXXXXX" to 8-byte binary */
+		ASSERT(strncmp("eui.", (char *)devid->ident, 4) == 0);
+		sbd_base16_str_to_binary((char *)devid->ident+4, 16,
+		    srpid->srp_name);
+		/* ASSUME: initiator-extension part of srp_name is zero */
+		sz = 24;
+		break;
+
 	default :
 		cmn_err(CE_NOTE, "sbd_devid_desc_to_tptid: received unknown"
-		    "protocol id 0x%x", devid->protocol_id);
+		    " protocol id 0x%x", devid->protocol_id);
 		break;
 	}
 
@@ -1876,6 +1910,7 @@ sbd_get_tptid_length_for_devid(scsi_devid_desc_t *devid)
 {
 	uint32_t sz = 0;
 	switch (devid->protocol_id) {
+	case PROTOCOL_SRP:
 	case PROTOCOL_FIBRE_CHANNEL:
 		sz = 24;
 		break;
@@ -1902,4 +1937,24 @@ sbd_get_devid_string(sbd_lu_t *sl)
 	    sl->sl_device_id[16], sl->sl_device_id[17], sl->sl_device_id[18],
 	    sl->sl_device_id[19]);
 	return (str);
+}
+
+/* Convert from Hex value in ASCII format to the equivalent bytes */
+void
+sbd_base16_str_to_binary(char *c, int len, uint8_t *dp)
+{
+	int		ii;
+
+	ASSERT((len & 1) == 0);
+
+	for (ii = 0; ii < len / 2; ii++) {
+		char nibble1, nibble2;
+		char enc_char = *c++;
+		nibble1 = sbd_ctoi(enc_char);
+
+		enc_char = *c++;
+		nibble2 = sbd_ctoi(enc_char);
+
+		dp[ii] = (nibble1 << 4) | nibble2;
+	}
 }

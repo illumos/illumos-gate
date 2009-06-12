@@ -134,6 +134,11 @@ typedef struct scsi_per_res_type {
 	uint8_t			ex_ac_ar : 1,
 				resbits4 : 7;
 } scsi_per_res_type_t;
+
+/*
+ * Refer SPC-3, Revision 23
+ * Section 6.11.4 REPORT CAPABILITIES service action
+ */
 typedef struct scsi_prin_rpt_cap {
 	uint8_t			length[2];
 	uint8_t			ptpl_c : 1,
@@ -178,6 +183,14 @@ typedef struct iscsi_transport_id {
 	char			iscsi_name[1];
 } iscsi_transport_id_t;
 
+typedef struct scsi_srp_transport_id {
+	uint8_t			protocol_id : 4,
+				resbits : 2,
+				format_code : 2;
+	uint8_t			rsvbytes1[7];
+	uint8_t			srp_name[16];
+} scsi_srp_transport_id_t;
+
 /*
  * Information obtained from:
  *	SPC-3, Revision 23
@@ -199,6 +212,7 @@ typedef struct scsi_prin_status_t {
 	uint8_t			add_len[4];
 	scsi_transport_id_t	trans_id;
 } scsi_prin_status_t;
+
 typedef struct scsi_prin_full_status {
 	uint8_t			PRgeneration[4];
 	uint8_t			add_len[4];
@@ -317,6 +331,10 @@ typedef struct scsi_per_res_type {
 	uint8_t			resbits4 : 7,
 				ex_ac_ar : 1;
 } scsi_per_res_type_t;
+/*
+ * Refer SPC-3, Revision 23
+ * Section 6.11.4 REPORT CAPABILITIES service action
+ */
 typedef struct scsi_prin_rpt_cap {
 	uint8_t			length[2];
 	uint8_t			resbits2 : 3,
@@ -360,6 +378,15 @@ typedef struct iscsi_transport_id {
 	uint8_t			add_len[2];
 	char			iscsi_name[1];
 } iscsi_transport_id_t;
+
+
+typedef struct scsi_srp_transport_id {
+	uint8_t			format_code : 2,
+				resbits : 2,
+				protocol_id : 4;
+	uint8_t			rsvbytes1[7];
+	uint8_t			srp_name[16];
+} scsi_srp_transport_id_t;
 
 /*
  * Information obtained from:

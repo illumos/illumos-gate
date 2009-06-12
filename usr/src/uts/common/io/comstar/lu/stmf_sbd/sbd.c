@@ -79,6 +79,7 @@ sbd_status_t sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz,
 int sbd_is_zvol(char *path);
 int sbd_zvolget(char *zvol_name, char **comstarprop);
 int sbd_zvolset(char *zvol_name, char *comstarprop);
+char sbd_ctoi(char c);
 
 static ldi_ident_t	sbd_zfs_ident;
 static stmf_lu_provider_t *sbd_lp;
@@ -2488,8 +2489,8 @@ sbd_create_zfs_meta_object(sbd_lu_t *sl)
 	return (SBD_SUCCESS);
 }
 
-static char
-ctoi(char c)
+char
+sbd_ctoi(char c)
 {
 	if ((c >= '0') && (c <= '9'))
 		c -= '0';
@@ -2529,8 +2530,8 @@ sbd_open_zfs_meta(sbd_lu_t *sl)
 	len = strlen(meta);
 	ptr = sl->sl_zfs_meta;
 	for (i = 0; i < len; i += 2) {
-		ch = ctoi(*tmp++);
-		cl = ctoi(*tmp++);
+		ch = sbd_ctoi(*tmp++);
+		cl = sbd_ctoi(*tmp++);
 		if (ch == -1 || cl == -1) {
 			rc = SBD_FAILURE;
 			break;

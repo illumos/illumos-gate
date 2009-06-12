@@ -4260,7 +4260,7 @@ stmf_info(uint32_t cmd, void *arg1, void *arg2, uint8_t *buf,
 }
 
 /*
- * Used by port providers. pwwn is 8 byte wwn, sdid is th devid used by
+ * Used by port providers. pwwn is 8 byte wwn, sdid is the devid used by
  * stmf to register local ports. The ident should have 20 bytes in buffer
  * space to convert the wwn to "wwn.xxxxxxxxxxxxxxxx" string.
  */
@@ -4268,15 +4268,20 @@ void
 stmf_wwn_to_devid_desc(scsi_devid_desc_t *sdid, uint8_t *wwn,
     uint8_t protocol_id)
 {
+	char wwn_str[20+1];
+
 	sdid->protocol_id = protocol_id;
 	sdid->piv = 1;
 	sdid->code_set = CODE_SET_ASCII;
 	sdid->association = ID_IS_TARGET_PORT;
 	sdid->ident_length = 20;
-	(void) sprintf((char *)sdid->ident,
+	/* Convert wwn value to "wwn.XXXXXXXXXXXXXXXX" format */
+	(void) snprintf(wwn_str, sizeof (wwn_str),
 	    "wwn.%02X%02X%02X%02X%02X%02X%02X%02X",
 	    wwn[0], wwn[1], wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7]);
+	bcopy(wwn_str, (char *)sdid->ident, 20);
 }
+
 
 stmf_xfer_data_t *
 stmf_prepare_tpgs_data()
