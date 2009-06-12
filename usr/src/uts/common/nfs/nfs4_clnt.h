@@ -834,7 +834,7 @@ typedef struct nfs4_debug_msg {
  *	The mi_async_lock mutex protects the following fields:
  *		mi_async_reqs
  *		mi_async_req_count
- * 		mi_async_tail
+ *		mi_async_tail
  *		mi_async_curr
  *		mi_async_clusters
  *		mi_async_init_clusters
@@ -847,10 +847,16 @@ typedef struct nfs4_debug_msg {
  *		mi_clientid_next
  *		mi_clientid_prev
  *		mi_open_files
- *		mi_srvsettime
  *
  *	The mntinfo4_t::mi_recovlock protects the following fields:
  *		mi_srvsettime
+ *		mi_srvset_cnt
+ *		mi_srv
+ *
+ * Changing mi_srv from one nfs4_server_t to a different one requires
+ * holding the mi_recovlock as RW_WRITER.
+ * Exception: setting mi_srv the first time in mount/mountroot is done
+ * holding the mi_recovlock as RW_READER.
  *
  *	Locking order:
  *	  mi4_globals::mig_lock > mi_async_lock
@@ -896,6 +902,7 @@ typedef struct nfs4_debug_msg {
 struct zone;
 struct nfs4_ephemeral;
 struct nfs4_ephemeral_tree;
+struct nfs4_server;
 typedef struct mntinfo4 {
 	kmutex_t	mi_lock;	/* protects mntinfo4 fields */
 	struct servinfo4 *mi_servers;   /* server list */
@@ -956,7 +963,8 @@ typedef struct mntinfo4 {
 	clock_t		mi_printftime;	/* last error printf time */
 	nfs_rwlock_t	mi_recovlock;	/* separate ops from recovery (v4) */
 	time_t		mi_grace_wait;	/* non-zero represents time to wait */
-	time_t		mi_srvsettime;	/* when we switched nfs4_server_t */
+	/* when we switched nfs4_server_t - only for observability purposes */
+	time_t		mi_srvsettime;
 	nfs_rwlock_t	mi_rename_lock;	/* atomic volfh rename  */
 	struct nfs4_fname *mi_fname;	/* root fname */
 	list_t		mi_lost_state;	/* resend list */
@@ -1022,6 +1030,9 @@ typedef struct mntinfo4 {
 	 */
 	struct nfs4_ephemeral		*mi_ephemeral;
 	struct nfs4_ephemeral_tree	*mi_ephemeral_tree;
+
+	uint_t mi_srvset_cnt; /* increment when changing the nfs4_server_t */
+	struct nfs4_server *mi_srv; /* backpointer to nfs4_server_t */
 } mntinfo4_t;
 
 /*

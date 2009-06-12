@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NFS Version 4 state recovery code.
@@ -730,7 +728,7 @@ nfs4_start_fop(mntinfo4_t *mi, vnode_t *vp1, vnode_t *vp2, nfs4_op_hint_t op,
 	nfs4_server_t *sp = NULL;
 	nfs4_server_t *tsp;
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
-	time_t droplock_time;
+	uint_t droplock_cnt;
 #ifdef DEBUG
 	void *fop_caller;
 #endif
@@ -816,7 +814,7 @@ get_sp:
 	if (sp != NULL) {
 		sp->s_otw_call_count++;
 		mutex_exit(&sp->s_lock);
-		droplock_time = gethrestime_sec();
+		droplock_cnt = mi->mi_srvset_cnt;
 	}
 	nfs_rw_exit(&mi->mi_recovlock);
 
@@ -839,7 +837,7 @@ get_sp:
 	 * there's no point in double checking to make sure it
 	 * has switched.
 	 */
-	if (sp == NULL || droplock_time < mi->mi_srvsettime) {
+	if (sp == NULL || droplock_cnt != mi->mi_srvset_cnt) {
 		tsp = find_nfs4_server(mi);
 		if (tsp != sp) {
 			/* try again */

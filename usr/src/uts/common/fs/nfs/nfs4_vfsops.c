@@ -2000,9 +2000,11 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	mi->mi_fh_expire_type = FH4_PERSISTENT;
 	mi->mi_clientid_next = NULL;
 	mi->mi_clientid_prev = NULL;
+	mi->mi_srv = NULL;
 	mi->mi_grace_wait = 0;
 	mi->mi_error = 0;
 	mi->mi_srvsettime = 0;
+	mi->mi_srvset_cnt = 0;
 
 	mi->mi_count = 1;
 
@@ -3328,8 +3330,10 @@ nfs4_add_mi_to_server(nfs4_server_t *sp, mntinfo4_t *mi)
 		if (sp->mntinfo4_list)
 			sp->mntinfo4_list->mi_clientid_prev = mi;
 		mi->mi_clientid_next = sp->mntinfo4_list;
+		mi->mi_srv = sp;
 		sp->mntinfo4_list = mi;
 		mi->mi_srvsettime = gethrestime_sec();
+		mi->mi_srvset_cnt++;
 	}
 
 	/* set mi's clientid to that of sp's for later matching */
@@ -3427,6 +3431,7 @@ remove_mi(nfs4_server_t *sp, mntinfo4_t *mi)
 
 	/* Now mark the mntinfo4's links as being removed */
 	mi->mi_clientid_prev = mi->mi_clientid_next = NULL;
+	mi->mi_srv = NULL;
 
 	VFS_RELE(mi->mi_vfsp);
 }
@@ -3465,26 +3470,19 @@ nfs4_remove_mi_from_server(mntinfo4_t *mi, nfs4_server_t *esp)
 {
 	nfs4_server_t	*sp;
 
-	if (esp == NULL) {
-		(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER, 0);
-		sp = find_nfs4_server_all(mi, 1);
-	} else
-		sp = esp;
-
-	if (sp != NULL)
-		nfs4_remove_mi_from_server_nolock(mi, sp);
-
-	/*
-	 * If we had a valid esp as input, the calling function will be
-	 * responsible for unlocking the esp nfs4_server.
-	 */
-	if (esp == NULL) {
-		if (sp != NULL)
-			mutex_exit(&sp->s_lock);
-		nfs_rw_exit(&mi->mi_recovlock);
-		if (sp != NULL)
-			nfs4_server_rele(sp);
+	if (esp) {
+		nfs4_remove_mi_from_server_nolock(mi, esp);
+		return;
 	}
+
+	(void) nfs_rw_enter_sig(&mi->mi_recovlock, RW_READER, 0);
+	sp = mi->mi_srv;
+	if (sp != NULL) {
+		mutex_enter(&sp->s_lock);
+		nfs4_remove_mi_from_server_nolock(mi, sp);
+		mutex_exit(&sp->s_lock);
+	}
+	nfs_rw_exit(&mi->mi_recovlock);
 }
 
 /*
@@ -3780,8 +3778,11 @@ servinfo4_to_nfs4_server(servinfo4_t *srv_p)
 }
 
 /*
- * Search the nfs4_server_lst to find a match based on clientid and
- * addr.
+ * find_nfs4_server() and find_nfs4_server_all() are used to find
+ * a nfs4_server_t to which the mntinfo4_t was already linked.
+ * this is in contrast to searching a new nfs4_server_t, by walking
+ * the nfs4_server_lst list, needed e.g. when doing a failover.
+ *
  * Locks the nfs4_server down if it is found and returns a reference that
  * must eventually be freed.
  *
@@ -3809,53 +3810,16 @@ find_nfs4_server(mntinfo4_t *mi)
 nfs4_server_t *
 find_nfs4_server_all(mntinfo4_t *mi, int all)
 {
-	nfs4_server_t *np;
-	servinfo4_t *svp;
-	zoneid_t zoneid = mi->mi_zone->zone_id;
+	nfs4_server_t *np = mi->mi_srv;
 
 	ASSERT(nfs_rw_lock_held(&mi->mi_recovlock, RW_READER) ||
 	    nfs_rw_lock_held(&mi->mi_recovlock, RW_WRITER));
-	/*
-	 * This can be called from nfs4_unmount() which can be called from the
-	 * global zone, hence it's legal for the global zone to muck with
-	 * another zone's server list, as long as it doesn't try to contact
-	 * them.
-	 */
-	ASSERT(zoneid == getzoneid() || getzoneid() == GLOBAL_ZONEID ||
-	    nfs_global_client_only != 0);
 
-	/*
-	 * The nfs4_server_lst_lock global lock is held when we get a new
-	 * clientid (via SETCLIENTID OTW).  Holding this global lock and
-	 * mi_recovlock (READER is fine) ensures that the nfs4_server
-	 * and this mntinfo4 can't get out of sync, so the following search is
-	 * always valid.
-	 */
-	mutex_enter(&nfs4_server_lst_lock);
-#ifdef DEBUG
-	if (nfs4_server_t_debug) {
-		/* mi->mi_clientid is unprotected, ok for debug output */
-		dumpnfs4slist("find_nfs4_server", mi, mi->mi_clientid,
-		    mi->mi_curr_serv);
-	}
-#endif
-	for (np = nfs4_server_lst.forw; np != &nfs4_server_lst; np = np->forw) {
+	if (np && (np->s_thread_exit != NFS4_THREAD_EXIT || all)) {
 		mutex_enter(&np->s_lock);
-		svp = mi->mi_curr_serv;
-
-		if (np->zoneid == zoneid &&
-		    np->clientid == mi->mi_clientid &&
-		    np->saddr.len == svp->sv_addr.len &&
-		    bcmp(np->saddr.buf, svp->sv_addr.buf, np->saddr.len) == 0 &&
-		    (np->s_thread_exit != NFS4_THREAD_EXIT || all != 0)) {
-			mutex_exit(&nfs4_server_lst_lock);
-			np->s_refcnt++;
-			return (np);
-		}
-		mutex_exit(&np->s_lock);
+		np->s_refcnt++;
+		return (np);
 	}
-	mutex_exit(&nfs4_server_lst_lock);
-
 	return (NULL);
 }
 
