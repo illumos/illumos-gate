@@ -113,7 +113,6 @@ lpstat_default_printer(papi_encryption_t encryption)
 static int
 lpstat_service_status(papi_encryption_t encryption)
 {
-	int result = 0;
 	papi_status_t status;
 	papi_service_t svc = NULL;
 	char *name = NULL;
@@ -127,12 +126,11 @@ lpstat_service_status(papi_encryption_t encryption)
 	    encryption, NULL);
 	if (status != PAPI_OK) {
 		printf(gettext("scheduler is not running\n"));
-		result = -1;
 	} else
 		printf(gettext("scheduler is running\n"));
 	papiServiceDestroy(svc);
 
-	return (result);
+	return (0);
 }
 
 static char *
