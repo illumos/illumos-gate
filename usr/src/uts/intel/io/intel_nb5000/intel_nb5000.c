@@ -542,10 +542,16 @@ log_fsb_err(uint64_t ferr, nb_regs_t *rp, int willpanic, int *interpose)
 	rp->nb.fsb_regs.nrecfsb_addr = NRECADDR_RD(fsb);
 	rp->nb.fsb_regs.recfsb = RECFSB_RD(fsb);
 	if (!willpanic) {
+		/* Clear the fatal/non-fatal first/next FSB errors */
 		if (rp->nb.fsb_regs.ferr_fat_fsb || *interpose)
 			FERR_FAT_FSB_WR(fsb, rp->nb.fsb_regs.ferr_fat_fsb);
 		if (rp->nb.fsb_regs.ferr_nf_fsb || *interpose)
 			FERR_NF_FSB_WR(fsb, rp->nb.fsb_regs.ferr_nf_fsb);
+		if (rp->nb.fsb_regs.nerr_fat_fsb || *interpose)
+			NERR_FAT_FSB_WR(fsb, rp->nb.fsb_regs.nerr_fat_fsb);
+		if (rp->nb.fsb_regs.nerr_nf_fsb || *interpose)
+			NERR_NF_FSB_WR(fsb, rp->nb.fsb_regs.nerr_nf_fsb);
+
 		/*
 		 * if interpose write read-only registers to clear from pcii
 		 * cache
