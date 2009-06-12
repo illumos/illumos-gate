@@ -99,8 +99,14 @@ main(int ac, char *av[])
 			    printer);
 			exit_status = 1;
 		} else {
-			fprintf(stderr, gettext("enable: %s: %s\n"), printer,
-			    verbose_papi_message(svc, status));
+			/* The operation is not supported in lpd protocol */
+			if (status == PAPI_OPERATION_NOT_SUPPORTED) {
+				fprintf(stderr,
+				    verbose_papi_message(svc, status));
+			} else {
+				fprintf(stderr, gettext("enable: %s: %s\n"),
+				    printer, verbose_papi_message(svc, status));
+			}
 			exit_status = 1;
 		}
 

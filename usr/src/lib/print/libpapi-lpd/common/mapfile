@@ -97,10 +97,10 @@ SUNW_1.0 {
 	papiPrinterAdd  = FUNCTION FILTER libpapi-common.so ;
 	papiPrinterModify  = FUNCTION FILTER libpapi-common.so ;
 	papiPrinterRemove  = FUNCTION FILTER libpapi-common.so ;
-	papiPrinterDisable  = FUNCTION FILTER libpapi-common.so ;
-	papiPrinterEnable  = FUNCTION FILTER libpapi-common.so ;
-	papiPrinterPause  = FUNCTION FILTER libpapi-common.so ;
-	papiPrinterResume  = FUNCTION FILTER libpapi-common.so ;
+	papiPrinterDisable ;
+	papiPrinterEnable ;
+	papiPrinterPause ;
+	papiPrinterResume ;
         papiPrinterPurgeJobs ;
         papiPrinterListJobs ;
         papiPrinterGetAttributeList ;

@@ -20,18 +20,17 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: printer.c 149 2006-04-25 16:55:01Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <strings.h>
 #include <papi_impl.h>
+#include <libintl.h>
 
 static int
 contains(char *value, char **list)
@@ -67,7 +66,7 @@ papiPrinterQuery(papi_service_t handle, char *name,
 		if ((contains("printer-state", requested_attrs) == 1) ||
 		    (contains("printer-state-reasons", requested_attrs) == 1))
 			status = lpd_find_printer_info(svc,
-					(printer_t **)printer);
+			    (printer_t **)printer);
 
 		if ((status == PAPI_OK) && (*printer == NULL)) {
 			char buf[BUFSIZ];
@@ -75,19 +74,19 @@ papiPrinterQuery(papi_service_t handle, char *name,
 			*printer = p = calloc(1, sizeof (*p));
 
 			papiAttributeListAddString(&(p->attributes),
-				PAPI_ATTR_APPEND, "printer-name",
-				queue_name_from_uri(svc->uri));
+			    PAPI_ATTR_APPEND, "printer-name",
+			    queue_name_from_uri(svc->uri));
 
 			if (uri_to_string(svc->uri, buf, sizeof (buf)) == 0)
 				papiAttributeListAddString(&(p->attributes),
-					PAPI_ATTR_APPEND,
-					"printer-uri-supported", buf);
+				    PAPI_ATTR_APPEND,
+				    "printer-uri-supported", buf);
 		}
 		/* Set printer accepting: mimic prepapi behavior */
 		if ((p = *printer) != NULL)
 			papiAttributeListAddBoolean(&(p->attributes),
-				PAPI_ATTR_REPLACE,
-				"printer-is-accepting-jobs", PAPI_TRUE);
+			    PAPI_ATTR_REPLACE,
+			    "printer-is-accepting-jobs", PAPI_TRUE);
 
 	}
 
@@ -159,4 +158,63 @@ papiPrinterListFree(papi_printer_t *printers)
 			papiPrinterFree(printers[i]);
 		free(printers);
 	}
+}
+
+
+papi_status_t
+papiPrinterDisable(papi_service_t handle, char *name, char *message)
+{
+	service_t *svc = handle;
+	papi_status_t status;
+
+	if ((status = service_fill_in(svc, name)) == PAPI_OK) {
+		detailed_error(svc,
+		    gettext("Warning: %s is remote, disable has no meaning."),
+		    queue_name_from_uri(svc->uri));
+	}
+	return (PAPI_OPERATION_NOT_SUPPORTED);
+}
+
+papi_status_t
+papiPrinterEnable(papi_service_t handle, char *name)
+{
+	service_t *svc = handle;
+	papi_status_t status;
+
+	if ((status = service_fill_in(svc, name)) == PAPI_OK) {
+		detailed_error(svc,
+		    gettext("Warning: %s is remote, enable has no meaning."),
+		    queue_name_from_uri(svc->uri));
+	}
+	return (PAPI_OPERATION_NOT_SUPPORTED);
+}
+
+
+papi_status_t
+papiPrinterResume(papi_service_t handle, char *name)
+{
+	service_t *svc = handle;
+	papi_status_t status;
+
+	if ((status = service_fill_in(svc, name)) == PAPI_OK) {
+		detailed_error(svc,
+		    gettext("Warning: %s is remote, accept has no meaning."),
+		    queue_name_from_uri(svc->uri));
+	}
+	return (PAPI_OPERATION_NOT_SUPPORTED);
+}
+
+
+papi_status_t
+papiPrinterPause(papi_service_t handle, char *name, char *message)
+{
+	service_t *svc = handle;
+	papi_status_t status;
+
+	if ((status = service_fill_in(svc, name)) == PAPI_OK) {
+		detailed_error(svc,
+		    gettext("Warning: %s is remote, reject has no meaning."),
+		    queue_name_from_uri(svc->uri));
+	}
+	return (PAPI_OPERATION_NOT_SUPPORTED);
 }
