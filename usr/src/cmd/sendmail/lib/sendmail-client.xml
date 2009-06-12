@@ -122,6 +122,8 @@
 		<property_group name='config' type='application'>
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.sendmail' />
+			<propval name='path_to_submit_mc'
+				type='astring' value='' />
 		</property_group>
 			
 		<template>

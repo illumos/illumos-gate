@@ -46,9 +46,9 @@ case "$1" in
 
 	submit_path=`svcprop -p config/path_to_submit_mc $SMF_FMRI 2>/dev/null`
 	if [ $? -eq 0 -a -n "$submit_path" ]; then
-		turn_m4_crank $SUBMIT_CF $submit_path
+		turn_m4_crank "$SUBMIT_CF" "$submit_path"
 	fi
-	exist_or_exit $SUBMIT_CF
+	exist_or_exit "$SUBMIT_CF"
 
 	$SENDMAIL -Ac -q$CLIENTQUEUEINTERVAL $CLIENTOPTIONS &
 	;;

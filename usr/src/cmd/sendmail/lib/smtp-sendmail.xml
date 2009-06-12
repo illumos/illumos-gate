@@ -172,8 +172,6 @@
 				type='boolean' value='true' />
 			<propval name='path_to_sendmail_mc'
 				type='astring' value='' />
-			<propval name='path_to_submit_mc'
-				type='astring' value='' />
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.sendmail' />
 		</property_group>

@@ -62,10 +62,6 @@ turn_m4_crank()
 	[ $# -lt 2 ] && return
 	cf_path=$1
 	m4_path=$2
-	case "$m4_path" in
-	/*)	;;	# absolute path
-	*)	return;;
-	esac
 	if [ "$m4_path" = "_DONT_TOUCH_THIS" ]; then
 		if [ -f "${cf_path}.old" ]; then
 			mv "$cf_path" "${cf_path}.new"
@@ -78,6 +74,10 @@ turn_m4_crank()
 		# of on a previous run.
 		#
 	else
+		case "$m4_path" in
+		/*)	;;	# absolute path
+		*)	return;;
+		esac
 		exist_or_exit "$m4_path"
 		cd `dirname "$m4_path"`
 		base=`basename "$m4_path"`
