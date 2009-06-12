@@ -5714,6 +5714,7 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	mblk_t *mp;
 	mblk_t *mpc = NULL;
 	ipoib_hdr_t *ipibp;
+	ipha_t *iphap;
 	ip6_t *ip6h;
 	int rxcnt, len;
 
@@ -5826,10 +5827,19 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	else if ((ntohl(phdr->ib_dst.ipoib_qpn) & IB_QPN_MASK) == IB_MC_QPN)
 		atomic_inc_64(&state->id_multi_rcv);
 
+	iphap = (ipha_t *)((uchar_t *)ipibp + sizeof (ipoib_hdr_t));
 	/*
 	 * Set receive checksum status in mp
+	 * Hardware checksumming can be considered valid only if:
+	 * 1. CQE.IP_OK bit is set
+	 * 2. CQE.CKSUM = 0xffff
+	 * 3. IPv6 routing header is not present in the packet
+	 * 4. If there are no IP_OPTIONS in the IP HEADER
 	 */
-	if ((wc->wc_flags & IBT_WC_CKSUM_OK) == IBT_WC_CKSUM_OK) {
+
+	if (((wc->wc_flags & IBT_WC_CKSUM_OK) == IBT_WC_CKSUM_OK) &&
+	    (wc->wc_cksum == 0xFFFF) &&
+	    (iphap->ipha_version_and_hdr_length == IP_SIMPLE_HDR_VERSION)) {
 		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
 		    HCK_FULLCKSUM | HCK_FULLCKSUM_OK, 0);
 	}
