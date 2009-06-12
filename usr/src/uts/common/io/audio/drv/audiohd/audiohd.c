@@ -345,24 +345,8 @@ audiohd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (audio_dev_unregister(statep->adev) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
-	mutex_enter(&statep->hda_mutex);
-	audiohd_stop_dma(statep);
-	audiohd_disable_intr(statep);
-	mutex_exit(&statep->hda_mutex);
-	ddi_remove_intr(dip, 0, statep->hda_intr_cookie);
-	if (statep->hda_ksp)
-		kstat_delete(statep->hda_ksp);
-	audiohd_free_port(statep);
 	if (audiohd_beep)
 		(void) beep_fini();
-	audiohd_destroy_codec(statep);
-	audiohd_del_controls(statep);
-	audiohd_fini_controller(statep);
-	audiohd_fini_pci(statep);
-	mutex_destroy(&statep->hda_mutex);
-	if (statep->adev)
-		audio_dev_free(statep->adev);
-	kmem_free(statep, sizeof (*statep));
 	audiohd_destroy(statep);
 	return (DDI_SUCCESS);
 }
