@@ -246,7 +246,7 @@ ire_lookup_multi_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
 		ire_t *cire = NULL;
 		/*
 		 * If the route is not resolvable, the looked up ire
-		 * may be changed here. In that case, ire_multirt_lookup()
+		 * may be changed here. In that case, ire_multirt_lookup_v6()
 		 * IRE_REFRELE the original ire and change it.
 		 */
 		(void) ire_multirt_lookup_v6(&cire, &ire, MULTIRT_CACHEGW,

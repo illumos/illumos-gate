@@ -325,7 +325,7 @@ extern  void	ire_walk_ill_tables(uint_t match_flags, uint_t ire_type,
     zoneid_t zoneid, ip_stack_t *);
 extern	void	ire_walk_v6(pfv_t, void *, zoneid_t, ip_stack_t *);
 
-extern boolean_t	ire_multirt_lookup(ire_t **, ire_t **, uint32_t,
+extern boolean_t	ire_multirt_lookup(ire_t **, ire_t **, uint32_t, int *,
     const struct ts_label_s *, ip_stack_t *);
 extern boolean_t	ire_multirt_need_resolve(ipaddr_t,
     const struct ts_label_s *, ip_stack_t *);

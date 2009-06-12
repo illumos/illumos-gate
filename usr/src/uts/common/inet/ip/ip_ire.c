@@ -4731,7 +4731,7 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl, ip_stack_t *ipst)
 	/* At least one route is unresolved; search for a resolvable route. */
 	if (unres_cnt > 0)
 		resolvable = ire_multirt_lookup(&first_cire, &first_fire,
-		    MULTIRT_USESTAMP | MULTIRT_CACHEGW, tsl, ipst);
+		    MULTIRT_USESTAMP | MULTIRT_CACHEGW, NULL, tsl, ipst);
 
 	if (first_fire != NULL)
 		ire_refrele(first_fire);
@@ -4782,7 +4782,7 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl, ip_stack_t *ipst)
  * - if MULTIRT_USESTAMP is not specified in flags, the first
  *   unresolved but resolvable route is selected.
  *
- * - Otherwise, there is no resolvalble route, and
+ * - Otherwise, there is no resolvable route, and
  *   B_FALSE is returned.
  *
  * At last, MULTIRT_SETSTAMP can be specified in flags to
@@ -4790,11 +4790,14 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl, ip_stack_t *ipst)
  * be refreshed. This prevents the useless exploration
  * of those routes for a while, when MULTIRT_USESTAMP is used.
  *
+ * The argument already_resolved_count is an output variable to track number
+ * of already resolved multirt routes.
+ *
  * This only works in the global zone.
  */
 boolean_t
 ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
-    const ts_label_t *tsl, ip_stack_t *ipst)
+    int *already_resolved_count, const ts_label_t *tsl, ip_stack_t *ipst)
 {
 	clock_t	delta;
 	ire_t	*best_fire = NULL;
@@ -4921,6 +4924,9 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 			if (already_resolved) {
 				ip2dbg(("ire_multirt_lookup: found cire %p, "
 				    "already resolved\n", (void *)cire));
+
+				if (already_resolved_count != NULL)
+					(*already_resolved_count)++;
 				continue;
 			}
 
@@ -5128,6 +5134,8 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 			 */
 			if (already_resolved) {
 				ire_refrele(gw_ire);
+				if (already_resolved_count != NULL)
+					(*already_resolved_count)++;
 				continue;
 			}
 

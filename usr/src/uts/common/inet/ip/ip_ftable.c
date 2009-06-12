@@ -652,7 +652,7 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid, ip_stack_t *ipst)
 		 * may be changed here. In that case, ire_multirt_lookup()
 		 * IRE_REFRELE the original ire and change it.
 		 */
-		(void) ire_multirt_lookup(&cire, &ire, MULTIRT_CACHEGW,
+		(void) ire_multirt_lookup(&cire, &ire, MULTIRT_CACHEGW, NULL,
 		    NULL, ipst);
 		if (cire != NULL)
 			ire_refrele(cire);

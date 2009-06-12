@@ -7937,7 +7937,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 	boolean_t mctl_present;
 	ipsec_out_t *io;
 	mblk_t	*saved_mp;
-	ire_t	*first_sire = NULL;
 	mblk_t	*copy_mp = NULL;
 	mblk_t	*xmit_mp = NULL;
 	ipaddr_t save_dst;
@@ -7950,6 +7949,10 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 	tsol_ire_gw_secattr_t *attrp = NULL;
 	tsol_gcgrp_t *gcgrp = NULL;
 	tsol_gcgrp_addr_t ga;
+	int multirt_res_failures = 0;
+	int multirt_res_attempts = 0;
+	int multirt_already_resolved = 0;
+	boolean_t multirt_no_icmp_error = B_FALSE;
 
 	if (ip_debug > 2) {
 		/* ip1dbg */
@@ -8100,12 +8103,14 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 			ASSERT(sire != NULL);
 			multirt_is_resolvable =
 			    ire_multirt_lookup(&ire, &sire, multirt_flags,
-			    msg_getlabel(mp), ipst);
+			    &multirt_already_resolved, msg_getlabel(mp), ipst);
 
 			ip3dbg(("ip_newroute: multirt_is_resolvable %d, "
-			    "ire %p, sire %p\n",
-			    multirt_is_resolvable,
-			    (void *)ire, (void *)sire));
+			    "multirt_already_resolved %d, "
+			    "multirt_res_attempts %d, multirt_res_failures %d, "
+			    "ire %p, sire %p\n", multirt_is_resolvable,
+			    multirt_already_resolved, multirt_res_attempts,
+			    multirt_res_failures, (void *)ire, (void *)sire));
 
 			if (!multirt_is_resolvable) {
 				/*
@@ -8117,23 +8122,37 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 					ire_refrele(ire);
 					ire = NULL;
 				}
+				/*
+				 * Generate ICMP error only if all attempts to
+				 * resolve multirt route failed and there is no
+				 * already resolved one.  Don't generate ICMP
+				 * error when:
+				 *
+				 *  1) there was no attempt to resolve
+				 *  2) at least one attempt passed
+				 *  3) a multirt route is already resolved
+				 *
+				 *  Case 1) may occur due to multiple
+				 *    resolution attempts during single
+				 *    ip_multirt_resolution_interval.
+				 *
+				 *  Case 2-3) means that CGTP destination is
+				 *    reachable via one link so we don't want to
+				 *    generate ICMP host unreachable error.
+				 */
+				if (multirt_res_attempts == 0 ||
+				    multirt_res_failures <
+				    multirt_res_attempts ||
+				    multirt_already_resolved > 0)
+					multirt_no_icmp_error = B_TRUE;
 			} else {
 				ASSERT(sire != NULL);
 				ASSERT(ire != NULL);
-				/*
-				 * We simply use first_sire as a flag that
-				 * indicates if a resolvable multirt route
-				 * has already been found.
-				 * If it is not the case, we may have to send
-				 * an ICMP error to report that the
-				 * destination is unreachable.
-				 * We do not IRE_REFHOLD first_sire.
-				 */
-				if (first_sire == NULL) {
-					first_sire = sire;
-				}
+
+				multirt_res_attempts++;
 			}
 		}
+
 		if (ire == NULL) {
 			if (ip_debug > 3) {
 				/* ip2dbg */
@@ -8141,21 +8160,17 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 				    "can't resolve %s\n", AF_INET, &dst);
 			}
 			ip3dbg(("ip_newroute: "
-			    "ire %p, sire %p, first_sire %p\n",
-			    (void *)ire, (void *)sire, (void *)first_sire));
+			    "ire %p, sire %p, multirt_no_icmp_error %d\n",
+			    (void *)ire, (void *)sire,
+			    (int)multirt_no_icmp_error));
 
 			if (sire != NULL) {
 				ire_refrele(sire);
 				sire = NULL;
 			}
 
-			if (first_sire != NULL) {
-				/*
-				 * At least one multirt route has been found
-				 * in the same call to ip_newroute();
-				 * there is no need to report an ICMP error.
-				 * first_sire was not IRE_REFHOLDed.
-				 */
+			if (multirt_no_icmp_error) {
+				/* There is no need to report an ICMP error. */
 				MULTIRT_DEBUG_UNTAG(first_mp);
 				freemsg(first_mp);
 				return;
@@ -8285,6 +8300,23 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 				src_ipif = ipif_select_source(dst_ill, saddr,
 				    zoneid);
 				if (src_ipif == NULL) {
+					/*
+					 * In the case of multirouting, it may
+					 * happen that ipif_select_source fails
+					 * as DAD may disallow use of the
+					 * particular source interface.  Anyway,
+					 * we need to continue and attempt to
+					 * resolve other multirt routes.
+					 */
+					if ((sire != NULL) &&
+					    (sire->ire_flags & RTF_MULTIRT)) {
+						ire_refrele(ire);
+						ire = NULL;
+						multirt_resolve_next = B_TRUE;
+						multirt_res_failures++;
+						continue;
+					}
+
 					if (ip_debug > 2) {
 						pr_addr_dbg("ip_newroute: "
 						    "no src for dst %s ",
@@ -8731,7 +8763,25 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 					ipif_refrele(src_ipif);
 					src_ipif = ipif_select_source(dst_ill,
 					    gw, zoneid);
+					/*
+					 * In the case of multirouting, it may
+					 * happen that ipif_select_source fails
+					 * as DAD may disallow use of the
+					 * particular source interface.  Anyway,
+					 * we need to continue and attempt to
+					 * resolve other multirt routes.
+					 */
 					if (src_ipif == NULL) {
+						if (sire != NULL &&
+						    (sire->ire_flags &
+						    RTF_MULTIRT)) {
+							ire_refrele(ire);
+							ire = NULL;
+							multirt_resolve_next =
+							    B_TRUE;
+							multirt_res_failures++;
+							continue;
+						}
 						if (ip_debug > 2) {
 							pr_addr_dbg(
 							    "ip_newroute: no "
