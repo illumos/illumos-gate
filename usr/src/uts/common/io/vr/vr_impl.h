@@ -35,19 +35,6 @@
 #endif
 
 /*
- * Some definitions for the MII because miiregs doesn't have them
- */
-#define	MII_STATUS_100_BASE_T2_FD	(1 << 10)
-#define	MII_STATUS_100_BASE_T2		(1 << 9)
-#define	MII_STATUS_CAPEXT		(1 << 8)
-#define	MII_ABILITY_ASMDIR		(1 << 6)
-#define	MII_EXTSTATUS			0x9
-#define	MII_EXTSTATUS_1000BASE_X_FD	0x8000
-#define	MII_EXTSTATUS_1000BASE_X	0x4000
-#define	MII_EXTSTATUS_1000BASE_T_FD	0x2000
-#define	MII_EXTSTATUS_1000BASE_T	0x1000
-
-/*
  * MAC address
  */
 #define	VR_ETHERADDR	0x00

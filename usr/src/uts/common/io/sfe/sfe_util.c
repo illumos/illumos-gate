@@ -32,7 +32,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2107,7 +2107,7 @@ gem_mii_write(struct gem_dev *dp, uint_t reg, uint16_t val)
 
 #define	fc_cap_decode(x)	\
 	((((x) & MII_ABILITY_PAUSE) ? 1 : 0) |	\
-	(((x) & MII_ABILITY_ASM_DIR) ? 2 : 0))
+	(((x) & MII_ABILITY_ASMPAUSE) ? 2 : 0))
 
 int
 gem_mii_config_default(struct gem_dev *dp)
@@ -2115,10 +2115,10 @@ gem_mii_config_default(struct gem_dev *dp)
 	uint16_t	mii_stat;
 	uint16_t	val;
 	static uint16_t fc_cap_encode[4] = {
-		/* none */		0,
-		/* symmetric */		MII_ABILITY_PAUSE,
-		/* tx */		MII_ABILITY_ASM_DIR,
-		/* rx-symmetric */	MII_ABILITY_PAUSE | MII_ABILITY_ASM_DIR,
+		0, /* none */
+		MII_ABILITY_PAUSE, /* symmetric */
+		MII_ABILITY_ASMPAUSE, /* tx */
+		MII_ABILITY_PAUSE | MII_ABILITY_ASMPAUSE, /* rx-symmetric */
 	};
 
 	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
@@ -2477,7 +2477,7 @@ next_nowait:
 				    dp->name);
 			}
 			/*
-			 * it should be result of pararell detection, which
+			 * it should be result of parallel detection, which
 			 * cannot detect duplex mode.
 			 */
 			if (lpable & MII_ABILITY_100BASE_TX) {
@@ -2946,7 +2946,7 @@ PHY_found:
 	adv_org = gem_mii_read(dp, MII_AN_ADVERT);
 
 	gem_mii_write(dp, MII_AN_ADVERT,
-	    MII_ABILITY_PAUSE | MII_ABILITY_ASM_DIR);
+	    MII_ABILITY_PAUSE | MII_ABILITY_ASMPAUSE);
 
 	adv = gem_mii_read(dp, MII_AN_ADVERT);
 
@@ -2954,7 +2954,7 @@ PHY_found:
 		dp->gc.gc_flow_control &= ~1;
 	}
 
-	if ((adv & MII_ABILITY_ASM_DIR) == 0) {
+	if ((adv & MII_ABILITY_ASMPAUSE) == 0) {
 		dp->gc.gc_flow_control &= ~2;
 	}
 
@@ -3525,7 +3525,7 @@ gem_param_get(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *credp)
 		break;
 
 	case PARAM_LP_ASYM_PAUSE_CAP:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_ASM_DIR);
+		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_ASMPAUSE);
 		break;
 
 	case PARAM_LP_1000FDX_CAP:
@@ -4475,7 +4475,7 @@ gem_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 		break;
 
 	case ETHER_STAT_LP_CAP_ASMPAUSE:
-		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_ASM_DIR);
+		val = BOOLEAN(dp->mii_lpable & MII_ABILITY_ASMPAUSE);
 		break;
 
 	case ETHER_STAT_LP_CAP_PAUSE:

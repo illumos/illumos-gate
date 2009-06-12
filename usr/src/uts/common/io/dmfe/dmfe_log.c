@@ -19,23 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dmfe_impl.h"
-
-
-/*
- * Debug flags
- */
-
-#if	DMFEDEBUG
-uint32_t dmfe_debug = 0;
-#endif	/* DMFEDEBUG */
-
 
 /*
  *	========== Message printing & debug routines ==========
@@ -73,46 +61,6 @@ dmfe_vprt(const char *fmt, va_list args)
 	(void) vsnprintf(buf, sizeof (buf), fmt, args);
 	cmn_err(prtdata.level, prtdata.fmt, prtdata.ifname, buf);
 }
-
-#if	DMFEDEBUG
-
-static void
-dmfe_prt(const char *fmt, ...)
-{
-	va_list args;
-
-	ASSERT(mutex_owned(prtdata.mutex));
-
-	va_start(args, fmt);
-	dmfe_vprt(fmt, args);
-	va_end(args);
-
-	mutex_exit(prtdata.mutex);
-}
-
-void
-(*dmfe_db(dmfe_t *dmfep))(const char *fmt, ...)
-{
-	mutex_enter(prtdata.mutex);
-	prtdata.ifname = dmfep->ifname;
-	prtdata.fmt = "^%s: %s\n";
-	prtdata.level = CE_CONT;
-
-	return (dmfe_prt);
-}
-
-void
-(*dmfe_gdb())(const char *fmt, ...)
-{
-	mutex_enter(prtdata.mutex);
-	prtdata.ifname = "dmfe";
-	prtdata.fmt = "^%s: %s\n";
-	prtdata.level = CE_CONT;
-
-	return (dmfe_prt);
-}
-
-#endif	/* DMFEDEBUG */
 
 /*
  * Report a run-time error (CE_WARN, to console & log)

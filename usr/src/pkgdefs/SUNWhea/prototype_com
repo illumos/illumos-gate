@@ -1037,6 +1037,7 @@ f none usr/include/sys/md5.h 644 root bin
 f none usr/include/sys/md5_consts.h 644 root bin
 f none usr/include/sys/mkdev.h 644 root bin
 f none usr/include/sys/mhd.h 644 root bin
+f none usr/include/sys/mii.h 644 root bin
 f none usr/include/sys/miiregs.h 644 root bin
 f none usr/include/sys/mman.h 644 root bin
 f none usr/include/sys/mmapobj.h 644 root bin

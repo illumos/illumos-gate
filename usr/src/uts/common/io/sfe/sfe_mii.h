@@ -32,6 +32,11 @@
  */
 
 /*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * sfe_mii.h : MII registers
  */
 #ifndef _SFE_MII_H_
@@ -94,11 +99,6 @@
 	"\002JABBERING"	\
 	"\001EXTENDED"
 
-#define	MII_ABILITY_ASM_DIR		0x0800	/* for annex 28B */
-#define	MII_ABILITY_PAUSE		0x0400	/* for IEEE 802.3x */
-
-#define	MII_AN_LPABLE_NP	0x8000
-
 #define	MII_ABILITY_TECH	\
 	(MII_ABILITY_100BASE_T4	|	\
 	MII_ABILITY_100BASE_TX_FD |	\
@@ -108,7 +108,7 @@
 
 #define	MII_ABILITY_ALL	\
 	(MII_AN_ADVERT_REMFAULT |	\
-	MII_ABILITY_ASM_DIR |	\
+	MII_ABILITY_ASMPAUSE |	\
 	MII_ABILITY_PAUSE |	\
 	MII_ABILITY_TECH)
 

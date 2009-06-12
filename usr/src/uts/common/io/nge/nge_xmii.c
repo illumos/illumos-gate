@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,7 +265,7 @@ nge_phy_restart(nge_t *ngep)
 	if (!nge_phy_reset(ngep))
 		return (B_FALSE);
 
-	if (PHY_MANUFACTURER(ngep->phy_id) == MII_ID_CICADA) {
+	if (MII_PHY_MFG(ngep->phy_id) == MII_ID_CICADA) {
 		if (ngep->phy_mode == RGMII_IN) {
 			mii_reg = nge_mii_get16(ngep,
 			    MII_CICADA_EXT_CONTROL);
@@ -451,7 +451,7 @@ nge_update_copper(nge_t *ngep)
 	if (adv_pause)
 		anar |= MII_ABILITY_PAUSE;
 	if (adv_asym_pause)
-		anar |= MII_ABILITY_ASYM_PAUSE;
+		anar |= MII_ABILITY_ASMPAUSE;
 
 	/*
 	 * Munge in any other fixed bits we require ...

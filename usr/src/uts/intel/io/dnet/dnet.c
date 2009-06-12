@@ -60,16 +60,10 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#include <sys/mii.h>
-#include <sys/dnet.h>
+#include "dnet_mii.h"
+#include "dnet.h"
 
-#ifdef MII_IS_MODULE
-#define	MII_DEPEND " misc/mii"
-#else
-#define	MII_DEPEND
-#endif
-
-char _depends_on[] = "misc/gld" MII_DEPEND;
+char _depends_on[] = "misc/gld";
 
 /*
  *	Declarations and Module Linkage

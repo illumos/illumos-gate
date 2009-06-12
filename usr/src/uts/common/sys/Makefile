@@ -362,6 +362,7 @@ CHKHDRS=			\
 	memlist.h		\
 	mkdev.h			\
 	mhd.h			\
+	mii.h			\
 	miiregs.h		\
 	mixer.h			\
 	mman.h			\

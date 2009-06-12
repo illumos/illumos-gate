@@ -60,9 +60,6 @@ f none usr/include/sys/dktp/quetypes.h 644 root bin
 f none usr/include/sys/dktp/queue.h 644 root bin
 f none usr/include/sys/dktp/tgcom.h 644 root bin
 f none usr/include/sys/dktp/tgdk.h 644 root bin
-f none usr/include/sys/dnet.h 644 root bin
 f none usr/include/sys/fd_debug.h 644 root bin
 f none usr/include/sys/fdc.h 644 root bin
 f none usr/include/sys/fdmedia.h 644 root bin
-f none usr/include/sys/mii.h 644 root bin
-f none usr/include/sys/miipriv.h 644 root bin

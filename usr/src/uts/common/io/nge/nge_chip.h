@@ -1331,17 +1331,6 @@ typedef union {
 #define	MII_CONTROL_1000MB	0x0040
 
 /*
- * New bits in the MII_AN_ADVERT register
- */
-#define	MII_ABILITY_ASYM_PAUSE	0x0800
-#define	MII_ABILITY_PAUSE	0x0400
-
-/*
- * Values for the <selector> field of the MII_AN_ADVERT register
- */
-#define	MII_AN_SELECTOR_8023	0x0001
-
-/*
  * Bits in the MII_1000BASE_T_CONTROL register
  *
  * The MASTER_CFG bit enables manual configuration of Master/Slave mode

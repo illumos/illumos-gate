@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -506,9 +506,9 @@ rge_phy_update(rge_t *rgep)
 		control |= MII_CONTROL_ANE|MII_CONTROL_RSAN;
 
 	if (adv_1000fdx)
-		control |= MII_CONTROL_1000MB|MII_CONTROL_FDUPLEX;
+		control |= MII_CONTROL_1GB|MII_CONTROL_FDUPLEX;
 	else if (adv_1000hdx)
-		control |= MII_CONTROL_1000MB;
+		control |= MII_CONTROL_1GB;
 	else if (adv_100fdx)
 		control |= MII_CONTROL_100MB|MII_CONTROL_FDUPLEX;
 	else if (adv_100hdx)
@@ -548,7 +548,7 @@ rge_phy_update(rge_t *rgep)
 	if (adv_pause)
 		anar |= MII_ABILITY_PAUSE;
 	if (adv_asym_pause)
-		anar |= MII_ABILITY_ASYM_PAUSE;
+		anar |= MII_ABILITY_ASMPAUSE;
 
 	/*
 	 * Munge in any other fixed bits we require ...

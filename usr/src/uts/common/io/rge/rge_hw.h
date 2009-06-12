@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -474,22 +474,6 @@ extern "C" {
 #define	MII_1000BASE_T_CONTROL		9
 #define	MII_1000BASE_T_STATUS		10
 #define	MII_IEEE_EXT_STATUS		15
-
-/*
- * New bits in the MII_CONTROL register
- */
-#define	MII_CONTROL_1000MB		0x0040
-
-/*
- * New bits in the MII_AN_ADVERT register
- */
-#define	MII_ABILITY_ASYM_PAUSE		0x0800
-#define	MII_ABILITY_PAUSE		0x0400
-
-/*
- * Values for the <selector> field of the MII_AN_ADVERT register
- */
-#define	MII_AN_SELECTOR_8023		0x0001
 
 /*
  * Bits in the MII_1000BASE_T_CONTROL register

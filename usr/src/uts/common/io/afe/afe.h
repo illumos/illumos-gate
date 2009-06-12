@@ -28,24 +28,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef	_AFE_H
 #define	_AFE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/*
- * These are conveniently defined to have the same values
- * as are used by the NDD utility, which is an undocumented
- * interface.  YMMV.
- */
-#define	NDIOC	('N' << 8)
-#define	NDIOC_GET	(NDIOC|0)
-#define	NDIOC_SET	(NDIOC|1)
 
 /*
  * Registers and values are here, becuase they can be exported to userland
@@ -238,6 +231,7 @@ extern "C" {
 /*
  * Bits for CSR_CR
  */
+#define	CR_PAUSE	0x00000020U	/* enable pause flow control */
 #define	CR_TXURAUTOR	0x00000001U	/* transmit underrun auto recovery */
 
 /*

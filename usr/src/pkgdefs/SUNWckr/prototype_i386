@@ -220,6 +220,7 @@ f none kernel/misc/kmdbmod 755 root sys
 f none kernel/misc/ksocket 755 root sys
 f none kernel/misc/mac 755 root sys
 l none kernel/misc/md5=../../kernel/crypto/md5
+f none kernel/misc/mii 755 root sys
 f none kernel/misc/net80211 755 root sys
 f none kernel/misc/neti 755 root sys
 f none kernel/misc/pcicfg 755 root sys
@@ -439,6 +440,7 @@ f none kernel/misc/amd64/kmdbmod 755 root sys
 f none kernel/misc/amd64/ksocket 755 root sys
 f none kernel/misc/amd64/mac 755 root sys
 l none kernel/misc/amd64/md5=../../../kernel/crypto/amd64/md5
+f none kernel/misc/amd64/mii 755 root sys
 f none kernel/misc/amd64/net80211 755 root sys
 f none kernel/misc/amd64/neti 755 root sys
 f none kernel/misc/amd64/pcicfg 755 root sys

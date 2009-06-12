@@ -421,6 +421,7 @@ MISC_KMODS	+= blk2scsa
 MISC_KMODS	+= sda
 MISC_KMODS	+= spuni
 MISC_KMODS	+= hwa1480_fw uwba
+MISC_KMODS	+= mii
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= scsi_vhci_f_asym_lsi

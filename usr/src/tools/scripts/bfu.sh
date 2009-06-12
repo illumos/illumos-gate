@@ -6511,6 +6511,11 @@ mondo_loop() {
 	fi
 
 	#
+	# Remove mii private header
+	#
+	rm -f $usr/include/sys/miipriv.h
+
+	#
 	# Remove GMT* zoneinfo files
 	#
 	rm -f $usr/share/lib/zoneinfo/GMT-12

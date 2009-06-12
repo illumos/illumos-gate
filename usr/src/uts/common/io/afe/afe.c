@@ -46,6 +46,7 @@
 #include <sys/kmem.h>
 #include <sys/time.h>
 #include <sys/crc32.h>
+#include <sys/mii.h>
 #include <sys/miiregs.h>
 #include <sys/mac.h>
 #include <sys/mac_ether.h>
@@ -59,11 +60,6 @@
 /*
  * Driver globals.
  */
-
-/* patchable debug flag ... must not be static! */
-#ifdef	DEBUG
-unsigned		afe_debug = DWARN;
-#endif
 
 /* table of supported devices */
 static afe_card_t afe_cards[] = {
@@ -118,6 +114,7 @@ static int	afe_m_unicst(void *, const uint8_t *);
 static int	afe_m_multicst(void *, boolean_t, const uint8_t *);
 static int	afe_m_promisc(void *, boolean_t);
 static mblk_t	*afe_m_tx(void *, mblk_t *);
+static void	afe_m_ioctl(void *, queue_t *, mblk_t *);
 static int	afe_m_stat(void *, uint_t, uint64_t *);
 static int	afe_m_start(void *);
 static void	afe_m_stop(void *);
@@ -144,6 +141,7 @@ static int	afe_alloctxring(afe_t *);
 static void	afe_freetxring(afe_t *);
 static void	afe_error(dev_info_t *, char *, ...);
 static void	afe_setrxfilt(afe_t *);
+static int	afe_watchdog(afe_t *);
 static uint8_t	afe_sromwidth(afe_t *);
 static uint16_t	afe_readsromword(afe_t *, unsigned);
 static void	afe_readsrom(afe_t *, unsigned, unsigned, char *);
@@ -151,33 +149,31 @@ static void	afe_getfactaddr(afe_t *, uchar_t *);
 static uint8_t	afe_miireadbit(afe_t *);
 static void	afe_miiwritebit(afe_t *, uint8_t);
 static void	afe_miitristate(afe_t *);
-static uint16_t	afe_miiread(afe_t *, int, int);
-static void	afe_miiwrite(afe_t *, int, int, uint16_t);
-static uint16_t	afe_miireadgeneral(afe_t *, int, int);
-static void	afe_miiwritegeneral(afe_t *, int, int, uint16_t);
-static uint16_t	afe_miireadcomet(afe_t *, int, int);
-static void	afe_miiwritecomet(afe_t *, int, int, uint16_t);
-static int	afe_getmiibit(afe_t *, uint16_t, uint16_t);
-static void	afe_startphy(afe_t *);
-static void	afe_stopphy(afe_t *);
-static void	afe_reportlink(afe_t *);
-static void	afe_checklink(afe_t *);
-static void	afe_checklinkcomet(afe_t *);
-static void	afe_checklinkcentaur(afe_t *);
-static void	afe_checklinkmii(afe_t *);
+static uint16_t	afe_miireadgeneral(afe_t *, uint8_t, uint8_t);
+static void	afe_miiwritegeneral(afe_t *, uint8_t, uint8_t, uint16_t);
+static uint16_t	afe_miireadcomet(afe_t *, uint8_t, uint8_t);
+static void	afe_miiwritecomet(afe_t *, uint8_t, uint8_t, uint16_t);
+static uint16_t	afe_mii_read(void *, uint8_t, uint8_t);
+static void	afe_mii_write(void *, uint8_t, uint8_t, uint16_t);
+static void	afe_mii_notify(void *, link_state_t);
+static void	afe_mii_reset(void *);
 static void	afe_disableinterrupts(afe_t *);
 static void	afe_enableinterrupts(afe_t *);
 static void	afe_reclaim(afe_t *);
 static mblk_t	*afe_receive(afe_t *);
 
-#ifdef	DEBUG
-static void	afe_dprintf(afe_t *, const char *, int, char *, ...);
-#endif
-
 #define	KIOIP	KSTAT_INTR_PTR(afep->afe_intrstat)
 
+static mii_ops_t afe_mii_ops = {
+	MII_OPS_VERSION,
+	afe_mii_read,
+	afe_mii_write,
+	afe_mii_notify,
+	afe_mii_reset
+};
+
 static mac_callbacks_t afe_m_callbacks = {
-	MC_SETPROP | MC_GETPROP,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	afe_m_stat,
 	afe_m_start,
 	afe_m_stop,
@@ -185,7 +181,7 @@ static mac_callbacks_t afe_m_callbacks = {
 	afe_m_multicst,
 	afe_m_unicst,
 	afe_m_tx,
-	NULL,		/* mc_ioctl */
+	afe_m_ioctl,	/* mc_ioctl */
 	NULL,		/* mc_getcapab */
 	NULL,		/* mc_open */
 	NULL,		/* mc_close */
@@ -416,28 +412,8 @@ afe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	afep->afe_phyaddr = -1;
 	afep->afe_cachesize = cachesize;
 
-	/* default properties */
-	afep->afe_adv_aneg = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "adv_autoneg_cap", 1);
-	afep->afe_adv_100T4 = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "adv_100T4_cap", 1);
-	afep->afe_adv_100fdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "adv_100fdx_cap", 1);
-	afep->afe_adv_100hdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "adv_100hdx_cap", 1);
-	afep->afe_adv_10fdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "adv_10fdx_cap", 1);
-	afep->afe_adv_10hdx = !!ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
-	    "adv_10hdx_cap", 1);
-
 	afep->afe_forcefiber = ddi_prop_get_int(DDI_DEV_T_ANY, dip, 0,
 	    "fiber", 0);
-
-	DBG(DPCI, "PCI vendor id = %x", venid);
-	DBG(DPCI, "PCI device id = %x", devid);
-	DBG(DPCI, "PCI cachesize = %d", cachesize);
-	DBG(DPCI, "PCI COMM = %x", pci_config_get8(pci, PCI_CMD));
-	DBG(DPCI, "PCI STAT = %x", pci_config_get8(pci, PCI_STAT));
 
 	mutex_init(&afep->afe_xmtlock, NULL, MUTEX_DRIVER, afep->afe_icookie);
 	mutex_init(&afep->afe_intrlock, NULL, MUTEX_DRIVER, afep->afe_icookie);
@@ -463,6 +439,22 @@ afe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto failed;
 	}
 	kstat_install(afep->afe_intrstat);
+
+	/*
+	 * Set up the MII.
+	 */
+	if ((afep->afe_mii = mii_alloc(afep, dip, &afe_mii_ops)) == NULL) {
+		goto failed;
+	}
+
+	/*
+	 * Centaur can support PAUSE, but Comet can't.
+	 */
+	if (AFE_MODEL(afep) == MODEL_CENTAUR) {
+		mii_set_pauseable(afep->afe_mii, B_TRUE, B_FALSE);
+	} else {
+		mii_set_pauseable(afep->afe_mii, B_FALSE, B_FALSE);
+	}
 
 	/*
 	 * Map in the device registers.
@@ -588,6 +580,9 @@ afe_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/* clean up and shut down device */
 		ddi_remove_intr(dip, 0, afep->afe_icookie);
 
+		/* clean up MII layer */
+		mii_free(afep->afe_mii);
+
 		/* clean up kstats */
 		kstat_delete(afep->afe_intrstat);
 
@@ -605,6 +600,9 @@ afe_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
+		/* stop MII monitoring */
+		mii_suspend(afep->afe_mii);
+
 		/* quiesce the hardware */
 		mutex_enter(&afep->afe_intrlock);
 		mutex_enter(&afep->afe_xmtlock);
@@ -649,6 +647,8 @@ afe_resume(dev_info_t *dip)
 	/* drop locks */
 	mutex_exit(&afep->afe_xmtlock);
 	mutex_exit(&afep->afe_intrlock);
+
+	mii_resume(afep->afe_mii);
 
 	return (DDI_SUCCESS);
 }
@@ -707,16 +707,11 @@ afe_setrxfilt(afe_t *afep)
 	    (afep->afe_curraddr[1] << 8) | afep->afe_curraddr[0];
 	pa1 = (afep->afe_curraddr[5] << 8) | afep->afe_curraddr[4];
 
-	DBG(DMACID, "programming PAR0 with %x", pa0);
-	DBG(DMACID, "programming PAR1 with %x", pa1);
 	PUTCSR(afep, CSR_PAR0, pa0);
 	PUTCSR(afep, CSR_PAR1, pa1);
 	if (rxen) {
 		SETBIT(afep, CSR_NAR, rxen);
 	}
-
-	DBG(DMACID, "programming MAR0 = %x", afep->afe_mctab[0]);
-	DBG(DMACID, "programming MAR1 = %x", afep->afe_mctab[1]);
 
 	/* program multicast filter */
 	if (AFE_MODEL(afep) == MODEL_COMET) {
@@ -734,6 +729,20 @@ afe_setrxfilt(afe_t *afep)
 	/* restart receiver */
 	if (rxen) {
 		afe_startmac(afep);
+	}
+}
+
+int
+afe_watchdog(afe_t *afep)
+{
+	if ((afep->afe_txstall_time != 0) &&
+	    (gethrtime() > afep->afe_txstall_time) &&
+	    (afep->afe_txavail != AFE_TXRING)) {
+		afep->afe_txstall_time = 0;
+		afe_error(afep->afe_dip, "TX stall detected!");
+		return (DDI_FAILURE);
+	} else {
+		return (DDI_SUCCESS);
 	}
 }
 
@@ -846,6 +855,17 @@ afe_m_tx(void *arg, mblk_t *mp)
 	return (mp);
 }
 
+void
+afe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
+{
+	afe_t	*afep = arg;
+
+	if (mii_m_loop_ioctl(afep->afe_mii, wq, mp))
+		return;
+
+	miocnak(wq, mp, 0, EINVAL);
+}
+
 /*
  * Hardware management.
  */
@@ -859,7 +879,6 @@ afe_initialize(afe_t *afep)
 	ASSERT(mutex_owned(&afep->afe_intrlock));
 	ASSERT(mutex_owned(&afep->afe_xmtlock));
 
-	DBG(DCHATTY, "resetting!");
 	SETBIT(afep, CSR_PAR, PAR_RESET);
 	for (i = 1; i < 10; i++) {
 		drv_usecwait(5);
@@ -962,8 +981,6 @@ afe_sromwidth(afe_t *afep)
 	/* turn off accesses to the EEPROM */
 	PUTCSR(afep, CSR_SPR, eeread &~ SPR_SROM_CHIP);
 
-	DBG(DSROM, "detected srom width = %d bits", addrlen);
-
 	return ((addrlen < 4 || addrlen > 12) ? 6 : addrlen);
 }
 
@@ -1047,467 +1064,81 @@ void
 afe_getfactaddr(afe_t *afep, uchar_t *eaddr)
 {
 	afe_readsrom(afep, SROM_ENADDR, ETHERADDRL / 2, (char *)eaddr);
-
-	DBG(DMACID,
-	    "factory ethernet address = %02x:%02x:%02x:%02x:%02x:%02x",
-	    eaddr[0], eaddr[1], eaddr[2], eaddr[3], eaddr[4], eaddr[5]);
 }
+
+
 
 /*
  * MII management.
  */
 void
-afe_startphy(afe_t *afep)
+afe_mii_reset(void *arg)
 {
-	unsigned	phyaddr;
-	unsigned	bmcr;
-	unsigned	bmsr;
-	unsigned	anar;
-	unsigned	phyidr1;
-	unsigned	phyidr2;
-	unsigned	nosqe = 0;
-	int		retries;
+	afe_t		*afep = arg;
 	int		fiber;
-	int		cnt;
+	uint16_t	mcr;
+	uint16_t	pilr;
+	uint8_t		phyaddr;
 
-	/* ADMtek devices just use the PHY at address 1 */
-	afep->afe_phyaddr = phyaddr = 1;
-
-	phyidr1 = afe_miiread(afep, phyaddr, MII_PHYIDH);
-	phyidr2 = afe_miiread(afep, phyaddr, MII_PHYIDL);
-	if ((phyidr1 == 0x0022) &&
-	    ((phyidr2 & 0xfff0) ==  0x5410)) {
-		nosqe = 1;
-		/* only 983B has fiber support */
-		afep->afe_flags |= AFE_HASFIBER;
-	}
-	afep->afe_phyid = (phyidr1 << 16) | phyidr2;
-
-	DBG(DPHY, "phy at %d: %x,%x", phyaddr, phyidr1, phyidr2);
-	DBG(DPHY, "bmsr = %x", afe_miiread(afep,
-	    afep->afe_phyaddr, MII_STATUS));
-	DBG(DPHY, "anar = %x", afe_miiread(afep,
-	    afep->afe_phyaddr, MII_AN_ADVERT));
-	DBG(DPHY, "anlpar = %x", afe_miiread(afep,
-	    afep->afe_phyaddr, MII_AN_LPABLE));
-	DBG(DPHY, "aner = %x", afe_miiread(afep,
-	    afep->afe_phyaddr, MII_AN_EXPANSION));
-
-	DBG(DPHY, "resetting phy");
-
-	/* we reset the phy block */
-	afe_miiwrite(afep, phyaddr, MII_CONTROL, MII_CONTROL_RESET);
 	/*
-	 * wait for it to complete -- 500usec is still to short to
-	 * bother getting the system clock involved.
+	 * Its entirely possible that this belongs as a PHY specific
+	 * override.
 	 */
-	drv_usecwait(500);
-	for (retries = 0; retries < 10; retries++) {
-		if (afe_miiread(afep, phyaddr, MII_CONTROL) &
-		    MII_CONTROL_RESET) {
-			drv_usecwait(500);
-			continue;
-		}
-		break;
-	}
-	if (retries == 100) {
-		afe_error(afep->afe_dip, "timeout waiting on phy to reset");
+	if ((mii_get_id(afep->afe_mii) & 0xfffffff0) != 0x225410) {
+		/* if its not an AN983B, we don't care */
 		return;
 	}
 
-	DBG(DPHY, "phy reset complete");
-
-	bmsr = afe_miiread(afep, phyaddr, MII_STATUS);
-	anar = afe_miiread(afep, phyaddr, MII_AN_ADVERT);
-
-	anar &= ~(MII_ABILITY_100BASE_T4 |
-	    MII_ABILITY_100BASE_TX_FD | MII_ABILITY_100BASE_TX |
-	    MII_ABILITY_10BASE_T_FD | MII_ABILITY_10BASE_T);
+	phyaddr = mii_get_addr(afep->afe_mii);
 
 	fiber = 0;
 
-	/* if fiber is being forced, and device supports fiber... */
-	if (afep->afe_flags & AFE_HASFIBER) {
-
-		uint16_t	mcr;
-
-		DBG(DPHY, "device supports 100BaseFX");
-		mcr = afe_miiread(afep, phyaddr, PHY_MCR);
-		switch (afep->afe_forcefiber) {
-		case 0:
-			/* UTP Port */
-			DBG(DPHY, "forcing twpair");
-			mcr &= ~MCR_FIBER;
-			fiber = 0;
-			break;
-		case 1:
-			/* Fiber Port */
-			DBG(DPHY, "forcing 100BaseFX");
-			mcr |= MCR_FIBER;
-			bmcr = (MII_CONTROL_100MB | MII_CONTROL_FDUPLEX);
-			fiber = 1;
-			break;
-		default:
-			DBG(DPHY, "checking for 100BaseFX link");
-			/* fiber is 100 Mb FDX */
-			afe_miiwrite(afep, phyaddr, MII_CONTROL,
-			    MII_CONTROL_100MB | MII_CONTROL_FDUPLEX);
-			drv_usecwait(50);
-
-			mcr = afe_miiread(afep, phyaddr, PHY_MCR);
-			mcr |= MCR_FIBER;
-			afe_miiwrite(afep, phyaddr, PHY_MCR, mcr);
-			drv_usecwait(500);
-
-			/* if fiber is active, use it */
-			if ((afe_miiread(afep, phyaddr, MII_STATUS) &
-			    MII_STATUS_LINKUP)) {
-				bmcr = MII_CONTROL_100MB | MII_CONTROL_FDUPLEX;
-				fiber = 1;
-			} else {
-				mcr &= ~MCR_FIBER;
-				fiber = 0;
-			}
-			break;
-		}
-		afe_miiwrite(afep, phyaddr, PHY_MCR, mcr);
-		drv_usecwait(500);
-	}
-
-	if (fiber) {
-		/* fiber only supports 100FDX(?) */
-		bmsr &= ~(MII_STATUS_100_BASE_T4 |
-		    MII_STATUS_100_BASEX | MII_STATUS_10_FD | MII_STATUS_10);
-		bmsr |= MII_STATUS_100_BASEX_FD;
-	}
-
-	/* assume full support for everything to start */
-	afep->afe_cap_aneg = afep->afe_cap_100T4 =
-	    afep->afe_cap_100fdx = afep->afe_cap_100hdx =
-	    afep->afe_cap_10fdx = afep->afe_cap_10hdx = 1;
-
-	/* disable modes not supported in hardware */
-	if (!(bmsr & MII_STATUS_100_BASEX_FD)) {
-		afep->afe_adv_100fdx = 0;
-		afep->afe_cap_100fdx = 0;
-	}
-	if (!(bmsr & MII_STATUS_100_BASE_T4)) {
-		afep->afe_adv_100T4 = 0;
-		afep->afe_cap_100T4 = 0;
-	}
-	if (!(bmsr & MII_STATUS_100_BASEX)) {
-		afep->afe_adv_100hdx = 0;
-		afep->afe_cap_100hdx = 0;
-	}
-	if (!(bmsr & MII_STATUS_10_FD)) {
-		afep->afe_adv_10fdx = 0;
-		afep->afe_cap_10fdx = 0;
-	}
-	if (!(bmsr & MII_STATUS_10)) {
-		afep->afe_adv_10hdx = 0;
-		afep->afe_cap_10hdx = 0;
-	}
-	if (!(bmsr & MII_STATUS_CANAUTONEG)) {
-		afep->afe_adv_aneg = 0;
-		afep->afe_cap_aneg = 0;
-	}
-
-	cnt = 0;
-	if (afep->afe_adv_100fdx) {
-		anar |= MII_ABILITY_100BASE_TX_FD;
-		cnt++;
-	}
-	if (afep->afe_adv_100T4) {
-		anar |= MII_ABILITY_100BASE_T4;
-		cnt++;
-	}
-	if (afep->afe_adv_100hdx) {
-		anar |= MII_ABILITY_100BASE_TX;
-		cnt++;
-	}
-	if (afep->afe_adv_10fdx) {
-		anar |= MII_ABILITY_10BASE_T_FD;
-		cnt++;
-	}
-	if (afep->afe_adv_10hdx) {
-		anar |= MII_ABILITY_10BASE_T;
-		cnt++;
-	}
-
-	/*
-	 * Make certain at least one valid link mode is selected.
-	 */
-	if (!cnt) {
-		afe_error(afep->afe_dip, "No valid link mode selected.");
-		afe_error(afep->afe_dip, "Powering down PHY.");
-		afe_stopphy(afep);
-		afep->afe_linkup = LINK_STATE_DOWN;
-		if (afep->afe_flags & AFE_RUNNING)
-			afe_reportlink(afep);
-		return;
-	}
-
-	if (fiber) {
-		bmcr = MII_CONTROL_100MB | MII_CONTROL_FDUPLEX;
-	} else if ((afep->afe_adv_aneg) && (bmsr & MII_STATUS_CANAUTONEG)) {
-		DBG(DPHY, "using autoneg mode");
-		bmcr = (MII_CONTROL_ANE | MII_CONTROL_RSAN);
-	} else {
-		DBG(DPHY, "using forced mode");
-		if (afep->afe_adv_100fdx) {
-			bmcr = (MII_CONTROL_100MB | MII_CONTROL_FDUPLEX);
-		} else if (afep->afe_adv_100hdx) {
-			bmcr = MII_CONTROL_100MB;
-		} else if (afep->afe_adv_10fdx) {
-			bmcr = MII_CONTROL_FDUPLEX;
-		} else {
-			/* 10HDX */
-			bmcr = 0;
-		}
-	}
-
-	DBG(DPHY, "programming anar to 0x%x", anar);
-	afe_miiwrite(afep, phyaddr, MII_AN_ADVERT, anar);
-	DBG(DPHY, "programming bmcr to 0x%x", bmcr);
-	afe_miiwrite(afep, phyaddr, MII_CONTROL, bmcr);
-
-	if (nosqe) {
-		uint16_t	pilr;
-		/*
-		 * work around for errata 983B_0416 -- duplex light flashes
-		 * in 10 HDX.  we just disable SQE testing on the device.
-		 */
-		pilr = afe_miiread(afep, phyaddr, PHY_PILR);
-		pilr |= PILR_NOSQE;
-		afe_miiwrite(afep, phyaddr, PHY_PILR, pilr);
-	}
-
-	/*
-	 * schedule a query of the link status
-	 */
-	PUTCSR(afep, CSR_TIMER, TIMER_LOOP |
-	    (AFE_LINKTIMER * 1000 / TIMER_USEC));
-}
-
-void
-afe_stopphy(afe_t *afep)
-{
-	/* stop the phy timer */
-	PUTCSR(afep, CSR_TIMER, 0);
-
-	/*
-	 * phy in isolate & powerdown mode...
-	 */
-	afe_miiwrite(afep, afep->afe_phyaddr, MII_CONTROL,
-	    MII_CONTROL_PWRDN | MII_CONTROL_ISOLATE);
-
-	/*
-	 * mark the link state unknown
-	 */
-	if (!afep->afe_resetting) {
-		afep->afe_linkup = LINK_STATE_UNKNOWN;
-		afep->afe_ifspeed = 0;
-		afep->afe_duplex = LINK_DUPLEX_UNKNOWN;
-		if (afep->afe_flags & AFE_RUNNING)
-			afe_reportlink(afep);
-	}
-}
-
-void
-afe_reportlink(afe_t *afep)
-{
-	int changed = 0;
-
-	if (afep->afe_ifspeed != afep->afe_lastifspeed) {
-		afep->afe_lastifspeed = afep->afe_ifspeed;
-		changed++;
-	}
-	if (afep->afe_duplex != afep->afe_lastduplex) {
-		afep->afe_lastduplex = afep->afe_duplex;
-		changed++;
-	}
-	if (changed)
-		mac_link_update(afep->afe_mh, afep->afe_linkup);
-}
-
-void
-afe_checklink(afe_t *afep)
-{
-	if ((afep->afe_flags & AFE_RUNNING) == 0)
-		return;
-
-	if ((afep->afe_txstall_time != 0) &&
-	    (gethrtime() > afep->afe_txstall_time) &&
-	    (afep->afe_txavail != AFE_TXRING)) {
-		afep->afe_txstall_time = 0;
-		afe_error(afep->afe_dip, "TX stall detected!");
-		afe_resetall(afep);
-		return;
-	}
-
-	switch (AFE_MODEL(afep)) {
-	case MODEL_COMET:
-		afe_checklinkcomet(afep);
+	switch (afep->afe_forcefiber) {
+	case 0:
+		/* UTP Port */
+		fiber = 0;
 		break;
-	case MODEL_CENTAUR:
-		afe_checklinkcentaur(afep);
+	case 1:
+		/* Fiber Port */
+		fiber = 1;
 		break;
 	}
+
+	mcr = afe_mii_read(afep, phyaddr, PHY_MCR);
+	switch (fiber) {
+	case 0:
+		mcr &= ~MCR_FIBER;
+		break;
+
+	case 1:
+		mcr |= MCR_FIBER;
+		break;
+	}
+	afe_mii_write(afep, phyaddr, PHY_MCR, mcr);
+	drv_usecwait(500);
+
+	/*
+	 * work around for errata 983B_0416 -- duplex light flashes
+	 * in 10 HDX.  we just disable SQE testing on the device.
+	 */
+	pilr = afe_mii_read(afep, phyaddr, PHY_PILR);
+	pilr |= PILR_NOSQE;
+	afe_mii_write(afep, phyaddr, PHY_PILR, pilr);
 }
 
 void
-afe_checklinkcomet(afe_t *afep)
+afe_mii_notify(void *arg, link_state_t link)
 {
-	uint16_t	xciis;
-	int		reinit = 0;
+	afe_t	*afep = arg;
 
-	xciis = GETCSR16(afep, CSR_XCIIS);
-	if (xciis & XCIIS_PDF) {
-		afe_error(afep->afe_dip, "Parallel detection fault detected!");
-	}
-	if (xciis & XCIIS_RF) {
-		afe_error(afep->afe_dip, "Remote fault detected.");
-	}
-	if (xciis & XCIIS_LFAIL) {
-		if (afep->afe_linkup == LINK_STATE_UP) {
-			reinit++;
-		}
-		afep->afe_ifspeed = 0;
-		afep->afe_linkup = LINK_STATE_DOWN;
-		afep->afe_duplex = LINK_DUPLEX_UNKNOWN;
-		afe_reportlink(afep);
-		if (reinit) {
-			afe_startphy(afep);
-		}
-		return;
-	}
-
-	afep->afe_linkup = LINK_STATE_UP;
-	afep->afe_ifspeed = (xciis & XCIIS_SPEED) ? 100000000 : 10000000;
-	if (xciis & XCIIS_DUPLEX) {
-		afep->afe_duplex = LINK_DUPLEX_FULL;
-	} else {
-		afep->afe_duplex = LINK_DUPLEX_HALF;
-	}
-
-	afe_reportlink(afep);
-}
-
-void
-afe_checklinkcentaur(afe_t *afep)
-{
-	unsigned	opmode;
-	int		reinit = 0;
-
-	opmode = GETCSR(afep, CSR_OPM);
-	if ((opmode & OPM_MODE) == OPM_MACONLY) {
-		DBG(DPHY, "Centaur running in MAC-only mode");
-		afe_checklinkmii(afep);
-		return;
-	}
-	DBG(DPHY, "Centaur running in single chip mode");
-	if ((opmode & OPM_LINK) == 0) {
-		if (afep->afe_linkup == LINK_STATE_UP) {
-			reinit++;
-		}
-		afep->afe_ifspeed = 0;
-		afep->afe_duplex = LINK_DUPLEX_UNKNOWN;
-		afep->afe_linkup = LINK_STATE_DOWN;
-		afe_reportlink(afep);
-		if (reinit) {
-			afe_startphy(afep);
-		}
-		return;
-	}
-
-	afep->afe_linkup = LINK_STATE_UP;
-	afep->afe_ifspeed = (opmode & OPM_SPEED) ? 100000000 : 10000000;
-	if (opmode & OPM_DUPLEX) {
-		afep->afe_duplex = LINK_DUPLEX_FULL;
-	} else {
-		afep->afe_duplex = LINK_DUPLEX_HALF;
-	}
-	afe_reportlink(afep);
-}
-
-void
-afe_checklinkmii(afe_t *afep)
-{
-	/* read MII state registers */
-	uint16_t	bmsr;
-	uint16_t	bmcr;
-	uint16_t	anar;
-	uint16_t	anlpar;
-	int			reinit = 0;
-
-	/* read this twice, to clear latched link state */
-	bmsr = afe_miiread(afep, afep->afe_phyaddr, MII_STATUS);
-	bmsr = afe_miiread(afep, afep->afe_phyaddr, MII_STATUS);
-	bmcr = afe_miiread(afep, afep->afe_phyaddr, MII_CONTROL);
-	anar = afe_miiread(afep, afep->afe_phyaddr, MII_AN_ADVERT);
-	anlpar = afe_miiread(afep, afep->afe_phyaddr, MII_AN_LPABLE);
-
-	if (bmsr & MII_STATUS_REMFAULT) {
-		afe_error(afep->afe_dip, "Remote fault detected.");
-	}
-	if (bmsr & MII_STATUS_JABBERING) {
-		afe_error(afep->afe_dip, "Jabber condition detected.");
-	}
-	if ((bmsr & MII_STATUS_LINKUP) == 0) {
-		/* no link */
-		if (afep->afe_linkup == LINK_STATE_UP) {
-			reinit = 1;
-		}
-		afep->afe_ifspeed = 0;
-		afep->afe_duplex = LINK_DUPLEX_UNKNOWN;
-		afep->afe_linkup = LINK_STATE_DOWN;
-		afe_reportlink(afep);
-		if (reinit) {
-			afe_startphy(afep);
-		}
-		return;
-	}
-
-	DBG(DCHATTY, "link up!");
-	afep->afe_linkup = LINK_STATE_UP;
-
-	if (!(bmcr & MII_CONTROL_ANE)) {
-		/* forced mode */
-		if (bmcr & MII_CONTROL_100MB) {
-			afep->afe_ifspeed = 100000000;
+	if (AFE_MODEL(afep) == MODEL_CENTAUR) {
+		if (mii_get_flowctrl(afep->afe_mii) == LINK_FLOWCTRL_BI) {
+			SETBIT(afep, CSR_CR, CR_PAUSE);
 		} else {
-			afep->afe_ifspeed = 10000000;
+			CLRBIT(afep, CSR_CR, CR_PAUSE);
 		}
-		if (bmcr & MII_CONTROL_FDUPLEX) {
-			afep->afe_duplex = LINK_DUPLEX_FULL;
-		} else {
-			afep->afe_duplex = LINK_DUPLEX_HALF;
-		}
-	} else if ((!(bmsr & MII_STATUS_CANAUTONEG)) ||
-	    (!(bmsr & MII_STATUS_ANDONE))) {
-		afep->afe_ifspeed = 0;
-		afep->afe_duplex = LINK_DUPLEX_UNKNOWN;
-	} else if (anar & anlpar & MII_ABILITY_100BASE_TX_FD) {
-		afep->afe_ifspeed = 100000000;
-		afep->afe_duplex = LINK_DUPLEX_FULL;
-	} else if (anar & anlpar & MII_ABILITY_100BASE_T4) {
-		afep->afe_ifspeed = 100000000;
-		afep->afe_duplex = LINK_DUPLEX_HALF;
-	} else if (anar & anlpar & MII_ABILITY_100BASE_TX) {
-		afep->afe_ifspeed = 100000000;
-		afep->afe_duplex = LINK_DUPLEX_HALF;
-	} else if (anar & anlpar & MII_ABILITY_10BASE_T_FD) {
-		afep->afe_ifspeed = 10000000;
-		afep->afe_duplex = LINK_DUPLEX_FULL;
-	} else if (anar & anlpar & MII_ABILITY_10BASE_T) {
-		afep->afe_ifspeed = 10000000;
-		afep->afe_duplex = LINK_DUPLEX_HALF;
-	} else {
-		afep->afe_ifspeed = 0;
-		afep->afe_duplex = LINK_DUPLEX_UNKNOWN;
 	}
-
-	afe_reportlink(afep);
+	mac_link_update(afep->afe_mh, link);
 }
 
 void
@@ -1547,8 +1178,9 @@ afe_miireadbit(afe_t *afep)
 }
 
 uint16_t
-afe_miiread(afe_t *afep, int phy, int reg)
+afe_mii_read(void *arg, uint8_t phy, uint8_t reg)
 {
+	afe_t *afep = arg;
 	/*
 	 * ADMtek bugs ignore address decode bits -- they only
 	 * support PHY at 1.
@@ -1566,7 +1198,7 @@ afe_miiread(afe_t *afep, int phy, int reg)
 }
 
 uint16_t
-afe_miireadgeneral(afe_t *afep, int phy, int reg)
+afe_miireadgeneral(afe_t *afep, uint8_t phy, uint8_t reg)
 {
 	uint16_t	value = 0;
 	int		i;
@@ -1608,7 +1240,7 @@ afe_miireadgeneral(afe_t *afep, int phy, int reg)
 }
 
 uint16_t
-afe_miireadcomet(afe_t *afep, int phy, int reg)
+afe_miireadcomet(afe_t *afep, uint8_t phy, uint8_t reg)
 {
 	if (phy != 1) {
 		return (0xffff);
@@ -1642,8 +1274,10 @@ afe_miireadcomet(afe_t *afep, int phy, int reg)
 }
 
 void
-afe_miiwrite(afe_t *afep, int phy, int reg, uint16_t val)
+afe_mii_write(void *arg, uint8_t phy, uint8_t reg, uint16_t val)
 {
+	afe_t	*afep = arg;
+
 	/*
 	 * ADMtek bugs ignore address decode bits -- they only
 	 * support PHY at 1.
@@ -1662,7 +1296,7 @@ afe_miiwrite(afe_t *afep, int phy, int reg, uint16_t val)
 }
 
 void
-afe_miiwritegeneral(afe_t *afep, int phy, int reg, uint16_t val)
+afe_miiwritegeneral(afe_t *afep, uint8_t phy, uint8_t reg, uint16_t val)
 {
 	int i;
 
@@ -1689,8 +1323,8 @@ afe_miiwritegeneral(afe_t *afep, int phy, int reg, uint16_t val)
 		afe_miiwritebit(afep, (reg & i) ? 1 : 0);
 	}
 
-	/* turnaround - tristate followed by logic 0 */
-	afe_miitristate(afep);
+	/* turnaround - 1 bit followed by logic 0 */
+	afe_miiwritebit(afep, 1);
 	afe_miiwritebit(afep, 0);
 
 	/* now write out our data (16 bits) */
@@ -1703,7 +1337,7 @@ afe_miiwritegeneral(afe_t *afep, int phy, int reg, uint16_t val)
 }
 
 void
-afe_miiwritecomet(afe_t *afep, int phy, int reg, uint16_t val)
+afe_miiwritecomet(afe_t *afep, uint8_t phy, uint8_t reg, uint16_t val)
 {
 	if (phy != 1) {
 		return;
@@ -1750,6 +1384,9 @@ afe_m_start(void *arg)
 
 	mutex_exit(&afep->afe_xmtlock);
 	mutex_exit(&afep->afe_intrlock);
+
+	mii_start(afep->afe_mii);
+
 	return (0);
 }
 
@@ -1757,6 +1394,8 @@ void
 afe_m_stop(void *arg)
 {
 	afe_t	*afep = arg;
+
+	mii_stop(afep->afe_mii);
 
 	/* exclusive access to the hardware! */
 	mutex_enter(&afep->afe_intrlock);
@@ -1785,6 +1424,10 @@ afe_startmac(afe_t *afep)
 	/* tell the mac that we are ready to go! */
 	if (afep->afe_flags & AFE_RUNNING)
 		mac_tx_update(afep->afe_mh);
+
+	/* start watchdog timer */
+	PUTCSR(afep, CSR_TIMER, TIMER_LOOP |
+	    (AFE_WDOGTIMER * 1000 / TIMER_USEC));
 }
 
 void
@@ -1815,6 +1458,9 @@ afe_stopmac(afe_t *afep)
 
 	/* prevent an interrupt */
 	PUTCSR(afep, CSR_SR2, INT_RXSTOPPED | INT_TXSTOPPED);
+
+	/* stop the watchdog timer */
+	PUTCSR(afep, CSR_TIMER, 0);
 }
 
 void
@@ -1870,11 +1516,7 @@ void
 afe_stopall(afe_t *afep)
 {
 	afe_disableinterrupts(afep);
-
 	afe_stopmac(afep);
-
-	/* stop the phy */
-	afe_stopphy(afep);
 }
 
 void
@@ -1892,9 +1534,6 @@ afe_startall(afe_t *afep)
 	/* now we can enable interrupts */
 	afe_enableinterrupts(afep);
 
-	/* start up the phy */
-	afe_startphy(afep);
-
 	/* start up the mac */
 	afe_startmac(afep);
 }
@@ -1902,9 +1541,7 @@ afe_startall(afe_t *afep)
 void
 afe_resetall(afe_t *afep)
 {
-	afep->afe_resetting = B_TRUE;
 	afe_stopall(afep);
-	afep->afe_resetting = B_FALSE;
 	afe_startall(afep);
 }
 
@@ -2178,6 +1815,7 @@ afe_intr(caddr_t arg)
 	afe_t		*afep = (void *)arg;
 	uint32_t	status;
 	mblk_t		*mp = NULL;
+	boolean_t	doreset = B_FALSE;
 
 	mutex_enter(&afep->afe_intrlock);
 
@@ -2219,10 +1857,8 @@ afe_intr(caddr_t arg)
 		mutex_exit(&afep->afe_xmtlock);
 	}
 
-	if (status & (INT_LINKCHG|INT_TIMER)) {
-		mutex_enter(&afep->afe_xmtlock);
-		afe_checklink(afep);
-		mutex_exit(&afep->afe_xmtlock);
+	if ((status & INT_TIMER) && (afe_watchdog(afep) != DDI_SUCCESS)) {
+		doreset = B_TRUE;
 	}
 
 	if (status & (INT_RXSTOPPED|INT_TXSTOPPED|
@@ -2231,10 +1867,7 @@ afe_intr(caddr_t arg)
 		if (status & (INT_RXJABBER | INT_TXJABBER)) {
 			afep->afe_jabber++;
 		}
-		DBG(DWARN, "resetting mac, status %x", status);
-		mutex_enter(&afep->afe_xmtlock);
-		afe_resetall(afep);
-		mutex_exit(&afep->afe_xmtlock);
+		doreset = B_TRUE;
 	}
 
 	if (status & INT_BUSERR) {
@@ -2254,12 +1887,24 @@ afe_intr(caddr_t arg)
 		}
 
 		/* reset the chip in an attempt to fix things */
+		doreset = B_TRUE;
+	}
+
+
+	if (doreset) {
 		mutex_enter(&afep->afe_xmtlock);
 		afe_resetall(afep);
 		mutex_exit(&afep->afe_xmtlock);
+		mutex_exit(&afep->afe_intrlock);
+
+		mii_reset(afep->afe_mii);
+	} else {
+		mutex_exit(&afep->afe_intrlock);
 	}
 
-	mutex_exit(&afep->afe_intrlock);
+	if (status & INT_LINKCHG) {
+		mii_check(afep->afe_mii);
+	}
 
 	/*
 	 * Send up packets.  We do this outside of the intrlock.
@@ -2315,7 +1960,6 @@ afe_send(afe_t *afep, mblk_t *mp)
 
 	len = msgsize(mp);
 	if (len > ETHERVLANMTU) {
-		DBG(DXMIT, "frame too long: %d", len);
 		afep->afe_macxmt_errors++;
 		freemsg(mp);
 		return (B_TRUE);
@@ -2494,8 +2138,6 @@ afe_receive(afe_t *afep)
 	/* limit the number of packets we process to a half ring size */
 	for (cnt = 0; cnt < AFE_RXRING / 2; cnt++) {
 
-		DBG(DRECV, "receive at index %d", head);
-
 		rmd = &afep->afe_rxdescp[head];
 		rxb = afep->afe_rxbufs[head];
 
@@ -2509,8 +2151,6 @@ afe_receive(afe_t *afep)
 		/* discard the ethernet frame checksum */
 		len = RXLENGTH(status) - ETHERFCSL;
 
-		DBG(DRECV, "recv length %d, status %x", len, status);
-
 		if ((status & (RXSTAT_ERRS | RXSTAT_FIRST | RXSTAT_LAST)) !=
 		    (RXSTAT_FIRST | RXSTAT_LAST)) {
 
@@ -2521,7 +2161,7 @@ afe_receive(afe_t *afep)
 			 */
 			if ((status & (RXSTAT_LAST|RXSTAT_FIRST)) !=
 			    (RXSTAT_LAST|RXSTAT_FIRST)) {
-				DBG(DRECV, "rx packet overspill");
+
 				if (status & RXSTAT_FIRST) {
 					afep->afe_toolong_errors++;
 				}
@@ -2596,24 +2236,6 @@ skip:
 }
 
 int
-afe_getmiibit(afe_t *afep, uint16_t reg, uint16_t bit)
-{
-	unsigned	val;
-
-	mutex_enter(&afep->afe_xmtlock);
-	if (afep->afe_flags & AFE_SUSPENDED) {
-		mutex_exit(&afep->afe_xmtlock);
-		/* device is suspended */
-		return (0);
-	}
-	val = afe_miiread(afep, afep->afe_phyaddr, reg);
-	mutex_exit(&afep->afe_xmtlock);
-
-	return (val & bit ? 1 : 0);
-}
-#define	GETMIIBIT(reg, bit) afe_getmiibit(afep, reg, bit)
-
-int
 afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	afe_t	*afep = arg;
@@ -2623,11 +2245,10 @@ afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		afe_reclaim(afep);
 	mutex_exit(&afep->afe_xmtlock);
 
+	if (mii_m_getstat(afep->afe_mii, stat, val) == 0) {
+		return (0);
+	}
 	switch (stat) {
-	case MAC_STAT_IFSPEED:
-		*val = afep->afe_ifspeed;
-		break;
-
 	case MAC_STAT_MULTIRCV:
 		*val = afep->afe_multircv;
 		break;
@@ -2678,10 +2299,6 @@ afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case MAC_STAT_OERRORS:
 		*val = afep->afe_errxmt;
-		break;
-
-	case ETHER_STAT_LINK_DUPLEX:
-		*val = afep->afe_duplex;
 		break;
 
 	case ETHER_STAT_ALIGN_ERRORS:
@@ -2748,270 +2365,28 @@ afe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = afep->afe_jabber;
 		break;
 
-	case ETHER_STAT_CAP_100T4:
-		*val = afep->afe_cap_100T4;
-		break;
-
-	case ETHER_STAT_CAP_100FDX:
-		*val = afep->afe_cap_100fdx;
-		break;
-
-	case ETHER_STAT_CAP_100HDX:
-		*val = afep->afe_cap_100hdx;
-		break;
-
-	case ETHER_STAT_CAP_10FDX:
-		*val = afep->afe_cap_10fdx;
-		break;
-
-	case ETHER_STAT_CAP_10HDX:
-		*val = afep->afe_cap_10hdx;
-		break;
-
-	case ETHER_STAT_CAP_AUTONEG:
-		*val = afep->afe_cap_aneg;
-		break;
-
-	case ETHER_STAT_LINK_AUTONEG:
-		*val = ((afep->afe_adv_aneg != 0) &&
-		    (GETMIIBIT(MII_AN_LPABLE, MII_AN_EXP_LPCANAN) != 0));
-		break;
-
-	case ETHER_STAT_ADV_CAP_100T4:
-		*val = afep->afe_adv_100T4;
-		break;
-
-	case ETHER_STAT_ADV_CAP_100FDX:
-		*val = afep->afe_adv_100fdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_100HDX:
-		*val = afep->afe_adv_100hdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_10FDX:
-		*val = afep->afe_adv_10fdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_10HDX:
-		*val = afep->afe_adv_10hdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_AUTONEG:
-		*val = afep->afe_adv_aneg;
-		break;
-
-	case ETHER_STAT_LP_CAP_100T4:
-		*val = GETMIIBIT(MII_AN_LPABLE, MII_ABILITY_100BASE_T4);
-		break;
-
-	case ETHER_STAT_LP_CAP_100FDX:
-		*val = GETMIIBIT(MII_AN_LPABLE, MII_ABILITY_100BASE_TX_FD);
-		break;
-
-	case ETHER_STAT_LP_CAP_100HDX:
-		*val = GETMIIBIT(MII_AN_LPABLE, MII_ABILITY_100BASE_TX);
-		break;
-
-	case ETHER_STAT_LP_CAP_10FDX:
-		*val = GETMIIBIT(MII_AN_LPABLE, MII_ABILITY_10BASE_T_FD);
-		break;
-
-	case ETHER_STAT_LP_CAP_10HDX:
-		*val = GETMIIBIT(MII_AN_LPABLE, MII_ABILITY_10BASE_T);
-		break;
-
-	case ETHER_STAT_LP_CAP_AUTONEG:
-		*val = GETMIIBIT(MII_AN_EXPANSION, MII_AN_EXP_LPCANAN);
-		break;
-
-	case ETHER_STAT_XCVR_ADDR:
-		*val = afep->afe_phyaddr;
-		break;
-
-	case ETHER_STAT_XCVR_ID:
-		*val = afep->afe_phyid;
-		break;
-
 	default:
 		return (ENOTSUP);
 	}
 	return (0);
 }
 
-/*ARGSUSED*/
 int
 afe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
     uint_t sz, void *val, uint_t *perm)
 {
 	afe_t		*afep = arg;
-	int		err = 0;
-	boolean_t	dfl = flags & MAC_PROP_DEFAULT;
 
-	if (sz == 0)
-		return (EINVAL);
-
-	*perm = MAC_PROP_PERM_RW;
-	switch (num) {
-	case MAC_PROP_DUPLEX:
-		*perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (link_duplex_t)) {
-			bcopy(&afep->afe_duplex, val, sizeof (link_duplex_t));
-		} else {
-			err = EINVAL;
-		}
-		break;
-
-	case MAC_PROP_SPEED:
-		*perm = MAC_PROP_PERM_READ;
-		if (sz >= sizeof (uint64_t)) {
-			bcopy(&afep->afe_ifspeed, val, sizeof (uint64_t));
-		} else {
-			err = EINVAL;
-		}
-		break;
-
-	case MAC_PROP_AUTONEG:
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_aneg : afep->afe_adv_aneg;
-		break;
-
-#if 0
-	case MAC_PROP_ADV_1000FDX_CAP:
-	case MAC_PROP_EN_1000FDX_CAP:
-	case MAC_PROP_ADV_1000HDX_CAP:
-	case MAC_PROP_EN_1000HDX_CAP:
-		/* We don't support gigabit! */
-		*(uint8_t *)val = 0;
-		break;
-#endif
-
-	case MAC_PROP_ADV_100FDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_100fdx : afep->afe_adv_100fdx;
-		break;
-	case MAC_PROP_EN_100FDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_100fdx : afep->afe_adv_100fdx;
-		break;
-
-	case MAC_PROP_ADV_100HDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_100hdx : afep->afe_adv_100hdx;
-		break;
-	case MAC_PROP_EN_100HDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_100hdx : afep->afe_adv_100hdx;
-		break;
-
-	case MAC_PROP_ADV_10FDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_10fdx : afep->afe_adv_10fdx;
-		break;
-	case MAC_PROP_EN_10FDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_10fdx : afep->afe_adv_10fdx;
-		break;
-
-	case MAC_PROP_ADV_10HDX_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_10hdx : afep->afe_adv_10hdx;
-		break;
-	case MAC_PROP_EN_10HDX_CAP:
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_10hdx : afep->afe_adv_10hdx;
-		break;
-
-	case MAC_PROP_ADV_100T4_CAP:
-		*perm = MAC_PROP_PERM_READ;
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_100T4 : afep->afe_adv_100T4;
-		break;
-	case MAC_PROP_EN_100T4_CAP:
-		*(uint8_t *)val =
-		    dfl ? afep->afe_cap_100T4 : afep->afe_adv_100T4;
-		break;
-
-	default:
-		err = ENOTSUP;
-	}
-
-	return (err);
+	return (mii_m_getprop(afep->afe_mii, name, num, flags, sz, val, perm));
 }
 
-/*ARGSUSED*/
 int
 afe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
     const void *val)
 {
 	afe_t		*afep = arg;
-	uint8_t		*advp;
-	uint8_t		*capp;
 
-	switch (num) {
-	case MAC_PROP_EN_100FDX_CAP:
-		advp = &afep->afe_adv_100fdx;
-		capp = &afep->afe_cap_100fdx;
-		break;
-
-	case MAC_PROP_EN_100HDX_CAP:
-		advp = &afep->afe_adv_100hdx;
-		capp = &afep->afe_cap_100hdx;
-		break;
-
-	case MAC_PROP_EN_10FDX_CAP:
-		advp = &afep->afe_adv_10fdx;
-		capp = &afep->afe_cap_10fdx;
-		break;
-
-	case MAC_PROP_EN_10HDX_CAP:
-		advp = &afep->afe_adv_10hdx;
-		capp = &afep->afe_cap_10hdx;
-		break;
-
-	case MAC_PROP_EN_100T4_CAP:
-		advp = &afep->afe_adv_100T4;
-		capp = &afep->afe_cap_100T4;
-		break;
-
-	case MAC_PROP_AUTONEG:
-		advp = &afep->afe_adv_aneg;
-		capp = &afep->afe_cap_aneg;
-		break;
-
-	default:
-		return (ENOTSUP);
-	}
-
-	if (*capp == 0)		/* ensure phy can support value */
-		return (ENOTSUP);
-
-	mutex_enter(&afep->afe_intrlock);
-	mutex_enter(&afep->afe_xmtlock);
-
-	if (*advp != *(const uint8_t *)val) {
-		*advp = *(const uint8_t *)val;
-
-		if ((afep->afe_flags & (AFE_RUNNING|AFE_SUSPENDED)) ==
-		    AFE_RUNNING) {
-			/*
-			 * This re-initializes the phy, but it also
-			 * restarts transmit and receive rings.
-			 * Needless to say, changing the link
-			 * parameters is destructive to traffic in
-			 * progress.
-			 */
-			afe_resetall(afep);
-		}
-	}
-	mutex_exit(&afep->afe_xmtlock);
-	mutex_exit(&afep->afe_intrlock);
-
-	return (0);
+	return (mii_m_setprop(afep->afe_mii, name, num, sz, val));
 }
 
 /*
@@ -3034,33 +2409,3 @@ afe_error(dev_info_t *dip, char *fmt, ...)
 		cmn_err(CE_WARN, "afe: %s", buf);
 	}
 }
-
-#ifdef	DEBUG
-
-void
-afe_dprintf(afe_t *afep, const char *func, int level, char *fmt, ...)
-{
-	va_list	ap;
-
-	va_start(ap, fmt);
-	if (afe_debug & level) {
-		char	tag[64];
-		char	buf[256];
-
-		if (afep && afep->afe_dip) {
-			(void) snprintf(tag, sizeof (tag), "%s%d",
-			    ddi_driver_name(afep->afe_dip),
-			    ddi_get_instance(afep->afe_dip));
-		} else {
-			(void) snprintf(tag, sizeof (tag), "afe");
-		}
-
-		(void) snprintf(buf, sizeof (buf), "%s: %s: %s\n",
-		    tag, func, fmt);
-
-		vcmn_err(CE_CONT, buf, ap);
-	}
-	va_end(ap);
-}
-
-#endif

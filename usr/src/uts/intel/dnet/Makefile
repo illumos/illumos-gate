@@ -21,10 +21,8 @@
 #
 # uts/intel/dnet/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the dnet
 #	network driver kernel module.
@@ -44,7 +42,6 @@ MODULE		= dnet
 OBJECTS		= $(DNET_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DNET_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/intel/io
 
 #
 #	Include common rules.
@@ -54,14 +51,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(CONFMOD)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-
-DEBUG_FLGS      =
-$(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
-
-CPPFLAGS   	+= -DSUNDDI
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

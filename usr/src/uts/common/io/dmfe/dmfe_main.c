@@ -19,13 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
+#include <sys/policy.h>
+#include <sys/sdt.h>
 #include "dmfe_impl.h"
 
 /*
@@ -147,17 +149,11 @@ static boolean_t dmfe_reclaim_on_done = B_FALSE;
  *
  *	TX_STALL_TIME_10 is the equivalent timeout when running at 10Mb/s.
  *
- *	LINK_POLL_TIME is the interval between checks on the link state
- *	when nothing appears to have happened (this is in addition to the
- *	case where we think we've detected a link change, and serves as a
- *	backup in case the quick link check doesn't work properly).
- *
  * Patchable globals:
  *
  *	dmfe_tick_us:		DMFE_TICK
  *	dmfe_tx100_stall_us:	TX_STALL_TIME_100
  *	dmfe_tx10_stall_us:	TX_STALL_TIME_10
- *	dmfe_link_poll_us:	LINK_POLL_TIME
  *
  * These are then used in _init() to calculate:
  *
@@ -169,20 +165,15 @@ static boolean_t dmfe_reclaim_on_done = B_FALSE;
  *			 reclaim before the TX process is considered stalled,
  *			 when running at 10Mb/s.  The elements are indexed
  *			 by transmit-engine-state.
- *	factotum_tix:	 number of consecutive cyclic callbacks before waking
- *			 up the factotum even though there doesn't appear to
- *			 be anything for it to do
  */
 
 #define	DMFE_TICK		25000		/* microseconds		*/
 #define	TX_STALL_TIME_100	50000		/* microseconds		*/
 #define	TX_STALL_TIME_10	200000		/* microseconds		*/
-#define	LINK_POLL_TIME		5000000		/* microseconds		*/
 
 static uint32_t dmfe_tick_us = DMFE_TICK;
 static uint32_t dmfe_tx100_stall_us = TX_STALL_TIME_100;
 static uint32_t dmfe_tx10_stall_us = TX_STALL_TIME_10;
-static uint32_t dmfe_link_poll_us = LINK_POLL_TIME;
 
 /*
  * Calculated from above in _init()
@@ -190,16 +181,12 @@ static uint32_t dmfe_link_poll_us = LINK_POLL_TIME;
 
 static uint32_t stall_100_tix[TX_PROCESS_MAX_STATE+1];
 static uint32_t stall_10_tix[TX_PROCESS_MAX_STATE+1];
-static uint32_t factotum_tix;
-static uint32_t factotum_fast_tix;
-static uint32_t factotum_start_tix;
 
 /*
  * Property names
  */
 static char localmac_propname[] = "local-mac-address";
 static char opmode_propname[] = "opmode-reg-value";
-static char debug_propname[] = "dmfe-debug-flags";
 
 static int		dmfe_m_start(void *);
 static void		dmfe_m_stop(void *);
@@ -209,9 +196,13 @@ static int		dmfe_m_unicst(void *, const uint8_t *);
 static void		dmfe_m_ioctl(void *, queue_t *, mblk_t *);
 static mblk_t		*dmfe_m_tx(void *, mblk_t *);
 static int 		dmfe_m_stat(void *, uint_t, uint64_t *);
+static int		dmfe_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *, uint_t *);
+static int		dmfe_m_setprop(void *, const char *, mac_prop_id_t,
+    uint_t,  const void *);
 
 static mac_callbacks_t dmfe_m_callbacks = {
-	(MC_IOCTL),
+	(MC_IOCTL | MC_SETPROP | MC_GETPROP),
 	dmfe_m_stat,
 	dmfe_m_start,
 	dmfe_m_stop,
@@ -220,7 +211,11 @@ static mac_callbacks_t dmfe_m_callbacks = {
 	dmfe_m_unicst,
 	dmfe_m_tx,
 	dmfe_m_ioctl,
-	NULL,
+	NULL,	/* getcapab */
+	NULL,	/* open */
+	NULL,	/* close */
+	dmfe_m_setprop,
+	dmfe_m_getprop
 };
 
 
@@ -337,16 +332,12 @@ dmfe_setup_put32(dma_area_t *dma_p, uint_t index, uint32_t value)
  * ========== Low-level chip & ring buffer manipulation ==========
  */
 
-#define	DMFE_DBG	DMFE_DBG_REGS	/* debug flag for this code	*/
-
 /*
  * dmfe_set_opmode() -- function to set operating mode
  */
 static void
 dmfe_set_opmode(dmfe_t *dmfep)
 {
-	DMFE_DEBUG(("dmfe_set_opmode: opmode 0x%x", dmfep->opmode));
-
 	ASSERT(mutex_owned(dmfep->oplock));
 
 	dmfe_chip_put32(dmfep, OPN_MODE_REG, dmfep->opmode);
@@ -445,8 +436,6 @@ dmfe_init_rings(dmfe_t *dmfep)
 	/*
 	 * Set the base address of the RX descriptor list in CSR3
 	 */
-	DMFE_DEBUG(("RX descriptor VA: $%p (DVMA $%x)",
-	    descp->mem_va, descp->mem_dvma));
 	dmfe_chip_put32(dmfep, RX_BASE_ADDR_REG, descp->mem_dvma);
 
 	/*
@@ -479,8 +468,6 @@ dmfe_init_rings(dmfe_t *dmfep)
 	/*
 	 * Set the base address of the TX descrptor list in CSR4
 	 */
-	DMFE_DEBUG(("TX descriptor VA: $%p (DVMA $%x)",
-	    descp->mem_va, descp->mem_dvma));
 	dmfe_chip_put32(dmfep, TX_BASE_ADDR_REG, descp->mem_dvma);
 }
 
@@ -548,18 +535,11 @@ dmfe_enable_interrupts(dmfe_t *dmfep)
 	dmfe_chip_put32(dmfep, INT_MASK_REG,
 	    NORMAL_SUMMARY_INT | ABNORMAL_SUMMARY_INT | dmfep->imask);
 	dmfep->chip_state = CHIP_RUNNING;
-
-	DMFE_DEBUG(("dmfe_enable_interrupts: imask 0x%x", dmfep->imask));
 }
-
-#undef	DMFE_DBG
-
 
 /*
  * ========== RX side routines ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_RECV	/* debug flag for this code	*/
 
 /*
  * Function to update receive statistics on various errors
@@ -654,15 +634,13 @@ dmfe_getp(dmfe_t *dmfep)
 	 */
 	index = dmfep->rx.next_free;
 	desc0 = dmfe_ring_get32(descp, index, DESC0);
-	if (desc0 & RX_OWN)
-		DMFE_DEBUG(("dmfe_getp: no work, desc0 0x%x", desc0));
 
+	DTRACE_PROBE1(rx__start, uint32_t, desc0);
 	for (head = NULL, tail = &head; (desc0 & RX_OWN) == 0; ) {
 		/*
 		 * Maintain statistics for every descriptor returned
 		 * to us by the chip ...
 		 */
-		DMFE_DEBUG(("dmfe_getp: desc0 0x%x", desc0));
 		dmfe_update_rx_stats(dmfep, desc0);
 
 		/*
@@ -673,7 +651,7 @@ dmfe_getp(dmfe_t *dmfep)
 		 * fragments we find & skip on to the next entry.
 		 */
 		if (((RX_FIRST_DESC | RX_LAST_DESC) & ~desc0) != 0) {
-			DMFE_DEBUG(("dmfe_getp: dropping fragment"));
+			DTRACE_PROBE1(rx__frag, uint32_t, desc0);
 			goto skip;
 		}
 
@@ -682,14 +660,13 @@ dmfe_getp(dmfe_t *dmfep)
 		 * status and packet length before forwarding it upstream.
 		 */
 		if (desc0 & RX_ERR_SUMMARY) {
-			DMFE_DEBUG(("dmfe_getp: dropping errored packet"));
+			DTRACE_PROBE1(rx__err, uint32_t, desc0);
 			goto skip;
 		}
 
 		packet_length = (desc0 >> 16) & 0x3fff;
 		if (packet_length > DMFE_MAX_PKT_SIZE) {
-			DMFE_DEBUG(("dmfe_getp: dropping oversize packet, "
-			    "length %d", packet_length));
+			DTRACE_PROBE1(rx__toobig, int, packet_length);
 			goto skip;
 		} else if (packet_length < ETHERMIN) {
 			/*
@@ -700,8 +677,7 @@ dmfe_getp(dmfe_t *dmfep)
 			 * This check is probably redundant, as well,
 			 * since the hardware should drop RUNT frames.
 			 */
-			DMFE_DEBUG(("dmfe_getp: dropping undersize packet, "
-			    "length %d", packet_length));
+			DTRACE_PROBE1(rx__runt, int, packet_length);
 			goto skip;
 		}
 
@@ -736,7 +712,7 @@ dmfe_getp(dmfe_t *dmfep)
 		 */
 		mp = allocb(DMFE_HEADROOM + packet_length, 0);
 		if (mp == NULL) {
-			DMFE_DEBUG(("dmfe_getp: no buffer - dropping packet"));
+			DTRACE_PROBE(rx__no__buf);
 			dmfep->rx_stats_norcvbuf += 1;
 			goto skip;
 		}
@@ -799,14 +775,9 @@ dmfe_getp(dmfe_t *dmfep)
 	return (head);
 }
 
-#undef	DMFE_DBG
-
-
 /*
  * ========== Primary TX side routines ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_SEND	/* debug flag for this code	*/
 
 /*
  *	TX ring management:
@@ -986,37 +957,12 @@ dmfe_reclaim_tx_desc(dmfe_t *dmfep)
 		desc1 = dmfe_ring_get32(descp, i, DESC1);
 		ASSERT((desc1 & (TX_SETUP_PACKET | TX_LAST_DESC)) != 0);
 
-		if (desc1 & TX_SETUP_PACKET) {
-			/*
-			 * Setup packet - restore buffer address
-			 */
-			ASSERT(dmfe_ring_get32(descp, i, BUFFER1) ==
-			    descp->setup_dvma);
-			dmfe_ring_put32(descp, i, BUFFER1,
-			    dmfep->tx_buff.mem_dvma + i*DMFE_BUF_SIZE);
-		} else {
+		if ((desc1 & TX_SETUP_PACKET) == 0) {
 			/*
 			 * Regular packet - just update stats
 			 */
-			ASSERT(dmfe_ring_get32(descp, i, BUFFER1) ==
-			    dmfep->tx_buff.mem_dvma + i*DMFE_BUF_SIZE);
 			dmfe_update_tx_stats(dmfep, i, desc0, desc1);
 		}
-
-#if	DMFEDEBUG
-		/*
-		 * We can use one of the SPARE bits in the TX descriptor
-		 * to track when a ring buffer slot is reclaimed.  Then
-		 * we can deduce the last operation on a slot from the
-		 * top half of DESC0:
-		 *
-		 *	0x8000 xxxx	given to DMFE chip (TX_OWN)
-		 *	0x7fff xxxx	returned but not yet reclaimed
-		 *	0x3fff xxxx	reclaimed
-		 */
-#define	TX_PEND_RECLAIM		(1UL<<30)
-		dmfe_ring_put32(descp, i, DESC0, desc0 & ~TX_PEND_RECLAIM);
-#endif	/* DMFEDEBUG */
 
 		/*
 		 * Update count & index; we're all done if the ring is
@@ -1061,6 +1007,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 	uint32_t index;
 	size_t totlen;
 	size_t mblen;
+	uint32_t paddr;
 
 	/*
 	 * If the number of free slots is below the reclaim threshold
@@ -1069,6 +1016,9 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 	 * (the hard limit, usually 1), then we can't send the packet.
 	 */
 	mutex_enter(dmfep->txlock);
+	if (dmfep->suspended)
+		return (B_FALSE);
+
 	if (dmfep->tx.n_free <= dmfe_tx_reclaim_level &&
 	    dmfe_reclaim_tx_desc(dmfep) == B_FALSE &&
 	    dmfep->tx.n_free <= dmfe_tx_min_free) {
@@ -1078,7 +1028,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 		 * interrupt.
 		 */
 		mutex_exit(dmfep->txlock);
-		DMFE_DEBUG(("dmfe_send_msg: no free descriptors"));
+		DTRACE_PROBE(tx__no__desc);
 		return (B_FALSE);
 	}
 
@@ -1121,7 +1071,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 		 * need a separate ddi_dma_sync() call here.
 		 */
 		desc1 = dmfe_setup_desc1;
-		dmfe_ring_put32(descp, index, BUFFER1, descp->setup_dvma);
+		paddr = descp->setup_dvma;
 	} else {
 		/*
 		 * A regular packet; we copy the data into a pre-mapped
@@ -1175,6 +1125,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 		ASSERT(totlen <= DMFE_MAX_PKT_SIZE);
 		totlen &= TX_BUFFER_SIZE1;
 		desc1 = TX_FIRST_DESC | TX_LAST_DESC | totlen;
+		paddr = dmfep->tx_buff.mem_dvma + index*DMFE_BUF_SIZE;
 
 		(void) ddi_dma_sync(dmfep->tx_buff.dma_hdl,
 		    index * DMFE_BUF_SIZE, DMFE_BUF_SIZE, DDI_DMA_SYNC_FORDEV);
@@ -1187,6 +1138,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 	if ((index & dmfe_tx_int_factor) == 0)
 		desc1 |= TX_INT_ON_COMP;
 	desc1 |= TX_CHAINING;
+	dmfe_ring_put32(descp, index, BUFFER1, paddr);
 	dmfe_ring_put32(descp, index, DESC1, desc1);
 	dmfe_ring_put32(descp, index, DESC0, TX_OWN);
 	DMA_SYNC(descp, DDI_DMA_SYNC_FORDEV);
@@ -1236,14 +1188,9 @@ dmfe_m_tx(void *arg, mblk_t *mp)
 	return (mp);
 }
 
-#undef	DMFE_DBG
-
-
 /*
  * ========== Address-setting routines (TX-side) ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_ADDR	/* debug flag for this code	*/
 
 /*
  * Find the index of the relevant bit in the setup packet.
@@ -1334,6 +1281,9 @@ dmfe_send_setup(dmfe_t *dmfep)
 	int status;
 
 	ASSERT(mutex_owned(dmfep->oplock));
+
+	if (dmfep->suspended)
+		return (0);
 
 	/*
 	 * If the chip isn't running, we can't really send the setup frame
@@ -1457,14 +1407,10 @@ dmfe_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	return (status);
 }
 
-#undef	DMFE_DBG
-
 
 /*
  * ========== Internal state management entry points ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_GLD	/* debug flag for this code	*/
 
 /*
  * These routines provide all the functionality required by the
@@ -1551,8 +1497,9 @@ dmfe_restart(dmfe_t *dmfep)
 	dmfe_reset(dmfep);
 	mutex_exit(dmfep->txlock);
 	mutex_exit(dmfep->rxlock);
-	if (dmfep->mac_state == DMFE_MAC_STARTED)
+	if (dmfep->mac_state == DMFE_MAC_STARTED) {
 		dmfe_start(dmfep);
+	}
 }
 
 
@@ -1571,8 +1518,11 @@ dmfe_m_stop(void *arg)
 	/*
 	 * Just stop processing, then record new MAC state
 	 */
+	mii_stop(dmfep->mii);
+
 	mutex_enter(dmfep->oplock);
-	dmfe_stop(dmfep);
+	if (!dmfep->suspended)
+		dmfe_stop(dmfep);
 	dmfep->mac_state = DMFE_MAC_STOPPED;
 	mutex_exit(dmfep->oplock);
 }
@@ -1589,9 +1539,12 @@ dmfe_m_start(void *arg)
 	 * Start processing and record new MAC state
 	 */
 	mutex_enter(dmfep->oplock);
-	dmfe_start(dmfep);
+	if (!dmfep->suspended)
+		dmfe_start(dmfep);
 	dmfep->mac_state = DMFE_MAC_STARTED;
 	mutex_exit(dmfep->oplock);
+
+	mii_start(dmfep->mii);
 
 	return (0);
 }
@@ -1613,20 +1566,16 @@ dmfe_m_promisc(void *arg, boolean_t on)
 	dmfep->opmode &= ~(PROMISC_MODE | PASS_MULTICAST);
 	if (on)
 		dmfep->opmode |= PROMISC_MODE;
-	dmfe_set_opmode(dmfep);
+	if (!dmfep->suspended)
+		dmfe_set_opmode(dmfep);
 	mutex_exit(dmfep->oplock);
 
 	return (0);
 }
 
-#undef	DMFE_DBG
-
-
 /*
  * ========== Factotum, implemented as a softint handler ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_FACT	/* debug flag for this code	*/
 
 /*
  * The factotum is woken up when there's something to do that we'd rather
@@ -1644,6 +1593,10 @@ dmfe_factotum(caddr_t arg)
 	ASSERT(dmfep->dmfe_guard == DMFE_GUARD);
 
 	mutex_enter(dmfep->oplock);
+	if (dmfep->suspended) {
+		mutex_exit(dmfep->oplock);
+		return (DDI_INTR_CLAIMED);
+	}
 
 	dmfep->factotum_flag = 0;
 	DRV_KS_INC(dmfep, KS_FACTOTUM_RUN);
@@ -1658,47 +1611,14 @@ dmfe_factotum(caddr_t arg)
 		 */
 		DRV_KS_INC(dmfep, KS_RECOVERY);
 		dmfe_restart(dmfep);
+		mutex_exit(dmfep->oplock);
+
+		mii_reset(dmfep->mii);
+
 	} else if (dmfep->need_setup) {
 		(void) dmfe_send_setup(dmfep);
-	}
-	mutex_exit(dmfep->oplock);
-
-	/*
-	 * Then, check the link state.  We need <milock> but not <oplock>
-	 * to do this, but if something's changed, we need <oplock> as well
-	 * in order to stop/restart the chip!  Note: we could simply hold
-	 * <oplock> right through here, but we'd rather not 'cos checking
-	 * the link state involves reading over the bit-serial MII bus,
-	 * which takes ~500us even when nothing's changed.  Holding <oplock>
-	 * would lock out the interrupt handler for the duration, so it's
-	 * better to release it first and reacquire it only if needed.
-	 */
-	mutex_enter(dmfep->milock);
-	if (dmfe_check_link(dmfep)) {
-		mutex_enter(dmfep->oplock);
-		dmfe_stop(dmfep);
-		DRV_KS_INC(dmfep, KS_LINK_CHECK);
-		if (dmfep->update_phy) {
-			/*
-			 *  The chip may reset itself for some unknown
-			 * reason.  If this happens, the chip will use
-			 * default settings (for speed, duplex, and autoneg),
-			 * which possibly aren't the user's desired settings.
-			 */
-			dmfe_update_phy(dmfep);
-			dmfep->update_phy = B_FALSE;
-		}
-		dmfe_recheck_link(dmfep, B_FALSE);
-		if (dmfep->mac_state == DMFE_MAC_STARTED)
-			dmfe_start(dmfep);
 		mutex_exit(dmfep->oplock);
 	}
-	mutex_exit(dmfep->milock);
-
-	/*
-	 * Keep MAC up-to-date about the state of the link ...
-	 */
-	mac_link_update(dmfep->mh, dmfep->link_state);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -1706,9 +1626,7 @@ dmfe_factotum(caddr_t arg)
 static void
 dmfe_wake_factotum(dmfe_t *dmfep, int ks_id, const char *why)
 {
-	DMFE_DEBUG(("dmfe_wake_factotum: %s [%d] flag %d",
-	    why, ks_id, dmfep->factotum_flag));
-
+	_NOTE(ARGUNUSED(why));
 	ASSERT(mutex_owned(dmfep->oplock));
 	DRV_KS_INC(dmfep, ks_id);
 
@@ -1716,67 +1634,10 @@ dmfe_wake_factotum(dmfe_t *dmfep, int ks_id, const char *why)
 		ddi_trigger_softintr(dmfep->factotum_id);
 }
 
-#undef	DMFE_DBG
-
 
 /*
  * ========== Periodic Tasks (Cyclic handler & friends) ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_TICK	/* debug flag for this code	*/
-
-/*
- * Periodic tick tasks, run from the cyclic handler
- *
- * Check the state of the link and wake the factotum if necessary
- */
-static void
-dmfe_tick_link_check(dmfe_t *dmfep, uint32_t gpsr, uint32_t istat)
-{
-	link_state_t phy_state;
-	link_state_t utp_state;
-	const char *why;
-	int ks_id;
-
-	_NOTE(ARGUNUSED(istat))
-
-	ASSERT(mutex_owned(dmfep->oplock));
-
-	/*
-	 * Is it time to wake the factotum?  We do so periodically, in
-	 * case the fast check below doesn't always reveal a link change
-	 */
-	if (dmfep->link_poll_tix-- == 0) {
-		dmfep->link_poll_tix = factotum_tix;
-		why = "tick (link poll)";
-		ks_id = KS_TICK_LINK_POLL;
-	} else {
-		why = NULL;
-		ks_id = KS_TICK_LINK_STATE;
-	}
-
-	/*
-	 * Has the link status changed?  If so, we might want to wake
-	 * the factotum to deal with it.
-	 */
-	phy_state = (gpsr & GPS_LINK_STATUS) ? LINK_STATE_UP : LINK_STATE_DOWN;
-	utp_state = (gpsr & GPS_UTP_SIG) ? LINK_STATE_UP : LINK_STATE_DOWN;
-	if (phy_state != utp_state)
-		why = "tick (phy <> utp)";
-	else if ((dmfep->link_state == LINK_STATE_UP) &&
-	    (phy_state == LINK_STATE_DOWN))
-		why = "tick (UP -> DOWN)";
-	else if (phy_state != dmfep->link_state) {
-		if (dmfep->link_poll_tix > factotum_fast_tix)
-			dmfep->link_poll_tix = factotum_fast_tix;
-	}
-
-	if (why != NULL) {
-		DMFE_DEBUG(("dmfe_%s: link %d phy %d utp %d",
-		    why, dmfep->link_state, phy_state, utp_state));
-		dmfe_wake_factotum(dmfep, ks_id, why);
-	}
-}
 
 /*
  * Periodic tick tasks, run from the cyclic handler
@@ -1853,10 +1714,12 @@ dmfe_cyclic(void *arg)
 	 * If we can't get the mutex straight away, we'll just
 	 * skip this pass; we'll back back soon enough anyway.
 	 */
-	if (dmfep->chip_state != CHIP_RUNNING)
-		return;
 	if (mutex_tryenter(dmfep->oplock) == 0)
 		return;
+	if ((dmfep->suspended) || (dmfep->chip_state != CHIP_RUNNING)) {
+		mutex_exit(dmfep->oplock);
+		return;
+	}
 
 	/*
 	 * Recheck chip state (it might have been stopped since we
@@ -1866,7 +1729,6 @@ dmfe_cyclic(void *arg)
 	if (dmfep->chip_state == CHIP_RUNNING) {
 		istat = dmfe_chip_get32(dmfep, STATUS_REG);
 		gpsr = dmfe_chip_get32(dmfep, PHY_STATUS_REG);
-		dmfe_tick_link_check(dmfep, gpsr, istat);
 		dmfe_tick_stall_check(dmfep, gpsr, istat);
 	}
 
@@ -1874,14 +1736,9 @@ dmfe_cyclic(void *arg)
 	mutex_exit(dmfep->oplock);
 }
 
-#undef	DMFE_DBG
-
-
 /*
  * ========== Hardware interrupt handler ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_INT	/* debug flag for this code	*/
 
 /*
  *	dmfe_interrupt() -- handle chip interrupts
@@ -1898,6 +1755,12 @@ dmfe_interrupt(caddr_t arg)
 
 	dmfep = (void *)arg;
 
+	mutex_enter(dmfep->oplock);
+	if (dmfep->suspended) {
+		mutex_exit(dmfep->oplock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	/*
 	 * A quick check as to whether the interrupt was from this
 	 * device, before we even finish setting up all our local
@@ -1908,31 +1771,12 @@ dmfe_interrupt(caddr_t arg)
 	 * grabbed the mutexen.
 	 */
 	istat = dmfe_chip_get32(dmfep, STATUS_REG);
-	if ((istat & (NORMAL_SUMMARY_INT | ABNORMAL_SUMMARY_INT)) == 0)
-		return (DDI_INTR_UNCLAIMED);
+	if ((istat & (NORMAL_SUMMARY_INT | ABNORMAL_SUMMARY_INT)) == 0) {
 
-	/*
-	 * Unfortunately, there can be a race condition between attach()
-	 * adding the interrupt handler and initialising the mutexen,
-	 * and the handler itself being called because of a pending
-	 * interrupt.  So, we check <imask>; if it shows that interrupts
-	 * haven't yet been enabled (and therefore we shouldn't really
-	 * be here at all), we will just write back the value read from
-	 * the status register, thus acknowledging (and clearing) *all*
-	 * pending conditions without really servicing them, and claim
-	 * the interrupt.
-	 */
-	if (dmfep->imask == 0) {
-		DMFE_DEBUG(("dmfe_interrupt: early interrupt 0x%x", istat));
-		dmfe_chip_put32(dmfep, STATUS_REG, istat);
-		return (DDI_INTR_CLAIMED);
+		mutex_exit(dmfep->oplock);
+		return (DDI_INTR_UNCLAIMED);
 	}
 
-	/*
-	 * We're committed to servicing this interrupt, but we
-	 * need to get the lock before going any further ...
-	 */
-	mutex_enter(dmfep->oplock);
 	DRV_KS_INC(dmfep, KS_INTERRUPT);
 
 	/*
@@ -1942,7 +1786,7 @@ dmfe_interrupt(caddr_t arg)
 	interrupts = istat & dmfep->imask;
 	ASSERT(interrupts != 0);
 
-	DMFE_DEBUG(("dmfe_interrupt: istat 0x%x -> 0x%x", istat, interrupts));
+	DTRACE_PROBE1(intr, uint32_t, istat);
 
 	/*
 	 * Check for any interrupts other than TX/RX done.
@@ -2024,7 +1868,7 @@ dmfe_interrupt(caddr_t arg)
 			 * they weren't Abnormal?), but we'll check just
 			 * in case ...
 			 */
-			DMFE_DEBUG(("unexpected interrupt bits: 0x%x", istat));
+			DTRACE_PROBE1(intr__unexpected, uint32_t, istat);
 		}
 	}
 
@@ -2073,14 +1917,9 @@ dmfe_interrupt(caddr_t arg)
 	return (DDI_INTR_CLAIMED);
 }
 
-#undef	DMFE_DBG
-
-
 /*
  * ========== Statistics update handler ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_STATS	/* debug flag for this code	*/
 
 static int
 dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
@@ -2088,7 +1927,11 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	dmfe_t *dmfep = arg;
 	int rv = 0;
 
-	mutex_enter(dmfep->milock);
+	/* Let MII handle its own stats. */
+	if (mii_m_getstat(dmfep->mii, stat, val) == 0) {
+		return (0);
+	}
+
 	mutex_enter(dmfep->oplock);
 	mutex_enter(dmfep->rxlock);
 	mutex_enter(dmfep->txlock);
@@ -2097,9 +1940,6 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	(void) dmfe_reclaim_tx_desc(dmfep);
 
 	switch (stat) {
-	case MAC_STAT_IFSPEED:
-		*val = dmfep->op_stats_speed;
-		break;
 
 	case MAC_STAT_IPACKETS:
 		*val = dmfep->rx_stats_ipackets;
@@ -2209,106 +2049,6 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = dmfep->tx_stats_multi_coll;
 		break;
 
-	case ETHER_STAT_XCVR_INUSE:
-		*val = dmfep->phy_inuse;
-		break;
-
-	case ETHER_STAT_XCVR_ID:
-		*val = dmfep->phy_id;
-		break;
-
-	case ETHER_STAT_XCVR_ADDR:
-		*val = dmfep->phy_addr;
-		break;
-
-	case ETHER_STAT_LINK_DUPLEX:
-		*val = dmfep->op_stats_duplex;
-		break;
-
-	case ETHER_STAT_CAP_100T4:
-		*val = dmfep->param_bmsr_100T4;
-		break;
-
-	case ETHER_STAT_CAP_100FDX:
-		*val = dmfep->param_bmsr_100fdx;
-		break;
-
-	case ETHER_STAT_CAP_100HDX:
-		*val = dmfep->param_bmsr_100hdx;
-		break;
-
-	case ETHER_STAT_CAP_10FDX:
-		*val = dmfep->param_bmsr_10fdx;
-		break;
-
-	case ETHER_STAT_CAP_10HDX:
-		*val = dmfep->param_bmsr_10hdx;
-		break;
-
-	case ETHER_STAT_CAP_AUTONEG:
-		*val = dmfep->param_bmsr_autoneg;
-		break;
-
-	case ETHER_STAT_CAP_REMFAULT:
-		*val = dmfep->param_bmsr_remfault;
-		break;
-
-	case ETHER_STAT_ADV_CAP_AUTONEG:
-		*val = dmfep->param_autoneg;
-		break;
-
-	case ETHER_STAT_ADV_CAP_100T4:
-		*val = dmfep->param_anar_100T4;
-		break;
-
-	case ETHER_STAT_ADV_CAP_100FDX:
-		*val = dmfep->param_anar_100fdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_100HDX:
-		*val = dmfep->param_anar_100hdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_10FDX:
-		*val = dmfep->param_anar_10fdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_10HDX:
-		*val = dmfep->param_anar_10hdx;
-		break;
-
-	case ETHER_STAT_ADV_REMFAULT:
-		*val = dmfep->param_anar_remfault;
-		break;
-
-	case ETHER_STAT_LP_CAP_AUTONEG:
-		*val = dmfep->param_lp_autoneg;
-		break;
-
-	case ETHER_STAT_LP_CAP_100T4:
-		*val = dmfep->param_lp_100T4;
-		break;
-
-	case ETHER_STAT_LP_CAP_100FDX:
-		*val = dmfep->param_lp_100fdx;
-		break;
-
-	case ETHER_STAT_LP_CAP_100HDX:
-		*val = dmfep->param_lp_100hdx;
-		break;
-
-	case ETHER_STAT_LP_CAP_10FDX:
-		*val = dmfep->param_lp_10fdx;
-		break;
-
-	case ETHER_STAT_LP_CAP_10HDX:
-		*val = dmfep->param_lp_10hdx;
-		break;
-
-	case ETHER_STAT_LP_REMFAULT:
-		*val = dmfep->param_lp_remfault;
-		break;
-
 	default:
 		rv = ENOTSUP;
 	}
@@ -2316,233 +2056,149 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 	mutex_exit(dmfep->txlock);
 	mutex_exit(dmfep->rxlock);
 	mutex_exit(dmfep->oplock);
-	mutex_exit(dmfep->milock);
 
 	return (rv);
 }
-
-#undef	DMFE_DBG
-
 
 /*
  * ========== Ioctl handler & subfunctions ==========
  */
 
-#define	DMFE_DBG	DMFE_DBG_IOCTL	/* debug flag for this code	*/
-
-/*
- * Loopback operation
- *
- * Support access to the internal loopback and external loopback
- * functions selected via the Operation Mode Register (OPR).
- * These will be used by netlbtest (see BugId 4370609)
- *
- * Note that changing the loopback mode causes a stop/restart cycle
- *
- * It would be nice to evolve this to support the ioctls in sys/netlb.h,
- * but then it would be even better to use Brussels to configure this.
- */
-static enum ioc_reply
-dmfe_loop_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
-{
-	loopback_t *loop_req_p;
-	uint32_t loopmode;
-
-	if (mp->b_cont == NULL || MBLKL(mp->b_cont) < sizeof (loopback_t))
-		return (IOC_INVAL);
-
-	loop_req_p = (void *)mp->b_cont->b_rptr;
-
-	switch (cmd) {
-	default:
-		/*
-		 * This should never happen ...
-		 */
-		dmfe_error(dmfep, "dmfe_loop_ioctl: invalid cmd 0x%x", cmd);
-		return (IOC_INVAL);
-
-	case DMFE_GET_LOOP_MODE:
-		/*
-		 * This doesn't return the current loopback mode - it
-		 * returns a bitmask :-( of all possible loopback modes
-		 */
-		DMFE_DEBUG(("dmfe_loop_ioctl: GET_LOOP_MODE"));
-		loop_req_p->loopback = DMFE_LOOPBACK_MODES;
-		miocack(wq, mp, sizeof (loopback_t), 0);
-		return (IOC_DONE);
-
-	case DMFE_SET_LOOP_MODE:
-		/*
-		 * Select any of the various loopback modes
-		 */
-		DMFE_DEBUG(("dmfe_loop_ioctl: SET_LOOP_MODE %d",
-		    loop_req_p->loopback));
-		switch (loop_req_p->loopback) {
-		default:
-			return (IOC_INVAL);
-
-		case DMFE_LOOPBACK_OFF:
-			loopmode = LOOPBACK_OFF;
-			break;
-
-		case DMFE_PHY_A_LOOPBACK_ON:
-			loopmode = LOOPBACK_PHY_A;
-			break;
-
-		case DMFE_PHY_D_LOOPBACK_ON:
-			loopmode = LOOPBACK_PHY_D;
-			break;
-
-		case DMFE_INT_LOOPBACK_ON:
-			loopmode = LOOPBACK_INTERNAL;
-			break;
-		}
-
-		if ((dmfep->opmode & LOOPBACK_MODE_MASK) != loopmode) {
-			dmfep->opmode &= ~LOOPBACK_MODE_MASK;
-			dmfep->opmode |= loopmode;
-			return (IOC_RESTART_ACK);
-		}
-
-		return (IOC_ACK);
-	}
-}
+static lb_property_t dmfe_loopmodes[] = {
+	{ normal,	"normal",	0 },
+	{ internal,	"Internal",	1 },
+	{ external,	"External",	2 },
+};
 
 /*
  * Specific dmfe IOCTLs, the mac module handles the generic ones.
+ * Unfortunately, the DM9102 doesn't seem to work well with MII based
+ * loopback, so we have to do something special for it.
  */
+
 static void
 dmfe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 {
-	dmfe_t *dmfep = arg;
-	struct iocblk *iocp;
-	enum ioc_reply status;
-	int cmd;
+	dmfe_t		*dmfep = arg;
+	struct iocblk	*iocp;
+	int		rv = 0;
+	lb_info_sz_t	sz;
+	int		cmd;
+	uint32_t	mode;
 
-	/*
-	 * Validate the command before bothering with the mutexen ...
-	 */
 	iocp = (void *)mp->b_rptr;
 	cmd = iocp->ioc_cmd;
-	switch (cmd) {
-	default:
-		DMFE_DEBUG(("dmfe_m_ioctl: unknown cmd 0x%x", cmd));
+
+	if (mp->b_cont == NULL) {
+		/*
+		 * All of these ioctls need data!
+		 */
 		miocnak(wq, mp, 0, EINVAL);
 		return;
-
-	case DMFE_SET_LOOP_MODE:
-	case DMFE_GET_LOOP_MODE:
-	case ND_GET:
-	case ND_SET:
-		break;
 	}
-
-	mutex_enter(dmfep->milock);
-	mutex_enter(dmfep->oplock);
 
 	switch (cmd) {
-	default:
-		_NOTE(NOTREACHED)
-		status = IOC_INVAL;
-		break;
-
-	case DMFE_SET_LOOP_MODE:
-	case DMFE_GET_LOOP_MODE:
-		status = dmfe_loop_ioctl(dmfep, wq, mp, cmd);
-		break;
-
-	case ND_GET:
-	case ND_SET:
-		status = dmfe_nd_ioctl(dmfep, wq, mp, cmd);
-		break;
-	}
-
-	/*
-	 * Do we need to restart?
-	 */
-	switch (status) {
-	default:
-		break;
-
-	case IOC_RESTART_ACK:
-	case IOC_RESTART:
-		/*
-		 * PHY parameters changed; we need to stop, update the
-		 * PHY layer and restart before sending the reply or ACK
-		 */
-		dmfe_stop(dmfep);
-		dmfe_update_phy(dmfep);
-		dmfep->update_phy = B_FALSE;
-
-		/*
-		 * The link will now most likely go DOWN and UP, because
-		 * we've changed the loopback state or the link parameters
-		 * or autonegotiation.  So we have to check that it's
-		 * settled down before we restart the TX/RX processes.
-		 * The ioctl code will have planted some reason strings
-		 * to explain what's happening, so the link state change
-		 * messages won't be printed on the console . We wake the
-		 * factotum to deal with link notifications, if any ...
-		 */
-		if (dmfe_check_link(dmfep)) {
-			dmfe_recheck_link(dmfep, B_TRUE);
-			dmfe_wake_factotum(dmfep, KS_LINK_CHECK, "ioctl");
+	case LB_GET_INFO_SIZE:
+		if (iocp->ioc_count != sizeof (sz)) {
+			rv = EINVAL;
+		} else {
+			sz = sizeof (dmfe_loopmodes);
+			bcopy(&sz, mp->b_cont->b_rptr, sizeof (sz));
 		}
+		break;
 
-		if (dmfep->mac_state == DMFE_MAC_STARTED)
-			dmfe_start(dmfep);
+	case LB_GET_INFO:
+		if (iocp->ioc_count != sizeof (dmfe_loopmodes)) {
+			rv = EINVAL;
+		} else {
+			bcopy(dmfe_loopmodes, mp->b_cont->b_rptr,
+			    iocp->ioc_count);
+		}
+		break;
+
+	case LB_GET_MODE:
+		if (iocp->ioc_count != sizeof (mode)) {
+			rv = EINVAL;
+		} else {
+			mutex_enter(dmfep->oplock);
+			switch (dmfep->opmode & LOOPBACK_MODE_MASK) {
+			case LOOPBACK_OFF:
+				mode = 0;
+				break;
+			case LOOPBACK_INTERNAL:
+				mode = 1;
+				break;
+			default:
+				mode = 2;
+				break;
+			}
+			mutex_exit(dmfep->oplock);
+			bcopy(&mode, mp->b_cont->b_rptr, sizeof (mode));
+		}
+		break;
+
+	case LB_SET_MODE:
+		rv = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
+		if (rv != 0)
+			break;
+		if (iocp->ioc_count != sizeof (mode)) {
+			rv = EINVAL;
+			break;
+		}
+		bcopy(mp->b_cont->b_rptr, &mode, sizeof (mode));
+
+		mutex_enter(dmfep->oplock);
+		dmfep->opmode &= ~LOOPBACK_MODE_MASK;
+		switch (mode) {
+		case 2:
+			dmfep->opmode |= LOOPBACK_PHY_D;
+			break;
+		case 1:
+			dmfep->opmode |= LOOPBACK_INTERNAL;
+			break;
+		default:
+			break;
+		}
+		if (!dmfep->suspended) {
+			dmfe_restart(dmfep);
+		}
+		mutex_exit(dmfep->oplock);
+		break;
+
+	default:
+		rv = EINVAL;
 		break;
 	}
 
-	/*
-	 * The 'reasons-for-link-change', if any, don't apply any more
-	 */
-	mutex_exit(dmfep->oplock);
-	mutex_exit(dmfep->milock);
-
-	/*
-	 * Finally, decide how to reply
-	 */
-	switch (status) {
-	default:
-		/*
-		 * Error, reply with a NAK and EINVAL
-		 */
-		miocnak(wq, mp, 0, EINVAL);
-		break;
-
-	case IOC_RESTART_ACK:
-	case IOC_ACK:
-		/*
-		 * OK, reply with an ACK
-		 */
-		miocack(wq, mp, 0, 0);
-		break;
-
-	case IOC_RESTART:
-	case IOC_REPLY:
-		/*
-		 * OK, send prepared reply
-		 */
-		qreply(wq, mp);
-		break;
-
-	case IOC_DONE:
-		/*
-		 * OK, reply already sent
-		 */
-		break;
+	if (rv == 0) {
+		miocack(wq, mp, iocp->ioc_count, 0);
+	} else {
+		miocnak(wq, mp, 0, rv);
 	}
 }
 
-#undef	DMFE_DBG
+int
+dmfe_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
+    uint_t sz, void *val, uint_t *perm)
+{
+	dmfe_t		*dmfep = arg;
+
+	return (mii_m_getprop(dmfep->mii, name, num, flags, sz, val, perm));
+}
+
+int
+dmfe_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    const void *val)
+{
+	dmfe_t		*dmfep = arg;
+
+	return (mii_m_setprop(dmfep->mii, name, num, sz, val));
+}
 
 
 /*
  * ========== Per-instance setup/teardown code ==========
  */
-
-#define	DMFE_DBG	DMFE_DBG_INIT	/* debug flag for this code	*/
 
 /*
  * Determine local MAC address & broadcast address for this interface
@@ -2574,9 +2230,6 @@ dmfe_find_mac_address(dmfe_t *dmfep)
 		dmfe_read_eeprom(dmfep, EEPROM_EN_ADDR, dmfep->curr_addr,
 		    ETHERADDRL);
 	}
-
-	DMFE_DEBUG(("dmfe_setup_mac_address: factory %s",
-	    ether_sprintf((void *)dmfep->curr_addr)));
 }
 
 static int
@@ -2593,8 +2246,10 @@ dmfe_alloc_dma_mem(dmfe_t *dmfep, size_t memsize,
 	 */
 	err = ddi_dma_alloc_handle(dmfep->devinfo, &dma_attr,
 	    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
-	if (err != DDI_SUCCESS)
+	if (err != DDI_SUCCESS) {
+		dmfe_error(dmfep, "DMA handle allocation failed");
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Allocate memory
@@ -2603,8 +2258,10 @@ dmfe_alloc_dma_mem(dmfe_t *dmfep, size_t memsize,
 	    attr_p, dma_flags & (DDI_DMA_CONSISTENT | DDI_DMA_STREAMING),
 	    DDI_DMA_SLEEP, NULL,
 	    &dma_p->mem_va, &dma_p->alength, &dma_p->acc_hdl);
-	if (err != DDI_SUCCESS)
+	if (err != DDI_SUCCESS) {
+		dmfe_error(dmfep, "DMA memory allocation failed: %d", err);
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Bind the two together
@@ -2612,10 +2269,14 @@ dmfe_alloc_dma_mem(dmfe_t *dmfep, size_t memsize,
 	err = ddi_dma_addr_bind_handle(dma_p->dma_hdl, NULL,
 	    dma_p->mem_va, dma_p->alength, dma_flags,
 	    DDI_DMA_SLEEP, NULL, &dma_cookie, &ncookies);
-	if (err != DDI_DMA_MAPPED)
+	if (err != DDI_DMA_MAPPED) {
+		dmfe_error(dmfep, "DMA mapping failed: %d", err);
 		return (DDI_FAILURE);
-	if ((dma_p->ncookies = ncookies) != 1)
+	}
+	if ((dma_p->ncookies = ncookies) != 1) {
+		dmfe_error(dmfep, "Too many DMA cookeis: %d", ncookies);
 		return (DDI_FAILURE);
+	}
 
 	dma_p->mem_dvma = dma_cookie.dmac_address;
 	if (setup > 0) {
@@ -2645,8 +2306,10 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	err = dmfe_alloc_dma_mem(dmfep, memsize, SETUPBUF_SIZE, DMFE_SLOP,
 	    &dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &dmfep->tx_desc);
-	if (err != DDI_SUCCESS)
+	if (err != DDI_SUCCESS) {
+		dmfe_error(dmfep, "TX descriptor allocation failed");
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Allocate memory & handles for TX buffers
@@ -2655,8 +2318,10 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
 	    &dmfe_data_accattr, DDI_DMA_WRITE | DMFE_DMA_MODE,
 	    &dmfep->tx_buff);
-	if (err != DDI_SUCCESS)
+	if (err != DDI_SUCCESS) {
+		dmfe_error(dmfep, "TX buffer allocation failed");
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Allocate memory & handles for RX descriptor ring
@@ -2665,8 +2330,10 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, DMFE_SLOP,
 	    &dmfe_reg_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
 	    &dmfep->rx_desc);
-	if (err != DDI_SUCCESS)
+	if (err != DDI_SUCCESS) {
+		dmfe_error(dmfep, "RX descriptor allocation failed");
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Allocate memory & handles for RX buffers
@@ -2674,8 +2341,10 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	memsize = dmfep->rx.n_desc * DMFE_BUF_SIZE;
 	err = dmfe_alloc_dma_mem(dmfep, memsize, 0, 0,
 	    &dmfe_data_accattr, DDI_DMA_READ | DMFE_DMA_MODE, &dmfep->rx_buff);
-	if (err != DDI_SUCCESS)
+	if (err != DDI_SUCCESS) {
+		dmfe_error(dmfep, "RX buffer allocation failed");
 		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Allocate bitmasks for tx packet type tracking
@@ -2719,8 +2388,10 @@ dmfe_free_bufs(dmfe_t *dmfep)
 	dmfe_free_dma_mem(&dmfep->rx_desc);
 	dmfe_free_dma_mem(&dmfep->tx_buff);
 	dmfe_free_dma_mem(&dmfep->tx_desc);
-	kmem_free(dmfep->tx_mcast, dmfep->tx.n_desc / NBBY);
-	kmem_free(dmfep->tx_bcast, dmfep->tx.n_desc / NBBY);
+	if (dmfep->tx_mcast)
+		kmem_free(dmfep->tx_mcast, dmfep->tx.n_desc / NBBY);
+	if (dmfep->tx_bcast)
+		kmem_free(dmfep->tx_bcast, dmfep->tx.n_desc / NBBY);
 }
 
 static void
@@ -2738,18 +2409,19 @@ dmfe_unattach(dmfe_t *dmfep)
 		kstat_delete(dmfep->ksp_drv);
 	if (dmfep->progress & PROGRESS_HWINT) {
 		ddi_remove_intr(dmfep->devinfo, 0, dmfep->iblk);
+	}
+	if (dmfep->progress & PROGRESS_SOFTINT)
+		ddi_remove_softintr(dmfep->factotum_id);
+	if (dmfep->mii != NULL)
+		mii_free(dmfep->mii);
+	if (dmfep->progress & PROGRESS_MUTEX) {
 		mutex_destroy(dmfep->txlock);
 		mutex_destroy(dmfep->rxlock);
 		mutex_destroy(dmfep->oplock);
 	}
-	if (dmfep->progress & PROGRESS_SOFTINT)
-		ddi_remove_softintr(dmfep->factotum_id);
-	if (dmfep->progress & PROGRESS_BUFS)
-		dmfe_free_bufs(dmfep);
-	if (dmfep->progress & PROGRESS_REGS)
+	dmfe_free_bufs(dmfep);
+	if (dmfep->io_handle != NULL)
 		ddi_regs_map_free(&dmfep->io_handle);
-	if (dmfep->progress & PROGRESS_NDD)
-		dmfe_nd_cleanup(dmfep);
 
 	kmem_free(dmfep, sizeof (*dmfep));
 }
@@ -2794,23 +2466,11 @@ static const struct ks_index ks_drv_names[] = {
 	{	KS_INTERRUPT,			"intr"			},
 	{	KS_CYCLIC_RUN,			"cyclic_run"		},
 
-	{	KS_TICK_LINK_STATE,		"link_state_change"	},
-	{	KS_TICK_LINK_POLL,		"link_state_poll"	},
 	{	KS_TX_STALL,			"tx_stall_detect"	},
 	{	KS_CHIP_ERROR,			"chip_error_interrupt"	},
 
 	{	KS_FACTOTUM_RUN,		"factotum_run"		},
 	{	KS_RECOVERY,			"factotum_recover"	},
-	{	KS_LINK_CHECK,			"factotum_link_check"	},
-
-	{	KS_LINK_UP_CNT,			"link_up_cnt"		},
-	{	KS_LINK_DROP_CNT,		"link_drop_cnt"		},
-
-	{	KS_MIIREG_BMSR,			"mii_status"		},
-	{	KS_MIIREG_ANAR,			"mii_advert_cap"	},
-	{	KS_MIIREG_ANLPAR,		"mii_partner_cap"	},
-	{	KS_MIIREG_ANER,			"mii_expansion_cap"	},
-	{	KS_MIIREG_DSCSR,		"mii_dscsr"		},
 
 	{	-1,				NULL			}
 };
@@ -2846,6 +2506,7 @@ dmfe_resume(dev_info_t *devinfo)
 {
 	dmfe_t *dmfep;				/* Our private data	*/
 	chip_id_t chipid;
+	boolean_t restart = B_FALSE;
 
 	dmfep = ddi_get_driver_private(devinfo);
 	if (dmfep == NULL)
@@ -2869,13 +2530,24 @@ dmfe_resume(dev_info_t *devinfo)
 	if (chipid.revision != dmfep->chipid.revision)
 		return (DDI_FAILURE);
 
+	mutex_enter(dmfep->oplock);
+	mutex_enter(dmfep->txlock);
+	dmfep->suspended = B_FALSE;
+	mutex_exit(dmfep->txlock);
+
 	/*
 	 * All OK, reinitialise h/w & kick off MAC scheduling
 	 */
-	mutex_enter(dmfep->oplock);
-	dmfe_restart(dmfep);
+	if (dmfep->mac_state == DMFE_MAC_STARTED) {
+		dmfe_restart(dmfep);
+		restart = B_TRUE;
+	}
 	mutex_exit(dmfep->oplock);
-	mac_tx_update(dmfep->mh);
+
+	if (restart) {
+		mii_resume(dmfep->mii);
+		mac_tx_update(dmfep->mh);
+	}
 	return (DDI_SUCCESS);
 }
 
@@ -2938,16 +2610,6 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		dmfe_error(dmfep, "dmfe_config_init() failed");
 		goto attach_fail;
 	}
-	dmfep->progress |= PROGRESS_CONFIG;
-
-	/*
-	 * Register NDD-tweakable parameters
-	 */
-	if (dmfe_nd_init(dmfep)) {
-		dmfe_error(dmfep, "dmfe_nd_init() failed");
-		goto attach_fail;
-	}
-	dmfep->progress |= PROGRESS_NDD;
 
 	/*
 	 * Map operating registers
@@ -2958,7 +2620,6 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		dmfe_error(dmfep, "ddi_regs_map_setup() failed");
 		goto attach_fail;
 	}
-	dmfep->progress |= PROGRESS_REGS;
 
 	/*
 	 * Get our MAC address.
@@ -2972,15 +2633,12 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	dmfep->rx.n_desc = dmfe_rx_desc;
 	err = dmfe_alloc_bufs(dmfep);
 	if (err != DDI_SUCCESS) {
-		dmfe_error(dmfep, "DMA buffer allocation failed");
 		goto attach_fail;
 	}
-	dmfep->progress |= PROGRESS_BUFS;
 
 	/*
 	 * Add the softint handler
 	 */
-	dmfep->link_poll_tix = factotum_start_tix;
 	if (ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &dmfep->factotum_id,
 	    NULL, NULL, dmfe_factotum, (caddr_t)dmfep) != DDI_SUCCESS) {
 		dmfe_error(dmfep, "ddi_add_softintr() failed");
@@ -2991,15 +2649,22 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Add the h/w interrupt handler & initialise mutexen
 	 */
-	if (ddi_add_intr(devinfo, 0, &dmfep->iblk, NULL,
-	    dmfe_interrupt, (caddr_t)dmfep) != DDI_SUCCESS) {
-		dmfe_error(dmfep, "ddi_add_intr() failed");
+	if (ddi_get_iblock_cookie(devinfo, 0, &dmfep->iblk) != DDI_SUCCESS) {
+		dmfe_error(dmfep, "ddi_get_iblock_cookie() failed");
 		goto attach_fail;
 	}
+
 	mutex_init(dmfep->milock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(dmfep->oplock, NULL, MUTEX_DRIVER, dmfep->iblk);
 	mutex_init(dmfep->rxlock, NULL, MUTEX_DRIVER, dmfep->iblk);
 	mutex_init(dmfep->txlock, NULL, MUTEX_DRIVER, dmfep->iblk);
+	dmfep->progress |= PROGRESS_MUTEX;
+
+	if (ddi_add_intr(devinfo, 0, NULL, NULL,
+	    dmfe_interrupt, (caddr_t)dmfep) != DDI_SUCCESS) {
+		dmfe_error(dmfep, "ddi_add_intr() failed");
+		goto attach_fail;
+	}
 	dmfep->progress |= PROGRESS_HWINT;
 
 	/*
@@ -3030,10 +2695,8 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mutex_exit(dmfep->rxlock);
 	mutex_exit(dmfep->oplock);
 
-	dmfep->link_state = LINK_STATE_UNKNOWN;
 	if (dmfe_init_phy(dmfep) != B_TRUE)
 		goto attach_fail;
-	dmfep->update_phy = B_TRUE;
 
 	/*
 	 * Send a reasonable setup frame.  This configures our starting
@@ -3090,8 +2753,13 @@ dmfe_suspend(dmfe_t *dmfep)
 	/*
 	 * Just stop processing ...
 	 */
+	mii_suspend(dmfep->mii);
 	mutex_enter(dmfep->oplock);
 	dmfe_stop(dmfep);
+
+	mutex_enter(dmfep->txlock);
+	dmfep->suspended = B_TRUE;
+	mutex_exit(dmfep->txlock);
 	mutex_exit(dmfep->oplock);
 
 	return (DDI_SUCCESS);
@@ -3197,10 +2865,6 @@ _init(void)
 		}
 	}
 
-	factotum_tix = (dmfe_link_poll_us+dmfe_tick_us-1)/dmfe_tick_us;
-	factotum_fast_tix = 1+(factotum_tix/5);
-	factotum_start_tix = 1+(factotum_tix*2);
-
 	mac_init_ops(&dmfe_dev_ops, "dmfe");
 	status = mod_install(&modlinkage);
 	if (status == DDI_SUCCESS)
@@ -3222,5 +2886,3 @@ _fini(void)
 
 	return (status);
 }
-
-#undef	DMFE_DBG

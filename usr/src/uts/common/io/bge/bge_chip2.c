@@ -1185,7 +1185,7 @@ bge_mii_get16(bge_t *bgep, bge_regno_t regno)
 	ASSERT(mutex_owned(bgep->genlock));
 
 	if (DEVICE_5906_SERIES_CHIPSETS(bgep) && ((regno == MII_AUX_CONTROL) ||
-	    (regno == MII_1000BASE_T_CONTROL)))
+	    (regno == MII_MSCONTROL)))
 		return (0);
 
 	return (bge_mii_access(bgep, regno, 0, MI_COMMS_COMMAND_READ));
@@ -1203,7 +1203,7 @@ bge_mii_put16(bge_t *bgep, bge_regno_t regno, uint16_t data)
 	ASSERT(mutex_owned(bgep->genlock));
 
 	if (DEVICE_5906_SERIES_CHIPSETS(bgep) && ((regno == MII_AUX_CONTROL) ||
-	    (regno == MII_1000BASE_T_CONTROL)))
+	    (regno == MII_MSCONTROL)))
 		return;
 
 	(void) bge_mii_access(bgep, regno, data, MI_COMMS_COMMAND_WRITE);

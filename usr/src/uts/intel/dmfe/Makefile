@@ -18,12 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
 # uts/intel/dmfe/Makefile
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #	This makefile drives the production of the dmfe driver module.
 #
@@ -40,7 +38,6 @@ MODULE		= dmfe
 OBJECTS		= $(DMFE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DMFE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/dmfe
 
 #
 #	Include common rules.
@@ -50,9 +47,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 # lint pass one enforcement
@@ -62,7 +59,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # extra link arguments
 #
-LDFLAGS += -dy -N misc/mac -N drv/ip
+LDFLAGS += -dy -N misc/mac -N misc/mii
 
 #
 #	Default build targets.

@@ -721,7 +721,7 @@ vr_param_init(vr_t *vrp)
 	vrp->param.anadv_en |= MII_ABILITY_10BASE_T_FD;
 	vrp->param.anadv_en |= MII_ABILITY_10BASE_T;
 	/* Not a PHY ability, but advertised on behalf of MAC */
-	vrp->param.anadv_en |= MII_AN_ADVERT_FCS;
+	vrp->param.anadv_en |= MII_ABILITY_PAUSE;
 	vrp->param.mtu = ETHERMTU;
 
 	/*
@@ -2320,7 +2320,7 @@ vr_mac_getstat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_ADV_CAP_PAUSE:
-		v = (vrp->chip.mii.anadv & MII_AN_ADVERT_FCS) != 0;
+		v = (vrp->chip.mii.anadv & MII_ABILITY_PAUSE) != 0;
 		break;
 
 	case ETHER_STAT_ADV_REMFAULT:
@@ -2462,7 +2462,7 @@ vr_mac_getstat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_LP_CAP_PAUSE:
-		v = (vrp->chip.mii.lpable & MII_AN_ADVERT_FCS) != 0;
+		v = (vrp->chip.mii.lpable & MII_ABILITY_PAUSE) != 0;
 		break;
 
 	case ETHER_STAT_LP_REMFAULT:
@@ -2753,7 +2753,7 @@ vr_link_state(vr_t *vrp)
 		/*
 		 * Did we negotiate pause?
 		 */
-		if ((mask & MII_AN_ADVERT_FCS) != 0 &&
+		if ((mask & MII_ABILITY_PAUSE) != 0 &&
 		    vrp->chip.link.duplex == VR_LINK_DUPLEX_FULL)
 			vrp->chip.link.flowctrl = VR_PAUSE_BIDIRECTIONAL;
 		else
@@ -3507,9 +3507,9 @@ vr_mac_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 
 		case MAC_PROP_FLOWCTRL:
 			if (val == LINK_FLOWCTRL_NONE)
-				vrp->param.anadv_en &= ~MII_AN_ADVERT_FCS;
+				vrp->param.anadv_en &= ~MII_ABILITY_PAUSE;
 			else if (val == LINK_FLOWCTRL_BI)
-				vrp->param.anadv_en |= MII_AN_ADVERT_FCS;
+				vrp->param.anadv_en |= MII_ABILITY_PAUSE;
 			else
 				err = EINVAL;
 			break;

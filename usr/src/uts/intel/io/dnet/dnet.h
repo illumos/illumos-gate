@@ -19,18 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_DNET_H
-#define	_SYS_DNET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef _DNET_H
+#define	_DNET_H
 
 /* debug flags */
 #define	DNETTRACE		0x01
@@ -534,8 +528,4 @@ struct tx_desc_type {
 
 #pragma pack()
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif	/* _SYS_DNET_H */
+#endif	/* _DNET_H */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,9 +44,9 @@
 #include <sys/devops.h>
 #include <sys/modctl.h>
 #include <sys/cmn_err.h>
-#include <sys/mii.h>
-#include <sys/miipriv.h>
 #include <sys/miiregs.h>
+#include "dnet_mii.h"
+
 
 #ifdef DEBUG
 #define	MIIDEBUG
@@ -70,41 +70,6 @@ static int getspeed_ICS1890(mii_handle_t, int, int *, int *);
 static int getspeed_generic(mii_handle_t, int, int *, int *);
 static void postreset_ICS1890(mii_handle_t mac, int phy);
 static void postreset_NS83840(mii_handle_t mac, int phy);
-
-#ifdef MII_IS_MODULE
-/*
- * Loadable module structures/entrypoints
- */
-
-extern struct mod_ops mod_misc_ops;
-
-static struct modlmisc modlmisc = {
-	&mod_miscops,
-	"802.3u MII support",
-};
-
-static struct modlinkage modlinkage = {
-	MODREV_1, &modlmisc, NULL
-};
-
-int
-_init(void)
-{
-	return (mod_install(&modlinkage));
-}
-
-int
-_fini(void)
-{
-	return (mod_remove(&modlinkage));
-}
-
-int
-_info(struct modinfo *modinfop)
-{
-	return (mod_info(&modlinkage, modinfop));
-}
-#endif
 
 /*
  * MII Interface functions
@@ -159,7 +124,7 @@ mii_probe_phy(mii_handle_t mac, int phy)
 	mac->mii_read(dip, phy, MII_CONTROL);
 	if (miidebug & MIIPROBE)
 		cmn_err(CE_NOTE, "PHY Probe: Control=%x, Status=%x",
-			mac->mii_read(dip, phy, MII_CONTROL), status);
+		    mac->mii_read(dip, phy, MII_CONTROL), status);
 #endif
 	/*
 	 * At least one bit in status should be clear (one of the error
@@ -196,7 +161,7 @@ mii_init_phy(mii_handle_t mac, int phy)
 		return (MII_PHYPRESENT);
 
 	mac->phys[phy] = phydata = (struct phydata *)
-			    kmem_zalloc(sizeof (struct phydata), KM_NOSLEEP);
+	    kmem_zalloc(sizeof (struct phydata), KM_NOSLEEP);
 
 	if (!phydata)
 		return (MII_NOMEM);
@@ -243,14 +208,14 @@ mii_init_phy(mii_handle_t mac, int phy)
 	} else
 		phydata->control = MII_CONTROL_ANE;
 
-	switch (PHY_MANUFACTURER(phydata->id)) {
+	switch (MII_PHY_MFG(phydata->id)) {
 	case OUI_NATIONAL_SEMICONDUCTOR:
-		switch (PHY_MODEL(phydata->id)) {
+		switch (MII_PHY_MODEL(phydata->id)) {
 		case NS_DP83840:
 			phydata->phy_postreset = postreset_NS83840;
 			phydata->phy_dump = dump_NS83840;
 			phydata->description =
-				"National Semiconductor DP-83840";
+			    "National Semiconductor DP-83840";
 			phydata->phy_getspeed = getspeed_NS83840;
 			break;
 		default:
@@ -260,7 +225,7 @@ mii_init_phy(mii_handle_t mac, int phy)
 		break;
 
 	case OUI_INTEL:
-		switch (PHY_MODEL(phydata->id)) {
+		switch (MII_PHY_MODEL(phydata->id)) {
 		case INTEL_82553_CSTEP:
 			phydata->description = "Intel 82553 C-step";
 			phydata->phy_getspeed = getspeed_82553;
@@ -288,7 +253,7 @@ mii_init_phy(mii_handle_t mac, int phy)
 		break;
 
 	case OUI_ICS:
-		switch (PHY_MODEL(phydata->id)) {
+		switch (MII_PHY_MODEL(phydata->id)) {
 		case ICS_1890:
 		case ICS_1889:
 			phydata->phy_postreset = postreset_ICS1890;
@@ -334,7 +299,7 @@ mii_reset_phy(mii_handle_t mac, int phy, enum mii_wait_type wait)
 
 	/* Strobe the reset bit in the control register */
 	mac->mii_write(mac->mii_dip, phy, MII_CONTROL,
-			phyd->control | MII_CONTROL_RESET);
+	    phyd->control | MII_CONTROL_RESET);
 
 	phyd->state = phy_state_unknown;
 
@@ -443,7 +408,7 @@ mii_disable_fullduplex(mii_handle_t mac, int phy)
 	ushort_t expansion,  miiadvert;
 	/* dont advertise full duplex capabilites */
 	const int fullduplex = MII_ABILITY_10BASE_T_FD
-				| MII_ABILITY_100BASE_TX_FD;
+	    | MII_ABILITY_100BASE_TX_FD;
 
 	if (!(mac->mii_read(dip, phy, MII_STATUS) & MII_STATUS_CANAUTONEG)) {
 		/*
@@ -458,7 +423,7 @@ mii_disable_fullduplex(mii_handle_t mac, int phy)
 	miiadvert = mac->mii_read(dip, phy, MII_AN_ADVERT);
 	if (miiadvert & fullduplex)
 		mac->mii_write(dip, phy, MII_AN_ADVERT,
-				miiadvert & ~fullduplex);
+		    miiadvert & ~fullduplex);
 
 	/* See what other end is able to do.  */
 
@@ -552,8 +517,8 @@ mii_fixspeed(mii_handle_t mac, int phy, int speed, int fullduplex)
 
 #ifdef MIIDEBUG
 	cmn_err(CE_CONT, "!%s: setting speed to %d, %s duplex",
-			ddi_get_name(mac->mii_dip), speed,
-			fullduplex ? "full" : "half");
+	    ddi_get_name(mac->mii_dip), speed,
+	    fullduplex ? "full" : "half");
 #endif
 
 	if (!(phyd = mii_get_valid_phydata(mac, phy)))
@@ -566,7 +531,7 @@ mii_fixspeed(mii_handle_t mac, int phy, int speed, int fullduplex)
 		phyd->control &= ~MII_CONTROL_100MB;
 	else
 		cmn_err(CE_NOTE, "%s: mii does not support %d Mb/s speed",
-			ddi_get_name(mac->mii_dip), speed);
+		    ddi_get_name(mac->mii_dip), speed);
 
 	if (fullduplex)
 		phyd->control |= MII_CONTROL_FDUPLEX;
@@ -750,14 +715,14 @@ mii_portmon(mii_handle_t mac)
 	for (i = 0; i < 32; i++) {
 		if ((phydata = mac->phys[i]) != 0) {
 			state = mii_linkup(mac, i) ?
-				phy_state_linkup : phy_state_linkdown;
+			    phy_state_linkup : phy_state_linkdown;
 			if (state != phydata->state) {
 #ifdef MIIDEBUG
 				if (miidebug)
 					cmn_err(CE_NOTE, "%s: PHY %d link %s",
 					    ddi_get_name(mac->mii_dip), i,
 					    state == phy_state_linkup ?
-						"up" : "down");
+					    "up" : "down");
 #endif
 				phydata->state = state;
 				mac->mii_linknotify(mac->mii_dip, i, state);
@@ -766,7 +731,7 @@ mii_portmon(mii_handle_t mac)
 	}
 	/* Check the ports every 5 seconds */
 	mac->portmon_timer = timeout((void (*)(void*))mii_portmon, (void *)mac,
-				    (clock_t)(5 * drv_usectohz(1000000)));
+	    (clock_t)(5 * drv_usectohz(1000000)));
 	if (mac->lock)
 		mutex_exit(mac->lock);
 }
@@ -817,31 +782,31 @@ dump_NS83840(mii_handle_t mac, int phy)
 
 	dip = mac->mii_dip;
 	cmn_err(CE_NOTE, "Disconnect count: %x",
-				mac->mii_read(dip, phy, 0x12));
+	    mac->mii_read(dip, phy, 0x12));
 	cmn_err(CE_NOTE, "False Carrier detect count: %x",
-				mac->mii_read(dip, phy, 0x13));
+	    mac->mii_read(dip, phy, 0x13));
 	cmn_err(CE_NOTE, "Receive error count: %x",
-				mac->mii_read(dip, phy, 0x15));
+	    mac->mii_read(dip, phy, 0x15));
 	cmn_err(CE_NOTE, "Silicon revision: %x",
-				mac->mii_read(dip, phy, 0x16));
+	    mac->mii_read(dip, phy, 0x16));
 	cmn_err(CE_NOTE, "PCS Configuration : %x",
-				mac->mii_read(dip, phy, 0x17));
+	    mac->mii_read(dip, phy, 0x17));
 
 	cmn_err(CE_NOTE, "Loopback, Bypass and Receiver error mask: %x",
-				mac->mii_read(dip, phy, 0x18));
+	    mac->mii_read(dip, phy, 0x18));
 	cmn_err(CE_NOTE, "Wired phy address: %x",
-				mac->mii_read(dip, phy, 0x19)&0xf);
+	    mac->mii_read(dip, phy, 0x19)&0xf);
 
 	reg = mac->mii_read(dip, phy, 0x1b);
 	cmn_err(CE_NOTE, "10 Base T in %s mode",
-				BIT(9, reg) ? "serial":"nibble");
+	    BIT(9, reg) ? "serial":"nibble");
 
 	cmn_err(CE_NOTE, "%slink pulses, %sheartbeat, %s,%s squelch,jabber %s",
-				BIT(reg, 5) ? "" : "no ",
-				BIT(reg, 4) ? "" : "no ",
-				BIT(reg, 3) ? "UTP" : "STP",
-				BIT(reg, 2) ? "low" : "normal",
-				BIT(reg, 0) ? "enabled" : "disabled");
+	    BIT(reg, 5) ? "" : "no ",
+	    BIT(reg, 4) ? "" : "no ",
+	    BIT(reg, 3) ? "UTP" : "STP",
+	    BIT(reg, 2) ? "low" : "normal",
+	    BIT(reg, 0) ? "enabled" : "disabled");
 }
 
 static int
@@ -915,9 +880,9 @@ dump_ICS1890(mii_handle_t mac, int phy)
 {
 	ushort_t quickpoll = mac->mii_read(mac->mii_dip, phy, ICS_QUICKPOLL);
 	cmn_err(CE_NOTE, "QuickPoll:%x (Speed:%d FullDuplex:%c) ",
-				quickpoll,
-				quickpoll & ICS_QUICKPOLL_100MB ? 100:10,
-				quickpoll & ICS_QUICKPOLL_FDUPLEX ? 'Y' : 'N');
+	    quickpoll,
+	    quickpoll & ICS_QUICKPOLL_100MB ? 100:10,
+	    quickpoll & ICS_QUICKPOLL_FDUPLEX ? 'Y' : 'N');
 }
 
 static void

@@ -18,31 +18,35 @@
 #
 # CDDL HEADER END
 #
-# uts/sparc/dmfe/Makefile
+#
+# uts/intel/mii/Makefile
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the dmfe driver module.
+#	This makefile drives the production of the mii support module.
 #
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
+UTSBASE = ../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= dmfe
-OBJECTS		= $(DMFE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(DMFE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+MODULE		= mii
+OBJECTS		= $(MII_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(MII_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT	= $(MII_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+WLCMD_DIR	= $(UTSBASE)/common/io/warlock
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sparc/Makefile.sparc
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #	Define targets
@@ -51,15 +55,7 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
-
-#
-# extra link arguments
-#
-LDFLAGS += -dy -N misc/mac -N misc/mii
+LDFLAGS		+= -dy
 
 #
 #	Default build targets.
@@ -71,8 +67,10 @@ def:		$(DEF_DEPS)
 all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 clobber:	$(CLOBBER_DEPS)
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -85,4 +83,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sparc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ

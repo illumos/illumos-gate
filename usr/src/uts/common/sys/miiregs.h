@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,10 +27,8 @@
  * Definitions for MII registers from 802.3u and vendor documentation
  */
 
-#ifndef _MIIREGS_H
-#define	_MIIREGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _SYS_MIIREGS_H
+#define	_SYS_MIIREGS_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,10 +43,13 @@ extern "C" {
 #define	MII_AN_LPABLE		5	/* Auto neg. Link Partner Ability  */
 #define	MII_AN_EXPANSION	6	/* Auto neg. Expansion.		   */
 #define	MII_AN_NXTPGXMIT	7	/* Auto neg. Next Page Transmit	   */
-#define	MII_RESERVED		8	/* Reserved up to 16		   */
+#define	MII_AN_NXTPGLP		8	/* Link Part. Augo neg. Next Page  */
+#define	MII_MSCONTROL		9	/* 100Base-T2 and 1000 BaseT Ctrl. */
+#define	MII_MSSTATUS		10	/* 100Base-T2 and 1000 BaseT Stat. */
+#define	MII_EXTSTATUS		15	/* Extended status registers	   */
 #define	MII_VENDOR(x)		(16+(x)) /* Vendor specific		   */
 
-/* Control register: 22.2.4.1 */
+/* Control register: 22.2.4.1, 28.2.4.1.1 */
 #define	MII_CONTROL_RESET	(1<<15)
 #define	MII_CONTROL_LOOPBACK	(1<<14)
 #define	MII_CONTROL_100MB	(1<<13)
@@ -58,15 +59,19 @@ extern "C" {
 #define	MII_CONTROL_RSAN	(1<<9)
 #define	MII_CONTROL_FDUPLEX	(1<<8)
 #define	MII_CONTROL_COLTST	(1<<7)
-#define	MII_CONTROL_RESERVED	0x7f
+#define	MII_CONTROL_1GB		(1<<6)
+#define	MII_CONTROL_UNIDIR	(1<<5)
 
-/* Status register: 22.2.4.2 */
+/* Status register: 22.2.4.2, 28.2.4.1.2 */
 #define	MII_STATUS_100_BASE_T4	(1<<15)
 #define	MII_STATUS_100_BASEX_FD	(1<<14)
 #define	MII_STATUS_100_BASEX	(1<<13)
 #define	MII_STATUS_10_FD	(1<<12)
 #define	MII_STATUS_10		(1<<11)
-#define	MII_STATUS_RESERVED	(0xf<<7)
+#define	MII_STATUS_100T2_FD	(1<<10)
+#define	MII_STATUS_100T2	(1<<9)
+#define	MII_STATUS_EXTSTAT	(1<<8)
+#define	MII_STATUS_UNIDIR	(1<<7)
 #define	MII_STATUS_MFPRMBLSUPR	(1<<6)
 #define	MII_STATUS_ANDONE	(1<<5)
 #define	MII_STATUS_REMFAULT	(1<<4)
@@ -76,14 +81,13 @@ extern "C" {
 #define	MII_STATUS_EXTENDED	(1<<0)
 
 /* Advertisement/Partner ability registers: 28.2.4.1.3/4 */
-
 #define	MII_AN_ADVERT_NP	(1<<15)
 #define	MII_AN_ADVERT_ACK	(1<<14)
 #define	MII_AN_ADVERT_REMFAULT	(1<<13)
-#define	MII_AN_ADVERT_RESERVED	(3<<11)
-#define	MII_AN_ADVERT_FCS	(1<<10)
-#define	MII_AN_ADVERT_TECHABLE	(0xff<<5)
+#define	MII_AN_ADVERT_EXTNP	(1<<12)
+#define	MII_AN_ADVERT_TECHABLE	(0x7f<<5)
 #define	MII_AN_ADVERT_SELECTOR	(0x1f)
+#define	MII_AN_SELECTOR_8023	0x0001
 
 /* Technology field bits (above). From Annex 28B */
 #define	MII_ABILITY_10BASE_T	(1<<5)
@@ -91,6 +95,16 @@ extern "C" {
 #define	MII_ABILITY_100BASE_TX	(1<<7)
 #define	MII_ABILITY_100BASE_TX_FD (1<<8)
 #define	MII_ABILITY_100BASE_T4	(1<<9)
+#define	MII_ABILITY_PAUSE	(1<<10)
+#define	MII_ABILITY_ASMPAUSE	(1<<11)
+/* Override fields for 1000 Base-X: 37.2.5.1.3 */
+#define	MII_ABILITY_X_FD	(1<<5)
+#define	MII_ABILITY_X_HD	(1<<6)
+#define	MII_ABILITY_X_PAUSE	(1<<7)
+#define	MII_ABILITY_X_ASMPAUSE	(1<<8)
+/* Override fields for 100 Base T2: 32.5.4.2 */
+#define	MII_ABILITY_T2_FD	(1<<11)
+#define	MII_ABILITY_T2_HD	(1<<10)
 
 /* Expansion register 28.2.4.1.5 */
 #define	MII_AN_EXP_PARFAULT	(1<<4)	/* fault detected		  */
@@ -99,123 +113,99 @@ extern "C" {
 #define	MII_AN_EXP_PAGERCVD	(1<<1)	/* A new page has been recvd.	  */
 #define	MII_AN_EXP_LPCANAN	(1<<0)	/* LP can auto-negotiate	  */
 
+/* Master/Slave control: 40.5.1.1 */
+#define	MII_MSCONTROL_TEST_MASK	(3<<13)
+#define	MII_MSCONTROL_MANUAL	(1<<12)	/* manual master/slave control */
+#define	MII_MSCONTROL_MASTER	(1<<11)
+#define	MII_MSCONTROL_MULTIPORT	(1<<10)	/* DCE, default 0 for NICs */
+#define	MII_MSCONTROL_1000T_FD	(1<<9)
+#define	MII_MSCONTROL_1000T	(1<<8)
+
+/* Master/Slave status: 40.5.1.1 */
+#define	MII_MSSTATUS_FAULT	(1<<15)	/* Master/slave config fault */
+#define	MII_MSSTATUS_MASTER	(1<<14)	/* Master/slave config result */
+#define	MII_MSSTATUS_RXSTAT	(1<<13)
+#define	MII_MSSTATUS_REMRXSTAT	(1<<12)
+#define	MII_MSSTATUS_LP1000T_FD	(1<<11)
+#define	MII_MSSTATUS_LP1000T	(1<<10)
+#define	MII_MSSTATUS_IDLE_ERR	(0xff)
+
+/* Extended status: 22.2.4.4 */
+#define	MII_EXTSTATUS_1000X_FD	(1<<15)
+#define	MII_EXTSTATUS_1000X	(1<<14)
+#define	MII_EXTSTATUS_1000T_FD	(1<<13)
+#define	MII_EXTSTATUS_1000T	(1<<12)
+
 /*
  * Truncated OUIs as found in the PHY Identifier ( 22.2.4.3.1 ),
  * and known models (and their registers) from those manufacturers
  */
 
-#define	PHY_MANUFACTURER(x)	(((x) >> 10) & 0x3fffff) /* 22 bits, 10-31 */
-#define	PHY_MODEL(x)		(((x) >> 4) & 0x3f)	 /* 6 bits,4-9	   */
-#define	PHY_REVISION(x)		((x) & 0xf)		 /* 4 bits, 0-3	   */
+#define	MII_PHY_MFG(x)		(((x) >> 10) & 0x3fffff) /* 22 bits, 10-31 */
+#define	MII_PHY_MODEL(x)	(((x) >> 4) & 0x3f)	 /* 6 bits,4-9	   */
+#define	MII_PHY_REV(x)		((x) & 0xf)		 /* 4 bits, 0-3	   */
 
-#define	OUI_NATIONAL_SEMICONDUCTOR 0x80017
-#define	NS_DP83840		0x00
-#define	MII_83840_ADDR		25
-#define	NS83840_ADDR_SPEED10	(1<<6)
-#define	NS83840_ADDR_CONSTAT	(1<<5)
-#define	NS83840_ADDR_ADDR	(0x1f<<0)
+/*
+ * PHY manufacturer OUIs
+ */
+#define	MII_OUI_AMD			0x00001a
+#define	MII_OUI_AMD_2			0x000058
+#define	MII_OUI_BROADCOM		0x001018
+#define	MII_OUI_BROADCOM_2		0x000818
+#define	MII_OUI_CICADA			0x0003f1
+#define	MII_OUI_CICADA_2		0x00c08f
+#define	MII_OUI_DAVICOM			0x00606e
+#define	MII_OUI_DAVICOM_2		0x000676
+#define	MII_OUI_ICS			0x00057d
+#define	MII_OUI_ICPLUS			0x0090c3
+#define	MII_OUI_INTEL			0x00aa00
+#define	MII_OUI_INTEL_2			0x001f00
+#define	MII_OUI_MARVELL			0x005043
+#define	MII_OUI_NATIONAL_SEMI		0x008017
+#define	MII_OUI_NATIONAL_SEMI_2		0x1000e8
+#define	MII_OUI_QUALITY_SEMI		0x006051
+#define	MII_OUI_QUALITY_SEMI_2		0x00608a
 
-#define	OUI_INTEL		0x0aa00
-#define	INTEL_82553_CSTEP	0x35	/* A and B steps are non-standard */
-#define	MII_82553_EX0		16
-#define	I82553_EX0_FDUPLEX	(1<<0)
-#define	I82553_EX0_100MB	(1<<1)
-#define	I82553_EX0_WAKE		(1<<2)
-#define	I82553_EX0_SQUELCH	(3<<3) /* 3:4 */
-#define	I82553_EX0_REVCNTR	(7<<5) /* 5:7 */
-#define	I82553_EX0_FRCFAIL	(1<<8)
-#define	I82553_EX0_TEST		(0x1f<<9) /* 13:9 */
-#define	I82553_EX0_LINKDIS	(1<<14)
-#define	I82553_EX0_JABDIS	(1<<15)
+/*
+ * PHY models
+ */
 
-#define	MII_82553_EX1
-#define	I82553_EX1_RESERVE	(0x1ff<<0) /* 0:8 */
-#define	I82553_EX1_CH2EOF	(1<<9)
-#define	I82553_EX1_MNCHSTR	(1<<10)
-#define	I82553_EX1_EOP		(1<<11)
-#define	I82553_EX1_BADCODE	(1<<12)
-#define	I82553_EX1_INVALCODE	(1<<13)
-#define	I82553_EX1_DCBALANCE	(1<<14)
-#define	I82553_EX1_PAIRSKEW	(1<<15)
+#define	MII_MODEL_AMD_AM79C901			0x37
+#define	MII_MODEL_AMD_AM79C972			0x01
+#define	MII_MODEL_AMD_AM79C973			0x36
 
-#define	INTEL_82555		0x15
-#define	INTEL_82562_EH		0x33
-#define	INTEL_82562_ET		0x32
-#define	INTEL_82562_EM		0x31
+#define	MII_MODEL_CICADA_CS8201			0x01
+#define	MII_MODEL_CICADA_CS8201A		0x20
+#define	MII_MODEL_CICADA_CS8201B		0x21
 
-#define	OUI_ICS			0x57d
-#define	ICS_1890		2
-#define	ICS_1889		1
-#define	ICS_EXCTRL		16
-#define	ICS_EXCTRL_CMDOVRD	(1<<15)
-#define	ICS_EXCTRL_PHYADDR	(0x1f<<6)
-#define	ICS_EXCTRL_SCSTEST	(1<<5)
-#define	ICS_EXCTRL_INVECTEST	(1<<2)
-#define	ICS_EXCTRL_SCDISABLE	(1<<0)
+#define	MII_MODEL_DAVICOM_DM9101		0x00
+#define	MII_MODEL_DAVICOM_DM9102		0x04
+#define	MII_MODEL_DAVICOM_DM9161		0x08
 
-#define	ICS_QUICKPOLL		17
-#define	ICS_QUICKPOLL_100MB	(1<<15)
-#define	ICS_QUICKPOLL_FDUPLEX	(1<<14)
-#define	ICS_QUICKPOLL_ANPROG	(7<<11)
-#define	ICS_QUICKPOLL_RSE	(1<<10)
-#define	ICS_QUICKPOLL_PLLLOCK	(1<<9)
-#define	ICS_QUICKPOLL_FALSECD	(1<<8)
-#define	ICS_QUICKPOLL_SYMINVAL	(1<<7)
-#define	ICS_QUICKPOLL_SYMHALT	(1<<6)
-#define	ICS_QUICKPOLL_PREMEND	(1<<5)
-#define	ICS_QUICKPOLL_ANDONE	(1<<4)
-#define	ICS_QUICKPOLL_RESERVED	(1<<3)
-#define	ICS_QUICKPOLL_JABBER	(1<<2)
-#define	ICS_QUICKPOLL_REMFAULT	(1<<1)
-#define	ICS_QUICKPOLL_LINKSTAT	(1<<0)
+#define	MII_MODEL_ICPLUS_IP101			0x05
 
-#define	ICS_10BASET		18
-#define	ICS_10BASET_REMJABBER	(1<<15)
-#define	ICS_10BASET_REVPOLARITY (1<<14)
-#define	ICS_10BASET_RESERVED	(0xff<<6)
-#define	ICS_10BASET_NOJABBER	(1<<5)
-#define	ICS_10BASET_NORMLOOP	(1<<4)
-#define	ICS_10BASET_NOAUTOPOLL	(1<<3)
-#define	ICS_10BASET_NOSQE	(1<<2)
-#define	ICS_10BASET_NOLINKLOSS	(1<<1)
-#define	ICS_10BASET_NOSQUELCH	(1<<0)
+#define	MII_MODEL_ICS_ICS1889			0x01
+#define	MII_MODEL_ICS_ICS1890			0x02
+#define	MII_MODEL_ICS_ICS1892			0x03
+#define	MII_MODEL_ICS_ICS1893			0x04
 
-#define	ICS_EXCTRL2		19
-#define	ICS_EXCTRL2_ISREPEATER	(1<<15)
-#define	ICS_EXCTRL2_SOFTPRI	(1<<14)
-#define	ICS_EXCTRL2_LPCANREMF	(1<<13)
-#define	ICS_EXCTRL2_RMFSXMITED	(1<<10)
-#define	ICS_EXCTRL2_ANPWRREMF	(1<<4)
-#define	ICS_EXCTRL2_10BASETQUAL (1<<2)
-#define	ICS_EXCTRL2_AUTOPWRDN	(1<<0)
+#define	MII_MODEL_INTEL_82553_CSTEP		0x35
+#define	MII_MODEL_INTEL_82555			0x15
+#define	MII_MODEL_INTEL_82562_EH		0x33
+#define	MII_MODEL_INTEL_82562_EM		0x31
+#define	MII_MODEL_INTEL_82562_ET		0x32
 
-#define	OUI_DAVICOM		0x0606e
+#define	MII_MODEL_NATIONAL_SEMI_DP83840		0x00
+#define	MII_MODEL_NATIONAL_SEMI_DP83843		0x01
+#define	MII_MODEL_NATIONAL_SEMI_DP83815		0x02
+#define	MII_MODEL_NATIONAL_SEMI_DP83847		0x03
+#define	MII_MODEL_NATIONAL_SEMI_DP83891		0x05
+#define	MII_MODEL_NATIONAL_SEMI_DP83861		0x06
 
-#define	DM_SCR			16
-#define	DM_SCR_F_TX		(1<<10)
-#define	DM_SCR_UTP		(1<<9)
-#define	DM_SCR_F_LINK_100	(1<<7)
-#define	DM_SCR_LED_CTL		(1<<5)
-#define	DM_SCR_SMRST		(1<<3)
-#define	DM_SCR_MFPSC		(1<<2)
-#define	DM_SCR_SLEEP		(1<<1)
-#define	DM_SCR_RLOUT		(1<<0)
-
-#define	DM_SCSR			17
-#define	DM_SCSR_100FDX		(1<<15)
-#define	DM_SCSR_100HDX		(1<<14)
-#define	DM_SCSR_10FDX		(1<<13)
-#define	DM_SCSR_10HDX		(1<<12)
-#define	DM_SCSR_PHYAD		(0x1f<<4)
-#define	DM_SCSR_ANMB		(0x0f)
-
-#define	DM_10BT			18
-#define	DM_10BT_LB_EN		(1<<14)
-#define	DM_10BT_HBE		(1<<13)
-#define	DM_10BT_JABEN		(1<<11)
+#define	MII_MODEL_QUALITY_SEMI_QS6612		0x00
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _MIIREGS_H */
+#endif /* _SYS_MIIREGS_H */

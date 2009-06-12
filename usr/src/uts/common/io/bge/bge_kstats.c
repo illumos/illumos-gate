@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "bge_impl.h"
 
@@ -487,10 +485,10 @@ static const bge_ksindex_t bge_phydata[] = {
 	{ MII_AN_ADVERT,		"an_advert"		},
 	{ MII_AN_LPABLE,		"an_lp_ability"		},
 	{ MII_AN_EXPANSION,		"an_expansion"		},
-	{ MII_AN_LPNXTPG,		"an_lp_nextpage"	},
-	{ MII_1000BASE_T_CONTROL,	"gbit_control"		},
-	{ MII_1000BASE_T_STATUS,	"gbit_status"		},
-	{ MII_IEEE_EXT_STATUS,		"ieee_ext_status"	},
+	{ MII_AN_NXTPGLP,		"an_lp_nextpage"	},
+	{ MII_MSCONTROL,		"gbit_control"		},
+	{ MII_MSSTATUS,			"gbit_status"		},
+	{ MII_EXTSTATUS,		"ieee_ext_status"	},
 	{ MII_EXT_CONTROL,		"phy_ext_control"	},
 	{ MII_EXT_STATUS,		"phy_ext_status"	},
 	{ MII_RCV_ERR_COUNT,		"receive_error_count"	},

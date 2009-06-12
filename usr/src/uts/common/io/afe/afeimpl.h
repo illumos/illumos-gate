@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,7 @@
 #define	AFE_TXRING	128	/* number of xmt buffers */
 #define	AFE_TXRECLAIM	8	/* when to reclaim tx buffers (txavail) */
 #define	AFE_TXRESCHED	120	/* when to resched (txavail) */
-#define	AFE_LINKTIMER	5000	/* how often we check link state (in msec) */
+#define	AFE_WDOGTIMER	5000	/* how often we check for tx hang (in msec) */
 #define	AFE_HEADROOM	34	/* headroom in packet (should be 2 modulo 4) */
 
 /*
@@ -83,6 +83,7 @@ struct afe_card {
 struct afe {
 	dev_info_t		*afe_dip;
 	mac_handle_t		afe_mh;
+	mii_handle_t		afe_mii;
 	afe_card_t		*afe_cardp;
 	uint16_t		afe_cachesize;
 	uint8_t			afe_sromwidth;
@@ -122,34 +123,11 @@ struct afe {
 	boolean_t		afe_wantw;
 
 	/*
-	 * Link state.
-	 */
-	uint64_t		afe_lastifspeed;
-	link_state_t		afe_linkup;
-	link_duplex_t		afe_lastduplex;
-	link_duplex_t		afe_duplex;
-	uint64_t		afe_ifspeed;
-	boolean_t		afe_resetting;	/* no link warning */
-
-	/*
 	 * Transceiver stuff.
 	 */
 	int			afe_phyaddr;
 	int			afe_phyid;
 	int			afe_phyinuse;
-
-	uint8_t			afe_adv_aneg;
-	uint8_t			afe_adv_100T4;
-	uint8_t			afe_adv_100fdx;
-	uint8_t			afe_adv_100hdx;
-	uint8_t			afe_adv_10fdx;
-	uint8_t			afe_adv_10hdx;
-	uint8_t			afe_cap_aneg;
-	uint8_t			afe_cap_100T4;
-	uint8_t			afe_cap_100fdx;
-	uint8_t			afe_cap_100hdx;
-	uint8_t			afe_cap_10fdx;
-	uint8_t			afe_cap_10hdx;
 
 	int			afe_forcefiber;
 
@@ -337,27 +315,6 @@ struct afe_desc {
 
 #define	SYNCRXBUF(rxb, len, who)	\
 	(void) ddi_dma_sync(rxb->rxb_dmah, 0, len, who)
-
-/*
- * Debugging flags.
- */
-#define	DWARN	0x0001
-#define	DINTR	0x0002
-#define	DMACID	0x0008
-#define	DPHY	0x0020
-#define	DPCI	0x0040
-#define	DCHATTY	0x0080
-#define	DDMA	0x0100
-#define	DLINK	0x0200
-#define	DSROM	0x0400
-#define	DRECV	0x0800
-#define	DXMIT	0x1000
-
-#ifdef	DEBUG
-#define	DBG(lvl, ...)	afe_dprintf(afep, __func__, lvl, __VA_ARGS__)
-#else
-#define	DBG(lvl, ...)
-#endif
 
 #endif	/* _KERNEL */
 

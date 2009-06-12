@@ -19,16 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DMFE_IMPL_H
 #define	_SYS_DMFE_IMPL_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -43,17 +39,13 @@ extern "C" {
 #include <sys/debug.h>
 #include <sys/conf.h>
 
-#include <inet/common.h>
-#include <inet/nd.h>
-#include <inet/mi.h>
-
 #include <sys/vlan.h>
 
 #include <sys/dditypes.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#include <sys/miiregs.h>
+#include <sys/mii.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include "dmfe.h"
@@ -104,87 +96,21 @@ typedef struct {
 } dma_area_t;
 
 /*
- * Named Data (ND) Parameter Management Structure
- */
-typedef struct {
-	uint32_t		ndp_info;
-	uint32_t		ndp_min;
-	uint32_t		ndp_max;
-	uint32_t		ndp_val;
-	char			*ndp_name;
-	struct dmfe		*ndp_dmfe;
-} nd_param_t;
-
-/*
- * NDD parameter indexes, divided into:
- *
- *	read-only parameters describing the link state
- *	read-write parameters controlling the advertised link capabilities
- *	read-only parameters describing the device link capabilities
- *	read-only parameters describing the link-partner's link capabilities
- */
-enum {
-	PARAM_LINK_STATUS,
-	PARAM_LINK_SPEED,
-	PARAM_LINK_MODE,
-
-	PARAM_ADV_AUTONEG_CAP,
-	PARAM_ADV_100T4_CAP,
-	PARAM_ADV_100FDX_CAP,
-	PARAM_ADV_100HDX_CAP,
-	PARAM_ADV_10FDX_CAP,
-	PARAM_ADV_10HDX_CAP,
-	PARAM_ADV_REMFAULT,
-
-	PARAM_BMSR_AUTONEG_CAP,
-	PARAM_BMSR_100T4_CAP,
-	PARAM_BMSR_100FDX_CAP,
-	PARAM_BMSR_100HDX_CAP,
-	PARAM_BMSR_10FDX_CAP,
-	PARAM_BMSR_10HDX_CAP,
-	PARAM_BMSR_REMFAULT,
-
-	PARAM_LP_AUTONEG_CAP,
-	PARAM_LP_100T4_CAP,
-	PARAM_LP_100FDX_CAP,
-	PARAM_LP_100HDX_CAP,
-	PARAM_LP_10FDX_CAP,
-	PARAM_LP_10HDX_CAP,
-	PARAM_LP_REMFAULT,
-
-	PARAM_COUNT
-};
-
-/*
  * Indexes into the driver-specific kstats, divided into:
  *
  *	cyclic activity
  *	reasons for waking the factotum
  *	the factotum's activities
- *      link state updates
- *      MII-level register values
  */
 enum {
 	KS_CYCLIC_RUN,
 
-	KS_TICK_LINK_STATE,
-	KS_TICK_LINK_POLL,
 	KS_INTERRUPT,
 	KS_TX_STALL,
 	KS_CHIP_ERROR,
 
 	KS_FACTOTUM_RUN,
 	KS_RECOVERY,
-	KS_LINK_CHECK,
-
-	KS_LINK_UP_CNT,
-	KS_LINK_DROP_CNT,
-
-	KS_MIIREG_BMSR,
-	KS_MIIREG_ANAR,
-	KS_MIIREG_ANLPAR,
-	KS_MIIREG_ANER,
-	KS_MIIREG_DSCSR,
 
 	KS_DRV_COUNT
 };
@@ -233,8 +159,10 @@ typedef struct dmfe {
 	 */
 	dev_info_t		*devinfo;	/* device instance	*/
 	mac_handle_t		mh;		/* MAC instance data	*/
+	mii_handle_t		mii;		/* MII handle		*/
 	ddi_acc_handle_t	io_handle;	/* DDI I/O handle	*/
 	caddr_t			io_reg;		/* mapped registers	*/
+	boolean_t		suspended;
 
 	uint32_t		debug;		/* per-instance debug	*/
 	uint32_t		progress;	/* attach tracking	*/
@@ -301,8 +229,6 @@ typedef struct dmfe {
 	/*
 	 * GLD statistics; the prefix tells which lock each is protected by.
 	 */
-	uint64_t		op_stats_speed;
-	uint64_t		op_stats_duplex;
 
 	uint64_t		rx_stats_ipackets;
 	uint64_t		rx_stats_multi;
@@ -351,35 +277,12 @@ typedef struct dmfe {
 	/*
 	 * Miscellaneous operating variables (protected by oplock)
 	 */
-	uint32_t		link_poll_tix;	/* tix until link poll	 */
 	uint16_t		factotum_flag;	/* callback pending	 */
 	uint16_t		need_setup;	/* send-setup pending	 */
 	uint32_t		opmode;		/* operating mode shadow */
 	uint32_t		imask;		/* interrupt mask shadow */
 	enum mac_state		mac_state;	/* RESET/STOPPED/STARTED */
 	enum chip_state		chip_state;	/* see above		 */
-	boolean_t		link_reset;	/* ndd needs link reset  */
-
-	/*
-	 * Physical link state data (protected by oplock)
-	 */
-	link_state_t		link_state;	/* See above		*/
-
-	/*
-	 * PHYceiver state data (protected by milock)
-	 */
-	int			phy_inuse;
-	int			phy_addr;	/* should be -1!	*/
-	uint16_t		phy_control;	/* last value written	*/
-	uint16_t		phy_anar_w;	/* last value written	*/
-	uint16_t		phy_anar_r;	/* latest value read	*/
-	uint16_t		phy_anlpar;	/* latest value read	*/
-	uint16_t		phy_aner;
-	uint16_t		phy_dscsr;	/* latest value read	*/
-	uint16_t		phy_bmsr;	/* latest value read	*/
-	uint16_t		rsvd;		/* reserved for future use */
-	uint32_t		phy_bmsr_lbolt;	/* time of BMSR change	*/
-	uint32_t		phy_id; 	/* vendor+device (OUI)	*/
 
 	/*
 	 * Current Ethernet address & multicast map ...
@@ -387,13 +290,6 @@ typedef struct dmfe {
 	uint8_t			curr_addr[ETHERADDRL];
 	uint8_t			mcast_refs[MCASTBUF_SIZE];
 	boolean_t		addr_set;
-	boolean_t		update_phy;	/* Need to update_phy? */
-
-	/*
-	 * NDD parameters
-	 */
-	caddr_t			nd_data_p;
-	nd_param_t		nd_params[PARAM_COUNT];
 
 	/*
 	 * Guard element used to check data integrity
@@ -405,46 +301,11 @@ typedef struct dmfe {
  * 'Progress' bit flags ...
  */
 #define	PROGRESS_CONFIG		0x0001	/* config space initialised	*/
-#define	PROGRESS_NDD		0x0002	/* NDD parameters set up	*/
+#define	PROGRESS_MUTEX		0x0002	/* mutexes initialized		*/
 #define	PROGRESS_REGS		0x0004	/* registers mapped		*/
 #define	PROGRESS_BUFS		0x0008	/* buffers allocated		*/
 #define	PROGRESS_SOFTINT	0x0010	/* softint registered		*/
 #define	PROGRESS_HWINT		0x0020	/* h/w interrupt registered	*/
-
-/*
- * Type of transceiver currently in use
- */
-#define	PHY_TYPE_UNDEFINED	0
-#define	PHY_TYPE_10BASE_MNCHSTR	2
-#define	PHY_TYPE_100BASE_X	4
-
-/*
- * Shorthand for the NDD parameters
- */
-#define	param_linkup		nd_params[PARAM_LINK_STATUS].ndp_val
-#define	param_speed		nd_params[PARAM_LINK_SPEED].ndp_val
-#define	param_duplex		nd_params[PARAM_LINK_MODE].ndp_val
-#define	param_autoneg		nd_params[PARAM_ADV_AUTONEG_CAP].ndp_val
-#define	param_anar_100T4	nd_params[PARAM_ADV_100T4_CAP].ndp_val
-#define	param_anar_100fdx	nd_params[PARAM_ADV_100FDX_CAP].ndp_val
-#define	param_anar_100hdx	nd_params[PARAM_ADV_100HDX_CAP].ndp_val
-#define	param_anar_10fdx	nd_params[PARAM_ADV_10FDX_CAP].ndp_val
-#define	param_anar_10hdx	nd_params[PARAM_ADV_10HDX_CAP].ndp_val
-#define	param_anar_remfault	nd_params[PARAM_ADV_REMFAULT].ndp_val
-#define	param_bmsr_autoneg	nd_params[PARAM_BMSR_AUTONEG_CAP].ndp_val
-#define	param_bmsr_100T4	nd_params[PARAM_BMSR_100T4_CAP].ndp_val
-#define	param_bmsr_100fdx	nd_params[PARAM_BMSR_100FDX_CAP].ndp_val
-#define	param_bmsr_100hdx	nd_params[PARAM_BMSR_100HDX_CAP].ndp_val
-#define	param_bmsr_10fdx	nd_params[PARAM_BMSR_10FDX_CAP].ndp_val
-#define	param_bmsr_10hdx	nd_params[PARAM_BMSR_10HDX_CAP].ndp_val
-#define	param_bmsr_remfault	nd_params[PARAM_BMSR_REMFAULT].ndp_val
-#define	param_lp_autoneg	nd_params[PARAM_LP_AUTONEG_CAP].ndp_val
-#define	param_lp_100T4		nd_params[PARAM_LP_100T4_CAP].ndp_val
-#define	param_lp_100fdx		nd_params[PARAM_LP_100FDX_CAP].ndp_val
-#define	param_lp_100hdx		nd_params[PARAM_LP_100HDX_CAP].ndp_val
-#define	param_lp_10fdx		nd_params[PARAM_LP_10FDX_CAP].ndp_val
-#define	param_lp_10hdx		nd_params[PARAM_LP_10HDX_CAP].ndp_val
-#define	param_lp_remfault	nd_params[PARAM_LP_REMFAULT].ndp_val
 
 /*
  * Sync a DMA area described by a dma_area_t
@@ -458,31 +319,9 @@ typedef struct dmfe {
 #define	NEXT(index, limit)	((index)+1 < (limit) ? (index)+1 : 0);
 
 /*
- * Utility Macros
- */
-#define	U32TOPTR(x)		((void *)(uintptr_t)(uint32_t)(x))
-#define	PTRTOU32(x)		((uint32_t)(uintptr_t)(void *)(x))
-
-/*
  * Copy an ethernet address
  */
 #define	ethaddr_copy(src, dst)	bcopy((src), (dst), ETHERADDRL)
-#define	MII_KS_GET(dmfep, id)						\
-	(((dmfep)->knp_mii) ? ((dmfep)->knp_mii)[id].value.ui32 : 0)
-
-#define	MII_KS_SET(dmfep, id, val)					\
-	do {								\
-		if ((dmfep)->knp_mii != NULL)				\
-			((dmfep)->knp_mii)[id].value.ui32 = (val);	\
-		_NOTE(CONSTANTCONDITION)				\
-	} while (0)
-
-#define	MII_KS_INC(dmfep, id)						\
-	do {								\
-		if ((dmfep)->knp_mii != NULL)				\
-			((dmfep)->knp_mii)[id].value.ui32 += 1;		\
-		_NOTE(CONSTANTCONDITION)				\
-	} while (0)
 
 /*
  * Get/set/increment a (64-bit) driver-private kstat
@@ -504,95 +343,8 @@ typedef struct dmfe {
 		_NOTE(CONSTANTCONDITION)				\
 	} while (0)
 
-/*
- * Bit test macros, returning boolean_t values
- */
-#define	BIS(w, b)		(((w) & (b)) != 0)
-#define	BIC(w, b)		!BIS(w, b)
 
 #define	DMFE_GUARD		0x1919603003090218
-
-/*
- * 'Debug' bit flags ...
- */
-#define	DMFE_DBG_TRACE		0x0001		/* general flow tracing	*/
-#define	DMFE_DBG_REGS		0x0002		/* low-level accesses	*/
-#define	DMFE_DBG_RECV		0x0004		/* receive-side code	*/
-#define	DMFE_DBG_SEND		0x0008		/* packet-send code	*/
-#define	DMFE_DBG_ADDR		0x0010		/* address-setting code	*/
-#define	DMFE_DBG_GLD		0x0020		/* GLD entry points	*/
-#define	DMFE_DBG_FACT		0x0040		/* factotum (softint)	*/
-#define	DMFE_DBG_TICK		0x0080		/* GPT ticker		*/
-#define	DMFE_DBG_INT		0x0100		/* interrupt handler	*/
-#define	DMFE_DBG_STATS		0x0200		/* statistics		*/
-#define	DMFE_DBG_IOCTL		0x0400		/* ioctl/loopback code	*/
-#define	DMFE_DBG_INIT		0x0800		/* initialisation	*/
-#define	DMFE_DBG_MII		0x1000		/* low-level MII/PHY	*/
-#define	DMFE_DBG_LINK		0x2000		/* Link status check	*/
-#define	DMFE_DBG_NDD		0x4000		/* NDD parameters	*/
-
-/*
- * Debugging ...
- */
-#if defined(DEBUG) || defined(lint)
-#define	DMFEDEBUG		1
-#else
-#define	DMFEDEBUG		0
-#endif
-
-#if	DMFEDEBUG
-
-extern uint32_t dmfe_debug;
-extern void (*dmfe_gdb())(const char *fmt, ...);
-extern void (*dmfe_db(dmfe_t *dmfep))(const char *fmt, ...);
-
-/*
- * Define DMFE_DBG to be the relevant flag from the set above before
- * using the DMFE_GDEBUG() or DMFE_DEBUG() macros.  The 'G' versions
- * look at the Global debug flag word (dmfe_debug); the non-G versions
- * look in the per-instance data (dmfep->debug) and so require a variable
- * called 'dmfep' to be in scope (and initialised!)
- *
- * You could redefine DMFE_TRC too if you really need two different
- * flavours of debugging output in the same area of code, but I don't
- * really recommend it.
- */
-
-#define	DMFE_TRC		DMFE_DBG_TRACE	/* default 'trace' bit	*/
-
-#define	DMFE_GDEBUG(args)	do {					\
-					if (dmfe_debug & (DMFE_DBG))	\
-						(*dmfe_gdb()) args;	\
-					_NOTE(CONSTANTCONDITION)	\
-				} while (0)
-
-#define	DMFE_GTRACE(args)	do {					\
-					if (dmfe_debug & (DMFE_TRC))	\
-						(*dmfe_gdb()) args;	\
-					_NOTE(CONSTANTCONDITION)	\
-				} while (0)
-
-#define	DMFE_DEBUG(args)	do {					\
-					if (dmfep->debug & (DMFE_DBG))	\
-						(*dmfe_db(dmfep)) args;	\
-					_NOTE(CONSTANTCONDITION)	\
-				} while (0)
-
-#define	DMFE_TRACE(args)	do {					\
-					if (dmfep->debug & (DMFE_TRC))	\
-						(*dmfe_db(dmfep)) args;	\
-					_NOTE(CONSTANTCONDITION)	\
-				} while (0)
-
-#else
-
-#define	DMFE_DEBUG(args)	do ; _NOTE(CONSTANTCONDITION) while (0)
-#define	DMFE_TRACE(args)	do ; _NOTE(CONSTANTCONDITION) while (0)
-#define	DMFE_GDEBUG(args)	do ; _NOTE(CONSTANTCONDITION) while (0)
-#define	DMFE_GTRACE(args)	do ; _NOTE(CONSTANTCONDITION) while (0)
-
-#endif	/* DMFEDEBUG */
-
 
 /*
  * Inter-source-file linkage ...
@@ -613,17 +365,5 @@ void dmfe_chip_put32(dmfe_t *dmfep, off_t offset, uint32_t value);
 /* dmfe_mii.c */
 void dmfe_read_eeprom(dmfe_t *dmfep, uint16_t addr, uint8_t *ptr, int cnt);
 boolean_t dmfe_init_phy(dmfe_t *dmfep);
-void dmfe_update_phy(dmfe_t *dmfep);
-boolean_t dmfe_check_link(dmfe_t *dmfep);
-void dmfe_recheck_link(dmfe_t *dmfep, boolean_t ioctl);
-
-/* dmfe_ndd.c */
-int dmfe_nd_init(dmfe_t *dmfep);
-enum ioc_reply dmfe_nd_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd);
-void dmfe_nd_cleanup(dmfe_t *dmfep);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* _SYS_DMFE_IMPL_H */

@@ -1374,53 +1374,6 @@ extern "C" {
 #define	NVMEM_DATA_MAC_ADDRESS_5906	0x0010		/* 8 bytes	*/
 
 /*
- * MII (PHY) registers, beyond those already defined in <sys/miiregs.h>
- */
-
-#define	MII_AN_LPNXTPG			8
-#define	MII_1000BASE_T_CONTROL		9
-#define	MII_1000BASE_T_STATUS		10
-#define	MII_IEEE_EXT_STATUS		15
-
-/*
- * New bits in the MII_CONTROL register
- */
-#define	MII_CONTROL_1000MB		0x0040
-
-/*
- * New bits in the MII_AN_ADVERT register
- */
-#define	MII_ABILITY_ASYM_PAUSE		0x0800
-#define	MII_ABILITY_PAUSE		0x0400
-
-/*
- * Values for the <selector> field of the MII_AN_ADVERT register
- */
-#define	MII_AN_SELECTOR_8023		0x0001
-
-/*
- * Bits in the MII_1000BASE_T_CONTROL register
- *
- * The MASTER_CFG bit enables manual configuration of Master/Slave mode
- * (otherwise, roles are automatically negotiated).  When this bit is set,
- * the MASTER_SEL bit forces Master mode, otherwise Slave mode is forced.
- */
-#define	MII_1000BT_CTL_MASTER_CFG	0x1000	/* enable role select	*/
-#define	MII_1000BT_CTL_MASTER_SEL	0x0800	/* role select bit	*/
-#define	MII_1000BT_CTL_ADV_FDX		0x0200
-#define	MII_1000BT_CTL_ADV_HDX		0x0100
-
-/*
- * Bits in the MII_1000BASE_T_STATUS register
- */
-#define	MII_1000BT_STAT_MASTER_FAULT	0x8000
-#define	MII_1000BT_STAT_MASTER_MODE	0x4000	/* shows role selected	*/
-#define	MII_1000BT_STAT_LCL_RCV_OK	0x2000
-#define	MII_1000BT_STAT_RMT_RCV_OK	0x1000
-#define	MII_1000BT_STAT_LP_FDX_CAP	0x0800
-#define	MII_1000BT_STAT_LP_HDX_CAP	0x0400
-
-/*
  * Vendor-specific MII registers
  */
 #define	MII_EXT_CONTROL			MII_VENDOR(0)

@@ -703,8 +703,8 @@ bge_update_copper(bge_t *bgep)
 			bgep->param_link_speed = 1000;
 			adv_1000fdx = B_TRUE;
 			auxctrl = MII_AUX_CTRL_NORM_EXT_LOOPBACK;
-			gigctrl |= MII_1000BT_CTL_MASTER_CFG;
-			gigctrl |= MII_1000BT_CTL_MASTER_SEL;
+			gigctrl |= MII_MSCONTROL_MANUAL;
+			gigctrl |= MII_MSCONTROL_MASTER;
 			break;
 
 		case BGE_LOOP_EXTERNAL_100:
@@ -763,9 +763,9 @@ bge_update_copper(bge_t *bgep)
 		control |= MII_CONTROL_ANE|MII_CONTROL_RSAN;
 
 	if (adv_1000fdx)
-		control |= MII_CONTROL_1000MB|MII_CONTROL_FDUPLEX;
+		control |= MII_CONTROL_1GB|MII_CONTROL_FDUPLEX;
 	else if (adv_1000hdx)
-		control |= MII_CONTROL_1000MB;
+		control |= MII_CONTROL_1GB;
 	else if (adv_100fdx)
 		control |= MII_CONTROL_100MB|MII_CONTROL_FDUPLEX;
 	else if (adv_100hdx)
@@ -778,9 +778,9 @@ bge_update_copper(bge_t *bgep)
 		{ _NOTE(EMPTY); }	/* Can't get here anyway ...	*/
 
 	if (adv_1000fdx)
-		gigctrl |= MII_1000BT_CTL_ADV_FDX;
+		gigctrl |= MII_MSCONTROL_1000T_FD;
 	if (adv_1000hdx)
-		gigctrl |= MII_1000BT_CTL_ADV_HDX;
+		gigctrl |= MII_MSCONTROL_1000T;
 
 	if (adv_100fdx)
 		anar |= MII_ABILITY_100BASE_TX_FD;
@@ -794,7 +794,7 @@ bge_update_copper(bge_t *bgep)
 	if (adv_pause)
 		anar |= MII_ABILITY_PAUSE;
 	if (adv_asym_pause)
-		anar |= MII_ABILITY_ASYM_PAUSE;
+		anar |= MII_ABILITY_ASMPAUSE;
 
 	/*
 	 * Munge in any other fixed bits we require ...
@@ -813,7 +813,7 @@ bge_update_copper(bge_t *bgep)
 	bge_mii_put16(bgep, MII_AN_ADVERT, anar);
 	bge_mii_put16(bgep, MII_CONTROL, control);
 	bge_mii_put16(bgep, MII_AUX_CONTROL, auxctrl);
-	bge_mii_put16(bgep, MII_1000BASE_T_CONTROL, gigctrl);
+	bge_mii_put16(bgep, MII_MSCONTROL, gigctrl);
 
 	BGE_DEBUG(("bge_update_copper: anar <- 0x%x", anar));
 	BGE_DEBUG(("bge_update_copper: control <- 0x%x", control));
@@ -948,9 +948,9 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 		bgep->param_link_tx_pause = BIS(aux, MII_AUX_STATUS_TX_PAUSE);
 		bgep->param_link_rx_pause = BIS(aux, MII_AUX_STATUS_RX_PAUSE);
 
-		aux = bge_mii_get16(bgep, MII_1000BASE_T_STATUS);
-		bgep->param_lp_1000fdx = BIS(aux, MII_1000BT_STAT_LP_FDX_CAP);
-		bgep->param_lp_1000hdx = BIS(aux, MII_1000BT_STAT_LP_HDX_CAP);
+		aux = bge_mii_get16(bgep, MII_MSSTATUS);
+		bgep->param_lp_1000fdx = BIS(aux, MII_MSSTATUS_LP1000T_FD);
+		bgep->param_lp_1000hdx = BIS(aux, MII_MSSTATUS_LP1000T);
 
 		aux = bge_mii_get16(bgep, MII_AN_LPABLE);
 		bgep->param_lp_100fdx = BIS(aux, MII_ABILITY_100BASE_TX_FD);
@@ -958,7 +958,7 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 		bgep->param_lp_10fdx = BIS(aux, MII_ABILITY_10BASE_T_FD);
 		bgep->param_lp_10hdx = BIS(aux, MII_ABILITY_10BASE_T);
 		bgep->param_lp_pause = BIS(aux, MII_ABILITY_PAUSE);
-		bgep->param_lp_asym_pause = BIS(aux, MII_ABILITY_ASYM_PAUSE);
+		bgep->param_lp_asym_pause = BIS(aux, MII_ABILITY_ASMPAUSE);
 	}
 
 	/*

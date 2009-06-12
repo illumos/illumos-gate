@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the ADMtek
 #	Ethernet (AFE) driver module in intel systems
@@ -60,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Driver depends on GLD
 #
-LDFLAGS		+= -dy -N misc/mac
+LDFLAGS		+= -dy -N misc/mac -Nmisc/mii
 
 #
 #	Default build targets.

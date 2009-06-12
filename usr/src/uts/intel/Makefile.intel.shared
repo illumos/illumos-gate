@@ -590,6 +590,7 @@ MISC_KMODS	+= kmech_dummy
 MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= ksocket
 MISC_KMODS	+= mac
+MISC_KMODS	+= mii
 MISC_KMODS	+= net80211
 MISC_KMODS	+= nfs_dlboot
 MISC_KMODS	+= nfssrv

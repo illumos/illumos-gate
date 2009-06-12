@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -47,4 +45,3 @@ i postremove
 # Davicom 9102 Fast Ethernet driver
 d none kernel			0755	root	sys
 d none kernel/drv		0755	root	sys
-f none kernel/drv/dmfe.conf	0644	root	sys
