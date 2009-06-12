@@ -75,10 +75,31 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	char			*addr		= NULL;
 	uint16_t		boot_lun_num	= 0;
 	uint64_t		*lun_num_ptr	= NULL;
+	uint32_t		oid_tmp		= 0;
 
 	ASSERT(isp != NULL);
 	ihp = isp->sess_hba;
 	ASSERT(ihp != NULL);
+
+	mutex_enter(&iscsi_oid_mutex);
+	oid_tmp = iscsi_oid++;
+	mutex_exit(&iscsi_oid_mutex);
+
+	rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
+	/*
+	 * Check whether it has already existed in the list.
+	 */
+	for (ilp_tmp = isp->sess_lun_list; ilp_tmp != NULL;
+	    ilp_tmp = ilp_tmp->lun_next) {
+		if (ilp_tmp->lun_num == lun_num) {
+			/*
+			 * The logic unit has already existed in the list,
+			 * return with success.
+			 */
+			rw_exit(&isp->sess_lun_list_rwlock);
+			return (ISCSI_STATUS_SUCCESS);
+		}
+	}
 
 	addr = kmem_zalloc((strlen((char *)isp->sess_name) +
 	    ADDR_EXT_SIZE + 1), KM_SLEEP);
@@ -101,10 +122,7 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	ilp->lun_sess	    = isp;
 	ilp->lun_addr	    = addr;
 	ilp->lun_type	    = inq->inq_dtype & DTYPE_MASK;
-
-	mutex_enter(&iscsi_oid_mutex);
-	ilp->lun_oid = iscsi_oid++;
-	mutex_exit(&iscsi_oid_mutex);
+	ilp->lun_oid	    = oid_tmp;
 
 	bcopy(inq->inq_vid, ilp->lun_vid, sizeof (inq->inq_vid));
 	bcopy(inq->inq_pid, ilp->lun_pid, sizeof (inq->inq_pid));
@@ -126,7 +144,6 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	 * occur via our tran_init_lun, tran_get_name, tran_get_bus_addr,
 	 * tran_init_pkt, tran_start.
 	 */
-	rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
 	if (isp->sess_lun_list == NULL) {
 		isp->sess_lun_list = ilp;
 	} else {
