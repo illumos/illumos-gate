@@ -1656,26 +1656,23 @@ ipif_ndp_down(ipif_t *ipif)
 	ASSERT(IAM_WRITER_ILL(ill));
 
 	if (ipif->ipif_isv6) {
-		ill_t *bound_ill;
-
-		if (IS_IPMP(ill))
-			bound_ill = ipmp_ipif_bound_ill(ipif);
-		else
-			bound_ill = ill;
-
-		if (bound_ill != NULL && ipif->ipif_added_nce) {
-			nce = ndp_lookup_v6(bound_ill,
-			    B_TRUE,
-			    &ipif->ipif_v6lcl_addr,
+		if (ipif->ipif_added_nce) {
+			/*
+			 * For IPMP, `ill' can be the IPMP ill but the NCE will
+			 * always be tied to an underlying IP interface, so we
+			 * match across the illgrp.  This is safe since we
+			 * ensure uniqueness across the group in ipif_ndp_up().
+			 */
+			nce = ndp_lookup_v6(ill, B_TRUE, &ipif->ipif_v6lcl_addr,
 			    B_FALSE);
-			if (nce == NULL)
-				goto no_nce;
-			if (--nce->nce_ipif_cnt == 0)
-				ndp_delete(nce); /* last ipif for nce */
+			if (nce != NULL) {
+				if (--nce->nce_ipif_cnt == 0)
+					ndp_delete(nce); /* last ipif for nce */
+				NCE_REFRELE(nce);
+			}
 			ipif->ipif_added_nce = 0;
-			NCE_REFRELE(nce);
 		}
-no_nce:
+
 		/*
 		 * Make IPMP aware of the deleted data address.
 		 */
