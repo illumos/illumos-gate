@@ -122,6 +122,12 @@ extern "C" {
  */
 #define	BOOT_CONFIG_PG_FBBLACKLIST	"fastreboot_blacklist"
 
+/*
+ * Non-persistent property group which contains all the properties that
+ * will override settings in the BOOT_CONFIG_PG_PARAMS property group.
+ */
+#define	BOOT_CONFIG_PG_OVR		"config_ovr"
+
 #endif	/* _KERNEL */
 
 /*
@@ -130,6 +136,7 @@ extern "C" {
 #define	UA_FASTREBOOT_DEFAULT	0x01
 #define	UA_FASTREBOOT_ONPANIC	0x02
 
+#define	FASTREBOOT_DEFAULT		"fastreboot_default"
 #define	FASTREBOOT_ONPANIC		"fastreboot_onpanic"
 #define	FASTREBOOT_ONPANIC_CMDLINE	"fastreboot_onpanic_cmdline"
 

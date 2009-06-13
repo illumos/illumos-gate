@@ -104,6 +104,54 @@ fb_out:
 
 	return (blacklisted);
 }
+
+/*
+ * Add or get a property group given an FMRI.
+ * Return SCF_SUCCESS on success, SCF_FAILED on failure.
+ */
+static int
+scf_fmri_pg_get_or_add(const char *fmri, const char *pgname,
+    const char *pgtype, uint32_t pgflags, int add)
+{
+	scf_handle_t	*handle = NULL;
+	scf_instance_t	*inst = NULL;
+	int		rc = SCF_FAILED;
+	int		error = SCF_ERROR_NONE;
+
+	if ((handle = scf_handle_create(SCF_VERSION)) == NULL ||
+	    scf_handle_bind(handle) != 0 ||
+	    (inst = scf_instance_create(handle)) == NULL ||
+	    scf_handle_decode_fmri(handle, fmri, NULL, NULL,
+	    inst, NULL, NULL, SCF_DECODE_FMRI_EXACT) != SCF_SUCCESS)
+		goto scferror;
+
+	if (add) {
+		rc = scf_instance_add_pg(inst, pgname, pgtype, pgflags, NULL);
+		/*
+		 * If the property group already exists, return SCF_SUCCESS.
+		 */
+		if (rc != SCF_SUCCESS && scf_error() == SCF_ERROR_EXISTS) {
+			(void) scf_set_error(SCF_ERROR_NONE);
+			rc = SCF_SUCCESS;
+		}
+	} else {
+		rc = scf_instance_get_pg(inst, pgname, NULL);
+	}
+
+scferror:
+	error = scf_error();
+
+	scf_instance_destroy(inst);
+	if (handle)
+		(void) scf_handle_unbind(handle);
+	scf_handle_destroy(handle);
+
+	if (error != SCF_ERROR_NONE) {
+		(void) scf_set_error(error);
+		rc = SCF_FAILED;
+	}
+	return (rc);
+}
 #endif	/* __x86 */
 
 /*
@@ -124,7 +172,7 @@ scf_get_boot_config(uint8_t *boot_config)
 		 * Property vector for BOOT_CONFIG_PG_PARAMS property group.
 		 */
 		scf_propvec_t ua_boot_config[] = {
-			{ "fastreboot_default", NULL, SCF_TYPE_BOOLEAN, NULL,
+			{ FASTREBOOT_DEFAULT, NULL, SCF_TYPE_BOOLEAN, NULL,
 			    UA_FASTREBOOT_DEFAULT },
 			{ FASTREBOOT_ONPANIC, NULL, SCF_TYPE_BOOLEAN, NULL,
 			    UA_FASTREBOOT_ONPANIC },
@@ -162,23 +210,119 @@ scf_get_boot_config(uint8_t *boot_config)
 }
 
 /*
+ * Get or set properties in non-persistent "config_ovr" property group
+ * in svc:/system/boot-config:default.
+ * It prints errors with uu_warn().
+ */
+/*ARGSUSED*/
+static int
+scf_getset_boot_config_ovr(int set, uint8_t *boot_config_ovr)
+{
+	int rc = SCF_SUCCESS;
+
+	assert(boot_config_ovr);
+
+#ifndef	__x86
+	return (rc);
+#else
+	{
+		/*
+		 * Property vector for BOOT_CONFIG_PG_OVR property group.
+		 */
+		scf_propvec_t ua_boot_config_ovr[] = {
+			{ FASTREBOOT_DEFAULT, NULL, SCF_TYPE_BOOLEAN, NULL,
+			    UA_FASTREBOOT_DEFAULT },
+			{ NULL }
+		};
+		scf_propvec_t	*prop;
+
+		rc = scf_fmri_pg_get_or_add(FMRI_BOOT_CONFIG,
+		    BOOT_CONFIG_PG_OVR, SCF_GROUP_APPLICATION,
+		    SCF_PG_FLAG_NONPERSISTENT, set);
+
+		if (rc != SCF_SUCCESS) {
+#if defined(FASTREBOOT_DEBUG)
+			if (set)
+				(void) uu_warn("Unable to add service %s "
+				    "property group '%s'\n",
+				    FMRI_BOOT_CONFIG, BOOT_CONFIG_PG_OVR);
+#endif	/* FASTREBOOT_DEBUG */
+			return (rc);
+		}
+
+		for (prop = ua_boot_config_ovr; prop->pv_prop != NULL; prop++)
+			prop->pv_ptr = boot_config_ovr;
+		prop = NULL;
+
+		if (set)
+			rc = scf_write_propvec(FMRI_BOOT_CONFIG,
+			    BOOT_CONFIG_PG_OVR, ua_boot_config_ovr, &prop);
+		else
+			rc = scf_read_propvec(FMRI_BOOT_CONFIG,
+			    BOOT_CONFIG_PG_OVR, B_FALSE, ua_boot_config_ovr,
+			    &prop);
+
+#if defined(FASTREBOOT_DEBUG)
+		if (rc != SCF_SUCCESS) {
+			if (prop != NULL) {
+				(void) uu_warn("Service %s property '%s/%s' "
+				    "not found.\n", FMRI_BOOT_CONFIG,
+				    BOOT_CONFIG_PG_OVR, prop->pv_prop);
+			} else {
+				(void) uu_warn("Unable to %s service %s "
+				    "property '%s': %s\n", set ? "set" : "get",
+				    FMRI_BOOT_CONFIG, BOOT_CONFIG_PG_OVR,
+				    scf_strerror(scf_error()));
+			}
+		}
+#endif	/* FASTREBOOT_DEBUG */
+		return (rc);
+
+	}
+#endif	/* __x86 */
+}
+
+/*
+ * Get values of properties in non-persistent "config_ovr" property group.
+ */
+static void
+scf_get_boot_config_ovr(uint8_t *boot_config_ovr)
+{
+	(void) scf_getset_boot_config_ovr(B_FALSE, boot_config_ovr);
+}
+
+/*
+ * Set value of "config_ovr/fastreboot_default".
+ */
+int
+scf_fastreboot_default_set_transient(boolean_t value)
+{
+	uint8_t	boot_config_ovr = (value & UA_FASTREBOOT_DEFAULT);
+
+	return (scf_getset_boot_config_ovr(B_TRUE, &boot_config_ovr));
+}
+
+/*
  * Check whether Fast Reboot is the default operating mode.
  * Return 0 if
  *   1. the platform is xVM
  * or
  *   2. svc:/system/boot-config:default service doesn't exist,
  * or
- *   3. property "fastreboot_default" doesn't exist,
+ *   3. property "config/fastreboot_default" doesn't exist,
  * or
- *   4. value of property "fastreboot_default" is set to 0.
+ *   4. value of property "config/fastreboot_default" is set to "false"
+ *      and "config_ovr/fastreboot_default" is not set to "true",
  * or
  *   5. the platform has been blacklisted.
+ * or
+ *   6. value of property "config_ovr/fastreboot_default" is set to "false".
  * Return non-zero otherwise.
  */
 int
 scf_is_fastboot_default(void)
 {
-	uint8_t	boot_config = 0;
+	uint8_t	boot_config = 0, boot_config_ovr;
 	char procbuf[SYS_NMLN];
 
 	/*
@@ -188,6 +332,16 @@ scf_is_fastboot_default(void)
 	    strcmp(procbuf, "i86xpv") == 0)
 		return (0);
 
+	/*
+	 * Get property values from "config" property group
+	 */
 	scf_get_boot_config(&boot_config);
-	return (boot_config & UA_FASTREBOOT_DEFAULT);
+
+	/*
+	 * Get property values from non-persistent "config_ovr" property group
+	 */
+	boot_config_ovr = boot_config;
+	scf_get_boot_config_ovr(&boot_config_ovr);
+
+	return (boot_config & boot_config_ovr & UA_FASTREBOOT_DEFAULT);
 }

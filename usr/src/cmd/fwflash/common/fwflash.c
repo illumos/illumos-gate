@@ -43,6 +43,7 @@
 #include <sys/varargs.h>
 #include <libintl.h> /* for gettext(3c) */
 #include <libdevinfo.h>
+#include <libscf_priv.h>
 #include <fwflash/fwflash.h>
 #include <sys/modctl.h> /* for MAXMODCONFNAME */
 
@@ -219,12 +220,21 @@ main(int argc, char **argv)
 	if ((fwflash_arg_list == (FWFLASH_FW_FLAG | FWFLASH_DEVICE_FLAG)) ||
 	    (fwflash_arg_list == (FWFLASH_FW_FLAG | FWFLASH_DEVICE_FLAG |
 	    FWFLASH_YES_FLAG))) {
+		int fastreboot_disabled = 0;
 		/* the update function handles the real arg parsing */
 		i = 0;
 		while (filelist[i] != NULL) {
 			if ((rv = fwflash_update(devpath, filelist[i],
 			    fwflash_arg_list)) == FWFLASH_SUCCESS) {
 				/* failed ops have already been noted */
+				if (!fastreboot_disabled &&
+				    scf_fastreboot_default_set_transient(
+				    B_FALSE) != SCF_SUCCESS)
+					logmsg(MSG_ERROR, gettext(
+					    "Failed to disable fast "
+					    "reboot.\n"));
+				else
+					fastreboot_disabled = 1;
 				logmsg(MSG_ERROR,
 				    gettext("New firmware will be activated "
 				    "after you reboot\n\n"));

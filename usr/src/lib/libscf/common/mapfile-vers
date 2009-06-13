@@ -316,6 +316,7 @@ SUNWprivate_1.1 {
 	scf_instance_delete_prop;
 	scf_get_boot_config;
 	scf_is_fastboot_default;
+	scf_fastreboot_default_set_transient;
     local:
 	*;
 };
