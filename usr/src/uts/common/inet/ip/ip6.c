@@ -11153,7 +11153,8 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			int extra_len = ipsec_out_extra_length(first_mp);
 
 			if (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN + extra_len >
-			    max_frag) {
+			    max_frag && connp != NULL &&
+			    (flags & IP6I_DONTFRAG)) {
 				/*
 				 * IPsec headers will push the packet over the
 				 * MTU limit.  Issue an ICMPv6 Packet Too Big
