@@ -929,16 +929,21 @@ secpolicy_vnode_setids_setgids(const cred_t *cred, gid_t gid)
  */
 
 int
-secpolicy_vnode_chown(const cred_t *cred, boolean_t check_self)
+secpolicy_vnode_chown(const cred_t *cred, uid_t owner)
 {
-	if (HAS_PRIVILEGE(cred, PRIV_FILE_CHOWN))
-		return (PRIV_POLICY(cred, PRIV_FILE_CHOWN, B_FALSE, EPERM,
-		    NULL));
-	else if (check_self)
-		return (PRIV_POLICY(cred, PRIV_FILE_CHOWN_SELF, B_FALSE, EPERM,
-		    NULL));
-	else
-		return (EPERM);
+	boolean_t is_owner = (owner == crgetuid(cred));
+	boolean_t allzone = B_FALSE;
+	int priv;
+
+	if (!is_owner) {
+		allzone = (owner == 0);
+		priv = PRIV_FILE_CHOWN;
+	} else {
+		priv = HAS_PRIVILEGE(cred, PRIV_FILE_CHOWN) ?
+		    PRIV_FILE_CHOWN : PRIV_FILE_CHOWN_SELF;
+	}
+
+	return (PRIV_POLICY(cred, priv, allzone, EPERM, NULL));
 }
 
 /*
@@ -951,7 +956,12 @@ secpolicy_vnode_chown(const cred_t *cred, boolean_t check_self)
 int
 secpolicy_vnode_create_gid(const cred_t *cred)
 {
-	return (secpolicy_vnode_chown(cred, B_TRUE));
+	if (HAS_PRIVILEGE(cred, PRIV_FILE_CHOWN))
+		return (PRIV_POLICY(cred, PRIV_FILE_CHOWN, B_FALSE, EPERM,
+		    NULL));
+	else
+		return (PRIV_POLICY(cred, PRIV_FILE_CHOWN_SELF, B_FALSE, EPERM,
+		    NULL));
 }
 
 /*
@@ -1211,8 +1221,6 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 
 	if (mask & (AT_UID|AT_GID)) {
 		boolean_t checkpriv = B_FALSE;
-		int priv;
-		boolean_t allzone = B_FALSE;
 
 		/*
 		 * Chowning files.
@@ -1232,23 +1240,18 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 		 */
 		if (cr->cr_uid != ovap->va_uid) {
 			checkpriv = B_TRUE;
-			allzone = (ovap->va_uid == 0);
-			priv = PRIV_FILE_CHOWN;
 		} else {
 			if (((mask & AT_UID) && vap->va_uid != ovap->va_uid) ||
 			    ((mask & AT_GID) && vap->va_gid != ovap->va_gid &&
 			    !groupmember(vap->va_gid, cr))) {
 				checkpriv = B_TRUE;
-				priv = HAS_PRIVILEGE(cr, PRIV_FILE_CHOWN) ?
-				    PRIV_FILE_CHOWN : PRIV_FILE_CHOWN_SELF;
 			}
 		}
 		/*
 		 * If necessary, check privilege to see if update can be done.
 		 */
 		if (checkpriv &&
-		    (error = PRIV_POLICY(cr, priv, allzone, EPERM, NULL))
-		    != 0) {
+		    (error = secpolicy_vnode_chown(cr, ovap->va_uid)) != 0) {
 			goto out;
 		}
 

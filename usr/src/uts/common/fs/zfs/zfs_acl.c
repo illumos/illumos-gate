@@ -2366,8 +2366,7 @@ zfs_has_access(znode_t *zp, cred_t *cr)
 		    secpolicy_vnode_access(cr, ZTOV(zp), owner, VREAD) == 0 ||
 		    secpolicy_vnode_access(cr, ZTOV(zp), owner, VWRITE) == 0 ||
 		    secpolicy_vnode_access(cr, ZTOV(zp), owner, VEXEC) == 0 ||
-		    secpolicy_vnode_chown(cr, B_TRUE) == 0 ||
-		    secpolicy_vnode_chown(cr, B_FALSE) == 0 ||
+		    secpolicy_vnode_chown(cr, owner) == 0 ||
 		    secpolicy_vnode_setdac(cr, owner) == 0 ||
 		    secpolicy_vnode_remove(cr) == 0);
 	}
@@ -2515,7 +2514,7 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 			    owner, checkmode);
 
 		if (error == 0 && (working_mode & ACE_WRITE_OWNER))
-			error = secpolicy_vnode_chown(cr, B_TRUE);
+			error = secpolicy_vnode_chown(cr, owner);
 		if (error == 0 && (working_mode & ACE_WRITE_ACL))
 			error = secpolicy_vnode_setdac(cr, owner);
 
@@ -2524,7 +2523,7 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 			error = secpolicy_vnode_remove(cr);
 
 		if (error == 0 && (working_mode & ACE_SYNCHRONIZE)) {
-			error = secpolicy_vnode_chown(cr, B_FALSE);
+			error = secpolicy_vnode_chown(cr, owner);
 		}
 		if (error == 0) {
 			/*
