@@ -58,6 +58,7 @@ d none usr/sadm/install/bin 755 root bin
 f none usr/sadm/install/bin/pkginstall 555 root sys
 f none usr/sadm/install/bin/pkgname 555 root sys
 f none usr/sadm/install/bin/pkgremove 555 root sys
+f none usr/sadm/install/bin/pkgserv 555 root sys
 d none usr/sadm/install/scripts 755 root bin
 f none usr/sadm/install/scripts/cmdexec 555 root sys
 f none usr/sadm/install/scripts/i.CompCpio 555 root sys

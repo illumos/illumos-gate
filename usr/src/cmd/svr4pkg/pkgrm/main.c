@@ -189,11 +189,11 @@ static int		pkgRemove(int a_nodelete, char *a_altBinDir,
 static int		pkgZoneCheckRemove(char *a_zoneName,
 				char **a_inheritedPkgDirs, char *a_altBinDir,
 				char *a_adminFile, char *a_stdoutPath,
-				zone_state_t a_zoneState);
+				zone_state_t a_zoneState, boolean_t tmpzone);
 static int		pkgZoneRemove(char *a_zoneName,
 				char **a_inheritedPkgDirs, int a_nodelete,
 				char *a_altBinDir, char *a_adminFile,
-				zone_state_t a_zoneState);
+				zone_state_t a_zoneState, boolean_t tmpzone);
 static void		resetreturn();
 static void		usage(void);
 static boolean_t	check_applicability(char *a_packageDir,
@@ -286,6 +286,8 @@ main(int argc, char **argv)
 	if (z_running_in_global_zone() && !enable_local_fs()) {
 		progerr(ERR_CANNOT_ENABLE_LOCAL_FS);
 	}
+
+	pkgserversetmode(DEFAULTMODE);
 
 	/*
 	 * ********************************************************************
@@ -1017,7 +1019,7 @@ doRemove(int a_nodelete, char *a_altBinDir, int a_longestPkg, char *a_adminFile,
 
 		n = pkgZoneRemove(z_zlist_get_scratch(a_zlst, zoneIndex),
 			inheritedPkgDirs, a_nodelete, a_altBinDir,
-			a_zoneAdminFile, zst);
+			a_zoneAdminFile, zst, B_FALSE);
 
 		/* set success/fail condition variables */
 
@@ -1085,7 +1087,7 @@ doRemove(int a_nodelete, char *a_altBinDir, int a_longestPkg, char *a_adminFile,
 			n = pkgZoneRemove(z_zlist_get_scratch(a_zlst,
 				zoneIndex), inheritedPkgDirs,
 				a_nodelete, a_altBinDir, a_zoneAdminFile,
-				ZONE_STATE_MOUNTED);
+				ZONE_STATE_MOUNTED, B_TRUE);
 
 			/* set success/fail condition variables */
 
@@ -1213,7 +1215,7 @@ ckreturn(int retcode)
 static int
 pkgZoneCheckRemove(char *a_zoneName, char **a_inheritedPkgDirs,
 	char *a_altBinDir, char *a_adminFile, char *a_stdoutPath,
-	zone_state_t a_zoneState)
+	zone_state_t a_zoneState, boolean_t tmpzone)
 {
 	char	*arg[MAXARGS];
 	char	*p;
@@ -1394,6 +1396,11 @@ pkgZoneCheckRemove(char *a_zoneName, char **a_inheritedPkgDirs,
 			arg[nargs++] = strdup(zn);
 	}
 
+	/* Add arguments how to start the pkgserv */
+
+	arg[nargs++] = "-O";
+	arg[nargs++] = pkgmodeargument(tmpzone ? RUN_ONCE : pkgservergetmode());
+
 	/* pass -N to pkgremove: program name to report */
 
 	arg[nargs++] = "-N";
@@ -1445,7 +1452,7 @@ pkgZoneCheckRemove(char *a_zoneName, char **a_inheritedPkgDirs,
 static int
 pkgZoneRemove(char *a_zoneName, char **a_inheritedPkgDirs,
 	int a_nodelete, char *a_altBinDir, char *a_adminFile,
-	zone_state_t a_zoneState)
+	zone_state_t a_zoneState, boolean_t tmpzone)
 {
 	char	*arg[MAXARGS];
 	char	*p;
@@ -1630,6 +1637,11 @@ pkgZoneRemove(char *a_zoneName, char **a_inheritedPkgDirs,
 			arg[nargs++] = strdup(zn);
 	}
 
+	/* Add arguments how to start the pkgserv */
+
+	arg[nargs++] = "-O";
+	arg[nargs++] = pkgmodeargument(tmpzone ? RUN_ONCE : pkgservergetmode());
+
 	/* pass -N to pkgremove: program name to report */
 
 	arg[nargs++] = "-N";
@@ -1737,6 +1749,11 @@ pkgRemove(int a_nodelete, char *a_altBinDir, char *a_adminFile,
 		arg[nargs++] = "-O";
 		arg[nargs++] = "debug";
 	}
+
+	/* Add arguments how to start the pkgserv */
+
+	arg[nargs++] = "-O";
+	arg[nargs++] = pkgmodeargument(pkgservergetmode());
 
 	/* pkgrm -b dir: pass -b to pkgremove */
 
@@ -2058,7 +2075,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 
 			n = pkgZoneCheckRemove(scratchName, inheritedPkgDirs,
 				a_altBinDir, admnfile, preremovecheckPath,
-				zst);
+				zst, B_FALSE);
 
 			/* set success/fail condition variables */
 
@@ -2139,7 +2156,7 @@ static	char		*zoneAdminFile = (char *)NULL;
 
 			n = pkgZoneCheckRemove(scratchName, inheritedPkgDirs,
 				a_altBinDir, admnfile, preremovecheckPath,
-				ZONE_STATE_MOUNTED);
+				ZONE_STATE_MOUNTED, B_TRUE);
 
 			/* set success/fail condition variables */
 

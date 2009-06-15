@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,7 @@ static int	server_refer(struct cfextra **ext);
 
 int
 sortmap(struct cfextra ***extlist, VFP_T *pkgmapVfp,
-    VFP_T *mapvfp, VFP_T *tmpvfp, char *a_zoneName)
+    PKGserver pkgserver, VFP_T *tmpvfp, char *a_zoneName)
 {
 	int	i, n, nparts;
 	char *db_mrg = "unable to merge package and system information";
@@ -68,7 +68,7 @@ sortmap(struct cfextra ***extlist, VFP_T *pkgmapVfp,
 		echo(gettext("## Processing package information."));
 	} else {
 		echo(gettext("## Processing package information in zone <%s>."),
-			a_zoneName);
+		    a_zoneName);
 	}
 
 	/*
@@ -107,7 +107,7 @@ sortmap(struct cfextra ***extlist, VFP_T *pkgmapVfp,
 		echo(gettext("## Processing system information."));
 	} else {
 		echo(gettext("## Processing system information in zone <%s>."),
-			a_zoneName);
+		    a_zoneName);
 	}
 
 	/*
@@ -125,7 +125,7 @@ sortmap(struct cfextra ***extlist, VFP_T *pkgmapVfp,
 
 		vfpTruncate(tmpvfp);
 
-		dbchg = pkgdbmerg(mapvfp, tmpvfp, *extlist, 60);
+		dbchg = pkgdbmerg(pkgserver, tmpvfp, *extlist);
 		if (dbchg < 0) {
 			progerr(gettext(db_mrg));
 			quit(99);

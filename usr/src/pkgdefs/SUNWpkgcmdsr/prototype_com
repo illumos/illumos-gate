@@ -48,5 +48,9 @@ f none var/sadm/install/admin/default 444 root sys
 d none var/sadm/install/logs 555 root bin
 d none var/sadm/pkg 555 root sys
 d none var/sadm/security 555 root sys
+d none var/svc 0755 root sys
+d none var/svc/manifest 0755 root sys
+d none var/svc/manifest/system 0755 root sys
+f none var/svc/manifest/system/pkgserv.xml 0444 root sys
 d none var/spool 755 root bin
 d none var/spool/pkg 1777 root bin

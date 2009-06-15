@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,11 +54,13 @@
 #include "libinst.h"
 #include "libadm.h"
 
-#define	LOCKFILE	".pkg.lock"
+#define	LOCKFILE	".pkg.lock.client"
+#define	LOCKFILESERV	".pkg.lock"
+
 #define	LOCKWAIT	10	/* seconds between retries */
 #define	LOCKRETRY	20	/* number of retries for a DB lock */
 
-#define	ERR_TC_WRITE	"WARNING: unable to write temp contents file <%s>"
+#define	ERR_COMMIT	"WARNING: unable to commit contents database update"
 #define	ERR_NOCLOSE	"WARNING: unable to close <%s>"
 #define	ERR_NOUNLINK_LATENT	"WARNING: unable to unlink latent <%s>"
 #define	ERR_LINK_FAIL	"link(%s, %s) failed (errno %d)"
@@ -101,33 +103,8 @@ static int	active_lock;
 static int	lock_fd;	/* fd of LOCKFILE. */
 static char	*pkgadm_dir;
 
-static int	pkgWlock(int verbose);
+int		pkgWlock(int verbose);
 static int	pkgWunlock(void);
-
-/*
- * This VFP is used to cache the last copy of the contents file that was
- * written out - upon subsequent open if the contents file has not changed
- * since it was last written out, use the last cached copy that is still
- * in memory to avoid re-reading the contents file again. If the contents
- * file has changed since the cached copy was written out, the previous
- * copy is discarded and the new contents file contents are read in.
- */
-
-static VFP_T	*contentsVfp = {(VFP_T *)NULL};
-
-/*
- * This defines the maximum number of bytes that can be added to the contents
- * file for a single package - this must be higher than the largest expected
- * pkgmap file will ever be. This controls the amount of memory allocated for
- * the contents file additions. A pkgmap file with an average line length of
- * 128/256/512 bytes could add 62500/31250/15625 entries with this size. This
- * allows the contents file to have a fixed allocation without having to check
- * size and realloc as necessary with the attendant cost of the realloc. The
- * real memory used will only be those pages that are actually touched when
- * the contents file is written.
- */
-
-#define	CONTENTS_DELTA	(32*1024*1024)	/* 32mb */
 
 /* forward declarations */
 
@@ -182,8 +159,11 @@ set_cfdir(char *cfdir)
 
 	/*
 	 * If there's a contents file there already, copy it
-	 * over, otherwise initialize one.
+	 * over, otherwise initialize one.  Make sure that the
+	 * server, if running, flushes the contents file.
 	 */
+
+	(void) pkgsync(NULL, get_PKGADM(), B_FALSE);
 
 	/* create new contents file if one does not already exist */
 
@@ -193,7 +173,7 @@ set_cfdir(char *cfdir)
 		n = open(tmpcf, O_WRONLY|O_CREAT|O_TRUNC|O_EXCL, 0644);
 		if (n < 0) {
 			progerr(gettext(ERR_CREAT_CONT), tmpcf,
-						strerror(errno));
+			    strerror(errno));
 			return (99);
 		}
 		(void) close(n);
@@ -217,21 +197,17 @@ set_cfdir(char *cfdir)
  * It returns 1 if successful, 0 otherwise.
  */
 int
-ocfile(VFP_T **r_mapvfp, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
+ocfile(PKGserver *server, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 {
 	struct	stat64	statb;
 	struct	statvfs64	svfsb;
 	fsblkcnt_t free_blocks;
 	fsblkcnt_t need_blocks;
-	VFP_T		*mapvfp = (VFP_T *)NULL;
 	VFP_T		*tmpvfp = (VFP_T *)NULL;
 	char		contents[PATH_MAX];
 	int		n;
-
-	/* reset return VFP/FILE pointers */
-
-	(*r_mapvfp) = (VFP_T *)NULL;
-	(*r_tmpvfp) = (VFP_T *)NULL;
+	off_t		cdiff_alloc;
+	PKGserver	newserver;
 
 	/* establish package administration contents directory location */
 
@@ -249,32 +225,25 @@ ocfile(VFP_T **r_mapvfp, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 		return (0);
 	}
 
-	/* determine path to the primary contents file */
+	if (*server != NULL) {
+		vfpTruncate(*r_tmpvfp);
+		(void) vfpClearModified(*r_tmpvfp);
 
-	(void) snprintf(contents, sizeof (contents), "%s/contents", pkgadm_dir);
-
-	/*
-	 * open the contents file to read only - if a previous contents file has
-	 * been cached attempt to use that cached copy for the open, otherwise
-	 * just open the contents file directly
-	 */
-
-	n = vfpCheckpointOpen(&contentsVfp, &mapvfp, contents, "r", VFP_NONE);
-
-	/* return error if contents file cannot be accessed */
-
-	if (n != 0) {
-		int	lerrno = errno;
-
-		if (errno == ENOENT) {
-			progerr(gettext(ERR_NOCFILE), contents);
-		} else {
-			progerr(gettext(ERR_NOROPEN), contents);
-		}
-
-		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
-		return (0);
+		return (1);
 	}
+
+	newserver = pkgopenserver(NULL, pkgadm_dir, B_FALSE);
+
+	/* The error has been reported. */
+	if (newserver == NULL)
+		return (0);
+
+	/* reset return VFP/FILE pointers */
+
+	(*r_tmpvfp) = (VFP_T *)NULL;
+
+	/* determine path to the primary contents file */
+	(void) snprintf(contents, sizeof (contents), "%s/contents", pkgadm_dir);
 
 	/*
 	 * Check and see if there is enough space for the packaging commands
@@ -284,23 +253,23 @@ ocfile(VFP_T **r_mapvfp, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 
 	/* Get the contents file size */
 
-	if (fstat64(fileno(mapvfp->_vfpFile), &statb) == -1) {
+	if (stat64(contents, &statb) == -1) {
 		int	lerrno = errno;
 
-		progerr(gettext(ERR_NOSTAT), contents);
+		progerr(gettext(ERR_NOCFILE), contents);
 		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
-		(void) vfpClose(&mapvfp);
+		pkgcloseserver(newserver);
 		return (0);
 	}
 
 	/* Get the filesystem space */
 
-	if (fstatvfs64(fileno(mapvfp->_vfpFile), &svfsb) == -1) {
+	if (statvfs64(contents, &svfsb) == -1) {
 		int	lerrno = errno;
 
 		progerr(gettext(ERR_NOSTATV), contents);
 		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
-		(void) vfpClose(&mapvfp);
+		pkgcloseserver(newserver);
 		return (0);
 	}
 
@@ -308,22 +277,29 @@ ocfile(VFP_T **r_mapvfp, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 			howmany(svfsb.f_frsize, DEV_BSIZE) :
 			howmany(svfsb.f_bsize, DEV_BSIZE)) * svfsb.f_bfree;
 
-	if (map_blks == 0LL) {
-		map_blks = 10LL;
-	}
+	/*
+	 * If we're removing a package, then the log might grow to the size
+	 * of the full contents file.
+	 */
+
+	if (map_blks == 0LL)
+		map_blks = nblk(statb.st_size, svfsb.f_bsize, svfsb.f_frsize);
 
 	/*
 	 * Calculate the number of blocks we need to be able to operate on
 	 * the contents file.
 	 */
 	need_blocks = map_blks +
+		/* Max of the log file */
+		nblk(MAXLOGFILESIZE, svfsb.f_bsize, svfsb.f_frsize) +
+		/* Current content file */
 		nblk(statb.st_size, svfsb.f_bsize, svfsb.f_frsize);
 
 	if ((need_blocks + 10) > free_blocks) {
 		progerr(gettext(ERR_CFBACK), contents);
 		progerr(gettext(ERR_CFBACK1), need_blocks, free_blocks,
 			DEV_BSIZE);
-		(void) vfpClose(&mapvfp);
+		pkgcloseserver(newserver);
 		return (0);
 	}
 
@@ -341,36 +317,38 @@ ocfile(VFP_T **r_mapvfp, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
 
 		progerr(gettext(ERR_NOTMPOPEN));
 		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
-		(void) vfpClose(&mapvfp);
+		pkgcloseserver(newserver);
 		return (0);
 	}
 
 	/*
 	 * set size of allocation for temporary contents file - this sets the
 	 * size of the in-memory buffer associated with the open vfp.
+	 * We only store the new and changed entries.
+	 * We allocate memory depending on the size of the pkgmap; it's not
+	 * completely right but <some value + * 1.5 * map_blks * DEV_BSIZE>
+	 * seems fine (an install adds the size if the name of the package.)
 	 */
 
-	if (vfpSetSize(tmpvfp, statb.st_size + CONTENTS_DELTA) != 0) {
+	cdiff_alloc = map_blks * DEV_BSIZE;
+	cdiff_alloc += cdiff_alloc/2;
+	if (cdiff_alloc < 1000000)
+		cdiff_alloc += 1000000;
+
+	if (vfpSetSize(tmpvfp, cdiff_alloc) != 0) {
 		int	lerrno = errno;
 
 		progerr(gettext(ERR_NOTMPOPEN));
 		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
 		(void) vfpClose(&tmpvfp);
-		(void) vfpClose(&mapvfp);
+		pkgcloseserver(newserver);
 		return (0);
 	}
 
-	/*
-	 * now that the temporary file is opened, advise the vm system to start
-	 * mapping the real contents file into memory if possible
-	 */
+	/* set return ->s to open server/vfps */
 
-	(void) vfpSetFlags(mapvfp, VFP_NEEDNOW);
-
-	/* set return ->s to open vfps */
-
-	(*r_mapvfp) = mapvfp;
 	(*r_tmpvfp) = tmpvfp;
+	*server = newserver;
 
 	return (1);	/* All OK */
 }
@@ -381,15 +359,11 @@ ocfile(VFP_T **r_mapvfp, VFP_T **r_tmpvfp, fsblkcnt_t map_blks)
  * Returns 1 for OK and 0 for "didn't do it".
  */
 int
-socfile(VFP_T **r_mapvfp)
+socfile(PKGserver *server, boolean_t quiet)
 {
-	VFP_T	*mapvfp = (VFP_T *)NULL;
-	char	contents[PATH_MAX];
-	int	n;
-
-	/* reset return VFP/FILE pointer */
-
-	(*r_mapvfp) = (VFP_T *)NULL;
+	char		contents[PATH_MAX];
+	boolean_t 	readonly = B_FALSE;
+	PKGserver	newserver;
 
 	if (pkgadm_dir == NULL) {
 		if (set_cfdir(NULL) != 0) {
@@ -405,29 +379,16 @@ socfile(VFP_T **r_mapvfp)
 	 */
 
 	if (!pkgWlock(0)) {
-		logerr(gettext(MSG_NOLOCK));
+		if (!quiet)
+			logerr(gettext(MSG_NOLOCK));
+		readonly = B_TRUE;
 	}
 
-	/* open the contents file to read only */
-
-	(void) snprintf(contents, sizeof (contents), "%s/contents", pkgadm_dir);
-
-	n = vfpCheckpointOpen(&contentsVfp, &mapvfp, contents,
-							"r", VFP_NEEDNOW);
-	if (n != 0) {
-		int lerrno = errno;
-
-		if (errno == ENOENT) {
-			progerr(gettext(ERR_NOCFILE), contents);
-		} else {
-			progerr(gettext(ERR_NOROPEN), contents);
-		}
-		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
+	newserver = pkgopenserver(NULL, pkgadm_dir, readonly);
+	if (newserver == NULL)
 		return (0);
-	}
 
-	*r_mapvfp = mapvfp;
-
+	*server = newserver;
 	return (1);
 }
 
@@ -438,11 +399,10 @@ socfile(VFP_T **r_mapvfp)
  *		contents file with the newly updated temporary contents file.
  *		The "ocfile()" or "socfile()" functions must be called to re-
  *		open the real contents file for processing.
- * Arguments:	a_cfVfp - (VFP_T **) - [RW, *RW]
- *			This is the VFP associated with the real contents file
- *			that is being read from and data processed.
+ * Arguments:	PKGserver - handle to the package database
  *		a_cfTmpVfp - (VFP_T **) - [RW, *RW]
- *			This is the VFP associated with the temporary contents
+ *			This is the VFP associated which contains all the
+ *			modifications to be written back to the database.
  *			file that is being written to.
  *		pkginst - (char) - [RO, *RO]
  *			This is the name of the package being operated on;
@@ -467,15 +427,12 @@ socfile(VFP_T **r_mapvfp)
  */
 
 int
-swapcfile(VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp, char *pkginst, int dbchg)
+swapcfile(PKGserver server, VFP_T **a_cfTmpVfp, char *pkginst, int dbchg)
 {
 	char	*pe;
 	char	*pl;
 	char	*ps;
-	char	contentsPath[PATH_MAX] = {'\0'};
 	char	line[256];
-	char	sContentsPath[PATH_MAX] = {'\0'};
-	char	tContentsPath[PATH_MAX] = {'\0'};
 	char	timeb[BUFSIZ];
 	int	retval = RESULT_OK;
 	struct tm	*timep;
@@ -488,27 +445,6 @@ swapcfile(VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp, char *pkginst, int dbchg)
 		pkginst = "<unknown>";
 	}
 
-	/* cache all paths for the associated open files */
-
-	(void) strlcpy(contentsPath, vfpGetPath(*a_cfVfp),
-			sizeof (contentsPath));
-
-	(void) snprintf(tContentsPath, sizeof (tContentsPath),
-			"%s/t.contents", pkgadm_dir);
-
-	(void) snprintf(sContentsPath, sizeof (sContentsPath),
-			"%s/s.contents", pkgadm_dir);
-
-	/* original contents file no longer needed - close */
-
-	if (vfpClose(a_cfVfp) != 0) {
-		int	lerrno = errno;
-
-		logerr(gettext(ERR_NOCLOSE), contentsPath);
-		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
-		retval = RESULT_WRN;
-	}
-
 	/*
 	 * If no changes were made to the database, checkpoint the temporary
 	 * contents file - if this fails, then just close the file which causes
@@ -516,10 +452,6 @@ swapcfile(VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp, char *pkginst, int dbchg)
 	 */
 
 	if ((dbchg == 0) && (vfpGetModified(*a_cfTmpVfp) == 0)) {
-		if (vfpCheckpointFile(&contentsVfp, a_cfTmpVfp,
-							contentsPath) != 0) {
-			vfpClose(a_cfTmpVfp);
-		}
 		(void) pkgWunlock();	/* Free the database lock. */
 		return (retval);
 	}
@@ -570,78 +502,14 @@ swapcfile(VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp, char *pkginst, int dbchg)
 
 	/* commit temporary contents file bytes to storage */
 
-	if (vfpWriteToFile(*a_cfTmpVfp, tContentsPath) != 0) {
+	if (pkgservercommitfile(*a_cfTmpVfp, server) != 0) {
 		int	lerrno = errno;
 
-		logerr(gettext(ERR_TC_WRITE), tContentsPath);
-		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
+		logerr(gettext(ERR_COMMIT));
 		vfpClose(a_cfTmpVfp);
-		(void) remove(tContentsPath);
+		pkgcloseserver(server);
 		(void) pkgWunlock();	/* Free the database lock. */
 		return (RESULT_ERR);
-	}
-
-	/*
-	 * Now we want to make a copy of the old contents file as a
-	 * fail-safe. In support of that, we create a hard link to
-	 * s.contents.
-	 */
-
-	if ((access(sContentsPath, F_OK) == 0) && remove(sContentsPath)) {
-		int	lerrno = errno;
-
-		logerr(gettext(ERR_NOUNLINK_LATENT), sContentsPath);
-		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
-		(void) remove(tContentsPath);
-		(void) pkgWunlock();	/* Free the database lock. */
-		vfpClose(a_cfTmpVfp);
-		return (RESULT_ERR);
-	}
-
-	if (link(contentsPath, sContentsPath) != 0) {
-		int	lerrno = errno;
-
-		progerr(gettext(ERR_NOUPD));
-		logerr(gettext(ERR_LINK_FAIL), contentsPath, sContentsPath,
-			lerrno);
-		(void) remove(tContentsPath);
-		(void) pkgWunlock();	/* Free the database lock. */
-		vfpClose(a_cfTmpVfp);
-		return (RESULT_ERR);
-	}
-
-	if (rename(tContentsPath, contentsPath) != 0) {
-		int	lerrno = errno;
-
-		progerr(gettext(ERR_NORENAME_CONTENTS), contentsPath,
-			tContentsPath);
-		logerr(gettext(ERR_RENAME_FAIL), tContentsPath,
-			contentsPath, lerrno);
-		if (rename(sContentsPath, contentsPath)) {
-			lerrno = errno;
-			progerr(gettext(ERR_RESTORE_FAIL), contentsPath);
-			logerr(gettext(ERR_RENAME_FAIL), sContentsPath,
-				contentsPath, lerrno);
-		}
-		(void) remove(tContentsPath);
-	}
-
-	if (remove(sContentsPath) != 0) {
-		int	lerrno = errno;
-
-		logerr(gettext(ERR_NOUNLINK), sContentsPath);
-		logerr(gettext(ERR_ERRNO), lerrno, strerror(lerrno));
-		retval = RESULT_WRN;
-	}
-
-	/*
-	 * checkpoint the temporary contents file - if this fails, then
-	 * just close the file which causes the contents file to be reopened
-	 * and reread if it is needed again
-	 */
-
-	if (vfpCheckpointFile(&contentsVfp, a_cfTmpVfp, contentsPath) != 0) {
-		vfpClose(a_cfTmpVfp);
 	}
 
 	return (relslock() == 0 ? RESULT_ERR : retval);
@@ -669,7 +537,7 @@ relslock(void)
  * success, 0 on failure. The positive logic verbose flag determines whether
  * or not the function displays the error message upon failure.
  */
-static int
+int
 pkgWlock(int verbose) {
 	int retry_cnt, retval;
 	char lockpath[PATH_MAX];

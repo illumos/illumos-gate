@@ -100,7 +100,6 @@ static char	*parmlst[] = {
 	"EMAIL", NULL
 };
 
-static char	contents[PATH_MAX];
 static int	errflg = 0;
 static int	qflag = 0;
 static int	iflag = -1;
@@ -290,18 +289,14 @@ main(int argc, char **argv)
 
 	/*
 	 * If we are to inspect a spooled package we are only interested in
-	 * the pkginfo file in the spooled pkg so we skip any Reg 4 DB
-	 * lookups and use the old algorithm. We have a spooled pkg if
+	 * the pkginfo file in the spooled pkg.  We have a spooled pkg if
 	 * device is not NULL.
 	 */
 
-
 	look_for_installed();
 
-	if (lflag && strcmp(pkgdir, get_PKGLOC()) == NULL) {
+	if (lflag && strcmp(pkgdir, get_PKGLOC()) == 0) {
 		/* look at contents file */
-		(void) snprintf(contents, sizeof (contents),
-		    "%s/contents", get_PKGADM());
 		rdcontents();
 
 	}
@@ -690,18 +685,17 @@ selectp(char *p)
 static void
 rdcontents(void)
 {
-	VFP_T		*vfp;
 	struct cfstat	*dp;
 	struct pinfo	*pinfo;
 	int		n;
+	PKGserver	server;
 
-	if (vfpOpen(&vfp, contents, "r", VFP_NEEDNOW) != 0) {
-		progerr(gettext("unable to open \"%s\" for reading"), contents);
+	if (!socfile(&server, B_TRUE) ||
+	    pkgopenfilter(server, pkgcnt == 1 ? pkg[0] :  NULL) != 0)
 		exit(1);
-	}
 
 	/* check the contents file to look for referenced packages */
-	while ((n = srchcfile(&entry, "*", vfp, (VFP_T *)NULL)) > 0) {
+	while ((n = srchcfile(&entry, "*", server)) > 0) {
 		for (pinfo = entry.pinfo; pinfo; pinfo = pinfo->next) {
 			/* see if entry is used by indicated packaged */
 			if (pkgcnt && (selectp(pinfo->pkg) < 0))
@@ -738,8 +732,7 @@ rdcontents(void)
 		    (errstr && *errstr) ? errstr : "Unknown");
 		exit(1);
 	}
-
-	(void) vfpClose(&vfp);
+	pkgcloseserver(server);
 }
 
 static void

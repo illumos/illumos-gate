@@ -132,6 +132,9 @@ SUNWprivate {
 	path_valid;
 	pkg_passphrase_cb;
 	pkgalias;
+	pkgclosefilter;
+	pkgcloseserver;
+	pkgcmd;
 	pkgerr;
 	pkgerr_add;
 	pkgerr_clear;
@@ -142,9 +145,18 @@ SUNWprivate {
 	pkgerr_num;
 	pkgexecl;
 	pkgexecv;
+	pkggetentry;
+	pkggetentry_named;
 	pkghead;
 	pkglist_cont;
+	pkgmodeargument;
 	pkgmount;
+	pkgopenfilter;
+	pkgopenserver;
+	pkgparsemode;
+	pkgservercommitfile;
+	pkgservergetmode;
+	pkgserversetmode;
 	pkgstrAddToken;
 	pkgstrContainsToken;
 	pkgstrConvertPathToBasename;
@@ -160,6 +172,8 @@ SUNWprivate {
 	pkgstrRemoveLeadingWhitespace;
 	pkgstrRemoveToken;
 	pkgstrScaleNumericString;
+	pkgsync;
+	pkgsync_needed;
 	pkgtrans;
 	pkgumount;
 	ppkgmap;

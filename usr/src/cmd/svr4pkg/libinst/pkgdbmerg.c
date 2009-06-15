@@ -90,9 +90,6 @@ int files_installed(void);	/* return number of files installed. */
 
 static int	errflg = 0;
 static int	eptnum;
-static VFP_T	*fpvfp = {(VFP_T *)NULL};
-static long	sizetot;
-static int	seconds;
 static int	installed;	/* # of files, already properly installed. */
 static struct	pinfo	*pkgpinfo = (struct pinfo *)0;
 
@@ -109,275 +106,176 @@ static void	set_change(struct cfextra *el_ent);
 static void	chgclass(struct cfent *cf_ent, struct pinfo *pinfo);
 static void	output(VFP_T *vfpo, struct cfent *ent, struct pinfo *pinfo);
 
-/* ARGSUNUSED */
-void
-notice(int n)
-{
-#ifdef lint
-	int i = n;
-	n = i;
-#endif	/* lint */
-	(void) signal(SIGALRM, SIG_IGN);
-	if (sizetot != 0) {
-		echo(gettext(INFO_PROCESS),
-			vfpGetBytesRemaining(fpvfp) * 100L / sizetot);
-	}
-	(void) signal(SIGALRM, notice);
-	(void) alarm(seconds);
-}
-
-/* ARGSUSED */
-
 /*
- * This scans the extlist (pkgmap) and the package database to the end,
- * copying out the merged contents to the file at tmpfp. It updates the mergstat
+ * This scans the extlist (pkgmap) and matches them to the database, copying
+ * out the modified contents to the file at tmpfp. It updates the mergstat
  * structures and deals with administrative defaults regarding setuid and
  * conflict.
- *
- * Since both the extlist and the package database entries are in numerical
- * order, they both scan unidirectionally. If the entry in the extlist is
- * found in the package database (by pathname) then do_like_ent() is called.
- * If the extlist entry is not found in the package database then
- * do_new_ent() is called. srchcfile() is responsible for copying out
- * non-matching package database entries. At package database EOF, the
- * eocontents flag is set and the rest of the extlist are assumed to be new
- * entries. At the end of the extlist, the eoextlist flag is set and the
- * remaining package database ends up copied out by srchcfile().
  */
 
 int
-pkgdbmerg(VFP_T *mapvfp, VFP_T *tmpvfp, struct cfextra **extlist, int notify)
+pkgdbmerg(PKGserver server, VFP_T *tmpvfp, struct cfextra **extlist)
 {
 	static	struct	cfent	cf_ent;	/* scratch area */
 	struct	cfextra	*el_ent;	/* extlist entry under review */
-	int	eocontents = 0;
-	int	eoextlist = 0;
 	int	n;
 	int	changed;
 	int	assume_ok = 0;
 
 	cf_ent.pinfo = (NULL);
 	errflg = 0;
-	eptnum = 0;
 	installed = changed = 0;
 
-	fpvfp = mapvfp;	/* for notice function ...arg! */
-
-	if (notify) {
-		seconds = notify;
-		(void) signal(SIGALRM, notice);
-		(void) alarm(seconds);
-	}
-
-	(void) sighold(SIGALRM);
-
-	sizetot = (((ptrdiff_t)(mapvfp->_vfpEnd)) -
-				((ptrdiff_t)(mapvfp->_vfpStart)));
-	vfpRewind(mapvfp);
 	vfpRewind(tmpvfp);
 
-	(void) sigrelse(SIGALRM);
-
-	do {
-		(void) sighold(SIGALRM);
-
+	for (eptnum = 0; (el_ent = extlist[eptnum]) != NULL; eptnum++) {
 		/*
 		 * If there's an entry in the extlist at this position,
 		 * process that entry.
 		 */
-		if (!eoextlist && (el_ent = extlist[eptnum])) {
-
-			/* Metafiles don't get merged. */
-			if ((el_ent->cf_ent.ftype == 'i') ||
-				(el_ent->cf_ent.ftype == 'n')) {
-				continue;
-			}
-
-			/*
-			 * Copy cfextra structure for duplicated paths.
-			 * This is not just an optimization, it is
-			 * necessary for correct operation of algorithm.
-			 */
-			if ((eptnum > 0) && (strncmp(el_ent->cf_ent.path,
-			    extlist[eptnum-1]->cf_ent.path, PATH_MAX) == 0)) {
-				memcpy(extlist[eptnum], extlist[eptnum-1],
-				    sizeof (struct cfextra));
-				continue;
-			}
-
-			/*
-			 * Normally dbst comes to us from installf() or
-			 * removef() in order to specify their special
-			 * database status codes. They cannot implement a
-			 * quick verify (it just doesn't make sense). For
-			 * that reason, we can test to see if we already have
-			 * a special database status. If we don't (it's from
-			 * pkgadd) then we can test to see if this is calling
-			 * for a quick verify wherein we assume the install
-			 * will work and fix it if it doesn't. In that case
-			 * we set our own dbst to be ENTRY_OK.
-			 */
-			if (dbst == '\0') {
-				if (cl_dvfy(el_ent->cf_ent.pkg_class_idx) ==
-				    QKVERIFY) {
-					assume_ok = 1;
-				}
-			} else {
-				/*
-				 * If we DO end up with an installf/quick
-				 * verify combination, we fix that by simply
-				 * denying the quick verify for this class.
-				 * This forces everything to come out alright
-				 * by forcing the standard assumptions as
-				 * regards package database for the rest of
-				 * the load.
-				 */
-				if (cl_dvfy(el_ent->cf_ent.pkg_class_idx) ==
-				    QKVERIFY) {
-					logerr(gettext(WRN_ODDVERIFY),
-					    cl_nam(
-					    el_ent->cf_ent.pkg_class_idx));
-					/*
-					 * Set destination verification to
-					 * default.
-					 */
-					cl_def_dverify(
-					    el_ent->cf_ent.pkg_class_idx);
-				}
-			}
-
-			/*
-			 * Comply with administrative requirements regarding
-			 * setuid/setgid processes.
-			 */
-			if (is_setuid(&(el_ent->cf_ent))) {
-				el_ent->mstat.setuid = 1;
-			}
-			if (is_setgid(&(el_ent->cf_ent))) {
-				el_ent->mstat.setgid = 1;
-			}
-
-			/*
-			 * If setuid/setgid processes are not allowed, reset
-			 * those bits.
-			 */
-			if (nosetuid && (el_ent->mstat.setgid ||
-			    el_ent->mstat.setuid)) {
-				el_ent->cf_ent.ainfo.mode &=
-				    ~(S_ISUID | S_ISGID);
-			}
-		} else {
-			eoextlist = 1;	/* end of extlist[] */
+		/* Metafiles don't get merged. */
+		if ((el_ent->cf_ent.ftype == 'i') ||
+			(el_ent->cf_ent.ftype == 'n')) {
+			continue;
 		}
 
 		/*
-		 * If we're not at the end of the package database, get the
-		 * next entry for comparison.
+		 * Copy cfextra structure for duplicated paths.
+		 * This is not just an optimization, it is
+		 * necessary for correct operation of algorithm.
 		 */
-		if (!eocontents) {
+		if ((eptnum > 0) && (strncmp(el_ent->cf_ent.path,
+		    extlist[eptnum-1]->cf_ent.path, PATH_MAX) == 0)) {
+			memcpy(extlist[eptnum], extlist[eptnum-1],
+			    sizeof (struct cfextra));
+			continue;
+		}
 
-			/* Search package database for this entry. */
-			n = srchcfile(&cf_ent, el_ent ?
-				el_ent->cf_ent.path : NULL,
-				mapvfp, tmpvfp);
-
+		/*
+		 * Normally dbst comes to us from installf() or
+		 * removef() in order to specify their special
+		 * database status codes. They cannot implement a
+		 * quick verify (it just doesn't make sense). For
+		 * that reason, we can test to see if we already have
+		 * a special database status. If we don't (it's from
+		 * pkgadd) then we can test to see if this is calling
+		 * for a quick verify wherein we assume the install
+		 * will work and fix it if it doesn't. In that case
+		 * we set our own dbst to be ENTRY_OK.
+		 */
+		if (dbst == '\0') {
+			if (cl_dvfy(el_ent->cf_ent.pkg_class_idx) ==
+			    QKVERIFY) {
+				assume_ok = 1;
+			}
+		} else {
 			/*
-			 * If there was an error, note it and return an error
-			 * flag.
+			 * If we DO end up with an installf/quick
+			 * verify combination, we fix that by simply
+			 * denying the quick verify for this class.
+			 * This forces everything to come out alright
+			 * by forcing the standard assumptions as
+			 * regards package database for the rest of
+			 * the load.
 			 */
-			if (n < 0) {
-				char	*errstr = getErrstr();
-				logerr(gettext(
-				    "bad entry read from contents file"));
-				logerr(gettext("- pathname: %s"),
-				    (cf_ent.path && *cf_ent.path) ?
-				    cf_ent.path : "Unknown");
-				logerr(gettext("- problem: %s"),
-				    (errstr && *errstr) ? errstr : "Unknown");
-				return (-1);
+			if (cl_dvfy(el_ent->cf_ent.pkg_class_idx) ==
+			    QKVERIFY) {
+				logerr(gettext(WRN_ODDVERIFY),
+				    cl_nam(el_ent->cf_ent.pkg_class_idx));
+				/*
+				 * Set destination verification to
+				 * default.
+				 */
+				cl_def_dverify(el_ent->cf_ent.pkg_class_idx);
+			}
+		}
+
+		/*
+		 * Comply with administrative requirements regarding
+		 * setuid/setgid processes.
+		 */
+		if (is_setuid(&(el_ent->cf_ent))) {
+			el_ent->mstat.setuid = 1;
+		}
+		if (is_setgid(&(el_ent->cf_ent))) {
+			el_ent->mstat.setgid = 1;
+		}
+
+		/*
+		 * If setuid/setgid processes are not allowed, reset
+		 * those bits.
+		 */
+		if (nosetuid && (el_ent->mstat.setgid ||
+		    el_ent->mstat.setuid)) {
+			el_ent->cf_ent.ainfo.mode &= ~(S_ISUID | S_ISGID);
+		}
+
+		/* Search package database for this entry. */
+		n = srchcfile(&cf_ent, el_ent->cf_ent.path, server);
+
+		/*
+		 * If there was an error, note it and return an error
+		 * flag.
+		 */
+		if (n < 0) {
+			char	*errstr = getErrstr();
+			progerr(ERR_CFBAD);
+			logerr(gettext("pathname: %s"),
+			    (cf_ent.path && *cf_ent.path) ?
+			    cf_ent.path : "Unknown");
+			logerr(gettext("problem: %s"),
+			    (errstr && *errstr) ? errstr : "Unknown");
+			return (-1);
+		/*
+		 * If there was a match, then merge them into a
+		 * single entry.
+		 */
+		} else if (n == 1) {
 			/*
-			 * If there was a match, then merge them into a
-			 * single entry.
+			 * If this package is overwriting a setuid or
+			 * setgid process, set the status bits so we
+			 * can inform the administrator.
 			 */
-			} else if (n == 1) {
-				/*
-				 * If this package is overwriting a setuid or
-				 * setgid process, set the status bits so we
-				 * can inform the administrator.
-				 */
-				if (is_setuid(&cf_ent)) {
-					el_ent->mstat.osetuid = 1;
-				}
+			if (is_setuid(&cf_ent)) {
+				el_ent->mstat.osetuid = 1;
+			}
 
-				if (is_setgid(&cf_ent)) {
-					el_ent->mstat.osetgid = 1;
-				}
-				/*
-				 * Detect if a symlink has changed to directory
-				 * If so mark all the files/dir supposed to be
-				 * iniside this dir, so that they are not miss
-				 * understood by do_new_ent later as already
-				 * installed.
-				 */
-				if ((!eoextlist) && (cf_ent.ftype == 's') &&
-				    (el_ent->cf_ent.ftype == 'd')) {
-					int i;
-					int plen = strlen(el_ent->cf_ent.path);
-					for (i = eptnum + 1; extlist[i]; i++) {
-						if (strncmp(el_ent->cf_ent.path,
-						    extlist[i]->cf_ent.path,
-						    plen) != 0)
-							break;
-						extlist[i]->mstat.parentsyml2dir
-						    = 1;
-					}
-				}
-
-				if (do_like_ent(tmpvfp, el_ent, &cf_ent,
-				    assume_ok)) {
-					changed++;
-				}
-
+			if (is_setgid(&cf_ent)) {
+				el_ent->mstat.osetgid = 1;
+			}
 			/*
-			 * If the alphabetical position in the package
-			 * database is unfilled, then this will be a new
-			 * entry. If n == 0, then we're also at the end of
-			 * the contents file.
+			 * Detect if a symlink has changed to directory
+			 * If so mark all the files/dir supposed to be
+			 * iniside this dir, so that they are not miss
+			 * understood by do_new_ent later as already
+			 * installed.
 			 */
-			} else {
-				if (n == 0) {
-					eocontents++;
-				}
-
-				/*
-				 * If there is an extlist entry in the
-				 * hopper, insert it at the end of the
-				 * package database.
-				 */
-				if (!eoextlist) {
-					if (do_new_ent(tmpvfp, el_ent,
-					    assume_ok)) {
-						changed++;
-					}
+			if ((cf_ent.ftype == 's') &&
+			    (el_ent->cf_ent.ftype == 'd')) {
+				int i;
+				int plen = strlen(el_ent->cf_ent.path);
+				for (i = eptnum + 1; extlist[i]; i++) {
+					if (strncmp(el_ent->cf_ent.path,
+					    extlist[i]->cf_ent.path,
+					    plen) != 0)
+						break;
+					extlist[i]->mstat.parentsyml2dir
+					    = 1;
 				}
 			}
-		/*
-		 * We have passed the last entry in the package database,
-		 * tagging these extlist entries onto the end.
-		 */
-		} else if (!eoextlist) {
+
+			if (do_like_ent(tmpvfp, el_ent, &cf_ent, assume_ok)) {
+				changed++;
+			}
+
+		} else {
+			/*
+			 * The file doesn't exist in the database.
+			 */
 			if (do_new_ent(tmpvfp, el_ent, assume_ok)) {
 				changed++;
 			}
 		}
-		/* Else, we'll drop out of the loop. */
-
-		(void) sigrelse(SIGALRM);
-	} while (eptnum++, (!eocontents || !eoextlist));
-
-	if (notify) {
-		(void) alarm(0);
-		(void) signal(SIGALRM, SIG_IGN);
 	}
 
 	return (errflg ? -1 : changed);

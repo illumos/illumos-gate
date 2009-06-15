@@ -24,22 +24,18 @@
 # Use is subject to license terms.
 #
 
-PROG=           pkgadm
+PROG=		pkgserv
 
-OBJS=           addcert.o	\
-		certs.o		\
-		listcert.o	\
-		lock.o		\
-		main.o		\
-		removecert.o
+OBJS=		pkgserv.o
 
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg
 
-LDLIBS	+=	-lpkg -ladm -lcrypto -lgen
+LDLIBS  +=      -lpkg -lumem -lavl
+
 
 .KEEP_STATE:
 all:            $(PROG)
 
-install:	all $(ROOTPROG)
+install:	all $(ROOTPKGBINPROG)
 
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg.targ

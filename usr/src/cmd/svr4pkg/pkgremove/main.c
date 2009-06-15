@@ -76,7 +76,7 @@ extern int	rckrunlevel(void);
 extern void	predepend(char *oldpkg);
 
 /* delmap.c */
-extern int delmap(int flag, char *pkginst);
+extern int delmap(int flag, char *pkginst, PKGserver *server, VFP_T **tfp);
 
 #define	DEFPATH		"/sbin:/usr/sbin:/usr/bin"
 
@@ -188,6 +188,8 @@ main(int argc, char *argv[])
 	int		pkgrmremote = 0;	/* dont remove remote objects */
 	struct sigaction	nact;
 	struct sigaction	oact;
+	PKGserver	pkgserver = NULL;
+	VFP_T		*tmpfp;
 
 	/* reset contents of all default paths */
 
@@ -221,6 +223,8 @@ main(int argc, char *argv[])
 		progerr(ERR_ROOT_SET);
 		exit(1);
 	}
+
+	pkgserversetmode(DEFAULTMODE);
 
 	/* parse command line options */
 
@@ -402,6 +406,12 @@ main(int argc, char *argv[])
 					continue;
 				}
 
+				if (strncmp(p, PKGSERV_MODE,
+				    PKGSERV_MODE_LEN) == 0) {
+					pkgserversetmode(pkgparsemode(p +
+					    PKGSERV_MODE_LEN));
+					continue;
+				}
 				/* option not recognized - issue warning */
 
 				progerr(ERR_INVALID_O_OPTION, p);
@@ -954,7 +964,7 @@ main(int argc, char *argv[])
 		echoDebug(DBG_PKGREMOVE_PROCPKG_LZ, pkginst, rlockfile,
 			zoneName);
 	}
-	if (delmap(0, pkginst) != 0) {
+	if (delmap(0, pkginst, &pkgserver, &tmpfp) != 0) {
 		progerr(ERR_DB_QUERY, pkginst);
 		quit(99);
 	}
@@ -1103,7 +1113,7 @@ main(int argc, char *argv[])
 		echo(MSG_PKGREMOVE_UPDINF_LZ, zoneName);
 	}
 
-	if (delmap(1, pkginst) != 0) {
+	if (delmap(1, pkginst, &pkgserver, &tmpfp) != 0) {
 		progerr(ERR_DB_QUERY, pkginst);
 		quit(99);
 	}
@@ -1130,6 +1140,8 @@ main(int argc, char *argv[])
 	/* release the generic package lock */
 
 	(void) unlockinst();
+
+	pkgcloseserver(pkgserver);
 
 	quit(0);
 	/* LINTED: no return */

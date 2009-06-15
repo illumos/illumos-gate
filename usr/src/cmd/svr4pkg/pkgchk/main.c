@@ -372,6 +372,9 @@ main(int argc, char *argv[])
 		pkgcnt = (argc - optind);
 	}
 
+	/* read the environment for the pkgserver */
+	pkgserversetmode(DEFAULTMODE);
+
 	environ = NULL;		/* Sever the parent environment. */
 
 	if (vcfile() == 0) {

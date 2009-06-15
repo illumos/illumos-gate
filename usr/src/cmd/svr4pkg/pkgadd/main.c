@@ -218,7 +218,7 @@ static void		pkginstall_check_in_one_zone(char **a_inheritedPkgDirs,
 				char *a_zoneName, char *a_idsName,
 				char *a_zoneAdminFile, char *a_zoneTempDir,
 				char *a_altBinDir, char *a_scratchName,
-				zone_state_t a_zoneState);
+				zone_state_t a_zoneState, boolean_t a_tmpzn);
 static void		ckreturn(int retcode);
 static void		create_zone_adminfile(char **r_zoneAdminFile,
 				char *a_zoneTempDir, char *a_admnfile);
@@ -227,7 +227,8 @@ static void		create_zone_tempdir(char **r_zoneTempDir,
 static void		install_in_one_zone(char **a_inheritedPkgDirs,
 				char *a_zoneName, char *a_idsName,
 				char *a_zoneAdminFile, char *a_zoneTempDir,
-				char *a_altBinDir, zone_state_t a_zoneState);
+				char *a_altBinDir, zone_state_t a_zoneState,
+				boolean_t a_tmpzn);
 static int		pkginstall_check_in_zones(zoneList_t a_zlst,
 				char *a_idsName, char *a_altBinDir,
 				char *a_zoneAdminFile, char *a_zoneTempDir);
@@ -240,12 +241,13 @@ static int		pkgZoneCheckInstall(char *a_zoneName,
 				char **a_inheritedPkgDirs,
 				zone_state_t a_zoneState,
 				char *a_idsName, char *a_altBinDir,
-				char *a_adminFile, char *a_stdoutPath);
+				char *a_adminFile, char *a_stdoutPath,
+				boolean_t a_tmpzn);
 static int		pkgZoneInstall(char *a_zoneName,
 				char **a_inheritedPkgDirs,
 				zone_state_t a_zoneState,
 				char *a_idsName, char *a_altBinDir,
-				char *a_adminFile);
+				char *a_adminFile, boolean_t a_tmpzn);
 static void		resetreturn();
 static void		usage(void);
 static boolean_t	add_packages(char **a_pkgList, char *a_uri,
@@ -373,6 +375,8 @@ main(int argc, char **argv)
 	if (z_running_in_global_zone() && !enable_local_fs()) {
 		progerr(ERR_CANNOT_ENABLE_LOCAL_FS);
 	}
+
+	pkgserversetmode(DEFAULTMODE);
 
 	/*
 	 * ********************************************************************
@@ -1508,6 +1512,8 @@ main(int argc, char **argv)
  *			into which all output written by pkginstall to stdout
  *			is stored.
  *			If this is == NULL stdout is redirected to /dev/null
+ *		a_tmpzn - B_TRUE when this zone is booted by the package
+ *			command or B_FALSE if it was running before.
  * Returns:	int	(see ckreturn() function for details)
  *		0 - success
  *		1 - package operation failed (fatal error)
@@ -1522,7 +1528,7 @@ main(int argc, char **argv)
 static int
 pkgZoneCheckInstall(char *a_zoneName, char **a_inheritedPkgDirs,
 	zone_state_t a_zoneState, char *a_idsName, char *a_altBinDir,
-	char *a_adminFile, char *a_stdoutPath)
+	char *a_adminFile, char *a_stdoutPath, boolean_t a_tmpzn)
 {
 	char	*arg[MAXARGS];
 	char	*p;
@@ -1748,6 +1754,10 @@ pkgZoneCheckInstall(char *a_zoneName, char **a_inheritedPkgDirs,
 			arg[nargs++] = strdup(zn);
 	}
 
+	/* Add the pkgserv options */
+	arg[nargs++] = "-O";
+	arg[nargs++] = pkgmodeargument(a_tmpzn ? RUN_ONCE : pkgservergetmode());
+
 	/* add in the package stream file */
 
 	if (a_idsName != NULL) {
@@ -1837,6 +1847,8 @@ pkgZoneCheckInstall(char *a_zoneName, char **a_inheritedPkgDirs,
  *			into which all output written by pkginstall to stdout
  *			is stored.
  *			If this is == NULL stdout is redirected to /dev/null
+ *		a_tmpzn - B_TRUE when this zone is booted by the package
+ *			command or B_FALSE if it was running before.
  * Returns:	int	(see ckreturn() function for details)
  *		0 - success
  *		1 - package operation failed (fatal error)
@@ -1851,7 +1863,7 @@ pkgZoneCheckInstall(char *a_zoneName, char **a_inheritedPkgDirs,
 static int
 pkgZoneInstall(char *a_zoneName, char **a_inheritedPkgDirs,
     zone_state_t a_zoneState, char *a_idsName, char *a_altBinDir,
-    char *a_adminFile)
+    char *a_adminFile, boolean_t a_tmpzn)
 {
 	char	*arg[MAXARGS];
 	char	*p;
@@ -2107,6 +2119,10 @@ pkgZoneInstall(char *a_zoneName, char **a_inheritedPkgDirs,
 			arg[nargs++] = strdup(zn);
 	}
 
+	/* Add the pkgserv options */
+	arg[nargs++] = "-O";
+	arg[nargs++] = pkgmodeargument(a_tmpzn ? RUN_ONCE : pkgservergetmode());
+
 	/* add in the package stream file */
 
 	if (a_idsName != NULL) {
@@ -2256,6 +2272,9 @@ pkgInstall(char *a_altRoot, char *a_idsName, char *a_pkgDir, char *a_altBinDir,
 			arg[nargs++] = "patchPkgInstall";
 		}
 	}
+
+	arg[nargs++] = "-O";
+	arg[nargs++] = pkgmodeargument(pkgservergetmode());
 
 	/*
 	 * pkgadd -G: pass -G to pkginstall if:
@@ -3403,6 +3422,8 @@ get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
  *		a_scratchName - pointer to string representing the name of the
  *			scratch zone to use for installation.
  *		a_zoneState - state of the zone; must be mounted or running.
+ *		a_tmpzn - B_TRUE when this zone is booted by the package
+ *			command or B_FALSE if it was running before.
  * Returns:	void
  * NOTE:	As a side effect, "ckreturn" is called on the result returned
  *		from running 'pkginstall' in the zone; this sets several global
@@ -3413,7 +3434,7 @@ get_package_list(char ***r_pkgList, char **a_argv, char *a_categories,
 static void
 install_in_one_zone(char **a_inheritedPkgDirs, char *a_zoneName,
 	char *a_idsName, char *a_zoneAdminFile, char *a_zoneTempDir,
-	char *a_altBinDir, zone_state_t a_zoneState)
+	char *a_altBinDir, zone_state_t a_zoneState, boolean_t a_tmpzn)
 {
 	char	zoneStreamName[PATH_MAX] = {'\0'};
 	int	n;
@@ -3449,7 +3470,7 @@ install_in_one_zone(char **a_inheritedPkgDirs, char *a_zoneName,
 	echoDebug(DBG_INSTALL_IN_ZONE, pkginst, a_zoneName, zoneStreamName);
 
 	n = pkgZoneInstall(a_zoneName, a_inheritedPkgDirs, a_zoneState,
-		zoneStreamName, a_altBinDir, a_zoneAdminFile);
+		zoneStreamName, a_altBinDir, a_zoneAdminFile, a_tmpzn);
 
 	/* set success/fail condition variables */
 
@@ -3528,7 +3549,7 @@ install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 
 		install_in_one_zone(inheritedPkgDirs,
 		    z_zlist_get_scratch(a_zlst, zoneIndex), a_idsName,
-		    a_zoneAdminFile, a_zoneTempDir, a_altBinDir, zst);
+		    a_zoneAdminFile, a_zoneTempDir, a_altBinDir, zst, B_FALSE);
 	}
 
 	return (zonesSkipped);
@@ -3625,7 +3646,7 @@ boot_and_install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 		install_in_one_zone(inheritedPkgDirs,
 		    z_zlist_get_scratch(a_zlst, zoneIndex), a_idsName,
 		    a_zoneAdminFile, a_zoneTempDir, a_altBinDir,
-		    ZONE_STATE_MOUNTED);
+		    ZONE_STATE_MOUNTED, B_TRUE);
 
 		/* restore original state of zone */
 
@@ -3664,6 +3685,8 @@ boot_and_install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
  *		a_scratchName - pointer to string representing the name of the
  *			scratch zone to use for installation.
  *		a_zoneState - state of the zone; must be mounted or running.
+ *		a_tmpzn - B_TRUE when this zone is booted by the package
+ *			command or B_FALSE if it was running before.
  * Returns:	void
  * NOTE:	As a side effect, "ckreturn" is called on the result returned
  *		from running 'pkginstall' in the zone; this sets several global
@@ -3674,7 +3697,8 @@ boot_and_install_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 static void
 pkginstall_check_in_one_zone(char **a_inheritedPkgDirs, char *a_zoneName,
 	char *a_idsName, char *a_zoneAdminFile, char *a_zoneTempDir,
-	char *a_altBinDir, char *a_scratchName, zone_state_t a_zoneState)
+	char *a_altBinDir, char *a_scratchName, zone_state_t a_zoneState,
+	boolean_t a_tmpzn)
 {
 	char	preinstallcheckPath[PATH_MAX+1];
 	char	zoneStreamName[PATH_MAX] = {'\0'};
@@ -3701,7 +3725,7 @@ pkginstall_check_in_one_zone(char **a_inheritedPkgDirs, char *a_zoneName,
 
 	n = pkgZoneCheckInstall(a_scratchName, a_inheritedPkgDirs,
 	    a_zoneState, zoneStreamName, a_altBinDir, a_zoneAdminFile,
-	    preinstallcheckPath);
+	    preinstallcheckPath, a_tmpzn);
 
 	/* set success/fail condition variables */
 
@@ -3761,7 +3785,7 @@ pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName, char *a_altBinDir,
 
 		pkginstall_check_in_one_zone(inheritedPkgDirs, zoneName,
 		    a_idsName, a_zoneAdminFile, a_zoneTempDir, a_altBinDir,
-		    z_zlist_get_scratch(a_zlst, zoneIndex), zst);
+		    z_zlist_get_scratch(a_zlst, zoneIndex), zst, B_FALSE);
 	}
 
 	return (zonesSkipped);
@@ -3859,7 +3883,7 @@ boot_and_pkginstall_check_in_zones(zoneList_t a_zlst, char *a_idsName,
 		pkginstall_check_in_one_zone(inheritedPkgDirs, zoneName,
 		    a_idsName, a_zoneAdminFile, a_zoneTempDir, a_altBinDir,
 		    z_zlist_get_scratch(a_zlst, zoneIndex),
-		    ZONE_STATE_MOUNTED);
+		    ZONE_STATE_MOUNTED, B_TRUE);
 
 		/* restore original state of zone */
 

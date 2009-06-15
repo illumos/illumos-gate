@@ -39,6 +39,7 @@ CMDSUBDIRS=	\
 		pkgremove	\
 		pkgrm		\
 		pkgscripts	\
+		pkgserv		\
 		pkgtrans
 
 .PARALLEL=	$(CMDSUBDIRS)

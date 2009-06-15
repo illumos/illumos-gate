@@ -246,8 +246,7 @@ static char *cpio_names[] = {
 int
 main(int argc, char *argv[])
 {
-	VFP_T			*cfTmpVfp = (VFP_T *)NULL;	/* t.contents */
-	VFP_T			*cfVfp = (VFP_T *)NULL;		/* contents */
+	VFP_T			*cfTmpVfp = NULL;	/* temporary */
 	VFP_T			*pkgmapVfp;	/* "../pkgmap" file */
 	boolean_t		run_request_as_root = B_FALSE;
 	char			**np;
@@ -291,6 +290,7 @@ main(int argc, char *argv[])
 	struct stat		statb;
 	struct statvfs64	svfsb;
 	time_t			clock;
+	PKGserver		pkgserver = NULL;
 
 	/* reset contents of all default paths */
 
@@ -350,6 +350,8 @@ main(int argc, char *argv[])
 		progerr(ERR_ROOT_SET);
 		exit(1);
 	}
+
+	pkgserversetmode(DEFAULTMODE);
 
 	/* parse command line options */
 
@@ -689,6 +691,13 @@ main(int argc, char *argv[])
 					continue;
 				}
 
+				if (strncmp(p, PKGSERV_MODE,
+				    PKGSERV_MODE_LEN) == 0) {
+					pkgserversetmode(pkgparsemode(p +
+					    PKGSERV_MODE_LEN));
+					continue;
+				}
+
 				/* option not recognized - issue warning */
 
 				progerr(ERR_INVALID_O_OPTION, p);
@@ -842,7 +851,7 @@ main(int argc, char *argv[])
 		echoDebug(DBG_ENTRY_IN_GZ, prog_full_name);
 	} else {
 		echoDebug(DBG_ENTRY_IN_LZ, prog_full_name, getzoneid(),
-			z_get_zonename());
+		    z_get_zonename());
 	}
 
 	if (in_continue_mode() && !in_dryrun_mode()) {
@@ -1811,7 +1820,7 @@ main(int argc, char *argv[])
 			/*NOTREACHED*/
 		}
 	}
-	if (!ocfile(&cfVfp, &cfTmpVfp, pkgmap_blks)) {
+	if (!ocfile(&pkgserver, &cfTmpVfp, pkgmap_blks)) {
 		quit(99);
 		/*NOTREACHED*/
 	}
@@ -1844,7 +1853,7 @@ main(int argc, char *argv[])
 	 * how they should look after the merg is complete
 	 */
 
-	nparts = sortmap(&extlist, pkgmapVfp, cfVfp, cfTmpVfp, zoneName);
+	nparts = sortmap(&extlist, pkgmapVfp, pkgserver, cfTmpVfp, zoneName);
 
 	if ((n = files_installed()) > 0) {
 		if (n > 1) {
@@ -1976,7 +1985,7 @@ main(int argc, char *argv[])
 	 */
 
 	if (rprcflag) {
-		nparts = sortmap(&extlist, pkgmapVfp, cfVfp,
+		nparts = sortmap(&extlist, pkgmapVfp, pkgserver,
 				cfTmpVfp, zoneName);
 	}
 
@@ -2003,7 +2012,7 @@ main(int argc, char *argv[])
 	 * reviewed.
 	 */
 
-	n = swapcfile(&cfVfp, &cfTmpVfp, pkginst, dbchg);
+	n = swapcfile(pkgserver, &cfTmpVfp, pkginst, dbchg);
 	if (n == RESULT_WRN) {
 		warnflag++;
 	} else if (n == RESULT_ERR) {
@@ -2146,7 +2155,7 @@ main(int argc, char *argv[])
 		}
 
 		instvol(extlist, srcinst, part, nparts,
-			&cfVfp, &cfTmpVfp, &updated,
+			pkgserver, &cfTmpVfp, &updated,
 			&skipped, zoneName);
 
 		if (part++ >= nparts) {
@@ -2244,6 +2253,8 @@ main(int argc, char *argv[])
 	/* release the generic package lock */
 
 	(void) unlockinst();
+
+	pkgcloseserver(pkgserver);
 
 	quit(0);
 	/* LINTED: no return */

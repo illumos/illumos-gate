@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,11 @@ extern "C" {
 "\n" \
 "\t- Returns 'text' - the text install database in use since Solaris 2.0\n" \
 "\t  is the current install database in use.\n" \
+"\n" \
+"pkgadm sync [-R rootpath] [-q]\n" \
+"\n" \
+"\t- Writes the contents file and rolls the contents log file.\n" \
+"\t- Optionally forces the contents file server to quit [-q].\n" \
 "\n" \
 "pkgadm -V\n" \
 "\t- Displays packaging tools version\n" \

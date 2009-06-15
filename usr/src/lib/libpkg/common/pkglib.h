@@ -49,6 +49,58 @@ extern "C" {
 #include "cfext.h"
 
 /*
+ * The contents database file interface.
+ */
+
+typedef struct pkg_server *PKGserver;
+
+/* Some commands modify the internal database: add them here */
+#define	PKG_WRITE_COMMAND(cmd)	((cmd) == PKG_ADDLINES)
+
+#define	PKG_EXIT		0x0
+#define	PKG_FINDFILE		0x1
+#define	PKG_DUMP		0x2
+#define	PKG_PKGSYNC		0x3
+#define	PKG_FILTER		0x4
+#define	PKG_ADDLINES		0x5
+#define	PKG_NOP			0x6
+
+#define	SUNW_PKG_SERVERMODE	"SUNW_PKG_SERVERMODE"
+
+#define	PKGSERV_MODE		"pkg-server-mode="
+#define	PKGSERV_MODE_LEN	(sizeof (PKGSERV_MODE) - 1)
+
+#define	MODE_PERMANENT		"permanent"
+#define	MODE_RUN_ONCE		"run_once"
+#define	MODE_TIMEOUT		"timeout"
+
+#define	MAXLOGFILESIZE		(20 * 1024 * 1024)
+
+#define	PKGLOG			"pkglog"
+#define	PKGDOOR			".door"
+
+typedef enum {
+	INVALID,		/* Not initialized */
+	NEVER,			/* Don't start, does check if it is running. */
+	FLUSH_LOG,		/* Run it once to incorporate the log. */
+	RUN_ONCE,		/* Run until the current client stops. */
+	TIMEOUT,		/* Run until a timeout occurs. */
+	PERMANENT,		/* Run until it is externally terminated. */
+	DEFAULTMODE = TIMEOUT	/* The default mode, must come last */
+} start_mode_t;
+
+typedef struct pkgcmd {
+	int cmd;
+	char buf[1];
+} pkgcmd_t;
+
+typedef struct pkgfilter {
+	int cmd;
+	int len;
+	char buf[1];
+} pkgfilter_t;
+
+/*
  * Virtual File Protocol definitions
  */
 
@@ -428,8 +480,7 @@ extern void	set_passphrase_prompt(char *);
 extern void	set_passphrase_passarg(char *);
 extern int	pkg_passphrase_cb(char *, int, int, void *);
 
-extern int	srchcfile(struct cfent *ept, char *path, VFP_T *vfp,
-			VFP_T *vfpout);
+extern int	srchcfile(struct cfent *ept, char *path, PKGserver server);
 extern struct	group *cgrgid(gid_t gid);
 extern struct	group *cgrnam(char *nam);
 extern struct	passwd *cpwnam(char *nam);
@@ -517,6 +568,25 @@ extern int	vfpWriteToFile(VFP_T *a_vfp, char *a_path);
 /* handlelocalfs.c */
 boolean_t	enable_local_fs(void);
 boolean_t	restore_local_fs(void);
+
+/* pkgserv.c */
+extern PKGserver	pkgopenserver(const char *, const char *, boolean_t);
+extern void		pkgcloseserver(PKGserver);
+extern int		pkgcmd(PKGserver, void *, size_t, char **, size_t *,
+    int *);
+extern boolean_t	pkgsync_needed(const char *, const char *, boolean_t);
+extern int		pkgsync(const char *, const char *, boolean_t);
+extern int		pkgservercommitfile(VFP_T *, PKGserver);
+extern int		pkgopenfilter(PKGserver server, const char *pkginst);
+extern void		pkgclosefilter(PKGserver);
+extern char 		*pkggetentry(PKGserver, int *, int *);
+extern char 		*pkggetentry_named(PKGserver, const char *, int *,
+    int *);
+extern void		pkgserversetmode(start_mode_t);
+extern start_mode_t	pkgservergetmode(void);
+extern start_mode_t	pkgparsemode(const char *);
+extern char 		*pkgmodeargument(start_mode_t);
+
 
 #else	/* __STDC__ */
 

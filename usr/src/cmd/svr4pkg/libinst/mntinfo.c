@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,6 +170,10 @@ is_remote_src(char *source)
 	while (*src_ptr != ':')
 		*src_host_ptr++ = *src_ptr++;
 	*src_host_ptr = '\0';
+
+	/* Multiple hosts: failover with multiple servers; this is remote. */
+	if (strchr(source_host, ',') != NULL)
+		return (REAL_REMOTE);
 
 	if (strncmp(source, host_name, hn_len) == 0 &&
 	    *(source+hn_len) == ':' || is_local_host(source_host))
@@ -702,9 +706,16 @@ construct_mt(struct mnttab *mt)
 	if ((nfte = fs_tab_init(mt->mnt_mountp, mt->mnt_fstype)) == NULL)
 		return (1);
 
-	/* See if this is served from another host. */
-	if (is_remote_src(mt->mnt_special) == REAL_REMOTE ||
-	    strcmp(mt->mnt_fstype, MNTTYPE_AUTO) == 0)
+	/*
+	 * See if this is served from another host.
+	 * Testing the type is cheap; finding the hostname is not.
+	 * At this point, we're using the REAL mnttab; since we're not
+	 * allowed to mount ourself with "NFS", "NFS" must be remote.
+	 * The automount will translate "nfs:self" to a lofs mount.
+	 */
+	if (strcmp(mt->mnt_fstype, MNTTYPE_AUTO) == 0 ||
+	    strcmp(mt->mnt_fstype, MNTTYPE_NFS) == 0 ||
+	    is_remote_src(mt->mnt_special) == REAL_REMOTE)
 		nfte->remote = 1;
 	else
 		nfte->remote = 0;

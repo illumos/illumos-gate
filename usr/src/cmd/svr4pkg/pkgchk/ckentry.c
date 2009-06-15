@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,9 +48,7 @@
 extern int	Lflag, lflag, aflag, cflag, fflag, qflag, nflag, xflag, vflag;
 extern char	*basedir, *device, pkgspool[];
 
-#define	NXTENTRY(P, VFP) \
-		(maptyp ? srchcfile((P), "*", (VFP), (VFP_T *)NULL) :\
-		gpkgmapvfp((P), (VFP)))
+#define	NXTENTRY(P, VFP) (gpkgmapvfp((P), (VFP)))
 
 #define	ERR_SPOOLED	"ERROR: unable to locate spooled object <%s>"
 #define	MSG_NET_OBJ	"It is remote and may be available from the network."
@@ -58,10 +56,11 @@ extern char	*basedir, *device, pkgspool[];
 #define	ERR_HIDDEN	"ERROR: hidden file in exclusive directory"
 
 static char	*findspool(struct cfent *ept);
-static int	xdir(int maptyp, VFP_T *vfp, char *dirname);
+static int	xdir(int maptyp, VFP_T *vfp, PKGserver server, char *dirname);
 
 int
-ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp)
+ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp,
+    PKGserver server)
 {
 	int	a_err, c_err,
 		errflg;
@@ -188,7 +187,7 @@ ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp)
 		if (xflag && (ept->ftype == 'x')) {
 			/* must do verbose here since ept->path will change */
 			path = strdup(ept->path);
-			if (xdir(maptyp, vfp, path))
+			if (xdir(maptyp, vfp, server, path))
 				errflg++;
 			(void) strcpy(ept->path, path);
 			free(path);
@@ -200,10 +199,10 @@ ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp)
 }
 
 static int
-xdir(int maptyp, VFP_T *vfp, char *dirname)
+xdir(int maptyp, VFP_T *vfp, PKGserver server, char *dirname)
 {
 	DIR		*dirfp;
-	char		badpath[PATH_MAX+1];
+	char		badpath[PATH_MAX];
 	int		dirfound;
 	int		errflg;
 	int		len;
@@ -213,7 +212,8 @@ xdir(int maptyp, VFP_T *vfp, char *dirname)
 	struct pinfo	*pinfo;
 	void		*pos;
 
-	pos = vfpGetCurrCharPtr(vfp);	/* get current position in file */
+	if (!maptyp)
+		pos = vfpGetCurrCharPtr(vfp); /* get current position in file */
 
 	if ((dirfp = opendir(dirname)) == NULL) {
 		progerr(gettext("unable to open directory <%s>"), dirname);
@@ -227,51 +227,56 @@ xdir(int maptyp, VFP_T *vfp, char *dirname)
 		if (strcmp(drp->d_name, ".") == NULL ||
 		    strcmp(drp->d_name, "..") == NULL)
 			continue;
-		dirfound = 0;
-		while ((n = NXTENTRY(&mine, vfp)) != 0) {
-			if (n < 0) {
-				char	*errstr = getErrstr();
-				logerr(gettext("ERROR: garbled entry"));
-				logerr(gettext("pathname: %s"),
-				    (mine.path && *mine.path) ? mine.path :
-				    "Unknown");
-				logerr(gettext("problem: %s"),
-				    (errstr && *errstr) ? errstr : "Unknown");
-				exit(99);
+		(void) snprintf(badpath, sizeof (badpath), "%s/%s",
+		    dirname, drp->d_name);
+		if (!maptyp) {
+			dirfound = 0;
+			while ((n = NXTENTRY(&mine, vfp)) != 0) {
+				if (n < 0) {
+					char	*errstr = getErrstr();
+					logerr(gettext("ERROR: garbled entry"));
+					logerr(gettext("pathname: %s"),
+					    (mine.path && *mine.path) ?
+					    mine.path : "Unknown");
+					logerr(gettext("problem: %s"),
+					    (errstr && *errstr) ? errstr :
+					    "Unknown");
+					exit(99);
+				}
+				if (strncmp(mine.path, dirname, len) ||
+				    (mine.path[len] != '/'))
+					break;
+				if (strcmp(drp->d_name, &mine.path[len+1]) ==
+				    0) {
+					dirfound++;
+					break;
+				}
 			}
-			if (strncmp(mine.path, dirname, len) ||
-			(mine.path[len] != '/'))
-				break;
-			if (strcmp(drp->d_name, &mine.path[len+1]) == NULL) {
-				dirfound++;
-				break;
+
+			vfpGetCurrCharPtr(vfp) = pos;
+
+			if (dirfound)
+				continue;
+		} else {
+			if (srchcfile(&mine, badpath, server) == 1) {
+				while ((pinfo = mine.pinfo) != NULL) {
+					mine.pinfo = pinfo->next;
+					free((char *)pinfo);
+				}
+				continue;
 			}
 		}
 
-		vfpGetCurrCharPtr(vfp) = pos;
-
-		if (!dirfound) {
-			(void) snprintf(badpath, sizeof (badpath),
-				"%s/%s", dirname, drp->d_name);
-			if (fflag) {
-				if (unlink(badpath)) {
-					errflg++;
-					logerr(gettext("ERROR: %s"), badpath);
-					logerr(gettext(ERR_RMHIDDEN));
-				}
-			} else {
+		if (fflag) {
+			if (unlink(badpath)) {
 				errflg++;
 				logerr(gettext("ERROR: %s"), badpath);
-				logerr(gettext(ERR_HIDDEN));
+				logerr(gettext(ERR_RMHIDDEN));
 			}
-		}
-	}
-
-	if (maptyp) {
-		/* clear memory we've used */
-		while ((pinfo = mine.pinfo) != NULL) {
-			mine.pinfo = pinfo->next;
-			free((char *)pinfo);
+		} else {
+			errflg++;
+			logerr(gettext("ERROR: %s"), badpath);
+			logerr(gettext(ERR_HIDDEN));
 		}
 	}
 

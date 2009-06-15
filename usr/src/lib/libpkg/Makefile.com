@@ -40,7 +40,7 @@ OBJECTS=	\
 		verify.o     security.o   pkgweb.o \
 		pkgerr.o     keystore.o   p12lib.o \
 		vfpops.o     fmkdir.o     pkgstr.o \
-		handlelocalfs.o
+		handlelocalfs.o	pkgserv.o
 
 
 # include library definitions

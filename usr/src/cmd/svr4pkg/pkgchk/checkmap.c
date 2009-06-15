@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,15 +55,11 @@ extern char	*basedir, *pathlist[], *ppathlist[], **pkg, **environ;
 extern short	used[];
 extern struct cfent **eptlist;
 
-/* ocfile.c */
-extern int	socfile(VFP_T **vfp);	/* simple open & lock of DB. */
-extern int	relslock(void);		/* unlock the database. */
-
 /* ckentry.c */
-extern int	ckentry(int envflag, int maptyp, struct cfent *ept, VFP_T *vfp);
+extern int	ckentry(int, int, struct cfent *, VFP_T *, PKGserver);
 
-#define	NXTENTRY(P, VFP) \
-		(maptyp ? srchcfile((P), "*", (VFP), (VFP_T *)NULL) : \
+#define	NXTENTRY(P, VFP, SRV) \
+		(maptyp ? srchcfile((P), "*", (SRV)) : \
 		gpkgmapvfp((P), (VFP)))
 
 #define	MSG_ARCHIVE	"NOTE: some pathnames are in private formats " \
@@ -106,6 +102,7 @@ checkmap(int maptyp, int uninst, char *mapfile, char *envfile,
 	int		selected;
 	struct pinfo	*pinfo;
 	VFP_T		*vfp = (VFP_T *)NULL;
+	PKGserver	server;
 
 	if (envfile != NULL) {
 		if ((fp = fopen(envfile, "r")) == NULL) {
@@ -151,7 +148,8 @@ checkmap(int maptyp, int uninst, char *mapfile, char *envfile,
 	 * on some unknown medium so we don't bother.
 	 */
 	if (maptyp) {	/* If this is the contents file */
-		if (!socfile(&vfp)) {
+		if (!socfile(&server, B_FALSE) ||
+		    pkgopenfilter(server, pkgcnt == 1 ? pkginst : NULL) != 0) {
 			progerr(gettext(ERR_PKGMAP), "contents");
 			return (-1);
 		}
@@ -168,7 +166,7 @@ checkmap(int maptyp, int uninst, char *mapfile, char *envfile,
 	errflg = count = 0;
 
 	do {
-		if ((n = NXTENTRY(&entry, vfp)) == 0) {
+		if ((n = NXTENTRY(&entry, vfp, server)) == 0) {
 			break;
 		}
 		/*
@@ -179,8 +177,7 @@ checkmap(int maptyp, int uninst, char *mapfile, char *envfile,
 			if (is_partial_path_in_DB(entry.path, path)) {
 				/* Check this entry */
 				;
-			} else if (entry.ftype == 's' ||
-						entry.ftype == 'l') {
+			} else if (entry.ftype == 's' || entry.ftype == 'l') {
 				if (is_partial_path_in_DB(
 				/* LINTED warning: statement has no consequen */
 					entry.ainfo.local, path)) {
@@ -260,14 +257,14 @@ checkmap(int maptyp, int uninst, char *mapfile, char *envfile,
 					continue;
 
 		count++;
-		if (ckentry((envfile ? 1 : 0), maptyp, &entry, vfp))
+		if (ckentry((envfile ? 1 : 0), maptyp, &entry, vfp, server))
 			errflg++;
 	} while (n != 0);
 
-	(void) vfpClose(&vfp);
-
 	if (maptyp)
 		relslock();
+	else
+		(void) vfpClose(&vfp);
 
 	if (environ) {
 		/* free up environment resources */

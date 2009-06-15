@@ -38,6 +38,11 @@ CLASS_ACTION_SCRIPTS =  i.awk		\
 			r.sed
 ADMINFILE =		default
 
+ROOTPKGMNFSTDIR=$(ROOT)/var/svc/manifest/system
+ROOTPKGMNFST=   $(ROOTPKGMNFSTDIR)/pkgserv.xml
+
+$(ROOTPKGMNFST) := FILEMODE = 0444
+
 # cmdexec also installed in usr/sadm/install/scripts
 SCRIPTS = $(CLASS_ACTION_SCRIPTS) $(PROG)
 
@@ -49,6 +54,7 @@ LDLIBS  +=      -lpkg
 .KEEP_STATE:
 all:	$(PROG) $(CLASS_ACTION_SCRIPTS)
 
-install: all $(ROOTCLASS_SCR_FILES) $(ROOTADMIN_SRC_FILE)
+install: all $(ROOTCLASS_SCR_FILES) $(ROOTADMIN_SRC_FILE) \
+	    $(ROOTPKGMNFST)
 
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg.targ

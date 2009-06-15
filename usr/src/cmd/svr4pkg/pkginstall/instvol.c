@@ -111,7 +111,7 @@ static int	domerg(struct cfextra **extlist, int part, int nparts,
 			char **r_updated, char **r_skipped,
 			char **r_anyPathLocal);
 static void	endofclass(struct cfextra **extlist, int myclass,
-			int ckflag, VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp);
+			int ckflag, PKGserver server, VFP_T **a_cfTmpVfp);
 static int	fix_attributes(struct cfextra **, int);
 static int	dir_is_populated(char *dirpath);
 static boolean_t absolutepath(char *path);
@@ -137,7 +137,7 @@ static struct reg_files *regfiles_head = NULL;
  */
 void
 instvol(struct cfextra **extlist, char *srcinst, int part,
-	int nparts, VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp,
+	int nparts, PKGserver pkgserver, VFP_T **a_cfTmpVfp,
 	char **r_updated, char **r_skipped,
 	char *a_zoneName)
 {
@@ -858,7 +858,7 @@ instvol(struct cfextra **extlist, char *srcinst, int part,
 				 */
 				(void) endofclass(extlist, classidx,
 					(cl_iscript(classidx) ? 0 : 1),
-					a_cfVfp, a_cfTmpVfp);
+					pkgserver, a_cfTmpVfp);
 			}
 		}
 	    }
@@ -1060,12 +1060,12 @@ domerg(struct cfextra **extlist, int part, int nparts,
 		if (ept->pkg_class_idx == -1) {
 			progerr(ERR_CLIDX, ept->pkg_class_idx,
 			    (ept->path && *ept->path) ? ept->path : "unknown");
-			logerr(gettext("pathname=%s\n"),
+			logerr(gettext("pathname=%s"),
 			    (ept->path && *ept->path) ? ept->path : "unknown");
-			logerr(gettext("class=<%s>\n"),
+			logerr(gettext("class=<%s>"),
 			    (ept->pkg_class && *ept->pkg_class) ?
 			    ept->pkg_class : "Unknown");
-			logerr(gettext("CLASSES=<%s>\n"),
+			logerr(gettext("CLASSES=<%s>"),
 			    getenv("CLASSES") ? getenv("CLASSES") : "Not Set");
 			quit(99);
 		}
@@ -1372,7 +1372,7 @@ dir_is_populated(char *dirpath) {
  */
 static void
 endofclass(struct cfextra **extlist, int myclass, int ckflag,
-	VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp)
+	PKGserver pkgserver, VFP_T **a_cfTmpVfp)
 {
 	char		*temppath;
 	char 		*pspool_loc;
@@ -1388,7 +1388,7 @@ endofclass(struct cfextra **extlist, int myclass, int ckflag,
 
 	/* open the package database (contents) file */
 
-	if (!ocfile(a_cfVfp, a_cfTmpVfp, pkgmap_blks)) {
+	if (!ocfile(&pkgserver, a_cfTmpVfp, pkgmap_blks)) {
 		quit(99);
 	}
 
@@ -1404,41 +1404,31 @@ endofclass(struct cfextra **extlist, int myclass, int ckflag,
 			idx++;
 		}
 
-		if (extlist[idx] == NULL) {
-			/* finish copying contents file and exit loop */
-			(void) srchcfile(&(entry.cf_ent), NULL,
-					*a_cfVfp, *a_cfTmpVfp);
+		if (extlist[idx] == NULL)
 			break;
-		}
+
 
 		ept = &(extlist[idx]->cf_ent);
 		mstat = &(extlist[idx]->mstat);
 
-		temppath =
-			extlist[idx] ? extlist[idx]->client_path :
-			NULL;
+		temppath = extlist[idx]->client_path;
 
 		/*
 		 * At this point  the only difference between the entry
 		 * in the contents file and the entry in extlist[] is
 		 * that the status indicator contains CONFIRM_CONT.
-		 * So for the new DB we use this knowledge and just
-		 * verify everything in accordance with extlist without
-		 * trying to retrieve the entry from the DB.
+		 * This function should return one or something is wrong.
 		 */
 
-		n = srchcfile(&(entry.cf_ent),
-			(ept ? temppath : NULL), *a_cfVfp, *a_cfTmpVfp);
+		n = srchcfile(&(entry.cf_ent), temppath, pkgserver);
 
-		if (n == 0) {
-			break;
-		} else if (n < 0) {
+		if (n < 0) {
 			char	*errstr = getErrstr();
 			progerr(ERR_CFBAD);
-			logerr(gettext("pathname=%s\n"),
+			logerr(gettext("pathname=%s"),
 				entry.cf_ent.path && *entry.cf_ent.path ?
 				entry.cf_ent.path : "Unknown");
-			logerr(gettext("problem=%s\n"),
+			logerr(gettext("problem=%s"),
 				(errstr && *errstr) ? errstr : "Unknown");
 			quit(99);
 		} else if (n != 1) {
@@ -1601,7 +1591,7 @@ endofclass(struct cfextra **extlist, int myclass, int ckflag,
 		}
 	}
 
-	n = swapcfile(a_cfVfp, a_cfTmpVfp, pkginst, dbchg);
+	n = swapcfile(pkgserver, a_cfTmpVfp, pkginst, dbchg);
 	if (n == RESULT_WRN) {
 		warnflag++;
 	} else if (n == RESULT_ERR) {

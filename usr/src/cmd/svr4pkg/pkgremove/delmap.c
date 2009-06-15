@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,17 +56,16 @@ extern struct cfent	**eptlist;
 extern int	eptnum;
 
 int
-delmap(int flag, char *pkginst)
+delmap(int flag, char *pkginst, PKGserver *pkgserver, VFP_T **tmpfp)
 {
 	struct cfent	*ept;
 	struct pinfo	*pinfo;
-	VFP_T		*vfp;
-	VFP_T		*vfpo;
 	int		n;
 	char		*unknown = "Unknown";
 
 
-	if (!ocfile(&vfp, &vfpo, 0L)) {
+	if (!ocfile(pkgserver, tmpfp, 0L) ||
+	    pkgopenfilter(*pkgserver, pkginst) != 0) {
 		quit(99);
 	}
 
@@ -90,7 +89,7 @@ delmap(int flag, char *pkginst)
 	}
 
 	eptnum = 0;
-	while (n = srchcfile(ept, "*", vfp, (VFP_T *)NULL)) {
+	while (n = srchcfile(ept, "*", *pkgserver)) {
 		if (n < 0) {
 			char	*errstr = getErrstr();
 			progerr(gettext("bad read of contents file"));
@@ -103,10 +102,16 @@ delmap(int flag, char *pkginst)
 		}
 		pinfo = eptstat(ept, pkginst, (flag ? '@' : '-'));
 		if (ept->npkgs > 0) {
-			if (putcvfpfile(ept, vfpo)) {
+			if (putcvfpfile(ept, *tmpfp)) {
 				progerr(gettext(ERR_WRENT), errno);
 				quit(99);
 			}
+		} else if (ept->path != NULL) {
+			(void) vfpSetModified(*tmpfp);
+			/* add "-<path>" to the file */
+			vfpPutc(*tmpfp, '-');
+			vfpPuts(*tmpfp, ept->path);
+			vfpPutc(*tmpfp, '\n');
 		}
 
 		if (flag || (pinfo == NULL))
@@ -148,7 +153,7 @@ delmap(int flag, char *pkginst)
 
 	eptlist[eptnum] = (struct cfent *)NULL;
 
-	n = swapcfile(&vfp, &vfpo, pkginst, dbchg);
+	n = swapcfile(*pkgserver, tmpfp, pkginst, dbchg);
 	if (n == RESULT_WRN) {
 		warnflag++;
 	} else if (n == RESULT_ERR) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,12 +62,12 @@ extern void	pkgvolume __P((struct pkgdev *devp, char *pkg, int part,
 extern void	quit __P((int exitval));
 extern void	ckreturn __P((int retcode, char *msg));
 extern int	sortmap __P((struct cfextra ***extlist, VFP_T *pkgmapVfp,
-			VFP_T *mapvfp, VFP_T *tmpvfp, char *a_zoneName));
+			PKGserver serv, VFP_T *tmpvfp, char *a_zoneName));
 extern void merginfo __P((struct cl_attr **pclass, int install_from_pspool));
 extern void	set_infoloc __P((char *real_pkgsav));
 extern int	pkgenv __P((char *pkginst, char *p_pkginfo, char *p_pkgmap));
 extern void	instvol __P((struct cfextra **extlist, char *srcinst, int part,
-			int nparts, VFP_T **a_cfVfp, VFP_T **a_cfTmpVfp,
+			int nparts, PKGserver server, VFP_T **a_cfTmpVfp,
 			char **r_updated, char **r_skipped,
 			char *a_zoneName));
 extern int	reqexec __P((int update, char *script, int non_abi_scripts,

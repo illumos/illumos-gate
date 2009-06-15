@@ -116,7 +116,6 @@ char 	*ulim;
 char 	*script;
 
 int	eptnum;
-int	sortflag;
 int	nosetuid;
 int	nocnflct;
 int	warnflag = 0;
@@ -130,15 +129,12 @@ extern void set_limit(void);
 int
 main(int argc, char **argv)
 {
-	FILE		*pp;
 	VFP_T		*cfTmpVfp;
-	VFP_T		*cfVfp;
-	char		*cmd;
+	PKGserver	pkgserver = NULL;
 	char		*tp;
 	char		*prog;
 	char		*pt;
 	char		*vfstab_file = NULL;
-	char		line[1024];
 	char		outbuf[PATH_MAX];
 	int		c;
 	int		dbchg;
@@ -299,8 +295,6 @@ main(int argc, char **argv)
 			set_PKGADM(server_map(get_PKGADM(), fsys_value));
 	}
 
-	sortflag = 0;
-
 	/*
 	 * get the package name and verify length is not too long
 	 */
@@ -382,12 +376,12 @@ main(int argc, char **argv)
 
 	/* open the package database (contents) file */
 
-	if (!ocfile(&cfVfp, &cfTmpVfp, 0L)) {
+	if (!ocfile(&pkgserver, &cfTmpVfp, 0L)) {
 		quit(1);
 	}
 
 	if (fflag) {
-		dbchg = dofinal(cfVfp, cfTmpVfp, REMOVEF, classname, prog);
+		dbchg = dofinal(pkgserver, cfTmpVfp, REMOVEF, classname, prog);
 	} else {
 		if (INSTALF) {
 			dbst = INST_RDY;
@@ -398,7 +392,7 @@ main(int argc, char **argv)
 			removef(argc-optind, &argv[optind]);
 		}
 
-		dbchg = pkgdbmerg(cfVfp, cfTmpVfp, extlist, 0);
+		dbchg = pkgdbmerg(pkgserver, cfTmpVfp, extlist);
 		if (dbchg < 0) {
 			progerr(gettext(ERR_MERG));
 			quit(99);
@@ -406,11 +400,11 @@ main(int argc, char **argv)
 	}
 
 	if (dbchg) {
-		if ((n = swapcfile(&cfVfp, &cfTmpVfp, pkginst, 1))
-			== RESULT_WRN) {
-		    warnflag++;
+		if ((n = swapcfile(pkgserver, &cfTmpVfp, pkginst, 1))
+		    == RESULT_WRN) {
+			warnflag++;
 		} else if (n == RESULT_ERR) {
-		    quit(99);
+			quit(99);
 		}
 	}
 
@@ -442,15 +436,15 @@ main(int argc, char **argv)
 				if (is_a_cl_basedir() && !is_an_inst_root()) {
 					c = strlen(get_client_basedir());
 					(void) snprintf(outbuf, sizeof (outbuf),
-						"%s/%s\n", get_basedir(),
-						&(ept->path[c]));
+					    "%s/%s\n", get_basedir(),
+					    &(ept->path[c]));
 				} else if (is_an_inst_root()) {
 					(void) snprintf(outbuf, sizeof (outbuf),
-						"%s/%s\n", get_inst_root(),
-						&(ept->path[c]));
+					    "%s/%s\n", get_inst_root(),
+					    &(ept->path[c]));
 				} else {
 					(void) snprintf(outbuf, sizeof (outbuf),
-						"%s\n", &(ept->path[c]));
+					    "%s\n", &(ept->path[c]));
 				}
 				canonize(outbuf);
 				(void) printf("%s", outbuf);
@@ -462,50 +456,12 @@ main(int argc, char **argv)
 
 			if (strchr("dxcbp", ept->ftype)) {
 				tp = fixpath(ept->path);
-				(void) averify(1, &ept->ftype,
-					tp, &ept->ainfo);
+				(void) averify(1, &ept->ftype, tp, &ept->ainfo);
 			}
 		}
 	}
 
-	/* Sort the contents files if needed */
-	if (sortflag) {
-		int n;
-
-		warnflag += (ocfile(&cfVfp, &cfTmpVfp, 0L)) ? 0 : 1;
-		if (!warnflag) {
-			size_t	len;
-
-			len = strlen(CMD_SORT) + strlen(get_PKGADM()) +
-				strlen("/contents") + 5;
-			cmd = (char *)malloc(len);
-			(void) snprintf(cmd, len, "%s %s/contents",
-				CMD_SORT, get_PKGADM());
-			pp = popen(cmd, "r");
-			if (pp == NULL) {
-				(void) vfpClose(&cfVfp);
-				(void) vfpClose(&cfTmpVfp);
-				free(cmd);
-				progerr(gettext(ERR_SORT));
-				quit(1);
-			}
-			while (fgets(line, 1024, pp) != NULL) {
-				if (line[0] != DUP_ENTRY) {
-					vfpPuts(cfTmpVfp, line);
-				}
-			}
-			free(cmd);
-			(void) pclose(pp);
-			n = swapcfile(&cfVfp, &cfTmpVfp, pkginst, 1);
-			if (n == RESULT_WRN) {
-				warnflag++;
-			} else if (n == RESULT_ERR) {
-				quit(99);
-			}
-
-			relslock();	/* Unlock the database. */
-		}
-	}
+	pkgcloseserver(pkgserver);
 
 	z_destroyMountTable();
 

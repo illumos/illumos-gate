@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ extern void	quit(int);
 extern void	usage(void);
 extern void	removef(int, char *[]);
 extern int	installf(int, char *[]);
-extern int	dofinal(VFP_T *, VFP_T *, int, char *, char *);
+extern int	dofinal(PKGserver, VFP_T *, int, char *, char *);
 
 #ifdef __cplusplus
 }

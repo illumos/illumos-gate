@@ -277,20 +277,20 @@ extern int	is_local_host __P((char *hostname));
 extern void	fs_tab_free __P((void));
 
 /* pkgdbmerg.c */
-extern int	pkgdbmerg __P((VFP_T *mapvfp, VFP_T *tmpvfp,
-		    struct cfextra **extlist, int notify));
+extern int	pkgdbmerg __P((PKGserver server, VFP_T *tmpvfp,
+		    struct cfextra **extlist));
 extern int	files_installed __P((void));
-extern void	notice __P((int n));
 
 /* ocfile.c */
 extern int	trunc_tcfile __P((int fd));
-extern int	ocfile __P((VFP_T **mapvfp, VFP_T **tmpvfp,
+extern int	ocfile __P((PKGserver *serverp, VFP_T **tmpvfp,
 			fsblkcnt_t map_blks));
-extern int	swapcfile __P((VFP_T **a_mapvfp, VFP_T **a_tmpvfp,
+extern int	swapcfile __P((PKGserver server, VFP_T **a_tmpvfp,
 			char *pkginst, int dbchg));
 extern int	set_cfdir __P((char *cfdir));
-extern int	socfile __P((VFP_T **vfp));
+extern int	socfile __P((PKGserver *server, boolean_t quiet));
 extern int	relslock __P((void));
+extern int	pkgWlock __P((int verbose));
 extern int	iscfile __P((void));
 extern int	vcfile __P((void));
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@ static char *check_db_entry(VFP_T *, struct cfextra *, int, char *, int *);
 
 /*ARGSUSED*/
 int
-dofinal(VFP_T *vfp, VFP_T *vfpo, int rmflag, char *myclass, char *prog)
+dofinal(PKGserver server, VFP_T *vfpo, int rmflag, char *myclass, char *prog)
 {
 	struct cfextra entry;
 	int	n, indx, dbchg;
@@ -70,22 +70,22 @@ dofinal(VFP_T *vfp, VFP_T *vfpo, int rmflag, char *myclass, char *prog)
 
 	dbchg = 0;
 
-	while (n = srchcfile(&(entry.cf_ent), "*", vfp, vfpo)) {
+	if (pkgopenfilter(server, pkginst) != 0)
+		quit(99);
+
+	while (n = srchcfile(&(entry.cf_ent), "*", server)) {
 		if (n < 0) {
 			char	*errstr = getErrstr();
-			progerr(gettext
-				("bad entry read in contents file"));
-				logerr(gettext("pathname=%s"),
-				(entry.cf_ent.path &&
-				*(entry.cf_ent.path)) ?
-				entry.cf_ent.path : "Unknown");
+			progerr(gettext("bad entry read in contents file"));
+			logerr(gettext("pathname=%s"),
+			    (entry.cf_ent.path && *(entry.cf_ent.path)) ?
+			    entry.cf_ent.path : "Unknown");
 			logerr(gettext("problem=%s"),
-				(errstr && *errstr) ? errstr :
-				"Unknown");
+			    (errstr && *errstr) ? errstr : "Unknown");
 			quit(99);
 		}
-		save_path = check_db_entry(
-				vfpo, &entry, rmflag, myclass, &dbchg);
+		save_path = check_db_entry(vfpo, &entry, rmflag, myclass,
+		    &dbchg);
 
 		/* Restore original server-relative path, if needed */
 		if (save_path != NULL) {
@@ -93,6 +93,8 @@ dofinal(VFP_T *vfp, VFP_T *vfpo, int rmflag, char *myclass, char *prog)
 			save_path = NULL;
 		}
 	}
+
+	pkgclosefilter(server);
 
 	return (dbchg);
 }
@@ -106,13 +108,11 @@ check_db_entry(VFP_T *vfpo, struct cfextra *entry, int rmflag, char *myclass,
 	char	*save_path = NULL;
 	char	*tp;
 
-	/* write this entry to the contents file */
-
 	if (myclass && strcmp(myclass, entry->cf_ent.pkg_class)) {
-		if (putcvfpfile(&entry->cf_ent, vfpo)) {
-			progerr(gettext(ERR_WRITE));
-			quit(99);
-		}
+		/*
+		 * We already have it in the database we don't want
+		 * to modify it.
+		 */
 		return (NULL);
 	}
 
@@ -131,98 +131,101 @@ check_db_entry(VFP_T *vfpo, struct cfextra *entry, int rmflag, char *myclass,
 	/*
 	 * If pinfo == NULL at this point, then this file or
 	 * directory isn't part of the package of interest.
-	 * So the loop below executes only on files in the package
+	 * So the code below executes only on files in the package
 	 * of interest.
 	 */
 
-	save_path = NULL;
+	if (pinfo == NULL)
+		return (NULL);
 
-	if (pinfo) {
-		if (rmflag && (pinfo->status == RM_RDY)) {
-			*dbchg = 1;
+	if (rmflag && (pinfo->status == RM_RDY)) {
+		*dbchg = 1;
 
-			(void) eptstat(&(entry->cf_ent), pkginst, '@');
+		(void) eptstat(&(entry->cf_ent), pkginst, '@');
 
-			if (entry->cf_ent.npkgs) {
-				if (putcvfpfile(&(entry->cf_ent), vfpo)) {
-					progerr(gettext(ERR_WRITE));
-					quit(99);
-				}
+		if (entry->cf_ent.npkgs) {
+			if (putcvfpfile(&(entry->cf_ent), vfpo)) {
+				progerr(gettext(ERR_WRITE));
+				quit(99);
 			}
-			return (NULL);
+		} else if (entry->cf_ent.path != NULL) {
+			(void) vfpSetModified(vfpo);
+			/* add "-<path>" to the file */
+			vfpPutc(vfpo, '-');
+			vfpPuts(vfpo, entry->cf_ent.path);
+			vfpPutc(vfpo, '\n');
+		}
+		return (NULL);
 
-		} else if (!rmflag && (pinfo->status == INST_RDY)) {
-			*dbchg = 1;
+	} else if (!rmflag && (pinfo->status == INST_RDY)) {
+		*dbchg = 1;
 
-			/* tp is the server-relative path */
-			tp = fixpath(entry->cf_ent.path);
-			/* save_path is the cmd line path */
-			save_path = entry->cf_ent.path;
-			/* entry has the server-relative path */
-			entry->cf_ent.path = tp;
+		/* tp is the server-relative path */
+		tp = fixpath(entry->cf_ent.path);
+		/* save_path is the cmd line path */
+		save_path = entry->cf_ent.path;
+		/* entry has the server-relative path */
+		entry->cf_ent.path = tp;
+
+		/*
+		 * The next if statement figures out how
+		 * the contents file entry should be
+		 * annotated.
+		 *
+		 * Don't install or verify objects for
+		 * remote, read-only filesystems.  We
+		 * need only verify their presence and
+		 * flag them appropriately from some
+		 * server. Otherwise, ok to do final
+		 * check.
+		 */
+		fs_entry = fsys(entry->cf_ent.path);
+
+		if (is_remote_fs_n(fs_entry) && !is_fs_writeable_n(fs_entry)) {
+			/*
+			 * Mark it shared whether it's present
+			 * or not. life's too funny for me
+			 * to explain.
+			 */
+			pinfo->status = SERVED_FILE;
 
 			/*
-			 * The next if statement figures out how
-			 * the contents file entry should be
-			 * annotated.
-			 *
-			 * Don't install or verify objects for
-			 * remote, read-only filesystems.  We
-			 * need only verify their presence and
-			 * flag them appropriately from some
-			 * server. Otherwise, ok to do final
-			 * check.
+			 * restore for now. This may
+			 * chg soon.
 			 */
-			fs_entry = fsys(entry->cf_ent.path);
+			entry->cf_ent.path = save_path;
+		} else {
+			/*
+			 * If the object is accessible, check
+			 * the new entry for existence and
+			 * attributes. If there's a problem,
+			 * mark it NOT_FND; otherwise,
+			 * ENTRY_OK.
+			 */
+			if (is_mounted_n(fs_entry)) {
+				int	n;
 
-			if (is_remote_fs_n(fs_entry) &&
-				!is_fs_writeable_n(fs_entry)) {
-				/*
-				 * Mark it shared whether it's present
-				 * or not. life's too funny for me
-				 * to explain.
-				 */
+				n = finalck((&entry->cf_ent), 1, 1, B_FALSE);
+
+				pinfo->status = ENTRY_OK;
+				if (n != 0) {
+					pinfo->status = NOT_FND;
+				}
+			}
+
+			/*
+			 * It's not remote, read-only but it
+			 * may look that way to the client.
+			 * If it does, overwrite the above
+			 * result - mark it shared.
+			 */
+			if (is_served_n(fs_entry))
 				pinfo->status = SERVED_FILE;
 
-				/*
-				 * restore for now. This may
-				 * chg soon.
-				 */
-				entry->cf_ent.path = save_path;
-			} else {
-				/*
-				 * If the object is accessible, check
-				 * the new entry for existence and
-				 * attributes. If there's a problem,
-				 * mark it NOT_FND; otherwise,
-				 * ENTRY_OK.
-				 */
-				if (is_mounted_n(fs_entry)) {
-					int	n;
-
-					n = finalck((&entry->cf_ent), 1, 1,
-							B_FALSE);
-
-					pinfo->status = ENTRY_OK;
-					if (n != 0) {
-						pinfo->status = NOT_FND;
-					}
-				}
-
-				/*
-				 * It's not remote, read-only but it
-				 * may look that way to the client.
-				 * If it does, overwrite the above
-				 * result - mark it shared.
-				 */
-				if (is_served_n(fs_entry))
-					pinfo->status = SERVED_FILE;
-
-				/* restore original path */
-				entry->cf_ent.path = save_path;
-				/*   and clear save_path */
-				save_path = NULL;
-			}
+			/* restore original path */
+			entry->cf_ent.path = save_path;
+			/*   and clear save_path */
+			save_path = NULL;
 		}
 	}
 

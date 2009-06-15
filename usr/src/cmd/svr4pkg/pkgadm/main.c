@@ -42,6 +42,7 @@
 #include <keystore.h>
 #include "pkgadm.h"
 #include "pkgadm_msgs.h"
+#include "libadm.h"
 
 /* initial error message buffer size */
 
@@ -51,6 +52,7 @@
 
 static void			print_version();
 int				get_dbstatus(int argc, char **argv);
+int				sync_server(int argc, char **argv);
 
 /* holds subcommands and their definitions */
 struct cmd {
@@ -61,6 +63,7 @@ struct cmd {
 struct cmd  cmds[] = {
 	{ "dbstatus",		get_dbstatus},
 	{ "lock",		admin_lock},
+	{ "sync",		sync_server},
 	/* last one must be all NULLs */
 	{ NULL, NULL }
 };
@@ -99,7 +102,7 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	if (getenv("PKGADM_VERBOSE")) {
-	    set_verbose(B_TRUE);
+		set_verbose(B_TRUE);
 	}
 
 	/* Superficial check of the arguments. */
@@ -244,4 +247,48 @@ get_dbstatus(int argc, char **argv)
 	(void) printf("%s\n", PKGADM_DBSTATUS_TEXT);
 
 	return (0);
+}
+
+/*
+ * sync
+ *
+ * Use the command line to determine if there is an alternate root.
+ *
+ * Return: 0 on success, nonzero on failure
+ * Flush the pkgserv's log.
+ */
+int
+sync_server(int argc, char **argv)
+{
+	int c;
+	char *root = NULL;
+	boolean_t quit = B_FALSE;
+
+	while ((c = getopt(argc, argv, "R:q")) != EOF) {
+		switch (c) {
+		case 'R':
+			root = optarg;
+			break;
+		case 'q':
+			quit = B_TRUE;
+			break;
+		default:
+			return (usage());
+		}
+	}
+
+	if (!pkgsync_needed(root, NULL, quit))
+		return (0);
+
+	set_PKGpaths(root);
+	set_cfdir(NULL);
+
+	if (pkgWlock(1) == 1) {
+		/* Flush the log file */
+		(void) pkgsync(root, NULL, quit);
+		(void) relslock();
+		return (0);
+	}
+
+	return (1);
 }
