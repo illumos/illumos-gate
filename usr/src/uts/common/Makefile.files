@@ -1732,6 +1732,8 @@ MXFE_OBJS += mxfe.o
 
 SFE_OBJS += sfe.o sfe_util.o
 
+BFE_OBJS += bfe.o
+
 DDA_OBJS += dda.o
 
 DMD_OBJS += dmd.o
