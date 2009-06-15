@@ -2318,6 +2318,9 @@ extern void rfs4_rele_deleg_policy(void);
 
 extern int do_xattr_exists_check(vnode_t *, ulong_t *, cred_t *);
 
+extern ts_label_t	*nfs_getflabel(vnode_t *, struct exportinfo *);
+extern boolean_t	do_rfs_label_check(bslabel_t *, vnode_t *, int,
+			    struct exportinfo *);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

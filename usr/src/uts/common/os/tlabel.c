@@ -44,7 +44,6 @@
 #include <nfs/nfs.h>
 #include <nfs/nfs4.h>
 #include <nfs/nfs_clnt.h>
-#include <sys/dnlc.h>
 
 
 int sys_labeling = 0;			/* the default is "off" */
@@ -539,55 +538,4 @@ fgetlabel(int fd, bslabel_t *label_p)
 		return (set_errno(error));
 	else
 		return (0);
-}
-
-/*
- * Used by NFSv3 and NFSv4 server to query label of
- * a pathname component during lookup/access ops.
- */
-ts_label_t *
-nfs_getflabel(vnode_t *vp)
-{
-	zone_t *zone;
-	ts_label_t *zone_label;
-	char path[MAXNAMELEN];
-	vnode_t *pvp, *tvp;
-
-	mutex_enter(&vp->v_lock);
-	/*
-	 * mount traverse has been done by caller
-	 * before calling this routine.
-	 */
-	ASSERT(!vn_ismntpt(vp));
-	if (vp->v_path != NULL) {
-		zone = zone_find_by_any_path(vp->v_path, B_FALSE);
-		mutex_exit(&vp->v_lock);
-	} else {
-		/*
-		 * v_path not cached. Since we rely on path
-		 * of an obj to get its label, we need to get
-		 * path corresponding to the parent vnode.
-		 */
-		tvp = vp;
-		do {
-			mutex_exit(&tvp->v_lock);
-			if ((pvp = dnlc_reverse_lookup(tvp, path,
-			    sizeof (path))) == NULL)
-				return (NULL);
-			mutex_enter(&pvp->v_lock);
-			tvp = pvp;
-		} while (pvp->v_path == NULL);
-		zone = zone_find_by_any_path(pvp->v_path, B_FALSE);
-		mutex_exit(&pvp->v_lock);
-	}
-	/*
-	 * Caller has verified that the file is either
-	 * exported or visible. So if the path falls in
-	 * global zone, admin_low is returned; otherwise
-	 * the zone's label is returned.
-	 */
-	zone_label = zone->zone_slabel;
-	label_hold(zone_label);
-	zone_rele(zone);
-	return (zone_label);
 }

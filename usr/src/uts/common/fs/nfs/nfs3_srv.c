@@ -187,7 +187,8 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -508,7 +509,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
 			if (!do_rfs_label_check(clabel, dvp,
-			    DOMINANCE_CHECK)) {
+			    DOMINANCE_CHECK, exi)) {
 				if (publicfh_flag && exi != NULL)
 					exi_rele(exi);
 				VN_RELE(vp);
@@ -674,9 +675,9 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
 			if ((equal_label = do_rfs_label_check(clabel, vp,
-			    EQUALITY_CHECK)) == B_FALSE) {
+			    EQUALITY_CHECK, exi)) == B_FALSE) {
 				dominant_label = do_rfs_label_check(clabel,
-				    vp, DOMINANCE_CHECK);
+				    vp, DOMINANCE_CHECK, exi);
 			} else
 				dominant_label = B_TRUE;
 			admin_low_client = B_FALSE;
@@ -834,7 +835,8 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -980,7 +982,8 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -1282,7 +1285,8 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto err1;
 			}
@@ -1572,7 +1576,8 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -1957,7 +1962,8 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -2137,7 +2143,8 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto err1;
 			}
@@ -2344,7 +2351,8 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -2572,7 +2580,8 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto err1;
 			}
@@ -2731,7 +2740,8 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto err1;
 			}
@@ -2854,7 +2864,8 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, fvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, fvp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto err1;
 			}
@@ -2927,7 +2938,8 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 
 	if (is_system_labeled()) {
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, tvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, tvp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto err1;
 			}
@@ -3131,7 +3143,8 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -3180,7 +3193,8 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -3332,7 +3346,8 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -3619,7 +3634,8 @@ rfs3_readdirplus(READDIRPLUS3args *args, READDIRPLUS3res *resp,
 		    struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -3990,7 +4006,8 @@ rfs3_fsstat(FSSTAT3args *args, FSSTAT3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -4060,7 +4077,6 @@ rfs3_fsstat_getfh(FSSTAT3args *args)
 	return (&args->fsroot);
 }
 
-/* ARGSUSED */
 void
 rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 	struct svc_req *req, cred_t *cr)
@@ -4095,7 +4111,8 @@ rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_STALE;
 				vattr_to_post_op_attr(NULL,
 				    &resp->resfail.obj_attributes);
@@ -4194,7 +4211,8 @@ rfs3_pathconf(PATHCONF3args *args, PATHCONF3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}
@@ -4329,7 +4347,8 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK,
+			    exi)) {
 				resp->status = NFS3ERR_ACCES;
 				goto out1;
 			}

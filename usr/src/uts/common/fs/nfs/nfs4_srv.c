@@ -1301,7 +1301,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    "got client label from request(1)",
 		    struct svc_req *, req);
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if ((tslabel = nfs_getflabel(vp)) == NULL) {
+			if ((tslabel = nfs_getflabel(vp, cs->exi)) == NULL) {
 				*cs->statusp = resp->status = puterrno4(EACCES);
 				goto out;
 			}
@@ -2774,7 +2774,8 @@ do_rfs4_op_lookup(char *nm, uint_t buflen, struct svc_req *req,
 		    "got client label from request(1)", struct svc_req *, req);
 
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    cs->exi)) {
 				error = EACCES;
 				goto err_out;
 			}
@@ -3353,23 +3354,6 @@ rfs4_op_putpubfh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if (is_system_labeled()) {
-		bslabel_t *clabel;
-
-		ASSERT(req->rq_label != NULL);
-		clabel = req->rq_label;
-		DTRACE_PROBE2(tx__rfs4__log__info__opputpubfh__clabel, char *,
-		    "got client label from request(1)",
-		    struct svc_req *, req);
-		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK)) {
-				*cs->statusp = resp->status =
-				    NFS4ERR_SERVERFAULT;
-				return;
-			}
-		}
-	}
-
 	error = makefh4(&cs->fh, vp, exi_public);
 	if (error != 0) {
 		*cs->statusp = resp->status = puterrno4(error);
@@ -3397,6 +3381,24 @@ rfs4_op_putpubfh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 		 * it's a properly shared filesystem
 		 */
 		cs->exi = exi_public;
+	}
+
+	if (is_system_labeled()) {
+		bslabel_t *clabel;
+
+		ASSERT(req->rq_label != NULL);
+		clabel = req->rq_label;
+		DTRACE_PROBE2(tx__rfs4__log__info__opputpubfh__clabel, char *,
+		    "got client label from request(1)",
+		    struct svc_req *, req);
+		if (!blequal(&l_admin_low->tsl_label, clabel)) {
+			if (!do_rfs_label_check(clabel, vp, DOMINANCE_CHECK,
+			    cs->exi)) {
+				*cs->statusp = resp->status =
+				    NFS4ERR_SERVERFAULT;
+				goto out;
+			}
+		}
 	}
 
 	VN_HOLD(vp);
@@ -4109,7 +4111,8 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    "got client label from request(1)",
 		    struct svc_req *, req);
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, vp, EQUALITY_CHECK,
+			    cs->exi)) {
 				*cs->statusp = resp->status = NFS4ERR_ACCESS;
 				if (name != nm)
 					kmem_free(name, MAXPATHLEN + 1);
@@ -4416,7 +4419,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    struct svc_req *, req);
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
 			if (!do_rfs_label_check(clabel, ndvp,
-			    EQUALITY_CHECK)) {
+			    EQUALITY_CHECK, cs->exi)) {
 				*cs->statusp = resp->status = NFS4ERR_ACCESS;
 				goto err_out;
 			}
@@ -5304,7 +5307,7 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    struct svc_req *, req);
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
 			if (!do_rfs_label_check(clabel, cs->vp,
-			    EQUALITY_CHECK)) {
+			    EQUALITY_CHECK, cs->exi)) {
 				*cs->statusp = resp->status = NFS4ERR_ACCESS;
 				goto out;
 			}
@@ -6229,7 +6232,8 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 		    "got client label from request(1)",
 		    struct svc_req *, req);
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
-			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK)) {
+			if (!do_rfs_label_check(clabel, dvp, EQUALITY_CHECK,
+			    cs->exi)) {
 				return (NFS4ERR_ACCESS);
 			}
 		}

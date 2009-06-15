@@ -130,8 +130,6 @@ extern int		getlabel(const char *, m_label_t *);
 extern int		fgetlabel(int, m_label_t *);
 extern int		_blinrange(const m_label_t *, const brange_t *);
 extern int		blinlset(const m_label_t *, const blset_t);
-extern ts_label_t	*nfs_getflabel(vnode_t *);
-extern boolean_t	do_rfs_label_check(bslabel_t *, vnode_t *, int);
 
 /*
  * The use of '!!' here prevents users from referencing this function-like

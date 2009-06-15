@@ -87,6 +87,8 @@
 #include <sys/cladm.h>
 #include <sys/clconf.h>
 
+#include <sys/tsol/label.h>
+
 #define	MAXHOST 32
 const char *kinet_ntop6(uchar_t *, char *, size_t);
 
@@ -3117,4 +3119,74 @@ hanfsv4_failover(void)
 
 	if (rfs4_dss_numnewpaths > 0)
 		kmem_free(added_paths, rfs4_dss_numnewpaths * sizeof (char *));
+}
+
+/*
+ * Used by NFSv3 and NFSv4 server to query label of
+ * a pathname component during lookup/access ops.
+ */
+ts_label_t *
+nfs_getflabel(vnode_t *vp, struct exportinfo *exi)
+{
+	zone_t *zone;
+	ts_label_t *zone_label;
+	char *path;
+
+	mutex_enter(&vp->v_lock);
+	if (vp->v_path != NULL) {
+		zone = zone_find_by_any_path(vp->v_path, B_FALSE);
+		mutex_exit(&vp->v_lock);
+	} else {
+		/*
+		 * v_path not cached. Fall back on pathname of exported
+		 * file system as we rely on pathname from which we can
+		 * derive a label. The exported file system portion of
+		 * path is sufficient to obtain a label.
+		 */
+		path = exi->exi_export.ex_path;
+		if (path == NULL) {
+			mutex_exit(&vp->v_lock);
+			return (NULL);
+		}
+		zone = zone_find_by_any_path(path, B_FALSE);
+		mutex_exit(&vp->v_lock);
+	}
+	/*
+	 * Caller has verified that the file is either
+	 * exported or visible. So if the path falls in
+	 * global zone, admin_low is returned; otherwise
+	 * the zone's label is returned.
+	 */
+	zone_label = zone->zone_slabel;
+	label_hold(zone_label);
+	zone_rele(zone);
+	return (zone_label);
+}
+
+/*
+ * TX NFS routine used by NFSv3 and NFSv4 to do label check
+ * on client label and server's file object lable.
+ */
+boolean_t
+do_rfs_label_check(bslabel_t *clabel, vnode_t *vp, int flag,
+    struct exportinfo *exi)
+{
+	bslabel_t *slabel;
+	ts_label_t *tslabel;
+	boolean_t result;
+
+	if ((tslabel = nfs_getflabel(vp, exi)) == NULL) {
+		return (B_FALSE);
+	}
+	slabel = label2bslabel(tslabel);
+	DTRACE_PROBE4(tx__rfs__log__info__labelcheck, char *,
+	    "comparing server's file label(1) with client label(2) (vp(3))",
+	    bslabel_t *, slabel, bslabel_t *, clabel, vnode_t *, vp);
+
+	if (flag == EQUALITY_CHECK)
+		result = blequal(clabel, slabel);
+	else
+		result = bldominates(clabel, slabel);
+	label_rele(tslabel);
+	return (result);
 }
