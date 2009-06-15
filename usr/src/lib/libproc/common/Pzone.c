@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,79 @@ struct path_node {
 	char			*pn_path;
 };
 typedef struct path_node path_node_t;
+
+/*
+ * Parameters of the lofs lookup cache.
+ */
+static struct stat64 lofs_mstat; /* last stat() of MNTTAB */
+static struct lofs_mnttab {	/* linked list of all lofs mount points */
+	struct lofs_mnttab *l_next;
+	char	*l_special;	/* extracted from MNTTAB */
+	char	*l_mountp;	/* ditto */
+} *lofs_mnttab = NULL;
+static mutex_t lofs_lock = DEFAULTMUTEX;	/* protects the lofs cache */
+
+static void
+rebuild_lofs_cache(void)
+{
+	struct mnttab mt;
+	struct mnttab mt_find;
+	struct lofs_mnttab *lmt;
+	struct lofs_mnttab *next;
+	FILE *fp;
+
+	assert(MUTEX_HELD(&lofs_lock));
+
+	/* destroy the old cache */
+	for (lmt = lofs_mnttab; lmt != NULL; lmt = next) {
+		next = lmt->l_next;
+		free(lmt->l_special);
+		free(lmt->l_mountp);
+		free(lmt);
+	}
+	lofs_mnttab = NULL;
+
+	/* prepare to create the new cache */
+	if ((fp = fopen(MNTTAB, "r")) == NULL)
+		return;
+
+	/*
+	 * We only care about lofs mount points.  But we need to
+	 * ignore lofs mounts where the source path is the same
+	 * as the target path.  (This can happen when a non-global
+	 * zone has a lofs mount of a global zone filesystem, since
+	 * the source path can't expose information about global
+	 * zone paths to the non-global zone.)
+	 */
+	bzero(&mt_find, sizeof (mt_find));
+	mt_find.mnt_fstype = "lofs";
+	while (getmntany(fp, &mt, &mt_find) == 0 &&
+	    (strcmp(mt.mnt_fstype, "lofs") == 0) &&
+	    (strcmp(mt.mnt_special, mt.mnt_mountp) != 0)) {
+		if ((lmt = malloc(sizeof (struct lofs_mnttab))) == NULL)
+			break;
+		lmt->l_special = strdup(mt.mnt_special);
+		lmt->l_mountp = strdup(mt.mnt_mountp);
+		lmt->l_next = lofs_mnttab;
+		lofs_mnttab = lmt;
+	}
+
+	(void) fclose(fp);
+}
+
+static const char *
+lookup_lofs_mount_point(const char *mountp)
+{
+	struct lofs_mnttab *lmt;
+
+	assert(MUTEX_HELD(&lofs_lock));
+
+	for (lmt = lofs_mnttab; lmt != NULL; lmt = lmt->l_next) {
+		if (strcmp(lmt->l_mountp, mountp) == 0)
+			return (lmt->l_special);
+	}
+	return (NULL);
+}
 
 static path_node_t *
 pn_push(path_node_t **pnp, char *path)
@@ -250,8 +323,8 @@ char *
 Plofspath(const char *path, char *s, size_t n)
 {
 	char tmp[PATH_MAX + 1];
-	struct mnttab mt, mt_find;
-	FILE *fp;
+	struct stat64 statb;
+	const char *special;
 	char *p, *p2;
 	int rv;
 
@@ -259,10 +332,6 @@ Plofspath(const char *path, char *s, size_t n)
 
 	/* We only deal with absolute paths */
 	if (path[0] != '/')
-		return (NULL);
-
-	/* Open /etc/mnttab */
-	if ((fp = fopen(MNTTAB, "r")) == NULL)
 		return (NULL);
 
 	/* Make a copy of the path so that we can muck with it */
@@ -274,6 +343,21 @@ Plofspath(const char *path, char *s, size_t n)
 	 */
 	if ((rv = resolvepath(tmp, tmp, sizeof (tmp) - 1)) >= 0)
 		tmp[rv] = '\0';
+
+	(void) mutex_lock(&lofs_lock);
+
+	/*
+	 * If /etc/mnttab has been modified since the last time
+	 * we looked, then rebuild the lofs lookup cache.
+	 */
+	if (stat64(MNTTAB, &statb) == 0 &&
+	    (statb.st_mtim.tv_sec != lofs_mstat.st_mtim.tv_sec ||
+	    statb.st_mtim.tv_nsec != lofs_mstat.st_mtim.tv_nsec ||
+	    statb.st_ctim.tv_sec != lofs_mstat.st_ctim.tv_sec ||
+	    statb.st_ctim.tv_nsec != lofs_mstat.st_ctim.tv_nsec)) {
+		lofs_mstat = statb;
+		rebuild_lofs_cache();
+	}
 
 	/*
 	 * So now we're going to search the path for any components that
@@ -304,22 +388,7 @@ Plofspath(const char *path, char *s, size_t n)
 	p = &tmp[strlen(tmp)];
 	p[1] = '\0';
 	for (;;) {
-		/* Check if tmp is a mount point */
-		rewind(fp);
-		bzero(&mt_find, sizeof (mt_find));
-		mt_find.mnt_mountp = tmp;
-		rv = getmntany(fp, &mt, &mt_find);
-
-		/*
-		 * We only care about lofs mount points.  But we need to
-		 * ignore lofs mounts where the source path is the same
-		 * as the target path.  (This can happen when a non-global
-		 * zone has a lofs mount of a global zone filesystem, since
-		 * the source path can't expose information about global
-		 * zone paths to the non-global zone.)
-		 */
-		if ((rv == 0) && (strcmp(mt.mnt_fstype, "lofs") == 0) &&
-		    (strcmp(mt.mnt_special, mt.mnt_mountp) != 0)) {
+		if ((special = lookup_lofs_mount_point(tmp)) != NULL) {
 			char tmp2[PATH_MAX + 1];
 
 			/*
@@ -331,7 +400,7 @@ Plofspath(const char *path, char *s, size_t n)
 			 * sure there are no consecutive or trailing '/'s
 			 * in the path.
 			 */
-			(void) strlcpy(tmp2, mt.mnt_special, sizeof (tmp2) - 1);
+			(void) strlcpy(tmp2, special, sizeof (tmp2) - 1);
 			(void) strlcat(tmp2, "/", sizeof (tmp2) - 1);
 			(void) strlcat(tmp2, &p[1], sizeof (tmp2) - 1);
 			(void) strlcpy(tmp, tmp2, sizeof (tmp) - 1);
@@ -346,6 +415,8 @@ Plofspath(const char *path, char *s, size_t n)
 		if ((p2 = strrchr(tmp, '/')) == NULL) {
 			char tmp2[PATH_MAX];
 
+			(void) mutex_unlock(&lofs_lock);
+
 			/*
 			 * We know that tmp was an absolute path, so if we
 			 * made it here we know that (p == tmp) and that
@@ -354,7 +425,6 @@ Plofspath(const char *path, char *s, size_t n)
 			 */
 			assert(p == tmp);
 			assert(p[0] == '\0');
-			(void) fclose(fp);
 
 			/* Restore the leading '/' in the path */
 			p[0] = '/';
