@@ -292,7 +292,8 @@ typedef struct tcp_s {
 		tcp_tconnind_started : 1, /* conn_ind message is being sent */
 		tcp_lso :1,		/* Lower layer is capable of LSO */
 		tcp_refuse :1,		/* Connection needs refusing */
-		tcp_pad_to_bit_31 : 16;
+		tcp_is_wnd_shrnk : 1, /* Window has shrunk */
+		tcp_pad_to_bit_31 : 15;
 
 	uint32_t	tcp_if_mtu;	/* Outgoing interface MTU. */
 
@@ -600,6 +601,11 @@ typedef struct tcp_s {
 	 * protected by the tcp_non_sq_lock lock.
 	 */
 	boolean_t	tcp_flow_stopped;
+
+	/*
+	 * Sender's next sequence number at the time the window was shrunk.
+	 */
+	uint32_t	tcp_snxt_shrunk;
 
 	/*
 	 * The socket generation number is bumped when an outgoing connection

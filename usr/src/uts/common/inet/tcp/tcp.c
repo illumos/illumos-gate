@@ -774,6 +774,7 @@ static void	tcp_iss_key_init(uint8_t *phrase, int len, tcp_stack_t *);
 static int	tcp_1948_phrase_set(queue_t *q, mblk_t *mp, char *value,
 		    caddr_t cp, cred_t *cr);
 static void	tcp_process_shrunk_swnd(tcp_t *tcp, uint32_t shrunk_cnt);
+static void	tcp_update_xmit_tail(tcp_t *tcp, uint32_t snxt);
 static mblk_t	*tcp_reass(tcp_t *tcp, mblk_t *mp, uint32_t start);
 static void	tcp_reass_elim_overlap(tcp_t *tcp, mblk_t *mp);
 static void	tcp_reinit(tcp_t *tcp);
@@ -4255,7 +4256,8 @@ tcp_free(tcp_t *tcp)
 
 	if (tcp->tcp_sack_info != NULL) {
 		if (tcp->tcp_notsack_list != NULL) {
-			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list);
+			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list,
+			    tcp);
 		}
 		bzero(tcp->tcp_sack_info, sizeof (tcp_sack_info_t));
 	}
@@ -7715,10 +7717,12 @@ tcp_reinit_values(tcp)
 
 	tcp->tcp_cwr = B_FALSE;
 	tcp->tcp_ecn_echo_on = B_FALSE;
+	tcp->tcp_is_wnd_shrnk = B_FALSE;
 
 	if (tcp->tcp_sack_info != NULL) {
 		if (tcp->tcp_notsack_list != NULL) {
-			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list);
+			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list,
+			    tcp);
 		}
 		kmem_cache_free(tcp_sack_info_cache, tcp->tcp_sack_info);
 		tcp->tcp_sack_info = NULL;
@@ -11819,6 +11823,11 @@ tcp_set_rto(tcp_t *tcp, clock_t rtt)
 
 /*
  * tcp_get_seg_mp() is called to get the pointer to a segment in the
+ * send queue which starts at the given sequence number. If the given
+ * sequence number is equal to last valid sequence number (tcp_snxt), the
+ * returned mblk is the last valid mblk, and off is set to the length of
+ * that mblk.
+ *
  * send queue which starts at the given seq. no.
  *
  * Parameters:
@@ -11838,14 +11847,14 @@ tcp_get_seg_mp(tcp_t *tcp, uint32_t seq, int32_t *off)
 	mblk_t	*mp;
 
 	/* Defensive coding.  Make sure we don't send incorrect data. */
-	if (SEQ_LT(seq, tcp->tcp_suna) || SEQ_GEQ(seq, tcp->tcp_snxt))
+	if (SEQ_LT(seq, tcp->tcp_suna) || SEQ_GT(seq, tcp->tcp_snxt))
 		return (NULL);
 
 	cnt = seq - tcp->tcp_suna;
 	mp = tcp->tcp_xmit_head;
 	while (cnt > 0 && mp != NULL) {
 		cnt -= mp->b_wptr - mp->b_rptr;
-		if (cnt < 0) {
+		if (cnt <= 0) {
 			cnt += mp->b_wptr - mp->b_rptr;
 			break;
 		}
@@ -14294,34 +14303,63 @@ process_ack:
 	 * state is handled above, so we can always just drop the segment and
 	 * send an ACK here.
 	 *
+	 * In the case where the peer shrinks the window, we see the new window
+	 * update, but all the data sent previously is queued up by the peer.
+	 * To account for this, in tcp_process_shrunk_swnd(), the sequence
+	 * number, which was already sent, and within window, is recorded.
+	 * tcp_snxt is then updated.
+	 *
+	 * If the window has previously shrunk, and an ACK for data not yet
+	 * sent, according to tcp_snxt is recieved, it may still be valid. If
+	 * the ACK is for data within the window at the time the window was
+	 * shrunk, then the ACK is acceptable. In this case tcp_snxt is set to
+	 * the sequence number ACK'ed.
+	 *
+	 * If the ACK covers all the data sent at the time the window was
+	 * shrunk, we can now set tcp_is_wnd_shrnk to B_FALSE.
+	 *
 	 * Should we send ACKs in response to ACK only segments?
 	 */
-	if (SEQ_GT(seg_ack, tcp->tcp_snxt)) {
-		BUMP_MIB(&tcps->tcps_mib, tcpInAckUnsent);
-		/* drop the received segment */
-		freemsg(mp);
 
-		/*
-		 * Send back an ACK.  If tcp_drop_ack_unsent_cnt is
-		 * greater than 0, check if the number of such
-		 * bogus ACks is greater than that count.  If yes,
-		 * don't send back any ACK.  This prevents TCP from
-		 * getting into an ACK storm if somehow an attacker
-		 * successfully spoofs an acceptable segment to our
-		 * peer.
-		 */
-		if (tcp_drop_ack_unsent_cnt > 0 &&
-		    ++tcp->tcp_in_ack_unsent > tcp_drop_ack_unsent_cnt) {
-			TCP_STAT(tcps, tcp_in_ack_unsent_drop);
+	if (SEQ_GT(seg_ack, tcp->tcp_snxt)) {
+		if ((tcp->tcp_is_wnd_shrnk) &&
+		    (SEQ_LEQ(seg_ack, tcp->tcp_snxt_shrunk))) {
+			uint32_t data_acked_ahead_snxt;
+
+			data_acked_ahead_snxt = seg_ack - tcp->tcp_snxt;
+			tcp_update_xmit_tail(tcp, seg_ack);
+			tcp->tcp_unsent -= data_acked_ahead_snxt;
+		} else {
+			BUMP_MIB(&tcps->tcps_mib, tcpInAckUnsent);
+			/* drop the received segment */
+			freemsg(mp);
+
+			/*
+			 * Send back an ACK.  If tcp_drop_ack_unsent_cnt is
+			 * greater than 0, check if the number of such
+			 * bogus ACks is greater than that count.  If yes,
+			 * don't send back any ACK.  This prevents TCP from
+			 * getting into an ACK storm if somehow an attacker
+			 * successfully spoofs an acceptable segment to our
+			 * peer.
+			 */
+			if (tcp_drop_ack_unsent_cnt > 0 &&
+			    ++tcp->tcp_in_ack_unsent >
+			    tcp_drop_ack_unsent_cnt) {
+				TCP_STAT(tcps, tcp_in_ack_unsent_drop);
+				return;
+			}
+			mp = tcp_ack_mp(tcp);
+			if (mp != NULL) {
+				BUMP_LOCAL(tcp->tcp_obsegs);
+				BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
+				tcp_send_data(tcp, tcp->tcp_wq, mp);
+			}
 			return;
 		}
-		mp = tcp_ack_mp(tcp);
-		if (mp != NULL) {
-			BUMP_LOCAL(tcp->tcp_obsegs);
-			BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
-			tcp_send_data(tcp, tcp->tcp_wq, mp);
-		}
-		return;
+	} else if (tcp->tcp_is_wnd_shrnk && SEQ_GEQ(seg_ack,
+	    tcp->tcp_snxt_shrunk)) {
+			tcp->tcp_is_wnd_shrnk = B_FALSE;
 	}
 
 	/*
@@ -14361,7 +14399,8 @@ process_ack:
 			 */
 			if (tcp->tcp_snd_sack_ok &&
 			    tcp->tcp_notsack_list != NULL) {
-				TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list);
+				TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list,
+				    tcp);
 			}
 		} else {
 			if (tcp->tcp_snd_sack_ok &&
@@ -15163,6 +15202,26 @@ ack_check:
 	}
 done:
 	ASSERT(!(flags & TH_MARKNEXT_NEEDED));
+}
+
+/*
+ * This routine adjusts next-to-send sequence number variables, in the
+ * case where the reciever has shrunk it's window.
+ */
+static void
+tcp_update_xmit_tail(tcp_t *tcp, uint32_t snxt)
+{
+	mblk_t *xmit_tail;
+	int32_t offset;
+
+	tcp->tcp_snxt = snxt;
+
+	/* Get the mblk, and the offset in it, as per the shrunk window */
+	xmit_tail = tcp_get_seg_mp(tcp, snxt, &offset);
+	ASSERT(xmit_tail != NULL);
+	tcp->tcp_xmit_tail = xmit_tail;
+	tcp->tcp_xmit_tail_unsent = xmit_tail->b_wptr -
+	    xmit_tail->b_rptr - offset;
 }
 
 /*
@@ -16547,11 +16606,8 @@ tcp_timer(void *arg)
 	/*
 	 * Remove all rexmit SACK blk to start from fresh.
 	 */
-	if (tcp->tcp_snd_sack_ok && tcp->tcp_notsack_list != NULL) {
-		TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list);
-		tcp->tcp_num_notsack_blk = 0;
-		tcp->tcp_cnt_notsack_list = 0;
-	}
+	if (tcp->tcp_snd_sack_ok && tcp->tcp_notsack_list != NULL)
+		TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list, tcp);
 	if (mp == NULL) {
 		return;
 	}
@@ -18638,25 +18694,31 @@ static void
 tcp_process_shrunk_swnd(tcp_t *tcp, uint32_t shrunk_count)
 {
 	uint32_t	snxt = tcp->tcp_snxt;
-	mblk_t		*xmit_tail;
-	int32_t		offset;
 
 	ASSERT(shrunk_count > 0);
+
+	if (!tcp->tcp_is_wnd_shrnk) {
+		tcp->tcp_snxt_shrunk = snxt;
+		tcp->tcp_is_wnd_shrnk = B_TRUE;
+	} else if (SEQ_GT(snxt, tcp->tcp_snxt_shrunk)) {
+		tcp->tcp_snxt_shrunk = snxt;
+	}
 
 	/* Pretend we didn't send the data outside the window */
 	snxt -= shrunk_count;
 
-	/* Get the mblk and the offset in it per the shrunk window */
-	xmit_tail = tcp_get_seg_mp(tcp, snxt, &offset);
-
-	ASSERT(xmit_tail != NULL);
-
 	/* Reset all the values per the now shrunk window */
-	tcp->tcp_snxt = snxt;
-	tcp->tcp_xmit_tail = xmit_tail;
-	tcp->tcp_xmit_tail_unsent = xmit_tail->b_wptr - xmit_tail->b_rptr -
-	    offset;
+	tcp_update_xmit_tail(tcp, snxt);
 	tcp->tcp_unsent += shrunk_count;
+
+	/*
+	 * If the SACK option is set, delete the entire list of
+	 * notsack'ed blocks.
+	 */
+	if (tcp->tcp_sack_info != NULL) {
+		if (tcp->tcp_notsack_list != NULL)
+			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list, tcp);
+	}
 
 	if (tcp->tcp_suna == tcp->tcp_snxt && tcp->tcp_swnd == 0)
 		/*

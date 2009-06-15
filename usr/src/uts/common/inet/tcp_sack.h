@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_TCP_SACK_H
 #define	_INET_TCP_SACK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -88,7 +85,7 @@ extern void tcp_notsack_update(notsack_blk_t **, tcp_seq, tcp_seq,
  * Param:
  * notsack_blk_t *head: pointer to the head of the list of notsack'ed blks.
  */
-#define	TCP_NOTSACK_REMOVE_ALL(head) \
+#define	TCP_NOTSACK_REMOVE_ALL(head, tcp)		\
 { \
 	notsack_blk_t *prev, *tmp; \
 	tmp = (head); \
@@ -98,6 +95,8 @@ extern void tcp_notsack_update(notsack_blk_t **, tcp_seq, tcp_seq,
 		kmem_free(prev, sizeof (notsack_blk_t)); \
 	} while (tmp != NULL); \
 	(head) = NULL; \
+	(tcp)->tcp_cnt_notsack_list = 0; \
+	(tcp)->tcp_num_notsack_blk = 0; \
 }
 
 
