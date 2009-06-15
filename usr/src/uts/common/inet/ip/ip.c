@@ -15135,6 +15135,13 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 					continue;
 				}
 				(void) adjmsg(mp, -len);
+				/*
+				 * As the message len was adjusted, invalidate
+				 * any hw checksum here. This will force IP to
+				 * calculate the checksum in sw, but only for
+				 * this packet.
+				 */
+				DB_CKSUMFLAGS(mp) = 0;
 				IP_STAT(ipst, ip_multimblk3);
 			}
 		}
