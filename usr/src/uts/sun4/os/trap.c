@@ -1312,7 +1312,7 @@ trap_cleanup(
 		}
 
 		if (curthread->t_rprof != NULL) {
-			realsigprof(0, 0);
+			realsigprof(0, 0, 0);
 			curthread->t_sig_check = 1;
 		}
 	}

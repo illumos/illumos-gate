@@ -49,7 +49,6 @@ extern greg_t getpsr(void);
 extern uint_t getpil(void);
 extern void setpil(uint_t);
 extern greg_t gettbr(void);
-extern void realsigprof(int, int);
 
 extern uintptr_t shm_alignment;
 

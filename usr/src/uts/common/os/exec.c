@@ -1801,6 +1801,13 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	if (p->p_itimer != NULL)
 		timer_exit();
 
+	/*
+	 * Delete the ITIMER_REALPROF interval timer.
+	 * The other ITIMER_* interval timers are specified
+	 * to be inherited across exec().
+	 */
+	delete_itimer_realprof();
+
 	if (audit_active)
 		audit_exec(args->stk_base, args->stk_base + args->arglen,
 		    args->na - args->ne, args->ne);

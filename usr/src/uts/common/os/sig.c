@@ -56,6 +56,7 @@
 #include <sys/core.h>
 #include <sys/schedctl.h>
 #include <sys/contract/process_impl.h>
+#include <sys/cyclic.h>
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 
@@ -2547,6 +2548,51 @@ trapsig(k_siginfo_t *ip, int restartable)
 	}
 	bcopy(ip, &sqp->sq_info, sizeof (k_siginfo_t));
 	sigaddqa(p, curthread, sqp);
+	mutex_exit(&p->p_lock);
+}
+
+/*
+ * Arrange for the real time profiling signal to be dispatched.
+ */
+void
+realsigprof(int sysnum, int nsysarg, int error)
+{
+	proc_t *p;
+	klwp_t *lwp;
+
+	if (curthread->t_rprof->rp_anystate == 0)
+		return;
+	p = ttoproc(curthread);
+	lwp = ttolwp(curthread);
+	mutex_enter(&p->p_lock);
+	if (p->p_rprof_cyclic == CYCLIC_NONE) {
+		bzero(curthread->t_rprof, sizeof (*curthread->t_rprof));
+		mutex_exit(&p->p_lock);
+		return;
+	}
+	if (sigismember(&p->p_ignore, SIGPROF) ||
+	    signal_is_blocked(curthread, SIGPROF)) {
+		mutex_exit(&p->p_lock);
+		return;
+	}
+	lwp->lwp_siginfo.si_signo = SIGPROF;
+	lwp->lwp_siginfo.si_code = PROF_SIG;
+	lwp->lwp_siginfo.si_errno = error;
+	hrt2ts(gethrtime(), &lwp->lwp_siginfo.si_tstamp);
+	lwp->lwp_siginfo.si_syscall = sysnum;
+	lwp->lwp_siginfo.si_nsysarg = nsysarg;
+	lwp->lwp_siginfo.si_fault = lwp->lwp_lastfault;
+	lwp->lwp_siginfo.si_faddr = lwp->lwp_lastfaddr;
+	lwp->lwp_lastfault = 0;
+	lwp->lwp_lastfaddr = NULL;
+	sigtoproc(p, curthread, SIGPROF);
+	mutex_exit(&p->p_lock);
+	ASSERT(lwp->lwp_cursig == 0);
+	if (issig(FORREAL))
+		psig();
+	mutex_enter(&p->p_lock);
+	lwp->lwp_siginfo.si_signo = 0;
+	bzero(curthread->t_rprof, sizeof (*curthread->t_rprof));
 	mutex_exit(&p->p_lock);
 }
 

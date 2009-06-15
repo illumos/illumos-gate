@@ -1473,7 +1473,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		}
 
 		if (ct->t_rprof != NULL) {
-			realsigprof(0, 0);
+			realsigprof(0, 0, 0);
 			ct->t_sig_check = 1;
 		}
 

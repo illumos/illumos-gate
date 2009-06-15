@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/vmparam.h>
@@ -82,48 +80,6 @@ lwp_getsysent(klwp_t *lwp)
 #else
 #define	LWP_GETSYSENT(lwp)	(sysent)
 #endif
-
-/*
- * Arrange for the real time profiling signal to be dispatched.
- */
-void
-realsigprof(int sysnum, int error)
-{
-	proc_t *p;
-	klwp_t *lwp;
-
-	if (curthread->t_rprof->rp_anystate == 0)
-		return;
-	p = ttoproc(curthread);
-	lwp = ttolwp(curthread);
-	mutex_enter(&p->p_lock);
-	if (sigismember(&p->p_ignore, SIGPROF) ||
-	    signal_is_blocked(curthread, SIGPROF)) {
-		mutex_exit(&p->p_lock);
-		return;
-	}
-	lwp->lwp_siginfo.si_signo = SIGPROF;
-	lwp->lwp_siginfo.si_code = PROF_SIG;
-	lwp->lwp_siginfo.si_errno = error;
-	hrt2ts(gethrtime(), &lwp->lwp_siginfo.si_tstamp);
-	lwp->lwp_siginfo.si_syscall = sysnum;
-	lwp->lwp_siginfo.si_nsysarg = (sysnum > 0 && sysnum < NSYSCALL) ?
-	    LWP_GETSYSENT(lwp)[sysnum].sy_narg : 0;
-	lwp->lwp_siginfo.si_fault = lwp->lwp_lastfault;
-	lwp->lwp_siginfo.si_faddr = lwp->lwp_lastfaddr;
-	lwp->lwp_lastfault = 0;
-	lwp->lwp_lastfaddr = NULL;
-	sigtoproc(p, curthread, SIGPROF);
-	mutex_exit(&p->p_lock);
-	ASSERT(lwp->lwp_cursig == 0);
-	if (issig(FORREAL)) {
-		psig();
-	}
-	mutex_enter(&p->p_lock);
-	lwp->lwp_siginfo.si_signo = 0;
-	bzero(curthread->t_rprof, sizeof (*curthread->t_rprof));
-	mutex_exit(&p->p_lock);
-}
 
 /*
  * Called to restore the lwp's register window just before
@@ -793,7 +749,9 @@ sig_check:
 		}
 
 		if (sigprof) {
-			realsigprof(code, error);
+			int nargs = (code > 0 && code < NSYSCALL)?
+			    LWP_GETSYSENT(lwp)[code].sy_narg : 0;
+			realsigprof(code, nargs, error);
 			t->t_sig_check = 1;	/* recheck next time */
 		}
 

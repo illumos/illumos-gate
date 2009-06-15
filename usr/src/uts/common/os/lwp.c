@@ -57,6 +57,7 @@
 #include <sys/sdt.h>
 #include <sys/cmn_err.h>
 #include <sys/brand.h>
+#include <sys/cyclic.h>
 
 /* hash function for the lwpid hash table, p->p_tidhash[] */
 #define	TIDHASH(tid, hash_sz)	((tid) & ((hash_sz) - 1))
@@ -205,7 +206,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	/*
 	 * Allocate the SIGPROF buffer if ITIMER_REALPROF is in effect.
 	 */
-	if (timerisset(&p->p_rprof_timer.it_value))
+	if (p->p_rprof_cyclic != CYCLIC_NONE)
 		t->t_rprof = kmem_zalloc(sizeof (struct rprof), KM_SLEEP);
 
 	if (cid != NOCLASS)

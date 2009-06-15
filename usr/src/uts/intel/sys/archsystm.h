@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,8 +136,6 @@ extern void brand_interpositioning_disable(void);
 struct regs;
 
 extern int instr_size(struct regs *, caddr_t *, enum seg_rw);
-
-extern void realsigprof(int, int);
 
 extern int enable_cbcp; /* patchable in /etc/system */
 

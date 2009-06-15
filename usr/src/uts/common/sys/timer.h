@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_TIMER_H
 #define	_SYS_TIMER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/proc.h>
@@ -106,6 +104,7 @@ extern	void	timespecsub(timespec_t *, timespec_t *);
 extern	void	timespecfix(timespec_t *);
 extern	int	xgetitimer(uint_t, struct itimerval *, int);
 extern	int	xsetitimer(uint_t, struct itimerval *, int);
+extern	void	delete_itimer_realprof(void);
 
 #define	timerspecisset(tvp)		((tvp)->tv_sec || (tvp)->tv_nsec)
 #define	timerspeccmp(tvp, uvp)		(((tvp)->tv_sec - (uvp)->tv_sec) ? \

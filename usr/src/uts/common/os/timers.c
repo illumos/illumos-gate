@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -519,6 +520,61 @@ xsetitimer(uint_t which, struct itimerval *itv, int iskaddr)
 }
 
 /*
+ * Delete the ITIMER_REALPROF interval timer.
+ * Called only from exec_args() when exec occurs.
+ * The other ITIMER_* interval timers are specified
+ * to be inherited across exec(), so leave them alone.
+ */
+void
+delete_itimer_realprof(void)
+{
+	kthread_t *t = curthread;
+	struct proc *p = ttoproc(t);
+	klwp_t *lwp = ttolwp(t);
+	cyclic_id_t cyclic;
+
+	mutex_enter(&p->p_lock);
+
+	/* we are performing execve(); assert we are single-threaded */
+	ASSERT(t == p->p_tlist && t == t->t_forw);
+
+	if ((cyclic = p->p_rprof_cyclic) == CYCLIC_NONE) {
+		mutex_exit(&p->p_lock);
+	} else {
+		p->p_rprof_cyclic = CYCLIC_NONE;
+		/*
+		 * Delete any current instance of SIGPROF.
+		 */
+		if (lwp->lwp_cursig == SIGPROF) {
+			lwp->lwp_cursig = 0;
+			lwp->lwp_extsig = 0;
+			if (lwp->lwp_curinfo) {
+				siginfofree(lwp->lwp_curinfo);
+				lwp->lwp_curinfo = NULL;
+			}
+		}
+		/*
+		 * Delete any pending instances of SIGPROF.
+		 */
+		sigdelset(&p->p_sig, SIGPROF);
+		sigdelset(&p->p_extsig, SIGPROF);
+		sigdelq(p, NULL, SIGPROF);
+		sigdelset(&t->t_sig, SIGPROF);
+		sigdelset(&t->t_extsig, SIGPROF);
+		sigdelq(p, t, SIGPROF);
+
+		mutex_exit(&p->p_lock);
+
+		/*
+		 * Remove the ITIMER_REALPROF cyclic.
+		 */
+		mutex_enter(&cpu_lock);
+		cyclic_remove(cyclic);
+		mutex_exit(&cpu_lock);
+	}
+}
+
+/*
  * Real interval timer expired:
  * send process whose timer expired an alarm signal.
  * If time is not set up to reload, then just return.
@@ -578,7 +634,8 @@ realprofexpire(void *arg)
 	kthread_t *t;
 
 	mutex_enter(&p->p_lock);
-	if ((t = p->p_tlist) == NULL) {
+	if (p->p_rprof_cyclic == CYCLIC_NONE ||
+	    (t = p->p_tlist) == NULL) {
 		mutex_exit(&p->p_lock);
 		return;
 	}
