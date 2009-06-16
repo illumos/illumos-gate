@@ -1484,3 +1484,4 @@ Bugid   Risk Synopsis
 6841199 Undo 10 year old workaround and use 64-bit ld on 32-bit objects
 6784790 ld should examine archives to determine output object class/machine
 	PSARC/2009/305 ld -32 option
+6849998 remove undocumented mapfile $SPECVERS and $NEED options

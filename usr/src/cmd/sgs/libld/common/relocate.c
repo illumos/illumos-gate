@@ -1538,16 +1538,22 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp,
 				    MSG_INTL(MSG_REL_SLOPCDATNAM),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 				    reld->rel_rtype, 0, &inv_buf),
-				    ifl->ifl_name, reld->rel_isdesc->is_name,
-				    rep_sdp->sd_name, isp->is_name,
+				    ifl->ifl_name,
+				    EC_WORD(reld->rel_isdesc->is_scnndx),
+				    reld->rel_isdesc->is_name,
+				    rep_sdp->sd_name,
+				    EC_WORD(isp->is_scnndx), isp->is_name,
 				    rep_sdp->sd_file->ifl_name);
 			} else {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_REL_SLOPCDATNONAM),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 				    reld->rel_rtype, 0, &inv_buf),
-				    ifl->ifl_name, reld->rel_isdesc->is_name,
-				    isp->is_name, rep_sdp->sd_file->ifl_name);
+				    ifl->ifl_name,
+				    EC_WORD(reld->rel_isdesc->is_scnndx),
+				    reld->rel_isdesc->is_name,
+				    EC_WORD(isp->is_scnndx), isp->is_name,
+				    rep_sdp->sd_file->ifl_name);
 			}
 		}
 		DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml, rep_sdp));
@@ -1558,69 +1564,6 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp,
 	/* If didn't return above, we didn't find it */
 	*reject = ofl->ofl_sr_cache.sr_rej = RLXREL_REJ_SYMBOL;
 	return (ofl->ofl_sr_cache.sr_rsdp = NULL);
-}
-
-/*
- * Generate a name for a relocation descriptor that has an STT_SECTION
- * symbol associated with it. If it is a regular input section, it will
- * look like:
- *
- *	"XXX (section)"
- *
- * If it is a generated section created to receive the strings from
- * input SHF_MERGE|SHF_STRINGS sections, then it will look like:
- *
- *	"XXX (merged string section)"
- *
- * STT_SECTION relocations to the same section tend to come in clusters,
- * so we use a static variable to retain the last string we generate. If
- * another one comes along for the same section before some other section
- * intervenes, we will reuse the string.
- *
- * entry:
- *	sdp - STT_SECTION symbol for which a relocation descriptor name
- *		should be generated.
- *	sd_isc - NULL, or input section that should be used instead of
- *		the input section already assocated with the symbol
- *		(sdp->sd_isc). This value is set to a non-NULL value when
- *		a transition from the old input section to a new one is
- *		being made, but the symbol has not yet been updated.
- */
-const const char *
-ld_section_reld_name(Sym_desc *sdp, Is_desc *sd_isc)
-{
-	static Is_desc	*last_sd_isc = NULL;
-	static char	*namestr;
-
-	const char	*fmt;
-	size_t		len;
-
-	/*
-	 * If caller didn't supply a replacement input section,
-	 * use the one referenced by the symbol.
-	 */
-	if (sd_isc == NULL)
-		sd_isc = sdp->sd_isc;
-
-	if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
-	    (sd_isc != NULL) && (sd_isc->is_name != NULL)) {
-		if (last_sd_isc != sd_isc) {
-			fmt = (sd_isc->is_flags & FLG_IS_GNSTRMRG) ?
-			    MSG_INTL(MSG_STR_SECTION_MSTR) :
-			    MSG_INTL(MSG_STR_SECTION);
-			len = strlen(fmt) +
-			    strlen(sd_isc->is_name) + 1;
-
-			if ((namestr = libld_malloc(len)) == 0)
-				return (NULL);
-			(void) snprintf(namestr, len, fmt,
-			    sd_isc->is_name);
-			last_sd_isc = sd_isc;	/* Remember for next time */
-		}
-		return (namestr);
-	}
-
-	return (NULL);
 }
 
 /*
@@ -1640,7 +1583,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	 */
 	if (rtype >= ld_targ.t_m.m_r_num) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_INVALRELT),
-		    ifl->ifl_name, isp->is_name, rtype);
+		    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name,
+		    rtype);
 		return (S_ERROR);
 	}
 
@@ -1683,7 +1627,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	} else if ((sdp != NULL) &&
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
 	    (sdp->sd_isc != NULL) && (sdp->sd_isc->is_name != NULL)) {
-		if ((reld->rel_sname = ld_section_reld_name(sdp, NULL)) == NULL)
+		if ((reld->rel_sname = ld_stt_section_sym_name(sdp->sd_isc)) ==
+		    NULL)
 			return (S_ERROR);
 	} else {
 		static char *strunknown;
@@ -1704,7 +1649,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		    (void *)reloc, isp->is_name, isp->is_scnndx,
 		    reld->rel_sname));
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_NULL),
-		    ifl->ifl_name, isp->is_name);
+		    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name);
 		return (1);
 	}
 
@@ -1712,7 +1657,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	    IS_NOTSUP(rtype)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_NOTSUP),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
-		    0, &inv_buf), ifl->ifl_name, isp->is_name);
+		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
+		    isp->is_name);
 		return (S_ERROR);
 	}
 
@@ -1723,8 +1669,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	if (sdp == NULL) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYMBOL),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
-		    0, &inv_buf), isp->is_name, ifl->ifl_name,
-		    EC_XWORD(reloc->r_offset));
+		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
+		    isp->is_name, EC_XWORD(reloc->r_offset));
 		return (S_ERROR);
 	}
 
@@ -1777,8 +1723,11 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 					    conv_reloc_type(
 					    ifl->ifl_ehdr->e_machine,
 					    reld->rel_rtype, 0, &inv_buf),
-					    ifl->ifl_name, isp->is_name,
+					    ifl->ifl_name,
+					    EC_WORD(isp->is_scnndx),
+					    isp->is_name,
 					    demangle(reld->rel_sname),
+					    EC_WORD(sdp->sd_isc->is_scnndx),
 					    sdp->sd_isc->is_name);
 				return (1);
 			}
@@ -1790,7 +1739,9 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 			    MSG_INTL(MSG_REL_SYMDISC),
 			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 			    reld->rel_rtype, 0, &inv_buf), ifl->ifl_name,
-			    isp->is_name, demangle(reld->rel_sname),
+			    EC_WORD(isp->is_scnndx), isp->is_name,
+			    demangle(reld->rel_sname),
+			    EC_WORD(sdp->sd_isc->is_scnndx),
 			    sdp->sd_isc->is_name);
 			return (S_ERROR);
 		}
@@ -1820,7 +1771,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_RELINVSEC),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
-		    0, &inv_buf), ifl->ifl_name, isp->is_name,
+		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
+		    isp->is_name, EC_WORD(sdp->sd_isc->is_scnndx),
 		    sdp->sd_isc->is_name);
 		return (1);
 	}
@@ -1835,9 +1787,9 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	    (rsndx >= ifl->ifl_symscnt)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNKNWSYM),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
-		    0, &inv_buf), ifl->ifl_name, isp->is_name,
-		    demangle(reld->rel_sname), EC_XWORD(reloc->r_offset),
-		    EC_WORD(rsndx));
+		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
+		    isp->is_name, demangle(reld->rel_sname),
+		    EC_XWORD(reloc->r_offset), EC_WORD(rsndx));
 		return (S_ERROR);
 	}
 
@@ -1851,7 +1803,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSIZE),
 		    conv_reloc_type(ifl->ifl_ehdr->e_machine, rtype,
-		    0, &inv_buf), ifl->ifl_name, isp->is_name);
+		    0, &inv_buf), ifl->ifl_name, EC_WORD(isp->is_scnndx),
+		    isp->is_name);
 		return (S_ERROR);
 	}
 

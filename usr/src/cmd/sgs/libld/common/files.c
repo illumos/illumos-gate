@@ -238,7 +238,7 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  *                   |  SF1_SUNW_FPUSED  |                   |
  */
 static void
-sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
+sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, Is_desc *cisp)
 {
 	Xword	badval;
 
@@ -261,7 +261,8 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 		 */
 		if (val & SF1_SUNW_ADDR32) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_FIL_INADDR32SF1), ifl->ifl_name, name);
+			    MSG_INTL(MSG_FIL_INADDR32SF1), ifl->ifl_name,
+			    EC_WORD(cisp->is_scnndx), cisp->is_name);
 			val &= ~SF1_SUNW_ADDR32;
 		}
 	}
@@ -279,12 +280,14 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 	 */
 	if ((badval = (val & ~SF1_SUNW_MASK)) != 0) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
-		    ifl->ifl_name, name, EC_XWORD(badval));
+		    ifl->ifl_name, EC_WORD(cisp->is_scnndx), cisp->is_name,
+		    EC_XWORD(badval));
 		val &= SF1_SUNW_MASK;
 	}
 	if ((val & (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) == SF1_SUNW_FPUSED) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_BADSF1),
-		    ifl->ifl_name, name, EC_XWORD(val));
+		    ifl->ifl_name, EC_WORD(cisp->is_scnndx), cisp->is_name,
+		    EC_XWORD(val));
 		return;
 	}
 
@@ -306,7 +309,8 @@ sf1_cap(Ofl_desc *ofl, Xword val, Ifl_desc *ifl, const char *name)
 		if ((val & SF1_SUNW_ADDR32) && (ofl->ofl_flags & FLG_OF_EXEC) &&
 		    ((ofl->ofl_sfcap_1 & SF1_SUNW_ADDR32) == 0)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_FIL_EXADDR32SF1), ifl->ifl_name, name);
+			    MSG_INTL(MSG_FIL_EXADDR32SF1), ifl->ifl_name,
+			    EC_WORD(cisp->is_scnndx), cisp->is_name);
 		}
 #endif
 		return;
@@ -421,15 +425,15 @@ process_cap(Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 				 * file.  However, check the validity of the
 				 * software capabilities of any dependencies.
 				 */
-				sf1_cap(ofl, cdata->c_un.c_val, ifl,
-				    cisp->is_name);
+				sf1_cap(ofl, cdata->c_un.c_val, ifl, cisp);
 				break;
 			case CA_SUNW_NULL:
 				break;
 			default:
 				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_FIL_UNKCAP),
-				    ifl->ifl_name, cisp->is_name, cdata->c_tag);
+				    MSG_INTL(MSG_FIL_UNKCAP), ifl->ifl_name,
+				    EC_WORD(cisp->is_scnndx), cisp->is_name,
+				    cdata->c_tag);
 		}
 	}
 }
@@ -524,7 +528,8 @@ process_strtab(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		data = isp->is_indata->d_buf;
 		if (data[0] != '\0' || data[size - 1] != '\0')
 			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_FIL_MALSTR), ifl->ifl_name, name);
+			    MSG_INTL(MSG_FIL_MALSTR), ifl->ifl_name,
+			    EC_WORD(isp->is_scnndx), name);
 	} else
 		isp->is_indata->d_buf = (void *)MSG_ORIG(MSG_STR_EMPTY);
 
@@ -543,7 +548,7 @@ invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	Conv_inv_buf_t inv_buf;
 
 	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
-	    ifl->ifl_name, name,
+	    ifl->ifl_name, EC_WORD(ndx), name,
 	    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
 	    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
 	return (1);
@@ -779,8 +784,8 @@ process_sym_shndx(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		if ((isp == 0) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_FIL_INVSHLINK), ifl->ifl_name, name,
-			    EC_XWORD(shdr->sh_link));
+			    MSG_INTL(MSG_FIL_INVSHLINK), ifl->ifl_name,
+			    EC_WORD(ndx), name, EC_XWORD(shdr->sh_link));
 			return (S_ERROR);
 		}
 		isp->is_symshndx = ifl->ifl_isdesc[ndx];
@@ -802,7 +807,8 @@ sym_shndx_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHLINK), isc->is_file->ifl_name,
-			    isc->is_name, EC_XWORD(isc->is_shdr->sh_link));
+			    EC_WORD(isc->is_scnndx), isc->is_name,
+			    EC_XWORD(isc->is_shdr->sh_link));
 			return (S_ERROR);
 		}
 		isp->is_symshndx = isc;
@@ -1393,7 +1399,7 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 */
 	if (shdr->sh_type != ld_targ.t_m.m_rel_sht_type) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
-		    ifl->ifl_name, isc->is_name,
+		    ifl->ifl_name, EC_WORD(isc->is_scnndx), isc->is_name,
 		    conv_sec_type(ifl->ifl_ehdr->e_ident[EI_OSABI],
 		    ifl->ifl_ehdr->e_machine, shdr->sh_type, 0, &inv_buf));
 		ofl->ofl_flags |= FLG_OF_FATAL;
@@ -1413,7 +1419,8 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * Broken input file.
 		 */
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
-		    ifl->ifl_name, isc->is_name, EC_XWORD(rndx));
+		    ifl->ifl_name, EC_WORD(isc->is_scnndx), isc->is_name,
+		    EC_XWORD(rndx));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -1443,7 +1450,8 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			}
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVRELOC1), ifl->ifl_name,
-			    isc->is_name, risc->is_name);
+			    EC_WORD(isc->is_scnndx), isc->is_name,
+			    EC_WORD(risc->is_scnndx), risc->is_name);
 			return (0);
 		}
 		if (aplist_append(&osp->os_relisdescs, isc,
@@ -1477,7 +1485,7 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 		 * A conflict, issue an warning message, and ignore the section.
 		 */
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_EXCLUDE),
-		    ifl->ifl_name, name);
+		    ifl->ifl_name, EC_WORD(ndx), name);
 		return (0);
 	}
 
@@ -1559,7 +1567,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	Elf_Scn		*scn;
 	Shdr		*shdr;
 	Word		ndx, sndx, ordndx = 0, ordcnt = 0;
-	char		*str, *name, _name[MAXNDXSIZE];
+	char		*str, *name;
 	Word		row, column;
 	int		ident;
 	uintptr_t	error;
@@ -1599,18 +1607,10 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 	/*
 	 * Reset the name since the shdr->sh_name could have been changed as
-	 * part of ld_sup_input_section().  If there is no name, fabricate one
-	 * using the section index.
+	 * part of ld_sup_input_section().
 	 */
-	if (shdr->sh_name == 0) {
-		(void) snprintf(_name, MAXNDXSIZE, MSG_ORIG(MSG_FMT_INDEX),
-		    EC_XWORD(sndx));
-		if ((name = libld_malloc(strlen(_name) + 1)) == 0)
-			return (S_ERROR);
-		(void) strcpy(name, _name);
-
-	} else if ((name = elf_strptr(elf, (size_t)sndx,
-	    (size_t)shdr->sh_name)) == NULL) {
+	if ((name = elf_strptr(elf, (size_t)sndx, (size_t)shdr->sh_name)) ==
+	    NULL) {
 		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_STRPTR),
 		    ifl->ifl_name);
 		ofl->ofl_flags |= FLG_OF_FATAL;
@@ -1663,17 +1663,9 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 		/*
 		 * Reset the name since the shdr->sh_name could have been
-		 * changed as part of ld_sup_input_section().  If there is no
-		 * name, fabricate one using the section index.
+		 * changed as part of ld_sup_input_section().
 		 */
-		if (shdr->sh_name == 0) {
-			(void) snprintf(_name, MAXNDXSIZE,
-			    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(ndx));
-			if ((name = libld_malloc(strlen(_name) + 1)) == 0)
-				return (S_ERROR);
-			(void) strcpy(name, _name);
-		} else
-			name = str + (size_t)(shdr->sh_name);
+		name = str + (size_t)(shdr->sh_name);
 
 		row = shdr->sh_type;
 
@@ -1711,7 +1703,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name,
-				    name, conv_sec_type(
+				    EC_WORD(ndx), name, conv_sec_type(
 				    ifl->ifl_ehdr->e_ident[EI_OSABI],
 				    ifl->ifl_ehdr->e_machine,
 				    shdr->sh_type, 0, &inv_buf));

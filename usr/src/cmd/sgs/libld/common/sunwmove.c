@@ -141,6 +141,7 @@ append_move_desc(Ofl_desc *ofl, Sym_desc *sdp, Move *mvp, Is_desc *isp)
 
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_MOVE_OVERLAP), sdp->sd_file->ifl_name,
+			    EC_WORD(isp->is_scnndx),
 			    isp->is_name, demangle(sdp->sd_name),
 			    EC_XWORD(nmd.md_start), EC_XWORD(nmd.md_len),
 			    EC_XWORD(omdp->md_start), EC_XWORD(omdp->md_len));
@@ -184,7 +185,8 @@ ld_process_move(Ofl_desc *ofl)
 		if (isp->is_shdr->sh_entsize == 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHENTSIZE),
-			    isp->is_file->ifl_name, isp->is_name, EC_XWORD(0));
+			    isp->is_file->ifl_name, EC_WORD(isp->is_scnndx),
+			    isp->is_name, EC_XWORD(0));
 			return (S_ERROR);
 		}
 		num = isp->is_shdr->sh_size / isp->is_shdr->sh_entsize;
@@ -198,14 +200,16 @@ ld_process_move(Ofl_desc *ofl)
 			    (ndx == 0)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMINFO1),
-				    isp->is_file->ifl_name, isp->is_name, i,
+				    isp->is_file->ifl_name,
+				    EC_WORD(isp->is_scnndx), isp->is_name, i,
 				    EC_XWORD(mvp->m_info));
 				return (S_ERROR);
 			}
 			if (mvp->m_repeat == 0) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMREPEAT),
-				    isp->is_file->ifl_name, isp->is_name, i,
+				    isp->is_file->ifl_name,
+				    EC_WORD(isp->is_scnndx), isp->is_name, i,
 				    EC_XWORD(mvp->m_repeat));
 				return (S_ERROR);
 			}
@@ -223,7 +227,8 @@ ld_process_move(Ofl_desc *ofl)
 			default:
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_PSYM_INVMINFO2),
-				    isp->is_file->ifl_name, isp->is_name, i,
+				    isp->is_file->ifl_name,
+				    EC_WORD(isp->is_scnndx), isp->is_name, i,
 				    EC_XWORD(mvp->m_info));
 				return (S_ERROR);
 			}
@@ -337,6 +342,7 @@ ld_process_move(Ofl_desc *ofl)
 					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
 					    sdp->sd_file->ifl_name,
+					    EC_WORD(isp->is_scnndx),
 					    isp->is_name, i,
 					    MSG_INTL(MSG_PSYM_NOSTATIC));
 				} else {
@@ -347,6 +353,7 @@ ld_process_move(Ofl_desc *ofl)
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_PSYM_CANNOTEXPND),
 					    sdp->sd_file->ifl_name,
+					    EC_WORD(isp->is_scnndx),
 					    isp->is_name, i,
 					    MSG_ORIG(MSG_STR_EMPTY));
 				} else {

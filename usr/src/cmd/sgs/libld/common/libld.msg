@@ -234,9 +234,9 @@
 #
 # TRANSLATION_NOTE -- End of USAGE message
 #
-@ MSG_GRP_INVALNDX	"file: %s: group section: %s: entry %d: \
+@ MSG_GRP_INVALNDX	"file %s: group section [%u]%s: entry %d: \
 			 invalid section index: %d"
-@ MSG_GRP_INVALSYM	"file: %s: group section: %s: invalid group symbol %s:"
+@ MSG_GRP_INVALSYM	"file %s: group section [%u]%s: invalid group symbol %s"
 
 # Relocation processing messages (some of these are required to satisfy
 # do_reloc(), which is common code used by cmd/sgs/rtld - make sure both
@@ -246,9 +246,9 @@
 			 value 0x%llx does not fit"
 @ MSG_REL_NONALIGN	"relocation error: %s: file %s: symbol %s: \
 			 offset 0x%llx is non-aligned"
-@ MSG_REL_NULL		"relocation error: file %s: section %s: \
+@ MSG_REL_NULL		"relocation error: file %s: section [%u]%s: \
 			 skipping null relocation record"
-@ MSG_REL_NOTSUP	"relocation error: %s: file %s: section %s: \
+@ MSG_REL_NOTSUP	"relocation error: %s: file %s: section [%u]%s: \
 			 relocation not currently supported"
 @ MSG_REL_PICREDLOC	"relocation error: %s: file %s symbol %s: \
 			 -z redlocsym may not be used for pic code"
@@ -265,17 +265,17 @@
 			 relocation illegal for TLS symbol"
 @ MSG_REL_BADGOTBASED	"relocation error: %s: file %s: symbol %s: a GOT \
 			 relative relocation must reference a local symbol"
-@ MSG_REL_UNKNWSYM	"relocation error: %s: file %s: section %s: \
+@ MSG_REL_UNKNWSYM	"relocation error: %s: file %s: section [%u]%s: \
 			 attempt to relocate with respect to unknown \
 			 symbol %s: offset 0x%llx, symbol index %d"
 @ MSG_REL_UNSUPSZ	"relocation error: %s: file %s: symbol %s: \
 			 offset size (%d bytes) is not supported"
-@ MSG_REL_INVALOFFSET	"relocation error: %s: file: %s section %s: \
+@ MSG_REL_INVALOFFSET	"relocation error: %s: file %s section [%u]%s: \
 			 invalid offset symbol `%s': offset 0x%llx"
-@ MSG_REL_INVALRELT	"relocation error: file %s: section %s: \
+@ MSG_REL_INVALRELT	"relocation error: file %s: section [%u]%s: \
 			 invalid relocation type: 0x%x"
 @ MSG_REL_EMPTYSEC	"relocation error: %s: file %s: symbol %s: \
-			 attempted against empty section %s"
+			 attempted against empty section [%u]%s"
 @ MSG_REL_EXTERNSYM	"relocation error: %s: file %s: symbol %s: \
 			 external symbolic relocation against non-allocatable \
 			 section %s; cannot be processed at runtime: \
@@ -284,15 +284,15 @@
 			 unexpected relocation; generic processing performed"
 @ MSG_REL_UNEXPSYM	"relocation error: %s: file %s: symbol %s: \
 			 unexpected symbol referenced from file %s"
-@ MSG_REL_SYMDISC	"relocation error: %s: file: %s section: %s \
-			 symbol: %s: symbol has been discarded with discarded \
-			 section: %s"
-@ MSG_REL_NOSYMBOL	"relocation error: %s: file %s: section: %s: \
+@ MSG_REL_SYMDISC	"relocation error: %s: file %s: section [%u]%s: \
+			 symbol %s: symbol has been discarded with discarded \
+			 section: [%u]%s"
+@ MSG_REL_NOSYMBOL	"relocation error: %s: file %s: section: [%u]%s: \
 			 offset: 0x%llx: relocation requires reference symbol"
 @ MSG_REL_DISPREL1	"relocation error: %s: file %s: symbol %s: \
 			 displacement relocation applied to the symbol \
 			 %s at 0x%llx: symbol %s is a copy relocated symbol"
-@ MSG_REL_UNSUPSIZE	"relocation error: %s: file %s: section %s: \
+@ MSG_REL_UNSUPSIZE	"relocation error: %s: file %s: section [%u]%s: \
 			 relocation against section symbol unsupported"
 
 @ MSG_REL_DISPREL2	"relocation warning: %s: file %s: symbol %s: \
@@ -308,21 +308,21 @@
 @ MSG_REL_COPY		"relocation warning: %s: file %s: symbol %s: \
 			 relocation bound to a symbol with STV_PROTECTED \
 			 visibility"
-@ MSG_RELINVSEC		"relocation warning: %s: file %s: section: %s: \
-			 against suspicious section %s; relocation ignored"
+@ MSG_RELINVSEC		"relocation warning: %s: file %s: section: [%u]%s: \
+			 against suspicious section [%u]%s; relocation ignored"
 @ MSG_REL_TLSIE		"relocation warning: %s: file %s: symbol %s: \
 			 relocation has restricted use when building a shared \
 			 object"
 
-@ MSG_REL_SLOPCDATNONAM	"relocation warning: %s: file %s: section %s: \
-			 relocation against discarded COMDAT section %s: \
+@ MSG_REL_SLOPCDATNONAM	"relocation warning: %s: file %s: section [%u]%s: \
+			 relocation against discarded COMDAT section [%u]%s: \
 			 redirected to file %s"
-@ MSG_REL_SLOPCDATNAM	"relocation warning: %s: file %s: section %s: \
+@ MSG_REL_SLOPCDATNAM	"relocation warning: %s: file %s: section [%u]%s: \
 			 symbol %s: relocation against discarded COMDAT \
-			 section %s: redirected to file %s"
-@ MSG_REL_SLOPCDATNOSYM	"relocation warning: %s: file %s: section %s: \
+			 section [%u]%s: redirected to file %s"
+@ MSG_REL_SLOPCDATNOSYM	"relocation warning: %s: file %s: section [%u]%s: \
 			 symbol %s: relocation against discarded COMDAT \
-			 section %s: symbol not found, relocation ignored"
+			 section [%u]%s: symbol not found, relocation ignored"
 
 @ MSG_REL_NOREG		"relocation error: REGISTER relocation not supported \
 			 on target architecture"
@@ -375,36 +375,38 @@
 @ MSG_FIL_MULINC_2	"file %s: linked to %s: attempted multiple inclusion \
 			 of file"
 @ MSG_FIL_SOINSTAT	"input of shared object `%s' in static mode"
-@ MSG_FIL_INVALSEC	"file %s: section %s has invalid type %s"
+@ MSG_FIL_INVALSEC	"file %s: section [%u]%s has invalid type %s"
 @ MSG_FIL_NOTFOUND	"file %s: required by %s, not found"
-@ MSG_FIL_MALSTR	"file %s: section %s: malformed string table, \
+@ MSG_FIL_MALSTR	"file %s: section [%u]%s: malformed string table, \
 			 initial or final byte"
 @ MSG_FIL_PTHTOLONG	"`%s/%s' pathname too long"
-@ MSG_FIL_EXCLUDE	"file %s: section %s contains both SHF_EXCLUDE and \
+@ MSG_FIL_EXCLUDE	"file %s: section [%u]%s contains both SHF_EXCLUDE and \
 			 SHF_ALLOC flags: SHF_EXCLUDE ignored"
 @ MSG_FIL_INTERRUPT	"file %s: creation interrupted: %s"
-@ MSG_FIL_INVRELOC1	"file %s: section %s: relocations can not be applied \
-			 against section `%s'"
-@ MSG_FIL_INVSHINFO	"file %s: section %s: has invalid sh_info: %lld"
-@ MSG_FIL_INVSHLINK	"file %s: section %s: has invalid sh_link: %lld"
-@ MSG_FIL_INVSHENTSIZE	"file %s: section %s: has invalid sh_entsize: %lld"
-@ MSG_FIL_NOSTRTABLE	"file %s: section %s: symbol[%d]: specifies string \
+@ MSG_FIL_INVRELOC1	"file %s: section [%u]%s: relocations can not be \
+			 applied against section [%u]%s"
+@ MSG_FIL_INVSHINFO	"file %s: section [%u]%s: has invalid sh_info: %lld"
+@ MSG_FIL_INVSHLINK	"file %s: section [%u]%s: has invalid sh_link: %lld"
+@ MSG_FIL_INVSHENTSIZE	"file %s: section [%u]%s: has invalid sh_entsize: %lld"
+@ MSG_FIL_NOSTRTABLE	"file %s: section [%u]%s: symbol[%d]: specifies string \
 			 table offset 0x%llx: no string table is available"
-@ MSG_FIL_EXCSTRTABLE	"file %s: section %s: symbol[%d]: specifies string \
+@ MSG_FIL_EXCSTRTABLE	"file %s: section [%u]%s: symbol[%d]: specifies string \
 			 table offset 0x%llx: exceeds string table %s: \
 			 size 0x%llx"
-@ MSG_FIL_NONAMESYM	"file %s: section %s: symbol[%d]: global symbol has \
+@ MSG_FIL_NONAMESYM	"file %s: section [%u]%s: symbol[%d]: global symbol has \
 			 no name"
-@ MSG_FIL_UNKCAP	"file %s: section %s: unknown capability tag: %d"
-@ MSG_FIL_BADSF1	"file %s: section %s: unknown software capabilities: \
-			 0x%llx; ignored"
-@ MSG_FIL_INADDR32SF1	"file %s: section %s: software capability ADDR32: is \
+@ MSG_FIL_UNKCAP	"file %s: section [%u]%s: unknown capability tag: %d"
+@ MSG_FIL_BADSF1	"file %s: section [%u]%s: unknown software \
+			 capabilities: 0x%llx; ignored"
+@ MSG_MAPFIL_BADSF1	"file %s: line %llu: unknown software \
+			 capabilities: 0x%llx; ignored"
+@ MSG_FIL_INADDR32SF1	"file %s: section [%u]%s: software capability ADDR32: is \
 			 ineffective when building 32-bit object; ignored"
-@ MSG_FIL_EXADDR32SF1	"file %s: section %s: software capability ADDR32: \
+@ MSG_FIL_EXADDR32SF1	"file %s: section [%u]%s: software capability ADDR32: \
 			 requires executable be built with ADDR32 capability"
 
-@ MSG_FIL_BADORDREF	"file %s: section %s[%d]: contains illegal reference \
-			 to discarded section: %s[%d]"
+@ MSG_FIL_BADORDREF	"file %s: section [%u]%s: contains illegal reference \
+			 to discarded section: [%u]%s"
 
 
 # Recording name conflicts
@@ -436,9 +438,9 @@
 @ MSG_ELF_ARSYM		"file %s ignored: unable to locate archive symbol table"
 
 @ MSG_ELF_VERSYM	"file %s: version symbol section entry mismatch:\n\t\
-			 (section %s entries=%d; section %s entries=%d)"
+			 (section [%u]%s entries=%d; section [%u]%s entries=%d)"
 
-@ MSG_ELF_NOGROUPSECT	"file %s: section %s: SHF_GROUP flag set, but no \
+@ MSG_ELF_NOGROUPSECT	"file %s: section [%u]%s: SHF_GROUP flag set, but no \
 			 corresponding SHT_GROUP section found"
 
 # Section processing errors
@@ -453,11 +455,11 @@
 			 section[%lld]"
 @ MSG_SYM_TLS		"symbol `%s' in file %s (STT_TLS), is defined \
 			 in a non-SHF_TLS section"
-@ MSG_SYM_BADADDR	"symbol `%s' in file %s: section [%d] %s: size %#llx: \
+@ MSG_SYM_BADADDR	"symbol `%s' in file %s: section [%u]%s: size %#llx: \
 			 symbol (address %#llx, size %#llx) lies outside \
 			 of containing section"
 @ MSG_SYM_BADADDR_ROTXT	"symbol `%s' in file %s: readonly text section \
-			 [%d] %s: size %#llx: symbol (address %#llx, \
+			 [%u]%s: size %#llx: symbol (address %#llx, \
 			 size %#llx) lies outside of containing section"
 @ MSG_SYM_MULDEF	"symbol `%s' is multiply-defined:"
 @ MSG_SYM_CONFVIS	"symbol `%s' has conflicting visibilities:"
@@ -483,17 +485,17 @@
 			 same address: %#llx: remove duplicate with \
 			 NOSORTSYM mapfile directive"
 
-@ MSG_PSYM_INVMINFO1	"file %s: section %s: entry[%d] has invalid m_info: \
+@ MSG_PSYM_INVMINFO1	"file %s: section [%u]%s: entry[%d] has invalid m_info: \
 			 0x%llx for symbol index"
-@ MSG_PSYM_INVMINFO2	"file %s: section %s: entry[%d] has invalid m_info: \
+@ MSG_PSYM_INVMINFO2	"file %s: section [%u]%s: entry[%d] has invalid m_info: \
 			 0x%llx for size"
-@ MSG_PSYM_INVMREPEAT	"file %s: section %s: entry[%d] has invalid m_repeat: \
+@ MSG_PSYM_INVMREPEAT	"file %s: section [%u]%s: entry[%d] has invalid m_repeat: \
 			 0x%llx"
-@ MSG_PSYM_CANNOTEXPND	"file %s: section %s: entry[%d] can not be expanded: \
+@ MSG_PSYM_CANNOTEXPND	"file %s: section [%u]%s: entry[%d] can not be expanded: \
 			 associated symbol size is unknown %s"
 @ MSG_PSYM_NOSTATIC	"and partial initialization cannot be deferred to \
 			 a static object"
-@ MSG_MOVE_OVERLAP	"file %s: section %s: symbol `%s' overlapping move \
+@ MSG_MOVE_OVERLAP	"file %s: section [%u]%s: symbol `%s' overlapping move \
 			 initialization: start=0x%llx, length=0x%llx: \
 			 start=0x%llx, length=0x%llx"
 @ MSG_PSYM_EXPREASON1	"output file is static object"
@@ -951,10 +953,6 @@
 @ MSG_MAP_NOTERM	"%s: %lld: string does not terminate with a `\"'"
 @ MSG_MAP_SECINSEG	"%s: %lld: section within segment ordering done on \
 			 a non-existent segment `%s'"
-@ MSG_MAP_INCOMPFLG	"%s: %lld: incompatible flags $SPECVERS and $ADDVERS \
-			 used on the same object `%s'"
-@ MSG_MAP_MULSONAME	"%s: %lld: multiple definition of SONAME field for %s: \
-			 first `%s', second `%s'; first value used"
 @ MSG_MAP_UNEXDEP	"%s: %lld: dependency `%s' unexpected; ignored"
 @ MSG_MAP_UNEXTOK	"%s: %lld: unexpected occurrence of `%c' token"
 
@@ -1273,8 +1271,6 @@
 @ MSG_MAP_NOTE		"note"
 @ MSG_MAP_NULL		"null"
 @ MSG_MAP_STACK		"stack"
-@ MSG_MAP_NEED		"need"
-@ MSG_MAP_SPECVERS	"specvers"
 @ MSG_MAP_ADDVERS	"addvers"
 @ MSG_MAP_GLOBAL	"global"
 @ MSG_MAP_FUNCTION	"function"
@@ -1293,8 +1289,6 @@
 @ MSG_MAP_INTERPOSE	"interpose"
 @ MSG_MAP_DYNSORT	"dynsort"
 @ MSG_MAP_NODYNSORT	"nodynsort"
-
-@ MSG_FMT_INDEX		"[%lld]"
 
 @ MSG_STR_DTRACE	"PT_SUNWDTRACE"
 

@@ -931,8 +931,6 @@ make_dynamic(Ofl_desc *ofl)
 	 * Reserve entries for any needed dependencies.
 	 */
 	for (APLIST_TRAVERSE(ofl->ofl_sos, idx, ifl)) {
-		Sdf_desc	*sdf;
-
 		if (!(ifl->ifl_flags & (FLG_IF_NEEDED | FLG_IF_NEEDSTR)))
 			continue;
 
@@ -957,15 +955,6 @@ make_dynamic(Ofl_desc *ofl)
 			else if (ifl->ifl_flags & FLG_IF_IGNORE)
 				continue;
 		}
-
-		/*
-		 * If this object has an accompanying shared object definition
-		 * determine if an alternative shared object name has been
-		 * specified.
-		 */
-		if (((sdf = ifl->ifl_sdfdesc) != NULL) &&
-		    (sdf->sdf_flags & FLG_SDF_SONAME))
-			ifl->ifl_soname = sdf->sdf_soname;
 
 		/*
 		 * If this object is a lazyload reserve a DT_POSFLAG_1 entry.
@@ -2514,7 +2503,7 @@ ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_alpp,
 		 * output and helps show how the relocation has changed
 		 * from its original input section to our merged one.
 		 */
-		rsp->rel_sname = ld_section_reld_name(rsp->rel_sym, mstrsec);
+		rsp->rel_sname = ld_stt_section_sym_name(mstrsec);
 		if (rsp->rel_sname == NULL)
 			goto return_s_error;
 	}

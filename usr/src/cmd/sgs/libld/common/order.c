@@ -356,8 +356,8 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx)
 		if (isp2->is_flags & FLG_IS_DISCARD) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_BADORDREF), ifl->ifl_name,
-			    isp->is_name, isp->is_scnndx, isp2->is_name,
-			    isp2->is_scnndx);
+			    EC_WORD(isp->is_scnndx), isp->is_name,
+			    EC_WORD(isp2->is_scnndx), isp2->is_name);
 			return (S_ERROR);
 		}
 

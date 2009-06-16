@@ -169,6 +169,7 @@ $SkipUnusedSearchPath = qr{
 	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 |		# future needs
 	/usr/lib/mps/secv1.*\ from\ .*libnss3\.so |		# non-OSNet
 	/usr/lib/mps.*\ from\ .*libnss3\.so |			# non-OSNet
+	/usr/lib/mps.*\ from\ .*libnssutil3.so |		# non-OSNET
 	/usr/sfw/lib.*\ from\ .*libdbus-1\.so\.3 |		# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libdbus-glib-1\.so\.2 |		# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libglib-2\.0\.so\.0 |		# non-OSNet

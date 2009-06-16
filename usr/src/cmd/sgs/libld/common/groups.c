@@ -108,7 +108,7 @@ ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 	}
 
 	eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ELF_NOGROUPSECT),
-	    ifl->ifl_name, isp->is_name);
+	    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name);
 	ofl->ofl_flags |= FLG_OF_FATAL;
 	return (NULL);
 }
@@ -120,7 +120,7 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	Shdr		*sshdr, *gshdr = gisc->is_shdr;
 	Is_desc		*isc;
 	Sym		*sym;
-	char		*str;
+	const char	*str;
 	Group_desc	gd;
 	size_t		ndx;
 
@@ -131,13 +131,15 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	    (gshdr->sh_link >= gifl->ifl_shnum) ||
 	    ((isc = gifl->ifl_isdesc[gshdr->sh_link]) == NULL)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHLINK),
-		    gifl->ifl_name, gisc->is_name, EC_XWORD(gshdr->sh_link));
+		    gifl->ifl_name, EC_WORD(gisc->is_scnndx),
+		    gisc->is_name, EC_XWORD(gshdr->sh_link));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
 	if (gshdr->sh_entsize == 0) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHENTSIZE),
-		    gifl->ifl_name, gisc->is_name, EC_XWORD(gshdr->sh_entsize));
+		    gifl->ifl_name, EC_WORD(gisc->is_scnndx), gisc->is_name,
+		    EC_XWORD(gshdr->sh_entsize));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -154,7 +156,8 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	    (gshdr->sh_info >= (Word)(sshdr->sh_size / sshdr->sh_entsize)) ||
 	    ((isc = gifl->ifl_isdesc[sshdr->sh_link]) == NULL)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
-		    gifl->ifl_name, gisc->is_name, EC_XWORD(gshdr->sh_info));
+		    gifl->ifl_name, EC_WORD(gisc->is_scnndx), gisc->is_name,
+		    EC_XWORD(gshdr->sh_info));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -182,9 +185,18 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 	if ((gd.gd_data[0] & GRP_COMDAT) &&
 	    ((ELF_ST_BIND(sym->st_info) == STB_LOCAL) ||
 	    (sym->st_shndx == SHN_UNDEF))) {
-		/* FATAL or ignore? */
+		/* If section symbol, construct a printable name for it */
+		if (ELF_ST_TYPE(sym->st_info) == STT_SECTION) {
+			const char *stt_sym_name =
+			    ld_stt_section_sym_name(gisc);
+
+			if (stt_sym_name != NULL)
+				str = stt_sym_name;
+		}
+
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_GRP_INVALSYM),
-		    gifl->ifl_name, gisc->is_name, str);
+		    gifl->ifl_name, EC_WORD(gisc->is_scnndx),
+		    gisc->is_name, str);
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -199,7 +211,7 @@ ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
 		if ((gndx = gd.gd_data[ndx]) >= gifl->ifl_shnum) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_GRP_INVALNDX), gifl->ifl_name,
-			    gisc->is_name, ndx, gndx);
+			    EC_WORD(gisc->is_scnndx), gisc->is_name, ndx, gndx);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}

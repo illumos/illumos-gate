@@ -192,8 +192,8 @@ void	Dbg64_libs_yp(Lm_list *, const char *);
 void	Dbg32_libs_ylu(Lm_list *, const char *, const char *, int);
 void	Dbg64_libs_ylu(Lm_list *, const char *, const char *, int);
 
-void	Dbg32_map_dash(Lm_list *, const char *, Sdf_desc *);
-void	Dbg64_map_dash(Lm_list *, const char *, Sdf_desc *);
+void	Dbg32_map_dash(Lm_list *, const char *);
+void	Dbg64_map_dash(Lm_list *, const char *);
 void	Dbg32_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
 void	Dbg64_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
 void	Dbg32_map_parse(Lm_list *, const char *);

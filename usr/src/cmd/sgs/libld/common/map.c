@@ -328,7 +328,7 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 		if ((ofl->ofl_sfcap_1 &
 		    (SF1_SUNW_FPKNWN | SF1_SUNW_FPUSED)) == SF1_SUNW_FPUSED) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(MSG_FIL_BADSF1), mapfile,
+			    MSG_INTL(MSG_MAPFIL_BADSF1), mapfile,
 			    EC_XWORD(Line_num), EC_LWORD(SF1_SUNW_FPUSED));
 			ofl->ofl_sfcap_1 &= ~SF1_SUNW_FPUSED;
 		}
@@ -1158,9 +1158,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 	Sdv_desc	sdv;
 	enum {
 	    MD_NONE = 0,
-	    MD_SPECVERS,
 	    MD_ADDVERS,
-	    MD_NEEDED
 	}		dolkey = MD_NONE;
 
 
@@ -1200,39 +1198,9 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 				return (S_ERROR);
 			}
 			switch (dolkey) {
-			case MD_NEEDED:
-				if (sdf->sdf_flags & FLG_SDF_SONAME) {
-					eprintf(ofl->ofl_lml, ERR_WARNING,
-					    MSG_INTL(MSG_MAP_MULSONAME),
-					    mapfile, EC_XWORD(Line_num), name,
-					    sdf->sdf_soname, Start_tok);
-					dolkey = MD_NONE;
-					continue;
-				}
-				if ((sdf->sdf_soname =
-				    libld_malloc(strlen(Start_tok) + 1)) ==
-				    NULL)
-					return (S_ERROR);
-				(void) strcpy((char *)sdf->sdf_soname,
-				    Start_tok);
-				sdf->sdf_flags |= FLG_SDF_SONAME;
-				break;
-			case MD_SPECVERS:
 			case MD_ADDVERS:
-				if (dolkey == MD_SPECVERS)
-					sdf->sdf_flags |= FLG_SDF_SPECVER;
-				else
-					sdf->sdf_flags |= FLG_SDF_ADDVER;
+				sdf->sdf_flags |= FLG_SDF_ADDVER;
 
-				if ((sdf->sdf_flags & (FLG_SDF_SPECVER |
-				    FLG_SDF_ADDVER)) == (FLG_SDF_SPECVER |
-				    FLG_SDF_ADDVER)) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MAP_INCOMPFLG),
-					    mapfile, EC_XWORD(Line_num),
-					    sdf->sdf_name);
-					return (S_ERROR);
-				}
 				if ((version = libld_malloc(
 				    strlen(Start_tok) + 1)) == NULL)
 					return (S_ERROR);
@@ -1271,12 +1239,6 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 			Start_tok++;
 			lowercase(Start_tok);
 			if (strcmp(Start_tok,
-			    MSG_ORIG(MSG_MAP_NEED)) == 0)
-				dolkey = MD_NEEDED;
-			else if (strcmp(Start_tok,
-			    MSG_ORIG(MSG_MAP_SPECVERS)) == 0)
-				dolkey = MD_SPECVERS;
-			else if (strcmp(Start_tok,
 			    MSG_ORIG(MSG_MAP_ADDVERS)) == 0)
 				dolkey = MD_ADDVERS;
 			else {
@@ -1306,7 +1268,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 			return (S_ERROR);
 	}
 
-	DBG_CALL(Dbg_map_dash(ofl->ofl_lml, name, sdf));
+	DBG_CALL(Dbg_map_dash(ofl->ofl_lml, name));
 	return (1);
 }
 

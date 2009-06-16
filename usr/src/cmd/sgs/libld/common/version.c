@@ -357,7 +357,6 @@ ld_vers_check_need(Ofl_desc *ofl)
 		Aliste		idx2;
 		Ver_index	*vip;
 		Ver_desc	*vdp;
-		Sdf_desc	*sdf = ifl->ifl_sdfdesc;
 		Byte		cnt, need = 0;
 
 		if (!(ifl->ifl_flags & FLG_IF_NEEDED))
@@ -365,34 +364,6 @@ ld_vers_check_need(Ofl_desc *ofl)
 
 		if (ifl->ifl_vercnt <= VER_NDX_GLOBAL)
 			continue;
-
-		/*
-		 * If version needed definitions were specified in
-		 * a mapfile ($SPECVERS=) then record those definitions.
-		 */
-		if (sdf && (sdf->sdf_flags & FLG_SDF_SPECVER)) {
-			Sdv_desc	*sdv;
-			Aliste		idx3;
-
-			for (ALIST_TRAVERSE(sdf->sdf_verneed, idx3, sdv)) {
-				/*
-				 * If this $SPECVERS item corresponds to
-				 * a real version, then don't issue it
-				 * here, but use the real one instead.
-				 * This preserves the ability to reference it
-				 * from a symbol versym entry.
-				 */
-				if (sdv->sdv_flags & FLG_SDV_MATCHED)
-					continue;
-
-				/* Not found in known versions. Count it */
-				ofl->ofl_verneedsz += sizeof (Vernaux);
-				if (st_insert(ofl->ofl_dynstrtab,
-				    sdv->sdv_name) == -1)
-					return (S_ERROR);
-				need++;
-			}
-		}
 
 		/*
 		 * Scan the version index list and if any weak version
@@ -463,14 +434,10 @@ ld_vers_check_need(Ofl_desc *ofl)
 		}
 
 		if (need) {
-			const char *soname;
-
 			ifl->ifl_flags |= FLG_IF_VERNEED;
 			ofl->ofl_verneedsz += sizeof (Verneed);
-			soname = ((sdf != NULL) &&
-			    (sdf->sdf_flags & FLG_SDF_SONAME)) ?
-			    sdf->sdf_soname : ifl->ifl_soname;
-			if (st_insert(ofl->ofl_dynstrtab, soname) == -1)
+			if (st_insert(ofl->ofl_dynstrtab,
+			    ifl->ifl_soname) == -1)
 				return (S_ERROR);
 		}
 	}
@@ -541,12 +508,11 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 		if (vdp->vd_flags & VER_FLG_WEAK)
 			vip[ndx].vi_flags |= VER_FLG_WEAK;
 		/*
-		 * If this version is mentioned in a mapfile using
-		 * $ADDVERS or $SPECVERS syntax then check to see if
-		 * it corresponds to an actual version in the file.
+		 * If this version is mentioned in a mapfile using ADDVERS
+		 * syntax then check to see if it corresponds to an actual
+		 * version in the file.
 		 */
-		if (sdf &&
-		    (sdf->sdf_flags & (FLG_SDF_SPECVER|FLG_SDF_ADDVER))) {
+		if (sdf && (sdf->sdf_flags & FLG_SDF_ADDVER)) {
 			Aliste	idx2;
 
 			for (ALIST_TRAVERSE(sdf->sdf_verneed, idx2, sdv)) {
@@ -554,8 +520,6 @@ vers_index(Ofl_desc *ofl, Ifl_desc *ifl, int avail)
 					continue;
 
 				vip[ndx].vi_flags |= FLG_VER_REFER;
-				if (sdf->sdf_flags & FLG_SDF_SPECVER)
-					vip[ndx].vi_flags |= FLG_VER_SPECVER;
 				sdv->sdv_flags |= FLG_SDV_MATCHED;
 				break;
 			}
@@ -604,10 +568,12 @@ ld_vers_sym_process(Lm_list *lml, Is_desc *isp, Ifl_desc *ifl)
 	symshdr = ifl->ifl_isdesc[vershdr->sh_link]->is_shdr;
 	if ((symshdr->sh_size / symshdr->sh_entsize) != (vershdr->sh_size /
 	    vershdr->sh_entsize)) {
+		Is_desc	*sym_isp = ifl->ifl_isdesc[vershdr->sh_link];
+
 		eprintf(lml, ERR_WARNING, MSG_INTL(MSG_ELF_VERSYM),
-		    ifl->ifl_name, isp->is_name,
+		    ifl->ifl_name, EC_WORD(isp->is_scnndx), isp->is_name,
 		    EC_WORD(vershdr->sh_size / vershdr->sh_entsize),
-		    ifl->ifl_isdesc[vershdr->sh_link]->is_name,
+		    EC_WORD(sym_isp->is_scnndx), sym_isp->is_name,
 		    EC_WORD(symshdr->sh_size / symshdr->sh_entsize));
 		return (1);
 	}

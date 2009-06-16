@@ -577,9 +577,9 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_reloc_targval_get	ld64_reloc_targval_get
 #define	ld_reloc_targval_set	ld64_reloc_targval_set
 #define	ld_sec_validate		ld64_sec_validate
-#define	ld_section_reld_name	ld64_section_reld_name
 #define	ld_sort_ordered		ld64_sort_ordered
 #define	ld_sort_seg_list	ld64_sort_seg_list
+#define	ld_stt_section_sym_name	ld64_stt_section_sym_name
 #define	ld_sunw_ldmach		ld64_sunw_ldmach
 #define	ld_sup_atexit		ld64_sup_atexit
 #define	ld_sup_open		ld64_sup_open
@@ -634,7 +634,6 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_exit			ld32_exit
 #define	ld_find_library		ld32_find_library
 #define	ld_finish_libs		ld32_finish_libs
-#define	ld_section_reld_name	ld32_section_reld_name
 #define	ld_get_group		ld32_get_group
 #define	ld_group_process	ld32_group_process
 #define	ld_lib_setup		ld32_lib_setup
@@ -667,6 +666,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_sec_validate		ld32_sec_validate
 #define	ld_sort_ordered		ld32_sort_ordered
 #define	ld_sort_seg_list	ld32_sort_seg_list
+#define	ld_stt_section_sym_name	ld32_stt_section_sym_name
 #define	ld_sunw_ldmach		ld32_sunw_ldmach
 #define	ld_sup_atexit		ld32_sup_atexit
 #define	ld_sup_open		ld32_sup_open
@@ -733,7 +733,7 @@ extern int		ld_exit(Ofl_desc *);
 extern uintptr_t	ld_find_library(const char *, Ofl_desc *);
 extern uintptr_t	ld_finish_libs(Ofl_desc *);
 
-extern const char	*ld_section_reld_name(Sym_desc *, Is_desc *);
+extern const char	*ld_stt_section_sym_name(Is_desc *);
 
 extern Group_desc	*ld_get_group(Ofl_desc *, Is_desc *);
 extern uintptr_t	ld_group_process(Is_desc *, Ofl_desc *);

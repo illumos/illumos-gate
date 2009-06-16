@@ -790,8 +790,7 @@
 @ MSG_MAP_SYM_VER_1	"%s, %s; symbol=%s  (%s)"
 @ MSG_MAP_SYM_VER_2	"%s; symbol=%s  (%s)"
 
-@ MSG_MAP_CNT_DEF_1	"library control definition (-), %s; needed=%s"
-@ MSG_MAP_CNT_DEF_2	"library control definition (-), %s; needed"
+@ MSG_MAP_CNT_DEF	"library control definition (-), %s; needed"
 
 @ MSG_MAP_SORT_TITLE	"map file additions: segment sorting required (vaddr):" 
 @ MSG_MAP_SORT_ORIG	"  original=%s"

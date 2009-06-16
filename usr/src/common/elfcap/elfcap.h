@@ -97,7 +97,12 @@ typedef enum {
 
 /*
  * # of each type of capability known to the system. These values
- * must be kept in sync with the arrays found in elfcap.c
+ * must be kept in sync with the arrays found in elfcap.c.
+ *
+ * In ELFCLASS32, capability words are 32-bit, while ELFCLASS64 has
+ * 64-bit words. For simplicity of code and documentation, our policy
+ * is to limit each mask word to no more than 32 capabilities regardless of
+ * the ELFCLASS.
  */
 #define	ELFCAP_NUM_SF1			3
 #define	ELFCAP_NUM_HW1_SPARC		17

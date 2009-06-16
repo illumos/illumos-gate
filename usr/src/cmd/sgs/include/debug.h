@@ -772,7 +772,7 @@ extern	void	Dbg_libs_update(Lm_list *, APlist *, APlist *);
 extern	void	Dbg_libs_yp(Lm_list *, const char *);
 extern	void	Dbg_libs_ylu(Lm_list *, const char *, const char *, int);
 
-extern	void	Dbg_map_dash(Lm_list *, const char *, Sdf_desc *);
+extern	void	Dbg_map_dash(Lm_list *, const char *);
 extern	void	Dbg_map_ent(Lm_list *, Boolean, Ent_desc *, Ofl_desc *);
 extern	void	Dbg_map_parse(Lm_list *, const char *);
 extern	void	Dbg_map_pipe(Lm_list *, Sg_desc *, const char *, const Word);

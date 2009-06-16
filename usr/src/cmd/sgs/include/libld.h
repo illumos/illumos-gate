@@ -961,28 +961,24 @@ struct sym_avlnode {
  *
  *  o	ofl_socntl; maintains the shared object control definitions.  These are
  *	provided by the user (via a mapfile) and are used to indicate any
- *	SONAME translations and verion control requirements.
+ *	verion control requirements.
  */
 struct	sdf_desc {
 	const char	*sdf_name;	/* the shared objects file name */
-	const char	*sdf_soname;	/* the shared objects SONAME */
 	char		*sdf_rpath;	/* library search path DT_RPATH */
 	const char	*sdf_rfile;	/* referencing file for diagnostics */
 	Ifl_desc	*sdf_file;	/* the final input file descriptor */
 	Alist		*sdf_vers;	/* list of versions that are required */
 					/*	from this object */
 	Alist		*sdf_verneed;	/* list of VERNEEDS to create for */
-					/*	this object (via SPECVERS or */
-					/*	ADDVERS) */
+					/*	object via mapfile ADDVERS */
 	Word		sdf_flags;
 };
 
-#define	FLG_SDF_SONAME	0x02		/* An alternative SONAME is supplied */
-#define	FLG_SDF_SELECT	0x04		/* version control selection required */
-#define	FLG_SDF_VERIFY	0x08		/* version definition verification */
+#define	FLG_SDF_SELECT	0x01		/* version control selection required */
+#define	FLG_SDF_VERIFY	0x02		/* version definition verification */
 					/*	required */
-#define	FLG_SDF_SPECVER	0x10		/* specify VERNEEDS */
-#define	FLG_SDF_ADDVER	0x20		/* add VERNEED references */
+#define	FLG_SDF_ADDVER	0x04		/* add VERNEED references */
 
 /*
  * Structure to manage shared object version usage requirements.
@@ -1034,9 +1030,7 @@ struct	ver_index {
 
 #define	FLG_VER_AVAIL	0x10		/* version is available for binding */
 #define	FLG_VER_REFER	0x20		/* version has been referenced */
-#define	FLG_VER_SPECVER	0x40		/* via $SPECVERS in mapfile. */
-					/* 	Cannot be normalized away */
-#define	FLG_VER_CYCLIC	0x80		/* a member of cyclic dependency */
+#define	FLG_VER_CYCLIC	0x40		/* a member of cyclic dependency */
 
 /*
  * isalist(1) descriptor - used to break an isalist string into its component

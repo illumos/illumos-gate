@@ -86,6 +86,9 @@ static const elfcap_str_t format[] = {
  * Order the capabilities by their numeric value. See SF1_SUNW_
  * values in sys/elf.h.
  */
+#if (ELFCAP_NUM_SF1 > 32)
+#error ELFCAP_NUM_SF1 is limited to no more than 32 items
+#endif
 static const elfcap_desc_t sf1[ELFCAP_NUM_SF1] = {
 	{						/* 0x00000001 */
 		SF1_SUNW_FPKNWN, STRDESC("SF1_SUNW_FPKNWN"),
@@ -107,6 +110,9 @@ static const elfcap_desc_t sf1[ELFCAP_NUM_SF1] = {
  * Order the SPARC hardware capabilities to match their numeric value.  See
  * AV_SPARC_ values in sys/auxv_SPARC.h.
  */
+#if (ELFCAP_NUM_HW1_SPARC > 32)
+#error ELFCAP_NUM_HW1_SPARC is limited to no more than 32 items
+#endif
 static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
 	{						/* 0x00000001 */
 		AV_SPARC_MUL32, STRDESC("AV_SPARC_MUL32"),
@@ -185,6 +191,9 @@ static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
  * Order the Intel hardware capabilities to match their numeric value.  See
  * AV_386_ values in sys/auxv_386.h.
  */
+#if (ELFCAP_NUM_HW1_386 > 32)
+#error ELFCAP_NUM_HW1_386 is limited to no more than 32 items
+#endif
 static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
 	{						/* 0x00000001 */
 		AV_386_FPU, STRDESC("AV_386_FPU"),

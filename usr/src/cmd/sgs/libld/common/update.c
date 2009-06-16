@@ -2634,7 +2634,6 @@ update_overneed(Ofl_desc *ofl)
 	Verneed		*vnd, *_vnd;
 	Str_tbl		*dynstr;
 	Word		num = 0;
-	int		has_specver;
 
 	dynstr = ofl->ofl_dynstrtab;
 	_vnd = vnd = (Verneed *)ofl->ofl_osverneed->os_outdata->d_buf;
@@ -2647,7 +2646,6 @@ update_overneed(Ofl_desc *ofl)
 		Half		_cnt;
 		Word		cnt = 0;
 		Vernaux		*_vnap, *vnap;
-		Sdf_desc	*sdf = ifl->ifl_sdfdesc;
 		size_t		stoff;
 
 		if (!(ifl->ifl_flags & FLG_IF_VERNEED))
@@ -2659,41 +2657,6 @@ update_overneed(Ofl_desc *ofl)
 		vnd->vn_file = stoff;
 
 		_vnap = vnap = (Vernaux *)(vnd + 1);
-
-		has_specver = sdf && (sdf->sdf_flags & FLG_SDF_SPECVER);
-		if (has_specver) {
-			Sdv_desc	*sdv;
-			Aliste		idx2;
-
-			/*
-			 * If version needed definitions were specified in
-			 * a mapfile ($SPECVERS=*) then record those
-			 * definitions.
-			 */
-			for (ALIST_TRAVERSE(sdf->sdf_verneed, idx2, sdv)) {
-				/*
-				 * If this $SPECVERS item corresponds
-				 * to a real version, then skip it here
-				 * in favor of the real one below.
-				 */
-				if (sdv->sdv_flags & FLG_SDV_MATCHED)
-					continue;
-
-				(void) st_setstring(dynstr, sdv->sdv_name,
-				    &stoff);
-				vnap->vna_name = stoff;
-				/* LINTED */
-				vnap->vna_hash = (Word)elf_hash(sdv->sdv_name);
-				vnap->vna_flags = 0;
-				vnap->vna_other = 0;
-				_vnap = vnap;
-				vnap++;
-				cnt++;
-				/* LINTED */
-				_vnap->vna_next = (Word)((uintptr_t)vnap -
-				    (uintptr_t)_vnap);
-			}
-		}
 
 		/*
 		 * Traverse the version index list recording
@@ -2723,22 +2686,9 @@ update_overneed(Ofl_desc *ofl)
 				 * to verify A at runtime and skip B. The
 				 * version normalization process sets the INFO
 				 * flag for the versions we want ld.so.1 to
-				 * skip. By default, we progagate these flags
-				 * to the output object as computed.
-				 *
-				 * The presence of $SPECVERS items alters
-				 * matters. If $SPECVERS are present in the
-				 * mapfile, then any version that corresponds
-				 * to the $SPECVERS must be validated, and
-				 * all others must be skipped. This is true
-				 * even if it causes ld.so.1 to incorrectly
-				 * validate the object ---- it is an override
-				 * mechanism.
+				 * skip.
 				 */
-				if ((!has_specver &&
-				    (vip->vi_flags & VER_FLG_INFO)) ||
-				    (has_specver &&
-				    !(vip->vi_flags & FLG_VER_SPECVER)))
+				if (vip->vi_flags & VER_FLG_INFO)
 					vnap->vna_flags |= VER_FLG_INFO;
 
 				_vnap = vnap;
@@ -3202,7 +3152,7 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 	 */
 	if (link >= ifl->ifl_shnum) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, msg, ifl->ifl_name,
-		    isp->is_name, EC_XWORD(link));
+		    EC_WORD(isp->is_scnndx), isp->is_name, EC_XWORD(link));
 		return (link);
 	}
 

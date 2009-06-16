@@ -1356,6 +1356,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				    conv_reloc_SPARC_type(arsp->rel_rtype,
 				    0, &inv_buf), ifl_name,
 				    demangle(arsp->rel_sname),
+				    EC_WORD(arsp->rel_isdesc->is_scnndx),
 				    arsp->rel_isdesc->is_name);
 				return (S_ERROR);
 			}
@@ -1389,6 +1390,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				    MSG_INTL(MSG_REL_INVALOFFSET),
 				    conv_reloc_SPARC_type(arsp->rel_rtype,
 				    0, &inv_buf), ifl_name,
+				    EC_WORD(arsp->rel_isdesc->is_scnndx),
 				    arsp->rel_isdesc->is_name,
 				    demangle(arsp->rel_sname),
 				    EC_ADDR((uintptr_t)addr -

@@ -76,8 +76,8 @@ ld_sym_avl_comp(const void *elem1, const void *elem2)
  */
 inline static const char *
 string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
-    int symndx, Word shndx, const char *symsecname, const char *strsecname,
-    Word *flags)
+    int symndx, Word shndx, Word symsecndx, const char *symsecname,
+    const char *strsecname, Word *flags)
 {
 	Word	name = sym->st_name;
 
@@ -85,14 +85,15 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 		if ((ifl->ifl_flags & FLG_IF_HSTRTAB) == 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_NOSTRTABLE), ifl->ifl_name,
-			    symsecname, symndx, EC_XWORD(name));
+			    EC_WORD(symsecndx), symsecname, symndx,
+			    EC_XWORD(name));
 			return (NULL);
 		}
 		if (name >= (Word)strsize) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_EXCSTRTABLE), ifl->ifl_name,
-			    symsecname, symndx, EC_XWORD(name),
-			    strsecname, EC_XWORD(strsize));
+			    EC_WORD(symsecndx), symsecname, symndx,
+			    EC_XWORD(name), strsecname, EC_XWORD(strsize));
 			return (NULL);
 		}
 	}
@@ -122,7 +123,8 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 	 */
 	if ((name == 0) && (ELF_ST_BIND(sym->st_info) != STB_LOCAL)) {
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_NONAMESYM),
-		    ifl->ifl_name, symsecname, symndx, EC_XWORD(name));
+		    ifl->ifl_name, EC_WORD(symsecndx), symsecname, symndx,
+		    EC_XWORD(name));
 	}
 	return (strs + name);
 }
@@ -1822,6 +1824,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	Half		etype = ifl->ifl_ehdr->e_type;
 	int		etype_rel;
 	const char	*symsecname, *strsecname;
+	Word		symsecndx;
 	avl_index_t	where;
 	int		test_gnu_hidden_bit, weak;
 
@@ -1838,6 +1841,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 	DBG_CALL(Dbg_syms_process(ofl->ofl_lml, ifl));
 
+	symsecndx = isc->is_scnndx;
 	if (isc->is_name)
 		symsecname = isc->is_name;
 	else
@@ -1851,8 +1855,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		ndx = shdr->sh_link;
 		if ((ndx == 0) || (ndx >= ifl->ifl_shnum)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_FIL_INVSHLINK),
-			    ifl->ifl_name, symsecname, EC_XWORD(ndx));
+			    MSG_INTL(MSG_FIL_INVSHLINK), ifl->ifl_name,
+			    EC_WORD(symsecndx), symsecname, EC_XWORD(ndx));
 			return (S_ERROR);
 		}
 		strsize = ifl->ifl_isdesc[ndx]->is_shdr->sh_size;
@@ -1935,7 +1939,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * Check if st_name has a valid value or not.
 			 */
 			if ((name = string(ofl, ifl, sym, strs, strsize, ndx,
-			    shndx, symsecname, strsecname, &sdflags)) == NULL) {
+			    shndx, symsecndx, symsecname, strsecname,
+			    &sdflags)) == NULL) {
 				ofl->ofl_flags |= FLG_OF_FATAL;
 				continue;
 			}
@@ -1947,7 +1952,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			if (shndx_bad) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
-				    demangle_symname(name, isc->is_name, ndx),
+				    demangle_symname(name, symsecname, ndx),
 				    ifl->ifl_name,
 				    conv_sym_shndx(osabi, mach, sym->st_shndx,
 				    CONV_FMT_DECIMAL, &inv_buf));
@@ -2073,7 +2078,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				if (sym->st_shndx == SHN_UNDEF) {
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(MSG_SYM_INVSHNDX),
-					    demangle_symname(name, isc->is_name,
+					    demangle_symname(name, symsecname,
 					    ndx), ifl->ifl_name,
 					    conv_sym_shndx(osabi, mach,
 					    sym->st_shndx, CONV_FMT_DECIMAL,
@@ -2159,7 +2164,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    (sdp->sd_isc && (sdp->sd_isc->is_osdesc == NULL))) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
-				    demangle_symname(name, isc->is_name, ndx),
+				    demangle_symname(name, symsecname, ndx),
 				    ifl->ifl_name,
 				    conv_sym_shndx(osabi, mach, sym->st_shndx,
 				    CONV_FMT_DECIMAL, &inv_buf));
@@ -2239,7 +2244,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * Check if st_name has a valid value or not.
 		 */
 		if ((name = string(ofl, ifl, sym, strs, strsize, ndx, shndx,
-		    symsecname, strsecname, &sdflags)) == NULL) {
+		    symsecndx, symsecname, strsecname, &sdflags)) == NULL) {
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
@@ -2251,7 +2256,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		if (shndx_bad) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_SYM_INVSHNDX),
-			    demangle_symname(name, isc->is_name, ndx),
+			    demangle_symname(name, symsecname, ndx),
 			    ifl->ifl_name,
 			    conv_sym_shndx(osabi, mach, sym->st_shndx,
 			    CONV_FMT_DECIMAL, &inv_buf));
@@ -2295,7 +2300,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		if ((bind != STB_GLOBAL) && (bind != STB_WEAK)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_SYM_NONGLOB),
-			    demangle_symname(name, isc->is_name, ndx),
+			    demangle_symname(name, symsecname, ndx),
 			    ifl->ifl_name,
 			    conv_sym_info_bind(bind, 0, &inv_buf));
 			continue;
@@ -2320,7 +2325,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				 */
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
-				    demangle_symname(name, isc->is_name, ndx),
+				    demangle_symname(name, symsecname, ndx),
 				    ifl->ifl_name,
 				    conv_sym_shndx(osabi, mach, sym->st_shndx,
 				    CONV_FMT_DECIMAL, &inv_buf));
@@ -2664,4 +2669,58 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	sdp->sd_flags |= FLG_SY_CMDREF;
 
 	return (sdp);
+}
+
+/*
+ * STT_SECTION symbols have their st_name field set to NULL, and consequently
+ * have no name. Generate a name suitable for diagnostic use for such a symbol.
+ * The resulting name will be of the form:
+ *
+ *	"XXX (section)"
+ *
+ * where XXX is the name of the section.
+ *
+ * Diagnostics for STT_SECTION symbols tend to come in clusters,
+ * so we use a static variable to retain the last string we generate. If
+ * another one comes along for the same section before some other section
+ * intervenes, we will reuse the string.
+ *
+ * entry:
+ *	isc - Input section assocated with the symbol.
+ *	fmt - NULL, or format string to use.
+ *
+ * exit:
+ *	Returns the allocated string, or NULL on allocation failure.
+ */
+const const char *
+ld_stt_section_sym_name(Is_desc *isp)
+{
+	static const char	*last_fmt;
+	static Is_desc		*last_isp = NULL;
+	static char		*namestr;
+
+	const char		*fmt;
+	size_t			len;
+
+	if ((isp != NULL) && (isp->is_name != NULL)) {
+		fmt = (isp->is_flags & FLG_IS_GNSTRMRG) ?
+		    MSG_INTL(MSG_STR_SECTION_MSTR) : MSG_INTL(MSG_STR_SECTION);
+
+		if ((last_isp == isp) && (last_fmt == fmt))
+			return (namestr);
+
+		len = strlen(fmt) + strlen(isp->is_name) + 1;
+
+		if ((namestr = libld_malloc(len)) == 0)
+			return (NULL);
+		(void) snprintf(namestr, len, fmt, isp->is_name);
+
+		/* Remember for next time */
+		last_fmt = fmt;
+		last_isp = isp;
+
+		return (namestr);
+	}
+
+	return (NULL);
 }
