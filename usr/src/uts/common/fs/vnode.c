@@ -36,7 +36,6 @@
  * contributors.
  */
 
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/t_lock.h>
@@ -117,7 +116,7 @@ static void *vsd_realloc(void *, size_t, size_t);
  * callers to obtain a key and store a pointer to private data associated
  * with a vnode.
  *
- * Callers are responsible for protecting the vsd by holding v_lock
+ * Callers are responsible for protecting the vsd by holding v_vsd_lock
  * for calls to vsd_set() and vsd_get().
  */
 
@@ -2238,6 +2237,7 @@ vn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	vp = buf;
 
 	mutex_init(&vp->v_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&vp->v_vsd_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&vp->v_cv, NULL, CV_DEFAULT, NULL);
 	rw_init(&vp->v_nbllock, NULL, RW_DEFAULT, NULL);
 	vp->v_femhead = NULL;	/* Must be done before vn_reinit() */
@@ -2259,6 +2259,7 @@ vn_cache_destructor(void *buf, void *cdrarg)
 
 	rw_destroy(&vp->v_nbllock);
 	cv_destroy(&vp->v_cv);
+	mutex_destroy(&vp->v_vsd_lock);
 	mutex_destroy(&vp->v_lock);
 }
 
@@ -2323,7 +2324,7 @@ vn_recycle(vnode_t *vp)
  * as well as those which require an accessor function.
  *
  * Does not initialize:
- *	synchronization objects: v_lock, v_nbllock, v_cv
+ *	synchronization objects: v_lock, v_vsd_lock, v_nbllock, v_cv
  *	v_data (since FS-nodes and vnodes point to each other and should
  *		be updated simultaneously)
  *	v_op (in case someone needs to make a VOP call on this object)
@@ -4261,19 +4262,15 @@ vsd_destroy(uint_t *keyp)
 /*
  * Quickly return the per vnode value that was stored with the specified key
  * Assumes the caller is protecting key from vsd_create and vsd_destroy
- * Assumes the caller is holding v_lock to protect the vsd.
+ * Assumes the caller is holding v_vsd_lock to protect the vsd.
  */
 void *
 vsd_get(vnode_t *vp, uint_t key)
 {
 	struct vsd_node *vsd;
 
-	/*
-	 * The caller needs to pass a valid vnode.
-	 */
 	ASSERT(vp != NULL);
-	if (vp == NULL)
-		return (NULL);
+	ASSERT(mutex_owned(&vp->v_vsd_lock));
 
 	vsd = vp->v_vsd;
 
@@ -4284,15 +4281,20 @@ vsd_get(vnode_t *vp, uint_t key)
 
 /*
  * Set a per vnode value indexed with the specified key
- * Assumes the caller is holding v_lock to protect the vsd.
+ * Assumes the caller is holding v_vsd_lock to protect the vsd.
  */
 int
 vsd_set(vnode_t *vp, uint_t key, void *value)
 {
-	struct vsd_node *vsd = vp->v_vsd;
+	struct vsd_node *vsd;
+
+	ASSERT(vp != NULL);
+	ASSERT(mutex_owned(&vp->v_vsd_lock));
 
 	if (key == 0)
 		return (EINVAL);
+
+	vsd = vp->v_vsd;
 	if (vsd == NULL)
 		vsd = vp->v_vsd = kmem_zalloc(sizeof (*vsd), KM_SLEEP);
 

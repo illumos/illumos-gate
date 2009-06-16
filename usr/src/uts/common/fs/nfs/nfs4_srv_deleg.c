@@ -63,15 +63,14 @@ int rfs4_deleg_debug;
 #endif
 
 static void rfs4_recall_file(rfs4_file_t *,
-			    void (*recall)(rfs4_deleg_state_t *, bool_t),
-			    bool_t, rfs4_client_t *);
-static	void		rfs4_revoke_deleg(rfs4_deleg_state_t *);
+    void (*recall)(rfs4_deleg_state_t *, bool_t),
+    bool_t, rfs4_client_t *);
 static	void		rfs4_revoke_file(rfs4_file_t *);
 static	void		rfs4_cb_chflush(rfs4_cbinfo_t *);
 static	CLIENT		*rfs4_cb_getch(rfs4_cbinfo_t *);
 static	void		rfs4_cb_freech(rfs4_cbinfo_t *, CLIENT *, bool_t);
 static rfs4_deleg_state_t *rfs4_deleg_state(rfs4_state_t *,
-				open_delegation_type4, int *);
+    open_delegation_type4, int *);
 
 /*
  * Convert a universal address to an transport specific
@@ -218,7 +217,7 @@ rfs4_do_cb_null(rfs4_client_t *cp)
 	struct timeval tv;
 	CLIENT *ch;
 	rfs4_cbstate_t newstate;
-	rfs4_cbinfo_t *cbp = &cp->cbinfo;
+	rfs4_cbinfo_t *cbp = &cp->rc_cbinfo;
 
 	mutex_enter(cbp->cb_lock);
 	/* If another thread is doing CB_NULL RPC then return */
@@ -353,7 +352,7 @@ retry:
 static rfs4_cbinfo_t *
 rfs4_cbinfo_hold(rfs4_client_t *cp)
 {
-	rfs4_cbinfo_t *cbp = &cp->cbinfo;
+	rfs4_cbinfo_t *cbp = &cp->rc_cbinfo;
 	int retries = 0;
 
 	mutex_enter(cbp->cb_lock);
@@ -364,7 +363,7 @@ rfs4_cbinfo_hold(rfs4_client_t *cp)
 		 * noone has set it up.
 		 */
 		mutex_exit(cbp->cb_lock);
-		rfs4_dbe_hold(cp->dbe);
+		rfs4_dbe_hold(cp->rc_dbe);
 		rfs4_do_cb_null(cp); /* caller will release client hold */
 
 		mutex_enter(cbp->cb_lock);
@@ -645,7 +644,7 @@ rfs4_client_setcb(rfs4_client_t *cp, cb_client4 *cb, uint32_t cb_ident)
 {
 	char *addr = NULL;
 	char *netid = NULL;
-	rfs4_cbinfo_t *cbp = &cp->cbinfo;
+	rfs4_cbinfo_t *cbp = &cp->rc_cbinfo;
 	size_t len;
 
 	/* Set the call back for the client */
@@ -695,12 +694,12 @@ rfs4_client_setcb(rfs4_client_t *cp, cb_client4 *cb, uint32_t cb_ident)
 void
 rfs4_deleg_cb_check(rfs4_client_t *cp)
 {
-	if (cp->cbinfo.cb_newer.cb_new == FALSE)
+	if (cp->rc_cbinfo.cb_newer.cb_new == FALSE)
 		return;
 
-	cp->cbinfo.cb_newer.cb_confirmed = TRUE;
+	cp->rc_cbinfo.cb_newer.cb_confirmed = TRUE;
 
-	rfs4_dbe_hold(cp->dbe); /* hold the client struct for thread */
+	rfs4_dbe_hold(cp->rc_dbe); /* hold the client struct for thread */
 
 	(void) thread_create(NULL, 0, rfs4_do_cb_null, cp, 0, &p0, TS_RUN,
 	    minclsyspri);
@@ -766,8 +765,8 @@ rfs4freeargres(CB_COMPOUND4args *args, CB_COMPOUND4res *resp)
  * General callback routine for the server to the client.
  */
 static enum clnt_stat
-rfs4_do_callback(rfs4_client_t	*cp, CB_COMPOUND4args *args,
-		CB_COMPOUND4res *res, struct timeval timeout)
+rfs4_do_callback(rfs4_client_t *cp, CB_COMPOUND4args *args,
+    CB_COMPOUND4res *res, struct timeval timeout)
 {
 	rfs4_cbinfo_t *cbp;
 	CLIENT *ch;
@@ -876,16 +875,16 @@ rfs4_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 	/*
 	 * fill in the args struct
 	 */
-	bcopy(&dsp->delegid.stateid, &rec_argp->stateid, sizeof (stateid4));
+	bcopy(&dsp->rds_delegid.stateid, &rec_argp->stateid, sizeof (stateid4));
 	rec_argp->truncate = trunc;
 
-	fhp = &dsp->finfo->filehandle;
+	fhp = &dsp->rds_finfo->rf_filehandle;
 	rec_argp->fh.nfs_fh4_val = kmem_alloc(sizeof (char) *
 	    fhp->nfs_fh4_len, KM_SLEEP);
 	nfs_fh4_copy(fhp, &rec_argp->fh);
 
 	/* Keep track of when we did this for observability */
-	dsp->time_recalled = gethrestime_sec();
+	dsp->rds_time_recalled = gethrestime_sec();
 
 	/*
 	 * Set up the timeout for the callback and make the actual call.
@@ -894,19 +893,20 @@ rfs4_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 	timeout.tv_sec = (rfs4_lease_time * 80) / 100;
 	timeout.tv_usec = 0;
 
-	DTRACE_NFSV4_3(cb__recall__start, rfs4_client_t *, dsp->client,
+	DTRACE_NFSV4_3(cb__recall__start, rfs4_client_t *, dsp->rds_client,
 	    rfs4_deleg_state_t *, dsp, CB_RECALL4args *, rec_argp);
 
-	call_stat = rfs4_do_callback(dsp->client, &cb4_args, &cb4_res, timeout);
+	call_stat = rfs4_do_callback(dsp->rds_client, &cb4_args, &cb4_res,
+	    timeout);
 
 	rec_resp = (cb4_res.array_len == 0) ? NULL :
 	    &cb4_res.array[0].nfs_cb_resop4_u.opcbrecall;
 
-	DTRACE_NFSV4_3(cb__recall__done, rfs4_client_t *, dsp->client,
+	DTRACE_NFSV4_3(cb__recall__done, rfs4_client_t *, dsp->rds_client,
 	    rfs4_deleg_state_t *, dsp, CB_RECALL4res *, rec_resp);
 
 	if (call_stat != RPC_SUCCESS || cb4_res.status != NFS4_OK) {
-		rfs4_revoke_deleg(dsp);
+		rfs4_return_deleg(dsp, TRUE);
 	}
 
 	rfs4freeargres(&cb4_args, &cb4_res);
@@ -922,7 +922,7 @@ static void
 do_recall(struct recall_arg *arg)
 {
 	rfs4_deleg_state_t *dsp = arg->dsp;
-	rfs4_file_t *fp = dsp->finfo;
+	rfs4_file_t *fp = dsp->rds_finfo;
 	callb_cpr_t cpr_info;
 	kmutex_t cpr_lock;
 
@@ -935,7 +935,7 @@ do_recall(struct recall_arg *arg)
 	 * if that is the case we do not need to send the
 	 * recall callback.
 	 */
-	if (dsp->dtype != OPEN_DELEGATE_NONE) {
+	if (dsp->rds_dtype != OPEN_DELEGATE_NONE) {
 		DTRACE_PROBE3(nfss__i__recall,
 		    struct recall_arg *, arg,
 		    struct rfs4_deleg_state_t *, dsp,
@@ -945,17 +945,17 @@ do_recall(struct recall_arg *arg)
 			(void) (*arg->recall)(dsp, arg->trunc);
 	}
 
-	mutex_enter(fp->dinfo->recall_lock);
+	mutex_enter(fp->rf_dinfo.rd_recall_lock);
 	/*
 	 * Recall count may go negative if the parent thread that is
 	 * creating the individual callback threads does not modify
 	 * the recall_count field before the callback thread actually
 	 * gets a response from the CB_RECALL
 	 */
-	fp->dinfo->recall_count--;
-	if (fp->dinfo->recall_count == 0)
-		cv_signal(fp->dinfo->recall_cv);
-	mutex_exit(fp->dinfo->recall_lock);
+	fp->rf_dinfo.rd_recall_count--;
+	if (fp->rf_dinfo.rd_recall_count == 0)
+		cv_signal(fp->rf_dinfo.rd_recall_cv);
+	mutex_exit(fp->rf_dinfo.rd_recall_lock);
 
 	mutex_enter(&cpr_lock);
 	CALLB_CPR_EXIT(&cpr_info);
@@ -982,40 +982,40 @@ do_recall_file(struct master_recall_args *map)
 	kmutex_t cpr_lock;
 	int32_t recall_count;
 
-	rfs4_dbe_lock(fp->dbe);
+	rfs4_dbe_lock(fp->rf_dbe);
 
 	/* Recall already in progress ? */
-	mutex_enter(fp->dinfo->recall_lock);
-	if (fp->dinfo->recall_count != 0) {
-		mutex_exit(fp->dinfo->recall_lock);
-		rfs4_dbe_rele_nolock(fp->dbe);
-		rfs4_dbe_unlock(fp->dbe);
+	mutex_enter(fp->rf_dinfo.rd_recall_lock);
+	if (fp->rf_dinfo.rd_recall_count != 0) {
+		mutex_exit(fp->rf_dinfo.rd_recall_lock);
+		rfs4_dbe_rele_nolock(fp->rf_dbe);
+		rfs4_dbe_unlock(fp->rf_dbe);
 		kmem_free(map, sizeof (struct master_recall_args));
 		return;
 	}
 
-	mutex_exit(fp->dinfo->recall_lock);
+	mutex_exit(fp->rf_dinfo.rd_recall_lock);
 
 	mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
 	CALLB_CPR_INIT(&cpr_info, &cpr_lock, callb_generic_cpr,	"v4RecallFile");
 
 	recall_count = 0;
-	for (dsp = fp->delegationlist.next->dsp; dsp != NULL;
-	    dsp = dsp->delegationlist.next->dsp) {
+	for (dsp = list_head(&fp->rf_delegstatelist); dsp != NULL;
+	    dsp = list_next(&fp->rf_delegstatelist, dsp)) {
 
-		rfs4_dbe_lock(dsp->dbe);
+		rfs4_dbe_lock(dsp->rds_dbe);
 		/*
 		 * if this delegation state
 		 * is being reaped skip it
 		 */
-		if (rfs4_dbe_is_invalid(dsp->dbe)) {
-			rfs4_dbe_unlock(dsp->dbe);
+		if (rfs4_dbe_is_invalid(dsp->rds_dbe)) {
+			rfs4_dbe_unlock(dsp->rds_dbe);
 			continue;
 		}
 
 		/* hold for receiving thread */
-		rfs4_dbe_hold(dsp->dbe);
-		rfs4_dbe_unlock(dsp->dbe);
+		rfs4_dbe_hold(dsp->rds_dbe);
+		rfs4_dbe_unlock(dsp->rds_dbe);
 
 		arg = kmem_alloc(sizeof (struct recall_arg), KM_SLEEP);
 		arg->recall = map->recall;
@@ -1028,20 +1028,20 @@ do_recall_file(struct master_recall_args *map)
 		    minclsyspri);
 	}
 
-	rfs4_dbe_unlock(fp->dbe);
+	rfs4_dbe_unlock(fp->rf_dbe);
 
-	mutex_enter(fp->dinfo->recall_lock);
+	mutex_enter(fp->rf_dinfo.rd_recall_lock);
 	/*
 	 * Recall count may go negative if the parent thread that is
 	 * creating the individual callback threads does not modify
 	 * the recall_count field before the callback thread actually
 	 * gets a response from the CB_RECALL
 	 */
-	fp->dinfo->recall_count += recall_count;
-	while (fp->dinfo->recall_count)
-		cv_wait(fp->dinfo->recall_cv, fp->dinfo->recall_lock);
+	fp->rf_dinfo.rd_recall_count += recall_count;
+	while (fp->rf_dinfo.rd_recall_count)
+		cv_wait(fp->rf_dinfo.rd_recall_cv, fp->rf_dinfo.rd_recall_lock);
 
-	mutex_exit(fp->dinfo->recall_lock);
+	mutex_exit(fp->rf_dinfo.rd_recall_lock);
 
 	DTRACE_PROBE1(nfss__i__recall_done, rfs4_file_t *, fp);
 	rfs4_file_rele(fp);
@@ -1053,31 +1053,31 @@ do_recall_file(struct master_recall_args *map)
 
 static void
 rfs4_recall_file(rfs4_file_t *fp,
-	void (*recall)(rfs4_deleg_state_t *, bool_t trunc),
-	bool_t trunc, rfs4_client_t *cp)
+    void (*recall)(rfs4_deleg_state_t *, bool_t trunc),
+    bool_t trunc, rfs4_client_t *cp)
 {
 	struct master_recall_args *args;
 
-	rfs4_dbe_lock(fp->dbe);
-	if (fp->dinfo->dtype == OPEN_DELEGATE_NONE) {
-		rfs4_dbe_unlock(fp->dbe);
+	rfs4_dbe_lock(fp->rf_dbe);
+	if (fp->rf_dinfo.rd_dtype == OPEN_DELEGATE_NONE) {
+		rfs4_dbe_unlock(fp->rf_dbe);
 		return;
 	}
-	rfs4_dbe_hold(fp->dbe);	/* hold for new thread */
+	rfs4_dbe_hold(fp->rf_dbe);	/* hold for new thread */
 
 	/*
 	 * Mark the time we started the recall processing.
 	 * If it has been previously recalled, do not reset the
 	 * timer since this is used for the revocation decision.
 	 */
-	if (fp->dinfo->time_recalled == 0)
-		fp->dinfo->time_recalled = gethrestime_sec();
-	fp->dinfo->ever_recalled = TRUE; /* used for policy decision */
+	if (fp->rf_dinfo.rd_time_recalled == 0)
+		fp->rf_dinfo.rd_time_recalled = gethrestime_sec();
+	fp->rf_dinfo.rd_ever_recalled = TRUE; /* used for policy decision */
 	/* Client causing recall not always available */
 	if (cp)
-		fp->dinfo->conflicted_client = cp->clientid;
+		fp->rf_dinfo.rd_conflicted_client = cp->rc_clientid;
 
-	rfs4_dbe_unlock(fp->dbe);
+	rfs4_dbe_unlock(fp->rf_dbe);
 
 	args = kmem_alloc(sizeof (struct master_recall_args), KM_SLEEP);
 	args->fp = fp;
@@ -1093,9 +1093,9 @@ rfs4_recall_deleg(rfs4_file_t *fp, bool_t trunc, rfs4_client_t *cp)
 {
 	time_t elapsed1, elapsed2;
 
-	if (fp->dinfo->time_recalled != 0) {
-		elapsed1 = gethrestime_sec() - fp->dinfo->time_recalled;
-		elapsed2 = gethrestime_sec() - fp->dinfo->time_lastwrite;
+	if (fp->rf_dinfo.rd_time_recalled != 0) {
+		elapsed1 = gethrestime_sec() - fp->rf_dinfo.rd_time_recalled;
+		elapsed2 = gethrestime_sec() - fp->rf_dinfo.rd_time_lastwrite;
 		/* First check to see if a revocation should occur */
 		if (elapsed1 > rfs4_lease_time &&
 		    elapsed2 > rfs4_lease_time) {
@@ -1116,12 +1116,12 @@ rfs4_recall_deleg(rfs4_file_t *fp, bool_t trunc, rfs4_client_t *cp)
  * rfs4_check_recall is called from rfs4_do_open to determine if the current
  * open conflicts with the delegation.
  * Return true if we need recall otherwise false.
- * Assumes entry locks for sp and sp->finfo are held.
+ * Assumes entry locks for sp and sp->rs_finfo are held.
  */
 bool_t
 rfs4_check_recall(rfs4_state_t *sp, uint32_t access)
 {
-	open_delegation_type4 dtype = sp->finfo->dinfo->dtype;
+	open_delegation_type4 dtype = sp->rs_finfo->rf_dinfo.rd_dtype;
 
 	switch (dtype) {
 	case OPEN_DELEGATE_NONE:
@@ -1155,9 +1155,9 @@ rfs4_check_recall(rfs4_state_t *sp, uint32_t access)
 static open_delegation_type4
 rfs4_check_delegation(rfs4_state_t *sp, rfs4_file_t *fp)
 {
-	open_delegation_type4 dtype = fp->dinfo->dtype;
-	uint32_t access = sp->share_access;
-	uint32_t deny = sp->share_deny;
+	open_delegation_type4 dtype = fp->rf_dinfo.rd_dtype;
+	uint32_t access = sp->rs_share_access;
+	uint32_t deny = sp->rs_share_deny;
 	int readcnt = 0;
 	int writecnt = 0;
 
@@ -1173,7 +1173,8 @@ rfs4_check_delegation(rfs4_state_t *sp, rfs4_file_t *fp)
 		if (access & OPEN4_SHARE_ACCESS_READ)
 			readcnt++;
 
-		if (fp->access_read > readcnt || fp->access_write > writecnt)
+		if (fp->rf_access_read > readcnt ||
+		    fp->rf_access_write > writecnt)
 			return (OPEN_DELEGATE_NONE);
 
 		/*
@@ -1220,7 +1221,7 @@ rfs4_check_delegation(rfs4_state_t *sp, rfs4_file_t *fp)
  */
 static open_delegation_type4
 rfs4_delegation_policy(open_delegation_type4 dtype,
-	rfs4_dinfo_t *dinfo, clientid4 cid)
+    rfs4_dinfo_t *dinfo, clientid4 cid)
 {
 	time_t elapsed;
 
@@ -1229,7 +1230,7 @@ rfs4_delegation_policy(open_delegation_type4 dtype,
 
 	/*
 	 * Has this file/delegation ever been recalled?  If not then
-	 * no furhter checks for a delegation race need to be done.
+	 * no further checks for a delegation race need to be done.
 	 * However if a recall has occurred, then check to see if a
 	 * client has caused its own delegation recall to occur.  If
 	 * not, then has a delegation for this file been returned
@@ -1237,9 +1238,9 @@ rfs4_delegation_policy(open_delegation_type4 dtype,
 	 * avoid a "delegation race" between the original client and
 	 * the new/conflicting client.
 	 */
-	if (dinfo->ever_recalled == TRUE) {
-		if (dinfo->conflicted_client != cid) {
-			elapsed = gethrestime_sec() - dinfo->time_returned;
+	if (dinfo->rd_ever_recalled == TRUE) {
+		if (dinfo->rd_conflicted_client != cid) {
+			elapsed = gethrestime_sec() - dinfo->rd_time_returned;
 			if (elapsed < rfs4_lease_time)
 				return (OPEN_DELEGATE_NONE);
 		}
@@ -1247,7 +1248,7 @@ rfs4_delegation_policy(open_delegation_type4 dtype,
 
 	/* Limit the number of read grants */
 	if (dtype == OPEN_DELEGATE_READ &&
-	    dinfo->rdgrants > MAX_READ_DELEGATIONS)
+	    dinfo->rd_rdgrants > MAX_READ_DELEGATIONS)
 		return (OPEN_DELEGATE_NONE);
 
 	/*
@@ -1267,12 +1268,12 @@ rfs4_delegation_policy(open_delegation_type4 dtype,
 rfs4_deleg_state_t *
 rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 {
-	rfs4_file_t *fp = sp->finfo;
+	rfs4_file_t *fp = sp->rs_finfo;
 	open_delegation_type4 dtype;
 	int no_delegation;
 
-	ASSERT(rfs4_dbe_islocked(sp->dbe));
-	ASSERT(rfs4_dbe_islocked(fp->dbe));
+	ASSERT(rfs4_dbe_islocked(sp->rs_dbe));
+	ASSERT(rfs4_dbe_islocked(fp->rf_dbe));
 
 	/* Is the server even providing delegations? */
 	if (rfs4_deleg_policy == SRV_NEVER_DELEGATE || dreq == DELEG_NONE)
@@ -1287,7 +1288,7 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 		return (NULL);
 
 	/* Don't grant a delegation if a deletion is impending. */
-	if (fp->dinfo->hold_grant > 0) {
+	if (fp->rf_dinfo.rd_hold_grant > 0) {
 		return (NULL);
 	}
 
@@ -1303,7 +1304,7 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 	 * we decide to grant the delegation, the delegation will get
 	 * immediately recalled (if there's a conflict), so we're safe.
 	 */
-	if (lm_vp_active(fp->vp)) {
+	if (lm_vp_active(fp->rf_vp)) {
 		return (NULL);
 	}
 
@@ -1327,7 +1328,7 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 		 * If a valid callback path does not exist, no delegation may
 		 * be granted.
 		 */
-		if (sp->owner->client->cbinfo.cb_state != CB_OK)
+		if (sp->rs_owner->ro_client->rc_cbinfo.cb_state != CB_OK)
 			return (NULL);
 
 		/*
@@ -1336,10 +1337,10 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 		 * full lease period, clear it and allow delegations to
 		 * get granted again.
 		 */
-		if (fp->dinfo->time_rm_delayed > 0 &&
+		if (fp->rf_dinfo.rd_time_rm_delayed > 0 &&
 		    gethrestime_sec() >
-		    fp->dinfo->time_rm_delayed + rfs4_lease_time)
-			fp->dinfo->time_rm_delayed = 0;
+		    fp->rf_dinfo.rd_time_rm_delayed + rfs4_lease_time)
+			fp->rf_dinfo.rd_time_rm_delayed = 0;
 
 		/*
 		 * If we are waiting for a delegation to be returned then
@@ -1348,8 +1349,8 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 		 * recall this file again.
 		 */
 
-		if (fp->dinfo->time_recalled != 0 ||
-		    fp->dinfo->time_rm_delayed != 0)
+		if (fp->rf_dinfo.rd_time_recalled != 0 ||
+		    fp->rf_dinfo.rd_time_rm_delayed != 0)
 			return (NULL);
 
 		/* Get the "best" delegation candidate */
@@ -1362,8 +1363,8 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 		 * Based on policy and the history of the file get the
 		 * actual delegation.
 		 */
-		dtype = rfs4_delegation_policy(dtype, fp->dinfo,
-		    sp->owner->client->clientid);
+		dtype = rfs4_delegation_policy(dtype, &fp->rf_dinfo,
+		    sp->rs_owner->ro_client->rc_clientid);
 
 		if (dtype == OPEN_DELEGATE_NONE)
 			return (NULL);
@@ -1378,7 +1379,7 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 
 void
 rfs4_set_deleg_response(rfs4_deleg_state_t *dsp, open_delegation4 *dp,
-			nfsace4 *ace,  int recall)
+    nfsace4 *ace,  int recall)
 {
 	open_write_delegation4 *wp;
 	open_read_delegation4 *rp;
@@ -1412,20 +1413,20 @@ rfs4_set_deleg_response(rfs4_deleg_state_t *dsp, open_delegation4 *dp,
 		(void) utf8_copy(&ace->who, &nace.who);
 	}
 
-	dp->delegation_type = dsp->dtype;
+	dp->delegation_type = dsp->rds_dtype;
 
-	switch (dsp->dtype) {
+	switch (dsp->rds_dtype) {
 	case OPEN_DELEGATE_NONE:
 		break;
 	case OPEN_DELEGATE_READ:
 		rp = &dp->open_delegation4_u.read;
-		rp->stateid = dsp->delegid.stateid;
+		rp->stateid = dsp->rds_delegid.stateid;
 		rp->recall = (bool_t)recall;
 		rp->permissions = nace;
 		break;
 	case OPEN_DELEGATE_WRITE:
 		wp = &dp->open_delegation4_u.write;
-		wp->stateid = dsp->delegid.stateid;
+		wp->stateid = dsp->rds_delegid.stateid;
 		wp->recall = (bool_t)recall;
 		spl = &wp->space_limit;
 		spl->limitby = NFS_LIMIT_SIZE;
@@ -1447,7 +1448,7 @@ rfs4_set_deleg_response(rfs4_deleg_state_t *dsp, open_delegation4 *dp,
  */
 bool_t
 rfs4_check_delegated_byfp(int mode, rfs4_file_t *fp,
-	bool_t trunc, bool_t do_delay, bool_t is_rm, clientid4 *cp)
+    bool_t trunc, bool_t do_delay, bool_t is_rm, clientid4 *cp)
 {
 	rfs4_deleg_state_t *dsp;
 
@@ -1456,11 +1457,11 @@ rfs4_check_delegated_byfp(int mode, rfs4_file_t *fp,
 		return (FALSE);
 
 	/* do we have a delegation on this file? */
-	rfs4_dbe_lock(fp->dbe);
-	if (fp->dinfo->dtype == OPEN_DELEGATE_NONE) {
+	rfs4_dbe_lock(fp->rf_dbe);
+	if (fp->rf_dinfo.rd_dtype == OPEN_DELEGATE_NONE) {
 		if (is_rm)
-			fp->dinfo->hold_grant++;
-		rfs4_dbe_unlock(fp->dbe);
+			fp->rf_dinfo.rd_hold_grant++;
+		rfs4_dbe_unlock(fp->rf_dbe);
 		return (FALSE);
 	}
 	/*
@@ -1468,44 +1469,44 @@ rfs4_check_delegated_byfp(int mode, rfs4_file_t *fp,
 	 * requesting write access to a file with any type of existing
 	 * delegation?
 	 */
-	if (mode == FWRITE || fp->dinfo->dtype == OPEN_DELEGATE_WRITE) {
+	if (mode == FWRITE || fp->rf_dinfo.rd_dtype == OPEN_DELEGATE_WRITE) {
 		if (cp != NULL) {
-			dsp = fp->delegationlist.next->dsp;
+			dsp = list_head(&fp->rf_delegstatelist);
 			if (dsp == NULL) {
-				rfs4_dbe_unlock(fp->dbe);
+				rfs4_dbe_unlock(fp->rf_dbe);
 				return (FALSE);
 			}
 			/*
 			 * Does the requestor already own the delegation?
 			 */
-			if (dsp->client->clientid == *(cp)) {
-				rfs4_dbe_unlock(fp->dbe);
+			if (dsp->rds_client->rc_clientid == *(cp)) {
+				rfs4_dbe_unlock(fp->rf_dbe);
 				return (FALSE);
 			}
 		}
 
-		rfs4_dbe_unlock(fp->dbe);
+		rfs4_dbe_unlock(fp->rf_dbe);
 		rfs4_recall_deleg(fp, trunc, NULL);
 
 		if (!do_delay) {
-			rfs4_dbe_lock(fp->dbe);
-			fp->dinfo->time_rm_delayed = gethrestime_sec();
-			rfs4_dbe_unlock(fp->dbe);
+			rfs4_dbe_lock(fp->rf_dbe);
+			fp->rf_dinfo.rd_time_rm_delayed = gethrestime_sec();
+			rfs4_dbe_unlock(fp->rf_dbe);
 			return (TRUE);
 		}
 
 		delay(NFS4_DELEGATION_CONFLICT_DELAY);
 
-		rfs4_dbe_lock(fp->dbe);
-		if (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
-			fp->dinfo->time_rm_delayed = gethrestime_sec();
-			rfs4_dbe_unlock(fp->dbe);
+		rfs4_dbe_lock(fp->rf_dbe);
+		if (fp->rf_dinfo.rd_dtype != OPEN_DELEGATE_NONE) {
+			fp->rf_dinfo.rd_time_rm_delayed = gethrestime_sec();
+			rfs4_dbe_unlock(fp->rf_dbe);
 			return (TRUE);
 		}
 	}
 	if (is_rm)
-		fp->dinfo->hold_grant++;
-	rfs4_dbe_unlock(fp->dbe);
+		fp->rf_dinfo.rd_hold_grant++;
+	rfs4_dbe_unlock(fp->rf_dbe);
 	return (FALSE);
 }
 
@@ -1548,23 +1549,23 @@ rfs4_clear_dont_grant(rfs4_file_t *fp)
 {
 	if (rfs4_deleg_policy == SRV_NEVER_DELEGATE)
 		return;
-	rfs4_dbe_lock(fp->dbe);
-	ASSERT(fp->dinfo->hold_grant > 0);
-	fp->dinfo->hold_grant--;
-	fp->dinfo->time_rm_delayed = 0;
-	rfs4_dbe_unlock(fp->dbe);
+	rfs4_dbe_lock(fp->rf_dbe);
+	ASSERT(fp->rf_dinfo.rd_hold_grant > 0);
+	fp->rf_dinfo.rd_hold_grant--;
+	fp->rf_dinfo.rd_time_rm_delayed = 0;
+	rfs4_dbe_unlock(fp->rf_dbe);
 }
 
 /*
  * State support for delegation.
  * Set the state delegation type for this state;
  * This routine is called from open via rfs4_grant_delegation and the entry
- * locks on sp and sp->finfo are assumed.
+ * locks on sp and sp->rs_finfo are assumed.
  */
 static rfs4_deleg_state_t *
 rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 {
-	rfs4_file_t *fp = sp->finfo;
+	rfs4_file_t *fp = sp->rs_finfo;
 	bool_t create = TRUE;
 	rfs4_deleg_state_t *dsp;
 	vnode_t *vp;
@@ -1572,24 +1573,24 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	int ret;
 	int fflags = 0;
 
-	ASSERT(rfs4_dbe_islocked(sp->dbe));
-	ASSERT(rfs4_dbe_islocked(fp->dbe));
+	ASSERT(rfs4_dbe_islocked(sp->rs_dbe));
+	ASSERT(rfs4_dbe_islocked(fp->rf_dbe));
 
 	/* Shouldn't happen */
-	if (fp->dinfo->recall_count != 0 ||
-	    (fp->dinfo->dtype == OPEN_DELEGATE_READ &&
+	if (fp->rf_dinfo.rd_recall_count != 0 ||
+	    (fp->rf_dinfo.rd_dtype == OPEN_DELEGATE_READ &&
 	    dtype != OPEN_DELEGATE_READ)) {
 		return (NULL);
 	}
 
 	/* Unlock to avoid deadlock */
-	rfs4_dbe_unlock(fp->dbe);
-	rfs4_dbe_unlock(sp->dbe);
+	rfs4_dbe_unlock(fp->rf_dbe);
+	rfs4_dbe_unlock(sp->rs_dbe);
 
 	dsp = rfs4_finddeleg(sp, &create);
 
-	rfs4_dbe_lock(sp->dbe);
-	rfs4_dbe_lock(fp->dbe);
+	rfs4_dbe_lock(sp->rs_dbe);
+	rfs4_dbe_lock(fp->rf_dbe);
 
 	if (dsp == NULL)
 		return (NULL);
@@ -1600,14 +1601,14 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	 * was marked such that we should not grant a
 	 * delegation, if so bail out.
 	 */
-	if (fp->dinfo->hold_grant > 0) {
+	if (fp->rf_dinfo.rd_hold_grant > 0) {
 		rfs4_deleg_state_rele(dsp);
 		return (NULL);
 	}
 
 	if (create == FALSE) {
-		if (sp->owner->client == dsp->client &&
-		    dsp->dtype == dtype) {
+		if (sp->rs_owner->ro_client == dsp->rds_client &&
+		    dsp->rds_dtype == dtype) {
 			return (dsp);
 		} else {
 			rfs4_deleg_state_rele(dsp);
@@ -1619,15 +1620,15 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	 * Check that this file has not been delegated to another
 	 * client
 	 */
-	if (fp->dinfo->recall_count != 0 ||
-	    fp->dinfo->dtype == OPEN_DELEGATE_WRITE ||
-	    (fp->dinfo->dtype == OPEN_DELEGATE_READ &&
+	if (fp->rf_dinfo.rd_recall_count != 0 ||
+	    fp->rf_dinfo.rd_dtype == OPEN_DELEGATE_WRITE ||
+	    (fp->rf_dinfo.rd_dtype == OPEN_DELEGATE_READ &&
 	    dtype != OPEN_DELEGATE_READ)) {
 		rfs4_deleg_state_rele(dsp);
 		return (NULL);
 	}
 
-	vp = fp->vp;
+	vp = fp->rf_vp;
 	/* vnevent_support returns 0 if file system supports vnevents */
 	if (vnevent_support(vp, NULL)) {
 		rfs4_deleg_state_rele(dsp);
@@ -1635,9 +1636,9 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	}
 
 	/* Calculate the fflags for this OPEN. */
-	if (sp->share_access & OPEN4_SHARE_ACCESS_READ)
+	if (sp->rs_share_access & OPEN4_SHARE_ACCESS_READ)
 		fflags |= FREAD;
-	if (sp->share_access & OPEN4_SHARE_ACCESS_WRITE)
+	if (sp->rs_share_access & OPEN4_SHARE_ACCESS_WRITE)
 		fflags |= FWRITE;
 
 	*recall = 0;
@@ -1726,21 +1727,22 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 			vn_open_upgrade(vp, FREAD|FWRITE);
 	}
 	/* Place on delegation list for file */
-	insque(&dsp->delegationlist, fp->delegationlist.prev);
+	ASSERT(!list_link_active(&dsp->rds_node));
+	list_insert_tail(&fp->rf_delegstatelist, dsp);
 
-	dsp->dtype = fp->dinfo->dtype = dtype;
+	dsp->rds_dtype = fp->rf_dinfo.rd_dtype = dtype;
 
 	/* Update delegation stats for this file */
-	fp->dinfo->time_lastgrant = gethrestime_sec();
+	fp->rf_dinfo.rd_time_lastgrant = gethrestime_sec();
 
 	/* reset since this is a new delegation */
-	fp->dinfo->conflicted_client = 0;
-	fp->dinfo->ever_recalled = FALSE;
+	fp->rf_dinfo.rd_conflicted_client = 0;
+	fp->rf_dinfo.rd_ever_recalled = FALSE;
 
 	if (dtype == OPEN_DELEGATE_READ)
-		fp->dinfo->rdgrants++;
+		fp->rf_dinfo.rd_rdgrants++;
 	else
-		fp->dinfo->wrgrants++;
+		fp->rf_dinfo.rd_wrgrants++;
 
 	return (dsp);
 }
@@ -1751,23 +1753,27 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 void
 rfs4_return_deleg(rfs4_deleg_state_t *dsp, bool_t revoked)
 {
-	rfs4_file_t *fp = dsp->finfo;
+	rfs4_file_t *fp = dsp->rds_finfo;
 	open_delegation_type4 dtypewas;
 
-	rfs4_dbe_lock(fp->dbe);
+	rfs4_dbe_lock(fp->rf_dbe);
+
+	/* nothing to do if no longer on list */
+	if (!list_link_active(&dsp->rds_node)) {
+		rfs4_dbe_unlock(fp->rf_dbe);
+		return;
+	}
+
 	/* Remove state from recall list */
+	list_remove(&fp->rf_delegstatelist, dsp);
 
-	remque(&dsp->delegationlist);
-	dsp->delegationlist.next = dsp->delegationlist.prev =
-	    &dsp->delegationlist;
-
-	if (&fp->delegationlist == fp->delegationlist.next) {
-		dtypewas = fp->dinfo->dtype;
-		fp->dinfo->dtype = OPEN_DELEGATE_NONE;
-		rfs4_dbe_cv_broadcast(fp->dbe);
+	if (list_is_empty(&fp->rf_delegstatelist)) {
+		dtypewas = fp->rf_dinfo.rd_dtype;
+		fp->rf_dinfo.rd_dtype = OPEN_DELEGATE_NONE;
+		rfs4_dbe_cv_broadcast(fp->rf_dbe);
 
 		/* if file system was unshared, the vp will be NULL */
-		if (fp->vp != NULL) {
+		if (fp->rf_vp != NULL) {
 			/*
 			 * Once a delegation is no longer held by any client,
 			 * the monitor is uninstalled.  At this point, the
@@ -1776,62 +1782,56 @@ rfs4_return_deleg(rfs4_deleg_state_t *dsp, bool_t revoked)
 			 * downgrade removes the reference put on earlier.
 			 */
 			if (dtypewas == OPEN_DELEGATE_READ) {
-				(void) fem_uninstall(fp->vp, deleg_rdops,
+				(void) fem_uninstall(fp->rf_vp, deleg_rdops,
 				    (void *)fp);
-				vn_open_downgrade(fp->vp, FREAD);
+				vn_open_downgrade(fp->rf_vp, FREAD);
 			} else if (dtypewas == OPEN_DELEGATE_WRITE) {
-				(void) fem_uninstall(fp->vp, deleg_wrops,
+				(void) fem_uninstall(fp->rf_vp, deleg_wrops,
 				    (void *)fp);
-				vn_open_downgrade(fp->vp, FREAD|FWRITE);
+				vn_open_downgrade(fp->rf_vp, FREAD|FWRITE);
 			}
 		}
 	}
 
-	switch (dsp->dtype) {
+	switch (dsp->rds_dtype) {
 	case OPEN_DELEGATE_READ:
-		fp->dinfo->rdgrants--;
+		fp->rf_dinfo.rd_rdgrants--;
 		break;
 	case OPEN_DELEGATE_WRITE:
-		fp->dinfo->wrgrants--;
+		fp->rf_dinfo.rd_wrgrants--;
 		break;
 	default:
 		break;
 	}
 
 	/* used in the policy decision */
-	fp->dinfo->time_returned = gethrestime_sec();
+	fp->rf_dinfo.rd_time_returned = gethrestime_sec();
 
 	/*
 	 * reset the time_recalled field so future delegations are not
 	 * accidentally revoked
 	 */
-	if ((fp->dinfo->rdgrants + fp->dinfo->wrgrants) == 0)
-		fp->dinfo->time_recalled = 0;
+	if ((fp->rf_dinfo.rd_rdgrants + fp->rf_dinfo.rd_wrgrants) == 0)
+		fp->rf_dinfo.rd_time_recalled = 0;
 
-	rfs4_dbe_unlock(fp->dbe);
+	rfs4_dbe_unlock(fp->rf_dbe);
 
-	rfs4_dbe_lock(dsp->dbe);
+	rfs4_dbe_lock(dsp->rds_dbe);
 
-	dsp->dtype = OPEN_DELEGATE_NONE;
+	dsp->rds_dtype = OPEN_DELEGATE_NONE;
 
 	if (revoked == TRUE)
-		dsp->time_revoked = gethrestime_sec();
+		dsp->rds_time_revoked = gethrestime_sec();
 
-	rfs4_dbe_invalidate(dsp->dbe);
+	rfs4_dbe_invalidate(dsp->rds_dbe);
 
-	rfs4_dbe_unlock(dsp->dbe);
+	rfs4_dbe_unlock(dsp->rds_dbe);
 
 	if (revoked == TRUE) {
-		rfs4_dbe_lock(dsp->client->dbe);
-		dsp->client->deleg_revoked++;	/* observability */
-		rfs4_dbe_unlock(dsp->client->dbe);
+		rfs4_dbe_lock(dsp->rds_client->rc_dbe);
+		dsp->rds_client->rc_deleg_revoked++;	/* observability */
+		rfs4_dbe_unlock(dsp->rds_client->rc_dbe);
 	}
-}
-
-static void
-rfs4_revoke_deleg(rfs4_deleg_state_t *dsp)
-{
-	rfs4_return_deleg(dsp, TRUE);
 }
 
 static void
@@ -1842,42 +1842,38 @@ rfs4_revoke_file(rfs4_file_t *fp)
 	/*
 	 * The lock for rfs4_file_t must be held when traversing the
 	 * delegation list but that lock needs to be released to call
-	 * rfs4_revoke_deleg()
-	 * This for loop is set up to check the list for being empty,
-	 * and locking the rfs4_file_t struct on init and end
+	 * rfs4_return_deleg()
 	 */
-	for (rfs4_dbe_lock(fp->dbe);
-	    &fp->delegationlist != fp->delegationlist.next;
-	    rfs4_dbe_lock(fp->dbe)) {
-
-		dsp = fp->delegationlist.next->dsp;
-		rfs4_dbe_hold(dsp->dbe);
-		rfs4_dbe_unlock(fp->dbe);
-		rfs4_revoke_deleg(dsp);
+	rfs4_dbe_lock(fp->rf_dbe);
+	while (dsp = list_head(&fp->rf_delegstatelist)) {
+		rfs4_dbe_hold(dsp->rds_dbe);
+		rfs4_dbe_unlock(fp->rf_dbe);
+		rfs4_return_deleg(dsp, TRUE);
 		rfs4_deleg_state_rele(dsp);
+		rfs4_dbe_lock(fp->rf_dbe);
 	}
-	rfs4_dbe_unlock(fp->dbe);
+	rfs4_dbe_unlock(fp->rf_dbe);
 }
 
 /*
  * A delegation is assumed to be present on the file associated with
- * "state".  Check to see if the delegation matches is associated with
- * the same client as referenced by "state".  If it is not, TRUE is
+ * "sp".  Check to see if the delegation matches is associated with
+ * the same client as referenced by "sp".  If it is not, TRUE is
  * returned.  If the delegation DOES match the client (or no
  * delegation is present), return FALSE.
  * Assume the state entry and file entry are locked.
  */
 bool_t
-rfs4_is_deleg(rfs4_state_t *state)
+rfs4_is_deleg(rfs4_state_t *sp)
 {
 	rfs4_deleg_state_t *dsp;
-	rfs4_file_t *fp = state->finfo;
-	rfs4_client_t *cp = state->owner->client;
+	rfs4_file_t *fp = sp->rs_finfo;
+	rfs4_client_t *cp = sp->rs_owner->ro_client;
 
-	ASSERT(rfs4_dbe_islocked(fp->dbe));
-	for (dsp = fp->delegationlist.next->dsp; dsp != NULL;
-	    dsp = dsp->delegationlist.next->dsp) {
-		if (cp != dsp->client) {
+	ASSERT(rfs4_dbe_islocked(fp->rf_dbe));
+	for (dsp = list_head(&fp->rf_delegstatelist); dsp != NULL;
+	    dsp = list_next(&fp->rf_delegstatelist, dsp)) {
+		if (cp != dsp->rds_client) {
 			return (TRUE);
 		}
 	}
@@ -1906,7 +1902,7 @@ rfs4_mon_hold(void *arg)
 {
 	rfs4_file_t *fp = arg;
 
-	rfs4_dbe_hold(fp->dbe);
+	rfs4_dbe_hold(fp->rf_dbe);
 }
 
 void
@@ -1914,5 +1910,5 @@ rfs4_mon_rele(void *arg)
 {
 	rfs4_file_t *fp = arg;
 
-	rfs4_dbe_rele_nolock(fp->dbe);
+	rfs4_dbe_rele_nolock(fp->rf_dbe);
 }

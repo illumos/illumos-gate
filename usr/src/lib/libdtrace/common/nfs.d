@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma	D depends_on library ip.d
 #pragma	D depends_on library net.d
@@ -91,20 +89,20 @@ translator nfsv4opinfo_t < struct compound_state *P > {
 
 #pragma D binding "1.5" translator
 translator conninfo_t < rfs4_client_t *P > {
-	ci_protocol = (P->cl_addr.ss_family == AF_INET) ? "ipv4" : "ipv6";
+	ci_protocol = (P->rc_addr.ss_family == AF_INET) ? "ipv4" : "ipv6";
 
 	ci_local = "<unknown>";
 
-	ci_remote = (P->cl_addr.ss_family == AF_INET) ?
+	ci_remote = (P->rc_addr.ss_family == AF_INET) ?
 	    inet_ntoa((ipaddr_t *)
-	    &((struct sockaddr_in *)&P->cl_addr)->sin_addr) :
-	    inet_ntoa6(&((struct sockaddr_in6 *)&P->cl_addr)->sin6_addr);
+	    &((struct sockaddr_in *)&P->rc_addr)->sin_addr) :
+	    inet_ntoa6(&((struct sockaddr_in6 *)&P->rc_addr)->sin6_addr);
 };
 
 #pragma D binding "1.5" translator
 translator nfsv4cbinfo_t < rfs4_deleg_state_t *P > {
-	nci_curpath = (P->finfo->vp == NULL) ? "<unknown>" :
-	    P->finfo->vp->v_path;
+	nci_curpath = (P->rds_finfo->rf_vp == NULL) ? "<unknown>" :
+	    P->rds_finfo->rf_vp->v_path;
 };
 
 typedef struct nfsv3opinfo {

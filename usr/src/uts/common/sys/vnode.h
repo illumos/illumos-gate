@@ -250,6 +250,7 @@ typedef struct vnode {
 	u_longlong_t	v_mmap_write;	/* mmap write count */
 	void		*v_mpssdata;	/* info for large page mappings */
 	void		*v_fopdata;	/* list of file ops event watches */
+	kmutex_t	v_vsd_lock;	/* protects v_vsd field */
 	struct vsd_node *v_vsd;		/* vnode specific data */
 	struct vnode	*v_xattrdir;	/* unnamed extended attr dir (GFS) */
 	uint_t		v_count_dnlc;	/* dnlc reference count */
