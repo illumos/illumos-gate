@@ -485,7 +485,6 @@ srpt_stp_xfer_data(struct scsi_task *task, struct stmf_data_buf *dbuf,
 	iu = task->task_port_private;
 	ASSERT(iu != NULL);
 	ASSERT(iu->iu_ch != NULL);
-
 	/*
 	 * We should use iu->iu_ch->ch_swqe_posted to throttle
 	 * send wqe posting. This is very unlikely because we limit
@@ -583,9 +582,10 @@ srpt_stp_xfer_data(struct scsi_task *task, struct stmf_data_buf *dbuf,
 		 * If this task is being aborted or has been aborted,
 		 * do not post additional I/O.
 		 */
-		DTRACE_SRP_7(xfer__start, srpt_channel_t, ch,
-		    ibt_wr_ds_t, &(db->db_sge), ibt_send_wr_t, &wr, uint32_t,
-		    rdma_len, uint32_t, xferred_len, uint32_t, desc_offset,
+		DTRACE_SRP_8(xfer__start, srpt_channel_t, ch,
+		    ibt_wr_ds_t, &(db->db_sge), srpt_iu_t, iu,
+		    ibt_send_wr_t, &wr, uint32_t, rdma_len,
+		    uint32_t, xferred_len, uint32_t, desc_offset,
 		    uint32_t, wr.wr_opcode == IBT_WRC_RDMAR ? 0 : 1);
 		mutex_enter(&iu->iu_lock);
 		if ((iu->iu_flags & (SRPT_IU_SRP_ABORTING |

@@ -610,6 +610,13 @@ srpt_ch_data_comp(srpt_channel_t *ch, stmf_data_buf_t *stmf_dbuf,
 	 */
 	stmf_dbuf->db_xfer_status = STMF_SUCCESS;
 	mutex_exit(&iu->iu_lock);
+
+	DTRACE_SRP_8(xfer__done, srpt_channel_t, ch,
+	    ibt_wr_ds_t, &(dbuf->db_sge), srpt_iu_t, iu,
+	    ibt_send_wr_t, 0, uint32_t, stmf_dbuf->db_data_size,
+	    uint32_t, 0, uint32_t, 0,
+	    uint32_t, (stmf_dbuf->db_flags & DB_DIRECTION_TO_RPORT) ? 1 : 0);
+
 	if ((stmf_dbuf->db_flags & DB_SEND_STATUS_GOOD) != 0) {
 		status = srpt_stp_send_status(dbuf->db_iu->iu_stmf_task, 0);
 		if (status == STMF_SUCCESS) {
@@ -617,11 +624,6 @@ srpt_ch_data_comp(srpt_channel_t *ch, stmf_data_buf_t *stmf_dbuf,
 		}
 		stmf_dbuf->db_xfer_status = STMF_FAILURE;
 	}
-
-	DTRACE_SRP_7(xfer__done, srpt_channel_t, ch,
-	    ibt_wr_ds_t, &(dbuf->db_sge), ibt_send_wr_t, 0,
-	    uint32_t, stmf_dbuf->db_data_size, uint32_t, 0, uint32_t, 0,
-	    uint32_t, (stmf_dbuf->db_flags & DB_DIRECTION_TO_RPORT) ? 1 : 0);
 	stmf_data_xfer_done(dbuf->db_iu->iu_stmf_task, stmf_dbuf, 0);
 }
 

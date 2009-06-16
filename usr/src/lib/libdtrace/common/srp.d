@@ -69,7 +69,7 @@ translator srp_portinfo_t < srpt_channel_t *P > {
 	pi_i_sid = P->ch_session->ss_i_alias;
 	pi_target = P->ch_session->ss_t_name;
 	pi_t_sid = P->ch_session->ss_t_alias;
-	pi_chan_id = (uintptr_t) P->ch_chan_hdl;
+	pi_chan_id = (uintptr_t)P->ch_chan_hdl;
 };
 
 typedef struct srp_logininfo {
@@ -98,7 +98,7 @@ translator srp_logininfo_t < srp_login_rsp_t *P > {
 	li_max_it_iu_len = ntohl(P->lrsp_max_it_iu_len);
 	li_max_ti_iu_len = ntohl(P->lrsp_max_ti_iu_len);
 	li_request_limit = ntohl(P->lrsp_req_limit_delta);
-	li_reason_code = ntohl(((srp_login_rej_t *) arg2)->lrej_reason);
+	li_reason_code = ntohl(((srp_login_rej_t *)arg2)->lrej_reason);
 };
 
 typedef struct srp_taskinfo {
@@ -118,7 +118,7 @@ typedef struct srp_taskinfo {
 #pragma D binding "1.5" translator
 translator srp_taskinfo_t < srp_cmd_req_t *P > {
 	ti_task_tag = P->cr_tag;
-	ti_lun =  (ntohl(*((uint32_t *)P->cr_lun)) << 32) +
+	ti_lun = (ntohl(*((uint32_t *)P->cr_lun)) << 32) +
 	    ntohl(*((uint32_t *)&P->cr_lun[4]));
 	ti_function = P->cr_type == 1 ?  /* 1: MGMT CMD 2: SRP CMD */
 	    ((srp_tsk_mgmt_t *)P)->tm_function : 0;
@@ -132,8 +132,8 @@ translator srp_taskinfo_t < srp_cmd_req_t *P > {
 #pragma D binding "1.5" translator
 translator srp_taskinfo_t < srp_rsp_t *P > {
 	ti_task_tag = P->rsp_tag;
-	ti_lun = ntohll(*(uint64_t *)((scsi_task_t *) arg2)->task_lun_no);
-	ti_function = ((scsi_task_t *) arg2)->task_mgmt_function;
+	ti_lun = ntohll(*(uint64_t *)((scsi_task_t *)arg2)->task_lun_no);
+	ti_function = ((scsi_task_t *)arg2)->task_mgmt_function;
 	ti_req_limit_delta = ntohl(P->rsp_req_limit_delta);
 	ti_flag = P->rsp_flags;
 	ti_do_resid_cnt = ntohl(P->rsp_do_resid_cnt);
@@ -142,15 +142,27 @@ translator srp_taskinfo_t < srp_rsp_t *P > {
 };
 
 #pragma D binding "1.5" translator
+translator srp_taskinfo_t < srpt_iu_t *P > {
+	ti_task_tag = P->iu_tag;
+	ti_lun = ntohll(*(uint64_t *)P->iu_stmf_task->task_lun_no);
+	ti_function = 0;
+	ti_req_limit_delta = 0;
+	ti_flag = 0;
+	ti_do_resid_cnt = 0;
+	ti_di_resid_cnt = 0;
+	ti_status = 0;
+};
+
+#pragma D binding "1.5" translator
 translator xferinfo_t < ibt_wr_ds_t *P > {
 	xfer_laddr = P->ds_va + arg4;
 	xfer_lkey = P->ds_key;
-	xfer_raddr = (arg2 == 0) ? 0 :
-	    ((ibt_send_wr_t *) arg2)->wr.rc.rcwr.rdma.rdma_raddr;
-	xfer_rkey = (arg2 == 0) ? 0 :
-	    ((ibt_send_wr_t *) arg2)->wr.rc.rcwr.rdma.rdma_rkey;
-	xfer_len = arg3;
-	xfer_loffset = arg4;
-	xfer_roffset = arg5;
-	xfer_type = arg6;
+	xfer_raddr = (arg3 == 0) ? 0 :
+	    ((ibt_send_wr_t *)arg3)->wr.rc.rcwr.rdma.rdma_raddr;
+	xfer_rkey = (arg3 == 0) ? 0 :
+	    ((ibt_send_wr_t *)arg3)->wr.rc.rcwr.rdma.rdma_rkey;
+	xfer_len = arg4;
+	xfer_loffset = arg5;
+	xfer_roffset = arg6;
+	xfer_type = arg7;
 };

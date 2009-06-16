@@ -348,6 +348,12 @@ extern "C" {
 	DTRACE_PROBE7(__srp_##name, type1, arg1, type2, arg2, 		\
 	    type3, arg3, type4, arg4, type5, arg5, type6, arg6, type7, arg7);
 
+#define	DTRACE_SRP_8(name, type1, arg1, type2, arg2, type3, arg3,	\
+	    type4, arg4, type5, arg5, type6, arg6, type7, arg7, type8, arg8) \
+	DTRACE_PROBE8(__srp_##name, type1, arg1, type2, arg2, 		\
+	    type3, arg3, type4, arg4, type5, arg5, type6, arg6,		\
+	    type7, arg7, type8, arg8);
+
 #endif /* _KERNEL */
 
 extern const char *sdt_prefix;
