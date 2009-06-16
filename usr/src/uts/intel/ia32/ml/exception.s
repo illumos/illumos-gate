@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
  *
  * $FreeBSD: src/sys/amd64/amd64/exception.S,v 1.113 2003/10/15 02:04:52 peter Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -161,9 +159,12 @@ ndptrap_frstor(void)
 	 */
 	leaq	sys_sysenter(%rip), %r11
 	cmpq	%r11, 24(%rsp)	/* Compare to saved r_rip on the stack */
-	jne	1f
-	SWAPGS
-1:	popq	%r11
+	je	1f
+	leaq	brand_sys_sysenter(%rip), %r11
+	cmpq	%r11, 24(%rsp)	/* Compare to saved r_rip on the stack */
+	jne	2f
+1:	SWAPGS
+2:	popq	%r11
 #endif	/* !__xpv */
 
 	INTR_PUSH
