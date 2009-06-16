@@ -691,7 +691,7 @@ extern void mac_update_srs_priority(mac_soft_ring_set_t *, pri_t);
 extern void mac_client_update_classifier(mac_client_impl_t *, boolean_t);
 
 extern void mac_soft_ring_intr_enable(void *);
-extern void mac_soft_ring_intr_disable(void *);
+extern boolean_t mac_soft_ring_intr_disable(void *);
 extern mac_soft_ring_t *mac_soft_ring_create(int, clock_t, void *, uint16_t,
     pri_t, mac_client_impl_t *, mac_soft_ring_set_t *,
     processorid_t, mac_direct_rx_t, void *, mac_resource_handle_t);

@@ -3612,7 +3612,7 @@ typedef enum {
  * we need to duplicate the definitions here because we cannot
  * include mac/dls header files here.
  */
-typedef void			(*ip_mac_intr_disable_t)(void *);
+typedef boolean_t		(*ip_mac_intr_disable_t)(void *);
 typedef void			(*ip_mac_intr_enable_t)(void *);
 typedef ip_mac_tx_cookie_t	(*ip_dld_tx_t)(void *, mblk_t *,
     uint64_t, uint16_t);

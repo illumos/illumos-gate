@@ -423,7 +423,7 @@ mac_soft_ring_worker(mac_soft_ring_t *ringp)
 start:
 	for (;;) {
 		while (((ringp->s_ring_first == NULL ||
-		    (ringp->s_ring_state & S_RING_BLOCK)) &&
+		    (ringp->s_ring_state & (S_RING_BLOCK|S_RING_BLANK))) &&
 		    !(ringp->s_ring_state & S_RING_PAUSE)) ||
 		    (ringp->s_ring_state & S_RING_PROC)) {
 
@@ -498,17 +498,22 @@ mac_soft_ring_intr_enable(void *arg)
 	mutex_exit(&ringp->s_ring_lock);
 }
 
-void
+boolean_t
 mac_soft_ring_intr_disable(void *arg)
 {
 	mac_soft_ring_t *ringp = (mac_soft_ring_t *)arg;
+	boolean_t sring_blanked = B_FALSE;
 	/*
 	 * Stop worker thread from sending packets above.
 	 * Squeue will poll soft ring when it needs packets.
 	 */
 	mutex_enter(&ringp->s_ring_lock);
-	ringp->s_ring_state |= S_RING_BLANK;
+	if (!(ringp->s_ring_state & S_RING_PROC)) {
+		ringp->s_ring_state |= S_RING_BLANK;
+		sring_blanked = B_TRUE;
+	}
 	mutex_exit(&ringp->s_ring_lock);
+	return (sring_blanked);
 }
 
 /*

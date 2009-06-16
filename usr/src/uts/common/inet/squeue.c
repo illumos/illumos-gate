@@ -163,14 +163,21 @@ static int squeue_workerwait_tick = 0;
 								\
 }
 
+/*
+ * Blank the receive ring (in this case it is the soft ring). When
+ * blanked, the soft ring will not send any more packets up.
+ * Blanking may not succeed when there is a CPU already in the soft
+ * ring sending packets up. In that case, SQS_POLLING will not be
+ * set.
+ */
 #define	SQS_POLLING_ON(sqp, sq_poll_capable, rx_ring) {		\
 	ASSERT(MUTEX_HELD(&(sqp)->sq_lock));			\
 	if (sq_poll_capable) {					\
 		ASSERT(rx_ring != NULL);			\
 		ASSERT(sqp->sq_state & SQS_POLL_CAPAB);		\
 		if (!(sqp->sq_state & SQS_POLLING)) {		\
-			sqp->sq_state |= SQS_POLLING;		\
-			rx_ring->rr_intr_disable(rx_ring->rr_intr_handle); \
+			if (rx_ring->rr_intr_disable(rx_ring->rr_intr_handle)) \
+				sqp->sq_state |= SQS_POLLING;	\
 		}						\
 	}							\
 }
@@ -187,9 +194,10 @@ static int squeue_workerwait_tick = 0;
 	}							\
 }
 
-#define	SQS_POLL_RING(sqp, sq_poll_capable) {			\
+/* Wakeup poll thread only if SQS_POLLING is set */
+#define	SQS_POLL_RING(sqp) {			\
 	ASSERT(MUTEX_HELD(&(sqp)->sq_lock));			\
-	if (sq_poll_capable) {					\
+	if (sqp->sq_state & SQS_POLLING) {			\
 		ASSERT(sqp->sq_state & SQS_POLL_CAPAB);		\
 		if (!(sqp->sq_state & SQS_GET_PKTS)) {		\
 			sqp->sq_state |= SQS_GET_PKTS;		\
@@ -662,7 +670,6 @@ again:
 
 	sqp->sq_state |= SQS_PROC | proc_type;
 
-
 	/*
 	 * We have backlog built up. Switch to polling mode if the
 	 * device underneath allows it. Need to do it so that
@@ -740,9 +747,14 @@ again:
 			 * We turn off interrupts for all userland threads
 			 * doing drain but we do active polling only for
 			 * worker thread.
+			 *
+			 * Calling SQS_POLL_RING() even in the case of
+			 * SQS_POLLING_ON() not succeeding is ok as
+			 * SQS_POLL_RING() will not wake up poll thread
+			 * if SQS_POLLING bit is not set.
 			 */
 			if (proc_type == SQS_WORKER)
-				SQS_POLL_RING(sqp, sq_poll_capable);
+				SQS_POLL_RING(sqp);
 			goto again;
 		} else {
 			did_wakeup = B_TRUE;
@@ -769,8 +781,7 @@ again:
 	 * thread down once more to see if something arrived. Otherwise,
 	 * turn the interrupts back on and we are done.
 	 */
-	if ((proc_type == SQS_WORKER) &&
-	    (sqp->sq_state & SQS_POLL_CAPAB)) {
+	if ((proc_type == SQS_WORKER) && (sqp->sq_state & SQS_POLLING)) {
 		/*
 		 * Do one last check to see if anything arrived
 		 * in the NIC. We leave the SQS_PROC set to ensure
@@ -792,16 +803,17 @@ again:
 		 */
 		ASSERT(!(sqp->sq_state & (SQS_POLL_THR_QUIESCED |
 		    SQS_POLL_QUIESCE_DONE)));
-		SQS_POLL_RING(sqp, sq_poll_capable);
+		SQS_POLL_RING(sqp);
 		sqp->sq_state &= ~proc_type;
 	} else {
 		/*
-		 * The squeue is either not capable of polling or
-		 * poll thread already finished processing and didn't
-		 * find anything. Since there is nothing queued and
-		 * we already turn polling on (for all threads doing
-		 * drain), we should turn polling off and relinquish
-		 * the PROC.
+		 * The squeue is either not capable of polling or the
+		 * attempt to blank (i.e., turn SQS_POLLING_ON()) was
+		 * unsuccessful or poll thread already finished
+		 * processing and didn't find anything. Since there
+		 * is nothing queued and we already turn polling on
+		 * (for all threads doing drain), we should turn
+		 * polling off and relinquish the PROC.
 		 */
 		ASSERT(!(sqp->sq_state & (SQS_POLL_THR_QUIESCED |
 		    SQS_POLL_QUIESCE_DONE)));
