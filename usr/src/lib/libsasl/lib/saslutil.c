@@ -1,8 +1,7 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* saslutil.c
  * Rob Siemborski
@@ -142,7 +141,7 @@ int sasl_encode64(const char *_in, unsigned inlen,
     olen = (inlen + 2) / 3 * 4;
     if (outlen)
       *outlen = olen;
-    if (outmax < olen)
+    if (outmax <= olen)
       return SASL_BUFOVER;
 
     /* Do the work... */
@@ -168,9 +167,8 @@ int sasl_encode64(const char *_in, unsigned inlen,
         *out++ = '=';
     }
 
-    if (olen < outmax)
-      *out = '\0';
-    
+    *out = '\0';
+ 
     return SASL_OK;
 }
 
