@@ -60,6 +60,16 @@
  */
 #define CORRLINK_COUNT 6
 #define CORRLINK_TIME 2h
+#define BTLP_COUNT 6
+#define BTLP_TIME 2h
+#define BDLLP_COUNT 6
+#define BDLLP_TIME 2h
+#define RTO_COUNT 6
+#define RTO_TIME 2h
+#define RNR_COUNT 6
+#define RNR_TIME 2h
+#define RE_COUNT 6
+#define RE_TIME 2h
 #define NONFATAL_DPE_COUNT 3
 #define NONFATAL_DPE_TIME 168h
 
@@ -111,6 +121,14 @@ event fault.io.pciex.device-interr-unaf@PCIEXFN, FITrate=PCIEX_DEV_FIT,
 engine serd.io.device.nonfatal@PCIEXFN, N=CORRLINK_COUNT, T=CORRLINK_TIME;
 event fault.io.pciex.device-interr-corr@PCIEXFN, FITrate=PCIEX_DEV_FIT,
 	engine=serd.io.device.nonfatal@PCIEXFN;
+engine serd.io.device.nonfatal@PCIEXFN/PCIEXFN,
+	N=CORRLINK_COUNT, T=CORRLINK_TIME;
+event fault.io.pciex.device-interr-corr@PCIEXFN/PCIEXFN, FITrate=PCIEX_DEV_FIT,
+	engine=serd.io.device.nonfatal@PCIEXFN/PCIEXFN;
+engine serd.io.device.nonfatal@pciexrc/PCIEXFN,
+	N=CORRLINK_COUNT, T=CORRLINK_TIME;
+event fault.io.pciex.device-interr-corr@pciexrc/PCIEXFN, FITrate=PCIEX_DEV_FIT,
+	engine=serd.io.device.nonfatal@pciexrc/PCIEXFN;
 
 event fault.io.pciex.device-interr@pciexrc, FITrate=PCIEX_RC_FIT;
 
@@ -136,9 +154,14 @@ event fault.io.pciex.bus-noresp@PCIEXFN, FITrate=PCIEX_BUS_NR_FIT;
 
 event fault.io.pciex.bus-linkerr@PCIEXFN, FITrate=PCIEX_BUS_FIT;
 
-engine serd.io.pciex.corrlink-bus@PCIEXFN, N=CORRLINK_COUNT, T=CORRLINK_TIME;
-event fault.io.pciex.bus-linkerr-corr@PCIEXFN, FITrate=PCIEX_BUS_FIT,
-	engine=serd.io.pciex.corrlink-bus@PCIEXFN;
+engine serd.io.pciex.corrlink-bus@pciexrc/PCIEXFN,
+	N=CORRLINK_COUNT, T=CORRLINK_TIME;
+event fault.io.pciex.bus-linkerr-corr@pciexrc/PCIEXFN, FITrate=PCIEX_BUS_FIT,
+	engine=serd.io.pciex.corrlink-bus@pciexrc/PCIEXFN;
+engine serd.io.pciex.corrlink-bus@PCIEXFN/PCIEXFN,
+	N=CORRLINK_COUNT, T=CORRLINK_TIME;
+event fault.io.pciex.bus-linkerr-corr@PCIEXFN/PCIEXFN, FITrate=PCIEX_BUS_FIT,
+	engine=serd.io.pciex.corrlink-bus@PCIEXFN/PCIEXFN;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -286,12 +309,21 @@ prop error.io.service.restored@PCIEXFN (1)->
 event error.io.pciex.nr-d@pciexrc/PCIEXFN;
 event error.io.pciex.ca-d@pciexrc/PCIEXFN;
 event error.io.pciex.mtlp-d@pciexrc/PCIEXFN;
-event error.io.pciex.corrlink@pciexrc/pciexbus;
 event error.io.pciex.fatlink@pciexrc/PCIEXFN;
 event error.io.pciex.badreq-d@pciexrc/PCIEXFN;
 event error.io.pciex.nf-poisecrc-d@pciexrc/PCIEXFN;
 event error.io.pciex.f-poisecrc-d@pciexrc/PCIEXFN;
 event error.io.pciex.deg-poisecrc-d@pciexrc/PCIEXFN;
+event ereport.io.pciex.dl.btlp@pciexrc{within(5s)};
+event ereport.io.pciex.dl.bdllp@pciexrc{within(5s)};
+event ereport.io.pciex.dl.rto@pciexrc{within(5s)};
+event ereport.io.pciex.dl.rnr@pciexrc{within(5s)};
+event ereport.io.pciex.pl.re@pciexrc{within(5s)};
+event ereport.io.pciex.dl.btlp@pciexrc/PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.bdllp@pciexrc/PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rto@pciexrc/PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rnr@pciexrc/PCIEXFN{within(5s)};
+event ereport.io.pciex.pl.re@pciexrc/PCIEXFN{within(5s)};
 
 prop fault.io.pciex.device-noresp@pciexrc (1)->
     error.io.pciex.nr-d@pciexrc/PCIEXFNHZ;
@@ -299,8 +331,35 @@ prop fault.io.pciex.device-noresp@pciexrc (1)->
 prop fault.io.pciex.device-invreq@pciexrc (1)->
     error.io.pciex.badreq-d@pciexrc/PCIEXFNHZ;
 
-prop fault.io.pciex.device-interr-corr@pciexrc (1)->
-    error.io.pciex.corrlink@pciexrc/pciexbus<> { setserdsuffix("_corr") };
+prop fault.io.pciex.device-interr-corr@pciexrc {
+    payloadprop_defined("detector") && setserdsuffix("_btlp") &&
+    setserdn(BTLP_COUNT) && setserdt(BTLP_TIME) } (0)->
+    ereport.io.pciex.dl.btlp@pciexrc,
+    ereport.io.pciex.dl.btlp@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc {
+    payloadprop_defined("detector") && setserdsuffix("_bdllp") &&
+    setserdn(BDLLP_COUNT) && setserdt(BDLLP_TIME) } (0)->
+    ereport.io.pciex.dl.bdllp@pciexrc,
+    ereport.io.pciex.dl.bdllp@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc {
+    payloadprop_defined("detector") && setserdsuffix("_rto") &&
+    setserdn(RTO_COUNT) && setserdt(RTO_TIME) } (0)->
+    ereport.io.pciex.dl.rto@pciexrc,
+    ereport.io.pciex.dl.rto@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc {
+    payloadprop_defined("detector") && setserdsuffix("_rnr") &&
+    setserdn(RNR_COUNT) && setserdt(RNR_TIME) } (0)->
+    ereport.io.pciex.dl.rnr@pciexrc,
+    ereport.io.pciex.dl.rnr@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc {
+    payloadprop_defined("detector") && setserdsuffix("_re") &&
+    setserdn(RE_COUNT) && setserdt(RE_TIME) } (0)->
+    ereport.io.pciex.pl.re@pciexrc,
+    ereport.io.pciex.pl.re@pciexrc/PCIEXFNHZ;
 
 prop fault.io.pciex.device-interr-unaf@pciexrc (1)->
     error.io.pciex.nf-poisecrc-d@pciexrc/PCIEXFNHZ;
@@ -340,7 +399,16 @@ event error.io.pciex.flt-badreq-u@PCIEXFN;
 event error.io.pciex.flt-nf-poisecrc-u@PCIEXFN;
 event error.io.pciex.flt-f-poisecrc-u@PCIEXFN;
 event error.io.pciex.flt-deg-poisecrc-u@PCIEXFN;
-event error.io.pciex.corrlink@pciexbus;
+event ereport.io.pciex.dl.btlp@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.bdllp@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rto@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rnr@PCIEXFN{within(5s)};
+event ereport.io.pciex.pl.re@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.btlp@PCIEXFN/PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.bdllp@PCIEXFN/PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rto@PCIEXFN/PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rnr@PCIEXFN/PCIEXFN{within(5s)};
+event ereport.io.pciex.pl.re@PCIEXFN/PCIEXFN{within(5s)};
 
 prop fault.io.pciex.device-noresp@PCIEXFN { IS_LF(PCIEXFN) } (1)->
     error.io.pciex.flt-nr-u@PCIEXFN;
@@ -351,14 +419,73 @@ prop fault.io.pciex.device-noresp@PCIEXFN { IS_SU(PCIEXFN) } (1)->
 prop fault.io.pciex.device-invreq@PCIEXFN { IS_LF(PCIEXFN) } (1)->
     error.io.pciex.flt-badreq-u@PCIEXFN;
 
-prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SU(PCIEXFN) } (1)->
-    error.io.pciex.corrlink@pciexbus { setserdsuffix("_corr") };
+prop fault.io.pciex.device-interr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_btlp") &&
+    setserdn(BTLP_COUNT) && setserdt(BTLP_TIME) } (0)->
+    ereport.io.pciex.dl.btlp@pciexrc,
+    ereport.io.pciex.dl.btlp@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_bdllp") &&
+    setserdn(BDLLP_COUNT) && setserdt(BDLLP_TIME) } (0)->
+    ereport.io.pciex.dl.bdllp@pciexrc,
+    ereport.io.pciex.dl.bdllp@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_rto") &&
+    setserdn(RTO_COUNT) && setserdt(RTO_TIME) } (0)->
+    ereport.io.pciex.dl.rto@pciexrc,
+    ereport.io.pciex.dl.rto@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_rnr") &&
+    setserdn(RNR_COUNT) && setserdt(RNR_TIME) } (0)->
+    ereport.io.pciex.dl.rnr@pciexrc,
+    ereport.io.pciex.dl.rnr@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_re") &&
+    setserdn(RE_COUNT) && setserdt(RE_TIME) } (0)->
+    ereport.io.pciex.pl.re@pciexrc,
+    ereport.io.pciex.pl.re@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_btlp") &&
+    setserdn(BTLP_COUNT) && setserdt(BTLP_TIME) } (0)->
+    ereport.io.pciex.dl.btlp@PCIEXFN,
+    ereport.io.pciex.dl.btlp@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_bdllp") &&
+    setserdn(BDLLP_COUNT) && setserdt(BDLLP_TIME) } (0)->
+    ereport.io.pciex.dl.bdllp@PCIEXFN,
+    ereport.io.pciex.dl.bdllp@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_rto") &&
+    setserdn(RTO_COUNT) && setserdt(RTO_TIME) } (0)->
+    ereport.io.pciex.dl.rto@PCIEXFN,
+    ereport.io.pciex.dl.rto@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_rnr") &&
+    setserdn(RNR_COUNT) && setserdt(RNR_TIME) } (0)->
+    ereport.io.pciex.dl.rnr@PCIEXFN,
+    ereport.io.pciex.dl.rnr@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_re") &&
+    setserdn(RE_COUNT) && setserdt(RE_TIME) } (0)->
+    ereport.io.pciex.pl.re@PCIEXFN,
+    ereport.io.pciex.pl.re@PCIEXFN/PCIEXFNHZ;
 
 prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_SU(PCIEXFN) } (1)->
     error.io.pciex.flt-nf-poisecrc-u@PCIEXFN;
-
-prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_LF(PCIEXFN) } (0)->
-    error.io.pciex.corrlink@pciexbus { setserdsuffix("_corr") };
 
 prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_LF(PCIEXFN) } (0)->
     error.io.device.nf-device@PCIEXFN;
@@ -401,7 +528,6 @@ prop fault.io.pciex.device-interr@PCIEXFN { IS_LF(PCIEXFN) } (1)->
 
 event error.io.pciex.nr-d@PCIEXFN/PCIEXFN;
 event error.io.pciex.ca-d@PCIEXFN/PCIEXFN;
-event error.io.pciex.corrlink@PCIEXFN/pciexbus;
 event error.io.pciex.fatlink@PCIEXFN/PCIEXFN;
 event error.io.pciex.nf-poisecrc-d@PCIEXFN/PCIEXFN;
 event error.io.pciex.f-poisecrc-d@PCIEXFN/PCIEXFN;
@@ -410,8 +536,35 @@ event error.io.pciex.deg-poisecrc-d@PCIEXFN/PCIEXFN;
 prop fault.io.pciex.device-noresp@PCIEXFN { IS_SD(PCIEXFN) } (1)->
     error.io.pciex.nr-d@PCIEXFN/PCIEXFNHZ;
 
-prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) } (1)->
-    error.io.pciex.corrlink@PCIEXFN/pciexbus<> { setserdsuffix("_corr") };
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_btlp") &&
+    setserdn(BTLP_COUNT) && setserdt(BTLP_TIME) } (0)->
+    ereport.io.pciex.dl.btlp@PCIEXFN,
+    ereport.io.pciex.dl.btlp@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_bdllp") &&
+    setserdn(BDLLP_COUNT) && setserdt(BDLLP_TIME) } (0)->
+    ereport.io.pciex.dl.bdllp@PCIEXFN,
+    ereport.io.pciex.dl.bdllp@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_rto") &&
+    setserdn(RTO_COUNT) && setserdt(RTO_TIME) } (0)->
+    ereport.io.pciex.dl.rto@PCIEXFN,
+    ereport.io.pciex.dl.rto@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_rnr") &&
+    setserdn(RNR_COUNT) && setserdt(RNR_TIME) } (0)->
+    ereport.io.pciex.dl.rnr@PCIEXFN,
+    ereport.io.pciex.dl.rnr@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_re") &&
+    setserdn(RE_COUNT) && setserdt(RE_TIME) } (0)->
+    ereport.io.pciex.pl.re@PCIEXFN,
+    ereport.io.pciex.pl.re@PCIEXFN/PCIEXFNHZ;
 
 prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_SD(PCIEXFN) } (1)->
     error.io.pciex.nf-poisecrc-d@PCIEXFN/PCIEXFNHZ;
@@ -440,8 +593,70 @@ prop fault.io.pciex.bus-noresp@PCIEXFN { !IS_SD(PCIEXFN) } (0)->
     error.io.pciex.flt-nr-u@PCIEXFN,
     error.io.pciex.nr-d@PCIEXFN;
 
-prop fault.io.pciex.bus-linkerr-corr@PCIEXFN (0)->
-    error.io.pciex.corrlink@pciexbus;
+prop fault.io.pciex.bus-linkerr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_btlp") &&
+    setserdn(BTLP_COUNT) && setserdt(BTLP_TIME) } (0)->
+    ereport.io.pciex.dl.btlp@PCIEXFN,
+    ereport.io.pciex.dl.btlp@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_bdllp") &&
+    setserdn(BDLLP_COUNT) && setserdt(BDLLP_TIME) } (0)->
+    ereport.io.pciex.dl.bdllp@PCIEXFN,
+    ereport.io.pciex.dl.bdllp@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_rto") &&
+    setserdn(RTO_COUNT) && setserdt(RTO_TIME) } (0)->
+    ereport.io.pciex.dl.rto@PCIEXFN,
+    ereport.io.pciex.dl.rto@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_rnr") &&
+    setserdn(RNR_COUNT) && setserdt(RNR_TIME) } (0)->
+    ereport.io.pciex.dl.rnr@PCIEXFN,
+    ereport.io.pciex.dl.rnr@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@PCIEXFN/PCIEXFN {
+    !IS_SD(PCIEXFN/PCIEXFN) &&
+    payloadprop_defined("detector") && setserdsuffix("_re") &&
+    setserdn(RE_COUNT) && setserdt(RE_TIME) } (0)->
+    ereport.io.pciex.pl.re@PCIEXFN,
+    ereport.io.pciex.pl.re@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_btlp") &&
+    setserdn(BTLP_COUNT) && setserdt(BTLP_TIME) } (0)->
+    ereport.io.pciex.dl.btlp@pciexrc,
+    ereport.io.pciex.dl.btlp@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_bdllp") &&
+    setserdn(BDLLP_COUNT) && setserdt(BDLLP_TIME) } (0)->
+    ereport.io.pciex.dl.bdllp@pciexrc,
+    ereport.io.pciex.dl.bdllp@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_rto") &&
+    setserdn(RTO_COUNT) && setserdt(RTO_TIME) } (0)->
+    ereport.io.pciex.dl.rto@pciexrc,
+    ereport.io.pciex.dl.rto@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_rnr") &&
+    setserdn(RNR_COUNT) && setserdt(RNR_TIME) } (0)->
+    ereport.io.pciex.dl.rnr@pciexrc,
+    ereport.io.pciex.dl.rnr@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.bus-linkerr-corr@pciexrc/PCIEXFN {
+    payloadprop_defined("detector") && setserdsuffix("_re") &&
+    setserdn(RE_COUNT) && setserdt(RE_TIME) } (0)->
+    ereport.io.pciex.pl.re@pciexrc,
+    ereport.io.pciex.pl.re@pciexrc/PCIEXFNHZ;
 
 prop fault.io.pciex.bus-linkerr@PCIEXFN { !IS_SD(PCIEXFN) } (0)->
     error.io.pciex.fatlink@PCIEXFN;
@@ -493,9 +708,6 @@ prop fault.io.pciex.device-noresp@PCIEXFN { IS_BG(PCIEXFN) } (1)->
     error.io.pci.retry-to-d@PCIEXFN/PCIFNHZ,
     error.io.pci.nr-pw-d@PCIEXFN/PCIFNHZ,
     error.io.pci.nr-drw-d@PCIEXFN/PCIFNHZ;
-
-prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_BG(PCIEXFN) } (1)->
-    error.io.pciex.corrlink@pciexbus { setserdsuffix("_corr") };
 
 prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_BG(PCIEXFN) } (1)->
     error.io.pciex.flt-nf-poisecrc-u@PCIEXFN,
@@ -661,11 +873,6 @@ event ereport.io.pci.dpe@PCIEXFN{within(5s)};
 event ereport.io.pci.rta@PCIEXFN{within(5s)};
 event ereport.io.pci.sta@PCIEXFN{within(5s)};
 event ereport.io.pciex.dl.dllp@PCIEXFN{within(5s)};
-event ereport.io.pciex.dl.btlp@PCIEXFN{within(5s)};
-event ereport.io.pciex.dl.bdllp@PCIEXFN{within(5s)};
-event ereport.io.pciex.dl.rto@PCIEXFN{within(5s)};
-event ereport.io.pciex.dl.rnr@PCIEXFN{within(5s)};
-event ereport.io.pciex.pl.re@PCIEXFN{within(5s)};
 event ereport.io.pciex.pl.te@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.fcp@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.rof@PCIEXFN{within(5s)};
@@ -677,11 +884,6 @@ event ereport.io.pciex.tl.ecrc@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.uc@PCIEXFN{within(5s)};
 event ereport.io.pciex.tl.cto@PCIEXFN{within(5s)};
 event ereport.io.pciex.dl.dllp@pciexrc{within(5s)};
-event ereport.io.pciex.dl.btlp@pciexrc{within(5s)};
-event ereport.io.pciex.dl.bdllp@pciexrc{within(5s)};
-event ereport.io.pciex.dl.rto@pciexrc{within(5s)};
-event ereport.io.pciex.dl.rnr@pciexrc{within(5s)};
-event ereport.io.pciex.pl.re@pciexrc{within(5s)};
 event ereport.io.pciex.pl.te@pciexrc{within(5s)};
 event ereport.io.pciex.tl.fcp@pciexrc{within(5s)};
 event ereport.io.pciex.tl.rof@pciexrc{within(5s)};
@@ -721,7 +923,7 @@ prop error.io.pciex.fatal@PCIEXFN1 (1)->
 	SOURCE_ID_MATCHES_BDF };
 
 prop error.io.pciex.fatal@PCIEXFN (0)->
-    ereport.io.pci.sserr@PCIEXFN1;
+    ereport.io.pci.sserr@PCIEXFN;
 
 prop error.io.pciex.fatal@PCIEXFN { is_under(PCIEXFN1, PCIEXFN) } (0)->
     ereport.io.pci.sserr@PCIEXFN1,
@@ -751,27 +953,6 @@ prop error.io.pciex.nonfatal@PCIEXFN { is_under(pciexrc, PCIEXFN) } (0)->
  * can use may propagations here as these ereports are only seen for these
  * faults.
  */
-prop error.io.pciex.corrlink@pciexbus { !IS_SD(PCIEXFN) } (0)->
-    ereport.io.pciex.dl.btlp@PCIEXFN,
-    ereport.io.pciex.dl.bdllp@PCIEXFN,
-    ereport.io.pciex.dl.rto@PCIEXFN,
-    ereport.io.pciex.dl.rnr@PCIEXFN,
-    ereport.io.pciex.pl.re@PCIEXFN;
-
-prop error.io.pciex.corrlink@PCIEXFN/pciexbus { IS_SD(PCIEXFN) } (0)->
-    ereport.io.pciex.dl.btlp@PCIEXFN,
-    ereport.io.pciex.dl.bdllp@PCIEXFN,
-    ereport.io.pciex.dl.rto@PCIEXFN,
-    ereport.io.pciex.dl.rnr@PCIEXFN,
-    ereport.io.pciex.pl.re@PCIEXFN;
-
-prop error.io.pciex.corrlink@pciexrc/pciexbus (0)->
-    ereport.io.pciex.dl.btlp@pciexrc,
-    ereport.io.pciex.dl.bdllp@pciexrc,
-    ereport.io.pciex.dl.rto@pciexrc,
-    ereport.io.pciex.dl.rnr@pciexrc,
-    ereport.io.pciex.pl.re@pciexrc;
-
 prop error.io.pciex.fatlink@PCIEXFN { !IS_SD(PCIEXFN) } (0)->
     error.io.pciex.fatal@PCIEXFN;
 

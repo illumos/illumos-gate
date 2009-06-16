@@ -2194,9 +2194,13 @@ void
 fmd_repair_fru(fmd_hdl_t *hdl, const char *fmri)
 {
 	int err;
+	fmd_asru_rep_arg_t fara;
 
+	fara.fara_reason = FMD_ASRU_REPAIRED;
+	fara.fara_bywhat = FARA_BY_FRU;
+	fara.fara_rval = &err;
 	fmd_asru_hash_apply_by_fru(fmd.d_asrus, (char *)fmri,
-	    fmd_asru_repaired, &err);
+	    fmd_asru_repaired, &fara);
 }
 
 int

@@ -1233,7 +1233,7 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 				got_hc_rsrc = 1;
 				if (xip->xi_flags & FMD_XPRT_EXTERNAL)
 					continue;
-				if (topo_fmri_present(thp, asru, &err) == 0)
+				if (topo_fmri_present(thp, asru, &err) != 0)
 					got_present_rsrc = 1;
 				if (topo_fmri_asru(thp, asru, &asrua[i],
 				    &err) == 0) {
@@ -1249,7 +1249,7 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 				got_hc_rsrc = 1;
 				if (xip->xi_flags & FMD_XPRT_EXTERNAL)
 					continue;
-				if (topo_fmri_present(thp, rsrc, &err) == 0)
+				if (topo_fmri_present(thp, rsrc, &err) != 0)
 					got_present_rsrc = 1;
 				if (topo_fmri_asru(thp, rsrc, &asrua[i],
 				    &err) == 0) {

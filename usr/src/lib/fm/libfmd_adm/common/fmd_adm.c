@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <stdlib.h>
@@ -140,6 +138,8 @@ fmd_adm_svc_errmsg(enum fmd_adm_error err)
 		return ("specified transport ID is invalid or has been closed");
 	case FMD_ADM_ERR_CASEXPRT:
 		return ("specified UUID is owned by a different fault manager");
+	case FMD_ADM_ERR_RSRCNOTR:
+		return ("specified resource has not been replaced");
 	default:
 		return ("unknown fault manager error");
 	}

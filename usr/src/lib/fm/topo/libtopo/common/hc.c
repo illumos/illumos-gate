@@ -1732,19 +1732,19 @@ struct hc_args {
 	topo_version_t ha_method_ver;
 };
 
-static boolean_t
+static int
 hc_auth_changed(nvlist_t *nva, nvlist_t *nvb, const char *propname)
 {
 	char *stra, *strb;
 
 	if (nvlist_lookup_string(nva, propname, &stra) != 0 ||
 	    nvlist_lookup_string(nvb, propname, &strb) != 0)
-		return (B_FALSE);
+		return (FMD_OBJ_STATE_UNKNOWN);
 
 	if (strcmp(stra, strb) != 0)
-		return (B_TRUE);
+		return (FMD_OBJ_STATE_REPLACED);
 	else
-		return (B_FALSE);
+		return (FMD_OBJ_STATE_STILL_PRESENT);
 }
 
 static int
@@ -1781,9 +1781,9 @@ hc_is_present(topo_mod_t *mod, tnode_t *node, void *pdata)
 
 		present = B_TRUE;
 		if (hc_auth_changed(hap->ha_fmri, rsrc,
-		    FM_FMRI_HC_SERIAL_ID) ||
+		    FM_FMRI_HC_SERIAL_ID) == FMD_OBJ_STATE_REPLACED ||
 		    hc_auth_changed(hap->ha_fmri, rsrc,
-		    FM_FMRI_HC_PART)) {
+		    FM_FMRI_HC_PART) == FMD_OBJ_STATE_REPLACED) {
 			present = B_FALSE;
 		}
 		nvlist_free(rsrc);
@@ -1845,6 +1845,8 @@ hc_is_replaced(topo_mod_t *mod, tnode_t *node, void *pdata)
 	int err;
 	struct hc_args *hap = (struct hc_args *)pdata;
 	uint32_t present = 0;
+	nvlist_t *rsrc;
+	uint32_t rval = FMD_OBJ_STATE_UNKNOWN;
 
 	/*
 	 * check with the enumerator that created this FMRI
@@ -1854,28 +1856,65 @@ hc_is_replaced(topo_mod_t *mod, tnode_t *node, void *pdata)
 	    TOPO_METH_REPLACED_VERSION, hap->ha_fmri, &hap->ha_nvl,
 	    &err) < 0) {
 		/*
-		 * enumerator didn't provide "replaced" method - so
+		 * If the method exists but failed for some other
+		 * reason, propagate the error as making any decision
+		 * over presence is impossible.
+		 */
+		if (err != ETOPO_METHOD_NOTSUP)
+			return (err);
+
+		/*
+		 * Enumerator didn't provide "replaced" method -
 		 * try "present" method
 		 */
 		if (topo_method_invoke(node, TOPO_METH_PRESENT,
 		    TOPO_METH_PRESENT_VERSION, hap->ha_fmri, &hap->ha_nvl,
 		    &err) < 0) {
-			/* no present method either - assume present */
-			present = 1;
+			/*
+			 * If the method exists but failed for some other
+			 * reason, propagate the error as making any decision
+			 * over presence is impossible.
+			 */
+			if (err != ETOPO_METHOD_NOTSUP)
+				return (err);
+
+			/*
+			 * Enumerator didn't provide "present" method either -
+			 * so check the authority information.  If the part id
+			 * or serial number doesn't match, then it isn't the
+			 * same FMRI. Otherwise, if we have a serial number and
+			 * it hasn't changed, then assume it is the same FMRI.
+			 */
+			if (topo_node_resource(node, &rsrc, &err) != 0)
+				return (err);
+			rval = hc_auth_changed(hap->ha_fmri, rsrc,
+			    FM_FMRI_HC_PART);
+			if (rval != FMD_OBJ_STATE_REPLACED)
+				rval = hc_auth_changed(hap->ha_fmri, rsrc,
+				    FM_FMRI_HC_SERIAL_ID);
+			nvlist_free(rsrc);
 			if (topo_mod_nvalloc(mod, &hap->ha_nvl,
 			    NV_UNIQUE_NAME) != 0)
+				return (EMOD_NOMEM);
+			if (nvlist_add_uint32(hap->ha_nvl,
+			    TOPO_METH_REPLACED_RET, rval) != 0) {
+				nvlist_free(hap->ha_nvl);
+				hap->ha_nvl = NULL;
 				return (ETOPO_PROP_NVL);
+			}
 		} else {
 			(void) nvlist_lookup_uint32(hap->ha_nvl,
 			    TOPO_METH_PRESENT_RET, &present);
 			(void) nvlist_remove(hap->ha_nvl,
 			    TOPO_METH_PRESENT_RET, DATA_TYPE_UINT32);
-		}
-		if (nvlist_add_uint32(hap->ha_nvl, TOPO_METH_REPLACED_RET,
-		    present ? FMD_OBJ_STATE_UNKNOWN :
-		    FMD_OBJ_STATE_NOT_PRESENT) != 0) {
-			nvlist_free(hap->ha_nvl);
-			return (ETOPO_PROP_NVL);
+			if (nvlist_add_uint32(hap->ha_nvl,
+			    TOPO_METH_REPLACED_RET,
+			    present ? FMD_OBJ_STATE_UNKNOWN :
+			    FMD_OBJ_STATE_NOT_PRESENT) != 0) {
+				nvlist_free(hap->ha_nvl);
+				hap->ha_nvl = NULL;
+				return (ETOPO_PROP_NVL);
+			}
 		}
 	}
 	return (0);

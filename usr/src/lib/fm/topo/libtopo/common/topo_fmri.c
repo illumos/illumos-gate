@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -517,6 +517,19 @@ topo_fmri_serial(topo_hdl_t *thp, nvlist_t *nvl, char **serial, int *err)
 {
 	nvlist_t *prop = NULL;
 	char *sp;
+
+	/*
+	 * If there is a serial id in the resource fmri, then use that.
+	 * Otherwise fall back to looking for a serial id property in the
+	 * protocol group.
+	 */
+	if (nvlist_lookup_string(nvl, FM_FMRI_HC_SERIAL_ID, &sp) == 0) {
+		if ((*serial = topo_hdl_strdup(thp, sp)) == NULL)
+			return (set_error(thp, ETOPO_PROP_NOMEM, err,
+			    "topo_fmri_serial", prop));
+		else
+			return (0);
+	}
 
 	if (fmri_prop(thp, nvl, TOPO_PGROUP_PROTOCOL, FM_FMRI_HC_SERIAL_ID,
 	    NULL, &prop, err) < 0)

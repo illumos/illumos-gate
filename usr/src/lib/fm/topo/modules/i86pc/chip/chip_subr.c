@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -365,6 +365,7 @@ static int
 fmri_replaced(topo_mod_t *mod, tnode_t *node, nvlist_t *unum, int *errp)
 {
 	tnode_t *dimmnode;
+	nvlist_t *resource;
 	int rc, err;
 	char *old_serial, *curr_serial;
 	fmd_agent_hdl_t *hdl;
@@ -393,9 +394,24 @@ fmri_replaced(topo_mod_t *mod, tnode_t *node, nvlist_t *unum, int *errp)
 	/*
 	 * If the current serial number is available for the DIMM that this rank
 	 * belongs to, it will be accessible as a property on the parent (dimm)
-	 * node.
+	 * node. If there is a serial id in the resource fmri, then use that.
+	 * Otherwise fall back to looking for a serial id property in the
+	 * protocol group.
 	 */
 	dimmnode = topo_node_parent(node);
+	if (topo_node_resource(dimmnode, &resource, &err) != -1) {
+		if (nvlist_lookup_string(resource, FM_FMRI_HC_SERIAL_ID,
+		    &curr_serial) == 0) {
+			if (strcmp(old_serial, curr_serial) != 0) {
+				nvlist_free(resource);
+				return (FMD_OBJ_STATE_REPLACED);
+			} else {
+				nvlist_free(resource);
+				return (FMD_OBJ_STATE_STILL_PRESENT);
+			}
+		}
+		nvlist_free(resource);
+	}
 	if (topo_prop_get_string(dimmnode, TOPO_PGROUP_PROTOCOL,
 	    FM_FMRI_HC_SERIAL_ID, &curr_serial, &err) != 0) {
 		if (err == ETOPO_PROP_NOENT) {

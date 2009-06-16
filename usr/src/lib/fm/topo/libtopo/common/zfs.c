@@ -81,7 +81,8 @@ zfs_init(topo_mod_t *mod, topo_version_t version)
 		    "%s\n", topo_mod_errmsg(mod));
 		return (-1); /* mod errno already set */
 	}
-	g_zfs = libzfs_init();
+	if (!g_zfs)
+		g_zfs = libzfs_init();
 
 	return (0);
 }

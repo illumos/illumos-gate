@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ipath.c -- instanced pathname module
@@ -27,8 +27,6 @@
  * this module provides a cache of fully instantized component paths,
  * stored in a fairly compact format.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -136,6 +134,15 @@ ipath_epnamecmp(struct ipath *ipp, struct node *np)
 		return (-1);
 }
 
+/*
+ * The following functions are only used in the "itree_create_dummy()" first
+ * pass at itree creation. ipath_dummy() creates paths used in the itree (see
+ * comment above add_event_dummy() for details). ipath_for_usednames() creates
+ * a different set of paths using the full names from the propagations. These
+ * are only used by ipath_dummy_lut() in order to set up the Usednames lut
+ * correctly, which in turn allows conf propteries on any alement in those
+ * names to be used in constraints.
+ */
 struct lut *Usednames;
 
 void
@@ -143,13 +150,13 @@ ipath_dummy_lut(struct arrow *arrowp)
 {
 	const struct ipath *ipp;
 
-	ipp = arrowp->head->myevent->ipp;
+	ipp = arrowp->head->myevent->ipp_un;
 	while (ipp->s != NULL) {
 		Usednames = lut_add(Usednames, (void *)ipp->s,
 		    (void *)ipp->s, NULL);
 		ipp++;
 	}
-	ipp = arrowp->tail->myevent->ipp;
+	ipp = arrowp->tail->myevent->ipp_un;
 	while (ipp->s != NULL) {
 		Usednames = lut_add(Usednames, (void *)ipp->s,
 		    (void *)ipp->s, NULL);
@@ -180,6 +187,32 @@ ipath_dummy(struct node *np, struct ipath *ipp)
 	Ipaths = lut_add(Ipaths, (void *)ret, (void *)ret, (lut_cmp)ipath_cmp);
 	stats_counter_bump(Nipath);
 	stats_counter_add(Nbytes, 2 * sizeof (struct ipath));
+	return (ret);
+}
+
+struct ipath *
+ipath_for_usednames(struct node *np)
+{
+	struct ipath *ret, *ipp;
+	int i = 0;
+	struct node *np2;
+
+	for (np2 = np; np2 != NULL; np2 = np2->u.name.next)
+		i++;
+	ret = MALLOC(sizeof (*ret) * (i + 1));
+	for (i = 0, np2 = np; np2 != NULL; np2 = np2->u.name.next) {
+		ret[i].s = np2->u.name.s;
+		ret[i++].i = 0;
+	}
+	ret[i].s = NULL;
+	if ((ipp = lut_lookup(Ipaths, (void *)ret,
+	    (lut_cmp)ipath_cmp)) != NULL) {
+		FREE(ret);
+		return (ipp);
+	}
+	Ipaths = lut_add(Ipaths, (void *)ret, (void *)ret, (lut_cmp)ipath_cmp);
+	stats_counter_bump(Nipath);
+	stats_counter_add(Nbytes, (i + 1) * sizeof (struct ipath));
 	return (ret);
 }
 

@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.c -- instance tree creation and manipulation
  *
  * this module provides the instance tree
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -1303,9 +1301,12 @@ add_event_dummy(struct node *np, const struct ipath *ipp)
 	struct event *ret;
 	struct event searchevent;	/* just used for searching */
 	extern struct ipath *ipath_dummy(struct node *, struct ipath *);
+	struct ipath *ipp_un;
+	extern struct ipath *ipath_for_usednames(struct node *);
 
 	searchevent.enode = np;
 	searchevent.ipp = ipath_dummy(np->u.event.epname, (struct ipath *)ipp);
+	ipp_un = ipath_for_usednames(np->u.event.epname);
 	if ((ret = lut_lookup(Ninfo.lut, (void *)&searchevent,
 	    (lut_cmp)event_cmp)) != NULL)
 		return (ret);
@@ -1315,6 +1316,7 @@ add_event_dummy(struct node *np, const struct ipath *ipp)
 	ret->t = np->u.event.ename->u.name.t;
 	ret->enode = np;
 	ret->ipp = searchevent.ipp;
+	ret->ipp_un = ipp_un;
 	Ninfo.lut = lut_add(Ninfo.lut, (void *)ret, (void *)ret,
 	    (lut_cmp)event_cmp);
 	return (ret);

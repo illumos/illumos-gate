@@ -471,9 +471,10 @@ fmd_adm_do_repair(char *name, struct svc_req *req, int *errp, uint8_t reason,
 		*errp = FMD_ADM_ERR_PERM;
 	else {
 		fmd_asru_rep_arg_t fara;
+		int err = FARA_ERR_RSRCNOTF;
 
 		fara.fara_reason = reason;
-		fara.fara_rval = errp;
+		fara.fara_rval = &err;
 		fara.fara_uuid = uuid;
 		fara.fara_bywhat = FARA_BY_ASRU;
 		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
@@ -487,6 +488,10 @@ fmd_adm_do_repair(char *name, struct svc_req *req, int *errp, uint8_t reason,
 		fara.fara_bywhat = FARA_BY_RSRC;
 		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
 		    fmd_asru_repaired, &fara);
+		if (err == FARA_ERR_RSRCNOTR)
+			*errp = FMD_ADM_ERR_RSRCNOTR;
+		else if (err == FARA_OK)
+			*errp = 0;
 	}
 }
 

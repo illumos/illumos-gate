@@ -1255,13 +1255,16 @@ fmd_asru_repaired(fmd_asru_link_t *alp, void *arg)
 		return;
 
 	/*
-	 * For replaced, verify it has been replaced if we have serial number
+	 * For replaced, verify it has been replaced if we have serial number.
+	 * If not set *farap->fara_rval to FARA_ERR_RSRCNOTR.
 	 */
 	if (farap->fara_reason == FMD_ASRU_REPLACED &&
 	    !(alp->al_flags & FMD_ASRU_PROXY_EXTERNAL) &&
 	    fmd_asru_replacement_state(alp->al_event,
 	    (alp->al_flags & FMD_ASRU_PROXY) ? HC_ONLY_TRUE : HC_ONLY_FALSE) ==
 	    FMD_OBJ_STATE_STILL_PRESENT) {
+		if (farap->fara_rval)
+			*farap->fara_rval = FARA_ERR_RSRCNOTR;
 		return;
 	}
 
@@ -1275,7 +1278,16 @@ fmd_asru_repaired(fmd_asru_link_t *alp, void *arg)
 	 * when arg is NULL) as the case will be explicitly repaired anyway.
 	 */
 	if (farap->fara_rval) {
-		*farap->fara_rval = 0;
+		/*
+		 * *farap->fara_rval defaults to FARA_ERR_RSRCNOTF (not found).
+		 * If we find a valid cache entry which we repair then we
+		 * set it to FARA_OK. However we don't want to do this if
+		 * we have already set it to FARA_ERR_RSRCNOTR (not replaced)
+		 * in a previous iteration (see above). So only set it to
+		 * FARA_OK if the current value is still FARA_ERR_RSRCNOTF.
+		 */
+		if (*farap->fara_rval == FARA_ERR_RSRCNOTF)
+			*farap->fara_rval = FARA_OK;
 		if (cleared) {
 			if (alp->al_flags & FMD_ASRU_PROXY)
 				fmd_case_xprt_updated(alp->al_case);

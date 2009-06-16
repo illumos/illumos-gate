@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 %#include <fm/fmd_api.h>
 
@@ -48,7 +46,8 @@ enum fmd_adm_error {
 	FMD_ADM_ERR_CASESRCH,
 	FMD_ADM_ERR_CASEOPEN,
 	FMD_ADM_ERR_XPRTSRCH,
-	FMD_ADM_ERR_CASEXPRT
+	FMD_ADM_ERR_CASEXPRT,
+	FMD_ADM_ERR_RSRCNOTR
 };
 
 struct fmd_rpc_modstat {

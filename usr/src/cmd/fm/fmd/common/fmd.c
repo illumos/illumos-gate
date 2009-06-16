@@ -36,6 +36,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <door.h>
 
 #include <fmd_conf.h>
@@ -319,6 +320,45 @@ static fmd_statistics_t _fmd_stats = {
 { "topo.drgen", FMD_TYPE_UINT64, "current topology DR generation number" },
 };
 
+/*
+ * SMBIOS serial numbers can contain characters (particularly ':' and ' ')
+ * that are invalid for the authority and can break FMRI parsing.  We translate
+ * any invalid characters to a safe '-', as well as trimming any leading or
+ * trailing whitespace.  Similarly, '/' can be found in some product names
+ * so we translate that to '-'.
+ */
+void
+fmd_cleanup_auth_str(char *buf, const char *begin)
+{
+	const char *end, *cp;
+	char c;
+	int i;
+
+	end = begin + strlen(begin);
+
+	while (begin < end && isspace(*begin))
+		begin++;
+	while (begin < end && isspace(*(end - 1)))
+		end--;
+
+	if (begin >= end)
+		return;
+
+	cp = begin;
+	for (i = 0; i < MAXNAMELEN - 1; i++) {
+		if (cp >= end)
+			break;
+		c = *cp;
+		if (c == ':' || c == '=' || c == '/' || isspace(c) ||
+		    !isprint(c))
+			buf[i] = '-';
+		else
+			buf[i] = c;
+		cp++;
+	}
+	buf[i] = 0;
+}
+
 void
 fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 {
@@ -344,15 +384,15 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	if ((shp = smbios_open(NULL, SMB_VERSION, 0, NULL)) != NULL) {
 		if ((id = smbios_info_system(shp, &s1)) != SMB_ERR &&
 		    smbios_info_common(shp, id, &s2) != SMB_ERR) {
-			(void) strlcpy(_fmd_prod, s2.smbi_product, MAXNAMELEN);
-			(void) strlcpy(_fmd_csn, s2.smbi_serial, MAXNAMELEN);
+			fmd_cleanup_auth_str(_fmd_prod, s2.smbi_product);
+			fmd_cleanup_auth_str(_fmd_csn, s2.smbi_serial);
 		}
 		smbios_close(shp);
 	} else if ((rooth = di_init("/", DINFOPROP)) != DI_NODE_NIL &&
 	    (promh = di_prom_init()) != DI_PROM_HANDLE_NIL) {
 		if (di_prom_prop_lookup_bytes(promh, rooth, "chassis-sn",
 		    (unsigned char **)&bufp) != -1) {
-			(void) strlcpy(_fmd_csn, bufp, MAXNAMELEN);
+			fmd_cleanup_auth_str(_fmd_csn, bufp);
 		}
 	}
 

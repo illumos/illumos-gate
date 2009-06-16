@@ -177,6 +177,14 @@ extern void fmd_asru_clear_aged_rsrcs();
 #define	FARA_BY_LABEL	5
 
 /*
+ * Return values for fmd_asru_repaired. May return "ok" or "not replaced".
+ * If no fault is found we will get default value of "not found".
+ */
+#define	FARA_OK 0
+#define	FARA_ERR_RSRCNOTF 1
+#define	FARA_ERR_RSRCNOTR 2
+
+/*
  * The following structures are used to pass arguments to the corresponding
  * function when walking the resource cache by case etc.
  */

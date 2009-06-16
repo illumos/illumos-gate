@@ -208,8 +208,7 @@ topo_open(int version, const char *rootdir, int *errp)
 		topo_dprintf(thp, TOPO_DBG_ERR,
 		    "failed to load builtin modules: %s\n",
 		    topo_hdl_errmsg(thp));
-		topo_close(thp);
-		return (NULL);
+		return (set_open_errno(thp, errp, topo_hdl_errno(thp)));
 	}
 
 	return (thp);

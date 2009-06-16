@@ -709,7 +709,7 @@ topo_mod_csn(topo_mod_t *mod)
 	char csn[MAXNAMELEN];
 	di_prom_handle_t promh = DI_PROM_HANDLE_NIL;
 	di_node_t rooth = DI_NODE_NIL;
-	char *bufp, *str;
+	char *bufp;
 	smbios_hdl_t *shp;
 	smbios_system_t s1;
 	smbios_info_t s2;
@@ -724,12 +724,6 @@ topo_mod_csn(topo_mod_t *mod)
 		if (strcmp(csn, SMB_DEFAULT1) == 0 ||
 		    strcmp(csn, SMB_DEFAULT2) == 0)
 			return (NULL);
-
-		/*
-		 * Terminate CSN at the first white space
-		 */
-		if ((str = strchr(csn, ' ')) != NULL)
-			*str = '\0';
 
 	} else if ((rooth = topo_mod_devinfo(mod)) != DI_NODE_NIL &&
 	    (promh = topo_mod_prominfo(mod)) != DI_PROM_HANDLE_NIL) {

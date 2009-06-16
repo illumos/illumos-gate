@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.h -- public definitions for itree module
@@ -28,8 +28,6 @@
 
 #ifndef	_EFT_ITREE_H
 #define	_EFT_ITREE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -82,6 +80,7 @@ struct event {
 	nvlist_t *nvp;			/* payload nvp for ereports */
 	struct node *enode;		/* event node in parse tree */
 	const struct ipath *ipp;	/* instanced version of event */
+	const struct ipath *ipp_un;	/* full version for Usednames */
 	struct lut *props;		/* instanced version of nvpairs */
 	struct lut *payloadprops;	/* nvpairs for problem payload */
 	struct lut *serdprops;		/* nvpairs for dynamic serd args */
