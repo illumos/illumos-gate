@@ -659,7 +659,7 @@ Notes on packaging:
 
 5.3.7
 ======
-  This version has the following fixes:
+  This version has the following fix:
    6812227 e1000g(intel 82571 adapter) must support MTU size of 9216
 
 5.3.8
@@ -670,10 +670,15 @@ Notes on packaging:
 
 5.3.9
 ====
-  This version has the following fixes:
+  This version has the following fix:
    6680929 dladm should print POSSIBLE values for properties like mtu by contacting the driver.
 
 5.3.10
 ====
-  This version has the following fixes:
+  This version has the following fix:
    6841089 Customer wants to be able to set MAX_NUM_MULTICAST_ADDRESSES above 256 on e1000g driver
+
+5.3.11
+====
+  This version has the following fix:
+   6848586 rw_enter()/rw_exit() could be called on uninitialized rw lock

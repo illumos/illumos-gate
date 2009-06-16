@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.10";
+static char e1000g_version[] = "Driver Ver. 5.3.11";
 
 /*
  * Proto types for DDI entry points
@@ -2481,15 +2481,11 @@ multicst_remove(struct e1000g *Adapter, const uint8_t *multiaddr)
 static void
 e1000g_release_multicast(struct e1000g *Adapter)
 {
-	rw_enter(&Adapter->chip_lock, RW_WRITER);
-
 	if (Adapter->mcast_table != NULL) {
 		kmem_free(Adapter->mcast_table,
 		    Adapter->mcast_alloc_count * sizeof (struct ether_addr));
 		Adapter->mcast_table = NULL;
 	}
-
-	rw_exit(&Adapter->chip_lock);
 }
 
 /*
