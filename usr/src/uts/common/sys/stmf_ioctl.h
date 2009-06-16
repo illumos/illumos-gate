@@ -156,6 +156,7 @@ typedef struct stmf_state_desc {
 #define	STMF_IOCERR_UPDATE_NEED_CFG_INIT	17
 #define	STMF_IOCERR_PPD_UPDATED			18
 #define	STMF_IOCERR_INSUFFICIENT_BUF		19
+#define	STMF_IOCERR_TG_NEED_TG_OFFLINE		20
 
 
 typedef struct stmf_group_name {

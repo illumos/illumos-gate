@@ -795,14 +795,6 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 			break; /* not allowed */
 		}
 		mutex_enter(&stmf_state.stmf_lock);
-		if (idtype == STMF_ID_TYPE_TARGET &&
-		    stmf_state.stmf_service_running) {
-			mutex_exit(&stmf_state.stmf_lock);
-			iocd->stmf_error =
-			    STMF_IOCERR_TG_UPDATE_NEED_SVC_OFFLINE;
-			ret = EBUSY;
-			break; /* not allowed */
-		}
 		ret = stmf_add_group_member(grp_entry->group.name,
 		    grp_entry->group.name_size,
 		    grp_entry->ident + 4,
@@ -834,14 +826,6 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 			break; /* not allowed */
 		}
 		mutex_enter(&stmf_state.stmf_lock);
-		if (idtype == STMF_ID_TYPE_TARGET &&
-		    stmf_state.stmf_service_running) {
-			mutex_exit(&stmf_state.stmf_lock);
-			iocd->stmf_error =
-			    STMF_IOCERR_TG_UPDATE_NEED_SVC_OFFLINE;
-			ret = EBUSY;
-			break; /* not allowed */
-		}
 		ret = stmf_remove_group_member(grp_entry->group.name,
 		    grp_entry->group.name_size,
 		    grp_entry->ident + 4,

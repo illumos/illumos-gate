@@ -342,7 +342,14 @@ groupMemberIoctl(int fd, int cmd, stmfGroupName *groupName, stmfDevid *devid)
 	if (ioctlRet != 0) {
 		switch (errno) {
 			case EBUSY:
-				ret = STMF_ERROR_BUSY;
+				switch (stmfIoctl.stmf_error) {
+					case STMF_IOCERR_TG_NEED_TG_OFFLINE:
+						ret = STMF_ERROR_TG_ONLINE;
+						break;
+					default:
+						ret = STMF_ERROR_BUSY;
+						break;
+				}
 				break;
 			case EPERM:
 			case EACCES:
@@ -506,21 +513,11 @@ stmfAddToTargetGroup(stmfGroupName *targetGroupName, stmfDevid *targetName)
 {
 	int ret;
 	int fd;
-	stmfState state;
 
 	if (targetGroupName == NULL ||
 	    (strnlen((char *)targetGroupName, sizeof (stmfGroupName))
 	    == sizeof (stmfGroupName)) || targetName == NULL) {
 		return (STMF_ERROR_INVALID_ARG);
-	}
-
-	ret = stmfGetState(&state);
-	if (ret == STMF_STATUS_SUCCESS) {
-		if (state.operationalState != STMF_SERVICE_STATE_OFFLINE) {
-			return (STMF_ERROR_SERVICE_ONLINE);
-		}
-	} else {
-		return (STMF_STATUS_ERROR);
 	}
 
 	/* call init */

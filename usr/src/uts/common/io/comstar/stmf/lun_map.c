@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -460,7 +460,7 @@ stmf_remove_lu_from_session(stmf_i_local_port_t *ilport,
 	iss->iss_flags |= ISS_LUN_INVENTORY_CHANGED;
 	if (lun_map_ent->ent_itl_datap) {
 		stmf_do_itl_dereg(lu, lun_map_ent->ent_itl_datap,
-					STMF_ITL_REASON_USER_REQUEST);
+		    STMF_ITL_REASON_USER_REQUEST);
 	}
 	kmem_free((void *)lun_map_ent, sizeof (stmf_lun_map_ent_t));
 	return (STMF_SUCCESS);
@@ -1530,6 +1530,15 @@ stmf_remove_group_member(uint8_t *grpname, uint16_t grpname_size,
 		    STMF_IOCERR_INVALID_HG_ENTRY:STMF_IOCERR_INVALID_TG_ENTRY;
 		return (ENODEV); /* no such member */
 	}
+	/* verify target is offline */
+	if (entry_type == STMF_ID_TYPE_TARGET) {
+		ilport = stmf_targetident_to_ilport(entry_ident, entry_size);
+		if (ilport && ilport->ilport_state != STMF_STATE_OFFLINE) {
+			*err_detail = STMF_IOCERR_TG_NEED_TG_OFFLINE;
+			return (EBUSY);
+		}
+	}
+
 	stmf_remove_id((stmf_id_list_t *)id_grp->id_impl_specific, id_member);
 	stmf_free_id(id_member);
 
