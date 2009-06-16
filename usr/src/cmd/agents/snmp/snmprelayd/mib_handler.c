@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -13,18 +12,16 @@
  *
  * When distributing Covered Code, include this CDDL HEADER in each
  * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the 
+ * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <sys/types.h>
@@ -296,15 +293,19 @@ char* first_entry_Agent()
 
 int add_entry_Agent(char* t)
 {
-  Agent *entry = (Agent*) t;
+	Agent *entry = (Agent*) t;
+	Agent *last = NULL;
 
-  if(first_agent == NULL){
-	entry->next_agent = NULL;
-  }else{
-	entry->next_agent = first_agent;
-  }
-  first_agent = entry;
-  return SAP_TBL_SUCCESS;
+	if (first_agent == NULL){
+		entry->next_agent = NULL;
+		first_agent = entry;
+	} else {
+		last = first_agent;
+		while (last->next_agent != NULL)
+			last = last->next_agent;
+		last->next_agent = entry;
+	}
+	return (SAP_TBL_SUCCESS);
 }
 
 /* a hack: assume the index is integer */
