@@ -718,6 +718,10 @@ label=AUE_EXITPROM
 label=AUE_EXPORTFS
   skip=Not used.
 
+label=AUE_FACCESSAT
+  see=access(2)
+  format=path:[path_attr]:[attr]
+
 label=AUE_FACLSET
   syscall=facl
   case=Invalid file descriptor
@@ -838,6 +842,7 @@ label=AUE_FSAT
 #unlinkat	AUE_UNLINKAT
 #futimesat	AUE_FUTIMESAT
 #renameat	AUE_RENAMEAT
+#faccessat	AUE_FACCESSAT
 
 label=AUE_FSTAT
   skip=Not used.

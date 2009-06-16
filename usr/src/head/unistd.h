@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _UNISTD_H
 #define	_UNISTD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -560,6 +558,10 @@ extern ssize_t write(int, const void *, size_t);
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern void yield(void);
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
+	defined(__EXTENSIONS__)
+extern int faccessat(int, const char *, int, int);
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
 
 /* transitional large file interface versions */
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
@@ -857,6 +859,10 @@ extern ssize_t write();
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern void yield();
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+#if !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE) || \
+	defined(__EXTENSIONS__)
+extern int faccessat();
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_ATFILE_SOURCE)... */
 
 /* transitional large file interface versions */
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \

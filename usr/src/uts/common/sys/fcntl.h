@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,6 @@
 
 #ifndef	_SYS_FCNTL_H
 #define	_SYS_FCNTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -351,6 +349,7 @@ typedef struct fshare {
 #define	AT_SYMLINK_NOFOLLOW		0x1000
 #define	AT_REMOVEDIR			0x1
 #define	_AT_TRIGGER			0x2
+#define	AT_EACCESS			0x4	/* use EUID/EGID for access */
 #endif
 
 #if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)

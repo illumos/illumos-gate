@@ -46,6 +46,7 @@
 #include <sys/file.h>
 #include <fs/fs_subr.h>
 #include <c2/audit.h>
+#include <sys/fcntl.h>
 
 /*
  * Determine accessibility of file.
@@ -123,7 +124,7 @@ access(char *fname, int fmode)
 }
 
 int
-accessat(int fd, char *fname, int fmode)
+faccessat(int fd, char *fname, int fmode, int flag)
 {
 	file_t *dirfp;
 	vnode_t *dirvp;
@@ -132,6 +133,9 @@ accessat(int fd, char *fname, int fmode)
 
 	if (fd == AT_FDCWD && fname == NULL)
 		return (set_errno(EFAULT));
+
+	if ((flag & ~AT_EACCESS) != 0)
+		return (set_errno(EINVAL));
 
 	if (fname != NULL) {
 		if (copyin(fname, &startchar, sizeof (char)))
@@ -156,6 +160,11 @@ accessat(int fd, char *fname, int fmode)
 
 	if (audit_active)
 		audit_setfsat_path(1);
+
+	/* Do not allow E_OK unless AT_EACCESS flag is set */
+	fmode &= ~E_OK;
+	if (flag & AT_EACCESS)
+		fmode |= E_OK;
 
 	error = caccess(fname, fmode, dirvp);
 	if (dirvp != NULL)

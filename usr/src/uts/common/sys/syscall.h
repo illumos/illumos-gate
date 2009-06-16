@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -222,6 +222,7 @@ extern "C" {
 	 *	fchownat(...)	:: fsat(5, ...)
 	 *	unlinkat(...)	:: fsat(6, ...)
 	 *	futimesat(...)	:: fsat(7, ...)
+	 *	faccessat(...)	:: fsat(8, ...)
 	 */
 #define	SYS_lwp_park	77
 	/*

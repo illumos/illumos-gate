@@ -854,7 +854,6 @@ PORTSYS=			\
 	execl.o			\
 	execle.o		\
 	execv.o			\
-	faccessat.o		\
 	fsmisc.o		\
 	fstatat.o		\
 	getpagesizes.o		\

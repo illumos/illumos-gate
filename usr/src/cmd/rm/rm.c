@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
 /*	All Rights Reserved   */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rm [-fiRr] file ...
@@ -48,8 +46,6 @@
 #include <unistd.h>
 #include <values.h>
 #include "getresponse.h"
-
-#define	E_OK	010		/* make __accessat() use effective ids */
 
 #define	DIR_CANTCLOSE		1
 
@@ -86,8 +82,6 @@ static size_t pathbuflen = MAXPATHLEN;
 
 static int maxfds = MAXINT;
 static int nfds;
-
-extern int __accessat(int, const char *, int);
 
 int
 main(int argc, char **argv)
@@ -388,7 +382,7 @@ rm(const char *entry, struct dlist *caller)
 		 * prompt user for response.
 		 */
 		if (ontty && !interactive && !silent &&
-		    __accessat(caller->fd, entry, W_OK|X_OK|E_OK) != 0 &&
+		    faccessat(caller->fd, entry, W_OK|X_OK, AT_EACCESS) != 0 &&
 		    !confirm(stderr,
 		    gettext("rm: examine files in directory %s (%s/%s)? "),
 		    pathbuf, yesstr, nostr)) {
@@ -521,7 +515,7 @@ unlinkit:
 		 *
 		 */
 		if (ontty && !S_ISLNK(temp.st_mode) &&
-		    __accessat(caller->fd, entry, W_OK|E_OK) != 0 &&
+		    faccessat(caller->fd, entry, W_OK, AT_EACCESS) != 0 &&
 		    !confirm(stdout,
 		    gettext("rm: %s: override protection %o (%s/%s)? "),
 		    pathbuf, temp.st_mode & 0777, yesstr, nostr)) {

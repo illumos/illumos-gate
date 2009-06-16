@@ -717,7 +717,7 @@ static const	struct systable fsatsystable[] = {
 {"unlinkat",	4, DEC, NOV, HID, ATC, STG, HEX},		/* 5 */
 {"futimesat",	4, DEC, NOV, HID, ATC, STG, HEX},		/* 6 */
 {"renameat",	5, DEC, NOV, HID, ATC, STG, DEC, STG},		/* 7 */
-{"__accessat",	5, DEC, NOV, HID, ATC, STG, ACC},		/* 8 */
+{"faccessat",	5, DEC, NOV, HID, ATC, STG, ACC, ACC},		/* 8 */
 {"__openattrdirat", 3, DEC, NOV, HID, ATC, STG},		/* 9 */
 {"openat",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 2 */
 {"openat64",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 1 */
@@ -953,7 +953,7 @@ const	struct sysalias sysalias[] = {
 	{ "unlinkat",		SYS_fsat	},
 	{ "futimesat",		SYS_fsat	},
 	{ "renameat",		SYS_fsat	},
-	{ "__accessat",		SYS_fsat	},
+	{ "faccessat",		SYS_fsat	},
 	{ "__openattrdirat",	SYS_fsat	},
 	{ "lgrpsys",		SYS_lgrpsys	},
 	{ "getrusage",		SYS_rusagesys	},

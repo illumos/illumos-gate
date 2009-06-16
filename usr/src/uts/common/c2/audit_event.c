@@ -1024,6 +1024,9 @@ aui_fsat(au_event_t e)
 	case 7: /* renameat */
 		e = AUE_RENAMEAT;
 		break;
+	case 8: /* faccessat */
+		e = AUE_FACCESSAT;
+		break;
 	case 9: /* __openattrdirat */
 		tad->tad_ctrl |= PAD_SAVPATH;
 		/*FALLTHROUGH*/

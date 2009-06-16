@@ -355,6 +355,7 @@
 #
 307:AUE_SETSID:setsid(2):pm
 308:AUE_SETPGID:setpgid(2):pm
+309:AUE_FACCESSAT:faccessat(2):fa
 #
 # user level audit events
 #	2048 -  6143	Reserved

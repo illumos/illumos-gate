@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1748,9 +1748,6 @@ int _autofssys(enum autofssys_op, void *);
 
 /* label.c */
 extern int is_system_labeled(void);
-
-/* until TOG resolves the name, keep this private */
-int __accessat(int, const char *, int);
 
 extern int uconv_u16tou32(const uint16_t *, size_t *, uint32_t *, size_t *,
 	int);
