@@ -6,11 +6,9 @@
  * @(#)ip_frag.h	1.5 3/24/96
  * $Id: ip_frag.h,v 2.23.2.2 2005/06/10 18:02:37 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	__IP_FRAG_H__
 #define	__IP_FRAG_H__
@@ -22,25 +20,21 @@ typedef	struct	ipfr	{
 	struct	ipfr	*ipfr_next, **ipfr_prev;
 	void	*ipfr_data;
 	void	*ipfr_ifp;
-	i6addr_t	ipfr_source;
-	i6addr_t	ipfr_dest;
+	i6addr_t	ipfr_src;
+	i6addr_t	ipfr_dst;
 	u_32_t	ipfr_optmsk;
 	u_short	ipfr_secmsk;
 	u_short	ipfr_auth;
 	u_32_t	ipfr_id;
-	u_char	ipfr_p;
-	u_char	ipfr_tos;
+	u_32_t	ipfr_p;
+	u_32_t	ipfr_tos;
 	u_32_t	ipfr_pass;
 	u_short	ipfr_off;
 	u_long	ipfr_ttl;
 	u_char	ipfr_seen0;
-	u_short ipfr_firstend;
 	frentry_t *ipfr_rule;
 	int	ipfr_ref;
 } ipfr_t;
-
-#define ipfr_src	ipfr_source.in4
-#define ipfr_dst	ipfr_dest.in4
 
 typedef	struct	ipfrstat {
 	u_long	ifs_exists;	/* add & already exists */

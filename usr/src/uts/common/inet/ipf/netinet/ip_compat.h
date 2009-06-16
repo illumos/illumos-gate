@@ -6,7 +6,7 @@
  * @(#)ip_compat.h	1.8 1/14/96
  * $Id: ip_compat.h,v 2.142.2.30 2005/08/11 15:13:49 darrenr Exp $
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2368,6 +2368,25 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #endif
 #ifndef	ICMP6_NI_SUBJ_IPV4
 # define	ICMP6_NI_SUBJ_IPV4	2
+#endif
+
+#if !defined(IPV6_FLOWINFO_MASK)
+# if (BYTE_ORDER == BIG_ENDIAN) || defined(_BIG_ENDIAN)
+#  define IPV6_FLOWINFO_MASK    0x0fffffff      /* flow info (28 bits) */
+# else
+#  if(BYTE_ORDER == LITTLE_ENDIAN) || !defined(_BIG_ENDIAN)
+#   define IPV6_FLOWINFO_MASK   0xffffff0f      /* flow info (28 bits) */
+#  endif /* LITTLE_ENDIAN */
+# endif
+#endif
+#if !defined(IPV6_FLOWLABEL_MASK)
+# if (BYTE_ORDER == BIG_ENDIAN) || defined(_BIG_ENDIAN)
+#  define IPV6_FLOWLABEL_MASK   0x000fffff      /* flow label (20 bits) */
+# else
+#  if (BYTE_ORDER == LITTLE_ENDIAN) || !defined(_BIG_ENDIAN)
+#   define IPV6_FLOWLABEL_MASK  0xffff0f00      /* flow label (20 bits) */
+#  endif /* LITTLE_ENDIAN */
+# endif
 #endif
 
 /*

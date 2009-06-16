@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,17 @@ typedef struct _condvar_impl {
 #endif	/* _ASM */
 
 
+/*
+ * The cvwaitlock_t structure and associated macros provide an implementation
+ * of a locking mechanism that allows recursion on the reader lock without
+ * danger of a pending write lock elsewhere being able to cause a deadlock.
+ * The provision for supporting recursion is necessary for use with the
+ * netinfo (neti) kernel module when processing network data.
+ *
+ * Support for recursion (giving precedence to readers and allowing them
+ * to enter even when a write is blocked) can result in write starvation.
+ * There is no priority inheritence for this locking interface.
+ */
 typedef	struct	cvwaitlock_s	{
 	kmutex_t	cvw_lock;
 	kcondvar_t	cvw_waiter;

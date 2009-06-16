@@ -1693,9 +1693,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		 */
 		ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
 		    NULL, NULL, NULL, NULL, ipst);
-		if (ill != NULL) {
-			supplied_ipif = ipif_get_next_ipif(NULL, ill);
-		} else {
+		if (ill == NULL) {
 			ip1dbg(("ipfil_sendpkt: Could not find"
 			    " route to dst\n"));
 			value = ECOMM;
@@ -1703,9 +1701,11 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 			goto discard;
 		}
 
+		supplied_ipif = ipif_get_next_ipif(NULL, ill);
 		ire = ire_route_lookup(dst, 0, 0, 0, supplied_ipif,
 		    &sire, zoneid, msg_getlabel(mp), match_flags, ipst);
-		ipif_refrele(supplied_ipif);
+		if (supplied_ipif != NULL)
+			ipif_refrele(supplied_ipif);
 		ill_refrele(ill);
 	}
 

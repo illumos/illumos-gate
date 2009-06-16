@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -273,6 +273,7 @@ struct ipf_stack {
 	int			ifs_fr_state_maxbucket;
 	int			ifs_fr_state_maxbucket_reset;
 	int			ifs_fr_state_init;
+	int			ifs_fr_enable_active;
 	ipftq_t			ifs_ips_tqtqb[IPF_TCP_NSTATES];
 	ipftq_t			ifs_ips_udptq;
 	ipftq_t			ifs_ips_udpacktq;

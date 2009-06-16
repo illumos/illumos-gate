@@ -941,7 +941,7 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 		ASSERT(sin6->sin6_family == AF_INET6);
 
 		ire = ire_route_lookup_v6(&sin6->sin6_addr, 0, 0, 0,
-		    NULL, NULL, ALL_ZONES, NULL,
+		    NULL, NULL, zoneid, NULL,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
 		    ipst);
 
@@ -975,7 +975,7 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 		    ire->ire_nce->nce_fp_mp == NULL &&
 		    ire->ire_nce->nce_res_mp == NULL) {
 			ip_newroute_v6(ire->ire_stq, mp, &sin6->sin6_addr,
-			    &ip6h->ip6_src, NULL, ALL_ZONES, ipst);
+			    &ip6h->ip6_src, NULL, zoneid, ipst);
 
 			ire_refrele(ire);
 			return (0);
@@ -1084,15 +1084,18 @@ ip_routeto_impl(struct sockaddr *address, struct sockaddr *nexthop,
 	ire_t *ire;
 	ill_t *ill;
 	phy_if_t phy_if;
+	zoneid_t zoneid;
+
+	zoneid = netstackid_to_zoneid(ipst->ips_netstack->netstack_stackid);
 
 	if (address->sa_family == AF_INET6) {
 		ire = ire_route_lookup_v6(&sin6->sin6_addr, NULL,
-		    0, 0, NULL, &sire, ALL_ZONES, NULL,
+		    0, 0, NULL, &sire, zoneid, NULL,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
 		    ipst);
 	} else {
 		ire = ire_route_lookup(sin->sin_addr.s_addr, 0,
-		    0, 0, NULL, &sire, ALL_ZONES, NULL,
+		    0, 0, NULL, &sire, zoneid, NULL,
 		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
 		    ipst);
 	}

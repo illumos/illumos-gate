@@ -548,6 +548,10 @@ int *rp;
 	}
 
 	READ_ENTER(&ifs->ifs_ipf_global);
+	if (ifs->ifs_fr_enable_active != 0) {
+		RWLOCK_EXIT(&ifs->ifs_ipf_global);
+		return EBUSY;
+	}
 
 	error = fr_ioctlswitch(unit, (caddr_t)data, cmd, mode, cp->cr_uid,
 			       curproc, ifs);
@@ -572,7 +576,9 @@ int *rp;
 
 			RWLOCK_EXIT(&ifs->ifs_ipf_global);
 			WRITE_ENTER(&ifs->ifs_ipf_global);
+			ifs->ifs_fr_enable_active = 1;
 			error = fr_enableipf(ifs, enable);
+			ifs->ifs_fr_enable_active = 0;
 		}
 		break;
 	case SIOCIPFSET :
@@ -1316,7 +1322,11 @@ static void rate_limit_message(ipf_stack_t *ifs,
 }
 
 /*
- * return the first IP Address associated with an interface
+ * Return the first IP Address associated with an interface
+ * For IPv6, we walk through the list of logical interfaces and return
+ * the address of the first one that isn't a link-local interface.
+ * We can't assume that it is :1 because another link-local address
+ * may have been assigned there.
  */
 /*ARGSUSED*/
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask, ifs)
@@ -1369,13 +1379,29 @@ ipf_stack_t *ifs;
 
 	type[1] = NA_NETMASK;
 
-	if (net_getlifaddr(net_data, phyif, 0, 2, type, array) < 0)
-		return -1;
-
 	if (v == 6) {
+		lif_if_t idx = 0;
+
+		do {
+			idx = net_lifgetnext(net_data, phyif, idx);
+			if (net_getlifaddr(net_data, phyif, idx, 2, type,
+					   array) < 0)
+				return -1;
+			if (!IN6_IS_ADDR_LINKLOCAL(&v6addr[0].sin6_addr) &&
+			    !IN6_IS_ADDR_MULTICAST(&v6addr[0].sin6_addr))
+				break;
+		} while (idx != 0);
+
+		if (idx == 0)
+			return -1;
+
 		return fr_ifpfillv6addr(atype, &v6addr[0], &v6addr[1],
 					inp, inpmask);
 	}
+
+	if (net_getlifaddr(net_data, phyif, 0, 2, type, array) < 0)
+		return -1;
+
 	return fr_ifpfillv4addr(atype, &v4addr[0], &v4addr[1], inp, inpmask);
 }
 
