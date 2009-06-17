@@ -222,6 +222,88 @@ hermon_get_smlid(hermon_state_t *state, uint_t port)
 }
 
 /*
+ * hermon_get_port_change_flags()
+ * 	Helper function to determine the changes in the incoming MAD's portinfo
+ * 	for the Port Change event.
+ */
+static ibt_port_change_t
+hermon_port_change_flags(sm_portinfo_t *curpinfo, sm_portinfo_t *madpinfo)
+{
+	int SMDisabled, ReregSuppd;
+	ibt_port_change_t flags = 0;
+
+	SMDisabled = curpinfo->CapabilityMask & SM_CAP_MASK_IS_SM_DISABLED;
+	ReregSuppd = curpinfo->CapabilityMask & SM_CAP_MASK_IS_CLNT_REREG_SUPPD;
+
+	if (curpinfo->MasterSMLID != madpinfo->MasterSMLID) {
+		flags |= IBT_PORT_CHANGE_SM_LID;
+	}
+	if (curpinfo->MasterSMSL != madpinfo->MasterSMSL) {
+		flags |= IBT_PORT_CHANGE_SM_SL;
+	}
+	if (curpinfo->SubnetTimeOut != madpinfo->SubnetTimeOut) {
+		flags |= IBT_PORT_CHANGE_SUB_TIMEOUT;
+	}
+	if ((madpinfo->CapabilityMask & SM_CAP_MASK_IS_SM_DISABLED)
+	    ^ SMDisabled) {
+		flags |= IBT_PORT_CHANGE_SM_FLAG;
+	}
+	if ((madpinfo->CapabilityMask & SM_CAP_MASK_IS_CLNT_REREG_SUPPD)
+	    ^ ReregSuppd) {
+		flags |= IBT_PORT_CHANGE_REREG;
+	}
+	return (flags);
+}
+
+int
+hermon_set_port_capability(hermon_state_t *state, uint8_t port,
+    sm_portinfo_t *portinfo, ibt_port_change_t flags)
+{
+	uint32_t		capmask;
+	int			status;
+	hermon_hw_set_port_t	set_port;
+
+	bzero(&set_port, sizeof (set_port));
+
+	/* Validate that specified port number is legal */
+	if (!hermon_portnum_is_valid(state, port)) {
+		return (IBT_HCA_PORT_INVALID);
+	}
+
+	/*
+	 * Convert InfiniBand-defined port capability flags to the format
+	 * specified by the IBTF.  Specifically, we modify the capability
+	 * mask based on the specified values.
+	 */
+	capmask = portinfo->CapabilityMask;
+
+	if (flags & IBT_PORT_CHANGE_SM_FLAG)
+		capmask ^= SM_CAP_MASK_IS_SM;
+
+	if (flags & IBT_PORT_CHANGE_REREG)
+		capmask ^= SM_CAP_MASK_IS_CLNT_REREG_SUPPD;
+	set_port.cap_mask = capmask;
+
+	/*
+	 * Use the Hermon SET_PORT command to update the capability mask and
+	 * (possibly) reset the QKey violation counter for the specified port.
+	 * Note: In general, this operation shouldn't fail.  If it does, then
+	 * it is an indication that something (probably in HW, but maybe in
+	 * SW) has gone seriously wrong.
+	 */
+	status = hermon_set_port_cmd_post(state, &set_port, port,
+	    HERMON_SLEEPFLAG_FOR_CONTEXT());
+	if (status != HERMON_CMD_SUCCESS) {
+		HERMON_WARNING(state, "failed to modify port capabilities");
+		cmn_err(CE_CONT, "Hermon: SET_IB (port %02d) command failed: "
+		    "%08x\n", port, status);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
  * hermon_agent_handle_req()
  *    Context: Called with priority of taskQ thread
  */
@@ -230,15 +312,23 @@ hermon_agent_handle_req(void *cb_args)
 {
 	hermon_agent_handler_arg_t	*agent_args;
 	hermon_agent_list_t		*curr;
+	ibc_async_event_t		event;
+	ibt_async_code_t		type, code;
+	sm_portinfo_t			curpinfo, tmadpinfo;
+	sm_portinfo_t			*madpinfop;
 	hermon_state_t			*state;
 	ibmf_handle_t			ibmf_handle;
 	ibmf_msg_t			*msgp;
 	ibmf_msg_bufs_t			*recv_msgbufp;
 	ibmf_msg_bufs_t			*send_msgbufp;
+	ib_mad_hdr_t			*madhdrp;
 	ibmf_retrans_t			retrans;
 	uint_t				port;
 	int				status;
 
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*((sm_portinfo_t *)madpinfop)))
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(curpinfo))
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(tmadpinfo))
 	/* Extract the necessary info from the callback args parameter */
 	agent_args  = (hermon_agent_handler_arg_t *)cb_args;
 	ibmf_handle = agent_args->ahd_ibmfhdl;
@@ -275,6 +365,43 @@ hermon_agent_handle_req(void *cb_args)
 		msgp->im_local_addr.ia_remote_lid =
 		    hermon_get_smlid(state, port);
 	} else {
+		int isSMSet, isReregSuppd;
+		uint_t attr_id, method, mgmt_class;
+
+		madhdrp = recv_msgbufp->im_bufs_mad_hdr;
+		method = madhdrp->R_Method;
+		attr_id = b2h16(madhdrp->AttributeID);
+		mgmt_class = madhdrp->MgmtClass;
+
+		/*
+		 * Is this a Subnet Manager MAD with SET method ? If so
+		 * we will have to get the current portinfo to generate
+		 * events based on what has changed in portinfo.
+		 */
+		isSMSet = (((mgmt_class == MAD_MGMT_CLASS_SUBN_LID_ROUTED)||
+		    (mgmt_class == MAD_MGMT_CLASS_SUBN_DIRECT_ROUTE)) &&
+		    (method == MAD_METHOD_SET));
+
+		/*
+		 * Get the current portinfo to compare with the portinfo
+		 * received in the MAD for PortChange event.
+		 */
+		if (isSMSet && (attr_id == SM_PORTINFO_ATTRID) ||
+		    (attr_id == SM_PKEY_TABLE_ATTRID) ||
+		    (attr_id == SM_GUIDINFO_ATTRID)) {
+			madpinfop = recv_msgbufp->im_bufs_cl_data;
+			tmadpinfo = *madpinfop;
+			HERMON_GETPORTINFO_SWAP(&tmadpinfo);
+			status = hermon_getportinfo_cmd_post(state, port,
+			    HERMON_SLEEPFLAG_FOR_CONTEXT(), &curpinfo);
+			if (status != HERMON_CMD_SUCCESS) {
+				cmn_err(CE_CONT, "Hermon: GetPortInfo "
+				    "(port %02d) command failed: %08x\n", port,
+				    status);
+				goto hermon_agent_handle_req_skip_response;
+			}
+		}
+
 		/*
 		 * Post the command to the firmware (using the MAD_IFC
 		 * command).  Note: We also reuse the command that was passed
@@ -298,6 +425,96 @@ hermon_agent_handle_req(void *cb_args)
 
 			/* finish cleanup */
 			goto hermon_agent_handle_req_skip_response;
+		}
+
+		if (isSMSet) {
+			event.ev_port_flags = 0;
+			type = 0;
+			event.ev_port = (uint8_t)port;
+
+			switch (attr_id) {
+			case SM_PORTINFO_ATTRID:
+				/*
+				 * This is a SM SET method with portinfo
+				 * attribute. If ClientRereg bit was set in
+				 * the MADs portinfo this is a REREG event
+				 * (see section 14.4.11 in IB Spec 1.2.1). Else
+				 * compare the current (before MAD_IFC command)
+				 * portinfo with the portinfo in the MAD and
+				 * signal PORT_CHANGE event with the proper
+				 * ev_port_flags.
+				 *
+				 */
+				isReregSuppd = curpinfo.CapabilityMask &
+				    SM_CAP_MASK_IS_CLNT_REREG_SUPPD;
+
+				madpinfop = recv_msgbufp->im_bufs_cl_data;
+				if (tmadpinfo.ClientRereg && isReregSuppd) {
+					type |= IBT_CLNT_REREG_EVENT;
+				}
+
+				type |= IBT_PORT_CHANGE_EVENT;
+				event.ev_port_flags = hermon_port_change_flags(
+				    &curpinfo, &tmadpinfo);
+				if (event.ev_port_flags &
+				    (IBT_PORT_CHANGE_REREG |
+				    IBT_PORT_CHANGE_SM_FLAG)) {
+					if (hermon_set_port_capability(state,
+					    port, &curpinfo,
+					    event.ev_port_flags)
+					    != DDI_SUCCESS) {
+						cmn_err(CE_CONT, "HERMON: Port "
+						    "%d capability reset "
+						    "failed\n", port);
+					}
+				}
+
+				/*
+				 * If we have a SMLID change event but
+				 * capability mask doesn't have Rereg support
+				 * bit set, we have to do the Rereg part too.
+				 */
+				if ((event.ev_port_flags &
+				    IBT_PORT_CHANGE_SM_LID) && !isReregSuppd)
+					type |= IBT_CLNT_REREG_EVENT;
+				break;
+			case SM_PKEY_TABLE_ATTRID:
+				type |= IBT_PORT_CHANGE_EVENT;
+				event.ev_port_flags = IBT_PORT_CHANGE_PKEY;
+				break;
+			case SM_GUIDINFO_ATTRID:
+				type |= IBT_PORT_CHANGE_EVENT;
+				event.ev_port_flags = IBT_PORT_CHANGE_SGID;
+				break;
+			default:
+				break;
+
+			}
+
+			/*
+			 * NOTE: here we call ibc_async_handler directly without
+			 * using the HERMON_DO_IBTF_ASYNC_CALLB, since hermon
+			 * can not be unloaded till ibmf_unregiter is done and
+			 * this thread (hs_taskq_agents) will be destroyed
+			 * before ibmf_uregister is called.
+			 *
+			 * The hermon event queue based hs_in_evcallb flag
+			 * assumes that we will pick one event after another
+			 * and dispatch them sequentially. If we use
+			 * HERMON_DO_IBTF_ASYNC_CALLB, we will break this
+			 * assumption make hs_in_evcallb inconsistent.
+			 */
+			while (type != 0) {
+				if (type & IBT_PORT_CHANGE_EVENT) {
+					code = IBT_PORT_CHANGE_EVENT;
+					type &= ~IBT_PORT_CHANGE_EVENT;
+				} else {
+					code = IBT_CLNT_REREG_EVENT;
+					type = 0;
+				}
+				ibc_async_handler(state->hs_ibtfpriv, code,
+				    &event);
+			}
 		}
 	}
 

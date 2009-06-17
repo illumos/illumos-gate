@@ -237,6 +237,14 @@ void ibtl_cm_sm_notice_init_failure(ibtl_cm_sm_init_fail_t *ifail);
 
 char *ibtl_cm_get_clnt_name(ibt_clnt_hdl_t ibt_hdl);
 
+/*
+ * ibtl_cm_set_node_info_cb: This is a private interface between IBTL and IBCM
+ * to let IBTL get the Node Record of a remote port. This interface is used by
+ * IBCM to register a callback which can be used by IBTL to get the Node record.
+ */
+void ibtl_cm_set_node_info_cb(ibt_status_t (*)(ib_guid_t, uint8_t, ib_lid_t,
+    ibt_node_info_t *));
+
 #ifdef __cplusplus
 }
 #endif

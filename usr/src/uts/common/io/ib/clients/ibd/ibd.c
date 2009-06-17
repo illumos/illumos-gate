@@ -1962,7 +1962,8 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 		return;
 	}
 
-	if (code == IBT_EVENT_PORT_UP) {
+	if ((code == IBT_EVENT_PORT_UP) || (code == IBT_CLNT_REREG_EVENT) ||
+	    (code == IBT_PORT_CHANGE_EVENT)) {
 		uint8_t itreply;
 		boolean_t badup = B_FALSE;
 
@@ -2018,14 +2019,20 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 		    SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY)
 			opcode = IBD_LINK_UP;
 
-		if (badup)
-			code = IBT_ERROR_PORT_DOWN;
 		ibt_free_portinfo(port_infop, port_infosz);
+
+		if (badup) {
+			code = IBT_ERROR_PORT_DOWN;
+		} else if (code == IBT_PORT_CHANGE_EVENT) {
+			mutex_exit(&state->id_link_mutex);
+			return;
+		}
 	}
 
 	if (!ibd_async_safe(state)) {
-		state->id_link_state = ((code == IBT_EVENT_PORT_UP) ?
-		    LINK_STATE_UP : LINK_STATE_DOWN);
+		state->id_link_state = (((code == IBT_EVENT_PORT_UP) ||
+		    (code == IBT_CLNT_REREG_EVENT)) ?  LINK_STATE_UP :
+		    LINK_STATE_DOWN);
 		mutex_exit(&state->id_link_mutex);
 		return;
 	}
@@ -2058,7 +2065,26 @@ ibd_async_handler(void *clnt_private, ibt_hca_hdl_t hca_hdl,
 	case IBT_ERROR_CQ:
 		ibd_print_warn(state, "completion queue error");
 		break;
+	case IBT_PORT_CHANGE_EVENT:
+		/*
+		 * Events will be delivered to all instances that have
+		 * done ibt_open_hca() but not yet done ibt_close_hca().
+		 * Only need to do work for our port; IBTF will deliver
+		 * events for other ports on the hca we have ibt_open_hca'ed
+		 * too. Note that ibd_drv_init() initializes id_port before
+		 * doing ibt_open_hca().
+		 */
+		ASSERT(state->id_hca_hdl == hca_hdl);
+		if (state->id_port != event->ev_port)
+			break;
+
+		if ((event->ev_port_flags & IBT_PORT_CHANGE_PKEY) ==
+		    IBT_PORT_CHANGE_PKEY) {
+			ibd_link_mod(state, code);
+		}
+		break;
 	case IBT_ERROR_PORT_DOWN:
+	case IBT_CLNT_REREG_EVENT:
 	case IBT_EVENT_PORT_UP:
 		/*
 		 * Events will be delivered to all instances that have

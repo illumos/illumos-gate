@@ -1960,6 +1960,8 @@ hermon_port_query(hermon_state_t *state, uint_t port, ibt_hca_portinfo_t *pi)
 		pi->p_capabilities |= IBT_PORT_CAP_DM;
 	if (portinfo.CapabilityMask & SM_CAP_MASK_IS_VM_SUPPD)
 		pi->p_capabilities |= IBT_PORT_CAP_VENDOR;
+	if (portinfo.CapabilityMask & SM_CAP_MASK_IS_CLNT_REREG_SUPPD)
+		pi->p_capabilities |= IBT_PORT_CAP_CLNT_REREG;
 
 	/*
 	 * Fill in the SGID table.  Since the only access to the Hermon

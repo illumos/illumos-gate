@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -447,7 +447,8 @@ typedef struct sm_portinfo_s {
 	uint16_t	P_KeyViolations;	/* count of P_key violations */
 	uint16_t	Q_KeyViolations;	/* count of Q_key violations */
 	uint8_t		GUIDCap;		/* number of GUIDs supported */
-	uint8_t		Reserved2	:3;
+	uint8_t		ClientRereg	:1;	/* Client ReReg supported */
+	uint8_t		Reserved2	:2;
 	uint8_t		SubnetTimeOut	:5;	/* defines subnet prop. dely */
 	uint8_t		Reserved3	:3;
 	uint8_t		RespTimeValue	:5;	/* defines resp time to SMPs */
@@ -497,7 +498,8 @@ typedef struct sm_portinfo_s {
 	uint16_t	Q_KeyViolations;	/* count of Q_key violations */
 	uint8_t		GUIDCap;		/* number of GUIDs supported */
 	uint8_t		SubnetTimeOut	:5;	/* defines subnet prop. dely */
-	uint8_t		Reserved2	:3;
+	uint8_t		Reserved2	:2;
+	uint8_t		ClientRereg	:1;	/* Client ReReg supported */
 	uint8_t		RespTimeValue	:5;	/* defines resp time to SMPs */
 	uint8_t		Reserved3	:3;
 	uint8_t		OverrunErrors	:4;	/* threshold for errors */
@@ -527,6 +529,7 @@ typedef struct sm_portinfo_s {
 #define	SM_CAP_MASK_IS_DR_NOTICE_SUPPD		0x00200000
 #define	SM_CAP_MASK_IS_CAP_MASK_NOTICE_SUPPD	0x00400000
 #define	SM_CAP_MASK_IS_BOOT_MGMT_SUPPD		0x00800000
+#define	SM_CAP_MASK_IS_CLNT_REREG_SUPPD		0x02000000
 
 /* Standard Encoding of DiagCode Bits 3-0: Table 133 */
 #define	SM_DIAG_CODE_PORT_READY			0x0

@@ -306,6 +306,8 @@ ibmf_saa_add_event_subscriber(saa_client_data_t *client,
 void ibmf_saa_subscribe_events(saa_port_t *saa_portp, boolean_t subscribe,
     boolean_t seq_unsubscribe);
 
+void ibmf_saa_subscribe_sm_events(saa_port_t *saa_portp);
+
 void
 ibmf_saa_notify_event_clients(saa_port_t *saa_portp,
     ibmf_saa_event_details_t *event_details,

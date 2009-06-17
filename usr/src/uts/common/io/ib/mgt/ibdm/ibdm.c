@@ -81,6 +81,7 @@ static void	ibdm_process_incoming_mad(ibmf_handle_t, ibmf_msg_t *, void *);
 static void	ibdm_ibmf_send_cb(ibmf_handle_t, ibmf_msg_t *, void *);
 static void	ibdm_pkt_timeout_hdlr(void *arg);
 static void	ibdm_initialize_port(ibdm_port_attr_t *);
+static void	ibdm_update_port_pkeys(ibdm_port_attr_t *port);
 static void	ibdm_handle_diagcode(ibmf_msg_t *, ibdm_dp_gidinfo_t *, int *);
 static void	ibdm_probe_gid(ibdm_dp_gidinfo_t *);
 static void	ibdm_alloc_send_buffers(ibmf_msg_t *);
@@ -573,11 +574,114 @@ ibdm_event_hdlr(void *clnt_hdl,
 		ibdm_reset_all_dgids(port_sa_hdl);
 		break;
 
+	case IBT_PORT_CHANGE_EVENT:
+		IBTF_DPRINTF_L4("ibdm", "\tevent_hdlr: PORT_CHANGE");
+		if (event->ev_port_flags & IBT_PORT_CHANGE_PKEY) {
+			mutex_enter(&ibdm.ibdm_hl_mutex);
+			port = ibdm_get_port_attr(event, &hca_list);
+			if (port == NULL) {
+				IBTF_DPRINTF_L2("ibdm",
+				    "\tevent_hdlr: HCA not present");
+				mutex_exit(&ibdm.ibdm_hl_mutex);
+				break;
+			}
+			ibdm_update_port_pkeys(port);
+			cv_broadcast(&ibdm.ibdm_port_settle_cv);
+			mutex_exit(&ibdm.ibdm_hl_mutex);
+		}
+		break;
+
 	default:		/* Ignore all other events/errors */
 		break;
 	}
 }
 
+
+/*
+ * ibdm_update_port_pkeys()
+ *	Update the pkey table
+ *	Update the port attributes
+ */
+static void
+ibdm_update_port_pkeys(ibdm_port_attr_t *port)
+{
+	uint_t				nports, size;
+	uint_t				pkey_idx, opkey_idx;
+	uint16_t			npkeys;
+	ibt_hca_portinfo_t		*pinfop;
+	ib_pkey_t			pkey;
+	ibdm_pkey_tbl_t			*pkey_tbl;
+	ibdm_port_attr_t		newport;
+
+	IBTF_DPRINTF_L4("ibdm", "\tupdate_port_pkeys:");
+	ASSERT(MUTEX_HELD(&ibdm.ibdm_hl_mutex));
+
+	/* Check whether the port is active */
+	if (ibt_get_port_state(port->pa_hca_hdl, port->pa_port_num, NULL,
+	    NULL) != IBT_SUCCESS)
+		return;
+
+	if (ibt_query_hca_ports(port->pa_hca_hdl, port->pa_port_num,
+	    &pinfop, &nports, &size) != IBT_SUCCESS) {
+		/* This should not occur */
+		port->pa_npkeys = 0;
+		port->pa_pkey_tbl = NULL;
+		return;
+	}
+
+	npkeys = pinfop->p_pkey_tbl_sz;
+	pkey_tbl = kmem_zalloc(npkeys * sizeof (ibdm_pkey_tbl_t), KM_SLEEP);
+	newport.pa_pkey_tbl = pkey_tbl;
+	newport.pa_ibmf_hdl = port->pa_ibmf_hdl;
+
+	for (pkey_idx = 0; pkey_idx < npkeys; pkey_idx++) {
+		pkey = pkey_tbl[pkey_idx].pt_pkey =
+		    pinfop->p_pkey_tbl[pkey_idx];
+		/*
+		 * Is this pkey present in the current table ?
+		 */
+		for (opkey_idx = 0; opkey_idx < port->pa_npkeys; opkey_idx++) {
+			if (pkey == port->pa_pkey_tbl[opkey_idx].pt_pkey) {
+				pkey_tbl[pkey_idx].pt_qp_hdl =
+				    port->pa_pkey_tbl[opkey_idx].pt_qp_hdl;
+				port->pa_pkey_tbl[opkey_idx].pt_qp_hdl = NULL;
+				break;
+			}
+		}
+
+		if (opkey_idx == port->pa_npkeys) {
+			pkey = pkey_tbl[pkey_idx].pt_pkey;
+			if (IBDM_INVALID_PKEY(pkey)) {
+				pkey_tbl[pkey_idx].pt_qp_hdl = NULL;
+				continue;
+			}
+			ibdm_port_attr_ibmf_init(&newport, pkey, pkey_idx);
+		}
+	}
+
+	for (opkey_idx = 0; opkey_idx < port->pa_npkeys; opkey_idx++) {
+		if (port->pa_pkey_tbl[opkey_idx].pt_qp_hdl != NULL) {
+			if (ibdm_port_attr_ibmf_fini(port, opkey_idx) !=
+			    IBDM_SUCCESS) {
+				IBTF_DPRINTF_L2("ibdm", "\tupdate_port_pkeys: "
+				    "ibdm_port_attr_ibmf_fini failed for "
+				    "port pkey 0x%x",
+				    port->pa_pkey_tbl[opkey_idx].pt_pkey);
+			}
+		}
+	}
+
+	if (port->pa_pkey_tbl != NULL) {
+		kmem_free(port->pa_pkey_tbl,
+		    port->pa_npkeys * sizeof (ibdm_pkey_tbl_t));
+	}
+
+	port->pa_npkeys = npkeys;
+	port->pa_pkey_tbl = pkey_tbl;
+	port->pa_sn_prefix = pinfop->p_sgid_tbl[0].gid_prefix;
+	port->pa_state = pinfop->p_linkstate;
+	ibt_free_portinfo(pinfop, size);
+}
 
 /*
  * ibdm_initialize_port()

@@ -626,6 +626,11 @@ ibcm_init(void)
 	ibcm_finit_state = IBCM_FINIT_IDLE;
 
 	ibcm_path_cache_init();
+	/*
+	 * This callback will be used by IBTL to get the Node record for a
+	 * given LID via the speccified HCA and port.
+	 */
+	ibtl_cm_set_node_info_cb(ibcm_ibtl_node_info);
 
 	/* Unblock any waiting HCA DR asyncs in CM */
 	mutex_exit(&ibcm_global_hca_lock);
@@ -735,6 +740,7 @@ ibcm_fini(void)
 
 	ibcm_stop_timeout_thread();
 
+	ibtl_cm_set_node_info_cb(NULL);
 	/*
 	 * Detach from IBTL. Waits until all pending asyncs are complete.
 	 * Above cv_broadcast wakes up any waiting hca attach/detach asyncs
@@ -2413,6 +2419,11 @@ ibcm_async_handler(void *clnt_hdl, ibt_hca_hdl_t hca_hdl,
 	}
 
 	switch (code) {
+	case IBT_PORT_CHANGE_EVENT:
+		if ((eventp->ev_port_flags & IBT_PORT_CHANGE_SM_LID) == 0)
+			break;
+	/* FALLTHROUGH */
+	case IBT_CLNT_REREG_EVENT:
 	case IBT_EVENT_PORT_UP:
 		mutex_exit(&ibcm_global_hca_lock);
 		pup = kmem_alloc(sizeof (ibcm_port_up_t), KM_SLEEP);

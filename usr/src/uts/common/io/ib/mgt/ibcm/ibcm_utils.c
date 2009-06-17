@@ -50,6 +50,8 @@ static void		ibcm_init_conn_trace(ibcm_state_data_t *statep);
 static void		ibcm_fini_conn_trace(ibcm_state_data_t *statep);
 static void		ibcm_dump_conn_trbuf(void *statep, char *line_prefix,
 			    char *buf, int buf_size);
+extern ibt_status_t	ibcm_get_node_rec(ibmf_saa_handle_t, sa_node_record_t *,
+			    uint64_t c_mask, void *, size_t *);
 
 /*
  * ibcm_lookup_msg:
@@ -1894,7 +1896,6 @@ ibcm_dump_pathrec(sa_path_record_t *path_rec)
 	IBTF_DPRINTF_L5(cmlog, "Preference Bit:    %02X", path_rec->Preference);
 }
 
-
 /*
  * ibcm_dump_node_rec:
  *	Dumps Node Records.
@@ -1927,6 +1928,103 @@ ibcm_dump_noderec(sa_node_record_t *nrec)
 }
 #endif
 
+/*
+ * ibcm_ibtl_node_info:
+ *	Get the node record of the destination specified by lid via the HCA
+ *	and port specified.
+ *
+ * Arguments:
+ *	hca_guid - GUID of the local HCA.
+ *	port     - port in the HCA to be used.
+ *	lid      - destination LID
+ *	node_info_p - pointer to the Node Info to be returned.
+ *
+ * Return values:
+ * 	IBT_SUCCESS : Got the node record sucessfully
+ * 	IBT_FILURE  : Failed to get the node record.
+ */
+ibt_status_t
+ibcm_ibtl_node_info(ib_guid_t hca_guid, uint8_t port, ib_lid_t lid,
+    ibt_node_info_t *node_info_p)
+{
+	sa_node_record_t	nr_req, *nr_resp;
+	void			*res_p;
+	ibmf_saa_handle_t	saa_handle;
+	ibt_status_t		ibt_status;
+	ibcm_hca_info_t		*hcap;
+	uint_t			num_rec;
+	size_t			len;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_ibtl_node_info: ENTER: port %x "
+	    "guid %llx\n", port, hca_guid);
+
+	hcap = ibcm_find_hca_entry(hca_guid);
+	if (hcap == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_ibtl_node_info: "
+		    "HCA(%llX) info not found", hca_guid);
+		return (IBT_FAILURE);
+	}
+
+	/* Get SA Access Handle. */
+	saa_handle = ibcm_get_saa_handle(hcap, port);
+	if (saa_handle == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_ibtl_node_info: "
+		    "Port %d of HCA (%llX) is NOT ACTIVE", port, hca_guid);
+		ibcm_dec_hca_acc_cnt(hcap);
+		return (IBT_FAILURE);
+	}
+
+	/* Retrieve Node Records from SA Access. */
+	bzero(&nr_req, sizeof (sa_node_record_t));
+	nr_req.LID =  lid;
+
+	ibt_status = ibcm_get_node_rec(saa_handle, &nr_req,
+	    SA_NODEINFO_COMPMASK_NODELID, &res_p, &len);
+	if (ibt_status != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_ibtl_node_info: "
+		    "failed (%d) to get Node records", ibt_status);
+		ibcm_dec_hca_acc_cnt(hcap);
+		return (IBT_FAILURE);
+	}
+
+	num_rec = len/sizeof (sa_node_record_t);
+	nr_resp = (sa_node_record_t *)(uchar_t *)res_p;
+
+	if ((nr_resp != NULL) && (num_rec > 0)) {
+		IBCM_DUMP_NODE_REC(nr_resp);
+
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(
+		    *node_info_p))
+
+		node_info_p->n_sys_img_guid =
+		    nr_resp->NodeInfo.SystemImageGUID;
+		node_info_p->n_node_guid =
+		    nr_resp->NodeInfo.NodeGUID;
+		node_info_p->n_port_guid =
+		    nr_resp->NodeInfo.PortGUID;
+		node_info_p->n_dev_id =
+		    nr_resp->NodeInfo.DeviceID;
+		node_info_p->n_revision =
+		    nr_resp->NodeInfo.Revision;
+		node_info_p->n_vendor_id =
+		    nr_resp->NodeInfo.VendorID;
+		node_info_p->n_num_ports =
+		    nr_resp->NodeInfo.NumPorts;
+		node_info_p->n_port_num =
+		    nr_resp->NodeInfo.LocalPortNum;
+		node_info_p->n_node_type =
+		    nr_resp->NodeInfo.NodeType;
+		(void) strncpy(node_info_p->n_description,
+		    (char *)&nr_resp->NodeDescription, 64);
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(
+		    *node_info_p))
+
+
+		kmem_free(nr_resp, len);
+	}
+	ibcm_dec_hca_acc_cnt(hcap);
+	return (IBT_SUCCESS);
+}
 
 /*
  * ibcm_ibmf_analyze_error:

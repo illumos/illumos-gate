@@ -87,11 +87,20 @@ typedef enum ibtl_hca_state_e {
  */
 
 typedef enum ibtl_async_port_status_e {
-	IBTL_HCA_PORT_UNKNOWN	= 0x0,	/* initial state */
-	IBTL_HCA_PORT_UP	= 0x1,
-	IBTL_HCA_PORT_DOWN	= 0x2,
-	IBTL_HCA_PORT_CHANGED	= 0x4
+	IBTL_HCA_PORT_UNKNOWN		= 0x000,	/* initial state */
+	IBTL_HCA_PORT_UP		= 0x001,
+	IBTL_HCA_PORT_DOWN		= 0x002,
+	IBTL_HCA_PORT_CHG		= 0x004,
+	IBTL_HCA_PORT_ASYNC_CLNT_REREG	= 0x008,
 } ibtl_async_port_status_t;
+
+/*
+ * Define a type to record the PORT async events and port change flags.
+ */
+typedef struct ibtl_async_port_event_s {
+	ibtl_async_port_status_t	status;
+	ibt_port_change_t		flags;
+} ibtl_async_port_event_t;
 
 /*
  * Bit definition(s) for {qp,cq,eec,hd,ha,srq}_async_flags.
@@ -165,7 +174,7 @@ typedef struct ibtl_hca_devinfo_s {
 	ibtl_hca_port_kstat_t	*hd_hca_port_ks_info;	/* port kstat ptr */
 	uint_t			hd_hca_port_ks_info_len; /* port kstat size */
 		/* The following must be at the end of this struct */
-	ibtl_async_port_status_t hd_async_port[1]; /* per-port async data */
+	ibtl_async_port_event_t hd_async_port[1]; /* per-port async data */
 } ibtl_hca_devinfo_t;
 
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ibtl_hca_devinfo_s::hd_ibc_ops))

@@ -2038,6 +2038,7 @@ hermon_getportinfo_cmd_post(hermon_state_t *state, uint_t port,
 	 */
 	bcopy((void *)((uintptr_t)mbox_info.mbi_out->mb_addr +
 	    HERMON_CMD_MADDATA_OFFSET), portinfo, size);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*portinfo))
 	HERMON_GETPORTINFO_SWAP(portinfo);
 
 getportinfo_fail:
@@ -2212,6 +2213,7 @@ hermon_getnodeinfo_cmd_post(hermon_state_t *state, uint_t sleepflag,
 	 */
 	bcopy((void *)((uintptr_t)mbox_info.mbi_out->mb_addr +
 	    HERMON_CMD_MADDATA_OFFSET), nodeinfo, size);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*nodeinfo))
 	HERMON_GETNODEINFO_SWAP(nodeinfo);
 
 getnodeinfo_fail:
@@ -2350,6 +2352,7 @@ hermon_getguidinfo_cmd_post(hermon_state_t *state, uint_t port,
 	 */
 	bcopy((void *)((uintptr_t)mbox_info.mbi_out->mb_addr +
 	    HERMON_CMD_MADDATA_OFFSET), guidinfo, size);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*guidinfo))
 	HERMON_GETGUIDINFO_SWAP(guidinfo);
 
 getguidinfo_fail:
@@ -2421,6 +2424,7 @@ hermon_getpkeytable_cmd_post(hermon_state_t *state, uint_t port,
 	 */
 	bcopy((void *)((uintptr_t)mbox_info.mbi_out->mb_addr +
 	    HERMON_CMD_MADDATA_OFFSET), pkeytable, size);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*pkeytable))
 	HERMON_GETPKEYTABLE_SWAP(pkeytable);
 
 getpkeytable_fail:

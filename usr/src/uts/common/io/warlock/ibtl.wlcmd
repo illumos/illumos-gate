@@ -194,7 +194,9 @@ root	ibtl_cm_free_active_plist
 root	ibtl_cm_get_1st_full_pkey_ix
 root	ibtl_cm_get_local_comp_gids
 root	ibtl_cm_is_multi_sm
+root	ibtl_cm_set_node_info_cb
 root	ibtl_cm_get_clnt_name
+root	ibtl_dummy_node_info_cb
 
 # IBTL-IBNEX private interface
 root	ibtl_ibnex_get_hca_info
@@ -211,6 +213,7 @@ root	ibtl_do_mgr_async_task
 root	ibtl_hca_client_async_task
 root	ibtl_tell_client_about_new_hca
 root	ibtl_sm_notice_task
+root	ibt_cisco_embedded_sm_rereg_fix
 
 # IBTL internal threads
 root	ibtl_async_thread

@@ -148,12 +148,27 @@ static int ibtl_cq_thread_exit = 0;	/* set if/when thread(s) should exit */
 
 /* value used to tell IBTL threads to exit */
 #define	IBTL_THREAD_EXIT 0x1b7fdead	/* IBTF DEAD */
+/* Cisco Topspin Vendor ID for Rereg hack */
+#define	IBT_VENDOR_CISCO 0x05ad
 
 int ibtl_eec_not_supported = 1;
 
 char *ibtl_last_client_name;	/* may help debugging */
+typedef ibt_status_t (*ibtl_node_info_cb_t)(ib_guid_t, uint8_t, ib_lid_t,
+    ibt_node_info_t *);
+
+ibtl_node_info_cb_t ibtl_node_info_cb;
 
 _NOTE(LOCK_ORDER(ibtl_clnt_list_mutex ibtl_async_mutex))
+
+void
+ibtl_cm_set_node_info_cb(ibt_status_t (*node_info_cb)(ib_guid_t, uint8_t,
+    ib_lid_t, ibt_node_info_t *))
+{
+	mutex_enter(&ibtl_clnt_list_mutex);
+	ibtl_node_info_cb = node_info_cb;
+	mutex_exit(&ibtl_clnt_list_mutex);
+}
 
 /*
  * ibc_async_handler()
@@ -179,6 +194,8 @@ ibc_async_handler(ibc_clnt_hdl_t hca_devp, ibt_async_code_t code,
 	ibtl_srq_t	*ibtl_srq;
 	ibtl_eec_t	*ibtl_eec;
 	uint8_t		port_minus1;
+
+	ibtl_async_port_event_t	*portp;
 
 	IBTF_DPRINTF_L2(ibtf_handlers, "ibc_async_handler(%p, 0x%x, %p)",
 	    hca_devp, code, event_p);
@@ -309,9 +326,10 @@ ibc_async_handler(ibc_clnt_hdl_t hca_devp, ibt_async_code_t code,
 		/* FALLTHROUGH */
 
 	case IBT_EVENT_PORT_UP:
+	case IBT_PORT_CHANGE_EVENT:
+	case IBT_CLNT_REREG_EVENT:
 	case IBT_ERROR_PORT_DOWN:
-		if ((code == IBT_EVENT_PORT_UP) ||
-		    (code == IBT_ERROR_PORT_DOWN)) {
+		if ((code & IBT_PORT_EVENTS) != 0) {
 			if ((port_minus1 = event_p->ev_port - 1) >=
 			    hca_devp->hd_hca_attr->hca_nports) {
 				IBTF_DPRINTF_L2(ibtf_handlers,
@@ -319,9 +337,43 @@ ibc_async_handler(ibc_clnt_hdl_t hca_devp, ibt_async_code_t code,
 				    event_p->ev_port);
 				break;
 			}
-			hca_devp->hd_async_port[port_minus1] =
-			    ((code == IBT_EVENT_PORT_UP) ? IBTL_HCA_PORT_UP :
-			    IBTL_HCA_PORT_DOWN) | IBTL_HCA_PORT_CHANGED;
+			portp = &hca_devp->hd_async_port[port_minus1];
+			if (code == IBT_EVENT_PORT_UP) {
+				/*
+				 * The port is just coming UP we can't have any
+				 * valid older events.
+				 */
+				portp->status = IBTL_HCA_PORT_UP;
+			} else if (code == IBT_ERROR_PORT_DOWN) {
+				/*
+				 * The port is going DOWN older events don't
+				 * count.
+				 */
+				portp->status = IBTL_HCA_PORT_DOWN;
+			} else if (code == IBT_PORT_CHANGE_EVENT) {
+				/*
+				 * For port UP and DOWN events only the latest
+				 * event counts. If we get a UP after DOWN it
+				 * is sufficient to send just UP and vice versa.
+				 * In the case of port CHANGE event it is valid
+				 * only when the port is UP already but if we
+				 * receive it after UP but before UP is
+				 * delivered we still need to deliver CHANGE
+				 * after we deliver UP event.
+				 *
+				 * We will not get a CHANGE event when the port
+				 * is down or DOWN event is pending.
+				 */
+				portp->flags |= event_p->ev_port_flags;
+				portp->status |= IBTL_HCA_PORT_CHG;
+			} else if (code == IBT_CLNT_REREG_EVENT) {
+				/*
+				 * SM has requested a re-register of
+				 * subscription to SM events notification.
+				 */
+				portp->status |= IBTL_HCA_PORT_ASYNC_CLNT_REREG;
+			}
+
 			hca_devp->hd_async_codes |= code;
 		}
 
@@ -429,6 +481,73 @@ ibtl_do_mgr_async_task(void *arg)
 }
 
 static void
+ibt_cisco_embedded_sm_rereg_fix(void *arg)
+{
+	struct ibtl_mgr_s *mgrp = arg;
+	ibtl_hca_devinfo_t *hca_devp;
+	ibt_node_info_t node_info;
+	ibt_status_t ibt_status;
+	ibtl_async_port_event_t *portp;
+	ib_lid_t sm_lid;
+	ib_guid_t hca_guid;
+	ibt_async_event_t *event_p;
+	ibt_hca_portinfo_t *pinfop;
+	uint8_t	port;
+
+	hca_devp = mgrp->mgr_hca_devp;
+
+	mutex_enter(&ibtl_clnt_list_mutex);
+	event_p = &hca_devp->hd_async_event;
+	port = event_p->ev_port;
+	portp = &hca_devp->hd_async_port[port - 1];
+	pinfop = &hca_devp->hd_portinfop[port - 1];
+	sm_lid = pinfop->p_sm_lid;
+	hca_guid = hca_devp->hd_hca_attr->hca_node_guid;
+	mutex_exit(&ibtl_clnt_list_mutex);
+
+	ibt_status = ((ibtl_node_info_cb_t)mgrp->mgr_async_handler)(hca_guid,
+	    port, sm_lid, &node_info);
+	if (ibt_status == IBT_SUCCESS) {
+		if ((node_info.n_vendor_id == IBT_VENDOR_CISCO) &&
+		    (node_info.n_node_type == IBT_NODE_TYPE_SWITCH)) {
+			mutex_enter(&ibtl_async_mutex);
+			portp->status |= IBTL_HCA_PORT_ASYNC_CLNT_REREG;
+			hca_devp->hd_async_codes |= IBT_CLNT_REREG_EVENT;
+			mutex_exit(&ibtl_async_mutex);
+		}
+	}
+	kmem_free(mgrp, sizeof (*mgrp));
+
+	mutex_enter(&ibtl_clnt_list_mutex);
+	if (--hca_devp->hd_async_task_cnt == 0)
+		cv_signal(&hca_devp->hd_async_task_cv);
+	mutex_exit(&ibtl_clnt_list_mutex);
+}
+
+static void
+ibtl_cm_get_node_info(ibtl_hca_devinfo_t *hca_devp,
+    ibt_async_handler_t async_handler)
+{
+	struct ibtl_mgr_s *mgrp;
+
+	if (async_handler == NULL)
+		return;
+
+	_NOTE(NO_COMPETING_THREADS_NOW)
+	mgrp = kmem_alloc(sizeof (*mgrp), KM_SLEEP);
+	mgrp->mgr_hca_devp = hca_devp;
+	mgrp->mgr_async_handler = async_handler;
+	mgrp->mgr_clnt_private = NULL;
+	hca_devp->hd_async_task_cnt++;
+
+	(void) taskq_dispatch(ibtl_async_taskq,
+	    ibt_cisco_embedded_sm_rereg_fix, mgrp, TQ_SLEEP);
+#ifndef lint
+	_NOTE(COMPETING_THREADS_NOW)
+#endif
+}
+
+static void
 ibtl_tell_mgr(ibtl_hca_devinfo_t *hca_devp, ibt_async_handler_t async_handler,
     void *clnt_private)
 {
@@ -503,11 +622,12 @@ static void
 ibtl_do_hca_asyncs(ibtl_hca_devinfo_t *hca_devp)
 {
 	ibtl_hca_t			*ibt_hca;
+	ibt_async_event_t		*eventp;
 	ibt_async_code_t		code;
 	ibtl_async_port_status_t  	temp;
 	uint8_t				nports;
 	uint8_t				port_minus1;
-	ibtl_async_port_status_t	*portp;
+	ibtl_async_port_event_t		*portp;
 
 	mutex_exit(&ibtl_async_mutex);
 
@@ -527,11 +647,19 @@ ibtl_do_hca_asyncs(ibtl_hca_devinfo_t *hca_devp)
 			code = IBT_ERROR_LOCAL_CATASTROPHIC;
 			hca_devp->hd_async_event.ev_fma_ena =
 			    hca_devp->hd_fma_ena;
-		} else if (code & IBT_ERROR_PORT_DOWN)
+		} else if (code & IBT_ERROR_PORT_DOWN) {
 			code = IBT_ERROR_PORT_DOWN;
-		else if (code & IBT_EVENT_PORT_UP)
+			temp = IBTL_HCA_PORT_DOWN;
+		} else if (code & IBT_EVENT_PORT_UP) {
 			code = IBT_EVENT_PORT_UP;
-		else {
+			temp = IBTL_HCA_PORT_UP;
+		} else if (code & IBT_PORT_CHANGE_EVENT) {
+			code = IBT_PORT_CHANGE_EVENT;
+			temp = IBTL_HCA_PORT_CHG;
+		} else if (code & IBT_CLNT_REREG_EVENT) {
+			code = IBT_CLNT_REREG_EVENT;
+			temp = IBTL_HCA_PORT_ASYNC_CLNT_REREG;
+		} else {
 			hca_devp->hd_async_codes = 0;
 			code = 0;
 		}
@@ -542,17 +670,17 @@ ibtl_do_hca_asyncs(ibtl_hca_devinfo_t *hca_devp)
 		}
 		hca_devp->hd_async_codes &= ~code;
 
-		if ((code == IBT_EVENT_PORT_UP) ||
-		    (code == IBT_ERROR_PORT_DOWN)) {
-			/* PORT_UP or PORT_DOWN */
+		/* PORT_UP, PORT_CHANGE, PORT_DOWN or ASYNC_REREG */
+		if ((code & IBT_PORT_EVENTS) != 0) {
 			portp = hca_devp->hd_async_port;
 			nports = hca_devp->hd_hca_attr->hca_nports;
 			for (port_minus1 = 0; port_minus1 < nports;
 			    port_minus1++) {
-				temp = ((code == IBT_EVENT_PORT_UP) ?
-				    IBTL_HCA_PORT_UP : IBTL_HCA_PORT_DOWN) |
-				    IBTL_HCA_PORT_CHANGED;
-				if (portp[port_minus1] == temp)
+				/*
+				 * Matching event in this port, let's go handle
+				 * it.
+				 */
+				if ((portp[port_minus1].status & temp) != 0)
 					break;
 			}
 			if (port_minus1 >= nports) {
@@ -564,13 +692,24 @@ ibtl_do_hca_asyncs(ibtl_hca_devinfo_t *hca_devp)
 			/* mark it to check for other ports after we're done */
 			hca_devp->hd_async_codes |= code;
 
+			/*
+			 * Copy the event information into hca_devp and clear
+			 * event information from the per port data.
+			 */
 			hca_devp->hd_async_event.ev_port = port_minus1 + 1;
-			hca_devp->hd_async_port[port_minus1] &=
-			    ~IBTL_HCA_PORT_CHANGED;
+			if (temp == IBTL_HCA_PORT_CHG) {
+				hca_devp->hd_async_event.ev_port_flags =
+				    hca_devp->hd_async_port[port_minus1].flags;
+				hca_devp->hd_async_port[port_minus1].flags = 0;
+			}
+			hca_devp->hd_async_port[port_minus1].status &= ~temp;
 
 			mutex_exit(&ibtl_async_mutex);
 			ibtl_reinit_hca_portinfo(hca_devp, port_minus1 + 1);
 			mutex_enter(&ibtl_async_mutex);
+			eventp = &hca_devp->hd_async_event;
+			eventp->ev_hca_guid =
+			    hca_devp->hd_hca_attr->hca_node_guid;
 		}
 
 		hca_devp->hd_async_code = code;
@@ -588,6 +727,21 @@ ibtl_do_hca_asyncs(ibtl_hca_devinfo_t *hca_devp)
 			ibtl_tell_mgr(hca_devp, ibtl_ibma_async_handler,
 			    ibtl_ibma_clnt_private);
 		/* wait for all tasks to complete */
+		while (hca_devp->hd_async_task_cnt != 0)
+			cv_wait(&hca_devp->hd_async_task_cv,
+			    &ibtl_clnt_list_mutex);
+
+		/*
+		 * Hack Alert:
+		 * The ibmf handler would have updated the Master SM LID if it
+		 * was SM LID change event. Now lets check if the new Master SM
+		 * is a Embedded Cisco Topspin SM.
+		 */
+		if ((code == IBT_PORT_CHANGE_EVENT) &&
+		    eventp->ev_port_flags & IBT_PORT_CHANGE_SM_LID)
+			ibtl_cm_get_node_info(hca_devp,
+			    (ibt_async_handler_t)ibtl_node_info_cb);
+		/* wait for node info task to complete */
 		while (hca_devp->hd_async_task_cnt != 0)
 			cv_wait(&hca_devp->hd_async_task_cv,
 			    &ibtl_clnt_list_mutex);
@@ -1920,4 +2074,11 @@ ibtl_thread_fini(void)
 	mutex_destroy(&ibtl_async_mutex);
 	cv_destroy(&ibtl_async_cv);
 	cv_destroy(&ibtl_clnt_cv);
+}
+
+/* ARGSUSED */
+ibt_status_t ibtl_dummy_node_info_cb(ib_guid_t hca_guid, uint8_t port,
+    ib_lid_t lid, ibt_node_info_t *node_info)
+{
+	return (IBT_SUCCESS);
 }

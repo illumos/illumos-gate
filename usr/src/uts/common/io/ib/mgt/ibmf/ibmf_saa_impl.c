@@ -57,6 +57,8 @@ static void ibmf_saa_impl_async_event_cb(ibmf_handle_t ibmf_handle,
     void *clnt_private, ibmf_async_event_t event_type);
 static void ibmf_saa_impl_port_up(ib_guid_t ci_guid, uint8_t port_num);
 static void ibmf_saa_impl_port_down(ib_guid_t ci_guid, uint8_t port_num);
+static void ibmf_saa_impl_port_chg(ibt_async_event_t *event);
+static void ibmf_saa_impl_client_rereg(ib_guid_t ci_guid, uint8_t port_num);
 static void ibmf_saa_impl_hca_detach(saa_port_t *saa_removed);
 static void ibmf_saa_impl_prepare_response(ibmf_handle_t ibmf_handle,
     ibmf_msg_t *msgp, boolean_t ignore_data, int *status, void **result,
@@ -2287,6 +2289,12 @@ ibmf_saa_impl_ibt_async_handler(ibt_async_code_t code, ibt_async_event_t *event)
 	case IBT_ERROR_PORT_DOWN:
 		ibmf_saa_impl_port_down(event->ev_hca_guid, event->ev_port);
 		break;
+	case IBT_PORT_CHANGE_EVENT:
+		ibmf_saa_impl_port_chg(event);
+		break;
+	case IBT_CLNT_REREG_EVENT:
+		ibmf_saa_impl_client_rereg(event->ev_hca_guid, event->ev_port);
+		break;
 	default:
 		break;
 	}
@@ -2295,6 +2303,222 @@ ibmf_saa_impl_ibt_async_handler(ibt_async_code_t code, ibt_async_event_t *event)
 	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_ibt_async_handler() exit\n");
 }
 
+/*
+ * ibmf_saa_impl_port_chg:
+ */
+static void
+ibmf_saa_impl_port_chg(ibt_async_event_t *event)
+{
+	saa_port_t		*saa_portp	= NULL;
+	boolean_t		is_ready = B_FALSE;
+	ibt_hca_portinfo_t	*ibt_portinfop;
+	uint_t			nports, size;
+	ibt_status_t		ibt_status;
+	ib_guid_t		ci_guid;
+	int			port_num;
+
+	ci_guid = event->ev_hca_guid;
+	port_num = event->ev_port;
+
+	IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3, ibmf_saa_impl_port_chg_start,
+	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_port_chg: Handling port chg"
+	    " guid %016" PRIx64 " port %d\n",
+	    tnf_opaque, hca_guid, ci_guid, tnf_uint, port, port_num);
+
+	/* Get classportinfo of corresponding entry */
+	mutex_enter(&saa_statep->saa_port_list_mutex);
+
+	saa_portp = saa_statep->saa_port_list;
+	while (saa_portp != NULL) {
+		if (saa_portp->saa_pt_ibmf_reginfo.ir_ci_guid == ci_guid &&
+		    saa_portp->saa_pt_ibmf_reginfo.ir_port_num == port_num) {
+			mutex_enter(&saa_portp->saa_pt_mutex);
+
+			is_ready = (saa_portp->saa_pt_state
+			    == IBMF_SAA_PORT_STATE_READY) ? B_TRUE : B_FALSE;
+
+			/*
+			 * increment reference count to account for cpi and
+			 * informinfos.  All 4 informinfo's sent are treated as
+			 * one port client reference
+			 */
+			if (is_ready)
+				saa_portp->saa_pt_reference_count ++;
+
+			mutex_exit(&saa_portp->saa_pt_mutex);
+
+			if (is_ready)
+				break; /* normally, only 1 port entry */
+		}
+		saa_portp = saa_portp->next;
+	}
+
+	mutex_exit(&saa_statep->saa_port_list_mutex);
+
+	if (saa_portp != NULL) {
+		/* first query the portinfo to see if the lid changed */
+		ibt_status = ibt_query_hca_ports_byguid(ci_guid, port_num,
+		    &ibt_portinfop, &nports, &size);
+
+		if (ibt_status != IBT_SUCCESS) {
+
+			IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
+			    ibmf_saa_impl_port_chg_err, IBMF_TNF_ERROR, "",
+			    "ibmf_saa_impl_port_chg: %s, ibmf_status ="
+			    " %d\n", tnf_string, msg,
+			    "ibt_query_hca_ports_byguid() failed",
+			    tnf_int, ibt_status, ibt_status);
+
+			goto bail;
+		}
+
+		mutex_enter(&saa_portp->saa_pt_mutex);
+		if (event->ev_port_flags & IBT_PORT_CHANGE_SM_LID) {
+			/* update the Master SM Lid value in ibmf_saa */
+			saa_portp->saa_pt_ibmf_addr_info.ia_remote_lid =
+			    ibt_portinfop->p_sm_lid;
+		}
+		if (event->ev_port_flags & IBT_PORT_CHANGE_SM_SL) {
+			/* update the Master SM SL value in ibmf_saa */
+			saa_portp->saa_pt_ibmf_addr_info.ia_service_level =
+			    ibt_portinfop->p_sm_sl;
+		}
+		if (event->ev_port_flags & IBT_PORT_CHANGE_SUB_TIMEOUT) {
+			/* update the Subnet timeout value in ibmf_saa */
+			saa_portp->saa_pt_timeout =
+			    ibt_portinfop->p_subnet_timeout;
+		}
+		mutex_exit(&saa_portp->saa_pt_mutex);
+
+		ibt_free_portinfo(ibt_portinfop, size);
+
+		/* get the classportinfo again */
+		ibmf_saa_impl_get_classportinfo(saa_portp);
+	}
+bail:
+
+	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4, ibmf_saa_impl_port_chg_end,
+	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_port_chg() exit\n");
+}
+/*
+ * ibmf_saa_impl_client_rereg:
+ */
+static void
+ibmf_saa_impl_client_rereg(ib_guid_t ci_guid, uint8_t port_num)
+{
+	saa_port_t		*saa_portp	= NULL;
+	boolean_t		is_ready = B_FALSE;
+	ibt_hca_portinfo_t	*ibt_portinfop;
+	ib_lid_t		master_sm_lid;
+	uint_t			nports, size;
+	ibt_status_t		ibt_status;
+	boolean_t		event_subs = B_FALSE;
+
+	IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3, ibmf_saa_impl_port_rereg_start,
+	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_client_rereg: Handling clnt "
+	    "rereg guid %016" PRIx64 " port %d\n",
+	    tnf_opaque, hca_guid, ci_guid, tnf_uint, port, port_num);
+
+	/* Get classportinfo of corresponding entry */
+	mutex_enter(&saa_statep->saa_port_list_mutex);
+
+	saa_portp = saa_statep->saa_port_list;
+	while (saa_portp != NULL) {
+
+		if (saa_portp->saa_pt_ibmf_reginfo.ir_ci_guid == ci_guid &&
+		    saa_portp->saa_pt_ibmf_reginfo.ir_port_num == port_num) {
+
+			mutex_enter(&saa_portp->saa_pt_mutex);
+
+			is_ready = (saa_portp->saa_pt_state
+			    == IBMF_SAA_PORT_STATE_READY) ? B_TRUE : B_FALSE;
+
+			/*
+			 * increment reference count to account for cpi and
+			 * informinfos.  All 4 informinfo's sent are treated as
+			 * one port client reference
+			 */
+			if (is_ready)
+				saa_portp->saa_pt_reference_count += 2;
+
+			mutex_exit(&saa_portp->saa_pt_mutex);
+
+			if (is_ready)
+				break; /* normally, only 1 port entry */
+		}
+		saa_portp = saa_portp->next;
+	}
+
+	mutex_exit(&saa_statep->saa_port_list_mutex);
+
+	if (saa_portp != NULL && is_ready == B_TRUE) {
+
+		/* verify whether master sm lid changed */
+
+		/* first query the portinfo to see if the lid changed */
+		ibt_status = ibt_query_hca_ports_byguid(ci_guid, port_num,
+		    &ibt_portinfop, &nports, &size);
+
+		if (ibt_status != IBT_SUCCESS) {
+
+			IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
+			    ibmf_saa_impl_port_rereg_err, IBMF_TNF_ERROR, "",
+			    "ibmf_saa_impl_client_rereg: %s, ibmf_status ="
+			    " %d\n", tnf_string, msg,
+			    "ibt_query_hca_ports_byguid() failed",
+			    tnf_int, ibt_status, ibt_status);
+
+			goto bail;
+		}
+
+		master_sm_lid = ibt_portinfop->p_sm_lid;
+
+		ibt_free_portinfo(ibt_portinfop, size);
+
+		/* check whether we need to subscribe for events */
+		mutex_enter(&saa_portp->saa_pt_event_sub_mutex);
+
+		event_subs = (saa_portp->saa_pt_event_sub_client_list != NULL) ?
+		    B_TRUE : B_FALSE;
+
+		mutex_exit(&saa_portp->saa_pt_event_sub_mutex);
+
+		/* update the master smlid */
+		mutex_enter(&saa_portp->saa_pt_mutex);
+
+		/* update the master sm lid value in ibmf_saa */
+		saa_portp->saa_pt_ibmf_addr_info.ia_remote_lid =
+		    master_sm_lid;
+
+		/* if we're not subscribed for events, dec reference count */
+		if (event_subs == B_FALSE)
+			saa_portp->saa_pt_reference_count--;
+
+		mutex_exit(&saa_portp->saa_pt_mutex);
+
+		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3,
+		    ibmf_saa_impl_port_rereg, IBMF_TNF_TRACE, "",
+		    "ibmf_saa_impl_client_rereg: %s, master_sm_lid = 0x%x\n",
+		    tnf_string, msg,
+		    "port is up.  Sending classportinfo request",
+		    tnf_opaque, master_sm_lid, master_sm_lid);
+
+		/* get the classportinfo again */
+		ibmf_saa_impl_get_classportinfo(saa_portp);
+
+		/*
+		 * resubscribe to events if there are subscribers since SA may
+		 * have removed our subscription records when the port went down
+		 */
+		if (event_subs == B_TRUE)
+			ibmf_saa_subscribe_events(saa_portp, B_TRUE, B_FALSE);
+	}
+
+bail:
+
+	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4, ibmf_saa_impl_port_rereg_end,
+	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_client_rereg() exit\n");
+}
 /*
  * ibmf_saa_impl_port_up:
  */

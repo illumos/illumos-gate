@@ -51,7 +51,7 @@ static ibt_status_t	ibcm_process_rc_recycle_ret(void *recycle_arg);
 static ibt_status_t	ibcm_process_join_mcg(void *taskq_arg);
 static void		ibcm_process_async_join_mcg(void *tq_arg);
 
-static ibt_status_t ibcm_get_node_rec(ibmf_saa_handle_t, sa_node_record_t *,
+ibt_status_t ibcm_get_node_rec(ibmf_saa_handle_t, sa_node_record_t *,
     uint64_t c_mask, void *, size_t *);
 
 static ibt_status_t ibcm_close_rc_channel(ibt_channel_hdl_t channel,
@@ -5641,7 +5641,7 @@ gid_to_ni_exit:
 }
 
 
-static ibt_status_t
+ibt_status_t
 ibcm_get_node_rec(ibmf_saa_handle_t saa_handle, sa_node_record_t *nr_req,
     uint64_t component_mask, void *result_p, size_t *len)
 {

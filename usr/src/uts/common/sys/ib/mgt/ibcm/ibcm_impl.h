@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2178,6 +2178,9 @@ ibt_status_t ibcm_ibmf_analyze_error(int ibmf_status);
 
 ibt_status_t ibcm_contact_sa_access(ibmf_saa_handle_t saa_handle,
     ibmf_saa_access_args_t *access_args, size_t *length, void **results_p);
+
+ibt_status_t	ibcm_ibtl_node_info(ib_guid_t, uint8_t, ib_lid_t,
+    ibt_node_info_t *node_info);
 
 void ibcm_path_cache_init(void);
 void ibcm_path_cache_fini(void);

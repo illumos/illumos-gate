@@ -577,7 +577,7 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 
 	/* Allocate the memory for per-client info structure */
 	hca_devp = kmem_zalloc(sizeof (ibtl_hca_devinfo_t) +
-	    (nports - 1) * sizeof (ibtl_async_port_status_t), KM_SLEEP);
+	    (nports - 1) * sizeof (ibtl_async_port_event_t), KM_SLEEP);
 
 	mutex_enter(&ibtl_clnt_list_mutex);
 
@@ -593,7 +593,7 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 		IBTF_DPRINTF_L1(ibtf, "ibc_attach: call to ibc_query_hca_ports "
 		    "failed: status = %d", status);
 		kmem_free(hca_devp, sizeof (ibtl_hca_devinfo_t) +
-		    (nports - 1) * sizeof (ibtl_async_port_status_t));
+		    (nports - 1) * sizeof (ibtl_async_port_event_t));
 		return (IBC_FAILURE);
 	}
 
@@ -602,7 +602,7 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 		mutex_exit(&ibtl_clnt_list_mutex);
 		IBTF_DPRINTF_L1(ibtf, "ibc_attach: MPxIO register failed");
 		kmem_free(hca_devp, sizeof (ibtl_hca_devinfo_t) +
-		    (nports - 1) * sizeof (ibtl_async_port_status_t));
+		    (nports - 1) * sizeof (ibtl_async_port_event_t));
 		return (IBC_FAILURE);
 	}
 
@@ -813,7 +813,7 @@ ibc_detach(ibc_clnt_hdl_t hca_devp)
 	/* Free up the memory of per-client info struct */
 	kmem_free(hca_devp, sizeof (ibtl_hca_devinfo_t) +
 	    (hca_devp->hd_hca_attr->hca_nports - 1) *
-	    sizeof (ibtl_async_port_status_t));
+	    sizeof (ibtl_async_port_event_t));
 	ibtl_clear_ibhw_status();
 }
 

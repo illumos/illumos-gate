@@ -1515,6 +1515,9 @@ typedef enum ibt_async_code_e {
 	IBT_CLNT_REREG_EVENT			= 0x200000
 } ibt_async_code_t;
 
+#define	IBT_PORT_EVENTS (IBT_EVENT_PORT_UP|IBT_PORT_CHANGE_EVENT|\
+    IBT_ERROR_PORT_DOWN|IBT_CLNT_REREG_EVENT)
+
 typedef enum ibt_port_change_e {
 	IBT_PORT_CHANGE_SGID		= 0x000001, /* SGID table */
 	IBT_PORT_CHANGE_PKEY		= 0x000002, /* P_Key table */
