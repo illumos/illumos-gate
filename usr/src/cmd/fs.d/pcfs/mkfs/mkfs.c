@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2190,6 +2190,7 @@ open_and_examine(char *dn, bpb_t *wbpb)
 	char *actualdisk = NULL;
 	char *suffix = NULL;
 	int fd;
+	struct dk_minfo dkminfo;
 
 	if (Verbose)
 		(void) printf(gettext("Opening destination device/file.\n"));
@@ -2207,6 +2208,21 @@ open_and_examine(char *dn, bpb_t *wbpb)
 	} else if ((fd = open(actualdisk, O_RDWR)) < 0) {
 		perror(actualdisk);
 		exit(2);
+	}
+
+	/*
+	 * Check the media sector size
+	 */
+	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+		if (dkminfo.dki_lbsize != 0 &&
+		    ISP2(dkminfo.dki_lbsize / DEV_BSIZE) &&
+		    dkminfo.dki_lbsize != DEV_BSIZE) {
+			(void) fprintf(stderr,
+			    gettext("The device sector size %u is not "
+			    "supported by pcfs!\n"), dkminfo.dki_lbsize);
+			(void) close(fd);
+			exit(1);
+		}
 	}
 
 	/*
@@ -2240,6 +2256,7 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 	struct fd_char fdchar;
 	struct dk_geom dg;
 	struct stat di;
+	struct dk_minfo	dkminfo;
 	char *actualdisk = NULL;
 	char *suffix = NULL;
 	int fd;
@@ -2305,6 +2322,21 @@ open_and_seek(char *dn, bpb_t *wbpb, off64_t *seekto)
 	} else if ((fd = open(actualdisk, O_RDWR)) < 0) {
 		perror(actualdisk);
 		exit(2);
+	}
+
+	/*
+	 * Check the media sector size
+	 */
+	if (ioctl(fd, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+		if (dkminfo.dki_lbsize != 0 &&
+		    ISP2(dkminfo.dki_lbsize / DEV_BSIZE) &&
+		    dkminfo.dki_lbsize != DEV_BSIZE) {
+			(void) fprintf(stderr,
+			    gettext("The device sector size %u is not "
+			    "supported by pcfs!\n"), dkminfo.dki_lbsize);
+			(void) close(fd);
+			exit(1);
+		}
 	}
 
 	/*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -461,7 +461,7 @@ scan_repair(bn, mode)
 {
 	int	status;
 	int	result = 1;
-	char	buf[SECSIZE];
+	char	*buf;
 	int	buf_is_good;
 	int	i;
 
@@ -471,6 +471,11 @@ scan_repair(bn, mode)
 		return (result);
 	}
 
+	buf = malloc(cur_blksz);
+	if (buf == NULL) {
+		err_print("Warning: no memory.\n\n");
+		return (result);
+	}
 	enter_critical();
 
 	/*
@@ -509,7 +514,7 @@ scan_repair(bn, mode)
 		 * determine if the new block appears ok.
 		 */
 		if (!buf_is_good) {
-			bzero(buf, SECSIZE);
+			bzero(buf, cur_blksz);
 			fmt_print("Warning: Block %llu zero-filled.\n", bn);
 		} else {
 			fmt_print("ok.\n");
@@ -565,7 +570,7 @@ scan_repair(bn, mode)
 	}
 
 	exit_critical();
-
+	free(buf);
 	return (result);
 }
 
@@ -596,7 +601,7 @@ analyze_blocks(flags, blkno, blkcnt, data, init, driver_flags, xfercntp)
 	/*
 	 * Initialize the pattern buffer if necessary.
 	 */
-	nints = (diskaddr_t)blkcnt * SECSIZE / sizeof (int);
+	nints = (diskaddr_t)blkcnt * cur_blksz / sizeof (int);
 	if ((flags & SCAN_PATTERN) && init) {
 		for (i = 0; i < nints; i++)
 			*((int *)((int *)pattern_buf + i)) = data;
@@ -724,7 +729,7 @@ verify_blocks(int flags,
 	int		status, i, nints;
 	unsigned	*ptr = (uint_t *)pattern_buf;
 
-	nints = SECSIZE / sizeof (int);
+	nints = cur_blksz / sizeof (int);
 
 	/*
 	 * Initialize the pattern buffer if we are in write pass.

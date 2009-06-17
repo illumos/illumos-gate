@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1607,6 +1607,12 @@ add_device_to_disklist(char *devname, char *devpath)
 		}
 	}
 
+	if (ioctl(search_file, DKIOCGMEDIAINFO, &mediainfo) == -1) {
+		cur_blksz = DEV_BSIZE;
+	} else {
+		cur_blksz = mediainfo.dki_lbsize;
+	}
+
 	/*
 	 * If the type of disk is one we don't know about,
 	 * add it to the list.
@@ -1708,8 +1714,11 @@ add_device_to_disklist(char *devname, char *devpath)
 	 * generic check for reserved disks here, including intel disks.
 	 */
 	if (dkinfo.dki_ctype == DKC_SCSI_CCS) {
+		char	*first_sector;
+
+		first_sector = zalloc(cur_blksz);
 		i = scsi_rdwr(DIR_READ, search_file, (diskaddr_t)0,
-		    1, (char *)&search_label, F_SILENT, NULL);
+		    1, first_sector, F_SILENT, NULL);
 		switch (i) {
 		case DSK_RESERVED:
 			access_flags |= DSK_RESERVED;
@@ -1720,6 +1729,7 @@ add_device_to_disklist(char *devname, char *devpath)
 		default:
 			break;
 		}
+		free(first_sector);
 	}
 #endif /* defined(sparc) */
 
@@ -1750,6 +1760,11 @@ add_device_to_disklist(char *devname, char *devpath)
 	 */
 	search_disk->disk_name = alloc_string(devname);
 	search_disk->disk_path = alloc_string(devpath);
+
+	/*
+	 * Remember the lba size of the disk
+	 */
+	search_disk->disk_lbasize = cur_blksz;
 
 	(void) strcpy(x86_devname, devname);
 

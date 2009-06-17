@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -606,11 +606,11 @@ reprompt:
 			fmt_print("[%llub, %llue, %llumb, %llugb, %llutb]",
 			    efi_deflt->end_sector,
 			    efi_deflt->start_sector + efi_deflt->end_sector - 1,
-			    (efi_deflt->end_sector * DEV_BSIZE) /
+			    (efi_deflt->end_sector * cur_blksz) /
 				(1024 * 1024),
-			    (efi_deflt->end_sector * DEV_BSIZE) /
+			    (efi_deflt->end_sector * cur_blksz) /
 				(1024 * 1024 * 1024),
-			    (efi_deflt->end_sector * DEV_BSIZE) /
+			    (efi_deflt->end_sector * cur_blksz) /
 				((uint64_t)1024 * 1024 * 1024 * 1024));
 			break;
 		case FIO_OPINT:
@@ -1518,13 +1518,13 @@ or g(gigabytes)\n");
 			fmt_print("Expecting up to %llu sectors,",
 			    cur_parts->etoc->efi_last_u_lba);
 			fmt_print("or %llu megabytes,",
-			    (cur_parts->etoc->efi_last_u_lba * DEV_BSIZE)/
+			    (cur_parts->etoc->efi_last_u_lba * cur_blksz)/
 				(1024 * 1024));
 			fmt_print("or %llu gigabytes\n",
-			    (cur_parts->etoc->efi_last_u_lba * DEV_BSIZE)/
+			    (cur_parts->etoc->efi_last_u_lba * cur_blksz)/
 				(1024 * 1024 * 1024));
 			fmt_print("or %llu terabytes\n",
-			    (cur_parts->etoc->efi_last_u_lba * DEV_BSIZE)/
+			    (cur_parts->etoc->efi_last_u_lba * cur_blksz)/
 				((uint64_t)1024 * 1024 * 1024 * 1024));
 			break;
 		}
@@ -1676,7 +1676,7 @@ or g(gigabytes)\n");
 				break;
 			}
 			return (uint64_t)((float)nmegs * 1024.0 *
-				1024.0 * 1024.0 * 1024.0 / DEV_BSIZE);
+				1024.0 * 1024.0 * 1024.0 / cur_blksz);
 
 		default:
 			err_print(
@@ -2102,6 +2102,7 @@ pr_diskline(disk, num)
 			type->dtype_acyl, type->dtype_nhead,
 			type->dtype_nsect);
 	} else if ((type != NULL) && (disk->label_type == L_TYPE_EFI)) {
+		cur_blksz = disk->disk_lbasize;
 		print_efi_string(type->vendor, type->product,
 			type->revision, type->capacity);
 	} else if (disk->disk_flags & DSK_RESERVED) {

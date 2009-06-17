@@ -48,7 +48,7 @@ extern "C" {
 #define	XB_BSIZE	DEV_BSIZE
 #define	XB_BMASK	(XB_BSIZE - 1)
 #define	XB_BSHIFT	9
-#define	XB_DTOB(bn)	((bn) << XB_BSHIFT)
+#define	XB_DTOB(bn, vdp)	((bn) * (vdp)->xdf_xdev_secsize)
 
 #define	XB_MAX_SEGLEN	(8 * XB_BSIZE)
 #define	XB_SEGOFFSET	(XB_MAX_SEGLEN - 1)
@@ -222,6 +222,7 @@ typedef struct xdf {
 	kcondvar_t	xdf_dev_cv; /* cv used in I/O path */
 	uint_t		xdf_dinfo; /* disk info from backend xenstore */
 	diskaddr_t	xdf_xdev_nblocks; /* total size in block */
+	uint_t		xdf_xdev_secsize; /* disk blksize from backend */
 	cmlb_geom_t	xdf_pgeom;
 	boolean_t	xdf_pgeom_set;
 	boolean_t	xdf_pgeom_fixed;

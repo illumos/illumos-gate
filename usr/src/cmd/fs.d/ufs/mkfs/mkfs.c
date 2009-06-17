@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -632,6 +632,7 @@ main(int argc, char *argv[])
 	struct statvfs64 fs;
 	struct dk_geom dkg;
 	struct dk_cinfo dkcinfo;
+	struct dk_minfo dkminfo;
 	char pbuf[sizeof (uint64_t) * 3 + 1];
 	char *tmpbuf;
 	int width, plen;
@@ -1500,6 +1501,21 @@ retry_alternate_logic:
 			(void) fprintf(stderr, gettext("%s: cannot open: %s\n"),
 			    fsys, strerror(saverr));
 			lockexit(32);
+		}
+	}
+
+	/*
+	 * Check the media sector size
+	 */
+	if (ioctl(fso, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+		if (dkminfo.dki_lbsize != 0 &&
+		    POWEROF2(dkminfo.dki_lbsize / DEV_BSIZE) &&
+		    dkminfo.dki_lbsize != DEV_BSIZE) {
+			fprintf(stderr,
+			    gettext("The device sector size %u is not "
+			    "supported by ufs!\n"), dkminfo.dki_lbsize);
+			(void) close(fso);
+			exit(1);
 		}
 	}
 

@@ -1017,6 +1017,7 @@ static int sd_pm_idletime = 1;
 #define	sd_free_rqs			ssd_free_rqs
 #define	sd_dump_memory			ssd_dump_memory
 #define	sd_get_media_info		ssd_get_media_info
+#define	sd_get_media_info_ext		ssd_get_media_info_ext
 #define	sd_dkio_ctrl_info		ssd_dkio_ctrl_info
 #define	sd_nvpair_str_decode		ssd_nvpair_str_decode
 #define	sd_strtok_r			ssd_strtok_r
@@ -1093,6 +1094,7 @@ static int sd_pm_idletime = 1;
 #define	sd_is_lsi			ssd_is_lsi
 #define	sd_tg_rdwr			ssd_tg_rdwr
 #define	sd_tg_getinfo			ssd_tg_getinfo
+#define	sd_rmw_msg_print_handler	ssd_rmw_msg_print_handler
 
 #endif	/* #if (defined(__fibre)) */
 
@@ -1463,7 +1465,7 @@ static int sd_send_scsi_DOORLOCK(sd_ssc_t *ssc, int flag, int path_flag);
 static int sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp,
 	uint32_t *lbap, int path_flag);
 static int sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
-	uint32_t *lbap, int path_flag);
+	uint32_t *lbap, uint32_t *psp, int path_flag);
 static int sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int flag,
 	int path_flag);
 static int sd_send_scsi_INQUIRY(sd_ssc_t *ssc, uchar_t *bufaddr,
@@ -1510,6 +1512,7 @@ static void sd_panic_for_res_conflict(struct sd_lun *un);
  * Disk Ioctl Function Prototypes
  */
 static int sd_get_media_info(dev_t dev, caddr_t arg, int flag);
+static int sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag);
 static int sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag);
 static int sd_dkio_get_temp(dev_t dev, caddr_t arg, int flag);
 
@@ -1608,6 +1611,11 @@ static int sd_tg_rdwr(dev_info_t *devi, uchar_t cmd, void *bufaddr,
     diskaddr_t start_block, size_t reqlength, void *tg_cookie);
 
 static int sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie);
+
+/*
+ * For printing RMW warning message timely
+ */
+static void sd_rmw_msg_print_handler(void *arg);
 
 /*
  * Constants for failfast support:
@@ -1781,13 +1789,19 @@ static sd_chain_t sd_iostart_chain[] = {
 	sd_mapblockaddr_iostart,	/* Index: 3 */
 	sd_core_iostart,		/* Index: 4 */
 
-	/* Chain for buf IO for removable-media targets (PM enabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets with RMW needed (PM enabled)
+	 */
 	sd_mapblockaddr_iostart,	/* Index: 5 */
 	sd_mapblocksize_iostart,	/* Index: 6 */
 	sd_pm_iostart,			/* Index: 7 */
 	sd_core_iostart,		/* Index: 8 */
 
-	/* Chain for buf IO for removable-media targets (PM disabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets with RMW needed (PM disabled)
+	 */
 	sd_mapblockaddr_iostart,	/* Index: 9 */
 	sd_mapblocksize_iostart,	/* Index: 10 */
 	sd_core_iostart,		/* Index: 11 */
@@ -1817,6 +1831,26 @@ static sd_chain_t sd_iostart_chain[] = {
 
 	/* Chain for "direct priority" USCSI commands (all targets) */
 	sd_core_iostart,		/* Index: 25 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with RMW needed with checksumming (PM enabled)
+	 */
+	sd_mapblockaddr_iostart,	/* Index: 26 */
+	sd_mapblocksize_iostart,	/* Index: 27 */
+	sd_checksum_iostart,		/* Index: 28 */
+	sd_pm_iostart,			/* Index: 29 */
+	sd_core_iostart,		/* Index: 30 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with RMW needed with checksumming (PM disabled)
+	 */
+	sd_mapblockaddr_iostart,	/* Index: 31 */
+	sd_mapblocksize_iostart,	/* Index: 32 */
+	sd_checksum_iostart,		/* Index: 33 */
+	sd_core_iostart,		/* Index: 34 */
+
 };
 
 /*
@@ -1825,7 +1859,9 @@ static sd_chain_t sd_iostart_chain[] = {
  */
 #define	SD_CHAIN_DISK_IOSTART			0
 #define	SD_CHAIN_DISK_IOSTART_NO_PM		3
+#define	SD_CHAIN_MSS_DISK_IOSTART		5
 #define	SD_CHAIN_RMMEDIA_IOSTART		5
+#define	SD_CHAIN_MSS_DISK_IOSTART_NO_PM		9
 #define	SD_CHAIN_RMMEDIA_IOSTART_NO_PM		9
 #define	SD_CHAIN_CHKSUM_IOSTART			12
 #define	SD_CHAIN_CHKSUM_IOSTART_NO_PM		16
@@ -1833,6 +1869,8 @@ static sd_chain_t sd_iostart_chain[] = {
 #define	SD_CHAIN_USCSI_CHKSUM_IOSTART		21
 #define	SD_CHAIN_DIRECT_CMD_IOSTART		24
 #define	SD_CHAIN_PRIORITY_CMD_IOSTART		25
+#define	SD_CHAIN_MSS_CHKSUM_IOSTART		26
+#define	SD_CHAIN_MSS_CHKSUM_IOSTART_NO_PM	31
 
 
 /*
@@ -1859,13 +1897,19 @@ static sd_chain_t sd_iodone_chain[] = {
 	sd_buf_iodone,			/* Index: 3 */
 	sd_mapblockaddr_iodone,		/* Index: 4 */
 
-	/* Chain for buf IO for removable-media targets (PM enabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets with RMW needed (PM enabled)
+	 */
 	sd_buf_iodone,			/* Index: 5 */
 	sd_mapblockaddr_iodone,		/* Index: 6 */
 	sd_mapblocksize_iodone,		/* Index: 7 */
 	sd_pm_iodone,			/* Index: 8 */
 
-	/* Chain for buf IO for removable-media targets (PM disabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets with RMW needed (PM disabled)
+	 */
 	sd_buf_iodone,			/* Index: 9 */
 	sd_mapblockaddr_iodone,		/* Index: 10 */
 	sd_mapblocksize_iodone,		/* Index: 11 */
@@ -1895,6 +1939,25 @@ static sd_chain_t sd_iodone_chain[] = {
 
 	/* Chain for "direct priority" USCSI commands (all targets) */
 	sd_uscsi_iodone,		/* Index: 25 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM enabled)
+	 */
+	sd_buf_iodone,			/* Index: 26 */
+	sd_mapblockaddr_iodone,		/* Index: 27 */
+	sd_mapblocksize_iodone,		/* Index: 28 */
+	sd_checksum_iodone,		/* Index: 29 */
+	sd_pm_iodone,			/* Index: 30 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM disabled)
+	 */
+	sd_buf_iodone,			/* Index: 31 */
+	sd_mapblockaddr_iodone,		/* Index: 32 */
+	sd_mapblocksize_iodone,		/* Index: 33 */
+	sd_checksum_iodone,		/* Index: 34 */
 };
 
 
@@ -1910,14 +1973,17 @@ static sd_chain_t sd_iodone_chain[] = {
 #define	SD_CHAIN_DISK_IODONE			2
 #define	SD_CHAIN_DISK_IODONE_NO_PM		4
 #define	SD_CHAIN_RMMEDIA_IODONE			8
+#define	SD_CHAIN_MSS_DISK_IODONE		8
 #define	SD_CHAIN_RMMEDIA_IODONE_NO_PM		11
+#define	SD_CHAIN_MSS_DISK_IODONE_NO_PM		11
 #define	SD_CHAIN_CHKSUM_IODONE			15
 #define	SD_CHAIN_CHKSUM_IODONE_NO_PM		18
 #define	SD_CHAIN_USCSI_CMD_IODONE		20
 #define	SD_CHAIN_USCSI_CHKSUM_IODONE		22
 #define	SD_CHAIN_DIRECT_CMD_IODONE		24
 #define	SD_CHAIN_PRIORITY_CMD_IODONE		25
-
+#define	SD_CHAIN_MSS_CHKSUM_IODONE		30
+#define	SD_CHAIN_MSS_CHKSUM_IODONE_NO_PM	34
 
 
 
@@ -1940,13 +2006,19 @@ static sd_initpkt_t	sd_initpkt_map[] = {
 	sd_initpkt_for_buf,		/* Index: 3 */
 	sd_initpkt_for_buf,		/* Index: 4 */
 
-	/* Chain for buf IO for removable-media targets (PM enabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets (PM enabled)
+	 */
 	sd_initpkt_for_buf,		/* Index: 5 */
 	sd_initpkt_for_buf,		/* Index: 6 */
 	sd_initpkt_for_buf,		/* Index: 7 */
 	sd_initpkt_for_buf,		/* Index: 8 */
 
-	/* Chain for buf IO for removable-media targets (PM disabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets (PM disabled)
+	 */
 	sd_initpkt_for_buf,		/* Index: 9 */
 	sd_initpkt_for_buf,		/* Index: 10 */
 	sd_initpkt_for_buf,		/* Index: 11 */
@@ -1977,6 +2049,24 @@ static sd_initpkt_t	sd_initpkt_map[] = {
 	/* Chain for "direct priority" USCSI commands (all targets) */
 	sd_initpkt_for_uscsi,		/* Index: 25 */
 
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM enabled)
+	 */
+	sd_initpkt_for_buf,		/* Index: 26 */
+	sd_initpkt_for_buf,		/* Index: 27 */
+	sd_initpkt_for_buf,		/* Index: 28 */
+	sd_initpkt_for_buf,		/* Index: 29 */
+	sd_initpkt_for_buf,		/* Index: 30 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM disabled)
+	 */
+	sd_initpkt_for_buf,		/* Index: 31 */
+	sd_initpkt_for_buf,		/* Index: 32 */
+	sd_initpkt_for_buf,		/* Index: 33 */
+	sd_initpkt_for_buf,		/* Index: 34 */
 };
 
 
@@ -1999,13 +2089,19 @@ static sd_destroypkt_t	sd_destroypkt_map[] = {
 	sd_destroypkt_for_buf,		/* Index: 3 */
 	sd_destroypkt_for_buf,		/* Index: 4 */
 
-	/* Chain for buf IO for removable-media targets (PM enabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets (PM enabled)
+	 */
 	sd_destroypkt_for_buf,		/* Index: 5 */
 	sd_destroypkt_for_buf,		/* Index: 6 */
 	sd_destroypkt_for_buf,		/* Index: 7 */
 	sd_destroypkt_for_buf,		/* Index: 8 */
 
-	/* Chain for buf IO for removable-media targets (PM disabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets (PM disabled)
+	 */
 	sd_destroypkt_for_buf,		/* Index: 9 */
 	sd_destroypkt_for_buf,		/* Index: 10 */
 	sd_destroypkt_for_buf,		/* Index: 11 */
@@ -2036,6 +2132,24 @@ static sd_destroypkt_t	sd_destroypkt_map[] = {
 	/* Chain for "direct priority" USCSI commands (all targets) */
 	sd_destroypkt_for_uscsi,	/* Index: 25 */
 
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM disabled)
+	 */
+	sd_destroypkt_for_buf,		/* Index: 26 */
+	sd_destroypkt_for_buf,		/* Index: 27 */
+	sd_destroypkt_for_buf,		/* Index: 28 */
+	sd_destroypkt_for_buf,		/* Index: 29 */
+	sd_destroypkt_for_buf,		/* Index: 30 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM enabled)
+	 */
+	sd_destroypkt_for_buf,		/* Index: 31 */
+	sd_destroypkt_for_buf,		/* Index: 32 */
+	sd_destroypkt_for_buf,		/* Index: 33 */
+	sd_destroypkt_for_buf,		/* Index: 34 */
 };
 
 
@@ -2066,13 +2180,19 @@ static int sd_chain_type_map[] = {
 	SD_CHAIN_BUFIO,			/* Index: 3 */
 	SD_CHAIN_BUFIO,			/* Index: 4 */
 
-	/* Chain for buf IO for removable-media targets (PM enabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets (PM enabled)
+	 */
 	SD_CHAIN_BUFIO,			/* Index: 5 */
 	SD_CHAIN_BUFIO,			/* Index: 6 */
 	SD_CHAIN_BUFIO,			/* Index: 7 */
 	SD_CHAIN_BUFIO,			/* Index: 8 */
 
-	/* Chain for buf IO for removable-media targets (PM disabled) */
+	/*
+	 * Chain for buf IO for removable-media or large sector size
+	 * disk drive targets (PM disabled)
+	 */
 	SD_CHAIN_BUFIO,			/* Index: 9 */
 	SD_CHAIN_BUFIO,			/* Index: 10 */
 	SD_CHAIN_BUFIO,			/* Index: 11 */
@@ -2095,13 +2215,32 @@ static int sd_chain_type_map[] = {
 	/* Chain for USCSI commands (checksum targets) */
 	SD_CHAIN_USCSI,			/* Index: 21 */
 	SD_CHAIN_USCSI,			/* Index: 22 */
-	SD_CHAIN_USCSI,			/* Index: 22 */
+	SD_CHAIN_USCSI,			/* Index: 23 */
 
 	/* Chain for "direct" USCSI commands (all targets) */
 	SD_CHAIN_DIRECT,		/* Index: 24 */
 
 	/* Chain for "direct priority" USCSI commands (all targets) */
 	SD_CHAIN_DIRECT_PRIORITY,	/* Index: 25 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM enabled)
+	 */
+	SD_CHAIN_BUFIO,			/* Index: 26 */
+	SD_CHAIN_BUFIO,			/* Index: 27 */
+	SD_CHAIN_BUFIO,			/* Index: 28 */
+	SD_CHAIN_BUFIO,			/* Index: 29 */
+	SD_CHAIN_BUFIO,			/* Index: 30 */
+
+	/*
+	 * Chain for buf IO for large sector size disk drive targets
+	 * with checksumming (PM disabled)
+	 */
+	SD_CHAIN_BUFIO,			/* Index: 31 */
+	SD_CHAIN_BUFIO,			/* Index: 32 */
+	SD_CHAIN_BUFIO,			/* Index: 33 */
+	SD_CHAIN_BUFIO,			/* Index: 34 */
 };
 
 
@@ -2147,6 +2286,9 @@ static struct sd_chain_index	sd_chain_index_map[] = {
 	{ SD_CHAIN_USCSI_CHKSUM_IOSTART,	SD_CHAIN_USCSI_CHKSUM_IODONE },
 	{ SD_CHAIN_DIRECT_CMD_IOSTART,		SD_CHAIN_DIRECT_CMD_IODONE },
 	{ SD_CHAIN_PRIORITY_CMD_IOSTART,	SD_CHAIN_PRIORITY_CMD_IODONE },
+	{ SD_CHAIN_MSS_CHKSUM_IOSTART,		SD_CHAIN_MSS_CHKSUM_IODONE },
+	{ SD_CHAIN_MSS_CHKSUM_IOSTART_NO_PM, SD_CHAIN_MSS_CHKSUM_IODONE_NO_PM },
+
 };
 
 
@@ -2158,9 +2300,13 @@ static struct sd_chain_index	sd_chain_index_map[] = {
 #define	SD_CHAIN_INFO_DISK		0
 #define	SD_CHAIN_INFO_DISK_NO_PM	1
 #define	SD_CHAIN_INFO_RMMEDIA		2
+#define	SD_CHAIN_INFO_MSS_DISK		2
 #define	SD_CHAIN_INFO_RMMEDIA_NO_PM	3
+#define	SD_CHAIN_INFO_MSS_DSK_NO_PM	3
 #define	SD_CHAIN_INFO_CHKSUM		4
 #define	SD_CHAIN_INFO_CHKSUM_NO_PM	5
+#define	SD_CHAIN_INFO_MSS_DISK_CHKSUM	10
+#define	SD_CHAIN_INFO_MSS_DISK_CHKSUM_NO_PM	11
 
 /* un->un_uscsi_chain_type must be set to one of these */
 #define	SD_CHAIN_INFO_USCSI_CMD		6
@@ -3967,6 +4113,16 @@ sd_set_properties(struct sd_lun *un, char *name, char *value)
 		    "min throttle set to %d\n", un->un_min_throttle);
 	}
 
+	if (strcasecmp(name, "rmw-type") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_f_rmw_type = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "RMW type set to %d\n", un->un_f_rmw_type);
+	}
+
 	/*
 	 * Validate the throttle values.
 	 * If any of the numbers are invalid, set everything to defaults.
@@ -4996,7 +5152,10 @@ sd_update_block_info(struct sd_lun *un, uint32_t lbasize, uint64_t capacity)
 {
 	if (lbasize != 0) {
 		un->un_tgt_blocksize = lbasize;
-		un->un_f_tgt_blocksize_is_valid	= TRUE;
+		un->un_f_tgt_blocksize_is_valid = TRUE;
+		if (!un->un_f_has_removable_media) {
+			un->un_sys_blocksize = lbasize;
+		}
 	}
 
 	if (capacity != 0) {
@@ -5290,7 +5449,7 @@ sd_get_devid(sd_ssc_t *ssc)
 	/* Calculate the checksum */
 	chksum = 0;
 	ip = (uint_t *)dkdevid;
-	for (i = 0; i < ((un->un_sys_blocksize - sizeof (int))/sizeof (int));
+	for (i = 0; i < ((DEV_BSIZE - sizeof (int)) / sizeof (int));
 	    i++) {
 		chksum ^= ip[i];
 	}
@@ -5386,6 +5545,7 @@ static int
 sd_write_deviceid(sd_ssc_t *ssc)
 {
 	struct dk_devid		*dkdevid;
+	uchar_t			*buf;
 	diskaddr_t		blk;
 	uint_t			*ip, chksum;
 	int			status;
@@ -5406,7 +5566,8 @@ sd_write_deviceid(sd_ssc_t *ssc)
 
 
 	/* Allocate the buffer */
-	dkdevid = kmem_zalloc(un->un_sys_blocksize, KM_SLEEP);
+	buf = kmem_zalloc(un->un_sys_blocksize, KM_SLEEP);
+	dkdevid = (struct dk_devid *)buf;
 
 	/* Fill in the revision */
 	dkdevid->dkd_rev_hi = DK_DEVID_REV_MSB;
@@ -5421,7 +5582,7 @@ sd_write_deviceid(sd_ssc_t *ssc)
 	/* Calculate the checksum */
 	chksum = 0;
 	ip = (uint_t *)dkdevid;
-	for (i = 0; i < ((un->un_sys_blocksize - sizeof (int))/sizeof (int));
+	for (i = 0; i < ((DEV_BSIZE - sizeof (int)) / sizeof (int));
 	    i++) {
 		chksum ^= ip[i];
 	}
@@ -5430,12 +5591,12 @@ sd_write_deviceid(sd_ssc_t *ssc)
 	DKD_FORMCHKSUM(chksum, dkdevid);
 
 	/* Write the reserved sector */
-	status = sd_send_scsi_WRITE(ssc, dkdevid, un->un_sys_blocksize, blk,
+	status = sd_send_scsi_WRITE(ssc, buf, un->un_sys_blocksize, blk,
 	    SD_PATH_DIRECT);
 	if (status != 0)
 		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 
-	kmem_free(dkdevid, un->un_sys_blocksize);
+	kmem_free(buf, un->un_sys_blocksize);
 
 	mutex_enter(SD_MUTEX(un));
 	return (status);
@@ -5903,6 +6064,14 @@ sd_ddi_suspend(dev_info_t *devi)
 		mutex_exit(&un->un_pm_mutex);
 	}
 
+	if (un->un_rmw_msg_timeid != NULL) {
+		timeout_id_t temp_id = un->un_rmw_msg_timeid;
+		un->un_rmw_msg_timeid = NULL;
+		mutex_exit(SD_MUTEX(un));
+		(void) untimeout(temp_id);
+		mutex_enter(SD_MUTEX(un));
+	}
+
 	if (un->un_retry_timeid != NULL) {
 		timeout_id_t temp_id = un->un_retry_timeid;
 		un->un_retry_timeid = NULL;
@@ -6217,7 +6386,7 @@ sd_pm_idletimeout_handler(void *arg)
 		} else {
 			un->un_buf_chain_type = SD_CHAIN_INFO_DISK;
 		}
-		un->un_uscsi_chain_type  = SD_CHAIN_INFO_USCSI_CMD;
+		un->un_uscsi_chain_type = SD_CHAIN_INFO_USCSI_CMD;
 
 		SD_TRACE(SD_LOG_IO_PM, un,
 		    "sd_pm_idletimeout_handler: idling device\n");
@@ -6839,6 +7008,7 @@ sd_unit_attach(dev_info_t *devi)
 	struct	scsi_device	*devp;
 	struct	sd_lun		*un;
 	char			*variantp;
+	char			name_str[48];
 	int	reservation_flag = SD_TARGET_IS_UNRESERVED;
 	int	instance;
 	int	rval;
@@ -7267,6 +7437,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * meaning a non-zero value must be entered to change the default.
 	 */
 	un->un_f_disksort_disabled = FALSE;
+	un->un_f_rmw_type = SD_RMW_TYPE_DEFAULT;
 
 	/*
 	 * Retrieve the properties from the static driver table or the driver
@@ -7906,6 +8077,24 @@ sd_unit_attach(dev_info_t *devi)
 	un->un_f_write_cache_enabled = (wc_enabled != 0);
 	mutex_exit(SD_MUTEX(un));
 
+	if (un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR &&
+	    un->un_tgt_blocksize != DEV_BSIZE) {
+		if (!(un->un_wm_cache)) {
+			(void) snprintf(name_str, sizeof (name_str),
+			    "%s%d_cache",
+			    ddi_driver_name(SD_DEVINFO(un)),
+			    ddi_get_instance(SD_DEVINFO(un)));
+			un->un_wm_cache = kmem_cache_create(
+			    name_str, sizeof (struct sd_w_map),
+			    8, sd_wm_cache_constructor,
+			    sd_wm_cache_destructor, NULL,
+			    (void *)un, NULL, 0);
+			if (!(un->un_wm_cache)) {
+				goto wm_cache_failed;
+			}
+		}
+	}
+
 	/*
 	 * Check the value of the NV_SUP bit and set
 	 * un_f_suppress_cache_flush accordingly.
@@ -7994,7 +8183,7 @@ sd_unit_attach(dev_info_t *devi)
 	/*
 	 * An error occurred during the attach; clean up & return failure.
 	 */
-
+wm_cache_failed:
 devid_failed:
 
 setup_pm_failed:
@@ -8052,6 +8241,15 @@ spinup_failed:
 	if (un->un_reset_throttle_timeid != NULL) {
 		timeout_id_t temp_id = un->un_reset_throttle_timeid;
 		un->un_reset_throttle_timeid = NULL;
+		mutex_exit(SD_MUTEX(un));
+		(void) untimeout(temp_id);
+		mutex_enter(SD_MUTEX(un));
+	}
+
+	/* Cancel rmw warning message timeouts */
+	if (un->un_rmw_msg_timeid != NULL) {
+		timeout_id_t temp_id = un->un_rmw_msg_timeid;
+		un->un_rmw_msg_timeid = NULL;
 		mutex_exit(SD_MUTEX(un));
 		(void) untimeout(temp_id);
 		mutex_enter(SD_MUTEX(un));
@@ -8265,6 +8463,14 @@ sd_unit_detach(dev_info_t *devi)
 	if (un->un_startstop_timeid != NULL) {
 		timeout_id_t temp_id = un->un_startstop_timeid;
 		un->un_startstop_timeid = NULL;
+		mutex_exit(SD_MUTEX(un));
+		(void) untimeout(temp_id);
+		mutex_enter(SD_MUTEX(un));
+	}
+
+	if (un->un_rmw_msg_timeid != NULL) {
+		timeout_id_t temp_id = un->un_rmw_msg_timeid;
+		un->un_rmw_msg_timeid = NULL;
 		mutex_exit(SD_MUTEX(un));
 		(void) untimeout(temp_id);
 		mutex_enter(SD_MUTEX(un));
@@ -10288,7 +10494,9 @@ sd_ready_and_valid(sd_ssc_t *ssc, int part)
 	 * a media is changed this routine will be called and the
 	 * block size is a function of media rather than device.
 	 */
-	if (un->un_f_non_devbsize_supported && NOT_DEVBSIZE(un)) {
+	if ((un->un_f_rmw_type != SD_RMW_TYPE_RETURN_ERROR ||
+	    un->un_f_non_devbsize_supported) &&
+	    un->un_tgt_blocksize != DEV_BSIZE) {
 		if (!(un->un_wm_cache)) {
 			(void) snprintf(name_str, sizeof (name_str),
 			    "%s%d_cache",
@@ -10518,17 +10726,20 @@ sdread(dev_t dev, struct uio *uio, cred_t *cred_p)
 	/*
 	 * Read requests are restricted to multiples of the system block size.
 	 */
-	secmask = un->un_sys_blocksize - 1;
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+		secmask = un->un_tgt_blocksize - 1;
+	else
+		secmask = DEV_BSIZE - 1;
 
 	if (uio->uio_loffset & ((offset_t)(secmask))) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdread: file offset not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else if (uio->uio_iov->iov_len & (secmask)) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdread: transfer length not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else {
 		err = physio(sdstrategy, NULL, dev, B_READ, sdmin, uio);
@@ -10604,17 +10815,20 @@ sdwrite(dev_t dev, struct uio *uio, cred_t *cred_p)
 	/*
 	 * Write requests are restricted to multiples of the system block size.
 	 */
-	secmask = un->un_sys_blocksize - 1;
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+		secmask = un->un_tgt_blocksize - 1;
+	else
+		secmask = DEV_BSIZE - 1;
 
 	if (uio->uio_loffset & ((offset_t)(secmask))) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdwrite: file offset not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else if (uio->uio_iov->iov_len & (secmask)) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdwrite: transfer length not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else {
 		err = physio(sdstrategy, NULL, dev, B_WRITE, sdmin, uio);
@@ -10690,17 +10904,20 @@ sdaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 	/*
 	 * Read requests are restricted to multiples of the system block size.
 	 */
-	secmask = un->un_sys_blocksize - 1;
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+		secmask = un->un_tgt_blocksize - 1;
+	else
+		secmask = DEV_BSIZE - 1;
 
 	if (uio->uio_loffset & ((offset_t)(secmask))) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdaread: file offset not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else if (uio->uio_iov->iov_len & (secmask)) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdaread: transfer length not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else {
 		err = aphysio(sdstrategy, anocancel, dev, B_READ, sdmin, aio);
@@ -10776,17 +10993,20 @@ sdawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 	/*
 	 * Write requests are restricted to multiples of the system block size.
 	 */
-	secmask = un->un_sys_blocksize - 1;
+	if (un->un_f_rmw_type == SD_RMW_TYPE_RETURN_ERROR)
+		secmask = un->un_tgt_blocksize - 1;
+	else
+		secmask = DEV_BSIZE - 1;
 
 	if (uio->uio_loffset & ((offset_t)(secmask))) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdawrite: file offset not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else if (uio->uio_iov->iov_len & (secmask)) {
 		SD_ERROR(SD_LOG_READ_WRITE, un,
 		    "sdawrite: transfer length not modulo %d\n",
-		    un->un_sys_blocksize);
+		    secmask + 1);
 		err = EINVAL;
 	} else {
 		err = aphysio(sdstrategy, anocancel, dev, B_WRITE, sdmin, aio);
@@ -11012,6 +11232,7 @@ sdstrategy(struct buf *bp)
 		biodone(bp);
 		return (0);
 	}
+
 	/* As was done in the past, fail new cmds. if state is dumping. */
 	if (un->un_state == SD_STATE_DUMPING) {
 		bioerror(bp, ENXIO);
@@ -11150,6 +11371,27 @@ sd_xbuf_init(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 		/* FALLTHRU */
 	case SD_CHAIN_BUFIO:
 		index = un->un_buf_chain_type;
+		if ((!un->un_f_has_removable_media) &&
+		    (un->un_tgt_blocksize != 0) &&
+		    (un->un_tgt_blocksize != DEV_BSIZE)) {
+			int secmask = 0, blknomask = 0;
+			blknomask =
+			    (un->un_tgt_blocksize / DEV_BSIZE) - 1;
+			secmask = un->un_tgt_blocksize - 1;
+
+			if ((bp->b_lblkno & (blknomask)) ||
+			    (bp->b_bcount & (secmask))) {
+				if (un->un_f_rmw_type !=
+				    SD_RMW_TYPE_RETURN_ERROR) {
+					if (un->un_f_pm_is_enabled == FALSE)
+						index =
+						    SD_CHAIN_INFO_MSS_DSK_NO_PM;
+					else
+						index =
+						    SD_CHAIN_INFO_MSS_DISK;
+				}
+			}
+		}
 		break;
 	case SD_CHAIN_USCSI:
 		index = un->un_uscsi_chain_type;
@@ -12039,6 +12281,20 @@ sd_uscsi_iodone(int index, struct sd_lun *un, struct buf *bp)
  *		request would exceed partition range.  Converts
  *		partition-relative block address to absolute.
  *
+ *              Upon exit of this function:
+ *              1.I/O is aligned
+ *                 xp->xb_blkno represents the absolute sector address
+ *              2.I/O is misaligned
+ *                 xp->xb_blkno represents the absolute logical block address
+ *                 based on DEV_BSIZE. The logical block address will be
+ *                 converted to physical sector address in sd_mapblocksize_\
+ *                 iostart.
+ *              3.I/O is misaligned but is aligned in "overrun" buf
+ *                 xp->xb_blkno represents the absolute logical block address
+ *                 based on DEV_BSIZE. The logical block address will be
+ *                 converted to physical sector address in sd_mapblocksize_\
+ *                 iostart. But no RMW will be issued in this case.
+ *
  *     Context: Can sleep
  *
  *      Issues: This follows what the old code did, in terms of accessing
@@ -12060,6 +12316,8 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 	int	partition;
 	diskaddr_t	partition_offset;
 	struct sd_xbuf *xp;
+	int secmask = 0, blknomask = 0;
+	ushort_t is_aligned = TRUE;
 
 	ASSERT(un != NULL);
 	ASSERT(bp != NULL);
@@ -12116,6 +12374,57 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 	(void) cmlb_partinfo(un->un_cmlbhandle, partition,
 	    &nblocks, &partition_offset, NULL, NULL, (void *)SD_PATH_DIRECT);
 
+	blknomask = (un->un_tgt_blocksize / DEV_BSIZE) - 1;
+	secmask = un->un_tgt_blocksize - 1;
+
+	if ((bp->b_lblkno & (blknomask)) || (bp->b_bcount & (secmask))) {
+		is_aligned = FALSE;
+	}
+
+	if (!(NOT_DEVBSIZE(un))) {
+		/*
+		 * If I/O is aligned, no need to involve RMW(Read Modify Write)
+		 * Convert the logical block number to target's physical sector
+		 * number.
+		 */
+		if (is_aligned) {
+			xp->xb_blkno = SD_SYS2TGTBLOCK(un, xp->xb_blkno);
+		} else {
+			switch (un->un_f_rmw_type) {
+			case SD_RMW_TYPE_RETURN_ERROR:
+				bp->b_flags |= B_ERROR;
+				goto error_exit;
+
+			case SD_RMW_TYPE_DEFAULT:
+				mutex_enter(SD_MUTEX(un));
+				if (un->un_rmw_msg_timeid == NULL) {
+					scsi_log(SD_DEVINFO(un), sd_label,
+					    CE_WARN, "I/O request is not "
+					    "aligned with %d disk sector size. "
+					    "It is handled through Read Modify "
+					    "Write but the performance is "
+					    "very low.\n",
+					    un->un_tgt_blocksize);
+					un->un_rmw_msg_timeid =
+					    timeout(sd_rmw_msg_print_handler,
+					    un, SD_RMW_MSG_PRINT_TIMEOUT);
+				} else {
+					un->un_rmw_incre_count ++;
+				}
+				mutex_exit(SD_MUTEX(un));
+				break;
+
+			case SD_RMW_TYPE_NO_WARNING:
+			default:
+				break;
+			}
+
+			nblocks = SD_TGT2SYSBLOCK(un, nblocks);
+			partition_offset = SD_TGT2SYSBLOCK(un,
+			    partition_offset);
+		}
+	}
+
 	/*
 	 * blocknum is the starting block number of the request. At this
 	 * point it is still relative to the start of the minor device.
@@ -12136,7 +12445,7 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * a multiple of the system block size.
 	 */
 	if ((blocknum < 0) || (blocknum >= nblocks) ||
-	    ((bp->b_bcount & (un->un_sys_blocksize - 1)) != 0)) {
+	    ((bp->b_bcount & (DEV_BSIZE - 1)) != 0)) {
 		bp->b_flags |= B_ERROR;
 		goto error_exit;
 	}
@@ -12145,11 +12454,18 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * If the requsted # blocks exceeds the available # blocks, that
 	 * is an overrun of the partition.
 	 */
-	requested_nblocks = SD_BYTES2SYSBLOCKS(un, bp->b_bcount);
+	if ((!NOT_DEVBSIZE(un)) && is_aligned) {
+		requested_nblocks = SD_BYTES2TGTBLOCKS(un, bp->b_bcount);
+	} else {
+		requested_nblocks = SD_BYTES2SYSBLOCKS(bp->b_bcount);
+	}
+
 	available_nblocks = (size_t)(nblocks - blocknum);
 	ASSERT(nblocks >= blocknum);
 
 	if (requested_nblocks > available_nblocks) {
+		size_t resid;
+
 		/*
 		 * Allocate an "overrun" buf to allow the request to proceed
 		 * for the amount of space available in the partition. The
@@ -12158,8 +12474,14 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 		 * replaces the original buf here, and the original buf
 		 * is saved inside the overrun buf, for later use.
 		 */
-		size_t resid = SD_SYSBLOCKS2BYTES(un,
-		    (offset_t)(requested_nblocks - available_nblocks));
+		if ((!NOT_DEVBSIZE(un)) && is_aligned) {
+			resid = SD_TGTBLOCKS2BYTES(un,
+			    (offset_t)(requested_nblocks - available_nblocks));
+		} else {
+			resid = SD_SYSBLOCKS2BYTES(
+			    (offset_t)(requested_nblocks - available_nblocks));
+		}
+
 		size_t count = bp->b_bcount - resid;
 		/*
 		 * Note: count is an unsigned entity thus it'll NEVER
@@ -12318,7 +12640,7 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * un->un_sys_blocksize as its block size or if bcount == 0.
 	 * In this case there is no layer-private data block allocated.
 	 */
-	if ((un->un_tgt_blocksize == un->un_sys_blocksize) ||
+	if ((un->un_tgt_blocksize == DEV_BSIZE) ||
 	    (bp->b_bcount == 0)) {
 		goto done;
 	}
@@ -12333,7 +12655,7 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 
 	SD_INFO(SD_LOG_IO_RMMEDIA, un, "sd_mapblocksize_iostart: "
 	    "tgt_blocksize:0x%x sys_blocksize: 0x%x\n",
-	    un->un_tgt_blocksize, un->un_sys_blocksize);
+	    un->un_tgt_blocksize, DEV_BSIZE);
 	SD_INFO(SD_LOG_IO_RMMEDIA, un, "sd_mapblocksize_iostart: "
 	    "request start block:0x%x\n", xp->xb_blkno);
 	SD_INFO(SD_LOG_IO_RMMEDIA, un, "sd_mapblocksize_iostart: "
@@ -12376,7 +12698,7 @@ sd_mapblocksize_iostart(int index, struct sd_lun *un, struct buf *bp)
 	 * Note that end_block is actually the block that follows the last
 	 * block of the request, but that's what is needed for the computation.
 	 */
-	first_byte  = SD_SYSBLOCKS2BYTES(un, (offset_t)xp->xb_blkno);
+	first_byte  = SD_SYSBLOCKS2BYTES((offset_t)xp->xb_blkno);
 	start_block = xp->xb_blkno = first_byte / un->un_tgt_blocksize;
 	end_block   = (first_byte + bp->b_bcount + un->un_tgt_blocksize - 1) /
 	    un->un_tgt_blocksize;
@@ -12519,7 +12841,7 @@ sd_mapblocksize_iodone(int index, struct sd_lun *un, struct buf *bp)
 	 * There is no shadow buf or layer-private data if the target is
 	 * using un->un_sys_blocksize as its block size or if bcount == 0.
 	 */
-	if ((un->un_tgt_blocksize == un->un_sys_blocksize) ||
+	if ((un->un_tgt_blocksize == DEV_BSIZE) ||
 	    (bp->b_bcount == 0)) {
 		goto exit;
 	}
@@ -15550,6 +15872,48 @@ sd_start_retry_command(void *arg)
 	    "sd_start_retry_command: exit\n");
 }
 
+/*
+ *    Function: sd_rmw_msg_print_handler
+ *
+ * Description: If RMW mode is enabled and warning message is triggered
+ *              print I/O count during a fixed interval.
+ *
+ *   Arguments: arg - pointer to associated softstate for the device.
+ *
+ *     Context: timeout(9F) thread context. May not sleep.
+ */
+static void
+sd_rmw_msg_print_handler(void *arg)
+{
+	struct sd_lun *un = arg;
+
+	ASSERT(un != NULL);
+	ASSERT(!mutex_owned(SD_MUTEX(un)));
+
+	SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
+	    "sd_rmw_msg_print_handler: entry\n");
+
+	mutex_enter(SD_MUTEX(un));
+
+	if (un->un_rmw_incre_count > 0) {
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "%"PRIu64" I/O requests are not aligned with %d disk "
+		    "sector size in %ld seconds. They are handled through "
+		    "Read Modify Write but the performance is very low!\n",
+		    un->un_rmw_incre_count, un->un_tgt_blocksize,
+		    drv_hztousec(SD_RMW_MSG_PRINT_TIMEOUT) / 1000000);
+		un->un_rmw_incre_count = 0;
+		un->un_rmw_msg_timeid = timeout(sd_rmw_msg_print_handler,
+		    un, SD_RMW_MSG_PRINT_TIMEOUT);
+	} else {
+		un->un_rmw_msg_timeid = NULL;
+	}
+
+	mutex_exit(SD_MUTEX(un));
+
+	SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
+	    "sd_rmw_msg_print_handler: exit\n");
+}
 
 /*
  *    Function: sd_start_direct_priority_command
@@ -19336,6 +19700,7 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 	uint32_t		*capacity_buf;
 	uint64_t		capacity;
 	uint32_t		lbasize;
+	uint32_t		pbsize;
 	int			status;
 	struct sd_lun		*un;
 
@@ -19418,7 +19783,7 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 		if (capacity == 0xffffffff) {
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 			status = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity,
-			    &lbasize, path_flag);
+			    &lbasize, &pbsize, path_flag);
 			if (status != 0) {
 				return (status);
 			}
@@ -19467,10 +19832,11 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 	 * on the logical unit.  The actual logical block count will be
 	 * this value plus one.
 	 *
-	 * Currently the capacity is saved in terms of un->un_sys_blocksize,
-	 * so scale the capacity value to reflect this.
+	 * Currently, for removable media, the capacity is saved in terms
+	 * of un->un_sys_blocksize, so scale the capacity value to reflect this.
 	 */
-	capacity = (capacity + 1) * (lbasize / un->un_sys_blocksize);
+	if (un->un_f_has_removable_media)
+		capacity = (capacity + 1) * (lbasize / un->un_sys_blocksize);
 
 	/*
 	 * Copy the values from the READ CAPACITY command into the space
@@ -19504,15 +19870,19 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
  *		determine the device capacity in number of blocks and the
  *		device native block size.  If this function returns a failure,
  *		then the values in *capp and *lbap are undefined.
- *		This routine should always be called by
- *		sd_send_scsi_READ_CAPACITY which will appy any device
- *		specific adjustments to capacity and lbasize.
+ *		This routine should be called by sd_send_scsi_READ_CAPACITY
+ *              which will apply any device specific adjustments to capacity
+ *              and lbasize. One exception is it is also called by
+ *              sd_get_media_info_ext. In that function, there is no need to
+ *              adjust the capacity and lbasize.
  *
  *   Arguments: ssc   - ssc contains ptr to soft state struct for the target
  *		capp - ptr to unsigned 64-bit variable to receive the
  *			capacity value from the command.
  *		lbap - ptr to unsigned 32-bit varaible to receive the
  *			block size value from the command
+ *              psp  - ptr to unsigned 32-bit variable to receive the
+ *                      physical block size value from the command
  *		path_flag - SD_PATH_DIRECT to use the USCSI "direct" chain and
  *			the normal command waitq, or SD_PATH_DIRECT_PRIORITY
  *			to use the USCSI "direct" chain and bypass the normal
@@ -19533,7 +19903,7 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 
 static int
 sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
-	uint32_t *lbap, int path_flag)
+	uint32_t *lbap, uint32_t *psp, int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
 	struct	uscsi_cmd	ucmd_buf;
@@ -19541,6 +19911,8 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 	uint64_t		*capacity16_buf;
 	uint64_t		capacity;
 	uint32_t		lbasize;
+	uint32_t		pbsize;
+	uint32_t		lbpb_exp;
 	int			status;
 	struct sd_lun		*un;
 
@@ -19617,9 +19989,13 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 		 *  bytes 8-11: Block length in bytes
 		 *		(MSB in byte:8 & LSB in byte:11)
 		 *
+		 *  byte 13: LOGICAL BLOCKS PER PHYSICAL BLOCK EXPONENT
 		 */
 		capacity = BE_64(capacity16_buf[0]);
 		lbasize = BE_32(*(uint32_t *)&capacity16_buf[1]);
+		lbpb_exp = (BE_64(capacity16_buf[1]) >> 40) & 0x0f;
+
+		pbsize = lbasize << lbpb_exp;
 
 		/*
 		 * Done with capacity16_buf
@@ -19666,9 +20042,11 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 
 	*capp = capacity;
 	*lbap = lbasize;
+	*psp = pbsize;
 
 	SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_READ_CAPACITY_16: "
-	    "capacity:0x%llx  lbasize:0x%x\n", capacity, lbasize);
+	    "capacity:0x%llx  lbasize:0x%x, pbsize: 0x%x\n",
+	    capacity, lbasize, pbsize);
 
 	return (0);
 }
@@ -21443,6 +21821,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case DKIOCHOTPLUGGABLE:
 		case DKIOCINFO:
 		case DKIOCGMEDIAINFO:
+		case DKIOCGMEDIAINFOEXT:
 		case MHIOCENFAILFAST:
 		case MHIOCSTATUS:
 		case MHIOCTKOWN:
@@ -21507,6 +21886,11 @@ skip_ready_valid:
 	case DKIOCGMEDIAINFO:
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGMEDIAINFO\n");
 		err = sd_get_media_info(dev, (caddr_t)arg, flag);
+		break;
+
+	case DKIOCGMEDIAINFOEXT:
+		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCGMEDIAINFOEXT\n");
+		err = sd_get_media_info_ext(dev, (caddr_t)arg, flag);
 		break;
 
 	case DKIOCGGEOM:
@@ -22609,6 +22993,205 @@ no_assessment:
 	return (rval);
 }
 
+/*
+ *    Function: sd_get_media_info_ext
+ *
+ * Description: This routine is the driver entry point for handling ioctl
+ *		requests for the media type or command set profile used by the
+ *		drive to operate on the media (DKIOCGMEDIAINFOEXT). The
+ *		difference this ioctl and DKIOCGMEDIAINFO is the return value
+ *		of this ioctl contains both logical block size and physical
+ *		block size.
+ *
+ *
+ *   Arguments: dev	- the device number
+ *		arg	- pointer to user provided dk_minfo_ext structure
+ *			  specifying the media type, logical block size,
+ *			  physical block size and disk capacity.
+ *		flag	- this argument is a pass through to ddi_copyxxx()
+ *			  directly from the mode argument of ioctl().
+ *
+ * Return Code: 0
+ *		EACCESS
+ *		EFAULT
+ *		ENXIO
+ *		EIO
+ */
+
+static int
+sd_get_media_info_ext(dev_t dev, caddr_t arg, int flag)
+{
+	struct sd_lun		*un = NULL;
+	struct uscsi_cmd	com;
+	struct scsi_inquiry	*sinq;
+	struct dk_minfo_ext	media_info_ext;
+	u_longlong_t		media_capacity;
+	uint64_t		capacity;
+	uint_t			lbasize;
+	uint_t			pbsize;
+	uchar_t			*out_data;
+	uchar_t			*rqbuf;
+	int			rval = 0;
+	int			rtn;
+	sd_ssc_t		*ssc;
+
+	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL ||
+	    (un->un_state == SD_STATE_OFFLINE)) {
+		return (ENXIO);
+	}
+
+	SD_TRACE(SD_LOG_IOCTL_DKIO, un, "sd_get_media_info_ext: entry\n");
+
+	out_data = kmem_zalloc(SD_PROFILE_HEADER_LEN, KM_SLEEP);
+	rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
+	ssc = sd_ssc_init(un);
+
+	/* Issue a TUR to determine if the drive is ready with media present */
+	rval = sd_send_scsi_TEST_UNIT_READY(ssc, SD_CHECK_FOR_MEDIA);
+	if (rval == ENXIO) {
+		goto done;
+	} else if (rval != 0) {
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+	}
+
+	/* Now get configuration data */
+	if (ISCD(un)) {
+		media_info_ext.dki_media_type = DK_CDROM;
+
+		/* Allow SCMD_GET_CONFIGURATION to MMC devices only */
+		if (un->un_f_mmc_cap == TRUE) {
+			rtn = sd_send_scsi_GET_CONFIGURATION(ssc, &com, rqbuf,
+			    SENSE_LENGTH, out_data, SD_PROFILE_HEADER_LEN,
+			    SD_PATH_STANDARD);
+
+			if (rtn) {
+				/*
+				 * We ignore all failures for CD and need to
+				 * put the assessment before processing code
+				 * to avoid missing assessment for FMA.
+				 */
+				sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+				/*
+				 * Failed for other than an illegal request
+				 * or command not supported
+				 */
+				if ((com.uscsi_status == STATUS_CHECK) &&
+				    (com.uscsi_rqstatus == STATUS_GOOD)) {
+					if ((rqbuf[2] != KEY_ILLEGAL_REQUEST) ||
+					    (rqbuf[12] != 0x20)) {
+						rval = EIO;
+						goto no_assessment;
+					}
+				}
+			} else {
+				/*
+				 * The GET CONFIGURATION command succeeded
+				 * so set the media type according to the
+				 * returned data
+				 */
+				media_info_ext.dki_media_type = out_data[6];
+				media_info_ext.dki_media_type <<= 8;
+				media_info_ext.dki_media_type |= out_data[7];
+			}
+		}
+	} else {
+		/*
+		 * The profile list is not available, so we attempt to identify
+		 * the media type based on the inquiry data
+		 */
+		sinq = un->un_sd->sd_inq;
+		if ((sinq->inq_dtype == DTYPE_DIRECT) ||
+		    (sinq->inq_dtype == DTYPE_OPTICAL)) {
+			/* This is a direct access device  or optical disk */
+			media_info_ext.dki_media_type = DK_FIXED_DISK;
+
+			if ((bcmp(sinq->inq_vid, "IOMEGA", 6) == 0) ||
+			    (bcmp(sinq->inq_vid, "iomega", 6) == 0)) {
+				if ((bcmp(sinq->inq_pid, "ZIP", 3) == 0)) {
+					media_info_ext.dki_media_type = DK_ZIP;
+				} else if (
+				    (bcmp(sinq->inq_pid, "jaz", 3) == 0)) {
+					media_info_ext.dki_media_type = DK_JAZ;
+				}
+			}
+		} else {
+			/*
+			 * Not a CD, direct access or optical disk so return
+			 * unknown media
+			 */
+			media_info_ext.dki_media_type = DK_UNKNOWN;
+		}
+	}
+
+	/*
+	 * Now read the capacity so we can provide the lbasize,
+	 * pbsize and capacity.
+	 */
+	rval = sd_send_scsi_READ_CAPACITY_16(ssc, &capacity, &lbasize, &pbsize,
+	    SD_PATH_DIRECT);
+
+	if (rval != 0) {
+		rval = sd_send_scsi_READ_CAPACITY(ssc, &capacity, &lbasize,
+		    SD_PATH_DIRECT);
+
+		switch (rval) {
+		case 0:
+			pbsize = lbasize;
+			media_capacity = capacity;
+			/*
+			 * sd_send_scsi_READ_CAPACITY() reports capacity in
+			 * un->un_sys_blocksize chunks. So we need to convert
+			 * it into cap.lbsize chunks.
+			 */
+			if (un->un_f_has_removable_media) {
+				media_capacity *= un->un_sys_blocksize;
+				media_capacity /= lbasize;
+			}
+			break;
+		case EACCES:
+			rval = EACCES;
+			goto done;
+		default:
+			rval = EIO;
+			goto done;
+		}
+	} else {
+		media_capacity = capacity;
+	}
+
+	/*
+	 * If lun is expanded dynamically, update the un structure.
+	 */
+	mutex_enter(SD_MUTEX(un));
+	if ((un->un_f_blockcount_is_valid == TRUE) &&
+	    (un->un_f_tgt_blocksize_is_valid == TRUE) &&
+	    (capacity > un->un_blockcount)) {
+		sd_update_block_info(un, lbasize, capacity);
+	}
+	mutex_exit(SD_MUTEX(un));
+
+	media_info_ext.dki_lbsize = lbasize;
+	media_info_ext.dki_capacity = media_capacity;
+	media_info_ext.dki_pbsize = pbsize;
+
+	if (ddi_copyout(&media_info_ext, arg, sizeof (struct dk_minfo_ext),
+	    flag)) {
+		rval = EFAULT;
+		goto no_assessment;
+	}
+done:
+	if (rval != 0) {
+		if (rval == EIO)
+			sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
+		else
+			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+	}
+no_assessment:
+	sd_ssc_fini(ssc);
+	kmem_free(out_data, SD_PROFILE_HEADER_LEN);
+	kmem_free(rqbuf, SENSE_LENGTH);
+	return (rval);
+}
 
 /*
  *    Function: sd_check_media
@@ -24700,17 +25283,51 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	partition = SDPART(dev);
 	SD_INFO(SD_LOG_DUMP, un, "sddump: partition = %d\n", partition);
 
+	if (!(NOT_DEVBSIZE(un))) {
+		int secmask = 0;
+		int blknomask = 0;
+
+		blknomask = (un->un_tgt_blocksize / DEV_BSIZE) - 1;
+		secmask = un->un_tgt_blocksize - 1;
+
+		if (blkno & blknomask) {
+			SD_TRACE(SD_LOG_DUMP, un,
+			    "sddump: dump start block not modulo %d\n",
+			    un->un_tgt_blocksize);
+			return (EINVAL);
+		}
+
+		if ((nblk * DEV_BSIZE) & secmask) {
+			SD_TRACE(SD_LOG_DUMP, un,
+			    "sddump: dump length not modulo %d\n",
+			    un->un_tgt_blocksize);
+			return (EINVAL);
+		}
+
+	}
+
 	/* Validate blocks to dump at against partition size. */
 
 	(void) cmlb_partinfo(un->un_cmlbhandle, partition,
 	    &nblks, &start_block, NULL, NULL, (void *)SD_PATH_DIRECT);
 
-	if ((blkno + nblk) > nblks) {
-		SD_TRACE(SD_LOG_DUMP, un,
-		    "sddump: dump range larger than partition: "
-		    "blkno = 0x%x, nblk = 0x%x, dkl_nblk = 0x%x\n",
-		    blkno, nblk, nblks);
-		return (EINVAL);
+	if (NOT_DEVBSIZE(un)) {
+		if ((blkno + nblk) > nblks) {
+			SD_TRACE(SD_LOG_DUMP, un,
+			    "sddump: dump range larger than partition: "
+			    "blkno = 0x%x, nblk = 0x%x, dkl_nblk = 0x%x\n",
+			    blkno, nblk, nblks);
+			return (EINVAL);
+		}
+	} else {
+		if (((blkno / (un->un_tgt_blocksize / DEV_BSIZE)) +
+		    (nblk / (un->un_tgt_blocksize / DEV_BSIZE))) > nblks) {
+			SD_TRACE(SD_LOG_DUMP, un,
+			    "sddump: dump range larger than partition: "
+			    "blkno = 0x%x, nblk = 0x%x, dkl_nblk = 0x%x\n",
+			    blkno, nblk, nblks);
+			return (EINVAL);
+		}
 	}
 
 	mutex_enter(&un->un_pm_mutex);
@@ -24813,7 +25430,12 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	 * Convert the partition-relative block number to a
 	 * disk physical block number.
 	 */
-	blkno += start_block;
+	if (NOT_DEVBSIZE(un)) {
+		blkno += start_block;
+	} else {
+		blkno = blkno / (un->un_tgt_blocksize / DEV_BSIZE);
+		blkno += start_block;
+	}
 
 	SD_INFO(SD_LOG_DUMP, un, "sddump: disk blkno = 0x%x\n", blkno);
 
@@ -24900,6 +25522,10 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 
 	dma_resid = wr_bp->b_bcount;
 	oblkno = blkno;
+
+	if (!(NOT_DEVBSIZE(un))) {
+		nblk = nblk / (un->un_tgt_blocksize / DEV_BSIZE);
+	}
 
 	while (dma_resid != 0) {
 
@@ -29894,7 +30520,7 @@ sd_tg_rdwr(dev_info_t *devi, uchar_t cmd, void *bufaddr,
 		 * sys_blocksize != tgt_blocksize, need to re-adjust
 		 * blkno and save the index to beginning of dk_label
 		 */
-		first_byte  = SD_SYSBLOCKS2BYTES(un, start_block);
+		first_byte  = SD_SYSBLOCKS2BYTES(start_block);
 		real_addr = first_byte / un->un_tgt_blocksize;
 
 		end_block = (first_byte + reqlength +

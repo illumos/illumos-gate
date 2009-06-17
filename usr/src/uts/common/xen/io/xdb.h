@@ -113,6 +113,8 @@ struct xdb {
 	uint32_t	xs_type;
 	/* # of total sectors */
 	uint64_t	xs_sectors;
+	/* sector size if existed */
+	uint_t		xs_sec_size;
 	/* blkif I/O request ring buffer */
 	xendev_ring_t	*xs_ring;
 	/* handle to access the ring buffer */

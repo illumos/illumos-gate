@@ -185,6 +185,7 @@ efi_alloc_and_init(int fd, uint32_t nparts, struct dk_gpt **vtoc)
 	vptr->efi_last_lba = capacity - 1;
 	vptr->efi_altern_lba = capacity -1;
 	vptr->efi_last_u_lba = vptr->efi_last_lba - nblocks;
+
 	(void) uuid_generate((uchar_t *)&uuid);
 	UUID_LE_CONVERT(vptr->efi_disk_uguid, uuid);
 	return (0);
@@ -437,7 +438,6 @@ efi_read(int fd, struct dk_gpt *vtoc)
 			vtoc->efi_flags |= EFI_GPT_PRIMARY_CORRUPT;
 			vtoc->efi_nparts =
 			    LE_32(efi->efi_gpt_NumberOfPartitionEntries);
-
 			/*
 			 * Partition tables are between backup GPT header
 			 * table and ParitionEntryLBA (the starting LBA of
@@ -446,7 +446,9 @@ efi_read(int fd, struct dk_gpt *vtoc)
 			 * dk_ioc.dki_data, we try to get GUID partition
 			 * entry array here.
 			 */
-			dk_ioc.dki_data++;
+			/* LINTED */
+			dk_ioc.dki_data = (efi_gpt_t *)((char *)dk_ioc.dki_data
+			    + disk_info.dki_lbsize);
 			if (legacy_label)
 				dk_ioc.dki_length = disk_info.dki_capacity - 1 -
 				    dk_ioc.dki_lba;
@@ -468,7 +470,9 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	} else if (rval == 0) {
 
 		dk_ioc.dki_lba = LE_64(efi->efi_gpt_PartitionEntryLBA);
-		dk_ioc.dki_data++;
+		/* LINTED */
+		dk_ioc.dki_data = (efi_gpt_t *)((char *)dk_ioc.dki_data
+		    + disk_info.dki_lbsize);
 		dk_ioc.dki_length = label_len - disk_info.dki_lbsize;
 		rval = efi_ioctl(fd, DKIOCGETEFI, &dk_ioc);
 
@@ -565,20 +569,32 @@ write_pmbr(int fd, struct dk_gpt *vtoc)
 	struct mboot	mb;
 	uchar_t		*cp;
 	diskaddr_t	size_in_lba;
+	uchar_t		*buf;
+	int		len;
+
+	len = (vtoc->efi_lbasize == 0) ? sizeof (mb) : vtoc->efi_lbasize;
+	buf = calloc(len, 1);
 
 	/*
 	 * Preserve any boot code and disk signature if the first block is
 	 * already an MBR.
 	 */
 	dk_ioc.dki_lba = 0;
-	dk_ioc.dki_length = sizeof (mb);
+	dk_ioc.dki_length = len;
 	/* LINTED -- always longlong aligned */
-	dk_ioc.dki_data = (efi_gpt_t *)&mb;
-	if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc) == -1 ||
-	    mb.signature != LE_16(MBB_MAGIC)) {
+	dk_ioc.dki_data = (efi_gpt_t *)buf;
+	if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc) == -1) {
+		(void *) memcpy(&mb, buf, sizeof (mb));
 		bzero(&mb, sizeof (mb));
 		mb.signature = LE_16(MBB_MAGIC);
+	} else {
+		(void *) memcpy(&mb, buf, sizeof (mb));
+		if (mb.signature != LE_16(MBB_MAGIC)) {
+			bzero(&mb, sizeof (mb));
+			mb.signature = LE_16(MBB_MAGIC);
+		}
 	}
+
 	bzero(&mb.parts, sizeof (mb.parts));
 	cp = (uchar_t *)&mb.parts[0];
 	/* bootable or not */
@@ -611,11 +627,14 @@ write_pmbr(int fd, struct dk_gpt *vtoc)
 		*cp++ = 0xff;
 		*cp++ = 0xff;
 	}
+
+	(void *) memcpy(buf, &mb, sizeof (mb));
 	/* LINTED -- always longlong aligned */
-	dk_ioc.dki_data = (efi_gpt_t *)&mb;
+	dk_ioc.dki_data = (efi_gpt_t *)buf;
 	dk_ioc.dki_lba = 0;
-	dk_ioc.dki_length = sizeof (mb);
+	dk_ioc.dki_length = len;
 	if (efi_ioctl(fd, DKIOCSETEFI, &dk_ioc) == -1) {
+		free(buf);
 		switch (errno) {
 		case EIO:
 			return (VT_EIO);
@@ -625,6 +644,7 @@ write_pmbr(int fd, struct dk_gpt *vtoc)
 			return (VT_ERROR);
 		}
 	}
+	free(buf);
 	return (0);
 }
 
@@ -873,7 +893,6 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	 * for backup GPT header.
 	 */
 	lba_backup_gpt_hdr = vtoc->efi_last_u_lba + 1 + nblocks;
-
 	if ((dk_ioc.dki_data = calloc(dk_ioc.dki_length, 1)) == NULL)
 		return (VT_ERROR);
 
@@ -894,7 +913,7 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	UUID_LE_CONVERT(efi->efi_gpt_DiskGUID, vtoc->efi_disk_uguid);
 
 	/* LINTED -- always longlong aligned */
-	efi_parts = (efi_gpe_t *)((char *)dk_ioc.dki_data + sizeof (efi_gpt_t));
+	efi_parts = (efi_gpe_t *)((char *)dk_ioc.dki_data + vtoc->efi_lbasize);
 
 	for (i = 0; i < vtoc->efi_nparts; i++) {
 		for (j = 0;
@@ -965,10 +984,14 @@ efi_write(int fd, struct dk_gpt *vtoc)
 		free(dk_ioc.dki_data);
 		return (0);
 	}
+
 	/* write backup partition array */
 	dk_ioc.dki_lba = vtoc->efi_last_u_lba + 1;
 	dk_ioc.dki_length -= vtoc->efi_lbasize;
-	dk_ioc.dki_data++;
+	/* LINTED */
+	dk_ioc.dki_data = (efi_gpt_t *)((char *)dk_ioc.dki_data +
+	    vtoc->efi_lbasize);
+
 	if (efi_ioctl(fd, DKIOCSETEFI, &dk_ioc) == -1) {
 		/*
 		 * we wrote the primary label okay, so don't fail
@@ -987,7 +1010,9 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	 */
 	dk_ioc.dki_lba = lba_backup_gpt_hdr;
 	dk_ioc.dki_length = vtoc->efi_lbasize;
-	dk_ioc.dki_data--;
+	/* LINTED */
+	dk_ioc.dki_data = (efi_gpt_t *)((char *)dk_ioc.dki_data -
+	    vtoc->efi_lbasize);
 	efi->efi_gpt_AlternateLBA = LE_64(1ULL);
 	efi->efi_gpt_MyLBA = LE_64(lba_backup_gpt_hdr);
 	efi->efi_gpt_PartitionEntryLBA = LE_64(vtoc->efi_last_u_lba + 1);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DEFECT_H
 #define	_DEFECT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -82,16 +79,6 @@ struct defect_list {
 #define	LISTCOUNT	2
 
 /*
- * This defines the size (in sectors) of the defect array given the number
- * of defects in the array.  It must be rounded to a sector boundary since
- * that is the atomic disk size.  We make a zero length list use up a
- * sector because it is convenient to have malloc'd space in every
- * non-null list.
- */
-#define	LISTSIZE(x)	((x) ? ((x) * sizeof (struct defect_entry) + \
-			SECSIZE - 1) / SECSIZE : 1)
-
-/*
  * These defines are the flags for the defect list.
  */
 #define	LIST_DIRTY	0x01	/* List needs to be synced */
@@ -134,6 +121,15 @@ void	add_ldef(diskaddr_t blkno, struct defect_list *list);
 void	add_def(struct defect_entry *def, struct defect_list *list,
 		int index);
 void	kill_deflist(struct defect_list *list);
+
+/*
+ * This defines the size (in sectors) of the defect array given the number
+ * of defects in the array.  It must be rounded to a sector boundary since
+ * that is the atomic disk size.  We make a zero length list use up a
+ * sector because it is convenient to have malloc'd space in every
+ * non-null list.
+ */
+int	deflist_size(int secsz, int sz);
 
 #ifdef	__cplusplus
 }

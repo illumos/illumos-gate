@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,7 +92,8 @@ d_restore()
 	if (cur_list.list != NULL) {
 		work_list.header = cur_list.header;
 		work_list.list = (struct defect_entry *)zalloc(
-		    LISTSIZE(work_list.header.count) * SECSIZE);
+		    deflist_size(cur_blksz, work_list.header.count) *
+		    cur_blksz);
 		for (i = 0; i < work_list.header.count; i++)
 			*(work_list.list + i) = *(cur_list.list + i);
 	}
@@ -230,7 +231,7 @@ and may take a long while. Continue"))
 				fmt_print("Extraction complete.\n");
 				fmt_print(
 "Working list updated, total of %d defects.\n\n",
-				work_list.header.count);
+				    work_list.header.count);
 			} else {
 				fmt_print("Extraction failed.\n\n");
 			}
@@ -277,7 +278,7 @@ d_add()
 	ioparam.io_bounds.lower = 0;
 	ioparam.io_bounds.upper = 1;
 	type = input(FIO_INT, "Select input format (enter its number)", ':',
-		&ioparam, &deflt, DATA_INPUT);
+	    &ioparam, &deflt, DATA_INPUT);
 	fmt_print("\nEnter Control-C to terminate.\n");
 loop:
 	if (type) {
@@ -288,9 +289,9 @@ loop:
 		def.bfi = def.nbits = UNKNOWN;
 		ioparam.io_bounds.lower = 0;
 		if (cur_disk->label_type == L_TYPE_SOLARIS) {
-		    ioparam.io_bounds.upper = physsects() - 1;
+			ioparam.io_bounds.upper = physsects() - 1;
 		} else {
-		    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
+			ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
 		}
 		bn = input(FIO_BN, "Enter defective block number", ':',
 		    &ioparam, (int *)NULL, DATA_INPUT);
@@ -349,7 +350,7 @@ loop:
 		work_list.header.magicno = (uint_t)DEFECT_MAGIC;
 		work_list.header.count = 0;
 		work_list.list = (struct defect_entry *)zalloc(
-		    LISTSIZE(0) * SECSIZE);
+		    deflist_size(cur_blksz, 0) * cur_blksz);
 	}
 	/*
 	 * Add the defect to the working list.
@@ -420,9 +421,11 @@ d_delete()
 	 * If the size of the list in sectors has changed, reallocate
 	 * the list to shrink it appropriately.
 	 */
-	if (LISTSIZE(count - 1) < LISTSIZE(count))
+	if (deflist_size(cur_blksz, count - 1) <
+	    deflist_size(cur_blksz, count))
 		work_list.list = (struct defect_entry *)rezalloc(
-		    (void *)work_list.list, LISTSIZE(count - 1) * SECSIZE);
+		    (void *)work_list.list,
+		    deflist_size(cur_blksz, count - 1) * cur_blksz);
 	/*
 	 * Decrement the defect count.
 	 */
@@ -488,7 +491,7 @@ d_print()
 		 * before going on.
 		 */
 		if (one_line ||
-			(!nomore && ((i + 1) % (tty_lines - 1) == 0))) {
+		    (!nomore && ((i + 1) % (tty_lines - 1) == 0))) {
 			/*
 			 * Get the next character.
 			 */
@@ -574,8 +577,8 @@ d_dump()
 	 * Print a header containing the magic number, count, and checksum.
 	 */
 	(void) fprintf(fptr, "0x%08x%8d  0x%08x\n",
-		work_list.header.magicno,
-		work_list.header.count, work_list.header.cksum);
+	    work_list.header.magicno,
+	    work_list.header.count, work_list.header.cksum);
 	/*
 	 * Loop through each defect in the working list.  Write the
 	 * defect info to the defect file.
@@ -583,8 +586,8 @@ d_dump()
 	for (i = 0; i < work_list.header.count; i++) {
 		dptr = work_list.list + i;
 		(void) fprintf(fptr, "%4d%8d%7d%8d%8d%8d\n",
-			i+1, dptr->cyl, dptr->head,
-			dptr->bfi, dptr->nbits, dptr->sect);
+		    i+1, dptr->cyl, dptr->head,
+		    dptr->bfi, dptr->nbits, dptr->sect);
 	}
 	fmt_print("defect file updated, total of %d defects.\n", i);
 	/*
@@ -663,13 +666,13 @@ d_load()
 	 * Scan in the header.
 	 */
 	items = fscanf(fptr, "0x%x%d  0x%x\n", &magicno,
-		&count, (uint_t *)&cksum);
+	    &count, (uint_t *)&cksum);
 	/*
 	 * If the header is wrong, this isn't a good defect file.
 	 */
 	if (items != 3 || count < 0 ||
 	    (magicno != (uint_t)DEFECT_MAGIC &&
-				magicno != (uint_t)NO_CHECKSUM)) {
+	    magicno != (uint_t)NO_CHECKSUM)) {
 		err_print("Defect file is corrupted.\n");
 		status = -1;
 		goto out;
@@ -690,8 +693,8 @@ d_load()
 	/*
 	 * Allocate space for the new list.
 	 */
-	work_list.list = (struct defect_entry *)zalloc(LISTSIZE(count) *
-	    SECSIZE);
+	work_list.list = (struct defect_entry *)zalloc(
+	    deflist_size(cur_blksz, count) * cur_blksz);
 	/*
 	 * Mark the working list dirty since we are modifying it.
 	 */
@@ -806,14 +809,14 @@ commit_list()
 		work_list.header.magicno = (uint_t)DEFECT_MAGIC;
 		work_list.header.count = 0;
 		work_list.list = (struct defect_entry *)zalloc(
-		    LISTSIZE(0) * SECSIZE);
+		    deflist_size(cur_blksz, 0) * cur_blksz);
 	}
 	/*
 	 * Copy the working list into the current list.
 	 */
 	cur_list.header = work_list.header;
 	cur_list.list = (struct defect_entry *)zalloc(
-	    LISTSIZE(cur_list.header.count) * SECSIZE);
+	    deflist_size(cur_blksz, cur_list.header.count) * cur_blksz);
 	for (i = 0; i < cur_list.header.count; i++)
 		*(cur_list.list + i) = *(work_list.list + i);
 	/*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,12 +183,12 @@ a_print()
 	 * Loop through the data buffer.
 	 */
 	lines = 0;
-	for (i = 0; i < scan_size * SECSIZE / sizeof (int); i += 6) {
+	for (i = 0; i < scan_size * cur_blksz / sizeof (int); i += 6) {
 		/*
 		 * Print the data.
 		 */
 		for (j = 0; j < 6; j++)
-			if (i + j < scan_size * SECSIZE / sizeof (int))
+			if (i + j < scan_size * cur_blksz / sizeof (int))
 				fmt_print("0x%08x  ",
 				    *((int *)((int *)cur_buf + i + j)));
 		fmt_print("\n");

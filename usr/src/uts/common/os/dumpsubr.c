@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,12 +255,12 @@ dumpinit(vnode_t *vp, char *name, int justchecking)
 		if (VOP_OPEN(&cdev_vp, FREAD | FWRITE, kcred, NULL) == 0) {
 			size_t blk_size;
 			struct dk_cinfo dki;
-			struct extvtoc vtoc;
+			struct dk_minfo minf;
 
-			if (VOP_IOCTL(cdev_vp, DKIOCGEXTVTOC, (intptr_t)&vtoc,
-			    FKIOCTL, kcred, NULL, NULL) == 0 &&
-			    vtoc.v_sectorsz != 0)
-				blk_size = vtoc.v_sectorsz;
+			if (VOP_IOCTL(cdev_vp, DKIOCGMEDIAINFO,
+			    (intptr_t)&minf, FKIOCTL, kcred, NULL, NULL)
+			    == 0 && minf.dki_lbsize != 0)
+				blk_size = minf.dki_lbsize;
 			else
 				blk_size = DEV_BSIZE;
 

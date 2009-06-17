@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,8 +121,8 @@ generic_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
 	offset_t	tmpsec, status, tmpblk;
 	int		ret;
 
-	tmpsec = (offset_t)secnt * UBSIZE;
-	tmpblk = (offset_t)blkno * UBSIZE;
+	tmpsec = (offset_t)secnt * cur_blksz;
+	tmpblk = (offset_t)blkno * cur_blksz;
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
 	/* Use "p0" file to seek/read the data  */

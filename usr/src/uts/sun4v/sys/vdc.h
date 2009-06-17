@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,6 +97,10 @@ extern "C" {
  * (NOTE: Uses the same format and definitions as the sd(7D) driver)
  */
 #define	VD_MAKE_DEV(instance, minor)	((instance << VDCUNIT_SHIFT) | minor)
+
+#define	VDC_EFI_DEV_SET(dev, vdsk, ioctl)	\
+	VDSK_EFI_DEV_SET(dev, vdsk, ioctl,	\
+	    (vdsk)->vdisk_bsize, (vdsk)->vdisk_size)
 
 /*
  * variables controlling how long to wait before timing out and how many
@@ -302,7 +306,9 @@ typedef struct vdc {
 	uint32_t	vdisk_media;	/* physical media type of vDisk */
 	uint64_t	vdisk_size;	/* device size in blocks */
 	uint64_t	max_xfer_sz;	/* maximum block size of a descriptor */
-	uint64_t	block_size;	/* device block size used */
+	uint64_t	vdisk_bsize;	/* blk size for the virtual disk */
+	uint32_t	vio_bmask;	/* mask to check vio blk alignment */
+	int		vio_bshift;	/* shift for vio blk conversion */
 	uint64_t	operations;	/* bitmask of ops. server supports */
 	struct dk_cinfo	*cinfo;		/* structure to store DKIOCINFO data */
 	struct dk_minfo	*minfo;		/* structure for DKIOCGMEDIAINFO data */

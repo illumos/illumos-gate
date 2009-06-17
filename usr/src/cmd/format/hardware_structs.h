@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,8 @@ struct disk_info {
 	char			v_volume[LEN_DKL_VVOL];
 						/* volume name from label */
 						/* (no terminating null) */
+	uint_t			disk_lbasize;	/* disk block size */
+
 };
 
 #define	NSPECIFICS	8

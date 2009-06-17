@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -521,11 +521,11 @@ typedef	struct vd_efi_dev {
 	vd_efi_ioctl_func vdisk_ioctl;	/* vdisk ioctl function */
 } vd_efi_dev_t;
 
-#define	VD_EFI_DEV_SET(efi_dev, vdsk, ioctl)		\
-	(efi_dev).vdisk = vdsk;				\
-	(efi_dev).vdisk_ioctl = ioctl;			\
-	(efi_dev).block_size = (vdsk)->block_size;	\
-	(efi_dev).disk_size = (vdsk)->vdisk_size;
+#define	VDSK_EFI_DEV_SET(efi_dev, vdsk, ioctl, bsize, dsize)	\
+	(efi_dev).vdisk = vdsk;					\
+	(efi_dev).vdisk_ioctl = ioctl;				\
+	(efi_dev).block_size = bsize;				\
+	(efi_dev).disk_size = dsize;
 
 
 int vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **gpt, efi_gpe_t **gpe);

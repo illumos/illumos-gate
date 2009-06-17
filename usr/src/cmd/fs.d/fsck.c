@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<errno.h>
@@ -39,9 +36,12 @@
 #include	<sys/wait.h>
 #include	<sys/vfstab.h>
 #include	<sys/mntent.h>
+#include	<sys/sysmacros.h>
 #include	<locale.h>
 #include	<libintl.h>
+#include	<sys/dkio.h>
 
+#define	DEV_BSIZE	512
 #define	ARGV_MAX	16
 #define	FSTYPE_MAX	8
 #define	VFS_PATH	"/usr/lib/fs"
@@ -217,10 +217,13 @@ main(int argc, char *argv[])
 	int	questflg = 0, Fflg = 0, Vflg = 0, sanity = 0;
 	char	*subopt;
 	FILE	*fd = NULL;
+	int	devfd;
 	struct vfstab	vget, vref;
+	struct dk_minfo dkminfo;
 	int preencnt = 0;
 	struct devlist *dp, *devs = NULL;
 	int status;
+	uint_t lbs;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -408,6 +411,7 @@ main(int argc, char *argv[])
 				myname);
 			exit(1);
 		}
+
 		while (optind < argc) {
 			/*
 			 * If "-F FStype" is specified, use that fs type.
@@ -464,6 +468,32 @@ try_again:
 
 				case FSCKDEV:
 					vref.vfs_fsckdev = argv[optind];
+
+					/*
+					 * Check the media sector size
+					 */
+					if (((devfd = open(vref.vfs_fsckdev,
+					    O_RDWR)) >= 0) && (ioctl(devfd,
+					    DKIOCGMEDIAINFO, &dkminfo) !=
+					    -1)) {
+						lbs =  dkminfo.dki_lbsize;
+						if (lbs != 0 && ISP2(lbs /
+						    DEV_BSIZE) &&
+						    lbs != DEV_BSIZE) {
+							fprintf(stderr,
+							    gettext("The device"
+							    " sector size is"
+							    " not supported by"
+							    " fsck\n"));
+							(void) close(devfd);
+							exit(1);
+						}
+					}
+
+					if (devfd >= 0) {
+						(void) close(devfd);
+					}
+
 					if ((ret = mygetvfsany(fd, &vget,
 						&vref)) == -1 ||
 						vget.vfs_fstype == NULL) {

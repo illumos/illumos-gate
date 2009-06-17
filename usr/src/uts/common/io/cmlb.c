@@ -1287,6 +1287,9 @@ cmlb_check_update_blockcount(struct cmlb_lun *cl, void *tg_cookie)
 	if ((capacity != 0) && (lbasize != 0)) {
 		cl->cl_blockcount = capacity;
 		cl->cl_tgt_blocksize = lbasize;
+		if (!cl->cl_is_removable) {
+			cl->cl_sys_blocksize = lbasize;
+		}
 		return (0);
 	} else {
 		return (EIO);
@@ -1592,7 +1595,7 @@ cmlb_validate_geometry(struct cmlb_lun *cl, boolean_t forcerevalid, int flags,
 
 		label_addr = (daddr_t)(cl->cl_solaris_offset + DK_LABEL_LOC);
 
-		buffer_size = sizeof (struct dk_label);
+		buffer_size = cl->cl_sys_blocksize;
 
 		cmlb_dbg(CMLB_TRACE, cl, "cmlb_validate_geometry: "
 		    "label_addr: 0x%x allocation size: 0x%x\n",
@@ -2198,12 +2201,6 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 #endif
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
-
-	if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize) {
-		rval = EINVAL;
-		goto done_err1;
-	}
-
 
 	lbasize = cl->cl_sys_blocksize;
 
@@ -3637,7 +3634,7 @@ cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
 	}
 
 	buffer = kmem_alloc(EFI_MIN_ARRAY_SIZE, KM_SLEEP);
-	rval = DK_TG_READ(cl, buffer, 1, DEV_BSIZE, tg_cookie);
+	rval = DK_TG_READ(cl, buffer, 1, cl->cl_sys_blocksize, tg_cookie);
 	if (rval != 0)
 		goto done_error;
 
@@ -4048,9 +4045,9 @@ cmlb_clear_efi(struct cmlb_lun *cl, void *tg_cookie)
 	cl->cl_reserved = -1;
 	mutex_exit(CMLB_MUTEX(cl));
 
-	gpt = kmem_alloc(sizeof (efi_gpt_t), KM_SLEEP);
+	gpt = kmem_alloc(cl->cl_sys_blocksize, KM_SLEEP);
 
-	if (DK_TG_READ(cl, gpt, 1, DEV_BSIZE, tg_cookie) != 0) {
+	if (DK_TG_READ(cl, gpt, 1, cl->cl_sys_blocksize, tg_cookie) != 0) {
 		goto done;
 	}
 
@@ -4059,7 +4056,8 @@ cmlb_clear_efi(struct cmlb_lun *cl, void *tg_cookie)
 	if (rval == 0) {
 		/* clear primary */
 		bzero(gpt, sizeof (efi_gpt_t));
-		if (rval = DK_TG_WRITE(cl, gpt, 1, EFI_LABEL_SIZE, tg_cookie)) {
+		if (rval = DK_TG_WRITE(cl, gpt, 1, cl->cl_sys_blocksize,
+		    tg_cookie)) {
 			cmlb_dbg(CMLB_INFO,  cl,
 			    "cmlb_clear_efi: clear primary label failed\n");
 		}
@@ -4070,8 +4068,8 @@ cmlb_clear_efi(struct cmlb_lun *cl, void *tg_cookie)
 		goto done;
 	}
 
-	if ((rval = DK_TG_READ(cl, gpt, cap - 1, EFI_LABEL_SIZE, tg_cookie))
-	    != 0) {
+	if ((rval = DK_TG_READ(cl, gpt, cap - 1, cl->cl_sys_blocksize,
+	    tg_cookie)) != 0) {
 		goto done;
 	}
 	cmlb_swap_efi_gpt(gpt);
@@ -4081,7 +4079,7 @@ cmlb_clear_efi(struct cmlb_lun *cl, void *tg_cookie)
 		cmlb_dbg(CMLB_TRACE,  cl,
 		    "cmlb_clear_efi clear backup@%lu\n", cap - 1);
 		bzero(gpt, sizeof (efi_gpt_t));
-		if ((rval = DK_TG_WRITE(cl,  gpt, cap - 1, EFI_LABEL_SIZE,
+		if ((rval = DK_TG_WRITE(cl,  gpt, cap - 1, cl->cl_sys_blocksize,
 		    tg_cookie))) {
 			cmlb_dbg(CMLB_INFO,  cl,
 			    "cmlb_clear_efi: clear backup label failed\n");
@@ -4092,7 +4090,7 @@ cmlb_clear_efi(struct cmlb_lun *cl, void *tg_cookie)
 		 * header of this file
 		 */
 		if ((rval = DK_TG_READ(cl, gpt, cap - 2,
-		    EFI_LABEL_SIZE, tg_cookie)) != 0) {
+		    cl->cl_sys_blocksize, tg_cookie)) != 0) {
 			goto done;
 		}
 		cmlb_swap_efi_gpt(gpt);
@@ -4104,7 +4102,7 @@ cmlb_clear_efi(struct cmlb_lun *cl, void *tg_cookie)
 			    cap - 2);
 			bzero(gpt, sizeof (efi_gpt_t));
 			if ((rval = DK_TG_WRITE(cl,  gpt, cap - 2,
-			    EFI_LABEL_SIZE, tg_cookie))) {
+			    cl->cl_sys_blocksize, tg_cookie))) {
 				cmlb_dbg(CMLB_INFO,  cl,
 				"cmlb_clear_efi: clear legacy backup label "
 				"failed\n");
@@ -4113,7 +4111,7 @@ cmlb_clear_efi(struct cmlb_lun *cl, void *tg_cookie)
 	}
 
 done:
-	kmem_free(gpt, sizeof (efi_gpt_t));
+	kmem_free(gpt, cl->cl_sys_blocksize);
 }
 
 /*
@@ -4210,7 +4208,7 @@ cmlb_clear_vtoc(struct cmlb_lun *cl, void *tg_cookie)
 	struct dk_label		*dkl;
 
 	mutex_exit(CMLB_MUTEX(cl));
-	dkl = kmem_zalloc(sizeof (struct dk_label), KM_SLEEP);
+	dkl = kmem_zalloc(cl->cl_sys_blocksize, KM_SLEEP);
 	mutex_enter(CMLB_MUTEX(cl));
 	/*
 	 * cmlb_set_vtoc uses these fields in order to figure out
@@ -4223,7 +4221,7 @@ cmlb_clear_vtoc(struct cmlb_lun *cl, void *tg_cookie)
 	dkl->dkl_nsect  = cl->cl_g.dkg_nsect;
 	mutex_exit(CMLB_MUTEX(cl));
 	(void) cmlb_set_vtoc(cl, dkl, tg_cookie);
-	kmem_free(dkl, sizeof (struct dk_label));
+	kmem_free(dkl, cl->cl_sys_blocksize);
 
 	mutex_enter(CMLB_MUTEX(cl));
 }
@@ -4258,7 +4256,7 @@ cmlb_write_label(struct cmlb_lun *cl, void *tg_cookie)
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 	mutex_exit(CMLB_MUTEX(cl));
-	dkl = kmem_zalloc(sizeof (struct dk_label), KM_SLEEP);
+	dkl = kmem_zalloc(cl->cl_sys_blocksize, KM_SLEEP);
 	mutex_enter(CMLB_MUTEX(cl));
 
 	bcopy(&cl->cl_vtoc, &dkl->dkl_vtoc, sizeof (struct dk_vtoc));
@@ -4303,7 +4301,7 @@ cmlb_write_label(struct cmlb_lun *cl, void *tg_cookie)
 
 	rval = cmlb_set_vtoc(cl, dkl, tg_cookie);
 exit:
-	kmem_free(dkl, sizeof (struct dk_label));
+	kmem_free(dkl, cl->cl_sys_blocksize);
 	mutex_enter(CMLB_MUTEX(cl));
 	return (rval);
 }
@@ -4422,7 +4420,7 @@ cmlb_dkio_get_mboot(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 	/*
 	 * Read the mboot block, located at absolute block 0 on the target.
 	 */
-	buffer_size = sizeof (struct mboot);
+	buffer_size = cl->cl_sys_blocksize;
 
 	cmlb_dbg(CMLB_TRACE,  cl,
 	    "cmlb_dkio_get_mboot: allocation size: 0x%x\n", buffer_size);
@@ -4481,18 +4479,18 @@ cmlb_dkio_set_mboot(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 		return (EINVAL);
 	}
 
-	mboot = kmem_zalloc(sizeof (struct mboot), KM_SLEEP);
+	mboot = kmem_zalloc(cl->cl_sys_blocksize, KM_SLEEP);
 
 	if (ddi_copyin((const void *)arg, mboot,
-	    sizeof (struct mboot), flag) != 0) {
-		kmem_free(mboot, (size_t)(sizeof (struct mboot)));
+	    cl->cl_sys_blocksize, flag) != 0) {
+		kmem_free(mboot, cl->cl_sys_blocksize);
 		return (EFAULT);
 	}
 
 	/* Is this really a master boot record? */
 	magic = LE_16(mboot->signature);
 	if (magic != MBB_MAGIC) {
-		kmem_free(mboot, (size_t)(sizeof (struct mboot)));
+		kmem_free(mboot, cl->cl_sys_blocksize);
 		return (EINVAL);
 	}
 
@@ -4508,7 +4506,7 @@ cmlb_dkio_set_mboot(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 		rval = cmlb_update_fdisk_and_vtoc(cl, tg_cookie);
 		if ((!cl->cl_f_geometry_is_valid) || (rval != 0)) {
 			mutex_exit(CMLB_MUTEX(cl));
-			kmem_free(mboot, (size_t)(sizeof (struct mboot)));
+			kmem_free(mboot, cl->cl_sys_blocksize);
 			return (rval);
 		}
 	}
@@ -4529,7 +4527,7 @@ cmlb_dkio_set_mboot(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 #endif
 	cl->cl_msglog_flag |= CMLB_ALLOW_2TB_WARN;
 	mutex_exit(CMLB_MUTEX(cl));
-	kmem_free(mboot, (size_t)(sizeof (struct mboot)));
+	kmem_free(mboot, cl->cl_sys_blocksize);
 	return (rval);
 }
 
@@ -5098,10 +5096,10 @@ fallback:	return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 	    (diskaddr_t *)&nblocks64, NULL, NULL, NULL, tg_cookie);
 
 	/*
-	 * Assume partition information is in DEV_BSIZE units, compute
+	 * Assume partition information is in sys_blocksize units, compute
 	 * divisor for size(9P) property representation.
 	 */
-	dblk = lbasize / DEV_BSIZE;
+	dblk = lbasize / cl->cl_sys_blocksize;
 
 	/* Now let ddi_prop_op_nblocks_blksize() handle the request. */
 	return (ddi_prop_op_nblocks_blksize(dev, dip, prop_op, mod_flags,

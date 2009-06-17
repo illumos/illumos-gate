@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -867,7 +867,7 @@ bn2mb(uint64_t nblks)
 	float	n;
 
 	n = (float)nblks / 1024.0;
-	return ((n / 1024.0) * DEV_BSIZE);
+	return ((n / 1024.0) * cur_blksz);
 }
 
 
@@ -876,7 +876,7 @@ mb2bn(float mb)
 {
 	diskaddr_t	n;
 
-	n = (diskaddr_t)(mb * 1024.0 * (1024.0 / DEV_BSIZE));
+	n = (diskaddr_t)(mb * 1024.0 * (1024.0 / cur_blksz));
 	return (n);
 }
 
@@ -886,7 +886,7 @@ bn2gb(uint64_t nblks)
 	float	n;
 
 	n = (float)nblks / (1024.0 * 1024.0);
-	return ((n/1024.0) * DEV_BSIZE);
+	return ((n/1024.0) * cur_blksz);
 
 }
 
@@ -896,7 +896,7 @@ bn2tb(uint64_t nblks)
 	float	n;
 
 	n = (float)nblks / (1024.0 * 1024.0 * 1024.0);
-	return ((n/1024.0) * DEV_BSIZE);
+	return ((n/1024.0) * cur_blksz);
 }
 
 diskaddr_t
@@ -904,7 +904,7 @@ gb2bn(float gb)
 {
 	diskaddr_t	n;
 
-	n = (diskaddr_t)(gb * 1024.0 * 1024.0 * (1024.0 / DEV_BSIZE));
+	n = (diskaddr_t)(gb * 1024.0 * 1024.0 * (1024.0 / cur_blksz));
 	return (n);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -365,6 +365,7 @@ init_globals(disk)
 	cur_label = cur_disk->label_type;
 	cur_ctlr = cur_disk->disk_ctlr;
 	cur_parts = cur_disk->disk_parts;
+	cur_blksz = cur_disk->disk_lbasize;
 	cur_ctype = cur_ctlr->ctlr_ctype;
 	cur_ops = cur_ctype->ctype_ops;
 	cur_flags = 0;
@@ -439,8 +440,8 @@ init_globals(disk)
 		/*
 		 * Allocate the buffers.
 		 */
-		cur_buf = (void *) zalloc(BUF_SECTS * SECSIZE);
-		pattern_buf = (void *) zalloc(BUF_SECTS * SECSIZE);
+		cur_buf = (void *) zalloc(BUF_SECTS * cur_blksz);
+		pattern_buf = (void *) zalloc(BUF_SECTS * cur_blksz);
 
 		/*
 		 * Tell the user which disk (s)he selected.

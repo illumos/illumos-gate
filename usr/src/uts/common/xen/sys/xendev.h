@@ -52,6 +52,7 @@ extern "C" {
 /*
  * Xenbus property interfaces, initialized by backend disk driver
  */
+#define	XBP_SECTOR_SIZE	"sector-size"		/* backend prop: uint */
 #define	XBP_SECTORS	"sectors"		/* backend prop: uint64 */
 #define	XBP_INFO	"info"			/* backend prop: uint */
 #define	XBP_FB		"feature-barrier"	/* backend prop: boolean int */

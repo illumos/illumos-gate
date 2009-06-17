@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * make file system for udfs (UDF - ISO13346)
@@ -298,7 +296,7 @@ main(int32_t argc, int8_t *argv[])
 	if ((temp_secsz = get_bsize()) != 0) {
 		sectorsize = temp_secsz;
 	}
-
+	
 	/* Get old file system information */
 	isfs = readvolseq();
 
@@ -1337,6 +1335,7 @@ get_bsize()
 {
 	struct dk_cinfo info;
 	struct fd_char fd_char;
+	struct dk_minfo dkminfo;
 
 	if (ioctl(fso, DKIOCINFO, &info) < 0) {
 		perror("mkfs DKIOCINFO ");
@@ -1350,6 +1349,18 @@ get_bsize()
 		case DKC_CDROM :
 			return (2048);
 		case DKC_SCSI_CCS :
+			if (ioctl(fso, DKIOCGMEDIAINFO, &dkminfo) != -1) {
+				if (dkminfo.dki_lbsize != 0 &&
+				    POWEROF2(dkminfo.dki_lbsize / DEV_BSIZE) &&
+				    dkminfo.dki_lbsize != DEV_BSIZE) {
+					fprintf(stderr,
+					    gettext("The device sector size "
+					    "%u is not supported by udfs!\n"),
+					    dkminfo.dki_lbsize);
+					(void) close(fso);
+					exit(1);
+				}
+			}
 			/* FALLTHROUGH */
 		case DKC_INTEL82072 :
 			/* FALLTHROUGH */

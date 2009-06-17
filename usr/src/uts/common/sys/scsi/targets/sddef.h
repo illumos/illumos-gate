@@ -438,7 +438,8 @@ struct sd_lun {
 						/* SYNC CACHE needs to be */
 						/* sent in sdclose */
 	    un_f_devid_transport_defined :1,	/* devid defined by transport */
-	    un_f_reserved		:12;
+	    un_f_rmw_type		 :2,	/* RMW type */
+	    un_f_reserved		:10;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -477,6 +478,8 @@ struct sd_lun {
 	struct kmem_cache *un_wm_cache;	/* fast alloc in non-512 write case */
 	uint_t		un_rmw_count;	/* count of read-modify-writes */
 	struct sd_w_map	*un_wm;		/* head of sd_w_map chain */
+	uint64_t	un_rmw_incre_count;	/* count I/O */
+	timeout_id_t	un_rmw_msg_timeid;	/* for RMW message control */
 
 	/* For timeout callback to issue a START STOP UNIT command */
 	timeout_id_t	un_startstop_timeid;
@@ -560,12 +563,12 @@ struct sd_lun {
 	(blockcount * (un)->un_tgt_blocksize)
 
 /* Convert a byte count to a number of system blocks */
-#define	SD_BYTES2SYSBLOCKS(un, bytecount)				\
-	((bytecount + (un->un_sys_blocksize - 1))/un->un_sys_blocksize)
+#define	SD_BYTES2SYSBLOCKS(bytecount)				\
+	((bytecount + (DEV_BSIZE - 1))/DEV_BSIZE)
 
 /* Convert a system block count to a number of bytes */
-#define	SD_SYSBLOCKS2BYTES(un, blockcount)				\
-	(blockcount * (un)->un_sys_blocksize)
+#define	SD_SYSBLOCKS2BYTES(blockcount)				\
+	(blockcount * DEV_BSIZE)
 
 /*
  * Calculate the number of bytes needed to hold the requested number of bytes
@@ -579,13 +582,19 @@ struct sd_lun {
  * to the system block location.
  */
 #define	SD_TGTBYTEOFFSET(un, sysblk, tgtblk)				\
-	(SD_SYSBLOCKS2BYTES(un, sysblk) - SD_TGTBLOCKS2BYTES(un, tgtblk))
+	(SD_SYSBLOCKS2BYTES(sysblk) - SD_TGTBLOCKS2BYTES(un, tgtblk))
 
 /*
  * Calculate the target block location from the system block location
  */
 #define	SD_SYS2TGTBLOCK(un, blockcnt)					\
-	((blockcnt * un->un_sys_blocksize) / un->un_tgt_blocksize)
+	(blockcnt / ((un)->un_tgt_blocksize / DEV_BSIZE))
+
+/*
+ * Calculate the target block location from the system block location
+ */
+#define	SD_TGT2SYSBLOCK(un, blockcnt)					\
+	(blockcnt * ((un)->un_tgt_blocksize / DEV_BSIZE))
 
 /*
  * SD_DEFAULT_MAX_XFER_SIZE is the default value to bound the max xfer
@@ -768,6 +777,12 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
 #define	SD_WTYPE_RMW	0x002	/* Write requires read-modify-write */
 #define	SD_WM_BUSY		0x100	/* write-map is busy */
 
+/*
+ * RMW type
+ */
+#define	SD_RMW_TYPE_DEFAULT	0	/* do rmw with warning message */
+#define	SD_RMW_TYPE_NO_WARNING	1	/* do rmw without warning message */
+#define	SD_RMW_TYPE_RETURN_ERROR	2	/* rmw disabled */
 
 /* Device error kstats */
 struct sd_errstats {
@@ -1676,6 +1691,11 @@ struct sd_fm_internal {
  * 100 msec. is what we'll wait for restarted commands.
  */
 #define	SD_RESTART_TIMEOUT		(drv_usectohz((clock_t)100000))
+
+/*
+ * 10s misaligned I/O warning message interval
+ */
+#define	SD_RMW_MSG_PRINT_TIMEOUT	(drv_usectohz((clock_t)10000000))
 
 /*
  * 100 msec. is what we'll wait for certain retries for fibre channel

@@ -478,7 +478,6 @@ vreq_setup(xdf_t *vdp, v_req_t *vreq)
 		if (!ALIGNED_XFER(bp)) {
 			if (bp->b_flags & (B_PAGEIO | B_PHYS))
 				bp_mapin(bp);
-
 			rc = ddi_dma_mem_alloc(vreq->v_memdmahdl,
 			    roundup(bp->b_bcount, XB_BSIZE), &xc_acc_attr,
 			    DDI_DMA_STREAMING, xdf_dmacallback, (caddr_t)vdp,
@@ -1638,11 +1637,13 @@ xdf_get_flush_block(xdf_t *vdp)
 	/*
 	 * Get a DEV_BSIZE aligned bufer
 	 */
-	vdp->xdf_flush_mem = kmem_alloc(DEV_BSIZE * 2, KM_SLEEP);
+	vdp->xdf_flush_mem = kmem_alloc(vdp->xdf_xdev_secsize * 2, KM_SLEEP);
 	vdp->xdf_cache_flush_block =
-	    (char *)P2ROUNDUP((uintptr_t)(vdp->xdf_flush_mem), DEV_BSIZE);
+	    (char *)P2ROUNDUP((uintptr_t)(vdp->xdf_flush_mem),
+	    (int)vdp->xdf_xdev_secsize);
+
 	if (xdf_lb_rdwr(vdp->xdf_dip, TG_READ, vdp->xdf_cache_flush_block,
-	    xdf_flush_block, DEV_BSIZE, NULL) != 0)
+	    xdf_flush_block, vdp->xdf_xdev_secsize, NULL) != 0)
 		return (DDI_FAILURE);
 	return (DDI_SUCCESS);
 }
@@ -1746,7 +1747,7 @@ xdf_synthetic_pgeom(dev_info_t *dip, cmlb_geom_t *geomp)
 	geomp->g_acyl = 0;
 	geomp->g_nhead = XDF_NHEADS;
 	geomp->g_nsect = XDF_NSECTS;
-	geomp->g_secsize = XB_BSIZE;
+	geomp->g_secsize = vdp->xdf_xdev_secsize;
 	geomp->g_capacity = vdp->xdf_xdev_nblocks;
 	geomp->g_intrlv = 0;
 	geomp->g_rpm = 7200;
@@ -1764,6 +1765,7 @@ xdf_setstate_connected(xdf_t *vdp)
 	dev_info_t	*dip = vdp->xdf_dip;
 	cmlb_geom_t	pgeom;
 	diskaddr_t	nblocks = 0;
+	uint_t		secsize = 0;
 	char		*oename, *xsname, *str;
 	uint_t		dinfo;
 
@@ -1793,6 +1795,7 @@ xdf_setstate_connected(xdf_t *vdp)
 	 */
 	if (xenbus_gather(XBT_NULL, oename,
 	    XBP_SECTORS, "%"SCNu64, &nblocks,
+	    XBP_SECTOR_SIZE, "%u", &secsize,
 	    XBP_INFO, "%u", &dinfo,
 	    NULL) != 0) {
 		cmn_err(CE_WARN, "xdf@%s: xdf_setstate_connected: "
@@ -1808,7 +1811,10 @@ xdf_setstate_connected(xdf_t *vdp)
 		dinfo |= VDISK_CDROM;
 	strfree(str);
 
+	if (secsize == 0 || !(ISP2(secsize / DEV_BSIZE)))
+		secsize = DEV_BSIZE;
 	vdp->xdf_xdev_nblocks = nblocks;
+	vdp->xdf_xdev_secsize = secsize;
 #ifdef _ILP32
 	if (vdp->xdf_xdev_nblocks > DK_MAX_BLOCKS) {
 		cmn_err(CE_WARN, "xdf@%s: xdf_setstate_connected: "
@@ -2373,6 +2379,14 @@ xdf_lb_getattribute(dev_info_t *dip, tg_attribute_t *tgattributep)
 int
 xdf_lb_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 {
+	int instance;
+	xdf_t   *vdp;
+
+	instance = ddi_get_instance(dip);
+
+	if ((vdp = ddi_get_soft_state(xdf_ssp, instance)) == NULL)
+		return (ENXIO);
+
 	switch (cmd) {
 	case TG_GETPHYGEOM:
 		return (xdf_lb_getpgeom(dip, (cmlb_geom_t *)arg));
@@ -2381,7 +2395,9 @@ xdf_lb_getinfo(dev_info_t *dip, int cmd, void *arg, void *tg_cookie)
 	case TG_GETCAPACITY:
 		return (xdf_lb_getcap(dip, (diskaddr_t *)arg));
 	case TG_GETBLOCKSIZE:
-		*(uint32_t *)arg = XB_BSIZE;
+		mutex_enter(&vdp->xdf_cb_lk);
+		*(uint32_t *)arg = vdp->xdf_xdev_secsize;
+		mutex_exit(&vdp->xdf_cb_lk);
 		return (0);
 	case TG_GETATTR:
 		return (xdf_lb_getattribute(dip, (tg_attribute_t *)arg));
@@ -2404,7 +2420,8 @@ xdf_lb_rdwr(dev_info_t *dip, uchar_t cmd, void *bufp,
 	/* We don't allow IO from the oe_change callback thread */
 	ASSERT(curthread != vdp->xdf_oe_change_thread);
 
-	if ((start + (reqlen >> DEV_BSHIFT)) > vdp->xdf_pgeom.g_capacity)
+	if ((start + ((reqlen / (vdp->xdf_xdev_secsize / DEV_BSIZE))
+	    >> DEV_BSHIFT)) > vdp->xdf_pgeom.g_capacity)
 		return (EINVAL);
 
 	bp = getrbuf(KM_SLEEP);
@@ -2412,9 +2429,10 @@ xdf_lb_rdwr(dev_info_t *dip, uchar_t cmd, void *bufp,
 		bp->b_flags = B_BUSY | B_READ;
 	else
 		bp->b_flags = B_BUSY | B_WRITE;
+
 	bp->b_un.b_addr = bufp;
 	bp->b_bcount = reqlen;
-	bp->b_blkno = start;
+	bp->b_blkno = start * (vdp->xdf_xdev_secsize / DEV_BSIZE);
 	bp->b_edev = DDI_DEV_T_NONE; /* don't have dev_t */
 
 	mutex_enter(&vdp->xdf_dev_lk);
@@ -2582,7 +2600,7 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case DKIOCGMEDIAINFO: {
 		struct dk_minfo media_info;
 
-		media_info.dki_lbsize = DEV_BSIZE;
+		media_info.dki_lbsize = vdp->xdf_xdev_secsize;
 		media_info.dki_capacity = vdp->xdf_pgeom.g_capacity;
 		if (XD_IS_CD(vdp))
 			media_info.dki_media_type = DK_CDROM;
@@ -2664,7 +2682,7 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		    !xdf_barrier_flush_disable) {
 			rv = xdf_lb_rdwr(vdp->xdf_dip, TG_WRITE,
 			    vdp->xdf_cache_flush_block, xdf_flush_block,
-			    DEV_BSIZE, (void *)dev);
+			    vdp->xdf_xdev_secsize, (void *)dev);
 		} else {
 			return (ENOTTY);
 		}
@@ -2686,6 +2704,7 @@ xdf_strategy(struct buf *bp)
 	xdf_t	*vdp;
 	minor_t minor;
 	diskaddr_t p_blkct, p_blkst;
+	daddr_t blkno;
 	ulong_t nblks;
 	int part;
 
@@ -2726,16 +2745,24 @@ xdf_strategy(struct buf *bp)
 		mutex_enter(&vdp->xdf_dev_lk);
 	}
 
+	/*
+	 * Adjust the real blkno and bcount according to the underline
+	 * physical sector size.
+	 */
+	blkno = bp->b_blkno / (vdp->xdf_xdev_secsize / XB_BSIZE);
+
 	/* check for a starting block beyond the disk or partition limit */
-	if (bp->b_blkno > p_blkct) {
+	if (blkno > p_blkct) {
 		DPRINTF(IO_DBG, ("xdf@%s: block %lld exceeds VBD size %"PRIu64,
-		    vdp->xdf_addr, (longlong_t)bp->b_blkno, (uint64_t)p_blkct));
+		    vdp->xdf_addr, (longlong_t)blkno, (uint64_t)p_blkct));
+		mutex_exit(&vdp->xdf_dev_lk);
 		xdf_io_err(bp, EINVAL, 0);
 		return (0);
 	}
 
 	/* Legacy: don't set error flag at this case */
-	if (bp->b_blkno == p_blkct) {
+	if (blkno == p_blkct) {
+		mutex_exit(&vdp->xdf_dev_lk);
 		bp->b_resid = bp->b_bcount;
 		biodone(bp);
 		return (0);
@@ -2747,14 +2774,29 @@ xdf_strategy(struct buf *bp)
 	bp->av_back = bp->av_forw = NULL;
 
 	/* Adjust for partial transfer, this will result in an error later */
-	nblks = bp->b_bcount >> XB_BSHIFT;
-	if ((bp->b_blkno + nblks) > p_blkct) {
-		bp->b_resid = ((bp->b_blkno + nblks) - p_blkct) << XB_BSHIFT;
+	if (vdp->xdf_xdev_secsize != 0 &&
+	    vdp->xdf_xdev_secsize != XB_BSIZE) {
+		nblks = bp->b_bcount / vdp->xdf_xdev_secsize;
+	} else {
+		nblks = bp->b_bcount >> XB_BSHIFT;
+	}
+
+	if ((blkno + nblks) > p_blkct) {
+		if (vdp->xdf_xdev_secsize != 0 &&
+		    vdp->xdf_xdev_secsize != XB_BSIZE) {
+			bp->b_resid =
+			    ((blkno + nblks) - p_blkct) *
+			    vdp->xdf_xdev_secsize;
+		} else {
+			bp->b_resid =
+			    ((blkno + nblks) - p_blkct) <<
+			    XB_BSHIFT;
+		}
 		bp->b_bcount -= bp->b_resid;
 	}
 
 	DPRINTF(IO_DBG, ("xdf@%s: strategy blk %lld len %lu\n",
-	    vdp->xdf_addr, (longlong_t)bp->b_blkno, (ulong_t)bp->b_bcount));
+	    vdp->xdf_addr, (longlong_t)blkno, (ulong_t)bp->b_bcount));
 
 	/* Fix up the buf struct */
 	bp->b_flags |= B_BUSY;
@@ -2792,6 +2834,9 @@ xdf_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	    NULL, NULL, NULL, NULL))
 		return (ENXIO);
 
+	if (uiop->uio_loffset >= XB_DTOB(p_blkcnt, vdp))
+		return (ENOSPC);
+
 	if (U_INVAL(uiop))
 		return (EINVAL);
 
@@ -2822,7 +2867,7 @@ xdf_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	    NULL, NULL, NULL, NULL))
 		return (ENXIO);
 
-	if (uiop->uio_loffset >= XB_DTOB(p_blkcnt))
+	if (uiop->uio_loffset >= XB_DTOB(p_blkcnt, vdp))
 		return (ENOSPC);
 
 	if (U_INVAL(uiop))
@@ -2853,7 +2898,7 @@ xdf_aread(dev_t dev, struct aio_req *aiop, cred_t *credp)
 	    NULL, NULL, NULL, NULL))
 		return (ENXIO);
 
-	if (uiop->uio_loffset >= XB_DTOB(p_blkcnt))
+	if (uiop->uio_loffset >= XB_DTOB(p_blkcnt, vdp))
 		return (ENOSPC);
 
 	if (U_INVAL(uiop))
@@ -2884,7 +2929,7 @@ xdf_awrite(dev_t dev, struct aio_req *aiop, cred_t *credp)
 	    NULL, NULL, NULL, NULL))
 		return (ENXIO);
 
-	if (uiop->uio_loffset >= XB_DTOB(p_blkcnt))
+	if (uiop->uio_loffset >= XB_DTOB(p_blkcnt, vdp))
 		return (ENOSPC);
 
 	if (U_INVAL(uiop))
@@ -2921,9 +2966,11 @@ xdf_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	    NULL, NULL, NULL))
 		return (ENXIO);
 
-	if ((blkno + nblk) > p_blkcnt) {
+	if ((blkno + nblk) >
+	    (p_blkcnt * (vdp->xdf_xdev_secsize / XB_BSIZE))) {
 		cmn_err(CE_WARN, "xdf@%s: block %ld exceeds VBD size %"PRIu64,
-		    vdp->xdf_addr, blkno + nblk, (uint64_t)p_blkcnt);
+		    vdp->xdf_addr, (daddr_t)((blkno + nblk) /
+		    (vdp->xdf_xdev_secsize / XB_BSIZE)), (uint64_t)p_blkcnt);
 		return (EINVAL);
 	}
 
@@ -3451,7 +3498,7 @@ xdf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_destroy(&vdp->xdf_cb_lk);
 	mutex_destroy(&vdp->xdf_dev_lk);
 	if (vdp->xdf_cache_flush_block != NULL)
-		kmem_free(vdp->xdf_flush_mem, 2 * DEV_BSIZE);
+		kmem_free(vdp->xdf_flush_mem, 2 * vdp->xdf_xdev_secsize);
 	ddi_soft_state_free(xdf_ssp, instance);
 	return (DDI_SUCCESS);
 }

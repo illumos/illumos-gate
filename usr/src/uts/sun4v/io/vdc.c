@@ -150,6 +150,7 @@ static void	vdc_store_label_vtoc(vdc_t *, struct dk_geom *,
 static void	vdc_store_label_unk(vdc_t *vdc);
 static boolean_t vdc_is_opened(vdc_t *vdc);
 static void	vdc_update_size(vdc_t *vdc, size_t, size_t, size_t);
+static int	vdc_update_vio_bsize(vdc_t *vdc, uint32_t);
 
 /* handshake with vds */
 static int		vdc_init_ver_negotiation(vdc_t *vdc, vio_ver_t ver);
@@ -621,8 +622,10 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->state	= VDC_STATE_INIT;
 	vdc->lifecycle	= VDC_LC_ATTACHING;
 	vdc->session_id = 0;
-	vdc->block_size = DEV_BSIZE;
-	vdc->max_xfer_sz = maxphys / DEV_BSIZE;
+	vdc->vdisk_bsize = DEV_BSIZE;
+	vdc->vio_bmask = 0;
+	vdc->vio_bshift = 0;
+	vdc->max_xfer_sz = maxphys / vdc->vdisk_bsize;
 
 	/*
 	 * We assume, for now, that the vDisk server will export 'read'
@@ -943,7 +946,7 @@ vdc_set_err_kstats(vdc_t *vdc)
 	stp = (vd_err_stats_t *)vdc->err_stats->ks_data;
 	ASSERT(stp != NULL);
 
-	stp->vd_capacity.value.ui64 = vdc->vdisk_size * vdc->block_size;
+	stp->vd_capacity.value.ui64 = vdc->vdisk_size * vdc->vdisk_bsize;
 	(void) strcpy(stp->vd_vid.value.c, "SUN");
 	(void) strcpy(stp->vd_pid.value.c, "VDSK");
 
@@ -1124,7 +1127,7 @@ vdc_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 		    name, valuep, lengthp));
 	}
 	nblocks = vdc->slice[VDCPART(dev)].nblocks;
-	blksize = vdc->block_size;
+	blksize = vdc->vdisk_bsize;
 	mutex_exit(&vdc->lock);
 
 	return (ddi_prop_op_nblocks_blksize(dev, dip, prop_op, mod_flags,
@@ -1382,6 +1385,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	size_t	nbytes = nblk * DEV_BSIZE;
 	int	instance = VDCUNIT(dev);
 	vdc_t	*vdc = NULL;
+	diskaddr_t vio_blkno;
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
 		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
@@ -1390,8 +1394,16 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 
 	DMSG(vdc, 2, "[%d] dump %ld bytes at block 0x%lx : addr=0x%p\n",
 	    instance, nbytes, blkno, (void *)addr);
+
+	/* convert logical block to vio block */
+	if ((blkno & vdc->vio_bmask) != 0) {
+		DMSG(vdc, 0, "Misaligned block number (%lu)\n", blkno);
+		return (EINVAL);
+	}
+	vio_blkno = blkno >> vdc->vio_bshift;
+
 	rv = vdc_send_request(vdc, VD_OP_BWRITE, addr, nbytes,
-	    VDCPART(dev), blkno, CB_STRATEGY, 0, VIO_write_dir);
+	    VDCPART(dev), vio_blkno, CB_STRATEGY, 0, VIO_write_dir);
 	if (rv) {
 		DMSG(vdc, 0, "Failed to do a disk dump (err=%d)\n", rv);
 		return (rv);
@@ -1422,6 +1434,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 static int
 vdc_strategy(struct buf *buf)
 {
+	diskaddr_t vio_blkno;
 	int	rv = -1;
 	vdc_t	*vdc = NULL;
 	int	instance = VDCUNIT(buf->b_edev);
@@ -1448,8 +1461,21 @@ vdc_strategy(struct buf *buf)
 		slice = VDCPART(buf->b_edev);
 	}
 
+	/*
+	 * In the buf structure, b_lblkno represents a logical block number
+	 * using a block size of 512 bytes. For the VIO request, this block
+	 * number has to be converted to be represented with the block size
+	 * used by the VIO protocol.
+	 */
+	if ((buf->b_lblkno & vdc->vio_bmask) != 0) {
+		bioerror(buf, EINVAL);
+		biodone(buf);
+		return (0);
+	}
+	vio_blkno = buf->b_lblkno >> vdc->vio_bshift;
+
 	rv = vdc_send_request(vdc, op, (caddr_t)buf->b_un.b_addr,
-	    buf->b_bcount, slice, buf->b_lblkno,
+	    buf->b_bcount, slice, vio_blkno,
 	    CB_STRATEGY, buf, (op == VD_OP_BREAD) ? VIO_read_dir :
 	    VIO_write_dir);
 
@@ -1494,8 +1520,8 @@ vdc_min(struct buf *bufp)
 	vdc = ddi_get_soft_state(vdc_state, instance);
 	VERIFY(vdc != NULL);
 
-	if (bufp->b_bcount > (vdc->max_xfer_sz * vdc->block_size)) {
-		bufp->b_bcount = vdc->max_xfer_sz * vdc->block_size;
+	if (bufp->b_bcount > (vdc->max_xfer_sz * vdc->vdisk_bsize)) {
+		bufp->b_bcount = vdc->max_xfer_sz * vdc->vdisk_bsize;
 	}
 }
 
@@ -1670,7 +1696,7 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 	pkt.tag.vio_sid = vdc->session_id;
 	/* fill in payload */
 	pkt.max_xfer_sz = vdc->max_xfer_sz;
-	pkt.vdisk_block_size = vdc->block_size;
+	pkt.vdisk_block_size = vdc->vdisk_bsize;
 	pkt.xfer_mode = VIO_DRING_MODE_V1_0;
 	pkt.operations = 0;	/* server will set bits of valid operations */
 	pkt.vdisk_type = 0;	/* server will set to valid device type */
@@ -2605,13 +2631,13 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 		 * as we do not have the capability to split requests over
 		 * multiple DRing entries.
 		 */
-		if ((vdc->max_xfer_sz * vdc->block_size) < maxphys) {
+		if ((vdc->max_xfer_sz * vdc->vdisk_bsize) < maxphys) {
 			DMSG(vdc, 0, "[%d] using minimum DRing size\n",
 			    vdc->instance);
 			vdc->dring_max_cookies = maxphys / PAGESIZE;
 		} else {
 			vdc->dring_max_cookies =
-			    (vdc->max_xfer_sz * vdc->block_size) / PAGESIZE;
+			    (vdc->max_xfer_sz * vdc->vdisk_bsize) / PAGESIZE;
 		}
 		vdc->dring_entry_size = (sizeof (vd_dring_entry_t) +
 		    (sizeof (ldc_mem_cookie_t) *
@@ -4864,6 +4890,17 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 			    vdc->instance);
 			attr_msg->vdisk_size = 0;
 		}
+
+		/* update the VIO block size */
+		if (attr_msg->vdisk_block_size > 0 &&
+		    vdc_update_vio_bsize(vdc,
+		    attr_msg->vdisk_block_size) != 0) {
+			DMSG(vdc, 0, "[%d] Invalid block size (%u) from vds",
+			    vdc->instance, attr_msg->vdisk_block_size);
+			status = EINVAL;
+			break;
+		}
+
 		/* update disk, block and transfer sizes */
 		vdc_update_size(vdc, attr_msg->vdisk_size,
 		    attr_msg->vdisk_block_size, attr_msg->max_xfer_sz);
@@ -4877,7 +4914,7 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		DMSG(vdc, 0, "[%d] max_xfer_sz: sent %lx acked %lx\n",
 		    vdc->instance, vdc->max_xfer_sz, attr_msg->max_xfer_sz);
 		DMSG(vdc, 0, "[%d] vdisk_block_size: sent %lx acked %x\n",
-		    vdc->instance, vdc->block_size,
+		    vdc->instance, vdc->vdisk_bsize,
 		    attr_msg->vdisk_block_size);
 
 		if ((attr_msg->xfer_mode != VIO_DRING_MODE_V1_0) ||
@@ -5266,7 +5303,7 @@ vdc_dkio_partition(vdc_t *vdc, caddr_t arg, int flag)
 		return (EFAULT);
 	}
 
-	VD_EFI_DEV_SET(edev, vdc, vd_process_efi_ioctl);
+	VDC_EFI_DEV_SET(edev, vdc, vd_process_efi_ioctl);
 
 	if ((rv = vd_efi_alloc_and_read(&edev, &gpt, &gpe)) != 0) {
 		return (rv);
@@ -5307,7 +5344,7 @@ vdc_dkio_partition(vdc_t *vdc, caddr_t arg, int flag)
  *	flag	- ioctl flags
  */
 static int
-vdc_dioctl_rwcmd(dev_t dev, caddr_t arg, int flag)
+vdc_dioctl_rwcmd(vdc_t *vdc, caddr_t arg, int flag)
 {
 	struct dadkio_rwcmd32 rwcmd32;
 	struct dadkio_rwcmd rwcmd;
@@ -5351,7 +5388,7 @@ vdc_dioctl_rwcmd(dev_t dev, caddr_t arg, int flag)
 	bzero((caddr_t)&auio, sizeof (struct uio));
 	auio.uio_iov    = &aiov;
 	auio.uio_iovcnt = 1;
-	auio.uio_loffset = rwcmd.blkaddr * DEV_BSIZE;
+	auio.uio_loffset = rwcmd.blkaddr * vdc->vdisk_bsize;
 	auio.uio_resid  = rwcmd.buflen;
 	auio.uio_segflg = flag & FKIOCTL ? UIO_SYSSPACE : UIO_USERSPACE;
 
@@ -5363,7 +5400,8 @@ vdc_dioctl_rwcmd(dev_t dev, caddr_t arg, int flag)
 	 */
 	buf->b_private = (void *)VD_SLICE_NONE;
 
-	status = physio(vdc_strategy, buf, dev, rw, vdc_min, &auio);
+	status = physio(vdc_strategy, buf, VD_MAKE_DEV(vdc->instance, 0),
+	    rw, vdc_min, &auio);
 
 	biofini(buf);
 	kmem_free(buf, sizeof (buf_t));
@@ -6639,14 +6677,23 @@ vdc_check_capacity(vdc_t *vdc)
 	if ((rv = vdc_get_capacity(vdc, &dsk_size, &blk_size)) != 0)
 		return (rv);
 
-	if (dsk_size == VD_SIZE_UNKNOWN || dsk_size == 0)
+	if (dsk_size == VD_SIZE_UNKNOWN || dsk_size == 0 || blk_size == 0)
 		return (EINVAL);
 
 	mutex_enter(&vdc->lock);
-	vdc_update_size(vdc, dsk_size, blk_size, vdc->max_xfer_sz);
+	/*
+	 * First try to update the VIO block size (which is the same as the
+	 * vdisk block size). If this returns an error then that means that
+	 * we can not use that block size so basically the vdisk is unusable
+	 * and we return an error.
+	 */
+	rv = vdc_update_vio_bsize(vdc, blk_size);
+	if (rv == 0)
+		vdc_update_size(vdc, dsk_size, blk_size, vdc->max_xfer_sz);
+
 	mutex_exit(&vdc->lock);
 
-	return (0);
+	return (rv);
 }
 
 /*
@@ -6969,7 +7016,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 
 	case DIOCTL_RWCMD:
 	{
-		return (vdc_dioctl_rwcmd(dev, arg, mode));
+		return (vdc_dioctl_rwcmd(vdc, arg, mode));
 	}
 
 	case DKIOCGAPART:
@@ -7604,7 +7651,7 @@ vdc_create_fake_geometry(vdc_t *vdc)
 
 	(void) strcpy(vdc->cinfo->dki_cname, VDC_DRIVER_NAME);
 	(void) strcpy(vdc->cinfo->dki_dname, VDC_DRIVER_NAME);
-	/* max_xfer_sz is #blocks so we don't need to divide by DEV_BSIZE */
+	/* max_xfer_sz is #blocks so we don't need to divide by vdisk_bsize */
 	vdc->cinfo->dki_maxtransfer = vdc->max_xfer_sz;
 
 	/*
@@ -7660,7 +7707,7 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	}
 
 	vdc->minfo->dki_capacity = vdc->vdisk_size;
-	vdc->minfo->dki_lbsize = vdc->block_size;
+	vdc->minfo->dki_lbsize = vdc->vdisk_bsize;
 }
 
 static ushort_t
@@ -7692,7 +7739,7 @@ vdc_update_size(vdc_t *vdc, size_t dsk_size, size_t blk_size, size_t xfr_size)
 	 * update anything.
 	 */
 	if (dsk_size == VD_SIZE_UNKNOWN || dsk_size == 0 ||
-	    (blk_size == vdc->block_size && dsk_size == vdc->vdisk_size &&
+	    (blk_size == vdc->vdisk_bsize && dsk_size == vdc->vdisk_size &&
 	    xfr_size == vdc->max_xfer_sz))
 		return;
 
@@ -7706,13 +7753,11 @@ vdc_update_size(vdc_t *vdc, size_t dsk_size, size_t blk_size, size_t xfr_size)
 	if ((xfr_size * blk_size) > (PAGESIZE * DEV_BSIZE)) {
 		DMSG(vdc, 0, "[%d] vds block transfer size too big;"
 		    " using max supported by vdc", vdc->instance);
-		xfr_size = maxphys / DEV_BSIZE;
-		dsk_size = (dsk_size * blk_size) / DEV_BSIZE;
-		blk_size = DEV_BSIZE;
+		xfr_size = maxphys / blk_size;
 	}
 
 	vdc->max_xfer_sz = xfr_size;
-	vdc->block_size = blk_size;
+	vdc->vdisk_bsize = blk_size;
 	vdc->vdisk_size = dsk_size;
 
 	stp = (vd_err_stats_t *)vdc->err_stats->ks_data;
@@ -7720,6 +7765,50 @@ vdc_update_size(vdc_t *vdc, size_t dsk_size, size_t blk_size, size_t xfr_size)
 
 	vdc->minfo->dki_capacity = dsk_size;
 	vdc->minfo->dki_lbsize = (uint_t)blk_size;
+}
+
+/*
+ * Update information about the VIO block size. The VIO block size is the
+ * same as the vdisk block size which is stored in vdc->vdisk_bsize so we
+ * do not store that information again.
+ *
+ * However, buf structures will always use a logical block size of 512 bytes
+ * (DEV_BSIZE) and we will need to convert logical block numbers to VIO block
+ * numbers for each read or write operation using vdc_strategy(). To speed up
+ * this conversion, we expect the VIO block size to be a power of 2 and a
+ * multiple 512 bytes (DEV_BSIZE), and we cache some useful information.
+ *
+ * The function return EINVAL if the new VIO block size (blk_size) is not a
+ * power of 2 or not a multiple of 512 bytes, otherwise it returns 0.
+ */
+static int
+vdc_update_vio_bsize(vdc_t *vdc, uint32_t blk_size)
+{
+	uint32_t ratio, n;
+	int nshift = 0;
+
+	vdc->vio_bmask = 0;
+	vdc->vio_bshift = 0;
+
+	ASSERT(blk_size > 0);
+
+	if ((blk_size % DEV_BSIZE) != 0)
+		return (EINVAL);
+
+	ratio = blk_size / DEV_BSIZE;
+
+	for (n = ratio; n > 1; n >>= 1) {
+		if ((n & 0x1) != 0) {
+			/* blk_size is not a power of 2 */
+			return (EINVAL);
+		}
+		nshift++;
+	}
+
+	vdc->vio_bshift = nshift;
+	vdc->vio_bmask = ratio - 1;
+
+	return (0);
 }
 
 /*
@@ -7747,7 +7836,7 @@ vdc_validate_geometry(vdc_t *vdc)
 	buf_t	*buf;	/* BREAD requests need to be in a buf_t structure */
 	dev_t	dev;
 	int	rv, rval;
-	struct dk_label label;
+	struct dk_label *label;
 	struct dk_geom geom;
 	struct extvtoc vtoc;
 	efi_gpt_t *gpt;
@@ -7786,7 +7875,7 @@ vdc_validate_geometry(vdc_t *vdc)
 			return (EIO);
 		}
 
-		VD_EFI_DEV_SET(edev, vdc, vd_process_efi_ioctl);
+		VDC_EFI_DEV_SET(edev, vdc, vd_process_efi_ioctl);
 
 		rv = vd_efi_alloc_and_read(&edev, &gpt, &gpe);
 
@@ -7870,14 +7959,15 @@ vdc_validate_geometry(vdc_t *vdc)
 	/*
 	 * Read disk label from start of disk
 	 */
+	label = kmem_alloc(vdc->vdisk_bsize, KM_SLEEP);
 	buf = kmem_alloc(sizeof (buf_t), KM_SLEEP);
 	bioinit(buf);
-	buf->b_un.b_addr = (caddr_t)&label;
-	buf->b_bcount = DK_LABEL_SIZE;
+	buf->b_un.b_addr = (caddr_t)label;
+	buf->b_bcount = vdc->vdisk_bsize;
 	buf->b_flags = B_BUSY | B_READ;
 	buf->b_dev = cmpdev(dev);
-	rv = vdc_send_request(vdc, VD_OP_BREAD, (caddr_t)&label,
-	    DK_LABEL_SIZE, VD_SLICE_NONE, 0, CB_STRATEGY, buf, VIO_read_dir);
+	rv = vdc_send_request(vdc, VD_OP_BREAD, (caddr_t)label,
+	    vdc->vdisk_bsize, VD_SLICE_NONE, 0, CB_STRATEGY, buf, VIO_read_dir);
 	if (rv) {
 		DMSG(vdc, 1, "[%d] Failed to read disk block 0\n",
 		    vdc->instance);
@@ -7892,15 +7982,17 @@ vdc_validate_geometry(vdc_t *vdc)
 	biofini(buf);
 	kmem_free(buf, sizeof (buf_t));
 
-	if (rv != 0 || label.dkl_magic != DKL_MAGIC ||
-	    label.dkl_cksum != vdc_lbl2cksum(&label)) {
+	if (rv != 0 || label->dkl_magic != DKL_MAGIC ||
+	    label->dkl_cksum != vdc_lbl2cksum(label)) {
 		DMSG(vdc, 1, "[%d] Got VTOC with invalid label\n",
 		    vdc->instance);
+		kmem_free(label, vdc->vdisk_bsize);
 		mutex_enter(&vdc->lock);
 		vdc_store_label_unk(vdc);
 		return (EINVAL);
 	}
 
+	kmem_free(label, vdc->vdisk_bsize);
 	mutex_enter(&vdc->lock);
 	vdc_store_label_vtoc(vdc, &geom, &vtoc);
 	return (0);
@@ -8108,7 +8200,7 @@ vdc_store_label_vtoc(vdc_t *vdc, struct dk_geom *geom, struct extvtoc *vtoc)
 	int i;
 
 	ASSERT(MUTEX_HELD(&vdc->lock));
-	ASSERT(vdc->block_size == vtoc->v_sectorsz);
+	ASSERT(vdc->vdisk_bsize == vtoc->v_sectorsz);
 
 	vdc->vdisk_label = VD_DISK_LABEL_VTOC;
 	bcopy(vtoc, vdc->vtoc, sizeof (struct extvtoc));

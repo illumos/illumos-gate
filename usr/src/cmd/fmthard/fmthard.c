@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,8 +125,8 @@ static char *uboot = "";
 #endif	/* various platform-specific definitions */
 
 static char	*ufirm = "firm";
-#if defined(_SUNOS_VTOC_16)
 static int		sectsiz;
+#if defined(_SUNOS_VTOC_16)
 static struct extvtoc	disk_vtoc;
 #endif	/* defined(_SUNOS_VTOC_16) */
 
@@ -143,6 +143,7 @@ main(int argc, char **argv)
 #endif	/* defined(_SUNOS_VTOC_8) */
 	struct dk_gpt	*disk_efi;
 	struct dk_geom	disk_geom;
+	struct dk_minfo	minfo;
 	int		n;
 
 
@@ -203,22 +204,30 @@ main(int argc, char **argv)
 
 	if (stat(argv[optind], (struct stat *)&statbuf) == -1) {
 		(void) fprintf(stderr,
-			"fmthard:  Cannot stat device %s\n",
-			argv[optind]);
+		    "fmthard:  Cannot stat device %s\n",
+		    argv[optind]);
 		exit(1);
 	}
 
 	if ((statbuf.st_mode & S_IFMT) != S_IFCHR) {
 		(void) fprintf(stderr,
-			"fmthard:  %s must be a raw device.\n",
-			argv[optind]);
+		    "fmthard:  %s must be a raw device.\n",
+		    argv[optind]);
 		exit(1);
 	}
 
 	if ((fd = open(argv[optind], O_RDWR|O_NDELAY)) < 0) {
 		(void) fprintf(stderr, "fmthard:  Cannot open device %s - %s\n",
-			argv[optind], strerror(errno));
+		    argv[optind], strerror(errno));
 		exit(1);
+	}
+
+	if (ioctl(fd, DKIOCGMEDIAINFO, &minfo) == 0) {
+		sectsiz = minfo.dki_lbsize;
+	}
+
+	if (sectsiz == 0) {
+		sectsiz = SECSIZE;
 	}
 
 	/*
@@ -233,7 +242,7 @@ main(int argc, char **argv)
 			eflag++;
 		} else {
 			(void) fprintf(stderr,
-				"%s: Cannot get disk geometry\n", argv[optind]);
+			    "%s: Cannot get disk geometry\n", argv[optind]);
 			(void) close(fd);
 			exit(1);
 		}
@@ -295,7 +304,7 @@ main(int argc, char **argv)
 			FILE *fp;
 			if ((fp = fopen(dfile, "r")) == NULL) {
 				(void) fprintf(stderr, "Cannot open file %s\n",
-					dfile);
+				    dfile);
 				(void) close(fd);
 				exit(1);
 			}
@@ -306,7 +315,6 @@ main(int argc, char **argv)
 			(void) fclose(fp);
 		}
 	}
-
 
 	/*
 	 * Print the modified VTOC, rather than updating the disk
@@ -326,10 +334,10 @@ main(int argc, char **argv)
 			(void) memcpy(disk_vtoc.v_volume, vname, n);
 		} else {
 			for (c = 0; c < disk_efi->efi_nparts; c++) {
-			    if (disk_efi->efi_parts[c].p_tag ==
+				if (disk_efi->efi_parts[c].p_tag ==
 				    V_RESERVED) {
 				(void) memcpy(&disk_efi->efi_parts[c].p_name,
-					    vname, n);
+				    vname, n);
 				}
 			}
 		}
@@ -388,7 +396,7 @@ display(struct dk_geom *geom, struct extvtoc *vtoc, char *device)
 	}
 	(void) printf("*\n");
 	(void) printf("* Dimensions:\n");
-	(void) printf("*     %d bytes/sector\n", SECSIZE);
+	(void) printf("*     %d bytes/sector\n", sectsiz);
 	(void) printf("*      %d sectors/track\n", geom->dkg_nsect);
 	(void) printf("*       %d tracks/cylinder\n", geom->dkg_nhead);
 	(void) printf("*     %d cylinders\n", geom->dkg_pcyl);
@@ -404,10 +412,10 @@ display(struct dk_geom *geom, struct extvtoc *vtoc, char *device)
 		if (vtoc->v_part[i].p_size > 0)
 			(void) printf(
 "    %d		%d	0%x		%llu		%llu\n",
-				i, vtoc->v_part[i].p_tag,
-				vtoc->v_part[i].p_flag,
-				vtoc->v_part[i].p_start,
-				vtoc->v_part[i].p_size);
+			    i, vtoc->v_part[i].p_tag,
+			    vtoc->v_part[i].p_flag,
+			    vtoc->v_part[i].p_start,
+			    vtoc->v_part[i].p_size);
 	}
 	exit(0);
 }
@@ -444,10 +452,10 @@ display64(struct dk_gpt *efi, char *device)
 		if (efi->efi_parts[i].p_size > 0)
 			(void) printf(
 "    %d		%d	0%x		%8lld	%8lld\n",
-				i, efi->efi_parts[i].p_tag,
-				efi->efi_parts[i].p_flag,
-				efi->efi_parts[i].p_start,
-				efi->efi_parts[i].p_size);
+			    i, efi->efi_parts[i].p_tag,
+			    efi->efi_parts[i].p_flag,
+			    efi->efi_parts[i].p_start,
+			    efi->efi_parts[i].p_size);
 	}
 	exit(0);
 }
@@ -474,8 +482,8 @@ insert(char *data, struct extvtoc *vtoc)
 	}
 	if (part >= V_NUMPAR) {
 		(void) fprintf(stderr,
-			"Error in data \"%s\": No such partition %x\n",
-			data, part);
+		    "Error in data \"%s\": No such partition %x\n",
+		    data, part);
 		exit(1);
 	}
 	vtoc->v_part[part].p_tag = (ushort_t)tag;
@@ -505,8 +513,8 @@ insert64(char *data, struct dk_gpt *efi)
 	}
 	if (part >= efi->efi_nparts) {
 		(void) fprintf(stderr,
-			"Error in data \"%s\": No such partition %x\n",
-			data, part);
+		    "Error in data \"%s\": No such partition %x\n",
+		    data, part);
 		exit(1);
 	}
 	efi->efi_parts[part].p_tag = (ushort_t)tag;
@@ -558,19 +566,19 @@ load(FILE *fp, struct dk_geom *geom, struct extvtoc *vtoc)
 		if (sscanf(line, "%d %d %x %llu %llu",
 		    &part, &tag, &flag, &start, &size) != 5) {
 			(void) fprintf(stderr, "Syntax error: \"%s\"\n",
-				line);
+			    line);
 			exit(1);
 		}
 		if (part >= V_NUMPAR) {
 			(void) fprintf(stderr,
-				"No such partition %x: \"%s\"\n",
-				part, line);
+			    "No such partition %x: \"%s\"\n",
+			    part, line);
 			exit(1);
 		}
 		if (!eflag && ((start % nblks) != 0 || (size % nblks) != 0)) {
 			(void) fprintf(stderr,
 "Partition %d not aligned on cylinder boundary: \"%s\"\n",
-					part, line);
+			    part, line);
 			exit(1);
 		}
 		vtoc->v_part[part].p_tag = (ushort_t)tag;
@@ -609,7 +617,7 @@ load64(FILE *fp, int fd, struct dk_gpt **efi)
 		if (sscanf(line, "%d %d %x %lld %lld",
 		    &part, &tag, &flag, &start, &size) != 5) {
 			(void) fprintf(stderr, "Syntax error: \"%s\"\n",
-				line);
+			    line);
 			exit(1);
 		}
 		mem = realloc(mem, sizeof (*mem) * (nlines + 1));
@@ -624,13 +632,13 @@ load64(FILE *fp, int fd, struct dk_gpt **efi)
 		}
 		nlines++;
 		if (part > max_part)
-		    max_part = part;
+			max_part = part;
 	}
 	max_part++;
 
 	if ((i = efi_alloc_and_init(fd, max_part, efi)) < 0) {
 		(void) fprintf(stderr,
-				"efi_alloc_and_init failed: %d\n", i);
+		    "efi_alloc_and_init failed: %d\n", i);
 		exit(1);
 	}
 	for (i = 0; i < (*efi)->efi_nparts; ++i) {
@@ -645,14 +653,14 @@ load64(FILE *fp, int fd, struct dk_gpt **efi)
 		if (sscanf(mem[i], "%d %d %x %lld %lld",
 		    &part, &tag, &flag, &start, &size) != 5) {
 			(void) fprintf(stderr, "Syntax error: \"%s\"\n",
-				line);
+			    line);
 			exit(1);
 		}
 		free(mem[i]);
 		if (part >= (*efi)->efi_nparts) {
 			(void) fprintf(stderr,
-				"No such partition %x: \"%s\"\n",
-				part, line);
+			    "No such partition %x: \"%s\"\n",
+			    part, line);
 			exit(1);
 		}
 		(*efi)->efi_parts[part].p_tag = (ushort_t)tag;
@@ -668,12 +676,13 @@ load64(FILE *fp, int fd, struct dk_gpt **efi)
 static void
 usage()
 {
-	(void) fprintf(stderr,
 #if defined(sparc)
+	(void) fprintf(stderr,
 "Usage:	fmthard [ -i ] [ -n volumename ] [ -s datafile ] [ -d arguments] \
 raw-device\n");
 
 #elif defined(i386)
+	(void) fprintf(stderr,
 "Usage:	fmthard [ -i ] [ -S ] [-I geom_file]  \
 -n volumename | -s datafile  [ -d arguments] raw-device\n");
 
@@ -710,8 +719,6 @@ validate(struct dk_geom *geom, struct extvtoc *vtoc)
 	vtoc->v_version = V_VERSION;
 	vtoc->v_sanity = VTOC_SANE;
 	vtoc->v_nparts = V_NUMPAR;
-	if (sectsiz == 0)
-		sectsiz = SECSIZE;
 	if (vtoc->v_sectorsz == 0)
 		vtoc->v_sectorsz = sectsiz;
 #endif				/* defined(_SUNOS_VTOC_16) */
@@ -730,19 +737,19 @@ full size of disk.  The full disk capacity is %llu sectors.\n", i, fullsz);
 		if (vtoc->v_part[i].p_size == 0)
 			continue;	/* Undefined partition */
 		if ((vtoc->v_part[i].p_start % nblks) ||
-				(vtoc->v_part[i].p_size % nblks)) {
+		    (vtoc->v_part[i].p_size % nblks)) {
 			(void) fprintf(stderr, "\
 fmthard: Partition %d not aligned on cylinder boundary \n", i);
 				exit(1);
 		}
 		if (vtoc->v_part[i].p_start > fullsz ||
-			vtoc->v_part[i].p_start +
-				vtoc->v_part[i].p_size > fullsz) {
+		    vtoc->v_part[i].p_start +
+		    vtoc->v_part[i].p_size > fullsz) {
 			(void) fprintf(stderr, "\
 fmthard: Partition %d specified as %llu sectors starting at %llu\n\
 \tdoes not fit. The full disk contains %llu sectors.\n",
-				i, vtoc->v_part[i].p_size,
-				vtoc->v_part[i].p_start, fullsz);
+			    i, vtoc->v_part[i].p_size,
+			    vtoc->v_part[i].p_start, fullsz);
 #if defined(sparc)
 			exit(1);
 #endif
@@ -763,7 +770,7 @@ fmthard: Partition %d specified as %llu sectors starting at %llu\n\
 				    (isize != 0) && (jsize != 0)) {
 					endsect = jstart + jsize -1;
 					if ((jstart <= istart) &&
-						(istart <= endsect)) {
+					    (istart <= endsect)) {
 						(void) fprintf(stderr, "\
 fmthard: Partition %d overlaps partition %d. Overlap is allowed\n\
 \tonly on partition on the full disk partition).\n",
@@ -804,13 +811,13 @@ validate64(struct dk_gpt *efi)
 		if (efi->efi_parts[i].p_tag == V_RESERVED)
 			resv_part++;
 		if (efi->efi_parts[i].p_start > fullsz ||
-			efi->efi_parts[i].p_start +
-				efi->efi_parts[i].p_size > fullsz) {
+		    efi->efi_parts[i].p_start +
+		    efi->efi_parts[i].p_size > fullsz) {
 			(void) fprintf(stderr, "\
 fmthard: Partition %d specified as %lld sectors starting at %lld\n\
 \tdoes not fit. The full disk contains %lld sectors.\n",
-				i, efi->efi_parts[i].p_size,
-				efi->efi_parts[i].p_start, fullsz);
+			    i, efi->efi_parts[i].p_size,
+			    efi->efi_parts[i].p_start, fullsz);
 			exit(1);
 		}
 
@@ -827,7 +834,7 @@ fmthard: Partition %d specified as %lld sectors starting at %lld\n\
 				    (isize != 0) && (jsize != 0)) {
 					endsect = jstart + jsize - 1;
 					if ((jstart <= istart) &&
-						(istart <= endsect)) {
+					    (istart <= endsect)) {
 						(void) fprintf(stderr, "\
 fmthard: Partition %d overlaps partition %d. Overlap is allowed\n\
 \tonly on partition on the full disk partition).\n",
@@ -863,10 +870,10 @@ vread(int fd, struct extvtoc *vtoc, char *devname)
 		}
 		if (i == VT_EINVAL) {
 			(void) fprintf(stderr, "%s: Invalid VTOC\n",
-				devname);
+			    devname);
 		} else {
 			(void) fprintf(stderr, "%s: Cannot read VTOC\n",
-				devname);
+			    devname);
 		}
 		exit(1);
 	}
@@ -881,12 +888,12 @@ vread64(int fd, struct dk_gpt **efi_hdr, char *devname)
 	if ((i = efi_alloc_and_read(fd, efi_hdr)) < 0) {
 		if (i == VT_EINVAL)
 			(void) fprintf(stderr,
-				"%s: this disk must be labeled first\n",
-				devname);
+			    "%s: this disk must be labeled first\n",
+			    devname);
 		else
 			(void) fprintf(stderr,
-				"%s: read_efi failed %d\n",
-				devname, i);
+			    "%s: read_efi failed %d\n",
+			    devname, i);
 		exit(1);
 	}
 	lastlba = (*efi_hdr)->efi_last_u_lba;
@@ -904,10 +911,10 @@ vwrite(int fd, struct extvtoc *vtoc, char *devname)
 		if (i == VT_EINVAL) {
 			(void) fprintf(stderr,
 			"%s: invalid entry exists in vtoc\n",
-				devname);
+			    devname);
 		} else {
 			(void) fprintf(stderr, "%s: Cannot write VTOC\n",
-				devname);
+			    devname);
 		}
 		exit(1);
 	}
@@ -925,10 +932,10 @@ vwrite64(int fd, struct dk_gpt *efi, char *devname)
 		if (i == VT_EINVAL) {
 			(void) fprintf(stderr,
 			"%s: invalid entry exists in vtoc\n",
-				devname);
+			    devname);
 		} else {
 			(void) fprintf(stderr, "%s: Cannot write EFI\n",
-				devname);
+			    devname);
 		}
 		exit(1);
 	}

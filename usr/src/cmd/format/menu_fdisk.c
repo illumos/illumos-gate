@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -274,11 +274,11 @@ open_cur_file(int mode)
 	char	pbuf[MAXPATHLEN];
 
 	switch (mode) {
-	    case FD_USE_P0_PATH:
+	case FD_USE_P0_PATH:
 		(void) get_pname(&pbuf[0]);
 		dkpath = pbuf;
 		break;
-	    case FD_USE_CUR_DISK_PATH:
+	case FD_USE_CUR_DISK_PATH:
 		if (cur_disk->fdisk_part.systid == SUNIXOS ||
 		    cur_disk->fdisk_part.systid == SUNIXOS2) {
 			(void) get_sname(&pbuf[0]);
@@ -287,7 +287,7 @@ open_cur_file(int mode)
 			dkpath = cur_disk->disk_path;
 		}
 		break;
-	    default:
+	default:
 		err_print("Error: Invalid mode option for opening cur_file\n");
 		fullabort();
 	}
@@ -388,7 +388,7 @@ update_cur_parts()
 	for (i = 0; i < NDKMAP; i++) {
 #if defined(_SUNOS_VTOC_16)
 		if (cur_parts->vtoc.v_part[i].p_tag &&
-			cur_parts->vtoc.v_part[i].p_tag != V_ALTSCTR) {
+		    cur_parts->vtoc.v_part[i].p_tag != V_ALTSCTR) {
 			cur_parts->vtoc.v_part[i].p_start = 0;
 			cur_parts->vtoc.v_part[i].p_size = 0;
 
@@ -396,9 +396,9 @@ update_cur_parts()
 			cur_parts->pinfo_map[i].dkl_nblk = 0;
 			cur_parts->pinfo_map[i].dkl_cylno = 0;
 			cur_parts->vtoc.v_part[i].p_tag =
-				default_vtoc_map[i].p_tag;
+			    default_vtoc_map[i].p_tag;
 			cur_parts->vtoc.v_part[i].p_flag =
-				default_vtoc_map[i].p_flag;
+			    default_vtoc_map[i].p_flag;
 #if defined(_SUNOS_VTOC_16)
 		}
 #endif
@@ -412,14 +412,14 @@ update_cur_parts()
 	cur_parts->pinfo_map[I_PARTITION].dkl_nblk = spc();
 	cur_parts->pinfo_map[I_PARTITION].dkl_cylno = 0;
 	cur_parts->vtoc.v_part[C_PARTITION].p_start =
-		cur_parts->pinfo_map[C_PARTITION].dkl_cylno * nhead * nsect;
+	    cur_parts->pinfo_map[C_PARTITION].dkl_cylno * nhead * nsect;
 	cur_parts->vtoc.v_part[C_PARTITION].p_size =
-		cur_parts->pinfo_map[C_PARTITION].dkl_nblk;
+	    cur_parts->pinfo_map[C_PARTITION].dkl_nblk;
 
 	cur_parts->vtoc.v_part[I_PARTITION].p_start =
-			cur_parts->pinfo_map[I_PARTITION].dkl_cylno;
+	    cur_parts->pinfo_map[I_PARTITION].dkl_cylno;
 	cur_parts->vtoc.v_part[I_PARTITION].p_size =
-			cur_parts->pinfo_map[I_PARTITION].dkl_nblk;
+	    cur_parts->pinfo_map[I_PARTITION].dkl_nblk;
 
 #endif	/* defined(_SUNOS_VTOC_16) */
 	parts = cur_dtype->dtype_plist;
@@ -438,17 +438,32 @@ get_solaris_part(int fd, struct ipart *ipart)
 	int		i;
 	struct ipart	ip;
 	int		status;
+	char		*mbr;
 	char		*bootptr;
 	struct dk_label	update_label;
 
 	(void) lseek(fd, 0, 0);
-	status = read(fd, (caddr_t)&boot_sec, NBPSCTR);
 
-	if (status != NBPSCTR) {
-		err_print("Bad read of fdisk partition. Status = %x\n", status);
-		err_print("Cannot read fdisk partition information.\n");
+	/*
+	 * We may get mbr of different size, but the first 512 bytes
+	 * are valid information.
+	 */
+	mbr = malloc(cur_blksz);
+	if (mbr == NULL) {
+		err_print("No memory available.\n");
 		return (-1);
 	}
+	status = read(fd, mbr, cur_blksz);
+
+	if (status != cur_blksz) {
+		err_print("Bad read of fdisk partition. Status = %x\n", status);
+		err_print("Cannot read fdisk partition information.\n");
+		free(mbr);
+		return (-1);
+	}
+
+	(void) memcpy(&boot_sec, mbr, sizeof (struct mboot));
+	free(mbr);
 
 	for (i = 0; i < FD_NUMPART; i++) {
 		int	ipc;
@@ -478,8 +493,8 @@ get_solaris_part(int fd, struct ipart *ipart)
 #ifdef DEBUG
 			else {
 				err_print("Critical geometry values are zero:\n"
-					"\tnhead = %d; nsect = %d\n", nhead,
-					nsect);
+				    "\tnhead = %d; nsect = %d\n", nhead,
+				    nsect);
 			}
 #endif /* DEBUG */
 
@@ -555,6 +570,7 @@ get_solaris_part(int fd, struct ipart *ipart)
 		nsect = cur_dtype->dtype_nsect;
 		nhead = cur_dtype->dtype_nhead;
 	}
+
 	return (0);
 }
 
@@ -565,6 +581,7 @@ copy_solaris_part(struct ipart *ipart)
 
 	int		status, i, fd;
 	struct mboot	mboot;
+	char		*mbr;
 	struct ipart	ip;
 	char		buf[MAXPATHLEN];
 	char		*bootptr;
@@ -574,7 +591,7 @@ copy_solaris_part(struct ipart *ipart)
 	if (stat(buf, &statbuf) == -1 ||
 	    !S_ISCHR(statbuf.st_mode) ||
 	    ((cur_label == L_TYPE_EFI) &&
-		(cur_disk->disk_flags & DSK_LABEL_DIRTY))) {
+	    (cur_disk->disk_flags & DSK_LABEL_DIRTY))) {
 		/*
 		 * Make sure to reset solaris_offset to zero if it is
 		 *	previously set by a selected disk that
@@ -595,13 +612,25 @@ copy_solaris_part(struct ipart *ipart)
 		return (-1);
 	}
 
-	status = read(fd, (caddr_t)&mboot, sizeof (struct mboot));
-
-	if (status != sizeof (struct mboot)) {
-		err_print("Bad read of fdisk partition.\n");
-		(void) close(fd);
+	/*
+	 * We may get mbr of different size, but the first 512 bytes
+	 * are valid information.
+	 */
+	mbr = malloc(cur_blksz);
+	if (mbr == NULL) {
+		err_print("No memory available.\n");
 		return (-1);
 	}
+	status = read(fd, mbr, cur_blksz);
+
+	if (status != cur_blksz) {
+		err_print("Bad read of fdisk partition.\n");
+		(void) close(fd);
+		free(mbr);
+		return (-1);
+	}
+
+	(void) memcpy(&mboot, mbr, sizeof (struct mboot));
 
 	for (i = 0; i < FD_NUMPART; i++) {
 		int	ipc;
@@ -631,8 +660,8 @@ copy_solaris_part(struct ipart *ipart)
 #ifdef DEBUG
 			else {
 				err_print("Critical geometry values are zero:\n"
-					"\tnhead = %d; nsect = %d\n", nhead,
-					nsect);
+				    "\tnhead = %d; nsect = %d\n", nhead,
+				    nsect);
 			}
 #endif /* DEBUG */
 
@@ -641,8 +670,8 @@ copy_solaris_part(struct ipart *ipart)
 	}
 
 	(void) close(fd);
+	free(mbr);
 	return (0);
-
 }
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
@@ -652,10 +681,10 @@ auto_solaris_part(struct dk_label *label)
 
 	int		status, i, fd;
 	struct mboot	mboot;
+	char		*mbr;
 	struct ipart	ip;
 	char		*bootptr;
 	char		pbuf[MAXPATHLEN];
-
 
 	(void) get_pname(&pbuf[0]);
 	if ((fd = open_disk(pbuf, O_RDONLY)) < 0) {
@@ -663,12 +692,24 @@ auto_solaris_part(struct dk_label *label)
 		return (-1);
 	}
 
-	status = read(fd, (caddr_t)&mboot, sizeof (struct mboot));
-
-	if (status != sizeof (struct mboot)) {
-		err_print("Bad read of fdisk partition.\n");
+	/*
+	 * We may get mbr of different size, but the first 512 bytes
+	 * are valid information.
+	 */
+	mbr = malloc(cur_blksz);
+	if (mbr == NULL) {
+		err_print("No memory available.\n");
 		return (-1);
 	}
+	status = read(fd, mbr, cur_blksz);
+
+	if (status != cur_blksz) {
+		err_print("Bad read of fdisk partition.\n");
+		free(mbr);
+		return (-1);
+	}
+
+	(void) memcpy(&mboot, mbr, sizeof (struct mboot));
 
 	for (i = 0; i < FD_NUMPART; i++) {
 		int	ipc;
@@ -697,11 +738,11 @@ auto_solaris_part(struct dk_label *label)
 #ifdef DEBUG
 			else {
 				err_print("Critical label fields aren't "
-					"non-zero:\n"
-					"\tlabel->dkl_nhead = %d; "
-					"label->dkl_nsect = "
-					"%d\n", label->dkl_nhead,
-					label->dkl_nsect);
+				    "non-zero:\n"
+				    "\tlabel->dkl_nhead = %d; "
+				    "label->dkl_nsect = "
+				    "%d\n", label->dkl_nhead,
+				    label->dkl_nsect);
 			}
 #endif /* DEBUG */
 
@@ -711,7 +752,7 @@ auto_solaris_part(struct dk_label *label)
 	}
 
 	(void) close(fd);
-
+	free(mbr);
 	return (0);
 }
 #endif	/* defined(_FIRMWARE_NEEDS_FDISK) */
@@ -739,9 +780,9 @@ good_fdisk()
 	} else {
 		err_print("WARNING - ");
 		err_print("This disk may be in use by an application "
-			"that has\n\t  modified the fdisk table. Ensure "
-			"that this disk is\n\t  not currently in use "
-			"before proceeding to use fdisk.\n");
+		    "that has\n\t  modified the fdisk table. Ensure "
+		    "that this disk is\n\t  not currently in use "
+		    "before proceeding to use fdisk.\n");
 		return (0);
 	}
 }

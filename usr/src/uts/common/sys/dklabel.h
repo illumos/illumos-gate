@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,7 +207,7 @@ struct dk_label {
 	uint16_t	dkl_ncyl;	/* # of data cylinders */
 	uint16_t	dkl_acyl;	/* # of alternate cylinders */
 	uint16_t	dkl_nhead;	/* # of heads in this partition */
-	uint16_t	dkl_nsect;	/* # of 512 byte sectors per track */
+	uint16_t	dkl_nsect;	/* # of sectors per track */
 	uint16_t	dkl_obs3;	/* obsolete */
 	uint16_t	dkl_obs4;	/* obsolete */
 	struct dk_map32	dkl_map[NDKMAP]; /* logical partition headers */

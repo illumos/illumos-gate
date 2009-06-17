@@ -119,6 +119,10 @@
 #define	VD_EFI_LBA_GPT		1	/* LBA of the GPT */
 #define	VD_EFI_LBA_GPE		2	/* LBA of the GPE */
 
+#define	VD_EFI_DEV_SET(dev, vdsk, ioctl)	\
+	VDSK_EFI_DEV_SET(dev, vdsk, ioctl,	\
+	    (vdsk)->vdisk_bsize, (vdsk)->vdisk_size)
+
 /*
  * Flags defining the behavior for flushing asynchronous writes used to
  * performed some write I/O requests.
@@ -451,13 +455,14 @@ typedef struct vd {
 	int			open_flags;	/* open flags */
 	uint_t			nslices;	/* number of slices we export */
 	size_t			vdisk_size;	/* number of blocks in vdisk */
-	size_t			vdisk_block_size; /* size of each vdisk block */
+	size_t			vdisk_bsize;	/* blk size of the vdisk */
 	vd_disk_type_t		vdisk_type;	/* slice or entire disk */
 	vd_disk_label_t		vdisk_label;	/* EFI or VTOC label */
 	vd_media_t		vdisk_media;	/* media type of backing dev. */
 	boolean_t		is_atapi_dev;	/* Is this an IDE CD-ROM dev? */
 	ushort_t		max_xfer_sz;	/* max xfer size in DEV_BSIZE */
-	size_t			block_size;	/* blk size of actual device */
+	size_t			backend_bsize;	/* blk size of backend device */
+	int			vio_bshift;	/* shift for blk convertion */
 	boolean_t		volume;		/* is vDisk backed by volume */
 	boolean_t		zvol;		/* is vDisk backed by a zvol */
 	boolean_t		file;		/* is vDisk backed by a file? */
@@ -506,21 +511,20 @@ typedef struct vd {
  * followed by a GPT (efi_gpt_t) and a GPE (efi_gpe_t).
  *
  */
-#define	VD_LABEL_VTOC_SIZE					\
-	P2ROUNDUP(sizeof (struct dk_label), DEV_BSIZE)
+#define	VD_LABEL_VTOC_SIZE(lba)					\
+	P2ROUNDUP(sizeof (struct dk_label), (lba))
 
-#define	VD_LABEL_EFI_SIZE					\
-	P2ROUNDUP(DEV_BSIZE + sizeof (efi_gpt_t) + 		\
-	    sizeof (efi_gpe_t) * VD_MAXPART, DEV_BSIZE)
+#define	VD_LABEL_EFI_SIZE(lba)					\
+	P2ROUNDUP(2 * (lba) + sizeof (efi_gpe_t) * VD_MAXPART,	\
+	    (lba))
 
 #define	VD_LABEL_VTOC(vd)	\
 		((struct dk_label *)(void *)((vd)->flabel))
 
-#define	VD_LABEL_EFI_GPT(vd)	\
-		((efi_gpt_t *)(void *)((vd)->flabel + DEV_BSIZE))
-#define	VD_LABEL_EFI_GPE(vd)	\
-		((efi_gpe_t *)(void *)((vd)->flabel + DEV_BSIZE + \
-		sizeof (efi_gpt_t)))
+#define	VD_LABEL_EFI_GPT(vd, lba)	\
+		((efi_gpt_t *)(void *)((vd)->flabel + (lba)))
+#define	VD_LABEL_EFI_GPE(vd, lba)	\
+		((efi_gpe_t *)(void *)((vd)->flabel + 2 * (lba)))
 
 
 typedef struct vds_operation {
@@ -757,6 +761,7 @@ vd_dskimg_io_params(vd_t *vd, int slice, size_t *blkp, size_t *lenp)
 
 	ASSERT(vd->file || VD_DSKIMG(vd));
 	ASSERT(len > 0);
+	ASSERT(vd->vdisk_bsize == DEV_BSIZE);
 
 	/*
 	 * If a file is exported as a slice then we don't care about the vtoc.
@@ -797,7 +802,6 @@ vd_dskimg_io_params(vd_t *vd, int slice, size_t *blkp, size_t *lenp)
 			ASSERT(vd->vtoc.v_sectorsz == DEV_BSIZE);
 		} else {
 			ASSERT(vd->vdisk_label == VD_DISK_LABEL_EFI);
-			ASSERT(vd->vdisk_block_size == DEV_BSIZE);
 		}
 
 		if (blk >= vd->slices[slice].nblocks) {
@@ -875,6 +879,7 @@ vd_dskimg_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t offset,
 
 	ASSERT(vd->file || VD_DSKIMG(vd));
 	ASSERT(len > 0);
+	ASSERT(vd->vdisk_bsize == DEV_BSIZE);
 
 	if ((status = vd_dskimg_io_params(vd, slice, &offset, &len)) != 0)
 		return ((status == ENODATA)? 0: -1);
@@ -941,13 +946,14 @@ vd_dskimg_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t offset,
  *
  * Parameters:
  *	disk_size	- the disk size in bytes
+ *	bsize		- the disk block size in bytes
  *	label		- the returned default label.
  *
  * Return Code:
  *	none.
  */
 static void
-vd_build_default_label(size_t disk_size, struct dk_label *label)
+vd_build_default_label(size_t disk_size, size_t bsize, struct dk_label *label)
 {
 	size_t size;
 	char unit;
@@ -1005,7 +1011,7 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 	}
 
 	label->dkl_pcyl = disk_size /
-	    (label->dkl_nsect * label->dkl_nhead * DEV_BSIZE);
+	    (label->dkl_nsect * label->dkl_nhead * bsize);
 
 	if (label->dkl_pcyl == 0)
 		label->dkl_pcyl = 1;
@@ -1027,7 +1033,7 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 	    label->dkl_nhead, label->dkl_nsect);
 	PR0("provided disk size: %ld bytes\n", (uint64_t)
 	    (label->dkl_pcyl * label->dkl_nhead *
-	    label->dkl_nsect * DEV_BSIZE));
+	    label->dkl_nsect * bsize));
 
 	vd_get_readable_size(disk_size, &size, &unit);
 
@@ -1230,6 +1236,8 @@ vd_dskimg_read_devid(vd_t *vd, ddi_devid_t *devid)
 	uint_t chksum;
 	int status, sz;
 
+	ASSERT(vd->vdisk_bsize == DEV_BSIZE);
+
 	if ((status = vd_dskimg_get_devid_block(vd, &blk)) != 0)
 		return (status);
 
@@ -1304,6 +1312,8 @@ vd_dskimg_write_devid(vd_t *vd, ddi_devid_t devid)
 	size_t blk;
 	int status;
 
+	ASSERT(vd->vdisk_bsize == DEV_BSIZE);
+
 	if (devid == NULL) {
 		/* nothing to write */
 		return (0);
@@ -1371,12 +1381,12 @@ vd_do_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 
 	ASSERT(!vd->file);
 	ASSERT(!vd->volume);
-	ASSERT(vd->vdisk_block_size > 0);
+	ASSERT(vd->vdisk_bsize > 0);
 
 	max_sectors = vd->max_xfer_sz;
-	nblk = (len / vd->vdisk_block_size);
+	nblk = (len / vd->vdisk_bsize);
 
-	if (len % vd->vdisk_block_size != 0)
+	if (len % vd->vdisk_bsize != 0)
 		return (EINVAL);
 
 	/*
@@ -1414,7 +1424,7 @@ vd_do_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 		}
 		ucmd.uscsi_cdb = (caddr_t)&cdb;
 		ucmd.uscsi_bufaddr = data;
-		ucmd.uscsi_buflen = nsectors * vd->block_size;
+		ucmd.uscsi_buflen = nsectors * vd->backend_bsize;
 		ucmd.uscsi_timeout = vd_scsi_rdwr_timeout;
 		/*
 		 * Set flags so that the command is isolated from normal
@@ -1459,7 +1469,7 @@ vd_do_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 
 		blk += nsectors;
 		nblk -= nsectors;
-		data += nsectors * vd->vdisk_block_size; /* SECSIZE */
+		data += nsectors * vd->vdisk_bsize;
 	}
 
 	return (status);
@@ -1498,7 +1508,7 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
 	size_t	plen;	/* length of data to be read from physical device */
 	char	*buf;	/* buffer area to fit physical device's block size */
 
-	if (vd->block_size == 0) {
+	if (vd->backend_bsize == 0) {
 		/*
 		 * The block size was not available during the attach,
 		 * try to update it now.
@@ -1514,10 +1524,10 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
 	 * and adjust the block to be read from and the amount of data to
 	 * read to correspond with the device's block size.
 	 */
-	if (vd->vdisk_block_size == vd->block_size)
+	if (vd->vdisk_bsize == vd->backend_bsize)
 		return (vd_do_scsi_rdwr(vd, operation, data, vblk, vlen));
 
-	if (vd->vdisk_block_size > vd->block_size)
+	if (vd->vdisk_bsize > vd->backend_bsize)
 		return (EINVAL);
 
 	/*
@@ -1540,23 +1550,23 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
 	 *             v                 v
 	 *  --+--+--+--+--+--+--+--+--+--+--+--+--+--+--+-   virtual disk:
 	 *    |  |  |  |XX|XX|XX|XX|XX|XX|  |  |  |  |  |  } block size is
-	 *  --+--+--+--+--+--+--+--+--+--+--+--+--+--+--+-  vd->vdisk_block_size
+	 *  --+--+--+--+--+--+--+--+--+--+--+--+--+--+--+-   vd->vdisk_bsize
 	 *          :  :                 :  :
 	 *         >:==:< delta          :  :
 	 *          :  :                 :  :
 	 *  --+-----+-----+-----+-----+-----+-----+-----+--   physical disk:
 	 *    |     |YY:YY|YYYYY|YYYYY|YY:YY|     |     |   } block size is
-	 *  --+-----+-----+-----+-----+-----+-----+-----+--   vd->block_size
+	 *  --+-----+-----+-----+-----+-----+-----+-----+--   vd->backend_bsize
 	 *          ^                       ^
 	 *          |<--------------------->|
 	 *          |         plen
 	 *         pblk 
 	 */
 	/* END CSTYLED */
-	pblk = (vblk * vd->vdisk_block_size) / vd->block_size;
-	delta = (vblk * vd->vdisk_block_size) - (pblk * vd->block_size);
-	pnblk = ((delta + vlen - 1) / vd->block_size) + 1;
-	plen = pnblk * vd->block_size;
+	pblk = (vblk * vd->vdisk_bsize) / vd->backend_bsize;
+	delta = (vblk * vd->vdisk_bsize) - (pblk * vd->backend_bsize);
+	pnblk = ((delta + vlen - 1) / vd->backend_bsize) + 1;
+	plen = pnblk * vd->backend_bsize;
 
 	PR2("vblk %lx:pblk %lx: vlen %ld:plen %ld", vblk, pblk, vlen, plen);
 
@@ -1591,7 +1601,7 @@ static ssize_t
 vd_slice_flabel_read(vd_t *vd, caddr_t data, size_t offset, size_t length)
 {
 	size_t n = 0;
-	uint_t limit = vd->flabel_limit * DEV_BSIZE;
+	uint_t limit = vd->flabel_limit * vd->vdisk_bsize;
 
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
 	ASSERT(vd->flabel != NULL);
@@ -1646,7 +1656,7 @@ vd_slice_flabel_read(vd_t *vd, caddr_t data, size_t offset, size_t length)
 static ssize_t
 vd_slice_flabel_write(vd_t *vd, caddr_t data, size_t offset, size_t length)
 {
-	uint_t limit = vd->flabel_limit * DEV_BSIZE;
+	uint_t limit = vd->flabel_limit * vd->vdisk_bsize;
 	struct dk_label *label;
 	struct dk_geom geom;
 	struct extvtoc vtoc;
@@ -1663,7 +1673,7 @@ vd_slice_flabel_write(vd_t *vd, caddr_t data, size_t offset, size_t length)
 	 * write was successful, but note that nothing is actually overwritten.
 	 */
 	if (vd->vdisk_label == VD_DISK_LABEL_VTOC &&
-	    offset == 0 && length == DEV_BSIZE) {
+	    offset == 0 && length == vd->vdisk_bsize) {
 		label = (void *)data;
 
 		/* check that this is a valid label */
@@ -1721,7 +1731,7 @@ vd_slice_flabel_write(vd_t *vd, caddr_t data, size_t offset, size_t length)
  *			  Return the starting block relative to the vdisk
  *			  backend for the remaining operation.
  *	lengthp		- pointer to the number of bytes to read or write.
- *			  This should be a multiple of DEV_BSIZE. Return the
+ *			  This should be a multiple of vdisk_bsize. Return the
  *			  remaining number of bytes to read or write.
  *
  * Return Code:
@@ -1739,6 +1749,7 @@ vd_slice_fake_rdwr(vd_t *vd, int slice, int operation, caddr_t *datap,
 	size_t ablk, asize, aoff, alen;
 	ssize_t n;
 	int sec, status;
+	size_t bsize = vd->vdisk_bsize;
 
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
 	ASSERT(slice != 0);
@@ -1759,23 +1770,23 @@ vd_slice_fake_rdwr(vd_t *vd, int slice, int operation, caddr_t *datap,
 		return (EIO);
 	}
 
-	if (length % DEV_BSIZE != 0)
+	if (length % bsize != 0)
 		return (EINVAL);
 
 	/* handle any I/O with the fake label */
 	if (operation == VD_OP_BWRITE)
-		n = vd_slice_flabel_write(vd, data, blk * DEV_BSIZE, length);
+		n = vd_slice_flabel_write(vd, data, blk * bsize, length);
 	else
-		n = vd_slice_flabel_read(vd, data, blk * DEV_BSIZE, length);
+		n = vd_slice_flabel_read(vd, data, blk * bsize, length);
 
 	if (n == -1)
 		return (EINVAL);
 
-	ASSERT(n % DEV_BSIZE == 0);
+	ASSERT(n % bsize == 0);
 
 	/* adjust I/O arguments */
 	data += n;
-	blk += n / DEV_BSIZE;
+	blk += n / bsize;
 	length -= n;
 
 	/* check if there's something else to process */
@@ -1791,7 +1802,7 @@ vd_slice_fake_rdwr(vd_t *vd, int slice, int operation, caddr_t *datap,
 	}
 
 	if (vd->vdisk_label == VD_DISK_LABEL_EFI) {
-		asize = EFI_MIN_RESV_SIZE + 33;
+		asize = EFI_MIN_RESV_SIZE + (EFI_MIN_ARRAY_SIZE / bsize) + 1;
 		ablk = vd->vdisk_size - asize;
 	} else {
 		ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
@@ -1802,7 +1813,7 @@ vd_slice_fake_rdwr(vd_t *vd, int slice, int operation, caddr_t *datap,
 		asize = vd->dk_geom.dkg_acyl * csize;
 	}
 
-	alen = length / DEV_BSIZE;
+	alen = length / bsize;
 	aoff = blk;
 
 	/* if we have reached the last block then the I/O is completed */
@@ -1834,10 +1845,10 @@ vd_slice_fake_rdwr(vd_t *vd, int slice, int operation, caddr_t *datap,
 		alen = ablk + asize - aoff;
 	}
 
-	alen *= DEV_BSIZE;
+	alen *= bsize;
 
 	if (operation == VD_OP_BREAD) {
-		bzero(data + (aoff - blk) * DEV_BSIZE, alen);
+		bzero(data + (aoff - blk) * bsize, alen);
 
 		if (vd->vdisk_label == VD_DISK_LABEL_VTOC) {
 			/* check if we read backup labels */
@@ -1848,9 +1859,9 @@ vd_slice_fake_rdwr(vd_t *vd, int slice, int operation, caddr_t *datap,
 			for (sec = 1; (sec < 5 * 2 + 1); sec += 2) {
 
 				if (ablk + sec >= blk &&
-				    ablk + sec < blk + (length / DEV_BSIZE)) {
+				    ablk + sec < blk + (length / bsize)) {
 					bcopy(label, data +
-					    (ablk + sec - blk) * DEV_BSIZE,
+					    (ablk + sec - blk) * bsize,
 					    sizeof (struct dk_label));
 				}
 			}
@@ -1898,6 +1909,8 @@ vd_bio_task(void *arg)
 	vd_t *vd = task->vd;
 	ssize_t resid;
 	int status;
+
+	ASSERT(vd->vdisk_bsize == DEV_BSIZE);
 
 	if (vd->zvol) {
 
@@ -2161,6 +2174,9 @@ vd_start_bio(vd_task_t *task)
 		} else {
 			buf->b_flags |= B_WRITE;
 		}
+
+		/* convert VIO block number to buf block number */
+		buf->b_lblkno = offset << vd->vio_bshift;
 
 		request->status = ldi_strategy(vd->ldi_handle[slice], buf);
 	}
@@ -3101,7 +3117,8 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		switch (cmd) {
 		case DKIOCGETEFI:
 			len = vd_slice_flabel_read(vd,
-			    (caddr_t)dk_ioc->dki_data, lba * DEV_BSIZE, len);
+			    (caddr_t)dk_ioc->dki_data,
+			    lba * vd->vdisk_bsize, len);
 
 			ASSERT(len > 0);
 
@@ -3237,7 +3254,8 @@ vd_dskimg_validate_geometry(vd_t *vd)
 		}
 
 		vd->vdisk_label = VD_DISK_LABEL_UNK;
-		vd_build_default_label(vd->dskimg_size, &label);
+		vd_build_default_label(vd->dskimg_size, vd->vdisk_bsize,
+		    &label);
 		status = EINVAL;
 	} else {
 		vd->vdisk_label = VD_DISK_LABEL_VTOC;
@@ -3835,7 +3853,7 @@ vd_get_capacity(vd_task_t *task)
 
 	request->status = 0;
 
-	vd_cap.vdisk_block_size = vd->vdisk_block_size;
+	vd_cap.vdisk_block_size = vd->vdisk_bsize;
 	vd_cap.vdisk_size = vd->vdisk_size;
 
 	if ((rv = ldc_mem_copy(vd->ldc_handle, (char *)&vd_cap, 0, &nbytes,
@@ -4480,7 +4498,7 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		 * Must first get the maximum transfer size in bytes.
 		 */
 		size_t	max_xfer_bytes = attr_msg->vdisk_block_size ?
-		    attr_msg->vdisk_block_size*attr_msg->max_xfer_sz :
+		    attr_msg->vdisk_block_size * attr_msg->max_xfer_sz :
 		    attr_msg->max_xfer_sz;
 		size_t	max_inband_msglen =
 		    sizeof (vd_dring_inband_msg_t) +
@@ -4506,7 +4524,7 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	/* Return the device's block size and max transfer size to the client */
-	attr_msg->vdisk_block_size	= vd->vdisk_block_size;
+	attr_msg->vdisk_block_size	= vd->vdisk_bsize;
 	attr_msg->max_xfer_sz		= vd->max_xfer_sz;
 
 	attr_msg->vdisk_size = vd->vdisk_size;
@@ -5442,7 +5460,7 @@ vd_dskimg_is_iso_image(vd_t *vd)
 	 * Standard Identifier and is set to CD001 for a CD-ROM compliant
 	 * to the ISO 9660 standard.
 	 */
-	sec = (ISO_VOLDESC_SEC * ISO_SECTOR_SIZE) / vd->vdisk_block_size;
+	sec = (ISO_VOLDESC_SEC * ISO_SECTOR_SIZE) / vd->vdisk_bsize;
 	rv = vd_dskimg_rw(vd, VD_SLICE_NONE, VD_OP_BREAD, (caddr_t)iso_buf,
 	    sec, ISO_SECTOR_SIZE);
 
@@ -5507,16 +5525,13 @@ vd_setup_full_disk(vd_t *vd)
 
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
 
-	vd->vdisk_block_size = DEV_BSIZE;
-
 	/* set the disk size, block size and the media type of the disk */
 	status = vd_backend_check_size(vd);
 
 	if (status != 0) {
 		if (!vd->scsi) {
 			/* unexpected failure */
-			PRN("ldi_ioctl(DKIOCGMEDIAINFO) returned errno %d",
-			    status);
+			PRN("Failed to check backend size (errno %d)", status);
 			return (status);
 		}
 
@@ -5526,7 +5541,8 @@ vd_setup_full_disk(vd_t *vd)
 		 * size of the disk and the block size.
 		 */
 		vd->vdisk_size = VD_SIZE_UNKNOWN;
-		vd->block_size = 0;
+		vd->vdisk_bsize = 0;
+		vd->backend_bsize = 0;
 		vd->vdisk_media = VD_MEDIA_FIXED;
 	}
 
@@ -5697,7 +5713,7 @@ vd_setup_partition_vtoc(vd_t *vd)
 		vd->vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_size =
 		    vd->dk_geom.dkg_ncyl * csize;
 
-		vd_get_readable_size(vd->vdisk_size * vd->vdisk_block_size,
+		vd_get_readable_size(vd->vdisk_size * vd->vdisk_bsize,
 		    &size, &unit);
 
 		/*
@@ -5723,7 +5739,7 @@ vd_setup_partition_vtoc(vd_t *vd)
 
 		/* create a fake label from the vtoc and geometry */
 		vd->flabel_limit = (uint_t)csize;
-		vd->flabel_size = VD_LABEL_VTOC_SIZE;
+		vd->flabel_size = VD_LABEL_VTOC_SIZE(vd->vdisk_bsize);
 		vd->flabel = kmem_zalloc(vd->flabel_size, KM_SLEEP);
 		vd_vtocgeom_to_label(&vd->vtoc, &vd->dk_geom,
 		    VD_LABEL_VTOC(vd));
@@ -5741,7 +5757,7 @@ vd_setup_partition_vtoc(vd_t *vd)
  * as a slice without the addition of any metadata.
  *
  * So when exporting the disk as an EFI disk, we fake a disk with the following
- * layout:
+ * layout: (assuming the block size is 512 bytes)
  *
  *                  flabel        +--- flabel_limit
  *                 <------>       v
@@ -5776,9 +5792,8 @@ vd_setup_partition_vtoc(vd_t *vd)
  * - blocks 34+N+1 to P define a fake reserved partition and backup label, it
  *   returns 0
  *
- * Note: if the backend size is not a multiple of the vdisk block size
- * (DEV_BSIZE = 512 byte) then the very end of the backend will not map to
- * any block of the virtual disk.
+ * Note: if the backend size is not a multiple of the vdisk block size then
+ * the very end of the backend will not map to any block of the virtual disk.
  */
 static int
 vd_setup_partition_efi(vd_t *vd)
@@ -5788,23 +5803,35 @@ vd_setup_partition_efi(vd_t *vd)
 	struct uuid uuid = EFI_USR;
 	struct uuid efi_reserved = EFI_RESERVED;
 	uint32_t crc;
-	uint64_t s0_start, s0_end;
+	uint64_t s0_start, s0_end, first_u_lba;
+	size_t bsize;
 
-	vd->flabel_limit = 34;
-	vd->flabel_size = VD_LABEL_EFI_SIZE;
+	ASSERT(vd->vdisk_bsize > 0);
+
+	bsize = vd->vdisk_bsize;
+	/*
+	 * The minimum size for the label is 16K (EFI_MIN_ARRAY_SIZE)
+	 * for GPEs plus one block for the GPT and one for PMBR.
+	 */
+	first_u_lba = (EFI_MIN_ARRAY_SIZE / bsize) + 2;
+	vd->flabel_limit = (uint_t)first_u_lba;
+	vd->flabel_size = VD_LABEL_EFI_SIZE(bsize);
 	vd->flabel = kmem_zalloc(vd->flabel_size, KM_SLEEP);
-	gpt = VD_LABEL_EFI_GPT(vd);
-	gpe = VD_LABEL_EFI_GPE(vd);
+	gpt = VD_LABEL_EFI_GPT(vd, bsize);
+	gpe = VD_LABEL_EFI_GPE(vd, bsize);
 
-	/* adjust the vdisk_size, we emulate the first 34 blocks */
-	vd->vdisk_size += 34;
-	s0_start = 34;
+	/*
+	 * Adjust the vdisk_size, we emulate the first few blocks
+	 * for the disk label.
+	 */
+	vd->vdisk_size += first_u_lba;
+	s0_start = first_u_lba;
 	s0_end = vd->vdisk_size - 1;
 
 	gpt->efi_gpt_Signature = LE_64(EFI_SIGNATURE);
 	gpt->efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
 	gpt->efi_gpt_HeaderSize = LE_32(sizeof (efi_gpt_t));
-	gpt->efi_gpt_FirstUsableLBA = LE_64(34ULL);
+	gpt->efi_gpt_FirstUsableLBA = LE_64(first_u_lba);
 	gpt->efi_gpt_PartitionEntryLBA = LE_64(2ULL);
 	gpt->efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (efi_gpe_t));
 
@@ -5834,7 +5861,8 @@ vd_setup_partition_efi(vd_t *vd)
 	gpt->efi_gpt_LastUsableLBA = LE_64(vd->vdisk_size - 1);
 
 	/* adjust the vdisk size for the backup GPT and GPE */
-	vd->vdisk_size += 33;
+	vd->vdisk_size += (EFI_MIN_ARRAY_SIZE / bsize) + 1;
+	gpt->efi_gpt_AlternateLBA = LE_64(vd->vdisk_size - 1);
 
 	CRC32(crc, gpe, sizeof (efi_gpe_t) * VD_MAXPART, -1U, crc32_table);
 	gpt->efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
@@ -5854,7 +5882,6 @@ static int
 vd_setup_backend_vnode(vd_t *vd)
 {
 	int 		rval, status;
-	vattr_t		vattr;
 	dev_t		dev;
 	char		*file_path = vd->device_path;
 	ldi_handle_t	lhandle;
@@ -5873,20 +5900,6 @@ vd_setup_backend_vnode(vd_t *vd)
 	 * closing the file and releasing the vnode in case of an error.
 	 */
 	vd->file = B_TRUE;
-
-	vattr.va_mask = AT_SIZE;
-	if ((status = VOP_GETATTR(vd->file_vnode, &vattr, 0, kcred, NULL))
-	    != 0) {
-		PRN("VOP_GETATTR(%s) = errno %d", file_path, status);
-		return (EIO);
-	}
-
-	vd->dskimg_size = vattr.va_size;
-
-	if (vd->file_vnode->v_flag & VNOMAP) {
-		PRN("File %s cannot be mapped", file_path);
-		return (EIO);
-	}
 
 	vd->max_xfer_sz = maxphys / DEV_BSIZE; /* default transfer size */
 
@@ -5938,10 +5951,6 @@ vd_setup_slice_image(vd_t *vd)
 	struct dk_label label;
 	int status;
 
-	/* sector size = block size = DEV_BSIZE */
-	vd->block_size = DEV_BSIZE;
-	vd->vdisk_block_size = DEV_BSIZE;
-	vd->vdisk_size = vd->dskimg_size / DEV_BSIZE;
 	vd->vdisk_media = VD_MEDIA_FIXED;
 	vd->vdisk_label = (vd_slice_label == VD_DISK_LABEL_UNK)?
 	    vd_file_slice_label : vd_slice_label;
@@ -5956,7 +5965,8 @@ vd_setup_slice_image(vd_t *vd)
 		 * adjust the vtoc so that it defines a single-slice
 		 * disk.
 		 */
-		vd_build_default_label(vd->dskimg_size, &label);
+		vd_build_default_label(vd->dskimg_size, vd->vdisk_bsize,
+		    &label);
 		vd_label_to_vtocgeom(&label, &vd->vtoc, &vd->dk_geom);
 		status = vd_setup_partition_vtoc(vd);
 	}
@@ -5970,17 +5980,18 @@ vd_setup_disk_image(vd_t *vd)
 	int status;
 	char *backend_path = vd->device_path;
 
+	if ((status = vd_backend_check_size(vd)) != 0) {
+		PRN("Fail to check size of %s (errno %d)",
+		    backend_path, status);
+		return (EIO);
+	}
+
 	/* size should be at least sizeof(dk_label) */
 	if (vd->dskimg_size < sizeof (struct dk_label)) {
 		PRN("Size of file has to be at least %ld bytes",
 		    sizeof (struct dk_label));
 		return (EIO);
 	}
-
-	/* sector size = block size = DEV_BSIZE */
-	vd->block_size = DEV_BSIZE;
-	vd->vdisk_block_size = DEV_BSIZE;
-	vd->vdisk_size = vd->dskimg_size / DEV_BSIZE;
 
 	/*
 	 * Find and validate the geometry of a disk image.
@@ -5997,7 +6008,7 @@ vd_setup_disk_image(vd_t *vd)
 		 * of the ISO image (images for both drive types are stored
 		 * in the ISO-9600 format). CDs can store up to just under 1Gb
 		 */
-		if ((vd->vdisk_size * vd->vdisk_block_size) > ONE_GIGABYTE)
+		if ((vd->vdisk_size * vd->vdisk_bsize) > ONE_GIGABYTE)
 			vd->vdisk_media = VD_MEDIA_DVD;
 		else
 			vd->vdisk_media = VD_MEDIA_CD;
@@ -6179,14 +6190,6 @@ vd_setup_backend_ldi(vd_t *vd)
 	if (vd->vdisk_type == VD_DISK_TYPE_DISK) {
 
 		if (vd->volume) {
-			/* get size of backing device */
-			if (ldi_get_size(vd->ldi_handle[0], &vd->dskimg_size) !=
-			    DDI_SUCCESS) {
-				PRN("ldi_get_size() failed for %s",
-				    device_path);
-				return (EIO);
-			}
-
 			/* setup disk image */
 			return (vd_setup_disk_image(vd));
 		}
@@ -6220,14 +6223,6 @@ vd_setup_single_slice_disk(vd_t *vd)
 	char *device_path = vd->device_path;
 	struct vtoc vtoc;
 
-	/* Get size of backing device */
-	if (ldi_get_size(vd->ldi_handle[0], &vd->vdisk_size) != DDI_SUCCESS) {
-		PRN("ldi_get_size() failed for %s", device_path);
-		return (EIO);
-	}
-	vd->vdisk_size = lbtodb(vd->vdisk_size);	/* convert to blocks */
-	vd->block_size = DEV_BSIZE;
-	vd->vdisk_block_size = DEV_BSIZE;
 	vd->vdisk_media = VD_MEDIA_FIXED;
 
 	if (vd->volume) {
@@ -6241,6 +6236,12 @@ vd_setup_single_slice_disk(vd_t *vd)
 	vd->vdisk_type  = VD_DISK_TYPE_SLICE;
 	vd->nslices	= 1;
 
+	/* Get size of backing device */
+	if ((status = vd_backend_check_size(vd)) != 0) {
+		PRN("Fail to check size of %s (errno %d)", device_path, status);
+		return (EIO);
+	}
+
 	/*
 	 * When exporting a slice or a device as a single slice disk, we don't
 	 * care about any partitioning exposed by the backend. The goal is just
@@ -6251,7 +6252,7 @@ vd_setup_single_slice_disk(vd_t *vd)
 	 * variable.
 	 */
 	if (vd_slice_label == VD_DISK_LABEL_EFI ||
-	    vd->vdisk_size >= ONE_TERABYTE / DEV_BSIZE) {
+	    vd->vdisk_size >= ONE_TERABYTE / vd->vdisk_bsize) {
 		vd->vdisk_label = VD_DISK_LABEL_EFI;
 	} else {
 		status = ldi_ioctl(vd->ldi_handle[0], DKIOCGEXTVTOC,
@@ -6281,8 +6282,8 @@ vd_setup_single_slice_disk(vd_t *vd)
 		} else if (vd_slice_label == VD_DISK_LABEL_VTOC) {
 
 			vd->vdisk_label = VD_DISK_LABEL_VTOC;
-			vd_build_default_label(vd->vdisk_size * DEV_BSIZE,
-			    &label);
+			vd_build_default_label(vd->vdisk_size * vd->vdisk_bsize,
+			    vd->vdisk_bsize, &label);
 			vd_label_to_vtocgeom(&label, &vd->vtoc, &vd->dk_geom);
 
 		} else {
@@ -6302,13 +6303,50 @@ vd_setup_single_slice_disk(vd_t *vd)
 	return (status);
 }
 
+/*
+ * This function is invoked when setting up the vdisk backend and to process
+ * the VD_OP_GET_CAPACITY operation. It checks the backend size and set the
+ * following attributes of the vd structure:
+ *
+ * - vdisk_bsize: block size for the virtual disk used by the VIO protocol. Its
+ *   value is 512 bytes (DEV_BSIZE) when the backend is a file, a volume or a
+ *   CD/DVD. When the backend is a disk or a disk slice then it has the value
+ *   of the logical block size of that disk (as returned by the DKIOCGMEDIAINFO
+ *   ioctl). This block size is expected to be a power of 2 and a multiple of
+ *   512.
+ *
+ * - vdisk_size: size of the virtual disk expressed as a number of vdisk_bsize
+ *   blocks.
+ *
+ * vdisk_size and vdisk_bsize are sent to the vdisk client during the connection
+ * handshake and in the result of a VD_OP_GET_CAPACITY operation.
+ *
+ * - backend_bsize: block size of the backend device. backend_bsize has the same
+ *   value as vdisk_bsize except when the backend is a CD/DVD. In that case,
+ *   vdisk_bsize is set to 512 (DEV_BSIZE) while backend_bsize is set to the
+ *   effective logical block size of the CD/DVD (usually 2048).
+ *
+ * - dskimg_size: size of the backend when the backend is a disk image. This
+ *   attribute is set only when the backend is a file or a volume, otherwise it
+ *   is unused.
+ *
+ * - vio_bshift: number of bit to shift to convert a VIO block number (which
+ *   uses a block size of vdisk_bsize) to a buf(9s) block number (which uses a
+ *   block size of 512 bytes) i.e. we have vdisk_bsize = 512 x 2 ^ vio_bshift
+ *
+ * - vdisk_media: media of the virtual disk. This function only sets this
+ *   attribute for physical disk and CD/DVD. For other backend types, this
+ *   attribute is set in the setup function of the backend.
+ */
 static int
 vd_backend_check_size(vd_t *vd)
 {
-	size_t backend_size, old_size, new_size;
+	size_t backend_size, backend_bsize, vdisk_bsize;
+	size_t old_size, new_size;
 	struct dk_minfo minfo;
 	vattr_t vattr;
-	int rval, rv;
+	int rval, rv, media, nshift = 0;
+	uint32_t n;
 
 	if (vd->file) {
 
@@ -6320,20 +6358,23 @@ vd_backend_check_size(vd_t *vd)
 			return (rv);
 		}
 		backend_size = vattr.va_size;
+		backend_bsize = DEV_BSIZE;
+		vdisk_bsize = DEV_BSIZE;
 
-	} else if (vd->volume || vd->vdisk_type == VD_DISK_TYPE_SLICE) {
+	} else if (vd->volume) {
 
-		/* physical slice or volume (slice or full disk) */
+		/* volume (slice or full disk) */
 		rv = ldi_get_size(vd->ldi_handle[0], &backend_size);
 		if (rv != DDI_SUCCESS) {
 			PR0("ldi_get_size() failed for %s", vd->device_path);
 			return (EIO);
 		}
+		backend_bsize = DEV_BSIZE;
+		vdisk_bsize = DEV_BSIZE;
 
 	} else {
 
-		/* physical disk */
-		ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
+		/* physical disk or slice */
 		rv = ldi_ioctl(vd->ldi_handle[0], DKIOCGMEDIAINFO,
 		    (intptr_t)&minfo, (vd->open_flags | FKIOCTL),
 		    kcred, &rval);
@@ -6342,17 +6383,58 @@ vd_backend_check_size(vd_t *vd)
 			    vd->device_path, rv);
 			return (rv);
 		}
-		backend_size = minfo.dki_capacity * minfo.dki_lbsize;
+
+		if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
+			rv = ldi_get_size(vd->ldi_handle[0], &backend_size);
+			if (rv != DDI_SUCCESS) {
+				PR0("ldi_get_size() failed for %s",
+				    vd->device_path);
+				return (EIO);
+			}
+		} else {
+			ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
+			backend_size = minfo.dki_capacity * minfo.dki_lbsize;
+		}
+
+		backend_bsize = minfo.dki_lbsize;
+		media = DK_MEDIATYPE2VD_MEDIATYPE(minfo.dki_media_type);
+
+		/*
+		 * If the device is a CD or a DVD then we force the vdisk block
+		 * size to 512 bytes (DEV_BSIZE). In that case, vdisk_bsize can
+		 * be different from backend_size.
+		 */
+		if (media == VD_MEDIA_CD || media == VD_MEDIA_DVD)
+			vdisk_bsize = DEV_BSIZE;
+		else
+			vdisk_bsize = backend_bsize;
 	}
 
+	/* check vdisk block size */
+	if (vdisk_bsize == 0 || vdisk_bsize % DEV_BSIZE != 0)
+		return (EINVAL);
+
 	old_size = vd->vdisk_size;
-	new_size = backend_size / DEV_BSIZE;
+	new_size = backend_size / vdisk_bsize;
 
 	/* check if size has changed */
-	if (old_size != VD_SIZE_UNKNOWN && old_size == new_size)
+	if (old_size != VD_SIZE_UNKNOWN && old_size == new_size &&
+	    vd->vdisk_bsize == vdisk_bsize)
 		return (0);
 
+	/* cache info for blk conversion */
+	for (n = vdisk_bsize / DEV_BSIZE; n > 1; n >>= 1) {
+		if ((n & 0x1) != 0) {
+			/* blk_size is not a power of 2 */
+			return (EINVAL);
+		}
+		nshift++;
+	}
+
+	vd->vio_bshift = nshift;
 	vd->vdisk_size = new_size;
+	vd->vdisk_bsize = vdisk_bsize;
+	vd->backend_bsize = backend_bsize;
 
 	if (vd->file || vd->volume)
 		vd->dskimg_size = backend_size;
@@ -6384,9 +6466,7 @@ vd_backend_check_size(vd_t *vd)
 	} else if (!vd->file && !vd->volume) {
 		/* physical disk */
 		ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
-		vd->block_size = minfo.dki_lbsize;
-		vd->vdisk_media =
-		    DK_MEDIATYPE2VD_MEDIATYPE(minfo.dki_media_type);
+		vd->vdisk_media = media;
 	}
 
 	return (0);

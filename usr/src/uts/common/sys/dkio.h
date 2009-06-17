@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,6 +301,11 @@ enum dkio_state { DKIO_NONE, DKIO_EJECTED, DKIO_INSERTED, DKIO_DEV_GONE };
 #define	DKIOCGTEMPERATURE	(DKIOC|45)	/* get temperature */
 
 /*
+ * ioctl to get the media info including physical block size
+ */
+#define	DKIOCGMEDIAINFOEXT	(DKIOC|48)
+
+/*
  * Used for providing the temperature.
  */
 
@@ -321,6 +326,17 @@ struct dk_minfo {
 	uint_t		dki_media_type;	/* Media type or profile info */
 	uint_t		dki_lbsize;	/* Logical blocksize of media */
 	diskaddr_t	dki_capacity;	/* Capacity as # of dki_lbsize blks */
+};
+
+/*
+ * Used for Media info or the current profile info
+ * including physical block size if supported.
+ */
+struct dk_minfo_ext {
+	uint_t		dki_media_type;	/* Media type or profile info */
+	uint_t		dki_lbsize;	/* Logical blocksize of media */
+	diskaddr_t	dki_capacity;	/* Capacity as # of dki_lbsize blks */
+	uint_t		dki_pbsize;	/* Physical blocksize of media */
 };
 
 /*

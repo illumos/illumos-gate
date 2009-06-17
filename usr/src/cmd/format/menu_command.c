@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -293,8 +293,8 @@ found:
 	 * Also, set partition table (best guess) too.
 	 */
 	if (!option_f && ncyl == 0 && nhead == 0 && nsect == 0 &&
-		(disk->label_type != L_TYPE_EFI)) {
-		    (void) c_type();
+	    (disk->label_type != L_TYPE_EFI)) {
+		(void) c_type();
 	}
 
 	/*
@@ -305,11 +305,11 @@ found:
 
 	if ((cur_disk->label_type == L_TYPE_EFI) &&
 	    (cur_disk->disk_parts->etoc->efi_flags &
-		EFI_GPT_PRIMARY_CORRUPT)) {
-		    err_print("Reading the primary EFI GPT label ");
-		    err_print("failed.  Using backup label.\n");
-		    err_print("Use the 'backup' command to restore ");
-		    err_print("the primary label.\n");
+	    EFI_GPT_PRIMARY_CORRUPT)) {
+		err_print("Reading the primary EFI GPT label ");
+		err_print("failed.  Using backup label.\n");
+		err_print("Use the 'backup' command to restore ");
+		err_print("the primary label.\n");
 	}
 
 #if defined(_SUNOS_VTOC_16)
@@ -383,6 +383,7 @@ c_type()
 	} else {
 		auto_conf_choice = -1;
 	}
+
 	i = first_disk;
 	for (tptr = type; tptr != NULL; tptr = tptr->dtype_next) {
 		/*
@@ -396,7 +397,8 @@ c_type()
 			continue;
 		}
 		if (tptr->dtype_asciilabel)
-		    fmt_print("        %d. %s\n", i++, tptr->dtype_asciilabel);
+			fmt_print("        %d. %s\n", i++,
+			    tptr->dtype_asciilabel);
 	}
 	other_choice = i;
 	fmt_print("        %d. other\n", i);
@@ -418,85 +420,89 @@ c_type()
 		/*
 		 * User chose "auto configure".
 		 */
-	    (void) strcpy(x86_devname, cur_disk->disk_name);
-	    switch (cur_disk->label_type) {
-	    case L_TYPE_SOLARIS:
-		if ((tptr = auto_sense(cur_file, 1, &label)) == NULL) {
-			err_print("Auto configure failed\n");
-			return (-1);
-		}
-		fmt_print("%s: configured with capacity of ",
-			cur_disk->disk_name);
-		nblks = (diskaddr_t)tptr->dtype_ncyl * tptr->dtype_nhead *
-			tptr->dtype_nsect;
-		scaled = bn2mb(nblks);
-		if (scaled > 1024.0) {
-			fmt_print("%1.2fGB\n", scaled/1024.0);
-		} else {
-			fmt_print("%1.2fMB\n", scaled);
-		}
-		fmt_print("<%s cyl %d alt %d hd %d sec %d>\n",
-			tptr->dtype_asciilabel, tptr->dtype_ncyl,
-			tptr->dtype_acyl, tptr->dtype_nhead,
-			tptr->dtype_nsect);
-		break;
-	    case L_TYPE_EFI:
-		if ((tptr = auto_efi_sense(cur_file, &efi_info)) == NULL) {
-			err_print("Auto configure failed\n");
-			return (-1);
-		}
-		fmt_print("%s: configured with capacity of ",
-			cur_disk->disk_name);
-		scaled = bn2mb(efi_info.capacity);
-		if (scaled > 1024.0) {
-			fmt_print("%1.2fGB\n", scaled/1024.0);
-		} else {
-			fmt_print("%1.2fMB\n", scaled);
-		}
-		print_efi_string(efi_info.vendor, efi_info.product,
-		    efi_info.revision, efi_info.capacity);
-		fmt_print("\n");
-		for (nparts = 0; nparts < cur_parts->etoc->efi_nparts;
-			nparts++) {
-		    if (cur_parts->etoc->efi_parts[nparts].p_tag ==
-			V_RESERVED) {
-			if (cur_parts->etoc->efi_parts[nparts].p_name) {
-			    (void) strcpy(volname,
-				cur_parts->etoc->efi_parts[nparts].p_name);
-			    volinit = 1;
+		(void) strcpy(x86_devname, cur_disk->disk_name);
+		switch (cur_disk->label_type) {
+		case L_TYPE_SOLARIS:
+			if ((tptr = auto_sense(cur_file, 1, &label)) == NULL) {
+				err_print("Auto configure failed\n");
+				return (-1);
 			}
+			fmt_print("%s: configured with capacity of ",
+			    cur_disk->disk_name);
+			nblks = (diskaddr_t)tptr->dtype_ncyl *
+			    tptr->dtype_nhead * tptr->dtype_nsect;
+			scaled = bn2mb(nblks);
+			if (scaled > 1024.0) {
+				fmt_print("%1.2fGB\n", scaled/1024.0);
+			} else {
+				fmt_print("%1.2fMB\n", scaled);
+			}
+			fmt_print("<%s cyl %d alt %d hd %d sec %d>\n",
+			    tptr->dtype_asciilabel, tptr->dtype_ncyl,
+			    tptr->dtype_acyl, tptr->dtype_nhead,
+			    tptr->dtype_nsect);
 			break;
-		    }
-		}
-		enter_critical();
-		if (delete_disk_type(cur_disk->disk_type) != 0) {
-			fmt_print("Autoconfiguration failed.\n");
-			return (-1);
-		}
-		cur_disk->disk_type = tptr;
-		cur_disk->disk_parts = tptr->dtype_plist;
-		init_globals(cur_disk);
-		exit_critical();
-		if (volinit) {
-		    for (nparts = 0; nparts < cur_parts->etoc->efi_nparts;
-				nparts++) {
-			if (cur_parts->etoc->efi_parts[nparts].p_tag ==
-				V_RESERVED) {
-			    (void) strcpy(
-				cur_parts->etoc->efi_parts[nparts].p_name,
-				    volname);
-			    (void) strlcpy(cur_disk->v_volume, volname,
-				    LEN_DKL_VVOL);
-			    break;
+		case L_TYPE_EFI:
+			if ((tptr = auto_efi_sense(cur_file, &efi_info))
+			    == NULL) {
+				err_print("Auto configure failed\n");
+				return (-1);
 			}
-		    }
-		}
-		return (0);
-		break;
-	    default:
+			fmt_print("%s: configured with capacity of ",
+			    cur_disk->disk_name);
+			scaled = bn2mb(efi_info.capacity);
+			if (scaled > 1024.0) {
+				fmt_print("%1.2fGB\n", scaled/1024.0);
+			} else {
+				fmt_print("%1.2fMB\n", scaled);
+			}
+			cur_blksz = efi_info.e_parts->efi_lbasize;
+			print_efi_string(efi_info.vendor, efi_info.product,
+			    efi_info.revision, efi_info.capacity);
+			fmt_print("\n");
+			for (nparts = 0; nparts < cur_parts->etoc->efi_nparts;
+			    nparts++) {
+				if (cur_parts->etoc->efi_parts[nparts].p_tag ==
+				    V_RESERVED) {
+					if (cur_parts->etoc->efi_parts[nparts].
+					    p_name) {
+						(void) strcpy(volname,
+						    cur_parts->etoc->efi_parts
+						    [nparts].p_name);
+						volinit = 1;
+					}
+					break;
+				}
+			}
+			enter_critical();
+			if (delete_disk_type(cur_disk->disk_type) != 0) {
+				fmt_print("Autoconfiguration failed.\n");
+				return (-1);
+			}
+			cur_disk->disk_type = tptr;
+			cur_disk->disk_parts = tptr->dtype_plist;
+			init_globals(cur_disk);
+			exit_critical();
+			if (volinit) {
+				for (nparts = 0; nparts <
+				    cur_parts->etoc->efi_nparts; nparts++) {
+				if (cur_parts->etoc->efi_parts[nparts].p_tag ==
+				    V_RESERVED) {
+				(void) strcpy(
+				    cur_parts->etoc->efi_parts[nparts].p_name,
+				    volname);
+				(void) strlcpy(cur_disk->v_volume, volname,
+				    LEN_DKL_VVOL);
+				break;
+				}
+				}
+			}
+			return (0);
+			break;
+		default:
 		/* Should never happen */
 		return (-1);
-	    }
+		}
 	} else if ((index == other_choice) && (cur_label == L_TYPE_SOLARIS)) {
 		/*
 		 * User chose "other".
@@ -525,14 +531,13 @@ c_type()
 		d->dtype_threshold = get_threshold(&d->dtype_options);
 		d->dtype_prefetch_min = get_min_prefetch(&d->dtype_options);
 		d->dtype_prefetch_max = get_max_prefetch(d->dtype_prefetch_min,
-			&d->dtype_options);
+		    &d->dtype_options);
 		d->dtype_bps = get_bps();
 #if defined(sparc)
 		d->dtype_dr_type = 0;
 #endif /* defined(sparc) */
 
 		d->dtype_asciilabel = get_asciilabel();
-
 		/*
 		 * Add the new type to the list of possible types for
 		 * this controller.  We lock out interrupts so the lists
@@ -563,18 +568,18 @@ c_type()
 		cur_parts->etoc->efi_last_lba = maxLBA;
 		cur_parts->etoc->efi_last_u_lba = maxLBA - 34;
 		for (i = 0; i < cur_parts->etoc->efi_nparts; i++) {
-		    cur_parts->etoc->efi_parts[i].p_start = 0;
-		    cur_parts->etoc->efi_parts[i].p_size = 0;
-		    cur_parts->etoc->efi_parts[i].p_tag = V_UNASSIGNED;
+			cur_parts->etoc->efi_parts[i].p_start = 0;
+			cur_parts->etoc->efi_parts[i].p_size = 0;
+			cur_parts->etoc->efi_parts[i].p_tag = V_UNASSIGNED;
 		}
 		cur_parts->etoc->efi_parts[8].p_start =
-			maxLBA - 34 - (1024 * 16);
+		    maxLBA - 34 - (1024 * 16);
 		cur_parts->etoc->efi_parts[8].p_size = (1024 * 16);
 		cur_parts->etoc->efi_parts[8].p_tag = V_RESERVED;
 		if (write_label()) {
-		    err_print("Write label failed\n");
+			err_print("Write label failed\n");
 		} else {
-		    cur_disk->disk_flags &= ~DSK_LABEL_DIRTY;
+			cur_disk->disk_flags &= ~DSK_LABEL_DIRTY;
 		}
 		return (0);
 	} else {
@@ -584,10 +589,10 @@ c_type()
 		i = first_disk;
 		tptr = type;
 		while (i < index) {
-		    if (tptr->dtype_asciilabel) {
-			i++;
-		    }
-		    tptr = tptr->dtype_next;
+			if (tptr->dtype_asciilabel) {
+				i++;
+			}
+			tptr = tptr->dtype_next;
 		}
 		if ((tptr->dtype_asciilabel == NULL) &&
 		    (tptr->dtype_next != NULL)) {
@@ -605,18 +610,19 @@ c_type()
 	 * running from a file.
 	 */
 	if ((tptr != oldtype) &&
-			checkmount((diskaddr_t)-1, (diskaddr_t)-1)) {
+	    checkmount((diskaddr_t)-1, (diskaddr_t)-1)) {
 		err_print(
-		"Cannot set disk type while it has mounted partitions.\n\n");
+		    "Cannot set disk type while it has mounted "
+		    "partitions.\n\n");
 		return (-1);
 	}
 	/*
 	 * check for partitions being used for swapping in format zone
 	 */
 	if ((tptr != oldtype) &&
-			checkswap((diskaddr_t)-1, (diskaddr_t)-1)) {
-		err_print("Cannot set disk type while its partition are \
-currently being used for swapping.\n");
+	    checkswap((diskaddr_t)-1, (diskaddr_t)-1)) {
+		err_print("Cannot set disk type while its partition are "
+		"currently being used for swapping.\n");
 		return (-1);
 	}
 
@@ -625,11 +631,11 @@ currently being used for swapping.\n");
 	 */
 
 	if ((tptr != oldtype) &&
-		checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
-		    (diskaddr_t)-1, 0, 0)) {
+	    checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	    (diskaddr_t)-1, 0, 0)) {
 		err_print("Cannot set disk type while its "
 		    "partitions are currently in use.\n");
-				return (-1);
+		return (-1);
 	}
 	/*
 	 * If the type selected is different from the previous type,
@@ -742,8 +748,8 @@ c_current()
 			fmt_print("<type unknown>\n");
 		} else if (cur_label == L_TYPE_SOLARIS) {
 			fmt_print("<%s cyl %d alt %d hd %d sec %d>\n",
-				cur_dtype->dtype_asciilabel, ncyl,
-				acyl, nhead, nsect);
+			    cur_dtype->dtype_asciilabel, ncyl,
+			    acyl, nhead, nsect);
 		} else if (cur_label == L_TYPE_EFI) {
 			print_efi_string(cur_dtype->vendor,
 			    cur_dtype->product, cur_dtype->revision,
@@ -753,13 +759,13 @@ c_current()
 		fmt_print("%s\n", cur_disk->devfs_name);
 	} else {
 		fmt_print("%s%d: <", cur_ctlr->ctlr_dname,
-			cur_disk->disk_dkinfo.dki_unit);
+		    cur_disk->disk_dkinfo.dki_unit);
 		if (cur_dtype == NULL) {
 			fmt_print("type unknown");
 		} else if (cur_label == L_TYPE_SOLARIS) {
 			fmt_print("%s cyl %d alt %d hd %d sec %d",
-				cur_dtype->dtype_asciilabel, ncyl,
-				acyl, nhead, nsect);
+			    cur_dtype->dtype_asciilabel, ncyl,
+			    acyl, nhead, nsect);
 		} else if (cur_label == L_TYPE_EFI) {
 			print_efi_string(cur_dtype->vendor,
 			    cur_dtype->product, cur_dtype->revision,
@@ -811,8 +817,8 @@ c_format()
 	 * can only be retrieved after formatting the disk.
 	 */
 	if ((cur_ctype->ctype_flags & CF_SCSI) && !EMBEDDED_SCSI &&
-		(cur_ctype->ctype_flags & CF_DEFECTS) &&
-			! (cur_flags & DISK_FORMATTED)) {
+	    (cur_ctype->ctype_flags & CF_DEFECTS) &&
+	    ! (cur_flags & DISK_FORMATTED)) {
 		cur_list.flags |= LIST_RELOAD;
 
 	} else if (cur_list.list == NULL && !EMBEDDED_SCSI) {
@@ -827,25 +833,25 @@ c_format()
 	 */
 	ioparam.io_bounds.lower = start = 0;
 	if (cur_label == L_TYPE_SOLARIS) {
-	    if (cur_ctype->ctype_flags & CF_SCSI) {
-		ioparam.io_bounds.upper = end = datasects() - 1;
-	    } else {
-		ioparam.io_bounds.upper = end = physsects() - 1;
-	    }
+		if (cur_ctype->ctype_flags & CF_SCSI) {
+			ioparam.io_bounds.upper = end = datasects() - 1;
+		} else {
+			ioparam.io_bounds.upper = end = physsects() - 1;
+		}
 	} else {
-	    ioparam.io_bounds.upper = end = cur_parts->etoc->efi_last_lba;
+		ioparam.io_bounds.upper = end = cur_parts->etoc->efi_last_lba;
 	}
 
 	if (! (cur_ctlr->ctlr_flags & DKI_FMTVOL)) {
 		deflt = ioparam.io_bounds.lower;
 		start = input(FIO_BN,
-			"Enter starting block number", ':',
-			&ioparam, (int *)&deflt, DATA_INPUT);
+		    "Enter starting block number", ':',
+		    &ioparam, (int *)&deflt, DATA_INPUT);
 		ioparam.io_bounds.lower = start;
 		deflt = ioparam.io_bounds.upper;
 		end = input(FIO_BN,
-			"Enter ending block number", ':',
-			&ioparam, (int *)&deflt, DATA_INPUT);
+		    "Enter ending block number", ':',
+		    &ioparam, (int *)&deflt, DATA_INPUT);
 	}
 	/*
 	 * Some disks can format tracks.  Make sure the whole track is
@@ -853,7 +859,7 @@ c_format()
 	 */
 	if (cur_ctlr->ctlr_flags & DKI_FMTTRK) {
 		if (bn2s(start) != 0 ||
-				bn2s(end) != sectors(bn2h(end)) - 1) {
+		    bn2s(end) != sectors(bn2h(end)) - 1) {
 			err_print("Controller requires formatting of ");
 			err_print("entire tracks.\n");
 			return (-1);
@@ -886,13 +892,22 @@ currently being used for swapping.\n");
 	 */
 	if (checkdevinuse(cur_disk->disk_name, start, end, 0, 0)) {
 		err_print("Cannot format disk while its partitions "
-			    "are currently in use.\n");
+		    "are currently in use.\n");
+		return (-1);
+	}
+
+	if (cur_disk->disk_lbasize != DEV_BSIZE) {
+		fmt_print("Current disk sector size is %d Byte, format\n"
+		    "will change the sector size to 512 Byte. ",
+		    cur_disk->disk_lbasize);
+		if (check("Continue")) {
 			return (-1);
+		}
 	}
 
 	if (SCSI && (format_time = scsi_format_time()) > 0) {
 		fmt_print(
-		    "Ready to format.  Formatting cannot be interrupted\n"
+		    "\nReady to format.  Formatting cannot be interrupted\n"
 		    "and takes %d minutes (estimated). ", format_time);
 
 	} else if (cur_dtype->dtype_options & SUP_FMTTIME) {
@@ -913,7 +928,7 @@ currently being used for swapping.\n");
 		 * ms.
 		 */
 		format_time = ((60000 / cur_dtype->dtype_rpm) +1) *
-			format_tracks + format_cyls * 7;
+		    format_tracks + format_cyls * 7;
 		/*
 		 * 20% done tick (sec)
 		 */
@@ -964,7 +979,7 @@ currently being used for swapping.\n");
 	 */
 	clock = time((time_t *)0);
 	fmt_print("Beginning format. The current time is %s\n",
-		ctime(&clock));
+	    ctime(&clock));
 	enter_critical();
 	/*
 	 * Mark the defect list dirty so it will be rewritten when we are
@@ -980,15 +995,15 @@ currently being used for swapping.\n");
 	 * dirty so it will be rewritten.
 	 */
 	if (cur_disk->label_type == L_TYPE_SOLARIS) {
-	    if (start < totalsects() && end >= datasects()) {
-		if (cur_disk->disk_flags & DSK_LABEL)
-			cur_flags |= LABEL_DIRTY;
-	    }
+		if (start < totalsects() && end >= datasects()) {
+			if (cur_disk->disk_flags & DSK_LABEL)
+				cur_flags |= LABEL_DIRTY;
+		}
 	} else if (cur_disk->label_type == L_TYPE_EFI) {
-	    if (start < 34) {
-		if (cur_disk->disk_flags & DSK_LABEL)
-		    cur_flags |= LABEL_DIRTY;
-	    }
+		if (start < 34) {
+			if (cur_disk->disk_flags & DSK_LABEL)
+				cur_flags |= LABEL_DIRTY;
+		}
 	}
 	if (start == 0) {
 		cur_flags |= LABEL_DIRTY;
@@ -1078,7 +1093,7 @@ c_repair()
 	diskaddr_t	bn;
 	int		status;
 	u_ioparam_t	ioparam;
-	char		buf[SECSIZE];
+	char		*buf;
 	int		buf_is_good;
 	int		block_has_error;
 	int		i;
@@ -1125,13 +1140,13 @@ c_repair()
 	 */
 	ioparam.io_bounds.lower = 0;
 	if (cur_disk->label_type == L_TYPE_SOLARIS) {
-	    ioparam.io_bounds.upper = physsects() - 1;
+		ioparam.io_bounds.upper = physsects() - 1;
 	} else {
-	    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
+		ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
 	}
 	bn = input(FIO_BN,
-		"Enter absolute block number of defect", ':',
-		&ioparam, (int *)NULL, DATA_INPUT);
+	    "Enter absolute block number of defect", ':',
+	    &ioparam, (int *)NULL, DATA_INPUT);
 	/*
 	 * Check to see if there is a mounted file system over the
 	 * specified sector.  If there is, make sure the user is
@@ -1156,6 +1171,9 @@ being used for swapping.\ncontinue"))
 			return (-1);
 	}
 
+	buf = zalloc((cur_disk->disk_lbasize == 0) ?
+	    SECSIZE : cur_disk->disk_lbasize);
+
 	/*
 	 * Try to read the sector before repairing it.  If we can
 	 * get good data out of it, we can write that data back
@@ -1169,7 +1187,7 @@ being used for swapping.\ncontinue"))
 	block_has_error = 1;
 	for (i = 0; i < 5; i++) {
 		status = (*cur_ops->op_rdwr)(DIR_READ, cur_file, bn,
-				1, buf, (F_SILENT | F_ALLERRS), NULL);
+		    1, buf, (F_SILENT | F_ALLERRS), NULL);
 		if (status)
 			break;		/* one of the tries failed */
 	}
@@ -1177,6 +1195,7 @@ being used for swapping.\ncontinue"))
 		block_has_error = 0;
 		if (check("\
 This block doesn't appear to be bad.  Repair it anyway")) {
+			free(buf);
 			return (0);
 		}
 	}
@@ -1184,6 +1203,7 @@ This block doesn't appear to be bad.  Repair it anyway")) {
 	 * Last chance...
 	 */
 	if (check("Ready to repair defect, continue")) {
+		free(buf);
 		return (-1);
 	}
 	/*
@@ -1194,7 +1214,7 @@ This block doesn't appear to be bad.  Repair it anyway")) {
 	buf_is_good = 0;
 	for (i = 0; i < 5; i++) {
 		status = (*cur_ops->op_rdwr)(DIR_READ, cur_file, bn,
-					1, buf, F_SILENT, NULL);
+		    1, buf, F_SILENT, NULL);
 		if (status == 0) {
 			buf_is_good = 1;
 			break;
@@ -1229,13 +1249,13 @@ This block doesn't appear to be bad.  Repair it anyway")) {
 		 */
 		fmt_print("ok.\n");
 		if (!buf_is_good) {
-			bzero(buf, SECSIZE);
+			bzero(buf, cur_disk->disk_lbasize);
 		}
 		status = (*cur_ops->op_rdwr)(DIR_WRITE, cur_file, bn,
-					1, buf, (F_SILENT | F_ALLERRS), NULL);
+		    1, buf, (F_SILENT | F_ALLERRS), NULL);
 		if (status == 0) {
 			status = (*cur_ops->op_rdwr)(DIR_READ, cur_file,
-				bn, 1, buf, (F_SILENT | F_ALLERRS), NULL);
+			    bn, 1, buf, (F_SILENT | F_ALLERRS), NULL);
 		}
 		if (status) {
 			fmt_print("The new block %llu (", bn);
@@ -1275,6 +1295,8 @@ This block doesn't appear to be bad.  Repair it anyway")) {
 		kill_deflist(&work_list);
 	}
 	exit_critical();
+	free(buf);
+
 	/*
 	 * Return status.
 	 */
@@ -1304,9 +1326,9 @@ c_show()
 	 */
 	ioparam.io_bounds.lower = 0;
 	if (cur_disk->label_type == L_TYPE_SOLARIS) {
-	    ioparam.io_bounds.upper = physsects() - 1;
+		ioparam.io_bounds.upper = physsects() - 1;
 	} else {
-	    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
+		ioparam.io_bounds.upper = cur_parts->etoc->efi_last_lba;
 	}
 	bn = input(FIO_BN, "Enter a disk block", ':',
 	    &ioparam, (int *)NULL, DATA_INPUT);
@@ -1359,7 +1381,7 @@ c_label()
 		/* Bleagh, too descriptive */
 		if (check_label_with_mount()) {
 			err_print("Cannot label disk while it has "
-				"mounted partitions.\n\n");
+			    "mounted partitions.\n\n");
 			return (-1);
 		}
 	}
@@ -1398,7 +1420,7 @@ c_label()
 	 */
 	if (cur_parts == NULL) {
 		fmt_print("Current Partition Table is not set, "
-			"using default.\n");
+		    "using default.\n");
 		cur_disk->disk_parts = cur_parts = cur_dtype->dtype_plist;
 		if (cur_parts == NULL) {
 			err_print("No default available, cannot label.\n");
@@ -1411,53 +1433,55 @@ c_label()
 	 */
 	if (expert_mode) {
 #if defined(_SUNOS_VTOC_8)
-	    int 		i;
+		int 		i;
 #endif
-	    int 		choice;
-	    u_ioparam_t		ioparam;
-	    struct extvtoc	vtoc;
-	    struct dk_label	label;
-	    struct dk_gpt	*vtoc64;
-	    struct efi_info	efinfo;
-	    struct disk_type	*dptr;
+		int 		choice;
+		u_ioparam_t		ioparam;
+		struct extvtoc	vtoc;
+		struct dk_label	label;
+		struct dk_gpt	*vtoc64;
+		struct efi_info	efinfo;
+		struct disk_type	*dptr;
 
-	    /* Ask user what label to use */
-	    fmt_print("[0] SMI Label\n");
-	    fmt_print("[1] EFI Label\n");
-	    ioparam.io_bounds.lower = 0;
-	    ioparam.io_bounds.upper = 1;
-	    if (cur_label == L_TYPE_SOLARIS)
-		deflt = 0;
-	    else
-		deflt = 1;
-	    defltptr = &deflt;
-	    choice = input(FIO_INT, "Specify Label type", ':',
-		&ioparam, defltptr, DATA_INPUT);
-	    if ((choice == 0) && (cur_label == L_TYPE_SOLARIS)) {
-		goto expert_end;
-	    } else if ((choice == 1) && (cur_label == L_TYPE_EFI)) {
-		goto expert_end;
-	    }
-	    switch (choice) {
-	    case 0:
+		/* Ask user what label to use */
+		fmt_print("[0] SMI Label\n");
+		fmt_print("[1] EFI Label\n");
+		ioparam.io_bounds.lower = 0;
+		ioparam.io_bounds.upper = 1;
+		if (cur_label == L_TYPE_SOLARIS)
+			deflt = 0;
+		else
+			deflt = 1;
+		defltptr = &deflt;
+		choice = input(FIO_INT, "Specify Label type", ':',
+		    &ioparam, defltptr, DATA_INPUT);
+		if ((choice == 0) && (cur_label == L_TYPE_SOLARIS)) {
+			goto expert_end;
+		} else if ((choice == 1) && (cur_label == L_TYPE_EFI)) {
+			goto expert_end;
+		}
+		switch (choice) {
+		case 0:
 		/*
 		 * EFI label to SMI label
 		 */
 		if (cur_dtype->capacity > INFINITY) {
-		    fmt_print("Warning: SMI labels only support up to 2 TB.\n");
+			fmt_print("Warning: SMI labels only support up to "
+			    "2 TB.\n");
 		}
 
 		if (cur_disk->fdisk_part.systid == EFI_PMBR) {
-		    fmt_print("Warning: This disk has an EFI label. Changing to"
-		    " SMI label will erase all\ncurrent partitions.\n");
-		    if (check("Continue"))
+			fmt_print("Warning: This disk has an EFI label. "
+			    "Changing to SMI label will erase all\n"
+			    "current partitions.\n");
+			if (check("Continue"))
 			return (-1);
 #if defined(_FIRMWARE_NEEDS_FDISK)
-		    fmt_print("You must use fdisk to delete the current "
+			fmt_print("You must use fdisk to delete the current "
 			    "EFI partition and create a new\n"
 			    "Solaris partition before you can convert the "
 			    "label.\n");
-		    return (-1);
+			return (-1);
 #endif
 		}
 
@@ -1509,7 +1533,7 @@ c_label()
 		}
 
 
-	    case 1:
+		case 1:
 		/*
 		 * SMI label to EFI label
 		 */
@@ -1523,7 +1547,7 @@ c_label()
 		}
 
 		if (get_disk_info(cur_file, &efinfo) != 0) {
-		    return (-1);
+			return (-1);
 		}
 		(void) memset((char *)&label, 0, sizeof (struct dk_label));
 		label.dkl_pcyl = pcyl;
@@ -1536,21 +1560,21 @@ c_label()
 		label.dkl_nsect = nsect;
 #if defined(_SUNOS_VTOC_8)
 		for (i = 0; i < NDKMAP; i++) {
-		    label.dkl_map[i] = cur_parts->pinfo_map[i];
+			label.dkl_map[i] = cur_parts->pinfo_map[i];
 		}
 #endif			/* defined(_SUNOS_VTOC_8) */
 		label.dkl_magic = DKL_MAGIC;
 		label.dkl_vtoc = cur_parts->vtoc;
 		if (label_to_vtoc(&vtoc, &label) == -1) {
-		    return (-1);
+			return (-1);
 		}
 		if (SMI_vtoc_to_EFI(cur_file, &vtoc64) == -1) {
-		    return (-1);
+			return (-1);
 		}
 		if (efi_write(cur_file, vtoc64) != 0) {
-		    err_check(vtoc64);
-		    err_print("Warning: error writing EFI.\n");
-		    return (-1);
+			err_check(vtoc64);
+			err_print("Warning: error writing EFI.\n");
+			return (-1);
 		} else {
 			cur_disk->disk_flags &= ~DSK_LABEL_DIRTY;
 		}
@@ -1580,7 +1604,7 @@ c_label()
 		(void) copy_solaris_part(&cur_disk->fdisk_part);
 
 		return (0);
-	    }
+		}
 	}
 
 expert_end:
@@ -1648,7 +1672,7 @@ c_defect()
 	 * display appropriate message.
 	 */
 	if ((cur_ops->op_ex_man == NULL) && (cur_ops->op_ex_cur == NULL) &&
-		(cur_ops->op_create == NULL) && (cur_ops->op_wr_cur == NULL)) {
+	    (cur_ops->op_create == NULL) && (cur_ops->op_wr_cur == NULL)) {
 		err_print("Controller does not support defect management\n");
 		err_print("or disk supports automatic defect management.\n");
 		return (-1);
@@ -1667,7 +1691,8 @@ c_defect()
 	if ((work_list.list == NULL) && (cur_list.list != NULL)) {
 		work_list.header = cur_list.header;
 		work_list.list = (struct defect_entry *)zalloc(
-		    LISTSIZE(work_list.header.count) * SECSIZE);
+		    deflist_size(cur_blksz, work_list.header.count) *
+		    cur_blksz);
 		for (i = 0; i < work_list.header.count; i++)
 			*(work_list.list + i) = *(cur_list.list + i);
 		work_list.flags = cur_list.flags & LIST_PGLIST;
@@ -1710,6 +1735,7 @@ c_backup()
 	struct	partition_info *parts, *plist;
 	diskaddr_t	bn;
 	int	sec, head, i;
+	char	*buf;
 
 	/*
 	 * There must be a current disk type (and therefore a current disk).
@@ -1736,23 +1762,26 @@ c_backup()
 	 * the user is serious.
 	 */
 	if (cur_disk->label_type == L_TYPE_EFI) {
-	    if (((cur_disk->disk_parts->etoc->efi_flags &
-		EFI_GPT_PRIMARY_CORRUPT) == 0) &&
-		check("Disk has a primary label, still continue"))
-		    return (-1);
-	    fmt_print("Restoring primary label.\n");
-	    if (write_label()) {
-		    err_print("Failed\n");
-		    return (-1);
-	    }
-	    return (0);
+		if (((cur_disk->disk_parts->etoc->efi_flags &
+		    EFI_GPT_PRIMARY_CORRUPT) == 0) &&
+		    check("Disk has a primary label, still continue"))
+			return (-1);
+		fmt_print("Restoring primary label.\n");
+		if (write_label()) {
+			err_print("Failed\n");
+			return (-1);
+		}
+		return (0);
 	} else if (((cur_disk->disk_flags & (DSK_LABEL | DSK_LABEL_DIRTY)) ==
-		DSK_LABEL) &&
+	    DSK_LABEL) &&
 	    (check("Disk has a primary label, still continue"))) {
 		return (-1);
 	}
+
+	buf = zalloc(cur_blksz);
 	fmt_print("Searching for backup labels...");
 	(void) fflush(stdout);
+
 	/*
 	 * Some disks have the backup labels in a strange place.
 	 */
@@ -1770,9 +1799,12 @@ c_backup()
 		 * Attempt to read it.
 		 */
 		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, bn,
-				1, (char *)&label, F_NORMAL, NULL)) {
+		    1, buf, F_NORMAL, NULL)) {
 			continue;
 		}
+
+		(void *) memcpy((char *)&label, buf, sizeof (struct dk_label));
+
 		/*
 		 * Verify that it is a reasonable label.
 		 */
@@ -1801,15 +1833,17 @@ c_backup()
 				fmt_print("\
 Unknown disk type in backup label\n");
 				exit_critical();
+				free(buf);
 				return (-1);
 			}
 			fmt_print("Backup label claims different type:\n");
 			fmt_print("    <%s cyl %d alt %d hd %d sec %d>\n",
-				label.dkl_asciilabel, label.dkl_ncyl,
-				label.dkl_acyl, label.dkl_nhead,
-				label.dkl_nsect);
+			    label.dkl_asciilabel, label.dkl_ncyl,
+			    label.dkl_acyl, label.dkl_nhead,
+			    label.dkl_nsect);
 			if (check("Continue")) {
 				exit_critical();
+				free(buf);
 				return (-1);
 			}
 			cur_dtype = dtype;
@@ -1828,7 +1862,7 @@ Unknown disk type in backup label\n");
 		 */
 		if (parts == NULL) {
 			parts = (struct partition_info *)
-				zalloc(sizeof (struct partition_info));
+			    zalloc(sizeof (struct partition_info));
 			plist = dtype->dtype_plist;
 			if (plist == NULL)
 				dtype->dtype_plist = parts;
@@ -1863,22 +1897,28 @@ Unknown disk type in backup label\n");
 		 */
 		if (EMBEDDED_SCSI) {
 			fmt_print("Restoring primary label.\n");
-			if (write_label())
+			if (write_label()) {
+				free(buf);
 				return (-1);
+			}
 		} else {
 			fmt_print("Restoring primary label and defect list.\n");
-			if (write_label())
+			if (write_label()) {
+				free(buf);
 				return (-1);
+			}
 			if (cur_list.list != NULL)
 				write_deflist(&cur_list);
 		}
 		fmt_print("\n");
+		free(buf);
 		return (0);
 	}
 	/*
 	 * If we didn't find any backup labels, say so.
 	 */
 	fmt_print("not found.\n\n");
+	free(buf);
 	return (0);
 }
 
@@ -1894,8 +1934,8 @@ c_verify_efi()
 
 	status = read_efi_label(cur_file, &efi_info);
 	if (status != 0) {
-	    err_print("Warning: Could not read label.\n");
-	    return (-1);
+		err_print("Warning: Could not read label.\n");
+		return (-1);
 	}
 	if (cur_parts->etoc->efi_flags & EFI_GPT_PRIMARY_CORRUPT) {
 		err_print("Reading the primary EFI GPT label ");
@@ -1906,20 +1946,20 @@ c_verify_efi()
 	tmp_pinfo.etoc = efi_info.e_parts;
 	fmt_print("\n");
 	if (cur_parts->etoc->efi_parts[8].p_name) {
-	    fmt_print("Volume name = <%8s>\n",
-		cur_parts->etoc->efi_parts[8].p_name);
+		fmt_print("Volume name = <%8s>\n",
+		    cur_parts->etoc->efi_parts[8].p_name);
 	} else {
-	    fmt_print("Volume name = <        >\n");
+		fmt_print("Volume name = <        >\n");
 	}
 	fmt_print("ascii name  = ");
 	print_efi_string(efi_info.vendor, efi_info.product,
 	    efi_info.revision, efi_info.capacity);
 	fmt_print("\n");
 
-	fmt_print("bytes/sector	=  %d\n", DEV_BSIZE);
+	fmt_print("bytes/sector	=  %d\n", cur_blksz);
 	fmt_print("sectors = %llu\n", cur_parts->etoc->efi_last_lba);
 	fmt_print("accessible sectors = %llu\n",
-		cur_parts->etoc->efi_last_u_lba);
+	    cur_parts->etoc->efi_last_u_lba);
 
 	print_map(&tmp_pinfo);
 	return (0);
@@ -1941,6 +1981,7 @@ c_verify()
 	int	p_label_found = 0;
 	int	b_label_found = 0;
 	char	id_str[128];
+	char	*buf;
 
 	/*
 	 * There must be a current disk type (and therefore a current disk).
@@ -1966,7 +2007,7 @@ c_verify()
 	 * Branch off here if the disk is EFI labelled.
 	 */
 	if (cur_label == L_TYPE_EFI) {
-	    return (c_verify_efi());
+		return (c_verify_efi());
 	}
 	/*
 	 * Attempt to read the primary label.
@@ -1985,7 +2026,7 @@ c_verify()
 		(void) strncpy(id_str, p_label.dkl_asciilabel, 128);
 
 		if ((!checklabel((struct dk_label *)&p_label)) ||
-			(trim_id(p_label.dkl_asciilabel))) {
+		    (trim_id(p_label.dkl_asciilabel))) {
 			err_print("\
 Warning: Primary label appears to be corrupt.\n");
 			p_label_bad = 1;
@@ -1995,10 +2036,10 @@ Warning: Primary label appears to be corrupt.\n");
 			 * Make sure it matches current label
 			 */
 			if ((!dtype_match(&p_label, cur_dtype)) ||
-				(!parts_match(&p_label, cur_parts))) {
+			    (!parts_match(&p_label, cur_parts))) {
 				err_print("\
 Warning: Primary label on disk appears to be different from\ncurrent label.\n");
-			p_label_bad = 1;
+				p_label_bad = 1;
 			}
 		}
 	}
@@ -2011,6 +2052,8 @@ Warning: Primary label on disk appears to be different from\ncurrent label.\n");
 		head = 2;
 	else
 		head = nhead - 1;
+
+	buf = zalloc(cur_blksz);
 	/*
 	 * Loop through each copy of the backup label.
 	 */
@@ -2021,8 +2064,12 @@ Warning: Primary label on disk appears to be different from\ncurrent label.\n");
 		 * Attempt to read it.
 		 */
 		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, bn,
-				1, (char *)&b_label, F_NORMAL, NULL))
+		    1, buf, F_NORMAL, NULL))
 			continue;
+
+		(void *) memcpy((char *)&b_label, buf,
+		    sizeof (struct dk_label));
+
 		/*
 		 * Verify that it is a reasonable label.
 		 */
@@ -2043,11 +2090,11 @@ Warning: Primary label on disk appears to be different from\ncurrent label.\n");
 		 */
 		if (p_label_found) {
 			if ((strcmp(b_label.dkl_asciilabel,
-				p_label.dkl_asciilabel) != 0) ||
-				(b_label.dkl_ncyl != p_label.dkl_ncyl) ||
-				(b_label.dkl_acyl != p_label.dkl_acyl) ||
-				(b_label.dkl_nhead != p_label.dkl_nhead) ||
-				(b_label.dkl_nsect != p_label.dkl_nsect)) {
+			    p_label.dkl_asciilabel) != 0) ||
+			    (b_label.dkl_ncyl != p_label.dkl_ncyl) ||
+			    (b_label.dkl_acyl != p_label.dkl_acyl) ||
+			    (b_label.dkl_nhead != p_label.dkl_nhead) ||
+			    (b_label.dkl_nsect != p_label.dkl_nsect)) {
 				b_label_bad = 1;
 			} else {
 				for (i = 0; i < NDKMAP; i++) {
@@ -2062,13 +2109,16 @@ Warning: Primary label on disk appears to be different from\ncurrent label.\n");
 
 #elif defined(_SUNOS_VTOC_16)
 					if ((b_label.dkl_vtoc.v_part[i].p_tag !=
-					p_label.dkl_vtoc.v_part[i].p_tag) ||
-					(b_label.dkl_vtoc.v_part[i].p_flag !=
-					p_label.dkl_vtoc.v_part[i].p_flag) ||
-					(b_label.dkl_vtoc.v_part[i].p_start !=
-					p_label.dkl_vtoc.v_part[i].p_start) ||
-					(b_label.dkl_vtoc.v_part[i].p_size !=
-					p_label.dkl_vtoc.v_part[i].p_size)) {
+					    p_label.dkl_vtoc.v_part[i].p_tag) ||
+					    (b_label.dkl_vtoc.v_part[i].p_flag
+					    != p_label.dkl_vtoc.v_part[i].
+					    p_flag) ||
+					    (b_label.dkl_vtoc.v_part[i].p_start
+					    != p_label.dkl_vtoc.v_part[i].
+					    p_start) ||
+					    (b_label.dkl_vtoc.v_part[i].p_size
+					    != p_label.dkl_vtoc.v_part[i].
+					    p_size)) {
 						b_label_bad = 1;
 						break;
 					}
@@ -2104,6 +2154,7 @@ Warning: Check the current partitioning and 'label' the disk or use the\n\
 		fmt_print("\nBackup label contents:\n");
 		label = &b_label;
 	} else {
+		free(buf);
 		return (0);
 	}
 
@@ -2119,9 +2170,9 @@ Warning: Check the current partitioning and 'label' the disk or use the\n\
 
 #elif defined(_SUNOS_VTOC_16)
 		tmp_pinfo.pinfo_map[i].dkl_cylno =
-			label->dkl_vtoc.v_part[i].p_start / spc();
+		    label->dkl_vtoc.v_part[i].p_start / spc();
 		tmp_pinfo.pinfo_map[i].dkl_nblk =
-			label->dkl_vtoc.v_part[i].p_size;
+		    label->dkl_vtoc.v_part[i].p_size;
 #else
 #error No VTOC layout defined.
 #endif /* defined(_SUNOS_VTOC_8) */
@@ -2143,6 +2194,7 @@ Warning: Check the current partitioning and 'label' the disk or use the\n\
 	fmt_print("nsect       = %4d\n", label->dkl_nsect);
 
 	print_map(&tmp_pinfo);
+	free(buf);
 	return (0);
 }
 
@@ -2323,9 +2375,9 @@ being used for swapping.\n\n");
 	bcopy(volname, cur_disk->v_volume, min((int)strlen(volname),
 	    LEN_DKL_VVOL));
 	if (cur_label == L_TYPE_EFI) {
-	    bzero(cur_parts->etoc->efi_parts[8].p_name, LEN_DKL_VVOL);
-	    bcopy(volname, cur_parts->etoc->efi_parts[8].p_name,
-		LEN_DKL_VVOL);
+		bzero(cur_parts->etoc->efi_parts[8].p_name, LEN_DKL_VVOL);
+		bcopy(volname, cur_parts->etoc->efi_parts[8].p_name,
+		    LEN_DKL_VVOL);
 	}
 	/*
 	 * Write the labels out (this will also notify unix) and

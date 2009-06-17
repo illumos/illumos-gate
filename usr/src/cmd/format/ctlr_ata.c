@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,7 +155,7 @@ ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
 	blkno = (blkaddr_t)blk64;
 	bzero((caddr_t)&dadkio_rwcmd, sizeof (struct dadkio_rwcmd));
 
-	tmpsec = secnt * 512;
+	tmpsec = secnt * cur_blksz;
 
 	/* Doing raw read */
 	dadkio_rwcmd.cmd = (dir == DIR_READ) ? DADKIO_RWCMD_READ :
@@ -213,11 +213,14 @@ ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
 int
 ata_ck_format()
 {
-	unsigned char bufaddr[2048];
+	char *bufaddr;
 	int status;
 
+	bufaddr = (char *)zalloc(4 * cur_blksz);
 	status = ata_rdwr(DIR_READ, cur_file, (diskaddr_t)1, 4,
 	    (caddr_t)bufaddr, 0, NULL);
+
+	free(bufaddr);
 
 	return (!status);
 }

@@ -223,8 +223,6 @@ static char		*get_sun_disk_name(
 static char		*get_generic_disk_name(
 				char		*disk_name,
 				struct scsi_inquiry *inquiry);
-static int		force_blocksize(int fd);
-static int		raw_format(int fd);
 static char		*strcopy(
 				char	*dst,
 				char	*src,
@@ -308,10 +306,10 @@ auto_efi_sense(int fd, struct efi_info *label)
 	 */
 
 	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
-	    if (option_msg && diag_msg) {
-		err_print("DKIOCINFO failed\n");
-	    }
-	    return (NULL);
+		if (option_msg && diag_msg) {
+			err_print("DKIOCINFO failed\n");
+		}
+		return (NULL);
 	}
 	if ((cur_ctype != NULL) && (cur_ctype->ctype_ctype == DKC_DIRECT)) {
 		ctlr = find_direct_ctlr_info(&dkinfo);
@@ -337,11 +335,11 @@ auto_efi_sense(int fd, struct efi_info *label)
 	disk->dtype_next = NULL;
 
 	(void) strlcpy(disk->vendor, label->vendor,
-		    sizeof (disk->vendor));
+	    sizeof (disk->vendor));
 	(void) strlcpy(disk->product, label->product,
-		    sizeof (disk->product));
+	    sizeof (disk->product));
 	(void) strlcpy(disk->revision, label->revision,
-		    sizeof (disk->revision));
+	    sizeof (disk->revision));
 	disk->capacity = label->capacity;
 
 	part = (struct partition_info *)
@@ -554,11 +552,6 @@ auto_label_init(struct dk_label *label)
 		disk_info.dki_lbsize = DEV_BSIZE;
 	}
 
-	if (disk_info.dki_lbsize != DEV_BSIZE) {
-		err_print("auto_label_init: lbasize is not 512\n");
-		goto auto_label_init_out;
-	}
-
 	dk_ioc_back.dki_data = databack;
 
 	/*
@@ -584,7 +577,7 @@ auto_label_init(struct dk_label *label)
 		goto auto_label_init_out;
 	}
 
-	backsigp = (efi_gpt_t *)((uintptr_t)dk_ioc_back.dki_data + DEV_BSIZE);
+	backsigp = (efi_gpt_t *)((uintptr_t)dk_ioc_back.dki_data + cur_blksz);
 
 	backsig = backsigp->efi_gpt_Signature;
 
@@ -736,7 +729,7 @@ new_direct_disk_type(
 	disk->dtype_rpm = label->dkl_rpm;
 
 	part = (struct partition_info *)
-		zalloc(sizeof (struct partition_info));
+	    zalloc(sizeof (struct partition_info));
 	pt = disk->dtype_plist;
 	if (pt == NULL) {
 		disk->dtype_plist = part;
@@ -764,11 +757,11 @@ new_direct_disk_type(
 
 #elif defined(_SUNOS_VTOC_16)
 		part->pinfo_map[i].dkl_cylno =
-			label->dkl_vtoc.v_part[i].p_start /
-			    ((blkaddr_t)(disk->dtype_nhead *
-			    disk->dtype_nsect - apc));
+		    label->dkl_vtoc.v_part[i].p_start /
+		    ((blkaddr_t)(disk->dtype_nhead *
+		    disk->dtype_nsect - apc));
 		part->pinfo_map[i].dkl_nblk =
-			label->dkl_vtoc.v_part[i].p_size;
+		    label->dkl_vtoc.v_part[i].p_size;
 #else
 #error No VTOC format defined.
 #endif				/* defined(_SUNOS_VTOC_8) */
@@ -779,7 +772,7 @@ new_direct_disk_type(
 	 */
 	if (label->dkl_vtoc.v_version == V_VERSION) {
 		(void) memcpy(disk_info->v_volume, label->dkl_vtoc.v_volume,
-			LEN_DKL_VVOL);
+		    LEN_DKL_VVOL);
 		part->vtoc = label->dkl_vtoc;
 	} else {
 		(void) memset(disk_info->v_volume, 0, LEN_DKL_VVOL);
@@ -845,10 +838,10 @@ auto_sense(
 		deflt = 1;
 		ioparam.io_charlist = confirm_list;
 		if (input(FIO_MSTR, FORMAT_MSG, '?', &ioparam,
-				&deflt, DATA_INPUT) == 0) {
+		    &deflt, DATA_INPUT) == 0) {
 			force_format_dat = 1;
 		} else if (input(FIO_MSTR, GENERIC_MSG, '?', &ioparam,
-				&deflt, DATA_INPUT) == 0) {
+		    &deflt, DATA_INPUT) == 0) {
 			force_generic = 1;
 		}
 	}
@@ -890,7 +883,7 @@ auto_sense(
 	}
 	if (option_msg && diag_msg) {
 		err_print("blocks:  %llu (0x%llx)\n",
-			capacity.sc_capacity, capacity.sc_capacity);
+		    capacity.sc_capacity, capacity.sc_capacity);
 		err_print("blksize: %u\n", capacity.sc_lbasize);
 	}
 
@@ -910,7 +903,7 @@ auto_sense(
 
 	if (force_generic) {
 		return (generic_disk_sense(fd, can_prompt, label,
-			&inquiry, &capacity, disk_name));
+		    &inquiry, &capacity, disk_name));
 	}
 
 	/*
@@ -918,7 +911,7 @@ auto_sense(
 	 */
 	if ((disk_type = find_scsi_disk_by_name(disk_name)) != NULL) {
 		if (use_existing_disk_type(fd, can_prompt, label,
-				&inquiry, disk_type, &capacity)) {
+		    &inquiry, disk_type, &capacity)) {
 			return (disk_type);
 		}
 		if (force_format_dat) {
@@ -931,7 +924,7 @@ auto_sense(
 	 */
 
 	return (generic_disk_sense(fd, can_prompt, label,
-			&inquiry, &capacity, disk_name));
+	    &inquiry, &capacity, disk_name));
 }
 
 
@@ -964,7 +957,6 @@ generic_disk_sense(
 		struct mode_geometry	page4;
 		uchar_t			buf4[MAX_MODE_SENSE_SIZE];
 	} u_page4;
-	struct scsi_capacity_16		new_capacity;
 	struct mode_format		*page3 = &u_page3.page3;
 	struct mode_geometry		*page4 = &u_page4.page4;
 	struct scsi_ms_header		header;
@@ -982,38 +974,6 @@ generic_disk_sense(
 	}
 
 	/*
-	 * If the device's block size is not 512, we have to
-	 * change block size, reformat, and then sense the
-	 * geometry.  To do this, we must be able to prompt
-	 * the user.
-	 */
-	if (capacity->sc_lbasize != DEV_BSIZE) {
-		if (!can_prompt) {
-			return (NULL);
-		}
-		if (force_blocksize(fd)) {
-			goto err;
-		}
-
-		/*
-		 * Get the capacity again, since this has changed
-		 */
-		if (uscsi_read_capacity(fd, &new_capacity)) {
-			goto err;
-		}
-		if (option_msg && diag_msg) {
-			err_print("blocks:  %llu (0x%llx)\n",
-				new_capacity.sc_capacity,
-				    new_capacity.sc_capacity);
-			err_print("blksize: %u\n", new_capacity.sc_lbasize);
-		}
-		capacity = &new_capacity;
-		if (capacity->sc_lbasize != DEV_BSIZE) {
-			goto err;
-		}
-	}
-
-	/*
 	 * Get the number of blocks from Read Capacity data. Note that
 	 * the logical block address range from 0 to capacity->sc_capacity.
 	 * Limit the size to 2 TB (UINT32_MAX) to use with SMI labels.
@@ -1028,7 +988,7 @@ generic_disk_sense(
 	 * Get current Page 3 - Format Parameters page
 	 */
 	if (uscsi_mode_sense(fd, DAD_MODE_FORMAT, MODE_SENSE_PC_CURRENT,
-			(caddr_t)&u_page3, MAX_MODE_SENSE_SIZE, &header)) {
+	    (caddr_t)&u_page3, MAX_MODE_SENSE_SIZE, &header)) {
 		setdefault = 1;
 	}
 
@@ -1036,7 +996,7 @@ generic_disk_sense(
 	 * Get current Page 4 - Drive Geometry page
 	 */
 	if (uscsi_mode_sense(fd, DAD_MODE_GEOMETRY, MODE_SENSE_PC_CURRENT,
-			(caddr_t)&u_page4, MAX_MODE_SENSE_SIZE, &header)) {
+	    (caddr_t)&u_page4, MAX_MODE_SENSE_SIZE, &header)) {
 		setdefault = 1;
 	}
 
@@ -1071,7 +1031,7 @@ generic_disk_sense(
 			    &nsect);
 		} else {
 			pcyl = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) +
-				page4->cyl_lb;
+			    page4->cyl_lb;
 			nhead = page4->heads;
 			nsect = page3->sect_track;
 		}
@@ -1094,7 +1054,12 @@ generic_disk_sense(
 		}
 	}
 
-	if (setdefault == 1) {
+	/*
+	 * Mode sense page 3 and page 4 are obsolete in SCSI-3. For
+	 * newly developed large sector size disk, we will not rely on
+	 * those two pages but compute geometry directly.
+	 */
+	if ((setdefault == 1) || (capacity->sc_lbasize != DEV_BSIZE)) {
 		/*
 		 * If the number of cylinders or the number of heads reported
 		 * is zero, we think the inquiry of page 3 and page 4 failed.
@@ -1223,7 +1188,7 @@ generic_disk_sense(
 				    p, nhead, n);
 				if (input(FIO_INT, "Select one of the above "
 				    "choices ", ':', &ioparam,
-					&deflt, DATA_INPUT) == 2) {
+				    &deflt, DATA_INPUT) == 2) {
 					pcyl = p;
 					nsect = n;
 				}
@@ -1239,16 +1204,16 @@ generic_disk_sense(
 	 */
 
 	if ((pcyl > MAXIMUM_NO_CYLINDERS &&
-		((nsect > MAXIMUM_NO_SECTORS) ||
-		(nhead > MAXIMUM_NO_HEADS))) ||
-		((nsect > MAXIMUM_NO_SECTORS) &&
-		(nhead > MAXIMUM_NO_HEADS))) {
+	    ((nsect > MAXIMUM_NO_SECTORS) ||
+	    (nhead > MAXIMUM_NO_HEADS))) ||
+	    ((nsect > MAXIMUM_NO_SECTORS) &&
+	    (nhead > MAXIMUM_NO_HEADS))) {
 		err_print("This disk is too big to label. "
-			" You will lose some blocks.\n");
+		    " You will lose some blocks.\n");
 	}
 	if ((pcyl > MAXIMUM_NO_CYLINDERS) ||
-		(nsect > MAXIMUM_NO_SECTORS) ||
-		(nhead > MAXIMUM_NO_HEADS)) {
+	    (nsect > MAXIMUM_NO_SECTORS) ||
+	    (nhead > MAXIMUM_NO_HEADS)) {
 		u_ioparam_t	ioparam;
 		int		order;
 		char		msg[256];
@@ -1259,45 +1224,45 @@ generic_disk_sense(
 		switch (order) {
 		case 0x7: /* pcyl > nhead > nsect */
 			nblocks =
-				square_box(nblocks,
-					&pcyl, MAXIMUM_NO_CYLINDERS,
-					&nhead, MAXIMUM_NO_HEADS,
-					&nsect, MAXIMUM_NO_SECTORS);
+			    square_box(nblocks,
+			    &pcyl, MAXIMUM_NO_CYLINDERS,
+			    &nhead, MAXIMUM_NO_HEADS,
+			    &nsect, MAXIMUM_NO_SECTORS);
 			break;
 		case 0x6: /* pcyl > nsect > nhead */
 			nblocks =
-				square_box(nblocks,
-					&pcyl, MAXIMUM_NO_CYLINDERS,
-					&nsect, MAXIMUM_NO_SECTORS,
-					&nhead, MAXIMUM_NO_HEADS);
+			    square_box(nblocks,
+			    &pcyl, MAXIMUM_NO_CYLINDERS,
+			    &nsect, MAXIMUM_NO_SECTORS,
+			    &nhead, MAXIMUM_NO_HEADS);
 			break;
 		case 0x4: /* nsect > pcyl > nhead */
 			nblocks =
-				square_box(nblocks,
-					&nsect, MAXIMUM_NO_SECTORS,
-					&pcyl, MAXIMUM_NO_CYLINDERS,
-					&nhead, MAXIMUM_NO_HEADS);
+			    square_box(nblocks,
+			    &nsect, MAXIMUM_NO_SECTORS,
+			    &pcyl, MAXIMUM_NO_CYLINDERS,
+			    &nhead, MAXIMUM_NO_HEADS);
 			break;
 		case 0x0: /* nsect > nhead > pcyl */
 			nblocks =
-				square_box(nblocks,
-					&nsect, MAXIMUM_NO_SECTORS,
-					&nhead, MAXIMUM_NO_HEADS,
-					&pcyl, MAXIMUM_NO_CYLINDERS);
+			    square_box(nblocks,
+			    &nsect, MAXIMUM_NO_SECTORS,
+			    &nhead, MAXIMUM_NO_HEADS,
+			    &pcyl, MAXIMUM_NO_CYLINDERS);
 			break;
 		case 0x3: /* nhead > pcyl > nsect */
 			nblocks =
-				square_box(nblocks,
-					&nhead, MAXIMUM_NO_HEADS,
-					&pcyl, MAXIMUM_NO_CYLINDERS,
-					&nsect, MAXIMUM_NO_SECTORS);
+			    square_box(nblocks,
+			    &nhead, MAXIMUM_NO_HEADS,
+			    &pcyl, MAXIMUM_NO_CYLINDERS,
+			    &nsect, MAXIMUM_NO_SECTORS);
 			break;
 		case 0x1: /* nhead > nsect > pcyl */
 			nblocks =
-				square_box(nblocks,
-					&nhead, MAXIMUM_NO_HEADS,
-					&nsect, MAXIMUM_NO_SECTORS,
-					&pcyl, MAXIMUM_NO_CYLINDERS);
+			    square_box(nblocks,
+			    &nhead, MAXIMUM_NO_HEADS,
+			    &nsect, MAXIMUM_NO_SECTORS,
+			    &pcyl, MAXIMUM_NO_CYLINDERS);
 			break;
 		default:
 			/* How did we get here? */
@@ -1305,10 +1270,10 @@ generic_disk_sense(
 
 			/* Do something useful */
 			nblocks =
-				square_box(nblocks,
-					&nhead, MAXIMUM_NO_HEADS,
-					&nsect, MAXIMUM_NO_SECTORS,
-					&pcyl, MAXIMUM_NO_CYLINDERS);
+			    square_box(nblocks,
+			    &nhead, MAXIMUM_NO_HEADS,
+			    &nsect, MAXIMUM_NO_SECTORS,
+			    &pcyl, MAXIMUM_NO_CYLINDERS);
 			break;
 		}
 		if (option_msg && diag_msg &&
@@ -1333,7 +1298,7 @@ generic_disk_sense(
 
 			ioparam.io_charlist = confirm_list;
 			if (input(FIO_MSTR, msg, '?', &ioparam,
-				&deflt, DATA_INPUT) != 0)
+			    &deflt, DATA_INPUT) != 0)
 				break;
 
 			ioparam.io_bounds.lower = MINIMUM_NO_HEADS;
@@ -1417,7 +1382,7 @@ generic_disk_sense(
 			char	old_name[DISK_NAME_MAX];
 			(void) strcpy(old_name, disk_name);
 			(void) get_generic_disk_name(disk_name,
-				inquiry);
+			    inquiry);
 			if (option_msg && diag_msg) {
 				err_print(
 "Changing disk type name from '%s' to '%s'\n", old_name, disk_name);
@@ -1457,46 +1422,11 @@ use_existing_disk_type(
 	struct disk_type	*disk_type,
 	struct scsi_capacity_16	*capacity)
 {
-	struct scsi_capacity_16	new_capacity;
 	int			pcyl;
 	int			acyl;
 	int			nhead;
 	int			nsect;
 	int			rpm;
-
-	/*
-	 * If the device's block size is not 512, we have to
-	 * change block size, reformat, and then sense the
-	 * geometry.  To do this, we must be able to prompt
-	 * the user.
-	 */
-	if (capacity->sc_lbasize != DEV_BSIZE) {
-		if (!can_prompt) {
-			return (0);
-		}
-		if (force_blocksize(fd)) {
-			goto err;
-		}
-
-		/*
-		 * Get the capacity again, since this has changed
-		 */
-		if (uscsi_read_capacity(fd, &new_capacity)) {
-			goto err;
-		}
-
-		if (option_msg && diag_msg) {
-			err_print("blocks:  %llu (0x%llx)\n",
-			    new_capacity.sc_capacity,
-			    new_capacity.sc_capacity);
-			err_print("blksize: %u\n", new_capacity.sc_lbasize);
-		}
-
-		capacity = &new_capacity;
-		if (capacity->sc_lbasize != DEV_BSIZE) {
-			goto err;
-		}
-	}
 
 	/*
 	 * Construct a new label out of the format.dat
@@ -1545,7 +1475,7 @@ use_existing_disk_type(
 err:
 	if (option_msg && diag_msg) {
 		err_print(
-			"Configuration via format.dat geometry failed\n");
+		    "Configuration via format.dat geometry failed\n");
 	}
 	return (0);
 }
@@ -1589,11 +1519,11 @@ build_default_partition(
 	 * is in integral number of megabytes.
 	 */
 	capacity = ((diskaddr_t)(label->dkl_ncyl) * label->dkl_nhead *
-	    label->dkl_nsect) / (1024 * 1024) / DEV_BSIZE;
+	    label->dkl_nsect) / (1024 * 1024) / cur_blksz;
 	dpt = default_partitions;
 	for (i = 0; i < DEFAULT_PARTITION_TABLE_SIZE; i++, dpt++) {
 		if (capacity >= dpt->min_capacity &&
-				capacity < dpt->max_capacity) {
+		    capacity < dpt->max_capacity) {
 			break;
 		}
 	}
@@ -1623,7 +1553,7 @@ build_default_partition(
 			 * cylinders.  Always give what they
 			 * asked or more, never less.
 			 */
-			nblks = pt->partitions[i] * ((1024*1024)/DEV_BSIZE);
+			nblks = pt->partitions[i] * ((1024*1024)/cur_blksz);
 			nblks += (blks_per_cyl - 1);
 			ncyls[i] = nblks / blks_per_cyl;
 			freecyls -= ncyls[i];
@@ -1639,7 +1569,7 @@ build_default_partition(
 				    i, ncyls[i]);
 			}
 			err_print("Free cylinders exhausted (%d)\n",
-				freecyls);
+			    freecyls);
 		}
 		return (0);
 	}
@@ -1733,13 +1663,13 @@ build_default_partition(
 #if defined(_SUNOS_VTOC_8)
 	label->dkl_map[2].dkl_cylno = 0;
 	label->dkl_map[2].dkl_nblk =
-		label->dkl_ncyl * label->dkl_nhead * label->dkl_nsect;
+	    label->dkl_ncyl * label->dkl_nhead * label->dkl_nsect;
 
 #elif defined(_SUNOS_VTOC_16)
 	label->dkl_vtoc.v_part[2].p_start = 0;
 	label->dkl_vtoc.v_part[2].p_size =
-		(label->dkl_ncyl + label->dkl_acyl) * label->dkl_nhead *
-			label->dkl_nsect;
+	    (label->dkl_ncyl + label->dkl_acyl) * label->dkl_nhead *
+	    label->dkl_nsect;
 #else
 #error No VTOC format defined.
 #endif				/* defined(_SUNOS_VTOC_8) */
@@ -1776,13 +1706,12 @@ build_default_partition(
 			} else {
 				err_print("%6.2fMB  ", scaled);
 			}
-			err_print(" %6d cylinders\n",
 #if defined(_SUNOS_VTOC_8)
+			err_print(" %6d cylinders\n",
 			    label->dkl_map[i].dkl_nblk/blks_per_cyl);
-
 #elif defined(_SUNOS_VTOC_16)
+			err_print(" %6d cylinders\n",
 			    label->dkl_vtoc.v_part[i].p_size/blks_per_cyl);
-
 #else
 #error No VTOC format defined.
 #endif				/* defined(_SUNOS_VTOC_8) */
@@ -1810,16 +1739,16 @@ find_scsi_disk_type(
 
 	ctlr = find_scsi_ctlr_type();
 	for (dp = ctlr->ctype_dlist; dp != NULL; dp = dp->dtype_next) {
-	    if (dp->dtype_asciilabel) {
-		if ((strcmp(dp->dtype_asciilabel, disk_name) == 0) &&
-				dp->dtype_pcyl == label->dkl_pcyl &&
-				dp->dtype_ncyl == label->dkl_ncyl &&
-				dp->dtype_acyl == label->dkl_acyl &&
-				dp->dtype_nhead == label->dkl_nhead &&
-				dp->dtype_nsect == label->dkl_nsect) {
-			return (dp);
+		if (dp->dtype_asciilabel) {
+			if ((strcmp(dp->dtype_asciilabel, disk_name) == 0) &&
+			    dp->dtype_pcyl == label->dkl_pcyl &&
+			    dp->dtype_ncyl == label->dkl_ncyl &&
+			    dp->dtype_acyl == label->dkl_acyl &&
+			    dp->dtype_nhead == label->dkl_nhead &&
+			    dp->dtype_nsect == label->dkl_nsect) {
+				return (dp);
+			}
 		}
-	    }
 	}
 
 	return ((struct disk_type *)NULL);
@@ -1839,11 +1768,11 @@ find_scsi_disk_by_name(
 
 	ctlr = find_scsi_ctlr_type();
 	for (dp = ctlr->ctype_dlist; dp != NULL; dp = dp->dtype_next) {
-	    if (dp->dtype_asciilabel) {
-		if ((strcmp(dp->dtype_asciilabel, disk_name) == 0)) {
-			return (dp);
+		if (dp->dtype_asciilabel) {
+			if ((strcmp(dp->dtype_asciilabel, disk_name) == 0)) {
+				return (dp);
+			}
 		}
-	    }
 	}
 
 	return ((struct disk_type *)NULL);
@@ -1997,7 +1926,7 @@ new_scsi_disk_type(
 	 */
 	if (part == NULL) {
 		part = (struct partition_info *)
-			zalloc(sizeof (struct partition_info));
+		    zalloc(sizeof (struct partition_info));
 		pt = disk->dtype_plist;
 		if (pt == NULL) {
 			disk->dtype_plist = part;
@@ -2024,11 +1953,11 @@ new_scsi_disk_type(
 
 #elif defined(_SUNOS_VTOC_16)
 			part->pinfo_map[i].dkl_cylno =
-				label->dkl_vtoc.v_part[i].p_start /
-				    ((blkaddr32_t)(disk->dtype_nhead *
-				    disk->dtype_nsect - apc));
+			    label->dkl_vtoc.v_part[i].p_start /
+			    ((blkaddr32_t)(disk->dtype_nhead *
+			    disk->dtype_nsect - apc));
 			part->pinfo_map[i].dkl_nblk =
-				label->dkl_vtoc.v_part[i].p_size;
+			    label->dkl_vtoc.v_part[i].p_size;
 #else
 #error No VTOC format defined.
 #endif				/* defined(_SUNOS_VTOC_8) */
@@ -2042,7 +1971,7 @@ new_scsi_disk_type(
 	 */
 	if (label->dkl_vtoc.v_version == V_VERSION) {
 		(void) memcpy(disk_info->v_volume, label->dkl_vtoc.v_volume,
-			LEN_DKL_VVOL);
+		    LEN_DKL_VVOL);
 		part->vtoc = label->dkl_vtoc;
 	} else {
 		(void) memset(disk_info->v_volume, 0, LEN_DKL_VVOL);
@@ -2151,110 +2080,14 @@ get_generic_disk_name(
 
 	(void) memset(disk_name, 0, DISK_NAME_MAX);
 	p = strcopy(disk_name, inquiry->inq_vid,
-		sizeof (inquiry->inq_vid));
+	    sizeof (inquiry->inq_vid));
 	*p++ = '-';
 	p = strcopy(p, inquiry->inq_pid, sizeof (inquiry->inq_pid));
 	*p++ = '-';
 	p = strcopy(p, inquiry->inq_revision,
-		sizeof (inquiry->inq_revision));
+	    sizeof (inquiry->inq_revision));
 
 	return (disk_name);
-}
-
-
-
-static int
-force_blocksize(
-	int	fd)
-{
-	union {
-		struct mode_format	page3;
-		uchar_t			buf3[MAX_MODE_SENSE_SIZE];
-	} u_page3;
-	struct mode_format		*page3 = &u_page3.page3;
-	struct scsi_ms_header		header;
-
-	if (check("\
-Must reformat device to 512-byte blocksize.  Continue") == 0) {
-
-		/*
-		 * Get current Page 3 - Format Parameters page
-		 */
-		if (uscsi_mode_sense(fd, DAD_MODE_FORMAT,
-			MODE_SENSE_PC_CURRENT, (caddr_t)&u_page3,
-			MAX_MODE_SENSE_SIZE, &header)) {
-			goto err;
-		}
-
-		/*
-		 * Make our changes to the geometry
-		 */
-		header.mode_header.length = 0;
-		header.mode_header.device_specific = 0;
-		page3->mode_page.ps = 0;
-		page3->data_bytes_sect = DEV_BSIZE;
-
-		/*
-		 * make sure that logical block size is of
-		 * DEV_BSIZE.
-		 */
-		header.block_descriptor.blksize_hi = (DEV_BSIZE >> 16);
-		header.block_descriptor.blksize_mid = (DEV_BSIZE >> 8);
-		header.block_descriptor.blksize_lo = (char)(DEV_BSIZE);
-		/*
-		 * Select current Page 3 - Format Parameters page
-		 */
-		if (uscsi_mode_select(fd, DAD_MODE_FORMAT,
-			MODE_SELECT_PF, (caddr_t)&u_page3,
-			MODESENSE_PAGE_LEN(&u_page3), &header)) {
-			goto err;
-		}
-
-		/*
-		 * Now reformat the device
-		 */
-		if (raw_format(fd)) {
-			goto err;
-		}
-		return (0);
-	}
-
-err:
-	if (option_msg && diag_msg) {
-		err_print(
-			"Reformat device to 512-byte blocksize failed\n");
-	}
-	return (1);
-}
-
-static int
-raw_format(
-	int	fd)
-{
-	union scsi_cdb			cdb;
-	struct uscsi_cmd		ucmd;
-	struct scsi_defect_hdr		defect_hdr;
-
-	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
-	(void) memset((char *)&cdb, 0, sizeof (union scsi_cdb));
-	(void) memset((char *)&defect_hdr, 0, sizeof (defect_hdr));
-	cdb.scc_cmd = SCMD_FORMAT;
-	ucmd.uscsi_cdb = (caddr_t)&cdb;
-	ucmd.uscsi_cdblen = CDB_GROUP0;
-	ucmd.uscsi_bufaddr = (caddr_t)&defect_hdr;
-	ucmd.uscsi_buflen = sizeof (defect_hdr);
-	cdb.cdb_opaque[1] = FPB_DATA;
-
-	/*
-	 * Issue the format ioctl
-	 */
-	fmt_print("Formatting...\n");
-	(void) fflush(stdout);
-	if (uscsi_cmd(fd, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT)) {
-		return (1);
-	}
-	return (0);
 }
 
 /*
@@ -2383,7 +2216,8 @@ square_box(
 	 * any blocks.
 	 */
 
-	for (i = 0; (((*dim1)>>i)&1) == 0 && ((*dim1)>>i) > lim1; i++);
+	for (i = 0; (((*dim1)>>i)&1) == 0 && ((*dim1)>>i) > lim1; i++)
+		;
 	if (i) {
 		*dim1 = ((*dim1)>>i);
 		*dim3 = ((*dim3)<<i);

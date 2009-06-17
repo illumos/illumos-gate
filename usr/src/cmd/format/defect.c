@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,8 +132,8 @@ read_list(struct defect_list *list)
 		/*
 		 * Allocate space for the rest of the list.
 		 */
-		size = LISTSIZE(list->header.count);
-		list->list = (struct defect_entry *)zalloc(size * SECSIZE);
+		size = deflist_size(cur_blksz, list->header.count);
+		list->list = (struct defect_entry *)zalloc(size * cur_blksz);
 		/*
 		 * Try to read in the rest of the list. If there is an
 		 * error, or the checksum is wrong, this copy is corrupt.
@@ -352,7 +352,7 @@ write_deflist(struct defect_list *list)
 		/*
 		 * calculate how many sectors the defect list will occupy.
 		 */
-		size = LISTSIZE(list->header.count);
+		size = deflist_size(cur_blksz, list->header.count);
 		/*
 		 * Loop for each copy of the list to be written.  Write
 		 * out the header of the list followed by the data.
@@ -444,9 +444,9 @@ add_def(struct defect_entry *def, struct defect_list *list, int index)
 	 * sector, allocate the necessary space.
 	 */
 	count = list->header.count;
-	if (LISTSIZE(count + 1) > LISTSIZE(count))
+	if (deflist_size(cur_blksz, count + 1) > deflist_size(cur_blksz, count))
 		list->list = (struct defect_entry *)rezalloc((void *)list->list,
-		    LISTSIZE(count + 1) * SECSIZE);
+		    deflist_size(cur_blksz, count + 1) * cur_blksz);
 	/*
 	 * Slip all the defects after this one down one slot in the list.
 	 */
@@ -484,4 +484,23 @@ kill_deflist(struct defect_list *list)
 	 */
 	list->list = NULL;
 	list->flags = 0;
+}
+
+/*
+ * This routine returns the defect list size
+ * according to the sector size.
+ */
+int
+deflist_size(int secsz, int sz)
+{
+	int rval;
+
+	if (secsz == 0) {
+		secsz = SECSIZE;
+	}
+
+	rval = sz ? ((sz * sizeof (struct defect_entry) +
+	    secsz - 1) / secsz) : 1;
+
+	return (rval);
 }

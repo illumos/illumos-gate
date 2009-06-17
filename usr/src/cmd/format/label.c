@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,11 +270,11 @@ write_label()
 {
 	int	error = 0, head, sec;
 	struct dk_label label;
-	struct dk_label new_label;
 	struct extvtoc	vtoc;
 	struct dk_geom	geom;
 	struct dk_gpt	*vtoc64;
 	int		nbackups;
+	char		*new_label;
 
 #if defined(_SUNOS_VTOC_8)
 	int i;
@@ -313,7 +313,8 @@ write_label()
 	 * Fill in a label structure with the geometry information.
 	 */
 	(void) memset((char *)&label, 0, sizeof (struct dk_label));
-	(void) memset((char *)&new_label, 0, sizeof (struct dk_label));
+	new_label = zalloc(cur_blksz);
+
 	label.dkl_pcyl = pcyl;
 	label.dkl_ncyl = ncyl;
 	label.dkl_acyl = acyl;
@@ -358,10 +359,9 @@ write_label()
 
 #if defined(_SUNOS_VTOC_16)
 	/*
-	 * Also add in v_sectorsz, as the driver will.  Everyone
-	 * else is assuming DEV_BSIZE, so we do the same.
+	 * Also add in v_sectorsz, as the driver will.
 	 */
-	label.dkl_vtoc.v_sectorsz = DEV_BSIZE;
+	label.dkl_vtoc.v_sectorsz = cur_blksz;
 #endif			/* defined(_SUNOS_VTOC_16) */
 
 	/*
@@ -372,6 +372,7 @@ write_label()
 	 * Convert the label into a vtoc
 	 */
 	if (label_to_vtoc(&vtoc, &label) == -1) {
+		free(new_label);
 		return (-1);
 	}
 	/*
@@ -400,6 +401,7 @@ write_label()
 	 * is only for SCSI disks.
 	 */
 	if (SCSI && do_geometry_sanity_check() != 0) {
+		free(new_label);
 		return (-1);
 	}
 
@@ -444,14 +446,15 @@ write_label()
 	for (sec = 1; ((sec < BAD_LISTCNT * 2 + 1) && (sec < nsect));
 	    sec += 2) {
 		if ((*cur_ops->op_rdwr)(DIR_READ, cur_file, (diskaddr_t)
-		    ((chs2bn(ncyl + acyl - 1, head, sec)) + solaris_offset),
-		    1, (caddr_t)&new_label, F_NORMAL, NULL)) {
-			err_print("Warning: error reading backup label.\n");
+		    ((chs2bn(ncyl + acyl - 1, head, sec))
+		    + solaris_offset), 1, new_label, F_NORMAL, NULL)) {
+			err_print("Warning: error reading"
+			    "backup label.\n");
 			error = -1;
 		} else {
-			if (bcmp((char *)&label, (char *)&new_label,
+			if (bcmp((char *)&label, new_label,
 			    sizeof (struct dk_label)) == 0) {
-					nbackups++;
+				nbackups++;
 			}
 		}
 	}
@@ -466,6 +469,7 @@ write_label()
 	cur_disk->disk_flags |= DSK_LABEL;
 
 	exit_critical();
+	free(new_label);
 	return (error);
 }
 
@@ -578,7 +582,8 @@ get_disk_info(int fd, struct efi_info *label)
 			err_print("Fetch Capacity failed\n");
 			return (-1);
 		}
-		label->capacity = minf.dki_capacity * minf.dki_lbsize / 512;
+		label->capacity =
+		    minf.dki_capacity * minf.dki_lbsize / cur_blksz;
 	} else {
 		label->capacity = capacity.sc_capacity;
 
@@ -689,7 +694,7 @@ vtoc_to_label(struct dk_label *label, struct extvtoc *vtoc,
 	/*
 	 * Sanity-check the vtoc
 	 */
-	if (vtoc->v_sanity != VTOC_SANE || vtoc->v_sectorsz != DEV_BSIZE ||
+	if (vtoc->v_sanity != VTOC_SANE ||
 	    vtoc->v_nparts != V_NUMPAR) {
 		return (-1);
 	}
@@ -881,7 +886,7 @@ label_to_vtoc(struct extvtoc *vtoc, struct dk_label *label)
 	 */
 	vtoc->v_sanity = VTOC_SANE;
 	vtoc->v_version = V_VERSION;
-	vtoc->v_sectorsz = DEV_BSIZE;
+	vtoc->v_sectorsz = cur_blksz;
 	vtoc->v_nparts = V_NUMPAR;
 
 	(void) memcpy(vtoc->v_asciilabel, label->dkl_asciilabel,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,7 +264,7 @@ scsi_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
 		}
 		ucmd.uscsi_cdb = (caddr_t)&cdb;
 		ucmd.uscsi_bufaddr = bufaddr;
-		ucmd.uscsi_buflen = nsectors * SECSIZE;
+		ucmd.uscsi_buflen = nsectors * cur_blksz;
 		rc = uscsi_cmd(fd, &ucmd, flags);
 
 		if (rc != 0)
@@ -290,7 +290,7 @@ scsi_rdwr(dir, fd, blkno, secnt, bufaddr, flags, xfercntp)
 
 		blkno += nsectors;
 		secnt -= nsectors;
-		bufaddr += nsectors * SECSIZE;
+		bufaddr += nsectors * cur_blksz;
 	}
 
 	/*
@@ -326,7 +326,7 @@ scsi_ck_format(void)
 	 * Try to read the first four blocks.
 	 */
 	status = scsi_rdwr(DIR_READ, cur_file, (diskaddr_t)0, 4,
-		(caddr_t)cur_buf, F_SILENT, NULL);
+	    (caddr_t)cur_buf, F_SILENT, NULL);
 	return (!status);
 }
 
@@ -498,7 +498,7 @@ scsi_raw_format(void)
 	    "by format verification and surface analysis.\n\n");
 
 	if (check("Retry format without mode selects and Grown Defects list")
-		!= 0) {
+	    != 0) {
 		return (-1);
 	}
 
@@ -580,18 +580,18 @@ scsi_format_time()
 	 * If it fail, try to use the saved or current instead.
 	 */
 	status = uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-		MODE_SENSE_PC_DEFAULT, (caddr_t)page4,
-		MAX_MODE_SENSE_SIZE, &header);
+	    MODE_SENSE_PC_DEFAULT, (caddr_t)page4,
+	    MAX_MODE_SENSE_SIZE, &header);
 
 	if (status) {
 		status = uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_SAVED, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_SAVED, (caddr_t)page4,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 	if (status) {
 		status = uscsi_mode_sense(cur_file, DAD_MODE_GEOMETRY,
-			MODE_SENSE_PC_CURRENT, (caddr_t)page4,
-			MAX_MODE_SENSE_SIZE, &header);
+		    MODE_SENSE_PC_CURRENT, (caddr_t)page4,
+		    MAX_MODE_SENSE_SIZE, &header);
 	}
 	if (status) {
 		return (0);
@@ -609,7 +609,7 @@ scsi_format_time()
 
 	page4->rpm = BE_16(page4->rpm);
 	p4_cylinders = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) +
-		page4->cyl_lb;
+	    page4->cyl_lb;
 	p4_heads = page4->heads;
 	p4_rpm = page4->rpm;
 
@@ -618,7 +618,7 @@ scsi_format_time()
 	 */
 	if (p4_rpm < MIN_RPM || p4_rpm > MAX_RPM) {
 		err_print("Mode sense page(4) reports rpm value as %d,"
-			" adjusting it to %d\n", p4_rpm, AVG_RPM);
+		    " adjusting it to %d\n", p4_rpm, AVG_RPM);
 		p4_rpm = AVG_RPM;
 	}
 
@@ -626,7 +626,7 @@ scsi_format_time()
 		return (0);
 
 	format_time = ((scsi_format_revolutions * p4_heads *
-			p4_cylinders) + p4_rpm) / p4_rpm;
+	    p4_cylinders) + p4_rpm) / p4_rpm;
 
 	if (option_msg && diag_msg) {
 		err_print("       pcyl:    %d\n", p4_cylinders);
@@ -1027,8 +1027,8 @@ scsi_ms_page3(scsi2_flag)
 	tmp5 = page3->alt_tracks_vol;
 	tmp6 = page3->alt_sect_zone;
 
-	flag = (page3->data_bytes_sect != SECSIZE);
-	page3->data_bytes_sect = SECSIZE;
+	flag = (page3->data_bytes_sect != cur_blksz);
+	page3->data_bytes_sect = cur_blksz;
 
 	flag |= (page3->interleave != 1);
 	page3->interleave = 1;
@@ -1844,7 +1844,8 @@ scsi_convert_list_to_new(list, def_list, list_format)
 		len = def_list->length / sizeof (struct scsi_bfi_defect);
 		old_defect = def_list->list;
 		new_defect = (struct defect_entry *)
-				zalloc(LISTSIZE(len) * SECSIZE);
+		    zalloc(deflist_size(cur_blksz, len) *
+		    cur_blksz);
 
 		list->header.magicno = (uint_t)DEFECT_MAGIC;
 		list->list = new_defect;
@@ -2618,7 +2619,7 @@ uscsi_reserve_release(int fd, int cmd)
 	ucmd.uscsi_cdb = (caddr_t)&cdb;
 	ucmd.uscsi_cdblen = CDB_GROUP0;
 	status = uscsi_cmd(fd, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 
 	if (status) {
 		/*
@@ -2630,14 +2631,14 @@ uscsi_reserve_release(int fd, int cmd)
 		(void) memset((char *)&cdb, 0, sizeof (union scsi_cdb));
 		ucmd.uscsi_cdb = (caddr_t)&cdb;
 		cdb.scc_cmd = (cmd == SCMD_RESERVE) ?
-			SCMD_RESERVE_G1 : SCMD_RELEASE_G1;
+		    SCMD_RESERVE_G1 : SCMD_RELEASE_G1;
 		ucmd.uscsi_cdblen = CDB_GROUP1;
 		status = uscsi_cmd(fd, &ucmd,
-			(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+		    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 		if (status) {
 			if (option_msg) {
-			    err_print("%s failed\n", (cmd == SCMD_RESERVE) ?
-				"Reserve" : "Release");
+				err_print("%s failed\n", (cmd == SCMD_RESERVE) ?
+				    "Reserve" : "Release");
 			}
 		}
 	}
@@ -2916,13 +2917,13 @@ scsi_extract_sense_info_descr(struct scsi_descr_sense_hdr *sdsp, int rqlen)
 			 */
 			result =
 			    (((diskaddr_t)isd->isd_information[0] << 56) |
-				((diskaddr_t)isd->isd_information[1] << 48) |
-				((diskaddr_t)isd->isd_information[2] << 40) |
-				((diskaddr_t)isd->isd_information[3] << 32) |
-				((diskaddr_t)isd->isd_information[4] << 24) |
-				((diskaddr_t)isd->isd_information[5] << 16) |
-				((diskaddr_t)isd->isd_information[6] << 8)  |
-				((diskaddr_t)isd->isd_information[7]));
+			    ((diskaddr_t)isd->isd_information[1] << 48) |
+			    ((diskaddr_t)isd->isd_information[2] << 40) |
+			    ((diskaddr_t)isd->isd_information[3] << 32) |
+			    ((diskaddr_t)isd->isd_information[4] << 24) |
+			    ((diskaddr_t)isd->isd_information[5] << 16) |
+			    ((diskaddr_t)isd->isd_information[6] << 8)  |
+			    ((diskaddr_t)isd->isd_information[7]));
 			break;
 		}
 
@@ -2975,7 +2976,7 @@ apply_chg_list(int pageno, int pagsiz, uchar_t *curbits,
 
 	while (chglist != NULL) {
 		if (chglist->pageno == pageno &&
-				chglist->byteno < pagsiz) {
+		    chglist->byteno < pagsiz) {
 			i = chglist->byteno;
 			c = curbits[i];
 			switch (chglist->mode) {
@@ -3288,16 +3289,16 @@ check_support_for_defects()
 	rq = (struct scsi_extended_sense *)ucmd.uscsi_rqbuf;
 
 	status = uscsi_cmd(cur_file, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 
 	if (status != 0) {
 		/*
 		 * check if read_defect_list_is_supported.
 		 */
 		if (ucmd.uscsi_rqstatus == STATUS_GOOD &&
-			rq->es_key == KEY_ILLEGAL_REQUEST &&
-				rq->es_add_code == INVALID_OPCODE)
-				return (0);
+		    rq->es_key == KEY_ILLEGAL_REQUEST &&
+		    rq->es_add_code == INVALID_OPCODE)
+			return (0);
 	}
 	return (1);
 }
@@ -3335,7 +3336,7 @@ scsi_format_without_defects()
 	 * Issue the format ioctl
 	 */
 	status = uscsi_cmd(cur_file, &ucmd,
-		(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
+	    (option_msg && diag_msg) ? F_NORMAL : F_SILENT);
 	return (status);
 }
 

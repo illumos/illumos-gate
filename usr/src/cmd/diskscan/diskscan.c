@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,7 +168,7 @@ main(int argc, char *argv[]) {
 static void
 scandisk(char *device, int devfd, int writeflag)
 {
-	int	 trksiz = NBPSCTR * dkg.dkg_nsect;
+	int	trksiz = 0;
 	char	*verbuf;
 	diskaddr_t cursec;
 	int	 cylsiz =  dkg.dkg_nsect * dkg.dkg_nhead;
@@ -176,6 +176,15 @@ scandisk(char *device, int devfd, int writeflag)
 	char	*rptr;
 	diskaddr_t tmpend = 0;
 	diskaddr_t tmpsec = 0;
+	struct dk_minfo	mediainfo;
+	uint_t  sector_size;
+
+	if ((ioctl(devfd, DKIOCGMEDIAINFO, &mediainfo)) == 0) {
+		sector_size = mediainfo.dki_lbsize;
+	} else {
+		sector_size = NBPSCTR;
+	}
+	trksiz =  sector_size * dkg.dkg_nsect;
 
 /* #define LIBMALLOC */
 
@@ -187,23 +196,25 @@ scandisk(char *device, int devfd, int writeflag)
 
 
 	/* make track buffer sector aligned */
-	if (mallopt(M_GRAIN, 0x200)) {
+	if (mallopt(M_GRAIN, sector_size)) {
 		perror("mallopt");
 		exit(1);
 	}
-	if ((verbuf = malloc(NBPSCTR * dkg.dkg_nsect)) == (char *)NULL) {
+	if ((verbuf = malloc(sector_size * dkg.dkg_nsect)) ==
+	    (char *)NULL) {
 		perror("malloc");
 		exit(1);
 	}
 
 #else
 
-	if ((verbuf = malloc(0x200 + NBPSCTR * dkg.dkg_nsect))
+	if ((verbuf = malloc(sector_size + sector_size * dkg.dkg_nsect))
 	    == (char *)NULL) {
 		perror("malloc");
 		exit(1);
 	}
-	verbuf = (char *)(((unsigned long)verbuf + 0x00000200) & 0xfffffe00);
+	verbuf = (char *)((((unsigned long)verbuf + sector_size)) &
+	    (-sector_size));
 
 #endif
 
@@ -238,7 +249,7 @@ scandisk(char *device, int devfd, int writeflag)
 	}
 
 	for (cursec = 0; cursec < unix_size; cursec +=  dkg.dkg_nsect) {
-		if (llseek(devfd, cursec * NBPSCTR, 0) == -1) {
+		if (llseek(devfd, cursec * sector_size, 0) == -1) {
 			(void) fprintf(stderr,
 			    "Error seeking sector %llu Cylinder %llu\n",
 			    cursec, cursec / cylsiz);
@@ -261,7 +272,8 @@ scandisk(char *device, int devfd, int writeflag)
 				 *  then announce the sector bad on stderr
 				 */
 
-				if (llseek(devfd, tmpsec * NBPSCTR, 0) == -1) {
+				if (llseek(devfd, tmpsec * sector_size,
+				    0) == -1) {
 					(void) fprintf(stderr, "Error seeking "
 					    "sector %llu Cylinder %llu\n",
 					    tmpsec, cursec / cylsiz);
@@ -270,7 +282,8 @@ scandisk(char *device, int devfd, int writeflag)
 
 				report("Writing", tmpsec);
 
-				if (write(devfd, verbuf, NBPSCTR) != NBPSCTR) {
+				if (write(devfd, verbuf, sector_size)
+				    != sector_size) {
 					(void) fprintf(stderr,
 					    "%llu\n", tmpsec + unix_base);
 					numbadwr++;
@@ -283,7 +296,7 @@ scandisk(char *device, int devfd, int writeflag)
 	do_readonly:
 
 	for (cursec = 0; cursec < unix_size; cursec +=  dkg.dkg_nsect) {
-		if (llseek(devfd, cursec * NBPSCTR, 0) == -1) {
+		if (llseek(devfd, cursec * sector_size, 0) == -1) {
 			(void) fprintf(stderr,
 			    "Error seeking sector %llu Cylinder %llu\n",
 			    cursec, cursec / cylsiz);
@@ -300,14 +313,16 @@ scandisk(char *device, int devfd, int writeflag)
 		if (read(devfd, verbuf, trksiz) != trksiz) {
 			tmpend = cursec +  dkg.dkg_nsect;
 			for (tmpsec = cursec; tmpsec < tmpend; tmpsec++) {
-				if (llseek(devfd, tmpsec * NBPSCTR, 0) == -1) {
+				if (llseek(devfd, tmpsec * sector_size,
+				    0) == -1) {
 					(void) fprintf(stderr, "Error seeking"
 					    " sector %llu Cylinder %llu\n",
 					    tmpsec, cursec / cylsiz);
 					verexit(1);
 				}
 				report("Reading", tmpsec);
-				if (read(devfd, verbuf, NBPSCTR) != NBPSCTR) {
+				if (read(devfd, verbuf, sector_size) !=
+				    sector_size) {
 					(void) fprintf(stderr, "%llu\n",
 					    tmpsec + unix_base);
 					numbadrd++;

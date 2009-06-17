@@ -559,7 +559,7 @@ main(int argc, char *argv[])
 	 * in that case leave the minfo structure zeroed
 	 */
 	if (ioctl(Dev, DKIOCGMEDIAINFO, &minfo)) {
-		memset(&minfo, 0, sizeof (minfo));
+		(void) memset(&minfo, 0, sizeof (minfo));
 	}
 
 	/* Get the disk geometry */
@@ -628,7 +628,12 @@ main(int argc, char *argv[])
 		Numcyl = disk_geom.dkg_ncyl;
 		heads = disk_geom.dkg_nhead;
 		sectors = disk_geom.dkg_nsect;
-		sectsiz = 512;
+
+		if (minfo.dki_lbsize != 0)
+			sectsiz = minfo.dki_lbsize;
+		else
+			sectsiz = 512;
+
 		acyl = disk_geom.dkg_acyl;
 
 		/*
@@ -690,7 +695,11 @@ main(int argc, char *argv[])
 		Numcyl = disk_geom.dkg_ncyl;
 		heads = disk_geom.dkg_nhead;
 		sectors = disk_geom.dkg_nsect;
-		sectsiz = 512;
+		if (minfo.dki_lbsize != 0)
+			sectsiz = minfo.dki_lbsize;
+		else
+			sectsiz = 512;
+
 		acyl = disk_geom.dkg_acyl;
 		(void) printf("* Label geometry for device %s\n", Dfltdev);
 		(void) printf(
@@ -751,7 +760,7 @@ main(int argc, char *argv[])
 		dev_capacity = minfo.dki_capacity;
 
 	/* Allocate memory to hold three complete sectors */
-	Bootsect = (char *)malloc(3 * sectsiz);
+	Bootsect = (char *)calloc(3 * sectsiz, 1);
 	if (Bootsect == NULL) {
 		(void) fprintf(stderr,
 		    "fdisk: Unable to obtain enough buffer memory"
@@ -2819,8 +2828,8 @@ disptbl(void)
 	(void) printf(HOME);
 	(void) printf(T_LINE);
 	(void) printf("             Total disk size is %d cylinders\n", Numcyl);
-	(void) printf("             Cylinder size is %d (512 byte) blocks\n\n",
-	    heads * sectors);
+	(void) printf("             Cylinder size is %d (%d byte) blocks\n\n",
+	    heads * sectors, sectsiz);
 	(void) printf(
 	    "                                               Cylinders\n");
 	(void) printf(
@@ -3165,7 +3174,7 @@ getlong(char **bp)
 
 /*
  * copy_Table_to_Bootblk
- * Copy the table into the 512 boot record. Note that the unused
+ * Copy the table into the boot record. Note that the unused
  * entries will always be the last ones in the table and they are
  * marked with 100 in sysind. The the unused portion of the table
  * is padded with zeros in the bytes after the used entries.
@@ -3638,7 +3647,8 @@ clear_efi(void)
 	 */
 	dk_ioc.dki_lba = efi_vtoc->efi_last_u_lba + 1;
 	dk_ioc.dki_length -= efi_vtoc->efi_lbasize;
-	dk_ioc.dki_data++;
+	dk_ioc.dki_data = (efi_gpt_t *)((char *)dk_ioc.dki_data +
+	    efi_vtoc->efi_lbasize);
 	if (io_debug) {
 		(void) fprintf(stderr,
 		    "\tClearing backup partition table at block %lld\n",
@@ -3656,7 +3666,8 @@ clear_efi(void)
 	 */
 	dk_ioc.dki_lba = efi_vtoc->efi_last_lba;
 	dk_ioc.dki_length = efi_vtoc->efi_lbasize;
-	dk_ioc.dki_data--;
+	dk_ioc.dki_data = (efi_gpt_t *)((char *)dk_ioc.dki_data -
+	    efi_vtoc->efi_lbasize);
 	if (io_debug) {
 		(void) fprintf(stderr, "\tClearing backup label at block "
 		    "%lld\n", dk_ioc.dki_lba);
@@ -3685,14 +3696,14 @@ static void
 clear_vtoc(int table, int part)
 {
 	struct ipart *clr_table;
-	struct dk_label disk_label;
+	char *disk_label;
 	uint32_t pcyl, ncyl, count;
 	diskaddr_t backup_block, solaris_offset;
 	ssize_t bytes;
 	off_t seek_byte;
 
 #ifdef DEBUG
-	struct dk_label	read_label;
+	char *read_label;
 #endif /* DEBUG */
 
 	if (table == OLD) {
@@ -3701,7 +3712,10 @@ clear_vtoc(int table, int part)
 		clr_table = &Table[part];
 	}
 
-	(void) memset(&disk_label, 0, sizeof (struct dk_label));
+	disk_label = (char *)calloc(sectsiz, 1);
+	if (disk_label == NULL) {
+		return;
+	}
 
 	seek_byte = (off_t)(lel(clr_table->relsect) + VTOC_OFFSET) * sectsiz;
 
@@ -3716,12 +3730,13 @@ clear_vtoc(int table, int part)
 		(void) fprintf(stderr,
 		    "\tError seeking to primary label at byte %llu\n",
 		    (uint64_t)seek_byte);
+		free(disk_label);
 		return;
 	}
 
-	bytes = write(Dev, &disk_label, sizeof (struct dk_label));
+	bytes = write(Dev, disk_label, sectsiz);
 
-	if (bytes != sizeof (struct dk_label)) {
+	if (bytes != sectsiz) {
 		(void) fprintf(stderr,
 		    "\tWarning: only %d bytes written to clear primary"
 		    " VTOC!\n", bytes);
@@ -3732,6 +3747,7 @@ clear_vtoc(int table, int part)
 		(void) fprintf(stderr,
 		    "DEBUG: Error seeking to primary label at byte %llu\n",
 		    (uint64_t)seek_byte);
+		free(disk_label);
 		return;
 	} else {
 		(void) fprintf(stderr,
@@ -3739,15 +3755,21 @@ clear_vtoc(int table, int part)
 		    (uint64_t)seek_byte);
 	}
 
-	bytes = read(Dev, &read_label, sizeof (struct dk_label));
+	read_label = (char *)calloc(sectsiz, 1);
+	if (read_label == NULL) {
+		free(disk_label);
+		return;
+	}
 
-	if (bytes != sizeof (struct dk_label)) {
+	bytes = read(Dev, read_label, sectsiz);
+
+	if (bytes != sectsiz) {
 		(void) fprintf(stderr,
 		    "DEBUG: Warning: only %d bytes read of label\n",
 		    bytes);
 	}
 
-	if (memcmp(&disk_label, &read_label, sizeof (struct dk_label)) != 0) {
+	if (memcmp(disk_label, read_label, sectsiz) != 0) {
 		(void) fprintf(stderr,
 		    "DEBUG: Warning: disk_label and read_label differ!!!\n");
 	} else {
@@ -3765,12 +3787,16 @@ clear_vtoc(int table, int part)
 	    (heads * sectors)) + ((heads - 1) * sectors) + 1;
 
 	for (count = 1; count < 6; count++) {
-		seek_byte = (off_t)(solaris_offset + backup_block) * 512;
+		seek_byte = (off_t)(solaris_offset + backup_block) * sectsiz;
 
 		if (lseek(Dev, seek_byte, SEEK_SET) == -1) {
 			(void) fprintf(stderr,
 			    "\tError seeking to backup label at byte %llu on "
 			    "%s.\n", (uint64_t)seek_byte, Dfltdev);
+			free(disk_label);
+#ifdef DEBUG
+			free(read_label);
+#endif /* DEBUG */
 			return;
 		}
 
@@ -3781,9 +3807,9 @@ clear_vtoc(int table, int part)
 			    (uint64_t)(solaris_offset + backup_block));
 		}
 
-		bytes = write(Dev, &disk_label, sizeof (struct dk_label));
+		bytes = write(Dev, disk_label, sectsiz);
 
-		if (bytes != sizeof (struct dk_label)) {
+		if (bytes != sectsiz) {
 			(void) fprintf(stderr,
 			    "\t\tWarning: only %d bytes written to "
 			    "clear backup VTOC at block %llu!\n", bytes,
@@ -3795,6 +3821,8 @@ clear_vtoc(int table, int part)
 		(void) fprintf(stderr,
 		    "DEBUG: Error seeking to backup label at byte %llu\n",
 		    (uint64_t)seek_byte);
+		free(disk_label);
+		free(read_label);
 		return;
 	} else {
 		(void) fprintf(stderr,
@@ -3802,15 +3830,15 @@ clear_vtoc(int table, int part)
 		    (uint64_t)seek_byte);
 	}
 
-	bytes = read(Dev, &read_label, sizeof (struct dk_label));
+	bytes = read(Dev, read_label, sectsiz);
 
-	if (bytes != sizeof (struct dk_label)) {
+	if (bytes != sectsiz) {
 		(void) fprintf(stderr,
 		    "DEBUG: Warning: only %d bytes read of backup label\n",
 		    bytes);
 	}
 
-	if (memcmp(&disk_label, &read_label, sizeof (struct dk_label)) != 0) {
+	if (memcmp(disk_label, read_label, sectsiz) != 0) {
 		(void) fprintf(stderr,
 		    "DEBUG: Warning: disk_label and read_label differ!!!\n");
 	} else {
@@ -3818,10 +3846,16 @@ clear_vtoc(int table, int part)
 		    "DEBUG: Good compare of disk_label and backup "
 		    "read_label\n");
 	}
+
 #endif /* DEBUG */
 
 		backup_block += 2;
 	}
+
+#ifdef DEBUG
+	free(read_label);
+#endif /* DEBUG */
+	free(disk_label);
 }
 
 #define	FDISK_STANDARD_LECTURE \

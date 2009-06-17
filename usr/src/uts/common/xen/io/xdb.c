@@ -1202,6 +1202,7 @@ xdb_open_device(xdb_t *vdp)
 {
 	dev_info_t *dip = vdp->xs_dip;
 	uint64_t devsize;
+	int blksize;
 	char *nodepath;
 
 	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
@@ -1252,7 +1253,17 @@ xdb_open_device(xdb_t *vdp)
 		kmem_free(nodepath, MAXPATHLEN);
 		return (DDI_FAILURE);
 	}
-	vdp->xs_sectors = devsize / XB_BSIZE;
+
+	blksize = ldi_prop_get_int64(vdp->xs_ldi_hdl,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "blksize", DEV_BSIZE);
+	if (blksize == DEV_BSIZE)
+		blksize = ldi_prop_get_int(vdp->xs_ldi_hdl,
+		    LDI_DEV_T_ANY | DDI_PROP_DONTPASS |
+		    DDI_PROP_NOTPROM, "device-blksize", DEV_BSIZE);
+
+	vdp->xs_sec_size = blksize;
+	vdp->xs_sectors = devsize / blksize;
 
 	/* check if the underlying device is a CD/DVD disc */
 	if (ldi_prop_get_int(vdp->xs_ldi_hdl, LDI_DEV_T_ANY | DDI_PROP_DONTPASS,
@@ -1388,13 +1399,12 @@ trans_retry:
 	/* If feature-barrier isn't present in xenstore, add it.  */
 	fb_exists = xenbus_exists(xsname, XBP_FB);
 
-	/* hard-coded 512-byte sector size */
-	ssize = DEV_BSIZE;
+	ssize = (vdp->xs_sec_size == 0) ? DEV_BSIZE : vdp->xs_sec_size;
 	sectors = vdp->xs_sectors;
 	if (((!fb_exists &&
 	    (err = xenbus_printf(xbt, xsname, XBP_FB, "%d", 1)))) ||
 	    (err = xenbus_printf(xbt, xsname, XBP_INFO, "%u", dinfo)) ||
-	    (err = xenbus_printf(xbt, xsname, "sector-size", "%u", ssize)) ||
+	    (err = xenbus_printf(xbt, xsname, XBP_SECTOR_SIZE, "%u", ssize)) ||
 	    (err = xenbus_printf(xbt, xsname,
 	    XBP_SECTORS, "%"PRIu64, sectors)) ||
 	    (err = xenbus_printf(xbt, xsname, "instance", "%d", instance)) ||
