@@ -1783,7 +1783,7 @@ xdf_setstate_connected(xdf_t *vdp)
 
 	/* Determine if feature barrier is supported by backend */
 	if (!(vdp->xdf_feature_barrier = xenbus_exists(oename, XBP_FB)))
-		cmn_err(CE_NOTE, "xdf@%s: failed to read feature-barrier",
+		cmn_err(CE_NOTE, "!xdf@%s: feature-barrier not supported",
 		    vdp->xdf_addr);
 
 	/*
