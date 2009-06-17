@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,8 @@ void	sfmmu_kpm_hme_unload(page_t *);
 kpm_hlk_t *sfmmu_kpm_kpmp_enter(page_t *, pgcnt_t);
 void	sfmmu_kpm_kpmp_exit(kpm_hlk_t *kpmp);
 void	sfmmu_kpm_page_cache(page_t *, int, int);
+
+extern uint_t vac_colors;
 
 /*
  * Kernel Physical Mapping (kpm) facility
@@ -165,6 +167,46 @@ hat_kpm_mapout(struct page *pp, struct kpme *kpme, caddr_t vaddr)
 		sfmmu_kpm_mapout(pp, vaddr);
 
 	sfmmu_mlist_exit(pml);
+}
+
+/*
+ * hat_kpm_mapin_pfn is used to obtain a kpm mapping for physical
+ * memory addresses that are not described by a page_t.  It can
+ * only be supported if vac_colors=1, because there is no page_t
+ * and corresponding kpm_page_t to track VAC conflicts.  Currently,
+ * this may not be used on pfn's backed by page_t's, because the
+ * kpm state may not be consistent in hat_kpm_fault if the page is
+ * mapped using both this routine and hat_kpm_mapin.  KPM should be
+ * cleaned up on sun4u/vac_colors=1 to be minimal as on sun4v.
+ * The caller must only pass pfn's for valid physical addresses; violation
+ * of this rule will cause panic.
+ */
+caddr_t
+hat_kpm_mapin_pfn(pfn_t pfn)
+{
+	caddr_t paddr, vaddr;
+	tte_t tte;
+	uint_t szc = kpm_smallpages ? TTE8K : TTE4M;
+	uint_t shift = kpm_smallpages ? MMU_PAGESHIFT : MMU_PAGESHIFT4M;
+
+	if (kpm_enable == 0 || vac_colors > 1 ||
+	    page_numtomemseg_nolock(pfn) != NULL)
+		return ((caddr_t)NULL);
+
+	paddr = (caddr_t)ptob(pfn);
+	vaddr = (uintptr_t)kpm_vbase + paddr;
+
+	KPM_TTE_VCACHED(tte.ll, pfn, szc);
+	sfmmu_kpm_load_tsb(vaddr, &tte, shift);
+
+	return (vaddr);
+}
+
+/*ARGSUSED*/
+void
+hat_kpm_mapout_pfn(pfn_t pfn)
+{
+	/* empty */
 }
 
 /*
@@ -279,17 +321,28 @@ hat_kpm_fault(struct hat *hat, caddr_t vaddr)
 
 	SFMMU_KPM_VTOP(vaddr, paddr);
 	pfn = (pfn_t)btop(paddr);
-	mseg = page_numtomemseg_nolock(pfn);
-	if (mseg == NULL)
-		return (EFAULT);
+	if ((mseg = page_numtomemseg_nolock(pfn)) != NULL) {
+		pp = &mseg->pages[(pgcnt_t)(pfn - mseg->pages_base)];
+		ASSERT((pfn_t)pp->p_pagenum == pfn);
+	}
 
-	pp = &mseg->pages[(pgcnt_t)(pfn - mseg->pages_base)];
-	ASSERT((pfn_t)pp->p_pagenum == pfn);
+	/*
+	 * hat_kpm_mapin_pfn may add a kpm translation for memory that falls
+	 * outside of memsegs.  Check for this case and provide the translation
+	 * here.
+	 */
+	if (vac_colors == 1 && mseg == NULL) {
+		tte_t tte;
+		uint_t szc = kpm_smallpages ? TTE8K : TTE4M;
+		uint_t shift = kpm_smallpages ? MMU_PAGESHIFT : MMU_PAGESHIFT4M;
 
-	if (!PAGE_LOCKED(pp))
-		return (EFAULT);
-
-	if (kpm_smallpages == 0)
+		ASSERT(address_in_memlist(phys_install, paddr, 1));
+		KPM_TTE_VCACHED(tte.ll, pfn, szc);
+		sfmmu_kpm_load_tsb(vaddr, &tte, shift);
+		error = 0;
+	} else if (mseg == NULL || !PAGE_LOCKED(pp))
+		error = EFAULT;
+	else if (kpm_smallpages == 0)
 		error = sfmmu_kpm_fault(vaddr, mseg, pp);
 	else
 		error = sfmmu_kpm_fault_small(vaddr, mseg, pp);
@@ -522,7 +575,6 @@ hat_kpm_walk(void (*func)(void *, void *, size_t), void *arg)
 	void	*base;
 	size_t	size;
 	struct memseg *msp;
-	extern uint_t vac_colors;
 
 	for (msp = memsegs; msp; msp = msp->next) {
 		pbase = msp->pages_base;

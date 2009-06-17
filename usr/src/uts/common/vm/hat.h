@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -248,6 +248,8 @@ pfn_t	hat_getkpfnum(caddr_t);
  */
 caddr_t	hat_kpm_mapin(struct page *, struct kpme *);
 void	hat_kpm_mapout(struct page *, struct kpme *, caddr_t);
+caddr_t hat_kpm_mapin_pfn(pfn_t);
+void    hat_kpm_mapout_pfn(pfn_t);
 caddr_t	hat_kpm_page2va(struct page *, int);
 struct page *hat_kpm_vaddr2page(caddr_t);
 int	hat_kpm_fault(struct hat *, caddr_t);

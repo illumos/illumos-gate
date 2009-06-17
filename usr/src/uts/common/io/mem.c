@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,18 +234,34 @@ extern void mach_sync_icache_pa(caddr_t, size_t);
 #pragma weak mach_sync_icache_pa
 
 static int
-mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
+mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio,
+    page_t *pp)
 {
 	int error = 0;
+	int devload = 0;
+	int is_memory = pf_is_memory(pfn);
 	size_t nbytes = MIN((size_t)(PAGESIZE - pageoff),
 	    (size_t)uio->uio_iov->iov_len);
+	caddr_t va = NULL;
 
 	mutex_enter(&mm_lock);
-	hat_devload(kas.a_hat, mm_map, PAGESIZE, pfn,
-	    (uint_t)(rw == UIO_READ ? PROT_READ : PROT_READ | PROT_WRITE),
-	    HAT_LOAD_NOCONSIST | HAT_LOAD_LOCK);
 
-	if (!pf_is_memory(pfn)) {
+	if (is_memory && kpm_enable) {
+		if (pp)
+			va = hat_kpm_mapin(pp, NULL);
+		else
+			va = hat_kpm_mapin_pfn(pfn);
+	}
+
+	if (va == NULL) {
+		hat_devload(kas.a_hat, mm_map, PAGESIZE, pfn,
+		    (uint_t)(rw == UIO_READ ? PROT_READ : PROT_READ|PROT_WRITE),
+		    HAT_LOAD_NOCONSIST|HAT_LOAD_LOCK);
+		va = mm_map;
+		devload = 1;
+	}
+
+	if (!is_memory) {
 		if (allowio) {
 			size_t c = uio->uio_iov->iov_len;
 
@@ -256,7 +272,7 @@ mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
 		} else
 			error = EIO;
 	} else {
-		error = uiomove(&mm_map[pageoff], nbytes, rw, uio);
+		error = uiomove(va + pageoff, nbytes, rw, uio);
 
 		/*
 		 * In case this has changed executable code,
@@ -267,7 +283,13 @@ mmio(struct uio *uio, enum uio_rw rw, pfn_t pfn, off_t pageoff, int allowio)
 		}
 	}
 
-	hat_unload(kas.a_hat, mm_map, PAGESIZE, HAT_UNLOAD_UNLOCK);
+	if (devload)
+		hat_unload(kas.a_hat, mm_map, PAGESIZE, HAT_UNLOAD_UNLOCK);
+	else if (pp)
+		hat_kpm_mapout(pp, NULL, va);
+	else
+		hat_kpm_mapout_pfn(pfn);
+
 	mutex_exit(&mm_lock);
 	return (error);
 }
@@ -330,13 +352,13 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw, cred_t *cred)
 
 			v = BTOP((u_offset_t)uio->uio_loffset);
 			error = mmio(uio, rw, v,
-			    uio->uio_loffset & PAGEOFFSET, 0);
+			    uio->uio_loffset & PAGEOFFSET, 0, NULL);
 			break;
 
 		case M_KMEM:
 		case M_ALLKMEM:
 			{
-			page_t **ppp;
+			page_t **ppp = NULL;
 			caddr_t vaddr = (caddr_t)uio->uio_offset;
 			int try_lock = NEED_LOCK_KVADDR(vaddr);
 			int locked = 0;
@@ -369,7 +391,8 @@ mmrw(dev_t dev, struct uio *uio, enum uio_rw rw, cred_t *cred)
 			}
 
 			error = mmio(uio, rw, v, uio->uio_loffset & PAGEOFFSET,
-			    minor == M_ALLKMEM || mm_kmem_io_access);
+			    minor == M_ALLKMEM || mm_kmem_io_access,
+			    (locked && ppp) ? *ppp : NULL);
 			if (locked)
 				as_pageunlock(&kas, ppp, vaddr, PAGESIZE,
 				    S_WRITE);

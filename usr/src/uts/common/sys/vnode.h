@@ -326,6 +326,12 @@ typedef struct vn_vfslocks_entry {
 	(pvn_vmodsort_supported != 0 && ((vp)->v_flag  & VMODSORT) != 0)
 
 #define	VISSWAPFS	0x20000	/* vnode is being used for swapfs */
+
+/*
+ * The mdb memstat command assumes that IS_SWAPFSVP only uses the
+ * vnode's v_flag field.  If this changes, cache the additional
+ * fields in mdb; see vn_get in mdb/common/modules/genunix/memory.c
+ */
 #define	IS_SWAPFSVP(vp)	(((vp)->v_flag & VISSWAPFS) != 0)
 
 #define	V_SYSATTR	0x40000	/* vnode is a GFS system attribute */

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel Physical Mapping (segkpm) hat interface routines for sun4v.
@@ -120,6 +118,38 @@ hat_kpm_mapout(struct page *pp, struct kpme *kpme, caddr_t vaddr)
 		return;
 	}
 #endif
+}
+
+/*
+ * hat_kpm_mapin_pfn is used to obtain a kpm mapping for physical
+ * memory addresses that are not described by a page_t.  It can
+ * also be used for normal pages that are not locked, but beware
+ * this is dangerous - no locking is performed, so the identity of
+ * the page could change.  hat_kpm_mapin_pfn is not supported when
+ * vac_colors > 1, because the chosen va depends on the page identity,
+ * which could change.
+ * The caller must only pass pfn's for valid physical addresses; violation
+ * of this rule will cause panic.
+ */
+caddr_t
+hat_kpm_mapin_pfn(pfn_t pfn)
+{
+	caddr_t paddr, vaddr;
+
+	if (kpm_enable == 0)
+		return ((caddr_t)NULL);
+
+	paddr = (caddr_t)ptob(pfn);
+	vaddr = (uintptr_t)kpm_vbase + paddr;
+
+	return ((caddr_t)vaddr);
+}
+
+/*ARGSUSED*/
+void
+hat_kpm_mapout_pfn(pfn_t pfn)
+{
+	/* empty */
 }
 
 /*

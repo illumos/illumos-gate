@@ -4833,6 +4833,8 @@ static const mdb_walker_t walkers[] = {
 	/* from memory.c */
 	{ "page", "walk all pages, or those from the specified vnode",
 		page_walk_init, page_walk_step, page_walk_fini },
+	{ "allpages", "walk all pages, including free pages",
+		allpages_walk_init, allpages_walk_step, allpages_walk_fini },
 	{ "memlist", "walk specified memlist",
 		NULL, memlist_walk_step, NULL },
 	{ "swapinfo", "walk swapinfo structures",

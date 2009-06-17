@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,9 +214,222 @@ page_walk_fini(mdb_walk_state_t *wsp)
 	mdb_free(wsp->walk_data, sizeof (page_walk_data_t));
 }
 
+/*
+ * allpages walks all pages in the system in order they appear in
+ * the memseg structure
+ */
+
+#define	PAGE_BUFFER	128
+
+int
+allpages_walk_init(mdb_walk_state_t *wsp)
+{
+	if (wsp->walk_addr != 0) {
+		mdb_warn("allpages only supports global walks.\n");
+		return (WALK_ERR);
+	}
+
+	if (mdb_layered_walk("memseg", wsp) == -1) {
+		mdb_warn("couldn't walk 'memseg'");
+		return (WALK_ERR);
+	}
+
+	wsp->walk_data = mdb_alloc(sizeof (page_t) * PAGE_BUFFER, UM_SLEEP);
+	return (WALK_NEXT);
+}
+
+int
+allpages_walk_step(mdb_walk_state_t *wsp)
+{
+	const struct memseg *msp = wsp->walk_layer;
+	page_t *buf = wsp->walk_data;
+	size_t pg_read, i;
+	size_t pg_num = msp->pages_end - msp->pages_base;
+	const page_t *pg_addr = msp->pages;
+
+	while (pg_num > 0) {
+		pg_read = MIN(pg_num, PAGE_BUFFER);
+
+		if (mdb_vread(buf, pg_read * sizeof (page_t),
+		    (uintptr_t)pg_addr) == -1) {
+			mdb_warn("can't read page_t's at %#lx", pg_addr);
+			return (WALK_ERR);
+		}
+		for (i = 0; i < pg_read; i++) {
+			int ret = wsp->walk_callback((uintptr_t)&pg_addr[i],
+			    &buf[i], wsp->walk_cbdata);
+
+			if (ret != WALK_NEXT)
+				return (ret);
+		}
+		pg_num -= pg_read;
+		pg_addr += pg_read;
+	}
+
+	return (WALK_NEXT);
+}
+
+void
+allpages_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (page_t) * PAGE_BUFFER);
+}
+
+/*
+ * Hash table + LRU queue.
+ * This table is used to cache recently read vnodes for the memstat
+ * command, to reduce the number of mdb_vread calls.  This greatly
+ * speeds the memstat command on on live, large CPU count systems.
+ */
+
+#define	VN_SMALL	401
+#define	VN_LARGE	10007
+#define	VN_HTABLE_KEY(p, hp)	((p) % ((hp)->vn_htable_buckets))
+
+struct vn_htable_list {
+	uint_t vn_flag;				/* v_flag from vnode	*/
+	uintptr_t vn_ptr;			/* pointer to vnode	*/
+	struct vn_htable_list *vn_q_next;	/* queue next pointer	*/
+	struct vn_htable_list *vn_q_prev;	/* queue prev pointer	*/
+	struct vn_htable_list *vn_h_next;	/* hash table pointer	*/
+};
+
+/*
+ * vn_q_first        -> points to to head of queue: the vnode that was most
+ *                      recently used
+ * vn_q_last         -> points to the oldest used vnode, and is freed once a new
+ *                      vnode is read.
+ * vn_htable         -> hash table
+ * vn_htable_buf     -> contains htable objects
+ * vn_htable_size    -> total number of items in the hash table
+ * vn_htable_buckets -> number of buckets in the hash table
+ */
+typedef struct vn_htable {
+	struct vn_htable_list  *vn_q_first;
+	struct vn_htable_list  *vn_q_last;
+	struct vn_htable_list **vn_htable;
+	struct vn_htable_list  *vn_htable_buf;
+	int vn_htable_size;
+	int vn_htable_buckets;
+} vn_htable_t;
+
+
+/* allocate memory, initilize hash table and LRU queue */
+static void
+vn_htable_init(vn_htable_t *hp, size_t vn_size)
+{
+	int i;
+	int htable_size = MAX(vn_size, VN_LARGE);
+
+	if ((hp->vn_htable_buf = mdb_zalloc(sizeof (struct vn_htable_list)
+	    * htable_size, UM_NOSLEEP|UM_GC)) == NULL) {
+		htable_size = VN_SMALL;
+		hp->vn_htable_buf = mdb_zalloc(sizeof (struct vn_htable_list)
+		    * htable_size, UM_SLEEP|UM_GC);
+	}
+
+	hp->vn_htable = mdb_zalloc(sizeof (struct vn_htable_list *)
+	    * htable_size, UM_SLEEP|UM_GC);
+
+	hp->vn_q_first  = &hp->vn_htable_buf[0];
+	hp->vn_q_last   = &hp->vn_htable_buf[htable_size - 1];
+	hp->vn_q_first->vn_q_next = &hp->vn_htable_buf[1];
+	hp->vn_q_last->vn_q_prev = &hp->vn_htable_buf[htable_size - 2];
+
+	for (i = 1; i < (htable_size-1); i++) {
+		hp->vn_htable_buf[i].vn_q_next = &hp->vn_htable_buf[i + 1];
+		hp->vn_htable_buf[i].vn_q_prev = &hp->vn_htable_buf[i - 1];
+	}
+
+	hp->vn_htable_size = htable_size;
+	hp->vn_htable_buckets = htable_size;
+}
+
+
+/*
+ * Find the vnode whose address is ptr, and return its v_flag in vp->v_flag.
+ * The function tries to find needed information in the following order:
+ *
+ * 1. check if ptr is the first in queue
+ * 2. check if ptr is in hash table (if so move it to the top of queue)
+ * 3. do mdb_vread, remove last queue item from queue and hash table.
+ *    Insert new information to freed object, and put this object in to the
+ *    top of the queue.
+ */
+static int
+vn_get(vn_htable_t *hp, struct vnode *vp, uintptr_t ptr)
+{
+	int hkey;
+	struct vn_htable_list *hent, **htmp, *q_next, *q_prev;
+	struct vn_htable_list  *q_first = hp->vn_q_first;
+
+	/* 1. vnode ptr is the first in queue, just get v_flag and return */
+	if (q_first->vn_ptr == ptr) {
+		vp->v_flag = q_first->vn_flag;
+
+		return (0);
+	}
+
+	/* 2. search the hash table for this ptr */
+	hkey = VN_HTABLE_KEY(ptr, hp);
+	hent = hp->vn_htable[hkey];
+	while (hent && (hent->vn_ptr != ptr))
+		hent = hent->vn_h_next;
+
+	/* 3. if hent is NULL, we did not find in hash table, do mdb_vread */
+	if (hent == NULL) {
+		struct vnode vn;
+
+		if (mdb_vread(&vn, sizeof (vnode_t), ptr) == -1) {
+			mdb_warn("unable to read vnode_t at %#lx", ptr);
+			return (-1);
+		}
+
+		/* we will insert read data into the last element in queue */
+		hent = hp->vn_q_last;
+
+		/* remove last hp->vn_q_last object from hash table */
+		if (hent->vn_ptr) {
+			htmp = &hp->vn_htable[VN_HTABLE_KEY(hent->vn_ptr, hp)];
+			while (*htmp != hent)
+				htmp = &(*htmp)->vn_h_next;
+			*htmp = hent->vn_h_next;
+		}
+
+		/* insert data into new free object */
+		hent->vn_ptr  = ptr;
+		hent->vn_flag = vn.v_flag;
+
+		/* insert new object into hash table */
+		hent->vn_h_next = hp->vn_htable[hkey];
+		hp->vn_htable[hkey] = hent;
+	}
+
+	/* Remove from queue. hent is not first, vn_q_prev is not NULL */
+	q_next = hent->vn_q_next;
+	q_prev = hent->vn_q_prev;
+	if (q_next == NULL)
+		hp->vn_q_last = q_prev;
+	else
+		q_next->vn_q_prev = q_prev;
+	q_prev->vn_q_next = q_next;
+
+	/* Add to the front of queue */
+	hent->vn_q_prev = NULL;
+	hent->vn_q_next = q_first;
+	q_first->vn_q_prev = hent;
+	hp->vn_q_first = hent;
+
+	/* Set v_flag in vnode pointer from hent */
+	vp->v_flag = hent->vn_flag;
+
+	return (0);
+}
+
 /* Summary statistics of pages */
 typedef struct memstat {
 	struct vnode    *ms_kvp;	/* Cached address of kernel vnode */
+	struct vnode    *ms_unused_vp;	/* Unused pages vnode pointer	  */
 	struct vnode    *ms_zvp;	/* Cached address of zio vnode    */
 	uint64_t	ms_kmem;	/* Pages of kernel memory	  */
 	uint64_t	ms_zfs_data;	/* Pages of zfs data		  */
@@ -225,6 +438,8 @@ typedef struct memstat {
 	uint64_t	ms_exec;	/* Pages of exec/library memory	  */
 	uint64_t	ms_cachelist;	/* Pages on the cachelist (free)  */
 	uint64_t	ms_total;	/* Pages on page hash		  */
+	vn_htable_t	*ms_vn_htable;	/* Pointer to hash table	  */
+	struct vnode	ms_vn;		/* vnode buffer			  */
 } memstat_t;
 
 #define	MS_PP_ISKAS(pp, stats)				\
@@ -234,36 +449,28 @@ typedef struct memstat {
 	(((stats)->ms_zvp != NULL) && ((pp)->p_vnode == (stats)->ms_zvp))
 
 /*
- * Summarize pages by type; called from page walker.
+ * Summarize pages by type and update stat information
  */
 
 /* ARGSUSED */
 static int
 memstat_callback(page_t *page, page_t *pp, memstat_t *stats)
 {
-	struct vnode vn, *vp;
-	uintptr_t ptr;
+	struct vnode *vp = &stats->ms_vn;
 
-	/* read page's vnode pointer */
-	if ((ptr = (uintptr_t)(pp->p_vnode)) != NULL) {
-		if (mdb_vread(&vn, sizeof (vnode_t), ptr) == -1) {
-			mdb_warn("unable to read vnode_t at %#lx",
-			    ptr);
-			return (WALK_ERR);
-		}
-		vp = &vn;
-	} else
-		vp = NULL;
-
-	if (PP_ISFREE(pp))
-		stats->ms_cachelist++;
-	else if (vp && IS_SWAPFSVP(vp))
-		stats->ms_anon++;
-	else if (MS_PP_ISZFS_DATA(pp, stats))
-		stats->ms_zfs_data++;
+	if (pp->p_vnode == NULL || pp->p_vnode == stats->ms_unused_vp)
+		return (WALK_NEXT);
 	else if (MS_PP_ISKAS(pp, stats))
 		stats->ms_kmem++;
-	else if (vp && (((vp)->v_flag & VVMEXEC)) != 0)
+	else if (MS_PP_ISZFS_DATA(pp, stats))
+		stats->ms_zfs_data++;
+	else if (PP_ISFREE(pp))
+		stats->ms_cachelist++;
+	else if (vn_get(stats->ms_vn_htable, vp, (uintptr_t)pp->p_vnode))
+		return (WALK_ERR);
+	else if (IS_SWAPFSVP(vp))
+		stats->ms_anon++;
+	else if ((vp->v_flag & VVMEXEC) != 0)
 		stats->ms_exec++;
 	else
 		stats->ms_vnode++;
@@ -281,18 +488,32 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	pgcnt_t total_pages, physmem;
 	ulong_t freemem;
 	memstat_t stats;
-	memstat_t unused_stats;
 	GElf_Sym sym;
+	vn_htable_t ht;
+	uintptr_t vn_size = 0;
 #if defined(__i386) || defined(__amd64)
 	bln_stats_t bln_stats;
 	ssize_t bln_size;
 #endif
 
 	bzero(&stats, sizeof (memstat_t));
-	bzero(&unused_stats, sizeof (memstat_t));
 
-	if (argc != 0 || (flags & DCMD_ADDRSPEC))
+	/*
+	 * -s size, is an internal option. It specifies the size of vn_htable.
+	 * Hash table size is set in the following order:
+	 * If user has specified the size that is larger than VN_LARGE: try it,
+	 * but if malloc failed default to VN_SMALL. Otherwise try VN_LARGE, if
+	 * failed to allocate default to VN_SMALL.
+	 * For a better efficiency of hash table it is highly recommended to
+	 * set size to a prime number.
+	 */
+	if ((flags & DCMD_ADDRSPEC) || mdb_getopts(argc, argv,
+	    's', MDB_OPT_UINTPTR, &vn_size, NULL) != argc)
 		return (DCMD_USAGE);
+
+	/* Initialize vnode hash list and queue */
+	vn_htable_init(&ht, vn_size);
+	stats.ms_vn_htable = &ht;
 
 	/* Grab base page size */
 	if (mdb_readvar(&pagesize, "_pagesize") == -1) {
@@ -332,36 +553,25 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		stats.ms_zvp = (struct vnode *)(uintptr_t)sym.st_value;
 	}
 
-	/* Walk page structures, summarizing usage */
-	if (mdb_walk("page", (mdb_walk_cb_t)memstat_callback,
-	    &stats) == -1) {
-		mdb_warn("can't walk pages");
-		return (DCMD_ERR);
-	}
-
-	/* read unused pages vnode */
+	/*
+	 * If physmem != total_pages, then the administrator has limited the
+	 * number of pages available in the system.  Excluded pages are
+	 * associated with the unused pages vnode.  Read this vnode so the
+	 * pages can be excluded in the page accounting.
+	 */
 	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "unused_pages_vp",
 	    (GElf_Sym *)&sym) == -1) {
 		mdb_warn("unable to read unused_pages_vp");
 		return (DCMD_ERR);
 	}
+	stats.ms_unused_vp = (struct vnode *)(uintptr_t)sym.st_value;
 
-	unused_stats.ms_kvp = (struct vnode *)(uintptr_t)sym.st_value;
-
-	/* Find unused pages */
-	if (mdb_walk("page", (mdb_walk_cb_t)memstat_callback,
-	    &unused_stats) == -1) {
-		mdb_warn("can't walk pages");
+	/* walk all pages, collect statistics */
+	if (mdb_walk("allpages", (mdb_walk_cb_t)memstat_callback,
+	    &stats) == -1) {
+		mdb_warn("can't walk memseg");
 		return (DCMD_ERR);
 	}
-
-	/*
-	 * If physmem != total_pages, then the administrator has limited the
-	 * number of pages available in the system.  In order to account for
-	 * this, we reduce the amount normally attributed to the page cache.
-	 */
-	stats.ms_vnode -= unused_stats.ms_kmem;
-	stats.ms_total -= unused_stats.ms_kmem;
 
 #define	MS_PCT_TOTAL(x)	((ulong_t)((((5 * total_pages) + ((x) * 1000ull))) / \
 		((physmem) * 10)))
