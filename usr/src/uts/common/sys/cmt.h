@@ -61,7 +61,6 @@ typedef struct pg_cmt {
 	pg_cmt_policy_t	cmt_policy;		/* Dispatcher policies to use */
 	uint32_t	cmt_utilization;	/* Group's utilization */
 	int		cmt_nchildren;		/* # of children CMT PGs */
-	int		cmt_hint;		/* hint for balancing */
 	struct group	cmt_cpus_actv;
 	struct bitset	cmt_cpus_actv_set;	/* bitset of active CPUs */
 } pg_cmt_t;

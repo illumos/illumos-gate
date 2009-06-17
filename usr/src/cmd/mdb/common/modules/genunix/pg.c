@@ -115,18 +115,18 @@ pg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
+	if (mdb_vread(&pg_class, sizeof (struct pg_class),
+	    (uintptr_t)pg.pg_class) == -1) {
+		mdb_warn("unable to read 'pg_class' at %p", pg.pg_class);
+		return (DCMD_ERR);
+	}
+
 	if (strcmp(pg_class.pgc_name, "cmt") == 0) {
 		if (mdb_vread(&pg_cmt, sizeof (pg_cmt_t), addr) == -1) {
 			mdb_warn("unable to read 'cmt pg' at %p", addr);
 			return (DCMD_ERR);
 		}
 		is_cmt = 1;
-	}
-
-	if (mdb_vread(&pg_class, sizeof (struct pg_class),
-	    (uintptr_t)pg.pg_class) == -1) {
-		mdb_warn("unable to read 'pg_class' at %p", pg.pg_class);
-		return (DCMD_ERR);
 	}
 
 	if (pg.pg_relation == PGR_PHYSICAL) {
