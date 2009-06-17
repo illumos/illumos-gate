@@ -105,6 +105,10 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlmisc, NULL
 };
 
+static void ibtl_kstat_init(ibtl_hca_devinfo_t *);
+static void ibtl_kstat_fini(ibtl_hca_devinfo_t *);
+static void ibtl_kstat_stats_create(ibtl_hca_devinfo_t *, uint_t);
+static void ibtl_kstat_pkeys_create(ibtl_hca_devinfo_t *, uint_t);
 
 /*
  * IBTF Loadable Module Routines.
@@ -615,6 +619,8 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 	hca_devp->hd_portinfo_locked_port = 0;
 	cv_init(&hca_devp->hd_portinfo_cv, NULL, CV_DEFAULT, NULL);
 
+	ibtl_kstat_init(hca_devp);
+
 	mutex_exit(&ibtl_clnt_list_mutex);
 
 	/*
@@ -801,6 +807,8 @@ ibc_detach(ibc_clnt_hdl_t hca_devp)
 
 	kmem_free(hca_devp->hd_portinfop, hca_devp->hd_portinfo_len);
 	mutex_exit(&ibtl_clnt_list_mutex);
+
+	ibtl_kstat_fini(hca_devp);
 
 	/* Free up the memory of per-client info struct */
 	kmem_free(hca_devp, sizeof (ibtl_hca_devinfo_t) +
@@ -1101,4 +1109,237 @@ ibt_check_failure(ibt_status_t status, uint64_t *reserved_p)
 	}
 	IBTF_DPRINTF_L3(ibtf, "ibt_check_failure: type = 0x%X", type);
 	return (type);
+}
+
+/*
+ * Initialize and create kstats.
+ *
+ * We create the following kstats on all ports of the HCA:
+ *	<hca_driver_name><instance_number>/port<port_num>/stats
+ *	<hca_driver_name><instance_number>/port<port_num>/pkeys
+ */
+static void
+ibtl_kstat_init(ibtl_hca_devinfo_t *hca_devp)
+{
+	uint_t			nports = hca_devp->hd_hca_attr->hca_nports;
+	ibtl_hca_port_kstat_t	*pks;
+	int			i;
+
+	IBTF_DPRINTF_L3(ibtf, "ibtl_kstat_init(hca_devp = 0x%p)", hca_devp);
+
+	hca_devp->hd_hca_port_ks_info_len =
+	    sizeof (ibtl_hca_port_kstat_t) * nports;
+	pks = kmem_zalloc(hca_devp->hd_hca_port_ks_info_len, KM_SLEEP);
+	hca_devp->hd_hca_port_ks_info = pks;
+
+	for (i = 0; i < nports; i++, pks++) {
+		pks->pks_hca_devp = hca_devp;
+		pks->pks_port_num = i + 1;
+		ibtl_kstat_stats_create(hca_devp, i + 1);
+		ibtl_kstat_pkeys_create(hca_devp, i + 1);
+	}
+}
+
+/*
+ * Delete kstats on all ports of the HCA.
+ */
+static void
+ibtl_kstat_fini(ibtl_hca_devinfo_t *hca_devp)
+{
+	ibtl_hca_port_kstat_t	*pks;
+	int			i;
+
+	IBTF_DPRINTF_L3(ibtf, "ibtl_kstat_fini(hca_devp = 0x%p)", hca_devp);
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*hca_devp))
+
+	pks = hca_devp->hd_hca_port_ks_info;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*pks))
+
+	if (pks == NULL)
+		return;
+
+	for (i = 0; i < hca_devp->hd_hca_attr->hca_nports; i++, pks++) {
+		if (pks->pks_stats_ksp)
+			kstat_delete(pks->pks_stats_ksp);
+
+		if (pks->pks_pkeys_ksp) {
+			ASSERT(!MUTEX_HELD(&ibtl_clnt_list_mutex));
+			kstat_delete(pks->pks_pkeys_ksp);
+		}
+	}
+
+	kmem_free(hca_devp->hd_hca_port_ks_info,
+	    hca_devp->hd_hca_port_ks_info_len);
+}
+
+/*
+ * Update "stats" kstat.
+ * Called by kstat framework.
+ */
+static int
+ibtl_kstat_stats_update(kstat_t *ksp, int rw)
+{
+	ibtl_hca_port_kstat_t	*pks;
+	ibtl_hca_devinfo_t	*hca_devp;
+	ibt_hca_portinfo_t	*p;
+	struct kstat_named	*data;
+
+	IBTF_DPRINTF_L4(ibtf, "ibtl_kstat_stats_update(ksp = 0x%p, rw = %d)",
+	    ksp, rw);
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	mutex_enter(&ibtl_clnt_list_mutex);
+
+	/*
+	 * Update the link_state kstat using the value from portinfo cache.
+	 */
+	pks = ksp->ks_private;
+	hca_devp = pks->pks_hca_devp;
+	data = (struct kstat_named *)(ksp->ks_data);
+	p = hca_devp->hd_portinfop + pks->pks_port_num - 1;
+	data[0].value.ui32 = (uint32_t)p->p_linkstate;
+
+	mutex_exit(&ibtl_clnt_list_mutex);
+
+	return (0);
+}
+
+/*
+ * Create "stats" kstat for the specified HCA port in the form:
+ *	<hca_driver_name><instance_number>/port<port_num>/stats
+ *	At preset it contains only one named data of "link_state"
+ */
+static void
+ibtl_kstat_stats_create(ibtl_hca_devinfo_t *hca_devp, uint_t port_num)
+{
+	struct kstat		*ksp;
+	struct kstat_named	*named_data;
+	char			*drv_name;
+	int			drv_instance;
+	ibtl_hca_port_kstat_t	*pks;
+	char			kname[40];
+
+	IBTF_DPRINTF_L3(ibtf, "ibtl_kstat_stats_create(hca_devp = 0x%p, "
+	    "port_num = 0x%u)", hca_devp, port_num);
+
+	drv_name = (char *)ddi_driver_name(hca_devp->hd_hca_dip);
+	drv_instance = ddi_get_instance(hca_devp->hd_hca_dip);
+	(void) snprintf(kname, sizeof (kname), "%s%d/port%d/stats",
+	    drv_name, drv_instance, port_num);
+
+	ksp = kstat_create("ibtf", 0, kname, "ib", KSTAT_TYPE_NAMED, 1, 0);
+	if (ksp == NULL) {
+		IBTF_DPRINTF_L2(ibtf,
+		    "ibtl_kstat_stats_create: kstat_create() failed");
+		return;
+	}
+
+	named_data = (struct kstat_named *)(ksp->ks_data);
+	kstat_named_init(&named_data[0], "link_state", KSTAT_DATA_UINT32);
+
+	pks = hca_devp->hd_hca_port_ks_info + port_num - 1;
+	pks->pks_stats_ksp = ksp;
+
+	ksp->ks_private = pks;
+	ksp->ks_update = ibtl_kstat_stats_update;
+
+	/* Install the kstat */
+	kstat_install(ksp);
+}
+
+/*
+ * Update "pkeys" kstat.
+ *
+ * Called by kstat framework. Since ks_lock was set to ibtl_clnt_list_mutex
+ * at the time of the kstat creation, kstat framework will hold this lock
+ * while calling this function.
+ */
+static int
+ibtl_kstat_pkeys_update(kstat_t *ksp, int rw)
+{
+	ibtl_hca_port_kstat_t	*pks;
+	ibtl_hca_devinfo_t	*hca_devp;
+	ibt_hca_portinfo_t	*p;
+
+	IBTF_DPRINTF_L4(ibtf, "ibtl_kstat_pkeys_update(ksp = 0x%p, rw = %d)",
+	    ksp, rw);
+
+#ifndef	__lock_lint
+	ASSERT(MUTEX_HELD(&ibtl_clnt_list_mutex));
+#endif
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*ksp))
+
+	pks = ksp->ks_private;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*pks))
+
+	hca_devp = pks->pks_hca_devp;
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*hca_devp))
+
+	/*
+	 * Point kstat data to the pkey table in the portinfo cache.
+	 */
+
+	p = hca_devp->hd_portinfop + pks->pks_port_num - 1;
+
+	ksp->ks_data = p->p_pkey_tbl;
+	ksp->ks_ndata = p->p_pkey_tbl_sz;
+	ksp->ks_data_size = p->p_pkey_tbl_sz * sizeof (ib_pkey_t);
+
+	return (0);
+}
+
+/*
+ * Create "pkeys" kstat for the specified HCA port in the form:
+ *	<hca_driver_name><instance_number>/port<port_num>/pkeys
+ *
+ * Currently kstat framework allows only some fixed data types as named
+ * data components under a named kstat. Due to this limitation it is not
+ * possible to add "pkeys" as a named data under the "stats" kstat.
+ */
+static void
+ibtl_kstat_pkeys_create(ibtl_hca_devinfo_t *hca_devp, uint_t port_num)
+{
+	struct kstat		*ksp;
+	char			*drv_name;
+	int			drv_instance;
+	char			kname[40];
+	ibtl_hca_port_kstat_t	*pks;
+
+	IBTF_DPRINTF_L3(ibtf, "ibtl_kstat_stats_create(hca_devp = 0x%p, "
+	    "port_num = 0x%u)", hca_devp, port_num);
+
+	drv_name = (char *)ddi_driver_name(hca_devp->hd_hca_dip);
+	drv_instance = ddi_get_instance(hca_devp->hd_hca_dip);
+	(void) snprintf(kname, sizeof (kname), "%s%d/port%d/pkeys",
+	    drv_name, drv_instance, port_num);
+
+	ksp = kstat_create("ibtf", 0, kname, "ib", KSTAT_TYPE_RAW, 0,
+	    KSTAT_FLAG_VAR_SIZE | KSTAT_FLAG_VIRTUAL);
+	if (ksp == NULL) {
+		IBTF_DPRINTF_L2(ibtf,
+		    "ibtl_kstat_pkeys_create: kstat_create() failed");
+		return;
+	}
+
+	pks = hca_devp->hd_hca_port_ks_info + port_num - 1;
+	pks->pks_pkeys_ksp = ksp;
+
+	ksp->ks_private = pks;
+	ksp->ks_update = ibtl_kstat_pkeys_update;
+	ksp->ks_lock = &ibtl_clnt_list_mutex;
+
+	/*
+	 * We just go with the default_kstat_snapshot().
+	 * So there is no need to set ks_snapshot field.
+	 */
+
+	/* Install the kstat */
+	kstat_install(ksp);
 }

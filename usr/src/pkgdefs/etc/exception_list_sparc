@@ -809,11 +809,6 @@ usr/lib/sparcv9/libcmdutils.so		sparc
 #
 usr/include/aclutils.h			sparc
 #
-# User<->kernel interface used by cfgadm/IB only
-#
-usr/include/sys/ib/ibnex		sparc
-usr/include/sys/ib/ibnex/ibnex_devctl.h	sparc
-#
 # Entries for the SCM IFD Handler which are used only to build
 # the SCM IFD Handler and are not delivered to customers.
 #

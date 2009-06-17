@@ -471,6 +471,30 @@ typedef struct hermon_ks_mask_s {
 } hermon_ks_mask_t;
 
 /*
+ * Index into the named data components of 64 bit "perf_counters" kstat.
+ */
+enum {
+	HERMON_PERFCNTR64_ENABLE_IDX = 0,
+	HERMON_PERFCNTR64_XMIT_DATA_IDX,
+	HERMON_PERFCNTR64_RECV_DATA_IDX,
+	HERMON_PERFCNTR64_XMIT_PKTS_IDX,
+	HERMON_PERFCNTR64_RECV_PKTS_IDX,
+	HERMON_PERFCNTR64_NUM_COUNTERS
+};
+
+/*
+ * Data associated with the 64 bit "perf_counters" kstat. One for each port.
+ */
+typedef struct hermon_perfcntr64_ks_info_s {
+	struct kstat	*hki64_ksp;
+	int		hki64_enabled;
+	uint64_t	hki64_counters[HERMON_PERFCNTR64_NUM_COUNTERS];
+	uint32_t	hki64_last_read[HERMON_PERFCNTR64_NUM_COUNTERS];
+	uint_t		hki64_port_num;
+	hermon_state_t	*hki64_state;
+} hermon_perfcntr64_ks_info_t;
+
+/*
  * The hermon_ks_info_t structure stores all the information necessary for
  * tracking the resources associated with each of the various kstats.  In
  * addition to containing pointers to each of the counter and pic kstats,
@@ -485,7 +509,16 @@ typedef struct hermon_ks_info_s {
 	uint64_t	hki_pic0;
 	uint64_t	hki_pic1;
 	hermon_ks_mask_t	hki_ib_perfcnt[HERMON_CNTR_NUMENTRIES];
+	kt_did_t	hki_perfcntr64_thread_id;
+	kmutex_t	hki_perfcntr64_lock;
+	kcondvar_t	hki_perfcntr64_cv;
+	uint_t		hki_perfcntr64_flags;	/* see below */
+	hermon_perfcntr64_ks_info_t	hki_perfcntr64[HERMON_MAX_PORTS];
 } hermon_ks_info_t;
+
+/* hki_perfcntr64_flags */
+#define	HERMON_PERFCNTR64_THREAD_CREATED	0x0001
+#define	HERMON_PERFCNTR64_THREAD_EXIT		0x0002
 
 /*
  * The hermon_ports_ioctl32_t, hermon_loopback_ioctl32_t, and

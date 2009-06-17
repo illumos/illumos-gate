@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,6 +225,27 @@ ibt_status_t	ibtl_ibnex_phci_register(dev_info_t *hca_dip);
  * 	MPxIO PCHI.
  */
 ibt_status_t	ibtl_ibnex_phci_unregister(dev_info_t *hca_dip);
+
+/*
+ * Function:
+ *	ibtl_ibnex_query_hca_byguid
+ * Input:
+ *	hca_guid	- The HCA's node GUID.
+ *	driver_name_size- size of the caller allocated driver_name buffer
+ * Output:
+ *	hca_attrs	- caller allocated buffer which will contain
+ *			  HCA attributes upon success
+ *	driver_name	- caller allocated buffer which will contain
+ *			  HCA driver name upon success
+ *	driver_instance - HCA driver instance
+ * Returns:
+ *	IBT_SUCCESS/IBT_FAILURE
+ * Description:
+ *	Get the HCA attributes, driver name and instance number of the
+ *	specified HCA.
+ */
+ibt_status_t
+ibtl_ibnex_query_hca_byguid(ib_guid_t, ibt_hca_attr_t *, char *, size_t, int *);
 
 #ifdef __cplusplus
 }

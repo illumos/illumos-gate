@@ -137,6 +137,7 @@ root	hermon_rsrc_srqhdl_destructor
 
 ### Hermon kstat callback
 root	hermon_kstat_cntr_update
+root	hermon_kstat_perfcntr64_update
 
 ### Hermon userland mapping callbacks and functions
 root	hermon_umap_umemlock_cb

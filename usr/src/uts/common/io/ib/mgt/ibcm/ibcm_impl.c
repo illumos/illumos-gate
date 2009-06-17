@@ -987,14 +987,8 @@ ibcm_hca_detach(ibcm_hca_info_t *hcap)
 	IBTF_DPRINTF_L3(cmlog, "ibcm_hca_detach:hca_guid = 0x%llX res_cnt = %d",
 	    hcap->hca_guid, hcap->hca_res_cnt);
 
-	/* wait on response CV */
-	absolute_time = ddi_get_lbolt() +
-	    drv_usectohz(ibcm_wait_for_res_cnt_timeout);
-
 	while (hcap->hca_res_cnt > 0)
-		if (cv_timedwait(&ibcm_global_hca_cv, &ibcm_global_hca_lock,
-		    absolute_time) == -1)
-			break;
+		cv_wait(&ibcm_global_hca_cv, &ibcm_global_hca_lock);
 
 	if (hcap->hca_res_cnt != 0) {
 		/* We got a timeout waiting for hca_res_cnt to become 0 */

@@ -47,6 +47,12 @@ static kstat_t *hermon_kstat_cntr_create(hermon_state_t *state, int num_pic,
     int (*update)(kstat_t *, int));
 static int hermon_kstat_cntr_update(kstat_t *ksp, int rw);
 
+void hermon_kstat_perfcntr64_create(hermon_state_t *state, uint_t port_num);
+static int hermon_kstat_perfcntr64_read(hermon_state_t *state, uint_t port,
+    int reset);
+static void hermon_kstat_perfcntr64_thread_exit(hermon_ks_info_t *ksi);
+static int hermon_kstat_perfcntr64_update(kstat_t *ksp, int rw);
+
 /*
  * Hermon IB Performance Events structure
  *    This structure is read-only and is used to setup the individual kstats
@@ -72,6 +78,19 @@ hermon_ks_mask_t hermon_ib_perfcnt_list[HERMON_CNTR_NUMENTRIES] = {
 	{"clear_pic", 0, 0}
 };
 
+/*
+ * Return the maximum of (x) and (y)
+ */
+#define	MAX(x, y)	(((x) > (y)) ? (x) : (y))
+
+/*
+ * Set (x) to the maximum of (x) and (y)
+ */
+#define	SET_TO_MAX(x, y)	\
+{				\
+	if ((x) < (y))		\
+		(x) = (y);	\
+}
 
 /*
  * hermon_kstat_init()
@@ -93,14 +112,20 @@ hermon_kstat_init(hermon_state_t *state)
 	state->hs_ks_info = ksi;
 
 	/*
-	 * Create as many "pic" kstats as we have IB ports.  Enable all
-	 * of the events specified in the "hermon_ib_perfcnt_list" structure.
+	 * Create as many "pic" and perfcntr64 kstats as we have IB ports.
+	 * Enable all of the events specified in the "hermon_ib_perfcnt_list"
+	 * structure.
 	 */
 	numports = state->hs_cfg_profile->cp_num_ports;
 	for (i = 0; i < numports; i++) {
 		ksi->hki_picN_ksp[i] = hermon_kstat_picN_create(state, i,
 		    HERMON_CNTR_NUMENTRIES, hermon_ib_perfcnt_list);
 		if (ksi->hki_picN_ksp[i] == NULL) {
+			goto kstat_init_fail;
+		}
+
+		hermon_kstat_perfcntr64_create(state, i + 1);
+		if (ksi->hki_perfcntr64[i].hki64_ksp == NULL) {
 			goto kstat_init_fail;
 		}
 	}
@@ -125,6 +150,9 @@ hermon_kstat_init(hermon_state_t *state)
 		ksi->hki_ib_perfcnt[i] = hermon_ib_perfcnt_list[i];
 	}
 
+	mutex_init(&ksi->hki_perfcntr64_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&ksi->hki_perfcntr64_cv, NULL, CV_DRIVER, NULL);
+
 	return (DDI_SUCCESS);
 
 
@@ -137,6 +165,9 @@ kstat_init_fail:
 	for (i = 0; i < numports; i++) {
 		if (ksi->hki_picN_ksp[i] != NULL) {
 			kstat_delete(ksi->hki_picN_ksp[i]);
+		}
+		if (ksi->hki_perfcntr64[i].hki64_ksp != NULL) {
+			kstat_delete(ksi->hki_perfcntr64[i].hki64_ksp);
 		}
 	}
 
@@ -154,23 +185,38 @@ kstat_init_fail:
 void
 hermon_kstat_fini(hermon_state_t *state)
 {
-	hermon_ks_info_t		*ksi;
+	hermon_ks_info_t	*ksi;
 	uint_t			numports;
 	int			i;
 
 	/* Get pointer to kstat info */
 	ksi = state->hs_ks_info;
 
-	/* Delete all the "pic" kstats (one per port) */
+	/*
+	 * Signal the perfcntr64_update_thread to exit and wait until the
+	 * thread exits.
+	 */
+	mutex_enter(&ksi->hki_perfcntr64_lock);
+	hermon_kstat_perfcntr64_thread_exit(ksi);
+	mutex_exit(&ksi->hki_perfcntr64_lock);
+
+	/* Delete all the "pic" and perfcntr64 kstats (one per port) */
 	numports = state->hs_cfg_profile->cp_num_ports;
 	for (i = 0; i < numports; i++) {
 		if (ksi->hki_picN_ksp[i] != NULL) {
 			kstat_delete(ksi->hki_picN_ksp[i]);
 		}
+
+		if (ksi->hki_perfcntr64[i].hki64_ksp != NULL) {
+			kstat_delete(ksi->hki_perfcntr64[i].hki64_ksp);
+		}
 	}
 
 	/* Delete the "counter" kstats (one per port) */
 	kstat_delete(ksi->hki_cntr_ksp);
+
+	cv_destroy(&ksi->hki_perfcntr64_cv);
+	mutex_destroy(&ksi->hki_perfcntr64_lock);
 
 	/* Free the kstat info structure */
 	kmem_free(ksi, sizeof (hermon_ks_info_t));
@@ -355,7 +401,7 @@ hermon_kstat_cntr_update(kstat_t *ksp, int rw)
 		oldval = ib_perf[indx].ks_old_pic0;
 
 		status = hermon_getperfcntr_cmd_post(state, 1,
-		    HERMON_CMD_NOSLEEP_SPIN, &sm_perfcntr);
+		    HERMON_CMD_NOSLEEP_SPIN, &sm_perfcntr, 0);
 		if (status != HERMON_CMD_SUCCESS) {
 			return (-1);
 		}
@@ -431,7 +477,7 @@ hermon_kstat_cntr_update(kstat_t *ksp, int rw)
 			oldval = ib_perf[indx].ks_old_pic1;
 
 			status = hermon_getperfcntr_cmd_post(state, 2,
-			    HERMON_CMD_NOSLEEP_SPIN, &sm_perfcntr);
+			    HERMON_CMD_NOSLEEP_SPIN, &sm_perfcntr, 0);
 			if (status != HERMON_CMD_SUCCESS) {
 				return (-1);
 			}
@@ -500,4 +546,351 @@ hermon_kstat_cntr_update(kstat_t *ksp, int rw)
 
 		return (0);
 	}
+}
+
+/*
+ * 64 bit kstats for performance counters:
+ *
+ * Since the hardware as of now does not support 64 bit performance counters,
+ * we maintain 64 bit performance counters in software using the 32 bit
+ * hardware counters.
+ *
+ * We create a thread that, every one second, reads the values of 32 bit
+ * hardware counters and adds them to the 64 bit software counters. Immediately
+ * after reading, it resets the 32 bit hardware counters to zero (so that they
+ * start counting from zero again). At any time the current value of a counter
+ * is going to be the sum of the 64 bit software counter and the 32 bit
+ * hardware counter.
+ *
+ * Since this work need not be done if there is no consumer, by default
+ * we do not maintain 64 bit software counters. To enable this the consumer
+ * needs to write a non-zero value to the "enable" component of the of
+ * perf_counters kstat. Writing zero to this component will disable this work.
+ *
+ * If performance monitor is enabled in subnet manager, the SM could
+ * periodically reset the hardware counters by sending perf-MADs. So only
+ * one of either our software 64 bit counters or the SM performance monitor
+ * could be enabled at the same time. However, if both of them are enabled at
+ * the same time we still do our best by keeping track of the values of the
+ * last read 32 bit hardware counters. If the current read of a 32 bit hardware
+ * counter is less than the last read of the counter, we ignore the current
+ * value and go with the last read value.
+ */
+
+/*
+ * hermon_kstat_perfcntr64_create()
+ *    Context: Only called from attach() path context
+ *
+ * Create "port#/perf_counters" kstat for the specified port number.
+ */
+void
+hermon_kstat_perfcntr64_create(hermon_state_t *state, uint_t port_num)
+{
+	hermon_ks_info_t	*ksi = state->hs_ks_info;
+	struct kstat		*cntr_ksp;
+	struct kstat_named	*cntr_named_data;
+	int			drv_instance;
+	char			*drv_name;
+	char			kname[32];
+
+	ASSERT(port_num != 0);
+
+	drv_name = (char *)ddi_driver_name(state->hs_dip);
+	drv_instance = ddi_get_instance(state->hs_dip);
+	(void) snprintf(kname, sizeof (kname), "port%u/perf_counters",
+	    port_num);
+	cntr_ksp = kstat_create(drv_name, drv_instance, kname, "ib",
+	    KSTAT_TYPE_NAMED, HERMON_PERFCNTR64_NUM_COUNTERS,
+	    KSTAT_FLAG_WRITABLE);
+	if (cntr_ksp == NULL) {
+		return;
+	}
+	cntr_named_data = (struct kstat_named *)(cntr_ksp->ks_data);
+
+	kstat_named_init(&cntr_named_data[HERMON_PERFCNTR64_ENABLE_IDX],
+	    "enable", KSTAT_DATA_UINT32);
+	kstat_named_init(&cntr_named_data[HERMON_PERFCNTR64_XMIT_DATA_IDX],
+	    "xmit_data", KSTAT_DATA_UINT64);
+	kstat_named_init(&cntr_named_data[HERMON_PERFCNTR64_RECV_DATA_IDX],
+	    "recv_data", KSTAT_DATA_UINT64);
+	kstat_named_init(&cntr_named_data[HERMON_PERFCNTR64_XMIT_PKTS_IDX],
+	    "xmit_pkts", KSTAT_DATA_UINT64);
+	kstat_named_init(&cntr_named_data[HERMON_PERFCNTR64_RECV_PKTS_IDX],
+	    "recv_pkts", KSTAT_DATA_UINT64);
+
+	ksi->hki_perfcntr64[port_num - 1].hki64_ksp = cntr_ksp;
+	ksi->hki_perfcntr64[port_num - 1].hki64_port_num = port_num;
+	ksi->hki_perfcntr64[port_num - 1].hki64_state = state;
+
+	cntr_ksp->ks_private = &ksi->hki_perfcntr64[port_num - 1];
+	cntr_ksp->ks_update  = hermon_kstat_perfcntr64_update;
+
+	/* Install the kstat */
+	kstat_install(cntr_ksp);
+}
+
+/*
+ * hermon_kstat_perfcntr64_read()
+ *
+ * Read the values of 32 bit hardware counters.
+ *
+ * If reset is true, reset the 32 bit hardware counters. Add the values of the
+ * 32 bit hardware counters to the 64 bit software counters.
+ *
+ * If reset is false, just save the values read from the 32 bit hardware
+ * counters in hki64_last_read[].
+ *
+ * See the general comment on the 64 bit performance counters
+ * regarding the use of last read 32 bit hardware counter values.
+ */
+static int
+hermon_kstat_perfcntr64_read(hermon_state_t *state, uint_t port, int reset)
+{
+	hermon_ks_info_t	*ksi = state->hs_ks_info;
+	hermon_perfcntr64_ks_info_t *ksi64 = &ksi->hki_perfcntr64[port - 1];
+	int			status, i;
+	uint32_t		tmp;
+	hermon_hw_sm_perfcntr_t	sm_perfcntr;
+
+	ASSERT(MUTEX_HELD(&ksi->hki_perfcntr64_lock));
+	ASSERT(port != 0);
+
+	/* read the 32 bit hardware counters */
+	status = hermon_getperfcntr_cmd_post(state, port,
+	    HERMON_CMD_NOSLEEP_SPIN, &sm_perfcntr, 0);
+	if (status != HERMON_CMD_SUCCESS) {
+		return (status);
+	}
+
+	if (reset) {
+		/* reset the hardware counters */
+		status = hermon_getperfcntr_cmd_post(state, port,
+		    HERMON_CMD_NOSLEEP_SPIN, NULL, 1);
+		if (status != HERMON_CMD_SUCCESS) {
+			return (status);
+		}
+
+		/*
+		 * Update 64 bit software counters
+		 */
+		tmp = MAX(sm_perfcntr.portxmdata,
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_XMIT_DATA_IDX]);
+		ksi64->hki64_counters[HERMON_PERFCNTR64_XMIT_DATA_IDX] += tmp;
+
+		tmp = MAX(sm_perfcntr.portrcdata,
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_RECV_DATA_IDX]);
+		ksi64->hki64_counters[HERMON_PERFCNTR64_RECV_DATA_IDX] += tmp;
+
+		tmp = MAX(sm_perfcntr.portxmpkts,
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_XMIT_PKTS_IDX]);
+		ksi64->hki64_counters[HERMON_PERFCNTR64_XMIT_PKTS_IDX] += tmp;
+
+		tmp = MAX(sm_perfcntr.portrcpkts,
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_RECV_PKTS_IDX]);
+		ksi64->hki64_counters[HERMON_PERFCNTR64_RECV_PKTS_IDX] += tmp;
+
+		for (i = 0; i < HERMON_PERFCNTR64_NUM_COUNTERS; i++)
+			ksi64->hki64_last_read[i] = 0;
+
+	} else {
+		/*
+		 * Update ksi64->hki64_last_read[]
+		 */
+		SET_TO_MAX(
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_XMIT_DATA_IDX],
+		    sm_perfcntr.portxmdata);
+
+		SET_TO_MAX(
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_RECV_DATA_IDX],
+		    sm_perfcntr.portrcdata);
+
+		SET_TO_MAX(
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_XMIT_PKTS_IDX],
+		    sm_perfcntr.portxmpkts);
+
+		SET_TO_MAX(
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_RECV_PKTS_IDX],
+		    sm_perfcntr.portrcpkts);
+	}
+
+	return (HERMON_CMD_SUCCESS);
+}
+
+/*
+ * hermon_kstat_perfcntr64_update_thread()
+ *    Context: Entry point for a kernel thread
+ *
+ * Maintain 64 bit performance counters in software using the 32 bit
+ * hardware counters.
+ */
+static void
+hermon_kstat_perfcntr64_update_thread(void *arg)
+{
+	hermon_state_t		*state = (hermon_state_t *)arg;
+	hermon_ks_info_t	*ksi = state->hs_ks_info;
+	uint_t			i;
+
+	mutex_enter(&ksi->hki_perfcntr64_lock);
+	/*
+	 * Every one second update the values 64 bit software counters
+	 * for all ports. Exit if HERMON_PERFCNTR64_THREAD_EXIT flag is set.
+	 */
+	while (!(ksi->hki_perfcntr64_flags & HERMON_PERFCNTR64_THREAD_EXIT)) {
+		for (i = 0; i < state->hs_cfg_profile->cp_num_ports; i++) {
+			if (ksi->hki_perfcntr64[i].hki64_enabled) {
+				(void) hermon_kstat_perfcntr64_read(state,
+				    i + 1, 1);
+			}
+		}
+		/* sleep for a second */
+		(void) cv_timedwait(&ksi->hki_perfcntr64_cv,
+		    &ksi->hki_perfcntr64_lock,
+		    ddi_get_lbolt() + drv_usectohz(1000000));
+	}
+	ksi->hki_perfcntr64_flags = 0;
+	mutex_exit(&ksi->hki_perfcntr64_lock);
+}
+
+/*
+ * hermon_kstat_perfcntr64_thread_create()
+ *    Context: Called from the kstat context
+ *
+ * Create a thread that maintains 64 bit performance counters in software.
+ */
+static void
+hermon_kstat_perfcntr64_thread_create(hermon_state_t *state)
+{
+	hermon_ks_info_t	*ksi = state->hs_ks_info;
+	kthread_t		*thr;
+
+	ASSERT(MUTEX_HELD(&ksi->hki_perfcntr64_lock));
+
+	/*
+	 * One thread per hermon instance. Don't create a thread if already
+	 * created.
+	 */
+	if (!(ksi->hki_perfcntr64_flags & HERMON_PERFCNTR64_THREAD_CREATED)) {
+		thr = thread_create(NULL, 0,
+		    hermon_kstat_perfcntr64_update_thread,
+		    state, 0, &p0, TS_RUN, minclsyspri);
+		ksi->hki_perfcntr64_thread_id = thr->t_did;
+		ksi->hki_perfcntr64_flags |= HERMON_PERFCNTR64_THREAD_CREATED;
+	}
+}
+
+/*
+ * hermon_kstat_perfcntr64_thread_exit()
+ *    Context: Called from attach, detach or kstat context
+ */
+static void
+hermon_kstat_perfcntr64_thread_exit(hermon_ks_info_t *ksi)
+{
+	kt_did_t	tid;
+
+	ASSERT(MUTEX_HELD(&ksi->hki_perfcntr64_lock));
+
+	if (ksi->hki_perfcntr64_flags & HERMON_PERFCNTR64_THREAD_CREATED) {
+		/*
+		 * Signal the thread to exit and wait until the thread exits.
+		 */
+		ksi->hki_perfcntr64_flags |= HERMON_PERFCNTR64_THREAD_EXIT;
+		tid = ksi->hki_perfcntr64_thread_id;
+		cv_signal(&ksi->hki_perfcntr64_cv);
+
+		mutex_exit(&ksi->hki_perfcntr64_lock);
+		thread_join(tid);
+		mutex_enter(&ksi->hki_perfcntr64_lock);
+	}
+}
+
+/*
+ * hermon_kstat_perfcntr64_update()
+ *    Context: Called from the kstat context
+ *
+ * See the general comment on 64 bit kstats for performance counters:
+ */
+static int
+hermon_kstat_perfcntr64_update(kstat_t *ksp, int rw)
+{
+	hermon_state_t			*state;
+	struct kstat_named		*data;
+	hermon_ks_info_t		*ksi;
+	hermon_perfcntr64_ks_info_t	*ksi64;
+	int				i, thr_exit;
+
+	ksi64	= ksp->ks_private;
+	state	= ksi64->hki64_state;
+	ksi	= state->hs_ks_info;
+	data	= (struct kstat_named *)(ksp->ks_data);
+
+	mutex_enter(&ksi->hki_perfcntr64_lock);
+
+	/*
+	 * 64 bit performance counters maintained by the software is not
+	 * enabled by default. Enable them upon a writing a non-zero value
+	 * to "enable" kstat. Disable them upon a writing zero to the
+	 * "enable" kstat.
+	 */
+	if (rw == KSTAT_WRITE) {
+		if (data[HERMON_PERFCNTR64_ENABLE_IDX].value.ui32) {
+			if (ksi64->hki64_enabled == 0) {
+				/* Enable 64 bit software counters */
+				ksi64->hki64_enabled = 1;
+				for (i = 0;
+				    i < HERMON_PERFCNTR64_NUM_COUNTERS; i++) {
+					ksi64->hki64_counters[i] = 0;
+					ksi64->hki64_last_read[i] = 0;
+				}
+				hermon_kstat_perfcntr64_thread_create(state);
+			}
+
+		} else if (ksi64->hki64_enabled) {
+			/* Disable 64 bit software counters */
+			ksi64->hki64_enabled = 0;
+			thr_exit = 1;
+			for (i = 0; i < state->hs_cfg_profile->cp_num_ports;
+			    i++) {
+				if (ksi->hki_perfcntr64[i].hki64_enabled) {
+					thr_exit = 0;
+					break;
+				}
+			}
+			if (thr_exit)
+				hermon_kstat_perfcntr64_thread_exit(ksi);
+		}
+	} else if (ksi64->hki64_enabled) {
+		/*
+		 * Read the counters and update kstats.
+		 */
+		if (hermon_kstat_perfcntr64_read(state, ksi64->hki64_port_num,
+		    0) != HERMON_CMD_SUCCESS) {
+			mutex_exit(&ksi->hki_perfcntr64_lock);
+			return (EIO);
+		}
+
+		data[HERMON_PERFCNTR64_XMIT_DATA_IDX].value.ui64 =
+		    ksi64->hki64_counters[HERMON_PERFCNTR64_XMIT_DATA_IDX] +
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_XMIT_DATA_IDX];
+
+		data[HERMON_PERFCNTR64_RECV_DATA_IDX].value.ui64 =
+		    ksi64->hki64_counters[HERMON_PERFCNTR64_RECV_DATA_IDX] +
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_RECV_DATA_IDX];
+
+		data[HERMON_PERFCNTR64_XMIT_PKTS_IDX].value.ui64 =
+		    ksi64->hki64_counters[HERMON_PERFCNTR64_XMIT_PKTS_IDX] +
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_XMIT_PKTS_IDX];
+
+		data[HERMON_PERFCNTR64_RECV_PKTS_IDX].value.ui64 =
+		    ksi64->hki64_counters[HERMON_PERFCNTR64_RECV_PKTS_IDX] +
+		    ksi64->hki64_last_read[HERMON_PERFCNTR64_RECV_PKTS_IDX];
+
+	} else {
+		/* return 0 in kstats if not enabled */
+		data[HERMON_PERFCNTR64_ENABLE_IDX].value.ui32 = 0;
+		for (i = 1; i < HERMON_PERFCNTR64_NUM_COUNTERS; i++)
+			data[i].value.ui64 = 0;
+	}
+
+	mutex_exit(&ksi->hki_perfcntr64_lock);
+	return (0);
 }

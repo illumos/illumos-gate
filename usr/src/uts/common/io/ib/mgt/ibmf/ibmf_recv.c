@@ -349,6 +349,24 @@ ibmf_i_handle_recv_completion(ibmf_ci_t *cip, ibt_wc_t *wcp)
 
 		ibmf_mod_load_args_t	*modlargsp;
 
+		/*
+		 * HCA driver handles the Performance management
+		 * class MAD's. It registers with the IBMF during early
+		 * boot and unregisters during detach and during
+		 * HCA unconfigure operation. We come here
+		 * 1. Before HCA registers with IBMF
+		 * 	Drop the MAD. Since this is a UD MAD,
+		 *	sender will resend the request
+		 * 2. After HCA unregistered with IBMF during DR operation.
+		 *	Since HCA is going away, we can safely drop the PMA
+		 *	MAD's here.
+		 * Solaris does not support BM_AGENT and so drop the BM MAD's
+		 */
+		if ((class == PERF_AGENT) || (class == BM_AGENT)) {
+			(void) ibmf_i_repost_recv_buffer(cip, recv_wqep);
+			return;
+		}
+
 		recv_wqep->recv_wc = *wcp; /* struct copy */
 
 		IBMF_TRACE_3(IBMF_TNF_NODEBUG, DPRINT_L4,

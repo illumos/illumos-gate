@@ -34,11 +34,15 @@
 #include <sys/ib/ibnex/ibnex.h>
 #include <sys/ib/ibnex/ibnex_devctl.h>
 #include <sys/ib/ibtl/impl/ibtl_ibnex.h>
+#include <sys/ib/ibtl/impl/ibtl.h>
 #include <sys/file.h>
 #include <sys/sunndi.h>
 #include <sys/fs/dv_node.h>
 #include <sys/mdi_impldefs.h>
 #include <sys/sunmdi.h>
+
+/* return the minimum value of (x) and (y) */
+#define	MIN(x, y)	((x) < (y) ? (x) : (y))
 
 /*
  * function prototypes
@@ -74,6 +78,17 @@ static int		ibnex_hcasvc_conf_entry_delete(char *, char *);
 static ibnex_rval_t	ibnex_ioc_fininode(dev_info_t *, ibnex_ioc_node_t *);
 static ibnex_rval_t	ibnex_commsvc_fininode(dev_info_t *);
 static ibnex_rval_t	ibnex_pseudo_fininode(dev_info_t *);
+
+static int		ibnex_devctl(dev_t, int, intptr_t, int,
+			    cred_t *, int *);
+static int		ibnex_ctl_get_api_ver(dev_t, int, intptr_t, int,
+			    cred_t *, int *);
+static int		ibnex_ctl_get_hca_list(dev_t, int, intptr_t, int,
+			    cred_t *, int *);
+static int		ibnex_ctl_query_hca(dev_t, int, intptr_t, int,
+			    cred_t *, int *);
+static int		ibnex_ctl_query_hca_port(dev_t, int, intptr_t, int,
+			    cred_t *, int *);
 
 extern uint64_t		ibnex_str2hex(char *, int, int *);
 extern int		ibnex_ioc_initnode_all_pi(ibdm_ioc_info_t *);
@@ -112,6 +127,42 @@ ibnex_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	return (0);
 }
 
+int
+ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
+{
+	/*
+	 * For all generic devctl ioctls (such as DEVCTL_AP_CONFIGURE),
+	 * call ibnex_devctl().
+	 */
+	if (IS_DEVCTL(cmd))
+		return (ibnex_devctl(dev, cmd, arg, mode, credp, rvalp));
+
+	/*
+	 * The rest are ibnex specific ioctls.
+	 */
+
+	switch (cmd) {
+	case IBNEX_CTL_GET_API_VER:
+		return (ibnex_ctl_get_api_ver(dev, cmd, arg, mode,
+		    credp, rvalp));
+
+	case IBNEX_CTL_GET_HCA_LIST:
+		return (ibnex_ctl_get_hca_list(dev, cmd, arg, mode,
+		    credp, rvalp));
+
+	case IBNEX_CTL_QUERY_HCA:
+		return (ibnex_ctl_query_hca(dev, cmd, arg, mode,
+		    credp, rvalp));
+
+	case IBNEX_CTL_QUERY_HCA_PORT:
+		return (ibnex_ctl_query_hca_port(dev, cmd, arg, mode,
+		    credp, rvalp));
+
+	default:
+		return (EINVAL);
+	}
+}
 
 /*
  * ibnex_ioctl()
@@ -138,8 +189,8 @@ ibnex_close(dev_t dev, int flag, int otyp, cred_t *credp)
  *	DEVCTL_AP_UNCONFIGURE:	"unconfigure" the attachment point
  */
 /* ARGSUSED */
-int
-ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+static int
+ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
 {
 	int			ret, rv = 0, ioc_reprobe_pending = 0;
@@ -164,21 +215,21 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	ibnex_node_data_t	*nodep, *scanp;
 	struct devctl_iocdata	*dcp = NULL;
 
-	IBTF_DPRINTF_L4("ibnex", "\tioctl: cmd=%x, arg=%p, mode=%x, cred=%p, "
+	IBTF_DPRINTF_L4("ibnex", "\tdevctl: cmd=%x, arg=%p, mode=%x, cred=%p, "
 	    "\t\trval=%p dev=0x%x", cmd, arg, mode, credp, rvalp, dev);
 
 	/* read devctl ioctl data */
 	if ((cmd != DEVCTL_AP_CONTROL) &&
 	    (ndi_dc_allochdl((void *)arg, &dcp) != NDI_SUCCESS)) {
 		IBTF_DPRINTF_L4("ibnex",
-		    "\tioctl: ndi_dc_allochdl failed\n");
+		    "\tdevctl: ndi_dc_allochdl failed\n");
 		return (EFAULT);
 	}
 
 	mutex_enter(&ibnex.ibnex_mutex);
 	switch (cmd) {
 	case DEVCTL_AP_GETSTATE:
-		msg = "\tioctl: DEVCTL_AP_GETSTATE";
+		msg = "\tdevctl: DEVCTL_AP_GETSTATE";
 		IBTF_DPRINTF_L4("ibnex", "%s:", msg);
 
 		apid_n = ibnex_get_apid(dcp);
@@ -222,7 +273,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		int			num_nodes = 0;
 		ibnex_ioctl_data_t	ioc;	/* for 64-bit copies only */
 
-		msg = "\tioctl: DEVCTL_AP_CONTROL";
+		msg = "\tdevctl: DEVCTL_AP_CONTROL";
 #ifdef	_MULTI_DATAMODEL
 		if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 			ibnex_ioctl_data_32_t ioc32;
@@ -281,7 +332,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		/* process sub-commands */
 		switch (ioc.cmd) {
 		case IBNEX_NUM_DEVICE_NODES:
-			msg = "\tioctl: DEVCTL_AP_CONTROL: NUM_DEVICE_NODES";
+			msg = "\tdevctl: DEVCTL_AP_CONTROL: NUM_DEVICE_NODES";
 
 			/*
 			 * figure out how many IOC, VPPA,
@@ -300,7 +351,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (rv);
 
 		case IBNEX_NUM_HCA_NODES:
-			msg = "\tioctl: DEVCTL_AP_CONTROL: NUM_HCA_NODES";
+			msg = "\tdevctl: DEVCTL_AP_CONTROL: NUM_HCA_NODES";
 
 			/* figure out how many HCAs are present in the host */
 			mutex_exit(&ibnex.ibnex_mutex);
@@ -315,7 +366,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (rv);
 
 		case IBNEX_UPDATE_PKEY_TBLS:
-			msg = "\tioctl: DEVCTL_AP_CONTROL: UPDATE_PKEY_TBLS";
+			msg = "\tdevctl: DEVCTL_AP_CONTROL: UPDATE_PKEY_TBLS";
 			IBTF_DPRINTF_L4("ibnex", "%s", msg);
 
 			/*
@@ -342,8 +393,8 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		case IBNEX_GET_SNAPSHOT:
 		case IBNEX_SNAPSHOT_SIZE:
 			msg = (ioc.cmd == IBNEX_SNAPSHOT_SIZE) ?
-			    "\tioctl: DEVCTL_AP_CONTROL: IBNEX_SNAPSHOT_SIZE" :
-			    "\tioctl: DEVCTL_AP_CONTROL: IBNEX_GET_SNAPSHOT";
+			    "\tdevctl: DEVCTL_AP_CONTROL: IBNEX_SNAPSHOT_SIZE" :
+			    "\tdevctl: DEVCTL_AP_CONTROL: IBNEX_GET_SNAPSHOT";
 
 			IBTF_DPRINTF_L4("ibnex", "%s:", msg);
 
@@ -392,8 +443,8 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			char	 path[MAXPATHLEN];
 
 			msg = (ioc.cmd == IBNEX_DEVICE_PATH_SZ) ?
-			    "\tioctl:DEVCTL_AP_CONTROL: IBNEX_DEVICE_PATH_SZ" :
-			    "\tioctl:DEVCTL_AP_CONTROL: IBNEX_GET_DEVICE_PATH";
+			    "\tdevctl:DEVCTL_AP_CONTROL: IBNEX_DEVICE_PATH_SZ" :
+			    "\tdevctl:DEVCTL_AP_CONTROL: IBNEX_GET_DEVICE_PATH";
 
 			IBTF_DPRINTF_L4("ibnex", "%s: apid = %s", msg, apid_n);
 
@@ -508,8 +559,9 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		case IBNEX_UNCFG_CLNTS_SZ:
 		case IBNEX_UNCFG_CLNTS_INFO:
 			msg = (ioc.cmd == IBNEX_UNCFG_CLNTS_SZ) ?
-			    "\tioctl:DEVCTL_AP_CONTROL: IBNEX_UNCFG_CLNTS_SZ" :
-			    "\tioctl:DEVCTL_AP_CONTROL: IBNEX_UNCFG_CLNTS_INFO";
+			    "\tdevctl:DEVCTL_AP_CONTROL: IBNEX_UNCFG_CLNTS_SZ" :
+			    "\tdevctl:DEVCTL_AP_CONTROL: "
+			    "IBNEX_UNCFG_CLNTS_INFO";
 
 			guid_str = strrchr(apid_n, ':') + 1;
 			IBTF_DPRINTF_L4("ibnex", "%s, apid = %s, guid = %s",
@@ -571,7 +623,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 
 		case IBNEX_CONF_ENTRY_ADD:
-			msg = "\tioctl: IBNEX_CONF_ENTRY_ADD: ";
+			msg = "\tdevctl: IBNEX_CONF_ENTRY_ADD: ";
 			service = kmem_zalloc(ioc.bufsiz + 1, KM_SLEEP);
 			/* read in the "service" name */
 			if (ddi_copyin(ioc.buf, service,
@@ -598,7 +650,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 
 		case IBNEX_CONF_ENTRY_DEL:
-			msg = "\tioctl:IBNEX_CONF_ENTRY_DEL: ";
+			msg = "\tdevctl:IBNEX_CONF_ENTRY_DEL: ";
 			service = kmem_zalloc(ioc.bufsiz + 1, KM_SLEEP);
 			/* read in the "service" name */
 			if (ddi_copyin(ioc.buf, service,
@@ -690,7 +742,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 
 		case IBNEX_UPDATE_IOC_CONF :
-			msg = "\tioctl:IBNEX_UPDATE_IOC_CONF: ";
+			msg = "\tdevctl:IBNEX_UPDATE_IOC_CONF: ";
 
 			/*
 			 * If IB fabric APID, call ibnex_update_all
@@ -2727,4 +2779,392 @@ ibnex_pseudo_fininode(dev_info_t *dip)
 
 	mutex_enter(&ibnex.ibnex_mutex);
 	return (rval == MDI_SUCCESS ? IBNEX_SUCCESS : IBNEX_OFFLINE_FAILED);
+}
+
+/*
+ * IOCTL implementation to get api version number.
+ */
+static int
+ibnex_ctl_get_api_ver(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp)
+{
+	ibnex_ctl_api_ver_t	api_ver;
+
+	IBTF_DPRINTF_L4("ibnex", "\tctl_get_api_ver: cmd=%x, arg=%p, "
+	    "mode=%x, cred=%p, rval=%p, dev=0x%x", cmd, arg, mode, credp,
+	    rvalp, dev);
+
+	api_ver.api_ver_num = IBNEX_CTL_API_VERSION;
+
+	if (ddi_copyout(&api_ver, (void *)arg, sizeof (ibnex_ctl_api_ver_t),
+	    mode) != 0) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tctl_get_api_ver: ddi_copyout err");
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+/*
+ * IOCTL implementation to get the list of HCAs
+ */
+static int
+ibnex_ctl_get_hca_list(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp)
+{
+	ibnex_ctl_get_hca_list_t hca_list;
+	int		rv = 0;
+	uint_t		*in_nhcasp;
+	uint_t		nhcas, n;
+	ib_guid_t	*hca_guids;
+
+	IBTF_DPRINTF_L4("ibnex", "\tctl_get_hca_list: cmd=%x, arg=%p, "
+	    "mode=%x, cred=%p, rval=%p, dev=0x%x", cmd, arg, mode, credp,
+	    rvalp, dev);
+
+#ifdef	_MULTI_DATAMODEL
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		ibnex_ctl_get_hca_list_32_t hca_list_32;
+
+		if (ddi_copyin((void *)arg, &hca_list_32,
+		    sizeof (ibnex_ctl_get_hca_list_32_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_get_hca_list: ddi_copyin err 1");
+			return (EFAULT);
+		}
+
+		hca_list.hca_guids_alloc_sz = hca_list_32.hca_guids_alloc_sz;
+		hca_list.hca_guids =
+		    (ib_guid_t *)(uintptr_t)hca_list_32.hca_guids;
+		in_nhcasp = &((ibnex_ctl_get_hca_list_32_t *)arg)->nhcas;
+	} else
+#endif
+	{
+		if (ddi_copyin((void *)arg, &hca_list,
+		    sizeof (ibnex_ctl_get_hca_list_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_get_hca_list: ddi_copyin err 2");
+			return (EFAULT);
+		}
+
+		in_nhcasp = &((ibnex_ctl_get_hca_list_t *)arg)->nhcas;
+	}
+
+	nhcas = ibt_get_hca_list(&hca_guids);
+
+	/* copy number of hcas to user space */
+	if (ddi_copyout(&nhcas, in_nhcasp, sizeof (uint_t), mode) != 0) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tctl_get_hca_list: ddi_copyout err 1");
+		rv = EFAULT;
+		goto out;
+	}
+
+	n = MIN(nhcas, hca_list.hca_guids_alloc_sz);
+	if (n == 0)
+		goto out;
+
+	/* copy HCA guids to user space */
+	if (ddi_copyout(hca_guids, hca_list.hca_guids,
+	    n * sizeof (ib_guid_t), mode) != 0) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tctl_get_hca_list: ddi_copyout err 2");
+		rv = EFAULT;
+	}
+
+out:
+	if (nhcas > 0)
+		ibt_free_hca_list(hca_guids, nhcas);
+
+	return (rv);
+}
+
+/*
+ * IOCTL implementation to query HCA attributes
+ */
+static int
+ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp)
+{
+	int			rv = 0;
+	ibnex_ctl_hca_info_t	*hca_info;
+	ibnex_ctl_query_hca_t	*query_hca;
+	ibt_hca_attr_t		*hca_attr;
+	char			driver_name[MAX_HCA_DRVNAME_LEN];
+	int			instance;
+
+	IBTF_DPRINTF_L4("ibnex", "\tctl_query_hca: cmd=%x, arg=%p, "
+	    "mode=%x, cred=%p, rval=%p, dev=0x%x", cmd, arg, mode, credp,
+	    rvalp, dev);
+
+	/*
+	 * NOTE: 32-bit versions of the structures for ibnex_ctl_query_hca_t
+	 * and ibnex_ctl_hca_info_t are not defined because the alignment
+	 * of fields for these structures happen to be the same for both
+	 * 64-bit and 32-bit cases.
+	 */
+
+	query_hca = kmem_zalloc(sizeof (ibnex_ctl_query_hca_t), KM_SLEEP);
+	hca_attr = kmem_zalloc(sizeof (ibt_hca_attr_t), KM_SLEEP);
+
+	if (ddi_copyin((void *)arg, query_hca,
+	    sizeof (ibnex_ctl_query_hca_t), mode) != 0) {
+		IBTF_DPRINTF_L2("ibnex", "\tctl_query_hca: ddi_copyin err");
+		rv = EFAULT;
+		goto out;
+	}
+
+	if (ibtl_ibnex_query_hca_byguid(query_hca->hca_guid, hca_attr,
+	    driver_name, sizeof (driver_name), &instance) != IBT_SUCCESS) {
+		rv = ENXIO;
+		goto out;
+	}
+
+	hca_info = &query_hca->hca_info;
+
+	hca_info->hca_node_guid = hca_attr->hca_node_guid;
+	hca_info->hca_si_guid = hca_attr->hca_si_guid;
+	hca_info->hca_nports = hca_attr->hca_nports;
+	hca_info->hca_flags = hca_attr->hca_flags;
+	hca_info->hca_flags2 = hca_attr->hca_flags2;
+	hca_info->hca_vendor_id = hca_attr->hca_vendor_id;
+	hca_info->hca_device_id = hca_attr->hca_device_id;
+	hca_info->hca_version_id = hca_attr->hca_version_id;
+	hca_info->hca_max_chans = hca_attr->hca_max_chans;
+	hca_info->hca_max_chan_sz = hca_attr->hca_max_chan_sz;
+	hca_info->hca_max_sgl = hca_attr->hca_max_sgl;
+	hca_info->hca_max_cq = hca_attr->hca_max_cq;
+	hca_info->hca_max_cq_sz = hca_attr->hca_max_cq_sz;
+	hca_info->hca_page_sz = hca_attr->hca_page_sz;
+	hca_info->hca_max_memr = hca_attr->hca_max_memr;
+	hca_info->hca_max_memr_len = hca_attr->hca_max_memr_len;
+	hca_info->hca_max_mem_win = hca_attr->hca_max_mem_win;
+	hca_info->hca_max_rsc = hca_attr->hca_max_rsc;
+	hca_info->hca_max_rdma_in_chan = hca_attr->hca_max_rdma_in_chan;
+	hca_info->hca_max_rdma_out_chan = hca_attr->hca_max_rdma_out_chan;
+	hca_info->hca_max_ipv6_chan = hca_attr->hca_max_ipv6_chan;
+	hca_info->hca_max_ether_chan = hca_attr->hca_max_ether_chan;
+	hca_info->hca_max_mcg_chans = hca_attr->hca_max_mcg_chans;
+	hca_info->hca_max_mcg = hca_attr->hca_max_mcg;
+	hca_info->hca_max_chan_per_mcg = hca_attr->hca_max_chan_per_mcg;
+	hca_info->hca_max_partitions = hca_attr->hca_max_partitions;
+	hca_info->hca_local_ack_delay = hca_attr->hca_local_ack_delay;
+	hca_info->hca_max_port_sgid_tbl_sz = hca_attr->hca_max_port_sgid_tbl_sz;
+	hca_info->hca_max_port_pkey_tbl_sz = hca_attr->hca_max_port_pkey_tbl_sz;
+	hca_info->hca_max_pd = hca_attr->hca_max_pd;
+	hca_info->hca_max_ud_dest = hca_attr->hca_max_ud_dest;
+	hca_info->hca_max_srqs = hca_attr->hca_max_srqs;
+	hca_info->hca_max_srqs_sz = hca_attr->hca_max_srqs_sz;
+	hca_info->hca_max_srq_sgl = hca_attr->hca_max_srq_sgl;
+	hca_info->hca_max_cq_handlers = hca_attr->hca_max_cq_handlers;
+	hca_info->hca_reserved_lkey = hca_attr->hca_reserved_lkey;
+	hca_info->hca_max_fmrs = hca_attr->hca_max_fmrs;
+	hca_info->hca_max_lso_size = hca_attr->hca_max_lso_size;
+	hca_info->hca_max_lso_hdr_size = hca_attr->hca_max_lso_hdr_size;
+	hca_info->hca_max_inline_size = hca_attr->hca_max_inline_size;
+	hca_info->hca_max_cq_mod_count = hca_attr->hca_max_cq_mod_count;
+	hca_info->hca_max_cq_mod_usec = hca_attr->hca_max_cq_mod_usec;
+	hca_info->hca_fw_major_version = hca_attr->hca_fw_major_version;
+	hca_info->hca_fw_minor_version = hca_attr->hca_fw_minor_version;
+	hca_info->hca_fw_micro_version = hca_attr->hca_fw_micro_version;
+	hca_info->hca_ud_send_inline_sz = hca_attr->hca_ud_send_inline_sz;
+	hca_info->hca_conn_send_inline_sz = hca_attr->hca_conn_send_inline_sz;
+	hca_info->hca_conn_rdmaw_inline_overhead =
+	    hca_attr->hca_conn_rdmaw_inline_overhead;
+	hca_info->hca_recv_sgl_sz = hca_attr->hca_recv_sgl_sz;
+	hca_info->hca_ud_send_sgl_sz = hca_attr->hca_ud_send_sgl_sz;
+	hca_info->hca_conn_send_sgl_sz = hca_attr->hca_conn_send_sgl_sz;
+	hca_info->hca_conn_rdma_sgl_overhead =
+	    hca_attr->hca_conn_rdma_sgl_overhead;
+
+	(void) strlcpy(hca_info->hca_driver_name, driver_name,
+	    MAX_HCA_DRVNAME_LEN);
+	hca_info->hca_driver_instance = instance;
+
+	/* copy hca information to the user space */
+	if (ddi_copyout(hca_info, &((ibnex_ctl_query_hca_t *)arg)->hca_info,
+	    sizeof (ibnex_ctl_hca_info_t), mode) != 0) {
+		IBTF_DPRINTF_L2("ibnex", "\tctl_query_hca: ddi_copyout err");
+		rv = EFAULT;
+	}
+
+out:
+	kmem_free(query_hca, sizeof (ibnex_ctl_query_hca_t));
+	kmem_free(hca_attr, sizeof (ibt_hca_attr_t));
+	return (rv);
+}
+
+#define	IBNEX_CTL_CP_PORT_INFO(x, y, sgid_tbl, pkey_tbl)	\
+{								\
+	(x)->p_lid		= (y)->p_opaque1;		\
+	(x)->p_qkey_violations	= (y)->p_qkey_violations;	\
+	(x)->p_pkey_violations	= (y)->p_pkey_violations;	\
+	(x)->p_sm_sl		= (y)->p_sm_sl;			\
+	(x)->p_phys_state	= (y)->p_phys_state;		\
+	(x)->p_sm_lid		= (y)->p_sm_lid;		\
+	(x)->p_linkstate	= (y)->p_linkstate;		\
+	(x)->p_port_num		= (y)->p_port_num;		\
+	(x)->p_width_supported	= (y)->p_width_supported;	\
+	(x)->p_width_enabled	= (y)->p_width_enabled;		\
+	(x)->p_width_active	= (y)->p_width_active;		\
+	(x)->p_mtu		= (y)->p_mtu;			\
+	(x)->p_lmc		= (y)->p_lmc;			\
+	(x)->p_speed_supported	= (y)->p_speed_supported;	\
+	(x)->p_speed_enabled	= (y)->p_speed_enabled;		\
+	(x)->p_speed_active	= (y)->p_speed_active;		\
+	(x)->p_sgid_tbl		= (sgid_tbl);			\
+	(x)->p_sgid_tbl_sz	= (y)->p_sgid_tbl_sz;		\
+	(x)->p_pkey_tbl		= (pkey_tbl);			\
+	(x)->p_pkey_tbl_sz	= (y)->p_pkey_tbl_sz;		\
+	(x)->p_def_pkey_ix	= (y)->p_def_pkey_ix;		\
+	(x)->p_max_vl		= (y)->p_max_vl;		\
+	(x)->p_init_type_reply	= (y)->p_init_type_reply;	\
+	(x)->p_subnet_timeout	= (y)->p_subnet_timeout;	\
+	(x)->p_capabilities	= (y)->p_capabilities;		\
+	(x)->p_msg_sz		= (y)->p_msg_sz;		\
+}
+
+/*
+ * IOCTL implementation to query HCA port attributes
+ */
+static int
+ibnex_ctl_query_hca_port(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp)
+{
+	ibt_hca_portinfo_t		*ibt_pi;
+	uint_t				nports;
+	uint_t				size = 0;
+	int				rv = 0;
+	ibnex_ctl_query_hca_port_t	*query_hca_port = NULL;
+	ibnex_ctl_query_hca_port_32_t	*query_hca_port_32 = NULL;
+	uint_t				sgid_tbl_sz;
+	uint16_t			pkey_tbl_sz;
+
+	IBTF_DPRINTF_L4("ibnex", "\tctl_query_hca_port: cmd=%x, arg=%p, "
+	    "mode=%x, cred=%p, rval=%p, dev=0x%x", cmd, arg, mode, credp,
+	    rvalp, dev);
+
+	query_hca_port = kmem_zalloc(sizeof (ibnex_ctl_query_hca_port_t),
+	    KM_SLEEP);
+
+#ifdef	_MULTI_DATAMODEL
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		query_hca_port_32 = kmem_zalloc(
+		    sizeof (ibnex_ctl_query_hca_port_32_t), KM_SLEEP);
+
+		if (ddi_copyin((void *)arg, query_hca_port_32,
+		    sizeof (ibnex_ctl_query_hca_port_32_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca_port: ddi_copyin err 2");
+			rv = EFAULT;
+			goto out;
+		}
+
+		query_hca_port->hca_guid = query_hca_port_32->hca_guid;
+		query_hca_port->port_num = query_hca_port_32->port_num;
+
+		query_hca_port->sgid_tbl =
+		    (ib_gid_t *)(uintptr_t)query_hca_port_32->sgid_tbl;
+		query_hca_port->sgid_tbl_alloc_sz =
+		    query_hca_port_32->sgid_tbl_alloc_sz;
+
+		query_hca_port->pkey_tbl =
+		    (ib_pkey_t *)(uintptr_t)query_hca_port_32->pkey_tbl;
+		query_hca_port->pkey_tbl_alloc_sz =
+		    query_hca_port_32->pkey_tbl_alloc_sz;
+
+	} else
+#endif
+	{
+		if (ddi_copyin((void *)arg, query_hca_port,
+		    sizeof (ibnex_ctl_query_hca_port_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca_port: ddi_copyin err 2");
+			rv = EFAULT;
+			goto out;
+		}
+	}
+
+	if (query_hca_port->port_num == 0) {
+		rv = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Query hca port attributes and copy them to the user space.
+	 */
+
+	if (ibt_query_hca_ports_byguid(query_hca_port->hca_guid,
+	    query_hca_port->port_num, &ibt_pi, &nports, &size) != IBT_SUCCESS) {
+		rv = EINVAL;
+		goto out;
+	}
+
+	sgid_tbl_sz = MIN(query_hca_port->sgid_tbl_alloc_sz,
+	    ibt_pi->p_sgid_tbl_sz);
+
+	pkey_tbl_sz = MIN(query_hca_port->pkey_tbl_alloc_sz,
+	    ibt_pi->p_pkey_tbl_sz);
+
+#ifdef	_MULTI_DATAMODEL
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		IBNEX_CTL_CP_PORT_INFO(
+		    &query_hca_port_32->port_info, ibt_pi,
+		    query_hca_port_32->sgid_tbl, query_hca_port_32->pkey_tbl);
+
+		if (ddi_copyout(&query_hca_port_32->port_info,
+		    &((ibnex_ctl_query_hca_port_32_t *)arg)->port_info,
+		    sizeof (ibnex_ctl_hca_port_info_32_t), mode) != 0 ||
+
+		    ddi_copyout(ibt_pi->p_sgid_tbl,
+		    query_hca_port->sgid_tbl,
+		    sgid_tbl_sz * sizeof (ib_gid_t), mode) != 0 ||
+
+		    ddi_copyout(ibt_pi->p_pkey_tbl,
+		    query_hca_port->pkey_tbl,
+		    pkey_tbl_sz * sizeof (ib_pkey_t), mode) != 0) {
+
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca_port: ddi_copyout err 2");
+			rv = EFAULT;
+			goto out;
+		}
+	} else
+#endif
+	{
+		IBNEX_CTL_CP_PORT_INFO(
+		    &query_hca_port->port_info, ibt_pi,
+		    query_hca_port->sgid_tbl, query_hca_port->pkey_tbl);
+
+		if (ddi_copyout(&query_hca_port->port_info,
+		    &((ibnex_ctl_query_hca_port_t *)arg)->port_info,
+		    sizeof (ibnex_ctl_hca_port_info_t), mode) != 0 ||
+
+		    ddi_copyout(ibt_pi->p_sgid_tbl,
+		    query_hca_port->sgid_tbl,
+		    sgid_tbl_sz * sizeof (ib_gid_t), mode) != 0 ||
+
+		    ddi_copyout(ibt_pi->p_pkey_tbl,
+		    query_hca_port->pkey_tbl,
+		    pkey_tbl_sz * sizeof (ib_pkey_t), mode) != 0) {
+
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca_port: ddi_copyout err 2");
+			rv = EFAULT;
+			goto out;
+		}
+	}
+
+out:
+	if (size > 0)
+		ibt_free_portinfo(ibt_pi, size);
+
+	if (query_hca_port)
+		kmem_free(query_hca_port, sizeof (ibnex_ctl_query_hca_port_t));
+
+	if (query_hca_port_32)
+		kmem_free(query_hca_port_32,
+		    sizeof (ibnex_ctl_query_hca_port_32_t));
+	return (rv);
 }

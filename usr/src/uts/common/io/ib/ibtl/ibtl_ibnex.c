@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -620,5 +620,56 @@ ibtl_ibnex_phci_unregister(dev_info_t *hca_dip)
 		    "unregister failed");
 		return (IBT_FAILURE);
 	}
+	return (IBT_SUCCESS);
+}
+
+/*
+ * Function:
+ *	ibtl_ibnex_query_hca_byguid
+ * Input:
+ *	hca_guid	- The HCA's node GUID.
+ *	driver_name_size- size of the caller allocated driver_name buffer
+ * Output:
+ *	hca_attrs	- caller allocated buffer which will contain
+ *			  HCA attributes upon success
+ *	driver_name	- caller allocated buffer which will contain
+ *			  HCA driver name upon success
+ *	driver_instance - HCA driver instance
+ * Returns:
+ *	IBT_SUCCESS/IBT_FAILURE
+ * Description:
+ *	Get the HCA attributes, driver name and instance number of the
+ *	specified HCA.
+ */
+ibt_status_t
+ibtl_ibnex_query_hca_byguid(ib_guid_t hca_guid, ibt_hca_attr_t *hca_attrs,
+    char *driver_name, size_t driver_name_size, int *driver_instance)
+{
+	ibtl_hca_devinfo_t	*hca_devp;
+
+	IBTF_DPRINTF_L4(ibtl_ibnex, "ibtl_ibnex_query_hca_byguid("
+	    "hca_guid = 0x%llx, hca_attrs = 0x%p, driver_name = 0x%p, "
+	    "driver_name_size = 0x%d, driver_instancep = 0x%p)", hca_guid,
+	    hca_attrs, driver_name, (int)driver_name_size, driver_instance);
+
+	mutex_enter(&ibtl_clnt_list_mutex);
+
+	hca_devp = ibtl_get_hcadevinfo(hca_guid);
+	if (hca_devp == NULL) {
+		mutex_exit(&ibtl_clnt_list_mutex);
+		return (IBT_HCA_INVALID);
+	}
+
+	if (strlcpy(driver_name,
+	    ddi_driver_name(hca_devp->hd_hca_dip), driver_name_size) >=
+	    driver_name_size) {
+		mutex_exit(&ibtl_clnt_list_mutex);
+		return (IBT_INSUFF_KERNEL_RESOURCE);
+	}
+
+	*driver_instance = ddi_get_instance(hca_devp->hd_hca_dip);
+	bcopy(hca_devp->hd_hca_attr, hca_attrs, sizeof (ibt_hca_attr_t));
+
+	mutex_exit(&ibtl_clnt_list_mutex);
 	return (IBT_SUCCESS);
 }

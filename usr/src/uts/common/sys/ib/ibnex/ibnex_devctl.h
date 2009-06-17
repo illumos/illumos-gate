@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_IBNEX_IBNEX_DEVCTL_H
 #define	_SYS_IB_IBNEX_IBNEX_DEVCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/ib/ib_types.h>
+#include <sys/ib/ibtl/ibtl_types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -137,6 +137,347 @@ typedef struct ibnex_ioctl_data_32 {
 	uint32_t	ap_id_len;	/* AP_ID name len */
 	uint32_t	misc_arg;	/* reserved */
 } ibnex_ioctl_data_32_t;
+
+/*
+ * General ibnex IOCTLs
+ *
+ * IBNEX_CTL_GET_API_VER
+ * ======================
+ *
+ * Gets the version number of the API that IB nexus currently supports.
+ *
+ * arg - pointer to a structure of type ibnex_ctl_api_ver_t
+ *
+ * Caller does not set any field of this structure. When this IOCTL is issued,
+ * ib nexus will set api_ver_num field to the currently supported API
+ * version number.
+ *
+ * The caller could issue this IOCTL prior to issuing any other general
+ * ibnex IOCTLs to detect incompatible changes to the API. The caller may
+ * call other IOCTLs only if the api_ver_num matches the API version number
+ * used by the caller.
+ *
+ *
+ * IBNEX_CTL_GET_HCA_LIST
+ * ======================
+ *
+ * Gets GUIDs for all HCAs in the system
+ *
+ * arg - pointer to a structure of type ibnex_ctl_get_hca_list_t
+ *
+ * Caller allocates memory for HCA GUIDs. Sets hca_guids field to point to the
+ * allocated memory. Sets hca_guids_alloc_sz to the number of GUIDs for which
+ * memory has been allocated.
+ *
+ * Upon successful return from the IOCTL, nhcas will contain the number of
+ * HCAs in the system. HCA GUIDs will be copied into hca_guids array.
+ * The number of GUIDs copied are nhcas or hca_guids_alloc_sz which ever is
+ * smaller.
+ *
+ *
+ * IBNEX_CTL_QUERY_HCA
+ * ===================
+ *
+ * Query HCA attributes
+ *
+ * arg - pointer to a structure of type ibnex_ctl_query_hca_t
+ *
+ * Caller sets hca_guid field of this structure.
+ *
+ * Upon successful return from the IOCTL, hca_info will contain HCA attributes
+ * for the specified GUID.
+ *
+ *
+ * IBNEX_CTL_QUERY_HCA_PORT
+ * ========================
+ *
+ * Query HCA port attributes
+ *
+ * arg - pointer to a structure of type ibnex_ctl_query_hca_port_t
+ *
+ * Caller sets hca_guid and port_num fields.
+ *
+ * Caller allocates memory for sgid entries. Sets sgid_tbl to point to
+ * the allocated memory and sgid_tbl_alloc_sz to the number of sgid entries
+ * for which memory has been allocated.
+ *
+ * Caller allocates memory for pkey entries. Sets pkey_tbl to point to
+ * the allocated memory and pkey_tbl_alloc_sz to the number of pkey entries
+ * for which memory has been allocated.
+ *
+ * Upon successful return from the IOCTL, port_info will contain HCA port
+ * attributes for the specified HCA port. port_info.p_sgid_tbl_sz will contain
+ * the actual number of sgids associated with this port. port_info.p_pkey_tbl_sz
+ * will contain the actual number of pkeys associated with this port.
+ *
+ * port_info.p_sgid_tbl will point to an array containing sgids. The number of
+ * sgids in the array is sgid_tbl_alloc_sz or port_info.p_sgid_tbl_sz
+ * whichever is smaller.
+ *
+ * port_info.p_pkey_tbl will point to an array containing pkeys. The number of
+ * pkeys in the array is pkey_tbl_alloc_sz or port_info.p_pkey_tbl_sz
+ * whichever is smaller.
+ */
+
+
+/*
+ * ibnex specific ioctls
+ *
+ * NOTE: The ioctl codes should not collide with generic devctl ioctls
+ * such as DEVCTL_AP_CONFIGURE.
+ */
+#define	IBNEX_IOC		(1 << 16)
+#define	IBNEX_CTL_GET_API_VER	(IBNEX_IOC + 1)	/* Get API version # */
+#define	IBNEX_CTL_GET_HCA_LIST	(IBNEX_IOC + 2)	/* Get HCA GUID list */
+#define	IBNEX_CTL_QUERY_HCA	(IBNEX_IOC + 3)	/* Query HCA attributes */
+#define	IBNEX_CTL_QUERY_HCA_PORT (IBNEX_IOC + 4) /* Query HCA port attributes */
+
+/*
+ * The device to open for issuing ibnex IOCTLs
+ */
+#define	IBNEX_DEVCTL_DEV		"/devices/ib:devctl"
+
+/*
+ * ibnex IOCTL API version number - to be incremented when making an
+ * incompatible change to the API.
+ */
+#define	IBNEX_CTL_API_VERSION		1
+
+#define	MAX_HCA_DRVNAME_LEN		16
+
+/*
+ * Data structure for IBNEX_CTL_GET_API_VER
+ */
+typedef struct ibnex_ctl_api_ver_s {
+	uint_t		api_ver_num;		/* out: supported API version */
+} ibnex_ctl_api_ver_t;
+
+/*
+ * Data structure for IBNEX_CTL_GET_HCA_LIST
+ */
+typedef struct ibnex_ctl_get_hca_list_s {
+	ib_guid_t	*hca_guids;		/* in/out: HCA GUID array */
+	uint_t		hca_guids_alloc_sz;	/* in: # of HCA GUIDs for */
+						/* which storage is allocated */
+	uint_t		nhcas;			/* out: actual number of HCAs */
+} ibnex_ctl_get_hca_list_t;
+
+typedef struct ibnex_ctl_get_hca_list_32_s {
+	caddr32_t	hca_guids;		/* in/out: HCA GUID array */
+	uint_t		hca_guids_alloc_sz;	/* in: # of HCA GUIDs for */
+						/* which storage is allocated */
+	uint_t		nhcas;			/* out: actual number of HCAs */
+} ibnex_ctl_get_hca_list_32_t;
+
+/*
+ * HCA information structure
+ */
+typedef struct ibnex_ctl_hca_info_s {
+	ib_guid_t	hca_node_guid;		/* Node GUID */
+	ib_guid_t	hca_si_guid;		/* Optional System Image GUID */
+	uint_t		hca_nports;		/* Number of physical ports */
+
+	/* HCA driver name and instance number */
+	char		hca_driver_name[MAX_HCA_DRVNAME_LEN];
+	int		hca_driver_instance;
+
+	ibt_hca_flags_t		hca_flags;	/* HCA capabilities etc */
+	ibt_hca_flags2_t	hca_flags2;	/* HCA capabilities etc */
+
+	uint32_t	hca_vendor_id;		/* Vendor ID */
+	uint16_t	hca_device_id;		/* Device ID */
+	uint32_t	hca_version_id;		/* Version ID */
+
+	uint_t		hca_max_chans;		/* Max channels supported */
+	uint_t		hca_max_chan_sz;	/* Max outstanding WRs on any */
+						/* channel */
+
+	uint_t		hca_max_sgl;		/* Max SGL entries per WR */
+
+	uint_t		hca_max_cq;		/* Max num of CQs supported  */
+	uint_t		hca_max_cq_sz;		/* Max capacity of each CQ */
+
+	ibt_page_sizes_t	hca_page_sz;	/* Bit mask of page sizes */
+
+	uint_t		hca_max_memr;		/* Max num of HCA mem regions */
+	ib_memlen_t	hca_max_memr_len;	/* Largest block, in bytes of */
+						/* mem that can be registered */
+	uint_t		hca_max_mem_win;	/* Max Memory windows in HCA */
+
+	uint_t		hca_max_rsc; 		/* Max Responder Resources of */
+						/* this HCA for RDMAR/Atomics */
+						/* with this HCA as target. */
+	uint8_t		hca_max_rdma_in_chan;	/* Max RDMAR/Atomics in per */
+						/* chan this HCA as target. */
+	uint8_t		hca_max_rdma_out_chan;	/* Max RDMA Reads/Atomics out */
+						/* per channel by this HCA */
+	uint_t		hca_max_ipv6_chan;	/* Max IPV6 channels in HCA */
+	uint_t		hca_max_ether_chan;	/* Max Ether channels in HCA */
+
+	uint_t		hca_max_mcg_chans;	/* Max number of channels */
+						/* that can join multicast */
+						/* groups */
+	uint_t		hca_max_mcg;		/* Max multicast groups */
+	uint_t		hca_max_chan_per_mcg;	/* Max number of channels per */
+						/* Multicast group in HCA */
+	uint16_t	hca_max_partitions;	/* Max partitions in HCA */
+
+	ib_time_t	hca_local_ack_delay;
+
+	uint_t		hca_max_port_sgid_tbl_sz;
+	uint16_t	hca_max_port_pkey_tbl_sz;
+	uint_t		hca_max_pd;		/* Max# of Protection Domains */
+
+	uint_t		hca_max_ud_dest;
+	uint_t		hca_max_srqs;		/* Max SRQs supported */
+	uint_t		hca_max_srqs_sz;	/* Max outstanding WRs on any */
+						/* SRQ */
+	uint_t		hca_max_srq_sgl;	/* Max SGL entries per SRQ WR */
+	uint_t		hca_max_cq_handlers;
+	ibt_lkey_t	hca_reserved_lkey;	/* Reserved L_Key value */
+	uint_t		hca_max_fmrs;		/* Max FMR Supported */
+
+	uint_t		hca_max_lso_size;
+	uint_t		hca_max_lso_hdr_size;
+	uint_t		hca_max_inline_size;
+
+	uint_t		hca_max_cq_mod_count;	/* CQ notify moderation */
+	uint_t		hca_max_cq_mod_usec;
+
+	uint32_t	hca_fw_major_version;	/* firmware version */
+	uint16_t	hca_fw_minor_version;
+	uint16_t	hca_fw_micro_version;
+
+	/* detailed WQE size info */
+	uint_t		hca_ud_send_inline_sz;	/* inline size in bytes */
+	uint_t		hca_conn_send_inline_sz;
+	uint_t		hca_conn_rdmaw_inline_overhead;
+	uint_t		hca_recv_sgl_sz;	/* detailed SGL sizes */
+	uint_t		hca_ud_send_sgl_sz;
+	uint_t		hca_conn_send_sgl_sz;
+	uint_t		hca_conn_rdma_sgl_overhead;
+	int32_t		hca_pad;
+} ibnex_ctl_hca_info_t;
+
+/*
+ * Data structure for IBNEX_CTL_QUERY_HCA
+ */
+typedef struct ibnex_ctl_query_hca_s {
+	ib_guid_t		hca_guid;	/* in: HCA GUID */
+	ibnex_ctl_hca_info_t	hca_info;	/* out: HCA information */
+} ibnex_ctl_query_hca_t;
+
+/*
+ * HCA port information structure
+ */
+typedef struct ibnex_ctl_hca_port_info_s {
+	ib_lid_t		p_lid;		/* Base LID of port */
+	ib_qkey_cntr_t		p_qkey_violations; /* Bad Q_Key cnt */
+	ib_pkey_cntr_t		p_pkey_violations; /* Optional bad P_Key cnt */
+	uint8_t			p_sm_sl;	/* SM Service level */
+	ib_port_phys_state_t	p_phys_state;
+	ib_lid_t		p_sm_lid;	/* SM LID */
+	ibt_port_state_t	p_linkstate;	/* Port state */
+	uint8_t			p_port_num;	/* Port number */
+
+	ib_link_width_t		p_width_supported;
+	ib_link_width_t		p_width_enabled;
+	ib_link_width_t		p_width_active;
+
+	ib_mtu_t		p_mtu;		/* Max transfer unit - pkt */
+	uint8_t			p_lmc;		/* LID mask control */
+
+	ib_link_speed_t		p_speed_supported;
+	ib_link_speed_t		p_speed_enabled;
+	ib_link_speed_t		p_speed_active;
+
+	ib_gid_t		*p_sgid_tbl;	/* SGID Table */
+	uint_t			p_sgid_tbl_sz;	/* # of entries in SGID table */
+
+	ib_pkey_t		*p_pkey_tbl;	/* P_Key table */
+	uint16_t		p_pkey_tbl_sz;	/* # of entries in P_Key tbl */
+	uint16_t		p_def_pkey_ix;	/* default pkey index for TI */
+
+	uint8_t			p_max_vl;	/* Max num of virtual lanes */
+	uint8_t			p_init_type_reply; /* Optional InitTypeReply */
+	ib_time_t		p_subnet_timeout; /* Max Subnet Timeout */
+	ibt_port_caps_t		p_capabilities;	/* Port Capabilities */
+	uint32_t		p_msg_sz;	/* Max message size */
+} ibnex_ctl_hca_port_info_t;
+
+typedef struct ibnex_ctl_hca_port_info_32_s {
+	ib_lid_t		p_lid;		/* Base LID of port */
+	ib_qkey_cntr_t		p_qkey_violations; /* Bad Q_Key cnt */
+	ib_pkey_cntr_t		p_pkey_violations; /* Optional bad P_Key cnt */
+	uint8_t			p_sm_sl;	/* SM Service level */
+	ib_port_phys_state_t	p_phys_state;
+	ib_lid_t		p_sm_lid;	/* SM LID */
+	ibt_port_state_t	p_linkstate;	/* Port state */
+	uint8_t			p_port_num;	/* Port number */
+
+	ib_link_width_t		p_width_supported;
+	ib_link_width_t		p_width_enabled;
+	ib_link_width_t		p_width_active;
+
+	ib_mtu_t		p_mtu;		/* Max transfer unit - pkt */
+	uint8_t			p_lmc;		/* LID mask control */
+
+	ib_link_speed_t		p_speed_supported;
+	ib_link_speed_t		p_speed_enabled;
+	ib_link_speed_t		p_speed_active;
+
+	caddr32_t		p_sgid_tbl;	/* SGID Table */
+	uint_t			p_sgid_tbl_sz;	/* # of entries in SGID table */
+
+	caddr32_t		p_pkey_tbl;	/* P_Key table */
+	uint16_t		p_pkey_tbl_sz;	/* # of entries in P_Key tbl */
+	uint16_t		p_def_pkey_ix;	/* default pkey index for TI */
+
+	uint8_t			p_max_vl;	/* Max num of virtual lanes */
+	uint8_t			p_init_type_reply; /* Optional InitTypeReply */
+	ib_time_t		p_subnet_timeout; /* Max Subnet Timeout */
+	ibt_port_caps_t		p_capabilities;	/* Port Capabilities */
+	uint32_t		p_msg_sz;	/* Max message size */
+} ibnex_ctl_hca_port_info_32_t;
+
+/*
+ * Data structure for IBNEX_CTL_QUERY_HCA_PORT
+ */
+typedef struct ibnex_ctl_query_hca_port_s {
+	ib_guid_t	hca_guid;		/* in: HCA GUID */
+	uint_t		port_num;		/* in: port number */
+
+	ib_gid_t	*sgid_tbl;		/* in: SGID Table */
+	uint_t		sgid_tbl_alloc_sz; /* in: # of entries in SGID table */
+
+	ib_pkey_t	*pkey_tbl;		/* in: P_Key table */
+	uint_t		pkey_tbl_alloc_sz; /* in: # of entries in P_Key table */
+
+	uint32_t	pad;
+	ibnex_ctl_hca_port_info_t port_info;	/* out: port information */
+} ibnex_ctl_query_hca_port_t;
+
+typedef struct ibnex_ctl_query_hca_port_32_s {
+	ib_guid_t	hca_guid;		/* in: HCA GUID */
+	uint_t		port_num;		/* in: port number */
+
+	caddr32_t	sgid_tbl;		/* in: SGID Table */
+	uint_t		sgid_tbl_alloc_sz; /* in: # of entries in SGID table */
+
+	caddr32_t	pkey_tbl;		/* in: P_Key table */
+	uint_t		pkey_tbl_alloc_sz; /* in: # of entries in P_Key table */
+
+	uint32_t	pad;
+	ibnex_ctl_hca_port_info_32_t port_info;	/* out: port information */
+} ibnex_ctl_query_hca_port_32_t;
+
+#ifdef _KERNEL
+_NOTE(SCHEME_PROTECTS_DATA("", ibnex_ctl_hca_info_s))
+_NOTE(SCHEME_PROTECTS_DATA("", ibnex_ctl_hca_port_info_s))
+_NOTE(SCHEME_PROTECTS_DATA("", ibnex_ctl_hca_port_info_32_s))
+_NOTE(SCHEME_PROTECTS_DATA("", ibnex_ctl_query_hca_port_s))
+_NOTE(SCHEME_PROTECTS_DATA("", ibnex_ctl_query_hca_port_32_s))
+#endif
 
 
 #ifdef __cplusplus

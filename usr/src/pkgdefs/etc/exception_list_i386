@@ -789,11 +789,6 @@ usr/lib/amd64/llib-lcmdutils.ln		i386
 #
 usr/include/aclutils.h			i386
 #
-# User<->kernel interface used by cfgadm/IB only
-#
-usr/include/sys/ib/ibnex		i386
-usr/include/sys/ib/ibnex/ibnex_devctl.h	i386
-#
 # USB skeleton driver stays in sync with the rest of USB but doesn't ship.
 #
 kernel/drv/usbskel			i386

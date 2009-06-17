@@ -320,7 +320,8 @@ extern "C" {
 #define	HERMON_CMD_GUIDINFO		0x00140000
 #define	HERMON_CMD_PKEYTBLE		0x00160000
 
-#define	HERMON_CMD_PERFHDR0		0x01040101
+#define	HERMON_CMD_PERF_GET		0x01040101
+#define	HERMON_CMD_PERF_SET		0x01040102
 #define	HERMON_CMD_PERFCNTRS		0x00120000
 #define	HERMON_CMD_PERFATTR		0x00000000
 
@@ -754,7 +755,7 @@ int hermon_getguidinfo_cmd_post(hermon_state_t *state, uint_t port,
 int hermon_getpkeytable_cmd_post(hermon_state_t *state, uint_t port,
     uint_t pkeyblock, uint_t sleepflag, sm_pkey_table_t *pkeytable);
 int hermon_getperfcntr_cmd_post(hermon_state_t *state, uint_t port,
-    uint_t sleepflag, hermon_hw_sm_perfcntr_t *perfinfo);
+    uint_t sleepflag, hermon_hw_sm_perfcntr_t *perfinfo, int reset);
 /*
  * WRITE_MTT - used for write MTT entries to the Hermon MTT table
  */

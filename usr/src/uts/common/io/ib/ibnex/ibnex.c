@@ -513,6 +513,18 @@ ibnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	/*
+	 * Create "devctl" minor node for general ioctl interface to the
+	 * ib nexus.
+	 */
+	if (ddi_create_minor_node(dip, "devctl", S_IFCHR, instance,
+	    DDI_NT_IB_NEXUS, 0) != DDI_SUCCESS) {
+		IBTF_DPRINTF_L2("ibnex",
+		    "\tattach: failed to create devctl minornode");
+		(void) ddi_remove_minor_node(dip, NULL);
+		(void) mdi_vhci_unregister(dip, 0);
+		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Set pm-want-child-notification property for

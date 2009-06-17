@@ -194,6 +194,7 @@ root	ibtl_cm_free_active_plist
 root	ibtl_cm_get_1st_full_pkey_ix
 root	ibtl_cm_get_local_comp_gids
 root	ibtl_cm_is_multi_sm
+root	ibtl_cm_get_clnt_name
 
 # IBTL-IBNEX private interface
 root	ibtl_ibnex_get_hca_info
@@ -203,6 +204,7 @@ root	ibtl_ibnex_hcadip2guid
 root	ibtl_ibnex_hcaguid2dip
 root	ibtl_ibnex_get_hca_verbose_data
 root	ibtl_ibnex_valid_hca_parent
+root	ibtl_ibnex_query_hca_byguid
 
 # IBTL internal taskq related callbacks
 root	ibtl_do_mgr_async_task
@@ -218,6 +220,11 @@ root	ibtl_cq_thread
 root	ibc_get_ci_failure
 root	ibt_get_module_failure
 root	ibt_check_failure
+
+# IBTL kstat callback
+root	ibtl_kstat_stats_update
+root	ibtl_kstat_pkeys_update
+
 
 
 # Internal, but not referenced (n the future, maybe)

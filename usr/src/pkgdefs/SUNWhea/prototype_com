@@ -922,6 +922,8 @@ d none usr/include/sys/ib/adapters/hermon 755 root bin
 f none usr/include/sys/ib/adapters/hermon/hermon_ioctl.h 644 root bin
 f none usr/include/sys/ib/ib_pkt_hdrs.h 644 root bin
 f none usr/include/sys/ib/ib_types.h 644 root bin
+d none usr/include/sys/ib/ibnex 755 root bin
+f none usr/include/sys/ib/ibnex/ibnex_devctl.h 644 root bin
 d none usr/include/sys/ib/ibtl 755 root bin
 f none usr/include/sys/ib/ibtl/ibci.h 644 root bin
 f none usr/include/sys/ib/ibtl/ibti.h 644 root bin

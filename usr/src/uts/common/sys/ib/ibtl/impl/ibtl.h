@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_IBTL_IMPL_IBTL_H
 #define	_SYS_IB_IBTL_IMPL_IBTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl.h
@@ -115,6 +112,16 @@ typedef enum ibtl_async_flags_e {
 } ibtl_async_flags_t;
 
 /*
+ * Keeps track of all data associated with HCA port kstats.
+ */
+typedef struct ibtl_hca_port_kstat_s {
+	struct ibtl_hca_devinfo_s *pks_hca_devp;
+	uint_t			pks_port_num;
+	struct kstat		*pks_stats_ksp;
+	struct kstat		*pks_pkeys_ksp;
+} ibtl_hca_port_kstat_t;
+
+/*
  * Define a per CI HCA Device structure. Its address is returned
  * to the CI as an opaque IBTL HCA Handle - ibc_hdl_t.
  *
@@ -155,6 +162,8 @@ typedef struct ibtl_hca_devinfo_s {
 	uint32_t		hd_async_task_cnt; /* #clients doing asyncs */
 	kcondvar_t		hd_async_task_cv; /* wakeup when #clients = 0 */
 	uint_t			hd_multism;	/* 1 - MultiSM, 0 - Single SM */
+	ibtl_hca_port_kstat_t	*hd_hca_port_ks_info;	/* port kstat ptr */
+	uint_t			hd_hca_port_ks_info_len; /* port kstat size */
 		/* The following must be at the end of this struct */
 	ibtl_async_port_status_t hd_async_port[1]; /* per-port async data */
 } ibtl_hca_devinfo_t;
