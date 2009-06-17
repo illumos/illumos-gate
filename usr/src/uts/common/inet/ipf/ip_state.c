@@ -1660,10 +1660,10 @@ ipstate_t *is;
 	 * entry to be created with a retransmited SYN packet.
 	 */
 	if ((tcp->th_flags & TH_OPENING) == TH_SYN) {
-		if (((is->is_state[source] > IPF_TCPS_ESTABLISHED) ||
-		    (is->is_state[source] == IPF_TCPS_CLOSED)) &&
-		    ((is->is_state[!source] > IPF_TCPS_ESTABLISHED) ||
-		    (is->is_state[!source] == IPF_TCPS_CLOSED))) {
+		if ((is->is_state[source] > IPF_TCPS_ESTABLISHED) &&
+		    (is->is_state[!source] > IPF_TCPS_ESTABLISHED)) {
+			is->is_state[source] = IPF_TCPS_CLOSED;
+			is->is_state[!source] = IPF_TCPS_CLOSED;
 			/*
 			 * Do not update is->is_sti.tqe_die in case state entry
 			 * is already present in deletetq. It prevents state
@@ -3532,19 +3532,36 @@ int flags;
 	tcpflags = tcp->th_flags;
 	dlen = fin->fin_dlen - (TCP_OFF(tcp) << 2);
 
+	ostate = tqe->tqe_state[1 - dir];
+	nstate = tqe->tqe_state[dir];
+
+	DTRACE_PROBE4(
+		indata,
+		fr_info_t *, fin,
+		int, ostate,
+		int, nstate,
+		u_char, tcpflags
+	);
+
 	if (tcpflags & TH_RST) {
 		if (!(tcpflags & TH_PUSH) && !dlen)
 			nstate = IPF_TCPS_CLOSED;
 		else
 			nstate = IPF_TCPS_CLOSE_WAIT;
+
+		/*
+		 * Once RST is received, we must advance peer's state to
+		 * CLOSE_WAIT.
+		 */
+		if (ostate <= IPF_TCPS_ESTABLISHED) {
+			tqe->tqe_state[1 - dir] = IPF_TCPS_CLOSE_WAIT;
+		}
 		rval = 1;
 	} else {
-		ostate = tqe->tqe_state[1 - dir];
-		nstate = tqe->tqe_state[dir];
 
 		switch (nstate)
 		{
-		case IPF_TCPS_CLOSED: /* 0 */
+		case IPF_TCPS_LISTEN: /* 0 */
 			if ((tcpflags & TH_OPENING) == TH_OPENING) {
 				/*
 				 * 'dir' received an S and sends SA in
@@ -3572,7 +3589,7 @@ int flags;
 				 */
 				switch (ostate)
 				{
-				case IPF_TCPS_CLOSED :
+				case IPF_TCPS_LISTEN :
 				case IPF_TCPS_SYN_RECEIVED :
 					nstate = IPF_TCPS_HALF_ESTAB;
 					rval = 1;
@@ -3593,11 +3610,7 @@ int flags;
 			 */
 			break;
 
-		case IPF_TCPS_LISTEN: /* 1 */
-			/* NOT USED */
-			break;
-
-		case IPF_TCPS_SYN_SENT: /* 2 */
+		case IPF_TCPS_SYN_SENT: /* 1 */
 			if ((tcpflags & ~(TH_ECN|TH_CWR)) == TH_SYN) {
 				/*
 				 * A retransmitted SYN packet.  We do not reset
@@ -3638,7 +3651,7 @@ int flags;
 			}
 			break;
 
-		case IPF_TCPS_SYN_RECEIVED: /* 3 */
+		case IPF_TCPS_SYN_RECEIVED: /* 2 */
 			if ((tcpflags & (TH_SYN|TH_FIN|TH_ACK)) == TH_ACK) {
 				/*
 				 * we see an A from 'dir' which was in
@@ -3667,17 +3680,38 @@ int flags;
 			}
 			break;
 
-		case IPF_TCPS_HALF_ESTAB: /* 4 */
-			if (ostate >= IPF_TCPS_HALF_ESTAB) {
-				if ((tcpflags & TH_ACKMASK) == TH_ACK) {
+		case IPF_TCPS_HALF_ESTAB: /* 3 */
+			if (tcpflags & TH_FIN) {
+				nstate = IPF_TCPS_FIN_WAIT_1;
+				rval = 1;
+			} else if ((tcpflags & TH_ACKMASK) == TH_ACK) {
+				/*
+				 * If we've picked up a connection in mid
+				 * flight, we could be looking at a follow on
+				 * packet from the same direction as the one
+				 * that created this state.  Recognise it but
+				 * do not advance the entire connection's
+				 * state.
+				 */
+				switch (ostate)
+				{
+				case IPF_TCPS_LISTEN :
+				case IPF_TCPS_SYN_SENT :
+				case IPF_TCPS_SYN_RECEIVED :
+					rval = 1;
+					break;
+				case IPF_TCPS_HALF_ESTAB :
+				case IPF_TCPS_ESTABLISHED :
 					nstate = IPF_TCPS_ESTABLISHED;
+					rval = 1;
+					break;
+				default :
+					break;
 				}
 			}
-			rval = 1;
-				
 			break;
 
-		case IPF_TCPS_ESTABLISHED: /* 5 */
+		case IPF_TCPS_ESTABLISHED: /* 4 */
 			rval = 1;
 			if (tcpflags & TH_FIN) {
 				/*
@@ -3685,7 +3719,11 @@ int flags;
 				 * this gives us a half-closed connection;
 				 * ESTABLISHED -> FIN_WAIT_1
 				 */
-				nstate = IPF_TCPS_FIN_WAIT_1;
+				if (ostate == IPF_TCPS_FIN_WAIT_1) {
+					nstate = IPF_TCPS_CLOSING;
+				} else {
+					nstate = IPF_TCPS_FIN_WAIT_1;
+				}
 			} else if (tcpflags & TH_ACK) {
 				/*
 				 * an ACK, should we exclude other flags here?
@@ -3710,7 +3748,7 @@ int flags;
 			}
 			break;
 
-		case IPF_TCPS_CLOSE_WAIT: /* 6 */
+		case IPF_TCPS_CLOSE_WAIT: /* 5 */
 			rval = 1;
 			if (tcpflags & TH_FIN) {
 				/*
@@ -3728,7 +3766,7 @@ int flags;
 			}
 			break;
 
-		case IPF_TCPS_FIN_WAIT_1: /* 7 */
+		case IPF_TCPS_FIN_WAIT_1: /* 6 */
 			rval = 1;
 			if ((tcpflags & TH_ACK) &&
 			    ostate > IPF_TCPS_CLOSE_WAIT) {
@@ -3737,14 +3775,14 @@ int flags;
 				 * it has sent us a FIN packet that we are
 				 * ack'ing now with an ACK; this means both
 				 * sides have now closed the connection and
-				 * we go into TIME_WAIT
+				 * we go into LAST_ACK
 				 */
 				/*
 				 * XXX: how do we know we really are ACKing
 				 * the FIN packet here? does the window code
 				 * guarantee that?
 				 */
-				nstate = IPF_TCPS_TIME_WAIT;
+				nstate = IPF_TCPS_LAST_ACK;
 			} else {
 				/*
 				 * we closed our side of the connection
@@ -3756,11 +3794,14 @@ int flags;
 			}
 			break;
 
-		case IPF_TCPS_CLOSING: /* 8 */
-			/* NOT USED */
+		case IPF_TCPS_CLOSING: /* 7 */
+			if ((tcpflags & (TH_FIN|TH_ACK)) == TH_ACK) {
+				nstate = IPF_TCPS_TIME_WAIT;
+			}
+			rval = 1;
 			break;
 
-		case IPF_TCPS_LAST_ACK: /* 9 */
+		case IPF_TCPS_LAST_ACK: /* 8 */
 			/*
 			 * We want to reset timer here to keep state in table.
 			 * If we would allow the state to time out here, while
@@ -3771,33 +3812,28 @@ int flags;
 			rval = 1;
 			break;
 
-		case IPF_TCPS_FIN_WAIT_2: /* 10 */
-			rval = 1;
-			if ((tcpflags & TH_OPENING) == TH_OPENING)
-				nstate = IPF_TCPS_SYN_RECEIVED;
-			else if (tcpflags & TH_SYN)
-				nstate = IPF_TCPS_SYN_SENT;
+		case IPF_TCPS_FIN_WAIT_2: /* 9 */
+			/* NOT USED */
 			break;
 
-		case IPF_TCPS_TIME_WAIT: /* 11 */
+		case IPF_TCPS_TIME_WAIT: /* 10 */
 			/* we're in 2MSL timeout now */
-			rval = 1;
+			if (ostate == IPF_TCPS_LAST_ACK) {
+				nstate = IPF_TCPS_CLOSED;
+				rval = 1;
+			} else {
+				rval = 2;
+			}
+			break;
+
+		case IPF_TCPS_CLOSED: /* 11 */
+			rval = 2;
 			break;
 
 		default :
 #if defined(_KERNEL)
-# if SOLARIS
-#  ifdef IPFDEBUG
-			cmn_err(CE_NOTE,
-				"tcp %lx flags %x si %lx nstate %d ostate %d\n",
-				(u_long)tcp, tcpflags, (u_long)tqe,
-				nstate, ostate);
-#  endif
-# else
-			printf("tcp %lx flags %x si %lx nstate %d ostate %d\n",
-				(u_long)tcp, tcpflags, (u_long)tqe,
-				nstate, ostate);
-# endif
+			ASSERT(nstate >= IPF_TCPS_LISTEN &&
+			    nstate <= IPF_TCPS_CLOSED);
 #else
 			abort();
 #endif
@@ -3809,10 +3845,19 @@ int flags;
 	 * If rval == 2 then do not update the queue position, but treat the
 	 * packet as being ok.
 	 */
-	if (rval == 2)
+	if (rval == 2) {
+		DTRACE_PROBE1(state_keeping_timer, int, nstate);
 		rval = 1;
+	}
 	else if (rval == 1) {
 		tqe->tqe_state[dir] = nstate;
+		/*
+		 * The nstate can either advance to a new state, or remain
+		 * unchanged, resetting the timer by moving to the bottom of
+		 * the queue.
+		 */
+		DTRACE_PROBE1(state_done, int, nstate);
+
 		if ((tqe->tqe_flags & TQE_RULEBASED) == 0)
 			fr_movequeue(tqe, tqe->tqe_ifq, tqtab + nstate, ifs);
 	}

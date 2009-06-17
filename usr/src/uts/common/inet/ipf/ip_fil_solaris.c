@@ -2277,6 +2277,7 @@ static int fr_make_icmp_v4(fin)
 fr_info_t *fin;
 {
 	struct in_addr tmp_src;
+	tcphdr_t *tcp;
 	struct icmp *icmp;
 	mblk_t *mblk_icmp;
 	mblk_t *mblk_ip;
@@ -2294,8 +2295,10 @@ fr_info_t *fin;
 	 * If we are dealing with TCP, then packet must be SYN/FIN to be routed
 	 * by IP stack. If it is not SYN/FIN, then we must drop it silently.
 	 */
+	tcp = (tcphdr_t *) fin->fin_dp;
+
 	if ((fin->fin_p == IPPROTO_TCP) && 
-	    !(fin->fin_flx & (TH_SYN | TH_FIN)))
+	    ((tcp == NULL) || ((tcp->th_flags & (TH_SYN | TH_FIN)) == 0)))
 		return (-1);
 
 	/*
@@ -2467,6 +2470,7 @@ static int fr_make_icmp_v6(fin)
 fr_info_t *fin;
 {
 	struct icmp6_hdr *icmp6;
+	tcphdr_t *tcp;
 	struct in6_addr	tmp_src6;
 	size_t icmp_pld_len;
 	mblk_t *mblk_ip, *mblk_icmp;
@@ -2478,8 +2482,10 @@ fr_info_t *fin;
 	 * If we are dealing with TCP, then packet must SYN/FIN to be routed by
 	 * IP stack. If it is not SYN/FIN, then we must drop it silently.
 	 */
-	if (fin->fin_p == IPPROTO_TCP &&
-	    !(fin->fin_flx & (TH_SYN | TH_FIN)))
+	tcp = (tcphdr_t *) fin->fin_dp;
+
+	if ((fin->fin_p == IPPROTO_TCP) && 
+	    ((tcp == NULL) || ((tcp->th_flags & (TH_SYN | TH_FIN)) == 0)))
 		return (-1);
 
 	/*

@@ -2403,21 +2403,21 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 /*
  * TCP States
  */
-#define IPF_TCPS_CLOSED		0	/* closed */
-#define IPF_TCPS_LISTEN		1	/* listening for connection */
-#define IPF_TCPS_SYN_SENT	2	/* active, have sent syn */
-#define IPF_TCPS_SYN_RECEIVED	3	/* have send and received syn */
-#define IPF_TCPS_HALF_ESTAB	4	/* for connections not fully "up" */
+#define IPF_TCPS_LISTEN		0	/* listening for connection */
+#define IPF_TCPS_SYN_SENT	1	/* active, have sent syn */
+#define IPF_TCPS_SYN_RECEIVED	2	/* have send and received syn */
+#define IPF_TCPS_HALF_ESTAB	3	/* for connections not fully "up" */
 /* states < IPF_TCPS_ESTABLISHED are those where connections not established */
-#define IPF_TCPS_ESTABLISHED	5	/* established */
-#define IPF_TCPS_CLOSE_WAIT	6	/* rcvd fin, waiting for close */
+#define IPF_TCPS_ESTABLISHED	4	/* established */
+#define IPF_TCPS_CLOSE_WAIT	5	/* rcvd fin, waiting for close */
 /* states > IPF_TCPS_CLOSE_WAIT are those where user has closed */
-#define IPF_TCPS_FIN_WAIT_1	7	/* have closed, sent fin */
-#define IPF_TCPS_CLOSING	8	/* closed xchd FIN; await FIN ACK */
-#define IPF_TCPS_LAST_ACK	9	/* had fin and close; await FIN ACK */
+#define IPF_TCPS_FIN_WAIT_1	6	/* have closed, sent fin */
+#define IPF_TCPS_CLOSING	7	/* closed xchd FIN; await FIN ACK */
+#define IPF_TCPS_LAST_ACK	8	/* had fin and close; await FIN ACK */
 /* states > IPF_TCPS_CLOSE_WAIT && < IPF_TCPS_FIN_WAIT_2 await ACK of FIN */
-#define IPF_TCPS_FIN_WAIT_2	10	/* have closed, fin is acked */
-#define IPF_TCPS_TIME_WAIT	11	/* in 2*msl quiet wait after close */
+#define IPF_TCPS_FIN_WAIT_2	9	/* have closed, fin is acked */
+#define IPF_TCPS_TIME_WAIT	10	/* in 2*msl quiet wait after close */
+#define IPF_TCPS_CLOSED		11	/* closed */
 #define IPF_TCP_NSTATES		12
 
 #define	TCP_MSL			120
