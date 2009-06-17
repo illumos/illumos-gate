@@ -1001,7 +1001,7 @@ audiohd_do_set_pin_volume(audiohd_state_t *statep, audiohd_path_t *path,
 	uint_t				tmp;
 	int				gain;
 
-	if (val == 0) {
+	if (path->mute_wid && val == 0) {
 		(void) audioha_codec_4bit_verb_get(
 		    statep,
 		    path->codec->index,
@@ -1030,7 +1030,7 @@ audiohd_do_set_pin_volume(audiohd_state_t *statep, audiohd_path_t *path,
 	    AUDIOHDC_VERB_SET_AMP_MUTE,
 	    AUDIOHDC_AMP_SET_RIGHT | path->gain_dir |
 	    tmp);
-	if (path->mute_wid != path->gain_wid) {
+	if (path->mute_wid && path->mute_wid != path->gain_wid) {
 		gain = AUDIOHDC_GAIN_MAX;
 		(void) audioha_codec_4bit_verb_get(
 		    statep,
@@ -1076,6 +1076,13 @@ audiohd_set_pin_volume(audiohd_state_t *statep, audiohda_device_type_t type)
 				return;
 			val = control->val;
 			break;
+		case DTYPE_LINEOUT:
+			control = statep->controls[CTL_FRONT];
+			if (control == NULL)
+				return;
+			val = control->val;
+			break;
+
 		case DTYPE_CD:
 			control = statep->controls[CTL_CD];
 			if (control == NULL)
@@ -1424,19 +1431,17 @@ audiohd_do_set_beep_volume(audiohd_state_t *statep, audiohd_path_t *path,
 }
 
 static void
-audiohd_restore_volume(audiohd_state_t *statep)
+audiohd_configure_output(audiohd_state_t *statep)
 {
 	audiohd_set_pin_volume(statep, DTYPE_LINEOUT);
 	audiohd_set_pin_volume(statep, DTYPE_SPEAKER);
 	audiohd_set_pin_volume(statep, DTYPE_HP_OUT);
 
+	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_GREEN);
 	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_BLACK);
 	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_GREY);
 	audiohd_set_pin_volume_by_color(statep, AUDIOHD_PIN_ORANGE);
-}
-static void
-audiohd_configure_output(audiohd_state_t *statep)
-{
+
 	audiohd_set_output_gain(statep);
 }
 static void
@@ -5453,7 +5458,6 @@ audiohd_resume(audiohd_state_t *statep)
 
 	audiohd_restore_play_and_record(statep);
 	audiohd_configure_output(statep);
-	audiohd_restore_volume(statep);
 	audiohd_configure_input(statep);
 
 	/* set widget power to D0 */
