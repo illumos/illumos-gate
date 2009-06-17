@@ -41,15 +41,15 @@ do
 		#
 		# Add the sysadmin group (gid 14) to support admintool
 		#
-		grep '^sysadmin:.*:14:.*' $dest 2>&1 >/dev/null
+		grep '^sysadmin:.*:14:.*' $dest >/dev/null 2>&1
 		if [ $? = 0 ] ; then
 			/usr/bin/true
-		elif grep '^sysadmin:' $dest 2>&1 >/dev/null; then
+		elif grep '^sysadmin:' $dest >/dev/null 2>&1; then
 			cur_name="sysadmin"
 			echo "SYSADMIN_NOT_14 $dest_file none" >> /tmp/CLEANUP
 			echo "sysadmin::14:" >> $dest
 
-		elif grep ':14:' $dest 2>&1 >/dev/null; then
+		elif grep ':14:' $dest >/dev/null 2>&1; then
 			cur_name=`grep ':14:' $dest | awk -F: '{print $1}'`
 			echo "GROUP14_IN_USE $dest_file none" >> /tmp/CLEANUP
 			echo "sysadmin::14:" >> $dest
@@ -63,7 +63,7 @@ do
 		# assign it to a regular user and confuse themselves
 		#
 		NOGROUP_LINE="nogroup::65534:"
-		if grep "$NOGROUP_LINE" $dest 2>&1 >/dev/null; then
+		if grep "$NOGROUP_LINE" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^noaccess::60002:/ a\
@@ -127,7 +127,7 @@ do
 		# Add the 'smmsp' group for sendmail 8.12
 		#
 		SMMSPGROUP_LINE="smmsp::25:"
-		if grep "$SMMSPGROUP_LINE" $dest 2>&1 >/dev/null; then
+		if grep "$SMMSPGROUP_LINE" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^nogroup::65534:/ a\
@@ -142,11 +142,26 @@ do
 		if [ ! -z "$cur_name" -a "$cur_name" != "gdm" ]; then
 			echo "ERROR: Reserved GID 50 already assigned" \
 				"to '$cur_name'" >> /tmp/CLEANUP
-		elif grep "$GDMGROUP_LINE" $dest 2>&1 >/dev/null; then
+		elif grep "$GDMGROUP_LINE" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^smmsp::25:/ a\
 '"$GDMGROUP_LINE"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
+		fi
+		#
+		# Add the 'upnp' group if it doesn't already exist.
+		#
+		UPNPGROUP_LINE="upnp::52:"
+		cur_name=`awk -F: '$3 == 52 {print $1}' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "upnp" ]; then
+			echo "ERROR: Reserved GID 52 already assigned" \
+				"to '$cur_name'" >> /tmp/CLEANUP
+		elif grep "$UPNPGROUP_LINE" $dest >/dev/null 2>&1; then
+			:
+		else
+			sed '/^gdm::50:/ a\
+'"$UPNPGROUP_LINE"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
 		fi
 		#
@@ -157,10 +172,10 @@ do
 		if [ ! -z "$cur_name" -a "$cur_name" != "webservd" ]; then
 			echo "ERROR: Reserved GID 80 already assigned" \
 				"to '$cur_name'" >> /tmp/CLEANUP
-		elif grep "$WEBSERVDGROUP_LINE" $dest 2>&1 >/dev/null; then
+		elif grep "$WEBSERVDGROUP_LINE" $dest >/dev/null 2>&1; then
 			:
 		else
-			sed '/^gdm::50:/ a\
+			sed '/^upnp::50:/ a\
 '"$WEBSERVDGROUP_LINE"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
 		fi
@@ -177,7 +192,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "90" ]; then
 			echo "NOTE: postgres group already assigned" \
 			    "to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$POSTGRESGROUP_LINE" $dest 2>&1 >/dev/null; then
+		elif grep "$POSTGRESGROUP_LINE" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^webservd::80:/ a\
@@ -196,7 +211,7 @@ do
                 elif [ ! -z "$cur_id" -a "$cur_id" != "70" ]; then
                         echo "NOTE: mysql group already assigned" \
                             "to id '$cur_id'" >> /tmp/CLEANUP
-                elif grep "$MYSQLGROUP_LINE" $dest 2>&1 >/dev/null; then
+                elif grep "$MYSQLGROUP_LINE" $dest >/dev/null 2>&1; then
                         :
                 else
                         sed '/^postgres::90:/ a\
@@ -215,7 +230,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "20" ]; then
 			echo "NOTE: games group already assigned" \
 			"to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$GAMESGROUP_LINE" $dest 2>&1 >/dev/null; then
+		elif grep "$GAMESGROUP_LINE" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^smmsp::25:/ a\
@@ -234,7 +249,7 @@ do
 		elif [ ! -z "$cur_id" -a "$cur_id" != "60" ]; then
 			echo "NOTE: xvm group already assigned" \
 			"to id '$cur_id'" >> /tmp/CLEANUP
-		elif grep "$XVMGROUP_LINE" $dest 2>&1 >/dev/null; then
+		elif grep "$XVMGROUP_LINE" $dest >/dev/null 2>&1; then
 			:
 		else
 			sed '/^mysql::70:/ a\
@@ -253,7 +268,7 @@ do
                 elif [ ! -z "$cur_id" -a "$cur_id" != "95" ]; then
                         echo "NOTE: slocate group already assigned" \
                             "to id '$cur_id'" >> /tmp/CLEANUP
-                elif grep "$SLOCATEGROUP_LINE" $dest 2>&1 >/dev/null; then
+                elif grep "$SLOCATEGROUP_LINE" $dest >/dev/null 2>&1; then
                         :
                 else
                         sed '/^postgres::90:/ a\
@@ -272,7 +287,7 @@ do
                 elif [ ! -z "$cur_id" -a "$cur_id" != "75" ]; then
                         echo "NOTE: openldap group already assigned" \
                             "to id '$cur_id'" >> /tmp/CLEANUP
-                elif grep "$OPENLDAPGROUP_LINE" $dest 2>&1 >/dev/null; then
+                elif grep "$OPENLDAPGROUP_LINE" $dest >/dev/null 2>&1; then
                         :
                 else
                         sed '/^mysql::70:/ a\

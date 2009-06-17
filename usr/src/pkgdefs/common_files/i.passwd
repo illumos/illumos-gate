@@ -251,6 +251,26 @@ do
 '"$ZSNAP_LIN"'' $dest > $TEMPF
 			mv -f $TEMPF $dest
 		fi
+
+		#
+		# Add the 'upnp' user if it doesn't exist.
+		#
+		UPNP_LIN="upnp:x:52:52:UPnP Server Reserved UID:/var/coherence:/bin/ksh"
+		cur_name=`awk -F: '$3 == 52 { print $1 }' $dest`
+		cur_id=`awk -F: '$1 == "upnp" { print $3 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "upnp" ]; then
+			echo "ERROR: Reserved UID 52 already assigned" \
+			    "to '$cur_name'" >> /tmp/CLEANUP
+		elif [ ! -z "$cur_id" -a "$cur_id" != "52" ]; then
+			echo "NOTE: upnp username already assigned" \
+			    "to id '$cur_id'" >> /tmp/CLEANUP
+		elif grep "$UPNP_LIN" $dest > /dev/null 2>&1; then
+			:
+		else
+			sed '/^zfssnap:x/ a\
+'"$UPNP_LIN"'' $dest > $TEMPF
+			mv -f $TEMPF $dest
+		fi
 	fi
 done
 
