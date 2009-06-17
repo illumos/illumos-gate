@@ -449,8 +449,6 @@ heci_detach(dev_info_t *dip,  ddi_detach_cmd_t cmd)
 
 	dev->iamthif_current_cb = NULL;
 	dev->iamthif_file_ext.file = NULL;
-	dev->num_heci_me_clients = 0;
-
 
 	/* disable interrupts */
 	heci_csr_disable_interrupts(dev);
@@ -468,6 +466,8 @@ heci_detach(dev_info_t *dip,  ddi_detach_cmd_t cmd)
 		kmem_free(dev->me_clients, sizeof (struct heci_me_client) *
 		    dev->num_heci_me_clients);
 	}
+
+	dev->num_heci_me_clients = 0;
 
 	heci_destroy_locks(dev);
 
