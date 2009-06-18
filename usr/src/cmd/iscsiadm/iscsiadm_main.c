@@ -3048,6 +3048,10 @@ modifyNodeAuthParam(IMA_OID oid, int param, char *chapName, int *funcRet)
 			(void) fprintf(stderr, "CHAP name cannot be NULL.\n");
 			return (1);
 		}
+		if (strlen(chapName) == 0) {
+			(void) fprintf(stderr, "CHAP name cannot be empty.\n");
+			return (1);
+		}
 		(void) memset(&authParams.chapParms.name, 0,
 		    sizeof (authParams.chapParms.name));
 		(void) memcpy(&authParams.chapParms.name,
@@ -3111,6 +3115,10 @@ modifyTargetAuthParam(IMA_OID oid, int param, char *chapName, int *funcRet)
 	case AUTH_NAME:
 		if (chapName == NULL) {
 			(void) fprintf(stderr, "CHAP name cannot be NULL.\n");
+			return (1);
+		}
+		if (strlen(chapName) == 0) {
+			(void) fprintf(stderr, "CHAP name cannot be empty.\n");
 			return (1);
 		}
 		(void) memset(&authParams.chapParms.name, 0,
