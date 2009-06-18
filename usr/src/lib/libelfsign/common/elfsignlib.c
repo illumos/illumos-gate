@@ -354,7 +354,7 @@ elfsign_begin(const char *filename, enum ES_ACTION action, ELFsign_t *essp)
 	 * Call elf_getshstrndx to be sure we have a real ELF object
 	 * this is required because elf_begin doesn't check that.
 	 */
-	if (elf_getshdrstrndx(ess->es_elf, &ess->es_shstrndx) == -1) {
+	if (elf_getshstrndx(ess->es_elf, &ess->es_shstrndx) == 0) {
 		elfsign_end(ess);
 		cryptodebug("elfsign_begin: elf_getshstrndx failed");
 		return (ELFSIGN_INVALID_ELFOBJ);
