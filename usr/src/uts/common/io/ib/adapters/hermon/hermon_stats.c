@@ -834,6 +834,21 @@ hermon_kstat_perfcntr64_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE) {
 		if (data[HERMON_PERFCNTR64_ENABLE_IDX].value.ui32) {
 			if (ksi64->hki64_enabled == 0) {
+				/*
+				 * Reset the hardware counters to ensure that
+				 * the hardware counter doesn't max out
+				 * (and hence stop counting) before we get
+				 * a chance to reset the counter in
+				 * hermon_kstat_perfcntr64_update_thread.
+				 */
+				if (hermon_getperfcntr_cmd_post(state,
+				    ksi64->hki64_port_num,
+				    HERMON_CMD_NOSLEEP_SPIN, NULL, 1) !=
+				    HERMON_CMD_SUCCESS) {
+					mutex_exit(&ksi->hki_perfcntr64_lock);
+					return (EIO);
+				}
+
 				/* Enable 64 bit software counters */
 				ksi64->hki64_enabled = 1;
 				for (i = 0;
@@ -867,6 +882,8 @@ hermon_kstat_perfcntr64_update(kstat_t *ksp, int rw)
 			mutex_exit(&ksi->hki_perfcntr64_lock);
 			return (EIO);
 		}
+
+		data[HERMON_PERFCNTR64_ENABLE_IDX].value.ui32 = 1;
 
 		data[HERMON_PERFCNTR64_XMIT_DATA_IDX].value.ui64 =
 		    ksi64->hki64_counters[HERMON_PERFCNTR64_XMIT_DATA_IDX] +
