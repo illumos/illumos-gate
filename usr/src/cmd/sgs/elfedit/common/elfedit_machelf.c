@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ELFCLASS specific code for elfedit, built once for each class
@@ -109,17 +108,19 @@ elfedit32_init_obj_state(const char *file, int fd, Elf *elf)
 #define	INITIAL_SYMTABNDX_ALLOC	5
 
 	/*
-	 * This macro is used to call functions from libelf, all of which
-	 * return NULL for failure and something else for success. On error,
-	 * libelf_fail_name is set and execution jumps to the libelf_failure
-	 * label for handling. Otherwise, the results of the call are ready
-	 * for use by the caller.
+	 * These macros are used to call functions from libelf.
+	 *
+	 * LIBELF_FAIL encapsulates the common way in which we handle
+	 * all of these errors: libelf_fail_name is set and execution
+	 * jumps to the libelf_failure label for handling.
+	 *
+	 * LIBELF is used for the common case in which the function returns
+	 * NULL for failure and something else for success.
 	 */
+#define	LIBELF_FAIL(_name) { libelf_fail_name = _name; goto libelf_failure; }
 #define	LIBELF(_libelf_expr, _name) \
-	if ((_libelf_expr) == NULL) { \
-		libelf_fail_name = _name; \
-		goto libelf_failure; \
-	}
+	if ((_libelf_expr) == NULL) \
+		LIBELF_FAIL(_name)
 
 	const char *libelf_fail_name;	/* Used for LIBELF errors */
 
@@ -146,8 +147,8 @@ elfedit32_init_obj_state(const char *file, int fd, Elf *elf)
 	    MSG_ORIG(MSG_ELF_GETEHDR))
 
 	/* Program header array count and address */
-	LIBELF(elf_getphnum(tstate.os_elf, &tstate.os_phnum),
-	    MSG_ORIG(MSG_ELF_GETPHNUM))
+	if (elf_getphdrnum(tstate.os_elf, &tstate.os_phnum) == -1)
+		LIBELF_FAIL(MSG_ORIG(MSG_ELF_GETPHDRNUM))
 	if (tstate.os_phnum > 0) {
 		LIBELF((tstate.os_phdr = elf_getphdr(tstate.os_elf)),
 		    MSG_ORIG(MSG_ELF_GETPHDR))
@@ -155,17 +156,15 @@ elfedit32_init_obj_state(const char *file, int fd, Elf *elf)
 		tstate.os_phdr = NULL;
 	}
 
-
-	LIBELF(elf_getshnum(tstate.os_elf, &tstate.os_shnum),
-	    MSG_ORIG(MSG_ELF_GETSHNUM))
-
+	if (elf_getshdrnum(tstate.os_elf, &tstate.os_shnum) == -1)
+		LIBELF_FAIL(MSG_ORIG(MSG_ELF_GETSHDRNUM))
 
 	/*
 	 * Obtain the .shstrtab data buffer to provide the required section
 	 * name strings.
 	 */
-	LIBELF(elf_getshstrndx(tstate.os_elf, &tstate.os_shstrndx),
-	    MSG_ORIG(MSG_ELF_GETSHSTRNDX))
+	if (elf_getshdrstrndx(tstate.os_elf, &tstate.os_shstrndx) == -1)
+		LIBELF_FAIL(MSG_ORIG(MSG_ELF_GETSHDRSTRNDX))
 	LIBELF((scn = elf_getscn(tstate.os_elf, tstate.os_shstrndx)),
 	    MSG_ORIG(MSG_ELF_GETSCN))
 	LIBELF((data = elf_getdata(scn, NULL)), MSG_ORIG(MSG_ELF_GETDATA))
@@ -448,6 +447,7 @@ libelf_failure:
 		free(obj_state);
 	(void) close(tstate.os_fd);
 	elfedit_elferr(tstate.os_file, libelf_fail_name);
-#undef LIBELF_FAILURE
 #undef INITIAL_SYMTABNDX_ALLOC
+#undef LIBELF_FAIL
+#undef LIBELF
 }

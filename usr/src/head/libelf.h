@@ -22,14 +22,12 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LIBELF_H
 #define	_LIBELF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9	*/
 
 #include <sys/types.h>
 #include <sys/elf.h>
@@ -191,8 +189,11 @@ Elf32_Phdr	*elf32_getphdr	_((Elf *));
 Elf_Scn		*elf_getscn	_((Elf *elf, size_t));
 Elf32_Shdr	*elf32_getshdr	_((Elf_Scn *));
 int		elf_getphnum	_((Elf *, size_t *));
+int		elf_getphdrnum	_((Elf *, size_t *));
 int		elf_getshnum	_((Elf *, size_t *));
+int		elf_getshdrnum	_((Elf *, size_t *));
 int		elf_getshstrndx	_((Elf *, size_t *));
+int		elf_getshdrstrndx _((Elf *, size_t *));
 unsigned long	elf_hash	_((const char *));
 uint_t		elf_sys_encoding _((void));
 long		elf32_checksum	_((Elf *));

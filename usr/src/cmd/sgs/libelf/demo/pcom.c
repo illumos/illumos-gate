@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,8 +32,6 @@
  * for a .comment section.  If a .comment section is found it's
  * contents will be displayed on stdout.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <libelf.h>
@@ -58,9 +55,9 @@ print_comment(Elf *elf, const char *file)
 
 	(void) printf("%s .comment:\n", file);
 
-	if (elf_getshstrndx(elf, &shstrndx) == 0) {
-		(void) fprintf(stderr, "%s: elf_getshstrndx() failed: %s\n",
-			file, elf_errmsg(0));
+	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
+		(void) fprintf(stderr, "%s: elf_getshdrstrndx() failed: %s\n",
+		    file, elf_errmsg(0));
 		return;
 	}
 
@@ -71,9 +68,8 @@ print_comment(Elf *elf, const char *file)
 		 * this is the section we want to process.
 		 */
 		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			return;
 		}
 		if (strcmp(CommentStr, elf_strptr(elf, shstrndx,
@@ -87,8 +83,8 @@ print_comment(Elf *elf, const char *file)
 			 */
 			if ((data = elf_getdata(scn, 0)) == 0) {
 				(void) fprintf(stderr,
-					"%s: elf_getdata() failed: %s\n",
-					file, elf_errmsg(0));
+				    "%s: elf_getdata() failed: %s\n",
+				    file, elf_errmsg(0));
 				return;
 			}
 			/*
@@ -155,8 +151,8 @@ process_elf(Elf *elf, char *file, int fd, int member)
 	default:
 		if (!member)
 			(void) fprintf(stderr,
-				"%s: unexpected elf_kind(): 0x%x\n",
-				file, elf_kind(elf));
+			    "%s: unexpected elf_kind(): 0x%x\n",
+			    file, elf_kind(elf));
 		return;
 	}
 }
@@ -178,7 +174,7 @@ main(int argc, char **argv)
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		(void) fprintf(stderr,
-			"elf_version() failed: %s\n", elf_errmsg(0));
+		    "elf_version() failed: %s\n", elf_errmsg(0));
 		return (1);
 	}
 

@@ -550,8 +550,7 @@ typedef struct {
 #define	STT_FILE	4		/* symbol's name is file name */
 #define	STT_COMMON	5		/* common data object */
 #define	STT_TLS		6		/* thread-local data object */
-#define	STT_IFUNC	7		/* indirect code object (unused) */
-#define	STT_NUM		8		/* # defined types in generic range */
+#define	STT_NUM		7		/* # defined types in generic range */
 #define	STT_LOOS	10		/* OS specific range */
 #define	STT_HIOS	12
 #define	STT_LOPROC	13		/* processor specific range */

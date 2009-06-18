@@ -1122,8 +1122,8 @@ fake_shdr_cache(const char *file, int fd, Elf *elf, Ehdr *ehdr,
 	fstate.file = file;
 	fstate.fd = fd;
 	fstate.ehdr = ehdr;
-	if (elf_getphnum(elf, &fstate.phnum) == 0) {
-		failure(file, MSG_ORIG(MSG_ELF_GETPHNUM));
+	if (elf_getphdrnum(elf, &fstate.phnum) == -1) {
+		failure(file, MSG_ORIG(MSG_ELF_GETPHDRNUM));
 		return (0);
 	}
 	if ((fstate.phdr = elf_getphdr(elf)) == NULL) {

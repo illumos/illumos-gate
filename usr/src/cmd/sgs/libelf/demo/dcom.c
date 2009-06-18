@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -109,25 +107,25 @@ delete_comment(Elf *elf, int fd, const char *file)
 
 	if (gelf_getehdr(elf, &ehdr) == 0) {
 		(void) fprintf(stderr, "%s: elf_getehdr() failed: %s\n",
-			file, elf_errmsg(0));
+		    file, elf_errmsg(0));
 		return;
 	}
 
-	if (elf_getshnum(elf, &shnum) == 0) {
-		(void) fprintf(stderr, "%s: elf_getshnum() failed: %s\n",
-			file, elf_errmsg(0));
+	if (elf_getshdrnum(elf, &shnum) == -1) {
+		(void) fprintf(stderr, "%s: elf_getshdrnum() failed: %s\n",
+		    file, elf_errmsg(0));
 		return;
 	}
 
-	if (elf_getshstrndx(elf, &shstrndx) == 0) {
-		(void) fprintf(stderr, "%s: elf_getshstrndx() failed: %s\n",
-			file, elf_errmsg(0));
+	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
+		(void) fprintf(stderr, "%s: elf_getshdrstrndx() failed: %s\n",
+		    file, elf_errmsg(0));
 		return;
 	}
 
-	if (elf_getphnum(elf, &phnum) == 0) {
-		(void) fprintf(stderr, "%s: elf_getphnum() failed: %s\n",
-			file, elf_errmsg(0));
+	if (elf_getphdrnum(elf, &phnum) == -1) {
+		(void) fprintf(stderr, "%s: elf_getphdrnum() failed: %s\n",
+		    file, elf_errmsg(0));
 		return;
 	}
 
@@ -146,9 +144,8 @@ delete_comment(Elf *elf, int fd, const char *file)
 		 * this is the section we want to process.
 		 */
 		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
@@ -164,8 +161,8 @@ delete_comment(Elf *elf, int fd, const char *file)
 			 */
 			if (shdr.sh_addr != 0) {
 				(void) printf("%s: .comment section is "
-					"part of a loadable segment, it "
-					"cannot be deleted.\n", file);
+				    "part of a loadable segment, it "
+				    "cannot be deleted.\n", file);
 				free(shndx);
 				return;
 			}
@@ -195,13 +192,13 @@ delete_comment(Elf *elf, int fd, const char *file)
 
 	if (gelf_newehdr(telf, gelf_getclass(elf)) == 0) {
 		(void) fprintf(stderr, "%s: elf_newehdr() failed: %s\n",
-			file, elf_errmsg(0));
+		    file, elf_errmsg(0));
 		free(shndx);
 		return;
 	}
 	if (gelf_getehdr(telf, &tehdr) == 0) {
 		(void) fprintf(stderr, "%s: elf_getehdr() failed: %s\n",
-			file, elf_errmsg(0));
+		    file, elf_errmsg(0));
 		free(shndx);
 		return;
 	}
@@ -225,23 +222,20 @@ delete_comment(Elf *elf, int fd, const char *file)
 		 * new file.
 		 */
 		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
 		if ((tscn = elf_newscn(telf)) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_newscn() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_newscn() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
 		if (gelf_getshdr(tscn, &tshdr) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
@@ -268,16 +262,14 @@ delete_comment(Elf *elf, int fd, const char *file)
 		gelf_update_shdr(tscn, &tshdr);
 
 		if ((data = elf_getdata(scn, 0)) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getdata() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getdata() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
 		if ((tdata = elf_newdata(tscn)) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_newdata() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_newdata() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
@@ -296,16 +288,14 @@ delete_comment(Elf *elf, int fd, const char *file)
 		 * store the shstrndx in Shdr[0].sh_link
 		 */
 		if ((_scn = elf_getscn(telf, 0)) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getscn() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getscn() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
 		if (gelf_getshdr(_scn, &shdr0) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			free(shndx);
 			return;
 		}
@@ -322,17 +312,16 @@ delete_comment(Elf *elf, int fd, const char *file)
 	 */
 	if (phnum != 0) {
 		if (gelf_newphdr(telf, phnum) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_newphdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_newphdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			return;
 		}
 		for (ndx = 0; ndx < (int)phnum; ndx++) {
 			if (gelf_getphdr(elf, ndx, &phdr) == 0 ||
 			    gelf_getphdr(telf, ndx, &tphdr) == 0) {
 				(void) fprintf(stderr,
-					"%s: elf_getphdr() failed: %s\n",
-					file, elf_errmsg(0));
+				    "%s: elf_getphdr() failed: %s\n",
+				    file, elf_errmsg(0));
 				return;
 			}
 			tphdr = phdr;
@@ -347,7 +336,7 @@ delete_comment(Elf *elf, int fd, const char *file)
 	 */
 	if (elf_update(telf, ELF_C_WRITE) == -1) {
 		(void) fprintf(stderr, "elf_update() failed: %s\n",
-			elf_errmsg(0));
+		    elf_errmsg(0));
 		(void) elf_end(telf);
 		(void) close(tfd);
 		return;
@@ -387,7 +376,7 @@ main(int argc, char ** argv)
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		(void) fprintf(stderr, "elf_version() failed: %s\n",
-			elf_errmsg(0));
+		    elf_errmsg(0));
 		return (1);
 	}
 
@@ -423,8 +412,7 @@ main(int argc, char ** argv)
 			 * ELF files.
 			 */
 			(void) printf("%s not of type ELF_K_ELF.  "
-				"elf_kind == %d\n",
-				elf_fname, elf_kind(elf));
+			    "elf_kind == %d\n", elf_fname, elf_kind(elf));
 		} else
 			delete_comment(elf, fd, elf_fname);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1288,7 +1288,7 @@ core_find_text(struct ps_prochandle *P, Elf *elf, rd_loadobj_t *rlp)
 	uint_t i;
 	size_t nphdrs;
 
-	if (elf_getphnum(elf, &nphdrs) == 0)
+	if (elf_getphdrnum(elf, &nphdrs) == -1)
 		return (NULL);
 
 	for (i = 0; i < nphdrs; i++) {
@@ -1323,7 +1323,7 @@ core_find_data(struct ps_prochandle *P, Elf *elf, rd_loadobj_t *rlp)
 	 * as the virtual address at which is was loaded.
 	 */
 	if (gelf_getehdr(elf, &ehdr) == NULL ||
-	    elf_getphnum(elf, &nphdrs) == 0)
+	    elf_getphdrnum(elf, &nphdrs) == -1)
 		return (NULL);
 
 	for (i = 0; i < nphdrs; i++) {

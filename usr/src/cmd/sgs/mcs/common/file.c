@@ -258,7 +258,7 @@ process_file(Elf *elf, char *cur_file, Cmd_Info *cmd_info)
 		return (FAILURE);
 	}
 
-	if (elf_getshnum(elf, &shnum) == NULL) {
+	if (elf_getshdrnum(elf, &shnum) == -1) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR, elf_errmsg(-1), prog);
 		return (FAILURE);
 	}
@@ -328,11 +328,11 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 
 	state->Sect_exists = 0;
 
-	if (elf_getshnum(elf, &shnum) == NULL) {
+	if (elf_getshdrnum(elf, &shnum) == -1) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR, elf_errmsg(-1), prog);
 		return (FAILURE);
 	}
-	if (elf_getshstrndx(elf, &shstrndx) == NULL) {
+	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR, elf_errmsg(-1), prog);
 		return (FAILURE);
 	}
@@ -693,11 +693,11 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 	size_t shnum, shstrndx;
 
 
-	if (elf_getshnum(src_elf, &shnum) == NULL) {
+	if (elf_getshdrnum(src_elf, &shnum) == -1) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR, elf_errmsg(-1), prog);
 		return (FAILURE);
 	}
-	if (elf_getshstrndx(src_elf, &shstrndx) == NULL) {
+	if (elf_getshdrstrndx(src_elf, &shstrndx) == -1) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR, elf_errmsg(-1), prog);
 		return (FAILURE);
 	}

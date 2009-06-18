@@ -538,7 +538,7 @@ get_symtab(Elf *elf_file, char *filename)
 	GElf_Word symtabtype;
 	size_t shstrndx;
 
-	if (elf_getshstrndx(elf_file, &shstrndx) == 0) {
+	if (elf_getshdrstrndx(elf_file, &shstrndx) == -1) {
 		(void) fprintf(stderr, gettext(
 		    "%s: %s: could not get e_shstrndx\n"),
 		    prog_name, filename);

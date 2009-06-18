@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tpcom: Threaded Print Comment
@@ -77,9 +74,9 @@ print_comment(Elf *elf, const char *file)
 	size_t		shstrndx;
 
 
-	if (elf_getshstrndx(elf, &shstrndx) == 0) {
-		(void) fprintf(stderr, "%s: elf_getshstrndx() failed: %s\n",
-			file, elf_errmsg(0));
+	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
+		(void) fprintf(stderr, "%s: elf_getshdrstrndx() failed: %s\n",
+		    file, elf_errmsg(0));
 		return;
 	}
 	while ((scn = elf_nextscn(elf, scn)) != 0) {
@@ -89,9 +86,8 @@ print_comment(Elf *elf, const char *file)
 		 * this is the section we want to process.
 		 */
 		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			return;
 		}
 
@@ -109,8 +105,8 @@ print_comment(Elf *elf, const char *file)
 			 */
 			if ((data = elf_getdata(scn, 0)) == 0) {
 				(void) fprintf(stderr,
-					"%s: elf_getdata() failed: %s\n",
-					file, elf_errmsg(0));
+				    "%s: elf_getdata() failed: %s\n",
+				    file, elf_errmsg(0));
 				mutex_unlock(&printlock);
 				return;
 			}
@@ -153,23 +149,23 @@ process_elf(pe_args * pep)
 
 			if ((arhdr = elf_getarhdr(_elf)) == 0) {
 				(void) fprintf(stderr,
-					"%s: elf_getarhdr() failed: %s\n",
-					pep->pe_file, elf_errmsg(0));
+				    "%s: elf_getarhdr() failed: %s\n",
+				    pep->pe_file, elf_errmsg(0));
 			}
 			cmd = elf_next(_elf);
 			_pep = malloc(sizeof (pe_args));
 			_pep->pe_elf = _elf;
 			_pep->pe_file = malloc(strlen(pep->pe_file) +
-				strlen(arhdr->ar_name) + 5);
+			    strlen(arhdr->ar_name) + 5);
 			(void) sprintf(_pep->pe_file,
-				"%s(%s)", pep->pe_file, arhdr->ar_name);
+			    "%s(%s)", pep->pe_file, arhdr->ar_name);
 			_pep->pe_fd = pep->pe_fd;
 			_pep->pe_member = 1;
 			if ((rc = thr_create(NULL, 0,
 			    (void *(*)(void *))process_elf,
 			    (void *)_pep, THR_DETACHED, 0)) != 0) {
 				(void) fprintf(stderr,
-					"thr_create() failed, rc = %d\n", rc);
+				    "thr_create() failed, rc = %d\n", rc);
 			}
 		}
 		break;
@@ -177,8 +173,8 @@ process_elf(pe_args * pep)
 		if (!pep->pe_member) {
 			mutex_lock(&printlock);
 			(void) fprintf(stderr,
-				"%s: unexpected elf_kind(): 0x%x\n",
-				pep->pe_file, elf_kind(pep->pe_elf));
+			    "%s: unexpected elf_kind(): 0x%x\n",
+			    pep->pe_file, elf_kind(pep->pe_elf));
 			mutex_unlock(&printlock);
 		}
 	}
@@ -207,7 +203,7 @@ main(int argc, char ** argv)
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		(void) fprintf(stderr,
-			"elf_version() failed: %s\n", elf_errmsg(0));
+		    "elf_version() failed: %s\n", elf_errmsg(0));
 		return (1);
 	}
 
@@ -255,7 +251,7 @@ main(int argc, char ** argv)
 		    (void *)pep, THR_DETACHED, 0)) != 0) {
 			mutex_lock(&printlock);
 			(void) fprintf(stderr,
-				"thr_create() failed with code: %d\n", rc);
+			    "thr_create() failed with code: %d\n", rc);
 			mutex_unlock(&printlock);
 			return (1);
 		}

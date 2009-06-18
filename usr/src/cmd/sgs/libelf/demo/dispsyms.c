@@ -61,9 +61,8 @@ static const char *symtype[STT_NUM] = {
 /* STT_FILE */		"FILE",
 /* STT_COMMON */	"COMM",
 /* STT_TLS */		"TLS"
-/* STT_IFUNC */		"IFUNC"
 };
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. Update symtype[]."
 #endif
 
@@ -85,8 +84,8 @@ print_symtab(Elf *elf, const char *file)
 		return;
 	}
 
-	if (elf_getshstrndx(elf, &shstrndx) == 0) {
-		(void) fprintf(stderr, "%s: elf_getshstrndx() failed: %s\n",
+	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
+		(void) fprintf(stderr, "%s: elf_getshdrstrndx() failed: %s\n",
 		    file, elf_errmsg(0));
 		return;
 	}

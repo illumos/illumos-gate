@@ -927,7 +927,7 @@ gelf32_symtab_sort(mdb_gelf_symtab_t *gst)
 static void
 gelf32_symtab_init(mdb_gelf_symtab_t *gst)
 {
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. update gelf32_symtab_init()"
 #endif
 
@@ -954,7 +954,7 @@ gelf32_symtab_init(mdb_gelf_symtab_t *gst)
 		const char *name = base + sym->st_name;
 		uchar_t type = ELF32_ST_TYPE(sym->st_info);
 
-		if (type >= STT_IFUNC || type == STT_SECTION)
+		if (type >= STT_NUM || type == STT_SECTION)
 			continue; /* skip sections and unknown types */
 
 		if (sym->st_name >= ss_size || name[0] < '!' || name[0] > '~') {
@@ -1024,7 +1024,7 @@ gelf64_symtab_sort(mdb_gelf_symtab_t *gst)
 static void
 gelf64_symtab_init(mdb_gelf_symtab_t *gst)
 {
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. update gelf64_symtab_init()"
 #endif
 
@@ -1051,7 +1051,7 @@ gelf64_symtab_init(mdb_gelf_symtab_t *gst)
 		const char *name = base + sym->st_name;
 		uchar_t type = ELF64_ST_TYPE(sym->st_info);
 
-		if (type >= STT_IFUNC || type == STT_SECTION)
+		if (type >= STT_NUM || type == STT_SECTION)
 			continue; /* skip sections and unknown types */
 
 		if (sym->st_name >= ss_size || name[0] < '!' || name[0] > '~') {

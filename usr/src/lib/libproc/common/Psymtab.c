@@ -1664,8 +1664,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		if ((elf = fake_elf(P, fptr)) == NULL ||
 		    elf_kind(elf) != ELF_K_ELF ||
 		    gelf_getehdr(elf, &ehdr) == NULL ||
-		    elf_getshnum(elf, &nshdrs) == 0 ||
-		    elf_getshstrndx(elf, &shstrndx) == 0 ||
+		    elf_getshdrnum(elf, &nshdrs) == -1 ||
+		    elf_getshdrstrndx(elf, &shstrndx) == -1 ||
 		    (scn = elf_getscn(elf, shstrndx)) == NULL ||
 		    (shdata = elf_getdata(scn, NULL)) == NULL) {
 			dprintf("failed to fake up ELF file\n");
@@ -1675,8 +1675,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	} else if ((elf = elf_begin(fptr->file_fd, ELF_C_READ, NULL)) == NULL ||
 	    elf_kind(elf) != ELF_K_ELF ||
 	    gelf_getehdr(elf, &ehdr) == NULL ||
-	    elf_getshnum(elf, &nshdrs) == 0 ||
-	    elf_getshstrndx(elf, &shstrndx) == 0 ||
+	    elf_getshdrnum(elf, &nshdrs) == -1 ||
+	    elf_getshdrstrndx(elf, &shstrndx) == -1 ||
 	    (scn = elf_getscn(elf, shstrndx)) == NULL ||
 	    (shdata = elf_getdata(scn, NULL)) == NULL) {
 		int err = elf_errno();
@@ -1687,8 +1687,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		if ((elf = fake_elf(P, fptr)) == NULL ||
 		    elf_kind(elf) != ELF_K_ELF ||
 		    gelf_getehdr(elf, &ehdr) == NULL ||
-		    elf_getshnum(elf, &nshdrs) == 0 ||
-		    elf_getshstrndx(elf, &shstrndx) == 0 ||
+		    elf_getshdrnum(elf, &nshdrs) == -1 ||
+		    elf_getshdrstrndx(elf, &shstrndx) == -1 ||
 		    (scn = elf_getscn(elf, shstrndx)) == NULL ||
 		    (shdata = elf_getdata(scn, NULL)) == NULL) {
 			dprintf("failed to fake up ELF file\n");
@@ -1712,8 +1712,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		if ((newelf = fake_elf(P, fptr)) == NULL ||
 		    elf_kind(newelf) != ELF_K_ELF ||
 		    gelf_getehdr(newelf, &ehdr) == NULL ||
-		    elf_getshnum(newelf, &nshdrs) == 0 ||
-		    elf_getshstrndx(newelf, &shstrndx) == 0 ||
+		    elf_getshdrnum(newelf, &nshdrs) == -1 ||
+		    elf_getshdrstrndx(newelf, &shstrndx) == -1 ||
 		    (scn = elf_getscn(newelf, shstrndx)) == NULL ||
 		    (shdata = elf_getdata(scn, NULL)) == NULL) {
 			dprintf("failed to fake up ELF file\n");
@@ -2757,7 +2757,7 @@ static int
 Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
     int which, int mask, pr_order_t order, proc_xsym_f *func, void *cd)
 {
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. update Psymbol_iter_com()"
 #endif
 
@@ -2845,7 +2845,7 @@ Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
 			 * maintain binary compatibility, so I think this is
 			 * reasonably fair game.
 			 */
-			if (s_bind < STB_NUM && s_type < STT_IFUNC) {
+			if (s_bind < STB_NUM && s_type < STT_NUM) {
 				type = (1 << (s_type + 8)) | (1 << s_bind);
 				if ((type & ~mask) != 0)
 					continue;

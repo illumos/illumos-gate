@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include "_libelf.h"
@@ -223,7 +221,7 @@ gelf_getphdr(Elf *elf, int ndx, GElf_Phdr *dst)
 	if (elf == NULL)
 		return (NULL);
 
-	if (elf_getphnum(elf, &phnum) == 0)
+	if (elf_getphdrnum(elf, &phnum) == -1)
 		return (NULL);
 
 	if (phnum <= ndx) {
@@ -270,7 +268,7 @@ gelf_update_phdr(Elf *elf, int ndx, GElf_Phdr *src)
 	if (elf == NULL)
 		return (0);
 
-	if (elf_getphnum(elf, &phnum) == 0)
+	if (elf_getphdrnum(elf, &phnum) == -1)
 		return (NULL);
 
 	if (phnum < ndx) {

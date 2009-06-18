@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <errno.h>
@@ -390,7 +388,7 @@ dis_tgt_create(const char *file)
 		current->dt_elf = elf;
 		current->dt_arhdr = arhdr;
 
-		if (elf_getshstrndx(elf, &current->dt_shstrndx) == -1) {
+		if (elf_getshdrstrndx(elf, &current->dt_shstrndx) == -1) {
 			warn("%s: failed to get section string table for "
 			    "file", file);
 			dis_tgt_destroy(tgt);

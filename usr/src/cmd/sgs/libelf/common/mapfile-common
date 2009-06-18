@@ -37,6 +37,13 @@
 # MAPFILE HEADER END
 #
 
+SUNW_1.7 {
+    global:
+	elf_getphdrnum;
+	elf_getshdrnum;
+	elf_getshdrstrndx;
+} SUNW_1.6;
+
 SUNW_1.6 {
     global:
 	elf_getphnum;

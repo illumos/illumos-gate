@@ -64,7 +64,7 @@ dt_module_symhash_insert(dt_module_t *dmp, const char *name, uint_t id)
 static uint_t
 dt_module_syminit32(dt_module_t *dmp)
 {
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. update dt_module_syminit32()"
 #endif
 
@@ -78,7 +78,7 @@ dt_module_syminit32(dt_module_t *dmp)
 		const char *name = base + sym->st_name;
 		uchar_t type = ELF32_ST_TYPE(sym->st_info);
 
-		if (type >= STT_IFUNC || type == STT_SECTION)
+		if (type >= STT_NUM || type == STT_SECTION)
 			continue; /* skip sections and unknown types */
 
 		if (sym->st_name == 0 || sym->st_name >= ss_size)
@@ -97,7 +97,7 @@ dt_module_syminit32(dt_module_t *dmp)
 static uint_t
 dt_module_syminit64(dt_module_t *dmp)
 {
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. update dt_module_syminit64()"
 #endif
 
@@ -111,7 +111,7 @@ dt_module_syminit64(dt_module_t *dmp)
 		const char *name = base + sym->st_name;
 		uchar_t type = ELF64_ST_TYPE(sym->st_info);
 
-		if (type >= STT_IFUNC || type == STT_SECTION)
+		if (type >= STT_NUM || type == STT_SECTION)
 			continue; /* skip sections and unknown types */
 
 		if (sym->st_name == 0 || sym->st_name >= ss_size)
@@ -474,7 +474,7 @@ dt_module_load_sect(dtrace_hdl_t *dtp, dt_module_t *dmp, ctf_sect_t *ctsp)
 	Elf_Data *dp;
 	Elf_Scn *sp;
 
-	if (elf_getshstrndx(dmp->dm_elf, &shstrs) == 0)
+	if (elf_getshdrstrndx(dmp->dm_elf, &shstrs) == -1)
 		return (dt_set_errno(dtp, EDT_NOTLOADED));
 
 	for (sp = NULL; (sp = elf_nextscn(dmp->dm_elf, sp)) != NULL; ) {
@@ -823,7 +823,7 @@ dt_module_update(dtrace_hdl_t *dtp, const char *name)
 	(void) close(fd);
 
 	if (dmp->dm_elf == NULL || err == -1 ||
-	    elf_getshstrndx(dmp->dm_elf, &shstrs) == 0) {
+	    elf_getshdrstrndx(dmp->dm_elf, &shstrs) == -1) {
 		dt_dprintf("failed to load %s: %s\n",
 		    fname, elf_errmsg(elf_errno()));
 		dt_module_destroy(dtp, dmp);

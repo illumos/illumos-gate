@@ -789,9 +789,9 @@ dump_reloc_table(Elf *elf_file, GElf_Ehdr *p_ehdr,
 
 	head_scns = p_head_scns;
 
-	if (elf_getshnum(elf_file, &shnum) == 0) {
+	if (elf_getshdrnum(elf_file, &shnum) == -1) {
 		(void) fprintf(stderr,
-		    "%s: %s: elf_getshnum failed: %s\n",
+		    "%s: %s: elf_getshdrnum failed: %s\n",
 		    prog_name, filename, elf_errmsg(-1));
 		return;
 	}
@@ -1658,15 +1658,15 @@ dump_section_table(Elf *elf_file, GElf_Ehdr *elf_head_p, char *filename)
 	size_t		shnum;
 
 
-	if (elf_getshnum(elf_file, &shnum) == 0) {
+	if (elf_getshdrnum(elf_file, &shnum) == -1) {
 		(void) fprintf(stderr,
-		    "%s: %s: elf_getshnum failed: %s\n",
+		    "%s: %s: elf_getshdrnum failed: %s\n",
 		    prog_name, filename, elf_errmsg(-1));
 		return;
 	}
-	if (elf_getshstrndx(elf_file, &shstrndx) == 0) {
+	if (elf_getshdrstrndx(elf_file, &shstrndx) == -1) {
 		(void) fprintf(stderr,
-		    "%s: %s: elf_getshstrndx failed: %s\n",
+		    "%s: %s: elf_getshdrstrndx failed: %s\n",
 		    prog_name, filename, elf_errmsg(-1));
 		return;
 	}

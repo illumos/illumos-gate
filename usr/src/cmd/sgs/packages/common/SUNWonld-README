@@ -1485,3 +1485,6 @@ Bugid   Risk Synopsis
 6784790 ld should examine archives to determine output object class/machine
 	PSARC/2009/305 ld -32 option
 6849998 remove undocumented mapfile $SPECVERS and $NEED options
+6851224 elf_getshnum() and elf_getshstrndx() incompatible with 2002 ELF gABI
+	agreement
+	PSARC/2009/363 replace elf_getphnum, elf_getshnum, and elf_getshstrndx

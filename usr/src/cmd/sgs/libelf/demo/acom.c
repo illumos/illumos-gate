@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * acom: Append Comment
@@ -53,9 +51,9 @@ update_comment(Elf *elf, const char *file, const char *comment)
 	Elf_Data	*data;
 	size_t		shstrndx;
 
-	if (elf_getshstrndx(elf, &shstrndx) == 0) {
-		(void) fprintf(stderr, "%s: gelf_getshstrdx() failed: %s\n",
-			file, elf_errmsg(0));
+	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
+		(void) fprintf(stderr, "%s: gelf_getshdrstrdx() failed: %s\n",
+		    file, elf_errmsg(0));
 		return;
 	}
 
@@ -66,9 +64,8 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		 * this is the section we want to process.
 		 */
 		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			return;
 		}
 		if (strcmp(CommentStr, elf_strptr(elf, shstrndx,
@@ -80,24 +77,24 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		int	ndx;
 
 		(void) printf("%s has no .comment section.  "
-			"Creating one...\n", file);
+		    "Creating one...\n", file);
 		/*
 		 * First add the ".comment" string to the string table
 		 */
 		if ((scn = elf_getscn(elf, shstrndx)) == 0) {
 			(void) fprintf(stderr, "%s: elf_getscn() failed: %s\n",
-				file, elf_errmsg(0));
+			    file, elf_errmsg(0));
 			return;
 		}
 		if ((data = elf_getdata(scn, 0)) == 0) {
 			(void) fprintf(stderr, "%s: elf_getdata() failed: %s\n",
-				file, elf_errmsg(0));
+			    file, elf_errmsg(0));
 			return;
 		}
 		ndx = data->d_off + data->d_size;
 		if ((data = elf_newdata(scn)) == 0) {
 			(void) fprintf(stderr, "%s: elf_newdata() failed: %s\n",
-				file, elf_errmsg(0));
+			    file, elf_errmsg(0));
 			return;
 		}
 		data->d_buf = (void *)CommentStr;
@@ -111,13 +108,12 @@ update_comment(Elf *elf, const char *file, const char *comment)
 		 */
 		if ((scn = elf_newscn(elf)) == 0) {
 			(void) fprintf(stderr, "%s: elf_newscn() failed: %s\n",
-				file, elf_errmsg(0));
+			    file, elf_errmsg(0));
 			return;
 		}
 		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr,
-				"%s: elf_getshdr() failed: %s\n",
-				file, elf_errmsg(0));
+			(void) fprintf(stderr, "%s: elf_getshdr() failed: %s\n",
+			    file, elf_errmsg(0));
 			return;
 		}
 		shdr.sh_name = ndx;
@@ -136,13 +132,13 @@ update_comment(Elf *elf, const char *file, const char *comment)
 
 	if (shdr.sh_addr != 0) {
 		(void) printf("%s: .comment section is part of a "
-			"loadable segment, it cannot be changed.\n", file);
+		    "loadable segment, it cannot be changed.\n", file);
 		return;
 	}
 
 	if ((data = elf_newdata(scn)) == 0) {
 		(void) fprintf(stderr, "%s: elf_getdata() failed: %s\n",
-			file, elf_errmsg(0));
+		    file, elf_errmsg(0));
 		return;
 	}
 	data->d_buf = (void *)comment;
@@ -151,7 +147,7 @@ update_comment(Elf *elf, const char *file, const char *comment)
 
 	if (elf_update(elf, ELF_C_WRITE) == -1)
 		(void) fprintf(stderr, "%s: elf_update() failed: %s\n", file,
-			elf_errmsg(0));
+		    elf_errmsg(0));
 }
 
 
@@ -164,7 +160,7 @@ main(int argc, char **argv)
 
 	if (argc < 3) {
 		(void) printf("usage: %s <new comment> elf_file ...\n",
-			argv[0]);
+		    argv[0]);
 		return (1);
 	}
 
@@ -174,7 +170,7 @@ main(int argc, char **argv)
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		(void) fprintf(stderr, "elf_version() failed: %s\n",
-			elf_errmsg(0));
+		    elf_errmsg(0));
 		return (1);
 	}
 
@@ -212,8 +208,7 @@ main(int argc, char **argv)
 			update_comment(elf, elf_fname, new_comment);
 		else
 			(void) printf("%s not of type ELF_K_ELF.  "
-				"elf_kind == %d\n",
-				elf_fname, elf_kind(elf));
+			    "elf_kind == %d\n", elf_fname, elf_kind(elf));
 
 		(void) elf_end(elf);
 		(void) close(fd);

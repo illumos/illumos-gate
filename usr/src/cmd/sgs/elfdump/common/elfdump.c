@@ -1637,7 +1637,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 		0,			/* STT_FILE */
 		1,			/* STT_COMMON */
 		0,			/* STT_TLS */
-		0,			/* STT_IFUNC */
+		0,			/* 7 */
 		0,			/* 8 */
 		0,			/* 9 */
 		0,			/* 10 */
@@ -1647,7 +1647,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 		0,			/* 14 */
 		0,			/* 15 */
 	};
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. Update addr_symtype[]"
 #endif
 
@@ -4218,18 +4218,18 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		return (ret);
 	}
 
-	if (elf_getshnum(elf, &shnum) == 0) {
-		failure(file, MSG_ORIG(MSG_ELF_GETSHNUM));
+	if (elf_getshdrnum(elf, &shnum) == -1) {
+		failure(file, MSG_ORIG(MSG_ELF_GETSHDRNUM));
 		return (ret);
 	}
 
-	if (elf_getshstrndx(elf, &shstrndx) == 0) {
-		failure(file, MSG_ORIG(MSG_ELF_GETSHSTRNDX));
+	if (elf_getshdrstrndx(elf, &shstrndx) == -1) {
+		failure(file, MSG_ORIG(MSG_ELF_GETSHDRSTRNDX));
 		return (ret);
 	}
 
-	if (elf_getphnum(elf, &phnum) == 0) {
-		failure(file, MSG_ORIG(MSG_ELF_GETPHNUM));
+	if (elf_getphdrnum(elf, &phnum) == -1) {
+		failure(file, MSG_ORIG(MSG_ELF_GETPHDRNUM));
 		return (ret);
 	}
 	/*

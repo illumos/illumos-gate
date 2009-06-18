@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,7 +201,7 @@ Pgrab_file(const char *fname, int *perr)
 		goto err;
 	}
 
-	if (elf_getphnum(elf, &phnum) == 0) {
+	if (elf_getphdrnum(elf, &phnum) == -1) {
 		*perr = G_STRANGE;
 		goto err;
 	}

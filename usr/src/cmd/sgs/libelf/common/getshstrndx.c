@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,34 +19,51 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <gelf.h>
 #include <decl.h>
 #include <msg.h>
 
+/*
+ * Return section header array string table index, taking
+ * extended headers into account.
+ *
+ * elf_getshstrndx() returns 0 for failure, and 1 for success.
+ *
+ * elf_getshdrstrndx() supercedes elf_getshstrndx(), which is now considered
+ * obsolete. It returns -1 for failure and 0 for success, bringing us into
+ * alignment with the interface agreed to in the 2002 gABI meeting.
+ *
+ * See the comment in getshnum.c for additional information.
+ */
+
 int
-elf_getshstrndx(Elf *elf, size_t *shstrndx)
+elf_getshdrstrndx(Elf *elf, size_t *shstrndx)
 {
 	GElf_Ehdr	ehdr;
 	Elf_Scn		*scn;
 	GElf_Shdr	shdr0;
 
 	if (gelf_getehdr(elf, &ehdr) == 0)
-		return (0);
+		return (-1);
 	if (ehdr.e_shstrndx != SHN_XINDEX) {
 		*shstrndx = ehdr.e_shstrndx;
-		return (1);
+		return (0);
 	}
 	if ((scn = elf_getscn(elf, 0)) == 0)
-		return (0);
+		return (-1);
 	if (gelf_getshdr(scn, &shdr0) == 0)
-		return (0);
+		return (-1);
 	*shstrndx = shdr0.sh_link;
-	return (1);
+	return (0);
+}
+
+int
+elf_getshstrndx(Elf *elf, size_t *shstrndx)
+{
+	return (elf_getshdrstrndx(elf, shstrndx) == 0);
 }

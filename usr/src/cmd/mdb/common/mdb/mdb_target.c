@@ -1902,7 +1902,7 @@ mdb_tgt_xdata_delete(mdb_tgt_t *t, const char *name)
 int
 mdb_tgt_sym_match(const GElf_Sym *sym, uint_t mask)
 {
-#if STT_NUM != (STT_IFUNC + 1)
+#if STT_NUM != (STT_TLS + 1)
 #error "STT_NUM has grown. update mdb_tgt_sym_match()"
 #endif
 
@@ -1916,7 +1916,7 @@ mdb_tgt_sym_match(const GElf_Sym *sym, uint_t mask)
 	 * in <sys/elf.h>.  Changes to ELF must maintain binary
 	 * compatibility, so I think this is reasonably fair game.
 	 */
-	if (s_bind < STB_NUM && s_type < STT_IFUNC) {
+	if (s_bind < STB_NUM && s_type < STT_NUM) {
 		uint_t type = (1 << (s_type + 8)) | (1 << s_bind);
 		return ((type & ~mask) == 0);
 	}
