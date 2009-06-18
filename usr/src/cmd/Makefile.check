@@ -41,6 +41,7 @@ MANIFEST_TOPDIRS=			\
 	drd				\
 	dumpadm				\
 	fcinfo				\
+	fcoesvc				\
 	fm				\
 	intrd				\
 	iscsid				\

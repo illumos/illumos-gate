@@ -42,6 +42,7 @@ SUNWprivate {
 	FCOE_CreatePort;
 	FCOE_DeletePort;
 	FCOE_GetPortList;
+	FCOE_LoadConfig;
 
     local:
 	*;

@@ -453,7 +453,8 @@ fcoe_create_port(dev_info_t *parent, fcoe_mac_t *mac, int is_target)
 }
 
 int
-fcoe_delete_port(dev_info_t *parent, fcoeio_t *fcoeio, datalink_id_t linkid)
+fcoe_delete_port(dev_info_t *parent, fcoeio_t *fcoeio, datalink_id_t linkid,
+    uint64_t *is_target)
 {
 	int		 rval = 0;
 	fcoe_mac_t	*mac;
@@ -463,6 +464,8 @@ fcoe_delete_port(dev_info_t *parent, fcoeio_t *fcoeio, datalink_id_t linkid)
 		fcoeio->fcoeio_status = FCOEIOE_MAC_NOT_FOUND;
 		return (EINVAL);
 	}
+
+	*is_target = EPORT_CLT_TYPE(&mac->fm_eport);
 
 	if ((mac->fm_flags & FCOE_MAC_FLAG_ENABLED) != FCOE_MAC_FLAG_ENABLED) {
 		fcoeio->fcoeio_status = FCOEIOE_ALREADY;

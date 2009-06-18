@@ -1,4 +1,3 @@
-#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -19,17 +18,53 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# This script is used to reconfigure fabric device(s) which were configured
-# prior to boot.  The luxadm command used below is an expert level command
-# and has a restrictive usage for boot time reconfiguration of fabric
-# devices.
-#
-# DO NOT USE the command for any other purpose.
-#
 
-/usr/sbin/fcadm create-fcoe-ports
+PROG =	svc-fcoet
+
+include ../Makefile.cmd
+
+COMMONBASE = ../../common
+
+LOCAL_OBJS = fcoetsvc.o
+LOCAL_SRCS =	$(LOCAL_OBJS:%.o=%.c)
+OBJS =	$(LOCAL_OBJS)
+SRCS = $(LOCAL_SRCS)
+
+LDLIBS += -lfcoe
+
+MANIFEST    = fcoe_target.xml
+SVCMETHOD   = svc-fcoet
+
+ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)
+$(ROOTSVCSYSTEM)/fcoe_target.xml	:= OWNER = root
+$(ROOTSVCSYSTEM)/fcoe_target.xml	:= GROUP = bin
+$(ROOTSVCSYSTEM)/fcoe_target.xml	:= FILEMODE = 0444
+
+.KEEP_STATE:
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
+	$(CSTYLE) -pPc $(SRCS:%=%)
+
+cmdparse.o:
+	    $(COMPILE.c) -o $@
+	    $(POST_PROCESS_O)
+
+clean:
+	$(RM) $(OBJS)
+
+lint:	lint_SRCS
+
+include ../Makefile.targ

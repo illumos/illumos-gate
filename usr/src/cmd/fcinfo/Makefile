@@ -30,9 +30,7 @@ COMMONBASE = ../../common
 PROG = fcinfo
 ROOT_PROG_LINK = $(ROOTUSRSBIN)/fcadm
 MANIFEST = npiv_config.xml
-MANIFEST += fcoe_config.xml
 SVCMETHOD = npivconfig
-SVCMETHOD += fcoeconfig
 PRODUCT = $(PROG)
 
 $(ROOT_PROG_LINK) := FILEMODE = 0555

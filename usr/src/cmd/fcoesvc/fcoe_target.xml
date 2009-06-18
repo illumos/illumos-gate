@@ -25,20 +25,17 @@ CDDL HEADER END
 Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-
-Service manifests for the FCOE configure
-
-
+Service manifests for the FCoE target configuration
 -->
 
 <!--
-
+	system/fcoe_target - Export FCoE target port services
 -->
 
-<service_bundle type='manifest' name='SUNWfcprt:fcoe_config'>
+<service_bundle type='manifest' name='SUNWfcprtr:fcoe_target'>
 
 <service
-	name='network/fcoe_config'
+	name='system/fcoe_target'
 	type='service'
 	version='1'>
 
@@ -46,33 +43,32 @@ Service manifests for the FCOE configure
 
 	<single_instance/>
 
-	<dependency
-		name='fcoesysevent'
+	<dependency name = 'network'
+		grouping='require_any'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/milestone/network'/>
+	</dependency>
+
+	<dependency name = 'stmf'
 		grouping='require_all'
 		restart_on='none'
 		type='service'>
-		<service_fmri value='svc:/system/sysevent' />
+		<service_fmri value='svc:/system/stmf:default'/>
 	</dependency>
-
-	<dependent
-		name='fcoe-filesystem'
-		grouping='require_all'
-		restart_on='none'>
-		<service_fmri value='svc:/system/filesystem/local' />
-	</dependent>
-
-	<dependent
-		name='fcoe-fc'
-		grouping='require_all'
-		restart_on='none'>
-		<service_fmri value='svc:/system/device/fc-fabric' />
-	</dependent>
 
 	<exec_method
 		type='method'
 		name='start'
-		exec='/lib/svc/method/fcoeconfig'
-		timeout_seconds='1200'>
+		exec='/lib/svc/method/svc-fcoet'
+		timeout_seconds='600'>
+		<method_context>
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic,sys_devices'
+			/>
+		</method_context>
 	</exec_method>
 
 	<exec_method
@@ -80,6 +76,13 @@ Service manifests for the FCOE configure
 		name='stop'
 		exec=':true'
 		timeout_seconds='60'>
+		<method_context>
+			<method_credential
+			user='root'
+			group='root'
+			privileges='basic,sys_devices'
+			/>
+		</method_context>
 	</exec_method>
 
 	<property_group name='startd' type='framework'>
@@ -87,7 +90,19 @@ Service manifests for the FCOE configure
 			value='transient' />
 	</property_group>
 
-	<stability value='Unstable' />
+	<stability value='Evolving' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				fcoe target service
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='fcadm' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
 
 </service>
 

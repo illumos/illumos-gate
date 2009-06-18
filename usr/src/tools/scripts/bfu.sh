@@ -306,13 +306,13 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/fc-fabric
 	lib/svc/method/iscsi-initiator
 	lib/svc/method/npivconfig
-	lib/svc/method/fcoeconfig
 	lib/svc/method/sf880dr
 	lib/svc/method/svc-cvcd
 	lib/svc/method/svc-dcs
 	lib/svc/method/svc-drd
 	lib/svc/method/svc-dscp
 	lib/svc/method/svc-dumpadm
+	lib/svc/method/svc-fcoet
 	lib/svc/method/svc-intrd
 	lib/svc/method/svc-hal
 	lib/svc/method/svc-labeld
@@ -364,7 +364,6 @@ superfluous_nonglobal_zone_files="
 	var/log/pool
 	var/svc/manifest/network/iscsi/iscsi-initiator.xml
 	var/svc/manifest/network/npiv_config.xml
-	var/svc/manifest/network/fcoe_config.xml
 	var/svc/manifest/network/rpc/mdcomm.xml
 	var/svc/manifest/network/rpc/meta.xml
 	var/svc/manifest/network/rpc/metamed.xml
@@ -383,6 +382,7 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/system/device/devices-audio.xml
 	var/svc/manifest/system/device/devices-fc-fabric.xml
 	var/svc/manifest/system/dumpadm.xml
+	var/svc/manifest/system/fcoe_target.xml
 	var/svc/manifest/system/filesystem/rmvolmgr.xml
 	var/svc/manifest/system/fmd.xml
 	var/svc/manifest/system/hal.xml
@@ -1476,6 +1476,7 @@ smf_obsolete_manifests="
 	var/svc/manifest/network/datalink.xml
 	var/svc/manifest/network/datalink-init.xml
 	var/svc/manifest/network/iscsi_initiator.xml
+	var/svc/manifest/network/fcoe_config.xml
 "
 
 # smf services whose manifests have been renamed
@@ -1498,6 +1499,7 @@ smf_obsolete_methods="
 	lib/svc/method/svc-kdc.slave
 	lib/svc/share/krb_include.sh
 	lib/svc/method/iscsid
+	lib/svc/method/fcoeconfig
 "
 
 smf_cleanup () {

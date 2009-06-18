@@ -89,24 +89,6 @@ extern "C" {
 #define	NPIV_PG_NAME	"npiv-port-list"
 #define	NPIV_PORT_LIST	"port_list"
 
-#define	FCOE_SCF_ADD		0
-#define	FCOE_SCF_REMOVE		1
-
-#define	FCOE_SUCCESS			0
-#define	FCOE_ERROR			1
-#define	FCOE_ERROR_NOT_FOUND		2
-#define	FCOE_ERROR_EXISTS		3
-#define	FCOE_ERROR_SERVICE_NOT_FOUND	4
-#define	FCOE_ERROR_NOMEM		5
-#define	FCOE_ERROR_MEMBER_NOT_FOUND	6
-#define	FCOE_ERROR_BUSY			7
-
-#define	FCOE_PORT_LIST_LENGTH	255
-
-#define	FCOE_SERVICE	"network/fcoe_config"
-#define	FCOE_PG_NAME	"fcoe-port-list-pg"
-#define	FCOE_PORT_LIST	"port_list_p"
-
 /* flags that are needed to be passed into processHBA */
 #define	PRINT_LINKSTAT	    0x00000001	/* print link statistics information */
 #define	PRINT_SCSI_TARGET   0x00000010	/* print Scsi target information */
@@ -169,7 +151,6 @@ int fcoe_adm_create_port(int objects, char *argv[],
     cmdOptions_t *options);
 int fcoe_adm_delete_port(int objects, char *argv[]);
 int fcoe_adm_list_ports(cmdOptions_t *options);
-int fcoe_adm_create_portlist(cmdOptions_t *options);
 
 
 #ifdef	__cplusplus

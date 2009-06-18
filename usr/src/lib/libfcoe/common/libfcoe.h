@@ -37,12 +37,31 @@ extern "C" {
 #endif
 
 /*
- * FCOE Port Type
+ * FCoE Port Type
  */
 #define	FCOE_PORTTYPE_INITIATOR		0
 #define	FCOE_PORTTYPE_TARGET		1
 
 #define	FCOE_MAX_MAC_NAME_LEN		32
+
+#define	FCOE_SCF_ADD		0
+#define	FCOE_SCF_REMOVE		1
+
+#define	FCOE_SUCCESS			0
+#define	FCOE_ERROR			1
+#define	FCOE_ERROR_EXISTS		2
+#define	FCOE_ERROR_SERVICE_NOT_FOUND	3
+#define	FCOE_ERROR_NOMEM		4
+#define	FCOE_ERROR_MEMBER_NOT_FOUND	5
+#define	FCOE_ERROR_BUSY			6
+
+#define	FCOE_TARGET_SERVICE	"system/fcoe_target"
+#define	FCOE_INITIATOR_SERVICE	"system/fcoe_initiator"
+#define	FCOE_PG_NAME	"fcoe-port-list-pg"
+#define	FCOE_PORT_LIST	"port_list_p"
+
+#define	FCOE_PORT_LIST_LENGTH	255
+
 typedef unsigned char	FCOE_UINT8;
 typedef		 char	FCOE_INT8;
 typedef unsigned short	FCOE_UINT16;
@@ -88,6 +107,25 @@ typedef struct fcoe_port_attr {
 } FCOE_PORT_ATTRIBUTE, *PFCOE_PORT_ATTRIBUTE;
 
 /*
+ * FCoE port instance in smf repository
+ */
+typedef struct fcoe_smf_port_instance {
+	FCOE_UINT8	mac_link_name[MAXLINKNAMELEN];
+	FCOE_UINT8	port_type;
+	FCOE_PORT_WWN	port_pwwn;
+	FCOE_PORT_WWN	port_nwwn;
+	FCOE_UINT8	mac_promisc;
+} FCOE_SMF_PORT_INSTANCE, *PFCOE_SMF_PORT_INSTANCE;
+
+/*
+ * FCoE port instance list
+ */
+typedef struct fcoe_smf_port_list {
+	FCOE_UINT32	port_num;
+	FCOE_SMF_PORT_INSTANCE	ports[1];
+} FCOE_SMF_PORT_LIST, *PFCOE_SMF_PORT_LIST;
+
+/*
  * macLinkName: mac name with maximum lenth 32
  * portType: 0 (Initiator)/ 1(Target)
  * pwwn: Port WWN
@@ -112,6 +150,14 @@ FCOE_STATUS FCOE_DeletePort(
 FCOE_STATUS FCOE_GetPortList(
     FCOE_UINT32		*port_num,
     FCOE_PORT_ATTRIBUTE	**portlist
+);
+
+/*
+ * Make sure to free the memory pointed by portlist
+ */
+FCOE_STATUS FCOE_LoadConfig(
+    FCOE_UINT8		portType,
+    FCOE_SMF_PORT_LIST **portlist
 );
 
 #ifdef	__cplusplus

@@ -765,9 +765,11 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 	case FCOEIO_DELETE_FCOE_PORT: {
 		fcoeio_delete_port_param_t *del_port_param =
 		    (fcoeio_delete_port_param_t *)ibuf;
+		uint64_t *is_target = (uint64_t *)obuf;
 
 		if (fcoeio->fcoeio_ilen < sizeof (fcoeio_delete_port_param_t) ||
-		    fcoeio->fcoeio_xfer != FCOEIO_XFER_WRITE) {
+		    fcoeio->fcoeio_olen != sizeof (uint64_t) ||
+		    fcoeio->fcoeio_xfer != FCOEIO_XFER_RW) {
 			fcoeio->fcoeio_status = FCOEIOE_INVAL_ARG;
 			ret = EINVAL;
 			break;
@@ -775,7 +777,7 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 
 		mutex_enter(&ss->ss_ioctl_mutex);
 		ret = fcoe_delete_port(ss->ss_dip, fcoeio,
-		    del_port_param->fdp_mac_linkid);
+		    del_port_param->fdp_mac_linkid, is_target);
 		if (ret != 0) {
 			FCOE_LOG("fcoe",
 			    "fcoe_delete_port failed: %d", ret);

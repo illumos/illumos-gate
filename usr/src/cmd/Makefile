@@ -152,6 +152,7 @@ COMMON_SUBDIRS=		\
 	factor		\
 	false		\
 	fcinfo		\
+	fcoesvc		\
 	fdetach		\
 	fdformat	\
 	fdisk		\

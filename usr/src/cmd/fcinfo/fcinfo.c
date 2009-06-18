@@ -53,7 +53,6 @@ static int npivListRemotePortFunc(int, char **, cmdOptions_t *, void *);
 static int fcoeAdmCreatePortFunc(int, char **, cmdOptions_t *, void *);
 static int fcoeListPortsFunc(int, char **, cmdOptions_t *, void *);
 static int fcoeAdmDeletePortFunc(int, char **, cmdOptions_t *, void *);
-static int fcoeAdmCreatePortListFunc(int, char **, cmdOptions_t *, void *);
 static char *getExecBasename(char *);
 
 /*
@@ -121,9 +120,6 @@ subCommandProps_t fcadmsubcommands[] = {
 		OPERAND_MANDATORY_SINGLE, "Network Interface Name"},
 	{"list-fcoe-ports",
 	    fcoeListPortsFunc, "t", NULL, NULL,
-		OPERAND_NONE, NULL},
-	{"create-fcoe-ports",
-	    fcoeAdmCreatePortListFunc, "t", NULL, NULL,
 		OPERAND_NONE, NULL},
 	{NULL, 0, NULL, NULL, NULL, 0, NULL, NULL}
 };
@@ -240,17 +236,6 @@ fcoeListPortsFunc(int objects, char *argv[], cmdOptions_t *options,
     void *addArgs)
 {
 	return (fcoe_adm_list_ports(options));
-}
-
-/*
- * Pass in options/arguments, rest of arguments
- */
-/*ARGSUSED*/
-static int
-fcoeAdmCreatePortListFunc(int objects, char *argv[], cmdOptions_t *options,
-    void *addArgs)
-{
-	return (fcoe_adm_create_portlist(options));
 }
 
 /*
