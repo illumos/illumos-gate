@@ -19,18 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifndef lint
-static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
-#endif
-
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -449,8 +438,10 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 
 	is_obj = ((tmpacl.a_type == USER_OBJ) ||
 	    (tmpacl.a_type == GROUP_OBJ) ||
+	    (tmpacl.a_type == CLASS_OBJ) ||
 	    (tmpacl.a_type == DEF_USER_OBJ) ||
-	    (tmpacl.a_type == DEF_GROUP_OBJ));
+	    (tmpacl.a_type == DEF_GROUP_OBJ) ||
+	    (tmpacl.a_type == DEF_OTHER_OBJ));
 
 	cur_cnt = *cntp - 1;
 	switch (mode) {
