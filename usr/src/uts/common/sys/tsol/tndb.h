@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * from "tndb.h	7.34	01/08/31 SMI; TSOL 2.x"
@@ -28,16 +28,14 @@
 #ifndef	_SYS_TSOL_TNDB_H
 #define	_SYS_TSOL_TNDB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <sys/zone.h>
 #include <sys/tsol/label.h>
 #include <sys/tsol/label_macro.h>
 #include <net/if.h>
 
 #ifdef _KERNEL
 #include <net/route.h>
-#include <sys/zone.h>
 #endif
 
 #ifdef	__cplusplus
@@ -74,10 +72,10 @@ typedef enum tsol_dbops {
 	TNDB_GET = 5
 } tsol_dbops_t;
 
-#define	TNTNAMSIZ 	32	/* template name size */
-#define	IP_STR_SIZE 	200	/* string ip address size */
+#define	TNTNAMSIZ 	ZONENAME_MAX	/* template name size */
+#define	IP_STR_SIZE 	200		/* string ip address size */
 
-#define	TNRHDB_NCOL	2	/* # of columns in tnrhdb */
+#define	TNRHDB_NCOL	2		/* # of columns in tnrhdb */
 
 /*
  * For tnrhdb access library routines and tnrh(2TSOL)
@@ -241,7 +239,7 @@ typedef struct tsol_mlpent {
  * List of MLPs ends with null entry, where protocol and port are both zero.
  */
 typedef struct tsol_zcent {
-	char		zc_name[TNTNAMSIZ];
+	char		zc_name[ZONENAME_MAX];
 	int		zc_doi;
 	bslabel_t	zc_label;
 	int		zc_match;
