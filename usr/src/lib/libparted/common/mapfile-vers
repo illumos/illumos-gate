@@ -52,6 +52,7 @@ SUNW_8.1 {
 	ped_constraint_new;
 	ped_debug;
 	ped_device_close;
+	ped_device_destroy;
 	ped_device_free_all;
 	ped_device_get;
 	ped_device_get_constraint;
@@ -59,9 +60,14 @@ SUNW_8.1 {
 	ped_device_is_busy;
 	ped_device_open;
 	ped_device_probe_all;
+	ped_device_read;
+	ped_device_sync;
+	ped_device_write;
 	ped_disk_add_partition;
 	ped_disk_check;
 	ped_disk_commit;
+	ped_disk_commit_to_dev;
+	ped_disk_commit_to_os;
 	ped_disk_delete_partition;
 	ped_disk_destroy;
 	ped_disk_extended_partition;
@@ -85,6 +91,7 @@ SUNW_8.1 {
 	ped_exception_set_handler;
 	ped_exception_throw;
 	ped_file_system_check;
+	ped_file_system_clobber;
 	ped_file_system_close;
 	ped_file_system_copy;
 	ped_file_system_create;
@@ -100,10 +107,13 @@ SUNW_8.1 {
 	ped_geometry_destroy;
 	ped_geometry_init;
 	ped_geometry_new;
+	ped_geometry_read;
 	ped_geometry_set;
 	ped_geometry_test_inside;
 	ped_geometry_test_overlap;
 	ped_geometry_test_sector_inside;
+	ped_geometry_write;
+	ped_get_version;
 	ped_malloc;
 	ped_partition_destroy;
 	ped_partition_flag_get_by_name;

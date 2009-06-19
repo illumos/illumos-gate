@@ -44,40 +44,38 @@ POFILES=	generic.po
 SED=	sed
 GREP=	grep
 
+# definitions for install_h target
+HDRDIR=		common/include/parted
+HDRS=		constraint.h \
+		crc32.h \
+		debug.h \
+		device.h \
+		disk.h \
+		endian.h \
+		exception.h \
+		filesys.h \
+		geom.h \
+		natmath.h \
+		parted.h \
+		solaris.h \
+		timer.h \
+		unit.h
+ROOTHDRDIR=     $(ROOT)/usr/include/parted
+ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
+
 .KEEP_STATE:
 
 all clean clobber delete install package: $(SUBDIRS)
 
-# definitions for install_h target
-HDRS=		../common/include/parted/constraint.h \
-		../common/include/parted/crc32.h \
-		../common/include/parted/debug.h \
-		../common/include/parted/device.h \
-		../common/include/parted/disk.h \
-		../common/include/parted/endian.h \
-		../common/include/parted/exception.h \
-		../common/include/parted/fdasd.h \
-		../common/include/parted/filesys.h \
-		../common/include/parted/geom.h \
-		../common/include/parted/gnu.h \
-		../common/include/parted/linux.h \
-		../common/include/parted/natmath.h \
-		../common/include/parted/parted.h \
-		../common/include/parted/solaris.h \
-		../common/include/parted/timer.h \
-		../common/include/parted/unit.h \
-		../common/include/parted/vtoc.h
-ROOTHDRDIR=     $(ROOT)/usr/include
-ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
-CHECKHDRS=      $(HDRS:%.h=%.check)
+install_h: $(ROOTHDRDIR) $(ROOTHDRS)
 
-# install rule for install_h target
-$(ROOTHDRDIR)/%: %
-	$(INS.file)
+$(ROOTHDRDIR):
+	mkdir -p $@
 
-install_h: $(ROOTHDRS)
-
-check: $(CHECKHDRS)
+#
+# This open source is exempt from check
+#
+check:
 
 $(SUBDIRS):      FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -100,3 +98,5 @@ $(MSGDOMAIN):
 	$(INS.dir)
 
 FRC:
+
+include	../Makefile.targ

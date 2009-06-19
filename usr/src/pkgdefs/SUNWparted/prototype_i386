@@ -50,3 +50,19 @@ f none usr/lib/libparted.so.8 0755 root bin
 s none usr/lib/libparted.so=./libparted.so.8
 d none usr/sbin 0755 root bin
 f none usr/sbin/parted 0555 root bin
+d none usr/include 0755 root bin
+d none usr/include/parted 0755 root bin
+f none usr/include/parted/constraint.h 0644 root bin
+f none usr/include/parted/crc32.h 0644 root bin
+f none usr/include/parted/debug.h 0644 root bin
+f none usr/include/parted/device.h 0644 root bin
+f none usr/include/parted/disk.h 0644 root bin
+f none usr/include/parted/endian.h 0644 root bin
+f none usr/include/parted/exception.h 0644 root bin
+f none usr/include/parted/filesys.h 0644 root bin
+f none usr/include/parted/geom.h 0644 root bin
+f none usr/include/parted/natmath.h 0644 root bin
+f none usr/include/parted/parted.h 0644 root bin
+f none usr/include/parted/solaris.h 0644 root bin
+f none usr/include/parted/timer.h 0644 root bin
+f none usr/include/parted/unit.h 0644 root bin

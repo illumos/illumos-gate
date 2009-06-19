@@ -412,7 +412,6 @@ getpartition(PedDevice* dev, char *pathname)
 	int		found = -1;
 
 	PED_ASSERT(dev != NULL, return (found));
-	PED_ASSERT(dev->open_count > 0, return (found));
 	PED_ASSERT(pathname != NULL, return (found));
 
 	arch_specific = SOLARIS_SPECIFIC(dev);
@@ -462,7 +461,6 @@ getpartition(PedDevice* dev, char *pathname)
 	 * Now get the info about the current disk
 	 */
 	if (ioctl(arch_specific->fd, DKIOCINFO, &cur_disk_dkinfo) < 0) {
-		perror("getpartition: ioctl DKIOCINFO current disk");
 		(void) close(mfd);
 		return (found);
 	}
@@ -502,7 +500,6 @@ checkswap(PedDevice* dev, diskaddr_t start, diskaddr_t end)
 	diskaddr_t	p_size;
 
 	PED_ASSERT(dev != NULL, return (0));
-	PED_ASSERT(dev->open_count > 0, return (0));
 
 	arch_specific = SOLARIS_SPECIFIC(dev);
 
@@ -562,7 +559,6 @@ checkdevinuse(PedDevice *dev, diskaddr_t start, diskaddr_t end, int print)
 	char		*pcur_disk_path;
 
 	PED_ASSERT(dev != NULL, return (found));
-	PED_ASSERT(dev->open_count > 0, return (found));
 
 	/*
 	 * Truncate the characters following "d*", such as "s*" or "p*"
@@ -786,7 +782,6 @@ checkmount(PedDevice* dev, diskaddr_t start, diskaddr_t end)
 	struct mnttab	*mp = &mnt_record;
 
 	PED_ASSERT(dev != NULL, return (found));
-	PED_ASSERT(dev->open_count > 0, return (found));
 
 	arch_specific = SOLARIS_SPECIFIC(dev);
 
@@ -1074,7 +1069,6 @@ solaris_read(const PedDevice* dev, void* vbuffer, PedSector start,
 
 	while (1) {
 		status = read(arch_specific->fd, diobuf, read_length);
-		PED_ASSERT(status <= read_length, break);
 
 		if (status > 0)
 			memcpy(buffer, diobuf, status);

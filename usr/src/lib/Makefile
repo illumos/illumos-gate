@@ -490,6 +490,9 @@ $(CLOSED_BUILD)HDRSUBDIRS += \
 	$(CLOSED)/lib/libike	\
 	$(CLOSED)/lib/smartcard
 
+i386_HDRSUBDIRS=	\
+	libparted
+
 sparc_HDRSUBDIRS=	\
 	libds		\
 	libdscp		\
