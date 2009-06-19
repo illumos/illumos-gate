@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -55,6 +53,18 @@ ESSRC =			$(ESFILES:%=%)
 ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
 $(ETCSECURITYFILES) :=	GROUP = sys
 
+MFSTFILES =	rbac.xml
+MANIFESTDIR =	$(ROOT)/var/svc/manifest/system
+MANIFEST =	$(MFSTFILES:%=$(MANIFESTDIR)/%)
+$(MANIFEST) :=	FILEMODE = 0444
+$(MANIFEST) :=	GROUP = sys
+
+METHODFILES =	svc-rbac
+METHODDIR =	$(ROOT)/lib/svc/method
+METHOD =	$(METHODFILES:%=$(METHODDIR)/%)
+$(METHOD) :=	FILEMODE = 0555
+$(METHOD) :=	GROUP = bin
+
 SCRIPTS =		i.rbac r.rbac
 CLASS_SCR_SRC_DIR =	$(SRC)/pkgdefs/common_files
 INSTALL_DIR =		$(ROOT)/usr/sadm/install
@@ -67,21 +77,18 @@ CLASS_SCR_FILES =	$(SCRIPTS:%=$(CLASS_SCR_DIR)/%)
 $(CLASS_SCR_FILES) :=	FILEMODE = 0555
 $(CLASS_SCR_FILES) :=	GROUP = sys
 
-TMPDIR =	/tmp
-
 all clean clobber delete install lint package: $(SUBDIRS)
 _msg: $(MSGSUBDIRS)
 
 install:	install_data
 
-install_data:	$(ETCSECURITYFILES) $(ETCFILES) $(CLASS_SCR_FILES)
+install_data:	$(ETCSECURITYFILES) $(ETCFILES) $(CLASS_SCR_FILES) \
+	$(MANIFESTDIR) $(MANIFEST) $(METHODDIR) $(METHOD)
 
 ATTR_FILES =	auth_attr exec_attr prof_attr user_attr
 ${ATTR_FILES}:	$$@.txt
-	$(CP) $@.txt ${TMPDIR}/$@
 	> $@
-	$(ECHO) ${TMPDIR}/$@ $@ | $(SHELL) ${CLASS_SCR_SRC_DIR}/i.rbac
-	@$(RM) ${TMPDIR}/$@
+	$(ECHO) $@.txt $@ | $(SHELL) ${CLASS_SCR_SRC_DIR}/i.rbac
 
 $(ETCSECURITYFILES) $(ETCFILES): $(ETCSECURITY) $(ROOTETCSECURITY)
 
@@ -95,6 +102,18 @@ $(ROOTETCSECURITY)/%: %
 	$(INS.file)
 
 $(ROOTETC)/% : %
+	$(INS.file)
+
+$(MANIFESTDIR):
+	$(INS.dir)
+
+$(MANIFESTDIR)/% : %
+	$(INS.file)
+
+$(METHODDIR):
+	$(INS.dir)
+
+$(METHODDIR)/% : %
 	$(INS.file)
 
 $(CLASS_SCR_FILES): $(INSTALL_DIR) $(CLASS_SCR_DIR)

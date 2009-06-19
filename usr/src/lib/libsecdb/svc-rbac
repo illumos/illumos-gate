@@ -1,0 +1,82 @@
+#! /usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+. /lib/svc/share/smf_include.sh
+
+files='/etc/user_attr /etc/security/auth_attr /etc/security/exec_attr
+    /etc/security/prof_attr'
+
+PKGINST=
+export PKGINST
+
+irbac=/usr/sadm/install/scripts/i.rbac
+
+if [ ! -x $irbac ]
+then
+	echo "${irbac}: not found."
+	exit $SMF_EXIT_ERR_FATAL
+fi
+
+case "$1" in
+start|refresh)
+	;;
+stop)
+	exit $SMF_EXIT_OK;;
+*)
+	echo "Usage: $0 { start | refresh | stop }"
+	exit $SMF_EXIT_ERR_FATAL;;
+esac
+	
+for f in $files
+do
+	d=${f}.d
+	if [ ! -d ${d} ]
+	then
+		# No directory, nothing to do
+		continue
+	fi
+	#
+	# List all the files in the directory and the destination file
+	# in the order of their timestamp.  Most recent files are
+	# displayed first.  When we find the destination file, we're
+	# done as the rest of the files are older and they are already
+	# incorporated.
+	#
+	for frag in `ls -t $f $d/* 2> /dev/null`
+	do
+		if [ "$frag" = "$f" ]
+		then
+			break
+		fi
+		if [ -f "$frag" ]
+		then
+			echo $frag $f | $irbac
+		fi
+	done
+done
+
+exit $SMF_EXIT_OK

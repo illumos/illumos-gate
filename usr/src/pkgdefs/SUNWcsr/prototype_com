@@ -377,6 +377,7 @@ f none lib/svc/method/svc-forwarding 0555 root bin
 f none lib/svc/method/svc-legacy-routing 0555 root bin
 f none lib/svc/method/svc-dlmgmtd 0555 root bin
 f none lib/svc/method/svc-nscd 0555 root bin
+f none lib/svc/method/svc-rbac 0555 root bin
 f none lib/svc/method/svc-utmpd 0555 root bin
 f none lib/svc/method/system-log 0555 root bin
 f none lib/svc/method/vtdaemon 0555 root bin
@@ -553,6 +554,7 @@ f manifest var/svc/manifest/system/idmap.xml 0444 root sys
 f manifest var/svc/manifest/system/keymap.xml 0444 root sys
 f manifest var/svc/manifest/system/manifest-import.xml 0444 root sys
 f manifest var/svc/manifest/system/name-service-cache.xml 0444 root sys
+f manifest var/svc/manifest/system/rbac.xml 0444 root sys
 f manifest var/svc/manifest/system/rmtmpfiles.xml 0444 root sys
 f manifest var/svc/manifest/system/sac.xml 0444 root sys
 f manifest var/svc/manifest/system/system-log.xml 0444 root sys
