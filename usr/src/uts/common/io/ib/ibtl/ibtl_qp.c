@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/ibtl/impl/ibtl.h>
 #include <sys/ib/ibtl/impl/ibtl_cm.h>
@@ -178,6 +176,13 @@ ibt_alloc_qp(ibt_hca_hdl_t hca_hdl, ibt_qp_type_t type,
 	chanp->ch_qp.qp_send_cq = qp_attrp->qp_scq_hdl;
 	chanp->ch_qp.qp_recv_cq = qp_attrp->qp_rcq_hdl;
 	chanp->ch_current_state = IBT_STATE_RESET;
+	/*
+	 * The IBTA spec does not include the signal type or PD on a QP
+	 * query operation. In order to implement the "CLONE" feature
+	 * we need to cache these values.  Mostly used by TI client.
+	 */
+	chanp->ch_qp.qp_flags = qp_attrp->qp_flags;
+	chanp->ch_qp.qp_pd_hdl = qp_attrp->qp_pd_hdl;
 	mutex_init(&chanp->ch_cm_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&chanp->ch_cm_cv, NULL, CV_DEFAULT, NULL);
 
@@ -384,6 +389,10 @@ ibt_alloc_special_qp(ibt_hca_hdl_t hca_hdl, uint8_t port, ibt_sqp_type_t type,
 	chanp->ch_current_state = IBT_STATE_RESET;
 	mutex_init(&chanp->ch_cm_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&chanp->ch_cm_cv, NULL, CV_DEFAULT, NULL);
+
+	/* Updating these variable, so that debugger shows correct values. */
+	chanp->ch_qp.qp_flags = qp_attrp->qp_flags;
+	chanp->ch_qp.qp_pd_hdl = qp_attrp->qp_pd_hdl;
 
 	mutex_enter(&hca_hdl->ha_mutex);
 	hca_hdl->ha_qp_cnt++;

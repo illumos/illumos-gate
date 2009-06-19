@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,6 +181,11 @@ mlx_mdr_t mlx_mdr[] = {
 	{ "375-3605-01",	"SUN0160000001",	"Sun Mirage QDR" },
 	{ "375-3606-01",	"SUN0150000001",	"Sun Falcon QDR" },
 	{ "MHJH29-XTC",		"MT_04E0110003",	"Eagle QDR" },
+	{ "MHJH29-XSC",		"MT_0500120005", "Eagle QDR PCIe Gen 2.0" },
+	{ "MHQH29-XTC",		"MT_04E0120005", "Eagle QDR PCIe Gen 2.0" },
+	{ "MHQH19-XTC",		"MT_0C40110009", "Falcon QDR PCIe Gen 2.0" },
+	{ "MHQH29-XTC",		"MT_0BB0110003", "Falcon QDR PCIe Gen 2.0" },
+	{ "MHQH29-XTC",		"MT_0BB0120003", "Falcon QDR PCIe Gen 2.0" },
 	{ "375-3551-05",	"SUN0080000001",	"Sun C48-IB-NEM" }
 };
 

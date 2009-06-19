@@ -40,7 +40,7 @@
 static ibcm_status_t	ibcm_init(void);
 static ibcm_status_t	ibcm_fini(void);
 
-/* Routines to initialize and destory CM global locks and CVs */
+/* Routines to initialize and destroy CM global locks and CVs */
 static void		ibcm_init_locks(void);
 static void		ibcm_fini_locks(void);
 
@@ -88,6 +88,7 @@ avl_tree_t		ibcm_svc_avl_tree;
 taskq_t			*ibcm_taskq = NULL;
 int			taskq_dispatch_fail_cnt;
 
+kmutex_t		ibcm_mcglist_lock;	/* MCG list lock */
 kmutex_t		ibcm_trace_mutex;	/* Trace mutex */
 kmutex_t		ibcm_trace_print_mutex;	/* Trace print mutex */
 int			ibcm_conn_max_trcnt = IBCM_MAX_CONN_TRCNT;
@@ -187,8 +188,6 @@ struct ibcm_open_s {
 	ibcm_state_data_t	head;
 } ibcm_open;
 
-static void ibcm_open_task(void *);
-
 /*
  * Flow control logic for SA access and close_rc_channel calls follows.
  */
@@ -254,7 +253,7 @@ ibcm_state_handler_t	ibcm_sm_funcs_tbl[] = {
 /* the following globals are CM tunables */
 ibt_rnr_nak_time_t	ibcm_default_rnr_nak_time = IBT_RNR_NAK_655ms;
 
-uint32_t	ibcm_max_retries = IBCM_MAX_RETRIES;
+uint8_t		ibcm_max_retries = IBCM_MAX_RETRIES;
 clock_t		ibcm_local_processing_time = IBCM_LOCAL_RESPONSE_TIME;
 clock_t		ibcm_remote_response_time = IBCM_REMOTE_RESPONSE_TIME;
 ib_time_t	ibcm_max_sidr_rep_proctime = IBCM_MAX_SIDR_PROCESS_TIME;
@@ -262,7 +261,6 @@ ib_time_t	ibcm_max_sidr_pktlife_time = IBCM_MAX_SIDR_PKT_LIFE_TIME;
 
 ib_time_t	ibcm_max_sidr_rep_store_time = 18;
 uint32_t	ibcm_wait_for_acc_cnt_timeout = 2000000;	/* 2 sec */
-uint32_t	ibcm_wait_for_res_cnt_timeout = 2000000;	/* 2 sec */
 
 ib_time_t	ibcm_max_ib_pkt_lt = IBCM_MAX_IB_PKT_LT;
 ib_time_t	ibcm_max_ib_mad_pkt_lt = IBCM_MAX_IB_MAD_PKT_LT;
@@ -475,6 +473,7 @@ ibcm_init_locks()
 
 	/* Create all global locks within cm module */
 	mutex_init(&ibcm_svc_info_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&ibcm_mcglist_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&ibcm_timeout_list_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&ibcm_global_hca_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&ibcm_sa_open_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -501,6 +500,7 @@ ibcm_fini_locks()
 {
 	/* Destroy all global locks within cm module */
 	mutex_destroy(&ibcm_svc_info_lock);
+	mutex_destroy(&ibcm_mcglist_lock);
 	mutex_destroy(&ibcm_timeout_list_lock);
 	mutex_destroy(&ibcm_global_hca_lock);
 	mutex_destroy(&ibcm_sa_open_lock);
@@ -825,7 +825,7 @@ ibcm_hca_attach(ib_guid_t hcaguid)
 {
 	int			i;
 	ibt_status_t		status;
-	uint_t			nports = 0;
+	uint8_t			nports = 0;
 	ibcm_hca_info_t		*hcap;
 	ibt_hca_attr_t		hca_attrs;
 
@@ -995,17 +995,6 @@ ibcm_hca_detach(ibcm_hca_info_t *hcap)
 
 	while (hcap->hca_res_cnt > 0)
 		cv_wait(&ibcm_global_hca_cv, &ibcm_global_hca_lock);
-
-	if (hcap->hca_res_cnt != 0) {
-		/* We got a timeout waiting for hca_res_cnt to become 0 */
-		IBTF_DPRINTF_L2(cmlog, "ibcm_hca_detach: Aborting due"
-		    " to timeout on res_cnt %d, \n Some CM connections are "
-		    "still in transient state, looks like we need to wait "
-		    "some more time (ibcm_wait_for_res_cnt_timeout).",
-		    hcap->hca_res_cnt);
-		hcap->hca_state = IBCM_HCA_ACTIVE;
-		return (IBCM_FAILURE);
-	}
 
 	/* Re-assert the while loop step above */
 	ASSERT(hcap->hca_sidr_list == NULL);
@@ -1931,8 +1920,8 @@ ibt_register_subnet_notices(ibt_clnt_hdl_t ibt_hdl,
 	ibtl_cm_sm_init_fail_t	*ifail;
 	ib_gid_t		*sgidp;
 
-	IBTF_DPRINTF_L3(cmlog, "ibt_register_subnet_notices: ibt_hdl = %p",
-	    ibt_hdl);
+	IBTF_DPRINTF_L3(cmlog, "ibt_register_subnet_notices(%p, %s)",
+	    ibt_hdl, ibtl_cm_get_clnt_name(ibt_hdl));
 
 	mutex_enter(&ibcm_sm_notice_serialize_lock);
 

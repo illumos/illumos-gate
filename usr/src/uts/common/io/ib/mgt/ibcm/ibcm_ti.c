@@ -687,7 +687,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		req_msgp->req_mtu_plus = IB_MTU_1K << 4 |
 		    chan_args->oc_path_rnr_retry_cnt;
 		IBTF_DPRINTF_L3(cmlog, "ibt_open_rc_channel: chan 0x%p PathMTU"
-		    " overidden to IB_MTU_1K(%d) from %d", channel, IB_MTU_1K,
+		    " overridden to IB_MTU_1K(%d) from %d", channel, IB_MTU_1K,
 		    chan_args->oc_path->pi_path_mtu);
 	} else
 		req_msgp->req_mtu_plus = chan_args->oc_path->pi_path_mtu << 4 |
@@ -3815,6 +3815,77 @@ check_for_work:
 	kmem_free(pup, sizeof (ibcm_port_up_t));
 }
 
+ibt_status_t
+ibt_ofuvcm_get_req_data(void *session_id, ibt_ofuvcm_req_data_t *req_data)
+{
+	ibcm_state_data_t 	*statep = (ibcm_state_data_t *)session_id;
+	ibcm_req_msg_t 		*req_msgp;
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ofuvcm_req_data: session_id %p",
+	    session_id);
+	mutex_enter(&statep->state_mutex);
+	if ((statep->state != IBCM_STATE_REQ_RCVD) &&
+	    (statep->state != IBCM_STATE_MRA_SENT)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ofuvcm_req_data: Invalid "
+		    "State %x", statep->state);
+		mutex_exit(&statep->state_mutex);
+		return (IBT_CHAN_STATE_INVALID);
+	}
+	if (statep->mode == IBCM_ACTIVE_MODE) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ofuvcm_req_data: Active mode "
+		    "not supported");
+		mutex_exit(&statep->state_mutex);
+		return (IBT_INVALID_PARAM);
+	}
+	ASSERT(statep->req_msgp);
+
+	/*
+	 * Fill in the additional req message values reqired for
+	 * RTR transition.
+	 * Should the PSN be same as the active side??
+	 */
+	req_msgp = (ibcm_req_msg_t *)statep->req_msgp;
+	req_data->req_rnr_nak_time = ibcm_default_rnr_nak_time;
+	req_data->req_path_mtu = req_msgp->req_mtu_plus >> 4;
+	req_data->req_rq_psn = b2h32(req_msgp->req_starting_psn_plus) >> 8;
+	mutex_exit(&statep->state_mutex);
+	return (IBT_SUCCESS);
+}
+
+ibt_status_t
+ibt_ofuvcm_proceed(ibt_cm_event_type_t event, void *session_id,
+    ibt_cm_status_t status, ibt_cm_proceed_reply_t *cm_event_data,
+    void *priv_data, ibt_priv_data_len_t priv_data_len)
+{
+	ibcm_state_data_t *statep = (ibcm_state_data_t *)session_id;
+	ibt_status_t		ret;
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_ofuvcm_proceed chan 0x%p event %x "
+	    "status %x session_id %p", statep->channel, event, status,
+	    session_id);
+
+	IBTF_DPRINTF_L5(cmlog, "ibt_ofuvcm_proceed chan 0x%p "
+	    "cm_event_data %p, priv_data %p priv_data_len %x",
+	    statep->channel, cm_event_data, priv_data, priv_data_len);
+
+	/* validate session_id and status */
+	if ((statep == NULL) || (status == IBT_CM_DEFER)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_ofuvcm_proceed : Invalid Args");
+		return (IBT_INVALID_PARAM);
+	}
+
+	if (event != IBT_CM_EVENT_REQ_RCV) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_ofuvcm_proceed : only for REQ_RCV");
+		return (IBT_INVALID_PARAM);
+	}
+	mutex_enter(&statep->state_mutex);
+	statep->skip_rtr = 1;
+	mutex_exit(&statep->state_mutex);
+
+	ret = ibt_cm_proceed(event, session_id, status, cm_event_data,
+	    priv_data, priv_data_len);
+	return (ret);
+}
 
 /*
  * Function:
@@ -3988,6 +4059,10 @@ ibcm_proceed_via_taskq(void *targs)
 
 		ibcm_handle_cep_req_response(statep, response, reject_reason,
 		    arej_len);
+
+		mutex_enter(&statep->state_mutex);
+		statep->skip_rtr = 0;
+		mutex_exit(&statep->state_mutex);
 
 	} else if (proceed_targs->event == IBT_CM_EVENT_REP_RCV) {
 		response =
@@ -4573,6 +4648,22 @@ ibcm_print_reply_addr(ibt_channel_hdl_t channel, ibcm_mad_addr_t *cm_reply_addr)
 
 #endif
 
+/* For MCG List search */
+typedef struct ibcm_mcg_list_s {
+	struct ibcm_mcg_list_s	*ml_next;
+	ib_gid_t		ml_sgid;
+	ib_gid_t		ml_mgid;
+	ib_pkey_t		ml_pkey;
+	ib_qkey_t		ml_qkey;
+	uint_t			ml_refcnt;
+	uint8_t			ml_jstate;
+} ibcm_mcg_list_t;
+
+ibcm_mcg_list_t	*ibcm_mcglist = NULL;
+
+_NOTE(MUTEX_PROTECTS_DATA(ibcm_mcglist_lock, ibcm_mcg_list_s))
+_NOTE(MUTEX_PROTECTS_DATA(ibcm_mcglist_lock, ibcm_mcglist))
+
 typedef struct ibcm_join_mcg_tqarg_s {
 	ib_gid_t		rgid;
 	ibt_mcg_attr_t		mcg_attr;
@@ -4582,6 +4673,135 @@ typedef struct ibcm_join_mcg_tqarg_s {
 } ibcm_join_mcg_tqarg_t;
 
 _NOTE(READ_ONLY_DATA(ibcm_join_mcg_tqarg_s))
+
+void
+ibcm_add_incr_mcg_entry(sa_mcmember_record_t *mcg_req,
+    sa_mcmember_record_t *mcg_resp)
+{
+	ibcm_mcg_list_t	*new = NULL;
+	ibcm_mcg_list_t	*head = NULL;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_add_incr_mcg_entry: MGID %llX:%llX"
+	    "\n SGID %llX:%llX, JState %X)", mcg_req->MGID.gid_prefix,
+	    mcg_req->MGID.gid_guid, mcg_req->PortGID.gid_prefix,
+	    mcg_req->PortGID.gid_guid, mcg_req->JoinState);
+
+	mutex_enter(&ibcm_mcglist_lock);
+	head = ibcm_mcglist;
+
+	while (head != NULL) {
+		if ((head->ml_mgid.gid_guid == mcg_resp->MGID.gid_guid) &&
+		    (head->ml_mgid.gid_prefix == mcg_resp->MGID.gid_prefix) &&
+		    (head->ml_sgid.gid_guid == mcg_resp->PortGID.gid_guid)) {
+			/* Increment the count */
+			head->ml_refcnt++;
+			/* OR the join_state value, we need this during leave */
+			head->ml_jstate |= mcg_req->JoinState;
+
+			IBTF_DPRINTF_L3(cmlog, "ibcm_add_incr_mcg_entry: Entry "
+			    "FOUND: refcnt %d JState %X", head->ml_refcnt,
+			    head->ml_jstate);
+
+			mutex_exit(&ibcm_mcglist_lock);
+			return;
+		}
+		head = head->ml_next;
+	}
+	mutex_exit(&ibcm_mcglist_lock);
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_add_incr_mcg_entry: Create NEW Entry ");
+
+	/* If we are here, either list is empty or match couldn't be found */
+	new = kmem_zalloc(sizeof (ibcm_mcg_list_t), KM_SLEEP);
+
+	mutex_enter(&ibcm_mcglist_lock);
+	/* Initialize the fields */
+	new->ml_sgid = mcg_resp->PortGID;
+	new->ml_mgid = mcg_resp->MGID;
+	new->ml_qkey = mcg_req->Q_Key;
+	new->ml_pkey = mcg_req->P_Key;
+	new->ml_refcnt = 1; /* As this is the first entry */
+	new->ml_jstate = mcg_req->JoinState;
+	new->ml_next = NULL;
+
+	new->ml_next = ibcm_mcglist;
+	ibcm_mcglist = new;
+	mutex_exit(&ibcm_mcglist_lock);
+}
+
+/*
+ * ibcm_del_decr_mcg_entry
+ *
+ * Return value:
+ * IBCM_SUCCESS		Entry found and ref_cnt is now zero. So go-ahead and
+ * 			leave the MCG group. The return arg *jstate will have
+ * 			a valid join_state value that needed to be used by
+ * 			xxx_leave_mcg().
+ * IBCM_LOOKUP_EXISTS	Entry found and ref_cnt is decremented but is NOT zero.
+ * 			So do not leave the MCG group yet.
+ * IBCM_LOOKUP_FAIL	Entry is NOT found.
+ */
+ibcm_status_t
+ibcm_del_decr_mcg_entry(sa_mcmember_record_t *mcg_req, uint8_t *jstate)
+{
+	ibcm_mcg_list_t	*head, *prev;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_del_decr_mcg_entry: MGID %llX:%llX"
+	    "\n SGID %llX:%llX, JState %X)", mcg_req->MGID.gid_prefix,
+	    mcg_req->MGID.gid_guid, mcg_req->PortGID.gid_prefix,
+	    mcg_req->PortGID.gid_guid, mcg_req->JoinState);
+
+	*jstate = 0;
+
+	mutex_enter(&ibcm_mcglist_lock);
+	head = ibcm_mcglist;
+	prev = NULL;
+
+	while (head != NULL) {
+		if ((head->ml_mgid.gid_guid == mcg_req->MGID.gid_guid) &&
+		    (head->ml_mgid.gid_prefix == mcg_req->MGID.gid_prefix) &&
+		    (head->ml_sgid.gid_guid == mcg_req->PortGID.gid_guid)) {
+			if (!(head->ml_jstate & mcg_req->JoinState)) {
+				IBTF_DPRINTF_L2(cmlog, "ibcm_del_decr_mcg_entry"
+				    ": JoinState mismatch %X %X)",
+				    head->ml_jstate, mcg_req->JoinState);
+			}
+			/* Decrement the count */
+			head->ml_refcnt--;
+
+			if (head->ml_refcnt == 0) {
+				*jstate = head->ml_jstate;
+
+				IBTF_DPRINTF_L3(cmlog, "ibcm_del_decr_mcg_entry"
+				    ": refcnt is ZERO, so delete the entry ");
+				if ((head == ibcm_mcglist) || (prev == NULL)) {
+					ibcm_mcglist = head->ml_next;
+				} else if (prev != NULL) {
+					prev->ml_next = head->ml_next;
+				}
+				mutex_exit(&ibcm_mcglist_lock);
+
+				kmem_free(head, sizeof (ibcm_mcg_list_t));
+				return (IBCM_SUCCESS);
+			}
+			mutex_exit(&ibcm_mcglist_lock);
+			return (IBCM_LOOKUP_EXISTS);
+		}
+		prev = head;
+		head = head->ml_next;
+	}
+	mutex_exit(&ibcm_mcglist_lock);
+
+	/*
+	 * If we are here, something went wrong, we don't have the entry
+	 * for that MCG being joined.
+	 */
+	IBTF_DPRINTF_L2(cmlog, "ibcm_del_decr_mcg_entry: Match NOT "
+	    "Found ");
+
+	return (IBCM_LOOKUP_FAIL);
+}
+
 
 /*
  * Function:
@@ -4879,8 +5099,11 @@ ibcm_process_join_mcg(void *taskq_arg)
 		mcg_info_p->mc_adds_vect.av_sgid_ix = hca_port.hp_sgid_ix;
 		mcg_info_p->mc_adds_vect.av_src_path = 0;
 
+		/* Add or Incr the matching MCG entry. */
+		ibcm_add_incr_mcg_entry(&mcg_req, mcg_resp);
 		/* Deallocate the memory allocated by SA for mcg_resp. */
 		kmem_free(mcg_resp, length);
+
 		retval = IBT_SUCCESS;
 	} else {
 		retval = IBT_MCG_RECORDS_NOT_FOUND;
@@ -4959,10 +5182,12 @@ ibt_leave_mcg(ib_gid_t rgid, ib_gid_t mc_gid, ib_gid_t port_gid,
 	uint64_t		component_mask = 0;
 	int			sa_retval;
 	ibt_status_t		retval;
+	ibcm_status_t		ret;
 	ibtl_cm_hca_port_t	hca_port;
 	size_t			length;
 	void			*results_p;
 	ibcm_hca_info_t		*hcap;
+	uint8_t			jstate = 0;
 
 	IBTF_DPRINTF_L3(cmlog, "ibt_leave_mcg(%llX:%llX, %llX:%llX)",
 	    rgid.gid_prefix, rgid.gid_guid, mc_gid.gid_prefix, mc_gid.gid_guid);
@@ -5003,6 +5228,22 @@ ibt_leave_mcg(ib_gid_t rgid, ib_gid_t mc_gid, ib_gid_t port_gid,
 	/* Join State */
 	mcg_req.JoinState = mc_join_state;
 	component_mask |= SA_MC_COMPMASK_JOINSTATE;
+
+	ret = ibcm_del_decr_mcg_entry(&mcg_req, &jstate);
+	if (ret == IBCM_LOOKUP_EXISTS) {
+		IBTF_DPRINTF_L3(cmlog, "ibt_leave_mcg: Multiple JoinMCG record "
+		    " still exists, we shall leave for last leave_mcg call");
+		return (IBT_SUCCESS);
+	} else if (ret == IBCM_LOOKUP_FAIL) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_leave_mcg: No Record found, "
+		    "continue with leave_mcg call");
+	} else if ((ret == IBCM_SUCCESS) && (jstate != 0)) {
+		/*
+		 * Update with cached "jstate", as this will be OR'ed of
+		 * all ibt_join_mcg() calls for this record.
+		 */
+		mcg_req.JoinState = jstate;
+	}
 
 	retval = ibtl_cm_get_hca_port(rgid, 0, &hca_port);
 	if (retval != IBT_SUCCESS) {

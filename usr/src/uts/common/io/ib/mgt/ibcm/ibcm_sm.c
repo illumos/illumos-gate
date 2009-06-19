@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4535,7 +4535,6 @@ ibcm_process_sidr_req_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 			mutex_enter(&ud_statep->ud_state_mutex);
 			IBCM_UD_REF_CNT_DECR(ud_statep);
 			mutex_exit(&ud_statep->ud_state_mutex);
-			ibcm_dec_hca_res_cnt(hcap);
 			ibcm_delete_ud_state_data(ud_statep);
 			return;
 		}
@@ -4544,7 +4543,6 @@ ibcm_process_sidr_req_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		ud_statep->ud_svc_id = b2h64(sidr_reqp->sidr_req_service_id);
 		ud_statep->ud_state  = IBCM_STATE_SIDR_REQ_RCVD;
 		ud_statep->ud_clnt_proceed = IBCM_BLOCK;
-		ud_statep->ud_hcap = hcap;
 
 		mutex_enter(&ibcm_svc_info_lock);
 
@@ -4907,6 +4905,7 @@ ibcm_sidr_timeout_cb(void *arg)
 	ibcm_ud_state_data_t	*ud_statep = (ibcm_ud_state_data_t *)arg;
 
 	mutex_enter(&ud_statep->ud_state_mutex);
+	ud_statep->ud_timerid = 0;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_sidr_timeout_cb: ud_statep 0x%p "
 	    "state = 0x%x", ud_statep, ud_statep->ud_state);
@@ -6115,6 +6114,8 @@ ibcm_cep_state_req(ibcm_state_data_t *statep, ibcm_req_msg_t *cm_req_msgp,
 	ibcm_clnt_reply_info_t	clnt_info;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_cep_state_req: statep 0x%p", statep);
+	IBTF_DPRINTF_L4(cmlog, "ibcm_cep_state_req: SID 0x%lX",
+	    b2h64(cm_req_msgp->req_svc_id));
 	/* client handler should be valid */
 	ASSERT(statep->cm_handler != NULL);
 
@@ -6240,8 +6241,10 @@ ibcm_cep_state_req(ibcm_state_data_t *statep, ibcm_req_msg_t *cm_req_msgp,
 	ibcm_insert_trace(statep, IBCM_TRACE_CALLED_REQ_RCVD_EVENT);
 
 	/* Invoke the client handler */
+	statep->req_msgp = cm_req_msgp;
 	cb_status = statep->cm_handler(statep->state_cm_private, &event,
 	    &ret_args, priv_data, IBT_REP_PRIV_DATA_SZ);
+	statep->req_msgp = NULL;
 
 	ibcm_insert_trace(statep, IBCM_TRACE_RET_REQ_RCVD_EVENT);
 
@@ -6395,7 +6398,8 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 			return (IBCM_SEND_REJ);
 		}
 
-		if (qp_attrs.qp_info.qp_state != IBT_STATE_INIT) {
+		if (qp_attrs.qp_info.qp_state != IBT_STATE_INIT &&
+		    statep->skip_rtr == 0) {
 			IBTF_DPRINTF_L3(cmlog, "ibcm_process_cep_req_cm_hdlr: "
 			    "qp state != INIT on server");
 			*reject_reason = IBT_CM_CHAN_INVALID_STATE;
@@ -6403,7 +6407,29 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 			    IBT_CM_FAILURE_REQ, IBT_CM_CHAN_INVALID_STATE,
 			    NULL, 0);
 			return (IBCM_SEND_REJ);
+		} else if (qp_attrs.qp_info.qp_state != IBT_STATE_RTR &&
+		    statep->skip_rtr == 1) {
+			IBTF_DPRINTF_L3(cmlog, "ibcm_process_cep_req_cm_hdlr: "
+			    "qp state != RTR on server");
+			*reject_reason = IBT_CM_CHAN_INVALID_STATE;
+			ibcm_handler_conn_fail(statep, IBT_CM_FAILURE_REJ_SENT,
+			    IBT_CM_FAILURE_REQ, IBT_CM_CHAN_INVALID_STATE,
+			    NULL, 0);
+			return (IBCM_SEND_REJ);
 		}
+
+		if (statep->skip_rtr &&
+		    qp_attrs.qp_info.qp_transport.rc.rc_path.cep_hca_port_num !=
+		    statep->prim_port) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_cep_req_cm_hdlr: "
+			    "QP port invalid");
+			*reject_reason = IBT_CM_CHAN_INVALID_STATE;
+			ibcm_handler_conn_fail(statep, IBT_CM_FAILURE_REJ_SENT,
+			    IBT_CM_FAILURE_REQ, IBT_CM_CHAN_INVALID_STATE,
+			    NULL, 0);
+			return (IBCM_SEND_REJ);
+		} else if (statep->skip_rtr)
+			goto skip_init_trans;
 
 		/* Init to Init, if required */
 		if (qp_attrs.qp_info.qp_transport.rc.rc_path.cep_hca_port_num !=
@@ -6456,6 +6482,8 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 				    status);
 			}
 		}
+skip_init_trans:
+		/* Do sanity tests even if we are skipping RTR */
 
 		/* fill in the REP msg based on ret_args from client */
 		if (clnt_info->reply_event->rep.cm_rdma_ra_out >
@@ -6521,6 +6549,9 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 		bcopy(&local_ca_guid, rep_msgp->rep_local_ca_guid,
 		    sizeof (ib_guid_t));
 
+		if (statep->skip_rtr)
+			goto skip_rtr_trans;
+
 		/* Transition QP from Init to RTR state */
 		if (ibcm_invoke_qp_modify(statep, cm_req_msg, rep_msgp) !=
 		    IBT_SUCCESS) {
@@ -6533,6 +6564,7 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 			    IBT_CM_FAILURE_REQ, IBT_CM_CI_FAILURE, NULL, 0);
 			return (IBCM_SEND_REJ);
 		}
+skip_rtr_trans:
 
 		/*
 		 * Link statep and channel, once CM determines it is

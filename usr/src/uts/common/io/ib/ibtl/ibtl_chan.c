@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl_chan.c
@@ -201,13 +198,6 @@ ibt_alloc_rc_channel(ibt_hca_hdl_t hca_hdl, ibt_chan_alloc_flags_t flags,
 		return (retval);
 	}
 
-	/*
-	 * The IBTA spec does not include the signal type or PD on a QP
-	 * query operation. In order to implement the "CLONE" feature
-	 * we need to cache these values.
-	 */
-	chanp->ch_qp.qp_flags = qp_attr.qp_flags;
-	chanp->ch_qp.qp_pd_hdl = qp_attr.qp_pd_hdl;
 	*rc_chan_p = chanp;
 
 	IBTF_DPRINTF_L3(ibtl_chan, "ibt_alloc_rc_channel(%p): - SUCCESS (%p)",
@@ -534,13 +524,6 @@ ibt_alloc_ud_channel(ibt_hca_hdl_t hca_hdl, ibt_chan_alloc_flags_t flags,
 		return (retval);
 	}
 
-	/*
-	 * The IBTA spec does not include the signal type or PD on a QP
-	 * query operation. In order to implement the "CLONE" feature
-	 * we need to cache these values.
-	 */
-	chanp->ch_qp.qp_flags = qp_attr.qp_flags;
-	chanp->ch_qp.qp_pd_hdl = qp_attr.qp_pd_hdl;
 	*ud_chan_p = chanp;
 
 	IBTF_DPRINTF_L3(ibtl_chan, "ibt_alloc_ud_channel(%p): - SUCCESS (%p)",

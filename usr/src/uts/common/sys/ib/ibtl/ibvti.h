@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IB_IBTL_IBVTI_H
 #define	_SYS_IB_IBTL_IBVTI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibvti.h
@@ -259,6 +256,12 @@ ibt_status_t ibt_ud_get_dqpn(ibt_ud_dest_attr_t *attr,
  *	failures, i.e. failures other than those defined in ibt_status_t.
  */
 ibt_status_t ibt_get_module_failure(ibt_failure_type_t type, uint64_t ena);
+
+ibt_status_t ibt_ofuvcm_get_req_data(void *, ibt_ofuvcm_req_data_t *);
+
+ibt_status_t ibt_ofuvcm_proceed(ibt_cm_event_type_t, void *,
+    ibt_cm_status_t, ibt_cm_proceed_reply_t *, void *,
+    ibt_priv_data_len_t);
 
 #ifdef __cplusplus
 }
