@@ -54,12 +54,12 @@ static char		**dtp_argv;
 
 /*
  * Enabling PM through /etc/power.conf
- * See suggest_p_state()
+ * See pt_cpufreq_suggest()
  */
 static char default_conf[]	= "/etc/power.conf";
 static char default_pmconf[]	= "/usr/sbin/pmconfig";
-static char cpupm_enable[]	= " echo cpupm enable >> /etc/power.conf";
-static char cpupm_treshold[]	= " echo cpu-threshold 1s >> /etc/power.conf";
+static char cpupm_enable[]	= "echo cpupm enable >> /etc/power.conf";
+static char cpupm_treshold[]	= "echo cpu-threshold 1s >> /etc/power.conf";
 
 /*
  * Buffer containing DTrace program to track CPU frequency transitions
@@ -123,8 +123,9 @@ static int	pt_cpufreq_setup(void);
 static int	pt_cpufreq_snapshot(void);
 static int	pt_cpufreq_dtrace_walk(const dtrace_aggdata_t *, void *);
 static void	pt_cpufreq_stat_account(double, uint_t);
-static int	pt_cpufreq_snapshot_cpu(kstat_ctl_t *,
-    uint_t);
+static int	pt_cpufreq_snapshot_cpu(kstat_ctl_t *, uint_t);
+static int	pt_cpufreq_check_pm(void);
+static void	pt_cpufreq_enable(void);
 
 static int
 pt_cpufreq_setup(void)
@@ -499,51 +500,74 @@ pt_cpufreq_dtrace_walk(const dtrace_aggdata_t *data, void *arg)
 }
 
 /*
+ * Checks if PM is enabled in /etc/power.conf, enabling if not
+ */
+void
+pt_cpufreq_suggest(void)
+{
+	int ret = pt_cpufreq_check_pm();
+
+	switch (ret) {
+	case 0:
+		pt_sugg_add("Suggestion: enable CPU power management by "
+		    "pressing the P key", 40, 'P', (char *)g_msg_freq_enable,
+		    pt_cpufreq_enable);
+		break;
+	}
+}
+
+/*
+ * Checks /etc/power.conf and returns:
+ *
+ *     0 if CPUPM is not enabled
+ *     1 if there's nothing for us to do because:
+ *         (a) the system does not support frequency scaling
+ *         (b) there's no power.conf.
+ *     2 if CPUPM is enabled
+ *     3 if the system is running in poll-mode, as opposed to event-mode
+ *
+ * Notice the ordering of the return values, they will be picked up and
+ * switched upon ascendingly.
+ */
+static int
+pt_cpufreq_check_pm(void)
+{
+	char line[1024];
+	FILE *file;
+	int ret = 0;
+
+	if (g_npstates < 2 || (file = fopen(default_conf, "r")) == NULL)
+		return (1);
+
+	(void) memset(line, 0, 1024);
+
+	while (fgets(line, 1024, file)) {
+		if (strstr(line, "cpupm")) {
+			if (strstr(line, "enable")) {
+				(void) fclose(file);
+				return (2);
+			}
+		}
+		if (strstr(line, "poll"))
+			ret = 3;
+	}
+
+	(void) fclose(file);
+
+	return (ret);
+}
+
+/*
  * Used as a suggestion, sets PM in /etc/power.conf and
  * a 1sec threshold, then calls /usr/sbin/pmconfig
  */
-void
-enable_p_state(void)
+static void
+pt_cpufreq_enable(void)
 {
 	(void) system(cpupm_enable);
 	(void) system(cpupm_treshold);
 	(void) system(default_pmconf);
-}
 
-/*
- * Checks if PM is enabled in /etc/power.conf, enabling if not
- */
-void
-suggest_p_state(void)
-{
-	char 	line[1024];
-	FILE 	*file;
-
-	/*
-	 * Return if speed transition is not supported
-	 */
-	if (g_npstates < 2)
-		return;
-
-	file = fopen(default_conf, "r");
-
-	if (!file)
-		return;
-
-	(void) memset(line, 0, 1024);
-
-	while (fgets(line, 1023, file)) {
-		if (strstr(line, "cpupm")) {
-			if (strstr(line, "enable")) {
-				(void) fclose(file);
-				return;
-			}
-		}
-	}
-
-	add_suggestion("Suggestion: enable CPU power management by "
-	    "pressing the P key",  40, 'P', "P - Enable p-state",
-	    enable_p_state);
-
-	(void) fclose(file);
+	if (pt_sugg_remove(pt_cpufreq_enable) == 0)
+		pt_error("%s : failed to remove a sugg.\n", __FILE__);
 }

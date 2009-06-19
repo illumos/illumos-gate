@@ -48,7 +48,7 @@
 
 #define	_(STRING)		gettext(STRING)
 
-#define	TITLE			"OpenSolaris PowerTOP version 1.1"
+#define	TITLE			"OpenSolaris PowerTOP version 1.2"
 #define	COPYRIGHT_INTEL		"(C) 2009 Intel Corporation"
 
 /*
@@ -77,29 +77,6 @@
 #define	EVENT_NAME_MAX 		64
 #define	EVENT_NUM_MAX 		100
 #define	NSTATES			32
-
-/*
- * Display colors
- */
-#define	PT_COLOR_DEFAULT	1
-#define	PT_COLOR_HEADER_BAR	2
-#define	PT_COLOR_ERROR		3
-#define	PT_COLOR_RED		4
-#define	PT_COLOR_YELLOW		5
-#define	PT_COLOR_GREEN		6
-#define	PT_COLOR_BRIGHT		7
-#define	PT_COLOR_BLUE		8
-
-/*
- * Constants for setup_windows()
- */
-#define	SINGLE_LINE_SW 		1
-#define	LENGTH_SUGG_SW		2
-#define	TITLE_LINE		1
-#define	BLANK_LINE		1
-#define	NEXT_LINE		1
-#define	PT_BAR_NSLOTS		10
-#define	PT_BAR_LENGTH		40
 
 /*
  * Available op modes
@@ -158,12 +135,21 @@ typedef struct turbo_info {
 	uint64_t	t_acnt;
 } turbo_info_t;
 
-typedef	void			(suggestion_func)(void);
-
 /*
- * Global variables
+ * Suggestions
  */
-extern double			g_displaytime;
+typedef	void		(sugg_func_t)(void);
+
+typedef struct suggestion {
+	char *text;
+	char key;
+	char *sb_msg;
+	int weight;
+	int slice;
+	sugg_func_t *func;
+	struct suggestion *prev;
+	struct suggestion *next;
+} sugg_t;
 
 extern int			g_bit_depth;
 
@@ -213,11 +199,9 @@ extern hrtime_t			g_total_c_time;
 extern state_info_t		g_cstate_info[NSTATES];
 extern freq_state_info_t	g_pstate_info[NSTATES];
 
+extern uint_t			g_features;
 extern uint_t			g_ncpus;
 extern uint_t			g_ncpus_observed;
-
-extern char 			g_status_bar_slots[PT_BAR_NSLOTS]
-	[PT_BAR_LENGTH];
 
 extern cpu_power_info_t		*g_cpu_power_states;
 
@@ -227,8 +211,7 @@ extern cpu_power_info_t		*g_cpu_power_states;
 extern boolean_t		g_turbo_supported;
 extern double			g_turbo_ratio;
 
-extern char 			g_suggestion_key;
-extern suggestion_func 		*g_suggestion_activate;
+extern sugg_t			*g_curr_sugg;
 
 /*
  * DTrace scripts for the events report
@@ -247,13 +230,15 @@ extern char			**g_argv;
 /*
  * Platform specific messages
  */
-extern const char 		*g_msg_idle_state;
-extern const char 		*g_msg_freq_state;
+extern const char		*g_msg_idle_state;
+extern const char		*g_msg_freq_state;
+extern const char		*g_msg_freq_enable;
+
 /*
  * Suggestions related
  */
-extern void 		suggest_p_state(void);
-extern void		suggest_as_root(void);
+extern void 		pt_cpufreq_suggest(void);
+extern void		pt_sugg_as_root(void);
 
 /*
  * See util.c
@@ -269,27 +254,30 @@ extern int		event_compare(const void *, const void *);
 /*
  * Display/curses related
  */
-extern void 		show_title_bar(void);
-extern void 		setup_windows(void);
-extern void 		initialize_curses(void);
-extern void		show_acpi_power_line(uint32_t, double, double, double,
+extern void		pt_display_setup(boolean_t);
+extern void 		pt_display_init_curses(void);
+extern void		pt_display_update(void);
+extern void 		pt_display_title_bar(void);
+extern void		pt_display_status_bar(void);
+extern void		pt_display_mod_status_bar(char *);
+extern void 		pt_display_states(void);
+extern void		pt_display_acpi_power(uint32_t, double, double, double,
 	uint32_t);
-extern void 		show_cstates();
-extern void 		show_wakeups(double);
-extern void 		show_eventstats(double);
-extern void 		show_suggestion(char *);
-extern void 		cleanup_curses(void);
-extern void		update_windows(void);
+extern void 		pt_display_wakeups(double);
+extern void 		pt_display_events(double);
+extern void 		pt_display_suggestions(char *);
 
 /*
  * Suggestions
  */
-extern void 		pick_suggestion(void);
-extern void 		add_suggestion(char *, int, char, char *,
-	suggestion_func *);
-extern void 		reset_suggestions(void);
-extern void 		print_all_suggestions(void);
-extern void 		print_battery(void);
+extern void 		pt_sugg_add(char *, int, char, char *, sugg_func_t *);
+extern int		pt_sugg_remove(sugg_func_t *);
+extern void 		pt_sugg_pick(void);
+
+/*
+ * Battery
+ */
+extern void 		pt_battery_print(void);
 
 /*
  * DTrace stats

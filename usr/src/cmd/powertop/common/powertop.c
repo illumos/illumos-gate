@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h>
 #include <ctype.h>
 #include <locale.h>
@@ -52,11 +53,11 @@
  */
 double 			g_ticktime, g_ticktime_usr;
 double 			g_interval;
-double			g_displaytime;
 
 int			g_bit_depth;
 int 			g_total_events, g_top_events;
 int			g_npstates, g_max_cstate, g_longest_cstate;
+uint_t			g_features;
 uint_t			g_ncpus;
 uint_t			g_ncpus_observed;
 
@@ -72,7 +73,6 @@ event_info_t    	g_event_info[EVENT_NUM_MAX];
 state_info_t		g_cstate_info[NSTATES];
 freq_state_info_t	g_pstate_info[NSTATES];
 cpu_power_info_t	*g_cpu_power_states;
-suggestion_func 	*g_suggestion_activate;
 
 boolean_t		g_turbo_supported;
 
@@ -87,10 +87,11 @@ int
 main(int argc, char **argv)
 {
 	hrtime_t 	last, now;
-	uint_t		features = 0, user_interval = 0;
-	int		ncursesinited = 0, index2 = 0, c, ret, dump_count = 0;
+	uint_t		user_interval = 0;
+	int		index2 = 0, c, ret, dump_count = 0;
 	double		last_time;
 	char		*endptr;
+	boolean_t	root_user = B_FALSE;
 
 	static struct option opts[] = {
 		{ "dump", 1, NULL, 'd' },
@@ -108,8 +109,7 @@ main(int argc, char **argv)
 	pt_set_progname(argv[0]);
 
 	/*
-	 * Enumerate the system's CPUs
-	 * Populate cpu_table, g_ncpus
+	 * Enumerate the system's CPUs, populate cpu_table, g_ncpus
 	 */
 	if ((g_ncpus = g_ncpus_observed = enumerate_cpus()) == 0)
 		exit(EXIT_FAILURE);
@@ -117,15 +117,16 @@ main(int argc, char **argv)
 	if ((g_bit_depth = get_bit_depth()) < 0)
 		exit(EXIT_FAILURE);
 
+	g_features = 0;
 	g_ticktime = g_ticktime_usr = INTERVAL_DEFAULT;
-	g_displaytime 	= 0.0;
-	g_op_mode	= PT_MODE_DEFAULT;
-	g_gui		= B_FALSE;
-	g_max_cstate	= 0;
-	g_argv		= NULL;
-	g_argc		= 0;
-	g_observed_cpu	= 0;
+	g_op_mode = PT_MODE_DEFAULT;
+	g_gui = B_FALSE;
+	g_max_cstate = 0;
+	g_argv = NULL;
+	g_argc = 0;
+	g_observed_cpu = 0;
 	g_turbo_supported = B_FALSE;
+	g_curr_sugg = NULL;
 
 	while ((c = getopt_long(argc, argv, "d:t:h:vc:", opts, &index2))
 	    != EOF) {
@@ -189,22 +190,22 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (optind < argc) {
+	if (optind < argc)
 		usage();
-	}
 
 	(void) printf("%s   %s\n\n", TITLE, COPYRIGHT_INTEL);
 
-	/*
-	 * If the system is running on battery, find out what's
-	 * the kstat module for it
-	 */
-	battery_mod_lookup();
+	(void) printf(_("Collecting data for %.2f second(s) \n"),
+	    (float)g_ticktime);
+
+	/* Prepare P-state statistics */
+	if (pt_cpufreq_stat_prepare() == 0)
+		g_features |= FEATURE_PSTATE;
 
 	/* Prepare C-state statistics */
 	ret = pt_cpuidle_stat_prepare();
 	if (ret == 0)
-		features |= FEATURE_CSTATE;
+		g_features |= FEATURE_CSTATE;
 	else
 		/*
 		 * PowerTop was unable to run a DTrace program,
@@ -212,31 +213,51 @@ main(int argc, char **argv)
 		 */
 		exit(EXIT_FAILURE);
 
-	/* Prepare P-state statistics */
-	if (pt_cpufreq_stat_prepare() == 0)
-		features |= FEATURE_PSTATE;
+	/*
+	 * We need to initiate the display to make sure there's enough space
+	 * in the terminal for all of PowerTOP's subwindows, but after
+	 * pt_cpufreq_stat_prepare() which finds out how many states the
+	 * system supports.
+	 */
+	if (!PT_ON_DUMP) {
+		pt_display_init_curses();
+		pt_display_setup(B_FALSE);
+		g_gui = B_TRUE;
+		pt_display_title_bar();
+		pt_display_status_bar();
+	}
 
 	/* Prepare event statistics */
 	if (pt_events_stat_prepare() != -1)
-		features |= FEATURE_EVENTS;
+		g_features |= FEATURE_EVENTS;
+
+	/*
+	 * If the system is running on battery, find out what's
+	 * the kstat module for it
+	 */
+	battery_mod_lookup();
 
 	/* Prepare turbo statistics */
-	if (pt_turbo_stat_prepare() == 0) {
-		features |= FEATURE_TURBO;
+	if (pt_turbo_stat_prepare() == 0)
+		g_features |= FEATURE_TURBO;
+
+	/*
+	 * Installs the initial suggestions, running as root and turning CPU
+	 * power management ON.
+	 */
+	if (geteuid() != 0)
+		pt_sugg_as_root();
+	else {
+		root_user = B_TRUE;
+		pt_cpufreq_suggest();
 	}
-
-	(void) printf(_("Collecting data for %.2f second(s) \n"),
-	    (float)g_ticktime);
-
-	if (!PT_ON_DUMP)
-		g_gui = B_TRUE;
 
 	last = gethrtime();
 
 	while (true) {
 		fd_set 	rfds;
 		struct 	timeval tv;
-		int 	key, reinit = 0;
+		int 	key;
 		char 	keychar;
 
 		/*
@@ -246,18 +267,18 @@ main(int argc, char **argv)
 		FD_ZERO(&rfds);
 		FD_SET(0, &rfds);
 
-		tv.tv_sec 	= (long)g_ticktime;
-		tv.tv_usec 	= (long)((g_ticktime - tv.tv_sec) * MICROSEC);
+		tv.tv_sec = (long)g_ticktime;
+		tv.tv_usec = (long)((g_ticktime - tv.tv_sec) * MICROSEC);
 
-		if (!PT_ON_DUMP)
+		if (!PT_ON_DUMP) {
 			key = select(1, &rfds, NULL, NULL, &tv);
-		else
+		} else
 			key = select(1, NULL, NULL, NULL, &tv);
 
-		now 		= gethrtime();
+		now = gethrtime();
 
-		g_interval 	= (double)(now - last)/NANOSEC;
-		last 		= now;
+		g_interval = (double)(now - last)/NANOSEC;
+		last = now;
 
 		g_top_events 	= 0;
 		g_total_events 	= 0;
@@ -268,145 +289,114 @@ main(int argc, char **argv)
 		    NSTATES * sizeof (state_info_t));
 
 		/* Collect idle state transition stats */
-		if (features & FEATURE_CSTATE &&
+		if (g_features & FEATURE_CSTATE &&
 		    pt_cpuidle_stat_collect(g_interval) < 0) {
 			/* Reinitialize C-state statistics */
 			if (pt_cpuidle_stat_prepare() != 0)
 				exit(EXIT_FAILURE);
 
-			reinit = 1;
+			continue;
 		}
 
 		/* Collect frequency change stats */
-		if (features & FEATURE_PSTATE &&
+		if (g_features & FEATURE_PSTATE &&
 		    pt_cpufreq_stat_collect(g_interval) < 0) {
 			/* Reinitialize P-state statistics */
 			if (pt_cpufreq_stat_prepare() != 0)
 				exit(EXIT_FAILURE);
 
-			reinit = 1;
+			continue;
 		}
 
 		/* Collect event statistics */
-		if (features & FEATURE_EVENTS &&
+		if (g_features & FEATURE_EVENTS &&
 		    pt_events_stat_collect() < 0) {
 			/* Reinitialize event statistics */
 			if (pt_events_stat_prepare() != 0)
 				exit(EXIT_FAILURE);
 
-			reinit = 1;
-		}
-
-		if (reinit)
 			continue;
+		}
 
 		/* Collect turbo statistics */
-		if (features & FEATURE_TURBO &&
-		    pt_turbo_stat_collect() < 0) {
+		if (g_features & FEATURE_TURBO &&
+		    pt_turbo_stat_collect() < 0)
 			exit(EXIT_FAILURE);
-		}
-
-		/*
-		 * Initialize curses if we're not dumping and
-		 * haven't already done it
-		 */
-		if (!PT_ON_DUMP) {
-			if (!ncursesinited) {
-				initialize_curses();
-				ncursesinited++;
-			}
-			setup_windows();
-			show_title_bar();
-		}
 
 		/* Show CPU power states */
-		if (features & FEATURE_CSTATE)
-			show_cstates();
+		pt_display_states();
 
 		/* Show wakeups events affecting PM */
-		if (features & FEATURE_EVENTS) {
-			show_wakeups(g_interval);
-			show_eventstats(g_interval);
+		if (g_features & FEATURE_EVENTS) {
+			pt_display_wakeups(g_interval);
+			pt_display_events(g_interval);
 		}
 
-		print_battery();
-
-		g_displaytime = g_displaytime - g_ticktime;
+		pt_battery_print();
 
 		if (key && !PT_ON_DUMP) {
 			keychar = toupper(fgetc(stdin));
 
 			switch (keychar) {
 			case 'Q':
-				cleanup_curses();
 				exit(EXIT_SUCCESS);
 				break;
+
 			case 'R':
 				g_ticktime = 3;
 				break;
 			}
-			if (keychar == g_suggestion_key &&
-			    g_suggestion_activate) {
-				g_suggestion_activate();
-				g_displaytime = -1.0;
-			}
-		}
-		reset_suggestions();
 
-		/* suggests PM */
-		if (geteuid() == 0) {
-			suggest_p_state();
-		} else {
-			suggest_as_root();
+			/*
+			 * Check if the user has activated the current
+			 * suggestion.
+			 */
+			if (g_curr_sugg != NULL &&
+			    keychar == g_curr_sugg->key && g_curr_sugg->func)
+				g_curr_sugg->func();
 		}
 
 		if (dump_count)
 			dump_count--;
 
 		/* Exits if user requested a dump */
-		if (PT_ON_DUMP && !dump_count) {
-			print_all_suggestions();
+		if (PT_ON_DUMP && !dump_count)
 			exit(EXIT_SUCCESS);
-		}
 
 		/* No key pressed, will suggest something */
 		if (!key && !dump_count)
-			pick_suggestion();
+			pt_sugg_pick();
 
 		/* Refresh display */
-		if (!PT_ON_DUMP) {
-			show_title_bar();
-			update_windows();
-		}
+		if (!PT_ON_DUMP)
+			pt_display_update();
+
+		if (root_user)
+			pt_cpufreq_suggest();
 
 		/*
 		 * Update the interval based on how long the CPU was in the
 		 * longest c-state during the last snapshot. If the user
 		 * specified an interval we skip this bit and keep it fixed.
 		 */
-		last_time = (((double)g_cstate_info[g_longest_cstate].total_time
-		    /MICROSEC/g_ncpus)/g_cstate_info[g_longest_cstate].events);
+		if (g_features & FEATURE_CSTATE && !user_interval) {
+			last_time = (((double)
+			    g_cstate_info[g_longest_cstate].total_time/MICROSEC
+			    /g_ncpus)/g_cstate_info[g_longest_cstate].events);
 
-		if (!user_interval)
 			if (last_time < INTERVAL_DEFAULT ||
 			    (g_total_events/g_ticktime) < 1)
 				g_ticktime = INTERVAL_DEFAULT;
 			else
 				g_ticktime = INTERVAL_UPDATE(last_time);
-
-		/*
-		 * Restore user specified interval after a refresh
-		 */
-		if (keychar == 'R' && user_interval)
-			g_ticktime = g_ticktime_usr;
+		} else {
+			/*
+			 * Restore interval after a refresh.
+			 */
+			if (key)
+				g_ticktime = g_ticktime_usr;
+		}
 	}
-	return (EXIT_SUCCESS);
-}
 
-void
-suggest_as_root(void)
-{
-	add_suggestion("Suggestion: run as root to get suggestions"
-	    " for reducing system power consumption",  40, NULL, NULL,
-	    NULL);
+	return (EXIT_SUCCESS);
 }

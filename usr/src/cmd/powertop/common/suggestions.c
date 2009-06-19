@@ -43,136 +43,231 @@
 #include <string.h>
 #include "powertop.h"
 
-struct suggestion;
+/*
+ * Default number of intervals we display a suggestion before moving
+ * to the next.
+ */
+#define	PT_SUGG_DEF_SLICE	3
 
-struct suggestion {
-	struct suggestion *next;
+/*
+ * Global pointer to the current suggestion.
+ */
+sugg_t	*g_curr_sugg;
 
-	char 	*string;
-	int	weight;
-	char 	key;
-	char 	*keystring;
+/*
+ * Head of the list of suggestions.
+ */
+static sugg_t *sugg;
 
-	suggestion_func *func;
-};
-
-static struct suggestion 	*suggestions;
-static int 			total_weight;
-
-static char 	previous[1024];
-
+/*
+ * Add a new suggestion. Only one suggestion per text allowed.
+ */
 void
-reset_suggestions(void)
+pt_sugg_add(char *text, int weight, char key, char *sb_msg, sugg_func_t *func)
 {
-	struct suggestion *ptr;
+	sugg_t *new, *n, *pos = NULL;
 
-	ptr = suggestions;
-
-	while (ptr) {
-		struct suggestion *next;
-
-		next = ptr->next;
-		free(ptr->string);
-		free(ptr->keystring);
-		free(ptr);
-		ptr = next;
-	}
-
-	suggestions = NULL;
-	(void) strcpy(g_status_bar_slots[8], "");
-
-	g_suggestion_key 	= -1;
-	g_suggestion_activate 	= NULL;
-	total_weight 		= 0;
-}
-
-void
-add_suggestion(char *text, int weight, char key, char *keystring,
-    suggestion_func *func)
-{
-	struct suggestion *new;
-
-	if (!text)
+	/*
+	 * Text is a required field for suggestions
+	 */
+	if (text == NULL)
 		return;
 
-	new = malloc(sizeof (struct suggestion));
+	if (sugg == NULL) {
+		/*
+		 * Creating first element
+		 */
+		if ((new = calloc(1, sizeof (sugg_t))) == NULL)
+			return;
 
-	if (!new)
-		return;
+		if (sb_msg != NULL)
+			new->sb_msg = strdup(sb_msg);
 
-	(void) memset(new, 0, sizeof (struct suggestion));
+		if (text != NULL)
+			new->text = strdup(text);
 
-	new->string = strdup(text);
-	new->weight = weight;
-	new->key = key;
+		new->weight = weight;
+		new->key = key;
+		new->func = func;
+		new->slice = 0;
 
-	if (keystring)
-		new->keystring = strdup(keystring);
+		sugg = new;
+		new->prev = NULL;
+		new->next = NULL;
+	} else {
+		for (n = sugg; n != NULL; n = n->next) {
+			if (strcmp(n->text, text) == 0)
+				return;
 
-	new->next 	= suggestions;
-	new->func 	= func;
-	suggestions 	= new;
-	total_weight 	+= weight;
-}
+			if (weight > n->weight && pos == NULL)
+				pos = n;
+		}
+		/*
+		 * Create a new element
+		 */
+		if ((new = calloc(1, sizeof (sugg_t))) == NULL)
+			return;
 
-void
-pick_suggestion(void)
-{
-	int			weight, value, running = 0;
-	struct suggestion 	*ptr;
+		if (sb_msg != NULL)
+			new->sb_msg = strdup(sb_msg);
 
-	(void) strcpy(g_status_bar_slots[8], "");
-	g_suggestion_key 	= -1;
-	g_suggestion_activate 	= NULL;
+		new->text = strdup(text);
 
-	if (total_weight == 0 || suggestions == NULL) {
-		show_suggestion("");
-		return;
-	}
+		new->weight = weight;
+		new->key = key;
+		new->func = func;
+		new->slice = 0;
 
-	weight = total_weight;
+		if (pos == NULL) {
+			/*
+			 * Ordering placed the new element at the end
+			 */
+			for (n = sugg; n->next != NULL; n = n->next)
+				;
 
-	if (strlen(previous) && g_displaytime > 0.0)
-		weight += 50;
-
-	value 	= rand() % weight;
-	ptr 	= suggestions;
-
-	while (ptr) {
-		running += ptr->weight;
-
-		if (strcmp(ptr->string, previous) == 0 && g_displaytime > 0.0)
-			running += 50;
-
-		if (running > value) {
-			if (ptr->keystring)
-				(void) strncpy(g_status_bar_slots[8],
-				    ptr->keystring, PT_BAR_LENGTH);
-
-			g_suggestion_key 	= ptr->key;
-			g_suggestion_activate 	= ptr->func;
-
-			show_suggestion(ptr->string);
-
-			if (strcmp(ptr->string, previous)) {
-				g_displaytime = 30.0;
-				(void) strcpy(previous, ptr->string);
+			n->next = new;
+			new->prev = n;
+			new->next = NULL;
+		} else {
+			if (pos == sugg) {
+				/*
+				 * Ordering placed the new element at the start
+				 */
+				new->next = sugg;
+				new->prev = sugg;
+				sugg->prev = new;
+				sugg = new;
+			} else {
+				/*
+				 * Ordering placed the new element somewhere in
+				 * the middle
+				 */
+				new->next = pos;
+				new->prev = pos->prev;
+				pos->prev->next = new;
+				pos->prev = new;
 			}
+		}
+	}
+}
+
+/*
+ * Removes a suggestion, returning 0 if not found and 1 if so.
+ */
+int
+pt_sugg_remove(sugg_func_t *func)
+{
+	sugg_t *n;
+	int ret = 0;
+
+	for (n = sugg; n != NULL; n = n->next) {
+		if (n->func == func) {
+			/* Removing the first element */
+			if (n == sugg) {
+				if (sugg->next == NULL) {
+					/* Removing the only element */
+					sugg = NULL;
+				} else {
+					sugg = n->next;
+					sugg->prev = NULL;
+				}
+			} else {
+				if (n->next == NULL) {
+					/* Removing the last element */
+					n->prev->next = NULL;
+				} else {
+					/* Removing an intermediate element */
+					n->prev->next = n->next;
+					n->next->prev = n->prev;
+				}
+			}
+
+			/*
+			 * If this suggestions is currently being suggested,
+			 * remove it and update the screen.
+			 */
+			if (n == g_curr_sugg) {
+				if (n->sb_msg != NULL) {
+					pt_display_mod_status_bar(n->sb_msg);
+					pt_display_status_bar();
+				}
+				if (n->text != NULL)
+					pt_display_suggestions(NULL);
+			}
+
+			free(n);
+			ret = 1;
+		}
+	}
+
+	return (ret);
+}
+
+/*
+ * Chose a suggestion to display. The list of suggestions is ordered by weight,
+ * so we only worry about fariness here. Each suggestion, starting with the
+ * first (the 'heaviest') is displayed during PT_SUGG_DEF_SLICE intervals.
+ */
+void
+pt_sugg_pick(void)
+{
+	sugg_t *n;
+
+	if (sugg == NULL) {
+		g_curr_sugg = NULL;
+		return;
+	}
+
+search:
+	for (n = sugg; n != NULL; n = n->next) {
+
+		if (n->slice++ < PT_SUGG_DEF_SLICE) {
+
+			/*
+			 * Don't need to re-suggest the current suggestion.
+			 */
+			if (g_curr_sugg == n)
+				return;
+
+			/*
+			 * Remove the current suggestion from screen.
+			 */
+			if (g_curr_sugg != NULL) {
+				if (g_curr_sugg->sb_msg != NULL) {
+					pt_display_mod_status_bar(
+					    g_curr_sugg->sb_msg);
+					pt_display_status_bar();
+				}
+				if (g_curr_sugg->text != NULL)
+					pt_display_suggestions(NULL);
+			}
+
+			if (n->sb_msg != NULL) {
+				pt_display_mod_status_bar(n->sb_msg);
+				pt_display_status_bar();
+			}
+
+			pt_display_suggestions(n->text);
+
+			g_curr_sugg = n;
+
 			return;
 		}
-		ptr = ptr->next;
 	}
 
-	show_suggestion("");
-	(void) memset(previous, 0, sizeof (previous));
-	g_displaytime = -1.0;
+	/*
+	 * All suggestions have run out of slice quotas, so we restart.
+	 */
+	for (n = sugg; n != NULL; n = n->next)
+		n->slice = 0;
+
+	goto search;
 }
 
 void
-print_all_suggestions(void)
+pt_sugg_as_root(void)
 {
-	struct suggestion *ptr;
-
-	for (ptr = suggestions; ptr; ptr = ptr->next)
-		(void) printf("\n%s\n", ptr->string);
+	pt_sugg_add("Suggestion: run as root to get suggestions"
+	    " for reducing system power consumption",  40, NULL, NULL,
+	    NULL);
 }

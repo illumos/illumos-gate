@@ -80,7 +80,7 @@ battery_mod_lookup(void)
 }
 
 void
-print_battery(void)
+pt_battery_print(void)
 {
 	int err;
 
@@ -105,7 +105,7 @@ print_battery(void)
 			    err);
 	}
 
-	show_acpi_power_line(battery_state.exist, battery_state.present_rate,
+	pt_display_acpi_power(battery_state.exist, battery_state.present_rate,
 	    battery_state.remain_cap, battery_state.last_cap,
 	    battery_state.bst_state);
 }

@@ -217,3 +217,4 @@ const char *g_dtp_events_c =
  */
 const char *g_msg_idle_state = "C-states (idle power)";
 const char *g_msg_freq_state = "P-states (frequencies)";
+const char *g_msg_freq_enable = "P - Enable P-states";

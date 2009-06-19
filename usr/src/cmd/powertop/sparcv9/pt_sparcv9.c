@@ -245,5 +245,6 @@ const char *g_dtp_events_c =
 /*
  * sparcv9 platform specific display messages
  */
-const char *g_msg_idle_state = "Idle Power States\t";
+const char *g_msg_idle_state = "Idle Power States";
 const char *g_msg_freq_state = "Frequency Levels";
+const char *g_msg_freq_enable = "P - Enable CPU PM";

@@ -39,16 +39,38 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <curses.h>
+#include <signal.h>
+#include <fcntl.h>
 #include "powertop.h"
 
-static WINDOW 	*title_bar_window;
-static WINDOW 	*cstate_window;
-static WINDOW 	*wakeup_window;
-static WINDOW 	*acpi_power_window;
-static WINDOW 	*eventstat_window;
-static WINDOW 	*suggestion_window;
-static WINDOW 	*status_bar_window;
+/*
+ * Minimum terminal height and width to run PowerTOP on curses mode.
+ */
+#define	PT_MIN_COLS		70
+#define	PT_MIN_ROWS		15
+
+/*
+ * Display colors
+ */
+#define	PT_COLOR_DEFAULT	1
+#define	PT_COLOR_HEADER_BAR	2
+#define	PT_COLOR_ERROR		3
+#define	PT_COLOR_RED		4
+#define	PT_COLOR_YELLOW		5
+#define	PT_COLOR_GREEN		6
+#define	PT_COLOR_BRIGHT		7
+#define	PT_COLOR_BLUE		8
+
+/*
+ * Constants for pt_display_setup()
+ */
+#define	SINGLE_LINE_SW 		1
+#define	LENGTH_SUGG_SW		2
+#define	TITLE_LINE		1
+#define	BLANK_LINE		1
+#define	NEXT_LINE		1
 
 #define	print(win, y, x, fmt, args...)				\
 	if (PT_ON_DUMP)						\
@@ -56,48 +78,73 @@ static WINDOW 	*status_bar_window;
 	else							\
 		(void) mvwprintw(win, y, x, fmt, ## args);
 
-char 		g_status_bar_slots[PT_BAR_NSLOTS][PT_BAR_LENGTH];
-char 		g_suggestion_key;
+enum pt_subwindows {
+	SW_TITLE,
+	SW_IDLE,
+	SW_FREQ,
+	SW_WAKEUPS,
+	SW_POWER,
+	SW_EVENTS,
+	SW_SUGG,
+	SW_STATUS,
+	SW_COUNT
+};
 
-static int	maxx, maxy;
+typedef struct sb_slot {
+	char *msg;
+	struct sb_slot *prev;
+	struct sb_slot *next;
+} sb_slot_t;
+
+static WINDOW *sw[SW_COUNT];
+static int win_cols, win_rows;
+static sb_slot_t *status_bar;
 
 static void
-zap_windows(void)
+pt_display_cleanup(void)
 {
-	if (title_bar_window) {
-		(void) delwin(title_bar_window);
-		title_bar_window = NULL;
-	}
-	if (cstate_window) {
-		(void) delwin(cstate_window);
-		cstate_window = NULL;
-	}
-	if (wakeup_window) {
-		(void) delwin(wakeup_window);
-		wakeup_window = NULL;
-	}
-	if (acpi_power_window) {
-		(void) delwin(acpi_power_window);
-		acpi_power_window = NULL;
-	}
-	if (eventstat_window) {
-		(void) delwin(eventstat_window);
-		eventstat_window = NULL;
-	}
-	if (suggestion_window) {
-		(void) delwin(suggestion_window);
-		suggestion_window = NULL;
-	}
-	if (status_bar_window) {
-		(void) delwin(status_bar_window);
-		status_bar_window = NULL;
+	(void) endwin();
+}
+
+static void
+pt_display_get_size(void)
+{
+	getmaxyx(stdscr, win_rows, win_cols);
+
+	if (win_rows < PT_MIN_ROWS || win_cols < PT_MIN_COLS) {
+		pt_display_cleanup();
+		(void) printf("\n\nPowerTOP cannot run in such a small "
+		    "terminal window. Please resize it.\n\n");
+		exit(EXIT_FAILURE);
 	}
 }
 
-void
-cleanup_curses(void)
+/*
+ * Signal handler, currently only used for window resizing.
+ */
+static void
+pt_display_resize(int sig)
 {
-	(void) endwin();
+	int i;
+
+	switch (sig) {
+	case SIGWINCH:
+		for (i = 0; i < SW_COUNT; i++)
+			if (sw[i] != NULL) {
+				(void) delwin(sw[i]);
+				sw[i] = NULL;
+			}
+
+		pt_display_cleanup();
+		(void) pt_display_init_curses();
+		pt_display_setup(B_TRUE);
+
+		pt_display_title_bar();
+
+		pt_display_update();
+
+		break;
+	}
 }
 
 /*
@@ -108,55 +155,75 @@ cleanup_curses(void)
  * 	subwin(WINDOW *orig, int nlines, int ncols, int begin_y, int begin_x)
  */
 void
-setup_windows(void)
+pt_display_setup(boolean_t resized)
 {
 	/*
 	 * These variables are used to properly set the initial y position and
 	 * number of lines in each subwindow, as the number of supported CPU
 	 * states affects their placement.
 	 */
-	int cstate_lines, event_lines, pos_y;
+	int cstate_lines, event_lines, pos_y = 0;
 
-	getmaxyx(stdscr, maxy, maxx);
+	/*
+	 * In theory, all systems have at least two idle states. We add two here
+	 * since we have to use DTrace to figure out how many this box has.
+	 */
+	cstate_lines = TITLE_LINE + max((g_max_cstate+2), g_npstates);
 
-	zap_windows();
-
-	cstate_lines 	= TITLE_LINE + max((g_max_cstate+1), g_npstates);
-
-	pos_y = 0;
-	title_bar_window = subwin(stdscr, SINGLE_LINE_SW, maxx, pos_y, 0);
+	sw[SW_TITLE] = subwin(stdscr, SINGLE_LINE_SW, win_cols, pos_y, 0);
 
 	pos_y += NEXT_LINE + BLANK_LINE;
-	cstate_window = subwin(stdscr, cstate_lines, maxx, pos_y, 0);
+	sw[SW_IDLE] = subwin(stdscr, cstate_lines, win_cols/2 + 1, pos_y, 0);
+	sw[SW_FREQ] = subwin(stdscr, cstate_lines, win_cols/2 - 8, pos_y,
+	    win_cols/2 + 8);
 
 	pos_y += cstate_lines + BLANK_LINE;
-	wakeup_window = subwin(stdscr, SINGLE_LINE_SW, maxx, pos_y, 0);
+	sw[SW_WAKEUPS] = subwin(stdscr, SINGLE_LINE_SW, win_cols, pos_y, 0);
 
 	pos_y += NEXT_LINE;
-	acpi_power_window = subwin(stdscr, SINGLE_LINE_SW, maxx, pos_y, 0);
+	sw[SW_POWER] = subwin(stdscr, SINGLE_LINE_SW, win_cols, pos_y, 0);
 
 	pos_y += NEXT_LINE + BLANK_LINE;
-	event_lines = maxy - SINGLE_LINE_SW - NEXT_LINE - LENGTH_SUGG_SW -
+	event_lines = win_rows - SINGLE_LINE_SW - NEXT_LINE - LENGTH_SUGG_SW -
 	    pos_y;
-	eventstat_window = subwin(stdscr, event_lines, maxx, pos_y, 0);
+
+	if (event_lines > 0) {
+		sw[SW_EVENTS] = subwin(stdscr, event_lines, win_cols, pos_y, 0);
+	} else {
+		(void) printf("\n\nPowerTOP cannot run in such a small "
+		    "terminal window, please resize it.\n\n");
+		exit(EXIT_FAILURE);
+	}
 
 	pos_y += event_lines + NEXT_LINE;
-	suggestion_window = subwin(stdscr, SINGLE_LINE_SW, maxx, pos_y, 0);
+	sw[SW_SUGG] = subwin(stdscr, SINGLE_LINE_SW, win_cols, pos_y, 0);
 
 	pos_y += BLANK_LINE + NEXT_LINE;
-	status_bar_window = subwin(stdscr, SINGLE_LINE_SW, maxx, pos_y, 0);
+	sw[SW_STATUS] = subwin(stdscr, SINGLE_LINE_SW, win_cols, pos_y, 0);
 
-	(void) strcpy(g_status_bar_slots[0], _(" Q - Quit "));
-	(void) strcpy(g_status_bar_slots[1], _(" R - Refresh "));
+	if (!resized) {
+		status_bar = NULL;
 
-	(void) werase(stdscr);
-	(void) wrefresh(status_bar_window);
+		pt_display_mod_status_bar(_("Q - Quit"));
+		pt_display_mod_status_bar(_("R - Refresh"));
+	}
+
+	pt_display_status_bar();
 }
 
+/*
+ * This routine handles all the necessary curses initialization.
+ */
 void
-initialize_curses(void)
+pt_display_init_curses(void)
 {
 	(void) initscr();
+
+	(void) atexit(pt_display_cleanup);
+	(void) signal(SIGWINCH, pt_display_resize);
+
+	pt_display_get_size();
+
 	(void) start_color();
 
 	/*
@@ -192,86 +259,172 @@ initialize_curses(void)
 	(void) init_pair(PT_COLOR_GREEN, COLOR_WHITE, COLOR_GREEN);
 	(void) init_pair(PT_COLOR_BLUE, COLOR_WHITE, COLOR_BLUE);
 	(void) init_pair(PT_COLOR_BRIGHT, COLOR_WHITE, COLOR_BLACK);
-
-	(void) atexit(cleanup_curses);
 }
 
 void
-show_title_bar(void)
+pt_display_update(void)
 {
-	int 	i, x = 0, y = 0;
+	(void) doupdate();
+}
+
+void
+pt_display_title_bar(void)
+{
 	char	title_pad[10];
 
-	(void) wattrset(title_bar_window, COLOR_PAIR(PT_COLOR_HEADER_BAR));
-	(void) wbkgd(title_bar_window, COLOR_PAIR(PT_COLOR_HEADER_BAR));
-	(void) werase(title_bar_window);
+	(void) wattrset(sw[SW_TITLE], COLOR_PAIR(PT_COLOR_HEADER_BAR));
+	(void) wbkgd(sw[SW_TITLE], COLOR_PAIR(PT_COLOR_HEADER_BAR));
+	(void) werase(sw[SW_TITLE]);
 
 	(void) snprintf(title_pad, 10, "%%%ds",
-	    (maxx - strlen(TITLE))/2 + strlen(TITLE));
+	    (win_cols - strlen(TITLE))/2 + strlen(TITLE));
+
 	/* LINTED: E_SEC_PRINTF_VAR_FMT */
-	print(title_bar_window, y, x, title_pad, TITLE);
+	print(sw[SW_TITLE], 0, 0, title_pad, TITLE);
 
-	(void) wrefresh(title_bar_window);
-	(void) werase(status_bar_window);
-
-	for (i = 0; i < PT_BAR_NSLOTS; i++) {
-		if (strlen(g_status_bar_slots[i]) == 0)
-			continue;
-		(void) wattron(status_bar_window, A_REVERSE);
-		print(status_bar_window, y, x, "%s", g_status_bar_slots[i]);
-		(void) wattroff(status_bar_window, A_REVERSE);
-		x += strlen(g_status_bar_slots[i]) + 1;
-	}
-	(void) wnoutrefresh(status_bar_window);
+	(void) wnoutrefresh(sw[SW_TITLE]);
 }
 
 void
-show_cstates(void)
+pt_display_status_bar(void)
+{
+	sb_slot_t *n = status_bar;
+	int x = 0;
+
+	(void) werase(sw[SW_STATUS]);
+
+	while (n && x < win_cols) {
+		(void) wattron(sw[SW_STATUS], A_REVERSE);
+		print(sw[SW_STATUS], 0, x, "%s", n->msg);
+		(void) wattroff(sw[SW_STATUS], A_REVERSE);
+		x += strlen(n->msg) + 1;
+
+		n = n->next;
+	}
+
+	(void) wnoutrefresh(sw[SW_STATUS]);
+}
+
+/*
+ * Adds or removes items to the status bar automatically.
+ * Only one instance of an item allowed.
+ */
+void
+pt_display_mod_status_bar(char *msg)
+{
+	sb_slot_t *new, *n;
+	boolean_t found = B_FALSE, first = B_FALSE;
+
+	if (msg == NULL) {
+		pt_error("%s : can't add an empty status bar item.", __FILE__);
+		return;
+	}
+
+	if (status_bar != NULL) {
+		/*
+		 * Non-empty status bar. Look for an entry matching this msg.
+		 */
+		for (n = status_bar; n != NULL; n = n->next) {
+
+			if (strcmp(msg, n->msg) == 0) {
+				if (n != status_bar)
+					n->prev->next = n->next;
+				else
+					first = B_TRUE;
+
+				if (n->next != NULL) {
+					n->next->prev = n->prev;
+					if (first)
+						status_bar = n->next;
+				} else {
+					if (first)
+						status_bar = NULL;
+				}
+
+				free(n);
+				found = B_TRUE;
+			}
+		}
+
+		/*
+		 * Found and removed at least one occurrance of msg, refresh
+		 * the bar and return.
+		 */
+		if (found) {
+			return;
+		} else {
+			/*
+			 * Inserting a new msg, walk to the end of the bar.
+			 */
+			for (n = status_bar; n->next != NULL; n = n->next)
+				;
+		}
+	}
+
+	if ((new = calloc(1, sizeof (sb_slot_t))) == NULL) {
+		pt_error("%s : failed to allocate a new slot\n", __FILE__);
+	} else {
+		new->msg = strdup(msg);
+
+		/*
+		 * Check if it's the first entry.
+		 */
+		if (status_bar == NULL) {
+			status_bar = new;
+			new->prev = NULL;
+		} else {
+			new->prev = n;
+			n->next = new;
+		}
+		new->next = NULL;
+	}
+}
+
+void
+pt_display_states(void)
 {
 	char		c[100];
 	int		i;
 	double		total_pstates = 0.0, avg, res;
 	uint64_t	p0_speed, p1_speed;
 
-	if (!PT_ON_DUMP) {
-		(void) werase(cstate_window);
-		(void) wattrset(cstate_window, COLOR_PAIR(PT_COLOR_DEFAULT));
-		(void) wbkgd(cstate_window, COLOR_PAIR(PT_COLOR_DEFAULT));
-	}
+	print(sw[SW_IDLE], 0, 0, "%s\tAvg\tResidency\n", g_msg_idle_state);
 
-	print(cstate_window, 0, 0, "%s\tAvg\tresidency\n", g_msg_idle_state);
-	res =  (((double)g_cstate_info[0].total_time / g_total_c_time)) * 100;
-	(void) sprintf(c, "C0 (cpu running)\t\t(%.1f%%)\n", (float)res);
-	print(cstate_window, 1, 0, "%s", c);
-
-	for (i = 1; i <= g_max_cstate; i++) {
-		/*
-		 * In situations where the load is too intensive, the system
-		 * might not transition at all.
-		 */
-		if (g_cstate_info[i].events > 0)
-			avg = (((double)g_cstate_info[i].total_time/
-			    MICROSEC)/g_cstate_info[i].events);
-		else
-			avg = 0;
-
-		res = ((double)g_cstate_info[i].total_time/g_total_c_time)
+	if (g_features & FEATURE_CSTATE) {
+		res =  (((double)g_cstate_info[0].total_time / g_total_c_time))
 		    * 100;
+		(void) sprintf(c, "C0 (cpu running)\t\t(%.1f%%)\n", (float)res);
+		print(sw[SW_IDLE], 1, 0, "%s", c);
 
-		(void) sprintf(c, "C%d\t\t\t%.1fms\t(%.1f%%)\n", i, (float)avg,
-		    (float)res);
-		print(cstate_window, i + 1, 0, "%s", c);
+		for (i = 1; i <= g_max_cstate; i++) {
+			/*
+			 * In situations where the load is too intensive, the
+			 * system might not transition at all.
+			 */
+			if (g_cstate_info[i].events > 0)
+				avg = (((double)g_cstate_info[i].total_time/
+				    MICROSEC)/g_cstate_info[i].events);
+			else
+				avg = 0;
+
+			res = ((double)g_cstate_info[i].total_time/
+			    g_total_c_time) * 100;
+
+			(void) sprintf(c, "C%d\t\t\t%.1fms\t(%.1f%%)\n",
+			    i, (float)avg, (float)res);
+			print(sw[SW_IDLE], i + 1, 0, "%s", c);
+		}
 	}
 
-	print(cstate_window, 0, 48, "%s\n", g_msg_freq_state);
+	if (!PT_ON_DUMP)
+		(void) wnoutrefresh(sw[SW_IDLE]);
 
-	if (g_npstates < 2) {
-		(void) sprintf(c, "%4lu Mhz\t%.1f%%",
-		    (long)g_pstate_info[0].speed, 100.0);
-		print(cstate_window, 1, 48, "%s\n", c);
-	} else {
+	print(sw[SW_FREQ], 0, 0, "%s\n", g_msg_freq_state);
+
+	if (g_features & FEATURE_PSTATE) {
 		for (i = 0; i < g_npstates; i++) {
-			total_pstates += (double)(g_pstate_info[i].total_time/
+			total_pstates +=
+			    (double)(g_pstate_info[i].total_time/
 			    g_ncpus_observed/MICROSEC);
 		}
 
@@ -281,9 +434,9 @@ show_cstates(void)
 		for (i = 0;  i < g_npstates - 1; i++) {
 			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
 			    (long)g_pstate_info[i].speed,
-			    100 * (g_pstate_info[i].total_time/g_ncpus_observed/
-			    MICROSEC/total_pstates));
-			print(cstate_window, i+1, 48, "%s\n", c);
+			    100 * (g_pstate_info[i].total_time/
+			    g_ncpus_observed/MICROSEC/total_pstates));
+			print(sw[SW_FREQ], i+1, 0, "%s\n", c);
 		}
 
 		/*
@@ -301,12 +454,14 @@ show_cstates(void)
 				p0_speed = p1_speed + 1;
 			} else {
 				/*
-				 * If g_turbo_ratio > 1.0, that means turbo
-				 * mode works. So, P(0) = ratio * P(1);
+				 * If g_turbo_ratio > 1.0, that means
+				 * turbo mode works. So, P(0) = ratio *
+				 *  P(1);
 				 */
-				p0_speed = (uint64_t)(p1_speed * g_turbo_ratio);
+				p0_speed = (uint64_t)(p1_speed *
+				    g_turbo_ratio);
 				if (p0_speed < (p1_speed + 1))
-				p0_speed = p1_speed + 1;
+					p0_speed = p1_speed + 1;
 			}
 			/*
 			 * Reset the ratio for the next round
@@ -326,15 +481,21 @@ show_cstates(void)
 			    100 * (g_pstate_info[i].total_time/
 			    g_ncpus_observed/MICROSEC/total_pstates));
 		}
-		print(cstate_window, i+1, 48, "%s\n", c);
+		print(sw[SW_FREQ], i+1, 0, "%s\n", c);
+	} else {
+		if (g_npstates == 1) {
+			(void) sprintf(c, "%4lu Mhz\t%.1f%%",
+			    (long)g_pstate_info[0].speed, 100.0);
+			print(sw[SW_FREQ], 1, 0, "%s\n", c);
+		}
 	}
 
 	if (!PT_ON_DUMP)
-		(void) wnoutrefresh(cstate_window);
+		(void) wnoutrefresh(sw[SW_FREQ]);
 }
 
 void
-show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
+pt_display_acpi_power(uint32_t flag, double rate, double rem_cap, double cap,
     uint32_t state)
 {
 	char	buffer[1024];
@@ -342,7 +503,8 @@ show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
 	(void) sprintf(buffer,  _("no ACPI power usage estimate available"));
 
 	if (!PT_ON_DUMP)
-		(void) werase(acpi_power_window);
+		(void) werase(sw[SW_POWER]);
+
 	if (flag) {
 		char *c;
 		(void) sprintf(buffer, "Power usage (ACPI estimate): %.3fW",
@@ -368,22 +530,23 @@ show_acpi_power_line(uint32_t flag, double rate, double rem_cap, double cap,
 		}
 
 	}
-	print(acpi_power_window, 0, 0, "%s\n", buffer);
+
+	print(sw[SW_POWER], 0, 0, "%s\n", buffer);
 	if (!PT_ON_DUMP)
-		(void) wnoutrefresh(acpi_power_window);
+		(void) wnoutrefresh(sw[SW_POWER]);
 }
 
 void
-show_wakeups(double interval)
+pt_display_wakeups(double interval)
 {
 	char		c[100];
 	int		i, event_sum = 0;
 	event_info_t	*event = g_event_info;
 
 	if (!PT_ON_DUMP) {
-		(void) werase(wakeup_window);
-		(void) wbkgd(wakeup_window, COLOR_PAIR(PT_COLOR_RED));
-		(void) wattron(wakeup_window, A_BOLD);
+		(void) werase(sw[SW_WAKEUPS]);
+		(void) wbkgd(sw[SW_WAKEUPS], COLOR_PAIR(PT_COLOR_RED));
+		(void) wattron(sw[SW_WAKEUPS], A_BOLD);
 	}
 
 	/*
@@ -404,14 +567,14 @@ show_wakeups(double interval)
 
 	(void) sprintf(c, "Wakeups-from-idle per second: %4.1f\tinterval: "
 	    "%.1fs", (double)(g_total_events/interval), interval);
-	print(wakeup_window, 0, 0, "%s\n", c);
+	print(sw[SW_WAKEUPS], 0, 0, "%s\n", c);
 
 	if (!PT_ON_DUMP)
-		(void) wnoutrefresh(wakeup_window);
+		(void) wnoutrefresh(sw[SW_WAKEUPS]);
 }
 
 void
-show_eventstats(double interval)
+pt_display_events(double interval)
 {
 	char		c[100];
 	int		i;
@@ -419,9 +582,9 @@ show_eventstats(double interval)
 	event_info_t	*event = g_event_info;
 
 	if (!PT_ON_DUMP) {
-		(void) werase(eventstat_window);
-		(void) wattrset(eventstat_window, COLOR_PAIR(PT_COLOR_DEFAULT));
-		(void) wbkgd(eventstat_window, COLOR_PAIR(PT_COLOR_DEFAULT));
+		(void) werase(sw[SW_EVENTS]);
+		(void) wbkgd(sw[SW_EVENTS], COLOR_PAIR(PT_COLOR_DEFAULT));
+		(void) wattron(sw[SW_EVENTS], COLOR_PAIR(PT_COLOR_DEFAULT));
 	}
 
 	/*
@@ -439,7 +602,7 @@ show_eventstats(double interval)
 	else
 		(void) sprintf(c, "Top causes for wakeups:\n");
 
-	print(eventstat_window, 0, 0, "%s", c);
+	print(sw[SW_EVENTS], 0, 0, "%s", c);
 
 	for (i = 0; i < g_top_events; i++, event++) {
 
@@ -451,27 +614,26 @@ show_eventstats(double interval)
 
 		(void) sprintf(c, "%4.1f%% (%5.1f)", 100 * events,
 		    (double)event->total_count/interval);
-		print(eventstat_window, i+1, 0, "%s", c);
-		print(eventstat_window, i+1, 16, "%20s :",
+		print(sw[SW_EVENTS], i+1, 0, "%s", c);
+		print(sw[SW_EVENTS], i+1, 16, "%20s :",
 		    event->offender_name);
-		print(eventstat_window, i+1, 40, "%-64s\n",
+		print(sw[SW_EVENTS], i+1, 40, "%-64s\n",
 		    event->offense_name);
 	}
 
 	if (!PT_ON_DUMP)
-		(void) wnoutrefresh(eventstat_window);
+		(void) wnoutrefresh(sw[SW_EVENTS]);
 }
 
 void
-show_suggestion(char *sug)
+pt_display_suggestions(char *sug)
 {
-	(void) werase(suggestion_window);
-	print(suggestion_window, 0, 0, "%s", sug);
-	(void) wnoutrefresh(suggestion_window);
-}
+	(void) werase(sw[SW_SUGG]);
 
-void
-update_windows(void)
-{
-	(void) doupdate();
+	if (sug != NULL)
+		print(sw[SW_SUGG], 0, 0, "%s", sug);
+
+	(void) wnoutrefresh(sw[SW_SUGG]);
+
+	pt_display_update();
 }
