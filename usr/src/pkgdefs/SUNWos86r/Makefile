@@ -25,7 +25,7 @@
 
 include ../Makefile.com
 
-DATAFILES += i.manifest r.manifest i.rOWconfig
+DATAFILES += i.manifest r.manifest
 
 MACHDATAFILES += i.sdconf
 CLOBBERFILES += $(MACHDATAFILES)

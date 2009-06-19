@@ -488,7 +488,6 @@ i386_SUBDIRS=		\
 	diskscan	\
 	lms		\
 	ntfsprogs	\
-	OWconfig	\
 	parted		\
 	rtc		\
 	ucodeadm	\
