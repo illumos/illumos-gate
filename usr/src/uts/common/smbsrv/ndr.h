@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,6 +277,8 @@ typedef struct ndr_stream {
 #define	NDR_MODE_CALL_RECV	(NDR_M_OP_UNMARSHALL + NDR_DIR_IN)
 #define	NDR_MODE_RETURN_SEND	(NDR_M_OP_MARSHALL + NDR_DIR_OUT)
 #define	NDR_MODE_RETURN_RECV	(NDR_M_OP_UNMARSHALL + NDR_DIR_OUT)
+#define	NDR_MODE_BUF_ENCODE	NDR_MODE_CALL_SEND
+#define	NDR_MODE_BUF_DECODE	NDR_MODE_RETURN_RECV
 
 #define	NDR_MODE_TO_M_OP(MODE)	((MODE) & 0x0F)
 #define	NDR_MODE_TO_DIR(MODE)	((MODE) & 0xF0)
@@ -284,6 +286,11 @@ typedef struct ndr_stream {
 
 #define	NDR_MODE_MATCH(NDS, MODE) \
 	(NDR_M_OP_AND_DIR_TO_MODE((NDS)->m_op, (NDS)->dir) == (MODE))
+
+#define	NDR_IS_FIRST_FRAG(F)	((F) & NDR_PFC_FIRST_FRAG)
+#define	NDR_IS_LAST_FRAG(F)	((F) & NDR_PFC_LAST_FRAG)
+#define	NDR_IS_SINGLE_FRAG(F)	\
+	(NDR_IS_FIRST_FRAG((F)) && NDR_IS_LAST_FRAG((F)))
 
 #define	NDS_F_NONE		0x00
 #define	NDS_F_NOTERM		0x01	/* strings are not null terminated */

@@ -69,6 +69,7 @@
 #define	SMB_ADS_DCLEVEL_W2K	0
 #define	SMB_ADS_DCLEVEL_W2K3	2
 #define	SMB_ADS_DCLEVEL_W2K8	3
+#define	SMB_ADS_DCLEVEL_W2K8_R2 4
 
 /*
  * msDs-supportedEncryptionTypes (Windows Server 2008 only)
@@ -2039,7 +2040,7 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	 * Windows 2008 DC expects the UPN attribute to be host/fqhn while
 	 * both Windows 2000 & 2003 expect it to be host/fqhn@realm.
 	 */
-	if (dclevel == SMB_ADS_DCLEVEL_W2K8)
+	if (dclevel >= SMB_ADS_DCLEVEL_W2K8)
 		user_principal = smb_krb5_get_spn(SMBKRB5_SPN_IDX_HOST, fqhost);
 	else
 		user_principal = smb_krb5_get_upn(spn_set[SMBKRB5_SPN_IDX_HOST],
@@ -2051,7 +2052,7 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	}
 
 	max = (SMB_ADS_COMPUTER_NUM_ATTR - ((op != LDAP_MOD_ADD) ? 1 : 0))
-	    - (dclevel == SMB_ADS_DCLEVEL_W2K8 ?  0 : 1);
+	    - (dclevel >= SMB_ADS_DCLEVEL_W2K8 ?  0 : 1);
 
 	if (smb_ads_alloc_attr(attrs, max) != 0) {
 		free(user_principal);
@@ -2580,7 +2581,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		goto adjoin_cleanup;
 	}
 
-	if (dclevel == SMB_ADS_DCLEVEL_W2K8) {
+	if (dclevel >= SMB_ADS_DCLEVEL_W2K8) {
 		num = sizeof (w2k8enctypes) / sizeof (krb5_enctype);
 		encptr = w2k8enctypes;
 	} else {

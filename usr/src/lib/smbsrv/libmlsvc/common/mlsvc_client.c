@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -303,7 +303,8 @@ ndr_xa_init(ndr_client_t *clnt, ndr_xa_t *mxa)
 	mxa->heap = heap;
 
 	nds_initialize(send_nds, 0, NDR_MODE_CALL_SEND, heap);
-	nds_initialize(recv_nds, 16 * 1024, NDR_MODE_RETURN_RECV, heap);
+	nds_initialize(recv_nds, NDR_PDU_SIZE_HINT_DEFAULT,
+	    NDR_MODE_RETURN_RECV, heap);
 	return (0);
 }
 

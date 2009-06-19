@@ -32,9 +32,26 @@
 #include <smbsrv/ntifs.h>
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/ntstatus.h>
+#include <smbsrv/libsmb.h>
 
 #define	SMB_SHR_ACE_READ_PERMS	(ACE_READ_PERMS | ACE_EXECUTE | ACE_SYNCHRONIZE)
 #define	SMB_SHR_ACE_CONTROL_PERMS	(ACE_MODIFY_PERMS & (~ACE_DELETE_CHILD))
+
+#define	SMB_SHR_ACE_MODIFY_PERMS	(ACE_MODIFY_PERMS &		\
+	(~(ACE_READ_DATA | ACE_READ_ATTRIBUTES | ACE_READ_NAMED_ATTRS |	\
+	ACE_EXECUTE | ACE_DELETE_CHILD)))
+
+static struct {
+	int am_ace_perms;
+	int am_share_perms;
+} smb_ace_map[] = {
+	{ ACE_ALL_PERMS,	ACE_ALL_PERMS },
+	{ ACE_MODIFY_PERMS,	SMB_SHR_ACE_CONTROL_PERMS },
+	{ ACE_MODIFY_PERMS,	SMB_SHR_ACE_MODIFY_PERMS },
+	{ ACE_READ_PERMS,	SMB_SHR_ACE_READ_PERMS }
+};
+
+#define	SMB_ACE_MASK_MAP_SIZE	(sizeof (smb_ace_map)/sizeof (smb_ace_map[0]))
 
 static void smb_sd_set_sacl(smb_sd_t *, smb_acl_t *, boolean_t, int);
 static void smb_sd_set_dacl(smb_sd_t *, smb_acl_t *, boolean_t, int);
@@ -122,12 +139,13 @@ smb_sd_get_secinfo(smb_sd_t *sd)
 static int
 smb_sd_adjust_read_mask(int mask)
 {
-	if (mask == ACE_ALL_PERMS)
-		return (ACE_ALL_PERMS);
-	if (mask == ACE_MODIFY_PERMS)
-		return (SMB_SHR_ACE_CONTROL_PERMS);
-	if (mask == ACE_READ_PERMS)
-		return (SMB_SHR_ACE_READ_PERMS);
+	int i;
+
+	for (i = 0; i < SMB_ACE_MASK_MAP_SIZE; ++i) {
+		if (smb_ace_map[i].am_ace_perms == mask)
+			return (smb_ace_map[i].am_share_perms);
+	}
+
 	return (-1);
 }
 
@@ -201,12 +219,13 @@ smb_sd_read(char *path, smb_sd_t *sd, uint32_t secinfo)
 static int
 smb_sd_adjust_write_mask(int mask)
 {
-	if (mask == ACE_ALL_PERMS)
-		return (ACE_ALL_PERMS);
-	if (mask == SMB_SHR_ACE_CONTROL_PERMS)
-		return (ACE_MODIFY_PERMS);
-	if (mask == SMB_SHR_ACE_READ_PERMS)
-		return (ACE_READ_PERMS);
+	int i;
+
+	for (i = 0; i < SMB_ACE_MASK_MAP_SIZE; ++i) {
+		if (smb_ace_map[i].am_share_perms == mask)
+			return (smb_ace_map[i].am_ace_perms);
+	}
+
 	return (-1);
 }
 

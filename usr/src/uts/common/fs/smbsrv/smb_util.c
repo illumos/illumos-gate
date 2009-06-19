@@ -284,8 +284,10 @@ smb_sattr_check(uint16_t dosattr, uint16_t sattr)
  *
  * Find the last component of path and split it into filename
  * and stream name.
- * On return the named stream always has type ":$DATA",
- * i.e. 'stream' contains :<sname>:$DATA
+ *
+ * On return the named stream type will be present.  The stream
+ * type defaults to ":$DATA", if it has not been defined
+ * For exmaple, 'stream' contains :<sname>:$DATA
  */
 void
 smb_stream_parse_name(char *path, char *filename, char *stream)
@@ -350,11 +352,18 @@ smb_is_stream_name(char *path)
  * - the path is not a stream name
  * - a path is specified but the fname is ommitted.
  * - the stream_type is specified but not valid.
- *   Only type $DATA is supported, where $DATA is case-insensitive.
+ *
+ * Note: the stream type is case-insensitive.
  */
 uint32_t
 smb_validate_stream_name(smb_pathname_t *pn)
 {
+	static char *strmtype[] = {
+		"$DATA",
+		"$INDEX_ALLOCATION"
+	};
+	int i;
+
 	ASSERT(pn);
 	ASSERT(pn->pn_sname);
 
@@ -364,8 +373,12 @@ smb_validate_stream_name(smb_pathname_t *pn)
 	if ((pn->pn_pname) && !(pn->pn_fname))
 		return (NT_STATUS_OBJECT_NAME_INVALID);
 
-	if ((pn->pn_stype != NULL) &&
-	    (strcasecmp(pn->pn_stype, "$DATA") != 0)) {
+	if (pn->pn_stype != NULL) {
+		for (i = 0; i < sizeof (strmtype) / sizeof (strmtype[0]); ++i) {
+			if (strcasecmp(pn->pn_stype, strmtype[i]) == 0)
+				return (NT_STATUS_SUCCESS);
+		}
+
 		return (NT_STATUS_OBJECT_NAME_INVALID);
 	}
 

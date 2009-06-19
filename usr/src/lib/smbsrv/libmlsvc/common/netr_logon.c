@@ -123,9 +123,8 @@ netlogon_logon_private(netr_client_t *clnt, smb_token_t *token)
 	}
 
 	do {
-		status = netr_open(di.d_dc, di.d_info.di_nbname, &netr_handle);
-		if (status != 0)
-			return (status);
+		if (netr_open(di.d_dc, di.d_info.di_nbname, &netr_handle) != 0)
+			return (NT_STATUS_OPEN_FAILED);
 
 		if (di.d_dc && (*netr_global_info.server != '\0')) {
 			(void) snprintf(server, sizeof (server),

@@ -115,6 +115,7 @@ int smb_vop_lookup(vnode_t *, char *, vnode_t **, char *, int, int *, vnode_t *,
     cred_t *);
 int smb_vop_create(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,
     vsecattr_t *);
+int smb_vop_link(vnode_t *, vnode_t *, char *, int, cred_t *);
 int smb_vop_remove(vnode_t *, char *, int, cred_t *);
 int smb_vop_rename(vnode_t *, char *, vnode_t *, char *, int, cred_t *);
 int smb_vop_mkdir(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,

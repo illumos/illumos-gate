@@ -99,25 +99,6 @@ ndr_svc_unregister(ndr_service_t *svc)
 	}
 }
 
-int
-ndr_svc_list(char *buffer, int bufsize)
-{
-	ndr_service_t *svc;
-	smb_ctxbuf_t ctx;
-	int i;
-
-	(void) smb_ctxbuf_init(&ctx, (uint8_t *)buffer, bufsize);
-
-	for (i = 0; i < NDR_MAX_SERVICES; i++) {
-		if ((svc = ndr_services[i]) != 0) {
-			(void) smb_ctxbuf_printf(&ctx, "%-16s %s\n",
-			    svc->name, svc->desc);
-		}
-	}
-
-	return (smb_ctxbuf_len(&ctx));
-}
-
 ndr_stub_table_t *
 ndr_svc_find_stub(ndr_service_t *svc, int opnum)
 {

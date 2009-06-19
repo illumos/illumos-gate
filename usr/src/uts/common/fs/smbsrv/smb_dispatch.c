@@ -420,7 +420,9 @@ static smb_disp_entry_t	dispatch[SMB_COM_NUM] = {
 	{ SMB_SDT_OPS(nt_cancel),				/* 0xA4 164 */
 	    NT_LM_0_12, 0,
 	    { "SmbNtCancel",	KSTAT_DATA_UINT64 } },
-	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA5 165 */
+	{ SMB_SDT_OPS(nt_rename),				/* 0xA5 165 */
+	    NT_LM_0_12, 0,
+	    { "SmbNtRename",	KSTAT_DATA_UINT64 } },
 	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA6 166 */
 	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA7 167 */
 	{ SMB_SDT_OPS(invalid), 0, 0, 0 },			/* 0xA8 168 */

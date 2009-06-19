@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -488,8 +488,8 @@ ndo_fmt(ndr_stream_t *nds, ndr_ref_t *ref, char *note)
 		(void) strlcpy(ref_name, "----", NDOBUFSZ);
 	}
 
-	(void) snprintf(buf, NDOBUFSZ, "%c%c %02d %-.*s %-*s  %s",
-	    m_op_c, dir_c, indent, indent,
+	(void) snprintf(buf, NDOBUFSZ, "%c%c %-.*s %-*s  %s",
+	    m_op_c, dir_c, indent,
 	    "....+....+....+....+....+....",
 	    20 - indent, ref_name, note);
 

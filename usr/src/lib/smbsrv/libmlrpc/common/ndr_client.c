@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,6 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 
-#define	NDR_IS_LAST_FRAG(F)	((F) & NDR_PFC_LAST_FRAG)
 #define	NDR_DEFAULT_FRAGSZ	8192
 
 static void ndr_clnt_init_hdr(ndr_client_t *, ndr_xa_t *);
@@ -147,8 +146,8 @@ ndr_clnt_call(ndr_binding_t *mbind, int opnum, void *params)
 	unsigned long		recv_pdu_scan_offset;
 	int			rc;
 
-	if (ndr_svc_find_stub(msvc, opnum) == NULL)
-		return (NDR_DRC_FAULT_API_OPNUM_INVALID);
+	if (ndr_svc_lookup_name(msvc->name) == NULL)
+		return (NDR_DRC_FAULT_API_SERVICE_INVALID);
 
 	bzero(&mxa, sizeof (mxa));
 	mxa.ptype = NDR_PTYPE_REQUEST;

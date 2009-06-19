@@ -62,7 +62,6 @@ int	smb_maxbufsize = SMB_NT_MAXBUF;
 int	smb_oplock_timeout = OPLOCK_STD_TIMEOUT;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
-int	smb_announce_quota = 0;
 int	smb_sign_debug = 0;
 uint_t	smb_audit_flags =
 #ifdef	DEBUG

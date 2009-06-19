@@ -246,7 +246,7 @@ struct winreg_EnumKey {
 	IN	winreg_handle_t	handle;
 	IN	DWORD	index;
 	IN	winreg_string_t	name_in;
-	IN	winreg_string_t	class_in;
+	IN	winreg_string_t	*class_in;
 	OUT	winreg_string_t	name_out;
 	OUT	winreg_string_t	*class_out;
 	INOUT	file_time_t	*change_time;

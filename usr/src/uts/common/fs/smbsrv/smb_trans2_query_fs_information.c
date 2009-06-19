@@ -383,11 +383,10 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		if ((tree->t_flags & SMB_TREE_CASEINSENSITIVE) == 0)
 			flags |= FILE_CASE_SENSITIVE_SEARCH;
 
-		if (tree->t_flags & SMB_TREE_STREAMS)
+		if (tree->t_flags & SMB_TREE_STREAMS) {
 			flags |= FILE_NAMED_STREAMS;
-
-		if (smb_announce_quota)
 			flags |= FILE_VOLUME_QUOTAS;
+		}
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, encode_str, sr,
 		    flags,

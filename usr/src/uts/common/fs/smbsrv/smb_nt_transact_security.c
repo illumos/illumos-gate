@@ -30,11 +30,9 @@
 #include <smbsrv/cifs.h>
 
 static void smb_encode_sd(struct smb_xa *, smb_sd_t *, uint32_t);
-static void smb_encode_sid(struct smb_xa *, smb_sid_t *);
 static void smb_encode_sacl(struct smb_xa *, smb_acl_t *);
 static void smb_encode_dacl(struct smb_xa *, smb_acl_t *);
 
-uint32_t smb_decode_sd(struct smb_xa *, smb_sd_t *);
 static smb_sid_t *smb_decode_sid(struct smb_xa *, uint32_t);
 static smb_acl_t *smb_decode_acl(struct smb_xa *, uint32_t);
 
@@ -288,7 +286,7 @@ smb_encode_sd(struct smb_xa *xa, smb_sd_t *sd, uint32_t secinfo)
  *
  * Encodes given SID in the reply buffer.
  */
-static void
+void
 smb_encode_sid(struct smb_xa *xa, smb_sid_t *sid)
 {
 	int i;

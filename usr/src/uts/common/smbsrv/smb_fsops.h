@@ -68,6 +68,9 @@ int smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
 
 int smb_maybe_mangled_name(char *name);
 
+int smb_fsop_link(smb_request_t *, cred_t *, smb_node_t *, smb_node_t *,
+    char *);
+
 int smb_fsop_rename(struct smb_request *sr, cred_t *cr,
     smb_node_t *from_snode, char *from_name, smb_node_t *to_snode,
     char *to_name);

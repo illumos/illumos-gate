@@ -40,7 +40,7 @@
  *
  * For example:  HKEY_LOCAL_MACHINE\System\CurrentControlSet
  *
- * The HKEY_LOCAL_MACHINE root key contains a subkey call System, and
+ * The HKEY_LOCAL_MACHINE root key contains a subkey called System, and
  * System contains a subkey called CurrentControlSet.
  *
  * The WINREG RPC interface returns Win32 error codes.
@@ -60,11 +60,18 @@
  * List of supported registry keys (case-insensitive).
  */
 static char *winreg_keys[] = {
+	"HKLM",
+	"HKU",
+	"HKLM\\SOFTWARE",
+	"HKLM\\SYSTEM",
+	"System",
+	"CurrentControlSet",
 	"System\\CurrentControlSet\\Services\\Eventlog",
 	"System\\CurrentControlSet\\Services\\Eventlog\\Application",
 	"System\\CurrentControlSet\\Services\\Eventlog\\Security",
 	"System\\CurrentControlSet\\Services\\Eventlog\\System",
 	"System\\CurrentControlSet\\Control\\ProductOptions",
+	"SOFTWARE",
 	"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 };
 
@@ -665,10 +672,18 @@ static int
 winreg_s_OpenKey(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_OpenKey *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
 	char *subkey = (char *)param->name.str;
-	ndr_hdid_t *id = NULL;
 	winreg_subkey_t *key;
 	char *dupkey;
+
+	if (subkey == NULL || *subkey == '\0') {
+		if ((hd = ndr_hdlookup(mxa, id)) != NULL)
+			subkey = hd->nh_data;
+	}
+
+	id = NULL;
 
 	if (subkey == NULL || list_is_empty(&winreg_keylist.kl_list)) {
 		bzero(&param->result_handle, sizeof (winreg_handle_t));

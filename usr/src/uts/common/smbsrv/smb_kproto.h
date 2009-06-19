@@ -49,7 +49,6 @@ extern "C" {
 extern	int smb_maxbufsize;
 extern	int smb_flush_required;
 extern	int smb_dirsymlink_enable;
-extern	int smb_announce_quota;
 extern	int smb_oplock_timeout;
 extern	int smb_sign_debug;
 extern	uint_t smb_audit_flags;
@@ -105,6 +104,7 @@ SMB_COM_DECL(logoff_andx);
 SMB_COM_DECL(negotiate);
 SMB_COM_DECL(nt_cancel);
 SMB_COM_DECL(nt_create_andx);
+SMB_COM_DECL(nt_rename);
 SMB_COM_DECL(nt_transact);
 SMB_COM_DECL(nt_transact_secondary);
 SMB_COM_DECL(open);
@@ -291,6 +291,7 @@ int	smbd_fs_query(smb_request_t *, smb_fqi_t *, int);
 int smb_lock_range_access(struct smb_request *, struct smb_node *,
     uint64_t, uint64_t, boolean_t);
 
+void	smb_encode_sid(struct smb_xa *, smb_sid_t *);
 uint32_t smb_decode_sd(struct smb_xa *, smb_sd_t *);
 
 /*
@@ -385,6 +386,7 @@ uint32_t smb_node_open_check(smb_node_t *, cred_t *,
     uint32_t, uint32_t);
 DWORD smb_node_rename_check(smb_node_t *);
 DWORD smb_node_delete_check(smb_node_t *);
+void smb_node_notify_change(smb_node_t *);
 
 u_offset_t smb_node_get_size(smb_node_t *, smb_attr_t *);
 void smb_node_set_time(struct smb_node *node, timestruc_t *crtime,

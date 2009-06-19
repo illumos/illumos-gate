@@ -1441,6 +1441,7 @@ typedef struct smb_request {
 	    struct dirop {
 		smb_fqi_t	fqi;
 		smb_fqi_t	dst_fqi;
+		uint16_t	info_level;
 	    } dirop;
 
 	    open_param_t	open;

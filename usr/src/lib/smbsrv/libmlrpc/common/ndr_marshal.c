@@ -19,10 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#include <assert.h>
 #include <strings.h>
 #include <sys/param.h>
 
@@ -35,24 +36,13 @@ static const int ndr_native_byte_order = NDR_REPLAB_INTG_BIG_ENDIAN;
 static const int ndr_native_byte_order = NDR_REPLAB_INTG_LITTLE_ENDIAN;
 #endif
 
-int
-ndr_encode_decode_common(ndr_xa_t *mxa, int mode, unsigned opnum,
+static int ndr_decode_hdr_common(ndr_stream_t *, ndr_common_header_t *);
+
+static int
+ndr_encode_decode_common(ndr_stream_t *nds, unsigned opnum,
     ndr_typeinfo_t *ti, void *datum)
 {
-	ndr_stream_t	*nds;
-	int		m_op = NDR_MODE_TO_M_OP(mode);
-	int		rc;
-
-	if (m_op == NDR_M_OP_MARSHALL)
-		nds = &mxa->send_nds;
-	else
-		nds = &mxa->recv_nds;
-
-	/*
-	 * Make sure that nds is in the correct mode
-	 */
-	if (!NDR_MODE_MATCH(nds, mode))
-		return (NDR_DRC_FAULT_MODE_MISMATCH);
+	int rc;
 
 	/*
 	 * Perform the (un)marshalling
@@ -78,7 +68,7 @@ ndr_encode_decode_common(ndr_xa_t *mxa, int mode, unsigned opnum,
 		break;
 
 	default:
-		if (m_op == NDR_M_OP_MARSHALL)
+		if (nds->m_op == NDR_M_OP_MARSHALL)
 			rc = NDR_DRC_FAULT_ENCODE_FAILED;
 		else
 			rc = NDR_DRC_FAULT_DECODE_FAILED;
@@ -88,46 +78,151 @@ ndr_encode_decode_common(ndr_xa_t *mxa, int mode, unsigned opnum,
 	return (rc);
 }
 
+ndr_buf_t *
+ndr_buf_init(ndr_typeinfo_t *ti)
+{
+	ndr_buf_t		*nbuf;
+
+	if ((nbuf = calloc(1, sizeof (ndr_buf_t))) == NULL)
+		return (NULL);
+
+	if ((nbuf->nb_heap = ndr_heap_create()) == NULL) {
+		free(nbuf);
+		return (NULL);
+	}
+
+	nbuf->nb_ti = ti;
+	nbuf->nb_magic = NDR_BUF_MAGIC;
+	return (nbuf);
+}
+
+void
+ndr_buf_fini(ndr_buf_t *nbuf)
+{
+	assert(nbuf->nb_magic == NDR_BUF_MAGIC);
+
+	nds_destruct(&nbuf->nb_nds);
+	ndr_heap_destroy(nbuf->nb_heap);
+	nbuf->nb_magic = 0;
+	free(nbuf);
+}
+
+/*
+ * Decode an NDR encoded buffer.  The buffer is expected to contain
+ * a single fragment packet with a valid PDU header followed by NDR
+ * encoded data.  The structure to which result points should be
+ * of the appropriate type to hold the decoded output.  For example:
+ *
+ *	pac_info_t info;
+ *
+ * 	if ((nbuf = ndr_buf_init(&TYPEINFO(ndr_pac)) != NULL) {
+ *		rc = ndr_decode_buf(nbuf, opnum, data, datalen, &info);
+ *		...
+ *		ndr_buf_fini(nbuf);
+ *	}
+ */
+int
+ndr_buf_decode(ndr_buf_t *nbuf, unsigned opnum, const char *data,
+    size_t datalen, void *result)
+{
+	ndr_common_header_t	hdr;
+	unsigned		pdu_size_hint;
+	int			rc;
+
+	assert(nbuf->nb_magic == NDR_BUF_MAGIC);
+	assert(nbuf->nb_heap != NULL);
+	assert(nbuf->nb_ti != NULL);
+
+	if (datalen < NDR_PDU_SIZE_HINT_DEFAULT)
+		pdu_size_hint = NDR_PDU_SIZE_HINT_DEFAULT;
+	else
+		pdu_size_hint = datalen;
+
+	nds_destruct(&nbuf->nb_nds);
+	nds_initialize(&nbuf->nb_nds, pdu_size_hint, NDR_MODE_BUF_DECODE,
+	    nbuf->nb_heap);
+	bcopy(data, nbuf->nb_nds.pdu_base_addr, datalen);
+
+	rc = ndr_decode_hdr_common(&nbuf->nb_nds, &hdr);
+	if (NDR_DRC_IS_FAULT(rc))
+		return (rc);
+
+	if (!NDR_IS_SINGLE_FRAG(hdr.pfc_flags))
+		return (rc);
+
+	rc = ndr_encode_decode_common(&nbuf->nb_nds, opnum, nbuf->nb_ti,
+	    result);
+	return (rc);
+}
+
+/*
+ * Use the receive stream to unmarshall data (NDR_MODE_CALL_RECV).
+ */
 int
 ndr_decode_call(ndr_xa_t *mxa, void *params)
 {
-	int rc;
+	ndr_stream_t	*nds = &mxa->recv_nds;
+	int		rc;
 
-	rc = ndr_encode_decode_common(mxa, NDR_MODE_CALL_RECV,
-	    mxa->opnum, mxa->binding->service->interface_ti, params);
+	if (!NDR_MODE_MATCH(nds, NDR_MODE_CALL_RECV))
+		return (NDR_DRC_FAULT_MODE_MISMATCH);
+
+	rc = ndr_encode_decode_common(nds, mxa->opnum,
+	    mxa->binding->service->interface_ti, params);
 
 	return (rc + NDR_PTYPE_REQUEST);
 }
 
+/*
+ * Use the send stream to marshall data (NDR_MODE_RETURN_SEND).
+ */
 int
 ndr_encode_return(ndr_xa_t *mxa, void *params)
 {
-	int rc;
+	ndr_stream_t	*nds = &mxa->send_nds;
+	int		rc;
 
-	rc = ndr_encode_decode_common(mxa, NDR_MODE_RETURN_SEND,
-	    mxa->opnum, mxa->binding->service->interface_ti, params);
+	if (!NDR_MODE_MATCH(nds, NDR_MODE_RETURN_SEND))
+		return (NDR_DRC_FAULT_MODE_MISMATCH);
+
+	rc = ndr_encode_decode_common(nds, mxa->opnum,
+	    mxa->binding->service->interface_ti, params);
 
 	return (rc + NDR_PTYPE_RESPONSE);
 }
 
+/*
+ * Use the send stream to marshall data (NDR_MODE_CALL_SEND).
+ */
 int
 ndr_encode_call(ndr_xa_t *mxa, void *params)
 {
-	int rc;
+	ndr_stream_t	*nds = &mxa->send_nds;
+	int		rc;
 
-	rc = ndr_encode_decode_common(mxa, NDR_MODE_CALL_SEND,
-	    mxa->opnum, mxa->binding->service->interface_ti, params);
+	if (!NDR_MODE_MATCH(nds, NDR_MODE_CALL_SEND))
+		return (NDR_DRC_FAULT_MODE_MISMATCH);
+
+	rc = ndr_encode_decode_common(nds, mxa->opnum,
+	    mxa->binding->service->interface_ti, params);
 
 	return (rc + NDR_PTYPE_REQUEST);
 }
 
+/*
+ * Use the receive stream to unmarshall data (NDR_MODE_RETURN_RECV).
+ */
 int
 ndr_decode_return(ndr_xa_t *mxa, void *params)
 {
-	int rc;
+	ndr_stream_t	*nds = &mxa->recv_nds;
+	int		rc;
 
-	rc = ndr_encode_decode_common(mxa, NDR_MODE_RETURN_RECV,
-	    mxa->opnum, mxa->binding->service->interface_ti, params);
+	if (!NDR_MODE_MATCH(nds, NDR_MODE_RETURN_RECV))
+		return (NDR_DRC_FAULT_MODE_MISMATCH);
+
+	rc = ndr_encode_decode_common(nds, mxa->opnum,
+	    mxa->binding->service->interface_ti, params);
 
 	return (rc + NDR_PTYPE_RESPONSE);
 }
@@ -137,6 +232,25 @@ ndr_decode_pdu_hdr(ndr_xa_t *mxa)
 {
 	ndr_common_header_t	*hdr = &mxa->recv_hdr.common_hdr;
 	ndr_stream_t		*nds = &mxa->recv_nds;
+	int			rc;
+
+	rc = ndr_decode_hdr_common(nds, hdr);
+	if (NDR_DRC_IS_FAULT(rc))
+		return (rc);
+
+	/*
+	 * Verify the protocol version.
+	 */
+	if ((hdr->rpc_vers != 5) || (hdr->rpc_vers_minor != 0))
+		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
+
+	mxa->ptype = hdr->ptype;
+	return (NDR_DRC_OK);
+}
+
+static int
+ndr_decode_hdr_common(ndr_stream_t *nds, ndr_common_header_t *hdr)
+{
 	int			ptype;
 	int			rc;
 	int			charset;
@@ -160,12 +274,6 @@ ndr_decode_pdu_hdr(ndr_xa_t *mxa)
 		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
 
 	/*
-	 * Verify the protocol version.
-	 */
-	if ((hdr->rpc_vers != 5) || (hdr->rpc_vers_minor != 0))
-		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
-
-	/*
 	 * Check for ASCII as the character set.  This is an ASCII
 	 * versus EBCDIC option and has nothing to do with Unicode.
 	 */
@@ -186,11 +294,7 @@ ndr_decode_pdu_hdr(ndr_xa_t *mxa)
 		ptype = NDR_PTYPE_REQUEST_WITH;	/* fake for sizing */
 	}
 
-	mxa->ptype = hdr->ptype;
-
-	rc = ndr_encode_decode_common(mxa,
-	    NDR_M_OP_AND_DIR_TO_MODE(nds->m_op, nds->dir),
-	    ptype, &TYPEINFO(ndr_hdr), hdr);
+	rc = ndr_encode_decode_common(nds, ptype, &TYPEINFO(ndr_hdr), hdr);
 
 	return (NDR_DRC_PTYPE_RPCHDR(rc));
 }
@@ -245,9 +349,7 @@ ndr_encode_pdu_hdr(ndr_xa_t *mxa)
 		ptype = NDR_PTYPE_REQUEST_WITH;	/* fake for sizing */
 	}
 
-	rc = ndr_encode_decode_common(mxa,
-	    NDR_M_OP_AND_DIR_TO_MODE(nds->m_op, nds->dir),
-	    ptype, &TYPEINFO(ndr_hdr), hdr);
+	rc = ndr_encode_decode_common(nds, ptype, &TYPEINFO(ndr_hdr), hdr);
 
 	return (NDR_DRC_PTYPE_RPCHDR(rc));
 }

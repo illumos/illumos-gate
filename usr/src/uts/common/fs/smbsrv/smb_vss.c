@@ -71,44 +71,36 @@ smb_vss_ioctl_enumerate_snaps(smb_request_t *sr, smb_xa_t *xa)
 {
 	uint32_t count = 0;
 	char *root_path;
-	uint32_t err = SDRC_SUCCESS;
+	uint32_t status = NT_STATUS_SUCCESS;
 	smb_dr_return_gmttokens_t gmttokens;
 
-	if (xa->smb_mdrcnt < SMB_VSS_COUNT_SIZE) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR);
-	}
+	if (xa->smb_mdrcnt < SMB_VSS_COUNT_SIZE)
+		return (NT_STATUS_INVALID_PARAMETER);
 
 	root_path  = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-	err = smb_vss_get_fsmountpath(sr, root_path, MAXPATHLEN);
+	if (smb_vss_get_fsmountpath(sr, root_path, MAXPATHLEN) != 0)
+		return (NT_STATUS_INVALID_PARAMETER);
 
-	if (err != SDRC_SUCCESS) {
-		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
-		return (SDRC_ERROR);
-	}
 	if (xa->smb_mdrcnt == SMB_VSS_COUNT_SIZE) {
 		count = smb_upcall_vss_get_count(root_path);
 		if (smb_mbc_encodef(&xa->rep_data_mb, "lllw", count, 0,
 		    (count * SMB_VSS_GMT_NET_SIZE(sr) +
 		    smb_ascii_or_unicode_null_len(sr)), 0) != 0) {
-			smbsr_error(sr, 0, ERRSRV, ERRerror);
-			err = SDRC_ERROR;
+			status = NT_STATUS_INVALID_PARAMETER;
 		}
 	} else {
 		count = xa->smb_mdrcnt / SMB_VSS_GMT_NET_SIZE(sr);
 
 		smb_upcall_vss_get_snapshots(root_path, count, &gmttokens);
 
-		err = smb_vss_encode_gmttokens(sr, xa, count, &gmttokens);
+		status = smb_vss_encode_gmttokens(sr, xa, count, &gmttokens);
 
 		smb_upcall_vss_get_snapshots_free(&gmttokens);
 	}
 
 	kmem_free(root_path, MAXPATHLEN);
-
-	return (err);
+	return (status);
 }
-
 
 /*
  * sr - the request info, used to find root of dataset,
@@ -133,7 +125,6 @@ smb_vss_ioctl_enumerate_snaps(smb_request_t *sr, smb_xa_t *xa)
  * One the new smb node is found, the path is modified by
  * removing the @GMT token from the path in the buf.
  */
-
 int
 smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
     smb_node_t *cur_node, char *buf, smb_node_t **vss_cur_node,
@@ -171,7 +162,6 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 	nodepath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
 	err = smb_vss_get_fsmountpath(sr, rootpath, MAXPATHLEN);
-
 	if (err != 0)
 		goto error;
 
@@ -247,7 +237,6 @@ error:
 
 	return (err);
 }
-
 
 static boolean_t
 smb_vss_is_gmttoken(const char *s)
@@ -329,38 +318,33 @@ smb_vss_encode_gmttokens(smb_request_t *sr, smb_xa_t *xa,
 	uint32_t returned_count;
 	uint32_t num_gmttokens;
 	char **gmttokens;
-	uint32_t err = SDRC_SUCCESS;
+	uint32_t status = NT_STATUS_SUCCESS;
 	uint32_t data_size;
 
 	returned_count = snap_data->rg_count;
 	num_gmttokens = snap_data->rg_gmttokens.rg_gmttokens_len;
 	gmttokens = snap_data->rg_gmttokens.rg_gmttokens_val;
 
-	if (returned_count > count) {
-		err = NT_STATUS_BUFFER_TOO_SMALL;
-	}
+	if (returned_count > count)
+		status = NT_STATUS_BUFFER_TOO_SMALL;
 
 	data_size = returned_count * SMB_VSS_GMT_NET_SIZE(sr) +
 	    smb_ascii_or_unicode_null_len(sr);
 
 	if (smb_mbc_encodef(&xa->rep_data_mb, "lll", returned_count,
-	    num_gmttokens, data_size) != 0) {
-			smbsr_error(sr, 0, ERRSRV, ERRerror);
-			err = SDRC_ERROR;
-		}
+	    num_gmttokens, data_size) != 0)
+		return (NT_STATUS_INVALID_PARAMETER);
 
-	if (err == SDRC_SUCCESS) {
+	if (status == NT_STATUS_SUCCESS) {
 		for (i = 0; i < num_gmttokens; i++) {
 			if (smb_mbc_encodef(&xa->rep_data_mb, "%u", sr,
-			    *gmttokens) != 0) {
-				smbsr_error(sr, 0, ERRSRV, ERRerror);
-				err = SDRC_ERROR;
-			}
+			    *gmttokens) != 0)
+				status = NT_STATUS_INVALID_PARAMETER;
 			gmttokens++;
 		}
 	}
 
-	return (err);
+	return (status);
 }
 
 /* This removes the first @GMT from the path */

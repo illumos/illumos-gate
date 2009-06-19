@@ -951,6 +951,64 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 }
 
 /*
+ * smb_fsop_link
+ *
+ * All SMB functions should use this smb_vop_link wrapper to ensure that
+ * the smb_vop_link is performed with the appropriate credentials.
+ * Please document any direct call to smb_vop_link to explain the reason
+ * for avoiding this wrapper.
+ *
+ * It is assumed that references exist on from_dnode and to_dnode coming
+ * into this routine.
+ */
+int
+smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *to_dnode,
+    smb_node_t *from_fnode, char *to_name)
+{
+	char	*longname = NULL;
+	int	flags = 0;
+	int	rc;
+
+	ASSERT(sr);
+	ASSERT(sr->tid_tree);
+	ASSERT(cr);
+	ASSERT(to_dnode);
+	ASSERT(to_dnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(to_dnode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(from_fnode);
+	ASSERT(from_fnode->n_magic == SMB_NODE_MAGIC);
+	ASSERT(from_fnode->n_state != SMB_NODE_STATE_DESTROYING);
+
+	if (SMB_TREE_CONTAINS_NODE(sr, from_fnode) == 0)
+		return (EACCES);
+
+	if (SMB_TREE_CONTAINS_NODE(sr, to_dnode) == 0)
+		return (EACCES);
+
+	if (SMB_TREE_IS_READONLY(sr))
+		return (EROFS);
+
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
+		flags = SMB_IGNORE_CASE;
+	if (SMB_TREE_SUPPORTS_CATIA(sr))
+		flags |= SMB_CATIA;
+
+	if (smb_maybe_mangled_name(to_name)) {
+		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		rc = smb_unmangle_name(to_dnode, to_name, longname, MAXNAMELEN);
+		kmem_free(longname, MAXNAMELEN);
+
+		if (rc == 0)
+			rc = EEXIST;
+		if (rc != ENOENT)
+			return (rc);
+	}
+
+	rc = smb_vop_link(to_dnode->vp, from_fnode->vp, to_name, flags, cr);
+	return (rc);
+}
+
+/*
  * smb_fsop_rename
  *
  * All SMB functions should use this smb_vop_rename wrapper to ensure that
@@ -2004,7 +2062,7 @@ smb_fsop_sdread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 			error = smb_fsop_access(sr, ga_cred, snode,
 			    READ_CONTROL);
 			if (error)
-				return (error);
+				return (EACCES);
 		}
 
 		attr.sa_mask = SMB_AT_UID | SMB_AT_GID;

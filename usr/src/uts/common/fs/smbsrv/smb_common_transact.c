@@ -32,6 +32,8 @@
 #include <smbsrv/lmerr.h>
 #include <smbsrv/nterror.h>
 
+#define	SMB_QUOTA_UNLIMITED	0xFFFFFFFFFFFFFFFF;
+
 /*
  * count of bytes in server response packet
  * except parameters and data. Note that setup
@@ -40,7 +42,7 @@
 #define	RESP_HEADER_LEN		24
 
 /*
- * NB. I started by using common functions for transaction/transaction2
+ * We started by using common functions for transaction/transaction2
  * and transaction_secondary/transaction2_secondary because they
  * are respectively so similar. However, it turned out to be a bad
  * idea because of quirky differences. Be sure if you modify one
@@ -452,8 +454,7 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 
 	case NT_TRANSACT_QUERY_QUOTA:
 		(void) smb_nt_transact_query_quota(sr, xa);
-		smbsr_error(sr, 0, ERRSRV, ERRaccess);
-		return (SDRC_ERROR);
+		break;
 
 	case NT_TRANSACT_SET_QUOTA:
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
@@ -523,21 +524,78 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
-
 /*
  * smb_nt_transact_query_quota
  *
- * There are 16 parameter bytes: fid, flags and 12 zero bytes.
+ * Request                    Description
+ * ========================== ==================================
+ * WORD fid
+ * BYTE ReturnSingleEntry     A boolean indicating whether to return
+ *                            a single entry or multiple entries.
+ * BYTE RestartScan           A boolean indicating whether to continue from
+ *                            the previous request or restart a new sequence.
+ * DWORD SidListLength        The length in bytes of the SidList or 0 if
+ *                            there is no SidList.
+ * DWORD StartSidLength       The length in bytes of the StartSid or 0 if
+ *                            there is no StartSid.  The server must ignore
+ *                            StartSidLength if SidListLength is non-zero.
+ * DWORD StartSidOffset       The offset, in bytes, to the StartSid in the
+ *                            parameter block.
+ *
+ * If SidListLength is non-zero, the request contains a list of SIDs
+ * for which information is requested.  If StartSidLength is nonzero,
+ * the request contains the SID at which the enumeration should start.
+ *
+ * One of SidListLength and StartSidLength must be 0.  If both are 0,
+ * all SIDs are to be enumerated by the server as if they were passed
+ * the SidList.
  */
 static smb_sdrc_t
 smb_nt_transact_query_quota(struct smb_request *sr, struct smb_xa *xa)
 {
-	uint16_t fid;
-	uint16_t flags;
+	smb_sid_t	*sid;
+	uint8_t		single, restart;
+	uint16_t	fid;
+	uint32_t	sidlen, listlen, startlen, startoff;
+	uint64_t	limit, used, mtime;
 
-	if (smb_mbc_decodef(&xa->req_param_mb, "%ww", sr, &fid, &flags))
+	if (smb_mbc_decodef(&xa->req_param_mb, "%wbblll", sr,
+	    &fid, &single, &restart, &listlen, &startlen, &startoff))
 		return (SDRC_ERROR);
 
+	if (restart == 0) {
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "l", 0);
+		return (SDRC_SUCCESS);
+	}
+
+	/*
+	 * BUILTIN\Administrators
+	 */
+	if ((sid = smb_sid_fromstr("S-1-5-32-544")) == NULL) {
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, 0, 0);
+		return (SDRC_ERROR);
+	}
+
+	sidlen = smb_sid_len(sid);
+	used = 0;
+	mtime = 0xBA7ADAAC0436C601; /* canned dummy timestamp */
+	limit = SMB_QUOTA_UNLIMITED;
+
+	/*
+	 * The encoded length of "llqqqq" is 40 bytes.
+	 */
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "l", 40 + sidlen);
+
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "llqqqq",
+	    0,		/* next offset */
+	    sidlen,	/* sid length */
+	    mtime,	/* change time */
+	    used,	/* quota used */
+	    limit,	/* soft limit */
+	    limit);	/* hard limit */
+
+	smb_encode_sid(xa, sid);
+	smb_sid_free(sid);
 	return (SDRC_SUCCESS);
 }
 

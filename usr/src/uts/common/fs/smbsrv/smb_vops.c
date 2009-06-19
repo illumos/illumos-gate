@@ -652,6 +652,39 @@ smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr)
 }
 
 /*
+ * smb_vop_link(target-dir-vp, source-file-vp, target-name)
+ *
+ * Create a link - same tree (identical TID) only.
+ */
+int
+smb_vop_link(vnode_t *to_dvp, vnode_t *from_vp, char *to_name,
+    int flags, cred_t *cr)
+{
+	int option_flags = 0;
+	char *np, *buf;
+	int rc;
+
+	if (flags & SMB_IGNORE_CASE)
+		option_flags = FIGNORECASE;
+
+	if (flags & SMB_CATIA) {
+		buf = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+		np = smb_vop_catia_v5tov4(to_name, buf, MAXNAMELEN);
+		if (strchr(np, '/') != NULL) {
+			kmem_free(buf, MAXNAMELEN);
+			return (EILSEQ);
+		}
+
+		rc = VOP_LINK(to_dvp, from_vp, np, cr, &smb_ct, option_flags);
+		kmem_free(buf, MAXNAMELEN);
+		return (rc);
+	}
+
+	rc = VOP_LINK(to_dvp, from_vp, to_name, cr, &smb_ct, option_flags);
+	return (rc);
+}
+
+/*
  * smb_vop_rename()
  *
  * The rename is for files in the same tree (identical TID) only.

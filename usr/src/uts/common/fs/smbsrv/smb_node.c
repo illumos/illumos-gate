@@ -972,6 +972,17 @@ smb_node_delete_check(smb_node_t *node)
 		return (NT_STATUS_SUCCESS);
 }
 
+void
+smb_node_notify_change(smb_node_t *node)
+{
+	SMB_NODE_VALID(node);
+
+	if (node->flags & NODE_FLAGS_NOTIFY_CHANGE) {
+		node->flags |= NODE_FLAGS_CHANGED;
+		smb_process_node_notify_change_queue(node);
+	}
+}
+
 /*
  * smb_node_start_crit()
  *
