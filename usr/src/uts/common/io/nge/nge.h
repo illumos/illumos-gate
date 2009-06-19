@@ -657,7 +657,7 @@ struct nge_desc_attr	{
 	void (*txd_fill)(void *, const ddi_dma_cookie_t *, size_t,
 			uint32_t, boolean_t);
 
-	uint32_t (*txd_check)(const void *, size_t *);
+	uint32_t (*txd_check)(const void *);
 };
 
 typedef struct nge_desc_attr nge_desc_attr_t;
@@ -1045,7 +1045,7 @@ extern uint32_t nge_sum_rxd_check(const void *, size_t *);
 
 extern void nge_sum_txd_fill(void *, const ddi_dma_cookie_t *,
 				size_t, uint32_t, boolean_t);
-extern uint32_t nge_sum_txd_check(const void *, size_t *);
+extern uint32_t nge_sum_txd_check(const void *);
 
 /*
  * DESC MODE 3
@@ -1056,7 +1056,7 @@ extern uint32_t nge_hot_rxd_check(const void *, size_t *);
 
 extern void nge_hot_txd_fill(void *, const ddi_dma_cookie_t *,
 				size_t, uint32_t, boolean_t);
-extern uint32_t nge_hot_txd_check(const void *, size_t *);
+extern uint32_t nge_hot_txd_check(const void *);
 
 #ifdef __cplusplus
 }

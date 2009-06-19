@@ -145,7 +145,6 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 {
 	int resched;
 	uint32_t stflg;
-	size_t len;
 	uint32_t free;
 	uint32_t slot;
 	uint32_t used;
@@ -202,7 +201,7 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 
 		if (ssbdp->flags == HOST_OWN)
 			break;
-		stflg = ngep->desc_attr.txd_check(hw_sbd_p, &len);
+		stflg = ngep->desc_attr.txd_check(hw_sbd_p);
 		if ((stflg & TXD_OWN) != 0)
 			break;
 		DMA_ZERO(ssbdp->desc);
@@ -682,28 +681,24 @@ nge_reschedule(caddr_t args1, caddr_t args2)
 }
 
 uint32_t
-nge_hot_txd_check(const void *hwd, size_t *len)
+nge_hot_txd_check(const void *hwd)
 {
 	uint32_t err_flag;
 	const hot_tx_bd * htbdp;
 
 	htbdp = hwd;
-	err_flag = htbdp->control_status.cntl_val & ~TXD_BCNT_MSK;
-
-	*len = htbdp->control_status.status_bits.bcnt;
+	err_flag = htbdp->control_status.cntl_val;
 	return (err_flag);
 }
 
 uint32_t
-nge_sum_txd_check(const void *hwd, size_t *len)
+nge_sum_txd_check(const void *hwd)
 {
 	uint32_t err_flag;
 	const sum_tx_bd * htbdp;
 
 	htbdp = hwd;
-	err_flag = htbdp->control_status.cntl_val & ~TXD_BCNT_MSK;
-
-	*len = htbdp->control_status.status_bits.bcnt;
+	err_flag = htbdp->control_status.cntl_val;
 	return (err_flag);
 }
 

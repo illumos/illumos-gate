@@ -46,6 +46,7 @@ extern "C" {
 #define	DEVICE_ID_MCP61_3EE	0x3ee
 #define	DEVICE_ID_MCP61_3EF	0x3ef
 #define	DEVICE_ID_MCP77_760	0x760
+#define	DEVICE_ID_MCP79_AB0	0xab0
 #define	DEVICE_ID_NF3_E6	0xe6
 #define	DEVICE_ID_NF3_DF	0xdf
 

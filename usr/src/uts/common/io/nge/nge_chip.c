@@ -530,6 +530,7 @@ nge_init_dev_spec_param(nge_t *ngep)
 		break;
 
 	case DEVICE_ID_MCP77_760:
+	case DEVICE_ID_MCP79_AB0:
 		dev_param_p->msi = B_FALSE;
 		dev_param_p->msi_x = B_FALSE;
 		dev_param_p->vlan = B_FALSE;
@@ -1112,7 +1113,8 @@ nge_chip_reset(nge_t *ngep)
 	    ngep->chipinfo.device == DEVICE_ID_MCP55_373 ||
 	    ngep->chipinfo.device == DEVICE_ID_MCP61_3EE ||
 	    ngep->chipinfo.device == DEVICE_ID_MCP61_3EF ||
-	    ngep->chipinfo.device == DEVICE_ID_MCP77_760) {
+	    ngep->chipinfo.device == DEVICE_ID_MCP77_760 ||
+	    ngep->chipinfo.device == DEVICE_ID_MCP79_AB0) {
 
 		pm_cntl2.cntl_val = nge_reg_get32(ngep, NGE_PM_CNTL2);
 		/* bring phy out of coma mode */

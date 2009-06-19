@@ -473,10 +473,8 @@ nge_hot_rxd_check(const void *hwd, size_t *len)
 	const hot_rx_bd * hrbdp;
 
 	hrbdp = hwd;
-
-	err_flag = hrbdp->cntl_status.cntl_val & ~RXD_BCNT_MSK;
-	*len = hrbdp->cntl_status.status_bits_legacy.bcnt;
-
+	err_flag = hrbdp->cntl_status.cntl_val;
+	*len = err_flag & RXD_BCNT_MSK;
 	return (err_flag);
 }
 
@@ -488,8 +486,7 @@ nge_sum_rxd_check(const void *hwd, size_t *len)
 
 	hrbdp = hwd;
 
-	err_flag = hrbdp->cntl_status.cntl_val & ~RXD_BCNT_MSK;
-	*len = hrbdp->cntl_status.status_bits.bcnt;
-
+	err_flag = hrbdp->cntl_status.cntl_val;
+	*len = err_flag & RXD_BCNT_MSK;
 	return (err_flag);
 }
