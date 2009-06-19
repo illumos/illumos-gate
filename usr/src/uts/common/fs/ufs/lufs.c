@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,10 +65,12 @@ struct kmem_cache	*lufs_bp;
 /* Tunables */
 uint_t		ldl_maxlogsize	= LDL_MAXLOGSIZE;
 uint_t		ldl_minlogsize	= LDL_MINLOGSIZE;
+uint_t		ldl_softlogcap	= LDL_SOFTLOGCAP;
 uint32_t	ldl_divisor	= LDL_DIVISOR;
 uint32_t	ldl_mintransfer	= LDL_MINTRANSFER;
 uint32_t	ldl_maxtransfer	= LDL_MAXTRANSFER;
 uint32_t	ldl_minbufsize	= LDL_MINBUFSIZE;
+uint32_t	ldl_cgsizereq	= 0;
 
 /* Generation of header ids */
 static kmutex_t	genid_mutex;
@@ -656,7 +658,7 @@ errout:
  *	Assumes the file system is write locked and is not logging
  */
 static int
-lufs_alloc(struct ufsvfs *ufsvfsp, struct fiolog *flp, cred_t *cr)
+lufs_alloc(struct ufsvfs *ufsvfsp, struct fiolog *flp, size_t minb, cred_t *cr)
 {
 	int		error = 0;
 	buf_t		*bp = NULL;
@@ -689,7 +691,7 @@ lufs_alloc(struct ufsvfs *ufsvfsp, struct fiolog *flp, cred_t *cr)
 	ip = ufs_alloc_inode(ufsvfsp, UFSROOTINO);
 	ip->i_mode = IFSHAD;		/* make the dummy a shadow inode */
 	rw_enter(&ip->i_contents, RW_WRITER);
-	fno = contigpref(ufsvfsp, nb + fs->fs_bsize);
+	fno = contigpref(ufsvfsp, nb + fs->fs_bsize, minb);
 	error = alloc(ip, fno, fs->fs_bsize, &fno, cr);
 	if (error)
 		goto errout;
@@ -733,7 +735,7 @@ lufs_alloc(struct ufsvfs *ufsvfsp, struct fiolog *flp, cred_t *cr)
 	while (nb) {
 		error = alloc(ip, fno + fs->fs_frag, fs->fs_bsize, &fno, cr);
 		if (error) {
-			if (tb < ldl_minlogsize)
+			if (tb < minb)
 				goto errout;
 			error = 0;
 			break;
@@ -760,6 +762,12 @@ lufs_alloc(struct ufsvfs *ufsvfsp, struct fiolog *flp, cred_t *cr)
 		tb += fs->fs_bsize;
 		nb -= fs->fs_bsize;
 	}
+
+	if (tb < minb) {	/* Failed to reach minimum log size */
+		error = ENOSPC;
+		goto errout;
+	}
+
 	ebp->nbytes = (uint32_t)tb;
 	setsum(&ebp->chksum, (int32_t *)bp->b_un.b_addr, fs->fs_bsize);
 	UFS_BWRITE2(ufsvfsp, bp);
@@ -983,6 +991,10 @@ lufs_enable(struct vnode *vp, struct fiolog *flp, cred_t *cr)
 	struct ulockfs	*ulp;
 	vfs_t		*vfsp = ufsvfsp->vfs_vfs;
 	uint64_t	tmp_nbytes_actual;
+	uint64_t	cg_minlogsize;
+	uint32_t	cgsize;
+	static int	minlogsizewarn = 0;
+	static int	maxlogsizewarn = 0;
 
 	/*
 	 * Check if logging is already enabled
@@ -1004,6 +1016,22 @@ recheck:
 	flp->error = FIOLOG_ENONE;
 
 	/*
+	 * The size of the ufs log is determined using the following rules:
+	 *
+	 * 1) If no size is requested the log size is calculated as a
+	 *    ratio of the total file system size. By default this is
+	 *    1MB of log per 1GB of file system. This calculation is then
+	 *    capped at the log size specified by ldl_softlogcap.
+	 * 2) The log size requested may then be increased based on the
+	 *    number of cylinder groups contained in the file system.
+	 *    To prevent a hang the log has to be large enough to contain a
+	 *    single transaction that alters every cylinder group in the file
+	 *    system. This is calculated as cg_minlogsize.
+	 * 3) Finally a check is made that the log size requested is within
+	 *    the limits of ldl_minlogsize and ldl_maxlogsize.
+	 */
+
+	/*
 	 * Adjust requested log size
 	 */
 	flp->nbytes_actual = flp->nbytes_requested;
@@ -1011,7 +1039,59 @@ recheck:
 		tmp_nbytes_actual =
 		    (((uint64_t)fs->fs_size) / ldl_divisor) << fs->fs_fshift;
 		flp->nbytes_actual = (uint_t)MIN(tmp_nbytes_actual, INT_MAX);
+		/*
+		 * The 1MB per 1GB log size allocation only applies up to
+		 * ldl_softlogcap size of log.
+		 */
+		flp->nbytes_actual = MIN(flp->nbytes_actual, ldl_softlogcap);
 	}
+
+	cgsize = ldl_cgsizereq ? ldl_cgsizereq : LDL_CGSIZEREQ(fs);
+
+	/*
+	 * Determine the log size required based on the number of cylinder
+	 * groups in the file system. The log has to be at least this size
+	 * to prevent possible hangs due to log space exhaustion.
+	 */
+	cg_minlogsize = cgsize * fs->fs_ncg;
+
+	/*
+	 * Ensure that the minimum log size isn't so small that it could lead
+	 * to a full log hang.
+	 */
+	if (ldl_minlogsize < LDL_MINLOGSIZE) {
+		ldl_minlogsize = LDL_MINLOGSIZE;
+		if (!minlogsizewarn) {
+			cmn_err(CE_WARN, "ldl_minlogsize too small, increasing "
+			    "to 0x%x", LDL_MINLOGSIZE);
+			minlogsizewarn = 1;
+		}
+	}
+
+	/*
+	 * Ensure that the maximum log size isn't greater than INT_MAX as the
+	 * logical log offset fields would overflow.
+	 */
+	if (ldl_maxlogsize > INT_MAX) {
+		ldl_maxlogsize = INT_MAX;
+		if (!maxlogsizewarn) {
+			cmn_err(CE_WARN, "ldl_maxlogsize too large, reducing "
+			    "to 0x%x", INT_MAX);
+			maxlogsizewarn = 1;
+		}
+	}
+
+	if (cg_minlogsize > ldl_maxlogsize) {
+		cmn_err(CE_WARN,
+		    "%s: reducing calculated log size from 0x%x to "
+		    "ldl_maxlogsize (0x%x).", fs->fs_fsmnt, (int)cg_minlogsize,
+		    ldl_maxlogsize);
+	}
+
+	cg_minlogsize = MAX(cg_minlogsize, ldl_minlogsize);
+	cg_minlogsize = MIN(cg_minlogsize, ldl_maxlogsize);
+
+	flp->nbytes_actual = MAX(flp->nbytes_actual, cg_minlogsize);
 	flp->nbytes_actual = MAX(flp->nbytes_actual, ldl_minlogsize);
 	flp->nbytes_actual = MIN(flp->nbytes_actual, ldl_maxlogsize);
 	flp->nbytes_actual = blkroundup(fs, flp->nbytes_actual);
@@ -1106,7 +1186,7 @@ recheck:
 		goto recheck;
 	}
 
-	error = lufs_alloc(ufsvfsp, flp, cr);
+	error = lufs_alloc(ufsvfsp, flp, cg_minlogsize, cr);
 	if (error)
 		goto errout;
 

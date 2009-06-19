@@ -878,7 +878,7 @@ extern	int	ufs_allocsp(struct vnode *, struct flock64 *, cred_t *);
 extern	int	ufs_freesp(struct vnode *, struct flock64 *, int, cred_t *);
 extern	ino_t	dirpref(inode_t *);
 extern	daddr_t	blkpref(struct inode *, daddr_t, int, daddr32_t *);
-extern	daddr_t	contigpref(ufsvfs_t *, size_t);
+extern	daddr_t	contigpref(ufsvfs_t *, size_t, size_t);
 
 extern	int	ufs_rdwri(enum uio_rw, int, struct inode *, caddr_t, ssize_t,
 	offset_t, enum uio_seg, int *, cred_t *);

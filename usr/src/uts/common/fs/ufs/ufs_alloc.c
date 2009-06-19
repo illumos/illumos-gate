@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@
 #include <fs/fs_subr.h>
 #include <sys/cmn_err.h>
 #include <sys/policy.h>
+#include <sys/fs/ufs_log.h>
 
 static ino_t	hashalloc();
 static daddr_t	fragextend();
@@ -75,6 +76,7 @@ static daddr_t	alloccg();
 static daddr_t	alloccgblk();
 static ino_t	ialloccg();
 static daddr_t	mapsearch();
+static int	findlogstartcg();
 
 extern int	inside[], around[];
 extern uchar_t	*fragtbl[];
@@ -1944,12 +1946,13 @@ ufs_freesp(struct vnode *vp, struct flock64 *lp, int flag, cred_t *cr)
  * writing the ufs log file to, minimizing future disk head seeking
  */
 daddr_t
-contigpref(ufsvfs_t *ufsvfsp, size_t nb)
+contigpref(ufsvfs_t *ufsvfsp, size_t nb, size_t minb)
 {
 	struct fs	*fs	= ufsvfsp->vfs_fs;
 	daddr_t		nblk	= lblkno(fs, blkroundup(fs, nb));
+	daddr_t		minblk	= lblkno(fs, blkroundup(fs, minb));
 	daddr_t		savebno, curbno, cgbno;
-	int		cg, cgblks, savecg, savenblk, curnblk;
+	int		cg, cgblks, savecg, savenblk, curnblk, startcg;
 	uchar_t		*blksfree;
 	buf_t		*bp;
 	struct cg	*cgp;
@@ -1957,12 +1960,13 @@ contigpref(ufsvfs_t *ufsvfsp, size_t nb)
 	savenblk = 0;
 	savecg = 0;
 	savebno = 0;
-	for (cg = 0; cg < fs->fs_ncg; ++cg) {
 
-		/* not enough free blks for a contig check */
-		if (fs->fs_cs(fs, cg).cs_nbfree < nblk)
-			continue;
+	if ((startcg = findlogstartcg(fs, nblk, minblk)) == -1)
+		cg = 0;	/* Nothing suitable found */
+	else
+		cg = startcg;
 
+	for (; cg < fs->fs_ncg; ++cg) {
 		/*
 		 * find the largest contiguous range in this cg
 		 */
@@ -1979,9 +1983,14 @@ contigpref(ufsvfs_t *ufsvfsp, size_t nb)
 		cgbno = 0;
 		while (cgbno < cgblks && savenblk < nblk) {
 			/* find a free block */
-			for (; cgbno < cgblks; ++cgbno)
-				if (isblock(fs, blksfree, cgbno))
-					break;
+			for (; cgbno < cgblks; ++cgbno) {
+				if (isblock(fs, blksfree, cgbno)) {
+					if (startcg != -1)
+						goto done;
+					else
+						break;
+				}
+			}
 			curbno = cgbno;
 			/* count the number of free blocks */
 			for (curnblk = 0; cgbno < cgblks; ++cgbno) {
@@ -2001,6 +2010,13 @@ contigpref(ufsvfs_t *ufsvfsp, size_t nb)
 			break;
 	}
 
+done:
+	if (startcg != -1) {
+		brelse(bp);
+		savecg = startcg;
+		savebno = cgbno;
+	}
+
 	/* convert block offset in cg to frag offset in cg */
 	savebno = blkstofrags(fs, savebno);
 
@@ -2008,4 +2024,79 @@ contigpref(ufsvfs_t *ufsvfsp, size_t nb)
 	savebno += (savecg * fs->fs_fpg);
 
 	return (savebno);
+}
+
+/*
+ * The object of this routine is to find a start point for the UFS log.
+ * Ideally the space should be allocated from the smallest possible number
+ * of contiguous cylinder groups. This is found by using a sliding window
+ * technique. The smallest window of contiguous cylinder groups, which is
+ * still able to accommodate the target, is found by moving the window
+ * through the cylinder groups in a single pass. The end of the window is
+ * advanced until the space is accommodated, then the start is advanced until
+ * it no longer fits, the end is then advanced again and so on until the
+ * final cylinder group is reached. The first suitable instance is recorded
+ * and its starting cg number is returned.
+ *
+ * If we are not able to find a minimum amount of space, represented by
+ * minblk, or to do so uses more than the available extents, then return -1.
+ */
+
+int
+findlogstartcg(struct fs *fs, daddr_t requested, daddr_t minblk)
+{
+	int	 ncgs;		 /* number of cylinder groups */
+	daddr_t target;		 /* amount of space sought */
+	int	 cwidth, ctotal; /* current window width and total */
+	int	 bwidth, btotal; /* best window width and total so far */
+	int	 s;	/* index of the first element in the current window */
+	int	 e;	/* index of the first element + the width */
+			/*  (i.e. 1 + index of last element) */
+	int	 bs; /* index of the first element in the best window so far */
+	int	 header, max_extents;
+
+	target = requested;
+	ncgs = fs->fs_ncg;
+
+	header = sizeof (extent_block_t) - sizeof (extent_t);
+	max_extents = ((fs->fs_bsize)-header) / sizeof (extent_t);
+	cwidth = ctotal = 0;
+	btotal = -1;
+	bwidth = ncgs;
+	s = e = 0;
+	while (e < ncgs) {
+	/* Advance the end of the window until it accommodates the target. */
+		while (ctotal < target && e < ncgs) {
+			ctotal += fs->fs_cs(fs, e).cs_nbfree;
+			e++;
+		}
+
+		/*
+		 * Advance the start of the window until it no longer
+		 * accommodates the target.
+		 */
+		while (ctotal >= target && s < e) {
+			/* See if this is the smallest window so far. */
+			cwidth = e - s;
+			if (cwidth <= bwidth) {
+				if (cwidth == bwidth && ctotal <= btotal)
+					goto more;
+				bwidth = cwidth;
+				btotal = ctotal;
+				bs = s;
+			}
+more:
+			ctotal -= fs->fs_cs(fs, s).cs_nbfree;
+			s++;
+		}
+	}
+
+	/*
+	 * If we cannot allocate the minimum required or we use too many
+	 * extents to do so, return -1.
+	 */
+	if (btotal < minblk || bwidth > max_extents)
+		bs = -1;
+
+	return (bs);
 }

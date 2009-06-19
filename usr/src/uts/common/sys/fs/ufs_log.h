@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,12 +97,25 @@ typedef struct ic_extent_block {
 #define	LDL_DIVISOR		1024 /* 1024 gives 1MB per 1GB */
 
 /*
+ * This gives the maximum size of log for which the 1MB per 1GB rule
+ * applies. The size of the log will only be greater than this based
+ * on the cylinder group space requirements.
+ */
+#define	LDL_SOFTLOGCAP		(256 * 1024 * 1024)
+
+/*
  * But set reasonable min/max units
- *   BUT never set LDL_MAXLOGSIZE to greater than LDL_REALMAXLOGSIZE.  The
- *   scan code will break (See sect_trailer).
  */
 #define	LDL_MINLOGSIZE		(1024 * 1024)
-#define	LDL_MAXLOGSIZE		(64 * 1024 * 1024)
+#define	LDL_MAXLOGSIZE		(512 * 1024 * 1024)
+
+/*
+ * Log space requirement per cylinder group. This needs to accommodate a
+ * cg delta (inc. header) and have a factor to cover other deltas involved
+ * in a single transaction which could touch all cyl groups in a file system.
+ */
+#define	LDL_CGSIZEREQ(fs) \
+	((fs)->fs_cgsize + ((fs)->fs_cgsize >> 1))
 
 #define	LDL_MINBUFSIZE		(32 * 1024)
 #define	LDL_USABLE_BSIZE	(DEV_BSIZE - sizeof (sect_trailer_t))
