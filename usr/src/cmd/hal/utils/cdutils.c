@@ -2,14 +2,13 @@
  *
  * cdutils.c : CD/DVD utilities
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
@@ -212,13 +211,19 @@ boolean_t
 get_current_profile(int fd, int *profile)
 {
 	size_t i;
-	uchar_t smallbuf[4];
+	uchar_t smallbuf[8];
 	size_t buflen;
 	uchar_t *bufp;
 	int ret = B_FALSE;
 
-	/* first determine amount of memory needed to hold all profiles */
-	if (get_configuration(fd, 0, 4, &smallbuf[0])) {
+	/*
+	 * first determine amount of memory needed to hold all profiles.
+	 * The first four bytes of smallbuf concatenated tell us the
+	 * number of bytes of memory we need but do not take themselves
+	 * into account. Therefore, add four to allocate that number
+	 * of bytes.
+	 */
+	if (get_configuration(fd, 0, 8, &smallbuf[0])) {
 		buflen = GET32(smallbuf) + 4;
 		bufp = (uchar_t *)malloc(buflen);
 
@@ -238,13 +243,19 @@ walk_profiles(int fd, int (*f)(void *, int, boolean_t), void *arg)
 {
 	size_t i;
 	uint16_t profile, current_profile;
-	uchar_t smallbuf[4];
+	uchar_t smallbuf[8];
 	size_t buflen;
 	uchar_t *bufp;
 	int ret;
 
-	/* first determine amount of memory needed to hold all profiles */
-	if (get_configuration(fd, 0, 4, &smallbuf[0])) {
+	/*
+	 * first determine amount of memory needed to hold all profiles.
+	 * The first four bytes of smallbuf concatenated tell us the
+	 * number of bytes of memory we need but do not take themselves
+	 * into account. Therefore, add four to allocate that number
+	 * of bytes.
+	 */
+	if (get_configuration(fd, 0, 8, &smallbuf[0])) {
 		buflen = GET32(smallbuf) + 4;
 		bufp = (uchar_t *)malloc(buflen);
 
