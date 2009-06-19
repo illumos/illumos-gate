@@ -407,6 +407,7 @@ ds_ldc_fini(ds_port_t *port)
 	char	ebuf[DS_EBUFSIZE];
 
 	ASSERT(port->state >= DS_PORT_LDC_INIT);
+	ASSERT(MUTEX_HELD(&port->lock));
 
 	DS_DBG_LDC(CE_NOTE, "ds@%lx: %s: ldc_id=%ld" DS_EOL, PORTID(port),
 	    __func__, port->ldc.id);
@@ -428,6 +429,10 @@ ds_ldc_fini(ds_port_t *port)
 		    PORTID(port), __func__, ds_errno_to_str(rv, ebuf));
 		return (rv);
 	}
+
+	port->ldc.id = (uint64_t)-1;
+	port->ldc.hdl = NULL;
+	port->ldc.state = 0;
 
 	return (rv);
 }
@@ -459,7 +464,13 @@ ds_recv_msg(ds_port_t *port, caddr_t msgp, size_t *sizep)
 
 		nbytes = bytes_left;
 
-		if ((rv = ldc_read(port->ldc.hdl, msgp, &nbytes)) != 0) {
+		mutex_enter(&port->lock);
+		if (port->ldc.state == LDC_UP) {
+			rv = ldc_read(port->ldc.hdl, msgp, &nbytes);
+		} else
+			rv = ENXIO;
+		mutex_exit(&port->lock);
+		if (rv != 0) {
 			if (rv == ECONNRESET) {
 				break;
 			} else if (rv != EAGAIN) {
@@ -537,7 +548,15 @@ ds_handle_recv(void *arg)
 
 	mutex_enter(&port->rcv_lock);
 
-	while (((rv = ldc_chkq(port->ldc.hdl, &hasdata)) == 0) && hasdata) {
+	for (;;) {
+		mutex_enter(&port->lock);
+		if (port->ldc.state == LDC_UP) {
+			rv = ldc_chkq(port->ldc.hdl, &hasdata);
+		} else
+			rv = ENXIO;
+		mutex_exit(&port->lock);
+		if (rv != 0 || !hasdata)
+			break;
 
 		DS_DBG(CE_NOTE, "ds@%lx: %s: reading next message" DS_EOL,
 		    PORTID(port), __func__);
@@ -680,7 +699,13 @@ ds_send_msg(ds_port_t *port, caddr_t msg, size_t msglen)
 	mutex_enter(&port->tx_lock);
 
 	do {
-		if ((rv = ldc_write(port->ldc.hdl, currp, &msglen)) != 0) {
+		mutex_enter(&port->lock);
+		if (port->ldc.state == LDC_UP) {
+			rv = ldc_write(port->ldc.hdl, currp, &msglen);
+		} else
+			rv = ENXIO;
+		mutex_exit(&port->lock);
+		if (rv != 0) {
 			if (rv == ECONNRESET) {
 				mutex_exit(&port->tx_lock);
 				ds_handle_down_reset_events(port);
@@ -1397,6 +1422,7 @@ ds_handle_unreg_req(ds_port_t *port, caddr_t buf, size_t len)
 	char		*msg;
 	size_t		msglen;
 	size_t		explen = DS_MSG_LEN(ds_unreg_req_t);
+	boolean_t	is_up;
 
 	/* sanity check the incoming message */
 	if (len != explen) {
@@ -1415,10 +1441,15 @@ ds_handle_unreg_req(ds_port_t *port, caddr_t buf, size_t len)
 	    ((svc = ds_find_clnt_svc_by_hdl_port(req->svc_handle, port))
 	    == NULL && ((svc = ds_get_svc(req->svc_handle)) == NULL ||
 	    svc->port != port))) {
+		mutex_exit(&ds_svcs.lock);
+		mutex_enter(&port->lock);
+		is_up = (port->ldc.state == LDC_UP);
+		mutex_exit(&port->lock);
+		if (!is_up)
+			return;
 		cmn_err(CE_WARN, "ds@%lx: <unreg_req: invalid handle 0x%llx"
 		    DS_EOL, PORTID(port), (u_longlong_t)req->svc_handle);
 		ds_send_unreg_nack(port, req->svc_handle);
-		mutex_exit(&ds_svcs.lock);
 		return;
 	}
 
@@ -2731,16 +2762,11 @@ ds_port_common_init(ds_port_t *port)
 }
 
 void
-ds_port_common_fini(ds_port_t *port, int is_fini)
+ds_port_common_fini(ds_port_t *port)
 {
-	port->state = DS_PORT_FREE;
+	ASSERT(MUTEX_HELD(&port->lock));
 
-	if (is_fini && (port->flags & DS_PORT_MUTEX_INITED) != 0) {
-		mutex_destroy(&port->lock);
-		mutex_destroy(&port->tx_lock);
-		mutex_destroy(&port->rcv_lock);
-		port->flags &= ~DS_PORT_MUTEX_INITED;
-	}
+	port->state = DS_PORT_FREE;
 
 	DS_PORTSET_DEL(ds_allports, port->id);
 

@@ -817,6 +817,7 @@ ds_add_port(uint64_t port_id, uint64_t ldc_id, ds_domain_hdl_t dhdl,
 	return (0);
 }
 
+/* ARGSUSED */
 int
 ds_remove_port(uint64_t port_id, int is_fini)
 {
@@ -839,8 +840,6 @@ ds_remove_port(uint64_t port_id, int is_fini)
 		(void) ds_ldc_fini(port);
 	}
 
-	mutex_exit(&port->lock);
-
 	if (port->domain_name) {
 		DS_FREE(port->domain_name, strlen(port->domain_name) + 1);
 		port->domain_name = NULL;
@@ -848,7 +847,9 @@ ds_remove_port(uint64_t port_id, int is_fini)
 	port->domain_hdl = DS_DHDL_INVALID;
 
 	/* clean up the port structure */
-	ds_port_common_fini(port, is_fini);
+	ds_port_common_fini(port);
+
+	mutex_exit(&port->lock);
 	return (0);
 }
 

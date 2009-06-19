@@ -468,7 +468,7 @@ ds_svc_t *ds_get_svc(ds_svc_hdl_t hdl);
 
 /* port utilities */
 void ds_port_common_init(ds_port_t *port);
-void ds_port_common_fini(ds_port_t *port, int is_fini);
+void ds_port_common_fini(ds_port_t *port);
 
 /* misc utilities */
 ds_vers_check_t ds_vers_isvalid(ds_ver_t *vers, int nvers);
