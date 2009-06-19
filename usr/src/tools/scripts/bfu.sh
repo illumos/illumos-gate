@@ -220,6 +220,7 @@ global_zone_only_files="
 	kernel/drv/iscsi.conf
 	kernel/drv/md.conf
 	kernel/drv/mpt.conf
+	kernel/drv/mpt_sas.conf
 	kernel/drv/options.conf
 	kernel/drv/qlc.conf
 	kernel/drv/ra.conf

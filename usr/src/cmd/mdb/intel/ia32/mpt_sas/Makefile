@@ -18,28 +18,18 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
 
-PKG=SUNWmptsas
-NAME=LSI MPT SAS 2.0 Controller HBA Driver
-ARCH="ISA"
-VERSION="ONVERS,REV=0.0.0"
-SUNW_PRODNAME="SunOS"
-SUNW_PRODVERS="RELEASE/VERSION"
-SUNW_PKGVERS="1.0"
-SUNW_PKGTYPE="root"
-MAXINST="1000"
-CATEGORY=system
-VENDOR="Sun Microsystems, Inc."
-DESC="LSI MPT SAS 2.0 Controller HBA Driver"
-CLASSES="none mptsasconf"
-HOTLINE="Please contact your local service provider"
-EMAIL=""
-BASEDIR=/
-SUNW_PKG_ALLZONES="true"
-SUNW_PKG_HOLLOW="true"
-SUNW_PKG_THISZONE="false"
+
+MODULE = mpt_sas.so
+MDBTGT = kvm
+
+MODSRCS = mpt_sas.c
+
+include ../../../../Makefile.cmd
+include ../../Makefile.ia32
+include ../../../Makefile.module
+
+CPPFLAGS += -I$(SRC)/uts/common

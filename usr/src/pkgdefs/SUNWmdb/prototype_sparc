@@ -55,6 +55,7 @@ f none usr/lib/mdb/kvm/sparcv9/mac.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/md.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/mdb_ks.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/mpt.so 555 root sys
+f none usr/lib/mdb/kvm/sparcv9/mpt_sas.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/mr_sas.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/nca.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/nfs.so 555 root sys

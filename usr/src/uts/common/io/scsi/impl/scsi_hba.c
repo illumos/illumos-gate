@@ -4000,6 +4000,7 @@ scsi_hba_bus_config_iports(dev_info_t *self, uint_t flags,
 		    (strncmp(nameaddr, "iport@", strlen("iport@")) != 0)) {
 			ret = NDI_FAILURE;
 			ndi_devi_exit(self, circ);
+			ddi_prop_free(iports);
 			return (ret);
 		}
 

@@ -43,6 +43,7 @@ f none kernel/kmdb/sparcv9/mac 555 root sys
 f none kernel/kmdb/sparcv9/md 555 root sys
 f none kernel/kmdb/sparcv9/mdb_ds 555 root sys
 f none kernel/kmdb/sparcv9/mpt 555 root sys
+f none kernel/kmdb/sparcv9/mpt_sas 555 root sys
 f none kernel/kmdb/sparcv9/mr_sas 555 root sys
 f none kernel/kmdb/sparcv9/nca 555 root sys
 f none kernel/kmdb/sparcv9/neti 555 root sys

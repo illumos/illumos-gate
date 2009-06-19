@@ -141,6 +141,8 @@ main(int argc, char **argv)
 			    devinfo_root));
 			print_mpx_capable(di_drv_first_node("mpt",
 			    devinfo_root));
+			print_mpx_capable(di_drv_first_node("mpt_sas",
+			    devinfo_root));
 		}
 		di_fini(devinfo_root);
 		return (0);
@@ -398,7 +400,8 @@ parse_args(int argc, char *argv[])
 			bcopy(optarg, drvlimit, strlen(optarg));
 			/* update this if adding support for a new driver */
 			if ((strncmp(drvlimit, "fp", 2) == NULL) &&
-			    (strncmp(drvlimit, "mpt", 3) == NULL)) {
+			    (strncmp(drvlimit, "mpt", 3) == NULL) &&
+			    (strncmp(drvlimit, "mpt_sas", 7) == NULL)) {
 				logmsg(MSG_ERROR,
 				    gettext("invalid parent driver (%s) "
 				    "specified"), drvlimit);
@@ -1218,6 +1221,25 @@ print_bootpath()
 	}
 }
 
+static void
+get_phci_driver_name(char *phci_path, char **driver_name)
+{
+	di_node_t phci_node = DI_NODE_NIL;
+	char *tmp = NULL;
+
+	phci_node = di_init(phci_path, DINFOCPYONE);
+	if (phci_node == DI_NODE_NIL) {
+		logmsg(MSG_ERROR,
+		    gettext("Unable to take phci snapshot "
+		    "(%s: %d)\n"), strerror(errno), errno);
+		return;
+	}
+	tmp = di_driver_name(phci_node);
+	if (tmp != NULL) {
+		(void) strncpy(*driver_name, tmp, 10);
+	}
+	di_fini(phci_node);
+}
 /*
  * We only call this routine if we have a scsi_vhci node and must
  * determine the actual physical path of its first online client
@@ -1268,18 +1290,39 @@ vhci_to_phci(char *devpath, char *physpath)
 	pi = (sv_path_info_t *)ioc.ret_buf;
 	while (npaths--) {
 		if (pi->ret_state == MDI_PATHINFO_STATE_ONLINE) {
-			char nodename[4];
+			char nodename[5];
+			char *phci_driver = NULL;
 
-			bzero(nodename, 4);
-			/* A hack, but nicer than a platform-specific ifdef */
+			bzero(nodename, 5);
+			phci_driver = malloc(10);
+			if (phci_driver == NULL) {
+				logmsg(MSG_INFO,
+				    "vhci_to_phci: Memory allocation failed\n");
+				goto failure;
+			}
+			bzero(phci_driver, 10);
+			get_phci_driver_name(pi->device.ret_phci,
+			    &phci_driver);
+			logmsg(MSG_INFO, "phci driver name: %s\n", phci_driver);
+			/*
+			 * A hack, but nicer than a platform-specific ifdef
+			 * fp on SPARC using "ssd" as nodename
+			 * mpt use "sd" when mpxio disabled, use "disk" when
+			 * mpxio is enabled
+			 * for alll other cases, "disk" should be used as the
+			 * nodename
+			 */
 			if (strstr(devpath, "ssd") != NULL) {
-				(void) snprintf(nodename, 4, "ssd");
+				(void) snprintf(nodename, 5, "ssd");
+			} else if (strncmp(phci_driver, "mpt", 10) == 0) {
+				(void) snprintf(nodename, 5, "sd");
 			} else {
-				(void) snprintf(nodename, 4, "sd");
+				(void) snprintf(nodename, 5, "disk");
 			}
 			(void) snprintf(physpath, MAXPATHLEN, "%s/%s@%s",
 			    pi->device.ret_phci, nodename, pi->ret_addr);
 			free(ioc.ret_buf);
+			free(phci_driver);
 			return;
 		}
 		pi++;
@@ -1294,7 +1337,7 @@ failure:
  * names substituted.
  *
  * Returns:
- * 	0	successful operation
+ *	0	successful operation
  *	-1	failed
  */
 static int
