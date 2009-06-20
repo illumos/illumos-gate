@@ -37,7 +37,7 @@ static char bge_ident[] = "Broadcom Gb Ethernet";
 /*
  * Make sure you keep the version ID up to date!
  */
-static char bge_version[] = "Broadcom Gb Ethernet v1.07";
+static char bge_version[] = "Broadcom Gb Ethernet v1.08";
 
 /*
  * Property names
@@ -558,6 +558,7 @@ bge_m_start(void *arg)
 		mutex_exit(bgep->genlock);
 		return (EIO);
 	}
+	bgep->watchdog = 0;
 	bgep->bge_mac_state = BGE_MAC_STARTED;
 	BGE_DEBUG(("bge_m_start($%p) done", arg));
 
