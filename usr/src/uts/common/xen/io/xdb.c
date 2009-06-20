@@ -299,13 +299,13 @@ xdb_get_buf(xdb_t *vdp, blkif_request_t *req, xdb_request_t *xreq)
 			/*
 			 * first_sect should be no bigger than last_sect and
 			 * both of them should be no bigger than
-			 * (PAGESIZE / XB_BSIZE - 1) according to definition
+			 * XB_LAST_SECTOR_IN_SEG according to definition
 			 * of blk interface by Xen, so sanity check again
 			 */
-			if (fs > (PAGESIZE / XB_BSIZE - 1))
-				fs = PAGESIZE / XB_BSIZE - 1;
-			if (ls > (PAGESIZE / XB_BSIZE - 1))
-				ls = PAGESIZE / XB_BSIZE - 1;
+			if (fs > XB_LAST_SECTOR_IN_SEG)
+				fs = XB_LAST_SECTOR_IN_SEG;
+			if (ls > XB_LAST_SECTOR_IN_SEG)
+				ls = XB_LAST_SECTOR_IN_SEG;
 			if (fs > ls)
 				fs = ls;
 
@@ -406,15 +406,31 @@ xdb_get_buf(xdb_t *vdp, blkif_request_t *req, xdb_request_t *xreq)
 	bp->b_shadow = &xreq->xr_pplist[curseg];
 	bp->b_iodone = xdb_biodone;
 	sectors = 0;
+
+	/*
+	 * Run through the segments. There are XB_NUM_SECTORS_PER_SEG sectors
+	 * per segment. On some OSes (e.g. Linux), there may be empty gaps
+	 * between segments. (i.e. the first segment may end on sector 6 and
+	 * the second segment start on sector 4).
+	 *
+	 * if a segments first sector is not set to 0, and this is not the
+	 * first segment in our buf, end this buf now.
+	 *
+	 * if a segments last sector is not set to XB_LAST_SECTOR_IN_SEG, and
+	 * this is not the last segment in the request, add this segment into
+	 * the buf, then end this buf (updating the pointer to point to the
+	 * next segment next time around).
+	 */
 	for (i = curseg; i < xreq->xr_buf_pages; i++) {
-		/*
-		 * The xreq->xr_segs[i].fs of the first seg can be non-zero
-		 * otherwise, we'll break it into multiple bufs
-		 */
-		if ((i != curseg) && (xreq->xr_segs[i].fs != 0)) {
+		if ((xreq->xr_segs[i].fs != 0) && (i != curseg)) {
 			break;
 		}
 		sectors += (xreq->xr_segs[i].ls - xreq->xr_segs[i].fs + 1);
+		if ((xreq->xr_segs[i].ls != XB_LAST_SECTOR_IN_SEG) &&
+		    (i != (xreq->xr_buf_pages - 1))) {
+			i++;
+			break;
+		}
 	}
 	xreq->xr_curseg = i;
 	bp->b_bcount = sectors * DEV_BSIZE;

@@ -55,6 +55,11 @@ extern "C" {
 #define	XB_MAX_XFER	(XB_MAX_SEGLEN * BLKIF_MAX_SEGMENTS_PER_REQUEST)
 #define	XB_MAXPHYS	(XB_MAX_XFER * BLKIF_RING_SIZE)
 
+/* Number of sectors per segement */
+#define	XB_NUM_SECTORS_PER_SEG	(PAGESIZE / XB_BSIZE)
+/* sectors are number 0 through XB_NUM_SECTORS_PER_SEG - 1 */
+#define	XB_LAST_SECTOR_IN_SEG	(XB_NUM_SECTORS_PER_SEG - 1)
+
 
 /*
  * Slice for absolute disk transaction.
