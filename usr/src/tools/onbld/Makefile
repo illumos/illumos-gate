@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/Makefile.master
@@ -44,18 +42,24 @@ PYFILES= $(PYSRCS) $(PYOBJS)
 all := TARGET = all
 install := TARGET = install
 clean := TARGET = clean
+clobber := TARGET = clobber
 
 ROOTONBLDBASEFILES=	$(PYFILES:%=$(ROOTONBLDLIBPY)/onbld/%)
 $(ROOTONBLDBASEFILES) := FILEMODE = 0444
 
+CLOBBERFILES += THIRDPARTYLICENSE
+
 .KEEP_STATE:
 
-all: $(PYOBJS) $(SUBDIRS)
+all: $(PYOBJS) $(SUBDIRS) THIRDPARTYLICENSE
 
-install: $(ROOTONBLDBASEFILES) $(SUBDIRS)
+install: all $(ROOTONBLDBASEFILES) $(SUBDIRS)
 
-clean: $(SUBDIRS)
-	$(RM) $(PYOBJS)
+clean clobber: $(SUBDIRS)
+
+THIRDPARTYLICENSE: $(SRC)/pkgdefs/license_files/lic_GPLv2
+	$(RM) $@
+	$(CAT) $? > $@
 
 $(ROOTONBLDLIBPY)/onbld/%: %
 	$(INS.pyfile)

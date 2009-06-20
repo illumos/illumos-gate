@@ -56,7 +56,6 @@ all: $(PYOBJS)
 install: $(ROOTONBLDCHECKSFILES)
 
 clean:
-	$(RM) $(PYOBJS)
 
 $(ROOTONBLDLIBPY)/onbld/Checks/%: %
 	$(INS.pyfile)

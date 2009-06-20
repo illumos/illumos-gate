@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -78,9 +76,6 @@ cd $CODEMGR_WS
     fail "$PKGARCHIVE/SUNWonbld is missing."
 (cd $PKGARCHIVE; tar cf - SUNWonbld) | (cd $stagedir/$subdir; tar xf -)
 
-# Insert binary license files.
-cp -p $SRC/tools/opensolaris/BINARYLICENSE.txt $stagedir/$subdir || \
-    fail "Can't add BINARYLICENSE.txt"
 mkreadme $stagedir/$subdir
 cp -p $CODEMGR_WS/THIRDPARTYLICENSE.ON-BUILD-TOOLS $stagedir/$subdir || \
     fail "Can't add THIRDPARTYLICENSE.ON-BUILD-TOOLS."

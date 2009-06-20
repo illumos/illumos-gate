@@ -116,6 +116,7 @@ usr/src/lib/pkcs11/include/THIRDPARTYLICENSE
 usr/src/lib/print/libhttp-core/common/LICENSE.txt
 usr/src/stand/lib/tcp/THIRDPARTYLICENSE
 usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE
+usr/src/tools/onbld/THIRDPARTYLICENSE
 usr/src/ucbcmd/basename/THIRDPARTYLICENSE
 usr/src/ucbcmd/echo/THIRDPARTYLICENSE
 usr/src/ucbcmd/from/THIRDPARTYLICENSE

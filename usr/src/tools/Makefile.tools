@@ -31,6 +31,8 @@ include $(SRC)/Makefile.master
 
 FILEMODE=	0555
 
+CLOBBERFILES += $(PYOBJS)
+
 TOOLS=			$(SRC)/tools
 TOOLS_PROTO=		$(TOOLS)/proto
 ROOTOPT=		$(TOOLS_PROTO)/opt

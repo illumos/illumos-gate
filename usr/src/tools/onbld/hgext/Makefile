@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/Makefile.master
@@ -31,7 +29,7 @@ include ../../Makefile.tools
 
 PYSRCS= \
 	__init__.py	\
-	cdm.py		\
+	cdm.py
 
 PYOBJS = $(PYSRCS:%.py=%.pyc)
 
@@ -48,7 +46,6 @@ all: $(PYOBJS)
 install: all .WAIT $(ROOTONBLDHGEXTFILES)
 
 clean:
-	$(RM) $(PYOBJS)
 
 $(ROOTONBLDLIBPY)/onbld/hgext/%: %
 	$(INS.pyfile)

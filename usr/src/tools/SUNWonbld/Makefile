@@ -18,17 +18,41 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 include ../../Makefile.master
 include $(PKGDEFS)/Makefile.com
 include ../Makefile.tools
 
-LICENSEFILES += ../ctf/dwarf/THIRDPARTYLICENSE $(GPLV2)
+#
+# Warning: do not use the common license files here.  Instead, make sure
+# that all files listed in LICENSEFILES come from somewhere under the
+# usr/src/tools directory, have a corresponding .descrip file, and have a
+# corresponding entry in usr/src/tools/opensolaris/license-list.
+#
+# If they only apply to source under usr/src/tools, simply integrate
+# the licenses as source-code-managed text files, as with the dwarf
+# license referenced below.
+#
+# If the licenses are duplicated in other parts of the source tree,
+# create a Makefile target to copy them into place, as is done in
+# usr/src/tools/onbld/Makefile for the onbld license referenced below.
+#
+# This dance ensures that the appropriate licenses are incorporated into
+# both the package copyright file and the tools tarball license file.
+# See usr/src/tools/scripts/mktpl.pl for details.
+#
+LICENSEFILES += \
+	../ctf/dwarf/THIRDPARTYLICENSE \
+	../onbld/THIRDPARTYLICENSE
+
+CLEANFILES += bld_awk_pkginfo
+
+CLOBBERFILES += awk_pkginfo
 
 .KEEP_STATE:
 
@@ -60,9 +84,11 @@ $(DATAFILES): $(PKGDEFS)/common_files/$$@
 $(MACHDATAFILES): $(PKGDEFS)/common_files/$$@_$(MACH)
 	$(RM) $@; cp $(PKGDEFS)/common_files/$@_$(MACH) $@
 
-clobber clean:
-	-$(RM) $(CLOBBERFILES) $(CLEANFILES)
-	-$(RM) awk_pkginfo bld_awk_pkginfo
+clean:
+	-$(RM) $(CLEANFILES)
+
+clobber: clean
+	-$(RM) $(CLOBBERFILES)
 
 copyright: $(BUILDPKGCR) $(LICENSEFILES)
 	@$(DO_BUILDPKGCR)
