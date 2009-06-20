@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,9 +29,10 @@
 # Various database lookup classes/methods, i.e.:
 #     * monaco
 #     * bugs.opensolaris.org (b.o.o.)
-#     * opensolaris.org/cgi/arc.py (for ARC)
+#     * arc.opensolaris.org/cgi-bin/arc.cgi (for ARC)
 #
 
+import csv
 import re
 import urllib
 import urllib2
@@ -41,25 +42,13 @@ from socket import socket, AF_INET, SOCK_STREAM
 
 from onbld.Checks import onSWAN
 
-class BugException(Exception):
-	def __init__(self, data=''):
-		self.data = data
-		Exception.__init__(self, data)
-
+class NonExistentBug(Exception):
 	def __str__(self):
-		return "Unknown error: %s" % self.data
-
-class NonExistentBug(BugException):
-	def __str__(self):
-		return "Bug %s does not exist" % self.data
+		return "Bug %s does not exist" % (Exception.__str__(self))
 
 class BugDBException(Exception):
-	def __init__(self, data=''):
-		self.data = data
-		Exception.__init__(self, data)
-
 	def __str__(self):
-		return "Unknown bug database: %s" % self.data
+		return "Unknown bug database: %s" % (Exception.__str__(self))
 
 class BugDB(object):
 	"""Lookup change requests.
@@ -75,7 +64,7 @@ class BugDB(object):
 	print r["6505625"]["synopsis"]
 	"""
 
-	def __init__(self, priority = ("bugster",), forceBoo = False):
+	def __init__(self, priority = ("bugster",), forceBoo=False):
 		"""Create a BugDB object.
 
 		Keyword argument:
@@ -224,15 +213,17 @@ class BugDB(object):
 		
 		return results
 ####################################################################
-def ARC(arclist):
-	opts = {}
-	url = "http://opensolaris.org/cgi/arc.py"
-	opts["n"] = str(len(arclist))
-	for i, arc in enumerate(arclist):
-		arc, case = arc
-		opts["arc" + str(i)] = arc
-		opts["case" + str(i)] = case
-	req = urllib2.Request(url, urllib.urlencode(opts))
+class ARCException(Exception):
+	"""This covers arc.cgi script failure."""
+	def __str__(self):
+		return "Error retrieving ARC data: %s" % (Exception.__str__(self))
+
+def ARC(arclist, arcPath=None):
+	if not arcPath:
+		arcPath = "http://arc.opensolaris.org/cgi-bin/arc.cgi"
+	fields = ["present", "arc", "year", "case", "status", "title"]
+	opts = [("case", "%s/%s" % (a, c)) for a, c in arclist]
+	req = urllib2.Request(arcPath, urllib.urlencode(opts))
 	try:
 		data = urllib2.urlopen(req).readlines()
 	except urllib2.HTTPError, e:
@@ -245,14 +236,13 @@ def ARC(arclist):
 			' got error: "' + e.reason[1] + '"'
 		raise e
 	ret = {}
-	for line in data:
-		oneline = line.rstrip('\n')
-		fields = oneline.split('|')
-		# check if each is valid ( fields[0]::validity )
-		if fields[0] != "0":
-			continue
-		arc, case = fields[1].split(" ")
-		ret[(arc, case)] = fields[2]
+	for line in csv.DictReader(data, fields):
+		if line["present"] == "exists":
+			yc = "%s/%s" % (line["year"], line["case"])
+			ret[(line["arc"], yc)] = line["title"]
+		elif line["present"] == "fatal":
+			raise ARCException(line["arc"])
+
 	return ret
 
 ####################################################################
@@ -268,40 +258,39 @@ WEBRTICLI = '/net/onnv.sfbay.sun.com/export/onnv-gate/public/bin/webrticli'
 
 
 class RtiException(Exception):
-	def __init__(self, data=''):
-		self.data = data
-		Exception.__init__(self, data)
-
-	def __str__(self):
-		return "Unknown error: %s" % self.data
+	pass
 
 class RtiCallFailed(RtiException):
 	def __str__(self):
-		return "Unable to call webrti: %s" % self.data
+		return "Unable to call webrti: %s" % (RtiException.__str__(self))
 
 class RtiSystemProblem(RtiException):
 	def __str__(self):
-		return "RTI status cannot be determined: %s" % self.data
+		return "RTI status cannot be determined for CR: %s" % (RtiException.__str__(self))
 
 class RtiIncorrectCR(RtiException):
 	def __str__(self):
-		return "Incorrect CR number specified: %s" % self.data
+		return "Incorrect CR number specified: %s" % (RtiException.__str__(self))
 
 class RtiNotFound(RtiException):
 	def __str__(self):
-		return "RTI not found: %s" % self.data
+		return "RTI not found for CR: %s" % (RtiException.__str__(self))
 
 class RtiNeedConsolidation(RtiException):
 	def __str__(self):
-		return "More than one consolidation has this CR: %s" % self.data
+		return "More than one consolidation has this CR: %s" % (RtiException.__str__(self))
 
 class RtiBadGate(RtiException):
 	def __str__(self):
-		return "Incorrect gate name specified: %s" % self.data
+		return "Incorrect gate name specified: %s" % (RtiException.__str__(self))
+
+class RtiUnknownException(Exception):
+	def __str__(self):
+		return "Unknown webrti return code: %s" % (RtiException.__str__(self))
 
 class RtiOffSwan(RtiException):
 	def __str__(self):
-		return "RTI status checks need SWAN access: %s" % self.data
+		return "RTI status checks need SWAN access: %s" % (RtiException.__str__(self))
 
 WEBRTI_ERRORS = {
 	'1': RtiSystemProblem,
@@ -405,17 +394,23 @@ class Rti:
 
 		# parse the data to see if we got a return code
 		# if we did, then that's bad.  if we didn't,
-		# then our call was successfully
+		# then our call was successful
 		m = returnCodeRe.search(data)
 		if m:
+			rc = m.group(1)
 			# we got a return code, set it in our
 			# object, set the webRtiOutput for debugging
 			# or logging, and return a failure
-			if m.group(1) in WEBRTI_ERRORS:
-				exc = WEBRTI_ERRORS[m.group(1)]
+			if rc in WEBRTI_ERRORS:
+				exc = WEBRTI_ERRORS[rc]
+				if exc == RtiBadGate:
+					edata = gate
+				else:
+					edata = cr
 			else:
-				exc = RtiException
-			raise exc(data)
+				exc = RtiUnknownException
+				edata = rc
+			raise exc(edata)
 
 		data = data.splitlines()
 		# At this point, we should have valid data

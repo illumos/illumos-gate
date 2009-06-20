@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -51,7 +51,7 @@ def isBug(comment):
 def normalize_arc(caseid):
 	return re.sub(r'^([A-Z][A-Z]*ARC)[/ \t]', '\\1 ', caseid)
 
-def comchk(comments, check_db=True, output=sys.stderr):
+def comchk(comments, check_db=True, output=sys.stderr, arcPath=None):
 	'''Validate checkin comments against ON standards.
 
 	Comments must be a list of one-line comments, with no trailing
@@ -147,7 +147,7 @@ def comchk(comments, check_db=True, output=sys.stderr):
 							entered])
 
 	if check_db:
-		valid = ARC(arcs.keys())
+		valid = ARC(arcs.keys(), arcPath)
 
 	for case, insts in arcs.iteritems():
 		if len(insts) > 1:
@@ -159,22 +159,19 @@ def comchk(comments, check_db=True, output=sys.stderr):
 		if not case in valid:
 			errors['nonexistent'].append(' '.join(case))
 			continue
-		#
-		# The opensolaris.org ARC interfaces only give us the
-		# first 40 characters of the case name, so we must limit
-		# our checking similarly.
+
 		#
 		# We first try a direct match between the actual case name
 		# and the entered comment.  If that fails we remove a possible
 		# trailing (fix nit)-type comment, and re-try.
 		#
 		for entered in insts:
-			if entered[0:40] == valid[case]:
+			if entered == valid[case]:
 				break
 			else:
 				# Try again with trailing (fix ...) removed.
 				dbcom = re.sub(r' \([^)]+\)$', '', entered)
-				if dbcom[0:40] != valid[case]:
+				if dbcom != valid[case]:
 					errors['nomatch'].append(
 						[' '.join(case), valid[case],
 						 entered])

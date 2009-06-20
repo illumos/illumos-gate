@@ -110,11 +110,6 @@ def rti(bugids, gatePath=None, consolidation=None,
 			except RtiOffSwan, e:
 				output.write("%s\n" % e)
 				return False
-			except RtiNotFound, e:
-				output.write("Error: no RTI found for bug %s\n"
-					% cr)
-				badRtis.append(cr)  
-				continue
 			except RtiException, e:
 				output.write("%s\n" % e)
 				badRtis.append(cr)

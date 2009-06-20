@@ -293,7 +293,8 @@ def cdm_comchk(ui, repo, **opts):
     ui.write('Comments check:\n')
 
     check_db = not opts.get('nocheck')
-    return Comments.comchk(active.comments(), check_db=check_db, output=ui)
+    return Comments.comchk(active.comments(), check_db=check_db, output=ui,
+                           arcPath=ui.config('cdm', 'arcpath', None))
 
 
 def cdm_cddlchk(ui, repo, *args, **opts):
