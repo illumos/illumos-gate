@@ -118,8 +118,8 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	 * XXX No IOMMU protection for broken devices.
 	 */
 	ASSERT((intptr_t)ddi_get_parent_data(rdip) >> 1 == 0);
-	mp->dmai_bdf = ((intptr_t)ddi_get_parent_data(rdip) == 1) ? 0 :
-	    pcie_get_bdf_for_dma_xfer(dip, rdip);
+	mp->dmai_bdf = ((intptr_t)ddi_get_parent_data(rdip) == 1) ?
+	    PCIE_INVALID_BDF : pcie_get_bdf_for_dma_xfer(dip, rdip);
 
 	return (mp);
 }

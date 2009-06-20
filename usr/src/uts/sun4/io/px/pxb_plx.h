@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PXB_PLX_H
 #define	_SYS_PXB_PLX_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,8 +45,11 @@ extern "C" {
 #define	PXB_DEVICE_PLX_AA_REV	0xAA
 
 /* Register offsets and bits specific to the 8548 and 8533 */
-#define	PLX_EGRESS_PERFCTR_OFFSET	0x1F0
-#define	PLX_RO_MODE_BIT			0x100000
+#define	PLX_INGRESS_CONTROL_SHADOW	0x664
+#define	PLX_INGRESS_PORT_ENABLE		0x668
+#define	PLX_CAM_PORT_8			0x2e8
+#define	PLX_CAM_PORT_12			0x2f8
+#define	PLX_RO_MODE_BIT			0x20
 
 #ifdef	__cplusplus
 }

@@ -225,7 +225,7 @@ typedef	uint64_t io_attributes_t;
 #define	PCI_MAP_ATTR_BDF_MASK	0xffff0000
 
 #define	PX_ADD_ATTR_EXTNS(attr, bdf) \
-	(attr | (bdf << PCI_MAP_ATTR_BDF))
+	(attr | (PCIE_CHECK_VALID_BDF(bdf) ? (bdf << PCI_MAP_ATTR_BDF) : 0))
 
 typedef enum io_sync_direction {
 	IO_SYNC_DEVICE		= (uint32_t)0x01,

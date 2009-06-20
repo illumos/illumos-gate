@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -413,7 +413,7 @@ pci_bridge_declare(topo_mod_t *mod, tnode_t *fn, di_node_t din, int board,
 
 	devtyp = pci_devtype_get(mod, din);
 	/* Check if the children are PCI or PCIe */
-	if (strcmp(devtyp, "pciex") == 0)
+	if (devtyp && (strcmp(devtyp, "pciex") == 0))
 		err = pci_children_instantiate(mod, fn, din, board, bridge,
 		    rc, TRUST_BDF, depth + 1);
 	else

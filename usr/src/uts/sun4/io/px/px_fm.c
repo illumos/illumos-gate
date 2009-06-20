@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,7 +299,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	int		lookup, rc_err, fab_err;
 	uint64_t	addr, base_addr;
 	uint64_t	fault_addr = (uint64_t)derr->fme_bus_specific;
-	pcie_req_id_t	bdf;
+	pcie_req_id_t	bdf = PCIE_INVALID_BDF;
 	px_ranges_t	*ranges_p;
 	int		range_len;
 
@@ -339,7 +339,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 			case PCI_ADDR_MEM32:
 				acc_type = PF_ADDR_PIO;
 				addr = fault_addr - base_addr;
-				bdf = NULL;
+				bdf = PCIE_INVALID_BDF;
 				break;
 			}
 			break;
@@ -591,15 +591,15 @@ px_err_check_pcie(dev_info_t *dip, ddi_fm_error_t *derr, px_err_pcie_t *regs)
 
 	if (regs->primary_ue & (PCIE_AER_UCE_UR | PCIE_AER_UCE_CA)) {
 		if (pf_tlp_decode(PCIE_DIP2BUS(dip), adv_reg) == DDI_SUCCESS)
-			PCIE_ROOT_FAULT(pfd_p)->fault_bdf =
+			PCIE_ROOT_FAULT(pfd_p)->scan_bdf =
 			    adv_reg->pcie_ue_tgt_bdf;
 	} else if (regs->primary_ue & PCIE_AER_UCE_PTLP) {
 		if (pf_tlp_decode(PCIE_DIP2BUS(dip), adv_reg) == DDI_SUCCESS) {
-			PCIE_ROOT_FAULT(pfd_p)->fault_bdf =
+			PCIE_ROOT_FAULT(pfd_p)->scan_bdf =
 			    adv_reg->pcie_ue_tgt_bdf;
 			if (adv_reg->pcie_ue_tgt_trans ==
 			    PF_ADDR_PIO)
-				PCIE_ROOT_FAULT(pfd_p)->fault_addr =
+				PCIE_ROOT_FAULT(pfd_p)->scan_addr =
 				    adv_reg->pcie_ue_tgt_addr;
 		}
 
@@ -708,8 +708,8 @@ px_get_pfd(px_t *px_p) {
 	pf_data_t	*pfd_p = &px_p->px_pfd_arr[idx];
 
 	/* Clear Old Data */
-	PCIE_ROOT_FAULT(pfd_p)->fault_bdf = 0;
-	PCIE_ROOT_FAULT(pfd_p)->fault_addr = 0;
+	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = PCIE_INVALID_BDF;
+	PCIE_ROOT_FAULT(pfd_p)->scan_addr = 0;
 	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = 0;
 	PCIE_ADV_REG(pfd_p)->pcie_ce_status = 0;
 	PCIE_ADV_REG(pfd_p)->pcie_ue_status = 0;
@@ -734,26 +734,26 @@ px_get_pfd(px_t *px_p) {
  * o errs rcvd in RC, that may have been propagated to/from the fabric
  * o the fabric scan code should scan the device path of fault bdf/addr
  *
- * fault_bdf: The bdf that caused the fault, which may have error bits set.
- * fault_addr: The PIO addr that caused the fault, such as failed PIO, but not
+ * scan_bdf: The bdf that caused the fault, which may have error bits set.
+ * scan_addr: The PIO addr that caused the fault, such as failed PIO, but not
  *	       failed DMAs.
  * s_status: Secondary Status equivalent to why the fault occured.
  *	     (ie S-TA/MA, R-TA)
- * Either the fault bdf or addr may be NULL, but not both.
+ * Either the scan bdf or addr may be NULL, but not both.
  */
 void
-px_rp_en_q(px_t *px_p, pcie_req_id_t fault_bdf, uint32_t fault_addr,
+px_rp_en_q(px_t *px_p, pcie_req_id_t scan_bdf, uint32_t scan_addr,
     uint16_t s_status)
 {
 	pf_data_t	*pfd_p;
 
-	if (!fault_bdf && !fault_addr)
+	if (!PCIE_CHECK_VALID_BDF(scan_bdf) && !scan_addr)
 		return;
 
 	pfd_p = px_get_pfd(px_p);
 
-	PCIE_ROOT_FAULT(pfd_p)->fault_bdf = fault_bdf;
-	PCIE_ROOT_FAULT(pfd_p)->fault_addr = (uint64_t)fault_addr;
+	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = scan_bdf;
+	PCIE_ROOT_FAULT(pfd_p)->scan_addr = (uint64_t)scan_addr;
 	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = s_status;
 }
 
@@ -784,8 +784,8 @@ px_err_cfg_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 	 * only mark the device as "Non-Fatal" if the addr == NULL and bdf !=
 	 * NULL.
 	 */
-	status = (!addr && (bus_p->bus_bdf == bdf)) ? DDI_FM_NONFATAL :
-	    DDI_FM_FATAL;
+	status = (!addr && (PCIE_CHECK_VALID_BDF(bdf) &&
+	    (bus_p->bus_bdf == bdf))) ? DDI_FM_NONFATAL : DDI_FM_FATAL;
 
 	return (status);
 }
@@ -840,7 +840,8 @@ px_err_pio_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 	 */
 	size = hp->ah_len;
 	if (((fault_addr >= base_addr) && (fault_addr < (base_addr + size))) ||
-	    ((fault_addr == NULL) && (bdf == PCIE_DIP2BUS(dip)->bus_bdf)))
+	    ((fault_addr == NULL) && (PCIE_CHECK_VALID_BDF(bdf) &&
+	    (bdf == PCIE_DIP2BUS(dip)->bus_bdf))))
 		status = DDI_FM_NONFATAL;
 
 	return (status);
@@ -876,7 +877,7 @@ px_err_dma_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 	 * know the BDF and ADDR == 0.
 	 */
 	if (((addr >= base_addr) && (addr < (base_addr + size))) ||
-	    ((addr == NULL) && (bdf != NULL)))
+	    ((addr == NULL) && PCIE_CHECK_VALID_BDF(bdf)))
 		status = DDI_FM_NONFATAL;
 
 	return (status);

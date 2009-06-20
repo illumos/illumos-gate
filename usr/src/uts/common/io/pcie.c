@@ -333,8 +333,10 @@ pcie_init_pfd(dev_info_t *dip)
 	pfd_p->pe_valid = B_FALSE;
 
 	/* Allocate the root fault struct for both RC and RP */
-	if (PCIE_IS_ROOT(bus_p))
+	if (PCIE_IS_ROOT(bus_p)) {
 		PCIE_ROOT_FAULT(pfd_p) = PCIE_ZALLOC(pf_root_fault_t);
+		PCIE_ROOT_FAULT(pfd_p)->scan_bdf = PCIE_INVALID_BDF;
+	}
 
 	PCI_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pci_err_regs_t);
 
@@ -349,13 +351,21 @@ pcie_init_pfd(dev_info_t *dip)
 			    PCIE_ZALLOC(pf_pcie_rp_err_regs_t);
 
 		PCIE_ADV_REG(pfd_p) = PCIE_ZALLOC(pf_pcie_adv_err_regs_t);
+		PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_bdf = PCIE_INVALID_BDF;
 
-		if (PCIE_IS_RP(bus_p))
+		if (PCIE_IS_RP(bus_p)) {
 			PCIE_ADV_RP_REG(pfd_p) =
 			    PCIE_ZALLOC(pf_pcie_adv_rp_err_regs_t);
-		else if (PCIE_IS_PCIE_BDG(bus_p))
+			PCIE_ADV_RP_REG(pfd_p)->pcie_rp_ce_src_id =
+			    PCIE_INVALID_BDF;
+			PCIE_ADV_RP_REG(pfd_p)->pcie_rp_ue_src_id =
+			    PCIE_INVALID_BDF;
+		} else if (PCIE_IS_PCIE_BDG(bus_p)) {
 			PCIE_ADV_BDG_REG(pfd_p) =
 			    PCIE_ZALLOC(pf_pcie_adv_bdg_err_regs_t);
+			PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_bdf =
+			    PCIE_INVALID_BDF;
+		}
 
 		if (PCIE_IS_PCIE_BDG(bus_p) && PCIE_IS_PCIX(bus_p)) {
 			PCIX_BDG_ERR_REG(pfd_p) =
@@ -472,6 +482,7 @@ pcie_rc_init_pfd(dev_info_t *dip, pf_data_t *pfd_p)
 	pfd_p->pe_valid = B_FALSE;
 
 	PCIE_ROOT_FAULT(pfd_p) = PCIE_ZALLOC(pf_root_fault_t);
+	PCIE_ROOT_FAULT(pfd_p)->scan_bdf = PCIE_INVALID_BDF;
 	PCI_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pci_err_regs_t);
 	PCI_BDG_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pci_bdg_err_regs_t);
 	PCIE_ERR_REG(pfd_p) = PCIE_ZALLOC(pf_pcie_err_regs_t);
@@ -581,7 +592,7 @@ pcie_init_bus(dev_info_t *cdip)
 			bus_p->bus_aer_off = NULL;
 	} else {
 		bus_p->bus_pcie_off = NULL;
-		bus_p->bus_dev_type = PCIE_PCIECAP_DEV_TYPE_PCI_DEV;
+		bus_p->bus_dev_type = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
 	}
 
 	if ((PCI_CAP_LOCATE(eh, PCI_CAP_ID_PCIX, &bus_p->bus_pcix_off))
@@ -1017,11 +1028,11 @@ pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip)
 	 * As part of the probing, the PCI fcode interpreter may setup a DMA
 	 * request if a given card has a fcode on it using dip and rdip of the
 	 * AP (attachment point) i.e, dip and rdip of px/px_pci driver. In this
-	 * case, return zero for the bdf since we cannot get to the bdf value
-	 * of the actual device which will be initiating this DMA.
+	 * case, return a invalid value for the bdf since we cannot get to the
+	 * bdf value of the actual device which will be initiating this DMA.
 	 */
 	if (rdip == dip)
-		return (0);
+		return (PCIE_INVALID_BDF);
 
 	cdip = pcie_get_my_childs_dip(dip, rdip);
 
@@ -1029,10 +1040,11 @@ pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip)
 	 * For a given rdip, return the bdf value of dip's (px or px_pci)
 	 * immediate child or secondary bus-id if dip is a PCIe2PCI bridge.
 	 *
-	 * XXX - For now, return bdf value of zero for all PCI and PCI-X devices
-	 * since this needs more work.
+	 * XXX - For now, return a invalid bdf value for all PCI and PCI-X
+	 * devices since this needs more work.
 	 */
-	return (PCI_GET_PCIE2PCI_SECBUS(cdip) ? 0 : PCI_GET_BDF(cdip));
+	return (PCI_GET_PCIE2PCI_SECBUS(cdip) ?
+	    PCIE_INVALID_BDF : PCI_GET_BDF(cdip));
 }
 
 uint32_t

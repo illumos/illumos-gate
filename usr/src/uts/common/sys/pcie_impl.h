@@ -61,8 +61,7 @@ extern "C" {
 
 #define	PCIE_IS_PCIE(bus_p) (bus_p->bus_pcie_off)
 #define	PCIE_IS_PCIX(bus_p) (bus_p->bus_pcix_off)
-#define	PCIE_IS_PCI(bus_p) \
-	(bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_PCI_DEV)
+#define	PCIE_IS_PCI(bus_p) (!PCIE_IS_PCIE(bus_p))
 #define	PCIE_HAS_AER(bus_p) (bus_p->bus_aer_off)
 /* IS_ROOT = is RC or RP */
 #define	PCIE_IS_ROOT(bus_p) (PCIE_IS_RC(bus_p) || PCIE_IS_RP(bus_p))
@@ -76,13 +75,14 @@ extern "C" {
 #define	PCIE_IS_RP(bus_p) \
 	((bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) && \
 	    PCIE_IS_PCIE(bus_p))
+#define	PCIE_IS_SWU(bus_p) \
+	(bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_UP)
+#define	PCIE_IS_SWD(bus_p) \
+	(bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN)
 #define	PCIE_IS_SW(bus_p) \
-	((bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_UP) || \
-	    (bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN))
+	(PCIE_IS_SWU(bus_p) || PCIE_IS_SWD(bus_p))
 #define	PCIE_IS_BDG(bus_p)  (bus_p->bus_hdr_type == PCI_HEADER_ONE)
-#define	PCIE_IS_PCI_BDG(bus_p) \
-	((bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_PCI_DEV) && \
-	    PCIE_IS_BDG(bus_p))
+#define	PCIE_IS_PCI_BDG(bus_p) (PCIE_IS_PCI(bus_p) && PCIE_IS_BDG(bus_p))
 #define	PCIE_IS_PCIE_BDG(bus_p) \
 	(bus_p->bus_dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
 #define	PCIE_IS_PCI2PCIE(bus_p) \
@@ -216,7 +216,7 @@ typedef struct pf_pcie_adv_err_regs {
 	} pcie_ext;
 	uint32_t pcie_ue_tgt_trans;	/* Fault trans type from AER Logs */
 	uint64_t pcie_ue_tgt_addr;	/* Fault addr from AER Logs */
-	pcie_req_id_t pcie_ue_tgt_bdf;	/* Fault bdf from SAER Logs */
+	pcie_req_id_t pcie_ue_tgt_bdf;	/* Fault bdf from AER Logs */
 } pf_pcie_adv_err_regs_t;
 
 typedef struct pf_pcie_rp_err_regs {
@@ -233,8 +233,8 @@ typedef struct pf_pcie_err_regs {
 } pf_pcie_err_regs_t;
 
 typedef struct pf_root_fault {
-	pcie_req_id_t	fault_bdf;	/* Fault BDF of error */
-	uint64_t	fault_addr;	/* Fault Addr of error */
+	pcie_req_id_t	scan_bdf;	/* BDF from error logs */
+	uint64_t	scan_addr;	/* Addr from error logs */
 	boolean_t	full_scan;	/* Option to do a full scan */
 } pf_root_fault_t;
 
@@ -337,7 +337,19 @@ typedef struct pf_impl {
 #define	PF_HDL_FOUND		1
 #define	PF_HDL_NOTFOUND		2
 
-#define	PCIE_PCIECAP_DEV_TYPE_RC_PSEUDO	0x100
+/*
+ * PCIe Capability Device Type Pseudo Definitions.
+ *
+ * PCI_PSEUDO is used on real PCI devices.  The Legacy PCI definition in the
+ * PCIe spec really refers to PCIe devices that *require* IO Space access.  IO
+ * Space access is usually frowned upon now in PCIe, but there for legacy
+ * purposes.
+ */
+#define	PCIE_PCIECAP_DEV_TYPE_RC_PSEUDO		0x100
+#define	PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO	0x101
+
+#define	PCIE_INVALID_BDF	0xFFFF
+#define	PCIE_CHECK_VALID_BDF(x)	(x != PCIE_INVALID_BDF)
 
 typedef struct {
 	dev_info_t	*dip;

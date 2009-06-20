@@ -212,8 +212,8 @@ pf_scan_fabric(dev_info_t *rdip, ddi_fm_error_t *derr, pf_data_t *root_pfd_p)
 	}
 
 	/*
-	 * Scan the fabric using the fault_bdf and fault_addr in error q.
-	 * fault_bdf will be valid in the following cases:
+	 * Scan the fabric using the scan_bdf and scan_addr in error q.
+	 * scan_bdf will be valid in the following cases:
 	 *	- Fabric message
 	 *	- Poisoned TLP
 	 *	- Signaled UR/CA
@@ -227,8 +227,9 @@ pf_scan_fabric(dev_info_t *rdip, ddi_fm_error_t *derr, pf_data_t *root_pfd_p)
 		if (impl.pf_fault->full_scan)
 			full_scan = B_TRUE;
 
-		if (full_scan || impl.pf_fault->fault_bdf ||
-		    impl.pf_fault->fault_addr)
+		if (full_scan ||
+		    PCIE_CHECK_VALID_BDF(impl.pf_fault->scan_bdf) ||
+		    impl.pf_fault->scan_addr)
 			scan_flag |= pf_dispatch(rdip, &impl, full_scan);
 
 		if (full_scan)
@@ -277,7 +278,7 @@ static int
 pf_dispatch(dev_info_t *pdip, pf_impl_t *impl, boolean_t full_scan)
 {
 	dev_info_t	*dip;
-	pcie_req_id_t	rid = impl->pf_fault->fault_bdf;
+	pcie_req_id_t	rid = impl->pf_fault->scan_bdf;
 	pcie_bus_t	*bus_p;
 	int		scan_flag = PF_SCAN_SUCCESS;
 
@@ -300,7 +301,7 @@ pf_dispatch(dev_info_t *pdip, pf_impl_t *impl, boolean_t full_scan)
 		if (full_scan ||
 		    (bus_p->bus_bdf == rid) ||
 		    pf_in_bus_range(bus_p, rid) ||
-		    pf_in_addr_range(bus_p, impl->pf_fault->fault_addr)) {
+		    pf_in_addr_range(bus_p, impl->pf_fault->scan_addr)) {
 			int hdl_flag = pf_default_hdl(dip, impl);
 			scan_flag |= hdl_flag;
 
@@ -348,8 +349,13 @@ pf_dispatch(dev_info_t *pdip, pf_impl_t *impl, boolean_t full_scan)
 			break;
 		}
 		case PCIE_PCIECAP_DEV_TYPE_PCIE_DEV:
-			break;
 		case PCIE_PCIECAP_DEV_TYPE_PCI_DEV:
+			/*
+			 * Reached a PCIe end point so stop. Note dev_type
+			 * PCI_DEV is just a PCIe device that requires IO Space
+			 */
+			break;
+		case PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO:
 			if (PCIE_IS_BDG(bus_p))
 				scan_flag |= pf_dispatch(dip, impl, B_TRUE);
 			break;
@@ -402,6 +408,7 @@ pf_in_addr_range(pcie_bus_t *bus_p, uint64_t addr)
 
 	for (i = 0; i < bus_p->bus_addr_entries; i++, ranges_p++) {
 		switch (ranges_p->child_high & PCI_ADDR_MASK) {
+		case PCI_ADDR_IO:
 		case PCI_ADDR_MEM32:
 			low = ranges_p->child_low;
 			hi = ranges_p->size_low + low;
@@ -767,8 +774,8 @@ pf_pci_find_rp_fault(pf_data_t *pfd_p, pcie_bus_t *bus_p)
 
 	/* Since this data structure is reused, make sure to reset it */
 	root_fault->full_scan = B_FALSE;
-	root_fault->fault_bdf = 0;
-	root_fault->fault_addr = 0;
+	root_fault->scan_bdf = PCIE_INVALID_BDF;
+	root_fault->scan_addr = 0;
 
 	if (!PCIE_HAS_AER(bus_p) &&
 	    (PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat & PF_PCI_BDG_ERR)) {
@@ -811,19 +818,17 @@ pf_pci_find_rp_fault(pf_data_t *pfd_p, pcie_bus_t *bus_p)
 	}
 
 	/* By this point, there is only 1 fault detected */
-	if ((root_err & PCIE_AER_RE_STS_CE_RCVD) &&
-	    rp_regs->pcie_rp_ce_src_id) {
-		PCIE_ROOT_FAULT(pfd_p)->fault_bdf = rp_regs->pcie_rp_ce_src_id;
+	if (root_err & PCIE_AER_RE_STS_CE_RCVD) {
+		PCIE_ROOT_FAULT(pfd_p)->scan_bdf = rp_regs->pcie_rp_ce_src_id;
 		num_faults--;
-	} else if ((root_err & PCIE_AER_RE_STS_FE_NFE_RCVD) &&
-	    rp_regs->pcie_rp_ue_src_id) {
-		PCIE_ROOT_FAULT(pfd_p)->fault_bdf = rp_regs->pcie_rp_ue_src_id;
-			num_faults--;
+	} else if (root_err & PCIE_AER_RE_STS_FE_NFE_RCVD) {
+		PCIE_ROOT_FAULT(pfd_p)->scan_bdf = rp_regs->pcie_rp_ue_src_id;
+		num_faults--;
 	} else if ((HAS_AER_LOGS(pfd_p, PCIE_AER_UCE_CA) ||
 	    HAS_AER_LOGS(pfd_p, PCIE_AER_UCE_UR)) &&
 	    (pf_tlp_decode(PCIE_PFD2BUS(pfd_p), PCIE_ADV_REG(pfd_p)) ==
 	    DDI_SUCCESS)) {
-		PCIE_ROOT_FAULT(pfd_p)->fault_bdf =
+		PCIE_ROOT_FAULT(pfd_p)->scan_addr =
 		    PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_addr;
 		num_faults--;
 	}
@@ -1171,6 +1176,12 @@ const pf_fab_err_tbl_t pcie_pci_tbl[] = {
 	NULL,			NULL
 };
 
+#define	PF_MASKED_AER_ERR(pfd_p) \
+	(PCIE_ADV_REG(pfd_p)->pcie_ue_status & \
+	    ((PCIE_ADV_REG(pfd_p)->pcie_ue_mask) ^ 0xFFFFFFFF))
+#define	PF_MASKED_SAER_ERR(pfd_p) \
+	(PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_status & \
+	    ((PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_mask) ^ 0xFFFFFFFF))
 /*
  * Analyse all the PCIe Fault Data (erpt) gathered during dispatch in the erpt
  * Queue.
@@ -1186,25 +1197,24 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 
 		switch (PCIE_PFD2BUS(pfd_p)->bus_dev_type) {
 		case PCIE_PCIECAP_DEV_TYPE_PCIE_DEV:
+		case PCIE_PCIECAP_DEV_TYPE_PCI_DEV:
 			if (PCIE_DEVSTS_CE_DETECTED &
 			    PCIE_ERR_REG(pfd_p)->pcie_err_status)
 				sts_flags |= PF_ERR_CE;
 
 			pf_adjust_for_no_aer(pfd_p);
 			sts_flags |= pf_analyse_error_tbl(derr, impl,
-			    pfd_p, pcie_pcie_tbl,
-			    PCIE_ADV_REG(pfd_p)->pcie_ue_status);
+			    pfd_p, pcie_pcie_tbl, PF_MASKED_AER_ERR(pfd_p));
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_ROOT:
 			pf_adjust_for_no_aer(pfd_p);
 			sts_flags |= pf_analyse_error_tbl(derr, impl,
-			    pfd_p, pcie_rp_tbl,
-			    PCIE_ADV_REG(pfd_p)->pcie_ue_status);
+			    pfd_p, pcie_rp_tbl, PF_MASKED_AER_ERR(pfd_p));
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_RC_PSEUDO:
 			/* no adjust_for_aer for pseudo RC */
 			sts_flags |= pf_analyse_error_tbl(derr, impl, pfd_p,
-			    pcie_rp_tbl, PCIE_ADV_REG(pfd_p)->pcie_ue_status);
+			    pcie_rp_tbl, PF_MASKED_AER_ERR(pfd_p));
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_UP:
 		case PCIE_PCIECAP_DEV_TYPE_DOWN:
@@ -1214,8 +1224,7 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 
 			pf_adjust_for_no_aer(pfd_p);
 			sts_flags |= pf_analyse_error_tbl(derr, impl,
-			    pfd_p, pcie_sw_tbl,
-			    PCIE_ADV_REG(pfd_p)->pcie_ue_status);
+			    pfd_p, pcie_sw_tbl, PF_MASKED_AER_ERR(pfd_p));
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_PCIE2PCI:
 			if (PCIE_DEVSTS_CE_DETECTED &
@@ -1226,10 +1235,10 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 			pf_adjust_for_no_saer(pfd_p);
 			sts_flags |= pf_analyse_error_tbl(derr,
 			    impl, pfd_p, pcie_pcie_tbl,
-			    PCIE_ADV_REG(pfd_p)->pcie_ue_status);
+			    PF_MASKED_AER_ERR(pfd_p));
 			sts_flags |= pf_analyse_error_tbl(derr,
 			    impl, pfd_p, pcie_pcie_bdg_tbl,
-			    PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_status);
+			    PF_MASKED_SAER_ERR(pfd_p));
 			/*
 			 * Some non-compliant PCIe devices do not utilize PCIe
 			 * error registers.  So fallthrough and rely on legacy
@@ -1239,7 +1248,7 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 			    & PCIE_ERR_REG(pfd_p)->pcie_err_status)
 				break;
 			/* FALLTHROUGH */
-		case PCIE_PCIECAP_DEV_TYPE_PCI_DEV:
+		case PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO:
 			sts_flags |= pf_analyse_error_tbl(derr, impl,
 			    pfd_p, pcie_pci_tbl,
 			    PCI_ERR_REG(pfd_p)->pci_err_status);
@@ -1612,7 +1621,7 @@ pf_analyse_ptlp(ddi_fm_error_t *derr, uint32_t bit, pf_data_t *dq_head_p,
 
 		secbus = PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_bdf;
 
-		if (secbus & 0xFF)
+		if (!PCIE_CHECK_VALID_BDF(secbus) || (secbus & 0xFF))
 			goto done;
 
 		bdg_pfd_p = pf_get_pcie_bridge(pfd_p, secbus);
@@ -1906,7 +1915,7 @@ pf_matched_in_rc(pf_data_t *dq_head_p, pf_data_t *pfd_p,
 		if (!(PCI_BDG_ERR_REG(rc_pfd_p)->pci_bdg_sec_stat & abort_type))
 			continue;
 
-		fault_bdf = PCIE_ROOT_FAULT(rc_pfd_p)->fault_bdf;
+		fault_bdf = PCIE_ROOT_FAULT(rc_pfd_p)->scan_bdf;
 
 		/* The Fault BDF = Device's BDF */
 		if (fault_bdf == bus_p->bus_bdf)
@@ -1914,7 +1923,7 @@ pf_matched_in_rc(pf_data_t *dq_head_p, pf_data_t *pfd_p,
 
 		/* The Fault Addr is in device's address range */
 		if (pf_in_addr_range(bus_p,
-		    PCIE_ROOT_FAULT(rc_pfd_p)->fault_addr))
+		    PCIE_ROOT_FAULT(rc_pfd_p)->scan_addr))
 			return (B_TRUE);
 
 		/* The Fault BDF is from PCIe-PCI Bridge's secondary bus */
@@ -1943,7 +1952,7 @@ pf_pci_find_trans_type(pf_data_t *pfd_p, uint64_t *addr, uint32_t *trans_type,
 		return;
 	case PCIE_AER_SUCE_RCVD_TA:
 	case PCIE_AER_SUCE_RCVD_MA:
-		*bdf = 0;
+		*bdf = PCIE_INVALID_BDF;
 		*trans_type = PF_ADDR_PIO;
 		return;
 	case PCIE_AER_SUCE_USC_ERR:
@@ -1952,12 +1961,12 @@ pf_pci_find_trans_type(pf_data_t *pfd_p, uint64_t *addr, uint32_t *trans_type,
 		break;
 	default:
 		*addr = 0;
-		*bdf = 0;
+		*bdf = PCIE_INVALID_BDF;
 		*trans_type = 0;
 		return;
 	}
 
-	*bdf = 0;
+	*bdf = PCIE_INVALID_BDF;
 	*trans_type = PF_ADDR_PIO;
 	for (rc_pfd_p = pfd_p->pe_prev; rc_pfd_p;
 	    rc_pfd_p = rc_pfd_p->pe_prev) {
@@ -1987,7 +1996,7 @@ pf_pci_decode(pf_data_t *pfd_p, uint16_t *cmd) {
 	pcix_attr_t	*attr;
 	uint64_t	addr;
 	uint32_t	trans_type;
-	pcie_req_id_t	bdf;
+	pcie_req_id_t	bdf = PCIE_INVALID_BDF;
 
 	attr = (pcix_attr_t *)&PCIE_ADV_BDG_HDR(pfd_p, 0);
 	*cmd = GET_SAER_CMD(pfd_p);
@@ -2045,7 +2054,7 @@ cmd_switch:
 		/* FALLTHROUGH */
 	default:
 		PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_trans = 0;
-		PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_bdf = 0;
+		PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_bdf = PCIE_INVALID_BDF;
 		PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_addr = 0;
 		return (DDI_FAILURE);
 	}
@@ -2066,7 +2075,7 @@ pf_hdl_lookup(dev_info_t *dip, uint64_t ena, uint32_t flag, uint64_t addr,
 	ddi_fm_error_t		derr;
 
 	/* If we don't know the addr or rid just return with NOTFOUND */
-	if (addr == NULL && bdf == NULL)
+	if ((addr == NULL) && !PCIE_CHECK_VALID_BDF(bdf))
 		return (PF_HDL_NOTFOUND);
 
 	if (!(flag & (PF_ADDR_DMA | PF_ADDR_PIO | PF_ADDR_CFG))) {
@@ -2110,7 +2119,8 @@ pf_hdl_child_lookup(dev_info_t *dip, ddi_fm_error_t *derr, uint32_t flag,
 	dip_bdf = PCI_GET_BDF(dip);
 
 	/* Check if dip and BDF match, if not recurse to it's children. */
-	if (!PCIE_IS_RC(bus_p) && (bdf == NULL || dip_bdf == bdf)) {
+	if (!PCIE_IS_RC(bus_p) && (!PCIE_CHECK_VALID_BDF(bdf) ||
+	    dip_bdf == bdf)) {
 		if ((flag & PF_ADDR_DMA) && DDI_FM_DMA_ERR_CAP(fmhdl->fh_cap))
 			fcp = fmhdl->fh_dma_cache;
 		else
@@ -2227,7 +2237,7 @@ pf_hdl_compare(dev_info_t *dip, ddi_fm_error_t *derr, uint32_t flag,
 	 * If a handler isn't found and we know this is the right device mark
 	 * them all failed.
 	 */
-	if ((addr != NULL) && (bdf != NULL) && (found == 0)) {
+	if ((addr != NULL) && PCIE_CHECK_VALID_BDF(bdf) && (found == 0)) {
 		status = pf_hdl_compare(dip, derr, flag, addr, bdf, fcp);
 		if (status == PF_HDL_FOUND)
 			found++;
@@ -2300,12 +2310,12 @@ pf_log_hdl_lookup(dev_info_t *rpdip, ddi_fm_error_t *derr, pf_data_t *pfd_p,
 int
 pf_tlp_decode(pcie_bus_t *bus_p, pf_pcie_adv_err_regs_t *adv_reg_p) {
 	pcie_tlp_hdr_t	*tlp_hdr = (pcie_tlp_hdr_t *)adv_reg_p->pcie_ue_hdr;
-	pcie_req_id_t	my_bdf, tlp_bdf, flt_bdf = 0xFFFF;
+	pcie_req_id_t	my_bdf, tlp_bdf, flt_bdf = PCIE_INVALID_BDF;
 	uint64_t	flt_addr = 0;
 	uint32_t	flt_trans_type = 0;
 
 	adv_reg_p->pcie_ue_tgt_addr = 0;
-	adv_reg_p->pcie_ue_tgt_bdf = 0;
+	adv_reg_p->pcie_ue_tgt_bdf = PCIE_INVALID_BDF;
 	adv_reg_p->pcie_ue_tgt_trans = 0;
 
 	my_bdf = bus_p->bus_bdf;
@@ -2338,7 +2348,7 @@ pf_tlp_decode(pcie_bus_t *bus_p, pf_pcie_adv_err_regs_t *adv_reg_p) {
 			flt_bdf = tlp_bdf;
 		} else {
 			flt_trans_type = PF_ADDR_PIO;
-			flt_bdf = 0;
+			flt_bdf = PCIE_INVALID_BDF;
 		}
 		break;
 	case PCIE_TLP_TYPE_CFG0:
@@ -2614,7 +2624,7 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 			/* Clear these values as they no longer valid */
 			PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_trans = 0;
 			PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_addr = 0;
-			PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_bdf = 0;
+			PCIE_ADV_REG(pfd_p)->pcie_ue_tgt_bdf = PCIE_INVALID_BDF;
 		}
 
 		/* PCIe BDG AER registers */
@@ -2653,7 +2663,8 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 			/* Clear these values as they no longer valid */
 			PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_trans = 0;
 			PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_addr = 0;
-			PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_bdf = 0;
+			PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_tgt_bdf =
+			    PCIE_INVALID_BDF;
 		}
 
 		/* PCIe RP registers */

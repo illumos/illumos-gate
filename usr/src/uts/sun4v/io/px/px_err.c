@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v Fire Error Handling
@@ -139,7 +137,7 @@ static void
 px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 	pf_pcie_adv_err_regs_t adv_reg;
 	int		sts = DDI_SUCCESS;
-	pcie_req_id_t	fault_bdf = 0;
+	pcie_req_id_t	fault_bdf = PCIE_INVALID_BDF;
 	uint64_t	fault_addr = 0;
 	uint16_t	s_status = 0;
 
@@ -179,7 +177,7 @@ px_err_fill_pfd(dev_info_t *dip, px_t *px_p, px_rc_err_t *epkt) {
 
 		sts = pf_tlp_decode(PCIE_DIP2BUS(dip), &adv_reg);
 		fault_bdf = adv_reg.pcie_ue_tgt_bdf;
-		fault_addr = adv_reg.pcie_ue_tgt_bdf;
+		fault_addr = adv_reg.pcie_ue_tgt_addr;
 	}
 
 	if (sts == DDI_SUCCESS)
@@ -671,7 +669,7 @@ static int
 px_mmu_handle_lookup(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 {
 	uint64_t addr = (uint64_t)epkt->addr;
-	pcie_req_id_t bdf = NULL;
+	pcie_req_id_t bdf = PCIE_INVALID_BDF;
 
 	if (epkt->rc_descr.H) {
 		bdf = (uint32_t)((epkt->hdr[0] >> 16) && 0xFFFF);

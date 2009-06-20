@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /* 
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
- 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma dictionary "SUN4" 
 
@@ -174,6 +172,7 @@ event error.io.fire.fabric@pcibus/pcidev/pcifn;
  * o HV and Guest are out of sync.
  ***************/
 event ereport.io.fire.epkt@hostbridge/pciexrc {within(5s)};
+event ereport.io.fire.epkt@hostbridge {within(5s)};
 
 /******************************
  * Generic Rules Begin Here   *
@@ -211,6 +210,12 @@ event fault.io.fire.fw-epkt@hostbridge/pciexrc, retire=0, response=0,
     FITrate=HV_FIT;
 event fault.io.fire.sw-fw-mismatch@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_HV_MISMATCH_FIT;
+event fault.io.fire.sw-epkt@hostbridge, retire=0, response=0,
+    FITrate=SW_FIT;
+event fault.io.fire.fw-epkt@hostbridge, retire=0, response=0,
+    FITrate=HV_FIT;
+event fault.io.fire.sw-fw-mismatch@hostbridge, retire=0, response=0,
+    FITrate=SW_HV_MISMATCH_FIT;
 event fault.io.fire.hb.sw-config@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_FIT;
 event fault.io.fire.dmc.sw-algorithm@hostbridge/pciexrc, retire=0, response=0,
@@ -228,6 +233,11 @@ prop fault.io.fire.sw-epkt@hostbridge/pciexrc,
 	fault.io.fire.fw-epkt@hostbridge/pciexrc,
 	fault.io.fire.sw-fw-mismatch@hostbridge/pciexrc->(A)
     ereport.io.fire.epkt@hostbridge/pciexrc { MATCH_UNRECOGNIZED };
+
+prop fault.io.fire.sw-epkt@hostbridge,
+	fault.io.fire.fw-epkt@hostbridge,
+	fault.io.fire.sw-fw-mismatch@hostbridge->(A)
+    ereport.io.fire.epkt@hostbridge { MATCH_UNRECOGNIZED };
 
 prop fault.io.fire.hb.sw-config@hostbridge/pciexrc (0)->
     error.io.fire.jbc.driver@hostbridge/pciexrc;
@@ -658,4 +668,5 @@ prop upset.io.fire.nodiag@hostbridge/pciexrc (0)->
     ereport.io.fire.pec.lup@hostbridge/pciexrc,
     error.io.fire.dmc.nodiag@hostbridge/pciexrc,
     error.io.fire.dmc.secondary@hostbridge/pciexrc,
+    ereport.io.fire.epkt@hostbridge { !MATCH_UNRECOGNIZED },
     ereport.io.fire.epkt@hostbridge/pciexrc { !MATCH_UNRECOGNIZED };

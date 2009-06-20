@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,7 +219,7 @@ typedef struct {
 		ushort_t bridge_control;
 	} config_state[PCI_MAX_CHILDREN];
 
-	uint8_t parent_bus;
+	uint16_t parent_bus;
 } ppb_devstate_t;
 
 
@@ -339,7 +339,7 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 
-		ppb->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_DEV;
+		ppb->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
 		for (pdip = ddi_get_parent(devi); pdip && (pdip != root) &&
 		    (ppb->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV);
 		    pdip = ddi_get_parent(pdip)) {

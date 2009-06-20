@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4u Fire Error Handling
@@ -1714,7 +1712,7 @@ PX_ERPT_SEND_DEC(mmu_tfar_tfsr)
 	char		buf[FM_MAX_CLASS];
 	boolean_t	pri = PX_ERR_IS_PRI(bit);
 	px_t		*px_p = DIP_TO_STATE(rpdip);
-	pcie_req_id_t	fault_bdf = 0;
+	pcie_req_id_t	fault_bdf = PCIE_INVALID_BDF;
 	uint16_t	s_status = 0;
 
 	if (pri) {

@@ -975,7 +975,7 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 
 			/*
 			 * Access device.  prg is modified.
-			 * First, check for AMD northbridges for I/O access
+			 * First, check for AMD K8 northbridges for I/O access
 			 * (This fix will move in future to pcitool user-land)
 			 * Next, check for PCIe devices and do
 			 * memory-mapped access
@@ -983,8 +983,10 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			 */
 			if ((prg.bus_no == 0) &&
 			    (prg.dev_no >= 0x18) &&
-			    (prg.dev_no < (0x18 + ncpus)) &&
-			    (cpuid_getvendor(CPU) == X86_VENDOR_AMD)) {
+			    (prg.dev_no <
+			    (0x18 + ncpus/cpuid_get_ncpu_per_chip(CPU))) &&
+			    (cpuid_getvendor(CPU) == X86_VENDOR_AMD) &&
+			    (cpuid_getfamily(CPU) == 0xf)) {
 				rval = pcitool_cfg_access(dip, &prg,
 				    write_flag);
 			} else if (max_cfg_size == PCIE_CONF_HDR_SIZE) {

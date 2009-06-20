@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -244,7 +244,7 @@ typedef struct {
 	int fm_cap;
 	ddi_iblock_cookie_t fm_ibc;
 
-	uint8_t parent_bus;
+	uint16_t parent_bus;
 } ppb_devstate_t;
 
 /*
@@ -1711,7 +1711,7 @@ ppb_fm_init(ppb_devstate_t *ppb_p)
 	 */
 	ddi_fm_handler_register(ppb_p->dip, ppb_err_callback, NULL);
 
-	ppb_p->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_DEV;
+	ppb_p->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
 	for (pdip = ddi_get_parent(ppb_p->dip); pdip && (pdip != root) &&
 	    (ppb_p->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV);
 	    pdip = ddi_get_parent(pdip)) {

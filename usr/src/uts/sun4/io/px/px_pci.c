@@ -2119,31 +2119,159 @@ body:
 }
 #endif
 
+
 #ifdef PX_PLX
 /*
- * Disable PLX specific relaxed ordering mode.  Due to PLX
+ * Disable PLX specific relaxed ordering mode.	Due to PLX
  * erratum #6, use of this mode with Cut-Through Cancellation
  * can result in dropped Completion type packets.
+ *
+ * Clear the Relaxed Ordering Mode on 8533 and 8548 switches.
+ * To disable RO, clear bit 5 in offset 0x664, an undocumented
+ * bit in the PLX spec, on Ports 0, 8 and 12.  Proprietary PLX
+ * registers are normally accessible only via memspace from Port
+ * 0.  If port 0 is attached go ahead and disable RO on Port 0,
+ * 8 and 12, if they exist.
  */
 static void
 plx_ro_disable(pxb_devstate_t *pxb)
 {
-	uint32_t		val;
-	ddi_acc_handle_t	hdl = pxb->pxb_config_handle;
+	pcie_bus_t		*bus_p = PCIE_DIP2BUS(pxb->pxb_dip);
+	dev_info_t		*dip = pxb->pxb_dip;
+	pci_regspec_t		*reg_spec, *addr_spec;
+	int			rlen, alen;
+	int			orig_rsize, new_rsize;
+	uint_t			rnum, anum;
+	ddi_device_acc_attr_t	attr;
+	ddi_acc_handle_t	hdl;
+	caddr_t			regsp;
+	uint32_t		val, port_enable;
+	char			*offset;
+	char			*port_offset;
 
-	switch (pxb->pxb_device_id) {
-	case PXB_DEVICE_PLX_8533:
-	case PXB_DEVICE_PLX_8548:
-		/*
-		 * Clear the Relaxed Ordering Mode bit of the Egress
-		 * Performance Counter register on 8533 and 8548 switches.
-		 */
-		val = pci_config_get32(hdl, PLX_EGRESS_PERFCTR_OFFSET);
-		if (val & PLX_RO_MODE_BIT) {
-			val ^= PLX_RO_MODE_BIT;
-			pci_config_put32(hdl, PLX_EGRESS_PERFCTR_OFFSET, val);
-		}
-		break;
+	if (!((pxb->pxb_device_id == PXB_DEVICE_PLX_8533) ||
+	    (pxb->pxb_device_id == PXB_DEVICE_PLX_8548)))
+		return;
+
+	/* You can also only do this on Port 0 */
+	val = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP);
+	val = (val >> PCIE_LINKCAP_PORT_NUMBER_SHIFT) &
+	    PCIE_LINKCAP_PORT_NUMBER_MASK;
+
+	DBG(DBG_ATTACH, dip, "PLX RO Disable : bdf=0x%x port=%d\n",
+	    bus_p->bus_bdf, val);
+
+	if (val != 0)
+		return;
+
+	/*
+	 * Read the reg property, but allocate extra space incase we need to add
+	 * a new entry later.
+	 */
+	if (ddi_getproplen(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
+	    &orig_rsize) != DDI_SUCCESS)
+		return;
+
+	new_rsize = orig_rsize + sizeof (pci_regspec_t);
+	reg_spec = kmem_alloc(new_rsize, KM_SLEEP);
+
+	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
+	    (caddr_t)reg_spec, &orig_rsize) != DDI_SUCCESS)
+		goto fail;
+
+	/* Find the mem32 reg property */
+	rlen = orig_rsize / sizeof (pci_regspec_t);
+	for (rnum = 0; rnum < rlen; rnum++) {
+		if ((reg_spec[rnum].pci_phys_hi & PCI_ADDR_MASK) ==
+		    PCI_ADDR_MEM32)
+			goto fix;
 	}
+
+	/*
+	 * Mem32 reg property was not found.
+	 * Look for it in assign-address property.
+	 */
+	addr_spec = bus_p->bus_assigned_addr;
+	alen = bus_p->bus_assigned_entries;
+	for (anum = 0; anum < alen; anum++) {
+		if ((addr_spec[anum].pci_phys_hi & PCI_ADDR_MASK) ==
+		    PCI_ADDR_MEM32)
+			goto update;
+	}
+
+	/* Unable to find mem space assigned address, give up. */
+	goto fail;
+
+update:
+	/*
+	 * Add the mem32 access to the reg spec.
+	 * Use the last entry which was previously allocated.
+	 */
+	reg_spec[rnum].pci_phys_hi = (addr_spec[anum].pci_phys_hi &
+	    ~PCI_REG_REL_M);
+	reg_spec[rnum].pci_phys_mid = 0;
+	reg_spec[rnum].pci_phys_low = 0;
+	reg_spec[rnum].pci_size_hi = addr_spec[anum].pci_size_hi;
+	reg_spec[rnum].pci_size_low = addr_spec[anum].pci_size_low;
+
+	/* Create the new reg_spec data and update the property */
+	if (ddi_prop_update_int_array(DDI_DEV_T_NONE, dip, "reg",
+	    (int *)reg_spec, (new_rsize / sizeof (int))) != DDI_SUCCESS)
+		goto fail;
+
+fix:
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	attr.devacc_attr_endian_flags  = DDI_STRUCTURE_LE_ACC;
+	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+
+	if (ddi_regs_map_setup(dip, rnum, &regsp, 0, 0, &attr,
+	    &hdl) != DDI_SUCCESS)
+		goto fail;
+
+	/* Grab register which shows which ports are enabled */
+	offset = (char *)regsp + PLX_INGRESS_PORT_ENABLE;
+	port_enable = ddi_get32(hdl, (uint32_t *)offset);
+
+	if ((port_enable == 0xFFFFFFFF) || (port_enable == 0))
+		goto done;
+
+	offset = (char *)regsp + PLX_INGRESS_CONTROL_SHADOW;
+
+	/* Disable RO on Port 0 */
+	port_offset = 0x0 + offset;
+	val = ddi_get32(hdl, (uint32_t *)port_offset);
+	if (val & PLX_RO_MODE_BIT)
+		val ^= PLX_RO_MODE_BIT;
+	ddi_put32(hdl, (uint32_t *)port_offset, val);
+
+	/* Disable RO on Port 8, but make sure its enabled */
+	if (!(port_enable & (1 << 8)))
+		goto port12;
+
+	port_offset = (8 * 0x1000) + offset;
+	val = ddi_get32(hdl, (uint32_t *)port_offset);
+	if (val & PLX_RO_MODE_BIT)
+		val ^= PLX_RO_MODE_BIT;
+	ddi_put32(hdl, (uint32_t *)port_offset, val);
+
+port12:
+	/* Disable RO on Port 12, but make sure it exists */
+	if (!(port_enable & (1 << 12)))
+		goto done;
+
+	port_offset = (12 * 0x1000) + offset;
+	val = ddi_get32(hdl, (uint32_t *)port_offset);
+	if (val & PLX_RO_MODE_BIT)
+		val ^= PLX_RO_MODE_BIT;
+	ddi_put32(hdl, (uint32_t *)port_offset, val);
+
+	goto done;
+
+fail:
+	DBG(DBG_ATTACH, dip, "PLX RO Disable failed.\n");
+
+done:
+	ddi_regs_map_free(&hdl);
+	kmem_free(reg_spec, new_rsize);
 }
 #endif /* PX_PLX */

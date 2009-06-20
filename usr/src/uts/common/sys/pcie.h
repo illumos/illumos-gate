@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,7 @@ extern "C" {
 #define	PCIE_PCIECAP_VER_1_0		0x1	/* PCI-E spec 1.0 */
 #define	PCIE_PCIECAP_VER_MASK		0xF	/* Version Mask */
 #define	PCIE_PCIECAP_DEV_TYPE_PCIE_DEV	0x00	/* PCI-E Endpont Device */
-#define	PCIE_PCIECAP_DEV_TYPE_PCI_DEV	0x10	/* Leg PCI Endpont Device */
+#define	PCIE_PCIECAP_DEV_TYPE_PCI_DEV	0x10	/* "Leg PCI" Endpont Device */
 #define	PCIE_PCIECAP_DEV_TYPE_ROOT	0x40	/* Root Port of Root Complex */
 #define	PCIE_PCIECAP_DEV_TYPE_UP	0x50	/* Upstream Port of Switch */
 #define	PCIE_PCIECAP_DEV_TYPE_DOWN	0x60	/* Downstream Port of Switch */
@@ -216,7 +216,9 @@ extern "C" {
 #define	PCIE_LINKCAP_DLL_ACTIVE_REP_CAPABLE	0x100000    /* DLL Active */
 							    /* Capable bit */
 
-#define	PCIE_LINKCAP_PORT_NUMBER	0xF0000000	/* Port Number */
+#define	PCIE_LINKCAP_PORT_NUMBER	0xFF000000	/* Port Number */
+#define	PCIE_LINKCAP_PORT_NUMBER_SHIFT	24	/* Port Number Shift */
+#define	PCIE_LINKCAP_PORT_NUMBER_MASK	0xFF	/* Port Number Mask */
 
 /*
  * Link Control Register (2 bytes)
@@ -590,7 +592,7 @@ typedef uint16_t pcie_req_id_t;
 #define	PCIE_REQ_ID_BUS_SHIFT	8
 #define	PCIE_REQ_ID_BUS_MASK	0xFF00
 #define	PCIE_REQ_ID_DEV_SHIFT	3
-#define	PCIE_REQ_ID_DEV_MASK	0x00F1
+#define	PCIE_REQ_ID_DEV_MASK	0x00F8
 #define	PCIE_REQ_ID_FUNC_SHIFT	0
 #define	PCIE_REQ_ID_FUNC_MASK	0x0007
 

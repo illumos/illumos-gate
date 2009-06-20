@@ -1527,7 +1527,7 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
     r_addr_t addr)
 {
 	uint32_t	addr_high, addr_low;
-	pcie_req_id_t	bdf;
+	pcie_req_id_t	bdf = PCIE_INVALID_BDF;
 	px_ranges_t	*ranges_p;
 	int		range_len, i;
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)handle;
@@ -1557,7 +1557,7 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
 				bdf = (pcie_req_id_t)(addr_low >> 12);
 				break;
 			default:
-				bdf = NULL;
+				bdf = PCIE_INVALID_BDF;
 				break;
 			}
 			break;

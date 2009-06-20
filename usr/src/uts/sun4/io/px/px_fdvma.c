@@ -211,8 +211,8 @@ px_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	 * XXX No IOMMU protection for broken devices.
 	 */
 	ASSERT((intptr_t)ddi_get_parent_data(rdip) >> 1 == 0);
-	mp->dmai_bdf = ((intptr_t)ddi_get_parent_data(rdip) == 1) ? 0 :
-	    pcie_get_bdf_for_dma_xfer(dip, rdip);
+	mp->dmai_bdf = ((intptr_t)ddi_get_parent_data(rdip) == 1) ?
+	    PCIE_INVALID_BDF : pcie_get_bdf_for_dma_xfer(dip, rdip);
 
 	DBG(DBG_DMA_CTL, dip,
 	    "DDI_DMA_RESERVE: mp=%p dvma=%x npages=%x private=%p\n",
