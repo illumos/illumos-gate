@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -284,8 +284,7 @@ update_bootpath()
 	# now strip off leading and trailing space chars
 	new_bootpath=`echo $NEWBOOTPATH`
 	$EEPROM bootpath="$new_bootpath"
-	cecho "stmsboot: bootpath has been updated, now regenerating boot archive"
-	$BOOTADM update-archive	    
+	cecho "stmsboot: bootpath has been updated"
 	cecho ""
 }
 
@@ -350,6 +349,8 @@ mpxio_main()
 				# only update bootpath here for x86
 				update_bootpath
 			fi
+			cecho "stmsboot: now regenerating boot archive"
+			$BOOTADM update-archive
 		else
 			mpxio_error "failed to update /etc/vfstab."
 		fi
