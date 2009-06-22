@@ -2623,7 +2623,8 @@ checkwfdlist(vnode_t *vp, fpollinfo_t *fpip)
 	}
 	PH_ENTER(&stp->sd_pollist);
 	for (pdp = stp->sd_pollist.ph_list; pdp; pdp = pdp->pd_next) {
-		if (pdp->pd_thread->t_procp == curthread->t_procp) {
+		if (pdp->pd_thread != NULL &&
+		    pdp->pd_thread->t_procp == curthread->t_procp) {
 			for (fpip2 = fpip; fpip2; fpip2 = fpip2->fp_next) {
 				if (pdp->pd_thread == fpip2->fp_thread) {
 					break;
