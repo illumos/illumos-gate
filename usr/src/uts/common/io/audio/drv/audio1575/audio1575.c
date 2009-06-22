@@ -948,7 +948,7 @@ audio1575_attach(dev_info_t *dip)
 	/*
 	 * We want the micboost enabled by default as well.
 	 */
-	ddi_prop_update_int(DDI_DEV_T_NONE, dip, AC97_PROP_MICBOOST, 1);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, dip, AC97_PROP_MICBOOST, 1);
 
 	/* allocate common audio dev structure */
 	adev = audio_dev_alloc(dip, 0);
