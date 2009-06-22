@@ -48,3 +48,4 @@ P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWntfsprogs	Utilities that provide access to NTFS
+P SUNWsmapi	Storage Management APIs
