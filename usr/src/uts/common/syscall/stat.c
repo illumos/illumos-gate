@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,8 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Get file attribute information through a file name or a file descriptor.
@@ -55,44 +57,6 @@
 #include <sys/cmn_err.h>
 #include <c2/audit.h>
 #include <fs/fs_subr.h>
-
-/*
- * =========================================================
- * "ROUND_TO_USEC" workaround for missing syscall interface.
- * =========================================================
- *
- * Solaris does not provide interface to set the timestamp of a file in
- * nanosecond granularity. POSIX.1-2008 specifies such syscall interface:
- * futimens(), utimensat(). The modern filesystems like ZFS support
- * nanosecond granular timestamps.
- *
- * Before the workaround was implemented:
- *
- * The timestamps were read with the nanosecond granularity but written
- * only with the microsecond granularity. If the timestamp was copied by
- * reading it with nanosecond granularity and by writing with the microsecond
- * granularity, the nanosecond part of the timestamp was zero.
- *
- * Example: such copying of the timestamp is done by touch(1) if the '-r'
- * option is used. 'touch -r' is used by build procuderes based on make(1S).
- * The missing nanosecond part was breaking build procuderes and resulted in
- * hard to diagnose build failures.
- *
- * After the workaround is implemented:
- *
- * The timestamps are in the kernel still stored with the nanosecond
- * granularity. However, all the 'stat' syscalls now clear the nanosecond part
- * in the timestamp values returned by these syscalls.
- *
- * The "ROUND_TO_USEC" workaround should be removed when the new syscall
- * interface is available.
- */
-int stat_force_usec_granularity = 1;
-
-#define	ROUND_TO_USEC(tms)						\
-{									\
-	(tms)->tv_nsec = (long)(((tms)->tv_nsec / 1000) * 1000);	\
-}
 
 /*
  * Get the vp to be stated and the cred to be used for the call
@@ -288,14 +252,6 @@ cstat(vnode_t *vp, struct stat *ubp, int flag, cred_t *cr)
 	vattr.va_mask = AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
 	if ((error = VOP_GETATTR(vp, &vattr, flag, cr, NULL)) != 0)
 		return (error);
-
-	/* Workaround - see beginning of the file for the details */
-	if (stat_force_usec_granularity) {
-		ROUND_TO_USEC(&(vattr.va_atime));
-		ROUND_TO_USEC(&(vattr.va_mtime));
-		ROUND_TO_USEC(&(vattr.va_ctime));
-	}
-
 #ifdef	_ILP32
 	/*
 	 * (32-bit kernel, 32-bit applications, 32-bit files)
@@ -445,13 +401,6 @@ cstat32(vnode_t *vp, struct stat32 *ubp, int flag, struct cred *cr)
 	if (error = VOP_GETATTR(vp, &vattr, flag, cr, NULL))
 		return (error);
 
-	/* Workaround - see beginning of the file for the details */
-	if (stat_force_usec_granularity) {
-		ROUND_TO_USEC(&(vattr.va_atime));
-		ROUND_TO_USEC(&(vattr.va_mtime));
-		ROUND_TO_USEC(&(vattr.va_ctime));
-	}
-
 	/* devices are a special case, see comments in cstat */
 	if ((vattr.va_size > MAXOFF32_T) &&
 	    ((vp->v_type == VBLK) || (vp->v_type == VCHR))) {
@@ -572,13 +521,6 @@ cstat64(vnode_t *vp, struct stat64 *ubp, int flag, cred_t *cr)
 	if (error = VOP_GETATTR(vp, &vattr, flag, cr, NULL))
 		return (error);
 
-	/* Workaround - see beginning of the file for the details */
-	if (stat_force_usec_granularity) {
-		ROUND_TO_USEC(&(vattr.va_atime));
-		ROUND_TO_USEC(&(vattr.va_mtime));
-		ROUND_TO_USEC(&(vattr.va_ctime));
-	}
-
 	bzero(&lsb, sizeof (lsb));
 	lsb.st_dev = vattr.va_fsid;
 	lsb.st_ino = vattr.va_nodeid;
@@ -684,13 +626,6 @@ cstat64_32(vnode_t *vp, struct stat64_32 *ubp, int flag, cred_t *cr)
 	vattr.va_mask = AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
 	if (error = VOP_GETATTR(vp, &vattr, flag, cr, NULL))
 		return (error);
-
-	/* Workaround - see beginning of the file for the details */
-	if (stat_force_usec_granularity) {
-		ROUND_TO_USEC(&(vattr.va_atime));
-		ROUND_TO_USEC(&(vattr.va_mtime));
-		ROUND_TO_USEC(&(vattr.va_ctime));
-	}
 
 	if (!cmpldev(&st_dev, vattr.va_fsid) ||
 	    !cmpldev(&st_rdev, vattr.va_rdev) ||
