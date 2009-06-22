@@ -1131,9 +1131,18 @@ okname(cp0)
 		c = (int)*cp;
 		if (c & 0200)
 			goto bad;
-		if (!isalpha(c) && !isdigit(c) &&
-		    c != '_' && c != '-' && c != '.' && c != '+')
-			goto bad;
+		if (!isalpha(c) && !isdigit(c)) {
+			switch (c) {
+				case '\'':
+				case '"':
+				case '`':
+				case ' ':
+				case '#':
+					goto bad;
+				default:
+					break;
+			}
+		}
 	} while (*++cp);
 	return (1);
 
