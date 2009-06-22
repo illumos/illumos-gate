@@ -1890,14 +1890,24 @@ iscsit_op_scsi_cmd(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		    uint64_t, 0, uint32_t, 0, uint32_t, 0, /* no raddr */
 		    uint32_t, rx_pdu->isp_datalen, int, XFER_BUF_TX_TO_INI);
 
-		stmf_post_task(task, ibuf->ibuf_stmf_buf);
-
+		/*
+		 * For immediate data transfer, there is no callback from
+		 * stmf to indicate that the initial burst of data is
+		 * transferred successfully. In some cases, the task can
+		 * get freed before execution returns from stmf_post_task.
+		 * Although this xfer-start/done probe accurately tracks
+		 * the size of the transfer, it does only provide a best
+		 * effort on the timing of the transfer.
+		 */
 		DTRACE_ISCSI_8(xfer__done, idm_conn_t *, ic,
 		    uintptr_t, ibuf->ibuf_stmf_buf->db_sglist[0].seg_addr,
 		    uint32_t, ibuf->ibuf_stmf_buf->db_relative_offset,
 		    uint64_t, 0, uint32_t, 0, uint32_t, 0, /* no raddr */
 		    uint32_t, rx_pdu->isp_datalen, int, XFER_BUF_TX_TO_INI);
+
+		stmf_post_task(task, ibuf->ibuf_stmf_buf);
 	} else {
+
 		stmf_post_task(task, NULL);
 		idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
 	}

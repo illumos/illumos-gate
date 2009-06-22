@@ -724,6 +724,7 @@ iser_handle_digest(nvpair_t *choices, const idm_kv_xlate_t *ikvx,
 		ASSERT(nvrc == 0);
 
 		if (strcasecmp(digest_choice_string, "none") == 0) {
+
 			/* Add to negotiated values list */
 			nvrc = nvlist_add_string(negotiated_nvl,
 			    ikvx->ik_key_name, digest_choice_string);
@@ -742,8 +743,6 @@ iser_handle_digest(nvpair_t *choices, const idm_kv_xlate_t *ikvx,
 		digest_choice = idm_get_next_listvalue(choices,
 		    digest_choice);
 	}
-
-	ASSERT(digest_choice != NULL);
 
 	return (kvrc);
 }
