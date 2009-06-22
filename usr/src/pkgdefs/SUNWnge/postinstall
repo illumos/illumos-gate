@@ -129,4 +129,4 @@ check_add_drv()
 
 	check_add_drv -b "${BASEDIR}" -i \
 		'"pci10de,56" "pci10de,57" "pci10de,269" "pci10de,268" "pci10de,373" "pci10de,372"
-		"pci10de,37" "pci10de,38" "pci10de,3ee" "pci10de,3ef" "pci10de,760" "pci10de,e6" "pci10de,df"' nge
+		"pci10de,37" "pci10de,38" "pci10de,3ee" "pci10de,3ef" "pci10de,760" "pci10de,ab0" "pci10de,e6" "pci10de,df"' nge
