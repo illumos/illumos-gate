@@ -171,6 +171,10 @@ static void startup_vm(void);
 static void startup_end(void);
 static void layout_kernel_va(void);
 
+#if !defined(__xpv)
+void (*rootnex_iommu_init)(void) = NULL;
+#endif
+
 /*
  * Declare these as initialized data so we can patch them.
  */
@@ -335,6 +339,7 @@ caddr_t e_moddata;	/* end of loadable module data reserved */
 
 struct memlist *phys_install;	/* Total installed physical memory */
 struct memlist *phys_avail;	/* Total available physical memory */
+struct memlist *bios_rsvd;	/* Bios reserved memory */
 
 /*
  * kphysm_init returns the number of pages that were processed
@@ -601,7 +606,7 @@ int prom_debug;
  * done in startup_memlist(). The value of NUM_ALLOCATIONS needs to
  * be >= the number of ADD_TO_ALLOCATIONS() executed in the code.
  */
-#define	NUM_ALLOCATIONS 7
+#define	NUM_ALLOCATIONS 8
 int num_allocations = 0;
 struct {
 	void **al_ptr;
@@ -914,6 +919,10 @@ startup_memlist(void)
 	uint_t prot;
 	pfn_t pfn;
 	int memblocks;
+	pfn_t rsvd_high_pfn;
+	pgcnt_t rsvd_pgcnt;
+	size_t rsvdmemlist_sz;
+	int rsvdmemblocks;
 	caddr_t pagecolor_mem;
 	size_t pagecolor_memsz;
 	caddr_t page_ctrs_mem;
@@ -967,6 +976,19 @@ startup_memlist(void)
 	PRM_DEBUG(physmax);
 	PRM_DEBUG(physinstalled);
 	PRM_DEBUG(memblocks);
+
+	/*
+	 * Examine the bios reserved memory to find out:
+	 * - the number of discontiguous segments of memory.
+	 */
+	if (prom_debug)
+		print_memlist("boot reserved mem",
+		    bootops->boot_mem->rsvdmem);
+	installed_top_size(bootops->boot_mem->rsvdmem, &rsvd_high_pfn,
+	    &rsvd_pgcnt, &rsvdmemblocks);
+	PRM_DEBUG(rsvd_high_pfn);
+	PRM_DEBUG(rsvd_pgcnt);
+	PRM_DEBUG(rsvdmemblocks);
 
 	/*
 	 * Initialize hat's mmu parameters.
@@ -1062,6 +1084,14 @@ startup_memlist(void)
 	    (memblocks + POSS_NEW_FRAGMENTS));
 	ADD_TO_ALLOCATIONS(memlist, memlist_sz);
 	PRM_DEBUG(memlist_sz);
+
+	/*
+	 * Reserve space for bios reserved memlists.
+	 */
+	rsvdmemlist_sz = ROUND_UP_PAGE(2 * sizeof (struct memlist) *
+	    (rsvdmemblocks + POSS_NEW_FRAGMENTS));
+	ADD_TO_ALLOCATIONS(bios_rsvd, rsvdmemlist_sz);
+	PRM_DEBUG(rsvdmemlist_sz);
 
 	/*
 	 * The page structure hash table size is a power of 2
@@ -1161,6 +1191,16 @@ startup_memlist(void)
 		panic("physavail was too big!");
 	if (prom_debug)
 		print_memlist("phys_avail", phys_avail);
+
+	/*
+	 * Build bios reserved memspace
+	 */
+	current = bios_rsvd;
+	copy_memlist_filter(bootops->boot_mem->rsvdmem, &current, NULL);
+	if ((caddr_t)current > (caddr_t)bios_rsvd + rsvdmemlist_sz)
+		panic("bios_rsvd was too big!");
+	if (prom_debug)
+		print_memlist("bios_rsvd", bios_rsvd);
 
 	/*
 	 * setup page coloring
@@ -2084,6 +2124,12 @@ startup_end(void)
 #if defined(__xpv)
 	ec_init_debug_irq();
 	xs_domu_init();
+#endif
+
+#if !defined(__xpv)
+	if (rootnex_iommu_init != NULL) {
+		rootnex_iommu_init();
+	}
 #endif
 	PRM_POINT("Enabling interrupts");
 	(*picinitf)();

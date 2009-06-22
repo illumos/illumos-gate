@@ -437,12 +437,6 @@ apic_init()
 		apic_cr8pri[i] = apic_ipltopri[i] >> APIC_IPL_SHIFT;
 	CPU->cpu_pri_data = apic_cr8pri;
 #endif	/* __amd64 */
-
-	/*
-	 * initialize interrupt remapping before apic
-	 * hardware initialization
-	 */
-	apic_intrr_init(apic_mode);
 }
 
 /*
@@ -756,6 +750,12 @@ apic_picinit(void)
 	int i, j;
 	uint_t isr;
 	uint32_t ver;
+
+	/*
+	 * initialize interrupt remapping before apic
+	 * hardware initialization
+	 */
+	apic_intrr_init(apic_mode);
 
 	/*
 	 * On UniSys Model 6520, the BIOS leaves vector 0x20 isr

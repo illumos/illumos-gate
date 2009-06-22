@@ -149,6 +149,7 @@ iommu_page_alloc(intel_iommu_state_t *iommu, int kmflag)
 	}
 
 	pghdl->paddr = pfn_to_pa(hat_getpfnum(kas.a_hat, vaddr));
+	pghdl->vaddr = vaddr;
 
 	idx = iommu_pghdl_hash_func(pghdl->paddr);
 	pghdl->next = iommu->iu_pghdl_hash[idx];
@@ -171,7 +172,7 @@ iommu_page_free(intel_iommu_state_t *iommu, paddr_t paddr)
 	idx = iommu_pghdl_hash_func(paddr);
 	pghdl = iommu->iu_pghdl_hash[idx];
 	while (pghdl && pghdl->paddr != paddr)
-		continue;
+		pghdl = pghdl->next;
 	if (pghdl == NULL) {
 		cmn_err(CE_PANIC,
 		    "Freeing a free IOMMU page: paddr=0x%" PRIx64,
@@ -202,7 +203,7 @@ iommu_get_vaddr(intel_iommu_state_t *iommu, paddr_t paddr)
 	idx = iommu_pghdl_hash_func(paddr);
 	pghdl = iommu->iu_pghdl_hash[idx];
 	while (pghdl && pghdl->paddr != paddr)
-		continue;
+		pghdl = pghdl->next;
 	if (pghdl == NULL) {
 		return (0);
 	}

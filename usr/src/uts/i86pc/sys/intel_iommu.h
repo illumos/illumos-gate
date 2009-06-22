@@ -518,6 +518,7 @@ typedef struct dvma_cache_head {
  * dm_dvma_map		- dvma map
  * dm_dvma_cache	- dvma cahce lists
  * dm_page_table_paddr	- page table address for this domain
+ * dm_pgtable_lock	- lock to protect changes to page table.
  * dm_pt_tree		- the kernel maintained page tables
  * dm_identity		- does this domain identity mapped
  */
@@ -527,24 +528,10 @@ typedef struct dmar_domain_state {
 	vmem_t			*dm_dvma_map;
 	dvma_cache_head_t	dm_dvma_cache[DVMA_CACHE_HEAD_CNT];
 	paddr_t			dm_page_table_paddr;
+	kmutex_t		dm_pgtable_lock;
 	struct iovpte		dm_pt_tree;
 	boolean_t		dm_identity;
 } dmar_domain_state_t;
-
-/*
- * struct dmar_reserve_mem
- *   This structure describes the reserved memory regions which can
- *   not be allocated by vmem.
- *
- * node		- list node
- * rm_pfn_start	- the start page frame number
- * rm_pfn_end	- the end page frame number
- */
-typedef struct dmar_reserve_pages {
-	list_node_t	node;
-	uint64_t	rm_pfn_start;
-	uint64_t	rm_pfn_end;
-} dmar_reserve_pages_t;
 
 /*
  * struct pci_dev_info
@@ -718,6 +705,16 @@ typedef enum {
 	SQ_VERIFY_IGR_2,	/* ignore bit 2-3 */
 	SQ_VERIFY_IGR_3		/* ignore bit 1-3 */
 } intrr_sq_t;
+
+/*
+ * struct vmem_walk_arg
+ *   the arg of vmem vmem walker
+ */
+typedef struct vmem_walk_arg {
+	rmrr_info_t		*vwa_rmrr;
+	dmar_domain_state_t	*vwa_domain;
+	dev_info_t		*vwa_dip;
+} vmem_walk_arg_t;
 
 #ifdef	__cplusplus
 }

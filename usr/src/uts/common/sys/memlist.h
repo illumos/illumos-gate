@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MEMLIST_H
 #define	_SYS_MEMLIST_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* SunOS-4.0 1.7 */
 
 /*
  * Common memlist format, exported by boot.
@@ -58,6 +56,13 @@ extern int address_in_memlist(struct memlist *, uint64_t, size_t);
  * to protect reading this list.
  */
 extern struct memlist *phys_install;
+
+#if defined(__x86)
+/*
+ * bios reserved memory
+ */
+extern struct memlist *bios_rsvd;
+#endif
 
 extern pgcnt_t num_phys_pages();
 

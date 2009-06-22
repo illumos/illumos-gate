@@ -77,6 +77,7 @@ extern "C" {
  */
 struct bsys_mem {
 	struct memlist	*physinstalled;	/* amt of physmem installed */
+	struct memlist	*rsvdmem;	/* amt of bios reserved mem */
 	struct memlist	*physavail;	/* amt of physmem avail for use */
 	struct memlist	*virtavail;	/* amt of virtmem avail for use */
 	struct memlist	*pcimem;	/* amt of pcimem avail for use */

@@ -154,6 +154,8 @@ struct boot_memlist memlists[MAX_MEMLIST];
 uint_t memlists_used = 0;
 struct boot_memlist pcimemlists[MAX_MEMLIST];
 uint_t pcimemlists_used = 0;
+struct boot_memlist rsvdmemlists[MAX_MEMLIST];
+uint_t rsvdmemlists_used = 0;
 
 #define	MAX_MODULES (10)
 struct boot_modules modules[MAX_MODULES];
@@ -237,6 +239,27 @@ sort_physinstall(void)
 	}
 	bi->bi_phys_install = (native_ptr_t)memlists;
 	DBG(bi->bi_phys_install);
+}
+
+/*
+ * build bios reserved memlists
+ */
+static void
+build_rsvdmemlists(void)
+{
+	int i;
+
+	rsvdmemlists[0].next = 0;
+	rsvdmemlists[0].prev = 0;
+	for (i = 1; i < rsvdmemlists_used; ++i) {
+		rsvdmemlists[i].prev =
+		    (native_ptr_t)(uintptr_t)(rsvdmemlists + i - 1);
+		rsvdmemlists[i].next = 0;
+		rsvdmemlists[i - 1].next =
+		    (native_ptr_t)(uintptr_t)(rsvdmemlists + i);
+	}
+	bi->bi_rsvdmem = (native_ptr_t)rsvdmemlists;
+	DBG(bi->bi_rsvdmem);
 }
 
 #if defined(__xpv)
@@ -724,6 +747,11 @@ init_mem_alloc(void)
 	 */
 	sort_physinstall();
 
+	/*
+	 * build bios reserved memlists
+	 */
+	build_rsvdmemlists();
+
 	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
 		/*
 		 * build PCI Memory list
@@ -834,17 +862,27 @@ init_mem_alloc(void)
 			/*
 			 * only type 1 is usable RAM
 			 */
-			if (mmap->type != 1)
+			switch (mmap->type) {
+			case 1:
+				if (end > max_mem)
+					max_mem = end;
+				memlists[memlists_used].addr = start;
+				memlists[memlists_used].size = end - start;
+				++memlists_used;
+				if (memlists_used > MAX_MEMLIST)
+					dboot_panic("too many memlists");
+				break;
+			case 2:
+				rsvdmemlists[rsvdmemlists_used].addr = start;
+				rsvdmemlists[rsvdmemlists_used].size =
+				    end - start;
+				++rsvdmemlists_used;
+				if (rsvdmemlists_used > MAX_MEMLIST)
+					dboot_panic("too many rsvdmemlists");
+				break;
+			default:
 				continue;
-
-			if (end > max_mem)
-				max_mem = end;
-
-			memlists[memlists_used].addr = start;
-			memlists[memlists_used].size = end - start;
-			++memlists_used;
-			if (memlists_used > MAX_MEMLIST)
-				dboot_panic("too many memlists");
+			}
 		}
 		build_pcimemlists((mb_memory_map_t *)mb_info->mmap_addr, cnt);
 	} else if (mb_info->flags & 0x01) {
@@ -877,6 +915,11 @@ init_mem_alloc(void)
 	 * finish processing the physinstall list
 	 */
 	sort_physinstall();
+
+	/*
+	 * build bios reserved mem lists
+	 */
+	build_rsvdmemlists();
 }
 #endif /* !__xpv */
 

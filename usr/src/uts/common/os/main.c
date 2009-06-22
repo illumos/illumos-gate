@@ -346,11 +346,6 @@ start_init(void)
 	lwp_rtt();
 }
 
-#if defined(__i386) || defined(__amd64)
-extern void return_instr(void);
-void (*rootnex_iommu_add_intr)(void) = (void (*)(void))return_instr;
-#endif
-
 void
 main(void)
 {
@@ -455,13 +450,6 @@ main(void)
 	 */
 	(void) spl0();
 	interrupts_unleashed = 1;
-
-#if defined(__i386) || defined(__amd64)
-	/*
-	 * add intel iommu fault event handler
-	 */
-	rootnex_iommu_add_intr();
-#endif
 
 	vfs_mountroot();	/* Mount the root file system */
 	errorq_init();		/* after vfs_mountroot() so DDI root is ready */

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_BOOTINFO_H
 #define	_SYS_BOOTINFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -78,6 +76,7 @@ struct xboot_info {
 	native_ptr_t	bi_next_vaddr;	/* next virtual address not used */
 	native_ptr_t	bi_cmdline;
 	native_ptr_t	bi_phys_install;
+	native_ptr_t	bi_rsvdmem;
 	native_ptr_t	bi_pcimem;
 	native_ptr_t	bi_modules;
 	uint32_t	bi_module_cnt;

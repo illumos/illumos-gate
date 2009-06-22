@@ -56,15 +56,36 @@
 #include <sys/intel_iommu.h>
 #include <sys/atomic.h>
 #include <sys/iommulib.h>
+#include <sys/memlist.h>
+
+static boolean_t drhd_only_for_gfx(intel_iommu_state_t *iommu);
+static void iommu_bringup_unit(intel_iommu_state_t *iommu);
+
+/*
+ * Are we on a Mobile 4 Series Chipset
+ */
+
+static int mobile4_cs = 0;
+
+/*
+ * Activate usb workaround for some Mobile 4 Series Chipset based platforms
+ * On Toshiba laptops, its observed that usb devices appear to
+ * read physical page 0. If we enable RW access via iommu, system doesnt
+ * hang, otherwise the system hangs when the last include-all engine is
+ * enabled for translation.
+ * This happens only when enabling legacy emulation mode.
+ */
+
+static int usb_page0_quirk = 1;
+static int usb_fullpa_quirk = 0;
+static int usb_rmrr_quirk = 1;
 
 /*
  * internal variables
  *   iommu_state	- the list of iommu structures
- *   reserve_memory	- the list of reserved regions
  *   page_num		- the count of pages for iommu page tables
  */
 static list_t iommu_states;
-static list_t reserve_memory;
 static uint_t page_num;
 
 /*
@@ -97,6 +118,12 @@ static dev_info_t *gfx_devinfo = NULL;
  */
 int dmar_drhd_disable = 0;
 
+/*
+ * switch to disable queued invalidation interface/interrupt remapping
+ */
+int qinv_disable = 0;
+int intrr_disable = 0;
+
 static char *dmar_fault_reason[] = {
 	"Reserved",
 	"The present field in root-entry is Clear",
@@ -116,6 +143,40 @@ static char *dmar_fault_reason[] = {
 };
 
 #define	DMAR_MAX_REASON_NUMBER	(14)
+
+#define	IOMMU_IOVPTE_TABLE_SIZE	(IOMMU_LEVEL_SIZE * sizeof (struct iovpte))
+
+static int
+check_hwquirk_walk(dev_info_t *dip, void *arg)
+{
+	_NOTE(ARGUNUSED(arg))
+	int vendor_id, device_id;
+
+	vendor_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "vendor-id", -1);
+	device_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "device-id", -1);
+
+	if (vendor_id == 0x8086 && device_id == 0x2a40) {
+		mobile4_cs = 1;
+		return (DDI_WALK_TERMINATE);
+	} else
+		return (DDI_WALK_CONTINUE);
+}
+
+static void check_hwquirk(dev_info_t *pdip)
+{
+	int count;
+	ASSERT(pdip);
+
+	/*
+	 * walk through the device tree under pdip
+	 * normally, pdip should be the pci root nexus
+	 */
+	ndi_devi_enter(pdip, &count);
+	ddi_walk_devs(ddi_get_child(pdip), check_hwquirk_walk, NULL);
+	ndi_devi_exit(pdip, count);
+}
 
 #define	IOMMU_ALLOC_RESOURCE_DELAY	drv_usectohz(5000)
 
@@ -488,6 +549,7 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 	uint32_t status;
 	int index, fault_reg_offset;
 	int max_fault_index;
+	int any_fault = 0;
 
 	mutex_enter(&(iommu->iu_reg_lock));
 
@@ -502,6 +564,7 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 	/*
 	 * handle all primary pending faults
 	 */
+	any_fault = 1;
 	index = IOMMU_FAULT_GET_INDEX(status);
 	max_fault_index =  IOMMU_CAP_GET_NFR(iommu->iu_capability) - 1;
 	fault_reg_offset = IOMMU_CAP_GET_FRO(iommu->iu_capability);
@@ -621,51 +684,40 @@ no_primary_faults:
 
 	mutex_exit(&(iommu->iu_reg_lock));
 
-	return (1);
+	return (any_fault ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }
 
 /*
- * intel_iommu_intr_handler()
- *   call iommu_intr_handler for each iommu
- */
-static uint_t
-intel_iommu_intr_handler(caddr_t arg)
-{
-	int claimed = 0;
-	intel_iommu_state_t *iommu;
-	list_t *lp = (list_t *)arg;
-
-	for_each_in_list(lp, iommu) {
-		claimed |= iommu_intr_handler(iommu);
-	}
-
-	return (claimed ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
-}
-
-/*
- * intel_iommu_add_intr()
- *   the interface to hook dmar interrupt handler
+ * intel_iommu_init()
+ *   the interface to setup interrupt handlers and init the DMAR units
  */
 static void
-intel_iommu_add_intr(void)
+intel_iommu_init(void)
 {
 	int ipl, irq, vect;
 	intel_iommu_state_t *iommu;
+	char intr_name[64];
 	uint32_t msi_addr, msi_data;
+	uint32_t iommu_instance = 0;
 	ipl = IOMMU_INTR_IPL;
 
-	irq = psm_get_ipivect(ipl, -1);
-	vect = apic_irq_table[irq]->airq_vector;
-	(void) add_avintr((void *)NULL, ipl, (avfunc)(intel_iommu_intr_handler),
-	    "iommu intr", irq, (caddr_t)&iommu_states, NULL, NULL, NULL);
-
 	msi_addr = (MSI_ADDR_HDR |
+	    ((apic_cpus[0].aci_local_id & 0xFF) << MSI_ADDR_DEST_SHIFT) |
 	    (MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
-	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT) |
-	    (apic_cpus[0].aci_local_id & 0xFF));
-	msi_data = ((MSI_DATA_TM_EDGE << MSI_DATA_TM_SHIFT) | vect);
+	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT));
 
 	for_each_in_list(&iommu_states, iommu) {
+		irq = psm_get_ipivect(ipl, -1);
+		vect = apic_irq_table[irq]->airq_vector;
+		msi_data =
+		    ((MSI_DATA_DELIVERY_FIXED << MSI_DATA_DELIVERY_SHIFT) |
+		    vect);
+		(void) snprintf(intr_name, sizeof (intr_name),
+		    "iommu intr%d", iommu_instance++);
+		(void) add_avintr((void *)NULL, ipl,
+		    (avfunc)(iommu_intr_handler),
+		    intr_name, irq, (caddr_t)iommu,
+		    NULL, NULL, NULL);
 		(void) iommu_intr_handler(iommu);
 		mutex_enter(&(iommu->iu_reg_lock));
 		iommu_put_reg32(iommu, IOMMU_REG_FEVNT_ADDR, msi_addr);
@@ -678,6 +730,19 @@ intel_iommu_add_intr(void)
 		iommu_put_reg32(iommu, IOMMU_REG_FEVNT_DATA, msi_data);
 		iommu_put_reg32(iommu, IOMMU_REG_FEVNT_CON, 0);
 		mutex_exit(&(iommu->iu_reg_lock));
+	}
+
+	/*
+	 * enable dma remapping
+	 */
+	cmn_err(CE_CONT, "?Start to enable the dmar units\n");
+	if (!dmar_drhd_disable) {
+		for_each_in_list(&iommu_states, iommu) {
+			if (gfx_drhd_disable &&
+			    drhd_only_for_gfx(iommu))
+				continue;
+			iommu_bringup_unit(iommu);
+		}
 	}
 }
 
@@ -1344,6 +1409,15 @@ dmar_init_ops(intel_iommu_state_t *iommu)
 		ops->do_clflush = cpu_clflush;
 	}
 
+	/* Check for Mobile 4 Series Chipset */
+	if (mobile4_cs && !IOMMU_CAP_GET_RWBF(iommu->iu_capability)) {
+		cmn_err(CE_WARN,
+		    "Mobile 4 Series chipset present, activating quirks\n");
+		iommu->iu_capability |= (1 << 4);
+		if (IOMMU_CAP_GET_RWBF(iommu->iu_capability))
+			cmn_err(CE_WARN, "Setting RWBF forcefully\n");
+	}
+
 	/* write buffer */
 	if (IOMMU_CAP_GET_RWBF(iommu->iu_capability)) {
 		ops->do_flwb = dmar_flush_write_buffer;
@@ -1362,6 +1436,7 @@ dmar_init_ops(intel_iommu_state_t *iommu)
 	ops->do_reap_wait = dmar_reg_reap_wait;
 
 	ops->do_set_root_table = dmar_set_root_table;
+
 
 	iommu->iu_dmar_ops = ops;
 }
@@ -1384,7 +1459,7 @@ create_iommu_state(drhd_info_t *drhd)
 		DDI_STRICTORDER_ACC,
 	};
 
-	iommu = kmem_alloc(sizeof (intel_iommu_state_t), KM_SLEEP);
+	iommu = kmem_zalloc(sizeof (intel_iommu_state_t), KM_SLEEP);
 	drhd->di_iommu = (void *)iommu;
 	iommu->iu_drhd = drhd;
 
@@ -1492,7 +1567,7 @@ create_iommu_state(drhd_info_t *drhd)
 	 * init queued invalidation interface
 	 */
 	iommu->iu_inv_queue = NULL;
-	if (IOMMU_ECAP_GET_QI(iommu->iu_excapability)) {
+	if (IOMMU_ECAP_GET_QI(iommu->iu_excapability) && !qinv_disable) {
 		if (iommu_qinv_init(iommu) != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
 			    "%s init queued invalidation interface failed\n",
@@ -1533,134 +1608,6 @@ create_iommu_state(drhd_info_t *drhd)
 	    ddi_node_name(iommu->iu_drhd->di_dip));
 
 	return (DDI_SUCCESS);
-}
-
-#define	IS_OVERLAP(new, old)	(((new)->rm_pfn_start <= (old)->rm_pfn_end) && \
-				((new)->rm_pfn_end >= (old)->rm_pfn_start))
-
-/*
- * memory_region_overlap()
- *   handle the pci mmio pages overlap condition
- */
-static boolean_t
-memory_region_overlap(dmar_reserve_pages_t *rmem)
-{
-	dmar_reserve_pages_t *temp;
-
-	for_each_in_list(&reserve_memory, temp) {
-		if (IS_OVERLAP(rmem, temp)) {
-			temp->rm_pfn_start = MIN(temp->rm_pfn_start,
-			    rmem->rm_pfn_start);
-			temp->rm_pfn_end = MAX(temp->rm_pfn_end,
-			    rmem->rm_pfn_end);
-			return (B_TRUE);
-		}
-	}
-
-	return (B_FALSE);
-}
-
-/*
- * collect_pci_mmio_walk
- *   reserve a single dev mmio resources
- */
-static int
-collect_pci_mmio_walk(dev_info_t *dip, void *arg)
-{
-	_NOTE(ARGUNUSED(arg))
-
-	int i, length, account;
-	pci_regspec_t *assigned;
-	uint64_t mmio_hi, mmio_lo, mmio_size;
-	dmar_reserve_pages_t *rmem;
-
-	/*
-	 * ingore the devices which have no assigned-address
-	 * properties
-	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "assigned-addresses", (caddr_t)&assigned,
-	    &length) != DDI_PROP_SUCCESS)
-		return (DDI_WALK_CONTINUE);
-
-	account = length / sizeof (pci_regspec_t);
-
-	for (i = 0; i < account; i++) {
-
-		/*
-		 * check the memory io assigned-addresses
-		 * refer to pci.h for bits defination of
-		 * pci_phys_hi
-		 */
-		if (((assigned[i].pci_phys_hi & PCI_ADDR_MASK)
-		    == PCI_ADDR_MEM32) ||
-		    ((assigned[i].pci_phys_hi & PCI_ADDR_MASK)
-		    == PCI_ADDR_MEM64)) {
-			mmio_lo = (((uint64_t)assigned[i].pci_phys_mid) << 32) |
-			    (uint64_t)assigned[i].pci_phys_low;
-			mmio_size =
-			    (((uint64_t)assigned[i].pci_size_hi) << 32) |
-			    (uint64_t)assigned[i].pci_size_low;
-			mmio_hi = mmio_lo + mmio_size - 1;
-
-			rmem = kmem_alloc(sizeof (dmar_reserve_pages_t),
-			    KM_SLEEP);
-			rmem->rm_pfn_start = IOMMU_BTOP(mmio_lo);
-			rmem->rm_pfn_end = IOMMU_BTOP(mmio_hi);
-			if (!memory_region_overlap(rmem)) {
-				list_insert_tail(&reserve_memory, rmem);
-			}
-		}
-	}
-
-	kmem_free(assigned, length);
-
-	return (DDI_WALK_CONTINUE);
-}
-
-/*
- * collect_pci_mmio()
- *   walk through the pci device tree, and collect the mmio resources
- */
-static int
-collect_pci_mmio(dev_info_t *pdip)
-{
-	int count;
-	ASSERT(pdip);
-
-	/*
-	 * walk through the device tree under pdip
-	 * normally, pdip should be the pci root nexus
-	 */
-	ndi_devi_enter(pdip, &count);
-	ddi_walk_devs(ddi_get_child(pdip),
-	    collect_pci_mmio_walk, NULL);
-	ndi_devi_exit(pdip, count);
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * iommu_collect_reserve_memory()
- *   collect the reserved memory region
- */
-static void
-iommu_collect_reserve_memory(void)
-{
-	dmar_reserve_pages_t *rmem;
-
-	/*
-	 * reserve pages for pci memory mapped io
-	 */
-	(void) collect_pci_mmio(pci_top_devinfo);
-
-	/*
-	 * reserve pages for ioapic
-	 */
-	rmem = kmem_alloc(sizeof (dmar_reserve_pages_t), KM_SLEEP);
-	rmem->rm_pfn_start = IOMMU_BTOP(IOAPIC_REGION_START);
-	rmem->rm_pfn_end = IOMMU_BTOP(IOAPIC_REGION_END);
-	list_insert_tail(&reserve_memory, rmem);
 }
 
 /*
@@ -1728,37 +1675,6 @@ get_pci_top_bridge(dev_info_t *dip)
 }
 
 /*
- * domain_vmem_init_reserve()
- *   dish out the reserved pages
- */
-static void
-domain_vmem_init_reserve(dmar_domain_state_t *domain)
-{
-	dmar_reserve_pages_t *rmem;
-	uint64_t lo, hi;
-	size_t size;
-
-	for_each_in_list(&reserve_memory, rmem) {
-		lo = IOMMU_PTOB(rmem->rm_pfn_start);
-		hi = IOMMU_PTOB(rmem->rm_pfn_end + 1);
-		size = hi - lo;
-
-		if (vmem_xalloc(domain->dm_dvma_map,
-		    size,		/* size */
-		    IOMMU_PAGE_SIZE,	/* align/quantum */
-		    0,			/* phase */
-		    0,			/* nocross */
-		    (void *)(uintptr_t)lo,	/* minaddr */
-		    (void *)(uintptr_t)hi,	/* maxaddr */
-		    VM_NOSLEEP) == NULL) {
-			cmn_err(CE_WARN,
-			    "region [%" PRIx64 ",%" PRIx64 ") not reserved",
-			    lo, hi);
-		}
-	}
-}
-
-/*
  * domain_vmem_init()
  *   initiate the domain vmem
  */
@@ -1766,21 +1682,36 @@ static void
 domain_vmem_init(dmar_domain_state_t *domain)
 {
 	char vmem_name[64];
-	uint64_t base, size;
 	static uint_t vmem_instance = 0;
+	struct memlist *mp;
+	uint64_t start, end;
+	void *vmem_ret;
 
-	/*
-	 * create the whole available virtual address and
-	 * dish out the reserved memory regions with xalloc
-	 */
 	(void) snprintf(vmem_name, sizeof (vmem_name),
 	    "domain_vmem_%d", vmem_instance++);
-	base = IOMMU_PAGE_SIZE;
-	size = IOMMU_SIZE_4G - base;
+
+
+	memlist_read_lock();
+	mp = phys_install;
+	end = (mp->address + mp->size);
+
+	/*
+	 * Skip page 0: vmem_create wont like it for obvious
+	 * reasons.
+	 */
+	if (mp->address == 0) {
+		start = IOMMU_PAGE_SIZE;
+	} else {
+		start = mp->address;
+	}
+
+	cmn_err(CE_CONT, "?Adding iova [0x%" PRIx64
+	    " - 0x%" PRIx64 "] to %s\n", start, end,
+	    vmem_name);
 
 	domain->dm_dvma_map = vmem_create(vmem_name,
-	    (void *)(uintptr_t)base,	/* base */
-	    size,			/* size */
+	    (void *)(uintptr_t)start,	/* base */
+	    end - start,		/* size */
 	    IOMMU_PAGE_SIZE,		/* quantum */
 	    NULL,			/* afunc */
 	    NULL,			/* ffunc */
@@ -1788,10 +1719,24 @@ domain_vmem_init(dmar_domain_state_t *domain)
 	    0,				/* qcache_max */
 	    VM_SLEEP);
 
-	/*
-	 * dish out the reserved pages
-	 */
-	domain_vmem_init_reserve(domain);
+	if (domain->dm_dvma_map == NULL) {
+		cmn_err(CE_PANIC, "Unable to inialize vmem map\n");
+	}
+
+	mp = mp->next;
+	while (mp) {
+		vmem_ret = vmem_add(domain->dm_dvma_map,
+		    (void *)((uintptr_t)mp->address),
+		    mp->size, VM_NOSLEEP);
+		cmn_err(CE_CONT, "?Adding iova [0x%" PRIx64
+		    " - 0x%" PRIx64 "] to %s\n", mp->address,
+		    mp->address + mp->size, vmem_name);
+		if (!vmem_ret)
+			cmn_err(CE_PANIC, "Unable to inialize vmem map\n");
+		mp = mp->next;
+	}
+
+	memlist_read_unlock();
 }
 
 /*
@@ -1829,10 +1774,11 @@ iommu_domain_init(dmar_domain_state_t *domain)
 	domain->dm_page_table_paddr = iommu_get_page(domain->dm_iommu,
 	    KM_SLEEP);
 
+	mutex_init(&(domain->dm_pgtable_lock), NULL, MUTEX_DRIVER, NULL);
 	/*
 	 * init the CPU available page tables
 	 */
-	domain->dm_pt_tree.vp = kmem_zalloc(IOMMU_PAGE_SIZE << 1, KM_SLEEP);
+	domain->dm_pt_tree.vp = kmem_zalloc(IOMMU_IOVPTE_TABLE_SIZE, KM_SLEEP);
 	domain->dm_pt_tree.pp = iommu_get_vaddr(domain->dm_iommu,
 	    domain->dm_page_table_paddr);
 	domain->dm_identity = B_FALSE;
@@ -2089,13 +2035,12 @@ static int
 iommu_alloc_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 {
 	iommu_private_t *private, *b_private;
+	dev_info_t *bdip = NULL, *ldip = NULL;
 	dmar_domain_state_t *new;
 	pci_dev_info_t info;
-	dev_info_t *bdip = NULL;
-	uint_t need_to_set_parent;
-	int count, pcount;
+	uint_t need_to_set_parent = 0;
+	int count;
 
-	need_to_set_parent = 0;
 	private = DEVI(dip)->devi_iommu_private;
 	if (private == NULL) {
 		cmn_err(CE_PANIC, "iommu private is NULL (%s)\n",
@@ -2103,7 +2048,7 @@ iommu_alloc_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 	}
 
 	/*
-	 * check if the domain has already allocated
+	 * check if the domain has already allocated without lock held.
 	 */
 	if (private->idp_intel_domain) {
 		*domain = INTEL_IOMMU_PRIVATE(private->idp_intel_domain);
@@ -2111,19 +2056,27 @@ iommu_alloc_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 	}
 
 	/*
-	 * we have to assign a domain for this device,
+	 * lock strategy for dip->devi_iommu_private->idp_intel_domain field:
+	 * 1) read access is allowed without lock held.
+	 * 2) write access is protected by ndi_devi_enter(dip, &count). Lock
+	 *    on dip will protect itself and all descendants.
+	 * 3) lock will be released if in-kernel and iommu hardware data
+	 *    strutures have been synchronized.
 	 */
-
 	ndi_hold_devi(dip);
 	bdip = get_pci_top_bridge(dip);
-	if (bdip != NULL) {
-		ndi_devi_enter(ddi_get_parent(bdip), &pcount);
-	}
+	ldip = (bdip != NULL) ? bdip : dip;
+	ndi_devi_enter(ldip, &count);
 
 	/*
-	 * hold the parent for modifying its children
+	 * double check if the domain has already created by other thread.
 	 */
-	ndi_devi_enter(ddi_get_parent(dip), &count);
+	if (private->idp_intel_domain) {
+		ndi_devi_exit(ldip, count);
+		ndi_rele_devi(dip);
+		*domain = INTEL_IOMMU_PRIVATE(private->idp_intel_domain);
+		return (DDI_SUCCESS);
+	}
 
 	/*
 	 * check to see if it is under a pci bridge
@@ -2138,48 +2091,40 @@ iommu_alloc_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 		}
 	}
 
-get_domain_alloc:
 	/*
 	 * OK, we have to allocate a new domain
 	 */
 	new = kmem_alloc(sizeof (dmar_domain_state_t), KM_SLEEP);
 	new->dm_iommu = iommu_get_dmar(dip);
-
-	/*
-	 * setup the domain
-	 */
 	if (iommu_domain_init(new) != DDI_SUCCESS) {
-		ndi_devi_exit(ddi_get_parent(dip), count);
-		if (need_to_set_parent)
-			ndi_devi_exit(ddi_get_parent(bdip), pcount);
+		ndi_devi_exit(ldip, count);
+		ndi_rele_devi(dip);
+		kmem_free(new, sizeof (dmar_domain_state_t));
+		*domain = NULL;
 		return (DDI_FAILURE);
 	}
 
 get_domain_finish:
 	/*
-	 * add the device to the domain's device list
+	 * setup root context entries
 	 */
-	private->idp_intel_domain = (void *)new;
-	ndi_devi_exit(ddi_get_parent(dip), count);
-
-	if (need_to_set_parent) {
-		b_private->idp_intel_domain = (void *)new;
-		ndi_devi_exit(ddi_get_parent(bdip), pcount);
-		setup_possible_contexts(new, bdip);
-	} else if (bdip == NULL) {
+	if (bdip == NULL) {
 		info.pdi_seg = private->idp_seg;
 		info.pdi_bus = private->idp_bus;
 		info.pdi_devfn = private->idp_devfn;
-		domain_set_root_context(new, &info,
-		    new->dm_iommu->iu_agaw);
-	} else {
-		ndi_devi_exit(ddi_get_parent(bdip), pcount);
+		domain_set_root_context(new, &info, new->dm_iommu->iu_agaw);
+	} else if (need_to_set_parent) {
+		setup_possible_contexts(new, bdip);
+		membar_producer();
+		b_private->idp_intel_domain = (void *)new;
 	}
+	membar_producer();
+	private->idp_intel_domain = (void *)new;
 
-	/*
-	 * return new domain
-	 */
+	ndi_devi_exit(ldip, count);
+	ndi_rele_devi(dip);
 	*domain = new;
+
 	return (DDI_SUCCESS);
 }
 
@@ -2285,21 +2230,41 @@ iommu_setup_level_table(dmar_domain_state_t *domain,
 	iopte_t pte;
 	iovpte_t vpte;
 	paddr_t child;
+	caddr_t vp;
 
 	vpte = (iovpte_t)(pvpte->vp) + offset;
 	pte = (iopte_t)(pvpte->pp) + offset;
 
 	/*
-	 * the pte is nonpresent, alloc new page
+	 * check whether pde already exists withoud lock held.
 	 */
-	if (*pte == NULL) {
-		child = iommu_get_page(domain->dm_iommu, KM_SLEEP);
-		set_pte(pte, IOMMU_PAGE_PROP_RW, child);
-		domain->dm_iommu->iu_dmar_ops->do_clflush((caddr_t)pte,
-		    sizeof (*pte));
-		vpte->vp = kmem_zalloc(IOMMU_PAGE_SIZE << 1, KM_SLEEP);
-		vpte->pp = iommu_get_vaddr(domain->dm_iommu, child);
+	if (vpte->pp != NULL) {
+		return (vpte);
 	}
+
+	/* Speculatively allocate resources needed. */
+	child = iommu_get_page(domain->dm_iommu, KM_SLEEP);
+	vp = kmem_zalloc(IOMMU_IOVPTE_TABLE_SIZE, KM_SLEEP);
+	mutex_enter(&(domain->dm_pgtable_lock));
+
+	/*
+	 * double check whether pde already exists with lock held.
+	 */
+	if (vpte->pp != NULL) {
+		mutex_exit(&(domain->dm_pgtable_lock));
+		kmem_free(vp, IOMMU_IOVPTE_TABLE_SIZE);
+		iommu_free_page(domain->dm_iommu, child);
+		return (vpte);
+	}
+
+	set_pte(pte, IOMMU_PAGE_PROP_RW, child);
+	domain->dm_iommu->iu_dmar_ops->do_clflush((caddr_t)pte, sizeof (*pte));
+	vpte->vp = vp;
+
+	/* make previous changes visible to other threads. */
+	membar_producer();
+	vpte->pp = iommu_get_vaddr(domain->dm_iommu, child);
+	mutex_exit(&(domain->dm_pgtable_lock));
 
 	return (vpte);
 }
@@ -2394,6 +2359,36 @@ iommu_map_page_range(dmar_domain_state_t *domain, uint64_t dvma,
 }
 
 /*
+ * iommu_vmem_walker()
+ */
+static void
+iommu_vmem_walker(void *arg, void *base, size_t size)
+{
+	vmem_walk_arg_t *warg = (vmem_walk_arg_t *)arg;
+	rmrr_info_t *rmrr = warg->vwa_rmrr;
+	dmar_domain_state_t *domain = warg->vwa_domain;
+	dev_info_t *dip = warg->vwa_dip;
+	uint64_t start, end;
+
+	start = MAX(rmrr->ri_baseaddr, (uint64_t)(intptr_t)base);
+	end = MIN(rmrr->ri_limiaddr + 1, (uint64_t)(intptr_t)base + size);
+	if (start < end) {
+		cmn_err(CE_WARN, "rmrr overlap with physmem [0x%"
+		    PRIx64 " - 0x%" PRIx64 "] for %s", start, end,
+		    ddi_node_name(dip));
+
+		(void) vmem_xalloc(domain->dm_dvma_map,
+		    end - start,	/* size */
+		    IOMMU_PAGE_SIZE,	/* align/quantum */
+		    0,			/* phase */
+		    0,			/* nocross */
+		    (void *)(uintptr_t)start,	/* minaddr */
+		    (void *)(uintptr_t)end,	/* maxaddr */
+		    VM_NOSLEEP);
+	}
+}
+
+/*
  * build_single_rmrr_identity_map()
  *   build identity map for a single rmrr unit
  */
@@ -2404,6 +2399,7 @@ build_single_rmrr_identity_map(rmrr_info_t *rmrr)
 	pci_dev_info_t info;
 	uint64_t start, end, size;
 	dmar_domain_state_t *domain;
+	vmem_walk_arg_t warg;
 
 	info.pdi_seg = rmrr->ri_segment;
 	for_each_in_list(&(rmrr->ri_dev_list), devs) {
@@ -2427,26 +2423,24 @@ build_single_rmrr_identity_map(rmrr_info_t *rmrr)
 		end = rmrr->ri_limiaddr;
 		size = end - start + 1;
 
-		/*
-		 * setup the page tables
-		 */
-		if ((vmem_xalloc(domain->dm_dvma_map,
-		    size,		/* size */
-		    IOMMU_PAGE_SIZE,	/* align/quantum */
-		    0,			/* phase */
-		    0,			/* nocross */
-		    (void *)(uintptr_t)start,		/* minaddr */
-		    (void *)(uintptr_t)(end + 1),	/* maxaddr */
-		    VM_NOSLEEP) != NULL)) {
-			(void) iommu_map_page_range(domain,
-			    start, start, end,
-			    DDI_DMA_READ | DDI_DMA_WRITE |
-			    IOMMU_PAGE_PROP_NOSYNC);
-		} else {
-			cmn_err(CE_WARN, "Can't reserve 0x%" PRIx64
-			    " ~ 0x%" PRIx64 " for %s", start, end,
-			    ddi_node_name(info.pdi_dip));
+		if (!address_in_memlist(bios_rsvd, start, size)) {
+			cmn_err(CE_WARN, "bios issue: "
+			    "rmrr is not in reserved memory range\n");
 		}
+
+		(void) iommu_map_page_range(domain,
+		    start, start, end,
+		    DDI_DMA_READ | DDI_DMA_WRITE |
+		    IOMMU_PAGE_PROP_NOSYNC);
+
+		/*
+		 * rmrr should never overlap phy_mem
+		 */
+		warg.vwa_rmrr = rmrr;
+		warg.vwa_domain = domain;
+		warg.vwa_dip = info.pdi_dip;
+		vmem_walk(domain->dm_dvma_map, VMEM_SPAN | VMEM_REENTRANT,
+		    iommu_vmem_walker, &warg);
 	}
 }
 
@@ -2527,10 +2521,9 @@ build_dev_identity_map(dev_info_t *dip)
 		return;
 	}
 
-	ASSERT(bootops != NULL);
-	ASSERT(!modrootloaded);
-	mp = bootops->boot_mem->physinstalled;
-	while (mp != 0) {
+	memlist_read_lock();
+	mp = phys_install;
+	while (mp != NULL) {
 		(void) iommu_map_page_range(domain,
 		    mp->address & IOMMU_PAGE_MASK,
 		    mp->address & IOMMU_PAGE_MASK,
@@ -2539,6 +2532,8 @@ build_dev_identity_map(dev_info_t *dip)
 		    IOMMU_PAGE_PROP_NOSYNC);
 		mp = mp->next;
 	}
+
+	memlist_read_unlock();
 
 	/*
 	 * record the identity map for domain, any device
@@ -2549,15 +2544,47 @@ build_dev_identity_map(dev_info_t *dip)
 }
 
 /*
+ * build dma map for bios reserved memspace
+ */
+static void
+map_bios_rsvd_mem_pool(dev_info_t *dip)
+{
+	struct memlist *mp;
+	dmar_domain_state_t *domain;
+
+	if (iommu_get_domain(dip, &domain) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "get domain for %s failed",
+		    ddi_node_name(dip));
+		return;
+	}
+
+	mp = bios_rsvd;
+	while (mp != 0) {
+		(void) iommu_map_page_range(domain,
+		    mp->address & IOMMU_PAGE_MASK,
+		    mp->address & IOMMU_PAGE_MASK,
+		    (mp->address + mp->size - 1) & IOMMU_PAGE_MASK,
+		    DDI_DMA_READ | DDI_DMA_WRITE |
+		    IOMMU_PAGE_PROP_NOSYNC);
+		cmn_err(CE_CONT, "?Mapping Reservd [0x%" PRIx64
+		    " - 0x%" PRIx64 "]\n", mp->address,
+		    (mp->address + mp->size));
+		mp = mp->next;
+	}
+}
+
+/*
  * build_isa_gfx_identity_walk()
  *   the walk function for build_isa_gfx_identity_map()
  */
 static int
 build_isa_gfx_identity_walk(dev_info_t *dip, void *arg)
 {
+	dmar_domain_state_t *domain;
 	_NOTE(ARGUNUSED(arg))
 
 	iommu_private_t *private;
+
 	private = DEVI(dip)->devi_iommu_private;
 
 	/* ignore the NULL private device */
@@ -2568,16 +2595,54 @@ build_isa_gfx_identity_walk(dev_info_t *dip, void *arg)
 	if (private->idp_is_display) {
 		gfx_devinfo = dip;
 		build_dev_identity_map(dip);
+		return (DDI_WALK_CONTINUE);
 	} else if (private->idp_is_lpc) {
 		lpc_devinfo = dip;
+		return (DDI_WALK_CONTINUE);
 	}
 
-	/* workaround for pci8086,10bc pci8086,11bc */
-	if ((strcmp(ddi_node_name(dip), "pci8086,10bc") == 0) ||
-	    (strcmp(ddi_node_name(dip), "pci8086,11bc") == 0)) {
-		cmn_err(CE_CONT, "?Workaround for PRO/1000 PT Quad"
-		    " Port LP Server Adapter applied\n");
+	if (!(usb_rmrr_quirk || usb_page0_quirk || usb_fullpa_quirk)) {
+		return (DDI_WALK_CONTINUE);
+	}
+
+	if (!((strcmp(ddi_driver_name(dip), "uhci") == 0) ||
+	    (strcmp(ddi_driver_name(dip), "ehci") == 0) ||
+	    (strcmp(ddi_driver_name(dip), "ohci") == 0))) {
+		return (DDI_WALK_CONTINUE);
+	}
+
+	/* workaround for usb leagcy emulation mode */
+	if (usb_rmrr_quirk) {
+		map_bios_rsvd_mem_pool(dip);
+		cmn_err(CE_CONT,
+		    "?Workaround for %s USB rmrr\n",
+		    ddi_node_name(dip));
+	}
+
+	/*
+	 * Identify usb ehci and uhci controllers
+	 */
+	if (usb_fullpa_quirk) {
 		build_dev_identity_map(dip);
+		cmn_err(CE_CONT,
+		    "?Workaround for %s USB phys install mem\n",
+		    ddi_node_name(dip));
+		return (DDI_WALK_CONTINUE);
+	}
+
+	if (usb_page0_quirk) {
+		if (iommu_get_domain(dip, &domain) != DDI_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "Unable to setup usb-quirk for %s failed,"
+			    "this device may not be functional",
+			    ddi_node_name(dip));
+			return (DDI_WALK_CONTINUE);
+		}
+		(void) iommu_map_page_range(domain,
+		    0, 0, 0, DDI_DMA_READ | DDI_DMA_WRITE |
+		    IOMMU_PAGE_PROP_NOSYNC);
+		cmn_err(CE_CONT, "?Workaround for %s USB [0-4k]\n",
+		    ddi_node_name(dip));
 	}
 
 	return (DDI_WALK_CONTINUE);
@@ -2612,8 +2677,6 @@ dmar_check_boot_option(char *opt, int *var)
 	int len;
 	char *boot_option;
 
-	*var = 0;
-
 	if ((len = do_bsys_getproplen(NULL, opt)) > 0) {
 		boot_option = kmem_alloc(len, KM_SLEEP);
 		(void) do_bsys_getprop(NULL, opt, boot_option);
@@ -2632,7 +2695,7 @@ dmar_check_boot_option(char *opt, int *var)
 	}
 }
 
-extern void (*rootnex_iommu_add_intr)(void);
+extern void (*rootnex_iommu_init)(void);
 
 /*
  * intel_iommu_attach_dmar_nodes()
@@ -2643,7 +2706,6 @@ intel_iommu_attach_dmar_nodes(void)
 {
 	drhd_info_t *drhd;
 	intel_iommu_state_t *iommu;
-	dmar_reserve_pages_t *rmem;
 	int i;
 
 	/*
@@ -2652,21 +2714,32 @@ intel_iommu_attach_dmar_nodes(void)
 	cmn_err(CE_CONT, "?Start to check dmar related boot options\n");
 	dmar_check_boot_option("dmar-gfx-disable", &gfx_drhd_disable);
 	dmar_check_boot_option("dmar-drhd-disable", &dmar_drhd_disable);
+	dmar_check_boot_option("usb-page0-quirk", &usb_page0_quirk);
+	dmar_check_boot_option("usb-fullpa-quirk", &usb_fullpa_quirk);
+	dmar_check_boot_option("usb-rmrr-quirk", &usb_rmrr_quirk);
+	dmar_check_boot_option("qinv-disable", &qinv_disable);
+	dmar_check_boot_option("intrr-disable", &intrr_disable);
 
 	/*
 	 * init the lists
 	 */
 	list_create(&iommu_states, sizeof (intel_iommu_state_t),
 	    offsetof(intel_iommu_state_t, node));
-	list_create(&reserve_memory, sizeof (dmar_reserve_pages_t),
-	    offsetof(dmar_reserve_pages_t, node));
 
 	pci_top_devinfo = ddi_find_devinfo("pci", -1, 0);
 	isa_top_devinfo = ddi_find_devinfo("isa", -1, 0);
 	if (pci_top_devinfo == NULL) {
 		cmn_err(CE_WARN, "can't get pci top devinfo");
 		return (DDI_FAILURE);
+	} else {
+		ndi_rele_devi(pci_top_devinfo);
 	}
+
+	if (isa_top_devinfo != NULL) {
+		ndi_rele_devi(isa_top_devinfo);
+	}
+
+	check_hwquirk(pci_top_devinfo);
 
 	iommu_page_init();
 
@@ -2684,15 +2757,9 @@ intel_iommu_attach_dmar_nodes(void)
 	/*
 	 * register interrupt remap ops
 	 */
-	if (dmar_info->dmari_intr_remap == B_TRUE) {
+	if ((dmar_info->dmari_intr_remap == B_TRUE) && !intrr_disable) {
 		psm_vt_ops = &intr_remap_ops;
 	}
-
-	/*
-	 * collect the reserved memory pages
-	 */
-	cmn_err(CE_CONT, "?Start to collect the reserved memory\n");
-	iommu_collect_reserve_memory();
 
 	/*
 	 * build identity map for devices in the rmrr scope
@@ -2719,32 +2786,11 @@ intel_iommu_attach_dmar_nodes(void)
 	/*
 	 * regist the intr add function
 	 */
-	rootnex_iommu_add_intr = intel_iommu_add_intr;
-
-	/*
-	 * enable dma remapping
-	 */
-	cmn_err(CE_CONT, "?Start to enable the dmar units\n");
-	if (!dmar_drhd_disable) {
-		for_each_in_list(&iommu_states, iommu) {
-			if (gfx_drhd_disable &&
-			    drhd_only_for_gfx(iommu))
-				continue;
-			iommu_bringup_unit(iommu);
-		}
-	}
+	rootnex_iommu_init = intel_iommu_init;
 
 	return (DDI_SUCCESS);
 
 iommu_init_fail:
-	/*
-	 * free the reserve memory list
-	 */
-	while (rmem = list_head(&reserve_memory)) {
-		list_remove(&reserve_memory, rmem);
-		kmem_free(rmem, sizeof (dmar_reserve_pages_t));
-	}
-	list_destroy(&reserve_memory);
 
 	/*
 	 * free iommu state structure
@@ -3149,7 +3195,7 @@ iommu_clear_leaf_pte(dmar_domain_state_t *domain, uint64_t dvma, uint64_t size)
 		domain->dm_iommu->iu_dmar_ops->do_clflush(dirt,
 		    count * sizeof (uint64_t));
 		domain->dm_iommu->iu_dmar_ops->do_iotlb_psi(domain->dm_iommu,
-		    domain->dm_domain_id, cdvma, count, TLB_IVA_LEAF);
+		    domain->dm_domain_id, cdvma, count, TLB_IVA_WHOLE);
 
 		/* unmap the leaf page */
 		cdvma += IOMMU_PTOB(count);
@@ -3418,7 +3464,6 @@ qinv_submit_inv_dsc(intel_iommu_state_t *iommu, inv_dsc_t *dsc)
 	inv_queue_state_t *inv_queue;
 	inv_queue_mem_t *iq_table;
 	uint_t tail;
-	uint_t old_tail;
 
 	inv_queue = iommu->iu_inv_queue;
 	iq_table = &(inv_queue->iq_table);
@@ -3438,16 +3483,13 @@ qinv_submit_inv_dsc(intel_iommu_state_t *iommu, inv_dsc_t *dsc)
 		iq_table->head = QINV_IQA_HEAD(
 		    iommu_get_reg64(iommu, IOMMU_REG_INVAL_QH));
 	}
-	old_tail = iq_table->tail;
-	mutex_exit(&iq_table->lock);
 
 	bcopy(dsc, iq_table->vaddr + tail * QINV_ENTRY_SIZE,
 	    QINV_ENTRY_SIZE);
 
-	mutex_enter(&iq_table->lock);
-	if (old_tail == iq_table->tail)
-		iommu_put_reg64(iommu, IOMMU_REG_INVAL_QT,
-		    iq_table->tail << QINV_IQA_TAIL_SHIFT);
+	iommu_put_reg64(iommu, IOMMU_REG_INVAL_QT,
+	    iq_table->tail << QINV_IQA_TAIL_SHIFT);
+
 	mutex_exit(&iq_table->lock);
 }
 

@@ -1716,6 +1716,7 @@ _start(struct xboot_info *xbp)
 	 */
 	bm.physinstalled = xbp->bi_phys_install;
 	bm.pcimem = xbp->bi_pcimem;
+	bm.rsvdmem = xbp->bi_rsvdmem;
 	bm.physavail = NULL;
 
 	/*
