@@ -115,6 +115,7 @@ i386_SUBDIRS= \
 	SUNWamt \
 	SUNWamt-lms \
 	SUNWarcmsr \
+	SUNWarn \
 	SUNWatheros \
 	SUNWatigfx \
 	SUNWatu \

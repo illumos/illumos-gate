@@ -109,6 +109,7 @@ clone:nge		0600 root sys 0666 root sys	/dev/nge
 clone:chxge		0600 root sys 0666 root sys	/dev/chxge
 clone:pcn		0600 root sys 0666 root sys	/dev/pcn
 clone:rtls		0600 root sys 0666 root sys	/dev/rtls
+clone:arn               0600 root sys 0666 root sys     /dev/arn
 clone:ath		0600 root sys 0666 root sys	/dev/ath
 clone:atu		0600 root sys 0666 root sys	/dev/atu
 clone:ipw               0600 root sys 0666 root sys     /dev/ipw
@@ -138,6 +139,7 @@ e1000g:*		0666 root root 0666 root sys	/dev/e1000g*
 chxge:*			0600 root sys 0666 root sys	/dev/chxge*
 pcn:*			0600 root sys 0666 root sys	/dev/pcn*
 rtls:*			0600 root sys 0666 root sys	/dev/rtls*
+arn:*                   0600 root sys 0666 root sys     /dev/arn*
 ath:*			0600 root sys 0666 root sys	/dev/ath*
 atu:*			0600 root sys 0666 root sys	/dev/atu*
 ipw:*                   0600 root sys 0666 root sys     /dev/ipw*
@@ -294,6 +296,7 @@ clone:e1000g
 clone:chxge
 clone:pcn
 clone:rtls
+clone:arn
 clone:ath
 clone:atu
 clone:ipw
@@ -323,6 +326,7 @@ e1000g:*
 chxge:*
 pcn:*
 rtls:*
+arn:*
 ath:*
 atu:*
 ipw:*
