@@ -49,7 +49,7 @@
 
 #define	SBD_IS_ZVOL(zvol)	(strncmp("/dev/zvol", zvol, 9))
 
-extern sbd_status_t sbd_pgr_meta_write(sbd_lu_t *sl);
+extern sbd_status_t sbd_pgr_meta_init(sbd_lu_t *sl);
 extern sbd_status_t sbd_pgr_meta_load(sbd_lu_t *sl);
 
 static int sbd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
@@ -1599,7 +1599,7 @@ over_meta_open:
 		goto scm_err_out;
 	}
 
-	if (sbd_pgr_meta_write(sl) != SBD_SUCCESS) {
+	if (sbd_pgr_meta_init(sl) != SBD_SUCCESS) {
 		*err_ret = SBD_RET_META_CREATION_FAILED;
 		ret = EIO;
 		goto scm_err_out;

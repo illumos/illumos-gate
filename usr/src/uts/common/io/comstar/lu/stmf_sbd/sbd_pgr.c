@@ -51,6 +51,7 @@ scsi_devid_desc_t *sbd_tptid_to_devid_desc(scsi_transport_id_t *, uint32_t *);
 char *sbd_get_devid_string(sbd_lu_t *);
 void sbd_base16_str_to_binary(char *c, int, uint8_t *);
 
+sbd_status_t sbd_pgr_meta_init(sbd_lu_t *);
 sbd_status_t sbd_pgr_meta_load(sbd_lu_t *);
 sbd_status_t sbd_pgr_meta_write(sbd_lu_t *);
 static void sbd_swap_pgr_info(sbd_pgr_info_t *);
@@ -279,6 +280,25 @@ sbd_swap_pgrkey_info(sbd_pgr_key_info_t *key)
 }
 
 sbd_status_t
+sbd_pgr_meta_init(sbd_lu_t *slu)
+{
+	sbd_pgr_info_t	*spi = NULL;
+	uint32_t 	sz;
+	sbd_status_t	ret;
+
+	sz = sizeof (sbd_pgr_info_t);
+	spi = (sbd_pgr_info_t *)kmem_zalloc(sz, KM_SLEEP);
+	spi->pgr_data_order = SMS_DATA_ORDER;
+	spi->pgr_sms_header.sms_size = sz;
+	spi->pgr_sms_header.sms_id = SMS_ID_PGR_INFO;
+	spi->pgr_sms_header.sms_data_order = SMS_DATA_ORDER;
+
+	ret = sbd_write_meta_section(slu, (sm_section_hdr_t *)spi);
+	kmem_free(spi, sz);
+	return (ret);
+}
+
+sbd_status_t
 sbd_pgr_meta_load(sbd_lu_t *slu)
 {
 	sbd_pgr_t		*pgr = slu->sl_pgr;
@@ -296,7 +316,7 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 		/* No PGR section found, means volume made before PGR support */
 		if (ret == SBD_NOT_FOUND) {
 			/* So just create a default PGR section */
-			ret = sbd_pgr_meta_write(slu);
+			ret = sbd_pgr_meta_init(slu);
 		}
 		return (ret);
 	}
