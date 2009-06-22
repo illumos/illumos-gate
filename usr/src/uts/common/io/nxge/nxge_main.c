@@ -385,9 +385,9 @@ uint64_t nxge_debug_level;
  * mutually exclusive access to the list.
  */
 void 			*nxge_list = NULL;
-
 void			*nxge_hw_list = NULL;
 nxge_os_mutex_t 	nxge_common_lock;
+nxge_os_mutex_t 	nxgedebuglock;
 
 extern uint64_t 	npi_debug_level;
 
@@ -1786,10 +1786,6 @@ nxge_put64(p_nxge_t nxgep, p_mblk_t mp)
 	NXGE_NPI_PIO_WRITE64(nxgep->npi_handle, reg, buf[1]);
 }
 
-
-nxge_os_mutex_t nxgedebuglock;
-int nxge_debug_init = 0;
-
 /*ARGSUSED*/
 /*VARARGS*/
 void
@@ -1815,11 +1811,6 @@ nxge_debug_msg(p_nxge_t nxgep, uint64_t level, char *fmt, ...)
 	    (level == NXGE_NOTE) ||
 	    (level == NXGE_ERR_CTL)) {
 		/* do the msg processing */
-		if (nxge_debug_init == 0) {
-			MUTEX_INIT(&nxgedebuglock, NULL, MUTEX_DRIVER, NULL);
-			nxge_debug_init = 1;
-		}
-
 		MUTEX_ENTER(&nxgedebuglock);
 
 		if ((level & NXGE_NOTE)) {
@@ -5390,14 +5381,19 @@ _init(void)
 {
 	int		status;
 
+	MUTEX_INIT(&nxgedebuglock, NULL, MUTEX_DRIVER, NULL);
+
 	NXGE_DEBUG_MSG((NULL, MOD_CTL, "==> _init"));
+
 	mac_init_ops(&nxge_dev_ops, "nxge");
+
 	status = ddi_soft_state_init(&nxge_list, sizeof (nxge_t), 0);
 	if (status != 0) {
 		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
 		    "failed to init device soft state"));
 		goto _init_exit;
 	}
+
 	status = mod_install(&modlinkage);
 	if (status != 0) {
 		ddi_soft_state_fini(&nxge_list);
@@ -5407,9 +5403,12 @@ _init(void)
 
 	MUTEX_INIT(&nxge_common_lock, NULL, MUTEX_DRIVER, NULL);
 
-_init_exit:
-	NXGE_DEBUG_MSG((NULL, MOD_CTL, "_init status = 0x%X", status));
+	NXGE_DEBUG_MSG((NULL, MOD_CTL, "<== _init status = 0x%X", status));
+	return (status);
 
+_init_exit:
+	NXGE_DEBUG_MSG((NULL, MOD_CTL, "<== _init status = 0x%X", status));
+	MUTEX_DESTROY(&nxgedebuglock);
 	return (status);
 }
 
@@ -5419,7 +5418,6 @@ _fini(void)
 	int		status;
 
 	NXGE_DEBUG_MSG((NULL, MOD_CTL, "==> _fini"));
-
 	NXGE_DEBUG_MSG((NULL, MOD_CTL, "==> _fini: mod_remove"));
 
 	if (nxge_mblks_pending)
@@ -5437,10 +5435,14 @@ _fini(void)
 
 	ddi_soft_state_fini(&nxge_list);
 
-	MUTEX_DESTROY(&nxge_common_lock);
-_fini_exit:
-	NXGE_DEBUG_MSG((NULL, MOD_CTL, "_fini status = 0x%08x", status));
+	NXGE_DEBUG_MSG((NULL, MOD_CTL, "<== _fini status = 0x%08x", status));
 
+	MUTEX_DESTROY(&nxge_common_lock);
+	MUTEX_DESTROY(&nxgedebuglock);
+	return (status);
+
+_fini_exit:
+	NXGE_DEBUG_MSG((NULL, MOD_CTL, "<== _fini status = 0x%08x", status));
 	return (status);
 }
 
