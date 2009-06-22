@@ -19,21 +19,13 @@
 \ CDDL HEADER END
 \
 \
-\ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 
-id: %Z%%M%	%I%	%E% SMI
 purpose: utility words
-copyright: Copyright 2007 Sun Microsystems, Inc. All Rights Reserved
+copyright: Copyright 2009 Sun Microsystems, Inc. All Rights Reserved
 
-
-[ifdef] doheaders
-headers
-[else]
-headerless
-[then]
 
 d# 256  constant  /buf-len
 

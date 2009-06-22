@@ -1,7 +1,3 @@
-
-\ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-\ Use is subject to license terms.
 \
 \ CDDL HEADER START
 \
@@ -23,17 +19,13 @@
 \ CDDL HEADER END
 \
 \
-
-[ifdef] doheaders
-headers
-[else]
-headerless
-[then]
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
 
 
-id: %Z%%M%	%I%	%E% SMI
 purpose: ZFS file system support package
-copyright: Copyright 2006 Sun Microsystems, Inc. All Rights Reserved
+copyright: Copyright 2009 Sun Microsystems, Inc. All Rights Reserved
 
 " /packages" get-package  push-package
 
@@ -172,12 +164,22 @@ new-device
    \	ZFS block (SPA) routines
    \
 
+   1           constant  def-comp#
    2           constant  no-comp#
+   3           constant  lzjb-comp#
+
    h# 2.0000   constant  /max-bsize
    d# 512      constant  /disk-block
    d# 128      constant  /blkp
 
-   : blk_offset    ( bp -- n )  h#  8 +  x@  -1 h# 8fff.ffff  lxjoin  and  ;
+   alias  /gang-block  /disk-block
+
+   \ the ending checksum is larger than 1 byte, but that
+   \ doesn't affect the math here
+   /gang-block 1-
+   /blkp  /    constant  #blks/gang
+
+   : blk_offset    ( bp -- n )  h#  8 +  x@  -1 h# 7fff.ffff  lxjoin  and  ;
    : blk_gang      ( bp -- n )  h#  8 +  x@  xlsplit  nip  d# 31 rshift  ;
    : blk_comp      ( bp -- n )  h# 33 +  c@  ;
    : blk_psize     ( bp -- n )  h# 34 +  w@  ;
@@ -194,47 +196,74 @@ new-device
    : bp-dsize  ( bp -- dsize )  blk_psize fsz>dsz  ;
    : bp-lsize  ( bp -- lsize )  blk_lsize fsz>dsz  ;
 
-   : (read-bp)  ( adr len bp -- )
+   : (read-dva)  ( adr len dva -- )
       blk_offset foff>doff  dev-ih  read-disk
    ;
 
-   : gang-read  ( adr len bp -- )
+   : gang-read  ( adr len bp gb-adr -- )    tokenizer[ reveal ]tokenizer
 
       \ read gang block
-      gang-space /disk-block  rot      ( adr len gb-adr gb-len bp )
-      (read-bp)                        ( adr len )
+      tuck  /gang-block rot  (read-dva)   ( adr len gb-adr )
 
-      \ read gang indirected blocks to blk-space
-      \ and copy requested len from there
-      blk-space  gang-space            ( adr len tmp-adr bp0 )
-      dup  /blkp 3 *  +  bounds  do    ( adr len tmp-adr )
+      \ loop through indirected bp's
+      dup  /blkp #blks/gang *             ( adr len gb-adr bp-list bp-list-len )
+      bounds  do                          ( adr len gb-adr )
          i blk_offset x0=  ?leave
-         i bp-dsize                    ( adr len tmp-adr rd-len )
-         2dup  i (read-bp)
-         +                             ( adr len tmp-adr' )
+
+         \ calc subordinate read len
+         over  i bp-dsize  min            ( adr len gb-adr sub-len )
+         2swap swap                       ( gb-adr sub-len len adr )
+
+         \ nested gang block - recurse with new gang block area
+         i blk_gang  if
+            2swap                         ( len adr gb-adr sub-len )
+            3dup  swap  /gang-block +     ( len adr gb-adr sub-len adr sub-len gb-adr' )
+            i swap  gang-read             ( len adr gb-adr sub-len )
+            2swap                         ( gb-adr sub-len len adr )
+         else
+            3dup  nip  swap               ( gb-adr sub-len len adr adr sub-len )
+            i (read-dva)                  ( gb-adr sub-len len adr )
+         then                             ( gb-adr sub-len len adr )
+
+         \ adjust adr,len and check if done
+         -rot  over -                     ( gb-adr adr sub-len len' )
+         -rot  +  swap                    ( gb-adr adr' len' )
+         dup 0=  ?leave
+         rot                              ( adr' len' gb-adr )
       /blkp  +loop
-      drop                             ( adr len )
-      blk-space -rot  move             (  )
+      3drop                               (  )
+   ;
+
+   : read-dva  ( adr len dva -- )
+      dup  blk_gang  if
+         gang-space  gang-read
+      else
+         (read-dva)
+      then
    ;
 
    \ block read that check for holes, gangs, compression, etc
    : read-bp  ( adr len bp -- )
       \ sparse block?
       dup  blk_birth x0=  if
-         drop  erase  exit            (  )
+         drop  erase  exit               (  )
       then
-      \ gang block?
-      dup  blk_gang   if
-         gang-read  exit              (  )
+
+      \ no compression?
+      dup blk_comp  no-comp#  =  if
+         read-dva  exit                  (  )
       then
-      \ compression?
-      dup  blk_comp no-comp#  <>  if
-         blk-space  over bp-dsize     ( adr len bp b-adr rd-len )
-         rot  (read-bp)               ( adr len )
-         blk-space -rot  lzjb  exit   ( )
+
+      \ only do lzjb
+      dup blk_comp  dup lzjb-comp#  <>   ( adr len bp comp lzjb? )
+      swap  def-comp#  <>  and  if       ( adr len bp )
+         " only lzjb supported"  die
       then
-      \ boring direct block
-      (read-bp)                       (  )
+
+      \ read into blk-space and de-compress
+      blk-space  over bp-dsize           ( adr len bp blk-adr rd-len )
+      rot  read-dva                      ( adr len )
+      blk-space -rot  lzjb               (  )
    ;
 
    \
@@ -685,7 +714,6 @@ new-device
    ;
 [then]
 
-[ifdef] bigbootblk
    : fz-print  ( dn le -- false )
       entry-name$  type cr  false
    ;
@@ -710,7 +738,6 @@ new-device
       endcase                             ( false )
       drop                                (  )
    ;
-[then]
 
 
    \
@@ -1116,13 +1143,13 @@ new-device
    ;
 
 
-   /max-bsize  5 *
-   /uber-block      +
-   /dnode      6 *  +
-   /disk-block      +    ( size )
+   /max-bsize    5 *
+   /uber-block        +
+   /dnode        6 *  +
+   /disk-block   6 *  +    ( size )
    \ ugh - sg proms can't free 512k allocations
    \ that aren't a multiple of 512k in size
-   h# 8.0000  roundup    ( size' )
+   h# 8.0000  roundup      ( size' )
    constant  alloc-size
 
 
@@ -1291,7 +1318,6 @@ new-device
    ;
 
 
-[ifdef] bigbootblk
    : chdir  ( dir$ -- )
       current-obj# -rot            ( obj# dir$ )
       lookup  if                   ( obj# )
@@ -1308,7 +1334,6 @@ new-device
       current-obj# get-fs-dnode
       dnode zap-print
    ;
-[then]
 
 finish-device
 pop-package

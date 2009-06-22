@@ -1,7 +1,3 @@
-
-\ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-\ Use is subject to license terms.
 \
 \ CDDL HEADER START
 \
@@ -23,10 +19,13 @@
 \ CDDL HEADER END
 \
 \
+\
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
 
-id: %Z%%M%	%I%	%E% SMI
 purpose: HSFS file system support package for NewBoot
-copyright: Copyright 2006 Sun Microsystems, Inc. All Rights Reserved
+copyright: Copyright 2009 Sun Microsystems, Inc. All Rights Reserved
 
 \ High Sierra, Rock Ridge (CD-ROM) file system reader and boot block
 

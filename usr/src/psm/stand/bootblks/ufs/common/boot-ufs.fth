@@ -1,8 +1,3 @@
-
-
-\ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-\ Use is subject to license terms.
 \
 \ CDDL HEADER START
 \
@@ -23,14 +18,15 @@
 \
 \ CDDL HEADER END
 \
+\
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
 
 
-id: %Z%%M%	%I%	%E% SMI
 purpose: UFS bootblock for sun4u platforms
-copyright: Copyright 2006 Sun Microsystems, Inc. All Rights Reserved
+copyright: Copyright 2009 Sun Microsystems, Inc. All Rights Reserved
 
-\ add headers
-create doheaders
 
 : fs-pkg$   " ufs-file-system"  ;
 : fs-type$  " ufs"  ;

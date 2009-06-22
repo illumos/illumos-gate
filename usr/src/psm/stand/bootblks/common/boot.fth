@@ -19,14 +19,12 @@
 \ CDDL HEADER END
 \
 \
-\ ident	"%Z%%M%	%I%	%E% SMI"
-\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 
-id: %Z%%M%	%I%	%E% SMI
 purpose: boot block for OBP systems
-copyright: Copyright 2007 Sun Microsystems, Inc. All Rights Reserved
+copyright: Copyright 2009 Sun Microsystems, Inc. All Rights Reserved
 
 
 headerless
@@ -148,18 +146,15 @@ headerless
 create spin-data
    ascii | c,  ascii / c,  ascii - c,  ascii \ c,
 
-0 instance variable spindex
+variable spindex
 
+headers
 : spinner ( -- )
    spindex @  3 and  spin-data +   ( c-adr )
    c@ emit  (cr
    1 spindex +!
 ;
 
-: spin-on   ( -- )  ['] spinner  d# 1000  alarm  ;
-: spin-off  ( -- )  ['] spinner        0  alarm  ;
-
-headers
 \ allocate and return physical allocation size
 : vmem-alloc-prop  ( size virt -- alloc-size virt )
    2dup  ['] vmem-alloc  catch  if            ( size virt ??? ??? )
@@ -178,6 +173,24 @@ headers
    swap
 ;
 
+\ read file in chunks so we can toggle the spinner
+: read-file  ( virt size fd -- failed? )
+   >r                             ( virt sz-left  r: fd )
+   begin  dup  while
+      spinner
+      dup  4meg min               ( virt sz-left read-sz  r: fd )
+      3dup nip  r@ fs-read        ( virt sz-left read-sz size-read  r: fd )
+      over <>  if                 ( virt sz-left read-sz  r: fd )
+         r>  2drop  2drop         (  )
+         true  exit               ( failed )
+      then
+      rot over  +                 ( sz-left read-sz virt'  r: fd )
+      -rot  -                     ( virt' sz-left'  r: fd )
+   repeat
+   r>  3drop                      (  )
+   false                          ( succeeded )
+;
+
 \ read in file and return buffer
 \ if base==0, vmem-alloc will allocate virt
 \ NB returned size is 8k rounded since the
@@ -185,9 +198,8 @@ headers
 : get-file ( base fd -- [ alloc-sz virt size ] failed? )
    dup >r  fs-size                         ( base size  r: fd )
    dup rot  vmem-alloc-prop                ( size alloc-sz virt  r: fd )
-   rot  2dup tuck  r>                      ( alloc-sz virt size size virt size fd )
-   spin-on  fs-read  spin-off              ( alloc-sz virt size size size-rd )
-   <>  if                                  ( alloc-sz virt size )
+   rot  2dup                               ( alloc-sz virt size virt size  r: fd )
+   r>  read-file  if                       ( alloc-sz virt size )
       3drop true  exit                     ( failed )
    then
    h# 2000  roundup                        ( alloc-sz virt size' )
@@ -437,8 +449,9 @@ headers
    dup >r  2swap  r> -         ( adr' len' s-adr s-len )
 ;
 
+\ next char or 0 if eol
 : next-c  ( adr len -- adr' len' c )
-   over c@ >r  str++  r>
+   dup  if  over c@ >r  str++  r>  else  0  then
 ;
 
 false value halt?
