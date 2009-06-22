@@ -483,7 +483,9 @@ audiots_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	audiots_chip_init(state);
 
 	/* initialize the AC-97 Codec */
-	ac97_init(state->ts_ac97, state->ts_adev);
+	if (ac97_init(state->ts_ac97, state->ts_adev) != 0) {
+		goto error;
+	}
 
 	/* put the engine interrupts into a known state -- all off */
 	ddi_put32(state->ts_acch, &state->ts_regs->aud_regs.ap_ainten,

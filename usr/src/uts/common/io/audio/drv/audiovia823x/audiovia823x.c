@@ -656,7 +656,7 @@ auvia_alloc_port(auvia_devc_t *devc, int num)
 		paddr += portc->fragsz;
 	}
 
-	ddi_dma_sync(portc->sgd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
+	(void) ddi_dma_sync(portc->sgd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
 
 	portc->engine = audio_engine_alloc(&auvia_engine_ops, caps);
 	if (portc->engine == NULL) {

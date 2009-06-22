@@ -911,7 +911,8 @@ audioens_init(audioens_dev_t *dev)
 	 * default, if it exists.  (We don't have a speakerphone on any
 	 * of these cards, and no SPARC hardware uses it either!)
 	 */
-	ddi_prop_update_int(DDI_DEV_T_NONE, dev->dip, AC97_PROP_SPEAKER, 0);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, dev->dip, AC97_PROP_SPEAKER,
+	    0);
 
 	/*
 	 * Init mixer
