@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,10 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Check versioning information.
 #
@@ -625,7 +622,7 @@ sub ProcFile
 {
 	my ($FullPath, $RelPath) = @_;
 	my (@Elf, @Pvs, @Vers, @Syms);
-	my ($Aud, $Man, $Max, $Priv, $Pub, $Def, $Val, $Cls);
+	my ($Aud, $Man, $Max, $Priv, $Pub, $ElfCnt, $Val);
 	my ($RelPath_File, $LibName, $Name, $File);
 
 	if ($RelPath =~ $SkipProfile) {
@@ -647,49 +644,29 @@ sub ProcFile
 	$Aud = "$Auddir/$LibName";
 
 	# Determine whether we have a shared object, and whether version
-	# definitions exist.
-	@Elf = split(/\n/, `elfdump -ed '$FullPath' 2>&1`);
-
-	$Val = $Def = 0;
-	foreach my $Line (@Elf) {
-		$Val++;
-
-		# If we have an invalid file type, which we can tell from the
-		# first line, bail.
-		if (($Val == 1) && ($Line =~ /invalid file/)) {
-			return;
-		}
-
-		# Look for the ei_class (line 4) for man page processing.
-		if ($Val == 4) {
-			if ($Line !~ /ei_class:/) {
-				return;
-			}
-			if ($Line =~ /ELFCLASS32/) {
-				$Cls = "-32";
-			} else {
-				$Cls = "-64";
-			}
-		}
-
-		# Look for the e_type field (line 6) which indicates whether
-		# this file is a shared object (ET_DYN).
-		if ($Val == 6) {
-			if ($Line !~ /e_type:/) {
-				return;
-			}
-			if ($Line !~ /ET_DYN/) {
-				return;
-			}
-			next;
-		}
-
-		# Look for the dynamic section (occurs after line 11) and
-		# whether version definitions exist.
-		if (($Val > 11) && ($Line =~ /VERDEF/)) {
-			$Def = 1;
-			last;
-		}
+	# definitions exist. We use elfedit to do this, executing three
+	# commands in order, to produce a 0, 2, or 3 element output array.
+	#
+	#	Command                 Meaning
+	#	-----------------------------------------------
+	#	ehdr:ei_class		ELFCLASS of object
+	#	ehdr:ei_e_type		Type of object
+	#	dyn:tag verdef		Address of verdef items
+	#
+	# We discard stderr, and simply examine the resulting array to
+	# determine the situation:
+	#
+	#	# Array Elements	Meaning
+	#	-----------------------------------------------
+	#	  0			File is not ELF object
+	#	  2			Object with no versions (no VERDEF)
+	#	  3			Object that has versions
+	my $ecmd = "elfedit -r -o simple -e ehdr:ei_class -e ehdr:e_type" .
+	    " -e 'dyn:tag verdef'";
+	@Elf = split(/\n/, `$ecmd $FullPath 2>/dev/null`);
+	$ElfCnt = scalar @Elf;
+	if (($ElfCnt == 0) || ($Elf[1] ne 'ET_DYN')) {
+		return;
 	}
 
 	# Does this object follow the runtime versioned name convention?
@@ -702,7 +679,7 @@ sub ProcFile
 	}
 
 	# If there are no versions in the file we're done.
-	if (($Def eq 0) && !$opt{s} && !$opt{g}) {
+	if (($ElfCnt != 3) && !$opt{s} && !$opt{g}) {
 		OutMsg($Name, "no versions found", "WARNING");
 		return;
 	}
@@ -941,7 +918,7 @@ PVS2:	foreach my $Line (@Pvs) {
 			$Line =~ s/^\.//;
 			$Line =~ s/\.so\.\d+/.so/;
 
-			if ($Cls eq "-32") {
+			if ($Elf[0] eq 'ELFCLASS32') {
 				if (!$Pub32) {
 					$Pub32 = "$IntfDir/Public-32";
 					open(PUB32, "> $Pub32") or die
