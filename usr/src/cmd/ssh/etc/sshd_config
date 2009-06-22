@@ -2,7 +2,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Configuration file for sshd(1m)
+# Configuration file for sshd(1m) (see also sshd_config(4))
 
 # Protocol versions supported
 #
@@ -39,10 +39,8 @@ Port 22
 # IPv4 & IPv6
 ListenAddress ::
 
-# Port forwarding
-AllowTcpForwarding no
-
-# If port forwarding is enabled, specify if the server can bind to INADDR_ANY. 
+# If port forwarding is enabled (default), specify if the server can bind to
+# INADDR_ANY. 
 # This allows the local port forwarding to work when connections are received
 # from any remote host.
 GatewayPorts no
