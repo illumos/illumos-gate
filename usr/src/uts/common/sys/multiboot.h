@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MULTIBOOT_H
 #define	_MULTIBOOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -152,10 +150,10 @@ struct sol_netinfo {
 	uint8_t sn_mactype;
 	uint8_t sn_maclen;
 	uint8_t sn_padding;
-	ulong_t sn_ciaddr;
-	ulong_t sn_siaddr;
-	ulong_t sn_giaddr;
-	ulong_t sn_netmask;
+	uint32_t sn_ciaddr;
+	uint32_t sn_siaddr;
+	uint32_t sn_giaddr;
+	uint32_t sn_netmask;
 	uint8_t sn_macaddr[1];
 };
 
