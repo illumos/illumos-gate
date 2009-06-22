@@ -404,7 +404,7 @@ archive_lu()
 
 	(
 		cd "$MINIROOT"
-		find usr/lib/install usr/snadm usr/sbin \
+		find usr/lib/install usr/snadm usr/sbin usr/lib/locale \
 		    boot/grub boot/solaris/bootenv.rc \
 		    tmp/root/boot/grub tmp/root/boot/solaris/bootenv.rc \
 		    2> /dev/null | cpio -ocmPuB 2> /dev/null | bzip2 \
