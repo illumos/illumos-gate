@@ -2583,7 +2583,7 @@ sbd_write_zfs_meta(sbd_lu_t *sl, uint8_t *buf, uint64_t sz, uint64_t off)
 	file = sbd_get_zvol_name(sl);
 	if (sbd_zvolset(file, (char *)ptr)) {
 		rw_exit(&sl->sl_zfs_meta_lock);
-		kmem_free(ah_meta, ZAP_MAXVALUELEN);
+		kmem_free(ptr, ZAP_MAXVALUELEN);
 		kmem_free(file, strlen(file) + 1);
 		return (SBD_META_CORRUPTED);
 	}
