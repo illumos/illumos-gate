@@ -117,7 +117,7 @@
  * system expects the memnodes which describe the physical address range for
  * each NUMA node to be arranged in ascending order by physical address.  (:-(
  * Otherwise, the kernel will panic in different semi-random places in the VM
- * system (see CR#6816963).
+ * system.
  *
  * Consequently, this module has to try to sort the nodes in ascending order by
  * each node's starting physical address to try to meet this "constraint" in
@@ -1384,7 +1384,7 @@ lgrp_plat_domain_to_node(node_domain_map_t *node_domain, int node_cnt,
 		if (node_domain[node].prox_domain == domain &&
 		    node_domain[node].exists)
 			return (node);
-		node = NODE_DOMAIN_HASH(node + 1, node_cnt);
+		node = (node + 1) % node_cnt;
 	} while (node != start);
 	return (-1);
 }
