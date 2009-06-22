@@ -132,7 +132,6 @@ static char mac_mtu_propname[] = "mtu";
  */
 extern int vsw_mac_open_retries;
 
-
 #define	WRITE_MACCL_ENTER(vswp, port, type)	\
 	(type == VSW_LOCALDEV) ?  rw_enter(&vswp->maccl_rwlock, RW_WRITER) :\
 	rw_enter(&port->maccl_rwlock, RW_WRITER)
@@ -558,9 +557,9 @@ void
 vsw_mac_client_cleanup(vsw_t *vswp, vsw_port_t *port, int type)
 {
 	WRITE_MACCL_ENTER(vswp, port, type);
+	vsw_mac_multicast_remove_all(vswp, port, type);
 	vsw_unset_hw(vswp, port, type);
 	vsw_maccl_close(vswp, port, type);
-	vsw_mac_multicast_remove_all(vswp, port, type);
 	RW_MACCL_EXIT(vswp, port, type);
 }
 
