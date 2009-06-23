@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Definitions of interfaces that provide services from the secondary
@@ -49,6 +47,11 @@ struct bootops *bootops;
 struct bootops kbootops;
 
 pnode_t chosennode;
+/*
+ * Flag to disable the use of real ramdisks (in the OBP - on Sparc) when
+ * the associated memory is no longer available.
+ */
+int bootops_obp_ramdisk_disabled = 0;
 
 #define	FAKE_ROOT	(pnode_t)1
 
@@ -521,6 +524,8 @@ bop_free_archive(void)
 	    prom_getprop(arph, OBP_SIZE, (caddr_t)&arsize) == -1 ||
 	    prom_getprop(arph, OBP_ADDRESS, (caddr_t)&arbase) == -1)
 		prom_panic("can't free boot archive");
+
+	bootops_obp_ramdisk_disabled = 1;
 
 #if !defined(C_OBP)
 	if (alloc_size == 0)

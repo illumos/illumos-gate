@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +83,14 @@
 #include <sys/sunddi.h>
 #include <sys/ramdisk.h>
 #include <vm/seg_kmem.h>
+
+/*
+ * Flag to disable the use of real ramdisks (in the OBP - on Sparc) when
+ * the associated memory is no longer available - set in the bootops section.
+ */
+#ifdef __sparc
+extern int bootops_obp_ramdisk_disabled;
+#endif /* __sparc */
 
 /*
  * An opaque handle where information about our set of ramdisk devices lives.
@@ -820,6 +828,11 @@ rd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				goto attach_failed;
 			}
 		} else {
+#ifdef __sparc
+			if (bootops_obp_ramdisk_disabled)
+				goto attach_failed;
+#endif /* __sparc */
+
 			RD_STRIP_PREFIX(name, ddi_node_name(dip));
 
 			if (strlen(name) > RD_NAME_LEN) {
@@ -1073,6 +1086,13 @@ rd_rw(rd_devstate_t *rsp, struct buf *bp, offset_t offset, size_t nbytes)
 	}
 }
 
+/*
+ * On Sparc, this function deals with both pseudo ramdisks and OBP ramdisks.
+ * In the case where we freed the "bootarchive" ramdisk in bop_free_archive(),
+ * we stop allowing access to the OBP ramdisks. To do so, we set the
+ * bootops_obp_ramdisk_disabled flag to true, and we check if the operation
+ * is for an OBP ramdisk. In this case we indicate an ENXIO error.
+ */
 static int
 rd_strategy(struct buf *bp)
 {
@@ -1082,7 +1102,13 @@ rd_strategy(struct buf *bp)
 	rsp = ddi_get_soft_state(rd_statep, getminor(bp->b_edev));
 	offset = bp->b_blkno * DEV_BSIZE;
 
+#ifdef __sparc
+	if (rsp == NULL ||
+	    (bootops_obp_ramdisk_disabled &&
+	    (rsp->rd_dip != rd_dip || rd_dip == NULL))) { /* OBP ramdisk */
+#else /* __sparc */
 	if (rsp == NULL) {
+#endif /* __sparc */
 		bp->b_error = ENXIO;
 		bp->b_flags |= B_ERROR;
 	} else if (offset >= rsp->rd_size) {
