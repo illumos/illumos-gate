@@ -2265,13 +2265,9 @@ port12:
 		val ^= PLX_RO_MODE_BIT;
 	ddi_put32(hdl, (uint32_t *)port_offset, val);
 
-	goto done;
-
-fail:
-	DBG(DBG_ATTACH, dip, "PLX RO Disable failed.\n");
-
 done:
 	ddi_regs_map_free(&hdl);
+fail:
 	kmem_free(reg_spec, new_rsize);
 }
 #endif /* PX_PLX */
