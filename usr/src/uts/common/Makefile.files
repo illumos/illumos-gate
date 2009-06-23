@@ -1702,9 +1702,6 @@ RGE_OBJS += rge_main.o rge_chip.o rge_ndd.o rge_kstats.o rge_log.o rge_rxtx.o
 
 URTW_OBJS += urtw.o
 
-ARN_OBJS += hw.o eeprom.o mac.o calib.o ani.o phy.o regd.o beacon.o \
-		arn_main.o recv.o xmit.o rc.o
-
 ATH_OBJS += ath_aux.o ath_main.o ath_osdep.o ath_rate.o
 
 ATU_OBJS += atu.o

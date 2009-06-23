@@ -190,7 +190,6 @@ DRV_KMODS	+= amr
 DRV_KMODS	+= agpgart
 DRV_KMODS	+= srn
 DRV_KMODS	+= agptarget
-DRV_KMODS       += arn
 DRV_KMODS	+= arp
 DRV_KMODS	+= asy
 DRV_KMODS	+= ata
