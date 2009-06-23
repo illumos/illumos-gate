@@ -101,6 +101,13 @@ struct	iwh_phy_rx {
 	uint8_t	buf[128];
 };
 
+struct iwh_beacon_missed {
+	uint32_t	consecutive;
+	uint32_t	total;
+	uint32_t	expected;
+	uint32_t	received;
+};
+
 typedef struct iwh_softc {
 	struct ieee80211com	sc_ic;
 	dev_info_t		*sc_dip;

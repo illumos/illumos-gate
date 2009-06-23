@@ -2601,6 +2601,23 @@ iwh_rx_softintr(caddr_t arg, caddr_t unused)
 			sc->sc_flags |= IWH_F_FW_INIT;
 			cv_signal(&sc->sc_ucode_cv);
 			break;
+
+		case MISSED_BEACONS_NOTIFICATION:
+		{
+			struct iwh_beacon_missed *miss =
+			    (struct iwh_beacon_missed *)(desc + 1);
+
+			if ((ic->ic_state == IEEE80211_S_RUN) &&
+			    (LE_32(miss->consecutive) > 10)) {
+				cmn_err(CE_NOTE, "iwh: iwh_rx_softintr(): "
+				    "beacon missed %d/%d\n",
+				    LE_32(miss->consecutive),
+				    LE_32(miss->total));
+				(void) ieee80211_new_state(ic,
+				    IEEE80211_S_INIT, -1);
+			}
+			break;
+		}
 		}
 
 		sc->sc_rxq.cur = (sc->sc_rxq.cur + 1) % RX_QUEUE_SIZE;
