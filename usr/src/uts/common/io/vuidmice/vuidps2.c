@@ -556,7 +556,9 @@ packet_complete:
 			 */
 			if (STATEP->inited & PS2_FLAG_INIT_TIMEOUT) {
 				STATEP->inited &= ~PS2_FLAG_INIT_TIMEOUT;
+				STATEP->init_count = 0;
 				vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+				break;
 			}
 
 			STATEP->state = PS2_WAIT_RESET_AA;
