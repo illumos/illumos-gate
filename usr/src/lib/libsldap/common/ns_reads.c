@@ -2392,17 +2392,33 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 						}
 					} else if ((rc == LDAP_CONNECT_ERROR ||
 					    rc == LDAP_SERVER_DOWN) &&
-					    cookie->conn_user != NULL &&
-					    cookie->reinit_on_retriable_err) {
-						/*
-						 * MT connection not usable,
-						 * close it before REINIT.
-						 * rc has already been saved
-						 * in cookie->err_rc above.
-						 */
-						__s_api_conn_mt_close(
-						    cookie->conn_user,
-						    rc, &cookie->errorp);
+					    cookie->conn_user != NULL) {
+						if (cookie->
+						    reinit_on_retriable_err) {
+							/*
+							 * MT connection not
+							 * usable, close it
+							 * before REINIT.
+							 * rc has already
+							 * been saved in
+							 * cookie->err_rc above.
+							 */
+							__s_api_conn_mt_close(
+							    cookie->conn_user,
+							    rc,
+							    &cookie->errorp);
+						} else {
+							/*
+							 * MT connection not
+							 * usable, close it in
+							 * the LDAP_ERROR state.
+							 * A retry will be done
+							 * next if allowed.
+							 */
+							cookie->err_rc = rc;
+							cookie->new_state =
+							    LDAP_ERROR;
+						}
 					}
 					break;
 				}
