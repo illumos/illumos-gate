@@ -2558,6 +2558,7 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 	ipsec_stack_t	*ipss;
 	ip_stack_t	*ipst;
 	netstack_t	*ns;
+	ipsec_policy_head_t *policy_head;
 
 	ASSERT(connp != NULL);
 	ns = connp->conn_netstack;
@@ -2620,7 +2621,11 @@ clear:
 			}
 		} else {
 			uchar_t db_type;
+			policy_head = connp->conn_policy;
 
+			/* Hold a reference in case the conn is closing */
+			if (policy_head != NULL)
+				IPPH_REFHOLD(policy_head);
 			mutex_exit(&connp->conn_lock);
 			/*
 			 * As this is a non-hardbound connection we need
@@ -2634,6 +2639,8 @@ clear:
 			mp->b_datap->db_type = M_DATA;
 			first_mp = ipsec_check_global_policy(first_mp, connp,
 			    ipha, ip6h, mctl_present, ns);
+			if (policy_head != NULL)
+				IPPH_REFRELE(policy_head, ns);
 			if (first_mp != NULL)
 				mp->b_datap->db_type = db_type;
 			return (first_mp);
@@ -2678,6 +2685,12 @@ clear:
 	 * as the earlier initialization was done only in the cleartext case.
 	 */
 	if ((ipl = connp->conn_latch) == NULL) {
+		mblk_t *retmp;
+		policy_head = connp->conn_policy;
+
+		/* Hold a reference in case the conn is closing */
+		if (policy_head != NULL)
+			IPPH_REFHOLD(policy_head);
 		mutex_exit(&connp->conn_lock);
 		/*
 		 * We don't have policies cached in the conn
@@ -2685,8 +2698,11 @@ clear:
 		 * policy. It will check against conn or global
 		 * depending on whichever is stronger.
 		 */
-		return (ipsec_check_global_policy(first_mp, connp,
-		    ipha, ip6h, mctl_present, ns));
+		retmp = ipsec_check_global_policy(first_mp, connp,
+		    ipha, ip6h, mctl_present, ns);
+		if (policy_head != NULL)
+			IPPH_REFRELE(policy_head, ns);
+		return (retmp);
 	}
 
 	IPLATCH_REFHOLD(ipl);
