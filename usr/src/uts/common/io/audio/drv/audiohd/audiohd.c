@@ -1189,11 +1189,12 @@ static int
 audiohd_set_input_pin(audiohd_state_t *statep)
 {
 	uint64_t		val;
+	hda_codec_t		*codec;
 	audiohd_pin_t		*pin;
 	audiohd_path_t		*path;
-	audiohd_widget_t	*widget;
+	audiohd_widget_t	*widget, *w;
 	int			i, j;
-	wid_t			wid;
+	wid_t			wid, pin_wid = 0;
 
 	val = statep->controls[CTL_RECSRC]->val;
 	for (i = 0; i < statep->pathnum; i++) {
@@ -1212,6 +1213,8 @@ audiohd_set_input_pin(audiohd_state_t *statep)
 					AUDIOHD_ENABLE_PIN_IN(statep,
 					    path->codec->index,
 					    pin->wid);
+					pin_wid = pin->wid;
+					codec = path->codec;
 					statep->in_port = pin->device;
 				} else if (statep->in_port == pin->device) {
 					AUDIOHD_DISABLE_PIN_IN(statep,
@@ -1224,6 +1227,28 @@ audiohd_set_input_pin(audiohd_state_t *statep)
 			break;
 		}
 		break;
+	}
+	if (pin_wid == 0)
+		return (DDI_SUCCESS);
+	w = codec->widget[pin_wid];
+	pin = (audiohd_pin_t *)w->priv;
+	w = codec->widget[pin->adc_dac_wid];
+	path = (audiohd_path_t *)w->priv;
+	/*
+	 * If there is a real selector in this input path,
+	 * we select the right one input for the selector.
+	 */
+	if (path->sum_wid) {
+		w = codec->widget[path->sum_wid];
+		if (w->type == WTYPE_AUDIO_SEL) {
+			for (i = 0; i < path->pin_nums; i++)
+				if (path->pin_wid[i] == pin_wid)
+					break;
+			(void) audioha_codec_verb_get(
+			    statep, codec->index, path->sum_wid,
+			    AUDIOHDC_VERB_SET_CONN_SEL,
+			    path->sum_selconn[i]);
+		}
 	}
 	return (DDI_SUCCESS);
 }
@@ -4002,7 +4027,7 @@ audiohd_build_input_amp(hda_codec_t *codec)
 
 	for (i = 0; i < codec->soft_statep->pathnum; i++) {
 		path = codec->soft_statep->path[i];
-		if (path == NULL || path->path_type == PLAY ||
+		if (path == NULL || path->path_type != RECORD ||
 		    path->codec != codec)
 			continue;
 
@@ -4169,7 +4194,7 @@ audiohd_finish_input_path(hda_codec_t *codec)
 
 	for (i = 0; i < codec->soft_statep->pathnum; i++) {
 		path = codec->soft_statep->path[i];
-		if (path == NULL || path->path_type == PLAY ||
+		if (path == NULL || path->path_type != RECORD ||
 		    path->codec != codec)
 			continue;
 		wid = path->adda_wid;
