@@ -5540,11 +5540,9 @@ verify_func(cmd_t *cmd)
 		zone_perror(zone, err, B_TRUE);
 		return;
 	}
-	if (strcmp(brand, NATIVE_BRAND_NAME) != 0) {
-		if ((err = brand_verify(handle)) != Z_OK) {
-			zone_perror(zone, err, B_TRUE);
-			return;
-		}
+	if ((err = brand_verify(handle)) != Z_OK) {
+		zone_perror(zone, err, B_TRUE);
+		return;
 	}
 
 	if (zonecfg_get_iptype(handle, &iptype) != Z_OK) {
