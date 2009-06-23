@@ -1130,7 +1130,7 @@ dmu_objset_userspace_upgrade(objset_t *os)
 	 */
 
 	for (obj = 0; err == 0; err = dmu_object_next(os, &obj, FALSE, 0)) {
-		dmu_tx_t *tx = dmu_tx_create(os);
+		dmu_tx_t *tx;
 		dmu_buf_t *db;
 		int objerr;
 
@@ -1140,6 +1140,7 @@ dmu_objset_userspace_upgrade(objset_t *os)
 		objerr = dmu_bonus_hold(os, obj, FTAG, &db);
 		if (objerr)
 			continue;
+		tx = dmu_tx_create(os);
 		dmu_tx_hold_bonus(tx, obj);
 		objerr = dmu_tx_assign(tx, TXG_WAIT);
 		if (objerr) {

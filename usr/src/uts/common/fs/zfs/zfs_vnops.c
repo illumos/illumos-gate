@@ -3724,8 +3724,8 @@ top:
 	if (err == 0) {
 		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
 		zfs_log_write(zfsvfs->z_log, tx, TX_WRITE, zp, off, len, 0);
-		dmu_tx_commit(tx);
 	}
+	dmu_tx_commit(tx);
 
 out:
 	pvn_write_done(pp, (err ? B_ERROR : 0) | flags);
