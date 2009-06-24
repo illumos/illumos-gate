@@ -19,12 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains miscellaneous device validation routines.
@@ -54,6 +53,7 @@
 #include <libnvpair.h>
 #include "misc.h"
 #include "checkdev.h"
+#include <sys/efi_partition.h>
 
 /* Function prototypes */
 #ifdef	__STDC__
@@ -92,7 +92,7 @@ getswapentries(void)
 	if (num == 0)
 		return (NULL);
 	if ((st = (swaptbl_t *)malloc(num * sizeof (swapent_t) + sizeof (int)))
-			== NULL) {
+	    == NULL) {
 		err_print("getswapentries: malloc  failed.\n");
 		fullabort();
 	}
@@ -311,7 +311,7 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 		(void) stat(cur_disk_path, &stbuf);
 		majornum = major(stbuf.st_rdev);
 		(void) modctl(MODGETNAME, majorname, sizeof (majorname),
-				&majornum);
+		    &majornum);
 
 		if (strcmp(majorname, "sd"))
 			if (strcmp(majorname, "ssd"))
@@ -326,7 +326,8 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 	name = strrchr(cur_disk_path, 'd');
 	if (name) {
 		name++;
-		for (; (*name <= '9') && (*name >= '0'); name++);
+		for (; (*name <= '9') && (*name >= '0'); name++) {
+		}
 		*name = (char)0;
 	}
 
@@ -362,8 +363,7 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 			name = dm_get_name(slices[i], &error);
 			if (error != 0 || !name) {
 				err_print("Error occurred with device "
-				    "in use checking: %s\n",
-				    strerror(error));
+				    "in use checking: %s\n", strerror(error));
 				continue;
 			}
 			if (dm_inuse(name, &usage, DM_WHO_FORMAT, &error) ||
@@ -371,9 +371,9 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 				if (error != 0) {
 					dm_free_name(name);
 					name = NULL;
-					err_print("Error occurred with device "
-					    "in use checking: %s\n",
-					    strerror(error));
+					err_print("Error occurred with "
+					    "device in use checking: "
+					    "%s\n", strerror(error));
 					continue;
 				}
 				dm_free_name(name);
@@ -437,8 +437,7 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 			name = dm_get_name(slices[i], &error);
 			if (error != 0 || !name) {
 				err_print("Error occurred with device "
-				    "in use checking: %s\n",
-				    strerror(error));
+				    "in use checking: %s\n", strerror(error));
 				nvlist_free(attrs);
 				attrs = NULL;
 				continue;
@@ -448,9 +447,9 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 				if (error != 0) {
 					dm_free_name(name);
 					name = NULL;
-					err_print("Error occurred with device "
-					    "in use checking: %s\n",
-					    strerror(error));
+					err_print("Error occurred with "
+					    "device in use checking: "
+					    "%s\n", strerror(error));
 					nvlist_free(attrs);
 					attrs = NULL;
 					continue;
@@ -500,8 +499,7 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 			name = dm_get_name(slices[i], &error);
 			if (error != 0 || !name) {
 				err_print("Error occurred with device "
-				    "in use checking: %s\n",
-				    strerror(error));
+				    "in use checking: %s\n", strerror(error));
 				nvlist_free(attrs);
 				attrs = NULL;
 				continue;
@@ -740,6 +738,7 @@ checkpartitions(int bm_mounted)
 	struct dk_map		*o;
 	struct dk_allmap	old_map;
 	int			i, found = 0;
+	struct partition64	o_efi;
 
 	/*
 	 * Now we need to check that the current partition list and the
@@ -749,51 +748,83 @@ checkpartitions(int bm_mounted)
 	 */
 
 	/*
-	 * Get the "real" (on-disk) version of the partition table
+	 * Check if the user wants to online-label an
+	 * existing EFI label.
 	 */
-	if (ioctl(cur_file, DKIOCGAPART, &old_map) == -1) {
-		err_print("Unable to get current partition map.\n");
-		return (-1);
-	}
-	for (i = 0; i < NDKMAP; i++) {
-		if (bm_mounted & (1 << i)) {
-			/*
-			 * This partition is mounted
-			 */
-			o = &old_map.dka_map[i];
-			n = &cur_parts->pinfo_map[i];
+	if (cur_label == L_TYPE_EFI) {
+		for (i = 0; i < EFI_NUMPAR; i++) {
+			if (bm_mounted & (1 << i)) {
+				o_efi.p_partno = i;
+				if (ioctl(cur_file, DKIOCPARTITION, &o_efi)
+				    == -1) {
+					err_print("Unable to get information "
+					    "for EFI partition %d.\n", i);
+					return (-1);
+				}
+
+				/*
+				 * Partition can grow or remain same.
+				 */
+				if (o_efi.p_start == cur_parts->etoc->
+				    efi_parts[i].p_start && o_efi.p_size
+				    <= cur_parts->etoc->efi_parts[i].p_size) {
+					continue;
+				}
+
+				found = -1;
+			}
+			if (found)
+				break;
+		}
+
+	} else {
+
+		/*
+		 * Get the "real" (on-disk) version of the partition table
+		 */
+		if (ioctl(cur_file, DKIOCGAPART, &old_map) == -1) {
+			err_print("Unable to get current partition map.\n");
+			return (-1);
+		}
+		for (i = 0; i < NDKMAP; i++) {
+			if (bm_mounted & (1 << i)) {
+				/*
+				 * This partition is mounted
+				 */
+				o = &old_map.dka_map[i];
+				n = &cur_parts->pinfo_map[i];
 #ifdef DEBUG
-			fmt_print(
+				fmt_print(
 "checkpartitions :checking partition '%c' \n", i + PARTITION_BASE);
 #endif
-			/*
-			 * If partition is identical, we're fine.
-			 * If the partition grows, we're also fine, because
-			 * the routines in partition.c check for overflow.
-			 * It will (ultimately) be up to the routines in
-			 * partition.c to warn about creation of overlapping
-			 * partitions
-			 */
-			if (o->dkl_cylno == n->dkl_cylno &&
-					o->dkl_nblk <= n->dkl_nblk) {
+				/*
+				 * If partition is identical, we're fine.
+				 * If the partition grows, we're also fine,
+				 * because the routines in partition.c check
+				 * for overflow. It will (ultimately) be up
+				 * to the routines in partition.c to warn
+				 * about creation of overlapping partitions.
+				 */
+				if (o->dkl_cylno == n->dkl_cylno &&
+				    o->dkl_nblk <= n->dkl_nblk) {
 #ifdef	DEBUG
-				if (o->dkl_nblk < n->dkl_nblk) {
-					fmt_print(
+					if (o->dkl_nblk < n->dkl_nblk) {
+						fmt_print(
 "- new partition larger by %d blocks", n->dkl_nblk-o->dkl_nblk);
+					}
+					fmt_print("\n");
+#endif
+					continue;
 				}
-				fmt_print("\n");
-#endif
-				continue;
-			}
 #ifdef DEBUG
-			fmt_print("- changes; old (%d,%d)->new (%d,%d)\n",
-				o->dkl_cylno, o->dkl_nblk, n->dkl_cylno,
-				n->dkl_nblk);
+				fmt_print("- changes; old (%d,%d)->new "
+"(%d,%d)\n", o->dkl_cylno, o->dkl_nblk, n->dkl_cylno, n->dkl_nblk);
 #endif
-			found = -1;
+				found = -1;
+			}
+			if (found)
+				break;
 		}
-		if (found)
-			break;
 	}
 
 	/*
