@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,9 @@
 #include <libw.h>
 #include "mse.h"
 #include "xpg6.h"
+
+static const char nullstr[] = "(null)";
+static const wchar_t widenullstr[] = L"(null)";
 
 #if defined(__i386) || defined(__amd64) || defined(__sparcv9)
 #define	GETQVAL(arg)	(va_arg(arg, long double))
@@ -1748,6 +1751,8 @@ wide_S:
 				lflag++;
 			}
 			bp = va_arg(args.ap, wchar_t *);
+			if (bp == NULL)
+				bp = (wchar_t *)widenullstr;
 			if (!(flagword & DOTSEEN)) {
 				/* wide character handling */
 				prec = MAXINT;
@@ -1770,6 +1775,8 @@ wide_S:
 			if (!wflag)
 				wflag++;
 			bp = va_arg(args.ap, char *);
+			if (bp == NULL)
+				bp = (char *)widenullstr;
 			if (!(flagword & DOTSEEN)) {
 				/* wide character handling */
 				prec = MAXINT;
@@ -1802,6 +1809,8 @@ wide_S:
 			}
 #ifdef	_WIDE
 			cbp = va_arg(args.ap, char *);
+			if (cbp == NULL)
+				cbp = (char *)nullstr;
 			if (!(flagword & DOTSEEN)) {
 				size_t	nwc;
 				wchar_t	*wstr;
@@ -1863,6 +1872,8 @@ wide_S:
 			wflag = 1;
 #else  /* _WIDE */
 			bp = va_arg(args.ap, char *);
+			if (bp == NULL)
+				bp = (char *)nullstr;
 			if (!(flagword & DOTSEEN)) {
 				if (wflag) {
 					/* wide character handling */
