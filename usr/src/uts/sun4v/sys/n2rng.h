@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_N2RNG_H
 #define	_SYS_N2RNG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* skip following stuff when included in n2rng_hcall.s */
 #ifndef _ASM
@@ -236,7 +234,7 @@ typedef struct n2rng {
 	ddi_taskq_t		*n_taskq;
 } n2rng_t;
 
-typedef kstat_named_t n2rng_kstat_bias_t[N2RNG_NOSC][N2RNG_NBIASES];
+typedef kstat_named_t n2rng_kstat_bias_t[N2RNG_MAX_RNGS][N2RNG_NOSC];
 
 typedef struct n2rng_stat n2rng_stat_t;
 struct n2rng_stat {
