@@ -4521,7 +4521,11 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		    task->task_cmd_xfer_length;
 	}
 
-	if (task->task_cmd_xfer_length < 16) {
+	if (task->task_cmd_xfer_length == 0) {
+		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		return;
+	}
+	if (task->task_cmd_xfer_length < 4) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_INVALID_FIELD_IN_CDB);
 		return;
