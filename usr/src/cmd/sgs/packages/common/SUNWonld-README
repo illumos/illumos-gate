@@ -1488,3 +1488,6 @@ Bugid   Risk Synopsis
 6851224 elf_getshnum() and elf_getshstrndx() incompatible with 2002 ELF gABI
 	agreement
 	PSARC/2009/363 replace elf_getphnum, elf_getshnum, and elf_getshstrndx
+6853809	ld.so.1: rescan fallback optimization is invalid
+6854158	ld.so.1: interposition can be skipped because of incorrect
+	caller/destination validation

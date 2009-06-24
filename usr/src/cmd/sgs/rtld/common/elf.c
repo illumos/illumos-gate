@@ -2622,13 +2622,13 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 			 *
 			 * If the symbol hasn't been found, use the referenced
 			 * objects handle, as it might have dependencies on
-			 * objects that are already loaded.  We only need to
-			 * look in any existing objects if the mode of those
-			 * objects has changed.  Existing objects would have
-			 * already been searched, however, a lazy load might
-			 * still cause the promotion of modes, and in this case
-			 * the handle associated with the object is used to
-			 * carry out the symbol search.
+			 * objects that are already loaded.  Note that existing
+			 * objects might have already been searched and skipped
+			 * as non-available to this caller.   However, a lazy
+			 * load might have caused the promotion of modes, or
+			 * added this object to the family of the caller.  In
+			 * either case, the handle associated with the object
+			 * is then used to carry out the symbol search.
 			 */
 			if ((nlmp = elf_lazy_load(lmp, &sl1, cnt, name,
 			    FLG_RT_PRIHDL, &ghp, in_nfavl)) == NULL)
@@ -2641,39 +2641,31 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 				sl1.sl_imap = NEXT_RT_MAP(llmp);
 				sl1.sl_flags &= ~LKUP_STDRELOC;
 
-				sym = lookup_sym(&sl1, _lmp, binfo, in_nfavl);
+				if ((sym = lookup_sym(&sl1, _lmp, binfo,
+				    in_nfavl)) != NULL)
+					return (sym);
 			}
 
 			/*
-			 * Use the objects handle to determine any promoted
-			 * objects.  Clear any modes regardless.  Note, there's
+			 * Use the objects handle to inspect the family of
+			 * objects associated with the handle.  Note, there's
 			 * a possibility of overlap with the above search,
 			 * should a lazy load bring in new objects and
 			 * reference existing objects.
 			 */
 			sl2 = sl1;
 			for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
-				if ((gdp->gd_flags & GPD_MODECHANGE) == 0)
-					continue;
-
-				if ((sym == NULL) &&
-				    (gdp->gd_depend != NEXT_RT_MAP(llmp)) &&
+				if ((gdp->gd_depend != NEXT_RT_MAP(llmp)) &&
 				    (gdp->gd_flags & GPD_DLSYM)) {
 
 					sl2.sl_imap = gdp->gd_depend;
 					sl2.sl_flags |= LKUP_FIRST;
 
-					sym = lookup_sym(&sl2, _lmp, binfo,
-					    in_nfavl);
+					if ((sym = lookup_sym(&sl2, _lmp, binfo,
+					    in_nfavl)) != NULL)
+						return (sym);
 				}
-				gdp->gd_flags &= ~GPD_MODECHANGE;
 			}
-
-			/*
-			 * If the symbol has been found, cleanup and return.
-			 */
-			if (sym)
-				return (sym);
 
 			/*
 			 * Some dlsym() operations are already traversing a

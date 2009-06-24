@@ -2213,13 +2213,6 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	rdflags = (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS);
 
 	/*
-	 * If this is a global object, ensure the associated link-map list can
-	 * be rescanned for global, lazy dependencies.
-	 */
-	if (MODE(nlmp) & RTLD_GLOBAL)
-		LIST(nlmp)->lm_flags &= ~LML_FLG_NOPENDGLBLAZY;
-
-	/*
 	 * If we've been asked to establish a handle create one for this object.
 	 * Or, if this object has already been analyzed, but this reference
 	 * requires that the mode of the object be promoted, create a private
@@ -2283,22 +2276,6 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			return (0);
 
 		/*
-		 * If the new link-map has been promoted, record this mode
-		 * change for possible rescan use.
-		 */
-		if (promote) {
-			Aliste		idx2;
-			Grp_desc	*gdp;
-
-			for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
-				if (gdp->gd_depend == nlmp) {
-					gdp->gd_flags |= GPD_MODECHANGE;
-					break;
-				}
-			}
-		}
-
-		/*
 		 * Add any dependencies that are already loaded, to the handle.
 		 */
 		if (hdl_initialize(ghp, nlmp, nmode, promote) == 0)
@@ -2358,13 +2335,6 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			return (0);
 
 		/*
-		 * If the new link-map has been promoted, record this mode
-		 * change for possible rescan use.
-		 */
-		if (promote)
-			gdp->gd_flags |= GPD_MODECHANGE;
-
-		/*
 		 * If this member already exists then its dependencies will
 		 * have already been processed.
 		 */
@@ -2419,9 +2389,8 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 				return (0);
 			}
 
-			if ((ale == ALE_CREATE) &&
-			    (update_mode(dlmp1, MODE(dlmp1), nmode)))
-				gdp->gd_flags |= GPD_MODECHANGE;
+			if (ale == ALE_CREATE)
+				(void) update_mode(dlmp1, MODE(dlmp1), nmode);
 		}
 		free(lmalp);
 	}
@@ -2440,12 +2409,30 @@ load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
 	Rt_map		*nlmp;
 
 	if ((nmode & RTLD_NOLOAD) == 0) {
+		int	oin_nfavl;
+
+		/*
+		 * Keep track of the number of not-found loads.
+		 */
+		if (in_nfavl)
+			oin_nfavl = *in_nfavl;
+
 		/*
 		 * If this isn't a noload request attempt to load the file.
 		 */
 		if ((nlmp = load_so(lml, lmco, clmp, flags, fdp, rej,
 		    in_nfavl)) == NULL)
 			return (NULL);
+
+		/*
+		 * If this file has been found, reset the not-found load count.
+		 * Although a search for this file might have inspected a number
+		 * of non-existent path names, the file has been found so there
+		 * is no need to to accumulate a non-found count, as this may
+		 * trigger unnecessary fall back (retry) processing.
+		 */
+		if (in_nfavl)
+			*in_nfavl = oin_nfavl;
 
 		/*
 		 * If we've loaded a library which identifies itself as not
@@ -2731,7 +2718,18 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 		if ((FLAGS(lmp) & MSK_RT_INTPOSE) == 0)
 			break;
 
-		if (callable(lmp, clmp, 0, sl.sl_flags)) {
+		/*
+		 * If we had already bound to this object, there's no point in
+		 * searching it again, we're done.
+		 */
+		if (lmp == *dlmp)
+			break;
+
+		/*
+		 * If this interposer can be inspected by the caller, look for
+		 * the symbol within the interposer.
+		 */
+		if (callable(clmp, lmp, 0, sl.sl_flags)) {
 			Rt_map	*ilmp;
 			Sym	*isym;
 

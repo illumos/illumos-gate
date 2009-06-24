@@ -67,7 +67,6 @@ conv_grphdl_flags(uint_t flags, Conv_grphdl_flags_buf_t *grphdl_flags_buf)
 		{ GPH_FIRST,		MSG_GPH_FIRST },
 		{ GPH_FILTEE,		MSG_GPH_FILTEE },
 		{ GPH_INITIAL,		MSG_GPH_INITIAL },
-		{ GPH_NOPENDLAZY,	MSG_GPH_NOPENDLAZY },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {
@@ -121,7 +120,6 @@ conv_grpdesc_flags(uint_t flags, Conv_grpdesc_flags_buf_t *grpdesc_flags_buf)
 		{ GPD_PARENT,		MSG_GPD_PARENT },
 		{ GPD_FILTER,		MSG_GPD_FILTER },
 		{ GPD_REMOVE,		MSG_GPD_REMOVE },
-		{ GPD_MODECHANGE,	MSG_GPD_MODECHANGE },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = {

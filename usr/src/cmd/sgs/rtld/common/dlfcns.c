@@ -413,19 +413,16 @@ hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, int mode, int promote)
 			continue;
 
 		for (APLIST_TRAVERSE(DEPENDS(lmp), idx1, bdp)) {
-			Grp_desc	*gdp;
-			Rt_map		*dlmp = bdp->b_depend;
+			Rt_map	*dlmp = bdp->b_depend;
 
 			if ((bdp->b_flags & BND_NEEDED) == 0)
 				continue;
 
-			if ((gdp = hdl_add(ghp, dlmp,
-			    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS),
-			    NULL)) == NULL)
+			if (hdl_add(ghp, dlmp,
+			    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS), NULL) == NULL)
 				return (0);
 
-			if (update_mode(dlmp, MODE(dlmp), mode))
-				gdp->gd_flags |= GPD_MODECHANGE;
+			(void) update_mode(dlmp, MODE(dlmp), mode);
 		}
 	}
 	ghp->gh_flags |= GPH_INITIAL;
@@ -1059,7 +1056,7 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 	 * the address space.  If the symbol isn't located, and lazy
 	 * dependencies still exist, then a second pass is made to load these
 	 * dependencies if applicable.  This model means that in the case where
-	 * a symbols exists in more than one object, the one located may not be
+	 * a symbol exists in more than one object, the one located may not be
 	 * constant - this is the standard issue with lazy loading. In addition,
 	 * attempting to locate a symbol that doesn't exist will result in the
 	 * loading of all lazy dependencies on the given handle, which can
@@ -1067,6 +1064,7 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 	 */
 	if (ghp->gh_flags & GPH_ZERO) {
 		Lm_list	*lml;
+		uint_t	lazy = 0;
 
 		/*
 		 * If this symbol lookup is triggered from a dlopen(0) handle,
@@ -1074,7 +1072,6 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 		 * entries.
 		 */
 		for (nlmp = lmp; nlmp; nlmp = NEXT_RT_MAP(nlmp)) {
-
 			/*
 			 * If this handle indicates we're only to look in the
 			 * first object check whether we're done.
@@ -1092,20 +1089,22 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo,
 			    in_nfavl))
 				return (sym);
+
+			/*
+			 * Keep track of any global pending lazy loads.
+			 */
+			lazy += LAZY(nlmp);
 		}
 
 		/*
-		 * If we're unable to locate the symbol and this link-map still
-		 * has pending lazy dependencies, start loading them in an
+		 * If we're unable to locate the symbol and this link-map list
+		 * still has pending lazy dependencies, start loading them in an
 		 * attempt to exhaust the search.  Note that as we're already
 		 * traversing a dynamic linked list of link-maps there's no
 		 * need for elf_lazy_find_sym() to descend the link-maps itself.
 		 */
 		lml = LIST(lmp);
-		if ((lml->lm_lazy) &&
-		    ((lml->lm_flags & LML_FLG_NOPENDGLBLAZY) == 0)) {
-			int	lazy = 0;
-
+		if (lazy) {
 			DBG_CALL(Dbg_syms_lazy_rescan(lml, name));
 
 			sl.sl_flags |= LKUP_NODESCENT;
@@ -1118,55 +1117,48 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 				    ((FLAGS(clmp) & FLG_RT_DELETE) == 0))
 					continue;
 
-				lazy = 1;
 				sl.sl_imap = nlmp;
 				if (sym = elf_lazy_find_sym(&sl, _lmp, binfo,
 				    in_nfavl))
 					return (sym);
 			}
-
-			/*
-			 * If no global, lazy loadable dependencies are found,
-			 * then none exist for this link-map list.  Pending lazy
-			 * loadable objects may still exist for non-local
-			 * objects that are associated with this link-map list,
-			 * which is why we entered this fallback.  Tag this
-			 * link-map list to prevent further searching for lazy
-			 * dependencies.
-			 */
-			if (lazy == 0)
-				lml->lm_flags |= LML_FLG_NOPENDGLBLAZY;
 		}
 	} else {
 		/*
-		 * Traverse the dlopen() handle for the presently loaded
+		 * Traverse the dlopen() handle searching all presently loaded
 		 * link-maps.
 		 */
 		Grp_desc	*gdp;
 		Aliste		idx;
+		uint_t		lazy = 0;
 
 		for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
+			nlmp = gdp->gd_depend;
+
 			if ((gdp->gd_flags & GPD_DLSYM) == 0)
 				continue;
 
-			sl.sl_imap = gdp->gd_depend;
+			sl.sl_imap = nlmp;
 			if (sym = LM_LOOKUP_SYM(clmp)(&sl, _lmp, binfo,
 			    in_nfavl))
 				return (sym);
 
 			if (ghp->gh_flags & GPH_FIRST)
 				return (NULL);
+
+			/*
+			 * Keep track of any pending lazy loads associated
+			 * with this handle.
+			 */
+			lazy += LAZY(nlmp);
 		}
 
 		/*
-		 * If we're unable to locate the symbol and this link-map still
-		 * has pending lazy dependencies, start loading them in an
-		 * attempt to exhaust the search.
+		 * If we're unable to locate the symbol and this handle still
+		 * has pending lazy dependencies, start loading the lazy
+		 * dependencies, in an attempt to exhaust the search.
 		 */
-		if ((LIST(lmp)->lm_lazy) &&
-		    ((ghp->gh_flags & GPH_NOPENDLAZY) == 0)) {
-			int	lazy = 0;
-
+		if (lazy) {
 			DBG_CALL(Dbg_syms_lazy_rescan(LIST(lmp), name));
 
 			for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
@@ -1176,23 +1168,11 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 				    (LAZY(nlmp) == 0))
 					continue;
 
-				lazy = 1;
 				sl.sl_imap = nlmp;
 				if (sym = elf_lazy_find_sym(&sl, _lmp,
 				    binfo, in_nfavl))
 					return (sym);
 			}
-
-			/*
-			 * If no lazy loadable dependencies are found, then
-			 * none exist for this handle.  Pending lazy loadable
-			 * objects may still exist for the associated link-map
-			 * list, which is why we entered this fallback.  Tag
-			 * this handle to prevent further searching for lazy
-			 * dependencies.
-			 */
-			if (lazy == 0)
-				ghp->gh_flags |= GPH_NOPENDLAZY;
 		}
 	}
 	return (NULL);

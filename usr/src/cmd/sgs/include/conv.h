@@ -186,7 +186,7 @@ typedef union {
 } Conv_dl_flag_buf_t;
 
 /* conv_grphdl_flags() */
-#define	CONV_GRPHDL_FLAGS_BUFSIZE	92
+#define	CONV_GRPHDL_FLAGS_BUFSIZE	78
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_GRPHDL_FLAGS_BUFSIZE];
