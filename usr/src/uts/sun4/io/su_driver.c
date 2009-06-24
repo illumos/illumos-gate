@@ -23,7 +23,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2155,7 +2155,9 @@ async_softint(struct asycom *asy)
 				OUTB(MCR, (val & ~DTR));
 				flushflag = (async->async_flags &
 				    ASYNC_CLOSING) ? FLUSHALL : FLUSHDATA;
-				flushq(tp->t_writeq, flushflag);
+				if (tp->t_writeq != NULL) {
+					flushq(tp->t_writeq, flushflag);
+				}
 				if (async->async_xmitblk != NULL) {
 					freeb(async->async_xmitblk);
 					async->async_xmitblk = NULL;
