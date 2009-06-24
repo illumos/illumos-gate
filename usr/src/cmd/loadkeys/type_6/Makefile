@@ -34,7 +34,7 @@ KEYTABLES = \
         slovakia slovenia serbiaandmontenegro \
         iceland croatia bulgaria belarus maltaus \
         maltauk albania turkeyq turkeyf latvia lithuania macedonia russia \
-        latinamerica canadian_bilingual brazil dvorak
+        latinamerica canadian_bilingual brazil dvorak estonia romania
 
 KEYTABLESCONFIG = kbd_layouts
 
@@ -55,7 +55,7 @@ LAYOUTS= \
 	layout_20 layout_21 layout_100 layout_18 layout_101 layout_102 \
 	layout_103 layout_104 layout_105 layout_106 layout_107 layout_108 \
 	layout_10f layout_1f layout_23 layout_15 layout_05 layout_11 \
-	layout_03 layout_110 layout_111
+	layout_03 layout_110 layout_111 layout_112 layout_113
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -217,5 +217,11 @@ $(ROOTKEYDIR)/layout_110: $(ROOTKEYDIR)/brazil
 
 $(ROOTKEYDIR)/layout_111: $(ROOTKEYDIR)/dvorak
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/dvorak  $@
+
+$(ROOTKEYDIR)/layout_112: $(ROOTKEYDIR)/estonia
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/estonia  $@
+
+$(ROOTKEYDIR)/layout_113: $(ROOTKEYDIR)/romania
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/romania  $@
 
 include ../../Makefile.targ
