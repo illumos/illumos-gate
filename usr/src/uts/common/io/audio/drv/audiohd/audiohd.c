@@ -545,6 +545,7 @@ audiohd_init_play_path(audiohd_path_t *path)
 
 	/* two channels supported */
 	if (pin->device == DTYPE_SPEAKER ||
+	    pin->device == DTYPE_HP_OUT ||
 	    pin->assoc != statep->assoc) {
 		(void) audioha_codec_verb_get(
 		    statep,
@@ -3487,7 +3488,8 @@ audiohd_do_build_output_path(hda_codec_t *codec, int mixer, int *mnum,
 			 */
 			if (wid == (wid_t)DDI_FAILURE)
 				continue;
-			if (pin->device != DTYPE_SPEAKER)
+			if (pin->device != DTYPE_SPEAKER &&
+			    pin->device != DTYPE_HP_OUT)
 				statep->chann[pin->assoc] += 2;
 			path = (audiohd_path_t *)
 			    kmem_zalloc(sizeof (audiohd_path_t),
