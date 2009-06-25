@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2009 Chad Mynhier
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <procfs.h>
 #include <unistd.h>
@@ -59,11 +59,11 @@ pwd_getid(char *name)
 }
 
 void
-pwd_getname(uid_t uid, char *name, int length)
+pwd_getname(uid_t uid, char *name, int length, int noresolve)
 {
 	struct passwd *pwd;
 
-	if ((pwd = getpwuid(uid)) == NULL) {
+	if (noresolve || (pwd = getpwuid(uid)) == NULL) {
 		(void) snprintf(name, length, "%u", uid);
 	} else {
 		(void) snprintf(name, length, "%s", pwd->pw_name);
@@ -71,35 +71,33 @@ pwd_getname(uid_t uid, char *name, int length)
 }
 
 void
-add_uid(nametbl_t *tbl, char *name)
+add_uid(uidtbl_t *tbl, char *name)
 {
-	name_t *entp;
+	uid_t *uid;
 
 	if (tbl->n_size == tbl->n_nent) {	/* reallocation */
 		if ((tbl->n_size *= 2) == 0)
 			tbl->n_size = 4;	/* first time */
-		tbl->n_list = Realloc(tbl->n_list, tbl->n_size*sizeof (name_t));
+		tbl->n_list = Realloc(tbl->n_list, tbl->n_size*sizeof (uid_t));
 	}
 
-	entp = &tbl->n_list[tbl->n_nent++];
+	uid = &tbl->n_list[tbl->n_nent++];
 
 	if (isdigit(name[0])) {
-		entp->u_id = Atoi(name);
-		pwd_getname(entp->u_id, entp->u_name, LOGNAME_MAX);
+		*uid = Atoi(name);
 	} else {
-		entp->u_id = pwd_getid(name);
-		(void) snprintf(entp->u_name, LOGNAME_MAX, "%s", name);
+		*uid = pwd_getid(name);
 	}
 }
 
 int
-has_uid(nametbl_t *tbl, uid_t uid)
+has_uid(uidtbl_t *tbl, uid_t uid)
 {
 	size_t i;
 
 	if (tbl->n_nent) {	/* do linear search if table is not empty */
 		for (i = 0; i < tbl->n_nent; i++)
-			if (tbl->n_list[i].u_id == uid)
+			if (tbl->n_list[i] == uid)
 				return (1);
 	} else {
 		return (1);	/* if table is empty return true */

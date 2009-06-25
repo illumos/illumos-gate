@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2009 Chad Mynhier
  */
 
 #ifndef	_PRTABLE_H
 #define	_PRTABLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -46,15 +46,10 @@ typedef struct {
 } table_t;
 
 typedef struct {
-	uid_t		u_id;
-	char		u_name[LOGNAME_MAX+1];
-} name_t;
-
-typedef struct {
 	size_t		n_size;
 	size_t		n_nent;
-	name_t		*n_list;
-} nametbl_t;
+	uid_t		*n_list;
+} uidtbl_t;
 
 typedef struct {
 	zoneid_t	z_id;
@@ -75,9 +70,9 @@ typedef struct plwp {		/* linked list of pointers to lwps */
 	struct plwp	*l_next;
 } plwp_t;
 
-extern void pwd_getname(uid_t, char *, int);
-extern void add_uid(nametbl_t *, char *);
-extern int has_uid(nametbl_t *, uid_t);
+extern void pwd_getname(uid_t, char *, int, int);
+extern void add_uid(uidtbl_t *, char *);
+extern int has_uid(uidtbl_t *, uid_t);
 extern void add_element(table_t *, long);
 extern int has_element(table_t *, long);
 extern void add_zone(zonetbl_t *, char *);

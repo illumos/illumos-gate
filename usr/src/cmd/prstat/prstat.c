@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2009 Chad Mynhier
  */
 
 #include <sys/types.h>
@@ -141,8 +143,8 @@ static table_t	prj_tbl = {0, 0, NULL};		/* selected projects */
 static table_t	tsk_tbl = {0, 0, NULL};		/* selected tasks */
 static table_t	lgr_tbl = {0, 0, NULL};		/* selected lgroups */
 static zonetbl_t zone_tbl = {0, 0, NULL};	/* selected zones */
-static nametbl_t euid_tbl = {0, 0, NULL}; 	/* selected effective users */
-static nametbl_t ruid_tbl = {0, 0, NULL}; 	/* selected real users */
+static uidtbl_t euid_tbl = {0, 0, NULL}; 	/* selected effective users */
+static uidtbl_t ruid_tbl = {0, 0, NULL}; 	/* selected real users */
 
 static uint_t	total_procs;			/* total number of procs */
 static uint_t	total_lwps;			/* total number of lwps */
@@ -445,13 +447,15 @@ list_print(list_t *list)
 			else
 				mem = id->id_pctmem;
 			if (list->l_type == LT_USERS)
-				pwd_getname(id->id_uid, pname, LOGNAME_MAX + 1);
+				pwd_getname(id->id_uid, pname, LOGNAME_MAX + 1,
+				    opts.o_outpmode & OPT_NORESOLVE);
 			else if (list->l_type == LT_ZONES)
 				getzonename(id->id_zoneid, zonename,
 				    ZONENAME_MAX);
 			else
 				getprojname(id->id_projid, projname,
-				    PROJNAME_MAX);
+				    PROJNAME_MAX,
+				    opts.o_outpmode & OPT_NORESOLVE);
 			Format_size(psize, id->id_size, 6);
 			Format_size(prssize, id->id_rssize, 6);
 			Format_pct(pmem, mem, 4);
@@ -484,8 +488,8 @@ list_print(list_t *list)
 			else
 				lwpid = lwp->li_info.pr_nlwp +
 				    lwp->li_info.pr_nzomb;
-			pwd_getname(lwp->li_info.pr_uid, pname,
-			    LOGNAME_MAX + 1);
+			pwd_getname(lwp->li_info.pr_uid, pname, LOGNAME_MAX + 1,
+			    opts.o_outpmode & OPT_NORESOLVE);
 			if (opts.o_outpmode & OPT_PSINFO) {
 				Format_size(psize, lwp->li_info.pr_size, 6);
 				Format_size(prssize, lwp->li_info.pr_rssize, 6);
@@ -1360,8 +1364,11 @@ main(int argc, char **argv)
 	pagesize = sysconf(_SC_PAGESIZE);
 
 	while ((opt = getopt(argc, argv,
-	    "vcd:HmaRLtu:U:n:p:C:P:h:s:S:j:k:TJz:Z")) != (int)EOF) {
+	    "vcd:HmarRLtu:U:n:p:C:P:h:s:S:j:k:TJz:Z")) != (int)EOF) {
 		switch (opt) {
+		case 'r':
+			opts.o_outpmode |= OPT_NORESOLVE;
+			break;
 		case 'R':
 			opts.o_outpmode |= OPT_REALTIME;
 			break;

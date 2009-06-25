@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2009 Chad Mynhier
  */
 
 #ifndef	_PRSTAT_H
@@ -70,6 +72,7 @@ extern "C" {
 #define	OPT_LGRP	0x8000		/* report home lgroups */
 #define	OPT_UDATE	0x20000		/* print unix timestamp */
 #define	OPT_DDATE	0x40000		/* print timestamp in date(1) format */
+#define	OPT_NORESOLVE	0x80000		/* no nsswitch lookups */
 
 /*
  * Flags to keep track of process or lwp status

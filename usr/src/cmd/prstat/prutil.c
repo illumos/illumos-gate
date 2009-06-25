@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2009 Chad Mynhier
  */
 
 #include <sys/types.h>
@@ -104,7 +106,7 @@ void
 Usage()
 {
 	(void) fprintf(stderr, gettext(
-	    "Usage:\tprstat [-acHJLmRtTvZ] [-u euidlist] [-U uidlist]\n"
+	    "Usage:\tprstat [-acHJLmrRtTvZ] [-u euidlist] [-U uidlist]\n"
 	    "\t[-p pidlist] [-P cpulist] [-C psrsetlist] [-h lgrouplist]\n"
 	    "\t[-j projidlist] [-k taskidlist] [-z zoneidlist]\n"
 	    "\t[-s key | -S key] [-n nprocs[,nusers]] [-d d|u]\n"
@@ -276,14 +278,15 @@ Priocntl(char *class)
 }
 
 void
-getprojname(projid_t projid, char *str, int len)
+getprojname(projid_t projid, char *str, int len, int noresolve)
 {
 	struct project proj;
 
-	if (getprojbyid(projid, &proj, projbuf, PROJECT_BUFSZ) != NULL)
-		(void) snprintf(str, len, "%-28s", proj.pj_name);
-	else
+	if (noresolve || getprojbyid(projid, &proj, projbuf, PROJECT_BUFSZ) ==
+	    NULL)
 		(void) snprintf(str, len, "%-6d", (int)projid);
+	else
+		(void) snprintf(str, len, "%-28s", proj.pj_name);
 }
 
 void
