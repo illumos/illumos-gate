@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sunndi.h>
@@ -278,6 +276,10 @@ static uint32_t pci_pcix_save(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
     uint32_t *regbuf, uint32_t notused);
 static uint32_t pci_pcie_save(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
     uint32_t *regbuf, uint32_t notused);
+static uint32_t pci_ht_addrmap_save(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
+    uint32_t *regbuf, uint32_t notused);
+static uint32_t pci_ht_funcext_save(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
+    uint32_t *regbuf, uint32_t notused);
 static void pci_fill_buf(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
     uint32_t *regbuf, uint32_t nwords);
 static uint32_t cap_walk_and_save(ddi_acc_handle_t confhdl, uint32_t *regbuf,
@@ -297,13 +299,56 @@ static void pci_pmcap_check(ddi_acc_handle_t confhdl, uint32_t *regbuf,
  * size words.
  */
 static pci_cap_entry_t pci_cap_table[] = {
-	{PCI_CAP_ID_PM, PCI_PMCAP_NDWORDS, pci_generic_save},
-	{PCI_CAP_ID_AGP, PCI_AGP_NDWORDS, pci_generic_save},
-	{PCI_CAP_ID_SLOT_ID, PCI_SLOTID_NDWORDS, pci_generic_save},
-	{PCI_CAP_ID_MSI_X, PCI_MSIX_NDWORDS, pci_generic_save},
-	{PCI_CAP_ID_MSI, PCI_CAP_SZUNKNOWN, pci_msi_save},
-	{PCI_CAP_ID_PCIX, PCI_CAP_SZUNKNOWN, pci_pcix_save},
-	{PCI_CAP_ID_PCI_E, PCI_CAP_SZUNKNOWN, pci_pcie_save},
+	{PCI_CAP_ID_PM, 0, 0, PCI_PMCAP_NDWORDS, pci_generic_save},
+	{PCI_CAP_ID_AGP, 0, 0, PCI_AGP_NDWORDS, pci_generic_save},
+	{PCI_CAP_ID_SLOT_ID, 0, 0, PCI_SLOTID_NDWORDS, pci_generic_save},
+	{PCI_CAP_ID_MSI_X, 0, 0, PCI_MSIX_NDWORDS, pci_generic_save},
+	{PCI_CAP_ID_MSI, 0, 0, PCI_CAP_SZUNKNOWN, pci_msi_save},
+	{PCI_CAP_ID_PCIX, 0, 0, PCI_CAP_SZUNKNOWN, pci_pcix_save},
+	{PCI_CAP_ID_PCI_E, 0, 0, PCI_CAP_SZUNKNOWN, pci_pcie_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_SLPRI_TYPE, PCI_HTCAP_TYPE_SLHOST_MASK,
+		PCI_HTCAP_SLPRI_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_HOSTSEC_TYPE, PCI_HTCAP_TYPE_SLHOST_MASK,
+		PCI_HTCAP_HOSTSEC_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_INTCONF_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_INTCONF_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_REVID_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_REVID_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_UNITID_CLUMP_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_UNITID_CLUMP_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_ECFG_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_ECFG_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_ADDRMAP_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_CAP_SZUNKNOWN, pci_ht_addrmap_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_MSIMAP_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_MSIMAP_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_DIRROUTE_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_DIRROUTE_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_VCSET_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_VCSET_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_RETRYMODE_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_RETRYMODE_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_GEN3_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_GEN3_NDWORDS, pci_generic_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_FUNCEXT_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_CAP_SZUNKNOWN, pci_ht_funcext_save},
+
+	{PCI_CAP_ID_HT, PCI_HTCAP_PM_TYPE, PCI_HTCAP_TYPE_MASK,
+		PCI_HTCAP_PM_NDWORDS, pci_generic_save},
+
 	/*
 	 * {PCI_CAP_ID_cPCI_CRC, 0, NULL},
 	 * {PCI_CAP_ID_VPD, 0, NULL},
@@ -314,6 +359,7 @@ static pci_cap_entry_t pci_cap_table[] = {
 	 */
 	{PCI_CAP_NEXT_PTR_NULL, 0, NULL}
 };
+
 
 /*
  * Save the configuration registers for cdip as a property
@@ -537,6 +583,7 @@ cap_walk_and_save(ddi_acc_handle_t confhdl, uint32_t *regbuf,
 	uint16_t cap_id, offset, status;
 	uint32_t words_saved = 0, nwords = 0;
 	uint16_t cap_ptr = PCI_CAP_NEXT_PTR_NULL;
+	uint16_t cap_reg;
 
 	*ncapsp = 0;
 
@@ -555,12 +602,22 @@ cap_walk_and_save(ddi_acc_handle_t confhdl, uint32_t *regbuf,
 	 */
 	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
 		cap_id = CAP_ID(confhdl, cap_ptr, xspace);
+
 		/* Search for this cap id in our table */
-		if (!xspace)
+		if (!xspace) {
 			pci_cap_entp = pci_cap_table;
-		while (pci_cap_entp->cap_id != PCI_CAP_NEXT_PTR_NULL &&
-		    pci_cap_entp->cap_id != cap_id)
+			cap_reg = pci_config_get16(confhdl,
+			    cap_ptr + PCI_CAP_ID_REGS_OFF);
+		}
+
+		while (pci_cap_entp->cap_id != PCI_CAP_NEXT_PTR_NULL) {
+			if (pci_cap_entp->cap_id == cap_id &&
+			    (cap_reg & pci_cap_entp->cap_mask) ==
+			    pci_cap_entp->cap_reg)
+				break;
+
 			pci_cap_entp++;
+		}
 
 		offset = cap_ptr;
 		cap_ptr = NEXT_CAP(confhdl, cap_ptr, xspace);
@@ -654,6 +711,51 @@ pci_pcie_save(ddi_acc_handle_t confhdl, uint16_t cap_ptr, uint32_t *regbuf,
     uint32_t notused)
 {
 	return (0);
+}
+
+/*ARGSUSED*/
+static uint32_t
+pci_ht_addrmap_save(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
+    uint32_t *regbuf, uint32_t notused)
+{
+	uint32_t nwords = 0;
+	uint16_t reg;
+
+	reg = pci_config_get16(confhdl, cap_ptr + PCI_CAP_ID_REGS_OFF);
+
+	switch ((reg & PCI_HTCAP_ADDRMAP_MAPTYPE_MASK) >>
+	    PCI_HTCAP_ADDRMAP_MAPTYPE_SHIFT) {
+	case PCI_HTCAP_ADDRMAP_40BIT_ID:
+		/* HT3.1 spec, ch 7.7, 40-bit dma */
+		nwords = 3 + ((reg & PCI_HTCAP_ADDRMAP_NUMMAP_MASK) * 2);
+		break;
+	case PCI_HTCAP_ADDRMAP_64BIT_ID:
+		/* HT3.1 spec, ch 7.8, 64-bit dma */
+		nwords = 4;
+		break;
+	default:
+		nwords = 0;
+	}
+
+	pci_fill_buf(confhdl, cap_ptr, regbuf, nwords);
+	return (nwords);
+}
+
+/*ARGSUSED*/
+static uint32_t
+pci_ht_funcext_save(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
+    uint32_t *regbuf, uint32_t notused)
+{
+	uint32_t nwords;
+	uint16_t reg;
+
+	reg = pci_config_get16(confhdl, cap_ptr + PCI_CAP_ID_REGS_OFF);
+
+	/* HT3.1 spec, ch 7.17 */
+	nwords = 1 + (reg & PCI_HTCAP_FUNCEXT_LEN_MASK);
+
+	pci_fill_buf(confhdl, cap_ptr, regbuf, nwords);
+	return (nwords);
 }
 
 static void

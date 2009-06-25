@@ -1172,6 +1172,8 @@ typedef struct pci_cap_save_desc {
 
 typedef struct pci_cap_entry {
 	uint16_t		cap_id;
+	uint16_t		cap_reg;
+	uint16_t		cap_mask;
 	uint32_t		cap_ndwords;
 	uint32_t (*cap_save_func)(ddi_acc_handle_t confhdl, uint16_t cap_ptr,
 	    uint32_t *regbuf, uint32_t ndwords);

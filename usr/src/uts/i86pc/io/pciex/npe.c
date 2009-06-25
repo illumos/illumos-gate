@@ -182,6 +182,9 @@ extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
 extern void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
 extern void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
 extern boolean_t npe_is_mmcfg_supported(dev_info_t *dip);
+extern void	npe_enable_htmsi_children(dev_info_t *dip);
+extern int	npe_save_htconfig_children(dev_info_t *dip);
+extern int	npe_restore_htconfig_children(dev_info_t *dip);
 
 /*
  * Module linkage information for the kernel.
@@ -251,8 +254,26 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	int instance = ddi_get_instance(devi);
 	pci_state_t *pcip = NULL;
 
-	if (cmd == DDI_RESUME)
+	if (cmd == DDI_RESUME) {
+		/*
+		 * the system might still be able to resume even if this fails
+		 */
+		(void) npe_restore_htconfig_children(devi);
 		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * We must do this here in order to ensure that all top level devices
+	 * get their HyperTransport MSI mapping regs programmed first.
+	 * "Memory controller" and "hostbridge" class devices are leaf devices
+	 * that may affect MSI translation functionality for devices
+	 * connected to the same link/bus.
+	 *
+	 * This will also program HT MSI mapping registers on root buses
+	 * devices (basically sitting on an HT bus) that are not dependent
+	 * on the aforementioned HT devices for MSI translation.
+	 */
+	npe_enable_htmsi_children(devi);
 
 	if (ddi_prop_update_string(DDI_DEV_T_NONE, devi, "device_type",
 	    "pciex") != DDI_PROP_SUCCESS) {
@@ -337,6 +358,11 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
+		/*
+		 * the system might still be able to suspend/resume even if
+		 * this fails
+		 */
+		(void) npe_save_htconfig_children(devi);
 		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);

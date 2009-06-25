@@ -152,6 +152,22 @@ extern int memlist_count(struct memlist *);
 #define	PCI_MSIX_NDWORDS	3
 #define	PCI_CAP_SZUNKNOWN	0
 
+#define	PCI_HTCAP_SLPRI_NDWORDS		7
+#define	PCI_HTCAP_HOSTSEC_NDWORDS	6
+#define	PCI_HTCAP_INTCONF_NDWORDS	2
+#define	PCI_HTCAP_REVID_NDWORDS		1
+#define	PCI_HTCAP_UNITID_CLUMP_NDWORDS	3
+#define	PCI_HTCAP_ECFG_NDWORDS		3
+#define	PCI_HTCAP_ADDRMAP_NDWORDS	PCI_CAP_SZUNKNOWN	/* variable */
+#define	PCI_HTCAP_MSIMAP_NDWORDS	3
+#define	PCI_HTCAP_DIRROUTE_NDWORDS	3
+#define	PCI_HTCAP_VCSET_NDWORDS		3
+#define	PCI_HTCAP_RETRYMODE_NDWORDS	3
+#define	PCI_HTCAP_GEN3_NDWORDS		10
+#define	PCI_HTCAP_FUNCEXT_NDWORDS	PCI_CAP_SZUNKNOWN	/* variable */
+#define	PCI_HTCAP_PM_NDWORDS		2
+
+
 #define	CAP_ID(confhdl, cap_ptr, xspace)		\
 	((xspace) ? 0 : pci_config_get8((confhdl), (cap_ptr) + PCI_CAP_ID))
 

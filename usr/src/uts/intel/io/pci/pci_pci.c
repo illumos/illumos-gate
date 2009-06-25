@@ -44,6 +44,7 @@
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/psm.h>
+#include <sys/pci_cap.h>
 
 /*
  * The variable controls the default setting of the command register
@@ -82,15 +83,6 @@ int ppb_support_msi = 0;
  *     -1 = always disable HT MSI mapping
  */
 int ppb_support_ht_msimap = 0;
-
-/*
- * masks and values for the upper 16-bits of hypertransport cap headers
- */
-#define	PCI_CAP_HT_MSIMAP_TYPE			0xA800
-#define	PCI_CAP_HT_MSIMAP_TYPE_MASK		0xFF00
-#define	PCI_CAP_HT_MSIMAP_ENABLE		0x0001
-#define	PCI_CAP_HT_MSIMAP_ENABLE_MASK		0x0001
-
 
 struct bus_ops ppb_bus_ops = {
 	BUSO_REV,
@@ -230,8 +222,6 @@ static void	ppb_removechild(dev_info_t *);
 static int	ppb_initchild(dev_info_t *child);
 static void	ppb_save_config_regs(ppb_devstate_t *ppb_p);
 static void	ppb_restore_config_regs(ppb_devstate_t *ppb_p);
-static uint8_t	ppb_find_ht_cap(ddi_acc_handle_t cfg_hdl, uint16_t reg_mask,
-		    uint16_t reg_val);
 static boolean_t	ppb_ht_msimap_check(ddi_acc_handle_t cfg_hdl);
 static int	ppb_ht_msimap_set(ddi_acc_handle_t cfg_hdl, int cmd);
 
@@ -795,53 +785,15 @@ ppb_restore_config_regs(ppb_devstate_t *ppb_p)
 }
 
 
-/*
- * returns the location of a hypertransport capability whose upper 16-bit
- * register of the cap header matches <reg_val> after masking the register
- * with <reg_mask>; if both <reg_mask> and <reg_val> are 0, it will return the
- * first HT cap found
- */
-static uint8_t
-ppb_find_ht_cap(ddi_acc_handle_t cfg_hdl, uint16_t reg_mask, uint16_t reg_val)
-{
-	uint16_t status, reg;
-	uint8_t ptr, id;
-
-	status = pci_config_get16(cfg_hdl, PCI_CONF_STAT);
-	if (status == 0xffff || !((status & PCI_STAT_CAP)))
-		return (PCI_CAP_NEXT_PTR_NULL);
-
-	ptr = pci_config_get8(cfg_hdl, PCI_CONF_CAP_PTR);
-	while (ptr != 0xFF &&
-	    ptr != PCI_CAP_NEXT_PTR_NULL &&
-	    ptr >= PCI_CAP_PTR_OFF) {
-
-		ptr &= PCI_CAP_PTR_MASK;
-		id = pci_config_get8(cfg_hdl, ptr + PCI_CAP_ID);
-
-		if (id == PCI_CAP_ID_HT) {
-			reg = pci_config_get16(cfg_hdl,
-			    ptr + PCI_CAP_ID_REGS_OFF);
-			if ((reg & reg_mask) == reg_val)
-				return (ptr);
-		}
-		ptr = pci_config_get8(cfg_hdl, ptr + PCI_CAP_NEXT_PTR);
-	}
-
-	return (PCI_CAP_NEXT_PTR_NULL);
-}
-
-
 static boolean_t
 ppb_ht_msimap_check(ddi_acc_handle_t cfg_hdl)
 {
-	uint8_t ptr;
+	uint16_t ptr;
 
-	ptr = ppb_find_ht_cap(cfg_hdl,
-	    PCI_CAP_HT_MSIMAP_TYPE_MASK | PCI_CAP_HT_MSIMAP_ENABLE_MASK,
-	    PCI_CAP_HT_MSIMAP_TYPE | PCI_CAP_HT_MSIMAP_ENABLE);
-
-	if (ptr == PCI_CAP_NEXT_PTR_NULL)
+	if (pci_htcap_locate(cfg_hdl,
+	    PCI_HTCAP_TYPE_MASK | PCI_HTCAP_MSIMAP_ENABLE_MASK,
+	    PCI_HTCAP_MSIMAP_TYPE | PCI_HTCAP_MSIMAP_ENABLE, &ptr) !=
+	    DDI_SUCCESS)
 		return (B_FALSE);
 
 	return (B_TRUE);
@@ -851,22 +803,21 @@ ppb_ht_msimap_check(ddi_acc_handle_t cfg_hdl)
 static int
 ppb_ht_msimap_set(ddi_acc_handle_t cfg_hdl, int cmd)
 {
-	uint8_t ptr;
+	uint16_t ptr;
 	uint16_t reg;
 
-	ptr = ppb_find_ht_cap(cfg_hdl, PCI_CAP_HT_MSIMAP_TYPE_MASK,
-	    PCI_CAP_HT_MSIMAP_TYPE);
-	if (ptr == PCI_CAP_NEXT_PTR_NULL)
+	if (pci_htcap_locate(cfg_hdl, PCI_HTCAP_TYPE_MASK,
+	    PCI_HTCAP_MSIMAP_TYPE, &ptr) != DDI_SUCCESS)
 		return (0);
 
 	reg = pci_config_get16(cfg_hdl, ptr + PCI_CAP_ID_REGS_OFF);
 	switch (cmd) {
 	case HT_MSIMAP_ENABLE:
-		reg |= PCI_CAP_HT_MSIMAP_ENABLE;
+		reg |= PCI_HTCAP_MSIMAP_ENABLE;
 		break;
 	case HT_MSIMAP_DISABLE:
 	default:
-		reg &= ~(uint16_t)PCI_CAP_HT_MSIMAP_ENABLE;
+		reg &= ~(uint16_t)PCI_HTCAP_MSIMAP_ENABLE;
 	}
 
 	pci_config_put16(cfg_hdl, ptr + PCI_CAP_ID_REGS_OFF, reg);

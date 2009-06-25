@@ -65,8 +65,8 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 
 	/* PCIE and PCIX Version 2 contain Extended Config Space */
 	for (i = 0, base = pci_config_get8(h, PCI_CONF_CAP_PTR);
-		base && i < index; base = pci_config_get8(h, base
-			+ PCI_CAP_NEXT_PTR), i++) {
+	    base && i < index; base = pci_config_get8(h, base
+	    + PCI_CAP_NEXT_PTR), i++) {
 
 		if ((id = pci_config_get8(h, base)) == 0xff)
 			break;
@@ -75,7 +75,7 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 			search_ext = 1;
 		else if (id == PCI_CAP_ID_PCIX) {
 			if ((pcix_cmd = pci_config_get16(h, base +
-				PCI_PCIX_COMMAND)) != PCI_CAP_EINVAL16)
+			    PCI_PCIX_COMMAND)) != PCI_CAP_EINVAL16)
 				continue;
 			if ((pcix_cmd & PCI_PCIX_VER_MASK) == PCI_PCIX_VER_2)
 				search_ext = 1;
@@ -95,9 +95,9 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 			break;
 
 		id = (xcaps_hdr >> PCIE_EXT_CAP_ID_SHIFT)
-			& PCIE_EXT_CAP_ID_MASK;
+		    & PCIE_EXT_CAP_ID_MASK;
 		base = (xcaps_hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT)
-			& PCIE_EXT_CAP_NEXT_PTR_MASK;
+		    & PCIE_EXT_CAP_NEXT_PTR_MASK;
 	}
 
 	if (!base || i < index)
@@ -107,10 +107,10 @@ pci_cap_probe(ddi_acc_handle_t h, uint16_t index,
 		return (DDI_FAILURE);
 
 	id = ((xcaps_hdr >> PCIE_EXT_CAP_ID_SHIFT) & PCIE_EXT_CAP_ID_MASK) |
-			PCI_CAP_XCFG_FLAG;
+	    PCI_CAP_XCFG_FLAG;
 found:
 	PCI_CAP_DBG("pci_cap_probe: index=%x, id=%x, base=%x\n",
-		index, id, base);
+	    index, id, base);
 
 	*id_p = id;
 	*base_p = base;
@@ -145,12 +145,12 @@ pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p)
 		break;
 	default:
 		cmn_err(CE_WARN, "%s: unexpected pci header type:%x",
-			__func__, header);
+		    __func__, header);
 		return (DDI_FAILURE);
 	}
 
 	for (base = pci_config_get8(h, base); base;
-		base = pci_config_get8(h, base + PCI_CAP_NEXT_PTR)) {
+	    base = pci_config_get8(h, base + PCI_CAP_NEXT_PTR)) {
 		if (pci_config_get8(h, base) == id) {
 			*base_p = base;
 			return (DDI_SUCCESS);
@@ -159,8 +159,6 @@ pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p)
 
 	*base_p = PCI_CAP_NEXT_PTR_NULL;
 	return (DDI_FAILURE);
-
-
 }
 
 /*
@@ -178,13 +176,63 @@ pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p)
 		return (DDI_FAILURE);
 
 	for (base = PCIE_EXT_CAP; base; base = (xcaps_hdr >>
-		PCIE_EXT_CAP_NEXT_PTR_SHIFT) & PCIE_EXT_CAP_NEXT_PTR_MASK) {
+	    PCIE_EXT_CAP_NEXT_PTR_SHIFT) & PCIE_EXT_CAP_NEXT_PTR_MASK) {
 
 		if ((xcaps_hdr = pci_config_get32(h, base)) == PCI_CAP_EINVAL32)
 			break;
 
 		if (((xcaps_hdr >> PCIE_EXT_CAP_ID_SHIFT) &
-			PCIE_EXT_CAP_ID_MASK) == id) {
+		    PCIE_EXT_CAP_ID_MASK) == id) {
+			*base_p = base;
+			return (DDI_SUCCESS);
+		}
+	}
+
+	*base_p = PCI_CAP_NEXT_PTR_NULL;
+	return (DDI_FAILURE);
+}
+
+/*
+ * There can be multiple pci caps with a Hypertransport technology cap ID
+ * Each is distiguished by a type register in the upper half of the cap
+ * header (the "command" register part).
+ *
+ * This returns the location of a hypertransport capability whose upper
+ * 16-bits of the cap header matches <reg_val> after masking the value
+ * with <reg_mask>; if both <reg_mask> and <reg_val> are 0, it will return
+ * the first HT cap found
+ */
+int
+pci_htcap_locate(ddi_acc_handle_t h, uint16_t reg_mask, uint16_t reg_val,
+    uint16_t *base_p)
+{
+	uint8_t header;
+	uint16_t status, base;
+
+	status = pci_config_get16(h, PCI_CONF_STAT);
+
+	if (status == PCI_CAP_EINVAL16 || !(status & PCI_STAT_CAP))
+		return (DDI_FAILURE);
+
+	header = pci_config_get8(h, PCI_CONF_HEADER);
+	switch (header & PCI_HEADER_TYPE_M) {
+	case PCI_HEADER_ZERO:
+		base = PCI_CONF_CAP_PTR;
+		break;
+	case PCI_HEADER_PPB:
+		base = PCI_BCNF_CAP_PTR;
+		break;
+	default:
+		cmn_err(CE_WARN, "%s: unexpected pci header type:%x",
+		    __func__, header);
+		return (DDI_FAILURE);
+	}
+
+	for (base = pci_config_get8(h, base); base;
+	    base = pci_config_get8(h, base + PCI_CAP_NEXT_PTR)) {
+		if (pci_config_get8(h, base) == PCI_CAP_ID_HT &&
+		    (pci_config_get16(h, base + PCI_CAP_ID_REGS_OFF) &
+		    reg_mask) == reg_val) {
 			*base_p = base;
 			return (DDI_SUCCESS);
 		}

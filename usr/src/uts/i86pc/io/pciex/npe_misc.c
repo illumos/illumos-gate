@@ -309,3 +309,105 @@ npe_is_mmcfg_supported(dev_info_t *dip)
 	return !(npe_child_is_pci(dip) ||
 	    IS_BAD_AMD_NTBRIDGE(vendor_id, device_id));
 }
+
+int
+npe_enable_htmsi(ddi_acc_handle_t cfg_hdl)
+{
+	uint16_t ptr;
+	uint16_t reg;
+
+	if (pci_htcap_locate(cfg_hdl, PCI_HTCAP_TYPE_MASK,
+	    PCI_HTCAP_MSIMAP_TYPE, &ptr) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	reg = pci_config_get16(cfg_hdl, ptr + PCI_CAP_ID_REGS_OFF);
+	reg |= PCI_HTCAP_MSIMAP_ENABLE;
+
+	pci_config_put16(cfg_hdl, ptr + PCI_CAP_ID_REGS_OFF, reg);
+	return (DDI_SUCCESS);
+}
+
+void
+npe_enable_htmsi_children(dev_info_t *dip)
+{
+	dev_info_t *cdip = ddi_get_child(dip);
+	ddi_acc_handle_t cfg_hdl;
+
+	for (; cdip != NULL; cdip = ddi_get_next_sibling(cdip)) {
+		if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS) {
+			cmn_err(CE_NOTE, "!npe_enable_htmsi_children: "
+			    "pci_config_setup failed for %s",
+			    ddi_node_name(cdip));
+		}
+
+		(void) npe_enable_htmsi(cfg_hdl);
+		pci_config_teardown(&cfg_hdl);
+	}
+}
+
+/*
+ * save config regs for HyperTransport devices without drivers of classes:
+ * memory controller and hostbridge
+ */
+int
+npe_save_htconfig_children(dev_info_t *dip)
+{
+	dev_info_t *cdip = ddi_get_child(dip);
+	ddi_acc_handle_t cfg_hdl;
+	uint16_t ptr;
+	int rval = DDI_SUCCESS;
+	uint8_t cl, scl;
+
+	for (; cdip != NULL; cdip = ddi_get_next_sibling(cdip)) {
+		if (ddi_driver_major(cdip) != DDI_MAJOR_T_NONE)
+			continue;
+
+		if (pci_config_setup(cdip, &cfg_hdl) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+
+		cl = pci_config_get8(cfg_hdl, PCI_CONF_BASCLASS);
+		scl = pci_config_get8(cfg_hdl, PCI_CONF_SUBCLASS);
+
+		if (((cl == PCI_CLASS_MEM && scl == PCI_MEM_RAM) ||
+		    (cl == PCI_CLASS_BRIDGE && scl == PCI_BRIDGE_HOST)) &&
+		    pci_htcap_locate(cfg_hdl, 0, 0, &ptr) == DDI_SUCCESS) {
+
+			if (pci_save_config_regs(cdip) != DDI_SUCCESS) {
+				cmn_err(CE_WARN, "Failed to save HT config "
+				    "regs for %s\n", ddi_node_name(cdip));
+				rval = DDI_FAILURE;
+
+			} else if (ddi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			    "htconfig-saved", 1) != DDI_SUCCESS) {
+				cmn_err(CE_WARN, "Failed to set htconfig-saved "
+				    "property for %s\n", ddi_node_name(cdip));
+				rval = DDI_FAILURE;
+			}
+		}
+
+		pci_config_teardown(&cfg_hdl);
+	}
+
+	return (rval);
+}
+
+int
+npe_restore_htconfig_children(dev_info_t *dip)
+{
+	dev_info_t *cdip = ddi_get_child(dip);
+	int rval = DDI_SUCCESS;
+
+	for (; cdip != NULL; cdip = ddi_get_next_sibling(cdip)) {
+		if (ddi_prop_get_int(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
+		    "htconfig-saved", 0) == 0)
+			continue;
+
+		if (pci_restore_config_regs(cdip) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "Failed to restore HT config "
+			    "regs for %s\n", ddi_node_name(cdip));
+			rval = DDI_FAILURE;
+		}
+	}
+
+	return (rval);
+}

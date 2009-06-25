@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PCI_CAP_H
 #define	_SYS_PCI_CAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +36,8 @@ extern "C" {
 /* Function Prototypes */
 int pci_xcap_locate(ddi_acc_handle_t h, uint16_t id, uint16_t *base_p);
 int pci_lcap_locate(ddi_acc_handle_t h, uint8_t id, uint16_t *base_p);
+int pci_htcap_locate(ddi_acc_handle_t h, uint16_t reg_mask, uint16_t reg_val,
+    uint16_t *base_p);
 
 
 /* Extract the lower 16 bits Extended CFG SPACE */
