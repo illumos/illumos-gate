@@ -2298,7 +2298,7 @@ hermon_get_addr_path(hermon_state_t *state, hermon_hw_addr_path_t *path,
 	case 15:			/* 12xQDR-120Gb/s injection rate */
 		av->av_srate = IBT_SRATE_120; break;
 	case 0:				/* max */
-		av->av_srate = IBT_SRATE_10; break;
+		av->av_srate = IBT_SRATE_NOT_SPECIFIED; break;
 	default:			/* 1x injection rate */
 		av->av_srate = IBT_SRATE_1X;
 	}
