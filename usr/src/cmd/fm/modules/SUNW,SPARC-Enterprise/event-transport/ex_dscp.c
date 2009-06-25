@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * FMA Event Transport Module Transport Layer API implementation.
@@ -365,7 +363,7 @@ exs_accept(fmd_hdl_t *hdl)
 		hp->h_tid = fmd_thr_create(hdl, exs_server, hp);
 
 	} else {
-		fmd_hdl_error(hp->h_hdl, "Failed to accept() a new connection");
+		fmd_hdl_error(hdl, "Failed to accept() a new connection");
 	}
 }
 
