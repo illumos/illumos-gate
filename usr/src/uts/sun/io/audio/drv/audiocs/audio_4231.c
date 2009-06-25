@@ -549,8 +549,11 @@ audiocs_attach(dev_info_t *dip)
 		goto error;
 	}
 
+	mutex_enter(&state->cs_lock);
+
 	/* initialize the audio chip */
 	if ((audiocs_chip_init(state)) == DDI_FAILURE) {
+		mutex_exit(&state->cs_lock);
 		audio_dev_warn(adev, "chip_init() failed");
 		goto error;
 	}
@@ -566,8 +569,10 @@ audiocs_attach(dev_info_t *dip)
 
 	/* we're ready, set up the interrupt handler */
 	if (CS4231_DMA_ADD_INTR(state) != DDI_SUCCESS) {
+		mutex_exit(&state->cs_lock);
 		goto error;
 	}
+	mutex_exit(&state->cs_lock);
 
 	/* finally register with framework to kick everything off */
 	if (audio_dev_register(state->cs_adev) != DDI_SUCCESS) {
@@ -617,19 +622,17 @@ audiocs_resume(dev_info_t *dip)
 	audiocs_power_up(state);
 	state->cs_powered = B_TRUE;
 
+	mutex_enter(&state->cs_lock);
+
 	/* initialize the audio chip */
 	if ((audiocs_chip_init(state)) == DDI_FAILURE) {
+		mutex_exit(&state->cs_lock);
 		audio_dev_warn(adev, "chip_init() failed");
 		(void) pm_idle_component(state->cs_dip, CS4231_COMPONENT);
 		return (DDI_FAILURE);
 	}
 
-	mutex_enter(&state->cs_lock);
 	state->cs_suspended = B_FALSE;
-
-	/* restore mixer settings */
-	audiocs_configure_output(state);
-	audiocs_configure_input(state);
 
 	for (int i = CS4231_PLAY; i <= CS4231_REC; i++) {
 		CS_engine_t	*eng = state->cs_engines[i];
@@ -904,13 +907,9 @@ audiocs_add_controls(CS_state_t *state)
 	    (1U << OUTPUT_SPEAKER));
 	ADD_CTRL(inputs, CTL_INPUTS, (1U << INPUT_MIC));
 
-	mutex_enter(&state->cs_lock);
-	audiocs_configure_output(state);
-	audiocs_configure_input(state);
-	mutex_exit(&state->cs_lock);
-
 	return (DDI_SUCCESS);
 }
+
 /*
  * audiocs_del_controls
  *
@@ -956,6 +955,11 @@ audiocs_chip_init(CS_state_t *state)
 
 	CS4231_DMA_RESET(state);
 
+	/* wait for the Codec before we continue */
+	if (audiocs_poll_ready(state) == DDI_FAILURE) {
+		return (DDI_FAILURE);
+	}
+
 	/* activate registers 16 -> 31 */
 	SELIDX(state, MID_REG);
 	ddi_put8(handle, &CS4231_IDR, MID_MODE2);
@@ -993,10 +997,15 @@ audiocs_chip_init(CS_state_t *state)
 	/* program the sample rate, play and capture must be the same */
 	SELIDX(state, FSDF_REG | IAR_MCE);
 	PUTIDX(state, FS_48000 | PDF_LINEAR16NE | PDF_STEREO, FSDF_VALID_MASK);
-	SELIDX(state, FSDF_REG);
+	if (audiocs_poll_ready(state) == DDI_FAILURE) {
+		return (DDI_FAILURE);
+	}
+
 	SELIDX(state, CDF_REG | IAR_MCE);
 	PUTIDX(state, CDF_LINEAR16NE | CDF_STEREO, CDF_VALID_MASK);
-	SELIDX(state, CDF_REG);
+	if (audiocs_poll_ready(state) == DDI_FAILURE) {
+		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Set up the Codec for playback and capture disabled, dual DMA, and
@@ -1004,11 +1013,6 @@ audiocs_chip_init(CS_state_t *state)
 	 */
 	SELIDX(state, (INTC_REG | IAR_MCE));
 	PUTIDX(state, INTC_DDC | INTC_PDMA | INTC_CDMA, INTC_VALID_MASK);
-
-	/* turn off the MCE bit */
-	SELIDX(state, LADCI_REG);
-
-	/* wait for the Codec before we continue XXX - do we need this? */
 	if (audiocs_poll_ready(state) == DDI_FAILURE) {
 		return (DDI_FAILURE);
 	}
@@ -1044,13 +1048,8 @@ audiocs_chip_init(CS_state_t *state)
 	SELIDX(state, MIOC_REG);
 	PUTIDX(state, MIOC_MIM, MIOC_VALID_MASK);
 
-	/* clear the mode change bit */
-	SELIDX(state, RDACO_REG);
-
-	/* wait for the Codec before we continue XXX - do we need this? */
-	if (audiocs_poll_ready(state) == DDI_FAILURE) {
-		return (DDI_FAILURE);
-	}
+	audiocs_configure_output(state);
+	audiocs_configure_input(state);
 
 	return (DDI_SUCCESS);
 }
@@ -1296,6 +1295,8 @@ audiocs_power_up(CS_state_t *state)
 	/* reset the DMA engine(s) */
 	CS4231_DMA_RESET(state);
 
+	(void) audiocs_poll_ready(state);
+
 	/*
 	 * Reload the Codec's registers, the DMA engines will be
 	 * taken care of when play and record start up again. But
@@ -1308,7 +1309,7 @@ audiocs_power_up(CS_state_t *state)
 		/* restore Codec registers */
 		SELIDX(state, (i | IAR_MCE));
 		ddi_put8(handle, &CS4231_IDR, state->cs_save[i]);
-		drv_usecwait(500);	/* chip bug */
+		(void) audiocs_poll_ready(state);
 	}
 	/* clear MCE bit */
 	SELIDX(state, 0);
@@ -1985,9 +1986,6 @@ audiocs_reset_engine(CS_engine_t *eng)
 	PUTIDX(state, value, mask);
 
 	(void) audiocs_poll_ready(state);
-
-	/* clear the mode change bit */
-	SELIDX(state, reg);
 }
 
 /*
