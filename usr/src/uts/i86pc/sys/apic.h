@@ -491,6 +491,14 @@ typedef struct	apic_irq {
 #define	VIRTIRQ(irqno, share_id)	((irqno) | ((share_id) << 8))
 #define	IRQINDEX(irq)	((irq) & 0xFF)	/* Mask to get irq from virtual irq */
 
+/*
+ * We align apic_cpus_info at 64-byte cache line boundary. Please make sure we
+ * adjust APIC_PADSZ as we add/modify any member of apic_cpus_info. We also
+ * don't want the compiler to optimize apic_cpus_info.
+ */
+#define	APIC_PADSZ	19
+
+#pragma	pack(1)
 typedef struct apic_cpus_info {
 	uint32_t aci_local_id;
 	uchar_t	aci_local_ver;
@@ -505,13 +513,11 @@ typedef struct apic_cpus_info {
 	uint32_t aci_temp_bound;	/* # of non user IRQ binds */
 	uchar_t	aci_idle;		/* The CPU is idle */
 	/*
-	 * fill to make sure each struct is in seperate cache line.
-	 * Or atleast that ISR_in_progress/curipl is not shared with something
-	 * that is read/written heavily by another CPU.
-	 * Given kmem_alloc guarantees alignment to 8 bytes, having 8
-	 * bytes on each side will isolate us in a 16 byte cache line.
+	 * Fill to make sure each struct is in separate 64-byte cache line.
 	 */
+	uchar_t	aci_pad[APIC_PADSZ];	/* padding for 64-byte cache line */
 } apic_cpus_info_t;
+#pragma	pack()
 
 #define	APIC_CPU_ONLINE		1
 #define	APIC_CPU_INTR_ENABLE	2
