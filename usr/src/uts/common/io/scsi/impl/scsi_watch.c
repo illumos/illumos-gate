@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -719,6 +719,7 @@ head:
 			default:
 				if (swr->swr_timeout <= 0 && !swr->swr_busy) {
 					swr->swr_busy = 1;
+					swr->swr_timeout = swr->swr_interval;
 
 					/*
 					 * submit the cmd and let the completion
@@ -751,7 +752,6 @@ head:
 						mutex_exit(&cpr_mutex);
 					}
 					mutex_enter(&sw.sw_mutex);
-					swr->swr_timeout = swr->swr_interval;
 				}
 				break;
 			}
