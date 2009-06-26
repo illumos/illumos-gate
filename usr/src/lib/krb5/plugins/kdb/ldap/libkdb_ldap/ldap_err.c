@@ -1,6 +1,4 @@
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ldap.h>
 #include <errno.h>
 /* Solaris Kerberos: errors are handled diff from MIT */
@@ -135,6 +133,8 @@ int translate_ldap_error(int err, int op) {
     case LDAP_INAPPROPRIATE_AUTH:
     case LDAP_INVALID_CREDENTIALS:
     case LDAP_UNAVAILABLE:
+    case LDAP_SERVER_DOWN: /* Solaris Kerberos */
+    case LDAP_CONNECT_ERROR: /* Solaris Kerberos */
 	return KRB5_KDB_ACCESS_ERROR;
 
     case LDAP_STRONG_AUTH_REQUIRED:

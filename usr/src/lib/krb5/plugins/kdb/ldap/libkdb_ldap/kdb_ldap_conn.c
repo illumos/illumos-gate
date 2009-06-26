@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,7 +277,7 @@ krb5_ldap_db_init(krb5_context context, krb5_ldap_context *ldap_context)
 #ifdef LDAP_OPT_NETWORK_TIMEOUT
     struct timeval              local_timelimit = {10,0};
 #elif defined LDAP_X_OPT_CONNECT_TIMEOUT
-    int              		local_timelimit = 10;
+    int              		local_timelimit = 1000; /* Solaris Kerberos: 1 second */
 #endif
 
     if ((st=krb5_validate_ldap_context(context, ldap_context)) != 0)
