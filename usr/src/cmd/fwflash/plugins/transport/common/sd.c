@@ -67,21 +67,25 @@ static sam4_statdesc_t sam4_status[] = {
 		free((thisdev));	\
 		FW_SD_FREE_DEVPATH((devpath))	\
 	}
-#define	FW_SD_FREE_ACC_NAME(thisdev, devpath) {	\
-		free((thisdev)->access_devname);	\
-		FW_SD_FREE_DEVICELIST(thisdev, devpath)	\
-	}
 #define	FW_SD_FREE_DRV_NAME(thisdev, devpath) {	\
 		free((thisdev)->drvname);	\
-		FW_SD_FREE_ACC_NAME((thisdev), (devpath))	\
+		FW_SD_FREE_DEVICELIST((thisdev), (devpath))	\
 	}
 #define	FW_SD_FREE_CLS_NAME(thisdev, devpath) {	\
 		free((thisdev)->classname);	\
 		FW_SD_FREE_DRV_NAME((thisdev), (devpath))	\
 	}
+#define	FW_SD_FREE_ACC_NAME(thisdev, devpath) {	\
+		free((thisdev)->access_devname);	\
+		FW_SD_FREE_CLS_NAME(thisdev, devpath)	\
+	}
+#define	FW_SD_FREE_ADDR(thisdev, devpath) {	\
+		free((thisdev)->addresses[0]);	\
+		FW_SD_FREE_ACC_NAME(thisdev, devpath)	\
+	}
 #define	FW_SD_FREE_IDENT(thisdev, devpath) {	\
 		free((thisdev)->ident);	\
-		FW_SD_FREE_CLS_NAME((thisdev), (devpath))	\
+		FW_SD_FREE_ADDR((thisdev), (devpath))	\
 	}
 #define	FW_SD_FREE_IDENT_VID(thisdev, devpath) {	\
 		free((thisdev)->ident->vid);	\
@@ -114,7 +118,7 @@ int fw_devinfo(struct devicelist *thisdev);
 void fw_cleanup(struct devicelist *thisdev);
 
 /* helper functions */
-static char *find_link(di_node_t bnode);
+static char *find_link(di_node_t bnode, char *acc_devname);
 static int link_cb(di_devlink_t devlink, void *arg);
 static int sd_idtfy_custmz(struct devicelist *device, char *sp);
 
@@ -269,23 +273,21 @@ fw_identify(int start)
 		return (FWFLASH_FAILURE);
 	}
 
-	if ((devpath = calloc(1, MAXPATHLEN + 1)) == NULL) {
-		logmsg(MSG_ERROR,
-		    gettext("%s: Unable to allocate space for a device node\n"),
-		    driver);
-		return (FWFLASH_FAILURE);
-	}
-
 	if ((handle = libscsi_init(LIBSCSI_VERSION, &serr)) == NULL) {
 		logmsg(MSG_ERROR, gettext("%s: failed to initialize "
 		    "libscsi\n"), newdev->drvname);
-		FW_SD_FREE_DEVPATH(devpath)
 		return (FWFLASH_FAILURE);
 	}
 
 	/* we've found one, at least */
 	for (; thisnode != DI_NODE_NIL; thisnode = di_drv_next_node(thisnode)) {
-		devpath = di_devfs_path(thisnode);
+		/* Need to free by di_devfs_path_free */
+		if ((devpath = di_devfs_path(thisnode)) == NULL) {
+			logmsg(MSG_INFO, "unable to get device path for "
+			    "current node with errno %d\n", errno);
+			continue;
+		};
+
 		/*
 		 * We check if this is removable device, in which case
 		 * we really aren't interested, so exit stage left
@@ -295,6 +297,7 @@ fw_identify(int start)
 			logmsg(MSG_INFO,
 			    "%s: not interested in removable media device\n"
 			    "%s\n", driver, devpath);
+			FW_SD_FREE_DEVPATH(devpath)
 			continue;
 		}
 
@@ -309,36 +312,13 @@ fw_identify(int start)
 			return (FWFLASH_FAILURE);
 		}
 
-		if ((newdev->access_devname = calloc(1, MAXPATHLEN)) == NULL) {
-			logmsg(MSG_ERROR,
-			    gettext("%s: Unable to allocate space for a devfs "
-			    "name\n"), driver);
-			libscsi_fini(handle);
-			FW_SD_FREE_DEVICELIST(newdev, devpath)
-			return (FWFLASH_FAILURE);
-		}
-
-		/* save the /devices name */
-		(void) snprintf(newdev->access_devname, MAXPATHLEN,
-		    "%s%s:c,raw", devprefix, devpath);
-
-		/* and the /dev/rdsk/ name */
-		newdev->addresses[0] = calloc(1, MAXPATHLEN);
-		if (newdev->addresses[0])
-			newdev->addresses[0] = find_link(thisnode);
-		if (newdev->addresses[0] == NULL) {
-			libscsi_fini(handle);
-			FW_SD_FREE_DEVICELIST(newdev, devpath)
-			return (FWFLASH_FAILURE);
-		}
-
 		if ((newdev->drvname = calloc(1, strlen(driver) + 1))
 		    == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("%s: Unable to allocate space to store a "
 			    "driver name\n"), driver);
 			libscsi_fini(handle);
-			FW_SD_FREE_ACC_NAME(newdev, devpath)
+			FW_SD_FREE_DEVICELIST(newdev, devpath)
 			return (FWFLASH_FAILURE);
 		}
 		(void) strlcpy(newdev->drvname, driver, strlen(driver) + 1);
@@ -354,6 +334,42 @@ fw_identify(int start)
 		}
 		(void) strlcpy(newdev->classname, driver, strlen(driver) + 1);
 
+		/* Get the access name for current node */
+		if ((newdev->access_devname = calloc(1, MAXPATHLEN)) == NULL) {
+			logmsg(MSG_ERROR,
+			    gettext("%s: Unable to allocate space for a devfs "
+			    "name\n"), driver);
+			libscsi_fini(handle);
+			FW_SD_FREE_CLS_NAME(newdev, devpath)
+			return (FWFLASH_FAILURE);
+		}
+
+		/* The slice number may be 2 or 0, we will try 2 first */
+		(void) snprintf(newdev->access_devname, MAXPATHLEN,
+		    "%s%s:c,raw", devprefix, devpath);
+		if ((target = libscsi_open(handle, NULL,
+		    newdev->access_devname)) == NULL) {
+			/* try 0 for EFI label */
+			(void) snprintf(newdev->access_devname, MAXPATHLEN,
+			    "%s%s:a,raw", devprefix, devpath);
+			if ((target = libscsi_open(handle, NULL,
+			    newdev->access_devname)) == NULL) {
+				logmsg(MSG_INFO,
+				    "%s: unable to open device %s\n",
+				    newdev->drvname, newdev->access_devname);
+				FW_SD_FREE_ACC_NAME(newdev, devpath)
+				continue;
+			}
+		}
+
+		/* and the /dev/rdsk/ name */
+		if ((newdev->addresses[0] = find_link(thisnode,
+		    newdev->access_devname)) == NULL) {
+			libscsi_fini(handle);
+			FW_SD_FREE_ACC_NAME(newdev, devpath)
+			return (FWFLASH_FAILURE);
+		}
+
 		/*
 		 * Only alloc as much as we truly need, and DON'T forget
 		 * that libdevinfo manages the memory!
@@ -363,21 +379,13 @@ fw_identify(int start)
 			    gettext("%s: Unable to allocate space for SCSI "
 			    "INQUIRY data\n"), driver);
 			libscsi_fini(handle);
-			FW_SD_FREE_CLS_NAME(newdev, devpath)
+			FW_SD_FREE_ADDR(newdev, devpath)
 			return (FWFLASH_FAILURE);
 		}
 
 		/* We don't use new->ident->encap_ident currently */
 
 		/* Retrive information by using libscsi */
-		if ((target = libscsi_open(handle, NULL,
-		    newdev->access_devname)) == NULL) {
-			logmsg(MSG_INFO, "%s: unable to open device %s\n",
-			    newdev->drvname, newdev->access_devname);
-			FW_SD_FREE_IDENT(newdev, devpath)
-			continue;
-		}
-
 		/* Vendor ID */
 		sp_temp = (char *)libscsi_vendor(target);
 		if (strncmp(sp_temp, "ATA", 3) == 0) {
@@ -412,7 +420,10 @@ fw_identify(int start)
 		if (fw_sata_disk) {
 			sp_temp_cut = strchr(sp_temp, ' ');
 			if (!sp_temp_cut) {
-				/* Customize strings for special SATA disks */
+				/*
+				 * There is no SPACE character in the PID field
+				 * Customize strings for special SATA disks
+				 */
 				if (sd_idtfy_custmz(newdev, sp_temp)
 				    != FWFLASH_SUCCESS) {
 					libscsi_close(handle, target);
@@ -520,9 +531,9 @@ fw_identify(int start)
 		newdev->plugin = self;
 
 		TAILQ_INSERT_TAIL(fw_devices, newdev, nextdev);
+		FW_SD_FREE_DEVPATH(devpath)
 	}
 	libscsi_fini(handle);
-	FW_SD_FREE_DEVPATH(devpath)
 
 	/* Check if sd targets presented are all unflashable. */
 	if (idx == start)
@@ -642,31 +653,23 @@ link_cb(di_devlink_t devlink, void *arg)
 }
 
 static char *
-find_link(di_node_t bnode)
+find_link(di_node_t bnode, char *acc_devname)
 {
 	di_minor_t devminor = DI_MINOR_NIL;
-	di_devlink_handle_t	hdl;
-	char *devfspath = NULL;
-	char *minorpath = NULL;
+	di_devlink_handle_t hdl;
 	char *cbresult = NULL;
 	char linkname[] = "^rdsk/\0";
 
-	devfspath = di_devfs_path(bnode);
 	if (bnode == DI_NODE_NIL) {
 		logmsg(MSG_ERROR,
 		    gettext("find_link must be called with non-null "
 		    "di_node_t\n"));
-		FW_SD_FREE_DEVPATH(devfspath)
 		return (NULL);
 	}
 
-	logmsg(MSG_INFO, "find_link: devfspath %s\n", devfspath);
-
-	if (((cbresult = calloc(1, MAXPATHLEN)) == NULL) ||
-	    ((minorpath = calloc(1, MAXPATHLEN)) == NULL)) {
+	if ((cbresult = calloc(1, MAXPATHLEN)) == NULL) {
 		logmsg(MSG_ERROR, gettext("unable to allocate space for dev "
 		    "link\n"));
-		FW_SD_FREE_DEVPATH(devfspath)
 		return (NULL);
 	}
 
@@ -683,19 +686,17 @@ find_link(di_node_t bnode)
 			    gettext("unable to take devlink snapshot: %s\n"),
 			    strerror(errno));
 		}
-		FW_SD_FREE_DEVPATH(devfspath)
+		free(cbresult);
 		return (NULL);
 	}
 
-	(void) snprintf(minorpath, MAXPATHLEN, "%s:c,raw", devfspath);
-
 	errno = 0;
-	if (di_devlink_walk(hdl, linkname, minorpath, DI_PRIMARY_LINK,
-	    (void *)cbresult, link_cb) < 0) {
+	if (di_devlink_walk(hdl, linkname, acc_devname + strlen(devprefix),
+	    DI_PRIMARY_LINK, (void *)cbresult, link_cb) < 0) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to walk devlink snapshot for %s: %s\n"),
-		    minorpath, strerror(errno));
-		FW_SD_FREE_DEVPATH(devfspath)
+		    acc_devname, strerror(errno));
+		free(cbresult);
 		return (NULL);
 	}
 
@@ -704,8 +705,6 @@ find_link(di_node_t bnode)
 		    gettext("Unable to close devlink snapshot: %s\n"),
 		    strerror(errno));
 	}
-	free(minorpath); /* don't need this now */
-	FW_SD_FREE_DEVPATH(devfspath)
 
 	logmsg(MSG_INFO, "cbresult: %s\n", cbresult);
 	return (cbresult);
