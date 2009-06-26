@@ -664,7 +664,7 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if ((hba_tran = ndi_flavorv_get(pdip, SCSA_FLAVOR_SCSI_DEVICE)) ==
 	    NULL) {
-		cmn_err(CE_WARN, "Failed attach iport becasue fail to "
+		cmn_err(CE_WARN, "Failed attach iport because fail to "
 		    "get tran vector for the HBA node");
 		return (DDI_FAILURE);
 	}
@@ -676,7 +676,7 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if ((hba_tran = ndi_flavorv_get(dip, SCSA_FLAVOR_SCSI_DEVICE)) ==
 	    NULL) {
-		mptsas_log(mpt, CE_WARN, "Failed attach iport becasue fail to "
+		mptsas_log(mpt, CE_WARN, "Failed attach iport because fail to "
 		    "get tran vector for the iport node");
 		return (DDI_FAILURE);
 	}
@@ -706,7 +706,7 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (i == MPTSAS_MAX_PHYS) {
-		mptsas_log(mpt, CE_WARN, "Failed attach port %s becasue port"
+		mptsas_log(mpt, CE_WARN, "Failed attach port %s because port"
 		    "seems not exist", iport);
 		mutex_exit(&mpt->m_mutex);
 		return (DDI_FAILURE);
@@ -725,7 +725,7 @@ mptsas_iport_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	rval = mptsas_get_sas_port_page0(mpt, page_address, &wwid, &portwidth);
 	if (rval != DDI_SUCCESS) {
-		mptsas_log(mpt, CE_WARN, "Failed attach port %s becasue get"
+		mptsas_log(mpt, CE_WARN, "Failed attach port %s because get"
 		    "SAS address of initiator failed!", iport);
 		mutex_exit(&mpt->m_mutex);
 		return (DDI_FAILURE);
@@ -2668,7 +2668,7 @@ mptsas_name_child(dev_info_t *lun_dip, char *name, int len)
 		/*
 		 * Stick in the address of the form "wWWN,LUN"
 		 */
-		reallen = snprintf(name, len, "w%016s,%x", sas_wwn, lun);
+		reallen = snprintf(name, len, "w%s,%x", sas_wwn, lun);
 		ddi_prop_free(sas_wwn);
 	} else if ((phynum = ddi_prop_get_int(DDI_DEV_T_ANY, lun_dip,
 	    DDI_PROP_DONTPASS, "sata-phy", -1)) != -1) {
@@ -5646,7 +5646,7 @@ find_parent:
 			parent = scsi_hba_iport_find(mpt->m_dip,
 			    phy_mask_name);
 			if (parent == NULL) {
-				mptsas_log(mpt, CE_WARN, "Failed to find a "
+				mptsas_log(mpt, CE_WARN, "Failed to find an "
 				    "iport, should not happen!");
 				goto out;
 			}
@@ -5839,7 +5839,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 		rval = mptsas_offline_target(parent, addr);
 		ndi_devi_exit(parent, circ1);
 		ndi_devi_exit(scsi_vhci_dip, circ);
-		NDBG20(("mptsas%d handle_topo_change to offine devhdl:%x, "
+		NDBG20(("mptsas%d handle_topo_change to offline devhdl:%x, "
 		    "phymask:%x, rval:%x", mpt->m_instance,
 		    ptgt->m_devhdl, ptgt->m_phymask, rval));
 
@@ -12395,7 +12395,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 	 * if nodename can't be determined then print a message and skip it
 	 */
 	if (nodename == NULL) {
-		mptsas_log(mpt, CE_WARN, "mptsas found no comptible driver "
+		mptsas_log(mpt, CE_WARN, "mptsas found no compatible driver "
 		    "for target %d lun %d", target, lun);
 		return (DDI_FAILURE);
 	}
