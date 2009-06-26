@@ -1055,6 +1055,14 @@ poll_again:
 			sqp->sq_state &= ~(SQS_PROC|SQS_GET_PKTS);
 			/* LINTED: constant in conditional context */
 			SQS_POLLING_OFF(sqp, B_TRUE, sq_rx_ring);
+
+			/*
+			 * If there is a pending control operation
+			 * wake up the worker, since it is currently
+			 * not running.
+			 */
+			if (sqp->sq_state & SQS_WORKER_THR_CONTROL)
+				cv_signal(&sqp->sq_worker_cv);
 		} else {
 			/*
 			 * Worker thread is already running. We don't need

@@ -203,7 +203,7 @@ ip_squeue_set_create(processorid_t id)
 	 * default squeue, in order to support fanout of conns across
 	 * CPUs. Try to find a former default squeue that matches this
 	 * cpu id on the unbound squeue set. If no such squeue is found,
-	 * find some non-default TCP squeue and steal it. If still no such
+	 * find some non-default TCP squeue that is free. If still no such
 	 * candidate is found, create a new squeue.
 	 */
 
@@ -214,17 +214,24 @@ ip_squeue_set_create(processorid_t id)
 	while (*lastsqp) {
 		if ((*lastsqp)->sq_bind == id &&
 		    (*lastsqp)->sq_state & SQS_DEFAULT) {
+			/*
+			 * Exact match. Former default squeue of cpu 'id'
+			 */
+			ASSERT(!((*lastsqp)->sq_state & SQS_ILL_BOUND));
 			defaultq_lastp = lastsqp;
 			break;
 		}
 		if (defaultq_lastp == NULL &&
-		    !((*lastsqp)->sq_state & SQS_DEFAULT)) {
+		    !((*lastsqp)->sq_state & (SQS_ILL_BOUND | SQS_DEFAULT))) {
+			/*
+			 * A free non-default TCP squeue
+			 */
 			defaultq_lastp = lastsqp;
 		}
 		lastsqp = &(*lastsqp)->sq_next;
-
 	}
-	if (defaultq_lastp) {
+
+	if (defaultq_lastp != NULL) {
 		/* Remove from src set and set SQS_DEFAULT */
 		sq = *defaultq_lastp;
 		*defaultq_lastp = sq->sq_next;
@@ -262,7 +269,8 @@ ip_squeue_getfree(pri_t pri)
 	mutex_enter(&sqset_lock);
 	for (sq = sqs->sqs_head; sq != NULL; sq = sq->sq_next) {
 		/*
-		 * Select a non-default squeue
+		 * Select a non-default TCP squeue that is free i.e. not
+		 * bound to any ill.
 		 */
 		if (!(sq->sq_state & (SQS_DEFAULT | SQS_ILL_BOUND)))
 			break;
@@ -564,7 +572,7 @@ ip_squeue_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
 	mutex_exit(&ill->ill_lock);
 	while (!(sqp->sq_state & SQS_POLL_CLEANUP_DONE))
 		cv_wait(&sqp->sq_ctrlop_done_cv, &sqp->sq_lock);
-	sqp->sq_state &= ~(SQS_POLL_CLEANUP_DONE | SQS_ILL_BOUND);
+	sqp->sq_state &= ~SQS_POLL_CLEANUP_DONE;
 
 	ASSERT(!(sqp->sq_state & (SQS_POLL_THR_CONTROL |
 	    SQS_WORKER_THR_CONTROL | SQS_POLL_QUIESCE_DONE |
@@ -574,12 +582,24 @@ ip_squeue_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
 	mutex_exit(&sqp->sq_lock);
 
 	/*
-	 * Logically free the squeue. It goes back to the set of unused
-	 * squeues
+	 * Move the squeue to sqset_global_list[0] which holds the set of
+	 * squeues not bound to any cpu. Note that the squeue is still
+	 * considered bound to an ill as long as SQS_ILL_BOUND is set.
 	 */
 	mutex_enter(&sqset_lock);
 	ip_squeue_set_move(sqp, sqset_global_list[0]);
 	mutex_exit(&sqset_lock);
+
+	/*
+	 * CPU going offline can also trigger a move of the squeue to the
+	 * unbound set sqset_global_list[0]. However the squeue won't be
+	 * recycled for the next use as long as the SQS_ILL_BOUND flag
+	 * is set. Hence we clear the SQS_ILL_BOUND flag only towards the
+	 * end after the move.
+	 */
+	mutex_enter(&sqp->sq_lock);
+	sqp->sq_state &= ~SQS_ILL_BOUND;
+	mutex_exit(&sqp->sq_lock);
 
 	mutex_enter(&ill->ill_lock);
 	rx_ring->rr_ring_state = RR_FREE;
@@ -702,7 +722,7 @@ ip_squeue_set_destroy(cpu_t *cpu)
 	/* Also move default squeue to unbound set */
 
 	sqp = sqs->sqs_default;
-	ASSERT(sqp);
+	ASSERT(sqp != NULL);
 	ASSERT((sqp->sq_state & (SQS_DEFAULT|SQS_ILL_BOUND)) == SQS_DEFAULT);
 
 	sqp->sq_next = unbound->sqs_head;

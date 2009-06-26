@@ -3229,14 +3229,18 @@ ill_taskq_dispatch(ip_stack_t *ipst)
 	mutex_enter(&ipst->ips_capab_taskq_lock);
 
 	for (;;) {
-		mp = list_head(&ipst->ips_capab_taskq_list);
+		mp = ipst->ips_capab_taskq_head;
 		while (mp != NULL) {
-			list_remove(&ipst->ips_capab_taskq_list, mp);
+			ipst->ips_capab_taskq_head = mp->b_next;
+			if (ipst->ips_capab_taskq_head == NULL)
+				ipst->ips_capab_taskq_tail = NULL;
 			mutex_exit(&ipst->ips_capab_taskq_lock);
+			mp->b_next = NULL;
+
 			VERIFY(taskq_dispatch(system_taskq,
 			    ill_capability_ack_thr, mp, TQ_SLEEP) != 0);
 			mutex_enter(&ipst->ips_capab_taskq_lock);
-			mp = list_head(&ipst->ips_capab_taskq_list);
+			mp = ipst->ips_capab_taskq_head;
 		}
 
 		if (ipst->ips_capab_taskq_quit)
@@ -3245,7 +3249,8 @@ ill_taskq_dispatch(ip_stack_t *ipst)
 		cv_wait(&ipst->ips_capab_taskq_cv, &ipst->ips_capab_taskq_lock);
 		CALLB_CPR_SAFE_END(&cprinfo, &ipst->ips_capab_taskq_lock);
 	}
-	VERIFY(list_head(&ipst->ips_capab_taskq_list) == NULL);
+	VERIFY(ipst->ips_capab_taskq_head == NULL);
+	VERIFY(ipst->ips_capab_taskq_tail == NULL);
 	CALLB_CPR_EXIT(&cprinfo);
 	thread_exit();
 }
@@ -3264,6 +3269,8 @@ ill_capability_ack_thr(void *arg)
 	boolean_t reneg;
 
 	ill = (ill_t *)mp->b_prev;
+	mp->b_prev = NULL;
+
 	VERIFY(ipsq_enter(ill, B_FALSE, CUR_OP) == B_TRUE);
 
 	if (ill->ill_dlpi_capab_state == IDCS_RESET_SENT ||
@@ -3335,6 +3342,8 @@ ill_capability_ack(ill_t *ill, mblk_t *mp)
 	ip_stack_t	*ipst = ill->ill_ipst;
 
 	mp->b_prev = (mblk_t *)ill;
+	ASSERT(mp->b_next == NULL);
+
 	if (taskq_dispatch(system_taskq, ill_capability_ack_thr, mp,
 	    TQ_NOSLEEP) != 0)
 		return;
@@ -3344,7 +3353,14 @@ ill_capability_ack(ill_t *ill, mblk_t *mp)
 	 * which will do the dispatch using TQ_SLEEP to guarantee success.
 	 */
 	mutex_enter(&ipst->ips_capab_taskq_lock);
-	list_insert_tail(&ipst->ips_capab_taskq_list, mp);
+	if (ipst->ips_capab_taskq_head == NULL) {
+		ASSERT(ipst->ips_capab_taskq_tail == NULL);
+		ipst->ips_capab_taskq_head = mp;
+	} else {
+		ipst->ips_capab_taskq_tail->b_next = mp;
+	}
+	ipst->ips_capab_taskq_tail = mp;
+
 	cv_signal(&ipst->ips_capab_taskq_cv);
 	mutex_exit(&ipst->ips_capab_taskq_lock);
 }

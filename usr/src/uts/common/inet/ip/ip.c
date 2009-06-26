@@ -5823,7 +5823,6 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 
 	mutex_destroy(&ipst->ips_capab_taskq_lock);
 	cv_destroy(&ipst->ips_capab_taskq_cv);
-	list_destroy(&ipst->ips_capab_taskq_list);
 
 	mutex_enter(&ipst->ips_mrt_lock);
 	while (!(ipst->ips_mrt_flags & IP_MRT_DONE))
@@ -6118,8 +6117,6 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	    ill_taskq_dispatch, ipst, 0, &p0, TS_RUN, minclsyspri);
 	mutex_init(&ipst->ips_capab_taskq_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ipst->ips_capab_taskq_cv, NULL, CV_DEFAULT, NULL);
-	list_create(&ipst->ips_capab_taskq_list, sizeof (mblk_t),
-	    offsetof(mblk_t, b_next));
 
 	/*
 	 * Create the mcast_restart_timers_thread() worker thread.

@@ -188,7 +188,8 @@ struct ip_stack {
 	/* Taskq dispatcher for capability operations */
 	kmutex_t	ips_capab_taskq_lock;
 	kcondvar_t	ips_capab_taskq_cv;
-	list_t		ips_capab_taskq_list;
+	mblk_t		*ips_capab_taskq_head;
+	mblk_t		*ips_capab_taskq_tail;
 	kthread_t	*ips_capab_taskq_thread;
 	boolean_t	ips_capab_taskq_quit;
 
