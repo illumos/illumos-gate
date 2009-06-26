@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/proc.h>
@@ -60,7 +58,7 @@ void aio_cleanup_exit(void);
 static void aio_sigev_send(proc_t *, sigqueue_t *);
 static void aio_hash_delete(aio_t *, aio_req_t *);
 static void aio_lio_free(aio_t *, aio_lio_t *);
-static void aio_cleanup_cleanupq(aio_t *, aio_req_t *, int);
+static int aio_cleanup_cleanupq(aio_t *, aio_req_t *, int);
 static int aio_cleanup_notifyq(aio_t *, aio_req_t *, int);
 static void aio_cleanup_pollq(aio_t *, aio_req_t *, int);
 static void aio_cleanup_portq(aio_t *, aio_req_t *, int);
@@ -103,11 +101,11 @@ aphysio(
 #endif	/* _ILP32 */
 
 	TNF_PROBE_5(aphysio_start, "kaio", /* CSTYLED */,
-		tnf_opaque, bp, bp,
-		tnf_device, device, dev,
-		tnf_offset, blkno, btodt(uio->uio_loffset),
-		tnf_size, size, uio->uio_iov->iov_len,
-		tnf_bioflags, rw, rw);
+	    tnf_opaque, bp, bp,
+	    tnf_device, device, dev,
+	    tnf_offset, blkno, btodt(uio->uio_loffset),
+	    tnf_size, size, uio->uio_iov->iov_len,
+	    tnf_bioflags, rw, rw);
 
 	if (rw == B_READ) {
 		CPU_STATS_ADD_K(sys, phread, 1);
@@ -216,11 +214,11 @@ aio_done(struct buf *bp)
 	fd = reqp->aio_req_fd;
 
 	TNF_PROBE_5(aphysio_end, "kaio", /* CSTYLED */,
-		tnf_opaque, bp, bp,
-		tnf_device, device, bp->b_edev,
-		tnf_offset, blkno, btodt(reqp->aio_req_uio.uio_loffset),
-		tnf_size, size, reqp->aio_req_uio.uio_iov->iov_len,
-		tnf_bioflags, rw, (bp->b_flags & (B_READ|B_WRITE)));
+	    tnf_opaque, bp, bp,
+	    tnf_device, device, bp->b_edev,
+	    tnf_offset, blkno, btodt(reqp->aio_req_uio.uio_loffset),
+	    tnf_size, size, reqp->aio_req_uio.uio_iov->iov_len,
+	    tnf_bioflags, rw, (bp->b_flags & (B_READ|B_WRITE)));
 
 	/*
 	 * mapout earlier so that more kmem is available when aio is
@@ -408,9 +406,13 @@ aio_done(struct buf *bp)
 		/*
 		 * Send a SIGIO signal when the process has a handler enabled.
 		 */
-		if ((func = PTOU(p)->u_signal[SIGIO - 1]) != SIG_DFL &&
-		    func != SIG_IGN)
+		if ((func = PTOU(p)->u_signal[SIGIO - 1]) !=
+		    SIG_DFL && (func != SIG_IGN)) {
 			psignal(p, SIGIO);
+			mutex_enter(&aiop->aio_mutex);
+			reqp->aio_req_flags |= AIO_SIGNALLED;
+			mutex_exit(&aiop->aio_mutex);
+		}
 	}
 	if (pkevp)
 		port_send_event(pkevp);
@@ -482,8 +484,8 @@ aphysio_unlock(aio_req_t *reqp)
 	flags = (((bp->b_flags & B_READ) == B_READ) ? S_WRITE : S_READ);
 	if (reqp->aio_req_flags & AIO_PAGELOCKDONE) {
 		as_pageunlock(bp->b_proc->p_as,
-			bp->b_flags & B_SHADOW ? bp->b_shadow : NULL,
-			iov->iov_base, iov->iov_len, flags);
+		    bp->b_flags & B_SHADOW ? bp->b_shadow : NULL,
+		    iov->iov_base, iov->iov_len, flags);
 		reqp->aio_req_flags &= ~AIO_PAGELOCKDONE;
 	}
 	bp->b_flags &= ~(B_BUSY|B_WANTED|B_PHYS|B_SHADOW);
@@ -747,7 +749,7 @@ aio_cleanup(int flag)
 	 * do cleanup for the various queues.
 	 */
 	if (cleanupqhead)
-		aio_cleanup_cleanupq(aiop, cleanupqhead, exitflg);
+		signalled = aio_cleanup_cleanupq(aiop, cleanupqhead, exitflg);
 	mutex_exit(&aiop->aio_cleanupq_mutex);
 	if (notifyqhead)
 		signalled = aio_cleanup_notifyq(aiop, notifyqhead, exitflg);
@@ -882,10 +884,11 @@ aio_cleanup_portq(aio_t *aiop, aio_req_t *cleanupq, int exitflag)
 /*
  * Do cleanup for every element of the cleanupq.
  */
-static void
+static int
 aio_cleanup_cleanupq(aio_t *aiop, aio_req_t *qhead, int exitflg)
 {
 	aio_req_t *reqp, *next;
+	int signalled = 0;
 
 	ASSERT(MUTEX_HELD(&aiop->aio_cleanupq_mutex));
 
@@ -897,7 +900,7 @@ aio_cleanup_cleanupq(aio_t *aiop, aio_req_t *qhead, int exitflg)
 	 * loop from aio_req_done() and aio_req_find().
 	 */
 	if ((reqp = qhead) == NULL)
-		return;
+		return (0);
 	do {
 		ASSERT(reqp->aio_req_flags & AIO_CLEANUPQ);
 		ASSERT(reqp->aio_req_portkev == NULL);
@@ -908,8 +911,11 @@ aio_cleanup_cleanupq(aio_t *aiop, aio_req_t *qhead, int exitflg)
 			aio_req_free(aiop, reqp);
 		else
 			aio_enq(&aiop->aio_doneq, reqp, AIO_DONEQ);
+		if (!exitflg && reqp->aio_req_flags & AIO_SIGNALLED)
+			signalled++;
 		mutex_exit(&aiop->aio_mutex);
 	} while ((reqp = next) != qhead);
+	return (signalled);
 }
 
 /*

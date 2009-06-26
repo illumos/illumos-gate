@@ -155,7 +155,8 @@ typedef struct aio {
 #define	AIO_DONEQ	0x80			/* aio req is on the doneq */
 #define	AIO_ZEROLEN	0x100			/* aio req is zero length */
 #define	AIO_PAGELOCKDONE	0x200		/* aio called as_pagelock() */
-#define	AIO_CLOSE_PORT		0x400		/* port is being closed */
+#define	AIO_CLOSE_PORT	0x400		/* port is being closed */
+#define	AIO_SIGNALLED	0x800		/* process signalled by this req */
 
 /* flag argument of aio_cleanup() */
 
