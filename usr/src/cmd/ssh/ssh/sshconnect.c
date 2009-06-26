@@ -1003,6 +1003,10 @@ ssh_login(Sensitive *sensitive, const char *orighost,
 	/* key exchange */
 	/* authenticate user */
 	if (compat20) {
+		/*
+		 * Note that the host pointer is saved in ssh_kex2() for later
+		 * use during the key re-exchanges so we must not xfree() it.
+		 */
 		ssh_kex2(host, hostaddr);
 		ssh_userauth2(local_user, server_user, host, sensitive);
 	} else {
@@ -1010,7 +1014,6 @@ ssh_login(Sensitive *sensitive, const char *orighost,
 		ssh_userauth1(local_user, server_user, host, sensitive);
 	}
 
-	xfree(host);
 	xfree(local_user);
 }
 
