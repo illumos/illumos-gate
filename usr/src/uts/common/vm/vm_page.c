@@ -3077,15 +3077,18 @@ page_destroy(page_t *pp, int dontfree)
 		 * Acquire the "freemem_lock" for availrmem.
 		 * The page_struct_lock need not be acquired for lckcnt
 		 * and cowcnt since the page has an "exclusive" lock.
+		 * We are doing a modified version of page_pp_unlock here.
 		 */
 		if ((pp->p_lckcnt != 0) || (pp->p_cowcnt != 0)) {
 			mutex_enter(&freemem_lock);
 			if (pp->p_lckcnt != 0) {
 				availrmem++;
+				pages_locked--;
 				pp->p_lckcnt = 0;
 			}
 			if (pp->p_cowcnt != 0) {
 				availrmem += pp->p_cowcnt;
+				pages_locked -= pp->p_cowcnt;
 				pp->p_cowcnt = 0;
 			}
 			mutex_exit(&freemem_lock);

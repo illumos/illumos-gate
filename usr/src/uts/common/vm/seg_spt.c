@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/user.h>
@@ -740,6 +738,13 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 				panic("segspt_free_pages: bad large page");
 				/*NOTREACHED*/
 			}
+			/*
+			 * Before destroying the pages, we need to take care
+			 * of the rctl locked memory accounting. For that
+			 * we need to calculte the unlocked_bytes.
+			 */
+			if (pp->p_lckcnt > 0)
+				unlocked_bytes += PAGESIZE;
 			/*LINTED: constant in conditional context */
 			VN_DISPOSE(pp, B_INVAL, 0, kcred);
 		}

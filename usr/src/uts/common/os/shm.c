@@ -578,15 +578,17 @@ shm_dtor(kipc_perm_t *perm)
 	uint_t cnt;
 	size_t rsize;
 
+	if (sp->shm_sptinfo) {
+		if (isspt(sp)) {
+			sptdestroy(sp->shm_sptinfo->sptas, sp->shm_amp);
+			sp->shm_lkcnt = 0;
+		}
+		kmem_free(sp->shm_sptinfo, sizeof (sptinfo_t));
+	}
+
 	if (sp->shm_lkcnt > 0) {
 		shmem_unlock(sp, sp->shm_amp);
 		sp->shm_lkcnt = 0;
-	}
-
-	if (sp->shm_sptinfo) {
-		if (isspt(sp))
-			sptdestroy(sp->shm_sptinfo->sptas, sp->shm_amp);
-		kmem_free(sp->shm_sptinfo, sizeof (sptinfo_t));
 	}
 
 	ANON_LOCK_ENTER(&sp->shm_amp->a_rwlock, RW_WRITER);
