@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 1.154 $
  *
  ******************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __UTMISC_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acnamesp.h"
 
 
@@ -1176,7 +1176,7 @@ AcpiUtWalkPackageTree (
          */
         if ((!ThisSourceObj) ||
             (ACPI_GET_DESCRIPTOR_TYPE (ThisSourceObj) != ACPI_DESC_TYPE_OPERAND) ||
-            (ACPI_GET_OBJECT_TYPE (ThisSourceObj) != ACPI_TYPE_PACKAGE))
+            (ThisSourceObj->Common.Type != ACPI_TYPE_PACKAGE))
         {
             Status = WalkCallback (ACPI_COPY_TYPE_SIMPLE, ThisSourceObj,
                                     State, Context);
@@ -1237,6 +1237,13 @@ AcpiUtWalkPackageTree (
                                             State->Pkg.ThisTargetObj, 0);
             if (!State)
             {
+                /* Free any stacked Update State objects */
+
+                while (StateList)
+                {
+                    State = AcpiUtPopGenericState (&StateList);
+                    AcpiUtDeleteGenericState (State);
+                }
                 return_ACPI_STATUS (AE_NO_MEMORY);
             }
         }
@@ -1250,7 +1257,7 @@ AcpiUtWalkPackageTree (
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiUtError, AcpiUtWarning, AcpiUtInfo
+ * FUNCTION:    AcpiError, AcpiException, AcpiWarning, AcpiInfo
  *
  * PARAMETERS:  ModuleName          - Caller's module name (for error output)
  *              LineNumber          - Caller's line number (for error output)
@@ -1263,7 +1270,7 @@ AcpiUtWalkPackageTree (
  ******************************************************************************/
 
 void  ACPI_INTERNAL_VAR_XFACE
-AcpiUtError (
+AcpiError (
     const char              *ModuleName,
     UINT32                  LineNumber,
     const char              *Format,
@@ -1272,16 +1279,16 @@ AcpiUtError (
     va_list                 args;
 
 
-    AcpiOsPrintf ("ACPI Error (%s-%04d): ", ModuleName, LineNumber);
+    AcpiOsPrintf ("ACPI Error: ");
 
     va_start (args, Format);
     AcpiOsVprintf (Format, args);
-    AcpiOsPrintf (" [%X]\n", ACPI_CA_VERSION);
+    AcpiOsPrintf (" %8.8X %s-%u\n", ACPI_CA_VERSION, ModuleName, LineNumber);
     va_end (args);
 }
 
 void  ACPI_INTERNAL_VAR_XFACE
-AcpiUtException (
+AcpiException (
     const char              *ModuleName,
     UINT32                  LineNumber,
     ACPI_STATUS             Status,
@@ -1291,17 +1298,16 @@ AcpiUtException (
     va_list                 args;
 
 
-    AcpiOsPrintf ("ACPI Exception (%s-%04d): %s, ", ModuleName, LineNumber,
-        AcpiFormatException (Status));
+    AcpiOsPrintf ("ACPI Exception: %s, ", AcpiFormatException (Status));
 
     va_start (args, Format);
     AcpiOsVprintf (Format, args);
-    AcpiOsPrintf (" [%X]\n", ACPI_CA_VERSION);
+    AcpiOsPrintf (" %8.8X %s-%u\n", ACPI_CA_VERSION, ModuleName, LineNumber);
     va_end (args);
 }
 
 void  ACPI_INTERNAL_VAR_XFACE
-AcpiUtWarning (
+AcpiWarning (
     const char              *ModuleName,
     UINT32                  LineNumber,
     const char              *Format,
@@ -1310,16 +1316,16 @@ AcpiUtWarning (
     va_list                 args;
 
 
-    AcpiOsPrintf ("ACPI Warning (%s-%04d): ", ModuleName, LineNumber);
+    AcpiOsPrintf ("ACPI Warning: ");
 
     va_start (args, Format);
     AcpiOsVprintf (Format, args);
-    AcpiOsPrintf (" [%X]\n", ACPI_CA_VERSION);
+    AcpiOsPrintf (" %8.8X %s-%u\n", ACPI_CA_VERSION, ModuleName, LineNumber);
     va_end (args);
 }
 
 void  ACPI_INTERNAL_VAR_XFACE
-AcpiUtInfo (
+AcpiInfo (
     const char              *ModuleName,
     UINT32                  LineNumber,
     const char              *Format,
@@ -1328,10 +1334,6 @@ AcpiUtInfo (
     va_list                 args;
 
 
-    /*
-     * Removed ModuleName, LineNumber, and acpica version, not needed
-     * for info output
-     */
     AcpiOsPrintf ("ACPI: ");
 
     va_start (args, Format);
@@ -1339,4 +1341,10 @@ AcpiUtInfo (
     AcpiOsPrintf ("\n");
     va_end (args);
 }
+
+ACPI_EXPORT_SYMBOL (AcpiError)
+ACPI_EXPORT_SYMBOL (AcpiException)
+ACPI_EXPORT_SYMBOL (AcpiWarning)
+ACPI_EXPORT_SYMBOL (AcpiInfo)
+
 

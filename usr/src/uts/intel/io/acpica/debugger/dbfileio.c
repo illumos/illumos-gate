@@ -2,7 +2,6 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands. These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 1.96 $
  *
  ******************************************************************************/
 
@@ -10,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -117,6 +116,7 @@
 
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acdebug.h"
 
 #ifdef ACPI_APPLICATION

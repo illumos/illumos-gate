@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 1.145 $
  *
  *****************************************************************************/
 
@@ -10,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -119,6 +118,7 @@
 #define __EXMISC_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acinterp.h"
 #include "amlcode.h"
 #include "amlresrc.h"
@@ -162,7 +162,7 @@ AcpiExGetObjectReference (
     {
     case ACPI_DESC_TYPE_OPERAND:
 
-        if (ACPI_GET_OBJECT_TYPE (ObjDesc) != ACPI_TYPE_LOCAL_REFERENCE)
+        if (ObjDesc->Common.Type != ACPI_TYPE_LOCAL_REFERENCE)
         {
             return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
         }
@@ -357,7 +357,7 @@ AcpiExDoConcatenate (
      * guaranteed to be either Integer/String/Buffer by the operand
      * resolution mechanism.
      */
-    switch (ACPI_GET_OBJECT_TYPE (Operand0))
+    switch (Operand0->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
         Status = AcpiExConvertToInteger (Operand1, &LocalOperand1, 16);
@@ -374,7 +374,7 @@ AcpiExDoConcatenate (
 
     default:
         ACPI_ERROR ((AE_INFO, "Invalid object type: %X",
-            ACPI_GET_OBJECT_TYPE (Operand0)));
+            Operand0->Common.Type));
         Status = AE_AML_INTERNAL;
     }
 
@@ -396,7 +396,7 @@ AcpiExDoConcatenate (
      * 2) Two Strings concatenated to produce a new String
      * 3) Two Buffers concatenated to produce a new Buffer
      */
-    switch (ACPI_GET_OBJECT_TYPE (Operand0))
+    switch (Operand0->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
 
@@ -476,7 +476,7 @@ AcpiExDoConcatenate (
         /* Invalid object type, should not happen here */
 
         ACPI_ERROR ((AE_INFO, "Invalid object type: %X",
-            ACPI_GET_OBJECT_TYPE (Operand0)));
+            Operand0->Common.Type));
         Status =AE_AML_INTERNAL;
         goto Cleanup;
     }
@@ -709,7 +709,7 @@ AcpiExDoLogicalOp (
      * guaranteed to be either Integer/String/Buffer by the operand
      * resolution mechanism.
      */
-    switch (ACPI_GET_OBJECT_TYPE (Operand0))
+    switch (Operand0->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
         Status = AcpiExConvertToInteger (Operand1, &LocalOperand1, 16);
@@ -737,7 +737,7 @@ AcpiExDoLogicalOp (
     /*
      * Two cases: 1) Both Integers, 2) Both Strings or Buffers
      */
-    if (ACPI_GET_OBJECT_TYPE (Operand0) == ACPI_TYPE_INTEGER)
+    if (Operand0->Common.Type == ACPI_TYPE_INTEGER)
     {
         /*
          * 1) Both operands are of type integer

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 1.210 $
  *
  *****************************************************************************/
 
@@ -10,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __EXSTORE_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acdispat.h"
 #include "acinterp.h"
 #include "amlcode.h"
@@ -216,7 +216,7 @@ AcpiExDoDebugObject (
 
     /* SourceDesc is of type ACPI_DESC_TYPE_OPERAND */
 
-    switch (ACPI_GET_OBJECT_TYPE (SourceDesc))
+    switch (SourceDesc->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
 
@@ -279,9 +279,11 @@ AcpiExDoDebugObject (
 
         case ACPI_REFCLASS_TABLE:
 
+            /* Case for DdbHandle */
+
             ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Table Index 0x%X\n",
                 SourceDesc->Reference.Value));
-            break;
+            return;
 
         default:
             break;
@@ -410,7 +412,7 @@ AcpiExStore (
 
     /* Destination object must be a Reference or a Constant object */
 
-    switch (ACPI_GET_OBJECT_TYPE (DestDesc))
+    switch (DestDesc->Common.Type)
     {
     case ACPI_TYPE_LOCAL_REFERENCE:
         break;
@@ -551,7 +553,7 @@ AcpiExStoreObjectToIndex (
          */
         ObjDesc = *(IndexDesc->Reference.Where);
 
-        if (ACPI_GET_OBJECT_TYPE (SourceDesc) == ACPI_TYPE_LOCAL_REFERENCE &&
+        if (SourceDesc->Common.Type == ACPI_TYPE_LOCAL_REFERENCE &&
             SourceDesc->Reference.Class == ACPI_REFCLASS_TABLE)
         {
             /* This is a DDBHandle, just add a reference to it */
@@ -615,8 +617,8 @@ AcpiExStoreObjectToIndex (
          * by the INDEX_OP code.
          */
         ObjDesc = IndexDesc->Reference.Object;
-        if ((ACPI_GET_OBJECT_TYPE (ObjDesc) != ACPI_TYPE_BUFFER) &&
-            (ACPI_GET_OBJECT_TYPE (ObjDesc) != ACPI_TYPE_STRING))
+        if ((ObjDesc->Common.Type != ACPI_TYPE_BUFFER) &&
+            (ObjDesc->Common.Type != ACPI_TYPE_STRING))
         {
             return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
         }
@@ -625,7 +627,7 @@ AcpiExStoreObjectToIndex (
          * The assignment of the individual elements will be slightly
          * different for each source type.
          */
-        switch (ACPI_GET_OBJECT_TYPE (SourceDesc))
+        switch (SourceDesc->Common.Type)
         {
         case ACPI_TYPE_INTEGER:
 
@@ -810,7 +812,7 @@ AcpiExStoreObjectToNode (
         /* No conversions for all other types.  Just attach the source object */
 
         Status = AcpiNsAttachObject (Node, SourceDesc,
-                    ACPI_GET_OBJECT_TYPE (SourceDesc));
+                    SourceDesc->Common.Type);
         break;
     }
 

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 1.204 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -356,7 +355,9 @@ extern const UINT8 _acpi_ctype[];
 #define ACPI_IS_PRINT(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_LO | _ACPI_UP | _ACPI_DI | _ACPI_SP | _ACPI_PU))
 #define ACPI_IS_ALPHA(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_LO | _ACPI_UP))
 
-#endif /* ACPI_USE_SYSTEM_CLIBRARY */
+#endif /* !ACPI_USE_SYSTEM_CLIBRARY */
+
+#define ACPI_IS_ASCII(c)  ((c) < 0x80)
 
 
 /*
@@ -507,58 +508,6 @@ AcpiUtReportWarning (
     char                    *ModuleName,
     UINT32                  LineNumber);
 
-/* Error and message reporting interfaces */
-
-void ACPI_INTERNAL_VAR_XFACE
-AcpiUtDebugPrint (
-    UINT32                  RequestedDebugLevel,
-    UINT32                  LineNumber,
-    const char              *FunctionName,
-    const char              *ModuleName,
-    UINT32                  ComponentId,
-    const char              *Format,
-    ...) ACPI_PRINTF_LIKE(6);
-
-void ACPI_INTERNAL_VAR_XFACE
-AcpiUtDebugPrintRaw (
-    UINT32                  RequestedDebugLevel,
-    UINT32                  LineNumber,
-    const char              *FunctionName,
-    const char              *ModuleName,
-    UINT32                  ComponentId,
-    const char              *Format,
-    ...) ACPI_PRINTF_LIKE(6);
-
-void ACPI_INTERNAL_VAR_XFACE
-AcpiUtError (
-    const char              *ModuleName,
-    UINT32                  LineNumber,
-    const char              *Format,
-    ...) ACPI_PRINTF_LIKE(3);
-
-void  ACPI_INTERNAL_VAR_XFACE
-AcpiUtException (
-    const char              *ModuleName,
-    UINT32                  LineNumber,
-    ACPI_STATUS             Status,
-    const char              *Format,
-    ...) ACPI_PRINTF_LIKE(4);
-
-void ACPI_INTERNAL_VAR_XFACE
-AcpiUtWarning (
-    const char              *ModuleName,
-    UINT32                  LineNumber,
-    const char              *Format,
-    ...) ACPI_PRINTF_LIKE(3);
-
-void ACPI_INTERNAL_VAR_XFACE
-AcpiUtInfo (
-    const char              *ModuleName,
-    UINT32                  LineNumber,
-    const char              *Format,
-    ...) ACPI_PRINTF_LIKE(3);
-
-
 /*
  * utdelete - Object deletion and reference counts
  */
@@ -627,6 +576,33 @@ ACPI_STATUS
 AcpiUtExecute_Sxds (
     ACPI_NAMESPACE_NODE     *DeviceNode,
     UINT8                   *Highest);
+
+/*
+ * utlock - reader/writer locks
+ */
+ACPI_STATUS
+AcpiUtCreateRwLock (
+    ACPI_RW_LOCK            *Lock);
+
+void
+AcpiUtDeleteRwLock (
+    ACPI_RW_LOCK            *Lock);
+
+ACPI_STATUS
+AcpiUtAcquireReadLock (
+    ACPI_RW_LOCK            *Lock);
+
+ACPI_STATUS
+AcpiUtReleaseReadLock (
+    ACPI_RW_LOCK            *Lock);
+
+ACPI_STATUS
+AcpiUtAcquireWriteLock (
+    ACPI_RW_LOCK            *Lock);
+
+void
+AcpiUtReleaseWriteLock (
+    ACPI_RW_LOCK            *Lock);
 
 
 /*

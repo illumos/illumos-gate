@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: utxface - External interfaces for "global" ACPI functions
- *              $Revision: 1.128 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,9 +117,11 @@
 #define __UTXFACE_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acevents.h"
 #include "acnamesp.h"
 #include "acdebug.h"
+#include "actables.h"
 
 #define _COMPONENT          ACPI_UTILITIES
         ACPI_MODULE_NAME    ("utxface")
@@ -238,6 +239,17 @@ AcpiEnableSubsystem (
             ACPI_WARNING ((AE_INFO, "AcpiEnable failed"));
             return_ACPI_STATUS (Status);
         }
+    }
+
+    /*
+     * Obtain a permanent mapping for the FACS. This is required for the
+     * Global Lock and the Firmware Waking Vector
+     */
+    Status = AcpiTbInitializeFacs ();
+    if (ACPI_FAILURE (Status))
+    {
+        ACPI_WARNING ((AE_INFO, "Could not map the FACS table"));
+        return_ACPI_STATUS (Status);
     }
 
     /*
@@ -695,4 +707,5 @@ AcpiPurgeCachedObjects (
 
 ACPI_EXPORT_SYMBOL (AcpiPurgeCachedObjects)
 
-#endif
+#endif /* ACPI_ASL_COMPILER */
+

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 1.186 $
  *
  *****************************************************************************/
 
@@ -10,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __EXOPARG1_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acparser.h"
 #include "acdispat.h"
 #include "acinterp.h"
@@ -947,8 +947,8 @@ AcpiExOpcode_1A_0T_1R (
             TempDesc = AcpiNsGetAttachedObject (
                            (ACPI_NAMESPACE_NODE *) Operand[0]);
             if (TempDesc &&
-                 ((ACPI_GET_OBJECT_TYPE (TempDesc) == ACPI_TYPE_STRING) ||
-                  (ACPI_GET_OBJECT_TYPE (TempDesc) == ACPI_TYPE_LOCAL_REFERENCE)))
+                 ((TempDesc->Common.Type == ACPI_TYPE_STRING) ||
+                  (TempDesc->Common.Type == ACPI_TYPE_LOCAL_REFERENCE)))
             {
                 Operand[0] = TempDesc;
                 AcpiUtAddReference (TempDesc);
@@ -961,7 +961,7 @@ AcpiExOpcode_1A_0T_1R (
         }
         else
         {
-            switch (ACPI_GET_OBJECT_TYPE (Operand[0]))
+            switch ((Operand[0])->Common.Type)
             {
             case ACPI_TYPE_LOCAL_REFERENCE:
                 /*
@@ -1020,7 +1020,7 @@ AcpiExOpcode_1A_0T_1R (
 
         if (ACPI_GET_DESCRIPTOR_TYPE (Operand[0]) != ACPI_DESC_TYPE_NAMED)
         {
-            if (ACPI_GET_OBJECT_TYPE (Operand[0]) == ACPI_TYPE_STRING)
+            if ((Operand[0])->Common.Type == ACPI_TYPE_STRING)
             {
                 /*
                  * This is a DerefOf (String). The string is a reference

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 1.154 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -188,10 +187,14 @@ AcpiNsWalkNamespace (
 
 ACPI_NAMESPACE_NODE *
 AcpiNsGetNextNode (
-    ACPI_OBJECT_TYPE        Type,
     ACPI_NAMESPACE_NODE     *Parent,
     ACPI_NAMESPACE_NODE     *Child);
 
+ACPI_NAMESPACE_NODE *
+AcpiNsGetNextNodeTyped (
+    ACPI_OBJECT_TYPE        Type,
+    ACPI_NAMESPACE_NODE     *Parent,
+    ACPI_NAMESPACE_NODE     *Child);
 
 /*
  * nsparse - table parsing
@@ -306,6 +309,28 @@ AcpiNsDumpObjects (
 ACPI_STATUS
 AcpiNsEvaluate (
     ACPI_EVALUATE_INFO      *Info);
+
+
+/*
+ * nspredef - Support for predefined/reserved names
+ */
+ACPI_STATUS
+AcpiNsCheckPredefinedNames (
+    ACPI_NAMESPACE_NODE     *Node,
+    UINT32                  UserParamCount,
+    ACPI_STATUS             ReturnStatus,
+    ACPI_OPERAND_OBJECT     **ReturnObject);
+
+const ACPI_PREDEFINED_INFO *
+AcpiNsCheckForPredefinedName (
+    ACPI_NAMESPACE_NODE     *Node);
+
+void
+AcpiNsCheckParameterCount (
+    char                        *Pathname,
+    ACPI_NAMESPACE_NODE         *Node,
+    UINT32                      UserParamCount,
+    const ACPI_PREDEFINED_INFO  *Info);
 
 
 /*

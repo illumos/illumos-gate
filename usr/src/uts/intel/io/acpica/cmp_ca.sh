@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -28,7 +28,7 @@
 #
 # Set this to the fully-qualified path to the ACPI CA GIT directory
 #
-ACDIR=/export/home/myers/acpica/acpica-unix-20080829
+ACDIR=/export/home/myers/acpica/acpica-unix-20090521
 
 ACSRC=$ACDIR
 ACINC=$ACDIR/include

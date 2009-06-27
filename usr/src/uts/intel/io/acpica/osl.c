@@ -47,7 +47,6 @@
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
-#include <sys/acpi/acinterp.h>
 
 #define	MAX_DAT_FILE_SIZE	(64*1024)
 
@@ -701,11 +700,12 @@ ACPI_THREAD_ID
 AcpiOsGetThreadId(void)
 {
 	/*
-	 * ACPI CA regards thread ID as an error, but it's valid
-	 * on Solaris during kernel initialization.  Thus, 1 is added
-	 * to the kernel thread ID to avoid returning 0
+	 * ACPI CA doesn't care what actual value is returned as long
+	 * as it is non-zero and unique to each existing thread.
+	 * ACPI CA assumes that thread ID is castable to a pointer,
+	 * so we use the current thread pointer.
 	 */
-	return (ddi_get_kt_did() + 1);
+	return (curthread);
 }
 
 /*

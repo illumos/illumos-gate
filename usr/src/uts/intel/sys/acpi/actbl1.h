@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: actbl1.h - Additional ACPI table definitions
- *       $Revision: 1.51 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -803,7 +802,7 @@ typedef struct acpi_hest_aer_common
     UINT32                  UncorrectableErrorMask;
     UINT32                  UncorrectableErrorSeverity;
     UINT32                  CorrectableErrorMask;
-    UINT32                  AdvancedErrorCababilities;
+    UINT32                  AdvancedErrorCapabilities;
 
 } ACPI_HEST_AER_COMMON;
 
@@ -1263,15 +1262,15 @@ typedef struct acpi_madt_interrupt_source
 
 #define ACPI_MADT_CPEI_OVERRIDE     (1)
 
-/* 9: Processor Local X2_APIC (07/2008) */
+/* 9: Processor Local X2APIC (07/2008) */
 
 typedef struct acpi_madt_local_x2apic
 {
     ACPI_SUBTABLE_HEADER    Header;
     UINT16                  Reserved;           /* Reserved - must be zero */
-    UINT32                  LocalApicId;        /* Processor X2_APIC ID  */
+    UINT32                  LocalApicId;        /* Processor x2APIC ID  */
     UINT32                  LapicFlags;
-    UINT32                  Uid;                /* Extended X2_APIC processor ID */
+    UINT32                  Uid;                /* ACPI processor UID */
 
 } ACPI_MADT_LOCAL_X2APIC;
 
@@ -1281,9 +1280,9 @@ typedef struct acpi_madt_local_x2apic_nmi
 {
     ACPI_SUBTABLE_HEADER    Header;
     UINT16                  IntiFlags;
-    UINT32                  Uid;                /* Processor X2_APIC ID */
+    UINT32                  Uid;                /* ACPI processor UID */
     UINT8                   Lint;               /* LINTn to which NMI is connected */
-    UINT8                   Reserved[3];
+    UINT8                   Reserved[3];        /* Reserved - must be zero */
 
 } ACPI_MADT_LOCAL_X2APIC_NMI;
 

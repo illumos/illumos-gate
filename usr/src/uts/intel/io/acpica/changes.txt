@@ -1,4 +1,557 @@
 ----------------------------------------
+21 May 2009. Summary of changes for version 20090521:
+
+This release is available at www.acpica.org/downloads
+
+1) ACPI CA Core Subsystem:
+
+Disabled the preservation of the SCI enable bit in the PM1 control register. 
+The SCI enable bit (bit 0, SCI_EN) is defined by the ACPI specification to be 
+a "preserved" bit - "OSPM always preserves this bit position", section 
+4.7.3.2.1. However, some machines fail if this bit is in fact preserved 
+because the bit needs to be explicitly set by the OS as a workaround. No 
+machines fail if the bit is not preserved. Therefore, ACPICA no longer 
+attempts to preserve this bit.
+
+Fixed a problem in AcpiRsGetPciRoutingTableLength where an invalid or 
+incorrectly formed _PRT package could cause a fault. Added validation to 
+ensure that each package element is actually a sub-package.
+
+Implemented a new interface to install or override a single control method, 
+AcpiInstallMethod. This interface is useful when debugging in order to repair 
+an existing method or to install a missing method without having to override 
+the entire ACPI table. See the ACPICA Programmer Reference for use and 
+examples. Lin Ming, Bob Moore.
+
+Fixed several reference count issues with the DdbHandle object that is 
+created from a Load or LoadTable operator. Prevent premature deletion of the 
+object. Also, mark the object as invalid once the table has been unloaded. 
+This is needed because the handle itself may not be deleted after the table 
+unload, depending on whether it has been stored in a named object by the 
+caller. Lin Ming.
+
+Fixed a problem with Mutex Sync Levels. Fixed a problem where if multiple 
+mutexes of the same sync level are acquired but then not released in strict 
+opposite order, the internally maintained Current Sync Level becomes confused 
+and can cause subsequent execution errors. ACPICA BZ 471.
+
+Changed the allowable release order for ASL mutex objects. The ACPI 4.0 
+specification has been changed to make the SyncLevel for mutex objects more 
+useful. When releasing a mutex, the SyncLevel of the mutex must now be the 
+same as the current sync level. This makes more sense than the previous rule 
+(SyncLevel less than or equal). This change updates the code to match the 
+specification.
+
+Fixed a problem with the local version of the AcpiOsPurgeCache function. The 
+(local) cache must be locked during all cache object deletions. Andrew 
+Baumann.
+
+Updated the Load operator to use operation region interfaces. This replaces 
+direct memory mapping with region access calls. Now, all region accesses go 
+through the installed region handler as they should.
+
+Simplified and optimized the NsGetNextNode function. Reduced parameter count 
+and reduced code for this frequently used function.
+
+Example Code and Data Size: These are the sizes for the OS-independent 
+acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
+
+  Previous Release:
+    Non-Debug Version:  82.8K Code, 17.5K Data, 100.3K Total
+    Debug Version:     158.0K Code, 49.9K Data, 207.9K Total
+  Current Release:
+    Non-Debug Version:  83.4K Code, 17.5K Data, 100.9K Total
+    Debug Version:     158.9K Code, 50.0K Data, 208.9K Total
+
+2) iASL Compiler/Disassembler and Tools:
+
+Disassembler: Fixed some issues with DMAR, HEST, MADT tables. Some problems 
+with sub-table disassembly and handling invalid sub-tables. Attempt recovery 
+after an invalid sub-table ID.
+
+----------------------------------------
+22 April 2009. Summary of changes for version 20090422:
+
+This release is available at www.acpica.org/downloads
+
+1) ACPI CA Core Subsystem:
+
+Fixed a compatibility issue with the recently released I/O port protection 
+mechanism. For windows compatibility, 1) On a port protection violation, 
+simply ignore the request and do not return an exception (allow the control 
+method to continue execution.) 2) If only part of the request overlaps a 
+protected port, read/write the individual ports that are not protected. Linux 
+BZ 13036. Lin Ming
+
+Enhanced the execution of the ASL/AML BreakPoint operator so that it actually 
+breaks into the AML debugger if the debugger is present. This matches the 
+ACPI-defined behavior.
+
+Fixed several possible warnings related to the use of the configurable 
+ACPI_THREAD_ID. This type can now be configured as either an integer or a 
+pointer with no warnings. Also fixes several warnings in printf-like 
+statements for the 64-bit build when the type is configured as a pointer. 
+ACPICA BZ 766, 767.
+
+Fixed a number of possible warnings when compiling with gcc 4+ (depending on 
+warning options.) Examples include printf formats, aliasing, unused globals, 
+missing prototypes, missing switch default statements, use of non-ANSI 
+library functions, use of non-ANSI constructs. See generate/unix/Makefile for 
+a list of warning options used with gcc 3 and 4. ACPICA BZ 735.
+
+Example Code and Data Size: These are the sizes for the OS-independent 
+acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
+
+  Previous Release:
+    Non-Debug Version:  82.6K Code, 17.6K Data, 100.2K Total
+    Debug Version:     157.7K Code, 49.9K Data, 207.6K Total
+  Current Release:
+    Non-Debug Version:  82.8K Code, 17.5K Data, 100.3K Total
+    Debug Version:     158.0K Code, 49.9K Data, 207.9K Total
+
+2) iASL Compiler/Disassembler and Tools:
+
+iASL: Fixed a generation warning from Bison 2.3 and fixed several warnings on 
+the 64-bit build.
+
+iASL: Fixed a problem where the Unix/Linux versions of the compiler could not 
+correctly digest Windows/DOS formatted files (with CR/LF).
+
+iASL: Added a new option for "quiet mode" (-va) that produces only the 
+compilation summary, not individual errors and warnings. Useful for large 
+batch compilations.
+
+AcpiExec: Implemented a new option (-z) to enable a forced semaphore/mutex 
+timeout that can be used to detect hang conditions during execution of AML 
+code (includes both internal semaphores and AML-defined mutexes and events.)
+
+Added new makefiles for the generation of acpica in a generic unix-like 
+environment. These makefiles are intended to generate the acpica tools and 
+utilities from the original acpica git source tree structure.
+
+Test Suites: Updated and cleaned up the documentation files. Updated the 
+copyrights to 2009, affecting all source files. Use the new version of iASL 
+with quiet mode. Increased the number of available semaphores in the Windows 
+OSL, allowing the aslts to execute fully on Windows. For the Unix OSL, added 
+an alternate implementation of the semaphore timeout to allow aslts to 
+execute fully on Cygwin.
+
+----------------------------------------
+20 March 2009. Summary of changes for version 20090320:
+
+1) ACPI CA Core Subsystem:
+
+Fixed a possible race condition between AcpiWalkNamespace and dynamic table 
+unloads. Added a reader/writer locking mechanism to allow multiple concurrent 
+namespace walks (readers), but block a dynamic table unload until it can gain 
+exclusive write access to the namespace. This fixes a problem where a table 
+unload could (possibly catastrophically) delete the portion of the namespace 
+that is currently being examined by a walk. Adds a new file, utlock.c, that 
+implements the reader/writer lock mechanism. ACPICA BZ 749.
+
+Fixed a regression introduced in version 20090220 where a change to the FADT 
+handling could cause the ACPICA subsystem to access non-existent I/O ports.
+
+Modified the handling of FADT register and table (FACS/DSDT) addresses. The 
+FADT can contain both 32-bit and 64-bit versions of these addresses. 
+Previously, the 64-bit versions were favored, meaning that if both 32 and 64 
+versions were valid, but not equal, the 64-bit version was used. This was 
+found to cause some machines to fail. Now, in this case, the 32-bit version 
+is used instead. This now matches the Windows behavior.
+
+Implemented a new mechanism to protect certain I/O ports. Provides Microsoft 
+compatibility and protects the standard PC I/O ports from access via AML 
+code. Adds a new file, hwvalid.c
+
+Fixed a possible extraneous warning message from the FADT support. The 
+message warns of a 32/64 length mismatch between the legacy and GAS 
+definitions for a register.
+
+Removed the obsolete AcpiOsValidateAddress OSL interface. This interface is 
+made obsolete by the port protection mechanism above. It was previously used 
+to validate the entire address range of an operation region, which could be 
+incorrect if the range included illegal ports, but fields within the 
+operation region did not actually access those ports. Validation is now 
+performed on a per-field basis instead of the entire region.
+
+Modified the handling of the PM1 Status Register ignored bit (bit 11.) 
+Ignored bits must be "preserved" according to the ACPI spec. Usually, this 
+means a read/modify/write when writing to the register. However, for status 
+registers, writing a one means clear the event. Writing a zero means preserve 
+the event (do not clear.) This behavior is clarified in the ACPI 4.0 spec, 
+and the ACPICA code now simply always writes a zero to the ignored bit.
+
+Modified the handling of ignored bits for the PM1 A/B Control Registers. As 
+per the ACPI specification, for the control registers, preserve 
+(read/modify/write) all bits that are defined as either reserved or ignored.
+
+Updated the handling of write-only bits in the PM1 A/B Control Registers. 
+When reading the register, zero the write-only bits as per the ACPI spec. 
+ACPICA BZ 443. Lin Ming.
+
+Removed "Linux" from the list of supported _OSI strings. Linux no longer 
+wants to reply true to this request. The Windows strings are the only paths 
+through the AML that are tested and known to work properly.
+
+  Previous Release:
+    Non-Debug Version:  82.0K Code, 17.5K Data,  99.5K Total
+    Debug Version:     156.9K Code, 49.8K Data, 206.7K Total
+  Current Release:
+    Non-Debug Version:  82.6K Code, 17.6K Data, 100.2K Total
+    Debug Version:     157.7K Code, 49.9K Data, 207.6K Total
+
+2) iASL Compiler/Disassembler and Tools:
+
+Acpiexec: Split the large aeexec.c file into two new files, aehandlers.c and 
+aetables.c
+
+----------------------------------------
+20 February 2009. Summary of changes for version 20090220:
+
+1) ACPI CA Core Subsystem:
+
+Optimized the ACPI register locking. Removed locking for reads from the ACPI 
+bit registers in PM1 Status, Enable, Control, and PM2 Control. The lock is 
+not required when reading the single-bit registers. The 
+AcpiGetRegisterUnlocked function is no longer needed and has been removed. 
+This will improve performance for reads on these registers. ACPICA BZ 760.
+
+Fixed the parameter validation for AcpiRead/Write. Now return 
+AE_BAD_PARAMETER if the input register pointer is null, and AE_BAD_ADDRESS if 
+the register has an address of zero. Previously, these cases simply returned 
+AE_OK. For optional registers such as PM1B status/enable/control, the caller 
+should check for a valid register address before calling. ACPICA BZ 748.
+
+Renamed the external ACPI bit register access functions. Renamed 
+AcpiGetRegister and AcpiSetRegister to clarify the purpose of these 
+functions. The new names are AcpiReadBitRegister and AcpiWriteBitRegister. 
+Also, restructured the code for these functions by simplifying the code path 
+and condensing duplicate code to reduce code size.
+
+Added new functions to transparently handle the possibly split PM1 A/B 
+registers. AcpiHwReadMultiple and AcpiHwWriteMultiple. These two functions 
+now handle the split registers for PM1 Status, Enable, and Control. ACPICA BZ 
+746.
+
+Added a function to handle the PM1 control registers, AcpiHwWritePm1Control. 
+This function writes both of the PM1 control registers (A/B). These registers 
+are different than the PM1 A/B status and enable registers in that different 
+values can be written to the A/B registers. Most notably, the SLP_TYP bits 
+can be different, as per the values returned from the _Sx predefined methods.
+
+Removed an extra register write within AcpiHwClearAcpiStatus. This function 
+was writing an optional PM1B status register twice. The existing call to the 
+low-level AcpiHwRegisterWrite automatically handles a possibly split PM1 A/B 
+register. ACPICA BZ 751.
+
+Split out the PM1 Status registers from the FADT. Added new globals for these 
+registers (A/B), similar to the way the PM1 Enable registers are handled. 
+Instead of overloading the FADT Event Register blocks. This makes the code 
+clearer and less prone to error.
+
+Fixed the warning message for when the platform contains too many ACPI tables 
+for the default size of the global root table data structure. The calculation 
+for the truncation value was incorrect.
+
+Removed the ACPI_GET_OBJECT_TYPE macro. Removed all instances of this 
+obsolete macro, since it is now a simple reference to ->common.type. There 
+were about 150 invocations of the macro across 41 files. ACPICA BZ 755.
+
+Removed the redundant ACPI_BITREG_SLEEP_TYPE_B. This type is the same as 
+TYPE_A. Removed this and all related instances. Renamed SLEEP_TYPE_A to 
+simply SLEEP_TYPE. ACPICA BZ 754.
+
+Conditionally compile the AcpiSetFirmwareWakingVector64 function. This 
+function is only needed on 64-bit host operating systems and is thus not 
+included for 32-bit hosts.
+
+Debug output: print the input and result for invocations of the _OSI reserved 
+control method via the ACPI_LV_INFO debug level. Also, reduced some of the 
+verbosity of this debug level. Len Brown.
+
+Example Code and Data Size: These are the sizes for the OS-independent 
+acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
+
+  Previous Release:
+    Non-Debug Version:  82.3K Code, 17.5K Data,  99.8K Total
+    Debug Version:     157.3K Code, 49.8K Data, 207.1K Total
+  Current Release:
+    Non-Debug Version:  82.0K Code, 17.5K Data,  99.5K Total
+    Debug Version:     156.9K Code, 49.8K Data, 206.7K Total
+
+2) iASL Compiler/Disassembler and Tools:
+
+Disassembler: Decode the FADT PM_Profile field. Emit ascii names for the 
+various legal performance profiles.
+
+----------------------------------------
+23 January 2009. Summary of changes for version 20090123:
+
+1) ACPI CA Core Subsystem:
+
+Added the 2009 copyright to all module headers and signons. This affects 
+virtually every file in the ACPICA core subsystem, the iASL compiler, and 
+the tools/utilities.
+
+Implemented a change to allow the host to override any ACPI table, including 
+dynamically loaded tables. Previously, only the DSDT could be replaced by the 
+host. With this change, the AcpiOsTableOverride interface is called for each 
+table found in the RSDT/XSDT during ACPICA initialization, and also whenever 
+a table is dynamically loaded via the AML Load operator.
+
+Updated FADT flag definitions, especially the Boot Architecture flags.
+
+Debugger: For the Find command, automatically pad the input ACPI name with 
+underscores if the name is shorter than 4 characters. This enables a match 
+with the actual namespace entry which is itself padded with underscores.
+
+Example Code and Data Size: These are the sizes for the OS-independent 
+acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
+
+  Previous Release:
+    Non-Debug Version:  82.3K Code, 17.4K Data,  99.7K Total
+    Debug Version:     157.1K Code, 49.7K Data, 206.8K Total
+  Current Release:
+    Non-Debug Version:  82.3K Code, 17.5K Data,  99.8K Total
+    Debug Version:     157.3K Code, 49.8K Data, 207.1K Total
+
+2) iASL Compiler/Disassembler and Tools:
+
+Fix build error under Bison-2.4.
+
+Dissasembler: Enhanced FADT support. Added decoding of the Boot Architecture 
+flags. Now decode all flags, regardless of the FADT version. Flag output 
+includes the FADT version which first defined each flag.
+
+The iASL -g option now dumps the RSDT to a file (in addition to the FADT and 
+DSDT). Windows only.
+
+----------------------------------------
+04 December 2008. Summary of changes for version 20081204:
+
+1) ACPI CA Core Subsystem:
+
+The ACPICA Programmer Reference has been completely updated and revamped for 
+this release. This includes updates to the external interfaces, OSL 
+interfaces, the overview sections, and the debugger reference.
+
+Several new ACPICA interfaces have been implemented and documented in the 
+programmer reference:
+AcpiReset - Writes the reset value to the FADT-defined reset register.
+AcpiDisableAllGpes - Disable all available GPEs.
+AcpiEnableAllRuntimeGpes - Enable all available runtime GPEs.
+AcpiGetGpeDevice - Get the GPE block device associated with a GPE.
+AcpiGbl_CurrentGpeCount - Tracks the current number of available GPEs.
+AcpiRead - Low-level read ACPI register (was HwLowLevelRead.)
+AcpiWrite - Low-level write ACPI register (was HwLowLevelWrite.)
+
+Most of the public ACPI hardware-related interfaces have been moved to a new 
+file, components/hardware/hwxface.c
+
+Enhanced the FADT parsing and low-level ACPI register access: The ACPI 
+register lengths within the FADT are now used, and the low level ACPI 
+register access no longer hardcodes the ACPI register lengths. Given that 
+there may be some risk in actually trusting the FADT register lengths, a run-
+time option was added to fall back to the default hardcoded lengths if the 
+FADT proves to contain incorrect values - UseDefaultRegisterWidths. This 
+option is set to true for now, and a warning is issued if a suspicious FADT 
+register length is overridden with the default value.
+
+Fixed a reference count issue in NsRepairObject. This problem was introduced 
+in version 20081031 as part of a fix to repair Buffer objects within 
+Packages. Lin Ming.
+
+Added semaphore support to the Linux/Unix application OS-services layer 
+(OSL). ACPICA BZ 448. Lin Ming.
+
+Added the ACPI_MUTEX_TYPE configuration option to select whether mutexes will 
+be implemented in the OSL, or will binary semaphores be used instead.
+
+Example Code and Data Size: These are the sizes for the OS-independent 
+acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
+
+  Previous Release:
+    Non-Debug Version:  81.7K Code, 17.3K Data,  99.0K Total
+    Debug Version:     156.4K Code, 49.4K Data, 205.8K Total
+  Current Release:
+    Non-Debug Version:  82.3K Code, 17.4K Data,  99.7K Total
+    Debug Version:     157.1K Code, 49.7K Data, 206.8K Total
+
+2) iASL Compiler/Disassembler and Tools:
+
+iASL: Completed the '-e' option to include additional ACPI tables in order to 
+aid with disassembly and External statement generation. ACPICA BZ 742. Lin 
+Ming.
+
+iASL: Removed the "named object in while loop" error. The compiler cannot 
+determine how many times a loop will execute. ACPICA BZ 730.
+
+Disassembler: Implemented support for FADT revision 2 (MS extension). ACPICA 
+BZ 743.
+
+Disassembler: Updates for several ACPI data tables (HEST, EINJ, and MCFG).
+
+----------------------------------------
+31 October 2008. Summary of changes for version 20081031:
+
+1) ACPI CA Core Subsystem:
+
+Restructured the ACPICA header files into public/private. acpi.h now includes 
+only the "public" acpica headers. All other acpica headers are "private" and 
+should not be included by acpica users. One new file, accommon.h is used to 
+include the commonly used private headers for acpica code generation. Future 
+plans include moving all private headers to a new subdirectory.
+
+Implemented an automatic Buffer->String return value conversion for 
+predefined ACPI methods. For these methods (such as _BIF), added automatic 
+conversion for return objects that are required to be a String, but a Buffer 
+was found instead. This can happen when reading string battery data from an 
+operation region, because it used to be difficult to convert the data from 
+buffer to string from within the ASL. Ensures that the host OS is provided 
+with a valid null-terminated string. Linux BZ 11822.
+
+Updated the FACS waking vector interfaces. Split AcpiSetFirmwareWakingVector 
+into two: one for the 32-bit vector, another for the 64-bit vector. This is 
+required because the host OS must setup the wake much differently for each 
+vector (real vs. protected mode, etc.) and the interface itself should not be 
+deciding which vector to use. Also, eliminated the GetFirmwareWakingVector 
+interface, as it served no purpose (only the firmware reads the vector, OS 
+only writes the vector.) ACPICA BZ 731.
+
+Implemented a mechanism to escape infinite AML While() loops. Added a loop 
+counter to force exit from AML While loops if the count becomes too large. 
+This can occur in poorly written AML when the hardware does not respond 
+within a while loop and the loop does not implement a timeout. The maximum 
+loop count is configurable. A new exception code is returned when a loop is 
+broken, AE_AML_INFINITE_LOOP. Alexey Starikovskiy, Bob Moore.
+
+Optimized the execution of AML While loops. Previously, a control state 
+object was allocated and freed for each execution of the loop. The 
+optimization is to simply reuse the control state for each iteration. This 
+speeds up the raw loop execution time by about 5%.
+
+Enhanced the implicit return mechanism. For Windows compatibility, return an 
+implicit integer of value zero for methods that contain no executable code. 
+Such methods are seen in the field as stubs (presumably), and can cause 
+drivers to fail if they expect a return value. Lin Ming.
+
+Allow multiple backslashes as root prefixes in namepaths. In a fully 
+qualified namepath, allow multiple backslash prefixes. This can happen (and 
+is seen in the field) because of the use of a double-backslash in strings 
+(since backslash is the escape character) causing confusion. ACPICA BZ 739 
+Lin Ming.
+
+Emit a warning if two different FACS or DSDT tables are discovered in the 
+FADT. Checks if there are two valid but different addresses for the FACS and 
+DSDT within the FADT (mismatch between the 32-bit and 64-bit fields.)
+
+Consolidated the method argument count validation code. Merged the code that 
+validates control method argument counts into the predefined validation 
+module. Eliminates possible multiple warnings for incorrect argument counts.
+
+Implemented ACPICA example code. Includes code for ACPICA initialization, 
+handler installation, and calling a control method. Available at 
+source/tools/examples.
+
+Added a global pointer for FACS table to simplify internal FACS access. Use 
+the global pointer instead of using AcpiGetTableByIndex for each FACS access. 
+This simplifies the code for the Global Lock and the Firmware Waking 
+Vector(s).
+
+Example Code and Data Size: These are the sizes for the OS-independent 
+acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
+
+  Previous Release:
+    Non-Debug Version:  81.2K Code, 17.0K Data,  98.2K Total
+    Debug Version:     155.8K Code, 49.1K Data, 204.9K Total
+  Current Release:
+    Non-Debug Version:  81.7K Code, 17.3K Data,  99.0K Total
+    Debug Version:     156.4K Code, 49.4K Data, 205.8K Total
+
+2) iASL Compiler/Disassembler and Tools:
+
+iASL: Improved disassembly of external method calls. Added the -e option to 
+allow the inclusion of additional ACPI tables to help with the disassembly of 
+method invocations and the generation of external declarations during the 
+disassembly. Certain external method invocations cannot be disassembled 
+properly without the actual declaration of the method. Use the -e option to 
+include the table where the external method(s) are actually declared. Most 
+useful for disassembling SSDTs that make method calls back to the master 
+DSDT. Lin Ming. Example: To disassemble an SSDT with calls to DSDT:  iasl -d 
+-e dsdt.aml ssdt1.aml
+
+iASL: Fix to allow references to aliases within ASL namepaths. Fixes a 
+problem where the use of an alias within a namepath would result in a not 
+found error or cause the compiler to fault. Also now allows forward 
+references from the Alias operator itself. ACPICA BZ 738.
+
+----------------------------------------
+26 September 2008. Summary of changes for version 20080926:
+
+1) ACPI CA Core Subsystem:
+
+Designed and implemented a mechanism to validate predefined ACPI methods and 
+objects. This code validates the predefined ACPI objects (objects whose names 
+start with underscore) that appear in the namespace, at the time they are 
+evaluated. The argument count and the type of the returned object are 
+validated against the ACPI specification. The purpose of this validation is 
+to detect problems with the BIOS-implemented predefined ACPI objects before 
+the results are returned to the ACPI-related drivers. Future enhancements may 
+include actual repair of incorrect return objects where possible. Two new 
+files are nspredef.c and acpredef.h.
+
+Fixed a fault in the AML parser if a memory allocation fails during the Op 
+completion routine AcpiPsCompleteThisOp. Lin Ming. ACPICA BZ 492.
+
+Fixed an issue with implicit return compatibility. This change improves the 
+implicit return mechanism to be more compatible with the MS interpreter. Lin 
+Ming, ACPICA BZ 349.
+
+Implemented support for zero-length buffer-to-string conversions. Allow zero 
+length strings during interpreter buffer-to-string conversions. For example, 
+during the ToDecimalString and ToHexString operators, as well as implicit 
+conversions. Fiodor Suietov, ACPICA BZ 585.
+
+Fixed two possible memory leaks in the error exit paths of 
+AcpiUtUpdateObjectReference and AcpiUtWalkPackageTree. These functions are 
+similar in that they use a stack of state objects in order to eliminate 
+recursion. The stack must be fully unwound and deallocated if an error 
+occurs. Lin Ming. ACPICA BZ 383.
+
+Removed the unused ACPI_BITREG_WAKE_ENABLE definition and entry in the global 
+ACPI register table. This bit does not exist and is unused. Lin Ming, Bob 
+Moore ACPICA BZ 442.
+
+Removed the obsolete version number in module headers. Removed the 
+"$Revision" number that appeared in each module header. This version number 
+was useful under SourceSafe and CVS, but has no meaning under git. It is not 
+only incorrect, it could also be misleading.
+
+Example Code and Data Size: These are the sizes for the OS-independent 
+acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
+
+  Previous Release:
+    Non-Debug Version:  79.7K Code, 16.4K Data,  96.1K Total
+    Debug Version:     153.7K Code, 48.2K Data, 201.9K Total
+  Current Release:
+    Non-Debug Version:  81.2K Code, 17.0K Data,  98.2K Total
+    Debug Version:     155.8K Code, 49.1K Data, 204.9K Total
+
+----------------------------------------
 29 August 2008. Summary of changes for version 20080829:
 
 1) ACPI CA Core Subsystem:
@@ -168,28 +721,22 @@ Direct git access via http://www.acpica.org/repos/acpica.git
 0) Git source tree / acpica.org
 
 Fixed a problem where a git-clone from http would not transfer the entire 
-source 
-tree.
+source tree.
 
 1) ACPI CA Core Subsystem:
 
 Implemented a "careful" GPE disable in AcpiEvDisableGpe, only modify one 
-enable 
-bit. Now performs a read-change-write of the enable register instead of 
-simply 
-writing out the cached enable mask. This will prevent inadvertent enabling of 
-GPEs if a rogue GPE is received during initialization (before GPE handlers 
-are 
-installed.)
+enable bit. Now performs a read-change-write of the enable register instead 
+of simply writing out the cached enable mask. This will prevent inadvertent 
+enabling of GPEs if a rogue GPE is received during initialization (before GPE 
+handlers are installed.)
 
 Implemented a copy for dynamically loaded tables. Previously, dynamically 
-loaded 
-tables were simply mapped - but on some machines this memory is corrupted 
-after 
-suspend. Now copy the table to a local buffer. For the OpRegion case, added 
-checksum verify. Use the table length from the table header, not the region 
-length. For the Buffer case, use the table length also. Dennis Noordsij, Bob 
-Moore. BZ 10734
+loaded tables were simply mapped - but on some machines this memory is 
+corrupted after suspend. Now copy the table to a local buffer. For the 
+OpRegion case, added checksum verify. Use the table length from the table 
+header, not the region length. For the Buffer case, use the table length 
+also. Dennis Noordsij, Bob Moore. BZ 10734
 
 Fixed a problem where the same ACPI table could not be dynamically loaded and 
 unloaded more than once. Without this change, a table cannot be loaded again 
@@ -198,24 +745,18 @@ unregister a table upon an unload. During a load, if the same table is found,
 this no longer returns an exception. BZ 722
 
 Fixed a problem where the wrong descriptor length was calculated for the 
-EndTag 
-descriptor in 64-bit mode. The "minimal" descriptors such as EndTag are 
-calculated as 12 bytes long, but the actual length in the internal descriptor 
-is 
-16 because of the round-up to 8 on the 64-bit build. Reported by Linn 
-Crosetto. 
-BZ 728
+EndTag descriptor in 64-bit mode. The "minimal" descriptors such as EndTag 
+are calculated as 12 bytes long, but the actual length in the internal 
+descriptor is 16 because of the round-up to 8 on the 64-bit build. Reported 
+by Linn Crosetto. BZ 728
 
 Fixed a possible memory leak in the Unload operator. The DdbHandle returned 
-by 
-Load() did not have its reference count decremented during unload, leading to 
-a 
-memory leak. Lin Ming. BZ 727
+by Load() did not have its reference count decremented during unload, leading 
+to a memory leak. Lin Ming. BZ 727
 
 Fixed a possible memory leak when deleting thermal/processor objects. Any 
 associated notify handlers (and objects) were not being deleted. Fiodor 
-Suietov. 
-BZ 506
+Suietov. BZ 506
 
 Fixed the ordering of the ASCII names in the global mutex table to match the 
 actual mutex IDs. Used by AcpiUtGetMutexName, a function used for debug only. 
@@ -223,10 +764,8 @@ Vegard Nossum. BZ 726
 
 Enhanced the AcpiGetObjectInfo interface to return the number of required 
 arguments if the object is a control method. Added this call to the debugger 
-so 
-the proper number of default arguments are passed to a method. This prevents 
-a 
-warning when executing methods from AcpiExec.
+so the proper number of default arguments are passed to a method. This 
+prevents a warning when executing methods from AcpiExec.
 
 Added a check for an invalid handle in AcpiGetObjectInfo. Return 
 AE_BAD_PARAMETER if input handle is invalid. BZ 474
@@ -235,9 +774,8 @@ Fixed an extraneous warning from exconfig.c on the 64-bit build.
 
 Example Code and Data Size: These are the sizes for the OS-independent 
 acpica.lib produced by the Microsoft Visual C++ 6.0 32-bit compiler. The 
-debug 
-version of the code includes the debug output trace mechanism and has a much 
-larger code and data size.
+debug version of the code includes the debug output trace mechanism and has a 
+much larger code and data size.
 
   Previous Release:
     Non-Debug Version:  79.3K Code, 16.2K Data,  95.5K Total
@@ -249,12 +787,10 @@ larger code and data size.
 2) iASL Compiler/Disassembler and Tools:
 
 iASL: Added two missing ACPI reserved names. Added _MTP and _ASZ, both 
-resource 
-descriptor names.
+resource descriptor names.
 
 iASL: Detect invalid ASCII characters in input (windows version). Removed the 
-"-
-CF" flag from the flex compile, enables correct detection of non-ASCII 
+"-CF" flag from the flex compile, enables correct detection of non-ASCII 
 characters in the input. BZ 441
 
 iASL: Eliminate warning when result of LoadTable is not used. Eliminate the 
@@ -263,14 +799,11 @@ LoadTable is not used. The warning is not needed. BZ 590
 
 AcpiExec: Add support for dynamic table load/unload. Now calls _CFG method to 
 pass address of table to the AML. Added option to disable OpRegion simulation 
-to 
-allow creation of an OpRegion with a real address that was passed to _CFG. 
-All 
-of this allows testing of the Load and Unload operators from AcpiExec.
+to allow creation of an OpRegion with a real address that was passed to _CFG. 
+All of this allows testing of the Load and Unload operators from AcpiExec.
 
 Debugger: update tables command for unloaded tables. Handle unloaded tables 
-and 
-use the standard table header output routine.
+and use the standard table header output routine.
 
 ----------------------------------------
 09 June 2008. Summary of changes for version 20080609:

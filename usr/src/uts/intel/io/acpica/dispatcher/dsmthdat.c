@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 1.94 $
  *
  ******************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -117,6 +116,7 @@
 #define __DSMTHDAT_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acdispat.h"
 #include "acnamesp.h"
 #include "acinterp.h"
@@ -261,8 +261,6 @@ AcpiDsMethodDataDeleteAll (
             AcpiNsDetachObject (&WalkState->Arguments[Index]);
         }
     }
-
-    AcpiDsClearImplicitReturn (WalkState);
 
     return_VOID;
 }
@@ -841,7 +839,7 @@ AcpiDsMethodDataGetType (
 
     /* Get the object type */
 
-    return_VALUE (ACPI_GET_OBJECT_TYPE (Object));
+    return_VALUE (Object->Type);
 }
 #endif
 

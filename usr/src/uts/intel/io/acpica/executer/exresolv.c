@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 1.146 $
  *
  *****************************************************************************/
 
@@ -10,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __EXRESOLV_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "amlcode.h"
 #include "acdispat.h"
 #include "acinterp.h"
@@ -239,7 +239,7 @@ AcpiExResolveObjectToValue (
 
     /* This is an ACPI_OPERAND_OBJECT  */
 
-    switch (ACPI_GET_OBJECT_TYPE (StackDesc))
+    switch (StackDesc->Common.Type)
     {
     case ACPI_TYPE_LOCAL_REFERENCE:
 
@@ -392,7 +392,7 @@ AcpiExResolveObjectToValue (
     case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
         ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "FieldRead SourceDesc=%p Type=%X\n",
-            StackDesc, ACPI_GET_OBJECT_TYPE (StackDesc)));
+            StackDesc, StackDesc->Common.Type));
 
         Status = AcpiExReadDataFromField (WalkState, StackDesc, &ObjDesc);
 
@@ -480,7 +480,7 @@ AcpiExResolveMultiple (
      * specification of the ObjectType and SizeOf operators). This means
      * traversing the list of possibly many nested references.
      */
-    while (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_REFERENCE)
+    while (ObjDesc->Common.Type == ACPI_TYPE_LOCAL_REFERENCE)
     {
         switch (ObjDesc->Reference.Class)
         {
@@ -614,7 +614,7 @@ AcpiExResolveMultiple (
      * Now we are guaranteed to have an object that has not been created
      * via the RefOf or Index operators.
      */
-    Type = ACPI_GET_OBJECT_TYPE (ObjDesc);
+    Type = ObjDesc->Common.Type;
 
 
 Exit:

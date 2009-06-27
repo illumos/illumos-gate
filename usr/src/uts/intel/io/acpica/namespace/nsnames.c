@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 1.101 $
  *
  ******************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -117,6 +116,7 @@
 #define __NSNAMES_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "amlcode.h"
 #include "acnamesp.h"
 
@@ -201,7 +201,6 @@ AcpiNsBuildExternalPath (
 }
 
 
-#ifdef ACPI_DEBUG_OUTPUT
 /*******************************************************************************
  *
  * FUNCTION:    AcpiNsGetExternalPathname
@@ -212,7 +211,8 @@ AcpiNsBuildExternalPath (
  *              the node, In external format (name segments separated by path
  *              separators.)
  *
- * DESCRIPTION: Used for debug printing in AcpiNsSearchTable().
+ * DESCRIPTION: Used to obtain the full pathname to a namespace node, usually
+ *              for error and debug statements.
  *
  ******************************************************************************/
 
@@ -241,7 +241,7 @@ AcpiNsGetExternalPathname (
     NameBuffer = ACPI_ALLOCATE_ZEROED (Size);
     if (!NameBuffer)
     {
-        ACPI_ERROR ((AE_INFO, "Allocation failure"));
+        ACPI_ERROR ((AE_INFO, "Could not allocate %u bytes", (UINT32) Size));
         return_PTR (NULL);
     }
 
@@ -256,7 +256,6 @@ AcpiNsGetExternalPathname (
 
     return_PTR (NameBuffer);
 }
-#endif
 
 
 /*******************************************************************************
@@ -304,7 +303,7 @@ AcpiNsGetPathnameLength (
 
     if (!Size)
     {
-        Size = 1;       /* Root node case */
+        Size = 1; /* Root node case */
     }
 
     return (Size + 1);  /* +1 for null string terminator */

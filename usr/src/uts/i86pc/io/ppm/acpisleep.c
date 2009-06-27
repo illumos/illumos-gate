@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ acpi_enter_sleepstate(s3a_t *s3ap)
 	}
 	if (acpi_rtc_wake > 0) {
 		/* clear the RTC bit first */
-		(void) AcpiSetRegister(ACPI_BITREG_RT_CLOCK_STATUS, 1);
+		(void) AcpiWriteBitRegister(ACPI_BITREG_RT_CLOCK_STATUS, 1);
 		PT(PT_RTCW);
 		if (AcpiEnableEvent(ACPI_EVENT_RTC, 0) != AE_OK) {
 			PT(PT_RTCW_FAIL);

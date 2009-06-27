@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@ extern "C" {
 #include <sys/sunddi.h>
 #include <sys/varargs.h>
 #include <sys/cpu.h>
+#include <sys/thread.h>
 
 #define	strtoul simple_strtoul
 
@@ -50,7 +51,7 @@ void	 __acpi_wbinvd(void);
 #define	COMPILER_DEPENDENT_INT64	int64_t
 #define	COMPILER_DEPENDENT_UINT64	uint64_t
 
-#define	ACPI_THREAD_ID		kt_did_t
+#define	ACPI_THREAD_ID		kthread_t *
 
 #define	ACPI_PRINTF_LIKE_FUNC
 #define	ACPI_UNUSED_VAR

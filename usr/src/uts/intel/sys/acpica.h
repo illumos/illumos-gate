@@ -135,6 +135,34 @@ typedef struct iflag {
 #define	ACPI_DEVCFG_CONTAINER	0x4
 
 /*
+ * master_ops.c
+ */
+typedef struct device_id {
+	struct device_id *next;
+	char 	*id;
+} device_id_t;
+
+typedef struct property {
+	struct property *next;
+	char *name;
+	char *value;
+} property_t;
+
+typedef struct master_rec {
+	struct master_rec *next;
+	device_id_t	*device_ids;
+	char		*name;
+	char		*description;
+	property_t	*properties;
+} master_rec_t;
+
+extern const master_rec_t *master_file_lookup(device_id_t *);
+extern device_id_t *mf_alloc_device_id(void);
+extern void mf_free_device_id(device_id_t *);
+extern void process_master_file(void);
+extern void free_master_data(void);
+
+/*
  * Function prototypes
  */
 extern ACPI_STATUS acpica_get_sci(int *, iflag_t *);

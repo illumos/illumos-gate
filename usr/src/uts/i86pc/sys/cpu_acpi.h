@@ -28,8 +28,8 @@
 
 #include <sys/cpuvar.h>
 #include <sys/acpi/acpi.h>
+#include <sys/acpi/accommon.h>
 #include <sys/acpi/acresrc.h>
-#include <sys/acpi/acglobal.h>
 #include <sys/acpica.h>
 
 #ifdef __cplusplus

@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,8 +118,29 @@
 #ifndef __ACXFACE_H__
 #define __ACXFACE_H__
 
+/* Current ACPICA subsystem version in YYYYMMDD format */
+
+#define ACPI_CA_VERSION                 0x20090521
+
 #include "actypes.h"
 #include "actbl.h"
+
+/*
+ * Globals that are publically available
+ */
+extern UINT32               AcpiCurrentGpeCount;
+extern ACPI_TABLE_FADT      AcpiGbl_FADT;
+
+/* Run-time configuration */
+
+extern UINT32               AcpiDbgLevel;
+extern UINT32               AcpiDbgLayer;
+extern UINT8                AcpiGbl_EnableInterpreterSlack;
+extern UINT8                AcpiGbl_AllMethodsSerialized;
+extern UINT8                AcpiGbl_CreateOsiMethod;
+extern UINT8                AcpiGbl_LeaveWakeGpesDisabled;
+extern ACPI_NAME            AcpiGbl_TraceMethodName;
+extern UINT32               AcpiGbl_TraceFlags;
 
 
 /*
@@ -175,10 +196,6 @@ ACPI_STATUS
 AcpiPurgeCachedObjects (
     void);
 
-ACPI_STATUS
-AcpiInstallInitializationHandler (
-    ACPI_INIT_HANDLER       Handler,
-    UINT32                  Function);
 
 /*
  * ACPI Memory managment
@@ -318,6 +335,10 @@ AcpiGetObjectInfo (
     ACPI_BUFFER             *ReturnBuffer);
 
 ACPI_STATUS
+AcpiInstallMethod (
+    UINT8                   *Buffer);
+
+ACPI_STATUS
 AcpiGetNextObject (
     ACPI_OBJECT_TYPE        Type,
     ACPI_HANDLE             Parent,
@@ -336,8 +357,13 @@ AcpiGetParent (
 
 
 /*
- * Event handler interfaces
+ * Handler interfaces
  */
+ACPI_STATUS
+AcpiInstallInitializationHandler (
+    ACPI_INIT_HANDLER       Handler,
+    UINT32                  Function);
+
 ACPI_STATUS
 AcpiInstallFixedEventHandler (
     UINT32                  AcpiEvent,
@@ -385,6 +411,12 @@ AcpiInstallGpeHandler (
     void                    *Context);
 
 ACPI_STATUS
+AcpiRemoveGpeHandler (
+    ACPI_HANDLE             GpeDevice,
+    UINT32                  GpeNumber,
+    ACPI_EVENT_HANDLER      Address);
+
+ACPI_STATUS
 AcpiInstallExceptionHandler (
     ACPI_EXCEPTION_HANDLER  Handler);
 
@@ -400,12 +432,6 @@ AcpiAcquireGlobalLock (
 ACPI_STATUS
 AcpiReleaseGlobalLock (
     UINT32                  Handle);
-
-ACPI_STATUS
-AcpiRemoveGpeHandler (
-    ACPI_HANDLE             GpeDevice,
-    UINT32                  GpeNumber,
-    ACPI_EVENT_HANDLER      Address);
 
 ACPI_STATUS
 AcpiEnableEvent (
@@ -426,6 +452,10 @@ AcpiGetEventStatus (
     UINT32                  Event,
     ACPI_EVENT_STATUS       *EventStatus);
 
+
+/*
+ * GPE Interfaces
+ */
 ACPI_STATUS
 AcpiSetGpeType (
     ACPI_HANDLE             GpeDevice,
@@ -456,6 +486,19 @@ AcpiGetGpeStatus (
     UINT32                  GpeNumber,
     UINT32                  Flags,
     ACPI_EVENT_STATUS       *EventStatus);
+
+ACPI_STATUS
+AcpiDisableAllGpes (
+    void);
+
+ACPI_STATUS
+AcpiEnableAllRuntimeGpes (
+    void);
+
+ACPI_STATUS
+AcpiGetGpeDevice (
+    UINT32                  GpeIndex,
+    ACPI_HANDLE             *GpeDevice);
 
 ACPI_STATUS
 AcpiInstallGpeBlock (
@@ -516,31 +559,33 @@ AcpiResourceToAddress64 (
     ACPI_RESOURCE           *Resource,
     ACPI_RESOURCE_ADDRESS64 *Out);
 
+
 /*
  * Hardware (ACPI device) interfaces
  */
 ACPI_STATUS
-AcpiGetRegister (
+AcpiReset (
+    void);
+
+ACPI_STATUS
+AcpiRead (
+    UINT32                  *Value,
+    ACPI_GENERIC_ADDRESS    *Reg);
+
+ACPI_STATUS
+AcpiWrite (
+    UINT32                  Value,
+    ACPI_GENERIC_ADDRESS    *Reg);
+
+ACPI_STATUS
+AcpiReadBitRegister (
     UINT32                  RegisterId,
     UINT32                  *ReturnValue);
 
 ACPI_STATUS
-AcpiGetRegisterUnlocked (
-    UINT32                  RegisterId,
-    UINT32                  *ReturnValue);
-
-ACPI_STATUS
-AcpiSetRegister (
+AcpiWriteBitRegister (
     UINT32                  RegisterId,
     UINT32                  Value);
-
-ACPI_STATUS
-AcpiSetFirmwareWakingVector (
-    ACPI_PHYSICAL_ADDRESS   PhysicalAddress);
-
-ACPI_STATUS
-AcpiGetFirmwareWakingVector (
-    ACPI_PHYSICAL_ADDRESS   *PhysicalAddress);
 
 ACPI_STATUS
 AcpiGetSleepTypeData (
@@ -562,7 +607,76 @@ AcpiEnterSleepStateS4bios (
 
 ACPI_STATUS
 AcpiLeaveSleepState (
-    UINT8                   SleepState);
+    UINT8                   SleepState)
+    ;
+ACPI_STATUS
+AcpiSetFirmwareWakingVector (
+    UINT32                  PhysicalAddress);
 
+#if ACPI_MACHINE_WIDTH == 64
+ACPI_STATUS
+AcpiSetFirmwareWakingVector64 (
+    UINT64                  PhysicalAddress);
+#endif
+
+
+/*
+ * Error/Warning output
+ */
+void ACPI_INTERNAL_VAR_XFACE
+AcpiError (
+    const char              *ModuleName,
+    UINT32                  LineNumber,
+    const char              *Format,
+    ...) ACPI_PRINTF_LIKE(3);
+
+void  ACPI_INTERNAL_VAR_XFACE
+AcpiException (
+    const char              *ModuleName,
+    UINT32                  LineNumber,
+    ACPI_STATUS             Status,
+    const char              *Format,
+    ...) ACPI_PRINTF_LIKE(4);
+
+void ACPI_INTERNAL_VAR_XFACE
+AcpiWarning (
+    const char              *ModuleName,
+    UINT32                  LineNumber,
+    const char              *Format,
+    ...) ACPI_PRINTF_LIKE(3);
+
+void ACPI_INTERNAL_VAR_XFACE
+AcpiInfo (
+    const char              *ModuleName,
+    UINT32                  LineNumber,
+    const char              *Format,
+    ...) ACPI_PRINTF_LIKE(3);
+
+
+/*
+ * Debug output
+ */
+#ifdef ACPI_DEBUG_OUTPUT
+
+void ACPI_INTERNAL_VAR_XFACE
+AcpiDebugPrint (
+    UINT32                  RequestedDebugLevel,
+    UINT32                  LineNumber,
+    const char              *FunctionName,
+    const char              *ModuleName,
+    UINT32                  ComponentId,
+    const char              *Format,
+    ...) ACPI_PRINTF_LIKE(6);
+
+void ACPI_INTERNAL_VAR_XFACE
+AcpiDebugPrintRaw (
+    UINT32                  RequestedDebugLevel,
+    UINT32                  LineNumber,
+    const char              *FunctionName,
+    const char              *ModuleName,
+    UINT32                  ComponentId,
+    const char              *Format,
+    ...) ACPI_PRINTF_LIKE(6);
+#endif
 
 #endif /* __ACXFACE_H__ */

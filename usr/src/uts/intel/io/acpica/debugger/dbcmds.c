@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 1.157 $
  *
  ******************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -116,6 +115,7 @@
 
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acdispat.h"
 #include "acnamesp.h"
 #include "acevents.h"
@@ -388,6 +388,228 @@ AcpiDbFindReferences (
 
 /*******************************************************************************
  *
+ * FUNCTION:    AcpiDbWalkForPredefinedNames
+ *
+ * PARAMETERS:  Callback from WalkNamespace
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Detect and display predefined ACPI names (names that start with
+ *              an underscore)
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbWalkForPredefinedNames (
+    ACPI_HANDLE             ObjHandle,
+    UINT32                  NestingLevel,
+    void                    *Context,
+    void                    **ReturnValue)
+{
+    ACPI_NAMESPACE_NODE         *Node = (ACPI_NAMESPACE_NODE *) ObjHandle;
+    UINT32                      *Count = (UINT32 *) Context;
+    const ACPI_PREDEFINED_INFO  *Predefined;
+    const ACPI_PREDEFINED_INFO  *Package = NULL;
+    char                        *Pathname;
+
+
+    Predefined = AcpiNsCheckForPredefinedName (Node);
+    if (!Predefined)
+    {
+        return (AE_OK);
+    }
+
+    Pathname = AcpiNsGetExternalPathname (Node);
+    if (!Pathname)
+    {
+        return (AE_OK);
+    }
+
+    /* If method returns a package, the info is in the next table entry */
+
+    if (Predefined->Info.ExpectedBtypes & ACPI_BTYPE_PACKAGE)
+    {
+        Package = Predefined + 1;
+    }
+
+    AcpiOsPrintf ("%-32s arg %X ret %2.2X", Pathname,
+        Predefined->Info.ParamCount, Predefined->Info.ExpectedBtypes);
+
+    if (Package)
+    {
+        AcpiOsPrintf (" PkgType %2.2X ObjType %2.2X Count %2.2X",
+            Package->RetInfo.Type, Package->RetInfo.ObjectType1,
+            Package->RetInfo.Count1);
+    }
+
+    AcpiOsPrintf("\n");
+
+    AcpiNsCheckParameterCount (Pathname, Node, ACPI_UINT32_MAX, Predefined);
+    ACPI_FREE (Pathname);
+    (*Count)++;
+
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbCheckPredefinedNames
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Validate all predefined names in the namespace
+ *
+ ******************************************************************************/
+
+void
+AcpiDbCheckPredefinedNames (
+    void)
+{
+    UINT32                  Count = 0;
+
+
+    /* Search all nodes in namespace */
+
+    (void) AcpiWalkNamespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
+                AcpiDbWalkForPredefinedNames, (void *) &Count, NULL);
+
+    AcpiOsPrintf ("Found %d predefined names in the namespace\n", Count);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbWalkForExecute
+ *
+ * PARAMETERS:  Callback from WalkNamespace
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Batch execution module. Currently only executes predefined
+ *              ACPI names.
+ *
+ ******************************************************************************/
+
+static ACPI_STATUS
+AcpiDbWalkForExecute (
+    ACPI_HANDLE             ObjHandle,
+    UINT32                  NestingLevel,
+    void                    *Context,
+    void                    **ReturnValue)
+{
+    ACPI_NAMESPACE_NODE         *Node = (ACPI_NAMESPACE_NODE *) ObjHandle;
+    UINT32                      *Count = (UINT32 *) Context;
+    const ACPI_PREDEFINED_INFO  *Predefined;
+    ACPI_BUFFER                 ReturnObj;
+    ACPI_STATUS                 Status;
+    char                        *Pathname;
+    ACPI_BUFFER             Buffer;
+    UINT32                  i;
+    ACPI_DEVICE_INFO        *ObjInfo;
+    ACPI_OBJECT_LIST        ParamObjects;
+    ACPI_OBJECT             Params[ACPI_METHOD_NUM_ARGS];
+
+
+    Predefined = AcpiNsCheckForPredefinedName (Node);
+    if (!Predefined)
+    {
+        return (AE_OK);
+    }
+
+    if (Node->Type == ACPI_TYPE_LOCAL_SCOPE)
+    {
+        return (AE_OK);
+    }
+
+    Pathname = AcpiNsGetExternalPathname (Node);
+    if (!Pathname)
+    {
+        return (AE_OK);
+    }
+
+    /* Get the object info for number of method parameters */
+
+    Buffer.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+    Status = AcpiGetObjectInfo (ObjHandle, &Buffer);
+    if (ACPI_FAILURE (Status))
+    {
+        return (Status);
+    }
+
+    ParamObjects.Pointer = NULL;
+    ParamObjects.Count   = 0;
+
+    ObjInfo = Buffer.Pointer;
+    if (ObjInfo->Type == ACPI_TYPE_METHOD)
+    {
+
+        /* Setup default parameters */
+
+        for (i = 0; i < ObjInfo->ParamCount; i++)
+        {
+            Params[i].Type           = ACPI_TYPE_INTEGER;
+            Params[i].Integer.Value  = 1;
+        }
+
+        ParamObjects.Pointer     = Params;
+        ParamObjects.Count       = ObjInfo->ParamCount;
+    }
+
+    ACPI_FREE (Buffer.Pointer);
+
+    ReturnObj.Pointer = NULL;
+    ReturnObj.Length = ACPI_ALLOCATE_BUFFER;
+
+
+    /* Do the actual method execution */
+
+    AcpiGbl_MethodExecuting = TRUE;
+
+    Status = AcpiEvaluateObject (Node, NULL, &ParamObjects, &ReturnObj);
+
+    AcpiOsPrintf ("%-32s returned %s\n", Pathname, AcpiFormatException (Status));
+    AcpiGbl_MethodExecuting = FALSE;
+
+    ACPI_FREE (Pathname);
+    (*Count)++;
+
+    return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDbBatchExecute
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Namespace batch execution.
+ *
+ ******************************************************************************/
+
+void
+AcpiDbBatchExecute (
+    void)
+{
+    UINT32                  Count = 0;
+
+
+    /* Search all nodes in namespace */
+
+    (void) AcpiWalkNamespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
+                AcpiDbWalkForExecute, (void *) &Count, NULL);
+
+    AcpiOsPrintf ("Executed %d predefined names in the namespace\n", Count);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    AcpiDbDisplayLocks
  *
  * PARAMETERS:  None
@@ -433,6 +655,7 @@ AcpiDbDisplayTableInfo (
 {
     UINT32                  i;
     ACPI_TABLE_DESC         *TableDesc;
+    ACPI_STATUS             Status;
 
 
     /* Walk the entire root table list */
@@ -444,7 +667,11 @@ AcpiDbDisplayTableInfo (
 
         /* Make sure that the table is mapped */
 
-        AcpiTbVerifyTable (TableDesc);
+        Status = AcpiTbVerifyTable (TableDesc);
+        if (ACPI_FAILURE (Status))
+        {
+            return;
+        }
 
         /* Dump the table header */
 
@@ -1172,6 +1399,9 @@ ACPI_STATUS
 AcpiDbFindNameInNamespace (
     char                    *NameArg)
 {
+    char                    AcpiName[5] = "____";
+    char                    *AcpiNamePtr = AcpiName;
+
 
     if (ACPI_STRLEN (NameArg) > 4)
     {
@@ -1179,11 +1409,20 @@ AcpiDbFindNameInNamespace (
         return (AE_OK);
     }
 
-    /* Walk the namespace from the root */
+    /* Pad out name with underscores as necessary to create a 4-char name */
 
     AcpiUtStrupr (NameArg);
+    while (*NameArg)
+    {
+        *AcpiNamePtr = *NameArg;
+        AcpiNamePtr++;
+        NameArg++;
+    }
+
+    /* Walk the namespace from the root */
+
     (void) AcpiWalkNamespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
-                        AcpiDbWalkAndMatchName, NameArg, NULL);
+                        AcpiDbWalkAndMatchName, AcpiName, NULL);
 
     AcpiDbSetOutputDestination (ACPI_DB_CONSOLE_OUTPUT);
     return (AE_OK);

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acdisasm.h - AML disassembler
- *       $Revision: 1.45 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -183,6 +182,7 @@ typedef const struct acpi_dmtable_info
 #define ACPI_DMT_SRAT                   29
 #define ACPI_DMT_EXIT                   30
 #define ACPI_DMT_SIG                    31
+#define ACPI_DMT_FADTPM                 32
 
 typedef
 void (*ACPI_DMTABLE_HANDLER) (
@@ -257,9 +257,18 @@ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoErst[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoFacs[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoFadt1[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoFadt2[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoFadt3[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoGas[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHeader[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest0[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest1[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest3[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest4[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest5[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest6[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest7[];
+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest8[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHest9[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHestNotify[];
 extern ACPI_DMTABLE_INFO        AcpiDmTableInfoHpet[];

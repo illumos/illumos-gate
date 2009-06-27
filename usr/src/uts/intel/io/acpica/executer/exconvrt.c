@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 1.75 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __EXCONVRT_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acinterp.h"
 #include "amlcode.h"
 
@@ -167,7 +167,7 @@ AcpiExConvertToInteger (
     ACPI_FUNCTION_TRACE_PTR (ExConvertToInteger, ObjDesc);
 
 
-    switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+    switch (ObjDesc->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
 
@@ -202,7 +202,7 @@ AcpiExConvertToInteger (
 
     /* String conversion is different than Buffer conversion */
 
-    switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+    switch (ObjDesc->Common.Type)
     {
     case ACPI_TYPE_STRING:
 
@@ -304,7 +304,7 @@ AcpiExConvertToBuffer (
     ACPI_FUNCTION_TRACE_PTR (ExConvertToBuffer, ObjDesc);
 
 
-    switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+    switch (ObjDesc->Common.Type)
     {
     case ACPI_TYPE_BUFFER:
 
@@ -525,7 +525,7 @@ AcpiExConvertToString (
     ACPI_FUNCTION_TRACE_PTR (ExConvertToString, ObjDesc);
 
 
-    switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+    switch (ObjDesc->Common.Type)
     {
     case ACPI_TYPE_STRING:
 
@@ -638,8 +638,14 @@ AcpiExConvertToString (
         /*
          * Create a new string object and string buffer
          * (-1 because of extra separator included in StringLength from above)
+         * Allow creation of zero-length strings from zero-length buffers.
          */
-        ReturnDesc = AcpiUtCreateStringObject ((ACPI_SIZE) (StringLength - 1));
+        if (StringLength)
+        {
+            StringLength--;
+        }
+
+        ReturnDesc = AcpiUtCreateStringObject ((ACPI_SIZE) StringLength);
         if (!ReturnDesc)
         {
             return_ACPI_STATUS (AE_NO_MEMORY);
@@ -663,7 +669,10 @@ AcpiExConvertToString (
          * Null terminate the string
          * (overwrites final comma/space from above)
          */
-        NewBuf--;
+        if (ObjDesc->Buffer.Length)
+        {
+            NewBuf--;
+        }
         *NewBuf = 0;
         break;
 
@@ -729,7 +738,7 @@ AcpiExConvertToTargetType (
         default:
             /* No conversion allowed for these types */
 
-            if (DestinationType != ACPI_GET_OBJECT_TYPE (SourceDesc))
+            if (DestinationType != SourceDesc->Common.Type)
             {
                 ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
                     "Explicit operator, will store (%s) over existing type (%s)\n",

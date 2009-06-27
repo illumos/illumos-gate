@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 1.133 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __EXFIELD_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acdispat.h"
 #include "acinterp.h"
 
@@ -167,7 +167,7 @@ AcpiExReadDataFromField (
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
 
-    if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_BUFFER_FIELD)
+    if (ObjDesc->Common.Type == ACPI_TYPE_BUFFER_FIELD)
     {
         /*
          * If the BufferField arguments have not been previously evaluated,
@@ -182,7 +182,7 @@ AcpiExReadDataFromField (
             }
         }
     }
-    else if ((ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_REGION_FIELD) &&
+    else if ((ObjDesc->Common.Type == ACPI_TYPE_LOCAL_REGION_FIELD) &&
              (ObjDesc->Field.RegionObj->Region.SpaceId == ACPI_ADR_SPACE_SMBUS))
     {
         /*
@@ -249,7 +249,7 @@ AcpiExReadDataFromField (
 
     ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
         "FieldRead [TO]:   Obj %p, Type %X, Buf %p, ByteLen %X\n",
-        ObjDesc, ACPI_GET_OBJECT_TYPE (ObjDesc), Buffer, (UINT32) Length));
+        ObjDesc, ObjDesc->Common.Type, Buffer, (UINT32) Length));
     ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
         "FieldRead [FROM]: BitLen %X, BitOff %X, ByteOff %X\n",
         ObjDesc->CommonField.BitLength,
@@ -316,7 +316,7 @@ AcpiExWriteDataToField (
         return_ACPI_STATUS (AE_AML_NO_OPERAND);
     }
 
-    if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_BUFFER_FIELD)
+    if (ObjDesc->Common.Type == ACPI_TYPE_BUFFER_FIELD)
     {
         /*
          * If the BufferField arguments have not been previously evaluated,
@@ -331,7 +331,7 @@ AcpiExWriteDataToField (
             }
         }
     }
-    else if ((ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_LOCAL_REGION_FIELD) &&
+    else if ((ObjDesc->Common.Type == ACPI_TYPE_LOCAL_REGION_FIELD) &&
              (ObjDesc->Field.RegionObj->Region.SpaceId == ACPI_ADR_SPACE_SMBUS))
     {
         /*
@@ -340,7 +340,7 @@ AcpiExWriteDataToField (
          *
          * Source must be a buffer of sufficient size (ACPI_SMBUS_BUFFER_SIZE).
          */
-        if (ACPI_GET_OBJECT_TYPE (SourceDesc) != ACPI_TYPE_BUFFER)
+        if (SourceDesc->Common.Type != ACPI_TYPE_BUFFER)
         {
             ACPI_ERROR ((AE_INFO, "SMBus write requires Buffer, found type %s",
                 AcpiUtGetObjectTypeName (SourceDesc)));
@@ -387,7 +387,7 @@ AcpiExWriteDataToField (
 
     /* Get a pointer to the data to be written */
 
-    switch (ACPI_GET_OBJECT_TYPE (SourceDesc))
+    switch (SourceDesc->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
         Buffer = &SourceDesc->Integer.Value;
@@ -410,13 +410,13 @@ AcpiExWriteDataToField (
 
     ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
         "FieldWrite [FROM]: Obj %p (%s:%X), Buf %p, ByteLen %X\n",
-        SourceDesc, AcpiUtGetTypeName (ACPI_GET_OBJECT_TYPE (SourceDesc)),
-        ACPI_GET_OBJECT_TYPE (SourceDesc), Buffer, Length));
+        SourceDesc, AcpiUtGetTypeName (SourceDesc->Common.Type),
+        SourceDesc->Common.Type, Buffer, Length));
 
     ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
         "FieldWrite [TO]:   Obj %p (%s:%X), BitLen %X, BitOff %X, ByteOff %X\n",
-        ObjDesc, AcpiUtGetTypeName (ACPI_GET_OBJECT_TYPE (ObjDesc)),
-        ACPI_GET_OBJECT_TYPE (ObjDesc),
+        ObjDesc, AcpiUtGetTypeName (ObjDesc->Common.Type),
+        ObjDesc->Common.Type,
         ObjDesc->CommonField.BitLength,
         ObjDesc->CommonField.StartFieldBitOffset,
         ObjDesc->CommonField.BaseByteOffset));

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 1.96 $
  *
  *****************************************************************************/
 
@@ -10,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __EXRESOP_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "amlcode.h"
 #include "acparser.h"
 #include "acinterp.h"
@@ -302,7 +302,7 @@ AcpiExResolveOperands (
 
             /* ACPI internal object */
 
-            ObjectType = ACPI_GET_OBJECT_TYPE (ObjDesc);
+            ObjectType = ObjDesc->Common.Type;
 
             /* Check for bad ACPI_OBJECT_TYPE */
 
@@ -375,7 +375,7 @@ AcpiExResolveOperands (
         case ARGI_REF_OR_STRING:        /* Can be a String or Reference */
 
             if ((ACPI_GET_DESCRIPTOR_TYPE (ObjDesc) == ACPI_DESC_TYPE_OPERAND) &&
-                (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_STRING))
+                (ObjDesc->Common.Type == ACPI_TYPE_STRING))
             {
                 /*
                  * String found - the string references a named object and
@@ -425,7 +425,7 @@ AcpiExResolveOperands (
              * -- All others must be resolved below.
              */
             if ((Opcode == AML_STORE_OP) &&
-                (ACPI_GET_OBJECT_TYPE (*StackPtr) == ACPI_TYPE_LOCAL_REFERENCE) &&
+                ((*StackPtr)->Common.Type == ACPI_TYPE_LOCAL_REFERENCE) &&
                 ((*StackPtr)->Reference.Class == ACPI_REFCLASS_INDEX))
             {
                 goto NextOperand;
@@ -590,7 +590,7 @@ AcpiExResolveOperands (
 
             /* Need an operand of type INTEGER, STRING or BUFFER */
 
-            switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+            switch (ObjDesc->Common.Type)
             {
             case ACPI_TYPE_INTEGER:
             case ACPI_TYPE_STRING:
@@ -613,7 +613,7 @@ AcpiExResolveOperands (
 
             /* Need an operand of type STRING or BUFFER */
 
-            switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+            switch (ObjDesc->Common.Type)
             {
             case ACPI_TYPE_STRING:
             case ACPI_TYPE_BUFFER:
@@ -655,7 +655,7 @@ AcpiExResolveOperands (
              * The only reference allowed here is a direct reference to
              * a namespace node.
              */
-            switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+            switch (ObjDesc->Common.Type)
             {
             case ACPI_TYPE_PACKAGE:
             case ACPI_TYPE_STRING:
@@ -679,7 +679,7 @@ AcpiExResolveOperands (
 
             /* Need a buffer or package or (ACPI 2.0) String */
 
-            switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+            switch (ObjDesc->Common.Type)
             {
             case ACPI_TYPE_PACKAGE:
             case ACPI_TYPE_STRING:
@@ -702,7 +702,7 @@ AcpiExResolveOperands (
 
             /* Need an operand of type REGION or a BUFFER (which could be a resolved region field) */
 
-            switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+            switch (ObjDesc->Common.Type)
             {
             case ACPI_TYPE_BUFFER:
             case ACPI_TYPE_REGION:
@@ -724,7 +724,7 @@ AcpiExResolveOperands (
 
             /* Used by the Store() operator only */
 
-            switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+            switch (ObjDesc->Common.Type)
             {
             case ACPI_TYPE_INTEGER:
             case ACPI_TYPE_PACKAGE:
@@ -784,7 +784,7 @@ AcpiExResolveOperands (
          * required object type (Simple cases only).
          */
         Status = AcpiExCheckObjectType (TypeNeeded,
-                        ACPI_GET_OBJECT_TYPE (*StackPtr), *StackPtr);
+                        (*StackPtr)->Common.Type, *StackPtr);
         if (ACPI_FAILURE (Status))
         {
             return_ACPI_STATUS (Status);

@@ -1,8 +1,7 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the ACPI CA services
 #	kernel module.
@@ -24,6 +23,7 @@ LINTS		= $(ACPICA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 INC_PATH        += -I$(UTSBASE)/intel/sys/acpi
 INC_PATH	+= -I$(UTSBASE)/i86pc
+INC_PATH	+= -I$(SRC)/common
 
 #
 #	Include common rules.

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 1.78 $
  *
  *****************************************************************************/
 
@@ -10,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -118,6 +117,7 @@
 #define __EXRESNTE_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acdispat.h"
 #include "acinterp.h"
 #include "acnamesp.h"
@@ -220,7 +220,7 @@ AcpiExResolveNodeToValue (
     {
     case ACPI_TYPE_PACKAGE:
 
-        if (ACPI_GET_OBJECT_TYPE (SourceDesc) != ACPI_TYPE_PACKAGE)
+        if (SourceDesc->Common.Type != ACPI_TYPE_PACKAGE)
         {
             ACPI_ERROR ((AE_INFO, "Object not a Package, type %s",
                 AcpiUtGetObjectTypeName (SourceDesc)));
@@ -240,7 +240,7 @@ AcpiExResolveNodeToValue (
 
     case ACPI_TYPE_BUFFER:
 
-        if (ACPI_GET_OBJECT_TYPE (SourceDesc) != ACPI_TYPE_BUFFER)
+        if (SourceDesc->Common.Type != ACPI_TYPE_BUFFER)
         {
             ACPI_ERROR ((AE_INFO, "Object not a Buffer, type %s",
                 AcpiUtGetObjectTypeName (SourceDesc)));
@@ -260,7 +260,7 @@ AcpiExResolveNodeToValue (
 
     case ACPI_TYPE_STRING:
 
-        if (ACPI_GET_OBJECT_TYPE (SourceDesc) != ACPI_TYPE_STRING)
+        if (SourceDesc->Common.Type != ACPI_TYPE_STRING)
         {
             ACPI_ERROR ((AE_INFO, "Object not a String, type %s",
                 AcpiUtGetObjectTypeName (SourceDesc)));
@@ -276,7 +276,7 @@ AcpiExResolveNodeToValue (
 
     case ACPI_TYPE_INTEGER:
 
-        if (ACPI_GET_OBJECT_TYPE (SourceDesc) != ACPI_TYPE_INTEGER)
+        if (SourceDesc->Common.Type != ACPI_TYPE_INTEGER)
         {
             ACPI_ERROR ((AE_INFO, "Object not a Integer, type %s",
                 AcpiUtGetObjectTypeName (SourceDesc)));

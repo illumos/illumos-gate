@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem
- *       $Revision: 1.80 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -180,8 +179,9 @@
 #define AE_BAD_OCTAL_CONSTANT           (ACPI_STATUS) (0x0006 | AE_CODE_PROGRAMMER)
 #define AE_BAD_DECIMAL_CONSTANT         (ACPI_STATUS) (0x0007 | AE_CODE_PROGRAMMER)
 #define AE_MISSING_ARGUMENTS            (ACPI_STATUS) (0x0008 | AE_CODE_PROGRAMMER)
+#define AE_BAD_ADDRESS                  (ACPI_STATUS) (0x0009 | AE_CODE_PROGRAMMER)
 
-#define AE_CODE_PGM_MAX                 0x0008
+#define AE_CODE_PGM_MAX                 0x0009
 
 
 /*
@@ -232,8 +232,9 @@
 #define AE_AML_CIRCULAR_REFERENCE       (ACPI_STATUS) (0x001E | AE_CODE_AML)
 #define AE_AML_BAD_RESOURCE_LENGTH      (ACPI_STATUS) (0x001F | AE_CODE_AML)
 #define AE_AML_ILLEGAL_ADDRESS          (ACPI_STATUS) (0x0020 | AE_CODE_AML)
+#define AE_AML_INFINITE_LOOP            (ACPI_STATUS) (0x0021 | AE_CODE_AML)
 
-#define AE_CODE_AML_MAX                 0x0020
+#define AE_CODE_AML_MAX                 0x0021
 
 
 /*
@@ -256,8 +257,9 @@
 #define AE_CODE_CTRL_MAX                0x000D
 
 
-#ifdef DEFINE_ACPI_GLOBALS
+/* Exception strings for AcpiFormatException */
 
+#ifdef DEFINE_ACPI_GLOBALS
 
 /*
  * String versions of the exception codes above
@@ -305,7 +307,8 @@ char const   *AcpiGbl_ExceptionNames_Pgm[] =
     "AE_BAD_HEX_CONSTANT",
     "AE_BAD_OCTAL_CONSTANT",
     "AE_BAD_DECIMAL_CONSTANT",
-    "AE_MISSING_ARGUMENTS"
+    "AE_MISSING_ARGUMENTS",
+    "AE_BAD_ADDRESS"
 };
 
 char const   *AcpiGbl_ExceptionNames_Tbl[] =
@@ -353,6 +356,7 @@ char const   *AcpiGbl_ExceptionNames_Aml[] =
     "AE_AML_CIRCULAR_REFERENCE",
     "AE_AML_BAD_RESOURCE_LENGTH",
     "AE_AML_ILLEGAL_ADDRESS",
+    "AE_AML_INFINITE_LOOP"
 };
 
 char const   *AcpiGbl_ExceptionNames_Ctrl[] =

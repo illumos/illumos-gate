@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 1.73 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -117,6 +116,7 @@
 #define __UTEVAL_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acnamesp.h"
 #include "acinterp.h"
 
@@ -140,23 +140,30 @@ AcpiUtTranslateOneCid (
 
 /*
  * Strings supported by the _OSI predefined (internal) method.
+ *
+ * March 2009: Removed "Linux" as this host no longer wants to respond true
+ * for this string. Basically, the only safe OS strings are windows-related
+ * and in many or most cases represent the only test path within the 
+ * BIOS-provided ASL code.
+ *
+ * The second element of each entry is used to track the newest version of
+ * Windows that the BIOS has requested.
  */
-static const char               *AcpiInterfacesSupported[] =
+static const ACPI_INTERFACE_INFO    AcpiInterfacesSupported[] =
 {
     /* Operating System Vendor Strings */
 
-    "Linux",
-    "Windows 2000",         /* Windows 2000 */
-    "Windows 2001",         /* Windows XP */
-    "Windows 2001 SP1",     /* Windows XP SP1 */
-    "Windows 2001 SP2",     /* Windows XP SP2 */
-    "Windows 2001.1",       /* Windows Server 2003 */
-    "Windows 2001.1 SP1",   /* Windows Server 2003 SP1 - Added 03/2006 */
-    "Windows 2006",         /* Windows Vista - Added 03/2006 */
+    {"Windows 2000",        ACPI_OSI_WIN_2000},         /* Windows 2000 */
+    {"Windows 2001",        ACPI_OSI_WIN_XP},           /* Windows XP */
+    {"Windows 2001 SP1",    ACPI_OSI_WIN_XP_SP1},       /* Windows XP SP1 */
+    {"Windows 2001.1",      ACPI_OSI_WINSRV_2003},      /* Windows Server 2003 */
+    {"Windows 2001 SP2",    ACPI_OSI_WIN_XP_SP2},       /* Windows XP SP2 */
+    {"Windows 2001.1 SP1",  ACPI_OSI_WINSRV_2003_SP1},  /* Windows Server 2003 SP1 - Added 03/2006 */
+    {"Windows 2006",        ACPI_OSI_WIN_VISTA},        /* Windows Vista - Added 03/2006 */
 
     /* Feature Group Strings */
 
-    "Extended Address Space Descriptor"
+    {"Extended Address Space Descriptor", 0}
 
     /*
      * All "optional" feature group strings (features that are implemented
@@ -185,6 +192,7 @@ AcpiUtOsiImplementation (
     ACPI_STATUS             Status;
     ACPI_OPERAND_OBJECT     *StringDesc;
     ACPI_OPERAND_OBJECT     *ReturnDesc;
+    UINT32                  ReturnValue;
     UINT32                  i;
 
 
@@ -207,20 +215,29 @@ AcpiUtOsiImplementation (
         return_ACPI_STATUS (AE_NO_MEMORY);
     }
 
-    /* Default return value is SUPPORTED */
+    /* Default return value is 0, NOT SUPPORTED */
 
-    ReturnDesc->Integer.Value = ACPI_UINT32_MAX;
-    WalkState->ReturnDesc = ReturnDesc;
+    ReturnValue = 0;
 
     /* Compare input string to static table of supported interfaces */
 
     for (i = 0; i < ACPI_ARRAY_LENGTH (AcpiInterfacesSupported); i++)
     {
-        if (!ACPI_STRCMP (StringDesc->String.Pointer, AcpiInterfacesSupported[i]))
+        if (!ACPI_STRCMP (StringDesc->String.Pointer,
+                AcpiInterfacesSupported[i].Name))
         {
-            /* The interface is supported */
+            /*
+             * The interface is supported.
+             * Update the OsiData if necessary. We keep track of the latest
+             * version of Windows that has been requested by the BIOS.
+             */
+            if (AcpiInterfacesSupported[i].Value > AcpiGbl_OsiData)
+            {
+                AcpiGbl_OsiData = AcpiInterfacesSupported[i].Value;
+            }
 
-            return_ACPI_STATUS (AE_CTRL_TERMINATE);
+            ReturnValue = ACPI_UINT32_MAX;
+            goto Exit;
         }
     }
 
@@ -234,13 +251,20 @@ AcpiUtOsiImplementation (
     {
         /* The interface is supported */
 
-        return_ACPI_STATUS (AE_CTRL_TERMINATE);
+        ReturnValue = ACPI_UINT32_MAX;
     }
 
-    /* The interface is not supported */
 
-    ReturnDesc->Integer.Value = 0;
-    return_ACPI_STATUS (AE_CTRL_TERMINATE);
+Exit:
+    ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO,
+        "ACPI: BIOS _OSI(%s) is %ssupported\n",
+        StringDesc->String.Pointer, ReturnValue == 0 ? "not " : ""));
+
+    /* Complete the return value */
+
+    ReturnDesc->Integer.Value = ReturnValue;
+    WalkState->ReturnDesc = ReturnDesc;
+    return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -325,7 +349,7 @@ AcpiUtEvaluateObject (
 
     /* Map the return object type to the bitmapped type */
 
-    switch (ACPI_GET_OBJECT_TYPE (Info->ReturnObject))
+    switch ((Info->ReturnObject)->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
         ReturnBtype = ACPI_BTYPE_INTEGER;
@@ -512,7 +536,7 @@ AcpiUtExecute_HID (
         return_ACPI_STATUS (Status);
     }
 
-    if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_INTEGER)
+    if (ObjDesc->Common.Type == ACPI_TYPE_INTEGER)
     {
         /* Convert the Numeric HID to string */
 
@@ -557,7 +581,7 @@ AcpiUtTranslateOneCid (
 {
 
 
-    switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+    switch (ObjDesc->Common.Type)
     {
     case ACPI_TYPE_INTEGER:
 
@@ -631,7 +655,7 @@ AcpiUtExecute_CID (
     /* Get the number of _CIDs returned */
 
     Count = 1;
-    if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_PACKAGE)
+    if (ObjDesc->Common.Type == ACPI_TYPE_PACKAGE)
     {
         Count = ObjDesc->Package.Count;
     }
@@ -661,7 +685,7 @@ AcpiUtExecute_CID (
 
     /* The _CID object can be either a single CID or a package (list) of CIDs */
 
-    if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_PACKAGE)
+    if (ObjDesc->Common.Type == ACPI_TYPE_PACKAGE)
     {
         /* Translate each package element */
 
@@ -735,7 +759,7 @@ AcpiUtExecute_UID (
         return_ACPI_STATUS (Status);
     }
 
-    if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_INTEGER)
+    if (ObjDesc->Common.Type == ACPI_TYPE_INTEGER)
     {
         /* Convert the Numeric UID to string */
 

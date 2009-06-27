@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 1.140 $
  *
  *****************************************************************************/
 
@@ -9,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2008, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2009, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -117,6 +116,7 @@
 #define __DSOBJECT_C__
 
 #include "acpi.h"
+#include "accommon.h"
 #include "acparser.h"
 #include "amlcode.h"
 #include "acdispat.h"
@@ -661,7 +661,7 @@ AcpiDsCreateNode (
 
     /* Re-type the object according to its argument */
 
-    Node->Type = ACPI_GET_OBJECT_TYPE (ObjDesc);
+    Node->Type = ObjDesc->Common.Type;
 
     /* Attach obj to node */
 
@@ -719,7 +719,7 @@ AcpiDsInitObjectFromOp (
 
     /* Perform per-object initialization */
 
-    switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
+    switch (ObjDesc->Common.Type)
     {
     case ACPI_TYPE_BUFFER:
 
@@ -841,7 +841,7 @@ AcpiDsInitObjectFromOp (
 
             /* Local ID (0-7) is (AML opcode - base AML_LOCAL_OP) */
 
-            ObjDesc->Reference.Value = Opcode - AML_LOCAL_OP;
+            ObjDesc->Reference.Value = ((UINT32) Opcode) - AML_LOCAL_OP;
             ObjDesc->Reference.Class = ACPI_REFCLASS_LOCAL;
 
 #ifndef ACPI_NO_METHOD_EXECUTION
@@ -857,7 +857,7 @@ AcpiDsInitObjectFromOp (
 
             /* Arg ID (0-6) is (AML opcode - base AML_ARG_OP) */
 
-            ObjDesc->Reference.Value = Opcode - AML_ARG_OP;
+            ObjDesc->Reference.Value = ((UINT32) Opcode) - AML_ARG_OP;
             ObjDesc->Reference.Class = ACPI_REFCLASS_ARG;
 
 #ifndef ACPI_NO_METHOD_EXECUTION
@@ -900,7 +900,7 @@ AcpiDsInitObjectFromOp (
     default:
 
         ACPI_ERROR ((AE_INFO, "Unimplemented data type: %X",
-            ACPI_GET_OBJECT_TYPE (ObjDesc)));
+            ObjDesc->Common.Type));
 
         Status = AE_AML_OPERAND_TYPE;
         break;

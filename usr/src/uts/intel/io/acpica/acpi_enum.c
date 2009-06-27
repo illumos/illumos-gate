@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,13 +31,10 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/note.h>
-#include "acpi.h"
+#include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
+#include <util/sscanf.h>
 
-extern void free_master_data();
-extern void process_master_file();
-extern int master_file_lookup(char *, char **, char **, char **);
-extern int master_file_lookups(char *, char **, char **, char **, int);
 
 static char keyboard_alias[] = "keyboard";
 static char mouse_alias[] = "mouse";
@@ -605,40 +602,23 @@ get_bus_dip(char *nodename, dev_info_t *isa_dip)
 
 /*
  * put content of properties (if any) to dev info tree at branch xdip
+ * return non-zero if a "compatible" property was processed, zero otherwise
  *
  */
-static void
-process_properties(dev_info_t *xdip, char *properties)
+static int
+process_properties(dev_info_t *xdip, property_t *properties)
 {
-	char *tmp, *value, *org1;
+	int	rv = 0;
 
-	if (properties == NULL) {
-		return; /* nothing to add */
+	while (properties != NULL) {
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
+		    properties->name, properties->value);
+		if (strcmp(properties->name, "compatible") == 0)
+			rv = 1;
+		properties = properties->next;
 	}
-	org1 = tmp = strchr(properties, '=');
-	if (tmp == NULL) {
-		cmn_err(CE_WARN, "!master_ops: incorrect properties: %s\n",
-		    properties);
-		return; /* don't know how to process this */
-	}
-	*tmp = '\0';
-	tmp++;
-	if (*tmp == '"') {
-		tmp++;
-	}
-	value = tmp;
-	tmp = strchr(value, '"');
-	if (tmp != NULL) {
-		*tmp = '\0';
-	}
-	(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip, properties, value);
-	/* put back original value to avoid kmem corruption */
-	if (org1 != NULL) {
-		*org1 = '=';
-	}
-	if (tmp != NULL) {
-		*tmp = '"';
-	}
+
+	return (rv);
 }
 
 void
@@ -649,8 +629,8 @@ eisa_to_str(ACPI_INTEGER id, char *np)
 	/*
 	 *  Expand an EISA device name:
 	 *
-	 * This is the inverse of the above routine.  It converts a 32-bit EISA
-	 * device "id" to a 7-byte ASCII device name, which is stored at "np".
+	 * This routine converts a 32-bit EISA device "id" to a
+	 * 7-byte ASCII device name, which is stored at "np".
 	 */
 
 	*np++ = '@' + ((id >> 2)  & 0x1F);
@@ -667,51 +647,35 @@ eisa_to_str(ACPI_INTEGER id, char *np)
  * process_cids() -- process multiple CIDs in a package
  */
 static void
-process_cids(ACPI_OBJECT *rv, char **cidstr, int *cidstr_size)
+process_cids(ACPI_OBJECT *rv, device_id_t **dd)
 {
-	char *tmp_cidstr;
+	device_id_t *d;
+	char tmp_cidstr[8];	/* 7-character EISA ID */
 	int i;
 
-	*cidstr_size = 0;
-	*cidstr = NULL;
-	if ((rv->Package.Count == 0) || rv->Package.Elements == NULL) {
+	if ((rv->Package.Count == 0) || rv->Package.Elements == NULL)
 		return; /* empty package */
-	}
 
-	/* figure out the total cid size needed */
-	for (i = 0; i < rv->Package.Count; i++) {
-		/* total up all CIDs size */
-		ACPI_OBJECT obj = rv->Package.Elements[i];
-		switch (obj.Type) {
-		case ACPI_TYPE_INTEGER:
-			*cidstr_size += EISA_ID_SIZE + 1;
-			break;
-		case ACPI_TYPE_STRING:
-			*cidstr_size += obj.String.Length + 1;
-			break;
-		default:
-			break;
-		}
-	}
-	*cidstr = kmem_zalloc(*cidstr_size, KM_SLEEP);
-	tmp_cidstr = *cidstr;
-	for (i = 0; i < rv->Package.Count; i++) {
+	/*
+	 * Work the package 'backwards' so the resulting list is
+	 * in original order of preference.
+	 */
+	for (i = rv->Package.Count - 1; i >= 0; i--) {
 		/* get the actual acpi_object */
 		ACPI_OBJECT obj = rv->Package.Elements[i];
 		switch (obj.Type) {
 		case ACPI_TYPE_INTEGER:
 			eisa_to_str(obj.Integer.Value, tmp_cidstr);
-			if (acpi_enum_debug & PROCESS_CIDS) {
-				cmn_err(CE_NOTE, "integer CID: %s", tmp_cidstr);
-			}
-			tmp_cidstr += EISA_ID_SIZE + 1;
+			d = mf_alloc_device_id();
+			d->id = strdup(tmp_cidstr);
+			d->next = *dd;
+			*dd = d;
 			break;
 		case ACPI_TYPE_STRING:
-			(void) strcpy(tmp_cidstr, obj.String.Pointer);
-			if (acpi_enum_debug & PROCESS_CIDS) {
-				cmn_err(CE_NOTE, "string CID: %s", tmp_cidstr);
-			}
-			tmp_cidstr += strlen(obj.String.Pointer) + 1;
+			d = mf_alloc_device_id();
+			d->id = strdup(obj.String.Pointer);
+			d->next = *dd;
+			*dd = d;
 			break;
 		default:
 			if (acpi_enum_debug & PROCESS_CIDS) {
@@ -721,9 +685,70 @@ process_cids(ACPI_OBJECT *rv, char **cidstr, int *cidstr_size)
 			break;
 		}
 	}
-	if (acpi_enum_debug & PROCESS_CIDS) {
-		cmn_err(CE_NOTE, "total CIDs: %d", rv->Package.Count);
+}
+
+/*
+ * Convert "raw" PNP and ACPI IDs to IEEE 1275-compliant form.
+ * Some liberty is taken here, treating "ACPI" as a special form
+ * of PNP vendor ID.  strsize specifies size of buffer.
+ */
+static void
+convert_to_pnp1275(char *pnpid, char *str, int strsize)
+{
+	char	vendor[5];
+	uint_t	id;
+
+	if (strncmp(pnpid, "ACPI", 4) == 0) {
+		/* Assume ACPI ID: ACPIxxxx */
+		sscanf(pnpid, "%4s%x", vendor, &id);
+	} else {
+		/* Assume PNP ID: aaaxxxx */
+		sscanf(pnpid, "%3s%x", vendor, &id);
 	}
+
+	snprintf(str, strsize, "pnp%s,%x", vendor, id);
+}
+
+/*
+ * Given a list of device ID elements in most-to-least-specific
+ * order, create a "compatible" property.
+ */
+static void
+create_compatible_property(dev_info_t *dip, device_id_t *ids)
+{
+	char		**strs;
+	int		list_len, i;
+	device_id_t	*d;
+
+	/* count list length */
+	list_len = 0;
+	d = ids;
+	while (d != NULL) {
+		list_len++;
+		d = d->next;
+	}
+
+	/* create string array */
+	strs = (char **)kmem_zalloc(list_len * sizeof (char *), KM_SLEEP);
+	i = 0;
+	d = ids;
+	while (d != NULL) {
+		/* strlen("pnpXXXX,xxxx") + 1 = 13 */
+		strs[i] = kmem_zalloc(13, KM_SLEEP);
+		convert_to_pnp1275(d->id, strs[i++], 13);
+		d = d->next;
+	}
+
+	/* update property */
+	(void) ndi_prop_update_string_array(DDI_DEV_T_NONE, dip,
+	    "compatible", strs, list_len);
+
+
+	/* free memory */
+	for (i = 0; i < list_len; i++)
+		kmem_free(strs[i], 13);
+
+	kmem_free(strs, list_len * sizeof (char *));
 }
 
 /*
@@ -738,14 +763,13 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	ACPI_BUFFER	rb;
 	ACPI_DEVICE_INFO *info = NULL;
 	char		*path = NULL;
-	char 		*devname = NULL;
 	char		*hidstr = NULL;
-	char		*cidstr = NULL;
-	int		cidstr_size = 0;
-	char		*description = NULL;
-	char		*properties = NULL;
+	char		tmp_cidstr[8];	/* EISAID size */
 	dev_info_t	*dip = (dev_info_t *)a;
 	dev_info_t	*xdip = NULL;
+	device_id_t	*d, *device_ids = NULL;
+	const master_rec_t	*m;
+	int		compatible_present = 0;
 
 	/*
 	 * get full ACPI pathname for object
@@ -809,17 +833,20 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 
 		switch (rv->Type) {
 		case ACPI_TYPE_INTEGER:
-			cidstr_size = 8;
-			cidstr = kmem_zalloc(cidstr_size, KM_SLEEP);
-			eisa_to_str(rv->Integer.Value, cidstr);
+			eisa_to_str(rv->Integer.Value, tmp_cidstr);
+			d = mf_alloc_device_id();
+			d->id = strdup(tmp_cidstr);
+			d->next = device_ids;
+			device_ids = d;
 			break;
 		case ACPI_TYPE_STRING:
-			cidstr_size = strlen(rv->String.Pointer) + 1;
-			cidstr = kmem_zalloc(cidstr_size, KM_SLEEP);
-			(void) strcpy(cidstr, rv->String.Pointer);
+			d = mf_alloc_device_id();
+			d->id = strdup(rv->String.Pointer);
+			d->next = device_ids;
+			device_ids = d;
 			break;
 		case ACPI_TYPE_PACKAGE:
-			process_cids(rv, &cidstr, &cidstr_size);
+			process_cids(rv, &device_ids);
 			break;
 		default:
 			break;
@@ -827,27 +854,29 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 		AcpiOsFree(rb.Pointer);
 	}
 
+	/*
+	 * Add _HID last so it's at the head of the list
+	 */
+	d = mf_alloc_device_id();
+	d->id = strdup(hidstr);
+	d->next = device_ids;
+	device_ids = d;
 
 	/*
-	 * Note carefully: expressions are evaluated left to right, so
-	 * this first checks for _HID and then for _CID match
+	 * master_file_lookup() expects _HID first in device_ids
 	 */
-	if (master_file_lookup(hidstr, &devname, &description, &properties) ||
-	    master_file_lookups(cidstr, &devname, &description, &properties,
-	    cidstr_size)) {
+	if ((m = master_file_lookup(device_ids)) !=  NULL) {
 		/* PNP description found in master table */
 		if (!(strncmp(hidstr, "ACPI", 4))) {
 			dip = ddi_root_node();
 		} else {
-			dip = get_bus_dip(devname, dip);
+			dip = get_bus_dip(m->name, dip);
 		}
-		ndi_devi_alloc_sleep(dip, devname,
+		ndi_devi_alloc_sleep(dip, m->name,
 		    (pnode_t)DEVI_SID_NODEID, &xdip);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-		    "compatible", hidstr);
-		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
-		    "model", description);
-		(void) process_properties(xdip, properties);
+		    "model", m->description);
+		compatible_present = process_properties(xdip, m->properties);
 	} else {
 		/* for ISA devices not known to the master file */
 		if (!(strncmp(hidstr, "PNP03", 5))) {
@@ -870,77 +899,59 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
 				    xdip, "model", "PNP0Fxx mouse");
 			} else {
-				if (acpi_enum_debug & DEVICES_NOT_ENUMED) {
-					cmn_err(CE_WARN,
-					    "Not enum HID(%s), CID(%s)\n",
-					    hidstr, cidstr);
-				}
 				(void) parse_resources(ObjHandle, xdip);
 				goto done;
 			}
 		}
 	}
-	if (acpi_enum_debug & MASTER_LOOKUP_DEBUG) {
-		cmn_err(CE_NOTE, "ACPI devname=(%s), HID(%s), CID(%s)\n",
-		    devname, hidstr, cidstr);
-		cmn_err(CE_NOTE, "description=(%s) properties=(%s)\n",
-		    description, properties);
-	}
+
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip, "acpi-namespace",
 	    path);
-	if (cidstr) {
-		char *cids[ACPI_ELEMENT_PACKAGE_LIMIT];
-		char *t = cidstr;
-		int i = 0;
-		while (t < (cidstr + cidstr_size)) {
-			if (*t == NULL) {
-				t++;
-				continue;
-			}
-			cids[i++] = t;
-			t += strlen(t);
-		}
-		(void) ndi_prop_update_string_array(DDI_DEV_T_NONE, xdip,
-		    "_CID", (char **)cids, i);
-	}
 
 	(void) parse_resources(ObjHandle, xdip);
 
 	/* Special processing for mouse and keyboard devices per IEEE 1275 */
 	/* if master entry doesn't contain "compatible" then we add default */
-	if (strcmp(devname, keyboard_alias) == 0) {
+	if (strcmp(m->name, keyboard_alias) == 0) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip, "reg", 0);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 		    "device-type", keyboard_alias);
-		if (strncmp(properties, "compatible", 10)) {
+		if (!compatible_present)
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 			    "compatible", "pnpPNP,303");
-		}
-	} else if (strcmp(devname, mouse_alias) == 0) {
+	} else if (strcmp(m->name, mouse_alias) == 0) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip, "reg", 1);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 		    "device-type", mouse_alias);
-		if (strncmp(properties, "compatible", 10)) {
+		if (!compatible_present)
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 			    "compatible", "pnpPNP,f03");
-		}
 	}
+
+	/*
+	 * Create default "compatible" property if required
+	 */
+	if (!ddi_prop_exists(DDI_DEV_T_ANY, xdip,
+	    DDI_PROP_DONTPASS, "compatible"))
+		create_compatible_property(xdip, device_ids);
 
 	(void) ndi_devi_bind_driver(xdip, 0);
 
 done:
+	/* discard _HID/_CID list */
+	d = device_ids;
+	while (d != NULL) {
+		device_id_t *next;
+
+		next = d->next;
+		mf_free_device_id(d);
+		d = next;
+	}
+
 	if (path != NULL)
 		AcpiOsFree(path);
 	if (info != NULL)
 		AcpiOsFree(info);
-	if (cidstr != NULL)
-		kmem_free(cidstr, cidstr_size);
-	if (devname != NULL)
-		kmem_free(devname, strlen(devname) + 1);
-	if (description != NULL)
-		kmem_free(description, strlen(description) + 1);
-	if (properties != NULL)
-		kmem_free(properties, strlen(properties) + 1);
 
 	return (AE_OK);
 }
