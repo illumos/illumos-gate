@@ -988,6 +988,27 @@ zfs_access(vnode_t *vp, int mode, int flag, cred_t *cr,
 }
 
 /*
+ * If vnode is for a device return a specfs vnode instead.
+ */
+static int
+specvp_check(vnode_t **vpp, cred_t *cr)
+{
+	int error = 0;
+
+	if (IS_DEVVP(*vpp)) {
+		struct vnode *svp;
+
+		svp = specvp(*vpp, (*vpp)->v_rdev, (*vpp)->v_type, cr);
+		VN_RELE(*vpp);
+		if (svp == NULL)
+			error = ENOSYS;
+		*vpp = svp;
+	}
+	return (error);
+}
+
+
+/*
  * Lookup an entry in a directory, or an extended attribute directory.
  * If it exists, return a held vnode reference for it.
  *
@@ -1017,7 +1038,46 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 {
 	znode_t *zdp = VTOZ(dvp);
 	zfsvfs_t *zfsvfs = zdp->z_zfsvfs;
-	int	error;
+	int	error = 0;
+
+	/* fast path */
+	if (!(flags & (LOOKUP_XATTR | FIGNORECASE))) {
+
+		if (dvp->v_type != VDIR) {
+			return (ENOTDIR);
+		} else if (zdp->z_dbuf == NULL) {
+			return (EIO);
+		}
+
+		if (nm[0] == 0 || (nm[0] == '.' && nm[1] == '\0')) {
+			error = zfs_fastaccesschk_execute(zdp, cr);
+			if (!error) {
+				*vpp = dvp;
+				VN_HOLD(*vpp);
+				return (0);
+			}
+			return (error);
+		} else {
+			vnode_t *tvp = dnlc_lookup(dvp, nm);
+
+			if (tvp) {
+				error = zfs_fastaccesschk_execute(zdp, cr);
+				if (error) {
+					VN_RELE(tvp);
+					return (error);
+				}
+				if (tvp == DNLC_NO_VNODE) {
+					VN_RELE(tvp);
+					return (ENOENT);
+				} else {
+					*vpp = tvp;
+					return (specvp_check(vpp, cr));
+				}
+			}
+		}
+	}
+
+	DTRACE_PROBE2(zfs__fastpath__lookup__miss, vnode_t *, dvp, char *, nm);
 
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zdp);
@@ -1082,21 +1142,8 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	}
 
 	error = zfs_dirlook(zdp, nm, vpp, flags, direntflags, realpnp);
-	if (error == 0) {
-		/*
-		 * Convert device special files
-		 */
-		if (IS_DEVVP(*vpp)) {
-			vnode_t	*svp;
-
-			svp = specvp(*vpp, (*vpp)->v_rdev, (*vpp)->v_type, cr);
-			VN_RELE(*vpp);
-			if (svp == NULL)
-				error = ENOSYS;
-			else
-				*vpp = svp;
-		}
-	}
+	if (error == 0)
+		error = specvp_check(vpp, cr);
 
 	ZFS_EXIT(zfsvfs);
 	return (error);
@@ -1332,19 +1379,7 @@ out:
 			VN_RELE(ZTOV(zp));
 	} else {
 		*vpp = ZTOV(zp);
-		/*
-		 * If vnode is for a device return a specfs vnode instead.
-		 */
-		if (IS_DEVVP(*vpp)) {
-			struct vnode *svp;
-
-			svp = specvp(*vpp, (*vpp)->v_rdev, (*vpp)->v_type, cr);
-			VN_RELE(*vpp);
-			if (svp == NULL) {
-				error = ENOSYS;
-			}
-			*vpp = svp;
-		}
+		error = specvp_check(vpp, cr);
 	}
 
 	ZFS_EXIT(zfsvfs);
@@ -2456,6 +2491,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 top:
 	attrzp = NULL;
 
+	/* Can this be moved to before the top label? */
 	if (zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) {
 		ZFS_EXIT(zfsvfs);
 		return (EROFS);
@@ -2855,11 +2891,6 @@ top:
 out:
 	if (attrzp)
 		VN_RELE(ZTOV(attrzp));
-
-	if (aclp) {
-		zfs_acl_free(aclp);
-		aclp = NULL;
-	}
 
 	if (fuidp) {
 		zfs_fuid_info_free(fuidp);

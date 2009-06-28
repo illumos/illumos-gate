@@ -133,6 +133,7 @@ zfs_znode_cache_constructor(void *buf, void *arg, int kmflags)
 
 	zp->z_dbuf = NULL;
 	zp->z_dirlocks = NULL;
+	zp->z_acl_cached = NULL;
 	return (0);
 }
 
@@ -1080,6 +1081,11 @@ zfs_znode_free(znode_t *zp)
 	POINTER_INVALIDATE(&zp->z_zfsvfs);
 	list_remove(&zfsvfs->z_all_znodes, zp);
 	mutex_exit(&zfsvfs->z_znodes_lock);
+
+	if (zp->z_acl_cached) {
+		zfs_acl_free(zp->z_acl_cached);
+		zp->z_acl_cached = NULL;
+	}
 
 	kmem_cache_free(znode_cache, zp);
 
