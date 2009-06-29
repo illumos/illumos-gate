@@ -86,12 +86,11 @@ typedef struct udp_bits_s {
 	udpb_ipv6_recvrthdrdstopts : 1,	/* IPV6_RECVRTHDRDSTOPTS */
 
 	udpb_rcvhdr : 1,		/* UDP_RCVHDR option */
-	udpb_issocket : 1,		/* socket mode */
-	udpb_direct_sockfs : 1,		/* direct calls to/from sockfs */
+	udpb_issocket : 1,		/* socket mode; sockfs is on top */
 	udpb_timestamp : 1,		/* SO_TIMESTAMP "socket" option */
 
 	udpb_nat_t_endpoint : 1,	/* UDP_NAT_T_ENDPOINT option */
-	udpb_pad_to_bit_31 : 3;
+	udpb_pad_to_bit_31 : 4;
 } udp_bits_t;
 
 #define	udp_debug	udp_bits.udpb_debug
@@ -126,7 +125,6 @@ typedef struct udp_bits_s {
 
 #define	udp_rcvhdr		udp_bits.udpb_rcvhdr
 #define	udp_issocket		udp_bits.udpb_issocket
-#define	udp_direct_sockfs	udp_bits.udpb_direct_sockfs
 #define	udp_timestamp		udp_bits.udpb_timestamp
 
 #define	udp_nat_t_endpoint	udp_bits.udpb_nat_t_endpoint
@@ -166,10 +164,7 @@ typedef struct udp_stat {			/* Class "net" kstats */
 	kstat_named_t	udp_ip_send;
 	kstat_named_t	udp_ip_ire_send;
 	kstat_named_t	udp_ire_null;
-	kstat_named_t	udp_drain;
 	kstat_named_t	udp_sock_fallback;
-	kstat_named_t	udp_rrw_busy;
-	kstat_named_t	udp_rrw_msgcnt;
 	kstat_named_t	udp_out_sw_cksum;
 	kstat_named_t	udp_out_sw_cksum_bytes;
 	kstat_named_t	udp_out_opt;
@@ -296,16 +291,8 @@ typedef	struct udp_s {
 	struct udp_s	*udp_bind_hash; /* Bind hash chain */
 	struct udp_s	**udp_ptpbhn; /* Pointer to previous bind hash next. */
 
-	kmutex_t	udp_drain_lock;		/* lock for udp_rcv_list */
-	/* Protected by udp_drain_lock */
-	boolean_t	udp_drain_qfull;	/* drain queue is full */
-
 	/* Following protected by udp_rwlock */
-	mblk_t		*udp_rcv_list_head;	/* b_next chain of mblks */
-	mblk_t		*udp_rcv_list_tail;	/* last mblk in chain */
 	kmutex_t	udp_recv_lock;		/* recv lock */
-	uint_t		udp_rcv_cnt;		/* total data in rcv_list */
-	uint_t		udp_rcv_msgcnt;		/* total msgs in rcv_list */
 	size_t		udp_rcv_disply_hiwat;	/* user's view of rcvbuf */
 	size_t		udp_rcv_hiwat;		/* receive high watermark */
 	size_t		udp_rcv_lowat;		/* receive low watermark */

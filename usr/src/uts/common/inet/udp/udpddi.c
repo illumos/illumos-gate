@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -43,12 +43,7 @@
 #define	INET_SOCKDESC	"UDP socket module"
 #define	INET_SOCK_PROTO_CREATE_FUNC	(*udp_create)
 #define	INET_SOCK_PROTO_FB_FUNC		(*udp_fallback)
-/*
- * We define both synchronous STREAMS and sockfs direct-access
- * mode for UDP module instance, because it is autopushed on
- * top of /dev/ip for the sockets case.
- */
-#define	INET_DEVMTFLAGS (D_MP|D_SYNCSTR|_D_DIRECT)
+#define	INET_DEVMTFLAGS (D_MP|_D_DIRECT)
 
 #include "../inetddi.c"
 

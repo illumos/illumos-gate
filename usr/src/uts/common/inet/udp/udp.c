@@ -168,8 +168,6 @@ static void	udp_icmp_error(conn_t *, mblk_t *);
 static void	udp_icmp_error_ipv6(conn_t *, mblk_t *);
 static void	udp_info_req(queue_t *q, mblk_t *mp);
 static void	udp_input(void *, mblk_t *, void *);
-static mblk_t	*udp_ip_bind_mp(udp_t *udp, t_scalar_t bind_prim,
-		    t_scalar_t addr_length);
 static void	udp_lrput(queue_t *, mblk_t *);
 static void	udp_lwput(queue_t *, mblk_t *);
 static int	udp_open(queue_t *q, dev_t *devp, int flag, int sflag,
@@ -185,8 +183,6 @@ static int	udp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t udp_param_register(IDP *ndp, udpparam_t *udppa, int cnt);
 static int	udp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 		    cred_t *cr);
-static int	udp_rinfop(queue_t *q, infod_t *dp);
-static int	udp_rrw(queue_t *q, struiod_t *dp);
 static void	udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp,
 		    ipha_t *ipha);
 static void	udp_ud_err(queue_t *q, mblk_t *mp, uchar_t *destaddr,
@@ -212,9 +208,6 @@ static void	*udp_kstat2_init(netstackid_t, udp_stat_t *);
 static void	udp_kstat2_fini(netstackid_t, kstat_t *);
 static int	udp_kstat_update(kstat_t *kp, int rw);
 
-static void	udp_rcv_enqueue(queue_t *q, udp_t *udp, mblk_t *mp,
-		    uint_t pkt_len);
-static void	udp_rcv_drain(queue_t *q, udp_t *udp, boolean_t closing);
 static void	udp_xmit(queue_t *, mblk_t *, ire_t *ire, conn_t *, zoneid_t);
 
 static int	udp_send_connected(conn_t *, mblk_t *, struct nmsghdr *,
@@ -298,18 +291,15 @@ static struct module_info udp_mod_info =  {
  * We have separate open functions for the /dev/udp and /dev/udp6 devices.
  */
 static struct qinit udp_rinitv4 = {
-	NULL, NULL, udp_openv4, udp_tpi_close, NULL,
-	&udp_mod_info, NULL, udp_rrw, udp_rinfop, STRUIOT_STANDARD
+	NULL, NULL, udp_openv4, udp_tpi_close, NULL, &udp_mod_info, NULL
 };
 
 static struct qinit udp_rinitv6 = {
-	NULL, NULL, udp_openv6, udp_tpi_close, NULL,
-	&udp_mod_info, NULL, udp_rrw, udp_rinfop, STRUIOT_STANDARD
+	NULL, NULL, udp_openv6, udp_tpi_close, NULL, &udp_mod_info, NULL
 };
 
 static struct qinit udp_winit = {
-	(pfi_t)udp_wput, (pfi_t)ip_wsrv, NULL, NULL, NULL,
-	&udp_mod_info, NULL, NULL, NULL, STRUIOT_NONE
+	(pfi_t)udp_wput, (pfi_t)ip_wsrv, NULL, NULL, NULL, &udp_mod_info
 };
 
 /* UDP entry point during fallback */
@@ -322,13 +312,11 @@ struct qinit udp_fallback_sock_winit = {
  * likes to use it as a place to hang the various streams.
  */
 static struct qinit udp_lrinit = {
-	(pfi_t)udp_lrput, NULL, udp_openv4, udp_tpi_close, NULL,
-	&udp_mod_info
+	(pfi_t)udp_lrput, NULL, udp_openv4, udp_tpi_close, NULL, &udp_mod_info
 };
 
 static struct qinit udp_lwinit = {
-	(pfi_t)udp_lwput, NULL, udp_openv4, udp_tpi_close, NULL,
-	&udp_mod_info
+	(pfi_t)udp_lwput, NULL, udp_openv4, udp_tpi_close, NULL, &udp_mod_info
 };
 
 /* For AF_INET aka /dev/udp */
@@ -1626,145 +1614,6 @@ udp_info_req(queue_t *q, mblk_t *mp)
 	qreply(q, mp);
 }
 
-/*
- * IP recognizes seven kinds of bind requests:
- *
- * - A zero-length address binds only to the protocol number.
- *
- * - A 4-byte address is treated as a request to
- * validate that the address is a valid local IPv4
- * address, appropriate for an application to bind to.
- * IP does the verification, but does not make any note
- * of the address at this time.
- *
- * - A 16-byte address contains is treated as a request
- * to validate a local IPv6 address, as the 4-byte
- * address case above.
- *
- * - A 16-byte sockaddr_in to validate the local IPv4 address and also
- * use it for the inbound fanout of packets.
- *
- * - A 24-byte sockaddr_in6 to validate the local IPv6 address and also
- * use it for the inbound fanout of packets.
- *
- * - A 12-byte address (ipa_conn_t) containing complete IPv4 fanout
- * information consisting of local and remote addresses
- * and ports.  In this case, the addresses are both
- * validated as appropriate for this operation, and, if
- * so, the information is retained for use in the
- * inbound fanout.
- *
- * - A 36-byte address address (ipa6_conn_t) containing complete IPv6
- * fanout information, like the 12-byte case above.
- *
- * IP will also fill in the IRE request mblk with information
- * regarding our peer.  In all cases, we notify IP of our protocol
- * type by appending a single protocol byte to the bind request.
- */
-static mblk_t *
-udp_ip_bind_mp(udp_t *udp, t_scalar_t bind_prim, t_scalar_t addr_length)
-{
-	char	*cp;
-	mblk_t	*mp;
-	struct T_bind_req *tbr;
-	ipa_conn_t	*ac;
-	ipa6_conn_t	*ac6;
-	sin_t		*sin;
-	sin6_t		*sin6;
-
-	ASSERT(bind_prim == O_T_BIND_REQ || bind_prim == T_BIND_REQ);
-	ASSERT(RW_LOCK_HELD(&udp->udp_rwlock));
-	mp = allocb(sizeof (*tbr) + addr_length + 1, BPRI_HI);
-	if (!mp)
-		return (mp);
-	mp->b_datap->db_type = M_PROTO;
-	tbr = (struct T_bind_req *)mp->b_rptr;
-	tbr->PRIM_type = bind_prim;
-	tbr->ADDR_offset = sizeof (*tbr);
-	tbr->CONIND_number = 0;
-	tbr->ADDR_length = addr_length;
-	cp = (char *)&tbr[1];
-	switch (addr_length) {
-	case sizeof (ipa_conn_t):
-		ASSERT(udp->udp_family == AF_INET);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (!mp->b_cont) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		/* cp known to be 32 bit aligned */
-		ac = (ipa_conn_t *)cp;
-		ac->ac_laddr = V4_PART_OF_V6(udp->udp_v6src);
-		ac->ac_faddr = V4_PART_OF_V6(udp->udp_v6dst);
-		ac->ac_fport = udp->udp_dstport;
-		ac->ac_lport = udp->udp_port;
-		break;
-
-	case sizeof (ipa6_conn_t):
-		ASSERT(udp->udp_family == AF_INET6);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (!mp->b_cont) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		/* cp known to be 32 bit aligned */
-		ac6 = (ipa6_conn_t *)cp;
-		ac6->ac6_laddr = udp->udp_v6src;
-		ac6->ac6_faddr = udp->udp_v6dst;
-		ac6->ac6_fport = udp->udp_dstport;
-		ac6->ac6_lport = udp->udp_port;
-		break;
-
-	case sizeof (sin_t):
-		ASSERT(udp->udp_family == AF_INET);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (!mp->b_cont) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		sin = (sin_t *)cp;
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		sin->sin_addr.s_addr = V4_PART_OF_V6(udp->udp_bound_v6src);
-		sin->sin_port = udp->udp_port;
-		break;
-
-	case sizeof (sin6_t):
-		ASSERT(udp->udp_family == AF_INET6);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (!mp->b_cont) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		sin6 = (sin6_t *)cp;
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_addr = udp->udp_bound_v6src;
-		sin6->sin6_port = udp->udp_port;
-		break;
-	}
-	/* Add protocol number to end */
-	cp[addr_length] = (char)IPPROTO_UDP;
-	mp->b_wptr = (uchar_t *)&cp[addr_length + 1];
-	return (mp);
-}
-
 /* For /dev/udp aka AF_INET open */
 static int
 udp_openv4(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
@@ -1858,7 +1707,6 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	if (flag & SO_SOCKSTR) {
 		connp->conn_flags |= IPCL_SOCKET;
 		udp->udp_issocket = B_TRUE;
-		udp->udp_direct_sockfs = B_TRUE;
 	}
 
 	q->q_hiwat = us->us_recv_hiwat;
@@ -5953,7 +5801,7 @@ udp_wput(queue_t *q, mblk_t *mp)
 		 * Quick check for error cases. Checks will be done again
 		 * under the lock later on
 		 */
-		if (!udp->udp_direct_sockfs || udp->udp_state != TS_DATA_XFER) {
+		if (!udp->udp_issocket || udp->udp_state != TS_DATA_XFER) {
 			/* Not connected; address is required */
 			BUMP_MIB(&us->us_udp_mib, udpOutErrors);
 			UDP_STAT(us, udp_out_err_notconn);
@@ -6889,18 +6737,13 @@ udp_wput_cmdblk(queue_t *q, mblk_t *mp)
 }
 
 static void
-udp_disable_direct_sockfs(udp_t *udp)
+udp_use_pure_tpi(udp_t *udp)
 {
+	rw_enter(&udp->udp_rwlock, RW_WRITER);
 	udp->udp_issocket = B_FALSE;
-	if (udp->udp_direct_sockfs) {
-		/*
-		 * Disable read-side synchronous stream interface and
-		 * drain any queued data.
-		 */
-		udp_rcv_drain(udp->udp_connp->conn_rq, udp, B_FALSE);
-		ASSERT(!udp->udp_direct_sockfs);
-		UDP_STAT(udp->udp_us, udp_sock_fallback);
-	}
+	rw_exit(&udp->udp_rwlock);
+
+	UDP_STAT(udp->udp_us, udp_sock_fallback);
 }
 
 static void
@@ -7096,16 +6939,14 @@ udp_wput_other(queue_t *q, mblk_t *mp)
 			/*
 			 * Either sockmod is about to be popped and the
 			 * socket would now be treated as a plain stream,
-			 * or a module is about to be pushed so we could
-			 * no longer use read-side synchronous stream.
-			 * Drain any queued data and disable direct sockfs
-			 * interface from now on.
+			 * or a module is about to be pushed so we have
+			 * to follow pure TPI semantics.
 			 */
 			if (!udp->udp_issocket) {
 				DB_TYPE(mp) = M_IOCNAK;
 				iocp->ioc_error = EINVAL;
 			} else {
-				udp_disable_direct_sockfs(udp);
+				udp_use_pure_tpi(udp);
 
 				DB_TYPE(mp) = M_IOCACK;
 				iocp->ioc_error = 0;
@@ -7388,10 +7229,7 @@ udp_kstat2_init(netstackid_t stackid, udp_stat_t *us_statisticsp)
 		{ "udp_ip_send",		KSTAT_DATA_UINT64 },
 		{ "udp_ip_ire_send",		KSTAT_DATA_UINT64 },
 		{ "udp_ire_null",		KSTAT_DATA_UINT64 },
-		{ "udp_drain",			KSTAT_DATA_UINT64 },
 		{ "udp_sock_fallback",		KSTAT_DATA_UINT64 },
-		{ "udp_rrw_busy",		KSTAT_DATA_UINT64 },
-		{ "udp_rrw_msgcnt",		KSTAT_DATA_UINT64 },
 		{ "udp_out_sw_cksum",		KSTAT_DATA_UINT64 },
 		{ "udp_out_sw_cksum_bytes",	KSTAT_DATA_UINT64 },
 		{ "udp_out_opt",		KSTAT_DATA_UINT64 },
@@ -7514,241 +7352,6 @@ udp_kstat_update(kstat_t *kp, int rw)
 	udpkp->outErrors.value.ui32 =	us->us_udp_mib.udpOutErrors;
 	netstack_rele(ns);
 	return (0);
-}
-
-/*
- * Read-side synchronous stream info entry point, called as a
- * result of handling certain STREAMS ioctl operations.
- */
-static int
-udp_rinfop(queue_t *q, infod_t *dp)
-{
-	mblk_t	*mp;
-	uint_t	cmd = dp->d_cmd;
-	int	res = 0;
-	int	error = 0;
-	udp_t	*udp = Q_TO_UDP(q);
-	struct stdata *stp = STREAM(q);
-
-	mutex_enter(&udp->udp_drain_lock);
-	/* If shutdown on read has happened, return nothing */
-	mutex_enter(&stp->sd_lock);
-	if (stp->sd_flag & STREOF) {
-		mutex_exit(&stp->sd_lock);
-		goto done;
-	}
-	mutex_exit(&stp->sd_lock);
-
-	if ((mp = udp->udp_rcv_list_head) == NULL)
-		goto done;
-
-	ASSERT(DB_TYPE(mp) != M_DATA && mp->b_cont != NULL);
-
-	if (cmd & INFOD_COUNT) {
-		/*
-		 * Return the number of messages.
-		 */
-		dp->d_count += udp->udp_rcv_msgcnt;
-		res |= INFOD_COUNT;
-	}
-	if (cmd & INFOD_BYTES) {
-		/*
-		 * Return size of all data messages.
-		 */
-		dp->d_bytes += udp->udp_rcv_cnt;
-		res |= INFOD_BYTES;
-	}
-	if (cmd & INFOD_FIRSTBYTES) {
-		/*
-		 * Return size of first data message.
-		 */
-		dp->d_bytes = msgdsize(mp);
-		res |= INFOD_FIRSTBYTES;
-		dp->d_cmd &= ~INFOD_FIRSTBYTES;
-	}
-	if (cmd & INFOD_COPYOUT) {
-		mblk_t *mp1 = mp->b_cont;
-		int n;
-		/*
-		 * Return data contents of first message.
-		 */
-		ASSERT(DB_TYPE(mp1) == M_DATA);
-		while (mp1 != NULL && dp->d_uiop->uio_resid > 0) {
-			n = MIN(dp->d_uiop->uio_resid, MBLKL(mp1));
-			if (n != 0 && (error = uiomove((char *)mp1->b_rptr, n,
-			    UIO_READ, dp->d_uiop)) != 0) {
-				goto done;
-			}
-			mp1 = mp1->b_cont;
-		}
-		res |= INFOD_COPYOUT;
-		dp->d_cmd &= ~INFOD_COPYOUT;
-	}
-done:
-	mutex_exit(&udp->udp_drain_lock);
-
-	dp->d_res |= res;
-
-	return (error);
-}
-
-/*
- * Read-side synchronous stream entry point.  This is called as a result
- * of recv/read operation done at sockfs, and is guaranteed to execute
- * outside of the interrupt thread context.  It returns a single datagram
- * (b_cont chain of T_UNITDATA_IND plus data) to the upper layer.
- */
-static int
-udp_rrw(queue_t *q, struiod_t *dp)
-{
-	mblk_t	*mp;
-	udp_t	*udp = Q_TO_UDP(q);
-	udp_stack_t *us = udp->udp_us;
-
-	/*
-	 * Dequeue datagram from the head of the list and return
-	 * it to caller; also ensure that RSLEEP sd_wakeq flag is
-	 * set/cleared depending on whether or not there's data
-	 * remaining in the list.
-	 */
-	mutex_enter(&udp->udp_drain_lock);
-	if (!udp->udp_direct_sockfs) {
-		mutex_exit(&udp->udp_drain_lock);
-		UDP_STAT(us, udp_rrw_busy);
-		return (EBUSY);
-	}
-	if ((mp = udp->udp_rcv_list_head) != NULL) {
-		uint_t size = msgdsize(mp);
-
-		/* Last datagram in the list? */
-		if ((udp->udp_rcv_list_head = mp->b_next) == NULL)
-			udp->udp_rcv_list_tail = NULL;
-		mp->b_next = NULL;
-
-		udp->udp_rcv_cnt -= size;
-		udp->udp_rcv_msgcnt--;
-		UDP_STAT(us, udp_rrw_msgcnt);
-
-		/* No longer flow-controlling? */
-		if (udp->udp_rcv_cnt < udp->udp_rcv_hiwat &&
-		    udp->udp_rcv_msgcnt < udp->udp_rcv_hiwat)
-			udp->udp_drain_qfull = B_FALSE;
-	}
-	if (udp->udp_rcv_list_head == NULL) {
-		/*
-		 * Either we just dequeued the last datagram or
-		 * we get here from sockfs and have nothing to
-		 * return; in this case clear RSLEEP.
-		 */
-		ASSERT(udp->udp_rcv_cnt == 0);
-		ASSERT(udp->udp_rcv_msgcnt == 0);
-		ASSERT(udp->udp_rcv_list_tail == NULL);
-		STR_WAKEUP_CLEAR(STREAM(q));
-	} else {
-		/*
-		 * More data follows; we need udp_rrw() to be
-		 * called in future to pick up the rest.
-		 */
-		STR_WAKEUP_SET(STREAM(q));
-	}
-	mutex_exit(&udp->udp_drain_lock);
-	dp->d_mp = mp;
-	return (0);
-}
-
-/*
- * Enqueue a completely-built T_UNITDATA_IND message into the receive
- * list; this is typically executed within the interrupt thread context
- * and so we do things as quickly as possible.
- */
-static void
-udp_rcv_enqueue(queue_t *q, udp_t *udp, mblk_t *mp, uint_t pkt_len)
-{
-	ASSERT(q == RD(q));
-	ASSERT(pkt_len == msgdsize(mp));
-	ASSERT(mp->b_next == NULL && mp->b_cont != NULL);
-	ASSERT(DB_TYPE(mp) == M_PROTO && DB_TYPE(mp->b_cont) == M_DATA);
-	ASSERT(MBLKL(mp) >= sizeof (struct T_unitdata_ind));
-
-	mutex_enter(&udp->udp_drain_lock);
-	/*
-	 * Wake up and signal the receiving app; it is okay to do this
-	 * before enqueueing the mp because we are holding the drain lock.
-	 * One of the advantages of synchronous stream is the ability for
-	 * us to find out when the application performs a read on the
-	 * socket by way of udp_rrw() entry point being called.  We need
-	 * to generate SIGPOLL/SIGIO for each received data in the case
-	 * of asynchronous socket just as in the strrput() case.  However,
-	 * we only wake the application up when necessary, i.e. during the
-	 * first enqueue.  When udp_rrw() is called, we send up a single
-	 * datagram upstream and call STR_WAKEUP_SET() again when there
-	 * are still data remaining in our receive queue.
-	 */
-	STR_WAKEUP_SENDSIG(STREAM(q), udp->udp_rcv_list_head);
-	if (udp->udp_rcv_list_head == NULL)
-		udp->udp_rcv_list_head = mp;
-	else
-		udp->udp_rcv_list_tail->b_next = mp;
-	udp->udp_rcv_list_tail = mp;
-	udp->udp_rcv_cnt += pkt_len;
-	udp->udp_rcv_msgcnt++;
-
-	/* Need to flow-control? */
-	if (udp->udp_rcv_cnt >= udp->udp_rcv_hiwat ||
-	    udp->udp_rcv_msgcnt >= udp->udp_rcv_hiwat)
-		udp->udp_drain_qfull = B_TRUE;
-
-	mutex_exit(&udp->udp_drain_lock);
-}
-
-/*
- * Drain the contents of receive list to the module upstream; we do
- * this during close or when we fallback to the slow mode due to
- * sockmod being popped or a module being pushed on top of us.
- */
-static void
-udp_rcv_drain(queue_t *q, udp_t *udp, boolean_t closing)
-{
-	mblk_t *mp;
-	udp_stack_t *us = udp->udp_us;
-
-	mutex_enter(&udp->udp_drain_lock);
-	/*
-	 * There is no race with a concurrent udp_input() sending
-	 * up packets using putnext() after we have cleared the
-	 * udp_direct_sockfs flag but before we have completed
-	 * sending up the packets in udp_rcv_list, since we are
-	 * either a writer or we have quiesced the conn.
-	 */
-	udp->udp_direct_sockfs = B_FALSE;
-	mutex_exit(&udp->udp_drain_lock);
-
-	if (udp->udp_rcv_list_head != NULL)
-		UDP_STAT(us, udp_drain);
-
-	/*
-	 * Send up everything via putnext(); note here that we
-	 * don't need the udp_drain_lock to protect us since
-	 * nothing can enter udp_rrw() and that we currently
-	 * have exclusive access to this udp.
-	 */
-	while ((mp = udp->udp_rcv_list_head) != NULL) {
-		udp->udp_rcv_list_head = mp->b_next;
-		mp->b_next = NULL;
-		udp->udp_rcv_cnt -= msgdsize(mp);
-		udp->udp_rcv_msgcnt--;
-		if (closing) {
-			freemsg(mp);
-		} else {
-			ASSERT(q == RD(q));
-			putnext(q, mp);
-		}
-	}
-	ASSERT(udp->udp_rcv_cnt == 0);
-	ASSERT(udp->udp_rcv_msgcnt == 0);
-	ASSERT(udp->udp_rcv_list_head == NULL);
-	udp->udp_rcv_list_tail = NULL;
-	udp->udp_drain_qfull = B_FALSE;
 }
 
 static size_t
@@ -8009,31 +7612,16 @@ udp_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
 static void
 udp_do_close(conn_t *connp)
 {
-	udp_t	*udp;
-
 	ASSERT(connp != NULL && IPCL_IS_UDP(connp));
-	udp = connp->conn_udp;
 
 	udp_quiesce_conn(connp);
 	ip_quiesce_conn(connp);
 
 	if (!IPCL_IS_NONSTR(connp)) {
-		/*
-		 * Disable read-side synchronous stream
-		 * interface and drain any queued data.
-		 */
 		ASSERT(connp->conn_wq != NULL);
-		udp_rcv_drain(connp->conn_wq, udp, B_TRUE);
-		ASSERT(!udp->udp_direct_sockfs);
-
 		ASSERT(connp->conn_rq != NULL);
 		qprocsoff(connp->conn_rq);
 	}
-
-	ASSERT(udp->udp_rcv_cnt == 0);
-	ASSERT(udp->udp_rcv_msgcnt == 0);
-	ASSERT(udp->udp_rcv_list_head == NULL);
-	ASSERT(udp->udp_rcv_list_tail == NULL);
 
 	udp_close_free(connp);
 
@@ -9232,7 +8820,7 @@ udp_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 
 int
 udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
-    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
+    boolean_t issocket, so_proto_quiesced_cb_t quiesced_cb)
 {
 	conn_t 	*connp = (conn_t *)proto_handle;
 	udp_t	*udp;
@@ -9276,8 +8864,8 @@ udp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	 */
 	ip_free_helper_stream(connp);
 
-	if (!direct_sockfs)
-		udp_disable_direct_sockfs(udp);
+	if (!issocket)
+		udp_use_pure_tpi(udp);
 
 	/*
 	 * Collect the information needed to sync with the sonode

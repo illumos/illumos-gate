@@ -476,26 +476,14 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	}								\
 }
 
-#define	CONN_UDP_SYNCSTR(connp)						\
-	(IPCL_IS_UDP(connp) && (connp)->conn_udp->udp_direct_sockfs)
-
 /*
  * Macro that checks whether or not a particular UDP conn is
- * flow-controlling on the read-side.  If udp module is directly
- * above ip, check to see if the drain queue is full; note here
- * that we check this without any lock protection because this
- * is a coarse granularity inbound flow-control.  If the module
- * above ip is not udp, then use canputnext to determine the
- * flow-control.
+ * flow-controlling on the read-side.
  *
- * Note that these checks are done after the conn is found in
+ * Note that this check is done after the conn is found in
  * the UDP fanout table.
- * FIXME? Might be faster to check both udp_drain_qfull and canputnext.
  */
-#define	CONN_UDP_FLOWCTLD(connp)					\
-	(CONN_UDP_SYNCSTR(connp) ?					\
-	(connp)->conn_udp->udp_drain_qfull :				\
-	!canputnext((connp)->conn_rq))
+#define	CONN_UDP_FLOWCTLD(connp) !canputnext((connp)->conn_rq)
 
 /* Macro that follows definitions of flags for mac_tx() (see mac_client.h) */
 #define	IP_DROP_ON_NO_DESC	0x01	/* Equivalent to MAC_DROP_ON_NO_DESC */
