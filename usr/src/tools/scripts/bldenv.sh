@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
@@ -232,7 +230,13 @@ unset \
 	ARCH \
 	CLASSPATH
 
-# setup environmental variables
+#
+# Setup environment variables
+#
+if [[ -f /etc/nightly.conf ]]; then
+	source /etc/nightly.conf
+fi
+
 if [[ -f "$1" ]]; then
 	if [[ "$1" == */* ]]; then
 		source "$1"
@@ -369,6 +373,7 @@ if "${flags.t}" ; then
 	export PATH
 fi
 
+export DMAKE_MODE=${DMAKE_MODE:-parallel}
 
 if "${flags.o}" ; then
 	export CH=
@@ -444,6 +449,10 @@ elif "${flags.t}" ; then
 	    "${TOOLS}"
 fi
 
+#
+# place ourselves in a new task, respecting BUILD_PROJECT if set.
+#
+/usr/bin/newtask -c $$ ${BUILD_PROJECT:+-p$BUILD_PROJECT}
 
 if [[ "${flags.c}" == "false" && -x "$SHELL" && \
     "$(basename "${SHELL}")" != "csh" ]]; then
