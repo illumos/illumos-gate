@@ -226,15 +226,17 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 
 	/*
 	 * We can only proceed if peer exists, resides in the same squeue
-	 * as our conn and is not raw-socket.  The squeue assignment of
-	 * this eager tcp was done earlier at the time of SYN processing
-	 * in ip_fanout_tcp{_v6}.  Note that similar squeues by itself
-	 * doesn't guarantee a safe condition to fuse, hence we perform
+	 * as our conn and is not raw-socket. We also restrict fusion to
+	 * endpoints of the same type (STREAMS or non-STREAMS). The squeue
+	 * assignment of this eager tcp was done earlier at the time of SYN
+	 * processing in ip_fanout_tcp{_v6}.  Note that similar squeues by
+	 * itself doesn't guarantee a safe condition to fuse, hence we perform
 	 * additional tests below.
 	 */
 	ASSERT(peer_connp == NULL || peer_connp != connp);
 	if (peer_connp == NULL || peer_connp->conn_sqp != connp->conn_sqp ||
-	    !IPCL_IS_TCP(peer_connp)) {
+	    !IPCL_IS_TCP(peer_connp) ||
+	    IPCL_IS_NONSTR(connp) != IPCL_IS_NONSTR(peer_connp)) {
 		if (peer_connp != NULL) {
 			TCP_STAT(tcps, tcp_fusion_unqualified);
 			CONN_DEC_REF(peer_connp);
@@ -289,23 +291,19 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		 * endpoints which will only be used during/after unfuse.
 		 */
 		if (!IPCL_IS_NONSTR(tcp->tcp_connp)) {
+			ASSERT(!IPCL_IS_NONSTR(peer_tcp->tcp_connp));
+
 			if ((mp = allocb(1, BPRI_HI)) == NULL)
 				goto failed;
-
 			tcp->tcp_fused_sigurg_mp = mp;
-		}
 
-		if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
 			if ((mp = allocb(1, BPRI_HI)) == NULL)
 				goto failed;
-
 			peer_tcp->tcp_fused_sigurg_mp = mp;
-		}
 
-		if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
-		    (mp = allocb(sizeof (struct stroptions),
-		    BPRI_HI)) == NULL) {
-			goto failed;
+			if ((mp = allocb(sizeof (struct stroptions),
+			    BPRI_HI)) == NULL)
+				goto failed;
 		}
 
 		/* Fuse both endpoints */
@@ -458,8 +456,9 @@ tcp_unfuse(tcp_t *tcp)
 }
 
 /*
- * Fusion output routine for urgent data.  This routine is called by
- * tcp_fuse_output() for handling non-M_DATA mblks.
+ * Fusion output routine used to handle urgent data sent by STREAMS based
+ * endpoints. This routine is called by tcp_fuse_output() for handling
+ * non-M_DATA mblks.
  */
 void
 tcp_fuse_output_urg(tcp_t *tcp, mblk_t *mp)
@@ -471,6 +470,7 @@ tcp_fuse_output_urg(tcp_t *tcp, mblk_t *mp)
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(tcp->tcp_fused);
+	ASSERT(!IPCL_IS_NONSTR(tcp->tcp_connp));
 	ASSERT(peer_tcp != NULL && peer_tcp->tcp_loopback_peer == tcp);
 	ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
 	ASSERT(mp->b_cont != NULL && DB_TYPE(mp->b_cont) == M_DATA);
@@ -924,7 +924,8 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 
 	DTRACE_PROBE2(tcp__fuse__output, tcp_t *, tcp, uint_t, send_size);
 
-	if (!TCP_IS_DETACHED(peer_tcp)) {
+	if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
+	    !TCP_IS_DETACHED(peer_tcp)) {
 		/*
 		 * Drain the peer's receive queue it has urgent data or if
 		 * we're not flow-controlled.  There is no need for draining
@@ -932,8 +933,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		 * will pull the data via tcp_fuse_rrw().
 		 */
 		if (urgent || (!flow_stopped && !peer_tcp->tcp_direct_sockfs)) {
-			ASSERT(IPCL_IS_NONSTR(peer_tcp->tcp_connp) ||
-			    peer_tcp->tcp_rcv_list != NULL);
+			ASSERT(peer_tcp->tcp_rcv_list != NULL);
 			/*
 			 * For TLI-based streams, a thread in tcp_accept_swap()
 			 * can race with us.  That thread will ensure that the
@@ -995,41 +995,39 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	 * works properly.
 	 */
 	if (tcp->tcp_fused_sigurg) {
-		tcp->tcp_fused_sigurg = B_FALSE;
-		if (IPCL_IS_NONSTR(connp)) {
-			(*connp->conn_upcalls->su_signal_oob)
-			    (connp->conn_upper_handle, 0);
-		} else {
-			/*
-			 * sigurg_mpp is normally NULL, i.e. when we're still
-			 * fused and didn't get here because of tcp_unfuse().
-			 * In this case try hard to allocate the M_PCSIG mblk.
-			 */
-			if (sigurg_mpp == NULL &&
-			    (mp = allocb(1, BPRI_HI)) == NULL &&
-			    (mp = allocb_tryhard(1)) == NULL) {
-				/* Alloc failed; try again next time */
-				tcp->tcp_push_tid = TCP_TIMER(tcp,
-				    tcp_push_timer,
-				    MSEC_TO_TICK(
-				    tcps->tcps_push_timer_interval));
-				return (B_TRUE);
-			} else if (sigurg_mpp != NULL) {
-				/*
-				 * Use the supplied M_PCSIG mblk; it means we're
-				 * either unfused or in the process of unfusing,
-				 * and the drain must happen now.
-				 */
-				mp = *sigurg_mpp;
-				*sigurg_mpp = NULL;
-			}
-			ASSERT(mp != NULL);
+		ASSERT(!IPCL_IS_NONSTR(tcp->tcp_connp));
 
-			/* Send up the signal */
-			DB_TYPE(mp) = M_PCSIG;
-			*mp->b_wptr++ = (uchar_t)SIGURG;
-			putnext(q, mp);
+		tcp->tcp_fused_sigurg = B_FALSE;
+		/*
+		 * sigurg_mpp is normally NULL, i.e. when we're still
+		 * fused and didn't get here because of tcp_unfuse().
+		 * In this case try hard to allocate the M_PCSIG mblk.
+		 */
+		if (sigurg_mpp == NULL &&
+		    (mp = allocb(1, BPRI_HI)) == NULL &&
+		    (mp = allocb_tryhard(1)) == NULL) {
+			/* Alloc failed; try again next time */
+			tcp->tcp_push_tid = TCP_TIMER(tcp,
+			    tcp_push_timer,
+			    MSEC_TO_TICK(
+			    tcps->tcps_push_timer_interval));
+			return (B_TRUE);
+		} else if (sigurg_mpp != NULL) {
+			/*
+			 * Use the supplied M_PCSIG mblk; it means we're
+			 * either unfused or in the process of unfusing,
+			 * and the drain must happen now.
+			 */
+			mp = *sigurg_mpp;
+			*sigurg_mpp = NULL;
 		}
+		ASSERT(mp != NULL);
+
+		/* Send up the signal */
+		DB_TYPE(mp) = M_PCSIG;
+		*mp->b_wptr++ = (uchar_t)SIGURG;
+		putnext(q, mp);
+
 		/*
 		 * Let the regular tcp_rcv_drain() path handle
 		 * draining the data if we're no longer fused.

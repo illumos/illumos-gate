@@ -21700,8 +21700,7 @@ tcp_wput_proto(void *arg, mblk_t *mp, void *arg2)
 	if ((mp->b_wptr - rptr) >= sizeof (t_scalar_t)) {
 		type = ((union T_primitives *)rptr)->type;
 		if (type == T_EXDATA_REQ) {
-			tcp_output_urgent(connp, mp->b_cont, arg2);
-			freeb(mp);
+			tcp_output_urgent(connp, mp, arg2);
 		} else if (type != T_DATA_REQ) {
 			goto non_urgent_data;
 		} else {
@@ -26721,9 +26720,8 @@ tcp_output_urgent(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	/*
-	 * Try to force urgent data out on the wire.
-	 * Even if we have unsent data this will
-	 * at least send the urgent flag.
+	 * Try to force urgent data out on the wire. Even if we have unsent
+	 * data this will at least send the urgent flag.
 	 * XXX does not handle more flag correctly.
 	 */
 	len += tcp->tcp_unsent;
@@ -26734,6 +26732,14 @@ tcp_output_urgent(void *arg, mblk_t *mp, void *arg2)
 	/* Bypass tcp protocol for fused tcp loopback */
 	if (tcp->tcp_fused && tcp_fuse_output(tcp, mp, msize))
 		return;
+
+	/* Strip off the T_EXDATA_REQ if the data is from TPI */
+	if (DB_TYPE(mp) != M_DATA) {
+		mblk_t *mp1 = mp;
+		ASSERT(!IPCL_IS_NONSTR(connp));
+		mp = mp->b_cont;
+		freeb(mp1);
+	}
 	tcp_wput_data(tcp, mp, B_TRUE);
 }
 
@@ -26920,7 +26926,6 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	int			error;
 	mblk_t			*stropt_mp;
 	mblk_t			*ordrel_mp;
-	mblk_t			*fused_sigurp_mp;
 
 	tcp = connp->conn_tcp;
 
@@ -26935,9 +26940,6 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	((struct T_ordrel_ind *)ordrel_mp->b_rptr)->PRIM_type = T_ORDREL_IND;
 	ordrel_mp->b_wptr += sizeof (struct T_ordrel_ind);
 
-	/* Pre-allocate the M_PCSIG used by fusion */
-	fused_sigurp_mp = allocb_wait(1, BPRI_HI, STR_NOSIG, NULL);
-
 	/*
 	 * Enter the squeue so that no new packets can come in
 	 */
@@ -26946,7 +26948,6 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 		/* failed to enter, free all the pre-allocated messages. */
 		freeb(stropt_mp);
 		freeb(ordrel_mp);
-		freeb(fused_sigurp_mp);
 		/*
 		 * We cannot process the eager, so at least send out a
 		 * RST so the peer can reconnect.
@@ -26959,18 +26960,18 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	}
 
 	/*
+	 * Both endpoints must be of the same type (either STREAMS or
+	 * non-STREAMS) for fusion to be enabled. So if we are fused,
+	 * we have to unfuse.
+	 */
+	if (tcp->tcp_fused)
+		tcp_unfuse(tcp);
+
+	/*
 	 * No longer a direct socket
 	 */
 	connp->conn_flags &= ~IPCL_NONSTR;
-
 	tcp->tcp_ordrel_mp = ordrel_mp;
-
-	if (tcp->tcp_fused) {
-		ASSERT(tcp->tcp_fused_sigurg_mp == NULL);
-		tcp->tcp_fused_sigurg_mp = fused_sigurp_mp;
-	} else {
-		freeb(fused_sigurp_mp);
-	}
 
 	if (tcp->tcp_listener != NULL) {
 		/* The eager will deal with opts when accept() is called */
