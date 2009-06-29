@@ -80,7 +80,8 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 	 * 3. Otherwise, the device may have moved.  Try opening the device
 	 *    by the devid instead.
 	 *
-	 * If the vdev is part of the root pool, we avoid opening it by path.
+	 * If the vdev is part of the root pool, we avoid opening it by path
+	 * unless we're adding (i.e. attaching) it to the vdev namespace.
 	 * We do this because there is no /dev path available early in boot,
 	 * and if we try to open the device by path at a later point, we can
 	 * deadlock when devfsadm attempts to open the underlying backing store
@@ -96,7 +97,8 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 
 	error = EINVAL;		/* presume failure */
 
-	if (vd->vdev_path != NULL && !spa_is_root(spa)) {
+	if (vd->vdev_path != NULL && (!spa_is_root(spa) ||
+	    spa_lookup_by_guid(spa, vd->vdev_guid, B_FALSE) == NULL)) {
 		ddi_devid_t devid;
 
 		if (vd->vdev_wholedisk == -1ULL) {
@@ -167,7 +169,8 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 		 * as above.  This hasn't been used in a very long time and we
 		 * don't need to propagate its oddities to this edge condition.
 		 */
-		if (error && vd->vdev_path != NULL && !spa_is_root(spa))
+		if (error && vd->vdev_path != NULL && (!spa_is_root(spa) ||
+		    spa_lookup_by_guid(spa, vd->vdev_guid, B_FALSE) == NULL))
 			error = ldi_open_by_name(vd->vdev_path, spa_mode(spa),
 			    kcred, &dvd->vd_lh, zfs_li);
 	}
