@@ -163,6 +163,7 @@ usr/src/uts/common/io/ppp/THIRDPARTYLICENSE
 usr/src/uts/common/io/ral/THIRDPARTYLICENSE
 usr/src/uts/common/io/rtw/THIRDPARTYLICENSE
 usr/src/uts/common/io/rum/THIRDPARTYLICENSE
+usr/src/uts/common/io/rwd/THIRDPARTYLICENSE
 usr/src/uts/common/io/rwn/THIRDPARTYLICENSE
 usr/src/uts/common/io/rwn/fw-rt2860/LICENSE
 usr/src/uts/common/io/sfe/THIRDPARTYLICENSE

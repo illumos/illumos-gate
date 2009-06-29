@@ -140,6 +140,7 @@ clone:pcan 0666 root sys
 clone:ral 0666 root sys
 clone:rtw 0666 root sys
 clone:rum 0666 root sys
+clone:rwd 0666 root sys
 clone:rwn 0666 root sys
 clone:simnet 0666 root sys
 clone:ural 0666 root sys
@@ -171,6 +172,7 @@ pcan:* 0666 root sys
 ral:* 0666 root sys
 rtw:* 0666 root sys
 rum:* 0666 root sys
+rwd:* 0666 root sys
 rwn:* 0666 root sys
 simnet:* 0666 root sys
 ural:* 0666 root sys

@@ -302,6 +302,7 @@ DRV_KMODS	+= rsm
 DRV_KMODS	+= rts
 DRV_KMODS	+= rtw
 DRV_KMODS	+= rum
+DRV_KMODS	+= rwd
 DRV_KMODS	+= rwn
 DRV_KMODS	+= sad
 DRV_KMODS	+= sctp

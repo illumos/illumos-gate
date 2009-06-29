@@ -1720,6 +1720,8 @@ RAL_OBJS += rt2560.o ral_rate.o
 
 RUM_OBJS += rum.o
 
+RWD_OBJS += rt2661.o
+
 RWN_OBJS += rt2860.o
 
 URAL_OBJS += ural.o
