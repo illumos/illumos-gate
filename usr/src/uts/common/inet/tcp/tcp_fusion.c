@@ -220,8 +220,10 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		queue_t *peer_rq = peer_tcp->tcp_rq;
 
 		ASSERT(!TCP_IS_DETACHED(peer_tcp));
-		ASSERT(tcp->tcp_fused_sigurg_mp == NULL);
-		ASSERT(peer_tcp->tcp_fused_sigurg_mp == NULL);
+		ASSERT(tcp->tcp_fused_sigurg_mp == NULL ||
+		    (!IPCL_IS_NONSTR(connp) && tcp->tcp_refuse));
+		ASSERT(peer_tcp->tcp_fused_sigurg_mp == NULL ||
+		    (!IPCL_IS_NONSTR(peer_connp) && peer_tcp->tcp_refuse));
 		ASSERT(tcp->tcp_kssl_ctx == NULL);
 
 		/*
@@ -230,17 +232,22 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		 * we want to be sure that an mblk is readily available.
 		 * This is why we pre-allocate the M_PCSIG mblks for both
 		 * endpoints which will only be used during/after unfuse.
+		 * The mblk might already exist if we are doing a re-fuse.
 		 */
 		if (!IPCL_IS_NONSTR(tcp->tcp_connp)) {
 			ASSERT(!IPCL_IS_NONSTR(peer_tcp->tcp_connp));
 
-			if ((mp = allocb(1, BPRI_HI)) == NULL)
-				goto failed;
-			tcp->tcp_fused_sigurg_mp = mp;
+			if (tcp->tcp_fused_sigurg_mp == NULL) {
+				if ((mp = allocb(1, BPRI_HI)) == NULL)
+					goto failed;
+				tcp->tcp_fused_sigurg_mp = mp;
+			}
 
-			if ((mp = allocb(1, BPRI_HI)) == NULL)
-				goto failed;
-			peer_tcp->tcp_fused_sigurg_mp = mp;
+			if (peer_tcp->tcp_fused_sigurg_mp == NULL) {
+				if ((mp = allocb(1, BPRI_HI)) == NULL)
+					goto failed;
+				peer_tcp->tcp_fused_sigurg_mp = mp;
+			}
 
 			if ((mp = allocb(sizeof (struct stroptions),
 			    BPRI_HI)) == NULL)
@@ -423,16 +430,6 @@ tcp_unfuse(tcp_t *tcp)
 	/* Unfuse the endpoints */
 	peer_tcp->tcp_fused = tcp->tcp_fused = B_FALSE;
 	peer_tcp->tcp_loopback_peer = tcp->tcp_loopback_peer = NULL;
-	if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
-		ASSERT(peer_tcp->tcp_fused_sigurg_mp != NULL);
-		freeb(peer_tcp->tcp_fused_sigurg_mp);
-		peer_tcp->tcp_fused_sigurg_mp = NULL;
-
-		ASSERT(!IPCL_IS_NONSTR(tcp->tcp_connp));
-		ASSERT(tcp->tcp_fused_sigurg_mp != NULL);
-		freeb(tcp->tcp_fused_sigurg_mp);
-		tcp->tcp_fused_sigurg_mp = NULL;
-	}
 }
 
 /*
