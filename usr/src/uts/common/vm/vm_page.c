@@ -2939,6 +2939,12 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 			mutex_enter(&p->pcf_lock);
 			if (p->pcf_count >= 1) {
 				p->pcf_count -= 1;
+				/*
+				 * freemem is not protected by any lock. Thus,
+				 * we cannot have any assertion containing
+				 * freemem here.
+				 */
+				freemem -= 1;
 				enough = 1;
 				break;
 			}
@@ -2998,11 +3004,6 @@ page_reclaim_nomem:
 		}
 	}
 
-	/*
-	 * freemem is not protected by any lock. Thus, we cannot
-	 * have any assertion containing freemem here.
-	 */
-	freemem -= 1;
 
 	VM_STAT_ADD(pagecnt.pc_reclaim);
 
