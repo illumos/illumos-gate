@@ -316,8 +316,6 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 				stropt->so_hiwat = tcp_fuse_set_rcv_hiwat(
 				    peer_tcp, peer_rq->q_hiwat);
 
-				tcp->tcp_refuse = B_FALSE;
-				peer_tcp->tcp_refuse = B_FALSE;
 				/* Send the options up */
 				putnext(peer_rq, mp);
 			} else {
@@ -339,6 +337,14 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 				(*peer_connp->conn_upcalls->su_set_proto_props)
 				    (peer_connp->conn_upper_handle, &sopp);
 			}
+		} else {
+			/*
+			 * Endpoints are being re-fused, so options will not
+			 * be sent up. In case of STREAMS, free the stroptions
+			 * mblk.
+			 */
+			if (!IPCL_IS_NONSTR(connp))
+				freemsg(mp);
 		}
 		tcp->tcp_refuse = B_FALSE;
 		peer_tcp->tcp_refuse = B_FALSE;
