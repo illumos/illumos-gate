@@ -2009,8 +2009,8 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 	int anon_res = 0;
 
 	/*
-	 *	Check for privileged port number
-	 *	N.B.:  this assumes that we know the format of a netbuf.
+	 * Check for privileged port number
+	 * N.B.:  this assumes that we know the format of a netbuf.
 	 */
 	if (nfs_portmon) {
 		struct sockaddr *ca;
@@ -2257,6 +2257,31 @@ checkauth4(struct compound_state *cs, struct svc_req *req)
 
 	rpcflavor = req->rq_cred.oa_flavor;
 	cs->access &= ~CS_ACCESS_LIMITED;
+
+	/*
+	 * Check for privileged port number
+	 * N.B.:  this assumes that we know the format of a netbuf.
+	 */
+	if (nfs_portmon) {
+		struct sockaddr *ca;
+		ca = (struct sockaddr *)svc_getrpccaller(req->rq_xprt)->buf;
+
+		if (ca == NULL)
+			return (0);
+
+		if ((ca->sa_family == AF_INET &&
+		    ntohs(((struct sockaddr_in *)ca)->sin_port) >=
+		    IPPORT_RESERVED) ||
+		    (ca->sa_family == AF_INET6 &&
+		    ntohs(((struct sockaddr_in6 *)ca)->sin6_port) >=
+		    IPPORT_RESERVED)) {
+			cmn_err(CE_NOTE,
+			    "nfs_server: client %s%ssent NFSv4 request from "
+			    "unprivileged port",
+			    client_name(req), client_addr(req, buf));
+			return (0);
+		}
+	}
 
 	/*
 	 * Check the access right per auth flavor on the vnode of
