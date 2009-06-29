@@ -977,16 +977,6 @@ struct qinit tcp_acceptor_winit = {
 	(pfi_t)tcp_tpi_accept, NULL, NULL, NULL, NULL, &tcp_winfo
 };
 
-/*
- * Entry points for TCP loopback (read side only)
- * The open routine is only used for reopens, thus no need to
- * have a separate one for tcp_openv6.
- */
-struct qinit tcp_loopback_rinit = {
-	(pfi_t)0, (pfi_t)tcp_rsrv, tcp_openv4, tcp_tpi_close, (pfi_t)0,
-	&tcp_rinfo, NULL, tcp_fuse_rrw, tcp_fuse_rinfop, STRUIOT_STANDARD
-};
-
 /* For AF_INET aka /dev/tcp */
 struct streamtab tcpinfov4 = {
 	&tcp_rinitv4, &tcp_winit
@@ -7866,13 +7856,8 @@ tcp_reinit_values(tcp)
 	tcp->tcp_fused = B_FALSE;
 	tcp->tcp_unfusable = B_FALSE;
 	tcp->tcp_fused_sigurg = B_FALSE;
-	tcp->tcp_direct_sockfs = B_FALSE;
-	tcp->tcp_fuse_syncstr_stopped = B_FALSE;
-	tcp->tcp_fuse_syncstr_plugged = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
 	tcp->tcp_fuse_rcv_hiwater = 0;
-	tcp->tcp_fuse_rcv_unread_hiwater = 0;
-	tcp->tcp_fuse_rcv_unread_cnt = 0;
 
 	tcp->tcp_lso = B_FALSE;
 
@@ -7975,13 +7960,8 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_fused = B_FALSE;
 	tcp->tcp_unfusable = B_FALSE;
 	tcp->tcp_fused_sigurg = B_FALSE;
-	tcp->tcp_direct_sockfs = B_FALSE;
-	tcp->tcp_fuse_syncstr_stopped = B_FALSE;
-	tcp->tcp_fuse_syncstr_plugged = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
 	tcp->tcp_fuse_rcv_hiwater = 0;
-	tcp->tcp_fuse_rcv_unread_hiwater = 0;
-	tcp->tcp_fuse_rcv_unread_cnt = 0;
 
 	/* Initialize the header template */
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
@@ -17269,13 +17249,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	/*
-	 * For a loopback connection with tcp_direct_sockfs on, note that
-	 * we don't have to protect tcp_rcv_list yet because synchronous
-	 * streams has not yet been enabled and tcp_fuse_rrw() cannot
-	 * possibly race with us.
-	 */
-
-	/*
 	 * Set the max window size (tcp_rq->q_hiwat) of the acceptor
 	 * properly.  This is the first time we know of the acceptor'
 	 * queue.  So we do it here.
@@ -17491,24 +17464,13 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 
 			ASSERT(peer_tcp != NULL);
 			ASSERT(peer_tcp->tcp_fused);
-			/*
-			 * In order to change the peer's tcp_flow_stopped,
-			 * we need to take locks for both end points. The
-			 * highest address is taken first.
-			 */
-			if (peer_tcp > tcp) {
-				mutex_enter(&peer_tcp->tcp_non_sq_lock);
-				mutex_enter(&tcp->tcp_non_sq_lock);
-			} else {
-				mutex_enter(&tcp->tcp_non_sq_lock);
-				mutex_enter(&peer_tcp->tcp_non_sq_lock);
-			}
+
+			mutex_enter(&peer_tcp->tcp_non_sq_lock);
 			if (peer_tcp->tcp_flow_stopped) {
 				tcp_clrqfull(peer_tcp);
 				TCP_STAT(tcps, tcp_fusion_backenabled);
 			}
 			mutex_exit(&peer_tcp->tcp_non_sq_lock);
-			mutex_exit(&tcp->tcp_non_sq_lock);
 		}
 	}
 	ASSERT(tcp->tcp_rcv_list == NULL || tcp->tcp_fused_sigurg);
@@ -17528,13 +17490,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	if (tcp->tcp_hard_binding) {
 		tcp->tcp_hard_binding = B_FALSE;
 		tcp->tcp_hard_bound = B_TRUE;
-	}
-
-	/* We can enable synchronous streams for STREAMS tcp endpoint now */
-	if (tcp->tcp_fused && !IPCL_IS_NONSTR(connp) &&
-	    tcp->tcp_loopback_peer != NULL &&
-	    !IPCL_IS_NONSTR(tcp->tcp_loopback_peer->tcp_connp)) {
-		tcp_fuse_syncstr_enable_pair(tcp);
 	}
 
 	if (tcp->tcp_ka_enabled) {
@@ -21578,7 +21533,7 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 }
 
 static void
-tcp_disable_direct_sockfs(tcp_t *tcp)
+tcp_use_pure_tpi(tcp_t *tcp)
 {
 #ifdef	_ILP32
 	tcp->tcp_acceptor_id = (t_uscalar_t)tcp->tcp_rq;
@@ -21591,16 +21546,6 @@ tcp_disable_direct_sockfs(tcp_t *tcp)
 	 */
 	tcp_acceptor_hash_insert(tcp->tcp_acceptor_id, tcp);
 
-	if (tcp->tcp_fused) {
-		/*
-		 * This is a fused loopback tcp; disable
-		 * read-side synchronous streams interface
-		 * and drain any queued data.  It is okay
-		 * to do this for non-synchronous streams
-		 * fused tcp as well.
-		 */
-		tcp_fuse_disable_pair(tcp, B_FALSE);
-	}
 	tcp->tcp_issocket = B_FALSE;
 	TCP_STAT(tcp->tcp_tcps, tcp_sock_fallback);
 }
@@ -21657,7 +21602,7 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
 			DB_TYPE(mp) = M_IOCNAK;
 			iocp->ioc_error = EINVAL;
 		} else {
-			tcp_disable_direct_sockfs(tcp);
+			tcp_use_pure_tpi(tcp);
 			DB_TYPE(mp) = M_IOCACK;
 			iocp->ioc_error = 0;
 		}
@@ -22975,18 +22920,11 @@ tcp_push_timer(void *arg)
 
 	ASSERT(!IPCL_IS_NONSTR(connp));
 
-	/*
-	 * We need to plug synchronous streams during our drain to prevent
-	 * a race with tcp_fuse_rrw() or tcp_fusion_rinfop().
-	 */
-	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
 	tcp->tcp_push_tid = 0;
 
 	if (tcp->tcp_rcv_list != NULL &&
 	    tcp_rcv_drain(tcp) == TH_ACK_NEEDED)
 		tcp_xmit_ctl(NULL, tcp, tcp->tcp_snxt, tcp->tcp_rnxt, TH_ACK);
-
-	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
 }
 
 /*
@@ -26785,7 +26723,7 @@ tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
  * associated with a conn, and the q_ptrs instead contain the
  * dev and minor area that should be used.
  *
- * The 'direct_sockfs' flag indicates whether the FireEngine
+ * The 'issocket' flag indicates whether the FireEngine
  * optimizations should be used. The common case would be that
  * optimizations are enabled, and they might be subsequently
  * disabled using the _SIOCSOCKFALLBACK ioctl.
@@ -26797,7 +26735,7 @@ tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
  */
 void
 tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
-    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
+    boolean_t issocket, so_proto_quiesced_cb_t quiesced_cb)
 {
 	conn_t			*connp = tcp->tcp_connp;
 	struct stroptions	*stropt;
@@ -26818,8 +26756,8 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 
 	WR(q)->q_qinfo = &tcp_sock_winit;
 
-	if (!direct_sockfs)
-		tcp_disable_direct_sockfs(tcp);
+	if (!issocket)
+		tcp_use_pure_tpi(tcp);
 
 	/*
 	 * free the helper stream

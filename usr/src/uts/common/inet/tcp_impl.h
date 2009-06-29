@@ -70,44 +70,6 @@ extern "C" {
 }
 
 /*
- * This stops synchronous streams for a fused tcp endpoint
- * and prevents tcp_fuse_rrw() from pulling data from it.
- */
-#define	TCP_FUSE_SYNCSTR_STOP(tcp) {				\
-	if ((tcp)->tcp_direct_sockfs) {				\
-		mutex_enter(&(tcp)->tcp_non_sq_lock);		\
-		(tcp)->tcp_fuse_syncstr_stopped = B_TRUE;	\
-		mutex_exit(&(tcp)->tcp_non_sq_lock);		\
-	}							\
-}
-
-/*
- * This causes all calls to tcp_fuse_rrw() to block until
- * TCP_FUSE_SYNCSTR_UNPLUG_DRAIN() is called.
- */
-#define	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp) {			\
-	if ((tcp)->tcp_direct_sockfs) {				\
-		mutex_enter(&(tcp)->tcp_non_sq_lock);		\
-		ASSERT(!(tcp)->tcp_fuse_syncstr_plugged);	\
-		(tcp)->tcp_fuse_syncstr_plugged = B_TRUE;	\
-		mutex_exit(&(tcp)->tcp_non_sq_lock);		\
-	}							\
-}
-
-/*
- * This unplugs the draining of data through tcp_fuse_rrw(); see
- * the comments in tcp_fuse_rrw() for how we preserve ordering.
- */
-#define	TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp) {			\
-	if ((tcp)->tcp_direct_sockfs) {				\
-		mutex_enter(&(tcp)->tcp_non_sq_lock);		\
-		(tcp)->tcp_fuse_syncstr_plugged = B_FALSE;	\
-		(void) cv_broadcast(&(tcp)->tcp_fuse_plugcv);	\
-		mutex_exit(&(tcp)->tcp_non_sq_lock);		\
-	}							\
-}
-
-/*
  * Before caching the conn IRE, we need to make sure certain TCP
  * states are in sync with the ire. The mismatch could occur if the
  * TCP state has been set in tcp_adapt_ire() using a different IRE,
@@ -244,7 +206,7 @@ typedef struct tcpparam_s {
 #define	tcps_keepalive_abort_interval		tcps_params[59].tcp_param_val
 #define	tcps_keepalive_abort_interval_low	tcps_params[59].tcp_param_min
 
-extern struct qinit tcp_loopback_rinit, tcp_rinitv4, tcp_rinitv6;
+extern struct qinit tcp_rinitv4, tcp_rinitv6;
 extern boolean_t do_tcp_fusion;
 
 extern int	tcp_maxpsz_set(tcp_t *, boolean_t);
@@ -259,10 +221,6 @@ extern void	tcp_unfuse(tcp_t *);
 extern boolean_t tcp_fuse_output(tcp_t *, mblk_t *, uint32_t);
 extern void	tcp_fuse_output_urg(tcp_t *, mblk_t *);
 extern boolean_t tcp_fuse_rcv_drain(queue_t *, tcp_t *, mblk_t **);
-extern void	tcp_fuse_syncstr_enable_pair(tcp_t *);
-extern void	tcp_fuse_disable_pair(tcp_t *, boolean_t);
-extern int	tcp_fuse_rrw(queue_t *, struiod_t *);
-extern int	tcp_fuse_rinfop(queue_t *, infod_t *);
 extern size_t	tcp_fuse_set_rcv_hiwat(tcp_t *, size_t);
 extern int	tcp_fuse_maxpsz_set(tcp_t *);
 extern void	tcp_fuse_backenable(tcp_t *tcp);

@@ -532,30 +532,20 @@ typedef struct tcp_s {
 	uint32_t	tcp_in_ack_unsent;	/* ACK for unsent data cnt. */
 
 	/*
-	 * The following fusion-related fields are protected by squeue.
+	 * All fusion-related fields are protected by squeue.
 	 */
 	struct tcp_s *tcp_loopback_peer;	/* peer tcp for loopback */
 	mblk_t	*tcp_fused_sigurg_mp;		/* M_PCSIG mblk for SIGURG */
 	size_t	tcp_fuse_rcv_hiwater;		/* fusion receive queue size */
-	uint_t	tcp_fuse_rcv_unread_hiwater;	/* max # of outstanding pkts */
-	/*
-	 * The following fusion-related fields and bit fields are to be
-	 * manipulated with squeue protection or with tcp_non_sq_lock held.
-	 * tcp_non_sq_lock is used to protect fields that may be modified
-	 * accessed outside the squeue.
-	 */
-	kmutex_t tcp_non_sq_lock;
-	kcondvar_t tcp_fuse_plugcv;
-	uint_t tcp_fuse_rcv_unread_cnt;	/* # of outstanding pkts */
+
 	uint32_t
 		tcp_fused : 1,		/* loopback tcp in fusion mode */
 		tcp_unfusable : 1,	/* fusion not allowed on endpoint */
 		tcp_fused_sigurg : 1,	/* send SIGURG upon draining */
-		tcp_direct_sockfs : 1,	/* direct calls to sockfs */
 
-		tcp_fuse_syncstr_stopped : 1, /* synchronous streams stopped */
-		tcp_fuse_syncstr_plugged : 1, /* synchronous streams plugged */
-		tcp_fuse_to_bit_31 : 26;
+		tcp_fuse_to_bit_31 : 29;
+
+	kmutex_t tcp_non_sq_lock;
 
 	/*
 	 * This variable is accessed without any lock protection

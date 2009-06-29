@@ -43,11 +43,6 @@
 #define	INET_SOCK_PROTO_FB_FUNC		(*tcp_fallback)
 #define	INET_DEVMINOR	0
 #define	INET_MODMTFLAGS	D_MP
-/*
- * Note that unlike UDP, TCP uses synchronous STREAMS only
- * for TCP Fusion (loopback); this is why we don't define
- * D_SYNCSTR here.
- */
 #define	INET_DEVMTFLAGS	(D_MP|_D_DIRECT)
 
 #include "../inetddi.c"

@@ -45,7 +45,6 @@ cl_sctp_listen
 cl_sctp_unlisten
 conn_drain_nthreads
 default_ip6_asp_table
-do_tcp_direct_sockfs
 do_tcp_fusion
 do_tcpzcopy
 dohwcksum
@@ -276,14 +275,12 @@ tcp_conn_hash_size
 tcp_drop_ack_unsent_cnt
 tcp_fallback_sock_winit
 tcp_free_list_max_cnt
-tcp_fusion_rcv_unread_min
 tcp_g_kstat
 tcp_g_statistics
 tcp_g_t_info_ack
 tcp_g_t_info_ack_v6
 tcp_icmp_source_quench
 tcp_iphc_cache
-tcp_loopback_rinit
 tcp_max_optsize
 tcp_mdt_chain
 tcp_mdt_smss_threshold

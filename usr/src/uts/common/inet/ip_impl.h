@@ -423,60 +423,6 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	(connp)->conn_latch->ipl_out_policy != NULL))
 
 /*
- * These are used by the synchronous streams code in tcp and udp.
- * When we set the flags for a wakeup from a synchronous stream we
- * always set RSLEEP in sd_wakeq, even if we have a read thread waiting
- * to do the io. This is in case the read thread gets interrupted
- * before completing the io. The RSLEEP flag in sd_wakeq is used to
- * indicate that there is data available at the synchronous barrier.
- * The assumption is that subsequent functions calls through rwnext()
- * will reset sd_wakeq appropriately.
- */
-#define	STR_WAKEUP_CLEAR(stp) {						\
-	mutex_enter(&stp->sd_lock);					\
-	stp->sd_wakeq &= ~RSLEEP;					\
-	mutex_exit(&stp->sd_lock);					\
-}
-
-#define	STR_WAKEUP_SET(stp) {						\
-	mutex_enter(&stp->sd_lock);					\
-	if (stp->sd_flag & RSLEEP) {					\
-		stp->sd_flag &= ~RSLEEP;				\
-		cv_broadcast(&_RD(stp->sd_wrq)->q_wait);		\
-	}								\
-	stp->sd_wakeq |= RSLEEP;					\
-	mutex_exit(&stp->sd_lock);					\
-}
-
-/*
- * Combined wakeup and sendsig to avoid dropping and reacquiring the
- * sd_lock. The list of messages waiting at the synchronous barrier is
- * supplied in order to determine whether a wakeup needs to occur. We
- * only send a wakeup to the application when necessary, i.e. during
- * the first enqueue when the received messages list will be NULL.
- */
-#define	STR_WAKEUP_SENDSIG(stp, rcv_list) {				\
-	int _events;							\
-	mutex_enter(&stp->sd_lock);					\
-	if (rcv_list == NULL) {						\
-		if (stp->sd_flag & RSLEEP) {				\
-			stp->sd_flag &= ~RSLEEP;			\
-			cv_broadcast(&_RD(stp->sd_wrq)->q_wait);	\
-		}							\
-		stp->sd_wakeq |= RSLEEP;				\
-	}								\
-	if ((_events = stp->sd_sigflags & (S_INPUT | S_RDNORM)) != 0)	\
-		strsendsig(stp->sd_siglist, _events, 0, 0);		\
-	if (stp->sd_rput_opt & SR_POLLIN) {				\
-		stp->sd_rput_opt &= ~SR_POLLIN;				\
-		mutex_exit(&stp->sd_lock);				\
-		pollwakeup(&stp->sd_pollist, POLLIN | POLLRDNORM);	\
-	} else {							\
-		mutex_exit(&stp->sd_lock);				\
-	}								\
-}
-
-/*
  * Macro that checks whether or not a particular UDP conn is
  * flow-controlling on the read-side.
  *
