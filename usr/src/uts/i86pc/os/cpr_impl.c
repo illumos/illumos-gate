@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,17 @@ static void i_cpr_platform_free(psm_state_request_t *req);
 static int i_cpr_save_apic(psm_state_request_t *req);
 static int i_cpr_restore_apic(psm_state_request_t *req);
 static int wait_for_set(cpuset_t *set, int who);
+
+static	void i_cpr_save_stack(kthread_t *t, wc_cpu_t *wc_cpu);
+void i_cpr_restore_stack(kthread_t *t, greg_t *save_stack);
+
+#ifdef STACK_GROWTH_DOWN
+#define	CPR_GET_STACK_START(t) ((t)->t_stkbase)
+#define	CPR_GET_STACK_END(t) ((t)->t_stk)
+#else
+#define	CPR_GET_STACK_START(t) ((t)->t_stk)
+#define	CPR_GET_STACK_END(t) ((t)->t_stkbase)
+#endif	/* STACK_GROWTH_DOWN */
 
 /*
  * restart paused slave cpus
@@ -172,12 +183,13 @@ i_cpr_save_context(void *arg)
 	psm_state_request_t *papic_state;
 	int resuming;
 	int	ret;
+	wc_cpu_t	*wc_cpu = wc_other_cpus + index;
 
 	PMD(PMD_SX, ("i_cpr_save_context() index = %ld\n", index))
 
 	ASSERT(index < NCPU);
 
-	papic_state = &(wc_other_cpus + index)->wc_apic_state;
+	papic_state = &(wc_cpu)->wc_apic_state;
 
 	ret = i_cpr_platform_alloc(papic_state);
 	ASSERT(ret == 0);
@@ -185,12 +197,14 @@ i_cpr_save_context(void *arg)
 	ret = i_cpr_save_apic(papic_state);
 	ASSERT(ret == 0);
 
+	i_cpr_save_stack(curthread, wc_cpu);
+
 	/*
 	 * wc_save_context returns twice, once when susending and
 	 * once when resuming,  wc_save_context() returns 0 when
 	 * suspending and non-zero upon resume
 	 */
-	resuming = (wc_save_context(wc_other_cpus + index) == 0);
+	resuming = (wc_save_context(wc_cpu) == 0);
 
 	/*
 	 * do NOT call any functions after this point, because doing so
@@ -1062,4 +1076,37 @@ wait_for_set(cpuset_t *set, int who)
 	}
 
 	return (1);
+}
+
+static	void
+i_cpr_save_stack(kthread_t *t, wc_cpu_t *wc_cpu)
+{
+	size_t	stack_size;	/* size of stack */
+	caddr_t	start = CPR_GET_STACK_START(t);	/* stack start */
+	caddr_t	end = CPR_GET_STACK_END(t);	/* stack end  */
+
+	stack_size = (size_t)end - (size_t)start;
+
+	if (wc_cpu->wc_saved_stack_size < stack_size) {
+		if (wc_cpu->wc_saved_stack != NULL) {
+			kmem_free(wc_cpu->wc_saved_stack,
+			    wc_cpu->wc_saved_stack_size);
+		}
+		wc_cpu->wc_saved_stack = kmem_zalloc(stack_size, KM_SLEEP);
+		wc_cpu->wc_saved_stack_size = stack_size;
+	}
+
+	bcopy(start, wc_cpu->wc_saved_stack, stack_size);
+}
+
+void
+i_cpr_restore_stack(kthread_t *t, greg_t *save_stack)
+{
+	size_t	stack_size;	/* size of stack */
+	caddr_t	start = CPR_GET_STACK_START(t);	/* stack start */
+	caddr_t	end = CPR_GET_STACK_END(t);	/* stack end  */
+
+	stack_size = (size_t)end - (size_t)start;
+
+	bcopy(save_stack, start, stack_size);
 }

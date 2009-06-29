@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 	
@@ -163,10 +163,14 @@ wc_save_context(wc_cpu_t *pcpu)
 	movl    %eax, WC_KGSBASE(%rdi)
 	movl    %edx, WC_KGSBASE+4(%rdi)
 
+	movq	%gs:CPU_ID, %rax	/ save current cpu id
+	movq	%rax, WC_CPU_ID(%rdi)
+
 	pushfq
 	popq	WC_EFLAGS(%rdi)
 
 	wbinvd				/ flush the cache
+	mfence
 
 	movq	$1, %rax		/ at suspend return 1
 
@@ -214,7 +218,11 @@ wc_save_context(wc_cpu_t *pcpu)
 	pushfl
 	popl	WC_EFLAGS(%eax)
 
+	pushl	%gs:CPU_ID		/ save current cpu id
+	popl	WC_CPU_ID(%eax)
+
 	wbinvd				/ flush the cache
+	mfence
 
 	movl	$1, %eax		/ at suspend return 1
 	ret
@@ -738,21 +746,34 @@ kernel_wc_code:
 	outb    (%dx)
 #endif
 
-/ dummy up a stck so we can make C function calls
-	movq    WC_RSP(%rbx), %rsp
+	/*
+	 * if we are not running on the boot CPU restore stack contents by
+	 * calling i_cpr_restore_stack(curthread, save_stack);
+	 */
+	movq    %rsp, %rbp
+	call	i_cpr_bootcpuid
+	cmpl	%eax, WC_CPU_ID(%rbx)
+	je	2f
+
+	movq	%gs:CPU_THREAD, %rdi
+	movq	WC_SAVED_STACK(%rbx), %rsi
+	call	i_cpr_restore_stack
+2:
+
+	movq    WC_RSP(%rbx), %rsp	/ restore stack pointer
 
 	/*
 	 * APIC initialization
 	 */
-	movq    %rsp, %rbp      /* stack aligned on 16-byte boundary */
+	movq    %rsp, %rbp
 
 	/*
 	 * skip iff function pointer is NULL
 	 */
 	cmpq	$0, ap_mlsetup
-	je	2f
+	je	3f
 	call	*ap_mlsetup
-2:
+3:
 
 	call    *cpr_start_cpu_func
 
@@ -1091,23 +1112,48 @@ kernel_wc_code:
 	andl	$-1!0x200, 4(%eax)
 	ltr	WC_TR(%ebx)		/ $UTSS_SEL
 
-	movw	WC_SS(%ebx), %ss	/ lssl	WC_ESP(%ebx), %esp
-	movl	WC_ESP(%ebx), %esp	/ ^ don't use, asm busted! 
+	movw	WC_SS(%ebx), %ss	/ restore segment registers
+	movw	WC_ES(%ebx), %es
+	movw	WC_FS(%ebx), %fs
+	movw	WC_GS(%ebx), %gs
+
+	/*
+	 * set the stack pointer to point into the identity mapped page
+	 * temporarily, so we can make function calls 
+	 */
+	.globl  rm_platter_va
+	movl    rm_platter_va, %eax
+	movl	$WC_STKSTART, %esp
+	addl	%eax, %esp
+	movl	%esp, %ebp
+
+	/*
+	 * if we are not running on the boot CPU restore stack contents by
+	 * calling i_cpr_restore_stack(curthread, save_stack);
+	 */
+	call	i_cpr_bootcpuid
+	cmpl	%eax, WC_CPU_ID(%ebx)
+	je	2f
+
+	pushl	WC_SAVED_STACK(%ebx)
+	pushl	%gs:CPU_THREAD
+	call	i_cpr_restore_stack
+	addl	$0x10, %esp
+2:
+
+	movl	WC_ESP(%ebx), %esp
+	movl	%esp, %ebp
 
 	movl	WC_RETADDR(%ebx), %eax	/ return to caller of wc_save_context
 	movl	%eax, (%esp)
-
-	movw	WC_ES(%ebx), %es	/ restore segment registers
-	movw	WC_FS(%ebx), %fs
-	movw	WC_GS(%ebx), %gs
 
 	/*
 	 * APIC initialization, skip iff function pointer is NULL
 	 */
 	cmpl	$0, ap_mlsetup
-	je	2f
+	je	3f
 	call	*ap_mlsetup
-2:
+3:
 
 	call    *cpr_start_cpu_func
 

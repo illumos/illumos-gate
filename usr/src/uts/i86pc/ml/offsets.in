@@ -1,5 +1,5 @@
 \
-\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ CDDL HEADER START
@@ -459,6 +459,8 @@ wc_cpu	WC_CPU_SIZE
 	wc_cs
 	wc_ds
 	wc_es
+	wc_cpu_id
+	wc_saved_stack
 
 wc_wakecode
 	wc_cpu

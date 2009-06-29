@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,9 @@ uint32_t wc_idt_pad1;
 	uint16_t wc_ds;
 	uint16_t wc_es;
 	psm_state_request_t	wc_apic_state;
+	processorid_t	wc_cpu_id;	/* which CPU are we running on */
+	greg_t	*wc_saved_stack; /* pointer to where stack contents are saved */
+	size_t	wc_saved_stack_size;	/* size of the saved stack */
 
 
 	/* temp stack grows down to here */
