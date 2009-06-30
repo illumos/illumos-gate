@@ -1211,7 +1211,8 @@ dsl_dataset_rollback_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	/*
 	 * We can only roll back to emptyness if it is a ZPL objset.
 	 */
-	if (*ost != DMU_OST_ZFS && ds->ds_phys->ds_prev_snap_txg == 0)
+	if (*ost != DMU_OST_ZFS &&
+	    ds->ds_phys->ds_prev_snap_txg < TXG_INITIAL)
 		return (EINVAL);
 
 	/*
@@ -1316,6 +1317,7 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	} else {
 		objset_impl_t *osi;
 
+		ASSERT(*ost != DMU_OST_ZVOL);
 		ASSERT3U(ds->ds_phys->ds_used_bytes, ==, 0);
 		ASSERT3U(ds->ds_phys->ds_compressed_bytes, ==, 0);
 		ASSERT3U(ds->ds_phys->ds_uncompressed_bytes, ==, 0);
