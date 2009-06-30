@@ -173,6 +173,8 @@ get_one_physpath(char *physpath, uint_t prtnum, uint_t slcnum)
 	}
 
 	free(tmp);
+	if (ret)
+		ret = ENODEV;
 	return (ret);
 }
 
@@ -413,11 +415,17 @@ grub_current_root(grub_fs_t *fs, grub_root_t *root)
 			return (EG_OPENZFS);
 
 		/*
-		 * get_zfs_root returns non-zero on failure, not
-		 * errno.
+		 * get_zfs_root returns non-zero on failure, not errno.
 		 */
 		if (get_zfs_root(zfh, fs, root))
 			rc = EG_CURROOT;
+		else
+			/*
+			 * For mirrored root physpath would contain the list of
+			 * all bootable devices, pick up the first one.
+			 */
+			rc = get_one_physpath(root->gr_physpath, SLCNUM_INVALID,
+			    PRTNUM_INVALID);
 
 		zfs_close(zfh);
 
