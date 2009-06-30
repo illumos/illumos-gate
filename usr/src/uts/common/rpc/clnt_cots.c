@@ -381,6 +381,13 @@ static bool_t	connmgr_connect(struct cm_xprt *, queue_t *, struct netbuf *,
 				int, calllist_t *, int *, bool_t reconnect,
 				const struct timeval *, bool_t, cred_t *);
 
+static void	*connmgr_opt_getoff(mblk_t *mp, t_uscalar_t offset,
+				t_uscalar_t length, uint_t align_size);
+static bool_t	connmgr_setbufsz(calllist_t *e, queue_t *wq, cred_t *cr);
+static bool_t	connmgr_getopt_int(queue_t *wq, int level, int name, int *val,
+				calllist_t *e, cred_t *cr);
+static bool_t	connmgr_setopt_int(queue_t *wq, int level, int name, int val,
+				calllist_t *e, cred_t *cr);
 static bool_t	connmgr_setopt(queue_t *, int, int, calllist_t *, cred_t *cr);
 static void	connmgr_sndrel(struct cm_xprt *);
 static void	connmgr_snddis(struct cm_xprt *);
@@ -501,6 +508,20 @@ void (*clnt_stop_idle)(queue_t *wq);
 int clnt_cots_do_bindresvport = 1;
 
 static zone_key_t zone_cots_key;
+
+/*
+ * Defaults TCP send and receive buffer size for RPC connections.
+ * These values can be tuned by /etc/system.
+ */
+int rpc_send_bufsz = 1024*1024;
+int rpc_recv_bufsz = 1024*1024;
+/*
+ * To use system-wide default for TCP send and receive buffer size,
+ * use /etc/system to set rpc_default_tcp_bufsz to 1:
+ *
+ * set rpcmod:rpc_default_tcp_bufsz=1
+ */
+int rpc_default_tcp_bufsz = 0;
 
 /*
  * We need to do this after all kernel threads in the zone have exited.
@@ -2558,6 +2579,41 @@ connmgr_release(struct cm_xprt *cm_entry)
 }
 
 /*
+ * Set TCP receive and xmit buffer size for RPC connections.
+ */
+static bool_t
+connmgr_setbufsz(calllist_t *e, queue_t *wq, cred_t *cr)
+{
+	int ok = FALSE;
+	int val;
+
+	if (rpc_default_tcp_bufsz)
+		return (FALSE);
+
+	/*
+	 * Only set new buffer size if it's larger than the system
+	 * default buffer size. If smaller buffer size is needed
+	 * then use /etc/system to set rpc_default_tcp_bufsz to 1.
+	 */
+	ok = connmgr_getopt_int(wq, SOL_SOCKET, SO_RCVBUF, &val, e, cr);
+	if ((ok == TRUE) && (val < rpc_send_bufsz)) {
+		ok = connmgr_setopt_int(wq, SOL_SOCKET, SO_RCVBUF,
+		    rpc_send_bufsz, e, cr);
+		DTRACE_PROBE2(krpc__i__connmgr_rcvbufsz,
+		    int, ok, calllist_t *, e);
+	}
+
+	ok = connmgr_getopt_int(wq, SOL_SOCKET, SO_SNDBUF, &val, e, cr);
+	if ((ok == TRUE) && (val < rpc_recv_bufsz)) {
+		ok = connmgr_setopt_int(wq, SOL_SOCKET, SO_SNDBUF,
+		    rpc_recv_bufsz, e, cr);
+		DTRACE_PROBE2(krpc__i__connmgr_sndbufsz,
+		    int, ok, calllist_t *, e);
+	}
+	return (TRUE);
+}
+
+/*
  * Given an open stream, connect to the remote.  Returns true if connected,
  * false otherwise.
  */
@@ -2608,6 +2664,10 @@ connmgr_connect(
 		e->call_reason = ENOSR;
 		return (FALSE);
 	}
+
+	/* Set TCP buffer size for RPC connections if needed */
+	if (addrfmly == AF_INET || addrfmly == AF_INET6)
+		(void) connmgr_setbufsz(e, wq, cr);
 
 	mp->b_datap->db_type = M_PROTO;
 	tcr = (struct T_conn_req *)mp->b_rptr;
@@ -2764,10 +2824,122 @@ connmgr_connect(
 }
 
 /*
+ * Verify that the specified offset falls within the mblk and
+ * that the resulting pointer is aligned.
+ * Returns NULL if not.
+ *
+ * code from fs/sockfs/socksubr.c
+ */
+static void *
+connmgr_opt_getoff(mblk_t *mp, t_uscalar_t offset,
+    t_uscalar_t length, uint_t align_size)
+{
+	uintptr_t ptr1, ptr2;
+
+	ASSERT(mp && mp->b_wptr >= mp->b_rptr);
+	ptr1 = (uintptr_t)mp->b_rptr + offset;
+	ptr2 = (uintptr_t)ptr1 + length;
+	if (ptr1 < (uintptr_t)mp->b_rptr || ptr2 > (uintptr_t)mp->b_wptr) {
+		return (NULL);
+	}
+	if ((ptr1 & (align_size - 1)) != 0) {
+		return (NULL);
+	}
+	return ((void *)ptr1);
+}
+
+static bool_t
+connmgr_getopt_int(queue_t *wq, int level, int name, int *val,
+    calllist_t *e, cred_t *cr)
+{
+	mblk_t *mp;
+	struct opthdr *opt, *opt_res;
+	struct T_optmgmt_req *tor;
+	struct T_optmgmt_ack *opt_ack;
+	struct timeval waitp;
+	int error;
+
+	mp = allocb_cred(sizeof (struct T_optmgmt_req) +
+	    sizeof (struct opthdr) + sizeof (int), cr, NOPID);
+	if (mp == NULL)
+		return (FALSE);
+
+	mp->b_datap->db_type = M_PROTO;
+	tor = (struct T_optmgmt_req *)(mp->b_rptr);
+	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
+	tor->MGMT_flags = T_CURRENT;
+	tor->OPT_length = sizeof (struct opthdr) + sizeof (int);
+	tor->OPT_offset = sizeof (struct T_optmgmt_req);
+
+	opt = (struct opthdr *)(mp->b_rptr + sizeof (struct T_optmgmt_req));
+	opt->level = level;
+	opt->name = name;
+	opt->len = sizeof (int);
+	mp->b_wptr += sizeof (struct T_optmgmt_req) + sizeof (struct opthdr) +
+	    sizeof (int);
+
+	/*
+	 * We will use this connection regardless
+	 * of whether or not the option is readable.
+	 */
+	if (clnt_dispatch_send(wq, mp, e, 0, 0) != RPC_SUCCESS) {
+		DTRACE_PROBE(krpc__e__connmgr__getopt__cantsend);
+		freemsg(mp);
+		return (FALSE);
+	}
+
+	mutex_enter(&clnt_pending_lock);
+
+	waitp.tv_sec = clnt_cots_min_conntout;
+	waitp.tv_usec = 0;
+	error = waitforack(e, T_OPTMGMT_ACK, &waitp, 1);
+
+	if (e->call_prev)
+		e->call_prev->call_next = e->call_next;
+	else
+		clnt_pending = e->call_next;
+	if (e->call_next)
+		e->call_next->call_prev = e->call_prev;
+	mutex_exit(&clnt_pending_lock);
+
+	/* get reply message */
+	mp = e->call_reply;
+	e->call_reply = NULL;
+
+	if ((!mp) || (e->call_status != RPC_SUCCESS) || (error != 0)) {
+
+		DTRACE_PROBE4(krpc__e__connmgr_getopt, int, name,
+		    int, e->call_status, int, error, mblk_t *, mp);
+
+		if (mp)
+			freemsg(mp);
+		return (FALSE);
+	}
+
+	opt_ack = (struct T_optmgmt_ack *)mp->b_rptr;
+	opt_res = (struct opthdr *)connmgr_opt_getoff(mp, opt_ack->OPT_offset,
+	    opt_ack->OPT_length, __TPI_ALIGN_SIZE);
+
+	if (!opt_res) {
+		DTRACE_PROBE4(krpc__e__connmgr_optres, mblk_t *, mp, int, name,
+		    int, opt_ack->OPT_offset, int, opt_ack->OPT_length);
+		freemsg(mp);
+		return (FALSE);
+	}
+	*val = *(int *)&opt_res[1];
+
+	DTRACE_PROBE2(connmgr_getopt__ok, int, name, int, *val);
+
+	freemsg(mp);
+	return (TRUE);
+}
+
+/*
  * Called by connmgr_connect to set an option on the new stream.
  */
 static bool_t
-connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e, cred_t *cr)
+connmgr_setopt_int(queue_t *wq, int level, int name, int val,
+    calllist_t *e, cred_t *cr)
 {
 	mblk_t *mp;
 	struct opthdr *opt;
@@ -2794,7 +2966,7 @@ connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e, cred_t *cr)
 	opt->level = level;
 	opt->name = name;
 	opt->len = sizeof (int);
-	*(int *)((char *)opt + sizeof (*opt)) = 1;
+	*(int *)((char *)opt + sizeof (*opt)) = val;
 	mp->b_wptr += sizeof (struct T_optmgmt_req) + sizeof (struct opthdr) +
 	    sizeof (int);
 
@@ -2833,6 +3005,12 @@ connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e, cred_t *cr)
 	}
 	RPCLOG(8, "connmgr_setopt: successfully set option: %d\n", name);
 	return (TRUE);
+}
+
+static bool_t
+connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e, cred_t *cr)
+{
+	return (connmgr_setopt_int(wq, level, name, 1, e, cr));
 }
 
 #ifdef	DEBUG
