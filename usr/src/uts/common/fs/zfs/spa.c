@@ -2493,6 +2493,8 @@ spa_import_verbatim(const char *pool, nvlist_t *config, nvlist_t *props)
 	    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), &altroot);
 	spa = spa_add(pool, altroot);
 
+	spa->spa_inactive_states_ok = B_TRUE;
+
 	VERIFY(nvlist_dup(config, &spa->spa_config, 0) == 0);
 
 	if (props != NULL)
