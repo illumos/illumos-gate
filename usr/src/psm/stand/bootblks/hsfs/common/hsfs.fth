@@ -534,6 +534,7 @@ new-device
       tuck                                   ( len adr len )
       file-block0@ /block * file-offset@ +   ( len adr len off )
       dev-ih read-disk                       ( #read )
+      dup file-offset@ +  file-offset!
    ;
 
    : seek-file  ( off fd -- error? )
