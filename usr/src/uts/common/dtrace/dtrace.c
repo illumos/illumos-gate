@@ -14482,7 +14482,7 @@ dtrace_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	mutex_exit(&cpu_lock);
 
 	if (state == NULL) {
-		if (--dtrace_opens == 0)
+		if (--dtrace_opens == 0 && dtrace_anon.dta_enabling == NULL)
 			(void) kdi_dtrace_set(KDI_DTSET_DTRACE_DEACTIVATE);
 		mutex_exit(&dtrace_lock);
 		return (EAGAIN);
@@ -14518,7 +14518,12 @@ dtrace_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	dtrace_state_destroy(state);
 	ASSERT(dtrace_opens > 0);
-	if (--dtrace_opens == 0)
+
+	/*
+	 * Only relinquish control of the kernel debugger interface when there
+	 * are no consumers and no anonymous enablings.
+	 */
+	if (--dtrace_opens == 0 && dtrace_anon.dta_enabling == NULL)
 		(void) kdi_dtrace_set(KDI_DTSET_DTRACE_DEACTIVATE);
 
 	mutex_exit(&dtrace_lock);
