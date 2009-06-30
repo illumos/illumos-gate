@@ -128,6 +128,7 @@ clone:e1000g 0666 root sys
 clone:chxge 0666 root sys
 clone:pcn 0666 root sys
 clone:rtls 0666 root sys
+clone:arn 0666 root sys
 clone:ath 0666 root sys
 clone:atu 0666 root sys
 clone:vnic 0666 root sys
@@ -160,6 +161,7 @@ e1000g:* 0666 root sys
 chxge:* 0666 root sys
 pcn:* 0666 root sys
 rtls:* 0666 root sys
+arn:* 0666 root sys
 ath:* 0666 root sys
 atu:* 0666 root sys
 vnic:* 0666 root sys
