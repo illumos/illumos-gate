@@ -72,9 +72,8 @@ smb_sdrc_t
 smb_com_set_information2(smb_request_t *sr)
 {
 	uint32_t creation, last_access, last_write;  /* times */
-	timestruc_t		crtime, mtime, atime;
-	unsigned int 		what = 0;
-	struct smb_node		*node;
+	smb_attr_t		attr;
+	smb_node_t		*node;
 	int			rc;
 
 	rc = smbsr_decode_vwv(sr, "wyyy", &sr->smb_fid,
@@ -97,30 +96,30 @@ smb_com_set_information2(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
+	bzero(&attr, sizeof (smb_attr_t));
+
 	/*
 	 * The behaviour when the time field is set to -1
 	 * is not documented but is generally treated like 0,
 	 * meaning that that server file system assigned value
 	 * need not be changed.
 	 */
-	crtime.tv_nsec = mtime.tv_nsec = atime.tv_nsec = 0;
 	if (last_write != 0 && last_write != UINT_MAX) {
-		mtime.tv_sec = smb_local2gmt(sr, last_write);
-		what |= SMB_AT_MTIME;
+		attr.sa_vattr.va_mtime.tv_sec = smb_local2gmt(sr, last_write);
+		attr.sa_mask |= SMB_AT_MTIME;
 	}
 
 	if (creation != 0 && creation != UINT_MAX) {
-		crtime.tv_sec = smb_local2gmt(sr, creation);
-		what |= SMB_AT_CRTIME;
+		attr.sa_crtime.tv_sec = smb_local2gmt(sr, creation);
+		attr.sa_mask |= SMB_AT_CRTIME;
 	}
 
 	if (last_access != 0 && last_access != UINT_MAX) {
-		atime.tv_sec = smb_local2gmt(sr, last_access);
-		what |= SMB_AT_ATIME;
+		attr.sa_vattr.va_atime.tv_sec = smb_local2gmt(sr, last_access);
+		attr.sa_mask |= SMB_AT_ATIME;
 	}
 
-	smb_node_set_time(node, &crtime, &mtime, &atime, 0, what);
-	rc = smb_sync_fsattr(sr, sr->user_cr, node);
+	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
 	if (rc) {
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);

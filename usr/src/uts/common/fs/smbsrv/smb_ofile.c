@@ -165,13 +165,12 @@
 #include <smbsrv/smb_fsops.h>
 
 /* Static functions defined further down this file. */
-static void		smb_ofile_delete(smb_ofile_t *of);
-static smb_ofile_t	*smb_ofile_close_and_next(smb_ofile_t *of);
+static void smb_ofile_delete(smb_ofile_t *of);
+static smb_ofile_t *smb_ofile_close_and_next(smb_ofile_t *of);
+static void smb_ofile_set_close_attrs(smb_ofile_t *, uint32_t);
 
 /*
  * smb_ofile_open
- *
- *
  */
 smb_ofile_t *
 smb_ofile_open(
@@ -185,6 +184,7 @@ smb_ofile_open(
 {
 	smb_ofile_t	*of;
 	uint16_t	fid;
+	smb_attr_t	attr;
 
 	if (smb_idpool_alloc(&tree->t_fid_pool, &fid)) {
 		err->status = NT_STATUS_TOO_MANY_OPENED_FILES;
@@ -212,8 +212,10 @@ smb_ofile_open(
 	of->f_user = tree->t_user;
 	of->f_tree = tree;
 	of->f_node = node;
+	of->f_explicit_times = 0;
 	mutex_init(&of->f_mutex, NULL, MUTEX_DEFAULT, NULL);
 	of->f_state = SMB_OFILE_STATE_OPEN;
+
 
 	if (ftype == SMB_FTYPE_MESG_PIPE) {
 		of->f_pipe = kmem_zalloc(sizeof (smb_opipe_t), KM_SLEEP);
@@ -224,7 +226,20 @@ smb_ofile_open(
 		if (of->f_granted_access == FILE_EXECUTE)
 			of->f_flags |= SMB_OFLAGS_EXECONLY;
 
-		if (crgetuid(of->f_cr) == node->attr.sa_vattr.va_uid) {
+		bzero(&attr, sizeof (smb_attr_t));
+		attr.sa_mask |= SMB_AT_UID;
+		if (smb_fsop_getattr(NULL, kcred, node, &attr) != 0) {
+			of->f_magic = 0;
+			mutex_destroy(&of->f_mutex);
+			crfree(of->f_cr);
+			smb_idpool_free(&tree->t_fid_pool, of->f_fid);
+			kmem_cache_free(tree->t_server->si_cache_ofile, of);
+			err->status = NT_STATUS_INTERNAL_ERROR;
+			err->errcls = ERRDOS;
+			err->errcode = ERROR_INTERNAL_ERROR;
+			return (NULL);
+		}
+		if (crgetuid(of->f_cr) == attr.sa_vattr.va_uid) {
 			/*
 			 * Add this bit for the file's owner even if it's not
 			 * specified in the request (Windows behavior).
@@ -270,13 +285,9 @@ smb_ofile_open(
 
 /*
  * smb_ofile_close
- *
- *
  */
 void
-smb_ofile_close(
-    smb_ofile_t		*of,
-    uint32_t		last_wtime)
+smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 {
 	ASSERT(of);
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
@@ -293,19 +304,8 @@ smb_ofile_close(
 		if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
 			smb_opipe_close(of);
 		} else {
-			/*
-			 * For files created readonly, propagate the readonly
-			 * bit to the ofile now
-			 */
-			if (of->f_node->readonly_creator == of) {
-				of->f_node->attr.sa_dosattr |=
-				    FILE_ATTRIBUTE_READONLY;
-				of->f_node->what |= SMB_AT_DOSATTR;
-				of->f_node->readonly_creator = NULL;
-			}
+			smb_ofile_set_close_attrs(of, last_wtime);
 
-			smb_ofile_close_timestamp_update(of, last_wtime);
-			(void) smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 			if (of->f_flags & SMB_OFLAGS_SET_DELETE_ON_CLOSE) {
 				if (smb_tree_has_feature(of->f_tree,
 				    SMB_TREE_CATIA)) {
@@ -526,6 +526,7 @@ smb_ofile_seek(
 {
 	u_offset_t	newoff = 0;
 	int		rc = 0;
+	smb_attr_t	attr;
 
 	ASSERT(of);
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
@@ -548,11 +549,17 @@ smb_ofile_seek(
 		break;
 
 	case SMB_SEEK_END:
-		if (off < 0 && (-off) > of->f_node->attr.sa_vattr.va_size)
+		bzero(&attr, sizeof (smb_attr_t));
+		attr.sa_mask |= SMB_AT_SIZE;
+		rc = smb_fsop_getattr(NULL, kcred, of->f_node, &attr);
+		if (rc != 0) {
+			mutex_exit(&of->f_mutex);
+			return (rc);
+		}
+		if (off < 0 && (-off) > attr.sa_vattr.va_size)
 			newoff = 0;
 		else
-			newoff = of->f_node->attr.sa_vattr.va_size +
-			    (u_offset_t)off;
+			newoff = attr.sa_vattr.va_size + (u_offset_t)off;
 		break;
 
 	default:
@@ -576,47 +583,7 @@ smb_ofile_seek(
 }
 
 /*
- * smb_ofile_close_timestamp_update
- *
- * The last_wtime is specified in the request received
- * from the client. If it is neither 0 nor -1, this time
- * should be used as the file's mtime. It must first be
- * converted from the server's localtime (as received in
- * the client's request) to GMT.
- */
-void
-smb_ofile_close_timestamp_update(
-    smb_ofile_t		*of,
-    uint32_t		last_wtime)
-{
-	smb_node_t	*node;
-	timestruc_t	mtime, atime;
-	unsigned int	what = 0;
-
-	mtime.tv_sec = 0;
-	mtime.tv_nsec = 0;
-
-	if (last_wtime != 0 && last_wtime != 0xFFFFFFFF) {
-		mtime.tv_sec = last_wtime + of->f_server->si_gmtoff;
-		what |= SMB_AT_MTIME;
-	}
-
-	/*
-	 * NODE_FLAGS_SYNCATIME is set whenever something is
-	 * written to a file.
-	 */
-	node = of->f_node;
-	if (node->flags & NODE_FLAGS_SYNCATIME) {
-		what |= SMB_AT_ATIME;
-		(void) microtime(&atime);
-	}
-
-	smb_node_set_time(node, 0, &mtime, &atime, 0, what);
-}
-
-/*
  * smb_ofile_is_open
- *
  */
 boolean_t
 smb_ofile_is_open(smb_ofile_t *of)
@@ -644,7 +611,111 @@ smb_ofile_set_oplock_granted(smb_ofile_t *of)
 	mutex_exit(&of->f_mutex);
 }
 
+/*
+ * smb_ofile_pending_write_time
+ *
+ * Flag write times as pending - to be set on close, setattr
+ * or delayed write timer.
+ */
+void
+smb_ofile_set_write_time_pending(smb_ofile_t *of)
+{
+	SMB_OFILE_VALID(of);
+	mutex_enter(&of->f_mutex);
+	of->f_flags |= SMB_OFLAGS_TIMESTAMPS_PENDING;
+	mutex_exit(&of->f_mutex);
+}
+
+boolean_t
+smb_ofile_write_time_pending(smb_ofile_t *of)
+{
+	boolean_t rc = B_FALSE;
+
+	SMB_OFILE_VALID(of);
+	mutex_enter(&of->f_mutex);
+	if (of->f_flags & SMB_OFLAGS_TIMESTAMPS_PENDING)
+		rc = B_TRUE;
+	mutex_exit(&of->f_mutex);
+
+	return (rc);
+}
+
+/*
+ * smb_ofile_set_explicit_time_flag
+ *
+ * Note the timestamps specified in "what", as having been
+ * explicity set for the ofile. Also clear the flag for pending
+ * timestamps as the pending timestamps will have been applied
+ * by the explicit set.
+ */
+void
+smb_ofile_set_explicit_times(smb_ofile_t *of, uint32_t what)
+{
+	SMB_OFILE_VALID(of);
+	mutex_enter(&of->f_mutex);
+	of->f_flags &= ~SMB_OFLAGS_TIMESTAMPS_PENDING;
+	of->f_explicit_times |= (what & SMB_AT_TIMES);
+	mutex_exit(&of->f_mutex);
+}
+
+uint32_t
+smb_ofile_explicit_times(smb_ofile_t *of)
+{
+	uint32_t rc;
+
+	SMB_OFILE_VALID(of);
+	mutex_enter(&of->f_mutex);
+	rc = of->f_explicit_times;
+	mutex_exit(&of->f_mutex);
+
+	return (rc);
+}
+
 /* *************************** Static Functions ***************************** */
+
+/*
+ * smb_ofile_set_close_attrs
+ *
+ * Updates timestamps, size and readonly bit.
+ * The last_wtime is specified in the request received
+ * from the client. If it is neither 0 nor -1, this time
+ * should be used as the file's mtime. It must first be
+ * converted from the server's localtime (as received in
+ * the client's request) to GMT.
+ *
+ * Call smb_node_setattr even if no attributes are being
+ * explicitly set, to set any pending attributes.
+ */
+static void
+smb_ofile_set_close_attrs(smb_ofile_t *of, uint32_t last_wtime)
+{
+	smb_node_t *node = of->f_node;
+	smb_attr_t attr;
+
+	bzero(&attr, sizeof (smb_attr_t));
+
+	/* For files created readonly, propagate readonly bit */
+	if (node->readonly_creator == of) {
+		attr.sa_mask |= SMB_AT_DOSATTR;
+		if (smb_fsop_getattr(NULL, kcred, node, &attr) &&
+		    (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
+			attr.sa_mask = 0;
+		} else {
+			attr.sa_dosattr |= FILE_ATTRIBUTE_READONLY;
+		}
+
+		node->readonly_creator = NULL;
+	}
+
+	/* apply last_wtime if specified */
+	if (last_wtime != 0 && last_wtime != 0xFFFFFFFF) {
+		attr.sa_vattr.va_mtime.tv_sec =
+		    last_wtime + of->f_server->si_gmtoff;
+		attr.sa_mask |= SMB_AT_MTIME;
+	}
+
+	(void) smb_node_setattr(NULL, node, of->f_cr, of, &attr);
+}
 
 /*
  * smb_ofile_close_and_next
@@ -655,8 +726,7 @@ smb_ofile_set_oplock_granted(smb_ofile_t *of)
  * RW_READER mode before being called.
  */
 static smb_ofile_t *
-smb_ofile_close_and_next(
-    smb_ofile_t		*of)
+smb_ofile_close_and_next(smb_ofile_t *of)
 {
 	smb_ofile_t	*next_of;
 	smb_tree_t	*tree;
@@ -702,8 +772,7 @@ smb_ofile_close_and_next(
  *
  */
 static void
-smb_ofile_delete(
-    smb_ofile_t		*of)
+smb_ofile_delete(smb_ofile_t *of)
 {
 	ASSERT(of);
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
@@ -800,7 +869,7 @@ smb_ofile_open_check(
 	 * directories, but this check will remain as it is not
 	 * clear whether it was originally put here for a reason.
 	 */
-	if (node->attr.sa_vattr.va_type == VDIR) {
+	if (smb_node_is_dir(node)) {
 		if (SMB_DENY_RW(of->f_share_access) &&
 		    (node->n_orig_uid != crgetuid(cr))) {
 			mutex_exit(&of->f_mutex);

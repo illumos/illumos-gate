@@ -104,7 +104,7 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	smb_trans2_setinfo_t *info;
 	smb_error_t smberr;
-	DWORD status;
+	uint32_t status;
 	int rc;
 
 	info = kmem_zalloc(sizeof (smb_trans2_setinfo_t), KM_SLEEP);

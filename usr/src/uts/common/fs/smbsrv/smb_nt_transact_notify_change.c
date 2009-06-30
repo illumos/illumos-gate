@@ -203,7 +203,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 
 	node = sr->fid_ofile->f_node;
 
-	if (node->attr.sa_vattr.va_type != VDIR) {
+	if (!smb_node_is_dir(node)) {
 		/*
 		 * Notify change requests are only valid on directories.
 		 */

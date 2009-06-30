@@ -459,6 +459,27 @@ typedef struct smb_unexport {
 	char		ux_sharename[MAXNAMELEN];
 } smb_unexport_t;
 
+/*
+ * Solaris file systems handle timestamps differently from NTFS.
+ * In order to provide a more similar view of an open file's
+ * timestamps, we cache the timestamps in the node and manipulate
+ * them in a manner more consistent with windows.
+ * t_cached is B_TRUE when timestamps are cached.
+ * Timestamps remain cached while there are open ofiles for the node.
+ * This includes open ofiles for named streams.  t_open_ofiles is a
+ * count of open ofiles on the node, including named streams' ofiles,
+ * n_open_ofiles cannot be used as it doesn't include ofiles opened
+ * for the node's named streams.
+ */
+typedef struct smb_times {
+	uint32_t		t_open_ofiles;
+	boolean_t		t_cached;
+	timestruc_t		t_atime;
+	timestruc_t		t_mtime;
+	timestruc_t		t_ctime;
+	timestruc_t		t_crtime;
+} smb_times_t;
+
 #define	SMB_NODE_MAGIC		0x4E4F4445	/* 'NODE' */
 #define	SMB_NODE_VALID(p)	ASSERT((p)->n_magic == SMB_NODE_MAGIC)
 
@@ -485,9 +506,8 @@ typedef struct smb_node {
 	struct smb_ofile	*readonly_creator;
 	volatile int		flags;	/* FILE_NOTIFY_CHANGE_* */
 	volatile int		waiting_event; /* # of clients requesting FCN */
-	smb_attr_t		attr;
+	smb_times_t		n_timestamps; /* cached timestamps */
 	unsigned int		what;
-	u_offset_t		n_size;
 	smb_oplock_t		n_oplock;
 	struct smb_node		*dir_snode; /* Directory of node */
 	struct smb_node		*unnamed_stream_node; /* set in stream nodes */
@@ -510,7 +530,6 @@ typedef struct smb_node {
 #define	NODE_FLAGS_WRITE_THROUGH	0x00100000
 #define	NODE_FLAGS_SYNCATIME		0x00200000
 #define	NODE_FLAGS_LOCKED		0x00400000
-#define	NODE_FLAGS_ATTR_VALID		0x00800000
 #define	NODE_XATTR_DIR			0x01000000
 #define	NODE_FLAGS_CREATED		0x04000000
 #define	NODE_FLAGS_CHANGED		0x08000000
@@ -885,16 +904,6 @@ typedef struct smb_tree {
 	(SMB_TREE_VFS((sr)->tid_tree) == SMB_NODE_VFS(node)) : 1)
 
 /*
- * SMB_NODE_IS_READONLY(node)
- *
- * This macro indicates whether the DOS readonly bit is set in the node's
- * attribute cache.  The cache reflects what is on-disk.
- */
-
-#define	SMB_NODE_IS_READONLY(node) \
-	((node) && (node)->attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)
-
-/*
  * SMB_OFILE_IS_READONLY reflects whether an ofile is readonly or not.
  * The macro takes into account
  *      - the tree readonly state
@@ -905,7 +914,7 @@ typedef struct smb_tree {
 
 #define	SMB_OFILE_IS_READONLY(of)                               \
 	(((of)->f_flags & SMB_OFLAGS_READONLY) ||               \
-	SMB_NODE_IS_READONLY((of)->f_node) ||                   \
+	smb_node_file_is_readonly((of)->f_node) ||                   \
 	(((of)->f_node->readonly_creator) &&                    \
 	((of)->f_node->readonly_creator != (of))))
 
@@ -918,7 +927,7 @@ typedef struct smb_tree {
 
 #define	SMB_PATHFILE_IS_READONLY(sr, node)                       \
 	(SMB_TREE_IS_READONLY((sr)) ||                           \
-	SMB_NODE_IS_READONLY((node)) ||                          \
+	smb_node_file_is_readonly((node)) ||                          \
 	((node)->readonly_creator))
 
 #define	PIPE_STATE_AUTH_VERIFY	0x00000001
@@ -960,12 +969,18 @@ typedef struct smb_opipe {
  *   DELETE_ON_CLOSE bit of the CreateOptions is set. If any
  *   open file instance has this bit set, the NODE_FLAGS_DELETE_ON_CLOSE
  *   will be set for the file node upon close.
+ *
+ *	SMB_OFLAGS_TIMESTAMPS_PENDING
+ *   This flag gets set when a write operation is performed on the
+ *   ofile. The timestamps will be updated, and the flags cleared,
+ *   when the ofile gets closed or a setattr is performed on the ofile.
  */
 
 #define	SMB_OFLAGS_READONLY		0x0001
 #define	SMB_OFLAGS_EXECONLY		0x0002
 #define	SMB_OFLAGS_SET_DELETE_ON_CLOSE	0x0004
 #define	SMB_OFLAGS_LLF_POS_VALID	0x0008
+#define	SMB_OFLAGS_TIMESTAMPS_PENDING	0x0010
 
 #define	SMB_OFILE_MAGIC 	0x4F464C45	/* 'OFLE' */
 #define	SMB_OFILE_VALID(p)	ASSERT((p)->f_magic == SMB_OFILE_MAGIC)
@@ -1007,6 +1022,8 @@ typedef struct smb_ofile {
 	pid_t			f_pid;
 	boolean_t		f_oplock_granted;
 	boolean_t		f_oplock_exit;
+	uint32_t		f_explicit_times;
+
 } smb_ofile_t;
 
 #define	SMB_ODIR_MAGIC 		0x4F444952	/* 'ODIR' */
@@ -1097,6 +1114,7 @@ typedef struct smb_fileinfo {
 
 typedef struct smb_streaminfo {
 	uint64_t	si_size;
+	uint64_t	si_alloc_size;
 	char		si_name[MAXPATHLEN];
 } smb_streaminfo_t;
 

@@ -514,7 +514,7 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 	case STYPE_DISKTREE:
 		node = ofile->f_node;
 
-		if (node->attr.sa_vattr.va_type != VDIR) {
+		if (!smb_node_is_dir(node)) {
 			rc = smb_lock_range_access(sr, node, param->rw_offset,
 			    param->rw_count, B_FALSE);
 			if (rc != NT_STATUS_SUCCESS) {
@@ -535,13 +535,10 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 			break;
 		}
 
-		(void) smb_sync_fsattr(sr, sr->user_cr, node);
-
 		sr->raw_data.max_bytes = vdb->vdb_uio.uio_resid;
 		top = smb_mbuf_allocate(&vdb->vdb_uio);
 
-		rc = smb_fsop_read(sr, sr->user_cr, node, &vdb->vdb_uio,
-		    &node->attr);
+		rc = smb_fsop_read(sr, sr->user_cr, node, &vdb->vdb_uio);
 
 		sr->raw_data.max_bytes -= vdb->vdb_uio.uio_resid;
 		smb_mbuf_trim(top, sr->raw_data.max_bytes);

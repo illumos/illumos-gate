@@ -132,7 +132,7 @@ mlsvc_set_share(int shrop, char *path, char *name)
 		rc = smb_kmod_share(path, name);
 		break;
 	case SMB_SHROP_DELETE:
-		rc = smb_kmod_unshare(name);
+		rc = smb_kmod_unshare(path, name);
 		break;
 	default:
 		rc = EINVAL;

@@ -274,7 +274,7 @@ smb_com_write_raw(struct smb_request *sr)
 		/*
 		 * See comments in smb_write.c
 		 */
-		if (fnode->attr.sa_vattr.va_type != VDIR) {
+		if (!smb_node_is_dir(fnode)) {
 			rc = smb_lock_range_access(sr, fnode, off,
 			    count, B_TRUE);
 			if (rc != NT_STATUS_SUCCESS) {
@@ -498,19 +498,10 @@ smb_write_raw_helper(struct smb_request *sr, struct uio *uiop,
 	} else {
 		fnode = sr->fid_ofile->f_node;
 		rc = smb_fsop_write(sr, sr->user_cr, fnode,
-		    uiop, lcountp, &fnode->attr, stability);
+		    uiop, lcountp, stability);
 
-		if (rc == 0) {
-
-			fnode->flags |= NODE_FLAGS_SYNCATIME;
-
-			if (fnode->flags & NODE_FLAGS_SET_SIZE) {
-				if ((*offp + *lcountp) >= fnode->n_size) {
-					fnode->flags &= ~NODE_FLAGS_SET_SIZE;
-					fnode->n_size = *offp + *lcountp;
-				}
-			}
-		}
+		if (rc == 0)
+			smb_ofile_set_write_time_pending(sr->fid_ofile);
 	}
 
 	*offp += *lcountp;

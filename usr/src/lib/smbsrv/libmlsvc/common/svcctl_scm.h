@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +95,8 @@ int svcctl_scm_scf_handle_init(svcctl_manager_context_t *);
 void svcctl_scm_scf_handle_fini(svcctl_manager_context_t *);
 int svcctl_scm_refresh(svcctl_manager_context_t *);
 void svcctl_scm_bytes_needed(svcctl_manager_context_t *);
-void svcctl_scm_enum_services(svcctl_manager_context_t *, unsigned char *);
+uint32_t svcctl_scm_enum_services(svcctl_manager_context_t *, uint8_t *,
+    size_t, uint32_t *, boolean_t);
 uint32_t svcctl_scm_validate_service(svcctl_manager_context_t *, char *);
 svcctl_svc_node_t *svcctl_scm_find_service(svcctl_manager_context_t *, char *);
 uint32_t svcctl_scm_map_status(const char *);

@@ -31,33 +31,33 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
-static DWORD smb_set_standard_info(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
+static uint32_t smb_set_standard_info(smb_request_t *,
+    smb_trans2_setinfo_t *, smb_error_t *);
 
-static DWORD smb_set_basic_info(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
+static uint32_t smb_set_basic_info(smb_request_t *,
+    smb_trans2_setinfo_t *, smb_error_t *);
 
-static DWORD smb_set_disposition_info(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
+static uint32_t smb_set_disposition_info(smb_request_t *,
+    smb_trans2_setinfo_t *, smb_error_t *);
 
-static DWORD smb_set_alloc_info(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
-
-/*LINTED E_STATIC_UNUSED*/
-static DWORD smb_set_mac_info(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
+static uint32_t smb_set_alloc_info(smb_request_t *sr,
+    smb_trans2_setinfo_t *, smb_error_t *);
 
 /*LINTED E_STATIC_UNUSED*/
-static DWORD smb_set_mac_addappl(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
+static uint32_t smb_set_mac_info(smb_request_t *,
+    smb_trans2_setinfo_t *, smb_error_t *);
 
 /*LINTED E_STATIC_UNUSED*/
-static DWORD smb_set_mac_rmvappl(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
+static uint32_t smb_set_mac_addappl(smb_request_t *,
+    smb_trans2_setinfo_t *, smb_error_t *);
 
 /*LINTED E_STATIC_UNUSED*/
-static DWORD smb_set_mac_addicon(struct smb_request *sr,
-    smb_trans2_setinfo_t *info, smb_error_t *smberr);
+static uint32_t smb_set_mac_rmvappl(smb_request_t *,
+    smb_trans2_setinfo_t *, smb_error_t *);
+
+/*LINTED E_STATIC_UNUSED*/
+static uint32_t smb_set_mac_addicon(smb_request_t *,
+    smb_trans2_setinfo_t *, smb_error_t *);
 
 static unsigned short smb_info_passthru(unsigned short infolevel);
 
@@ -67,10 +67,8 @@ static unsigned short smb_info_passthru(unsigned short infolevel);
  * This is a common function called by both Trans2SetFileInfo
  * and Trans2SetPathInfo.
  */
-DWORD
-smb_trans2_set_information(
-    struct smb_request *sr,
-    smb_trans2_setinfo_t *info,
+uint32_t
+smb_trans2_set_information(smb_request_t *sr, smb_trans2_setinfo_t *info,
     smb_error_t *smberr)
 {
 	info->level = smb_info_passthru(info->level);
@@ -153,50 +151,26 @@ smb_info_passthru(unsigned short infolevel)
 /*
  * smb_set_standard_info
  *
- * SMB_INFO_STANDARD
- *
- *  Data Block Encoding                Description
- *  ================================== =================================
- *
- *  SMB_DATE CreationDate;             Date when file was created
- *  SMB_TIME CreationTime;             Time when file was created
- *  SMB_DATE LastAccessDate;           Date of last file access
- *  SMB_TIME LastAccessTime;           Time of last file access
- *  SMB_DATE LastWriteDate;            Date of last write to the file
- *  SMB_TIME LastWriteTime;            Time of last write to the file
- *  ULONG  DataSize;                   File Size
- *  ULONG AllocationSize;              Size of filesystem allocation unit
- *  USHORT Attributes;                 File Attributes
- *
- * For exact compatibility with Windows (NT and later), the whole
- * request is decoded (to ensure that all 22 bytes are present),
- * and the DataSize, AllocationSize and Attributes values are
- * ignored.
+ * Sets standard file/path information.
  */
-static DWORD
-smb_set_standard_info(
-    struct smb_request *sr,
-    smb_trans2_setinfo_t *info,
+static uint32_t
+smb_set_standard_info(smb_request_t *sr, smb_trans2_setinfo_t *info,
     smb_error_t *smberr)
 {
+	smb_attr_t attr;
 	uint32_t Creation, LastAccess, LastWrite;  /* times */
-	uint32_t DataSize, AllocationSize;
-	unsigned short Attributes;
-	unsigned int what = 0;
-	timestruc_t crtime, mtime, atime;
-	DWORD status = NT_STATUS_SUCCESS;
-	struct smb_node *node = info->node;
+	uint32_t status = NT_STATUS_SUCCESS;
+	smb_node_t *node = info->node;
 	int rc;
 
-	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "yyyllw",
-	    &Creation,			/* CreationDate/Time */
-	    &LastAccess,		/* LastAccessDate/Time */
-	    &LastWrite,			/* LastWriteDate/Time */
-	    &DataSize,			/* File Size */
-	    &AllocationSize,		/* Block Size */
-	    &Attributes) != 0) {	/* File Attributes */
+	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "yyy",
+	    &Creation,		/* CreationDate/Time */
+	    &LastAccess,	/* LastAccessDate/Time */
+	    &LastWrite) != 0) {	/* LastWriteDate/Time */
 		return (NT_STATUS_DATA_ERROR);
 	}
+
+	bzero(&attr, sizeof (smb_attr_t));
 
 	/*
 	 * The behaviour when the time field is set to -1
@@ -204,24 +178,22 @@ smb_set_standard_info(
 	 * meaning that that server file system assigned value
 	 * need not be changed.
 	 */
-	crtime.tv_nsec = mtime.tv_nsec = atime.tv_nsec = 0;
 	if (LastWrite != 0 && LastWrite != (uint32_t)-1) {
-		mtime.tv_sec = smb_local2gmt(sr, LastWrite);
-		what |= SMB_AT_MTIME;
+		attr.sa_vattr.va_mtime.tv_sec = smb_local2gmt(sr, LastWrite);
+		attr.sa_mask |= SMB_AT_MTIME;
 	}
 
 	if (Creation != 0 && Creation != (uint32_t)-1) {
-		crtime.tv_sec = smb_local2gmt(sr, Creation);
-		what |= SMB_AT_CRTIME;
+		attr.sa_crtime.tv_sec = smb_local2gmt(sr, Creation);
+		attr.sa_mask |= SMB_AT_CRTIME;
 	}
 
 	if (LastAccess != 0 && LastAccess != (uint32_t)-1) {
-		atime.tv_sec = smb_local2gmt(sr, LastAccess);
-		what |= SMB_AT_ATIME;
+		attr.sa_vattr.va_atime.tv_sec = smb_local2gmt(sr, LastAccess);
+		attr.sa_mask |= SMB_AT_ATIME;
 	}
 
-	smb_node_set_time(node, &crtime, &mtime, &atime, 0, what);
-	rc = smb_sync_fsattr(sr, sr->user_cr, node);
+	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
 	if (rc) {
 		smbsr_map_errno(rc, smberr);
 		status = NT_STATUS_UNSUCCESSFUL;
@@ -235,18 +207,15 @@ smb_set_standard_info(
  *
  * Sets basic file/path information.
  */
-static DWORD
-smb_set_basic_info(
-    struct smb_request *sr,
-    smb_trans2_setinfo_t *info,
+static uint32_t
+smb_set_basic_info(smb_request_t *sr, smb_trans2_setinfo_t *info,
     smb_error_t *smberr)
 {
+	smb_attr_t attr;
 	uint64_t NT_Creation, NT_LastAccess, NT_LastWrite, NT_Change;
 	unsigned short Attributes;
-	unsigned int what = 0;
-	timestruc_t crtime, mtime, atime, ctime;
-	struct smb_node *node = info->node;
-	DWORD status = NT_STATUS_SUCCESS;
+	smb_node_t *node = info->node;
+	uint32_t status = NT_STATUS_SUCCESS;
 	int rc;
 
 	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "qqqqw",
@@ -258,6 +227,8 @@ smb_set_basic_info(
 		return (NT_STATUS_DATA_ERROR);
 	}
 
+	bzero(&attr, sizeof (smb_attr_t));
+
 	/*
 	 * The behaviour when the time field is set to -1
 	 * is not documented but is generally treated like 0,
@@ -265,23 +236,23 @@ smb_set_basic_info(
 	 * need not be changed.
 	 */
 	if (NT_Change != 0 && NT_Change != (uint64_t)-1) {
-		(void) nt_to_unix_time(NT_Change, &ctime);
-		what |= SMB_AT_CTIME;
+		(void) nt_to_unix_time(NT_Change, &attr.sa_vattr.va_ctime);
+		attr.sa_mask |= SMB_AT_CTIME;
 	}
 
 	if (NT_Creation != 0 && NT_Creation != (uint64_t)-1) {
-		(void) nt_to_unix_time(NT_Creation, &crtime);
-		what |= SMB_AT_CRTIME;
+		(void) nt_to_unix_time(NT_Creation, &attr.sa_crtime);
+		attr.sa_mask |= SMB_AT_CRTIME;
 	}
 
 	if (NT_LastWrite != 0 && NT_LastWrite != (uint64_t)-1) {
-		(void) nt_to_unix_time(NT_LastWrite, &mtime);
-		what |= SMB_AT_MTIME;
+		(void) nt_to_unix_time(NT_LastWrite, &attr.sa_vattr.va_mtime);
+		attr.sa_mask |= SMB_AT_MTIME;
 	}
 
 	if (NT_LastAccess != 0 && NT_LastAccess != (uint64_t)-1) {
-		(void) nt_to_unix_time(NT_LastAccess, &atime);
-		what |= SMB_AT_ATIME;
+		(void) nt_to_unix_time(NT_LastAccess, &attr.sa_vattr.va_atime);
+		attr.sa_mask |= SMB_AT_ATIME;
 	}
 
 	/*
@@ -295,17 +266,18 @@ smb_set_basic_info(
 	 */
 	if (Attributes != 0) {
 		if ((Attributes & FILE_ATTRIBUTE_DIRECTORY) &&
-		    (node->attr.sa_vattr.va_type != VDIR)) {
+		    (!smb_node_is_dir(node))) {
 			smberr->status = NT_STATUS_INVALID_PARAMETER;
 			smberr->errcls = ERRDOS;
 			smberr->errcode = ERROR_INVALID_PARAMETER;
 			return (NT_STATUS_UNSUCCESSFUL);
 		}
-		smb_node_set_dosattr(node, Attributes);
+
+		attr.sa_dosattr = Attributes;
+		attr.sa_mask |= SMB_AT_DOSATTR;
 	}
 
-	smb_node_set_time(node, &crtime, &mtime, &atime, &ctime, what);
-	rc = smb_sync_fsattr(sr, sr->user_cr, node);
+	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
 	if (rc) {
 		smbsr_map_errno(rc, smberr);
 		status = NT_STATUS_UNSUCCESSFUL;
@@ -320,33 +292,26 @@ smb_set_basic_info(
  *
  * Sets file allocation/end_of_file info
  */
-static DWORD
-smb_set_alloc_info(
-    struct smb_request *sr,
-    smb_trans2_setinfo_t *info,
+static uint32_t
+smb_set_alloc_info(smb_request_t *sr, smb_trans2_setinfo_t *info,
     smb_error_t *smberr)
 {
+	smb_attr_t attr;
 	uint64_t DataSize;
-	DWORD status = NT_STATUS_SUCCESS;
-	struct smb_node *node = info->node;
+	uint32_t status = NT_STATUS_SUCCESS;
+	smb_node_t *node = info->node;
 	int rc;
 
 	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "q", &DataSize) != 0)
 		return (NT_STATUS_DATA_ERROR);
 
-	if (node->attr.sa_vattr.va_size != DataSize) {
-		node->flags |= NODE_FLAGS_SET_SIZE;
-		node->n_size = (u_offset_t)DataSize;
-
-		/*
-		 * Ensure that the FS is consistent with the node cache
-		 * because the size flag can get cleared by subsequent
-		 * write requests without the inode ever being updated.
-		 */
-		if ((rc = smb_set_file_size(sr, node)) != 0) {
-			smbsr_map_errno(rc, smberr);
-			status = NT_STATUS_UNSUCCESSFUL;
-		}
+	bzero(&attr, sizeof (smb_attr_t));
+	attr.sa_mask = SMB_AT_SIZE;
+	attr.sa_vattr.va_size = (u_offset_t)DataSize;
+	rc = smb_node_setattr(sr, node, sr->user_cr, sr->fid_ofile, &attr);
+	if (rc) {
+		smbsr_map_errno(rc, smberr);
+		status = NT_STATUS_UNSUCCESSFUL;
 	}
 
 	return (status);
@@ -385,11 +350,9 @@ smb_set_alloc_info(
  * node delete-on-close flag, which will result in the file not being
  * removed even after the last file handle is closed.
  */
-static DWORD
-smb_set_disposition_info(
-    smb_request_t		*sr,
-    smb_trans2_setinfo_t	*info,
-    smb_error_t			*smberr)
+static uint32_t
+smb_set_disposition_info(smb_request_t *sr, smb_trans2_setinfo_t *info,
+    smb_error_t *smberr)
 {
 	unsigned char	mark_delete;
 	uint32_t	flags = 0;

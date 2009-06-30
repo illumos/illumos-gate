@@ -420,9 +420,10 @@ smb_tree_acl_access(cred_t *cred, const char *sharename, vnode_t *pathvp,
 	 * values.
 	 */
 
-	if (rc == 0)
+	if (rc == 0) {
 		smb_vop_eaccess(sharevp, (int *)access, V_ACE_MASK, NULL, cred);
-
+		VN_RELE(sharevp);
+	}
 }
 
 /*
@@ -438,7 +439,6 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
 	smb_share_t 		*si;
-	smb_attr_t		attr;
 	cred_t			*u_cred;
 	int			rc;
 	uint32_t		access = 0; /* read/write is assumed */
@@ -535,7 +535,7 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	if (rc == 0) {
 		rc = smb_fsop_lookup(sr, u_cred, SMB_FOLLOW_LINKS,
 		    sr->sr_server->si_root_smb_node, dir_snode, last_component,
-		    &snode, &attr);
+		    &snode);
 
 		smb_node_release(dir_snode);
 	}
@@ -556,19 +556,12 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	 * before the tree is allocated.
 	 */
 	smb_tree_acl_access(u_cred, sharename, snode->vp, &aclaccess);
-	/* if an error, then no share file -- default to no ACL */
-	if (rc == 0) {
-		/*
-		 * There need to be some permissions in order to have
-		 * any access.
-		 */
-		if ((aclaccess & ACE_ALL_PERMS) == 0) {
-			smb_tree_log(sr, sharename, "access denied: share ACL");
-			smbsr_error(sr, 0, ERRSRV, ERRaccess);
-			kmem_free(si, sizeof (smb_share_t));
-			smb_node_release(snode);
-			return (NULL);
-		}
+	if ((aclaccess & ACE_ALL_PERMS) == 0) {
+		smb_tree_log(sr, sharename, "access denied: share ACL");
+		smbsr_error(sr, 0, ERRSRV, ERRaccess);
+		kmem_free(si, sizeof (smb_share_t));
+		smb_node_release(snode);
+		return (NULL);
 	}
 
 	/*

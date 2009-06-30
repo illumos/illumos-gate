@@ -74,11 +74,10 @@ smb_com_set_information(smb_request_t *sr)
 {
 	int			rc;
 	unsigned short		dattr;
-	timestruc_t		utime;
 	char			*path;
-	struct smb_node		*dir_node;
+	smb_node_t		*dir_node;
+	smb_node_t		*node;
 	smb_attr_t		attr;
-	struct smb_node		*node;
 	char			*name;
 	uint32_t		last_wtime;
 
@@ -106,8 +105,8 @@ smb_com_set_information(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, name, &node, &attr);
+	rc = smb_fsop_lookup_name(sr, sr->user_cr, SMB_FOLLOW_LINKS,
+	    sr->tid_tree->t_snode, dir_node, name, &node);
 	if (rc != 0) {
 		smb_node_release(dir_node);
 		kmem_free(name, MAXNAMELEN);
@@ -122,7 +121,7 @@ smb_com_set_information(smb_request_t *sr)
 	 * target is not a directory.
 	 */
 	if ((dattr & FILE_ATTRIBUTE_DIRECTORY) &&
-	    (node->attr.sa_vattr.va_type != VDIR)) {
+	    (!smb_node_is_dir(node))) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
 		return (SDRC_ERROR);
@@ -135,14 +134,18 @@ smb_com_set_information(smb_request_t *sr)
 		(void) smb_oplock_break(node, sr->session, B_FALSE);
 	}
 
+	bzero(&attr, sizeof (smb_attr_t));
+
 	/*
 	 * For compatibility with Windows Servers, if the specified
 	 * attributes have ONLY FILE_ATTRIBUTE_NORMAL set do NOT change
 	 * the file's attributes.
 	 * Note - this is different from TRANS2_SET_PATH/FILE_INFORMATION
 	 */
-	if (dattr != FILE_ATTRIBUTE_NORMAL)
-		smb_node_set_dosattr(node, dattr);
+	if (dattr != FILE_ATTRIBUTE_NORMAL) {
+		attr.sa_dosattr = dattr;
+		attr.sa_mask |= SMB_AT_DOSATTR;
+	}
 
 	/*
 	 * The behaviour when the time field is set to -1
@@ -151,12 +154,11 @@ smb_com_set_information(smb_request_t *sr)
 	 * need not be changed.
 	 */
 	if (last_wtime != 0 && last_wtime != 0xFFFFFFFF) {
-		utime.tv_sec = smb_local2gmt(sr, last_wtime);
-		utime.tv_nsec = 0;
-		smb_node_set_time(node, 0, &utime, 0, 0, SMB_AT_MTIME);
+		attr.sa_vattr.va_mtime.tv_sec = smb_local2gmt(sr, last_wtime);
+		attr.sa_mask |= SMB_AT_MTIME;
 	}
 
-	rc = smb_sync_fsattr(sr, sr->user_cr, node);
+	rc = smb_node_setattr(sr, node, sr->user_cr, NULL, &attr);
 	smb_node_release(node);
 	kmem_free(name, MAXNAMELEN);
 

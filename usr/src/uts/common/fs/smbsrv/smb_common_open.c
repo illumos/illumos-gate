@@ -41,6 +41,7 @@ volatile uint32_t smb_fids = 0;
 static uint32_t smb_open_subr(smb_request_t *);
 extern uint32_t smb_is_executable(char *);
 static void smb_delete_new_object(smb_request_t *);
+static int smb_set_open_timestamps(smb_request_t *, smb_ofile_t *, boolean_t);
 
 static char *smb_pathname_strdup(smb_request_t *, const char *);
 static char *smb_pathname_strcat(char *, const char *);
@@ -242,6 +243,8 @@ smb_common_open(smb_request_t *sr)
  * 1. The creator of a readonly file can write to/modify the size of the file
  * using the original create fid, even though the file will appear as readonly
  * to all other fids and via a CIFS getattr call.
+ * The readonly bit therefore cannot be set in the filesystem until the file
+ * is closed (smb_ofile_close). It is accounted for via ofile and node flags.
  *
  * 2. A setinfo operation (using either an open fid or a path) to set/unset
  * readonly will be successful regardless of whether a creator of a readonly
@@ -305,18 +308,17 @@ smb_open_subr(smb_request_t *sr)
 	smb_error_t	err;
 	boolean_t	is_stream = B_FALSE;
 	int		lookup_flags = SMB_FOLLOW_LINKS;
-	uint32_t	daccess;
 	uint32_t	uniq_fid;
 	smb_pathname_t	*pn = &op->fqi.fq_path;
 
 	is_dir = (op->create_options & FILE_DIRECTORY_FILE) ? 1 : 0;
 
+	/*
+	 * If the object being created or opened is a directory
+	 * the Disposition parameter must be one of FILE_CREATE,
+	 * FILE_OPEN, or FILE_OPEN_IF
+	 */
 	if (is_dir) {
-		/*
-		 * The object being created or opened is a directory,
-		 * and the Disposition parameter must be one of
-		 * FILE_CREATE, FILE_OPEN, or FILE_OPEN_IF
-		 */
 		if ((op->create_disposition != FILE_CREATE) &&
 		    (op->create_disposition != FILE_OPEN_IF) &&
 		    (op->create_disposition != FILE_OPEN)) {
@@ -430,19 +432,27 @@ smb_open_subr(smb_request_t *sr)
 	 * and do not follow links.  Otherwise, follow
 	 * the link to the target.
 	 */
-	daccess = op->desired_access & ~FILE_READ_ATTRIBUTES;
-
-	if (daccess == DELETE)
+	if ((op->desired_access & ~FILE_READ_ATTRIBUTES) == DELETE)
 		lookup_flags &= ~SMB_FOLLOW_LINKS;
 
 	rc = smb_fsop_lookup_name(sr, kcred, lookup_flags,
 	    sr->tid_tree->t_snode, op->fqi.fq_dnode, op->fqi.fq_last_comp,
-	    &op->fqi.fq_fnode, &op->fqi.fq_fattr);
+	    &op->fqi.fq_fnode);
 
 	if (rc == 0) {
 		last_comp_found = B_TRUE;
 		(void) strcpy(op->fqi.fq_od_name,
 		    op->fqi.fq_fnode->od_name);
+		rc = smb_node_getattr(sr, op->fqi.fq_fnode,
+		    &op->fqi.fq_fattr);
+		if (rc != 0) {
+			smb_node_release(op->fqi.fq_fnode);
+			smb_node_release(op->fqi.fq_dnode);
+			SMB_NULL_FQI_NODES(op->fqi);
+			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+			    ERRDOS, ERROR_INTERNAL_ERROR);
+			return (sr->smb_error.status);
+		}
 	} else if (rc == ENOENT) {
 		last_comp_found = B_FALSE;
 		op->fqi.fq_fnode = NULL;
@@ -453,6 +463,7 @@ smb_open_subr(smb_request_t *sr)
 		smbsr_errno(sr, rc);
 		return (sr->smb_error.status);
 	}
+
 
 	/*
 	 * The uniq_fid is a CIFS-server-wide unique identifier for an ofile
@@ -541,7 +552,7 @@ smb_open_subr(smb_request_t *sr)
 		 */
 		if (SMB_PATHFILE_IS_READONLY(sr, node)) {
 			/* Files data only */
-			if (node->attr.sa_vattr.va_type != VDIR) {
+			if (!smb_node_is_dir(node)) {
 				if (op->desired_access & (FILE_WRITE_DATA |
 				    FILE_APPEND_DATA)) {
 					smb_node_release(node);
@@ -566,7 +577,7 @@ smb_open_subr(smb_request_t *sr)
 			if ((!(op->desired_access &
 			    (FILE_WRITE_DATA | FILE_APPEND_DATA |
 			    FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA))) ||
-			    (!smb_sattr_check(node->attr.sa_dosattr,
+			    (!smb_sattr_check(op->fqi.fq_fattr.sa_dosattr,
 			    op->dattr))) {
 				smb_node_unlock(node);
 				smb_node_release(node);
@@ -615,7 +626,7 @@ smb_open_subr(smb_request_t *sr)
 		case FILE_SUPERSEDE:
 		case FILE_OVERWRITE_IF:
 		case FILE_OVERWRITE:
-			if (node->attr.sa_vattr.va_type == VDIR) {
+			if (smb_node_is_dir(node)) {
 				smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
 				smb_node_unlock(node);
 				smb_node_release(node);
@@ -626,45 +637,35 @@ smb_open_subr(smb_request_t *sr)
 				return (NT_STATUS_ACCESS_DENIED);
 			}
 
-			if (node->attr.sa_vattr.va_size != op->dsize) {
-				node->flags &= ~NODE_FLAGS_SET_SIZE;
-				bzero(&new_attr, sizeof (new_attr));
-				new_attr.sa_vattr.va_size = op->dsize;
-				new_attr.sa_mask = SMB_AT_SIZE;
-
-				rc = smb_fsop_setattr(sr, sr->user_cr,
-				    node, &new_attr, &op->fqi.fq_fattr);
-
-				if (rc) {
-					smb_fsop_unshrlock(sr->user_cr, node,
-					    uniq_fid);
-					smb_node_unlock(node);
-					smb_node_release(node);
-					smb_node_release(dnode);
-					SMB_NULL_FQI_NODES(op->fqi);
-					smbsr_errno(sr, rc);
-					return (sr->smb_error.status);
-				}
-
-				op->dsize = op->fqi.fq_fattr.sa_vattr.va_size;
-			}
-
 			op->dattr |= FILE_ATTRIBUTE_ARCHIVE;
+			/* Don't apply readonly bit until smb_ofile_close */
 			if (op->dattr & FILE_ATTRIBUTE_READONLY) {
 				op->created_readonly = B_TRUE;
 				op->dattr &= ~FILE_ATTRIBUTE_READONLY;
 			}
 
-			smb_node_set_dosattr(node, op->dattr);
-			(void) smb_sync_fsattr(sr, sr->user_cr, node);
+			bzero(&new_attr, sizeof (new_attr));
+			new_attr.sa_dosattr = op->dattr;
+			new_attr.sa_vattr.va_size = op->dsize;
+			new_attr.sa_mask = SMB_AT_DOSATTR | SMB_AT_SIZE;
+			rc = smb_fsop_setattr(sr, sr->user_cr, node, &new_attr);
+			if (rc != 0) {
+				smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
+				smb_node_unlock(node);
+				smb_node_release(node);
+				smb_node_release(dnode);
+				SMB_NULL_FQI_NODES(op->fqi);
+				smbsr_errno(sr, rc);
+				return (sr->smb_error.status);
+			}
 
 			/*
-			 * If file is being replaced,
-			 * we should remove existing streams
+			 * If file is being replaced, remove existing streams
 			 */
 			if (SMB_IS_STREAM(node) == 0) {
-				if (smb_fsop_remove_streams(sr, sr->user_cr,
-				    node) != 0) {
+				rc = smb_fsop_remove_streams(sr, sr->user_cr,
+				    node);
+				if (rc != 0) {
 					smb_fsop_unshrlock(sr->user_cr, node,
 					    uniq_fid);
 					smb_node_unlock(node);
@@ -716,22 +717,13 @@ smb_open_subr(smb_request_t *sr)
 		 */
 		smb_node_wrlock(dnode);
 
+		/* Don't apply readonly bit until smb_ofile_close */
+		if (op->dattr & FILE_ATTRIBUTE_READONLY) {
+			op->dattr &= ~FILE_ATTRIBUTE_READONLY;
+			op->created_readonly = B_TRUE;
+		}
+
 		bzero(&new_attr, sizeof (new_attr));
-		new_attr.sa_dosattr = op->dattr;
-		new_attr.sa_mask |= SMB_AT_DOSATTR;
-
-		/*
-		 * A file created with the readonly bit should not
-		 * stop the creator writing to the file until it is
-		 * closed.  Although the readonly bit will not be set
-		 * on the file until it is closed, it will be accounted
-		 * for on other fids and on queries based on the node
-		 * state.
-		 */
-		if (op->dattr & FILE_ATTRIBUTE_READONLY)
-			new_attr.sa_dosattr &= ~FILE_ATTRIBUTE_READONLY;
-
-
 		if ((op->crtime.tv_sec != 0) &&
 		    (op->crtime.tv_sec != UINT_MAX)) {
 
@@ -740,12 +732,14 @@ smb_open_subr(smb_request_t *sr)
 		}
 
 		if (is_dir == 0) {
-			new_attr.sa_dosattr |= FILE_ATTRIBUTE_ARCHIVE;
+			op->dattr |= FILE_ATTRIBUTE_ARCHIVE;
+			new_attr.sa_dosattr = op->dattr;
 			new_attr.sa_vattr.va_type = VREG;
 			new_attr.sa_vattr.va_mode = is_stream ? S_IRUSR :
 			    S_IRUSR | S_IRGRP | S_IROTH |
 			    S_IWUSR | S_IWGRP | S_IWOTH;
-			new_attr.sa_mask |= SMB_AT_TYPE | SMB_AT_MODE;
+			new_attr.sa_mask |=
+			    SMB_AT_DOSATTR | SMB_AT_TYPE | SMB_AT_MODE;
 
 			if (op->dsize) {
 				new_attr.sa_vattr.va_size = op->dsize;
@@ -753,8 +747,7 @@ smb_open_subr(smb_request_t *sr)
 			}
 
 			rc = smb_fsop_create(sr, sr->user_cr, dnode,
-			    op->fqi.fq_last_comp, &new_attr,
-			    &op->fqi.fq_fnode, &op->fqi.fq_fattr);
+			    op->fqi.fq_last_comp, &new_attr, &op->fqi.fq_fnode);
 
 			if (rc != 0) {
 				smb_node_unlock(dnode);
@@ -765,9 +758,6 @@ smb_open_subr(smb_request_t *sr)
 			}
 
 			node = op->fqi.fq_fnode;
-
-			op->fqi.fq_fattr = node->attr;
-
 			smb_node_wrlock(node);
 
 			status = smb_fsop_shrlock(sr->user_cr, node, uniq_fid,
@@ -775,8 +765,7 @@ smb_open_subr(smb_request_t *sr)
 
 			if (status == NT_STATUS_SHARING_VIOLATION) {
 				smb_node_unlock(node);
-				if (created)
-					smb_delete_new_object(sr);
+				smb_delete_new_object(sr);
 				smb_node_release(node);
 				smb_node_unlock(dnode);
 				smb_node_release(dnode);
@@ -785,13 +774,14 @@ smb_open_subr(smb_request_t *sr)
 			}
 		} else {
 			op->dattr |= FILE_ATTRIBUTE_DIRECTORY;
+			new_attr.sa_dosattr = op->dattr;
 			new_attr.sa_vattr.va_type = VDIR;
 			new_attr.sa_vattr.va_mode = 0777;
-			new_attr.sa_mask |= SMB_AT_TYPE | SMB_AT_MODE;
+			new_attr.sa_mask |=
+			    SMB_AT_DOSATTR | SMB_AT_TYPE | SMB_AT_MODE;
 
 			rc = smb_fsop_mkdir(sr, sr->user_cr, dnode,
-			    op->fqi.fq_last_comp, &new_attr,
-			    &op->fqi.fq_fnode, &op->fqi.fq_fattr);
+			    op->fqi.fq_last_comp, &new_attr, &op->fqi.fq_fnode);
 			if (rc != 0) {
 				smb_node_unlock(dnode);
 				smb_node_release(dnode);
@@ -807,50 +797,59 @@ smb_open_subr(smb_request_t *sr)
 		created = B_TRUE;
 		op->action_taken = SMB_OACT_CREATED;
 		node->flags |= NODE_FLAGS_CREATED;
-
-		if (op->dattr & FILE_ATTRIBUTE_READONLY) {
-			op->created_readonly = B_TRUE;
-			op->dattr &= ~FILE_ATTRIBUTE_READONLY;
-		}
 	}
-
-	op->dattr = smb_node_get_dosattr(node);
 
 	if (max_requested) {
 		smb_fsop_eaccess(sr, sr->user_cr, node, &max_allowed);
 		op->desired_access |= max_allowed;
 	}
 
-	/*
-	 * if last_write time was in request and is not 0 or -1,
-	 * use it as file's mtime
-	 */
-	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX)) {
-		smb_node_set_time(node, NULL, &op->mtime, NULL, NULL,
-		    SMB_AT_MTIME);
-		(void) smb_sync_fsattr(sr, sr->user_cr, node);
-	}
+	status = NT_STATUS_SUCCESS;
 
 	of = smb_ofile_open(sr->tid_tree, node, sr->smb_pid, op, SMB_FTYPE_DISK,
 	    uniq_fid, &err);
-
 	if (of == NULL) {
-		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
-		if (created)
-			smb_delete_new_object(sr);
-		smb_node_unlock(node);
-		smb_node_release(node);
-		if (created)
-			smb_node_unlock(dnode);
-		smb_node_release(dnode);
-		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_error(sr, err.status, err.errcls, err.errcode);
-		return (err.status);
+		status = err.status;
 	}
 
-	if (!smb_tree_is_connected(sr->tid_tree)) {
-		smb_ofile_close(of, 0);
-		smb_ofile_release(of);
+	if (status == NT_STATUS_SUCCESS) {
+		if (!smb_tree_is_connected(sr->tid_tree)) {
+			smbsr_error(sr, 0, ERRSRV, ERRinvnid);
+			status = NT_STATUS_UNSUCCESSFUL;
+		}
+	}
+
+	/*
+	 * This MUST be done after ofile creation, so that explicitly
+	 * set timestamps can be remembered on the ofile.
+	 */
+	if (status == NT_STATUS_SUCCESS) {
+		if ((rc = smb_set_open_timestamps(sr, of, created)) != 0) {
+			smbsr_errno(sr, rc);
+			status = sr->smb_error.status;
+		}
+	}
+
+	if (status == NT_STATUS_SUCCESS) {
+		if (smb_node_getattr(sr, node,  &op->fqi.fq_fattr) != 0) {
+			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+			    ERRDOS, ERROR_INTERNAL_ERROR);
+			status = NT_STATUS_INTERNAL_ERROR;
+		}
+	}
+
+	/*
+	 * smb_fsop_unshrlock is a no-op if node is a directory
+	 * smb_fsop_unshrlock is done in smb_ofile_close
+	 */
+	if (status != NT_STATUS_SUCCESS) {
+		if (of == NULL) {
+			smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
+		} else {
+			smb_ofile_close(of, 0);
+			smb_ofile_release(of);
+		}
 		if (created)
 			smb_delete_new_object(sr);
 		smb_node_unlock(node);
@@ -859,8 +858,7 @@ smb_open_subr(smb_request_t *sr)
 			smb_node_unlock(dnode);
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(op->fqi);
-		smbsr_error(sr, 0, ERRSRV, ERRinvnid);
-		return (NT_STATUS_UNSUCCESSFUL);
+		return (status);
 	}
 
 	/*
@@ -871,7 +869,11 @@ smb_open_subr(smb_request_t *sr)
 	    (op->create_options & FILE_WRITE_THROUGH))
 		node->flags |= NODE_FLAGS_WRITE_THROUGH;
 
+	/*
+	 * Set up the fileid and dosattr in open_param for response
+	 */
 	op->fileid = op->fqi.fq_fattr.sa_vattr.va_nodeid;
+	op->dattr = op->fqi.fq_fattr.sa_dosattr;
 
 	/*
 	 * Set up the file type in open_param for the response
@@ -897,6 +899,64 @@ smb_open_subr(smb_request_t *sr)
 	SMB_NULL_FQI_NODES(op->fqi);
 
 	return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * smb_set_open_timestamps
+ *
+ * Last write time:
+ * - If the last_write time specified in the open params is not 0 or -1,
+ *   use it as file's mtime. This will be considered an explicitly set
+ *   timestamps, not reset by subsequent writes.
+ *
+ * Opening existing file (not directory):
+ * - If opening an existing file for overwrite set initial ATIME, MTIME
+ *   & CTIME to now. (This is achieved by setting them as pending then forcing
+ *   an smb_node_setattr() to apply pending times.)
+ *
+ * - Note  If opening an existing file NOT for overwrite, windows would
+ *   set the atime on file close, however setting the atime would cause
+ *   the ARCHIVE attribute to be set, which does not occur on windows,
+ *   so we do not do the atime update.
+ *
+ * Returns: errno
+ */
+static int
+smb_set_open_timestamps(smb_request_t *sr, smb_ofile_t *of, boolean_t created)
+{
+	int		rc = 0;
+	open_param_t	*op = &sr->arg.open;
+	smb_node_t	*node = of->f_node;
+	boolean_t	existing_file, set_times;
+	smb_attr_t	attr;
+
+	bzero(&attr, sizeof (smb_attr_t));
+	set_times = B_FALSE;
+
+	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX)) {
+		attr.sa_mask = SMB_AT_MTIME;
+		attr.sa_vattr.va_mtime = op->mtime;
+		set_times = B_TRUE;
+	}
+
+	existing_file = !(created || smb_node_is_dir(node));
+	if (existing_file) {
+		switch (op->create_disposition) {
+		case FILE_SUPERSEDE:
+		case FILE_OVERWRITE_IF:
+		case FILE_OVERWRITE:
+			smb_ofile_set_write_time_pending(of);
+			set_times = B_TRUE;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (set_times)
+		rc = smb_node_setattr(sr, node, sr->user_cr, of, &attr);
+
+	return (rc);
 }
 
 /*

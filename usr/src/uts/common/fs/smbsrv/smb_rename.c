@@ -44,7 +44,7 @@
 
 static int smb_do_rename(smb_request_t *, smb_fqi_t *, smb_fqi_t *);
 static int smb_make_link(smb_request_t *, smb_fqi_t *, smb_fqi_t *);
-static int smb_rename_check_attr(smb_node_t *, uint16_t);
+static int smb_rename_check_attr(smb_request_t *, smb_node_t *, uint16_t);
 static void smb_rename_set_error(smb_request_t *, int);
 
 /*
@@ -141,7 +141,7 @@ smb_do_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 
 	src_node = src_fqi->fq_fnode;
 
-	if ((rc = smb_rename_check_attr(src_node, src_fqi->fq_sattr)) != 0)
+	if ((rc = smb_rename_check_attr(sr, src_node, src_fqi->fq_sattr)) != 0)
 		goto rename_cleanup_nodes;
 
 	/*
@@ -387,7 +387,7 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 
 	src_fnode = src_fqi->fq_fnode;
 
-	if ((rc = smb_rename_check_attr(src_fnode, src_fqi->fq_sattr)) != 0)
+	if ((rc = smb_rename_check_attr(sr, src_fnode, src_fqi->fq_sattr)) != 0)
 		goto link_cleanup_nodes;
 
 	/*
@@ -462,14 +462,19 @@ link_cleanup_nodes:
 }
 
 static int
-smb_rename_check_attr(smb_node_t *node, uint16_t sattr)
+smb_rename_check_attr(smb_request_t *sr, smb_node_t *node, uint16_t sattr)
 {
-	uint16_t dosattr = smb_node_get_dosattr(node);
+	smb_attr_t attr;
 
-	if ((dosattr & FILE_ATTRIBUTE_HIDDEN) && !(SMB_SEARCH_HIDDEN(sattr)))
+	if (smb_node_getattr(sr, node, &attr) != 0)
+		return (EIO);
+
+	if ((attr.sa_dosattr & FILE_ATTRIBUTE_HIDDEN) &&
+	    !(SMB_SEARCH_HIDDEN(sattr)))
 		return (ESRCH);
 
-	if ((dosattr & FILE_ATTRIBUTE_SYSTEM) && !(SMB_SEARCH_SYSTEM(sattr)))
+	if ((attr.sa_dosattr & FILE_ATTRIBUTE_SYSTEM) &&
+	    !(SMB_SEARCH_SYSTEM(sattr)))
 		return (ESRCH);
 
 	return (0);
@@ -497,7 +502,8 @@ smb_rename_set_error(smb_request_t *sr, int errnum)
 	{ ENOENT, ERROR_FILE_NOT_FOUND,	NT_STATUS_OBJECT_NAME_NOT_FOUND },
 	{ ESRCH,  ERROR_FILE_NOT_FOUND,	NT_STATUS_NO_SUCH_FILE },
 	{ EINVAL, ERROR_INVALID_PARAMETER, NT_STATUS_INVALID_PARAMETER },
-	{ EACCES, ERROR_ACCESS_DENIED,	NT_STATUS_ACCESS_DENIED }
+	{ EACCES, ERROR_ACCESS_DENIED,	NT_STATUS_ACCESS_DENIED },
+	{ EIO,    ERROR_INTERNAL_ERROR,	NT_STATUS_INTERNAL_ERROR }
 	};
 
 	int i;

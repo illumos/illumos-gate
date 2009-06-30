@@ -163,7 +163,7 @@ smb_kmod_share(char *path, char *name)
 }
 
 int
-smb_kmod_unshare(char *name)
+smb_kmod_unshare(char *path, char *name)
 {
 	smb_ioc_share_t *ioc;
 	int rc = ENOMEM;
@@ -171,6 +171,7 @@ smb_kmod_unshare(char *name)
 	ioc = malloc(sizeof (smb_ioc_share_t));
 
 	if (ioc != NULL) {
+		(void) strlcpy(ioc->path, path, sizeof (ioc->path));
 		(void) strlcpy(ioc->name, name, sizeof (ioc->name));
 		rc = smb_kmod_ioctl(SMB_IOC_UNSHARE, &ioc->hdr,
 		    sizeof (smb_ioc_share_t));

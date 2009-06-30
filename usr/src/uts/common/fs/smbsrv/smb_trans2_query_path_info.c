@@ -321,6 +321,8 @@
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_fsops.h>
 
+int smb_query_all_info_filename(smb_tree_t *, smb_node_t *, char *, size_t);
+
 /*
  * Function: int smb_com_trans2_query_path_information(struct smb_request *)
  */
@@ -334,7 +336,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	smb_attr_t		*ap, ret_attr;
 	struct smb_node		*dir_node;
 	struct smb_node		*node;
-	char			*name;
+	char			*name, *namep;
 	char			short_name[SMB_SHORTNAMELEN];
 	char			name83[SMB_SHORTNAMELEN];
 	unsigned char		is_dir;
@@ -369,12 +371,12 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	ap = &ret_attr;
-	name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+	name = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 
 	if ((rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name))
 	    != 0) {
-		kmem_free(name, MAXNAMELEN);
+		kmem_free(name, MAXPATHLEN);
 		if (rc == ENOENT)
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
 			    ERRDOS, ERROR_FILE_NOT_FOUND);
@@ -383,10 +385,10 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, name, &node, ap)) != 0) {
+	if ((rc = smb_fsop_lookup_name(sr, sr->user_cr, SMB_FOLLOW_LINKS,
+	    sr->tid_tree->t_snode, dir_node, name, &node)) != 0) {
 		smb_node_release(dir_node);
-		kmem_free(name, MAXNAMELEN);
+		kmem_free(name, MAXPATHLEN);
 
 		if (rc == ENOENT)
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
@@ -397,14 +399,22 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	smb_node_release(dir_node);
-	(void) strcpy(name, node->od_name);
 
-	dattr = smb_node_get_dosattr(node);
-	if (ap->sa_vattr.va_type == VDIR) {
+	if (smb_node_getattr(sr, node, ap) != 0) {
+		smb_node_release(node);
+		kmem_free(name, MAXPATHLEN);
+		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+		    ERRDOS, ERROR_INTERNAL_ERROR);
+		return (SDRC_ERROR);
+	}
+
+	(void) strcpy(name, node->od_name);
+	namep = node->od_name;
+	dattr = ap->sa_dosattr;
+
+	if (smb_node_is_dir(node)) {
 		is_dir = 1;
-		/*
-		 * Win2K and NT reply with the size of directory file.
-		 */
+		/* Win2K and NT reply with the size of directory file */
 		datasz = allocsz = 0;
 	} else {
 		is_dir = 0;
@@ -491,21 +501,25 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_EA_INFO:
+	case SMB_FILE_EA_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 		break;
 
 	case SMB_QUERY_FILE_NAME_INFO:
-		/*
-		 * If you have problems here, see the changes
-		 * in smb_trans2_query_file_information.c.
-		 */
+	case SMB_FILE_NAME_INFORMATION:
+		/* If the leading \ is missing, add it.  */
+		if (*namep != '\\') {
+			(void) snprintf(name, MAXNAMELEN, "\\%s", namep);
+			namep = name;
+		}
+		len = smb_ascii_or_unicode_strlen(sr, namep);
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu", sr,
-		    smb_ascii_or_unicode_strlen(sr, name), name);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu", sr, len, namep);
 		break;
 
 	case SMB_QUERY_FILE_ALL_INFO:
+	case SMB_FILE_ALL_INFORMATION:
 		/*
 		 * The reply of this information level on the
 		 * wire doesn't match with protocol specification.
@@ -520,6 +534,15 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		 * AlignmentRequirement in spec. that aren't sent
 		 * on the wire.
 		 */
+		rc = smb_query_all_info_filename(sr->tid_tree, node,
+		    name, MAXPATHLEN);
+		if (rc != 0) {
+			smbsr_errno(sr, rc);
+			smb_node_release(node);
+			kmem_free(name, MAXPATHLEN);
+			return (SDRC_ERROR);
+		}
+
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.qqlbb2.l",
 		    &ap->sa_crtime,
@@ -533,11 +556,13 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		    0,
 		    is_dir,
 		    0);
+
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu", sr,
 		    smb_ascii_or_unicode_strlen(sr, name), name);
 		break;
 
 	case SMB_QUERY_FILE_ALT_NAME_INFO:
+	case SMB_FILE_ALT_NAME_INFORMATION:
 		/*
 		 * Conform to the rule used by Windows NT/2003 servers.
 		 * Shortname is created only if either the filename or
@@ -558,11 +583,13 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_STREAM_INFO:
+	case SMB_FILE_STREAM_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		smb_encode_stream_info(sr, xa, node, ap);
 		break;
 
 	case SMB_QUERY_FILE_COMPRESSION_INFO:
+	case SMB_FILE_COMPRESSION_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb,
 		    "qwbbb3.", datasz, 0, 0, 0, 0);
@@ -589,12 +616,57 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 
 	default:
 		smb_node_release(node);
-		kmem_free(name, MAXNAMELEN);
+		kmem_free(name, MAXPATHLEN);
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
 		return (SDRC_ERROR);
 	}
 
 	smb_node_release(node);
-	kmem_free(name, MAXNAMELEN);
+	kmem_free(name, MAXPATHLEN);
 	return (SDRC_SUCCESS);
+}
+
+
+/*
+ * smb_query_all_info_filename
+ *
+ * This format of filename is only used by the ALL_INFO level.
+ *
+ * Determine the absolute pathname of 'node' within the share.
+ * For example if the node represents file "test1.txt" in directory
+ * "dir1" on share "share1", the path would be: \share1\dir1\test1.txt
+ *
+ * If node represents a named stream, construct the pathname for the
+ * associated unnamed stream then append the stream name.
+ */
+int
+smb_query_all_info_filename(smb_tree_t *tree, smb_node_t *node,
+    char *buf, size_t buflen)
+{
+	char *sharename = tree->t_sharename;
+	int rc;
+	size_t len;
+	vnode_t *vp;
+
+	len = snprintf(buf, buflen, "\\%s", sharename);
+	if (len == (buflen - 1))
+		return (ENAMETOOLONG);
+
+	buf += len;
+	buflen -= len;
+
+	if (SMB_IS_STREAM(node))
+		vp = node->unnamed_stream_node->vp;
+	else
+		vp = node->vp;
+
+	rc = vnodetopath(tree->t_snode->vp, vp, buf, buflen, kcred);
+	if (rc == 0) {
+		(void) strsubst(buf, '/', '\\');
+
+		if (SMB_IS_STREAM(node))
+			(void) strlcat(buf, node->od_name, buflen);
+	}
+
+	return (rc);
 }

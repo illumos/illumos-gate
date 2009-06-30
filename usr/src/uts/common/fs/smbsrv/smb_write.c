@@ -461,7 +461,7 @@ smb_com_write_andx(smb_request_t *sr)
 static int
 smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 {
-	struct smb_ofile *ofile = sr->fid_ofile;
+	smb_ofile_t *ofile = sr->fid_ofile;
 	smb_node_t *node;
 	int stability = 0;
 	uint32_t lcount;
@@ -471,7 +471,7 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 	case STYPE_DISKTREE:
 		node = ofile->f_node;
 
-		if (node->attr.sa_vattr.va_type != VDIR) {
+		if (!smb_node_is_dir(node)) {
 			rc = smb_lock_range_access(sr, node, param->rw_offset,
 			    param->rw_count, B_TRUE);
 			if (rc != NT_STATUS_SUCCESS) {
@@ -487,19 +487,12 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 		}
 
 		rc = smb_fsop_write(sr, sr->user_cr, node,
-		    &param->rw_vdb.vdb_uio, &lcount, &node->attr, stability);
+		    &param->rw_vdb.vdb_uio, &lcount, stability);
 
 		if (rc)
 			return (rc);
 
-		node->flags |= NODE_FLAGS_SYNCATIME;
-
-		if (node->flags & NODE_FLAGS_SET_SIZE) {
-			if ((param->rw_offset + lcount) >= node->n_size) {
-				node->flags &= ~NODE_FLAGS_SET_SIZE;
-				node->n_size = param->rw_offset + lcount;
-			}
-		}
+		smb_ofile_set_write_time_pending(ofile);
 
 		param->rw_count = lcount;
 		break;
@@ -529,38 +522,27 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
  * Truncate a disk file to the specified offset.
  * Typically, w_count will be zero here.
  *
+ * Note that smb_write_andx cannot be used to reduce the file size so,
+ * if this is required, smb_write is called with a count of zero and
+ * the appropriate file length in offset. The file should be resized
+ * to the length specified by the offset.
+ *
  * Returns errno values.
  */
 static int
 smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
 {
-	struct smb_ofile *ofile = sr->fid_ofile;
+	smb_ofile_t *ofile = sr->fid_ofile;
 	smb_node_t *node = ofile->f_node;
-	boolean_t append_only = B_FALSE;
+	smb_attr_t attr;
 	uint32_t status;
 	int rc;
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0)
 		return (0);
 
-	status = smb_ofile_access(sr->fid_ofile, sr->user_cr, FILE_WRITE_DATA);
-	if (status != NT_STATUS_SUCCESS) {
-		status = smb_ofile_access(sr->fid_ofile, sr->user_cr,
-		    FILE_APPEND_DATA);
-		if (status != NT_STATUS_SUCCESS)
-			return (EACCES);
-		else
-			append_only = B_TRUE;
-	}
-
 	mutex_enter(&node->n_mutex);
-
-	if (append_only && (param->rw_offset < node->n_size)) {
-		mutex_exit(&node->n_mutex);
-		return (EACCES);
-	}
-
-	if (node->attr.sa_vattr.va_type != VDIR) {
+	if (!smb_node_is_dir(node)) {
 		status = smb_lock_range_access(sr, node, param->rw_offset,
 		    param->rw_count, B_TRUE);
 		if (status != NT_STATUS_SUCCESS) {
@@ -570,52 +552,17 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
 			return (EACCES);
 		}
 	}
-
-	node->flags |= NODE_FLAGS_SET_SIZE;
-	node->n_size = param->rw_offset;
-
 	mutex_exit(&node->n_mutex);
 
-	if ((rc = smb_set_file_size(sr, node)) != 0)
+	bzero(&attr, sizeof (smb_attr_t));
+	attr.sa_mask = SMB_AT_SIZE;
+	attr.sa_vattr.va_size = param->rw_offset;
+	rc = smb_node_setattr(sr, node, sr->user_cr, ofile, &attr);
+	if (rc != 0)
 		return (rc);
 
 	mutex_enter(&ofile->f_mutex);
 	ofile->f_seek_pos = param->rw_offset + param->rw_count;
 	mutex_exit(&ofile->f_mutex);
 	return (0);
-}
-
-/*
- * Set the file size using the value in the node. The file will only be
- * updated if NODE_FLAGS_SET_SIZE is set.  It is safe to pass a null node
- * pointer, we just return success.
- *
- * The node attributes are refreshed here from the file system. So any
- * attributes that are affected by file size changes, i.e. the mtime,
- * will be current.
- *
- * Note that smb_write_andx cannot be used to reduce the file size so,
- * if this is required, smb_write is called with a count of zero and
- * the appropriate file length in offset. The file should be resized
- * to the length specified by the offset.
- */
-int
-smb_set_file_size(smb_request_t *sr, smb_node_t *node)
-{
-	smb_attr_t new_attr;
-
-	if (node == NULL)
-		return (0);
-
-	if ((node->flags & NODE_FLAGS_SET_SIZE) == 0)
-		return (0);
-
-	node->flags &= ~NODE_FLAGS_SET_SIZE;
-
-	bzero(&new_attr, sizeof (new_attr));
-	new_attr.sa_vattr.va_size = node->n_size;
-	new_attr.sa_mask = SMB_AT_SIZE;
-
-	return (smb_fsop_setattr(sr, sr->user_cr, node, &new_attr,
-	    &node->attr));
 }

@@ -114,23 +114,29 @@ smb_com_query_information(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if ((rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, name, &node, &attr)) != 0) {
+	if ((rc = smb_fsop_lookup_name(sr, sr->user_cr, SMB_FOLLOW_LINKS,
+	    sr->tid_tree->t_snode, dir_node, name, &node)) != 0) {
 		smb_node_release(dir_node);
 		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
 	smb_node_release(dir_node);
+	rc = smb_node_getattr(sr, node, &attr);
+	smb_node_release(node);
 
-	dattr = smb_node_get_dosattr(node);
-	mtime = smb_node_get_mtime(node);
+	if (rc != 0) {
+		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+		    ERRDOS, ERROR_INTERNAL_ERROR);
+		return (SDRC_ERROR);
+	}
+
+	dattr = attr.sa_dosattr & FILE_ATTRIBUTE_MASK;
+	mtime = &attr.sa_vattr.va_mtime;
 	write_time = smb_gmt2local(sr, mtime->tv_sec);
-	datasz = smb_node_get_size(node, &node->attr);
+	datasz = attr.sa_vattr.va_size;
 	if (datasz > UINT_MAX)
 		datasz = UINT_MAX;
-
-	smb_node_release(node);
 
 	rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
 	    10, dattr, write_time, (uint32_t)datasz, 0);

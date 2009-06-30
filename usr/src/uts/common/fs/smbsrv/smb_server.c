@@ -882,7 +882,6 @@ smb_server_share_export(smb_ioc_share_t *ioc)
 	int		error = 0;
 	smb_node_t	*fnode = NULL;
 	smb_node_t	*dnode;
-	smb_attr_t	ret_attr;
 	char		last_comp[MAXNAMELEN];
 	smb_request_t	*sr;
 
@@ -917,7 +916,7 @@ smb_server_share_export(smb_ioc_share_t *ioc)
 	}
 
 	error = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sv->si_root_smb_node, dnode, last_comp, &fnode, &ret_attr);
+	    sv->si_root_smb_node, dnode, last_comp, &fnode);
 
 	smb_node_release(dnode);
 
@@ -980,7 +979,6 @@ smb_server_share_unexport(smb_ioc_share_t *ioc)
 	smb_unexport_t	*ux;
 	smb_node_t	*fnode = NULL;
 	smb_node_t	*dnode;
-	smb_attr_t	ret_attr;
 	char		last_comp[MAXNAMELEN];
 	int		rc;
 
@@ -1016,7 +1014,7 @@ smb_server_share_unexport(smb_ioc_share_t *ioc)
 	}
 
 	rc = smb_fsop_lookup(sr, kcred, SMB_FOLLOW_LINKS, sv->si_root_smb_node,
-	    dnode, last_comp, &fnode, &ret_attr);
+	    dnode, last_comp, &fnode);
 
 	smb_node_release(dnode);
 	smb_request_free(sr);

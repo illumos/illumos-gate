@@ -2016,49 +2016,6 @@ smb_kstrdup(const char *s, size_t n)
 }
 
 /*
- * smb_sync_fsattr
- *
- * Sync file's attributes with file system.
- * The sync takes place based on node->what and node->flags
- * values.
- */
-int
-smb_sync_fsattr(struct smb_request *sr, cred_t *cr, smb_node_t *node)
-{
-	uint32_t what;
-	int rc = 0;
-
-	if (node->flags & NODE_FLAGS_SET_SIZE) {
-		node->flags &= ~NODE_FLAGS_SET_SIZE;
-		node->what |= SMB_AT_SIZE;
-		node->attr.sa_vattr.va_size = node->n_size;
-	}
-
-	if (node->what) {
-		/*
-		 * This is to prevent another thread from starting
-		 * a setattr should this one go to sleep
-		 */
-		what = node->what;
-		node->what = 0;
-
-		node->attr.sa_mask = what;
-
-		rc = smb_fsop_setattr(sr, cr, node, &node->attr, &node->attr);
-
-		if (rc) {
-			/* setattr failed, restore the dirty state? */
-			node->what = what;
-		} else {
-			if (what & SMB_AT_ATIME)
-				node->flags &= ~NODE_FLAGS_SYNCATIME;
-		}
-	}
-
-	return (rc);
-}
-
-/*
  * smb_cred_create_privs
  *
  * Creates a duplicate credential that contains system privileges for

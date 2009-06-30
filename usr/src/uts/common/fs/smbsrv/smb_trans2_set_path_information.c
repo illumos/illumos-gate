@@ -111,11 +111,10 @@ smb_sdrc_t
 smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	smb_trans2_setinfo_t *info;
-	smb_attr_t ret_attr;
 	struct smb_node *dir_node;
 	struct smb_node *ret_snode;
 	smb_error_t smberr;
-	DWORD status;
+	uint32_t status;
 	int rc = 0;
 
 	info = kmem_zalloc(sizeof (smb_trans2_setinfo_t), KM_SLEEP);
@@ -145,8 +144,8 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dir_node, info->name, &ret_snode, &ret_attr);
+	rc = smb_fsop_lookup_name(sr, sr->user_cr, SMB_FOLLOW_LINKS,
+	    sr->tid_tree->t_snode, dir_node, info->name, &ret_snode);
 
 	smb_node_release(dir_node);
 

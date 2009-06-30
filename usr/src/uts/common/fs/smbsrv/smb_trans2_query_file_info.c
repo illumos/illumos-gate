@@ -52,6 +52,8 @@
 #include <smbsrv/smb_fsops.h>
 
 uint32_t smb_pad_align(uint32_t offset, uint32_t align);
+extern int smb_query_all_info_filename(smb_tree_t *, smb_node_t *,
+    char *, size_t);
 
 
 /*
@@ -69,30 +71,26 @@ uint32_t smb_pad_align(uint32_t offset, uint32_t align);
  * delete-on-close status returned by Trans2QueryFileInfo will be set
  * immediately.
  */
-
 smb_sdrc_t
 smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	static smb_attr_t pipe_attr;
+	smb_attr_t file_attr;
 	unsigned short	infolev, dattr = 0;
 	u_offset_t	datasz = 0, allocsz = 0;
 	smb_attr_t	*ap = NULL;
 	char		*namep = NULL;
 	char		*filename = NULL, *alt_nm_ptr = NULL;
 	int		filename_len = 0;
-	struct smb_node	*dir_snode = NULL;
+	smb_node_t	*node = NULL; /* only set for SMB_FTYPE_DISK files */
+	smb_node_t	*dir_snode = NULL;
 	timestruc_t	*creation_time = NULL;
 	unsigned char	delete_on_close = 0;
 	unsigned char	is_dir = 0;
 	char		*filebuf = NULL;
-
-	/*
-	 *  buffer for mangled name and shortname are allocated
-	 *  much higher than required space. Optimization
-	 *  here should be performed along with mangled_name & shortname
-	 *  of query path information.
-	 */
-	char *mangled_name = 0;
+	char		short_name[SMB_SHORTNAMELEN];
+	char		name83[SMB_SHORTNAMELEN];
+	int		rc;
 
 	if (smb_mbc_decodef(&xa->req_param_mb, "ww", &sr->smb_fid,
 	    &infolev) != 0) {
@@ -108,10 +106,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 	switch (sr->fid_ofile->f_ftype) {
 	case SMB_FTYPE_DISK:
 		{
-		/*
-		 * The node is only valid for SMB_FTYPE_DISK files.
-		 */
-		struct smb_node *node = sr->fid_ofile->f_node;
+		/* The node is only valid for SMB_FTYPE_DISK files. */
+		node = sr->fid_ofile->f_node;
 
 		/*
 		 * For some reason NT will not show the security tab in the root
@@ -129,11 +125,17 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		if (strcmp(namep, ".") == 0 && filename_len == 1)
 			filename_len = 2;
 
-		creation_time = smb_node_get_crtime(node);
-		dattr = smb_node_get_dosattr(node);
+		ap = &file_attr;
+		if (smb_node_getattr(sr, node, ap) != 0) {
+			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+			    ERRDOS, ERROR_INTERNAL_ERROR);
+			return (SDRC_ERROR);
+		}
 
-		ap = &node->attr;
-		if (ap->sa_vattr.va_type == VDIR) {
+		dattr = ap->sa_dosattr;
+		creation_time = &ap->sa_crtime;
+
+		if (smb_node_is_dir(node)) {
 			is_dir = 1;
 			datasz = allocsz = 0;
 		} else {
@@ -172,8 +174,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	filebuf = kmem_alloc(MAXNAMELEN+1, KM_SLEEP);
-	mangled_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	filebuf = kmem_alloc(MAXPATHLEN+1, KM_SLEEP);
 
 	switch (infolev) {
 	case SMB_FILE_ACCESS_INFORMATION:
@@ -219,6 +220,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	case SMB_INFO_QUERY_EAS_FROM_LIST:
 	case SMB_INFO_QUERY_ALL_EAS:
+	case SMB_FILE_EA_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 		break;
@@ -263,6 +265,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_NAME_INFO:
+	case SMB_FILE_NAME_INFORMATION:
 		/*
 		 * It looks like NT doesn't know what to do with the name "."
 		 * so we convert it to "\\" to indicate the root directory.
@@ -290,6 +293,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_ALL_INFO:
+	case SMB_FILE_ALL_INFORMATION:
 		/*
 		 * The reply of this information level on the
 		 * wire doesn't match with protocol specification.
@@ -304,6 +308,19 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		 * AlignmentRequirement in spec. that aren't sent
 		 * on the wire.
 		 */
+		if (node) {
+			rc = smb_query_all_info_filename(sr->tid_tree, node,
+			    filebuf, MAXPATHLEN);
+			if (rc != 0) {
+				smbsr_errno(sr, rc);
+				kmem_free(filebuf, MAXPATHLEN+1);
+				return (SDRC_ERROR);
+			}
+			filename = filebuf;
+			filename_len = smb_ascii_or_unicode_strlen(sr,
+			    filename);
+		}
+
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.qqlbb2.l",
 		    creation_time,
@@ -317,37 +334,38 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		    delete_on_close,
 		    is_dir,
 		    0);
+
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu",
 		    sr, filename_len, filename);
 		break;
 
 	case SMB_QUERY_FILE_ALT_NAME_INFO:
+	case SMB_FILE_ALT_NAME_INFORMATION:
 		/*
 		 * Conform to the rule used by Windows NT/2003 servers.
-		 * Shortname is created only if either the
-		 * filename or extension portion of a file is made up of
-		 * mixed case. This is handled in os/libnt/nt_mangle_name.c.
+		 * Shortname is created only if either the filename or
+		 * extension portion of a file is made up of mixed case.
 		 *
 		 * If the shortname is generated, it will be returned as
-		 * the alternative name.  Otherwise, converts the original
-		 * name to all upper-case and returns it as the alternative
-		 * name.  This is how Windows NT/2003 servers behave.  However,
-		 * Windows 2000 seems to preserve the case of the original
-		 * name, and returns it as the alternative name.
+		 * the alternative name.  Otherwise, convert the original
+		 * name to all upper-case and return it as the alternative
+		 * name.
 		 */
-		alt_nm_ptr = (*mangled_name == 0) ?
-		    utf8_strupr(filename) : mangled_name;
+		(void) smb_mangle_name(ap->sa_vattr.va_nodeid,
+		    filename, short_name, name83, 0);
+		alt_nm_ptr = (*short_name == 0) ?
+		    utf8_strupr(filename) : short_name;
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lU", sr,
 		    mts_wcequiv_strlen(alt_nm_ptr), alt_nm_ptr);
 		break;
 
 	case SMB_QUERY_FILE_STREAM_INFO:
+	case SMB_FILE_STREAM_INFORMATION:
 		{
 		struct smb_node *node = sr->fid_ofile->f_node;
 		if (dir_snode == NULL) {
-			kmem_free(filebuf, MAXNAMELEN+1);
-			kmem_free(mangled_name, MAXNAMELEN);
+			kmem_free(filebuf, MAXPATHLEN+1);
 			smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 			return (SDRC_ERROR);
 		}
@@ -367,9 +385,16 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 		}
 	case SMB_QUERY_FILE_COMPRESSION_INFO:
+	case SMB_FILE_COMPRESSION_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "qwbbb3.",
 		    datasz, 0, 0, 0, 0);
+		break;
+
+	case SMB_FILE_INTERNAL_INFORMATION:
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "q",
+		    ap->sa_vattr.va_nodeid);
 		break;
 
 	case SMB_FILE_ATTR_TAG_INFORMATION:
@@ -386,14 +411,12 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	default:
-		kmem_free(filebuf, MAXNAMELEN+1);
-		kmem_free(mangled_name, MAXNAMELEN);
+		kmem_free(filebuf, MAXPATHLEN+1);
 		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
 		return (SDRC_ERROR);
 	}
 
-	kmem_free(filebuf, MAXNAMELEN+1);
-	kmem_free(mangled_name, MAXNAMELEN);
+	kmem_free(filebuf, MAXPATHLEN+1);
 	return (SDRC_SUCCESS);
 }
 
@@ -457,7 +480,7 @@ smb_encode_stream_info(
 	uint32_t next_offset;
 	uint32_t stream_nlen;
 	uint32_t pad;
-	u_offset_t datasz;
+	u_offset_t datasz, allocsz;
 	boolean_t is_dir;
 	smb_streaminfo_t *sinfo, *sinfo_next;
 	int rc = 0;
@@ -470,6 +493,7 @@ smb_encode_stream_info(
 	sinfo_next = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
 	is_dir = (attr->sa_vattr.va_type == VDIR);
 	datasz = attr->sa_vattr.va_size;
+	allocsz = attr->sa_vattr.va_nblocks * DEV_BSIZE;
 
 	odid = smb_odir_openat(sr, fnode);
 	if (odid != 0)
@@ -494,7 +518,7 @@ smb_encode_stream_info(
 			    smb_ascii_or_unicode_null_len(sr);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu", sr,
-		    next_offset, stream_nlen, datasz, datasz, stream_name);
+		    next_offset, stream_nlen, datasz, allocsz, stream_name);
 	}
 
 	/*
@@ -518,7 +542,7 @@ smb_encode_stream_info(
 		}
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu#.",
 		    sr, next_offset, stream_nlen,
-		    sinfo->si_size, sinfo->si_size,
+		    sinfo->si_size, sinfo->si_alloc_size,
 		    sinfo->si_name, pad);
 
 		(void) memcpy(sinfo, sinfo_next, sizeof (smb_streaminfo_t));

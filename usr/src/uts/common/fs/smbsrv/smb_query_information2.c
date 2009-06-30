@@ -81,10 +81,9 @@ smb_sdrc_t
 smb_com_query_information2(smb_request_t *sr)
 {
 	smb_node_t *node;
-	smb_attr_t *attr;
+	smb_attr_t attr;
 	u_offset_t size64;
 	uint32_t datasz, allocsz;
-	uint16_t dattr;
 	int rc;
 
 	smbsr_lookup_file(sr);
@@ -99,26 +98,29 @@ smb_com_query_information2(smb_request_t *sr)
 	}
 
 	node = sr->fid_ofile->f_node;
-	attr = &node->attr;
+	if (smb_node_getattr(sr, node, &attr) != 0) {
+		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+		    ERRDOS, ERROR_INTERNAL_ERROR);
+		return (SDRC_ERROR);
+	}
 
-	dattr = smb_node_get_dosattr(node);
-	size64 = smb_node_get_size(node, attr);
+	size64 =  attr.sa_vattr.va_size;
 	datasz = (size64 > UINT_MAX) ? UINT_MAX : (uint32_t)size64;
 
-	size64 = attr->sa_vattr.va_nblocks * DEV_BSIZE;
+	size64 = attr.sa_vattr.va_nblocks * DEV_BSIZE;
 	allocsz = (size64 > UINT_MAX) ? UINT_MAX : (uint32_t)size64;
 
 	rc = smbsr_encode_result(sr, 11, 0, "byyyllww",
-	    11,						/* wct */
-	    smb_gmt2local(sr, attr->sa_crtime.tv_sec),
+	    11,				/* wct */
+	    smb_gmt2local(sr, attr.sa_crtime.tv_sec),
 	    /* LastAccessTime */
-	    smb_gmt2local(sr, attr->sa_vattr.va_atime.tv_sec),
+	    smb_gmt2local(sr, attr.sa_vattr.va_atime.tv_sec),
 	    /* LastWriteTime */
-	    smb_gmt2local(sr, attr->sa_vattr.va_mtime.tv_sec),
+	    smb_gmt2local(sr, attr.sa_vattr.va_mtime.tv_sec),
 	    datasz,
 	    allocsz,
-	    dattr,					/* FileAttributes */
-	    0);						/* bcc */
+	    attr.sa_dosattr & FILE_ATTRIBUTE_MASK,
+	    0);				/* bcc */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }

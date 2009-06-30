@@ -32,7 +32,7 @@ static int smb_delete_check_path(smb_request_t *, boolean_t *);
 static int smb_delete_single_file(smb_request_t *, smb_error_t *);
 static int smb_delete_multiple_files(smb_request_t *, smb_error_t *);
 static int smb_delete_find_fname(smb_request_t *, smb_odir_t *);
-static int smb_delete_check_attr(smb_request_t *, smb_error_t *);
+static int smb_delete_check_dosattr(smb_request_t *, smb_error_t *);
 static int smb_delete_remove_file(smb_request_t *, smb_error_t *);
 
 static void smb_delete_error(smb_error_t *, uint32_t, uint16_t, uint16_t);
@@ -219,7 +219,6 @@ static int
 smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
 {
 	smb_fqi_t *fqi;
-	smb_attr_t ret_attr;
 	uint32_t status;
 
 	fqi = &sr->arg.dirop.fqi;
@@ -232,13 +231,13 @@ smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
 	}
 
 	if (smb_fsop_lookup_name(sr, sr->user_cr, 0, sr->tid_tree->t_snode,
-	    fqi->fq_dnode, fqi->fq_last_comp, &fqi->fq_fnode, &ret_attr) != 0) {
+	    fqi->fq_dnode, fqi->fq_last_comp, &fqi->fq_fnode) != 0) {
 		smb_delete_error(err, NT_STATUS_OBJECT_NAME_NOT_FOUND,
 		    ERRDOS, ERROR_FILE_NOT_FOUND);
 		return (-1);
 	}
 
-	if (smb_delete_check_attr(sr, err) != 0) {
+	if (smb_delete_check_dosattr(sr, err) != 0) {
 		smb_node_release(fqi->fq_fnode);
 		return (-1);
 	}
@@ -263,7 +262,7 @@ smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
  *    - The search ends (but not an error) if a directory is
  *      matched and the request's search did not include
  *      directories.
- *    - Otherwise, if smb_delete_check_attr fails the file
+ *    - Otherwise, if smb_delete_check_dosattr fails the file
  *      is skipped and the search continues (at step 1)
  * 3. delete the file
  *
@@ -275,7 +274,6 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 {
 	int rc, deleted = 0;
 	smb_fqi_t *fqi;
-	smb_attr_t ret_attr;
 	uint16_t odid;
 	smb_odir_t *od;
 
@@ -283,7 +281,7 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 
 	/*
 	 * Specify all search attributes (SMB_SEARCH_ATTRIBUTES) so that
-	 * delete-specific checking can be done (smb_delete_check_attr).
+	 * delete-specific checking can be done (smb_delete_check_dosattr).
 	 */
 	odid = smb_odir_open(sr, fqi->fq_path.pn_path,
 	    SMB_SEARCH_ATTRIBUTES, 0);
@@ -300,11 +298,11 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 
 		rc = smb_fsop_lookup_name(sr, sr->user_cr, 0,
 		    sr->tid_tree->t_snode, fqi->fq_dnode,
-		    fqi->fq_od_name, &fqi->fq_fnode, &ret_attr);
+		    fqi->fq_od_name, &fqi->fq_fnode);
 		if (rc != 0)
 			break;
 
-		if (smb_delete_check_attr(sr, err) != 0) {
+		if (smb_delete_check_dosattr(sr, err) != 0) {
 			smb_node_release(fqi->fq_fnode);
 			if (err->status == NT_STATUS_CANNOT_DELETE) {
 				smb_odir_close(od);
@@ -406,7 +404,7 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
 }
 
 /*
- * smb_delete_check_attr
+ * smb_delete_check_dosattr
  *
  * Check file's dos atributes to ensure that
  * 1. the file is not a directory - NT_STATUS_FILE_IS_A_DIRECTORY
@@ -419,18 +417,24 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
  *         -1 - err populated with error details
  */
 static int
-smb_delete_check_attr(smb_request_t *sr, smb_error_t *err)
+smb_delete_check_dosattr(smb_request_t *sr, smb_error_t *err)
 {
 	smb_fqi_t *fqi;
 	smb_node_t *node;
-	uint16_t dosattr, sattr;
+	smb_attr_t attr;
+	uint16_t sattr;
 
 	fqi = &sr->arg.dirop.fqi;
 	sattr = fqi->fq_sattr;
 	node = fqi->fq_fnode;
-	dosattr = smb_node_get_dosattr(node);
 
-	if (dosattr & FILE_ATTRIBUTE_DIRECTORY) {
+	if (smb_node_getattr(sr, node, &attr) != 0) {
+		smb_delete_error(err, NT_STATUS_INTERNAL_ERROR,
+		    ERRDOS, ERROR_INTERNAL_ERROR);
+		return (-1);
+	}
+
+	if (attr.sa_dosattr & FILE_ATTRIBUTE_DIRECTORY) {
 		smb_delete_error(err, NT_STATUS_FILE_IS_A_DIRECTORY,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (-1);
@@ -442,13 +446,15 @@ smb_delete_check_attr(smb_request_t *sr, smb_error_t *err)
 		return (-1);
 	}
 
-	if ((dosattr & FILE_ATTRIBUTE_HIDDEN) && !(SMB_SEARCH_HIDDEN(sattr))) {
+	if ((attr.sa_dosattr & FILE_ATTRIBUTE_HIDDEN) &&
+	    !(SMB_SEARCH_HIDDEN(sattr))) {
 		smb_delete_error(err, NT_STATUS_NO_SUCH_FILE,
 		    ERRDOS, ERROR_FILE_NOT_FOUND);
 		return (-1);
 	}
 
-	if ((dosattr & FILE_ATTRIBUTE_SYSTEM) && !(SMB_SEARCH_SYSTEM(sattr))) {
+	if ((attr.sa_dosattr & FILE_ATTRIBUTE_SYSTEM) &&
+	    !(SMB_SEARCH_SYSTEM(sattr))) {
 		smb_delete_error(err, NT_STATUS_NO_SUCH_FILE,
 		    ERRDOS, ERROR_FILE_NOT_FOUND);
 		return (-1);

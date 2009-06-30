@@ -135,7 +135,6 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 	char *snapname;
 	char *nodepath;
 	char gmttoken[SMB_VSS_GMT_SIZE];
-	smb_attr_t attr;
 	vnode_t *fsrootvp;
 	vnode_t *vp = NULL;
 	int err = 0;
@@ -196,7 +195,7 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 		}
 
 		*vss_root_node = smb_node_lookup(sr, NULL, kcred, vp,
-		    gmttoken, cur_node, NULL, &attr);
+		    gmttoken, cur_node, NULL);
 		VN_RELE(vp);
 
 		if (*vss_root_node == NULL) {
@@ -212,7 +211,7 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 
 		if (vp) {
 			*vss_cur_node = smb_node_lookup(sr, NULL, kcred, vp,
-			    gmttoken, cur_node, NULL, &attr);
+			    gmttoken, cur_node, NULL);
 			VN_RELE(vp);
 
 			if (*vss_cur_node != NULL) {

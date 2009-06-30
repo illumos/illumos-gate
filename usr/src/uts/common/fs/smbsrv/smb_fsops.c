@@ -43,13 +43,13 @@ extern void smb_fem_oplock_uninstall(smb_node_t *);
 extern int smb_vop_other_opens(vnode_t *, int);
 
 static int smb_fsop_create_stream(smb_request_t *, cred_t *, smb_node_t *,
-    char *, char *, int, smb_attr_t *, smb_node_t **, smb_attr_t *);
+    char *, char *, int, smb_attr_t *, smb_node_t **);
 
 static int smb_fsop_create_file(smb_request_t *, cred_t *, smb_node_t *,
-    char *, int, smb_attr_t *, smb_node_t **, smb_attr_t *);
+    char *, int, smb_attr_t *, smb_node_t **);
 
 static int smb_fsop_create_with_sd(smb_request_t *, cred_t *, smb_node_t *,
-    char *, smb_attr_t *, smb_node_t **, smb_attr_t *, smb_fssd_t *);
+    char *, smb_attr_t *, smb_node_t **, smb_fssd_t *);
 
 static int smb_fsop_sdinherit(smb_request_t *, smb_node_t *, smb_fssd_t *);
 
@@ -152,8 +152,7 @@ smb_fsop_oplock_uninstall(smb_node_t *node)
 static int
 smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
     smb_node_t *dnode, char *name,
-    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr,
-    smb_fssd_t *fs_sd)
+    smb_attr_t *attr, smb_node_t **ret_snode, smb_fssd_t *fs_sd)
 {
 	vsecattr_t *vsap;
 	vsecattr_t vsecattr;
@@ -243,7 +242,7 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
-			    name, dnode, NULL, ret_attr);
+			    name, dnode, NULL);
 
 			if (*ret_snode == NULL)
 				rc = ENOMEM;
@@ -272,7 +271,7 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 			return (rc);
 
 		*ret_snode = smb_node_lookup(sr, &sr->arg.open, cr, vp,
-		    name, dnode, NULL, ret_attr);
+		    name, dnode, NULL);
 
 		if (*ret_snode != NULL) {
 			if (!smb_tree_has_feature(sr->tid_tree,
@@ -308,9 +307,8 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
  * taken if an error is returned.
  */
 int
-smb_fsop_create(smb_request_t *sr, cred_t *cr,
-    smb_node_t *dnode, char *name,
-    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr)
+smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
+    char *name, smb_attr_t *attr, smb_node_t **ret_snode)
 {
 	int	rc = 0;
 	int	flags = 0;
@@ -349,7 +347,7 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr,
 		smb_stream_parse_name(name, fname, sname);
 
 		rc = smb_fsop_create_stream(sr, cr, dnode,
-		    fname, sname, flags, attr, ret_snode, ret_attr);
+		    fname, sname, flags, attr, ret_snode);
 
 		kmem_free(fname, MAXNAMELEN);
 		kmem_free(sname, MAXNAMELEN);
@@ -370,7 +368,7 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr,
 	}
 
 	rc = smb_fsop_create_file(sr, cr, dnode, name, flags,
-	    attr, ret_snode, ret_attr);
+	    attr, ret_snode);
 	return (rc);
 
 }
@@ -397,7 +395,7 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr,
 static int
 smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
     smb_node_t *dnode, char *fname, char *sname, int flags,
-    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr)
+    smb_attr_t *attr, smb_node_t **ret_snode)
 {
 	smb_node_t	*fnode;
 	smb_attr_t	fattr;
@@ -408,19 +406,23 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 
 	/* Look up / create the unnamed stream, fname */
 	rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dnode, fname,
-	    &fnode, &fattr);
+	    sr->tid_tree->t_snode, dnode, fname, &fnode);
 	if (rc == ENOENT) {
 		fcreate = B_TRUE;
 		rc = smb_fsop_create_file(sr, cr, dnode, fname, flags,
-		    attr, &fnode, &fattr);
+		    attr, &fnode);
 	}
 	if (rc != 0)
 		return (rc);
 
-	/* create the named stream, sname */
-	rc = smb_vop_stream_create(fnode->vp, sname, attr, &vp,
-	    &xattrdvp, flags, cr);
+	fattr.sa_mask = SMB_AT_UID | SMB_AT_GID;
+	rc = smb_vop_getattr(fnode->vp, NULL, &fattr, 0, kcred);
+
+	if (rc == 0) {
+		/* create the named stream, sname */
+		rc = smb_vop_stream_create(fnode->vp, sname, attr,
+		    &vp, &xattrdvp, flags, cr);
+	}
 	if (rc != 0) {
 		if (fcreate) {
 			flags &= ~SMB_IGNORE_CASE;
@@ -442,7 +444,7 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 	}
 
 	*ret_snode = smb_stream_node_lookup(sr, cr, fnode, xattrdvp,
-	    vp, sname, ret_attr);
+	    vp, sname);
 
 	smb_node_release(fnode);
 	VN_RELE(xattrdvp);
@@ -460,7 +462,7 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 static int
 smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
     smb_node_t *dnode, char *name, int flags,
-    smb_attr_t *attr, smb_node_t **ret_snode, smb_attr_t *ret_attr)
+    smb_attr_t *attr, smb_node_t **ret_snode)
 {
 	open_param_t	*op = &sr->arg.open;
 	vnode_t		*vp;
@@ -480,7 +482,7 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 		status = smb_sd_tofs(op->sd, &fs_sd);
 		if (status == NT_STATUS_SUCCESS) {
 			rc = smb_fsop_create_with_sd(sr, cr, dnode,
-			    name, attr, ret_snode, ret_attr, &fs_sd);
+			    name, attr, ret_snode, &fs_sd);
 		} else {
 			rc = EINVAL;
 		}
@@ -495,7 +497,7 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 		rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
 		if (rc == 0) {
 			rc = smb_fsop_create_with_sd(sr, cr, dnode,
-			    name, attr, ret_snode, ret_attr, &fs_sd);
+			    name, attr, ret_snode, &fs_sd);
 		}
 
 		smb_fssd_term(&fs_sd);
@@ -509,7 +511,7 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, op, cr, vp,
-			    name, dnode, NULL, ret_attr);
+			    name, dnode, NULL);
 
 			if (*ret_snode == NULL)
 				rc = ENOMEM;
@@ -541,8 +543,7 @@ smb_fsop_mkdir(
     smb_node_t *dnode,
     char *name,
     smb_attr_t *attr,
-    smb_node_t **ret_snode,
-    smb_attr_t *ret_attr)
+    smb_node_t **ret_snode)
 {
 	struct open_param *op = &sr->arg.open;
 	char *longname;
@@ -609,7 +610,7 @@ smb_fsop_mkdir(
 		status = smb_sd_tofs(op->sd, &fs_sd);
 		if (status == NT_STATUS_SUCCESS) {
 			rc = smb_fsop_create_with_sd(sr, cr, dnode,
-			    name, attr, ret_snode, ret_attr, &fs_sd);
+			    name, attr, ret_snode, &fs_sd);
 		}
 		else
 			rc = EINVAL;
@@ -624,7 +625,7 @@ smb_fsop_mkdir(
 		rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
 		if (rc == 0) {
 			rc = smb_fsop_create_with_sd(sr, cr, dnode,
-			    name, attr, ret_snode, ret_attr, &fs_sd);
+			    name, attr, ret_snode, &fs_sd);
 		}
 
 		smb_fssd_term(&fs_sd);
@@ -635,7 +636,7 @@ smb_fsop_mkdir(
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, op, cr, vp, name,
-			    dnode, NULL, ret_attr);
+			    dnode, NULL);
 
 			if (*ret_snode == NULL)
 				rc = ENOMEM;
@@ -668,7 +669,6 @@ smb_fsop_remove(
     uint32_t		flags)
 {
 	smb_node_t	*fnode;
-	smb_attr_t	file_attr;
 	char		*longname;
 	char		*fname;
 	char		*sname;
@@ -706,8 +706,7 @@ smb_fsop_remove(
 		 */
 
 		rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
-		    sr->tid_tree->t_snode, dnode, fname,
-		    &fnode, &file_attr);
+		    sr->tid_tree->t_snode, dnode, fname, &fnode);
 
 		if (rc != 0) {
 			kmem_free(fname, MAXNAMELEN);
@@ -917,7 +916,8 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	    SMB_TREE_HAS_ACCESS(sr, ACE_READ_ATTRIBUTES) == 0)
 		return (EACCES);
 
-	if (sr->fid_ofile) {
+	/* sr could be NULL in some cases */
+	if (sr && sr->fid_ofile) {
 		/* if uid and/or gid is requested */
 		if (attr->sa_mask & (SMB_AT_UID|SMB_AT_GID))
 			access |= READ_CONTROL;
@@ -944,9 +944,6 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	}
 
 	rc = smb_vop_getattr(snode->vp, unnamed_vp, attr, flags, cr);
-	if (rc == 0)
-		snode->attr = *attr;
-
 	return (rc);
 }
 
@@ -1029,7 +1026,6 @@ smb_fsop_rename(
     char *to_name)
 {
 	smb_node_t *from_snode;
-	smb_attr_t tmp_attr;
 	vnode_t *from_vp;
 	int flags = 0, ret_flags;
 	int rc;
@@ -1095,7 +1091,7 @@ smb_fsop_rename(
 
 	if (rc == 0) {
 		from_snode = smb_node_lookup(sr, NULL, cr, from_vp, from_name,
-		    from_dnode, NULL, &tmp_attr);
+		    from_dnode, NULL);
 
 		if (from_snode == NULL) {
 			rc = ENOMEM;
@@ -1128,8 +1124,7 @@ smb_fsop_setattr(
     smb_request_t	*sr,
     cred_t		*cr,
     smb_node_t		*snode,
-    smb_attr_t		*set_attr,
-    smb_attr_t		*ret_attr)
+    smb_attr_t		*set_attr)
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
@@ -1200,19 +1195,6 @@ smb_fsop_setattr(
 	}
 
 	rc = smb_vop_setattr(snode->vp, unnamed_vp, set_attr, flags, cr);
-
-	if ((rc == 0) && ret_attr) {
-		/*
-		 * Use kcred to update the node attr because this
-		 * call is not being made on behalf of the user.
-		 */
-		ret_attr->sa_mask = SMB_AT_ALL;
-		rc = smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, flags,
-		    kcred);
-		if (rc == 0)
-			snode->attr = *ret_attr;
-	}
-
 	return (rc);
 }
 
@@ -1227,15 +1209,8 @@ smb_fsop_setattr(
  * It is assumed that a reference exists on snode coming into this routine.
  */
 int
-smb_fsop_read(
-    struct smb_request *sr,
-    cred_t *cr,
-    smb_node_t *snode,
-    uio_t *uio,
-    smb_attr_t *ret_attr)
+smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode, uio_t *uio)
 {
-	smb_node_t *unnamed_node;
-	vnode_t *unnamed_vp = NULL;
 	caller_context_t ct;
 	int svmand;
 	int rc;
@@ -1258,19 +1233,14 @@ smb_fsop_read(
 			return (EACCES);
 	}
 
-	unnamed_node = SMB_IS_STREAM(snode);
-	if (unnamed_node) {
-		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
-		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
-		unnamed_vp = unnamed_node->vp;
-		/*
-		 * Streams permission are checked against the unnamed stream,
-		 * but in FS level they have their own permissions. To avoid
-		 * rejection by FS due to lack of permission on the actual
-		 * extended attr kcred is passed for streams.
-		 */
+	/*
+	 * Streams permission are checked against the unnamed stream,
+	 * but in FS level they have their own permissions. To avoid
+	 * rejection by FS due to lack of permission on the actual
+	 * extended attr kcred is passed for streams.
+	 */
+	if (SMB_IS_STREAM(snode))
 		cr = kcred;
-	}
 
 	smb_node_start_crit(snode, RW_READER);
 	rc = nbl_svmand(snode->vp, kcred, &svmand);
@@ -1288,20 +1258,8 @@ smb_fsop_read(
 		smb_node_end_crit(snode);
 		return (ERANGE);
 	}
+
 	rc = smb_vop_read(snode->vp, uio, cr);
-
-	if (rc == 0 && ret_attr) {
-		/*
-		 * Use kcred to update the node attr because this
-		 * call is not being made on behalf of the user.
-		 */
-		ret_attr->sa_mask = SMB_AT_ALL;
-		if (smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0,
-		    kcred) == 0) {
-			snode->attr = *ret_attr;
-		}
-	}
-
 	smb_node_end_crit(snode);
 
 	return (rc);
@@ -1321,11 +1279,8 @@ smb_fsop_write(
     smb_node_t *snode,
     uio_t *uio,
     uint32_t *lcount,
-    smb_attr_t *ret_attr,
     int ioflag)
 {
-	smb_node_t *unnamed_node;
-	vnode_t *unnamed_vp = NULL;
 	caller_context_t ct;
 	int svmand;
 	int rc;
@@ -1353,20 +1308,14 @@ smb_fsop_write(
 			return (EACCES);
 	}
 
-	unnamed_node = SMB_IS_STREAM(snode);
-
-	if (unnamed_node) {
-		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
-		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
-		unnamed_vp = unnamed_node->vp;
-		/*
-		 * Streams permission are checked against the unnamed stream,
-		 * but in FS level they have their own permissions. To avoid
-		 * rejection by FS due to lack of permission on the actual
-		 * extended attr kcred is passed for streams.
-		 */
+	/*
+	 * Streams permission are checked against the unnamed stream,
+	 * but in FS level they have their own permissions. To avoid
+	 * rejection by FS due to lack of permission on the actual
+	 * extended attr kcred is passed for streams.
+	 */
+	if (SMB_IS_STREAM(snode))
 		cr = kcred;
-	}
 
 	smb_node_start_crit(snode, RW_READER);
 	rc = nbl_svmand(snode->vp, kcred, &svmand);
@@ -1384,20 +1333,8 @@ smb_fsop_write(
 		smb_node_end_crit(snode);
 		return (ERANGE);
 	}
+
 	rc = smb_vop_write(snode->vp, uio, ioflag, lcount, cr);
-
-	if (rc == 0 && ret_attr) {
-		/*
-		 * Use kcred to update the node attr because this
-		 * call is not being made on behalf of the user.
-		 */
-		ret_attr->sa_mask = SMB_AT_ALL;
-		if (smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0,
-		    kcred) == 0) {
-			snode->attr = *ret_attr;
-		}
-	}
-
 	smb_node_end_crit(snode);
 
 	return (rc);
@@ -1504,7 +1441,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	/* Links don't have ACL */
 	if ((!smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS)) ||
-	    (snode->attr.sa_vattr.va_type == VLNK))
+	    smb_node_is_link(snode))
 		acl_check = B_FALSE;
 
 	/*
@@ -1556,11 +1493,9 @@ smb_fsop_lookup_name(
     smb_node_t	*root_node,
     smb_node_t	*dnode,
     char	*name,
-    smb_node_t	**ret_snode,
-    smb_attr_t	*ret_attr)
+    smb_node_t	**ret_snode)
 {
 	smb_node_t	*fnode;
-	smb_attr_t	file_attr;
 	vnode_t		*xattrdirvp;
 	vnode_t		*vp;
 	char		*od_name;
@@ -1591,8 +1526,8 @@ smb_fsop_lookup_name(
 		 * Unmangle processing will be done on fname
 		 * as well as any link target.
 		 */
-		rc = smb_fsop_lookup(sr, cr, flags, root_node, dnode, fname,
-		    &fnode, &file_attr);
+		rc = smb_fsop_lookup(sr, cr, flags, root_node, dnode,
+		    fname, &fnode);
 
 		if (rc != 0) {
 			kmem_free(fname, MAXNAMELEN);
@@ -1623,7 +1558,7 @@ smb_fsop_lookup_name(
 		}
 
 		*ret_snode = smb_stream_node_lookup(sr, cr, fnode, xattrdirvp,
-		    vp, od_name, ret_attr);
+		    vp, od_name);
 
 		kmem_free(od_name, MAXNAMELEN);
 		smb_node_release(fnode);
@@ -1637,7 +1572,7 @@ smb_fsop_lookup_name(
 		}
 	} else {
 		rc = smb_fsop_lookup(sr, cr, flags, root_node, dnode, name,
-		    ret_snode, ret_attr);
+		    ret_snode);
 	}
 
 	if (rc == 0) {
@@ -1685,8 +1620,7 @@ smb_fsop_lookup(
     smb_node_t	*root_node,
     smb_node_t	*dnode,
     char	*name,
-    smb_node_t	**ret_snode,
-    smb_attr_t	*ret_attr)
+    smb_node_t	**ret_snode)
 {
 	smb_node_t *lnk_target_node;
 	smb_node_t *lnk_dnode;
@@ -1794,11 +1728,9 @@ smb_fsop_lookup(
 
 		if (lnk_target_node->vp == vp) {
 			*ret_snode = lnk_target_node;
-			*ret_attr = (*ret_snode)->attr;
 		} else {
 			*ret_snode = smb_node_lookup(sr, NULL, cr, vp,
-			    lnk_target_node->od_name, lnk_dnode, NULL,
-			    ret_attr);
+			    lnk_target_node->od_name, lnk_dnode, NULL);
 			VN_RELE(vp);
 
 			if (*ret_snode == NULL)
@@ -1818,7 +1750,7 @@ smb_fsop_lookup(
 		}
 
 		*ret_snode = smb_node_lookup(sr, NULL, cr, vp, od_name,
-		    dnode, NULL, ret_attr);
+		    dnode, NULL);
 		VN_RELE(vp);
 
 		if (*ret_snode == NULL)
@@ -2229,8 +2161,7 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		orig_attr.sa_mask = SMB_AT_UID | SMB_AT_GID;
 		error = smb_fsop_getattr(sr, kcred, snode, &orig_attr);
 		if (error == 0) {
-			error = smb_fsop_setattr(sr, cr, snode, &set_attr,
-			    NULL);
+			error = smb_fsop_setattr(sr, cr, snode, &set_attr);
 			if (error == EPERM)
 				error = EBADE;
 		}
@@ -2254,7 +2185,7 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 			if (set_attr.sa_mask) {
 				orig_attr.sa_mask = set_attr.sa_mask;
 				(void) smb_fsop_setattr(sr, kcred, snode,
-				    &orig_attr, NULL);
+				    &orig_attr);
 			}
 		}
 	}
@@ -2425,7 +2356,7 @@ smb_fsop_shrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid,
 {
 	int rc;
 
-	if (node->attr.sa_vattr.va_type == VDIR)
+	if (smb_node_is_dir(node))
 		return (NT_STATUS_SUCCESS);
 
 	/* Allow access if the request is just for meta data */
@@ -2447,7 +2378,7 @@ smb_fsop_shrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid,
 void
 smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid)
 {
-	if (node->attr.sa_vattr.va_type == VDIR)
+	if (smb_node_is_dir(node))
 		return;
 
 	(void) smb_vop_unshrlock(node->vp, uniq_fid, cr);

@@ -847,7 +847,7 @@ int smb_kmod_tcpreceive(void);
 int smb_kmod_nbtreceive(void);
 void smb_kmod_unbind(void);
 int smb_kmod_share(char *, char *);
-int smb_kmod_unshare(char *);
+int smb_kmod_unshare(char *, char *);
 int smb_kmod_get_usernum(uint32_t *);
 int smb_kmod_get_userlist(smb_ulist_t *);
 

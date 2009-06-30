@@ -2036,15 +2036,8 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	if (smb_ads_get_spnset(fqhost, spn_set) != 0)
 		return (-1);
 
-	/*
-	 * Windows 2008 DC expects the UPN attribute to be host/fqhn while
-	 * both Windows 2000 & 2003 expect it to be host/fqhn@realm.
-	 */
-	if (dclevel >= SMB_ADS_DCLEVEL_W2K8)
-		user_principal = smb_krb5_get_spn(SMBKRB5_SPN_IDX_HOST, fqhost);
-	else
-		user_principal = smb_krb5_get_upn(spn_set[SMBKRB5_SPN_IDX_HOST],
-		    ah->domain);
+	user_principal = smb_krb5_get_upn(spn_set[SMBKRB5_SPN_IDX_HOST],
+	    ah->domain);
 
 	if (user_principal == NULL) {
 		smb_ads_free_spnset(spn_set);
@@ -2556,6 +2549,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	 * the TRUSTED_FOR_DELEGATION userAccountControl flag.
 	 */
 	if (smb_ads_update_computer_cntrl_attr(ah,
+	    SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
 	    SMB_ADS_USER_ACCT_CTL_TRUSTED_FOR_DELEGATION, dn)
 	    == LDAP_INSUFFICIENT_ACCESS) {
 		usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |

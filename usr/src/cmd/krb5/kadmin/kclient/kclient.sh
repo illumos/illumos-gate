@@ -1178,7 +1178,7 @@ function join_domain {
 	upcase_nodename=$hostname
 	netbios_nodename="${upcase_nodename}\$"
 	fqdn=$hostname.$domain
-	upn=host/${fqdn}
+	upn=host/${fqdn}@${realm}
 
 	grep=/usr/xpg4/bin/grep
 
@@ -1255,10 +1255,6 @@ function join_domain {
 		printf "$(gettext "Search for domain functionality failed, exiting").\n" >&2
 		error_message
 	fi
-	# Longhorn and above can't perform an init auth from service
-	# keys if the realm is included in the UPN.  w2k3 and below
-	# can't perform an init auth when the realm is excluded.
-	[[ $level -lt 3 ]] && upn=${upn}@${realm}
 
 	if ldapsearch -R -T -h "$dc" $ldap_args -b "$baseDN" \
 	    -s sub sAMAccountName="$netbios_nodename" dn > /dev/null 2>&1

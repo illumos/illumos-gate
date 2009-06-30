@@ -228,14 +228,19 @@ smb_common_create_directory(smb_request_t *sr)
 
 	if ((rc = smb_fsop_mkdir(sr, sr->user_cr, dnode,
 	    sr->arg.dirop.fqi.fq_last_comp, &new_attr,
-	    &sr->arg.dirop.fqi.fq_fnode,
-	    &sr->arg.dirop.fqi.fq_fattr)) != 0) {
+	    &sr->arg.dirop.fqi.fq_fnode)) != 0) {
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
 		return (rc);
 	}
 
 	node = sr->arg.dirop.fqi.fq_fnode;
+	rc = smb_node_getattr(sr, node, &sr->arg.dirop.fqi.fq_fattr);
+	if (rc != 0) {
+		smb_node_release(dnode);
+		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
+		return (rc);
+	}
 	node->flags |= NODE_FLAGS_CREATED;
 
 	sr->arg.open.create_options = FILE_DIRECTORY_FILE;
@@ -393,7 +398,7 @@ smb_com_delete_directory(smb_request_t *sr)
 	rc = smb_fsop_access(sr, sr->user_cr, dnode, DELETE);
 
 	if ((rc != NT_STATUS_SUCCESS) ||
-	    (dnode->attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
+	    attr->sa_dosattr & FILE_ATTRIBUTE_READONLY) {
 		smb_node_release(dnode);
 		smb_node_release(sr->arg.dirop.fqi.fq_dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);

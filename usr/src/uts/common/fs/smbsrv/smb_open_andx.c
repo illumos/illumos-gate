@@ -243,6 +243,7 @@ smb_com_open(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	smb_node_t *node;
+	smb_attr_t attr;
 	uint16_t file_attr;
 	int rc;
 
@@ -279,12 +280,17 @@ smb_com_open(smb_request_t *sr)
 
 	file_attr = op->dattr  & FILE_ATTRIBUTE_MASK;
 	node = sr->fid_ofile->f_node;
+	if (smb_node_getattr(sr, node, &attr) != 0) {
+		smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+		    ERRDOS, ERROR_INTERNAL_ERROR);
+		return (SDRC_ERROR);
+	}
 
 	rc = smbsr_encode_result(sr, 7, 0, "bwwllww",
 	    7,
 	    sr->smb_fid,
 	    file_attr,
-	    smb_gmt2local(sr, node->attr.sa_vattr.va_mtime.tv_sec),
+	    smb_gmt2local(sr, attr.sa_vattr.va_mtime.tv_sec),
 	    (uint32_t)op->dsize,
 	    op->omode,
 	    (uint16_t)0);	/* bcc */
@@ -348,6 +354,7 @@ smb_com_open_andx(smb_request_t *sr)
 {
 	struct open_param	*op = &sr->arg.open;
 	uint16_t		file_attr;
+	smb_attr_t		attr;
 	int rc;
 
 	op->desired_access = smb_omode_to_amask(op->omode);
@@ -378,14 +385,21 @@ smb_com_open_andx(smb_request_t *sr)
 
 	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+
 		smb_node_t *node = sr->fid_ofile->f_node;
+		if (smb_node_getattr(sr, node, &attr) != 0) {
+			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+			    ERRDOS, ERROR_INTERNAL_ERROR);
+			return (SDRC_ERROR);
+		}
+
 		rc = smbsr_encode_result(sr, 15, 0,
 		    "bb.wwwllwwwwl2.w",
 		    15,
 		    sr->andx_com, VAR_BCC,
 		    sr->smb_fid,
 		    file_attr,
-		    smb_gmt2local(sr, node->attr.sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, attr.sa_vattr.va_mtime.tv_sec),
 		    (uint32_t)op->dsize,
 		    op->omode, op->ftype,
 		    op->devstate,

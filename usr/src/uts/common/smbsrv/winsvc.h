@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_WINSVC_H
 #define	_SMBSRV_WINSVC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NT Service Control interface definition for the Service Control
@@ -209,6 +207,11 @@ extern "C" {
 #define	SC_ACTION_RESTART		1
 #define	SC_ACTION_REBOOT		2
 #define	SC_ACTION_RUN_COMMAND		3
+
+/*
+ * Information level for QueryServiceStatusEx
+ */
+#define	SC_STATUS_PROCESS_INFO		0
 
 #ifdef __cplusplus
 }

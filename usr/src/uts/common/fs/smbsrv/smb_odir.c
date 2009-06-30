@@ -164,7 +164,7 @@
  *	Find the next directory entry in the odir. Return the details of
  *	the directory entry in smb_fileinfo_t. (See odir internals below)
  *
- * smb_odir_read_stream_info(..., smb_streaminfo_t *)
+ * smb_odir_read_streaminfo(..., smb_streaminfo_t *)
  *	Find the next named stream entry in the odir. Return the details of
  *	the named stream in smb_streaminfo_t.
  *
@@ -214,7 +214,7 @@
  * of the file that is the target of the link. If the link target cannot
  * be found the attributes returned are the attributes of the link itself.
  *
- * smb_odir_read_stream_info
+ * smb_odir_read_streaminfo
  * In order for an odir to provide information about stream files it
  * must be opened with smb_odir_openat(). smb_odir_read_streaminfo() can
  * then be used to obtain the name and size of named stream files.
@@ -257,8 +257,8 @@ static int smb_odir_single_fileinfo(smb_request_t *, smb_odir_t *,
 static int smb_odir_wildcard_fileinfo(smb_request_t *, smb_odir_t *,
     smb_odirent_t *, smb_fileinfo_t *);
 static int smb_odir_next_odirent(smb_odir_t *, smb_odirent_t *);
-static boolean_t smb_odir_lookup_link(smb_request_t *, smb_odir_t *, char *,
-    smb_node_t **, smb_attr_t *);
+static boolean_t smb_odir_lookup_link(smb_request_t *, smb_odir_t *,
+    char *, smb_node_t **);
 
 
 /*
@@ -338,7 +338,6 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 	char		pattern[SMB_STREAM_PREFIX_LEN + 2];
 
 	smb_node_t	*xattr_dnode;
-	smb_attr_t	tmp_attr;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -362,7 +361,7 @@ smb_odir_openat(smb_request_t *sr, smb_node_t *unode)
 
 	/* lookup the xattrdir's smb_node */
 	xattr_dnode = smb_node_lookup(sr, NULL, cr, xattr_dvp, XATTR_DIR,
-	    unode, NULL, &tmp_attr);
+	    unode, NULL);
 	VN_RELE(xattr_dvp);
 	if (xattr_dnode == NULL) {
 		smbsr_error(sr, NT_STATUS_NO_MEMORY,
@@ -704,8 +703,8 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 		}
 
 		/*
-		 * since we only care about the size attribute we don't need to
-		 * pass the vp of the unnamed stream file to smb_vop_getattr
+		 * since we only care about the size attributes we don't need
+		 * to pass the vp of the unnamed stream file to smb_vop_getattr
 		 */
 		rc = smb_vop_lookup(od->d_dnode->vp, odirent->od_name, &vp,
 		    NULL, 0, &tmpflg, od->d_tree->t_snode->vp, od->d_cred);
@@ -719,6 +718,8 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 			    odirent->od_name + SMB_STREAM_PREFIX_LEN,
 			    sizeof (sinfo->si_name));
 			sinfo->si_size = attr.sa_vattr.va_size;
+			sinfo->si_alloc_size =
+			    attr.sa_vattr.va_nblocks * DEV_BSIZE;
 			break;
 		}
 	}
@@ -1037,10 +1038,9 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 {
 	int		rc;
 	smb_node_t	*fnode, *tgt_node;
-	smb_attr_t	attr, tgt_attr, *fattr;
+	smb_attr_t	attr;
 	ino64_t		ino;
 	char		*name;
-	uint32_t	dosattr;
 	boolean_t	case_conflict = B_FALSE;
 	int		lookup_flags, flags = 0;
 	vnode_t		*vp;
@@ -1054,7 +1054,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	bzero(fileinfo, sizeof (smb_fileinfo_t));
 
 	rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
-	    od->d_dnode, od->d_pattern, &fnode, &attr);
+	    od->d_dnode, od->d_pattern, &fnode);
 	if (rc != 0)
 		return (rc);
 
@@ -1078,6 +1078,11 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 			case_conflict = B_TRUE;
 	}
 
+	if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {
+		smb_node_release(fnode);
+		return (rc);
+	}
+
 	ino = attr.sa_vattr.va_nodeid;
 	(void) smb_mangle_name(ino, fnode->od_name,
 	    fileinfo->fi_shortname, fileinfo->fi_name83, case_conflict);
@@ -1086,33 +1091,32 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 
 	/* follow link to get target node & attr */
 	if ((fnode->vp->v_type == VLNK) &&
-	    (smb_odir_lookup_link(sr, od, fnode->od_name,
-	    &tgt_node, &tgt_attr))) {
+	    (smb_odir_lookup_link(sr, od, fnode->od_name, &tgt_node))) {
 		smb_node_release(fnode);
 		fnode = tgt_node;
-		fattr = &tgt_attr;
-	} else {
-		fattr = &attr;
+		if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {
+			smb_node_release(fnode);
+			return (rc);
+		}
 	}
 
 	/* check search attributes */
-	dosattr = smb_node_get_dosattr(fnode);
-	if (!smb_sattr_check(dosattr, od->d_sattr)) {
+	if (!smb_sattr_check(attr.sa_dosattr, od->d_sattr)) {
 		smb_node_release(fnode);
 		return (ENOENT);
 	}
 
-	fileinfo->fi_dosattr = dosattr;
-	fileinfo->fi_nodeid = fattr->sa_vattr.va_nodeid;
-	fileinfo->fi_size = smb_node_get_size(fnode, fattr);
-	fileinfo->fi_alloc_size = fattr->sa_vattr.va_nblocks * DEV_BSIZE;
-	fileinfo->fi_atime = fattr->sa_vattr.va_atime;
-	fileinfo->fi_mtime = fattr->sa_vattr.va_mtime;
-	fileinfo->fi_ctime = fattr->sa_vattr.va_ctime;
-	if (fattr->sa_crtime.tv_sec)
-		fileinfo->fi_crtime = fattr->sa_crtime;
+	fileinfo->fi_dosattr = attr.sa_dosattr;
+	fileinfo->fi_nodeid = attr.sa_vattr.va_nodeid;
+	fileinfo->fi_size = attr.sa_vattr.va_size;
+	fileinfo->fi_alloc_size = attr.sa_vattr.va_nblocks * DEV_BSIZE;
+	fileinfo->fi_atime = attr.sa_vattr.va_atime;
+	fileinfo->fi_mtime = attr.sa_vattr.va_mtime;
+	fileinfo->fi_ctime = attr.sa_vattr.va_ctime;
+	if (attr.sa_crtime.tv_sec)
+		fileinfo->fi_crtime = attr.sa_crtime;
 	else
-		fileinfo->fi_crtime = fattr->sa_vattr.va_mtime;
+		fileinfo->fi_crtime = attr.sa_vattr.va_mtime;
 
 	smb_node_release(fnode);
 	return (0);
@@ -1150,9 +1154,8 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 {
 	int		rc;
 	smb_node_t	*fnode, *tgt_node;
-	smb_attr_t	attr, tgt_attr, *fattr;
+	smb_attr_t	attr;
 	char		*name;
-	uint32_t	dosattr;
 	boolean_t	case_conflict;
 
 	ASSERT(sr);
@@ -1171,39 +1174,40 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	(void) strlcpy(fileinfo->fi_name, name, sizeof (fileinfo->fi_name));
 
 	rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
-	    od->d_dnode, name, &fnode, &attr);
+	    od->d_dnode, name, &fnode);
 	if (rc != 0)
 		return (rc);
 
 	/* follow link to get target node & attr */
 	if ((fnode->vp->v_type == VLNK) &&
-	    (smb_odir_lookup_link(sr, od, name, &tgt_node, &tgt_attr))) {
+	    (smb_odir_lookup_link(sr, od, name, &tgt_node))) {
 		smb_node_release(fnode);
 		fnode = tgt_node;
-		fattr = &tgt_attr;
-	} else {
-		fattr = &attr;
+	}
+
+	if ((rc = smb_node_getattr(sr, fnode, &attr)) != 0) {
+		smb_node_release(fnode);
+		return (rc);
 	}
 
 	/* check search attributes */
-	dosattr = smb_node_get_dosattr(fnode);
-	if (!smb_sattr_check(dosattr, od->d_sattr)) {
+	if (!smb_sattr_check(attr.sa_dosattr, od->d_sattr)) {
 		smb_node_release(fnode);
 		return (ENOENT);
 	}
 
 	fileinfo->fi_cookie = (uint32_t)od->d_offset;
-	fileinfo->fi_dosattr = dosattr;
-	fileinfo->fi_nodeid = fattr->sa_vattr.va_nodeid;
-	fileinfo->fi_size = smb_node_get_size(fnode, fattr);
-	fileinfo->fi_alloc_size = fattr->sa_vattr.va_nblocks * DEV_BSIZE;
-	fileinfo->fi_atime = fattr->sa_vattr.va_atime;
-	fileinfo->fi_mtime = fattr->sa_vattr.va_mtime;
-	fileinfo->fi_ctime = fattr->sa_vattr.va_ctime;
-	if (fattr->sa_crtime.tv_sec)
-		fileinfo->fi_crtime = fattr->sa_crtime;
+	fileinfo->fi_dosattr = attr.sa_dosattr;
+	fileinfo->fi_nodeid = attr.sa_vattr.va_nodeid;
+	fileinfo->fi_size = attr.sa_vattr.va_size;
+	fileinfo->fi_alloc_size = attr.sa_vattr.va_nblocks * DEV_BSIZE;
+	fileinfo->fi_atime = attr.sa_vattr.va_atime;
+	fileinfo->fi_mtime = attr.sa_vattr.va_mtime;
+	fileinfo->fi_ctime = attr.sa_vattr.va_ctime;
+	if (attr.sa_crtime.tv_sec)
+		fileinfo->fi_crtime = attr.sa_crtime;
 	else
-		fileinfo->fi_crtime = fattr->sa_vattr.va_mtime;
+		fileinfo->fi_crtime = attr.sa_vattr.va_mtime;
 
 	smb_node_release(fnode);
 	return (0);
@@ -1229,18 +1233,18 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
  */
 static boolean_t
 smb_odir_lookup_link(smb_request_t *sr, smb_odir_t *od,
-    char *fname, smb_node_t **tgt_node, smb_attr_t *tgt_attr)
+    char *fname, smb_node_t **tgt_node)
 {
 	int rc;
 
 	rc = smb_fsop_lookup(sr, od->d_cred, SMB_FOLLOW_LINKS,
-	    od->d_tree->t_snode, od->d_dnode, fname, tgt_node, tgt_attr);
+	    od->d_tree->t_snode, od->d_dnode, fname, tgt_node);
 	if (rc != 0) {
 		*tgt_node = NULL;
 		return (B_FALSE);
 	}
 
-	if ((tgt_attr->sa_vattr.va_type == VDIR) && (!smb_dirsymlink_enable)) {
+	if (smb_node_is_dir(*tgt_node) && (!smb_dirsymlink_enable)) {
 		smb_node_release(*tgt_node);
 		*tgt_node = NULL;
 		return (B_FALSE);

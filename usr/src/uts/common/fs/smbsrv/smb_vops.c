@@ -385,8 +385,8 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 	if (unnamed_vp) {
 		ret_attr->sa_vattr.va_type = VREG;
 
-		if (ret_attr->sa_mask & SMB_AT_SIZE) {
-			tmp_attr.sa_vattr.va_mask = AT_SIZE;
+		if (ret_attr->sa_mask & (SMB_AT_SIZE | SMB_AT_NBLOCKS)) {
+			tmp_attr.sa_vattr.va_mask = AT_SIZE | AT_NBLOCKS;
 
 			error = VOP_GETATTR(vp, &tmp_attr.sa_vattr,
 			    flags, cr, &smb_ct);
@@ -394,6 +394,8 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 				return (error);
 
 			ret_attr->sa_vattr.va_size = tmp_attr.sa_vattr.va_size;
+			ret_attr->sa_vattr.va_nblocks =
+			    tmp_attr.sa_vattr.va_nblocks;
 		}
 	}
 
@@ -423,7 +425,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
  * with the (unnamed stream) file.
  */
 int
-smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
+smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *attr,
     int flags, cred_t *cr)
 {
 	int error = 0;
@@ -432,11 +434,17 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 	xvattr_t xvattr;
 	vattr_t *vap;
 
+	if (attr->sa_mask & SMB_AT_DOSATTR) {
+		attr->sa_dosattr &=
+		    (FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_READONLY |
+		    FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
+	}
+
 	if (unnamed_vp) {
 		use_vp = unnamed_vp;
-		if (set_attr->sa_mask & SMB_AT_SIZE) {
+		if (attr->sa_mask & SMB_AT_SIZE) {
 			at_size = 1;
-			set_attr->sa_mask &= ~SMB_AT_SIZE;
+			attr->sa_mask &= ~SMB_AT_SIZE;
 		}
 	} else {
 		use_vp = vp;
@@ -447,24 +455,23 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 	 * but rather sa_mask.
 	 */
 
-	set_attr->sa_vattr.va_mask = 0;
+	attr->sa_vattr.va_mask = 0;
 
 	if (vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
-		smb_vop_setup_xvattr(set_attr, &xvattr);
+		smb_vop_setup_xvattr(attr, &xvattr);
 		vap = &xvattr.xva_vattr;
 	} else {
-		smb_sa_to_va_mask(set_attr->sa_mask,
-		    &set_attr->sa_vattr.va_mask);
-		vap = &set_attr->sa_vattr;
+		smb_sa_to_va_mask(attr->sa_mask,
+		    &attr->sa_vattr.va_mask);
+		vap = &attr->sa_vattr;
 	}
 
 	if ((error = VOP_SETATTR(use_vp, vap, flags, cr, &smb_ct)) != 0)
 		return (error);
 
 	if (at_size) {
-		set_attr->sa_vattr.va_mask = AT_SIZE;
-		error = VOP_SETATTR(vp, &set_attr->sa_vattr, flags, cr,
-		    &smb_ct);
+		attr->sa_vattr.va_mask = AT_SIZE;
+		error = VOP_SETATTR(vp, &attr->sa_vattr, flags, kcred, &smb_ct);
 	}
 
 	return (error);

@@ -144,7 +144,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	struct open_param *op = &sr->arg.open;
 	uint8_t			OplockLevel;
 	uint8_t			DirFlag;
-	smb_attr_t		new_attr;
+	smb_attr_t		attr;
 	smb_node_t		*node;
 	uint32_t status;
 
@@ -213,19 +213,12 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		if (op->create_options & FILE_DELETE_ON_CLOSE)
 			smb_ofile_set_delete_on_close(sr->fid_ofile);
 
-		/*
-		 * Set up the directory flag and ensure that
-		 * we don't return a stale file size.
-		 */
 		node = sr->fid_ofile->f_node;
-		if (node->attr.sa_vattr.va_type == VDIR) {
-			DirFlag = 1;
-			new_attr.sa_vattr.va_size = 0;
-		} else {
-			DirFlag = 0;
-			new_attr.sa_mask = SMB_AT_SIZE;
-			(void) smb_fsop_getattr(sr, kcred, node, &new_attr);
-			node->attr.sa_vattr.va_size = new_attr.sa_vattr.va_size;
+		DirFlag = smb_node_is_dir(node) ? 1 : 0;
+		if (smb_node_getattr(sr, node, &attr) != 0) {
+			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
+			    ERRDOS, ERROR_INTERNAL_ERROR);
+			return (SDRC_ERROR);
 		}
 
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
@@ -233,28 +226,28 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		    sr->smb_fid,
 		    op->action_taken,
 		    0,	/* EaErrorOffset */
-		    &node->attr.sa_crtime,
-		    &node->attr.sa_vattr.va_atime,
-		    &node->attr.sa_vattr.va_mtime,
-		    &node->attr.sa_vattr.va_ctime,
+		    &attr.sa_crtime,
+		    &attr.sa_vattr.va_atime,
+		    &attr.sa_vattr.va_mtime,
+		    &attr.sa_vattr.va_ctime,
 		    op->dattr & FILE_ATTRIBUTE_MASK,
-		    new_attr.sa_vattr.va_size,
-		    new_attr.sa_vattr.va_size,
+		    attr.sa_vattr.va_size,
+		    attr.sa_vattr.va_size,
 		    op->ftype,
 		    op->devstate,
 		    DirFlag);
 	} else {
 		/* Named PIPE */
-		bzero(&new_attr, sizeof (smb_attr_t));
+		bzero(&attr, sizeof (smb_attr_t));
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
 		    0,
 		    sr->smb_fid,
 		    op->action_taken,
 		    0,	/* EaErrorOffset */
-		    &new_attr.sa_crtime,
-		    &new_attr.sa_vattr.va_atime,
-		    &new_attr.sa_vattr.va_mtime,
-		    &new_attr.sa_vattr.va_ctime,
+		    &attr.sa_crtime,
+		    &attr.sa_vattr.va_atime,
+		    &attr.sa_vattr.va_mtime,
+		    &attr.sa_vattr.va_ctime,
 		    op->dattr,
 		    0x1000LL,
 		    0LL,

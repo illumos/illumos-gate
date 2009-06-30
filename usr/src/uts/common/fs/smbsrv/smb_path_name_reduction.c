@@ -88,11 +88,22 @@ smbd_fs_query(smb_request_t *sr, smb_fqi_t *fqi, int fqm)
 
 	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
 	    sr->tid_tree->t_snode, fqi->fq_dnode, fqi->fq_last_comp,
-	    &fqi->fq_fnode, &fqi->fq_fattr);
+	    &fqi->fq_fnode);
 
 	if (rc == 0) {
-		(void) strcpy(fqi->fq_od_name,
-		    fqi->fq_fnode->od_name);
+		(void) strcpy(fqi->fq_od_name, fqi->fq_fnode->od_name);
+
+		/*
+		 * fqi->fq_fattr MUST be set even if returning EEXIST, as it
+		 * is used by some callers to determine how to handle EEXIST
+		 */
+		rc = smb_node_getattr(sr, fqi->fq_fnode, &fqi->fq_fattr);
+		if (rc != 0) {
+			smb_node_release(fqi->fq_dnode);
+			smb_node_release(fqi->fq_fnode);
+			SMB_NULL_FQI_NODES(*fqi);
+			return (rc);
+		}
 
 		if (fqm == FQM_PATH_MUST_NOT_EXIST) {
 			smb_node_release(fqi->fq_dnode);
@@ -383,7 +394,6 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 	pathname_t	pn, rpn, upn, link_pn;
 	smb_node_t	*dnode, *fnode;
 	vnode_t		*rootvp, *vp;
-	smb_attr_t	attr;
 	size_t		pathleft;
 	int		err = 0;
 	int		nlink = 0;
@@ -517,7 +527,7 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 			    namebuf, sizeof (namebuf));
 
 			fnode = smb_node_lookup(sr, NULL, cred, vp, namep,
-			    dnode, NULL, &attr);
+			    dnode, NULL);
 			VN_RELE(vp);
 
 			if (fnode == NULL) {
@@ -640,7 +650,7 @@ smb_lookuppathvptovp(smb_request_t *sr, char *path, vnode_t *startvp,
 	(void) pn_alloc(&pn);
 
 	if (pn_set(&pn, path) == 0) {
-		VN_HOLD(rootvp);
+		VN_HOLD(startvp);
 		if (rootvp != rootdir)
 			VN_HOLD(rootvp);
 

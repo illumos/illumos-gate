@@ -352,7 +352,7 @@ smb_range_check(smb_request_t *sr, smb_node_t *node, uint64_t start,
 
 	ASSERT(smb_node_in_crit(node));
 
-	if (node->attr.sa_vattr.va_type == VDIR)
+	if (smb_node_is_dir(node))
 		return (NT_STATUS_SUCCESS);
 
 	rc = smb_lock_range_access(sr, node, start, length, will_write);
