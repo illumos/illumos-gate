@@ -2720,7 +2720,7 @@ hermon_icm_config_setup(hermon_state_t *state,
 	icm[HERMON_EQC].object_size	= devlim->eqc_entry_sz;
 	icm[HERMON_RDB].object_size	= devlim->rdmardc_entry_sz *
 	    cfg->cp_hca_max_rdma_in_qp;
-	icm[HERMON_MCG].object_size	= HERMON_MCG_SIZE;
+	icm[HERMON_MCG].object_size	= HERMON_MCGMEM_SZ(state);
 	icm[HERMON_ALTC].object_size	= devlim->altc_entry_sz;
 	icm[HERMON_AUXC].object_size	= devlim->aux_entry_sz;
 

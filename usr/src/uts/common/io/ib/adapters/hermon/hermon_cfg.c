@@ -68,7 +68,7 @@ uint32_t hermon_log_num_rdb_per_qp	= HERMON_LOG_NUM_RDB_PER_QP;
  */
 uint32_t hermon_log_num_mcg		= HERMON_NUM_MCG_SHIFT;
 uint32_t hermon_num_qp_per_mcg		= HERMON_NUM_QP_PER_MCG;
-uint32_t hermon_log_num_mcg_hash		= HERMON_NUM_MCG_HASH_SHIFT;
+uint32_t hermon_log_num_mcg_hash	= HERMON_NUM_MCG_HASH_SHIFT;
 
 /* Number of UD AVs */
 uint32_t hermon_log_num_ah		= HERMON_NUM_AH_SHIFT;
@@ -299,8 +299,11 @@ hermon_cfg_profile_init_phase2(hermon_state_t *state)
 	    min(hermon_log_num_rdb_per_qp, devlim->log_max_ra_req_qp);
 	cp->cp_hca_max_rdma_in_qp = cp->cp_hca_max_rdma_out_qp =
 	    1 << min(hermon_log_num_rdb_per_qp, devlim->log_max_ra_req_qp);
-	cp->cp_num_qp_per_mcg	= min(hermon_num_qp_per_mcg,
-	    1 << devlim->log_max_qp_mcg);
+	cp->cp_num_qp_per_mcg	= max(hermon_num_qp_per_mcg,
+	    HERMON_NUM_QP_PER_MCG_MIN);
+	cp->cp_num_qp_per_mcg	= min(cp->cp_num_qp_per_mcg,
+	    (1 << devlim->log_max_qp_mcg) - 8);
+	cp->cp_num_qp_per_mcg	= (1 << highbit(cp->cp_num_qp_per_mcg + 7)) - 8;
 	cp->cp_log_num_mcg 	= min(hermon_log_num_mcg, devlim->log_max_mcg);
 	cp->cp_log_num_mcg_hash	= hermon_log_num_mcg_hash;
 

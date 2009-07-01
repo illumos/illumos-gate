@@ -90,26 +90,21 @@ extern "C" {
  * The following defines specify the default number of Multicast Groups (MCG)
  * and the maximum number of QP which can be associated with each.  By default
  * the maximum number of multicast groups is set to 256, and the maximum number
- * of QP per multicast group is set to 8.  These values are controllable
- * through the "hermon_log_num_mcg" and "hermon_num_qp_per_mcg" configuration
- * variables.
- * We also define a macro below that is used to determine the size of each
- * individual MCG entry (in hardware) based on the number of QP to be
- * supported per multicast group.
+ * of QP per multicast group is set to 248 (256 4-byte slots minus the 8 slots
+ * in the header).  The first of these values is controllable through the
+ * "hermon_log_num_mcg" configuration variable.  "hermon_num_qp_per_mcg" is
+ * also available if the customer needs such a large capability.
  */
-
-
 #define	HERMON_NUM_MCG_SHIFT		0x8
-#define	HERMON_NUM_QP_PER_MCG		8
-#define	HERMON_MCG_SIZE_SHIFT		0x6
-#define	HERMON_MCG_SIZE			(1 << HERMON_MCG_SIZE_SHIFT)
+#define	HERMON_NUM_QP_PER_MCG_MIN	0x8
+#define	HERMON_NUM_QP_PER_MCG		0xf8
 
+#define	HERMON_MCGMEM_SZ(state)						\
+	((((state)->hs_cfg_profile->cp_num_qp_per_mcg) + 8) << 2)
 
 /*
  * Macro to compute the offset of the QP list in a given MCG entry.
  */
-#define	HERMON_MCGMEM_SZ(state)						\
-	((((state)->hs_cfg_profile->cp_num_qp_per_mcg) + 8) << 2)
 #define	HERMON_MCG_GET_QPLIST_PTR(mcg)					\
 	((hermon_hw_mcg_qp_list_t *)((uintptr_t)(mcg) +			\
 	sizeof (hermon_hw_mcg_t)))
