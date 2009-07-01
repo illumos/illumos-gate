@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -632,6 +632,7 @@ int
 aio_error(const aiocb_t *aiocbp)
 {
 	const aio_result_t *resultp = &aiocbp->aio_resultp;
+	aio_req_t *reqp;
 	int error;
 
 	if ((error = resultp->aio_errno) == EINPROGRESS) {
@@ -649,6 +650,18 @@ aio_error(const aiocb_t *aiocbp)
 			error = resultp->aio_errno;
 		} else if (aiocbp->aio_state == CHECKED) {
 			((aiocb_t *)aiocbp)->aio_state = CHECK;
+		}
+	} else if (aiocbp->aio_state == USERAIO) {
+		sig_mutex_lock(&__aio_mutex);
+		if ((reqp = _aio_hash_del((aio_result_t *)resultp)) == NULL) {
+			sig_mutex_unlock(&__aio_mutex);
+			((aiocb_t *)aiocbp)->aio_state = CHECKED;
+		} else {
+			((aiocb_t *)aiocbp)->aio_state = NOCHECK;
+			ASSERT(reqp->req_head == NULL);
+			(void) _aio_req_remove(reqp);
+			sig_mutex_unlock(&__aio_mutex);
+			_aio_req_free(reqp);
 		}
 	}
 	return (error);
