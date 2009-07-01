@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1764,7 +1764,7 @@ rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
 		return (DDI_FAILURE);
 	}
 
-	ASSERT(IOMMU_USED(rdip));
+	ASSERT(IOMMULIB_HDL(rdip));
 
 	/* has an IOMMU */
 	return (iommulib_nexdma_allochdl(dip, rdip, attr,
@@ -1811,7 +1811,7 @@ static int
 rootnex_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(rdip)) {
+	if (IOMMU_USED(handle)) {
 		return (iommulib_nexdma_freehdl(dip, rdip, handle));
 	}
 #endif
@@ -2085,7 +2085,7 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(rdip)) {
+	if (IOMMU_USED(handle)) {
 		return (iommulib_nexdma_bindhdl(dip, rdip, handle, dmareq,
 		    cookiep, ccountp));
 	}
@@ -2183,7 +2183,7 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(rdip)) {
+	if (IOMMU_USED(handle)) {
 		return (iommulib_nexdma_unbindhdl(dip, rdip, handle));
 	}
 #endif
@@ -4239,7 +4239,7 @@ rootnex_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     off_t off, size_t len, uint_t cache_flags)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(rdip)) {
+	if (IOMMU_USED(handle)) {
 		return (iommulib_nexdma_sync(dip, rdip, handle, off, len,
 		    cache_flags));
 	}
@@ -4526,7 +4526,7 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     uint_t *ccountp)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(rdip)) {
+	if (IOMMU_USED(handle)) {
 		return (iommulib_nexdma_win(dip, rdip, handle, win, offp, lenp,
 		    cookiep, ccountp));
 	}
@@ -4628,11 +4628,7 @@ static int
 rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
     struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
 {
-#if !defined(__xpv)
-	if (IOMMU_USED(rdip)) {
-		return (iommulib_nexdma_map(dip, rdip, dmareq, handlep));
-	}
-#endif
+	/* NO IOMMU in 32 bit mode */
 	return (rootnex_coredma_map(dip, rdip, dmareq, handlep));
 }
 
@@ -4837,13 +4833,7 @@ rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     enum ddi_dma_ctlops request, off_t *offp, size_t *lenp, caddr_t *objpp,
     uint_t cache_flags)
 {
-#if !defined(__xpv)
-	if (IOMMU_USED(rdip)) {
-		return (iommulib_nexdma_mctl(dip, rdip, handle, request, offp,
-		    lenp, objpp, cache_flags));
-	}
-#endif
-
+	/* NO IOMMU in 32 bit mode */
 	return (rootnex_coredma_mctl(dip, rdip, handle, request, offp,
 	    lenp, objpp, cache_flags));
 }

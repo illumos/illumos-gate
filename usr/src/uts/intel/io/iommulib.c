@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -576,7 +576,7 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 
 	*errorp = 0;
 
-	if (IOMMU_USED(rdip))
+	if (IOMMULIB_HDL(rdip))
 		return (DDI_SUCCESS);
 
 	ASSERT(DEVI(rdip)->devi_iommulib_handle == NULL);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,7 +96,18 @@ typedef struct iommulib_ops {
 
 } iommulib_ops_t;
 
-#define	IOMMU_USED(dip)	(DEVI(dip)->devi_iommulib_handle != NULL)
+
+/*
+ * IOMMULIB_HDL() checks if there is an IOMMU controlling the dip's DMA
+ * IOMMU_USED() checks if the dip associated with the DMA handle has DMA
+ * 		controlled by an IOMMU.
+ *		This ensures that we use the right dip associated with the
+ *		DMA handle irrespective of which dip's context we call
+ *		ddi_dma_* routines in.
+ */
+#define	IOMMULIB_HDL(dip)  (DEVI(dip)->devi_iommulib_handle)
+#define	IOMMU_USED(dmahdl)	\
+(DEVI(((struct ddi_dma_impl *)(dmahdl))->dmai_rdip)->devi_iommulib_handle)
 
 typedef enum {
 	IOMMU_NEXOPS_VERSION_INVALID = 0,
