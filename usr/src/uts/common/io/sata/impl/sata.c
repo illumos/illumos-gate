@@ -129,7 +129,7 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, int *, int);
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.42"};
+static char sata_rev_tag[] = {"1.43"};
 
 /*
  * SATA cb_ops functions
@@ -2903,7 +2903,7 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason)
  * This function should not be called for ATAPI devices - they
  * respond directly to SCSI Inquiry command.
  *
- * SATA Identify Device data has to be valid in sata_rive_info.
+ * SATA Identify Device data has to be valid in sata_drive_info.
  * Buffer has to accomodate the inquiry length (36 bytes).
  *
  * This function should be called with a port mutex held.
@@ -2928,7 +2928,9 @@ sata_identdev_to_inquiry(sata_hba_inst_t *sata_hba_inst,
 	inq->inq_dtype = sdinfo->satadrv_type == SATA_DTYPE_ATADISK ?
 	    DTYPE_DIRECT : DTYPE_RODIRECT; /* DTYPE_UNKNOWN; */
 
-	inq->inq_rmb = sid->ai_config & SATA_REM_MEDIA ? 1 : 0;
+	/* CFA type device is not a removable media device */
+	inq->inq_rmb = ((sid->ai_config != SATA_CFA_TYPE) &&
+	    (sid->ai_config & SATA_REM_MEDIA)) ? 1 : 0;
 	inq->inq_qual = 0;	/* Device type qualifier (obsolete in SCSI3? */
 	inq->inq_iso = 0;	/* ISO version */
 	inq->inq_ecma = 0;	/* ECMA version */
@@ -9422,6 +9424,9 @@ sata_identify_device(sata_hba_inst_t *sata_hba_inst,
 
 	/* Set the correct device type */
 	if ((cfg_word & SATA_ATA_TYPE_MASK) == SATA_ATA_TYPE) {
+		sdinfo->satadrv_type = SATA_DTYPE_ATADISK;
+	} else if (cfg_word == SATA_CFA_TYPE) {
+		/* It's a Compact Flash media via CF-to-SATA HDD adapter */
 		sdinfo->satadrv_type = SATA_DTYPE_ATADISK;
 	} else if ((cfg_word & SATA_ATAPI_TYPE_MASK) == SATA_ATAPI_TYPE) {
 		switch (cfg_word & SATA_ATAPI_ID_DEV_TYPE) {

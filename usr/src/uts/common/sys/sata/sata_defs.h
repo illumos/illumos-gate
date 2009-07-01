@@ -247,6 +247,7 @@ typedef struct sata_id {
 #define	SATA_ATA_TYPE		0x0000	/* ATA device */
 #define	SATA_REM_MEDIA  	0x0080 	/* Removable media */
 #define	SATA_INCOMPLETE_DATA	0x0004	/* Incomplete Identify Device data */
+#define	SATA_CFA_TYPE		0x848a	/* CFA feature set device */
 
 #define	SATA_ID_SERIAL_OFFSET	10
 #define	SATA_ID_SERIAL_LEN	20

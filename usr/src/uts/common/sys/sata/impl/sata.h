@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -768,7 +768,7 @@ typedef struct sata_atapi_cmd {
 
 #endif
 
-/* sata_rev_tag 1.42 */
+/* sata_rev_tag 1.43 */
 
 #ifdef	__cplusplus
 }
