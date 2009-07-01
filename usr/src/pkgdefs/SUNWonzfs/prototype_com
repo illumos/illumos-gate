@@ -24,14 +24,9 @@
 i pkginfo
 i copyright
 i depend
-i postinstall
-i preremove
 #
 # SUNWonzfs
 #
-d none kernel 755 root sys
-d none kernel/drv 0755 root sys
-f none kernel/drv/zut.conf 644 root sys
 d none usr 755 root sys
 d none usr/bin 755 root bin
 l none usr/bin/ztest=../../usr/lib/isaexec

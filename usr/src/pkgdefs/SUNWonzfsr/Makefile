@@ -18,29 +18,21 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This required package information file describes characteristics of the
-# package, such as package abbreviation, full package name, package version,
-# and package architecture.
-#
-PKG="SUNWonzfs"
-NAME="ZFS unbundled utilities"
-ARCH="ISA"
-VERSION="ONVERS,REV=0.0.0"
-SUNW_PRODNAME="SunOS"
-SUNW_PRODVERS="RELEASE/VERSION"
-SUNW_PKGTYPE="usr"
-MAXINST="1000"
-CATEGORY="system"
-DESC="ZFS test commands"
-VENDOR="Sun Microsystems, Inc."
-HOTLINE="Please contact your local service provider"
-EMAIL=""
-CLASSES="none"
-BASEDIR=/
-SUNW_PKGVERS="1.0"
-SUNW_PKG_ALLZONES="true"
-SUNW_PKG_HOLLOW="false"
-SUNW_PKG_THISZONE="false"
+
+include ../Makefile.com
+
+TMPLFILES += postinstall preremove
+DATAFILES += depend
+
+.KEEP_STATE:
+
+all: $(FILES)
+
+install: all pkg
+
+include ../Makefile.targ
+include ../Makefile.prtarg

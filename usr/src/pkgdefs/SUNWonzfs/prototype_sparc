@@ -24,8 +24,6 @@
 #
 !include prototype_com
 #
-d none kernel/drv/sparcv9 755 root sys
-f none kernel/drv/sparcv9/zut 755 root sys
 d none usr/sbin/sparcv9 755 root bin
 f none usr/sbin/sparcv9/zinject 555 root bin
 d none usr/bin/sparcv9 755 root bin

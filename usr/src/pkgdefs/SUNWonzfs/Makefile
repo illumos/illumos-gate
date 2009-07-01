@@ -25,9 +25,6 @@
 
 include ../Makefile.com
 
-TMPLFILES += postinstall preremove
-DATAFILES += depend
-
 .KEEP_STATE:
 
 all: $(FILES)

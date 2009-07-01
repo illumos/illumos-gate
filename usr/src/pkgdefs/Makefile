@@ -367,6 +367,7 @@ COMMON_SUBDIRS= \
 	SUNWocfh \
 	SUNWocfr \
 	SUNWonfmes \
+	SUNWonzfsr \
 	SUNWonzfs \
 	SUNWosdem \
 	SUNWypr \
