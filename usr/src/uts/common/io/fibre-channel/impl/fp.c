@@ -7338,7 +7338,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 		    val->ModelDescription,
 		    sizeof (val->ModelDescription));
 		bcopy(port->fp_sym_node_name, val->NodeSymbolicName,
-		    sizeof (val->NodeSymbolicName));
+		    port->fp_sym_node_namelen);
 		bcopy(port->fp_hba_port_attrs.hardware_version,
 		    val->HardwareVersion,
 		    sizeof (val->HardwareVersion));
@@ -7753,7 +7753,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 		bcopy(port->fp_fc4_types, val->PortActiveFc4Types,
 		    sizeof (val->PortActiveFc4Types));
 		bcopy(port->fp_sym_port_name, val->PortSymbolicName,
-		    sizeof (val->PortSymbolicName));
+		    port->fp_sym_port_namelen);
 		val->PortSupportedSpeed =
 		    port->fp_hba_port_attrs.supported_speed;
 
@@ -7897,7 +7897,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 			    sizeof (val->NodeWWN.raw_wwn));
 			val->PortFcId = tmp_pd->pd_port_id.port_id;
 			bcopy(tmp_pd->pd_spn, val->PortSymbolicName,
-			    sizeof (val->PortSymbolicName));
+			    tmp_pd->pd_spn_len);
 			val->PortSupportedClassofService = tmp_pd->pd_cos;
 			/*
 			 * we will assume the sizeof these pd_fc4types and
@@ -8029,7 +8029,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 			    sizeof (val->NodeWWN.raw_wwn));
 			val->PortFcId = tmp_pd->pd_port_id.port_id;
 			bcopy(tmp_pd->pd_spn, val->PortSymbolicName,
-			    sizeof (val->PortSymbolicName));
+			    tmp_pd->pd_spn_len);
 			val->PortSupportedClassofService = tmp_pd->pd_cos;
 			val->PortType = FC_HBA_PORTTYPE_UNKNOWN;
 			val->PortState =
