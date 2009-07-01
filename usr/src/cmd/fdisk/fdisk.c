@@ -1734,7 +1734,7 @@ entry_from_old_table(
 
 	if (id == SUNIXOS || id == SUNIXOS2)
 		return (0);
-	for (i = 0; i < FD_NUMPART - 1; i++) {
+	for (i = 0; i < FD_NUMPART; i++) {
 		if (Old_Table[i].systid == id &&
 		    Old_Table[i].bootid == act &&
 		    Old_Table[i].beghead == bhead &&
