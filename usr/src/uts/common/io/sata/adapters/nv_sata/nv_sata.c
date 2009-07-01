@@ -213,7 +213,7 @@ static ddi_dma_attr_t buffer_dma_40bit_attr = {
 	4,			/* dma_attr_align */
 	1,			/* dma_attr_burstsizes. */
 	1,			/* dma_attr_minxfer */
-	NV_BM_64K_BOUNDARY - 1,	/* dma_attr_maxxfer including all cookies */
+	0xffffffffull,		/* dma_attr_maxxfer including all cookies */
 	0xffffffffull,		/* dma_attr_seg */
 	NV_DMA_NSEGS,		/* dma_attr_sgllen */
 	512,			/* dma_attr_granular */
@@ -352,8 +352,8 @@ int non_ncq_commands = 0;
  */
 static void *nv_statep	= NULL;
 
-/* This can be disabled if there are any problems with 40-bit DMA */
-int nv_sata_40bit_dma = B_TRUE;
+/* We still have problems in 40-bit DMA support, so disable it by default */
+int nv_sata_40bit_dma = B_FALSE;
 
 static sata_tran_hotplug_ops_t nv_hotplug_ops = {
 	SATA_TRAN_HOTPLUG_OPS_REV_1,	/* structure version */
@@ -2257,7 +2257,7 @@ mcp5x_reg_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 			reg32 = pci_config_get32(pci_conf_handle,
 			    NV_SATA_CFG_20);
 			pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
-			    reg32 |NV_40BIT_PRD);
+			    reg32 | NV_40BIT_PRD);
 		} else {
 			NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
 			    "40-bit DMA disabled by nv_sata_40bit_dma"));
@@ -2345,8 +2345,10 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 * to enable access to the bar5 registers.
 	 */
 	reg32 = pci_config_get32(pci_conf_handle, NV_SATA_CFG_20);
-	pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
-	    reg32 | NV_BAR5_SPACE_EN);
+	if (!(reg32 & NV_BAR5_SPACE_EN)) {
+		pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
+		    reg32 | NV_BAR5_SPACE_EN);
+	}
 
 	/*
 	 * Determine if this is ck804 or mcp5x.  ck804 will map in the
