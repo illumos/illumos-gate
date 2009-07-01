@@ -2088,8 +2088,9 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 				hat_kpm_mapout(pp, GET_KPME(smp), addr);
 				if (smp->sm_flags & SM_NOTKPM_RELEASED) {
 					smp->sm_flags &= ~SM_NOTKPM_RELEASED;
-					hat_unload(kas.a_hat, addr, MAXBSIZE,
-					    HAT_UNLOAD);
+					hat_unload(kas.a_hat, segkmap->s_base +
+					    ((smp - smd_smap) * MAXBSIZE),
+					    MAXBSIZE, HAT_UNLOAD);
 				}
 
 			} else {
