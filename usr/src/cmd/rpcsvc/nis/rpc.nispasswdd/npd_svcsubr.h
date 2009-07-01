@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -28,9 +27,8 @@
 #ifndef _NPD_SVCSUBR_H
 #define	_NPD_SVCSUBR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpcsvc/yppasswd.h>
+#include <rpcsvc/nispasswd.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -53,8 +51,18 @@ bool_t __npd_am_master(char *host, char *dirlist);
 
 bool_t nispasswd_authenticate_1_svc(npd_request *argp,
 	nispasswd_authresult *result, struct svc_req *rqstp);
+bool_t nispasswd_authenticate_2_svc(npd_request *argp,
+	nispasswd_authresult *result, struct svc_req *rqstp);
+bool_t nispasswd_authenticate_common_svc(npd_request *argp,
+	nispasswd_authresult *result, struct svc_req *rqstp, rpcvers_t vers);
+
 bool_t nispasswd_update_1_svc(npd_update *updreq, nispasswd_updresult *res,
 	struct svc_req *rqstp);
+bool_t nispasswd_update_2_svc(npd_update2 *updreq, nispasswd_updresult *res,
+	struct svc_req *rqstp);
+bool_t nispasswd_update_common_svc(void *updreq, nispasswd_updresult *res,
+	struct svc_req *rqstp, rpcvers_t vers);
+
 bool_t yppasswdproc_update_1_svc(struct yppasswd *yppass, int *result,
 	struct svc_req *rqstp);
 
@@ -70,6 +78,11 @@ extern bool_t __npd_ecb_crypt(uint32_t *val1, uint32_t *val2, des_block *buf,
 extern bool_t __npd_cbc_crypt(uint32_t *val, char *str, unsigned int strsize,
 	npd_newpass *buf, unsigned int bufsize, unsigned int mode,
 	des_block *deskey);
+
+extern bool_t __npd2_cbc_crypt(uint32_t *val, char *str, unsigned int strsize,
+	npd_newpass2 *buf, unsigned int bufsize, unsigned int mode,
+	des_block *deskey);
+
 extern void __free_nis_server(nis_server *server);
 
 #ifdef	__cplusplus

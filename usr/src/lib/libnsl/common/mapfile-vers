@@ -587,6 +587,7 @@ SUNWprivate_1.1 {
 	__nis_ss_used;
 	__nis_translate_mechanism;
 	nis_write_obj;
+	__npd2_cbc_crypt;
 	__npd_cbc_crypt;
 	__npd_ecb_crypt;
 	__nsl_dom;

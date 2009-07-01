@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>	/* getenv, exit */
@@ -59,6 +56,8 @@ char	*ypfwd = (char *)NULL;	/* passwd map YP master machine */
 static void __msgout(const char *msg);
 static int __svc_priv_port_create(void);
 static void nispasswd_prog(struct svc_req *rqstp, register SVCXPRT *transp);
+static void nispasswd_prog_ver2(struct svc_req *rqstp,
+				    register SVCXPRT *transp);
 static void yppasswd_prog(struct svc_req *rqstp, register SVCXPRT *transp);
 static void set_rpc_gss_svc_names(void);
 
@@ -83,7 +82,7 @@ main(int argc, char *argv[])
 			if (max_attempts < 0) {
 				fprintf(stderr,
 				"%s: invalid number of maximum attempts\n",
-					argv[0]);
+				    argv[0]);
 				exit(1);
 			}
 			break;
@@ -91,7 +90,7 @@ main(int argc, char *argv[])
 			mins = atoi(optarg);
 			if (mins <= 0) {
 				fprintf(stderr,
-					"%s: invalid cache time\n", argv[0]);
+				    "%s: invalid cache time\n", argv[0]);
 				exit(1);
 			}
 			cache_time = (ulong_t)mins * 60;
@@ -107,14 +106,14 @@ main(int argc, char *argv[])
 			break;
 		case 'Y':	/* YP forward mode */
 			if (!(ypfwd = strdup(optarg))) {
-			    fprintf(stderr, "%s: out of memory\n", argv[0]);
-			    exit(1);
+				fprintf(stderr, "%s: out of memory\n", argv[0]);
+				exit(1);
 			}
 			break;
 		case '?':
 			fprintf(stderr,
 			"Usage: %s [-a attempts] [-c minutes] [-D] [-g] [-v]\n",
-				argv[0]);
+			    argv[0]);
 			exit(1);
 		}
 	}
@@ -129,7 +128,7 @@ main(int argc, char *argv[])
 	if (geteuid() != (uid_t)0) {
 		char err_string[256];
 		snprintf(err_string, sizeof (err_string),
-			"must be superuser to run %s", argv[0]);
+		    "must be superuser to run %s", argv[0]);
 		__msgout(err_string);
 		exit(1);
 	}
@@ -160,11 +159,11 @@ main(int argc, char *argv[])
 		if (debug == TRUE)
 			(void) fprintf(stderr,
 			"no host/address information for local host, %d\n",
-			status);
+			    status);
 		else
 			syslog(LOG_ERR,
 			"no host/address information for local host, %d",
-			status);
+			    status);
 		__msgout("exiting ...");
 		exit(1);
 	}
@@ -184,7 +183,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 	if ((strcmp(tagres[0].tag_val, "<Unknown Statistics>") == 0) ||
-		(strcmp(tagres[1].tag_val, "<Unknown Statistics>") == 0)) {
+	    (strcmp(tagres[1].tag_val, "<Unknown Statistics>") == 0)) {
 
 		/* old server */
 	__msgout("NIS+ server does not support the new statistics tags");
@@ -227,8 +226,20 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 	if (svc_create(nispasswd_prog, NISPASSWD_PROG, NISPASSWD_VERS,
-		"circuit_v") == 0) {
+	    "circuit_v") == 0) {
 		__msgout("unable to create (NISPASSWD_PROG, NISPASSWD_VERS)");
+		__msgout(" ... exiting ...");
+		exit(1);
+	}
+
+	if (rpcb_unset(NISPASSWD_PROG, NISPASSWD_VERS2, 0) == FALSE) {
+	__msgout("unable to de-register (NISPASSWD_PROG, NISPASSWD_VERS2)");
+		__msgout(" ... exiting ...");
+		exit(1);
+	}
+	if (svc_create(nispasswd_prog_ver2, NISPASSWD_PROG, NISPASSWD_VERS2,
+	    "circuit_v") == 0) {
+		__msgout("unable to create (NISPASSWD_PROG, NISPASSWD_VERS2)");
 		__msgout(" ... exiting ...");
 		exit(1);
 	}
@@ -266,9 +277,9 @@ __svc_priv_port_create()
 	}
 
 	while ((nconf = getnetconfig(handlep)) != 0 &&
-		(nconf4 == 0 || nconf6 == 0)) {
+	    (nconf4 == 0 || nconf6 == 0)) {
 		if ((nconf->nc_semantics == NC_TPI_CLTS) &&
-				strcmp(nconf->nc_proto, NC_UDP) == 0) {
+		    strcmp(nconf->nc_proto, NC_UDP) == 0) {
 			if (strcmp(nconf->nc_protofmly, NC_INET) == 0)
 				nconf4 = nconf;
 			else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0)
@@ -320,10 +331,10 @@ __svc_priv_port_create()
 
 	if (transp4 != 0)
 		svc4 = svc_reg(transp4, YPPASSWDPROG, YPPASSWDVERS,
-				yppasswd_prog, nconf4);
+		    yppasswd_prog, nconf4);
 	if (transp6 != 0)
 		svc6 = svc_reg(transp6, YPPASSWDPROG, YPPASSWDVERS,
-				yppasswd_prog, nconf6);
+		    yppasswd_prog, nconf6);
 	if (svc4 == 0 && svc6 == 0) {
 		__msgout("unable to register (YPPASSWDPROG, YPPASSWDVERS)");
 		if (transp4 != 0)
@@ -395,6 +406,71 @@ register SVCXPRT *transp;
 		exit(1);
 	}
 	if (nispasswd_prog_1_freeresult(transp, xdr_result,
+				(caddr_t)&result) == 0)
+		__msgout("unable to free results");
+
+	/* NOTREACHED */
+}
+
+static void
+nispasswd_prog_ver2(rqstp, transp)
+struct svc_req	*rqstp;
+register SVCXPRT *transp;
+{
+
+	union {
+		npd_request nispasswd_authenticate_2_arg;
+		npd_update2 nispasswd_update_2_arg;
+	} argument;
+	union {
+		nispasswd_authresult nispasswd_authenticate_2_res;
+		nispasswd_updresult nispasswd_update_2_res;
+	} result;
+	bool_t retval;
+	xdrproc_t xdr_argument, xdr_result;
+	bool_t (*local)(char *, void *, struct svc_req *);
+
+	switch (rqstp->rq_proc) {
+	case NULLPROC:
+		__msgout("received NIS+ null proc call");
+		(void) svc_sendreply(transp,
+			(xdrproc_t)xdr_void, (char *)NULL);
+		return;
+
+	case NISPASSWD_AUTHENTICATE:
+		xdr_argument = (xdrproc_t)xdr_npd_request;
+		xdr_result = (xdrproc_t)xdr_nispasswd_authresult;
+		local = (bool_t (*) (char *, void *, struct svc_req *))
+				nispasswd_authenticate_2_svc;
+		break;
+
+	case NISPASSWD_UPDATE:
+		xdr_argument = (xdrproc_t)xdr_npd_update2;
+		xdr_result = (xdrproc_t)xdr_nispasswd_updresult;
+		local = (bool_t (*) (char *, void *, struct svc_req *))
+				nispasswd_update_2_svc;
+		break;
+
+	default:
+		svcerr_noproc(transp);
+		return;
+	}
+	(void) memset((char *)&argument, 0, sizeof (argument));
+	if (svc_getargs(transp, xdr_argument, (caddr_t)&argument) == 0) {
+		svcerr_decode(transp);
+		return;
+	}
+	(void) memset((char *)&result, 0, sizeof (result));
+	retval = (bool_t)(*local)((char *)&argument, (void *)&result, rqstp);
+	if (retval == TRUE && (svc_sendreply(transp, xdr_result,
+						(char *)&result) == 0)) {
+		svcerr_systemerr(transp);
+	}
+	if (svc_freeargs(transp, xdr_argument, (caddr_t)&argument) == 0) {
+		__msgout("unable to free arguments");
+		exit(1);
+	}
+	if (nispasswd_prog_2_freeresult(transp, xdr_result,
 				(caddr_t)&result) == 0)
 		__msgout("unable to free results");
 
@@ -504,7 +580,7 @@ set_rpc_gss_svc_names()
 
 		/* '@' + NUL = 2 */
 		if (strlen(lh) + strlen(NIS_SVCNAME_NISPASSWD) + 2 >
-							sizeof (svc_name)) {
+		    sizeof (svc_name)) {
 			syslog(LOG_ERR,
 		"can't set RPC GSS service name:  svc_name bufsize too small");
 			__nis_release_mechanisms(mechs);
@@ -519,6 +595,7 @@ set_rpc_gss_svc_names()
 
 		for (mpp = mechs; *mpp; mpp++) {
 			mechanism_t *mp = *mpp;
+			bool_t	val;
 
 			if (AUTH_DES_COMPAT_CHK(mp))
 				break;
@@ -526,21 +603,44 @@ set_rpc_gss_svc_names()
 			if (! VALID_MECH_ENTRY(mp))
 				continue;
 
-			if (rpc_gss_set_svc_name(svc_name,  mp->mechname,
-							0, NISPASSWD_PROG,
-							NISPASSWD_VERS)) {
+			val = rpc_gss_set_svc_name(svc_name,  mp->mechname,
+			    0, NISPASSWD_PROG,
+			    NISPASSWD_VERS);
+			if (val) {
 				if (verbose)
 					syslog(LOG_INFO,
 				"RPC GSS service name for mechanism '%s' set",
-						mp->mechname);
+					    mp->mechname);
 			} else {
 				rpc_gss_error_t	err;
 
 				rpc_gss_get_error(&err);
 				syslog(LOG_ERR,
-"can't set RPC GSS svc name '%s' for mech '%s': RPC GSS err = %d, sys err = %d",
-					svc_name, mp->mechname,
-					err.rpc_gss_error, err.system_error);
+				    "can't set RPC GSS svc name '%s'"
+				    "for mech '%s': RPC GSS err = %d,"
+				    "sys err = %d",
+				    svc_name, mp->mechname,
+				    err.rpc_gss_error, err.system_error);
+			}
+
+			val = rpc_gss_set_svc_name(svc_name,  mp->mechname,
+			    0, NISPASSWD_PROG,
+			    NISPASSWD_VERS2);
+			if (val) {
+				if (verbose)
+					syslog(LOG_INFO,
+				"RPC GSS service name for mechanism '%s' set",
+					    mp->mechname);
+			} else {
+				rpc_gss_error_t	err;
+
+				rpc_gss_get_error(&err);
+				syslog(LOG_ERR,
+				    "can't set RPC GSS svc name '%s'"
+				    "for mech '%s': RPC GSS err = %d,"
+				    "sys err = %d",
+				    svc_name, mp->mechname,
+				    err.rpc_gss_error, err.system_error);
 			}
 		}
 		__nis_release_mechanisms(mechs);

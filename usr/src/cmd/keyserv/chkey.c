@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@
 #include <rpc/rpc.h>
 #include <rpc/key_prot.h>
 #include <rpcsvc/nis.h>
+#include <rpcsvc/nispasswd.h>
 #include <rpcsvc/nis_dhext.h>
 #include <rpcsvc/ypclnt.h>
 #include <nsswitch.h>
@@ -96,6 +97,8 @@ char		*sec_domain = NULL;
 char		**rpc_pws = NULL; /* List of S-RPC passwords */
 int		rpc_pw_count = 0; /* Number of passwords entered by user */
 char		*login_pw = NULL; /* Unencrypted login password */
+char		short_login_pw[DESCREDPASSLEN + 1];
+/* Short S-RPC password, which has first 8 chars of login_pw */
 
 static int add_cred_obj(nis_object *, char *);
 static nis_error auth_exists(char *, char *, char *, char *);
@@ -153,7 +156,7 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: %s [-p] [-s ldap | nisplus | nis | files] \n",
-		program_name);
+	    program_name);
 	exit(1);
 }
 
@@ -169,8 +172,8 @@ encryptkeys()
 			char		*crypt = NULL;
 
 			if (!xencrypt_g(slist[mcount], CURMECH->keylen,
-					CURMECH->algtype, login_pw, netname,
-					&crypt, TRUE)) {
+			    CURMECH->algtype, short_login_pw, netname,
+			    &crypt, TRUE)) {
 				/* Could not crypt key */
 				crypt = NULL;
 			} else
@@ -181,15 +184,15 @@ encryptkeys()
 		char		*crypt = NULL;
 
 		if (!(crypt =
-			(char *)malloc(HEXKEYBYTES + KEYCHECKSUMSIZE + 1))) {
+		    (char *)malloc(HEXKEYBYTES + KEYCHECKSUMSIZE + 1))) {
 			fprintf(stderr, "%s: Malloc failure.\n", program_name);
 			exit(1);
 		}
 
-		memcpy(crypt, slist[0], HEXKEYBYTES);
-		memcpy(crypt + HEXKEYBYTES, slist[0], KEYCHECKSUMSIZE);
+		(void) memcpy(crypt, slist[0], HEXKEYBYTES);
+		(void) memcpy(crypt + HEXKEYBYTES, slist[0], KEYCHECKSUMSIZE);
 		crypt[HEXKEYBYTES + KEYCHECKSUMSIZE] = 0;
-		xencrypt(crypt, login_pw);
+		xencrypt(crypt, short_login_pw);
 
 		clist[0] = crypt;
 		ccount++;
@@ -197,7 +200,7 @@ encryptkeys()
 
 	if (!ccount) {
 		fprintf(stderr, "%s: Could not encrypt any secret keys.\n",
-			program_name);
+		    program_name);
 		exit(1);
 	}
 }
@@ -211,7 +214,8 @@ initkeylist(bool_t nomech)
 
 	if (!nomech) {
 		assert(mechs && mechs[0]);
-		for (mcount = 0; CURMECH; mcount++);
+		for (mcount = 0; CURMECH; mcount++)
+			;
 	} else
 		mcount = 1;
 
@@ -245,17 +249,17 @@ getpublics()
 			hexkeylen = ((CURMECH->keylen / 8) * 2) + 1;
 			if (!(public = (char *)malloc(hexkeylen))) {
 				fprintf(stderr, "%s: Malloc failure.\n",
-					program_name);
+				    program_name);
 				exit(1);
 			}
 			if (!getpublickey_g(netname, CURMECH->keylen,
-					    CURMECH->algtype, public,
-					    hexkeylen)) {
+			    CURMECH->algtype, public,
+			    hexkeylen)) {
 				/* Could not get public key */
 				fprintf(stderr,
-					"Could not get %s public key.\n",
-					VALID_ALIAS(CURMECH->alias) ?
-					CURMECH->alias : "");
+				    "Could not get %s public key.\n",
+				    VALID_ALIAS(CURMECH->alias) ?
+				    CURMECH->alias : "");
 				free(public);
 				public = NULL;
 			} else
@@ -281,11 +285,11 @@ getpublics()
 
 	if (!pcount) {
 		fprintf(stderr, "%s: cannot get any public keys for %s.\n",
-			program_name, pw->pw_name);
+		    program_name, pw->pw_name);
 		error_msg();
 		fprintf(stderr,
 	"Make sure that the public keys are stored in the domain %s.\n",
-			local_domain);
+		    local_domain);
 		exit(1);
 	}
 }
@@ -309,22 +313,22 @@ makenewkeys()
 
 			if (!(public = malloc(hexkeylen))) {
 				fprintf(stderr, "%s: Malloc failure.\n",
-					program_name);
+				    program_name);
 				exit(1);
 			}
 			if (!(secret = malloc(hexkeylen))) {
 				fprintf(stderr, "%s: Malloc failure.\n",
-					program_name);
+				    program_name);
 				exit(1);
 			}
 
 			if (!(__gen_dhkeys_g(public, secret, CURMECH->keylen,
-					CURMECH->algtype, login_pw))) {
+			    CURMECH->algtype, short_login_pw))) {
 				/* Could not generate key pair */
 				fprintf(stderr,
 				"WARNING  Could not generate key pair %s\n",
-					VALID_ALIAS(CURMECH->alias) ?
-					CURMECH->alias : "");
+				    VALID_ALIAS(CURMECH->alias) ?
+				    CURMECH->alias : "");
 				free(public);
 				free(secret);
 				public = NULL;
@@ -348,7 +352,7 @@ makenewkeys()
 			exit(1);
 		}
 
-		__gen_dhkeys(public, secret, login_pw);
+		__gen_dhkeys(public, secret, short_login_pw);
 
 		plist[0] = public;
 		slist[0] = secret;
@@ -366,19 +370,25 @@ cmp_passwd()
 	char	baseprompt[] = "Please enter the login password for";
 	char	prompt[BUFSIZ];
 	char	*en_login_pw = spw->sp_pwdp;
+	char    short_en_login_pw[DESCREDPASSLEN + 1];
 	char	*try_en_login_pw;
 	bool_t	pwmatch = FALSE;
 	int	done = 0, tries = 0, pcount;
 
 	snprintf(prompt, BUFSIZ, "%s %s:", baseprompt, pw->pw_name);
 
+	(void) strlcpy(short_en_login_pw, en_login_pw,
+	    sizeof (short_en_login_pw));
+
 	if (en_login_pw && (strlen(en_login_pw) != 0)) {
 		for (pcount = 0; pcount < rpc_pw_count; pcount++) {
 			char	*try_en_rpc_pw;
 
-			try_en_rpc_pw = crypt(rpc_pws[pcount], en_login_pw);
-			if (strcmp(try_en_rpc_pw, en_login_pw) == 0) {
+		try_en_rpc_pw = crypt(rpc_pws[pcount], short_en_login_pw);
+			if (strcmp(try_en_rpc_pw, short_en_login_pw) == 0) {
 				login_pw = rpc_pws[pcount];
+				(void) strlcpy(short_login_pw, login_pw,
+				    sizeof (short_login_pw));
 				pwmatch = TRUE;
 				break;
 			}
@@ -387,14 +397,16 @@ cmp_passwd()
 			/* pw don't match */
 			while (!done) {
 				/* ask for the pw */
-				login_pw = getpass(prompt);
+				login_pw = getpassphrase(prompt);
+				(void) strlcpy(short_login_pw, login_pw,
+				    sizeof (short_login_pw));
 				if (login_pw && strlen(login_pw)) {
 					/* pw was not empty */
 					try_en_login_pw = crypt(login_pw,
-								en_login_pw);
+					    en_login_pw);
 					/* compare the pw's */
 					if (!(strcmp(try_en_login_pw,
-							en_login_pw))) {
+					    en_login_pw))) {
 						/* pw was correct */
 						return;
 					} else {
@@ -402,15 +414,15 @@ cmp_passwd()
 						if (tries++) {
 							/* Sorry */
 							fprintf(stderr,
-								"Sorry.\n");
+							    "Sorry.\n");
 							exit(1);
 						} else {
 							/* Try again */
 							snprintf(prompt,
-									BUFSIZ,
+							    BUFSIZ,
 							"Try again. %s %s:",
-								baseprompt,
-								pw->pw_name);
+							    baseprompt,
+							    pw->pw_name);
 						}
 					}
 				} else {
@@ -419,15 +431,15 @@ cmp_passwd()
 						/* Unchanged */
 						fprintf(stderr,
 					"%s: key-pair(s) unchanged for %s.\n",
-							program_name,
-							pw->pw_name);
+						    program_name,
+						    pw->pw_name);
 						exit(1);
 					} else {
 						/* Need a password */
 						snprintf(prompt, BUFSIZ,
 						"Need a password. %s %s:",
-								baseprompt,
-								pw->pw_name);
+						    baseprompt,
+						    pw->pw_name);
 					}
 				}
 			}
@@ -438,7 +450,7 @@ cmp_passwd()
 		/* no pw found */
 		fprintf(stderr,
 		"%s: no passwd found for %s in the shadow passwd entry.\n",
-			program_name, pw->pw_name);
+		    program_name, pw->pw_name);
 		exit(1);
 	}
 }
@@ -453,24 +465,24 @@ getrpcpws(char *flavor)
 
 	if (flavor)
 		snprintf(prompt, BUFSIZ,
-			"Please enter the %s Secure-RPC password for %s:",
-			flavor, pw->pw_name);
+		    "Please enter the %s Secure-RPC password for %s:",
+		    flavor, pw->pw_name);
 	else
 		snprintf(prompt, BUFSIZ,
-				"Please enter the Secure-RPC password for %s:",
-				pw->pw_name);
+		    "Please enter the Secure-RPC password for %s:",
+		    pw->pw_name);
 
 	cur_pw = getpass(prompt);
 	if (!cur_pw) {
 		/* No changes */
 		fprintf(stderr, "%s: key-pair(s) unchanged for %s.\n",
-			program_name, pw->pw_name);
+		    program_name, pw->pw_name);
 		exit(1);
 	}
 
 	rpc_pw_count++;
 	if (!(rpc_pws =
-		(char **)realloc(rpc_pws, sizeof (char *) * rpc_pw_count))) {
+	    (char **)realloc(rpc_pws, sizeof (char *) * rpc_pw_count))) {
 		fprintf(stderr, "%s: Realloc failure.\n", program_name);
 		exit(1);
 	}
@@ -495,17 +507,17 @@ getsecrets()
 
 			hexkeylen = ((CURMECH->keylen / 8) * 2) + 1;
 			if (!(secret = (char *)calloc(hexkeylen,
-							sizeof (char)))) {
+			    sizeof (char)))) {
 				fprintf(stderr, "%s: Malloc failure.\n",
-					program_name);
+				    program_name);
 				exit(1);
 			}
 
 			for (pcount = 0; pcount < rpc_pw_count; pcount++) {
 				if (!getsecretkey_g(netname, CURMECH->keylen,
-						    CURMECH->algtype, secret,
-						    hexkeylen,
-						    rpc_pws[pcount]))
+				    CURMECH->algtype, secret,
+				    hexkeylen,
+				    rpc_pws[pcount]))
 					continue;
 
 				if (secret[0] == 0)
@@ -524,11 +536,11 @@ getsecrets()
 					 */
 					getrpcpws(CURMECH->alias);
 					if (!getsecretkey_g(netname,
-							    CURMECH->keylen,
-							    CURMECH->algtype,
-							    secret,
-							    hexkeylen,
-							    rpc_pws[pcount])) {
+					    CURMECH->keylen,
+					    CURMECH->algtype,
+					    secret,
+					    hexkeylen,
+					    rpc_pws[pcount])) {
 						/*
 						 * Could not retreive
 						 * secret key, abort
@@ -551,7 +563,7 @@ getsecrets()
 				} else {
 					fprintf(stderr,
 					"%s: key-pair unchanged for %s.\n",
-						program_name, pw->pw_name);
+					    program_name, pw->pw_name);
 					exit(1);
 				}
 			} else
@@ -570,8 +582,8 @@ getsecrets()
 	getsecrets_tryagain:
 		if (!getsecretkey(netname, secret, rpc_pws[0])) {
 			fprintf(stderr,
-				"%s: could not get secret key for '%s'\n",
-				program_name, netname);
+			    "%s: could not get secret key for '%s'\n",
+			    program_name, netname);
 			exit(1);
 		}
 
@@ -586,8 +598,8 @@ getsecrets()
 				goto getsecrets_tryagain;
 			} else {
 				fprintf(stderr,
-					"%s: key-pair unchanged for %s.\n",
-					program_name, pw->pw_name);
+				    "%s: key-pair unchanged for %s.\n",
+				    program_name, pw->pw_name);
 				exit(1);
 			}
 		}
@@ -599,7 +611,7 @@ getsecrets()
 	if (!scount) {
 		(void) fprintf(stderr,
 		"%s: could not get nor decrypt any secret keys for '%s'\n",
-					program_name, netname);
+		    program_name, netname);
 		error_msg();
 		exit(1);
 	}
@@ -635,7 +647,7 @@ keylogin_des()
 		perror("Warning: NFS credentials not destroyed");
 #endif /* NFS_AUTH */
 
-	memcpy(netst.st_priv_key, secret, HEXKEYBYTES);
+	(void) memcpy(netst.st_priv_key, secret, HEXKEYBYTES);
 
 	netst.st_pub_key[0] = '\0';
 	netst.st_netname = strdup(netname);
@@ -659,15 +671,15 @@ keylogin(keylen_t keylen, algtype_t algtype)
 			if (keylen == CURMECH->keylen &&
 			    algtype == CURMECH->algtype) {
 				if (key_setnet_g(netname, slist[mcount],
-							CURMECH->keylen,
-							NULL, 0,
-							CURMECH->algtype)
+				    CURMECH->keylen,
+				    NULL, 0,
+				    CURMECH->algtype)
 				    < 0)
 					fprintf(stderr,
 					"Could not set %s's %s secret key\n",
-						netname,
-					VALID_ALIAS(CURMECH->alias) ?
-						CURMECH->alias : "");
+					    netname,
+					    VALID_ALIAS(CURMECH->alias) ?
+					    CURMECH->alias : "");
 			}
 		}
 	} else {
@@ -749,14 +761,14 @@ write_rootkey(char *secret, char *flavor, keylen_t keylen, algtype_t algtype)
 	if ((rootfd = open(ROOTKEY_FILE, O_WRONLY+O_CREAT, 0600)) < 0) {
 		perror("Could not open /etc/.rootkey for writing");
 		fprintf(stderr,
-			"Attempting to restore original /etc/.rootkey\n");
+		    "Attempting to restore original /etc/.rootkey\n");
 		rename(ROOTKEY_FILE_BACKUP, ROOTKEY_FILE);
 		goto rootkey_err;
 	}
 	if (!(rootfile = fdopen(rootfd, "w"))) {
 		perror("Could not open /etc/.rootkey for writing");
 		fprintf(stderr,
-			"Attempting to restore original /etc/.rootkey\n");
+		    "Attempting to restore original /etc/.rootkey\n");
 		close(rootfd);
 		unlink(ROOTKEY_FILE);
 		rename(ROOTKEY_FILE_BACKUP, ROOTKEY_FILE);
@@ -765,7 +777,7 @@ write_rootkey(char *secret, char *flavor, keylen_t keylen, algtype_t algtype)
 	if (!(bakfile = fopen(ROOTKEY_FILE_BACKUP, "r"))) {
 		perror("Could not open /etc/.rootkey.bak for reading");
 		fprintf(stderr,
-			"Attempting to restore original /etc/.rootkey\n");
+		    "Attempting to restore original /etc/.rootkey\n");
 		fclose(rootfile);
 		unlink(ROOTKEY_FILE);
 		rename(ROOTKEY_FILE_BACKUP, ROOTKEY_FILE);
@@ -830,7 +842,7 @@ write_rootkey(char *secret, char *flavor, keylen_t keylen, algtype_t algtype)
 
 rootkey_err:
 	fprintf(stderr, "WARNING: Could not write %s key to /etc/.rootkey\n",
-		flavor);
+	    flavor);
 }
 
 
@@ -846,7 +858,7 @@ sanity_checks(char *nis_princ, char *domain, char *authtype)
 	if (nis_princ == NULL) {
 		(void) fprintf(stderr,
 		"%s: you must create a \"LOCAL\" credential for '%s' first.\n",
-			program_name, netname);
+		    program_name, netname);
 		(void) fprintf(stderr, "\tSee nisaddcred(1).\n");
 		return (0);
 	}
@@ -856,15 +868,15 @@ sanity_checks(char *nis_princ, char *domain, char *authtype)
 	if (nis_princ[len-1] != '.') {
 		(void) fprintf(stderr,
 		"%s: invalid principal name: '%s' (forgot ending dot?).\n",
-			program_name, nis_princ);
+		    program_name, nis_princ);
 		return (0);
 	}
 
 	/* Sanity check 1.  We only deal with one type of netnames. */
 	if (strncmp(netname, "unix", 4) != 0) {
 		(void) fprintf(stderr,
-			"%s: unrecognized netname type: '%s'.\n",
-			program_name, netname);
+		"%s: unrecognized netname type: '%s'.\n",
+		    program_name, netname);
 		return (0);
 	}
 
@@ -873,7 +885,7 @@ sanity_checks(char *nis_princ, char *domain, char *authtype)
 	if (strcasecmp(princdomain, domain) != 0) {
 		(void) fprintf(stderr,
 "%s: domain of principal '%s' does not match destination domain '%s'.\n",
-			program_name, nis_princ, domain);
+		    program_name, nis_princ, domain);
 		(void) fprintf(stderr,
 	"Should only add DES credential of principal in its home domain\n");
 		return (0);
@@ -886,7 +898,7 @@ sanity_checks(char *nis_princ, char *domain, char *authtype)
 	netdomain = (char *)strchr(netname, '@');
 	if (! netdomain || netname[strlen(netname)-1] == '.') {
 		(void) fprintf(stderr, "%s: invalid netname: '%s'. \n",
-			program_name, netname);
+		    program_name, netname);
 		return (0);
 	}
 	netdomain++; /* skip '@' */
@@ -894,7 +906,7 @@ sanity_checks(char *nis_princ, char *domain, char *authtype)
 	if (strlcpy(netdomainaux, netdomain, sizeof (netdomainaux)) >=
 	    sizeof (netdomainaux)) {
 		(void) fprintf(stderr, "%s: net domain name %s is too long\n",
-			    program_name, netdomain);
+		    program_name, netdomain);
 		return (0);
 	}
 
@@ -902,8 +914,8 @@ sanity_checks(char *nis_princ, char *domain, char *authtype)
 		if (strlcat(netdomainaux, ".", sizeof (netdomainaux)) >=
 		    sizeof (netdomainaux)) {
 			(void) fprintf(stderr,
-				    "%s: net domain name %s is too long\n",
-				    program_name, netdomainaux);
+			    "%s: net domain name %s is too long\n",
+			    program_name, netdomainaux);
 			return (0);
 		}
 	}
@@ -911,7 +923,7 @@ sanity_checks(char *nis_princ, char *domain, char *authtype)
 	if (strcasecmp(princdomain, netdomainaux) != 0) {
 		(void) fprintf(stderr,
 	"%s: domain of netname %s should be same as that of principal %s\n",
-			program_name, netname, nis_princ);
+		    program_name, netname, nis_princ);
 		return (0);
 	}
 
@@ -937,31 +949,31 @@ storekeys()
 		break;
 	case PK_NISPLUS:
 		nis_princ = get_nisplus_principal(nis_local_directory(),
-							geteuid());
+		    geteuid());
 		break;
 	case PK_YP:
 		yp_get_default_domain(&ypdomain);
 		if (yp_master(ypdomain, PKMAP, &ypmaster) != 0) {
 			fprintf(stderr,
 			"%s: cannot find master of NIS publickey database\n",
-				program_name);
+			    program_name);
 			exit(1);
 		}
 		fprintf(stdout,
-			"Sending key change request to %s ...\n", ypmaster);
+		    "Sending key change request to %s ...\n", ypmaster);
 		break;
 	case PK_FILES:
 		if (geteuid() != 0) {
 			fprintf(stderr,
 		"%s: non-root users cannot change their key-pair in %s\n",
-				program_name, PKFILE);
+			    program_name, PKFILE);
 			exit(1);
 		}
 		break;
 	default:
 		fprintf(stderr,
-			"could not update; database %d unknown\n",
-			dest_service);
+		    "could not update; database %d unknown\n",
+		    dest_service);
 		exit(1);
 	}
 
@@ -973,38 +985,38 @@ storekeys()
 				continue;
 
 			__nis_mechalias2authtype(CURMECH->alias, authtype,
-							MECH_MAXATNAME);
+			    MECH_MAXATNAME);
 			if (!authtype) {
 				fprintf(stderr,
 				"Could not generate auth_type for %s.\n",
-					CURMECH->alias);
+				    CURMECH->alias);
 				continue;
 			}
 
 			snprintf(pkent, MAXPKENTLEN, "%s:%s:%d",
-					plist[mcount], clist[mcount],
-					CURMECH->algtype);
+			    plist[mcount], clist[mcount],
+			    CURMECH->algtype);
 
 			switch (dest_service) {
 			case PK_LDAP:
 				if (ldap_update(CURMECH->alias, netname,
-						plist[mcount], clist[mcount],
-						login_pw))
+				    plist[mcount], clist[mcount],
+				    login_pw))
 					fprintf(stderr,
 			"%s: unable to update %s key in LDAP database\n",
-						program_name, authtype);
+					    program_name, authtype);
 				else
 					ucount++;
 				break;
 
 			case PK_NISPLUS:
 				if (nisplus_update(nis_princ,
-							authtype,
-							plist[mcount],
-							clist[mcount]))
+				    authtype,
+				    plist[mcount],
+				    clist[mcount]))
 					fprintf(stderr,
 			"%s: unable to update %s key in nisplus database\n",
-						program_name, authtype);
+					    program_name, authtype);
 				else
 					ucount++;
 				break;
@@ -1027,11 +1039,11 @@ storekeys()
 		switch (dest_service) {
 		case PK_LDAP:
 			if (ldap_update("dh192-0", netname,
-					plist[0], clist[0],
-					login_pw)) {
+			    plist[0], clist[0],
+			    login_pw)) {
 				fprintf(stderr,
 			"%s: unable to update %s key in LDAP database\n",
-					program_name);
+				    program_name);
 				exit(1);
 			}
 			break;
@@ -1039,25 +1051,25 @@ storekeys()
 		case PK_NISPLUS:
 			assert(plist[0] && clist[0]);
 			if (nisplus_update(nis_princ,
-						AUTH_DES_AUTH_TYPE,
-						plist[0],
-						clist[0])) {
-					fprintf(stderr,
+			    AUTH_DES_AUTH_TYPE,
+			    plist[0],
+			    clist[0])) {
+				fprintf(stderr,
 			"%s: unable to update nisplus database\n",
-						program_name);
+				    program_name);
 					exit(1);
 			}
 			break;
 
 		case PK_YP:
 			if (status = yp_update(ypdomain, PKMAP,
-						YPOP_STORE, netname,
-						strlen(netname), pkent,
-						strlen(pkent))) {
+			    YPOP_STORE, netname,
+			    strlen(netname), pkent,
+			    strlen(pkent))) {
 				fprintf(stderr,
 				"%s: unable to update NIS database (%u): %s\n",
-					program_name, status,
-					yperr_string(status));
+				    program_name, status,
+				    yperr_string(status));
 				exit(1);
 			}
 			break;
@@ -1066,7 +1078,7 @@ storekeys()
 			if (localupdate(netname, PKFILE, YPOP_STORE, pkent)) {
 				fprintf(stderr,
 			"%s: hence, unable to update publickey database\n",
-					program_name);
+				    program_name);
 				exit(1);
 			}
 			break;
@@ -1079,7 +1091,7 @@ storekeys()
 	}
 	if (!ucount) {
 		fprintf(stderr, "%s: unable to update any key-pairs for %s.\n",
-			program_name, pw->pw_name);
+		    program_name, pw->pw_name);
 		exit(1);
 	}
 }
@@ -1095,13 +1107,13 @@ auth_exists(char *princname, char *auth_name, char *auth_type, char *domain)
 	char *foundprinc;
 
 	(void) sprintf(sname, "[auth_name=%s,auth_type=%s],%s.%s",
-		auth_name, auth_type, CRED_TABLE, domain);
+	    auth_name, auth_type, CRED_TABLE, domain);
 	if (sname[strlen(sname)-1] != '.')
 		strcat(sname, ".");
 	/* Don't want FOLLOW_PATH here */
 	res = nis_list(sname,
-		MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
-		NULL, NULL);
+	    MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
+	    NULL, NULL);
 
 	status = res->status;
 	switch (res->status) {
@@ -1109,14 +1121,14 @@ auth_exists(char *princname, char *auth_name, char *auth_type, char *domain)
 		break;
 	case NIS_TRYAGAIN:
 		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
+		"%s: NIS+ server busy, try again later.\n",
+		    program_name);
 		exit(1);
 		break;
 	case NIS_PERMISSION:
 		(void) fprintf(stderr,
 		"%s: insufficient permission to look up old credentials.\n",
-			program_name);
+		    program_name);
 		exit(1);
 		break;
 	case NIS_SUCCESS:
@@ -1124,14 +1136,14 @@ auth_exists(char *princname, char *auth_name, char *auth_type, char *domain)
 		if (nis_dir_cmp(foundprinc, princname) != SAME_NAME) {
 			(void) fprintf(stderr,
 	"%s: %s credentials with auth_name '%s' already belong to '%s'.\n",
-			program_name, auth_type, auth_name, foundprinc);
+			    program_name, auth_type, auth_name, foundprinc);
 			exit(1);
 		}
 		break;
 	default:
 		(void) fprintf(stderr,
-			"%s: error looking at cred table, NIS+ error: %s\n",
-			program_name, nis_sperrno(res->status));
+		"%s: error looking at cred table, NIS+ error: %s\n",
+		    program_name, nis_sperrno(res->status));
 		exit(1);
 	}
 	nis_freeresult(res);
@@ -1148,15 +1160,15 @@ cred_exists(const char *nisprinc, const char *flavor, const char *domain)
 	nis_error status;
 
 	snprintf(sname, NIS_MAXNAMELEN,
-			"[cname=\"%s\",auth_type=%s],%s.%s",
-			nisprinc, flavor, CRED_TABLE, domain);
+	    "[cname=\"%s\",auth_type=%s],%s.%s",
+	    nisprinc, flavor, CRED_TABLE, domain);
 	if (sname[strlen(sname)-1] != '.')
 		strcat(sname, ".");
 
 	/* Don't want FOLLOW_PATH here */
 	res = nis_list(sname,
-				MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
-				NULL, NULL);
+	    MASTER_ONLY+USE_DGRAM+NO_AUTHINFO+FOLLOW_LINKS,
+	    NULL, NULL);
 
 	status = res->status;
 	switch (status) {
@@ -1164,14 +1176,14 @@ cred_exists(const char *nisprinc, const char *flavor, const char *domain)
 		break;
 	case NIS_TRYAGAIN:
 		fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
+		"%s: NIS+ server busy, try again later.\n",
+		    program_name);
 		exit(1);
 		break;
 	case NIS_PERMISSION:
 		(void) fprintf(stderr,
 		"%s: insufficient permission to look at credentials table\n",
-			program_name);
+		    program_name);
 		exit(1);
 		break;
 	case NIS_SUCCESS:
@@ -1179,8 +1191,8 @@ cred_exists(const char *nisprinc, const char *flavor, const char *domain)
 		break;
 	default:
 		(void) fprintf(stderr,
-			"%s: error looking at cred table, NIS+ error: %s\n",
-			program_name, nis_sperrno(res->status));
+		"%s: error looking at cred table, NIS+ error: %s\n",
+		    program_name, nis_sperrno(res->status));
 		exit(1);
 	}
 	nis_freeresult(res);
@@ -1200,14 +1212,14 @@ modify_cred_obj(nis_object *obj, char *domain)
 	switch (res->status) {
 	case NIS_TRYAGAIN:
 		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
+		"%s: NIS+ server busy, try again later.\n",
+		    program_name);
 		exit(1);
 		break;
 	case NIS_PERMISSION:
 		(void) fprintf(stderr,
-			"%s: insufficient permission to update credentials.\n",
-			program_name);
+		"%s: insufficient permission to update credentials.\n",
+		    program_name);
 		exit(1);
 		break;
 	case NIS_SUCCESS:
@@ -1215,8 +1227,8 @@ modify_cred_obj(nis_object *obj, char *domain)
 		break;
 	default:
 		(void) fprintf(stderr,
-			"%s: error modifying credential, NIS+ error: %s.\n",
-			program_name, nis_sperrno(res->status));
+		"%s: error modifying credential, NIS+ error: %s.\n",
+		    program_name, nis_sperrno(res->status));
 		exit(1);
 	}
 	nis_freeresult(res);
@@ -1238,14 +1250,14 @@ add_cred_obj(nis_object *obj, char *domain)
 	switch (res->status) {
 	case NIS_TRYAGAIN:
 		(void) fprintf(stderr,
-			"%s: NIS+ server busy, try again later.\n",
-			program_name);
+		"%s: NIS+ server busy, try again later.\n",
+		    program_name);
 		exit(1);
 		break;
 	case NIS_PERMISSION:
 		(void) fprintf(stderr,
-			"%s: insufficient permission to update credentials.\n",
-			program_name);
+		"%s: insufficient permission to update credentials.\n",
+		    program_name);
 		exit(1);
 		break;
 	case NIS_SUCCESS:
@@ -1253,8 +1265,8 @@ add_cred_obj(nis_object *obj, char *domain)
 		break;
 	default:
 		(void) fprintf(stderr,
-			"%s: error creating credential, NIS+ error: %s.\n",
-			program_name, nis_sperrno(res->status));
+		"%s: error creating credential, NIS+ error: %s.\n",
+		    program_name, nis_sperrno(res->status));
 		exit(1);
 	}
 	nis_freeresult(res);
@@ -1274,7 +1286,7 @@ nisplus_update(nis_name nis_princ, char *authtype, char *public, char *crypt)
 
 	if (!(userdomain = strchr(netname, '@'))) {
 		fprintf(stderr, "%s: invalid netname: '%s'.\n",
-			program_name, netname);
+		    program_name, netname);
 		exit(1);
 	}
 	userdomain++;
@@ -1282,8 +1294,8 @@ nisplus_update(nis_name nis_princ, char *authtype, char *public, char *crypt)
 	if (strlcpy(cmpdomain, userdomain, sizeof (cmpdomain)) >=
 	    sizeof (cmpdomain)) {
 		(void) fprintf(stderr,
-			    "%s: net domain name %s is too long\n",
-			    program_name, cmpdomain);
+		"%s: net domain name %s is too long\n",
+		    program_name, cmpdomain);
 			exit(1);
 	}
 
@@ -1291,8 +1303,8 @@ nisplus_update(nis_name nis_princ, char *authtype, char *public, char *crypt)
 		if (strlcat(cmpdomain, ".", sizeof (cmpdomain)) >=
 		    sizeof (cmpdomain)) {
 			(void) fprintf(stderr,
-				    "%s: net domain name %s is too long\n",
-				    program_name, cmpdomain);
+			"%s: net domain name %s is too long\n",
+			    program_name, cmpdomain);
 			exit(1);
 		}
 	}
@@ -1327,8 +1339,8 @@ nisplus_update(nis_name nis_princ, char *authtype, char *public, char *crypt)
 		obj->zo_domain = domain;
 		/* owner: r, group: rmcd */
 		obj->zo_access = ((NIS_READ_ACC<<16)|
-				(NIS_READ_ACC|NIS_MODIFY_ACC|NIS_CREATE_ACC|
-				NIS_DESTROY_ACC)<<8);
+		    (NIS_READ_ACC|NIS_MODIFY_ACC|NIS_CREATE_ACC|
+		    NIS_DESTROY_ACC)<<8);
 		status = add_cred_obj(obj, domain);
 	} else {
 		obj->EN_data.en_cols.en_cols_val[3].ec_flags |= EN_MODIFIED;
@@ -1359,28 +1371,29 @@ addmechtolist(char *mechtype)
 					 */
 					numspecmech++;
 					if ((mechs =
-						(mechanism_t **)realloc(mechs,
-				sizeof (mechanism_t *) * (numspecmech + 1))) ==
-					    NULL) {
+					    (mechanism_t **)realloc(mechs,
+					    sizeof (mechanism_t *) *
+					    (numspecmech + 1))) == NULL) {
 						perror("Can not change keys");
 						exit(1);
 					}
 
 					if ((mechs[numspecmech - 1] =
-		(mechanism_t *)malloc(sizeof (mechanism_t))) == NULL) {
+					    (mechanism_t *)malloc(
+					    sizeof (mechanism_t))) == NULL) {
 						perror("Can not change keys");
 						exit(1);
 					}
 					if (realmechlist[i]->mechname)
 					mechs[numspecmech - 1]->mechname =
-					strdup(realmechlist[i]->mechname);
+					    strdup(realmechlist[i]->mechname);
 					if (realmechlist[i]->alias)
 					mechs[numspecmech - 1]->alias =
-						strdup(realmechlist[i]->alias);
+					    strdup(realmechlist[i]->alias);
 					mechs[numspecmech - 1]->keylen =
-						realmechlist[i]->keylen;
+					    realmechlist[i]->keylen;
 					mechs[numspecmech - 1]->algtype =
-						realmechlist[i]->algtype;
+					    realmechlist[i]->algtype;
 					mechs[numspecmech] = NULL;
 					__nis_release_mechanisms(realmechlist);
 					return;
@@ -1389,13 +1402,13 @@ addmechtolist(char *mechtype)
 
 		fprintf(stderr,
 		"WARNING: Mechanism '%s' not configured, skipping...\n",
-			mechtype);
+		    mechtype);
 		__nis_release_mechanisms(realmechlist);
 		return;
 	}
 	fprintf(stderr,
-		"WARNING: Mechanism '%s' not configured, skipping...\n",
-		mechtype);
+	"WARNING: Mechanism '%s' not configured, skipping...\n",
+	    mechtype);
 }
 
 
@@ -1452,7 +1465,7 @@ main(int argc, char **argv)
 	}
 	if (!__getnetnamebyuid(netname, uid = getuid())) {
 		fprintf(stderr, "%s: cannot generate netname for uid %d\n",
-			program_name, uid);
+		    program_name, uid);
 		exit(1);
 	}
 	sec_domain = strdup(strchr(netname, '@') + 1);
@@ -1467,7 +1480,7 @@ main(int argc, char **argv)
 		if (dest_service == PK_YP || dest_service == PK_FILES) {
 			fprintf(stderr,
 		"%s: can not add non-DES public keys to %s, skipping.\n",
-				program_name, service);
+			    program_name, service);
 			__nis_release_mechanisms(mechs);
 			mechs = NULL;
 			initkeylist(TRUE);
@@ -1482,8 +1495,8 @@ main(int argc, char **argv)
 	/* Get password information */
 	if ((pw = getpwuid(uid)) == NULL) {
 		fprintf(stderr,
-			"%s: Can not find passwd information for %d.\n",
-			program_name, uid);
+		"%s: Can not find passwd information for %d.\n",
+		    program_name, uid);
 		exit(1);
 	}
 
@@ -1506,10 +1519,10 @@ main(int argc, char **argv)
 				keylogin(CURMECH->keylen, CURMECH->algtype);
 				if ((uid == 0) && (makenew == FALSE))
 					write_rootkey(slist[mcount],
-					VALID_ALIAS(CURMECH->alias) ?
-							CURMECH->alias :
-							"",
-							keylen, algtype);
+					    VALID_ALIAS(CURMECH->alias) ?
+					    CURMECH->alias :
+					    "",
+					    keylen, algtype);
 			}
 		}
 	} else {
@@ -1544,8 +1557,8 @@ main(int argc, char **argv)
 		(void) seteuid(uid);
 
 		(void) fprintf(stderr,
-			"%s: cannot find shadow entry for %s.\n",
-			program_name, pw->pw_name);
+		"%s: cannot find shadow entry for %s.\n",
+		    program_name, pw->pw_name);
 		exit(1);
 	}
 
@@ -1555,7 +1568,7 @@ main(int argc, char **argv)
 	if (strcmp(spw->sp_pwdp, NOPWDRTR) == 0) {
 		(void) fprintf(stderr,
 		"%s: do not have read access to the passwd field for %s\n",
-				program_name, pw->pw_name);
+		    program_name, pw->pw_name);
 		exit(1);
 	}
 
@@ -1566,10 +1579,12 @@ main(int argc, char **argv)
 	if (force) {
 		char	*prompt = "Please enter New password:";
 
-		login_pw = getpass(prompt);
+		login_pw = getpassphrase(prompt);
+		(void) strlcpy(short_login_pw, login_pw,
+		    sizeof (short_login_pw));
 		if (!login_pw || !(strlen(login_pw))) {
 			fprintf(stderr, "%s: key-pair(s) unchanged for %s.\n",
-				program_name, pw->pw_name);
+			    program_name, pw->pw_name);
 			exit(1);
 		}
 	} else {
@@ -1598,9 +1613,9 @@ main(int argc, char **argv)
 					if (!slist[mcount])
 						continue;
 					write_rootkey(slist[mcount],
-							CURMECH->alias,
-							CURMECH->keylen,
-							CURMECH->algtype);
+					    CURMECH->alias,
+					    CURMECH->keylen,
+					    CURMECH->algtype);
 				}
 			} else {
 				assert(slist[0]);
@@ -1610,7 +1625,7 @@ main(int argc, char **argv)
 		if (mechs) {
 			for (mcount = 0; CURMECH; mcount++)
 				keylogin(CURMECH->keylen,
-						CURMECH->algtype);
+				    CURMECH->algtype);
 		} else
 			keylogin_des();
 	}

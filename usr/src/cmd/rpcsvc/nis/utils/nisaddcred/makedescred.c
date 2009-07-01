@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,9 @@
 /*
  *	makedescred.c
  *
- *	Copyright (c) 1988-1992,2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ *	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ *	Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * makedescred.c
@@ -45,6 +42,7 @@
 #include <nsswitch.h>
 #include <netdb.h>
 #include <rpcsvc/nis.h>
+#include <rpcsvc/nispasswd.h>
 #include <rpcsvc/nis_dhext.h>
 #include <rpc/key_prot.h>
 #include "nisaddcred.h"
@@ -84,7 +82,7 @@ keylogin_des(char *netname, char *secret)
 	struct key_netstarg netst;
 
 	netst.st_pub_key[0] = 0;
-	memcpy(netst.st_priv_key, secret, HEXKEYBYTES);
+	(void) memcpy(netst.st_priv_key, secret, HEXKEYBYTES);
 	netst.st_netname = netname;
 
 #ifdef NFS_AUTH
@@ -134,6 +132,7 @@ make_des_cred_be(char *nis_princ, char *netname, char *domain)
 {
 	nis_object	*obj = init_entry();
 	char 		*pass;
+	char		short_pass[DESCREDPASSLEN + 1];
 	uid_t		uid;
 	char 		public[HEXKEYBYTES + 1];
 	char		secret[HEXKEYBYTES + 1];
@@ -166,17 +165,18 @@ make_des_cred_be(char *nis_princ, char *netname, char *domain)
 	if (pass == 0)
 		return (0);
 
+	(void) strlcpy(short_pass, pass, sizeof (short_pass));
 	/* Get password with which to encrypt secret key. */
 	(void) printf("%s key pair for %s (%s).\n",
-			addition? "Adding" : "Updating", netname, nis_princ);
+	    addition? "Adding" : "Updating", netname, nis_princ);
 
 
 	/* Encrypt secret key */
-	(void) __gen_dhkeys(public, secret, pass);
-	memcpy(crypt1, secret, HEXKEYBYTES);
-	memcpy(crypt1 + HEXKEYBYTES, secret, KEYCHECKSUMSIZE);
+	(void) __gen_dhkeys(public, secret, short_pass);
+	(void) memcpy(crypt1, secret, HEXKEYBYTES);
+	(void) memcpy(crypt1 + HEXKEYBYTES, secret, KEYCHECKSUMSIZE);
 	crypt1[HEXKEYBYTES + KEYCHECKSUMSIZE] = 0;
-	xencrypt(crypt1, pass);
+	xencrypt(crypt1, short_pass);
 
 
 	/* Now we have a key pair, build up the cred entry */
@@ -205,8 +205,8 @@ make_des_cred_be(char *nis_princ, char *netname, char *domain)
 		obj->zo_domain = domain;
 		/* owner: r, group: rmcd */
 		obj->zo_access = ((NIS_READ_ACC<<16)|
-				(NIS_READ_ACC|NIS_MODIFY_ACC|NIS_CREATE_ACC|
-					NIS_DESTROY_ACC)<<8);
+		    (NIS_READ_ACC|NIS_MODIFY_ACC|NIS_CREATE_ACC|
+		    NIS_DESTROY_ACC)<<8);
 		status = add_cred_obj(obj, domain);
 	} else {
 		obj->EN_data.en_cols.en_cols_val[3].ec_flags |= EN_MODIFIED;
@@ -236,8 +236,8 @@ make_des_cred(char *nis_princ, char *netname, char *domain, char *flavor)
 	if (mechlist = (mechanism_t **)__nis_get_mechanisms(FALSE)) {
 		while (mechlist[i]) {
 			status = make_dhext_cred(nis_princ, netname,
-							domain,
-							mechlist[i]->alias);
+			    domain,
+			    mechlist[i]->alias);
 			if (!status)
 				return (status);
 			i++;

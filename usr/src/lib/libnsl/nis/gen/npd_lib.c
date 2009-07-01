@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +28,6 @@
  *	Contains the encryption routines required by the server
  *	and the client-side for NIS+ passwd update deamon.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <string.h>
@@ -72,12 +69,12 @@ __npd_ecb_crypt(
 		IXDR_PUT_U_INT32(ixdr, *val2);
 
 		status = ecb_crypt((char *)deskey, (char *)buf,
-				bufsize, mode | DES_HW);
+		    bufsize, mode | DES_HW);
 		if (DES_FAILED(status))
 			return (FALSE);
 	} else {
 		status = ecb_crypt((char *)deskey, (char *)buf,
-				bufsize, mode | DES_HW);
+		    bufsize, mode | DES_HW);
 
 		if (DES_FAILED(status))
 			return (FALSE);
@@ -106,8 +103,6 @@ __npd_cbc_crypt(
 	int32_t	*ixdr;
 	des_block	ivec;
 
-	if (bufsize > MAX_KEY_CRYPT_LEN)
-		return (FALSE);
 	ivec.key.low = ivec.key.high = 0;
 	ixdr = (int32_t *)buf;
 	if (mode == DES_ENCRYPT) {
@@ -119,12 +114,59 @@ __npd_cbc_crypt(
 			buf->pass[i] = '\0';
 
 		status = cbc_crypt((char *)deskey, (char *)buf,
-				bufsize, mode | DES_HW, (char *)&ivec);
+		    bufsize, mode | DES_HW, (char *)&ivec);
 		if (DES_FAILED(status))
 			return (FALSE);
 	} else {
 		status = cbc_crypt((char *)deskey, (char *)buf,
-				bufsize, mode | DES_HW, (char *)&ivec);
+		    bufsize, mode | DES_HW, (char *)&ivec);
+
+		if (DES_FAILED(status))
+			return (FALSE);
+
+		*val = IXDR_GET_U_INT32(ixdr);
+		if (strlen((char *)buf->pass) > strsize)
+			return (FALSE);
+		(void) strcpy(str, (char *)buf->pass);
+	}
+	return (TRUE);
+}
+
+/*
+ * encrypt/decrypt R (val) and password (str)
+ * return FALSE on failure and TRUE on success
+ */
+bool_t
+__npd2_cbc_crypt(
+	uint32_t	*val,
+	char		*str,
+	unsigned int	strsize,
+	npd_newpass2	*buf,
+	unsigned int	bufsize,
+	unsigned int	mode,
+	des_block	*deskey)
+{
+	int	status, i;
+	int32_t	*ixdr;
+	des_block	ivec;
+
+	ivec.key.low = ivec.key.high = 0;
+	ixdr = (int32_t *)buf;
+	if (mode == DES_ENCRYPT) {
+		if ((strsize + 8) > bufsize)
+			return (FALSE);
+		IXDR_PUT_U_INT32(ixdr, *val);
+		(void) strcpy((char *)buf->pass, str);
+		for (i = strsize; i < __NPD2_MAXPASSBYTES; i++)
+			buf->pass[i] = '\0';
+		buf->npd_pad = 0;
+		status = cbc_crypt((char *)deskey, (char *)buf,
+		    bufsize, mode | DES_HW, (char *)&ivec);
+		if (DES_FAILED(status))
+			return (FALSE);
+	} else {
+		status = cbc_crypt((char *)deskey, (char *)buf,
+		    bufsize, mode | DES_HW, (char *)&ivec);
 
 		if (DES_FAILED(status))
 			return (FALSE);

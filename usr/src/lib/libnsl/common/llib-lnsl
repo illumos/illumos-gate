@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -445,6 +445,9 @@ bool_t __npd_ecb_crypt(uint32_t *val1, uint32_t *val2, des_block *buf,
 			uint_t bufsize, uint_t mode, des_block *deskey);
 bool_t __npd_cbc_crypt(uint32_t *val, char *str, uint_t strsize,
 			npd_newpass *buf, uint_t bufsize, uint_t mode,
+			des_block *deskey);
+bool_t __npd2_cbc_crypt(uint32_t *val, char *str, uint_t strsize,
+			npd_newpass2 *buf, uint_t bufsize, uint_t mode,
 			des_block *deskey);
 
 /* print_obj.c */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,9 @@
 /*
  *	makedescred.c
  *
- *	Copyright (c) 1997 Sun Microsystems Inc
- *	All Rights Reserved.
+ *	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ *	Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * makedescred.c
@@ -45,11 +42,13 @@
 #include <nsswitch.h>
 #include <netdb.h>
 #include <rpcsvc/nis.h>
+#include <rpcsvc/nispasswd.h>
 #include <rpcsvc/nis_dhext.h>
 #include <rpc/key_prot.h>
 #include "nisaddcred.h"
 
 extern char *getpass();
+extern char *getpassphrase();
 extern char *crypt();
 extern int add_cred_obj(nis_object *, char *);
 extern nis_error auth_exists(char *, char *, char *, char *);
@@ -82,11 +81,11 @@ switch_policy_str(struct __nsw_switchconfig *conf)
 	static char policy[256];
 	int previous = 0;
 
-	memset((char *)policy, 0, 256);
+	(void) memset((char *)policy, 0, 256);
 
 	for (look = conf->lookups; look; look = look->next) {
 		if (previous)
-			strcat(policy, " ");
+			(void) strcat(policy, " ");
 		strcat(policy, look->service_name);
 		previous = 1;
 	}
@@ -106,8 +105,8 @@ int
 is_switch_policy(struct __nsw_switchconfig *conf, char *target)
 {
 	return (conf && conf->lookups &&
-		strcmp(conf->lookups->service_name, target) == 0 &&
-		conf->lookups->next == NULL);
+	    strcmp(conf->lookups->service_name, target) == 0 &&
+	    conf->lookups->next == NULL);
 }
 
 
@@ -124,25 +123,25 @@ check_switch_policy(char *policy, char *target_service,
 	if (no_switch_policy(conf)) {
 		if (!is_switch_policy(default_conf, target_service)) {
 			fprintf(stderr,
-				"\n%s\n There is no publickey entry in %s.\n",
-				head_msg, __NSW_CONFIG_FILE);
+			    "\n%s\n There is no publickey entry in %s.\n",
+			    head_msg, __NSW_CONFIG_FILE);
 			fprintf(stderr,
 			" The default publickey policy is \"publickey: %s\".\n",
-			switch_policy_str(default_conf));
+			    switch_policy_str(default_conf));
 			policy_correct = 0;
 		}
 	} else if (!is_switch_policy(conf, target_service)) {
 		fprintf(stderr,
 		"\n%s\n The publickey entry in %s is \"publickey: %s\".\n",
-			head_msg, __NSW_CONFIG_FILE,
-			switch_policy_str(conf));
+		    head_msg, __NSW_CONFIG_FILE,
+		    switch_policy_str(conf));
 		policy_correct = 0;
 	}
 	/* should we exit ? */
 	if (policy_correct == 0)
 		fprintf(stderr,
 		" It should be \"publickey: %s\"%s.\n\n",
-			target_service, tail_msg);
+		    target_service, tail_msg);
 	if (conf)
 		__nsw_freeconfig(conf);
 
@@ -160,17 +159,17 @@ sanity_checks(char *nis_princ, char *netname, char *domain, char *authtype)
 	/* Sanity check 0. Do we have a nis+ principal name to work with? */
 	if (nis_princ == NULL) {
 		fprintf(stderr,
-			"%s: you must create a \"local\" credential first.\n",
-			program_name);
+		    "%s: you must create a \"local\" credential first.\n",
+		    program_name);
 		fprintf(stderr,
-			"rerun this command as : %s local \n", program_name);
+		    "rerun this command as : %s local \n", program_name);
 		return (0);
 	}
 
 	/* Sanity check 1.  We only deal with one type of netnames. */
 	if (strncmp(netname, OPSYS, OPSYS_LEN) != 0) {
 		fprintf(stderr, "%s: unrecognized netname type: '%s'.\n",
-			program_name, netname);
+		    program_name, netname);
 		return (0);
 	}
 
@@ -179,7 +178,7 @@ sanity_checks(char *nis_princ, char *netname, char *domain, char *authtype)
 	if (strcasecmp(princdomain, domain) != 0) {
 		fprintf(stderr,
 "%s: domain of principal '%s' does not match destination domain '%s'.\n",
-			program_name, nis_princ, domain);
+		    program_name, nis_princ, domain);
 		fprintf(stderr,
 	"Should only add DES credential of principal in its home domain\n");
 		return (0);
@@ -192,7 +191,7 @@ sanity_checks(char *nis_princ, char *netname, char *domain, char *authtype)
 	netdomain = (char *)strchr(netname, '@');
 	if (! netdomain) {
 		fprintf(stderr, "%s: invalid netname, missing @: '%s'. \n",
-			program_name, netname);
+		    program_name, netname);
 		return (0);
 	}
 	if (netname[strlen(netname)-1] == '.')
@@ -210,7 +209,7 @@ sanity_checks(char *nis_princ, char *netname, char *domain, char *authtype)
 
 	/* Check publickey policy and warn user if it is not NIS+ */
 	check_switch_policy("publickey", "nisplus", &publickey_default,
-			    "WARNING:", " when using NIS+");
+	    "WARNING:", " when using NIS+");
 
 	/* Another principal owns same credentials? (exits if that happens) */
 	(void) auth_exists(nis_princ, netname, authtype, domain);
@@ -231,13 +230,13 @@ keylogin(char *netname, char *secret, char *flavor,
 			if (keylen == mechs[mcount]->keylen &&
 			    algtype == mechs[mcount]->algtype) {
 				if (key_setnet_g(netname, secret,
-							mechs[mcount]->keylen,
-							NULL, 0,
-							mechs[mcount]->algtype)
+				    mechs[mcount]->keylen,
+				    NULL, 0,
+				    mechs[mcount]->algtype)
 				    < 0) {
 					fprintf(stderr,
 					"Could not set %s's %s secret key\n",
-						netname, flavor);
+					    netname, flavor);
 					fprintf(stderr,
 					"May be the keyserv is down?\n");
 					return (0);
@@ -325,14 +324,14 @@ write_rootkey(char *secret, char *flavor, keylen_t keylen, algtype_t algtype)
 	if ((rootfd = open(ROOTKEY_FILE, O_WRONLY+O_CREAT, 0600)) < 0) {
 		perror("Could not open /etc/.rootkey for writing");
 		fprintf(stderr,
-			"Attempting to restore original /etc/.rootkey\n");
+		    "Attempting to restore original /etc/.rootkey\n");
 		rename(ROOTKEY_FILE_BACKUP, ROOTKEY_FILE);
 		goto rootkey_err;
 	}
 	if (!(rootfile = fdopen(rootfd, "w"))) {
 		perror("Could not open /etc/.rootkey for writing");
 		fprintf(stderr,
-			"Attempting to restore original /etc/.rootkey\n");
+		    "Attempting to restore original /etc/.rootkey\n");
 		close(rootfd);
 		unlink(ROOTKEY_FILE);
 		rename(ROOTKEY_FILE_BACKUP, ROOTKEY_FILE);
@@ -341,7 +340,7 @@ write_rootkey(char *secret, char *flavor, keylen_t keylen, algtype_t algtype)
 	if (!(bakfile = fopen(ROOTKEY_FILE_BACKUP, "r"))) {
 		perror("Could not open /etc/.rootkey.bak for reading");
 		fprintf(stderr,
-			"Attempting to restore original /etc/.rootkey\n");
+		    "Attempting to restore original /etc/.rootkey\n");
 		fclose(rootfile);
 		unlink(ROOTKEY_FILE);
 		rename(ROOTKEY_FILE_BACKUP, ROOTKEY_FILE);
@@ -400,7 +399,7 @@ write_rootkey(char *secret, char *flavor, keylen_t keylen, algtype_t algtype)
 
 rootkey_err:
 	fprintf(stderr, "WARNING: Could not write %s key to /etc/.rootkey\n",
-		flavor);
+	    flavor);
 }
 
 
@@ -431,14 +430,14 @@ get_password(uid_t uid, int same_host, char *target_host, char *domain)
 			if (! pw) {
 				fprintf(stderr,
 			"%s: unable to locate password record for uid %d\n",
-					program_name, uid);
+				    program_name, uid);
 				return (0);
 			}
 			spw = getspnam(pw->pw_name);
 			if (!spw) {
 				fprintf(stderr,
 			"%s: unable to locate password record for uid 0\n",
-					program_name);
+				    program_name);
 				return (0);
 			}
 			login_password = spw->sp_pwdp;
@@ -460,14 +459,14 @@ get_password(uid_t uid, int same_host, char *target_host, char *domain)
 		sprintf(prompt, "Enter login password:");
 	else if (uid == 0) {
 		sprintf(prompt, "Enter %s's root login password:",
-			target_host);
+		    target_host);
 	} else
 		sprintf(prompt, "Enter %s's login password:",
-			pw->pw_name);
-	pass = getpass(prompt);
+		    pw->pw_name);
+	pass = getpassphrase(prompt);
 	if (strlen(pass) == 0) {
 		(void) fprintf(stderr, "%s: Password unchanged.\n",
-								program_name);
+		    program_name);
 		return (0);
 	}
 	strcpy(password, pass);
@@ -481,7 +480,7 @@ get_password(uid_t uid, int same_host, char *target_host, char *domain)
 		else {
 			fprintf(stderr,
 			"%s: %s: password differs from login password.\n",
-				program_name, force? "WARNING" : "ERROR");
+			    program_name, force? "WARNING" : "ERROR");
 			if (!force)
 				return (0);
 		}
@@ -489,10 +488,10 @@ get_password(uid_t uid, int same_host, char *target_host, char *domain)
 
 	/* Check for mis-typed password */
 	if (!passwords_matched) {
-		pass = getpass("Retype password:");
+		pass = getpassphrase("Retype password:");
 		if (strcmp(password, pass) != 0) {
 			(void) fprintf(stderr, "%s: password incorrect.\n",
-								program_name);
+			    program_name);
 			return (0);
 		}
 	}
@@ -532,6 +531,7 @@ make_dhext_cred(nis_princ, netname, domain, flavor)
 	uid_t		uid;
 	static char	*pass;
 	char		*public, *secret, *crypt1;
+	char		short_pass[DESCREDPASSLEN + 1];
 	char		authtype[MECH_MAXATNAME];
 	char		target_host[MAXHOSTNAMELEN+1];
 	int		same_host = 0;
@@ -573,6 +573,8 @@ make_dhext_cred(nis_princ, netname, domain, flavor)
 	if (!pass)
 		goto badstatus;
 
+	(void) strlcpy(short_pass, pass, sizeof (short_pass));
+
 	/* Get password with which to encrypt secret key. */
 	(void) printf("%s %s key pair for %s (%s).\n",
 			addition? "Adding" : "Updating", flavor,
@@ -585,9 +587,9 @@ make_dhext_cred(nis_princ, netname, domain, flavor)
 	    goto badstatus;
 
 	/* Encrypt secret key */
-	if (!(__gen_dhkeys_g(public, secret, kl, at, pass)))
+	if (!(__gen_dhkeys_g(public, secret, kl, at, short_pass)))
 		goto badstatus;
-	if (!(xencrypt_g(secret, kl, at, pass, netname, &crypt1, TRUE)))
+	if (!(xencrypt_g(secret, kl, at, short_pass, netname, &crypt1, TRUE)))
 		goto badstatus;
 
 	/* Now we have a key pair, build up the cred entry */

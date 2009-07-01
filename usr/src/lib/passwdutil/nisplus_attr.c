@@ -462,7 +462,7 @@ nisplus_update(attrlist *items, pwu_repository_t *rep, void *buf)
 	struct spwd *spw;
 	char *pword;
 	int len;
-	char newpw[_PASS_MAX_XPG+1];
+	char newpw[_PASS_MAX+1];
 
 	statebuf = (struct statebuf *)buf;
 	pw = statebuf->pwd;
@@ -508,8 +508,10 @@ nisplus_update(attrlist *items, pwu_repository_t *rep, void *buf)
 			 * This encryption is done by the NPD client
 			 * routines
 			 */
-			(void) strlcpy(newpw, p->data.val_s, sizeof (newpw));
+			if (strlen(p->data.val_s) > __NPD2_MAXPASSBYTES)
+				return (PWU_DENIED);
 
+			(void) strlcpy(newpw, p->data.val_s, sizeof (newpw));
 			if ((spw->sp_pwdp = strdup(newpw)) == NULL)
 				return (PWU_NOMEM);
 			statebuf->proto |= PWU_NEW_PROTO;
@@ -736,7 +738,7 @@ nisplus_update_cred(char *name, char *oldrpcpw, pwu_repository_t *rep,
 	char *domain;
 	nis_result *cred_res;
 	nis_result *handle;
-	char *newpw;
+	char short_newpw[DESCREDPASSLEN+1], *short_newpwp = NULL;
 
 	entry_col ecol[5];
 	nis_object *eobj;
@@ -786,7 +788,8 @@ nisplus_update_cred(char *name, char *oldrpcpw, pwu_repository_t *rep,
 		return (PWU_SUCCESS);
 	}
 
-	newpw = buf->spwd->sp_pwdp;
+	(void) strlcpy(short_newpw, buf->spwd->sp_pwdp, sizeof (short_newpw));
+	short_newpwp = short_newpw;
 
 	for (i = 0; i < cred_res->objects.objects_len; i++) {
 		nis_object *cred_entry;
@@ -805,10 +808,11 @@ nisplus_update_cred(char *name, char *oldrpcpw, pwu_repository_t *rep,
 		reencrypt_tries++;
 
 		newcryptsecret = reencrypt_secret(oldcryptsecret, oldrpcpw,
-		    newpw, uid, keylen, algtype);
+		    short_newpwp, uid, keylen, algtype);
 
-		if (newcryptsecret == NULL)
+		if (newcryptsecret == NULL) {
 			continue;
+		}
 
 		reencrypt_success++;
 
@@ -829,7 +833,7 @@ nisplus_update_cred(char *name, char *oldrpcpw, pwu_repository_t *rep,
 		    "[cname=%s.%s,auth_type=%s],cred.%s", name, domain,
 		    authtype,
 		    NIS_RES_OBJECT(handle)->zo_domain) > sizeof (mname)-1) {
-			(void) memset(newpw, '\0', strlen(newpw));
+			(void) memset(short_newpw, '\0', strlen(short_newpw));
 			(void) memset(oldrpcpw, '\0', strlen(oldrpcpw));
 			free(newcryptsecret);
 			return (PWU_RECOVERY_ERR);
@@ -854,7 +858,8 @@ nisplus_update_cred(char *name, char *oldrpcpw, pwu_repository_t *rep,
 		(void) nis_freeresult(mres);
 	}
 
-	(void) memset(newpw, '\0', strlen(newpw));
+	(void) memset(short_newpw, '\0', strlen(short_newpw));
+	short_newpwp = NULL;
 	(void) memset(oldrpcpw, '\0', strlen(oldrpcpw));
 
 	if (reencrypt_tries > 0 && mod_entry == 0) {
@@ -903,6 +908,7 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 	int		retval;
 	int		npd_res;
 	nispasswd_error	*errlist = NULL;
+	char		short_opass[DESCREDPASSLEN+1], *short_opassp = NULL;
 
 	statebuf = (struct statebuf *)buf;
 
@@ -924,9 +930,12 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 		goto out;
 	}
 
+	(void) strlcpy(short_opass, oldpw, sizeof (short_opass));
+	short_opassp = short_opass;
+
 	/* Generate a key-pair for this user */
 	if (__gen_dhkeys_g((char *)u_pubkey, u_seckey, srv_keylen,
-	    srv_keyalgtype, oldpw) == 0) {
+	    srv_keyalgtype, short_opassp) == 0) {
 		syslog(LOG_ERR, "Couldn't create a D-H key-pair "
 		    "(len = %d, type = %d)", srv_keylen, srv_keyalgtype);
 		retval = PWU_RECOVERY_ERR;
@@ -1015,7 +1024,7 @@ nisplus_new_proto(char *name, char *oldpw, char *oldrpcpw,
 			 * We therefore try to update the credentials directly.
 			 */
 			retval = nisplus_update_cred(name,
-			    oldrpcpw ? oldrpcpw : oldpw, rep, buf);
+			    oldrpcpw ? oldrpcpw : short_opassp, rep, buf);
 		} else {
 			/* We don't update creds for gecos/shell updates */
 			retval = PWU_SUCCESS;
@@ -1035,7 +1044,6 @@ out:
 		auth_destroy(clnt->cl_auth);
 		clnt_destroy(clnt);
 	}
-
 	return (retval);
 }
 
@@ -1060,7 +1068,10 @@ nisplus_old_proto(char *name, char *oldpw, char *oldrpcpw,
 	nis_result *handle;
 	int pw_changed = 0;	/* indicates whether we should update creds */
 	int retval;
+	char short_opass[DESCREDPASSLEN+1], *short_opassp = NULL;
 
+	(void) strlcpy(short_opass, oldpw, sizeof (short_opass));
+	short_opassp = short_opass;
 	statebuf = (struct statebuf *)buf;
 	pw = statebuf->pwd;
 	spw = statebuf->spwd;
@@ -1177,15 +1188,16 @@ again:
 	eobj->EN_data.en_cols.en_cols_val = NULL;
 	eobj->EN_data.en_cols.en_cols_len = 0;
 	(void) nis_destroy_object(eobj);
-	(void) nis_freeresult(result);
-
+	if (result)
+		(void) nis_freeresult(result);
+	result = NULL;
 out:
 	if (ecol[COL_PASSWD].EC_VAL)
 		free(ecol[COL_PASSWD].EC_VAL);
 
 	if (pw_changed == 1 && retval == PWU_SUCCESS)
-		retval = nisplus_update_cred(name, oldrpcpw ? oldrpcpw : oldpw,
-		    rep, buf);
+		retval = nisplus_update_cred(name, oldrpcpw ? oldrpcpw
+		    : short_opassp, rep, buf);
 
 	return (retval);
 
@@ -1205,26 +1217,30 @@ nisplus_putpwnam(char *name, char *oldpw, char *oldrpcpw,
 	struct statebuf *statebuf;
 	int result = PWU_SUCCESS;
 	uid_t cur_euid;
-	char short_pw[_PASS_MAX_XPG+1], short_rpcpw[_PASS_MAX_XPG+1];
-	char *short_pwptr = NULL, *short_rpcpwptr = NULL;
+	char short_rpcpw[_PASS_MAX_XPG+1];
+	char *short_rpcpwptr = NULL;
+	char pw[_PASS_MAX+1];
+	char *pw_ptr = NULL;
 
 	if (strcmp(name, "root") == 0)
 		return (PWU_NOT_FOUND);
 
 	if (oldpw) {
-		(void) strlcpy(short_pw, oldpw, sizeof (short_pw));
-		short_pwptr = short_pw;
-	}
+		(void) strlcpy(pw, oldpw, sizeof (pw));
+		pw_ptr = pw;
+	} else /* oldpw is NULL. rpc.nispasswdd non-responsive ??? */
+		return (PWU_RECOVERY_ERR);
 
 	if (oldrpcpw) {
 		(void) strlcpy(short_rpcpw, oldrpcpw, sizeof (short_rpcpw));
 		short_rpcpwptr = short_rpcpw;
-	}
+	} else
+		return (PWU_RECOVERY_ERR);
 
 	statebuf = (struct statebuf *)buf;
 
 	if (statebuf->proto & PWU_OLD_PROTO) {
-		result = nisplus_old_proto(name, short_pwptr,
+		result = nisplus_old_proto(name, pw_ptr,
 		    short_rpcpwptr, rep, buf);
 	}
 
@@ -1233,9 +1249,8 @@ nisplus_putpwnam(char *name, char *oldpw, char *oldrpcpw,
 		if (getuid() != 0)
 			(void) seteuid(getuid());
 
-		result = nisplus_new_proto(name, short_pwptr,
+		result = nisplus_new_proto(name, pw_ptr,
 		    short_rpcpwptr, rep, buf);
-
 		(void) seteuid(cur_euid);
 	}
 

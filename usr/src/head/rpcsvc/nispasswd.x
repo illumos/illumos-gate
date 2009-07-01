@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,11 +21,12 @@
 /*
  * NIS+ password update protocol
  *
- * Copyright (c) 1994, 1997 by Sun Microsystems Inc
- * All Rights Reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
+
+%#include <limits.h>
 
 /*
  * Protocol description:
@@ -151,6 +151,21 @@ struct npd_update {
 	passwd_info	pass_info;		/* other information */
 };
 
+%#define DESCREDPASSLEN sizeof (des_block)
+const __NPD2_MAXPASSBYTES = 256;		/* _PASS_MAX */
+
+struct npd_newpass2 {
+	unsigned int	npd_xrandval;		/* R */
+	opaque	pass[__NPD2_MAXPASSBYTES];	/* "clear" new passwd */
+	unsigned int	npd_pad;	/* pad size to modulo des_block */
+};
+
+struct npd_update2 {
+	unsigned int	ident;			/* identifier */
+	npd_newpass2	xnewpass;		/* encrypted */
+	passwd_info	pass_info;		/* other information */
+};
+
 struct nispasswd_verf {
 	unsigned int	npd_xid;		/* encrypted identifier */
 	unsigned int	npd_xrandval;		/* encrypted R */
@@ -191,4 +206,16 @@ program NISPASSWD_PROG {
 		 */
 		nispasswd_updresult	NISPASSWD_UPDATE(npd_update) = 2;
 	} = 1;
+
+	version NISPASSWD_VERS2 {
+		/*
+		 * authenticate passwd update request
+		 */
+		nispasswd_authresult NISPASSWD_AUTHENTICATE(npd_request) = 1;
+
+		/*
+		 * send new passwd information
+		 */
+		nispasswd_updresult	NISPASSWD_UPDATE(npd_update2) = 2;
+	} = 2;
 } = 100303;

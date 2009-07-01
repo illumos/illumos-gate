@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	npd_svc.c
  *	NPD service routines
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <syslog.h>
 #include <string.h>
@@ -67,6 +64,31 @@ npd_request *argp;
 nispasswd_authresult *result;
 struct svc_req *rqstp;
 {
+	return (nispasswd_authenticate_common_svc(argp,
+	    result, rqstp, NISPASSWD_VERS));
+}
+
+/*
+ * service routine for first part of the nispasswd update2
+ * protocol.
+ */
+bool_t
+nispasswd_authenticate_2_svc(argp, result, rqstp)
+npd_request *argp;
+nispasswd_authresult *result;
+struct svc_req *rqstp;
+{
+	return (nispasswd_authenticate_common_svc(argp,
+	    result, rqstp, NISPASSWD_VERS2));
+}
+
+bool_t
+nispasswd_authenticate_common_svc(argp, result, rqstp, vers)
+npd_request *argp;
+nispasswd_authresult *result;
+struct svc_req *rqstp;
+rpcvers_t vers;
+{
 	bool_t	check_aging = TRUE;	/* default == check */
 	bool_t	same_user = TRUE;	/* default == same user */
 	bool_t	is_admin = FALSE;	/* default == not an admin */
@@ -75,7 +97,6 @@ struct svc_req *rqstp;
 	bool_t	refresh = FALSE;	/* default == do not refresh */
 	int	ans = 0;
 	char	prin[NIS_MAXNAMELEN];
-	unsigned char	xpass[_NPD_PASSMAXLEN];
 	struct	update_item	*entry = NULL;
 	nis_result	*pass_res;
 	nis_object	*pobj;
@@ -86,6 +107,22 @@ struct svc_req *rqstp;
 	uint32_t	rval, ident;
 	keylen_t pkeylen;  /* public key length (bits) */
 	algtype_t algtype; /* public key algorithm type */
+	int passlen = __NPD2_MAXPASSBYTES;
+	unsigned char *xpass;
+
+	if (vers == NISPASSWD_VERS) {
+		passlen = __NPD_MAXPASSBYTES;
+	} else if (vers == NISPASSWD_VERS2) {
+		passlen = __NPD2_MAXPASSBYTES;
+	}
+
+	if ((xpass = malloc(passlen + 1)) == NULL) {
+		syslog(LOG_ERR,
+		    "nispasswd_authenticate_common_svc: Out of memory");
+		result->status = NPD_FAILED;
+		result->nispasswd_authresult_u.npd_err = NPD_SYSTEMERR;
+		return (TRUE);
+	}
 
 	if (verbose)
 		syslog(LOG_ERR, "received NIS+ auth request for %s",
@@ -96,7 +133,7 @@ struct svc_req *rqstp;
 		syslog(LOG_ERR, "not master for %s", argp->domain);
 		result->status = NPD_FAILED;
 		result->nispasswd_authresult_u.npd_err = NPD_NOTMASTER;
-		return (TRUE);
+		goto auth_free_xpass;
 	}
 
 again:
@@ -126,7 +163,7 @@ again:
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err =
 				NPD_BUFTOOSMALL;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 		(void) sprintf(prin, "%s.%s", argp->username, argp->domain);
 		if (prin[strlen(prin) - 1] != '.')
@@ -166,7 +203,7 @@ again:
 				result->status = NPD_FAILED;
 				result->nispasswd_authresult_u.npd_err =
 					NPD_PASSINVALID;
-				return (TRUE);
+				goto auth_free_xpass;
 			}
 			if (argp->ident == 0) {
 				/*
@@ -191,7 +228,7 @@ again:
 				result->status = NPD_FAILED;
 				result->nispasswd_authresult_u.npd_err =
 						NPD_IDENTINVALID;
-				return (TRUE);
+				goto auth_free_xpass;
 			}
 	}
 
@@ -203,7 +240,7 @@ again:
 			argp->username, argp->domain);
 		result->status = NPD_FAILED;
 		result->nispasswd_authresult_u.npd_err = NPD_NOSUCHENTRY;
-		return (TRUE);
+		goto auth_free_xpass;
 	}
 	switch (pass_res->status) {
 	case NIS_SUCCESS:
@@ -215,7 +252,7 @@ again:
 		(void) nis_freeresult(pass_res);
 		result->status = NPD_FAILED;
 		result->nispasswd_authresult_u.npd_err = NPD_NOSUCHENTRY;
-		return (TRUE);
+		goto auth_free_xpass;
 	default:
 		syslog(LOG_ERR,
 			"NIS+ error (%d) getting passwd entry for %s",
@@ -223,7 +260,7 @@ again:
 		(void) nis_freeresult(pass_res);
 		result->status = NPD_FAILED;
 		result->nispasswd_authresult_u.npd_err = NPD_NISERROR;
-		return (TRUE);
+		goto auth_free_xpass;
 	}
 
 	/* if user check if 'min' days have passed since 'lastchg' */
@@ -236,7 +273,7 @@ again:
 			(void) nis_freeresult(pass_res);
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err = ans;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 	/* if ans == NPD_NOSHDWINFO then aging cannot be enforced */
 	}
@@ -261,7 +298,7 @@ again:
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err =
 				NPD_INVALIDARGS;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 	}
 
@@ -277,27 +314,27 @@ again:
 		(void) nis_freeresult(pass_res);
 		result->status = NPD_FAILED;
 		result->nispasswd_authresult_u.npd_err = NPD_CKGENFAILED;
-		return (TRUE);
+		goto auth_free_xpass;
 	}
 	/* decrypt the passwd sent */
-	if (argp->npd_authpass.npd_authpass_len != _NPD_PASSMAXLEN) {
+	if (argp->npd_authpass.npd_authpass_len != passlen) {
 		syslog(LOG_ERR, "password length wrong");
 		(void) nis_freeresult(pass_res);
 		result->status = NPD_TRYAGAIN;
 		result->nispasswd_authresult_u.npd_err = NPD_PASSINVALID;
-		return (TRUE);
+		goto auth_free_xpass;
 	}
 	(void) memcpy(xpass, argp->npd_authpass.npd_authpass_val,
-			_NPD_PASSMAXLEN);
+			passlen);
 
 	ivec.key.high = ivec.key.low = 0;
 	if (AUTH_DES_KEY(pkeylen, algtype))
 		status = cbc_crypt(deskeys[0].c, (char *)xpass,
-					_NPD_PASSMAXLEN, DES_DECRYPT | DES_HW,
+					passlen, DES_DECRYPT | DES_HW,
 					(char *)&ivec);
 	else
 		status = __cbc_triple_crypt(deskeys, (char *)xpass,
-					_NPD_PASSMAXLEN, DES_DECRYPT | DES_HW,
+					passlen, DES_DECRYPT | DES_HW,
 					(char *)&ivec);
 
 	if (DES_FAILED(status)) {
@@ -305,7 +342,7 @@ again:
 		(void) nis_freeresult(pass_res);
 		result->status = NPD_FAILED;
 		result->nispasswd_authresult_u.npd_err = NPD_DECRYPTFAIL;
-		return (TRUE);
+		goto auth_free_xpass;
 	}
 
 	/* assign an ID and generate R on the first call of a session */
@@ -316,7 +353,7 @@ again:
 			(void) nis_freeresult(pass_res);
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err = NPD_SYSTEMERR;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 		(void) __npd_gen_rval(&randval);
 	} else {
@@ -331,7 +368,7 @@ again:
 				result->status = NPD_FAILED;
 				result->nispasswd_authresult_u.npd_err =
 					NPD_SYSTEMERR;
-				return (TRUE);
+				goto auth_free_xpass;
 			}
 		} else {
 			if (strcmp(entry->ul_user, argp->username) != 0) {
@@ -349,7 +386,7 @@ again:
 		(void) nis_freeresult(pass_res);
 		result->status = NPD_FAILED;
 		result->nispasswd_authresult_u.npd_err = NPD_ENCRYPTFAIL;
-		return (TRUE);
+		goto auth_free_xpass;
 	}
 	/* encrypt the passwd and compare with that stored in NIS+ */
 	if (same_user) {
@@ -357,7 +394,7 @@ again:
 			(void) nis_freeresult(pass_res);
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err = NPD_NOPASSWD;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 		if (strcmp(crypt((const char *)xpass,
 		    (const char *)oldpass), oldpass) != 0) {
@@ -397,7 +434,7 @@ again:
 			}
 			if (verbose)
 				(void) __npd_print_entry(prin);
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 	} else {
 		if (is_admin == FALSE) {	/* not privileged */
@@ -405,7 +442,7 @@ again:
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err =
 					NPD_PERMDENIED;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 		/* admin changing another users password */
 		if (__authenticate_admin(prin, (char *)xpass) == FALSE) {
@@ -434,7 +471,7 @@ again:
 							NPD_SYSTEMERR;
 				}
 			}
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 	}
 	/* done with pass_res */
@@ -448,7 +485,7 @@ again:
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err =
 					NPD_SYSTEMERR;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 	} else {
 		if (entry->ul_oldpass != NULL)
@@ -458,7 +495,7 @@ again:
 			result->status = NPD_FAILED;
 			result->nispasswd_authresult_u.npd_err =
 					NPD_SYSTEMERR;
-			return (TRUE);
+			goto auth_free_xpass;
 		}
 		if (upd_entry == TRUE) {
 			entry->ul_ident = ident;
@@ -473,6 +510,10 @@ again:
 			htonl(cryptbuf.key.low);
 	if (verbose)
 		(void) __npd_print_entry(prin);
+
+auth_free_xpass:
+	if (xpass != NULL)
+		free(xpass);
 	return (TRUE);
 }
 
@@ -487,9 +528,38 @@ npd_update		*updreq;
 nispasswd_updresult	*res;
 struct svc_req	*rqstp;
 {
+	return (nispasswd_update_common_svc((void *) updreq,
+	    res, rqstp, NISPASSWD_VERS));
+}
+
+/*
+ * service routine for second part of the nispasswd update2
+ * protocol.
+ */
+/* ARGSUSED2 */
+bool_t
+nispasswd_update_2_svc(updreq, res, rqstp)
+npd_update2		*updreq;
+nispasswd_updresult	*res;
+struct svc_req	*rqstp;
+{
+	return (nispasswd_update_common_svc((void *) updreq,
+	    res, rqstp, NISPASSWD_VERS2));
+}
+
+/*
+ * service routine for second part of the nispasswd update common
+ * protocol.
+ */
+/* ARGSUSED2 */
+bool_t
+nispasswd_update_common_svc(tmp_updreq, res, rqstp, vers)
+void    *tmp_updreq;
+nispasswd_updresult	*res;
+struct svc_req	*rqstp;
+rpcvers_t   vers;
+{
 	struct update_item *entry;
-	npd_newpass	cryptbuf;
-	passbuf	pass;
 	char	*newpass, buf[NIS_MAXNAMELEN];
 	uint32_t	rand;
 	struct nis_result *pass_res = NULL, *mod_res = NULL;
@@ -505,16 +575,56 @@ struct svc_req	*rqstp;
 	uint_t		eobj_col_len;
 	int pwflag = FALSE;
 	int chg_passwd = TRUE;
+	char	*pass;
+	int	passlen = __NPD2_MAXPASSBYTES;
+	npd_newpass	cryptbuf1;
+	npd_newpass2	cryptbuf2;
+	npd_update	*updreq1;
+	npd_update2	*updreq2;
+	char *gecos;
+	char *shell;
+
+	if (vers == NISPASSWD_VERS) {
+		passlen = __NPD_MAXPASSBYTES;
+		updreq1 = (npd_update *)tmp_updreq;
+		gecos = updreq1->pass_info.pw_gecos;
+		shell = updreq1->pass_info.pw_shell;
+	} else if (vers == NISPASSWD_VERS2) {
+		passlen = __NPD2_MAXPASSBYTES;
+		updreq2 = (npd_update2 *)tmp_updreq;
+		gecos = updreq2->pass_info.pw_gecos;
+		shell = updreq2->pass_info.pw_shell;
+	}
+
+	if ((pass = malloc(passlen + 1)) == NULL) {
+		syslog(LOG_ERR,
+		    "nispasswd_update_common_svc: Out of memory");
+		res->status = NPD_FAILED;
+		res->nispasswd_updresult_u.npd_err = NPD_SYSTEMERR;
+		return (TRUE);
+	}
 
 	/* set to success, and reset to error when warranted */
 	res->status = NPD_SUCCESS;
 
-	entry = (struct update_item *)__npd_item_by_key(updreq->ident);
-	if (entry == NULL) {
-		syslog(LOG_ERR, "invalid identifier: %ld", updreq->ident);
-		res->status = NPD_FAILED;
-		res->nispasswd_updresult_u.npd_err = NPD_IDENTINVALID;
-		return (TRUE);
+	if (vers == NISPASSWD_VERS) {
+		entry = (struct update_item *)__npd_item_by_key(updreq1->ident);
+		if (entry == NULL) {
+			syslog(LOG_ERR, "invalid identifier: %ld",
+			    updreq1->ident);
+			res->status = NPD_FAILED;
+			res->nispasswd_updresult_u.npd_err = NPD_IDENTINVALID;
+			goto upd_free_pass;
+		}
+	} else if (vers == NISPASSWD_VERS2) {
+		entry = (struct update_item *)__npd_item_by_key(updreq2->ident);
+		if (entry == NULL) {
+			syslog(LOG_ERR, "invalid identifier: %ld",
+			    updreq2->ident);
+			res->status = NPD_FAILED;
+			res->nispasswd_updresult_u.npd_err = NPD_IDENTINVALID;
+			goto upd_free_pass;
+		}
 	}
 
 	if (verbose) {
@@ -528,19 +638,40 @@ struct svc_req	*rqstp;
 	 */
 	for (; entry != NULL;
 	    entry = (struct update_item *)entry->ul_item.next) {
+		if (vers == NISPASSWD_VERS) {
+			/* decrypt R and new passwd */
+			cryptbuf1.npd_xrandval =
+			    ntohl(updreq1->xnewpass.npd_xrandval);
+			for (i = 0; i < passlen; i++)
+				cryptbuf1.pass[i] = updreq1->xnewpass.pass[i];
 
-		/* decrypt R and new passwd */
-		cryptbuf.npd_xrandval = ntohl(updreq->xnewpass.npd_xrandval);
-		for (i = 0; i < __NPD_MAXPASSBYTES; i++)
-			cryptbuf.pass[i] = updreq->xnewpass.pass[i];
+			if (! __npd_cbc_crypt(&rand, pass, passlen,
+				&cryptbuf1, _NPD_PASSMAXLEN, DES_DECRYPT,
+				&entry->ul_key)) {
+				syslog(LOG_ERR, "failed to decrypt verifier");
+				res->status = NPD_FAILED;
+				res->nispasswd_updresult_u.npd_err =
+				    NPD_DECRYPTFAIL;
+				goto upd_free_pass;
+			}
+		} else if (vers == NISPASSWD_VERS2) {
+			/* decrypt R and new passwd */
 
-		if (! __npd_cbc_crypt(&rand, pass, __NPD_MAXPASSBYTES,
-			&cryptbuf, _NPD_PASSMAXLEN, DES_DECRYPT,
-			&entry->ul_key)) {
-			syslog(LOG_ERR, "failed to decrypt verifier");
-			res->status = NPD_FAILED;
-			res->nispasswd_updresult_u.npd_err = NPD_DECRYPTFAIL;
-			return (TRUE);
+			cryptbuf2.npd_xrandval =
+			    ntohl(updreq2->xnewpass.npd_xrandval);
+			cryptbuf2.npd_pad = ntohl(updreq2->xnewpass.npd_pad);
+			for (i = 0; i < passlen; i++)
+				cryptbuf2.pass[i] = updreq2->xnewpass.pass[i];
+
+			if (! __npd2_cbc_crypt(&rand, pass, passlen,
+				&cryptbuf2, sizeof (cryptbuf2), DES_DECRYPT,
+				&entry->ul_key)) {
+				syslog(LOG_ERR, "failed to decrypt verifier");
+				res->status = NPD_FAILED;
+				res->nispasswd_updresult_u.npd_err =
+				    NPD_DECRYPTFAIL;
+				goto upd_free_pass;
+			}
 		}
 
 		/* check if R sent/decrypted matches cached R */
@@ -561,7 +692,7 @@ struct svc_req	*rqstp;
 			syslog(LOG_ERR, "update failed; no rand matches");
 		res->status = NPD_FAILED;
 		res->nispasswd_updresult_u.npd_err = NPD_VERFINVALID;
-		return (TRUE);
+		goto upd_free_pass;
 	}
 
 	/* create passwd struct with this pass & gecos/shell */
@@ -572,7 +703,7 @@ struct svc_req	*rqstp;
 			entry->ul_user, entry->ul_domain);
 		res->status = NPD_FAILED;
 		res->nispasswd_updresult_u.npd_err = NPD_NOSUCHENTRY;
-		return (TRUE);
+		goto upd_free_pass;
 	}
 
 	switch (pass_res->status) {
@@ -585,7 +716,7 @@ struct svc_req	*rqstp;
 		(void) nis_freeresult(pass_res);
 		res->status = NPD_FAILED;
 		res->nispasswd_updresult_u.npd_err = NPD_NOSUCHENTRY;
-		return (TRUE);
+		goto upd_free_pass;
 	default:
 		syslog(LOG_ERR,
 			"NIS+ error (%d) getting passwd entry for %s",
@@ -593,7 +724,7 @@ struct svc_req	*rqstp;
 		(void) nis_freeresult(pass_res);
 		res->status = NPD_FAILED;
 		res->nispasswd_updresult_u.npd_err = NPD_NISERROR;
-		return (TRUE);
+		goto upd_free_pass;
 	}
 
 	old_pass =  ENTRY_VAL(pobj, 1);
@@ -607,7 +738,7 @@ struct svc_req	*rqstp;
 	(void) memset(errlist, 0, sizeof (errlist));
 
 	/* if a gecos field is provided... */
-	if (*updreq->pass_info.pw_gecos != '\0') {
+	if (*gecos != '\0') {
 		chg_passwd = FALSE;
 		if (__npd_can_do(NIS_MODIFY_ACC, pobj,
 			entry->ul_item.name, 4) == FALSE) {
@@ -619,17 +750,17 @@ struct svc_req	*rqstp;
 			errlist[0].npd_code = NPD_PERMDENIED;
 			errlist[0].next = NULL;
 		} else if (old_gecos == NULL ||
-			strcmp(updreq->pass_info.pw_gecos, old_gecos) != 0) {
+			strcmp(gecos, old_gecos) != 0) {
 
 			ecol[4].ec_value.ec_value_val =
-				updreq->pass_info.pw_gecos;
+				gecos;
 			ecol[4].ec_value.ec_value_len =
-				strlen(updreq->pass_info.pw_gecos) + 1;
+				strlen(gecos) + 1;
 			ecol[4].ec_flags = EN_MODIFIED;
 		}
 	}
 		/* if a shell field is provided... */
-	if (*updreq->pass_info.pw_shell != '\0') {
+	if (*shell != '\0') {
 		chg_passwd = FALSE;
 		if (__npd_can_do(NIS_MODIFY_ACC, pobj,
 			entry->ul_item.name, 6) == FALSE) {
@@ -654,11 +785,11 @@ struct svc_req	*rqstp;
 				errlist[0].next = NULL;
 			}
 		} else if (old_shell == NULL ||
-			strcmp(updreq->pass_info.pw_shell, old_shell) != 0) {
+			strcmp(shell, old_shell) != 0) {
 			ecol[6].ec_value.ec_value_val =
-				updreq->pass_info.pw_shell;
+				shell;
 			ecol[6].ec_value.ec_value_len =
-				strlen(updreq->pass_info.pw_shell) + 1;
+				strlen(shell) + 1;
 			ecol[6].ec_flags = EN_MODIFIED;
 		}
 	}
@@ -866,6 +997,10 @@ end:
 	if (mod_res) (void) nis_freeresult(mod_res);
 	if (pass_res) (void) nis_freeresult(pass_res);
 	if (entry) (void) free_upd_item(entry);
+
+upd_free_pass:
+	if (pass != NULL)
+		free(pass);
 	return (TRUE);
 }
 
@@ -1224,6 +1359,22 @@ ypend:
 /* ARGSUSED */
 int
 nispasswd_prog_1_freeresult(transp, xdr_result, result)
+SVCXPRT *transp;
+xdrproc_t xdr_result;
+caddr_t result;
+{
+
+	/*
+	 * (void) xdr_free(xdr_result, result);
+	 * Insert additional freeing code here, if needed
+	 */
+
+	return (1);
+}
+
+/* ARGSUSED */
+int
+nispasswd_prog_2_freeresult(transp, xdr_result, result)
 SVCXPRT *transp;
 xdrproc_t xdr_result;
 caddr_t result;
