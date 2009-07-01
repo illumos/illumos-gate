@@ -1786,11 +1786,12 @@ mac_client_datapath_setup(mac_client_impl_t *mcip, uint16_t vid,
 bail:
 	if (bcast_added)
 		mac_bcast_delete(mcip, mip->mi_type->mt_brdcst_addr, vid);
-	if (mac_started)
-		mac_stop((mac_handle_t)mip);
 
 	if (nactiveclients_added)
 		mip->mi_nactiveclients--;
+
+	if (mac_started)
+		mac_stop((mac_handle_t)mip);
 
 	return (err);
 }
