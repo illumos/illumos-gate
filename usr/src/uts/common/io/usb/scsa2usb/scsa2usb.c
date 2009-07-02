@@ -3315,8 +3315,10 @@ scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
 	 */
 	case SCMD_MODE_SENSE:
 	case SCMD_MODE_SELECT:
-		if ((pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE3_CODE) ||
-		    (pkt->pkt_cdbp[2] == SD_MODE_SENSE_PAGE4_CODE)) {
+		if (((pkt->pkt_cdbp[2] & SD_MODE_SENSE_PAGE_MASK)
+		    == SD_MODE_SENSE_PAGE3_CODE) ||
+		    ((pkt->pkt_cdbp[2] & SD_MODE_SENSE_PAGE_MASK)
+		    == SD_MODE_SENSE_PAGE4_CODE)) {
 			if (cmd->cmd_bp) {
 				cmd->cmd_pkt->pkt_resid = cmd->cmd_bp->b_bcount;
 			}

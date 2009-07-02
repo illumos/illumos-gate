@@ -217,6 +217,8 @@ extern "C" {
 #define	SD_MODE_SENSE_PAGE4_CODE	0x04
 #endif
 
+#define	SD_MODE_SENSE_PAGE_MASK		0x3F
+
 /*
  * PM support
  */
