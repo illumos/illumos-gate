@@ -2815,18 +2815,19 @@ lxml_get_default_instance(entity_t *service, xmlNodePtr definst)
 
 /*
  * Translate an instance element into an internal property tree, added to
- * service.  If op is SVCCFG_OP_APPLY (i.e., apply a profile), forbid
- * subelements and set the enabled property to override.
+ * service.  If op is SVCCFG_OP_APPLY (i.e., apply a profile), set the
+ * enabled property to override.
  */
 static int
-lxml_get_instance(entity_t *service, xmlNodePtr inst, svccfg_op_t op)
+lxml_get_instance(entity_t *service, xmlNodePtr inst, bundle_type_t bt,
+    svccfg_op_t op)
 {
 	entity_t *i;
 	pgroup_t *pg;
 	property_t *p;
 	xmlNodePtr cursor;
 	xmlChar *enabled;
-	int r;
+	int r, e_val;
 
 	/*
 	 * Fetch its attributes, as appropriate.
@@ -2844,24 +2845,36 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, svccfg_op_t op)
 
 	enabled = xmlGetProp(inst, (xmlChar *)enabled_attr);
 
-	/*
-	 * New general property group with enabled boolean property set.
-	 */
-	pg = internal_pgroup_new();
-	(void) internal_attach_pgroup(i, pg);
+	if (enabled == NULL) {
+		if (bt == SVCCFG_MANIFEST) {
+			semerr(gettext("Instance \"%s\" missing attribute "
+			    "\"%s\".\n"), i->sc_name, enabled_attr);
+			return (-1);
+		}
+	} else {	/* enabled != NULL */
+		if (strcmp(true, (const char *)enabled) != 0 &&
+		    strcmp(false, (const char *)enabled) != 0) {
+			xmlFree(enabled);
+			semerr(gettext("Invalid enabled value\n"));
+			return (-1);
+		}
+		pg = internal_pgroup_new();
+		(void) internal_attach_pgroup(i, pg);
 
-	pg->sc_pgroup_name = (char *)scf_pg_general;
-	pg->sc_pgroup_type = (char *)scf_group_framework;
-	pg->sc_pgroup_flags = 0;
+		pg->sc_pgroup_name = (char *)scf_pg_general;
+		pg->sc_pgroup_type = (char *)scf_group_framework;
+		pg->sc_pgroup_flags = 0;
 
-	p = internal_property_create(SCF_PROPERTY_ENABLED, SCF_TYPE_BOOLEAN, 1,
-	    (uint64_t)(strcmp(true, (const char *)enabled) == 0 ? 1 : 0));
+		e_val = (strcmp(true, (const char *)enabled) == 0);
+		p = internal_property_create(SCF_PROPERTY_ENABLED,
+		    SCF_TYPE_BOOLEAN, 1, (uint64_t)e_val);
 
-	p->sc_property_override = (op == SVCCFG_OP_APPLY);
+		p->sc_property_override = (op == SVCCFG_OP_APPLY);
 
-	(void) internal_attach_property(pg, p);
+		(void) internal_attach_property(pg, p);
 
-	xmlFree(enabled);
+		xmlFree(enabled);
+	}
 
 	/*
 	 * Walk its child elements, as appropriate.
@@ -2870,13 +2883,6 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, svccfg_op_t op)
 	    cursor = cursor->next) {
 		if (lxml_ignorable_block(cursor))
 			continue;
-
-		if (op == SVCCFG_OP_APPLY) {
-			semerr(gettext("Instance \"%s\" may not contain "
-			    "elements in profiles.\n"), i->sc_name,
-			    cursor->name);
-			return (-1);
-		}
 
 		switch (lxml_xlate_element(cursor->name)) {
 		case SC_RESTARTER:
@@ -2972,17 +2978,10 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 
 		e = lxml_xlate_element(cursor->name);
 
-		if (op == SVCCFG_OP_APPLY && e != SC_INSTANCE) {
-			semerr(gettext("Service \"%s\" may not contain the "
-			    "non-instance element \"%s\" in a profile.\n"),
-			    s->sc_name, cursor->name);
-
-			return (-1);
-		}
-
 		switch (e) {
 		case SC_INSTANCE:
-			if (lxml_get_instance(s, cursor, op) != 0)
+			if (lxml_get_instance(s, cursor,
+			    bundle->sc_bundle_type, op) != 0)
 				return (-1);
 			break;
 		case SC_TEMPLATE:

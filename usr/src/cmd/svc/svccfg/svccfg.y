@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -241,7 +241,23 @@ restore_cmd : SCC_RESTORE SCV_WORD terminator
 	| SCC_RESTORE error terminator	{ synerr(SCC_RESTORE); return(0); }
 
 apply_cmd : SCC_APPLY SCV_WORD terminator
-					{ (void) engine_apply($2); free($2); }
+	{
+		(void) engine_apply($2, 1);
+		free($2);
+	}
+	| SCC_APPLY SCV_WORD SCV_WORD terminator
+	{
+		if (strcmp($2, "-n") == 0) {
+			(void) engine_apply($3, 0);
+			free($2);
+			free($3);
+		} else {
+			synerr(SCC_APPLY);
+			free($2);
+			free($3);
+			return (0);
+		}
+	}
 	| SCC_APPLY error terminator	{ synerr(SCC_APPLY); return(0); }
 
 extract_cmd: SCC_EXTRACT terminator	{ lscf_profile_extract(NULL); }

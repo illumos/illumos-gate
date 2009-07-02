@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -637,7 +637,7 @@ engine_import(uu_list_t *args)
 }
 
 int
-engine_apply(const char *file)
+engine_apply(const char *file, int apply_changes)
 {
 	int ret;
 	bundle_t *b;
@@ -655,6 +655,11 @@ engine_apply(const char *file)
 	if (lxml_get_bundle_file(b, file, SVCCFG_OP_APPLY) != 0) {
 		internal_bundle_free(b);
 		return (-1);
+	}
+
+	if (!apply_changes) {	/* we don't want to apply, just test */
+		internal_bundle_free(b);
+		return (0);
 	}
 
 	if (lscf_bundle_apply(b, file) != 0) {

@@ -2143,6 +2143,7 @@ props:
 		default:
 			bad_error("scf_transaction_commit", scf_error());
 		}
+		break;
 
 	default:
 		bad_error("scf_transaction_commit", r);
@@ -2151,6 +2152,49 @@ props:
 	scf_transaction_destroy_children(imp_tx);
 
 	return (r);
+}
+
+/*
+ * Returns
+ *   0 - success
+ *   ECONNABORTED - repository connection broken
+ *   ENOMEM - out of memory
+ *   ENOSPC - svc.configd is out of resources
+ *   ECANCELED - inst was deleted
+ *   EPERM - could not create property group (permission denied) (error printed)
+ *	   - could not modify property group (permission denied) (error printed)
+ *   EROFS - could not create property group (repository is read-only)
+ *   EACCES - could not create property group (backend access denied)
+ *   EEXIST - could not create property group (already exists)
+ *   EINVAL - invalid property group name (error printed)
+ *	    - invalid property name (error printed)
+ *	    - invalid value (error printed)
+ *   EBUSY - new property group changed (error printed)
+ */
+static int
+lscf_import_service_pgs(scf_service_t *svc, const char *target_fmri,
+    const entity_t *isvc, int flags)
+{
+	scf_callback_t cbdata;
+
+	cbdata.sc_handle = scf_service_handle(svc);
+	cbdata.sc_parent = svc;
+	cbdata.sc_service = 1;
+	cbdata.sc_general = 0;
+	cbdata.sc_enable = 0;
+	cbdata.sc_flags = flags;
+	cbdata.sc_source_fmri = isvc->sc_fmri;
+	cbdata.sc_target_fmri = target_fmri;
+
+	if (uu_list_walk(isvc->sc_pgroups, entity_pgroup_import, &cbdata,
+	    UU_DEFAULT) != 0) {
+		if (uu_error() != UU_ERROR_CALLBACK_FAILED)
+			bad_error("uu_list_walk", uu_error());
+
+		return (cbdata.sc_err);
+	}
+
+	return (0);
 }
 
 /*
@@ -7303,6 +7347,69 @@ out:
 	return (result);
 }
 
+/*
+ * _lscf_import_err() summarize the error handling returned by
+ * lscf_import_{instance | service}_pgs
+ * Return values are:
+ * IMPORT_NEXT
+ * IMPORT_OUT
+ * IMPORT_BAD
+ */
+
+#define	IMPORT_BAD	-1
+#define	IMPORT_NEXT	0
+#define	IMPORT_OUT	1
+
+static int
+_lscf_import_err(int err, const char *fmri)
+{
+	switch (err) {
+	case 0:
+		if (g_verbose)
+			warn(gettext("%s updated.\n"), fmri);
+		return (IMPORT_NEXT);
+
+	case ECONNABORTED:
+		warn(gettext("Could not update %s "
+		    "(repository connection broken).\n"), fmri);
+		return (IMPORT_OUT);
+
+	case ENOMEM:
+		warn(gettext("Could not update %s (out of memory).\n"), fmri);
+		return (IMPORT_OUT);
+
+	case ENOSPC:
+		warn(gettext("Could not update %s "
+		    "(repository server out of resources).\n"), fmri);
+		return (IMPORT_OUT);
+
+	case ECANCELED:
+		warn(gettext(
+		    "Could not update %s (deleted).\n"), fmri);
+		return (IMPORT_NEXT);
+
+	case EPERM:
+	case EINVAL:
+	case EBUSY:
+		return (IMPORT_NEXT);
+
+	case EROFS:
+		warn(gettext("Could not update %s (repository read-only).\n"),
+		    fmri);
+		return (IMPORT_OUT);
+
+	case EACCES:
+		warn(gettext("Could not update %s "
+		    "(backend access denied).\n"), fmri);
+		return (IMPORT_NEXT);
+
+	case EEXIST:
+	default:
+		return (IMPORT_BAD);
+	}
+
+	/*NOTREACHED*/
+}
 
 /*
  * Returns
@@ -7316,6 +7423,7 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 	scf_scope_t *rscope;
 	scf_service_t *rsvc;
 	scf_instance_t *rinst;
+	scf_iter_t *iter;
 	int annotation_set = 0;
 	int r;
 
@@ -7324,6 +7432,7 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 	if ((rscope = scf_scope_create(g_hndl)) == NULL ||
 	    (rsvc = scf_service_create(g_hndl)) == NULL ||
 	    (rinst = scf_instance_create(g_hndl)) == NULL ||
+	    (iter = scf_iter_create(g_hndl)) == NULL ||
 	    (imp_pg = scf_pg_create(g_hndl)) == NULL ||
 	    (imp_tx = scf_transaction_create(g_hndl)) == NULL)
 		scfdie();
@@ -7364,6 +7473,8 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 	for (svc = uu_list_first(bndl->sc_bundle_services);
 	    svc != NULL;
 	    svc = uu_list_next(bndl->sc_bundle_services, svc)) {
+		int refresh = 0;
+
 		if (scf_scope_get_service(rscope, svc->sc_name, rsvc) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_NOT_FOUND:
@@ -7374,6 +7485,27 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 
 			default:
 				scfdie();
+			}
+		}
+
+		/*
+		 * if we have pgs in the profile, we need to refresh ALL
+		 * instances of the service
+		 */
+		if (uu_list_numnodes(svc->sc_pgroups) != 0) {
+			refresh = 1;
+			r = lscf_import_service_pgs(rsvc, svc->sc_fmri, svc,
+			    SCI_FORCE | SCI_KEEP);
+			switch (_lscf_import_err(r, svc->sc_fmri)) {
+			case IMPORT_NEXT:
+				break;
+
+			case IMPORT_OUT:
+				goto out;
+
+			case IMPORT_BAD:
+			default:
+				bad_error("lscf_import_service_pgs", r);
 			}
 		}
 
@@ -7401,57 +7533,30 @@ lscf_bundle_apply(bundle_t *bndl, const char *file)
 
 			r = lscf_import_instance_pgs(rinst, inst->sc_fmri, inst,
 			    SCI_FORCE | SCI_KEEP);
-			switch (r) {
-			case 0:
-				if (g_verbose)
-					warn(gettext("%s updated.\n"),
-					    inst->sc_fmri);
+			switch (_lscf_import_err(r, inst->sc_fmri)) {
+			case IMPORT_NEXT:
 				break;
 
-			case ECONNABORTED:
-				warn(gettext("Could not update %s "
-				    "(repository connection broken).\n"),
-				    inst->sc_fmri);
+			case IMPORT_OUT:
 				goto out;
 
-			case ENOMEM:
-				warn(gettext("Could not update %s "
-				    "(out of memory).\n"), inst->sc_fmri);
-				goto out;
-
-			case ENOSPC:
-				warn(gettext("Could not update %s "
-				    "(repository server out of resources).\n"),
-				    inst->sc_fmri);
-				goto out;
-
-			case ECANCELED:
-				warn(gettext(
-				    "Could not update %s (deleted).\n"),
-				    inst->sc_fmri);
-				break;
-
-			case EPERM:
-			case EINVAL:
-			case EBUSY:
-				break;
-
-			case EROFS:
-				warn(gettext("Could not update %s "
-				    "(repository read-only).\n"),
-				    inst->sc_fmri);
-				goto out;
-
-			case EACCES:
-				warn(gettext("Could not update %s "
-				    "(backend access denied).\n"),
-				    inst->sc_fmri);
-				break;
-
-			case EEXIST:
+			case IMPORT_BAD:
 			default:
 				bad_error("lscf_import_instance_pgs", r);
 			}
+
+			/* refresh only if there is no pgs in the service */
+			if (refresh == 0)
+				(void) refresh_entity(0, rinst, inst->sc_fmri,
+				    NULL, NULL, NULL);
+		}
+
+		if (refresh == 1) {
+			char *name_buf = safe_malloc(max_scf_name_len + 1);
+
+			(void) refresh_entity(1, rsvc, svc->sc_name, rinst,
+			    iter, name_buf);
+			free(name_buf);
 		}
 	}
 
@@ -7466,6 +7571,7 @@ out:
 	scf_pg_destroy(imp_pg);
 	imp_pg = NULL;
 
+	scf_iter_destroy(iter);
 	scf_instance_destroy(rinst);
 	scf_service_destroy(rsvc);
 	scf_scope_destroy(rscope);
