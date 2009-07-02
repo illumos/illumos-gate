@@ -163,7 +163,7 @@ struct sproc {
 	sclient_t		*p_reader;
 };
 
-int sproc_hold(audio_client_t *, int);
+int sproc_hold(audio_client_t *, ldi_handle_t, queue_t *, int);
 void sproc_release(sclient_t *);
 static void sproc_update(sproc_t *);
 
@@ -474,7 +474,7 @@ sproc_free(sproc_t *proc)
 }
 
 int
-sproc_hold(audio_client_t *c, int oflag)
+sproc_hold(audio_client_t *c, ldi_handle_t lh, queue_t *rq, int oflag)
 {
 	pid_t		pid;
 	sproc_t		*proc;
@@ -521,8 +521,6 @@ sproc_hold(audio_client_t *c, int oflag)
 		proc->p_sdev = sdev;
 		list_insert_tail(l, proc);
 	}
-
-	sc->s_proc = proc;
 
 	while (proc->p_oflag & oflag) {
 
@@ -591,6 +589,13 @@ sproc_hold(audio_client_t *c, int oflag)
 		proc->p_reader = sc;
 		proc->p_oflag |= FREAD;
 	}
+
+	sc->s_lh = lh;
+	sc->s_rq = rq;
+	sc->s_wq = WR(rq);
+	WR(rq)->q_ptr = rq->q_ptr = sc;
+	/* we update the s_proc last to avoid a race */
+	sc->s_proc = proc;
 
 	sproc_update(proc);
 
@@ -1409,7 +1414,6 @@ sunstr_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *cr)
 	ldi_ident_t		lid;
 	ldi_handle_t		lh = NULL;
 	audio_client_t		*c = NULL;
-	sclient_t		*sc = NULL;
 	audio_dev_t		*adev;
 	unsigned		fmt;
 	int			oflag;
@@ -1487,15 +1491,9 @@ sunstr_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *cr)
 	}
 	isopen = B_TRUE;
 
-	if ((rv = sproc_hold(c, oflag)) != 0) {
+	if ((rv = sproc_hold(c, lh, rq, oflag)) != 0) {
 		goto fail;
 	}
-
-	sc = auclnt_get_private(c);
-	WR(rq)->q_ptr = rq->q_ptr = sc;
-	sc->s_lh = lh;
-	sc->s_rq = rq;
-	sc->s_wq = WR(rq);
 
 	/* start up the input */
 	if (oflag & FREAD) {
@@ -1510,9 +1508,6 @@ sunstr_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *cr)
 	return (0);
 
 fail:
-	if (sc != NULL) {
-		sproc_release(sc);
-	}
 	if (isopen) {
 		auclnt_close(c);
 	}
