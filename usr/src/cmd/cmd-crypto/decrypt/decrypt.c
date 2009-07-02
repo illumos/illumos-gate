@@ -75,9 +75,13 @@
 #include <cryptoutil.h>
 #include <kmfapi.h>
 
-#define	BUFFERSIZE	(2048)		/* Buffer size for reading file */
+/*
+ * Buffer size for reading file. This is given a rather high value
+ * to get better performance when a hardware provider is present.
+ */
+#define	BUFFERSIZE	(1024 * 64)
 #define	BLOCKSIZE	(128)		/* Largest guess for block size */
-#define	PROGRESSSIZE	(BUFFERSIZE*20)	/* stdin progress indicator size */
+#define	PROGRESSSIZE	(1024 * 40)	/* stdin progress indicator size */
 
 #define	SUNW_ENCRYPT_FILE_VERSION 1
 
@@ -1130,10 +1134,10 @@ crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
 					status_pos = 1;
 				}
 
-				if ((status_index - status_last) >
+				while ((status_index - status_last) >
 				    (PROGRESSSIZE)) {
 					(void) fprintf(stderr, gettext("."));
-					status_last = status_index;
+					status_last += PROGRESSSIZE;
 				}
 				continue;
 			}
