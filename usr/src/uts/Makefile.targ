@@ -270,12 +270,6 @@ $(ROOT_CONFFILE):	$(SRC_CONFFILE)	$(ROOT_CONFFILE:%/$(CONFFILE)=%)
 	$(INS.conffile)
 
 #
-#	Targets for '.esa' (activation) file installation.
-#
-$(ROOT_ACTFILE):
-	$(INS.actfile)
-
-#
 #	Targets for creating links between common platforms. ROOT_PLAT_LINKS
 #	are are the /platform level while ROOT_PLAT_LINKS_2 are one level
 #	down (/platform/`uname -i`/{lib|sbin|kernel}.

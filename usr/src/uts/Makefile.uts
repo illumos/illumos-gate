@@ -291,18 +291,12 @@ ROOT_CONFFILE_32	= $(ROOTMODULE).conf
 ROOT_CONFFILE_64	= $(ROOTMODULE:%/$(SUBDIR64)/$(MODULE)=%/$(MODULE)).conf
 ROOT_CONFFILE		= $(ROOT_CONFFILE_$(CLASS))
 
-$(EXPORT_RELEASE_BUILD)ROOT_ACTFILE		= $(ROOTMODULE).esa
-
 
 INS.conffile= \
 	$(RM) $@; $(INS) -s -m $(CFILEMODE) -f $(@D) $(SRC_CONFFILE)
 $(CH)INS.conffile= \
     $(INS) -s -m $(CFILEMODE) -u $(OWNER) -g $(GROUP) -f $(@D) $(SRC_CONFFILE)
 
-INS.actfile= \
-	$(RM) $@; $(INS) -s -m $(CFILEMODE) -f $(@D) $(BINARY).esa
-$(CH)INS.actfile= \
-	$(INS) -s -m $(CFILEMODE) -u $(OWNER) -g $(GROUP) -f $(@D) $(BINARY).esa
 
 #
 # The CTF merge of child kernel modules is performed against one of the genunix

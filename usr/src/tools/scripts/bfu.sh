@@ -3893,9 +3893,12 @@ rbac_cleanup()
 	print "\n"
 }
 
-remove_eof_SUNWcry()
+crypto_cleanup()
 {
-	print "SUNWcry/SUNWcryr removal cleanup...\n"
+	# This function will remove no longer needed cryptography
+	# related packages.
+
+	print "SUNWcry, SUNWcryr, SUNWn2cpact.v removal cleanup...\n"
 
 	# This clean up of ipsecalgs is not directly related to the EOF
 	# of SUNWcry and SUWNcryr, but due to mistakes in this file seen
@@ -3913,7 +3916,7 @@ remove_eof_SUNWcry()
 	mv -f ${ipsecalgs}.tmp $ipsecalgs
 
 	# Packages to remove.
-	typeset -r sunwcry_pkgs='SUNWcry SUNWcryr'
+	typeset -r crypt_pkgs='SUNWcry SUNWcryr SUNWn2cpact.v'
 	typeset pkg
 
 	#
@@ -3922,7 +3925,7 @@ remove_eof_SUNWcry()
 	# in the packages being removed should be run even if they
 	# will run as root.
 
-	typeset -r admfile='/tmp/sunwcry_eof.$$'
+	typeset -r admfile='/tmp/crypt_eof.$$'
 	cat > $admfile <<- EOF
 	mail=
 	instance=overwrite
@@ -3938,7 +3941,7 @@ remove_eof_SUNWcry()
 	EOF
 
 	printf '    Removing packages...'
-	for pkg in $sunwcry_pkgs
+	for pkg in $crypt_pkgs
 	do
 		if pkginfo $pkgroot -q $pkg; then
 			printf ' %s' $pkg
@@ -3988,6 +3991,10 @@ remove_eof_SUNWcry()
 	rm -f $rootprefix/kernel/crypto/amd64/blowfish448
 	rm -f $rootprefix/usr/sfw/lib/libssl_extra.so.0.9.8
 	rm -f $rootprefix/usr/sfw/lib/libcrypto_extra.so.0.9.8
+
+	# SUNWn2cpact.v contents go away, if pkgrm didn't take
+	# care of them
+	rm -f $rootprefix/platform/sun4v/kernel/drv/sparcv9/n2cp.esa
 
 	print "\n"
 }
@@ -7992,8 +7999,8 @@ mondo_loop() {
 	done
 
 	#
-	# Remove EOF SUNWcry/SUNWcryr
-	remove_eof_SUNWcry
+	# Remove EOF Crypto packages 
+	crypto_cleanup
 
 	# Add uCF's metaslot feature
 	if [ -f $rootprefix/etc/crypto/pkcs11.conf ] ; then

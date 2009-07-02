@@ -101,9 +101,6 @@ sparc_SUBDIRS= \
 	SUNWust2.v \
 	SUNWwbsd
 
-sparc_XMODS= \
-	SUNWn2cpact.v
-
 i386_SUBDIRS= \
 	SUNWad810 \
 	SUNWadixp \
