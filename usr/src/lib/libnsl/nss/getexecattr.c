@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <stdio.h>
@@ -187,7 +184,7 @@ _getexecprof(char *name,
 	(void) strncpy(policy_buf, DEFAULT_POLICY, BUFSIZ);
 
 retry_policy:
-	_priv_exec.policy = policy_buf;
+	_priv_exec.policy = IS_SEARCH_ALL(search_flag) ? empty : policy_buf;
 	_priv_exec.search_flag = search_flag;
 	_priv_exec.head_exec = NULL;
 	_priv_exec.prev_exec = NULL;
@@ -247,7 +244,7 @@ retry_policy:
 					    &arg);
 					if (pexec_root.s != NULL)
 						_nss_db_state_destr(
-							pexec_root.s);
+						    pexec_root.s);
 				}
 				if (prof_root.s != NULL)
 					_nss_db_state_destr(prof_root.s);
@@ -267,7 +264,8 @@ out:
 	 * fall back to the old "suser" policy.  The nameservice is
 	 * shared between different OS releases.
 	 */
-	if (res == NSS_NOTFOUND && strcmp(policy_buf, DEFAULT_POLICY) == 0) {
+	if (!IS_SEARCH_ALL(search_flag) &&
+	    (res == NSS_NOTFOUND && strcmp(policy_buf, DEFAULT_POLICY) == 0)) {
 		(void) strlcpy(policy_buf, SUSER_POLICY, BUFSIZ);
 		goto retry_policy;
 	}

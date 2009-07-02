@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include "files_common.h"
@@ -80,7 +78,7 @@ check_match(nss_XbyY_args_t *argp, const char *line, int linelen)
 		if (keyp) {
 			/* compare field */
 			while (*keyp && linep < limit &&
-				*linep != ':' && *keyp == *linep) {
+			    *linep != ':' && *keyp == *linep) {
 				keyp++;
 				linep++;
 			}
@@ -220,7 +218,8 @@ _exec_files_XY_all(files_backend_ptr_t be,
 		default:
 			break;
 		}
-		if ((strstr(instr, _priv_exec->policy) == NULL) ||
+		if (((_priv_exec->policy != NULL) &&
+		    (strstr(instr, _priv_exec->policy) == NULL)) ||
 		    ((_priv_exec->type != NULL) &&
 		    (strstr(instr, _priv_exec->type) == NULL)))
 				continue;
@@ -262,10 +261,10 @@ _exec_files_XY_all(files_backend_ptr_t be,
 		    argp->buf.buffer, argp->buf.buflen);
 		if (parse_stat == NSS_STR_PARSE_SUCCESS) {
 			argp->returnval = (argp->buf.result != NULL)?
-					argp->buf.result : argp->buf.buffer;
+			    argp->buf.result : argp->buf.buffer;
 			argp->returnlen = linelen;
 			res = NSS_SUCCESS;
-			if (_priv_exec->search_flag == GET_ONE) {
+			if (IS_GET_ONE(_priv_exec->search_flag)) {
 				break;
 			} else if (_doexeclist(argp) == 0) {
 				res = NSS_UNAVAIL;
@@ -387,8 +386,6 @@ _nss_files_exec_attr_constr(const char *dummy1,
     const char *dummy7)
 {
 	return (_nss_files_constr(execattr_ops,
-		sizeof (execattr_ops)/sizeof (execattr_ops[0]),
-		EXECATTR_FILENAME,
-		NSS_LINELEN_EXECATTR,
-		NULL));
+	    sizeof (execattr_ops)/sizeof (execattr_ops[0]),
+	    EXECATTR_FILENAME, NSS_LINELEN_EXECATTR, NULL));
 }

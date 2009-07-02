@@ -398,7 +398,7 @@ try_local(
 	char			*me = "try_local";
 
 	if (strcmp(NSCD_NSW_DB_NAME(dbi), NSS_DBNAM_EXECATTR) == 0) {
-		if ((ep = ap->key.attrp) != NULL && ep->search_flag == GET_ALL)
+		if ((ep = ap->key.attrp) != NULL && IS_GET_ALL(ep->search_flag))
 			rc = 1;
 	}
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_EXEC_ATTR_H
 #define	_EXEC_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -65,9 +62,26 @@ extern "C" {
  * Some macros used internally by the nsswitch code
  */
 
-#define	GET_ONE		0	/* get only one exec_attr from list */
-#define	GET_ALL		1	/* get all matching exec_attrs in list */
+/*
+ * These macros are bitmasks. GET_ONE and GET_ALL are bitfield 0
+ * and thus mutually exclusive. __SEARCH_ALL_POLLS is bitfield
+ * 1 and can be logically ORed with GET_ALL if one wants to get
+ * all matching profiles from all policies, not just the ones from
+ * the currently active policy
+ *
+ * Testing for these values should be done using the IS_* macros
+ * defined below.
+ */
+#define	GET_ONE			0
+#define	GET_ALL			1
+#define	__SEARCH_ALL_POLS	2
 
+/* get only one exec_attr from list */
+#define	IS_GET_ONE(f) (((f) & GET_ALL) == 0)
+/* get all matching exec_attrs in list */
+#define	IS_GET_ALL(f) (((f) & GET_ALL) == 1)
+/* search all existing policies */
+#define	IS_SEARCH_ALL(f) (((f) & __SEARCH_ALL_POLS) == __SEARCH_ALL_POLS)
 
 /*
  * Key words used in the exec_attr database

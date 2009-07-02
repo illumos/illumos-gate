@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -483,16 +483,19 @@ main_loop(char *devname, boolean_t cttyflag)
 	sanitize_tty(fileno(stdin));
 
 	for (;;) {
-		(void) printf("\nEnter user name for system maintenance "
-		    "(control-d to bypass): ");
-		if ((user = sulogin_getinput(devname, ECHOON)) == NULL) {
-			/* signal other children to exit */
-			(void) sigsend(P_PID, masterpid, SIGUSR1);
-			/* ^D, so straight to default init state */
-			exit(EXIT_FAILURE);
-		}
-		(void) printf("\nEnter %s password for system maintenance "
-		    "(control-d to bypass): ", user);
+		do {
+			(void) printf("\nEnter user name for system "
+			    "maintenance (control-d to bypass): ");
+			user = sulogin_getinput(devname, ECHOON);
+			if (user == NULL) {
+				/* signal other children to exit */
+				(void) sigsend(P_PID, masterpid, SIGUSR1);
+				/* ^D, so straight to default init state */
+				exit(EXIT_FAILURE);
+			}
+		} while (user[0] == '\0');
+		(void) printf("Enter %s password (control-d to bypass): ",
+		    user);
 
 		if ((pass = sulogin_getinput(devname, ECHOOFF)) == NULL) {
 			/* signal other children to exit */

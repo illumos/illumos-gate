@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -122,11 +120,8 @@ _exec_process_val(_exec_nisplus_args * eargp, nis_object * obj)
 		parsestat = NSS_STR_PARSE_PARSE;
 		goto fail;
 	}
-	parsestat = (*argp->str2ent)(be->buffer,
-		be->buflen,
-		argp->buf.result,
-		argp->buf.buffer,
-		argp->buf.buflen);
+	parsestat = (*argp->str2ent)(be->buffer, be->buflen, argp->buf.result,
+	    argp->buf.buffer, argp->buf.buflen);
 	if (parsestat == NSS_STR_PARSE_SUCCESS) {
 		if (be->buffer != NULL) {
 			free(be->buffer);
@@ -140,7 +135,7 @@ _exec_process_val(_exec_nisplus_args * eargp, nis_object * obj)
 			argp->returnval = argp->buf.buffer;
 			argp->returnlen = strlen(argp->buf.buffer);
 		}
-		if (_priv_exec->search_flag == GET_ALL)
+		if (IS_GET_ALL(_priv_exec->search_flag))
 			if (_doexeclist(argp) == 0)
 				return (NSS_UNAVAIL);
 		return (NSS_SUCCESS);
@@ -228,7 +223,7 @@ check_match(nis_name table, nis_object * obj, void *eargs)
 	*(eargp->resp) = res;
 	switch (res) {
 	case NSS_SUCCESS:
-		status = (_priv_exec->search_flag == GET_ONE);
+		status = IS_GET_ONE(_priv_exec->search_flag);
 		break;
 	case NSS_UNAVAIL:
 		status = 1;
@@ -454,8 +449,7 @@ nis_object2execstr(int nobj, nis_object *obj,
 	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_TYPE, typelen, type);
 
 	/* policy */
-	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_POLICY,
-		policylen, policy);
+	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_POLICY, policylen, policy);
 
 	/* reserved field 1 */
 	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_RES1, res1len, res1);
@@ -469,8 +463,8 @@ nis_object2execstr(int nobj, nis_object *obj,
 	/* key-value pairs of attributes */
 	__NISPLUS_GETCOL_OR_EMPTY(ecol, EXECATTR_NDX_ATTR, attrlen, attr);
 
-	buflen = namelen + policylen + typelen + res1len + res2len
-		+ idlen + attrlen + 7;
+	buflen = namelen + policylen + typelen + res1len + res2len +
+	    idlen + attrlen + 7;
 	if (argp->buf.result != NULL) {
 		if ((be->buffer = calloc(1, buflen)) == NULL)
 			return (NSS_STR_PARSE_PARSE);
@@ -485,7 +479,7 @@ nis_object2execstr(int nobj, nis_object *obj,
 		(void) memset(buffer, 0, buflen);
 	}
 	(void) snprintf(buffer, buflen, "%s:%s:%s:%s:%s:%s:%s",
-		name, policy, type, res1, res2, id, attr);
+	    name, policy, type, res1, res2, id, attr);
 #ifdef DEBUG
 	(void) fprintf(stdout, "execattr [%s]\n", buffer);
 	(void) fflush(stdout);
@@ -514,7 +508,6 @@ _nss_nisplus_exec_attr_constr(const char *dummy1,
     const char *dummy7)
 {
 	return (_nss_nisplus_constr(execattr_ops,
-		sizeof (execattr_ops)/sizeof (execattr_ops[0]),
-		EXECATTR_TBLNAME,
-		nis_object2execstr));
+	    sizeof (execattr_ops)/sizeof (execattr_ops[0]),
+	    EXECATTR_TBLNAME, nis_object2execstr));
 }

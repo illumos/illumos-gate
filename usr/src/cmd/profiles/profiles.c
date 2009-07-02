@@ -145,7 +145,7 @@ show_profs(char *username, int print_flag)
 			} else {
 				if (print_flag & PRINT_LONG) {
 					exec = getexecuser(username, KV_COMMAND,
-					    NULL, GET_ALL);
+					    NULL, GET_ALL|__SEARCH_ALL_POLS);
 					print_profs_long(exec);
 					free_execattr(exec);
 				} else {
@@ -175,7 +175,8 @@ list_profs(userattr_t *user, int print_flag)
 	int		profcnt = 0;
 
 	if (print_flag & PRINT_LONG) {
-		exec = getexecuser(user->name, KV_COMMAND, NULL, GET_ALL);
+		exec = getexecuser(user->name, KV_COMMAND, NULL,
+		    GET_ALL|__SEARCH_ALL_POLS);
 		if (exec == NULL) {
 			status = EXIT_NON_FATAL;
 		}

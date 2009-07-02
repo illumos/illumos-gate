@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -82,27 +80,23 @@ getexecprof(const char *name, const char *type, const char *id, int search_flag)
 	(void) memset(unique, 0, NSS_BUFLEN_EXECATTR);
 	(void) memset(&exec, 0, sizeof (execstr_t));
 
-	if ((search_flag != GET_ONE) && (search_flag != GET_ALL)) {
+	if (!IS_GET_ONE(search_flag) && !IS_GET_ALL(search_flag)) {
 		return (NULL);
 	}
 
 	if ((name == NULL) && (type == NULL) && (id == NULL)) {
 		setexecattr();
-		switch (search_flag) {
-		case GET_ONE:
+		if (IS_GET_ONE(search_flag)) {
 			head = getexecattr();
-			break;
-		case GET_ALL:
+		} else if (IS_GET_ALL(search_flag)) {
 			head = getexecattr();
 			prev = head;
 			while (prev != NULL) {
 				prev->next = getexecattr();
 				prev = prev->next;
 			};
-			break;
-		default:
+		} else {
 			head = NULL;
-			break;
 		}
 		endexecattr();
 		return (head);
@@ -120,7 +114,6 @@ getexecprof(const char *name, const char *type, const char *id, int search_flag)
 	return (execstr2attr(tmp));
 }
 
-
 execattr_t *
 getexecuser(const char *username, const char *type, const char *id,
     int search_flag)
@@ -133,7 +126,7 @@ getexecuser(const char *username, const char *type, const char *id,
 	execattr_t	*prev =  NULL;
 	execattr_t	*new = NULL;
 
-	if ((search_flag != GET_ONE) && (search_flag != GET_ALL)) {
+	if (!IS_GET_ONE(search_flag) && !IS_GET_ALL(search_flag)) {
 		return (NULL);
 	}
 
@@ -144,12 +137,10 @@ getexecuser(const char *username, const char *type, const char *id,
 		if (utmp == NULL) {
 			return (head);
 		}
-		switch (search_flag) {
-		case GET_ONE:
+		if (IS_GET_ONE(search_flag)) {
 			head = userprof((const char *)(utmp->name), type, id,
 			    search_flag);
-			break;
-		case GET_ALL:
+		} else if (IS_GET_ALL(search_flag)) {
 			head = userprof((const char *)(utmp->name), type, id,
 			    search_flag);
 			if (head != NULL) {
@@ -169,10 +160,8 @@ getexecuser(const char *username, const char *type, const char *id,
 					}
 				}
 			}
-			break;
-		default:
+		} else {
 			head = NULL;
-			break;
 		}
 		enduserattr();
 	} else {
@@ -297,10 +286,10 @@ userprof(const char *username, const char *type, const char *id,
 		profname = profArray[i];
 		if ((exec = getexecprof(profname, type, id, search_flag)) !=
 		    NULL) {
-			if (search_flag == GET_ONE) {
+			if (IS_GET_ONE(search_flag)) {
 				head = exec;
 				break;
-			} else if (search_flag == GET_ALL) {
+			} else if (IS_GET_ALL(search_flag)) {
 				if (head == NULL) {
 					head = exec;
 					prev = get_tail(head);

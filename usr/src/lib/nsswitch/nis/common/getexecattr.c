@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -150,14 +148,14 @@ _exec_nis_parse(const char *instr,
 			if ((strbuf = strdup(instr)) == NULL)
 				res = NSS_UNAVAIL;
 			check_matched = check_match_strbuf(argp,
-				strbuf, check_policy);
+			    strbuf, check_policy);
 		} else {
 			argp->returnval = argp->buf.result;
 			check_matched = check_match(argp, check_policy);
 		}
 		if (check_matched) {
 			res = NSS_SUCCESS;
-			if (_priv_exec->search_flag == GET_ALL) {
+			if (IS_GET_ALL(_priv_exec->search_flag)) {
 				if (_doexeclist(argp) == 0) {
 					res = NSS_UNAVAIL;
 				}
@@ -242,7 +240,7 @@ _exec_nis_cb(int instatus,
 	switch (res) {
 	case NSS_SUCCESS:
 		*(eargp->yp_status) = 0;
-		stop_cb = (_priv_exec->search_flag == GET_ONE);
+		stop_cb = IS_GET_ONE(_priv_exec->search_flag);
 		break;
 	case NSS_UNAVAIL:
 		*(eargp->yp_status) = YPERR_KEY;
@@ -321,7 +319,7 @@ _exec_nis_lookup(nis_backend_ptr_t be, nss_XbyY_args_t *argp, int getby_flag)
 		 * do exactly the same thing.
 		 */
 		ypstatus = __yp_all_cflookup((char *)(be->domain),
-			(char *)(be->enum_map), &cback, 0);
+		    (char *)(be->enum_map), &cback, 0);
 
 		/*
 		 * For GET_ALL, check if we found anything at all.
@@ -457,6 +455,6 @@ _nss_nis_exec_attr_constr(const char *dummy1,
     const char *dummy7)
 {
 	return (_nss_nis_constr(execattr_ops,
-		sizeof (execattr_ops)/sizeof (execattr_ops[0]),
-		NIS_MAP_EXECATTR));
+	    sizeof (execattr_ops)/sizeof (execattr_ops[0]),
+	    NIS_MAP_EXECATTR));
 }

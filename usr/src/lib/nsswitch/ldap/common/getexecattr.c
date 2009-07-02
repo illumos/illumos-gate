@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <secdb.h>
 #include <exec_attr.h>
@@ -282,7 +280,7 @@ _nss_ldap_exec2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 
 	name = __ns_ldap_getAttr(result->entry, _EXEC_NAME);
 	if (name == NULL || name[0] == NULL ||
-			(strlen(name[0]) < 1)) {
+	    (strlen(name[0]) < 1)) {
 		status = NSS_STR_PARSE_PARSE;
 		goto result_exec2str;
 	}
@@ -326,8 +324,8 @@ _nss_ldap_exec2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 
 	/* 7 = 6 ':' + 1 '\0' */
 	len = strlen(name[0]) + strlen(policy_str) + strlen(type_str) +
-		strlen(res1_str) + strlen(res2_str) + strlen(id_str) +
-		strlen(attr_str) + 7;
+	    strlen(res1_str) + strlen(res2_str) + strlen(id_str) +
+	    strlen(attr_str) + 7;
 
 	if (len > argp->buf.buflen) {
 		status = NSS_STR_PARSE_ERANGE;
@@ -343,8 +341,8 @@ _nss_ldap_exec2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		buffer = argp->buf.buffer;
 
 	(void) snprintf(buffer, len, "%s:%s:%s:%s:%s:%s:%s",
-			name[0], policy_str, type_str, res1_str,
-			res2_str, id_str, attr_str);
+	    name[0], policy_str, type_str, res1_str,
+	    res2_str, id_str, attr_str);
 	/* The front end marshaller does not need the trailing null */
 	if (argp->buf.result != NULL)
 		be->buflen = strlen(buffer);
@@ -376,7 +374,7 @@ _exec_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		case NSS_STR_PARSE_SUCCESS:
 			argp->returnval = argp->buf.result;
 			nss_stat = NSS_SUCCESS;
-			if (_priv_exec->search_flag == GET_ALL) {
+			if (IS_GET_ALL(_priv_exec->search_flag)) {
 				if (_doexeclist(argp) == 0) {
 					nss_stat = NSS_UNAVAIL;
 				}
@@ -394,7 +392,7 @@ _exec_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 			break;
 		}
 
-		if ((_priv_exec->search_flag == GET_ONE) ||
+		if (IS_GET_ONE(_priv_exec->search_flag) ||
 		    (nss_stat != NSS_SUCCESS)) {
 			break;
 		}
@@ -491,7 +489,7 @@ exec_attr_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp) {
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 	int		stat, nss_stat = NSS_SUCCESS;
 
-	if (_priv_exec->search_flag == GET_ONE) {
+	if (IS_GET_ONE(_priv_exec->search_flag)) {
 		/* ns_ldap_entry_t -> file format */
 		stat = (*be->ldapobj2str)(be, argp);
 
@@ -624,6 +622,6 @@ _nss_ldap_exec_attr_constr(const char *dummy1,
 	    "\n[getexecattr.c: _nss_ldap_exec_attr_constr]\n");
 #endif
 	return ((nss_backend_t *)_nss_ldap_constr(execattr_ops,
-		sizeof (execattr_ops)/sizeof (execattr_ops[0]), _EXECATTR,
-		exec_attrs, _nss_ldap_exec2str));
+	    sizeof (execattr_ops)/sizeof (execattr_ops[0]), _EXECATTR,
+	    exec_attrs, _nss_ldap_exec2str));
 }
