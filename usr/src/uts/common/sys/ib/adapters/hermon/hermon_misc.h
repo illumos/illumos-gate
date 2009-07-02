@@ -179,8 +179,6 @@ extern "C" {
  * of UAR index, 3 bits of driver instance number).  This is especially true
  * for 32-bit kernels.
  */
-
-
 #define	HERMON_NUM_UAR_SHIFT		0xA
 
 /*
@@ -199,56 +197,24 @@ extern "C" {
  * Though it may lead to minor wastage, it also means that reuse is easier since
  * any DBr can be used for either, and we don't have to play allocation games.
  *
- * The structure of a page of DBrs looks like this:
- *
- *         ------------------------------
- *         |                            |
- *         |                            |
- *         |      HEADER structure      |
- *         |                            |
- *         |----------------------------|
- *         |                            |
- *         |                            |
- *         |                            |
- *         |           DBrs             |  ((PAGESIZE >> 3) - 4) DBrs / page
- *         |                            |
- *         |                            |
- *         |                            |
- *         |                            |
- *         |                            |
- *         |----------------------------|
- *
- *
- * The state structure will hold the pointer to the start of a list of pages
- * containing DBr's.  As you allocate each page you also allocate a dbr_into
- * structure, that contains the access information about the page, to minimize
- * what needs to be in the page itself - what's there is just what's needed
- * to step through at alloc time
+ * The state structure will hold the pointer to the start of a list of struct
+ * hermon_dbr_info_s, each one containing the necessary information to manage
+ * a page of DBr's.
  */
 
 typedef uint64_t hermon_dbr_t;
 
 typedef struct hermon_dbr_info_s {
-	caddr_t			dbr_page;	/* addr of page */
-	uint64_t		dbr_paddr;	/* paddr of page for HCA */
+	struct hermon_dbr_info_s *dbr_link;
+	hermon_dbr_t		*dbr_page;	/* virtual addr of page */
+	uint64_t		dbr_paddr;	/* physical addr of page */
 	ddi_acc_handle_t	dbr_acchdl;
 	ddi_dma_handle_t	dbr_dmahdl;
-	ddi_umem_cookie_t	dbr_umemcookie;
+	uint32_t		dbr_nfree;	/* #free DBrs in this page */
+	uint32_t		dbr_firstfree;	/* idx of first free DBr */
 } hermon_dbr_info_t;
 
-typedef struct hermon_dbr_header_s {
-	struct hermon_dbr_header_s *next; /* next page in chain */
-					/* (zero means last) */
-	hermon_dbr_info_t *dbr_info;	/* info structure for this page */
-	uint32_t	nfree;		/* #free DBrs in this page */
-	uint32_t	firstfree;	/* idx of first free DBr in this page */
-	hermon_dbr_t	dbr[1];		/* rest ot he page is the DBrs */
-} hermon_dbr_header_t;
-
-#define	HERMON_DBR_HEADER_LEN	/* size in QUADWORDS/DBRs */ \
-	((sizeof (hermon_dbr_header_t) / sizeof (hermon_dbr_t)) - 1)
-
-#define	HERMON_NUM_DBR_PER_PAGE	((PAGESIZE >> 3) - HERMON_DBR_HEADER_LEN)
+#define	HERMON_NUM_DBR_PER_PAGE	(PAGESIZE / sizeof (hermon_dbr_t))
 
 
 /*

@@ -237,7 +237,6 @@ hermon_user_dbr_free(hermon_state_t *state, uint_t index, hermon_dbr_t *record)
  *	in this case, we want exactly one page per call, and aligned on a
  *	page - and may need to be mapped to the user for access
  */
-
 int
 hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 {
@@ -247,10 +246,9 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 	ddi_dma_attr_t		dma_attr;
 	ddi_dma_cookie_t	cookie;
 	uint_t			cookie_cnt;
-	hermon_dbr_header_t	*pagehdr;
 	int			i;
 	hermon_dbr_info_t 	*info;
-	uint64_t		dmaaddr;
+	caddr_t			dmaaddr;
 	uint64_t		dmalen;
 
 	info = kmem_zalloc(sizeof (hermon_dbr_info_t), KM_SLEEP);
@@ -274,7 +272,7 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 
 	status = ddi_dma_mem_alloc(dma_hdl, PAGESIZE,
 	    &state->hs_reg_accattr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, (caddr_t *)&dmaaddr, (size_t *)&dmalen, &acc_hdl);
+	    NULL, &dmaaddr, (size_t *)&dmalen, &acc_hdl);
 	if (status != DDI_SUCCESS)	{
 		ddi_dma_free_handle(&dma_hdl);
 		cmn_err(CE_CONT, "dbr DMA mem alloc failed(status %d)", status);
@@ -284,7 +282,7 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 
 	/* this memory won't be IB registered, so do the bind here */
 	status = ddi_dma_addr_bind_handle(dma_hdl, NULL,
-	    (caddr_t)(uintptr_t)dmaaddr, (size_t)dmalen, DDI_DMA_RDWR |
+	    dmaaddr, (size_t)dmalen, DDI_DMA_RDWR |
 	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &cookie, &cookie_cnt);
 	if (status != DDI_SUCCESS) {
 		ddi_dma_mem_free(&acc_hdl);
@@ -299,18 +297,15 @@ hermon_dbr_page_alloc(hermon_state_t *state, hermon_dbr_info_t **dinfo)
 	/* init the info structure with returned info */
 	info->dbr_dmahdl = dma_hdl;
 	info->dbr_acchdl = acc_hdl;
-	info->dbr_page   = (caddr_t)(uintptr_t)dmaaddr;
+	info->dbr_page   = (hermon_dbr_t *)(void *)dmaaddr;
+	info->dbr_link = NULL;
 	/* extract the phys addr from the cookie */
 	info->dbr_paddr = cookie.dmac_laddress;
-	/* should have everything now, so do the init of the header */
-	pagehdr = (hermon_dbr_header_t *)(void *)info->dbr_page;
-	pagehdr->next = 0;
-	pagehdr->firstfree = 0;
-	pagehdr->nfree = HERMON_NUM_DBR_PER_PAGE;
-	pagehdr->dbr_info = info;
+	info->dbr_firstfree = 0;
+	info->dbr_nfree = HERMON_NUM_DBR_PER_PAGE;
 	/* link all DBrs onto the free list */
 	for (i = 0; i < HERMON_NUM_DBR_PER_PAGE; i++) {
-		pagehdr->dbr[i] = i + 1;
+		info->dbr_page[i] = i + 1;
 	}
 
 	return (DDI_SUCCESS);
@@ -328,9 +323,9 @@ int
 hermon_dbr_alloc(hermon_state_t *state, uint_t index, ddi_acc_handle_t *acchdl,
     hermon_dbr_t **vdbr, uint64_t *pdbr, uint64_t *mapoffset)
 {
-	hermon_dbr_header_t	*pagehdr, *lastpage;
 	hermon_dbr_t		*record = NULL;
-	hermon_dbr_info_t	*dinfo = NULL;
+	hermon_dbr_info_t	*info = NULL;
+	uint32_t		idx;
 	int			status;
 
 	if (index != state->hs_kernel_uar_index)
@@ -338,37 +333,30 @@ hermon_dbr_alloc(hermon_state_t *state, uint_t index, ddi_acc_handle_t *acchdl,
 		    mapoffset));
 
 	mutex_enter(&state->hs_dbr_lock);
-	/* 'pagehdr' holds pointer to first page */
-	pagehdr = (hermon_dbr_header_t *)(void *)state->hs_kern_dbr;
-	do {
-		lastpage = pagehdr; /* save pagehdr for later linking */
-		if (pagehdr->nfree == 0) {
-			pagehdr = (hermon_dbr_header_t *)(void *)pagehdr->next;
-			continue; /* page is full, go to next if there is one */
-		}
-		dinfo = pagehdr->dbr_info;
-		break;			/* found a page w/ one available */
-	} while (pagehdr != 0);
+	for (info = state->hs_kern_dbr; info != NULL; info = info->dbr_link)
+		if (info->dbr_nfree != 0)
+			break;		/* found a page w/ one available */
 
-	if (dinfo == NULL) {	/* did NOT find a page with one available */
-		status = hermon_dbr_page_alloc(state, &dinfo);
+	if (info == NULL) {	/* did NOT find a page with one available */
+		status = hermon_dbr_page_alloc(state, &info);
 		if (status != DDI_SUCCESS) {
 			/* do error handling */
 			mutex_exit(&state->hs_dbr_lock);
 			return (DDI_FAILURE);
 		}
 		/* got a new page, so link it in. */
-		pagehdr = (hermon_dbr_header_t *)(void *)dinfo->dbr_page;
-		lastpage->next = pagehdr;
+		info->dbr_link = state->hs_kern_dbr;
+		state->hs_kern_dbr = info;
 	}
-	record = pagehdr->dbr + pagehdr->firstfree;
-	pagehdr->firstfree = *record;
-	pagehdr->nfree--;
+	idx = info->dbr_firstfree;
+	record = info->dbr_page + idx;
+	info->dbr_firstfree = *record;
+	info->dbr_nfree--;
 	*record = 0;
 
-	*acchdl = dinfo->dbr_acchdl;
+	*acchdl = info->dbr_acchdl;
 	*vdbr = record;
-	*pdbr = ((uintptr_t)record - (uintptr_t)pagehdr + dinfo->dbr_paddr);
+	*pdbr = info->dbr_paddr + idx * sizeof (hermon_dbr_t);
 	mutex_exit(&state->hs_dbr_lock);
 	return (DDI_SUCCESS);
 }
@@ -380,22 +368,25 @@ hermon_dbr_alloc(hermon_state_t *state, uint_t index, ddi_acc_handle_t *acchdl,
  *	the dbr, but will NEVER free pages of dbrs - small
  *	price to pay, but userland access never will anyway
  */
-
 void
 hermon_dbr_free(hermon_state_t *state, uint_t indx, hermon_dbr_t *record)
 {
-	hermon_dbr_header_t	*pagehdr;
+	hermon_dbr_t		*page;
+	hermon_dbr_info_t	*info;
 
 	if (indx != state->hs_kernel_uar_index) {
 		hermon_user_dbr_free(state, indx, record);
 		return;
 	}
+	page = (hermon_dbr_t *)(uintptr_t)((uintptr_t)record & PAGEMASK);
 	mutex_enter(&state->hs_dbr_lock);
-	pagehdr = (hermon_dbr_header_t *)((uintptr_t)record &
-	    (uintptr_t)PAGEMASK);
-	*record = pagehdr->firstfree;
-	pagehdr->firstfree = record - pagehdr->dbr;
-	pagehdr->nfree++;		/* decr the count for this one */
+	for (info = state->hs_kern_dbr; info != NULL; info = info->dbr_link)
+		if (info->dbr_page == page)
+			break;
+	ASSERT(info != NULL);
+	*record = info->dbr_firstfree;
+	info->dbr_firstfree = record - info->dbr_page;
+	info->dbr_nfree++;
 	mutex_exit(&state->hs_dbr_lock);
 }
 
@@ -411,8 +402,7 @@ hermon_dbr_free(hermon_state_t *state, uint_t indx, hermon_dbr_t *record)
 void
 hermon_dbr_kern_free(hermon_state_t *state)
 {
-	hermon_dbr_header_t	*pagehdr, *lastpage;
-	hermon_dbr_info_t	*dinfo;
+	hermon_dbr_info_t	*info, *link;
 	hermon_user_dbr_t	*udbr, *next;
 	hermon_udbr_page_t	*pagep, *nextp;
 	hermon_umap_db_entry_t	*umapdb;
@@ -421,15 +411,12 @@ hermon_dbr_kern_free(hermon_state_t *state)
 	extern			hermon_umap_db_t hermon_userland_rsrc_db;
 
 	mutex_enter(&state->hs_dbr_lock);
-	pagehdr = (hermon_dbr_header_t *)(void *)state->hs_kern_dbr;
-	while (pagehdr != NULL) {
-		lastpage = (hermon_dbr_header_t *)(void *)pagehdr->next;
-		dinfo = pagehdr->dbr_info;
-		(void) ddi_dma_unbind_handle(dinfo->dbr_dmahdl);
-		ddi_dma_mem_free(&dinfo->dbr_acchdl);	/* free page */
-		ddi_dma_free_handle(&dinfo->dbr_dmahdl);
-		kmem_free(dinfo, sizeof (hermon_dbr_info_t));
-		pagehdr = lastpage;
+	for (info = state->hs_kern_dbr; info != NULL; info = link) {
+		(void) ddi_dma_unbind_handle(info->dbr_dmahdl);
+		ddi_dma_mem_free(&info->dbr_acchdl);	/* free page */
+		ddi_dma_free_handle(&info->dbr_dmahdl);
+		link = info->dbr_link;
+		kmem_free(info, sizeof (hermon_dbr_info_t));
 	}
 
 	udbr = state->hs_user_dbr;

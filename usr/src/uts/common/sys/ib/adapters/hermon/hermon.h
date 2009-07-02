@@ -580,9 +580,11 @@ struct hermon_hw_eqc_s		hs_debug_eqc;
 	hermon_qphdl_t		*hs_qphdl;
 	hermon_srqhdl_t		*hs_srqhdl;
 	kmutex_t		hs_dbr_lock;	/* lock for dbr mgmt */
-	caddr_t			hs_kern_dbr;
 
-	/* XXX needs work - link list of non-kernel dbr resources */
+	/* linked list of kernel dbr resources */
+	hermon_dbr_info_t	*hs_kern_dbr;
+
+	/* linked list of non-kernel dbr resources */
 	hermon_user_dbr_t	*hs_user_dbr;
 
 	/*
