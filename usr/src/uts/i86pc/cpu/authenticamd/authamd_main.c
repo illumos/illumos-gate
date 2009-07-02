@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * "Generic AMD" model-specific support.  If no more-specific support can
@@ -74,16 +72,6 @@ int authamd_ms_support_disable = 0;
  * feature imlementation - that way new family support may often simply
  * simply need to update these bitmasks.
  */
-
-/*
- * Families that this module will provide some model-specific
- * support for (if no more-specific module claims it first).
- * We try to support whole families rather than differentiate down
- * to revision.
- */
-#define	AUTHAMD_SUPPORTED(fam) \
-	((fam) == AUTHAMD_FAMILY_6 || (fam) == AUTHAMD_FAMILY_F || \
-	(fam) == AUTHAMD_FAMILY_10)
 
 /*
  * Models that include an on-chip NorthBridge.
@@ -450,6 +438,40 @@ authamd_clear_ecccnt(authamd_data_t *authamd, boolean_t clrint)
 	}
 }
 
+
+/*
+ * Return
+ * 	1: supported
+ *	0: unsupported
+ */
+static int
+authamd_supported(uint_t family, uint32_t rev, uint_t chipid)
+{
+	uint32_t nbcap;
+
+	if (family == AUTHAMD_FAMILY_6)
+		return (1);
+
+	if (family == AUTHAMD_FAMILY_F)
+		return (1);
+
+	/*
+	 * On Family 10h, authamd is currently unsupported when there are
+	 * multiple nodes on a processor chip.
+	 */
+	if (X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_D)) {
+		nbcap = authamd_pcicfg_read(chipid, MC_FUNC_MISCCTL,
+		    MC_CTL_REG_NBCAP);
+		if ((nbcap & MC_NBCAP_MULTINODECPU) == 0)
+			return (1);
+	} else {
+		if (X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+			return (1);
+	}
+
+	return (0);
+}
+
 /*
  * cms_init entry point.
  *
@@ -463,10 +485,12 @@ authamd_init(cmi_hdl_t hdl, void **datap)
 	uint_t chipid = cmi_hdl_chipid(hdl);
 	struct authamd_chipshared *sp, *osp;
 	uint_t family = cmi_hdl_family(hdl);
+	uint32_t rev = cmi_hdl_chiprev(hdl);
 	authamd_data_t *authamd;
 	uint64_t cap;
 
-	if (authamd_ms_support_disable || !AUTHAMD_SUPPORTED(family))
+	if (authamd_ms_support_disable ||
+	    !authamd_supported(family, rev, chipid))
 		return (ENOTSUP);
 
 	if (!(x86_feature & X86_MCA))

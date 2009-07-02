@@ -18,14 +18,12 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MC_AMD_H
 #define	_MC_AMD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mc.h>
 #include <sys/isa_defs.h>
@@ -201,7 +199,8 @@ enum mc_funcnum {
 #define	MC_CTL_REG_SPARECTL	0xb0	/* On-line spare control register */
 #define	MC_CTL_REG_NBCAP	0xe8	/* NB Capabilities */
 
-#define	MC_NBCAP_L3CAPABLE	0x02000000
+#define	MC_NBCAP_L3CAPABLE	(1U << 25)
+#define	MC_NBCAP_MULTINODECPU	(1U << 29)
 
 /*
  * MC4_MISC MSR and MC4_MISCj MSRs
