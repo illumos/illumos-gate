@@ -1345,6 +1345,8 @@ ext_to_provider_data(int mode, kcf_provider_desc_t *provider,
 	STRUCT_FSET(version, cv_minor, ei->ei_hardware_version.cv_minor);
 	bcopy(STRUCT_BUF(version), STRUCT_FADDR(pd, pd_hardware_version),
 	    STRUCT_SIZE(version));
+	STRUCT_FSET(version, cv_major, ei->ei_firmware_version.cv_major);
+	STRUCT_FSET(version, cv_minor, ei->ei_firmware_version.cv_minor);
 	bcopy(STRUCT_BUF(version), STRUCT_FADDR(pd, pd_firmware_version),
 	    STRUCT_SIZE(version));
 	bcopy(ei->ei_time, STRUCT_FGET(pd, pd_time), CRYPTO_EXT_SIZE_TIME);

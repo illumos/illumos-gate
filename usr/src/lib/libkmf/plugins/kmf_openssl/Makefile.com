@@ -51,7 +51,6 @@ CPPFLAGS	+=	-D_REENTRANT $(KMFINC) \
 			-I$(INCDIR) -I/usr/include/libxml2
 
 PICS=	$(OBJECTS:%=pics/%)
-SONAME=	$(DYNLIB)
 
 lint:=	OPENSSLLIBS=	$(LINTSSLLIBS)
 lint:=	OPENSSLLIBS64=	$(LINTSSLLIBS64)
