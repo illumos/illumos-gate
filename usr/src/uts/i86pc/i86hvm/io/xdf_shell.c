@@ -794,8 +794,13 @@ xdfs_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 	rv = xdfs_c_ioctl(xsp, dev, part, cmd, arg, flag, credp, rvalp, &done);
 	if (done)
 		return (rv);
-	return (ldi_ioctl(xsp->xdfss_tgt_lh[part],
-	    cmd, arg, flag, credp, rvalp));
+	rv = ldi_ioctl(xsp->xdfss_tgt_lh[part], cmd, arg, flag, credp, rvalp);
+	if (rv == 0) {
+		/* Force Geometry Validation */
+		(void) cmlb_invalidate(xsp->xdfss_cmlbhandle, 0);
+		(void) cmlb_validate(xsp->xdfss_cmlbhandle, 0, 0);
+	}
+	return (rv);
 }
 
 static int

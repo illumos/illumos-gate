@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,14 @@ extern "C" {
     gettext("cannot install stage2 on pcfs, too many fragments.\n")
 
 #define	OUT_OF_MEMORY	gettext("diskread: out of memory\n")
+
+#define	NO_VIRT_GEOM	gettext("Could not get virtual geometry\n")
+
+#define	NO_PHYS_GEOM	gettext("Could not get physical geometry\n")
+
+#define	NO_LABEL_GEOM	gettext("Could not get label geometry\n")
+
+#define	LIBFDISK_INIT_FAIL	gettext("Failed to initialize libfdisk.\n")
 
 #ifdef	__cplusplus
 }

@@ -18,55 +18,66 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# 
+#
 
-PROG= installgrub
+HDRS =          libfdisk.h
+ROOTHDRDIR=     $(ROOT)/usr/include
+ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
+CHECKDIRS=	$(HDRS:%.h=%.check)
+HDRDIR =        ./
 
-PCFS_SRC= $(SRC)/common/fs/pcfs.c
+$(ROOTHDRDIR)/%: %
+        $(INS.file)
 
-OBJS= installgrub.o floppy.o pcfs.o
-SRCS= installgrub.c floppy.c $(PCFS_SRC)
-SBINLINKS= $(PROG)
+all :=		TARGET = all
+install_h:=	TARGET = install_h
 
-include ../Makefile.com
+install_h: $(ROOTHDRS)
 
-CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
+LIBRARY= libfdisk.a
+VERS= .1
 
-LDLIBS += -lmd5
+PICS=   pics/libfdisk.o
+
+pics/%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+OBJECTS= \
+libfdisk.o
+
+# include library definitions
+include ../../Makefile.lib
+
+# install this library in the root filesystem
+include ../../Makefile.rootfs
+
+SRCDIR =	.
+
+C99MODE=	$(C99_DISABLE)
+
+MAPFILES += mapfile-vers
+
+CPPFLAGS += -I.
+LDLIBS += -lc
 
 i386_CFLAGS += -D_LARGEFILE64_SOURCE
 i386_CFLAGS += -D_FILE_OFFSET_BITS=64
 
-LDLIBS += -lfdisk
-
-LINTFLAGS += \
-	-erroff=E_BAD_PTR_CAST_ALIGN \
-	-erroff=E_STATIC_UNUSED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
-	-xerroff=E_NAME_DEF_NOT_USED2
-
 .KEEP_STATE:
 
-all: $(PROG)
+LIBS=	$(DYNLIB) $(LINTLIB)
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
+all: $(LIBS)
+
+lint: lintcheck
+
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
 
 
-# pick pcfs from usr/src/common/fs
-pcfs.o:	$(PCFS_SRC)
-	$(COMPILE.c) -o $@ $(PCFS_SRC)
-
-install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
-
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
-
-include ../Makefile.targ
+# include library targets
+include ../../Makefile.targ

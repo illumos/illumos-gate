@@ -38,6 +38,9 @@
 #include <sys/dktp/fdisk.h>
 #include <sys/stat.h>
 #include <sys/dklabel.h>
+#ifdef i386
+#include <libfdisk.h>
+#endif
 
 #include "main.h"
 #include "analyze.h"
@@ -105,6 +108,9 @@ static int get_solaris_part();
 
 #endif	/* __STDC__ */
 
+#ifdef i386
+int extpart_init(ext_part_t **epp);
+#endif
 /*
  * Handling the alignment problem of struct ipart.
  */
@@ -274,22 +280,23 @@ open_cur_file(int mode)
 	char	pbuf[MAXPATHLEN];
 
 	switch (mode) {
-	case FD_USE_P0_PATH:
-		(void) get_pname(&pbuf[0]);
-		dkpath = pbuf;
-		break;
-	case FD_USE_CUR_DISK_PATH:
-		if (cur_disk->fdisk_part.systid == SUNIXOS ||
-		    cur_disk->fdisk_part.systid == SUNIXOS2) {
-			(void) get_sname(&pbuf[0]);
+		case FD_USE_P0_PATH:
+			(void) get_pname(&pbuf[0]);
 			dkpath = pbuf;
-		} else {
-			dkpath = cur_disk->disk_path;
-		}
-		break;
-	default:
-		err_print("Error: Invalid mode option for opening cur_file\n");
-		fullabort();
+			break;
+		case FD_USE_CUR_DISK_PATH:
+			if (cur_disk->fdisk_part.systid == SUNIXOS ||
+			    cur_disk->fdisk_part.systid == SUNIXOS2) {
+				(void) get_sname(&pbuf[0]);
+				dkpath = pbuf;
+			} else {
+				dkpath = cur_disk->disk_path;
+			}
+			break;
+		default:
+			err_print("Error: Invalid mode option for opening "
+			    "cur_file\n");
+			fullabort();
 	}
 
 	/* Close previous cur_file */
@@ -441,6 +448,12 @@ get_solaris_part(int fd, struct ipart *ipart)
 	char		*mbr;
 	char		*bootptr;
 	struct dk_label	update_label;
+	ushort_t	found = 0;
+#ifdef i386
+	uint32_t	relsec, numsec;
+	int		pno, rval, ext_part_found = 0;
+	ext_part_t	*epp;
+#endif
 
 	(void) lseek(fd, 0, 0);
 
@@ -474,6 +487,41 @@ get_solaris_part(int fd, struct ipart *ipart)
 		bootptr = &boot_sec.parts[ipc];
 		(void) fill_ipart(bootptr, &ip);
 
+#ifdef i386
+		if (fdisk_is_dos_extended(ip.systid) && (ext_part_found == 0)) {
+			/* We support only one extended partition per disk */
+			ext_part_found = 1;
+			(void) extpart_init(&epp);
+			rval = fdisk_get_solaris_part(epp, &pno, &relsec,
+			    &numsec);
+			if (rval == FDISK_SUCCESS) {
+				/*
+				 * Found a solaris partition inside the
+				 * extended partition. Update the statistics.
+				 */
+				if (nhead != 0 && nsect != 0) {
+					pcyl = numsec / (nhead * nsect);
+					xstart = relsec / (nhead * nsect);
+					ncyl = pcyl - acyl;
+				}
+				solaris_offset = relsec;
+				found = 2;
+				ip.bootid = 0;
+				ip.beghead = ip.begsect = ip.begcyl = 0xff;
+				ip.endhead = ip.endsect = ip.endcyl = 0xff;
+				ip.systid = SUNIXOS2;
+				ip.relsect = relsec;
+				ip.numsect = numsec;
+				ipart->bootid = ip.bootid;
+				status = bcmp(&ip, ipart,
+				    sizeof (struct ipart));
+				bcopy(&ip, ipart, sizeof (struct ipart));
+			}
+			libfdisk_fini(&epp);
+			continue;
+		}
+#endif
+
 		/*
 		 * we are interested in Solaris and EFI partition types
 		 */
@@ -493,29 +541,31 @@ get_solaris_part(int fd, struct ipart *ipart)
 #ifdef DEBUG
 			else {
 				err_print("Critical geometry values are zero:\n"
-				    "\tnhead = %d; nsect = %d\n", nhead,
-				    nsect);
+				    "\tnhead = %d; nsect = %d\n", nhead, nsect);
 			}
 #endif /* DEBUG */
 
 			solaris_offset = (uint_t)lel(ip.relsect);
+			found = 1;
 			break;
 		}
 	}
 
-	if (i == FD_NUMPART) {
+	if (!found) {
 		err_print("Solaris fdisk partition not found\n");
 		return (-1);
+	} else if (found == 1) {
+		/*
+		 * Found a primary solaris partition.
+		 * compare the previous and current Solaris partition
+		 * but don't use bootid in determination of Solaris partition
+		 * changes
+		 */
+		ipart->bootid = ip.bootid;
+		status = bcmp(&ip, ipart, sizeof (struct ipart));
+
+		bcopy(&ip, ipart, sizeof (struct ipart));
 	}
-
-	/*
-	 * compare the previous and current Solaris partition
-	 * but don't use bootid in determination of Solaris partition changes
-	 */
-	ipart->bootid = ip.bootid;
-	status = bcmp(&ip, ipart, sizeof (struct ipart));
-
-	bcopy(&ip, ipart, sizeof (struct ipart));
 
 	/* if the disk partitioning has changed - get the VTOC */
 	if (status) {
@@ -570,7 +620,6 @@ get_solaris_part(int fd, struct ipart *ipart)
 		nsect = cur_dtype->dtype_nsect;
 		nhead = cur_dtype->dtype_nhead;
 	}
-
 	return (0);
 }
 
@@ -586,6 +635,11 @@ copy_solaris_part(struct ipart *ipart)
 	char		buf[MAXPATHLEN];
 	char		*bootptr;
 	struct stat	statbuf;
+#ifdef i386
+	uint32_t	relsec, numsec;
+	int		pno, rval, ext_part_found = 0;
+	ext_part_t	*epp;
+#endif
 
 	(void) get_pname(&buf[0]);
 	if (stat(buf, &statbuf) == -1 ||
@@ -641,6 +695,36 @@ copy_solaris_part(struct ipart *ipart)
 		bootptr = &mboot.parts[ipc];
 		(void) fill_ipart(bootptr, &ip);
 
+#ifdef i386
+		if (fdisk_is_dos_extended(ip.systid) && (ext_part_found == 0)) {
+			/* We support only one extended partition per disk */
+			ext_part_found = 1;
+			(void) extpart_init(&epp);
+			rval = fdisk_get_solaris_part(epp, &pno, &relsec,
+			    &numsec);
+			if (rval == FDISK_SUCCESS) {
+				/*
+				 * Found a solaris partition inside the
+				 * extended partition. Update the statistics.
+				 */
+				if (nhead != 0 && nsect != 0) {
+					pcyl = numsec / (nhead * nsect);
+					ncyl = pcyl - acyl;
+				}
+				solaris_offset = relsec;
+				ip.bootid = 0;
+				ip.beghead = ip.begsect = ip.begcyl = 0xff;
+				ip.endhead = ip.endsect = ip.endcyl = 0xff;
+				ip.systid = SUNIXOS2;
+				ip.relsect = relsec;
+				ip.numsect = numsec;
+				bcopy(&ip, ipart, sizeof (struct ipart));
+			}
+			libfdisk_fini(&epp);
+			continue;
+		}
+#endif
+
 		if (ip.systid == SUNIXOS ||
 		    ip.systid == SUNIXOS2 ||
 		    ip.systid == EFI_PMBR) {
@@ -660,8 +744,7 @@ copy_solaris_part(struct ipart *ipart)
 #ifdef DEBUG
 			else {
 				err_print("Critical geometry values are zero:\n"
-				    "\tnhead = %d; nsect = %d\n", nhead,
-				    nsect);
+				    "\tnhead = %d; nsect = %d\n", nhead, nsect);
 			}
 #endif /* DEBUG */
 
@@ -685,6 +768,11 @@ auto_solaris_part(struct dk_label *label)
 	struct ipart	ip;
 	char		*bootptr;
 	char		pbuf[MAXPATHLEN];
+#ifdef i386
+	uint32_t	relsec, numsec;
+	int		pno, rval, ext_part_found = 0;
+	ext_part_t	*epp;
+#endif
 
 	(void) get_pname(&pbuf[0]);
 	if ((fd = open_disk(pbuf, O_RDONLY)) < 0) {
@@ -719,6 +807,33 @@ auto_solaris_part(struct dk_label *label)
 		/* Handling the alignment problem of struct ipart */
 		bootptr = &mboot.parts[ipc];
 		(void) fill_ipart(bootptr, &ip);
+
+#ifdef i386
+		if (fdisk_is_dos_extended(ip.systid) && (ext_part_found == 0)) {
+			/* We support only one extended partition per disk */
+			ext_part_found = 1;
+			(void) extpart_init(&epp);
+			rval = fdisk_get_solaris_part(epp, &pno, &relsec,
+			    &numsec);
+			if (rval == FDISK_SUCCESS) {
+				/*
+				 * Found a solaris partition inside the
+				 * extended partition. Update the statistics.
+				 */
+				if ((label->dkl_nhead != 0) &&
+				    (label->dkl_nsect != 0)) {
+					label->dkl_pcyl =
+					    numsec / (label->dkl_nhead *
+					    label->dkl_nsect);
+					label->dkl_ncyl = label->dkl_pcyl -
+					    label->dkl_acyl;
+				}
+				solaris_offset = relsec;
+			}
+			libfdisk_fini(&epp);
+			continue;
+		}
+#endif
 
 		/*
 		 * if the disk has an EFI label, the nhead and nsect fields
@@ -786,3 +901,49 @@ good_fdisk()
 		return (0);
 	}
 }
+
+#ifdef i386
+int
+extpart_init(ext_part_t **epp)
+{
+	int		rval, lf_op_flag = 0;
+	char		p0_path[MAXPATHLEN];
+
+	get_pname(&p0_path[0]);
+	lf_op_flag |= FDISK_READ_DISK;
+	if ((rval = libfdisk_init(epp, p0_path, NULL, lf_op_flag)) !=
+	    FDISK_SUCCESS) {
+		switch (rval) {
+			/*
+			 * FDISK_EBADLOGDRIVE and FDISK_ENOLOGDRIVE can
+			 * be considered as soft errors and hence
+			 * we do not exit
+			 */
+			case FDISK_EBADLOGDRIVE:
+				break;
+			case FDISK_ENOLOGDRIVE:
+				break;
+			case FDISK_ENOVGEOM:
+				err_print("Could not get virtual geometry for"
+				    " this device\n");
+				fullabort();
+				break;
+			case FDISK_ENOPGEOM:
+				err_print("Could not get physical geometry for"
+				    " this device\n");
+				fullabort();
+				break;
+			case FDISK_ENOLGEOM:
+				err_print("Could not get label geometry for "
+				    " this device\n");
+				fullabort();
+				break;
+			default:
+				err_print("Failed to initialise libfdisk.\n");
+				fullabort();
+				break;
+		}
+	}
+	return (0);
+}
+#endif

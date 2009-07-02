@@ -18,55 +18,47 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# 
+#
 
-PROG= installgrub
+include		../Makefile.lib
 
-PCFS_SRC= $(SRC)/common/fs/pcfs.c
+LIBRARY= libfdisk.a
+VERS= .1
 
-OBJS= installgrub.o floppy.o pcfs.o
-SRCS= installgrub.c floppy.c $(PCFS_SRC)
-SBINLINKS= $(PROG)
+HDRS=		libfdisk.h
 
-include ../Makefile.com
+HDRDIR=		$(MACH)
 
-CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
-
-LDLIBS += -lmd5
-
-i386_CFLAGS += -D_LARGEFILE64_SOURCE
-i386_CFLAGS += -D_FILE_OFFSET_BITS=64
-
-LDLIBS += -lfdisk
-
-LINTFLAGS += \
-	-erroff=E_BAD_PTR_CAST_ALIGN \
-	-erroff=E_STATIC_UNUSED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
-	-xerroff=E_NAME_DEF_NOT_USED2
+all:=		TARGET= all
+install:=	TARGET= install
+clean:=		TARGET= clean
+clobber:=	TARGET= clobber
+lint:=		TARGET= lint
+_msg:=		TARGET= _msg
 
 .KEEP_STATE:
 
-all: $(PROG)
+SUBDIRS=	$(MACH) 
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
+all install clean clobber lint: $(SUBDIRS)
 
 
-# pick pcfs from usr/src/common/fs
-pcfs.o:	$(PCFS_SRC)
-	$(COMPILE.c) -o $@ $(PCFS_SRC)
+# install rule for install_h target
 
-install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
+install_h: $(ROOTHDRS)
 
-clean:
-	$(RM) $(OBJS)
+check: $(CHECKHDRS)
 
-lint:	lint_SRCS
+_msg: $(MSGSUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
 
 include ../Makefile.targ
+include ../../Makefile.msg.targ

@@ -230,6 +230,11 @@ struct dk_callback {
  */
 #define	DKIOCHOTPLUGGABLE	(DKIOC|35)	/* is hotpluggable */
 
+#if defined(__i386) || defined(__amd64)
+/* ioctl to write extended partition structure into the disk */
+#define	DKIOCSETEXTPART	(DKIOC|46)
+#endif
+
 /*
  * Ioctl to force driver to re-read the alternate partition and rebuild
  * the internal defect map.

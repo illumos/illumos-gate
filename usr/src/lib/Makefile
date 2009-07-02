@@ -263,7 +263,8 @@ SUBDIRS += \
 
 i386_SUBDIRS=		\
 	libntfs		\
-	libparted
+	libparted	\
+	libfdisk
 
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
@@ -365,6 +366,8 @@ MSGSUBDIRS += \
 sparc_MSGSUBDIRS=	\
 	libprtdiag	\
 	libprtdiag_psr
+
+i386_MSGSUBDIRS= libfdisk
 
 HDRSUBDIRS=		\
 	auditd_plugins	\
@@ -491,7 +494,8 @@ $(CLOSED_BUILD)HDRSUBDIRS += \
 	$(CLOSED)/lib/smartcard
 
 i386_HDRSUBDIRS=	\
-	libparted
+	libparted	\
+	libfdisk
 
 sparc_HDRSUBDIRS=	\
 	libds		\
