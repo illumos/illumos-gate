@@ -49,14 +49,12 @@
 #include <netsmb/netbios.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/nb_lib.h>
-#include <cflib.h>
+
 #include <err.h>
 
-uid_t real_uid, eff_uid;
+#include "private.h"
 
 static int smblib_initialized;
-
-struct rcfile *smb_rc;
 
 int
 smb_lib_init(void)
@@ -71,6 +69,23 @@ smb_lib_init(void)
 		return (error);
 	}
 	smblib_initialized++;
+	return (0);
+}
+
+int
+smb_getlocalname(char **namepp)
+{
+	char buf[SMBIOC_MAX_NAME], *cp;
+
+	if (gethostname(buf, sizeof (buf)) != 0)
+		return (errno);
+	cp = strchr(buf, '.');
+	if (cp)
+		*cp = '\0';
+	cp = strdup(buf);
+	if (cp == NULL)
+		return (ENOMEM);
+	*namepp = cp;
 	return (0);
 }
 
@@ -162,93 +177,6 @@ smb_printb(char *dest, int flags, const struct smb_bitname *bnp) {
 	return (dest);
 }
 
-extern int home_nsmbrc;
-
-#ifdef DEBUG
-#include "queue.h"
-#include "rcfile_priv.h"
-
-struct rcsection *rc_findsect(struct rcfile *rcp, const char *sectname);
-struct rckey *rc_sect_findkey(struct rcsection *rsp, const char *keyname);
-
-void
-dump_props(char *where)
-{
-	struct rcsection *rsp = NULL;
-	struct rckey *rkp = NULL;
-
-	printf("Settings %s\n", where);
-	SLIST_FOREACH(rsp, &smb_rc->rf_sect, rs_next) {
-		printf("section=%s\n", rsp->rs_name);
-		fflush(stdout);
-
-		SLIST_FOREACH(rkp, &rsp->rs_keys, rk_next) {
-			printf("  key=%s, value=%s\n",
-			    rkp->rk_name, rkp->rk_value);
-			fflush(stdout);
-		}
-	}
-}
-#endif
-
-/*
- * first read ~/.smbrc, next try to merge SMB_CFG_FILE - if that fails
- * because SMB_CFG_FILE doesn't exist, try to merge OLD_SMB_CFG_FILE
- */
-int
-smb_open_rcfile(struct smb_ctx *ctx)
-{
-	char *home, *fn;
-	int error, len;
-
-	smb_rc = NULL;
-#ifdef DEPRECATED
-	fn = SMB_CFG_FILE;
-	error = rc_merge(fn, &smb_rc);
-	if (error == ENOENT) {
-		/*
-		 * OK, try to read a config file in the old location.
-		 */
-		fn = OLD_SMB_CFG_FILE;
-		error = rc_merge(fn, &smb_rc);
-	}
-#endif
-	fn = "/usr/sbin/sharectl get smbfs";
-	error = rc_merge_pipe(fn, &smb_rc);
-	if (error != 0 && error != ENOENT)
-		fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "Can't open %s: %s\n"), fn, smb_strerror(errno));
-#ifdef DEBUG
-	if (smb_debug)
-		dump_props("after reading global repository");
-#endif
-
-	home = getenv("HOME");
-	if (home == NULL && ctx && ctx->ct_home)
-		home = ctx->ct_home;
-	if (home) {
-		len = strlen(home) + 20;
-		fn = malloc(len);
-		snprintf(fn, len, "%s/.nsmbrc", home);
-		home_nsmbrc = 1;
-		error = rc_merge(fn, &smb_rc);
-		if (error != 0 && error != ENOENT) {
-			fprintf(stderr, dgettext(TEXT_DOMAIN,
-			    "Can't open %s: %s\n"), fn, smb_strerror(errno));
-		}
-		free(fn);
-	}
-	home_nsmbrc = 0;
-#ifdef DEBUG
-	if (smb_debug)
-		dump_props("after reading user settings");
-#endif
-	if (smb_rc == NULL) {
-		return (ENOENT);
-	}
-	return (0);
-}
-
 void
 smb_simplecrypt(char *dst, const char *src)
 {
@@ -301,6 +229,79 @@ smb_simpledecrypt(char *dst, const char *src)
 	}
 	*dst = 0;
 	return (0);
+}
+
+/*
+ * Number of seconds between 1970 and 1601 year
+ * (134774 * 24 * 60 * 60)
+ */
+static const uint64_t DIFF1970TO1601 = 11644473600ULL;
+
+void
+smb_time_local2server(struct timeval *tsp, int tzoff, long *seconds)
+{
+	*seconds = tsp->tv_sec - tzoff * 60;
+}
+
+void
+smb_time_server2local(ulong_t seconds, int tzoff, struct timeval *tsp)
+{
+	tsp->tv_sec = seconds + tzoff * 60;
+	tsp->tv_usec = 0;
+}
+
+/*
+ * Time from server comes as UTC, so no need to use tz
+ */
+/*ARGSUSED*/
+void
+smb_time_NT2local(uint64_t nsec, int tzoff, struct timeval *tsp)
+{
+	smb_time_server2local(nsec / 10000000 - DIFF1970TO1601, 0, tsp);
+}
+
+/*ARGSUSED*/
+void
+smb_time_local2NT(struct timeval *tsp, int tzoff, uint64_t *nsec)
+{
+	long seconds;
+
+	smb_time_local2server(tsp, 0, &seconds);
+	*nsec = (((uint64_t)(seconds) & ~1) + DIFF1970TO1601) *
+	    (uint64_t)10000000;
+}
+
+void
+smb_hexdump(const void *buf, int len)
+{
+	const uchar_t *p = buf;
+	int ofs = 0;
+
+	while (len--) {
+		if (ofs % 16 == 0)
+			fprintf(stderr, "%02X: ", ofs);
+		fprintf(stderr, "%02x ", *p++);
+		ofs++;
+		if (ofs % 16 == 0)
+			fprintf(stderr, "\n");
+	}
+	if (ofs % 16 != 0)
+		fprintf(stderr, "\n");
+}
+
+void
+dprint(const char *fname, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+
+	if (smb_debug) {
+		fprintf(stderr, "%s: ", fname);
+		vfprintf(stderr, fmt, ap);
+		fprintf(stderr, "\n");
+	}
+	va_end(ap);
 }
 
 #undef __progname

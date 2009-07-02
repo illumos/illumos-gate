@@ -19,15 +19,21 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # lib/libsmbfs/Makefile
 #
 
 include $(SRC)/lib/Makefile.lib
+
+HDRS=		smbfs_acl.h smbfs_api.h
+HDRDIR=		netsmb
+
+ROOTHDRDIR=	$(ROOT)/usr/include/netsmb
+ROOTHDRS= $(HDRS:%=$(ROOTHDRDIR)/%)
 
 # ISA targets
 SUBDIRS = $(MACH)
@@ -40,29 +46,26 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 lint :=		TARGET= lint
 
+MSGFILES =	`$(GREP) -l gettext smb/*.[ch]`
 POFILE =	libsmbfs.po
 
 .KEEP_STATE:
 
 all install clean clobber lint:  $(SUBDIRS)
 
-include $(SRC)/Makefile.msg.targ
+_msg: $(MSGDOMAINPOFILE)
 
-MSGFILES=smb/cfopt.c smb/charsets.c smb/charsets.h smb/ctx.c smb/derparse.c \
-	smb/derparse.h smb/file.c smb/keychain.c smb/mbuf.c smb/nb.c \
-	smb/nb_name.c smb/nb_net.c smb/nbns_rq.c smb/netshareenum.c \
-	smb/nls.c smb/print.c smb/queue.h smb/rap.c smb/rcfile.c \
-	smb/rcfile_priv.h smb/rq.c smb/spnego.c smb/spnego.h \
-	smb/spnegoparse.c smb/spnegoparse.h smb/subr.c smb/ui-sun.c
+$(POFILE):	pofile_MSGFILES
 
-_msg:  $(MSGDOMAINPOFILE)
+install_h: $(ROOTHDRDIR) $(ROOTHDRS)
 
-$(MSGDOMAINPOFILE): $(POFILE)
+check: $(CHECKHDRS)
 
-$(POFILE): $(MSGFILES)
-	$(BUILDPO.msgfiles)
+$(ROOTHDRDIR)/%: %
+	$(INS.file)
 
-install:	$(ROOTLIBS)
+$(ROOTHDRDIR):
+	$(INS.dir)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -70,3 +73,4 @@ $(SUBDIRS): FRC
 FRC:
 
 include $(SRC)/lib/Makefile.targ
+include $(SRC)/Makefile.msg.targ

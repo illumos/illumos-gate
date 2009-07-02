@@ -37,11 +37,6 @@
  * Use is subject to license terms.
  */
 
-#include <sys/param.h>
-#include <sys/stat.h>
-#include <sys/errno.h>
-#include <sys/mount.h>
-
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -57,33 +52,38 @@
 #include <locale.h>
 #include <libscf.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/errno.h>
+#include <sys/mount.h>
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
 
-#include <cflib.h>
-
-#include <netsmb/smb.h>
+/* This needs to know ctx->ct_dev_fd, etc. */
 #include <netsmb/smb_lib.h>
 
 #include <sys/fs/smbfs_mount.h>
 
 #include "mntopts.h"
 
+extern char *optarg;
+extern int optind;
+
 static char mount_point[MAXPATHLEN + 1];
 static void usage(void);
-static int setsubopt(int, char *, struct smbfs_args *);
+static int setsubopt(smb_ctx_t *, struct smbfs_args *, int, char *);
 
 /* smbfs options */
-#define	MNTOPT_RETRY		"retry"
-#define	MNTOPT_TIMEOUT		"timeout"
+#define	MNTOPT_DOMAIN		"domain"
+#define	MNTOPT_USER		"user"
 #define	MNTOPT_DIRPERMS		"dirperms"
 #define	MNTOPT_FILEPERMS	"fileperms"
 #define	MNTOPT_GID		"gid"
 #define	MNTOPT_UID		"uid"
 #define	MNTOPT_NOPROMPT		"noprompt"
 
-#define	OPT_RETRY	1
-#define	OPT_TIMEOUT	2
+#define	OPT_DOMAIN	1
+#define	OPT_USER	2
 #define	OPT_DIRPERMS	3
 #define	OPT_FILEPERMS	4
 #define	OPT_GID		5
@@ -108,8 +108,8 @@ struct smbfsopts {
 };
 
 struct smbfsopts opts[] = {
-	{MNTOPT_RETRY,		OPT_RETRY},
-	{MNTOPT_TIMEOUT,	OPT_TIMEOUT},
+	{MNTOPT_DOMAIN,		OPT_DOMAIN},
+	{MNTOPT_USER,		OPT_USER},
 	{MNTOPT_DIRPERMS,	OPT_DIRPERMS},
 	{MNTOPT_FILEPERMS,	OPT_FILEPERMS},
 	{MNTOPT_GID,		OPT_GID},
@@ -132,22 +132,20 @@ static int Oflg = 0;    /* Overlay mounts */
 static int qflg = 0;    /* quiet - don't print warnings on bad options */
 static int ro = 0;	/* read-only mount */
 static int noprompt = 0;	/* don't prompt for password */
-static int retry = -1;
-static int timeout = -1;
 
 #define	RET_ERR	33
 #define	SERVICE "svc:/network/smb/client:default"
 
+struct smbfs_args mdata;
+struct mnttab mnt;
+char optbuf[MAX_MNTOPT_STR];
+
 int
 main(int argc, char *argv[])
 {
-	struct smb_ctx sctx, *ctx = &sctx;
-	struct smbfs_args mdata;
+	struct smb_ctx *ctx = NULL;
 	struct stat st;
-	int opt, error, mntflags;
-	struct mnttab mnt;
-	struct mnttab *mntp = &mnt;
-	char optbuf[MAX_MNTOPT_STR];
+	int opt, error, err2, mntflags;
 	static char *fstype = MNTTYPE_SMBFS;
 	char *env, *state;
 
@@ -174,8 +172,9 @@ main(int argc, char *argv[])
 		fprintf(stderr,
 		    gettext("mount_smbfs: service \"%s\" not enabled.\n"),
 		    SERVICE);
-		exit(1);
+		exit(RET_ERR);
 	}
+	free(state);
 
 	/* Debugging support. */
 	if ((env = getenv("SMBFS_DEBUG")) != NULL) {
@@ -186,22 +185,35 @@ main(int argc, char *argv[])
 
 	error = smb_lib_init();
 	if (error)
-		exit(error);
+		exit(RET_ERR);
 
 	mnt.mnt_mntopts = optbuf;
 	mntflags = MS_DATA;
+
 	bzero(&mdata, sizeof (mdata));
+	mdata.version = SMBFS_VERSION;		/* smbfs mount version */
 	mdata.uid = (uid_t)-1;
 	mdata.gid = (gid_t)-1;
 	mdata.caseopt = SMB_CS_NONE;
 
-	error = smb_ctx_init(ctx, argc, argv, SMBL_SHARE, SMBL_SHARE,
-	    SMB_ST_DISK);
+	error = smb_ctx_alloc(&ctx);
 	if (error)
-		exit(error);
+		exit(RET_ERR);
+
+	/*
+	 * Parse the UNC path so we have the server (etc.)
+	 * that we need during rcfile+sharectl parsing.
+	 */
+	if (argc < 3)
+		usage();
+	error = smb_ctx_parseunc(ctx, argv[argc - 2],
+	    SMBL_SHARE, SMBL_SHARE, USE_DISKDEV, NULL);
+	if (error)
+		exit(RET_ERR);
+
 	error = smb_ctx_readrc(ctx);
 	if (error)
-		exit(error);
+		exit(RET_ERR);
 
 	while ((opt = getopt(argc, argv, "ro:Oq")) != -1) {
 		switch (opt) {
@@ -254,7 +266,8 @@ main(int argc, char *argv[])
 						*comma = ',';
 					continue;
 				}
-				ret = setsubopt(opts[i].index, soptval, &mdata);
+				ret = setsubopt(ctx, &mdata,
+				    opts[i].index, soptval);
 				if (ret != 0)
 					exit(RET_ERR);
 				if (equals)
@@ -280,24 +293,19 @@ main(int argc, char *argv[])
 
 		mntflags |= MS_RDONLY;
 		/* convert "rw"->"ro" */
-		if (p = strstr(mntp->mnt_mntopts, "rw")) {
+		if (p = strstr(mnt.mnt_mntopts, "rw")) {
 			if (*(p+2) == ',' || *(p+2) == '\0')
 				*(p+1) = 'o';
 		}
 	}
 
+	if (optind + 2 != argc)
+		usage();
+
 	mnt.mnt_special = argv[optind];
 	mnt.mnt_mountp = argv[optind+1];
 
-	mdata.version = SMBFS_VERSION;		    /* smbfs mount version */
-
-	if (optind == argc - 2)
-		optind++;
-
-	if (optind != argc - 1)
-		usage();
-	realpath(unpercent(argv[optind]), mount_point);
-
+	realpath(argv[optind+1], mount_point);
 	if (stat(mount_point, &st) == -1)
 		err(EX_OSERR, gettext("could not find mount point %s"),
 		    mount_point);
@@ -325,90 +333,76 @@ main(int argc, char *argv[])
 			mdata.dir_mode |= S_IXOTH;
 	}
 
-	/*
-	 * XXX: The driver can fill these in more reliably,
-	 * so why do we set them here?  (Just set both = -1)
-	 */
-	ctx->ct_ssn.ioc_owner = ctx->ct_sh.ioc_owner = getuid();
-	ctx->ct_ssn.ioc_group = ctx->ct_sh.ioc_group = getgid();
-	opt = 0;
-	if (mdata.dir_mode & S_IXGRP)
-		opt |= SMBM_EXECGRP;
-	if (mdata.dir_mode & S_IXOTH)
-		opt |= SMBM_EXECOTH;
-	ctx->ct_ssn.ioc_rights |= opt;
-	ctx->ct_sh.ioc_rights |= opt;
+	ctx->ct_ssn.ssn_owner = SMBM_ANY_OWNER;
 	if (noprompt)
 		ctx->ct_flags |= SMBCF_NOPWD;
-	if (retry != -1)
-		ctx->ct_ssn.ioc_retrycount = retry;
-	if (timeout != -1)
-		ctx->ct_ssn.ioc_timeout = timeout;
 
 	/*
-	 * If we got our password from the keychain and get an
-	 * authorization error, we come back here to obtain a new
-	 * password from user input.
+	 * Resolve the server address,
+	 * setup derived defaults.
 	 */
-reauth:
 	error = smb_ctx_resolve(ctx);
 	if (error)
-		exit(error);
+		exit(RET_ERR);
 
-	mdata.devfd = ctx->ct_fd;		/* file descriptor */
-
+	/*
+	 * Have server, share, etc. from above:
+	 * smb_ctx_scan_argv, option settings.
+	 * Get the session and tree.
+	 */
 again:
-	error = smb_ctx_lookup(ctx, SMBL_SHARE, SMBLK_CREATE);
-	if (error == ENOENT && ctx->ct_origshare) {
-		strcpy(ctx->ct_sh.ioc_share, ctx->ct_origshare);
-		free(ctx->ct_origshare);
-		ctx->ct_origshare = NULL;
-		goto again; /* try again using share name as given */
+	error = smb_ctx_get_ssn(ctx);
+	if (error == EAUTH && noprompt == 0) {
+		err2 = smb_get_authentication(ctx);
+		if (err2 == 0)
+			goto again;
 	}
-	if (ctx->ct_flags & SMBCF_KCFOUND && smb_autherr(error)) {
-		ctx->ct_ssn.ioc_password[0] = '\0';
-		smb_error(gettext("main(lookup): bad keychain entry"), 0);
-		ctx->ct_flags |= SMBCF_KCBAD;
-		goto reauth;
+	if (error) {
+		smb_error(gettext("//%s: login failed"),
+		    error, ctx->ct_fullserver);
+		exit(RET_ERR);
 	}
-	if (error)
-		exit(error);
 
-	mdata.version = SMBFS_VERSION;
-	mdata.devfd = ctx->ct_fd;
+	error = smb_ctx_get_tree(ctx);
+	if (error) {
+		smb_error(gettext("//%s/%s: tree connect failed"),
+		    error, ctx->ct_fullserver, ctx->ct_origshare);
+		exit(RET_ERR);
+	}
 
-	if (mount(mntp->mnt_special, mntp->mnt_mountp,
+	/*
+	 * Have tree connection, now mount it.
+	 */
+	mdata.devfd = ctx->ct_dev_fd;
+
+	if (mount(mnt.mnt_special, mnt.mnt_mountp,
 	    mntflags, fstype, &mdata, sizeof (mdata),
-	    mntp->mnt_mntopts, MAX_MNTOPT_STR) < 0) {
+	    mnt.mnt_mntopts, MAX_MNTOPT_STR) < 0) {
 		if (errno != ENOENT) {
 			err(EX_OSERR, gettext("mount_smbfs: %s"),
-			    mntp->mnt_mountp);
+			    mnt.mnt_mountp);
 		} else {
 			struct stat sb;
-			if (stat(mntp->mnt_mountp, &sb) < 0 &&
+			if (stat(mnt.mnt_mountp, &sb) < 0 &&
 			    errno == ENOENT)
 				err(EX_OSERR, gettext("mount_smbfs: %s"),
-				    mntp->mnt_mountp);
+				    mnt.mnt_mountp);
 			else
 				err(EX_OSERR, gettext("mount_smbfs: %s"),
-				    mntp->mnt_special);
-
-			error = smb_ctx_tdis(ctx);
-			if (error) /* unable to clean up?! */
-				exit(error);
+				    mnt.mnt_special);
 		}
 	}
 
-	smb_ctx_done(ctx);
+	smb_ctx_free(ctx);
 	if (error) {
 		smb_error(gettext("mount error: %s"), error, mount_point);
-		exit(errno);
+		exit(RET_ERR);
 	}
 	return (0);
 }
 
 int
-setsubopt(int index, char *optarg, struct smbfs_args *mdatap)
+setsubopt(smb_ctx_t *ctx, struct smbfs_args *mdatap, int index, char *optarg)
 {
 	struct passwd *pwd;
 	struct group *grp;
@@ -429,6 +423,15 @@ setsubopt(int index, char *optarg, struct smbfs_args *mdatap)
 	case OPT_NOEXEC:
 		/* We don't have to handle generic options here */
 		return (0);
+
+	case OPT_DOMAIN:
+		err = smb_ctx_setdomain(ctx, optarg, B_TRUE);
+		break;
+
+	case OPT_USER:
+		err = smb_ctx_setuser(ctx, optarg, B_TRUE);
+		break;
+
 	case OPT_UID:
 		pwd = isdigit(optarg[0]) ?
 		    getpwuid(atoi(optarg)) : getpwnam(optarg);
@@ -473,12 +476,6 @@ setsubopt(int index, char *optarg, struct smbfs_args *mdatap)
 		} else {
 			mdatap->file_mode = l;
 		}
-		break;
-	case OPT_RETRY:
-		retry = atoi(optarg);
-		break;
-	case OPT_TIMEOUT:
-		timeout = atoi(optarg);
 		break;
 	case OPT_NOPROMPT:
 		noprompt++;

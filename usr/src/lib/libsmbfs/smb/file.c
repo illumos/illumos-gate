@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,35 +56,32 @@
 #include <sys/types.h>
 #include <sys/file.h>
 
+#include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
-#include <cflib.h>
 
-#include "charsets.h"
 #include "private.h"
 
 int
-smb_fh_close(struct smb_ctx *ctx, smbfh fh)
+smb_fh_close(struct smb_ctx *ctx, int fh)
 {
 	struct smb_rq	*rqp;
 	struct mbdata	*mbp;
-	int serr;
+	int error;
 
-	serr = smb_rq_init(ctx, SMB_COM_CLOSE, 0, &rqp);
-	if (serr != 0)
-		return (serr);
+	error = smb_rq_init(ctx, SMB_COM_CLOSE, &rqp);
+	if (error != 0)
+		return (error);
 	mbp = smb_rq_getrequest(rqp);
-	mb_put_uint16le(mbp, fh);
+	smb_rq_wstart(rqp);
+	mb_put_uint16le(mbp, (uint16_t)fh);
 	mb_put_uint32le(mbp, 0);	/* time stamp */
 	smb_rq_wend(rqp);
-	serr = smb_rq_simple(rqp);
-	if (serr != 0) {
-		smb_rq_done(rqp);
-		return (serr);
-	}
-	mbp = smb_rq_getreply(rqp);
+	mb_put_uint16le(mbp, 0);	/* byte count */
+
+	error = smb_rq_simple(rqp);
 	smb_rq_done(rqp);
 
-	return (serr);
+	return (error);
 }
 
 int
@@ -93,45 +90,32 @@ smb_fh_ntcreate(
 	int flags, int req_acc, int efattr,
 	int share_acc, int open_disp,
 	int create_opts, int impersonation,
-	smbfh *fhp, uint32_t *action_taken)
+	int *fhp, uint32_t *action_taken)
 {
 	struct smb_rq	*rqp;
 	struct mbdata	*mbp;
+	char		*pathsizep;
+	int		pathstart, pathsize;
+	int		error, flags2, uc;
+	uint16_t	fh;
 	uint8_t		wc;
-	size_t		pathlen, pathsize;
-	int		error, flags2;
-	uint16_t	*upath = NULL;
 
 	flags2 = smb_ctx_flags2(ctx);
 	if (flags2 == -1)
 		return (EIO);
+	uc = flags2 & SMB_FLAGS2_UNICODE;
 
-	error = smb_rq_init(ctx, SMB_COM_NT_CREATE_ANDX, 42, &rqp);
+	error = smb_rq_init(ctx, SMB_COM_NT_CREATE_ANDX, &rqp);
 	if (error != 0)
 		return (error);
 
-	if (flags2 & SMB_FLAGS2_UNICODE) {
-		upath = convert_utf8_to_leunicode(path);
-		if (upath == NULL) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "%s: failed converting to UCS-2"), 0, path);
-			error = EINVAL;
-			goto out;
-		}
-		pathlen = unicode_strlen(upath);
-		pathsize = (pathlen + 1) * 2;
-	} else {
-		pathlen = strlen(path);
-		pathsize = pathlen + 1;
-	}
-
 	mbp = smb_rq_getrequest(rqp);
-	mb_put_uint8(mbp, 0xff);	/* secondary command */
-	mb_put_uint8(mbp, 0);		/* MBZ */
+	smb_rq_wstart(rqp);
+	mb_put_uint16le(mbp, 0xff);	/* secondary command */
 	mb_put_uint16le(mbp, 0);	/* offset to next command (none) */
-	mb_put_uint8(mbp, 0);		/* MBZ */
-	mb_put_uint16le(mbp, pathsize);	/* path size (bytes) */
-	mb_put_uint32le(mbp, 0);	/* create flags (oplock) */
+	mb_put_uint8(mbp, 0);		/* MBZ (pad?) */
+	mb_fit(mbp, 2, &pathsizep);	/* path size - fill in below */
+	mb_put_uint32le(mbp, flags);	/* create flags (oplock) */
 	mb_put_uint32le(mbp, 0);	/* FID - basis for path if not root */
 	mb_put_uint32le(mbp, req_acc);
 	mb_put_uint64le(mbp, 0);		/* initial alloc. size */
@@ -139,16 +123,28 @@ smb_fh_ntcreate(
 	mb_put_uint32le(mbp, share_acc);	/* share access mode */
 	mb_put_uint32le(mbp, open_disp);	/* open disposition */
 	mb_put_uint32le(mbp, create_opts);  /* create_options */
-	mb_put_uint32le(mbp, NTCREATEX_IMPERSONATION_IMPERSONATION); /* (?) */
+	mb_put_uint32le(mbp, impersonation);
 	mb_put_uint8(mbp, 0);	/* security flags (?) */
 	smb_rq_wend(rqp);
+	smb_rq_bstart(rqp);
+	if (uc) {
+		/*
+		 * We're about to put a unicode string.  We know
+		 * we're misaligned at this point, and need to
+		 * save the mb_count at the start of the string,
+		 * not at the alignment padding placed before it.
+		 * So add the algnment padding by hand here.
+		 */
+		mb_put_uint8(mbp, 0);
+	}
+	pathstart = mbp->mb_count;
+	mb_put_dstring(mbp, path, uc);
+	smb_rq_bend(rqp);
 
-	/* XXX: Need a "put string" function. */
-	if (flags2 & SMB_FLAGS2_UNICODE) {
-		mb_put_uint8(mbp, 0);	/* pad byte - align(2) for Unicode */
-		mb_put_mem(mbp, (char *)upath, pathsize);
-	} else
-		mb_put_mem(mbp, path, pathsize);
+	/* Now go back and fill in pathsizep */
+	pathsize = mbp->mb_count - pathstart;
+	pathsizep[0] = pathsize & 0xFF;
+	pathsizep[1] = (pathsize >> 8);
 
 	error = smb_rq_simple(rqp);
 	if (error)
@@ -159,8 +155,8 @@ smb_fh_ntcreate(
 	 * spec says 26 for word count, but 34 words are defined
 	 * and observed from win2000
 	 */
-	wc = rqp->rq_wcount;
-	if (wc < 26) {
+	error = mb_get_uint8(mbp, &wc);
+	if (error || wc < 26) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "%s: open failed, bad word count"), 0, path);
 		error = EBADRPC;
@@ -170,7 +166,7 @@ smb_fh_ntcreate(
 	mb_get_uint8(mbp, NULL);	/* mbz */
 	mb_get_uint16le(mbp, NULL);	/* andxoffset */
 	mb_get_uint8(mbp, NULL);	/* oplock lvl granted */
-	mb_get_uint16le(mbp, fhp);	/* FID */
+	mb_get_uint16le(mbp, &fh);	/* FID */
 	mb_get_uint32le(mbp, action_taken);
 #if 0	/* skip decoding the rest */
 	mb_get_uint64le(mbp, NULL);	/* creation time */
@@ -183,14 +179,16 @@ smb_fh_ntcreate(
 	mb_get_uint16le(mbp, NULL);	/* file type */
 	mb_get_uint16le(mbp, NULL);	/* device state */
 	mb_get_uint8(mbp, NULL);	/* directory (boolean) */
-#endif	/* skip decoding */
+#endif
+
+	/* success! */
+	*fhp = fh;
+	error = 0;
 
 out:
-	if (upath)
-		free(upath);
 	smb_rq_done(rqp);
 
-	return (0);
+	return (error);
 }
 
 /*
@@ -198,7 +196,7 @@ out:
  * Converts Unix-style open call to NTCreate.
  */
 int
-smb_fh_open(struct smb_ctx *ctx, const char *path, int oflag, smbfh *fhp)
+smb_fh_open(struct smb_ctx *ctx, const char *path, int oflag, int *fhp)
 {
 	int error, mode, open_disp, req_acc, share_acc;
 	char *p, *ntpath = NULL;
@@ -273,7 +271,7 @@ smb_fh_open(struct smb_ctx *ctx, const char *path, int oflag, smbfh *fhp)
 }
 
 int
-smb_fh_read(struct smb_ctx *ctx, smbfh fh, off_t offset, size_t count,
+smb_fh_read(struct smb_ctx *ctx, int fh, off_t offset, size_t count,
 	char *dst)
 {
 	struct smbioc_rw rwrq;
@@ -283,14 +281,14 @@ smb_fh_read(struct smb_ctx *ctx, smbfh fh, off_t offset, size_t count,
 	rwrq.ioc_base = dst;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
-	if (ioctl(ctx->ct_fd, SMBIOC_READ, &rwrq) == -1) {
+	if (ioctl(ctx->ct_dev_fd, SMBIOC_READ, &rwrq) == -1) {
 		return (-1);
 	}
 	return (rwrq.ioc_cnt);
 }
 
 int
-smb_fh_write(struct smb_ctx *ctx, smbfh fh, off_t offset, size_t count,
+smb_fh_write(struct smb_ctx *ctx, int fh, off_t offset, size_t count,
 	const char *src)
 {
 	struct smbioc_rw rwrq;
@@ -300,7 +298,7 @@ smb_fh_write(struct smb_ctx *ctx, smbfh fh, off_t offset, size_t count,
 	rwrq.ioc_base = (char *)src;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
-	if (ioctl(ctx->ct_fd, SMBIOC_WRITE, &rwrq) == -1) {
+	if (ioctl(ctx->ct_dev_fd, SMBIOC_WRITE, &rwrq) == -1) {
 		return (-1);
 	}
 	return (rwrq.ioc_cnt);
@@ -315,7 +313,7 @@ smb_fh_write(struct smb_ctx *ctx, smbfh fh, off_t offset, size_t count,
  * and on output *rdlen is the received length.
  */
 int
-smb_fh_xactnp(struct smb_ctx *ctx, smbfh fh,
+smb_fh_xactnp(struct smb_ctx *ctx, int fh,
 	int tdlen, const char *tdata,	/* transmit */
 	int *rdlen, char *rdata,	/* receive */
 	int *more)

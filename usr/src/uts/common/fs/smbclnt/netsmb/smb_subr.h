@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,16 +75,6 @@ void m_dumpm(mblk_t *m);
 
 #endif /* DEBUG or lint */
 
-#define	SMB_SIGMASK	\
-	(sigmask(SIGINT)|sigmask(SIGTERM)|sigmask(SIGKILL)| \
-	sigmask(SIGHUP)|sigmask(SIGQUIT))
-
-#define	SMB_STRFREE(p)	do { \
-	if (p) \
-		smb_strfree(p); \
-	_NOTE(CONSTCOND)	\
-} while (0)
-
 typedef uint16_t	smb_unichar;
 typedef	smb_unichar	*smb_uniptr;
 
@@ -106,20 +96,8 @@ extern int smb_timo_append;
 
 #define	EMOREDATA (0x7fff)
 
-#ifdef APPLE
-void smb_scred_init(struct smb_cred *scred, vfs_context_t vfsctx);
-int  smb_sigintr(vfs_context_t);
-#endif
-void smb_credinit(struct smb_cred *scred, struct proc *p, cred_t *cr);
+void smb_credinit(struct smb_cred *scred, cred_t *cr);
 void smb_credrele(struct smb_cred *scred);
-char *smb_strdup(const char *s);
-void *smb_memdup(const void *umem, int len);
-char *smb_strdupin(char *s, int maxlen);
-void *smb_memdupin(void *umem, int len);
-size_t smb_strtouni(uint16_t *dst, const char *src, size_t inlen, int flags);
-void smb_strfree(char *s);
-void smb_memfree(void *s);
-void *smb_zmalloc(unsigned long size);
 
 void smb_oldlm_hash(const char *apwd, uchar_t *hash);
 void smb_ntlmv1hash(const char *apwd, uchar_t *hash);

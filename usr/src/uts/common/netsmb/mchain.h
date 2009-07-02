@@ -31,15 +31,14 @@
  *
  * $FreeBSD: src/sys/sys/mchain.h,v 1.1 2001/02/24 15:44:30 bp Exp $
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MCHAIN_H_
 #define	_MCHAIN_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/isa_defs.h>
@@ -158,10 +157,10 @@ int  mb_put_uint32be(struct mbchain *mbp, uint32_t x);
 int  mb_put_uint32le(struct mbchain *mbp, uint32_t x);
 int  mb_put_uint64be(struct mbchain *mbp, uint64_t x);
 int  mb_put_uint64le(struct mbchain *mbp, uint64_t x);
-int  mb_put_mem(struct mbchain *mbp, const char *src, int size, int type);
+int  mb_put_mem(struct mbchain *mbp, const void *src, int size, int type);
 
 int  mb_put_mbuf(struct mbchain *mbp, mblk_t *m);
-int  mb_put_uio(struct mbchain *mbp, uio_t *uiop, int size);
+int  mb_put_uio(struct mbchain *mbp, uio_t *uiop, size_t size);
 
 int  md_init(struct mdchain *mdp);
 void md_initm(struct mdchain *mbp, mblk_t *m);
@@ -169,18 +168,15 @@ void md_done(struct mdchain *mdp);
 void md_append_record(struct mdchain *mdp, mblk_t *top);
 int  md_next_record(struct mdchain *mdp);
 int  md_get_uint8(struct mdchain *mdp, uint8_t *x);
-int  md_get_uint16(struct mdchain *mdp, uint16_t *x);
 int  md_get_uint16le(struct mdchain *mdp, uint16_t *x);
 int  md_get_uint16be(struct mdchain *mdp, uint16_t *x);
-int  md_get_uint32(struct mdchain *mdp, uint32_t *x);
 int  md_get_uint32be(struct mdchain *mdp, uint32_t *x);
 int  md_get_uint32le(struct mdchain *mdp, uint32_t *x);
-int  md_get_uint64(struct mdchain *mdp, uint64_t *x);
 int  md_get_uint64be(struct mdchain *mdp, uint64_t *x);
 int  md_get_uint64le(struct mdchain *mdp, uint64_t *x);
-int  md_get_mem(struct mdchain *mdp, caddr_t target, int size, int type);
+int  md_get_mem(struct mdchain *mdp, void *vdst, int size, int type);
 int  md_get_mbuf(struct mdchain *mdp, int size, mblk_t **m);
-int  md_get_uio(struct mdchain *mdp, uio_t *uiop, int size);
+int  md_get_uio(struct mdchain *mdp, uio_t *uiop, size_t size);
 
 /*
  * Additions for Solaris to replace things that came from

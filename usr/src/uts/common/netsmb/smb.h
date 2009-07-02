@@ -45,8 +45,6 @@
 #ifndef _NETSMB_SMB_H_
 #define	_NETSMB_SMB_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file should be purely SMB protocol definition stuff.
  * (Please don't make it a catch-all:)
@@ -81,7 +79,7 @@ enum smb_dialects {
 #define	SMB_SIGNATURE		"\xFFSMB"
 #define	SMB_SIGLEN		4
 #define	SMB_HDRCMD(p)		(*((uchar_t *)(p) + SMB_SIGLEN))
-#define	SMB_HDRMID(p)		(letohs(*(ushort_t *)((uchar_t *)(p) + 30)))
+#define	SMB_HDRMID(p)		(*(ushort_t *)((uchar_t *)(p) + 30))
 #define	SMB_HDRLEN		32
 /*
  * bits in the smb_flags field
@@ -749,26 +747,6 @@ typedef struct ntsid ntsid_t;
 #define	SMB_LOCKING_ANDX_CHANGE_LOCKTYPE 0x04
 #define	SMB_LOCKING_ANDX_CANCEL_LOCK	0x08
 #define	SMB_LOCKING_ANDX_LARGE_FILES	0x10
-
-/*
- * Some names length limitations. Some of them aren't declared by specs,
- * but we need reasonable limits.
- */
-#define	SMB_MAXSRVNAMELEN	15	/* NetBIOS limit */
-#define	SMB_MAXUSERNAMELEN	128
-#define	SMB_MAXPASSWORDLEN	128
-#define	SMB_MAXSHARENAMELEN	128
-#define	SMB_MAXPKTLEN		0x1FFFF
-#define	SMB_MAXCHALLENGELEN	8
-#define	SMB_MAXFNAMELEN		255	/* Keep in sync with MAXNAMLEN */
-
-#define	SMB_RCNDELAY		2	/* seconds between reconnect attempts */
-/*
- * leave this zero - we can't ssecond guess server side effects of
- * duplicate ops, this isn't nfs!
- */
-#define	SMBMAXRESTARTS		0
-#define	SMB_MAXSETUPWORDS	3	/* max # of setup words in trans/t2 */
 
 /*
  * Error classes

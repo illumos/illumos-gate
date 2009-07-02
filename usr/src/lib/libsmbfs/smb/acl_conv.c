@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,10 +54,13 @@
 
 #include <sys/fs/smbfs_ioctl.h>
 
+#include <netsmb/mchain.h>
+#include <netsmb/smb.h>
+
 #include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
-#include <netsmb/smbfs_isec.h>
-#include <netsmb/mchain.h>
+
+#include "acl_nt.h"
 #include "private.h"
 
 #ifdef _KERNEL
@@ -167,7 +170,6 @@ errout:
 static void
 ifree_ace(i_ntace_t *ace)
 {
-	size_t sz;
 
 	if (ace == NULL)
 		return;
@@ -282,7 +284,6 @@ mb_get_acl(mbdata_t *mbp, i_ntacl_t **aclp)
 	i_ntace_t **acep;
 	uint8_t revision;
 	uint16_t acl_len, acecount;
-	uint32_t *subauthp;
 	size_t aclsz;
 	int i, error;
 
@@ -327,10 +328,7 @@ static int
 mb_put_acl(mbdata_t *mbp, i_ntacl_t *acl)
 {
 	i_ntace_t **acep;
-	uint8_t revision;
 	uint16_t acl_len, *acl_len_p;
-	uint32_t *subauthp;
-	size_t aclsz;
 	int i, cnt0, error;
 
 	cnt0 = mbp->mb_count;
@@ -929,6 +927,7 @@ errout:
  * Include owner/group too if uid/gid != -1.
  * Note optional arg: vsa/acl
  */
+/*ARGSUSED*/
 int smbfs_acl_zfs2sd(
 #ifdef	_KERNEL
 	vsecattr_t *vsa,

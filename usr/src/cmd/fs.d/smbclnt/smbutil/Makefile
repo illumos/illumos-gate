@@ -18,11 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # cmd/fs.d/smbclnt/smbutil/Makefile
 #
@@ -32,14 +33,31 @@ PROG=		smbutil
 include		$(SRC)/cmd/Makefile.cmd
 
 OBJS=   smbutil.o login.o lookup.o print.o status.o view.o
+
 SRCS=	$(OBJS:%.o=%.c)
 POFILE=	smbutil_all.po
 POFILES= $(OBJS:%.o=%.po)
+CLOBBERFILES+=  $(POFILE) $(POFILES)
 
 C99MODE= $(C99_ENABLE)
+
+LDLIBS += -lsmbfs -lnsl
+
 CPPFLAGS += -I$(SRC)/lib/libsmbfs \
 	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
-LDLIBS +=       -lsmbfs -lnsl
+
+# Debugging
+${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
+
+# uncomment these for dbx debugging
+#COPTFLAG = -g
+#CTF_FLAGS =
+#CTFCONVERT_O=
+#CTFMERGE_LIB=
+
+# disable some of the less important lint
+LINTFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+LINTFLAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
 
 all:		$(PROG)
 
@@ -58,8 +76,11 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
+lint:	lint_SRCS
+
 clean :
 	$(RM) $(OBJS)
 
-clobber:	clean
-	$(RM) $(PROG) $(POFILES)
+.KEEP_STATE:
+
+include ../../../Makefile.targ

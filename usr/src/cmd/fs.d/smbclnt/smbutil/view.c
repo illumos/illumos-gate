@@ -32,9 +32,13 @@
  * $Id: view.c,v 1.9 2004/12/13 00:25:39 lindak Exp $
  */
 
-#include <sys/param.h>
-#include <sys/errno.h>
-#include <sys/stat.h>
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#include <sys/types.h>
+#include <errno.h>
 #include <stdio.h>
 #include <err.h>
 #include <unistd.h>
@@ -43,11 +47,100 @@
 #include <sysexits.h>
 #include <libintl.h>
 
-#include <cflib.h>
+#include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/smb_netshareenum.h>
 
 #include "common.h"
+
+int enum_shares(smb_ctx_t *);
+void print_shares(int, int, struct share_info *);
+
+void
+view_usage(void)
+{
+	printf(gettext("usage: smbutil view [connection options] //"
+	    "[workgroup;][user[:password]@]server\n"));
+	exit(1);
+}
+
+int
+cmd_view(int argc, char *argv[])
+{
+	struct smb_ctx *ctx;
+	int error, err2, opt;
+
+	if (argc < 2)
+		view_usage();
+
+	error = smb_ctx_alloc(&ctx);
+	if (error)
+		return (error);
+
+	error = smb_ctx_scan_argv(ctx, argc, argv,
+	    SMBL_SERVER, SMBL_SERVER, USE_WILDCARD);
+	if (error)
+		return (error);
+
+	error = smb_ctx_readrc(ctx);
+	if (error)
+		return (error);
+
+	while ((opt = getopt(argc, argv, STDPARAM_OPT)) != EOF) {
+		if (opt == '?')
+			view_usage();
+		error = smb_ctx_opt(ctx, opt, optarg);
+		if (error)
+			return (error);
+	}
+
+	smb_ctx_setshare(ctx, "IPC$", USE_IPC);
+
+	/*
+	 * Resolve the server address,
+	 * setup derived defaults.
+	 */
+	error = smb_ctx_resolve(ctx);
+	if (error)
+		return (error);
+
+	/*
+	 * Have server, share, etc. from above:
+	 * smb_ctx_scan_argv, option settings.
+	 * Get the session and tree.
+	 */
+again:
+	error = smb_ctx_get_ssn(ctx);
+	if (error == EAUTH) {
+		err2 = smb_get_authentication(ctx);
+		if (err2 == 0)
+			goto again;
+	}
+	if (error) {
+		smb_error(gettext("//%s: login failed"),
+		    error, ctx->ct_fullserver);
+		return (error);
+	}
+
+	error = smb_ctx_get_tree(ctx);
+	if (error) {
+		smb_error(gettext("//%s/%s: tree connect failed"),
+		    error, ctx->ct_fullserver, ctx->ct_origshare);
+		return (error);
+	}
+
+	/*
+	 * Have IPC$ tcon, now list shares.
+	 */
+	error = enum_shares(ctx);
+	if (error) {
+		smb_error("cannot list shares", error);
+		return (error);
+	}
+
+	smb_ctx_free(ctx);
+	return (0);
+}
 
 #ifdef I18N	/* not defined, put here so xgettext(1) can find strings */
 static char *shtype[] = {
@@ -68,60 +161,34 @@ static char *shtype[] = {
 #endif
 
 int
-cmd_view(int argc, char *argv[])
+enum_shares(smb_ctx_t *ctx)
 {
-	struct smb_ctx sctx, *ctx = &sctx;
-	struct share_info *share_info, *ep;
-	int error, opt, i, entries, total;
+	struct share_info *share_info;
+	int error, entries, total;
 
-	if (argc < 2)
-		view_usage();
-	error = smb_ctx_init(ctx, argc, argv, SMBL_VC, SMBL_VC, SMB_ST_ANY);
-	if (error)
-		exit(error);
-	error = smb_ctx_readrc(ctx);
-	if (error)
-		exit(error);
-	if (smb_rc)
-		rc_close(smb_rc);
-	while ((opt = getopt(argc, argv, STDPARAM_OPT)) != EOF) {
-		switch (opt) {
-		case STDPARAM_ARGS:
-			error = smb_ctx_opt(ctx, opt, optarg);
-			if (error)
-				exit(error);
-			break;
-		default:
-			view_usage();
-			/*NOTREACHED*/
-		}
-	}
-#ifdef APPLE
-	if (loadsmbvfs())
-		fprintf(stderr, gettext("SMB filesystem is not available"));
-#endif
-reauth:
-	smb_ctx_setshare(ctx, "IPC$", SMB_ST_ANY);
-	error = smb_ctx_resolve(ctx);
-	if (error)
-		exit(error);
-	error = smb_ctx_lookup(ctx, SMBL_SHARE, SMBLK_CREATE);
-	if (ctx->ct_flags & SMBCF_KCFOUND && smb_autherr(error)) {
-		ctx->ct_ssn.ioc_password[0] = '\0';
-		goto reauth;
-	}
-	if (error) {
-		smb_error(gettext("could not login to server %s"),
-		    error, ctx->ct_ssn.ioc_srvname);
-		exit(error);
-	}
-	printf(gettext("Share        Type       Comment\n"));
-	printf("-------------------------------\n");
+	/*
+	 * XXX: Later, try RPC first,
+	 * then fall back to RAP...
+	 */
 	error = smb_netshareenum(ctx, &entries, &total, &share_info);
 	if (error) {
 		smb_error(gettext("unable to list resources"), error);
-		exit(error);
+		return (error);
 	}
+	print_shares(entries, total, share_info);
+	return (0);
+}
+
+void
+print_shares(int entries, int total,
+	struct share_info *share_info)
+{
+	struct share_info *ep;
+	int i;
+
+	printf(gettext("Share        Type       Comment\n"));
+	printf("-------------------------------\n");
+
 	for (ep = share_info, i = 0; i < entries; i++, ep++) {
 		int sti = ep->type & STYPE_MASK;
 		if (sti > STYPE_UNKNOWN)
@@ -136,18 +203,4 @@ reauth:
 	    entries, total);
 
 	free(share_info);
-	smb_ctx_done(ctx);
-#ifdef APPLE
-	smb_save2keychain(ctx);
-#endif
-	return (0);
-}
-
-
-void
-view_usage(void)
-{
-	printf(gettext("usage: smbutil view [connection options] //"
-	    "[workgroup;][user[:password]@]server\n"));
-	exit(1);
 }

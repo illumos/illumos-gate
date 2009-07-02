@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMB_PASS_H
 #define	_SMB_PASS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Password keychains interface
@@ -46,21 +44,14 @@ typedef struct smb_passid {
 	zoneid_t	zoneid;		/* Future Use */
 	char		*srvdom;	/* Windows Domain (or server) */
 	char		*username;	/* Windows User name */
-	uchar_t 	lmhash[SMB_PWH_MAX];
-	uchar_t 	nthash[SMB_PWH_MAX];
+	uchar_t 	lmhash[SMBIOC_HASH_SZ];
+	uchar_t 	nthash[SMBIOC_HASH_SZ];
 } smb_passid_t;
 
 /* Called from smb_dev.c */
 void smb_pkey_init(void);
 void smb_pkey_fini(void);
 int smb_pkey_idle(void);
-int smb_pkey_add(smbioc_pk_t *pk, cred_t *cr);
-int smb_pkey_del(smbioc_pk_t *pk, cred_t *cr);
-int smb_pkey_check(smbioc_pk_t *pk, cred_t *cr);
-int smb_pkey_deluid(uid_t uid, cred_t *cr);
-
-/* Called from smb_usr.c */
-struct smb_vc;
-int smb_pkey_getpwh(struct smb_vc *vcp, cred_t *cr);
+int smb_pkey_ioctl(int, intptr_t, int, cred_t *);
 
 #endif /* _SMB_PASS_H */

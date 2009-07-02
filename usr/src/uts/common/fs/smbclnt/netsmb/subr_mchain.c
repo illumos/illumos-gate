@@ -31,12 +31,11 @@
  *
  * $FreeBSD: src/sys/kern/subr_mchain.c,v 1.1 2001/02/24 15:44:29 bp Exp $
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,6 +45,7 @@
 #include <sys/stream.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
+#include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 
 #ifdef APPLE
@@ -127,17 +127,10 @@
  */
 
 /*
- * uio_isuserspace - return non zero value if the address space
+ * uio_isuserspace - non zero value if the address space
  * flag is for a user address space (could be 32 or 64 bit).
  */
-int
-uio_isuserspace(uio_t *a_uio)
-{
-	if (a_uio->uio_segflg == UIO_USERSPACE) {
-		return (1);
-	}
-	return (0);
-}
+#define	uio_isuserspace(uio) (uio->uio_segflg == UIO_USERSPACE)
 
 /*
  * uio_curriovbase - return the base address of the current iovec associated
@@ -198,10 +191,10 @@ uio_update(uio_t *a_uio, size_t a_count)
 			a_uio->uio_resid = 0;
 		}
 		if (a_count > (size_t)a_uio->uio_resid) {
-			a_uio->uio_offset += a_uio->uio_resid;
+			a_uio->uio_loffset += a_uio->uio_resid;
 			a_uio->uio_resid = 0;
 		} else {
-			a_uio->uio_offset += a_count;
+			a_uio->uio_loffset += a_count;
 			a_uio->uio_resid -= a_count;
 		}
 	}
@@ -216,7 +209,10 @@ uio_update(uio_t *a_uio, size_t a_count)
 	}
 }
 
-
+/*
+ * This is now used only to extend an existing mblk chain,
+ * so don't need to use allocb_cred_wait here.
+ */
 /*ARGSUSED*/
 mblk_t *
 m_getblk(int size, int type)
@@ -265,12 +261,17 @@ mb_initm(struct mbchain *mbp, mblk_t *m)
 int
 mb_init(struct mbchain *mbp)
 {
+	cred_t *cr;
 	mblk_t *mblk;
+	int error;
 
-	mblk = m_getblk(MLEN, 1);
-	if (mblk == NULL) {
-		return (ENOSR);
-	}
+	/*
+	 * This message will be the head of a new mblk chain,
+	 * so we'd like its db_credp set.  If we extend this
+	 * chain later, we'll just use allocb_wait()
+	 */
+	cr = ddi_get_cred();
+	mblk = allocb_cred_wait(MLEN, STR_NOSIG, &error, cr, NOPID);
 
 	/*
 	 * Leave room in this first mblk so we can
@@ -302,7 +303,7 @@ mb_detach(struct mbchain *mbp)
 
 /*
  * Returns the length of the mblk_t data.
- *
+ * Should be m_totlen() perhaps?
  */
 int
 m_fixhdr(mblk_t *m0)
@@ -364,70 +365,115 @@ mb_reserve(struct mbchain *mbp, int size)
  * All mb_put_*() functions perform an actual copy of the data into mbuf
  * chain. Functions which have le or be suffixes will perform conversion to
  * the little- or big-endian data formats.
- * XXX: Assumes total data length in previous mblks is EVEN.
- * XXX: Might need to compute the offset from mb_top instead.
+ *
+ * Inline version of mb_put_mem().  Handles the easy case in-line,
+ * and calls mb_put_mem() if crossing mblk boundaries, etc.
+ *
+ * We build with -xspace, which causes these inline functions
+ * to not be inlined.  Using macros instead for now.
+ */
+#ifdef	INLINE_WORKS
+
+static inline int
+mb_put_inline(struct mbchain *mbp, void *src, int size)
+{
+	mblk_t *m = mbp->mb_cur;
+
+	if (m != NULL && size <= MBLKTAIL(m)) {
+		uchar_t *p = src;
+		int n = size;
+		while (n--)
+			*(m->b_wptr)++ = *p++;
+		mbp->mb_count += size;
+		return (0);
+	}
+	return (mb_put_mem(mbp, src, size, MB_MINLINE));
+}
+#define	MB_PUT_INLINE(MBP, SRC, SZ) \
+	return (mb_put_inline(MBP, SRC, SZ))
+
+#else /* INLINE_WORKS */
+
+#define	MB_PUT_INLINE(MBP, SRC, SZ) \
+	mblk_t *m = MBP->mb_cur; \
+	if (m != NULL && SZ <= MBLKTAIL(m)) { \
+		uchar_t *p = (void *) SRC; \
+		int n = SZ; \
+		while (n--) \
+			*(m->b_wptr)++ = *p++; \
+		MBP->mb_count += SZ; \
+		return (0); \
+	} \
+	return (mb_put_mem(MBP, SRC, SZ, MB_MINLINE))
+
+#endif /* INLINE_WORKS */
+
+/*
+ * Assumes total data length in previous mblks is EVEN.
+ * Might need to compute the offset from mb_top instead.
  */
 int
 mb_put_padbyte(struct mbchain *mbp)
 {
-	caddr_t dst;
-	char x = 0;
+	uintptr_t dst;
+	char v = 0;
 
-	dst = (caddr_t)mbp->mb_cur->b_wptr;
-
+	dst = (uintptr_t)mbp->mb_cur->b_wptr;
 	/* only add padding if address is odd */
-	if ((long)dst & 1)
-		return (mb_put_mem(mbp, (caddr_t)&x, 1, MB_MSYSTEM));
-	else
-		return (0);
+	if (dst & 1) {
+		MB_PUT_INLINE(mbp, &v, sizeof (v));
+	}
+
+	return (0);
 }
 
 int
 mb_put_uint8(struct mbchain *mbp, u_int8_t x)
 {
-	return (mb_put_mem(mbp, (caddr_t)&x, sizeof (x), MB_MSYSTEM));
+	u_int8_t v = x;
+	MB_PUT_INLINE(mbp, &v, sizeof (v));
 }
 
 int
 mb_put_uint16be(struct mbchain *mbp, u_int16_t x)
 {
-	x = htobes(x);
-	return (mb_put_mem(mbp, (caddr_t)&x, sizeof (x), MB_MSYSTEM));
+	u_int16_t v = htobes(x);
+	MB_PUT_INLINE(mbp, &v, sizeof (v));
 }
 
 int
 mb_put_uint16le(struct mbchain *mbp, u_int16_t x)
 {
-	x = htoles(x);
-	return (mb_put_mem(mbp, (caddr_t)&x, sizeof (x), MB_MSYSTEM));
+	u_int16_t v = htoles(x);
+	MB_PUT_INLINE(mbp, &v, sizeof (v));
 }
 
 int
 mb_put_uint32be(struct mbchain *mbp, u_int32_t x)
 {
-	x = htobel(x);
-	return (mb_put_mem(mbp, (caddr_t)&x, sizeof (x), MB_MSYSTEM));
+	u_int32_t v = htobel(x);
+	MB_PUT_INLINE(mbp, &v, sizeof (v));
 }
 
 int
 mb_put_uint32le(struct mbchain *mbp, u_int32_t x)
 {
-	x = htolel(x);
-	return (mb_put_mem(mbp, (caddr_t)&x, sizeof (x), MB_MSYSTEM));
+	u_int32_t v = htolel(x);
+	MB_PUT_INLINE(mbp, &v, sizeof (v));
 }
 
 int
 mb_put_uint64be(struct mbchain *mbp, u_int64_t x)
 {
-	x = htobeq(x);
-	return (mb_put_mem(mbp, (caddr_t)&x, sizeof (x), MB_MSYSTEM));
+	u_int64_t v = htobeq(x);
+	MB_PUT_INLINE(mbp, &v, sizeof (v));
 }
 
 int
 mb_put_uint64le(struct mbchain *mbp, u_int64_t x)
 {
-	x = htoleq(x);
-	return (mb_put_mem(mbp, (caddr_t)&x, sizeof (x), MB_MSYSTEM));
+	u_int64_t v = htoleq(x);
+	MB_PUT_INLINE(mbp, &v, sizeof (v));
 }
 
 /*
@@ -436,15 +482,14 @@ mb_put_uint64le(struct mbchain *mbp, u_int64_t x)
  * to perform a copy
  */
 int
-mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
+mb_put_mem(struct mbchain *mbp, const void *vsrc, int size, int type)
 {
-	mblk_t *m, *n;
-	caddr_t dst;
+	mblk_t *n, *m = mbp->mb_cur;
+	c_caddr_t source = vsrc;
 	c_caddr_t src;
-	int cplen, error, mleft, count;
+	caddr_t dst;
 	uint64_t diff;
-
-	m = mbp->mb_cur;
+	int cplen, mleft, count;
 
 	diff = MBLKTAIL(m);
 	ASSERT(diff == (uint64_t)((int)diff));
@@ -477,15 +522,11 @@ mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
 				*dst++ = *src++;
 			break;
 		case MB_MSYSTEM:
-			/*
-			 * Try copying the raw bytes instead of using bcopy()
-			 */
 			bcopy(source, dst, cplen);
 			break;
 		case MB_MUSER:
-			error = copyin((void *)source, dst, cplen);
-			if (error)
-				return (error);
+			if (copyin((void *)source, dst, cplen))
+				return (EFAULT);
 			break;
 		case MB_MZERO:
 			bzero(dst, cplen);
@@ -523,16 +564,15 @@ mb_put_mbuf(struct mbchain *mbp, mblk_t *m)
  * copies a uio scatter/gather list to an mbuf chain.
  */
 int
-mb_put_uio(struct mbchain *mbp, uio_t *uiop, int size)
+mb_put_uio(struct mbchain *mbp, uio_t *uiop, size_t size)
 {
-	int left;
+	size_t left;
 	int mtype, error;
 
 	mtype = (uio_isuserspace(uiop) ? MB_MUSER : MB_MSYSTEM);
-
 	while (size > 0 && uiop->uio_resid) {
-		if (uiop->uio_iovcnt <= 0 || uio_curriovbase(uiop) ==
-		    USER_ADDR_NULL)
+		if (uiop->uio_iovcnt <= 0 ||
+		    uio_curriovbase(uiop) == USER_ADDR_NULL)
 			return (EFBIG);
 		left = uio_curriovlen(uiop);
 		if (left > size)
@@ -550,17 +590,6 @@ mb_put_uio(struct mbchain *mbp, uio_t *uiop, int size)
 /*
  * Routines for fetching data from an mbuf chain
  */
-int
-md_init(struct mdchain *mdp)
-{
-	mblk_t *m;
-
-	m = m_getblk(MLEN, 1);
-	if (m == NULL)
-		return (ENOBUFS);
-	md_initm(mdp, m);
-	return (0);
-}
 
 void
 md_initm(struct mdchain *mdp, mblk_t *m)
@@ -634,43 +663,81 @@ md_next_record(struct mdchain *mdp)
 	return (0);
 }
 
+/*
+ * Inline version of md_get_mem().  Handles the easy case in-line,
+ * and calls md_get_mem() if crossing mblk boundaries, etc.
+ */
+#ifdef	INLINE_WORKS	/* see above */
+
+static inline int
+md_get_inline(struct mdchain *mdp, void *dst, int size)
+{
+	mblk_t *m = mdp->md_cur;
+
+	if (m != NULL && mdp->md_pos + size <= m->b_wptr) {
+		uchar_t *p = dst;
+		int n = size;
+		while (n--)
+			*p++ = *(mdp->md_pos)++;
+		/* no md_count += size */
+		return (0);
+	}
+	return (md_get_mem(mdp, dst, size, MB_MINLINE));
+}
+#define	MD_GET_INLINE(MDP, DST, SZ) \
+	error = md_get_inline(MDP, DST, SZ)
+
+#else /* INLINE_WORKS */
+
+/* Note, sets variable: error */
+#define	MD_GET_INLINE(MDP, DST, SZ) \
+	mblk_t *m = MDP->md_cur; \
+	if (m != NULL && MDP->md_pos + SZ <= m->b_wptr) { \
+		uchar_t *p = (void *) DST; \
+		int n = SZ; \
+		while (n--) \
+			*p++ = *(mdp->md_pos)++; \
+		/* no md_count += SZ */ \
+		error = 0; \
+	} else \
+		error = md_get_mem(MDP, DST, SZ, MB_MINLINE)
+
+#endif /* INLINE_WORKS */
+
+
 int
 md_get_uint8(struct mdchain *mdp, u_int8_t *x)
 {
-	return (md_get_mem(mdp, (char *)x, 1, MB_MINLINE));
-}
+	uint8_t v;
+	int error;
 
-int
-md_get_uint16(struct mdchain *mdp, u_int16_t *x)
-{
-	return (md_get_mem(mdp, (char *)x, 2, MB_MINLINE));
-}
-
-int
-md_get_uint16le(struct mdchain *mdp, u_int16_t *x)
-{
-	u_int16_t v;
-	int error = md_get_uint16(mdp, &v);
-
+	MD_GET_INLINE(mdp, &v, sizeof (v));
 	if (x)
-		*x = letohs(v);
+		*x = v;
 	return (error);
 }
 
 int
 md_get_uint16be(struct mdchain *mdp, u_int16_t *x) {
 	u_int16_t v;
-	int error = md_get_uint16(mdp, &v);
+	int error;
 
+	MD_GET_INLINE(mdp, &v, sizeof (v));
 	if (x)
 		*x = betohs(v);
 	return (error);
 }
 
 int
-md_get_uint32(struct mdchain *mdp, u_int32_t *x)
+md_get_uint16le(struct mdchain *mdp, u_int16_t *x)
 {
-	return (md_get_mem(mdp, (caddr_t)x, 4, MB_MINLINE));
+	u_int16_t v;
+	int error;
+
+	MD_GET_INLINE(mdp, &v, sizeof (v));
+	if (x)
+		*x = letohs(v);
+	return (error);
 }
 
 int
@@ -679,7 +746,7 @@ md_get_uint32be(struct mdchain *mdp, u_int32_t *x)
 	u_int32_t v;
 	int error;
 
-	error = md_get_uint32(mdp, &v);
+	MD_GET_INLINE(mdp, &v, sizeof (v));
 	if (x)
 		*x = betohl(v);
 	return (error);
@@ -691,16 +758,10 @@ md_get_uint32le(struct mdchain *mdp, u_int32_t *x)
 	u_int32_t v;
 	int error;
 
-	error = md_get_uint32(mdp, &v);
+	MD_GET_INLINE(mdp, &v, sizeof (v));
 	if (x)
 		*x = letohl(v);
 	return (error);
-}
-
-int
-md_get_uint64(struct mdchain *mdp, u_int64_t *x)
-{
-	return (md_get_mem(mdp, (caddr_t)x, 8, MB_MINLINE));
 }
 
 int
@@ -709,7 +770,7 @@ md_get_uint64be(struct mdchain *mdp, u_int64_t *x)
 	u_int64_t v;
 	int error;
 
-	error = md_get_uint64(mdp, &v);
+	MD_GET_INLINE(mdp, &v, sizeof (v));
 	if (x)
 		*x = betohq(v);
 	return (error);
@@ -721,20 +782,20 @@ md_get_uint64le(struct mdchain *mdp, u_int64_t *x)
 	u_int64_t v;
 	int error;
 
-	error = md_get_uint64(mdp, &v);
+	MD_GET_INLINE(mdp, &v, sizeof (v));
 	if (x)
 		*x = letohq(v);
 	return (error);
 }
 
 int
-md_get_mem(struct mdchain *mdp, caddr_t target, int size, int type)
+md_get_mem(struct mdchain *mdp, void *vdst, int size, int type)
 {
 	mblk_t *m = mdp->md_cur;
-	int error;
-	int count;
+	caddr_t target = vdst;
 	unsigned char *s;
 	uint64_t diff;
+	int count;
 
 	while (size > 0) {
 		if (m == NULL) {
@@ -773,9 +834,8 @@ md_get_mem(struct mdchain *mdp, caddr_t target, int size, int type)
 			continue;
 		switch (type) {
 		case MB_MUSER:
-			error = copyout(s, (void *)target, count);
-			if (error)
-				return (error);
+			if (copyout(s, target, count))
+				return (EFAULT);
 			break;
 		case MB_MSYSTEM:
 			bcopy(s, target, count);
@@ -821,7 +881,7 @@ md_get_mbuf(struct mdchain *mdp, int size, mblk_t **ret)
 }
 
 int
-md_get_uio(struct mdchain *mdp, uio_t *uiop, int size)
+md_get_uio(struct mdchain *mdp, uio_t *uiop, size_t size)
 {
 	size_t left;
 	int mtype, error;

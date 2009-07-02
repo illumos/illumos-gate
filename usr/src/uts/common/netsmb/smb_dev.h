@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,13 +59,9 @@
  * any part of this user/kernel I/F changes.
  */
 
-#ifndef _KERNEL
 #include <sys/types.h>
-#endif
-
 #include <sys/socket_impl.h>
-#include <netsmb/smb.h>
-#include <netsmb/netbios.h>
+#include <netinet/in.h>
 
 #define	NSMB_NAME		"nsmb"
 
@@ -75,33 +71,23 @@
  * make them incompatible with an old driver.
  */
 #define	NSMB_VERMAJ	1
-#define	NSMB_VERMIN	3600
+#define	NSMB_VERMIN	3900
 #define	NSMB_VERSION	(NSMB_VERMAJ * 100000 + NSMB_VERMIN)
-#define	NSMB_VER_STR "1.36"
-
-#define	NSMBFL_OPEN		0x0001
-#define	NSMBFL_NEWVC		0x0002
 
 /*
- * Hack-ish errno values we need to expose to the library.
+ * Some errno values we need to expose to the library.
+ * NB: these are also defined in the library smbfs_api.h
+ * to avoid exposing all of this stuff in that API.
+ *
  * EBADRPC is used for message decoding errors.
  * EAUTH is used for CIFS authentication errors.
  */
 #ifndef EBADRPC
-#define	EBADRPC 	113 /* XXX */
+#define	EBADRPC 	113
 #endif
 #ifndef EAUTH
-#define	EAUTH		114 /* XXX */
+#define	EAUTH		114
 #endif
-
-/*
- * "Level" in the connection object hierarchy
- */
-#define	SMBL_SM		0
-#define	SMBL_VC		1
-#define	SMBL_SHARE	2
-#define	SMBL_NUM	3
-#define	SMBL_NONE	(-1)
 
 /*
  * Upper/lower case options
@@ -115,14 +101,6 @@
  */
 #define	SMBM_ANY_OWNER		((uid_t)-1)
 #define	SMBM_ANY_GROUP		((gid_t)-1)
-#define	SMBM_MASK		0777
-#define	SMBM_EXACT		010000	/* check for specified mode exactly */
-#ifdef _KERNEL
-/* In-kernel, we prefer the vnode.h names. */
-#define	SMBM_READ	VREAD	/* (S_IRUSR) read conn attrs. */
-#define	SMBM_WRITE	VWRITE	/* (S_IWUSR) modify conn attrs */
-#define	SMBM_EXEC	VEXEC	/* (S_IXUSR) can send SMB requests */
-#endif
 
 /*
  * Option flags in smbioc_ossn.ioc_opt
@@ -140,14 +118,6 @@
 #define	SMBVOPT_SIGNING_REQUIRED	0x0200	/* signing required */
 #define	SMBVOPT_SIGNING_MASK		0x0300	/* all signing bits */
 
-/* XXX: How about a separate field for these? */
-#define	SMBVOPT_MINAUTH			0x7000	/* min. auth. level (mask) */
-#define	SMBVOPT_MINAUTH_NONE		0x0000	/* any authentication OK */
-#define	SMBVOPT_MINAUTH_LM		0x1000	/* no plaintext passwords */
-#define	SMBVOPT_MINAUTH_NTLM		0x2000	/* don't send LM reply */
-#define	SMBVOPT_MINAUTH_NTLMV2		0x3000	/* don't fall back to NTLMv1 */
-#define	SMBVOPT_MINAUTH_KERBEROS	0x4000	/* don't do NTLMv1 or v2 */
-
 /*
  * Option flags in smbioc_oshare.ioc_opt
  * and sharespec.optflags
@@ -155,7 +125,27 @@
 #define	SMBSOPT_CREATE		SMBVOPT_CREATE
 #define	SMBSOPT_PERMANENT	SMBVOPT_PERMANENT
 
-#define	MAX_STR_LEN	8	/* Maxilum length of the minor device name */
+/* All user and machine names. */
+#define	SMBIOC_MAX_NAME		256
+
+/*
+ * Size of storage for p/w hashes.
+ * Also for SMBIOC_GETSSNKEY.
+ */
+#define	SMBIOC_HASH_SZ	16
+
+/*
+ * network IO daemon states
+ * really connection states.
+ */
+enum smbiod_state {
+	SMBIOD_ST_IDLE = 0,	/* no user requests enqueued yet */
+	SMBIOD_ST_RECONNECT,	/* a [re]connect attempt is in progress */
+	SMBIOD_ST_RCFAILED,	/* a reconnect attempt has failed */
+	SMBIOD_ST_VCACTIVE,	/* session established */
+	SMBIOD_ST_DEAD		/* connection gone, no IOD */
+};
+
 
 /*
  * We're now using structures that are invariant
@@ -187,98 +177,141 @@ typedef union lptr {
  * Handy union of sockaddr types we use.
  * Type discriminator is sa_family
  */
-union sockaddr_any {
-	struct sockaddr sa;
-	struct sockaddr_in in;
-	struct sockaddr_nb nb;
+union smbioc_sockaddr {
+	struct sockaddr sa;	/* generic */
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
 };
-
+typedef union smbioc_sockaddr smbioc_sockaddr_t;
 
 /*
- * SMBIOC_LOOKUP flags
+ * This is what identifies a session.
+ */
+struct smbioc_ssn_ident {
+	smbioc_sockaddr_t id_srvaddr;
+	char		id_domain[SMBIOC_MAX_NAME];
+	char		id_user[SMBIOC_MAX_NAME];
+};
+typedef struct smbioc_ssn_ident smbioc_ssn_ident_t;
+
+/*
+ * Flags for smbioc_ossn.ssn_opt
  */
 #define	SMBLK_CREATE		SMBVOPT_CREATE
 
-#define	DEF_SEC_TOKEN_LEN 2048
-
+/*
+ * Structure used with SMBIOC_SSN_FIND, _CREATE
+ */
 struct smbioc_ossn {
-	union sockaddr_any		ioc_server;
-	union sockaddr_any		ioc_local;
-	char		ioc_localcs[16];	/* local charset */
-	char		ioc_servercs[16];	/* server charset */
-	char		ioc_srvname[SMB_MAXSRVNAMELEN + 1];
-	char		ioc_user[SMB_MAXUSERNAMELEN + 1];
-	char		ioc_workgroup[SMB_MAXUSERNAMELEN + 1];
-	char		ioc_password[SMB_MAXPASSWORDLEN + 1];
-	int32_t		ioc_opt;
-	int32_t		ioc_timeout;    /* ignored?! XXX */
-	int32_t		ioc_retrycount; /* number of retries before giveup */
-	uid_t		ioc_owner;	/* proposed owner */
-	gid_t		ioc_group;	/* proposed group */
-	mode_t		ioc_mode;	/* desired access mode */
-	mode_t		ioc_rights;	/* SMBM_* */
-	int32_t		ioc_intoklen;
-	int32_t		ioc_outtoklen;
-	/* copyout ends at this offset */
-	lptr_t		_ioc_intok;
-	lptr_t		_ioc_outtok;
+	uint32_t		ssn_vopt;	/* i.e. SMBVOPT_CREATE */
+	uint32_t		ssn_owner;	/* Unix owner (UID) */
+	smbioc_ssn_ident_t	ssn_id;
+	char			ssn_srvname[SMBIOC_MAX_NAME];
 };
 typedef struct smbioc_ossn smbioc_ossn_t;
-#define	ioc_intok	_ioc_intok.lp_ptr
-#define	ioc_outtok	_ioc_outtok.lp_ptr
+/* Convenience names for members under ssn_id */
+#define	ssn_srvaddr	ssn_id.id_srvaddr
+#define	ssn_domain	ssn_id.id_domain
+#define	ssn_user	ssn_id.id_user
 
-
+/*
+ * Structure used with SMBIOC_TREE_FIND, _CONNECT
+ */
+#define	SMBIOC_STYPE_LEN	8
 struct smbioc_oshare {
-	char		ioc_share[SMB_MAXSHARENAMELEN + 1];
-	char		ioc_password[SMB_MAXPASSWORDLEN + 1];
-	int32_t		ioc_opt;
-	int32_t		ioc_stype;	/* share type */
-	uid_t		ioc_owner;	/* proposed owner of share */
-	gid_t		ioc_group;	/* proposed group of share */
-	mode_t		ioc_mode;	/* desired access mode to share */
-	mode_t		ioc_rights;	/* SMBM_* */
-	/*
-	 * Hack: need the size of this to be 8-byte aligned
-	 * so that the ioc_ossn following it in smbioc_lookup
-	 * is correctly aligned...
-	 */
-	int32_t		ioc__pad;
+	uint32_t	sh_pwlen;
+	char		sh_name[SMBIOC_MAX_NAME];
+	char		sh_pass[SMBIOC_MAX_NAME];
+	/* share types, in ASCII form, i.e. "A:", "IPC", ... */
+	char		sh_type_req[SMBIOC_STYPE_LEN];	/* requested */
+	char		sh_type_ret[SMBIOC_STYPE_LEN];	/* returned */
 };
 typedef struct smbioc_oshare smbioc_oshare_t;
 
+typedef struct smbioc_tcon {
+	int32_t		tc_flags;
+	int32_t		tc_opt;
+	smbioc_oshare_t	tc_sh;
+} smbioc_tcon_t;
+
+
+/*
+ * Negotiated protocol parameters
+ */
+struct smb_sopt {
+	int16_t		sv_proto;	/* protocol dialect */
+	uchar_t		sv_sm;		/* security mode */
+	int16_t		sv_tz;		/* offset in min relative to UTC */
+	uint16_t	sv_maxmux;	/* max number of outstanding rq's */
+	uint16_t 	sv_maxvcs;	/* max number of VCs */
+	uint16_t	sv_rawmode;
+	uint32_t	sv_maxtx;	/* maximum transmit buf size */
+	uint32_t	sv_maxraw;	/* maximum raw-buffer size */
+	uint32_t	sv_skey;	/* session key */
+	uint32_t	sv_caps;	/* capabilites SMB_CAP_ */
+};
+typedef struct smb_sopt smb_sopt_t;
+
+/*
+ * State carried in/out of the driver by the IOD thread.
+ * Inside the driver, these are members of the "VC" object.
+ */
+struct smb_iods {
+	int32_t		is_tran_fd;	/* transport FD */
+	uint32_t	is_vcflags;	/* SMBV_... */
+	uint8_t 	is_hflags;	/* SMB header flags */
+	uint16_t	is_hflags2;	/* SMB header flags2 */
+	uint16_t	is_smbuid;	/* SMB header UID */
+	uint16_t	is_next_mid;	/* SMB header MID */
+	uint32_t	is_txmax;	/* max tx/rx packet size */
+	uint32_t	is_rwmax;	/* max read/write data size */
+	uint32_t	is_rxmax;	/* max readx data size */
+	uint32_t	is_wxmax;	/* max writex data size */
+	uint8_t		is_ssn_key[SMBIOC_HASH_SZ]; /* session key */
+	/* Signing state */
+	uint32_t	is_next_seq;	/* my next sequence number */
+	uint32_t	is_u_maclen;	/* MAC key length */
+	lptr_t		is_u_mackey;	/* user-space ptr! */
+};
+typedef struct smb_iods smb_iods_t;
+
+/*
+ * This is the operational state information passed
+ * in and out of the driver for SMBIOC_SSN_WORK
+ */
+struct smbioc_ssn_work {
+	smb_iods_t	wk_iods;
+	smb_sopt_t	wk_sopt;
+	int		wk_out_state;
+};
+typedef struct smbioc_ssn_work smbioc_ssn_work_t;
+
+/*
+ * User-level SMB requests
+ */
+
+/*
+ * SMBIOC_REQUEST (simple SMB request)
+ */
 typedef struct smbioc_rq {
 	uchar_t		ioc_cmd;
-	uchar_t		ioc_twc; /* _twords */
-	ushort_t	ioc_tbc; /* _tbytes */
-	int32_t		ioc_rpbufsz; /* _rpbuf */
-	uchar_t		ioc__pad1;
-	uchar_t		ioc_rwc;
-	ushort_t	ioc_rbc;
-	uchar_t		ioc__pad2;
 	uint8_t 	ioc_errclass;
 	uint16_t	ioc_serror;
 	uint32_t	ioc_error;
-	uint32_t	ioc__pad3;
-	/*
-	 * Copyout all but the pointers, which
-	 * we may have set to kernel memory.
-	 * See ..._COPYOUT_SIZE
-	 */
-	lptr_t		_ioc_twords;
-	lptr_t		_ioc_tbytes;
-	lptr_t		_ioc_rpbuf;
+	uint32_t	ioc_tbufsz;	/* transmit */
+	uint32_t	ioc_rbufsz;	/* receive */
+	lptr_t		_ioc_tbuf;
+	lptr_t		_ioc_rbuf;
 } smbioc_rq_t;
-#define	ioc_twords	_ioc_twords.lp_ptr
-#define	ioc_tbytes	_ioc_tbytes.lp_ptr
-#define	ioc_rpbuf	_ioc_rpbuf.lp_ptr
-#define	SMBIOC_RQ_COPYOUT_SIZE \
-	(offsetof(smbioc_rq_t, _ioc_twords))
+#define	ioc_tbuf	_ioc_tbuf.lp_ptr
+#define	ioc_rbuf	_ioc_rbuf.lp_ptr
 
 
-#define	SMBIOC_T2RQ_MAXNAME 128
+#define	SMBIOC_T2RQ_MAXSETUP	4
+#define	SMBIOC_T2RQ_MAXNAME	128
 
 typedef struct smbioc_t2rq {
-	uint16_t	ioc_setup[SMB_MAXSETUPWORDS];
+	uint16_t	ioc_setup[SMBIOC_T2RQ_MAXSETUP];
 	int32_t		ioc_setupcnt;
 	char		ioc_name[SMBIOC_T2RQ_MAXNAME];
 	ushort_t	ioc_tparamcnt;
@@ -291,11 +324,6 @@ typedef struct smbioc_t2rq {
 	uint32_t	ioc_error;
 	uint16_t	ioc_rpflags2;
 	uint16_t	ioc__pad2;
-	/*
-	 * Copyout all but the pointers, which
-	 * we may have set to kernel memory.
-	 * See ..._COPYOUT_SIZE
-	 */
 	lptr_t		_ioc_tparam;
 	lptr_t		_ioc_tdata;
 	lptr_t		_ioc_rparam;
@@ -305,43 +333,30 @@ typedef struct smbioc_t2rq {
 #define	ioc_tdata	_ioc_tdata.lp_ptr
 #define	ioc_rparam	_ioc_rparam.lp_ptr
 #define	ioc_rdata	_ioc_rdata.lp_ptr
-#define	SMBIOC_T2RQ_COPYOUT_SIZE \
-	(offsetof(smbioc_t2rq_t, _ioc_tparam))
 
 
 typedef struct smbioc_flags {
 	int32_t		ioc_level;	/* 0 - session, 1 - share */
-	int32_t		ioc_mask;
 	int32_t		ioc_flags;
+	int32_t		ioc_mask;
 } smbioc_flags_t;
 
-typedef struct smbioc_lookup {
-	int32_t		ioc_level;
-	int32_t		ioc_flags;
-	struct smbioc_oshare	ioc_sh;
-	struct smbioc_ossn	ioc_ssn;
-} smbioc_lookup_t;
-#define	SMBIOC_LOOK_COPYOUT_SIZE \
-	(offsetof(smbioc_lookup_t, ioc_ssn._ioc_intok))
-
 typedef struct smbioc_rw {
-	uint16_t	ioc_fh;
+	uint32_t	ioc_fh;
 	uint32_t	ioc_cnt;
 	lloff_t	_ioc_offset;
 	lptr_t	_ioc_base;
 } smbioc_rw_t;
 #define	ioc_offset	_ioc_offset._f
 #define	ioc_base	_ioc_base.lp_ptr
-#define	SMBIOC_RW_COPYOUT_SIZE \
-	(offsetof(smbioc_rw_t, _ioc_base))
 
 /* Password Keychain (PK) support. */
-#define	SMBIOC_PK_MAXLEN 255
 typedef struct smbioc_pk {
 	uid_t	pk_uid;				/* UID for PAM use */
-	char pk_dom[SMBIOC_PK_MAXLEN+1];	/* CIFS domain name */
-	char pk_usr[SMBIOC_PK_MAXLEN+1];	/* CIFS user name */
-	char pk_pass[SMBIOC_PK_MAXLEN+1];	/* CIFS password */
+	char pk_dom[SMBIOC_MAX_NAME];		/* CIFS domain name */
+	char pk_usr[SMBIOC_MAX_NAME];		/* CIFS user name */
+	uchar_t pk_lmhash[SMBIOC_HASH_SZ];	/* LanMan p/w hash */
+	uchar_t pk_nthash[SMBIOC_HASH_SZ];	/* NTLM p/w hash */
 } smbioc_pk_t;
 
 
@@ -357,18 +372,29 @@ typedef struct smbioc_pk {
  */
 #define	SMBIOC_BASE 	((('n' << 8) | 's') << 8)
 typedef enum nsmb_ioc {
-	SMBIOC_GETVERS = SMBIOC_BASE,
-	SMBIOC_REQUEST,
-	SMBIOC_T2RQ,
-	SMBIOC_LOOKUP,
-	SMBIOC_READ,
-	SMBIOC_WRITE,
-	SMBIOC_FINDVC,
-	SMBIOC_NEGOTIATE,
-	SMBIOC_SSNSETUP,
-	SMBIOC_TCON,
-	SMBIOC_TDIS,
-	SMBIOC_FLAGS2,
+	SMBIOC_GETVERS = SMBIOC_BASE,	/* keep first */
+	SMBIOC_FLAGS2,		/* get hflags2 */
+	SMBIOC_GETSSNKEY,	/* get SMB session key */
+
+	SMBIOC_REQUEST,		/* simple request */
+	SMBIOC_T2RQ,		/* trans2 request */
+	SMBIOC_READ,		/* read (pipe) */
+	SMBIOC_WRITE,		/* write (pipe) */
+
+	SMBIOC_SSN_CREATE,
+	SMBIOC_SSN_FIND,
+	SMBIOC_SSN_KILL,	/* force disconnect */
+	SMBIOC_SSN_RELE,	/* drop our reference */
+
+	SMBIOC_TREE_CONNECT,	/* create and connect */
+	SMBIOC_TREE_FIND,
+	SMBIOC_TREE_KILL,
+	SMBIOC_TREE_RELE,
+
+	SMBIOC_IOD_WORK,	/* work on session requests */
+	SMBIOC_IOD_IDLE,	/* wait for requests on this session */
+	SMBIOC_IOD_RCFAIL,	/* notify that reconnect failed */
+
 	/* Password Keychain (PK) support. */
 	SMBIOC_PK_ADD,    /* Add/Modify a password entry */
 	SMBIOC_PK_CHK,    /* Check for a password entry */
@@ -377,52 +403,4 @@ typedef enum nsmb_ioc {
 	SMBIOC_PK_DEL_EVERYONE	/* all owned by everyone */
 } nsmb_ioc_t;
 
-#ifdef _KERNEL
-#include <sys/dditypes.h>	/* for dev_info_t */
-
-#define	SMBST_CONNECTED	1
-
-/* Size of storage for p/w hashes. */
-#define	SMB_PWH_MAX	24
-
-extern const uint32_t nsmb_version;
-
-struct smb_cred;
-struct smb_share;
-struct smb_vc;
-
-typedef struct smb_dev {
-	int		sd_opened;	/* Opened or not */
-	int		sd_level;	/* Future use */
-	struct smb_vc	*sd_vc;		/* Reference to VC */
-	struct smb_share *sd_share;	/* Reference to share if any */
-	int		sd_poll;	/* Future use */
-	int		sd_seq;		/* Kind of minor number/instance no */
-	int		sd_flags;	/* State of connection */
-	zoneid_t	zoneid;		/* Zone id */
-	dev_info_t	*smb_dip;	/* ptr to dev_info node */
-	void		*sd_devfs;	/* Dont know how to use this. but */
-	struct cred	*smb_cred;	/* per dev credentails. Future use */
-} smb_dev_t;
-
-/*
- * Compound user interface
- */
-int smb_usr_findvc(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc **vcpp);
-int  smb_usr_negotiate(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc **vcpp);
-int  smb_usr_ssnsetup(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc *vcp);
-int  smb_usr_tcon(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc *vcp, struct smb_share **sspp);
-int  smb_usr_simplerequest(struct smb_share *ssp, struct smbioc_rq *data,
-	struct smb_cred *scred);
-int  smb_usr_t2request(struct smb_share *ssp, struct smbioc_t2rq *data,
-	struct smb_cred *scred);
-int  smb_usr_rw(struct smb_share *ssp, smbioc_rw_t *dp,
-	int cmd, struct smb_cred *scred);
-int  smb_dev2share(int fd, struct smb_share **sspp);
-
-#endif /* _KERNEL */
 #endif /* _NETSMB_DEV_H_ */

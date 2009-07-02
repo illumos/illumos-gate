@@ -47,26 +47,66 @@
 #include <sysexits.h>
 #include <libintl.h>
 
+#include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
 #include "private.h"
 
+static uint32_t smb_map_doserr(uint8_t, uint16_t);
 
+/*
+ * Create and initialize a request structure, for either an
+ * "internal" request (one that does not use the driver) or
+ * a regular "driver" request, that uses driver ioctls.
+ *
+ * The two kinds are built a little differently:
+ * Driver requests are composed starting with the
+ * first word of the "variable word vector" section.
+ * The driver prepends the SMB header and word count.
+ * The driver also needs an output buffer to receive
+ * the response, filled in via copyout in the ioctl.
+ *
+ * Internal requests are composed entirely in this library.
+ * Space for the SMB header is reserved here, and later
+ * filled in by smb_rq_internal before the send/receive.
+ */
 int
-smb_rq_init(struct smb_ctx *ctx, uchar_t cmd, size_t rpbufsz,
-    struct smb_rq **rqpp)
+smb_rq_init(struct smb_ctx *ctx, uchar_t cmd, struct smb_rq **rqpp)
 {
 	struct smb_rq *rqp;
 
 	rqp = malloc(sizeof (*rqp));
 	if (rqp == NULL)
-		return (ENOMEM);
+		goto errout;
 	bzero(rqp, sizeof (*rqp));
 	rqp->rq_cmd = cmd;
 	rqp->rq_ctx = ctx;
-	mb_init(&rqp->rq_rq, M_MINSIZE);
-	mb_init(&rqp->rq_rp, rpbufsz);
+
+	/*
+	 * Setup the request buffer.
+	 * Do the reply buffer later.
+	 */
+	if (mb_init(&rqp->rq_rq, M_MINSIZE))
+		goto errout;
+
+	/* Space for the SMB header. (filled in later) */
+	mb_put_mem(&rqp->rq_rq, NULL, SMB_HDRLEN);
+
+	/*
+	 * Copy the ctx flags here, so the caller can
+	 * update the req flags before the OTW call.
+	 */
+	rqp->rq_hflags = ctx->ct_hflags;
+	rqp->rq_hflags2 = ctx->ct_hflags2;
+
 	*rqpp = rqp;
 	return (0);
+
+errout:
+	if (rqp) {
+		smb_rq_done(rqp);
+		free(rqp);
+	}
+	return (ENOMEM);
 }
 
 void
@@ -77,53 +117,102 @@ smb_rq_done(struct smb_rq *rqp)
 	free(rqp);
 }
 
+/*
+ * Reserve space for the word count, which is filled in later by
+ * smb_rq_wend().  Also initialize the counter that it uses
+ * to figure out what value to fill in.
+ *
+ * Note that the word count happens to be 8-bits,
+ * which can lead to confusion.
+ */
+void
+smb_rq_wstart(struct smb_rq *rqp)
+{
+	struct mbdata *mbp = &rqp->rq_rq;
+
+	mb_fit(mbp, 1, &rqp->rq_wcntp);
+	rqp->rq_wcbase = mbp->mb_count;
+}
+
+/*
+ * Fill in the word count, in the space reserved by
+ * smb_rq_wstart().
+ */
 void
 smb_rq_wend(struct smb_rq *rqp)
 {
-	if (rqp->rq_rq.mb_count & 1)
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "smbrq_wend: odd word count\n"), 0);
-	rqp->rq_wcount = rqp->rq_rq.mb_count / 2;
-	rqp->rq_rq.mb_count = 0;
-}
+	struct mbdata *mbp = &rqp->rq_rq;
+	int wcnt;
 
-int
-smb_rq_dmem(struct mbdata *mbp, const char *src, size_t size)
-{
-	struct mbuf *m;
-	char  *dst;
-	int cplen, error;
-
-	if (size == 0)
-		return (0);
-	m = mbp->mb_cur;
-	if ((error = m_getm(m, size, &m)) != 0)
-		return (error);
-	while (size > 0) {
-		cplen = M_TRAILINGSPACE(m);
-		if (cplen == 0) {
-			m = m->m_next;
-			continue;
-		}
-		if (cplen > (int)size)
-			cplen = size;
-		dst = mtod(m, char *) + m->m_len;
-		nls_mem_toext(dst, src, cplen);
-		size -= cplen;
-		src += cplen;
-		m->m_len += cplen;
-		mbp->mb_count += cplen;
+	if (rqp->rq_wcntp == NULL) {
+		DPRINT("no wcount ptr\n");
+		return;
 	}
-	mbp->mb_pos = mtod(m, char *) + m->m_len;
-	mbp->mb_cur = m;
-	return (0);
+	wcnt = mbp->mb_count - rqp->rq_wcbase;
+	if (wcnt > 0x1ff)
+		DPRINT("word count too large (%d)\n", wcnt);
+	if (wcnt & 1)
+		DPRINT("odd word count\n");
+	wcnt >>= 1;
+
+	/*
+	 * Fill in the word count (8-bits).
+	 * Also store it in the rq, in case
+	 * we're using the ioctl path.
+	 */
+	*rqp->rq_wcntp = (char)wcnt;
 }
 
-int
-smb_rq_dstring(struct mbdata *mbp, const char *s)
+/*
+ * Reserve space for the byte count, which is filled in later by
+ * smb_rq_bend().  Also initialize the counter that it uses
+ * to figure out what value to fill in.
+ *
+ * Note that the byte count happens to be 16-bits,
+ * which can lead to confusion.
+ */
+void
+smb_rq_bstart(struct smb_rq *rqp)
 {
-	return (smb_rq_dmem(mbp, s, strlen(s) + 1));
+	struct mbdata *mbp = &rqp->rq_rq;
+
+	mb_fit(mbp, 2, &rqp->rq_bcntp);
+	rqp->rq_bcbase = mbp->mb_count;
 }
+
+/*
+ * Fill in the byte count, in the space reserved by
+ * smb_rq_bstart().
+ */
+void
+smb_rq_bend(struct smb_rq *rqp)
+{
+	struct mbdata *mbp = &rqp->rq_rq;
+	int bcnt;
+
+	if (rqp->rq_bcntp == NULL) {
+		DPRINT("no bcount ptr\n");
+		return;
+	}
+	bcnt = mbp->mb_count - rqp->rq_bcbase;
+	if (bcnt > 0xffff)
+		DPRINT("byte count too large (%d)\n", bcnt);
+	/*
+	 * Fill in the byte count (16-bits).
+	 * Also store it in the rq, in case
+	 * we're using the ioctl path.
+	 *
+	 * The pointer is char * type due to
+	 * typical off-by-one alignment.
+	 */
+	rqp->rq_bcntp[0] = bcnt & 0xFF;
+	rqp->rq_bcntp[1] = (bcnt >> 8);
+}
+
+/*
+ * Removed: smb_rq_dmem
+ * which was mostly like: mb_put_mem
+ */
 
 int
 smb_rq_simple(struct smb_rq *rqp)
@@ -131,27 +220,59 @@ smb_rq_simple(struct smb_rq *rqp)
 	struct smbioc_rq krq;
 	struct mbdata *mbp;
 	char *data;
-	int i;
+	uint32_t len;
+	size_t rpbufsz;
 
+	bzero(&krq, sizeof (krq));
+	krq.ioc_cmd = rqp->rq_cmd;
+
+	/*
+	 * Make the SMB request body contiguous,
+	 * and fill in the ioctl request.
+	 */
 	mbp = smb_rq_getrequest(rqp);
 	m_lineup(mbp->mb_top, &mbp->mb_top);
 	data = mtod(mbp->mb_top, char *);
-	bzero(&krq, sizeof (krq));
-	krq.ioc_cmd = rqp->rq_cmd;
-	krq.ioc_twc = rqp->rq_wcount;
-	krq.ioc_twords = data;
-	krq.ioc_tbc = mbp->mb_count;
-	krq.ioc_tbytes = data + rqp->rq_wcount * 2;
+	len = m_totlen(mbp->mb_top);
 
+	/*
+	 * _rq_init left space for the SMB header,
+	 * which makes mb_count the offset from
+	 * the beginning of the header (useful).
+	 * However, in this code path the driver
+	 * prepends the header, so we skip it.
+	 */
+	krq.ioc_tbufsz = len - SMB_HDRLEN;
+	krq.ioc_tbuf  = data + SMB_HDRLEN;
+
+	/*
+	 * Setup a buffer to hold the reply.
+	 *
+	 * Default size is M_MINSIZE, but the
+	 * caller may increase rq_rpbufsz
+	 * before calling this.
+	 */
 	mbp = smb_rq_getreply(rqp);
-	krq.ioc_rpbufsz = mbp->mb_top->m_maxlen;
-	krq.ioc_rpbuf = mtod(mbp->mb_top, char *);
-	if (ioctl(rqp->rq_ctx->ct_fd, SMBIOC_REQUEST, &krq) == -1) {
+	rpbufsz = rqp->rq_rpbufsz;
+	if (rpbufsz < M_MINSIZE)
+		rpbufsz = M_MINSIZE;
+	if (mb_init(mbp, rpbufsz))
+		return (ENOMEM);
+	krq.ioc_rbufsz = rpbufsz;
+	krq.ioc_rbuf = mtod(mbp->mb_top, char *);
+
+	/*
+	 * Call the driver
+	 */
+	if (ioctl(rqp->rq_ctx->ct_dev_fd, SMBIOC_REQUEST, &krq) == -1)
 		return (errno);
-	}
-	mbp->mb_top->m_len = krq.ioc_rwc * 2 + krq.ioc_rbc;
-	rqp->rq_wcount = krq.ioc_rwc;
-	rqp->rq_bcount = krq.ioc_rbc;
+
+	/*
+	 * Initialize returned mbdata.
+	 * SMB header already parsed.
+	 */
+	mbp->mb_top->m_len = krq.ioc_rbufsz;
+
 	return (0);
 }
 
@@ -167,13 +288,11 @@ smb_t2_request(struct smb_ctx *ctx, int setupcount, uint16_t *setup,
 {
 	smbioc_t2rq_t *krq;
 	int i;
-	char *pass;
-
 
 	krq = (smbioc_t2rq_t *)malloc(sizeof (smbioc_t2rq_t));
 	bzero(krq, sizeof (*krq));
 
-	if (setupcount < 0 || setupcount >= SMB_MAXSETUPWORDS) {
+	if (setupcount < 0 || setupcount >= SMBIOC_T2RQ_MAXSETUP) {
 		/* Bogus setup count, or too many setup words */
 		return (EINVAL);
 	}
@@ -191,7 +310,7 @@ smb_t2_request(struct smb_ctx *ctx, int setupcount, uint16_t *setup,
 	krq->ioc_rparam = rparam;
 	krq->ioc_rdata  = rdata;
 
-	if (ioctl(ctx->ct_fd, SMBIOC_T2RQ, krq) == -1) {
+	if (ioctl(ctx->ct_dev_fd, SMBIOC_T2RQ, krq) == -1) {
 		return (errno);
 	}
 
@@ -200,5 +319,149 @@ smb_t2_request(struct smb_ctx *ctx, int setupcount, uint16_t *setup,
 	*buffer_oflow = (krq->ioc_rpflags2 & SMB_FLAGS2_ERR_STATUS) &&
 	    (krq->ioc_error == NT_STATUS_BUFFER_OVERFLOW);
 	free(krq);
+
 	return (0);
+}
+
+
+/*
+ * Do an over-the-wire call without using the nsmb driver.
+ * This is all "internal" to this library, and used only
+ * for connection setup (negotiate protocol, etc.)
+ */
+int
+smb_rq_internal(struct smb_ctx *ctx, struct smb_rq *rqp)
+{
+	static const uint8_t ffsmb[4] = SMB_SIGNATURE;
+	struct smb_iods *is = &ctx->ct_iods;
+	uint32_t sigbuf[2];
+	struct mbdata mbtmp, *mbp;
+	int err, save_mlen;
+	uint8_t ctmp;
+
+	rqp->rq_uid = is->is_smbuid;
+	rqp->rq_tid = SMB_TID_UNKNOWN;
+	rqp->rq_mid = is->is_next_mid++;
+
+	/*
+	 * Fill in the NBT and SMB headers
+	 * Using mbtmp so we can rewind without
+	 * affecting the passed request mbdata.
+	 */
+	bcopy(&rqp->rq_rq, &mbtmp, sizeof (mbtmp));
+	mbp = &mbtmp;
+	mbp->mb_cur = mbp->mb_top;
+	mbp->mb_pos = mbp->mb_cur->m_data;
+	mbp->mb_count = 0;
+	/* Have to save and restore m_len */
+	save_mlen = mbp->mb_cur->m_len;
+	mbp->mb_cur->m_len = 0;
+
+	/*
+	 * rewind done; fill it in
+	 */
+	mb_put_mem(mbp, (char *)SMB_SIGNATURE, SMB_SIGLEN);
+	mb_put_uint8(mbp, rqp->rq_cmd);
+	mb_put_mem(mbp, NULL, 4);	/* status */
+	mb_put_uint8(mbp, rqp->rq_hflags);
+	mb_put_uint16le(mbp, rqp->rq_hflags2);
+	mb_put_uint16le(mbp, 0);	/* pid_hi */
+	mb_put_mem(mbp, NULL, 8);	/* signature */
+	mb_put_uint16le(mbp, 0);	/* reserved */
+	mb_put_uint16le(mbp, rqp->rq_tid);
+	mb_put_uint16le(mbp, 0);	/* pid_lo */
+	mb_put_uint16le(mbp, rqp->rq_uid);
+	mb_put_uint16le(mbp, rqp->rq_mid);
+
+	/* Restore original m_len */
+	mbp->mb_cur->m_len = save_mlen;
+
+	/*
+	 * Sign the message, if flags2 indicates.
+	 */
+	if (rqp->rq_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+		smb_rq_sign(rqp);
+	}
+
+	/*
+	 * Send it, wait for the reply.
+	 */
+	if ((err = smb_ssn_send(ctx, &rqp->rq_rq)) != 0)
+		return (err);
+
+	if ((err = smb_ssn_recv(ctx, &rqp->rq_rp)) != 0)
+		return (err);
+
+	/*
+	 * Should have an SMB header, at least.
+	 */
+	mbp = &rqp->rq_rp;
+	if (mbp->mb_cur->m_len < SMB_HDRLEN) {
+		DPRINT("len < 32");
+		return (EBADRPC);
+	}
+
+	/*
+	 * If the request was signed, validate the
+	 * signature on the response.
+	 */
+	if (rqp->rq_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+		err = smb_rq_verify(rqp);
+		if (err) {
+			DPRINT("bad signature");
+			return (err);
+		}
+	}
+
+	/*
+	 * Decode the SMB header.
+	 */
+	mb_get_mem(mbp, (char *)sigbuf, 4);
+	if (0 != bcmp(sigbuf, ffsmb, 4)) {
+		DPRINT("not SMB");
+		return (EBADRPC);
+	}
+	mb_get_uint8(mbp, &ctmp);	/* SMB cmd */
+	mb_get_uint32le(mbp, &rqp->rq_status);
+	mb_get_uint8(mbp, &rqp->rq_hflags);
+	mb_get_uint16le(mbp, &rqp->rq_hflags2);
+	mb_get_uint16le(mbp, NULL);	/* pid_hi */
+	mb_get_mem(mbp, NULL, 8); /* signature */
+	mb_get_uint16le(mbp, NULL);	/* reserved */
+	mb_get_uint16le(mbp, &rqp->rq_tid);
+	mb_get_uint16le(mbp, NULL);	/* pid_lo */
+	mb_get_uint16le(mbp, &rqp->rq_uid);
+	mb_get_uint16le(mbp, &rqp->rq_mid);
+
+	/*
+	 * Figure out the status return.
+	 * Caller looks at rq_status.
+	 */
+	if ((rqp->rq_hflags2 & SMB_FLAGS2_ERR_STATUS) == 0) {
+		uint16_t	serr;
+		uint8_t		class;
+
+		class = rqp->rq_status & 0xff;
+		serr  = rqp->rq_status >> 16;
+		rqp->rq_status = smb_map_doserr(class, serr);
+	}
+
+	return (0);
+}
+
+/*
+ * Map old DOS errors (etc.) to NT status codes.
+ * We probably don't need this anymore, since
+ * the oldest server we talk to is NT.  But if
+ * later find we do need this, add support here
+ * for the DOS errors we care about.
+ */
+static uint32_t
+smb_map_doserr(uint8_t class, uint16_t serr)
+{
+	if (class == 0 && serr == 0)
+		return (0);
+
+	DPRINT("class 0x%x serr 0x%x", (int)class, (int)serr);
+	return (NT_STATUS_UNSUCCESSFUL);
 }

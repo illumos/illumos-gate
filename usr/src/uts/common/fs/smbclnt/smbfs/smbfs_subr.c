@@ -33,11 +33,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -343,48 +341,55 @@ smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
 	return (error);
 }
 
+/*
+ * Convert a Unicode directory entry to UTF-8
+ */
 void
 smbfs_fname_tolocal(struct smbfs_fctx *ctx)
 {
-	int length;
+	uchar_t tmpbuf[SMB_MAXFNAMELEN+1];
 	struct smb_vc *vcp = SSTOVC(ctx->f_ssp);
 	uchar_t *dst;
 	const ushort_t *src;
 	size_t inlen, outlen;
-	int flags = 0;
+	int flags;
 
 	if (ctx->f_nmlen == 0)
 		return;
 
-	/* XXX: This is temporary, right?  Need iconv... */
 	if (!SMB_UNICODE_STRINGS(vcp))
 		return;
 
-	/*
-	 * In Unix, the UTF-8 name can be larger and
-	 * in-place conversions are not supported.
-	 * Note: 3,9 are the maximum UTF-8 expansion
-	 * factors when converting strings from UTF-16
-	 * XXX: This was removed. REVISIT
-	 */
-	if (SMB_UNICODE_STRINGS(vcp))
-		length = ctx->f_nmlen * 9; /* why 9 */
-	else
-		length = ctx->f_nmlen * 3; /* why 3 */
-	length = min(length, SMB_MAXFNAMELEN);
+	if (ctx->f_namesz < sizeof (tmpbuf)) {
+		ASSERT(0);
+		goto errout;
+	}
 
-	dst = kmem_zalloc(length, KM_SLEEP);
-	outlen = length;
+	/*
+	 * In-place conversions are not supported,
+	 * so convert into tmpbuf and copy.
+	 */
+	dst = tmpbuf;
+	outlen = SMB_MAXFNAMELEN;
 	/*LINTED*/
 	src = (const ushort_t *)ctx->f_name;
-	inlen = ctx->f_nmlen / 2;	/* need number of UCS-2 characters */
-	flags |= UCONV_IN_LITTLE_ENDIAN;
+	inlen = ctx->f_nmlen / 2;	/* number of UCS-2 characters */
+	flags = UCONV_IN_LITTLE_ENDIAN;
 
-	if (uconv_u16tou8(src, &inlen, dst, &outlen, flags) == 0) {
-		kmem_free(ctx->f_name, ctx->f_namesz);
-		ctx->f_name = (char *)dst;
-		ctx->f_namesz = length;
-		ctx->f_nmlen = (int)outlen;
-	} else
-		kmem_free(dst, length);
+	if (uconv_u16tou8(src, &inlen, dst, &outlen, flags) != 0)
+		goto errout;
+
+	ASSERT(outlen < sizeof (tmpbuf));
+	tmpbuf[outlen] = '\0';
+	bcopy(tmpbuf, ctx->f_name, outlen + 1);
+	ctx->f_nmlen = (int)outlen;
+	return;
+
+errout:
+	/*
+	 * Conversion failed, but our caller does not
+	 * deal with errors here, so... (hack).
+	 * Don't expect to ever see this.
+	 */
+	strlcpy(ctx->f_name + 1, "?", ctx->f_namesz);
 }

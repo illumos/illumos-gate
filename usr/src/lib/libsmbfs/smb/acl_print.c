@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Print an NT Security Descriptor (SD) and its sub-components.
@@ -54,7 +52,8 @@
 
 #include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
-#include <netsmb/smbfs_isec.h>
+
+#include "acl_nt.h"
 
 static void
 fprint_sid(FILE *fp, i_ntsid_t *sid)

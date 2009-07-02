@@ -48,11 +48,21 @@
  * but that's now in sys/fs/smbfs_mount.h
  */
 
+#include <sys/param.h>
+#include <sys/fstyp.h>
 #include <sys/list.h>
 #include <sys/vfs.h>
-#include <sys/vfs_opreg.h>
 #include <sys/fs/smbfs_mount.h>
 
+/*
+ * Path component length
+ *
+ * The generic fs code uses MAXNAMELEN to represent
+ * what the largest component length is, but note:
+ * that length DOES include the terminating NULL.
+ * SMB_MAXFNAMELEN does NOT include the NULL.
+ */
+#define	SMB_MAXFNAMELEN		(MAXNAMELEN-1)	/* 255 */
 
 /*
  * SM_MAX_STATFSTIME is the maximum time to cache statvfs data. Since this
@@ -82,6 +92,16 @@ struct smb_share;
 #define	SMI_LLOCK	0x80		/* local locking only */
 
 /*
+ * Stuff returned by smbfs_smb_qfsattr
+ * See [CIFS] SMB_QUERY_FS_ATTRIBUTE_INFO
+ */
+typedef struct smb_fs_attr_info {
+	uint32_t	fsa_aflags;	/* Attr. flags [CIFS 4.1.6.6] */
+	uint32_t	fsa_maxname;	/* max. component length */
+	char		fsa_tname[FSTYPSZ]; /* type name, i.e. "NTFS" */
+} smb_fs_attr_info_t;
+
+/*
  * Corresponds to Darwin: struct smbmount
  */
 typedef struct smbmntinfo {
@@ -90,11 +110,12 @@ typedef struct smbmntinfo {
 	struct smb_share	*smi_share;	/* netsmb SMB share conn data */
 	kmutex_t		smi_lock;	/* mutex for flags, etc. */
 	uint32_t		smi_flags;	/* NFS-derived flag bits */
-	uint32_t		smi_fsattr;	/* acls & streams opts */
 	uint32_t		smi_status;	/* status bits for this mount */
 	hrtime_t		smi_statfstime;	/* sm_statvfsbuf cache time */
 	statvfs64_t		smi_statvfsbuf;	/* cached statvfs data */
 	kcondvar_t		smi_statvfs_cv;
+	smb_fs_attr_info_t	smi_fsa;	/* SMB FS attributes. */
+#define	smi_fsattr		smi_fsa.fsa_aflags
 
 	/*
 	 * Kstat statistics

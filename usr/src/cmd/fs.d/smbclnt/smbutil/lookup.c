@@ -32,7 +32,10 @@
  * $Id: lookup.c,v 1.1.1.1 2001/06/09 00:28:13 zarzycki Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -74,9 +77,9 @@ cmd_lookup(int argc, char *argv[])
 		exit(1);
 	}
 	if (smb_open_rcfile(NULL) == 0) {
-		if (nb_ctx_readrcsection(smb_rc, ctx, "default", 0) != 0)
+		if (nb_ctx_readrcsection(NULL, ctx, "default", 0) != 0)
 			exit(1);
-		rc_close(smb_rc);
+		smb_close_rcfile();
 	}
 	if ((ctx->nb_flags & NBCF_NS_ENABLE) == 0) {
 		fprintf(stderr,

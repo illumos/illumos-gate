@@ -32,29 +32,61 @@
  * $Id: nb.c,v 1.1.1.2 2001/07/06 22:38:42 conrad Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <sys/param.h>
 #include <sys/socket.h>
 
-#include <ctype.h>
-#include <netdb.h>
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <libintl.h>
+#include <netdb.h>
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <cflib.h>
 #include <netsmb/netbios.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/nb_lib.h>
 
-#include <cflib.h>
+int nb_ctx_setwins(struct nb_ctx *, const char *, const char *);
+
+
+/*
+ * API for library consumer to set wins1, wins2
+ */
+int
+smb_ctx_setwins(struct smb_ctx *ctx, const char *wins1, const char *wins2)
+{
+	struct nb_ctx *nb = ctx->ct_nb;
+
+	if (nb == NULL)
+		return (EINVAL);
+
+	return (nb_ctx_setwins(nb, wins1, wins2));
+}
+
+/*
+ * API for library consumer to set NB scope.
+ */
+int
+smb_ctx_setscope(struct smb_ctx *ctx, const char *scope)
+{
+	struct nb_ctx *nb = ctx->ct_nb;
+
+	if (nb == NULL)
+		return (EINVAL);
+
+	return (nb_ctx_setscope(nb, scope));
+}
 
 int
 nb_ctx_create(struct nb_ctx **ctxpp)
@@ -81,36 +113,37 @@ nb_ctx_done(struct nb_ctx *ctx)
 		free(ctx);
 }
 
-static int
-nb_ctx_setwins(in_addr_t *ina_p, const char *str)
+int
+nb_ctx_setwins(struct nb_ctx *ctx, const char *wins1, const char *wins2)
 {
 	struct in_addr ina;
-	struct sockaddr *sap;
 	int error;
 
-	if (str == NULL || str[0] == 0)
-		return (EINVAL);
-
-	if (inet_aton(str, &ina)) {
-		*ina_p = ina.s_addr;
-	} else {
-		error = nb_resolvehost_in(str, &sap);
-		if (error) {
-			smb_error(dgettext(TEXT_DOMAIN, "can't resolve %s"),
-			    error, str);
-			return (error);
-		}
-		if (sap->sa_family != AF_INET) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "unsupported address family %d"), 0,
-			    sap->sa_family);
-			return (EINVAL);
-		}
-		/*LINTED*/
-		*ina_p = ((struct sockaddr_in *)sap)->sin_addr.s_addr;
-		free(sap);
+	if (wins1 == NULL) {
+		ctx->nb_wins1 = 0;
+		ctx->nb_wins2 = 0;
+		return (0);
 	}
 
+	error = nb_resolvehost_in(wins1, &ina);
+	if (error) {
+		smb_error(dgettext(TEXT_DOMAIN, "can't resolve %s"),
+		    error, wins1);
+		return (error);
+	}
+	ctx->nb_wins1 = ina.s_addr;
+
+	if (wins2 == NULL)
+		ctx->nb_wins2 = 0;
+	else {
+		error = nb_resolvehost_in(wins2, &ina);
+		if (error) {
+			smb_error(dgettext(TEXT_DOMAIN, "can't resolve %s"),
+			    error, wins2);
+			return (error);
+		}
+		ctx->nb_wins2 = ina.s_addr;
+	}
 	return (0);
 }
 
@@ -126,10 +159,9 @@ nb_ctx_setns(struct nb_ctx *ctx, const char *addr)
 {
 	int error;
 
-	error = nb_ctx_setwins(&ctx->nb_wins1, addr);
+	error = nb_ctx_setwins(ctx, addr, NULL);
 	if (error)
 		return (error);
-	ctx->nb_wins2 = 0;
 
 	/* Deal with explicit request for broadcast. */
 	if (ctx->nb_wins1 == INADDR_BROADCAST) {
@@ -182,23 +214,35 @@ int
 nb_ctx_readrcsection(struct rcfile *rcfile, struct nb_ctx *ctx,
 	const char *sname, int level)
 {
-	char *p;
+	char *wins1, *wins2;
 	int error;
 	int nbns_enable;
 	int nbns_broadcast;
 
 	if (level > 1)
 		return (EINVAL);
+
+	/* External callers pass NULL to get the default. */
+	if (rcfile == NULL)
+		rcfile = smb_rc;
+
 #ifdef NOT_DEFINED
 	rc_getint(rcfile, sname, "nbtimeout", &ctx->nb_timo);
 	rc_getstringptr(rcfile, sname, "nbscope", &p);
 	if (p)
 		nb_ctx_setscope(ctx, p);
 #endif
-	/* "nbns" will be "wins1" some day, and we'll have a "wins2" also */
-	rc_getstringptr(rcfile, sname, "nbns", &p);
-	if (p) {
-		error = nb_ctx_setwins(&ctx->nb_wins1, p);
+	/*
+	 * Get "wins1", "wins2" config strings.
+	 * Also support legacy "nbns".
+	 */
+	rc_getstringptr(rcfile, sname, "wins1", &wins1);
+	if (wins1 == NULL)
+		rc_getstringptr(rcfile, sname, "nbns", &wins1);
+	rc_getstringptr(rcfile, sname, "wins2", &wins2);
+
+	if (wins1 != NULL) {
+		error = nb_ctx_setwins(ctx, wins1, wins2);
 		if (error) {
 			smb_error(dgettext(TEXT_DOMAIN,
 			    "invalid address specified in the section %s"),

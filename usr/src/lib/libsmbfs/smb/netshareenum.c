@@ -37,7 +37,7 @@
 /* END CSTYLED */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@
 #include <errno.h>
 
 #include <netsmb/mchain.h>
+#include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/smb_rap.h>
 #include <netsmb/smb_netshareenum.h>
@@ -275,8 +276,6 @@ smb_rap_NetShareEnum(struct smb_ctx *ctx, int sLevel, void *pbBuffer,
 	struct smb_rap *rap;
 	long lval = -1;
 	int error;
-	char *pass;
-	int i;
 
 	error = smb_rap_create(0, "WrLeh", "B13BWz", &rap);
 	if (error)
@@ -375,5 +374,6 @@ smb_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
 	 * XXX - do so only if it failed because we couldn't open
 	 * the pipe?
 	 */
-	return (rap_netshareenum(ctx, entriesp, totalp, entry_listp));
+	error = rap_netshareenum(ctx, entriesp, totalp, entry_listp);
+	return (error);
 }

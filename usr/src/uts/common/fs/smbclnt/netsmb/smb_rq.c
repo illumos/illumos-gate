@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/lock.h>
 #include <sys/socket.h>
 #include <sys/mount.h>
+#include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/sdt.h>
 
@@ -55,6 +56,18 @@
 #include <netsmb/smb_tran.h>
 #include <netsmb/smb_rq.h>
 
+/*
+ * How long to wait before restarting a request (after reconnect)
+ */
+#define	SMB_RCNDELAY		2	/* seconds */
+
+/*
+ * leave this zero - we can't ssecond guess server side effects of
+ * duplicate ops, this isn't nfs!
+ */
+#define	SMBMAXRESTARTS		0
+
+
 static int  smb_rq_reply(struct smb_rq *rqp);
 static int  smb_rq_enqueue(struct smb_rq *rqp);
 static int  smb_rq_getenv(struct smb_connobj *layer,
@@ -64,6 +77,27 @@ static int  smb_t2_reply(struct smb_t2rq *t2p);
 static int  smb_nt_reply(struct smb_ntrq *ntp);
 
 
+/*
+ * Done with a request object.  Free its contents.
+ * If it was allocated (SMBR_ALLOCED) free it too.
+ * Some of these are stack locals, not allocated.
+ *
+ * No locks here - this is the last ref.
+ */
+void
+smb_rq_done(struct smb_rq *rqp)
+{
+
+	/*
+	 * No smb_vc_rele() here - see smb_rq_init()
+	 */
+	mb_done(&rqp->sr_rq);
+	md_done(&rqp->sr_rp);
+	mutex_destroy(&rqp->sr_lock);
+	cv_destroy(&rqp->sr_cond);
+	if (rqp->sr_flags & SMBR_ALLOCED)
+		kmem_free(rqp, sizeof (*rqp));
+}
 
 int
 smb_rq_alloc(struct smb_connobj *layer, uchar_t cmd, struct smb_cred *scred,
@@ -85,9 +119,8 @@ smb_rq_alloc(struct smb_connobj *layer, uchar_t cmd, struct smb_cred *scred,
 	return (0);
 }
 
-
 int
-smb_rq_init(struct smb_rq *rqp, struct smb_connobj *layer, uchar_t cmd,
+smb_rq_init(struct smb_rq *rqp, struct smb_connobj *co, uchar_t cmd,
 	struct smb_cred *scred)
 {
 	int error;
@@ -96,78 +129,106 @@ smb_rq_init(struct smb_rq *rqp, struct smb_connobj *layer, uchar_t cmd,
 	mutex_init(&rqp->sr_lock, NULL,  MUTEX_DRIVER, NULL);
 	cv_init(&rqp->sr_cond, NULL, CV_DEFAULT, NULL);
 
-	error = smb_rq_getenv(layer, &rqp->sr_vc, &rqp->sr_share);
+	error = smb_rq_getenv(co, &rqp->sr_vc, &rqp->sr_share);
 	if (error)
 		return (error);
 
+	/*
+	 * We copied a VC pointer (vcp) into rqp->sr_vc,
+	 * but we do NOT do a smb_vc_hold here.  Instead,
+	 * the caller is responsible for the hold on the
+	 * share or the VC as needed.  For smbfs callers,
+	 * the hold is on the share, via the smbfs mount.
+	 * For nsmb ioctl callers, the hold is done when
+	 * the driver handle gets VC or share references.
+	 * This design avoids frequent hold/rele activity
+	 * when creating and completing requests.
+	 */
+
 	rqp->sr_rexmit = SMBMAXRESTARTS;
-	rqp->sr_cred = scred;	/* XXX no ref hold */
-	rqp->sr_mid = smb_vc_nextmid(rqp->sr_vc);
+	rqp->sr_cred = scred;	/* Note: ref hold done by caller. */
+	rqp->sr_pid = (uint16_t)ddi_get_pid();
 	error = smb_rq_new(rqp, cmd);
-	if (!error) {
-		rqp->sr_flags |= SMBR_VCREF;
-		smb_vc_hold(rqp->sr_vc);
-	}
+
 	return (error);
 }
 
 static int
 smb_rq_new(struct smb_rq *rqp, uchar_t cmd)
 {
-	struct smb_vc *vcp = rqp->sr_vc;
 	struct mbchain *mbp = &rqp->sr_rq;
+	struct smb_vc *vcp = rqp->sr_vc;
 	int error;
-	static char tzero[12];
-	caddr_t ptr;
-	pid_t   pid;
 
 	ASSERT(rqp != NULL);
-	ASSERT(rqp->sr_cred != NULL);
-	pid = rqp->sr_cred->vc_pid;
+
 	rqp->sr_sendcnt = 0;
 	rqp->sr_cmd = cmd;
+
 	mb_done(mbp);
 	md_done(&rqp->sr_rp);
 	error = mb_init(mbp);
 	if (error)
 		return (error);
-	mb_put_mem(mbp, SMB_SIGNATURE, SMB_SIGLEN, MB_MSYSTEM);
-	mb_put_uint8(mbp, cmd);
-	mb_put_uint32le(mbp, 0);
-	rqp->sr_rqflags = vcp->vc_hflags;
-	mb_put_uint8(mbp, rqp->sr_rqflags);
+
+	/*
+	 * Is this the right place to save the flags?
+	 */
+	rqp->sr_rqflags  = vcp->vc_hflags;
 	rqp->sr_rqflags2 = vcp->vc_hflags2;
-	mb_put_uint16le(mbp, rqp->sr_rqflags2);
-	mb_put_mem(mbp, tzero, 12, MB_MSYSTEM);
-	ptr = mb_reserve(mbp, sizeof (u_int16_t));
-	/*LINTED*/
-	ASSERT(ptr == (caddr_t)((u_int16_t *)ptr));
-	/*LINTED*/
-	rqp->sr_rqtid = (u_int16_t *)ptr;
-	mb_put_uint16le(mbp, (u_int16_t)(pid));
-	ptr = mb_reserve(mbp, sizeof (u_int16_t));
-	/*LINTED*/
-	ASSERT(ptr == (caddr_t)((u_int16_t *)ptr));
-	/*LINTED*/
-	rqp->sr_rquid = (u_int16_t *)ptr;
-	mb_put_uint16le(mbp, rqp->sr_mid);
+
+	/*
+	 * The SMB header is filled in later by
+	 * smb_rq_fillhdr (see below)
+	 * Just reserve space here.
+	 */
+	mb_put_mem(mbp, NULL, SMB_HDRLEN, MB_MZERO);
+
 	return (0);
 }
 
+/*
+ * Given a request with it's body already composed,
+ * rewind to the start and fill in the SMB header.
+ * This is called after the request is enqueued,
+ * so we have the final MID, seq num. etc.
+ */
 void
-smb_rq_done(struct smb_rq *rqp)
+smb_rq_fillhdr(struct smb_rq *rqp)
 {
-	/* No locks.  Last ref. here. */
-	if (rqp->sr_flags & SMBR_VCREF) {
-		rqp->sr_flags &= ~SMBR_VCREF;
-		smb_vc_rele(rqp->sr_vc);
-	}
-	mb_done(&rqp->sr_rq);
-	md_done(&rqp->sr_rp);
-	mutex_destroy(&rqp->sr_lock);
-	cv_destroy(&rqp->sr_cond);
-	if (rqp->sr_flags & SMBR_ALLOCED)
-		kmem_free(rqp, sizeof (*rqp));
+	struct mbchain mbtmp, *mbp = &mbtmp;
+	mblk_t *m;
+
+	/*
+	 * Fill in the SMB header using a dup of the first mblk,
+	 * which points at the same data but has its own wptr,
+	 * so we can rewind without trashing the message.
+	 */
+	m = dupb(rqp->sr_rq.mb_top);
+	m->b_wptr = m->b_rptr;	/* rewind */
+	mb_initm(mbp, m);
+
+	mb_put_mem(mbp, SMB_SIGNATURE, 4, MB_MSYSTEM);
+	mb_put_uint8(mbp, rqp->sr_cmd);
+	mb_put_uint32le(mbp, 0);	/* status */
+	mb_put_uint8(mbp, rqp->sr_rqflags);
+	mb_put_uint16le(mbp, rqp->sr_rqflags2);
+	mb_put_uint16le(mbp, 0);	/* pid-high */
+	mb_put_mem(mbp, NULL, 8, MB_MZERO);	/* MAC sig. (later) */
+	mb_put_uint16le(mbp, 0);	/* reserved */
+	mb_put_uint16le(mbp, rqp->sr_rqtid);
+	mb_put_uint16le(mbp, rqp->sr_pid);
+	mb_put_uint16le(mbp, rqp->sr_rquid);
+	mb_put_uint16le(mbp, rqp->sr_mid);
+
+	/* This will free the mblk from dupb. */
+	mb_done(mbp);
+}
+
+int
+smb_rq_simple(struct smb_rq *rqp)
+{
+	return (smb_rq_simple_timed(rqp, smb_timo_default));
 }
 
 /*
@@ -199,7 +260,7 @@ smb_rq_simple_timed(struct smb_rq *rqp, int timeout)
 		if (rqp->sr_rexmit <= 0)
 			break;
 		SMBRQ_LOCK(rqp);
-		if (rqp->sr_share && rqp->sr_share->ss_mount) {
+		if (rqp->sr_share) {
 			cv_timedwait(&rqp->sr_cond, &(rqp)->sr_lock,
 			    lbolt + (hz * SMB_RCNDELAY));
 
@@ -216,12 +277,6 @@ smb_rq_simple_timed(struct smb_rq *rqp, int timeout)
 }
 
 
-int
-smb_rq_simple(struct smb_rq *rqp)
-{
-	return (smb_rq_simple_timed(rqp, smb_timo_default));
-}
-
 static int
 smb_rq_enqueue(struct smb_rq *rqp)
 {
@@ -230,56 +285,50 @@ smb_rq_enqueue(struct smb_rq *rqp)
 	int error = 0;
 
 	/*
-	 * Unfortunate special case needed for
-	 * tree disconnect, which needs sr_share
-	 * but should skip the reconnect check.
+	 * Normal requests may initiate a reconnect,
+	 * and/or wait for state changes to finish.
+	 * Some requests set the NORECONNECT flag
+	 * to avoid all that (i.e. tree discon)
 	 */
-	if (rqp->sr_cmd == SMB_COM_TREE_DISCONNECT)
-		ssp = NULL;
-
-	/*
-	 * If this is an "internal" request, bypass any
-	 * wait for connection state changes, etc.
-	 * This request is making those changes.
-	 */
-	if (rqp->sr_flags & SMBR_INTERNAL) {
-		ASSERT(ssp == NULL);
-		goto just_doit;
+	if (rqp->sr_flags & SMBR_NORECONNECT) {
+		if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
+			SMBSDEBUG("bad vc_state=%d\n", vcp->vc_state);
+			return (ENOTCONN);
+		}
+		if (ssp != NULL &&
+		    ((ssp->ss_flags & SMBS_CONNECTED) == 0))
+			return (ENOTCONN);
+		goto ok_out;
 	}
 
 	/*
-	 * Wait for VC reconnect to finish...
-	 * XXX: Deal with reconnect later.
-	 * Just bail out for now.
-	 *
-	 * MacOS might check vfs_isforce() here.
+	 * If we're not connected, initiate a reconnect
+	 * and/or wait for an existing one to finish.
 	 */
 	if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
-		SMBSDEBUG("bad vc_state=%d\n", vcp->vc_state);
-		return (ENOTCONN);
+		error = smb_iod_reconnect(vcp);
+		if (error != 0)
+			return (error);
 	}
 
 	/*
-	 * If this request has a "share" object:
-	 * 1: Deny access if share is _GONE (unmounted)
-	 * 2: Wait for state changes in that object,
-	 *    Initiate share (re)connect if needed.
-	 * XXX: Not really doing 2 yet.
+	 * If this request has a "share" object
+	 * that needs a tree connect, do it now.
 	 */
-	if (ssp) {
-		if (ssp->ss_flags & SMBS_GONE)
-			return (ENOTCONN);
-		SMB_SS_LOCK(ssp);
-		if (!smb_share_valid(ssp)) {
-			error = smb_share_tcon(ssp);
-		}
-		SMB_SS_UNLOCK(ssp);
+	if (ssp != NULL && (ssp->ss_flags & SMBS_CONNECTED) == 0) {
+		error = smb_share_tcon(ssp, rqp->sr_cred);
+		if (error)
+			return (error);
 	}
 
-	if (!error) {
-	just_doit:
-		error = smb_iod_addrq(rqp);
-	}
+	/*
+	 * We now know what UID + TID to use.
+	 * Store them in the request.
+	 */
+ok_out:
+	rqp->sr_rquid = vcp->vc_smbuid;
+	rqp->sr_rqtid = ssp ? ssp->ss_tid : SMB_TID_UNKNOWN;
+	error = smb_iod_addrq(rqp);
 
 	return (error);
 }
@@ -358,23 +407,6 @@ smb_rq_intr(struct smb_rq *rqp)
 		return (EINTR);
 
 	return (0);
-#ifdef APPLE
-	return (smb_sigintr(rqp->sr_cred->scr_vfsctx));
-#endif
-}
-
-int
-smb_rq_getrequest(struct smb_rq *rqp, struct mbchain **mbpp)
-{
-	*mbpp = &rqp->sr_rq;
-	return (0);
-}
-
-int
-smb_rq_getreply(struct smb_rq *rqp, struct mdchain **mbpp)
-{
-	*mbpp = &rqp->sr_rp;
-	return (0);
 }
 
 static int
@@ -383,7 +415,7 @@ smb_rq_getenv(struct smb_connobj *co,
 {
 	struct smb_vc *vcp = NULL;
 	struct smb_share *ssp = NULL;
-	int error = 0;
+	int error = EINVAL;
 
 	if (co->co_flags & SMBO_GONE) {
 		SMBSDEBUG("zombie CO\n");
@@ -392,27 +424,28 @@ smb_rq_getenv(struct smb_connobj *co,
 	}
 
 	switch (co->co_level) {
-	case SMBL_VC:
-		vcp = CPTOVC(co);
-		if (co->co_parent == NULL) {
-			SMBSDEBUG("zombie VC %s\n", vcp->vc_srvname);
-			error = EINVAL;
-			break;
-		}
-		break;
-
 	case SMBL_SHARE:
 		ssp = CPTOSS(co);
-		if (co->co_parent == NULL) {
+		if ((co->co_flags & SMBO_GONE) ||
+		    co->co_parent == NULL) {
 			SMBSDEBUG("zombie share %s\n", ssp->ss_name);
-			error = EINVAL;
 			break;
 		}
-		error = smb_rq_getenv(co->co_parent, &vcp, NULL);
+		/* instead of recursion... */
+		co = co->co_parent;
+		/* FALLTHROUGH */
+	case SMBL_VC:
+		vcp = CPTOVC(co);
+		if ((co->co_flags & SMBO_GONE) ||
+		    co->co_parent == NULL) {
+			SMBSDEBUG("zombie VC %s\n", vcp->vc_srvname);
+			break;
+		}
+		error = 0;
 		break;
+
 	default:
 		SMBSDEBUG("invalid level %d passed\n", co->co_level);
-		error = EINVAL;
 	}
 
 out:
@@ -433,7 +466,6 @@ static int
 smb_rq_reply(struct smb_rq *rqp)
 {
 	struct mdchain *mdp = &rqp->sr_rp;
-	u_int32_t tdw;
 	u_int8_t tb;
 	int error, rperror = 0;
 
@@ -457,7 +489,7 @@ smb_rq_reply(struct smb_rq *rqp)
 	/*
 	 * Parse the SMB header
 	 */
-	error = md_get_uint32(mdp, &tdw);
+	error = md_get_uint32le(mdp, NULL);
 	if (error)
 		return (error);
 	error = md_get_uint8(mdp, &tb);
@@ -493,9 +525,9 @@ smb_rq_reply(struct smb_rq *rqp)
 	} else
 		rqp->sr_flags &= ~SMBR_MOREDATA;
 
-	error = md_get_uint32(mdp, &tdw);
-	error = md_get_uint32(mdp, &tdw);
-	error = md_get_uint32(mdp, &tdw);
+	error = md_get_uint32le(mdp, NULL);
+	error = md_get_uint32le(mdp, NULL);
+	error = md_get_uint32le(mdp, NULL);
 
 	error = md_get_uint16le(mdp, &rqp->sr_rptid);
 	error = md_get_uint16le(mdp, &rqp->sr_rppid);
@@ -528,8 +560,6 @@ smb_t2_alloc(struct smb_connobj *layer, ushort_t setup, struct smb_cred *scred,
 	if (t2p == NULL)
 		return (ENOMEM);
 	error = smb_t2_init(t2p, layer, &setup, 1, scred);
-	mutex_init(&t2p->t2_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&t2p->t2_cond, NULL, CV_DEFAULT, NULL);
 	t2p->t2_flags |= SMBT2_ALLOCED;
 	if (error) {
 		smb_t2_done(t2p);
@@ -569,6 +599,9 @@ smb_t2_init(struct smb_t2rq *t2p, struct smb_connobj *source, ushort_t *setup,
 	int error;
 
 	bzero(t2p, sizeof (*t2p));
+	mutex_init(&t2p->t2_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&t2p->t2_cond, NULL, CV_DEFAULT, NULL);
+
 	t2p->t2_source = source;
 	t2p->t2_setupcount = (u_int16_t)setupcnt;
 	t2p->t2_setupdata = t2p->t2_setup;
@@ -733,7 +766,7 @@ smb_t2_reply(struct smb_t2rq *t2p)
 		md_get_uint8(mdp, NULL); /* Reserved2 */
 		tmp = wc;
 		while (tmp--)
-			md_get_uint16(mdp, NULL);
+			md_get_uint16le(mdp, NULL);
 
 		if ((error2 = md_get_uint16le(mdp, &bc)) != 0)
 			break;
@@ -859,7 +892,7 @@ smb_nt_reply(struct smb_ntrq *ntp)
 		md_get_uint8(mdp, &wc);  /* SetupCount */
 		tmp = wc;
 		while (tmp--)
-			md_get_uint16(mdp, NULL);
+			md_get_uint16le(mdp, NULL);
 
 		if ((error2 = md_get_uint16le(mdp, &bc)) != 0)
 			break;
@@ -1375,7 +1408,7 @@ smb_t2_request(struct smb_t2rq *t2p)
 		if (++i > SMBMAXRESTARTS)
 			break;
 		mutex_enter(&(t2p)->t2_lock);
-		if (t2p->t2_share && t2p->t2_share->ss_mount) {
+		if (t2p->t2_share) {
 			cv_timedwait(&t2p->t2_cond, &(t2p)->t2_lock,
 			    lbolt + (hz * SMB_RCNDELAY));
 		} else {
@@ -1408,7 +1441,7 @@ smb_nt_request(struct smb_ntrq *ntp)
 		if (++i > SMBMAXRESTARTS)
 			break;
 		mutex_enter(&(ntp)->nt_lock);
-		if (ntp->nt_share && ntp->nt_share->ss_mount) {
+		if (ntp->nt_share) {
 			cv_timedwait(&ntp->nt_cond, &(ntp)->nt_lock,
 			    lbolt + (hz * SMB_RCNDELAY));
 

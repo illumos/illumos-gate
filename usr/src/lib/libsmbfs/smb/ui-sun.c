@@ -22,8 +22,6 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines for interacting with the user to get credentials
  * (workgroup/domain, username, password, etc.)
@@ -38,11 +36,11 @@
 #include <ctype.h>
 
 #include <netsmb/smb_lib.h>
-#include <netsmb/smb_keychain.h>
+#include "private.h"
+#include "ntlm.h"
 
+#if 0 /* not yet */
 #define	MAXLINE 	127
-#define	MAXPASSWD	256	/* from libc:getpass */
-
 static void
 smb_tty_prompt(char *prmpt,
 	char *buf, size_t buflen)
@@ -72,78 +70,69 @@ smb_tty_prompt(char *prmpt,
 	/* Use input as new value. */
 	strncpy(buf, temp, buflen);
 }
+#endif /* not yet */
 
+/*
+ * Prompt for a new password after auth. failure.
+ * (and maybe new user+domain, but not yet)
+ */
 int
-smb_get_authentication(
-	char *dom, size_t domlen,
-	char *usr, size_t usrlen,
-	char *passwd, size_t passwdlen,
-	const char *systemname, struct smb_ctx *ctx)
+smb_get_authentication(struct smb_ctx *ctx)
 {
 	char *npw;
-	int error, i, kcask, kcerr;
+	int err;
 
-	if (ctx->ct_flags & SMBCF_KCFOUND || ctx->ct_flags & SMBCF_KCBAD) {
-		ctx->ct_flags &= ~SMBCF_KCFOUND;
-	} else {
-		ctx->ct_flags &= ~(SMBCF_KCFOUND | SMBCF_KCDOMAIN);
+	/*
+	 * If we're getting a password, we must be doing
+	 * some kind of NTLM, possibly after a failure to
+	 * authenticate using Kerberos.  Turn off krb5.
+	 */
+	ctx->ct_authflags &= ~SMB_AT_KRB5;
 
-		/*
-		 * 1st: try lookup using system name
-		 */
-		kcerr = smbfs_keychain_chk(systemname, usr);
-		if (!kcerr) {
-			/*
-			 * Need passwd to be not empty for existing logic.
-			 * The string here is arbitrary (a debugging hint)
-			 * and will be replaced in the driver by the real
-			 * password from the keychain.
-			 */
-			strcpy(passwd, "$KC_SYSTEM");
-			ctx->ct_flags |= SMBCF_KCFOUND;
-			if (smb_debug) {
-				printf("found keychain entry for"
-				    " server/user: %s/%s\n",
-				    systemname, usr);
-			}
-			return (0);
-		}
-
-		/*
-		 * 2nd: try lookup using domain name
-		 */
-		kcerr = smbfs_keychain_chk(dom, usr);
-		if (!kcerr) {
-			/* Need passwd to be not empty... (see above) */
-			strcpy(passwd, "$KC_DOMAIN");
-			ctx->ct_flags |= (SMBCF_KCFOUND | SMBCF_KCDOMAIN);
-			if (smb_debug) {
-				printf("found keychain entry for"
-				    " domain/user: %s/%s\n",
-				    dom, usr);
-			}
-			return (0);
-		}
+	if (ctx->ct_flags & SMBCF_KCFOUND) {
+		/* Tried a keychain hash and failed. */
+		/* XXX: delete the KC entry? */
+		ctx->ct_flags |= SMBCF_KCBAD;
 	}
 
-	if (isatty(STDIN_FILENO)) { /* need command-line prompting? */
-		if (passwd && passwd[0] == '\0') {
-			npw = getpassphrase(dgettext(TEXT_DOMAIN, "Password:"));
-			strncpy(passwd, npw, passwdlen);
-		}
-		return (0);
+	if (ctx->ct_flags & SMBCF_NOPWD)
+		return (ENOTTY);
+
+	if (isatty(STDIN_FILENO)) {
+
+		/* Need command-line prompting. */
+		npw = getpassphrase(dgettext(TEXT_DOMAIN, "Password:"));
+		if (npw == NULL)
+			return (EINTR);
+		memset(ctx->ct_password, 0, sizeof (ctx->ct_password));
+		strlcpy(ctx->ct_password, npw, sizeof (ctx->ct_password));
+	} else {
+
+		/*
+		 * XXX: Ask the user for help, possibly via
+		 * GNOME dbus or some such... (todo).
+		 */
+		smb_error(dgettext(TEXT_DOMAIN,
+	"Cannot prompt for a password when input is redirected."), 0);
+		return (ENOTTY);
 	}
 
 	/*
-	 * XXX: Ask the user for help, possibly via
-	 * GNOME dbus or some such... (todo).
+	 * Recompute the password hashes.
 	 */
-	smb_error(dgettext(TEXT_DOMAIN,
-	    "Cannot prompt for a password when input is redirected."), 0);
+	if (ctx->ct_password[0]) {
+		err = ntlm_compute_lm_hash(ctx->ct_lmhash, ctx->ct_password);
+		if (err != 0)
+			return (err);
+		err = ntlm_compute_nt_hash(ctx->ct_nthash, ctx->ct_password);
+		if (err != 0)
+			return (err);
+	}
 
-	return (ENOTTY);
+	return (0);
 }
 
+/*ARGSUSED*/
 int
 smb_browse(struct smb_ctx *ctx, int anon)
 {

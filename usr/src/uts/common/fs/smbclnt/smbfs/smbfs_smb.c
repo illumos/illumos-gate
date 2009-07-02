@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/vnode.h>
+#include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 
 #ifdef APPLE
@@ -113,6 +114,10 @@ smbfs_smb_lockandx(struct smbnode *np, int op, uint32_t pid,
 	/* Shared lock for n_fid use below. */
 	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_READER));
 
+	/* After reconnect, n_fid is invalid */
+	if (np->n_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
 	if (op == SMB_LOCK_SHARED)
 		ltype |= SMB_LOCKING_ANDX_SHARED_LOCK;
 	if (largelock)
@@ -125,7 +130,7 @@ smbfs_smb_lockandx(struct smbnode *np, int op, uint32_t pid,
 	mb_put_uint8(mbp, 0xff);	/* secondary command */
 	mb_put_uint8(mbp, 0);		/* MBZ */
 	mb_put_uint16le(mbp, 0);
-	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, np->n_fid);
 	mb_put_uint8(mbp, ltype);	/* locktype */
 	mb_put_uint8(mbp, 0);		/* oplocklevel - 0 seems is NO_OPLOCK */
 	mb_put_uint32le(mbp, timeout);	/* 0 nowait, -1 infinite wait */
@@ -301,14 +306,14 @@ top:
 		}
 		md_get_uint32le(mdp, &size);
 		fap->fa_size = size;
-		md_get_uint32(mdp, NULL);	/* allocation size */
+		md_get_uint32le(mdp, NULL);	/* allocation size */
 		md_get_uint16le(mdp, &wattr);
 		fap->fa_attr = wattr;
 		break;
 	case SMB_QFILEINFO_ALL_INFO:
 		timesok = 0;
 		/* creation time (discard) */
-		md_get_uint64(mdp, NULL);
+		md_get_uint64le(mdp, NULL);
 		/* last access time */
 		md_get_uint64le(mdp, &llongint);
 		if (llongint) {
@@ -384,6 +389,10 @@ smbfs_smb_qfileinfo(struct smbnode *np, struct smbfattr *fap,
 	 */
 	ASSERT(np->r_lkserlock.count != 0);
 
+	/* After reconnect, n_fid is invalid */
+	if (np->n_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
 	if (np->n_fid == SMB_FID_UNUSED)
 		return (EBADF);
 
@@ -400,7 +409,7 @@ top:
 		else
 			infolevel = SMB_QFILEINFO_ALL_INFO;
 	}
-	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, np->n_fid);
 	mb_put_uint16le(mbp, infolevel);
 	t2p->t2_maxpcount = 2;
 	t2p->t2_maxdcount = vcp->vc_txmax;
@@ -436,14 +445,14 @@ top:
 		}
 		md_get_uint32le(mdp, &size);
 		fap->fa_size = size;
-		md_get_uint32(mdp, NULL);	/* allocation size */
+		md_get_uint32le(mdp, NULL);	/* allocation size */
 		md_get_uint16le(mdp, &wattr);
 		fap->fa_attr = wattr;
 		break;
 	case SMB_QFILEINFO_ALL_INFO:
 		timesok = 0;
 		/* creation time (discard) */
-		md_get_uint64(mdp, NULL);
+		md_get_uint64le(mdp, NULL);
 		/* last access time */
 		md_get_uint64le(mdp, &llongint);
 		if (llongint) {
@@ -497,20 +506,18 @@ top:
 
 /*
  * Support functions for _qstreaminfo
- * See smbfs_xattr.c
+ * Moved to smbfs_xattr.c
  */
 
 int
-smbfs_smb_qfsattr(struct smb_share *ssp, uint32_t *attrp,
-			struct smb_cred *scrp)
+smbfs_smb_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *fsa,
+	struct smb_cred *scrp)
 {
 	struct smb_t2rq *t2p;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
-	uint32_t nlen;
 	int error;
-	char *fs_name;	/* will malloc whatever the size is */
-	struct smbfs_fctx	ctx;
+	uint32_t nlen;
 
 	error = smb_t2_alloc(SSTOCP(ssp), SMB_TRANS2_QUERY_FS_INFORMATION,
 	    scrp, &t2p);
@@ -527,35 +534,44 @@ smbfs_smb_qfsattr(struct smb_share *ssp, uint32_t *attrp,
 		return (error);
 	}
 	mdp = &t2p->t2_rdata;
-	md_get_uint32le(mdp, attrp);
-	md_get_uint32le(mdp, &ssp->ss_maxfilenamelen);
+	md_get_uint32le(mdp, &fsa->fsa_aflags);
+	md_get_uint32le(mdp, &fsa->fsa_maxname);
 	md_get_uint32le(mdp, &nlen);	/* fs name length */
-	if (ssp->ss_fsname == NULL && nlen) {
-		ctx.f_ssp = ssp;
-		ctx.f_name = kmem_alloc(nlen, KM_SLEEP);
-		ctx.f_namesz = nlen;
-		md_get_mem(mdp, ctx.f_name, nlen, MB_MSYSTEM);
-		ctx.f_nmlen = nlen;
-		smbfs_fname_tolocal(&ctx);
-		fs_name = kmem_alloc(ctx.f_nmlen+1, KM_SLEEP);
-		bcopy(ctx.f_name, fs_name, ctx.f_nmlen);
-		fs_name[ctx.f_nmlen] = '\0';
-		ssp->ss_fsname = fs_name;
-		kmem_free(ctx.f_name, ctx.f_namesz);
-		/*
-		 * If fs_name isn't NTFS they probably require resume keys.
-		 * This is another example of the client trying to fix a server
-		 * bug. This code uses the logic created by PR-3983209. See
-		 * long block comment in smbfs_smb_findnextLM2.
-		 */
-		if (strcmp(fs_name, "NTFS")) {
-			SMB_SS_LOCK(ssp);
-			ssp->ss_flags |= SMBS_RESUMEKEYS;
-			SMB_SS_UNLOCK(ssp);
-		}
-		SMBVDEBUG("(fyi) share '%s', attr 0x%x, maxfilename %d\n",
-		    ssp->ss_fsname, *attrp, ssp->ss_maxfilenamelen);
+
+	/*
+	 * Get the FS type name.
+	 */
+	bzero(fsa->fsa_tname, FSTYPSZ);
+	if (SMB_UNICODE_STRINGS(SSTOVC(ssp))) {
+		uint16_t tmpbuf[FSTYPSZ];
+		size_t tmplen, outlen;
+
+		if (nlen > sizeof (tmpbuf))
+			nlen = sizeof (tmpbuf);
+		md_get_mem(mdp, tmpbuf, nlen, MB_MSYSTEM);
+		tmplen = nlen / 2;	/* UCS-2 chars */
+		outlen = FSTYPSZ - 1;
+		uconv_u16tou8(tmpbuf, &tmplen,
+		    (uchar_t *)fsa->fsa_tname, &outlen,
+		    UCONV_IN_LITTLE_ENDIAN);
+	} else {
+		if (nlen > (FSTYPSZ - 1))
+			nlen = FSTYPSZ - 1;
+		md_get_mem(mdp, fsa->fsa_tname, nlen, MB_MSYSTEM);
 	}
+
+	/*
+	 * If fs_name isn't NTFS they probably require resume keys.
+	 * This is another example of the client trying to fix a server
+	 * bug. This code uses the logic created by PR-3983209. See
+	 * long block comment in smbfs_smb_findnextLM2.
+	 */
+	if (strcmp(fsa->fsa_tname, "NTFS")) {
+		SMB_SS_LOCK(ssp);
+		ssp->ss_flags |= SMBS_RESUMEKEYS;
+		SMB_SS_UNLOCK(ssp);
+	}
+
 	smb_t2_done(t2p);
 	return (0);
 }
@@ -601,7 +617,7 @@ smbfs_smb_statfsLM2(struct smb_share *ssp, statvfs64_t *sbp,
 		return (error);
 	}
 	mdp = &t2p->t2_rdata;
-	md_get_uint32(mdp, NULL);	/* fs id */
+	md_get_uint32le(mdp, NULL);	/* fs id */
 	md_get_uint32le(mdp, &bpu);
 	md_get_uint32le(mdp, &units);
 	md_get_uint32le(mdp, &funits);
@@ -713,7 +729,7 @@ smbfs_smb_seteof(struct smb_share *ssp, uint16_t fid, uint64_t newsize,
 		return (error);
 	mbp = &t2p->t2_tparam;
 	mb_init(mbp);
-	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, fid);
 	if (vcp->vc_sopt.sv_caps & SMB_CAP_INFOLEVEL_PASSTHRU)
 		mb_put_uint16le(mbp, SMB_SFILEINFO_END_OF_FILE_INFORMATION);
 	else
@@ -747,6 +763,10 @@ smbfs_smb_t2rename(struct smbnode *np, struct smbnode *tdnp,
 	/* Shared lock for n_fid use below. */
 	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_READER));
 
+	/* After reconnect, n_fid is invalid */
+	if (np->n_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
 	if (!(vcp->vc_sopt.sv_caps & SMB_CAP_INFOLEVEL_PASSTHRU))
 		return (ENOTSUP);
 	error = smb_t2_alloc(SSTOCP(ssp), SMB_TRANS2_SET_FILE_INFORMATION,
@@ -761,13 +781,13 @@ smbfs_smb_t2rename(struct smbnode *np, struct smbnode *tdnp,
 	}
 	mbp = &t2p->t2_tparam;
 	mb_init(mbp);
-	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, np->n_fid);
 	mb_put_uint16le(mbp, SMB_SFILEINFO_RENAME_INFORMATION);
 	mb_put_uint16le(mbp, 0); /* reserved, nowadays */
 	mbp = &t2p->t2_tdata;
 	mb_init(mbp);
 	mb_put_uint32le(mbp, overwrite);
-	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM); /* base for tname */
+	mb_put_uint16le(mbp, fid); /* base for tname */
 	mb_put_uint16le(mbp, 0); /* part of a 32bit fid? */
 	ucslenp = (int32_t *)mb_reserve(mbp, sizeof (int32_t));
 	mbp->mb_count = 0;
@@ -805,12 +825,16 @@ smbfs_smb_flush(struct smbnode *np, struct smb_cred *scrp)
 	if (np->n_fidrefs == 0)
 		return (0); /* not open */
 
+	/* After reconnect, n_fid is invalid */
+	if (np->n_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
 	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_FLUSH, scrp);
 	if (error)
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (caddr_t)&np->n_fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, np->n_fid);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
@@ -865,7 +889,7 @@ smbfs_smb_setfsize(struct smbnode *np, uint16_t fid, uint64_t newsize,
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, fid);
 	mb_put_uint16le(mbp, 0);
 	mb_put_uint32le(mbp, newsize);
 	mb_put_uint16le(mbp, 0);
@@ -1273,7 +1297,7 @@ smbfs_smb_setftime1(
 	tzoff = SSTOVC(ssp)->vc_sopt.sv_tz;
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, fid);
 	mb_put_uint32le(mbp, 0);		/* creation time */
 
 	if (atime)
@@ -1320,7 +1344,7 @@ smbfs_smb_setfattrNT(struct smbnode *np, uint16_t fid,
 	svtz = SSTOVC(ssp)->vc_sopt.sv_tz;
 	mbp = &t2p->t2_tparam;
 	mb_init(mbp);
-	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, fid);
 	if (vcp->vc_sopt.sv_caps & SMB_CAP_INFOLEVEL_PASSTHRU)
 		mb_put_uint16le(mbp, SMB_SFILEINFO_BASIC_INFORMATION);
 	else
@@ -1461,7 +1485,7 @@ smbfs_smb_ntcreatex(struct smbnode *np, uint32_t rights,
 		md_get_uint8(mdp, NULL);	/* mbz */
 		md_get_uint16le(mdp, NULL);	/* andxoffset */
 		md_get_uint8(mdp, NULL);	/* oplock lvl granted */
-		md_get_uint16(mdp, &fid);	/* yes, leaving it LE */
+		md_get_uint16le(mdp, &fid);	/* file ID */
 		md_get_uint32le(mdp, &createact);	/* create_action */
 		md_get_uint64le(mdp, &llongint);	/* creation time */
 		md_get_uint64le(mdp, &llongint);	/* access time */
@@ -1634,7 +1658,7 @@ smbfs_smb_oldopen(struct smbnode *np, int accmode, struct smb_cred *scrp,
 			error = EBADRPC;
 			break;
 		}
-		md_get_uint16(mdp, &fid); /* yes, we leave it LE */
+		md_get_uint16le(mdp, &fid);
 		md_get_uint16le(mdp, &wattr);
 		fap.fa_attr = wattr;
 		/*
@@ -1703,15 +1727,19 @@ int
 smbfs_smb_tmpopen(struct smbnode *np, uint32_t rights, struct smb_cred *scrp,
 			uint16_t *fidp)
 {
-	struct smb_vc *vcp = SSTOVC(np->n_mount->smi_share);
+	struct smb_share *ssp = np->n_mount->smi_share;
+	struct smb_vc *vcp = SSTOVC(ssp);
 	enum vtype vt = VREG;
 	int error;
 
 	/* Shared lock for n_fid use below. */
 	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_READER));
 
+	/* Can we re-use n_fid? or must we open anew? */
 	mutex_enter(&np->r_statelock);
-	if (np->n_fidrefs && (rights & np->n_rights) == rights) {
+	if (np->n_fidrefs > 0 &&
+	    np->n_vcgenid == ssp->ss_vcgenid &&
+	    (rights & np->n_rights) == rights) {
 		np->n_fidrefs++;
 		*fidp = np->n_fid;
 		mutex_exit(&np->r_statelock);
@@ -1729,14 +1757,6 @@ smbfs_smb_tmpopen(struct smbnode *np, uint32_t rights, struct smb_cred *scrp,
 		error = smbfs_smb_ntcreatex(np, rights, scrp, vt,
 		    NULL, fidp, NULL, 0, NTCREATEX_DISP_OPEN, 0,
 		    NULL, NULL);
-	}
-
-	if (*fidp == np->n_fid) {
-		/*
-		 * Oh no, the server gave us the same FID again?
-		 * This will cause us to close np->n_fid early!
-		 */
-		SMBVDEBUG("duplicate fid: 0x%x\n", *fidp);
 	}
 
 	return (error);
@@ -1797,10 +1817,7 @@ smbfs_smb_open(struct smbnode *np, uint32_t rights, struct smb_cred *scrp,
 		error = smbfs_smb_oldopen(np, smb_rights2mode(rights), scrp,
 		    attrcacheupdated, fidp, name, nmlen, xattr, sizep, rightsp);
 	}
-#if 0 /* let caller do this */
-	if (!error && !name)
-		np->n_fidrefs++;
-#endif
+
 	return (error);
 }
 
@@ -1818,7 +1835,7 @@ smbfs_smb_close(struct smb_share *ssp, uint16_t fid, struct timespec *mtime,
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (caddr_t)&fid, sizeof (fid), MB_MSYSTEM);
+	mb_put_uint16le(mbp, fid);
 	if (mtime) {
 		smb_time_local2server(mtime, SSTOVC(ssp)->vc_sopt.sv_tz, &time);
 	} else
@@ -1900,7 +1917,7 @@ smbfs_smb_oldcreate(struct smbnode *dnp, const char *name, int nmlen,
 			smb_rq_getreply(rqp, &mdp);
 			md_get_uint8(mdp, &wc);
 			if (wc == 1)
-				md_get_uint16(mdp, fidp);
+				md_get_uint16le(mdp, fidp);
 			else
 				error = EBADRPC;
 		}
@@ -2327,7 +2344,7 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 		ctx->f_t2 = t2p;
 		mbp = &t2p->t2_tparam;
 		mb_init(mbp);
-		mb_put_mem(mbp, (caddr_t)&ctx->f_Sid, 2, MB_MSYSTEM);
+		mb_put_uint16le(mbp, ctx->f_Sid);
 		mb_put_uint16le(mbp, ctx->f_limit);
 		mb_put_uint16le(mbp, ctx->f_infolevel);
 		if (ctx->f_ssp->ss_flags & SMBS_RESUMEKEYS) {
@@ -2366,7 +2383,7 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 		return (error);
 	mdp = &t2p->t2_rparam;
 	if (ctx->f_flags & SMBFS_RDD_FINDFIRST) {
-		if ((error = md_get_uint16(mdp, &ctx->f_Sid)) != 0)
+		if ((error = md_get_uint16le(mdp, &ctx->f_Sid)) != 0)
 			return (error);
 		ctx->f_flags &= ~SMBFS_RDD_FINDFIRST;
 	}
@@ -2420,7 +2437,7 @@ smbfs_smb_findclose2(struct smbfs_fctx *ctx)
 		return (error);
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (caddr_t)&ctx->f_Sid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, ctx->f_Sid);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
@@ -2438,10 +2455,10 @@ smbfs_smb_findopenLM2(struct smbfs_fctx *ctx, struct smbnode *dnp,
 {
 
 	ctx->f_type = ft_LM2;
-	ctx->f_namesz = SMB_MAXFNAMELEN;
+	ctx->f_namesz = SMB_MAXFNAMELEN + 1;
 	if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp)))
 		ctx->f_namesz *= 2;
-	ctx->f_name = kmem_zalloc(ctx->f_namesz, KM_SLEEP);
+	ctx->f_name = kmem_alloc(ctx->f_namesz, KM_SLEEP);
 	ctx->f_infolevel = SMB_DIALECT(SSTOVC(ctx->f_ssp))
 	    < SMB_DIALECT_NTLM0_12 ? SMB_FIND_STANDARD :
 	    SMB_FIND_BOTH_DIRECTORY_INFO;
@@ -2495,7 +2512,7 @@ again:
 		smb_dos2unixtime(date, time, 0, svtz, &ctx->f_attr.fa_mtime);
 		md_get_uint32le(mdp, &size);
 		ctx->f_attr.fa_size = size;
-		md_get_uint32(mdp, NULL);	/* allocation size */
+		md_get_uint32le(mdp, NULL);	/* allocation size */
 		md_get_uint16le(mdp, &wattr);
 		ctx->f_attr.fa_attr = wattr;
 		md_get_uint8(mdp, &tb);
@@ -2507,7 +2524,7 @@ again:
 	case SMB_FIND_BOTH_DIRECTORY_INFO:
 		md_get_uint32le(mdp, &next);
 		md_get_uint32le(mdp, &resumekey); /* file index (resume key) */
-		md_get_uint64(mdp, NULL);	/* creation time */
+		md_get_uint64le(mdp, NULL);	/* creation time */
 		md_get_uint64le(mdp, &llongint);
 		smb_time_NT2local(llongint, svtz, &ctx->f_attr.fa_atime);
 		md_get_uint64le(mdp, &llongint);
@@ -2516,7 +2533,7 @@ again:
 		smb_time_NT2local(llongint, svtz, &ctx->f_attr.fa_ctime);
 		md_get_uint64le(mdp, &llongint);	/* file size */
 		ctx->f_attr.fa_size = llongint;
-		md_get_uint64(mdp, NULL);	/* real size (should use) */
+		md_get_uint64le(mdp, NULL);	/* real size (should use) */
 		/* freebsd bug: fa_attr endian bug */
 		md_get_uint32le(mdp, &dattr);	/* extended file attributes */
 		ctx->f_attr.fa_attr = dattr;
@@ -2541,10 +2558,11 @@ again:
 		nmlen = min(size, SMB_MAXFNAMELEN * 2);
 	else
 		nmlen = min(size, SMB_MAXFNAMELEN);
-	if (ctx->f_name)
-		kmem_free(ctx->f_name, ctx->f_namesz);
-	cp = ctx->f_name = kmem_alloc(nmlen, KM_SLEEP);
-	ctx->f_namesz = nmlen;
+
+	/* Allocated f_name in findopen */
+	ASSERT(nmlen < ctx->f_namesz);
+	cp = ctx->f_name;
+
 	error = md_get_mem(mdp, cp, nmlen, MB_MSYSTEM);
 	if (error)
 		return (error);
@@ -2663,10 +2681,7 @@ smbfs_smb_findopen(struct smbnode *dnp, const char *wild, int wlen,
 	struct smbfs_fctx *ctx;
 	int error;
 
-	ctx = kmem_alloc(sizeof (*ctx), KM_SLEEP);
-	if (ctx == NULL)
-		return (ENOMEM);
-	bzero(ctx, sizeof (*ctx));
+	ctx = kmem_zalloc(sizeof (*ctx), KM_SLEEP);
 
 	ctx->f_flags = SMBFS_RDD_FINDFIRST;
 	ctx->f_dnp = dnp;
@@ -2876,7 +2891,7 @@ smbfs_smb_getsec_m(struct smb_share *ssp, uint16_t fid,
 	/* Parameters part */
 	mbp = &ntp->nt_tparam;
 	mb_init(mbp);
-	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, fid);
 	mb_put_uint16le(mbp, 0); /* reserved */
 	mb_put_uint32le(mbp, selector);
 	/* Data part (none) */
@@ -2904,7 +2919,7 @@ smbfs_smb_getsec_m(struct smb_share *ssp, uint16_t fid,
 	 */
 	mdp = &ntp->nt_rdata;
 	if (mdp->md_top == NULL) {
-		SMBVDEBUG("null md_top? fid 0x%x\n", letohs(fid));
+		SMBVDEBUG("null md_top? fid 0x%x\n", fid);
 		error = EBADRPC;
 		goto done;
 	}
@@ -2917,7 +2932,7 @@ smbfs_smb_getsec_m(struct smb_share *ssp, uint16_t fid,
 	len = m_fixhdr(mdp->md_top);
 	if (len != *reslen) {
 		SMBVDEBUG("len %d *reslen %d fid 0x%x\n",
-		    len, *reslen, letohs(fid));
+		    len, *reslen, fid);
 	}
 
 	/*
@@ -3023,7 +3038,7 @@ int  smbfs_smb_setsec_m(struct smb_share *ssp, uint16_t fid,
 	/* Parameters part */
 	mbp = &ntp->nt_tparam;
 	mb_init(mbp);
-	mb_put_mem(mbp, (caddr_t)&fid, 2, MB_MSYSTEM);
+	mb_put_uint16le(mbp, fid);
 	mb_put_uint16le(mbp, 0); /* reserved */
 	mb_put_uint32le(mbp, selector);
 

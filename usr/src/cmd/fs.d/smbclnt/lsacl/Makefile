@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 FSTYPE=		smbfs
@@ -38,8 +36,6 @@ LDLIBS += -lsmbfs -lsec
 
 CFLAGS += $(CCVERBOSE)
 C99MODE= $(C99_ENABLE)
-CPPFLAGS += -I$(SRC)/lib/libsmbfs \
-	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
 
 CLOBBERFILES	+= $(LIBPROG)
 

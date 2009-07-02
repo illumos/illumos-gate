@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,4 +204,68 @@ convert_utf8_to_ucs2xx(iconv_t cd, const char *utf8_string)
 	}
 
 	return (obuf);
+}
+
+
+/*
+ * A simple wrapper around u8_textprep_str() that returns the Unicode
+ * upper-case version of some string.  Returns memory from malloc.
+ * Borrowed from idmapd.
+ */
+static char *
+utf8_str_to_upper_or_lower(const char *s, int upper_lower)
+{
+	char *res = NULL;
+	char *outs;
+	size_t inlen, outlen, inbleft, outbleft;
+	int rc, err;
+
+	/*
+	 * u8_textprep_str() does not allocate memory.  The input and
+	 * output buffers may differ in size (though that would be more
+	 * likely when normalization is done).  We have to loop over it...
+	 *
+	 * To improve the chances that we can avoid looping we add 10
+	 * bytes of output buffer room the first go around.
+	 */
+	inlen = inbleft = strlen(s);
+	outlen = outbleft = inlen + 10;
+	if ((res = malloc(outlen)) == NULL)
+		return (NULL);
+	outs = res;
+
+	while ((rc = u8_textprep_str((char *)s, &inbleft, outs,
+	    &outbleft, upper_lower, U8_UNICODE_LATEST, &err)) < 0 &&
+	    err == E2BIG) {
+		if ((res = realloc(res, outlen + inbleft)) == NULL)
+			return (NULL);
+		/* adjust input/output buffer pointers */
+		s += (inlen - inbleft);
+		outs = res + outlen - outbleft;
+		/* adjust outbleft and outlen */
+		outlen += inbleft;
+		outbleft += inbleft;
+	}
+
+	if (rc < 0) {
+		free(res);
+		res = NULL;
+		return (NULL);
+	}
+
+	res[outlen - outbleft] = '\0';
+
+	return (res);
+}
+
+char *
+utf8_str_toupper(const char *s)
+{
+	return (utf8_str_to_upper_or_lower(s, U8_TEXTPREP_TOUPPER));
+}
+
+char *
+utf8_str_tolower(const char *s)
+{
+	return (utf8_str_to_upper_or_lower(s, U8_TEXTPREP_TOLOWER));
 }

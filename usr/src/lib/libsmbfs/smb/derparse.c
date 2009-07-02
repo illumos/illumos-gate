@@ -1,4 +1,3 @@
-/*
 // Copyright (C) 2002 Microsoft Corporation
 // All rights reserved.
 //
@@ -23,10 +22,6 @@
 //
 /////////////////////////////////////////////////////////////
 
-*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>
@@ -34,12 +29,11 @@
 #include "spnego.h"
 #include "derparse.h"
 
-/*
 //
 // The GSS Mechanism OID enumeration values (SPNEGO_MECH_OID) control which offset in
 // the array below, that a mechanism can be found.
 //
-*/
+
 #pragma error_messages (off,E_INITIALIZATION_TYPE_MISMATCH)
 MECH_OID g_stcMechOIDList [] =
 {
@@ -55,7 +49,6 @@ MECH_OID g_stcMechOIDList [] =
 };
 #pragma error_messages (default,E_INITIALIZATION_TYPE_MISMATCH)
 
-/*
 /////////////////////////////////////////////////////////////////////////////
 //
 // Function:
@@ -78,7 +71,6 @@ MECH_OID g_stcMechOIDList [] =
 //    process lengths that take more than 4 bytes.
 //
 ////////////////////////////////////////////////////////////////////////////
-*/
 
 int ASNDerGetLength( unsigned char* pbLengthData, long nBoundaryLength, long* pnLength,
                      long* pnNumLengthBytes )
@@ -180,7 +172,6 @@ int ASNDerGetLength( unsigned char* pbLengthData, long nBoundaryLength, long* pn
 }
 
 
-/*
 /////////////////////////////////////////////////////////////////////////////
 //
 // Function:
@@ -206,7 +197,6 @@ int ASNDerGetLength( unsigned char* pbLengthData, long nBoundaryLength, long* pn
 //    length must also not exceed the specified boundary length .
 //
 ////////////////////////////////////////////////////////////////////////////
-*/
 
 int ASNDerCheckToken( unsigned char* pbTokenData, unsigned char nToken,
                         long nLengthWithToken, long nBoundaryLength,
@@ -271,7 +261,6 @@ int ASNDerCheckToken( unsigned char* pbTokenData, unsigned char nToken,
    return nReturn;
 }
 
-/*
 /////////////////////////////////////////////////////////////////////////////
 //
 // Function:
@@ -292,7 +281,6 @@ int ASNDerCheckToken( unsigned char* pbTokenData, unsigned char nToken,
 //    Checks the data pointed to by pbTokenData for the specified OID.
 //
 ////////////////////////////////////////////////////////////////////////////
-*/
 
 int ASNDerCheckOID( unsigned char* pbTokenData, SPNEGO_MECH_OID nMechOID, long nBoundaryLength,
                      long* pnTokenLength )
@@ -327,7 +315,6 @@ int ASNDerCheckOID( unsigned char* pbTokenData, SPNEGO_MECH_OID nMechOID, long n
    return nReturn;
 }
 
-/*
 /////////////////////////////////////////////////////////////////////////////
 //
 // Function:
@@ -345,7 +332,6 @@ int ASNDerCheckOID( unsigned char* pbTokenData, SPNEGO_MECH_OID nMechOID, long n
 //    enough to describea length.
 //
 ////////////////////////////////////////////////////////////////////////////
-*/
 
 int ASNDerCalcNumLengthBytes( long nLength )
 {

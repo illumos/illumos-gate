@@ -32,7 +32,10 @@
  * $Id: smb_subr.c,v 1.27.108.1 2005/06/02 00:55:39 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,150 +93,27 @@ smb_toupper(const char *inbuf, char *outbuf, size_t outlen)
 }
 
 void
-smb_credinit(struct smb_cred *scred, struct proc *p, cred_t *icr)
+smb_credinit(struct smb_cred *scred, cred_t *cr)
 {
-	scred->vc_pid = p->p_pidp->pid_id;
-	if (!icr)
-		icr = p->p_cred;
+	/* cr arg is optional */
+	if (cr == NULL)
+		cr = ddi_get_cred();
 	if (is_system_labeled()) {
-		icr = crdup(icr);
-		(void) setpflags(NET_MAC_AWARE, 1, icr);
+		cr = crdup(cr);
+		(void) setpflags(NET_MAC_AWARE, 1, cr);
 	} else {
-		crhold(icr);
+		crhold(cr);
 	}
-	scred->vc_ucred = icr;
+	scred->scr_cred = cr;
 }
 
 void
 smb_credrele(struct smb_cred *scred)
 {
-	crfree(scred->vc_ucred);
-	scred->vc_ucred = NULL;
-}
-
-#ifdef APPLE
-/*ARGSUSED*/
-int
-smb_sigintr(vfs_context_t vfsctx)
-{
-	/*
-	 * I cannot find something to match vfs_context_issignal.
-	 * It calls proc_pendingsignals() in Darwin code.
-	 */
-	if (vfsctx && vfs_context_issignal(vfsctx, SMB_SIGMASK))
-		return (EINTR);
-	return (0);
-}
-#endif
-
-char *
-smb_strdup(const char *s)
-{
-	char *p;
-	int len;
-
-	len = s ? strlen(s) + 1 : 1;
-	p = kmem_alloc(len, KM_SLEEP);
-	if (s)
-		bcopy(s, p, len);
-	else
-		*p = 0;
-	return (p);
-}
-
-/*
- * duplicate string from a user space.
- */
-char *
-smb_strdupin(char *s, int maxlen)
-{
-	char *p, bt;
-	int len = 0;
-
-	for (p = s; ; p++) {
-		if (copyin(p, &bt, 1))
-			return (NULL);
-		len++;
-		if (maxlen && len > maxlen)
-			return (NULL);
-		if (bt == 0)
-			break;
+	if (scred->scr_cred != NULL) {
+		crfree(scred->scr_cred);
+		scred->scr_cred = NULL;
 	}
-	p = kmem_alloc(len, KM_SLEEP);
-	copyin(s, p, len);
-	return (p);
-}
-
-/*
- * duplicate memory block from a user space.
- */
-void *
-smb_memdupin(void *umem, int len)
-{
-	char *p;
-
-	if (len > 32 * 1024)
-		return (NULL);
-	p = kmem_alloc(len, KM_SLEEP);
-	if (copyin(umem, p, len) == 0)
-		return (p);
-	kmem_free(p, len);
-	return (NULL);
-}
-
-/*
- * duplicate memory block in the kernel space.
- */
-void *
-smb_memdup(const void *umem, int len)
-{
-	char *p;
-
-	if (len > 32 * 1024)
-		return (NULL);
-	p = kmem_alloc(len, KM_SLEEP);
-	if (p == NULL)
-		return (NULL);
-	bcopy(umem, p, len);
-	return (p);
-}
-
-void
-smb_strfree(char *s)
-{
-	kmem_free(s, strlen(s) + 1);
-}
-
-void
-smb_memfree(void *s)
-{
-	kmem_free(s, strlen(s));
-}
-
-void *
-smb_zmalloc(unsigned long size)
-{
-	void *p = kmem_zalloc(size, KM_SLEEP);
-	return (p);
-}
-
-size_t
-smb_strtouni(u_int16_t *dst, const char *src, size_t inlen, int flags)
-{
-	size_t outlen = 0;
-
-	if (!inlen)
-		inlen = strlen(src);
-
-	/* Force output format to little-endian. */
-	flags &= ~UCONV_OUT_BIG_ENDIAN;
-	flags |= UCONV_OUT_LITTLE_ENDIAN;
-
-	outlen = inlen * 2;
-	if (uconv_u8tou16((uchar_t *)src, &inlen, dst, &outlen, flags) != 0) {
-		outlen = 0;
-	}
-	return (outlen * 2);
 }
 
 /*
@@ -290,7 +170,6 @@ m_dumpm(mblk_t *m)
 }
 #endif
 
-/* all these need review XXX */
 #ifndef EPROTO
 #define	EPROTO ECONNABORTED
 #endif

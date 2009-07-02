@@ -43,7 +43,9 @@
 #include <iconv.h>
 #include <langinfo.h>
 #include <strings.h>
+#include <libintl.h>
 
+#include <sys/isa_defs.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/mchain.h>
 

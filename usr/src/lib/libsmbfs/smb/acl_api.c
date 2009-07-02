@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,9 +49,11 @@
 
 #include <sys/fs/smbfs_ioctl.h>
 
+#include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
-#include <netsmb/smbfs_isec.h>
+
+#include "acl_nt.h"
 #include "private.h"
 
 /* Sanity check SD sizes */

@@ -32,10 +32,13 @@
  * $Id: netbios.h,v 1.5 2004/03/19 01:49:45 lindak Exp $
  */
 
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _NETSMB_NETBIOS_H_
 #define	_NETSMB_NETBIOS_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _NETINET_IN_H_
 #include <netinet/in.h>
@@ -65,6 +68,8 @@
 #define	NB_NAMELEN	16
 #define	NB_ENCNAMELEN	NB_NAMELEN * 2
 #define	NB_MAXLABLEN	63
+
+#define	NB_MAXPKTLEN	0x1FFFF
 
 #define	NB_MINSALEN	(sizeof (struct sockaddr_nb))
 

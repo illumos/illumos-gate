@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,10 +107,11 @@ struct sockaddr;
 extern "C" {
 #endif
 
-int  nb_resolvehost_in(const char *, struct sockaddr **);
+struct rcfile;
+int  nb_resolvehost_in(const char *, struct in_addr *);
 int  nbns_resolvename(const char *, struct nb_ctx *, struct sockaddr **);
-int  nbns_getnodestatus(struct sockaddr *targethost,
-    struct nb_ctx *ctx, char *system, char *workgroup);
+int  nbns_getnodestatus(struct nb_ctx *ctx, struct in_addr *,
+    char *system, char *workgroup);
 int  nb_getlocalname(char *name, size_t maxlen);
 const char *nb_strerror(int error);
 

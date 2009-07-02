@@ -21,10 +21,10 @@
 #
 # uts/intel/nsmb/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	intel architecture dependent
 #
@@ -70,6 +70,8 @@ LDFLAGS         += -dy -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
 
 LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
+# Until CR 4994570 is fixed...
+LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
 
 #
 #	Default build targets.

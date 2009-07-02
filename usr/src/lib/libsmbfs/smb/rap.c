@@ -204,7 +204,6 @@ smb_rap_create(int fn, const char *param, const char *data,
 	struct smb_rap *rap;
 	char *p;
 	int plen = 0, len = 0;
-	int i;
 
 	rap = malloc(sizeof (*rap));
 	if (rap == NULL)
@@ -326,10 +325,10 @@ int
 smb_rap_request(struct smb_rap *rap, struct smb_ctx *ctx)
 {
 	uint16_t *rp, conv, *tmp;
-	uint32_t *p32, ps1;
+	uint32_t *p32;
 	char *dp, *p = rap->r_nparam;
 	char ptype;
-	int error, rdatacnt, rparamcnt, entries, done, dlen, buffer_oflow, i;
+	int error, rdatacnt, rparamcnt, entries, done, dlen, buffer_oflow;
 
 	rdatacnt = rap->r_rcvbuflen;
 	rparamcnt = rap->r_plen;

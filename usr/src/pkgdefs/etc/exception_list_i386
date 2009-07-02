@@ -1128,6 +1128,9 @@ usr/include/sys/sdcard/sda_ioctl.h	i386
 #
 # libsmbfs is private
 #
+usr/include/netsmb			i386
+usr/include/netsmb/smbfs_acl.h		i386
+usr/include/netsmb/smbfs_api.h		i386
 usr/lib/libsmbfs.so			i386
 usr/lib/amd64/libsmbfs.so		i386
 usr/lib/llib-lsmbfs			i386

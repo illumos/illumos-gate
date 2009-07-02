@@ -475,6 +475,7 @@ HDRSUBDIRS=		\
 	udapl		\
 	libmapid	\
 	libkrb5		\
+	libsmbfs	\
 	libshare	\
 	libidmap	\
 	libvscan	\

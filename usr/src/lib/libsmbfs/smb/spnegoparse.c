@@ -20,8 +20,6 @@
 //
 /////////////////////////////////////////////////////////////
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>
@@ -1615,7 +1613,7 @@ int ValidateMechList( unsigned char* pbMechListData, long nBoundaryLength )
 int IsValidMechOid( SPNEGO_MECH_OID mechOid )
 {
    return ( mechOid >= spnego_mech_oid_Kerberos_V5_Legacy &&
-            mechOid <= spnego_mech_oid_Spnego );
+            mechOid <= spnego_mech_oid_NTLMSSP );
 }
 
 /////////////////////////////////////////////////////////////////////////////

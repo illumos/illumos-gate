@@ -7490,10 +7490,16 @@ mondo_loop() {
 	rm -f $root/usr/sbin/pfild
 
 	# Remove nsmb and smbfs modules from old locations
-	# Also remove new locations of kmdb stuff for BFU
+	# Also remove new locations of moved stuff for BFU
 	# from newer to older build ("backward BFU").
 	# These will be reinstalled from the archive.
 	# old locations:
+	rm -f $root/kernel/drv/nsmb
+	rm -f $root/kernel/drv/amd64/nsmb
+	rm -f $root/kernel/drv/sparcv9/nsmb
+	rm -f $root/kernel/fs/smbfs
+	rm -f $root/kernel/fs/amd64/smbfs
+	rm -f $root/kernel/fs/sparcv9/smbfs
 	rm -f $root/kernel/kmdb/nsmb
 	rm -f $root/kernel/kmdb/smbfs
 	rm -f $root/kernel/kmdb/amd64/nsmb
@@ -7504,6 +7510,12 @@ mondo_loop() {
 	rm -f $usr/kernel/sys/amd64/smbfs
 	rm -f $usr/kernel/sys/sparcv9/smbfs
 	# new locations:
+	rm -f $usr/kernel/drv/nsmb
+	rm -f $usr/kernel/drv/amd64/nsmb
+	rm -f $usr/kernel/drv/sparcv9/nsmb
+	rm -f $usr/kernel/fs/smbfs
+	rm -f $usr/kernel/fs/amd64/smbfs
+	rm -f $usr/kernel/fs/sparcv9/smbfs
 	rm -f $usr/kernel/kmdb/nsmb
 	rm -f $usr/kernel/kmdb/smbfs
 	rm -f $usr/kernel/kmdb/amd64/nsmb

@@ -32,8 +32,6 @@
  * $Id: nls.c,v 1.10 2004/12/13 00:25:22 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <ctype.h>
 #include <errno.h>
@@ -52,8 +50,8 @@ typedef void *iconv_t;
 
 static size_t(*my_iconv)(iconv_t, const char **, size_t *, char **, size_t *);
 
-u_char nls_lower[256];
-u_char nls_upper[256];
+uchar_t nls_lower[256];
+uchar_t nls_upper[256];
 
 static iconv_t nls_toext, nls_toloc;
 static int iconv_loaded;
@@ -71,13 +69,14 @@ nls_setlocale(const char *name)
 		nls_lower[i] = tolower(i);
 		nls_upper[i] = toupper(i);
 	}
-	return 0;
+	return (0);
 }
 
+/*ARGSUSED*/
 int
 nls_setrecode(const char *local, const char *external)
 {
-	return ENOENT;
+	return (ENOENT);
 }
 
 char *
@@ -87,15 +86,15 @@ nls_str_toloc(char *dst, const char *src)
 	size_t inlen, outlen;
 
 	if (!iconv_loaded)
-		return strcpy(dst, src);
+		return (strcpy(dst, src));
 
 	if (nls_toloc == (iconv_t)0)
-		return strcpy(dst, src);
+		return (strcpy(dst, src));
 	inlen = outlen = strlen(src);
 	my_iconv(nls_toloc, NULL, NULL, &p, &outlen);
 	my_iconv(nls_toloc, &src, &inlen, &p, &outlen);
 	*p = 0;
-	return dst;
+	return (dst);
 }
 
 char *
@@ -105,15 +104,15 @@ nls_str_toext(char *dst, const char *src)
 	size_t inlen, outlen;
 
 	if (!iconv_loaded)
-		return strcpy(dst, src);
+		return (strcpy(dst, src));
 
 	if (nls_toext == (iconv_t)0)
-		return strcpy(dst, src);
+		return (strcpy(dst, src));
 	inlen = outlen = strlen(src);
 	my_iconv(nls_toext, NULL, NULL, &p, &outlen);
 	my_iconv(nls_toext, &src, &inlen, &p, &outlen);
 	*p = 0;
-	return dst;
+	return (dst);
 }
 
 void *
@@ -124,17 +123,17 @@ nls_mem_toloc(void *dst, const void *src, int size)
 	size_t inlen, outlen;
 
 	if (!iconv_loaded)
-		return memcpy(dst, src, size);
+		return (memcpy(dst, src, size));
 
 	if (size == 0)
-		return NULL;
+		return (NULL);
 
 	if (nls_toloc == (iconv_t)0)
-		return memcpy(dst, src, size);
+		return (memcpy(dst, src, size));
 	inlen = outlen = size;
 	my_iconv(nls_toloc, NULL, NULL, &p, &outlen);
 	my_iconv(nls_toloc, &s, &inlen, &p, &outlen);
-	return dst;
+	return (dst);
 }
 
 void *
@@ -145,15 +144,15 @@ nls_mem_toext(void *dst, const void *src, int size)
 	size_t inlen, outlen;
 
 	if (size == 0)
-		return NULL;
+		return (NULL);
 
 	if (!iconv_loaded || nls_toext == (iconv_t)0)
-		return memcpy(dst, src, size);
+		return (memcpy(dst, src, size));
 
 	inlen = outlen = size;
 	my_iconv(nls_toext, NULL, NULL, &p, &outlen);
 	my_iconv(nls_toext, &s, &inlen, &p, &outlen);
-	return dst;
+	return (dst);
 }
 
 char *
@@ -164,7 +163,7 @@ nls_str_upper(char *dst, const char *src)
 	while (*src)
 		*dst++ = toupper(*src++);
 	*dst = 0;
-	return p;
+	return (p);
 }
 
 char *
@@ -175,5 +174,5 @@ nls_str_lower(char *dst, const char *src)
 	while (*src)
 		*dst++ = tolower(*src++);
 	*dst = 0;
-	return p;
+	return (p);
 }

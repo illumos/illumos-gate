@@ -32,7 +32,10 @@
  * $Id: cflib.h,v 1.1.1.1 2001/06/09 00:28:11 zarzycki Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef _CFLIB_H_
 #define	_CFLIB_H_
@@ -68,6 +71,7 @@ typedef struct opt_args opt_args_t;
 
 extern int cf_opterr, cf_optind, cf_optopt, cf_optreset;
 extern const char *cf_optarg;
+extern struct rcfile *smb_rc;
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,15 +82,16 @@ int  opt_args_parse(struct rcfile *, struct opt_args *, const char *,
 int  opt_args_parseopt(struct opt_args *, int, char *, opt_callback_t *);
 
 int  cf_getopt(int, char * const *, const char *);
+void cf_opt_lock(void);
+void cf_opt_unlock(void);
 
-int  rc_open(const char *, const char *, struct rcfile **);
-int  rc_close(struct rcfile *);
-int  rc_merge(const char *, struct rcfile **);
-int  rc_merge_pipe(const char *, struct rcfile **);
 int  rc_getstringptr(struct rcfile *, const char *, const char *, char **);
 int  rc_getstring(struct rcfile *, const char *, const char *, size_t, char *);
 int  rc_getint(struct rcfile *, const char *, const char *, int *);
 int  rc_getbool(struct rcfile *, const char *, const char *, int *);
+
+int smb_open_rcfile(char *);
+void smb_close_rcfile(void);
 
 #ifdef __cplusplus
 }

@@ -84,121 +84,10 @@
 static int smb_tcpsndbuf = 0x20000;
 static int smb_tcprcvbuf = 0x20000;
 
-static dev_t smb_tcp_dev;
-
 static int  nbssn_recv(struct nbpcb *nbp, mblk_t **mpp, int *lenp,
-	uint8_t *rpcodep, struct proc *p);
+	uint8_t *rpcodep);
 static int  nb_disconnect(struct nbpcb *nbp);
 
-
-/*
- * Internal set sockopt for int-sized options.
- * Is there a common Solaris function for this?
- * Code from uts/common/rpc/clnt_cots.c
- */
-static int
-nb_setsockopt_int(TIUSER *tiptr, int level, int name, int val)
-{
-	int fmode;
-	mblk_t *mp;
-	struct opthdr *opt;
-	struct T_optmgmt_req *tor;
-	struct T_optmgmt_ack *toa;
-	int *valp;
-	int error, mlen;
-
-	mlen = (sizeof (struct T_optmgmt_req) +
-	    sizeof (struct opthdr) + sizeof (int));
-	if (!(mp = allocb_cred_wait(mlen, STR_NOSIG, &error, CRED(), NOPID)))
-		return (error);
-
-	mp->b_datap->db_type = M_PROTO;
-	/*LINTED*/
-	tor = (struct T_optmgmt_req *)mp->b_wptr;
-	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
-	tor->MGMT_flags = T_NEGOTIATE;
-	tor->OPT_length = sizeof (struct opthdr) + sizeof (int);
-	tor->OPT_offset = sizeof (struct T_optmgmt_req);
-	mp->b_wptr += sizeof (struct T_optmgmt_req);
-
-	/*LINTED*/
-	opt = (struct opthdr *)mp->b_wptr;
-	opt->level = level;
-	opt->name = name;
-	opt->len = sizeof (int);
-	mp->b_wptr += sizeof (struct opthdr);
-
-	/* LINTED */
-	valp = (int *)mp->b_wptr;
-	*valp = val;
-	mp->b_wptr += sizeof (int);
-
-	fmode = tiptr->fp->f_flag;
-	if ((error = tli_send(tiptr, mp, fmode)) != 0)
-		return (error);
-
-	/*
-	 * Wait for T_OPTMGMT_ACK
-	 */
-	mp = NULL;
-	fmode = 0; /* need to block */
-	if ((error = tli_recv(tiptr, &mp, fmode)) != 0)
-		return (error);
-	/*LINTED*/
-	toa = (struct T_optmgmt_ack *)mp->b_rptr;
-	if (toa->PRIM_type != T_OPTMGMT_ACK)
-		error = EPROTO;
-	freemsg(mp);
-
-	return (error);
-}
-
-static void
-nb_setopts(struct nbpcb *nbp)
-{
-	int error;
-	TIUSER *tiptr = NULL;
-
-	tiptr = nbp->nbp_tiptr;
-	if (tiptr == NULL) {
-		NBDEBUG("no tiptr!\n");
-		return;
-	}
-
-	/*
-	 * Set various socket/TCP options.
-	 * Failures here are not fatal -
-	 * just log a complaint.
-	 *
-	 * We don't need these two:
-	 *   SO_RCVTIMEO, SO_SNDTIMEO
-	 */
-
-	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_SNDBUF,
-	    nbp->nbp_sndbuf);
-	if (error)
-		NBDEBUG("can't set SO_SNDBUF");
-
-	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_RCVBUF,
-	    nbp->nbp_rcvbuf);
-	if (error)
-		NBDEBUG("can't set SO_RCVBUF");
-
-	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_KEEPALIVE, 1);
-	if (error)
-		NBDEBUG("can't set SO_KEEPALIVE");
-
-	error = nb_setsockopt_int(tiptr, IPPROTO_TCP, TCP_NODELAY, 1);
-	if (error)
-		NBDEBUG("can't set TCP_NODELAY");
-
-	/* Set the connect timeout (in milliseconds). */
-	error = nb_setsockopt_int(tiptr, IPPROTO_TCP,
-	    TCP_CONN_ABORT_THRESHOLD,
-	    nbp->nbp_timo.tv_sec * 1000);
-	if (error)
-		NBDEBUG("can't set connect timeout");
-}
 
 /*
  * Get mblks into *mpp until the data length is at least mlen.
@@ -342,12 +231,14 @@ discon:
 static int
 nb_snddis(TIUSER *tiptr)
 {
+	cred_t *cr;
 	mblk_t *mp;
 	struct T_discon_req *dreq;
 	int error, fmode, mlen;
 
+	cr = ddi_get_cred();
 	mlen = sizeof (struct T_discon_req);
-	if (!(mp = allocb_cred_wait(mlen, STR_NOSIG, &error, CRED(), NOPID)))
+	if (!(mp = allocb_cred_wait(mlen, STR_NOSIG, &error, cr, NOPID)))
 		return (error);
 
 	mp->b_datap->db_type = M_PROTO;
@@ -367,14 +258,6 @@ nb_snddis(TIUSER *tiptr)
 	return (error);
 }
 
-#ifdef APPLE
-static int
-nb_intr(struct nbpcb *nbp, struct proc *p)
-{
-	return (0);
-}
-#endif
-
 /*
  * Stuff the NetBIOS header into space already prepended.
  */
@@ -390,211 +273,6 @@ nb_sethdr(mblk_t *m, uint8_t type, uint32_t len)
 	p = (uint32_t *)m->b_rptr;
 	*p = htonl(len);
 	return (0);
-}
-
-/*
- * Note: Moved name encoding into here.
- */
-static int
-nb_put_name(struct mbchain *mbp, struct sockaddr_nb *snb)
-{
-	int i, len;
-	uchar_t ch, *p;
-
-	/*
-	 * Do the NetBIOS "first-level encoding" here.
-	 * (RFC1002 explains this wierdness...)
-	 * See similar code in smbfs library:
-	 *   lib/libsmbfs/smb/nb_name.c
-	 *
-	 * Here is what we marshall:
-	 *   uint8_t NAME_LENGTH (always 32)
-	 *   uint8_t ENCODED_NAME[32]
-	 *   uint8_t SCOPE_LENGTH
-	 *   XXX Scope should follow here, then another null,
-	 *   if and when we support NetBIOS scopes.
-	 */
-	len = 1 + (2 * NB_NAMELEN) + 1;
-
-	p = mb_reserve(mbp, len);
-	if (!p)
-		return (ENOSR);
-
-	/* NAME_LENGTH */
-	*p++ = (2 * NB_NAMELEN);
-
-	/* ENCODED_NAME */
-	for (i = 0; i < NB_NAMELEN; i++) {
-		ch = (uchar_t)snb->snb_name[i];
-		*p++ = 'A' + ((ch >> 4) & 0xF);
-		*p++ = 'A' + ((ch) & 0xF);
-	}
-
-	/* SCOPE_LENGTH */
-	*p++ = 0;
-
-	return (0);
-}
-
-static int
-nb_tcpopen(struct nbpcb *nbp, struct proc *p)
-{
-	TIUSER *tiptr;
-	int err, oflags = FREAD|FWRITE;
-	cred_t *cr = p->p_cred;
-
-	if (!smb_tcp_dev) {
-		smb_tcp_dev = makedevice(
-		    clone_major, ddi_name_to_major("tcp"));
-	}
-
-	/*
-	 * This magic arranges for our network endpoint
-	 * to have the right "label" for operation in a
-	 * "trusted extensions" environment.
-	 */
-	if (is_system_labeled()) {
-		cr = crdup(cr);
-		(void) setpflags(NET_MAC_AWARE, 1, cr);
-	} else {
-		crhold(cr);
-	}
-	err = t_kopen(NULL, smb_tcp_dev, oflags, &tiptr, cr);
-	crfree(cr);
-	if (err)
-		return (err);
-
-	/* Note: I_PUSH "timod" is done by t_kopen */
-
-	/* Save the TPI handle we use everywhere. */
-	nbp->nbp_tiptr = tiptr;
-
-	/*
-	 * Internal ktli calls need the "fmode" flags
-	 * from the t_kopen call.  XXX: Not sure if the
-	 * flags have the right bits set, or if we
-	 * always want the same block/non-block flags.
-	 * XXX: Look into this...
-	 */
-	nbp->nbp_fmode = tiptr->fp->f_flag;
-	return (0);
-}
-
-/*ARGSUSED*/
-static int
-nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct proc *p)
-{
-	int error;
-	TIUSER *tiptr = NULL;
-	struct t_call call;
-
-	tiptr = nbp->nbp_tiptr;
-	if (tiptr == NULL)
-		return (EBADF);
-	if (nbp->nbp_flags & NBF_CONNECTED)
-		return (EISCONN);
-
-	/*
-	 * Setup (snd)call address (connect to).
-	 * Just pass NULL for the (rcv)call.
-	 */
-	bzero(&call, sizeof (call));
-	call.addr.len = sizeof (*to);
-	call.addr.buf = (char *)to;
-	/* call.opt - none */
-	/* call.udata -- XXX: Should put NB session req here! */
-
-	/* Send the connect, wait... */
-	error = t_kconnect(tiptr, &call, NULL);
-	if (error) {
-		NBDEBUG("nb_connect_in: connect %d error", error);
-	} else {
-		mutex_enter(&nbp->nbp_lock);
-		nbp->nbp_flags |= NBF_CONNECTED;
-		mutex_exit(&nbp->nbp_lock);
-	}
-
-	return (error);
-}
-
-static int
-nbssn_rq_request(struct nbpcb *nbp, struct proc *p)
-{
-	struct mbchain mb, *mbp = &mb;
-	struct mdchain md, *mdp = &md;
-	mblk_t *m0;
-	struct sockaddr_in sin;
-	ushort_t port;
-	uint8_t rpcode;
-	int error, rplen;
-
-	error = mb_init(mbp);
-	if (error)
-		return (error);
-
-	/*
-	 * Put a zero for the 4-byte NetBIOS header,
-	 * then let nb_sethdr() overwrite it.
-	 */
-	mb_put_uint32le(mbp, 0);
-	nb_put_name(mbp, nbp->nbp_paddr);
-	nb_put_name(mbp, nbp->nbp_laddr);
-	nb_sethdr(mbp->mb_top, NB_SSN_REQUEST, mb_fixhdr(mbp) - 4);
-
-	m0 = mb_detach(mbp);
-	error = tli_send(nbp->nbp_tiptr, m0, nbp->nbp_fmode);
-	m0 = NULL; /* Note: _always_ consumed by tli_send */
-	mb_done(mbp);
-	if (error)
-		return (error);
-
-	nbp->nbp_state = NBST_RQSENT;
-	error = nbssn_recv(nbp, &m0, &rplen, &rpcode, p);
-	if (error == EWOULDBLOCK) {	/* Timeout */
-		NBDEBUG("initial request timeout\n");
-		return (ETIMEDOUT);
-	}
-	if (error) {
-		NBDEBUG("recv() error %d\n", error);
-		return (error);
-	}
-	/*
-	 * Process NETBIOS reply
-	 */
-	if (m0)
-		md_initm(mdp, m0);
-
-	error = 0;
-	if (rpcode == NB_SSN_POSRESP) {
-		mutex_enter(&nbp->nbp_lock);
-		nbp->nbp_state = NBST_SESSION;
-		mutex_exit(&nbp->nbp_lock);
-		goto out;
-	}
-	if (rpcode != NB_SSN_RTGRESP) {
-		error = ECONNABORTED;
-		goto out;
-	}
-	if (rplen != 6) {
-		error = ECONNABORTED;
-		goto out;
-	}
-	md_get_mem(mdp, (caddr_t)&sin.sin_addr, 4, MB_MSYSTEM);
-	md_get_uint16(mdp, &port);
-	sin.sin_port = port;
-	nbp->nbp_state = NBST_RETARGET;
-	nb_disconnect(nbp);
-	error = nb_connect_in(nbp, &sin, p);
-	if (!error)
-		error = nbssn_rq_request(nbp, p);
-	if (error) {
-		nb_disconnect(nbp);
-	}
-
-out:
-	if (m0)
-		md_done(mdp);
-	return (error);
 }
 
 /*
@@ -648,7 +326,7 @@ nbssn_peekhdr(struct nbpcb *nbp, size_t *lenp,	uint8_t *rpcodep)
 		return (EPIPE);
 	}
 	len &= 0x1ffff;
-	if (len > SMB_MAXPKTLEN) {
+	if (len > NB_MAXPKTLEN) {
 		NBDEBUG("packet too long (%d)\n", len);
 		return (EFBIG);
 	}
@@ -667,7 +345,7 @@ nbssn_peekhdr(struct nbpcb *nbp, size_t *lenp,	uint8_t *rpcodep)
 /*ARGSUSED*/
 static int
 nbssn_recv(struct nbpcb *nbp, mblk_t **mpp, int *lenp,
-    uint8_t *rpcodep, struct proc *p)
+    uint8_t *rpcodep)
 {
 	TIUSER *tiptr = nbp->nbp_tiptr;
 	mblk_t *m0;
@@ -804,26 +482,13 @@ out:
 /*
  * SMB transport interface
  */
+/*ARGSUSED*/
 static int
-smb_nbst_create(struct smb_vc *vcp, struct proc *p)
+smb_nbst_create(struct smb_vc *vcp, cred_t *cr)
 {
 	struct nbpcb *nbp;
-	int error;
 
 	nbp = kmem_zalloc(sizeof (struct nbpcb), KM_SLEEP);
-
-	/*
-	 * We don't keep reference counts or otherwise
-	 * prevent nbp->nbp_tiptr from going away, so
-	 * do the TLI open here and keep it until the
-	 * last ref calls smb_nbst_done.
-	 * This does t_kopen (open endpoint)
-	 */
-	error = nb_tcpopen(nbp, p);
-	if (error) {
-		kmem_free(nbp, sizeof (*nbp));
-		return (error);
-	}
 
 	nbp->nbp_timo.tv_sec = SMB_NBTIMO;
 	nbp->nbp_state = NBST_CLOSED; /* really IDLE */
@@ -833,14 +498,12 @@ smb_nbst_create(struct smb_vc *vcp, struct proc *p)
 	mutex_init(&nbp->nbp_lock, NULL, MUTEX_DRIVER, NULL);
 	vcp->vc_tdata = nbp;
 
-	nb_setopts(nbp);
-
 	return (0);
 }
 
 /*ARGSUSED*/
 static int
-smb_nbst_done(struct smb_vc *vcp, struct proc *p)
+smb_nbst_done(struct smb_vc *vcp)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
 
@@ -856,7 +519,7 @@ smb_nbst_done(struct smb_vc *vcp, struct proc *p)
 	if (nbp->nbp_flags & NBF_CONNECTED)
 		nb_disconnect(nbp);
 	if (nbp->nbp_tiptr)
-		t_kclose(nbp->nbp_tiptr, 1);
+		t_kclose(nbp->nbp_tiptr, 0);
 	if (nbp->nbp_laddr)
 		smb_free_sockaddr((struct sockaddr *)nbp->nbp_laddr);
 	if (nbp->nbp_paddr)
@@ -866,136 +529,36 @@ smb_nbst_done(struct smb_vc *vcp, struct proc *p)
 	return (0);
 }
 
-/*ARGSUSED*/
 static int
-smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
+smb_nbst_loan_fp(struct smb_vc *vcp, struct file *fp, cred_t *cr)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
-	struct sockaddr_nb *snb;
+	TIUSER *tiptr;
 	int error = 0;
 
-	if (nbp->nbp_tiptr == NULL)
-		return (EBADF);
-
-	/*
-	 * Allow repeated bind calls on one endpoint.
-	 * This happens with reconnect.
-	 */
-
-	/*
-	 * Null name is an "anonymous" (NULL) bind request.
-	 * (Let the transport pick a local name.)
-	 * This transport does not support NULL bind,
-	 * because we require a local NetBIOS name.
-	 */
-	if (sap == NULL)
-		return (EINVAL);
-
-	/*LINTED*/
-	snb = (struct sockaddr_nb *)smb_dup_sockaddr(sap);
-	if (snb == NULL)
-		return (ENOMEM);
-
 	mutex_enter(&nbp->nbp_lock);
-	if (nbp->nbp_laddr)
-		smb_free_sockaddr((struct sockaddr *)nbp->nbp_laddr);
-	nbp->nbp_laddr = snb;
 
 	/*
-	 * Do local TCP bind with NULL (any address),
-	 * but just once (for multiple connect attempts)
-	 * or extra bind calls would cause errors.
+	 * Un-loan the existing one, if any.
 	 */
-	if ((nbp->nbp_flags & NBF_LOCADDR) == 0) {
-		error = t_kbind(nbp->nbp_tiptr, NULL, NULL);
-		if (error) {
-			NBDEBUG("t_kbind failed");
-		} else {
-			nbp->nbp_flags |= NBF_LOCADDR;
-		}
-	}
-	mutex_exit(&nbp->nbp_lock);
-
-	return (error);
-}
-
-static int
-smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
-{
-	struct nbpcb *nbp = vcp->vc_tdata;
-	struct sockaddr_in sin;
-	struct sockaddr_nb *snb;
-	int error;
-
-	if (nbp->nbp_tiptr == NULL)
-		return (EBADF);
-	if (nbp->nbp_laddr == NULL)
-		return (EINVAL);
-
-	/*
-	 * Note: nbssn_rq_request() will call nbssn_recv(),
-	 * so set the RECVLOCK flag here.  Otherwise we'll
-	 * hit an ASSERT for this flag in nbssn_recv().
-	 */
-	mutex_enter(&nbp->nbp_lock);
-	if (nbp->nbp_flags & NBF_RECVLOCK) {
-		NBDEBUG("attempt to reenter session layer!\n");
-		mutex_exit(&nbp->nbp_lock);
-		return (EWOULDBLOCK);
-	}
-	nbp->nbp_flags |= NBF_RECVLOCK;
-	mutex_exit(&nbp->nbp_lock);
-
-	/*LINTED*/
-	snb = (struct sockaddr_nb *)smb_dup_sockaddr(sap);
-	if (snb == NULL) {
-		error = ENOMEM;
-		goto out;
-	}
-	if (nbp->nbp_paddr)
-		smb_free_sockaddr((struct sockaddr *)nbp->nbp_paddr);
-	nbp->nbp_paddr = snb;
-
-	/*
-	 * Setup the remote IP address.
-	 * Try plain TCP first (port 445).
-	 */
-	bzero(&sin, sizeof (sin));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(IPPORT_SMB); /* port 445 */
-	sin.sin_addr.s_addr = snb->snb_ipaddr;
-
-again:
-	NBDEBUG("trying port %d\n", ntohs(sin.sin_port));
-	error = nb_connect_in(nbp, &sin, p);
-	switch (error) {
-	case 0:
-		break;
-	case ECONNREFUSED:
-		if (sin.sin_port != htons(IPPORT_NETBIOS_SSN)) {
-			/* Try again w/ NetBIOS (port 139) */
-			sin.sin_port = htons(IPPORT_NETBIOS_SSN);
-			goto again;
-		}
-		/* FALLTHROUGH */
-	default:
-		goto out;
+	if (nbp->nbp_tiptr != NULL) {
+		t_kclose(nbp->nbp_tiptr, 0);
+		nbp->nbp_tiptr = NULL;
+		nbp->nbp_flags &= ~NBF_CONNECTED;
+		nbp->nbp_state = NBST_CLOSED;
 	}
 
 	/*
-	 * If we connected via NetBIOS (port 139),
-	 * need to do a session request.
+	 * Loan the new one passed in.
 	 */
-	if (sin.sin_port == htons(IPPORT_NETBIOS_SSN)) {
-		error = nbssn_rq_request(nbp, p);
-		if (error)
-			nb_disconnect(nbp);
-	} else
+	if (fp != NULL && 0 == (error =
+	    t_kopen(fp, 0, 0, &tiptr, cr))) {
+		nbp->nbp_tiptr = tiptr;
+		nbp->nbp_fmode = tiptr->fp->f_flag;
+		nbp->nbp_flags |= NBF_CONNECTED;
 		nbp->nbp_state = NBST_SESSION;
+	}
 
-out:
-	mutex_enter(&nbp->nbp_lock);
-	nbp->nbp_flags &= ~NBF_RECVLOCK;
 	mutex_exit(&nbp->nbp_lock);
 
 	return (error);
@@ -1003,7 +566,21 @@ out:
 
 /*ARGSUSED*/
 static int
-smb_nbst_disconnect(struct smb_vc *vcp, struct proc *p)
+smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap)
+{
+	return (ENOTSUP);
+}
+
+/*ARGSUSED*/
+static int
+smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap)
+{
+	return (ENOTSUP);
+}
+
+/*ARGSUSED*/
+static int
+smb_nbst_disconnect(struct smb_vc *vcp)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
 
@@ -1036,7 +613,7 @@ nb_disconnect(struct nbpcb *nbp)
 		nb_snddis(tiptr);
 
 	if (nbp->nbp_state != NBST_RETARGET) {
-		nbp->nbp_state = NBST_CLOSED; /* really IDLE */
+		nbp->nbp_state = NBST_CLOSED;
 	}
 	return (0);
 }
@@ -1047,7 +624,7 @@ nb_disconnect(struct nbpcb *nbp)
  */
 /*ARGSUSED*/
 static int
-smb_nbst_send(struct smb_vc *vcp, mblk_t *m, struct proc *p)
+smb_nbst_send(struct smb_vc *vcp, mblk_t *m)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
 	ptrdiff_t diff;
@@ -1080,6 +657,10 @@ smb_nbst_send(struct smb_vc *vcp, mblk_t *m, struct proc *p)
 	 * some network drivers will apparently send
 	 * each mblk in the chain as separate frames.
 	 * (That's arguably a driver bug.)
+	 *
+	 * Not bothering with allocb_cred_wait below
+	 * because the message we're prepending to
+	 * should already have a db_credp.
 	 */
 
 	diff = MBLKHEAD(m);
@@ -1110,9 +691,8 @@ errout:
 	return (error);
 }
 
-
 static int
-smb_nbst_recv(struct smb_vc *vcp, mblk_t **mpp, struct proc *p)
+smb_nbst_recv(struct smb_vc *vcp, mblk_t **mpp)
 {
 	struct nbpcb *nbp = vcp->vc_tdata;
 	uint8_t rpcode;
@@ -1126,7 +706,7 @@ smb_nbst_recv(struct smb_vc *vcp, mblk_t **mpp, struct proc *p)
 	}
 	nbp->nbp_flags |= NBF_RECVLOCK;
 	mutex_exit(&nbp->nbp_lock);
-	error = nbssn_recv(nbp, mpp, &rplen, &rpcode, p);
+	error = nbssn_recv(nbp, mpp, &rplen, &rpcode);
 	mutex_enter(&nbp->nbp_lock);
 	nbp->nbp_flags &= ~NBF_RECVLOCK;
 	mutex_exit(&nbp->nbp_lock);
@@ -1140,7 +720,7 @@ smb_nbst_recv(struct smb_vc *vcp, mblk_t **mpp, struct proc *p)
  */
 /*ARGSUSED*/
 static int
-smb_nbst_poll(struct smb_vc *vcp, int ticks, struct proc *p)
+smb_nbst_poll(struct smb_vc *vcp, int ticks)
 {
 	int error;
 	int events = 0;
@@ -1220,6 +800,7 @@ struct smb_tran_desc smb_tran_nbtcp_desc = {
 	smb_nbst_send,
 	smb_nbst_recv,
 	smb_nbst_poll,
+	smb_nbst_loan_fp,
 	smb_nbst_getparam,
 	smb_nbst_setparam,
 	smb_nbst_fatal,

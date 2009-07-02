@@ -46,50 +46,77 @@
 #include <grp.h>
 #include <unistd.h>
 
+#include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
-#include <cflib.h>
 #include "private.h"
 
 int
-smb_smb_open_print_file(struct smb_ctx *ctx, int setuplen, int mode,
-	const char *ident, smbfh *fhp)
+smb_printer_open(struct smb_ctx *ctx, int setuplen, int mode,
+	const char *ident, int *fhp)
 {
 	struct smb_rq *rqp;
 	struct mbdata *mbp;
-	int error;
+	int error, flags2, uc;
+	uint16_t fh;
+	uint8_t wc;
 
-	error = smb_rq_init(ctx, SMB_COM_OPEN_PRINT_FILE, 2, &rqp);
+	flags2 = smb_ctx_flags2(ctx);
+	if (flags2 == -1)
+		return (EIO);
+	uc = flags2 & SMB_FLAGS2_UNICODE;
+
+	error = smb_rq_init(ctx, SMB_COM_OPEN_PRINT_FILE, &rqp);
 	if (error)
 		return (error);
 	mbp = smb_rq_getrequest(rqp);
+	smb_rq_wstart(rqp);
 	mb_put_uint16le(mbp, setuplen);
 	mb_put_uint16le(mbp, mode);
 	smb_rq_wend(rqp);
+	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	smb_rq_dstring(mbp, ident);
+	mb_put_dstring(mbp, ident, uc);
+	smb_rq_bend(rqp);
 	error = smb_rq_simple(rqp);
-	if (!error) {
-		mbp = smb_rq_getreply(rqp);
-		mb_get_uint16(mbp, fhp);
+	if (error)
+		goto out;
+
+	mbp = smb_rq_getreply(rqp);
+	error = mb_get_uint8(mbp, &wc);
+	if (error || wc < 1) {
+		error = EBADRPC;
+		goto out;
 	}
+	mb_get_uint16(mbp, &fh);
+	*fhp = fh;
+	error = 0;
+
+out:
 	smb_rq_done(rqp);
 	return (error);
 }
 
+/*
+ * Similar to smb_fh_close
+ */
 int
-smb_smb_close_print_file(struct smb_ctx *ctx, smbfh fh)
+smb_printer_close(struct smb_ctx *ctx, int fh)
 {
 	struct smb_rq *rqp;
 	struct mbdata *mbp;
 	int error;
 
-	error = smb_rq_init(ctx, SMB_COM_CLOSE_PRINT_FILE, 0, &rqp);
+	error = smb_rq_init(ctx, SMB_COM_CLOSE_PRINT_FILE, &rqp);
 	if (error)
 		return (error);
 	mbp = smb_rq_getrequest(rqp);
-	mb_put_mem(mbp, (char *)&fh, 2);
+	smb_rq_wstart(rqp);
+	mb_put_uint16le(mbp, (uint16_t)fh);
 	smb_rq_wend(rqp);
+	mb_put_uint16le(mbp, 0);	/* byte count */
+
 	error = smb_rq_simple(rqp);
 	smb_rq_done(rqp);
+
 	return (error);
 }

@@ -32,7 +32,7 @@
  * $Id: smb_conn.c,v 1.27.166.1 2005/05/27 02:35:29 lindak Exp $
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
 #include <sys/cmn_err.h>
 #include <sys/thread.h>
 #include <sys/atomic.h>
+#include <sys/u8_textprep.h>
 
 #ifdef APPLE
 #include <sys/smb_apple.h>
@@ -72,7 +73,6 @@
 #include <netsmb/smb_pass.h>
 
 static struct smb_connobj smb_vclist;
-static uint_t smb_vcnext = 0;	/* next unique id for VC */
 
 void smb_co_init(struct smb_connobj *cp, int level, char *objname);
 void smb_co_done(struct smb_connobj *cp);
@@ -80,18 +80,11 @@ void smb_co_hold(struct smb_connobj *cp);
 void smb_co_rele(struct smb_connobj *cp);
 void smb_co_kill(struct smb_connobj *cp);
 
-#ifdef APPLE
-static void smb_sm_lockvclist(void);
-static void smb_sm_unlockvclist(void);
-#endif
-
 static void smb_vc_free(struct smb_connobj *cp);
 static void smb_vc_gone(struct smb_connobj *cp);
 
 static void smb_share_free(struct smb_connobj *cp);
 static void smb_share_gone(struct smb_connobj *cp);
-
-/* smb_dup_sockaddr moved to smb_tran.c */
 
 int
 smb_sm_init(void)
@@ -125,401 +118,7 @@ smb_sm_done(void)
 	smb_co_done(&smb_vclist);
 }
 
-/*
- * Find a VC identified by the info in vcspec,
- * and return it with a "hold", but not locked.
- */
-/*ARGSUSED*/
-static int
-smb_sm_lookupvc(
-	struct smb_vcspec *vcspec,
-	struct smb_cred *scred,
-	struct smb_vc **vcpp)
-{
-	struct smb_connobj *co;
-	struct smb_vc *vcp;
-	zoneid_t zoneid = getzoneid();
 
-	ASSERT(MUTEX_HELD(&smb_vclist.co_lock));
-
-	/* var, head, next_field */
-	SLIST_FOREACH(co, &smb_vclist.co_children, co_next) {
-		vcp = CPTOVC(co);
-
-		/*
-		 * Some things we can check without
-		 * holding the lock (those that are
-		 * set at creation and never change).
-		 */
-
-		/* VCs in other zones are invisibile. */
-		if (vcp->vc_zoneid != zoneid)
-			continue;
-
-		/* Also segregate by owner. */
-		if (vcp->vc_uid != vcspec->owner)
-			continue;
-
-		/* XXX: we ignore the group.  Remove vc_gid? */
-
-		/* server */
-		if (smb_cmp_sockaddr(vcp->vc_paddr, vcspec->sap))
-			continue;
-
-		/* domain+user */
-		if (strcmp(vcp->vc_domain, vcspec->domain))
-			continue;
-		if (strcmp(vcp->vc_username, vcspec->username))
-			continue;
-
-		SMB_VC_LOCK(vcp);
-
-		/* No new references allowed when _GONE is set */
-		if (vcp->vc_flags & SMBV_GONE)
-			goto unlock_continue;
-
-		if (vcp->vc_vopt & SMBVOPT_PRIVATE)
-			goto unlock_continue;
-
-	found:
-		/*
-		 * Success! (Found one we can use)
-		 * Return with it held, unlocked.
-		 * In-line smb_vc_hold here.
-		 */
-		co->co_usecount++;
-		SMB_VC_UNLOCK(vcp);
-		*vcpp = vcp;
-		return (0);
-
-	unlock_continue:
-		SMB_VC_UNLOCK(vcp);
-		/* keep looking. */
-	}
-
-	return (ENOENT);
-}
-
-int
-smb_sm_findvc(
-	struct smb_vcspec *vcspec,
-	struct smb_cred *scred,
-	struct smb_vc **vcpp)
-{
-	struct smb_vc *vcp;
-	int error;
-
-	*vcpp = vcp = NULL;
-
-	SMB_CO_LOCK(&smb_vclist);
-	error = smb_sm_lookupvc(vcspec, scred, &vcp);
-	SMB_CO_UNLOCK(&smb_vclist);
-
-	/* Return if smb_sm_lookupvc fails */
-	if (error != 0)
-		return (error);
-
-	/* Ingore any VC that's not active. */
-	if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
-		smb_vc_rele(vcp);
-		return (ENOENT);
-	}
-
-	/* Active VC. Return it held. */
-	*vcpp = vcp;
-	return (error);
-}
-
-int
-smb_sm_negotiate(
-	struct smb_vcspec *vcspec,
-	struct smb_cred *scred,
-	struct smb_vc **vcpp)
-{
-	struct smb_vc *vcp;
-	clock_t tmo;
-	int created, error;
-
-top:
-	*vcpp = vcp = NULL;
-
-	SMB_CO_LOCK(&smb_vclist);
-	error = smb_sm_lookupvc(vcspec, scred, &vcp);
-	if (error) {
-		/* The VC was not found.  Create? */
-		if ((vcspec->optflags & SMBVOPT_CREATE) == 0) {
-			SMB_CO_UNLOCK(&smb_vclist);
-			return (error);
-		}
-		error = smb_vc_create(vcspec, scred, &vcp);
-		if (error) {
-			/* Could not create? Unusual. */
-			SMB_CO_UNLOCK(&smb_vclist);
-			return (error);
-		}
-		/* Note: co_usecount == 1 */
-		created = 1;
-	} else
-		created = 0;
-	SMB_CO_UNLOCK(&smb_vclist);
-
-	if (created == 0) {
-		/*
-		 * Found an existing VC.  Reuse it, but first,
-		 * wait for any other thread doing setup, etc.
-		 * Note: We hold a reference on the VC.
-		 */
-		error = 0;
-		SMB_VC_LOCK(vcp);
-		while (vcp->vc_state < SMBIOD_ST_VCACTIVE) {
-			if (vcp->vc_flags & SMBV_GONE)
-				break;
-			tmo = lbolt + SEC_TO_TICK(2);
-			tmo = cv_timedwait_sig(&vcp->vc_statechg,
-			    &vcp->vc_lock, tmo);
-			if (tmo == 0) {
-				error = EINTR;
-				break;
-			}
-		}
-		SMB_VC_UNLOCK(vcp);
-
-		/* Interrupted? */
-		if (error)
-			goto out;
-
-		/*
-		 * Was there a vc_kill while we waited?
-		 * If so, this VC is gone.  Start over.
-		 */
-		if (vcp->vc_flags & SMBV_GONE) {
-			smb_vc_rele(vcp);
-			goto top;
-		}
-
-		/*
-		 * The possible states here are:
-		 * SMBIOD_ST_VCACTIVE, SMBIOD_ST_DEAD
-		 *
-		 * SMBIOD_ST_VCACTIVE is the normal case,
-		 * where found a connection ready to use.
-		 *
-		 * We may find vc_state == SMBIOD_ST_DEAD
-		 * if a previous session has disconnected.
-		 * In this case, we'd like to reconnect,
-		 * so take over setting up this VC as if
-		 * this thread had created it.
-		 */
-		SMB_VC_LOCK(vcp);
-		if (vcp->vc_state == SMBIOD_ST_DEAD) {
-			vcp->vc_state = SMBIOD_ST_NOTCONN;
-			created = 1;
-			/* Will signal vc_statechg below */
-		}
-		SMB_VC_UNLOCK(vcp);
-	}
-
-	if (created) {
-		/*
-		 * We have a NEW VC, held, but not locked.
-		 */
-
-		SMBIODEBUG("vc_state=%d\n", vcp->vc_state);
-		switch (vcp->vc_state) {
-
-		case SMBIOD_ST_NOTCONN:
-			(void) smb_vc_setup(vcspec, scred, vcp, 0);
-			vcp->vc_genid++;
-			/* XXX: Save credentials of caller here? */
-			vcp->vc_state = SMBIOD_ST_RECONNECT;
-			/* FALLTHROUGH */
-
-		case SMBIOD_ST_RECONNECT:
-			error = smb_iod_connect(vcp);
-			if (error)
-				break;
-			vcp->vc_state = SMBIOD_ST_TRANACTIVE;
-			/* FALLTHROUGH */
-
-		case SMBIOD_ST_TRANACTIVE:
-			/* XXX: Just pass vcspec instead? */
-			vcp->vc_intok = vcspec->tok;
-			vcp->vc_intoklen = vcspec->toklen;
-			error = smb_smb_negotiate(vcp, &vcp->vc_scred);
-			vcp->vc_intok = NULL;
-			vcp->vc_intoklen = 0;
-			if (error)
-				break;
-			vcp->vc_state = SMBIOD_ST_NEGOACTIVE;
-			/* FALLTHROUGH */
-
-		case SMBIOD_ST_NEGOACTIVE:
-		case SMBIOD_ST_SSNSETUP:
-		case SMBIOD_ST_VCACTIVE:
-			/* We can (re)use this VC. */
-			error = 0;
-			break;
-
-		default:
-			error = EINVAL;
-			break;
-		}
-
-		if (error) {
-			/*
-			 * Leave the VC in a state that allows the
-			 * next open to attempt a new connection.
-			 * This call does the cv_broadcast too,
-			 * so that's in the else part.
-			 */
-			smb_iod_disconnect(vcp);
-		} else {
-			SMB_VC_LOCK(vcp);
-			cv_broadcast(&vcp->vc_statechg);
-			SMB_VC_UNLOCK(vcp);
-		}
-	}
-
-out:
-	if (error) {
-		/*
-		 * Undo the hold from lookupvc,
-		 * or destroy if from vc_create.
-		 */
-		smb_vc_rele(vcp);
-	} else {
-		/* Return it held. */
-		*vcpp = vcp;
-	}
-
-	return (error);
-}
-
-
-int
-smb_sm_ssnsetup(
-	struct smb_vcspec *vcspec,
-	struct smb_cred *scred,
-	struct smb_vc *vcp)
-{
-	int error;
-
-	/*
-	 * We have a VC, held, but not locked.
-	 *
-	 * Code from smb_iod_ssnsetup,
-	 * with lots of rework.
-	 */
-
-	SMBIODEBUG("vc_state=%d\n", vcp->vc_state);
-	switch (vcp->vc_state) {
-
-	case SMBIOD_ST_NEGOACTIVE:
-		/*
-		 * This is the state we normally find.
-		 * Calling _setup AGAIN to update the
-		 * flags, security info, etc.
-		 */
-		error = smb_vc_setup(vcspec, scred, vcp, 1);
-		if (error)
-			break;
-		vcp->vc_state = SMBIOD_ST_SSNSETUP;
-		/* FALLTHROUGH */
-
-	case SMBIOD_ST_SSNSETUP:
-		/* XXX: Just pass vcspec instead? */
-		vcp->vc_intok = vcspec->tok;
-		vcp->vc_intoklen = vcspec->toklen;
-		error = smb_smb_ssnsetup(vcp, &vcp->vc_scred);
-		vcp->vc_intok = NULL;
-		vcp->vc_intoklen = 0;
-		if (error)
-			break;
-		/* OK, start the reader thread... */
-		error = smb_iod_create(vcp);
-		if (error)
-			break;
-		vcp->vc_state = SMBIOD_ST_VCACTIVE;
-		/* FALLTHROUGH */
-
-	case SMBIOD_ST_VCACTIVE:
-		/* We can (re)use this VC. */
-		error = 0;
-		break;
-
-	default:
-		error = EINVAL;
-		break;
-	}
-
-	SMB_VC_LOCK(vcp);
-	cv_broadcast(&vcp->vc_statechg);
-	SMB_VC_UNLOCK(vcp);
-
-	return (error);
-}
-
-int
-smb_sm_tcon(
-	struct smb_sharespec *shspec,
-	struct smb_cred *scred,
-	struct smb_vc *vcp,
-	struct smb_share **sspp)
-{
-	struct smb_share *ssp;
-	int error;
-
-	*sspp = ssp = NULL;
-
-	if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
-		/*
-		 * The wait for vc_state in smb_sm_negotiate
-		 * _should_ get us a VC in the right state.
-		 */
-		SMBIODEBUG("bad vc_state=%d\n", vcp->vc_state);
-		return (ENOTCONN);
-	}
-
-	SMB_VC_LOCK(vcp);
-	error = smb_vc_lookupshare(vcp, shspec, scred, &ssp);
-	if (error) {
-		/* The share was not found.  Create? */
-		if ((shspec->optflags & SMBVOPT_CREATE) == 0) {
-			SMB_VC_UNLOCK(vcp);
-			return (error);
-		}
-		error = smb_share_create(vcp, shspec, scred, &ssp);
-		if (error) {
-			/* Could not create? Unusual. */
-			SMB_VC_UNLOCK(vcp);
-			return (error);
-		}
-		/* Note: co_usecount == 1 */
-	}
-	SMB_VC_UNLOCK(vcp);
-
-	/*
-	 * We have a share, held, but not locked.
-	 * Make it connected...
-	 */
-	SMB_SS_LOCK(ssp);
-	if (!smb_share_valid(ssp))
-		error = smb_share_tcon(ssp);
-	SMB_SS_UNLOCK(ssp);
-
-	if (error) {
-		/*
-		 * Undo hold from lookupshare,
-		 * or destroy if from _create.
-		 */
-		smb_share_rele(ssp);
-	} else {
-		/* Return it held. */
-		*sspp = ssp;
-	}
-
-	return (error);
-}
 
 /*
  * Common code for connection object
@@ -692,160 +291,10 @@ smb_co_kill(struct smb_connobj *co)
 
 
 /*
- * Session implementation
+ * Session objects, which are referred to as "VC" for
+ * "virtual cirtuit". This has nothing to do with the
+ * CIFS notion of a "virtual cirtuit".  See smb_conn.h
  */
-
-/*
- * This sets the fields that are allowed to change
- * when doing a reconnect.  Many others are set in
- * smb_vc_create and never change afterwards.
- * Don't want domain or user to change here.
- */
-int
-smb_vc_setup(struct smb_vcspec *vcspec, struct smb_cred *scred,
-	struct smb_vc *vcp, int is_ss)
-{
-	int error, minauth;
-
-	/* Just save all the SMBVOPT_ options. */
-	vcp->vc_vopt = vcspec->optflags;
-
-	if (is_ss) {
-		/* Called from smb_sm_ssnsetup */
-
-		if (vcspec->optflags & SMBVOPT_USE_KEYCHAIN) {
-			/*
-			 * Get p/w hashes from the keychain.
-			 * The password in vcspec->pass is
-			 * fiction, so don't store it.
-			 */
-			error = smb_pkey_getpwh(vcp, scred->vc_ucred);
-			return (error);
-		}
-
-		/*
-		 * Note: this can be called more than once
-		 * for a given vcp, so free the old strings.
-		 */
-		SMB_STRFREE(vcp->vc_pass);
-
-		/*
-		 * Don't store the cleartext password
-		 * unless the minauth value was changed
-		 * to allow use of cleartext passwords.
-		 * (By default, this is not allowed.)
-		 */
-		minauth = vcspec->optflags & SMBVOPT_MINAUTH;
-		if (minauth == SMBVOPT_MINAUTH_NONE)
-			vcp->vc_pass = smb_strdup(vcspec->pass);
-
-		/* Compute LM and NTLM hashes. */
-		smb_oldlm_hash(vcspec->pass, vcp->vc_lmhash);
-		smb_ntlmv1hash(vcspec->pass, vcp->vc_nthash);
-	}
-
-	/* Success! */
-	error = 0;
-	return (error);
-}
-
-/*ARGSUSED*/
-int
-smb_vc_create(struct smb_vcspec *vcspec,
-	struct smb_cred *scred, struct smb_vc **vcpp)
-{
-	static char objtype[] = "smb_vc";
-	struct smb_vc *vcp;
-	int error = 0;
-
-	ASSERT(MUTEX_HELD(&smb_vclist.co_lock));
-
-	/*
-	 * Checks for valid uid/gid are now in
-	 * smb_usr_ioc2vcspec, so at this point
-	 * we know the user has right to create
-	 * with the uid/gid in the vcspec.
-	 */
-
-	vcp = kmem_zalloc(sizeof (struct smb_vc), KM_SLEEP);
-
-	smb_co_init(VCTOCP(vcp), SMBL_VC, objtype);
-	vcp->vc_co.co_free = smb_vc_free;
-	vcp->vc_co.co_gone = smb_vc_gone;
-
-	cv_init(&vcp->vc_statechg, objtype, CV_DRIVER, NULL);
-	sema_init(&vcp->vc_sendlock, 1, objtype, SEMA_DRIVER, NULL);
-	rw_init(&vcp->iod_rqlock, objtype, RW_DRIVER, NULL);
-	cv_init(&vcp->iod_exit, objtype, CV_DRIVER, NULL);
-
-	vcp->vc_number = atomic_inc_uint_nv(&smb_vcnext);
-	vcp->vc_state = SMBIOD_ST_NOTCONN;
-	vcp->vc_timo = SMB_DEFRQTIMO;
-	/*
-	 * I think SMB_UID_UNKNOWN is not the correct
-	 * initial value for vc_smbuid. See the long
-	 * comment in smb_iod_sendrq()
-	 */
-	vcp->vc_smbuid = SMB_UID_UNKNOWN; /* XXX should be zero */
-	vcp->vc_tdesc = &smb_tran_nbtcp_desc;
-
-	/*
-	 * These identify the connection.
-	 */
-	vcp->vc_zoneid = getzoneid();
-	vcp->vc_uid = vcspec->owner;
-	vcp->vc_grp = vcspec->group;
-	vcp->vc_mode = vcspec->rights & SMBM_MASK;
-
-	vcp->vc_domain = smb_strdup(vcspec->domain);
-	vcp->vc_username = smb_strdup(vcspec->username);
-	vcp->vc_srvname = smb_strdup(vcspec->srvname);
-	vcp->vc_paddr = smb_dup_sockaddr(vcspec->sap);
-	vcp->vc_laddr = smb_dup_sockaddr(vcspec->lap);
-
-#ifdef NOICONVSUPPORT
-	/*
-	 * REVISIT
-	 */
-	error = iconv_open("tolower", vcspec->localcs, &vcp->vc_tolower);
-	if (error)
-		goto errout;
-
-	error = iconv_open("toupper", vcspec->localcs, &vcp->vc_toupper);
-	if (error)
-		goto errout;
-
-	if (vcspec->servercs[0]) {
-
-		error = iconv_open(vcspec->servercs, vcspec->localcs,
-		    &vcp->vc_toserver);
-		if (error)
-			goto errout;
-
-		error = iconv_open(vcspec->localcs, vcspec->servercs,
-		    &vcp->vc_tolocal);
-		if (error)
-			goto errout;
-	}
-#endif /* NOICONVSUPPORT */
-
-	/* This fills in vcp->vc_tdata */
-	if ((error = SMB_TRAN_CREATE(vcp, curproc)) != 0)
-		goto errout;
-
-	/* Success! */
-	smb_co_addchild(&smb_vclist, VCTOCP(vcp));
-	*vcpp = vcp;
-	return (0);
-
-errout:
-	/*
-	 * This will destroy the new vc.
-	 * See: smb_vc_free
-	 */
-	smb_vc_rele(vcp);
-	return (error);
-}
 
 void
 smb_vc_hold(struct smb_vc *vcp)
@@ -883,37 +332,27 @@ smb_vc_gone(struct smb_connobj *cp)
 	 * Was smb_vc_disconnect(vcp);
 	 */
 	smb_iod_disconnect(vcp);
-
-	/* Note: smb_iod_destroy in vc_free */
 }
 
+/*
+ * The VC has no more references.  Free it.
+ * No locks needed here.
+ */
 static void
 smb_vc_free(struct smb_connobj *cp)
 {
 	struct smb_vc *vcp = CPTOVC(cp);
 
 	/*
-	 * The VC has no more references, so
-	 * no locks should be needed here.
-	 * Make sure the IOD is gone.
+	 * The _gone call should have emptied the request list,
+	 * but let's make sure, as requests may have references
+	 * to this VC without taking a hold.  (The hold is the
+	 * responsibility of threads placing requests.)
 	 */
-	smb_iod_destroy(vcp);
+	ASSERT(vcp->iod_rqlist.tqh_first == NULL);
 
 	if (vcp->vc_tdata)
-		SMB_TRAN_DONE(vcp, curproc);
-
-	SMB_STRFREE(vcp->vc_username);
-	SMB_STRFREE(vcp->vc_srvname);
-	SMB_STRFREE(vcp->vc_pass);
-	SMB_STRFREE(vcp->vc_domain);
-	if (vcp->vc_paddr) {
-		smb_free_sockaddr(vcp->vc_paddr);
-		vcp->vc_paddr = NULL;
-	}
-	if (vcp->vc_laddr) {
-		smb_free_sockaddr(vcp->vc_laddr);
-		vcp->vc_laddr = NULL;
-	}
+		SMB_TRAN_DONE(vcp);
 
 /*
  * We are not using the iconv routines here. So commenting them for now.
@@ -929,17 +368,11 @@ smb_vc_free(struct smb_connobj *cp)
 	if (vcp->vc_toserver)
 		iconv_close(vcp->vc_toserver);
 #endif
-	if (vcp->vc_intok)
-		kmem_free(vcp->vc_intok, vcp->vc_intoklen);
-	if (vcp->vc_outtok)
-		kmem_free(vcp->vc_outtok, vcp->vc_outtoklen);
-	if (vcp->vc_negtok)
-		kmem_free(vcp->vc_negtok, vcp->vc_negtoklen);
 
 	if (vcp->vc_mackey != NULL)
 		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
 
-	cv_destroy(&vcp->iod_exit);
+	cv_destroy(&vcp->iod_idle);
 	rw_destroy(&vcp->iod_rqlock);
 	sema_destroy(&vcp->vc_sendlock);
 	cv_destroy(&vcp->vc_statechg);
@@ -947,176 +380,215 @@ smb_vc_free(struct smb_connobj *cp)
 	kmem_free(vcp, sizeof (*vcp));
 }
 
+/*ARGSUSED*/
+int
+smb_vc_create(smbioc_ossn_t *ossn, smb_cred_t *scred, smb_vc_t **vcpp)
+{
+	static char objtype[] = "smb_vc";
+	cred_t *cr = scred->scr_cred;
+	struct smb_vc *vcp;
+	int error = 0;
+
+	ASSERT(MUTEX_HELD(&smb_vclist.co_lock));
+
+	vcp = kmem_zalloc(sizeof (struct smb_vc), KM_SLEEP);
+
+	smb_co_init(VCTOCP(vcp), SMBL_VC, objtype);
+	vcp->vc_co.co_free = smb_vc_free;
+	vcp->vc_co.co_gone = smb_vc_gone;
+
+	cv_init(&vcp->vc_statechg, objtype, CV_DRIVER, NULL);
+	sema_init(&vcp->vc_sendlock, 1, objtype, SEMA_DRIVER, NULL);
+	rw_init(&vcp->iod_rqlock, objtype, RW_DRIVER, NULL);
+	cv_init(&vcp->iod_idle, objtype, CV_DRIVER, NULL);
+
+	/* Expanded TAILQ_HEAD_INITIALIZER */
+	vcp->iod_rqlist.tqh_last = &vcp->iod_rqlist.tqh_first;
+
+	vcp->vc_state = SMBIOD_ST_IDLE;
+
+	/*
+	 * These identify the connection.
+	 */
+	vcp->vc_zoneid = getzoneid();
+	bcopy(ossn, &vcp->vc_ssn, sizeof (*ossn));
+
+	/* This fills in vcp->vc_tdata */
+	vcp->vc_tdesc = &smb_tran_nbtcp_desc;
+	if ((error = SMB_TRAN_CREATE(vcp, cr)) != 0)
+		goto errout;
+
+	/* Success! */
+	smb_co_addchild(&smb_vclist, VCTOCP(vcp));
+	*vcpp = vcp;
+	return (0);
+
+errout:
+	/*
+	 * This will destroy the new vc.
+	 * See: smb_vc_free
+	 */
+	smb_vc_rele(vcp);
+	return (error);
+}
 
 /*
- * Lookup share in the given VC. Share referenced and locked on return.
- * VC expected to be locked on entry and will be left locked on exit.
+ * Find or create a VC identified by the info in ossn
+ * and return it with a "hold", but not locked.
  */
 /*ARGSUSED*/
 int
-smb_vc_lookupshare(struct smb_vc *vcp, struct smb_sharespec *shspec,
-	struct smb_cred *scred,	struct smb_share **sspp)
+smb_vc_findcreate(smbioc_ossn_t *ossn, smb_cred_t *scred, smb_vc_t **vcpp)
 {
 	struct smb_connobj *co;
-	struct smb_share *ssp = NULL;
+	struct smb_vc *vcp;
+	smbioc_ssn_ident_t *vc_id;
+	int error;
+	zoneid_t zoneid = getzoneid();
 
-	ASSERT(MUTEX_HELD(&vcp->vc_lock));
+	*vcpp = vcp = NULL;
 
-	*sspp = NULL;
+	SMB_CO_LOCK(&smb_vclist);
 
 	/* var, head, next_field */
-	SLIST_FOREACH(co, &(VCTOCP(vcp)->co_children), co_next) {
-		ssp = CPTOSS(co);
+	SLIST_FOREACH(co, &smb_vclist.co_children, co_next) {
+		vcp = CPTOVC(co);
 
-		/* No new refs if _GONE is set. */
-		if (ssp->ss_flags & SMBS_GONE)
+		/*
+		 * Some things we can check without
+		 * holding the lock (those that are
+		 * set at creation and never change).
+		 */
+
+		/* VCs in other zones are invisibile. */
+		if (vcp->vc_zoneid != zoneid)
 			continue;
 
-		/* This has a hold, so no need to lock it. */
-		if (strcmp(ssp->ss_name, shspec->name) == 0)
-			goto found;
+		/* Also segregate by Unix owner. */
+		if (vcp->vc_owner != ossn->ssn_owner)
+			continue;
+
+		/*
+		 * Compare identifying info:
+		 * server address, user, domain
+		 * names are case-insensitive
+		 */
+		vc_id = &vcp->vc_ssn.ssn_id;
+		if (bcmp(&vc_id->id_srvaddr,
+		    &ossn->ssn_id.id_srvaddr,
+		    sizeof (vc_id->id_srvaddr)))
+			continue;
+		if (u8_strcmp(vc_id->id_user, ossn->ssn_id.id_user, 0,
+		    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &error))
+			continue;
+		if (u8_strcmp(vc_id->id_domain, ossn->ssn_id.id_domain, 0,
+		    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &error))
+			continue;
+
+		/*
+		 * We have a match, but still have to check
+		 * the _GONE flag, and do that with a lock.
+		 * No new references when _GONE is set.
+		 *
+		 * Also clear SMBVOPT_CREATE which the caller
+		 * may check to find out if we did create.
+		 */
+		SMB_VC_LOCK(vcp);
+		if ((vcp->vc_flags & SMBV_GONE) == 0) {
+			ossn->ssn_vopt &= ~SMBVOPT_CREATE;
+			/*
+			 * Return it held, unlocked.
+			 * In-line smb_vc_hold here.
+			 */
+			co->co_usecount++;
+			SMB_VC_UNLOCK(vcp);
+			*vcpp = vcp;
+			error = 0;
+			goto out;
+		}
+		SMB_VC_UNLOCK(vcp);
+		/* keep looking. */
 	}
-	return (ENOENT);
+	vcp = NULL;
 
-found:
-	/* Return it with a hold. */
-	smb_share_hold(ssp);
-	*sspp = ssp;
-	return (0);
+	/* Note: smb_vclist is still locked. */
+
+	if (ossn->ssn_vopt & SMBVOPT_CREATE) {
+		/*
+		 * Create a new VC.  It starts out with
+		 * hold count = 1, so don't incr. here.
+		 */
+		error = smb_vc_create(ossn, scred, &vcp);
+		if (error == 0)
+			*vcpp = vcp;
+	} else
+		error = ENOENT;
+
+out:
+	SMB_CO_UNLOCK(&smb_vclist);
+	return (error);
 }
 
 
-static char smb_emptypass[] = "";
-
-const char *
-smb_vc_getpass(struct smb_vc *vcp)
-{
-	if (vcp->vc_pass)
-		return (vcp->vc_pass);
-	return (smb_emptypass);
-}
-
-uint16_t
-smb_vc_nextmid(struct smb_vc *vcp)
-{
-	uint16_t r;
-
-	r = atomic_inc_16_nv(&vcp->vc_mid);
-	return (r);
-}
+/*
+ * Helper functions that operate on VCs
+ */
 
 /*
  * Get a pointer to the IP address suitable for passing to Trusted
  * Extensions find_tpc() routine.  Used by smbfs_mount_label_policy().
  * Compare this code to nfs_mount_label_policy() if problems arise.
- * Without support for direct CIFS-over-TCP, we should always see
- * an AF_NETBIOS sockaddr here.
  */
 void *
 smb_vc_getipaddr(struct smb_vc *vcp, int *ipvers)
 {
-	switch (vcp->vc_paddr->sa_family) {
-	case AF_NETBIOS: {
-		struct sockaddr_nb *snb;
+	smbioc_ssn_ident_t *id = &vcp->vc_ssn.ssn_id;
+	void *ret;
 
+	switch (id->id_srvaddr.sa.sa_family) {
+	case AF_INET:
 		*ipvers = IPV4_VERSION;
-		/*LINTED*/
-		snb = (struct sockaddr_nb *)vcp->vc_paddr;
-		return ((void *)&snb->snb_ipaddr);
-	}
-	case AF_INET: {
-		struct sockaddr_in *sin;
+		ret = &id->id_srvaddr.sin.sin_addr;
+		break;
 
-		*ipvers = IPV4_VERSION;
-		/*LINTED*/
-		sin = (struct sockaddr_in *)vcp->vc_paddr;
-		return ((void *)&sin->sin_addr);
-	}
-	case AF_INET6: {
-		struct sockaddr_in6 *sin6;
-
+	case AF_INET6:
 		*ipvers = IPV6_VERSION;
-		/*LINTED*/
-		sin6 = (struct sockaddr_in6 *)vcp->vc_paddr;
-		return ((void *)&sin6->sin6_addr);
-	}
+		ret = &id->id_srvaddr.sin6.sin6_addr;
+		break;
 	default:
 		SMBSDEBUG("invalid address family %d\n",
-		    vcp->vc_paddr->sa_family);
+		    id->id_srvaddr.sa.sa_family);
 		*ipvers = 0;
-		return (NULL);
+		ret = NULL;
+		break;
 	}
+	return (ret);
 }
+
+void
+smb_vc_walkshares(struct smb_vc *vcp,
+	walk_share_func_t func)
+{
+	smb_connobj_t *co;
+	smb_share_t *ssp;
+
+	/*
+	 * Walk the share list calling func(ssp, arg)
+	 */
+	SMB_VC_LOCK(vcp);
+	SLIST_FOREACH(co, &(VCTOCP(vcp)->co_children), co_next) {
+		ssp = CPTOSS(co);
+		SMB_SS_LOCK(ssp);
+		func(ssp);
+		SMB_SS_UNLOCK(ssp);
+	}
+	SMB_VC_UNLOCK(vcp);
+}
+
 
 /*
  * Share implementation
  */
-/*
- * Allocate share structure and attach it to the given VC
- * Connection expected to be locked on entry. Share will be returned
- * in locked state.
- */
-/*ARGSUSED*/
-int
-smb_share_create(struct smb_vc *vcp, struct smb_sharespec *shspec,
-	struct smb_cred *scred, struct smb_share **sspp)
-{
-	static char objtype[] = "smb_ss";
-	struct smb_share *ssp;
-
-	ASSERT(MUTEX_HELD(&vcp->vc_lock));
-
-	ssp = kmem_zalloc(sizeof (struct smb_share), KM_SLEEP);
-	smb_co_init(SSTOCP(ssp), SMBL_SHARE, objtype);
-	ssp->ss_co.co_free = smb_share_free;
-	ssp->ss_co.co_gone = smb_share_gone;
-
-	ssp->ss_name = smb_strdup(shspec->name);
-	ssp->ss_mount = NULL;
-	if (shspec->pass && shspec->pass[0])
-		ssp->ss_pass = smb_strdup(shspec->pass);
-	ssp->ss_type = shspec->stype;
-	ssp->ss_tid = SMB_TID_UNKNOWN;
-	ssp->ss_mode = shspec->rights & SMBM_MASK;
-	ssp->ss_fsname = NULL;
-	smb_co_addchild(VCTOCP(vcp), SSTOCP(ssp));
-	*sspp = ssp;
-
-	return (0);
-}
-
-/*
- * Normally called via smb_share_rele()
- * after co_usecount drops to zero.
- */
-static void
-smb_share_free(struct smb_connobj *cp)
-{
-	struct smb_share *ssp = CPTOSS(cp);
-
-	SMB_STRFREE(ssp->ss_name);
-	SMB_STRFREE(ssp->ss_pass);
-	SMB_STRFREE(ssp->ss_fsname);
-	smb_co_done(SSTOCP(ssp));
-	kmem_free(ssp, sizeof (*ssp));
-}
-
-/*
- * Normally called via smb_share_rele()
- * after co_usecount drops to zero.
- * Also called via: smb_share_kill()
- */
-static void
-smb_share_gone(struct smb_connobj *cp)
-{
-	struct smb_cred scred;
-	struct smb_share *ssp = CPTOSS(cp);
-
-	smb_credinit(&scred, curproc, NULL);
-	smb_iod_shutdown_share(ssp);
-	smb_smb_treedisconnect(ssp, &scred);
-	smb_credrele(&scred);
-}
 
 void
 smb_share_hold(struct smb_share *ssp)
@@ -1136,56 +608,183 @@ smb_share_kill(struct smb_share *ssp)
 	smb_co_kill(SSTOCP(ssp));
 }
 
-
-void
-smb_share_invalidate(struct smb_share *ssp)
+/*
+ * Normally called via smb_share_rele()
+ * after co_usecount drops to zero.
+ * Also called via: smb_share_kill()
+ */
+static void
+smb_share_gone(struct smb_connobj *cp)
 {
-	ssp->ss_tid = SMB_TID_UNKNOWN;
+	struct smb_cred scred;
+	struct smb_share *ssp = CPTOSS(cp);
+
+	smb_credinit(&scred, NULL);
+	smb_iod_shutdown_share(ssp);
+	smb_smb_treedisconnect(ssp, &scred);
+	smb_credrele(&scred);
 }
 
 /*
- * Returns NON-zero if the share is valid.
- * Called with the share locked.
+ * Normally called via smb_share_rele()
+ * after co_usecount drops to zero.
  */
-int
-smb_share_valid(struct smb_share *ssp)
+static void
+smb_share_free(struct smb_connobj *cp)
 {
-	struct smb_vc *vcp = SSTOVC(ssp);
+	struct smb_share *ssp = CPTOSS(cp);
+
+	cv_destroy(&ssp->ss_conn_done);
+	smb_co_done(SSTOCP(ssp));
+	kmem_free(ssp, sizeof (*ssp));
+}
+
+/*
+ * Allocate share structure and attach it to the given VC
+ * Connection expected to be locked on entry. Share will be returned
+ * in locked state.
+ */
+/*ARGSUSED*/
+int
+smb_share_create(smbioc_tcon_t *tcon, struct smb_vc *vcp,
+	struct smb_share **sspp, struct smb_cred *scred)
+{
+	static char objtype[] = "smb_ss";
+	struct smb_share *ssp;
+
+	ASSERT(MUTEX_HELD(&vcp->vc_lock));
+
+	ssp = kmem_zalloc(sizeof (struct smb_share), KM_SLEEP);
+	smb_co_init(SSTOCP(ssp), SMBL_SHARE, objtype);
+	ssp->ss_co.co_free = smb_share_free;
+	ssp->ss_co.co_gone = smb_share_gone;
+
+	cv_init(&ssp->ss_conn_done, objtype, CV_DRIVER, NULL);
+	ssp->ss_tid = SMB_TID_UNKNOWN;
+
+	bcopy(&tcon->tc_sh, &ssp->ss_ioc,
+	    sizeof (smbioc_oshare_t));
+
+	smb_co_addchild(VCTOCP(vcp), SSTOCP(ssp));
+	*sspp = ssp;
+
+	return (0);
+}
+
+/*
+ * Find or create a share under the given VC
+ * and return it with a "hold", but not locked.
+ */
+
+int
+smb_share_findcreate(smbioc_tcon_t *tcon, struct smb_vc *vcp,
+	struct smb_share **sspp, struct smb_cred *scred)
+{
+	struct smb_connobj *co;
+	struct smb_share *ssp = NULL;
+	int error = 0;
+
+	*sspp = NULL;
+
+	SMB_VC_LOCK(vcp);
+
+	/* var, head, next_field */
+	SLIST_FOREACH(co, &(VCTOCP(vcp)->co_children), co_next) {
+		ssp = CPTOSS(co);
+
+		/* Share name */
+		if (u8_strcmp(ssp->ss_name, tcon->tc_sh.sh_name, 0,
+		    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &error))
+			continue;
+
+		/*
+		 * We have a match, but still have to check
+		 * the _GONE flag, and do that with a lock.
+		 * No new references when _GONE is set.
+		 *
+		 * Also clear SMBSOPT_CREATE which the caller
+		 * may check to find out if we did create.
+		 */
+		SMB_SS_LOCK(ssp);
+		if ((ssp->ss_flags & SMBS_GONE) == 0) {
+			tcon->tc_opt &= ~SMBSOPT_CREATE;
+			/*
+			 * Return it held, unlocked.
+			 * In-line smb_share_hold here.
+			 */
+			co->co_usecount++;
+			SMB_SS_UNLOCK(ssp);
+			*sspp = ssp;
+			error = 0;
+			goto out;
+		}
+		SMB_SS_UNLOCK(ssp);
+		/* keep looking. */
+	}
+	ssp = NULL;
+
+	/* Note: vcp (list of shares) is still locked. */
+
+	if (tcon->tc_opt & SMBSOPT_CREATE) {
+		/*
+		 * Create a new share.  It starts out with
+		 * hold count = 1, so don't incr. here.
+		 */
+		error = smb_share_create(tcon, vcp, &ssp, scred);
+		if (error == 0)
+			*sspp = ssp;
+	} else
+		error = ENOENT;
+
+out:
+	SMB_VC_UNLOCK(vcp);
+	return (error);
+}
+
+
+/*
+ * Helper functions that operate on shares
+ */
+
+/*
+ * Mark this share as invalid, so consumers will know
+ * their file handles have become invalid.
+ *
+ * Most share consumers store a copy of ss_vcgenid when
+ * opening a file handle and compare that with what's in
+ * the share before using a file handle.  If the genid
+ * doesn't match, the file handle has become "stale"
+ * due to disconnect.  Therefore, zap ss_vcgenid here.
+ */
+void
+smb_share_invalidate(struct smb_share *ssp)
+{
 
 	ASSERT(MUTEX_HELD(&ssp->ss_lock));
 
-	if ((ssp->ss_flags & SMBS_CONNECTED) == 0)
-		return (0);
-
-	if (ssp->ss_tid == SMB_TID_UNKNOWN) {
-		SMBIODEBUG("found TID unknown\n");
-		ssp->ss_flags &= ~SMBS_CONNECTED;
-	}
-
-	if (ssp->ss_vcgenid != vcp->vc_genid) {
-		SMBIODEBUG("wrong genid\n");
-		ssp->ss_flags &= ~SMBS_CONNECTED;
-	}
-
-	return (ssp->ss_flags & SMBS_CONNECTED);
+	ssp->ss_flags &= ~SMBS_CONNECTED;
+	ssp->ss_tid = SMB_TID_UNKNOWN;
+	ssp->ss_vcgenid = 0;
 }
 
 /*
  * Connect (or reconnect) a share object.
- * Called with the share locked.
+ *
+ * Called by smb_usr_get_tree() for new connections,
+ * and called by smb_rq_enqueue() for reconnect.
  */
 int
-smb_share_tcon(struct smb_share *ssp)
+smb_share_tcon(smb_share_t *ssp, smb_cred_t *scred)
 {
-	struct smb_vc *vcp = SSTOVC(ssp);
 	clock_t tmo;
 	int error;
 
-	ASSERT(MUTEX_HELD(&ssp->ss_lock));
+	SMB_SS_LOCK(ssp);
 
 	if (ssp->ss_flags & SMBS_CONNECTED) {
 		SMBIODEBUG("alread connected?");
-		return (0);
+		error = 0;
+		goto out;
 	}
 
 	/*
@@ -1198,76 +797,41 @@ smb_share_tcon(struct smb_share *ssp)
 		ssp->ss_conn_waiters--;
 		if (tmo == 0) {
 			/* Interrupt! */
-			return (EINTR);
+			error = EINTR;
+			goto out;
 		}
 	}
 
 	/* Did someone else do it for us? */
-	if (ssp->ss_flags & SMBS_CONNECTED)
-		return (0);
+	if (ssp->ss_flags & SMBS_CONNECTED) {
+		error = 0;
+		goto out;
+	}
 
 	/*
 	 * OK, we'll do the work.
 	 */
 	ssp->ss_flags |= SMBS_RECONNECTING;
 
-	/* Drop the lock while doing the call. */
+	/*
+	 * Drop the lock while doing the TCON.
+	 * On success, sets ss_tid, ss_vcgenid,
+	 * and ss_flags |= SMBS_CONNECTED;
+	 */
 	SMB_SS_UNLOCK(ssp);
-	error = smb_smb_treeconnect(ssp, &vcp->vc_scred);
+	error = smb_smb_treeconnect(ssp, scred);
 	SMB_SS_LOCK(ssp);
 
-	if (!error)
-		ssp->ss_flags |= SMBS_CONNECTED;
 	ssp->ss_flags &= ~SMBS_RECONNECTING;
 
 	/* They can all go ahead! */
 	if (ssp->ss_conn_waiters)
 		cv_broadcast(&ssp->ss_conn_done);
 
+out:
+	SMB_SS_UNLOCK(ssp);
+
 	return (error);
-}
-
-const char *
-smb_share_getpass(struct smb_share *ssp)
-{
-	struct smb_vc *vcp;
-
-	if (ssp->ss_pass)
-		return (ssp->ss_pass);
-	vcp = SSTOVC(ssp);
-	if (vcp->vc_pass)
-		return (vcp->vc_pass);
-	return (smb_emptypass);
-}
-
-int
-smb_share_count(void)
-{
-	struct smb_connobj *covc, *coss;
-	struct smb_vc *vcp;
-	zoneid_t zoneid = getzoneid();
-	int nshares = 0;
-
-	SMB_CO_LOCK(&smb_vclist);
-	SLIST_FOREACH(covc, &smb_vclist.co_children, co_next) {
-		vcp = CPTOVC(covc);
-
-		/* VCs in other zones are invisibile. */
-		if (vcp->vc_zoneid != zoneid)
-			continue;
-
-		SMB_VC_LOCK(vcp);
-
-		/* var, head, next_field */
-		SLIST_FOREACH(coss, &(VCTOCP(vcp)->co_children), co_next) {
-			nshares++;
-		}
-
-		SMB_VC_UNLOCK(vcp);
-	}
-	SMB_CO_UNLOCK(&smb_vclist);
-
-	return (nshares);
 }
 
 /*

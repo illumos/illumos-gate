@@ -33,14 +33,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _FS_SMBFS_SMBFS_SUBR_H_
 #define	_FS_SMBFS_SMBFS_SUBR_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cmn_err.h>
 #include <netsmb/mchain.h>
@@ -150,14 +148,13 @@ typedef struct smbfs_fctx smbfs_fctx_t;
 #define	f_rq	f_urq.uf_rq
 #define	f_t2	f_urq.uf_t2
 
-
 /*
  * smb level
  */
 int  smbfs_smb_lock(struct smbnode *np, int op, caddr_t id,
 	offset_t start, uint64_t len,	int largelock,
 	struct smb_cred *scrp, uint32_t timeout);
-int  smbfs_smb_qfsattr(struct smb_share *ssp, uint32_t *attrp,
+int  smbfs_smb_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *,
 	struct smb_cred *scrp);
 int  smbfs_smb_statfs(struct smb_share *ssp, statvfs64_t *sbp,
 	struct smb_cred *scrp);

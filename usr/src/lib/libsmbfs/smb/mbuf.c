@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,17 +47,11 @@
 #include <libintl.h>
 #include <assert.h>
 
-#include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/mchain.h>
 
 #include "private.h"
-
-#ifdef APPLE
-#define	__func__ ""
-#define	MBERROR(format, args...) \
-	printf("%s(%d): "format, __func__, __LINE__, ## args)
-#endif
+#include "charsets.h"
 
 static int
 m_get(size_t len, struct mbuf **mpp)
@@ -85,7 +79,7 @@ m_free(struct mbuf *m)
 	free(m);
 }
 
-static void
+void
 m_freem(struct mbuf *m0)
 {
 	struct mbuf *m;
@@ -97,7 +91,7 @@ m_freem(struct mbuf *m0)
 	}
 }
 
-static size_t
+size_t
 m_totlen(struct mbuf *m0)
 {
 	struct mbuf *m = m0;
@@ -226,61 +220,64 @@ int
 mb_put_uint8(struct mbdata *mbp, uint8_t x)
 {
 	uint8_t y = x;
-	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y)));
 }
 
 int
 mb_put_uint16be(struct mbdata *mbp, uint16_t x)
 {
 	uint16_t y = htobes(x);
-	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y)));
 }
 
 int
 mb_put_uint16le(struct mbdata *mbp, uint16_t x)
 {
 	uint16_t y = htoles(x);
-	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y)));
 }
 
 int
 mb_put_uint32be(struct mbdata *mbp, uint32_t x)
 {
 	uint32_t y = htobel(x);
-	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y)));
 }
 
 int
 mb_put_uint32le(struct mbdata *mbp, uint32_t x)
 {
 	uint32_t y = htolel(x);
-	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y)));
 }
 
 int
 mb_put_uint64be(struct mbdata *mbp, uint64_t x)
 {
 	uint64_t y = htobeq(x);
-	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y)));
 }
 
 int
 mb_put_uint64le(struct mbdata *mbp, uint64_t x)
 {
 	uint64_t y = htoleq(x);
-	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
+	return (mb_put_mem(mbp, &y, sizeof (y)));
 }
 
 int
-mb_put_mem(struct mbdata *mbp, const char *source, size_t size)
+mb_put_mem(struct mbdata *mbp, const void *vmem, size_t size)
 {
 	struct mbuf *m;
+	const char *src;
 	char  *dst;
 	size_t cplen;
 	int error;
 
 	if (size == 0)
 		return (0);
+
+	src = vmem;
 	m = mbp->mb_cur;
 	if ((error = m_getm(m, size, &m)) != 0)
 		return (error);
@@ -293,9 +290,9 @@ mb_put_mem(struct mbdata *mbp, const char *source, size_t size)
 		if (cplen > size)
 			cplen = size;
 		dst = mtod(m, char *) + m->m_len;
-		if (source) {
-			bcopy(source, dst, cplen);
-			source += cplen;
+		if (src) {
+			bcopy(src, dst, cplen);
+			src += cplen;
 		} else
 			bzero(dst, cplen);
 		size -= cplen;
@@ -307,10 +304,26 @@ mb_put_mem(struct mbdata *mbp, const char *source, size_t size)
 	return (0);
 }
 
+/*
+ * Append another mbuf to the mbuf chain.
+ * If what we're appending is smaller than
+ * the current trailing space, just copy.
+ * This always consumes the passed mbuf.
+ */
 int
 mb_put_mbuf(struct mbdata *mbp, struct mbuf *m)
 {
-	mbp->mb_cur->m_next = m;
+	struct mbuf *cm = mbp->mb_cur;
+	int ts = M_TRAILINGSPACE(cm);
+
+	if (m->m_next == NULL && m->m_len <= ts) {
+		/* just copy */
+		mb_put_mem(mbp, m->m_data, m->m_len);
+		m_freem(m);
+		return (0);
+	}
+
+	cm->m_next = m;
 	while (m) {
 		mbp->mb_count += m->m_len;
 		if (m->m_next == NULL)
@@ -322,17 +335,62 @@ mb_put_mbuf(struct mbdata *mbp, struct mbuf *m)
 	return (0);
 }
 
+/*
+ * Convenience function to put an OEM or Unicode string,
+ * null terminated, and aligned if necessary.
+ */
 int
-mb_put_pstring(struct mbdata *mbp, const char *s)
+mb_put_dstring(struct mbdata *mbp, const char *s, int uc)
 {
-	int error, len = strlen(s);
+	int err;
 
-	if (len > 255) {
-		len = 255;
+	if (uc) {
+		/* Put Unicode.  align(2) first. */
+		if (mbp->mb_count & 1)
+			mb_put_uint8(mbp, 0);
+		err = mb_put_ustring(mbp, s);
+	} else {
+		/* Put ASCII (really OEM) */
+		err = mb_put_astring(mbp, s);
 	}
-	if ((error = mb_put_uint8(mbp, len)) != 0)
-		return (error);
-	return (mb_put_mem(mbp, s, len));
+
+	return (err);
+}
+
+/*
+ * Put an ASCII string (really OEM), given a UTF-8 string.
+ */
+int
+mb_put_astring(struct mbdata *mbp, const char *s)
+{
+	char *abuf;
+	int err, len;
+
+	abuf = convert_utf8_to_wincs(s);
+	if (abuf == NULL)
+		return (ENOMEM);
+	len = strlen(abuf) + 1;
+	err = mb_put_mem(mbp, abuf, len);
+	free(abuf);
+	return (err);
+}
+
+/*
+ * Put UCS-2LE, given a UTF-8 string.
+ */
+int
+mb_put_ustring(struct mbdata *mbp, const char *s)
+{
+	uint16_t *ubuf;
+	int err, len;
+
+	ubuf = convert_utf8_to_leunicode(s);
+	if (ubuf == NULL)
+		return (ENOMEM);
+	len = unicode_strlen(ubuf) + 1;
+	err = mb_put_mem(mbp, ubuf, (len << 1));
+	free(ubuf);
+	return (err);
 }
 
 /*
@@ -343,111 +401,114 @@ mb_put_pstring(struct mbdata *mbp, const char *s)
 int
 mb_get_uint8(struct mbdata *mbp, uint8_t *x)
 {
-	return (mb_get_mem(mbp, (char *)x, 1));
+	return (mb_get_mem(mbp, x, 1));
 }
 
 int
 mb_get_uint16(struct mbdata *mbp, uint16_t *x)
 {
-	return (mb_get_mem(mbp, (char *)x, 2));
+	return (mb_get_mem(mbp, x, 2));
 }
 
 int
 mb_get_uint16le(struct mbdata *mbp, uint16_t *x)
 {
 	uint16_t v;
-	int error = mb_get_uint16(mbp, &v);
+	int err;
 
+	if ((err = mb_get_mem(mbp, &v, 2)) != 0)
+		return (err);
 	if (x != NULL)
 		*x = letohs(v);
-	return (error);
+	return (0);
 }
 
 int
 mb_get_uint16be(struct mbdata *mbp, uint16_t *x) {
 	uint16_t v;
-	int error = mb_get_uint16(mbp, &v);
+	int err;
 
+	if ((err = mb_get_mem(mbp, &v, 2)) != 0)
+		return (err);
 	if (x != NULL)
 		*x = betohs(v);
-	return (error);
+	return (0);
 }
 
 int
 mb_get_uint32(struct mbdata *mbp, uint32_t *x)
 {
-	return (mb_get_mem(mbp, (char *)x, 4));
+	return (mb_get_mem(mbp, x, 4));
 }
 
 int
 mb_get_uint32be(struct mbdata *mbp, uint32_t *x)
 {
 	uint32_t v;
-	int error;
+	int err;
 
-	error = mb_get_uint32(mbp, &v);
+	if ((err = mb_get_mem(mbp, &v, 4)) != 0)
+		return (err);
 	if (x != NULL)
 		*x = betohl(v);
-	return (error);
+	return (0);
 }
 
 int
 mb_get_uint32le(struct mbdata *mbp, uint32_t *x)
 {
 	uint32_t v;
-	int error;
+	int err;
 
-	error = mb_get_uint32(mbp, &v);
+	if ((err = mb_get_mem(mbp, &v, 4)) != 0)
+		return (err);
 	if (x != NULL)
 		*x = letohl(v);
-	return (error);
+	return (0);
 }
 
 int
 mb_get_uint64(struct mbdata *mbp, uint64_t *x)
 {
-	return (mb_get_mem(mbp, (char *)x, 8));
+	return (mb_get_mem(mbp, x, 8));
 }
 
 int
 mb_get_uint64be(struct mbdata *mbp, uint64_t *x)
 {
 	uint64_t v;
-	int error;
+	int err;
 
-	error = mb_get_uint64(mbp, &v);
+	if ((err = mb_get_mem(mbp, &v, 8)) != 0)
+		return (err);
 	if (x != NULL)
 		*x = betohq(v);
-	return (error);
+	return (0);
 }
 
 int
 mb_get_uint64le(struct mbdata *mbp, uint64_t *x)
 {
 	uint64_t v;
-	int error;
+	int err;
 
-	error = mb_get_uint64(mbp, &v);
+	if ((err = mb_get_mem(mbp, &v, 8)) != 0)
+		return (err);
 	if (x != NULL)
 		*x = letohq(v);
-	return (error);
+	return (0);
 }
 
 int
-mb_get_mem(struct mbdata *mbp, char *target, size_t size)
+mb_get_mem(struct mbdata *mbp, void *vmem, size_t size)
 {
 	struct mbuf *m = mbp->mb_cur;
+	char *dst = vmem;
 	uint_t count;
 
 	while (size > 0) {
 		if (m == NULL) {
-#ifdef DEBUG
-			printf(
-			    dgettext(TEXT_DOMAIN, "incomplete copy\n"));
-#endif
-#ifdef APPLE
-			MBERROR("incomplete copy\n");
-#endif
+			/* DPRINT("incomplete copy"); */
 			return (EBADRPC);
 		}
 		count = mb_left(m, mbp->mb_pos);
@@ -460,15 +521,181 @@ mb_get_mem(struct mbdata *mbp, char *target, size_t size)
 		if (count > size)
 			count = size;
 		size -= count;
-		if (target) {
+		if (dst) {
 			if (count == 1) {
-				*target++ = *mbp->mb_pos;
+				*dst++ = *mbp->mb_pos;
 			} else {
-				bcopy(mbp->mb_pos, target, count);
-				target += count;
+				bcopy(mbp->mb_pos, dst, count);
+				dst += count;
 			}
 		}
 		mbp->mb_pos += count;
 	}
+	return (0);
+}
+
+/*
+ * Get the next SIZE bytes as a separate mblk.
+ * Nothing fancy here - just copy.
+ */
+int
+mb_get_mbuf(struct mbdata *mbp, int size, struct mbuf **ret)
+{
+	mbuf_t *m;
+	int err;
+
+	err = m_get(size, &m);
+	if (err)
+		return (err);
+
+	err = mb_get_mem(mbp, m->m_data, size);
+	if (err) {
+		m_freem(m);
+		return (err);
+	}
+	m->m_len = size;
+	*ret = m;
+
+	return (0);
+}
+
+/*
+ * Get a string from the mbuf chain,
+ * either Unicode or OEM chars.
+ */
+int
+mb_get_string(struct mbdata *mbp, char **str_pp, int uc)
+{
+	int err;
+
+	if (uc)
+		err = mb_get_ustring(mbp, str_pp);
+	else
+		err = mb_get_astring(mbp, str_pp);
+	return (err);
+}
+
+/*
+ * Get an ASCII (really OEM) string from the mbuf chain
+ * and convert it to UTF-8
+ * Similar to mb_get_ustring below.
+ */
+int
+mb_get_astring(struct mbdata *real_mbp, char **str_pp)
+{
+	struct mbdata tmp_mb, *mbp;
+	char *tstr, *ostr;
+	int err, i, slen;
+	uint8_t ch;
+
+	/*
+	 * First, figure out the string length.
+	 * Use a copy of the real_mbp so we don't
+	 * actually consume it here, then search for
+	 * the null (or end of data).
+	 */
+	bcopy(real_mbp, &tmp_mb, sizeof (tmp_mb));
+	mbp = &tmp_mb;
+	slen = 0;
+	for (;;) {
+		err = mb_get_uint8(mbp, &ch);
+		if (err)
+			break;
+		if (ch == 0)
+			break;
+		slen++;
+	}
+
+	/*
+	 * Now read the (OEM) string for real.
+	 * No need to re-check errors.
+	 */
+	tstr = malloc(slen + 1);
+	if (tstr == NULL)
+		return (ENOMEM);
+	mbp = real_mbp;
+	for (i = 0; i < slen; i++) {
+		mb_get_uint8(mbp, &ch);
+		tstr[i] = ch;
+	}
+	tstr[i] = 0;
+	mb_get_uint8(mbp, NULL);
+
+	/*
+	 * Convert OEM to UTF-8
+	 */
+	ostr = convert_wincs_to_utf8(tstr);
+	free(tstr);
+	if (ostr == NULL)
+		return (ENOMEM);
+
+	*str_pp = ostr;
+	return (0);
+}
+
+/*
+ * Get a UCS-2LE string from the mbuf chain, and
+ * convert it to UTF-8.
+ *
+ * Similar to mb_get_astring below.
+ */
+int
+mb_get_ustring(struct mbdata *real_mbp, char **str_pp)
+{
+	struct mbdata tmp_mb, *mbp;
+	uint16_t *tstr;
+	char *ostr;
+	int err, i, slen;
+	uint16_t ch;
+
+	/*
+	 * First, align(2) on the real_mbp
+	 */
+	if (((uintptr_t)real_mbp->mb_pos) & 1)
+		mb_get_uint8(real_mbp, NULL);
+
+	/*
+	 * Next, figure out the string length.
+	 * Use a copy of the real_mbp so we don't
+	 * actually consume it here, then search for
+	 * the null (or end of data).
+	 */
+	bcopy(real_mbp, &tmp_mb, sizeof (tmp_mb));
+	mbp = &tmp_mb;
+	slen = 0;
+	for (;;) {
+		err = mb_get_uint16le(mbp, &ch);
+		if (err)
+			break;
+		if (ch == 0)
+			break;
+		slen++;
+	}
+
+	/*
+	 * Now read the (UCS-2) string for real.
+	 * No need to re-check errors.  Note:
+	 * This puts the UCS-2 in NATIVE order!
+	 */
+	tstr = calloc(slen + 1, 2);
+	if (tstr == NULL)
+		return (ENOMEM);
+	mbp = real_mbp;
+	for (i = 0; i < slen; i++) {
+		mb_get_uint16le(mbp, &ch);
+		tstr[i] = ch;
+	}
+	tstr[i] = 0;
+	mb_get_uint16le(mbp, NULL);
+
+	/*
+	 * Convert UCS-2 (native!) to UTF-8
+	 */
+	ostr = convert_unicode_to_utf8(tstr);
+	free(tstr);
+	if (ostr == NULL)
+		return (ENOMEM);
+
+	*str_pp = ostr;
 	return (0);
 }

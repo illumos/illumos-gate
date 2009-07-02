@@ -20,15 +20,15 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mdb_modapi.h>
+#include <mdb/mdb_ctf.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
 #include "smb_conn.h"
 #include "smb_rq.h"
@@ -210,6 +210,7 @@ smb_co_walk_step(mdb_walk_state_t *wsp)
 typedef struct smb_co_cbdata {
 	int flags;		/* OPT_...  */
 	int printed_header;
+	mdb_ctf_id_t ctf_id;
 } smb_co_cbdata_t;
 
 /*
@@ -221,9 +222,7 @@ smb_ss_cb(uintptr_t addr, const void *data, void *arg)
 	const smb_share_t *ssp = data;
 	smb_co_cbdata_t *cbd = arg;
 
-	mdb_printf(" %-p", addr);
-	print_str((uintptr_t)ssp->ss_name);
-	mdb_printf("\n");
+	mdb_printf(" %-p\t%s\n", addr, ssp->ss_name);
 
 	if (cbd->flags & OPT_VERBOSE) {
 		mdb_inc_indent(2);
@@ -232,6 +231,28 @@ smb_ss_cb(uintptr_t addr, const void *data, void *arg)
 	}
 
 	return (WALK_NEXT);
+}
+
+static const char *
+vcstate_str(smb_co_cbdata_t *cbd, int stval)
+{
+	static const char prefix[] = "SMBIOD_ST_";
+	int prefix_len = sizeof (prefix) - 1;
+	mdb_ctf_id_t vcst_enum;
+	const char *cp;
+
+	/* Got this in smb_vc_dcmd. */
+	vcst_enum = cbd->ctf_id;
+
+	/* Get the name for the enum value. */
+	if ((cp = mdb_ctf_enum_name(vcst_enum, stval)) == NULL)
+		return ("?");
+
+	/* Skip the prefix part. */
+	if (strncmp(cp, prefix, prefix_len) == 0)
+		cp += prefix_len;
+
+	return (cp);
 }
 
 /*
@@ -245,14 +266,33 @@ smb_vc_cb(uintptr_t addr, const void *data, void *arg)
 
 	if (cbd->printed_header == 0) {
 		cbd->printed_header = 1;
-		mdb_printf("// smb_vc_t uid server user\n");
+		mdb_printf("// smb_vc_t  uid  server  \tuser\t\tstate\n");
 	}
 
 	mdb_printf("%-p", addr);
-	mdb_printf(" %d", vcp->vc_uid);
-	print_str((uintptr_t)vcp->vc_srvname);
-	print_str((uintptr_t)vcp->vc_username);
-	mdb_printf("\n");
+	mdb_printf(" %7d", vcp->vc_owner);
+
+	switch (vcp->vc_srvaddr.sa.sa_family) {
+	case AF_INET:
+		mdb_printf(" %I", vcp->vc_srvaddr.sin.sin_addr);
+		break;
+	case AF_INET6:
+		mdb_printf(" %N", &vcp->vc_srvaddr.sin6.sin6_addr);
+		break;
+	default:
+		mdb_printf(" %15s", "(bad af)");
+		break;
+	}
+
+	if (vcp->vc_username[0] != '\0')
+		mdb_printf("\t%s", vcp->vc_username);
+	else
+		mdb_printf("\t%s", "(?)");
+
+	if (vcp->vc_domain[0] != '\0')
+		mdb_printf("@%s", vcp->vc_domain);
+
+	mdb_printf("\t%s\n", vcstate_str(cbd, vcp->vc_state));
 
 	if (cbd->flags & OPT_RECURSE) {
 		mdb_inc_indent(2);
@@ -280,6 +320,10 @@ smb_vc_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'v', MDB_OPT_SETBITS, OPT_VERBOSE, &cbd.flags,
 	    NULL) != argc) {
 		return (DCMD_USAGE);
+	}
+
+	if (mdb_ctf_lookup_by_name("enum smbiod_state", &cbd.ctf_id) == -1) {
+		mdb_warn("Could not find enum smbiod_state");
 	}
 
 	if (!(flags & DCMD_ADDRSPEC)) {

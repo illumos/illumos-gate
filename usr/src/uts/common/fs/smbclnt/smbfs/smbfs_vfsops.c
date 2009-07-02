@@ -33,11 +33,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/cred.h>
@@ -119,9 +117,11 @@ static mntopts_t smbfs_mntopts = {
 	mntopts
 };
 
+static const char fs_type_name[FSTYPSZ] = "smbfs";
+
 static vfsdef_t vfw = {
 	VFSDEF_VERSION,
-	"smbfs",		/* type name string */
+	(char *)fs_type_name,
 	smbfsinit,		/* init routine */
 	VSW_HASPROTO|VSW_NOTZONESAFE,	/* flags */
 	&smbfs_mntopts			/* mount options table prototype */
@@ -129,7 +129,7 @@ static vfsdef_t vfw = {
 
 static struct modlfs modlfs = {
 	&mod_fsops,
-	"SMBFS filesystem v" SMBFS_VER_STR,
+	"SMBFS filesystem",
 	&vfw
 };
 
@@ -386,16 +386,7 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		return (error);
 	}
 
-	/*
-	 * We don't have data structures to support multiple mounts of
-	 * the same share object by the same owner, so don't allow it.
-	 */
-	if (ssp->ss_mount != NULL) {
-		smb_share_rele(ssp);
-		return (EBUSY);
-	}
-
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	/*
 	 * Use "goto errout" from here on.
@@ -458,7 +449,6 @@ proceed:
 	smi = kmem_zalloc(sizeof (smbmntinfo_t), KM_SLEEP);
 
 	smi->smi_share	= ssp;
-	ssp->ss_mount	= smi;
 	smi->smi_zone	= mntzone;
 	smi->smi_flags	= SMI_LLOCK;
 
@@ -481,7 +471,7 @@ proceed:
 	 * Get attributes of the remote file system,
 	 * i.e. ACL support, named streams, etc.
 	 */
-	error = smbfs_smb_qfsattr(ssp, &smi->smi_fsattr, &scred);
+	error = smbfs_smb_qfsattr(ssp, &smi->smi_fsa, &scred);
 	if (error) {
 		SMBVDEBUG("smbfs_smb_qfsattr error %d\n", error);
 	}
@@ -729,6 +719,7 @@ smbfs_statvfs(vfs_t *vfsp, statvfs64_t *sbp)
 recheck:
 	now = gethrtime();
 	if (now < smi->smi_statfstime) {
+		error = 0;
 		goto cache_hit;
 	}
 
@@ -753,46 +744,45 @@ recheck:
 	/*
 	 * Do the OTW call.  Note: lock NOT held.
 	 */
-	smb_credinit(&scred, curproc, NULL);
+	smb_credinit(&scred, NULL);
 	bzero(&stvfs, sizeof (stvfs));
 	error = smbfs_smb_statfs(ssp, &stvfs, &scred);
 	smb_credrele(&scred);
+	if (error) {
+		SMBVDEBUG("statfs error=%d\n", error);
+	} else {
+
+		/*
+		 * Set a few things the OTW call didn't get.
+		 */
+		stvfs.f_frsize = stvfs.f_bsize;
+		stvfs.f_favail = stvfs.f_ffree;
+		stvfs.f_fsid = (unsigned long)vfsp->vfs_fsid.val[0];
+		bcopy(fs_type_name, stvfs.f_basetype, FSTYPSZ);
+		stvfs.f_flag	= vf_to_stf(vfsp->vfs_flag);
+		stvfs.f_namemax	= smi->smi_fsa.fsa_maxname;
+
+		/*
+		 * Save the result, update lifetime
+		 */
+		now = gethrtime();
+		smi->smi_statfstime = now +
+		    (SM_MAX_STATFSTIME * (hrtime_t)NANOSEC);
+		smi->smi_statvfsbuf = stvfs; /* struct assign! */
+	}
 
 	mutex_enter(&smi->smi_lock);
 	if (smi->smi_status & SM_STATUS_STATFS_WANT)
 		cv_broadcast(&smi->smi_statvfs_cv);
 	smi->smi_status &= ~(SM_STATUS_STATFS_BUSY | SM_STATUS_STATFS_WANT);
 
-	if (error) {
-		SMBVDEBUG("statfs error=%d\n", error);
-		mutex_exit(&smi->smi_lock);
-		return (error);
-	}
-
-	/*
-	 * Set a few things the OTW call didn't get.
-	 */
-	stvfs.f_frsize = stvfs.f_bsize;
-	stvfs.f_favail = stvfs.f_ffree;
-	stvfs.f_fsid = (unsigned long)vfsp->vfs_fsid.val[0];
-	(void) strncpy(stvfs.f_basetype, vfw.name, FSTYPSZ);
-	stvfs.f_flag	= vf_to_stf(vfsp->vfs_flag);
-	stvfs.f_namemax	= (uint32_t)MAXNAMELEN - 1;
-
-	/*
-	 * Save the result, update lifetime
-	 */
-	now = gethrtime();
-	smi->smi_statfstime = now +
-	    (SM_MAX_STATFSTIME * (hrtime_t)NANOSEC);
-	smi->smi_statvfsbuf = stvfs; /* struct assign! */
-
 	/*
 	 * Copy the statvfs data to caller's buf.
 	 * Note: struct assignment
 	 */
 cache_hit:
-	*sbp = smi->smi_statvfsbuf;
+	if (error == 0)
+		*sbp = smi->smi_statvfsbuf;
 	mutex_exit(&smi->smi_lock);
 	return (error);
 }
@@ -861,8 +851,6 @@ smbfs_freevfs(vfs_t *vfsp)
 	 */
 	ssp = smi->smi_share;
 	smi->smi_share = NULL;
-	ssp->ss_mount = NULL;
-
 	smb_share_rele(ssp);
 
 	zone_rele(smi->smi_zone);

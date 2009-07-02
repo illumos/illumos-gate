@@ -1206,6 +1206,9 @@ usr/include/sys/sdcard/sda_ioctl.h	sparc
 #
 # libsmbfs is private
 #
+usr/include/netsmb			sparc
+usr/include/netsmb/smbfs_acl.h		sparc
+usr/include/netsmb/smbfs_api.h		sparc
 usr/lib/libsmbfs.so			sparc
 usr/lib/sparcv9/libsmbfs.so		sparc
 usr/lib/llib-lsmbfs			sparc

@@ -43,5 +43,9 @@ extern char *convert_leunicode_to_utf8(unsigned short *windows_string);
 extern char *convert_unicode_to_utf8(unsigned short *windows_string);
 extern unsigned short *convert_utf8_to_leunicode(const char *utf8_string);
 extern size_t unicode_strlen(const uint16_t *unicode_string);
+extern char *utf8_str_tolower(const char *s);
+extern char *utf8_str_toupper(const char *s);
+
+extern char *unpercent(char *component);
 
 #endif /* __CHARSETS_H__ */

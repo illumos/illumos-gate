@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,7 +198,7 @@ smbfs_xa_exists(vnode_t *vp, cred_t *cr)
 	/* NB: have VN_HOLD on xpv */
 	xnp = VTOSMB(xvp);
 
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	bzero(&ctx, sizeof (ctx));
 	ctx.f_flags = SMBFS_RDD_FINDFIRST;
@@ -303,6 +303,10 @@ smbfs_xa_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
 	ASSERT(dnp->n_flag & N_XATTR);
 
 	ctx->f_type = ft_XA;
+	ctx->f_namesz = SMB_MAXFNAMELEN + 1;
+	if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp)))
+		ctx->f_namesz *= 2;
+	ctx->f_name = kmem_alloc(ctx->f_namesz, KM_SLEEP);
 
 	error = smbfs_xa_parent(SMBTOV(dnp), &pvp);
 	if (error)
@@ -404,12 +408,8 @@ again:
 		nmlen = min(size, SMB_MAXFNAMELEN);
 	}
 
-	if (ctx->f_name)
-		kmem_free(ctx->f_name, ctx->f_namesz);
+	ASSERT(nmlen < ctx->f_namesz);
 	ctx->f_nmlen = nmlen;
-	/* Add one to prevent allocating size zero. */
-	ctx->f_namesz = nmlen + 1;
-	ctx->f_name = kmem_alloc(ctx->f_namesz, KM_SLEEP);
 	error = md_get_mem(mdp, ctx->f_name, nmlen, MB_MSYSTEM);
 	if (error)
 		return (error);

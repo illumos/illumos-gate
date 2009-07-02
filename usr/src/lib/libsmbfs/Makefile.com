@@ -18,11 +18,15 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+
+#
 # lib/libsmbfs/Makefile.com
+#
 
 LIBRARY=	libsmbfs.a
 VERS=		.1
@@ -35,23 +39,38 @@ OBJECTS=\
 	acl_print.o \
 	charsets.o \
 	cfopt.o \
+	connect.o \
+	crypt.o \
 	ctx.o \
 	derparse.o \
 	file.o \
+	findvc.o \
+	getaddr.o \
+	iod_cl.o \
+	iod_wk.o \
 	keychain.o \
+	krb5ssp.o \
 	mbuf.o \
 	nb.o \
 	nb_name.o \
 	nb_net.o \
+	nb_ssn.o \
 	nbns_rq.o \
+	negprot.o \
 	netshareenum.o \
+	newvc.o \
 	nls.o \
+	ntlm.o \
+	ntlmssp.o \
 	print.o \
 	rap.o \
 	rcfile.o \
 	rq.o \
+	signing.o \
 	spnego.o \
 	spnegoparse.o \
+	ssnsetup.o \
+	ssp.o \
 	subr.o \
 	ui-sun.o \
 	utf_str.o
@@ -68,7 +87,7 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 C99MODE=	$(C99_ENABLE)
 
-LDLIBS += -lsocket -lnsl -lc -lkrb5 -lsec -lidmap
+LDLIBS += -lsocket -lnsl -lc -lmd -lpkcs11 -lkrb5 -lsec -lidmap
 
 # normal warnings...
 CFLAGS	+=	$(CCVERBOSE) 
@@ -76,25 +95,24 @@ CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
 	-I$(SRCDIR) -I.. -I$(SRC)/uts/common
 
-# uncomment these if you want to use dbx
+# Debugging
+${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
+
+# uncomment these for dbx debugging
 #COPTFLAG = -g
 #CTF_FLAGS =
 #CTFCONVERT_O=
 #CTFMERGE_LIB=
 
 # disable some of the less important lint
-LINTCHECKFLAGS	+= -erroff=E_FUNC_ARG_UNUSED
 LINTCHECKFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTCHECKFLAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTCHECKFLAGS	+= -erroff=E_FUNC_VAR_UNUSED
-LINTCHECKFLAGS	+= -erroff=E_STATIC_UNUSED
-LINTCHECKFLAGS	+= -erroff=E_CONSTANT_CONDITION
-LINTCHECKFLAGS	+= -erroff=E_TRUE_LOGICAL_EXPR
-
-.KEEP_STATE:
+LINTCHECKFLAGS	+= -DDEBUG
 
 all:	$(LIBS)
 
 lint:	lintcheck
 
 include ../../Makefile.targ
+
+.KEEP_STATE:

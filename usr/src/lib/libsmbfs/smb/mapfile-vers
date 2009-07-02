@@ -36,7 +36,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_1.0 {
+SUNWprivate {
     global:
 	convert_leunicode_to_utf8;
 	convert_unicode_to_utf8;
@@ -58,27 +58,37 @@ SUNWprivate_1.0 {
 	nls_str_toloc;
 	nls_str_upper;
 
-	rc_close;
-	rc_open;
+	smb_close_rcfile;
 
+	smb_ctx_alloc;
 	smb_ctx_done;
 	smb_ctx_flags2;
+	smb_ctx_free;
+	smb_ctx_get_ssn;
+	smb_ctx_get_ssnkey;
+	smb_ctx_get_tree;
+	smb_ctx_gethandle;
 	smb_ctx_init;
-	smb_ctx_lookup;
+	smb_ctx_kill;
 	smb_ctx_opt;
+	smb_ctx_parseunc;
 	smb_ctx_readrc;
 	smb_ctx_resolve;
+	smb_ctx_scan_argv;
 	smb_ctx_set_close_hook;
 
+	smb_ctx_setauthflags;
+	smb_ctx_setdomain;
 	smb_ctx_setfullserver;
 	smb_ctx_setpassword;
+	smb_ctx_setpwhash;
+	smb_ctx_setscope;
 	smb_ctx_setserver;
 	smb_ctx_setshare;
 	smb_ctx_setsrvaddr;
 	smb_ctx_setuser;
-	smb_ctx_setworkgroup;
+	smb_ctx_setwins;
 
-	smb_ctx_tdis;
 	smb_debug	= NODIRECT;	# data
 	smb_error;
 #
@@ -89,14 +99,20 @@ SUNWprivate_1.0 {
 	smb_fh_write;
 	smb_fh_xactnp;
 #
+	smb_get_authentication;
 	smb_getprogname;
+	smb_iod_connect;
+	smb_iod_door_path;
+	smb_iod_open_door;
+	smb_iod_work;
 	smb_lib_init;
 	smb_netshareenum;	# will move to libnetapi
 	smb_open_rcfile;
+	smb_printer_open;
+	smb_printer_close;
 	smb_simplecrypt;
 	smb_simpledecrypt;
 	smb_strerror;
-	smb_rc		= NODIRECT;	# data
 #
 # Functions to support the Remote Access Protocol (RAP)
 	smb_rap_create;
@@ -126,7 +142,7 @@ SUNWprivate_1.0 {
 	smbfs_keychain_del_everyone;
 	smbfs_keychain_del_owner;
 
-	unpercent;
+	smbutil_std_opts;
     local:
 	*;
 };

@@ -18,18 +18,18 @@
 \
 \ CDDL HEADER END
 \
+
 \
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 \
 \ offsets.in: input file for the ctfstabs program,
 \ used to generate ioc_check.h - which verifies
 \ invariance of our ioctl data structures across
 \ 32-bit and 64-bit ABIs.
+\
 
 #ifndef	_GENASSYM
 #define	_GENASSYM
@@ -43,56 +43,73 @@
 #include <netsmb/netbios.h>
 #include <netsmb/smb_dev.h>
 
-sockaddr_any	SIZEOF_SOCKADDR_ANY
+smbioc_sockaddr
 
-sockaddr_in	SIZEOF_SOCKADDR_IN
+smbioc_ssn_ident
+	id_srvaddr
+	id_domain
+	id_user
 
-sockaddr_nb	SIZEOF_SOCKADDR_NB
+smbioc_ossn
+	ssn_vopt
+	ssn_owner
+	ssn_id
+	ssn_srvname
 
-smbioc_ossn	SIZEOF_SMBIOC_OSSN
-	ioc_server
-	ioc_local
-	ioc_localcs
-	ioc_servercs
-	ioc_srvname
-	ioc_user
-	ioc_workgroup
-	ioc_password	IOC_SSN_PASSWD
-	ioc_opt		IOC_SSN_OPT
-	ioc_timeout
-	ioc_retrycount
-	ioc_owner	IOC_SSN_OWNER
-	ioc_group	IOC_SSN_GROUP
-	ioc_mode	IOC_SSN_MODE
-	ioc_rights	IOC_SSN_RIGHTS
-	ioc_intoklen
-	ioc_outtoklen
-	_ioc_intok
-	_ioc_outtok
+smbioc_oshare
+	sh_pwlen
+	sh_name
+	sh_pass
+	sh_type_req
+	sh_type_ret
 
-smbioc_oshare	SIZEOF_SMBIOC_OSHARE
-	ioc_share
-	ioc_password	IOC_SH_PASSWD
-	ioc_opt 	IOC_SH_OPT
-	ioc_stype
-	ioc_owner	IOC_SH_OWNER
-	ioc_group	IOC_SH_GROUP
-	ioc_mode	IOC_SH_MODE
-	ioc_rights	IOC_SH_RIGHTS
+smbioc_tcon
+	tc_flags
+	tc_opt
+	tc_sh
+
+smb_sopt
+	sv_proto
+	sv_sm
+	sv_tz
+	sv_maxmux
+	sv_maxvcs
+	sv_rawmode
+	sv_maxtx
+	sv_maxraw
+	sv_skey
+	sv_caps
+
+smb_iods
+	is_tran_fd
+	is_vcflags
+	is_hflags
+	is_hflags2
+	is_smbuid
+	is_next_mid
+	is_txmax
+	is_rwmax
+	is_rxmax
+	is_wxmax
+	is_ssn_key
+	is_next_seq
+	is_u_maclen
+	is_u_mackey
+
+smbioc_ssn_work
+	wk_iods
+	wk_sopt
+	wk_out_state
 
 smbioc_rq	SIZEOF_SMBIOC_RQ
 	ioc_cmd
-	ioc_twc
-	ioc_tbc
-	ioc_rpbufsz
-	ioc_rwc
-	ioc_rbc
 	ioc_errclass	IOC_RQ_ERRCLASS
 	ioc_serror	IOC_RQ_SERROR
 	ioc_error	IOC_RQ_ERROR
-	_ioc_twords
-	_ioc_tbytes
-	_ioc_rpbuf
+	ioc_tbufsz
+	ioc_rbufsz
+	_ioc_tbuf
+	_ioc_rbuf
 
 smbioc_t2rq	SIZEOF_SMBIOC_T2RQ
 	ioc_setup
@@ -116,12 +133,6 @@ smbioc_flags	SIZEOF_SMBIOC_FLAGS
 	ioc_mask
 	ioc_flags
 
-smbioc_lookup	SIZEOF_SMBIOC_LOOKUP
-	ioc_level	IOC_LOOK_LEVEL
-	ioc_flags	IOC_LOOK_FLAGS
-	ioc_sh
-	ioc_ssn
-
 smbioc_rw	SIZEOF_SMBIOC_RW
 	ioc_fh
 	ioc_cnt
@@ -129,6 +140,8 @@ smbioc_rw	SIZEOF_SMBIOC_RW
 	_ioc_base
 
 smbioc_pk	SIZEOF_SMBIOC_PK
+	pk_uid
 	pk_dom
 	pk_usr
-	pk_pass
+	pk_lmhash
+	pk_nthash

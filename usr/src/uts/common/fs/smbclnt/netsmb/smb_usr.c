@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,9 @@
 #include <sys/conf.h>
 #include <sys/proc.h>
 #include <sys/fcntl.h>
+#include <sys/file.h>
 #include <sys/socket.h>
+#include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 
 #include <netsmb/smb_osdep.h>
@@ -55,337 +57,278 @@
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_dev.h>
 
-/*
- * helpers for nsmb device. Can be moved to the smb_dev.c file.
- */
-static void smb_usr_vcspec_free(struct smb_vcspec *spec);
+static int smb_cpdatain(struct mbchain *mbp, int len, char *data, int seg);
 
 /*
- * Moved the access checks here, just becuase
- * this was a more convenient place to do it
- * than in every function calling this.
+ * Ioctl function for SMBIOC_FLAGS2
  */
-static int
-smb_usr_ioc2vcspec(struct smbioc_ossn *dp, struct smb_vcspec *spec)
+int
+smb_usr_get_flags2(smb_dev_t *sdp, intptr_t arg, int flags)
 {
-	cred_t *cr = CRED();
-	uid_t realuid;
+	struct smb_vc *vcp = NULL;
+
+	/* This ioctl requires a session. */
+	if ((vcp = sdp->sd_vc) == NULL)
+		return (ENOTCONN);
 
 	/*
-	 * Only superuser can specify a UID or GID.
+	 * Return the flags2 value.
 	 */
-	realuid = crgetruid(cr);
-	if (dp->ioc_owner == SMBM_ANY_OWNER)
-		spec->owner = realuid;
-	else {
-		/*
-		 * Do we have the privilege to create with the
-		 * specified uid?  (does uid == cr->cr_uid, etc.)
-		 * MacOS would want suser(), or similar here.
-		 */
-		if (secpolicy_vnode_owner(cr, dp->ioc_owner))
-			return (EPERM);
-		spec->owner = dp->ioc_owner;
-	}
-	if (dp->ioc_group == SMBM_ANY_GROUP)
-		spec->group = crgetgid(cr);
-	else {
-		/*
-		 * Do we have the privilege to create with the
-		 * specified gid?  (one of our groups?)
-		 */
-		if (groupmember(dp->ioc_group, cr) ||
-		    secpolicy_vnode_create_gid(cr) == 0)
-			spec->group = dp->ioc_group;
-		else
-			return (EPERM);
-	}
-
-	/*
-	 * Valid codesets?  XXX
-	 */
-	if (dp->ioc_localcs[0] == 0) {
-		spec->localcs = "ISO8859-1";
-#ifdef NOTYETRESOLVED
-		SMBERROR("no local charset ? dp->ioc_localcs[0]: %d\n",
-		    dp->ioc_localcs[0]);
-		return (EINVAL);
-#endif
-	} else
-		spec->localcs = spec->localcs;
-
-	/*
-	 * Check for valid sa_family.
-	 * XXX: Just NetBIOS for now.
-	 */
-	if (dp->ioc_server.sa.sa_family != AF_NETBIOS)
-		return (EINVAL);
-	spec->sap = &dp->ioc_server.sa;
-
-	if (dp->ioc_local.sa.sa_family) {
-		/* If specified, local AF must be the same. */
-		if (dp->ioc_local.sa.sa_family !=
-		    dp->ioc_server.sa.sa_family)
-			return (EINVAL);
-		spec->lap = &dp->ioc_local.sa;
-	}
-
-	if (dp->ioc_intok) {
-		spec->tok = smb_memdupin(dp->ioc_intok, dp->ioc_intoklen);
-		if (spec->tok == NULL)
-			return (EFAULT);
-		spec->toklen = dp->ioc_intoklen;
-	}
-
-	spec->srvname = dp->ioc_srvname;
-	spec->pass = dp->ioc_password;
-	spec->domain = dp->ioc_workgroup;
-	spec->username = dp->ioc_user;
-	spec->mode = dp->ioc_mode;
-	spec->rights = dp->ioc_rights;
-	spec->servercs = dp->ioc_servercs;
-	spec->optflags = dp->ioc_opt;
+	if (ddi_copyout(&vcp->vc_hflags2, (void *)arg,
+	    sizeof (u_int16_t), flags))
+		return (EFAULT);
 
 	return (0);
 }
 
-static void
-smb_usr_shspec_free(struct smb_sharespec *sspec)
+/*
+ * Ioctl function for SMBIOC_GETSSNKEY
+ * Size copied out is SMBIOC_HASH_SZ.
+ *
+ * The RPC library needs this for encrypting things
+ * like "set password" requests.  This is called
+ * with an active RPC binding, so the connection
+ * will already be active (but this checks).
+ */
+int
+smb_usr_get_ssnkey(smb_dev_t *sdp, intptr_t arg, int flags)
 {
-	kmem_free(sspec, sizeof (struct smb_sharespec));
-}
+	struct smb_vc *vcp = NULL;
 
-static void
-smb_usr_vcspec_free(struct smb_vcspec *spec)
-{
+	/* This ioctl requires an active session. */
+	if ((vcp = sdp->sd_vc) == NULL)
+		return (ENOTCONN);
+	if (vcp->vc_state != SMBIOD_ST_VCACTIVE)
+		return (ENOTCONN);
 
-	if (spec->tok) {
-		kmem_free(spec->tok, spec->toklen);
-	}
-	kmem_free(spec, sizeof (*spec));
-}
+	/*
+	 * Return the session key.
+	 */
+	if (ddi_copyout(vcp->vc_ssn_key, (void *)arg,
+	    SMBIOC_HASH_SZ, flags))
+		return (EFAULT);
 
-static int
-smb_usr_ioc2sharespec(struct smbioc_oshare *dp, struct smb_sharespec *spec)
-{
-	bzero(spec, sizeof (*spec));
-	spec->name = dp->ioc_share;
-	spec->pass = dp->ioc_password;
-	spec->mode = dp->ioc_mode;
-	spec->rights = dp->ioc_rights;
-	spec->owner = dp->ioc_owner;
-	spec->group = dp->ioc_group;
-	spec->stype = dp->ioc_stype;
-	spec->optflags = dp->ioc_opt;
 	return (0);
 }
 
-int
-smb_usr_findvc(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc **vcpp)
-{
-	struct smb_vc *vcp = NULL;
-	struct smb_vcspec *vspec = NULL;
-	int error = 0;
-
-	if (dp->ioc_flags & SMBLK_CREATE)
-		return (EINVAL);
-	if (dp->ioc_level != SMBL_VC)
-		return (EINVAL);
-	vspec = kmem_zalloc(sizeof (struct smb_vcspec), KM_SLEEP);
-	error = smb_usr_ioc2vcspec(&dp->ioc_ssn, vspec);
-	if (error)
-		goto out;
-	error = smb_sm_findvc(vspec, scred, &vcp);
-	if (error == 0)
-		*vcpp =  vcp;
-out:
-	smb_usr_vcspec_free(vspec);
-	return (error);
-}
-
-int
-smb_usr_negotiate(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc **vcpp)
-{
-	struct smb_vc *vcp = NULL;
-	struct smb_vcspec *vspec = NULL;
-	struct smb_sharespec *sspecp = NULL;
-	int error = 0;
-
-	if (dp->ioc_level < SMBL_VC || dp->ioc_level > SMBL_SHARE)
-		return (EINVAL);
-	vspec = kmem_zalloc(sizeof (struct smb_vcspec), KM_SLEEP);
-	error = smb_usr_ioc2vcspec(&dp->ioc_ssn, vspec);
-	if (error)
-		return (error);
-	if (dp->ioc_flags & SMBLK_CREATE)
-		vspec->optflags |= SMBVOPT_CREATE;
-	if (dp->ioc_level >= SMBL_SHARE) {
-		sspecp = kmem_alloc(sizeof (*sspecp), KM_SLEEP);
-		error = smb_usr_ioc2sharespec(&dp->ioc_sh, sspecp);
-		if (error)
-			goto out;
-	}
-	error = smb_sm_negotiate(vspec, scred, &vcp);
-	if (error == 0) {
-		*vcpp =  vcp;
-		/*
-		 * Used to copyout ioc_outtok, outtoklen here,
-		 * but that's now in smb_dev. (our caller)
-		 *
-		 * If this call asked for extended security and
-		 * the server does not support it, clear the
-		 * flag so the caller knows this.
-		 *
-		 * XXX: Should just add sv_caps to ioc_ssn,
-		 * set the new sv_caps field here, and let
-		 * let the copyout of ioc_ssn handle it.
-		 */
-		if (!(vcp->vc_sopt.sv_caps & SMB_CAP_EXT_SECURITY) &&
-		    (dp->ioc_ssn.ioc_opt & SMBVOPT_EXT_SEC)) {
-			dp->ioc_ssn.ioc_opt &= ~SMBVOPT_EXT_SEC;
-			SMBSDEBUG("turned off extended security");
-		}
-	}
-out:
-	smb_usr_vcspec_free(vspec);
-	smb_usr_shspec_free(sspecp);
-	return (error);
-}
-
-int
-smb_usr_ssnsetup(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc *vcp)
-{
-	struct smb_vcspec *vspec = NULL;
-	int error;
-
-	if (dp->ioc_level < SMBL_VC || dp->ioc_level > SMBL_SHARE)
-		return (EINVAL);
-
-	vspec = kmem_zalloc(sizeof (struct smb_vcspec), KM_SLEEP);
-	error = smb_usr_ioc2vcspec(&dp->ioc_ssn, vspec);
-	if (error)
-		goto out;
-
-	error = smb_sm_ssnsetup(vspec, scred, vcp);
-	/*
-	 * Moved the copyout of ioc_outtok to
-	 * smb_dev.c (our caller)
-	 */
-
-out:
-	smb_usr_vcspec_free(vspec);
-	return (error);
-}
-
-
-int
-smb_usr_tcon(struct smbioc_lookup *dp, struct smb_cred *scred,
-	struct smb_vc *vcp, struct smb_share **sspp)
-{
-	struct smb_sharespec *sspecp = NULL;
-	int error;
-
-	if (dp->ioc_level < SMBL_VC || dp->ioc_level > SMBL_SHARE)
-		return (EINVAL);
-
-	if (dp->ioc_level >= SMBL_SHARE) {
-		sspecp = kmem_alloc(sizeof (*sspecp), KM_SLEEP);
-		error = smb_usr_ioc2sharespec(&dp->ioc_sh, sspecp);
-		if (error)
-			goto out;
-	}
-	error = smb_sm_tcon(sspecp, scred, vcp, sspp);
-
-out:
-	if (sspecp)
-		smb_usr_shspec_free(sspecp);
-
-	return (error);
-}
-
 /*
- * Connect to the resource specified by smbioc_ossn structure.
- * It may either find an existing connection or try to establish a new one.
- * If no errors occured smb_vc returned locked and referenced.
+ * Ioctl function for SMBIOC_REQUEST
  */
-
 int
-smb_usr_simplerequest(struct smb_share *ssp, struct smbioc_rq *dp,
-	struct smb_cred *scred)
+smb_usr_simplerq(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 {
-	struct smb_rq rq, *rqp = &rq;
+	struct smb_cred scred;
+	struct smb_share *ssp;
+	smbioc_rq_t *ioc = NULL;
+	struct smb_rq *rqp = NULL;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
-	char *p;
-	size_t wc2;
-	u_int8_t wc;
-	u_int16_t bc;
-	int error;
+	uint32_t rsz;
+	int err, mbseg;
 
-	switch (dp->ioc_cmd) {
-	case SMB_COM_TRANSACTION2:
-	case SMB_COM_TRANSACTION2_SECONDARY:
-	case SMB_COM_CLOSE_AND_TREE_DISC:
-	case SMB_COM_TREE_CONNECT:
-	case SMB_COM_TREE_DISCONNECT:
-	case SMB_COM_NEGOTIATE:
-	case SMB_COM_SESSION_SETUP_ANDX:
-	case SMB_COM_LOGOFF_ANDX:
-	case SMB_COM_TREE_CONNECT_ANDX:
-		return (EPERM);
+	/* This ioctl requires a share. */
+	if ((ssp = sdp->sd_share) == NULL)
+		return (ENOTCONN);
+
+	smb_credinit(&scred, cr);
+	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
+	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
+		err = EFAULT;
+		goto out;
 	}
-	error = smb_rq_init(rqp, SSTOCP(ssp), dp->ioc_cmd, scred);
-	if (error)
-		return (error);
+
+	/* See ddi_copyin, ddi_copyout */
+	mbseg = (flags & FKIOCTL) ? MB_MSYSTEM : MB_MUSER;
+
+	/*
+	 * Lots of SMB commands could be safe, but
+	 * these are the only ones used by libsmbfs.
+	 */
+	switch (ioc->ioc_cmd) {
+		/* These are OK */
+	case SMB_COM_CLOSE:
+	case SMB_COM_FLUSH:
+	case SMB_COM_NT_CREATE_ANDX:
+	case SMB_COM_OPEN_PRINT_FILE:
+	case SMB_COM_CLOSE_PRINT_FILE:
+		break;
+
+	default:
+		err = EPERM;
+		goto out;
+	}
+
+	err = smb_rq_alloc(SSTOCP(ssp), ioc->ioc_cmd, &scred, &rqp);
+	if (err)
+		goto out;
+
 	mbp = &rqp->sr_rq;
-	smb_rq_wstart(rqp);
-	error = mb_put_mem(mbp, dp->ioc_twords,
-	    dp->ioc_twc * 2, MB_MUSER);
-	if (error)
-		goto bad;
-	smb_rq_wend(rqp);
-	smb_rq_bstart(rqp);
-	error = mb_put_mem(mbp, dp->ioc_tbytes,
-	    dp->ioc_tbc, MB_MUSER);
-	if (error)
-		goto bad;
-	smb_rq_bend(rqp);
-	error = smb_rq_simple(rqp);
-	if (error)
-		goto bad;
-	mdp = &rqp->sr_rp;
-	md_get_uint8(mdp, &wc);
-	dp->ioc_rwc = wc;
-	wc2 = wc * 2;
-	if (wc2 > dp->ioc_rpbufsz) {
-		error = EBADRPC;
-		goto bad;
+	err = mb_put_mem(mbp, ioc->ioc_tbuf, ioc->ioc_tbufsz, mbseg);
+
+	err = smb_rq_simple(rqp);
+	if (err == 0) {
+		/*
+		 * This may have been an open, so save the
+		 * generation ID of the share, which we
+		 * check before trying read or write.
+		 */
+		sdp->sd_vcgenid = ssp->ss_vcgenid;
+
+		/*
+		 * Have reply data. to copyout.
+		 * SMB header already parsed.
+		 */
+		mdp = &rqp->sr_rp;
+		rsz = msgdsize(mdp->md_top) - SMB_HDRLEN;
+		if (ioc->ioc_rbufsz < rsz) {
+			err = EOVERFLOW;
+			goto out;
+		}
+		ioc->ioc_rbufsz = rsz;
+		err = md_get_mem(mdp, ioc->ioc_rbuf, rsz, mbseg);
+		if (err)
+			goto out;
+
 	}
-	error = md_get_mem(mdp, dp->ioc_rpbuf, wc2, MB_MUSER);
-	if (error)
-		goto bad;
-	md_get_uint16le(mdp, &bc);
-	if ((wc2 + bc) > dp->ioc_rpbufsz) {
-		error = EBADRPC;
-		goto bad;
-	}
-	dp->ioc_rbc = bc;
-	p = dp->ioc_rpbuf;
-	error = md_get_mem(mdp, p + wc2, bc, MB_MUSER);
-bad:
-	dp->ioc_errclass = rqp->sr_errclass;
-	dp->ioc_serror = rqp->sr_serror;
-	dp->ioc_error = rqp->sr_error;
-	smb_rq_done(rqp);
-	return (error);
+
+	ioc->ioc_errclass = rqp->sr_errclass;
+	ioc->ioc_serror = rqp->sr_serror;
+	ioc->ioc_error = rqp->sr_error;
+	ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
+
+out:
+	if (rqp != NULL)
+		smb_rq_done(rqp); /* free rqp */
+	if (ioc != NULL)
+		kmem_free(ioc, sizeof (*ioc));
+	smb_credrele(&scred);
+
+	return (err);
 
 }
 
+/*
+ * Ioctl function for SMBIOC_T2RQ
+ */
+int
+smb_usr_t2request(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
+{
+	struct smb_cred scred;
+	struct smb_share *ssp;
+	smbioc_t2rq_t *ioc = NULL;
+	struct smb_t2rq *t2p = NULL;
+	struct mdchain *mdp;
+	int err, len, mbseg;
+
+	/* This ioctl requires a share. */
+	if ((ssp = sdp->sd_share) == NULL)
+		return (ENOTCONN);
+
+	smb_credinit(&scred, cr);
+	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
+	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
+		err = EFAULT;
+		goto out;
+	}
+
+	/* See ddi_copyin, ddi_copyout */
+	mbseg = (flags & FKIOCTL) ? MB_MSYSTEM : MB_MUSER;
+
+	if (ioc->ioc_setupcnt > SMBIOC_T2RQ_MAXSETUP) {
+		err = EINVAL;
+		goto out;
+	}
+
+	t2p = kmem_alloc(sizeof (*t2p), KM_SLEEP);
+	err = smb_t2_init(t2p, SSTOCP(ssp),
+	    ioc->ioc_setup, ioc->ioc_setupcnt, &scred);
+	if (err)
+		goto out;
+	len = t2p->t2_setupcount = ioc->ioc_setupcnt;
+	if (len > 1)
+		t2p->t2_setupdata = ioc->ioc_setup;
+
+	/* This ioc member is a fixed-size array. */
+	if (ioc->ioc_name[0]) {
+		/* Get the name length - carefully! */
+		ioc->ioc_name[SMBIOC_T2RQ_MAXNAME-1] = '\0';
+		t2p->t_name_len = strlen(ioc->ioc_name);
+		t2p->t_name = ioc->ioc_name;
+	}
+	t2p->t2_maxscount = 0;
+	t2p->t2_maxpcount = ioc->ioc_rparamcnt;
+	t2p->t2_maxdcount = ioc->ioc_rdatacnt;
+
+	/* Transmit parameters */
+	err = smb_cpdatain(&t2p->t2_tparam,
+	    ioc->ioc_tparamcnt, ioc->ioc_tparam, mbseg);
+	if (err)
+		goto out;
+
+	/* Transmit data */
+	err = smb_cpdatain(&t2p->t2_tdata,
+	    ioc->ioc_tdatacnt, ioc->ioc_tdata, mbseg);
+	if (err)
+		goto out;
+
+	err = smb_t2_request(t2p);
+
+	/* Copyout returned parameters. */
+	mdp = &t2p->t2_rparam;
+	if (err == 0 && mdp->md_top != NULL) {
+		/* User's buffer large enough? */
+		len = m_fixhdr(mdp->md_top);
+		if (len > ioc->ioc_rparamcnt) {
+			err = EMSGSIZE;
+			goto out;
+		}
+		ioc->ioc_rparamcnt = (ushort_t)len;
+		err = md_get_mem(mdp, ioc->ioc_rparam, len, mbseg);
+		if (err)
+			goto out;
+	} else
+		ioc->ioc_rparamcnt = 0;
+
+	/* Copyout returned data. */
+	mdp = &t2p->t2_rdata;
+	if (err == 0 && mdp->md_top != NULL) {
+		/* User's buffer large enough? */
+		len = m_fixhdr(mdp->md_top);
+		if (len > ioc->ioc_rdatacnt) {
+			err = EMSGSIZE;
+			goto out;
+		}
+		ioc->ioc_rdatacnt = (ushort_t)len;
+		err = md_get_mem(mdp, ioc->ioc_rdata, len, mbseg);
+		if (err)
+			goto out;
+	} else
+		ioc->ioc_rdatacnt = 0;
+
+	ioc->ioc_errclass = t2p->t2_sr_errclass;
+	ioc->ioc_serror = t2p->t2_sr_serror;
+	ioc->ioc_error = t2p->t2_sr_error;
+	ioc->ioc_rpflags2 = t2p->t2_sr_rpflags2;
+
+	ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
+
+
+out:
+	if (t2p != NULL) {
+		/* Note: t2p->t_name no longer allocated */
+		smb_t2_done(t2p);
+		kmem_free(t2p, sizeof (*t2p));
+	}
+	if (ioc != NULL)
+		kmem_free(ioc, sizeof (*ioc));
+	smb_credrele(&scred);
+
+	return (err);
+}
+
+/* helper for _t2request */
 static int
-smb_cpdatain(struct mbchain *mbp, int len, char *data)
+smb_cpdatain(struct mbchain *mbp, int len, char *data, int mbseg)
 {
 	int error;
 
@@ -394,98 +337,7 @@ smb_cpdatain(struct mbchain *mbp, int len, char *data)
 	error = mb_init(mbp);
 	if (error)
 		return (error);
-	return (mb_put_mem(mbp, data, len, MB_MUSER));
-}
-
-int
-smb_usr_t2request(struct smb_share *ssp, smbioc_t2rq_t *dp,
-	struct smb_cred *scred)
-{
-	struct smb_t2rq t2, *t2p = &t2;
-	struct mdchain *mdp;
-	int error, len;
-
-	if (dp->ioc_setupcnt > SMB_MAXSETUPWORDS)
-		return (EINVAL);
-	error = smb_t2_init(t2p, SSTOCP(ssp), dp->ioc_setup, dp->ioc_setupcnt,
-	    scred);
-	if (error)
-		return (error);
-	len = t2p->t2_setupcount = dp->ioc_setupcnt;
-	if (len > 1)
-		t2p->t2_setupdata = dp->ioc_setup;
-	/* This ioc member is a fixed-size array. */
-	if (dp->ioc_name[0]) {
-		t2p->t_name_maxlen = SMBIOC_T2RQ_MAXNAME;
-		t2p->t_name = kmem_alloc(t2p->t_name_maxlen, KM_SLEEP);
-		bcopy(dp->ioc_name, t2p->t_name, t2p->t_name_maxlen);
-		/* Get the string length - carefully! */
-		t2p->t_name[t2p->t_name_maxlen - 1] = '\0';
-		t2p->t_name_len = strlen(t2p->t_name);
-	}
-	t2p->t2_maxscount = 0;
-	t2p->t2_maxpcount = dp->ioc_rparamcnt;
-	t2p->t2_maxdcount = dp->ioc_rdatacnt;
-	error = smb_cpdatain(&t2p->t2_tparam, dp->ioc_tparamcnt,
-	    dp->ioc_tparam);
-	if (error)
-		goto bad;
-	error = smb_cpdatain(&t2p->t2_tdata,
-	    dp->ioc_tdatacnt, dp->ioc_tdata);
-	if (error)
-		goto bad;
-	error = smb_t2_request(t2p);
-	dp->ioc_errclass = t2p->t2_sr_errclass;
-	dp->ioc_serror = t2p->t2_sr_serror;
-	dp->ioc_error = t2p->t2_sr_error;
-	dp->ioc_rpflags2 = t2p->t2_sr_rpflags2;
-	if (error)
-		goto bad;
-	mdp = &t2p->t2_rparam;
-	if (mdp->md_top) {
-		mblk_t *m = mdp->md_top;
-#ifdef lint
-		m = m;
-#endif
-		len = m_fixhdr(mdp->md_top);
-		if (len > dp->ioc_rparamcnt) {
-			error = EMSGSIZE;
-			goto bad;
-		}
-		dp->ioc_rparamcnt = (ushort_t)len;
-		error = md_get_mem(mdp, dp->ioc_rparam,
-		    len, MB_MUSER);
-		if (error) {
-			goto bad;
-		}
-	} else
-		dp->ioc_rparamcnt = 0;
-	mdp = &t2p->t2_rdata;
-	if (mdp->md_top) {
-		mblk_t *m = mdp->md_top;
-#ifdef lint
-		m = m;
-#endif
-		len = m_fixhdr(mdp->md_top);
-		if (len > dp->ioc_rdatacnt) {
-			error = EMSGSIZE;
-			goto bad;
-		}
-		dp->ioc_rdatacnt = (ushort_t)len;
-		error = md_get_mem(mdp, dp->ioc_rdata,
-		    len, MB_MUSER);
-		if (error) {
-			goto bad;
-		}
-	} else
-		dp->ioc_rdatacnt = 0;
-bad:
-	if (t2p->t_name) {
-		kmem_free(t2p->t_name, t2p->t_name_maxlen);
-		t2p->t_name = NULL;
-	}
-	smb_t2_done(t2p);
-	return (error);
+	return (mb_put_mem(mbp, data, len, mbseg));
 }
 
 /*
@@ -493,14 +345,31 @@ bad:
  * SMBIOC_READ, SMBIOC_WRITE
  */
 int
-smb_usr_rw(struct smb_share *ssp, smbioc_rw_t *rwrq,
-    int cmd, struct smb_cred *scred)
+smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 {
+	struct smb_cred scred;
+	struct smb_share *ssp;
+	smbioc_rw_t *ioc = NULL;
 	struct iovec aiov[1];
 	struct uio  auio;
 	u_int16_t fh;
-	int error;
+	int err;
 	uio_rw_t rw;
+
+	/* This ioctl requires a share. */
+	if ((ssp = sdp->sd_share) == NULL)
+		return (ENOTCONN);
+
+	/* After reconnect, force close+reopen */
+	if (sdp->sd_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
+	smb_credinit(&scred, cr);
+	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
+	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
+		err = EFAULT;
+		goto out;
+	}
 
 	switch (cmd) {
 	case SMBIOC_READ:
@@ -510,28 +379,436 @@ smb_usr_rw(struct smb_share *ssp, smbioc_rw_t *rwrq,
 		rw = UIO_WRITE;
 		break;
 	default:
-		return (ENODEV);
+		err = ENODEV;
+		goto out;
 	}
 
-	fh = htoles(rwrq->ioc_fh);
+	fh = ioc->ioc_fh;
 
-	aiov[0].iov_base = rwrq->ioc_base;
-	aiov[0].iov_len = (size_t)rwrq->ioc_cnt;
+	aiov[0].iov_base = ioc->ioc_base;
+	aiov[0].iov_len = (size_t)ioc->ioc_cnt;
 
 	auio.uio_iov = aiov;
 	auio.uio_iovcnt = 1;
-	auio.uio_loffset = rwrq->ioc_offset;
-	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_loffset = ioc->ioc_offset;
+	auio.uio_segflg = (flags & FKIOCTL) ?
+	    UIO_SYSSPACE : UIO_USERSPACE;
 	auio.uio_fmode = 0;
-	auio.uio_resid = (size_t)rwrq->ioc_cnt;
+	auio.uio_resid = (size_t)ioc->ioc_cnt;
 
-	error = smb_rwuio(ssp, fh, rw, &auio, scred, 0);
+	err = smb_rwuio(ssp, fh, rw, &auio, &scred, 0);
 
 	/*
 	 * On return ioc_cnt holds the
 	 * number of bytes transferred.
 	 */
-	rwrq->ioc_cnt -= auio.uio_resid;
+	ioc->ioc_cnt -= auio.uio_resid;
+
+	ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
+
+out:
+	if (ioc != NULL)
+		kmem_free(ioc, sizeof (*ioc));
+	smb_credrele(&scred);
+
+	return (err);
+}
+
+/*
+ * Ioctl functions: SMBIOC_SSN_FIND, SMBIOC_SSN_CREATE
+ * Find or create a session (a.k.a. "VC" in here)
+ */
+int
+smb_usr_get_ssn(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
+{
+	struct smb_cred scred;
+	smbioc_ossn_t *ossn = NULL;
+	struct smb_vc *vcp = NULL;
+	int error = 0;
+	uid_t realuid;
+
+	/* Should be no VC */
+	if (sdp->sd_vc != NULL)
+		return (EISCONN);
+
+	smb_credinit(&scred, cr);
+	ossn = kmem_alloc(sizeof (*ossn), KM_SLEEP);
+	if (ddi_copyin((void *)arg, ossn, sizeof (*ossn), flags)) {
+		error = EFAULT;
+		goto out;
+	}
+
+	/*
+	 * Only superuser can specify a UID or GID.
+	 */
+	realuid = crgetruid(cr);
+	if (ossn->ssn_owner == SMBM_ANY_OWNER)
+		ossn->ssn_owner = realuid;
+	else {
+		/*
+		 * Do we have the privilege to create with the
+		 * specified uid?  (does uid == cr->cr_uid, etc.)
+		 */
+		if (secpolicy_vnode_owner(cr, ossn->ssn_owner)) {
+			error = EPERM;
+			goto out;
+		}
+		/* ossn->ssn_owner is OK */
+	}
+
+	/*
+	 * Make sure the strings are null terminated.
+	 */
+	ossn->ssn_srvname[SMBIOC_MAX_NAME-1] = '\0';
+	ossn->ssn_id.id_domain[ SMBIOC_MAX_NAME-1] = '\0';
+	ossn->ssn_id.id_user[   SMBIOC_MAX_NAME-1] = '\0';
+
+	if (cmd == SMBIOC_SSN_CREATE)
+		ossn->ssn_vopt |= SMBVOPT_CREATE;
+	else /* FIND */
+		ossn->ssn_vopt &= ~SMBVOPT_CREATE;
+
+	error = smb_vc_findcreate(ossn, &scred, &vcp);
+	if (error)
+		goto out;
+	ASSERT(vcp != NULL);
+
+	/*
+	 * We have a VC, held, but not locked.
+	 * If we're creating, mark this instance as
+	 * an open from IOD so close can do cleanup.
+	 *
+	 * XXX: Would be nice to have a back pointer
+	 * from the VC to this (IOD) sdp instance.
+	 */
+	if (cmd == SMBIOC_SSN_CREATE) {
+		if (vcp->iod_thr != NULL) {
+			error = EEXIST;
+			goto out;
+		}
+		sdp->sd_flags |= NSMBFL_IOD;
+	} else {
+		/*
+		 * Wait for it to finish connecting
+		 * (or reconnect) if necessary.
+		 */
+		if (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
+			error = smb_iod_reconnect(vcp);
+			if (error != 0)
+				goto out;
+		}
+	}
+
+	/*
+	 * The VC has a hold from _findvc
+	 * which we keep until _SSN_RELE
+	 * or nsmb_close().
+	 */
+	sdp->sd_level = SMBL_VC;
+	sdp->sd_vc = vcp;
+	vcp = NULL;
+	(void) ddi_copyout(ossn, (void *)arg, sizeof (*ossn), flags);
+
+out:
+	if (vcp) {
+		/* Error path: rele hold from _findcreate */
+		smb_vc_rele(vcp);
+	}
+	if (ossn != NULL)
+		kmem_free(ossn, sizeof (*ossn));
+	smb_credrele(&scred);
 
 	return (error);
+}
+
+/*
+ * Ioctl functions: SMBIOC_SSN_RELE, SMBIOC_SSN_KILL
+ * Release or kill the current session.
+ */
+int
+smb_usr_drop_ssn(smb_dev_t *sdp, int cmd)
+{
+	struct smb_vc *vcp = NULL;
+
+	/* Must have a VC. */
+	if ((vcp = sdp->sd_vc) == NULL)
+		return (ENOTCONN);
+
+	/* If we have a share ref, drop it too. */
+	if (sdp->sd_share) {
+		smb_share_rele(sdp->sd_share);
+		sdp->sd_share = NULL;
+		sdp->sd_level = SMBL_VC;
+	}
+
+	if (cmd == SMBIOC_SSN_KILL)
+		smb_vc_kill(vcp);
+
+	/* Drop the VC ref. */
+	smb_vc_rele(vcp);
+	sdp->sd_vc = NULL;
+	sdp->sd_level = 0;
+
+	return (0);
+}
+
+/*
+ * Find or create a tree (connected share)
+ */
+int
+smb_usr_get_tree(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
+{
+	struct smb_cred scred;
+	smbioc_tcon_t *tcon = NULL;
+	struct smb_vc *vcp = NULL;
+	struct smb_share *ssp = NULL;
+	int error = 0;
+
+	/* Must have a VC. */
+	if ((vcp = sdp->sd_vc) == NULL)
+		return (ENOTCONN);
+	/* Should not have a share. */
+	if (sdp->sd_share != NULL)
+		return (EISCONN);
+
+	smb_credinit(&scred, cr);
+	tcon = kmem_alloc(sizeof (*tcon), KM_SLEEP);
+	if (ddi_copyin((void *)arg, tcon, sizeof (*tcon), flags)) {
+		error = EFAULT;
+		goto out;
+	}
+
+	/*
+	 * Make sure the strings are null terminated.
+	 */
+	tcon->tc_sh.sh_name[SMBIOC_MAX_NAME-1] = '\0';
+	tcon->tc_sh.sh_pass[SMBIOC_MAX_NAME-1] = '\0';
+	tcon->tc_sh.sh_type_req[SMBIOC_STYPE_LEN-1] = '\0';
+	bzero(tcon->tc_sh.sh_type_ret, SMBIOC_STYPE_LEN);
+
+	if (cmd == SMBIOC_TREE_CONNECT)
+		tcon->tc_opt |= SMBSOPT_CREATE;
+	else /* FIND */
+		tcon->tc_opt &= ~SMBSOPT_CREATE;
+
+	error = smb_share_findcreate(tcon, vcp, &ssp, &scred);
+	if (error)
+		goto out;
+	ASSERT(ssp != NULL);
+
+	/*
+	 * We have a share, held, but not locked.
+	 * If we're creating, do tree connect now,
+	 * otherwise let that wait for a request.
+	 */
+	if (cmd == SMBIOC_TREE_CONNECT) {
+		error = smb_share_tcon(ssp, &scred);
+		if (error)
+			goto out;
+	}
+
+	/*
+	 * Give caller the real share type from
+	 * the tree connect response, so they can
+	 * see if they got the requested type.
+	 */
+	memcpy(tcon->tc_sh.sh_type_ret,
+	    ssp->ss_type_ret, SMBIOC_STYPE_LEN);
+
+	/*
+	 * The share has a hold from _tcon
+	 * which we keep until nsmb_close()
+	 * or the SMBIOC_TDIS below.
+	 */
+	sdp->sd_level = SMBL_SHARE;
+	sdp->sd_share = ssp;
+	ssp = NULL;
+	(void) ddi_copyout(tcon, (void *)arg, sizeof (*tcon), flags);
+
+out:
+	if (ssp) {
+		/* Error path: rele hold from _findcreate */
+		smb_share_rele(ssp);
+	}
+	if (tcon) {
+		/*
+		 * This structure may contain a
+		 * cleartext password, so zap it.
+		 */
+		bzero(tcon, sizeof (*tcon));
+		kmem_free(tcon, sizeof (*tcon));
+	}
+	smb_credrele(&scred);
+
+	return (error);
+}
+
+/*
+ * Ioctl functions: SMBIOC_TREE_RELE, SMBIOC_TREE_KILL
+ * Release or kill the current tree
+ */
+int
+smb_usr_drop_tree(smb_dev_t *sdp, int cmd)
+{
+	struct smb_share *ssp = NULL;
+
+	/* Must have a VC and a share. */
+	if (sdp->sd_vc == NULL)
+		return (ENOTCONN);
+	if ((ssp = sdp->sd_share) == NULL)
+		return (ENOTCONN);
+
+	if (cmd == SMBIOC_TREE_KILL)
+		smb_share_kill(ssp);
+
+	/* Drop the share ref. */
+	smb_share_rele(sdp->sd_share);
+	sdp->sd_share = NULL;
+	sdp->sd_level = SMBL_VC;
+
+	return (0);
+}
+
+
+/*
+ * Ioctl function: SMBIOC_IOD_WORK
+ *
+ * Become the reader (IOD) thread, until either the connection is
+ * reset by the server, or until the connection is idle longer than
+ * some max time. (max idle time not yet implemented)
+ */
+int
+smb_usr_iod_work(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
+{
+	struct smb_vc *vcp = NULL;
+	int err = 0;
+
+	/* Must have a valid session. */
+	if ((vcp = sdp->sd_vc) == NULL)
+		return (EINVAL);
+	if (vcp->vc_flags & SMBV_GONE)
+		return (EINVAL);
+
+	/*
+	 * Is there already an IOD for this VC?
+	 * (Should never happen.)
+	 */
+	SMB_VC_LOCK(vcp);
+	if (vcp->iod_thr == NULL)
+		vcp->iod_thr = curthread;
+	else
+		err = EEXIST;
+	SMB_VC_UNLOCK(vcp);
+	if (err)
+		return (err);
+
+	/*
+	 * Copy the "work" state, etc. into the VC
+	 * The MAC key is copied separately.
+	 */
+	if (ddi_copyin((void *)arg, &vcp->vc_work,
+	    sizeof (smbioc_ssn_work_t), flags)) {
+		err = EFAULT;
+		goto out;
+	}
+	if (vcp->vc_u_maclen) {
+		vcp->vc_mackeylen = vcp->vc_u_maclen;
+		vcp->vc_mackey = kmem_alloc(vcp->vc_mackeylen, KM_SLEEP);
+		if (ddi_copyin(vcp->vc_u_mackey.lp_ptr, vcp->vc_mackey,
+		    vcp->vc_mackeylen, flags)) {
+			err = EFAULT;
+			goto out;
+		}
+	}
+
+	err = smb_iod_vc_work(vcp, cr);
+
+	/* Caller wants state here. */
+	vcp->vc_work.wk_out_state = vcp->vc_state;
+
+	(void) ddi_copyout(&vcp->vc_work, (void *)arg,
+	    sizeof (smbioc_ssn_work_t), flags);
+
+out:
+	if (vcp->vc_mackey) {
+		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
+		vcp->vc_mackey = NULL;
+		vcp->vc_mackeylen = 0;
+	}
+
+	/*
+	 * The IOD thread is leaving the driver.  Clear iod_thr,
+	 * and wake up anybody waiting for us to quit.
+	 */
+	SMB_VC_LOCK(vcp);
+	vcp->iod_thr = NULL;
+	cv_broadcast(&vcp->vc_statechg);
+	SMB_VC_UNLOCK(vcp);
+
+	return (err);
+}
+
+/*
+ * Ioctl functions: SMBIOC_IOD_IDLE, SMBIOC_IOD_RCFAIL
+ *
+ * Wait for user-level requests to be enqueued on this session,
+ * and then return to the user-space helper, which will then
+ * initiate a reconnect, etc.
+ */
+int
+smb_usr_iod_ioctl(smb_dev_t *sdp, int cmd, intptr_t arg, int flags)
+{
+	struct smb_vc *vcp = NULL;
+	int err = 0;
+
+	/* Must have a valid session. */
+	if ((vcp = sdp->sd_vc) == NULL)
+		return (EINVAL);
+	if (vcp->vc_flags & SMBV_GONE)
+		return (EINVAL);
+
+	/*
+	 * Is there already an IOD for this VC?
+	 * (Should never happen.)
+	 */
+	SMB_VC_LOCK(vcp);
+	if (vcp->iod_thr == NULL)
+		vcp->iod_thr = curthread;
+	else
+		err = EEXIST;
+	SMB_VC_UNLOCK(vcp);
+	if (err)
+		return (err);
+
+	/* nothing to copyin */
+
+	switch (cmd) {
+	case SMBIOC_IOD_IDLE:
+		err = smb_iod_vc_idle(vcp);
+		break;
+
+	case SMBIOC_IOD_RCFAIL:
+		err = smb_iod_vc_rcfail(vcp);
+		break;
+
+	default:
+		err = ENOTTY;
+		goto out;
+	}
+
+	/* Both of these ioctls copy out the new state. */
+	(void) ddi_copyout(&vcp->vc_state, (void *)arg,
+	    sizeof (int), flags);
+
+out:
+	/*
+	 * The IOD thread is leaving the driver.  Clear iod_thr,
+	 * and wake up anybody waiting for us to quit.
+	 */
+	SMB_VC_LOCK(vcp);
+	vcp->iod_thr = NULL;
+	cv_broadcast(&vcp->vc_statechg);
+	SMB_VC_UNLOCK(vcp);
+
+	return (err);
 }

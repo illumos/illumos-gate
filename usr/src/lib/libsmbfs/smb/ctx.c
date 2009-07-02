@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,26 +58,33 @@
 #include <assert.h>
 #include <nss_dbdefs.h>
 
-#include <kerberosv5/krb5.h>
-#include <kerberosv5/com_err.h>
-
+#include <cflib.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/netbios.h>
 #include <netsmb/nb_lib.h>
 #include <netsmb/smb_dev.h>
-#include <cflib.h>
-#include <charsets.h>
 
-#include <spnego.h>
+#include "charsets.h"
+#include "spnego.h"
 #include "derparse.h"
 #include "private.h"
+#include "ntlm.h"
 
-extern MECH_OID g_stcMechOIDList [];
+#ifndef FALSE
+#define	FALSE	0
+#endif
+#ifndef TRUE
+#define	TRUE	1
+#endif
 
-#define	POWEROF2(x) (((x) & ((x)-1)) == 0)
 
 /* These two may be set by commands. */
 int smb_debug, smb_verbose;
+
+/*
+ * Was: STDPARAM_OPT - see smb_ctx_scan_argv, smb_ctx_opt
+ */
+const char smbutil_std_opts[] = "ABCD:E:I:L:M:NO:P:U:R:S:T:W:";
 
 /*
  * Give the RPC library a callback hook that will be
@@ -138,21 +145,30 @@ dump_ctx_flags(int flags)
 }
 
 void
-dump_ctx_ssn(struct smbioc_ossn *ssn)
+dump_iod_ssn(smb_iod_ssn_t *is)
 {
-	printf(" srvname=\"%s\", dom=\"%s\", user=\"%s\", password=%s\n",
-	    ssn->ioc_srvname, ssn->ioc_workgroup, ssn->ioc_user,
-	    ssn->ioc_password[0] ? "(non-null)" : "NULL");
-	printf(" timeout=%d, retry=%d, owner=%d, group=%d\n",
-	    ssn->ioc_timeout, ssn->ioc_retrycount,
-	    ssn->ioc_owner, ssn->ioc_group);
-}
+	static const char zeros[NTLM_HASH_SZ] = {0};
+	struct smbioc_ossn *ssn = &is->iod_ossn;
 
-void
-dump_ctx_sh(struct smbioc_oshare *sh)
-{
-	printf(" share_name=\"%s\", share_pw=\"%s\"\n",
-	    sh->ioc_share, sh->ioc_password);
+	printf(" ct_srvname=\"%s\", ", ssn->ssn_srvname);
+	dump_sockaddr(&ssn->ssn_srvaddr.sa);
+	printf(" dom=\"%s\", user=\"%s\"\n",
+	    ssn->ssn_domain, ssn->ssn_user);
+	printf(" ct_vopt=0x%x, ct_owner=%d\n",
+	    ssn->ssn_vopt, ssn->ssn_owner);
+	printf(" ct_authflags=0x%x\n", is->iod_authflags);
+
+	printf(" ct_nthash:");
+	if (bcmp(zeros, &is->iod_nthash, NTLM_HASH_SZ))
+		smb_hexdump(&is->iod_nthash, NTLM_HASH_SZ);
+	else
+		printf(" {0}\n");
+
+	printf(" ct_lmhash:");
+	if (bcmp(zeros, &is->iod_lmhash, NTLM_HASH_SZ))
+		smb_hexdump(&is->iod_lmhash, NTLM_HASH_SZ);
+	else
+		printf(" {0}\n");
 }
 
 void
@@ -161,24 +177,105 @@ dump_ctx(char *where, struct smb_ctx *ctx)
 	printf("context %s:\n", where);
 	dump_ctx_flags(ctx->ct_flags);
 
-	printf(" localname=\"%s\"", ctx->ct_locname);
+	if (ctx->ct_locname)
+		printf(" localname=\"%s\"", ctx->ct_locname);
+	else
+		printf(" localname=NULL");
 
 	if (ctx->ct_fullserver)
 		printf(" fullserver=\"%s\"", ctx->ct_fullserver);
 	else
 		printf(" fullserver=NULL");
 
-	if (ctx->ct_srvaddr)
-		printf(" srvaddr=\"%s\"\n", ctx->ct_srvaddr);
+	if (ctx->ct_srvaddr_s)
+		printf(" srvaddr_s=\"%s\"\n", ctx->ct_srvaddr_s);
 	else
-		printf(" srvaddr=NULL\n");
+		printf(" srvaddr_s=NULL\n");
 
-	dump_ctx_ssn(&ctx->ct_ssn);
-	dump_ctx_sh(&ctx->ct_sh);
+	if (ctx->ct_addrinfo)
+		dump_addrinfo(ctx->ct_addrinfo);
+	else
+		printf(" ct_addrinfo = NULL\n");
+
+	dump_iod_ssn(&ctx->ct_iod_ssn);
+
+	printf(" share_name=\"%s\", share_type=%d\n",
+	    ctx->ct_origshare ? ctx->ct_origshare : "",
+	    ctx->ct_shtype_req);
+
+	/* dump_iod_work()? */
+}
+
+int
+smb_ctx_alloc(struct smb_ctx **ctx_pp)
+{
+	smb_ctx_t *ctx;
+	int err;
+
+	ctx = malloc(sizeof (*ctx));
+	if (ctx == NULL)
+		return (ENOMEM);
+	err = smb_ctx_init(ctx);
+	if (err != 0) {
+		free(ctx);
+		return (err);
+	}
+	*ctx_pp = ctx;
+	return (0);
 }
 
 /*
- * Initialize an smb_ctx struct.
+ * Initialize an smb_ctx struct (defaults)
+ */
+int
+smb_ctx_init(struct smb_ctx *ctx)
+{
+	char pwbuf[NSS_BUFLEN_PASSWD];
+	struct passwd pw;
+	int error = 0;
+
+	bzero(ctx, sizeof (*ctx));
+
+	error = nb_ctx_create(&ctx->ct_nb);
+	if (error)
+		return (error);
+
+	ctx->ct_dev_fd = -1;
+	ctx->ct_tran_fd = -1;
+	ctx->ct_parsedlevel = SMBL_NONE;
+	ctx->ct_minlevel = SMBL_NONE;
+	ctx->ct_maxlevel = SMBL_PATH;
+
+	/* Fill in defaults */
+	ctx->ct_vopt = SMBVOPT_EXT_SEC;
+	ctx->ct_owner = SMBM_ANY_OWNER;
+	ctx->ct_authflags = SMB_AT_DEFAULT;
+	ctx->ct_minauth = SMB_AT_DEFAULT;
+
+	nb_ctx_setscope(ctx->ct_nb, "");
+
+	/*
+	 * if the user name is not specified some other way,
+	 * use the current user name (built-in default)
+	 */
+	if (getpwuid_r(getuid(), &pw, pwbuf, sizeof (pwbuf)) != NULL) {
+		smb_ctx_setuser(ctx, pw.pw_name, 0);
+		ctx->ct_home = strdup(pw.pw_name);
+	}
+
+	/*
+	 * Set a built-in default domain (workgroup).
+	 * Using the Windows/NT default for now.
+	 */
+	smb_ctx_setdomain(ctx, "WORKGROUP", 0);
+
+	return (error);
+}
+
+/*
+ * "Scan" the command line args to find the server name,
+ * user name, and share name, as needed.  We need these
+ * before reading the RC files and/or sharectl values.
  *
  * The sequence for getting all the members filled in
  * has some tricky aspects.  Here's how it works:
@@ -211,121 +308,83 @@ dump_ctx(char *where, struct smb_ctx *ctx)
  * ignore options not in the options string.
  */
 int
-smb_ctx_init(struct smb_ctx *ctx, int argc, char *argv[],
+smb_ctx_scan_argv(struct smb_ctx *ctx, int argc, char **argv,
 	int minlevel, int maxlevel, int sharetype)
 {
-	int  opt, error = 0;
-	const char *arg, *cp;
-	struct passwd pw;
-	char pwbuf[NSS_BUFLEN_PASSWD];
+	int  ind, opt, error = 0;
 	int aflg = 0, uflg = 0;
-
-	bzero(ctx, sizeof (*ctx));
-	if (sharetype == SMB_ST_DISK)
-		ctx->ct_flags |= SMBCF_BROWSEOK;
-	error = nb_ctx_create(&ctx->ct_nb);
-	if (error)
-		return (error);
-
-	ctx->ct_fd = -1;
-	ctx->ct_parsedlevel = SMBL_NONE;
-	ctx->ct_minlevel = minlevel;
-	ctx->ct_maxlevel = maxlevel;
-
-	/* Fill in defaults */
-	ctx->ct_ssn.ioc_opt = SMBVOPT_CREATE | SMBVOPT_MINAUTH_NTLM;
-
-	ctx->ct_ssn.ioc_timeout = 15;
-	ctx->ct_ssn.ioc_retrycount = 4;
-	ctx->ct_ssn.ioc_owner = SMBM_ANY_OWNER;
-	ctx->ct_ssn.ioc_group = SMBM_ANY_GROUP;
-	ctx->ct_ssn.ioc_mode = SMBM_EXEC;
-	ctx->ct_ssn.ioc_rights = SMBM_DEFAULT;
-
-	ctx->ct_sh.ioc_opt = SMBVOPT_CREATE;
-	ctx->ct_sh.ioc_owner = SMBM_ANY_OWNER;
-	ctx->ct_sh.ioc_group = SMBM_ANY_GROUP;
-	ctx->ct_sh.ioc_mode = SMBM_EXEC;
-	ctx->ct_sh.ioc_rights = SMBM_DEFAULT;
-	ctx->ct_sh.ioc_owner = SMBM_ANY_OWNER;
-	ctx->ct_sh.ioc_group = SMBM_ANY_GROUP;
-
-	nb_ctx_setscope(ctx->ct_nb, "");
-
-	/*
-	 * if the user name is not specified some other way,
-	 * use the current user name (built-in default)
-	 */
-	if (getpwuid_r(geteuid(), &pw, pwbuf, sizeof (pwbuf)) != NULL)
-		smb_ctx_setuser(ctx, pw.pw_name, 0);
-
-	/*
-	 * Set a built-in default domain (workgroup).
-	 * XXX: What's the best default? Use "?" instead?
-	 * Using the Windows/NT default for now.
-	 */
-	smb_ctx_setworkgroup(ctx, "WORKGROUP", 0);
-
-	/*
-	 * Parse the UNC path.  Values from here are
-	 * marked as "from CMD".
-	 */
-	if (argv == NULL)
-		goto done;
-	for (opt = 1; opt < argc; opt++) {
-		cp = argv[opt];
-		if (strncmp(cp, "//", 2) != 0)
-			continue;
-		error = smb_ctx_parseunc(ctx, cp, sharetype, &cp);
-		if (error)
-			return (error);
-		break;
-	}
+	const char *arg;
 
 	/*
 	 * Parse options, if any.  Values from here too
 	 * are marked as "from CMD".
 	 */
-	while (error == 0 && (opt = cf_getopt(argc, argv, ":AU:E:L:")) != -1) {
+	if (argv == NULL)
+		return (0);
+
+	ctx->ct_minlevel = minlevel;
+	ctx->ct_maxlevel = maxlevel;
+	ctx->ct_shtype_req = sharetype;
+
+	cf_opt_lock();
+	/* Careful: no return/goto before cf_opt_unlock! */
+	while (error == 0) {
+		opt = cf_getopt(argc, argv, STDPARAM_OPT);
+		if (opt == -1)
+			break;
 		arg = cf_optarg;
+		/* NB: handle most in smb_ctx_opt */
 		switch (opt) {
 		case 'A':
 			aflg = 1;
 			error = smb_ctx_setuser(ctx, "", TRUE);
-			error = smb_ctx_setpassword(ctx, "", TRUE);
 			ctx->ct_flags |= SMBCF_NOPWD;
-			break;
-		case 'E':
-#if 0 /* We don't support any "charset" stuff. (ignore -E) */
-			error = smb_ctx_setcharset(ctx, arg);
-			if (error)
-				return (error);
-#endif
-			break;
-		case 'L':
-#if 0 /* Use the standard environment variables (ignore -L) */
-			error = nls_setlocale(optarg);
-			if (error)
-				break;
-#endif
 			break;
 		case 'U':
 			uflg = 1;
 			error = smb_ctx_setuser(ctx, arg, TRUE);
 			break;
+		default:
+			DPRINT("skip opt=%c", opt);
+			break;
 		}
 	}
+	ind = cf_optind;
+	arg = argv[ind];
+	cf_optind = cf_optreset = 1;
+	cf_opt_unlock();
+
+	if (error)
+		return (error);
+
 	if (aflg && uflg)  {
 		printf(gettext("-A and -U flags are exclusive.\n"));
-		return (1);
+		return (EINVAL);
 	}
-	cf_optind = cf_optreset = 1;
 
-done:
-	if (smb_debug)
-		dump_ctx("after smb_ctx_init", ctx);
+	/*
+	 * Parse the UNC path.  Values from here are
+	 * marked as "from CMD".
+	 */
+	for (; ind < argc; ind++) {
+		arg = argv[ind];
+		if (strncmp(arg, "//", 2) != 0)
+			continue;
+		error = smb_ctx_parseunc(ctx, arg,
+		    minlevel, maxlevel, sharetype, &arg);
+		if (error)
+			return (error);
+		break;
+	}
 
 	return (error);
+}
+
+void
+smb_ctx_free(smb_ctx_t *ctx)
+{
+	smb_ctx_done(ctx);
+	free(ctx);
 }
 
 void
@@ -334,31 +393,52 @@ smb_ctx_done(struct smb_ctx *ctx)
 
 	rpc_cleanup_smbctx(ctx);
 
-	/* Kerberos stuff.  See smb_ctx_krb5init() */
-	if (ctx->ct_krb5ctx) {
-		if (ctx->ct_krb5cp)
-			krb5_free_principal(ctx->ct_krb5ctx, ctx->ct_krb5cp);
-		krb5_free_context(ctx->ct_krb5ctx);
+	if (ctx->ct_dev_fd != -1) {
+		close(ctx->ct_dev_fd);
+		ctx->ct_dev_fd = -1;
 	}
-
-	if (ctx->ct_fd != -1)
-		close(ctx->ct_fd);
-#if 0 /* XXX: not pointers anymore */
-	if (&ctx->ct_ssn.ioc_server)
-		nb_snbfree(&ctx->ct_ssn.ioc_server);
-	if (&ctx->ct_ssn.ioc_local)
-		nb_snbfree(&ctx->ct_ssn.ioc_local);
-#endif
-	if (ctx->ct_srvaddr)
-		free(ctx->ct_srvaddr);
-	if (ctx->ct_nb)
+	if (ctx->ct_tran_fd != -1) {
+		close(ctx->ct_tran_fd);
+		ctx->ct_tran_fd = -1;
+	}
+	if (ctx->ct_srvaddr_s) {
+		free(ctx->ct_srvaddr_s);
+		ctx->ct_srvaddr_s = NULL;
+	}
+	if (ctx->ct_nb) {
 		nb_ctx_done(ctx->ct_nb);
-	if (ctx->ct_secblob)
-		free(ctx->ct_secblob);
-	if (ctx->ct_origshare)
+		ctx->ct_nb = NULL;
+	}
+	if (ctx->ct_locname) {
+		free(ctx->ct_locname);
+		ctx->ct_locname = NULL;
+	}
+	if (ctx->ct_origshare) {
 		free(ctx->ct_origshare);
-	if (ctx->ct_fullserver)
+		ctx->ct_origshare = NULL;
+	}
+	if (ctx->ct_fullserver) {
 		free(ctx->ct_fullserver);
+		ctx->ct_fullserver = NULL;
+	}
+	if (ctx->ct_addrinfo) {
+		freeaddrinfo(ctx->ct_addrinfo);
+		ctx->ct_addrinfo = NULL;
+	}
+	if (ctx->ct_home)
+		free(ctx->ct_home);
+	if (ctx->ct_srv_OS) {
+		free(ctx->ct_srv_OS);
+		ctx->ct_srv_OS = NULL;
+	}
+	if (ctx->ct_srv_LM) {
+		free(ctx->ct_srv_LM);
+		ctx->ct_srv_LM = NULL;
+	}
+	if (ctx->ct_mackey) {
+		free(ctx->ct_mackey);
+		ctx->ct_mackey = NULL;
+	}
 }
 
 static int
@@ -385,20 +465,30 @@ getsubstring(const char *p, uchar_t sep, char *dest, int maxlen,
  * Values found here are marked as "from CMD".
  */
 int
-smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
+smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc,
+	int minlevel, int maxlevel, int sharetype,
 	const char **next)
 {
 	const char *p = unc;
-	char *p1, *colon, *servername;
+	char *p1, *colon;
 	char tmp[1024];
 	char tmp2[1024];
 	int error;
+
+	/*
+	 * This may be called outside of _scan_argv,
+	 * so make sure these get initialized.
+	 */
+	ctx->ct_minlevel = minlevel;
+	ctx->ct_maxlevel = maxlevel;
+	ctx->ct_shtype_req = sharetype;
 
 	ctx->ct_parsedlevel = SMBL_NONE;
 	if (*p++ != '/' || *p++ != '/') {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "UNC should start with '//'"), 0);
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 	}
 	p1 = tmp;
 	error = getsubstring(p, ';', p1, sizeof (tmp), &p);
@@ -406,12 +496,13 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
 		if (*p1 == 0) {
 			smb_error(dgettext(TEXT_DOMAIN,
 			    "empty workgroup name"), 0);
-			return (EINVAL);
+			error = EINVAL;
+			goto out;
 		}
 		nls_str_upper(tmp, tmp);
-		error = smb_ctx_setworkgroup(ctx, unpercent(tmp), TRUE);
+		error = smb_ctx_setdomain(ctx, unpercent(tmp), TRUE);
 		if (error)
-			return (error);
+			goto out;
 	}
 	colon = (char *)p;
 	error = getsubstring(p, '@', p1, sizeof (tmp), &p);
@@ -419,7 +510,8 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
 		if (ctx->ct_maxlevel < SMBL_VC) {
 			smb_error(dgettext(TEXT_DOMAIN,
 			    "no user name required"), 0);
-			return (EINVAL);
+			error = EINVAL;
+			goto out;
 		}
 		p1 = strchr(tmp, ':');
 		if (p1) {
@@ -427,7 +519,7 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
 			*p1++ = (char)0;
 			error = smb_ctx_setpassword(ctx, unpercent(p1), TRUE);
 			if (error)
-				return (error);
+				goto out;
 			if (p - colon > 2)
 				memset(colon+1, '*', p - colon - 2);
 		}
@@ -435,11 +527,12 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
 		if (*p1 == 0) {
 			smb_error(dgettext(TEXT_DOMAIN,
 			    "empty user name"), 0);
-			return (EINVAL);
+			error = EINVAL;
+			goto out;
 		}
 		error = smb_ctx_setuser(ctx, unpercent(tmp), TRUE);
 		if (error)
-			return (error);
+			goto out;
 		ctx->ct_parsedlevel = SMBL_VC;
 	}
 	error = getsubstring(p, '/', p1, sizeof (tmp), &p);
@@ -448,14 +541,14 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
 		if (error) {
 			smb_error(dgettext(TEXT_DOMAIN,
 			    "no server name found"), 0);
-			return (error);
+			goto out;
 		}
 	}
 	if (*p1 == 0) {
 		smb_error(dgettext(TEXT_DOMAIN, "empty server name"), 0);
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 	}
-
 
 	/*
 	 * It's safe to uppercase this string, which
@@ -464,49 +557,32 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
 	 * hex digits 0-9 and A-F (already uppercased, and
 	 * if not uppercased they need to be). However,
 	 * it is NOT safe to uppercase after it has been
-	 * converted, below!
+	 * "unpercent" converted, below!
 	 */
-
 	nls_str_upper(tmp2, tmp);
 
 	/*
-	 * scan for % in the string.
-	 * If we find one, convert
-	 * to the assumed codepage.
+	 * Save ct_fullserver without case conversion.
 	 */
-
-	if (strchr(tmp2, '%')) {
-		/* use the 1st buffer, we don't need the old string */
-		servername = tmp;
-		if (!(servername = convert_utf8_to_wincs(unpercent(tmp2)))) {
-			smb_error(dgettext(TEXT_DOMAIN, "bad server name"), 0);
-			return (EINVAL);
-		}
-		/*
-		 * Converts utf8 to win equivalent of
-		 * what is configured on this machine.
-		 * Note that we are assuming this is the
-		 * encoding used on the server, and that
-		 * assumption might be incorrect. This is
-		 * the best we can do now, and we should
-		 * move to use port 445 to avoid having
-		 * to worry about server codepages.
-		 */
-	} else /* no conversion needed */
-		servername = tmp2;
-
-	smb_ctx_setserver(ctx, servername);
-	error = smb_ctx_setfullserver(ctx, servername);
-
+	if (strchr(tmp, '%'))
+		(void) unpercent(tmp);
+	smb_ctx_setfullserver(ctx, tmp);
 	if (error)
-		return (error);
+		goto out;
+
+#ifdef	SMB_ST_NONE
 	if (sharetype == SMB_ST_NONE) {
-		*next = p;
-		return (0);
+		if (next)
+			*next = p;
+		error = 0;
+		goto out;
 	}
+#endif
+
 	if (*p != 0 && ctx->ct_maxlevel < SMBL_SHARE) {
 		smb_error(dgettext(TEXT_DOMAIN, "no share name required"), 0);
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 	}
 	error = getsubstring(p, '/', p1, sizeof (tmp), &p);
 	if (error) {
@@ -514,21 +590,31 @@ smb_ctx_parseunc(struct smb_ctx *ctx, const char *unc, int sharetype,
 		if (error) {
 			smb_error(dgettext(TEXT_DOMAIN,
 			    "unexpected end of line"), 0);
-			return (error);
+			goto out;
 		}
 	}
 	if (*p1 == 0 && ctx->ct_minlevel >= SMBL_SHARE &&
 	    !(ctx->ct_flags & SMBCF_BROWSEOK)) {
 		smb_error(dgettext(TEXT_DOMAIN, "empty share name"), 0);
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 	}
-	*next = p;
-	if (*p1 == 0)
-		return (0);
+	if (next)
+		*next = p;
+	if (*p1 == 0) {
+		error = 0;
+		goto out;
+	}
 	error = smb_ctx_setshare(ctx, unpercent(p1), sharetype);
+
+out:
+	if (error == 0 && smb_debug > 0)
+		dump_ctx("after smb_ctx_parseunc", ctx);
+
 	return (error);
 }
 
+#ifdef KICONV_SUPPORT
 int
 smb_ctx_setcharset(struct smb_ctx *ctx, const char *arg)
 {
@@ -562,98 +648,43 @@ smb_ctx_setcharset(struct smb_ctx *ctx, const char *arg)
 	servercs[0] = 0;
 	return (error);
 }
+#endif /* KICONV_SUPPORT */
+
+int
+smb_ctx_setauthflags(struct smb_ctx *ctx, int flags)
+{
+	ctx->ct_authflags = flags;
+	return (0);
+}
 
 int
 smb_ctx_setfullserver(struct smb_ctx *ctx, const char *name)
 {
-	ctx->ct_fullserver = strdup(name);
-	if (ctx->ct_fullserver == NULL)
+	char *p = strdup(name);
+
+	if (p == NULL)
 		return (ENOMEM);
+	if (ctx->ct_fullserver)
+		free(ctx->ct_fullserver);
+	ctx->ct_fullserver = p;
 	return (0);
 }
 
-/*
- * XXX TODO FIXME etc etc
- * If the call to nbns_getnodestatus(...) fails we can try one of two other
- * methods; use a name of "*SMBSERVER", which is supported by Samba (at least)
- * or, as a last resort, try the "truncate-at-dot" heuristic.
- * And the heuristic really should attempt truncation at
- * each dot in turn, left to right.
- *
- * These fallback heuristics should be triggered when the attempt to open the
- * session fails instead of in the code below.
- *
- * See http://ietf.org/internet-drafts/draft-crhertel-smb-url-07.txt
- */
-int
-smb_ctx_getnbname(struct smb_ctx *ctx, struct sockaddr *sap)
-{
-	char server[SMB_MAXSRVNAMELEN + 1];
-	char workgroup[SMB_MAXUSERNAMELEN + 1];
-	int error;
-#if 0
-	char *dot;
-#endif
-
-	server[0] = workgroup[0] = '\0';
-	error = nbns_getnodestatus(sap, ctx->ct_nb, server, workgroup);
-	if (error == 0) {
-		/*
-		 * Used to set our domain name to be the same as
-		 * the server's domain name.   Unnecessary at best,
-		 * and wrong for accounts in a trusted domain.
-		 */
-#ifdef APPLE
-		if (workgroup[0] && !ctx->ct_ssn.ioc_workgroup[0])
-			smb_ctx_setworkgroup(ctx, workgroup, 0);
-#endif
-		if (server[0])
-			smb_ctx_setserver(ctx, server);
-	} else {
-		if (smb_verbose)
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "Failed to get NetBIOS node status."), 0);
-		if (ctx->ct_ssn.ioc_srvname[0] == (char)0)
-			smb_ctx_setserver(ctx, "*SMBSERVER");
-	}
-#if 0
-	if (server[0] == (char)0) {
-		dot = strchr(ctx->ct_fullserver, '.');
-		if (dot)
-			*dot = '\0';
-		if (strlen(ctx->ct_fullserver) <= SMB_MAXSRVNAMELEN) {
-			/*
-			 * don't uppercase the server name. it comes from
-			 * NBNS and uppercasing can clobber the characters
-			 */
-			strcpy(ctx->ct_ssn.ioc_srvname, ctx->ct_fullserver);
-			error = 0;
-		} else {
-			error = -1;
-		}
-		if (dot)
-			*dot = '.';
-	}
-#endif
-	return (error);
-}
-
 /* this routine does not uppercase the server name */
-void
+int
 smb_ctx_setserver(struct smb_ctx *ctx, const char *name)
 {
 	/* don't uppercase the server name */
-	if (strlen(name) > SMB_MAXSRVNAMELEN) { /* NB limit is 15 */
-		ctx->ct_ssn.ioc_srvname[0] = '\0';
-	} else
-		strcpy(ctx->ct_ssn.ioc_srvname, name);
+	strlcpy(ctx->ct_srvname, name,
+	    sizeof (ctx->ct_srvname));
+	return (0);
 }
 
 int
 smb_ctx_setuser(struct smb_ctx *ctx, const char *name, int from_cmd)
 {
 
-	if (strlen(name) >= SMB_MAXUSERNAMELEN) {
+	if (strlen(name) >= sizeof (ctx->ct_user)) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "user name '%s' too long"), 0, name);
 		return (ENAMETOOLONG);
@@ -667,7 +698,8 @@ smb_ctx_setuser(struct smb_ctx *ctx, const char *name, int from_cmd)
 		return (0);
 
 	/* don't uppercase the username, just copy it. */
-	strcpy(ctx->ct_ssn.ioc_user, name);
+	strlcpy(ctx->ct_user, name,
+	    sizeof (ctx->ct_user));
 
 	/* Mark this as "from the command line". */
 	if (from_cmd)
@@ -686,10 +718,10 @@ smb_ctx_setuser(struct smb_ctx *ctx, const char *name, int from_cmd)
  * See smb_ctx_init() for notes about this.
  */
 int
-smb_ctx_setworkgroup(struct smb_ctx *ctx, const char *name, int from_cmd)
+smb_ctx_setdomain(struct smb_ctx *ctx, const char *name, int from_cmd)
 {
 
-	if (strlen(name) >= SMB_MAXUSERNAMELEN) {
+	if (strlen(name) >= sizeof (ctx->ct_domain)) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "workgroup name '%s' too long"), 0, name);
 		return (ENAMETOOLONG);
@@ -702,7 +734,8 @@ smb_ctx_setworkgroup(struct smb_ctx *ctx, const char *name, int from_cmd)
 	if (!from_cmd && (ctx->ct_flags & SMBCF_CMD_DOM))
 		return (0);
 
-	strcpy(ctx->ct_ssn.ioc_workgroup, name);
+	strlcpy(ctx->ct_domain, name,
+	    sizeof (ctx->ct_domain));
 
 	/* Mark this as "from the command line". */
 	if (from_cmd)
@@ -714,26 +747,41 @@ smb_ctx_setworkgroup(struct smb_ctx *ctx, const char *name, int from_cmd)
 int
 smb_ctx_setpassword(struct smb_ctx *ctx, const char *passwd, int from_cmd)
 {
+	int err;
 
-	if (passwd == NULL) /* XXX Huh? */
+	if (passwd == NULL)
 		return (EINVAL);
-	if (strlen(passwd) >= SMB_MAXPASSWORDLEN) {
+	if (strlen(passwd) >= sizeof (ctx->ct_password)) {
 		smb_error(dgettext(TEXT_DOMAIN, "password too long"), 0);
 		return (ENAMETOOLONG);
 	}
 
 	/*
-	 * Don't overwrite a value from the command line
-	 * with one from anywhere else.
+	 * If called again after comand line parsing,
+	 * don't overwrite a value from the command line
+	 * with one from any stored config.
 	 */
 	if (!from_cmd && (ctx->ct_flags & SMBCF_CMD_PW))
 		return (0);
 
+	memset(ctx->ct_password, 0, sizeof (ctx->ct_password));
 	if (strncmp(passwd, "$$1", 3) == 0)
-		smb_simpledecrypt(ctx->ct_ssn.ioc_password, passwd);
+		smb_simpledecrypt(ctx->ct_password, passwd);
 	else
-		strcpy(ctx->ct_ssn.ioc_password, passwd);
-	strcpy(ctx->ct_sh.ioc_password, ctx->ct_ssn.ioc_password);
+		strlcpy(ctx->ct_password, passwd,
+		    sizeof (ctx->ct_password));
+
+	/*
+	 * Compute LM hash, NT hash.
+	 */
+	if (ctx->ct_password[0]) {
+		err = ntlm_compute_nt_hash(ctx->ct_nthash, ctx->ct_password);
+		if (err != 0)
+			return (err);
+		err = ntlm_compute_lm_hash(ctx->ct_lmhash, ctx->ct_password);
+		if (err != 0)
+			return (err);
+	}
 
 	/* Mark this as "from the command line". */
 	if (from_cmd)
@@ -742,10 +790,37 @@ smb_ctx_setpassword(struct smb_ctx *ctx, const char *passwd, int from_cmd)
 	return (0);
 }
 
+/*
+ * Use this to set NTLM auth. info (hashes)
+ * when we don't have the password.
+ */
+int
+smb_ctx_setpwhash(smb_ctx_t *ctx,
+    const uchar_t *nthash, const uchar_t *lmhash)
+{
+
+	/* Need ct_password to be non-null. */
+	if (ctx->ct_password[0] == '\0')
+		strlcpy(ctx->ct_password, "$HASH",
+		    sizeof (ctx->ct_password));
+
+	/*
+	 * Compute LM hash, NT hash.
+	 */
+	memcpy(ctx->ct_nthash, nthash, NTLM_HASH_SZ);
+
+	/* The LM hash is optional */
+	if (lmhash) {
+		memcpy(ctx->ct_nthash, nthash, NTLM_HASH_SZ);
+	}
+
+	return (0);
+}
+
 int
 smb_ctx_setshare(struct smb_ctx *ctx, const char *share, int stype)
 {
-	if (strlen(share) >= SMB_MAXSHARENAMELEN) {
+	if (strlen(share) >= SMBIOC_MAX_NAME) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "share name '%s' too long"), 0, share);
 		return (ENAMETOOLONG);
@@ -754,10 +829,9 @@ smb_ctx_setshare(struct smb_ctx *ctx, const char *share, int stype)
 		free(ctx->ct_origshare);
 	if ((ctx->ct_origshare = strdup(share)) == NULL)
 		return (ENOMEM);
-	nls_str_upper(ctx->ct_sh.ioc_share, share);
-	if (share[0] != 0)
-		ctx->ct_parsedlevel = SMBL_SHARE;
-	ctx->ct_sh.ioc_stype = stype;
+
+	ctx->ct_shtype_req = stype;
+
 	return (0);
 }
 
@@ -766,9 +840,9 @@ smb_ctx_setsrvaddr(struct smb_ctx *ctx, const char *addr)
 {
 	if (addr == NULL || addr[0] == 0)
 		return (EINVAL);
-	if (ctx->ct_srvaddr)
-		free(ctx->ct_srvaddr);
-	if ((ctx->ct_srvaddr = strdup(addr)) == NULL)
+	if (ctx->ct_srvaddr_s)
+		free(ctx->ct_srvaddr_s);
+	if ((ctx->ct_srvaddr_s = strdup(addr)) == NULL)
 		return (ENOMEM);
 	return (0);
 }
@@ -784,7 +858,7 @@ smb_parse_owner(char *pair, uid_t *uid, gid_t *gid)
 	cp = strchr(pair, ':');
 	if (cp) {
 		*cp++ = '\0';
-		if (*cp) {
+		if (*cp && gid) {
 			if (getgrnam_r(cp, &gr, buf, sizeof (buf)) != NULL) {
 				*gid = gr.gr_gid;
 			} else
@@ -824,11 +898,8 @@ smb_ctx_opt(struct smb_ctx *ctx, int opt, const char *arg)
 		error = smb_ctx_setsrvaddr(ctx, arg);
 		break;
 	case 'M':
-		ctx->ct_ssn.ioc_rights = strtol(arg, &cp, 8);
-		if (*cp == '/') {
-			ctx->ct_sh.ioc_rights = strtol(cp + 1, &cp, 8);
-			ctx->ct_flags |= SMBCF_SRIGHTS;
-		}
+		/* share connect rights - ignored */
+		ctx->ct_flags |= SMBCF_SRIGHTS;
 		break;
 	case 'N':
 		ctx->ct_flags |= SMBCF_NOPWD;
@@ -836,61 +907,40 @@ smb_ctx_opt(struct smb_ctx *ctx, int opt, const char *arg)
 	case 'O':
 		p = strdup(arg);
 		cp = strchr(p, '/');
-		if (cp) {
-			*cp++ = '\0';
-			error = smb_parse_owner(cp, &ctx->ct_sh.ioc_owner,
-			    &ctx->ct_sh.ioc_group);
-		}
-		if (*p && error == 0) {
-			error = smb_parse_owner(cp, &ctx->ct_ssn.ioc_owner,
-			    &ctx->ct_ssn.ioc_group);
-		}
+		if (cp)
+			*cp = '\0';
+		error = smb_parse_owner(cp, &ctx->ct_owner, NULL);
 		free(p);
 		break;
 	case 'P':
-/*		ctx->ct_ssn.ioc_opt |= SMBCOPT_PERMANENT; */
+/*		ctx->ct_vopt |= SMBCOPT_PERMANENT; */
 		break;
 	case 'R':
-		ctx->ct_ssn.ioc_retrycount = atoi(arg);
+		/* retry count - ignored */
 		break;
 	case 'T':
-		ctx->ct_ssn.ioc_timeout = atoi(arg);
+		/* timeout - ignored */
 		break;
-	case 'W':
+	case 'D':	/* domain */
+	case 'W':	/* workgroup (legacy alias) */
 		nls_str_upper(tmp, arg);
-		error = smb_ctx_setworkgroup(ctx, tmp, TRUE);
+		error = smb_ctx_setdomain(ctx, tmp, TRUE);
 		break;
 	}
 	return (error);
 }
 
-#if 0
-static void
-smb_hexdump(const uchar_t *buf, int len) {
-	int ofs = 0;
 
-	while (len--) {
-		if (ofs % 16 == 0)
-			printf("\n%02X: ", ofs);
-		printf("%02x ", *buf++);
-		ofs++;
-	}
-	printf("\n");
-}
-#endif
-
-
+/*
+ * Original code injected iconv tables into the kernel.
+ * Not sure if we'll need this or not...  REVISIT
+ */
+#ifdef KICONV_SUPPORT
 static int
 smb_addiconvtbl(const char *to, const char *from, const uchar_t *tbl)
 {
-	int error;
+	int error = 0;
 
-	/*
-	 * Not able to find out what is the work of this routine till
-	 * now. Still investigating.
-	 * REVISIT
-	 */
-#ifdef KICONV_SUPPORT
 	error = kiconv_add_xlat_table(to, from, tbl);
 	if (error && error != EEXIST) {
 		smb_error(dgettext(TEXT_DOMAIN,
@@ -898,47 +948,44 @@ smb_addiconvtbl(const char *to, const char *from, const uchar_t *tbl)
 		    error, from, to);
 		return (error);
 	}
-#endif
-	return (0);
+	return (error);
 }
+#endif	/* KICONV_SUPPORT */
 
 /*
- * Verify context before connect operation(s),
+ * Verify context info. before connect operation(s),
  * lookup specified server and try to fill all forgotten fields.
+ * Legacy name used by commands.
  */
 int
 smb_ctx_resolve(struct smb_ctx *ctx)
 {
 	struct smbioc_ossn *ssn = &ctx->ct_ssn;
-	struct smbioc_oshare *sh = &ctx->ct_sh;
-	struct nb_name nn;
-	struct sockaddr *sap;
-	struct sockaddr_nb *salocal, *saserver;
-	char *cp;
+	int error = 0;
+#ifdef KICONV_SUPPORT
 	uchar_t cstbl[256];
 	uint_t i;
-	int error = 0;
-	int browseok = ctx->ct_flags & SMBCF_BROWSEOK;
-	int renego = 0;
+#endif
 
 	ctx->ct_flags &= ~SMBCF_RESOLVED;
-	if (isatty(STDIN_FILENO))
-		browseok = 0;
-	if (ctx->ct_fullserver == NULL || ctx->ct_fullserver[0] == 0) {
+
+	if (ctx->ct_fullserver == NULL) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "no server name specified"), 0);
 		return (EINVAL);
 	}
-	if (ctx->ct_minlevel >= SMBL_SHARE && sh->ioc_share[0] == 0 &&
-	    !browseok) {
+
+	if (ctx->ct_minlevel >= SMBL_SHARE &&
+	    ctx->ct_origshare == NULL) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "no share name specified for %s@%s"),
-		    0, ssn->ioc_user, ssn->ioc_srvname);
+		    0, ssn->ssn_user, ctx->ct_fullserver);
 		return (EINVAL);
 	}
 	error = nb_ctx_resolve(ctx->ct_nb);
 	if (error)
 		return (error);
+#ifdef KICONV_SUPPORT
 	if (ssn->ioc_localcs[0] == 0)
 		strcpy(ssn->ioc_localcs, "default");	/* XXX: locale name ? */
 	error = smb_addiconvtbl("tolower", ssn->ioc_localcs, nls_lower);
@@ -963,177 +1010,57 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 		if (error)
 			return (error);
 	}
-	/*
-	 * If we have an explicit address set for the server in
-	 * an "addr=X" setting in .nsmbrc or SMF, just try using a
-	 * gethostbyname() lookup for it.
-	 */
-	if (ctx->ct_srvaddr) {
-		error = nb_resolvehost_in(ctx->ct_srvaddr, &sap);
-		if (error == 0)
-			(void) smb_ctx_getnbname(ctx, sap);
-	} else
-		error = -1;
+#endif	/* KICONV_SUPPORT */
 
 	/*
-	 * Next try a gethostbyname() lookup on the original user-
-	 * specified server name. This is similar to Windows
-	 * NBT option "Use DNS for name resolution."
+	 * Lookup the IP address.
+	 * Puts a list in ct_addrinfo
 	 */
-	if (error && ctx->ct_fullserver) {
-		error = nb_resolvehost_in(ctx->ct_fullserver, &sap);
-		if (error == 0)
-			(void) smb_ctx_getnbname(ctx, sap);
-	}
-
-	/*
-	 * Finally, try the shorter, upper-cased ssn->ioc_srvname
-	 * with a NBNS/WINS lookup if the "nbns_enable" property is
-	 * true (the default).  nbns_resolvename() may unicast to the
-	 * "nbns" server or broadcast on the subnet.
-	 */
-	if (error && ssn->ioc_srvname[0] &&
-	    ctx->ct_nb->nb_flags & NBCF_NS_ENABLE) {
-		error = nbns_resolvename(ssn->ioc_srvname,
-		    ctx->ct_nb, &sap);
-		/*
-		 * Used to get the NetBIOS node status here.
-		 * Not necessary (we have the NetBIOS name).
-		 */
-	}
+	error = smb_ctx_getaddr(ctx);
 	if (error) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "can't get server address"), error);
 		return (error);
 	}
+	assert(ctx->ct_addrinfo != NULL);
 
-	/* XXX: no nls_str_upper(ssn->ioc_srvname) here? */
-
-	assert(sizeof (nn.nn_name) == sizeof (ssn->ioc_srvname));
-	memcpy(nn.nn_name, ssn->ioc_srvname, NB_NAMELEN);
-	nn.nn_type = NBT_SERVER;
-	nn.nn_scope = ctx->ct_nb->nb_scope;
-
-	error = nb_sockaddr(sap, &nn, &saserver);
-	memcpy(&ctx->ct_srvinaddr, sap, sizeof (struct sockaddr_in));
-	nb_snbfree(sap);
-	if (error) {
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "can't allocate server address"), error);
-		return (error);
-	}
-	/* We know it's a NetBIOS address here. */
-	bcopy(saserver, &ssn->ioc_server.nb,
-	    sizeof (struct sockaddr_nb));
-	if (ctx->ct_locname[0] == 0) {
-		error = nb_getlocalname(ctx->ct_locname,
-		    SMB_MAXUSERNAMELEN + 1);
-		if (error) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "can't get local name"), error);
-			return (error);
-		}
-		nls_str_upper(ctx->ct_locname, ctx->ct_locname);
-	}
-
-	/* XXX: no nls_str_upper(ctx->ct_locname); here? */
-
-	memcpy(nn.nn_name, ctx->ct_locname, NB_NAMELEN);
-	nn.nn_type = NBT_WKSTA;
-	nn.nn_scope = ctx->ct_nb->nb_scope;
-
-	error = nb_sockaddr(NULL, &nn, &salocal);
-	if (error) {
-		nb_snbfree((struct sockaddr *)saserver);
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "can't allocate local address"), error);
-		return (error);
-	}
-
-	/* We know it's a NetBIOS address here. */
-	bcopy(salocal, &ssn->ioc_local.nb,
-	    sizeof (struct sockaddr_nb));
-
-	error = smb_ctx_findvc(ctx, SMBL_VC, 0);
-	if (error == 0) {
-		/* re-use and existing VC */
-		ctx->ct_flags |= SMBCF_RESOLVED | SMBCF_SSNACTIVE;
-		return (0);
-	}
-
-	/* Make a new connection via smb_ctx_negotiate()... */
-	error = smb_ctx_negotiate(ctx, SMBL_SHARE, SMBLK_CREATE,
-	    ssn->ioc_workgroup);
-	if (error)
-		return (error);
-	ctx->ct_flags &= ~SMBCF_AUTHREQ;
-	if (!ctx->ct_secblob && browseok && !sh->ioc_share[0] &&
-	    !(ctx->ct_flags & SMBCF_XXX)) {
-		/* assert: anon share list is subset of overall server shares */
-		error = smb_browse(ctx, 1);
-		if (error) /* user cancel or other error? */
-			return (error);
-		/*
-		 * A share was selected, authenticate button was pressed,
-		 * or anon-authentication failed getting browse list.
-		 */
-	}
-	if ((ctx->ct_secblob == NULL) && (ctx->ct_flags & SMBCF_AUTHREQ ||
-	    (ssn->ioc_password[0] == '\0' &&
-	    !(ctx->ct_flags & SMBCF_NOPWD)))) {
-reauth:
-		/*
-		 * This function is implemented in both
-		 * ui-apple.c and ui-sun.c so let's try to
-		 * keep the same interface.  Not sure why
-		 * they didn't just pass ssn here.
-		 */
-		error = smb_get_authentication(
-		    ssn->ioc_workgroup, sizeof (ssn->ioc_workgroup) - 1,
-		    ssn->ioc_user, sizeof (ssn->ioc_user) - 1,
-		    ssn->ioc_password, sizeof (ssn->ioc_password) - 1,
-		    ssn->ioc_srvname, ctx);
-		if (error)
-			return (error);
-	}
 	/*
-	 * if we have a session it is either anonymous
-	 * or from a stale authentication.  re-negotiating
-	 * gets us ready for a fresh session
+	 * If we have a user name but no password,
+	 * check for a keychain entry.
+	 * XXX: Only for auth NTLM?
 	 */
-	if (ctx->ct_flags & SMBCF_SSNACTIVE || renego) {
-		renego = 0;
-		/* don't clobber workgroup name, pass null arg */
-		error = smb_ctx_negotiate(ctx, SMBL_SHARE, SMBLK_CREATE, NULL);
-		if (error)
-			return (error);
-	}
-	if (browseok && !sh->ioc_share[0]) {
-		ctx->ct_flags &= ~SMBCF_AUTHREQ;
-		error = smb_browse(ctx, 0);
-		if (ctx->ct_flags & SMBCF_KCFOUND && smb_autherr(error)) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "smb_ctx_resolve: bad keychain entry"), 0);
-			ctx->ct_flags |= SMBCF_KCBAD;
-			renego = 1;
-			goto reauth;
-		}
-		if (error) /* auth, user cancel, or other error */
-			return (error);
+	if (ctx->ct_user[0] == '\0') {
 		/*
-		 * Re-authenticate button was pressed?
+		 * No user name (anonymous session).
+		 * The minauth checks do not apply.
 		 */
-		if (ctx->ct_flags & SMBCF_AUTHREQ)
-			goto reauth;
-		if (!sh->ioc_share[0] && !(ctx->ct_flags & SMBCF_XXX)) {
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "no share specified for %s@%s"),
-			    0, ssn->ioc_user, ssn->ioc_srvname);
-			return (EINVAL);
-		}
+		ctx->ct_authflags = SMB_AT_ANON;
+	} else {
+		/*
+		 * Have a user name.
+		 * If we don't have a p/w yet,
+		 * try the keychain.
+		 */
+		if (ctx->ct_password[0] == '\0')
+			(void) smb_get_keychain(ctx);
+		/*
+		 * If we're doing p/w based auth,
+		 * that means not using Kerberos.
+		 */
+		if (ctx->ct_password[0] != '\0')
+			ctx->ct_authflags &= ~SMB_AT_KRB5;
+		/*
+		 * Mask out disallowed auth types.
+		 */
+		ctx->ct_authflags &= ctx->ct_minauth;
 	}
-	ctx->ct_flags |= SMBCF_RESOLVED;
+	if (ctx->ct_authflags == 0) {
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "no valid auth. types"), 0);
+		return (ENOTSUP);
+	}
 
+	ctx->ct_flags |= SMBCF_RESOLVED;
 	if (smb_debug)
 		dump_ctx("after smb_ctx_resolve", ctx);
 
@@ -1143,50 +1070,23 @@ reauth:
 int
 smb_open_driver()
 {
-	char buf[20];
-	int err, fd, i;
+	int err, fd;
 	uint32_t version;
 
-	/*
-	 * First try to open as clone
-	 */
 	fd = open("/dev/"NSMB_NAME, O_RDWR);
-	if (fd >= 0)
-		goto opened;
-
-	err = errno; /* from open */
-#ifdef APPLE
-	/*
-	 * well, no clone capabilities available - we have to scan
-	 * all devices in order to get free one
-	 */
-	for (i = 0; i < 1024; i++) {
-		snprintf(buf, sizeof (buf), "/dev/%s%d", NSMB_NAME, i);
-		fd = open(buf, O_RDWR);
-		if (fd >= 0)
-			goto opened;
-		if (i && POWEROF2(i+1))
-			smb_error(dgettext(TEXT_DOMAIN,
-			    "%d failures to open smb device"), errno, i+1);
+	if (fd < 0) {
+		err = errno;
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "failed to open driver"), err);
+		return (-1);
 	}
-	err = ENOENT;
-#endif
-	smb_error(dgettext(TEXT_DOMAIN,
-	    "failed to open %s"), err, "/dev/" NSMB_NAME);
-	return (-1);
 
-opened:
 	/*
 	 * Check the driver version (paranoia)
 	 * Do this BEFORE any other ioctl calls.
 	 */
-	if (ioctl(fd, SMBIOC_GETVERS, &version) < 0) {
-		err = errno;
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "failed to get driver version"), err);
-		close(fd);
-		return (-1);
-	}
+	if (ioctl(fd, SMBIOC_GETVERS, &version) < 0)
+		version = 0;
 	if (version != NSMB_VERSION) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "incorrect driver version"), 0);
@@ -1194,18 +1094,21 @@ opened:
 		return (-1);
 	}
 
+	/* This handle controls per-process resources. */
+	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
+
 	return (fd);
 }
 
-static int
+int
 smb_ctx_gethandle(struct smb_ctx *ctx)
 {
-	int err, fd;
+	int fd;
 
-	if (ctx->ct_fd != -1) {
+	if (ctx->ct_dev_fd != -1) {
 		rpc_cleanup_smbctx(ctx);
-		close(ctx->ct_fd);
-		ctx->ct_fd = -1;
+		close(ctx->ct_dev_fd);
+		ctx->ct_dev_fd = -1;
 		ctx->ct_flags &= ~SMBCF_SSNACTIVE;
 	}
 
@@ -1213,716 +1116,142 @@ smb_ctx_gethandle(struct smb_ctx *ctx)
 	if (fd < 0)
 		return (ENODEV);
 
-	ctx->ct_fd = fd;
+	ctx->ct_dev_fd = fd;
 	return (0);
 }
 
-int
-smb_ctx_ioctl(struct smb_ctx *ctx, int inum, struct smbioc_lookup *rqp)
-{
-	size_t	siz = DEF_SEC_TOKEN_LEN;
-	int	rc = 0;
-	struct sockaddr sap1, sap2;
-	int i;
 
-	if (rqp->ioc_ssn.ioc_outtok)
-		free(rqp->ioc_ssn.ioc_outtok);
-	rqp->ioc_ssn.ioc_outtoklen = siz;
-	rqp->ioc_ssn.ioc_outtok = malloc(siz+1);
-	if (rqp->ioc_ssn.ioc_outtok == NULL)
+/*
+ * Find or create a connection + logon session
+ */
+int
+smb_ctx_get_ssn(struct smb_ctx *ctx)
+{
+	int err = 0;
+
+	if ((ctx->ct_flags & SMBCF_RESOLVED) == 0)
+		return (EINVAL);
+
+	if (ctx->ct_dev_fd < 0) {
+		if ((err = smb_ctx_gethandle(ctx)))
+			return (err);
+	}
+
+	/*
+	 * Check whether the driver already has a VC
+	 * we can use.  If so, we're done!
+	 */
+	err = smb_ctx_findvc(ctx);
+	if (err == 0) {
+		DPRINT("found an existing VC");
+	} else {
+		/*
+		 * This calls the IOD to create a new session.
+		 */
+		DPRINT("setup a new VC");
+		err = smb_ctx_newvc(ctx);
+		if (err != 0)
+			return (err);
+
+		/*
+		 * Call findvc again.  The new VC sould be
+		 * found in the driver this time.
+		 */
+		err = smb_ctx_findvc(ctx);
+	}
+
+	return (err);
+}
+
+/*
+ * Get the string representation of a share "use" type,
+ * as needed for the "service" in tree connect.
+ */
+static const char *
+smb_use_type_str(smb_use_shtype_t stype)
+{
+	const char *pp;
+
+	switch (stype) {
+	default:
+	case USE_WILDCARD:
+		pp = "?????";
+		break;
+	case USE_DISKDEV:
+		pp = "A:";
+		break;
+	case USE_SPOOLDEV:
+		pp = "LPT1:";
+		break;
+	case USE_CHARDEV:
+		pp = "COMM";
+		break;
+	case USE_IPC:
+		pp = "IPC";
+		break;
+	}
+	return (pp);
+}
+
+/*
+ * Find or create a tree connection
+ */
+int
+smb_ctx_get_tree(struct smb_ctx *ctx)
+{
+	smbioc_tcon_t *tcon = NULL;
+	const char *stype;
+	int cmd, err = 0;
+
+	if (ctx->ct_dev_fd < 0 ||
+	    ctx->ct_origshare == NULL) {
+		return (EINVAL);
+	}
+
+	cmd = SMBIOC_TREE_CONNECT;
+	tcon = malloc(sizeof (*tcon));
+	if (tcon == NULL)
 		return (ENOMEM);
-	bzero(rqp->ioc_ssn.ioc_outtok, siz+1);
-	/* Note: No longer put length in outtok[0] */
-	/* *((int *)rqp->ioc_ssn.ioc_outtok) = (int)siz; */
+	bzero(tcon, sizeof (*tcon));
+	tcon->tc_flags = SMBLK_CREATE;
+	tcon->tc_opt = 0;
 
-	if (ioctl(ctx->ct_fd, inum, rqp) == -1) {
-		rc = errno;
-		goto out;
-	}
-	if (rqp->ioc_ssn.ioc_outtoklen <= siz)
-		goto out;
+	/* The share name */
+	strlcpy(tcon->tc_sh.sh_name, ctx->ct_origshare,
+	    sizeof (tcon->tc_sh.sh_name));
 
-	/*
-	 * Operation completed, but our output token wasn't large enough.
-	 * The re-call below only pulls the token from the kernel.
-	 */
-	siz = rqp->ioc_ssn.ioc_outtoklen;
-	free(rqp->ioc_ssn.ioc_outtok);
-	rqp->ioc_ssn.ioc_outtok = malloc(siz + 1);
-	if (rqp->ioc_ssn.ioc_outtok == NULL) {
-		rc = ENOMEM;
-		goto out;
-	}
-	bzero(rqp->ioc_ssn.ioc_outtok, siz+1);
-	/* Note: No longer put length in outtok[0] */
-	/* *((int *)rqp->ioc_ssn.ioc_outtok) = siz; */
-	if (ioctl(ctx->ct_fd, inum, rqp) == -1)
-		rc = errno;
-out:
-	return (rc);
-}
-
-int
-smb_ctx_findvc(struct smb_ctx *ctx, int level, int flags)
-{
-	struct smbioc_lookup	rq;
-	int	error = 0;
-
-	if ((error = smb_ctx_gethandle(ctx)))
-		return (error);
-
-	bzero(&rq, sizeof (rq));
-	bcopy(&ctx->ct_ssn, &rq.ioc_ssn, sizeof (struct smbioc_ossn));
-	bcopy(&ctx->ct_sh, &rq.ioc_sh, sizeof (struct smbioc_oshare));
-
-	rq.ioc_flags = flags;
-	rq.ioc_level = level;
-
-	return (smb_ctx_ioctl(ctx, SMBIOC_FINDVC, &rq));
-}
-
-/*
- * adds a GSSAPI wrapper
- */
-char *
-smb_ctx_tkt2gtok(uchar_t *tkt, ulong_t tktlen,
-    uchar_t **gtokp, ulong_t *gtoklenp)
-{
-	ulong_t		bloblen = tktlen;
-	ulong_t		len;
-	uchar_t		krbapreq[2] = "\x01\x00"; /* see RFC 1964 */
-	char 		*failure;
-	uchar_t 	*blob = NULL;		/* result */
-	uchar_t 	*b;
-
-	bloblen += sizeof (krbapreq);
-	bloblen += g_stcMechOIDList[spnego_mech_oid_Kerberos_V5].iLen;
-	len = bloblen;
-	bloblen = ASNDerCalcTokenLength(bloblen, bloblen);
-	failure = dgettext(TEXT_DOMAIN, "smb_ctx_tkt2gtok malloc");
-	if (!(blob = malloc(bloblen)))
-		goto out;
-	b = blob;
-	b += ASNDerWriteToken(b, SPNEGO_NEGINIT_APP_CONSTRUCT, NULL, len);
-	b += ASNDerWriteOID(b, spnego_mech_oid_Kerberos_V5);
-	memcpy(b, krbapreq, sizeof (krbapreq));
-	b += sizeof (krbapreq);
-	failure = dgettext(TEXT_DOMAIN, "smb_ctx_tkt2gtok insanity check");
-	if (b + tktlen != blob + bloblen)
-		goto out;
-	memcpy(b, tkt, tktlen);
-	*gtoklenp = bloblen;
-	*gtokp = blob;
-	failure = NULL;
-out:;
-	if (blob && failure)
-		free(blob);
-	return (failure);
-}
-
-
-/*
- * Initialization for Kerberos, pulled out of smb_ctx_principal2tkt.
- * This just gets our cached credentials, if we have any.
- * Based on the "klist" command.
- */
-char *
-smb_ctx_krb5init(struct smb_ctx *ctx)
-{
-	char *failure;
-	krb5_error_code	kerr;
-	krb5_context	kctx = NULL;
-	krb5_ccache 	kcc = NULL;
-	krb5_principal	kprin = NULL;
-
-	kerr = krb5_init_context(&kctx);
-	if (kerr) {
-		failure = "krb5_init_context";
-		goto out;
-	}
-	ctx->ct_krb5ctx = kctx;
-
-	/* non-default would instead use krb5_cc_resolve */
-	kerr = krb5_cc_default(kctx, &kcc);
-	if (kerr) {
-		failure = "krb5_cc_default";
-		goto out;
-	}
-	ctx->ct_krb5cc = kcc;
+	/* The share "use" type. */
+	stype = smb_use_type_str(ctx->ct_shtype_req);
+	strlcpy(tcon->tc_sh.sh_type_req, stype,
+	    sizeof (tcon->tc_sh.sh_type_req));
 
 	/*
-	 * Get the client principal (ticket),
-	 * or find out if we don't have one.
-	 */
-	kerr = krb5_cc_get_principal(kctx, kcc, &kprin);
-	if (kerr) {
-		failure = "krb5_cc_get_principal";
-		goto out;
-	}
-	ctx->ct_krb5cp = kprin;
-
-	if (smb_verbose) {
-		fprintf(stderr, gettext("Ticket cache: %s:%s\n"),
-		    krb5_cc_get_type(kctx, kcc),
-		    krb5_cc_get_name(kctx, kcc));
-	}
-	failure = NULL;
-
-out:
-	return (failure);
-}
-
-
-/*
- * See "Windows 2000 Kerberos Interoperability" paper by
- * Christopher Nebergall.  RC4 HMAC is the W2K default but
- * Samba support lagged (not due to Samba itself, but due to OS'
- * Kerberos implementations.)
- *
- * Only session enc type should matter, not ticket enc type,
- * per Sam Hartman on krbdev.
- *
- * Preauthentication failure topics in krb-protocol may help here...
- * try "John Brezak" and/or "Clifford Neuman" too.
- */
-static krb5_enctype kenctypes[] = {
-	ENCTYPE_ARCFOUR_HMAC,	/* defined in Tiger krb5.h */
-	ENCTYPE_DES_CBC_MD5,
-	ENCTYPE_DES_CBC_CRC,
-	ENCTYPE_NULL
-};
-
-/*
- * Obtain a kerberos ticket...
- * (if TLD != "gov" then pray first)
- */
-char *
-smb_ctx_principal2tkt(
-	struct smb_ctx *ctx, char *prin,
-	uchar_t **tktp, ulong_t *tktlenp)
-{
-	char 		*failure;
-	krb5_context	kctx = NULL;
-	krb5_error_code	kerr;
-	krb5_ccache	kcc = NULL;
-	krb5_principal	kprin = NULL, cprn = NULL;
-	krb5_creds	kcreds, *kcredsp = NULL;
-	krb5_auth_context	kauth = NULL;
-	krb5_data	kdata, kdata0;
-	uchar_t 		*tkt;
-
-	memset((char *)&kcreds, 0, sizeof (kcreds));
-	kdata0.length = 0;
-
-	/* These shoud have been done in smb_ctx_krb5init() */
-	if (ctx->ct_krb5ctx == NULL ||
-	    ctx->ct_krb5cc == NULL ||
-	    ctx->ct_krb5cp == NULL) {
-		failure = "smb_ctx_krb5init";
-		goto out;
-	}
-	kctx = ctx->ct_krb5ctx;
-	kcc  = ctx->ct_krb5cc;
-	cprn = ctx->ct_krb5cp;
-
-	failure = "krb5_set_default_tgs_enctypes";
-	if ((kerr = krb5_set_default_tgs_enctypes(kctx, kenctypes)))
-		goto out;
-	/*
-	 * The following is an unrolling of krb5_mk_req.  Something like:
-	 * krb5_mk_req(kctx, &kauth, 0, service(prin), hostname(prin),
-	 *		&kdata0, kcc, &kdata);)
-	 * ...except we needed krb5_parse_name not krb5_sname_to_principal.
-	 */
-	failure = "krb5_parse_name";
-	if ((kerr = krb5_parse_name(kctx, prin, &kprin)))
-		goto out;
-	failure = "krb5_copy_principal(server)";
-	if ((kerr = krb5_copy_principal(kctx, kprin, &kcreds.server)))
-		goto out;
-	failure = "krb5_copy_principal(client)";
-	if ((kerr = krb5_copy_principal(kctx, cprn, &kcreds.client)))
-		goto out;
-	failure = "krb5_get_credentials";
-	if ((kerr = krb5_get_credentials(kctx, 0, kcc, &kcreds, &kcredsp)))
-		goto out;
-	failure = "krb5_mk_req_extended";
-	if ((kerr = krb5_mk_req_extended(kctx, &kauth, 0, &kdata0, kcredsp,
-	    &kdata)))
-		goto out;
-	failure = "malloc";
-	if (!(tkt = malloc(kdata.length))) {
-		krb5_free_data_contents(kctx, &kdata);
-		goto out;
-	}
-	*tktlenp = kdata.length;
-	memcpy(tkt, kdata.data, kdata.length);
-	krb5_free_data_contents(kctx, &kdata);
-	*tktp = tkt;
-	failure = NULL;
-out:;
-	if (kerr) {
-		if (!failure)
-			failure = "smb_ctx_principal2tkt";
-		/*
-		 * Avoid logging the typical "No credentials cache found"
-		 */
-		if (kerr != KRB5_FCC_NOFILE ||
-		    strcmp(failure, "krb5_cc_get_principal"))
-			com_err(__progname, kerr, failure);
-	}
-	if (kauth)
-		krb5_auth_con_free(kctx, kauth);
-	if (kcredsp)
-		krb5_free_creds(kctx, kcredsp);
-	if (kcreds.server || kcreds.client)
-		krb5_free_cred_contents(kctx, &kcreds);
-	if (kprin)
-		krb5_free_principal(kctx, kprin);
-
-	/* Free kctx in smb_ctx_done */
-
-	return (failure);
-}
-
-char *
-smb_ctx_principal2blob(
-	struct smb_ctx *ctx,
-	smbioc_ossn_t *ssn,
-	char *prin)
-{
-	int		rc = 0;
-	char 		*failure;
-	uchar_t 	*tkt = NULL;
-	ulong_t		tktlen;
-	uchar_t 	*gtok = NULL;		/* gssapi token */
-	ulong_t		gtoklen;		/* gssapi token length */
-	SPNEGO_TOKEN_HANDLE  stok = NULL;	/* spnego token */
-	void 	*blob = NULL;		/* result */
-	ulong_t		bloblen;		/* result length */
-
-	if ((failure = smb_ctx_principal2tkt(ctx, prin, &tkt, &tktlen)))
-		goto out;
-	if ((failure = smb_ctx_tkt2gtok(tkt, tktlen, &gtok, &gtoklen)))
-		goto out;
-	/*
-	 * RFC says to send NegTokenTarg now.  So does MS docs.  But
-	 * win2k gives ERRbaduid if we do...  we must send
-	 * another NegTokenInit now!
-	 */
-	failure = "spnegoCreateNegTokenInit";
-	if ((rc = spnegoCreateNegTokenInit(spnego_mech_oid_Kerberos_V5_Legacy,
-	    0, gtok, gtoklen, NULL, 0, &stok)))
-		goto out;
-	failure = "spnegoTokenGetBinary(NULL)";
-	rc = spnegoTokenGetBinary(stok, NULL, &bloblen);
-	if (rc != SPNEGO_E_BUFFER_TOO_SMALL)
-		goto out;
-	failure = "malloc";
-	if (!(blob = malloc((size_t)bloblen)))
-		goto out;
-	/* No longer store length at start of blob. */
-	/* *blob = bloblen; */
-	failure = "spnegoTokenGetBinary";
-	if ((rc = spnegoTokenGetBinary(stok, blob, &bloblen)))
-		goto out;
-	ssn->ioc_intoklen = bloblen;
-	ssn->ioc_intok = blob;
-	failure = NULL;
-out:;
-	if (rc) {
-		/* XXX better is to embed rc in failure */
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "spnego principal2blob error %d"), 0, -rc);
-		if (!failure)
-			failure = "spnego";
-	}
-	if (blob && failure)
-		free(blob);
-	if (stok)
-		spnegoFreeData(stok);
-	if (gtok)
-		free(gtok);
-	if (tkt)
-		free(tkt);
-	return (failure);
-}
-
-
-#if 0
-void
-prblob(uchar_t *b, size_t len)
-{
-	while (len--)
-		fprintf(stderr, "%02x", *b++);
-	fprintf(stderr, "\n");
-}
-#endif
-
-
-/*
- * We navigate the SPNEGO & ASN1 encoding to find a kerberos principal
- * Note: driver no longer puts length at start of blob.
- */
-char *
-smb_ctx_blob2principal(
-	struct smb_ctx *ctx,
-	smbioc_ossn_t *ssn,
-	char **prinp)
-{
-	uchar_t		*blob = ssn->ioc_outtok;
-	size_t		len = ssn->ioc_outtoklen;
-	int		rc = 0;
-	SPNEGO_TOKEN_HANDLE	stok = NULL;
-	int		indx = 0;
-	char 		*failure;
-	uchar_t		flags = 0;
-	unsigned long	plen = 0;
-	uchar_t 	*prin;
-
-#if 0
-	fprintf(stderr, "blob from negotiate:\n");
-	prblob(blob, len);
-#endif
-
-	/* Skip the GUID */
-	assert(len >= SMB_GUIDLEN);
-	blob += SMB_GUIDLEN;
-	len  -= SMB_GUIDLEN;
-
-	failure = "spnegoInitFromBinary";
-	if ((rc = spnegoInitFromBinary(blob, len, &stok)))
-		goto out;
-	/*
-	 * Needn't use new Kerberos OID - the Legacy one is fine.
-	 */
-	failure = "spnegoIsMechTypeAvailable";
-	if (spnegoIsMechTypeAvailable(stok, spnego_mech_oid_Kerberos_V5_Legacy,
-	    &indx))
-		goto out;
-	/*
-	 * Ignoring optional context flags for now.  May want to pass
-	 * them to krb5 layer.  XXX
-	 */
-	if (!spnegoGetContextFlags(stok, &flags))
-		fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "spnego context flags 0x%x\n"), flags);
-	failure = "spnegoGetMechListMIC(NULL)";
-	rc = spnegoGetMechListMIC(stok, NULL, &plen);
-	if (rc != SPNEGO_E_BUFFER_TOO_SMALL)
-		goto out;
-	failure = "malloc";
-	if (!(prin = malloc(plen + 1)))
-		goto out;
-	failure = "spnegoGetMechListMIC";
-	if ((rc = spnegoGetMechListMIC(stok, prin, &plen))) {
-		free(prin);
-		goto out;
-	}
-	prin[plen] = '\0';
-	*prinp = (char *)prin;
-	failure = NULL;
-out:;
-	if (stok)
-		spnegoFreeData(stok);
-	if (rc) {
-		/* XXX better is to embed rc in failure */
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "spnego blob2principal error %d"), 0, -rc);
-		if (!failure)
-			failure = "spnego";
-	}
-	return (failure);
-}
-
-
-int
-smb_ctx_negotiate(struct smb_ctx *ctx, int level, int flags, char *workgroup)
-{
-	struct smbioc_lookup	rq;
-	int	error = 0;
-	char 	*failure = NULL;
-	char	*principal = NULL;
-	char c;
-	int i;
-	ssize_t *outtoklen;
-	uchar_t *blob;
-
-	/*
-	 * We leave ct_secblob set iff extended security
-	 * negotiation succeeds.
-	 */
-	if (ctx->ct_secblob) {
-		free(ctx->ct_secblob);
-		ctx->ct_secblob = NULL;
-	}
-#ifdef XXX
-	if ((ctx->ct_flags & SMBCF_RESOLVED) == 0) {
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "smb_ctx_lookup() data is not resolved"), 0);
-		return (EINVAL);
-	}
-#endif
-	if ((error = smb_ctx_gethandle(ctx)))
-		return (error);
-
-	bzero(&rq, sizeof (rq));
-	bcopy(&ctx->ct_ssn, &rq.ioc_ssn, sizeof (struct smbioc_ossn));
-	bcopy(&ctx->ct_sh, &rq.ioc_sh, sizeof (struct smbioc_oshare));
-
-	/*
-	 * Find out if we have a Kerberos ticket,
-	 * and only offer SPNEGO if we have one.
-	 */
-	failure = smb_ctx_krb5init(ctx);
-	if (failure) {
-		if (smb_verbose)
-			smb_error(failure, 0);
-		goto out;
-	}
-
-	rq.ioc_flags = flags;
-	rq.ioc_level = level;
-	rq.ioc_ssn.ioc_opt |= SMBVOPT_EXT_SEC;
-	error = smb_ctx_ioctl(ctx, SMBIOC_NEGOTIATE, &rq);
-	if (error) {
-		failure = dgettext(TEXT_DOMAIN, "negotiate failed");
-		smb_error(failure, error);
-		if (error == ETIMEDOUT)
-			return (error);
-		goto out;
-	}
-	/*
-	 * If the server capabilities did not include
-	 * SMB_CAP_EXT_SECURITY then the driver clears
-	 * the flag SMBVOPT_EXT_SEC for us.
-	 * XXX: should add the capabilities to ioc_ssn
-	 * XXX: see comment in driver - smb_usr.c
-	 */
-	failure = dgettext(TEXT_DOMAIN, "SPNEGO unsupported");
-	if ((rq.ioc_ssn.ioc_opt & SMBVOPT_EXT_SEC) == 0) {
-		if (smb_verbose)
-			smb_error(failure, 0);
-		/*
-		 * Do regular (old style) NTLM or NTLMv2
-		 * Nothing more to do here in negotiate.
-		 */
-		return (0);
-	}
-
-	/*
-	 * Capabilities DO include SMB_CAP_EXT_SECURITY,
-	 * so this should be an SPNEGO security blob.
-	 * Parse the ASN.1/DER, prepare response(s).
-	 * XXX: Handle STATUS_MORE_PROCESSING_REQUIRED?
-	 * XXX: Requires additional session setup calls.
-	 */
-	if (rq.ioc_ssn.ioc_outtoklen <= SMB_GUIDLEN)
-		goto out;
-	/* some servers send padding junk */
-	blob = rq.ioc_ssn.ioc_outtok;
-	if (blob[0] == 0)
-		goto out;
-
-	failure = smb_ctx_blob2principal(
-	    ctx, &rq.ioc_ssn, &principal);
-	if (failure)
-		goto out;
-	failure = smb_ctx_principal2blob(
-	    ctx, &rq.ioc_ssn, principal);
-	if (failure)
-		goto out;
-
-	/* Success! Save the blob to send next. */
-	ctx->ct_secblob = rq.ioc_ssn.ioc_intok;
-	ctx->ct_secbloblen = rq.ioc_ssn.ioc_intoklen;
-	rq.ioc_ssn.ioc_intok = NULL;
-
-out:
-	if (principal)
-		free(principal);
-	if (rq.ioc_ssn.ioc_intok)
-		free(rq.ioc_ssn.ioc_intok);
-	if (rq.ioc_ssn.ioc_outtok)
-		free(rq.ioc_ssn.ioc_outtok);
-	if (!failure)
-		return (0);		/* Success! */
-
-	/*
-	 * Negotiate failed with "extended security".
+	 * Todo: share passwords for share-level security.
 	 *
-	 * XXX: If we are doing SPNEGO correctly,
-	 * we should never get here unless the user
-	 * supplied invalid authentication data,
-	 * or we saw some kind of protocol error.
-	 *
-	 * XXX: The error message below should be
-	 * XXX: unconditional (remove "if verbose")
-	 * XXX: but not until we have "NTLMSSP"
-	 * Avoid spew for anticipated failure modes
-	 * but enable this with the verbose flag
+	 * The driver does the actual TCON call.
 	 */
-	if (smb_verbose) {
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "%s (extended security negotiate)"), error, failure);
+	if (ioctl(ctx->ct_dev_fd, cmd, tcon) == -1) {
+		err = errno;
+		goto out;
 	}
 
 	/*
-	 * XXX: Try again using NTLM (or NTLMv2)
-	 * XXX: Normal clients don't do this.
-	 * XXX: Should just return an error, but
-	 * keep the fall-back to NTLM for now.
-	 *
-	 * Start over with a new connection.
+	 * Check the returned share type
 	 */
-	if ((error = smb_ctx_gethandle(ctx)))
-		return (error);
-	bzero(&rq, sizeof (rq));
-	bcopy(&ctx->ct_ssn, &rq.ioc_ssn, sizeof (struct smbioc_ossn));
-	bcopy(&ctx->ct_sh, &rq.ioc_sh, sizeof (struct smbioc_oshare));
-	rq.ioc_flags = flags;
-	rq.ioc_level = level;
-	/* Note: NO SMBVOPT_EXT_SEC */
-	error = smb_ctx_ioctl(ctx, SMBIOC_NEGOTIATE, &rq);
-	if (error) {
-		failure = dgettext(TEXT_DOMAIN, "negotiate failed");
-		smb_error(failure, error);
-		rpc_cleanup_smbctx(ctx);
-		close(ctx->ct_fd);
-		ctx->ct_fd = -1;
-		return (error);
-	}
-
-	/*
-	 * Used to copy the workgroup out of the SMB_NEGOTIATE response
-	 * here, to default our domain name to be the same as the server.
-	 * Not a good idea: Unnecessary at best, and sometimes wrong, i.e.
-	 * when our account is in a trusted domain.
-	 */
-
-	return (error);
-}
-
-
-int
-smb_ctx_tdis(struct smb_ctx *ctx)
-{
-	struct smbioc_lookup rq; /* XXX may be used, someday */
-	int error = 0;
-
-	if (ctx->ct_fd < 0) {
+	DPRINT("ret. sh_type: \"%s\"", tcon->tc_sh.sh_type_ret);
+	if (ctx->ct_shtype_req != USE_WILDCARD &&
+	    0 != strcmp(stype, tcon->tc_sh.sh_type_ret)) {
 		smb_error(dgettext(TEXT_DOMAIN,
-		    "tree disconnect without handle?!"), 0);
-		return (EINVAL);
-	}
-	if (!(ctx->ct_flags & SMBCF_SSNACTIVE)) {
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "tree disconnect without session?!"), 0);
-		return (EINVAL);
-	}
-	bzero(&rq, sizeof (rq));
-	bcopy(&ctx->ct_ssn, &rq.ioc_ssn, sizeof (struct smbioc_ossn));
-	bcopy(&ctx->ct_sh, &rq.ioc_sh, sizeof (struct smbioc_oshare));
-	if (ioctl(ctx->ct_fd, SMBIOC_TDIS, &rq) == -1) {
-		error = errno;
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "tree disconnect failed"), error);
-	}
-	return (error);
-}
-
-
-int
-smb_ctx_lookup(struct smb_ctx *ctx, int level, int flags)
-{
-	struct smbioc_lookup rq;
-	int error = 0;
-	char 	*failure = NULL;
-
-	if ((ctx->ct_flags & SMBCF_RESOLVED) == 0) {
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "smb_ctx_lookup() data is not resolved"), 0);
-		return (EINVAL);
-	}
-	if (ctx->ct_fd < 0) {
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "handle from smb_ctx_nego() gone?!"), 0);
-		return (EINVAL);
-	}
-	if (!(flags & SMBLK_CREATE))
-		return (0);
-	bzero(&rq, sizeof (rq));
-	bcopy(&ctx->ct_ssn, &rq.ioc_ssn, sizeof (struct smbioc_ossn));
-	bcopy(&ctx->ct_sh, &rq.ioc_sh, sizeof (struct smbioc_oshare));
-	rq.ioc_flags = flags;
-	rq.ioc_level = level;
-
-	/*
-	 * Iff we have a security blob, we're using
-	 * extended security...
-	 */
-	if (ctx->ct_secblob) {
-		rq.ioc_ssn.ioc_opt |= SMBVOPT_EXT_SEC;
-		if (!(ctx->ct_flags & SMBCF_SSNACTIVE)) {
-			rq.ioc_ssn.ioc_intok = ctx->ct_secblob;
-			rq.ioc_ssn.ioc_intoklen = ctx->ct_secbloblen;
-			error = smb_ctx_ioctl(ctx, SMBIOC_SSNSETUP, &rq);
-		}
-		rq.ioc_ssn.ioc_intok = NULL;
-		if (error) {
-			failure = dgettext(TEXT_DOMAIN,
-			    "session setup failed");
-		} else {
-			ctx->ct_flags |= SMBCF_SSNACTIVE;
-			if ((error = smb_ctx_ioctl(ctx, SMBIOC_TCON, &rq)))
-				failure = dgettext(TEXT_DOMAIN,
-				    "tree connect failed");
-		}
-		if (rq.ioc_ssn.ioc_intok)
-			free(rq.ioc_ssn.ioc_intok);
-		if (rq.ioc_ssn.ioc_outtok)
-			free(rq.ioc_ssn.ioc_outtok);
-		if (!failure)
-			return (0);
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "%s (extended security lookup2)"), error, failure);
-		/* unwise to failback to NTLM now */
-		return (error);
-	}
-
-	/*
-	 * Otherwise we're doing plain old NTLM
-	 */
-	if ((ctx->ct_flags & SMBCF_SSNACTIVE) == 0) {
-		/*
-		 * This is the magic that tells the driver to
-		 * copy the password from the keychain, and
-		 * whether to use the system name or the
-		 * account domain to lookup the keychain.
-		 */
-		if (ctx->ct_flags & SMBCF_KCFOUND)
-			rq.ioc_ssn.ioc_opt |= SMBVOPT_USE_KEYCHAIN;
-		if (ctx->ct_flags & SMBCF_KCDOMAIN)
-			rq.ioc_ssn.ioc_opt |= SMBVOPT_KC_DOMAIN;
-		if (ioctl(ctx->ct_fd, SMBIOC_SSNSETUP, &rq) < 0) {
-			error = errno;
-			failure = dgettext(TEXT_DOMAIN, "session setup");
-			goto out;
-		}
-		ctx->ct_flags |= SMBCF_SSNACTIVE;
-	}
-	if (ioctl(ctx->ct_fd, SMBIOC_TCON, &rq) == -1) {
-		error = errno;
-		failure = dgettext(TEXT_DOMAIN, "tree connect");
+		    "%s: incompatible share type"),
+		    0, ctx->ct_origshare);
+		err = EINVAL;
 	}
 
 out:
-	if (failure) {
-		error = errno;
-		smb_error(dgettext(TEXT_DOMAIN,
-		    "%s phase failed"), error, failure);
-	}
-	return (error);
+	if (tcon != NULL)
+		free(tcon);
+
+	return (err);
 }
 
 /*
@@ -1933,13 +1262,49 @@ smb_ctx_flags2(struct smb_ctx *ctx)
 {
 	uint16_t flags2;
 
-	if (ioctl(ctx->ct_fd, SMBIOC_FLAGS2, &flags2) == -1) {
+	if (ioctl(ctx->ct_dev_fd, SMBIOC_FLAGS2, &flags2) == -1) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "can't get flags2 for a session"), errno);
 		return (-1);
 	}
 	return (flags2);
 }
+
+/*
+ * Get the transport level session key.
+ * Must already have an active SMB session.
+ */
+int
+smb_ctx_get_ssnkey(struct smb_ctx *ctx, uchar_t *key, size_t len)
+{
+	if (len < SMBIOC_HASH_SZ)
+		return (EINVAL);
+
+	if (ioctl(ctx->ct_dev_fd, SMBIOC_GETSSNKEY, key) == -1)
+		return (errno);
+
+	return (0);
+}
+
+
+/*
+ * RC file parsing stuff
+ */
+
+struct nv {
+	char *name;
+	int value;
+} minauth_table[] = {
+	/* Allowed auth. types */
+	{ "kerberos",	SMB_AT_KRB5 },
+	{ "ntlmv2",	SMB_AT_KRB5|SMB_AT_NTLM2 },
+	{ "ntlm",	SMB_AT_KRB5|SMB_AT_NTLM2|SMB_AT_NTLM1 },
+	{ "lm",		SMB_AT_KRB5|SMB_AT_NTLM2|SMB_AT_NTLM1|SMB_AT_LM1 },
+	{ "none",	SMB_AT_KRB5|SMB_AT_NTLM2|SMB_AT_NTLM1|SMB_AT_LM1|
+			SMB_AT_ANON },
+	{ NULL }
+};
+
 
 /*
  * level values:
@@ -1954,7 +1319,7 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 	char *p;
 	int error;
 
-#ifdef NOT_DEFINED
+#ifdef	KICONV_SUPPORT
 	if (level > 0) {
 		rc_getstringptr(smb_rc, sname, "charsets", &p);
 		if (p) {
@@ -1970,56 +1335,19 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 	if (level <= 1) {
 		/* Section is: [default] or [server] */
 
-		rc_getint(smb_rc, sname, "timeout",
-		    &ctx->ct_ssn.ioc_timeout);
-
-#ifdef NOT_DEFINED
-		rc_getint(smb_rc, sname, "retry_count",
-		    &ctx->ct_ssn.ioc_retrycount);
-		rc_getstringptr(smb_rc, sname, "use_negprot_domain", &p);
-		if (p && strcmp(p, "NO") == 0)
-			ctx->ct_flags |= SMBCF_NONEGDOM;
-#endif
-
 		rc_getstringptr(smb_rc, sname, "minauth", &p);
 		if (p) {
 			/*
 			 * "minauth" was set in this section; override
 			 * the current minimum authentication setting.
 			 */
-			ctx->ct_ssn.ioc_opt &= ~SMBVOPT_MINAUTH;
-			if (strcmp(p, "kerberos") == 0) {
-				/*
-				 * Don't fall back to NTLMv2, NTLMv1, or
-				 * a clear text password.
-				 */
-				ctx->ct_ssn.ioc_opt |= SMBVOPT_MINAUTH_KERBEROS;
-			} else if (strcmp(p, "ntlmv2") == 0) {
-				/*
-				 * Don't fall back to NTLMv1 or a clear
-				 * text password.
-				 */
-				ctx->ct_ssn.ioc_opt |= SMBVOPT_MINAUTH_NTLMV2;
-			} else if (strcmp(p, "ntlm") == 0) {
-				/*
-				 * Don't send the LM response over the wire.
-				 */
-				ctx->ct_ssn.ioc_opt |= SMBVOPT_MINAUTH_NTLM;
-			} else if (strcmp(p, "lm") == 0) {
-				/*
-				 * Fail if the server doesn't do encrypted
-				 * passwords.
-				 */
-				ctx->ct_ssn.ioc_opt |= SMBVOPT_MINAUTH_LM;
-			} else if (strcmp(p, "none") == 0) {
-				/*
-				 * Anything goes.
-				 * (The following statement should be
-				 * optimized away.)
-				 */
-				/* LINTED */
-				ctx->ct_ssn.ioc_opt |= SMBVOPT_MINAUTH_NONE;
-			} else {
+			struct nv *nvp;
+			for (nvp = minauth_table; nvp->name; nvp++)
+				if (strcmp(p, nvp->name) == 0)
+					break;
+			if (nvp->name)
+				ctx->ct_minauth = nvp->value;
+			else {
 				/*
 				 * Unknown minimum authentication level.
 				 */
@@ -2036,15 +1364,15 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 			 * "signing" was set in this section; override
 			 * the current signing settings.
 			 */
-			ctx->ct_ssn.ioc_opt &= ~SMBVOPT_SIGNING_MASK;
+			ctx->ct_vopt &= ~SMBVOPT_SIGNING_MASK;
 			if (strcmp(p, "disabled") == 0) {
 				/* leave flags zero (expr for lint) */
-				(void) ctx->ct_ssn.ioc_opt;
+				(void) ctx->ct_vopt;
 			} else if (strcmp(p, "enabled") == 0) {
-				ctx->ct_ssn.ioc_opt |=
+				ctx->ct_vopt |=
 				    SMBVOPT_SIGNING_ENABLED;
 			} else if (strcmp(p, "required") == 0) {
-				ctx->ct_ssn.ioc_opt |=
+				ctx->ct_vopt |=
 				    SMBVOPT_SIGNING_ENABLED |
 				    SMBVOPT_SIGNING_REQUIRED;
 			} else {
@@ -2068,7 +1396,7 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 		rc_getstringptr(smb_rc, sname, "workgroup", &p);
 		if (p) {
 			nls_str_upper(p, p);
-			error = smb_ctx_setworkgroup(ctx, p, 0);
+			error = smb_ctx_setdomain(ctx, p, 0);
 			if (error)
 				smb_error(dgettext(TEXT_DOMAIN,
 				    "workgroup specification in the "
@@ -2077,7 +1405,7 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 		rc_getstringptr(smb_rc, sname, "domain", &p);
 		if (p) {
 			nls_str_upper(p, p);
-			error = smb_ctx_setworkgroup(ctx, p, 0);
+			error = smb_ctx_setdomain(ctx, p, 0);
 			if (error)
 				smb_error(dgettext(TEXT_DOMAIN,
 				    "domain specification in the "
@@ -2132,11 +1460,25 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 int
 smb_ctx_readrc(struct smb_ctx *ctx)
 {
-	char sname[SMB_MAXSRVNAMELEN + SMB_MAXUSERNAMELEN +
-	    SMB_MAXSHARENAMELEN + 4];
+	char *home;
+	char *sname = NULL;
+	int sname_max;
+	int err = 0;
 
-	if (smb_open_rcfile(ctx) != 0)
+	if ((home = getenv("HOME")) == NULL)
+		home = ctx->ct_home;
+	if ((err = smb_open_rcfile(home)) != 0) {
+		DPRINT("smb_open_rcfile, err=%d", err);
+		/* ignore any error here */
+		return (0);
+	}
+
+	sname_max = 3 * SMBIOC_MAX_NAME + 4;
+	sname = malloc(sname_max);
+	if (sname == NULL) {
+		err = ENOMEM;
 		goto done;
+	}
 
 	/*
 	 * default parameters (level=0)
@@ -2148,47 +1490,51 @@ smb_ctx_readrc(struct smb_ctx *ctx)
 	 * If we don't have a server name, we can't read any of the
 	 * [server...] sections.
 	 */
-	if (ctx->ct_ssn.ioc_srvname[0] == 0)
+	if (ctx->ct_fullserver == NULL)
 		goto done;
-
 	/*
 	 * SERVER parameters.
 	 */
-	smb_ctx_readrcsection(ctx, ctx->ct_ssn.ioc_srvname, 1);
+	smb_ctx_readrcsection(ctx, ctx->ct_fullserver, 1);
 
 	/*
 	 * If we don't have a user name, we can't read any of the
 	 * [server:user...] sections.
 	 */
-	if (ctx->ct_ssn.ioc_user[0] == 0)
+	if (ctx->ct_user[0] == 0)
 		goto done;
-
 	/*
 	 * SERVER:USER parameters
 	 */
-	snprintf(sname, sizeof (sname), "%s:%s",
-	    ctx->ct_ssn.ioc_srvname,
-	    ctx->ct_ssn.ioc_user);
+	snprintf(sname, sname_max, "%s:%s",
+	    ctx->ct_fullserver,
+	    ctx->ct_user);
 	smb_ctx_readrcsection(ctx, sname, 2);
+
 
 	/*
 	 * If we don't have a share name, we can't read any of the
 	 * [server:user:share] sections.
 	 */
-	if (ctx->ct_sh.ioc_share[0] != 0) {
-		/*
-		 * SERVER:USER:SHARE parameters
-		 */
-		snprintf(sname, sizeof (sname), "%s:%s:%s",
-		    ctx->ct_ssn.ioc_srvname,
-		    ctx->ct_ssn.ioc_user,
-		    ctx->ct_sh.ioc_share);
-		smb_ctx_readrcsection(ctx, sname, 3);
-	}
+	if (ctx->ct_origshare == NULL)
+		goto done;
+	/*
+	 * SERVER:USER:SHARE parameters
+	 */
+	snprintf(sname, sname_max, "%s:%s:%s",
+	    ctx->ct_fullserver,
+	    ctx->ct_user,
+	    ctx->ct_origshare);
+	smb_ctx_readrcsection(ctx, sname, 3);
 
 done:
+	if (sname)
+		free(sname);
+	smb_close_rcfile();
 	if (smb_debug)
 		dump_ctx("after smb_ctx_readrc", ctx);
+	if (err)
+		DPRINT("err=%d\n", err);
 
-	return (0);
+	return (err);
 }

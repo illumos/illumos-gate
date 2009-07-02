@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +114,8 @@ static int nsmb_open(dev_t *devp, int flag, int otyp, cred_t *credp);
 static int nsmb_close(dev_t dev, int flag, int otyp, cred_t *credp);
 static int nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				cred_t *credp, int *rvalp);
+static int nsmb_close2(smb_dev_t *sdp, cred_t *cr);
+
 /* smbfs cb_ops */
 static struct cb_ops nsmb_cbops = {
 	nsmb_open,	/* open */
@@ -165,7 +167,7 @@ static struct dev_ops nsmb_ops = {
 
 static struct modldrv nsmb_modldrv = {
 	&mod_driverops,				/* Driver module */
-	"SMBFS network driver v" NSMB_VER_STR,
+	"SMBFS network driver",
 	&nsmb_ops				/* Driver ops */
 };
 
@@ -350,26 +352,11 @@ nsmb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /*ARGSUSED*/
 static int
-nsmb_ioctl(dev_t dev,
-	    int cmd,
-	    intptr_t arg,
-	    int mode,
-	    cred_t *credp,
-	    int *rvalp)
+nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
+	cred_t *cr, int *rvalp)
 {
 	smb_dev_t *sdp;
-	struct smb_vc *vcp = NULL;
-	struct smb_share *ssp = NULL;
-	struct smb_cred scred;
-	int err, error;
-	uid_t uid;
-
-	/* Free any+all of these at end of switch. */
-	smbioc_lookup_t *sioc = NULL;
-	smbioc_rq_t *srq = NULL;
-	smbioc_rw_t *rwrq = NULL;
-	smbioc_t2rq_t *strq = NULL;
-	smbioc_pk_t  *pk = NULL;
+	int err;
 
 	sdp = ddi_get_soft_state(statep, getminor(dev));
 	if (sdp == NULL) {
@@ -386,413 +373,85 @@ nsmb_ioctl(dev_t dev,
 	 */
 	if (sdp->zoneid != getzoneid())
 		return (EIO);
-	if (cmd != SMBIOC_TDIS &&
-	    zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN)
-		return (EIO);
-
-
-	error = 0;
-	smb_credinit(&scred, curproc, credp);
-	switch (cmd) {
-		case SMBIOC_GETVERS:
-			ddi_copyout(&nsmb_version, (void *)arg,
-			    sizeof (nsmb_version), mode);
-			break;
-
-		case SMBIOC_REQUEST:
-			if (sdp->sd_share == NULL) {
-				error = ENOTCONN;
-				break;
-			}
-			srq = kmem_alloc(sizeof (*srq), KM_SLEEP);
-			if (ddi_copyin((void *) arg, srq,
-			    sizeof (*srq), mode)) {
-				error = EFAULT;
-				break;
-			}
-			error = smb_usr_simplerequest(sdp->sd_share,
-			    srq, &scred);
-			ddi_copyout(srq, (void *)arg,
-			    SMBIOC_RQ_COPYOUT_SIZE, mode);
-			break;
-
-		case SMBIOC_T2RQ:
-			if (sdp->sd_share == NULL) {
-				error = ENOTCONN;
-				break;
-			}
-			strq = kmem_alloc(sizeof (*strq), KM_SLEEP);
-			if (ddi_copyin((void *)arg, strq,
-			    sizeof (*strq), mode)) {
-				error = EFAULT;
-				break;
-			}
-			error = smb_usr_t2request(sdp->sd_share, strq, &scred);
-			ddi_copyout(strq, (void *)arg,
-			    SMBIOC_T2RQ_COPYOUT_SIZE, mode);
-			break;
-
-		case SMBIOC_READ:
-		case SMBIOC_WRITE:
-			if ((ssp = sdp->sd_share) == NULL) {
-				error = ENOTCONN;
-				break;
-			}
-			rwrq = kmem_alloc(sizeof (*rwrq), KM_SLEEP);
-			if (ddi_copyin((void *)arg, rwrq,
-			    sizeof (*rwrq), mode)) {
-				error = EFAULT;
-				break;
-			}
-			error = smb_usr_rw(ssp, rwrq, cmd, &scred);
-			ddi_copyout(rwrq, (void *)arg,
-			    SMBIOC_RW_COPYOUT_SIZE, mode);
-			break;
-
-		case SMBIOC_FINDVC:
-			/* Should be no VC and no share */
-			if (sdp->sd_vc || sdp->sd_share) {
-				error = EISCONN;
-				break;
-			}
-			sioc = kmem_alloc(sizeof (*sioc), KM_SLEEP);
-			if (ddi_copyin((void *)arg, sioc,
-			    sizeof (*sioc), mode)) {
-				error = EFAULT;
-				break;
-			}
-			vcp = NULL;
-			ssp = NULL;
-			error = smb_usr_findvc(sioc, &scred, &vcp);
-			if (error)
-				break;
-			if (vcp) {
-				/*
-				 * The VC has a hold from _findvc
-				 * which we keep until nsmb_close().
-				 */
-				sdp->sd_level = SMBL_VC;
-				sdp->sd_vc = vcp;
-			}
-			(void) ddi_copyout(sioc, (void *)arg,
-			    SMBIOC_LOOK_COPYOUT_SIZE, mode);
-
-			break;
-
-		case SMBIOC_NEGOTIATE:
-			/* Should be no VC (and no share) */
-			if (sdp->sd_vc || sdp->sd_share) {
-				error = EISCONN;
-				break;
-			}
-			sioc = kmem_alloc(sizeof (*sioc), KM_SLEEP);
-			if (ddi_copyin((void *)arg, sioc,
-			    sizeof (*sioc), mode)) {
-				error = EFAULT;
-				break;
-			}
-			vcp = NULL;
-			ssp = NULL;
-			error = smb_usr_negotiate(sioc, &scred, &vcp);
-			if (error)
-				break;
-			if (vcp) {
-				/*
-				 * The VC has a hold from _negotiate
-				 * which we keep until nsmb_close().
-				 */
-				sdp->sd_level = SMBL_VC;
-				sdp->sd_vc = vcp;
-				/*
-				 * If we just created this VC, and
-				 * this minor is doing the setup,
-				 * keep track of that fact here.
-				 */
-				if (vcp->vc_state < SMBIOD_ST_VCACTIVE)
-					sdp->sd_flags |= NSMBFL_NEWVC;
-
-			}
-			/*
-			 * Copyout the "out token" (security blob).
-			 *
-			 * This code used to be near the end of
-			 * smb_usr_negotiate().  Moved the copyout
-			 * calls here so we know the "mode"
-			 */
-			if (vcp->vc_outtok) {
-				/*
-				 * Note: will copyout sioc below
-				 * including sioc.vc_outtoklen,
-				 * so we no longer put the length
-				 * at the start of the outtok data.
-				 */
-				sioc->ioc_ssn.ioc_outtoklen =
-				    vcp->vc_outtoklen;
-				err = ddi_copyout(
-				    vcp->vc_outtok,
-				    sioc->ioc_ssn.ioc_outtok,
-				    vcp->vc_outtoklen, mode);
-				if (err) {
-					error = EFAULT;
-					break;
-				}
-				/*
-				 * Save this blob in vc_negtok.
-				 * We need it in case we have to
-				 * reconnect.
-				 *
-				 * Set vc_negtok = vc_outtok
-				 * but free vc_negtok first.
-				 */
-				if (vcp->vc_negtok) {
-					kmem_free(
-					    vcp->vc_negtok,
-					    vcp->vc_negtoklen);
-					vcp->vc_negtok = NULL;
-					vcp->vc_negtoklen = 0;
-				}
-				vcp->vc_negtok    = vcp->vc_outtok;
-				vcp->vc_negtoklen = vcp->vc_outtoklen;
-				vcp->vc_outtok = NULL;
-				vcp->vc_outtoklen = 0;
-			}
-			/*
-			 * Added copyout here of (almost)
-			 * the whole struct, even though
-			 * the lib only needs _outtoklen.
-			 * We may put other things in this
-			 * struct that user-land needs.
-			 */
-			err = ddi_copyout(sioc, (void *)arg,
-			    SMBIOC_LOOK_COPYOUT_SIZE, mode);
-			if (err)
-				error = EFAULT;
-			break;
-
-		case SMBIOC_SSNSETUP:
-			/* Must have a VC, but no share. */
-			if (sdp->sd_share) {
-				error = EISCONN;
-				break;
-			}
-			if (!sdp->sd_vc) {
-				error = ENOTCONN;
-				break;
-			}
-			sioc = kmem_alloc(sizeof (*sioc), KM_SLEEP);
-			if (ddi_copyin((void *)arg, sioc,
-			    sizeof (*sioc), mode)) {
-				error = EFAULT;
-				break;
-			}
-			vcp = sdp->sd_vc;
-			ssp = NULL;
-			error = smb_usr_ssnsetup(sioc, &scred, vcp);
-			if (error)
-				break;
-			/*
-			 * If this minor has finished ssn setup,
-			 * turn off the NEWVC flag, otherwise we
-			 * will kill this VC when we close.
-			 */
-			if (vcp->vc_state == SMBIOD_ST_VCACTIVE)
-				sdp->sd_flags &= ~NSMBFL_NEWVC;
-			/*
-			 * Copyout the "out token" (security blob).
-			 *
-			 * This code used to be near the end of
-			 * smb_usr_ssnsetup().  Moved the copyout
-			 * calls here so we know the "mode"
-			 */
-			if (vcp->vc_outtok) {
-				/*
-				 * Note: will copyout sioc below
-				 * including sioc.vc_outtoklen,
-				 * so we no longer put the length
-				 * at the start of the outtok data.
-				 */
-				sioc->ioc_ssn.ioc_outtoklen =
-				    vcp->vc_outtoklen;
-				err = ddi_copyout(
-				    vcp->vc_outtok,
-				    sioc->ioc_ssn.ioc_outtok,
-				    vcp->vc_outtoklen, mode);
-				if (err) {
-					error = EFAULT;
-					break;
-				}
-				/*
-				 * Done with vc_outtok.  Similar,
-				 * but NOT the same as after the
-				 * smb_usr_negotiate call above.
-				 */
-				kmem_free(
-				    vcp->vc_outtok,
-				    vcp->vc_outtoklen);
-				vcp->vc_outtok = NULL;
-				vcp->vc_outtoklen = 0;
-			}
-			/* Added copyout here... (see above) */
-			err = ddi_copyout(sioc, (void *)arg,
-			    SMBIOC_LOOK_COPYOUT_SIZE, mode);
-			if (err)
-				error = EFAULT;
-			break;
-
-		case SMBIOC_TCON:
-			/* Must have a VC, but no share. */
-			if (sdp->sd_share) {
-				error = EISCONN;
-				break;
-			}
-			if (!sdp->sd_vc) {
-				error = ENOTCONN;
-				break;
-			}
-			sioc = kmem_alloc(sizeof (*sioc), KM_SLEEP);
-			if (ddi_copyin((void *)arg, sioc,
-			    sizeof (*sioc), mode)) {
-				error = EFAULT;
-				break;
-			}
-			vcp = sdp->sd_vc;
-			ssp = NULL;
-			error = smb_usr_tcon(sioc, &scred, vcp, &ssp);
-			if (error)
-				break;
-			if (ssp) {
-				/*
-				 * The share has a hold from _tcon
-				 * which we keep until nsmb_close()
-				 * or the SMBIOC_TDIS below.
-				 */
-				sdp->sd_share = ssp;
-				sdp->sd_level = SMBL_SHARE;
-			}
-			/* No need for copyout here. */
-			break;
-
-		case SMBIOC_TDIS:
-			if (sdp->sd_share == NULL) {
-				error = ENOTCONN;
-				break;
-			}
-			smb_share_rele(sdp->sd_share);
-			sdp->sd_share = NULL;
-			sdp->sd_level = SMBL_VC;
-			break;
-		case SMBIOC_FLAGS2:
-			if (sdp->sd_share == NULL) {
-				error = ENOTCONN;
-				break;
-			}
-			if (!sdp->sd_vc) {
-				error = ENOTCONN;
-				break;
-			}
-			vcp = sdp->sd_vc;
-			/*
-			 * Return the flags2 value.
-			 */
-			ddi_copyout(&vcp->vc_hflags2, (void *)arg,
-			    sizeof (u_int16_t), mode);
-			break;
-
-		case SMBIOC_PK_ADD:
-			pk = kmem_alloc(sizeof (*pk), KM_SLEEP);
-			if (ddi_copyin((void *)arg, pk,
-			    sizeof (*pk), mode)) {
-				error = EFAULT;
-				break;
-			}
-			error = smb_pkey_add(pk, credp);
-			break;
-
-		case SMBIOC_PK_DEL:
-			pk = kmem_alloc(sizeof (*pk), KM_SLEEP);
-			if (ddi_copyin((void *)arg, pk,
-			    sizeof (*pk), mode)) {
-				error = EFAULT;
-				break;
-			}
-			error = smb_pkey_del(pk, credp);
-			break;
-
-		case SMBIOC_PK_CHK:
-			pk = kmem_alloc(sizeof (*pk), KM_SLEEP);
-			if (ddi_copyin((void *)arg, pk,
-			    sizeof (*pk), mode)) {
-				error = EFAULT;
-				break;
-			}
-			error = smb_pkey_check(pk, credp);
-			/*
-			 * Note: Intentionally DO NOT copyout
-			 * the pasword here.  It can only be
-			 * retrieved by internal calls.  This
-			 * ioctl only tells the caller if the
-			 * keychain entry exists.
-			 */
-			break;
-
-		case SMBIOC_PK_DEL_OWNER:
-			uid = crgetruid(credp);
-			error = smb_pkey_deluid(uid, credp);
-			break;
-
-		case SMBIOC_PK_DEL_EVERYONE:
-			uid = (uid_t)-1;
-			error = smb_pkey_deluid(uid, credp);
-			break;
-
-		default:
-			error = ENODEV;
-	}
 
 	/*
-	 * Let's just do all the kmem_free stuff HERE,
-	 * instead of at every switch break.
+	 * We have a zone_shutdown call back that kills all the VCs
+	 * in a zone that's shutting down.  That action will cause
+	 * all of these ioctls to fail on such VCs, so no need to
+	 * check the zone status here on every ioctl call.
 	 */
 
-	/* SMBIOC_REQUEST */
-	if (srq)
-		kmem_free(srq, sizeof (*srq));
+	err = 0;
+	switch (cmd) {
+	case SMBIOC_GETVERS:
+		ddi_copyout(&nsmb_version, (void *)arg,
+		    sizeof (nsmb_version), flags);
+		break;
 
-	/* SMBIOC_T2RQ */
-	if (strq)
-		kmem_free(strq, sizeof (*strq));
+	case SMBIOC_FLAGS2:
+		err = smb_usr_get_flags2(sdp, arg, flags);
+		break;
 
-	/* SMBIOC_READ */
-	/* SMBIOC_WRITE */
-	if (rwrq)
-		kmem_free(rwrq, sizeof (*rwrq));
+	case SMBIOC_GETSSNKEY:
+		err = smb_usr_get_ssnkey(sdp, arg, flags);
+		break;
 
-	/* SMBIOC_FINDVC */
-	/* SMBIOC_NEGOTIATE */
-	/* SMBIOC_SSNSETUP */
-	/* SMBIOC_TCON */
-	if (sioc) {
-		/*
-		 * This data structure may contain
-		 * cleartext passwords, so zap it.
-		 */
-		bzero(sioc, sizeof (*sioc));
-		kmem_free(sioc, sizeof (*sioc));
+	case SMBIOC_REQUEST:
+		err = smb_usr_simplerq(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_T2RQ:
+		err = smb_usr_t2request(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_READ:
+	case SMBIOC_WRITE:
+		err = smb_usr_rw(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_SSN_CREATE:
+	case SMBIOC_SSN_FIND:
+		err = smb_usr_get_ssn(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_SSN_KILL:
+	case SMBIOC_SSN_RELE:
+		err = smb_usr_drop_ssn(sdp, cmd);
+		break;
+
+	case SMBIOC_TREE_CONNECT:
+	case SMBIOC_TREE_FIND:
+		err = smb_usr_get_tree(sdp, cmd, arg, flags, cr);
+		break;
+
+	case SMBIOC_TREE_KILL:
+	case SMBIOC_TREE_RELE:
+		err = smb_usr_drop_tree(sdp, cmd);
+		break;
+
+	case SMBIOC_IOD_WORK:
+		err = smb_usr_iod_work(sdp, arg, flags, cr);
+		break;
+
+	case SMBIOC_IOD_IDLE:
+	case SMBIOC_IOD_RCFAIL:
+		err = smb_usr_iod_ioctl(sdp, cmd, arg, flags);
+		break;
+
+	case SMBIOC_PK_ADD:
+	case SMBIOC_PK_DEL:
+	case SMBIOC_PK_CHK:
+	case SMBIOC_PK_DEL_OWNER:
+	case SMBIOC_PK_DEL_EVERYONE:
+		err = smb_pkey_ioctl(cmd, arg, flags, cr);
+		break;
+
+	default:
+		err = ENOTTY;
+		break;
 	}
 
-	/* SMBIOC_PK_... */
-	if (pk) {
-		/*
-		 * This data structure may contain
-		 * cleartext passwords, so zap it.
-		 */
-		bzero(pk, sizeof (*pk));
-		kmem_free(pk, sizeof (*pk));
-	}
-
-	smb_credrele(&scred);
-
-	return (error);
+	return (err);
 }
 
 /*ARGSUSED*/
@@ -879,11 +538,9 @@ nsmb_open(dev_t *dev, int flags, int otyp, cred_t *cr)
 static int
 nsmb_close(dev_t dev, int flags, int otyp, cred_t *cr)
 {
-	struct smb_vc *vcp;
-	struct smb_share *ssp;
-	struct smb_cred scred;
 	minor_t inst = getminor(dev);
 	smb_dev_t *sdp;
+	int err;
 
 	mutex_enter(&dev_lck);
 	/*
@@ -892,79 +549,90 @@ nsmb_close(dev_t dev, int flags, int otyp, cred_t *cr)
 	 * 3. Can close the minor number.
 	 * 4. Deallocate any resources allocated in open() call.
 	 */
-	smb_credinit(&scred, curproc, cr);
 
 	sdp = ddi_get_soft_state(statep, inst);
-
-	/*
-	 * time to call ddi_get_soft_state()
-	 */
-	ssp = sdp->sd_share;
-	if (ssp != NULL)
-		smb_share_rele(ssp);
-	vcp = sdp->sd_vc;
-	if (vcp != NULL) {
-		/*
-		 * If this dev minor was doing session setup
-		 * and failed to authenticate (or whatever)
-		 * then we need to put the VC in a state that
-		 * allows later commands to try again.
-		 */
-		if (sdp->sd_flags & NSMBFL_NEWVC)
-			smb_iod_disconnect(vcp);
-		smb_vc_rele(vcp);
-	}
-	smb_credrele(&scred);
+	if (sdp != NULL)
+		err = nsmb_close2(sdp, cr);
+	else
+		err = ENXIO;
 
 	/*
 	 * Free the instance
 	 */
 	ddi_soft_state_free(statep, inst);
 	mutex_exit(&dev_lck);
+	return (err);
+}
+
+static int
+nsmb_close2(smb_dev_t *sdp, cred_t *cr)
+{
+	struct smb_vc *vcp;
+	struct smb_share *ssp;
+	struct smb_cred scred;
+
+	smb_credinit(&scred, cr);
+	ssp = sdp->sd_share;
+	if (ssp != NULL)
+		smb_share_rele(ssp);
+	vcp = sdp->sd_vc;
+	if (vcp != NULL) {
+		/*
+		 * If this dev minor was opened by smbiod,
+		 * mark this VC as "dead" because it now
+		 * will have no IOD to service it.
+		 */
+		if (sdp->sd_flags & NSMBFL_IOD)
+			smb_iod_disconnect(vcp);
+		smb_vc_rele(vcp);
+	}
+
+	smb_credrele(&scred);
 	return (0);
 }
 
 int
 smb_dev2share(int fd, struct smb_share **sspp)
 {
-	register vnode_t *vp;
+	file_t *fp = NULL;
+	vnode_t *vp;
 	smb_dev_t *sdp;
-	struct smb_share *ssp;
+	smb_share_t *ssp;
 	dev_t dev;
-	file_t *fp;
+	int err;
 
 	if ((fp = getf(fd)) == NULL)
-		return (set_errno(EBADF));
+		return (EBADF);
+
 	vp = fp->f_vnode;
 	dev = vp->v_rdev;
-	if (dev == NULL) {
-		releasef(fd);
-		return (EBADF);
+	if (dev == 0 || dev == NODEV ||
+	    getmajor(dev) != nsmb_major) {
+		err = EBADF;
+		goto out;
 	}
+
 	sdp = ddi_get_soft_state(statep, getminor(dev));
 	if (sdp == NULL) {
-		releasef(fd);
-		return (DDI_FAILURE);
+		err = EINVAL;
+		goto out;
 	}
+
 	ssp = sdp->sd_share;
 	if (ssp == NULL) {
-		releasef(fd);
-		return (ENOTCONN);
+		err = ENOTCONN;
+		goto out;
 	}
+
 	/*
-	 * The share is already locked and referenced by the TCON ioctl
-	 * We NULL to hand off share to caller (mount)
-	 * This allows further ioctls against connection, for instance
-	 * another tree connect and mount, in the automounter case
-	 *
-	 * We're effectively giving our reference to the mount.
-	 *
-	 * XXX: I'm not sure I like this.  I'd rather see the ioctl
-	 * caller do something explicit to give up this reference,
-	 * (i.e. SMBIOC_TDIS above) and increment the hold here.
+	 * Our caller gains a ref. to this share.
 	 */
-	sdp->sd_share = NULL;
-	releasef(fd);
 	*sspp = ssp;
-	return (0);
+	smb_share_hold(ssp);
+	err = 0;
+
+out:
+	if (fp)
+		releasef(fd);
+	return (err);
 }

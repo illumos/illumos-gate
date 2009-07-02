@@ -18,20 +18,20 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/smbclnt/Makefile
+
 #
-#  cmd/fs.d/smbclnt contains the CIFS client commands
+# cmd/fs.d/smbclnt/Makefile
+#  contains the CIFS client commands
 #
 
 include $(SRC)/Makefile.master
 
-SUBDIRS_CATALOG=	smbutil mount umount
+SUBDIRS_CATALOG=	smbutil smbiod mount umount
 SUBDIRS=		$(SUBDIRS_CATALOG) lsacl svc
 
 # for messaging catalog files
@@ -50,9 +50,9 @@ catalog:=       TARGET= catalog
 
 .PARALLEL:	$(SUBDIRS)
 
-install clean clobber: $(SUBDIRS)
+all install clean clobber lint: $(SUBDIRS)
 
-all lint catalog: $(SUBDIRS_CATALOG)
+catalog: $(SUBDIRS_CATALOG)
 	$(RM) $(POFILE)
 	cat $(POFILES) > $(POFILE)
 

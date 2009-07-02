@@ -32,16 +32,19 @@
  * $Id: cfopt.c,v 1.1.1.1 2001/06/09 00:28:12 zarzycki Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/param.h>
+#include <sys/types.h>
 
 #include <stdio.h>
 #include <string.h>
+#include <synch.h>
 #include <libintl.h>
 
 #include <cflib.h>
 #include <netsmb/smb_lib.h>
+#include <assert.h>
+
+/* lock for the variables below */
+mutex_t cf_opt_mutex = DEFAULTMUTEX;
 
 int	cf_opterr = 1,		/* if error message should be printed */
 	cf_optind = 1,		/* index into parent argv vector */
@@ -53,6 +56,18 @@ const char *cf_optarg;		/* argument associated with option */
 #define	BADARG	(int)':'
 #define	EMSG	""
 
+void
+cf_opt_lock(void)
+{
+	mutex_lock(&cf_opt_mutex);
+}
+
+void
+cf_opt_unlock(void)
+{
+	mutex_unlock(&cf_opt_mutex);
+}
+
 int
 cf_getopt(nargc, nargv, ostr)
 	int nargc;
@@ -63,10 +78,12 @@ cf_getopt(nargc, nargv, ostr)
 	char *oli;				/* option letter list index */
 	int tmpind;
 
+	assert(MUTEX_HELD(&cf_opt_mutex));
+
 	if (cf_optreset || !*place) {		/* update scanning pointer */
 		cf_optreset = 0;
 		tmpind = cf_optind;
-		while (1) {
+		for (;;) {
 			if (tmpind >= nargc) {
 				place = EMSG;
 				return (-1);

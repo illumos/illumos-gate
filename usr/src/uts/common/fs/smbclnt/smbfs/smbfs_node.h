@@ -33,14 +33,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _FS_SMBFS_NODE_H_
 #define	_FS_SMBFS_NODE_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Much code copied into here from Sun NFS.
@@ -225,6 +223,7 @@ typedef struct smbnode {
 	struct smbfs_fctx	*n_dirseq;	/* ff context */
 	long		n_dirofs;	/* last ff offset */
 	long		n_direof;	/* End of dir. offset. */
+	int		n_vcgenid;	/* gereration no. (reconnect) */
 	int		n_fidrefs;
 	uint16_t	n_fid;		/* file handle */
 	uint32_t	n_rights;	/* granted rights */

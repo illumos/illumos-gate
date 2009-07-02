@@ -32,7 +32,10 @@
  * $Id: status.c,v 1.2 2001/08/18 05:44:50 conrad Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -62,10 +65,10 @@ int
 cmd_status(int argc, char *argv[])
 {
 	struct nb_ctx *ctx;
-	struct sockaddr *sap;
+	struct in_addr ina;
 	char *hostname;
-	char servername[SMB_MAXSRVNAMELEN + 1];
-	char workgroupname[SMB_MAXUSERNAMELEN + 1];
+	char servername[NB_NAMELEN];
+	char workgroupname[NB_NAMELEN];
 	int error, opt;
 
 	if (argc < 2)
@@ -76,9 +79,9 @@ cmd_status(int argc, char *argv[])
 		exit(1);
 	}
 	if (smb_open_rcfile(NULL) == 0) {
-		if (nb_ctx_readrcsection(smb_rc, ctx, "default", 0) != 0)
+		if (nb_ctx_readrcsection(NULL, ctx, "default", 0) != 0)
 			exit(1);
-		rc_close(smb_rc);
+		smb_close_rcfile();
 	}
 	while ((opt = getopt(argc, argv, "")) != EOF) {
 		switch (opt) {
@@ -91,7 +94,7 @@ cmd_status(int argc, char *argv[])
 		status_usage();
 
 	hostname = argv[argc - 1];
-	error = nb_resolvehost_in(hostname, &sap);
+	error = nb_resolvehost_in(hostname, &ina);
 	if (error) {
 		smb_error(gettext(
 		    "unable to resolve DNS hostname %s"), error, hostname);
@@ -104,7 +107,7 @@ cmd_status(int argc, char *argv[])
 	}
 	servername[0] = (char)0;
 	workgroupname[0] = (char)0;
-	error = nbns_getnodestatus(sap, ctx, servername, workgroupname);
+	error = nbns_getnodestatus(ctx, &ina, servername, workgroupname);
 	if (error) {
 		smb_error(
 		    gettext("unable to get status from %s"), error, hostname);

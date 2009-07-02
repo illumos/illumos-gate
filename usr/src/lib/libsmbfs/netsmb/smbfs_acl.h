@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NETSMB_SMBFS_ACL_H
 #define	_NETSMB_SMBFS_ACL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Get/set ACL via contracted interface in libsmbfs.
@@ -36,6 +34,10 @@
  */
 
 #include <sys/acl.h>
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 /*
  * Get a ZFS-style acl from an FD opened in smbfs.
@@ -87,6 +89,12 @@ int smbfs_acl_sd2zfs(i_ntsd_t *, acl_t *, uid_t *, gid_t *);
 int smbfs_acl_zfs2sd(acl_t *, uid_t, gid_t, i_ntsd_t **);
 
 void smbfs_acl_free_sd(i_ntsd_t *);
-void smbfs_acl_print_sd(FILE *, i_ntsd_t *);
+
+struct __FILE;
+void smbfs_acl_print_sd(struct __FILE *, i_ntsd_t *);
+
+#ifdef	__cplusplus
+}
+#endif
 
 #endif	/* _NETSMB_SMBFS_ACL_H */

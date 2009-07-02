@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,11 +50,12 @@
 #define	SMBR_RESTART		0x0010	/* req should be repeated if possible */
 #define	SMBR_NORESTART		0x0020	/* request is not restartable */
 #define	SMBR_MULTIPACKET	0x0040	/* multiple pkts can be sent/received */
-#define	SMBR_INTERNAL		0x0080	/* request is internal to netsmb */
+#define	SMBR_INTERNAL		0x0080	/* request enqueued by the IOD! */
 #define	SMBR_NOINTR_SEND	0x0100	/* no interrupt in send wait */
 #define	SMBR_NOINTR_RECV	0x0200	/* no interrupt in recv wait */
 #define	SMBR_SENDWAIT		0x0400	/* waiting for send to complete */
-#define	SMBR_VCREF		0x4000	/* took vc reference */
+#define	SMBR_NORECONNECT	0x0800	/* do not reconnect for this */
+/* 	SMBR_VCREF		0x4000	 * took vc reference (obsolete) */
 #define	SMBR_MOREDATA		0x8000	/* our buffer was too small */
 
 #define	SMBT2_ALLSENT		0x0001	/* all data and params are sent */
@@ -66,7 +67,6 @@
 
 #define	SMBRQ_LOCK(rqp) 	mutex_enter(&(rqp)->sr_lock)
 #define	SMBRQ_UNLOCK(rqp)	mutex_exit(&(rqp)->sr_lock)
-
 
 enum smbrq_state {
 	SMBRQ_NOTSENT,		/* rq have data to send */
@@ -85,13 +85,16 @@ struct smb_rq {
 	struct smb_vc		*sr_vc;
 	struct smb_share	*sr_share;
 	struct _kthread 	*sr_owner;
-	ushort_t		sr_mid;
 	uint32_t		sr_seqno;	/* Seq. no. of request */
 	uint32_t		sr_rseqno;	/* Seq. no. of reply */
 	struct mbchain		sr_rq;
 	uchar_t			sr_cmd;
 	uint8_t			sr_rqflags;
 	uint16_t		sr_rqflags2;
+	uint16_t		sr_rqtid;
+	uint16_t		sr_pid;
+	uint16_t		sr_rquid;
+	uint16_t		sr_mid;
 	uchar_t			*sr_wcount;
 	uchar_t			*sr_bcount;
 	struct mdchain		sr_rp;
@@ -105,8 +108,6 @@ struct smb_rq {
 	int			sr_sendcnt;
 	struct timespec 	sr_timesent;
 	int			sr_lerror;
-	uint16_t		*sr_rqtid;
-	uint16_t		*sr_rquid;
 	uint8_t			sr_errclass;
 	uint16_t		sr_serror;
 	uint32_t		sr_error;
@@ -124,7 +125,7 @@ struct smb_t2rq {
 	kcondvar_t	t2_cond;
 	uint16_t	t2_setupcount;
 	uint16_t	*t2_setupdata;
-	uint16_t	t2_setup[SMB_MAXSETUPWORDS];
+	uint16_t	t2_setup[SMBIOC_T2RQ_MAXSETUP];
 	uint8_t		t2_maxscount;	/* max setup words to return */
 	uint16_t	t2_maxpcount;	/* max param bytes to return */
 	uint16_t	t2_maxdcount;	/* max data bytes to return */
@@ -174,13 +175,18 @@ struct smb_ntrq {
 };
 typedef struct smb_ntrq smb_ntrq_t;
 
+#define	smb_rq_getrequest(RQ, MBPP) \
+	*(MBPP) = &(RQ)->sr_rq
+#define	smb_rq_getreply(RQ, MDPP) \
+	*(MDPP) = &(RQ)->sr_rp
+
+void smb_rq_done(struct smb_rq *rqp);
 int   smb_rq_alloc(struct smb_connobj *layer, uchar_t cmd,
 	struct smb_cred *scred, struct smb_rq **rqpp);
 int  smb_rq_init(struct smb_rq *rqp, struct smb_connobj *layer,
 	uchar_t cmd, struct smb_cred *scred);
-void smb_rq_done(struct smb_rq *rqp);
-int  smb_rq_getrequest(struct smb_rq *rqp, struct mbchain **mbpp);
-int  smb_rq_getreply(struct smb_rq *rqp, struct mdchain **mbpp);
+
+void smb_rq_fillhdr(struct smb_rq *rqp);
 void smb_rq_wstart(struct smb_rq *rqp);
 void smb_rq_wend(struct smb_rq *rqp);
 void smb_rq_bstart(struct smb_rq *rqp);

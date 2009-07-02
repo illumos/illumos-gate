@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ACL support for smbfs
@@ -89,7 +87,7 @@ smbfs_getsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 	/* Shared lock for (possible) n_fid use. */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	error = smbfs_smb_tmpopen(np, rights, &scred, &fid);
 	if (error)
@@ -162,7 +160,7 @@ smbfs_setsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 	/* Shared lock for (possible) n_fid use. */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	error = smbfs_smb_tmpopen(np, rights, &scred, &fid);
 	if (error)

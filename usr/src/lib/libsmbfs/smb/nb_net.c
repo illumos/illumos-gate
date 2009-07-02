@@ -38,13 +38,14 @@
 #include <sys/sockio.h>
 #include <net/if.h>
 #include <ctype.h>
-#include <netdb.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <netdb.h>
+#include <nss_dbdefs.h>
 
 #include <err.h>
 
@@ -59,32 +60,14 @@
  */
 
 int
-nb_getlocalname(char *name, size_t maxlen)
+nb_resolvehost_in(const char *name, struct in_addr *ia)
 {
-	char buf[1024], *cp;
+	char  he_buf[NSS_BUFLEN_HOSTS];
+	struct hostent he, *h;
+	int err;
 
-	if (gethostname(buf, sizeof (buf)) != 0)
-		return (errno);
-	cp = strchr(buf, '.');
-	if (cp)
-		*cp = 0;
-	strlcpy(name, buf, maxlen);
-	return (0);
-}
-
-int
-nb_resolvehost_in(const char *name, struct sockaddr **dest)
-{
-	struct hostent *h;
-	struct sockaddr_in *sinp;
-	in_addr_t	addr;
-	struct in_addr in;
-	int len;
-	char **p;
-
-
-	h = gethostbyname(name);
-	if (!h) {
+	h = gethostbyname_r(name, &he, he_buf, sizeof (he_buf), &err);
+	if (h == NULL) {
 #ifdef DEBUG
 		warnx("can't get server address `%s': ", name);
 #endif
@@ -102,19 +85,7 @@ nb_resolvehost_in(const char *name, struct sockaddr **dest)
 #endif
 		return (EAFNOSUPPORT);
 	}
-	len = sizeof (struct sockaddr_in);
-	sinp = malloc(len);
-	if (sinp == NULL)
-		return (ENOMEM);
-	bzero(sinp, len);
-	/*
-	 * There is no sin_len in sockaddr_in structure on Solaris.
-	 * sinp->sin_len = len;
-	 */
-	sinp->sin_family = h->h_addrtype;
-	memcpy(&sinp->sin_addr.s_addr, *h->h_addr_list,\
-	    sizeof (sinp->sin_addr.s_addr));
-	sinp->sin_port = htons(SMB_TCP_PORT);
-	*dest = (struct sockaddr *)sinp;
+
+	memcpy(ia, h->h_addr, sizeof (*ia));
 	return (0);
 }

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Password Keychain storage mechanism.
@@ -57,6 +55,7 @@
 #include <sys/mkdev.h>
 #include <sys/avl.h>
 #include <sys/avl_impl.h>
+#include <sys/u8_textprep.h>
 
 #include <netsmb/smb_osdep.h>
 
@@ -97,6 +96,9 @@ avl_tree_t smb_ptd; /* AVL password tree descriptor */
 unsigned int smb_list_len = 0;	/* No. of elements in the tree. */
 kmutex_t smb_ptd_lock; 	/* Mutex lock for controlled access */
 
+int smb_pkey_check(smbioc_pk_t *pk, cred_t *cr);
+int smb_pkey_deluid(uid_t ioc_uid, cred_t *cr);
+
 /*
  * This routine is called by AVL tree calls when they want to find a
  * node, find the next position in the tree to add or for deletion.
@@ -108,7 +110,7 @@ smb_pkey_cmp(const void *a, const void *b)
 {
 	const smb_passid_t *pa = (smb_passid_t *)a;
 	const smb_passid_t *pb = (smb_passid_t *)b;
-	int duser, dsrv;
+	int duser, dsrv, error;
 
 	ASSERT(MUTEX_HELD(&smb_ptd_lock));
 
@@ -128,12 +130,14 @@ smb_pkey_cmp(const void *a, const void *b)
 		return (-1);
 	if (pa->zoneid > pb->zoneid)
 		return (+1);
-	dsrv = strcasecmp(pa->srvdom, pb->srvdom);
+	dsrv = u8_strcmp(pa->srvdom, pb->srvdom, 0,
+	    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &error);
 	if (dsrv < 0)
 		return (-1);
 	if (dsrv > 0)
 		return (+1);
-	duser = strcasecmp(pa->username, pb->username);
+	duser = u8_strcmp(pa->username, pb->username, 0,
+	    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &error);
 	if (duser < 0)
 		return (-1);
 	if (duser > 0)
@@ -157,11 +161,12 @@ smb_pkey_init()
 
 /*
  * Destroy the full AVL tree.
+ * Called just before unload.
  */
 void
 smb_pkey_fini()
 {
-	smb_pkey_deluid((uid_t)-1, CRED());
+	smb_pkey_deluid((uid_t)-1, kcred);
 	avl_destroy(&smb_ptd);
 	mutex_destroy(&smb_ptd_lock);
 }
@@ -187,8 +192,8 @@ smb_node_delete(smb_passid_t *tmp)
 {
 	ASSERT(MUTEX_HELD(&smb_ptd_lock));
 	avl_remove(&smb_ptd, tmp);
-	smb_strfree(tmp->srvdom);
-	smb_strfree(tmp->username);
+	strfree(tmp->srvdom);
+	strfree(tmp->username);
 	kmem_free(tmp, sizeof (*tmp));
 	return (0);
 }
@@ -287,10 +292,10 @@ smb_pkey_add(smbioc_pk_t *pk, cred_t *cr)
 	cpid = kmem_zalloc(sizeof (smb_passid_t), KM_SLEEP);
 	cpid->uid = uid;
 	cpid->zoneid = getzoneid();
-	cpid->srvdom = smb_strdup(pk->pk_dom);
-	cpid->username = smb_strdup(pk->pk_usr);
-	smb_oldlm_hash(pk->pk_pass, cpid->lmhash);
-	smb_ntlmv1hash(pk->pk_pass, cpid->nthash);
+	cpid->srvdom = strdup(pk->pk_dom);
+	cpid->username = strdup(pk->pk_usr);
+	bcopy(pk->pk_lmhash, cpid->lmhash, SMBIOC_HASH_SZ);
+	bcopy(pk->pk_nthash, cpid->nthash, SMBIOC_HASH_SZ);
 
 	/*
 	 * XXX: Instead of calling smb_pkey_check here,
@@ -309,8 +314,8 @@ smb_pkey_add(smbioc_pk_t *pk, cred_t *cr)
 	if (tmp == NULL) {
 		avl_insert(t, cpid, where);
 	} else {
-		smb_strfree(cpid->srvdom);
-		smb_strfree(cpid->username);
+		strfree(cpid->srvdom);
+		strfree(cpid->username);
 		kmem_free(cpid, sizeof (smb_passid_t));
 	}
 	mutex_exit(&smb_ptd_lock);
@@ -320,7 +325,7 @@ smb_pkey_add(smbioc_pk_t *pk, cred_t *cr)
 
 /*
  * Determine if a node with uid,zoneid, uname & dname exists in the tree
- * given the information.  Does NOT return the stored password.
+ * given the information, and if found, return the hashes.
  */
 int
 smb_pkey_check(smbioc_pk_t *pk, cred_t *cr)
@@ -346,46 +351,74 @@ smb_pkey_check(smbioc_pk_t *pk, cred_t *cr)
 
 	mutex_enter(&smb_ptd_lock);
 	tmp = (smb_passid_t *)avl_find(t, cpid, &where);
-	if (tmp != NULL)
-		error = 0;
 	mutex_exit(&smb_ptd_lock);
+
+	if (tmp != NULL) {
+		bcopy(tmp->lmhash, pk->pk_lmhash, SMBIOC_HASH_SZ);
+		bcopy(tmp->nthash, pk->pk_nthash, SMBIOC_HASH_SZ);
+		error = 0;
+	}
 
 	kmem_free(cpid, sizeof (smb_passid_t));
 	return (error);
 }
 
-/*
- * Interface function between the keychain mechanism and SMB password
- * handling during Session Setup.  Internal form of smb_pkey_check().
- * Copies the password hashes into the VC.
- */
+
 int
-smb_pkey_getpwh(struct smb_vc *vcp, cred_t *cr)
+smb_pkey_ioctl(int cmd, intptr_t arg, int flags, cred_t *cr)
 {
-	avl_tree_t *t = &smb_ptd;
-	avl_index_t	where;
-	smb_passid_t *tmp, *cpid;
-	int error = ENOENT;
+	smbioc_pk_t  *pk;
+	uid_t uid;
+	int err = 0;
 
-	cpid = kmem_alloc(sizeof (smb_passid_t), KM_SLEEP);
-	cpid->uid = crgetruid(cr);
-	cpid->zoneid = getzoneid();
-	cpid->username = vcp->vc_username;
+	pk = kmem_alloc(sizeof (*pk), KM_SLEEP);
 
-	if (vcp->vc_vopt & SMBVOPT_KC_DOMAIN)
-		cpid->srvdom = vcp->vc_domain;
-	else
-		cpid->srvdom = vcp->vc_srvname;
-
-	mutex_enter(&smb_ptd_lock);
-	tmp = (smb_passid_t *)avl_find(t, cpid, &where);
-	if (tmp != NULL) {
-		bcopy(tmp->lmhash, vcp->vc_lmhash, SMB_PWH_MAX);
-		bcopy(tmp->nthash, vcp->vc_nthash, SMB_PWH_MAX);
-		error = 0;
+	switch (cmd) {
+	case SMBIOC_PK_ADD:
+	case SMBIOC_PK_DEL:
+	case SMBIOC_PK_CHK:
+		if (ddi_copyin((void *)arg, pk,
+		    sizeof (*pk), flags)) {
+			err = EFAULT;
+			goto out;
+		}
+		/* Make strlen (etc) on these safe. */
+		pk->pk_dom[SMBIOC_MAX_NAME-1] = '\0';
+		pk->pk_usr[SMBIOC_MAX_NAME-1] = '\0';
+		break;
 	}
-	mutex_exit(&smb_ptd_lock);
 
-	kmem_free(cpid, sizeof (smb_passid_t));
-	return (error);
+	switch (cmd) {
+	case SMBIOC_PK_ADD:
+		err = smb_pkey_add(pk, cr);
+		break;
+
+	case SMBIOC_PK_DEL:
+		err = smb_pkey_del(pk, cr);
+		break;
+
+	case SMBIOC_PK_CHK:
+		err = smb_pkey_check(pk, cr);
+		/* This is just a hash now. */
+		(void) ddi_copyout(pk, (void *)arg,
+		    sizeof (*pk), flags);
+		break;
+
+	case SMBIOC_PK_DEL_OWNER:
+		uid = crgetruid(cr);
+		err = smb_pkey_deluid(uid, cr);
+		break;
+
+	case SMBIOC_PK_DEL_EVERYONE:
+		uid = (uid_t)-1;
+		err = smb_pkey_deluid(uid, cr);
+		break;
+
+	default:
+		err = ENODEV;
+	}
+
+out:
+	kmem_free(pk, sizeof (*pk));
+	return (err);
 }

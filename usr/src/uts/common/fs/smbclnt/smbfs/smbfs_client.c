@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -212,42 +211,35 @@ smbfs_zonelist_remove(smbmntinfo_t *smi)
 	mutex_exit(&smg->smg_lock);
 }
 
+#ifdef	lint
+#define	NEED_SMBFS_CALLBACKS	1
+#endif
 
 #ifdef NEED_SMBFS_CALLBACKS
 /*
  * Call-back hooks for netsmb, in case we want them.
  * Apple's VFS wants them.  We may not need them.
- *
- * I thought I could use the "dead" callback from netsmb
- * to set the SMI_DEAD flag, but that looks like it will
- * interfere with the zone shutdown mechanisms.
  */
+/*ARGSUSED*/
 static void smbfs_dead(smb_share_t *ssp)
 {
-#if 0 /* see above */
-	smbmntinfo_t *smi = ssp->ss_mount;
-	if (smi) {
-		mutex_enter(&smi->smi_lock);
-		smi->smi_flags |= SMI_DEAD;
-		mutex_exit(&smi->smi_lock);
-	}
-#endif
+	/*
+	 * Walk the mount list, finding all mounts
+	 * using this share...
+	 */
 }
 
-static void smbfs_down(smb_share_t *ss)
-{
-	/* no-op */
-}
-
-static void smbfs_up(smb_share_t *ss)
+/*ARGSUSED*/
+static void smbfs_cb_nop(smb_share_t *ss)
 {
 	/* no-op */
 }
 
 smb_fscb_t smbfs_cb = {
-	.fscb_dead = smbfs_dead,
-	.fscb_down = smbfs_down,
-	.fscb_up   = smbfs_up };
+	.fscb_disconn	= smbfs_dead,
+	.fscb_connect	= smbfs_cb_nop,
+	.fscb_down	= smbfs_cb_nop,
+	.fscb_up	= smbfs_cb_nop };
 
 #endif /* NEED_SMBFS_CALLBACKS */
 

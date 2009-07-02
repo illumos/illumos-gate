@@ -36,45 +36,61 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/stat.h>
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
-#include <libintl.h>
-#include <pwd.h>
+#include <synch.h>
 #include <unistd.h>
-#include <sys/debug.h>
+#include <pwd.h>
+#include <libintl.h>
 
 #include <cflib.h>
 #include "rcfile_priv.h"
+
+#include <assert.h>
+
+#if 0 /* before SMF */
+#define	SMB_CFG_FILE	"/etc/nsmb.conf"
+#define	OLD_SMB_CFG_FILE	"/usr/local/etc/nsmb.conf"
+#endif
+#define	SMBFS_SHARECTL_CMD	"/usr/sbin/sharectl get smbfs"
+
 extern int smb_debug;
 
-SLIST_HEAD(rcfile_head, rcfile);
-static struct rcfile_head pf_head = {NULL};
-
 static struct rcfile *rc_cachelookup(const char *filename);
-struct rcsection *rc_findsect(struct rcfile *rcp, const char *sectname);
+static struct rcsection *rc_findsect(struct rcfile *rcp, const char *sectname);
 static struct rcsection *rc_addsect(struct rcfile *rcp, const char *sectname);
-static int rc_freesect(struct rcfile *rcp, struct rcsection *rsp);
-struct rckey *rc_sect_findkey(struct rcsection *rsp, const char *keyname);
+static int		rc_freesect(struct rcfile *rcp, struct rcsection *rsp);
+static struct rckey *rc_sect_findkey(struct rcsection *rsp, const char *key);
 static struct rckey *rc_sect_addkey(struct rcsection *rsp, const char *name,
     const char *value);
 static void rc_key_free(struct rckey *p);
 static void rc_parse(struct rcfile *rcp);
 
+/* lock for the variables below */
+mutex_t rcfile_mutex = DEFAULTMUTEX;
+
+SLIST_HEAD(rcfile_head, rcfile);
+static struct rcfile_head pf_head = {NULL};
+struct rcfile *smb_rc;
+int home_nsmbrc;
 int insecure_nsmbrc;
 
 /*
  * open rcfile and load its content, if already open - return previous handle
  */
-int
+static int
 rc_open(const char *filename, const char *mode, struct rcfile **rcfile)
 {
+	struct stat statbuf;
 	struct rcfile *rcp;
 	FILE *f;
-	struct stat statbuf;
+
+	assert(MUTEX_HELD(&rcfile_mutex));
 
 	rcp = rc_cachelookup(filename);
 	if (rcp) {
@@ -102,11 +118,14 @@ rc_open(const char *filename, const char *mode, struct rcfile **rcfile)
 	return (0);
 }
 
-int
+static int
 rc_merge(const char *filename, struct rcfile **rcfile)
 {
+	struct stat statbuf;
 	struct rcfile *rcp = *rcfile;
 	FILE *f, *t;
+
+	assert(MUTEX_HELD(&rcfile_mutex));
 
 	insecure_nsmbrc = 0;
 	if (rcp == NULL) {
@@ -115,6 +134,10 @@ rc_merge(const char *filename, struct rcfile **rcfile)
 	f = fopen(filename, "r");
 	if (f == NULL)
 		return (errno);
+	insecure_nsmbrc = 0;
+	if (fstat(fileno(f), &statbuf) >= 0 &&
+	    (statbuf.st_mode & 077) != 0)
+		insecure_nsmbrc = 1;
 	t = rcp->rf_f;
 	rcp->rf_f = f;
 	rc_parse(rcp);
@@ -123,42 +146,44 @@ rc_merge(const char *filename, struct rcfile **rcfile)
 	return (0);
 }
 
-int
-rc_merge_pipe(const char *command, struct rcfile **rcfile)
+/*
+ * Like rc_open, but does popen of command:
+ * sharectl get smbfs
+ */
+static int
+rc_popen_cmd(const char *command, struct rcfile **rcfile)
 {
-	struct rcfile *rcp = *rcfile;
-	FILE *f, *t;
+	struct rcfile *rcp;
+	FILE *f;
 
-	insecure_nsmbrc = 0;
+	assert(MUTEX_HELD(&rcfile_mutex));
+
 	f = popen(command, "r");
 	if (f == NULL)
 		return (errno);
+	insecure_nsmbrc = 0;
+
+	rcp = malloc(sizeof (struct rcfile));
 	if (rcp == NULL) {
-		rcp = malloc(sizeof (struct rcfile));
-		if (rcp == NULL) {
-			fclose(f);
-			return (ENOMEM);
-		}
-		*rcfile = rcp;
-		bzero(rcp, sizeof (struct rcfile));
-		rcp->rf_name = strdup(command);
-		rcp->rf_f = f;
-		SLIST_INSERT_HEAD(&pf_head, rcp, rf_next);
-		rc_parse(rcp);
-	} else {
-		t = rcp->rf_f;
-		rcp->rf_f = f;
-		rc_parse(rcp);
-		rcp->rf_f = t;
+		fclose(f);
+		return (ENOMEM);
 	}
-	fclose(f);
+	bzero(rcp, sizeof (struct rcfile));
+	rcp->rf_name = strdup(command);
+	rcp->rf_f = f;
+	SLIST_INSERT_HEAD(&pf_head, rcp, rf_next);
+	rc_parse(rcp);
+	*rcfile = rcp;
+	/* fclose(f) in rc_close */
 	return (0);
 }
 
-int
+static int
 rc_close(struct rcfile *rcp)
 {
 	struct rcsection *p, *n;
+
+	mutex_lock(&rcfile_mutex);
 
 	fclose(rcp->rf_f);
 	for (p = SLIST_FIRST(&rcp->rf_sect); p; ) {
@@ -169,6 +194,8 @@ rc_close(struct rcfile *rcp)
 	free(rcp->rf_name);
 	SLIST_REMOVE(&pf_head, rcp, rcfile, rf_next);
 	free(rcp);
+
+	mutex_unlock(&rcfile_mutex);
 	return (0);
 }
 
@@ -177,16 +204,20 @@ rc_cachelookup(const char *filename)
 {
 	struct rcfile *p;
 
+	assert(MUTEX_HELD(&rcfile_mutex));
+
 	SLIST_FOREACH(p, &pf_head, rf_next)
 		if (strcmp(filename, p->rf_name) == 0)
 			return (p);
 	return (0);
 }
 
-/* static */ struct rcsection *
+static struct rcsection *
 rc_findsect(struct rcfile *rcp, const char *sectname)
 {
 	struct rcsection *p;
+
+	assert(MUTEX_HELD(&rcfile_mutex));
 
 	SLIST_FOREACH(p, &rcp->rf_sect, rs_next)
 		if (strcasecmp(p->rs_name, sectname) == 0)
@@ -198,6 +229,8 @@ static struct rcsection *
 rc_addsect(struct rcfile *rcp, const char *sectname)
 {
 	struct rcsection *p;
+
+	assert(MUTEX_HELD(&rcfile_mutex));
 
 	p = rc_findsect(rcp, sectname);
 	if (p)
@@ -216,6 +249,8 @@ rc_freesect(struct rcfile *rcp, struct rcsection *rsp)
 {
 	struct rckey *p, *n;
 
+	assert(MUTEX_HELD(&rcfile_mutex));
+
 	SLIST_REMOVE(&rcp->rf_sect, rsp, rcsection, rs_next);
 	for (p = SLIST_FIRST(&rsp->rs_keys); p; ) {
 		n = p;
@@ -227,10 +262,12 @@ rc_freesect(struct rcfile *rcp, struct rcsection *rsp)
 	return (0);
 }
 
-/* static */ struct rckey *
+static struct rckey *
 rc_sect_findkey(struct rcsection *rsp, const char *keyname)
 {
 	struct rckey *p;
+
+	assert(MUTEX_HELD(&rcfile_mutex));
 
 	SLIST_FOREACH(p, &rsp->rs_keys, rk_next)
 		if (strcmp(p->rk_name, keyname) == 0)
@@ -242,6 +279,8 @@ static struct rckey *
 rc_sect_addkey(struct rcsection *rsp, const char *name, const char *value)
 {
 	struct rckey *p;
+
+	assert(MUTEX_HELD(&rcfile_mutex));
 
 	p = rc_sect_findkey(rsp, name);
 	if (!p) {
@@ -273,16 +312,13 @@ rc_key_free(struct rckey *p)
 	free(p);
 }
 
-enum { stNewLine, stHeader, stSkipToEOL, stGetKey, stGetValue};
 
-int home_nsmbrc = 0;
-
-static char *minauth[] = {
-	"kerberos",
-	"ntlmv2",
-	"ntlm",
-	"lm",
+static char *minauth_values[] = {
 	"none",
+	"lm",
+	"ntlm",
+	"ntlmv2",
+	"kerberos",
 	NULL
 };
 
@@ -291,42 +327,56 @@ eval_minauth(char *auth)
 {
 	int i;
 
-	for (i = 0; minauth[i]; i++)
-		if (strcmp(auth, minauth[i]) == 0)
-			break;
-	return (i);
+	for (i = 0; minauth_values[i]; i++)
+		if (strcmp(auth, minauth_values[i]) == 0)
+			return (i);
+	return (-1);
 }
 
 /*
- * Ensure that "minauth" is set to the highest level (lowest array offset)
+ * Ensure that "minauth" is set to the highest level
  */
+/*ARGSUSED*/
 static void
 set_value(struct rcfile *rcp, struct rcsection *rsp, struct rckey *rkp,
     char *ptr)
 {
 	int now, new;
+#ifdef DEBUG
+	char *from;
+
+	if (smb_debug)
+		from = (home_nsmbrc) ?
+		    "user file" : "SMF";
+#endif
 
 	if (strcmp(rkp->rk_name, "minauth") == 0) {
 		now = eval_minauth(rkp->rk_value);
 		new = eval_minauth(ptr);
-		if (new >= now) {
+		if (new <= now) {
 #ifdef DEBUG
 			if (smb_debug)
-				printf(
-				    "set_value: rejecting %s=%s from %s\n",
-				    rkp->rk_name, ptr, home_nsmbrc ?
-				    "user file" : "SMF");
+				fprintf(stderr,
+				    "set_value: rejecting %s=%s"
+				    " in %s from %s\n",
+				    rkp->rk_name, ptr,
+				    rsp->rs_name, from);
 #endif
 			return;
 		}
 	}
 #ifdef DEBUG
 	if (smb_debug)
-		printf("set_value: applying %s=%s from %s\n",
-		    rkp->rk_name, ptr, home_nsmbrc ? "user file" : "SMF");
+		fprintf(stderr,
+		    "set_value: applying %s=%s in %s from %s\n",
+		    rkp->rk_name, ptr, rsp->rs_name, from);
 #endif
 	rkp->rk_value = strdup(ptr);
 }
+
+
+/* states in rc_parse */
+enum { stNewLine, stHeader, stSkipToEOL, stGetKey, stGetValue};
 
 static void
 rc_parse(struct rcfile *rcp)
@@ -337,6 +387,8 @@ rc_parse(struct rcfile *rcp)
 	struct rckey *rkp = NULL;
 	char buf[2048];
 	char *next = buf, *last = &buf[sizeof (buf)-1];
+
+	assert(MUTEX_HELD(&rcfile_mutex));
 
 	while ((c = getc(f)) != EOF) {
 		if (c == '\r')
@@ -393,8 +445,8 @@ rc_parse(struct rcfile *rcp)
 				state = stSkipToEOL;
 				continue;
 			}
-			if (home_nsmbrc &&
-			    (strcmp(buf, "nbns") == 0 ||
+			if (home_nsmbrc != 0 && (
+			    strcmp(buf, "nbns") == 0 ||
 			    strcmp(buf, "nbns_enable") == 0 ||
 			    strcmp(buf, "nbns_broadcast") == 0 ||
 			    strcmp(buf, "signing") == 0)) {
@@ -405,7 +457,8 @@ rc_parse(struct rcfile *rcp)
 				state = stNewLine;
 				continue;
 			}
-			if (insecure_nsmbrc && (strcmp(buf, "password") == 0)) {
+			if (insecure_nsmbrc != 0 &&
+			    strcmp(buf, "password") == 0) {
 				fprintf(stderr, dgettext(TEXT_DOMAIN,
 				    "Warning: .nsmbrc file not secure, "
 				    "ignoring passwords\n"));
@@ -445,16 +498,27 @@ rc_getstringptr(struct rcfile *rcp, const char *section, const char *key,
 {
 	struct rcsection *rsp;
 	struct rckey *rkp;
+	int err;
+
+	mutex_lock(&rcfile_mutex);
 
 	*dest = NULL;
 	rsp = rc_findsect(rcp, section);
-	if (!rsp)
-		return (ENOENT);
+	if (!rsp) {
+		err = ENOENT;
+		goto out;
+	}
 	rkp = rc_sect_findkey(rsp, key);
-	if (!rkp)
-		return (ENOENT);
+	if (!rkp) {
+		err = ENOENT;
+		goto out;
+	}
 	*dest = rkp->rk_value;
-	return (0);
+	err = 0;
+
+out:
+	mutex_unlock(&rcfile_mutex);
+	return (err);
 }
 
 int
@@ -468,7 +532,7 @@ rc_getstring(struct rcfile *rcp, const char *section, const char *key,
 	if (error)
 		return (error);
 	if (strlen(value) >= maxlen) {
-		fprintf(stdout, dgettext(TEXT_DOMAIN,
+		fprintf(stderr, dgettext(TEXT_DOMAIN,
 		    "line too long for key '%s' in section '%s', max = %d\n"),
 		    key, section, maxlen);
 		return (EINVAL);
@@ -482,22 +546,31 @@ rc_getint(struct rcfile *rcp, const char *section, const char *key, int *value)
 {
 	struct rcsection *rsp;
 	struct rckey *rkp;
+	int err;
+
+	mutex_lock(&rcfile_mutex);
 
 	rsp = rc_findsect(rcp, section);
-	if (!rsp)
-		return (ENOENT);
+	if (!rsp) {
+		err = ENOENT;
+		goto out;
+	}
 	rkp = rc_sect_findkey(rsp, key);
-	if (!rkp)
-		return (ENOENT);
+	if (!rkp) {
+		err = ENOENT;
+		goto out;
+	}
 	errno = 0;
 	*value = strtol(rkp->rk_value, NULL, 0);
-	if (errno) {
-		fprintf(stdout, dgettext(TEXT_DOMAIN,
+	if ((err = errno) != 0) {
+		fprintf(stderr, dgettext(TEXT_DOMAIN,
 		    "invalid int value '%s' for key '%s' in section '%s'\n"),
 		    rkp->rk_value, key, section);
-		return (errno);
 	}
-	return (0);
+
+out:
+	mutex_unlock(&rcfile_mutex);
+	return (err);
 }
 
 /*
@@ -510,139 +583,136 @@ rc_getbool(struct rcfile *rcp, const char *section, const char *key, int *value)
 	struct rcsection *rsp;
 	struct rckey *rkp;
 	char *p;
+	int err;
+
+	mutex_lock(&rcfile_mutex);
 
 	rsp = rc_findsect(rcp, section);
-	if (!rsp)
-		return (ENOENT);
+	if (!rsp) {
+		err = ENOENT;
+		goto out;
+	}
 	rkp = rc_sect_findkey(rsp, key);
-	if (!rkp)
-		return (ENOENT);
+	if (!rkp) {
+		err = ENOENT;
+		goto out;
+	}
 	p = rkp->rk_value;
 	while (*p && isspace(*p)) p++;
 	if (*p == '0' ||
 	    strcasecmp(p, "no") == 0 ||
 	    strcasecmp(p, "false") == 0) {
 		*value = 0;
-		return (0);
+		err = 0;
+		goto out;
 	}
 	if (*p == '1' ||
 	    strcasecmp(p, "yes") == 0 ||
 	    strcasecmp(p, "true") == 0) {
 		*value = 1;
-		return (0);
+		err = 0;
+		goto out;
 	}
 	fprintf(stderr, dgettext(TEXT_DOMAIN,
 	    "invalid boolean value '%s' for key '%s' in section '%s' \n"),
 	    p, key, section);
-	return (EINVAL);
+	err = EINVAL;
+
+out:
+	mutex_unlock(&rcfile_mutex);
+	return (err);
+}
+
+#ifdef DEBUG
+void
+dump_props(char *where)
+{
+	struct rcsection *rsp = NULL;
+	struct rckey *rkp = NULL;
+
+	fprintf(stderr, "Settings %s\n", where);
+	SLIST_FOREACH(rsp, &smb_rc->rf_sect, rs_next) {
+		fprintf(stderr, "section=%s\n", rsp->rs_name);
+		fflush(stderr);
+
+		SLIST_FOREACH(rkp, &rsp->rs_keys, rk_next) {
+			fprintf(stderr, "  key=%s, value=%s\n",
+			    rkp->rk_name, rkp->rk_value);
+			fflush(stderr);
+		}
+	}
+}
+#endif
+
+/*
+ * first parse "sharectl get smbfs, then $HOME/.nsmbrc
+ * This is called by library consumers (commands)
+ */
+int
+smb_open_rcfile(char *home)
+{
+	char *fn;
+	int len, error = 0;
+
+	mutex_lock(&rcfile_mutex);
+
+	smb_rc = NULL;
+#if 0	/* before SMF */
+	fn = SMB_CFG_FILE;
+	error = rc_open(fn, &smb_rc);
+#else
+	fn = SMBFS_SHARECTL_CMD;
+	error = rc_popen_cmd(fn, &smb_rc);
+#endif
+	if (error != 0 && error != ENOENT) {
+		/* Error from fopen. strerror is OK. */
+		fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "Can't open %s: %s\n"), fn, strerror(errno));
+	}
+#ifdef DEBUG
+	if (smb_debug)
+		dump_props(fn);
+#endif
+
+	if (home) {
+		len = strlen(home) + 20;
+		fn = malloc(len);
+		snprintf(fn, len, "%s/.nsmbrc", home);
+		home_nsmbrc = 1;
+		error = rc_merge(fn, &smb_rc);
+		if (error != 0 && error != ENOENT) {
+			fprintf(stderr, dgettext(TEXT_DOMAIN,
+			    "Can't open %s: %s\n"), fn, strerror(errno));
+		}
+		home_nsmbrc = 0;
+#ifdef DEBUG
+		if (smb_debug)
+			dump_props(fn);
+#endif
+		free(fn);
+	}
+
+	/* Mostly ignore error returns above. */
+	if (smb_rc == NULL)
+		error = ENOENT;
+	else
+		error = 0;
+
+	mutex_unlock(&rcfile_mutex);
+
+	return (error);
 }
 
 /*
- * Unified command line/rc file parser
+ * This is called by library consumers (commands)
  */
-int
-opt_args_parse(struct rcfile *rcp, struct opt_args *ap, const char *sect,
-	opt_callback_t *callback)
+void
+smb_close_rcfile(void)
 {
-	int len, error;
+	struct rcfile *rcp;
 
-	for (; ap->opt; ap++) {
-		switch (ap->type) {
-		case OPTARG_STR:
-			if (rc_getstringptr(rcp, sect, ap->name, &ap->str) != 0)
-				break;
-			len = strlen(ap->str);
-			if (len > ap->ival) {
-				fprintf(stdout, dgettext(TEXT_DOMAIN,
-			"rc: argument for option '%c' (%s) too long\n"),
-				    ap->opt, ap->name);
-				return (EINVAL);
-			}
-			callback(ap);
-			break;
-		case OPTARG_BOOL:
-			error = rc_getbool(rcp, sect, ap->name, &ap->ival);
-			if (error == ENOENT)
-				break;
-			if (error)
-				return (EINVAL);
-			callback(ap);
-			break;
-		case OPTARG_INT:
-			if (rc_getint(rcp, sect, ap->name, &ap->ival) != 0)
-				break;
-			if (((ap->flag & OPTFL_HAVEMIN) &&
-			    ap->ival < ap->min) ||
-			    ((ap->flag & OPTFL_HAVEMAX) &&
-			    ap->ival > ap->max)) {
-				fprintf(stdout, dgettext(TEXT_DOMAIN,
-				    "rc: argument for option '%c' (%s) "
-				    "should be in [%d-%d] range\n"),
-				    ap->opt, ap->name, ap->min, ap->max);
-				return (EINVAL);
-			}
-			callback(ap);
-			break;
-		default:
-			break;
-		}
+	if ((rcp = smb_rc) != NULL) {
+		smb_rc = NULL;
+		rc_close(rcp);
 	}
-	return (0);
-}
-
-int
-opt_args_parseopt(struct opt_args *ap, int opt, char *arg,
-	opt_callback_t *callback)
-{
-	int len;
-
-	for (; ap->opt; ap++) {
-		if (ap->opt != opt)
-			continue;
-		switch (ap->type) {
-		case OPTARG_STR:
-			ap->str = arg;
-			if (arg) {
-				len = strlen(ap->str);
-				if (len > ap->ival) {
-					fprintf(stdout, dgettext(TEXT_DOMAIN,
-			"opt: Argument for option '%c' (%s) too long\n"),
-					    ap->opt, ap->name);
-					return (EINVAL);
-				}
-				callback(ap);
-			}
-			break;
-		case OPTARG_BOOL:
-			ap->ival = 0;
-			callback(ap);
-			break;
-		case OPTARG_INT:
-			errno = 0;
-			ap->ival = strtol(arg, NULL, 0);
-			if (errno) {
-				fprintf(stdout, dgettext(TEXT_DOMAIN,
-				    "opt: Invalid integer value for "
-				    "option '%c' (%s).\n"),
-				    ap->opt, ap->name);
-				return (EINVAL);
-			}
-			if (((ap->flag & OPTFL_HAVEMIN) &&
-			    (ap->ival < ap->min)) ||
-			    ((ap->flag & OPTFL_HAVEMAX) &&
-			    (ap->ival > ap->max))) {
-				fprintf(stdout, dgettext(TEXT_DOMAIN,
-				    "opt: Argument for option '%c' (%s) "
-				    "should be in [%d-%d] range\n"),
-				    ap->opt, ap->name, ap->min, ap->max);
-				return (EINVAL);
-			}
-			callback(ap);
-			break;
-		default:
-			break;
-		}
-		break;
-	}
-	return (0);
 }

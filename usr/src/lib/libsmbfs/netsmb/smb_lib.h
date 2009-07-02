@@ -33,12 +33,17 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NETSMB_SMB_LIB_H_
 #define	_NETSMB_SMB_LIB_H_
+
+/*
+ * Internal interface exported to our commands in:
+ *	usr/src/cmd/fs.d/smbclnt/
+ */
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -46,18 +51,11 @@
 #include <arpa/inet.h>
 #include <sys/byteorder.h>
 
-#include <netsmb/smb.h>
+#include <netsmb/smbfs_api.h>
 #include <netsmb/smb_dev.h>
 
-#define	SMB_CFG_FILE	"/etc/nsmb.conf"
-#define	OLD_SMB_CFG_FILE	"/usr/local/etc/nsmb.conf"
-
-#define	STDPARAM_ARGS	\
-	'A':case 'B':case 'C':case 'E':case 'I':case 'L':case \
-	'M':case 'N':case 'U':case 'R':case 'S':case 'T':case \
-	'W':case 'O':case 'P'
-
-#define	STDPARAM_OPT	"ABCE:I:L:M:NO:P:U:R:S:T:W:"
+extern const char smbutil_std_opts[];
+#define	STDPARAM_OPT	smbutil_std_opts
 
 /*
  * bits to indicate the source of error
@@ -68,33 +66,94 @@
 #define	SMB_NB_ERROR		0x20000
 
 /*
+ * Size of all LM/NTLM hashes (16 bytes).
+ * The driver needs to know this, so it's
+ * defined by smb_dev.h
+ */
+#define	NTLM_HASH_SZ		SMBIOC_HASH_SZ
+#define	NTLM_CHAL_SZ		8	/* challenge size */
+
+/*
+ * This is what goes across the door call to the IOD
+ * when asking for a new connection.
+ */
+struct smb_iod_ssn {
+	struct smbioc_ossn iod_ossn;
+	int		iod_authflags;	/* SMB_AT_x */
+	uchar_t		iod_nthash[NTLM_HASH_SZ];
+	uchar_t		iod_lmhash[NTLM_HASH_SZ];
+	/* Kerberos cred. cache res. name? */
+};
+typedef struct smb_iod_ssn smb_iod_ssn_t;
+
+
+/*
  * SMB work context. Used to store all values which are necessary
  * to establish connection to an SMB server.
  */
 struct smb_ctx {
 	int		ct_flags;	/* SMBCF_ */
-	int		ct_fd;		/* handle of connection */
+	int		ct_dev_fd;	/* device handle */
 	int		ct_parsedlevel;
 	int		ct_minlevel;
 	int		ct_maxlevel;
-	char		*ct_fullserver; /* original server name from cmd line */
-	char		*ct_srvaddr;	/* hostname or IP address of server */
-	struct sockaddr_in ct_srvinaddr; /* IP address of server */
-	char		ct_locname[SMB_MAXUSERNAMELEN + 1];
-	struct nb_ctx	*ct_nb;
-	struct smbioc_ossn	ct_ssn;
-	struct smbioc_oshare	ct_sh;
+	char		*ct_fullserver; /* orig. server name from cmd line */
+	char		*ct_srvaddr_s;	/* hostname or IP address of server */
+	struct addrinfo *ct_addrinfo;	/* IP addresses of the server */
+	struct nb_ctx	*ct_nb;		/* NetBIOS info. */
+	char		*ct_locname;	/* local (machine) name */
+	smb_iod_ssn_t	ct_iod_ssn;
+	/* smbioc_oshare_t	ct_sh; XXX */
+	int		ct_minauth;
+	int		ct_shtype_req;	/* share type wanted */
 	char		*ct_origshare;
 	char		*ct_home;
-	void		*ct_secblob;
-	int		ct_secbloblen;
-	/* krb5 stuff: all anonymous struct pointers here. */
-	struct _krb5_context *ct_krb5ctx;
-	struct _krb5_ccache *ct_krb5cc; 	/* credentials cache */
-	struct krb5_principal_data *ct_krb5cp;	/* client principal */
-};
-typedef struct smb_ctx smb_ctx_t;
 
+	/* Connection setup SMB stuff. */
+	/* Strings from the SMB negotiate response. */
+	char		*ct_srv_OS;
+	char		*ct_srv_LM;
+
+	/* NTLM auth. stuff */
+	uchar_t		ct_clnonce[NTLM_CHAL_SZ];
+	uchar_t		ct_ntlm_chal[NTLM_CHAL_SZ];
+	char		ct_password[SMBIOC_MAX_NAME];
+
+	/* See ssp.c */
+	void		*ct_ssp_ctx;
+	smbioc_ssn_work_t ct_work;
+};
+
+
+/*
+ * Short-hand for some of the substruct fields above
+ */
+#define	ct_ssn		ct_iod_ssn.iod_ossn
+#define	ct_vopt		ct_iod_ssn.iod_ossn.ssn_vopt
+#define	ct_owner	ct_iod_ssn.iod_ossn.ssn_owner
+#define	ct_srvaddr	ct_iod_ssn.iod_ossn.ssn_srvaddr
+#define	ct_domain	ct_iod_ssn.iod_ossn.ssn_domain
+#define	ct_user 	ct_iod_ssn.iod_ossn.ssn_user
+#define	ct_srvname 	ct_iod_ssn.iod_ossn.ssn_srvname
+#define	ct_authflags	ct_iod_ssn.iod_authflags
+#define	ct_nthash	ct_iod_ssn.iod_nthash
+#define	ct_lmhash	ct_iod_ssn.iod_lmhash
+
+#define	ct_sopt		ct_work.wk_sopt
+#define	ct_iods		ct_work.wk_iods
+#define	ct_tran_fd	ct_work.wk_iods.is_tran_fd
+#define	ct_hflags	ct_work.wk_iods.is_hflags
+#define	ct_hflags2	ct_work.wk_iods.is_hflags2
+#define	ct_vcflags	ct_work.wk_iods.is_vcflags
+#define	ct_ssn_key	ct_work.wk_iods.is_ssn_key
+#define	ct_mac_seqno	ct_work.wk_iods.is_next_seq
+#define	ct_mackeylen	ct_work.wk_iods.is_u_maclen
+#define	ct_mackey	ct_work.wk_iods.is_u_mackey.lp_ptr
+
+
+/*
+ * Bits in smb_ctx_t.ct_flags
+ */
 #define	SMBCF_NOPWD		    0x0001 /* don't ask for a password */
 #define	SMBCF_SRIGHTS		    0x0002 /* share access rights supplied */
 #define	SMBCF_LOCALE		    0x0004 /* use current locale */
@@ -111,100 +170,35 @@ typedef struct smb_ctx smb_ctx_t;
 #define	SMBCF_SSNACTIVE		0x02000000 /* session setup succeeded */
 #define	SMBCF_KCDOMAIN		0x04000000 /* use domain in KC lookup */
 
-/*
- * access modes (see also smb_dev.h)
- */
-#define	SMBM_READ	S_IRUSR	/* read conn attrs. (like list shares) */
-#define	SMBM_WRITE	S_IWUSR	/* modify conn attrs */
-#define	SMBM_EXEC	S_IXUSR	/* can send SMB requests */
-#define	SMBM_READGRP	S_IRGRP
-#define	SMBM_WRITEGRP	S_IWGRP
-#define	SMBM_EXECGRP	S_IXGRP
-#define	SMBM_READOTH	S_IROTH
-#define	SMBM_WRITEOTH	S_IWOTH
-#define	SMBM_EXECOTH	S_IXOTH
-#define	SMBM_ALL	S_IRWXU
-#define	SMBM_DEFAULT	S_IRWXU
-
-
-/*
- * Share type for smb_ctx_init
- */
-#define	SMB_ST_DISK		STYPE_DISKTREE
-#define	SMB_ST_PRINTER		STYPE_PRINTQ
-#define	SMB_ST_COMM		STYPE_DEVICE
-#define	SMB_ST_PIPE		STYPE_IPC
-#define	SMB_ST_ANY		STYPE_UNKNOWN
-#define	SMB_ST_MAX		STYPE_UNKNOWN
-#define	SMB_ST_NONE		0xff	/* not a part of protocol */
-
-struct mbdata {
-	struct mbuf	*mb_top;
-	struct mbuf	*mb_cur;
-	char		*mb_pos;
-	int		mb_count;
-};
-typedef struct mbdata mbdata_t;
-
-struct smb_bitname {
-	uint_t	bn_bit;
-	char	*bn_name;
-};
-typedef struct smb_bitname smb_bitname_t;
-
-extern int smb_debug, smb_verbose;
-extern struct rcfile *smb_rc;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-int  smb_lib_init(void);
-int  smb_open_driver(void);
-int  smb_open_rcfile(struct smb_ctx *ctx);
-void smb_error(const char *, int, ...);
-char *smb_printb(char *, int, const struct smb_bitname *);
 
 /*
  * Context management
  */
-int  smb_ctx_init(struct smb_ctx *, int, char *[], int, int, int);
+
+int  smb_ctx_init(struct smb_ctx *);
 void smb_ctx_done(struct smb_ctx *);
-int  smb_ctx_parseunc(struct smb_ctx *, const char *, int, const char **);
-int  smb_ctx_setcharset(struct smb_ctx *, const char *);
-int  smb_ctx_setfullserver(struct smb_ctx *, const char *);
-void  smb_ctx_setserver(struct smb_ctx *, const char *);
-int  smb_ctx_setuser(struct smb_ctx *, const char *, int);
-int  smb_ctx_setshare(struct smb_ctx *, const char *, int);
-int  smb_ctx_setscope(struct smb_ctx *, const char *);
-int  smb_ctx_setworkgroup(struct smb_ctx *, const char *, int);
-int  smb_ctx_setpassword(struct smb_ctx *, const char *, int);
-int  smb_ctx_setsrvaddr(struct smb_ctx *, const char *);
-int  smb_ctx_opt(struct smb_ctx *, int, const char *);
-int  smb_ctx_findvc(struct smb_ctx *, int, int);
-int  smb_ctx_negotiate(struct smb_ctx *, int, int, char *);
-int  smb_ctx_tdis(struct smb_ctx *ctx);
-int  smb_ctx_lookup(struct smb_ctx *, int, int);
-int  smb_ctx_login(struct smb_ctx *);
-int  smb_ctx_readrc(struct smb_ctx *);
-int  smb_ctx_resolve(struct smb_ctx *);
-int  smb_ctx_setflags(struct smb_ctx *, int, int, int);
-int  smb_ctx_flags2(struct smb_ctx *);
+int  smb_open_driver(void);
 
-int  smb_smb_open_print_file(struct smb_ctx *, int, int, const char *, smbfh*);
-int  smb_smb_close_print_file(struct smb_ctx *, smbfh);
+int  smb_ctx_gethandle(struct smb_ctx *);
+int  smb_ctx_findvc(struct smb_ctx *);
+int  smb_ctx_newvc(struct smb_ctx *);
 
-typedef void (*smb_ctx_close_hook_t)(struct smb_ctx *);
-void smb_ctx_set_close_hook(smb_ctx_close_hook_t);
-int  smb_fh_close(struct smb_ctx *ctx, smbfh fh);
-int  smb_fh_open(struct smb_ctx *ctx, const char *, int, smbfh *);
-int  smb_fh_read(struct smb_ctx *, smbfh, off_t, size_t, char *);
-int  smb_fh_write(struct smb_ctx *, smbfh, off_t, size_t, const char *);
-int  smb_fh_xactnp(struct smb_ctx *, smbfh, int, const char *,
-	int *, char *, int *);
+/*
+ * I/O daemon stuff
+ */
 
-int  smb_t2_request(struct smb_ctx *, int, uint16_t *, const char *,
-	int, void *, int, void *, int *, void *, int *, void *, int *);
+int  smb_iod_cl_newvc(smb_ctx_t *ctx);
+char *smb_iod_door_path(void);
+int smb_iod_open_door(int *);
+int smb_iod_connect(struct smb_ctx *);
+int smb_iod_work(struct smb_ctx *);
+
+/*
+ * Other stuff
+ */
+
+int  smb_open_rcfile(char *);
+void smb_close_rcfile(void);
 
 void smb_simplecrypt(char *dst, const char *src);
 int  smb_simpledecrypt(char *dst, const char *src);
@@ -218,19 +212,7 @@ void	*nls_mem_toloc(void *, const void *, int);
 char	*nls_str_upper(char *, const char *);
 char	*nls_str_lower(char *, const char *);
 
-int smb_get_authentication(char *, size_t, char *, size_t, char *, size_t,
-	const char *, struct smb_ctx *);
-int smb_browse(struct smb_ctx *, int);
-void smb_save2keychain(struct smb_ctx *);
-#define	smb_autherr(e) ((e) == EAUTH || (e) == EACCES || (e) == EPERM)
-char *smb_strerror(int);
 char *smb_getprogname();
 #define	__progname smb_getprogname()
-
-extern char *unpercent(char *component);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* _NETSMB_SMB_LIB_H_ */

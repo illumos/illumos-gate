@@ -20,17 +20,16 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SMBFS_ISEC_H
-#define	_SMBFS_ISEC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _ACL_NT_H
+#define	_ACL_NT_H
 
 /*
- * Internal Security Descriptor (SD)
+ * Internal functions for dealing with
+ * NT Security data structures.
  */
 
 #include <netsmb/smbfs_acl.h>
@@ -78,36 +77,37 @@ struct i_ntsd {
 	i_ntacl_t	*sd_dacl;
 };
 
+struct mbdata;
 
 /*
  * Import a raw SD (mb chain) into "internal" form.
  * (like "absolute" form per. NT docs)
  * Returns allocated data in sdp
  */
-int mb_get_ntsd(mbdata_t *mbp, i_ntsd_t **sdp);
+int mb_get_ntsd(struct mbdata *mbp, i_ntsd_t **sdp);
 
 /*
  * Export an "internal" SD into an raw SD (mb chain).
  * (a.k.a "self-relative" form per. NT docs)
  * Returns allocated mbchain in mbp.
  */
-int mb_put_ntsd(mbdata_t *mbp, i_ntsd_t *sd);
+int mb_put_ntsd(struct mbdata *mbp, i_ntsd_t *sd);
 
 
 /*
  * Get an SD via ioctl on FD (with "selector" bits),
  * stroing the raw Windows SD in the mb chain mbp.
  */
-int smbfs_acl_iocget(int fd, uint32_t selector, mbdata_t *mbp);
+int smbfs_acl_iocget(int fd, uint32_t selector, struct mbdata *mbp);
 
 /*
  * Set an SD via ioctl on FD (with "selector" bits),
  * with a raw Windows SD from the chain mbp.
  */
-int smbfs_acl_iocset(int fd, uint32_t selector, mbdata_t *mbp);
+int smbfs_acl_iocset(int fd, uint32_t selector, struct mbdata *mbp);
 
 
 int smbfs_sid2str(i_ntsid_t *sid,
 	char *obuf, size_t olen, uint32_t *ridp);
 
-#endif	/* _SMBFS_ISEC_H */
+#endif	/* _ACL_NT_H */

@@ -45,6 +45,7 @@
 #include <sys/uio.h>
 #include <sys/dirent.h>
 #include <sys/errno.h>
+#include <sys/sunddi.h>
 #include <sys/sysmacros.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
@@ -233,8 +234,10 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	vnode_t		*vp;
 	u_int32_t	rights, rightsrcvd;
 	u_int16_t	fid, oldfid;
+	int		oldgenid;
 	struct smb_cred scred;
 	smbmntinfo_t	*smi;
+	smb_share_t	*ssp;
 	cred_t		*oldcr;
 	int		attrcacheupdated = 0;
 	int		tmperror;
@@ -243,6 +246,7 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	vp = *vpp;
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
+	ssp = smi->smi_share;
 
 	if (curproc->p_zone != smi->smi_zone)
 		return (EIO);
@@ -261,7 +265,7 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	 */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_WRITER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	/*
 	 * Keep track of the vnode type at first open.
@@ -296,10 +300,11 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 		flag |= FWRITE;
 
 	/*
-	 * If we already have it open, check to see if current rights
-	 * are sufficient for this open.
+	 * If we already have it open, and the FID is still valid,
+	 * check whether the rights are sufficient for FID reuse.
 	 */
-	if (np->n_fidrefs) {
+	if (np->n_fidrefs > 0 &&
+	    np->n_vcgenid == ssp->ss_vcgenid) {
 		int upgrade = 0;
 
 		/* BEGIN CSTYLED */
@@ -346,16 +351,19 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	 * We have a new FID and access rights.
 	 */
 	oldfid = np->n_fid;
+	oldgenid = np->n_vcgenid;
 	np->n_fid = fid;
+	np->n_vcgenid = ssp->ss_vcgenid;
 	np->n_rights = rightsrcvd;
 	np->n_fidrefs++;
-	if (np->n_fidrefs > 1) {
+	if (np->n_fidrefs > 1 &&
+	    oldgenid == ssp->ss_vcgenid) {
 		/*
 		 * We already had it open (presumably because
 		 * it was open with insufficient rights.)
 		 * Close old wire-open.
 		 */
-		tmperror = smbfs_smb_close(smi->smi_share,
+		tmperror = smbfs_smb_close(ssp,
 		    oldfid, &np->n_mtime, &scred);
 		if (tmperror)
 			SMBVDEBUG("error %d closing %s\n",
@@ -413,10 +421,14 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	caller_context_t *ct)
 {
 	smbnode_t	*np;
+	smbmntinfo_t	*smi;
+	smb_share_t	*ssp;
 	int		error = 0;
 	struct smb_cred scred;
 
 	np = VTOSMB(vp);
+	smi = VTOSMI(vp);
+	ssp = smi->smi_share;
 
 	/*
 	 * Don't "bail out" for VFS_UNMOUNTED here,
@@ -457,8 +469,9 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	 * incoming reference count is.
 	 */
 	if (VTOSMI(vp)->smi_flags & SMI_LLOCK) {
-		cleanlocks(vp, ttoproc(curthread)->p_pid, 0);
-		cleanshares(vp, ttoproc(curthread)->p_pid);
+		pid_t pid = ddi_get_pid();
+		cleanlocks(vp, pid, 0);
+		cleanshares(vp, pid);
 	}
 
 	if (count > 1)
@@ -478,7 +491,7 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	 * Don't want this one ever interruptible.
 	 */
 	(void) smbfs_rw_enter_sig(&np->r_lkserlock, RW_WRITER, 0);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	error = 0;
 
@@ -505,8 +518,11 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 			goto out;
 		if ((ofid = np->n_fid) != SMB_FID_UNUSED) {
 			np->n_fid = SMB_FID_UNUSED;
-			error = smbfs_smb_close(np->n_mount->smi_share,
-			    ofid, NULL, &scred);
+			/* After reconnect, n_fid is invalid */
+			if (np->n_vcgenid == ssp->ss_vcgenid) {
+				error = smbfs_smb_close(
+				    ssp, ofid, NULL, &scred);
+			}
 		}
 	}
 	if (error) {
@@ -533,18 +549,18 @@ static int
 smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	caller_context_t *ct)
 {
-	smbmntinfo_t	*smi;
-	smbnode_t	*np;
 	struct smb_cred scred;
 	struct vattr	va;
-	/* u_offset_t	off; */
-	/* offset_t	diff; */
+	smbnode_t	*np;
+	smbmntinfo_t	*smi;
+	smb_share_t	*ssp;
 	offset_t	endoff;
 	ssize_t		past_eof;
 	int		error;
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
+	ssp = smi->smi_share;
 
 	if (curproc->p_zone != smi->smi_zone)
 		return (EIO);
@@ -565,8 +581,8 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	 * Our SMB layer takes care to return EFBIG
 	 * when it has to fallback to a 32-bit call.
 	 */
-	if (uiop->uio_loffset < 0 ||
-	    uiop->uio_loffset + uiop->uio_resid < 0)
+	endoff = uiop->uio_loffset + uiop->uio_resid;
+	if (uiop->uio_loffset < 0 || endoff < 0)
 		return (EINVAL);
 
 	/* get vnode attributes from server */
@@ -585,7 +601,6 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	 * Do this by temporarily reducing uio_resid
 	 * by the amount the lies beyoned the EOF.
 	 */
-	endoff = uiop->uio_loffset + uiop->uio_resid;
 	if (endoff > va.va_size) {
 		past_eof = (ssize_t)(endoff - va.va_size);
 		uiop->uio_resid -= past_eof;
@@ -595,10 +610,14 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	/* Shared lock for n_fid use in smb_rwuio */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
-	error = smb_rwuio(smi->smi_share, np->n_fid, UIO_READ, uiop,
-	    &scred, smb_timo_read);
+	/* After reconnect, n_fid is invalid */
+	if (np->n_vcgenid != ssp->ss_vcgenid)
+		error = ESTALE;
+	else
+		error = smb_rwuio(ssp, np->n_fid, UIO_READ,
+		    uiop, &scred, smb_timo_read);
 
 	smb_credrele(&scred);
 	smbfs_rw_exit(&np->r_lkserlock);
@@ -615,16 +634,18 @@ static int
 smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	caller_context_t *ct)
 {
-	smbmntinfo_t 	*smi;
-	smbnode_t 	*np;
 	struct smb_cred scred;
 	struct vattr	va;
+	smbnode_t	*np;
+	smbmntinfo_t	*smi;
+	smb_share_t	*ssp;
 	offset_t	endoff, limit;
 	ssize_t		past_limit;
 	int		error, timo;
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
+	ssp = smi->smi_share;
 
 	if (curproc->p_zone != smi->smi_zone)
 		return (EIO);
@@ -696,10 +717,14 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	/* Shared lock for n_fid use in smb_rwuio */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
-	error = smb_rwuio(smi->smi_share, np->n_fid, UIO_WRITE, uiop,
-	    &scred, timo);
+	/* After reconnect, n_fid is invalid */
+	if (np->n_vcgenid != ssp->ss_vcgenid)
+		error = ESTALE;
+	else
+		error = smb_rwuio(ssp, np->n_fid, UIO_WRITE,
+		    uiop, &scred, timo);
 
 	if (error == 0) {
 		mutex_enter(&np->r_statelock);
@@ -864,7 +889,7 @@ smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr)
 	/* Shared lock for (possible) n_fid use. */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	bzero(&fattr, sizeof (fattr));
 	error = smbfs_smb_getfattr(np, &fattr, &scred);
@@ -964,7 +989,7 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	/* Shared lock for (possible) n_fid use. */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	/*
 	 * Will we need an open handle for this setattr?
@@ -984,6 +1009,7 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 		 * Only SIZE requires a handle.
 		 * XXX May be more reliable to just
 		 * always get the file handle here.
+		 * The tmpopen checks n_vcgenid.
 		 */
 		error = smbfs_smb_tmpopen(np, rights, &scred, &fid);
 		if (error) {
@@ -1024,6 +1050,9 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 			 * Tests indicate the server will zero-fill,
 			 * so looks like we don't need to do this.
 			 * Good thing, as this could take forever.
+			 *
+			 * XXX: Reportedly, writing one byte of zero
+			 * at the end offset avoids problems here.
 			 */
 			mutex_enter(&np->r_statelock);
 			np->r_size = vap->va_size;
@@ -1265,7 +1294,7 @@ smbfs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 	/* Shared lock for n_fid use in _flush */
 	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	error = smbfs_smb_flush(np, &scred);
 
@@ -1563,7 +1592,7 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 	 * First, go over-the-wire to get the
 	 * node type (and attributes).
 	 */
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 	/* Note: this can allocate a new "name" */
 	error = smbfs_smb_lookup(dnp, &name, &nmlen, &fa, &scred);
 	smb_credrele(&scred);
@@ -1748,7 +1777,7 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 
 	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_WRITER, SMBINTR(dvp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	/*
 	 * XXX: Do we need r_lkserlock too?
@@ -2016,7 +2045,7 @@ smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	} else {
 		mutex_exit(&np->r_statelock);
 
-		smb_credinit(&scred, curproc, cr);
+		smb_credinit(&scred, cr);
 		error = smbfs_smb_delete(np, &scred, NULL, 0, 0);
 		smb_credrele(&scred);
 
@@ -2254,7 +2283,7 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 		/*
 		 * Target file is not active. Try to remove it.
 		 */
-		smb_credinit(&scred, curproc, cr);
+		smb_credinit(&scred, cr);
 		error = smbfs_smb_delete(nnp, &scred, NULL, 0, 0);
 		smb_credrele(&scred);
 		if (error)
@@ -2273,7 +2302,7 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 	dnlc_remove(ndvp, nnm);
 
 	onp = VTOSMB(ovp);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 	error = smbfs_smb_rename(onp, ndnp, nnm, strlen(nnm), &scred);
 	smb_credrele(&scred);
 
@@ -2331,7 +2360,7 @@ smbfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 
 	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_WRITER, SMBINTR(dvp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	/*
 	 * XXX: Do we need r_lkserlock too?
@@ -2409,7 +2438,7 @@ smbfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 
 	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_WRITER, SMBINTR(dvp)))
 		return (EINTR);
-	smb_credinit(&scred, curproc, cr);
+	smb_credinit(&scred, cr);
 
 	/*
 	 * Require w/x access in the containing directory.
@@ -2572,8 +2601,8 @@ smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 		dnlc_purge_vp(vp);
 #endif
 	SMBVDEBUG("dirname='%s'\n", np->n_rpath);
-	smb_credinit(&scred, curproc, cr);
-	dbufsiz = DIRENT64_RECLEN(MAXNAMELEN);
+	smb_credinit(&scred, cr);
+	dbufsiz = DIRENT64_RECLEN(SMB_MAXFNAMELEN);
 	dp = kmem_alloc(dbufsiz, KM_SLEEP);
 
 	offset = uio->uio_offset; /* NB: "cookie" */
@@ -2670,8 +2699,8 @@ smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 		np->n_dirofs++;
 		/* Sanity check the name length. */
 		nmlen = ctx->f_nmlen;
-		if (nmlen > (MAXNAMELEN - 1)) {
-			nmlen = MAXNAMELEN - 1;
+		if (nmlen > SMB_MAXFNAMELEN) {
+			nmlen = SMB_MAXFNAMELEN;
 			SMBVDEBUG("Truncating name: %s\n", ctx->f_name);
 		}
 		reclen = DIRENT64_RECLEN(nmlen);

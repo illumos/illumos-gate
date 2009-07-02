@@ -31,7 +31,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,8 @@ static struct commands {
 	{"logout",	cmd_logout,	logout_usage, 0},
 	{"logoutall",	cmd_logoutall,	logoutall_usage, 0},
 	{"lookup",	cmd_lookup,	lookup_usage, CMDFL_NO_KMOD},
-	{"status",	cmd_status,	status_usage, 0},
+	{"print",	cmd_print,	print_usage, 0},
+	{"status",	cmd_status,	status_usage, CMDFL_NO_KMOD},
 	{"view",	cmd_view,	view_usage, 0},
 	{NULL, NULL, NULL, 0}
 };
@@ -134,7 +135,7 @@ main(int argc, char *argv[])
 {
 	struct commands *cmd;
 	char *cp;
-	int opt;
+	int err, opt;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -176,7 +177,8 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 	optind = 1;
-	return (cmd->fn(argc, argv));
+	err = cmd->fn(argc, argv);
+	return ((err) ? 1 : 0);
 }
 
 static void
@@ -191,7 +193,7 @@ help(void) {
 	" logout 	logout from specified host\n"
 	" logoutall	logout all users (requires privilege)\n"
 	" lookup 	resolve NetBIOS name to IP address\n"
-	/* " print		print file to the specified remote printer\n" */
+	" print		print file to the specified remote printer\n"
 	" status 	resolve IP address or DNS name to NetBIOS names\n"
 	" view		list resources on specified host\n"
 	"\n"));

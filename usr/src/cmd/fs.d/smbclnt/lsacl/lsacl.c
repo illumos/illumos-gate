@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the smbfs/lsacl command.
@@ -42,7 +40,6 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
 
 char *progname;
@@ -81,7 +78,7 @@ main(int argc, char **argv)
 	error = smbfs_acl_getsd(fd, 7, &sd);
 	if (error) {
 		fprintf(stderr, "getsd: %s\n",
-		    smb_strerror(error));
+		    strerror(error));
 		exit(1);
 	}
 
@@ -101,7 +98,7 @@ main(int argc, char **argv)
 	error = smbfs_acl_get(fd, &acl, &uid, &gid);
 	if (error) {
 		fprintf(stderr, "getacl: %s\n",
-		    smb_strerror(error));
+		    strerror(error));
 		exit(1);
 	}
 	printf("Solaris security data:\n");

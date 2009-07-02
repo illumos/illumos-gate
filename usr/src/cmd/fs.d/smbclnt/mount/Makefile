@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # cmd/fs.d/smbclnt/mount/Makefile
 #
@@ -36,15 +36,20 @@ include		../../Makefile.fstype
 OBJS=	$(LIBPROG).o
 SRCS=	$(LIBPROG).c $(FSLIBSRC)
 POFILE=	$(LIBPROG).po
-
-LDLIBS += -lsmbfs -lscf
+CLOBBERFILES	+= $(LIBPROG)
 
 CFLAGS += $(CCVERBOSE)
 C99MODE= $(C99_ENABLE)
-CPPFLAGS += -I$(SRC)/lib/libsmbfs \
-	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
 
-CLOBBERFILES	+= $(LIBPROG)
+LDLIBS += -lsmbfs -lscf
+
+CPPFLAGS += -I$(SRC)/uts/common -I$(SRC)/lib/libsmbfs 
+
+# uncomment these for dbx debugging
+#COPTFLAG = -g
+#CTF_FLAGS =
+#CTFCONVERT_O=
+#CTFMERGE_LIB=
 
 .KEEP_STATE:
 
