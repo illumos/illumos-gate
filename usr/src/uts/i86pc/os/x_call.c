@@ -152,6 +152,15 @@ static void
 xc_insert(void *queue, xc_msg_t *msg)
 {
 	xc_msg_t *old_head;
+
+	/*
+	 * FREE messages should only ever be getting inserted into
+	 * the xc_master CPUs xc_free queue.
+	 */
+	ASSERT(msg->xc_command != XC_MSG_FREE ||
+	    cpu[msg->xc_master] == NULL || /* possible only during init */
+	    queue == &cpu[msg->xc_master]->cpu_m.xc_free);
+
 	do {
 		old_head = (xc_msg_t *)*(volatile xc_msg_t **)queue;
 		msg->xc_next = old_head;
@@ -190,17 +199,20 @@ xc_init_cpu(struct cpu *cpup)
 
 	/*
 	 * add a new msg to each existing CPU's free list, as well as one for
-	 * my list for each of them
+	 * my list for each of them. ncpus has an inconsistent value when this
+	 * function is called, so use cpup->cpu_id.
 	 */
-	for (c = 0; c < ncpus; ++c) {
+	for (c = 0; c < cpup->cpu_id; ++c) {
 		if (cpu[c] == NULL)
 			continue;
 		msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
 		msg->xc_command = XC_MSG_FREE;
+		msg->xc_master = c;
 		xc_insert(&cpu[c]->cpu_m.xc_free, msg);
 
 		msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
 		msg->xc_command = XC_MSG_FREE;
+		msg->xc_master = cpup->cpu_id;
 		xc_insert(&cpup->cpu_m.xc_free, msg);
 	}
 
@@ -209,6 +221,7 @@ xc_init_cpu(struct cpu *cpup)
 	 */
 	msg = kmem_zalloc(sizeof (*msg), KM_SLEEP);
 	msg->xc_command = XC_MSG_FREE;
+	msg->xc_master = cpup->cpu_id;
 	xc_insert(&cpup->cpu_m.xc_free, msg);
 
 	if (!xc_initialized)
@@ -243,7 +256,9 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 		/*
 		 * We may have to wait for a message to arrive.
 		 */
-		for (;;) {
+		for (msg = NULL; msg == NULL;
+		    msg = xc_extract(&mcpup->xc_msgbox)) {
+
 			/*
 			 * Alway check for and handle a priority message.
 			 */
@@ -260,24 +275,9 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 			}
 
 			/*
-			 * extract and handle regular message
-			 */
-			msg = xc_extract(&mcpup->xc_msgbox);
-			if (msg != NULL)
-				break;
-
-			/*
 			 * wait for a message to arrive
 			 */
-			if (x86_feature & X86_MWAIT) {
-				i86_monitor(
-				    (volatile uint32_t *)&mcpup->xc_msgbox,
-				    0, 0);
-				if (mcpup->xc_msgbox == NULL)
-					i86_mwait(0, 0);
-			} else {
-				SMT_PAUSE();
-			}
+			SMT_PAUSE();
 		}
 
 
@@ -364,11 +364,11 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 			break;
 
 		case XC_MSG_FREE:
-			panic("free message in msgbox");
+			panic("free message 0x%p in msgbox", (void *)msg);
 			break;
 
 		default:
-			panic("bad message in msgbox");
+			panic("bad message 0x%p in msgbox", (void *)msg);
 			break;
 		}
 	}
@@ -430,7 +430,8 @@ xc_common(
 		if (msg == NULL)
 			panic("Ran out of free xc_msg_t's");
 		msg->xc_command = command;
-		msg->xc_master = CPU->cpu_id;
+		if (msg->xc_master != CPU->cpu_id)
+			panic("msg %p has wrong xc_master", (void *)msg);
 		msg->xc_slave = c;
 
 		/*
