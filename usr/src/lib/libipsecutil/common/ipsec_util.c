@@ -1052,7 +1052,6 @@ spdsock_get_ext(spd_ext_t *extv[], spd_msg_t *basehdr, uint_t msgsize,
 	while ((char *)extv[0] < ((char *)basehdr + msgsize)) {
 		/* Check for unknown headers. */
 		i++;
-
 		if (extv[0]->spd_ext_type == 0 ||
 		    extv[0]->spd_ext_type > SPD_EXT_MAX) {
 			if (diag_buf != NULL) {
@@ -1413,6 +1412,15 @@ keysock_diag(int diagnostic)
 	case SADB_X_DIAGNOSTIC_SA_EXPIRED:
 		return (dgettext(TEXT_DOMAIN,
 		    "Security association is not valid"));
+	case SADB_X_DIAGNOSTIC_BAD_CTX:
+		return (dgettext(TEXT_DOMAIN,
+		    "Algorithm invalid or not supported by Crypto Framework"));
+	case SADB_X_DIAGNOSTIC_INVALID_REPLAY:
+		return (dgettext(TEXT_DOMAIN,
+		    "Invalid Replay counter"));
+	case SADB_X_DIAGNOSTIC_MISSING_LIFETIME:
+		return (dgettext(TEXT_DOMAIN,
+		    "Inappropriate lifetimes"));
 	default:
 		return (dgettext(TEXT_DOMAIN, "Unknown diagnostic code"));
 	}
@@ -2986,7 +2994,21 @@ rparseidtype(uint16_t type)
  * error type. If the command calling this function was started by smf(5) the
  * error type could be used as a hint to the restarter. In the future this
  * function could be used to do something more intelligent with a process that
- * encounters an error.
+ * encounters an error. If exit() is called with an error code other than those
+ * defined by smf(5), the program will just get restarted. Unless restarting
+ * is likely to resolve the error condition, its probably sensible to just
+ * log the error and keep running.
+ *
+ * The SERVICE_* exit_types mean nothing if the command was run from the
+ * command line, just exit(). There are two special cases:
+ *
+ * SERVICE_DEGRADE - Not implemented in smf(5), one day it could hint that
+ *                   the service is not running as well is it could. For
+ *                   now, don't do anything, just record the error.
+ * DEBUG_FATAL - Something happened, if the command was being run in debug
+ *               mode, exit() as you really want to know something happened,
+ *               otherwise just keep running. This is ignored when running
+ *               under smf(5).
  *
  * The function will handle an optional variable args error message, this
  * will be written to the error stream, typically a log file or stderr.
@@ -3020,6 +3042,7 @@ ipsecutil_exit(exit_type_t type, char *fmri, FILE *fp, const char *fmt, ...)
 		case SERVICE_DISABLE:
 		case SERVICE_FATAL:
 		case SERVICE_RESTART:
+		case DEBUG_FATAL:
 			warnxfp(fp, "Fatal error - exiting.");
 			exit_status = 1;
 			break;
@@ -3030,7 +3053,9 @@ ipsecutil_exit(exit_type_t type, char *fmri, FILE *fp, const char *fmt, ...)
 		case SERVICE_EXIT_OK:
 			exit_status = SMF_EXIT_OK;
 			break;
-		case SERVICE_DEGRADE:
+		case SERVICE_DEGRADE: /* Not implemented yet. */
+		case DEBUG_FATAL:
+			/* Keep running, don't exit(). */
 			return;
 			break;
 		case SERVICE_BADPERM:

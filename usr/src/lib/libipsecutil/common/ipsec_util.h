@@ -105,16 +105,26 @@ typedef struct keywdtab {
 	char	*kw_str;
 } keywdtab_t;
 
-/* Exit the programe and enter new state */
+/*
+ * These different exit states are designed to give consistant behaviour
+ * when a program needs to exit because of an error. These exit_types
+ * are used in macros, defined later in this file, which call ipsecutil_exit().
+ * What happens when ipsecutil_exit() may differ if the command was started
+ * on the command line or via smf(5), See ipsecutil_exit() source for details.
+ *
+ * Note: The calling function should decide what "debug mode" is before calling
+ * ipsecutil_exit() with DEBUG_FATAL.
+ */
 typedef enum exit_type {
-	SERVICE_EXIT_OK,
-	SERVICE_DEGRADE,
-	SERVICE_BADPERM,
-	SERVICE_BADCONF,
-	SERVICE_MAINTAIN,
-	SERVICE_DISABLE,
-	SERVICE_FATAL,
-	SERVICE_RESTART
+	SERVICE_EXIT_OK,	/* Exit without error. */
+	SERVICE_DEGRADE,	/* A hint that service should be degraded. */
+	SERVICE_BADPERM,	/* A Permission error occured. */
+	SERVICE_BADCONF,	/* Misconfiguration. */
+	SERVICE_MAINTAIN,	/* smf(5) to put service in maintenance mode. */
+	SERVICE_DISABLE,	/* Tell smf(5) to disable me. */
+	SERVICE_FATAL,		/* Whatever happened is not fixable. */
+	SERVICE_RESTART,	/* Tell smf(5) to restart the service. */
+	DEBUG_FATAL		/* Exit in debug mode. */
 } exit_type_t;
 
 /*
@@ -372,7 +382,8 @@ extern const char *do_inet_ntop(const void *, char *, size_t);
  * programs that use libipsecutil. These wll work in usr/src/cmd
  * and usr/src/lib, but because macros in usr/src/lib don't get
  * expanded when I18N message catalogs are built, avoid using
- * these with text inside libipsecutil.
+ * these with text inside libipsecutil. See source of ipsecutil_exit()
+ * for more details.
  */
 #define	EXIT_OK(x) \
 	ipsecutil_exit(SERVICE_EXIT_OK, my_fmri, debugfile, \

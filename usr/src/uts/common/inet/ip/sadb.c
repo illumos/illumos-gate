@@ -2774,10 +2774,16 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 		/*
 		 * Bucket locks will be required if SA is actually unlinked.
 		 * get_ipsa_pair() returns valid hash bucket pointers even
-		 * if it can't find a pair SA pointer.
+		 * if it can't find a pair SA pointer. To prevent a potential
+		 * deadlock, always lock the outbound bucket before the inbound.
 		 */
-		mutex_enter(&ipsapp->ipsap_bucket->isaf_lock);
-		mutex_enter(&ipsapp->ipsap_pbucket->isaf_lock);
+		if (ipsapp->in_inbound_table) {
+			mutex_enter(&ipsapp->ipsap_pbucket->isaf_lock);
+			mutex_enter(&ipsapp->ipsap_bucket->isaf_lock);
+		} else {
+			mutex_enter(&ipsapp->ipsap_bucket->isaf_lock);
+			mutex_enter(&ipsapp->ipsap_pbucket->isaf_lock);
+		}
 
 		if (ipsapp->ipsap_sa_ptr != NULL) {
 			mutex_enter(&ipsapp->ipsap_sa_ptr->ipsa_lock);
@@ -2846,6 +2852,11 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
  * association are also searched for. The "pair" of ipsa_t's and isaf_t's
  * are returned as a ipsap_t.
  *
+ * The hash buckets are returned for convenience, if the calling function
+ * needs to use the hash bucket locks, say to remove the SA's, it should
+ * take care to observe the convention of locking outbound bucket then
+ * inbound bucket. The flag in_inbound_table provides direction.
+ *
  * Note that a "pair" is defined as one (but not both) of the following:
  *
  * A security association which has a soft reference to another security
@@ -2869,7 +2880,6 @@ get_ipsa_pair(sadb_sa_t *assoc, sadb_address_t *srcext, sadb_address_t *dstext,
 	sadb_t *sp;
 	uint32_t *srcaddr, *dstaddr;
 	isaf_t *outbound_bucket, *inbound_bucket;
-	boolean_t in_inbound_table = B_FALSE;
 	ipsap_t *ipsapp;
 	sa_family_t af;
 
@@ -2880,6 +2890,8 @@ get_ipsa_pair(sadb_sa_t *assoc, sadb_address_t *srcext, sadb_address_t *dstext,
 	ipsapp = kmem_zalloc(sizeof (*ipsapp), KM_NOSLEEP);
 	if (ipsapp == NULL)
 		return (NULL);
+
+	ipsapp->in_inbound_table = B_FALSE;
 
 	/*
 	 * Don't worry about IPv6 v4-mapped addresses, sadb_addrcheck()
@@ -2929,7 +2941,7 @@ get_ipsa_pair(sadb_sa_t *assoc, sadb_address_t *srcext, sadb_address_t *dstext,
 		if (ipsapp->ipsap_sa_ptr != NULL) {
 			ipsapp->ipsap_bucket = inbound_bucket;
 			ipsapp->ipsap_pbucket = outbound_bucket;
-			in_inbound_table = B_TRUE;
+			ipsapp->in_inbound_table = B_TRUE;
 		} else {
 			ipsapp->ipsap_sa_ptr =
 			    ipsec_getassocbyspi(outbound_bucket,
@@ -2952,7 +2964,7 @@ get_ipsa_pair(sadb_sa_t *assoc, sadb_address_t *srcext, sadb_address_t *dstext,
 			ipsapp->ipsap_bucket = inbound_bucket;
 			ipsapp->ipsap_pbucket = outbound_bucket;
 			if (ipsapp->ipsap_sa_ptr != NULL)
-				in_inbound_table = B_TRUE;
+				ipsapp->in_inbound_table = B_TRUE;
 		}
 	}
 
@@ -2964,7 +2976,7 @@ get_ipsa_pair(sadb_sa_t *assoc, sadb_address_t *srcext, sadb_address_t *dstext,
 	}
 
 	if ((ipsapp->ipsap_sa_ptr->ipsa_state == IPSA_STATE_LARVAL) &&
-	    in_inbound_table) {
+	    ipsapp->in_inbound_table) {
 		mutex_exit(&outbound_bucket->isaf_lock);
 		mutex_exit(&inbound_bucket->isaf_lock);
 		return (ipsapp);
@@ -3001,7 +3013,7 @@ get_ipsa_pair(sadb_sa_t *assoc, sadb_address_t *srcext, sadb_address_t *dstext,
 
 	/* found sa in outbound sadb, peer should be inbound */
 
-	if (in_inbound_table) {
+	if (ipsapp->in_inbound_table) {
 		/* Found SA in inbound table, pair will be in outbound. */
 		if (af == AF_INET6) {
 			ipsapp->ipsap_pbucket = OUTBOUND_BUCKET_V6(sp,
@@ -3303,6 +3315,8 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 					 */
 					mutex_exit(&newbie->ipsa_lock);
 					error = EPROTOTYPE;
+					*diagnostic =
+					    SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH;
 					goto error;
 				} else {
 					/* Fill in with explicit protocol. */
@@ -3324,6 +3338,8 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 					 */
 					mutex_exit(&newbie->ipsa_lock);
 					error = EPROTOTYPE;
+					*diagnostic =
+					    SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH;
 					goto error;
 				} else {
 					/* Fill in with explicit protocol. */
@@ -3368,20 +3384,31 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	    src_addr_ptr, dst_addr_ptr);
 
 	newbie->ipsa_type = samsg->sadb_msg_satype;
+
 	ASSERT((assoc->sadb_sa_state == SADB_SASTATE_MATURE) ||
 	    (assoc->sadb_sa_state == SADB_X_SASTATE_ACTIVE_ELSEWHERE));
 	newbie->ipsa_auth_alg = assoc->sadb_sa_auth;
 	newbie->ipsa_encr_alg = assoc->sadb_sa_encrypt;
 
 	newbie->ipsa_flags |= assoc->sadb_sa_flags;
-	if ((newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_LOC &&
-	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC] == NULL) ||
-	    (newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_REM &&
-	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_REM] == NULL) ||
-	    (newbie->ipsa_flags & SADB_X_SAFLAGS_TUNNEL &&
-	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_SRC] == NULL)) {
+	if (newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_LOC &&
+	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_LOC] == NULL) {
 		mutex_exit(&newbie->ipsa_lock);
-		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
+		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_NATT_LOC;
+		error = EINVAL;
+		goto error;
+	}
+	if (newbie->ipsa_flags & SADB_X_SAFLAGS_NATT_REM &&
+	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_NATT_REM] == NULL) {
+		mutex_exit(&newbie->ipsa_lock);
+		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_NATT_REM;
+		error = EINVAL;
+		goto error;
+	}
+	if (newbie->ipsa_flags & SADB_X_SAFLAGS_TUNNEL &&
+	    ksi->ks_in_extv[SADB_X_EXT_ADDRESS_INNER_SRC] == NULL) {
+		mutex_exit(&newbie->ipsa_lock);
+		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_INNER_SRC;
 		error = EINVAL;
 		goto error;
 	}
@@ -3463,6 +3490,14 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		mutex_exit(&ipss->ipsec_alg_lock);
 		if (error != 0) {
 			mutex_exit(&newbie->ipsa_lock);
+			/*
+			 * An error here indicates that alg is the wrong type
+			 * (IE: not authentication) or its not in the alg tables
+			 * created by ipsecalgs(1m), or Kcf does not like the
+			 * parameters passed in with this algorithm, which is
+			 * probably a coding error!
+			 */
+			*diagnostic = SADB_X_DIAGNOSTIC_BAD_CTX;
 			goto error;
 		}
 	}
@@ -3497,6 +3532,8 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		mutex_exit(&ipss->ipsec_alg_lock);
 		if (error != 0) {
 			mutex_exit(&newbie->ipsa_lock);
+			/* See above for error explanation. */
+			*diagnostic = SADB_X_DIAGNOSTIC_BAD_CTX;
 			goto error;
 		}
 	}
@@ -3591,6 +3628,7 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		if ((replayext->sadb_x_rc_replay32 == 0) &&
 		    (replayext->sadb_x_rc_replay64 != 0)) {
 			error = EOPNOTSUPP;
+			*diagnostic = SADB_X_DIAGNOSTIC_INVALID_REPLAY;
 			mutex_exit(&newbie->ipsa_lock);
 			goto error;
 		}
@@ -4638,6 +4676,21 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi, mblk_t **ipkt_lst,
 		}
 	}
 
+	/*
+	 * At this point we have an UPDATE to a MATURE SA. There should
+	 * not be any keying material present.
+	 */
+	if (akey != NULL) {
+		*diagnostic = SADB_X_DIAGNOSTIC_AKEY_PRESENT;
+		error = EINVAL;
+		goto bail;
+	}
+	if (ekey != NULL) {
+		*diagnostic = SADB_X_DIAGNOSTIC_EKEY_PRESENT;
+		error = EINVAL;
+		goto bail;
+	}
+
 	if (assoc->sadb_sa_state == SADB_X_SASTATE_ACTIVE_ELSEWHERE) {
 		if (ipsapp->ipsap_sa_ptr != NULL &&
 		    ipsapp->ipsap_sa_ptr->ipsa_state == IPSA_STATE_IDLE) {
@@ -4703,21 +4756,12 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi, mblk_t **ipkt_lst,
 	}
 
 	if (ksi->ks_in_extv[SADB_EXT_LIFETIME_CURRENT] != NULL) {
+		*diagnostic = SADB_X_DIAGNOSTIC_MISSING_LIFETIME;
 		error = EOPNOTSUPP;
 		goto bail;
 	}
 
 	if ((*diagnostic = sadb_hardsoftchk(hard, soft, idle)) != 0) {
-		error = EINVAL;
-		goto bail;
-	}
-	if (akey != NULL) {
-		*diagnostic = SADB_X_DIAGNOSTIC_AKEY_PRESENT;
-		error = EINVAL;
-		goto bail;
-	}
-	if (ekey != NULL) {
-		*diagnostic = SADB_X_DIAGNOSTIC_EKEY_PRESENT;
 		error = EINVAL;
 		goto bail;
 	}
@@ -4793,6 +4837,8 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi, mblk_t **ipkt_lst,
 			if (ksi->ks_in_dsttype == KS_IN_ADDR_ME) {
 				if (!sadb_replay_check(ipsapp->ipsap_sa_ptr,
 				    replext->sadb_x_rc_replay32)) {
+					*diagnostic =
+					    SADB_X_DIAGNOSTIC_INVALID_REPLAY;
 					error = EINVAL;
 					goto bail;
 				}
@@ -4896,6 +4942,7 @@ update_pairing(ipsap_t *ipsapp, keysock_in_t *ksi, int *diagnostic,
 
 	if (oipsapp->ipsap_psa_ptr == NULL) {
 		*diagnostic = SADB_X_DIAGNOSTIC_PAIR_INAPPROPRIATE;
+		error = EINVAL;
 		undo_pair = B_TRUE;
 	} else {
 		ipsa_flags = oipsapp->ipsap_psa_ptr->ipsa_flags;
@@ -4922,7 +4969,6 @@ update_pairing(ipsap_t *ipsapp, keysock_in_t *ksi, int *diagnostic,
 		ipsapp->ipsap_sa_ptr->ipsa_flags &= ~IPSA_F_PAIRED;
 		ipsapp->ipsap_sa_ptr->ipsa_otherspi = 0;
 		mutex_exit(&ipsapp->ipsap_sa_ptr->ipsa_lock);
-		error = EINVAL;
 	} else {
 		mutex_enter(&oipsapp->ipsap_psa_ptr->ipsa_lock);
 		oipsapp->ipsap_psa_ptr->ipsa_otherspi = assoc->sadb_sa_spi;

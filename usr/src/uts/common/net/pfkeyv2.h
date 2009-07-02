@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -805,7 +805,10 @@ typedef struct sadb_x_edump {
 
 #define	SADB_X_DIAGNOSTIC_SA_NOTFOUND		78
 #define	SADB_X_DIAGNOSTIC_SA_EXPIRED		79
-#define	SADB_X_DIAGNOSTIC_MAX			79
+#define	SADB_X_DIAGNOSTIC_BAD_CTX		80
+#define	SADB_X_DIAGNOSTIC_INVALID_REPLAY	81
+#define	SADB_X_DIAGNOSTIC_MISSING_LIFETIME	82
+#define	SADB_X_DIAGNOSTIC_MAX			82
 
 /* Algorithm type for sadb_x_algdesc above... */
 

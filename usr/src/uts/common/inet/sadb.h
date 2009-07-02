@@ -510,6 +510,7 @@ typedef struct sadbp_s
  */
 typedef struct ipsap_s
 {
+	boolean_t	in_inbound_table;
 	isaf_t		*ipsap_bucket;
 	ipsa_t		*ipsap_sa_ptr;
 	isaf_t		*ipsap_pbucket;

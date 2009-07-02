@@ -2419,6 +2419,8 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 
 	msg->spd_msg_len = SPD_8TO64(size);
 	msg->spd_msg_errno = 0;
+	msg->spd_msg_type = SPD_ALGLIST;
+
 	msg->spd_msg_diagnostic = 0;
 
 	cur += sizeof (*msg);
@@ -2431,6 +2433,16 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 	act->spd_actions_count = ipss->ipsec_nalgs[IPSEC_ALG_AUTH] +
 	    ipss->ipsec_nalgs[IPSEC_ALG_ENCR];
 	act->spd_actions_reserved = 0;
+
+	/*
+	 * If there aren't any algorithms registered, return an empty message.
+	 * spdsock_get_ext() knows how to deal with this.
+	 */
+	if (act->spd_actions_count == 0) {
+		act->spd_actions_len = 0;
+		mutex_exit(&ipss->ipsec_alg_lock);
+		goto error;
+	}
 
 	attr = (struct spd_attribute *)cur;
 
@@ -2483,6 +2495,7 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 	attr--;
 	attr->spd_attr_tag = SPD_ATTR_END;
 
+error:
 	freemsg(mp);
 	qreply(q, m);
 }
