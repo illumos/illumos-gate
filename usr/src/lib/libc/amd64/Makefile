@@ -104,7 +104,6 @@ GENOBJS=			\
 	alloca.o		\
 	attrat.o		\
 	byteorder.o		\
-	cache.o			\
 	cuexit.o		\
 	ecvt.o			\
 	errlst.o		\

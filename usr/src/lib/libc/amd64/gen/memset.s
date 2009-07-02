@@ -20,13 +20,17 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2008, Intel Corporation
  * All rights reserved.
+ */
+
+/*
+ * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 
 	.file	"memset.s"
@@ -46,6 +50,11 @@
  * Thresholds used below were determined experimentally.
  *
  * Pseudo code:
+ *
+ * NOTE: On AMD NO_SSE is always set.  Performance on Opteron did not improve
+ * using 16-byte stores.  Setting NO_SSE on AMD should be re-evaluated on
+ * future AMD processors.
+ *
  *
  * If (size <= 144 bytes) {
  *	do unrolled code (primarily 8-byte stores) regardless of alignment.
@@ -914,17 +923,25 @@ L(use_rep):
 
 		.balign 16
 L(Loop8byte_nt_move):
-		lea    -0x40(%r8),%r8		# 64
+		lea    -0x80(%r8),%r8		# 128
 		movnti %rdx,(%rdi)
 		movnti %rdx,0x8(%rdi)
 		movnti %rdx,0x10(%rdi)
 		movnti %rdx,0x18(%rdi)
-		cmp    $0x40,%r8
 		movnti %rdx,0x20(%rdi)
 		movnti %rdx,0x28(%rdi)
 		movnti %rdx,0x30(%rdi)
 		movnti %rdx,0x38(%rdi)
-		lea    0x40(%rdi),%rdi
+		cmp    $0x80,%r8
+		movnti %rdx,0x40(%rdi)
+		movnti %rdx,0x48(%rdi)
+		movnti %rdx,0x50(%rdi)
+		movnti %rdx,0x58(%rdi)
+		movnti %rdx,0x60(%rdi)
+		movnti %rdx,0x68(%rdi)
+		movnti %rdx,0x70(%rdi)
+		movnti %rdx,0x78(%rdi)
+		lea    0x80(%rdi),%rdi  
 		jge    L(Loop8byte_nt_move)
 
 		sfence

@@ -24,7 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Portions Copyright 2009 Advanced Micro Devices, Inc.
+ */
 
 #include <sys/types.h>
 #include "proc64_id.h"
@@ -43,8 +45,6 @@ struct cpuid_values {
 	uint_t ecx;
 	uint_t edx;
 };
-
-extern void	__amd64id(void);
 
 /*
  * get_intel_cache_info()
@@ -103,8 +103,62 @@ get_intel_cache_info(void)
 		}
 	}
 
-	__intel_set_cache_sizes(l1_cache_size, l2_cache_size,
-	    largest_level_cache);
+	__set_cache_sizes(l1_cache_size, l2_cache_size, largest_level_cache);
+}
+
+/*
+ * get_amd_cache_info()
+ *      Same as get_intel_cache_info() but for AMD processors
+ */
+static void
+get_amd_cache_info(void)
+{
+	uint_t l1_cache_size = AMD_DFLT_L1_CACHE_SIZE;
+	uint_t l2_cache_size = AMD_DFLT_L2_CACHE_SIZE;
+	uint_t l3_cache_size = 0;
+	uint_t largest_level_cache = 0;
+	struct cpuid_values cpuid_info;
+	uint_t maxeax;
+	int ncores;
+
+	cpuid_info.eax = 0;
+	__libc_get_cpuid(0x80000000, (uint_t *)&cpuid_info, -1);
+	maxeax = cpuid_info.eax;
+
+	if (maxeax >= 0x80000005) {	/* We have L1D info */
+		__libc_get_cpuid(0x80000005, (uint_t *)&cpuid_info, -1);
+		l1_cache_size = ((cpuid_info.ecx >> 24) & 0xff) * 1024;
+	}
+
+	if (maxeax >= 0x80000006) {	/* We have L2 and L3 info */
+		__libc_get_cpuid(0x80000006, (uint_t *)&cpuid_info, -1);
+		l2_cache_size = ((cpuid_info.ecx >> 16) & 0xffff) * 1024;
+		l3_cache_size = ((cpuid_info.edx >> 18) & 0x3fff) * 512 * 1024;
+	}
+
+	/*
+	 * L3 cache is shared between cores on the processor
+	 */
+	if (maxeax >= 0x80000008 && l3_cache_size != 0) {
+		largest_level_cache = l3_cache_size;
+
+		/*
+		 * Divide by number of cores on the processor
+		 */
+		__libc_get_cpuid(0x80000008, (uint_t *)&cpuid_info, -1);
+		ncores = (cpuid_info.ecx & 0xff) + 1;
+		if (ncores > 1)
+			largest_level_cache /= ncores;
+
+		/*
+		 * L3 is a victim cache for L2
+		 */
+		largest_level_cache += l2_cache_size;
+	} else
+		largest_level_cache = l2_cache_size;
+
+		__set_cache_sizes(l1_cache_size, l2_cache_size,
+		    largest_level_cache);
 }
 
 /*
@@ -126,7 +180,7 @@ __proc64id(void)
 	if ((cpuid_info.ebx == 0x68747541) && /* Auth */
 	    (cpuid_info.edx == 0x69746e65) && /* enti */
 	    (cpuid_info.ecx == 0x444d4163)) { /* cAMD */
-		__amd64id();
+		get_amd_cache_info();
 		return;
 	}
 
@@ -174,7 +228,7 @@ __proc64id(void)
 		}
 		__intel_set_memops_method(use_sse);
 	} else {
-		__intel_set_cache_sizes(INTEL_DFLT_L1_CACHE_SIZE,
+		__set_cache_sizes(INTEL_DFLT_L1_CACHE_SIZE,
 		    INTEL_DFLT_L2_CACHE_SIZE,
 		    INTEL_DFLT_LARGEST_CACHE_SIZE);
 		__intel_set_memops_method(use_sse);

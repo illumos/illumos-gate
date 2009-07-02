@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,11 @@
  * Thresholds used below were determined experimentally.
  *
  * Pseudo code:
+ *
+ * NOTE: On AMD NO_SSE is always set.  Performance on Opteron did not improve
+ * using 16-byte stores.  Setting NO_SSE on AMD should be re-evaluated on
+ * future AMD processors.
+ *
  *
  * If (size <= 128 bytes) {
  *	do unrolled code (primarily 8-byte loads/stores) regardless of
@@ -2274,7 +2279,7 @@ L(Loop8byte_pre):
 	mov    .largest_level_cache_size(%rip),%r9d
 	shr    %r9		# take half of it
 	cmp    %r9,%r8  
-	jg     L(byte8_nt_top)
+	jge    L(byte8_nt_top)
 	# Find out whether to use rep movsq
 	cmp    $4096,%r8
 	jle    L(byte8_top)

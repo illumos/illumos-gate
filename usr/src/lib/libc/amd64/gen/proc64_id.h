@@ -24,10 +24,12 @@
  * All rights reserved.
  */
 
+/*
+ * Portions Copyright 2009 Advanced Micro Devices, Inc.
+ */
+
 #ifndef	_PROC64_ID_H
 #define	_PROC64_ID_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/x86_archext.h>
 
@@ -56,9 +58,7 @@ extern "C" {
  * Cache size defaults for AMD SledgeHammer
  */
 #define	AMD_DFLT_L1_CACHE_SIZE		(64 * 1024)
-#define	AMD_DFLT_L1_HALF_CACHE_SIZE	(32 * 1024)
 #define	AMD_DFLT_L2_CACHE_SIZE		(1024 * 1024)
-#define	AMD_DFLT_L2_HALF_CACHE_SIZE	(512 * 1024)
 
 #ifdef _ASM
 	.extern .memops_method
@@ -66,7 +66,7 @@ extern "C" {
 
 void __libc_get_cpuid(int cpuid_function, void *out_reg, int cache_index);
 void __intel_set_memops_method(long sse_level);
-void __intel_set_cache_sizes(long l1_cache_size, long l2_cache_size,
+void __set_cache_sizes(long l1_cache_size, long l2_cache_size,
     long largest_level_cache);
 
 #endif /* _ASM */
