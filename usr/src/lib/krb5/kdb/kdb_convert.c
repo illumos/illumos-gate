@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains api's for conversion of the kdb_incr_update_t
@@ -16,7 +14,8 @@
 #include <iprop_hdr.h>
 #include "iprop.h"
 #include <k5-int.h>
-#include <krb5/kdb.h>
+#include <kdb.h>
+#include <kdb_log.h>
 
 /* BEGIN CSTYLED */
 #define	ULOG_ENTRY_TYPE(upd, i)	((kdb_incr_update_t *)upd)->kdb_update.kdbe_t_val[i]
@@ -41,9 +40,10 @@ typedef enum {
  * (by comparing it to the db_entry currently present in principal.db)
  * in the update.
  */
-void
+static void
 find_changed_attrs(krb5_db_entry *current, krb5_db_entry *new,
-				kdbe_attr_type_t *attrs, int *nattrs) {
+		   kdbe_attr_type_t *attrs, int *nattrs)
+{
 	int i = 0, j = 0;
 
 	krb5_tl_data *first, *second;
@@ -139,77 +139,71 @@ find_changed_attrs(krb5_db_entry *current, krb5_db_entry *new,
 	*nattrs = i;
 }
 
+static int
+data_to_utf8str(utf8str_t *u, krb5_data d)
+{
+	u->utf8str_t_len = d.length;
+	if (d.data) {
+		u->utf8str_t_val = malloc(d.length);
+		if (u->utf8str_t_val == NULL)
+			return -1;
+		memcpy(u->utf8str_t_val, d.data, d.length);
+	} else
+		u->utf8str_t_val = NULL;
+	return 0;
+}
 
 /*
  * Converts the krb5_principal struct from db2 to ulog format.
  */
-krb5_error_code
+static krb5_error_code
 conv_princ_2ulog(krb5_principal princ, kdb_incr_update_t *upd,
-				int cnt, princ_type tp) {
+		 int cnt, princ_type tp) {
 	int i = 0;
+	kdbe_princ_t *p;
+	kdbe_data_t *components;
 
 	if ((upd == NULL) || !princ)
 		return (KRB5KRB_ERR_GENERIC);
 
 	switch (tp) {
 	case REG_PRINC:
-		ULOG_ENTRY(upd, cnt).av_princ.k_nametype =
-				(int32_t)princ->type;
-
-		ULOG_ENTRY(upd, cnt).av_princ.k_realm.utf8str_t_len =
-				princ->realm.length;
-		ULOG_ENTRY(upd, cnt).av_princ.k_realm.utf8str_t_val =
-				(princ->realm.data != NULL) ?
-				strdup(princ->realm.data) : NULL;
-
-		ULOG_ENTRY(upd, cnt).av_princ.k_components.k_components_len =
-				(uint_t)princ->length;
-
-		ULOG_ENTRY(upd, cnt).av_princ.k_components.k_components_val =
-				malloc(princ->length * sizeof (kdbe_data_t));
-		if (ULOG_ENTRY(upd, cnt).av_princ.k_components.k_components_val
-				== NULL)
-			return (ENOMEM);
-
-		for (i = 0; i < princ->length; i++) {
-			ULOG_ENTRY_PRINC(upd, cnt, i).k_magic =
-				princ->data[i].magic;
-			ULOG_ENTRY_PRINC(upd, cnt, i).k_data.utf8str_t_len =
-				princ->data[i].length;
-			ULOG_ENTRY_PRINC(upd, cnt, i).k_data.utf8str_t_val =
-				(princ->data[i].data != NULL) ?
-				strdup(princ->data[i].data) : NULL;
-		}
-		break;
-
 	case MOD_PRINC:
-		ULOG_ENTRY(upd, cnt).av_mod_princ.k_nametype =
-				(int32_t)princ->type;
+		p = &ULOG_ENTRY(upd, cnt).av_princ; /* or av_mod_princ */
+		p->k_nametype = (int32_t)princ->type;
 
-		ULOG_ENTRY(upd, cnt).av_mod_princ.k_realm.utf8str_t_len =
-				princ->realm.length;
+		if (data_to_utf8str(&p->k_realm, princ->realm) < 0) {
+			return ENOMEM;
+		}
 
-		ULOG_ENTRY(upd, cnt).av_mod_princ.k_realm.utf8str_t_val =
-				(princ->realm.data != NULL) ?
-				strdup(princ->realm.data) : NULL;
+		p->k_components.k_components_len = princ->length;
 
-		ULOG_ENTRY(upd, cnt).av_mod_princ.k_components.k_components_len
-				= (uint_t)princ->length;
-
-		ULOG_ENTRY(upd, cnt).av_mod_princ.k_components.k_components_val
-				= malloc(princ->length * sizeof (kdbe_data_t));
-		if (ULOG_ENTRY(upd,
-			cnt).av_mod_princ.k_components.k_components_val == NULL)
+		p->k_components.k_components_val = components
+		    = malloc(princ->length * sizeof (kdbe_data_t));
+		if (p->k_components.k_components_val == NULL) {
+			free(p->k_realm.utf8str_t_val);
+			p->k_realm.utf8str_t_val = NULL;
 			return (ENOMEM);
+		}
 
+		memset(components, 0, princ->length * sizeof(kdbe_data_t));
+		for (i = 0; i < princ->length; i++)
+			components[i].k_data.utf8str_t_val = NULL;
 		for (i = 0; i < princ->length; i++) {
-			ULOG_ENTRY_MOD_PRINC(upd, cnt, i).k_magic =
-				princ->data[i].magic;
-			ULOG_ENTRY_MOD_PRINC(upd, cnt, i).k_data.utf8str_t_len
-				= princ->data[i].length;
-			ULOG_ENTRY_MOD_PRINC(upd, cnt, i).k_data.utf8str_t_val
-				= (princ->data[i].data != NULL) ?
-				strdup(princ->data[i].data) : NULL;
+			components[i].k_magic = princ->data[i].magic;
+			if (data_to_utf8str(&components[i].k_data,
+			    princ->data[i]) < 0) {
+				int j;
+				for (j = 0; j < i; j++) {
+					free(components[j].k_data.utf8str_t_val);
+					components[j].k_data.utf8str_t_val = NULL;
+				}
+			free(components);
+			p->k_components.k_components_val = NULL;
+			free(p->k_realm.utf8str_t_val);
+			p->k_realm.utf8str_t_val = NULL;
+			return ENOMEM;
+			}
 		}
 		break;
 
@@ -220,134 +214,72 @@ conv_princ_2ulog(krb5_principal princ, kdb_incr_update_t *upd,
 }
 
 /*
- * Converts the krb5_principal struct from ulog to db2 format.
+ * Copies a UTF-8 string from ulog to a krb5_data object, which may
+ * already have allocated storage associated with it.
+ *
+ * Maybe a return value should indicate success/failure?
  */
-krb5_error_code
-conv_princ_2db(krb5_context context, krb5_principal *dbprinc,
-			kdb_incr_update_t *upd,
-			int cnt, princ_type tp,
-			int princ_exists) {
-
-	int i;
-	krb5_principal princ;
-
-	if (upd == NULL)
-		return (KRB5KRB_ERR_GENERIC);
-
-	if (princ_exists == 0) {
-		princ = NULL;
-		princ = (krb5_principal)malloc(sizeof (krb5_principal_data));
-		if (princ == NULL) {
-			return (ENOMEM);
-		}
-	} else {
-		princ = *dbprinc;
+static void
+set_from_utf8str(krb5_data *d, utf8str_t u)
+{
+	if (u.utf8str_t_len > INT_MAX-1 || u.utf8str_t_len >= SIZE_MAX-1) {
+		d->data = NULL;
+		return;
 	}
-
-	switch (tp) {
-	case REG_PRINC:
-		princ->type = (krb5_int32)
-			ULOG_ENTRY(upd, cnt).av_princ.k_nametype;
-		princ->realm.length = (int)
-			ULOG_ENTRY(upd, cnt).av_princ.k_realm.utf8str_t_len;
-
-		if (princ_exists == 0)
-			princ->realm.data = NULL;
-		princ->realm.data = (char *)realloc(princ->realm.data,
-					(princ->realm.length + 1));
-		if (princ->realm.data == NULL)
-			goto error;
-		strlcpy(princ->realm.data,
-		(char *)ULOG_ENTRY(upd, cnt).av_princ.k_realm.utf8str_t_val,
-		(princ->realm.length + 1));
-
-		princ->length = (krb5_int32)ULOG_ENTRY(upd,
-				cnt).av_princ.k_components.k_components_len;
-
-		if (princ_exists == 0)
-			princ->data = NULL;
-		princ->data = (krb5_data *)realloc(princ->data,
-			(princ->length * sizeof (krb5_data)));
-		if (princ->data == NULL)
-			goto error;
-
-		for (i = 0; i < princ->length; i++) {
-			princ->data[i].magic =
-				ULOG_ENTRY_PRINC(upd, cnt, i).k_magic;
-			princ->data[i].length = (int)
-			ULOG_ENTRY_PRINC(upd, cnt, i).k_data.utf8str_t_len;
-
-			if (princ_exists == 0)
-				princ->data[i].data = NULL;
-			princ->data[i].data = (char *)realloc(
-				princ->data[i].data,
-				(princ->data[i].length + 1));
-			if (princ->data[i].data == NULL)
-				goto error;
-
-			strlcpy(princ->data[i].data, (char *)ULOG_ENTRY_PRINC(
-				upd, cnt, i).k_data.utf8str_t_val,
-				(princ->data[i].length + 1));
-		}
-		break;
-
-	case MOD_PRINC:
-		princ->type = (krb5_int32)
-			ULOG_ENTRY(upd, cnt).av_mod_princ.k_nametype;
-		princ->realm.length = (int)
-			ULOG_ENTRY(upd, cnt).av_mod_princ.k_realm.utf8str_t_len;
-
-		if (princ_exists == 0)
-			princ->realm.data = NULL;
-		princ->realm.data = (char *)realloc(princ->realm.data,
-			(princ->realm.length + 1));
-		if (princ->realm.data == NULL)
-			goto error;
-		strlcpy(princ->realm.data, (char *)ULOG_ENTRY(upd,
-				cnt).av_mod_princ.k_realm.utf8str_t_val,
-				(princ->realm.length + 1));
-
-		princ->length = (krb5_int32)ULOG_ENTRY(upd,
-				cnt).av_mod_princ.k_components.k_components_len;
-
-		if (princ_exists == 0)
-			princ->data = NULL;
-		princ->data = (krb5_data *)realloc(princ->data,
-				(princ->length * sizeof (krb5_data)));
-		if (princ->data == NULL)
-			goto error;
-
-		for (i = 0; i < princ->length; i++) {
-			princ->data[i].magic =
-				ULOG_ENTRY_MOD_PRINC(upd, cnt, i).k_magic;
-			princ->data[i].length = (int)
-			ULOG_ENTRY_MOD_PRINC(upd, cnt, i).k_data.utf8str_t_len;
-
-			if (princ_exists == 0)
-				princ->data[i].data = NULL;
-			princ->data[i].data = (char *)realloc(
-				princ->data[i].data,
-				(princ->data[i].length + 1));
-			if (princ->data[i].data == NULL)
-				goto error;
-			strlcpy(princ->data[i].data,
-				(char *)ULOG_ENTRY_MOD_PRINC(upd,
-					cnt, i).k_data.utf8str_t_val,
-					(princ->data[i].length + 1));
-		}
-		break;
-
-	default:
-		break;
-	}
-
-	*dbprinc = princ;
-	return (0);
-error:
-	krb5_free_principal(context, princ);
-	return (ENOMEM);
+	d->length = u.utf8str_t_len;
+	d->data = malloc(d->length + 1);
+	if (d->data == NULL)
+		return;
+	if (d->length)   /* Pointer may be null if length = 0.  */
+		strncpy(d->data, u.utf8str_t_val, d->length);
+	d->data[d->length] = 0;
 }
 
+/*
+ * Converts the krb5_principal struct from ulog to db2 format.
+ */
+static krb5_principal
+conv_princ_2db(krb5_context context, kdbe_princ_t *kdbe_princ)
+{
+	int i;
+	krb5_principal princ;
+	kdbe_data_t *components;
+
+	princ = calloc(1, sizeof (krb5_principal_data));
+	if (princ == NULL) {
+		return NULL;
+	}
+	princ->length = 0;
+	princ->data = NULL;
+
+	components = kdbe_princ->k_components.k_components_val;
+
+	princ->type = (krb5_int32) kdbe_princ->k_nametype;
+	princ->realm.data = NULL;
+	set_from_utf8str(&princ->realm, kdbe_princ->k_realm);
+	if (princ->realm.data == NULL)
+		goto error;
+
+	princ->data = calloc(kdbe_princ->k_components.k_components_len,
+			     sizeof (krb5_data));
+	if (princ->data == NULL)
+		goto error;
+	for (i = 0; i < kdbe_princ->k_components.k_components_len; i++)
+		princ->data[i].data = NULL;
+	princ->length = (krb5_int32)kdbe_princ->k_components.k_components_len;
+
+	for (i = 0; i < princ->length; i++) {
+		princ->data[i].magic = components[i].k_magic;
+		set_from_utf8str(&princ->data[i], components[i].k_data);
+		if (princ->data[i].data == NULL)
+			goto error;
+	}
+
+	return princ;
+error:
+	krb5_free_principal(context, princ);
+	return NULL;
+}
 
 /*
  * This routine converts one or more krb5 db2 records into update
@@ -357,7 +289,8 @@ error:
 krb5_error_code
 ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 				kdb_incr_update_t *updates,
-				int nentries) {
+				int nentries)
+{
 	int i, j, k, cnt, final, nattrs, tmpint, nprincs;
 	unsigned int more;
 	krb5_principal tmpprinc;
@@ -367,7 +300,7 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 	kdbe_attr_type_t *attr_types;
 	kdb_incr_update_t *upd;
 	krb5_db_entry *ent;
-	boolean_t kadm_data_yes;
+	int kadm_data_yes;
 
 	if ((updates == NULL) || (entries == NULL))
 		return (KRB5KRB_ERR_GENERIC);
@@ -378,7 +311,7 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 	for (k = 0; k < nentries; k++) {
 		nprincs = nattrs = tmpint = 0;
 		final = -1;
-		kadm_data_yes = B_FALSE;
+		kadm_data_yes = 0;
 		attr_types = NULL;
 
 		if ((upd->kdb_update.kdbe_t_val = (kdbe_val_t *)
@@ -395,12 +328,9 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 			return (ENOMEM);
 		}
 
-		/*
-		 * Solaris Kerberos: avoid a deadlock since ulog_conv_2logentry
-		 * is called by krb5_db2_db_put_principal which holds a lock.
-		 */
-		if ((ret = krb5_db_get_principal_nolock(context, ent->princ,
-						    &curr, &nprincs, &more))) {
+		if ((ret = krb5_db_get_principal_nolock(context, ent->princ, &curr,
+						 &nprincs, &more))) {
+			free(attr_types);
 			return (ret);
 		}
 
@@ -511,8 +441,10 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 					ULOG_ENTRY_TYPE(upd, ++final).av_type =
 						AT_PRINC;
 					if ((ret = conv_princ_2ulog(ent->princ,
-						upd, final, REG_PRINC)))
+						upd, final, REG_PRINC))) {
+						free(attr_types);
 						return (ret);
+					}
 				}
 				break;
 
@@ -524,8 +456,10 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 					ULOG_ENTRY(upd, final).av_keydata.av_keydata_len = ent->n_key_data;
 
 					ULOG_ENTRY(upd, final).av_keydata.av_keydata_val = malloc(ent->n_key_data * sizeof (kdbe_key_t));
-					if (ULOG_ENTRY(upd, final).av_keydata.av_keydata_val == NULL)
+					if (ULOG_ENTRY(upd, final).av_keydata.av_keydata_val == NULL) {
+						free(attr_types);
 						return (ENOMEM);
+					}
 
 					for (j = 0; j < ent->n_key_data; j++) {
 						ULOG_ENTRY_KEYVAL(upd, final, j).k_ver = ent->key_data[j].key_data_ver;
@@ -534,19 +468,25 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 						ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_len = ent->key_data[j].key_data_ver;
 
 						ULOG_ENTRY_KEYVAL(upd, final, j).k_enctype.k_enctype_val = malloc(ent->key_data[j].key_data_ver * sizeof(int32_t));
-						if (ULOG_ENTRY_KEYVAL(upd, final, j).k_enctype.k_enctype_val == NULL)
+						if (ULOG_ENTRY_KEYVAL(upd, final, j).k_enctype.k_enctype_val == NULL) {
+							free(attr_types);
 							return (ENOMEM);
+						}
 
 						ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val = malloc(ent->key_data[j].key_data_ver * sizeof(utf8str_t));
-						if (ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val == NULL)
+						if (ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val == NULL) {
+							free(attr_types);
 							return (ENOMEM);
+						}
 
 						for (cnt = 0; cnt < ent->key_data[j].key_data_ver; cnt++) {
 							ULOG_ENTRY_KEYVAL(upd, final, j).k_enctype.k_enctype_val[cnt] = ent->key_data[j].key_data_type[cnt];
 							ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val[cnt].utf8str_t_len = ent->key_data[j].key_data_length[cnt];
 							ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val[cnt].utf8str_t_val = malloc(ent->key_data[j].key_data_length[cnt] * sizeof (char));
-							if (ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val[cnt].utf8str_t_val == NULL)
+							if (ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val[cnt].utf8str_t_val == NULL) {
+								free(attr_types);
 								return (ENOMEM);
+							}
 							(void) memcpy(ULOG_ENTRY_KEYVAL(upd, final, j).k_contents.k_contents_val[cnt].utf8str_t_val, ent->key_data[j].key_data_contents[cnt], ent->key_data[j].key_data_length[cnt]);
 						}
 					}
@@ -572,8 +512,10 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 					ret = conv_princ_2ulog(tmpprinc,
 					    upd, final, MOD_PRINC);
 					krb5_free_principal(context, tmpprinc);
-					if (ret)
+					if (ret) {
+						free(attr_types);
 						return (ret);
+					}
 					ULOG_ENTRY_TYPE(upd, ++final).av_type =
 						AT_MOD_TIME;
 					ULOG_ENTRY(upd, final).av_mod_time =
@@ -589,14 +531,16 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 
 					case KRB5_TL_KADM_DATA:
 					default:
-						if (kadm_data_yes == B_FALSE) {
+						if (kadm_data_yes == 0) {
 							ULOG_ENTRY_TYPE(upd, ++final).av_type = AT_TL_DATA;
 							ULOG_ENTRY(upd, final).av_tldata.av_tldata_len = 0;
 							ULOG_ENTRY(upd, final).av_tldata.av_tldata_val = malloc(ent->n_tl_data * sizeof(kdbe_tl_t));
 
-							if (ULOG_ENTRY(upd, final).av_tldata.av_tldata_val == NULL)
+							if (ULOG_ENTRY(upd, final).av_tldata.av_tldata_val == NULL) {
+								free(attr_types);
 								return (ENOMEM);
-							kadm_data_yes = B_TRUE;
+							}
+							kadm_data_yes = 1;
 						}
 
 						tmpint = ULOG_ENTRY(upd, final).av_tldata.av_tldata_len;
@@ -604,8 +548,10 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 						ULOG_ENTRY(upd, final).av_tldata.av_tldata_val[tmpint].tl_type = newtl->tl_data_type;
 						ULOG_ENTRY(upd, final).av_tldata.av_tldata_val[tmpint].tl_data.tl_data_len = newtl->tl_data_length;
 						ULOG_ENTRY(upd, final).av_tldata.av_tldata_val[tmpint].tl_data.tl_data_val = malloc(newtl->tl_data_length * sizeof (char));
-						if (ULOG_ENTRY(upd, final).av_tldata.av_tldata_val[tmpint].tl_data.tl_data_val == NULL)
+						if (ULOG_ENTRY(upd, final).av_tldata.av_tldata_val[tmpint].tl_data.tl_data_val == NULL) {
+							free(attr_types);
 							return (ENOMEM);
+						}
 						(void) memcpy(ULOG_ENTRY(upd, final).av_tldata.av_tldata_val[tmpint].tl_data.tl_data_val, newtl->tl_data_contents, newtl->tl_data_length);
 						break;
 					}
@@ -653,19 +599,11 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 krb5_error_code
 ulog_conv_2dbentry(krb5_context context, krb5_db_entry *entries,
 				kdb_incr_update_t *updates,
-				int nentries) {
-	int i, j, k, cnt, mod_time, nattrs, nprincs;
-	krb5_principal mod_princ = NULL;
-	krb5_principal dbprinc;
-	char *dbprincstr = NULL;
-
+				int nentries)
+{
+	int k;
 	krb5_db_entry *ent;
 	kdb_incr_update_t *upd;
-
-	krb5_tl_data *newtl = NULL;
-	krb5_error_code ret;
-	unsigned int more;
-	unsigned int prev_n_keys = 0;
 
 	if ((updates == NULL) || (entries == NULL))
 		return (KRB5KRB_ERR_GENERIC);
@@ -674,7 +612,15 @@ ulog_conv_2dbentry(krb5_context context, krb5_db_entry *entries,
 	upd = updates;
 
 	for (k = 0; k < nentries; k++) {
-		cnt = nprincs = 0;
+		krb5_principal mod_princ = NULL;
+		int i, j, cnt = 0, mod_time = 0, nattrs, nprincs = 0;
+		krb5_principal dbprinc;
+		char *dbprincstr = NULL;
+
+		krb5_tl_data *newtl = NULL;
+		krb5_error_code ret;
+		unsigned int more;
+		unsigned int prev_n_keys = 0;
 
 		/*
 		 * If the ulog entry represents a DELETE update,
@@ -692,9 +638,9 @@ ulog_conv_2dbentry(krb5_context context, krb5_db_entry *entries,
 					* sizeof (char));
 		if (dbprincstr == NULL)
 			return (ENOMEM);
-		strlcpy(dbprincstr, (char *)upd->kdb_princ_name.utf8str_t_val,
-				(upd->kdb_princ_name.utf8str_t_len + 1));
-
+		strncpy(dbprincstr, (char *)upd->kdb_princ_name.utf8str_t_val,
+		    upd->kdb_princ_name.utf8str_t_len);
+		dbprincstr[upd->kdb_princ_name.utf8str_t_len] = 0;
 		ret = krb5_parse_name(context, dbprincstr, &dbprinc);
 		free(dbprincstr);
 		if (ret)
@@ -713,117 +659,131 @@ ulog_conv_2dbentry(krb5_context context, krb5_db_entry *entries,
 			ent->n_tl_data = 0;
 
 		for (i = 0; i < nattrs; i++) {
+			krb5_principal tmpprinc = NULL;
+
+#define u (ULOG_ENTRY(upd, i))
 			switch (ULOG_ENTRY_TYPE(upd, i).av_type) {
 			case AT_ATTRFLAGS:
-				ent->attributes = (krb5_flags)
-					ULOG_ENTRY(upd, i).av_attrflags;
+				ent->attributes = (krb5_flags) u.av_attrflags;
 				break;
 
 			case AT_MAX_LIFE:
-				ent->max_life = (krb5_deltat)
-					ULOG_ENTRY(upd, i).av_max_life;
+				ent->max_life = (krb5_deltat) u.av_max_life;
 				break;
 
 			case AT_MAX_RENEW_LIFE:
-				ent->max_renewable_life = (krb5_deltat)
-					ULOG_ENTRY(upd, i).av_max_renew_life;
+				ent->max_renewable_life = (krb5_deltat) u.av_max_renew_life;
 				break;
 
 			case AT_EXP:
-				ent->expiration = (krb5_timestamp)
-					ULOG_ENTRY(upd, i).av_exp;
+				ent->expiration = (krb5_timestamp) u.av_exp;
 				break;
 
 			case AT_PW_EXP:
-				ent->pw_expiration = (krb5_timestamp)
-					ULOG_ENTRY(upd, i).av_pw_exp;
+				ent->pw_expiration = (krb5_timestamp) u.av_pw_exp;
 				break;
 
 			case AT_LAST_SUCCESS:
-				ent->last_success = (krb5_timestamp)
-					ULOG_ENTRY(upd, i).av_last_success;
+				ent->last_success = (krb5_timestamp) u.av_last_success;
 				break;
 
 			case AT_LAST_FAILED:
-				ent->last_failed = (krb5_timestamp)
-					ULOG_ENTRY(upd, i).av_last_failed;
+				ent->last_failed = (krb5_timestamp) u.av_last_failed;
 				break;
 
 			case AT_FAIL_AUTH_COUNT:
-				ent->fail_auth_count = (krb5_kvno)
-					ULOG_ENTRY(upd, i).av_fail_auth_count;
+				ent->fail_auth_count = (krb5_kvno) u.av_fail_auth_count;
 				break;
 
 			case AT_PRINC:
-				if ((ret = conv_princ_2db(context,
-						&(ent->princ), upd,
-						i, REG_PRINC, nprincs)))
-					return (ret);
+				tmpprinc = conv_princ_2db(context, &u.av_princ);
+				if (tmpprinc == NULL)
+					return ENOMEM;
+				if (nprincs)
+					krb5_free_principal(context, ent->princ);
+				ent->princ = tmpprinc;
 				break;
 
 			case AT_KEYDATA:
 
 				if (nprincs != 0)
 					prev_n_keys = ent->n_key_data;
-
-				ent->n_key_data = (krb5_int16)ULOG_ENTRY(upd,
-					i).av_keydata.av_keydata_len;
+				else
+					prev_n_keys = 0;
+				ent->n_key_data = (krb5_int16)u.av_keydata.av_keydata_len;
 				if (nprincs == 0)
 					ent->key_data = NULL;
 
-				ent->key_data = (krb5_key_data *)realloc(
-					ent->key_data,
-					(ent->n_key_data *
+				ent->key_data = (krb5_key_data *)realloc(ent->key_data,
+						(ent->n_key_data *
 						sizeof (krb5_key_data)));
+				 /* XXX Memory leak: Old key data in
+				    records eliminated by resizing to
+				    smaller size. */
 				if (ent->key_data == NULL)
+					/* XXX Memory leak: old storage.  */
 					return (ENOMEM);
 
 /* BEGIN CSTYLED */
+				for (j = prev_n_keys; j < ent->n_key_data; j++) {
+					for (cnt = 0; cnt < 2; cnt++) {
+						ent->key_data[j].key_data_contents[cnt] = NULL;
+					}
+				}
 				for (j = 0; j < ent->n_key_data; j++) {
-					ent->key_data[j].key_data_ver = (krb5_int16)ULOG_ENTRY_KEYVAL(upd, i, j).k_ver;
-					ent->key_data[j].key_data_kvno = (krb5_int16)ULOG_ENTRY_KEYVAL(upd, i, j).k_kvno;
+					krb5_key_data *kp = &ent->key_data[j];
+					kdbe_key_t *kv = &ULOG_ENTRY_KEYVAL(upd, i, j);
+					kp->key_data_ver = (krb5_int16)kv->k_ver;
+					kp->key_data_kvno = (krb5_int16)kv->k_kvno;
+					if (kp->key_data_ver > 2) {
+						return EINVAL; /* XXX ? */
+					}
 
-					for (cnt = 0; cnt < ent->key_data[j].key_data_ver; cnt++) {
-						ent->key_data[j].key_data_type[cnt] =  (krb5_int16)ULOG_ENTRY_KEYVAL(upd, i, j).k_enctype.k_enctype_val[cnt];
-						ent->key_data[j].key_data_length[cnt] = (krb5_int16)ULOG_ENTRY_KEYVAL(upd, i, j).k_contents.k_contents_val[cnt].utf8str_t_len;
-						if ((nprincs == 0) || (j >= prev_n_keys))
-							ent->key_data[j].key_data_contents[cnt] = NULL;
+					for (cnt = 0; cnt < kp->key_data_ver; cnt++) {
+						void *newptr;
+						kp->key_data_type[cnt] = (krb5_int16)kv->k_enctype.k_enctype_val[cnt];
+						kp->key_data_length[cnt] = (krb5_int16)kv->k_contents.k_contents_val[cnt].utf8str_t_len;
+						newptr = realloc(kp->key_data_contents[cnt],
+								 kp->key_data_length[cnt]);
+						if (newptr == NULL)
+							return ENOMEM;
+						kp->key_data_contents[cnt] = newptr;
 
-						ent->key_data[j].key_data_contents[cnt] = (krb5_octet *)realloc(ent->key_data[j].key_data_contents[cnt], ent->key_data[j].key_data_length[cnt]);
-						if (ent->key_data[j].key_data_contents[cnt] == NULL)
-								return (ENOMEM);
-
-						(void) memset(ent->key_data[j].key_data_contents[cnt], 0, (ent->key_data[j].key_data_length[cnt] * sizeof (krb5_octet)));
-						(void) memcpy(ent->key_data[j].key_data_contents[cnt], ULOG_ENTRY_KEYVAL(upd, i, j).k_contents.k_contents_val[cnt].utf8str_t_val, ent->key_data[j].key_data_length[cnt]);
+						(void) memset(kp->key_data_contents[cnt], 0,
+						    	      kp->key_data_length[cnt]);
+						(void) memcpy(kp->key_data_contents[cnt],
+						    	      kv->k_contents.k_contents_val[cnt].utf8str_t_val,
+						    	      kp->key_data_length[cnt]);
 					}
 				}
 				break;
 
 			case AT_TL_DATA:
-				cnt = ULOG_ENTRY(upd, i).av_tldata.av_tldata_len;
+				cnt = u.av_tldata.av_tldata_len;
 				newtl = malloc(cnt * sizeof (krb5_tl_data));
 				(void) memset(newtl, 0, (cnt * sizeof (krb5_tl_data)));
 				if (newtl == NULL)
 					return (ENOMEM);
 
-				for (j = 0; j < cnt; j++){
-					newtl[j].tl_data_type = (krb5_int16)ULOG_ENTRY(upd, i).av_tldata.av_tldata_val[j].tl_type;
-					newtl[j].tl_data_length = (krb5_int16)ULOG_ENTRY(upd, i).av_tldata.av_tldata_val[j].tl_data.tl_data_len;
+				for (j = 0; j < cnt; j++) {
+					newtl[j].tl_data_type = (krb5_int16)u.av_tldata.av_tldata_val[j].tl_type;
+					newtl[j].tl_data_length = (krb5_int16)u.av_tldata.av_tldata_val[j].tl_data.tl_data_len;
 					newtl[j].tl_data_contents = NULL;
 					newtl[j].tl_data_contents = malloc(newtl[j].tl_data_length * sizeof (krb5_octet));
 					if (newtl[j].tl_data_contents == NULL)
+						/* XXX Memory leak: newtl
+						   and previously
+						   allocated elements.  */
 						return (ENOMEM);
 
 					(void) memset(newtl[j].tl_data_contents, 0, (newtl[j].tl_data_length * sizeof (krb5_octet)));
-					(void) memcpy(newtl[j].tl_data_contents, ULOG_ENTRY(upd, i).av_tldata.av_tldata_val[j].tl_data.tl_data_val, newtl[j].tl_data_length);
+					(void) memcpy(newtl[j].tl_data_contents, u.av_tldata.av_tldata_val[j].tl_data.tl_data_val, newtl[j].tl_data_length);
 					newtl[j].tl_data_next = NULL;
 					if (j > 0)
-						newtl[j - 1].tl_data_next =
-								&newtl[j];
+						newtl[j - 1].tl_data_next = &newtl[j];
 				}
 
-				if ((ret = krb5_dbe_update_tl_data(context,
-								ent, newtl)))
+				if ((ret = krb5_dbe_update_tl_data(context, ent, newtl)))
 					return (ret);
 				for (j = 0; j < cnt; j++)
 					if (newtl[j].tl_data_contents) {
@@ -838,32 +798,30 @@ ulog_conv_2dbentry(krb5_context context, krb5_db_entry *entries,
 /* END CSTYLED */
 
 			case AT_PW_LAST_CHANGE:
-				if ((ret = krb5_dbe_update_last_pwd_change(
-					context, ent,
-					ULOG_ENTRY(upd, i).av_pw_last_change)))
+				if ((ret = krb5_dbe_update_last_pwd_change(context, ent,
+				    					   u.av_pw_last_change)))
 						return (ret);
 				break;
 
 			case AT_MOD_PRINC:
-				if ((ret = conv_princ_2db(context,
-						&mod_princ, upd,
-						i, MOD_PRINC, 0)))
-					return (ret);
+				tmpprinc = conv_princ_2db(context, &u.av_mod_princ);
+				if (tmpprinc == NULL)
+					return ENOMEM;
+				mod_princ = tmpprinc;
 				break;
 
 			case AT_MOD_TIME:
-				mod_time = ULOG_ENTRY(upd, i).av_mod_time;
+				mod_time = u.av_mod_time;
 				break;
 
 			case AT_LEN:
-				ent->len = (krb5_int16)
-						ULOG_ENTRY(upd, i).av_len;
+				ent->len = (krb5_int16) u.av_len;
 				break;
 
 			default:
 				break;
 			}
-
+#undef u
 		}
 
 		/*
@@ -873,6 +831,7 @@ ulog_conv_2dbentry(krb5_context context, krb5_db_entry *entries,
 			ret = krb5_dbe_update_mod_princ_data(context, ent,
 			    mod_time, mod_princ);
 			krb5_free_principal(context, mod_princ);
+			mod_princ = NULL;
 			if (ret)
 				return (ret);
 		}
@@ -893,7 +852,8 @@ next:
  * This routine frees up memory associated with the bunched ulog entries.
  */
 void
-ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
+ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates)
+{
 
 	kdb_incr_update_t *upd;
 	int i, j, k, cnt;
@@ -911,8 +871,7 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 		/*
 		 * ulog entry - kdb_princ_name
 		 */
-		if (upd->kdb_princ_name.utf8str_t_val)
-			free(upd->kdb_princ_name.utf8str_t_val);
+		free(upd->kdb_princ_name.utf8str_t_val);
 
 /* BEGIN CSTYLED */
 
@@ -920,24 +879,20 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 		 * ulog entry - kdb_kdcs_seen_by
 		 */
 		if (upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_val) {
-			for (i = 0; i < upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_len; i++) {
-				if (upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_val[i].utf8str_t_val)
-					free(upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_val[i].utf8str_t_val);
-			}
-			if (upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_val)
-				free(upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_val);
+			for (i = 0; i < upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_len; i++)
+				free(upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_val[i].utf8str_t_val);
+			free(upd->kdb_kdcs_seen_by.kdb_kdcs_seen_by_val);
 		}
 
 		/*
 		 * ulog entry - kdb_futures
 		 */
-		if (upd->kdb_futures.kdb_futures_val)
-			free(upd->kdb_futures.kdb_futures_val);
+		free(upd->kdb_futures.kdb_futures_val);
 
 		/*
 		 * ulog entry - kdb_update
 		 */
-		if(upd->kdb_update.kdbe_t_val) {
+		if (upd->kdb_update.kdbe_t_val) {
 			/*
 			 * Loop thru all the attributes and free up stuff
 			 */
@@ -949,12 +904,10 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 				if ((ULOG_ENTRY_TYPE(upd, i).av_type == AT_KEYDATA) && ULOG_ENTRY(upd, i).av_keydata.av_keydata_val) {
 
 					for (j = 0; j < ULOG_ENTRY(upd, i).av_keydata.av_keydata_len; j++) {
-						if (ULOG_ENTRY_KEYVAL(upd, i, j).k_enctype.k_enctype_val)
-							free(ULOG_ENTRY_KEYVAL(upd, i, j).k_enctype.k_enctype_val);
+						free(ULOG_ENTRY_KEYVAL(upd, i, j).k_enctype.k_enctype_val);
 						if (ULOG_ENTRY_KEYVAL(upd, i, j).k_contents.k_contents_val) {
 							for (k = 0; k < ULOG_ENTRY_KEYVAL(upd, i, j).k_ver; k++) {
-							if (ULOG_ENTRY_KEYVAL(upd, i, j).k_contents.k_contents_val[k].utf8str_t_val)
-									free(ULOG_ENTRY_KEYVAL(upd, i, j).k_contents.k_contents_val[k].utf8str_t_val);
+								free(ULOG_ENTRY_KEYVAL(upd, i, j).k_contents.k_contents_val[k].utf8str_t_val);
 							}
 							free(ULOG_ENTRY_KEYVAL(upd, i, j).k_contents.k_contents_val);
 						}
@@ -968,8 +921,7 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 				 */
 				if ((ULOG_ENTRY_TYPE(upd, i).av_type == AT_TL_DATA) && ULOG_ENTRY(upd, i).av_tldata.av_tldata_val) {
 					for (j = 0; j < ULOG_ENTRY(upd, i).av_tldata.av_tldata_len; j++) {
-						if (ULOG_ENTRY(upd, i).av_tldata.av_tldata_val[j].tl_data.tl_data_val)
-							free(ULOG_ENTRY(upd, i).av_tldata.av_tldata_val[j].tl_data.tl_data_val);
+						free(ULOG_ENTRY(upd, i).av_tldata.av_tldata_val[j].tl_data.tl_data_val);
 					}
 					free(ULOG_ENTRY(upd, i).av_tldata.av_tldata_val);
 				}
@@ -978,12 +930,10 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 				 * Free av_princ
 				 */
 				if (ULOG_ENTRY_TYPE(upd, i).av_type == AT_PRINC) {
-					if (ULOG_ENTRY(upd, i).av_princ.k_realm.utf8str_t_val)
-						free(ULOG_ENTRY(upd, i).av_princ.k_realm.utf8str_t_val);
+					free(ULOG_ENTRY(upd, i).av_princ.k_realm.utf8str_t_val);
 					if (ULOG_ENTRY(upd, i).av_princ.k_components.k_components_val) {
 						for (j = 0; j < ULOG_ENTRY(upd, i).av_princ.k_components.k_components_len; j++) {
-							if (ULOG_ENTRY_PRINC(upd, i, j).k_data.utf8str_t_val)
-								free(ULOG_ENTRY_PRINC(upd, i, j).k_data.utf8str_t_val);
+							free(ULOG_ENTRY_PRINC(upd, i, j).k_data.utf8str_t_val);
 						}
 						free(ULOG_ENTRY(upd, i).av_princ.k_components.k_components_val);
 					}
@@ -993,12 +943,10 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 				 * Free av_mod_princ
 				 */
 				if (ULOG_ENTRY_TYPE(upd, i).av_type == AT_MOD_PRINC) {
-					if (ULOG_ENTRY(upd, i).av_mod_princ.k_realm.utf8str_t_val)
-						free(ULOG_ENTRY(upd, i).av_mod_princ.k_realm.utf8str_t_val);
+					free(ULOG_ENTRY(upd, i).av_mod_princ.k_realm.utf8str_t_val);
 					if (ULOG_ENTRY(upd, i).av_mod_princ.k_components.k_components_val) {
 						for (j = 0; j < ULOG_ENTRY(upd, i).av_mod_princ.k_components.k_components_len; j++) {
-							if (ULOG_ENTRY_MOD_PRINC(upd, i, j).k_data.utf8str_t_val)
-								free(ULOG_ENTRY_MOD_PRINC(upd, i, j).k_data.utf8str_t_val);
+							free(ULOG_ENTRY_MOD_PRINC(upd, i, j).k_data.utf8str_t_val);
 						}
 						free(ULOG_ENTRY(upd, i).av_mod_princ.k_components.k_components_val);
 					}
@@ -1020,7 +968,7 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 				 * XXX: Free av_pw_hist
 				 *
 				 * For now, we just free the pointer
-				 * to av_pw_hist_val, since we arent
+				 * to av_pw_hist_val, since we aren't
 				 * populating this union member in
 				 * the conv api function(s) anyways.
 				 */
@@ -1032,8 +980,7 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 			/*
 			 * Free up the pointer to kdbe_t_val
 			 */
-			if (upd->kdb_update.kdbe_t_val)
-				free(upd->kdb_update.kdbe_t_val);
+			free(upd->kdb_update.kdbe_t_val);
 		}
 
 /* END CSTYLED */
@@ -1048,6 +995,5 @@ ulog_free_entries(kdb_incr_update_t *updates, int no_of_updates) {
 	/*
 	 * Finally, free up the pointer to the bunched ulog entries
 	 */
-	if (updates)
-		free(updates);
+	free(updates);
 }
