@@ -135,6 +135,7 @@ main(int argc, char **argv)
 	char		*prog;
 	char		*pt;
 	char		*vfstab_file = NULL;
+	char		*temp_cl_basedir;
 	char		outbuf[PATH_MAX];
 	int		c;
 	int		dbchg;
@@ -434,10 +435,24 @@ main(int argc, char **argv)
 
 				c = 0;
 				if (is_a_cl_basedir() && !is_an_inst_root()) {
-					c = strlen(get_client_basedir());
-					(void) snprintf(outbuf, sizeof (outbuf),
-					    "%s/%s\n", get_basedir(),
-					    &(ept->path[c]));
+					/*
+					 * A path in contents db might have
+					 * other prefix than BASEDIR of the
+					 * package
+					 */
+					temp_cl_basedir = get_client_basedir();
+					if (strncmp(ept->path, temp_cl_basedir,
+					    strlen(temp_cl_basedir)) == 0) {
+						c = strlen(temp_cl_basedir);
+						(void) snprintf(outbuf,
+						    sizeof (outbuf), "%s/%s\n",
+						    get_basedir(),
+						    &(ept->path[c]));
+					} else {
+						(void) snprintf(outbuf,
+						    sizeof (outbuf),
+						    "%s\n", &(ept->path[c]));
+					}
 				} else if (is_an_inst_root()) {
 					(void) snprintf(outbuf, sizeof (outbuf),
 					    "%s/%s\n", get_inst_root(),
