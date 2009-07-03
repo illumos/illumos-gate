@@ -1308,11 +1308,13 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		 */
 		if ((un->un_dev) &&		/* Been opened since attach */
 		    (result != EACCES) &&	/* drive is use by somebody */
-		    (((un->un_pos.pmode == legacy) &&
+		    ((((un->un_pos.pmode == legacy) &&
 		    (un->un_pos.fileno > 0) ||	/* Known position not rewound */
 		    (un->un_pos.blkno != 0)) ||	/* Or within first file */
 		    ((un->un_pos.pmode == logical) &&
-		    (un->un_pos.lgclblkno > 0)))) {
+		    (un->un_pos.lgclblkno > 0))) &&
+		    ((un->un_state != ST_STATE_CLOSED) &&
+		    (un->un_laststate != ST_STATE_CLOSING)))) {
 
 			ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "cannot detach: pmode=%d fileno=0x%x, blkno=0x%x"
