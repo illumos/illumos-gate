@@ -1563,7 +1563,10 @@ clear_mc(int first, int last, int ismc, boolean_t clrstatus,
 	gcpu_bank_logout_t *gbl, *pgbl;
 	uint64_t status;
 
-	for (i = first, gbl = &gcl->gcl_data[first]; i < last; i++, gbl++) {
+	if (first < 0 || last < 0)
+		return;
+
+	for (i = first, gbl = &gcl->gcl_data[first]; i <= last; i++, gbl++) {
 		status = gbl->gbl_status;
 		if (status == 0)
 			continue;
@@ -1658,7 +1661,7 @@ gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
 	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
 	gcpu_mca_t *mca = &gcpu->gcpu_mca;
 	int nbanks = mca->gcpu_mca_nbanks;
-	gcpu_bank_logout_t *gbl;
+	gcpu_bank_logout_t *gbl, *pgbl;
 	gcpu_logout_t *gcl, *pgcl;
 	int ismc = (rp != NULL);
 	int ispoll = !ismc;
@@ -1667,8 +1670,8 @@ gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
 	uint64_t mcg_status;
 	uint64_t disp;
 	uint64_t cap;
-	int first = 0;
-	int last = 0;
+	int first = -1;
+	int last = -1;
 	int willpanic = 0;
 
 	if (cmi_hdl_rdmsr(hdl, IA32_MSR_MCG_STATUS, &mcg_status) !=
@@ -1735,7 +1738,8 @@ retry:
 		if (!(status & MSR_MC_STATUS_VAL))
 			continue;
 
-		if (first == 0)
+		/* First and last bank that have valid status */
+		if (first < 0)
 			first = i;
 		last = i;
 
@@ -1788,6 +1792,23 @@ retry:
 		gbl->gbl_status = status;
 		gbl->gbl_addr = addr;
 		gbl->gbl_misc = misc;
+
+		/*
+		 * For polled observation, if the count of deferred status
+		 * clears updated in the clear_mc() is nonzero and the
+		 * MCi_STATUS has not changed, the last wakeup has produced
+		 * the ereport of the error. Therefore, clear the status in
+		 * this wakeup to avoid duplicate ereport.
+		 */
+		pgbl = &pgcl->gcl_data[i];
+		if (!isxpv && ispoll && IS_MCE_CANDIDATE(status) &&
+		    pgbl->gbl_clrdefcnt != 0) {
+			if (STATUS_EQV(status, pgcl->gcl_data[i].gbl_status)) {
+				gbl->gbl_status = 0;
+				(void) cmi_hdl_wrmsr(hdl,
+				    IA32_MSR_MC(i, STATUS), 0ULL);
+			}
+		}
 	}
 
 	if (gcpu_mca_stack_flag)
