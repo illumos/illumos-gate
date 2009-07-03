@@ -6370,17 +6370,12 @@ bad_opt:
 
 /*
  * Process a routing header that is not yet empty.
- * Only handles type 0 routing headers.
+ * Because of RFC 5095, we now reject all route headers.
  */
 static void
 ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
-    ill_t *ill, uint_t flags, mblk_t *hada_mp, mblk_t *dl_mp)
+    ill_t *ill, mblk_t *hada_mp)
 {
-	ip6_rthdr0_t *rthdr;
-	uint_t ehdrlen;
-	uint_t numaddr;
-	in6_addr_t *addrptr;
-	in6_addr_t tmp;
 	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(rth->ip6r_segleft != 0);
@@ -6393,79 +6388,15 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		freemsg(mp);
 		return;
 	}
-
-	if (rth->ip6r_type != 0) {
-		if (hada_mp != NULL)
-			goto hada_drop;
-		/* Sent by forwarding path, and router is global zone */
-		icmp_param_problem_v6(WR(q), mp,
-		    ICMP6_PARAMPROB_HEADER,
-		    (uint32_t)((uchar_t *)&rth->ip6r_type - (uchar_t *)ip6h),
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
-		return;
-	}
-	rthdr = (ip6_rthdr0_t *)rth;
-	ehdrlen = 8 * (rthdr->ip6r0_len + 1);
-	ASSERT(mp->b_rptr + ehdrlen <= mp->b_wptr);
-	addrptr = (in6_addr_t *)((char *)rthdr + sizeof (*rthdr));
-	/* rthdr->ip6r0_len is twice the number of addresses in the header */
-	if (rthdr->ip6r0_len & 0x1) {
-		/* An odd length is impossible */
-		if (hada_mp != NULL)
-			goto hada_drop;
-		/* Sent by forwarding path, and router is global zone */
-		icmp_param_problem_v6(WR(q), mp,
-		    ICMP6_PARAMPROB_HEADER,
-		    (uint32_t)((uchar_t *)&rthdr->ip6r0_len - (uchar_t *)ip6h),
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
-		return;
-	}
-	numaddr = rthdr->ip6r0_len / 2;
-	if (rthdr->ip6r0_segleft > numaddr) {
-		/* segleft exceeds number of addresses in routing header */
-		if (hada_mp != NULL)
-			goto hada_drop;
-		/* Sent by forwarding path, and router is global zone */
-		icmp_param_problem_v6(WR(q), mp,
-		    ICMP6_PARAMPROB_HEADER,
-		    (uint32_t)((uchar_t *)&rthdr->ip6r0_segleft -
-		    (uchar_t *)ip6h),
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
-		return;
-	}
-	addrptr += (numaddr - rthdr->ip6r0_segleft);
-	if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst) ||
-	    IN6_IS_ADDR_MULTICAST(addrptr)) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+	if (hada_mp != NULL) {
 		freemsg(hada_mp);
 		freemsg(mp);
 		return;
 	}
-	/* Swap */
-	tmp = *addrptr;
-	*addrptr = ip6h->ip6_dst;
-	ip6h->ip6_dst = tmp;
-	rthdr->ip6r0_segleft--;
-	/* Don't allow any mapped addresses - ip_wput_v6 can't handle them */
-	if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_dst)) {
-		if (hada_mp != NULL)
-			goto hada_drop;
-		/* Sent by forwarding path, and router is global zone */
-		icmp_unreachable_v6(WR(q), mp, ICMP6_DST_UNREACH_NOROUTE,
-		    B_FALSE, B_FALSE, GLOBAL_ZONEID, ipst);
-		return;
-	}
-	if (ip_check_v6_mblk(mp, ill) == IP6_MBLK_OK) {
-		ip6h = (ip6_t *)mp->b_rptr;
-		ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp, dl_mp);
-	} else {
-		freemsg(mp);
-	}
-	return;
-hada_drop:
-	/* IPsec kstats: bean counter? */
-	freemsg(hada_mp);
-	freemsg(mp);
+	/* Sent by forwarding path, and router is global zone */
+	icmp_param_problem_v6(WR(q), mp, ICMP6_PARAMPROB_HEADER,
+	    (uint32_t)((uchar_t *)&rth->ip6r_type - (uchar_t *)ip6h), B_FALSE,
+	    B_FALSE, GLOBAL_ZONEID, ipst);
 }
 
 /*
@@ -8125,7 +8056,7 @@ tcp_fanout:
 					return;
 				}
 				ip_process_rthdr(q, mp, ip6h, rthdr, ill,
-				    flags, hada_mp, dl_mp);
+				    hada_mp);
 				return;
 			}
 			used = ehdrlen;
