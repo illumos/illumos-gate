@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,9 +61,11 @@
 #define	QUAD_DECIMAL_LEN	20
 
 
-/* IS 'Y' OR "T' */
+/* Is Y=yes or T=true */
 #define	IS_YORT(c)	(strchr("YT", toupper(c)))
 
+/* Is F=file format (vs D=node-dir format) */
+#define	IS_F(c)		(toupper(c) == 'F')
 
 /*
  * If path is defined.
@@ -907,10 +909,18 @@ get_hist_env_v3(ndmpd_module_params_t *params, ndmp_lbr_params_t *nlp)
 		NLP_UNSET(nlp, NLPF_FH);
 	} else {
 		NDMP_LOG(LOG_DEBUG, "env(HIST): \"%s\"", envp);
-		if (IS_YORT(*envp))
+		if (IS_YORT(*envp) || IS_F(*envp))
 			NLP_SET(nlp, NLPF_FH);
 		else
 			NLP_UNSET(nlp, NLPF_FH);
+
+		/* Force file format if specified */
+		if (IS_F(*envp)) {
+			params->mp_file_history_path_func =
+			    ndmpd_api_file_history_file_v3;
+			params->mp_file_history_dir_func = 0;
+			params->mp_file_history_node_func = 0;
+		}
 	}
 }
 
@@ -2532,25 +2542,27 @@ backup_out:
  * of the progress of backup during NDMP backup.
  */
 void
-get_backup_size(ndmpd_session_t *session, char *path)
+get_backup_size(ndmp_bkup_size_arg_t *sarg)
 {
 	fs_traverse_t ft;
 	u_longlong_t bk_size;
+	char spath[PATH_MAX];
 	int rv;
 
-	if (path == NULL)
-		return;
-
 	bk_size = 0;
+	if (fs_is_chkpntvol(sarg->bs_path)) {
+		ft.ft_path = sarg->bs_path;
+	} else {
+		(void) tlm_build_snapshot_name(sarg->bs_path,
+		    spath, sarg->bs_jname);
+		ft.ft_path = spath;
+	}
 
-	/* set traversing arguments */
-	ft.ft_path = path;
-	ft.ft_lpath = path;
-
+	ft.ft_lpath = ft.ft_path;
 	ft.ft_callbk = size_cb;
 	ft.ft_arg = &bk_size;
 	ft.ft_logfp = (ft_log_t)ndmp_log;
-	ft.ft_flags = FST_VERBOSE;	/* Solaris */
+	ft.ft_flags = FST_VERBOSE;
 
 	if ((rv = traverse_level(&ft)) != 0) {
 		NDMP_LOG(LOG_DEBUG, "bksize err=%d", rv);
@@ -2559,7 +2571,7 @@ get_backup_size(ndmpd_session_t *session, char *path)
 		NDMP_LOG(LOG_DEBUG, "bksize %lld, %lldKB, %lldMB\n",
 		    bk_size, bk_size / 1024, bk_size /(1024 * 1024));
 	}
-	session->ns_data.dd_data_size = bk_size;
+	sarg->bs_session->ns_data.dd_data_size = bk_size;
 }
 
 /*
@@ -3688,6 +3700,8 @@ ndmpd_tar_backup_starter_v3(ndmpd_module_params_t *params)
 	ndmpd_session_t *session;
 	ndmp_lbr_params_t *nlp;
 	char jname[TLM_MAX_BACKUP_JOB_NAME];
+	ndmp_bkup_size_arg_t sarg;
+	pthread_t tid;
 
 	session = (ndmpd_session_t *)(params->mp_daemon_cookie);
 	*(params->mp_module_cookie) = nlp = ndmp_get_nlp(session);
@@ -3706,10 +3720,16 @@ ndmpd_tar_backup_starter_v3(ndmpd_module_params_t *params)
 	NDMP_LOG(LOG_DEBUG, "err %d, chkpnted %c",
 	    err, NDMP_YORN(NLP_ISCHKPNTED(nlp)));
 
-	/* Get an estimate of the data size */
-	get_backup_size(session, nlp->nlp_backup_path);
-
 	if (err == 0) {
+		sarg.bs_session = session;
+		sarg.bs_jname = jname;
+		sarg.bs_path = nlp->nlp_backup_path;
+
+		/* Get an estimate of the data size */
+		if (pthread_create(&tid, NULL, (funct_t)get_backup_size,
+		    (void *)&sarg) == 0)
+			(void) pthread_detach(tid);
+
 		err = ndmp_get_cur_bk_time(nlp, &nlp->nlp_cdate, jname);
 		if (err != 0) {
 			NDMP_LOG(LOG_DEBUG, "err %d", err);

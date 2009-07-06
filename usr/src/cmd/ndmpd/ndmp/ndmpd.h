@@ -641,6 +641,12 @@ typedef struct {
 	tlm_commands_t *tr_cmds;
 } ndmp_tar_reader_arg_t;
 
+typedef struct {
+	ndmpd_session_t *bs_session;
+	char *bs_jname;
+	char *bs_path;
+} ndmp_bkup_size_arg_t;
+
 /*
  * Variables from ndmpd_comm.c
  */
