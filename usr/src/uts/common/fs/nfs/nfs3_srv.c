@@ -4148,11 +4148,25 @@ rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 	 * underlying filesystem.  We can guess 2^31-1 if need be.
 	 */
 	error = VOP_PATHCONF(vp, _PC_FILESIZEBITS, &l, cr, NULL);
+	if (error) {
+		resp->status = puterrno3(error);
+		goto out;
+	}
 
-	if (!error && l != 0 && l <= 64)
-		resp->resok.maxfilesize = (1LL << (l-1)) - 1;
-	else
+	/*
+	 * If the underlying file system does not support _PC_FILESIZEBITS,
+	 * return a reasonable default. Note that error code on VOP_PATHCONF
+	 * will be 0, even if the underlying file system does not support
+	 * _PC_FILESIZEBITS.
+	 */
+	if (l == (ulong_t)-1) {
 		resp->resok.maxfilesize = MAXOFF32_T;
+	} else {
+		if (l >= (sizeof (uint64_t) * 8))
+			resp->resok.maxfilesize = INT64_MAX;
+		else
+			resp->resok.maxfilesize = (1LL << (l-1)) - 1;
+	}
 
 	resp->resok.time_delta.seconds = 0;
 	resp->resok.time_delta.nseconds = 1000;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
@@ -1574,10 +1572,21 @@ rfs4_fattr4_maxfilesize(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		    sarg->cs->cr, NULL);
 		if (error)
 			break;
-		if (val >= (sizeof (uint64_t) * 8))
-			na->maxfilesize = UINT64_MAX;
-		else
-			na->maxfilesize = ((1LL << val) - 1);
+
+		/*
+		 * If the underlying file system does not support
+		 * _PC_FILESIZEBITS, return a reasonable default. Note that
+		 * error code on VOP_PATHCONF will be 0, even if the underlying
+		 * file system does not support _PC_FILESIZEBITS.
+		 */
+		if (val == (ulong_t)-1) {
+			na->maxfilesize = MAXOFF32_T;
+		} else {
+			if (val >= (sizeof (uint64_t) * 8))
+				na->maxfilesize = INT64_MAX;
+			else
+				na->maxfilesize = ((1LL << (val - 1)) - 1);
+		}
 		break;
 	case NFS4ATTR_SETIT:
 		/*
@@ -1591,10 +1600,20 @@ rfs4_fattr4_maxfilesize(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		    sarg->cs->cr, NULL);
 		if (error)
 			break;
-		if (val >= (sizeof (uint64_t) * 8))
-			maxfilesize = UINT64_MAX;
-		else
-			maxfilesize = ((1LL << val) - 1);
+		/*
+		 * If the underlying file system does not support
+		 * _PC_FILESIZEBITS, return a reasonable default. Note that
+		 * error code on VOP_PATHCONF will be 0, even if the underlying
+		 * file system does not support _PC_FILESIZEBITS.
+		 */
+		if (val == (ulong_t)-1) {
+			maxfilesize = MAXOFF32_T;
+		} else {
+			if (val >= (sizeof (uint64_t) * 8))
+				maxfilesize = INT64_MAX;
+			else
+				maxfilesize = ((1LL << (val - 1)) - 1);
+		}
 		if (na->maxfilesize != maxfilesize)
 			error = -1;	/* no match */
 		break;
