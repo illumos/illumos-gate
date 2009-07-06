@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,11 +100,13 @@ typedef struct ehci_root_hub {
  * These timeout values are specified in terms of microseconds.
  */
 #define	EHCI_RH_POLL_TIME		256000	/* RH polling interval */
-#define	EHCI_PORT_RESET_TIMEWAIT	20000	/* RH port reset time */
+#define	EHCI_PORT_RESET_TIMEWAIT	50000	/* RH port reset time */
 #define	EHCI_PORT_RESET_COMP_TIMEWAIT	2000	/* RH port reset complete */
 #define	EHCI_PORT_SUSPEND_TIMEWAIT	10000	/* RH port suspend time */
 #define	EHCI_PORT_RESUME_TIMEWAIT	20000	/* RH port resume time */
 #define	EHCI_PORT_RESUME_COMP_TIMEWAIT	2000	/* RH port resume complete */
+#define	EHCI_PORT_RESET_RETRY_MAX	10	/* RH port reset retry max */
+#define	EHCI_PORT_RESUME_RETRY_MAX	10	/* RH port resume retry max */
 
 #ifdef __cplusplus
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -905,6 +905,7 @@ ehci_handle_clrchng_port_suspend(
 	uint16_t		port)
 {
 	uint_t			port_status;
+	int			i;
 
 	mutex_enter(&ehcip->ehci_int_mutex);
 
@@ -941,8 +942,22 @@ ehci_handle_clrchng_port_suspend(
 
 	mutex_exit(&ehcip->ehci_int_mutex);
 
-	/* Wait 2ms for port to return to high speed mode */
-	delay(drv_usectohz(EHCI_PORT_RESUME_COMP_TIMEWAIT));
+	/*
+	 * Wait for port to return to high speed mode. It's necessary to poll
+	 * for resume completion for some high-speed devices to work correctly.
+	 */
+	for (i = 0; i < EHCI_PORT_RESUME_RETRY_MAX; i++) {
+		delay(drv_usectohz(EHCI_PORT_RESUME_COMP_TIMEWAIT));
+
+		mutex_enter(&ehcip->ehci_int_mutex);
+		port_status = Get_OpReg(ehci_rh_port_status[port]) &
+		    ~EHCI_RH_PORT_CLEAR_MASK;
+		mutex_exit(&ehcip->ehci_int_mutex);
+
+		if (!(port_status & EHCI_RH_PORT_RESUME)) {
+			break;
+		}
+	}
 }
 
 
@@ -958,6 +973,7 @@ ehci_handle_port_reset(
 {
 	ehci_root_hub_t		*rh;
 	uint_t			port_status;
+	int			i;
 
 	mutex_enter(&ehcip->ehci_int_mutex);
 
@@ -999,7 +1015,7 @@ ehci_handle_port_reset(
 
 		mutex_exit(&ehcip->ehci_int_mutex);
 
-		/* Wait 20ms for reset to complete */
+		/* Wait 50ms for reset to complete */
 		delay(drv_usectohz(EHCI_PORT_RESET_TIMEWAIT));
 
 		mutex_enter(&ehcip->ehci_int_mutex);
@@ -1013,10 +1029,23 @@ ehci_handle_port_reset(
 		mutex_exit(&ehcip->ehci_int_mutex);
 
 		/*
-		 * Wait 2ms for hardware to enable this port
-		 * if connected usb device is high speed.
+		 * Wait for hardware to enable this port, if the connected
+		 * usb device is high speed. It's necessary to poll for reset
+		 * completion for some high-speed devices to recognized
+		 * correctly.
 		 */
-		delay(drv_usectohz(EHCI_PORT_RESET_COMP_TIMEWAIT));
+		for (i = 0; i < EHCI_PORT_RESET_RETRY_MAX; i++) {
+			delay(drv_usectohz(EHCI_PORT_RESET_COMP_TIMEWAIT));
+
+			mutex_enter(&ehcip->ehci_int_mutex);
+			port_status = Get_OpReg(ehci_rh_port_status[port]) &
+			    ~EHCI_RH_PORT_CLEAR_MASK;
+			mutex_exit(&ehcip->ehci_int_mutex);
+
+			if (!(port_status & EHCI_RH_PORT_RESET)) {
+				break;
+			}
+		}
 
 		mutex_enter(&ehcip->ehci_int_mutex);
 
