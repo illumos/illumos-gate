@@ -209,7 +209,7 @@ extern void vsw_hio_stop_port(vsw_port_t *portp);
 extern void vsw_publish_macaddr(vsw_t *vswp, vsw_port_t *portp);
 extern int vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type);
 extern void vsw_mac_client_cleanup(vsw_t *vswp, vsw_port_t *port, int type);
-
+extern void vsw_destroy_rxpools(void *arg);
 
 #define	VSW_NUM_VMPOOLS		3	/* number of vio mblk pools */
 
@@ -865,6 +865,7 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 	vsw_ldc_list_t	*ldcl = &port->p_ldclist;
 	int 		rv;
 	int		retries = 0;
+	vio_mblk_pool_t *fvmp = NULL;
 
 	prev_ldcp = ldcl->head;
 	for (; (ldcp = prev_ldcp) != NULL; prev_ldcp = ldcp->ldc_next) {
@@ -931,13 +932,17 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 
 
 	/*
-	 * Most likely some mblks are still in use and
-	 * have not been returned to the pool. These mblks are
-	 * added to the pool that is maintained in the device instance.
-	 * Another attempt will be made to destroy the pool
-	 * when the device detaches.
+	 * If we can't destroy all the rx pools for this channel, dispatch
+	 * a task to retry and clean up those rx pools. Note that we don't
+	 * need to wait for the task to complete. If the vsw device itself
+	 * gets detached (vsw_detach()), it will wait for the task to complete
+	 * implicitly in ddi_taskq_destroy().
 	 */
-	vio_destroy_multipools(&ldcp->vmp, &vswp->rxh);
+	vio_destroy_multipools(&ldcp->vmp, &fvmp);
+	if (fvmp != NULL) {
+		(void) ddi_taskq_dispatch(vswp->rxp_taskq,
+		    vsw_destroy_rxpools, fvmp, DDI_SLEEP);
+	}
 
 	/* unlink it from the list */
 	prev_ldcp = ldcp->ldc_next;
@@ -1606,11 +1611,22 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 	vsw_t		*vswp = ldcp->ldc_vswp;
 	vsw_port_t	*port;
 	vsw_ldc_list_t	*ldcl;
+	vio_mblk_pool_t *fvmp = NULL;
 
 	D1(vswp, "%s: enter", __func__);
 
-	/* free receive mblk pools for the channel */
-	vio_destroy_multipools(&ldcp->vmp, &vswp->rxh);
+	/*
+	 * If we can't destroy all the rx pools for this channel, dispatch
+	 * a task to retry and clean up those rx pools. Note that we don't
+	 * need to wait for the task to complete. If the vsw device itself
+	 * gets detached (vsw_detach()), it will wait for the task to complete
+	 * implicitly in ddi_taskq_destroy().
+	 */
+	vio_destroy_multipools(&ldcp->vmp, &fvmp);
+	if (fvmp != NULL) {
+		(void) ddi_taskq_dispatch(vswp->rxp_taskq,
+		    vsw_destroy_rxpools, fvmp, DDI_SLEEP);
+	}
 
 	port = ldcp->ldc_port;
 	ldcl = &port->p_ldclist;

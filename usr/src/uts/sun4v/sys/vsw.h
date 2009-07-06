@@ -99,9 +99,10 @@ typedef enum {
 	PROG_fdb = 0x04,
 	PROG_mfdb = 0x08,
 	PROG_taskq = 0x10,
-	PROG_swmode = 0x20,
-	PROG_macreg = 0x40,
-	PROG_mdreg = 0x80
+	PROG_rxp_taskq = 0x20,
+	PROG_swmode = 0x40,
+	PROG_macreg = 0x80,
+	PROG_mdreg = 0x100
 } vsw_attach_progress_t;
 
 /*
@@ -143,7 +144,7 @@ typedef struct	vsw {
 	mod_hash_t		*mfdb;		/* multicast FDB */
 	krwlock_t		mfdbrw;		/* rwlock for mFDB */
 
-	vio_mblk_pool_t		*rxh;		/* Receive pool handle */
+	ddi_taskq_t		*rxp_taskq;	/* VIO rx pool taskq */
 	void			(*vsw_switch_frame)
 					(struct vsw *, mblk_t *, int,
 					vsw_port_t *, mac_resource_handle_t);

@@ -80,7 +80,7 @@ static	int vsw_detach(dev_info_t *, ddi_detach_cmd_t);
 static	int vsw_unattach(vsw_t *vswp);
 static	int vsw_get_md_physname(vsw_t *, md_t *, mde_cookie_t, char *);
 static	int vsw_get_md_smodes(vsw_t *, md_t *, mde_cookie_t, uint8_t *);
-static	int vsw_mod_cleanup(void);
+void vsw_destroy_rxpools(void *);
 
 /* MDEG routines */
 static	int vsw_mdeg_register(vsw_t *vswp);
@@ -186,6 +186,8 @@ int	vsw_ldc_retries = 5;		/* # of ldc_close() retries */
 int	vsw_ldc_delay = 1000;		/* 1 ms delay for ldc_close() */
 boolean_t vsw_ldc_rxthr_enabled = B_TRUE;	/* LDC Rx thread enabled */
 boolean_t vsw_ldc_txthr_enabled = B_TRUE;	/* LDC Tx thread enabled */
+int	vsw_rxpool_cleanup_delay = 100000;	/* 100ms */
+
 
 uint32_t	vsw_fdb_nchains = 8;	/* # of chains in fdb hash table */
 uint32_t	vsw_vlan_nchains = 4;	/* # of chains in vlan id hash table */
@@ -352,7 +354,6 @@ static void	*vsw_state;
  * Linked list of "vsw_t" structures - one per instance.
  */
 vsw_t		*vsw_head = NULL;
-vio_mblk_pool_t	*vsw_rx_poolp = NULL;
 krwlock_t	vsw_rw;
 
 /*
@@ -485,10 +486,6 @@ _fini(void)
 {
 	int status;
 
-	status = vsw_mod_cleanup();
-	if (status != 0)
-		return (status);
-
 	status = mod_remove(&modlinkage);
 	if (status != 0)
 		return (status);
@@ -593,6 +590,17 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	progress |= PROG_taskq;
+
+	(void) snprintf(qname, TASKQ_NAMELEN, "vsw_rxp_taskq%d",
+	    vswp->instance);
+	if ((vswp->rxp_taskq = ddi_taskq_create(vswp->dip, qname, 1,
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
+		cmn_err(CE_WARN, "!vsw%d: Unable to create rxp task queue",
+		    vswp->instance);
+		goto vsw_attach_fail;
+	}
+
+	progress |= PROG_rxp_taskq;
 
 	/* prevent auto-detaching */
 	if (ddi_prop_update_int(DDI_DEV_T_NONE, vswp->dip,
@@ -716,7 +724,6 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static int
 vsw_unattach(vsw_t *vswp)
 {
-	vio_mblk_pool_t		*poolp, *npoolp;
 	vsw_attach_progress_t	progress;
 
 	progress = vswp->attach_progress;
@@ -747,24 +754,6 @@ vsw_unattach(vsw_t *vswp)
 	if (progress & PROG_mdreg) {
 		vsw_mdeg_unregister(vswp);
 		vsw_detach_ports(vswp);
-
-		/*
-		 * At this point, we attempt to free receive mblk pools that
-		 * couldn't be destroyed when the ports were detached; if this
-		 * attempt also fails, we hook up the pool(s) to the module so
-		 * they can be cleaned up in _fini().
-		 */
-		poolp = vswp->rxh;
-		while (poolp != NULL) {
-			npoolp = vswp->rxh = poolp->nextp;
-			if (vio_destroy_mblks(poolp) != 0) {
-				WRITE_ENTER(&vsw_rw);
-				poolp->nextp = vsw_rx_poolp;
-				vsw_rx_poolp = poolp;
-				RW_EXIT(&vsw_rw);
-			}
-			poolp = npoolp;
-		}
 		progress &= ~PROG_mdreg;
 	}
 
@@ -793,6 +782,17 @@ vsw_unattach(vsw_t *vswp)
 		mutex_exit(&vswp->mac_lock);
 
 		progress &= ~PROG_swmode;
+	}
+
+	/*
+	 * We now destroy the taskq used to clean up rx mblk pools that
+	 * couldn't be destroyed when the ports/channels were detached.
+	 * We implicitly wait for those tasks to complete in
+	 * ddi_taskq_destroy().
+	 */
+	if (progress & PROG_rxp_taskq) {
+		ddi_taskq_destroy(vswp->rxp_taskq);
+		progress &= ~PROG_rxp_taskq;
 	}
 
 	/*
@@ -844,32 +844,19 @@ vsw_unattach(vsw_t *vswp)
 	return (0);
 }
 
-/*
- * one time cleanup.
- */
-static int
-vsw_mod_cleanup(void)
+void
+vsw_destroy_rxpools(void *arg)
 {
-	vio_mblk_pool_t		*poolp, *npoolp;
+	vio_mblk_pool_t	*poolp = (vio_mblk_pool_t *)arg;
+	vio_mblk_pool_t	*npoolp;
 
-	/*
-	 * If any rx mblk pools are still in use, return
-	 * error and stop the module from unloading.
-	 */
-	WRITE_ENTER(&vsw_rw);
-	poolp = vsw_rx_poolp;
 	while (poolp != NULL) {
-		npoolp = vsw_rx_poolp = poolp->nextp;
-		if (vio_destroy_mblks(poolp) != 0) {
-			vsw_rx_poolp = poolp;
-			RW_EXIT(&vsw_rw);
-			return (EBUSY);
+		npoolp =  poolp->nextp;
+		while (vio_destroy_mblks(poolp) != 0) {
+			drv_usecwait(vsw_rxpool_cleanup_delay);
 		}
 		poolp = npoolp;
 	}
-	RW_EXIT(&vsw_rw);
-
-	return (0);
 }
 
 /*
