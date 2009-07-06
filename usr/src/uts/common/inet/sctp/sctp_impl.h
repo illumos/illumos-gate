@@ -982,7 +982,6 @@ extern int	sctp_bind_del(sctp_t *, const void *, uint32_t, boolean_t);
 extern int	sctp_build_hdrs(sctp_t *);
 
 extern int	sctp_check_abandoned_msg(sctp_t *, mblk_t *);
-extern void	sctp_chunkify(sctp_t *, int, int);
 extern void	sctp_clean_death(sctp_t *, int);
 extern void	sctp_close_eager(sctp_t *);
 extern int	sctp_compare_faddrsets(sctp_faddr_t *, sctp_faddr_t *);

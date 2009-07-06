@@ -79,6 +79,7 @@
 #include "sctp_impl.h"
 
 static struct kmem_cache	*sctp_kmem_ftsn_set_cache;
+static mblk_t			*sctp_chunkify(sctp_t *, int, int, int);
 
 #ifdef	DEBUG
 static boolean_t	sctp_verify_chain(mblk_t *, mblk_t *);
@@ -307,8 +308,16 @@ done:
 	return (error);
 }
 
-void
-sctp_chunkify(sctp_t *sctp, int first_len, int bytes_to_send)
+/*
+ * While there are messages on sctp_xmit_unsent, detach each one. For each:
+ * allocate space for the chunk header, fill in the data chunk, and fill in
+ * the chunk header. Then append it to sctp_xmit_tail.
+ * Return after appending as many bytes as required (bytes_to_send).
+ * We also return if we've appended one or more chunks, and find a subsequent
+ * unsent message is too big to fit in the segment.
+ */
+mblk_t *
+sctp_chunkify(sctp_t *sctp, int mss, int firstseg_len, int bytes_to_send)
 {
 	mblk_t			*mp;
 	mblk_t			*chunk_mp;
@@ -323,7 +332,12 @@ sctp_chunkify(sctp_t *sctp, int first_len, int bytes_to_send)
 	sctp_faddr_t		*fp1;
 	size_t			xtralen;
 	sctp_msg_hdr_t		*msg_hdr;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	sctp_msg_hdr_t		*next_msg_hdr;
+	size_t			nextlen;
+	int			remaining_len = mss - firstseg_len;
+
+	ASSERT(remaining_len >= 0);
 
 	fp = SCTP_CHUNK_DEST(mdblk);
 	if (fp == NULL)
@@ -334,14 +348,23 @@ sctp_chunkify(sctp_t *sctp, int first_len, int bytes_to_send)
 	else
 		xtralen = sctp->sctp_hdr6_len + sctps->sctps_wroff_xtra +
 		    sizeof (*sdc);
-	count = chunksize = first_len - sizeof (*sdc);
+	count = chunksize = remaining_len - sizeof (*sdc);
 nextmsg:
+	next_msg_hdr = (sctp_msg_hdr_t *)sctp->sctp_xmit_unsent->b_rptr;
+	nextlen = next_msg_hdr->smh_msglen;
+	/*
+	 * Will the entire next message fit in the current packet ?
+	 * if not, leave it on the unsent list.
+	 */
+	if ((firstseg_len != 0) && (nextlen > remaining_len))
+		return (NULL);
+
 	chunk_mp = mdblk->b_cont;
 
 	/*
-	 * If this partially chunked, we ignore the first_len for now
-	 * and use the one already present. For the unchunked bits, we
-	 * use the length of the last chunk.
+	 * If this partially chunked, we ignore the next one for now and
+	 * use the one already present. For the unchunked bits, we use the
+	 * length of the last chunk.
 	 */
 	if (SCTP_IS_MSG_CHUNKED(mdblk)) {
 		int	chunk_len;
@@ -405,7 +428,7 @@ nextchunk:
 					chunk_head->b_next = mdblk->b_cont;
 					mdblk->b_cont = chunk_head;
 				}
-				return;
+				return (sctp->sctp_xmit_tail);
 			}
 			if (chunk_tail != NULL) {
 				chunk_tail->b_cont = split_mp;
@@ -439,7 +462,7 @@ nextchunk:
 				chunk_head->b_next = mdblk->b_cont;
 				mdblk->b_cont = chunk_head;
 			}
-			return;
+			return (sctp->sctp_xmit_tail);
 		}
 		chunk_hdr->b_rptr += xtralen - sizeof (*sdc);
 		chunk_hdr->b_wptr = chunk_hdr->b_rptr + sizeof (*sdc);
@@ -523,6 +546,7 @@ try_next:
 		}
 		goto nextmsg;
 	}
+	return (sctp->sctp_xmit_tail);
 }
 
 void
@@ -788,16 +812,17 @@ sctp_verify_chain(mblk_t *head, mblk_t *tail)
  * skipped. A message can be abandoned if it has a non-zero timetolive and
  * transmission has not yet started or if it is a partially reliable
  * message and its time is up (assuming we are PR-SCTP aware).
+ * We only return a chunk if it will fit entirely in the current packet.
  * 'cansend' is used to determine if need to try and chunkify messages from
  * the unsent list, if any, and also as an input to sctp_chunkify() if so.
  *
- * firstseg indicates the space already used, cansend represents remaining
- * space in the window, ((sfa_pmss - firstseg) can therefore reasonably
+ * firstseg_len indicates the space already used, cansend represents remaining
+ * space in the window, ((sfa_pmss - firstseg_len) can therefore reasonably
  * be used to compute the cansend arg).
  */
 mblk_t *
 sctp_get_msg_to_send(sctp_t *sctp, mblk_t **mp, mblk_t *meta, int  *error,
-    int32_t firstseg, uint32_t cansend, sctp_faddr_t *fp)
+    int32_t firstseg_len, uint32_t cansend, sctp_faddr_t *fp)
 {
 	mblk_t		*mp1;
 	sctp_msg_hdr_t	*msg_hdr;
@@ -903,8 +928,8 @@ next_msg:
 				goto chunk_done;
 			}
 		}
-		sctp_chunkify(sctp, fp->sfa_pmss - firstseg, cansend);
-		if ((meta = sctp->sctp_xmit_tail) == NULL)
+		meta = sctp_chunkify(sctp, fp->sfa_pmss, firstseg_len, cansend);
+		if (meta == NULL)
 			goto chunk_done;
 		/*
 		 * sctp_chunkify() won't advance sctp_xmit_tail if it adds
@@ -1171,7 +1196,13 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 				goto unsent_data;
 			}
 		}
-		/* See if we can bundle more. */
+		/*
+		 * Bundle chunks. We linkb() the chunks together to send
+		 * downstream in a single packet.
+		 * Partial chunks MUST NOT be bundled with full chunks, so we
+		 * rely on sctp_get_msg_to_send() to only return messages that
+		 * will fit entirely in the current packet.
+		 */
 		while (seglen < pathmax) {
 			int32_t		new_len;
 			int32_t		new_xtralen;
@@ -1186,7 +1217,10 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 				    meta->b_next, &error, seglen,
 				    (seglen - xtralen) >= cansend ? 0 :
 				    cansend - seglen, fp);
-				if (error != 0 || meta == NULL)
+				if (error != 0)
+					break;
+				/* If no more eligible chunks, cease bundling */
+				if (meta == NULL)
 					break;
 				sctp->sctp_xmit_tail =  meta;
 			}
