@@ -7609,6 +7609,51 @@ out:
 }
 
 /*
+ * Return completion status of previously initiated DLPI operations on
+ * ills in the purview of an ipsq.
+ */
+static boolean_t
+ipsq_dlpi_done(ipsq_t *ipsq)
+{
+	ipsq_t		*ipsq_start;
+	phyint_t	*phyi;
+	ill_t		*ill;
+
+	ASSERT(RW_LOCK_HELD(&ipsq->ipsq_ipst->ips_ill_g_lock));
+	ipsq_start = ipsq;
+
+	do {
+		/*
+		 * The only current users of this function are ipsq_try_enter
+		 * and ipsq_enter which have made sure that ipsq_writer is
+		 * NULL before we reach here. ill_dlpi_pending is modified
+		 * only by an ipsq writer
+		 */
+		ASSERT(ipsq->ipsq_xop->ipx_writer == NULL);
+		phyi = ipsq->ipsq_phyint;
+		/*
+		 * phyi could be NULL if a phyint that is part of an
+		 * IPMP group is being unplumbed. A more detailed
+		 * comment is in ipmp_grp_update_kstats()
+		 */
+		if (phyi != NULL) {
+			ill = phyi->phyint_illv4;
+			if (ill != NULL &&
+			    ill->ill_dlpi_pending != DL_PRIM_INVAL)
+				return (B_FALSE);
+
+			ill = phyi->phyint_illv6;
+			if (ill != NULL &&
+			    ill->ill_dlpi_pending != DL_PRIM_INVAL)
+				return (B_FALSE);
+		}
+
+	} while ((ipsq = ipsq->ipsq_next) != ipsq_start);
+
+	return (B_TRUE);
+}
+
+/*
  * Enter the ipsq corresponding to ill, by waiting synchronously till
  * we can enter the ipsq exclusively. Unless 'force' is used, the ipsq
  * will have to drain completely before ipsq_enter returns success.
@@ -7626,6 +7671,7 @@ ipsq_enter(ill_t *ill, boolean_t force, int type)
 	ipsq_t	*ipsq;
 	ipxop_t *ipx;
 	boolean_t waited_enough = B_FALSE;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	/*
 	 * Note that the relationship between ill and ipsq is fixed as long as
@@ -7635,10 +7681,12 @@ ipsq_enter(ill_t *ill, boolean_t force, int type)
 	 * while we're waiting.  We wait on ill_cv and rely on ipsq_exit()
 	 * waking up all ills in the xop when it becomes available.
 	 */
-	mutex_enter(&ill->ill_lock);
 	for (;;) {
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+		mutex_enter(&ill->ill_lock);
 		if (ill->ill_state_flags & ILL_CONDEMNED) {
 			mutex_exit(&ill->ill_lock);
+			rw_exit(&ipst->ips_ill_g_lock);
 			return (B_FALSE);
 		}
 
@@ -7648,8 +7696,11 @@ ipsq_enter(ill_t *ill, boolean_t force, int type)
 		mutex_enter(&ipx->ipx_lock);
 
 		if (ipx->ipx_writer == NULL && (type == CUR_OP ||
-		    ipx->ipx_current_ipif == NULL || waited_enough))
+		    (ipx->ipx_current_ipif == NULL && ipsq_dlpi_done(ipsq)) ||
+		    waited_enough))
 			break;
+
+		rw_exit(&ipst->ips_ill_g_lock);
 
 		if (!force || ipx->ipx_writer != NULL) {
 			mutex_exit(&ipx->ipx_lock);
@@ -7662,6 +7713,7 @@ ipsq_enter(ill_t *ill, boolean_t force, int type)
 			    &ill->ill_lock, lbolt + ENTER_SQ_WAIT_TICKS);
 			waited_enough = B_TRUE;
 		}
+		mutex_exit(&ill->ill_lock);
 	}
 
 	ASSERT(ipx->ipx_mphead == NULL && ipx->ipx_mptail == NULL);
@@ -7675,19 +7727,78 @@ ipsq_enter(ill_t *ill, boolean_t force, int type)
 	mutex_exit(&ipx->ipx_lock);
 	mutex_exit(&ipsq->ipsq_lock);
 	mutex_exit(&ill->ill_lock);
+	rw_exit(&ipst->ips_ill_g_lock);
+
 	return (B_TRUE);
 }
 
-boolean_t
-ill_perim_enter(ill_t *ill)
+/*
+ * ipif_set_values() has a constraint that it cannot drop the ips_ill_g_lock
+ * across the call to the core interface ipsq_try_enter() and hence calls this
+ * function directly. This is explained more fully in ipif_set_values().
+ * In order to support the above constraint, ipsq_try_enter is implemented as
+ * a wrapper that grabs the ips_ill_g_lock and calls this function subsequently
+ */
+static ipsq_t *
+ipsq_try_enter_internal(ill_t *ill, queue_t *q, mblk_t *mp, ipsq_func_t func,
+    int type, boolean_t reentry_ok)
 {
-	return (ipsq_enter(ill, B_FALSE, CUR_OP));
-}
+	ipsq_t	*ipsq;
+	ipxop_t	*ipx;
+	ip_stack_t *ipst = ill->ill_ipst;
 
-void
-ill_perim_exit(ill_t *ill)
-{
-	ipsq_exit(ill->ill_phyint->phyint_ipsq);
+	/*
+	 * lock ordering:
+	 * ill_g_lock -> conn_lock -> ill_lock -> ipsq_lock -> ipx_lock.
+	 *
+	 * ipx of an ipsq can't change when ipsq_lock is held.
+	 */
+	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
+	GRAB_CONN_LOCK(q);
+	mutex_enter(&ill->ill_lock);
+	ipsq = ill->ill_phyint->phyint_ipsq;
+	mutex_enter(&ipsq->ipsq_lock);
+	ipx = ipsq->ipsq_xop;
+	mutex_enter(&ipx->ipx_lock);
+
+	/*
+	 * 1. Enter the ipsq if we are already writer and reentry is ok.
+	 *    (Note: If the caller does not specify reentry_ok then neither
+	 *    'func' nor any of its callees must ever attempt to enter the ipsq
+	 *    again. Otherwise it can lead to an infinite loop
+	 * 2. Enter the ipsq if there is no current writer and this attempted
+	 *    entry is part of the current operation
+	 * 3. Enter the ipsq if there is no current writer and this is a new
+	 *    operation and the operation queue is empty and there is no
+	 *    operation currently in progress and if all previously initiated
+	 *    DLPI operations have completed.
+	 */
+	if ((ipx->ipx_writer == curthread && reentry_ok) ||
+	    (ipx->ipx_writer == NULL && (type == CUR_OP || (type == NEW_OP &&
+	    !ipx->ipx_ipsq_queued && ipx->ipx_current_ipif == NULL &&
+	    ipsq_dlpi_done(ipsq))))) {
+		/* Success. */
+		ipx->ipx_reentry_cnt++;
+		ipx->ipx_writer = curthread;
+		ipx->ipx_forced = B_FALSE;
+		mutex_exit(&ipx->ipx_lock);
+		mutex_exit(&ipsq->ipsq_lock);
+		mutex_exit(&ill->ill_lock);
+		RELEASE_CONN_LOCK(q);
+#ifdef DEBUG
+		ipx->ipx_depth = getpcstack(ipx->ipx_stack, IPX_STACK_DEPTH);
+#endif
+		return (ipsq);
+	}
+
+	if (func != NULL)
+		ipsq_enq(ipsq, q, mp, func, type, ill);
+
+	mutex_exit(&ipx->ipx_lock);
+	mutex_exit(&ipsq->ipsq_lock);
+	mutex_exit(&ill->ill_lock);
+	RELEASE_CONN_LOCK(q);
+	return (NULL);
 }
 
 /*
@@ -7731,61 +7842,21 @@ ipsq_t *
 ipsq_try_enter(ipif_t *ipif, ill_t *ill, queue_t *q, mblk_t *mp,
     ipsq_func_t func, int type, boolean_t reentry_ok)
 {
-	ipsq_t	*ipsq;
-	ipxop_t	*ipx;
+	ip_stack_t	*ipst;
+	ipsq_t		*ipsq;
 
 	/* Only 1 of ipif or ill can be specified */
 	ASSERT((ipif != NULL) ^ (ill != NULL));
+
 	if (ipif != NULL)
 		ill = ipif->ipif_ill;
+	ipst = ill->ill_ipst;
 
-	/*
-	 * lock ordering: conn_lock -> ill_lock -> ipsq_lock -> ipx_lock.
-	 * ipx of an ipsq can't change when ipsq_lock is held.
-	 */
-	GRAB_CONN_LOCK(q);
-	mutex_enter(&ill->ill_lock);
-	ipsq = ill->ill_phyint->phyint_ipsq;
-	mutex_enter(&ipsq->ipsq_lock);
-	ipx = ipsq->ipsq_xop;
-	mutex_enter(&ipx->ipx_lock);
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ipsq = ipsq_try_enter_internal(ill, q, mp, func, type, reentry_ok);
+	rw_exit(&ipst->ips_ill_g_lock);
 
-	/*
-	 * 1. Enter the ipsq if we are already writer and reentry is ok.
-	 *    (Note: If the caller does not specify reentry_ok then neither
-	 *    'func' nor any of its callees must ever attempt to enter the ipsq
-	 *    again. Otherwise it can lead to an infinite loop
-	 * 2. Enter the ipsq if there is no current writer and this attempted
-	 *    entry is part of the current operation
-	 * 3. Enter the ipsq if there is no current writer and this is a new
-	 *    operation and the operation queue is empty and there is no
-	 *    operation currently in progress
-	 */
-	if ((ipx->ipx_writer == curthread && reentry_ok) ||
-	    (ipx->ipx_writer == NULL && (type == CUR_OP || (type == NEW_OP &&
-	    !ipx->ipx_ipsq_queued && ipx->ipx_current_ipif == NULL)))) {
-		/* Success. */
-		ipx->ipx_reentry_cnt++;
-		ipx->ipx_writer = curthread;
-		ipx->ipx_forced = B_FALSE;
-		mutex_exit(&ipx->ipx_lock);
-		mutex_exit(&ipsq->ipsq_lock);
-		mutex_exit(&ill->ill_lock);
-		RELEASE_CONN_LOCK(q);
-#ifdef DEBUG
-		ipx->ipx_depth = getpcstack(ipx->ipx_stack, IPX_STACK_DEPTH);
-#endif
-		return (ipsq);
-	}
-
-	if (func != NULL)
-		ipsq_enq(ipsq, q, mp, func, type, ill);
-
-	mutex_exit(&ipx->ipx_lock);
-	mutex_exit(&ipsq->ipsq_lock);
-	mutex_exit(&ill->ill_lock);
-	RELEASE_CONN_LOCK(q);
-	return (NULL);
+	return (ipsq);
 }
 
 /*
@@ -18793,7 +18864,18 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	/* Let SCTP know about this ILL */
 	sctp_update_ill(ill, SCTP_ILL_INSERT);
 
-	ipsq = ipsq_try_enter(NULL, ill, q, mp, ip_reprocess_ioctl, NEW_OP,
+	/*
+	 * ill_glist_insert has made the ill visible globally, and
+	 * ill_phyint_reinit could have changed the ipsq. At this point,
+	 * we need to hold the ips_ill_g_lock across the call to enter the
+	 * ipsq to enforce atomicity and prevent reordering. In the event
+	 * the ipsq has changed, and if the new ipsq is currently busy,
+	 * we need to make sure that this half-completed ioctl is ahead of
+	 * any subsequent ioctl. We achieve this by not dropping the
+	 * ips_ill_g_lock which prevents any ill lookup itself thereby
+	 * ensuring that new ioctls can't start.
+	 */
+	ipsq = ipsq_try_enter_internal(ill, q, mp, ip_reprocess_ioctl, NEW_OP,
 	    B_TRUE);
 
 	rw_exit(&ipst->ips_ill_g_lock);

@@ -2179,7 +2179,8 @@ typedef struct ill_s {
  * ill_resolver_mp		ipsq			only when ill is up
  * ill_down_mp			ipsq			ipsq
  * ill_dlpi_deferred		ill_lock		ill_lock
- * ill_dlpi_pending		ill_lock		ill_lock
+ * ill_dlpi_pending		ipsq + ill_lock		ipsq or ill_lock or
+ *							absence of ipsq writer.
  * ill_phys_addr_mp		ipsq + down ill		only when ill is up
  * ill_phys_addr		ipsq + down ill		only when ill is up
  *
