@@ -512,11 +512,11 @@ mach_modpath(char *path, const char *fname)
 	 */
 	(void) strcpy(path, "/platform/");
 	(void) strcat(path, platname);
-	(void) strcat(path, "/kernel ");
+	(void) strcat(path, "/kernel");
 	if (!compat) {
-		(void) strcat(path, "/platform/");
+		(void) strcat(path, " /platform/");
 		(void) strcat(path, defname);
-		(void) strcat(path, "/kernel ");
+		(void) strcat(path, "/kernel");
 	}
 	return;
 

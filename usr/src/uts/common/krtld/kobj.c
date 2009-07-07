@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3485,9 +3485,11 @@ kobj_open_path(char *name, int use_path, int use_moddir_suffix)
 			kobj_free(fullname, maxpathlen);
 			return (file);
 		}
+		while (*pathp == ' ')
+			pathp++;
 		if (*pathp == 0)
 			break;
-		pathp++;
+
 	}
 	kobj_free(fullname, maxpathlen);
 	if (_moddebug & MODDEBUG_ERRMSG) {
