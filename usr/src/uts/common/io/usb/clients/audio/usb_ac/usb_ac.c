@@ -4118,6 +4118,12 @@ usb_ac_reader(void *argp)
 
 		mutex_enter(&uacp->usb_ac_mutex);
 
+		if (rv == ENODEV) {
+			USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+			    "Device is not availabe");
+			break;
+		}
+
 		if ((acp->acp_flags & ACP_ENABLED) && mp != NULL && rv == 0)
 			rv = usb_ac_read_msg(acp, mp);
 
