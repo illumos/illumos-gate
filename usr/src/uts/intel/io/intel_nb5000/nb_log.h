@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,31 @@ typedef struct nb_nf_fbd {
 	uint32_t badcnt;	/* bad dram counter */
 } nb_nf_fbd_t;
 
+typedef struct nb_nf_mem {
+				/* Memory registers */
+	uint32_t ferr_nf_mem;	/* MC first non-fatal error */
+	uint32_t nerr_nf_mem;	/* MC next non-fatal error */
+	uint32_t nrecmema;	/* non-recoverable memory error log A */
+	uint32_t nrecmemb;	/* non-recoverable memory error log B */
+	uint32_t redmema;	/* recoverable memory data error log A */
+	uint32_t redmemb;	/* recoverable memory data error log B */
+	uint32_t recmema;	/* recoverable memory error log A */
+	uint32_t recmemb;	/* recoverable memory error log B */
+
+				/* Spare rank */
+	uint32_t spcpc;		/* spare copy control */
+	uint8_t spcps;		/* spare copy status */
+
+				/* RAS */
+	uint32_t cerrcnt;	/* correctable error count A */
+	uint32_t cerrcnt_ext;	/* correctable error count B */
+	uint32_t cerrcnt_last;	/* correctable error count A */
+	uint32_t cerrcnt_ext_last;	/* correctable error count B */
+	uint32_t badram;	/* bad dram marker */
+	uint32_t badcnt;	/* bad dram counter */
+	uint32_t validlog;	/* valid log markers */
+} nb_nf_mem_t;
+
 typedef struct nb_dma {
 	uint16_t pcists;
 	uint16_t pexdevsts;
@@ -155,6 +180,7 @@ typedef struct nb_regs {
 		nb_int_t int_regs;
 		nb_fat_fbd_t fat_fbd_regs;
 		nb_nf_fbd_t nf_fbd_regs;
+		nb_nf_mem_t nf_mem_regs;
 		nb_dma_t dma_regs;
 		nb_thr_t thr_regs;
 	} nb;
@@ -168,6 +194,7 @@ typedef struct nb_regs {
 #define	NB_REG_LOG_NF_FBD	5
 #define	NB_REG_LOG_DMA		6
 #define	NB_REG_LOG_THR		7
+#define	NB_REG_LOG_NF_MEM	8
 
 typedef struct nb_logout {
 	uint64_t acl_timestamp;
@@ -196,7 +223,8 @@ typedef union nb_scatchpad {
 typedef struct nb_dimm {
 	uint64_t dimm_size;
 	uint8_t mtr_present;
-	uint8_t nranks;
+	uint8_t start_rank;		/* id of the 1st rank */
+	uint8_t nranks;			/* number of ranks */
 	uint8_t nbanks;
 	uint8_t ncolumn;
 	uint8_t nrow;
@@ -232,6 +260,7 @@ enum nb_memory_mode { NB_MEMORY_SINGLE_CHANNEL, NB_MEMORY_NORMAL,
 
 extern int nb_5000_memory_controller;
 extern int nb_number_memory_controllers;
+extern int nb_channels_per_branch;
 extern int nb_dimms_per_channel;
 
 extern nb_dimm_t **nb_dimms;
@@ -248,6 +277,7 @@ extern rank_select_t nb_ranks[NB_5000_MAX_MEM_CONTROLLERS]
 	[NB_MAX_MEM_RANK_SELECT];
 extern uint8_t spare_rank[NB_5000_MAX_MEM_CONTROLLERS];
 extern enum nb_memory_mode nb_mode;
+extern int nb_rank2dimm(int, int);
 
 extern int inb_mc_register(cmi_hdl_t, void *, void *, void *);
 extern void nb_scrubber_enable(void);
@@ -267,6 +297,7 @@ extern void nb_pci_putl(int, int, int, int, uint32_t);
 
 extern void nb_fsb_mask_mc(int, uint16_t);
 extern void nb_fbd_mask_mc(uint32_t);
+extern void nb_mem_mask_mc(uint32_t);
 extern void nb_int_mask_mc(uint32_t);
 extern void nb_thr_mask_mc(uint16_t);
 extern void nb_mask_mc_reset(void);

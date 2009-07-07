@@ -52,6 +52,7 @@ static int nb_sw_scrub_disabled = 0;
 
 int nb_5000_memory_controller = 0;
 int nb_number_memory_controllers = NB_5000_MAX_MEM_CONTROLLERS;
+int nb_channels_per_branch = NB_MAX_CHANNELS_PER_BRANCH;
 int nb_dimms_per_channel = 0;
 
 nb_dimm_t **nb_dimms;
@@ -82,6 +83,12 @@ static uint32_t nb_err2_fbd;
 static uint32_t nb_mcerr_fbd;
 static uint32_t nb_emask_fbd;
 
+static uint32_t nb_err0_mem;
+static uint32_t nb_err1_mem;
+static uint32_t nb_err2_mem;
+static uint32_t nb_mcerr_mem;
+static uint32_t nb_emask_mem;
+
 static uint16_t nb_err0_fsb;
 static uint16_t nb_err1_fsb;
 static uint16_t nb_err2_fsb;
@@ -102,6 +109,7 @@ static uint32_t uncerrsev[NB_PCI_DEV];
 
 static uint32_t l_mcerr_int;
 static uint32_t l_mcerr_fbd;
+static uint32_t l_mcerr_mem;
 static uint16_t l_mcerr_fsb;
 static uint16_t l_mcerr_thr;
 
@@ -112,6 +120,9 @@ uint_t nb5000_mask_poll_fbd = EMASK_FBD_NF;
 uint_t nb5000_mask_bios_fbd = EMASK_FBD_FATAL;
 uint_t nb5400_mask_poll_fbd = EMASK_5400_FBD_NF;
 uint_t nb5400_mask_bios_fbd = EMASK_5400_FBD_FATAL;
+
+int nb5100_reset_emask_mem = 1;
+uint_t nb5100_mask_poll_mem = EMASK_MEM_NF;
 
 uint_t nb5000_emask_fsb = 0;
 int nb5000_reset_emask_fsb = 1;
@@ -143,6 +154,7 @@ typedef struct find_dimm_label {
 } find_dimm_label_t;
 
 static void x8450_dimm_label(int, char *, int);
+static void cp3250_dimm_label(int, char *, int);
 
 static struct platform_label {
 	const char *sys_vendor;		/* SMB_TYPE_SYSTEM vendor prefix */
@@ -152,6 +164,7 @@ static struct platform_label {
 } platform_label[] = {
 	{ "SUN MICROSYSTEMS", "SUN BLADE X8450 SERVER MODULE",
 	    x8450_dimm_label, 8 },
+	{ "MiTAC,Shunde", "CP3250", cp3250_dimm_label, 0 },
 	{ NULL, NULL, NULL, 0 }
 };
 
@@ -225,7 +238,7 @@ static void
 nb_fini()
 {
 	int i, j;
-	int nchannels = nb_number_memory_controllers * 2;
+	int nchannels = nb_number_memory_controllers * nb_channels_per_branch;
 	nb_dimm_t **dimmpp;
 	nb_dimm_t *dimmp;
 
@@ -264,21 +277,11 @@ nb_scrubber_enable()
 		cmi_mc_sw_memscrub_disable();
 }
 
-static nb_dimm_t *
-nb_dimm_init(int channel, int dimm, uint16_t mtr)
+static void
+fbd_eeprom(int channel, int dimm, nb_dimm_t *dp)
 {
-	nb_dimm_t *dp;
 	int i, t;
 	int spd_sz;
-
-	if (MTR_PRESENT(mtr) == 0)
-		return (NULL);
-	t = read_spd_eeprom(channel, dimm, 2) & 0xf;
-
-	if (t != 9)
-		return (NULL);
-
-	dp = kmem_zalloc(sizeof (nb_dimm_t), KM_SLEEP);
 
 	t = read_spd_eeprom(channel, dimm, 0) & 0xf;
 	if (t == 1)
@@ -308,7 +311,126 @@ nb_dimm_init(int channel, int dimm, uint16_t mtr)
 			    read_spd_eeprom(channel, dimm, 146 + i);
 		}
 	}
+}
+
+/* read the manR of the DDR2 dimm */
+static void
+ddr2_eeprom(int channel, int dimm, nb_dimm_t *dp)
+{
+	int i, t;
+	int slave;
+
+	slave = channel & 0x1 ? dimm + 4 : dimm;
+
+	/* byte[3]: number of row addresses */
+	dp->nrow = read_spd_eeprom(channel, slave, 3) & 0x1f;
+
+	/* byte[4]: number of column addresses */
+	dp->ncolumn = read_spd_eeprom(channel, slave, 4) & 0xf;
+
+	/* byte[5]: numranks; 0 means one rank */
+	dp->nranks = (read_spd_eeprom(channel, slave, 5) & 0x3) + 1;
+
+	/* byte[6]: data width */
+	dp->width = (read_spd_eeprom(channel, slave, 6) >> 5) << 2;
+
+	/* byte[17]: number of banks */
+	dp->nbanks = read_spd_eeprom(channel, slave, 17);
+
+	dp->dimm_size = DIMMSIZE(dp->nrow, dp->ncolumn, dp->nranks, dp->nbanks,
+	    dp->width);
+
+	/* manufacture-id - byte[64-65] */
+	dp->manufacture_id = read_spd_eeprom(channel, slave, 64) |
+	    (read_spd_eeprom(channel, dimm, 65) << 8);
+
+	/* location - byte[72] */
+	dp->manufacture_location = read_spd_eeprom(channel, slave, 72);
+
+	/* serial number - byte[95-98] */
+	dp->serial_number =
+	    (read_spd_eeprom(channel, slave, 98) << 24) |
+	    (read_spd_eeprom(channel, slave, 97) << 16) |
+	    (read_spd_eeprom(channel, slave, 96) << 8) |
+	    read_spd_eeprom(channel, slave, 95);
+
+	/* week - byte[94] */
+	t = read_spd_eeprom(channel, slave, 94);
+	dp->manufacture_week = (t >> 4) * 10 + (t & 0xf);
+	/* week - byte[93] */
+	t = read_spd_eeprom(channel, slave, 93);
+	dp->manufacture_year = (t >> 4) * 10 + (t & 0xf) + 2000;
+
+	/* part number - byte[73-81] */
+	for (i = 0; i < 8; i++) {
+		dp->part_number[i] = read_spd_eeprom(channel, slave, 73 + i);
+	}
+
+	/* revision - byte[91-92] */
+	for (i = 0; i < 2; i++) {
+		dp->revision[i] = read_spd_eeprom(channel, slave, 91 + i);
+	}
+}
+
+static boolean_t
+nb_dimm_present(int channel, int dimm)
+{
+	boolean_t rc = B_FALSE;
+
+	if (nb_chipset == INTEL_NB_5100) {
+		int t, slave;
+		slave = channel & 0x1 ? dimm + 4 : dimm;
+		/* read the type field from the dimm and check for DDR2 type */
+		if ((t = read_spd_eeprom(channel, slave, SPD_MEM_TYPE)) == -1)
+			return (B_FALSE);
+		rc = (t & 0xf) == SPD_DDR2;
+	} else {
+		rc = MTR_PRESENT(MTR_RD(channel, dimm)) != 0;
+	}
+
+	return (rc);
+}
+
+static nb_dimm_t *
+nb_ddr2_dimm_init(int channel, int dimm, int start_rank)
+{
+	nb_dimm_t *dp;
+
+	if (nb_dimm_present(channel, dimm) == B_FALSE)
+		return (NULL);
+
+	dp = kmem_zalloc(sizeof (nb_dimm_t), KM_SLEEP);
+
+	ddr2_eeprom(channel, dimm, dp);
+
+	/* The 1st rank of the dimm takes on this value */
+	dp->start_rank = (uint8_t)start_rank;
+
+	dp->mtr_present = 1;
+
+	return (dp);
+}
+
+static nb_dimm_t *
+nb_fbd_dimm_init(int channel, int dimm, uint16_t mtr)
+{
+	nb_dimm_t *dp;
+	int t;
+
+	if (MTR_PRESENT(mtr) == 0)
+		return (NULL);
+	t = read_spd_eeprom(channel, dimm, SPD_MEM_TYPE) & 0xf;
+
+	/* check for the dimm type */
+	if (t != SPD_FBDIMM)
+		return (NULL);
+
+	dp = kmem_zalloc(sizeof (nb_dimm_t), KM_SLEEP);
+
+	fbd_eeprom(channel, dimm, dp);
+
 	dp->mtr_present = MTR_PRESENT(mtr);
+	dp->start_rank = dimm << 1;
 	dp->nranks = MTR_NUMRANK(mtr);
 	dp->nbanks = MTR_NUMBANK(mtr);
 	dp->ncolumn = MTR_NUMCOL(mtr);
@@ -429,9 +551,6 @@ nb_mc_init()
 			nb_ranks[i][j].hole_base = hole_base;
 			nb_ranks[i][j].hole_size = hole_size;
 			if (limit > base) {
-				dimm_add_rank(i, rank0, branch_interleave, 0,
-				    base, hole_base, hole_size, interleave,
-				    limit);
 				if (rank0 != rank1) {
 					dimm_add_rank(i, rank1,
 					    branch_interleave, 1, base,
@@ -480,7 +599,6 @@ find_dimms_per_channel()
 	smbios_system_t sy;
 	id_t id;
 	int i, j;
-	uint16_t mtr;
 	find_dimm_label_t *rt = NULL;
 
 	if (ksmbios != NULL && nb_no_smbios == 0) {
@@ -509,8 +627,7 @@ find_dimms_per_channel()
 		for (i = 0; i < nb_number_memory_controllers; i++) {
 			for (j = nb_dimms_per_channel;
 			    j < NB_MAX_DIMMS_PER_CHANNEL; j++) {
-				mtr = MTR_RD(i, j);
-				if (MTR_PRESENT(mtr))
+				if (nb_dimm_present(i, j))
 					nb_dimms_per_channel = j + 1;
 			}
 		}
@@ -615,8 +732,114 @@ x8450_dimm_label(int dimm, char *label, int label_sz)
 	(void) snprintf(label, label_sz, "D%d", (dimm * 4) + channel);
 }
 
+/*
+ * CP3250 DIMM labels
+ * Channel   Dimm   Label
+ *       0      0      A0
+ *       1      0      B0
+ *       0      1      A1
+ *       1      1      B1
+ *       0      2      A2
+ *       1      2      B2
+ */
 static void
-nb_dimms_init(find_dimm_label_t *label_function)
+cp3250_dimm_label(int dimm, char *label, int label_sz)
+{
+	int channel = dimm / nb_dimms_per_channel;
+
+	dimm = dimm % nb_dimms_per_channel;
+	(void) snprintf(label, label_sz, "%c%d", channel == 0 ? 'A' : 'B',
+	    dimm);
+}
+
+/*
+ * Map the rank id to dimm id of a channel
+ * For the 5100 chipset, walk through the dimm list of channel the check if
+ * the given rank id is within the rank range assigned to the dimm.
+ * For other chipsets, the dimm is rank/2.
+ */
+int
+nb_rank2dimm(int channel, int rank)
+{
+	int i;
+	nb_dimm_t **dimmpp = nb_dimms;
+
+	if (nb_chipset != INTEL_NB_5100)
+		return (rank >> 1);
+
+	dimmpp += channel * nb_dimms_per_channel;
+	for (i = 0; i < nb_dimms_per_channel; i++) {
+		if ((rank >= dimmpp[i]->start_rank) &&
+		    (rank < dimmpp[i]->start_rank + dimmpp[i]->nranks)) {
+			return (i);
+		}
+	}
+	return (-1);
+}
+
+static void
+nb_ddr2_dimms_init(find_dimm_label_t *label_function)
+{
+	int i, j;
+	int start_rank;
+	uint32_t spcpc;
+	uint8_t spcps;
+	nb_dimm_t **dimmpp;
+
+	nb_dimm_slots = nb_number_memory_controllers * nb_channels_per_branch *
+	    nb_dimms_per_channel;
+	nb_dimms = (nb_dimm_t **)kmem_zalloc(sizeof (nb_dimm_t *) *
+	    nb_dimm_slots, KM_SLEEP);
+	dimmpp = nb_dimms;
+	nb_mode = NB_MEMORY_NORMAL;
+	for (i = 0; i < nb_number_memory_controllers; i++) {
+		if (nb_mode == NB_MEMORY_NORMAL) {
+			spcpc = SPCPC_RD(i);
+			spcps = SPCPS_RD(i);
+			if ((spcpc & SPCPC_SPARE_ENABLE) != 0 &&
+			    (spcps & SPCPS_SPARE_DEPLOYED) != 0)
+				nb_mode = NB_MEMORY_SPARE_RANK;
+			spare_rank[i] = SPCPC_SPRANK(spcpc);
+		}
+
+		/* The 1st dimm of a channel starts at rank 0 */
+		start_rank = 0;
+
+		for (j = 0; j < nb_dimms_per_channel; j++) {
+			dimmpp[j] = nb_ddr2_dimm_init(i, j, start_rank);
+			if (dimmpp[j]) {
+				nb_ndimm ++;
+				dimm_add_geometry(i, j, dimmpp[j]->nbanks,
+				    dimmpp[j]->width, dimmpp[j]->ncolumn,
+				    dimmpp[j]->nrow);
+				if (label_function) {
+					label_function->label_function(
+					    (i * nb_dimms_per_channel) + j,
+					    dimmpp[j]->label,
+					    sizeof (dimmpp[j]->label));
+				}
+				start_rank += dimmpp[j]->nranks;
+				/*
+				 * add an extra rank because
+				 * single-ranked dimm still takes on two ranks.
+				 */
+				if (dimmpp[j]->nranks & 0x1)
+					start_rank++;
+				}
+		}
+		dimmpp += nb_dimms_per_channel;
+	}
+
+	/*
+	 * single channel is supported.
+	 */
+	if (nb_ndimm > 0 && nb_ndimm <= nb_dimms_per_channel) {
+		nb_mode = NB_MEMORY_SINGLE_CHANNEL;
+	}
+}
+
+static void
+nb_fbd_dimms_init(find_dimm_label_t *label_function)
 {
 	int i, j, k, l;
 	uint16_t mtr;
@@ -649,7 +872,7 @@ nb_dimms_init(find_dimm_label_t *label_function)
 		for (j = 0; j < nb_dimms_per_channel; j++) {
 			mtr = MTR_RD(i, j);
 			k = i * 2;
-			dimmpp[j] = nb_dimm_init(k, j, mtr);
+			dimmpp[j] = nb_fbd_dimm_init(k, j, mtr);
 			if (dimmpp[j]) {
 				nb_ndimm ++;
 				dimm_add_geometry(i, j, dimmpp[j]->nbanks,
@@ -663,7 +886,7 @@ nb_dimms_init(find_dimm_label_t *label_function)
 				}
 			}
 			dimmpp[j + nb_dimms_per_channel] =
-			    nb_dimm_init(k + 1, j, mtr);
+			    nb_fbd_dimm_init(k + 1, j, mtr);
 			l = j + nb_dimms_per_channel;
 			if (dimmpp[l]) {
 				if (label_function) {
@@ -677,10 +900,19 @@ nb_dimms_init(find_dimm_label_t *label_function)
 		}
 		dimmpp += nb_dimms_per_channel * 2;
 	}
+}
+
+static void
+nb_dimms_init(find_dimm_label_t *label_function)
+{
+	if (nb_chipset == INTEL_NB_5100)
+		nb_ddr2_dimms_init(label_function);
+	else
+		nb_fbd_dimms_init(label_function);
+
 	if (label_function == NULL)
 		nb_smbios();
 }
-
 
 /* Setup the ESI port registers to enable SERR for southbridge */
 static void
@@ -822,7 +1054,7 @@ nb_int_mask_mc(uint32_t mc_mask_int)
 	}
 }
 
-void
+static void
 nb_fbd_init()
 {
 	uint32_t err0_fbd;
@@ -897,7 +1129,7 @@ nb_fbd_mask_mc(uint32_t mc_mask_fbd)
 	}
 }
 
-void
+static void
 nb_fbd_fini()
 {
 	ERR0_FBD_WR(0xffffffff);
@@ -911,6 +1143,80 @@ nb_fbd_fini()
 	ERR2_FBD_WR(nb_err2_fbd);
 	MCERR_FBD_WR(nb_mcerr_fbd);
 	EMASK_FBD_WR(nb_emask_fbd);
+}
+
+static void
+nb_mem_init()
+{
+	uint32_t err0_mem;
+	uint32_t err1_mem;
+	uint32_t err2_mem;
+	uint32_t mcerr_mem;
+	uint32_t emask_mem;
+	uint32_t emask_poll_mem;
+
+	err0_mem = ERR0_MEM_RD();
+	err1_mem = ERR1_MEM_RD();
+	err2_mem = ERR2_MEM_RD();
+	mcerr_mem = MCERR_MEM_RD();
+	emask_mem = EMASK_MEM_RD();
+
+	nb_err0_mem = err0_mem;
+	nb_err1_mem = err1_mem;
+	nb_err2_mem = err2_mem;
+	nb_mcerr_mem = mcerr_mem;
+	nb_emask_mem = emask_mem;
+
+	ERR0_MEM_WR(0xffffffff);
+	ERR1_MEM_WR(0xffffffff);
+	ERR2_MEM_WR(0xffffffff);
+	MCERR_MEM_WR(0xffffffff);
+	EMASK_MEM_WR(0xffffffff);
+
+	emask_poll_mem = nb5100_mask_poll_mem;
+	mcerr_mem |= emask_poll_mem;
+	err0_mem |= emask_poll_mem;
+	err1_mem |= emask_poll_mem;
+	err2_mem |= emask_poll_mem;
+
+	l_mcerr_mem = mcerr_mem;
+	ERR0_MEM_WR(err0_mem);
+	ERR1_MEM_WR(err1_mem);
+	ERR2_MEM_WR(err2_mem);
+	MCERR_MEM_WR(mcerr_mem);
+	if (nb5100_reset_emask_mem) {
+		EMASK_MEM_WR(~nb5100_mask_poll_mem);
+	} else {
+		EMASK_MEM_WR(nb_emask_mem);
+	}
+}
+
+void
+nb_mem_mask_mc(uint32_t mc_mask_mem)
+{
+	uint32_t emask_mem;
+
+	emask_mem = MCERR_MEM_RD();
+	if ((emask_mem & mc_mask_mem) != mc_mask_mem) {
+		MCERR_MEM_WR(emask_mem|mc_mask_mem);
+		nb_mask_mc_set = 1;
+	}
+}
+
+static void
+nb_mem_fini()
+{
+	ERR0_MEM_WR(0xffffffff);
+	ERR1_MEM_WR(0xffffffff);
+	ERR2_MEM_WR(0xffffffff);
+	MCERR_MEM_WR(0xffffffff);
+	EMASK_MEM_WR(0xffffffff);
+
+	ERR0_MEM_WR(nb_err0_mem);
+	ERR1_MEM_WR(nb_err1_mem);
+	ERR2_MEM_WR(nb_err2_mem);
+	MCERR_MEM_WR(nb_mcerr_mem);
+	EMASK_MEM_WR(nb_emask_mem);
 }
 
 static void
@@ -1152,7 +1458,10 @@ nb_thr_mask_mc(uint16_t mc_mask_thr)
 void
 nb_mask_mc_reset()
 {
-	MCERR_FBD_WR(l_mcerr_fbd);
+	if (nb_chipset == INTEL_NB_5100)
+		MCERR_MEM_WR(l_mcerr_mem);
+	else
+		MCERR_FBD_WR(l_mcerr_fbd);
 	MCERR_INT_WR(l_mcerr_int);
 	MCERR_FSB_WR(0, l_mcerr_fsb);
 	MCERR_FSB_WR(1, l_mcerr_fsb);
@@ -1184,7 +1493,10 @@ nb_dev_init()
 	nb_dimms_init(label_function_p);
 	nb_mc_init();
 	nb_pex_init();
-	nb_fbd_init();
+	if (nb_chipset == INTEL_NB_5100)
+		nb_mem_init();
+	else
+		nb_fbd_init();
 	nb_fsb_init();
 	nb_scrubber_enable();
 	return (0);
@@ -1211,6 +1523,9 @@ nb_init()
 	case INTEL_NB_5000V:
 	case INTEL_NB_5000Z:
 		nb_number_memory_controllers = 1;
+		break;
+	case INTEL_NB_5100:
+		nb_channels_per_branch = 1;
 		break;
 	case INTEL_NB_5400:
 	case INTEL_NB_5400A:
@@ -1245,7 +1560,10 @@ nb_dev_reinit()
 	nb_pex_init();
 	nb_int_init();
 	nb_thr_init();
-	nb_fbd_init();
+	if (nb_chipset == INTEL_NB_5100)
+		nb_mem_init();
+	else
+		nb_fbd_init();
 	nb_fsb_init();
 	nb_scrubber_enable();
 
@@ -1271,7 +1589,10 @@ nb_dev_unload()
 	mutex_destroy(&nb_mutex);
 	nb_int_fini();
 	nb_thr_fini();
-	nb_fbd_fini();
+	if (nb_chipset == INTEL_NB_5100)
+		nb_mem_fini();
+	else
+		nb_fbd_fini();
 	nb_fsb_fini();
 	nb_pex_fini();
 	nb_fini();

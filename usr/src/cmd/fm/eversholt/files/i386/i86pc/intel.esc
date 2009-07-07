@@ -223,6 +223,8 @@ prop upset.discard@chip/core/strand (0)->
 engine stat.ce_pgflt@memory-controller/dram-channel/dimm;
 
 event ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller{within(12s)};
+event ereport.cpu.intel.nb.ddr2_mem_ue@
+    motherboard/memory-controller{within(12s)};
 event ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller{within(12s)};
 event fault.memory.intel.page_ue@
     motherboard/memory-controller/dram-channel/dimm/rank,
@@ -236,18 +238,21 @@ prop fault.memory.intel.page_ue@
     (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
     SET_ADDR && SET_OFFSET } (1)->
     ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.ddr2_mem_ue@motherboard/memory-controller,
     ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
 
 prop fault.memory.intel.dimm_ue@
     motherboard/memory-controller/dram-channel<channel_num>/dimm/rank[rank_num]
     { payloadprop_defined("rank") && rank_num == payloadprop("rank") } (1)->
     ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.ddr2_mem_ue@motherboard/memory-controller,
     ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
 
 event upset.memory.intel.discard@motherboard/memory-controller{within(1s)};
 
 prop upset.memory.intel.discard@motherboard/memory-controller (0)->
     ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
+    ereport.cpu.intel.nb.ddr2_mem_ue@motherboard/memory-controller,
     ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
 
 prop upset.memory.intel.discard@motherboard/memory-controller (0)->
@@ -260,6 +265,9 @@ prop upset.memory.intel.discard@motherboard/memory-controller (0)->
 
 #define MBDIMM motherboard/memory-controller/dram-channel/dimm
 event ereport.cpu.intel.nb.mem_ce@MBDIMM/rank{within(12s)};
+event ereport.cpu.intel.nb.ddr2_mem_ce@MBDIMM/rank{within(12s)};
+event ereport.cpu.intel.nb.ddr2_mem_ce@
+    motherboard/memory-controller{within(12s)};
 
 engine serd.memory.intel.page_ce@MBDIMM/rank, N=PAGE_CE_COUNT, T=PAGE_CE_TIME;
 event fault.memory.intel.page_ce@MBDIMM/rank, message=0, response=0,
@@ -267,7 +275,8 @@ event fault.memory.intel.page_ce@MBDIMM/rank, message=0, response=0,
 prop fault.memory.intel.page_ce@MBDIMM/rank
     { (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
     SET_ADDR && SET_OFFSET } (0)->
-    ereport.cpu.intel.nb.mem_ce@MBDIMM/rank;
+    ereport.cpu.intel.nb.mem_ce@MBDIMM/rank,
+    ereport.cpu.intel.nb.ddr2_mem_ce@MBDIMM/rank;
 
 engine serd.memory.intel.dimm_ce@MBDIMM/rank, N=DIMM_CE_COUNT, T=DIMM_CE_TIME;
 event fault.memory.intel.dimm_ce@MBDIMM/rank,
@@ -275,14 +284,15 @@ event fault.memory.intel.dimm_ce@MBDIMM/rank,
 prop fault.memory.intel.dimm_ce@MBDIMM/rank
     { !confprop_defined(MBDIMM, "dimm-size") &&
     count(stat.ce_pgflt@MBDIMM) > 512 } (1)->
-    ereport.cpu.intel.nb.mem_ce@MBDIMM/rank;
-
+    ereport.cpu.intel.nb.mem_ce@MBDIMM/rank,
+    ereport.cpu.intel.nb.ddr2_mem_ce@MBDIMM/rank;
 #define DIMM_CE(dimm_size, n, t, fault_rate) \
 	prop fault.memory.intel.dimm_ce@MBDIMM/rank { \
 	    confprop(MBDIMM, "dimm-size") == dimm_size && \
 	    count(stat.ce_pgflt@MBDIMM) > fault_rate && \
 	    setserdn(n) & setserdt(t) } (1)-> \
-    	    ereport.cpu.intel.nb.mem_ce@MBDIMM/rank;
+    	    ereport.cpu.intel.nb.mem_ce@MBDIMM/rank, \
+	    ereport.cpu.intel.nb.ddr2_mem_ce@MBDIMM/rank;
 	
 DIMM_CE("8G", 8, 1week, 2000)
 DIMM_CE("4G", 4, 1week, 1500)
@@ -290,6 +300,9 @@ DIMM_CE("2G", 4, 2week, 1000)
 DIMM_CE("1G", 4, 4week, 500)
 DIMM_CE("512M", 4, 8week, 250)
 DIMM_CE("256M", 4, 16week, 125)
+
+prop upset.memory.intel.discard@motherboard/memory-controller (0)->
+    ereport.cpu.intel.nb.ddr2_mem_ce@motherboard/memory-controller;
 
 event ereport.cpu.intel.nb.fbd.alert@rank{within(12s)};
 event fault.memory.intel.fbd.alert@rank, retire=0;
@@ -345,21 +358,26 @@ prop fault.cpu.intel.nb.otf@motherboard (1)->
 event ereport.cpu.intel.nb.unknown@memory-controller {within(12s)};
 event ereport.cpu.intel.nb.unknown@memory-controller/dram-channel {within(12s)};
 event ereport.cpu.intel.nb.spd@memory-controller/dram-channel {within(12s)};
+event ereport.cpu.intel.nb.ddr2_spd@
+    memory-controller/dram-channel {within(12s)};
 event upset.discard@memory-controller;
 
 prop upset.discard@memory-controller (0)->
     ereport.cpu.intel.nb.unknown@memory-controller,
     ereport.cpu.intel.nb.unknown@memory-controller/dram-channel,
-    ereport.cpu.intel.nb.spd@memory-controller/dram-channel;
+    ereport.cpu.intel.nb.spd@memory-controller/dram-channel,
+    ereport.cpu.intel.nb.ddr2_spd@memory-controller/dram-channel;
 
 event ereport.cpu.intel.nb.mem_ds@memory-controller{within(30s)};
+event ereport.cpu.intel.nb.ddr2_mem_ds@memory-controller{within(30s)};
 event fault.memory.intel.fbd.mem_ds@memory-controller/dram-channel/dimm/rank,
     retire=0;
 
 prop fault.memory.intel.fbd.mem_ds@
     memory-controller/dram-channel/dimm/rank[rank_num]
     { payloadprop_defined("rank") && rank_num == payloadprop("rank") } (1)->
-    ereport.cpu.intel.nb.mem_ds@memory-controller;
+    ereport.cpu.intel.nb.mem_ds@memory-controller,
+    ereport.cpu.intel.nb.ddr2_mem_ds@memory-controller;
 
 event ereport.cpu.intel.nb.fsb@chip{within(12s)};
 event fault.cpu.intel.nb.fsb@chip, retire=0;

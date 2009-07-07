@@ -34,8 +34,12 @@ extern "C" {
 #include <sys/cpu_module.h>
 
 #define	NB_5000_MAX_MEM_CONTROLLERS	2
-#define	NB_MAX_DIMMS_PER_CHANNEL	(nb_chipset == INTEL_NB_7300 ? 8 : 4)
-#define	NB_MEM_BRANCH_SELECT		(nb_chipset == INTEL_NB_5400 ? 2 : 3)
+#define	NB_MAX_DIMMS_PER_CHANNEL	(nb_chipset == INTEL_NB_5100 ? 3 : \
+	(nb_chipset == INTEL_NB_7300 ? 8 : 4))
+#define	NB_MAX_CHANNELS_PER_BRANCH	2
+#define	NB_5100_RANKS_PER_CHANNEL	6
+#define	NB_MEM_BRANCH_SELECT \
+	(nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100 ? 2 : 3)
 #define	NB_MAX_MEM_BRANCH_SELECT	3
 #define	NB_MEM_RANK_SELECT		(nb_chipset == INTEL_NB_7300 ? 7 : 5)
 #define	NB_MAX_MEM_RANK_SELECT		7
@@ -64,20 +68,29 @@ extern "C" {
 #define	TLOW_MAX	0x100000000ULL
 
 #define	MTR_PRESENT(mtr) \
-	((mtr) & (nb_chipset == INTEL_NB_5400 ? 0x0400 : 0x0100))
+	((mtr) & (nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100 ? \
+	0x0400 : 0x0100))
 #define	MTR_ETHROTTLE(mtr) \
-	((mtr) & (nb_chipset == INTEL_NB_5400 ? 0x0200 : 0x0080))
+	((mtr) & (nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100 ? \
+	? 0x0200 : 0x0080))
 #define	MTR_WIDTH(mtr) \
-	(((mtr) & (nb_chipset == INTEL_NB_5400 ? 0x0100 : 0x0040)) ? 8 : 4)
+	((mtr) & (nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100 ? \
+	0x0100 : 0x0040) ? 8 : 4)
 #define	MTR_NUMBANK(mtr) \
-	(((mtr) & (nb_chipset == INTEL_NB_5400 ? 0x0040 : 0x0020)) ? 8 : 4)
-#define	MTR_NUMRANK(mtr) \
-	(((mtr) & (nb_chipset == INTEL_NB_5400 ? 0x0020 : 0x0010)) ? 2 : 1)
+	((mtr) & (nb_chipset == INTEL_NB_5400 || nb_chipset == INTEL_NB_5100 ? \
+	0x0040 : 0x0020) ? 8 : 4)
+#define	MTR_NUMRANK(mtr) (nb_chipset == INTEL_NB_5100 ? 1 : \
+	(((mtr) & (nb_chipset == INTEL_NB_5400 ? 0x0020 : 0x0010)) ? 2 : 1))
 #define	MTR_NUMROW(mtr) ((((mtr) >> 2) & 3) + 13)
 #define	MTR_NUMCOL(mtr) (((mtr) & 3) + 10)
 
 #define	MTR_DIMMSIZE(mtr) 	((1ULL << (MTR_NUMCOL(mtr) + MTR_NUMROW(mtr))) \
 	* MTR_NUMRANK(mtr) * MTR_NUMBANK(mtr) * MTR_WIDTH(mtr))
+#define	DIMMSIZE(nrow, ncol, nrank, nbank, width) \
+	((1ULL << ((ncol) + (nrow))) * (nrank) * (nbank) * (width))
+#define	MTR_DDR2_DIMMSIZE(mtr, nrank) \
+	((1ULL << (MTR_NUMCOL(mtr) + MTR_NUMROW(mtr))) \
+	* (nrank) * MTR_NUMBANK(mtr) * MTR_WIDTH(mtr))
 
 /* FERR_GLOBAL and NERR_GLOBAL */
 #define	GE_FERR_FSB3_FATAL	0x800000000ULL	/* FSB3 Fatal Error */
@@ -114,6 +127,8 @@ extern "C" {
 #define	GE_FERR_FBD1_NF	0x00000200	/* FBD channel 1 Non-Fatal Error */
 #define	GE_FERR_FBD0_NF	0x00000100	/* FBD channel 0 Non-Fatal Error */
 #define	GE_FERR_FBD_NF	0x00000800	/* FBD channel Non-Fatal Error */
+#define	GE_FERR_MEM1_NF	0x00000200	/* DDR channel 1 Non-Fatal Error */
+#define	GE_FERR_MEM0_NF	0x00000100	/* DDR channel 0 Non-Fatal Error */
 #define	GE_FERR_THERMAL_NF 0x00000400	/* Thermal Non-Fatal Error */
 #define	GE_PCIEX9_NF	0x00000200	/* PCI Express dev 9 Non-Fatal Error */
 #define	GE_PCIEX8_NF	0x00000100	/* PCI Express dev 8 Non-Fatal Error */
@@ -128,11 +143,14 @@ extern "C" {
 
 #define	GE_NERR_FSB2_FATAL	0x08000000 /* FSB2 Fatal Error */
 #define	GE_NERR_FSB3_FATAL	0x04000000 /* FSB3 Fatal Error */
-#define	GE_NERR_FBD_FATAL	0x01000000 /* FBD channel Fatal Error */
+#define	GE_NERR_FBD_FATAL	(nb_chipset == INTEL_NB_5100 ? 0 : 0x01000000)
+					/* FBD channel Fatal Error */
 #define	GE_NERR_FSB2_NF		0x00000800 /* FSB2 Non-Fatal Error */
 #define	GE_NERR_FSB3_NF		0x00000400 /* FSB3 Non-Fatal Error */
-#define	GE_NERR_FBD_NF		0x00000100 /* FBD channel Non-Fatal Error */
-
+#define	GE_NERR_FBD_NF		(nb_chipset == INTEL_NB_5100 ? 0 : 0x00000100)
+					/* FBD channel Non-Fatal Error */
+#define	GE_NERR_MEM_NF		(nb_chipset == INTEL_NB_5100 ? 0x00000100 : 0)
+					/* DDR channel0,1 Non-Fatal Error */
 #define	ERR_FAT_FSB_F9		0x20	/* F9Msk FSB Protocol */
 #define	ERR_FAT_FSB_F2		0x08	/* F2Msk Unsupported Bus Transaction */
 #define	ERR_FAT_FSB_F1		0x01 	/* F1Msk Request/Address Parity */
@@ -287,6 +305,47 @@ extern "C" {
 	EMASK_FBD_M11|EMASK_FBD_M10|EMASK_FBD_M9|EMASK_FBD_M8|EMASK_FBD_M7| \
 	EMASK_FBD_M6|EMASK_FBD_M5|EMASK_FBD_M4)
 
+/* FERR_NF_MEM: MC First non-fatal errors */
+#define	ERR_MEM_CH_SHIFT	28	/* channel index in nf_mem */
+
+#define	ERR_NF_MEM_M21	0x00200000	/* M21Err Spare Copy Completed */
+#define	ERR_NF_MEM_M20	0x00100000	/* M20Err Spare Copy Initiated */
+#define	ERR_NF_MEM_M18	0x00040000	/* M18Err SPD protocal */
+#define	ERR_NF_MEM_M16	0x00010000	/* M16Err Correctable Patrol Data ECC */
+#define	ERR_NF_MEM_M15	0x00008000	/* M15Err Correctable Spare-copy ECC */
+#define	ERR_NF_MEM_M14	0x00004000	/* M14Err Correctable demand data ECC */
+#define	ERR_NF_MEM_M12	0x00001000	/* M12Err non-aliased ue Patrol ECC */
+#define	ERR_NF_MEM_M11	0x00000800	/* M11Err non-aliased ue  Spare-copy */
+#define	ERR_NF_MEM_M10	0x00000400	/* M10Err non-aliased ue demand data */
+#define	ERR_NF_MEM_M6	0x00000040	/* M6Err aliased ue Patrol Data ECC */
+#define	ERR_NF_MEM_M5	0x00000020	/* M5Err aliased ue Spare-copy ECC */
+#define	ERR_NF_MEM_M4	0x00000010	/* M4Err aliased ue demand data ECC */
+#define	ERR_NF_MEM_M1	0x00000002	/* M1Err ue data ECC on replay */
+
+#define	ERR_NF_MEM_MASK 0x0003fffff
+#define	ERR_NF_MEM_ECC_UE	(ERR_NF_MEM_M12|ERR_NF_MEM_M11|ERR_NF_MEM_M10| \
+    ERR_NF_MEM_M6|ERR_NF_MEM_M5|ERR_NF_MEM_M4|ERR_NF_MEM_M1)
+#define	ERR_NF_MEM_ECC_CE	(ERR_NF_MEM_M16|ERR_NF_MEM_M15|ERR_NF_MEM_M14)
+#define	ERR_NF_MEM_SPARE	(ERR_NF_MEM_M21|ERR_NF_MEM_M20)
+
+#define	EMASK_MEM_M21	ERR_NF_MEM_M21
+#define	EMASK_MEM_M20	ERR_NF_MEM_M20
+#define	EMASK_MEM_M18	ERR_NF_MEM_M18
+#define	EMASK_MEM_M16	ERR_NF_MEM_M16
+#define	EMASK_MEM_M15	ERR_NF_MEM_M15
+#define	EMASK_MEM_M14	ERR_NF_MEM_M14
+#define	EMASK_MEM_M12	ERR_NF_MEM_M12
+#define	EMASK_MEM_M11	ERR_NF_MEM_M11
+#define	EMASK_MEM_M10	ERR_NF_MEM_M10
+#define	EMASK_MEM_M6	ERR_NF_MEM_M6
+#define	EMASK_MEM_M5	ERR_NF_MEM_M5
+#define	EMASK_MEM_M4	ERR_NF_MEM_M4
+#define	EMASK_MEM_M1	ERR_NF_MEM_M1
+
+#define	EMASK_MEM_NF (EMASK_FBD_M21|EMASK_FBD_M20|EMASK_FBD_M18|EMASK_FBD_M16| \
+	EMASK_FBD_M15|EMASK_FBD_M14|EMASK_FBD_M12|EMASK_FBD_M11|EMASK_FBD_M10| \
+	EMASK_MEM_M6|EMASK_MEM_M5|EMASK_MEM_M4|EMASK_MEM_M1)
+
 #define	ERR_INT_ALL	(nb_chipset == INTEL_NB_5400 ? 0xffffffff : 0xff)
 
 #define	ERR_FAT_INT_B14	0x0400	/* B14Msk SF Scrub DBE */
@@ -354,10 +413,14 @@ extern "C" {
 	EMASK_INT_B1)
 #define	EMASK_INT_NF	(EMASK_INT_B8|EMASK_INT_B6|EMASK_INT_B5)
 #define	GE_FBD_FATAL ((nb_chipset == INTEL_NB_5400) ? GE_FERR_FBD_FATAL : \
+	(nb_chipset == INTEL_NB_5100) ? 0 : \
 	(GE_FERR_FBD0_FATAL|GE_FERR_FBD1_FATAL|GE_FERR_FBD2_FATAL| \
 	GE_FERR_FBD3_FATAL))
 #define	GE_FBD_NF ((nb_chipset == INTEL_NB_5400) ? GE_FERR_FBD_NF : \
+	(nb_chipset == INTEL_NB_5100) ? 0 : \
 	(GE_FERR_FBD0_NF|GE_FERR_FBD1_NF|GE_FERR_FBD2_NF|GE_FERR_FBD3_NF))
+#define	GE_MEM_NF	((nb_chipset == INTEL_NB_5100) ? \
+	(GE_FERR_MEM0_NF|GE_FERR_MEM1_NF) : 0)
 
 #define	EMASK_UNCOR_PEX_IO18	0x00200000	/* ESI Reset timeout */
 #define	EMASK_UNCOR_PEX_IO2	0x00100000	/* Received an unsupported */
@@ -807,11 +870,16 @@ extern "C" {
 					nb_pci_putb(0, 16, 2, 0xd3, val); \
 				}
 
-#define	NRECINT_RD()		nb_pci_getl(0, 16, 2, 0xc4, 0)
-#define	RECINT_RD()		nb_pci_getl(0, 16, 2, 0xc8, 0)
+#define	NRECINT_RD()		nb_pci_getl(0, 16, 2, \
+	nb_chipset == INTEL_NB_5400 ? 0xc8 : 0xc4, 0)
+#define	RECINT_RD()		nb_pci_getl(0, 16, 2, \
+	nb_chipset == INTEL_NB_5400 ? 0xcc : 0xc8, 0)
 
-#define	NRECINT_WR()		nb_pci_putl(0, 16, 2, 0xc4, 0)
-#define	RECINT_WR()		nb_pci_putl(0, 16, 2, 0xc8, 0)
+#define	NRECINT_WR()		nb_pci_putl(0, 16, 2, \
+	nb_chipset == INTEL_NB_5400 ? 0xc8 : 0xc4, 0)
+#define	RECINT_WR()		nb_pci_putl(0, 16, 2, \
+	nb_chipset == INTEL_NB_5400 ? 0xcc : 0xc8, 0)
+
 
 #define	FERR_FAT_FBD_RD(ip)	nb_pci_getl(0, 16, 1, 0x98, ip)
 #define	NERR_FAT_FBD_RD(ip)	nb_pci_getl(0, 16, 1, 0x9c, ip)
@@ -1008,12 +1076,69 @@ extern "C" {
 	else if (nb_chipset == INTEL_NB_7300) \
 		nb_pci_putw(0, 16, 1, 0xf8, 0); \
 
+#define	FERR_NF_MEM_RD(ip)	nb_pci_getl(0, 16, 1, 0xa0, ip)
+#define	NERR_NF_MEM_RD(ip)	nb_pci_getl(0, 16, 1, 0xa4, ip)
+#define	EMASK_MEM_RD()		nb_pci_getl(0, 16, 1, 0xa8, 0)
+#define	ERR0_MEM_RD()		nb_pci_getl(0, 16, 1, 0xac, 0)
+#define	ERR1_MEM_RD()		nb_pci_getl(0, 16, 1, 0xb0, 0)
+#define	ERR2_MEM_RD()		nb_pci_getl(0, 16, 1, 0xb4, 0)
+#define	MCERR_MEM_RD()		nb_pci_getl(0, 16, 1, 0xb8, 0)
+#define	FERR_NF_MEM_WR(val)	\
+	nb_pci_putl(0, 16, 1, 0xa0, (val))
+#define	NERR_NF_MEM_WR(val)	\
+	nb_pci_putl(0, 16, 1, 0xa4, (val))
+#define	EMASK_MEM_WR(val)	\
+	nb_pci_putl(0, 16, 1, 0xa8, (val))
+#define	ERR0_MEM_WR(val)	\
+	nb_pci_putl(0, 16, 1, 0xac, (val))
+#define	ERR1_MEM_WR(val)	\
+	nb_pci_putl(0, 16, 1, 0xb0, (val))
+#define	ERR2_MEM_WR(val)	\
+	nb_pci_putl(0, 16, 1, 0xb4, (val))
+#define	MCERR_MEM_WR(val)	\
+	nb_pci_putl(0, 16, 1, 0xb8, (val))
+#define	VALIDLOG_RD(branch)	\
+	nb_pci_getl(0, (branch) ? 22 : 21, 0, 0x18c, 0)
+#define	MEM_NRECMEMA_RD(branch) \
+	nb_pci_getl(0, (branch) ? 22 : 21, 0, 0x190, 0)
+#define	MEM_NRECMEMB_RD(branch) \
+	nb_pci_getl(0, (branch) ? 22 : 21, 0, 0x194, 0)
+#define	MEM_REDMEMA_RD(branch) \
+	nb_pci_getl(0, (branch) ? 22 : 21, 0, 0x198, 0)
+#define	MEM_REDMEMB_RD(branch) \
+	nb_pci_getl(0, (branch) ? 22 : 21, 0, 0x19c, 0)
+#define	MEM_RECMEMA_RD(branch) \
+	nb_pci_getl(0, (branch) ? 22 : 21, 0, 0x1a0, 0)
+#define	MEM_RECMEMB_RD(branch) \
+	nb_pci_getl(0, (branch) ? 22 : 21, 0, 0x1a4, 0)
+#define	MEM_CERRCNT_RD(branch) nb_pci_getl(0, 21, 0, 0x180, 0)
+#define	MEM_CERRCNT_EXT_RD(branch) nb_pci_getw(0, 21, 0, 0x184, 0)
+#define	MEM_NRECMEMA_WR(branch) \
+	nb_pci_putl(0, (branch) ? 22 : 21, 0, 0x190, 0)
+#define	MEM_NRECMEMB_WR(branch) \
+	nb_pci_putl(0, (branch) ? 22 : 21, 0, 0x194, 0)
+#define	MEM_REDMEMA_WR(branch) \
+	nb_pci_putl(0, (branch) ? 22 : 21, 0, 0x198, 0)
+#define	MEM_REDMEMB_WR(branch) \
+	nb_pci_putl(0, (branch) ? 22 : 21, 0, 0x19c, 0)
+#define	MEM_RECMEMA_WR(branch) \
+	nb_pci_putl(0, (branch) ? 22 : 21, 0, 0x1a0, 0)
+#define	MEM_RECMEMB_WR(branch) \
+	nb_pci_putl(0, (branch) ? 22 : 21, 0, 0x1a4, 0)
+
 #define	MC_RD()		nb_pci_getl(0, 16, 1, 0x40, 0)
 #define	MC_WR(val)	nb_pci_putl(0, 16, 1, 0x40, val)
 #define	MCA_RD()	nb_pci_getl(0, 16, 1, 0x58, 0)
 #define	TOLM_RD()	nb_pci_getw(0, 16, 1, 0x6c, 0)
 
-#define	MTR_RD(branch, dimm) (nb_chipset == INTEL_NB_5400 ? \
+#define	MTR_5100_RD(channel, rank) ((rank) < 4 ? \
+	nb_pci_getw(0, (channel) == 0 ? 21 : 22, 0, 0x154 + ((rank) * 2), 0) : \
+	nb_pci_getw(0, (channel) == 0 ? 21 : 22, 0, 0x1b0 + (((rank) & 3) * 2),\
+	0))
+
+#define	MTR_RD(branch, dimm) (nb_chipset == INTEL_NB_5100 ? \
+	MTR_5100_RD(branch, dimm) : \
+	nb_chipset == INTEL_NB_5400 ? \
 	nb_pci_getw(0, (branch) == 0 ? 21 : 22, 0, 0x80 + dimm * 2, 0) : \
 	((branch) == 0) ? \
 	nb_pci_getw(0, 21, 0, \
@@ -1024,6 +1149,8 @@ extern "C" {
 #define	MIR_RD(reg)	nb_pci_getw(0, 16, 1, 0x80 + ((reg)*4), 0)
 
 #define	DMIR_RD(branch, reg) \
+	nb_chipset == INTEL_NB_5100 ? \
+	nb_pci_getl(0, ((branch) == 0) ? 21 : 22, 0, 0x15c + ((reg)*4), 0) : \
 	((branch) == 0) ? nb_pci_getl(0, 21, 0, 0x90 + ((reg)*4), 0) : \
 	(nb_number_memory_controllers == 2) ? \
 	nb_pci_getl(0, 22, 0, 0x90 + ((reg)*4), 0) : 0
@@ -1131,7 +1258,9 @@ extern "C" {
 	(nb_number_memory_controllers == 2) ? \
 	nb_pci_putl(0, 22, 0, 0xb4, val) : 0
 
-#define	SPD_RD(branch, channel)	((branch) == 0) ? \
+#define	SPD_RD(branch, channel) \
+	nb_chipset == INTEL_NB_5100 ? nb_pci_getw(0, 16, 1, 0x48, 0) : \
+	((branch) == 0) ? \
 	nb_pci_getw(0, 21, 0, 0x74 + ((channel) * 2), 0) : \
 	(nb_number_memory_controllers == 2) ? \
 	nb_pci_getw(0, 22, 0, 0x74 + ((channel) * 2), 0) : 0
@@ -1142,7 +1271,9 @@ extern "C" {
 
 #define	SPDCMD1_1_WR(val)	nb_pci_putl(0, 21, 0, 0x7c, val)
 #define	SPDCMD_WR(branch, channel, val)	\
-	if ((branch) == 0) \
+	if (nb_chipset == INTEL_NB_5100) \
+	nb_pci_putl(0, 16, 1, 0x4c, val); \
+	else if ((branch) == 0) \
 	nb_pci_putl(0, 21, 0, 0x78 + ((channel) * 4), val); \
 	else if (nb_number_memory_controllers == 2) \
 	nb_pci_putl(0, 22, 0, 0x78 + ((channel) * 4), val)
@@ -1211,7 +1342,8 @@ extern "C" {
 
 #define	DMIR_RANKS(dmir, rank0, rank1, rank2, rank3) \
 	if (nb_chipset == INTEL_NB_5000P || nb_chipset == INTEL_NB_5000X || \
-	    nb_chipset == INTEL_NB_5000V || nb_chipset == INTEL_NB_5000Z) { \
+	    nb_chipset == INTEL_NB_5000V || nb_chipset == INTEL_NB_5000Z || \
+	    nb_chipset == INTEL_NB_5100) { \
 		rank0 = (dmir) & 3; \
 		rank1 = ((dmir) >> 3) & 3; \
 		rank2 = ((dmir) >> 6) & 3; \
@@ -1264,6 +1396,11 @@ extern "C" {
 #define	EMASK_THR_F2	0x0002	/* >tnid thermal event with intelligent */
 				/* throttling disabled */
 #define	EMASK_THR_F1	0x0001	/* catastrophic on-die thermal event */
+
+/* dimm type */
+#define	SPD_MEM_TYPE	2
+#define	SPD_DDR2	8
+#define	SPD_FBDIMM	9
 
 #ifdef __cplusplus
 }

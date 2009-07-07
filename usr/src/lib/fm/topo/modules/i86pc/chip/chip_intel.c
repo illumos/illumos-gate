@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,10 +94,10 @@ mc_onchip(topo_instance_t id)
 	return (mc_fd != -1);
 }
 
-void
+static void
 mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
-    nvlist_t **ranks_nvp, int nranks, char *serial, char *part, char *rev,
-    int maxranks)
+    nvlist_t **ranks_nvp, int start_rank, int nranks, char *serial, char *part,
+    char *rev, int maxranks)
 {
 	int i;
 	int rank;
@@ -106,10 +106,14 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 	nvlist_t *fmri;
 	int err = 0;
 
-	rank = dimm * maxranks;
+	/*
+	 * If start_rank is defined, it is assigned to the first rank of this
+	 * dimm.
+	 */
+	rank = start_rank >= 0 ? start_rank : dimm * maxranks;
 	if (topo_node_range_create(mod, dnode, RANK, rank,
 	    rank + nranks - 1) < 0) {
-		whinge(mod, NULL, "mc_add_dimms: node range create failed"
+		whinge(mod, NULL, "mc_add_ranks: node range create failed"
 		    " for rank\n");
 		return;
 	}
@@ -162,6 +166,7 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 	nvpair_t *nvp;
 	int err;
 	nvlist_t **ranks_nvp;
+	int32_t start_rank = -1;
 	uint_t nranks = 0;
 	char *serial = NULL;
 	char *part = NULL;
@@ -181,6 +186,8 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 			if (strcmp(name, MCINTEL_NVLIST_RANKS) == 0) {
 				(void) nvpair_value_nvlist_array(nvp,
 				    &ranks_nvp, &nranks);
+			} else if (strcmp(name, MCINTEL_NVLIST_1ST_RANK) == 0) {
+				(void) nvpair_value_int32(nvp, &start_rank);
 			} else if (strcmp(name, FM_FMRI_HC_SERIAL_ID) == 0) {
 				(void) nvpair_value_string(nvp, &serial);
 			} else if (strcmp(name, FM_FMRI_HC_PART) == 0) {
@@ -219,7 +226,8 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 		    nvp = nvlist_next_nvpair(nvl[i], nvp)) {
 			name = nvpair_name(nvp);
 			if (strcmp(name, MCINTEL_NVLIST_RANKS) != 0 &&
-			    strcmp(name, FM_FAULT_FRU_LABEL) != 0) {
+			    strcmp(name, FM_FAULT_FRU_LABEL) != 0 &&
+			    strcmp(name, MCINTEL_NVLIST_1ST_RANK) != 0) {
 				(void) nvprop_add(mod, nvp, PGNAME(DIMM),
 				    dnode);
 			}
@@ -228,8 +236,8 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 			(void) topo_node_label_set(dnode, label, &err);
 
 		if (nranks) {
-			mc_add_ranks(mod, dnode, auth, i, ranks_nvp, nranks,
-			    serial, part, rev, maxranks);
+			mc_add_ranks(mod, dnode, auth, i, ranks_nvp, start_rank,
+			    nranks, serial, part, rev, maxranks);
 		}
 	}
 }
@@ -297,7 +305,13 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		    "mc_nb_create: failed to find channel information\n");
 		return (-1);
 	}
-	if (nvlist_lookup_uint8(nvl, MCINTEL_NVLIST_NMEM, &nmc) != 0) {
+	if (nvlist_lookup_uint8(nvl, MCINTEL_NVLIST_NMEM, &nmc) == 0) {
+		/*
+		 * Assume channels are evenly divided among the controllers.
+		 * Convert nchannels to channels per controller
+		 */
+		nchannels = nchannels / nmc;
+	} else {
 		/*
 		 * if number of memory controllers is not specified then there
 		 * are two channels per controller and the nchannels is total

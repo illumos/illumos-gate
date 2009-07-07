@@ -45,6 +45,7 @@ extern "C" {
 #define	MCINTEL_NVLIST_DIMMSZ	"memory-dimm-size"
 #define	MCINTEL_NVLIST_NRANKS	"dimm-max-ranks"
 #define	MCINTEL_NVLIST_RANKS	"dimm-ranks"
+#define	MCINTEL_NVLIST_1ST_RANK	"dimm-start-rank"
 #define	MCINTEL_NVLIST_ROWS	"dimm-rows"
 #define	MCINTEL_NVLIST_COL	"dimm-column"
 #define	MCINTEL_NVLIST_BANK	"dimm-banks"
@@ -93,6 +94,7 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_RAS			"ras"
 #define	FM_EREPORT_PAYLOAD_NAME_FERR_FAT_FBD		"ferr_fat_fbd"
 #define	FM_EREPORT_PAYLOAD_NAME_NERR_FAT_FBD		"nerr_fat_fbd"
+#define	FM_EREPORT_PAYLOAD_NAME_VALIDLOG		"validlog"
 #define	FM_EREPORT_PAYLOAD_NAME_NRECMEMA		"nrecmema"
 #define	FM_EREPORT_PAYLOAD_NAME_NRECMEMB		"nrecmemb"
 #define	FM_EREPORT_PAYLOAD_NAME_NRECFGLOG		"nrecfglog"
@@ -106,6 +108,7 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_SPCPS			"spcps"
 #define	FM_EREPORT_PAYLOAD_NAME_UERRCNT			"uerrcnt"
 #define	FM_EREPORT_PAYLOAD_NAME_UERRCNT_LAST		"uerrcnt_last"
+#define	FM_EREPORT_PAYLOAD_NAME_BADRAM			"badram"
 #define	FM_EREPORT_PAYLOAD_NAME_BADRAMA			"badrama"
 #define	FM_EREPORT_PAYLOAD_NAME_BADRAMB			"badramb"
 #define	FM_EREPORT_PAYLOAD_NAME_BADCNT			"badcnt"
@@ -117,8 +120,12 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_DMIR			"dmir"
 #define	FM_EREPORT_PAYLOAD_NAME_FERR_NF_FBD		"ferr_nf_fbd"
 #define	FM_EREPORT_PAYLOAD_NAME_NERR_NF_FBD		"nerr_nf_fbd"
+#define	FM_EREPORT_PAYLOAD_NAME_FERR_NF_MEM		"ferr_nf_mem"
+#define	FM_EREPORT_PAYLOAD_NAME_NERR_NF_MEM		"nerr_nf_mem"
 #define	FM_EREPORT_PAYLOAD_NAME_RECMEMA			"recmema"
 #define	FM_EREPORT_PAYLOAD_NAME_RECMEMB			"recmemb"
+#define	FM_EREPORT_PAYLOAD_NAME_REDMEMA			"redmema"
+#define	FM_EREPORT_PAYLOAD_NAME_REDMEMB			"redmemb"
 #define	FM_EREPORT_PAYLOAD_NAME_RECFGLOG		"recfglog"
 #define	FM_EREPORT_PAYLOAD_NAME_RECFBDA			"recfbda"
 #define	FM_EREPORT_PAYLOAD_NAME_RECFBDB			"recfbdb"
@@ -128,6 +135,8 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_RECFBDF			"recfbdf"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNT			"cerrcnt"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNT_LAST		"cerrcnt_last"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNT_EXT		"cerrcnt_ext"
+#define	FM_EREPORT_PAYLOAD_NAME_CERRCNT_EXT_LAST	"cerrcnt_ext_last"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNTA		"cerrcnta"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNTB		"cerrcntb"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNTC		"cerrcntc"
@@ -199,6 +208,7 @@ extern "C" {
 #define	INTEL_NB_5000V	0x25d48086
 #define	INTEL_NB_5000X	0x25c08086
 #define	INTEL_NB_5000Z	0x25d08086
+#define	INTEL_NB_5100	0x65c08086
 #define	INTEL_NB_5400	0x40008086
 #define	INTEL_NB_5400A	0x40018086
 #define	INTEL_NB_5400B	0x40038086

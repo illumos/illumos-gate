@@ -39,6 +39,8 @@
 
 static ddi_acc_handle_t dev_16_hdl[NB_PCI_NFUNC];
 static ddi_acc_handle_t dev_17_hdl[NB_PCI_NFUNC];
+static ddi_acc_handle_t dev_21_hdl;
+static ddi_acc_handle_t dev_22_hdl;
 static ddi_acc_handle_t dev_pci_hdl[NB_PCI_DEV];
 
 void
@@ -76,6 +78,20 @@ nb_pci_cfg_setup(dev_info_t *dip)
 			    "intel_nb5000: pci_config_setup failed");
 		reg.pci_phys_hi += 1 << PCI_REG_FUNC_SHIFT;
 	}
+	reg.pci_phys_hi = 21 << PCI_REG_DEV_SHIFT; /* Bus=0, Dev=21, Func=0 */
+	if (ddi_prop_update_int_array(DDI_MAJOR_T_UNKNOWN, dip, "reg",
+	    (int *)&reg, sizeof (reg)/sizeof (int)) != DDI_PROP_SUCCESS)
+		cmn_err(CE_WARN,
+		    "nb_pci_cfg_setup: cannot create reg property");
+	if (pci_config_setup(dip, &dev_21_hdl) != DDI_SUCCESS)
+		cmn_err(CE_WARN, "intel_nb5000: pci_config_setup failed");
+	reg.pci_phys_hi = 22 << PCI_REG_DEV_SHIFT; /* Bus=0, Dev=22, Func=0 */
+	if (ddi_prop_update_int_array(DDI_MAJOR_T_UNKNOWN, dip, "reg",
+	    (int *)&reg, sizeof (reg)/sizeof (int)) != DDI_PROP_SUCCESS)
+		cmn_err(CE_WARN,
+		    "nb_pci_cfg_setup: cannot create reg property");
+	if (pci_config_setup(dip, &dev_22_hdl) != DDI_SUCCESS)
+		cmn_err(CE_WARN, "intel_nb5000: pci_config_setup failed");
 	reg.pci_phys_hi = 0;		/* Bus=0, Dev=0, Func=0 */
 	for (i = 0; i < NB_PCI_DEV; i++) {
 		if (ddi_prop_update_int_array(DDI_MAJOR_T_UNKNOWN, dip, "reg",
@@ -102,6 +118,8 @@ nb_pci_cfg_free()
 	for (i = 0; i < NB_PCI_NFUNC; i++) {
 		pci_config_teardown(&dev_17_hdl[i]);
 	}
+	pci_config_teardown(&dev_21_hdl);
+	pci_config_teardown(&dev_22_hdl);
 	for (i = 0; i < NB_PCI_DEV; i++)
 		pci_config_teardown(&dev_pci_hdl[i]);
 }
@@ -117,6 +135,10 @@ nb_get_hdl(int bus, int dev, int func)
 		hdl = dev_17_hdl[func];
 	} else if (bus == 0 && dev < NB_PCI_DEV && func == 0) {
 		hdl = dev_pci_hdl[dev];
+	} else if (bus == 0 && dev == 21 && func == 0) {
+		hdl = dev_21_hdl;
+	} else if (bus == 0 && dev == 22 && func == 0) {
+		hdl = dev_22_hdl;
 	} else {
 		hdl = 0;
 	}

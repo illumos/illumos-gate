@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,13 +45,18 @@ uint64_t
 dimm_getphys(int branch, int rank, int bank, int ras, int cas)
 {
 	uint8_t i;
+	int num_ranks_per_branch;
 	uint64_t m;
 	uint64_t pa;
 	struct rank_base *rp;
 	struct rank_geometry *rgp;
 
-	ASSERT(rank < nb_dimms_per_channel * 2);
-	rp = &rank_base[(branch * nb_dimms_per_channel * 2) + rank];
+	/* max number of ranks per branch */
+	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
+	    NB_5100_RANKS_PER_CHANNEL :
+	    nb_dimms_per_channel * nb_channels_per_branch;
+	ASSERT(rank < num_ranks_per_branch);
+	rp = &rank_base[(branch * num_ranks_per_branch) + rank];
 	rgp = (struct rank_geometry *)rp->rank_geometry;
 	if (rgp == NULL)
 		return (-1LL);
@@ -98,6 +103,7 @@ uint64_t
 dimm_getoffset(int branch, int rank, int bank, int ras, int cas)
 {
 	uint8_t i;
+	int num_ranks_per_branch;
 	uint64_t m;
 	uint64_t offset;
 	struct dimm_geometry *dgp;
@@ -106,9 +112,14 @@ dimm_getoffset(int branch, int rank, int bank, int ras, int cas)
 	uint64_t pa;
 	uint64_t cal_pa;
 
-	ASSERT(rank < nb_dimms_per_channel * 2);
-	rp = &rank_base[(branch * nb_dimms_per_channel * 2) + rank];
-	dgp = dimm_geometry[(branch * nb_dimms_per_channel) + rank/2];
+	/* max number of ranks per branch */
+	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
+	    NB_5100_RANKS_PER_CHANNEL :
+	    nb_dimms_per_channel * nb_channels_per_branch;
+	ASSERT(rank < num_ranks_per_branch);
+	rp = &rank_base[(branch * num_ranks_per_branch) + rank];
+	dgp = dimm_geometry[(branch * nb_dimms_per_channel) +
+	    nb_rank2dimm(branch, rank)];
 	if (dgp == NULL)
 		return (TCODE_OFFSET(rank, bank, ras, cas));
 	rgp = (struct rank_geometry *)&dgp->rank_geometry[0];
@@ -224,6 +235,7 @@ inb_patounum(void *arg, uint64_t pa, uint8_t valid_hi, uint8_t valid_lo,
 static cmi_errno_t
 inb_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 {
+	int num_ranks_per_branch;
 	mc_unum_t unum;
 	uint64_t pa;
 	struct rank_base *rp;
@@ -244,7 +256,13 @@ inb_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 		*pap = pa;
 		return (CMI_SUCCESS);
 	}
-	rp = &rank_base[(unump->unum_mc * nb_dimms_per_channel * 2) +
+
+
+	/* max number of ranks per branch */
+	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
+	    NB_5100_RANKS_PER_CHANNEL :
+	    nb_dimms_per_channel * nb_channels_per_branch;
+	rp = &rank_base[(unump->unum_mc * num_ranks_per_branch) +
 	    unump->unum_rank];
 	pa = rp->base + (unump->unum_offset * rp->interleave);
 
@@ -257,20 +275,36 @@ inb_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 void
 dimm_init()
 {
+	int num_ranks_per_branch;
+
 	dimm_geometry = kmem_zalloc(sizeof (void *) *
 	    nb_number_memory_controllers * nb_dimms_per_channel, KM_SLEEP);
+
+	/* max number of ranks per branch */
+	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
+	    NB_5100_RANKS_PER_CHANNEL :
+	    nb_dimms_per_channel * nb_channels_per_branch;
+
 	rank_base = kmem_zalloc(sizeof (struct rank_base) *
-	    nb_number_memory_controllers * nb_dimms_per_channel * 2, KM_SLEEP);
+	    nb_number_memory_controllers * num_ranks_per_branch, KM_SLEEP);
 }
 
 void
 dimm_fini()
 {
+	int num_ranks_per_branch;
+
 	kmem_free(dimm_geometry, sizeof (void *) *
 	    nb_number_memory_controllers * nb_dimms_per_channel);
 	dimm_geometry = 0;
+
+	/* max number of ranks per branch */
+	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
+	    NB_5100_RANKS_PER_CHANNEL :
+	    nb_dimms_per_channel * nb_channels_per_branch;
+
 	kmem_free(rank_base, sizeof (struct rank_base) *
-	    nb_number_memory_controllers * nb_dimms_per_channel * 2);
+	    nb_number_memory_controllers * num_ranks_per_branch);
 	rank_base = 0;
 }
 
@@ -299,9 +333,16 @@ dimm_add_rank(int branch, int rank, int branch_interleave, int way,
 	struct dimm_geometry *dimm;
 	struct rank_base *rp;
 	int interleave_nbits;
+	int num_ranks_per_branch;
 
-	dimm = dimm_geometry[(branch * nb_dimms_per_channel) + (rank / 2)];
-	rp = &rank_base[(branch * nb_dimms_per_channel * 2) + rank];
+	dimm = dimm_geometry[(branch * nb_dimms_per_channel) +
+	    nb_rank2dimm(branch, rank)];
+
+	/* max number of ranks per branch */
+	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
+	    NB_5100_RANKS_PER_CHANNEL :
+	    nb_dimms_per_channel * nb_channels_per_branch;
+	rp = &rank_base[(branch * num_ranks_per_branch) + rank];
 	if (interleave == 1)
 		interleave_nbits = 0;
 	else if (interleave == 2)

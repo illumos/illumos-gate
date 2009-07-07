@@ -106,6 +106,7 @@ rank_to_base(uint8_t branch, uint8_t rank, uint8_t *interleave, uint64_t *limit,
 	return (base);
 }
 
+/*ARGSUSED*/
 void
 inb_rank(nvlist_t *newdimm, nb_dimm_t *nb_dimm, uint8_t channel, uint32_t dimm)
 {
@@ -122,7 +123,8 @@ inb_rank(nvlist_t *newdimm, nb_dimm_t *nb_dimm, uint8_t channel, uint32_t dimm)
 		uint64_t hole_base;
 		uint64_t hole_size;
 
-		dimm_base = rank_to_base(channel/2, dimm*2 + i, &interleave,
+		dimm_base = rank_to_base(channel/nb_channels_per_branch,
+		    nb_dimm->start_rank + i, &interleave,
 		    &limit, &hole_base, &hole_size, &way, &branch_interleave);
 		(void) nvlist_alloc(&newrank[i], NV_UNIQUE_NAME, KM_SLEEP);
 
@@ -178,6 +180,8 @@ inb_dimm(nb_dimm_t *nb_dimm, uint8_t channel, uint32_t dimm)
 	    (uint32_t)nb_dimm->ncolumn);
 	(void) nvlist_add_uint32(newdimm, "nrow", (uint32_t)nb_dimm->nrow);
 	(void) nvlist_add_uint32(newdimm, "width", (uint32_t)nb_dimm->width);
+	(void) nvlist_add_int32(newdimm, MCINTEL_NVLIST_1ST_RANK,
+	    (int32_t)nb_dimm->start_rank);
 	(void) nvlist_add_uint32(newdimm, "ranks", (uint32_t)nb_dimm->nranks);
 	inb_rank(newdimm, nb_dimm, channel, dimm);
 	(void) nvlist_add_uint32(newdimm, "manufacture-id",
@@ -220,7 +224,7 @@ inb_dimmlist(nvlist_t *nvl)
 {
 	nvlist_t **dimmlist;
 	nvlist_t **newchannel;
-	int nchannels = nb_number_memory_controllers * 2;
+	int nchannels = nb_number_memory_controllers * nb_channels_per_branch;
 	int nd;
 	uint8_t i, j;
 	nb_dimm_t **dimmpp;
@@ -274,6 +278,9 @@ inb_mc_name()
 	case INTEL_NB_5400B:
 		mc = "Intel 5400B";
 		break;
+	case INTEL_NB_5100:
+		mc = "Intel 5100";
+		break;
 	case INTEL_NB_5000P:
 		mc = "Intel 5000P";
 		break;
@@ -302,6 +309,9 @@ inb_create_nvl()
 	(void) nvlist_add_uint8(nvl, MCINTEL_NVLIST_VERSTR,
 	    MCINTEL_NVLIST_VERS);
 	(void) nvlist_add_string(nvl, "memory-controller", inb_mc_name());
+	if (nb_chipset == INTEL_NB_5100)
+		(void) nvlist_add_uint8(nvl, MCINTEL_NVLIST_NMEM,
+		    (uint8_t)nb_number_memory_controllers);
 	inb_dimmlist(nvl);
 
 	if (inb_mc_nvl)
