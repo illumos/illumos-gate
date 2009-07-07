@@ -20,15 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -115,11 +112,8 @@ sigaction(int sig, struct sigaction *actp, struct sigaction *oactp)
 	}
 
 	if (actp) {
-		if (sig == SIGCLD &&
-		    act.sa_handler != SIG_IGN &&
-		    act.sa_handler != SIG_DFL)
+		if (sig == SIGCLD)
 			sigcld_look = 1;
-
 		sigutok(&act.sa_mask, &set);
 		setsigact(sig, act.sa_handler, set, act.sa_flags);
 	}
@@ -211,11 +205,8 @@ sigaction32(int sig, struct sigaction32 *actp, struct sigaction32 *oactp)
 	}
 
 	if (actp) {
-		if (sig == SIGCLD &&
-		    act32.sa_handler != (caddr32_t)SIG_IGN &&
-		    act32.sa_handler != (caddr32_t)SIG_DFL)
+		if (sig == SIGCLD)
 			sigcld_look = 1;
-
 		sigutok(&act32.sa_mask, &set);
 		setsigact(sig, (void (*)())(uintptr_t)act32.sa_handler, set,
 		    act32.sa_flags);

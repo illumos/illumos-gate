@@ -481,7 +481,7 @@ issig_justlooking(void)
 				 * the process when lwp_nostop is set.
 				 */
 				if (!lwp->lwp_nostop ||
-				    PTOU(curproc)->u_signal[sig-1] != SIG_DFL ||
+				    PTOU(p)->u_signal[sig-1] != SIG_DFL ||
 				    !sigismember(&stopdefault, sig))
 					return (1);
 			}
@@ -683,8 +683,6 @@ issig_forreal(void)
 		 */
 		for (;;) {
 			if ((sig = fsig(&t->t_sig, t)) != 0) {
-				if (sig == SIGCLD)
-					sigcld_found = 1;
 				toproc = 0;
 				if (tracing(p, sig) ||
 				    sigismember(&t->t_sigwait, sig) ||
@@ -766,15 +764,10 @@ issig_forreal(void)
 	mutex_exit(&p->p_lock);
 
 	/*
-	 * If SIGCLD was dequeued, search for other pending SIGCLD's.
-	 * Don't do it if we are returning SIGCLD and the signal
-	 * handler will be reset by psig(); this enables reliable
-	 * delivery of SIGCLD even when using the old, broken
-	 * signal() interface for setting the signal handler.
+	 * If SIGCLD was dequeued from the process's signal queue,
+	 * search for other pending SIGCLD's from the list of children.
 	 */
-	if (sigcld_found &&
-	    (sig != SIGCLD || !sigismember(&PTOU(curproc)->u_sigresethand,
-	    SIGCLD)))
+	if (sigcld_found)
 		sigcld_repost();
 
 	if (sig != 0)
@@ -1586,7 +1579,6 @@ setsigact(int sig, void (*disp)(), k_sigset_t mask, int flags)
 			sigaddset(&PTOU(curproc)->u_sigonstack, sig);
 		else
 			sigdelset(&PTOU(curproc)->u_sigonstack, sig);
-
 	} else if (disp == SIG_IGN ||
 	    (disp == SIG_DFL && sigismember(&ignoredefault, sig))) {
 		/*
@@ -1605,7 +1597,6 @@ setsigact(int sig, void (*disp)(), k_sigset_t mask, int flags)
 			sigdelset(&t->t_extsig, sig);
 			sigdelq(p, t, sig);
 		} while ((t = t->t_forw) != p->p_tlist);
-
 	} else {
 		/*
 		 * The signal action is being set to SIG_DFL and the default
@@ -1729,7 +1720,8 @@ sigcld(proc_t *cp, sigqueue_t *sqp)
 }
 
 /*
- * Common code called from sigcld() and issig_forreal()
+ * Common code called from sigcld() and from
+ * waitid() and issig_forreal() via sigcld_repost().
  * Give the parent process a SIGCLD if it does not have one pending,
  * else mark the child process so a SIGCLD can be posted later.
  */
@@ -1737,22 +1729,20 @@ static void
 post_sigcld(proc_t *cp, sigqueue_t *sqp)
 {
 	proc_t *pp = cp->p_parent;
-	void (*handler)() = PTOU(pp)->u_signal[SIGCLD - 1];
 	k_siginfo_t info;
 
 	ASSERT(MUTEX_HELD(&pidlock));
 	mutex_enter(&pp->p_lock);
 
 	/*
-	 * If a SIGCLD is pending, or if SIGCLD is not now being caught,
-	 * then just mark the child process so that its SIGCLD will
-	 * be posted later, when the first SIGCLD is taken off the
-	 * queue or when the parent is ready to receive it, if ever.
+	 * If a SIGCLD is pending, then just mark the child process
+	 * so that its SIGCLD will be posted later, when the first
+	 * SIGCLD is taken off the queue or when the parent is ready
+	 * to receive it or accept it, if ever.
 	 */
-	if (handler == SIG_DFL || handler == SIG_IGN ||
-	    sigismember(&pp->p_sig, SIGCLD))
+	if (sigismember(&pp->p_sig, SIGCLD)) {
 		cp->p_pidflag |= CLDPEND;
-	else {
+	} else {
 		cp->p_pidflag &= ~CLDPEND;
 		if (sqp == NULL) {
 			/*
@@ -1787,14 +1777,7 @@ sigcld_repost()
 {
 	proc_t *pp = curproc;
 	proc_t *cp;
-	void (*handler)() = PTOU(pp)->u_signal[SIGCLD - 1];
 	sigqueue_t *sqp;
-
-	/*
-	 * Don't bother if SIGCLD is not now being caught.
-	 */
-	if (handler == SIG_DFL || handler == SIG_IGN)
-		return;
 
 	sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 	mutex_enter(&pidlock);
