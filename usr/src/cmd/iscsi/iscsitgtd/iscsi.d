@@ -26,26 +26,7 @@
 
 #pragma D depends_on library net.d
 #pragma D depends_on module genunix
-
-typedef struct iscsiinfo {
-	string ii_target;	/* target iqn */
-	string ii_initiator;	/* initiator iqn */
-	string ii_isid;         /* initiator session identifier */
-	string ii_tsih;         /* target session identifying handle */
-	string ii_transport;    /* transport type ("iser-ib", "sockets") */
-
-	uint64_t ii_lun;	/* target logical unit number */
-
-	uint32_t ii_itt;	/* initiator task tag */
-	uint32_t ii_ttt;	/* target transfer tag */
-
-	uint32_t ii_cmdsn;	/* command sequence number */
-	uint32_t ii_statsn;	/* status sequence number */
-	uint32_t ii_datasn;	/* data sequence number */
-
-	uint32_t ii_datalen;	/* length of data payload */
-	uint32_t ii_flags;	/* probe-specific flags */
-} iscsiinfo_t;
+#pragma D depends_on library scsi.d
 
 typedef struct uiscsiproto uiscsiproto_t;
 

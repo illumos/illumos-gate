@@ -62,3 +62,28 @@ typedef struct xferinfo {
 	uint32_t xfer_len;      /* transfer length */
 	uint32_t xfer_type;     /* Read (0) or Write (1) */
 } xferinfo_t;
+
+/*
+ * the iscsiinfo_t is used to provide identifying information about
+ * the target and the initiator and also some PDU level information
+ * such as lun, data length and sequence numbers.
+ */
+typedef struct iscsiinfo {
+	string ii_target;	/* target iqn */
+	string ii_initiator;	/* initiator iqn */
+	string ii_isid;         /* initiator session identifier */
+	string ii_tsih;         /* target session identifying handle */
+	string ii_transport;    /* transport type ("iser-ib", "sockets") */
+
+	uint64_t ii_lun;	/* target logical unit number */
+
+	uint32_t ii_itt;	/* initiator task tag */
+	uint32_t ii_ttt;	/* target transfer tag */
+
+	uint32_t ii_cmdsn;	/* command sequence number */
+	uint32_t ii_statsn;	/* status sequence number */
+	uint32_t ii_datasn;	/* data sequence number */
+
+	uint32_t ii_datalen;	/* length of data payload */
+	uint32_t ii_flags;	/* probe-specific flags */
+} iscsiinfo_t;

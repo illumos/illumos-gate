@@ -26,8 +26,7 @@
 
 #pragma D depends_on library ip.d
 #pragma D depends_on library net.d	/* conninfo_t */
-#pragma D depends_on library scsi.d	/* scsicmd_t */
-#pragma D depends_on library iscsi.d	/* iscsiinfo_t */
+#pragma D depends_on library scsi.d	/* scsicmd_t and iscsiinfo_t */
 #pragma D depends_on module genunix
 #pragma D depends_on module iscsit
 #pragma D depends_on module idm
