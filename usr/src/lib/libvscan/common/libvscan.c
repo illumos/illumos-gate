@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +135,7 @@ static const boolean_t vs_dflt_enable = B_TRUE;
 static const char *vs_dflt_maxsize = "1GB";
 static const char *vs_dflt_host = "";
 static const uint16_t vs_dflt_port = 1344;
-static const uint16_t vs_dflt_maxconn = 32L;
+static const uint16_t vs_dflt_maxconn = 8;
 static const  char *vs_dflt_types = "+*";
 static const char *vs_dflt_vlog = "";
 
