@@ -273,6 +273,9 @@ SYSVABI_1.3 {
 	_fp_hw;
 	free = NODIRECT;
 	frexp = FUNCTION FILTER libm.so.2;
+	scf_simple_prop_get = FUNCTION FILTER libscf.so.1;
+	scf_simple_prop_next_boolean = FUNCTION FILTER libscf.so.1;
+	scf_simple_prop_free = FUNCTION FILTER libscf.so.1;
 	getdate_err;
 	_getdate_err;
 	getenv;

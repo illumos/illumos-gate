@@ -29,8 +29,10 @@ include ../Makefile.cmd
 
 #
 # Currently Fast Reboot is only supported on x86.
+# A new propery config/uadmin_boot_archive_sync is added to
+# boot-config service. Which needs a support on sparc also.
 #
-sparc_SUBDIRS =
+sparc_SUBDIRS = smf
 i386_SUBDIRS = smf
 SUBDIRS = $($(MACH)_SUBDIRS)
 

@@ -577,3 +577,5 @@ f none var/svc/profile/ns_none.xml 0444 root sys
 f none var/svc/profile/platform_none.xml 0444 root sys
 f none var/svc/profile/prophist.SUNWcsr 0444 root sys
 d none var/tmp 1777 root sys
+f none lib/svc/method/svc-boot-config 0555 root bin
+f manifest var/svc/manifest/system/boot-config.xml 0444 root sys

@@ -96,6 +96,8 @@
 		    value='true' />
 		<propval name='value_authorization' type='astring'
 		    value='solaris.system.shutdown' />
+		<propval name='uadmin_boot_archive_sync' type='boolean'
+		    value='false' />	
 	</property_group>
 
 	<property_group name='fastreboot_blacklist' type='application'>

@@ -44,6 +44,7 @@
 #include <strings.h>
 #include <pthread.h>
 #include <zone.h>
+#include <libscf.h>
 
 static int
 legal_arg(char *bargs)
@@ -68,6 +69,10 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	char *bargs, cmdbuf[256];
 	struct stat sbuf;
 	char *altroot;
+	scf_simple_prop_t *prop = NULL;
+	uint8_t *ret_val = NULL;
+	boolean_t update_flag = B_FALSE;
+	char *fmri = "svc:/system/boot-config:default";
 
 	bargs = (char *)mdep;
 
@@ -159,7 +164,19 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 			}
 			(void) system(cmdbuf);
 		}
-	}
 
+		prop = scf_simple_prop_get(NULL, fmri, "config",
+		    "uadmin_boot_archive_sync");
+		if (prop) {
+			if ((ret_val = scf_simple_prop_next_boolean(prop)) !=
+			    NULL)
+				update_flag = (*ret_val == 0) ? B_FALSE :
+				    B_TRUE;
+			scf_simple_prop_free(prop);
+		}
+
+		if (update_flag == B_TRUE)
+			(void) system("/sbin/bootadm update-archive");
+	}
 	return (__uadmin(cmd, fcn, mdep));
 }
