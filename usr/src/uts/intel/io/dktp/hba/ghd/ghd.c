@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -56,11 +55,12 @@ static	int	 ghd_poll(ccc_t *cccp, gpoll_t polltype, ulong_t polltime,
 /*
  * Local configuration variables
  */
+#define	DEFAULT_GHD_TIMEOUT    50000	/* Amount of time to poll(50ms) */
 
-ulong_t	ghd_tran_abort_timeout = 5;
-ulong_t	ghd_tran_abort_lun_timeout = 5;
-ulong_t	ghd_tran_reset_target_timeout = 5;
-ulong_t	ghd_tran_reset_bus_timeout = 5;
+ulong_t	ghd_tran_abort_timeout = DEFAULT_GHD_TIMEOUT;
+ulong_t	ghd_tran_abort_lun_timeout = DEFAULT_GHD_TIMEOUT;
+ulong_t	ghd_tran_reset_target_timeout = DEFAULT_GHD_TIMEOUT;
+ulong_t	ghd_tran_reset_bus_timeout = DEFAULT_GHD_TIMEOUT;
 
 static int
 ghd_doneq_init(ccc_t *cccp)
@@ -446,6 +446,7 @@ ghd_poll(ccc_t	*cccp,
 	gcmd_t	*gcmdp;
 	L2el_t	 gcmd_hold_queue;
 	int	 got_it = FALSE;
+	clock_t  poll_lbolt;
 	clock_t	 start_lbolt;
 	clock_t	 current_lbolt;
 
@@ -454,6 +455,7 @@ ghd_poll(ccc_t	*cccp,
 	L2_INIT(&gcmd_hold_queue);
 
 	/* Que hora es? */
+	poll_lbolt = drv_usectohz((clock_t)polltime);
 	start_lbolt = ddi_get_lbolt();
 
 	/* unqueue and save all CMD/CCBs until I find the right one */
@@ -461,7 +463,7 @@ ghd_poll(ccc_t	*cccp,
 
 		/* Give up yet? */
 		current_lbolt = ddi_get_lbolt();
-		if (polltime && (current_lbolt - start_lbolt >= polltime))
+		if (poll_lbolt && (current_lbolt - start_lbolt >= poll_lbolt))
 			break;
 
 		/*
