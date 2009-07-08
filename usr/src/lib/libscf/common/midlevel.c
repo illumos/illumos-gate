@@ -946,10 +946,21 @@ set_inst_action(const char *fmri, const char *action)
 
 	if (inst != NULL) {
 		if (scf_handle_decode_fmri(h, fmri, NULL, NULL, inst, NULL,
-		    NULL, SCF_DECODE_FMRI_EXACT) == 0)
+		    NULL, SCF_DECODE_FMRI_EXACT) == 0) {
 			ret = set_inst_action_inst(inst, action);
-		else if (scf_error() == SCF_ERROR_CONSTRAINT_VIOLATED)
-			(void) scf_set_error(SCF_ERROR_INVALID_ARGUMENT);
+			if (ret == -1 && scf_error() == SCF_ERROR_DELETED)
+				(void) scf_set_error(SCF_ERROR_NOT_FOUND);
+		} else {
+			switch (scf_error()) {
+			case SCF_ERROR_CONSTRAINT_VIOLATED:
+				(void) scf_set_error(
+				    SCF_ERROR_INVALID_ARGUMENT);
+				break;
+			case SCF_ERROR_DELETED:
+				(void) scf_set_error(SCF_ERROR_NOT_FOUND);
+				break;
+			}
+		}
 
 		scf_instance_destroy(inst);
 	}
@@ -1106,6 +1117,8 @@ set_inst_enabled_flags(const char *fmri, int flags, uint8_t desired)
 out:
 	scf_instance_destroy(inst);
 	scf_handle_destroy(h);
+	if (ret == -1 && scf_error() == SCF_ERROR_DELETED)
+		(void) scf_set_error(SCF_ERROR_NOT_FOUND);
 	return (ret);
 }
 
