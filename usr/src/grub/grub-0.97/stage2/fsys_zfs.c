@@ -59,6 +59,7 @@ static dnode_phys_t *dnode_mdn = NULL;
 static uint64_t dnode_start = 0;
 static uint64_t dnode_end = 0;
 
+static uint64_t pool_guid = 0;
 static uberblock_t current_uberblock;
 static char *stackbase;
 
@@ -175,30 +176,14 @@ zio_checksum_verify(blkptr_t *bp, char *data, int size)
 }
 
 /*
- * vdev_label_offset takes "offset" (the offset within a vdev_label) and
- * returns its physical disk offset (starting from the beginning of the vdev).
- *
- * Input:
- *	psize	: Physical size of this vdev
- *      l	: Label Number (0-3)
- *	offset	: The offset with a vdev_label in which we want the physical
- *		  address
- * Return:
- * 	Success : physical disk offset
- * 	Failure : errnum = ERR_BAD_ARGUMENT, return value is meaningless
+ * vdev_label_start returns the physical disk offset (in bytes) of
+ * label "l".
  */
 static uint64_t
-vdev_label_offset(uint64_t psize, int l, uint64_t offset)
+vdev_label_start(uint64_t psize, int l)
 {
-	/* XXX Need to add back label support! */
-	if (l >= VDEV_LABELS/2 || offset > sizeof (vdev_label_t)) {
-		errnum = ERR_BAD_ARGUMENT;
-		return (0);
-	}
-
-	return (offset + l * sizeof (vdev_label_t) + (l < VDEV_LABELS / 2 ?
+	return (l * sizeof (vdev_label_t) + (l < VDEV_LABELS / 2 ?
 	    0 : psize - VDEV_LABELS * sizeof (vdev_label_t)));
-
 }
 
 /*
@@ -239,7 +224,7 @@ vdev_uberblock_compare(uberblock_t *ub1, uberblock_t *ub2)
  *    -1 - Failure
  */
 static int
-uberblock_verify(uberblock_phys_t *ub, int offset)
+uberblock_verify(uberblock_phys_t *ub, uint64_t offset)
 {
 
 	uberblock_t *uber = &ub->ubp_uberblock;
@@ -267,15 +252,15 @@ uberblock_verify(uberblock_phys_t *ub, int offset)
  *    Failure - NULL
  */
 static uberblock_phys_t *
-find_bestub(uberblock_phys_t *ub_array, int label)
+find_bestub(uberblock_phys_t *ub_array, uint64_t sector)
 {
 	uberblock_phys_t *ubbest = NULL;
-	int i, offset;
+	uint64_t offset;
+	int i;
 
 	for (i = 0; i < (VDEV_UBERBLOCK_RING >> VDEV_UBERBLOCK_SHIFT); i++) {
-		offset = vdev_label_offset(0, label, VDEV_UBERBLOCK_OFFSET(i));
-		if (errnum == ERR_BAD_ARGUMENT)
-			return (NULL);
+		offset = (sector << SPA_MINBLOCKSHIFT) +
+		    VDEV_UBERBLOCK_OFFSET(i);
 		if (uberblock_verify(&ub_array[i], offset) == 0) {
 			if (ubbest == NULL) {
 				ubbest = &ub_array[i];
@@ -1220,16 +1205,16 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath,
  *	ERR_* - failure
  */
 int
-check_pool_label(int label, char *stack, char *outdevid, char *outpath)
+check_pool_label(uint64_t sector, char *stack, char *outdevid,
+    char *outpath, uint64_t *outguid)
 {
 	vdev_phys_t *vdev;
-	uint64_t sector, pool_state, txg = 0;
+	uint64_t pool_state, txg = 0;
 	char *nvlist, *nv;
 	uint64_t diskguid;
 	uint64_t version;
 
-	sector = (label * sizeof (vdev_label_t) + VDEV_SKIP_SIZE)
-	    >> SPA_MINBLOCKSHIFT;
+	sector += (VDEV_SKIP_SIZE >> SPA_MINBLOCKSHIFT);
 
 	/* Read in the vdev name-value pair list (112K). */
 	if (devread(sector, 0, VDEV_PHYS_SIZE, stack) == 0)
@@ -1273,6 +1258,9 @@ check_pool_label(int label, char *stack, char *outdevid, char *outpath)
 		return (ERR_FSYS_CORRUPT);
 	if (vdev_get_bootpath(nv, diskguid, outdevid, outpath, 0))
 		return (ERR_NO_BOOTPATH);
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_POOL_GUID, outguid,
+	    DATA_TYPE_UINT64, NULL))
+		return (ERR_FSYS_CORRUPT);
 	return (0);
 }
 
@@ -1289,14 +1277,18 @@ zfs_mount(void)
 {
 	char *stack;
 	int label = 0;
-	uberblock_phys_t *ub_array, *ubbest = NULL;
+	uberblock_phys_t *ub_array, *ubbest;
 	objset_phys_t *osp;
 	char tmp_bootpath[MAXNAMELEN];
 	char tmp_devid[MAXNAMELEN];
+	uint64_t tmp_guid;
+	uint64_t adjpl = (uint64_t)part_length << SPA_MINBLOCKSHIFT;
 
 	/* if it's our first time here, zero the best uberblock out */
-	if (best_drive == 0 && best_part == 0 && find_best_root)
+	if (best_drive == 0 && best_part == 0 && find_best_root) {
 		grub_memset(&current_uberblock, 0, sizeof (uberblock_t));
+		pool_guid = 0;
+	}
 
 	stackbase = ZFS_SCRATCH;
 	stack = stackbase;
@@ -1305,30 +1297,34 @@ zfs_mount(void)
 
 	osp = (objset_phys_t *)stack;
 	stack += sizeof (objset_phys_t);
+	adjpl = P2ALIGN(adjpl, (uint64_t)sizeof (vdev_label_t));
 
-	/* XXX add back labels support? */
-	for (label = 0; ubbest == NULL && label < (VDEV_LABELS/2); label++) {
-		uint64_t sector = (label * sizeof (vdev_label_t) +
-		    VDEV_SKIP_SIZE + VDEV_PHYS_SIZE) >> SPA_MINBLOCKSHIFT;
+	for (label = 0; label < VDEV_LABELS; label++) {
+		uint64_t sector = vdev_label_start(adjpl,
+		    label) >> SPA_MINBLOCKSHIFT;
 
 		/* Read in the uberblock ring (128K). */
-		if (devread(sector, 0, VDEV_UBERBLOCK_RING,
+		if (devread(sector  +
+		    ((VDEV_SKIP_SIZE + VDEV_PHYS_SIZE) >>
+		    SPA_MINBLOCKSHIFT), 0, VDEV_UBERBLOCK_RING,
 		    (char *)ub_array) == 0)
 			continue;
 
-		if ((ubbest = find_bestub(ub_array, label)) != NULL &&
+		if ((ubbest = find_bestub(ub_array, sector)) != NULL &&
 		    zio_read(&ubbest->ubp_uberblock.ub_rootbp, osp, stack)
 		    == 0) {
 
 			VERIFY_OS_TYPE(osp, DMU_OST_META);
 
-			if (check_pool_label(label, stack, tmp_devid,
-			    tmp_bootpath))
-				return (0);
+			if (check_pool_label(sector, stack, tmp_devid,
+			    tmp_bootpath, &tmp_guid))
+				continue;
+			if (pool_guid == 0)
+				pool_guid = tmp_guid;
 
-			if (find_best_root &&
+			if (find_best_root && ((pool_guid != tmp_guid) ||
 			    vdev_uberblock_compare(&ubbest->ubp_uberblock,
-			    &(current_uberblock)) <= 0)
+			    &(current_uberblock)) <= 0))
 				continue;
 
 			/* Got the MOS. Save it at the memory addr MOS. */

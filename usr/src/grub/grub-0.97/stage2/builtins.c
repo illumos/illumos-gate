@@ -4226,10 +4226,7 @@ bootfs_func (char *arg, int flags)
 		return 0;
 	}
 
-	if (set_bootfs(arg) == 0) {
-		errnum = ERR_BAD_ARGUMENT;
-		return 0;
-	}
+	grub_memmove(current_bootfs, arg, MAXNAMELEN);
 
 	return (1);
 }

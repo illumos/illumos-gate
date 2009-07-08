@@ -17,13 +17,11 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _FSYS_ZFS_H
 #define	_FSYS_ZFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	FSYS_ZFS
 
@@ -119,6 +117,15 @@ typedef struct uberblock_phys {
 #define	P2PHASE(x, align)		((x) & ((align) - 1))
 #define	DVA_OFFSET_TO_PHYS_SECTOR(offset) \
 	((offset + VDEV_LABEL_START_SIZE) >> SPA_MINBLOCKSHIFT)
+
+/*
+ * return x rounded down to an align boundary
+ * eg, P2ALIGN(1200, 1024) == 1024 (1*align)
+ * eg, P2ALIGN(1024, 1024) == 1024 (1*align)
+ * eg, P2ALIGN(0x1234, 0x100) == 0x1200 (0x12*align)
+ * eg, P2ALIGN(0x5600, 0x100) == 0x5600 (0x56*align)
+ */
+#define	P2ALIGN(x, align)		((x) & -(align))
 
 /*
  * For nvlist manipulation. (from nvpair.h)

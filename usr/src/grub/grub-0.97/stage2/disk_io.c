@@ -1013,12 +1013,6 @@ static enum
 part_choice;
 #endif /* ! STAGE1_5 */
 
-int
-set_bootfs(char *fsname)
-{
-	grub_memmove(current_bootfs, fsname, MAXNAMELEN);
-}
-
 char *
 set_device (char *device)
 {
