@@ -103,6 +103,14 @@
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.firewall.config' />
 		</property_group>
+
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+					remote shell
+				</loctext>
+			</common_name>
+		</template>
 	</instance>
 
 	<!--
@@ -132,12 +140,20 @@
 		</property_group>
 
 		<property_group name='firewall_config' type='com.sun,fw_configuration'>
-			<propval name='policy' type='astring' value='default' />
+			<propval name='policy' type='astring' value='use_global' />
 			<propval name='apply_to' type='astring' value='' />
 			<propval name='exceptions' type='astring' value='' />
 			<propval name='value_authorization' type='astring'
 				value='solaris.smf.value.firewall.config' />
 		</property_group>
+
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+remote shell with Kerberos authentication
+				</loctext>
+			</common_name>
+		</template>
 	</instance>
 
 	<stability value='Unstable' />

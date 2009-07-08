@@ -83,6 +83,14 @@
 			<propval name='name' type='astring' value='login' />
 			<propval name='proto' type='astring' value='tcp6' />
 		</property_group>
+
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+					remote login
+				</loctext>
+			</common_name>
+		</template>
 	</instance>
 
 	<!--
@@ -119,6 +127,14 @@
 			<propval name='name' type='astring' value='klogin' />
 			<propval name='proto' type='astring' value='tcp' />
 		</property_group>
+
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+remote login with Kerberos authentication
+				</loctext>
+			</common_name>
+		</template>
 	</instance>
 
 	<!--
@@ -156,6 +172,14 @@
 			<propval name='name' type='astring' value='eklogin' />
 			<propval name='proto' type='astring' value='tcp' />
 		</property_group>
+
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+remote login with Kerberos authentication and encryption
+				</loctext>
+			</common_name>
+		</template>
 	</instance>
 
 	<stability value='Unstable' />
