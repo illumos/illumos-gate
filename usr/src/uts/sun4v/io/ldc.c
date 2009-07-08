@@ -73,7 +73,7 @@ void i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset);
 
 static int i_ldc_txq_reconf(ldc_chan_t *ldcp);
 static int i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset);
-static int i_ldc_rxq_drain(ldc_chan_t *ldcp);
+static void i_ldc_rxq_drain(ldc_chan_t *ldcp);
 static void i_ldc_reset_state(ldc_chan_t *ldcp);
 static void i_ldc_debug_enter(void);
 
@@ -629,27 +629,43 @@ i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset)
 /*
  * Drain the contents of the receive queue
  */
-static int
+static void
 i_ldc_rxq_drain(ldc_chan_t *ldcp)
 {
 	int rv;
 	uint64_t rx_head, rx_tail;
+	int retries = 0;
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
 	rv = hv_ldc_rx_get_state(ldcp->id, &rx_head, &rx_tail,
 	    &(ldcp->link_state));
 	if (rv) {
-		cmn_err(CE_WARN, "i_ldc_rxq_drain: (0x%lx) cannot get state",
-		    ldcp->id);
-		return (EIO);
+		cmn_err(CE_WARN, "i_ldc_rxq_drain: (0x%lx) cannot get state, "
+		    "rv = 0x%x", ldcp->id, rv);
+		return;
 	}
 
 	/* If the queue is already empty just return success. */
 	if (rx_head == rx_tail)
-		return (0);
+		return;
 
-	/* flush contents by setting the head = tail */
-	return (i_ldc_set_rx_head(ldcp, rx_tail));
+	/*
+	 * We are draining the queue in order to close the channel.
+	 * Call hv_ldc_rx_set_qhead directly instead of i_ldc_set_rx_head
+	 * because we do not need to reset the channel if the set
+	 * qhead fails.
+	 */
+	if ((rv = hv_ldc_rx_set_qhead(ldcp->id, rx_tail)) == 0)
+		return;
+
+	while ((rv == H_EWOULDBLOCK) && (retries++ < ldc_max_retries)) {
+		drv_usecwait(ldc_delay);
+		if ((rv = hv_ldc_rx_set_qhead(ldcp->id, rx_tail)) == 0)
+			return;
+	}
+
+	cmn_err(CE_WARN, "i_ldc_rxq_drain: (0x%lx) cannot set qhead 0x%lx, "
+	    "rv = 0x%x", ldcp->id, rx_tail, rv);
 }
 
 
@@ -792,8 +808,8 @@ i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 		drv_usecwait(ldc_delay);
 	}
 
-	cmn_err(CE_WARN, "ldc_set_rx_qhead: (0x%lx) cannot set qhead 0x%lx",
-	    ldcp->id, head);
+	cmn_err(CE_WARN, "ldc_set_rx_qhead: (0x%lx) cannot set qhead 0x%lx, "
+	    "rv = 0x%x", ldcp->id, head, rv);
 	mutex_enter(&ldcp->tx_lock);
 	i_ldc_reset(ldcp, B_TRUE);
 	mutex_exit(&ldcp->tx_lock);
@@ -3164,7 +3180,7 @@ ldc_close(ldc_handle_t handle)
 	 * cleared.
 	 */
 	(void) i_ldc_txq_reconf(ldcp);
-	(void) i_ldc_rxq_drain(ldcp);
+	i_ldc_rxq_drain(ldcp);
 
 	/*
 	 * Unregister the channel with the nexus
