@@ -33,6 +33,7 @@
  */
 
 #include "lint.h"
+#include "mtlib.h"
 #include <fcntl.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -45,7 +46,107 @@
 #include <pthread.h>
 #include <zone.h>
 #include <libscf.h>
+#include <thread.h>
+#include <dlfcn.h>
+#include <atomic.h>
 
+/*
+ * Pull in the following three interfaces from libscf without introducing
+ * a dependency on it, which since libscf depends on libc would be circular:
+ *
+ * scf_simple_prop_get
+ * scf_simple_prop_next_boolean
+ * scf_simple_prop_free
+ */
+typedef scf_simple_prop_t *(*scf_simple_prop_get_t)(scf_handle_t *,
+    const char *, const char *, const char *);
+static scf_simple_prop_get_t real_scf_simple_prop_get = NULL;
+typedef uint8_t *(*scf_simple_prop_next_boolean_t)(scf_simple_prop_t *);
+static scf_simple_prop_next_boolean_t real_scf_simple_prop_next_boolean = NULL;
+typedef void (*scf_simple_prop_free_t)(scf_simple_prop_t *);
+static scf_simple_prop_free_t real_scf_simple_prop_free = NULL;
+static mutex_t scf_lock = DEFAULTMUTEX;
+
+static void
+load_scf(void)
+{
+	void *scf_handle = dlopen("libscf.so.1", RTLD_LAZY);
+	scf_simple_prop_get_t scf_simple_prop_get = (scf_handle == NULL)? NULL :
+	    (scf_simple_prop_get_t)dlsym(scf_handle, "scf_simple_prop_get");
+	scf_simple_prop_next_boolean_t scf_simple_prop_next_boolean =
+	    (scf_handle == NULL)? NULL :
+	    (scf_simple_prop_next_boolean_t)dlsym(scf_handle,
+	    "scf_simple_prop_next_boolean");
+	scf_simple_prop_free_t scf_simple_prop_free =
+	    (scf_handle == NULL)? NULL :
+	    (scf_simple_prop_free_t)dlsym(scf_handle, "scf_simple_prop_free");
+
+	lmutex_lock(&scf_lock);
+	if (real_scf_simple_prop_get == NULL ||
+	    real_scf_simple_prop_next_boolean == NULL ||
+	    real_scf_simple_prop_free == NULL) {
+		if (scf_simple_prop_get == NULL)
+			real_scf_simple_prop_get = (scf_simple_prop_get_t)(-1);
+		else {
+			real_scf_simple_prop_get = scf_simple_prop_get;
+			scf_handle = NULL;	/* don't dlclose it */
+		}
+		if (scf_simple_prop_next_boolean == NULL)
+			real_scf_simple_prop_next_boolean =
+			    (scf_simple_prop_next_boolean_t)(-1);
+		else {
+			real_scf_simple_prop_next_boolean =
+			    scf_simple_prop_next_boolean;
+			scf_handle = NULL;	/* don't dlclose it */
+		}
+		if (scf_simple_prop_free == NULL)
+			real_scf_simple_prop_free =
+			    (scf_simple_prop_free_t)(-1);
+		else {
+			real_scf_simple_prop_free = scf_simple_prop_free;
+			scf_handle = NULL;	/* don't dlclose it */
+		}
+		membar_producer();
+	}
+	lmutex_unlock(&scf_lock);
+
+	if (scf_handle)
+		(void) dlclose(scf_handle);
+}
+
+static void
+check_archive_update(void)
+{
+	scf_simple_prop_t *prop = NULL;
+	boolean_t update_flag = B_FALSE;
+	char *fmri = "svc:/system/boot-config:default";
+	uint8_t *ret_val = NULL;
+
+	if (real_scf_simple_prop_get == NULL ||
+	    real_scf_simple_prop_next_boolean == NULL ||
+	    real_scf_simple_prop_free == NULL) {
+		load_scf();
+	}
+	if (real_scf_simple_prop_get == (scf_simple_prop_get_t)(-1) ||
+	    real_scf_simple_prop_next_boolean ==
+	    (scf_simple_prop_next_boolean_t)(-1) ||
+	    real_scf_simple_prop_free == (scf_simple_prop_free_t)(-1)) {
+		return;
+	}
+
+	prop = real_scf_simple_prop_get(NULL, fmri, "config",
+	    "uadmin_boot_archive_sync");
+	if (prop) {
+		if ((ret_val = real_scf_simple_prop_next_boolean(prop)) !=
+		    NULL)
+			update_flag = (*ret_val == 0) ? B_FALSE :
+			    B_TRUE;
+		real_scf_simple_prop_free(prop);
+	}
+
+	if (update_flag == B_TRUE)
+		(void) system("/sbin/bootadm update-archive");
+}
 static int
 legal_arg(char *bargs)
 {
@@ -69,10 +170,6 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	char *bargs, cmdbuf[256];
 	struct stat sbuf;
 	char *altroot;
-	scf_simple_prop_t *prop = NULL;
-	uint8_t *ret_val = NULL;
-	boolean_t update_flag = B_FALSE;
-	char *fmri = "svc:/system/boot-config:default";
 
 	bargs = (char *)mdep;
 
@@ -164,18 +261,7 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 			}
 			(void) system(cmdbuf);
 		}
-
-		prop = scf_simple_prop_get(NULL, fmri, "config",
-		    "uadmin_boot_archive_sync");
-		if (prop) {
-			if ((ret_val = scf_simple_prop_next_boolean(prop)) !=
-			    NULL)
-				update_flag = (*ret_val == 0) ? B_FALSE :
-				    B_TRUE;
-			scf_simple_prop_free(prop);
-		}
-		if (update_flag == B_TRUE)
-			(void) system("/sbin/bootadm update-archive");
+		check_archive_update();
 	}
 
 	return (__uadmin(cmd, fcn, mdep));
