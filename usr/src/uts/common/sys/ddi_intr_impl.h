@@ -62,7 +62,9 @@ typedef enum {
 	DDI_INTROP_CLRMASK,		/* 17 clear mask */
 	DDI_INTROP_GETPENDING,		/* 18 get pending interrupt */
 	DDI_INTROP_NAVAIL,		/* 19 get num of available interrupts */
-	DDI_INTROP_GETPOOL		/* 20 get resource management pool */
+	DDI_INTROP_GETPOOL,		/* 20 get resource management pool */
+	DDI_INTROP_GETTARGET,		/* 21 get target for a given intr(s) */
+	DDI_INTROP_SETTARGET		/* 22 set target for a given intr(s) */
 } ddi_intr_op_t;
 
 /* Version number used in the handles */
@@ -112,6 +114,14 @@ typedef struct ddi_intr_handle_impl {
 	void			*ih_private;	/* Platform specific data */
 	uint_t			ih_scratch1;	/* Scratch1: #interrupts */
 	void			*ih_scratch2;	/* Scratch2: flag/h_array */
+
+	/*
+	 * The ih_target field may not reflect the actual target that is
+	 * currently being used for the given interrupt. This field is just a
+	 * snapshot taken either during ddi_intr_add_handler() or
+	 * ddi_intr_get/set_affinity() calls.
+	 */
+	ddi_intr_target_t	ih_target;	/* Target ID */
 } ddi_intr_handle_impl_t;
 
 /* values for ih_state (strictly for interrupt handle) */

@@ -44,7 +44,7 @@ extern int px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 
 extern int px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	ddi_intr_handle_impl_t *hdlp, msiq_rec_type_t rec_type,
-	msgcode_t msg_code, msiqid_t *msiq_id_p);
+	msgcode_t msg_code, cpuid_t cpuid, msiqid_t *msiq_id_p);
 extern int px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	ddi_intr_handle_impl_t *hdlp, msiq_rec_type_t rec_type,
 	msgcode_t msg_code, msiqid_t msiq_id);

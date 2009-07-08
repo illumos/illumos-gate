@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI Interrupt Block (RISCx) implementation
@@ -893,6 +891,122 @@ ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 	return (ret);
 }
+
+/*
+ * Get interrupt CPU for a given ino.
+ * Return info only for inos which are already mapped to devices.
+ */
+/*ARGSUSED*/
+int
+ib_get_intr_target(pci_t *pci_p, ib_ino_t ino, int *cpu_id_p)
+{
+	dev_info_t		*dip = pci_p->pci_dip;
+	ib_t			*ib_p = pci_p->pci_ib_p;
+	volatile uint64_t	*imregp;
+	uint64_t		imregval;
+
+	DEBUG1(DBG_IB, dip, "ib_get_intr_target: ino %x\n", ino);
+
+	imregp = ib_intr_map_reg_addr(ib_p, ino);
+	imregval = *imregp;
+
+	*cpu_id_p = ib_map_reg_get_cpu(imregval);
+
+	DEBUG1(DBG_IB, dip, "ib_get_intr_target: cpu_id %x\n", *cpu_id_p);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Associate a new CPU with a given ino.
+ * Operate only on inos which are already mapped to devices.
+ */
+int
+ib_set_intr_target(pci_t *pci_p, ib_ino_t ino, int cpu_id)
+{
+	dev_info_t		*dip = pci_p->pci_dip;
+	ib_t			*ib_p = pci_p->pci_ib_p;
+	int			ret = DDI_SUCCESS;
+	uint32_t		old_cpu_id;
+	hrtime_t		start_time;
+	uint64_t		imregval;
+	uint64_t		new_imregval;
+	volatile uint64_t	*imregp;
+	volatile uint64_t	*idregp;
+	extern const int	_ncpu;
+	extern cpu_t		*cpu[];
+
+	DEBUG2(DBG_IB, dip, "ib_set_intr_target: ino %x cpu_id %x\n",
+	    ino, cpu_id);
+
+	imregp = (uint64_t *)ib_intr_map_reg_addr(ib_p, ino);
+	idregp = IB_INO_INTR_STATE_REG(ib_p, ino);
+
+	/* Save original mapreg value. */
+	imregval = *imregp;
+	DEBUG1(DBG_IB, dip, "ib_set_intr_target: orig mapreg value: 0x%llx\n",
+	    imregval);
+
+	/* Operate only on inos which are already enabled. */
+	if (!(imregval & COMMON_INTR_MAP_REG_VALID))
+		return (DDI_FAILURE);
+
+	/* Is this request a noop? */
+	if ((old_cpu_id = ib_map_reg_get_cpu(imregval)) == cpu_id)
+		return (DDI_SUCCESS);
+
+	/* Clear the interrupt valid/enable bit for particular ino. */
+	DEBUG0(DBG_IB, dip, "Clearing intr_enabled...\n");
+	*imregp = imregval & ~COMMON_INTR_MAP_REG_VALID;
+
+	/* Wait until there are no more pending interrupts. */
+	start_time = gethrtime();
+
+	DEBUG0(DBG_IB, dip, "About to check for pending interrupts...\n");
+
+	while (IB_INO_INTR_PENDING(idregp, ino)) {
+		DEBUG0(DBG_IB, dip, "Waiting for pending ints to clear\n");
+		if ((gethrtime() - start_time) < pci_intrpend_timeout) {
+			continue;
+		} else { /* Timed out waiting. */
+			DEBUG0(DBG_IB, dip, "Timed out waiting \n");
+			return (DDI_EPENDING);
+		}
+	}
+
+	new_imregval = *imregp;
+
+	DEBUG1(DBG_IB, dip,
+	    "after disabling intr, mapreg value: 0x%llx\n", new_imregval);
+
+	/*
+	 * Get lock, validate cpu and write new mapreg value.
+	 */
+	mutex_enter(&cpu_lock);
+	if ((cpu_id < _ncpu) && (cpu[cpu_id] && cpu_is_online(cpu[cpu_id]))) {
+		/* Prepare new mapreg value with intr enabled and new cpu_id. */
+		new_imregval &=
+		    COMMON_INTR_MAP_REG_IGN | COMMON_INTR_MAP_REG_INO;
+		new_imregval = ib_get_map_reg(new_imregval, cpu_id);
+
+		DEBUG1(DBG_IB, dip, "Writing new mapreg value:0x%llx\n",
+		    new_imregval);
+
+		*imregp = new_imregval;
+
+		ib_log_new_cpu(ib_p, old_cpu_id, cpu_id, ino);
+	} else {	/* Invalid cpu.  Restore original register image. */
+		DEBUG0(DBG_IB, dip,
+		    "Invalid cpuid: writing orig mapreg value\n");
+
+		*imregp = imregval;
+		ret = DDI_EINVAL;
+	}
+	mutex_exit(&cpu_lock);
+
+	return (ret);
+}
+
 
 /*
  * Return the dips or number of dips associated with a given interrupt block.

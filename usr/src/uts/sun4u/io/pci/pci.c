@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1298,8 +1298,8 @@ int
 pci_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
     ddi_intr_handle_impl_t *hdlp, void *result)
 {
-	pci_t		*pci_p = get_pci_soft_state(
-	    ddi_get_instance(dip));
+	pci_t		*pci_p = get_pci_soft_state(ddi_get_instance(dip));
+	ib_ino_t	ino;
 	int		ret = DDI_SUCCESS;
 
 	switch (intr_op) {
@@ -1326,6 +1326,14 @@ pci_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	case DDI_INTROP_REMISR:
 		ret = pci_remove_intr(dip, rdip, hdlp);
+		break;
+	case DDI_INTROP_GETTARGET:
+		ino = IB_MONDO_TO_INO(pci_xlate_intr(dip, rdip,
+		    pci_p->pci_ib_p, IB_MONDO_TO_INO(hdlp->ih_vector)));
+		ret = ib_get_intr_target(pci_p, ino, (int *)result);
+		break;
+	case DDI_INTROP_SETTARGET:
+		ret = DDI_ENOTSUP;
 		break;
 	case DDI_INTROP_ENABLE:
 		ret = ib_update_intr_state(pci_p, rdip, hdlp,

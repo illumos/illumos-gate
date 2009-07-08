@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/machsystm.h>	/* intr_dist_add */
 #include <sys/modctl.h>
 #include <sys/disp.h>
 #include <sys/stat.h>
@@ -46,7 +47,8 @@ static void px_msiq_get_props(px_t *px_p);
 int
 px_msiq_attach(px_t *px_p)
 {
-	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
 	int		i, ret = DDI_SUCCESS;
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_attach\n");
@@ -68,11 +70,8 @@ px_msiq_attach(px_t *px_p)
 	    msiq_state_p->msiq_msg_qcnt;
 
 	msiq_state_p->msiq_1st_msi_qid = msiq_state_p->msiq_1st_msiq_id;
-	msiq_state_p->msiq_next_msi_qid = msiq_state_p->msiq_1st_msi_qid;
-
 	msiq_state_p->msiq_1st_msg_qid = msiq_state_p->msiq_1st_msiq_id +
 	    msiq_state_p->msiq_msi_qcnt;
-	msiq_state_p->msiq_next_msg_qid = msiq_state_p->msiq_1st_msg_qid;
 
 	mutex_init(&msiq_state_p->msiq_mutex, NULL, MUTEX_DRIVER, NULL);
 	msiq_state_p->msiq_p = kmem_zalloc(msiq_state_p->msiq_cnt *
@@ -83,11 +82,14 @@ px_msiq_attach(px_t *px_p)
 		    msiq_state_p->msiq_1st_msiq_id + i;
 		msiq_state_p->msiq_p[i].msiq_refcnt = 0;
 		msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
+		(void) px_ib_alloc_ino(ib_p, px_msiqid_to_devino(px_p,
+		    msiq_state_p->msiq_p[i].msiq_id));
 	}
 
 	if ((ret = px_lib_msiq_init(px_p->px_dip)) != DDI_SUCCESS)
 		px_msiq_detach(px_p);
 
+	msiq_state_p->msiq_redist_flag = B_TRUE;
 	return (ret);
 }
 
@@ -110,11 +112,11 @@ px_msiq_detach(px_t *px_p)
 	kmem_free(msiq_state_p->msiq_p,
 	    msiq_state_p->msiq_cnt * sizeof (px_msiq_t));
 
-	bzero(&px_p->px_ib_p->ib_msiq_state, sizeof (px_msiq_state_t));
+	bzero(msiq_state_p, sizeof (px_msiq_state_t));
 }
 
 /*
- * px_msiq_detach()
+ * px_msiq_resume()
  */
 void
 px_msiq_resume(px_t *px_p)
@@ -123,7 +125,8 @@ px_msiq_resume(px_t *px_p)
 	int		i;
 
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
-		(void) px_lib_msiq_gethead(px_p->px_dip, i,
+		(void) px_lib_msiq_gethead(px_p->px_dip,
+		    msiq_state_p->msiq_p[i].msiq_id,
 		    &msiq_state_p->msiq_p[i].msiq_curr_head_index);
 		msiq_state_p->msiq_p[i].msiq_new_head_index = 0;
 		msiq_state_p->msiq_p[i].msiq_recs2process = 0;
@@ -136,53 +139,128 @@ px_msiq_resume(px_t *px_p)
 int
 px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msiqid_t *msiq_id_p)
 {
-	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	msiqid_t	first_msiq_id, *next_msiq_index;
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
+	msiqid_t	first_msiq_id;
 	uint_t		msiq_cnt;
+	ushort_t	least_refcnt;
 	int		i;
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_alloc\n");
+
+	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
+	mutex_enter(&msiq_state_p->msiq_mutex);
+
+	if (rec_type == MSG_REC) {
+		msiq_cnt = msiq_state_p->msiq_msg_qcnt;
+		first_msiq_id = msiq_state_p->msiq_1st_msg_qid;
+	} else {
+		msiq_cnt = msiq_state_p->msiq_msi_qcnt;
+		first_msiq_id = msiq_state_p->msiq_1st_msi_qid;
+	}
+
+	*msiq_id_p = first_msiq_id;
+	least_refcnt = msiq_state_p->msiq_p[first_msiq_id].msiq_refcnt;
+
+	/* Allocate MSIQs */
+	for (i = first_msiq_id; i < (first_msiq_id + msiq_cnt); i++) {
+		if (msiq_state_p->msiq_p[i].msiq_state == MSIQ_STATE_FREE) {
+			msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_INUSE;
+			(void) px_lib_msiq_gethead(px_p->px_dip, i,
+			    &msiq_state_p->msiq_p[i].msiq_curr_head_index);
+			*msiq_id_p = msiq_state_p->msiq_p[i].msiq_id;
+			break;
+		}
+
+		if (least_refcnt > msiq_state_p->msiq_p[i].msiq_refcnt) {
+			*msiq_id_p = msiq_state_p->msiq_p[i].msiq_id;
+			least_refcnt = msiq_state_p->msiq_p[i].msiq_refcnt;
+		}
+	}
+
+	msiq_state_p->msiq_p[*msiq_id_p].msiq_refcnt++;
+
+	DBG(DBG_MSIQ, px_p->px_dip,
+	    "px_msiq_alloc: msiq_id 0x%x\n", *msiq_id_p);
+
+	mutex_exit(&msiq_state_p->msiq_mutex);
+	return (DDI_SUCCESS);
+}
+
+/*
+ * px_msiq_alloc_based_on_cpuid()
+ */
+int
+px_msiq_alloc_based_on_cpuid(px_t *px_p, msiq_rec_type_t rec_type,
+    cpuid_t cpuid, msiqid_t *msiq_id_p)
+{
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
+	msiqid_t	first_msiq_id, free_msiq_id;
+	uint_t		msiq_cnt;
+	ushort_t	least_refcnt;
+	px_ino_t	*ino_p;
+	int		i;
+
+	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_alloc_based_on_cpuid: "
+	    "cpuid 0x%x\n", cpuid);
+
+	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 
 	mutex_enter(&msiq_state_p->msiq_mutex);
 
 	if (rec_type == MSG_REC) {
 		msiq_cnt = msiq_state_p->msiq_msg_qcnt;
 		first_msiq_id = msiq_state_p->msiq_1st_msg_qid;
-		next_msiq_index = &msiq_state_p->msiq_next_msg_qid;
 	} else {
 		msiq_cnt = msiq_state_p->msiq_msi_qcnt;
 		first_msiq_id = msiq_state_p->msiq_1st_msi_qid;
-		next_msiq_index = &msiq_state_p->msiq_next_msi_qid;
 	}
+
+	*msiq_id_p = free_msiq_id = (msiqid_t)-1;
+	least_refcnt = (ushort_t)-1;
 
 	/* Allocate MSIQs */
 	for (i = first_msiq_id; i < (first_msiq_id + msiq_cnt); i++) {
-		if (msiq_state_p->msiq_p[i].msiq_state == MSIQ_STATE_FREE) {
-			msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_INUSE;
-			msiq_state_p->msiq_p[i].msiq_refcnt = 1;
-			(void) px_lib_msiq_gethead(px_p->px_dip, i,
-			    &msiq_state_p->msiq_p[i].msiq_curr_head_index);
-			break;
+		ino_p = px_ib_locate_ino(ib_p, px_msiqid_to_devino(px_p, i));
+
+		if ((ino_p->ino_cpuid == cpuid) &&
+		    (least_refcnt > msiq_state_p->msiq_p[i].msiq_refcnt)) {
+			*msiq_id_p = msiq_state_p->msiq_p[i].msiq_id;
+			least_refcnt = msiq_state_p->msiq_p[i].msiq_refcnt;
 		}
+
+		if ((*msiq_id_p == -1) && (free_msiq_id == -1) &&
+		    (msiq_state_p->msiq_p[i].msiq_state == MSIQ_STATE_FREE))
+			free_msiq_id = msiq_state_p->msiq_p[i].msiq_id;
 	}
 
-	/*
-	 * There are no free MSIQ.
-	 * Use next available MSIQ.
-	 */
-	if (i >= (first_msiq_id + msiq_cnt)) {
-		i = *next_msiq_index;
-		msiq_state_p->msiq_p[i].msiq_refcnt++;
+	if (*msiq_id_p == -1) {
+		if (free_msiq_id == -1) {
+			DBG(DBG_MSIQ, px_p->px_dip,
+			    "px_msiq_alloc_based_on_cpuid: No EQ is available "
+			    "for CPU 0x%x\n", cpuid);
+
+			mutex_exit(&msiq_state_p->msiq_mutex);
+			return (DDI_EINVAL);
+		}
+
+		*msiq_id_p = free_msiq_id;
+		ino_p = px_ib_locate_ino(ib_p,
+		    px_msiqid_to_devino(px_p, *msiq_id_p));
+		ino_p->ino_cpuid = ino_p->ino_default_cpuid = cpuid;
 	}
 
-	*msiq_id_p = msiq_state_p->msiq_p[i].msiq_id;
+	if (msiq_state_p->msiq_p[*msiq_id_p].msiq_state == MSIQ_STATE_FREE) {
+		msiq_state_p->msiq_p[*msiq_id_p].msiq_state = MSIQ_STATE_INUSE;
+		(void) px_lib_msiq_gethead(px_p->px_dip, *msiq_id_p,
+		    &msiq_state_p->msiq_p[*msiq_id_p].msiq_curr_head_index);
+	}
+
+	msiq_state_p->msiq_p[*msiq_id_p].msiq_refcnt++;
+
 	DBG(DBG_MSIQ, px_p->px_dip,
-	    "px_msiq_alloc: msiq_id 0x%x\n", *msiq_id_p);
-
-	(*next_msiq_index)++;
-
-	if (*next_msiq_index >= (first_msiq_id + msiq_cnt))
-		*next_msiq_index = first_msiq_id;
+	    "px_msiq_alloc_based_on_cpuid: msiq_id 0x%x\n", *msiq_id_p);
 
 	mutex_exit(&msiq_state_p->msiq_mutex);
 	return (DDI_SUCCESS);
@@ -194,16 +272,20 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msiqid_t *msiq_id_p)
 int
 px_msiq_free(px_t *px_p, msiqid_t msiq_id)
 {
-	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_free: msiq_id 0x%x", msiq_id);
 
+	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 	mutex_enter(&msiq_state_p->msiq_mutex);
 
 	if ((msiq_id < msiq_state_p->msiq_1st_msiq_id) || (msiq_id >=
 	    (msiq_state_p->msiq_1st_msiq_id + msiq_state_p->msiq_cnt))) {
 		DBG(DBG_MSIQ, px_p->px_dip,
 		    "px_msiq_free: Invalid msiq_id 0x%x", msiq_id);
+
+		mutex_exit(&msiq_state_p->msiq_mutex);
 		return (DDI_FAILURE);
 	}
 
@@ -212,6 +294,45 @@ px_msiq_free(px_t *px_p, msiqid_t msiq_id)
 
 	mutex_exit(&msiq_state_p->msiq_mutex);
 	return (DDI_SUCCESS);
+}
+
+/*
+ * px_msiq_redist()
+ */
+void
+px_msiq_redist(px_t *px_p)
+{
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
+	px_ino_t	*ino_p;
+	int		i;
+
+	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
+
+	mutex_enter(&msiq_state_p->msiq_mutex);
+
+	if (msiq_state_p->msiq_redist_flag == B_FALSE) {
+		mutex_exit(&msiq_state_p->msiq_mutex);
+		return;
+	}
+
+	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
+		ino_p = px_ib_locate_ino(ib_p,
+		    px_msiqid_to_devino(px_p, msiq_state_p->msiq_p[i].msiq_id));
+
+		if (ino_p) {
+			ino_p->ino_cpuid = ino_p->ino_default_cpuid =
+			    intr_dist_cpuid();
+
+			DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_redist: "
+			    "sysino 0x%llx current cpuid 0x%x "
+			    "default cpuid 0x%x\n", ino_p->ino_sysino,
+			    ino_p->ino_cpuid, ino_p->ino_default_cpuid);
+		}
+	}
+
+	msiq_state_p->msiq_redist_flag = B_FALSE;
+	mutex_exit(&msiq_state_p->msiq_mutex);
 }
 
 /*

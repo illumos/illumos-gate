@@ -365,6 +365,8 @@ px_msiq_intr(caddr_t arg)
 			DTRACE_PROBE4(interrupt__start, dev_info_t, dip,
 			    void *, handler, caddr_t, arg1, caddr_t, arg2);
 
+			ih_p->ih_retarget_flag = B_FALSE;
+
 			/*
 			 * Special case for PCIE Error Messages.
 			 * The current frame work doesn't fit PCIE Err Msgs
@@ -496,6 +498,13 @@ px_intx_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_REMISR:
 		ret = px_rem_intx_intr(dip, rdip, hdlp);
 		break;
+	case DDI_INTROP_GETTARGET:
+		ret = px_ib_get_intr_target(px_p, hdlp->ih_vector,
+		    (cpuid_t *)result);
+		break;
+	case DDI_INTROP_SETTARGET:
+		ret = DDI_ENOTSUP;
+		break;
 	case DDI_INTROP_ENABLE:
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
 		    hdlp->ih_vector, hdlp->ih_pri, PX_INTR_STATE_ENABLE, 0, 0);
@@ -538,7 +547,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	msinum_t		msi_num;
 	msiqid_t		msiq_id;
 	uint_t			nintrs;
-	int			i, ret = DDI_SUCCESS;
+	int			ret = DDI_SUCCESS;
 
 	DBG(DBG_INTROPS, dip, "px_msix_ops: dip=%x rdip=%x intr_op=%x "
 	    "handle=%p\n", dip, rdip, intr_op, hdlp);
@@ -554,9 +563,15 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		msi_addr = msi_state_p->msi_addr32;
 	}
 
+	(void) px_msi_get_msinum(px_p, hdlp->ih_dip,
+	    (hdlp->ih_flags & DDI_INTR_MSIX_DUP) ? hdlp->ih_main->ih_inum :
+	    hdlp->ih_inum, &msi_num);
+
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
 		ret = pci_msi_get_cap(rdip, hdlp->ih_type, (int *)result);
+		if (ret == DDI_SUCCESS)
+			*(int *)result |= DDI_INTR_FLAG_RETARGETABLE;
 		break;
 	case DDI_INTROP_SETCAP:
 		DBG(DBG_INTROPS, dip, "px_msix_ops: SetCap is not supported\n");
@@ -624,12 +639,8 @@ msi_free:
 	case DDI_INTROP_SETPRI:
 		break;
 	case DDI_INTROP_ADDISR:
-		if ((ret = px_msi_get_msinum(px_p, hdlp->ih_dip,
-		    hdlp->ih_inum, &msi_num)) != DDI_SUCCESS)
-			return (ret);
-
 		if ((ret = px_add_msiq_intr(dip, rdip, hdlp,
-		    msiq_rec_type, msi_num, &msiq_id)) != DDI_SUCCESS) {
+		    msiq_rec_type, msi_num, -1, &msiq_id)) != DDI_SUCCESS) {
 			DBG(DBG_INTROPS, dip, "px_msix_ops: Add MSI handler "
 			    "failed, rdip 0x%p msi 0x%x\n", rdip, msi_num);
 			return (ret);
@@ -651,7 +662,14 @@ msi_free:
 			return (ret);
 		}
 
-		hdlp->ih_vector = msi_num;
+		if ((ret = px_lib_msi_setvalid(dip, msi_num,
+		    PCI_MSI_VALID)) != DDI_SUCCESS)
+			return (ret);
+
+		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
+		    px_msiqid_to_devino(px_p, msiq_id), hdlp->ih_pri,
+		    PX_INTR_STATE_ENABLE, msiq_rec_type, msi_num);
+
 		break;
 	case DDI_INTROP_DUPVEC:
 		DBG(DBG_INTROPS, dip, "px_msix_ops: dupisr - inum: %x, "
@@ -661,10 +679,18 @@ msi_free:
 		    hdlp->ih_scratch1);
 		break;
 	case DDI_INTROP_REMISR:
-		msi_num = hdlp->ih_vector;
-
 		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
 		    &msiq_id)) != DDI_SUCCESS)
+			return (ret);
+
+		if ((ret = px_ib_update_intr_state(px_p, rdip,
+		    hdlp->ih_inum, px_msiqid_to_devino(px_p, msiq_id),
+		    hdlp->ih_pri, PX_INTR_STATE_DISABLE, msiq_rec_type,
+		    msi_num)) != DDI_SUCCESS)
+			return (ret);
+
+		if ((ret = px_lib_msi_setvalid(dip, msi_num,
+		    PCI_MSI_INVALID)) != DDI_SUCCESS)
 			return (ret);
 
 		if ((ret = px_lib_msi_setstate(dip, msi_num,
@@ -674,125 +700,78 @@ msi_free:
 		ret = px_rem_msiq_intr(dip, rdip,
 		    hdlp, msiq_rec_type, msi_num, msiq_id);
 
-		hdlp->ih_vector = 0;
 		break;
-	case DDI_INTROP_ENABLE:
-		msi_num = hdlp->ih_vector;
-
-		if ((ret = px_lib_msi_setvalid(dip, msi_num,
-		    PCI_MSI_VALID)) != DDI_SUCCESS)
+	case DDI_INTROP_GETTARGET:
+		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
+		    &msiq_id)) != DDI_SUCCESS)
 			return (ret);
 
-		if ((pci_is_msi_enabled(rdip, hdlp->ih_type) != DDI_SUCCESS) ||
-		    (hdlp->ih_type == DDI_INTR_TYPE_MSIX)) {
-			nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
-
-			if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
-			    nintrs, hdlp->ih_inum, msi_addr,
-			    hdlp->ih_type == DDI_INTR_TYPE_MSIX ?
-			    msi_num : msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
-				return (ret);
-
-			if ((ret = pci_msi_enable_mode(rdip, hdlp->ih_type))
-			    != DDI_SUCCESS)
-				return (ret);
+		ret = px_ib_get_intr_target(px_p,
+		    px_msiqid_to_devino(px_p, msiq_id), (cpuid_t *)result);
+		break;
+	case DDI_INTROP_SETTARGET:
+		ret = px_ib_set_msix_target(px_p, hdlp, msi_num,
+		    *(cpuid_t *)result);
+		break;
+	case DDI_INTROP_ENABLE:
+		/*
+		 * curr_nenables will be greater than 0 if rdip is using
+		 * MSI-X and also, if it is using DUP interface. If this
+		 * curr_enables is > 1, return after clearing the mask bit.
+		 */
+		if ((pci_is_msi_enabled(rdip, hdlp->ih_type) == DDI_SUCCESS) &&
+		    (i_ddi_intr_get_current_nenables(rdip) > 0)) {
+			return (pci_msi_clr_mask(rdip, hdlp->ih_type,
+			    hdlp->ih_inum));
 		}
+
+		nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
+
+		if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
+		    nintrs, hdlp->ih_inum, msi_addr,
+		    hdlp->ih_type == DDI_INTR_TYPE_MSIX ? msi_num :
+		    msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
+			return (ret);
+
+		if ((ret = pci_msi_enable_mode(rdip,
+		    hdlp->ih_type)) != DDI_SUCCESS)
+			return (ret);
 
 		if ((ret = pci_msi_clr_mask(rdip, hdlp->ih_type,
 		    hdlp->ih_inum)) != DDI_SUCCESS)
 			return (ret);
 
-		if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
-			break;
-
-		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
-		    &msiq_id)) != DDI_SUCCESS)
-			return (ret);
-
-		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    px_msiqid_to_devino(px_p, msiq_id), hdlp->ih_pri,
-		    PX_INTR_STATE_ENABLE, msiq_rec_type, msi_num);
-
 		break;
 	case DDI_INTROP_DISABLE:
-		msi_num = hdlp->ih_vector;
-
-		if ((ret = pci_msi_disable_mode(rdip, hdlp->ih_type,
-		    hdlp->ih_cap & DDI_INTR_FLAG_BLOCK)) != DDI_SUCCESS)
-			return (ret);
-
 		if ((ret = pci_msi_set_mask(rdip, hdlp->ih_type,
 		    hdlp->ih_inum)) != DDI_SUCCESS)
 			return (ret);
 
-		if ((ret = px_lib_msi_setvalid(dip, msi_num,
-		    PCI_MSI_INVALID)) != DDI_SUCCESS)
+		/*
+		 * curr_nenables will be greater than 1 if rdip is using
+		 * MSI-X and also, if it is using DUP interface. If this
+		 * curr_enables is > 1, return after setting the mask bit.
+		 */
+		if (i_ddi_intr_get_current_nenables(rdip) > 1)
+			return (DDI_SUCCESS);
+
+		if ((ret = pci_msi_disable_mode(rdip, hdlp->ih_type))
+		    != DDI_SUCCESS)
 			return (ret);
-
-		if (hdlp->ih_flags & DDI_INTR_MSIX_DUP)
-			break;
-
-		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
-		    &msiq_id)) != DDI_SUCCESS)
-			return (ret);
-
-		ret = px_ib_update_intr_state(px_p, rdip,
-		    hdlp->ih_inum, px_msiqid_to_devino(px_p, msiq_id),
-		    hdlp->ih_pri, PX_INTR_STATE_DISABLE, msiq_rec_type,
-		    msi_num);
 
 		break;
 	case DDI_INTROP_BLOCKENABLE:
 		nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
-		msi_num = hdlp->ih_vector;
 
 		if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
 		    nintrs, hdlp->ih_inum, msi_addr,
 		    msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
 			return (ret);
 
-		for (i = 0; i < nintrs; i++, msi_num++) {
-			if ((ret = px_lib_msi_setvalid(dip, msi_num,
-			    PCI_MSI_VALID)) != DDI_SUCCESS)
-				return (ret);
-
-			if ((ret = px_lib_msi_getmsiq(dip, msi_num,
-			    &msiq_id)) != DDI_SUCCESS)
-				return (ret);
-
-			if ((ret = px_ib_update_intr_state(px_p, rdip,
-			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
-			    msiq_id), hdlp->ih_pri, PX_INTR_STATE_ENABLE,
-			    msiq_rec_type, msi_num)) != DDI_SUCCESS)
-				return (ret);
-		}
-
 		ret = pci_msi_enable_mode(rdip, hdlp->ih_type);
 		break;
 	case DDI_INTROP_BLOCKDISABLE:
-		nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
-		msi_num = hdlp->ih_vector;
-
-		if ((ret = pci_msi_disable_mode(rdip, hdlp->ih_type,
-		    hdlp->ih_cap & DDI_INTR_FLAG_BLOCK)) != DDI_SUCCESS)
-			return (ret);
-
-		for (i = 0; i < nintrs; i++, msi_num++) {
-			if ((ret = px_lib_msi_setvalid(dip, msi_num,
-			    PCI_MSI_INVALID)) != DDI_SUCCESS)
-				return (ret);
-
-			if ((ret = px_lib_msi_getmsiq(dip, msi_num,
-			    &msiq_id)) != DDI_SUCCESS)
-				return (ret);
-
-			if ((ret = px_ib_update_intr_state(px_p, rdip,
-			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
-			    msiq_id), hdlp->ih_pri, PX_INTR_STATE_DISABLE,
-			    msiq_rec_type, msi_num)) != DDI_SUCCESS)
-				return (ret);
-		}
-
+		ret = pci_msi_disable_mode(rdip, hdlp->ih_type);
 		break;
 	case DDI_INTROP_SETMASK:
 		ret = pci_msi_set_mask(rdip, hdlp->ih_type, hdlp->ih_inum);
@@ -1030,13 +1009,16 @@ px_add_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	/* Select cpu, saving it for sharing and removal */
 	if (ipil_list == NULL) {
-		ino_p->ino_cpuid = intr_dist_cpuid();
+		if (ino_p->ino_cpuid == -1)
+			ino_p->ino_cpuid = intr_dist_cpuid();
 
 		/* Enable interrupt */
 		px_ib_intr_enable(px_p, ino_p->ino_cpuid, ino);
 	}
 
 ino_done:
+	hdlp->ih_target = ino_p->ino_cpuid;
+
 	/* Add weight to the cpu that we are already targeting */
 	weight = pci_class_to_intr_weight(rdip);
 	intr_dist_cpuid_add_device_weight(ino_p->ino_cpuid, rdip, weight);
@@ -1133,7 +1115,7 @@ fail:
 int
 px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, msiq_rec_type_t rec_type,
-    msgcode_t msg_code, msiqid_t *msiq_id_p)
+    msgcode_t msg_code, cpuid_t cpu_id, msiqid_t *msiq_id_p)
 {
 	px_t		*px_p = INST_TO_STATE(ddi_get_instance(dip));
 	px_ib_t		*ib_p = px_p->px_ib_p;
@@ -1145,22 +1127,26 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	int32_t		weight;
 	int		ret = DDI_SUCCESS;
 
-	DBG(DBG_MSIQ, dip, "px_add_msiq_intr: rdip=%s%d handler=%x "
-	    "arg1=%x arg2=%x\n", ddi_driver_name(rdip), ddi_get_instance(rdip),
-	    hdlp->ih_cb_func, hdlp->ih_cb_arg1, hdlp->ih_cb_arg2);
-
-	if ((ret = px_msiq_alloc(px_p, rec_type, msiq_id_p)) != DDI_SUCCESS) {
-		DBG(DBG_MSIQ, dip, "px_add_msiq_intr: "
-		    "msiq allocation failed\n");
-		return (ret);
-	}
-
-	ino = px_msiqid_to_devino(px_p, *msiq_id_p);
+	DBG(DBG_MSIQ, dip, "px_add_msiq_intr: rdip=%s%d handler=0x%x "
+	    "arg1=0x%x arg2=0x%x cpu=0x%x\n", ddi_driver_name(rdip),
+	    ddi_get_instance(rdip), hdlp->ih_cb_func, hdlp->ih_cb_arg1,
+	    hdlp->ih_cb_arg2, cpu_id);
 
 	ih_p = px_ib_alloc_ih(rdip, hdlp->ih_inum, hdlp->ih_cb_func,
 	    hdlp->ih_cb_arg1, hdlp->ih_cb_arg2, rec_type, msg_code);
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
+
+	ret = (cpu_id == -1) ? px_msiq_alloc(px_p, rec_type, msiq_id_p) :
+	    px_msiq_alloc_based_on_cpuid(px_p, rec_type, cpu_id, msiq_id_p);
+
+	if (ret != DDI_SUCCESS) {
+		DBG(DBG_MSIQ, dip, "px_add_msiq_intr: "
+		    "msiq allocation failed\n");
+		goto fail;
+	}
+
+	ino = px_msiqid_to_devino(px_p, *msiq_id_p);
 
 	ino_p = px_ib_locate_ino(ib_p, ino);
 	ipil_list = ino_p ? ino_p->ino_ipil_p : NULL;
@@ -1221,17 +1207,20 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	/* Select cpu, saving it for sharing and removal */
 	if (ipil_list == NULL) {
-		ino_p->ino_cpuid = intr_dist_cpuid();
-
 		/* Enable MSIQ */
 		px_lib_msiq_setstate(dip, *msiq_id_p, PCI_MSIQ_STATE_IDLE);
 		px_lib_msiq_setvalid(dip, *msiq_id_p, PCI_MSIQ_VALID);
+
+		if (ino_p->ino_cpuid == -1)
+			ino_p->ino_cpuid = intr_dist_cpuid();
 
 		/* Enable interrupt */
 		px_ib_intr_enable(px_p, ino_p->ino_cpuid, ino);
 	}
 
 ino_done:
+	hdlp->ih_target = ino_p->ino_cpuid;
+
 	/* Add weight to the cpu that we are already targeting */
 	weight = pci_class_to_intr_weight(rdip);
 	intr_dist_cpuid_add_device_weight(ino_p->ino_cpuid, rdip, weight);
@@ -1249,6 +1238,8 @@ ino_done:
 fail2:
 	px_ib_delete_ino_pil(ib_p, ipil_p);
 fail1:
+	(void) px_msiq_free(px_p, *msiq_id_p);
+fail:
 	if (ih_p->ih_config_handle)
 		pci_config_teardown(&ih_p->ih_config_handle);
 
@@ -1309,13 +1300,11 @@ px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 		if (ino_p->ino_ipil_size == 0)
 			px_lib_msiq_setvalid(dip,
 			    px_devino_to_msiqid(px_p, ino), PCI_MSIQ_INVALID);
-
-		(void) px_msiq_free(px_p, msiq_id);
 	}
 
-	if (ino_p->ino_ipil_size == 0) {
-		kmem_free(ino_p, sizeof (px_ino_t));
-	} else {
+	(void) px_msiq_free(px_p, msiq_id);
+
+	if (ino_p->ino_ipil_size) {
 		/* Re-enable interrupt only if mapping register still shared */
 		PX_INTR_ENABLE(px_p->px_dip, ino_p->ino_sysino, curr_cpu);
 	}

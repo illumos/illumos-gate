@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/sunddi.h>
@@ -104,7 +102,6 @@ static int pcitool_phys_peek(pci_t *pci_p, boolean_t type, size_t size,
     uint64_t paddr, uint64_t *value_p);
 static int pcitool_phys_poke(pci_t *pci_p, boolean_t type, size_t size,
     uint64_t paddr, uint64_t value);
-static boolean_t pcitool_validate_cpuid(uint32_t cpu_id);
 static int pcitool_access(pci_t *pci_p, uint64_t phys_addr, uint64_t max_addr,
     uint64_t *data, uint8_t size, boolean_t write, boolean_t endian,
     uint32_t *pcitool_status);
@@ -251,22 +248,6 @@ pcitool_phys_poke(pci_t *pci_p, boolean_t type, size_t size,
 }
 
 
-/*
- * Validate the cpu_id passed in.
- * A value of B_TRUE will be returned for success.
- */
-static boolean_t
-pcitool_validate_cpuid(uint32_t cpuid)
-{
-	extern const int _ncpu;
-	extern cpu_t	*cpu[];
-
-	ASSERT(mutex_owned(&cpu_lock));
-
-	return ((cpuid < _ncpu) && (cpu[cpuid] && cpu_is_online(cpu[cpuid])));
-}
-
-
 /*ARGSUSED*/
 static int
 pcitool_intr_info(dev_info_t *dip, void *arg, int mode)
@@ -279,6 +260,9 @@ pcitool_intr_info(dev_info_t *dip, void *arg, int mode)
 	    DDI_SUCCESS) {
 		return (EFAULT);
 	}
+
+	if (intr_info.flags & PCITOOL_INTR_FLAG_GET_MSI)
+		return (ENOTSUP);
 
 	intr_info.ctlr_version = 0;	/* XXX how to get real version? */
 	intr_info.ctlr_type = PCITOOL_CTLR_TYPE_RISC;
@@ -314,6 +298,7 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 	uint64_t imregval;
 	uint32_t ino;
 	uint8_t num_devs_ret;
+	int cpu_id;
 	int copyout_rval;
 	int rval = SUCCESS;
 
@@ -322,6 +307,13 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 	    DDI_SUCCESS) {
 
 		return (EFAULT);
+	}
+
+	if (partial_iget.flags & PCITOOL_INTR_FLAG_GET_MSI) {
+		partial_iget.status = PCITOOL_IO_ERROR;
+		partial_iget.num_devs_ret = 0;
+		rval = ENOTSUP;
+		goto done_get_intr;
 	}
 
 	ino = partial_iget.ino;
@@ -369,7 +361,6 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 	 * This bit happens to be the same on Fire and Tomatillo.
 	 */
 	if (imregval & COMMON_INTR_MAP_REG_VALID) {
-
 		/*
 		 * The following looks up the ib_ino_info and returns
 		 * info of devices mapped to this ino.
@@ -377,18 +368,23 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 		iget->num_devs = ib_get_ino_devs(
 		    ib_p, ino, &iget->num_devs_ret, iget->dev);
 
+		if (ib_get_intr_target(pci_p, ino, &cpu_id) != DDI_SUCCESS) {
+			iget->status = PCITOOL_IO_ERROR;
+			rval = EIO;
+			goto done_get_intr;
+		}
+
 		/*
 		 * Consider only inos mapped to devices (as opposed to
 		 * inos mapped to the bridge itself.
 		 */
 		if (iget->num_devs > 0) {
-
 			/*
 			 * These 2 items are platform specific,
 			 * extracted from the bridge.
 			 */
 			iget->ctlr = 0;
-			iget->cpu_id = ib_map_reg_get_cpu(imregval);
+			iget->cpu_id = cpu_id;
 		}
 	}
 done_get_intr:
@@ -417,16 +413,14 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 {
 	ib_t *ib_p = pci_p->pci_ib_p;
 	int rval = SUCCESS;
-
+	int ret = DDI_SUCCESS;
 	uint8_t zero = 0;
 	pcitool_intr_set_t iset;
-	uint32_t old_cpu_id;
-	hrtime_t start_time;
-	uint64_t imregval;
-	uint64_t new_imregval;
 	volatile uint64_t *imregp;
-	volatile uint64_t *idregp;
+	uint64_t imregval;
+
 	size_t copyinout_size;
+	int old_cpu_id;
 
 	bzero(&iset, sizeof (pcitool_intr_set_t));
 
@@ -452,7 +446,8 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 		goto done_set_intr;
 	}
 
-	if (iset.flags & PCITOOL_INTR_SET_FLAG_GROUP) {
+	if ((iset.flags & PCITOOL_INTR_FLAG_SET_GROUP) ||
+	    (iset.flags & PCITOOL_INTR_FLAG_SET_MSI)) {
 		iset.status = PCITOOL_IO_ERROR;
 		rval = ENOTSUP;
 		goto done_set_intr;
@@ -467,21 +462,7 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 	}
 
 	imregp = (uint64_t *)ib_intr_map_reg_addr(ib_p, iset.ino);
-	idregp = IB_INO_INTR_STATE_REG(ib_p, iset.ino);
-
-	DEBUG4(DBG_TOOLS, dip, "set_intr: cpu:%d, ino:0x%x, mapreg @ "
-	    "0x%llx, intr_stat @ 0x%llx\n",
-	    iset.cpu_id, iset.ino, imregp, idregp);
-
-	/* Save original mapreg value. */
 	imregval = *imregp;
-	DEBUG1(DBG_TOOLS, dip, "orig mapreg value: 0x%llx\n", imregval);
-
-	/* Is this request a noop? */
-	if ((old_cpu_id = ib_map_reg_get_cpu(imregval)) == iset.cpu_id) {
-		iset.status = PCITOOL_SUCCESS;
-		goto done_set_intr;
-	}
 
 	/* Operate only on inos which are already enabled. */
 	if (!(imregval & COMMON_INTR_MAP_REG_VALID)) {
@@ -490,66 +471,32 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 		goto done_set_intr;
 	}
 
-	/* Clear the interrupt valid/enable bit for particular ino. */
-	DEBUG0(DBG_TOOLS, dip, "Clearing intr_enabled...\n");
-	*imregp = imregval & ~COMMON_INTR_MAP_REG_VALID;
-
-	/* Wait until there are no more pending interrupts. */
-	start_time = gethrtime();
-
-	DEBUG0(DBG_TOOLS, dip, "About to check for pending interrupts...\n");
-
-	while (IB_INO_INTR_PENDING(idregp, iset.ino)) {
-
-		DEBUG0(DBG_TOOLS, dip, "Waiting for pending ints to clear\n");
-		if ((gethrtime() - start_time) < pci_intrpend_timeout)
-			continue;
-
-		else {	/* Timed out waiting. */
-			iset.status = PCITOOL_PENDING_INTRTIMEOUT;
-			rval = ETIME;
-			goto done_set_intr;
-		}
+	if (ib_get_intr_target(pci_p, iset.ino, &old_cpu_id) != DDI_SUCCESS) {
+		iset.status = PCITOOL_INVALID_INO;
+		rval = EINVAL;
+		goto done_set_intr;
 	}
 
-	new_imregval = *imregp;
-
-	DEBUG1(DBG_TOOLS, dip,
-	    "after disabling intr, mapreg value: 0x%llx\n", new_imregval);
-
-	/*
-	 * Get lock, validate cpu and write new mapreg value.
-	 * Return original cpu value to caller via iset.cpu_id.
-	 */
-	mutex_enter(&cpu_lock);
-	if (pcitool_validate_cpuid(iset.cpu_id)) {
-
-		/* Prepare new mapreg value with intr enabled and new cpu_id. */
-		new_imregval &=
-		    COMMON_INTR_MAP_REG_IGN | COMMON_INTR_MAP_REG_INO;
-		new_imregval = ib_get_map_reg(new_imregval, iset.cpu_id);
-
-		DEBUG1(DBG_TOOLS, dip, "Writing new mapreg value:0x%llx\n",
-		    new_imregval);
-
-		*imregp = new_imregval;
-
-		ib_log_new_cpu(ib_p, old_cpu_id, iset.cpu_id, iset.ino);
-
-		mutex_exit(&cpu_lock);
-
+	if ((ret = ib_set_intr_target(pci_p, iset.ino,
+	    iset.cpu_id)) == DDI_SUCCESS) {
 		iset.cpu_id = old_cpu_id;
 		iset.status = PCITOOL_SUCCESS;
+		goto done_set_intr;
+	}
 
-	} else {	/* Invalid cpu.  Restore original register image. */
-
-		DEBUG0(DBG_TOOLS, dip,
-		    "Invalid cpuid: writing orig mapreg value\n");
-
-		*imregp = imregval;
-		mutex_exit(&cpu_lock);
+	switch (ret) {
+	case DDI_EPENDING:
+		iset.status = PCITOOL_PENDING_INTRTIMEOUT;
+		rval = ETIME;
+		break;
+	case DDI_EINVAL:
 		iset.status = PCITOOL_INVALID_CPUID;
 		rval = EINVAL;
+		break;
+	default:
+		iset.status = PCITOOL_INVALID_INO;
+		rval = EINVAL;
+		break;
 	}
 done_set_intr:
 	iset.drvr_version = PCITOOL_VERSION;

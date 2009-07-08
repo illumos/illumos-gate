@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -72,7 +70,7 @@ intrmove(path, ino, cpu, num_ino)
 	}
 	iset.ino = ino;
 	iset.cpu_id = cpu;
-	iset.flags = (num_ino > 1) ? PCITOOL_INTR_SET_FLAG_GROUP : 0;
+	iset.flags = (num_ino > 1) ? PCITOOL_INTR_FLAG_SET_GROUP : 0;
 	iset.user_version = PCITOOL_VERSION;
 
 	ret = ioctl(fd, PCITOOL_DEVICE_SET_INTR, &iset);

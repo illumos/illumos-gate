@@ -743,6 +743,8 @@ i_ddi_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t op,
 	switch (op) {
 	case DDI_INTROP_ADDISR:
 	case DDI_INTROP_REMISR:
+	case DDI_INTROP_GETTARGET:
+	case DDI_INTROP_SETTARGET:
 	case DDI_INTROP_ENABLE:
 	case DDI_INTROP_DISABLE:
 	case DDI_INTROP_BLOCKENABLE:

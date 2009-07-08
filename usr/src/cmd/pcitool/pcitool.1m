@@ -24,20 +24,32 @@
 pcitool \- interrupt routing tool
 .SH "SYNOPSIS"
 .PP
-/usr/sbin/pcitool \fIPCI_nexus_node\fR -i ino=\fIino\fR [ -r [ -c ] | -w cpu=\fICPU\fR [ -g ] ] [ -v ] [ -q ]
+/usr/sbin/pcitool \fIpci@<unit-address>\fR -i \fI<ino#> | all\fR [ -r [ -c ] | -w \fI<cpu#>\fR [ -g ] ] [ -v ] [ -q ]
+
+/usr/sbin/pcitool \fIpci@<unit-address>\fR -m \fI<msi#> | all\fR [ -r [ -c ] | -w \fI<cpu#>\fR [ -g ] ] [ -v ] [ -q ]
 
 /usr/sbin/pcitool [ -h ]
 
 .SH "DESCRIPTION"
 .PP
-PCItool is a low-level tool which provides a facility for getting and setting interrupt routing information.
+PCItool is a low-level tool which provides a facility for getting and setting
+interrupt routing information.
 
 .SS \fIInterrupt Routing\fR
 
 The \fIpcitool -i\fR command displays device and CPU routing information for
-all inos on a given nexus, and allows rerouting of a given ino or ino group
-to a specific CPU.
-
+INOs on a given nexus, and allows rerouting of a given INO or INO group to a
+specific CPU. Use the \fIpcitool -m\fR command to retrieve and reroute MSI/Xs.
+  
+On SPARC platforms, the INO is mapped to an interrupt mondo, where as one or
+more MSI/Xs are mapped to an INO. So, INO and MSI/Xs are individually
+retargetable. Use "-i" option to retrieve or reroute a given INO, where as
+use "-m" option for MSI/Xs.
+   
+On x86 platforms, both INOs and MSI/Xs are mapped to the same interrupt vectors.
+Use "-i" option to retrieve and reroute any interrupt vectors (both INO and
+MSI/Xs).  So, "-m" option is not required on x86 platforms. Hence it is not
+supported.
 
 \fIRequired privileges\fR
 
@@ -52,41 +64,59 @@ profile in the \fBuser_attr\fR file. See \fBuser_attr\fR(4) and
 
 -r [ -c ]
 
-Display device and CPU routing information for inos on a given nexus.
-The device path and instance number of each device for each displayed ino will
-be shown.  On some platforms (e.g. Fire) interrupts dedicated to the root
-complex are indicated with "(Internal)" appended to their pathname.
+Display device and CPU routing information for INOs on a given nexus.
+The device path and instance number of each device for each displayed INO will
+be shown.  On some platforms, interrupts dedicated to the root complex are
+indicated with "(Internal)" appended to their pathname.
 
 Dump interrupt controller information with -c.
 
 If neither -r nor -w are provided on the commandline, -r is assumed.
 
-The command for showing all inos on /pci@8,700000 is:
-
-  # pcitool /pci@8,700000 -i
-
-The command for showing ino 0x23 on the same root nexus, along with sample
+The command for showing all INOs on /pci@1e,600000 is:
+   
+  # pcitool /pci@1e,600000 -i all
+   
+The command for showing ino 0x19 on  the  same  root  nexus, along with sample
 output, is:
+   
+  # pcitool /pci@1e,600000 -i 19
+   
+  ino 19 mapped to cpu 0
+  Device: /pci@1e,600000/pci@0/pci@9/pci@0/scsi@1
+    Driver: mpt, instance 0
+   
+  ino 19 mapped to cpu 0
+  Device: /pci@1e,600000/pci@0/pci@2/pci@0/network@4
+    Driver: bge, instance 0
+   
+The command for showing MSI 0x1  on  the  same  root  nexus,
+along with sample output, is:
+   
+# pcitool /pci@1e,600000 -m 1
+   
+  msi 1 mapped to cpu 0
+  Device: /pci@1e,600000/pci@0/pci@9/pci@0/scsi@1
+    Driver: mpt, instance 0
 
-  # pcitool /pci@8,700000 -i ino=23
+-w \fI<cpu#>\fR [ -g ]
 
-  ino 23 on ctlr 0 mapped to cpu 0
-  Device: /pci@8,700000/ebus@5/i2c@1,30
-    Driver: pcf8584, instance 1
-  Device: /pci@8,700000/ebus@5/i2c@1,2e
-    Driver: pcf8584, instance 0
-
--w cpu=\fIhex_CPU\fR [ -g ]
-
-Route the given ino to the given CPU.  Display the new and original routing
-information.  The ino must be specified.
-
-Successful rerouting ino 23 above from cpu 0 to cpu 1 gives the following
+Route the given INO or MSI/X to the given CPU. Display the  new and original
+routing information. The INO or MSI/X must be specified.
+  
+Successful rerouting ino 19 above from cpu 0 to cpu 1 gives the following
 output:
-
-  # pcitool /pci@8,700000 -i ino=23 -w cpu=1
-
-  Interrupts on ino 23 reassigned: Old cpu:0, New cpu:1
+   
+  # pcitool /pci@1e,600000 -i 19 -w 1
+   
+  Interrupts on ino 19 reassigned: Old cpu: 0, New cpu: 1
+   
+Successful rerouting msi 1 above from cpu 1 to cpu 0 gives the following
+output:
+  
+  # pcitool /pci@1e,600000 -m 1 -w 0
+  
+  Interrupts on msi 1 reassigned: Old cpu: 1, New cpu: 0
 
 On some platforms (such as X86) multiple MSI interrupts of a single function
 need to be rerouted together.  Use -g to do this.  -g works only on supported
@@ -94,12 +124,12 @@ platforms  and only for groups of MSI interrupts.  (A "group" of 1 is accepted.)
 When -g is used, the vector provided must be the lowest-numbered vector of the
 group.  The size of the group is determined internally.
 
-Successful rerouting a group of inos starting at 60 from cpu 0 to cpu 1 gives
+Successful rerouting a group of INOs starting at 60 from cpu 0 to cpu 1 gives
 the following output:
 
-  # pcitool /pci@0,0 -i ino=60 -w cpu=1 -g
+  # pcitool /pci@0,0 -i 60 -w 1 -g
 
-  Interrupts on ino group starting at ino 60 reassigned: Old cpu:0, New cpu:1
+  Interrupts on ino group starting at ino 60 reassigned: Old cpu: 0, New cpu: 1
 
 -v
 

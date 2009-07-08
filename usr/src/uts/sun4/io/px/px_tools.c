@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -68,26 +66,13 @@ uint8_t pci_bars[] = {
 
 int	pci_num_bars = sizeof (pci_bars) / sizeof (pci_bars[0]);
 
-/*
- * Validate the cpu_id passed in.
- * A value of 1 will be returned for success and zero for failure.
- */
-static int
-pxtool_validate_cpuid(uint32_t cpuid)
-{
-	extern const int _ncpu;
-	extern cpu_t	*cpu[];
-
-	ASSERT(mutex_owned(&cpu_lock));
-
-	return ((cpuid < _ncpu) && (cpu[cpuid] && cpu_is_online(cpu[cpuid])));
-}
-
 
 /*ARGSUSED*/
 static int
 pxtool_intr_info(dev_info_t *dip, void *arg, int mode)
 {
+	px_t *px_p = DIP_TO_STATE(dip);
+	px_msi_state_t	*msi_state_p = &px_p->px_ib_p->ib_msi_state;
 	pcitool_intr_info_t intr_info;
 	int rval = SUCCESS;
 
@@ -99,7 +84,10 @@ pxtool_intr_info(dev_info_t *dip, void *arg, int mode)
 
 	intr_info.ctlr_version = 0;	/* XXX how to get real version? */
 	intr_info.ctlr_type = PCITOOL_CTLR_TYPE_RISC;
-	intr_info.num_intr = pxtool_num_inos;
+	if (intr_info.flags & PCITOOL_INTR_FLAG_GET_MSI)
+		intr_info.num_intr = msi_state_p->msi_cnt;
+	else
+		intr_info.num_intr = pxtool_num_inos;
 
 	intr_info.drvr_version = PCITOOL_VERSION;
 	if (ddi_copyout(&intr_info, arg, sizeof (pcitool_intr_info_t), mode) !=
@@ -125,44 +113,65 @@ pxtool_get_intr(dev_info_t *dip, void *arg, int mode)
 {
 	/* Array part isn't used here, but oh well... */
 	pcitool_intr_get_t partial_iget;
-	uint32_t ino;
-	uint8_t num_devs_ret;
+	pcitool_intr_get_t *iget = &partial_iget;
 	int copyout_rval;
 	sysino_t sysino;
 	intr_valid_state_t intr_valid_state;
 	cpuid_t old_cpu_id;
 	px_t *px_p = DIP_TO_STATE(dip);
-	pcitool_intr_get_t *iget = &partial_iget;
 	size_t	iget_kmem_alloc_size = 0;
-	int rval = SUCCESS;
+	int rval = EIO;
 
 	/* Read in just the header part, no array section. */
 	if (ddi_copyin(arg, &partial_iget, PCITOOL_IGET_SIZE(0), mode) !=
 	    DDI_SUCCESS)
 		return (EFAULT);
 
-	ino = partial_iget.ino;
-	num_devs_ret = partial_iget.num_devs_ret;
+	iget->status = PCITOOL_IO_ERROR;
 
-	partial_iget.num_devs_ret = 0;		/* Assume error for now. */
-	partial_iget.status = PCITOOL_INVALID_INO;
-	rval = EINVAL;
+	if (iget->flags & PCITOOL_INTR_FLAG_GET_MSI) {
+		px_msi_state_t	*msi_state_p = &px_p->px_ib_p->ib_msi_state;
+		pci_msi_valid_state_t	msi_state;
+		msiqid_t	msiq_id;
+
+		if ((iget->msi < msi_state_p->msi_1st_msinum) ||
+		    (iget->msi >= (msi_state_p->msi_1st_msinum +
+		    msi_state_p->msi_cnt))) {
+			iget->status = PCITOOL_INVALID_MSI;
+			rval = EINVAL;
+			goto done_get_intr;
+		}
+
+		if ((px_lib_msi_getvalid(dip, iget->msi,
+		    &msi_state) != DDI_SUCCESS) ||
+		    (msi_state != PCI_MSI_VALID))
+			goto done_get_intr;
+
+		if (px_lib_msi_getmsiq(dip, iget->msi,
+		    &msiq_id) != DDI_SUCCESS)
+			goto done_get_intr;
+
+		iget->ino = px_msiqid_to_devino(px_p, msiq_id);
+	} else {
+		iget->msi = (uint32_t)-1;
+	}
 
 	/* Validate argument. */
-	if (partial_iget.ino > pxtool_num_inos) {
+	if (iget->ino > pxtool_num_inos) {
+		iget->status = PCITOOL_INVALID_INO;
+		rval = EINVAL;
 		goto done_get_intr;
 	}
 
 	/* Caller wants device information returned. */
-	if (num_devs_ret > 0) {
-
+	if (iget->num_devs_ret > 0) {
 		/*
 		 * Allocate room.
 		 * Note if num_devs == 0 iget remains pointing to
 		 * partial_iget.
 		 */
-		iget_kmem_alloc_size = PCITOOL_IGET_SIZE(num_devs_ret);
-		iget = kmem_alloc(iget_kmem_alloc_size, KM_SLEEP);
+		iget_kmem_alloc_size = PCITOOL_IGET_SIZE(iget->num_devs_ret);
+		iget = kmem_zalloc(iget_kmem_alloc_size, KM_SLEEP);
 
 		/* Read in whole structure to verify there's room. */
 		if (ddi_copyin(arg, iget, iget_kmem_alloc_size, mode) !=
@@ -175,21 +184,17 @@ pxtool_get_intr(dev_info_t *dip, void *arg, int mode)
 		}
 	}
 
-	bzero(iget, PCITOOL_IGET_SIZE(num_devs_ret));
-	iget->ino = ino;
-	iget->num_devs_ret = num_devs_ret;
-
 	/* Convert leaf-wide intr to system-wide intr */
-	if (px_lib_intr_devino_to_sysino(dip, iget->ino, &sysino) ==
-	    DDI_FAILURE) {
+	if (px_lib_intr_devino_to_sysino(dip, iget->ino, &sysino) !=
+	    DDI_SUCCESS) {
 		iget->status = PCITOOL_IO_ERROR;
 		rval = EIO;
 		goto done_get_intr;
 	}
 
 	/* Operate only on inos which are already enabled. */
-	if (px_lib_intr_getvalid(dip, sysino, &intr_valid_state) ==
-	    DDI_FAILURE) {
+	if (px_lib_intr_getvalid(dip, sysino, &intr_valid_state) !=
+	    DDI_SUCCESS) {
 		iget->status = PCITOOL_IO_ERROR;
 		rval = EIO;
 		goto done_get_intr;
@@ -200,20 +205,20 @@ pxtool_get_intr(dev_info_t *dip, void *arg, int mode)
 	 * as well as those mapped to devices.
 	 */
 	if (intr_valid_state == INTR_VALID) {
-
 		/*
 		 * The following looks up the px_ino and returns
 		 * info of devices mapped to this ino.
 		 */
-		iget->num_devs = pxtool_ib_get_ino_devs(
-		    px_p, ino, &iget->num_devs_ret, iget->dev);
+		iget->num_devs = pxtool_ib_get_ino_devs(px_p, iget->ino,
+		    iget->msi, &iget->num_devs_ret, iget->dev);
 
-		if (px_lib_intr_gettarget(dip, sysino, &old_cpu_id) ==
-		    DDI_FAILURE) {
+		if (px_ib_get_intr_target(px_p, iget->ino,
+		    &old_cpu_id) != DDI_SUCCESS) {
 			iget->status = PCITOOL_IO_ERROR;
 			rval = EIO;
 			goto done_get_intr;
 		}
+
 		iget->cpu_id = old_cpu_id;
 	}
 
@@ -223,7 +228,7 @@ pxtool_get_intr(dev_info_t *dip, void *arg, int mode)
 done_get_intr:
 	iget->drvr_version = PCITOOL_VERSION;
 	copyout_rval =
-	    ddi_copyout(iget, arg, PCITOOL_IGET_SIZE(num_devs_ret), mode);
+	    ddi_copyout(iget, arg, PCITOOL_IGET_SIZE(iget->num_devs_ret), mode);
 
 	if (iget_kmem_alloc_size > 0)
 		kmem_free(iget, iget_kmem_alloc_size);
@@ -246,10 +251,11 @@ pxtool_set_intr(dev_info_t *dip, void *arg, int mode)
 	pcitool_intr_set_t iset;
 	cpuid_t old_cpu_id;
 	sysino_t sysino;
+	intr_valid_state_t intr_valid_state;
 	px_t *px_p = DIP_TO_STATE(dip);
-	px_ib_t *ib_p = px_p->px_ib_p;
-	uint8_t zero = 0;
-	int rval = SUCCESS;
+	msiqid_t msiq_id;
+	int rval = EIO;
+	int ret = DDI_SUCCESS;
 	size_t copyinout_size;
 
 	bzero(&iset, sizeof (pcitool_intr_set_t));
@@ -276,57 +282,108 @@ pxtool_set_intr(dev_info_t *dip, void *arg, int mode)
 		goto done_set_intr;
 	}
 
-	if (iset.flags & PCITOOL_INTR_SET_FLAG_GROUP) {
+	if (iset.flags & PCITOOL_INTR_FLAG_SET_GROUP) {
 		iset.status = PCITOOL_IO_ERROR;
 		rval = ENOTSUP;
 		goto done_set_intr;
 	}
 
-	iset.status = PCITOOL_INVALID_INO;
-	rval = EINVAL;
+	iset.status = PCITOOL_IO_ERROR;
+
+	if (iset.flags & PCITOOL_INTR_FLAG_SET_MSI) {
+		px_msi_state_t	*msi_state_p = &px_p->px_ib_p->ib_msi_state;
+		pci_msi_valid_state_t	msi_state;
+
+		if ((iset.msi < msi_state_p->msi_1st_msinum) ||
+		    (iset.msi >= (msi_state_p->msi_1st_msinum +
+		    msi_state_p->msi_cnt))) {
+			iset.status = PCITOOL_INVALID_MSI;
+			rval = EINVAL;
+			goto done_set_intr;
+		}
+
+		if ((px_lib_msi_getvalid(dip, iset.msi,
+		    &msi_state) != DDI_SUCCESS) ||
+		    (msi_state != PCI_MSI_VALID))
+			goto done_set_intr;
+
+		if (px_lib_msi_getmsiq(dip, iset.msi,
+		    &msiq_id) != DDI_SUCCESS)
+			goto done_set_intr;
+
+		iset.ino = px_msiqid_to_devino(px_p, msiq_id);
+	} else {
+		iset.msi = (uint32_t)-1;
+	}
 
 	/* Validate input argument. */
-	if (iset.ino > pxtool_num_inos)
+	if (iset.ino > pxtool_num_inos) {
+		iset.status = PCITOOL_INVALID_INO;
+		rval = EINVAL;
+		goto done_set_intr;
+	}
+
+	/* Convert leaf-wide intr to system-wide intr */
+	if (px_lib_intr_devino_to_sysino(dip, iset.ino, &sysino) !=
+	    DDI_SUCCESS)
 		goto done_set_intr;
 
-	/* Validate that ino given belongs to a device. */
-	if (pxtool_ib_get_ino_devs(px_p, iset.ino, &zero, NULL) == 0)
+	/* Operate only on inos which are already enabled. */
+	if ((px_lib_intr_getvalid(dip, sysino, &intr_valid_state) !=
+	    DDI_SUCCESS) || (intr_valid_state == INTR_NOTVALID))
 		goto done_set_intr;
 
 	/*
-	 * Get lock, validate cpu and write new mapreg value.
-	 * Return original cpu value to caller via iset.cpu.
+	 * Consider all valid inos: those mapped to the root complex itself
+	 * as well as those mapped to devices.
 	 */
-	mutex_enter(&cpu_lock);
-	if (pxtool_validate_cpuid(iset.cpu_id)) {
+	if (px_lib_intr_gettarget(dip, sysino, &old_cpu_id) != DDI_SUCCESS)
+		goto done_set_intr;
 
-		DBG(DBG_TOOLS, dip, "Enabling CPU %d\n", iset.cpu_id);
+	if (iset.flags & PCITOOL_INTR_FLAG_SET_MSI) {
+		ddi_intr_handle_impl_t	hdle;
 
-		if (px_lib_intr_devino_to_sysino(dip, iset.ino, &sysino) ==
-		    DDI_FAILURE)
+		bzero(&hdle, sizeof (ddi_intr_handle_impl_t));
+		if (pxtool_ib_get_msi_info(px_p, iset.ino, iset.msi,
+		    &hdle) != DDI_SUCCESS) {
+			iset.status = PCITOOL_INVALID_MSI;
+			rval = EINVAL;
 			goto done_set_intr;
+		}
 
-		if (px_lib_intr_gettarget(dip, sysino, &old_cpu_id) ==
-		    DDI_FAILURE)
+		if ((ret = px_ib_set_msix_target(px_p, &hdle, iset.msi,
+		    iset.cpu_id)) == DDI_SUCCESS) {
+			(void) px_lib_msi_getmsiq(dip, iset.msi, &msiq_id);
+			iset.ino = px_msiqid_to_devino(px_p, msiq_id);
+			iset.cpu_id = old_cpu_id;
+			iset.status = PCITOOL_SUCCESS;
+			rval = SUCCESS;
 			goto done_set_intr;
+		}
+	} else {
+		if ((ret = px_ib_set_intr_target(px_p, iset.ino,
+		    iset.cpu_id)) == DDI_SUCCESS) {
+			iset.cpu_id = old_cpu_id;
+			iset.status = PCITOOL_SUCCESS;
+			rval = SUCCESS;
+			goto done_set_intr;
+		}
+	}
 
-		px_ib_intr_dist_en(dip, iset.cpu_id, iset.ino, B_TRUE);
-
-		px_ib_log_new_cpu(ib_p, old_cpu_id, iset.cpu_id, iset.ino);
-
-		iset.cpu_id = old_cpu_id;
-		iset.status = PCITOOL_SUCCESS;
-		rval = SUCCESS;
-
-	} else {	/* Invalid cpu.  Restore original register image. */
-
-		DBG(DBG_TOOLS, dip,
-		    "Invalid cpuid: writing orig mapreg value\n");
-
+	switch (ret) {
+	case DDI_EPENDING:
+		iset.status = PCITOOL_PENDING_INTRTIMEOUT;
+		rval = ETIME;
+		break;
+	case DDI_EINVAL:
 		iset.status = PCITOOL_INVALID_CPUID;
 		rval = EINVAL;
+		break;
+	default:
+		iset.status = PCITOOL_IO_ERROR;
+		rval = EIO;
+		break;
 	}
-	mutex_exit(&cpu_lock);
 
 done_set_intr:
 	iset.drvr_version = PCITOOL_VERSION;

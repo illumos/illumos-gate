@@ -424,21 +424,13 @@ finished:
  * interrupt can be disabled.
  */
 int
-pci_msi_disable_mode(dev_info_t *rdip, int type, uint_t flags)
+pci_msi_disable_mode(dev_info_t *rdip, int type)
 {
 	ushort_t		caps_ptr, msi_ctrl;
 	ddi_acc_handle_t	cfg_hdle;
 
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_disable_mode: rdip = 0x%p "
-	    "flags = 0x%x\n", (void *)rdip, flags));
-
-	/*
-	 * Do not turn off the master enable bit if other interrupts are
-	 * still active.
-	 */
-	if ((flags != DDI_INTR_FLAG_BLOCK) &&
-	    (i_ddi_intr_get_current_nenables(rdip) > 1))
-		return (DDI_SUCCESS);
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_disable_mode: rdip = 0x%p\n",
+	    (void *)rdip));
 
 	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
 	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)

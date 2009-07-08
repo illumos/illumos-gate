@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PCI_TOOLS_H
 #define	_SYS_PCI_TOOLS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 
@@ -107,6 +105,7 @@ typedef enum {
 	PCITOOL_SUCCESS = 0x0,
 	PCITOOL_INVALID_CPUID,
 	PCITOOL_INVALID_INO,
+	PCITOOL_INVALID_MSI,
 	PCITOOL_PENDING_INTRTIMEOUT,
 	PCITOOL_REGPROP_NOTWELLFORMED,
 	PCITOOL_INVALID_ADDRESS,
@@ -127,16 +126,18 @@ typedef struct pcitool_intr_set {
 	uint16_t user_version;	/* Userland program version - to krnl */
 	uint16_t drvr_version;	/* Driver version - from kernel */
 	uint32_t ino;		/* interrupt to set - to kernel */
+	uint32_t msi;		/* Specific MSI to set - to kernel */
 	uint32_t cpu_id;	/* to: cpu to set / from: old cpu returned */
-	pcitool_errno_t status;	/* from kernel */
 	uint32_t flags;		/* to kernel */
+	pcitool_errno_t status;	/* from kernel */
 } pcitool_intr_set_t;
 
 /*
- * flags for pcitool_intr_set_t
+ * Flags for pcitool_intr_get/set_t/info_t
  */
-#define	PCITOOL_INTR_SET_FLAG_GROUP	0x1
-
+#define	PCITOOL_INTR_FLAG_SET_GROUP	0x1
+#define	PCITOOL_INTR_FLAG_GET_MSI	0x2
+#define	PCITOOL_INTR_FLAG_SET_MSI	0x4
 
 /*
  * PCITOOL_DEVICE_GET_INTR ioctl data structure to dump out the
@@ -153,6 +154,7 @@ typedef struct pcitool_intr_get {
 	uint16_t user_version;		/* Userland program version - to krnl */
 	uint16_t drvr_version;		/* Driver version - from kernel */
 	uint32_t	ino;		/* interrupt number - to kernel */
+	uint32_t	msi;		/* MSI number - to kernel */
 	uint8_t		num_devs_ret;	/* room for this # of devs to be */
 					/* returned - to kernel */
 					/* # devs returned - from kernel */
@@ -160,6 +162,7 @@ typedef struct pcitool_intr_get {
 					/* intrs enabled for devs if > 0 */
 	uint8_t		ctlr;		/* controller number - from kernel */
 	uint32_t	cpu_id;		/* cpu of interrupt - from kernel */
+	uint32_t	flags;		/* to kernel */
 	pcitool_errno_t status;		/* returned status - from kernel */
 	pcitool_intr_dev_t	dev[1];	/* start of variable device list */
 					/* from kernel */
@@ -177,6 +180,7 @@ typedef struct pcitool_intr_get {
 typedef struct pcitool_intr_info {
 	uint16_t user_version;		/* Userland program version - to krnl */
 	uint16_t drvr_version;		/* Driver version - from kernel */
+	uint32_t flags;			/* to kernel */
 	uint32_t num_intr;		/* Number of intrs suppt by nexus */
 	uint32_t ctlr_version;		/* Intr ctlr HW version - from kernel */
 	uchar_t	ctlr_type;		/* A PCITOOL_CTLR_TYPE - from kernel */

@@ -32,6 +32,7 @@
 
 #include <sys/ddipropdefs.h>
 #include <sys/rwlock.h>
+#include <sys/processor.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -85,7 +86,8 @@ extern "C" {
 #define	DDI_INTR_FLAG_MASKABLE	0x0010	/* (RO) maskable */
 #define	DDI_INTR_FLAG_PENDING	0x0020	/* (RO) int pending supported */
 #define	DDI_INTR_FLAG_BLOCK	0x0100	/* (RO) requires block enable */
-#define	DDI_INTR_FLAG_MSI64	0x0200	/* (R0) MSI/X supports 64 bit addr */
+#define	DDI_INTR_FLAG_MSI64	0x0200	/* (RO) MSI/X supports 64 bit addr */
+#define	DDI_INTR_FLAG_RETARGETABLE	0x0400	/* (RO) retargetable */
 
 /*
  * Macro to be used while passing interrupt priority
@@ -98,6 +100,11 @@ extern "C" {
  */
 typedef struct __ddi_intr_handle *ddi_intr_handle_t;
 typedef struct __ddi_softint_handle *ddi_softint_handle_t;
+
+/*
+ * Typedef for interrupt target
+ */
+typedef	processorid_t ddi_intr_target_t;
 
 /*
  * Definition for behavior flag which is used with ddi_intr_alloc(9f).
@@ -177,6 +184,12 @@ int	ddi_intr_dup_handler(ddi_intr_handle_t org, int vector,
 int	ddi_intr_remove_handler(ddi_intr_handle_t h);
 
 /*
+ * Interrupt get/set affinity functions
+ */
+int	ddi_intr_get_affinity(ddi_intr_handle_t h, ddi_intr_target_t *tgt_p);
+int	ddi_intr_set_affinity(ddi_intr_handle_t h, ddi_intr_target_t tgt);
+
+/*
  * Interrupt enable/disable/block_enable/block_disable functions
  */
 int	ddi_intr_enable(ddi_intr_handle_t h);
@@ -196,6 +209,11 @@ int	ddi_intr_clr_mask(ddi_intr_handle_t h);
 int	ddi_intr_get_pending(ddi_intr_handle_t h, int *pendingp);
 
 /*
+ * Interrupt resource management function
+ */
+int	ddi_intr_set_nreq(dev_info_t *dip, int nreq);
+
+/*
  * Soft interrupt functions
  */
 int	ddi_intr_add_softint(dev_info_t *dip, ddi_softint_handle_t *h,
@@ -204,11 +222,6 @@ int	ddi_intr_remove_softint(ddi_softint_handle_t h);
 int	ddi_intr_trigger_softint(ddi_softint_handle_t h, void *arg2);
 int	ddi_intr_get_softint_pri(ddi_softint_handle_t h, uint_t *soft_prip);
 int	ddi_intr_set_softint_pri(ddi_softint_handle_t h, uint_t soft_pri);
-
-/*
- * Interrupt resource management function
- */
-int	ddi_intr_set_nreq(dev_info_t *dip, int nreq);
 
 /*
  * Old DDI interrupt interfaces.

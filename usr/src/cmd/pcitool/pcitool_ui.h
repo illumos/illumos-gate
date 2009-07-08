@@ -43,7 +43,7 @@ extern "C" {
  */
 #define	NEXUS_FLAG	0x1
 #define	LEAF_FLAG	0x2
-#define	INTR_FLAG	0x4
+#define	INTR_FLAG	0x4		/* Either -i or -m specified */
 #define	PROBEDEV_FLAG	0x8		/* Probe a specific device */
 #define	PROBETREE_FLAG	0x10		/* Probe all devs on a tree */
 #define	PROBEALL_FLAG	0x20		/* Probe devs on all trees */
@@ -72,8 +72,11 @@ extern "C" {
 #define	BUS_SPEC_FLAG	(0x40000ULL << 32)
 #define	DEV_SPEC_FLAG	(0x80000ULL << 32)
 #define	FUNC_SPEC_FLAG	(0x100000ULL << 32)
-#define	CPU_SPEC_FLAG	(0x200000ULL << 32)
-#define	INO_SPEC_FLAG	(0x400000ULL << 32)
+#define	CPU_SPEC_FLAG	(0x200000ULL << 32)	/* -w <cpu#> */
+#define	INO_ALL_FLAG	(0x400000ULL << 32)	/* -i all */
+#define	INO_SPEC_FLAG	(0x800000ULL << 32)	/* -i <#ino> */
+#define	MSI_ALL_FLAG	(0x1000000ULL << 32)	/* -m all */
+#define	MSI_SPEC_FLAG	(0x2000000ULL << 32)	/* -m <#msi> */
 
 /* Macros for a few heavily-used flags. */
 #define	IS_VERBOSE(flags)	(flags & VERBOSE_FLAG)
@@ -96,6 +99,7 @@ typedef struct uiargs {
 	uint8_t		size;
 	uint8_t		bank;
 	uint8_t		intr_ino;
+	uint16_t	intr_msi;
 	boolean_t	big_endian;
 } pcitool_uiargs_t;
 

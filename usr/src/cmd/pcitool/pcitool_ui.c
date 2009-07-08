@@ -67,11 +67,8 @@
 /*
  * This defines which main options can be specified by the user.
  * Options with colons after them require arguments.
- *
- * First : means to return : if option is missing.  This is used to handle
- * the optional argument to -i.
  */
-static char *opt_string = ":n:d:i:p:rw:o:s:e:b:vaqlcxgy";
+static char *opt_string = ":n:d:i:m:p:rw:o:s:e:b:vaqlcxgy";
 
 /* This defines options used singly and only by themselves (no nexus). */
 static char *no_dev_opt_string = "ahpqv";
@@ -88,7 +85,8 @@ static int extract_bdf(char *value, char **bvalue_p, char **dvalue_p,
 static int parse_device_opts(char *input, uint64_t *flags_arg,
     uint8_t *bus_arg, uint8_t *device_arg, uint8_t *func_arg,
     uint8_t *bank_arg);
-static int parse_intr_opts(char *input, uint64_t *flags_arg, uint8_t *ino_arg);
+static int parse_ino_opts(char *input, uint64_t *flags_arg, uint8_t *ino_arg);
+static int parse_msi_opts(char *input, uint64_t *flags_arg, uint16_t *msi_arg);
 static int parse_intr_set_opts(char *input, uint64_t *flags_arg,
     uint32_t *cpu_arg);
 static int parse_probeone_opts(char *input, uint64_t *flags_arg,
@@ -187,7 +185,6 @@ get_commandline_args(int argc, char *argv[], pcitool_uiargs_t *parsed_args)
 		}
 
 		if (error) {
-
 			print_bad_option(argv, optopt, optarg);
 			return (FAILURE);
 		}
@@ -251,21 +248,15 @@ get_commandline_args(int argc, char *argv[], pcitool_uiargs_t *parsed_args)
 		case 'i':
 			if (parsed_args->flags & (LEAF_FLAG |
 			    NEXUS_FLAG | INTR_FLAG | PROBE_FLAGS)) {
-				(void) fprintf(stderr, "%s: -i set with "
+				(void) fprintf(stderr, "%s: -i set with -m, "
 				    "-n, -d or -p or is set twice\n", argv[0]);
 				error = B_TRUE;
 				break;
 			}
 			parsed_args->flags |= INTR_FLAG;
 
-			/* Process, say, -i -r */
-			if (optarg[0] == '-') {
-				optind--;
-				continue;
-			}
-
 			/* parse input to get ino value. */
-			if (parse_intr_opts(optarg, &parsed_args->flags,
+			if (parse_ino_opts(optarg, &parsed_args->flags,
 			    &parsed_args->intr_ino) != SUCCESS) {
 				(void) fprintf(stderr,
 				    "%s: Error parsing interrupt options\n",
@@ -273,7 +264,26 @@ get_commandline_args(int argc, char *argv[], pcitool_uiargs_t *parsed_args)
 				error = B_TRUE;
 			}
 			break;
+		/* Interrupt */
+		case 'm':
+			if (parsed_args->flags & (LEAF_FLAG |
+			    NEXUS_FLAG | INTR_FLAG | PROBE_FLAGS)) {
+				(void) fprintf(stderr, "%s: -m set with -i, "
+				    "-n, -d or -p or is set twice\n", argv[0]);
+				error = B_TRUE;
+				break;
+			}
+			parsed_args->flags |= INTR_FLAG;
 
+			/* parse input to get msi value. */
+			if (parse_msi_opts(optarg, &parsed_args->flags,
+			    &parsed_args->intr_msi) != SUCCESS) {
+				(void) fprintf(stderr,
+				    "%s: Error parsing interrupt options\n",
+				    argv[0]);
+				error = B_TRUE;
+			}
+			break;
 		/* Probe */
 		case 'p':
 			if (parsed_args->flags & (LEAF_FLAG |
@@ -573,10 +583,6 @@ get_commandline_args(int argc, char *argv[], pcitool_uiargs_t *parsed_args)
 		/* Option without operand. */
 		case ':':
 			switch (optopt) {
-			case 'i':
-				/* Allow -i without ino=. */
-				parsed_args->flags |= INTR_FLAG;
-				break;
 			case 'p':
 				/* Allow -p without bdf spec. */
 				parsed_args->flags |=
@@ -638,22 +644,23 @@ get_commandline_args(int argc, char *argv[], pcitool_uiargs_t *parsed_args)
 			if (parsed_args->flags &
 			    ~(INTR_FLAG | VERBOSE_FLAG | QUIET_FLAG |
 			    READ_FLAG | WRITE_FLAG | SHOWCTLR_FLAG |
-			    SETGRP_FLAG | INO_SPEC_FLAG | CPU_SPEC_FLAG)) {
+			    SETGRP_FLAG | INO_ALL_FLAG | INO_SPEC_FLAG |
+			    MSI_ALL_FLAG | MSI_SPEC_FLAG | CPU_SPEC_FLAG)) {
 				(void) fprintf(stderr, "%s: -v, -q, -r, -w, -c "
-				    "and -g are only options options allowed.\n"
-				    "with interrupt command.\n", argv[0]);
+				    "-g are only options allowed with "
+				    "interrupt command.\n", argv[0]);
 				error = B_TRUE;
 			}
 
 			/* Need cpu and ino values for interrupt set command. */
 			if ((parsed_args->flags & WRITE_FLAG) &&
-			    (parsed_args->flags &
-			    (CPU_SPEC_FLAG | INO_SPEC_FLAG)) !=
-			    (CPU_SPEC_FLAG | INO_SPEC_FLAG)) {
+			    !(parsed_args->flags & CPU_SPEC_FLAG) &&
+			    !((parsed_args->flags & INO_SPEC_FLAG) ||
+			    (parsed_args->flags & MSI_SPEC_FLAG))) {
 				(void) fprintf(stderr,
-				    "%s: Both cpu and ino must be specified "
-				    "explicitly for interrupt set command.\n",
-				    argv[0]);
+				    "%s: Both cpu and ino/msi must be "
+				    "specified explicitly for interrupt "
+				    "set command.\n", argv[0]);
 				error = B_TRUE;
 			}
 
@@ -1270,59 +1277,69 @@ parse_device_opts(
 
 
 /*
- * Parse interrupt options.  This includes:
- *   ino=number
+ * Parse INO options.  This includes:
+ *   ino#  | all
  *
  * input is the string of options to parse.  flags_arg returns modified with
  * specified options set.  Other args return their respective values.
  */
 static int
-parse_intr_opts(char *input, uint64_t *flags_arg, uint8_t *ino_arg)
+parse_ino_opts(char *input, uint64_t *flags_arg, uint8_t *ino_arg)
 {
-	typedef enum {
-		ino = 0
-	} intr_opts_index_t;
+	uint64_t	value;
+	int		rval = SUCCESS;
 
-	static char *intr_opts[] = {
-		"ino",
-		NULL
-	};
+	if (strcmp(input, "all") == 0) {
+		*flags_arg |= INO_ALL_FLAG;
+	} else if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS) {
+		*ino_arg = (uint8_t)value;
 
-	char *value;
-	uint64_t	recv64;
-
-	int rval = SUCCESS;
-
-	while ((*input != '\0') && (rval == SUCCESS)) {
-		switch (getsubopt(&input, intr_opts, &value)) {
-
-		/* ino=number */
-		case ino:
-			if (value == NULL) {
-				(void) fprintf(stderr, "Missing ino value.\n");
-				rval = FAILURE;
-				break;
-			}
-			if ((rval = get_value64(value, &recv64, HEX_ONLY)) !=
-			    SUCCESS) {
-				break;
-			}
-			*ino_arg = (uint8_t)recv64;
-			if (*ino_arg != recv64) {
-				(void) fprintf(stderr,
-				    "Ino argument must fit into 8 bits.\n");
-				rval = FAILURE;
-				break;
-			}
-			*flags_arg |= INO_SPEC_FLAG;
-			break;
-
-		default:
+		if (*ino_arg != value) {
 			(void) fprintf(stderr,
-			    "Unrecognized option for -i\n");
+			    "ino argument must fit into 8 bits.\n");
 			rval = FAILURE;
-			break;
+		} else {
+			*flags_arg |= INO_SPEC_FLAG;
 		}
+	} else {
+		(void) fprintf(stderr,
+		    "Unrecognized option for -i\n");
+		rval = FAILURE;
+	}
+
+	return (rval);
+}
+
+
+/*
+ * Parse MSI options.  This includes:
+ *   msi#  | all
+ *
+ * input is the string of options to parse.  flags_arg returns modified with
+ * specified options set.  Other args return their respective values.
+ */
+static int
+parse_msi_opts(char *input, uint64_t *flags_arg, uint16_t *msi_arg)
+{
+	uint64_t	value;
+	int		rval = SUCCESS;
+
+	if (strcmp(input, "all") == 0) {
+		*flags_arg |= MSI_ALL_FLAG;
+	} else if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS) {
+		*msi_arg = (uint16_t)value;
+
+		if (*msi_arg != value) {
+			(void) fprintf(stderr,
+			    "msi argument must fit into 16 bits.\n");
+			rval = FAILURE;
+		} else {
+			*flags_arg |= MSI_SPEC_FLAG;
+		}
+	} else {
+		(void) fprintf(stderr,
+		    "Unrecognized option for -m\n");
+		rval = FAILURE;
 	}
 
 	return (rval);
@@ -1339,50 +1356,23 @@ parse_intr_opts(char *input, uint64_t *flags_arg, uint8_t *ino_arg)
 static int
 parse_intr_set_opts(char *input, uint64_t *flags_arg, uint32_t *cpu_arg)
 {
-	typedef enum {
-		cpu = 0
-	} intr_set_opts_index_t;
+	uint64_t	value;
+	int		rval = SUCCESS;
 
-	static char *intr_set_opts[] = {
-		"cpu",
-		NULL
-	};
+	if ((rval = get_value64(input, &value, HEX_ONLY)) == SUCCESS) {
 
-	char *value;
-	uint64_t	recv64;
-
-	int rval = SUCCESS;
-
-	while ((*input != '\0') && (rval == SUCCESS)) {
-		switch (getsubopt(&input, intr_set_opts, &value)) {
-
-		/* cpu=value */
-		case cpu:
-			if (value == NULL) {
-				(void) fprintf(stderr, "Missing cpu value.\n");
-				rval = FAILURE;
-				break;
-			}
-			if ((rval = get_value64(value, &recv64, HEX_ONLY)) !=
-			    SUCCESS) {
-				break;
-			}
-			if ((long)recv64 > sysconf(_SC_CPUID_MAX)) {
-				(void) fprintf(stderr, "Cpu argument "
-				    "exceeds maximum for this system type.\n");
-				rval = FAILURE;
-				break;
-			}
-			*cpu_arg = (uint32_t)recv64;
-			*flags_arg |= CPU_SPEC_FLAG;
-			break;
-
-		default:
-			(void) fprintf(stderr,
-			    "Unrecognized option for -i -w\n");
+		if ((long)value > sysconf(_SC_CPUID_MAX)) {
+			(void) fprintf(stderr, "Cpu argument "
+			    "exceeds maximum for this system type.\n");
 			rval = FAILURE;
-			break;
+		} else {
+			*cpu_arg = (uint32_t)value;
+			*flags_arg |= CPU_SPEC_FLAG;
 		}
+	} else {
+		(void) fprintf(stderr,
+		    "Unrecognized option for -i -m -w\n");
+			rval = FAILURE;
 	}
 
 	return (rval);

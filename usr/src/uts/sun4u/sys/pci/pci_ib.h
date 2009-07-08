@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PCI_IB_H
 #define	_SYS_PCI_IB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -218,8 +216,6 @@ extern ih_t *ib_alloc_ih(dev_info_t *dip, uint32_t inum,
     uint_t (*int_handler)(caddr_t int_handler_arg1, caddr_t int_handler_arg2),
     caddr_t int_handler_arg1, caddr_t int_handler_arg2);
 extern void ib_free_ih(ih_t *ih_p);
-extern int ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
-    ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state);
 extern void ib_ino_map_reg_share(ib_t *ib_p, ib_ino_t ino,
     ib_ino_info_t *ino_p);
 extern int ib_ino_map_reg_unshare(ib_t *ib_p, ib_ino_t ino,
@@ -231,6 +227,10 @@ extern void ib_intr_dist_nintr(ib_t *ib_p, ib_ino_t ino,
     volatile uint64_t *imr_p);
 extern void ib_intr_dist_all(void *arg, int32_t max_weight, int32_t weight);
 extern void ib_cpu_ticks_to_ih_nsec(ib_t *ib_p, ih_t *ih_p, uint32_t cpu_id);
+extern int ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
+    ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state);
+extern int ib_get_intr_target(pci_t *pci_p, ib_ino_t ino, int *cpu_id_p);
+extern int ib_set_intr_target(pci_t *pci_p, ib_ino_t ino, int cpu_id);
 extern uint8_t ib_get_ino_devs(ib_t *ib_p, uint32_t ino, uint8_t *devs_ret,
     pcitool_intr_dev_t *devs);
 extern void ib_log_new_cpu(ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,

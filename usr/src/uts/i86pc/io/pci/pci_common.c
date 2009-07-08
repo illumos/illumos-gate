@@ -681,6 +681,30 @@ SUPPORTED_TYPES_OUT:
 		DDI_INTR_NEXDBG((CE_CONT, "pci: GETPENDING returned = %x\n",
 		    *(int *)result));
 		break;
+	case DDI_INTROP_GETTARGET:
+		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: GETTARGET\n"));
+
+		/* Note hdlp->ih_vector is actually an irq */
+		if ((rv = pci_get_cpu_from_vecirq(hdlp->ih_vector, IS_IRQ)) ==
+		    -1)
+			return (DDI_FAILURE);
+		*(int *)result = rv;
+		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: GETTARGET "
+		    "vector = 0x%x, cpu = 0x%x\n", hdlp->ih_vector, rv));
+		break;
+	case DDI_INTROP_SETTARGET:
+		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: SETTARGET\n"));
+
+		/* hdlp->ih_vector is actually an irq */
+		tmp_hdl.ih_vector = hdlp->ih_vector;
+		tmp_hdl.ih_flags = PSMGI_INTRBY_IRQ;
+		tmp_hdl.ih_private = (void *)(uintptr_t)*(int *)result;
+		psm_rval = (*psm_intr_ops)(rdip, &tmp_hdl, PSM_INTR_OP_SET_CPU,
+		    &psm_status);
+
+		if (psm_rval != PSM_SUCCESS)
+			return (DDI_FAILURE);
+		break;
 	default:
 		return (i_ddi_intr_ops(pdip, rdip, intr_op, hdlp, result));
 	}

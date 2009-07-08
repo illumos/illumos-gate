@@ -728,6 +728,69 @@ done:
 }
 
 /*
+ * Interrupt target get/set functions
+ */
+int
+ddi_intr_get_affinity(ddi_intr_handle_t h, ddi_intr_target_t *tgt_p)
+{
+	ddi_intr_handle_impl_t	*hdlp = (ddi_intr_handle_impl_t *)h;
+	int			ret;
+
+	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_affinity: hdlp = %p\n",
+	    (void *)hdlp));
+
+	if ((hdlp == NULL) || (tgt_p == NULL))
+		return (DDI_EINVAL);
+
+	rw_enter(&hdlp->ih_rwlock, RW_READER);
+	if (hdlp->ih_state != DDI_IHDL_STATE_ENABLE) {
+		rw_exit(&hdlp->ih_rwlock);
+		return (DDI_EINVAL);
+	}
+
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	    DDI_INTROP_GETTARGET, hdlp, (void *)tgt_p);
+
+	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_affinity: target %x\n",
+	    *tgt_p));
+
+	if (ret == DDI_SUCCESS)
+		hdlp->ih_target = *tgt_p;
+
+	rw_exit(&hdlp->ih_rwlock);
+	return (ret);
+}
+
+int
+ddi_intr_set_affinity(ddi_intr_handle_t h, ddi_intr_target_t tgt)
+{
+	ddi_intr_handle_impl_t	*hdlp = (ddi_intr_handle_impl_t *)h;
+	int			ret;
+
+	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_set_affinity: hdlp = %p "
+	    "target %x\n", (void *)hdlp, tgt));
+
+	if (hdlp == NULL)
+		return (DDI_EINVAL);
+
+	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
+	if ((hdlp->ih_state != DDI_IHDL_STATE_ENABLE) ||
+	    !(hdlp->ih_cap & DDI_INTR_FLAG_RETARGETABLE)) {
+		rw_exit(&hdlp->ih_rwlock);
+		return (DDI_EINVAL);
+	}
+
+	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
+	    DDI_INTROP_SETTARGET, hdlp, &tgt);
+
+	if (ret == DDI_SUCCESS)
+		hdlp->ih_target = tgt;
+
+	rw_exit(&hdlp->ih_rwlock);
+	return (ret);
+}
+
+/*
  * Interrupt enable/disable/block_enable/block_disable handlers
  */
 int
@@ -979,6 +1042,21 @@ ddi_intr_get_pending(ddi_intr_handle_t h, int *pendingp)
 }
 
 /*
+ * Set the number of interrupts requested from IRM
+ */
+int
+ddi_intr_set_nreq(dev_info_t *dip, int nreq)
+{
+	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_set_nreq: dip %p, nreq %d\n",
+	    (void *)dip, nreq));
+
+	if (dip == NULL)
+		return (DDI_EINVAL);
+
+	return (i_ddi_irm_modify(dip, nreq));
+}
+
+/*
  * Soft interrupt handlers
  */
 /*
@@ -1139,21 +1217,6 @@ ddi_intr_set_softint_pri(ddi_softint_handle_t h, uint_t soft_pri)
 
 	rw_exit(&hdlp->ih_rwlock);
 	return (ret);
-}
-
-/*
- * Set the number of interrupts requested from IRM
- */
-int
-ddi_intr_set_nreq(dev_info_t *dip, int nreq)
-{
-	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_set_nreq: dip %p, nreq %d\n",
-	    (void *)dip, nreq));
-
-	if (dip == NULL)
-		return (DDI_EINVAL);
-
-	return (i_ddi_irm_modify(dip, nreq));
 }
 
 /*

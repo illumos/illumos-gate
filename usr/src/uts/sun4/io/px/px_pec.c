@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI Express PEC implementation:
@@ -181,7 +179,7 @@ px_pec_msg_add_intr(px_t *px_p)
 	hdl.ih_pri = PX_ERR_LOW_PIL;
 
 	if ((ret = px_add_msiq_intr(dip, dip, &hdl,
-	    MSG_REC, (msgcode_t)PCIE_CORR_MSG,
+	    MSG_REC, (msgcode_t)PCIE_CORR_MSG, -1,
 	    &pec_p->pec_corr_msg_msiq_id)) != DDI_SUCCESS) {
 		DBG(DBG_MSG, px_p->px_dip,
 		    "PCIE_CORR_MSG registration failed\n");
@@ -204,7 +202,7 @@ px_pec_msg_add_intr(px_t *px_p)
 	hdl.ih_pri = PX_ERR_PIL;
 
 	if ((ret = px_add_msiq_intr(dip, dip, &hdl,
-	    MSG_REC, (msgcode_t)PCIE_NONFATAL_MSG,
+	    MSG_REC, (msgcode_t)PCIE_NONFATAL_MSG, -1,
 	    &pec_p->pec_non_fatal_msg_msiq_id)) != DDI_SUCCESS) {
 		DBG(DBG_MSG, px_p->px_dip,
 		    "PCIE_NONFATAL_MSG registration failed\n");
@@ -228,7 +226,7 @@ px_pec_msg_add_intr(px_t *px_p)
 	hdl.ih_pri = PX_ERR_PIL;
 
 	if ((ret = px_add_msiq_intr(dip, dip, &hdl,
-	    MSG_REC, (msgcode_t)PCIE_FATAL_MSG,
+	    MSG_REC, (msgcode_t)PCIE_FATAL_MSG, -1,
 	    &pec_p->pec_fatal_msg_msiq_id)) != DDI_SUCCESS) {
 		DBG(DBG_MSG, px_p->px_dip,
 		    "PCIE_FATAL_MSG registration failed\n");

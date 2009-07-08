@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -599,7 +599,8 @@ px_pwr_setup(dev_info_t *dip)
 	/* Add PME_TO_ACK message handler */
 	hdl.ih_cb_func = (ddi_intr_handler_t *)px_pmeq_intr;
 	if (px_add_msiq_intr(dip, dip, &hdl, MSG_REC,
-	    (msgcode_t)PCIE_PME_ACK_MSG, &px_p->px_pm_msiq_id) != DDI_SUCCESS) {
+	    (msgcode_t)PCIE_PME_ACK_MSG, -1,
+	    &px_p->px_pm_msiq_id) != DDI_SUCCESS) {
 		DBG(DBG_PWR, dip, "px_pwr_setup: couldn't add "
 		    " PME_TO_ACK intr\n");
 		goto pwr_setup_err1;

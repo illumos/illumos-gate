@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PX Interrupt Block implementation
@@ -311,10 +309,9 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 
 	/* Redistribute device interrupts */
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
+	px_msiq_redist(px_p);
 
 	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next_p) {
-		uint32_t orig_cpuid;
-
 		/*
 		 * Recomputes the sum of interrupt weights of devices that
 		 * share the same ino upon first call marked by
@@ -348,12 +345,31 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 		if ((weight == ino_p->ino_intr_weight) ||
 		    ((weight >= weight_max) &&
 		    (ino_p->ino_intr_weight >= weight_max))) {
-			orig_cpuid = ino_p->ino_cpuid;
+			uint32_t orig_cpuid = ino_p->ino_cpuid;
+
 			if (cpu[orig_cpuid] == NULL)
 				orig_cpuid = CPU->cpu_id;
 
-			/* select cpuid to target and mark ino established */
-			ino_p->ino_cpuid = intr_dist_cpuid();
+			DBG(DBG_IB, dip, "px_ib_intr_redist: sysino 0x%llx "
+			    "current cpuid 0x%x current default cpuid 0x%x\n",
+			    ino_p->ino_sysino, ino_p->ino_cpuid,
+			    ino_p->ino_default_cpuid);
+
+			/* select target cpuid and mark ino established */
+			if (ino_p->ino_default_cpuid == -1)
+				ino_p->ino_cpuid = ino_p->ino_default_cpuid =
+				    intr_dist_cpuid();
+			else if ((ino_p->ino_cpuid !=
+			    ino_p->ino_default_cpuid) &&
+			    (cpu_intr_on(cpu[ino_p->ino_default_cpuid])))
+				ino_p->ino_cpuid = ino_p->ino_default_cpuid;
+			else if (!cpu_intr_on(cpu[ino_p->ino_cpuid]))
+				ino_p->ino_cpuid = intr_dist_cpuid();
+
+			DBG(DBG_IB, dip, "px_ib_intr_redist: sysino 0x%llx "
+			    "new cpuid 0x%x new default cpuid 0x%x\n",
+			    ino_p->ino_sysino, ino_p->ino_cpuid,
+			    ino_p->ino_default_cpuid);
 
 			/* Add device weight to targeted cpu. */
 			for (ipil_p = ino_p->ino_ipil_p; ipil_p;
@@ -436,30 +452,41 @@ px_ib_locate_ino(px_ib_t *ib_p, devino_t ino_num)
 	return (ino_p);
 }
 
+px_ino_t *
+px_ib_alloc_ino(px_ib_t *ib_p, devino_t ino_num)
+{
+	sysino_t	sysino;
+	px_ino_t	*ino_p;
+
+	if (px_lib_intr_devino_to_sysino(ib_p->ib_px_p->px_dip,
+	    ino_num, &sysino) != DDI_SUCCESS)
+		return (NULL);
+
+	ino_p = kmem_zalloc(sizeof (px_ino_t), KM_SLEEP);
+
+	ino_p->ino_next_p = ib_p->ib_ino_lst;
+	ib_p->ib_ino_lst = ino_p;
+
+	ino_p->ino_ino = ino_num;
+	ino_p->ino_sysino = sysino;
+	ino_p->ino_ib_p = ib_p;
+	ino_p->ino_unclaimed_intrs = 0;
+	ino_p->ino_lopil = 0;
+	ino_p->ino_cpuid = ino_p->ino_default_cpuid = (cpuid_t)-1;
+
+	return (ino_p);
+}
+
 px_ino_pil_t *
 px_ib_new_ino_pil(px_ib_t *ib_p, devino_t ino_num, uint_t pil, px_ih_t *ih_p)
 {
 	px_ino_pil_t	*ipil_p = kmem_zalloc(sizeof (px_ino_pil_t), KM_SLEEP);
 	px_ino_t	*ino_p;
 
-	if ((ino_p = px_ib_locate_ino(ib_p, ino_num)) == NULL) {
-		sysino_t	sysino;
+	if ((ino_p = px_ib_locate_ino(ib_p, ino_num)) == NULL)
+		ino_p = px_ib_alloc_ino(ib_p, ino_num);
 
-		if (px_lib_intr_devino_to_sysino(ib_p->ib_px_p->px_dip,
-		    ino_num, &sysino) != DDI_SUCCESS)
-			return (NULL);
-
-		ino_p = kmem_zalloc(sizeof (px_ino_t), KM_SLEEP);
-
-		ino_p->ino_next_p = ib_p->ib_ino_lst;
-		ib_p->ib_ino_lst = ino_p;
-
-		ino_p->ino_ino = ino_num;
-		ino_p->ino_sysino = sysino;
-		ino_p->ino_ib_p = ib_p;
-		ino_p->ino_unclaimed_intrs = 0;
-		ino_p->ino_lopil = pil;
-	}
+	ASSERT(ino_p != NULL);
 
 	ih_p->ih_next = ih_p;
 	ipil_p->ipil_pil = pil;
@@ -473,7 +500,7 @@ px_ib_new_ino_pil(px_ib_t *ib_p, devino_t ino_num, uint_t pil, px_ih_t *ih_p)
 	ino_p->ino_ipil_p = ipil_p;
 	ino_p->ino_ipil_size++;
 
-	if (ino_p->ino_lopil > pil)
+	if ((ino_p->ino_lopil == 0) || (ino_p->ino_lopil > pil))
 		ino_p->ino_lopil = pil;
 
 	return (ipil_p);
@@ -508,6 +535,7 @@ px_ib_delete_ino_pil(px_ib_t *ib_p, px_ino_pil_t *ipil_p)
 			if (pil > next->ipil_pil)
 				pil = next->ipil_pil;
 		}
+
 		/*
 		 * Value stored in pil should be the lowest pil.
 		 */
@@ -515,6 +543,11 @@ px_ib_delete_ino_pil(px_ib_t *ib_p, px_ino_pil_t *ipil_p)
 	}
 
 	if (ino_p->ino_ipil_size)
+		return;
+
+	ino_p->ino_lopil = 0;
+
+	if (ino_p->ino_msiq_p)
 		return;
 
 	if (ib_p->ib_ino_lst == ino_p)
@@ -819,6 +852,242 @@ px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip,
 }
 
 
+/*
+ * Get interrupt CPU for a given ino.
+ * Return info only for inos which are already mapped to devices.
+ */
+/*ARGSUSED*/
+int
+px_ib_get_intr_target(px_t *px_p, devino_t ino, cpuid_t *cpu_id_p)
+{
+	dev_info_t	*dip = px_p->px_dip;
+	sysino_t	sysino;
+	int		ret;
+
+	DBG(DBG_IB, px_p->px_dip, "px_ib_get_intr_target: devino %x\n", ino);
+
+	/* Convert leaf-wide intr to system-wide intr */
+	if (px_lib_intr_devino_to_sysino(dip, ino, &sysino) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	ret = px_lib_intr_gettarget(dip, sysino, cpu_id_p);
+
+	DBG(DBG_IB, px_p->px_dip, "px_ib_get_intr_target: cpu_id %x\n",
+	    *cpu_id_p);
+
+	return (ret);
+}
+
+
+/*
+ * Associate a new CPU with a given ino.
+ * Operate only on INOs which are already mapped to devices.
+ */
+int
+px_ib_set_intr_target(px_t *px_p, devino_t ino, cpuid_t cpu_id)
+{
+	dev_info_t		*dip = px_p->px_dip;
+	cpuid_t			old_cpu_id;
+	sysino_t		sysino;
+	int			ret = DDI_SUCCESS;
+	extern const int	_ncpu;
+	extern cpu_t		*cpu[];
+
+	DBG(DBG_IB, px_p->px_dip, "px_ib_set_intr_target: devino %x "
+	    "cpu_id %x\n", ino, cpu_id);
+
+	mutex_enter(&cpu_lock);
+
+	/* Convert leaf-wide intr to system-wide intr */
+	if (px_lib_intr_devino_to_sysino(dip, ino, &sysino) != DDI_SUCCESS) {
+		ret = DDI_FAILURE;
+		goto done;
+	}
+
+	if (px_lib_intr_gettarget(dip, sysino, &old_cpu_id) != DDI_SUCCESS) {
+		ret = DDI_FAILURE;
+		goto done;
+	}
+
+	/*
+	 * Get lock, validate cpu and write it.
+	 */
+	if ((cpu_id < _ncpu) && (cpu[cpu_id] && cpu_is_online(cpu[cpu_id]))) {
+		DBG(DBG_IB, dip, "px_ib_set_intr_target: Enabling CPU %d\n",
+		    cpu_id);
+		px_ib_intr_dist_en(dip, cpu_id, ino, B_TRUE);
+		px_ib_log_new_cpu(px_p->px_ib_p, old_cpu_id, cpu_id, ino);
+	} else {	/* Invalid cpu */
+		DBG(DBG_IB, dip, "px_ib_set_intr_target: Invalid cpuid %x\n",
+		    cpu_id);
+		ret = DDI_EINVAL;
+	}
+
+done:
+	mutex_exit(&cpu_lock);
+	return (ret);
+}
+
+hrtime_t px_ib_msix_retarget_timeout = 120ll * NANOSEC;	/* 120 seconds */
+
+/*
+ * Associate a new CPU with a given MSI/X.
+ * Operate only on MSI/Xs which are already mapped to devices.
+ */
+int
+px_ib_set_msix_target(px_t *px_p, ddi_intr_handle_impl_t *hdlp,
+    msinum_t msi_num, cpuid_t cpu_id)
+{
+	px_ib_t			*ib_p = px_p->px_ib_p;
+	px_msi_state_t		*msi_state_p = &px_p->px_ib_p->ib_msi_state;
+	dev_info_t		*dip = px_p->px_dip;
+	dev_info_t		*rdip = hdlp->ih_dip;
+	msiqid_t		msiq_id, old_msiq_id;
+	pci_msi_state_t		msi_state;
+	msiq_rec_type_t		msiq_rec_type;
+	msi_type_t		msi_type;
+	px_ino_t		*ino_p;
+	px_ih_t			*ih_p, *old_ih_p;
+	cpuid_t			old_cpu_id;
+	hrtime_t		start_time, end_time;
+	int			ret = DDI_SUCCESS;
+	extern const int	_ncpu;
+	extern cpu_t		*cpu[];
+
+	DBG(DBG_IB, dip, "px_ib_set_msix_target: msi_num %x new cpu_id %x\n",
+	    msi_num, cpu_id);
+
+	mutex_enter(&cpu_lock);
+
+	/* Check for MSI64 support */
+	if ((hdlp->ih_cap & DDI_INTR_FLAG_MSI64) && msi_state_p->msi_addr64) {
+		msiq_rec_type = MSI64_REC;
+		msi_type = MSI64_TYPE;
+	} else {
+		msiq_rec_type = MSI32_REC;
+		msi_type = MSI32_TYPE;
+	}
+
+	if ((ret = px_lib_msi_getmsiq(dip, msi_num,
+	    &old_msiq_id)) != DDI_SUCCESS) {
+
+		mutex_exit(&cpu_lock);
+		return (ret);
+	}
+
+	DBG(DBG_IB, dip, "px_ib_set_msix_target: current msiq 0x%x\n",
+	    old_msiq_id);
+
+	if ((ret = px_ib_get_intr_target(px_p,
+	    px_msiqid_to_devino(px_p, old_msiq_id),
+	    &old_cpu_id)) != DDI_SUCCESS) {
+
+		mutex_exit(&cpu_lock);
+		return (ret);
+	}
+
+	DBG(DBG_IB, dip, "px_ib_set_msix_target: current cpuid 0x%x\n",
+	    old_cpu_id);
+
+	if (cpu_id == old_cpu_id) {
+
+		mutex_exit(&cpu_lock);
+		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * Get lock, validate cpu and write it.
+	 */
+	if (!((cpu_id < _ncpu) && (cpu[cpu_id] &&
+	    cpu_is_online(cpu[cpu_id])))) {
+		/* Invalid cpu */
+		DBG(DBG_IB, dip, "px_ib_set_msix_target: Invalid cpuid %x\n",
+		    cpu_id);
+
+		mutex_exit(&cpu_lock);
+		return (DDI_EINVAL);
+	}
+
+	DBG(DBG_IB, dip, "px_ib_set_msix_target: Enabling CPU %d\n", cpu_id);
+
+	if ((ret = px_add_msiq_intr(dip, rdip, hdlp,
+	    msiq_rec_type, msi_num, cpu_id, &msiq_id)) != DDI_SUCCESS) {
+		DBG(DBG_IB, dip, "px_ib_set_msix_target: Add MSI handler "
+		    "failed, rdip 0x%p msi 0x%x\n", rdip, msi_num);
+
+		mutex_exit(&cpu_lock);
+		return (ret);
+	}
+
+	if ((ret = px_lib_msi_setmsiq(dip, msi_num,
+	    msiq_id, msi_type)) != DDI_SUCCESS) {
+		(void) px_rem_msiq_intr(dip, rdip,
+		    hdlp, msiq_rec_type, msi_num, msiq_id);
+
+		mutex_exit(&cpu_lock);
+		return (ret);
+	}
+
+	if ((ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
+	    px_msiqid_to_devino(px_p, msiq_id), hdlp->ih_pri,
+	    PX_INTR_STATE_ENABLE, msiq_rec_type, msi_num)) != DDI_SUCCESS) {
+		(void) px_rem_msiq_intr(dip, rdip,
+		    hdlp, msiq_rec_type, msi_num, msiq_id);
+
+		mutex_exit(&cpu_lock);
+		return (ret);
+	}
+
+	mutex_exit(&cpu_lock);
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+
+	ino_p = px_ib_locate_ino(ib_p, px_msiqid_to_devino(px_p, old_msiq_id));
+	old_ih_p = px_ib_intr_locate_ih(px_ib_ino_locate_ipil(ino_p,
+	    hdlp->ih_pri), rdip, hdlp->ih_inum, msiq_rec_type, msi_num);
+	old_ih_p->ih_retarget_flag = B_TRUE;
+
+	ino_p = px_ib_locate_ino(ib_p, px_msiqid_to_devino(px_p, msiq_id));
+	ih_p = px_ib_intr_locate_ih(px_ib_ino_locate_ipil(ino_p, hdlp->ih_pri),
+	    rdip, hdlp->ih_inum, msiq_rec_type, msi_num);
+	ih_p->ih_retarget_flag = B_TRUE;
+
+	if ((ret = px_lib_msi_getstate(dip, msi_num,
+	    &msi_state)) != DDI_SUCCESS) {
+		(void) px_rem_msiq_intr(dip, rdip,
+		    hdlp, msiq_rec_type, msi_num, msiq_id);
+
+		mutex_exit(&ib_p->ib_ino_lst_mutex);
+		return (ret);
+	}
+
+	if (msi_state == PCI_MSI_STATE_IDLE)
+		ih_p->ih_retarget_flag = B_FALSE;
+
+	start_time = gethrtime();
+	while ((ih_p->ih_retarget_flag == B_TRUE) &&
+	    (old_ih_p->ih_retarget_flag == B_TRUE)) {
+		if ((end_time = (gethrtime() - start_time)) >
+		    px_ib_msix_retarget_timeout) {
+			cmn_err(CE_WARN, "MSIX retarget %x is not completed, "
+			    "even after waiting %llx ticks\n",
+			    msi_num, end_time);
+
+			break;
+		}
+
+		/* Wait for one second */
+		delay(drv_usectohz(1000000));
+	}
+
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+
+	ret = px_rem_msiq_intr(dip, rdip,
+	    hdlp, msiq_rec_type, msi_num, old_msiq_id);
+
+	return (ret);
+}
+
+
 static void
 px_fill_in_intr_devs(pcitool_intr_dev_t *dev, char *driver_name,
     char *path_name, int instance)
@@ -841,8 +1110,8 @@ px_fill_in_intr_devs(pcitool_intr_dev_t *dev, char *driver_name,
  * the px node and (Internal) when it finds no other devices (and *devs_ret > 0)
  */
 uint8_t
-pxtool_ib_get_ino_devs(
-    px_t *px_p, uint32_t ino, uint8_t *devs_ret, pcitool_intr_dev_t *devs)
+pxtool_ib_get_ino_devs(px_t *px_p, uint32_t ino, uint32_t msi_num,
+    uint8_t *devs_ret, pcitool_intr_dev_t *devs)
 {
 	px_ib_t		*ib_p = px_p->px_ib_p;
 	px_ino_t	*ino_p;
@@ -863,7 +1132,17 @@ pxtool_ib_get_ino_devs(
 			    ((i < ipil_p->ipil_ih_size) && (i < *devs_ret));
 			    i++, j++, ih_p = ih_p->ih_next) {
 				(void) ddi_pathname(ih_p->ih_dip, pathname);
-				px_fill_in_intr_devs(&devs[i],
+
+				if (ih_p->ih_msg_code == msi_num) {
+					num_devs = *devs_ret = 1;
+					px_fill_in_intr_devs(&devs[0],
+					    (char *)ddi_driver_name(
+					    ih_p->ih_dip), pathname,
+					    ddi_get_instance(ih_p->ih_dip));
+					goto done;
+				}
+
+				px_fill_in_intr_devs(&devs[j],
 				    (char *)ddi_driver_name(ih_p->ih_dip),
 				    pathname, ddi_get_instance(ih_p->ih_dip));
 			}
@@ -879,14 +1158,60 @@ pxtool_ib_get_ino_devs(
 		num_devs = *devs_ret = 1;
 	}
 
+done:
 	mutex_exit(&ib_p->ib_ino_lst_mutex);
 
 	return (num_devs);
 }
 
 
+int
+pxtool_ib_get_msi_info(px_t *px_p, devino_t ino, msinum_t msi_num,
+    ddi_intr_handle_impl_t *hdlp)
+{
+	px_ib_t		*ib_p = px_p->px_ib_p;
+	px_ino_t	*ino_p;
+	px_ino_pil_t	*ipil_p;
+	px_ih_t 	*ih_p;
+	int		i;
+
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+
+	if ((ino_p = px_ib_locate_ino(ib_p, ino)) == NULL) {
+		mutex_exit(&ib_p->ib_ino_lst_mutex);
+		return (DDI_FAILURE);
+	}
+
+	for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+	    ipil_p = ipil_p->ipil_next_p) {
+		for (i = 0, ih_p = ipil_p->ipil_ih_head;
+		    ((i < ipil_p->ipil_ih_size) && ih_p);
+		    i++, ih_p = ih_p->ih_next) {
+
+			if (ih_p->ih_msg_code != msi_num)
+				continue;
+
+			hdlp->ih_dip = ih_p->ih_dip;
+			hdlp->ih_inum = ih_p->ih_inum;
+			hdlp->ih_cb_func = ih_p->ih_handler;
+			hdlp->ih_cb_arg1 = ih_p->ih_handler_arg1;
+			hdlp->ih_cb_arg2 = ih_p->ih_handler_arg2;
+			if (ih_p->ih_rec_type == MSI64_REC)
+				hdlp->ih_cap = DDI_INTR_FLAG_MSI64;
+			hdlp->ih_pri = ipil_p->ipil_pil;
+			hdlp->ih_ver = DDI_INTR_VERSION;
+
+			mutex_exit(&ib_p->ib_ino_lst_mutex);
+			return (DDI_SUCCESS);
+		}
+	}
+
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+	return (DDI_FAILURE);
+}
+
 void
-px_ib_log_new_cpu(px_ib_t *ib_p, uint32_t old_cpu_id, uint32_t new_cpu_id,
+px_ib_log_new_cpu(px_ib_t *ib_p, cpuid_t old_cpu_id, cpuid_t new_cpu_id,
     uint32_t ino)
 {
 	px_ino_t	*ino_p;

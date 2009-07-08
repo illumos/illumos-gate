@@ -268,7 +268,7 @@ px_lib_intr_gettarget(dev_info_t *dip, sysino_t sysino, cpuid_t *cpuid)
 		return (DDI_FAILURE);
 	}
 
-	DBG(DBG_LIB_INT, dip, "px_lib_intr_gettarget: cpuid 0x%x\n", cpuid);
+	DBG(DBG_LIB_INT, dip, "px_lib_intr_gettarget: cpuid 0x%x\n", *cpuid);
 
 	return (DDI_SUCCESS);
 }

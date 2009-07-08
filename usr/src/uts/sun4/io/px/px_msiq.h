@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_MSIQ_H
 #define	_SYS_PX_MSIQ_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,16 +57,15 @@ typedef struct px_msiq_state {
 	uint_t		msiq_rec_cnt;	/* # of records per MSIQ */
 	msiqid_t	msiq_1st_msiq_id; /* First MSIQ ID */
 	devino_t	msiq_1st_devino; /* First devino */
+	boolean_t	msiq_redist_flag; /* Flag to redist MSIQs */
 
 	/* MSIQs specific reserved for MSI/Xs */
 	uint_t		msiq_msi_qcnt;	/* # of MSIQs for MSI/Xs */
 	msiqid_t	msiq_1st_msi_qid; /* First MSIQ ID for MSI/Xs */
-	msiqid_t	msiq_next_msi_qid; /* Next MSIQ index for MSI/Xs */
 
 	/* MSIQs specific reserved for PCIe messages */
 	uint_t		msiq_msg_qcnt;	/* # of MSIQs for PCIe msgs */
 	msiqid_t	msiq_1st_msg_qid; /* First MSIQ ID for PCIe msgs */
-	msiqid_t	msiq_next_msg_qid; /* Next MSIQ index for PCIe msgs */
 
 	px_msiq_t	*msiq_p;	/* Pointer to MSIQs array */
 	void		*msiq_buf_p; /* Pointer to MSIQs array */
@@ -98,7 +95,11 @@ extern	void	px_msiq_resume(px_t *px_p);
 
 extern	int	px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type,
 		    msiqid_t *msiq_id_p);
+extern	int	px_msiq_alloc_based_on_cpuid(px_t *px_p,
+		    msiq_rec_type_t rec_type, cpuid_t cpuid,
+		    msiqid_t *msiq_id_p);
 extern	int	px_msiq_free(px_t *px_p, msiqid_t msiq_id);
+extern	void	px_msiq_redist(px_t *px_p);
 
 extern  devino_t px_msiqid_to_devino(px_t *px_p, msiqid_t msiq_id);
 extern  msiqid_t px_devino_to_msiqid(px_t *px_p, devino_t devino);

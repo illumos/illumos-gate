@@ -156,6 +156,12 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
 		goto done_set_intr;
 	}
 
+	if (iset.flags & PCITOOL_INTR_FLAG_SET_MSI) {
+		rval = ENOTSUP;
+		iset.status = PCITOOL_IO_ERROR;
+		goto done_set_intr;
+	}
+
 	if (iset.ino > APIC_MAX_VECTOR) {
 		rval = EINVAL;
 		iset.status = PCITOOL_INVALID_INO;
@@ -179,13 +185,14 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
 	 */
 	info_hdl.ih_vector = iset.ino;
 	info_hdl.ih_private = (void *)(uintptr_t)iset.cpu_id;
+	info_hdl.ih_flags = PSMGI_INTRBY_VEC;
 	if (pcitool_debug)
 		prom_printf("user version:%d, flags:0x%x\n",
 		    iset.user_version, iset.flags);
 
 	result = ENOTSUP;
 	if ((iset.user_version >= PCITOOL_V2) &&
-	    (iset.flags & PCITOOL_INTR_SET_FLAG_GROUP)) {
+	    (iset.flags & PCITOOL_INTR_FLAG_SET_GROUP)) {
 		ret = (*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_GRP_SET_CPU,
 		    &result);
 	} else {
@@ -258,6 +265,13 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 	if (ddi_copyin(arg, &partial_iget, PCITOOL_IGET_SIZE(0), mode) !=
 	    DDI_SUCCESS)
 		return (EFAULT);
+
+	if (partial_iget.flags & PCITOOL_INTR_FLAG_GET_MSI) {
+		partial_iget.status = PCITOOL_IO_ERROR;
+		partial_iget.num_devs_ret = 0;
+		rval = ENOTSUP;
+		goto done_get_intr;
+	}
 
 	/* Validate argument. */
 	if (partial_iget.ino > APIC_MAX_VECTOR) {
@@ -387,6 +401,9 @@ pcitool_intr_info(dev_info_t *dip, void *arg, int mode)
 			prom_printf("Error reading arguments\n");
 		return (EFAULT);
 	}
+
+	if (intr_info.flags & PCITOOL_INTR_FLAG_GET_MSI)
+		return (ENOTSUP);
 
 	/* For UPPC systems, psm_intr_ops has no entry for APIC_TYPE. */
 	if ((rval = (*psm_intr_ops)(NULL, &info_hdl,

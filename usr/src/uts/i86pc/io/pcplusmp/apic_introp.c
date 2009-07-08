@@ -596,7 +596,7 @@ apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
 #if !defined(__xpv)
 
 static int
-apic_set_cpu(uint32_t vector, int cpu, int *result)
+apic_set_cpu(int irqno, int cpu, int *result)
 {
 	apic_irq_t *irqp;
 	ulong_t iflag;
@@ -604,9 +604,8 @@ apic_set_cpu(uint32_t vector, int cpu, int *result)
 
 	DDI_INTR_IMPLDBG((CE_CONT, "APIC_SET_CPU\n"));
 
-	/* Convert the vector to the irq using vector_to_irq table. */
 	mutex_enter(&airq_mutex);
-	irqp = apic_irq_table[apic_vector_to_irq[vector]];
+	irqp = apic_irq_table[irqno];
 	mutex_exit(&airq_mutex);
 
 	if (irqp == NULL) {
@@ -633,12 +632,17 @@ apic_set_cpu(uint32_t vector, int cpu, int *result)
 		*result = EIO;
 		return (PSM_FAILURE);
 	}
+	/*
+	 * keep tracking the default interrupt cpu binding
+	 */
+	irqp->airq_cpu = cpu;
+
 	*result = 0;
 	return (PSM_SUCCESS);
 }
 
 static int
-apic_grp_set_cpu(uint32_t vector, int new_cpu, int *result)
+apic_grp_set_cpu(int irqno, int new_cpu, int *result)
 {
 	dev_info_t *orig_dip;
 	uint32_t orig_cpu;
@@ -651,6 +655,7 @@ apic_grp_set_cpu(uint32_t vector, int new_cpu, int *result)
 	uint32_t msi_pvm;
 	ddi_acc_handle_t handle;
 	int num_vectors = 0;
+	uint32_t vector;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "APIC_GRP_SET_CPU\n"));
 
@@ -659,15 +664,16 @@ apic_grp_set_cpu(uint32_t vector, int new_cpu, int *result)
 	 * us while we're playing with it.
 	 */
 	mutex_enter(&airq_mutex);
-	irqps[0] = apic_irq_table[apic_vector_to_irq[vector]];
+	irqps[0] = apic_irq_table[irqno];
 	orig_cpu = irqps[0]->airq_temp_cpu;
 	orig_dip = irqps[0]->airq_dip;
 	num_vectors = irqps[0]->airq_intin_no;
+	vector = irqps[0]->airq_vector;
 
 	/* A "group" of 1 */
 	if (num_vectors == 1) {
 		mutex_exit(&airq_mutex);
-		return (apic_set_cpu(vector, new_cpu, result));
+		return (apic_set_cpu(irqno, new_cpu, result));
 	}
 
 	*result = ENXIO;
@@ -748,8 +754,12 @@ apic_grp_set_cpu(uint32_t vector, int new_cpu, int *result)
 	if (apic_rebind_all(irqps[0], new_cpu))
 		(void) apic_rebind_all(irqps[0], orig_cpu);
 	else {
-		for (i = 1; i < num_vectors; i++)
+		irqps[0]->airq_cpu = new_cpu;
+
+		for (i = 1; i < num_vectors; i++) {
 			(void) apic_rebind_all(irqps[i], new_cpu);
+			irqps[i]->airq_cpu = new_cpu;
+		}
 		*result = 0;	/* SUCCESS */
 	}
 
@@ -986,6 +996,8 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		cap = DDI_INTR_FLAG_PENDING;
 		if (hdlp->ih_type == DDI_INTR_TYPE_FIXED)
 			cap |= DDI_INTR_FLAG_MASKABLE;
+		else if (hdlp->ih_type == DDI_INTR_TYPE_MSIX)
+			cap |= DDI_INTR_FLAG_RETARGETABLE;
 		*result = cap;
 		break;
 	case PSM_INTR_OP_GET_SHARED:
@@ -1036,6 +1048,15 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			*result = EINVAL;
 			return (PSM_FAILURE);
 		}
+		if (hdlp->ih_vector > APIC_MAX_VECTOR) {
+			DDI_INTR_IMPLDBG((CE_CONT,
+			    "[grp_]set_cpu: vector out of range: %d\n",
+			    hdlp->ih_vector));
+			*result = EINVAL;
+			return (PSM_FAILURE);
+		}
+		if (!(hdlp->ih_flags & PSMGI_INTRBY_IRQ))
+			hdlp->ih_vector = apic_vector_to_irq[hdlp->ih_vector];
 		if (intr_op == PSM_INTR_OP_SET_CPU) {
 			if (apic_set_cpu(hdlp->ih_vector, new_cpu, result) !=
 			    PSM_SUCCESS)

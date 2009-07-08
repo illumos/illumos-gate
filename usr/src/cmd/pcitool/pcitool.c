@@ -94,6 +94,8 @@ static struct {
 		"CPU is non-existent or not online" },
 	{ PCITOOL_INVALID_INO,
 		"INO is out of range or invalid" },
+	{ PCITOOL_INVALID_MSI,
+		"MSI is out of range or invalid" },
 	{ PCITOOL_PENDING_INTRTIMEOUT,
 		"Timeout waiting for pending interrupts to clear" },
 	{ PCITOOL_REGPROP_NOTWELLFORMED,
@@ -1290,8 +1292,13 @@ print_intr_info(pcitool_intr_get_t *iget_p)
 {
 	int i;
 
-	(void) printf("\nino %x mapped to cpu %x\n",
-	    iget_p->ino,  iget_p->cpu_id);
+	if (iget_p->flags & PCITOOL_INTR_FLAG_GET_MSI)
+		(void) printf("\nmsi 0x%x mapped to cpu 0x%x\n",
+		    iget_p->msi,  iget_p->cpu_id);
+	else
+		(void) printf("\nino 0x%x mapped to cpu 0x%x\n",
+		    iget_p->ino,  iget_p->cpu_id);
+
 	for (i = 0; i < iget_p->num_devs; i++) {
 		(void) printf("Device: %s\n", iget_p->dev[i].path);
 		(void) printf("  Driver: %s, instance %d\n",
@@ -1310,29 +1317,38 @@ get_single_interrupt(int fd, pcitool_intr_get_t **iget_pp,
     pcitool_uiargs_t *input_args_p)
 {
 	pcitool_intr_get_t *iget_p = *iget_pp;
-	uint32_t ino = iget_p->ino;
+	const char	*str_type = NULL;
+	uint32_t	intr;
+
+	if (input_args_p->flags & MSI_SPEC_FLAG) {
+		intr = input_args_p->intr_msi;
+		str_type = "msi";
+	} else {
+		intr = input_args_p->intr_ino;
+		str_type = "ino";
+	}
 
 	/*
-	 * Check if interrupts are active on this ino.  Get as much
-	 * device info as there is room for at the moment.  If there
+	 * Check if interrupts are active on this ino/msi. Get as much
+	 * device info as there is room for at the moment. If there
 	 * is not enough room for all devices, will call again with a
 	 * larger buffer.
 	 */
 	if (ioctl(fd, PCITOOL_DEVICE_GET_INTR, iget_p) != 0) {
-
 		/*
 		 * Let EIO errors silently slip through, as
 		 * some inos may not be viewable by design.
 		 * We don't want to stop or print an error for these.
 		 */
-
 		if (errno == EIO) {
 			return (SUCCESS);
 		}
 
 		if (!(IS_QUIET(input_args_p->flags))) {
-			(void) fprintf(stderr, "Ioctl to get interrupt "
-			    "%d info failed %s\n", ino, strerror(errno));
+			(void) fprintf(stderr, "Ioctl to get %s 0x%x "
+			    "info failed: %s\n", str_type, intr,
+			    strerror(errno));
+
 			if (errno != EFAULT) {
 				(void) fprintf(stderr, "Pcitool status: %s\n",
 				    strstatus(iget_p->status));
@@ -1351,11 +1367,12 @@ get_single_interrupt(int fd, pcitool_intr_get_t **iget_pp,
 		iget_p = *iget_pp =
 		    realloc(iget_p, PCITOOL_IGET_SIZE(iget_p->num_devs));
 		iget_p->num_devs_ret = iget_p->num_devs;
+
 		if (ioctl(fd, PCITOOL_DEVICE_GET_INTR, iget_p) != 0) {
 			if (!(IS_QUIET(input_args_p->flags))) {
-				(void) fprintf(stderr, "Ioctl to get interrupt "
-				    "%d device info failed %s\n",
-				    ino, strerror(errno));
+				(void) fprintf(stderr, "Ioctl to get %s 0x%x"
+				    "device info failed: %s\n", str_type,
+				    intr, strerror(errno));
 				if (errno != EFAULT) {
 					(void) fprintf(stderr,
 					    "Pcitool status: %s\n",
@@ -1386,24 +1403,57 @@ get_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 	iget_p->num_devs_ret = INIT_NUM_DEVS;
 	iget_p->user_version = PCITOOL_VERSION;
 
-	/* Explicit ino requested. */
-	if (input_args_p->flags &  INO_SPEC_FLAG) {
-		iget_p->ino = input_args_p->intr_ino;
+	/* Explicit MSI requested. */
+	if (input_args_p->flags & MSI_SPEC_FLAG) {
+		iget_p->msi = input_args_p->intr_msi;
+		iget_p->flags = PCITOOL_INTR_FLAG_GET_MSI;
 		rval = get_single_interrupt(fd, &iget_p, input_args_p);
-
-	} else {	/* Return all inos. */
-
+		/* Return all MSIs. */
+	} else if (input_args_p->flags & MSI_ALL_FLAG) {
 		pcitool_intr_info_t intr_info;
+		intr_info.flags = PCITOOL_INTR_FLAG_GET_MSI;
 
 		if (ioctl(fd, PCITOOL_SYSTEM_INTR_INFO, &intr_info) != 0) {
 			if (!(IS_QUIET(input_args_p->flags))) {
 				(void) fprintf(stderr,
-				    "intr info ioctl failed:%s\n",
+				    "intr info ioctl failed: %s\n",
 				    strerror(errno));
 			}
-
 		} else {
+			int msi;
 
+			/*
+			 * Search through all interrupts.
+			 * Display info on enabled ones.
+			 */
+			for (msi = 0;
+			    ((msi < intr_info.num_intr) && (rval == SUCCESS));
+			    msi++) {
+				bzero(iget_p, sizeof (pcitool_intr_get_t));
+				iget_p->num_devs_ret = INIT_NUM_DEVS;
+				iget_p->user_version = PCITOOL_VERSION;
+				iget_p->flags = PCITOOL_INTR_FLAG_GET_MSI;
+				iget_p->msi = msi;
+				rval = get_single_interrupt(
+				    fd, &iget_p, input_args_p);
+			}
+		}
+		/* Explicit INO requested. */
+	} else if (input_args_p->flags & INO_SPEC_FLAG) {
+		iget_p->ino = input_args_p->intr_ino;
+		rval = get_single_interrupt(fd, &iget_p, input_args_p);
+		/* Return all INOs. */
+	} else if (input_args_p->flags & INO_ALL_FLAG) {
+		pcitool_intr_info_t intr_info;
+		intr_info.flags = 0;
+
+		if (ioctl(fd, PCITOOL_SYSTEM_INTR_INFO, &intr_info) != 0) {
+			if (!(IS_QUIET(input_args_p->flags))) {
+				(void) fprintf(stderr,
+				    "intr info ioctl failed: %s\n",
+				    strerror(errno));
+			}
+		} else {
 			int ino;
 
 			/*
@@ -1413,6 +1463,9 @@ get_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 			for (ino = 0;
 			    ((ino < intr_info.num_intr) && (rval == SUCCESS));
 			    ino++) {
+				bzero(iget_p, sizeof (pcitool_intr_get_t));
+				iget_p->num_devs_ret = INIT_NUM_DEVS;
+				iget_p->user_version = PCITOOL_VERSION;
 				iget_p->ino = ino;
 				rval = get_single_interrupt(
 				    fd, &iget_p, input_args_p);
@@ -1433,6 +1486,7 @@ get_interrupt_ctlr(int fd, pcitool_uiargs_t *input_args_p)
 	char *ctlr_type = NULL;
 	int rval = SUCCESS;
 
+	intr_info.flags = 0;
 	if (ioctl(fd, PCITOOL_SYSTEM_INTR_INFO, &intr_info) != 0) {
 		if (!(IS_QUIET(input_args_p->flags))) {
 			(void) perror("Ioctl to get intr ctlr info failed");
@@ -1488,36 +1542,46 @@ get_interrupt_ctlr(int fd, pcitool_uiargs_t *input_args_p)
 static int
 set_interrupts(int fd, pcitool_uiargs_t *input_args_p)
 {
-	int rval = SUCCESS;	/* Return status. */
-
-	pcitool_intr_set_t iset;
+	pcitool_intr_set_t	iset;
+	const char		*str_type = NULL;
+	uint32_t		intr;
+	int			rval = SUCCESS;	/* Return status. */
 
 	/* Load interrupt number and cpu from commandline. */
-	iset.ino = input_args_p->intr_ino;
+	if (input_args_p->flags & MSI_SPEC_FLAG) {
+		iset.msi = intr = input_args_p->intr_msi;
+		iset.flags = PCITOOL_INTR_FLAG_SET_MSI;
+		str_type = "msi";
+	} else {
+		iset.ino = intr = input_args_p->intr_ino;
+		iset.flags = 0;
+		str_type = "ino";
+	}
+
 	iset.cpu_id = input_args_p->intr_cpu;
 	iset.user_version = PCITOOL_VERSION;
-	iset.flags = (input_args_p->flags & SETGRP_FLAG) ?
-	    PCITOOL_INTR_SET_FLAG_GROUP : 0;
+	iset.flags |= (input_args_p->flags & SETGRP_FLAG) ?
+	    PCITOOL_INTR_FLAG_SET_GROUP : 0;
 
 	/* Do the deed. */
 	if (ioctl(fd, PCITOOL_DEVICE_SET_INTR, &iset) != 0) {
 		if (!(IS_QUIET(input_args_p->flags))) {
 			(void) fprintf(stderr,
-			    "Ioctl to set intr 0x%x failed: %s\n",
-			    input_args_p->intr_ino, strerror(errno));
+			    "Ioctl to set %s 0x%x failed: %s\n",
+			    str_type, intr, strerror(errno));
 			(void) fprintf(stderr, "pcitool status: %s\n",
 			    strstatus(iset.status));
 		}
 		rval = errno;
 	} else {
 		if (input_args_p->flags & SETGRP_FLAG) {
-			(void) printf("\nInterrupts on ino %x reassigned:",
-			    iset.ino);
+			(void) printf("\nInterrupts on %s group starting "
+			    "at %s 0x%x reassigned:", str_type, str_type, intr);
 		} else {
-			(void) printf("\nInterrupts on ino group starting "
-			    "at ino %x reassigned:", iset.ino);
+			(void) printf("\nInterrupts on %s 0x%x reassigned:",
+			    str_type, intr);
 		}
-		(void) printf(" Old cpu:%x, New cpu:%x\n", iset.cpu_id,
+		(void) printf(" Old cpu: 0x%x, New cpu: 0x%x\n", iset.cpu_id,
 		    input_args_p->intr_cpu);
 	}
 

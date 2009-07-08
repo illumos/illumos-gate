@@ -588,6 +588,7 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 		*ino_p->ino_map_reg;
 	}
 ino_done:
+	hdlp->ih_target = ino_p->ino_cpuid;
 	ih_p->ih_ipil_p = ipil_p;
 	ih_p->ih_ksp = kstat_create("pci_intrs",
 	    atomic_inc_32_nv(&pciintr_ks_instance), "config", "interrupts",

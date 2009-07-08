@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -289,13 +287,13 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 	do { /* ino_next_p loop */
 		if (mdb_vread(&ipil, sizeof (px_ino_pil_t),
 		    (uintptr_t)ino.ino_ipil_p) == -1) {
-			return;
+			continue;
 		}
 
 		do { /* ipil_next_p loop */
 			if (mdb_vread(&ih, sizeof (px_ih_t),
 			    (uintptr_t)ipil.ipil_ih_start) == -1) {
-				return;
+				continue;
 			}
 
 			count = 0;
@@ -358,11 +356,12 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 
 			} while (count < ipil.ipil_ih_size);
 
-		} while (mdb_vread(&ipil, sizeof (px_ino_pil_t),
-		    (uintptr_t)ipil.ipil_next_p) != -1);
+		} while ((ipil.ipil_next_p != NULL) &&
+		    (mdb_vread(&ipil, sizeof (px_ino_pil_t),
+		    (uintptr_t)ipil.ipil_next_p) != -1));
 
-	} while (mdb_vread(&ino, sizeof (px_ino_t),
-	    (uintptr_t)ino.ino_next_p) != -1);
+	} while ((ino.ino_next_p != NULL) && (mdb_vread(&ino, sizeof (px_ino_t),
+	    (uintptr_t)ino.ino_next_p) != -1));
 }
 
 static char *
