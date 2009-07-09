@@ -13633,6 +13633,20 @@ ok:;
 	if (flags & TH_URG && urp >= 0) {
 		if (!tcp->tcp_urp_last_valid ||
 		    SEQ_GT(urp + seg_seq, tcp->tcp_urp_last)) {
+			/*
+			 * Non-STREAMS sockets handle the urgent data a litte
+			 * differently from STREAMS based sockets. There is no
+			 * need to mark any mblks with the MSG{NOT,}MARKNEXT
+			 * flags to keep SIOCATMARK happy. Instead a
+			 * su_signal_oob upcall is made to update the mark.
+			 * Neither is a T_EXDATA_IND mblk needed to be
+			 * prepended to the urgent data. The urgent data is
+			 * delivered using the su_recv upcall, where we set
+			 * the MSG_OOB flag to indicate that it is urg data.
+			 *
+			 * Neither TH_SEND_URP_MARK nor TH_MARKNEXT_NEEDED
+			 * are used by non-STREAMS sockets.
+			 */
 			if (IPCL_IS_NONSTR(connp)) {
 				if (!TCP_IS_DETACHED(tcp)) {
 					(*connp->conn_upcalls->su_signal_oob)
@@ -13858,26 +13872,34 @@ ok:;
 		} else if (urp == seg_len) {
 			/*
 			 * The urgent byte is the next byte after this sequence
-			 * number. If there is data it is marked with
-			 * MSGMARKNEXT and any tcp_urp_mark_mp is discarded
-			 * since it is not needed. Otherwise, if the code
-			 * above just allocated a zero-length tcp_urp_mark_mp
-			 * message, that message is tagged with MSGMARKNEXT.
-			 * Sending up these MSGMARKNEXT messages makes
-			 * SIOCATMARK work correctly even though
-			 * the T_EXDATA_IND will not be sent up until the
-			 * urgent byte arrives.
+			 * number. If this endpoint is non-STREAMS, then there
+			 * is nothing to do here since the socket has already
+			 * been notified about the urg pointer by the
+			 * su_signal_oob call above.
+			 *
+			 * In case of STREAMS, some more work might be needed.
+			 * If there is data it is marked with MSGMARKNEXT and
+			 * and any tcp_urp_mark_mp is discarded since it is not
+			 * needed. Otherwise, if the code above just allocated
+			 * a zero-length tcp_urp_mark_mp message, that message
+			 * is tagged with MSGMARKNEXT. Sending up these
+			 * MSGMARKNEXT messages makes SIOCATMARK work correctly
+			 * even though the T_EXDATA_IND will not be sent up
+			 * until the urgent byte arrives.
 			 */
-			if (seg_len != 0) {
-				flags |= TH_MARKNEXT_NEEDED;
-				freemsg(tcp->tcp_urp_mark_mp);
-				tcp->tcp_urp_mark_mp = NULL;
-				flags &= ~TH_SEND_URP_MARK;
-			} else if (tcp->tcp_urp_mark_mp != NULL) {
-				flags |= TH_SEND_URP_MARK;
-				tcp->tcp_urp_mark_mp->b_flag &=
-				    ~MSGNOTMARKNEXT;
-				tcp->tcp_urp_mark_mp->b_flag |= MSGMARKNEXT;
+			if (!IPCL_IS_NONSTR(tcp->tcp_connp)) {
+				if (seg_len != 0) {
+					flags |= TH_MARKNEXT_NEEDED;
+					freemsg(tcp->tcp_urp_mark_mp);
+					tcp->tcp_urp_mark_mp = NULL;
+					flags &= ~TH_SEND_URP_MARK;
+				} else if (tcp->tcp_urp_mark_mp != NULL) {
+					flags |= TH_SEND_URP_MARK;
+					tcp->tcp_urp_mark_mp->b_flag &=
+					    ~MSGNOTMARKNEXT;
+					tcp->tcp_urp_mark_mp->b_flag |=
+					    MSGMARKNEXT;
+				}
 			}
 #ifdef DEBUG
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE,
@@ -14910,24 +14932,35 @@ update_ack:
 		} else {
 			tcp_rcv_enqueue(tcp, mp, seg_len);
 		}
+	} else if (IPCL_IS_NONSTR(connp)) {
+		/*
+		 * Non-STREAMS socket
+		 *
+		 * Note that no KSSL processing is done here, because
+		 * KSSL is not supported for non-STREAMS sockets.
+		 */
+		boolean_t push = flags & (TH_PUSH|TH_FIN);
+		int error;
+
+		if ((*connp->conn_upcalls->su_recv)(
+		    connp->conn_upper_handle,
+		    mp, seg_len, 0, &error, &push) <= 0) {
+			/*
+			 * We should never be in middle of a
+			 * fallback, the squeue guarantees that.
+			 */
+			ASSERT(error != EOPNOTSUPP);
+			if (error == ENOSPC)
+				tcp->tcp_rwnd -= seg_len;
+		} else if (push) {
+			/* PUSH bit set and sockfs is not flow controlled */
+			flags |= tcp_rwnd_reopen(tcp);
+		}
 	} else {
+		/* STREAMS socket */
 		if (mp->b_datap->db_type != M_DATA ||
 		    (flags & TH_MARKNEXT_NEEDED)) {
-			if (IPCL_IS_NONSTR(connp)) {
-				int error;
-
-				if ((*connp->conn_upcalls->su_recv)
-				    (connp->conn_upper_handle, mp,
-				    seg_len, 0, &error, NULL) <= 0) {
-					/*
-					 * We should never be in middle of a
-					 * fallback, the squeue guarantees that.
-					 */
-					ASSERT(error != EOPNOTSUPP);
-					if (error == ENOSPC)
-						tcp->tcp_rwnd -= seg_len;
-				}
-			} else if (tcp->tcp_rcv_list != NULL) {
+			if (tcp->tcp_rcv_list != NULL) {
 				flags |= tcp_rcv_drain(tcp);
 			}
 			ASSERT(tcp->tcp_rcv_list == NULL ||
@@ -14950,8 +14983,7 @@ update_ack:
 				DTRACE_PROBE1(kssl_mblk__ksslinput_data1,
 				    mblk_t *, mp);
 				tcp_kssl_input(tcp, mp);
-			} else if (!IPCL_IS_NONSTR(connp)) {
-				/* Already handled non-STREAMS case. */
+			} else {
 				putnext(tcp->tcp_rq, mp);
 				if (!canputnext(tcp->tcp_rq))
 					tcp->tcp_rwnd -= seg_len;
@@ -14961,28 +14993,6 @@ update_ack:
 			/* Does this need SSL processing first? */
 			DTRACE_PROBE1(kssl_mblk__ksslinput_data2, mblk_t *, mp);
 			tcp_kssl_input(tcp, mp);
-		} else if (IPCL_IS_NONSTR(connp)) {
-			/* Non-STREAMS socket */
-			boolean_t push = flags & (TH_PUSH|TH_FIN);
-			int	error;
-
-			if ((*connp->conn_upcalls->su_recv)(
-			    connp->conn_upper_handle,
-			    mp, seg_len, 0, &error, &push) <= 0) {
-				/*
-				 * We should never be in middle of a
-				 * fallback, the squeue guarantees that.
-				 */
-				ASSERT(error != EOPNOTSUPP);
-				if (error == ENOSPC)
-					tcp->tcp_rwnd -= seg_len;
-			} else if (push) {
-				/*
-				 * PUSH bit set and sockfs is not
-				 * flow controlled
-				 */
-				flags |= tcp_rwnd_reopen(tcp);
-			}
 		} else if ((flags & (TH_PUSH|TH_FIN)) ||
 		    tcp->tcp_rcv_cnt + seg_len >= tcp->tcp_recv_hiwater >> 3) {
 			if (tcp->tcp_rcv_list != NULL) {
@@ -15018,8 +15028,7 @@ update_ack:
 		 * for a push bit. This provides resiliency against
 		 * implementations that do not correctly generate push bits.
 		 */
-		if (!IPCL_IS_NONSTR(connp) && tcp->tcp_rcv_list != NULL &&
-		    tcp->tcp_push_tid == 0) {
+		if (tcp->tcp_rcv_list != NULL && tcp->tcp_push_tid == 0) {
 			/*
 			 * The connection may be closed at this point, so don't
 			 * do anything for a detached tcp.
