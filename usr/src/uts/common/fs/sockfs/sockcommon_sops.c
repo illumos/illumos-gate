@@ -1129,6 +1129,8 @@ so_set_prop(sock_upper_handle_t sock_handle, struct sock_proto_props *soppp)
 		so->so_proto_props.sopp_rcvthresh = soppp->sopp_rcvthresh;
 	if (soppp->sopp_flags & SOCKOPT_MAXADDRLEN)
 		so->so_proto_props.sopp_maxaddrlen = soppp->sopp_maxaddrlen;
+	if (soppp->sopp_flags & SOCKOPT_LOOPBACK)
+		so->so_proto_props.sopp_loopback = soppp->sopp_loopback;
 
 	mutex_exit(&so->so_lock);
 
@@ -1136,7 +1138,8 @@ so_set_prop(sock_upper_handle_t sock_handle, struct sock_proto_props *soppp)
 	soppp->sopp_flags &= ~(SOCKOPT_MAXBLK | SOCKOPT_WROFF | SOCKOPT_TAIL |
 	    SOCKOPT_RCVHIWAT | SOCKOPT_RCVLOWAT | SOCKOPT_MAXPSZ |
 	    SOCKOPT_ZCOPY | SOCKOPT_OOBINLINE | SOCKOPT_RCVTIMER |
-	    SOCKOPT_RCVTHRESH | SOCKOPT_MAXADDRLEN | SOCKOPT_MINPSZ);
+	    SOCKOPT_RCVTHRESH | SOCKOPT_MAXADDRLEN | SOCKOPT_MINPSZ |
+	    SOCKOPT_LOOPBACK);
 	ASSERT(soppp->sopp_flags == 0);
 #endif
 }

@@ -78,6 +78,7 @@ sod_rcv_init(struct sonode *so, int flags, struct uio **uiopp)
 	if (uiop->uio_resid >= uioasync.mincnt &&
 	    sodp != NULL && sodp->sod_enabled &&
 	    uioasync.enabled && !(flags & MSG_PEEK) &&
+	    !so->so_proto_props.sopp_loopback &&
 	    !(so->so_state & SS_CANTRCVMORE)) {
 		/*
 		 * Big enough I/O for uioa min setup and an sodirect socket

@@ -60,6 +60,7 @@ struct sock_proto_props {
 	uint_t sopp_rcvtimer;		/* delayed recv notification (time) */
 	uint32_t sopp_rcvthresh;	/* delayed recv notification (bytes) */
 	socklen_t sopp_maxaddrlen;	/* maximum size of protocol address */
+	boolean_t sopp_loopback;	/* loopback connection */
 };
 
 /* flags to determine which socket options are set */
@@ -75,6 +76,7 @@ struct sock_proto_props {
 #define	SOCKOPT_RCVTHRESH	0x0200
 #define	SOCKOPT_MAXADDRLEN	0x0400	/* set max address length */
 #define	SOCKOPT_MINPSZ		0x0800	/* set minpsz for protocols */
+#define	SOCKOPT_LOOPBACK	0x1000	/* set loopback */
 
 #define	IS_SO_OOB_INLINE(so)	((so)->so_proto_props.sopp_oobinline)
 

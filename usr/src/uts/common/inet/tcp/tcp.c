@@ -17371,6 +17371,10 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			sopp.sopp_tail = sopp_tail;
 			sopp.sopp_zcopyflag = sopp_copyopt;
 		}
+		if (tcp->tcp_loopback) {
+			sopp.sopp_flags |= SOCKOPT_LOOPBACK;
+			sopp.sopp_loopback = B_TRUE;
+		}
 		(*connp->conn_upcalls->su_set_proto_props)
 		    (connp->conn_upper_handle, &sopp);
 	} else {
@@ -26462,6 +26466,16 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		} else {
 			error = proto_tlitosyserr(-error);
 		}
+	}
+
+	if (tcp->tcp_loopback) {
+		struct sock_proto_props sopp;
+
+		sopp.sopp_flags = SOCKOPT_LOOPBACK;
+		sopp.sopp_loopback = B_TRUE;
+
+		(*connp->conn_upcalls->su_set_proto_props)(
+		    connp->conn_upper_handle, &sopp);
 	}
 done:
 	squeue_synch_exit(sqp, connp);
