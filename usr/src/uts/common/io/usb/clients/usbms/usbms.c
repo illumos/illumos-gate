@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1854,7 +1854,7 @@ usbms_get_coordinate(uint_t pos, uint_t len, mblk_t *mp)
 
 	/* get the unsigned int value from the bit stream */
 	utmp = 0;
-	for (i = (pos + len - 1); i >= pos; i--) {
+	for (i = (pos + len - 1); i >= (int)pos; i--) {
 		bitval = (mp->b_rptr[i/8] & (1 << (i%8))) >> (i%8);
 		utmp = utmp * 2 + bitval;
 	}
