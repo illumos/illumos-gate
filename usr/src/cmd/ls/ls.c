@@ -143,39 +143,6 @@ struct attrtm {
 	uint64_t	nstm;
 };
 
-struct	lbuf	{
-	union	{
-		char	lname[MAXNAMLEN]; /* used for filename in a directory */
-		char	*namep;		/* for name in ls-command; */
-	} ln;
-	char	ltype;		/* filetype */
-	ino_t	lnum;		/* inode number of file */
-	mode_t	lflags; 	/* 0777 bits used as r,w,x permissions */
-	nlink_t	lnl;		/* number of links to file */
-	uid_t	luid;
-	gid_t	lgid;
-	off_t	lsize;		/* filesize or major/minor dev numbers */
-	blkcnt_t	lblocks;	/* number of file blocks */
-	timestruc_t	lmtime;
-	timestruc_t	lat;
-	timestruc_t	lct;
-	timestruc_t	lmt;
-	char	*flinkto;	/* symbolic link contents */
-	char 	acl;		/* indicate there are additional acl entries */
-	int	cycle;		/* cycle detected flag */
-	struct ditem *ancinfo;	/* maintains ancestor info */
-	acl_t *aclp;		/* ACL if present */
-	struct attrb *exttr;	/* boolean extended system attributes */
-	struct attrtm *extm;	/* timestamp extended system attributes */
-};
-
-struct dchain {
-	char *dc_name;		/* path name */
-	int cycle_detected;	/* cycle detected visiting this directory */
-	struct ditem *myancinfo;	/* this directory's ancestry info */
-	struct dchain *dc_next;	/* next directory in the chain */
-};
-
 #define	LSA_NONE	(0)
 #define	LSA_BOLD	(1L << 0)
 #define	LSA_UNDERSCORE	(1L << 1)
@@ -205,13 +172,48 @@ typedef enum LS_CFTYPE {
 	LS_PAT
 } ls_cftype_t;
 
-typedef struct ls_color {
+typedef struct {
 	char		*sfx;
 	ls_cftype_t	ftype;
 	int		attr;
 	int		fg;
 	int		bg;
 } ls_color_t;
+
+struct	lbuf	{
+	union	{
+		char	lname[MAXNAMLEN]; /* used for filename in a directory */
+		char	*namep;		/* for name in ls-command; */
+	} ln;
+	char	ltype;		/* filetype */
+	ino_t	lnum;		/* inode number of file */
+	mode_t	lflags; 	/* 0777 bits used as r,w,x permissions */
+	nlink_t	lnl;		/* number of links to file */
+	uid_t	luid;
+	gid_t	lgid;
+	off_t	lsize;		/* filesize or major/minor dev numbers */
+	blkcnt_t	lblocks;	/* number of file blocks */
+	timestruc_t	lmtime;
+	timestruc_t	lat;
+	timestruc_t	lct;
+	timestruc_t	lmt;
+	char	*flinkto;	/* symbolic link contents */
+	char 	acl;		/* indicate there are additional acl entries */
+	int	cycle;		/* cycle detected flag */
+	struct ditem *ancinfo;	/* maintains ancestor info */
+	acl_t *aclp;		/* ACL if present */
+	struct attrb *exttr;	/* boolean extended system attributes */
+	struct attrtm *extm;	/* timestamp extended system attributes */
+	ls_color_t	*color;	/* color for entry */
+	ls_color_t	*link_color;	/* color for symlink */
+};
+
+struct dchain {
+	char *dc_name;		/* path name */
+	int cycle_detected;	/* cycle detected visiting this directory */
+	struct ditem *myancinfo;	/* this directory's ancestry info */
+	struct dchain *dc_next;	/* next directory in the chain */
+};
 
 /*
  * A numbuf_t is used when converting a number to a string representation
@@ -255,7 +257,8 @@ static char 		*number_to_scaled_string(numbuf_t buf,
 static void		record_ancestry(char *, struct stat *, struct lbuf *,
 			    int, struct ditem *);
 static void		ls_color_init(void);
-static void		ls_start_color(struct lbuf *);
+static ls_color_t	*ls_color_find(const char *, mode_t);
+static void		ls_start_color(ls_color_t *);
 static void		ls_end_color(void);
 
 static int		aflg;
@@ -349,6 +352,7 @@ static char		*lsc_concealed;
 static char		*lsc_none;
 static char		*lsc_setfg;
 static char		*lsc_setbg;
+static ls_color_t	*lsc_orphan;
 
 #define	NOTWORKINGDIR(d, l)	(((l) < 2) || \
 				    (strcmp((d) + (l) - 2, "/.") != 0))
@@ -1242,9 +1246,9 @@ pentry(struct lbuf *ap)
 {
 	struct lbuf *p;
 	numbuf_t hbuf;
-	char buf[BUFSIZ];
 	char *dmark = "";	/* Used if -p or -F option active */
 	char *cp;
+	char *str;
 
 	p = ap;
 	column();
@@ -1333,29 +1337,43 @@ pentry(struct lbuf *ap)
 			dmark = "";
 	}
 
-	if (lflg && p->flinkto) {
-		(void) strncpy(buf, " -> ", 4);
-		(void) strcpy(buf + 4, p->flinkto);
-		dmark = buf;
-	}
-
 	if (colorflg)
-		ls_start_color(p);
+		ls_start_color(p->color);
 
-	if (p->lflags & ISARG) {
-		if (qflg || bflg)
-			pprintf(p->ln.namep, dmark);
-		else {
-			(void) printf("%s%s", p->ln.namep, dmark);
-			curcol += strcol((unsigned char *)p->ln.namep);
-			curcol += strcol((unsigned char *)dmark);
+	if (p->lflags & ISARG)
+		str = p->ln.namep;
+	else
+		str = p->ln.lname;
+
+	if (qflg || bflg) {
+		csi_pprintf((unsigned char *)str);
+
+		if (lflg && p->flinkto) {
+			if (colorflg)
+				ls_end_color();
+			csi_pprintf((unsigned char *)" -> ");
+			if (colorflg)
+				ls_start_color(p->link_color);
+			csi_pprintf((unsigned char *)p->flinkto);
+		} else {
+			csi_pprintf((unsigned char *)dmark);
 		}
 	} else {
-		if (qflg || bflg)
-			pprintf(p->ln.lname, dmark);
-		else {
-			(void) printf("%s%s", p->ln.lname, dmark);
-			curcol += strcol((unsigned char *)p->ln.lname);
+		(void) printf("%s", str);
+		curcol += strcol((unsigned char *)str);
+
+		if (lflg && p->flinkto) {
+			if (colorflg)
+				ls_end_color();
+			str = " -> ";
+			(void) printf("%s", str);
+			curcol += strcol((unsigned char *)str);
+			if (colorflg)
+				ls_start_color(p->link_color);
+			(void) printf("%s", p->flinkto);
+			curcol += strcol((unsigned char *)p->flinkto);
+		} else {
+			(void) printf("%s", dmark);
 			curcol += strcol((unsigned char *)dmark);
 		}
 	}
@@ -1777,6 +1795,8 @@ gstat(char *file, int argfl, struct ditem *myparent)
 	rep->lmt.tv_nsec = 0;
 	rep->exttr = NULL;
 	rep->extm = NULL;
+	rep->color = NULL;
+	rep->link_color = NULL;
 
 	if (argfl || statreq) {
 		int doacl;
@@ -1816,6 +1836,9 @@ gstat(char *file, int argfl, struct ditem *myparent)
 		rep->lnum = statb.st_ino;
 		rep->lsize = statb.st_size;
 		rep->lblocks = statb.st_blocks;
+		if (colorflg)
+			rep->color = ls_color_find(file, statb.st_mode);
+
 		switch (statb.st_mode & S_IFMT) {
 		case S_IFDIR:
 			rep->ltype = 'd';
@@ -1846,44 +1869,54 @@ gstat(char *file, int argfl, struct ditem *myparent)
 				doacl = 0;
 			}
 			rep->ltype = 'l';
-			if (lflg) {
+			if (lflg || colorflg) {
 				cc = readlink(file, buf, BUFSIZ);
-				if (cc >= 0) {
+				if (cc < 0)
+					break;
 
-					/*
-					 * follow the symbolic link
-					 * to generate the appropriate
-					 * Fflg marker for the object
-					 * eg, /bin -> /sym/bin/
-					 */
-					if ((Fflg || pflg) &&
-					    (stat(file, &statb1) >= 0)) {
-						switch (statb1.st_mode &
-						    S_IFMT) {
-						case S_IFDIR:
-							buf[cc++] = '/';
-							break;
-						case S_IFSOCK:
-							buf[cc++] = '=';
-							break;
-						case S_IFDOOR:
-							buf[cc++] = '>';
-							break;
-						case S_IFIFO:
-							buf[cc++] = '|';
-							break;
-						default:
-							if ((statb1.st_mode &
-							    ~S_IFMT) &
-							    (S_IXUSR|S_IXGRP|
-							    S_IXOTH))
-								buf[cc++] = '*';
-							break;
-						}
-					}
-					buf[cc] = '\0';
-					rep->flinkto = strdup(buf);
+				/*
+				 * follow the symbolic link
+				 * to generate the appropriate
+				 * Fflg marker for the object
+				 * eg, /bin -> /sym/bin/
+				 */
+				error = 0;
+				if (Fflg || pflg || colorflg)
+					error = stat(file, &statb1);
+
+				if (colorflg) {
+					if (error >= 0)
+						rep->link_color =
+						    ls_color_find(file,
+						    statb1.st_mode);
+					else
+						rep->link_color =
+						    lsc_orphan;
 				}
+
+				if ((Fflg || pflg) && error >= 0) {
+					switch (statb1.st_mode & S_IFMT) {
+					case S_IFDIR:
+						buf[cc++] = '/';
+						break;
+					case S_IFSOCK:
+						buf[cc++] = '=';
+						break;
+					case S_IFDOOR:
+						buf[cc++] = '>';
+						break;
+					case S_IFIFO:
+						buf[cc++] = '|';
+						break;
+					default:
+						if ((statb1.st_mode & ~S_IFMT) &
+						    (S_IXUSR|S_IXGRP| S_IXOTH))
+							buf[cc++] = '*';
+						break;
+					}
+				}
+				buf[cc] = '\0';
+				rep->flinkto = strdup(buf);
 				break;
 			}
 
@@ -2660,18 +2693,12 @@ print_time(struct lbuf *p)
  * Check if color definition applies to entry, returns 1 if yes, 0 if no
  */
 static int
-color_match(struct lbuf *entry, ls_color_t *color)
+color_match(const char *fname, mode_t mode, ls_color_t *color)
 {
 	switch (color->ftype) {
 	case LS_PAT:
 	{
-		char	*fname;
 		size_t	fname_len, sfx_len;
-
-		if (entry->lflags & ISARG)
-			fname = entry->ln.namep;
-		else
-			fname = entry->ln.lname;
 
 		fname_len = strlen(fname);
 		sfx_len = strlen(color->sfx);
@@ -2688,72 +2715,53 @@ color_match(struct lbuf *entry, ls_color_t *color)
 		return (1);
 
 	case LS_FILE:
-		return ((entry->ltype == '-'));
+		return (S_ISREG(mode));
 
 	case LS_DIR:
-		return ((entry->ltype == 'd'));
+		return (S_ISDIR(mode));
 
 	case LS_LINK:
-		return ((entry->ltype == 'l'));
+		return (S_ISLNK(mode));
 
 	case LS_FIFO:
-		return ((entry->ltype == 'p'));
+		return (S_ISFIFO(mode));
 
 	case LS_SOCK:
-		return ((entry->ltype == 's'));
+		return (S_ISSOCK(mode));
 
 	case LS_DOOR:
-		return ((entry->ltype == 'D'));
+		return (S_ISDOOR(mode));
 
 	case LS_BLK:
-		return ((entry->ltype == 'b'));
+		return (S_ISBLK(mode));
 
 	case LS_CHR:
-		return ((entry->ltype == 'c'));
+		return (S_ISCHR(mode));
 
 	case LS_PORT:
-		return ((entry->ltype == 'P'));
+		return (S_ISPORT(mode));
 
 	case LS_ORPHAN:
-	{
-		struct stat st;
-		int rc;
-
-		if (entry->ltype != 'l')
-			return (0);
-		if (entry->flinkto == NULL)
-			return (1);
-
-		if (entry->lflags & ISARG)
-			rc = stat(entry->ln.namep, &st);
-		else
-			rc = stat(entry->ln.lname, &st);
-
-		if (rc == -1 && errno == ENOENT)
-			return (1);
-
+		/* this is tested for by gstat */
 		return (0);
-	}
 
 	case LS_SETUID:
-		return (entry->ltype != 'l' && (entry->lflags & (S_ISUID)));
+		return (!S_ISLNK(mode) && (mode & S_ISUID));
 
 	case LS_SETGID:
-		return (entry->ltype != 'l' && (entry->lflags & (S_ISGID)));
+		return (!S_ISLNK(mode) && (mode & S_ISGID));
 
 	case LS_STICKY_OTHER_WRITABLE:
-		return (entry->ltype != 'l' &&
-		    (entry->lflags & (S_IWOTH|S_ISVTX)));
+		return (!S_ISLNK(mode) && (mode & (S_IWOTH|S_ISVTX)));
 
 	case LS_OTHER_WRITABLE:
-		return (entry->ltype != 'l' && (entry->lflags & (S_IWOTH)));
+		return (!S_ISLNK(mode) && (mode & S_IWOTH));
 
 	case LS_STICKY:
-		return (entry->ltype != 'l' && (entry->lflags & (S_ISVTX)));
+		return (!S_ISLNK(mode) && (mode & S_ISVTX));
 
 	case LS_EXEC:
-		return (entry->ltype != 'l' &&
-		    (entry->lflags & (S_IXUSR|S_IXGRP|S_IXOTH)));
+		return (!S_ISLNK(mode) && (mode & (S_IXUSR|S_IXGRP|S_IXOTH)));
 	}
 
 	return (0);
@@ -2844,7 +2852,7 @@ dump_color(ls_color_t *c)
 }
 
 static ls_color_t *
-get_color_attr(struct lbuf *l)
+ls_color_find(const char *fname, mode_t mode)
 {
 	int i;
 
@@ -2854,7 +2862,7 @@ get_color_attr(struct lbuf *l)
 	 * most specific color rule and work towards most general.
 	 */
 	for (i = lsc_ncolors - 1; i >= 0; --i)
-		if (color_match(l, &lsc_colors[i]))
+		if (color_match(fname, mode, &lsc_colors[i]))
 			return (&lsc_colors[i]);
 
 	return (NULL);
@@ -2876,10 +2884,8 @@ ls_tprint(char *str, long int p1, long int p2, long int p3, long int p4,
 }
 
 static void
-ls_start_color(struct lbuf *l)
+ls_start_color(ls_color_t *c)
 {
-	ls_color_t *c = get_color_attr(l);
-
 	if (c == NULL)
 		return;
 
@@ -3050,6 +3056,7 @@ ls_color_init()
 	char    *p, *lasts;
 	size_t  color_sz;
 	int	termret;
+	int	i;
 
 	(void) setupterm(NULL, 1, &termret);
 	if (termret != 1)
@@ -3080,6 +3087,12 @@ ls_color_init()
 
 	qsort((void *)lsc_colors, lsc_ncolors, sizeof (ls_color_t),
 	    ls_color_compare);
+
+	for (i = 0; i < lsc_ncolors; ++i)
+		if (lsc_colors[i].ftype == LS_ORPHAN) {
+			lsc_orphan = &lsc_colors[i];
+			break;
+		}
 
 	if ((lsc_bold = tigetstr("bold")) == (char *)-1)
 		lsc_bold = NULL;
