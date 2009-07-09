@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -238,6 +238,11 @@ enum {
  * is port doing something?
  */
 #define	USBSER_PORT_IS_BUSY(pp)		((pp)->port_act != 0)
+
+/* port is busy on TX, delay, break, ctrl */
+#define	USBSER_PORT_IS_BUSY_NON_RX(pp)	\
+	(((pp)->port_act & (USBSER_ACT_DELAY | USBSER_ACT_CTL | \
+	USBSER_ACT_BREAK | USBSER_ACT_TX)) != 0)
 
 /*
  * is the port opening?

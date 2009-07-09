@@ -2042,7 +2042,13 @@ usbser_tx_cb(caddr_t arg)
 
 	usbser_release_port_act(pp, USBSER_ACT_TX);
 
-	if (online && USBSER_PORT_ACCESS_OK(pp) && !USBSER_PORT_IS_BUSY(pp)) {
+	/*
+	 * as long as port access is ok and the port is not busy on
+	 * TX, break, ctrl or delay, the wq_thread should be waken
+	 * to do further process for next message
+	 */
+	if (online && USBSER_PORT_ACCESS_OK(pp) &&
+	    !USBSER_PORT_IS_BUSY_NON_RX(pp)) {
 		/*
 		 * wake wq thread for further data/ioctl processing
 		 */
