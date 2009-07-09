@@ -958,6 +958,8 @@ vd_build_default_label(size_t disk_size, size_t bsize, struct dk_label *label)
 	size_t size;
 	char unit;
 
+	ASSERT(bsize > 0);
+
 	bzero(label, sizeof (struct dk_label));
 
 	/*
@@ -2913,7 +2915,7 @@ vd_label_to_vtocgeom(struct dk_label *label, struct extvtoc *vtoc,
 {
 	int i;
 
-	bzero(vtoc, sizeof (struct vtoc));
+	bzero(vtoc, sizeof (struct extvtoc));
 	bzero(geom, sizeof (struct dk_geom));
 
 	geom->dkg_ncyl = label->dkl_ncyl;
@@ -5531,8 +5533,9 @@ vd_setup_full_disk(vd_t *vd)
 	if (status != 0) {
 		if (!vd->scsi) {
 			/* unexpected failure */
-			PRN("Failed to check backend size (errno %d)", status);
-			return (status);
+			PRN("Check size failed for %s (errno %d)",
+			    vd->device_path, status);
+			return (EIO);
 		}
 
 		/*
@@ -5951,6 +5954,12 @@ vd_setup_slice_image(vd_t *vd)
 	struct dk_label label;
 	int status;
 
+	if ((status = vd_backend_check_size(vd)) != 0) {
+		PRN("Check size failed for %s (errno %d)",
+		    vd->device_path, status);
+		return (EIO);
+	}
+
 	vd->vdisk_media = VD_MEDIA_FIXED;
 	vd->vdisk_label = (vd_slice_label == VD_DISK_LABEL_UNK)?
 	    vd_file_slice_label : vd_slice_label;
@@ -5981,7 +5990,7 @@ vd_setup_disk_image(vd_t *vd)
 	char *backend_path = vd->device_path;
 
 	if ((status = vd_backend_check_size(vd)) != 0) {
-		PRN("Fail to check size of %s (errno %d)",
+		PRN("Check size failed for %s (errno %d)",
 		    backend_path, status);
 		return (EIO);
 	}
@@ -6238,7 +6247,7 @@ vd_setup_single_slice_disk(vd_t *vd)
 
 	/* Get size of backing device */
 	if ((status = vd_backend_check_size(vd)) != 0) {
-		PRN("Fail to check size of %s (errno %d)", device_path, status);
+		PRN("Check size failed for %s (errno %d)", device_path, status);
 		return (EIO);
 	}
 
