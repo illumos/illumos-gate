@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -283,6 +283,15 @@ cnopen(dev_t *dev, int flag, int state, struct cred *cred)
 	if (rconsvp == NULL)
 		return (0);
 
+	/*
+	 * Enable virtual console I/O for console logging if needed.
+	 */
+	if (vsconsvp != NULL && vsconsvp->v_stream == NULL) {
+		if (VOP_OPEN(&vsconsvp, FREAD | FWRITE, cred, NULL) != 0) {
+			cmn_err(CE_WARN, "cnopen: failed to open vsconsvp "
+			    "for virtual console logging");
+		}
+	}
 
 	/*
 	 * XXX: Clean up inactive PIDs from previous opens if any.
@@ -398,6 +407,21 @@ cnwrite(dev_t dev, struct uio *uio, struct cred *cred)
 	if (rconsvp == NULL) {
 		uio->uio_resid = 0;
 		return (0);
+	}
+
+	/*
+	 * Output to virtual console for logging if enabled.
+	 */
+	if (vsconsvp != NULL && vsconsvp->v_stream != NULL) {
+		struiod_t uiod;
+
+		/*
+		 * strwrite modifies uio so need to make copy.
+		 */
+		(void) uiodup(uio, &uiod.d_uio, uiod.d_iov,
+		    sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
+
+		(void) strwrite(vsconsvp, &uiod.d_uio, cred);
 	}
 
 	if (rconsvp->v_stream != NULL)

@@ -982,6 +982,36 @@ consconfig_load_drivers(cons_state_t *sp)
 	    "mousedev %lx\n", stdindev, stdoutdev, kbddev, mousedev);
 }
 
+#if !defined(__x86)
+void
+consconfig_virtual_console_vp(cons_state_t *sp)
+{
+	char    *virtual_cons_path;
+
+	if (plat_virtual_console_path(&virtual_cons_path) < 0)
+		return;
+
+	DPRINTF(DPRINT_L0, "consconfig_virtual_console_vp: "
+	    "virtual console device path %s\n", virtual_cons_path);
+
+	ASSERT(sp->cons_stdout_path != NULL);
+	if (strcmp(virtual_cons_path, sp->cons_stdout_path) == 0) {
+		/* virtual console already in use */
+		return;
+	}
+
+	vsconsvp = i_consconfig_createvp(virtual_cons_path);
+	if (vsconsvp == NULL) {
+		cmn_err(CE_WARN, "consconfig_virtual_console_vp: "
+		    "unable to find serial virtual console device %s",
+		    virtual_cons_path);
+			return;
+	}
+
+	(void) e_ddi_hold_devi_by_dev(vsconsvp->v_rdev, 0);
+}
+#endif
+
 static void
 consconfig_init_framebuffer(cons_state_t *sp)
 {
@@ -1004,7 +1034,7 @@ consconfig_init_framebuffer(cons_state_t *sp)
 		/* stdoutdev is valid, of fbvp should exist */
 		fbvp = i_consconfig_createvp(sp->cons_stdout_path);
 		if (fbvp == NULL) {
-			panic("consconfig_load_drivers: "
+			panic("consconfig_init_framebuffer: "
 			    "unable to find frame buffer device");
 			/*NOTREACHED*/
 		}
@@ -1494,6 +1524,11 @@ dynamic_console_config(void)
 	/* initialize framebuffer, console input, and redirection device  */
 	consconfig_init_framebuffer(consconfig_sp);
 	consconfig_init_input(consconfig_sp);
+
+#if !defined(__x86)
+	/* initialize virtual console vp for logging if needed */
+	consconfig_virtual_console_vp(consconfig_sp);
+#endif
 
 	DPRINTF(DPRINT_L0,
 	    "mousedev %lx, kbddev %lx, fbdev %lx, rconsdev %lx\n",

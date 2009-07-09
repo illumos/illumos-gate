@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CONSDEV_H
 #define	_SYS_CONSDEV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 #include <sys/dditypes.h>
@@ -53,6 +51,11 @@ extern "C" {
  */
 extern dev_t	rconsdev;	/* real (underlying) console */
 extern struct vnode *rconsvp;	/* pointer to vnode for that device */
+
+/*
+ * Virtual Serial Console redirection.
+ */
+extern struct vnode *vsconsvp;	/* pointer to vnode for virtual console */
 
 /*
  * Mouse, keyboard, and frame buffer configuration information.
