@@ -99,14 +99,14 @@ kcf_soft_config_init(void)
 	 *
 	 * # /etc/crypto/kcf.conf
 	 * des:supportedlist=CKM_DES_CBC,CKM_DES_ECB,CKM_DES3_CBC,CKM_DES3_ECB
-	 * aes:supportedlist=CKM_AES_ECB,CKM_AES_CBC,CKM_AES_CTR,CKM_AES_CCM,
+	 * aes:supportedlist=CKM_AES_ECB,CKM_AES_CBC,CKM_AES_CTR,CKM_AES_CCM,\
 	 * CKM_AES_GCM,CKM_AES_GMAC
 	 * arcfour:supportedlist=CKM_RC4
 	 * blowfish:supportedlist=CKM_BLOWFISH_ECB,CKM_BLOWFISH_CBC
 	 * ecc:supportedlist=CKM_EC_KEY_PAIR_GEN,CKM_ECDH1_DERIVE,CKM_ECDSA,\
 	 * CKM_ECDSA_SHA1
 	 * sha1:supportedlist=CKM_SHA_1,CKM_SHA_1_HMAC_GENERAL,CKM_SHA_1_HMAC
-	 * sha2:supportedlist=CKM_SHA256,CKM_SHA256_HMAC,
+	 * sha2:supportedlist=CKM_SHA256,CKM_SHA256_HMAC,\
 	 * CKM_SHA256_HMAC_GENERAL,CKM_SHA384,CKM_SHA384_HMAC,\
 	 * CKM_SHA384_HMAC_GENERAL,CKM_SHA512,CKM_SHA512_HMAC,\
 	 * CKM_SHA512_HMAC_GENERAL
@@ -118,15 +118,17 @@ kcf_soft_config_init(void)
 	 * swrand:supportedlist=random
 	 *
 	 * WARNING: If you add a new kernel crypto provider or mechanism,
-	 * you must update these constants.
+	 * you must update these structures.
 	 *
 	 * 1. To add a new mechanism to a provider add the string to the
-	 * appropriate array below.
+	 * appropriate array below and comment above.
 	 *
 	 * 2. To add a new provider, create a new *_mechs array listing the
-	 * provider's mechanism(s).  For example:
-	 *	sha3_mechs[SHA3_MECH_COUNT] = {"CKM_SHA_3"};
+	 * provider's mechanism(s) and a new comment line above.
 	 * Add the new *_mechs array to initial_soft_config_entry[].
+	 *
+	 * 3. If appropriate (that is the new mechanism is needed before
+	 * cryptosvc runs), add to kcf_init_mech_tabs() in kcf_mech_tabs.c.
 	 */
 	static crypto_mech_name_t	des_mechs[] = {
 	    "CKM_DES_CBC", "CKM_DES_ECB", "CKM_DES3_CBC", "CKM_DES3_ECB", ""};
@@ -1035,6 +1037,12 @@ free_soft_config_entry(kcf_soft_conf_entry_t *p)
  *
  * Important note: the array argument must be allocated memory
  * since it is consumed in soft_config_list.
+ *
+ * Parameters:
+ * name		Provider name to add or remove.
+ * count	Number of mechanisms to add.
+ *		If 0, then remove provider from the list (instead of add).
+ * array	An array of "count" mechanism names (use only if count > 0).
  */
 static int
 add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
@@ -1053,27 +1061,25 @@ add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
 	(void) strcpy(new_entry->ce_name, name);
 
 	mutex_enter(&soft_config_mutex);
-	p = soft_config_list;
-	if (p != NULL) {
-		do {
-			if (strncmp(name, p->ce_name, MAXNAMELEN) == 0) {
-				entry = p;
-				break;
-			}
-			prev = p;
 
-		} while ((p = p->ce_next) != NULL);
+	/* Search to see if provider already in soft_config_list */
+	for (p = soft_config_list; p != NULL; p = p->ce_next) {
+		if (strncmp(name, p->ce_name, MAXNAMELEN) == 0) { /* found */
+			entry = p;
+			break;
+		}
+		prev = p;
 	}
 
-	if (entry == NULL) {
-		if (count == 0) {
+	if (entry == NULL) { /* new provider (not in soft_config_list) */
+		if (count == 0) { /* free memory--no entry exists to remove */
 			mutex_exit(&soft_config_mutex);
 			kmem_free(new_entry->ce_name, name_len);
 			kmem_free(new_entry, sizeof (kcf_soft_conf_entry_t));
 			return (CRYPTO_SUCCESS);
 		}
 
-		if (soft_config_count > KCF_MAX_CONFIG_ENTRIES) {
+		if (soft_config_count > KCF_MAX_CONFIG_ENTRIES) { /* full */
 			mutex_exit(&soft_config_mutex);
 			kmem_free(new_entry->ce_name, name_len);
 			kmem_free(new_entry, sizeof (kcf_soft_conf_entry_t));
@@ -1081,20 +1087,20 @@ add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
 			return (CRYPTO_FAILED);
 		}
 
-		/* add to head of list */
+		/* add new provider to head of list */
 		new_entry->ce_next = soft_config_list;
 		soft_config_list = new_entry;
 		soft_config_count++;
 		entry = new_entry;
-	} else { /* mechanism already in list */
+
+	} else { /* mechanism already in soft_config_list */
 		kmem_free(new_entry->ce_name, name_len);
 		kmem_free(new_entry, sizeof (kcf_soft_conf_entry_t));
 	}
 
-	/* mechanism count == 0 means remove entry from list */
-	if (count == 0) {
+	if (count == 0) { /* remove provider entry from soft_config_list */
 		if (prev == NULL) {
-			/* remove first in list */
+			/* entry to remove is at the head of the list */
 			soft_config_list = entry->ce_next;
 		} else {
 			prev->ce_next = entry->ce_next;
@@ -1105,17 +1111,24 @@ add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
 		/* free entry */
 		free_soft_config_entry(entry);
 
-		return (CRYPTO_SUCCESS);
+	} else { /* add provider entry to soft_config_list */
+		/*
+		 * Don't replace a mechanism list if it's already present.
+		 * This is because the default entries for Software providers
+		 * are more up-to-date than possibly stale entries in kcf.conf.
+		 * If an entry is to be deleted, the proper way to do it is
+		 * to add it to the disablelist (with cryptoadm(1M)),
+		 * instead of removing it from the supportedlist.
+		 */
+		if (entry->ce_mechs == NULL) { /* add new mechanisms */
+			entry->ce_mechs = array;
+			entry->ce_count = count;
+			mutex_exit(&soft_config_mutex);
+		} else { /* ignore replacement mechanism list */
+			mutex_exit(&soft_config_mutex);
+			crypto_free_mech_list(array, count);
+		}
 	}
-
-
-	/* replace mechanisms */
-	if (entry->ce_mechs != NULL)
-		crypto_free_mech_list(entry->ce_mechs, entry->ce_count);
-
-	entry->ce_mechs = array;
-	entry->ce_count = count;
-	mutex_exit(&soft_config_mutex);
 
 	return (CRYPTO_SUCCESS);
 }
@@ -1139,7 +1152,8 @@ get_sw_provider_for_mech(crypto_mech_name_t mech, char **name)
 	while (p != NULL) {
 		next = p->ce_next;
 		for (i = 0; i < p->ce_count; i++) {
-			if (strcmp(mech, &p->ce_mechs[i][0]) == 0) {
+			if (strncmp(mech, &p->ce_mechs[i][0],
+			    CRYPTO_MAX_MECH_NAME) == 0) {
 				name_len = strlen(p->ce_name) + 1;
 				bcopy(p->ce_name, tmp_name, name_len);
 				break;
