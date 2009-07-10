@@ -110,6 +110,7 @@ static void sun4v_env_print_humidity_sensors();
 static void sun4v_env_print_humidity_indicators();
 static void sun4v_env_print_LEDs();
 static void sun4v_print_fru_status();
+static int is_fru_absent(picl_nodehdl_t);
 static void sun4v_print_fw_rev();
 static void sun4v_print_chassis_serial_no();
 static int openprom_callback(picl_nodehdl_t openpromh, void *arg);
@@ -1854,6 +1855,10 @@ sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
 		} else
 			return (PICL_WALK_CONTINUE);
 	}
+
+	if (is_fru_absent(nodeh))
+		strcpy(status, "Not present");
+
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &parenth,
 	    sizeof (parenth));
 	if (err != PICL_SUCCESS) {
@@ -1933,6 +1938,39 @@ sun4v_print_fru_status()
 	log_printf("------------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
 	    sun4v_print_fru_status_callback);
+}
+
+/*  Check the children of the FRU node for a presence indicator */
+static int
+is_fru_absent(picl_nodehdl_t fruh)
+{
+	char class [PICL_CLASSNAMELEN_MAX];
+	char condition [PICL_PROPNAMELEN_MAX];
+	picl_errno_t err;
+	picl_nodehdl_t nodeh;
+
+	err = picl_get_propval_by_name(fruh, PICL_PROP_CHILD, &nodeh,
+	    sizeof (picl_nodehdl_t));
+	while (err == PICL_SUCCESS) {
+		err = picl_get_propval_by_name(nodeh,
+		    PICL_PROP_CLASSNAME, class, sizeof (class));
+		if (err == PICL_SUCCESS &&
+		    strcmp(class, "presence-indicator") == 0) {
+			err = picl_get_propval_by_name(nodeh,
+			    PICL_PROP_CONDITION, condition,
+			    sizeof (condition));
+			if (err == PICL_SUCCESS) {
+				if (strcmp(condition, "Absent") == 0) {
+					return (1);
+				} else	{
+					return (0);
+				}
+			}
+		}
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER,
+		    &nodeh, sizeof (picl_nodehdl_t));
+	}
+	return (0);
 }
 
 /*ARGSUSED*/
