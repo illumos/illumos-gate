@@ -116,7 +116,7 @@ scf_fmri_pg_get_or_add(const char *fmri, const char *pgname,
 	scf_handle_t	*handle = NULL;
 	scf_instance_t	*inst = NULL;
 	int		rc = SCF_FAILED;
-	int		error = SCF_ERROR_NONE;
+	int		error;
 
 	if ((handle = scf_handle_create(SCF_VERSION)) == NULL ||
 	    scf_handle_bind(handle) != 0 ||
@@ -130,26 +130,24 @@ scf_fmri_pg_get_or_add(const char *fmri, const char *pgname,
 		/*
 		 * If the property group already exists, return SCF_SUCCESS.
 		 */
-		if (rc != SCF_SUCCESS && scf_error() == SCF_ERROR_EXISTS) {
-			(void) scf_set_error(SCF_ERROR_NONE);
+		if (rc != SCF_SUCCESS && scf_error() == SCF_ERROR_EXISTS)
 			rc = SCF_SUCCESS;
-		}
 	} else {
 		rc = scf_instance_get_pg(inst, pgname, NULL);
 	}
 
 scferror:
-	error = scf_error();
+	if (rc != SCF_SUCCESS)
+		error = scf_error();
 
 	scf_instance_destroy(inst);
 	if (handle)
 		(void) scf_handle_unbind(handle);
 	scf_handle_destroy(handle);
 
-	if (error != SCF_ERROR_NONE) {
+	if (rc != SCF_SUCCESS)
 		(void) scf_set_error(error);
-		rc = SCF_FAILED;
-	}
+
 	return (rc);
 }
 #endif	/* __x86 */
