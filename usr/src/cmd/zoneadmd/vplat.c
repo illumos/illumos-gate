@@ -2211,6 +2211,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 	struct lifreq lifr;
 	struct sockaddr_in netmask4;
 	struct sockaddr_in6 netmask6;
+	struct sockaddr_storage laddr;
 	struct in_addr in4;
 	sa_family_t af;
 	char *slashp = strchr(nwiftabptr->zone_nwif_address, '/');
@@ -2234,8 +2235,19 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		return (-1);
 	}
 
+	/*
+	 * This is a similar kind of "hack" like in addif() to get around
+	 * the problem of SIOCLIFADDIF.  The problem is that this ioctl
+	 * does not include the netmask when adding a logical interface.
+	 * To get around this problem, we first add the logical interface
+	 * with a 0 address.  After that, we set the netmask if provided.
+	 * Finally we set the interface address.
+	 */
+	laddr = lifr.lifr_addr;
 	(void) strlcpy(lifr.lifr_name, nwiftabptr->zone_nwif_physical,
 	    sizeof (lifr.lifr_name));
+	(void) memset(&lifr.lifr_addr, 0, sizeof (lifr.lifr_addr));
+
 	if (ioctl(s, SIOCLIFADDIF, (caddr_t)&lifr) < 0) {
 		/*
 		 * Here, we know that the interface can't be brought up.
@@ -2248,13 +2260,6 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		    "global zone.", lifr.lifr_name);
 		(void) close(s);
 		return (Z_OK);
-	}
-
-	if (ioctl(s, SIOCSLIFADDR, (caddr_t)&lifr) < 0) {
-		zerror(zlogp, B_TRUE,
-		    "%s: could not set IP address to %s",
-		    lifr.lifr_name, nwiftabptr->zone_nwif_address);
-		goto bad;
 	}
 
 	/* Preserve literal IPv4 address for later potential printing. */
@@ -2330,20 +2335,12 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		goto bad;
 	}
 
-	/*
-	 * This doesn't set the broadcast address at all. Rather, it
-	 * gets, then sets the interface's address, relying on the fact
-	 * that resetting the address will reset the broadcast address.
-	 */
-	if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) < 0) {
-		zerror(zlogp, B_TRUE, "%s: could not get address",
-		    lifr.lifr_name);
-		goto bad;
-	}
+	/* Set the interface address */
+	lifr.lifr_addr = laddr;
 	if (ioctl(s, SIOCSLIFADDR, (caddr_t)&lifr) < 0) {
 		zerror(zlogp, B_TRUE,
-		    "%s: could not reset broadcast address",
-		    lifr.lifr_name);
+		    "%s: could not set IP address to %s",
+		    lifr.lifr_name, nwiftabptr->zone_nwif_address);
 		goto bad;
 	}
 
