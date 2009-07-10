@@ -39,6 +39,8 @@
 #     message is displayed at the time of completion.
 #
 
+umask 022
+
 tmp_dir=${TMPDIR:-/tmp}
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -290,7 +292,10 @@ function unsplit(list, cnt, delim, str)
 # $2 is the target file
 #
 commit() {
-	$mv_cmd $1 $2
+	# Make sure that the last mv uses rename(2) by first moving to
+	# the same filesystem.
+	$mv_cmd $1 $2.$$
+	$mv_cmd $2.$$ $2
 	return $?
 }
 

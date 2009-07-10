@@ -1,10 +1,8 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-
-   
     CDDL HEADER START
-   
+
     The contents of this file are subject to the terms of the
     Common Development and Distribution License (the "License").
     You may not use this file except in compliance with the License.
@@ -49,6 +47,20 @@
                 restart_on='none'>
                 <service_fmri value='svc:/system/filesystem/minimal' />
         </dependency>
+
+	<dependent
+		name='manifest'
+		grouping='optional_all'
+		restart_on='none'>
+			<service_fmri value='svc:/system/manifest-import' />
+	</dependent>
+
+	<dependent
+		name='name-service-cache'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/name-service-cache' />
+	</dependent>
 
 	<exec_method
 		type='method'
