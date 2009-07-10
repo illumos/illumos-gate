@@ -2323,13 +2323,19 @@ sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
 		gapstart = ctsn + ntohs(ssf->ssf_start);
 		gapend = ctsn + ntohs(ssf->ssf_end);
 
-		/* SACK for TSN we have not sent - ABORT */
+		/*
+		 * Sanity checks:
+		 *
+		 * 1. SACK for TSN we have not sent - ABORT
+		 * 2. Invalid or spurious gaps, ignore all gaps
+		 */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
 			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
 			*trysend = -1;
 			return (acked);
-		} else if (SEQ_LT(gapend, gapstart)) {
+		} else if (SEQ_LT(gapend, gapstart) ||
+		    SEQ_LEQ(gapstart, ctsn)) {
 			break;
 		}
 		/*
@@ -2667,12 +2673,18 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		gapstart = cumtsn + ntohs(ssf->ssf_start);
 		gapend = cumtsn + ntohs(ssf->ssf_end);
 
-		/* SACK for TSN we have not sent - ABORT */
+		/*
+		 * Sanity checks:
+		 *
+		 * 1. SACK for TSN we have not sent - ABORT
+		 * 2. Invalid or spurious gaps, ignore all gaps
+		 */
 		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
 		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
 			BUMP_MIB(&sctps->sctps_mib, sctpInAckUnsent);
 			return (-1);
-		} else if (SEQ_LT(gapend, gapstart)) {
+		} else if (SEQ_LT(gapend, gapstart) ||
+		    SEQ_LEQ(gapstart, cumtsn)) {
 			break;
 		}
 		/*
@@ -2689,7 +2701,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		 * the fast retransmit threshold, we will fast retransmit
 		 * after processing all the gap blocks.
 		 */
-		ASSERT(SEQ_LT(xtsn, gapstart));
+		ASSERT(SEQ_LEQ(xtsn, gapstart));
 		while (xtsn != gapstart) {
 			SCTP_CHUNK_SET_SACKCNT(mp, SCTP_CHUNK_SACKCNT(mp) + 1);
 			if (SCTP_CHUNK_SACKCNT(mp) ==
@@ -2737,9 +2749,16 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 				ump = ump->b_next;
 				/*
 				 * ump can't be NULL given the sanity check
-				 * above.
+				 * above.  But if it is NULL, it means that
+				 * there is a data corruption.  We'd better
+				 * panic.
 				 */
-				ASSERT(ump != NULL);
+				if (ump == NULL) {
+					panic("Memory corruption detected: gap "
+					    "start TSN 0x%x missing from the "
+					    "xmit list: %p", gapstart,
+					    (void *)sctp);
+				}
 				mp = ump->b_cont;
 			}
 			/*
@@ -2784,7 +2803,10 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			 * if we are done with all the chunks from the current
 			 * message. Note, it is possible to hit the end of the
 			 * transmit list here, i.e. if we have already completed
-			 * processing the gap block.
+			 * processing the gap block.  But the TSN must be equal
+			 * to the gapend because of the above sanity check.
+			 * If it is not equal, it means that some data is
+			 * missing.
 			 * Also, note that we break here, which means we
 			 * continue processing gap blocks, if any. In case of
 			 * ordered gap blocks there can't be any following
@@ -2797,7 +2819,13 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			if (mp == NULL) {
 				ump = ump->b_next;
 				if (ump == NULL) {
-					ASSERT(xtsn == gapend);
+					if (xtsn != gapend) {
+						panic("Memory corruption "
+						    "detected: gap end TSN "
+						    "0x%x missing from the "
+						    "xmit list: %p", gapend,
+						    (void *)sctp);
+					}
 					ump = sctp->sctp_xmit_head;
 					mp = mp1;
 					sdc = (sctp_data_hdr_t *)mp->b_rptr;
