@@ -383,14 +383,8 @@ mii_start(mii_handle_t mh)
 void
 mii_stop(mii_handle_t mh)
 {
-	phy_handle_t	*ph;
-
 	mutex_enter(&mh->m_lock);
 	mh->m_started = B_FALSE;
-	ph = mh->m_phy;
-	if (ph->phy_present) {
-		ph->phy_stop(ph);
-	}
 	cv_broadcast(&mh->m_cv);
 	mutex_exit(&mh->m_lock);
 }
@@ -1080,9 +1074,8 @@ phy_reset(phy_handle_t *ph)
 int
 phy_stop(phy_handle_t *ph)
 {
-	phy_write(ph, MII_CONTROL,
-	    MII_CONTROL_ISOLATE | MII_CONTROL_PWRDN |
-	    MII_CONTROL_LOOPBACK);
+	phy_write(ph, MII_CONTROL, MII_CONTROL_ISOLATE);
+
 	return (DDI_SUCCESS);
 }
 
