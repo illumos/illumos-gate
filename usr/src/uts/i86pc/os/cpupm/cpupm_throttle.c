@@ -224,9 +224,14 @@ cpupm_throttle_init(cpu_t *cp)
 	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_ptc_t *ptc_stat;
+	int ret;
 
-	if (cpu_acpi_cache_tstate_data(handle) != 0) {
-		CTDEBUG(("Failed to cache T-state ACPI data\n"));
+	if ((ret = cpu_acpi_cache_tstate_data(handle)) != 0) {
+		if (ret < 0)
+			cmn_err(CE_NOTE,
+			    "!Support for CPU throttling is being "
+			    "disabled due to errors parsing ACPI T-state "
+			    "objects exported by BIOS.");
 		cpupm_throttle_fini(cp);
 		return (THROTTLE_RET_INCOMPLETE_DATA);
 	}
@@ -243,7 +248,7 @@ cpupm_throttle_init(cpu_t *cp)
 		CTDEBUG(("T-State transitions will use System IO\n"));
 		break;
 	default:
-		cmn_err(CE_WARN, "!_PTC conifgured for unsupported "
+		cmn_err(CE_NOTE, "!_PTC configured for unsupported "
 		    "address space type = %d.", ptc_stat->cr_addrspace_id);
 		return (THROTTLE_RET_INCOMPLETE_DATA);
 	}

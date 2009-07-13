@@ -188,15 +188,12 @@ cpupm_init(cpu_t *cp)
 	if (mach_state->ms_pstate.cma_ops != NULL) {
 		ret = mach_state->ms_pstate.cma_ops->cpus_init(cp);
 		if (ret != 0) {
-			cmn_err(CE_WARN, "!cpupm_init: processor %d:"
-			    " unable to initialize P-state support",
-			    cp->cpu_id);
 			mach_state->ms_pstate.cma_ops = NULL;
 			cpupm_disable(CPUPM_P_STATES);
 		} else {
 			nspeeds = cpupm_get_speeds(cp, &speeds);
 			if (nspeeds == 0) {
-				cmn_err(CE_WARN, "!cpupm_init: processor %d:"
+				cmn_err(CE_NOTE, "!cpupm_init: processor %d:"
 				    " no speeds to manage", cp->cpu_id);
 			} else {
 				cpupm_set_supp_freqs(cp, speeds, nspeeds);
@@ -209,13 +206,6 @@ cpupm_init(cpu_t *cp)
 	if (mach_state->ms_tstate.cma_ops != NULL) {
 		ret = mach_state->ms_tstate.cma_ops->cpus_init(cp);
 		if (ret != 0) {
-			char err_msg[128];
-			int p_res;
-			p_res =	snprintf(err_msg, sizeof (err_msg),
-			    "cpupm_init: processor %d: unable to initialize "
-			    "T-state support", cp->cpu_id);
-			if (p_res >= 0)
-				DTRACE_PROBE1(cpu_ts_err_msg, char *, err_msg);
 			mach_state->ms_tstate.cma_ops = NULL;
 			cpupm_disable(CPUPM_T_STATES);
 		} else {
@@ -229,9 +219,6 @@ cpupm_init(cpu_t *cp)
 	if (mach_state->ms_cstate.cma_ops != NULL) {
 		ret = mach_state->ms_cstate.cma_ops->cpus_init(cp);
 		if (ret != 0) {
-			cmn_err(CE_WARN, "!cpupm_init: processor %d:"
-			    " unable to initialize C-state support",
-			    cp->cpu_id);
 			mach_state->ms_cstate.cma_ops = NULL;
 			mcpu->max_cstates = CPU_ACPI_C1;
 			cpupm_disable(CPUPM_C_STATES);
@@ -556,7 +543,7 @@ cpupm_state_change(cpu_t *cp, int level, int state)
 		mutex_exit(&state_domain->pm_lock);
 		break;
 	default:
-		cmn_err(CE_WARN, "Unknown domain coordination type: %d",
+		cmn_err(CE_NOTE, "Unknown domain coordination type: %d",
 		    state_domain->pm_type);
 	}
 }

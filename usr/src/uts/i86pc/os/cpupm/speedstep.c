@@ -333,7 +333,9 @@ speedstep_init(cpu_t *cp)
 	 * Cache the P-state specific ACPI data.
 	 */
 	if (cpu_acpi_cache_pstate_data(handle) != 0) {
-		ESSDEBUG(("Failed to cache ACPI data\n"));
+		cmn_err(CE_NOTE, "!SpeedStep support is being "
+		    "disabled due to errors parsing ACPI P-state objects "
+		    "exported by BIOS.");
 		speedstep_fini(cp);
 		return (ESS_RET_NO_PM);
 	}

@@ -700,13 +700,17 @@ cpu_idle_init(cpu_t *cp)
 	char name[KSTAT_STRLEN];
 	int cpu_max_cstates, i;
 	ACPI_TABLE_FADT *gbl_FADT;
+	int ret;
 
 	/*
 	 * Cache the C-state specific ACPI data.
 	 */
-	if (cpu_acpi_cache_cstate_data(handle) != 0) {
-		cmn_err(CE_NOTE,
-		    "!cpu_idle_init: Failed to cache ACPI C-state data\n");
+	if ((ret = cpu_acpi_cache_cstate_data(handle)) != 0) {
+		if (ret < 0)
+			cmn_err(CE_NOTE,
+			    "!Support for CPU deep idle states is being "
+			    "disabled due to errors parsing ACPI C-state "
+			    "objects exported by BIOS.");
 		cpu_idle_fini(cp);
 		return (-1);
 	}

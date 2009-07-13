@@ -169,7 +169,9 @@ pwrnow_init(cpu_t *cp)
 	 * Cache the P-state specific ACPI data.
 	 */
 	if (cpu_acpi_cache_pstate_data(handle) != 0) {
-		PWRNOW_DEBUG(("Failed to cache ACPI data\n"));
+		cmn_err(CE_NOTE, "!PowerNow! support is being "
+		    "disabled due to errors parsing ACPI P-state objects "
+		    "exported by BIOS.");
 		pwrnow_fini(cp);
 		return (PWRNOW_RET_NO_PM);
 	}
