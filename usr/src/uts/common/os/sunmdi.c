@@ -6008,6 +6008,19 @@ i_mdi_enable_disable_path(mdi_pathinfo_t *pip, mdi_vhci_t *vh, int flags,
 	mdi_pathinfo_t 	*next;
 	int		(*f)() = NULL;
 
+	/*
+	 * Check to make sure the path is not already in the
+	 * requested state. If it is just return the next path
+	 * as we have nothing to do here.
+	 */
+	if ((MDI_PI_IS_DISABLE(pip) && op == MDI_DISABLE_OP) ||
+	    (!MDI_PI_IS_DISABLE(pip) && op == MDI_ENABLE_OP)) {
+		MDI_PI_LOCK(pip);
+		next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
+		MDI_PI_UNLOCK(pip);
+		return (next);
+	}
+
 	f = vh->vh_ops->vo_pi_state_change;
 
 	sync_flag = (flags << 8) & 0xf00;
