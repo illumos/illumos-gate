@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,13 +126,13 @@ ERPT_EVENT(strand, gstrand-uc);
 	event fault.cpu.generic-sparc.fltleaf@level;			\
 									\
 	prop fault.cpu.generic-sparc.fltleaf@level 			\
-	    { DIAGNOSE_ERPT } (1)->					\
+	    { DIAGNOSE_ERPT } (0)->					\
 	    ereport.cpu.generic-sparc.erptleaf@level;			\
 									\
 	event upset.cpu.generic-sparc.fltleaf@level;			\
 									\
 	prop upset.cpu.generic-sparc.fltleaf@level			\
-	    { !DIAGNOSE_ERPT } (1)->					\
+	    { !DIAGNOSE_ERPT } (0)->					\
 	    ereport.cpu.generic-sparc.erptleaf@level
 
 
@@ -174,13 +174,13 @@ FLT_CPU_UE(strand, gstrand-uc, strand-uc);
 	    retire=0;							\
 									\
 	prop fault.cpu.generic-sparc.fltleaf@level 			\
-	    { DIAGNOSE_ERPT } (1)->					\
+	    { DIAGNOSE_ERPT } (0)->					\
 	    ereport.cpu.generic-sparc.erptleaf@level;			\
 									\
 	event upset.cpu.generic-sparc.fltleaf@level;			\
 									\
 	prop upset.cpu.generic-sparc.fltleaf@level			\
-	    { !DIAGNOSE_ERPT } (1)->					\
+	    { !DIAGNOSE_ERPT } (0)->					\
 	    ereport.cpu.generic-sparc.erptleaf@level
 
 FLT_CPU_UE_UNRETIRED(chip, int-mem-ue, chip-uc-nr);
@@ -243,13 +243,13 @@ engine serd.cpu.generic-sparc.strand@strand, N=8, T=1week;
 	prop fault.cpu.generic-sparc.fltleaf@level			\
 	    { DIAGNOSE_ERPT && setserdsuffix("erptleaf") &&		\
 	    setserdn(n) && setserdt(t) && SET_SERDN &&			\
-	    SET_SERDT && SET_RATIO } (1) ->				\
+	    SET_SERDT && SET_RATIO } (0) ->				\
 	    ereport.cpu.generic-sparc.erptleaf@level;			\
 									\
 	event upset.cpu.generic-sparc.fltleaf@level;			\
 									\
 	prop upset.cpu.generic-sparc.fltleaf@level			\
-	    { !DIAGNOSE_ERPT } (1) ->					\
+	    { !DIAGNOSE_ERPT } (0) ->					\
 	    ereport.cpu.generic-sparc.erptleaf@level
 
 FLT_CPU_CE(itlb, core, core, 8, 1week);
@@ -285,13 +285,13 @@ engine serd.cpu.generic-sparc.strand-nr@strand, N=8, T=1week;
 	/* When the correctable engine trips, diagnose a fault */       \
 	prop fault.cpu.generic-sparc.fltleaf@level			\
 	    { DIAGNOSE_ERPT && setserdsuffix("erptleaf") && setserdn(n) && \
-	    setserdt(t) && SET_SERDN && SET_SERDT && SET_RATIO } (1) ->	\
+	    setserdt(t) && SET_SERDN && SET_SERDT && SET_RATIO } (0) ->	\
 	    ereport.cpu.generic-sparc.erptleaf@level;			\
 									\
 	event upset.fault.cpu.generic-sparc.fltleaf@level;		\
 									\
 	prop upset.fault.cpu.generic-sparc.fltleaf@level		\
-	    { !DIAGNOSE_ERPT } (1)->					\
+	    { !DIAGNOSE_ERPT } (0)->					\
 	    ereport.cpu.generic-sparc.erptleaf@level
 
 FLT_CPU_CE_UNRETIRED(itlb, chip, chip-nr, 8, 1week);
@@ -343,7 +343,7 @@ prop fault.cpu.generic-sparc.c2c-uc@chip
     ereport.cpu.generic-sparc.c2c-prot-uc@chip;
 
 prop upset.cpu.generic-sparc.c2c-uc@chip
-    { !DIAGNOSE_ERPT } (1) ->
+    { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.c2c-prot-uc@chip,
     ereport.cpu.generic-sparc.c2c-link-uc@chip;
 
@@ -356,7 +356,7 @@ prop fault.cpu.generic-sparc.c2c-failover@chip
     ereport.cpu.generic-sparc.c2c-failover@chip;
 
 prop upset.cpu.generic-sparc.c2c-failover@chip
-    { !DIAGNOSE_ERPT } (1) ->
+    { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.c2c-failover@chip;
 
 /*
@@ -394,7 +394,7 @@ prop fault.cpu.generic-sparc.c2c@chip
     ereport.cpu.generic-sparc.c2c-prot@chip;
 
 prop upset.cpu.generic-sparc.c2c-link@chip
-    { !DIAGNOSE_ERPT } (1) ->
+    { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.c2c-prot@chip,
     ereport.cpu.generic-sparc.c2c-link@chip;
 
@@ -416,11 +416,11 @@ event defect.fw.generic-sparc.addr-oob@chassis,
 event upset.fw.generic-sparc.addr-oob@chassis;
 
 prop defect.fw.generic-sparc.addr-oob@chassis
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.addr-oob@chassis;
 
 prop upset.fw.generic-sparc.addr-oob@chassis
-    { !DIAGNOSE_ERPT } (1) ->
+    { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.addr-oob@chassis;
 
 event ereport.cpu.generic-sparc.inconsistent@chassis;
@@ -430,11 +430,11 @@ event defect.fw.generic-sparc.erpt-gen@chassis,
 event upset.fw.generic-sparc.erpt-gen@chassis;
 
 prop defect.fw.generic-sparc.erpt-gen@chassis
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.inconsistent@chassis;
 
 prop upset.fw.generic-sparc.erpt-gen@chassis
-    { !DIAGNOSE_ERPT } (1) ->
+    { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.inconsistent@chassis;
 /*
  * bootbus-to and bootbus-par errors. Fault the detector.
@@ -446,15 +446,15 @@ event upset.cpu.generic-sparc.bootbus@chip;
 event fault.cpu.generic-sparc.bootbus@chip, retire=0;
 
 prop fault.cpu.generic-sparc.bootbus@chip
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.bootbus-to@chip;
 
 prop fault.cpu.generic-sparc.bootbus@chip
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.bootbus-par@chip;
 
 prop upset.cpu.generic-sparc.bootbus@chip
-    { !DIAGNOSE_ERPT } (1) ->
+    { !DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.bootbus-to@chip,
     ereport.cpu.generic-sparc.bootbus-par@chip;
 
@@ -464,5 +464,5 @@ prop upset.cpu.generic-sparc.bootbus@chip
 event ereport.cpu.generic-sparc.pio-read@chip;
 event upset.cpu.generic-sparc.discard@chip;
 
-prop upset.cpu.generic-sparc.discard@chip (1) ->
+prop upset.cpu.generic-sparc.discard@chip (0) ->
     ereport.cpu.generic-sparc.pio-read@chip;

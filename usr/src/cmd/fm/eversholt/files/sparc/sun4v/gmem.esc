@@ -64,13 +64,13 @@ MEMUE_ERPT(strand);
 	event fault.memory.bank@DIMMPATH;				\
 									\
 	prop fault.memory.bank@DIMMPATH					\
-	    { DIAGNOSE_ERPT && CONTAINS_DIMM } (1)->			\
+	    { DIAGNOSE_ERPT && CONTAINS_DIMM } (0)->			\
 	    ereport.cpu.generic-sparc.mem-uc@level<>;			\
 									\
 	event upset.memory.bank@DIMMPATH;				\
 									\
 	prop upset.memory.bank@DIMMPATH					\
-	    { !DIAGNOSE_ERPT } (1)->					\
+	    { !DIAGNOSE_ERPT } (0)->					\
 	    ereport.cpu.generic-sparc.mem-uc@level<>
 
 FLT_MEM_UE_BANK(chip);
@@ -82,13 +82,13 @@ FLT_MEM_UE_BANK(strand);
 	     message=0;							\
 									\
 	prop fault.memory.page@DIMMPATH					\
-	    { DIAGNOSE_ERPT && CONTAINS_DIMM && SET_ADDR && SET_OFFSET } (1)-> \
+	    { DIAGNOSE_ERPT && CONTAINS_DIMM && SET_ADDR && SET_OFFSET } (0)-> \
 	    ereport.cpu.generic-sparc.mem-uc@level<>;			\
 									\
 	event upset.memory.page@DIMMPATH;				\
 									\
 	prop upset.memory.page@DIMMPATH					\
-	    { !DIAGNOSE_ERPT } (1)->					\
+	    { !DIAGNOSE_ERPT } (0)->					\
 	    ereport.cpu.generic-sparc.mem-uc@level<>
 
 FLT_MEM_UE_PAGE(chip);
@@ -129,58 +129,58 @@ event ereport.cpu.generic-sparc.membuf-crc@MEM_CTRL { within(1s) };
  * detector is chip
  */
 prop fault.memory.memlink@CHIP
-    { DIAGNOSE_ERPT && SET_SERDN && SET_SERDT && SET_RATIO } (1) ->
+    { DIAGNOSE_ERPT && SET_SERDN && SET_SERDT && SET_RATIO } (0) ->
     ereport.cpu.generic-sparc.membuf-crc@CHIP;
 
 prop fault.memory.memlink@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF && SET_SERDN &&
-    SET_SERDT && SET_RATIO } (1)->
+    SET_SERDT && SET_RATIO } (0)->
     ereport.cpu.generic-sparc.membuf-crc@CHIP<>;
 
 event upset.memory.memlink@CHIP;
 
 prop upset.memory.memlink@CHIP
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc@CHIP;
 /*
  * detector is memory-buffer
  */
 prop fault.memory.memlink@MEM_BUFF
-    { DIAGNOSE_ERPT && SET_SERDN && SET_SERDT && SET_RATIO } (1) ->
+    { DIAGNOSE_ERPT && SET_SERDN && SET_SERDT && SET_RATIO } (0) ->
     ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF;
 
 prop fault.memory.memlink@CHIP
     { DIAGNOSE_ERPT && CONTAINS_CHIP && SET_SERDN &&
-    SET_SERDT && SET_RATIO } (1) ->
+    SET_SERDT && SET_RATIO } (0) ->
     ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF<>;
 
 prop fault.memory.memlink@MEM_CTRL
     { DIAGNOSE_ERPT && CONTAINS_MEMCTRL && SET_SERDN &&
-    SET_SERDT && SET_RATIO } (1)->  
+    SET_SERDT && SET_RATIO } (0)->  
     ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF<>;
 
 event upset.memory.memlink@MEM_BUFF;
 
 prop upset.memory.memlink@MEM_BUFF
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc@MEM_BUFF;
 
 /*
  * detector is memory-controller
  */
 prop fault.memory.memlink@MEM_CTRL
-    { DIAGNOSE_ERPT && SET_SERDN && SET_SERDT && SET_RATIO } (1)->
+    { DIAGNOSE_ERPT && SET_SERDN && SET_SERDT && SET_RATIO } (0)->
     ereport.cpu.generic-sparc.membuf-crc@MEM_CTRL;
 
 prop fault.memory.memlink@MEM_BUFF
     { DIAGNOSE_ERPT && CONTAINS_MEMBUFF && SET_SERDN &&
-    SET_SERDT && SET_RATIO } (1)->
+    SET_SERDT && SET_RATIO } (0)->
     ereport.cpu.generic-sparc.membuf-crc@MEM_CTRL<>;
 
 event upset.memory.memlink@MEM_CTRL;
 
 prop upset.memory.memlink@MEM_CTRL
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc@MEM_CTRL;
 
 /*
@@ -200,55 +200,55 @@ event fault.memory.memlink-uc@MEM_CTRL;
  * chip is detector
  */
 prop fault.memory.memlink-uc@CHIP
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-uc@CHIP;
 
 prop fault.memory.memlink-uc@MEM_BUFF
-    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-uc@CHIP<>;
 
 event upset.memory.memlink-uc@CHIP;
 
 prop upset.memory.memlink-uc@CHIP
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc-uc@CHIP;
 
 /*
  * memory-buffer is detector
  */
 prop fault.memory.memlink-uc@MEM_BUFF
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF;
 
 prop fault.memory.memlink-uc@CHIP
-    { DIAGNOSE_ERPT && CONTAINS_CHIP } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_CHIP } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>;
 
 prop fault.memory.memlink-uc@MEM_CTRL
-    { DIAGNOSE_ERPT && CONTAINS_MEMCTRL } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_MEMCTRL } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF<>;
 
 event upset.memory.memlink-uc@MEM_BUFF;
 
 prop upset.memory.memlink-uc@MEM_BUFF
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc-uc@MEM_BUFF;
 
 /*
  * memory-controller is detector
  */
 prop fault.memory.memlink-uc@MEM_CTRL
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL;
 
 prop fault.memory.memlink-uc@MEM_BUFF
-    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL<>;
 
 event upset.memory.memlink-uc@MEM_CTRL;
 
 prop upset.memory.memlink-uc@MEM_CTRL
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc-uc@MEM_CTRL;
 /*
  * membuf-crc-failover will fault the detector FRU and sender FRU
@@ -269,53 +269,53 @@ event fault.memory.memlink-failover@MEM_CTRL;
  * chip is detector
  */
 prop fault.memory.memlink-failover@CHIP
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-failover@CHIP;
 
 prop fault.memory.memlink-failover@MEM_BUFF
-    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-failover@CHIP<>;
 
 event upset.memory.memlink-failover@CHIP;
 
 prop upset.memory.memlink-failover@CHIP
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc-failover@CHIP;
 /*
  * memory-buffer is detector
  */
 prop fault.memory.memlink-failover@MEM_BUFF
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF;
 
 prop fault.memory.memlink-failover@CHIP
-    { DIAGNOSE_ERPT && CONTAINS_CHIP } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_CHIP } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF<>;
 
 prop fault.memory.memlink-failover@MEM_CTRL
-    { DIAGNOSE_ERPT && CONTAINS_MEMCTRL } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_MEMCTRL } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF<>;
 
 event upset.memory.memlink-failover@MEM_BUFF;
 
 prop upset.memory.memlink-failover@MEM_BUFF
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc-failover@MEM_BUFF;
 /*
  * memory-controller is detector
  */
 prop fault.memory.memlink-failover@MEM_CTRL
-    { DIAGNOSE_ERPT } (1) ->
+    { DIAGNOSE_ERPT } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-failover@MEM_CTRL;
 
 prop fault.memory.memlink-failover@MEM_BUFF
-    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (1) ->
+    { DIAGNOSE_ERPT && CONTAINS_MEMBUFF } (0) ->
     ereport.cpu.generic-sparc.membuf-crc-failover@MEM_CTRL<>;
 
 event upset.memory.memlink-failover@MEM_CTRL;
 
 prop upset.memory.memlink-failover@MEM_CTRL
-    { !DIAGNOSE_ERPT } (1)->
+    { !DIAGNOSE_ERPT } (0)->
     ereport.cpu.generic-sparc.membuf-crc-failover@MEM_CTRL;
 /*
  * ignore the membuf-other errors
