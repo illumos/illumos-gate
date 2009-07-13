@@ -8766,7 +8766,6 @@ get_set_kernel(
 			goto done;
 		}
 
-		free(fstype);
 		free(osdev);
 		(void) strlcpy(signbuf, sign, sizeof (signbuf));
 		free(sign);
@@ -8779,17 +8778,25 @@ get_set_kernel(
 			entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
 			    signbuf, new_path, NULL, NULL);
 		} else {
-			new_str_len = strlen(DIRECT_BOOT_KERNEL) +
-			    strlen(path) + 8;
-			new_arg = s_calloc(1, new_str_len);
+			new_str_len = strlen(path) + 8;
+			if (strcmp(fstype, "zfs") == 0) {
+				new_str_len += strlen(DIRECT_BOOT_KERNEL_ZFS);
+				new_arg = s_calloc(1, new_str_len);
+				(void) snprintf(new_arg, new_str_len, "%s %s",
+				    DIRECT_BOOT_KERNEL_ZFS, path);
+			} else {
+				new_str_len += strlen(DIRECT_BOOT_KERNEL);
+				new_arg = s_calloc(1, new_str_len);
+				(void) snprintf(new_arg, new_str_len, "%s %s",
+				    DIRECT_BOOT_KERNEL, path);
+			}
 
-			(void) snprintf(new_arg, new_str_len, "%s %s",
-			    DIRECT_BOOT_KERNEL, path);
 			BAM_DPRINTF((D_GET_SET_KERNEL_NEW_ARG, fcn, new_arg));
 			entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
 			    signbuf, new_arg, NULL, DIRECT_BOOT_ARCHIVE);
 			free(new_arg);
 		}
+		free(fstype);
 		INJECT_ERROR1("GET_SET_KERNEL_ADD_BOOT_ENTRY",
 		    entryNum = BAM_ERROR);
 		if (entryNum == BAM_ERROR) {
