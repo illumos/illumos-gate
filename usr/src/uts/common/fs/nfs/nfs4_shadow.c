@@ -125,14 +125,12 @@ sv_activate(vnode_t **vpp, vnode_t *dvp, nfs4_fname_t **namepp, int newnode)
 		ASSERT(resvp->v_type == VREG);
 		VN_RELE(*vpp);
 		*vpp = resvp;
-	} else if ((*vpp)->v_type == VDIR) {
+	} else {
 		/*
-		 * Directories only have a single shadow vnode which
-		 * is the master shadow vnode. This is because directories
-		 * can't have hard links. If sv_activate() is
-		 * called for an existing rnode (newnode isn't set)
-		 * but with a new name the fname needs to be updated
-		 * and the old one released.
+		 * No shadow vnodes (i.e. hard links) in this branch.
+		 * If sv_activate() is called for an existing rnode
+		 * (newnode isn't set) but with a new name, the sv_name
+		 * needs to be updated and the old sv_name released.
 		 *
 		 * fname mismatches can occur due to server side renames,
 		 * here is a chance to update the fname in case there is
@@ -156,8 +154,6 @@ sv_activate(vnode_t **vpp, vnode_t *dvp, nfs4_fname_t **namepp, int newnode)
 			mutex_exit(&rp->r_svlock);
 			fn_rele(namepp);
 		}
-	} else {
-		fn_rele(namepp);
 	}
 }
 

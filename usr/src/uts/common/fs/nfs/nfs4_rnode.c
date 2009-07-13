@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -465,7 +465,7 @@ makenfs4node_by_fh(nfs4_sharedfh_t *sfh, nfs4_sharedfh_t *psfh,
 		if (psfh != NULL)
 			sfh4_hold(psfh);
 		svp->sv_dfh = psfh;
-	} else if (vp->v_type == VDIR) {
+	} else {
 		/*
 		 * It is possible that due to a server
 		 * side rename fnames have changed.
@@ -481,8 +481,6 @@ makenfs4node_by_fh(nfs4_sharedfh_t *sfh, nfs4_sharedfh_t *psfh,
 			mutex_exit(&rp->r_svlock);
 			fn_rele(&name);
 		}
-	} else {
-		fn_rele(&name);
 	}
 
 	ASSERT(RW_LOCK_HELD(&rtable4[index].r_lock));
