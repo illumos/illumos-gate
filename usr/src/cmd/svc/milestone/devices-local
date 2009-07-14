@@ -20,14 +20,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # Initiate the device reconfiguration process in case we need some
 # device links established so that we can successfully perform our
@@ -41,9 +39,6 @@ svcprop -q -p system/reconfigure system/svc/restarter:default
 if [ $? -eq 0 ]; then
 	echo 'Configuring devices.' > /dev/msglog 2>&1
 	/usr/sbin/devfsadm >/dev/msglog 2>&1
-        if [ -x /usr/ucb/ucblinks -a -f /usr/ucblib/ucblinks.awk ]; then
-                /usr/ucb/ucblinks >/dev/null 2>&1
-        fi
 
 	#
 	# Flush any existing socket mappings since the major numbers of

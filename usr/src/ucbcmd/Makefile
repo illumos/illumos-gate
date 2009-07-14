@@ -60,7 +60,6 @@ COMMON_SUBDIRS=		\
 	touch		\
 	tr		\
 	tset		\
-	ucblinks	\
 	users		\
 	vipw		\
 	whereis		\
@@ -71,7 +70,7 @@ sparc_SUBDIRS= sbcp
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
 # commands messaged
-MSGSUBDIRS = biff install.d mkstr rusage shutdown ucblinks
+MSGSUBDIRS = biff install.d mkstr rusage shutdown
 
 BWOSDIRS=
 

@@ -7817,6 +7817,16 @@ mondo_loop() {
 	rm -f $usr/kernel/drv/amd64/lo
 	rm -f $usr/include/sys/lo.h
 
+	# Remove ucblinks 4.x dev names generator
+	rm -f $usr/ucb/ucblinks
+	rm -f $usr/ucblib/ucblinks.awk
+	rm -f $usr/ucblib/ucblinks.sh
+
+	rm -f $root/dev/sd[0-9]*
+	rm -f $root/dev/rsd[0-9]*
+	rm -f $root/dev/sr[0-9]*
+	rm -f $root/dev/rsr[0-9]*
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then
