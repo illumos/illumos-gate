@@ -939,10 +939,10 @@ enter_maintenance()
 
 	console(B_FALSE, "Requesting maintenance mode\n"
 	    "(See /lib/svc/share/README for additional information.)\n");
-	(void) sigset(SIGCLD, SIG_DFL);
+	(void) sighold(SIGCLD);
 	while ((su_process = efork(M_OFF, NULLPROC, NOCLEANUP)) == NO_ROOM)
 		(void) pause();
-	(void) sigset(SIGCLD, childeath);
+	(void) sigrelse(SIGCLD);
 	if (su_process == NULLPROC) {
 		int fd;
 
@@ -1394,7 +1394,7 @@ spawn(struct PROC_TABLE *process, struct CMD_LINE *cmd)
 	/*
 	 * Spawn a child process to execute this command.
 	 */
-	(void) sigset(SIGCLD, SIG_DFL);
+	(void) sighold(SIGCLD);
 	oprocess = process;
 	while ((process = efork(cmd->c_action, oprocess, modes)) == NO_ROOM)
 		(void) pause();
@@ -1453,7 +1453,7 @@ spawn(struct PROC_TABLE *process, struct CMD_LINE *cmd)
 
 	st_write();
 
-	(void) sigset(SIGCLD, childeath);
+	(void) sigrelse(SIGCLD);
 }
 
 /*
@@ -1890,10 +1890,10 @@ killproc(pid_t pid)
 {
 	struct PROC_TABLE	*process;
 
-	(void) sigset(SIGCLD, SIG_DFL);
+	(void) sighold(SIGCLD);
 	while ((process = efork(M_OFF, NULLPROC, 0)) == NO_ROOM)
 		(void) pause();
-	(void) sigset(SIGCLD, childeath);
+	(void) sigrelse(SIGCLD);
 
 	if (process == NULLPROC) {
 		/*
@@ -2080,7 +2080,7 @@ boot_init()
 			 * until after there has been an chance to check it.
 			 */
 			if (process = findpslot(&cmd)) {
-				(void) sigset(SIGCLD, SIG_DFL);
+				(void) sighold(SIGCLD);
 				(void) snprintf(svc_aux, SVC_AUX_SIZE,
 				    INITTAB_ENTRY_ID_STR_FORMAT, cmd.c_id);
 				(void) snprintf(init_svc_fmri, SVC_FMRI_SIZE,
@@ -2098,7 +2098,7 @@ boot_init()
 				    (NAMED|NOCLEANUP))) == NO_ROOM;
 				    /* CSTYLED */)
 					;
-				(void) sigset(SIGCLD, childeath);
+				(void) sigrelse(SIGCLD);
 
 				if (process == NULLPROC) {
 					maxfiles = ulimit(UL_GDESLIM, 0);
@@ -2355,22 +2355,14 @@ alarmclk()
  * to do and return, otherwise the child will be waited for.
  */
 static void
-childeath_single()
+childeath_single(pid_t pid, int status)
 {
 	struct PROC_TABLE	*process;
 	struct pidlist		*pp;
-	pid_t			pid;
-	int			status;
 
 	/*
-	 * Perform wait to get the process id of the child that died and
-	 * then scan the process table to see if we are interested in
-	 * this process. NOTE: if a super-user sends the SIGCLD signal
-	 * to init, the following wait will not immediately return and
-	 * init will be inoperative until one of its child really does die.
+	 * Scan the process table to see if we are interested in this process.
 	 */
-	pid = wait(&status);
-
 	for (process = proc_table;
 	    (process < proc_table + num_proc); process++) {
 		if ((process->p_flags & (LIVING|OCCUPIED)) ==
@@ -2425,11 +2417,11 @@ childeath_single()
 static void
 childeath(int signo)
 {
-	siginfo_t info;
+	pid_t pid;
+	int status;
 
-	while ((waitid(P_ALL, (id_t)0, &info, WEXITED|WNOHANG|WNOWAIT) == 0) &&
-	    info.si_pid != 0)
-		childeath_single();
+	while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+		childeath_single(pid, status);
 }
 
 static void
@@ -2448,13 +2440,8 @@ powerfail()
  * otherwise it searches for a free slot.  Regardless of how it was called,
  * it returns the pointer to the proc_table entry
  *
- * The SIGCLD handler is set to default (SIG_DFL) before calling efork().
- * This relies on the somewhat obscure SVR2 SIGCLD/SIG_DFL semantic
- * implied by the use of signal(3c).  While the meaning of SIG_DFL for
- * SIGCLD is nominally to ignore the signal, once the signal disposition
- * is set to childeath(), the kernel will post a SIGCLD if a child
- * exited during the period the disposition was SIG_DFL.  It acts more
- * like a signal block.
+ * The SIGCLD signal is blocked (held) before calling efork()
+ * and is unblocked (released) after efork() returns.
  *
  * Ideally, this should be rewritten to use modern signal semantics.
  */
@@ -2464,7 +2451,6 @@ efork(int action, struct PROC_TABLE *process, int modes)
 	pid_t	childpid;
 	struct PROC_TABLE *proc;
 	int		i;
-	void (*oldroutine)();
 	/*
 	 * Freshen up the proc_table, removing any entries for dead processes
 	 * that don't have NOCLEANUP set.  Perform the necessary accounting.
@@ -2494,13 +2480,13 @@ efork(int action, struct PROC_TABLE *process, int modes)
 		setimer(5);
 
 		/*
-		 * Wait for some children to die.  Since efork() is normally
-		 * called with SIGCLD in the default state, reset it to catch
-		 * so that child death signals can come in.
+		 * Wait for some children to die.  Since efork()
+		 * is always called with SIGCLD blocked, unblock
+		 * it here so that child death signals can come in.
 		 */
-		oldroutine = sigset(SIGCLD, childeath);
+		(void) sigrelse(SIGCLD);
 		(void) pause();
-		(void) sigset(SIGCLD, oldroutine);
+		(void) sighold(SIGCLD);
 		setimer(0);
 	}
 
@@ -2851,7 +2837,7 @@ prog_name(char *string)
 	 * '/', thus when a ' ', '\t', '\n', or '\0' is found, "ptr" will
 	 * point to the last element of the pathname.
 	 */
-	for (ptr = string; *string != ' ' && *string != '\t' && 
+	for (ptr = string; *string != ' ' && *string != '\t' &&
 	    *string != '\n' && *string != '\0'; string++) {
 		if (*string == '/')
 			ptr = string+1;
@@ -3765,7 +3751,7 @@ cleanaux()
 	pid_t	pid;
 	short	status;
 
-	(void) sigset(SIGCLD, SIG_DFL);
+	(void) sighold(SIGCLD);
 	Gchild = 0;	/* Note - Safe to do this here since no SIGCLDs */
 	(void) sighold(SIGPOLL);
 	savep = p = Plhead;
@@ -3795,7 +3781,7 @@ cleanaux()
 		p = p->pl_next;
 	}
 	(void) sigrelse(SIGPOLL);
-	(void) sigset(SIGCLD, childeath);
+	(void) sigrelse(SIGCLD);
 }
 
 
@@ -4420,8 +4406,8 @@ startd_run(const char *cline, int tmpl, ctid_t old_ctid)
 		    "Template activation failed; not starting \"%s\" in "
 		    "proper contract.\n", cline);
 
-	/* Hold SIGCHLD so we can wait if necessary. */
-	(void) sighold(SIGCHLD);
+	/* Hold SIGCLD so we can wait if necessary. */
+	(void) sighold(SIGCLD);
 
 	while ((pid = fork()) < 0) {
 		if (errno == EPERM) {
@@ -4491,7 +4477,7 @@ startd_run(const char *cline, int tmpl, ctid_t old_ctid)
 	if (old_ctid != 0)
 		(void) ct_pr_tmpl_set_transfer(tmpl, 0);
 
-	(void) sigrelse(SIGCHLD);
+	(void) sigrelse(SIGCLD);
 
 	return (0);
 }
