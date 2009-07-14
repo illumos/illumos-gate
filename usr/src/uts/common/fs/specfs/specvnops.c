@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -637,10 +637,21 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr, caller_context_t *cc)
 	    (devopsp[maj]->devo_cb_ops->cb_open == NULL))
 		return (ENXIO);
 
-	/* split streams .vs. non-streams */
-	if (STREAMSTAB(maj))
+	/*
+	 * split STREAMS vs. non-STREAMS
+	 *
+	 * If the device is a dual-personality device, then we might want
+	 * to allow for a regular OTYP_BLK open.  If however it's strictly
+	 * a pure STREAMS device, the cb_open entry point will be
+	 * nodev() which returns ENXIO.  This does make this failure path
+	 * somewhat longer, but such attempts to use OTYP_BLK with STREAMS
+	 * devices should be exceedingly rare.  (Most of the time they will
+	 * be due to programmer error.)
+	 */
+	if ((vp->v_type == VCHR) && (STREAMSTAB(maj)))
 		goto streams_open;
 
+not_streams:
 	/*
 	 * Wait for in progress last close to complete. This guarantees
 	 * to the driver writer that we will never be in the drivers
@@ -751,9 +762,6 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr, caller_context_t *cc)
 	return (error);
 
 streams_open:
-	if (vp->v_type != VCHR)
-		return (ENXIO);
-
 	/*
 	 * Lock common snode to prevent any new clone opens on this
 	 * stream while one is in progress. This is necessary since
@@ -846,6 +854,14 @@ streams_open:
 		SN_RELE(csp);
 	}
 
+	/*
+	 * Resolution for STREAMS vs. regular character device: If the
+	 * STREAMS open(9e) returns ENOSTR, then try an ordinary device
+	 * open instead.
+	 */
+	if (error == ENOSTR) {
+		goto not_streams;
+	}
 	return (error);
 }
 
@@ -972,7 +988,7 @@ spec_read(
 
 	ASSERT(vp->v_type == VCHR || vp->v_type == VBLK);
 
-	if (STREAMSTAB(getmajor(dev))) {	/* stream */
+	if (vp->v_stream) {
 		ASSERT(vp->v_type == VCHR);
 		smark(sp, SACC);
 		return (strread(vp, uiop, cr));
@@ -994,7 +1010,7 @@ spec_read(
 
 	if (vp->v_type == VCHR) {
 		smark(sp, SACC);
-		ASSERT(STREAMSTAB(getmajor(dev)) == 0);
+		ASSERT(vp->v_stream == NULL);
 		return (cdev_read(dev, uiop, cr));
 	}
 
@@ -1078,7 +1094,7 @@ spec_write(
 
 	ASSERT(vp->v_type == VCHR || vp->v_type == VBLK);
 
-	if (STREAMSTAB(getmajor(dev))) {
+	if (vp->v_stream) {
 		ASSERT(vp->v_type == VCHR);
 		smark(sp, SUPD);
 		return (strwrite(vp, uiop, cr));
@@ -1097,7 +1113,7 @@ spec_write(
 
 	if (vp->v_type == VCHR) {
 		smark(sp, SUPD);
-		ASSERT(STREAMSTAB(getmajor(dev)) == 0);
+		ASSERT(vp->v_stream == NULL);
 		return (cdev_write(dev, uiop, cr));
 	}
 
@@ -1258,7 +1274,7 @@ spec_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode, struct cred *cr,
 
 	sp = VTOS(vp);
 	dev = sp->s_dev;
-	if (STREAMSTAB(getmajor(dev))) {
+	if (vp->v_stream) {
 		error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
 	} else {
 		error = cdev_ioctl(dev, cmd, arg, mode, cr, rvalp);
@@ -2210,7 +2226,7 @@ spec_poll(
 	else {
 		ASSERT(vp->v_type == VCHR);
 		dev = vp->v_rdev;
-		if (STREAMSTAB(getmajor(dev))) {
+		if (vp->v_stream) {
 			ASSERT(vp->v_stream != NULL);
 			error = strpoll(vp->v_stream, events, anyyet,
 			    reventsp, phpp);

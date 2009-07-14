@@ -382,7 +382,7 @@ handle_alloc(vnode_t *vp, struct ldi_ident *ident)
 
 	/* set the device type for this handle */
 	lhp->lh_type = 0;
-	if (STREAMSTAB(getmajor(vp->v_rdev))) {
+	if (vp->v_stream) {
 		ASSERT(vp->v_type == VCHR);
 		lhp->lh_type |= LH_STREAM;
 	} else {
@@ -523,11 +523,6 @@ ldi_vp_from_dev(dev_t dev, int otyp, vnode_t **vpp)
 
 	if ((dip = e_ddi_hold_devi_by_dev(dev, 0)) == NULL)
 		return (ENODEV);
-
-	if (STREAMSTAB(getmajor(dev)) && (otyp != OTYP_CHR)) {
-		ddi_release_devi(dip);  /* from e_ddi_hold_devi_by_dev */
-		return (ENXIO);
-	}
 
 	vp = makespecvp(dev, OTYP_TO_VTYP(otyp));
 	spec_assoc_vp_with_devi(vp, dip);
@@ -3236,8 +3231,7 @@ ldi_ev_register_callbacks(ldi_handle_t lh, ldi_ev_cookie_t cookie,
 	 */
 	lecp->lec_lhp = lhp;
 	lecp->lec_dev = lhp->lh_vp->v_rdev;
-	lecp->lec_spec = (lhp->lh_vp->v_type == VCHR) ?
-	    S_IFCHR : S_IFBLK;
+	lecp->lec_spec = VTYP_TO_STYP(lhp->lh_vp->v_type);
 	lecp->lec_notify = callb->cb_notify;
 	lecp->lec_finalize = callb->cb_finalize;
 	lecp->lec_arg = arg;

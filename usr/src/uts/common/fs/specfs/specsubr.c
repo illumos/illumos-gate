@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -740,7 +738,7 @@ spec_maxoffset(struct vnode *vp)
 	struct snode *sp = VTOS(vp);
 	struct snode *csp = VTOS(sp->s_commonvp);
 
-	if (STREAMSTAB(getmajor(sp->s_dev)))
+	if (vp->v_stream)
 		return ((offset_t)-1);
 	else if (csp->s_flag & SANYOFFSET)	/* D_U64BIT */
 		return ((offset_t)-1);
@@ -847,7 +845,7 @@ device_close(struct vnode *vp, int flag, struct cred *cr)
 	switch (type) {
 
 	case VCHR:
-		if (STREAMSTAB(getmajor(dev))) {
+		if (vp->v_stream) {
 			if (cvp->v_stream != NULL)
 				error = strclose(cvp, flag, cr);
 			vp->v_stream = NULL;
