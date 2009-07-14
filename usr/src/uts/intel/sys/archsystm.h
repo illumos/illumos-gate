@@ -45,6 +45,8 @@ extern int getpil(void);
 
 extern ulong_t getcr0(void);
 extern void setcr0(ulong_t);
+extern ulong_t getcr8(void);
+extern void setcr8(ulong_t);
 extern ulong_t getcr2(void);
 extern void iommu_cpu_nop(void);
 extern void clflush_insn(caddr_t addr);

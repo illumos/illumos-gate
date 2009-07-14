@@ -629,6 +629,8 @@ extern const char *cpuid_getchiprevstr(struct cpu *);
 extern uint32_t cpuid_getsockettype(struct cpu *);
 extern const char *cpuid_getsocketstr(struct cpu *);
 
+extern int cpuid_have_cr8access(struct cpu *);
+
 extern int cpuid_opteron_erratum(struct cpu *, uint_t);
 
 struct cpuid_info;

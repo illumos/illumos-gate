@@ -364,6 +364,11 @@ platform_cpuid_mangle(uint_t vendor, uint32_t eax, struct cpuid_regs *cp)
 		break;
 	case X86_VENDOR_AMD:
 		switch (eax) {
+
+		case 0x80000001:
+			cp->cp_ecx &= ~CPUID_AMD_ECX_CR8D;
+			break;
+
 		case 0x80000008:
 			/*
 			 * Zero out the (ncores-per-chip - 1) field
@@ -2533,6 +2538,24 @@ cpuid_get_clogid(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 	return (cpu->cpu_m.mcpu_cpi->cpi_clogid);
+}
+
+/*ARGSUSED*/
+int
+cpuid_have_cr8access(cpu_t *cpu)
+{
+#if defined(__amd64)
+	return (1);
+#else
+	struct cpuid_info *cpi;
+
+	ASSERT(cpu != NULL);
+	cpi = cpu->cpu_m.mcpu_cpi;
+	if (cpi->cpi_vendor == X86_VENDOR_AMD && cpi->cpi_maxeax >= 1 &&
+	    (CPI_FEATURES_XTD_ECX(cpi) & CPUID_AMD_ECX_CR8D) != 0)
+		return (1);
+	return (0);
+#endif
 }
 
 uint32_t

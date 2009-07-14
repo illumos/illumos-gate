@@ -83,6 +83,7 @@ static apic_reg_ops_t x2apic_regs_ops = {
 	apic_send_EOI,
 };
 
+extern int apic_have_32bit_cr8;
 
 /* The default ops is local APIC (Memory Mapped IO) */
 apic_reg_ops_t *apic_reg_ops = &local_apic_regs_ops;
@@ -119,6 +120,8 @@ get_local_apic_pri(void)
 #if defined(__amd64)
 	return ((int)getcr8());
 #else
+	if (apic_have_32bit_cr8)
+		return ((int)getcr8());
 	return (apicadr[APIC_TASK_REG]);
 #endif
 }
@@ -129,7 +132,10 @@ local_apic_write_task_reg(uint64_t value)
 #if defined(__amd64)
 	setcr8((ulong_t)(value >> APIC_IPL_SHIFT));
 #else
-	apicadr[APIC_TASK_REG] = (uint32_t)value;
+	if (apic_have_32bit_cr8)
+		setcr8((ulong_t)(value >> APIC_IPL_SHIFT));
+	else
+		apicadr[APIC_TASK_REG] = (uint32_t)value;
 #endif
 }
 

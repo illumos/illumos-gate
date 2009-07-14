@@ -580,6 +580,24 @@ setcr8(ulong_t val)
         ret
 	SET_SIZE(setcr0)
 
+	/*
+	 * "lock mov %cr0" is used on processors which indicate it is
+	 * supported via CPUID. Normally the 32 bit TPR is accessed via
+	 * the local APIC.
+	 */
+	ENTRY(getcr8)
+	lock
+	movl	%cr0, %eax
+	ret
+	SET_SIZE(getcr8)
+
+	ENTRY(setcr8)
+        movl    4(%esp), %eax
+	lock
+        movl    %eax, %cr0
+	ret
+	SET_SIZE(setcr8)
+
         ENTRY(getcr2)
 #if defined(__xpv)
 	movl	%gs:CPU_VCPU_INFO, %eax
