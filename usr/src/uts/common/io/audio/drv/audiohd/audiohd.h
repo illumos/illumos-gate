@@ -40,7 +40,8 @@ extern "C" {
 /*
  * specific codec id used by specific vendors
  */
-#define	AUDIOHD_CODECID_HP	0x111d7608
+#define	AUDIOHD_CODEC_IDT7608	0x111d7608
+#define	AUDIOHD_CODEC_IDT76B2	0x111d76b2
 #define	AUDIOHD_CODECID_ALC888	0x10ec0888
 #define	AUDIOHD_CODECID_SONY1	0x10ec0260
 #define	AUDIOHD_CODECID_SONY2	0x10ec0262

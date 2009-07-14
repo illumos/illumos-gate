@@ -3191,7 +3191,7 @@ audiohd_set_codec_info(hda_codec_t *codec)
 		break;
 	default:
 		(void) snprintf(buf, sizeof (buf),
-		    "Unkown HD codec");
+		    "Unknown HD codec: 0x%x", codec->vid);
 		break;
 
 	}
@@ -3530,8 +3530,13 @@ audiohd_build_output_path(hda_codec_t *codec)
 	int 			mnum = 0;
 	uint8_t			mixer_allow = 1;
 
-	/* work around for hp mini 1000 laptop */
-	if (codec->vid == AUDIOHD_CODECID_HP)
+	/*
+	 * work around for laptops which have IDT audio chipset, such as
+	 * HP mini 1000 laptop, Dell Lattitude 6400. We don't allow mixer
+	 * widget on such path, which leads to speaker loud hiss noise.
+	 */
+	if (codec->vid == AUDIOHD_CODEC_IDT7608 ||
+	    codec->vid == AUDIOHD_CODEC_IDT76B2)
 		mixer_allow = 0;
 	/* search an exclusive mixer widget path. This is preferred */
 	audiohd_do_build_output_path(codec, mixer_allow, &mnum, 1, 0);
