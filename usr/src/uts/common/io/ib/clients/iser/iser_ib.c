@@ -187,7 +187,14 @@ iser_ib_register_service(idm_svc_t *idm_svc)
 /*
  * iser_ib_bind_service
  *
- * This function binds a given iSER service on all available HCA ports
+ * This function binds a given iSER service on all available HCA ports. The
+ * current specification does not allow user to specify transport bindings
+ * for each iscsi target. The ULP invokes this function to bind the target
+ * to all available iser ports after checking for the presence of an IB HCA.
+ * iSER is "configured" whenever an IB-capable IP address exists. The lack
+ * of active IB ports is a less-fatal condition, and sockets would be used
+ * as the transport even though an Infiniband HCA is configured but unusable.
+ *
  */
 int
 iser_ib_bind_service(idm_svc_t *idm_svc)
@@ -196,6 +203,7 @@ iser_ib_bind_service(idm_svc_t *idm_svc)
 	ib_gid_t	gid;
 	int		num_ports = 0;
 	int		num_binds = 0;
+	int		num_inactive_binds = 0; /* if HCA ports inactive */
 	int		status;
 	int		i;
 
@@ -218,6 +226,7 @@ iser_ib_bind_service(idm_svc_t *idm_svc)
 				 * in our async handler if the port comes up
 				 * at a later time.
 				 */
+				num_inactive_binds++;
 				continue;
 			}
 
@@ -245,6 +254,14 @@ iser_ib_bind_service(idm_svc_t *idm_svc)
 	if (num_binds) {
 		ISER_LOG(CE_NOTE, "iser_ib_bind_service: Service available on "
 		    "(%d) of (%d) ports", num_binds, num_ports);
+		return (ISER_STATUS_SUCCESS);
+	} else if (num_inactive_binds) {
+		ISER_LOG(CE_NOTE, "iser_ib_bind_service: Could not bind "
+		    "service, HCA ports are not active.");
+		/*
+		 * still considered success, the async handler will bind
+		 * the service when the port comes up at a later time
+		 */
 		return (ISER_STATUS_SUCCESS);
 	} else {
 		ISER_LOG(CE_NOTE, "iser_ib_bind_service: Did not bind service");
