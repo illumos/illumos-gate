@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -714,6 +714,40 @@ sata_pkt_t *sata_get_error_retrieval_pkt(dev_info_t *, sata_device_t *, int);
 void	sata_free_error_retrieval_pkt(sata_pkt_t *);
 void	sata_free_dma_resources(sata_pkt_t *);
 
+/*
+ * SATA trace ring buffer constants
+ */
+#define	DMSG_RING_SIZE		0x100000	/* 1MB */
+#define	DMSG_BUF_SIZE		256
+
+/*
+ * SATA trace ring buffer content
+ */
+typedef struct sata_trace_dmsg {
+	dev_info_t		*dip;
+	timespec_t		timestamp;
+	char			buf[DMSG_BUF_SIZE];
+	struct sata_trace_dmsg	*next;
+} sata_trace_dmsg_t;
+
+/*
+ * SATA trace ring buffer header
+ */
+typedef struct sata_trace_rbuf {
+	kmutex_t		lock;		/* lock to avoid clutter */
+	int			looped;		/* completed ring */
+	int			allocfailed;	/* dmsg mem alloc failed */
+	size_t			size;		/* current size */
+	size_t			maxsize;	/* max size */
+	sata_trace_dmsg_t	*dmsgh;		/* messages head */
+	sata_trace_dmsg_t	*dmsgp;		/* ptr to last message */
+} sata_trace_rbuf_t;
+
+/*
+ * SATA trace ring buffer interfaces
+ */
+void sata_trace_debug(dev_info_t *, const char *fmt, ...);
+void sata_vtrace_debug(dev_info_t *, const char *fmt, va_list);
 
 #ifdef	__cplusplus
 }

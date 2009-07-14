@@ -22,9 +22,14 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-SUBDIRS = mdb_kb \
-	generic_cpu \
-	amd_opteron \
-	sata
+MODULE = sata.so
+MDBTGT = kvm
 
-include ../../Makefile.subdirs
+MODSRCS = sata.c
+
+include ../../../../../Makefile.cmd
+include ../../../../../Makefile.cmd.64
+include ../../../Makefile.amd64
+include ../../../../Makefile.module
+
+CPPFLAGS += -I$(SRC)/cmd/mdb/common

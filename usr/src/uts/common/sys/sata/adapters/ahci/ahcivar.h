@@ -352,6 +352,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 
 #define	AHCI_DEBUG		1
 
+#endif
+
 #define	AHCIDBG_INIT		0x0001
 #define	AHCIDBG_ENTRY		0x0002
 #define	AHCIDBG_PRDT		0x0004
@@ -373,44 +375,28 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 
 extern uint32_t ahci_debug_flags;
 
-#define	AHCIDBG0(flag, ahci_ctlp, format)			\
+#if DEBUG
+
+#define	AHCIDBG(flag, ahci_ctlp, fmt, args ...)			\
 	if (ahci_debug_flags & (flag)) {			\
-		ahci_log(ahci_ctlp, CE_WARN, format);		\
+		ahci_log(ahci_ctlp, CE_WARN, fmt, ## args);	\
+		if (ahci_ctlp == NULL)				\
+			sata_trace_debug(NULL, fmt, ## args);	\
+		else						\
+			sata_trace_debug(ahci_ctlp->ahcictl_dip,\
+			    fmt, ## args);			\
 	}
 
-#define	AHCIDBG1(flag, ahci_ctlp, format, arg1)			\
-	if (ahci_debug_flags & (flag)) {			\
-		ahci_log(ahci_ctlp, CE_WARN, format, arg1);	\
-	}
-
-#define	AHCIDBG2(flag, ahci_ctlp, format, arg1, arg2)			\
-	if (ahci_debug_flags & (flag)) {				\
-		ahci_log(ahci_ctlp, CE_WARN, format, arg1, arg2);	\
-	}
-
-#define	AHCIDBG3(flag, ahci_ctlp, format, arg1, arg2, arg3)		\
-	if (ahci_debug_flags & (flag)) {				\
-		ahci_log(ahci_ctlp, CE_WARN, format, arg1, arg2, arg3); \
-	}
-
-#define	AHCIDBG4(flag, ahci_ctlp, format, arg1, arg2, arg3, arg4)	\
-	if (ahci_debug_flags & (flag)) {				\
-		ahci_log(ahci_ctlp, CE_WARN, format, arg1, arg2, arg3, arg4); \
-	}
-
-#define	AHCIDBG5(flag, ahci_ctlp, format, arg1, arg2, arg3, arg4, arg5)	\
-	if (ahci_debug_flags & (flag)) {				\
-		ahci_log(ahci_ctlp, CE_WARN, format, arg1, arg2,	\
-		    arg3, arg4, arg5); 					\
-	}
 #else
 
-#define	AHCIDBG0(flag, dip, frmt)
-#define	AHCIDBG1(flag, dip, frmt, arg1)
-#define	AHCIDBG2(flag, dip, frmt, arg1, arg2)
-#define	AHCIDBG3(flag, dip, frmt, arg1, arg2, arg3)
-#define	AHCIDBG4(flag, dip, frmt, arg1, arg2, arg3, arg4)
-#define	AHCIDBG5(flag, dip, frmt, arg1, arg2, arg3, arg4, arg5)
+#define	AHCIDBG(flag, ahci_ctlp, fmt, args ...)			\
+	if (ahci_debug_flags & (flag)) {			\
+		if (ahci_ctlp == NULL)				\
+			sata_trace_debug(NULL, fmt, ## args);	\
+		else						\
+			sata_trace_debug(ahci_ctlp->ahcictl_dip,\
+			    fmt, ## args);			\
+	}
 
 #endif /* DEBUG */
 

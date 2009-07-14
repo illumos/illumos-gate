@@ -102,7 +102,7 @@ static	void sata_save_atapi_trace(sata_pkt_txlate_t *, int);
     sata_save_atapi_trace(spx, count);
 
 #else
-#define	SATA_LOG_D(arg)
+#define	SATA_LOG_D(args)	sata_trace_log args
 #define	SATAATAPITRACE(spx, count)
 #endif
 
@@ -309,6 +309,7 @@ static	int sata_build_lsense_page_30(sata_drive_info_t *, uint8_t *,
 static	void sata_save_drive_settings(sata_drive_info_t *);
 static	void sata_show_drive_info(sata_hba_inst_t *, sata_drive_info_t *);
 static	void sata_log(sata_hba_inst_t *, uint_t, char *fmt, ...);
+static	void sata_trace_log(sata_hba_inst_t *, uint_t, const char *fmt, ...);
 static	int sata_fetch_smart_return_status(sata_hba_inst_t *,
     sata_drive_info_t *);
 static	int sata_fetch_smart_data(sata_hba_inst_t *, sata_drive_info_t *,
@@ -410,6 +411,17 @@ static	kmutex_t sata_mutex;		/* protects sata_hba_list */
 static	kmutex_t sata_log_mutex;	/* protects log */
 
 static 	char sata_log_buf[256];
+
+/*
+ * sata trace debug
+ */
+static	sata_trace_rbuf_t *sata_debug_rbuf;
+static	sata_trace_dmsg_t *sata_trace_dmsg_alloc(void);
+static	void sata_trace_dmsg_free(void);
+static	void sata_trace_rbuf_alloc(void);
+static	void sata_trace_rbuf_free(void);
+
+int	dmsg_ring_size = DMSG_RING_SIZE;
 
 /* Default write cache setting for SATA hard disks */
 int	sata_write_cache = 1;		/* enabled */
@@ -543,10 +555,12 @@ _init()
 	mutex_init(&sata_event_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&sata_log_mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&sata_event_cv, NULL, CV_DRIVER, NULL);
+	sata_trace_rbuf_alloc();
 	if ((rval = mod_install(&modlinkage)) != 0) {
 #ifdef SATA_DEBUG
 		cmn_err(CE_WARN, "sata: _init: mod_install failed\n");
 #endif
+		sata_trace_rbuf_free();
 		mutex_destroy(&sata_log_mutex);
 		cv_destroy(&sata_event_cv);
 		mutex_destroy(&sata_event_mutex);
@@ -563,6 +577,7 @@ _fini()
 	if ((rval = mod_remove(&modlinkage)) != 0)
 		return (rval);
 
+	sata_trace_rbuf_free();
 	mutex_destroy(&sata_log_mutex);
 	cv_destroy(&sata_event_cv);
 	mutex_destroy(&sata_event_mutex);
@@ -13825,7 +13840,7 @@ static	void
 sata_log(sata_hba_inst_t *sata_hba_inst, uint_t level, char *fmt, ...)
 {
 	char pathname[128];
-	dev_info_t *dip;
+	dev_info_t *dip = NULL;
 	va_list ap;
 
 	mutex_enter(&sata_log_mutex);
@@ -13853,6 +13868,9 @@ sata_log(sata_hba_inst_t *sata_hba_inst, uint_t level, char *fmt, ...)
 			    sata_log_buf);
 		}
 	}
+
+	/* sata trace debug */
+	sata_trace_debug(dip, sata_log_buf);
 
 	mutex_exit(&sata_log_mutex);
 }
@@ -15835,7 +15853,7 @@ static	uint32_t sata_fault_suspend_count = 0;
  */
 
 
-static	void
+static void
 sata_inject_pkt_fault(sata_pkt_t *spkt, int *rval, int fault)
 {
 
@@ -15950,3 +15968,232 @@ sata_inject_pkt_fault(sata_pkt_t *spkt, int *rval, int fault)
 }
 
 #endif
+
+/*
+ * SATA Trace Ring Buffer
+ * ----------------------
+ *
+ * Overview
+ *
+ * The SATA trace ring buffer is a ring buffer created and managed by
+ * the SATA framework module that can be used by any module or driver
+ * within the SATA framework to store debug messages.
+ *
+ * Ring Buffer Interfaces:
+ *
+ *	sata_vtrace_debug()	<-- Adds debug message to ring buffer
+ *	sata_trace_debug()	<-- Wraps varargs into sata_vtrace_debug()
+ *
+ *	Note that the sata_trace_debug() interface was created to give
+ *	consumers the flexibilty of sending debug messages to ring buffer
+ *	as variable arguments.  Consumers can send type va_list debug
+ *	messages directly to sata_vtrace_debug(). The sata_trace_debug()
+ *	and sata_vtrace_debug() relationship is similar to that of
+ *	cmn_err(9F) and vcmn_err(9F).
+ *
+ * Below is a diagram of the SATA trace ring buffer interfaces and
+ * sample consumers:
+ *
+ * +---------------------------------+
+ * |    o  o  SATA Framework Module  |
+ * | o  SATA  o     +------------------+      +------------------+
+ * |o   Trace  o <--|sata_vtrace_debug/|<-----|SATA HBA Driver #1|
+ * |o   R-Buf  o    |sata_trace_debug  |<--+  +------------------+
+ * | o        o     +------------------+   |  +------------------+
+ * |    o  o                ^        |     +--|SATA HBA Driver #2|
+ * |                        |        |        +------------------+
+ * |           +------------------+  |
+ * |           |SATA Debug Message|  |
+ * |           +------------------+  |
+ * +---------------------------------+
+ *
+ * Supporting Routines:
+ *
+ *	sata_trace_rbuf_alloc()	<-- Initializes ring buffer
+ *	sata_trace_rbuf_free()	<-- Destroys ring buffer
+ *	sata_trace_dmsg_alloc() <-- Creates or reuses buffer in ring buffer
+ *	sata_trace_dmsg_free()	<-- Destroys content of ring buffer
+ *
+ * The default SATA trace ring buffer size is defined by DMSG_RING_SIZE.
+ * The ring buffer size can be adjusted by setting dmsg_ring_size in
+ * /etc/system to desired size in unit of bytes.
+ *
+ * The individual debug message size in the ring buffer is restricted
+ * to DMSG_BUF_SIZE.
+ */
+void
+sata_vtrace_debug(dev_info_t *dip, const char *fmt, va_list ap)
+{
+	sata_trace_dmsg_t *dmsg;
+
+	if (sata_debug_rbuf == NULL) {
+		return;
+	}
+
+	/*
+	 * If max size of ring buffer is smaller than size
+	 * required for one debug message then just return
+	 * since we have no room for the debug message.
+	 */
+	if (sata_debug_rbuf->maxsize < (sizeof (sata_trace_dmsg_t))) {
+		return;
+	}
+
+	mutex_enter(&sata_debug_rbuf->lock);
+
+	/* alloc or reuse on ring buffer */
+	dmsg = sata_trace_dmsg_alloc();
+
+	if (dmsg == NULL) {
+		/* resource allocation failed */
+		mutex_exit(&sata_debug_rbuf->lock);
+		return;
+	}
+
+	dmsg->dip = dip;
+	gethrestime(&dmsg->timestamp);
+
+	(void) vsnprintf(dmsg->buf, sizeof (dmsg->buf), fmt, ap);
+
+	mutex_exit(&sata_debug_rbuf->lock);
+}
+
+void
+sata_trace_debug(dev_info_t *dip, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	sata_vtrace_debug(dip, fmt, ap);
+	va_end(ap);
+}
+
+/*
+ * This routine is used to manage debug messages
+ * on ring buffer.
+ */
+static sata_trace_dmsg_t *
+sata_trace_dmsg_alloc(void)
+{
+	sata_trace_dmsg_t *dmsg_alloc, *dmsg = sata_debug_rbuf->dmsgp;
+
+	if (sata_debug_rbuf->looped == TRUE) {
+		sata_debug_rbuf->dmsgp = dmsg->next;
+		return (sata_debug_rbuf->dmsgp);
+	}
+
+	/*
+	 * If we're looping for the first time,
+	 * connect the ring.
+	 */
+	if (((sata_debug_rbuf->size + (sizeof (sata_trace_dmsg_t))) >
+	    sata_debug_rbuf->maxsize) && (sata_debug_rbuf->dmsgh != NULL)) {
+		dmsg->next = sata_debug_rbuf->dmsgh;
+		sata_debug_rbuf->dmsgp = sata_debug_rbuf->dmsgh;
+		sata_debug_rbuf->looped = TRUE;
+		return (sata_debug_rbuf->dmsgp);
+	}
+
+	/* If we've gotten this far then memory allocation is needed */
+	dmsg_alloc = kmem_zalloc(sizeof (sata_trace_dmsg_t), KM_NOSLEEP);
+	if (dmsg_alloc == NULL) {
+		sata_debug_rbuf->allocfailed++;
+		return (dmsg_alloc);
+	} else {
+		sata_debug_rbuf->size += sizeof (sata_trace_dmsg_t);
+	}
+
+	if (sata_debug_rbuf->dmsgp != NULL) {
+		dmsg->next = dmsg_alloc;
+		sata_debug_rbuf->dmsgp = dmsg->next;
+		return (sata_debug_rbuf->dmsgp);
+	} else {
+		/*
+		 * We should only be here if we're initializing
+		 * the ring buffer.
+		 */
+		if (sata_debug_rbuf->dmsgh == NULL) {
+			sata_debug_rbuf->dmsgh = dmsg_alloc;
+		} else {
+			/* Something is wrong */
+			kmem_free(dmsg_alloc, sizeof (sata_trace_dmsg_t));
+			return (NULL);
+		}
+
+		sata_debug_rbuf->dmsgp = dmsg_alloc;
+		return (sata_debug_rbuf->dmsgp);
+	}
+}
+
+
+/*
+ * Free all messages on debug ring buffer.
+ */
+static void
+sata_trace_dmsg_free(void)
+{
+	sata_trace_dmsg_t *dmsg_next, *dmsg = sata_debug_rbuf->dmsgh;
+
+	while (dmsg != NULL) {
+		dmsg_next = dmsg->next;
+		kmem_free(dmsg, sizeof (sata_trace_dmsg_t));
+
+		/*
+		 * If we've looped around the ring than we're done.
+		 */
+		if (dmsg_next == sata_debug_rbuf->dmsgh) {
+			break;
+		} else {
+			dmsg = dmsg_next;
+		}
+	}
+}
+
+
+/*
+ * This function can block
+ */
+static void
+sata_trace_rbuf_alloc(void)
+{
+	sata_debug_rbuf = kmem_zalloc(sizeof (sata_trace_rbuf_t), KM_SLEEP);
+
+	mutex_init(&sata_debug_rbuf->lock, NULL, MUTEX_DRIVER, NULL);
+
+	if (dmsg_ring_size > 0) {
+		sata_debug_rbuf->maxsize = (size_t)dmsg_ring_size;
+	}
+}
+
+
+static void
+sata_trace_rbuf_free(void)
+{
+	sata_trace_dmsg_free();
+	mutex_destroy(&sata_debug_rbuf->lock);
+	kmem_free(sata_debug_rbuf, sizeof (sata_trace_rbuf_t));
+}
+
+/*
+ * If SATA_DEBUG is not defined then this routine is called instead
+ * of sata_log() via the SATA_LOG_D macro.
+ */
+static void
+sata_trace_log(sata_hba_inst_t *sata_hba_inst, uint_t level,
+    const char *fmt, ...)
+{
+#ifndef __lock_lint
+	_NOTE(ARGUNUSED(level))
+#endif
+
+	dev_info_t *dip = NULL;
+	va_list ap;
+
+	if (sata_hba_inst != NULL) {
+		dip = SATA_DIP(sata_hba_inst);
+	}
+
+	va_start(ap, fmt);
+	sata_vtrace_debug(dip, fmt, ap);
+	va_end(ap);
+}

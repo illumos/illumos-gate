@@ -18,13 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-SUBDIRS = mdb_kb \
-	generic_cpu \
-	amd_opteron \
-	sata
 
-include ../../Makefile.subdirs
+include $(SRC)/Makefile.master
+SUBDIRS =		ia32
+$(BUILD64)SUBDIRS += 	$(MACH64)
+include ../../../Makefile.subdirs
