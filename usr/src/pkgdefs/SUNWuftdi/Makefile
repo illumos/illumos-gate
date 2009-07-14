@@ -25,6 +25,8 @@
  
 include ../Makefile.com
 
+DATAFILES += i.preserve
+
 .KEEP_STATE:
 
 all: $(FILES) depend postinstall preremove

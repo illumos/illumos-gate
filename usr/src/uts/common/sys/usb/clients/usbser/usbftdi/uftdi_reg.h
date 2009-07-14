@@ -386,12 +386,19 @@ enum {
 #define	FTDI_MSR_MASK 0xf0
 #define	FTDI_GET_MSR(p) (((p)[0]) & FTDI_MSR_MASK)
 #define	FTDI_GET_LSR(p) ((p)[1])
-#define	FTDI_LSR_MASK (~0x60) /* interesting bits */
+#define	FTDI_LSR_MASK		(~0x60)	/* interesting rx bits */
 
 #define	FTDI_MSR_STATUS_CTS	0x10
 #define	FTDI_MSR_STATUS_DSR	0x20
 #define	FTDI_MSR_STATUS_RI	0x40
 #define	FTDI_MSR_STATUS_RLSD	0x80	/* aka Carrier Detect */
+
+#define	FTDI_LSR_STATUS_OE	0x02	/* overrun */
+#define	FTDI_LSR_STATUS_PE	0x04	/* parity */
+#define	FTDI_LSR_STATUS_FE	0x08	/* framing */
+#define	FTDI_LSR_STATUS_BI	0x10	/* break */
+#define	FTDI_LSR_STATUS_THRE	0x20	/* tx hold register is now empty */
+#define	FTDI_LSR_STATUS_TEMT	0x40	/* tx shift register is now empty */
 
 #define	FTDI_OUT_TAG(len, port) (((len) << 2) | (port))
 

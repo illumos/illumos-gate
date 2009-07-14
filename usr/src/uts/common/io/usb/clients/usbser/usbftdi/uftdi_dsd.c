@@ -1070,7 +1070,10 @@ static int
 uftdi_fifo_drain(ds_hdl_t hdl, uint_t portno, int timeout)
 {
 	uftdi_state_t *uf = (uftdi_state_t *)hdl;
-	int rval = USB_SUCCESS;
+	unsigned int count;
+	const uint_t countmax = 50;	/* at least 500ms */
+	const uint8_t txempty =
+	    FTDI_LSR_STATUS_TEMT | FTDI_LSR_STATUS_THRE;
 
 	USB_DPRINTF_L4(DPRINT_CTLOP, uf->uf_lh, "uftdi_fifo_drain");
 
@@ -1082,12 +1085,25 @@ uftdi_fifo_drain(ds_hdl_t hdl, uint_t portno, int timeout)
 		return (USB_FAILURE);
 	}
 
+	/*
+	 * Wait for the TX fifo to indicate empty.
+	 *
+	 * At all but the slowest baud rates, this is
+	 * likely to be a one-shot test that instantly
+	 * succeeds, but poll for at least 'countmax'
+	 * tries before giving up.
+	 */
+	for (count = 0; count < countmax; count++) {
+		if ((uf->uf_lsr & txempty) == txempty)
+			break;
+		mutex_exit(&uf->uf_lock);
+		delay(drv_usectohz(10*1000));	/* 10ms */
+		mutex_enter(&uf->uf_lock);
+	}
+
 	mutex_exit(&uf->uf_lock);
 
-	/* wait 500 ms until hw fifo drains */
-	delay(drv_usectohz(500*1000));
-
-	return (rval);
+	return (count < countmax ? USB_SUCCESS : USB_FAILURE);
 }
 
 
@@ -1518,6 +1534,55 @@ uftdi_reconnect_pipes(uftdi_state_t *uf)
 	return (uftdi_open_pipes(uf));
 }
 
+
+static void
+uftdi_rxerr_put(mblk_t **rx_mpp, mblk_t *data, uint8_t lsr)
+{
+	uchar_t errflg;
+
+	if (lsr & FTDI_LSR_STATUS_BI) {
+		/*
+		 * parity and framing errors only "count" if they
+		 * occur independently of a break being received.
+		 */
+		lsr &= ~(uint8_t)(FTDI_LSR_STATUS_PE | FTDI_LSR_STATUS_FE);
+	}
+	errflg =
+	    ((lsr & FTDI_LSR_STATUS_OE) ? DS_OVERRUN_ERR : 0) |
+	    ((lsr & FTDI_LSR_STATUS_PE) ? DS_PARITY_ERR : 0) |
+	    ((lsr & FTDI_LSR_STATUS_FE) ? DS_FRAMING_ERR : 0) |
+	    ((lsr & FTDI_LSR_STATUS_BI) ? DS_BREAK_ERR : 0);
+
+	/*
+	 * If there's no actual data, we send a NUL character along
+	 * with the error flags.  Otherwise, the data mblk contains
+	 * some number of highly questionable characters.
+	 *
+	 * According to FTDI tech support, there is no synchronous
+	 * error reporting i.e. we cannot assume that only the
+	 * first character in the mblk is bad -- so we treat all
+	 * of them them as if they have the error noted in the LSR.
+	 */
+	do {
+		mblk_t *mp;
+		uchar_t c = (MBLKL(data) == 0) ? '\0' : *data->b_rptr++;
+
+		if ((mp = allocb(2, BPRI_HI)) != NULL) {
+			DB_TYPE(mp) = M_BREAK;
+			*mp->b_wptr++ = errflg;
+			*mp->b_wptr++ = c;
+			uftdi_put_tail(rx_mpp, mp);
+		} else {
+			/*
+			 * low memory - just discard the bad data
+			 */
+			data->b_rptr = data->b_wptr;
+			break;
+		}
+	} while (MBLKL(data) > 0);
+}
+
+
 /*
  * bulk in pipe normal and exception callback handler
  */
@@ -1525,54 +1590,106 @@ uftdi_reconnect_pipes(uftdi_state_t *uf)
 static void
 uftdi_bulkin_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 {
-	uftdi_state_t	*uf = (uftdi_state_t *)req->bulk_client_private;
+	uftdi_state_t *uf = (uftdi_state_t *)req->bulk_client_private;
 	mblk_t *data;
 	int data_len;
-	int notify = 0;
 
 	data = req->bulk_data;
 	data_len = data ? MBLKL(data) : 0;
 
 	/*
-	 * The first two bytes of data are actually status register bytes
-	 * that arrive with every packet from the device.  Strip
-	 * them here before handing the data on.  Note that the device
-	 * will send us these bytes at least every 40 milliseconds,
-	 * even if there's no data ..
+	 * The first two bytes of data are status register bytes
+	 * that arrive with every packet from the device.  Process
+	 * them here before handing the rest of the data on.
+	 *
+	 * When active, the device will send us these bytes at least
+	 * every 40 milliseconds, even if there's no received data.
 	 */
 	if (req->bulk_completion_reason == USB_CR_OK && data_len >= 2) {
 		uint8_t msr = FTDI_GET_MSR(data->b_rptr);
 		uint8_t lsr = FTDI_GET_LSR(data->b_rptr);
+		int new_rx_err;
+
+		data->b_rptr += 2;
 
 		mutex_enter(&uf->uf_lock);
-		if (uf->uf_msr != msr ||
-		    (uf->uf_lsr & FTDI_LSR_MASK) != (lsr & FTDI_LSR_MASK)) {
-			USB_DPRINTF_L3(DPRINT_IN_PIPE, uf->uf_lh,
-			    "uftdi_bulkin_cb: status change "
-			    "0x%02x.0x%02x, was 0x%02x.0x%02x",
-			    msr, lsr, uf->uf_msr, uf->uf_lsr);
-			uf->uf_msr = msr;
-			uf->uf_lsr = lsr;
+
+		if (uf->uf_msr != msr) {
 			/*
-			 * If we're waiting for a modem status change,
-			 * sending an empty message will cause us to
-			 * reexamine the modem flags.
+			 * modem status register changed
 			 */
-			notify = 1;
+			USB_DPRINTF_L3(DPRINT_IN_PIPE, uf->uf_lh,
+			    "uftdi_bulkin_cb: new msr: 0x%02x -> 0x%02x",
+			    uf->uf_msr, msr);
+
+			uf->uf_msr = msr;
+
+			if (uf->uf_port_state == UFTDI_PORT_OPEN &&
+			    uf->uf_cb.cb_status) {
+				mutex_exit(&uf->uf_lock);
+				uf->uf_cb.cb_status(uf->uf_cb.cb_arg);
+				mutex_enter(&uf->uf_lock);
+			}
 		}
+
+		if ((uf->uf_lsr & FTDI_LSR_MASK) != (lsr & FTDI_LSR_MASK)) {
+			/*
+			 * line status register *receive* bits changed
+			 *
+			 * (The THRE and TEMT (transmit) status bits are
+			 * masked out above.)
+			 */
+			USB_DPRINTF_L3(DPRINT_IN_PIPE, uf->uf_lh,
+			    "uftdi_bulkin_cb: new lsr: 0x%02x -> 0x%02x",
+			    uf->uf_lsr, lsr);
+			new_rx_err = B_TRUE;
+		} else
+			new_rx_err = B_FALSE;
+
+		uf->uf_lsr = lsr;	/* THRE and TEMT captured here */
+
+		if ((lsr & FTDI_LSR_MASK) != 0 &&
+		    (MBLKL(data) > 0 || new_rx_err) &&
+		    uf->uf_port_state == UFTDI_PORT_OPEN) {
+			/*
+			 * The current line status register value indicates
+			 * that there's been some sort of unusual condition
+			 * on the receive side.  We either received a break,
+			 * or got some badly formed characters from the
+			 * serial port - framing errors, overrun, parity etc.
+			 * So there's either some new data to post, or a
+			 * new error (break) to post, or both.
+			 *
+			 * Invoke uftdi_rxerr_put() to place the inbound
+			 * characters as M_BREAK messages on the receive
+			 * mblk chain, decorated with error flag(s) for
+			 * upper-level modules (e.g. ldterm) to process.
+			 */
+			mutex_exit(&uf->uf_lock);
+			uftdi_rxerr_put(&uf->uf_rx_mp, data, lsr);
+			ASSERT(MBLKL(data) == 0);
+
+			/*
+			 * Since we've converted all the received
+			 * characters into M_BREAK messages, we
+			 * invoke the rx callback to shove the mblks
+			 * up the STREAM.
+			 */
+			if (uf->uf_cb.cb_rx)
+				uf->uf_cb.cb_rx(uf->uf_cb.cb_arg);
+			mutex_enter(&uf->uf_lock);
+		}
+
 		mutex_exit(&uf->uf_lock);
-
-		data_len -= 2;
-		data->b_rptr += 2;
+		data_len = MBLKL(data);
 	}
-
-	notify |= (data_len > 0);
 
 	USB_DPRINTF_L4(DPRINT_IN_PIPE, uf->uf_lh, "uftdi_bulkin_cb: "
 	    "cr=%d len=%d", req->bulk_completion_reason, data_len);
 
 	/* save data and notify GSD */
-	if (notify && uf->uf_port_state == UFTDI_PORT_OPEN &&
+	if (data_len > 0 &&
+	    uf->uf_port_state == UFTDI_PORT_OPEN &&
 	    req->bulk_completion_reason == USB_CR_OK) {
 		req->bulk_data = NULL;
 		uftdi_put_tail(&uf->uf_rx_mp, data);

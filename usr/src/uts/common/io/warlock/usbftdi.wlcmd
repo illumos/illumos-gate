@@ -80,6 +80,7 @@ add ds_ops::ds_in_pipe targets uftdi_in_pipe
 
 add uftdi_state::uf_cb.cb_tx targets usbser_tx_cb
 add uftdi_state::uf_cb.cb_rx targets usbser_rx_cb
+add uftdi_state::uf_cb.cb_status targets usbser_status_cb
 
 add bus_ops::bus_add_eventcall targets warlock_dummy
 add bus_ops::bus_get_eventcookie targets warlock_dummy

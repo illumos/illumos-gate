@@ -114,9 +114,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(uftdi_state::{
 	uf_xfer_sz
 	uf_pm
 	uf_port_state
-	uf_cb.cb_rx
-	uf_cb.cb_tx
-	uf_cb.cb_arg
+	uf_cb
 	uf_bulkin_ph
 	uf_bulkout_ph
 }))

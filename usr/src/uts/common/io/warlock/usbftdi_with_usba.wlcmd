@@ -197,6 +197,7 @@ add ds_ops::ds_in_pipe targets uftdi_in_pipe
 
 add uftdi_state::uf_cb.cb_tx targets usbser_tx_cb
 add uftdi_state::uf_cb.cb_rx targets usbser_rx_cb
+add uftdi_state::uf_cb.cb_status targets usbser_status_cb
 
 add hubd::h_cleanup_child targets warlock_dummy
 add usb_ctrl_req::ctrl_cb	targets warlock_dummy
