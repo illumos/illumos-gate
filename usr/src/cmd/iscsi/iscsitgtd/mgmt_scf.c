@@ -1119,15 +1119,19 @@ mgmt_convert_param(char *dir, tgt_node_t *tnode)
 }
 
 /*
- * this function tries to convert configuration in files into scf
- * it loads xml conf into node tree then dump them to scf with
- * mgmt_config_save2scf()
- * this function has 3 return values:
- * CONVERT_OK: successfully converted
- * CONVERT_INIT_NEW: configuration files dont exist, created a new scf entry
- * CONVERT_FAIL: some error occurred in conversion and no scf entry created.
- *               In this case, user have to check files manually and try
- *               conversion again.
+ * Convert legacy (XML) configuration files into an equivalent SCF
+ * representation.
+ *
+ * Read the XML from disk, translate the XML into a tree of nodes of
+ * type tgt_node_t, and write the in-memory tree to SCF's persistent
+ * data-store using mgmt_config_save2scf().
+ *
+ * Return Values:
+ * CONVERT_OK:	     successfully converted
+ * CONVERT_INIT_NEW: configuration files don't exist; created an SCF entry
+ * CONVERT_FAIL: some conversion error occurred; no SCF entry created.
+ *		 In this case, user has to manually check files and try
+ *		 conversion again.
  */
 convert_ret_t
 mgmt_convert_conf()
@@ -1146,17 +1150,21 @@ mgmt_convert_conf()
 	if (h == NULL)
 		return (CONVERT_FAIL);
 
-	/* check main config in pgroup iscsitgt */
+	/*
+	 * Check if the "iscsitgt" PropertyGroup has already been added
+	 * to the "iscsitgt" SMF Service.  If so, then we have already
+	 * converted the legacy configuration files (and there is no work
+	 * to do).
+	 */
 	if (scf_service_get_pg(h->t_service, "iscsitgt", h->t_pg) == 0) {
 		ret = CONVERT_OK;
 		goto done;
 	}
 
-	/* check the conf files */
 	if (access(config_file, R_OK) != 0) {
 		/*
-		 * if there is no configuration file, initialize
-		 * an empty scf entry
+		 * then the Main Config file is not present; initialize
+		 * SCF Properties to default values.
 		 */
 		if (mgmt_transaction_start(h, "iscsitgt", "basic") == True) {
 			ret = CONVERT_INIT_NEW;
@@ -1210,6 +1218,8 @@ mgmt_convert_conf()
 		r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd, NULL, NULL, 0);
 
 	if (r != NULL) {
+		int is_target_config;
+
 		n = xmlTextReaderRead(r);
 		while (n == 1) {
 			if (tgt_node_process(r, &node) == False) {
@@ -1225,30 +1235,53 @@ mgmt_convert_conf()
 
 		main_config = node;
 
+		/*
+		 * Initialize the Base Directory (global) variable by
+		 * using the value specified in the XML_ELEMENT_BASEDIR
+		 * XML tag.  If a tag is not specified, use a default.
+		 */
 		(void) tgt_find_value_str(node, XML_ELEMENT_BASEDIR,
 		    &target_basedir);
 
 		if (target_basedir == NULL)
 			target_basedir = strdup(DEFAULT_TARGET_BASEDIR);
 
-		/* Now convert targets' config if possible */
-		if (xml_fd != -1)
+		if (xml_fd != -1) {
 			(void) close(xml_fd);
+			xml_fd = -1;
+		}
 		(void) xmlTextReaderClose(r);
 		xmlFreeTextReader(r);
 		xmlCleanupParser();
-		r = NULL;
-		xml_fd = -1;
-		node = NULL;
 
+		/*
+		 * If a Target Config file is present, read and translate
+		 * its XML representation into a tree of tgt_node_t.
+		 * Merge that tree with the tree of tgt_node_t rooted at
+		 * 'main_config'.  The merged tree will then be archived
+		 * using an SCF representation.
+		 */
 		(void) snprintf(path, MAXPATHLEN, "%s/%s",
 		    target_basedir, "config.xml");
 
-		if ((xml_fd = open(path, O_RDONLY)) >= 0)
+		if ((xml_fd = open(path, O_RDONLY)) >= 0) {
+			is_target_config = 1;
 			r = (xmlTextReaderPtr)xmlReaderForFd(xml_fd,
 			    NULL, NULL, 0);
+		} else {
+			is_target_config = 0;
+			r = NULL;
+		}
 
 		if (r != NULL) {
+			/* then the Target Config file is available. */
+
+			node = NULL;
+
+			/*
+			 * Create a tree of tgt_node_t rooted at 'node' by
+			 * processing each XML Tag in the file.
+			 */
 			n = xmlTextReaderRead(r);
 			while (n == 1) {
 				if (tgt_node_process(r, &node) == False) {
@@ -1262,8 +1295,11 @@ mgmt_convert_conf()
 				goto done;
 			}
 
-			/* now combine main_config and node */
-			if (node) {
+			/*
+			 * Merge the tree at 'node' into the tree rooted at
+			 * 'main_config'.
+			 */
+			if (node != NULL) {
 				next = NULL;
 				while ((next = tgt_node_next(node,
 				    XML_ELEMENT_TARG, next)) != NULL) {
@@ -1272,59 +1308,77 @@ mgmt_convert_conf()
 				}
 				tgt_node_free(node);
 			}
+		}
 
-			if (mgmt_config_save2scf() != True) {
-				syslog(LOG_ERR, "Converting config failed");
-				if (xml_fd != -1)
-					(void) close(xml_fd);
-				(void) xmlTextReaderClose(r);
-				xmlFreeTextReader(r);
-				xmlCleanupParser();
-				ret = CONVERT_FAIL;
-				goto done;
+		/*
+		 * Iterate over the in-memory tree rooted at 'main_config'
+		 * and write a representation of the appropriate nodes to
+		 * SCF's persistent data-store.
+		 */
+		if (mgmt_config_save2scf() != True) {
+			syslog(LOG_ERR, "Converting config failed");
+			if (xml_fd != -1) {
+				(void) close(xml_fd);
+				xml_fd = -1;
 			}
-
-			/* Copy files into backup dir */
-			(void) snprintf(path, sizeof (path), "%s/backup",
-			    target_basedir);
-			if ((mkdir(path, 0755) == -1) && (errno != EEXIST)) {
-				syslog(LOG_ERR, "Creating backup dir failed");
-				ret = CONVERT_FAIL;
-				goto done;
-			}
-			backup(config_file, NULL);
-			(void) snprintf(path, MAXPATHLEN, "%s/%s",
-			    target_basedir, "config.xml");
-			backup(path, NULL);
-
-
-			while ((next = tgt_node_next(main_config,
-			    XML_ELEMENT_TARG, next)) != NULL) {
-				if (tgt_find_value_str(next, XML_ELEMENT_INAME,
-				    &target) == False) {
-					continue;
-				}
-				(void) snprintf(path, MAXPATHLEN, "%s/%s",
-				    target_basedir, target);
-				if (mgmt_convert_param(path, next)
-				    != True) {
-					ret = CONVERT_FAIL;
-					goto done;
-				}
-				free(target);
-			}
-
-			ret = CONVERT_OK;
-			syslog(LOG_NOTICE, "Conversion succeeded");
-
 			(void) xmlTextReaderClose(r);
 			xmlFreeTextReader(r);
 			xmlCleanupParser();
-		} else {
-			syslog(LOG_ERR, "Reading targets config failed");
 			ret = CONVERT_FAIL;
 			goto done;
 		}
+
+		/*
+		 * Move the configuration files into a well-known backup
+		 * directory.  This allows a user to restore their
+		 * configuration, if they choose.
+		 */
+		(void) snprintf(path, sizeof (path), "%s/backup",
+		    target_basedir);
+		if ((mkdir(path, 0755) == -1) && (errno != EEXIST)) {
+			syslog(LOG_ERR, "Creating backup dir failed");
+			ret = CONVERT_FAIL;
+			goto done;
+		}
+		/* Save the Main Config file. */
+		backup(config_file, NULL);
+
+		/* Save the Target Config file, if it was present. */
+		if (is_target_config != 0) {
+			(void) snprintf(path, MAXPATHLEN, "%s/%s",
+			    target_basedir, "config.xml");
+			backup(path, NULL);
+		}
+
+		/*
+		 * For each tgt_node_t node in 'main_config' whose value is
+		 * an iSCSI Name as defined in the RFC (3720) standard (eg,
+		 * "iqn.1986..."), read its XML-encoded attributes from a
+		 * flat-file and write an equivalent representation to SCF's
+		 * data-store.
+		 */
+		while ((next = tgt_node_next(main_config,
+		    XML_ELEMENT_TARG, next)) != NULL) {
+			if (tgt_find_value_str(next, XML_ELEMENT_INAME,
+			    &target) == False) {
+				continue;
+			}
+			(void) snprintf(path, MAXPATHLEN, "%s/%s",
+			    target_basedir, target);
+			if (mgmt_convert_param(path, next)
+			    != True) {
+				ret = CONVERT_FAIL;
+				goto done;
+			}
+			free(target);
+		}
+
+		ret = CONVERT_OK;
+		syslog(LOG_NOTICE, "Conversion succeeded");
+
+		(void) xmlTextReaderClose(r);
+		xmlFreeTextReader(r);
+		xmlCleanupParser();
 	} else {
 		syslog(LOG_ERR, "Reading main config failed");
 		ret = CONVERT_FAIL;
