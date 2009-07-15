@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PSET_H
 #define	_SYS_PSET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,6 +58,7 @@ extern int	pset_destroy(psetid_t);
 extern int	pset_assign(psetid_t, processorid_t, psetid_t *);
 extern int	pset_info(psetid_t, int *, uint_t *, processorid_t *);
 extern int	pset_bind(psetid_t, idtype_t, id_t, psetid_t *);
+extern int	pset_bind_lwp(psetid_t, id_t, pid_t, psetid_t *);
 extern int	pset_getloadavg(psetid_t, double [], int);
 extern int	pset_list(psetid_t *, uint_t *);
 extern int	pset_setattr(psetid_t, uint_t);
@@ -72,6 +71,7 @@ extern int	pset_destroy();
 extern int	pset_assign();
 extern int	pset_info();
 extern int	pset_bind();
+extern int	pset_bind_lwp();
 extern int	pset_getloadavg();
 extern int	pset_list();
 extern int	pset_setattr();
@@ -93,6 +93,7 @@ extern int	pset_getattr();
 #define	PSET_SETATTR		7
 #define	PSET_GETATTR		8
 #define	PSET_ASSIGN_FORCED	9
+#define	PSET_BIND_LWP		10
 
 /* attribute bits */
 #define	PSET_NOESCAPE	0x0001

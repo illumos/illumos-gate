@@ -1347,6 +1347,8 @@ int pset_assign(psetid_t pset, processorid_t cpu, psetid_t *opset);
 int pset_assign_forced(psetid_t pset, processorid_t cpu, psetid_t *opset);
 int pset_info(psetid_t pset, int *type, u_int *numcpus, processorid_t *cpulist);
 int pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset);
+int pset_bind_lwp(psetid_t pset, id_t id, pid_t, psetid_t *opset);
+  
 
 /* rctlsys.c */
 int getrctl(const char *name, rctlblk_t *old_rblk, rctlblk_t *new_rblk,

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/procset.h>
@@ -83,69 +80,6 @@ pr_processor_bind(struct ps_prochandle *Pr, idtype_t idtype, id_t id,
 	}
 
 	error = Psyscall(Pr, &rval, SYS_processor_bind, 4, &argd[0]);
-
-	if (error) {
-		errno = (error < 0)? ENOSYS : error;
-		return (-1);
-	}
-	return (rval.sys_rval1);
-}
-
-int
-pr_pset_bind(struct ps_prochandle *Pr, int pset, idtype_t idtype, id_t id,
-    int *opset)
-{
-	sysret_t rval;			/* return value */
-	argdes_t argd[5];		/* arg descriptors */
-	argdes_t *adp = &argd[0];	/* first argument */
-	int error;
-
-	if (Pr == NULL)		/* no subject process */
-		return (pset_bind(pset, idtype, id, opset));
-
-	adp->arg_value = PSET_BIND;	/* PSET_BIND */
-	adp->arg_object = NULL;
-	adp->arg_type = AT_BYVAL;
-	adp->arg_inout = AI_INPUT;
-	adp->arg_size = 0;
-	adp++;
-
-	adp->arg_value = pset;		/* pset */
-	adp->arg_object = NULL;
-	adp->arg_type = AT_BYVAL;
-	adp->arg_inout = AI_INPUT;
-	adp->arg_size = 0;
-	adp++;
-
-	adp->arg_value = idtype;	/* idtype */
-	adp->arg_object = NULL;
-	adp->arg_type = AT_BYVAL;
-	adp->arg_inout = AI_INPUT;
-	adp->arg_size = 0;
-	adp++;
-
-	adp->arg_value = id;		/* id */
-	adp->arg_object = NULL;
-	adp->arg_type = AT_BYVAL;
-	adp->arg_inout = AI_INPUT;
-	adp->arg_size = 0;
-	adp++;
-
-	if (opset == NULL) {
-		adp->arg_value = 0;	/* opset */
-		adp->arg_object = NULL;
-		adp->arg_type = AT_BYVAL;
-		adp->arg_inout = AI_INPUT;
-		adp->arg_size = 0;
-	} else {
-		adp->arg_value = 0;
-		adp->arg_object = opset;
-		adp->arg_type = AT_BYREF;
-		adp->arg_inout = AI_INOUT;
-		adp->arg_size = sizeof (int);
-	}
-
-	error = Psyscall(Pr, &rval, SYS_pset, 5, &argd[0]);
 
 	if (error) {
 		errno = (error < 0)? ENOSYS : error;

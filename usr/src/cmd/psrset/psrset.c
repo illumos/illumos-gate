@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * psrset - create and manage processor sets
@@ -44,7 +41,6 @@
 #include <procfs.h>
 #include <libproc.h>
 #include <stdarg.h>
-#include <priv.h>
 
 #if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
 #define	TEXT_DOMAIN 	"SYS_TEST"	/* Use this only if it wasn't */
@@ -107,14 +103,10 @@ die(char *format, ...)
 	exit(ERR_FAIL);
 }
 
-static prpriv_t *orig_priv;
-
 static struct ps_prochandle *
 grab_proc(id_t pid)
 {
 	int ret;
-	prpriv_t *new_priv;
-	priv_set_t *eff_set, *perm_set;
 	struct ps_prochandle *Pr;
 
 	if ((Pr = Pgrab(pid, 0, &ret)) == NULL) {
@@ -124,66 +116,6 @@ grab_proc(id_t pid)
 		return (NULL);
 	}
 
-	/*
-	 * If target process does not have required PRIV_SYS_RES_CONFIG
-	 * privilege, assign it temporarily to that process' effective
-	 * and permitted sets so that it can call pset_bind(2).
-	 */
-	if ((new_priv = proc_get_priv(pid)) == NULL) {
-		warn(gettext("unable to get privileges for process %d: %s\n"),
-		    pid, strerror(errno));
-		errors = ERR_FAIL;
-		Prelease(Pr, 0);
-		return (NULL);
-	}
-
-	if (Pcreate_agent(Pr) != 0) {
-		warn(gettext("cannot control process %d\n"), (int)pid);
-		errors = ERR_FAIL;
-		Prelease(Pr, 0);
-		free(new_priv);
-		return (NULL);
-	}
-
-	eff_set = (priv_set_t *)&new_priv->pr_sets[new_priv->pr_setsize *
-	    priv_getsetbyname(PRIV_EFFECTIVE)];
-	perm_set = (priv_set_t *)&new_priv->pr_sets[new_priv->pr_setsize *
-	    priv_getsetbyname(PRIV_PERMITTED)];
-	if (!priv_ismember(eff_set, PRIV_SYS_RES_CONFIG)) {
-		/*
-		 * Save original privileges
-		 */
-		if ((orig_priv = proc_get_priv(pid)) == NULL) {
-			warn(gettext("unable to get privileges for "
-			    "process %d: %s\n"), pid, strerror(errno));
-			errors = ERR_FAIL;
-			Pdestroy_agent(Pr);
-			Prelease(Pr, 0);
-			free(new_priv);
-			return (NULL);
-		}
-		(void) priv_addset(eff_set, PRIV_SYS_RES_CONFIG);
-		(void) priv_addset(perm_set, PRIV_SYS_RES_CONFIG);
-		/*
-		 * We don't want to leave a process with elevated privileges,
-		 * so make sure the process dies if we exit unexpectedly.
-		 */
-		if (Psetflags(Pr, PR_KLC) != 0 ||
-		    Psetpriv(Pr, new_priv) != 0) {
-			warn(gettext("unable to set process privileges for "
-			    "process %d: %s\n"), pid, strerror(errno));
-			(void) Punsetflags(Pr, PR_KLC);
-			free(new_priv);
-			free(orig_priv);
-			Pdestroy_agent(Pr);
-			Prelease(Pr, 0);
-			orig_priv = NULL;
-			errors = ERR_FAIL;
-			return (NULL);
-		}
-	}
-	free(new_priv);
-
 	return (Pr);
 }
 
@@ -192,28 +124,6 @@ rele_proc(struct ps_prochandle *Pr)
 {
 	if (Pr == NULL)
 		return;
-	if (orig_priv != NULL) {
-		if (Psetpriv(Pr, orig_priv) != 0) {
-			/*
-			 * If this fails, we can't leave a process with
-			 * elevated privileges, so we have to release the
-			 * process from libproc, knowing that it will
-			 * be killed (since we set the PR_KLC flag).
-			 */
-			Pdestroy_agent(Pr);
-			warn(gettext("cannot relinquish privileges for "
-			    "process %d.  The process was killed\n"),
-			    Ppsinfo(Pr)->pr_pid);
-			errors = ERR_FAIL;
-		} else {
-			(void) Punsetflags(Pr, PR_KLC);
-			Pdestroy_agent(Pr);
-		}
-		free(orig_priv);
-		orig_priv = NULL;
-	} else {
-		Pdestroy_agent(Pr);
-	}
 	Prelease(Pr, 0);
 }
 
@@ -351,29 +261,30 @@ bind_out(id_t pid, id_t lwpid, psetid_t old, psetid_t new)
 	if (old == PS_NONE) {
 		if (new == PS_NONE)
 			(void) printf(gettext("%s id %s: was not bound, "
-				"now not bound\n"), proclwp, pidstr);
+			    "now not bound\n"), proclwp, pidstr);
 		else
 			(void) printf(gettext("%s id %s: was not bound, "
-				"now %d\n"), proclwp, pidstr, new);
+			    "now %d\n"), proclwp, pidstr, new);
 	} else {
 		if (new == PS_NONE)
 			(void) printf(gettext("%s id %s: was %d, "
-				"now not bound\n"), proclwp, pidstr, old);
+			    "now not bound\n"), proclwp, pidstr, old);
 		else
 			(void) printf(gettext("%s id %s: was %d, "
-				"now %d\n"), proclwp, pidstr, old, new);
+			    "now %d\n"), proclwp, pidstr, old, new);
 	}
 }
 
 static void
-bind_lwp(struct ps_prochandle *Pr, id_t pid, id_t lwpid, psetid_t pset)
+bind_lwp(id_t pid, id_t lwpid, psetid_t pset)
 {
 	psetid_t old_pset;
 
-	if (pr_pset_bind(Pr, pset, P_LWPID, lwpid, &old_pset) < 0) {
+	if (pset_bind_lwp(pset, lwpid, pid, &old_pset) != 0) {
 		bind_err(pset, pid, lwpid, errno);
 		errors = ERR_FAIL;
-	} else {
+	}
+	if (errors != ERR_FAIL) {
 		if (qflag)
 			query_out(pid, lwpid, old_pset);
 		else
@@ -621,22 +532,22 @@ int
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-		"usage: \n"
-		"\t%1$s -c [-F] [processor_id ...]\n"
-		"\t%1$s -d processor_set_id ...\n"
-		"\t%1$s -n processor_set_id\n"
-		"\t%1$s -f processor_set_id\n"
-		"\t%1$s -e processor_set_id command [argument(s)...]\n"
-		"\t%1$s -a [-F] processor_set_id processor_id ...\n"
-		"\t%1$s -r [-F] processor_id ...\n"
-		"\t%1$s -p [processorid ...]\n"
-		"\t%1$s -b processor_set_id pid[/lwpids] ...\n"
-		"\t%1$s -u pid[/lwpids] ...\n"
-		"\t%1$s -q [pid[/lwpids] ...]\n"
-		"\t%1$s -U [processor_set_id] ...\n"
-		"\t%1$s -Q [processor_set_id] ...\n"
-		"\t%1$s [-i] [processor_set_id ...]\n"),
-		progname);
+	    "usage: \n"
+	    "\t%1$s -c [-F] [processor_id ...]\n"
+	    "\t%1$s -d processor_set_id ...\n"
+	    "\t%1$s -n processor_set_id\n"
+	    "\t%1$s -f processor_set_id\n"
+	    "\t%1$s -e processor_set_id command [argument(s)...]\n"
+	    "\t%1$s -a [-F] processor_set_id processor_id ...\n"
+	    "\t%1$s -r [-F] processor_id ...\n"
+	    "\t%1$s -p [processorid ...]\n"
+	    "\t%1$s -b processor_set_id pid[/lwpids] ...\n"
+	    "\t%1$s -u pid[/lwpids] ...\n"
+	    "\t%1$s -q [pid[/lwpids] ...]\n"
+	    "\t%1$s -U [processor_set_id] ...\n"
+	    "\t%1$s -Q [processor_set_id] ...\n"
+	    "\t%1$s [-i] [processor_set_id ...]\n"),
+	    progname);
 	return (ERR_USAGE);
 }
 
@@ -699,7 +610,7 @@ do_lwps(id_t pid, const char *range, psetid_t pset)
 			continue;
 		found++;
 		if (bflag || uflag)
-			bind_lwp(Pr, pid, lwp->pr_lwpid, pset);
+			bind_lwp(pid, lwp->pr_lwpid, pset);
 		else if (binding != PBIND_NONE)
 			query_out(pid, lwp->pr_lwpid, binding);
 	}
@@ -960,7 +871,7 @@ main(int argc, char *argv[])
 			pid = (id_t)strtol(*argv, &errptr, 10);
 			if (errno != 0 ||
 			    (errptr != NULL && *errptr != '\0' &&
-				*errptr != '/')) {
+			    *errptr != '/')) {
 				warn(gettext("invalid process ID: %s\n"),
 				    *argv);
 				continue;

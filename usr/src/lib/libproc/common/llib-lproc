@@ -22,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include "libproc.h"
@@ -304,7 +304,6 @@ int	pr_access(struct ps_prochandle *Pr, const char *path, int amode);
 
 /* pr_pbind.c */
 int	pr_processor_bind(struct ps_prochandle *Pr, idtype_t, id_t, int, int *);
-int	pr_pset_bind(struct ps_prochandle *Pr, int, idtype_t, id_t, int *);
 
 /* pr_rename.c */
 int	pr_rename(struct ps_prochandle *Pr, const char *old, const char *new);

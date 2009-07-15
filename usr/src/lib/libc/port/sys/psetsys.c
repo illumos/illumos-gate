@@ -20,21 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma weak _pset_create = pset_create
-#pragma weak _pset_destroy = pset_destroy
-#pragma weak _pset_assign = pset_assign
-#pragma weak _pset_info = pset_info
-#pragma weak _pset_bind = pset_bind
-#pragma weak _pset_getloadavg = pset_getloadavg
-#pragma weak _pset_list = pset_list
-#pragma weak _pset_setattr = pset_setattr
-#pragma weak _pset_getattr = pset_getattr
 
 #include "lint.h"
 #include <sys/types.h>
@@ -82,6 +70,12 @@ int
 pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset)
 {
 	return (_pset(PSET_BIND, pset, idtype, id, opset));
+}
+
+int
+pset_bind_lwp(psetid_t pset, id_t id, pid_t pid, psetid_t *opset)
+{
+	return (_pset(PSET_BIND_LWP, pset, id, pid, opset));
 }
 
 /*

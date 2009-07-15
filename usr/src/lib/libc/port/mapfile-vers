@@ -1605,6 +1605,7 @@ SUNWprivate_1.1 {
 	__priv_bracket;
 	__priv_relinquish;
 	pset_assign_forced;
+	pset_bind_lwp;
 	_psignal;
 	_pthread_setcleanupinit;
 	__putwchar_xpg5;

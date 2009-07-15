@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
  * _pset(int subcode, long arg1, long arg2, long arg3, long arg4)
  *
  * Syscall entry point for pset_create, pset_assign, pset_destroy,
- * pset_bind, and pset_info.
+ * pset_bind, pset_bind_lwp and pset_info.
  */
 	SYSCALL2_RVAL1(_pset,pset)
 	RETC

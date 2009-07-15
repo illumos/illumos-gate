@@ -220,7 +220,6 @@ SUNWprivate_1.1 {
 	proc_walk;
 	pr_open;
 	pr_processor_bind;
-	pr_pset_bind;
 	pr_rename;
 	pr_setitimer;
 	pr_setprojrctl;

@@ -470,6 +470,66 @@ pset_bind_contract(cont_process_t *ctp, psetid_t pset, psetid_t *oldpset,
 	return (error);
 }
 
+/*
+ * Bind the lwp:id of process:pid to processor set: pset
+ */
+static int
+pset_bind_lwp(psetid_t pset, id_t id, pid_t pid, psetid_t *opset)
+{
+	kthread_t	*tp;
+	proc_t		*pp;
+	psetid_t	oldpset;
+	void		*projbuf, *zonebuf;
+	int		error = 0;
+
+	pool_lock();
+	mutex_enter(&cpu_lock);
+	projbuf = fss_allocbuf(FSS_NPROJ_BUF, FSS_ALLOC_PROJ);
+	zonebuf = fss_allocbuf(FSS_NPROJ_BUF, FSS_ALLOC_ZONE);
+
+	mutex_enter(&pidlock);
+	if ((pid == P_MYID && id == P_MYID) ||
+	    (pid == curproc->p_pid && id == P_MYID)) {
+		pp = curproc;
+		tp = curthread;
+		mutex_enter(&pp->p_lock);
+	} else {
+		if (pid == P_MYID) {
+			pp = curproc;
+		} else if ((pp = prfind(pid)) == NULL) {
+			error = ESRCH;
+			goto err;
+		}
+		if (pp != curproc && id == P_MYID) {
+			error = EINVAL;
+			goto err;
+		}
+		mutex_enter(&pp->p_lock);
+		if ((tp = idtot(pp, id)) == NULL) {
+			mutex_exit(&pp->p_lock);
+			error = ESRCH;
+			goto err;
+		}
+	}
+
+	error = pset_bind_thread(tp, pset, &oldpset, projbuf, zonebuf);
+	mutex_exit(&pp->p_lock);
+err:
+	mutex_exit(&pidlock);
+
+	fss_freebuf(projbuf, FSS_ALLOC_PROJ);
+	fss_freebuf(zonebuf, FSS_ALLOC_ZONE);
+	mutex_exit(&cpu_lock);
+	pool_unlock();
+	if (opset != NULL) {
+		if (copyout(&oldpset, opset, sizeof (psetid_t)) != 0)
+			return (set_errno(EFAULT));
+	}
+	if (error != 0)
+		return (set_errno(error));
+	return (0);
+}
+
 static int
 pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset)
 {
@@ -797,6 +857,9 @@ pset(int subcode, long arg1, long arg2, long arg3, long arg4)
 	case PSET_BIND:
 		return (pset_bind((psetid_t)arg1, (idtype_t)arg2,
 		    (id_t)arg3, (psetid_t *)arg4));
+	case PSET_BIND_LWP:
+		return (pset_bind_lwp((psetid_t)arg1, (id_t)arg2,
+		    (pid_t)arg3, (psetid_t *)arg4));
 	case PSET_GETLOADAVG:
 		return (pset_getloadavg((psetid_t)arg1, (int *)arg2,
 		    (int)arg3));
