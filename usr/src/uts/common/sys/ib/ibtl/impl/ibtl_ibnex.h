@@ -238,6 +238,8 @@ ibt_status_t	ibtl_ibnex_phci_unregister(dev_info_t *hca_dip);
  *	driver_name	- caller allocated buffer which will contain
  *			  HCA driver name upon success
  *	driver_instance - HCA driver instance
+ *	hca_device_path	- caller allocated buffer of size MAXPATHLEN which
+ *			  will contain hca device path upon success.
  * Returns:
  *	IBT_SUCCESS/IBT_FAILURE
  * Description:
@@ -245,7 +247,8 @@ ibt_status_t	ibtl_ibnex_phci_unregister(dev_info_t *hca_dip);
  *	specified HCA.
  */
 ibt_status_t
-ibtl_ibnex_query_hca_byguid(ib_guid_t, ibt_hca_attr_t *, char *, size_t, int *);
+ibtl_ibnex_query_hca_byguid(ib_guid_t, ibt_hca_attr_t *, char *, size_t, int *,
+    char *);
 
 #ifdef __cplusplus
 }

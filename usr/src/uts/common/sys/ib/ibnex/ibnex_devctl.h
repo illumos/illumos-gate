@@ -184,8 +184,17 @@ typedef struct ibnex_ioctl_data_32 {
  *
  * Caller sets hca_guid field of this structure.
  *
+ * Caller allocates memory for hca device path. Sets hca_device_path to point
+ * to the allocated memory and hca_device_path_alloc_sz to the number of bytes
+ * allocated.
+ *
  * Upon successful return from the IOCTL, hca_info will contain HCA attributes
- * for the specified GUID.
+ * for the specified GUID. hca_info.hca_device_path_len will contain the actual
+ * string length of the hca device path plus the terminating null character.
+ * hca_info.hca_device_path will point to null terminated hca device path
+ * string if the caller allocated memory for the hca device path is large
+ * enough to hold the hca device path and the terminating null character.
+ * Otherwise hca_info.hca_device_path will be set to NULL.
  *
  *
  * IBNEX_CTL_QUERY_HCA_PORT
@@ -281,6 +290,14 @@ typedef struct ibnex_ctl_hca_info_s {
 	char		hca_driver_name[MAX_HCA_DRVNAME_LEN];
 	int		hca_driver_instance;
 
+	/*
+	 * hca device path and the length.
+	 * hca_device_path_len is string length of the actual hca device path
+	 * plus the terminating null character.
+	 */
+	char		*hca_device_path;
+	uint_t		hca_device_path_len;
+
 	ibt_hca_flags_t		hca_flags;	/* HCA capabilities etc */
 	ibt_hca_flags2_t	hca_flags2;	/* HCA capabilities etc */
 
@@ -359,13 +376,129 @@ typedef struct ibnex_ctl_hca_info_s {
 	int32_t		hca_pad;
 } ibnex_ctl_hca_info_t;
 
+typedef struct ibnex_ctl_hca_info_32_s {
+	ib_guid_t	hca_node_guid;		/* Node GUID */
+	ib_guid_t	hca_si_guid;		/* Optional System Image GUID */
+	uint_t		hca_nports;		/* Number of physical ports */
+
+	/* HCA driver name and instance number */
+	char		hca_driver_name[MAX_HCA_DRVNAME_LEN];
+	int		hca_driver_instance;
+
+	/*
+	 * hca device path and the length.
+	 * hca_device_path_len is string length of the actual hca device path
+	 * plus the terminating null character.
+	 */
+	caddr32_t	hca_device_path;
+	uint_t		hca_device_path_len;
+
+	ibt_hca_flags_t		hca_flags;	/* HCA capabilities etc */
+	ibt_hca_flags2_t	hca_flags2;	/* HCA capabilities etc */
+
+	uint32_t	hca_vendor_id;		/* Vendor ID */
+	uint16_t	hca_device_id;		/* Device ID */
+	uint32_t	hca_version_id;		/* Version ID */
+
+	uint_t		hca_max_chans;		/* Max channels supported */
+	uint_t		hca_max_chan_sz;	/* Max outstanding WRs on any */
+						/* channel */
+
+	uint_t		hca_max_sgl;		/* Max SGL entries per WR */
+
+	uint_t		hca_max_cq;		/* Max num of CQs supported  */
+	uint_t		hca_max_cq_sz;		/* Max capacity of each CQ */
+
+	ibt_page_sizes_t	hca_page_sz;	/* Bit mask of page sizes */
+
+	uint_t		hca_max_memr;		/* Max num of HCA mem regions */
+	ib_memlen_t	hca_max_memr_len;	/* Largest block, in bytes of */
+						/* mem that can be registered */
+	uint_t		hca_max_mem_win;	/* Max Memory windows in HCA */
+
+	uint_t		hca_max_rsc; 		/* Max Responder Resources of */
+						/* this HCA for RDMAR/Atomics */
+						/* with this HCA as target. */
+	uint8_t		hca_max_rdma_in_chan;	/* Max RDMAR/Atomics in per */
+						/* chan this HCA as target. */
+	uint8_t		hca_max_rdma_out_chan;	/* Max RDMA Reads/Atomics out */
+						/* per channel by this HCA */
+	uint_t		hca_max_ipv6_chan;	/* Max IPV6 channels in HCA */
+	uint_t		hca_max_ether_chan;	/* Max Ether channels in HCA */
+
+	uint_t		hca_max_mcg_chans;	/* Max number of channels */
+						/* that can join multicast */
+						/* groups */
+	uint_t		hca_max_mcg;		/* Max multicast groups */
+	uint_t		hca_max_chan_per_mcg;	/* Max number of channels per */
+						/* Multicast group in HCA */
+	uint16_t	hca_max_partitions;	/* Max partitions in HCA */
+
+	ib_time_t	hca_local_ack_delay;
+
+	uint_t		hca_max_port_sgid_tbl_sz;
+	uint16_t	hca_max_port_pkey_tbl_sz;
+	uint_t		hca_max_pd;		/* Max# of Protection Domains */
+
+	uint_t		hca_max_ud_dest;
+	uint_t		hca_max_srqs;		/* Max SRQs supported */
+	uint_t		hca_max_srqs_sz;	/* Max outstanding WRs on any */
+						/* SRQ */
+	uint_t		hca_max_srq_sgl;	/* Max SGL entries per SRQ WR */
+	uint_t		hca_max_cq_handlers;
+	ibt_lkey_t	hca_reserved_lkey;	/* Reserved L_Key value */
+	uint_t		hca_max_fmrs;		/* Max FMR Supported */
+
+	uint_t		hca_max_lso_size;
+	uint_t		hca_max_lso_hdr_size;
+	uint_t		hca_max_inline_size;
+
+	uint_t		hca_max_cq_mod_count;	/* CQ notify moderation */
+	uint_t		hca_max_cq_mod_usec;
+
+	uint32_t	hca_fw_major_version;	/* firmware version */
+	uint16_t	hca_fw_minor_version;
+	uint16_t	hca_fw_micro_version;
+
+	/* detailed WQE size info */
+	uint_t		hca_ud_send_inline_sz;	/* inline size in bytes */
+	uint_t		hca_conn_send_inline_sz;
+	uint_t		hca_conn_rdmaw_inline_overhead;
+	uint_t		hca_recv_sgl_sz;	/* detailed SGL sizes */
+	uint_t		hca_ud_send_sgl_sz;
+	uint_t		hca_conn_send_sgl_sz;
+	uint_t		hca_conn_rdma_sgl_overhead;
+	int32_t		hca_pad;
+} ibnex_ctl_hca_info_32_t;
+
 /*
  * Data structure for IBNEX_CTL_QUERY_HCA
  */
 typedef struct ibnex_ctl_query_hca_s {
-	ib_guid_t		hca_guid;	/* in: HCA GUID */
+	ib_guid_t	hca_guid;	/* in: HCA GUID */
+
+	/*
+	 * in: user allocated memory pointer for hca device path and number of
+	 * bytes allocated for the hca device path.
+	 */
+	char		*hca_device_path;
+	uint_t		hca_device_path_alloc_sz;
+
 	ibnex_ctl_hca_info_t	hca_info;	/* out: HCA information */
 } ibnex_ctl_query_hca_t;
+
+typedef struct ibnex_ctl_query_hca_32_s {
+	ib_guid_t	hca_guid;	/* in: HCA GUID */
+
+	/*
+	 * in: user allocated memory pointer for hca device path and number of
+	 * bytes allocated for the hca device path.
+	 */
+	caddr32_t	hca_device_path;
+	uint_t		hca_device_path_alloc_sz;
+
+	ibnex_ctl_hca_info_32_t	hca_info;	/* out: HCA information */
+} ibnex_ctl_query_hca_32_t;
 
 /*
  * HCA port information structure

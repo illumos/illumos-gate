@@ -2880,6 +2880,72 @@ out:
 	return (rv);
 }
 
+#define	IBNEX_CTL_CP_HCA_INFO(x, y, driver_name, instance, device_path, \
+    device_path_alloc_sz, device_path_len)				\
+{									\
+	(x)->hca_node_guid		= (y)->hca_node_guid;		\
+	(x)->hca_si_guid		= (y)->hca_si_guid;		\
+	(x)->hca_nports			= (y)->hca_nports;		\
+	(x)->hca_flags			= (y)->hca_flags;		\
+	(x)->hca_flags2			= (y)->hca_flags2;		\
+	(x)->hca_vendor_id		= (y)->hca_vendor_id;		\
+	(x)->hca_device_id		= (y)->hca_device_id;		\
+	(x)->hca_version_id		= (y)->hca_version_id;		\
+	(x)->hca_max_chans		= (y)->hca_max_chans;		\
+	(x)->hca_max_chan_sz		= (y)->hca_max_chan_sz;		\
+	(x)->hca_max_sgl		= (y)->hca_max_sgl;		\
+	(x)->hca_max_cq			= (y)->hca_max_cq;		\
+	(x)->hca_max_cq_sz		= (y)->hca_max_cq_sz;		\
+	(x)->hca_page_sz		= (y)->hca_page_sz;		\
+	(x)->hca_max_memr		= (y)->hca_max_memr;		\
+	(x)->hca_max_memr_len		= (y)->hca_max_memr_len;	\
+	(x)->hca_max_mem_win		= (y)->hca_max_mem_win;		\
+	(x)->hca_max_rsc		= (y)->hca_max_rsc;		\
+	(x)->hca_max_rdma_in_chan	= (y)->hca_max_rdma_in_chan;	\
+	(x)->hca_max_rdma_out_chan	= (y)->hca_max_rdma_out_chan;	\
+	(x)->hca_max_ipv6_chan		= (y)->hca_max_ipv6_chan;	\
+	(x)->hca_max_ether_chan 	= (y)->hca_max_ether_chan;	\
+	(x)->hca_max_mcg_chans		= (y)->hca_max_mcg_chans;	\
+	(x)->hca_max_mcg		= (y)->hca_max_mcg;		\
+	(x)->hca_max_chan_per_mcg	= (y)->hca_max_chan_per_mcg;	\
+	(x)->hca_max_partitions		= (y)->hca_max_partitions;	\
+	(x)->hca_local_ack_delay	= (y)->hca_local_ack_delay;	\
+	(x)->hca_max_port_sgid_tbl_sz	= (y)->hca_max_port_sgid_tbl_sz; \
+	(x)->hca_max_port_pkey_tbl_sz	= (y)->hca_max_port_pkey_tbl_sz; \
+	(x)->hca_max_pd			= (y)->hca_max_pd;		\
+	(x)->hca_max_ud_dest		= (y)->hca_max_ud_dest;		\
+	(x)->hca_max_srqs		= (y)->hca_max_srqs;		\
+	(x)->hca_max_srqs_sz		= (y)->hca_max_srqs_sz;		\
+	(x)->hca_max_srq_sgl		= (y)->hca_max_srq_sgl;		\
+	(x)->hca_max_cq_handlers	= (y)->hca_max_cq_handlers;	\
+	(x)->hca_reserved_lkey		= (y)->hca_reserved_lkey;	\
+	(x)->hca_max_fmrs		= (y)->hca_max_fmrs;		\
+	(x)->hca_max_lso_size		= (y)->hca_max_lso_size;	\
+	(x)->hca_max_lso_hdr_size	= (y)->hca_max_lso_hdr_size;	\
+	(x)->hca_max_inline_size	= (y)->hca_max_inline_size;	\
+	(x)->hca_max_cq_mod_count	= (y)->hca_max_cq_mod_count;	\
+	(x)->hca_max_cq_mod_usec	= (y)->hca_max_cq_mod_usec;	\
+	(x)->hca_fw_major_version	= (y)->hca_fw_major_version;	\
+	(x)->hca_fw_minor_version	= (y)->hca_fw_minor_version;	\
+	(x)->hca_fw_micro_version	= (y)->hca_fw_micro_version;	\
+	(x)->hca_ud_send_inline_sz	= (y)->hca_ud_send_inline_sz;	\
+	(x)->hca_conn_send_inline_sz	= (y)->hca_conn_send_inline_sz;	\
+	(x)->hca_conn_rdmaw_inline_overhead =				\
+	    (y)->hca_conn_rdmaw_inline_overhead;			\
+	(x)->hca_recv_sgl_sz		= (y)->hca_recv_sgl_sz;		\
+	(x)->hca_ud_send_sgl_sz		= (y)->hca_ud_send_sgl_sz;	\
+	(x)->hca_conn_send_sgl_sz	= (y)->hca_conn_send_sgl_sz;	\
+	(x)->hca_conn_rdma_sgl_overhead = (y)->hca_conn_rdma_sgl_overhead; \
+									\
+	(void) strlcpy((x)->hca_driver_name, (driver_name),		\
+	    MAX_HCA_DRVNAME_LEN);					\
+	(x)->hca_driver_instance	= (instance);			\
+									\
+	(x)->hca_device_path = ((device_path_alloc_sz) >= (device_path_len)) \
+	    ? (device_path) : NULL;					\
+	(x)->hca_device_path_len	= (device_path_len);		\
+}
+
 /*
  * IOCTL implementation to query HCA attributes
  */
@@ -2888,110 +2954,121 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
     cred_t *credp, int *rvalp)
 {
 	int			rv = 0;
-	ibnex_ctl_hca_info_t	*hca_info;
-	ibnex_ctl_query_hca_t	*query_hca;
-	ibt_hca_attr_t		*hca_attr;
+	ibnex_ctl_query_hca_t	*query_hca = NULL;
+	ibnex_ctl_query_hca_32_t *query_hca_32 = NULL;
+	ibt_hca_attr_t		*hca_attr = NULL;
 	char			driver_name[MAX_HCA_DRVNAME_LEN];
 	int			instance;
+	ib_guid_t		hca_guid;
+	char			*device_path;
+	uint_t			device_path_alloc_sz, hca_device_path_len;
+	char			*hca_device_path = NULL;
 
 	IBTF_DPRINTF_L4("ibnex", "\tctl_query_hca: cmd=%x, arg=%p, "
 	    "mode=%x, cred=%p, rval=%p, dev=0x%x", cmd, arg, mode, credp,
 	    rvalp, dev);
 
-	/*
-	 * NOTE: 32-bit versions of the structures for ibnex_ctl_query_hca_t
-	 * and ibnex_ctl_hca_info_t are not defined because the alignment
-	 * of fields for these structures happen to be the same for both
-	 * 64-bit and 32-bit cases.
-	 */
+#ifdef	_MULTI_DATAMODEL
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		query_hca_32 = kmem_zalloc(
+		    sizeof (ibnex_ctl_query_hca_32_t), KM_SLEEP);
 
-	query_hca = kmem_zalloc(sizeof (ibnex_ctl_query_hca_t), KM_SLEEP);
-	hca_attr = kmem_zalloc(sizeof (ibt_hca_attr_t), KM_SLEEP);
+		if (ddi_copyin((void *)arg, query_hca_32,
+		    sizeof (ibnex_ctl_query_hca_32_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca: ddi_copyin err 1");
+			rv = EFAULT;
+			goto out;
+		}
 
-	if (ddi_copyin((void *)arg, query_hca,
-	    sizeof (ibnex_ctl_query_hca_t), mode) != 0) {
-		IBTF_DPRINTF_L2("ibnex", "\tctl_query_hca: ddi_copyin err");
-		rv = EFAULT;
-		goto out;
+		hca_guid = query_hca_32->hca_guid;
+		device_path = (char *)(uintptr_t)query_hca_32->hca_device_path;
+		device_path_alloc_sz = query_hca_32->hca_device_path_alloc_sz;
+	} else
+#endif
+	{
+		query_hca = kmem_zalloc(sizeof (ibnex_ctl_query_hca_t),
+		    KM_SLEEP);
+
+		if (ddi_copyin((void *)arg, query_hca,
+		    sizeof (ibnex_ctl_query_hca_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca: ddi_copyin err 2");
+			rv = EFAULT;
+			goto out;
+		}
+
+		hca_guid = query_hca->hca_guid;
+		device_path = query_hca->hca_device_path;
+		device_path_alloc_sz = query_hca->hca_device_path_alloc_sz;
 	}
 
-	if (ibtl_ibnex_query_hca_byguid(query_hca->hca_guid, hca_attr,
-	    driver_name, sizeof (driver_name), &instance) != IBT_SUCCESS) {
+	hca_attr = kmem_zalloc(sizeof (ibt_hca_attr_t), KM_SLEEP);
+	hca_device_path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+
+	if (ibtl_ibnex_query_hca_byguid(hca_guid, hca_attr,
+	    driver_name, sizeof (driver_name), &instance, hca_device_path)
+	    != IBT_SUCCESS) {
 		rv = ENXIO;
 		goto out;
 	}
 
-	hca_info = &query_hca->hca_info;
+	hca_device_path_len = strlen(hca_device_path) + 1;
 
-	hca_info->hca_node_guid = hca_attr->hca_node_guid;
-	hca_info->hca_si_guid = hca_attr->hca_si_guid;
-	hca_info->hca_nports = hca_attr->hca_nports;
-	hca_info->hca_flags = hca_attr->hca_flags;
-	hca_info->hca_flags2 = hca_attr->hca_flags2;
-	hca_info->hca_vendor_id = hca_attr->hca_vendor_id;
-	hca_info->hca_device_id = hca_attr->hca_device_id;
-	hca_info->hca_version_id = hca_attr->hca_version_id;
-	hca_info->hca_max_chans = hca_attr->hca_max_chans;
-	hca_info->hca_max_chan_sz = hca_attr->hca_max_chan_sz;
-	hca_info->hca_max_sgl = hca_attr->hca_max_sgl;
-	hca_info->hca_max_cq = hca_attr->hca_max_cq;
-	hca_info->hca_max_cq_sz = hca_attr->hca_max_cq_sz;
-	hca_info->hca_page_sz = hca_attr->hca_page_sz;
-	hca_info->hca_max_memr = hca_attr->hca_max_memr;
-	hca_info->hca_max_memr_len = hca_attr->hca_max_memr_len;
-	hca_info->hca_max_mem_win = hca_attr->hca_max_mem_win;
-	hca_info->hca_max_rsc = hca_attr->hca_max_rsc;
-	hca_info->hca_max_rdma_in_chan = hca_attr->hca_max_rdma_in_chan;
-	hca_info->hca_max_rdma_out_chan = hca_attr->hca_max_rdma_out_chan;
-	hca_info->hca_max_ipv6_chan = hca_attr->hca_max_ipv6_chan;
-	hca_info->hca_max_ether_chan = hca_attr->hca_max_ether_chan;
-	hca_info->hca_max_mcg_chans = hca_attr->hca_max_mcg_chans;
-	hca_info->hca_max_mcg = hca_attr->hca_max_mcg;
-	hca_info->hca_max_chan_per_mcg = hca_attr->hca_max_chan_per_mcg;
-	hca_info->hca_max_partitions = hca_attr->hca_max_partitions;
-	hca_info->hca_local_ack_delay = hca_attr->hca_local_ack_delay;
-	hca_info->hca_max_port_sgid_tbl_sz = hca_attr->hca_max_port_sgid_tbl_sz;
-	hca_info->hca_max_port_pkey_tbl_sz = hca_attr->hca_max_port_pkey_tbl_sz;
-	hca_info->hca_max_pd = hca_attr->hca_max_pd;
-	hca_info->hca_max_ud_dest = hca_attr->hca_max_ud_dest;
-	hca_info->hca_max_srqs = hca_attr->hca_max_srqs;
-	hca_info->hca_max_srqs_sz = hca_attr->hca_max_srqs_sz;
-	hca_info->hca_max_srq_sgl = hca_attr->hca_max_srq_sgl;
-	hca_info->hca_max_cq_handlers = hca_attr->hca_max_cq_handlers;
-	hca_info->hca_reserved_lkey = hca_attr->hca_reserved_lkey;
-	hca_info->hca_max_fmrs = hca_attr->hca_max_fmrs;
-	hca_info->hca_max_lso_size = hca_attr->hca_max_lso_size;
-	hca_info->hca_max_lso_hdr_size = hca_attr->hca_max_lso_hdr_size;
-	hca_info->hca_max_inline_size = hca_attr->hca_max_inline_size;
-	hca_info->hca_max_cq_mod_count = hca_attr->hca_max_cq_mod_count;
-	hca_info->hca_max_cq_mod_usec = hca_attr->hca_max_cq_mod_usec;
-	hca_info->hca_fw_major_version = hca_attr->hca_fw_major_version;
-	hca_info->hca_fw_minor_version = hca_attr->hca_fw_minor_version;
-	hca_info->hca_fw_micro_version = hca_attr->hca_fw_micro_version;
-	hca_info->hca_ud_send_inline_sz = hca_attr->hca_ud_send_inline_sz;
-	hca_info->hca_conn_send_inline_sz = hca_attr->hca_conn_send_inline_sz;
-	hca_info->hca_conn_rdmaw_inline_overhead =
-	    hca_attr->hca_conn_rdmaw_inline_overhead;
-	hca_info->hca_recv_sgl_sz = hca_attr->hca_recv_sgl_sz;
-	hca_info->hca_ud_send_sgl_sz = hca_attr->hca_ud_send_sgl_sz;
-	hca_info->hca_conn_send_sgl_sz = hca_attr->hca_conn_send_sgl_sz;
-	hca_info->hca_conn_rdma_sgl_overhead =
-	    hca_attr->hca_conn_rdma_sgl_overhead;
+#ifdef	_MULTI_DATAMODEL
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 
-	(void) strlcpy(hca_info->hca_driver_name, driver_name,
-	    MAX_HCA_DRVNAME_LEN);
-	hca_info->hca_driver_instance = instance;
+		IBNEX_CTL_CP_HCA_INFO(&query_hca_32->hca_info, hca_attr,
+		    driver_name, instance, query_hca_32->hca_device_path,
+		    device_path_alloc_sz, hca_device_path_len);
 
-	/* copy hca information to the user space */
-	if (ddi_copyout(hca_info, &((ibnex_ctl_query_hca_t *)arg)->hca_info,
-	    sizeof (ibnex_ctl_hca_info_t), mode) != 0) {
-		IBTF_DPRINTF_L2("ibnex", "\tctl_query_hca: ddi_copyout err");
-		rv = EFAULT;
+		/* copy hca information to the user space */
+		if (ddi_copyout(&query_hca_32->hca_info,
+		    &((ibnex_ctl_query_hca_32_t *)arg)->hca_info,
+		    sizeof (ibnex_ctl_hca_info_32_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca: ddi_copyout err 1");
+			rv = EFAULT;
+			goto out;
+		}
+	} else
+#endif
+	{
+		IBNEX_CTL_CP_HCA_INFO(&query_hca->hca_info, hca_attr,
+		    driver_name, instance, device_path,
+		    device_path_alloc_sz, hca_device_path_len);
+
+		/* copy hca information to the user space */
+		if (ddi_copyout(&query_hca->hca_info,
+		    &((ibnex_ctl_query_hca_t *)arg)->hca_info,
+		    sizeof (ibnex_ctl_hca_info_t), mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex",
+			    "\tctl_query_hca: ddi_copyout err 2");
+			rv = EFAULT;
+			goto out;
+		}
+	}
+
+	if (device_path_alloc_sz >= hca_device_path_len) {
+		if (ddi_copyout(hca_device_path,
+		    device_path,
+		    hca_device_path_len, mode) != 0) {
+			IBTF_DPRINTF_L2("ibnex", "\tctl_query_hca: "
+			    "ddi_copyout err copying device path");
+			rv = EFAULT;
+		}
 	}
 
 out:
-	kmem_free(query_hca, sizeof (ibnex_ctl_query_hca_t));
-	kmem_free(hca_attr, sizeof (ibt_hca_attr_t));
+	if (query_hca)
+		kmem_free(query_hca, sizeof (ibnex_ctl_query_hca_t));
+	if (query_hca_32)
+		kmem_free(query_hca_32, sizeof (ibnex_ctl_query_hca_32_t));
+	if (hca_attr)
+		kmem_free(hca_attr, sizeof (ibt_hca_attr_t));
+	if (hca_device_path)
+		kmem_free(hca_device_path, MAXPATHLEN);
+
 	return (rv);
 }
 
@@ -3056,7 +3133,7 @@ ibnex_ctl_query_hca_port(dev_t dev, int cmd, intptr_t arg, int mode,
 		if (ddi_copyin((void *)arg, query_hca_port_32,
 		    sizeof (ibnex_ctl_query_hca_port_32_t), mode) != 0) {
 			IBTF_DPRINTF_L2("ibnex",
-			    "\tctl_query_hca_port: ddi_copyin err 2");
+			    "\tctl_query_hca_port: ddi_copyin err 1");
 			rv = EFAULT;
 			goto out;
 		}
