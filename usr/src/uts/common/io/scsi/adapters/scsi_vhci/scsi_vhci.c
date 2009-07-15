@@ -7201,7 +7201,8 @@ vhci_lun_free(dev_info_t *tgt_dip)
 	}
 	dvlp->svl_fops_name = NULL;
 
-	if (dvlp->svl_fops_ctpriv != NULL) {
+	if (dvlp->svl_fops_ctpriv != NULL &&
+	    dvlp->svl_fops != NULL) {
 		dvlp->svl_fops->sfo_device_unprobe(sd, dvlp->svl_fops_ctpriv);
 	}
 
