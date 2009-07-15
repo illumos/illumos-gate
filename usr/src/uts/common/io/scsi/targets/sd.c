@@ -707,6 +707,7 @@ static sd_disk_config_t sd_disk_table[] = {
 		SD_CONF_BSET_LUN_RESET_ENABLED,
 		&pirus_properties },
 	{ "SUN     STK6580_6780", SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "SUN     SUN_6180", SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "STK     OPENstorage", SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "STK     OpenStorage", SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "STK     BladeCtlr",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
