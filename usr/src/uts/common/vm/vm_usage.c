@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,11 +111,11 @@
  *    - visited page ranges for each collective.
  *	   - per vnode (entity->vme_vnode_hash)
  *	   - per shared amp (entity->vme_amp_hash)
- *	For accurate counting of map-shared and cow-shared pages.
+ *	For accurate counting of map-shared and COW-shared pages.
  *
  *    - visited private anons (refcnt > 1) for each collective.
  *	(entity->vme_anon_hash)
- *	For accurate counting of cow-shared pages.
+ *	For accurate counting of COW-shared pages.
  *
  * The common accounting structure is the vmu_entity_t, which represents
  * collectives:
@@ -152,6 +152,7 @@
 #include <sys/vm_usage.h>
 #include <sys/zone.h>
 #include <sys/sunddi.h>
+#include <sys/avl.h>
 #include <vm/anon.h>
 #include <vm/as.h>
 #include <vm/seg_vn.h>
@@ -167,13 +168,19 @@
 #define	VMUSAGE_BOUND_INCORE		1
 #define	VMUSAGE_BOUND_NOT_INCORE	2
 
+#define	ISWITHIN(node, addr)	((node)->vmb_start <= addr && \
+				    (node)->vmb_end >= addr ? 1 : 0)
+
 /*
  * bounds for vnodes and shared amps
  * Each bound is either entirely incore, entirely not in core, or
- * entirely unknown.  bounds are stored in order by offset.
+ * entirely unknown.  bounds are stored in an avl tree sorted by start member
+ * when in use, otherwise (free or temporary lists) they're strung
+ * together off of vmb_next.
  */
 typedef struct vmu_bound {
-	struct  vmu_bound *vmb_next;
+	avl_node_t vmb_node;
+	struct vmu_bound *vmb_next; /* NULL in tree else on free or temp list */
 	pgcnt_t vmb_start;  /* page offset in vnode/amp on which bound starts */
 	pgcnt_t	vmb_end;    /* page offset in vnode/amp on which bound ends */
 	char	vmb_type;   /* One of VMUSAGE_BOUND_* */
@@ -188,7 +195,7 @@ typedef struct vmu_object {
 	struct vmu_object	*vmo_next;	/* free list */
 	caddr_t		vmo_key;
 	short		vmo_type;
-	vmu_bound_t	*vmo_bounds;
+	avl_tree_t	vmo_bounds;
 } vmu_object_t;
 
 /*
@@ -214,7 +221,7 @@ typedef struct vmu_entity {
 	struct vmu_entity *vme_next_calc;
 	mod_hash_t	*vme_vnode_hash; /* vnodes visited for entity */
 	mod_hash_t	*vme_amp_hash;	 /* shared amps visited for entity */
-	mod_hash_t	*vme_anon_hash;	 /* cow anons visited for entity */
+	mod_hash_t	*vme_anon_hash;	 /* COW anons visited for entity */
 	vmusage_t	vme_result;	 /* identifies entity and results */
 } vmu_entity_t;
 
@@ -298,12 +305,34 @@ static kmem_cache_t *vmu_bound_cache;
 static kmem_cache_t *vmu_object_cache;
 
 /*
- * Save a bound on the free list
+ * Comparison routine for AVL tree. We base our comparison on vmb_start.
+ */
+static int
+bounds_cmp(const void *bnd1, const void *bnd2)
+{
+	const vmu_bound_t *bound1 = bnd1;
+	const vmu_bound_t *bound2 = bnd2;
+
+	if (bound1->vmb_start == bound2->vmb_start) {
+		return (0);
+	}
+	if (bound1->vmb_start < bound2->vmb_start) {
+		return (-1);
+	}
+
+	return (1);
+}
+
+/*
+ * Save a bound on the free list.
  */
 static void
 vmu_free_bound(vmu_bound_t *bound)
 {
 	bound->vmb_next = vmu_data.vmu_free_bounds;
+	bound->vmb_start = 0;
+	bound->vmb_end = 0;
+	bound->vmb_type = 0;
 	vmu_data.vmu_free_bounds = bound;
 }
 
@@ -314,14 +343,15 @@ static void
 vmu_free_object(mod_hash_val_t val)
 {
 	vmu_object_t *obj = (vmu_object_t *)val;
-	vmu_bound_t *bound = obj->vmo_bounds;
-	vmu_bound_t *tmp;
+	avl_tree_t *tree = &(obj->vmo_bounds);
+	vmu_bound_t *bound;
+	void *cookie = NULL;
 
-	while (bound != NULL) {
-		tmp = bound;
-		bound = bound->vmb_next;
-		vmu_free_bound(tmp);
-	}
+	while ((bound = avl_destroy_nodes(tree, &cookie)) != NULL)
+		vmu_free_bound(bound);
+	avl_destroy(tree);
+
+	obj->vmo_type = 0;
 	obj->vmo_next = vmu_data.vmu_free_objects;
 	vmu_data.vmu_free_objects = obj;
 }
@@ -530,9 +560,10 @@ vmu_alloc_object(caddr_t key, int type)
 		object = kmem_cache_alloc(vmu_object_cache, KM_SLEEP);
 	}
 
+	object->vmo_next = NULL;
 	object->vmo_key = key;
 	object->vmo_type = type;
-	object->vmo_bounds = NULL;
+	avl_create(&(object->vmo_bounds), bounds_cmp, sizeof (vmu_bound_t), 0);
 
 	return (object);
 }
@@ -549,11 +580,14 @@ vmu_alloc_bound()
 		bound = vmu_data.vmu_free_bounds;
 		vmu_data.vmu_free_bounds =
 		    vmu_data.vmu_free_bounds->vmb_next;
-		bzero(bound, sizeof (vmu_bound_t));
 	} else {
 		bound = kmem_cache_alloc(vmu_bound_cache, KM_SLEEP);
-		bzero(bound, sizeof (vmu_bound_t));
 	}
+
+	bound->vmb_next = NULL;
+	bound->vmb_start = 0;
+	bound->vmb_end = 0;
+	bound->vmb_type = 0;
 	return (bound);
 }
 
@@ -630,119 +664,116 @@ static pgcnt_t
 vmu_insert_lookup_object_bounds(vmu_object_t *ro, pgcnt_t start, pgcnt_t
     end, char type, vmu_bound_t **first, vmu_bound_t **last)
 {
-	vmu_bound_t *next;
-	vmu_bound_t *prev = NULL;
-	vmu_bound_t *tmp = NULL;
-	pgcnt_t ret = 0;
+	avl_tree_t	*tree = &(ro->vmo_bounds);
+	avl_index_t	where;
+	vmu_bound_t	*walker, *tmp;
+	pgcnt_t		ret = 0;
+
+	ASSERT(start <= end);
 
 	*first = *last = NULL;
 
-	for (next = ro->vmo_bounds; next != NULL; next = next->vmb_next) {
-		/*
-		 * Find bounds overlapping or overlapped by range [start,end].
-		 */
-		if (start > next->vmb_end) {
-			/* bound is before new bound */
-			prev = next;
-			continue;
-		}
-		if (next->vmb_start > end) {
-			/* bound is after new bound */
-			break;
-		}
-		if (*first == NULL)
-			*first = next;
-		*last = next;
+	tmp = vmu_alloc_bound();
+	tmp->vmb_start = start;
+	tmp->vmb_type = type;
+
+	/* Hopelessly optimistic case. */
+	if (walker = avl_find(tree, tmp, &where)) {
+		/* We got lucky. */
+		vmu_free_bound(tmp);
+		*first = walker;
 	}
 
-	if (*first == NULL) {
-		ASSERT(*last == NULL);
-		/*
-		 * No bounds overlapping range [start,end], so create new
-		 * bound
-		 */
-		tmp = vmu_alloc_bound();
-		tmp->vmb_start = start;
-		tmp->vmb_end = end;
-		tmp->vmb_type = type;
-		if (prev == NULL) {
-			tmp->vmb_next = ro->vmo_bounds;
-			ro->vmo_bounds = tmp;
-		} else {
-			tmp->vmb_next = prev->vmb_next;
-			prev->vmb_next = tmp;
+	if (walker == NULL) {
+		/* Is start in the previous node? */
+		walker = avl_nearest(tree, where, AVL_BEFORE);
+		if (walker != NULL) {
+			if (ISWITHIN(walker, start)) {
+				/* We found start. */
+				vmu_free_bound(tmp);
+				*first = walker;
+			}
 		}
-		*first = tmp;
-		*last = tmp;
-		ASSERT(tmp->vmb_end >= tmp->vmb_start);
-		ret = tmp->vmb_end - tmp->vmb_start + 1;
+	}
+
+	/*
+	 * At this point, if *first is still NULL, then we
+	 * didn't get a direct hit and start isn't covered
+	 * by the previous node. We know that the next node
+	 * must have a greater start value than we require
+	 * because avl_find tells us where the AVL routines would
+	 * insert our new node. We have some gap between the
+	 * start we want and the next node.
+	 */
+	if (*first == NULL) {
+		walker = avl_nearest(tree, where, AVL_AFTER);
+		if (walker != NULL && walker->vmb_start <= end) {
+			/* Fill the gap. */
+			tmp->vmb_end = walker->vmb_start - 1;
+			*first = tmp;
+		} else {
+			/* We have a gap over [start, end]. */
+			tmp->vmb_end = end;
+			*first = *last = tmp;
+		}
+		ret += tmp->vmb_end - tmp->vmb_start + 1;
+		avl_insert(tree, tmp, where);
+	}
+
+	ASSERT(*first != NULL);
+
+	if (*last != NULL) {
+		/* We're done. */
 		return (ret);
 	}
 
-	/* Check to see if start is before first known bound */
-	ASSERT(first != NULL && last != NULL);
-	next = (*first);
-	if (start < (*first)->vmb_start) {
-		/* Create new bound before first bound */
-		tmp = vmu_alloc_bound();
-		tmp->vmb_start = start;
-		tmp->vmb_end = (*first)->vmb_start - 1;
-		tmp->vmb_type = type;
-		tmp->vmb_next = *first;
-		if (*first == ro->vmo_bounds)
-			ro->vmo_bounds = tmp;
-		if (prev != NULL)
-			prev->vmb_next = tmp;
-		ASSERT(tmp->vmb_end >= tmp->vmb_start);
-		ret += tmp->vmb_end - tmp->vmb_start + 1;
-		*first = tmp;
-	}
 	/*
-	 * Between start and end, search for gaps between and after existing
-	 * bounds.  Create new bounds to fill gaps if they exist.
+	 * If we are here we still need to set *last and
+	 * that may involve filling in some gaps.
 	 */
-	while (end > next->vmb_end) {
-		/*
-		 * Check for gap between bound and next bound. if no gap,
-		 * continue.
-		 */
-		if ((next != *last) &&
-		    ((next->vmb_end + 1) == next->vmb_next->vmb_start)) {
-			next = next->vmb_next;
-			continue;
-		}
-		/*
-		 * Insert new bound in gap after bound, and before next
-		 * bound if next bound exists.
-		 */
-		tmp = vmu_alloc_bound();
-		tmp->vmb_type = type;
-		tmp->vmb_next = next->vmb_next;
-		tmp->vmb_start = next->vmb_end + 1;
-
-		if (next != *last) {
-			tmp->vmb_end = next->vmb_next->vmb_start - 1;
-			ASSERT(tmp->vmb_end >= tmp->vmb_start);
-			ret += tmp->vmb_end - tmp->vmb_start + 1;
-			next->vmb_next = tmp;
-			next = tmp->vmb_next;
-		} else {
-			tmp->vmb_end = end;
-			ASSERT(tmp->vmb_end >= tmp->vmb_start);
-			ret += tmp->vmb_end - tmp->vmb_start + 1;
-			next->vmb_next = tmp;
-			*last = tmp;
+	*last = *first;
+	for (;;) {
+		if (ISWITHIN(*last, end)) {
+			/* We're done. */
 			break;
 		}
+		walker = AVL_NEXT(tree, *last);
+		if (walker == NULL || walker->vmb_start > end) {
+			/* Bottom or mid tree with gap. */
+			tmp = vmu_alloc_bound();
+			tmp->vmb_start = (*last)->vmb_end + 1;
+			tmp->vmb_end = end;
+			ret += tmp->vmb_end - tmp->vmb_start + 1;
+			avl_insert_here(tree, tmp, *last, AVL_AFTER);
+			*last = tmp;
+			break;
+		} else {
+			if ((*last)->vmb_end + 1 != walker->vmb_start) {
+				/* Non-contiguous. */
+				tmp = vmu_alloc_bound();
+				tmp->vmb_start = (*last)->vmb_end + 1;
+				tmp->vmb_end = walker->vmb_start - 1;
+				ret += tmp->vmb_end - tmp->vmb_start + 1;
+				avl_insert_here(tree, tmp, *last, AVL_AFTER);
+				*last = tmp;
+			} else {
+				*last = walker;
+			}
+		}
 	}
+
 	return (ret);
 }
 
 /*
  * vmu_update_bounds()
  *
+ * tree: avl_tree in which first and last hang.
+ *
  * first, last:	list of continuous bounds, of which zero or more are of
  * 		type VMUSAGE_BOUND_UNKNOWN.
+ *
+ * new_tree: avl_tree in which new_first and new_last hang.
  *
  * new_first, new_last:	list of continuous bounds, of which none are of
  *			type VMUSAGE_BOUND_UNKNOWN.  These bounds are used to
@@ -763,8 +794,8 @@ vmu_insert_lookup_object_bounds(vmu_object_t *ro, pgcnt_t start, pgcnt_t
  *
  */
 static pgcnt_t
-vmu_update_bounds(vmu_bound_t **first, vmu_bound_t **last,
-    vmu_bound_t *new_first, vmu_bound_t *new_last)
+vmu_update_bounds(avl_tree_t *tree, vmu_bound_t **first, vmu_bound_t **last,
+    avl_tree_t *new_tree, vmu_bound_t *new_first, vmu_bound_t *new_last)
 {
 	vmu_bound_t *next, *new_next, *tmp;
 	pgcnt_t rss = 0;
@@ -777,19 +808,19 @@ vmu_update_bounds(vmu_bound_t **first, vmu_bound_t **last,
 	 * have unknown type.
 	 */
 	ASSERT((*first)->vmb_type != VMUSAGE_BOUND_UNKNOWN ||
-	    (*first)->vmb_start >= new_next->vmb_start);
+	    (*first)->vmb_start >= new_first->vmb_start);
 	ASSERT((*last)->vmb_type != VMUSAGE_BOUND_UNKNOWN ||
 	    (*last)->vmb_end <= new_last->vmb_end);
 	for (;;) {
-		/* If bound already has type, proceed to next bound */
+		/* If bound already has type, proceed to next bound. */
 		if (next->vmb_type != VMUSAGE_BOUND_UNKNOWN) {
 			if (next == *last)
 				break;
-			next = next->vmb_next;
+			next = AVL_NEXT(tree, next);
 			continue;
 		}
 		while (new_next->vmb_end < next->vmb_start)
-			new_next = new_next->vmb_next;
+			new_next = AVL_NEXT(new_tree, new_next);
 		ASSERT(new_next->vmb_type != VMUSAGE_BOUND_UNKNOWN);
 		next->vmb_type = new_next->vmb_type;
 		if (new_next->vmb_end < next->vmb_end) {
@@ -798,9 +829,8 @@ vmu_update_bounds(vmu_bound_t **first, vmu_bound_t **last,
 			tmp->vmb_type = VMUSAGE_BOUND_UNKNOWN;
 			tmp->vmb_start = new_next->vmb_end + 1;
 			tmp->vmb_end = next->vmb_end;
-			tmp->vmb_next = next->vmb_next;
+			avl_insert_here(tree, tmp, next, AVL_AFTER);
 			next->vmb_end = new_next->vmb_end;
-			next->vmb_next = tmp;
 			if (*last == next)
 				*last = tmp;
 			if (next->vmb_type == VMUSAGE_BOUND_INCORE)
@@ -811,41 +841,40 @@ vmu_update_bounds(vmu_bound_t **first, vmu_bound_t **last,
 				rss += next->vmb_end - next->vmb_start + 1;
 			if (next == *last)
 				break;
-			next = next->vmb_next;
+			next = AVL_NEXT(tree, next);
 		}
 	}
 	return (rss);
 }
 
 /*
- * merges adjacent bounds with same type between first and last bound.
+ * Merges adjacent bounds with same type between first and last bound.
  * After merge, last pointer is no longer valid, as last bound may be
  * merged away.
  */
 static void
-vmu_merge_bounds(vmu_bound_t **first, vmu_bound_t **last)
+vmu_merge_bounds(avl_tree_t *tree, vmu_bound_t **first, vmu_bound_t **last)
 {
+	vmu_bound_t *current;
 	vmu_bound_t *next;
-	vmu_bound_t *tmp;
 
+	ASSERT(tree != NULL);
 	ASSERT(*first != NULL);
 	ASSERT(*last != NULL);
 
-	next = *first;
-	while (next != *last) {
-
-		/* If bounds are adjacent and have same type, merge them */
-		if (((next->vmb_end + 1) == next->vmb_next->vmb_start) &&
-		    (next->vmb_type == next->vmb_next->vmb_type)) {
-			tmp = next->vmb_next;
-			next->vmb_end = tmp->vmb_end;
-			next->vmb_next = tmp->vmb_next;
-			vmu_free_bound(tmp);
-			if (tmp == *last)
-				*last = next;
-		} else {
-			next = next->vmb_next;
+	current = *first;
+	while (current != *last) {
+		next = AVL_NEXT(tree, current);
+		if ((current->vmb_end + 1) == next->vmb_start &&
+		    current->vmb_type == next->vmb_type) {
+			current->vmb_end = next->vmb_end;
+			avl_remove(tree, next);
+			vmu_free_bound(next);
+			if (next == *last) {
+				break;
+			}
 		}
+		current = AVL_NEXT(tree, current);
 	}
 }
 
@@ -855,14 +884,14 @@ vmu_merge_bounds(vmu_bound_t **first, vmu_bound_t **last)
  *
  * If a bound is partially incore, it will be split into two bounds.
  * first and last may be modified, as bounds may be split into multiple
- * bounds if the are partially incore/not-incore.
+ * bounds if they are partially incore/not-incore.
  *
- * Set incore to non-zero if bounds are already known to be incore
+ * Set incore to non-zero if bounds are already known to be incore.
  *
  */
 static void
-vmu_amp_update_incore_bounds(struct anon_map *amp, vmu_bound_t **first,
-    vmu_bound_t **last, boolean_t incore)
+vmu_amp_update_incore_bounds(avl_tree_t *tree, struct anon_map *amp,
+    vmu_bound_t **first, vmu_bound_t **last, boolean_t incore)
 {
 	vmu_bound_t *next;
 	vmu_bound_t *tmp;
@@ -874,7 +903,7 @@ vmu_amp_update_incore_bounds(struct anon_map *amp, vmu_bound_t **first,
 	struct anon *ap;
 
 	next = *first;
-	/* Shared anon slots don't change once set */
+	/* Shared anon slots don't change once set. */
 	ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 	for (;;) {
 		if (incore == B_TRUE)
@@ -883,7 +912,7 @@ vmu_amp_update_incore_bounds(struct anon_map *amp, vmu_bound_t **first,
 		if (next->vmb_type != VMUSAGE_BOUND_UNKNOWN) {
 			if (next == *last)
 				break;
-			next = next->vmb_next;
+			next = AVL_NEXT(tree, next);
 			continue;
 		}
 		bound_type = next->vmb_type;
@@ -919,16 +948,15 @@ vmu_amp_update_incore_bounds(struct anon_map *amp, vmu_bound_t **first,
 				next->vmb_type = page_type;
 			} else if (next->vmb_type != page_type) {
 				/*
-				 * if current bound type does not match page
+				 * If current bound type does not match page
 				 * type, need to split off new bound.
 				 */
 				tmp = vmu_alloc_bound();
 				tmp->vmb_type = page_type;
 				tmp->vmb_start = index;
 				tmp->vmb_end = next->vmb_end;
-				tmp->vmb_next = next->vmb_next;
+				avl_insert_here(tree, tmp, next, AVL_AFTER);
 				next->vmb_end = index - 1;
-				next->vmb_next = tmp;
 				if (*last == next)
 					*last = tmp;
 				next = tmp;
@@ -947,7 +975,7 @@ vmu_amp_update_incore_bounds(struct anon_map *amp, vmu_bound_t **first,
 			ASSERT(next->vmb_type != VMUSAGE_BOUND_UNKNOWN);
 			break;
 		} else
-			next = next->vmb_next;
+			next = AVL_NEXT(tree, next);
 	}
 	ANON_LOCK_EXIT(&amp->a_rwlock);
 }
@@ -957,8 +985,8 @@ vmu_amp_update_incore_bounds(struct anon_map *amp, vmu_bound_t **first,
  * incore-/not-incore for vnodes.
  */
 static void
-vmu_vnode_update_incore_bounds(vnode_t *vnode, vmu_bound_t **first,
-    vmu_bound_t **last)
+vmu_vnode_update_incore_bounds(avl_tree_t *tree, vnode_t *vnode,
+    vmu_bound_t **first, vmu_bound_t **last)
 {
 	vmu_bound_t *next;
 	vmu_bound_t *tmp;
@@ -974,7 +1002,7 @@ vmu_vnode_update_incore_bounds(vnode_t *vnode, vmu_bound_t **first,
 		if (next->vmb_type != VMUSAGE_BOUND_UNKNOWN) {
 			if (next == *last)
 				break;
-			next = next->vmb_next;
+			next = AVL_NEXT(tree, next);
 			continue;
 		}
 
@@ -1007,16 +1035,15 @@ vmu_vnode_update_incore_bounds(vnode_t *vnode, vmu_bound_t **first,
 				next->vmb_type = page_type;
 			} else if (next->vmb_type != page_type) {
 				/*
-				 * if current bound type does not match page
+				 * If current bound type does not match page
 				 * type, need to split off new bound.
 				 */
 				tmp = vmu_alloc_bound();
 				tmp->vmb_type = page_type;
 				tmp->vmb_start = index;
 				tmp->vmb_end = next->vmb_end;
-				tmp->vmb_next = next->vmb_next;
+				avl_insert_here(tree, tmp, next, AVL_AFTER);
 				next->vmb_end = index - 1;
-				next->vmb_next = tmp;
 				if (*last == next)
 					*last = tmp;
 				next = tmp;
@@ -1035,15 +1062,15 @@ vmu_vnode_update_incore_bounds(vnode_t *vnode, vmu_bound_t **first,
 			ASSERT(next->vmb_type != VMUSAGE_BOUND_UNKNOWN);
 			break;
 		} else
-			next = next->vmb_next;
+			next = AVL_NEXT(tree, next);
 	}
 }
 
 /*
  * Calculate the rss and swap consumed by a segment.  vmu_entities is the
  * list of entities to visit.  For shared segments, the vnode or amp
- * is looked up in each entity to see if has been already counted.  Private
- * anon pages are checked per entity to ensure that cow pages are not
+ * is looked up in each entity to see if it has been already counted.  Private
+ * anon pages are checked per entity to ensure that COW pages are not
  * double counted.
  *
  * For private mapped files, first the amp is checked for private pages.
@@ -1060,6 +1087,7 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 	vmu_object_t *entity_object = NULL;
 	vmu_entity_t *entity;
 	vmusage_t *result;
+	avl_tree_t *tree;
 	vmu_bound_t *first = NULL;
 	vmu_bound_t *last = NULL;
 	vmu_bound_t *cur = NULL;
@@ -1074,7 +1102,7 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 	pgcnt_t swresv = 0;
 	pgcnt_t panon = 0;
 
-	/* Can zero-length segments exist?  Not sure, so parenoia */
+	/* Can zero-length segments exist?  Not sure, so paranoia. */
 	if (seg->s_size <= 0)
 		return;
 
@@ -1085,11 +1113,31 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 	 */
 	if (seg->s_ops == &segvn_ops) {
 		svd = (struct segvn_data *)seg->s_data;
-		if (svd->type == MAP_SHARED)
+		if (svd->type == MAP_SHARED) {
 			shared = B_TRUE;
-		else
+		} else {
 			swresv = svd->swresv;
 
+			if (SEGVN_LOCK_TRYENTER(seg->s_as, &svd->lock,
+			    RW_READER) != 0) {
+				/*
+				 * Text replication anon maps can be shared
+				 * across all zones. Space used for text
+				 * replication is typically capped as a small %
+				 * of memory.  To keep it simple for now we
+				 * don't account for swap and memory space used
+				 * for text replication.
+				 */
+				if (svd->tr_state == SEGVN_TR_OFF &&
+				    svd->amp != NULL) {
+					private_amp = svd->amp;
+					p_start = svd->anon_index;
+					p_end = svd->anon_index +
+					    btop(seg->s_size) - 1;
+				}
+				SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			}
+		}
 		if (svd->vp != NULL) {
 			file = 1;
 			shared_object = vmu_find_insert_object(
@@ -1109,20 +1157,6 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 			if (svd->amp->swresv == 0)
 				incore = B_TRUE;
 		}
-		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
-		/*
-		 * Text replication anon maps can be shared across all zones.
-		 * Space used for text replication is typically capped as
-		 * small % of memory.  To keep it simple for now we don't
-		 * account for swap and memory space used for text replication.
-		 */
-		if (svd->tr_state == SEGVN_TR_OFF && svd->amp != NULL &&
-		    svd->type == MAP_PRIVATE) {
-			private_amp = svd->amp;
-			p_start = svd->anon_index;
-			p_end = svd->anon_index + btop(seg->s_size) - 1;
-		}
-		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 	} else if (seg->s_ops == &segspt_shmops) {
 		shared = B_TRUE;
 		shmd = (struct shm_data *)seg->s_data;
@@ -1143,15 +1177,15 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 
 	/*
 	 * If there is a private amp, count anon pages that exist.  If an
-	 * anon has a refcnt > 1 (cow sharing), then save the anon in a
+	 * anon has a refcnt > 1 (COW sharing), then save the anon in a
 	 * hash so that it is not double counted.
 	 *
-	 * If there is also a shared object, they figure out the bounds
+	 * If there is also a shared object, then figure out the bounds
 	 * which are not mapped by the private amp.
 	 */
 	if (private_amp != NULL) {
 
-		/* Enter as writer to prevent cow anons from being freed */
+		/* Enter as writer to prevent COW anons from being freed */
 		ANON_LOCK_ENTER(&private_amp->a_rwlock, RW_WRITER);
 
 		p_index = p_start;
@@ -1185,7 +1219,7 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 				ap = NULL;
 			}
 			/*
-			 * For cow segments, keep track of bounds not
+			 * For COW segments, keep track of bounds not
 			 * backed by private amp so they can be looked
 			 * up in the backing vnode
 			 */
@@ -1199,7 +1233,6 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 
 				if (shared_object != NULL) {
 					cur = vmu_alloc_bound();
-					cur->vmb_next = NULL;
 					cur->vmb_start = s_index;
 					cur->vmb_end = s_index + p_bound_size;
 					cur->vmb_type = VMUSAGE_BOUND_UNKNOWN;
@@ -1270,7 +1303,7 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 
 			/*
 			 * Assume anon structs with a refcnt
-			 * of 1 are not cow shared, so there
+			 * of 1 are not COW shared, so there
 			 * is no reason to track them per entity.
 			 */
 			if (cnt == 1) {
@@ -1282,7 +1315,7 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 
 				result = &entity->vme_result;
 				/*
-				 * Track cow anons per entity so
+				 * Track COW anons per entity so
 				 * they are not double counted.
 				 */
 				if (vmu_find_insert_anon(entity->vme_anon_hash,
@@ -1318,7 +1351,6 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 			 * the shared object.
 			 */
 			first = vmu_alloc_bound();
-			first->vmb_next = NULL;
 			first->vmb_start = s_start;
 			first->vmb_end = s_end;
 			first->vmb_type = VMUSAGE_BOUND_UNKNOWN;
@@ -1334,21 +1366,26 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 			    cur->vmb_start, cur->vmb_end, VMUSAGE_BOUND_UNKNOWN,
 			    &first, &last) > 0) {
 				/* new bounds, find incore/not-incore */
+				tree = &(shared_object->vmo_bounds);
 				if (shared_object->vmo_type ==
-				    VMUSAGE_TYPE_VNODE)
+				    VMUSAGE_TYPE_VNODE) {
 					vmu_vnode_update_incore_bounds(
+					    tree,
 					    (vnode_t *)
 					    shared_object->vmo_key, &first,
 					    &last);
-				else
+				} else {
 					vmu_amp_update_incore_bounds(
+					    tree,
 					    (struct anon_map *)
 					    shared_object->vmo_key, &first,
 					    &last, incore);
-				vmu_merge_bounds(&first, &last);
+				}
+				vmu_merge_bounds(tree, &first, &last);
 			}
 			for (entity = vmu_entities; entity != NULL;
 			    entity = entity->vme_next_calc) {
+				avl_tree_t *e_tree;
 
 				result = &entity->vme_result;
 
@@ -1368,8 +1405,9 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 				/*
 				 * Range visited for this entity
 				 */
-				rss = vmu_update_bounds(&e_first,
-				    &e_last, first, last);
+				e_tree = &(entity_object->vmo_bounds);
+				rss = vmu_update_bounds(e_tree, &e_first,
+				    &e_last, tree, first, last);
 				result->vmu_rss_all += (rss << PAGESHIFT);
 				if (shared == B_TRUE && file == B_FALSE) {
 					/* shared anon mapping */
@@ -1389,7 +1427,7 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 					result->vmu_rss_private +=
 					    (rss << PAGESHIFT);
 				}
-				vmu_merge_bounds(&e_first, &e_last);
+				vmu_merge_bounds(e_tree, &e_first, &e_last);
 			}
 			tmp = cur;
 			cur = cur->vmb_next;
