@@ -545,6 +545,7 @@ typedef struct rfs4_openowner {
  * finfo - reference to the open file for this state
  * share_access - how did the openowner OPEN the file (access)
  * share_deny - how did the openowner OPEN the file (deny)
+ * opened - has VOP_OPEN been done
  * closed - has this file been closed?
  * lostatelist - root of list of lo_state associated with this state/file
  * node - node for state struct list of states
@@ -556,6 +557,7 @@ typedef struct rfs4_state {
 	struct rfs4_file	*rs_finfo;
 	uint32_t		rs_share_access;
 	uint32_t		rs_share_deny;
+	unsigned		rs_opened:1;
 	unsigned		rs_closed:1;
 	list_t			rs_lostatelist;
 	list_node_t		rs_node;

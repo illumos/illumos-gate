@@ -6676,6 +6676,21 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		rfs4_recall_deleg(fp, FALSE, sp->rs_owner->ro_client);
 		delay(NFS4_DELEGATION_CONFLICT_DELAY);
 		rfs4_dbe_lock(sp->rs_dbe);
+
+		/* if state closed while lock was dropped */
+		if (sp->rs_closed) {
+			if (dmodes || amodes)
+				(void) rfs4_unshare(sp);
+			rfs4_dbe_unlock(sp->rs_dbe);
+			rfs4_file_rele(fp);
+			/* Not a fully formed open; "close" it */
+			if (screate == TRUE)
+				rfs4_state_close(sp, FALSE, FALSE, cs->cr);
+			rfs4_state_rele(sp);
+			resp->status = NFS4ERR_OLD_STATEID;
+			return;
+		}
+
 		rfs4_dbe_lock(fp->rf_dbe);
 		/* Let's see if the delegation was returned */
 		if (rfs4_check_recall(sp, access)) {
@@ -6743,6 +6758,7 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 			fflags |= FWRITE;
 		vn_open_upgrade(cs->vp, fflags);
 	}
+	sp->rs_opened = TRUE;
 
 	if (dmodes & OPEN4_SHARE_DENY_READ)
 		fp->rf_deny_read++;
@@ -8183,35 +8199,6 @@ rfs4_release_share_lock_state(rfs4_state_t *sp, cred_t *cr,
 	int fflags = 0;
 
 	/*
-	 * Decrement the count for each access and deny bit that this
-	 * state has contributed to the file. If the file counts go to zero
-	 * clear the appropriate bit in the appropriate mask.
-	 */
-
-	if (sp->rs_share_access & OPEN4_SHARE_ACCESS_READ) {
-		fp->rf_access_read--;
-		fflags |= FREAD;
-		if (fp->rf_access_read == 0)
-			fp->rf_share_access &= ~OPEN4_SHARE_ACCESS_READ;
-	}
-	if (sp->rs_share_access & OPEN4_SHARE_ACCESS_WRITE) {
-		fp->rf_access_write--;
-		fflags |= FWRITE;
-		if (fp->rf_access_write == 0)
-			fp->rf_share_access &= ~OPEN4_SHARE_ACCESS_WRITE;
-	}
-	if (sp->rs_share_deny & OPEN4_SHARE_DENY_READ) {
-		fp->rf_deny_read--;
-		if (fp->rf_deny_read == 0)
-			fp->rf_share_deny &= ~OPEN4_SHARE_DENY_READ;
-	}
-	if (sp->rs_share_deny & OPEN4_SHARE_DENY_WRITE) {
-		fp->rf_deny_write--;
-		if (fp->rf_deny_write == 0)
-			fp->rf_share_deny &= ~OPEN4_SHARE_DENY_WRITE;
-	}
-
-	/*
 	 * If this call is part of the larger closing down of client
 	 * state then it is just easier to release all locks
 	 * associated with this client instead of going through each
@@ -8280,7 +8267,41 @@ rfs4_release_share_lock_state(rfs4_state_t *sp, cred_t *cr,
 	if (sp->rs_owner->ro_client->rc_sysidt != LM_NOSYSID)
 		(void) rfs4_unshare(sp);
 
-	(void) VOP_CLOSE(fp->rf_vp, fflags, 1, (offset_t)0, cr, NULL);
+	if (sp->rs_opened) {
+		/*
+		 * Decrement the count for each access and deny bit that this
+		 * state has contributed to the file.
+		 * If the file counts go to zero
+		 * clear the appropriate bit in the appropriate mask.
+		 */
+		if (sp->rs_share_access & OPEN4_SHARE_ACCESS_READ) {
+			fp->rf_access_read--;
+			fflags |= FREAD;
+			if (fp->rf_access_read == 0)
+				fp->rf_share_access &= ~OPEN4_SHARE_ACCESS_READ;
+		}
+		if (sp->rs_share_access & OPEN4_SHARE_ACCESS_WRITE) {
+			fp->rf_access_write--;
+			fflags |= FWRITE;
+			if (fp->rf_access_write == 0)
+				fp->rf_share_access &=
+				    ~OPEN4_SHARE_ACCESS_WRITE;
+		}
+		if (sp->rs_share_deny & OPEN4_SHARE_DENY_READ) {
+			fp->rf_deny_read--;
+			if (fp->rf_deny_read == 0)
+				fp->rf_share_deny &= ~OPEN4_SHARE_DENY_READ;
+		}
+		if (sp->rs_share_deny & OPEN4_SHARE_DENY_WRITE) {
+			fp->rf_deny_write--;
+			if (fp->rf_deny_write == 0)
+				fp->rf_share_deny &= ~OPEN4_SHARE_DENY_WRITE;
+		}
+
+		(void) VOP_CLOSE(fp->rf_vp, fflags, 1, (offset_t)0, cr, NULL);
+
+		sp->rs_opened = FALSE;
+	}
 }
 
 /*
