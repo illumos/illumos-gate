@@ -103,32 +103,6 @@ static kbtrans_key_t keytab_pc2usb[KBTRANS_KEYNUMS_MAX] = {
 /* 248 */	0,	0,	0,	0
 };
 
-/*
- * DEBUG (or KD_DEBUG for just this module) turns on a flag called
- * kb8042_enable_debug_hotkey.  If kb8042_enable_debug_hotkey is true,
- * then the following hotkeys are enabled:
- *    F10 - turn on debugging "normal" translations
- *    F9  - turn on debugging "getchar" translations
- *    F8  - turn on "low level" debugging
- *    F7  - turn on terse press/release debugging
- *    F1  - turn off all debugging
- * The default value for kb8042_enable_debug_hotkey is false, disabling
- * these hotkeys.
- */
-
-#if	defined(DEBUG) || defined(lint)
-#define	KD_DEBUG
-#endif
-
-#ifdef	KD_DEBUG
-boolean_t	kb8042_enable_debug_hotkey = B_FALSE;
-boolean_t	kb8042_debug = B_FALSE;
-boolean_t	kb8042_getchar_debug = B_FALSE;
-boolean_t	kb8042_low_level_debug = B_FALSE;
-boolean_t	kb8042_pressrelease_debug = B_FALSE;
-static void kb8042_debug_hotkey(int scancode);
-#endif
-
 #ifdef __sparc
 #define	USECS_PER_WAIT 100
 #define	MAX_WAIT_USECS 100000 /* in usecs = 100 ms */
@@ -138,6 +112,9 @@ boolean_t kb8042_warn_unknown_scanset = B_TRUE;
 int kb8042_default_scanset = 2;
 
 #endif
+
+#define	MAX_KB8042_WAIT_MAX_MS	500		/* 500ms total */
+#define	MAX_KB8042_RETRIES	5
 
 enum state_return { STATE_NORMAL, STATE_INTERNAL };
 
@@ -312,21 +289,24 @@ kb8042_clear_input_buffer(struct kb8042 *kb8042, boolean_t polled)
 	}
 }
 
+/*
+ * kb8042_send_and_expect does all its I/O via polling interfaces
+ */
 static boolean_t
 kb8042_send_and_expect(struct kb8042 *kb8042, uint8_t send, uint8_t expect,
-    boolean_t polled, int timeout, int *error, uint8_t *got)
+    int timeout, int *error, uint8_t *got)
 {
-	int port = (polled == B_TRUE) ? I8042_POLL_INPUT_DATA :
-	    I8042_INT_INPUT_DATA;
 	uint8_t datab;
 	int err;
 	boolean_t rval;
 
-	kb8042_send_to_keyboard(kb8042, send, polled);
+	ddi_put8(kb8042->handle,
+	    kb8042->addr + I8042_POLL_OUTPUT_DATA, send);
 
-	if (kb8042_is_input_avail(kb8042, timeout, polled)) {
+	if (kb8042_is_input_avail(kb8042, timeout, B_TRUE)) {
 		err = 0;
-		datab = ddi_get8(kb8042->handle, kb8042->addr + port);
+		datab = ddi_get8(kb8042->handle,
+		    kb8042->addr + I8042_POLL_INPUT_DATA);
 		rval = ((datab == expect) ? B_TRUE : B_FALSE);
 	} else {
 		err = EAGAIN;
@@ -351,12 +331,16 @@ kb8042_error_string(int errcode)
 	}
 }
 
+/*
+ * kb8042_read_scanset works properly because it is called before ddi_add_intr
+ * (if it is called after ddi_add_intr, i8042_intr would call kb8042_intr
+ * instead of just storing the data that comes in from the keyboard, which
+ * would prevent the code here from getting it.)
+ */
 static int
-kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
+kb8042_read_scanset(struct kb8042 *kb8042)
 {
 	int scanset = -1;
-	int port = (polled == B_TRUE) ? I8042_POLL_INPUT_DATA :
-	    I8042_INT_INPUT_DATA;
 	int err;
 	uint8_t got;
 
@@ -366,8 +350,8 @@ kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
 	 * Send a "change scan code set" command to the keyboard.
 	 * It should respond with an ACK.
 	 */
-	if (kb8042_send_and_expect(kb8042, KB_SET_SCAN, KB_ACK, polled,
-	    MAX_WAIT_USECS, &err, &got) != B_TRUE) {
+	if (kb8042_send_and_expect(kb8042, KB_SET_SCAN, KB_ACK, MAX_WAIT_USECS,
+	    &err, &got) != B_TRUE) {
 		goto fail_read_scanset;
 	}
 
@@ -375,8 +359,8 @@ kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
 	 * Send a 0.  The keyboard should ACK the 0, then it should send the
 	 * scan code set in use.
 	 */
-	if (kb8042_send_and_expect(kb8042, 0, KB_ACK, polled,
-	    MAX_WAIT_USECS, &err, &got) != B_TRUE) {
+	if (kb8042_send_and_expect(kb8042, 0, KB_ACK, MAX_WAIT_USECS, &err,
+	    &got) != B_TRUE) {
 		goto fail_read_scanset;
 	}
 
@@ -386,11 +370,11 @@ kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
 	 * just for fun, so blow past those to get the keyboard scan code.
 	 */
 	while (kb8042_is_input_avail(kb8042, MAX_WAIT_USECS, B_TRUE) &&
-	    (scanset = ddi_get8(kb8042->handle, kb8042->addr + port))
-	    == KB_ACK)
+	    (scanset = ddi_get8(kb8042->handle,
+	    kb8042->addr + I8042_POLL_INPUT_DATA)) == KB_ACK)
 		;
 
-#ifdef KD_DEBUG
+#ifdef DEBUG
 	cmn_err(CE_NOTE, "!Scan code set from keyboard is `%d'.",
 	    scanset);
 #endif
@@ -398,7 +382,7 @@ kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
 	return (scanset);
 
 fail_read_scanset:
-#ifdef KD_DEBUG
+#ifdef DEBUG
 	if (err == 0)
 		cmn_err(CE_NOTE, "Could not read current scan set from "
 		    "keyboard: %s. (Expected 0x%x, but got 0x%x).",
@@ -473,7 +457,7 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	rc = ddi_regs_map_setup(devi, 0, (caddr_t *)&kb8042->addr,
 	    (offset_t)0, (offset_t)0, &attr, &kb8042->handle);
 	if (rc != DDI_SUCCESS) {
-#if	defined(KD_DEBUG)
+#ifdef DEBUG
 		cmn_err(CE_WARN, "kb8042_attach:  can't map registers");
 #endif
 		goto failure;
@@ -490,13 +474,14 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_init(&kb8042->w_hw_mutex, NULL, MUTEX_DRIVER, kb8042->w_iblock);
 	cv_init(&kb8042->ops_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&kb8042->suspend_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&kb8042->cmd_cv, NULL, CV_DRIVER, NULL);
 	kb8042->init_state |= KB8042_HW_MUTEX_INITTED;
 
 	kb8042_init(kb8042, B_FALSE);
 
 #ifdef __sparc
 	/* Detect the scan code set currently in use */
-	scanset = kb8042_read_scanset(kb8042, B_TRUE);
+	scanset = kb8042_read_scanset(kb8042);
 
 	if (scanset < 0 && kb8042_warn_unknown_scanset) {
 
@@ -542,7 +527,7 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	ddi_report_dev(devi);
 
-#ifdef	KD_DEBUG
+#ifdef DEBUG
 	cmn_err(CE_CONT, "?%s instance #%d READY\n",
 	    DRIVER_NAME(devi), ddi_get_instance(devi));
 #endif
@@ -620,14 +605,15 @@ kb8042_cleanup(struct kb8042 *kb8042)
 {
 	ASSERT(kb8042_dip != NULL);
 
+	if (kb8042->init_state & KB8042_INTR_ADDED)
+		ddi_remove_intr(kb8042_dip, 0, kb8042->w_iblock);
+
 	if (kb8042->init_state & KB8042_HW_MUTEX_INITTED) {
+		cv_destroy(&kb8042->cmd_cv);
 		cv_destroy(&kb8042->suspend_cv);
 		cv_destroy(&kb8042->ops_cv);
 		mutex_destroy(&kb8042->w_hw_mutex);
 	}
-
-	if (kb8042->init_state & KB8042_INTR_ADDED)
-		ddi_remove_intr(kb8042_dip, 0, kb8042->w_iblock);
 
 	if (kb8042->init_state & KB8042_REGS_MAPPED)
 		ddi_regs_map_free(&kb8042->handle);
@@ -657,8 +643,15 @@ kb8042_init(struct kb8042 *kb8042, boolean_t from_resume)
 
 	kb8042->kb_old_key_pos = 0;
 
+	/*
+	 * Explicitly grab and release the 8042 lock outside of
+	 * kb8042_send_to_keyboard, because this is the only situation
+	 * where a polling interface is used with locking required.
+	 */
+	(void) ddi_get8(kb8042->handle, kb8042->addr + I8042_LOCK);
 	/* Set up the command state machine and start it running. */
-	kb8042_send_to_keyboard(kb8042, KB_ENABLE, B_FALSE);
+	kb8042_send_to_keyboard(kb8042, KB_ENABLE, B_TRUE);
+	(void) ddi_get8(kb8042->handle, kb8042->addr + I8042_UNLOCK);
 
 	kb8042->w_init++;
 
@@ -1013,9 +1006,23 @@ kb8042_received_byte(
 	enum keystate	state;
 	boolean_t	synthetic_release_needed;
 
-#ifdef	KD_DEBUG
-	kb8042_debug_hotkey(scancode);
-#endif
+	/*
+	 * Intercept ACK and RESEND and signal the condition that
+	 * kb8042_send_and_wait is waiting for.
+	 */
+	if (scancode == KB_ACK) {
+		mutex_enter(&kb8042->w_hw_mutex);
+		kb8042->acked = 1;
+		cv_signal(&kb8042->cmd_cv);
+		mutex_exit(&kb8042->w_hw_mutex);
+		return;
+	} else if (scancode == KB_RESEND) {
+		mutex_enter(&kb8042->w_hw_mutex);
+		kb8042->need_retry = 1;
+		cv_signal(&kb8042->cmd_cv);
+		mutex_exit(&kb8042->w_hw_mutex);
+		return;
+	}
 
 	if (!kb8042->w_init)	/* can't do anything anyway */
 		return;
@@ -1025,48 +1032,23 @@ kb8042_received_byte(
 
 	if (legit == 0) {
 		/* Eaten by translation */
-#ifdef	KD_DEBUG
-		if (kb8042_debug)
-			prom_printf("kb8042_intr: 0x%x -> ignored\n", scancode);
-#endif
 		return;
 	}
-
-#ifdef	KD_DEBUG
-	if (kb8042_debug) {
-		prom_printf("kb8042_intr:  0x%x -> %s %d",
-		    scancode,
-		    state == KEY_RELEASED ? "released" : "pressed",
-		    key_pos);
-	}
-#endif
 
 	/*
 	 * Don't know if we want this permanently, but it seems interesting
 	 * for the moment.
 	 */
 	if (key_pos == kb8042->debugger.mod1) {
-#ifdef	KD_DEBUG
-		if (kb8042_debug)
-			prom_printf(" -> debug mod1");
-#endif
 		kb8042->debugger.mod1_down = (state == KEY_PRESSED);
 	}
 	if (key_pos == kb8042->debugger.mod2) {
-#ifdef	KD_DEBUG
-		if (kb8042_debug)
-			prom_printf(" -> debug mod2");
-#endif
 		kb8042->debugger.mod2_down = (state == KEY_PRESSED);
 	}
 	if (kb8042->debugger.enabled &&
 	    key_pos == kb8042->debugger.trigger &&
 	    kb8042->debugger.mod1_down &&
 	    kb8042->debugger.mod2_down) {
-#ifdef	KD_DEBUG
-		if (kb8042_debug)
-			prom_printf(" -> debugger\n");
-#endif
 		/*
 		 * Require new presses of the modifiers.
 		 */
@@ -1083,10 +1065,6 @@ kb8042_received_byte(
 	 * Ctrl-Alt-D still works.
 	 */
 	if (kb8042->w_qp == NULL) {
-#ifdef	KD_DEBUG
-		if (kb8042_debug)
-			prom_printf(" -> nobody home\n");
-#endif
 		return;
 	}
 
@@ -1097,27 +1075,11 @@ kb8042_received_byte(
 	 * Don't think so.)
 	 */
 	if (kb8042_autorepeat_detect(kb8042, key_pos, state)) {
-#ifdef	KD_DEBUG
-		if (kb8042_debug)
-			prom_printf(" -> autorepeat ignored\n");
-#endif
 		return;
 	}
 
-#ifdef	KD_DEBUG
-	if (kb8042_debug)
-		prom_printf(" -> OK\n");
-#endif
 
-#if	defined(KD_DEBUG)
-	if (kb8042_pressrelease_debug) {
-		prom_printf(" %s%d ",
-		    state == KEY_PRESSED ? "+" : "-",
-		    key_pos);
-	}
-#endif
-
-		kb8042_process_key(kb8042, key_pos, state);
+	kb8042_process_key(kb8042, key_pos, state);
 
 	/*
 	 * This is a total hack.  For some stupid reason, the two additional
@@ -1125,12 +1087,6 @@ kb8042_received_byte(
 	 * only.  We synthesize a release immediately.
 	 */
 	if (synthetic_release_needed) {
-#if	defined(KD_DEBUG)
-		if (kb8042_debug)
-			prom_printf("synthetic release %d\n", key_pos);
-		if (kb8042_pressrelease_debug)
-			prom_printf(" -%d(s) ", key_pos);
-#endif
 		(void) kb8042_autorepeat_detect(kb8042, key_pos, KEY_RELEASED);
 		kb8042_process_key(kb8042, key_pos, state);
 	}
@@ -1179,11 +1135,6 @@ kb8042_intr(caddr_t arg)
 		scancode = ddi_get8(kb8042->handle,
 		    kb8042->addr + I8042_INT_INPUT_DATA);
 
-#if	defined(KD_DEBUG)
-		if (kb8042_low_level_debug)
-			prom_printf(" <K:%x ", scancode);
-#endif
-
 		kb8042_received_byte(kb8042, scancode);
 	}
 
@@ -1223,10 +1174,6 @@ kb8042_polled_keycheck(
 		*key = kb8042->polled_synthetic_release_key;
 		*state = KEY_RELEASED;
 		kb8042->polled_synthetic_release_pending = B_FALSE;
-#if	defined(KD_DEBUG)
-		if (kb8042_getchar_debug)
-			prom_printf("synthetic release 0x%x\n", *key);
-#endif
 		(void) kb8042_autorepeat_detect(kb8042, *key, *state);
 		return (B_TRUE);
 	}
@@ -1240,33 +1187,11 @@ kb8042_polled_keycheck(
 		scancode = ddi_get8(kb8042->handle,
 		    kb8042->addr + I8042_POLL_INPUT_DATA);
 
-#if	defined(KD_DEBUG)
-		if (kb8042_low_level_debug)
-			prom_printf(" g<%x ", scancode);
-#endif
-
-#ifdef	KD_DEBUG
-		kb8042_debug_hotkey(scancode);
-		if (kb8042_getchar_debug)
-			prom_printf("polled 0x%x", scancode);
-#endif
-
 		legit = KeyboardConvertScan(kb8042, scancode, key, state,
 		    &synthetic_release_needed);
 		if (!legit) {
-#ifdef	KD_DEBUG
-			if (kb8042_getchar_debug)
-				prom_printf(" -> ignored\n");
-#endif
 			continue;
 		}
-#ifdef	KD_DEBUG
-		if (kb8042_getchar_debug) {
-			prom_printf(" -> %s %d\n",
-			    *state == KEY_PRESSED ? "pressed" : "released",
-			    *key);
-		}
-#endif
 		/*
 		 * For the moment at least, we rely on hardware autorepeat
 		 * for polled I/O autorepeat.  However, for coordination
@@ -1324,55 +1249,141 @@ kb8042_streams_setled(struct kbtrans_hardware *hw, int led_state)
 	kb8042_setled(kb8042, led_state, B_FALSE);
 }
 
+
+static int
+kb8042_send_and_wait(struct kb8042 *kb8042, uint8_t u8, boolean_t polled)
+{
+	uint8_t *outp = kb8042->addr +
+	    (polled ? I8042_POLL_OUTPUT_DATA : I8042_INT_OUTPUT_DATA);
+	uint8_t *inavp = kb8042->addr +
+	    (polled ? I8042_POLL_INPUT_AVAIL : I8042_INT_INPUT_AVAIL);
+	uint8_t *inp = kb8042->addr +
+	    (polled ? I8042_POLL_INPUT_DATA : I8042_INT_INPUT_DATA);
+	uint8_t b;
+	int ms_waited;
+	int timedout;
+	int expire;
+	int retries = 0;
+
+	do {
+		kb8042->acked = 0;
+		kb8042->need_retry = 0;
+		ms_waited = 0;		/* Zero it whether polled or not */
+		timedout = 0;
+
+		ddi_put8(kb8042->handle, outp, u8);
+
+		while (!kb8042->acked && !kb8042->need_retry && !timedout) {
+
+			if (polled) {
+				if (ddi_get8(kb8042->handle, inavp)) {
+					b = ddi_get8(kb8042->handle, inp);
+					switch (b) {
+					case KB_ACK:
+						kb8042->acked = 1;
+						break;
+					case KB_RESEND:
+						kb8042->need_retry = 1;
+						break;
+					default:
+						/*
+						 * drop it: We should never
+						 * get scancodes while
+						 * we're in the middle of a
+						 * command anyway.
+						 */
+#ifdef DEBUG
+						cmn_err(CE_WARN, "!Unexpected "
+						    " byte 0x%x", b);
+#endif
+						break;
+					}
+				}
+
+				/*
+				 * Wait 1ms if an ACK wasn't received yet
+				 */
+				if (!kb8042->acked) {
+					drv_usecwait(1000);
+					ms_waited++;
+					if (ms_waited >= MAX_KB8042_WAIT_MAX_MS)
+						timedout = B_TRUE;
+				}
+			} else {
+				/* Interrupt-driven */
+				expire = ddi_get_lbolt() +
+				    drv_usectohz(MAX_KB8042_WAIT_MAX_MS * 1000);
+
+				/*
+				 * If cv_timedwait returned -1 and we neither
+				 * received an ACK nor a RETRY response, then
+				 * we timed out.
+				 */
+				if (cv_timedwait(&kb8042->cmd_cv,
+				    &kb8042->w_hw_mutex, expire) == -1 &&
+				    !kb8042->acked && !kb8042->need_retry) {
+					timedout = B_TRUE;
+				}
+			}
+
+		}
+	} while ((kb8042->need_retry || timedout) &&
+	    ++retries < MAX_KB8042_RETRIES);
+
+	return (kb8042->acked);
+}
+
+/*
+ * kb8042_send_to_keyboard should be called with w_hw_mutex held if
+ * polled is FALSE.
+ */
 static void
 kb8042_send_to_keyboard(struct kb8042 *kb8042, int byte, boolean_t polled)
 {
-	uint8_t led_cmd[4];
 
 	/*
-	 * KB_SET_LED and KB_ENABLE are special commands for which the nexus
-	 * driver is requested to wait for responses before proceeding.
-	 * KB_SET_LED also provides an option byte for the nexus to send to
-	 * the keyboard after the acknowledgement.
+	 * KB_SET_LED and KB_ENABLE are special commands which require blocking
+	 * other 8042 consumers while executing.
 	 *
 	 * Other commands/data are sent using the single put8 I/O access
 	 * function.
 	 */
 	if (byte == KB_SET_LED) {
-		/*
-		 * Initialize the buffer used with _rep_put8.  We
-		 * expect an ACK after the SET_LED command, at which point
-		 * the LED byte should be sent to the keyboard.
-		 */
-		led_cmd[0] = KB_SET_LED;
-		led_cmd[1] = KB_ACK;
-		led_cmd[2] = KB_RESEND;
-		led_cmd[3] = kb8042_xlate_leds(kb8042->leds.desired);
-		if (polled) {
-			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 4, 0);
-		} else {
-			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 4, 0);
+
+		if (!polled) {
+			(void) ddi_get8(kb8042->handle, kb8042->addr +
+			    I8042_LOCK);
+		}
+
+		if (kb8042_send_and_wait(kb8042, KB_SET_LED, polled)) {
+			/*
+			 * Ignore return value, as there's nothing we can
+			 * do about it if the SET LED command fails.
+			 */
+			(void) kb8042_send_and_wait(kb8042,
+			    kb8042_xlate_leds(kb8042->leds.desired), polled);
+		}
+
+		if (!polled) {
+			(void) ddi_get8(kb8042->handle, kb8042->addr +
+			    I8042_UNLOCK);
 		}
 		kb8042->leds.commanded = kb8042->leds.desired;
 
 	} else if (byte == KB_ENABLE) {
 
-		/*
-		 * Initialize the buffer used with _rep_put8.  We
-		 * expect an ACK after the KB_ENABLE command.
-		 */
-		led_cmd[0] = KB_ENABLE;
-		led_cmd[1] = KB_ACK;
-		led_cmd[2] = KB_RESEND;
-		if (polled) {
-			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_POLL_CMD_PLUS_PARAM, 3, 0);
-		} else {
-			ddi_rep_put8(kb8042->handle, &led_cmd[0],
-			    kb8042->addr + I8042_INT_CMD_PLUS_PARAM, 3, 0);
+		if (!polled) {
+			(void) ddi_get8(kb8042->handle, kb8042->addr +
+			    I8042_LOCK);
 		}
+
+		(void) kb8042_send_and_wait(kb8042, KB_ENABLE, polled);
+
+		if (!polled) {
+			(void) ddi_get8(kb8042->handle, kb8042->addr +
+			    I8042_UNLOCK);
+		}
+
 	} else {
 		/* All other commands use the "normal" virtual output port */
 		if (polled) {
@@ -1383,11 +1394,6 @@ kb8042_send_to_keyboard(struct kb8042 *kb8042, int byte, boolean_t polled)
 			    kb8042->addr + I8042_INT_OUTPUT_DATA, byte);
 		}
 	}
-
-#if	defined(KD_DEBUG)
-	if (kb8042_low_level_debug)
-		prom_printf(" >K:%x ", byte);
-#endif
 }
 
 /*
@@ -1404,7 +1410,6 @@ kb8042_wait_poweron(struct kb8042 *kb8042)
 {
 	int cnt;
 	int ready;
-	unsigned char byt;
 
 	/* wait for up to 250 ms for a response */
 	for (cnt = 0; cnt < 250; cnt++) {
@@ -1421,12 +1426,8 @@ kb8042_wait_poweron(struct kb8042 *kb8042)
 	 * already.  (On a PC, the BIOS almost certainly did.)
 	 */
 	if (ready != 0) {
-		byt = ddi_get8(kb8042->handle,
+		(void) ddi_get8(kb8042->handle,
 		    kb8042->addr + I8042_INT_INPUT_DATA);
-#if	defined(KD_DEBUG)
-		if (kb8042_low_level_debug)
-			prom_printf(" <K:%x ", byt);
-#endif
 	}
 }
 
@@ -1473,55 +1474,6 @@ kb8042_get_initial_leds(
 	*initial_led_mask = 0;
 #endif
 }
-
-#if	defined(KD_DEBUG)
-static void
-kb8042_debug_hotkey(int scancode)
-{
-	if (!kb8042_enable_debug_hotkey)
-		return;
-
-	switch (scancode) {
-	case 0x44:	/* F10 in Scan Set 1 code.  (Set 2 code is 0x09)  */
-		if (!kb8042_debug) {
-			prom_printf("\nKeyboard:  normal debugging on\n");
-			kb8042_debug = B_TRUE;
-		}
-		break;
-	case 0x43:	/* F9 in Scan Set 1 code.  (Set 2 code is 0x01) */
-		if (!kb8042_getchar_debug) {
-			prom_printf("\nKeyboard:  getchar debugging on\n");
-			kb8042_getchar_debug = B_TRUE;
-		}
-		break;
-	case 0x42:	/* F8 in Scan Set 1 code.  (Set 2 code is 0x0a) */
-		if (!kb8042_low_level_debug) {
-			prom_printf("\nKeyboard:  low-level debugging on\n");
-			kb8042_low_level_debug = B_TRUE;
-		}
-		break;
-	case 0x41:	/* F7 in Scan Set 1 code.  (Set 2 code is 0x83) */
-		if (!kb8042_pressrelease_debug) {
-			prom_printf(
-			    "\nKeyboard:  press/release debugging on\n");
-			kb8042_pressrelease_debug = B_TRUE;
-		}
-		break;
-	case 0x3b:	/* F1 in Scan Set 1 code.  (Set 2 code is 0x05) */
-		if (kb8042_debug ||
-		    kb8042_getchar_debug ||
-		    kb8042_low_level_debug ||
-		    kb8042_pressrelease_debug) {
-			prom_printf("\nKeyboard:  all debugging off\n");
-			kb8042_debug = B_FALSE;
-			kb8042_getchar_debug = B_FALSE;
-			kb8042_low_level_debug = B_FALSE;
-			kb8042_pressrelease_debug = B_FALSE;
-		}
-		break;
-	}
-}
-#endif
 
 static boolean_t
 kb8042_autorepeat_detect(

@@ -59,18 +59,18 @@
 #define	PS2_DELTA_Y			3	/* Got delta X		*/
 #define	PS2_WHEEL_DELTA_Z		4
 #define	PS2_WHEEL5_DELTA_Z		5
-#define	PS2_WAIT_RESET_ACK		6
-#define	PS2_WAIT_RESET_AA		7
-#define	PS2_WAIT_RESET_00		8
+#define	PS2_WAIT_RESET_COMPLETE		6
+#define	PS2_WAIT_FOR_AA			7
+#define	PS2_WAIT_FOR_00			8
 #define	PS2_WAIT_SETRES0_ACK1		9
 #define	PS2_WAIT_SETRES0_ACK2		10	/* -+ must be consecutive */
 #define	PS2_WAIT_SCALE1_1_ACK		11	/*  | */
 #define	PS2_WAIT_SCALE1_2_ACK		12	/*  | */
 #define	PS2_WAIT_SCALE1_3_ACK		13	/* -+ */
-#define	PS2_WAIT_STATREQ_ACK		14
-#define	PS2_WAIT_STATUS_1		15
-#define	PS2_WAIT_STATUS_BUTTONS		16
-#define	PS2_WAIT_STATUS_REV		17
+#define	PS2_WAIT_STATREQ_ACK		14	/* -+ */
+#define	PS2_WAIT_STATUS_1		15	/*  | */
+#define	PS2_WAIT_STATUS_BUTTONS		16	/*  | must stay in this order */
+#define	PS2_WAIT_STATUS_REV		17	/* -+ */
 #define	PS2_WAIT_STATUS_3		18
 #define	PS2_WAIT_WHEEL_SMPL1_CMD_ACK	19	/* Set the sample rate to 200 */
 #define	PS2_WAIT_WHEEL_SMPL1_RATE_ACK	20
@@ -94,9 +94,6 @@
 #define	PS2_WAIT_STREAM_ACK		38
 #define	PS2_WAIT_ON_ACK			39
 
-#define	MSE_AA		0xaa
-#define	MSE_00		0x00
-
 #define	MOUSE_MODE_PLAIN	0	/* Normal PS/2 mouse - 3 byte msgs */
 #define	MOUSE_MODE_WHEEL	1	/* Wheel mouse - 4 byte msgs */
 #define	MOUSE_MODE_WHEEL5	2	/* Wheel + 5 btn mouse - 4 byte msgs */
@@ -115,7 +112,6 @@
 
 #define	PS2_MAX_INIT_COUNT	5
 
-
 static void vuidmice_send_wheel_event(queue_t *const, uchar_t,
 		uchar_t, uchar_t, int);
 extern void VUID_PUTNEXT(queue_t *const, uchar_t, uchar_t, uchar_t, int);
@@ -126,7 +122,6 @@ static void VUID_INIT_TIMEOUT(void *q);
  * We apply timeout to nearly each command-response
  * during initialization:
  *
- * Set timeout for RESET
  * Set timeout for SET RESOLUTION
  * Set timeout for SET SCALE
  * Set timeout for SET SAMPLE RATE
@@ -141,7 +136,8 @@ static void VUID_INIT_TIMEOUT(void *q);
 static void
 vuid_set_timeout(queue_t *const qp, clock_t time)
 {
-	ASSERT(STATEP->init_tid == 0);
+	if (STATEP->init_tid != 0)
+		(void) quntimeout(qp, STATEP->init_tid);
 	STATEP->init_tid = qtimeout(qp, VUID_INIT_TIMEOUT,
 	    qp, drv_usectohz(time));
 }
@@ -149,7 +145,6 @@ vuid_set_timeout(queue_t *const qp, clock_t time)
 static void
 vuid_cancel_timeout(queue_t *const qp)
 {
-	ASSERT(STATEP->init_tid != 0);
 	(void) quntimeout(qp, STATEP->init_tid);
 	STATEP->init_tid = 0;
 }
@@ -214,6 +209,30 @@ put1(queue_t *const qp, int c)
 	}
 }
 
+static void
+vuidmice_start_wdc_or_setres(queue_t *qp)
+{
+	/* Set timeout for set res or sample rate */
+	vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_GROUP);
+
+	/*
+	 * Start the wheel-mouse detection code.  First, we look
+	 * for standard wheel mice.  If we set the sample rate
+	 * to 200, 100, and then 80 and finally request the
+	 * device ID, a wheel mouse will return an ID of 0x03.
+	 * After that, we'll try for the wheel+5 variety.  The
+	 * incantation in this case is 200, 200, and 80.  We'll
+	 * get 0x04 back in that case.
+	 */
+	if (STATEP->inited & PS2_FLAG_NO_EXTN) {
+		STATEP->state = PS2_WAIT_SETRES3_ACK1;
+		put1(WR(qp), MSESETRES);
+	} else {
+		STATEP->state = PS2_WAIT_WHEEL_SMPL1_CMD_ACK;
+		put1(WR(qp), MSECHGMOD);
+	}
+}
+
 int
 VUID_OPEN(queue_t *const qp)
 {
@@ -222,10 +241,7 @@ VUID_OPEN(queue_t *const qp)
 	STATEP->inited = 0;
 	STATEP->nbuttons = 3;
 
-	STATEP->state = PS2_WAIT_RESET_ACK;
-
-	/* Set timeout for reset */
-	vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+	STATEP->state = PS2_WAIT_RESET_COMPLETE;
 
 	put1(WR(qp), MSERESET);
 
@@ -277,24 +293,49 @@ VUID_INIT_TIMEOUT(void *q)
 		STATEP->inited |= PS2_FLAG_NO_EXTN;
 	}
 
-	if (++STATEP->init_count >= PS2_MAX_INIT_COUNT) {
-		STATEP->inited |= PS2_FLAG_INIT_TIMEOUT;
+
+	/*
+	 * If the Logitech button detection sequence timed out at some point
+	 * in the sequence, ignore it and skip to the next step in
+	 * initialization.  Do NOT count this as a timeout, so do NOT
+	 * increment init_count.
+	 */
+	if (STATEP->state >= PS2_WAIT_STATREQ_ACK &&
+	    STATEP->state <= PS2_WAIT_STATUS_REV) {
+
+		/* See the comment under the PS2_WAIT_STATUS_BUTTONS case */
+#if	defined(VUID3PS2)
+		STATEP->nbuttons = 3;
+#else
+		STATEP->nbuttons = 2;
+#endif
+		vuidmice_start_wdc_or_setres(qp);
 		return;
 	}
 
+	/*
+	 * If the initialization process has timed out too many times, even if
+	 * a subset of the process was successful, stop trying and put the
+	 * mouse in the only state from which it can recover -- waiting for an
+	 * 0xAA 0x00 response (i.e. like one we get on resume from mouse8042
+	 * or from a replug).
+	 */
+	if (++STATEP->init_count >= PS2_MAX_INIT_COUNT) {
+		STATEP->inited |= PS2_FLAG_INIT_TIMEOUT;
+		STATEP->state = PS2_WAIT_FOR_AA;
+	} else {
 
-	STATEP->state = PS2_WAIT_RESET_ACK;
+		STATEP->state = PS2_WAIT_RESET_COMPLETE;
 
-	vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
-
-	/* try again */
-	put1(WR(qp), MSERESET);
+		/* Try to reset the mouse again */
+		put1(WR(qp), MSERESET);
+	}
 }
 
 void
 VUID_QUEUE(queue_t *const qp, mblk_t *mp)
 {
-	int code;
+	int code, length;
 	clock_t now;
 	clock_t elapsed;
 	clock_t mouse_timeout;
@@ -305,6 +346,7 @@ VUID_QUEUE(queue_t *const qp, mblk_t *mp)
 	STATEP->last_event_lbolt = now;
 
 	while (mp->b_rptr < mp->b_wptr) {
+		length = MBLKL(mp);
 		code = *mp->b_rptr++;
 
 		switch (STATEP->state) {
@@ -391,10 +433,39 @@ restart:
 
 			break;
 
+		case PS2_WAIT_FOR_AA:
+			/*
+			 * On Dell latitude D800, the initial MSE_ACK is
+			 * received after the initialization sequence
+			 * times out, so restart it here.
+			 */
+			if (code == MSE_ACK) {
+				STATEP->inited &= ~PS2_FLAG_INIT_TIMEOUT;
+				STATEP->init_count = 0;
+				STATEP->state = PS2_WAIT_RESET_COMPLETE;
+				put1(WR(qp), MSERESET);
+				break;
+			}
+
+			if (code != MSE_AA)
+				break;
+
+			STATEP->state = PS2_WAIT_FOR_00;
+			break;
+
+		case PS2_WAIT_FOR_00:
+			if (code != MSE_00)
+				break;
+
+			STATEP->inited &= ~PS2_FLAG_INIT_TIMEOUT;
+			STATEP->init_count = 0;
+			STATEP->state = PS2_WAIT_RESET_COMPLETE;
+			put1(WR(qp), MSERESET);
+			break;
+
 		case PS2_MAYBE_REATTACH:
 			if (code == MSE_00) {
-				STATEP->state = PS2_WAIT_RESET_ACK;
-				vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+				STATEP->state = PS2_WAIT_RESET_COMPLETE;
 				put1(WR(qp), MSERESET);
 				break;
 			}
@@ -542,48 +613,48 @@ packet_complete:
 			STATEP->deltax = STATEP->deltay = 0;
 			break;
 
-		case PS2_WAIT_RESET_ACK:
-			if (code != MSE_ACK) {
-				break;
-			}
+		case PS2_WAIT_RESET_COMPLETE:
 
 			/*
-			 * On Dell latitude D800, we find that the MSE_ACK is
-			 * coming up even after timeout in VUID_OPEN during
-			 * early boot. So here (PS2_WAIT_RESET_ACK) we check
-			 * if timeout happened before, if true, we reset the
-			 * timeout to restart the initialization.
+			 * If length is 1, code holds the data from the message.
+			 * for lengths > 1, we look at *(mp->b_rptr + offset)
+			 * for the rest of the data.
 			 */
-			if (STATEP->inited & PS2_FLAG_INIT_TIMEOUT) {
-				STATEP->inited &= ~PS2_FLAG_INIT_TIMEOUT;
-				STATEP->init_count = 0;
-				vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+			if (length == 1) {
+				/*
+				 * Technically, a length of 1 from the mouse
+				 * driver should only contain a MSEERROR or
+				 * MSERESEND value, but we don't test
+				 * that here because we'd be issuing a reset
+				 * anyway.  For mice that are not connected,
+				 * we will receive a MSERESEND quickly.
+				 */
+				if (++STATEP->init_count >=
+				    PS2_MAX_INIT_COUNT) {
+					STATEP->inited |= PS2_FLAG_INIT_TIMEOUT;
+					STATEP->state = PS2_WAIT_FOR_AA;
+				} else {
+					put1(WR(qp), MSERESET);
+				}
+				break;
+
+			} else if (length != 3) {
 				break;
 			}
 
-			STATEP->state = PS2_WAIT_RESET_AA;
-			break;
+			ASSERT(code == MSE_ACK && *(mp->b_rptr + 1) == 0xAA &&
+			    *(mp->b_rptr + 2) == 0x00);
 
-		case PS2_WAIT_RESET_AA:
-			if (code != MSE_AA) {
-				break;
-			}
-			STATEP->state = PS2_WAIT_RESET_00;
-			break;
+			mp->b_rptr += 2;	/* Skip past the 0xAA 0x00 */
 
-		case PS2_WAIT_RESET_00:
-			if (code != MSE_00) {
-				break;
-			}
-
-			/* Reset has been ok */
-			vuid_cancel_timeout(qp);
+			/* Reset completed successfully */
 
 			STATEP->state = PS2_WAIT_SETRES0_ACK1;
 
 			/* Set timeout for set res */
 			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_GROUP);
 
+			/* Begin Logitech autodetect sequence */
 			put1(WR(qp), MSESETRES);
 			break;
 
@@ -673,30 +744,12 @@ packet_complete:
 
 		case PS2_WAIT_STATUS_3:
 
-			/* Status request has been ok */
+			/* Status request completed successfully */
 			vuid_cancel_timeout(qp);
 
-			/* Set timeout for set res or sample rate */
-			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_GROUP);
-
-			/*
-			 * Start the wheel-mouse detection code.  First, we look
-			 * for standard wheel mice.  If we set the sample rate
-			 * to 200, 100, and then 80 and finally request the
-			 * device ID, a wheel mouse will return an ID of 0x03.
-			 * After that, we'll try for the wheel+5 variety.  The
-			 * incantation in this case is 200, 200, and 80.  We'll
-			 * get 0x04 back in that case.
-			 */
-			if (STATEP->inited & PS2_FLAG_NO_EXTN) {
-				STATEP->state = PS2_WAIT_SETRES3_ACK1;
-				put1(WR(qp), MSESETRES);
-			} else {
-				STATEP->state = PS2_WAIT_WHEEL_SMPL1_CMD_ACK;
-				put1(WR(qp), MSECHGMOD);
-			}
-
+			vuidmice_start_wdc_or_setres(qp);
 			break;
+
 		case PS2_WAIT_WHEEL_SMPL1_CMD_ACK:
 			if (code != MSE_ACK) {
 				break;
@@ -741,7 +794,7 @@ packet_complete:
 				break;
 			}
 
-			/* Set sample rate has been ok */
+			/* Set sample rate completed successfully */
 			vuid_cancel_timeout(qp);
 
 			STATEP->state = PS2_WAIT_WHEEL_DEV_CMD;
@@ -761,7 +814,7 @@ packet_complete:
 
 		case PS2_WAIT_WHEEL_DEV_ACK:
 
-			/* Get dev has been ok */
+			/* Get dev completed successfully */
 			vuid_cancel_timeout(qp);
 
 			if (code != 0x03) {
@@ -837,7 +890,7 @@ packet_complete:
 				break;
 			}
 
-			/* Set sample rate has been ok */
+			/* Set sample rate completed successfully */
 			vuid_cancel_timeout(qp);
 
 			STATEP->state = PS2_WAIT_WHEEL5_DEV_CMD;
@@ -869,7 +922,7 @@ packet_complete:
 				    MOUSE_MODE_WHEEL;
 			}
 
-			/* Wheel5 get dev has been ok */
+			/* Wheel5 get dev completed successfully */
 			vuid_cancel_timeout(qp);
 
 			/* FALLTHROUGH */
@@ -897,7 +950,7 @@ packet_complete:
 				break;
 			}
 
-			/* Set res has been ok */
+			/* Set res completed successfully */
 			vuid_cancel_timeout(qp);
 
 			STATEP->state = PS2_WAIT_STREAM_ACK;
@@ -922,8 +975,16 @@ packet_complete:
 				break;
 			}
 
-			/* Enable has been ok */
+			/* Enable completed successfully */
+
+			/*
+			 * The entire initialization sequence
+			 * is complete.  Now, we can clear the
+			 * init_count retry counter.
+			 */
+			STATEP->init_count = 0;
 			vuid_cancel_timeout(qp);
+
 
 			STATEP->state = PS2_START;
 			break;

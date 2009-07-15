@@ -23,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/stream.h>
 #include <sys/stropts.h>
 #include <sys/strtty.h>
+#include <sys/strsun.h>
 #include <sys/debug.h>
 #include <sys/ddi.h>
 #include <sys/stat.h>
@@ -53,16 +54,15 @@
 
 #include <sys/i8042.h>
 #include <sys/note.h>
+#include <sys/mouse.h>
 
 #define	DRIVER_NAME(dip)	ddi_driver_name(dip)
-
-#ifdef	DEBUG
-#define	MOUSE8042_DEBUG
-#endif
 
 #define	MOUSE8042_INTERNAL_OPEN(minor)	(((minor) & 0x1) == 1)
 #define	MOUSE8042_MINOR_TO_INSTANCE(minor)	((minor) / 2)
 #define	MOUSE8042_INTERNAL_MINOR(minor)		((minor) + 1)
+
+#define	MOUSE8042_RESET_TIMEOUT_USECS	500000	/* 500 ms */
 
 extern int ddi_create_internal_pathname(dev_info_t *, char *, int, minor_t);
 extern void consconfig_link(major_t major, minor_t minor);
@@ -85,6 +85,17 @@ extern int consconfig_unlink(major_t major, minor_t minor);
  */
 static dev_info_t *mouse8042_dip;
 
+/*
+ * RESET states
+ */
+typedef enum {
+	MSE_RESET_IDLE,	/* No reset in progress */
+	MSE_RESET_PRE,	/* Send reset, waiting for ACK */
+	MSE_RESET_ACK,	/* Got ACK, waiting for 0xAA */
+	MSE_RESET_AA,	/* Got 0xAA, waiting for 0x00 */
+	MSE_RESET_FAILED
+} mouse8042_reset_state_e;
+
 struct mouse_state {
 	queue_t	*ms_rqp;
 	queue_t	*ms_wqp;
@@ -95,18 +106,19 @@ struct mouse_state {
 
 	minor_t			ms_minor;
 	boolean_t		ms_opened;
+	kmutex_t		reset_mutex;
+	mouse8042_reset_state_e	reset_state;
+	timeout_id_t		reset_tid;
+	int			ready;
+	mblk_t			*reply_mp;
+	bufcall_id_t		bc_id;
 };
-
-#if	defined(MOUSE8042_DEBUG)
-int mouse8042_debug = 0;
-int mouse8042_debug_minimal = 0;
-#endif
 
 static uint_t mouse8042_intr(caddr_t arg);
 static int mouse8042_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		cred_t *cred_p);
 static int mouse8042_close(queue_t *q, int flag, cred_t *cred_p);
-static int mouse8042_wput(queue_t *q, mblk_t *mp);
+static int mouse8042_wsrv(queue_t *qp);
 
 static int mouse8042_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 		void *arg, void **result);
@@ -137,8 +149,8 @@ static struct qinit mouse8042_rinit = {
 };
 
 static struct qinit mouse8042_winit = {
-	mouse8042_wput,	/* put */
-	NULL,		/* service */
+	putq,		/* put */
+	mouse8042_wsrv,	/* service */
 	NULL,		/* open */
 	NULL,		/* close */
 	NULL,		/* admin */
@@ -254,14 +266,11 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int rc;
 
 
-#ifdef MOUSE8042_DEBUG
-	if (mouse8042_debug) {
-		cmn_err(CE_CONT, MODULE_NAME "_attach entry\n");
-	}
-#endif
-
 	if (cmd == DDI_RESUME) {
 		state = (struct mouse_state *)ddi_get_driver_private(dip);
+
+		/* Ready to handle inbound data from mouse8042_intr */
+		state->ready = 1;
 
 		/*
 		 * Send a 0xaa 0x00 upstream.
@@ -289,6 +298,9 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* allocate and initialize state structure */
 	state = kmem_zalloc(sizeof (struct mouse_state), KM_SLEEP);
 	state->ms_opened = B_FALSE;
+	state->reset_state = MSE_RESET_IDLE;
+	state->reset_tid = 0;
+	state->bc_id = 0;
 	ddi_set_driver_private(dip, state);
 
 	/*
@@ -310,10 +322,6 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rc = ddi_create_minor_node(dip, "mouse", S_IFCHR, instance * 2,
 	    DDI_NT_MOUSE, NULL);
 	if (rc != DDI_SUCCESS) {
-#if	defined(MOUSE8042_DEBUG)
-		cmn_err(CE_CONT,
-		    MODULE_NAME "_attach: ddi_create_minor_node failed\n");
-#endif
 		goto fail_1;
 	}
 
@@ -325,41 +333,33 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rc = ddi_regs_map_setup(dip, 0, (caddr_t *)&state->ms_addr,
 	    (offset_t)0, (offset_t)0, &attr, &state->ms_handle);
 	if (rc != DDI_SUCCESS) {
-#if	defined(MOUSE8042_DEBUG)
-		cmn_err(CE_WARN, MODULE_NAME "_attach:  can't map registers");
-#endif
 		goto fail_2;
 	}
 
 	rc = ddi_get_iblock_cookie(dip, 0, &state->ms_iblock_cookie);
 	if (rc != DDI_SUCCESS) {
-#if	defined(MOUSE8042_DEBUG)
-		cmn_err(CE_WARN,
-		    MODULE_NAME "_attach:  Can't get iblock cookie");
-#endif
 		goto fail_3;
 	}
 
 	mutex_init(&state->ms_mutex, NULL, MUTEX_DRIVER,
+	    state->ms_iblock_cookie);
+	mutex_init(&state->reset_mutex, NULL, MUTEX_DRIVER,
 	    state->ms_iblock_cookie);
 
 	rc = ddi_add_intr(dip, 0,
 	    (ddi_iblock_cookie_t *)NULL, (ddi_idevice_cookie_t *)NULL,
 	    mouse8042_intr, (caddr_t)state);
 	if (rc != DDI_SUCCESS) {
-#if	defined(MOUSE8042_DEBUG)
-		cmn_err(CE_WARN, MODULE_NAME "_attach: cannot add interrupt");
-#endif
 		goto fail_3;
 	}
 
 	mouse8042_dip = dip;
 
+	/* Ready to handle inbound data from mouse8042_intr */
+	state->ready = 1;
+
 	/* Now that we're attached, announce our presence to the world. */
 	ddi_report_dev(dip);
-#if	defined(MOUSE8042_DEBUG)
-	cmn_err(CE_CONT, "?%s #%d\n", DRIVER_NAME(dip), ddi_get_instance(dip));
-#endif
 	return (DDI_SUCCESS);
 
 fail_3:
@@ -383,11 +383,14 @@ mouse8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_SUSPEND:
+		/* Ignore all data from mouse8042_intr until we fully resume */
+		state->ready = 0;
 		return (DDI_SUCCESS);
 
 	case DDI_DETACH:
 		ddi_remove_intr(dip, 0, state->ms_iblock_cookie);
 		mouse8042_dip = NULL;
+		mutex_destroy(&state->reset_mutex);
 		mutex_destroy(&state->ms_mutex);
 		ddi_prop_remove_all(dip);
 		ddi_regs_map_free(&state->ms_handle);
@@ -396,12 +399,6 @@ mouse8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_SUCCESS);
 
 	default:
-#ifdef MOUSE8042_DEBUG
-		if (mouse8042_debug) {
-			cmn_err(CE_CONT,
-			    "mouse8042_detach: cmd = %d unknown\n", cmd);
-		}
-#endif
 		return (DDI_FAILURE);
 	}
 }
@@ -419,10 +416,6 @@ mouse8042_getinfo(
 	minor_t	minor = getminor(dev);
 	int	instance = MOUSE8042_MINOR_TO_INSTANCE(minor);
 
-#ifdef MOUSE8042_DEBUG
-	if (mouse8042_debug)
-		cmn_err(CE_CONT, "mouse8042_getinfo: call\n");
-#endif
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
 		if (mouse8042_dip == NULL)
@@ -456,11 +449,6 @@ mouse8042_open(
 		return (ENXIO);
 
 	state = ddi_get_driver_private(mouse8042_dip);
-
-#ifdef MOUSE8042_DEBUG
-	if (mouse8042_debug)
-		cmn_err(CE_CONT, "mouse8042_open:entered\n");
-#endif
 
 	mutex_enter(&state->ms_mutex);
 
@@ -545,14 +533,22 @@ mouse8042_close(queue_t *q, int flag, cred_t *cred_p)
 
 	state = (struct mouse_state *)q->q_ptr;
 
-#ifdef MOUSE8042_DEBUG
-	if (mouse8042_debug)
-		cmn_err(CE_CONT, "mouse8042_close:entered\n");
-#endif
-
 	mutex_enter(&state->ms_mutex);
 
 	qprocsoff(q);
+
+	if (state->reset_tid != 0) {
+		(void) quntimeout(q, state->reset_tid);
+		state->reset_tid = 0;
+	}
+	if (state->bc_id != 0) {
+		(void) qunbufcall(q, state->bc_id);
+		state->bc_id = 0;
+	}
+	if (state->reply_mp != NULL) {
+		freemsg(state->reply_mp);
+		state->reply_mp = NULL;
+	}
 
 	q->q_ptr = NULL;
 	WR(q)->q_ptr = NULL;
@@ -600,78 +596,267 @@ mouse8042_iocnack(
 	qreply(qp, mp);
 }
 
-static int
-mouse8042_wput(queue_t *q, mblk_t *mp)
+static void
+mouse8042_reset_timeout(void *argp)
 {
-	struct iocblk *iocbp;
+	struct mouse_state *state = (struct mouse_state *)argp;
+	mblk_t *mp;
+
+	mutex_enter(&state->reset_mutex);
+
+	/*
+	 * If the interrupt handler hasn't completed the reset handling
+	 * (reset_state would be IDLE or FAILED in that case), then
+	 * drop the 8042 lock, and send a faked retry reply upstream,
+	 * then enable the queue for further message processing.
+	 */
+	if (state->reset_state != MSE_RESET_IDLE &&
+	    state->reset_state != MSE_RESET_FAILED) {
+
+		state->reset_tid = 0;
+		state->reset_state = MSE_RESET_IDLE;
+
+		(void) ddi_get8(state->ms_handle, state->ms_addr +
+		    I8042_UNLOCK);
+
+		mp = state->reply_mp;
+		*mp->b_wptr++ = MSERESEND;
+		state->reply_mp = NULL;
+
+		if (state->ms_rqp != NULL)
+			putnext(state->ms_rqp, mp);
+		else
+			freemsg(mp);
+
+		ASSERT(state->ms_wqp != NULL);
+
+		enableok(state->ms_wqp);
+		qenable(state->ms_wqp);
+	}
+
+	mutex_exit(&state->reset_mutex);
+}
+
+/*
+ * Returns 1 if the caller should put the message (bp) back on the queue
+ */
+static int
+mouse8042_process_reset(queue_t *q, mblk_t *mp, struct mouse_state *state)
+{
+	mutex_enter(&state->reset_mutex);
+	/*
+	 * If we're in the middle of a reset, put the message back on the queue
+	 * for processing later.
+	 */
+	if (state->reset_state != MSE_RESET_IDLE) {
+		/*
+		 * We noenable the queue again here in case it was backenabled
+		 * by an upper-level module.
+		 */
+		noenable(q);
+
+		mutex_exit(&state->reset_mutex);
+		return (1);
+	}
+
+	/*
+	 * Drop the reset state lock before allocating the response message and
+	 * grabbing the 8042 exclusive-access lock (since those operations
+	 * may take an extended period of time to complete).
+	 */
+	mutex_exit(&state->reset_mutex);
+
+	state->reply_mp = allocb(3, BPRI_MED);
+	if (state->reply_mp == NULL) {
+		/*
+		 * Allocation failed -- set up a bufcall to enable the queue
+		 * whenever there is enough memory to allocate the response
+		 * message.
+		 */
+		state->bc_id = qbufcall(q, 3, BPRI_MED,
+		    (void (*)(void *))qenable, q);
+
+		if (state->bc_id == 0) {
+			/*
+			 * If the qbufcall failed, we cannot proceed, so use the
+			 * message we were sent to respond with an error.
+			 */
+			*mp->b_rptr = MSEERROR;
+			mp->b_wptr = mp->b_rptr + 1;
+			qreply(q, mp);
+			return (0);
+		}
+
+		return (1);
+	}
+
+	/*
+	 * Gain exclusive access to the 8042 for the duration of the reset.
+	 * The unlock will occur when the reset has either completed or timed
+	 * out.
+	 */
+	(void) ddi_get8(state->ms_handle,
+	    state->ms_addr + I8042_LOCK);
+
+	mutex_enter(&state->reset_mutex);
+
+	state->reset_state = MSE_RESET_PRE;
+	noenable(q);
+
+	state->reset_tid = qtimeout(q,
+	    mouse8042_reset_timeout,
+	    state,
+	    drv_usectohz(
+	    MOUSE8042_RESET_TIMEOUT_USECS));
+
+	ddi_put8(state->ms_handle,
+	    state->ms_addr +
+	    I8042_INT_OUTPUT_DATA, MSERESET);
+
+	mp->b_rptr++;
+
+	mutex_exit(&state->reset_mutex);
+	return (1);
+}
+
+/*
+ * Returns 1 if the caller should stop processing messages
+ */
+static int
+mouse8042_process_data_msg(queue_t *q, mblk_t *mp, struct mouse_state *state)
+{
 	mblk_t *bp;
 	mblk_t *next;
-	struct mouse_state *state;
 
-	state = (struct mouse_state *)q->q_ptr;
+	bp = mp;
+	do {
+		while (bp->b_rptr < bp->b_wptr) {
+			/*
+			 * Detect an attempt to reset the mouse.  Lock out any
+			 * further mouse writes until the reset has completed.
+			 */
+			if (*bp->b_rptr == MSERESET) {
 
-#ifdef MOUSE8042_DEBUG
-	if (mouse8042_debug)
-		cmn_err(CE_CONT, "mouse8042_wput:entered\n");
-#endif
+				/*
+				 * If we couldn't allocate memory and we
+				 * we couldn't register a bufcall,
+				 * mouse8042_process_reset returns 0 and
+				 * has already used the message to send an
+				 * error reply back upstream, so there is no
+				 * need to deallocate or put this message back
+				 * on the queue.
+				 */
+				if (mouse8042_process_reset(q, bp, state) == 0)
+					return (1);
+
+				/*
+				 * If there's no data remaining in this block,
+				 * free this block and put the following blocks
+				 * of this message back on the queue. If putting
+				 * the rest of the message back on the queue
+				 * fails, free the the message.
+				 */
+				if (MBLKL(bp) == 0) {
+					next = bp->b_cont;
+					freeb(bp);
+					bp = next;
+				}
+				if (bp != NULL) {
+					if (!putbq(q, bp))
+						freemsg(bp);
+				}
+
+				return (1);
+
+			}
+			ddi_put8(state->ms_handle,
+			    state->ms_addr + I8042_INT_OUTPUT_DATA,
+			    *bp->b_rptr++);
+		}
+		next = bp->b_cont;
+		freeb(bp);
+	} while ((bp = next) != NULL);
+
+	return (0);
+}
+
+static int
+mouse8042_process_msg(queue_t *q, mblk_t *mp, struct mouse_state *state)
+{
+	struct iocblk *iocbp;
+	int rv = 0;
+
 	iocbp = (struct iocblk *)mp->b_rptr;
+
 	switch (mp->b_datap->db_type) {
 	case M_FLUSH:
-#ifdef MOUSE8042_DEBUG
-		if (mouse8042_debug)
-			cmn_err(CE_CONT, "mouse8042_wput:M_FLUSH\n");
-#endif
-
-		if (*mp->b_rptr & FLUSHW)
+		if (*mp->b_rptr & FLUSHW) {
 			flushq(q, FLUSHDATA);
-		qreply(q, mp);
+			*mp->b_rptr &= ~FLUSHW;
+		}
+		if (*mp->b_rptr & FLUSHR) {
+			qreply(q, mp);
+		} else
+			freemsg(mp);
 		break;
 	case M_IOCTL:
-#ifdef MOUSE8042_DEBUG
-		if (mouse8042_debug)
-			cmn_err(CE_CONT, "mouse8042_wput:M_IOCTL\n");
-#endif
 		mouse8042_iocnack(q, mp, iocbp, EINVAL, 0);
 		break;
 	case M_IOCDATA:
-#ifdef MOUSE8042_DEBUG
-		if (mouse8042_debug)
-			cmn_err(CE_CONT, "mouse8042_wput:M_IOCDATA\n");
-#endif
 		mouse8042_iocnack(q, mp, iocbp, EINVAL, 0);
 		break;
 	case M_DATA:
-		bp = mp;
-		do {
-			while (bp->b_rptr < bp->b_wptr) {
-#if	defined(MOUSE8042_DEBUG)
-				if (mouse8042_debug) {
-					cmn_err(CE_CONT,
-					    "mouse8042:  send %2x\n",
-					    *bp->b_rptr);
-				}
-				if (mouse8042_debug_minimal) {
-					cmn_err(CE_CONT, ">a:%2x ",
-					    *bp->b_rptr);
-				}
-#endif
-				ddi_put8(state->ms_handle,
-				    state->ms_addr + I8042_INT_OUTPUT_DATA,
-				    *bp->b_rptr++);
-			}
-			next = bp->b_cont;
-			freeb(bp);
-		} while ((bp = next) != NULL);
+		rv = mouse8042_process_data_msg(q, mp, state);
 		break;
 	default:
 		freemsg(mp);
 		break;
 	}
-#ifdef MOUSE8042_DEBUG
-	if (mouse8042_debug)
-		cmn_err(CE_CONT, "mouse8042_wput:leaving\n");
-#endif
-	return (0);	/* ignored */
+
+	return (rv);
+}
+
+static int
+mouse8042_wsrv(queue_t *qp)
+{
+	mblk_t *mp;
+	struct mouse_state *state;
+	state = (struct mouse_state *)qp->q_ptr;
+
+	while ((mp = getq(qp)) != NULL) {
+		if (mouse8042_process_msg(qp, mp, state) != 0)
+			break;
+	}
+
+	return (0);
+}
+
+/*
+ * Returns the next reset state, given the current state and the byte
+ * received from the mouse.  Error and Resend codes are handled by the
+ * caller.
+ */
+static mouse8042_reset_state_e
+mouse8042_reset_fsm(mouse8042_reset_state_e reset_state, uint8_t mdata)
+{
+	switch (reset_state) {
+	case MSE_RESET_PRE:	/* RESET sent, now we expect an ACK */
+		if (mdata == MSE_ACK)	/* Got the ACK */
+			return (MSE_RESET_ACK);
+		break;
+
+	case MSE_RESET_ACK:	/* ACK received; now we expect 0xAA */
+		if (mdata == MSE_AA)	/* Got the 0xAA */
+			return (MSE_RESET_AA);
+		break;
+
+	case MSE_RESET_AA: 	/* 0xAA received; now we expect 0x00 */
+		if (mdata == MSE_00)
+			return (MSE_RESET_IDLE);
+		break;
+	}
+
+	return (reset_state);
 }
 
 static uint_t
@@ -684,10 +869,6 @@ mouse8042_intr(caddr_t arg)
 
 	mutex_enter(&state->ms_mutex);
 
-#if	defined(MOUSE8042_DEBUG)
-	if (mouse8042_debug)
-		cmn_err(CE_CONT, "mouse8042_intr()\n");
-#endif
 	rc = DDI_INTR_UNCLAIMED;
 
 	for (;;) {
@@ -700,24 +881,81 @@ mouse8042_intr(caddr_t arg)
 		mdata = ddi_get8(state->ms_handle,
 		    state->ms_addr + I8042_INT_INPUT_DATA);
 
-#if	defined(MOUSE8042_DEBUG)
-		if (mouse8042_debug)
-			cmn_err(CE_CONT, "mouse8042_intr:  got %2x\n", mdata);
-		if (mouse8042_debug_minimal)
-			cmn_err(CE_CONT, "<A:%2x ", mdata);
-#endif
-
 		rc = DDI_INTR_CLAIMED;
+
+		/*
+		 * If we're not ready for this data, discard it.
+		 */
+		if (!state->ready)
+			continue;
+
+		mutex_enter(&state->reset_mutex);
+		if (state->reset_state != MSE_RESET_IDLE) {
+
+			if (mdata == MSEERROR || mdata == MSERESET) {
+				state->reset_state = MSE_RESET_FAILED;
+			} else {
+				state->reset_state =
+				    mouse8042_reset_fsm(state->reset_state,
+				    mdata);
+			}
+
+			/*
+			 * If we transitioned back to the idle reset state (or
+			 * the reset failed), disable the timeout, release the
+			 * 8042 exclusive-access lock, then send the response
+			 * the the upper-level modules. Finally, enable the
+			 * queue and schedule queue service procedures so that
+			 * upper-level modules can process the response.
+			 * Otherwise, if we're still in the middle of the
+			 * reset sequence, do not send the data up (since the
+			 * response is sent at the end of the sequence, or
+			 * on timeout/error).
+			 */
+			if (state->reset_state == MSE_RESET_IDLE ||
+			    state->reset_state == MSE_RESET_FAILED) {
+
+				mutex_exit(&state->reset_mutex);
+				(void) quntimeout(state->ms_wqp,
+				    state->reset_tid);
+				mutex_enter(&state->reset_mutex);
+
+				(void) ddi_get8(state->ms_handle,
+				    state->ms_addr + I8042_UNLOCK);
+
+				state->reset_tid = 0;
+				mp = state->reply_mp;
+				if (state->reset_state == MSE_RESET_FAILED) {
+					*mp->b_wptr++ = mdata;
+				} else {
+					*mp->b_wptr++ = MSE_ACK;
+					*mp->b_wptr++ = MSE_AA;
+					*mp->b_wptr++ = MSE_00;
+				}
+				state->reply_mp = NULL;
+
+				state->reset_state = MSE_RESET_IDLE;
+
+				if (state->ms_rqp != NULL)
+					putnext(state->ms_rqp, mp);
+				else
+					freemsg(mp);
+
+				enableok(state->ms_wqp);
+				qenable(state->ms_wqp);
+			}
+
+			mutex_exit(&state->reset_mutex);
+			mutex_exit(&state->ms_mutex);
+			return (rc);
+		}
+		mutex_exit(&state->reset_mutex);
 
 		if (state->ms_rqp != NULL && (mp = allocb(1, BPRI_MED))) {
 			*mp->b_wptr++ = mdata;
 			putnext(state->ms_rqp, mp);
 		}
 	}
-#ifdef MOUSE8042_DEBUG
-	if (mouse8042_debug)
-		cmn_err(CE_CONT, "mouse8042_intr() ok\n");
-#endif
 	mutex_exit(&state->ms_mutex);
 
 	return (rc);

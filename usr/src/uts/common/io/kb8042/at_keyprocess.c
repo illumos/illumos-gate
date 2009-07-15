@@ -33,28 +33,11 @@
 #include "kb8042.h"
 
 /*
- * Debugging for this module is enabled by the kb8042_debug flag
- * defined in kb8042.c.  See that module for details.  This flag is
- * hotkey enabled by F10 if the kb8042_enable_debug_hotkey flag is set.
- */
-
-#if	defined(DEBUG) || defined(lint)
-#define	KD_DEBUG
-#endif
-
-/*
  * A note on the use of prom_printf here:  Most of these routines can be
  * called from "polled mode", where we're servicing I/O requests from kmdb.
  * Normal system services are not available from polled mode; cmn_err will
  * not work.  prom_printf is the only safe output mechanism.
  */
-
-#if	defined(KD_DEBUG)
-extern boolean_t kb8042_debug;
-#define	DEBUG_KD(f)	{ if (kb8042_debug) prom_printf f; }
-#else
-#define	DEBUG_KD(f)	/* nothing */
-#endif
 
 #define	KEYBAD		0xff		/* should generate an error */
 #define	KEYIGN		0xfe		/* ignore this sequence */
@@ -748,8 +731,6 @@ KeyboardConvertScan_set1(
     enum keystate	*state,
     boolean_t		*synthetic_release_needed)
 {
-	DEBUG_KD(("KeyboardConvertScan_set1: 0x%02x ", scan));
-
 	*synthetic_release_needed = B_FALSE;
 	*state = KEY_PRESSED;
 
@@ -763,7 +744,6 @@ KeyboardConvertScan_set1(
 		 * Perhaps we should reset state here,
 		 * since we no longer know what's going on.
 		 */
-		DEBUG_KD(("-> overrun\n"));
 		return (B_FALSE);
 	case KB_POST_FAIL:
 		/*
@@ -776,7 +756,6 @@ KeyboardConvertScan_set1(
 		 * Reset to idle
 		 */
 		kb8042->parse_scan_state = STATE_IDLE;
-		DEBUG_KD(("-> POST %s\n", scan == KB_POST_OK ? "OK" : "FAIL"));
 		return (B_FALSE);
 
 	case KXT_EXTEND:
@@ -809,12 +788,10 @@ KeyboardConvertScan_set1(
 		switch (scan) {
 		case KXT_EXTEND:
 			kb8042->parse_scan_state = STATE_E0;
-			DEBUG_KD(("-> state E0\n"));
 			return (B_FALSE);
 
 		case KXT_EXTEND2:
 			kb8042->parse_scan_state = STATE_E1;
-			DEBUG_KD(("-> state E1\n"));
 			return (B_FALSE);
 
 		/*
@@ -857,7 +834,6 @@ KeyboardConvertScan_set1(
 		switch (scan) {
 		case 0x1d:
 			kb8042->parse_scan_state = STATE_E1_1D;
-			DEBUG_KD(("-> state E1 1D\n"));
 			return (B_FALSE);
 		default:
 			*keynum = INVALID;
@@ -888,11 +864,9 @@ KeyboardConvertScan_set1(
 
 	switch (*keynum) {
 	case KEYIGN:				/* not a key, nor an error */
-		DEBUG_KD(("-> hole -> ignored\n"));
 		return (B_FALSE);		/* also not a final keycode */
 
 	case KEYBAD:		/* not part of a legit sequence? */
-		DEBUG_KD(("-> bad -> ignored\n"));
 		return (B_FALSE);	/* and return not a final keycode */
 
 	default:
@@ -900,11 +874,6 @@ KeyboardConvertScan_set1(
 		 * If we're here, it's a valid keycode.  We've already
 		 * filled in the return values; return success.
 		 */
-
-		DEBUG_KD(("-> %s keypos %d\n",
-		    *state == KEY_RELEASED ? "released" : "pressed",
-		    *keynum));
-
 		return (B_TRUE);		/* resolved to a key */
 	}
 }
@@ -930,8 +899,6 @@ KeyboardConvertScan_set2(
     enum keystate	*state,
     boolean_t		*synthetic_release_needed)
 {
-	DEBUG_KD(("KeyboardConvertScan_set2: 0x%02x ", scan));
-
 	*synthetic_release_needed = B_FALSE;
 	*state = KEY_PRESSED;
 
@@ -949,7 +916,6 @@ KeyboardConvertScan_set2(
 	case KAT_BREAK:
 		/* Switch states so we can recognize the code that follows */
 		kb8042->break_received = 1;
-		DEBUG_KD(("-> break prefix\n"));
 		return (B_FALSE);	/* not a final keycode */
 
 	case KB_ERROR:
@@ -957,7 +923,6 @@ KeyboardConvertScan_set2(
 		 * Perhaps we should reset state here,
 		 * since we no longer know what's going on.
 		 */
-		DEBUG_KD(("-> overrun\n"));
 		return (B_FALSE);
 
 	case KB_POST_OK:
@@ -972,7 +937,6 @@ KeyboardConvertScan_set2(
 		 * Reset to idle
 		 */
 		kb8042->parse_scan_state = STATE_IDLE;
-		DEBUG_KD(("-> POST %s\n", scan == KB_POST_OK ? "OK" : "FAIL"));
 		return (B_FALSE);
 	}
 
@@ -986,12 +950,10 @@ KeyboardConvertScan_set2(
 		switch (scan) {
 		case KXT_EXTEND:
 			kb8042->parse_scan_state = STATE_E0;
-			DEBUG_KD(("-> state E0\n"));
 			return (B_FALSE);
 
 		case KXT_EXTEND2:
 			kb8042->parse_scan_state = STATE_E1;
-			DEBUG_KD(("-> state E1\n"));
 			return (B_FALSE);
 
 		/*
@@ -1034,7 +996,6 @@ KeyboardConvertScan_set2(
 		switch (scan) {
 		case 0x14:
 			kb8042->parse_scan_state = STATE_E1_14;
-			DEBUG_KD(("-> state E1 14\n"));
 			return (B_FALSE);
 		default:
 			*keynum = INVALID;
@@ -1112,11 +1073,9 @@ KeyboardConvertScan_set2(
 
 	switch (*keynum) {
 	case KEYIGN:				/* not a key, nor an error */
-		DEBUG_KD(("-> hole -> ignored\n"));
 		return (B_FALSE);		/* also not a final keycode */
 
 	case KEYBAD:		/* not part of a legit sequence? */
-		DEBUG_KD(("-> bad -> ignored\n"));
 		return (B_FALSE);	/* and return not a final keycode */
 
 	default:
@@ -1124,11 +1083,6 @@ KeyboardConvertScan_set2(
 		 * If we're here, it's a valid keycode.  We've already
 		 * filled in the return values; return success.
 		 */
-
-		DEBUG_KD(("-> %s keypos %d\n",
-		    *state == KEY_RELEASED ? "released" : "pressed",
-		    *keynum));
-
 		return (B_TRUE);		/* resolved to a key */
 	}
 }
