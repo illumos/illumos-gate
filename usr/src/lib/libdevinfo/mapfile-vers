@@ -187,10 +187,6 @@ SUNWprivate_1.1 {
 	di_devlink_type;
 	di_devlink_update;
 	di_devlink_walk;
-	di_devname_action_on_key;
-	di_devname_get_mapent;
-	di_devname_get_mapinfo;
-	di_devname_print_mapinfo;
 	di_devperm_login;
 	di_devperm_logout;
 	di_dim_fini;

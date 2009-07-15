@@ -6053,6 +6053,8 @@ mondo_loop() {
 
 	find $root/kernel/drv -name zvol 2> /dev/null | xargs rm -f
 	rm -f $root/kernel/drv/zvol.conf
+	rm -rf $root/kernel/devname
+	rm -f $usr/include/sys/fs/sdev_node.h
 
 	#
 	# Remove /usr/lib/old_libthread since support for it has

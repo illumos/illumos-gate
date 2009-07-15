@@ -493,11 +493,6 @@ MAC_KMODS	+= mac_wifi
 MAC_KMODS	+= mac_ib
 
 #
-# 'Devname' Modules (kernel/devname)
-#
-DEVNAME_KMODS	+= sdev_nsconfig_mod
-
-#
 # socketmod (kernel/socketmod)
 #
 SOCKET_KMODS	+= socksctp

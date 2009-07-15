@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * negative cache handling for the /dev fs
@@ -54,7 +52,7 @@
 #include <sys/mount.h>
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
-#include <sys/fs/sdev_node.h>
+#include <sys/fs/sdev_impl.h>
 #include <sys/sunndi.h>
 #include <sys/sunmdi.h>
 #include <sys/ddi.h>
@@ -195,9 +193,9 @@ sdev_nvp_free(nvp_devname_t *dp)
 			kmem_free(*p, strlen(*p)+1);
 		}
 		kmem_free(dp->nvp_paths,
-			dp->nvp_npaths * sizeof (char *));
+		    dp->nvp_npaths * sizeof (char *));
 		kmem_free(dp->nvp_expirecnts,
-			dp->nvp_npaths * sizeof (int));
+		    dp->nvp_npaths * sizeof (int));
 	}
 
 	kmem_free(dp, sizeof (nvp_devname_t));
@@ -297,7 +295,7 @@ sdev_ncache_pack_list(nvf_handle_t fd, nvlist_t **ret_nvl)
 	rval = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
 	if (rval != 0) {
 		nvf_error("%s: nvlist alloc error %d\n",
-			nvf_cache_name(fd), rval);
+		    nvf_cache_name(fd), rval);
 		return (DDI_FAILURE);
 	}
 
@@ -308,7 +306,7 @@ sdev_ncache_pack_list(nvf_handle_t fd, nvlist_t **ret_nvl)
 		rval = nvlist_alloc(&sub_nvl, NV_UNIQUE_NAME, KM_SLEEP);
 		if (rval != 0) {
 			nvf_error("%s: nvlist alloc error %d\n",
-				nvf_cache_name(fd), rval);
+			    nvf_cache_name(fd), rval);
 			sub_nvl = NULL;
 			goto err;
 		}
@@ -706,7 +704,7 @@ sdev_lookup_failed(sdev_node_t *dv, char *nm, int failed_flags)
 	    !SDEV_IS_NO_NCACHE(dv) &&
 	    ((failed_flags & SLF_NO_NCACHE) == 0) &&
 	    ((sdev_reconfig_boot &&
-		(sdev_boot_state != SDEV_BOOT_STATE_COMPLETE)) ||
+	    (sdev_boot_state != SDEV_BOOT_STATE_COMPLETE)) ||
 	    (!sdev_reconfig_boot && ((failed_flags & SLF_REBUILT))))) {
 			sdev_nc_addname(sdev_ncache,
 			    dv, nm, NCN_SRC_CURRENT|NCN_ACTIVE);
@@ -818,7 +816,7 @@ sdev_nc_addname(sdev_nc_list_t *ncl, sdev_node_t *dv, char *nm, int flags)
 	n = strlen(dv->sdev_path) + strlen(nm) + 2;
 	lp->ncn_name = kmem_alloc(n, KM_SLEEP);
 	(void) sprintf(lp->ncn_name, "%s/%s",
-		dv->sdev_path, nm);
+	    dv->sdev_path, nm);
 	lp->ncn_flags = flags;
 	lp->ncn_expirecnt = sdev_nc_expirecnt;
 	sdev_nc_insertnode(ncl, lp);

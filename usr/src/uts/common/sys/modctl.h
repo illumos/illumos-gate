@@ -78,7 +78,6 @@ extern struct mod_ops mod_syscallops32;
 extern struct mod_ops mod_dacfops;
 extern struct mod_ops mod_ippops;
 extern struct mod_ops mod_pcbeops;
-extern struct mod_ops mod_devfsops;
 extern struct mod_ops mod_kiconvops;
 
 #endif /* _KERNEL */
@@ -181,13 +180,6 @@ struct modlbrand {
 	struct mod_ops		*brand_modops;
 	char			*brand_linkinfo;
 	struct brand		*brand_branddef;
-};
-
-/* for devname fs */
-struct modldev {
-	struct mod_ops		*dev_modops;
-	char			*dev_linkinfo;
-	struct devname_ops	*dev_ops;
 };
 
 /* For socket Modules. */
@@ -293,8 +285,6 @@ struct modlinkage {
  * devname subcmds for MODDEVNAME
  */
 #define	MODDEVNAME_LOOKUPDOOR	0
-#define	MODDEVNAME_DEVFSADMNODE	1
-#define	MODDEVNAME_NSMAPS	2
 #define	MODDEVNAME_PROFILE	3
 #define	MODDEVNAME_RECONFIG	4
 #define	MODDEVNAME_SYSAVAIL	5

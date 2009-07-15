@@ -52,6 +52,7 @@
 #include <sys/reboot.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
+#include <sys/fs/sdev_impl.h>
 #include <sys/sunldi.h>
 #include <sys/sunldi_impl.h>
 

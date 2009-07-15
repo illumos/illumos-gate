@@ -228,17 +228,12 @@ static char *packaged_dirs[] =
 	{"dsk", "rdsk", "term", NULL};
 
 /* Devname globals */
-static int devname_debug_msg = 1;
-static nvlist_t *devname_maps = NULL;
-static int devname_first_call = 1;
-static int load_devname_nsmaps = FALSE;
 static int lookup_door_fd = -1;
 static char *lookup_door_path;
 
 static void load_dev_acl(void);
 static void update_drvconf(major_t);
 static void check_reconfig_state(void);
-static void devname_setup_nsmaps(void);
 static int s_stat(const char *, struct stat *);
 
 static int is_blank(char *);
@@ -745,7 +740,7 @@ parse_args(int argc, char *argv[])
 		devlinktab_file = DEVLINKTAB_FILE;
 
 		while ((opt = getopt(argc, argv,
-		    "a:Cc:deIi:l:mnp:PR:r:sSt:vV:x:")) != EOF) {
+		    "a:Cc:deIi:l:np:PR:r:sSt:vV:x:")) != EOF) {
 			if (opt == 'I' || opt == 'P' || opt == 'S') {
 				if (public_mode)
 					usage();
@@ -797,9 +792,6 @@ parse_args(int argc, char *argv[])
 			case 'l':
 				/* specify an alternate module load path */
 				module_dirs = s_strdup(optarg);
-				break;
-			case 'm':
-				load_devname_nsmaps = TRUE;
 				break;
 			case 'n':
 				/* prevent driver loading and deferred attach */
@@ -906,12 +898,6 @@ parse_args(int argc, char *argv[])
 				update_drvconf((major_t)-1);
 			if (init_sysavail)
 				modctl_sysavail();
-			devfsadm_exit(0);
-			/*NOTREACHED*/
-		}
-
-		if (load_devname_nsmaps == TRUE) {
-			devname_setup_nsmaps();
 			devfsadm_exit(0);
 			/*NOTREACHED*/
 		}
@@ -1339,8 +1325,6 @@ retry:
 	/* pass down the door name to kernel for door_ki_open */
 	if (devname_kcall(MODDEVNAME_LOOKUPDOOR, (void *)door_file) != 0)
 		err_print(DEVNAME_CONTACT_FAILED, strerror(errno));
-	else
-		devname_setup_nsmaps();
 
 	vprint(CHATTY_MID, "%spausing\n", fcn);
 	for (;;) {
@@ -8430,25 +8414,8 @@ static int
 devname_kcall(int subcmd, void *args)
 {
 	int error = 0;
-	char *nvlbuf = NULL;
-	size_t nvlsize;
 
 	switch (subcmd) {
-	case MODDEVNAME_NSMAPS:
-		error = nvlist_pack((nvlist_t *)args, &nvlbuf, &nvlsize, 0, 0);
-		if (error) {
-			err_print("packing MODDEVNAME_NSMAPS failed\n");
-			break;
-		}
-		error = modctl(MODDEVNAME, subcmd, nvlbuf, nvlsize);
-		if (error) {
-			vprint(INFO_MID, "modctl(MODDEVNAME, "
-			    "MODDEVNAME_NSMAPS) failed - %s\n",
-			    strerror(errno));
-		}
-		free(nvlbuf);
-		nvlist_free(args);
-		break;
 	case MODDEVNAME_LOOKUPDOOR:
 		error = modctl(MODDEVNAME, subcmd, (uintptr_t)args);
 		if (error) {
@@ -8464,93 +8431,6 @@ devname_kcall(int subcmd, void *args)
 	return (error);
 }
 
-static void
-devname_setup_nsmaps(void)
-{
-	int error = 0;
-
-	if (devname_first_call) {
-		devname_first_call = 0;
-	}
-
-	error = di_devname_get_mapinfo(DEVNAME_MASTER_MAP, &devname_maps);
-
-	if (error) {
-		vprint(DEVNAME_MID, "devname_setup_nsmaps: non-existing/empty"
-		    "%s\n", DEVNAME_MASTER_MAP);
-	} else {
-		di_devname_print_mapinfo(devname_maps);
-
-		/* pass down the existing map names to kernel */
-		(void) devname_kcall(MODDEVNAME_NSMAPS, (void *)devname_maps);
-	}
-}
-
-static void
-devname_ns_services(uint8_t cmd, char *key, char *map)
-{
-	nvlist_t *nvl = NULL;
-	int32_t	error = 0;
-	sdev_door_res_t res;
-
-	vprint(DEVNAME_MID, "devname_ns_services: cmd %d key %s map %s\n",
-	    cmd, key, map);
-
-	switch (cmd) {
-	case DEVFSADMD_NS_LOOKUP:
-		vprint(DEVNAME_MID, "calling di_devname_get_mapent\n");
-		error = di_devname_get_mapent(key, map, &nvl);
-		if (nvl == NULL) {
-			error = DEVFSADM_NS_FAILED;
-			goto done;
-		}
-
-		if (error) {
-			nvlist_free(nvl);
-			goto done;
-		}
-
-		if (devname_debug_msg)
-			di_devname_print_mapinfo(nvl);
-
-		vprint(DEVNAME_MID, "calling di_devname_action_on_key for %d\n",
-		    cmd);
-		error = di_devname_action_on_key(nvl, cmd, key, (void *)&res);
-		nvlist_free(nvl);
-		break;
-	case DEVFSADMD_NS_READDIR:
-		vprint(DEVNAME_MID, "calling di_devname_get_mapinfo for cmd %d"
-		    "\n", cmd);
-		error = di_devname_get_mapinfo(map, &nvl);
-		if (nvl == NULL) {
-			error = DEVFSADM_NS_FAILED;
-			goto done;
-		}
-
-		if (error) {
-			nvlist_free(nvl);
-			goto done;
-		}
-
-		if (devname_debug_msg)
-			di_devname_print_mapinfo(nvl);
-
-		vprint(DEVNAME_MID, "calling di_devname_action_on_key\n");
-		error = di_devname_action_on_key(nvl, cmd, key, (void *)&res);
-		nvlist_free(nvl);
-		break;
-	default:
-		error = DEVFSADM_RUN_NOTSUP;
-		break;
-	}
-
-done:
-	vprint(DEVNAME_MID, "error %d\n", error);
-	res.devfsadm_error = error;
-	(void) door_return((char *)&res, sizeof (struct sdev_door_res),
-	    NULL, 0);
-}
-
 /* ARGSUSED */
 static void
 devname_lookup_handler(void *cookie, char *argp, size_t arg_size,
@@ -8560,7 +8440,6 @@ devname_lookup_handler(void *cookie, char *argp, size_t arg_size,
 	door_cred_t dcred;
 	struct dca_impl	dci;
 	uint8_t	cmd;
-	char *ns_map, *ns_name;
 	sdev_door_res_t res;
 	sdev_door_arg_t *args;
 
@@ -8582,19 +8461,6 @@ devname_lookup_handler(void *cookie, char *argp, size_t arg_size,
 
 	vprint(DEVNAME_MID, "devname_lookup_handler: cmd %d\n", cmd);
 	switch (cmd) {
-	case DEVFSADMD_NS_LOOKUP:
-	case DEVFSADMD_NS_READDIR:
-		ns_name = s_strdup(args->ns_hdl.ns_name);
-		ns_map = s_strdup(args->ns_hdl.ns_map);
-
-		vprint(DEVNAME_MID, " ns_name %s ns_map %s\n", ns_name, ns_map);
-		if (ns_name == NULL || ns_map == NULL) {
-			error = DEVFSADM_RUN_INVALID;
-			goto done;
-		}
-
-		devname_ns_services(cmd, ns_name, ns_map);
-		return;
 	case DEVFSADMD_RUN_ALL:
 		/*
 		 * run "devfsadm"

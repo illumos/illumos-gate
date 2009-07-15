@@ -424,9 +424,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(dev, sdev_modctl_readdir_free,	nomod_minus_one);
 	NO_UNLOAD_STUB(dev, devname_filename_register,	nomod_minus_one);
 	NO_UNLOAD_STUB(dev, sdev_modctl_devexists,	nomod_minus_one);
-	NO_UNLOAD_STUB(dev, devname_nsmaps_register,	nomod_minus_one);
 	NO_UNLOAD_STUB(dev, devname_profile_update,	nomod_minus_one);
-	NO_UNLOAD_STUB(dev, sdev_module_register,	nomod_minus_one);
 	NO_UNLOAD_STUB(dev, sdev_devstate_change,	nomod_minus_one);
 	NO_UNLOAD_STUB(dev, devvt_getvnodeops,		nomod_minus_one);
 	NO_UNLOAD_STUB(dev, devpts_getvnodeops,		nomod_zero);

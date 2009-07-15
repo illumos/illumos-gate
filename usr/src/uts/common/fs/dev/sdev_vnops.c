@@ -70,7 +70,6 @@
 #include <fs/fs_subr.h>
 #include <sys/fs/dv_node.h>
 #include <sys/fs/sdev_impl.h>
-#include <sys/fs/sdev_node.h>
 
 /*ARGSUSED*/
 static int
@@ -208,18 +207,11 @@ sdev_getattr(struct vnode *vp, struct vattr *vap, int flags,
 	int			error = 0;
 	struct sdev_node	*dv = VTOSDEV(vp);
 	struct sdev_node	*parent = dv->sdev_dotdot;
-	struct devname_nsmap *map = NULL;
-	struct devname_ops	*dirops = NULL;
-	int (*fn)(devname_handle_t *, struct vattr *, struct cred *);
 
 	ASSERT(parent);
 
 	rw_enter(&parent->sdev_contents, RW_READER);
 	ASSERT(dv->sdev_attr || dv->sdev_attrvp);
-	if (SDEV_IS_GLOBAL(dv) && (dv->sdev_state != SDEV_ZOMBIE)) {
-		map = sdev_get_map(parent, 0);
-		dirops = map ? map->dir_ops : NULL;
-	}
 
 	/*
 	 * search order:
@@ -230,10 +222,6 @@ sdev_getattr(struct vnode *vp, struct vattr *vap, int flags,
 		rw_exit(&parent->sdev_contents);
 		error = VOP_GETATTR(dv->sdev_attrvp, vap, flags, cr, ct);
 		sdev_vattr_merge(dv, vap);
-	} else if (dirops && (fn = dirops->devnops_getattr)) {
-		sdev_vattr_merge(dv, vap);
-		rw_exit(&parent->sdev_contents);
-		error = (*fn)(&(dv->sdev_handle), vap, cr);
 	} else {
 		ASSERT(dv->sdev_attr);
 		*vap = *dv->sdev_attr;
@@ -522,9 +510,6 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 	struct sdev_node *parent = (struct sdev_node *)VTOSDEV(dvp);
 	struct vnode *vp = NULL;
 	struct sdev_node *dv = NULL;
-	struct devname_nsmap *map = NULL;
-	struct devname_ops *dirops = NULL;
-	int (*fn)(devname_handle_t *);
 	int len;
 	int bkstore = 0;
 
@@ -571,18 +556,6 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
 		rw_exit(&parent->sdev_contents);
 		VN_RELE(vp);
 		return (error);
-	}
-
-	/* the module may record/reject removing a device node */
-	map = sdev_get_map(parent, 0);
-	dirops = map ? map->dir_ops : NULL;
-	if (dirops && ((fn = dirops->devnops_remove) != NULL)) {
-		error = (*fn)(&(dv->sdev_handle));
-		if (error) {
-			rw_exit(&parent->sdev_contents);
-			VN_RELE(vp);
-			return (error);
-		}
 	}
 
 	/*
@@ -653,12 +626,6 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	struct vnode 		*nvp = NULL;	/* destination vnode */
 	int			samedir = 0;	/* set if odvp == ndvp */
 	struct vnode		*realvp;
-	int			len;
-	char			nnm_path[MAXPATHLEN];
-	struct devname_nsmap 	*omap = NULL;
-	struct devname_ops	*odirops = NULL;
-	int (*fn)(devname_handle_t *, char *);
-	int (*rmfn)(devname_handle_t *);
 	int error = 0;
 	dev_t fsid;
 	int bkstore = 0;
@@ -782,30 +749,6 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	fromdv = VTOSDEV(ovp);
 	ASSERT(fromdv);
 
-	/* check with the plug-in modules for the source directory */
-	rw_enter(&fromparent->sdev_contents, RW_READER);
-	omap = sdev_get_map(fromparent, 0);
-	rw_exit(&fromparent->sdev_contents);
-	odirops = omap ? omap->dir_ops : NULL;
-	if (odirops && ((fn = odirops->devnops_rename) != NULL)) {
-		if (samedir) {
-			error = (*fn)(&(fromdv->sdev_handle), nnm);
-		} else {
-			len = strlen(nnm) + strlen(toparent->sdev_name) + 2;
-			(void) snprintf(nnm_path, len, "%s/%s",
-			    toparent->sdev_name, nnm);
-			error = (*fn)(&(fromdv->sdev_handle), nnm);
-		}
-
-		if (error) {
-			mutex_exit(&sdev_lock);
-			sdcmn_err2(("sdev_rename: DBNR doesn't "
-			    "allow rename, error %d", error));
-			VN_RELE(ovp);
-			return (error);
-		}
-	}
-
 	/* destination file exists */
 	if (nvp) {
 		todv = VTOSDEV(nvp);
@@ -824,11 +767,6 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 			VN_RELE(nvp);
 		VN_RELE(ovp);
 		return (error);
-	}
-
-	/* notify the DBNR module the node is going away */
-	if (odirops && ((rmfn = odirops->devnops_remove) != NULL)) {
-		(void) (*rmfn)(&(fromdv->sdev_handle));
 	}
 
 	/*

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBDEVINFO_H
 #define	_LIBDEVINFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -485,14 +483,6 @@ extern char *di_dli_name(char *);
 extern int di_dli_openr(char *);
 extern int di_dli_openw(char *);
 extern void di_dli_close(int);
-
-/*
- * Private interface for parsing devname binding info
- */
-extern void di_devname_print_mapinfo(nvlist_t *);
-extern int di_devname_get_mapinfo(char *, nvlist_t **);
-extern int di_devname_get_mapent(char *, char *, nvlist_t **);
-extern int di_devname_action_on_key(nvlist_t *, uint8_t, char *, void *);
 
 /*
  * Private interface for parsing path_to_inst binding file

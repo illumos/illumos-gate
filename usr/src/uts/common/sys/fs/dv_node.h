@@ -40,7 +40,7 @@
 #include <sys/sunddi.h>
 #include <sys/devops.h>
 #include <sys/ddi_impldefs.h>
-#include <sys/fs/sdev_node.h>
+#include <sys/fs/sdev_impl.h>
 #include <sys/devpolicy.h>
 #include <sys/avl.h>
 

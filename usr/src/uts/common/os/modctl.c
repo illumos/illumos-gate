@@ -76,7 +76,7 @@
 #include <ipp/ipp_impl.h>
 #include <sys/fs/dv_node.h>
 #include <sys/strsubr.h>
-#include <sys/fs/sdev_node.h>
+#include <sys/fs/sdev_impl.h>
 
 static int		mod_circdep(struct modctl *);
 static int		modinfo(modid_t, struct modinfo *);
@@ -2247,11 +2247,7 @@ modctl_moddevname(int subcmd, uintptr_t a1, uintptr_t a2)
 
 	switch (subcmd) {
 	case MODDEVNAME_LOOKUPDOOR:
-	case MODDEVNAME_DEVFSADMNODE:
-		error = devname_filename_register(subcmd, (char *)a1);
-		break;
-	case MODDEVNAME_NSMAPS:
-		error = devname_nsmaps_register((char *)a1, (size_t)a2);
+		error = devname_filename_register((char *)a1);
 		break;
 	case MODDEVNAME_PROFILE:
 		error = devname_profile_update((char *)a1, (size_t)a2);

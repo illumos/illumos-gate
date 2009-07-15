@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@ extern "C" {
 #include <sys/sysevent/dev.h>
 #include <libzonecfg.h>
 #include <device_info.h>
-#include <sys/fs/sdev_node.h>
+#include <sys/fs/sdev_impl.h>
 #include <sys/syscall.h>
 #include <rpcsvc/ypclnt.h>
 #include <sys/sysevent/eventdefs.h>

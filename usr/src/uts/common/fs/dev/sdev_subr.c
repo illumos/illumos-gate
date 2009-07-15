@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,6 @@
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
 #include <sys/fs/sdev_impl.h>
-#include <sys/fs/sdev_node.h>
 #include <sys/sunndi.h>
 #include <sys/sunmdi.h>
 #include <sys/conf.h>
@@ -151,17 +150,9 @@ vattr_t sdev_vattr_chr = {
 kmem_cache_t	*sdev_node_cache;	/* sdev_node cache */
 int		devtype;		/* fstype */
 
-struct devname_ops *devname_ns_ops;	/* default name service directory ops */
-kmutex_t devname_nsmaps_lock;	/* protect devname_nsmaps */
-
 /* static */
-static struct devname_nsmap *devname_nsmaps = NULL;
-				/* contents from /etc/dev/devname_master */
-static int devname_nsmaps_invalidated = 0; /* "devfsadm -m" has run */
-
 static struct vnodeops *sdev_get_vop(struct sdev_node *);
 static void sdev_set_no_nocache(struct sdev_node *);
-static int sdev_get_moduleops(struct sdev_node *);
 static fs_operation_def_t *sdev_merge_vtab(const fs_operation_def_t []);
 static void sdev_free_vtab(fs_operation_def_t *);
 
@@ -335,10 +326,8 @@ sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 	cv_init(&dv->sdev_lookup_cv, NULL, CV_DEFAULT, NULL);
 	if (SDEV_IS_GLOBAL(ddv)) {
 		dv->sdev_flags |= SDEV_GLOBAL;
-		dv->sdev_mapinfo = NULL;
 		dhl = &(dv->sdev_handle);
 		dhl->dh_data = dv;
-		dhl->dh_spec = DEVNAME_NS_NONE;
 		dhl->dh_args = NULL;
 		sdev_set_no_nocache(dv);
 		dv->sdev_gdir_gen = 0;
@@ -380,7 +369,6 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 		dv->sdev_flags &= ~SDEV_PERSIST;
 		dv->sdev_flags &= ~SDEV_DYNAMIC;
 		vn_setops(vp, sdev_get_vop(dv)); /* from internal vtab */
-		error = sdev_get_moduleops(dv); /* from plug-in module */
 		ASSERT(dv->sdev_dotdot);
 		ASSERT(SDEVTOV(dv->sdev_dotdot)->v_type == VDIR);
 		vp->v_rdev = SDEVTOV(dv->sdev_dotdot)->v_rdev;
@@ -484,8 +472,6 @@ sdev_mkroot(struct vfs *vfsp, dev_t devdev, struct vnode *mvp,
 	mutex_init(&dv->sdev_lookup_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&dv->sdev_lookup_cv, NULL, CV_DEFAULT, NULL);
 	if (strcmp(dv->sdev_name, "/dev") == 0) {
-		mutex_init(&devname_nsmaps_lock, NULL, MUTEX_DEFAULT, NULL);
-		dv->sdev_mapinfo = NULL;
 		dv->sdev_flags = SDEV_BUILD|SDEV_GLOBAL|SDEV_PERSIST;
 		bzero(&dv->sdev_handle, sizeof (dv->sdev_handle));
 		dv->sdev_gdir_gen = 0;
@@ -507,84 +493,6 @@ sdev_mkroot(struct vfs *vfsp, dev_t devdev, struct vnode *mvp,
 	rw_exit(&dv->sdev_contents);
 	sdev_nc_node_exists(dv);
 	return (dv);
-}
-
-/*
- *  1. load the module
- *  2. modload invokes sdev_module_register, which in turn sets
- *     the dv->sdev_mapinfo->dir_ops
- *
- * note: locking order:
- *	dv->sdev_contents -> map->dir_lock
- */
-static int
-sdev_get_moduleops(struct sdev_node *dv)
-{
-	int error = 0;
-	struct devname_nsmap *map = NULL;
-	char *module;
-	char *path;
-	int load = 1;
-
-	ASSERT(SDEVTOV(dv)->v_type == VDIR);
-
-	if (devname_nsmaps == NULL)
-		return (0);
-
-	if (!sdev_nsmaps_loaded() && !sdev_nsmaps_reloaded())
-		return (0);
-
-
-	path = dv->sdev_path;
-	if ((map = sdev_get_nsmap_by_dir(path, 0))) {
-		rw_enter(&map->dir_lock, RW_READER);
-		if (map->dir_invalid) {
-			if (map->dir_module && map->dir_newmodule &&
-			    (strcmp(map->dir_module,
-			    map->dir_newmodule) == 0)) {
-				load = 0;
-			}
-			sdev_replace_nsmap(map, map->dir_newmodule,
-			    map->dir_newmap);
-		}
-
-		module = map->dir_module;
-		if (module && load) {
-			sdcmn_err6(("sdev_get_moduleops: "
-			    "load module %s", module));
-			rw_exit(&map->dir_lock);
-			error = modload("devname", module);
-			sdcmn_err6(("sdev_get_moduleops: error %d\n", error));
-			if (error < 0) {
-				return (-1);
-			}
-		} else if (module == NULL) {
-			/*
-			 * loading the module ops for name services
-			 */
-			if (devname_ns_ops == NULL) {
-				sdcmn_err6((
-				    "sdev_get_moduleops: modload default\n"));
-				error = modload("devname", DEVNAME_NSCONFIG);
-				sdcmn_err6((
-				    "sdev_get_moduleops: error %d\n", error));
-				if (error < 0) {
-					return (-1);
-				}
-			}
-
-			if (!rw_tryupgrade(&map->dir_lock)) {
-				rw_exit(&map->dir_lock);
-				rw_enter(&map->dir_lock, RW_WRITER);
-			}
-			ASSERT(devname_ns_ops);
-			map->dir_ops = devname_ns_ops;
-			rw_exit(&map->dir_lock);
-		}
-	}
-
-	dv->sdev_mapinfo = map;
-	return (0);
 }
 
 /* directory dependent vop table */
@@ -1419,25 +1327,6 @@ sdev_to_vp(struct sdev_node *dv, struct vnode **vpp)
 }
 
 /*
- * loopback into sdev_lookup()
- */
-static struct vnode *
-devname_find_by_devpath(char *devpath, struct vattr *vattr)
-{
-	int error = 0;
-	struct vnode *vp;
-
-	error = lookupname(devpath, UIO_SYSSPACE, NO_FOLLOW, NULLVPP, &vp);
-	if (error) {
-		return (NULL);
-	}
-
-	if (vattr)
-		(void) VOP_GETATTR(vp, vattr, 0, kcred, NULL);
-	return (vp);
-}
-
-/*
  * the junction between devname and devfs
  */
 static struct vnode *
@@ -1838,92 +1727,6 @@ sdev_call_devfsadmd(struct sdev_node *ddv, struct sdev_node *dv, char *nm)
 	return (error);
 }
 
-static int
-sdev_call_modulelookup(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
-    int (*fn)(char *, devname_handle_t *, struct cred *), struct cred *cred)
-{
-	struct vnode *rvp = NULL;
-	int error = 0;
-	struct vattr *vap;
-	devname_spec_t spec;
-	devname_handle_t *hdl;
-	void *args = NULL;
-	struct sdev_node *dv = *dvp;
-
-	ASSERT(dv && ddv);
-	hdl = &(dv->sdev_handle);
-	ASSERT(hdl->dh_data == dv);
-	mutex_enter(&dv->sdev_lookup_lock);
-	SDEV_BLOCK_OTHERS(dv, SDEV_LOOKUP);
-	mutex_exit(&dv->sdev_lookup_lock);
-	error = (*fn)(nm, hdl, cred);
-	if (error) {
-		return (error);
-	}
-
-	spec = hdl->dh_spec;
-	args = hdl->dh_args;
-	ASSERT(args);
-
-	switch (spec) {
-	case DEVNAME_NS_PATH:
-		/*
-		 * symlink of:
-		 *	/dev/dir/nm -> /device/...
-		 */
-		rvp = devname_configure_by_path((char *)args, NULL);
-		break;
-	case DEVNAME_NS_DEV:
-		/*
-		 * symlink of:
-		 *	/dev/dir/nm -> /dev/...
-		 */
-		rvp = devname_find_by_devpath((char *)args, NULL);
-		break;
-	default:
-		if (args)
-			kmem_free((char *)args, strlen(args) + 1);
-		return (ENOENT);
-
-	}
-
-	if (rvp == NULL) {
-		if (args)
-			kmem_free((char *)args, strlen(args) + 1);
-		return (ENOENT);
-	} else {
-		vap = sdev_getdefault_attr(VLNK);
-		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
-		/*
-		 * Could sdev_mknode return a different dv_node
-		 * once the lock is dropped?
-		 */
-		if (!rw_tryupgrade(&ddv->sdev_contents)) {
-			rw_exit(&ddv->sdev_contents);
-			rw_enter(&ddv->sdev_contents, RW_WRITER);
-		}
-		error = sdev_mknode(ddv, nm, &dv, vap, NULL, args, cred,
-		    SDEV_READY);
-		rw_downgrade(&ddv->sdev_contents);
-		if (error) {
-			if (args)
-				kmem_free((char *)args, strlen(args) + 1);
-			return (error);
-		} else {
-			mutex_enter(&dv->sdev_lookup_lock);
-			SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
-			mutex_exit(&dv->sdev_lookup_lock);
-			error = 0;
-		}
-	}
-
-	if (args)
-		kmem_free((char *)args, strlen(args) + 1);
-
-	*dvp = dv;
-	return (0);
-}
-
 /*
  *  Support for specialized device naming construction mechanisms
  */
@@ -2129,9 +1932,6 @@ devname_lookup_func(struct sdev_node *ddv, char *nm, struct vnode **vpp,
 	struct sdev_node *dv = NULL;
 	int	retried = 0;
 	int	error = 0;
-	struct devname_nsmap *map = NULL;
-	struct devname_ops *dirops = NULL;
-	int (*fn)(char *, devname_handle_t *, struct cred *) = NULL;
 	struct vattr vattr;
 	char *lookup_thread = curproc->p_user.u_comm;
 	int failed_flags = 0;
@@ -2356,16 +2156,10 @@ lookup_create_node:
 		failed_flags |= SLF_NO_NCACHE;
 	}
 
-	if (SDEV_IS_GLOBAL(ddv)) {
-		map = sdev_get_map(ddv, 1);
-		dirops = map ? map->dir_ops : NULL;
-		fn = dirops ? dirops->devnops_lookup : NULL;
-	}
-
 	/*
 	 * (b1) invoking devfsadm once per life time for devfsadm nodes
 	 */
-	if ((fn == NULL) && !callback) {
+	if (!callback) {
 
 		if (sdev_reconfig_boot || !i_ddi_io_initialized() ||
 		    SDEV_IS_DYNAMIC(ddv) || SDEV_IS_NO_NCACHE(dv) ||
@@ -2424,15 +2218,7 @@ lookup_create_node:
 	 *
 	 *	note: module vnode ops take precedence than the build-in ones
 	 */
-	if (fn) {
-		error = sdev_call_modulelookup(ddv, &dv, nm, fn, cred);
-		if (error) {
-			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
-			goto notfound;
-		} else {
-			goto found;
-		}
-	} else if (callback) {
+	if (callback) {
 		error = sdev_call_dircallback(ddv, &dv, nm, callback,
 		    flags, cred);
 		if (error == 0) {
@@ -2493,11 +2279,6 @@ found:
 		}
 	}
 
-	if ((SDEVTOV(dv)->v_type == VDIR) && SDEV_IS_GLOBAL(dv)) {
-		rw_enter(&dv->sdev_contents, RW_READER);
-		(void) sdev_get_map(dv, 1);
-		rw_exit(&dv->sdev_contents);
-	}
 	rw_exit(&ddv->sdev_contents);
 	rv = sdev_to_vp(dv, vpp);
 	sdcmn_err3(("devname_lookup_func: returning vp %p v_count %d state %d "
@@ -2743,9 +2524,6 @@ devname_readdir_func(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp,
 	offset_t	diroff;
 	offset_t	soff;
 	int		this_reclen;
-	struct devname_nsmap	*map = NULL;
-	struct devname_ops	*dirops = NULL;
-	int (*fn)(devname_handle_t *, struct cred *) = NULL;
 	int (*vtor)(struct sdev_node *) = NULL;
 	struct vattr attr;
 	timestruc_t now;
@@ -2783,32 +2561,8 @@ devname_readdir_func(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp,
 		goto get_cache;
 
 	if (SDEV_IS_GLOBAL(ddv)) {
-		map = sdev_get_map(ddv, 0);
-		dirops = map ? map->dir_ops : NULL;
-		fn = dirops ? dirops->devnops_readdir : NULL;
 
-		if (map && map->dir_map) {
-			/*
-			 * load the name mapping rule database
-			 * through invoking devfsadm and symlink
-			 * all the entries in the map
-			 */
-			devname_rdr_result_t rdr_result;
-			int do_thread = 0;
-
-			rw_enter(&map->dir_lock, RW_READER);
-			do_thread = map->dir_maploaded ? 0 : 1;
-			rw_exit(&map->dir_lock);
-
-			if (do_thread) {
-				mutex_enter(&ddv->sdev_lookup_lock);
-				SDEV_BLOCK_OTHERS(ddv, SDEV_READDIR);
-				mutex_exit(&ddv->sdev_lookup_lock);
-
-				sdev_dispatch_to_nsrdr_thread(ddv,
-				    map->dir_map, &rdr_result);
-			}
-		} else if ((sdev_boot_state == SDEV_BOOT_STATE_COMPLETE) &&
+		if ((sdev_boot_state == SDEV_BOOT_STATE_COMPLETE) &&
 		    !sdev_reconfig_boot && (flags & SDEV_BROWSE) &&
 		    !SDEV_IS_DYNAMIC(ddv) && !SDEV_IS_NO_NCACHE(ddv) &&
 		    ((moddebug & MODDEBUG_FINI_EBUSY) == 0) &&
@@ -2934,19 +2688,6 @@ get_cache:
 				    dv->sdev_name, (void *)dv);
 				break;
 			/*NOTREACHED*/
-			}
-		}
-
-		/*
-		 * call back into the module for the validity/bookkeeping
-		 * of this entry
-		 */
-		if (fn) {
-			error = (*fn)(&(dv->sdev_handle), cred);
-			if (error) {
-				sdcmn_err4(("sdev_readdir: module did not "
-				    "validate %s\n", dv->sdev_name));
-				continue;
 			}
 		}
 
@@ -3279,306 +3020,6 @@ sdev_modctl_devexists(const char *path)
 	return (error);
 }
 
-void
-sdev_update_newnsmap(struct devname_nsmap *map, char *module, char *mapname)
-{
-	rw_enter(&map->dir_lock, RW_WRITER);
-	if (module) {
-		ASSERT(map->dir_newmodule == NULL);
-		map->dir_newmodule = i_ddi_strdup(module, KM_SLEEP);
-	}
-	if (mapname) {
-		ASSERT(map->dir_newmap == NULL);
-		map->dir_newmap = i_ddi_strdup(mapname, KM_SLEEP);
-	}
-
-	map->dir_invalid = 1;
-	rw_exit(&map->dir_lock);
-}
-
-void
-sdev_replace_nsmap(struct devname_nsmap *map, char *module, char *mapname)
-{
-	char *old_module = NULL;
-	char *old_map = NULL;
-
-	ASSERT(RW_LOCK_HELD(&map->dir_lock));
-	if (!rw_tryupgrade(&map->dir_lock)) {
-		rw_exit(&map->dir_lock);
-		rw_enter(&map->dir_lock, RW_WRITER);
-	}
-
-	old_module = map->dir_module;
-	if (module) {
-		if (old_module && strcmp(old_module, module) != 0) {
-			kmem_free(old_module, strlen(old_module) + 1);
-		}
-		map->dir_module = module;
-		map->dir_newmodule = NULL;
-	}
-
-	old_map = map->dir_map;
-	if (mapname) {
-		if (old_map && strcmp(old_map, mapname) != 0) {
-			kmem_free(old_map, strlen(old_map) + 1);
-		}
-
-		map->dir_map = mapname;
-		map->dir_newmap = NULL;
-	}
-	map->dir_maploaded = 0;
-	map->dir_invalid = 0;
-	rw_downgrade(&map->dir_lock);
-}
-
-/*
- * dir_name should have at least one attribute,
- *	dir_module
- *	or dir_map
- *	or both
- * caller holds the devname_nsmaps_lock
- */
-void
-sdev_insert_nsmap(char *dir_name, char *dir_module, char *dir_map)
-{
-	struct devname_nsmap *map;
-	int len = 0;
-
-	ASSERT(dir_name);
-	ASSERT(dir_module || dir_map);
-	ASSERT(MUTEX_HELD(&devname_nsmaps_lock));
-
-	if (map = sdev_get_nsmap_by_dir(dir_name, 1)) {
-		sdev_update_newnsmap(map, dir_module, dir_map);
-		return;
-	}
-
-	map = (struct devname_nsmap *)kmem_zalloc(sizeof (*map), KM_SLEEP);
-	map->dir_name = i_ddi_strdup(dir_name, KM_SLEEP);
-	if (dir_module) {
-		map->dir_module = i_ddi_strdup(dir_module, KM_SLEEP);
-	}
-
-	if (dir_map) {
-		if (dir_map[0] != '/') {
-			len = strlen(ETC_DEV_DIR) + strlen(dir_map) + 2;
-			map->dir_map = kmem_zalloc(len, KM_SLEEP);
-			(void) snprintf(map->dir_map, len, "%s/%s", ETC_DEV_DIR,
-			    dir_map);
-		} else {
-			map->dir_map = i_ddi_strdup(dir_map, KM_SLEEP);
-		}
-	}
-
-	map->dir_ops = NULL;
-	map->dir_maploaded = 0;
-	map->dir_invalid = 0;
-	rw_init(&map->dir_lock, NULL, RW_DEFAULT, NULL);
-
-	map->next = devname_nsmaps;
-	map->prev = NULL;
-	if (devname_nsmaps) {
-		devname_nsmaps->prev = map;
-	}
-	devname_nsmaps = map;
-}
-
-struct devname_nsmap *
-sdev_get_nsmap_by_dir(char *dir_path, int locked)
-{
-	struct devname_nsmap *map = NULL;
-
-	if (!locked)
-		mutex_enter(&devname_nsmaps_lock);
-	for (map = devname_nsmaps; map; map = map->next) {
-		sdcmn_err6(("sdev_get_nsmap_by_dir: dir %s\n", map->dir_name));
-		if (strcmp(map->dir_name, dir_path) == 0) {
-			if (!locked)
-				mutex_exit(&devname_nsmaps_lock);
-			return (map);
-		}
-	}
-	if (!locked)
-		mutex_exit(&devname_nsmaps_lock);
-	return (NULL);
-}
-
-struct devname_nsmap *
-sdev_get_nsmap_by_module(char *mod_name)
-{
-	struct devname_nsmap *map = NULL;
-
-	mutex_enter(&devname_nsmaps_lock);
-	for (map = devname_nsmaps; map; map = map->next) {
-		sdcmn_err7(("sdev_get_nsmap_by_module: module %s\n",
-		    map->dir_module));
-		if (map->dir_module && strcmp(map->dir_module, mod_name) == 0) {
-			mutex_exit(&devname_nsmaps_lock);
-			return (map);
-		}
-	}
-	mutex_exit(&devname_nsmaps_lock);
-	return (NULL);
-}
-
-void
-sdev_invalidate_nsmaps()
-{
-	struct devname_nsmap *map = NULL;
-
-	ASSERT(MUTEX_HELD(&devname_nsmaps_lock));
-
-	if (devname_nsmaps == NULL)
-		return;
-
-	for (map = devname_nsmaps; map; map = map->next) {
-		rw_enter(&map->dir_lock, RW_WRITER);
-		map->dir_invalid = 1;
-		rw_exit(&map->dir_lock);
-	}
-	devname_nsmaps_invalidated = 1;
-}
-
-
-int
-sdev_nsmaps_loaded()
-{
-	int ret = 0;
-
-	mutex_enter(&devname_nsmaps_lock);
-	if (devname_nsmaps_loaded)
-		ret = 1;
-
-	mutex_exit(&devname_nsmaps_lock);
-	return (ret);
-}
-
-int
-sdev_nsmaps_reloaded()
-{
-	int ret = 0;
-
-	mutex_enter(&devname_nsmaps_lock);
-	if (devname_nsmaps_invalidated)
-		ret = 1;
-
-	mutex_exit(&devname_nsmaps_lock);
-	return (ret);
-}
-
-static void
-sdev_free_nsmap(struct devname_nsmap *map)
-{
-	ASSERT(map);
-	if (map->dir_name)
-		kmem_free(map->dir_name, strlen(map->dir_name) + 1);
-	if (map->dir_module)
-		kmem_free(map->dir_module, strlen(map->dir_module) + 1);
-	if (map->dir_map)
-		kmem_free(map->dir_map, strlen(map->dir_map) + 1);
-	rw_destroy(&map->dir_lock);
-	kmem_free(map, sizeof (*map));
-}
-
-void
-sdev_validate_nsmaps()
-{
-	struct devname_nsmap *map = NULL;
-	struct devname_nsmap *oldmap = NULL;
-
-	ASSERT(MUTEX_HELD(&devname_nsmaps_lock));
-	map = devname_nsmaps;
-	while (map) {
-		rw_enter(&map->dir_lock, RW_READER);
-		if ((map->dir_invalid == 1) && (map->dir_newmodule == NULL) &&
-		    (map->dir_newmap == NULL)) {
-			oldmap = map;
-			rw_exit(&map->dir_lock);
-			if (map->prev)
-				map->prev->next = oldmap->next;
-			if (map == devname_nsmaps)
-				devname_nsmaps = oldmap->next;
-
-			map = oldmap->next;
-			if (map)
-				map->prev = oldmap->prev;
-			sdev_free_nsmap(oldmap);
-			oldmap = NULL;
-		} else {
-			rw_exit(&map->dir_lock);
-			map = map->next;
-		}
-	}
-	devname_nsmaps_invalidated = 0;
-}
-
-static int
-sdev_map_is_invalid(struct devname_nsmap *map)
-{
-	int ret = 0;
-
-	ASSERT(map);
-	rw_enter(&map->dir_lock, RW_READER);
-	if (map->dir_invalid)
-		ret = 1;
-	rw_exit(&map->dir_lock);
-	return (ret);
-}
-
-static int
-sdev_check_map(struct devname_nsmap *map)
-{
-	struct devname_nsmap *mapp;
-
-	mutex_enter(&devname_nsmaps_lock);
-	if (devname_nsmaps == NULL) {
-		mutex_exit(&devname_nsmaps_lock);
-		return (1);
-	}
-
-	for (mapp = devname_nsmaps; mapp; mapp = mapp->next) {
-		if (mapp == map) {
-			mutex_exit(&devname_nsmaps_lock);
-			return (0);
-		}
-	}
-
-	mutex_exit(&devname_nsmaps_lock);
-	return (1);
-
-}
-
-struct devname_nsmap *
-sdev_get_map(struct sdev_node *dv, int validate)
-{
-	struct devname_nsmap *map;
-	int error;
-
-	ASSERT(RW_READ_HELD(&dv->sdev_contents));
-	map = dv->sdev_mapinfo;
-	if (map && sdev_check_map(map)) {
-		if (!rw_tryupgrade(&dv->sdev_contents)) {
-			rw_exit(&dv->sdev_contents);
-			rw_enter(&dv->sdev_contents, RW_WRITER);
-		}
-		dv->sdev_mapinfo = NULL;
-		rw_downgrade(&dv->sdev_contents);
-		return (NULL);
-	}
-
-	if (validate && (!map || (map && sdev_map_is_invalid(map)))) {
-		if (!rw_tryupgrade(&dv->sdev_contents)) {
-			rw_exit(&dv->sdev_contents);
-			rw_enter(&dv->sdev_contents, RW_WRITER);
-		}
-		error = sdev_get_moduleops(dv);
-		if (!error)
-			map = dv->sdev_mapinfo;
-		rw_downgrade(&dv->sdev_contents);
-	}
-	return (map);
-}
-
 extern int sdev_vnodeops_tbl_size;
 
 /*
@@ -3617,115 +3058,6 @@ static void
 sdev_free_vtab(fs_operation_def_t *new)
 {
 	kmem_free(new, sdev_vnodeops_tbl_size);
-}
-
-void
-devname_get_vnode(devname_handle_t *hdl, vnode_t **vpp)
-{
-	struct sdev_node *dv = hdl->dh_data;
-
-	ASSERT(dv);
-
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*vpp = SDEVTOV(dv);
-	rw_exit(&dv->sdev_contents);
-}
-
-int
-devname_get_path(devname_handle_t *hdl, char **path)
-{
-	struct sdev_node *dv = hdl->dh_data;
-
-	ASSERT(dv);
-
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*path = dv->sdev_path;
-	rw_exit(&dv->sdev_contents);
-	return (0);
-}
-
-int
-devname_get_name(devname_handle_t *hdl, char **entry)
-{
-	struct sdev_node *dv = hdl->dh_data;
-
-	ASSERT(dv);
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*entry = dv->sdev_name;
-	rw_exit(&dv->sdev_contents);
-	return (0);
-}
-
-void
-devname_get_dir_vnode(devname_handle_t *hdl, vnode_t **vpp)
-{
-	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
-
-	ASSERT(dv);
-
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*vpp = SDEVTOV(dv);
-	rw_exit(&dv->sdev_contents);
-}
-
-int
-devname_get_dir_path(devname_handle_t *hdl, char **path)
-{
-	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
-
-	ASSERT(dv);
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*path = dv->sdev_path;
-	rw_exit(&dv->sdev_contents);
-	return (0);
-}
-
-int
-devname_get_dir_name(devname_handle_t *hdl, char **entry)
-{
-	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
-
-	ASSERT(dv);
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*entry = dv->sdev_name;
-	rw_exit(&dv->sdev_contents);
-	return (0);
-}
-
-int
-devname_get_dir_nsmap(devname_handle_t *hdl, struct devname_nsmap **map)
-{
-	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
-
-	ASSERT(dv);
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*map = dv->sdev_mapinfo;
-	rw_exit(&dv->sdev_contents);
-	return (0);
-}
-
-int
-devname_get_dir_handle(devname_handle_t *hdl, devname_handle_t **dir_hdl)
-{
-	struct sdev_node *dv = hdl->dh_data->sdev_dotdot;
-
-	ASSERT(dv);
-	rw_enter(&dv->sdev_contents, RW_READER);
-	*dir_hdl = &(dv->sdev_handle);
-	rw_exit(&dv->sdev_contents);
-	return (0);
-}
-
-void
-devname_set_nodetype(devname_handle_t *hdl, void *args, int spec)
-{
-	struct sdev_node *dv = hdl->dh_data;
-
-	ASSERT(dv);
-	rw_enter(&dv->sdev_contents, RW_WRITER);
-	hdl->dh_spec = (devname_spec_t)spec;
-	hdl->dh_args = (void *)i_ddi_strdup((char *)args, KM_SLEEP);
-	rw_exit(&dv->sdev_contents);
 }
 
 /*
@@ -3841,6 +3173,7 @@ devname_setattr_func(struct vnode *vp, struct vattr *vap, int flags,
 /*
  * a generic inactive() function
  */
+/*ARGSUSED*/
 void
 devname_inactive_func(struct vnode *vp, struct cred *cred,
     void (*callback)(struct vnode *))
@@ -3849,9 +3182,6 @@ devname_inactive_func(struct vnode *vp, struct cred *cred,
 	struct sdev_node *dv = VTOSDEV(vp);
 	struct sdev_node *ddv = dv->sdev_dotdot;
 	int state;
-	struct devname_nsmap *map = NULL;
-	struct devname_ops *dirops = NULL;
-	void (*fn)(devname_handle_t *, struct cred *) = NULL;
 
 	rw_enter(&ddv->sdev_contents, RW_WRITER);
 	state = dv->sdev_state;
@@ -3872,12 +3202,6 @@ devname_inactive_func(struct vnode *vp, struct cred *cred,
 	 */
 	if (clean) {
 		ASSERT(ddv);
-		if (SDEV_IS_GLOBAL(dv)) {
-			map = ddv->sdev_mapinfo;
-			dirops = map ? map->dir_ops : NULL;
-			if (dirops && (fn = dirops->devnops_inactive))
-				(*fn)(&(dv->sdev_handle), cred);
-		}
 
 		ddv->sdev_nlink--;
 		if (vp->v_type == VDIR) {

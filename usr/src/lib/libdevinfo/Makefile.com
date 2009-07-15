@@ -19,17 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libdevinfo.a
 VERS=		.1
 
 OBJECTS=	devfsinfo.o devinfo.o devinfo_prop_decode.o devinfo_devlink.o \
-		devinfo_devperm.o devfsmap.o devinfo_devname.o \
+		devinfo_devperm.o devfsmap.o devinfo_profile.o \
 		devinfo_finddev.o devinfo_dli.o devinfo_dim.o \
 		devinfo_realpath.o devinfo_retire.o
 		

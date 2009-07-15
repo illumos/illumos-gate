@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * routines to invoke user level name lookup services
@@ -59,7 +57,6 @@
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
 #include <sys/fs/sdev_impl.h>
-#include <sys/fs/sdev_node.h>
 #include <sys/sunndi.h>
 #include <sys/sunddi.h>
 #include <sys/sunmdi.h>
@@ -77,7 +74,6 @@ volatile uint_t devfsadm_state;
 static kmutex_t devfsadm_lock;
 static kcondvar_t devfsadm_cv;
 
-int devname_nsmaps_loaded = 0;
 static int dev_node_wait_timeout = DEV_NODE_WAIT_TIMEOUT;
 static int dev_devfsadm_startup =  DEV_DEVFSADM_STARTUP;
 
@@ -89,18 +85,8 @@ static char		*sdev_door_upcall_filename = NULL;
 static int		sdev_upcall_door_revoked = 0;
 static int		sdev_door_upcall_filename_size;
 
-static void sdev_devfsadmd_nsrdr(sdev_nsrdr_work_t *);
 static int sdev_devfsadm_revoked(void);
 static int sdev_ki_call_devfsadmd(sdev_door_arg_t *, sdev_door_res_t *);
-
-/*
- * nsmap_readdir processing thread
- */
-static uint_t			sdev_nsrdr_thread_created = 0;
-static kmutex_t			sdev_nsrdr_thread_lock;
-static kcondvar_t		sdev_nsrdr_thread_cv;
-static sdev_nsrdr_work_t	*sdev_nsrdr_thread_workq = NULL;
-static sdev_nsrdr_work_t	*sdev_nsrdr_thread_tail = NULL;
 
 void
 sdev_devfsadm_lockinit(void)
@@ -164,7 +150,7 @@ sdev_wait4lookup(struct sdev_node *dv, int cmd)
 			} else if ((rv == -1) &&
 			    (ddi_get_lbolt() >= expire)) {
 				sdcmn_err6(("%s: wait time is up\n",
-					dv->sdev_name));
+				    dv->sdev_name));
 				break;
 			}
 			sdcmn_err6(("%s: wait "
@@ -463,15 +449,12 @@ sdev_devfsadmd_thread(struct sdev_node *ddv, struct sdev_node *dv,
 }
 
 int
-devname_filename_register(int cmd, char *name)
+devname_filename_register(char *name)
 {
 	int error = 0;
 	char *strbuf;
 	char *namep;
 	int n;
-
-	ASSERT(cmd == MODDEVNAME_LOOKUPDOOR ||
-	    cmd == MODDEVNAME_DEVFSADMNODE);
 
 	strbuf = kmem_zalloc(MOD_MAXPATH, KM_SLEEP);
 
@@ -480,272 +463,20 @@ devname_filename_register(int cmd, char *name)
 		error = EFAULT;
 	} else {
 		sdcmn_err6(("file %s is registering\n", strbuf));
-		switch (cmd) {
-		case MODDEVNAME_LOOKUPDOOR:
-			/* handling the daemon re-start situations */
-			n = strlen(strbuf) + 1;
-			namep = i_ddi_strdup(strbuf, KM_SLEEP);
-			mutex_enter(&devfsadm_lock);
-			sdev_release_door();
-			sdev_door_upcall_filename_size = n;
-			sdev_door_upcall_filename = namep;
-			sdcmn_err6(("size %d file name %s\n",
-			    sdev_door_upcall_filename_size,
-			    sdev_door_upcall_filename));
-			cv_broadcast(&devfsadm_cv);
-			mutex_exit(&devfsadm_lock);
-			break;
-		case MODDEVNAME_DEVFSADMNODE:
-			break;
-		}
+		/* handling the daemon re-start situations */
+		n = strlen(strbuf) + 1;
+		namep = i_ddi_strdup(strbuf, KM_SLEEP);
+		mutex_enter(&devfsadm_lock);
+		sdev_release_door();
+		sdev_door_upcall_filename_size = n;
+		sdev_door_upcall_filename = namep;
+		sdcmn_err6(("size %d file name %s\n",
+		    sdev_door_upcall_filename_size,
+		    sdev_door_upcall_filename));
+		cv_broadcast(&devfsadm_cv);
+		mutex_exit(&devfsadm_lock);
 	}
 
 	kmem_free(strbuf, MOD_MAXPATH);
-	return (error);
-}
-static void
-sdev_nsrdr_thread(void)
-{
-	sdev_nsrdr_work_t *work;
-
-	for (;;) {
-		mutex_enter(&sdev_nsrdr_thread_lock);
-		if (sdev_nsrdr_thread_workq == NULL) {
-			cv_wait(&sdev_nsrdr_thread_cv, &sdev_nsrdr_thread_lock);
-		}
-		work = sdev_nsrdr_thread_workq;
-		sdev_nsrdr_thread_workq = work->next;
-		if (sdev_nsrdr_thread_tail == work)
-			sdev_nsrdr_thread_tail = work->next;
-		mutex_exit(&sdev_nsrdr_thread_lock);
-		sdev_devfsadmd_nsrdr(work);
-	}
-	/*NOTREACHED*/
-}
-
-int
-devname_nsmaps_register(char *nvlbuf, size_t nvlsize)
-{
-	int error = 0;
-	nvlist_t *nvl, *attrs;
-	nvpair_t *nvp = NULL;
-	nvpair_t *kvp = NULL;
-	char *buf;
-	char *key;
-	char *dirname = NULL;
-	char *dirmodule = NULL;
-	char *dirmap = NULL;
-	char *orig_module;
-	char *orig_map;
-	int len = 0;
-	char *tmpmap;
-	int mapcount = 0;
-
-	buf = kmem_zalloc(nvlsize, KM_SLEEP);
-	if ((error = ddi_copyin(nvlbuf, buf, nvlsize, 0)) != 0) {
-		kmem_free(buf, nvlsize);
-		return (error);
-	}
-
-	ASSERT(buf);
-	sdcmn_err6(("devname_nsmaps_register: nsmap buf %p\n", (void *)buf));
-	nvl = NULL;
-	error = nvlist_unpack(buf, nvlsize, &nvl, KM_SLEEP);
-	kmem_free(buf, nvlsize);
-	if (error || (nvl == NULL))
-		return (error);
-
-	/* invalidate all the nsmaps */
-	mutex_enter(&devname_nsmaps_lock);
-	sdev_invalidate_nsmaps();
-	for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
-	    nvp = nvlist_next_nvpair(nvl, nvp)) {
-		dirname = nvpair_name(nvp);
-		if (dirname == NULL) {
-			nvlist_free(nvl);
-			mutex_exit(&devname_nsmaps_lock);
-			return (-1);
-		}
-
-		sdcmn_err6(("dirname %s\n", dirname));
-		(void) nvpair_value_nvlist(nvp, &attrs);
-		for (kvp = nvlist_next_nvpair(attrs, NULL); kvp;
-		    kvp = nvlist_next_nvpair(attrs, kvp)) {
-			key = nvpair_name(kvp);
-			sdcmn_err6(("key %s\n", key));
-			if (strcmp(key, "module") == 0) {
-				(void) nvpair_value_string(kvp, &orig_module);
-				sdcmn_err6(("module %s\n", orig_module));
-				dirmodule = i_ddi_strdup(orig_module, KM_SLEEP);
-				if (strcmp(dirmodule, "devname_null") == 0)
-					dirmodule = NULL;
-			}
-
-			if (strcmp(key, "nsconfig") == 0) {
-				(void) nvpair_value_string(kvp, &orig_map);
-				sdcmn_err6(("dirmap %s\n", orig_map));
-				dirmap = i_ddi_strdup(orig_map, KM_SLEEP);
-				if (strcmp(dirmap, "devname_null") == 0)
-					dirmap = NULL;
-				else if (dirmap[0] != '/') {
-					len = strlen(dirmap) +
-					    strlen(ETC_DEV_DIR) + 2;
-					tmpmap = i_ddi_strdup(dirmap, KM_SLEEP);
-					(void) snprintf(dirmap, len, "%s/%s",
-					    ETC_DEV_DIR, tmpmap);
-					kmem_free(tmpmap, strlen(tmpmap) + 1);
-				}
-			}
-		}
-
-		if (dirmodule == NULL && dirmap == NULL) {
-			nvlist_free(nvl);
-			mutex_exit(&devname_nsmaps_lock);
-			return (-1);
-		}
-
-		sdcmn_err6(("sdev_nsmaps_register: dir %s module %s map %s\n",
-		    dirname, dirmodule, dirmap));
-		sdev_insert_nsmap(dirname, dirmodule, dirmap);
-		mapcount++;
-	}
-
-	if (mapcount > 0)
-		devname_nsmaps_loaded = 1;
-
-	/* clean up obsolete nsmaps */
-	sdev_validate_nsmaps();
-	mutex_exit(&devname_nsmaps_lock);
-	if (nvl)
-		nvlist_free(nvl);
-
-	if (sdev_nsrdr_thread_created) {
-		return (0);
-	}
-
-	mutex_init(&sdev_nsrdr_thread_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&sdev_nsrdr_thread_cv, NULL, CV_DEFAULT, NULL);
-	(void) thread_create(NULL, 0, (void (*)())sdev_nsrdr_thread, NULL, 0,
-	    &p0, TS_RUN, minclsyspri);
-	sdev_nsrdr_thread_created = 1;
-
-	return (0);
-}
-
-void
-sdev_dispatch_to_nsrdr_thread(struct sdev_node *ddv, char *dir_map,
-    devname_rdr_result_t *result)
-{
-	sdev_nsrdr_work_t *new_work;
-
-	new_work = kmem_zalloc(sizeof (sdev_nsrdr_work_t), KM_SLEEP);
-	new_work->dir_name = i_ddi_strdup(ddv->sdev_name, KM_SLEEP);
-	new_work->dir_map = i_ddi_strdup(dir_map, KM_SLEEP);
-	new_work->dir_dv = ddv;
-	new_work->result = &result;
-	mutex_enter(&sdev_nsrdr_thread_lock);
-	if (sdev_nsrdr_thread_workq == NULL) {
-		sdev_nsrdr_thread_workq = new_work;
-		sdev_nsrdr_thread_tail = new_work;
-		new_work->next = NULL;
-	} else {
-		sdev_nsrdr_thread_tail->next = new_work;
-		sdev_nsrdr_thread_tail = new_work;
-		new_work->next = NULL;
-	}
-	cv_signal(&sdev_nsrdr_thread_cv);
-	mutex_exit(&sdev_nsrdr_thread_lock);
-}
-
-static void
-sdev_devfsadmd_nsrdr(sdev_nsrdr_work_t *work)
-{
-	int32_t error;
-	struct sdev_door_arg *argp;
-	struct sdev_door_res res;
-	struct sdev_node *ddv = work->dir_dv;
-	uint32_t mapcount;
-
-	argp = kmem_zalloc(sizeof (sdev_door_arg_t), KM_SLEEP);
-	argp->devfsadm_cmd = DEVFSADMD_NS_READDIR;
-
-	(void) snprintf(argp->ns_hdl.ns_name,
-	    strlen(work->dir_dv->sdev_path) + 1, "%s", work->dir_dv->sdev_path);
-	(void) snprintf(argp->ns_hdl.ns_map, strlen(work->dir_map) + 1, "%s",
-	    work->dir_map);
-
-	sdcmn_err6(("sdev_devfsadmd_nsrdr: ns_name %s, ns_map %s\n",
-	    argp->ns_hdl.ns_name, argp->ns_hdl.ns_map));
-	error = sdev_ki_call_devfsadmd(argp, &res);
-	sdcmn_err6(("sdev_devfsadmd_nsrdr error %d\n", error));
-	if (error == 0) {
-		error = res.devfsadm_error;
-		if (error) {
-			goto out;
-		}
-
-		mapcount = (uint32_t)res.ns_rdr_hdl.ns_mapcount;
-		sdcmn_err6(("nsmapcount %d\n", mapcount));
-		if (mapcount > 0) {
-			struct devname_nsmap *map =
-			    ddv->sdev_mapinfo;
-			ASSERT(map && map->dir_map);
-			rw_enter(&map->dir_lock, RW_WRITER);
-			map->dir_maploaded = 1;
-			rw_exit(&map->dir_lock);
-		}
-	}
-
-out:
-	mutex_enter(&ddv->sdev_lookup_lock);
-	SDEV_UNBLOCK_OTHERS(ddv, SDEV_READDIR);
-	mutex_exit(&ddv->sdev_lookup_lock);
-
-	kmem_free(argp, sizeof (sdev_door_arg_t));
-}
-
-
-int
-devname_nsmap_lookup(devname_lkp_arg_t *args, devname_lkp_result_t **result)
-{
-	int32_t error = 0;
-	struct sdev_door_arg *argp;
-	struct sdev_door_res resp;
-	char *link;
-	devname_spec_t spec;
-
-	argp = kmem_zalloc(sizeof (sdev_door_arg_t), KM_SLEEP);
-	argp->devfsadm_cmd = DEVFSADMD_NS_LOOKUP;
-
-	(void) snprintf(argp->ns_hdl.ns_name, strlen(args->devname_name) + 1,
-	    "%s", args->devname_name);
-	(void) snprintf(argp->ns_hdl.ns_map, strlen(args->devname_map) + 1,
-	    "%s", args->devname_map);
-
-	error = sdev_ki_call_devfsadmd(argp, &resp);
-	if (error == 0) {
-		error = resp.devfsadm_error;
-		sdcmn_err6(("devfsadm: error %d\n", error));
-		if (error) {
-			goto done;
-		}
-		link = resp.ns_lkp_hdl.devfsadm_link;
-		if (link == NULL) {
-			error = ENOENT;
-			goto done;
-		}
-		spec = resp.ns_lkp_hdl.devfsadm_spec;
-		sdcmn_err6(("devfsadm_link %s spec %d\n",
-		    link, (int)spec));
-
-
-		(*result)->devname_spec = (devname_spec_t)spec;
-		(*result)->devname_link = i_ddi_strdup(link, KM_SLEEP);
-	} else {
-		(*result)->devname_spec = DEVNAME_NS_NONE;
-		(*result)->devname_link = NULL;
-	}
-done:
-	kmem_free(argp, sizeof (sdev_door_arg_t));
 	return (error);
 }

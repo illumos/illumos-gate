@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DEVFSADM_H
 #define	_DEVFSADM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <libdevinfo.h>
@@ -95,9 +93,6 @@ extern "C" {
 /* devfsadm event service door */
 #define	DEVFSADM_SERVICE_DOOR	"/etc/sysevent/devfsadm_event_channel"
 #define	DEVNAME_LOOKUP_DOOR	".devname_lookup_door"
-
-/* /dev device name binding rule locations */
-#define	DEVNAME_MASTER_MAP	"/etc/dev/devname_master"
 
 /* File of reserved devnames */
 #define	ENUMERATE_RESERVED "/etc/dev/reserved_devnames"

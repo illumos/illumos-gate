@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,6 @@
 #include <sys/mkdev.h>
 #include <fs/fs_subr.h>
 #include <sys/fs/sdev_impl.h>
-#include <sys/fs/sdev_node.h>
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
 #include <sys/sunndi.h>
@@ -463,26 +462,6 @@ sdev_statvfs(struct vfs *vfsp, struct statvfs64 *sbp)
 	sbp->f_namemax = MAXNAMELEN - 1;
 	(void) strcpy(sbp->f_fstr, "dev");
 
-	return (0);
-}
-
-int
-sdev_module_register(char *mod_name, struct devname_ops *dev_ops)
-{
-	struct devname_nsmap *map = NULL;
-
-	if (strcmp(mod_name, DEVNAME_NSCONFIG) == 0) {
-		devname_ns_ops = dev_ops;
-		return (0);
-	}
-
-	map = sdev_get_nsmap_by_module(mod_name);
-	if (map == NULL)
-		return (EFAULT);
-
-	rw_enter(&map->dir_lock, RW_WRITER);
-	map->dir_ops = dev_ops;
-	rw_exit(&map->dir_lock);
 	return (0);
 }
 

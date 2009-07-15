@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,17 +69,6 @@ struct sdev_mountargs {
  * supported devfsadm_cmd
  */
 #define	DEVFSADMD_RUN_ALL	1
-#define	DEVFSADMD_NS_LOOKUP	2
-#define	DEVFSADMD_NS_READDIR	3
-
-/*
- * supported protocols
- */
-typedef enum devname_spec {
-	DEVNAME_NS_NONE = 0,
-	DEVNAME_NS_PATH,	/* physical /devices path */
-	DEVNAME_NS_DEV		/* /dev path */
-} devname_spec_t;
 
 /*
  * devfsadm_error codes
@@ -87,35 +76,16 @@ typedef enum devname_spec {
 #define	DEVFSADM_RUN_INVALID		1
 #define	DEVFSADM_RUN_EPERM		2
 #define	DEVFSADM_RUN_NOTSUP		3
-#define	DEVFSADM_NS_FAILED		4
-
-typedef struct sdev_ns_handle {
-	char	ns_name[MAXPATHLEN];	/* device to be looked up */
-	char	ns_map[MAXPATHLEN];
-} sdev_ns_handle_t;
-
-typedef struct sdev_lkp_handle {
-	devname_spec_t	devfsadm_spec;	/* returned path property */
-	char	devfsadm_link[MAXPATHLEN]; /* symlink destination */
-} sdev_lkp_handle_t;
-
-typedef struct sdev_rdr_handle {
-	uint32_t ns_mapcount;	/* number of entries in the map */
-	uint32_t maplist_size;
-} sdev_rdr_handle_t;
 
 /*
  * devfsadm/devname door data structures
  */
 typedef struct sdev_door_arg {
 	uint8_t devfsadm_cmd;	/* what to do for devfsadm[d] */
-	sdev_ns_handle_t ns_hdl;
 } sdev_door_arg_t;
 
 typedef struct sdev_door_res {
 	int32_t devfsadm_error;
-	sdev_lkp_handle_t ns_lkp_hdl;
-	sdev_rdr_handle_t ns_rdr_hdl;
 } sdev_door_res_t;
 
 #ifdef _KERNEL
@@ -134,7 +104,6 @@ struct sdev_dprof {
  */
 struct devname_handle {
 	struct sdev_node *dh_data;	/* the sdev_node */
-	devname_spec_t dh_spec;
 	void    *dh_args;
 };
 typedef struct devname_handle devname_handle_t;
@@ -145,7 +114,6 @@ typedef struct devname_handle devname_handle_t;
  */
 typedef struct sdev_global_data {
 	struct devname_handle sdev_ghandle;
-	struct devname_nsmap *sdev_gmapinfo;	/* VDIR name service info */
 	ulong_t		sdev_dir_ggen;		/* name space generation # */
 } sdev_global_data_t;
 
@@ -200,7 +168,6 @@ typedef struct sdev_node {
 #define	sdev_gdata sdev_instance_data.sdev_globaldata
 
 #define	sdev_handle		sdev_gdata.sdev_ghandle
-#define	sdev_mapinfo		sdev_gdata.sdev_gmapinfo
 #define	sdev_gdir_gen		sdev_gdata.sdev_dir_ggen
 
 #define	sdev_ldir_gen		sdev_ldata.sdev_dir_lgen
@@ -353,7 +320,7 @@ extern int devname_setattr_func(struct vnode *, struct vattr *, int,
 /*
  * devname_inactive_func()
  */
-extern void devname_inactive_func(struct vnode *, struct cred *,
+extern void devname_inactive_func(struct vnode *, struct cred *cred,
     void (*)(struct vnode *));
 
 /*
@@ -418,7 +385,7 @@ extern void sdev_unblock_others(struct sdev_node *, uint_t);
 }
 
 extern int sdev_wait4lookup(struct sdev_node *, int);
-extern int devname_filename_register(int, char *);
+extern int devname_filename_register(char *);
 extern int devname_nsmaps_register(char *, size_t);
 extern void sdev_devfsadm_lockinit(void);
 extern void sdev_devfsadm_lockdestroy(void);
@@ -432,13 +399,6 @@ extern struct vnodeops *devpts_getvnodeops(void);
 extern struct vnodeops *devvt_getvnodeops(void);
 
 /*
- * Directory Based Device Naming (DBNR) defines
- */
-
-#define	ETC_DEV_DIR		"/etc/dev"
-#define	DEVNAME_NSCONFIG	"sdev_nsconfig_mod"
-
-/*
  * directory name rule
  */
 struct devname_nsmap {
@@ -447,7 +407,6 @@ struct devname_nsmap {
 	char	*dir_name;	/* /dev subdir name, e.g. /dev/disk */
 	char	*dir_module;	/* devname module impl the operations */
 	char	*dir_map;	/* dev naming rules, e.g. /etc/dev/disks */
-	struct devname_ops *dir_ops;	/* directory specific vnode ops */
 	char    *dir_newmodule; /* to be reloaded  */
 	char    *dir_newmap;    /* to be reloaded */
 	int	dir_invalid;    /* map entry obsolete */
@@ -464,15 +423,6 @@ typedef struct devname_lkp_arg {
 	char *devname_map;	/* the directory device naming map */
 	int reserved;
 } devname_lkp_arg_t;
-
-/*
- * name-value-property restured
- */
-typedef struct devname_lkp_result {
-	devname_spec_t	devname_spec;	/* link to /devices or /dev */
-	char	*devname_link;		/* the source path */
-	int	reserved;
-} devname_lkp_result_t;
 
 /*
  * directory name-value populating results
@@ -559,25 +509,6 @@ typedef struct nvp_devname {
  * name service globals and prototypes
  */
 
-extern struct devname_ops *devname_ns_ops;
-extern int devname_nsmaps_loaded;
-extern kmutex_t devname_nsmaps_lock;
-
-extern void sdev_invalidate_nsmaps(void);
-extern void sdev_validate_nsmaps(void);
-extern int sdev_module_register(char *, struct devname_ops *);
-extern struct devname_nsmap *sdev_get_nsmap_by_dir(char *, int);
-extern struct devname_nsmap *sdev_get_nsmap_by_module(char *);
-extern void sdev_dispatch_to_nsrdr_thread(struct sdev_node *, char *,
-    devname_rdr_result_t *);
-extern void sdev_insert_nsmap(char *, char *, char *);
-extern int devname_nsmap_lookup(devname_lkp_arg_t *, devname_lkp_result_t **);
-extern struct devname_nsmap *sdev_get_map(struct sdev_node *, int);
-extern int sdev_nsmaps_loaded(void);
-extern void sdev_replace_nsmap(struct devname_nsmap *, char *, char *);
-extern int sdev_nsmaps_reloaded(void);
-extern int devname_get_dir_nsmap(devname_handle_t *, struct devname_nsmap **);
-
 /*
  * vnodeops and vfsops helpers
  */
@@ -632,13 +563,6 @@ extern int devvt_validate(struct sdev_node *dv);
 extern void *sdev_get_vtor(struct sdev_node *dv);
 
 /*
- * devinfo helpers
- */
-extern int sdev_modctl_readdir(const char *, char ***, int *, int *, int);
-extern void sdev_modctl_readdir_free(char **, int, int);
-extern int sdev_modctl_devexists(const char *);
-
-/*
  * ncache handlers
  */
 
@@ -649,6 +573,13 @@ extern void sdev_nc_addname(sdev_nc_list_t *, sdev_node_t *, char *, int);
 extern void sdev_nc_node_exists(sdev_node_t *);
 extern void sdev_nc_path_exists(sdev_nc_list_t *, char *);
 extern void sdev_modctl_dump_files(void);
+
+/*
+ * devinfo helpers
+ */
+extern int sdev_modctl_readdir(const char *, char ***, int *, int *, int);
+extern void sdev_modctl_readdir_free(char **, int, int);
+extern int sdev_modctl_devexists(const char *);
 
 /*
  * globals

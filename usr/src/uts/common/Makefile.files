@@ -999,8 +999,6 @@ NV_SATA_OBJS += nv_sata.o
 
 SI3124_OBJS += si3124.o
 
-NSCONFIG_DEVNAME_OBJS += sdev_nsconfig_mod.o
-
 AHCI_OBJS += ahci.o
 
 PCIIDE_OBJS += pci-ide.o
