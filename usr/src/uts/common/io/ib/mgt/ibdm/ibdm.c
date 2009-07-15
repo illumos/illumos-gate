@@ -41,6 +41,7 @@
 #include <sys/taskq.h>
 #include <sys/ib/mgt/ibdm/ibdm_impl.h>
 #include <sys/ib/mgt/ibmf/ibmf_impl.h>
+#include <sys/ib/ibtl/impl/ibtl_ibnex.h>
 #include <sys/modctl.h>
 
 /* Function Prototype declarations */
@@ -87,6 +88,7 @@ static void	ibdm_probe_gid(ibdm_dp_gidinfo_t *);
 static void	ibdm_alloc_send_buffers(ibmf_msg_t *);
 static void	ibdm_free_send_buffers(ibmf_msg_t *);
 static void	ibdm_handle_hca_detach(ib_guid_t);
+static void	ibdm_handle_port_change_event(ibt_async_event_t *);
 static int	ibdm_fini_port(ibdm_port_attr_t *);
 static int	ibdm_uninit_hca(ibdm_hca_list_t *);
 static void	ibdm_handle_setclassportinfo(ibmf_handle_t, ibmf_msg_t *,
@@ -553,6 +555,14 @@ ibdm_event_hdlr(void *clnt_hdl,
 		hca_list->hl_nports_active++;
 		cv_broadcast(&ibdm.ibdm_port_settle_cv);
 		mutex_exit(&ibdm.ibdm_hl_mutex);
+
+		/* Inform IB nexus driver */
+		mutex_enter(&ibdm.ibdm_ibnex_mutex);
+		if (ibdm.ibdm_ibnex_callback != NULL) {
+			(*ibdm.ibdm_ibnex_callback)((void *)
+			    &event->ev_hca_guid, IBDM_EVENT_PORT_UP);
+		}
+		mutex_exit(&ibdm.ibdm_ibnex_mutex);
 		break;
 
 	case IBT_ERROR_PORT_DOWN:
@@ -576,19 +586,8 @@ ibdm_event_hdlr(void *clnt_hdl,
 
 	case IBT_PORT_CHANGE_EVENT:
 		IBTF_DPRINTF_L4("ibdm", "\tevent_hdlr: PORT_CHANGE");
-		if (event->ev_port_flags & IBT_PORT_CHANGE_PKEY) {
-			mutex_enter(&ibdm.ibdm_hl_mutex);
-			port = ibdm_get_port_attr(event, &hca_list);
-			if (port == NULL) {
-				IBTF_DPRINTF_L2("ibdm",
-				    "\tevent_hdlr: HCA not present");
-				mutex_exit(&ibdm.ibdm_hl_mutex);
-				break;
-			}
-			ibdm_update_port_pkeys(port);
-			cv_broadcast(&ibdm.ibdm_port_settle_cv);
-			mutex_exit(&ibdm.ibdm_hl_mutex);
-		}
+		if (event->ev_port_flags & IBT_PORT_CHANGE_PKEY)
+			ibdm_handle_port_change_event(event);
 		break;
 
 	default:		/* Ignore all other events/errors */
@@ -596,6 +595,33 @@ ibdm_event_hdlr(void *clnt_hdl,
 	}
 }
 
+static void
+ibdm_handle_port_change_event(ibt_async_event_t *event)
+{
+	ibdm_port_attr_t	*port;
+	ibdm_hca_list_t		*hca_list;
+
+	IBTF_DPRINTF_L2("ibdm", "\tibdm_handle_port_change_event:"
+	    " HCA guid  %llx", event->ev_hca_guid);
+	mutex_enter(&ibdm.ibdm_hl_mutex);
+	port = ibdm_get_port_attr(event, &hca_list);
+	if (port == NULL) {
+		IBTF_DPRINTF_L2("ibdm", "\tevent_hdlr: HCA not present");
+		mutex_exit(&ibdm.ibdm_hl_mutex);
+		return;
+	}
+	ibdm_update_port_pkeys(port);
+	cv_broadcast(&ibdm.ibdm_port_settle_cv);
+	mutex_exit(&ibdm.ibdm_hl_mutex);
+
+	/* Inform IB nexus driver */
+	mutex_enter(&ibdm.ibdm_ibnex_mutex);
+	if (ibdm.ibdm_ibnex_callback != NULL) {
+		(*ibdm.ibdm_ibnex_callback)((void *)
+		    &event->ev_hca_guid, IBDM_EVENT_PORT_PKEY_CHANGE);
+	}
+	mutex_exit(&ibdm.ibdm_ibnex_mutex);
+}
 
 /*
  * ibdm_update_port_pkeys()
@@ -1106,8 +1132,11 @@ ibdm_uninit_hca(ibdm_hca_list_t *head)
 		}
 	}
 	if (head->hl_hca_hdl)
-		if (ibt_close_hca(head->hl_hca_hdl) != IBT_SUCCESS)
+		if (ibt_close_hca(head->hl_hca_hdl) != IBT_SUCCESS) {
+			IBTF_DPRINTF_L2("ibdm", "uninit_hca: "
+			    "ibt_close_hca() failed");
 			return (IBDM_FAILURE);
+		}
 	kmem_free(head->hl_port_attr,
 	    head->hl_nports * sizeof (ibdm_port_attr_t));
 	kmem_free(head->hl_hca_port_attr, sizeof (ibdm_port_attr_t));
@@ -1151,7 +1180,7 @@ ibdm_fini_port(ibdm_port_attr_t *port_attr)
 
 		ibmf_status = ibmf_unregister(&port_attr->pa_ibmf_hdl, 0);
 		if (ibmf_status != IBMF_SUCCESS) {
-			IBTF_DPRINTF_L4("ibdm", "\tfini_port: "
+			IBTF_DPRINTF_L2("ibdm", "\tfini_port: "
 			    "ibmf_unregister failed %d", ibmf_status);
 			return (IBDM_FAILURE);
 		}
@@ -1162,7 +1191,7 @@ ibdm_fini_port(ibdm_port_attr_t *port_attr)
 	if (port_attr->pa_sa_hdl) {
 		ibmf_status = ibmf_sa_session_close(&port_attr->pa_sa_hdl, 0);
 		if (ibmf_status != IBMF_SUCCESS) {
-			IBTF_DPRINTF_L4("ibdm", "\tfini_port: "
+			IBTF_DPRINTF_L2("ibdm", "\tfini_port: "
 			    "ibmf_sa_session_close failed %d", ibmf_status);
 			return (IBDM_FAILURE);
 		}
@@ -5404,7 +5433,7 @@ ibdm_send_ioc_profile(ibdm_dp_gidinfo_t *gid_info, uint8_t ioc_no)
 	 */
 	if (ibmf_alloc_msg(gid_info->gl_ibmf_hdl, IBMF_ALLOC_SLEEP,
 	    &msg) != IBMF_SUCCESS) {
-		IBTF_DPRINTF_L4("ibdm", "\tsend_ioc_profile: pkt alloc fail");
+		IBTF_DPRINTF_L2("ibdm", "\tsend_ioc_profile: pkt alloc fail");
 		return (IBDM_FAILURE);
 	}
 

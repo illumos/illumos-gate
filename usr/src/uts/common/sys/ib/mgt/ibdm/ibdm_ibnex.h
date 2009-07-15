@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,9 @@ typedef enum ibdm_status_e {
 typedef enum ibdm_events_e {
 	IBDM_EVENT_HCA_ADDED,
 	IBDM_EVENT_HCA_REMOVED,
-	IBDM_EVENT_IOC_PROP_UPDATE
+	IBDM_EVENT_IOC_PROP_UPDATE,
+	IBDM_EVENT_PORT_UP,
+	IBDM_EVENT_PORT_PKEY_CHANGE
 } ibdm_events_t;
 
 /*
