@@ -25,6 +25,8 @@
 
 #include <hxge_impl.h>
 #include <hxge_rxdma.h>
+#include <hpi.h>
+#include <hpi_vir.h>
 
 /*
  * Number of blocks to accumulate before re-enabling DMA
@@ -258,17 +260,19 @@ hxge_enable_rxdma_channel(p_hxge_t hxgep, uint16_t channel,
 		return (HXGE_ERROR | rs);
 	}
 
-	/* Enable the DMA */
-	rs = hpi_rxdma_cfg_rdc_enable(handle, channel);
-	if (rs != HPI_SUCCESS) {
-		return (HXGE_ERROR | rs);
-	}
-
 	/* Kick the DMA engine */
 	hpi_rxdma_rdc_rbr_kick(handle, channel, n_init_kick);
 
 	/* Clear the rbr empty bit */
 	(void) hpi_rxdma_channel_rbr_empty_clear(handle, channel);
+
+	/*
+	 * Enable the DMA
+	 */
+	rs = hpi_rxdma_cfg_rdc_enable(handle, channel);
+	if (rs != HPI_SUCCESS) {
+		return (HXGE_ERROR | rs);
+	}
 
 	HXGE_DEBUG_MSG((hxgep, DMA_CTL, "<== hxge_enable_rxdma_channel"));
 
@@ -737,8 +741,10 @@ hxge_rxdma_stop(p_hxge_t hxgep)
 {
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_rxdma_stop"));
 
+	MUTEX_ENTER(&hxgep->vmac_lock);
 	(void) hxge_rx_vmac_disable(hxgep);
 	(void) hxge_rxdma_hw_mode(hxgep, HXGE_DMA_STOP);
+	MUTEX_EXIT(&hxgep->vmac_lock);
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "<== hxge_rxdma_stop"));
 }
@@ -752,7 +758,9 @@ hxge_rxdma_stop_reinit(p_hxge_t hxgep)
 	(void) hxge_uninit_rxdma_channels(hxgep);
 	(void) hxge_init_rxdma_channels(hxgep);
 
+	MUTEX_ENTER(&hxgep->vmac_lock);
 	(void) hxge_rx_vmac_enable(hxgep);
+	MUTEX_EXIT(&hxgep->vmac_lock);
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "<== hxge_rxdma_stop_reinit"));
 }
@@ -1132,7 +1140,6 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	uint8_t			channel;
 	hpi_handle_t		handle;
 	rdc_stat_t		cs;
-	uint_t			serviced = DDI_INTR_UNCLAIMED;
 	p_rx_rcr_ring_t		ring;
 	mblk_t			*mp = NULL;
 
@@ -1145,13 +1152,6 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	if (arg2 == NULL || (void *) ldvp->hxgep != arg2) {
 		hxgep = ldvp->hxgep;
 	}
-
-	/*
-	 * If the interface is not started, just swallow the interrupt
-	 * for the logical device and don't rearm it.
-	 */
-	if (hxgep->hxge_mac_state != HXGE_MAC_STARTED)
-		return (DDI_INTR_CLAIMED);
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 	    "==> hxge_rx_intr: arg2 $%p arg1 $%p", hxgep, ldvp));
@@ -1175,71 +1175,61 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 
 	MUTEX_ENTER(&ring->lock);
 
-	/*
-	 * If the channel is not started, then we are not
-	 * ready to process packets.
-	 */
-	if (!rhp->started) {
-		MUTEX_EXIT(&ring->lock);
-		return (DDI_INTR_CLAIMED);
-	}
+	if (!ring->poll_flag) {
+		RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
+		cs.bits.ptrread = 0;
+		cs.bits.pktread = 0;
+		RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
-	RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
-	cs.bits.ptrread = 0;
-	cs.bits.pktread = 0;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
-
-	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_intr:channel %d "
-	    "cs 0x%016llx rcrto 0x%x rcrthres %x",
-	    channel, cs.value, cs.bits.rcr_to, cs.bits.rcr_thres));
-
-	/*
-	 * Process packets, if we are not in polling mode. The MAC layer
-	 * under load will be operating in polling mode for RX traffic.
-	 */
-	if (ring->poll_flag == 0) {
-		mp = hxge_rx_pkts(hxgep, ldvp->vdma_index, ldvp, ring, cs, -1);
-	}
-	serviced = DDI_INTR_CLAIMED;
-
-	/* error events. */
-	if (cs.value & RDC_STAT_ERROR) {
-		(void) hxge_rx_err_evnts(hxgep, ldvp->vdma_index, ldvp, cs);
-	}
-
-	/*
-	 * Enable the mailbox update interrupt if we want to use mailbox. We
-	 * probably don't need to use mailbox as it only saves us one pio read.
-	 * Also write 1 to rcrthres and rcrto to clear these two edge triggered
-	 * bits.
-	 */
-	cs.value &= RDC_STAT_WR1C;
-	cs.bits.mex = 1;
-	cs.bits.ptrread = 0;
-	cs.bits.pktread = 0;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
-
-	/*
-	 * Rearm this logical group if this is a single device group.
-	 */
-	if (ring->poll_flag) {
-		if (ldgp->nldvs == 1) {
-			ld_intr_mgmt_t mgm;
-
-			mgm.value = 0;
-			mgm.bits.arm = 0;
-			HXGE_REG_WR32(handle,
-			    LD_INTR_MGMT + LDSV_OFFSET(ldgp->ldg), mgm.value);
+		/*
+		 * Process packets, if we are not in polling mode, the ring is
+		 * started and the interface is started. The MAC layer under
+		 * load will be operating in polling mode for RX traffic.
+		 */
+		if ((rhp->started) &&
+		    (hxgep->hxge_mac_state == HXGE_MAC_STARTED)) {
+			mp = hxge_rx_pkts(hxgep, ldvp->vdma_index,
+			    ldvp, ring, cs, -1);
 		}
-	} else if (ldgp->nldvs == 1) {
-		ld_intr_mgmt_t mgm;
 
-		mgm.value = 0;
-		mgm.bits.arm = 1;
-		mgm.bits.timer = ldgp->ldg_timer;
-		HXGE_REG_WR32(handle,
-		    LD_INTR_MGMT + LDSV_OFFSET(ldgp->ldg), mgm.value);
+		/* Process error events. */
+		if (cs.value & RDC_STAT_ERROR) {
+			MUTEX_EXIT(&ring->lock);
+			(void) hxge_rx_err_evnts(hxgep, channel, ldvp, cs);
+			MUTEX_ENTER(&ring->lock);
+		}
+
+		/*
+		 * Enable the mailbox update interrupt if we want to use
+		 * mailbox. We probably don't need to use mailbox as it only
+		 * saves us one pio read.  Also write 1 to rcrthres and
+		 * rcrto to clear these two edge triggered bits.
+		 */
+		cs.value &= RDC_STAT_WR1C;
+		cs.bits.mex = 1;
+		cs.bits.ptrread = 0;
+		cs.bits.pktread = 0;
+		RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
+
+		if (ldgp->nldvs == 1) {
+			/*
+			 * Re-arm the group.
+			 */
+			(void) hpi_intr_ldg_mgmt_set(handle, ldgp->ldg, B_TRUE,
+			    ldgp->ldg_timer);
+		}
+	} else if ((ldgp->nldvs == 1) && (ring->poll_flag)) {
+		/*
+		 * Disarm the group, if we are not a shared interrupt.
+		 */
+		(void) hpi_intr_ldg_mgmt_set(handle, ldgp->ldg, B_FALSE, 0);
+	} else if (ring->poll_flag) {
+		/*
+		 * Mask-off this device from the group.
+		 */
+		(void) hpi_intr_mask_set(handle, ldvp->ldv, 1);
 	}
+
 	MUTEX_EXIT(&ring->lock);
 
 	/*
@@ -1250,9 +1240,8 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 		    ring->rcr_gen_num);
 	}
 
-	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
-	    "<== hxge_rx_intr: serviced %d", serviced));
-	return (serviced);
+	HXGE_DEBUG_MSG((NULL, RX_INT_CTL, "<== hxge_rx_intr"));
+	return (DDI_INTR_CLAIMED);
 }
 
 /*
@@ -1268,26 +1257,34 @@ hxge_enable_poll(void *arg)
 	p_hxge_ldg_t		ldgp;
 
 	if (ring_handle == NULL) {
-		return (0);
+		ASSERT(ring_handle != NULL);
+		return (1);
 	}
+
 
 	hxgep = ring_handle->hxgep;
 	ringp = hxgep->rx_rcr_rings->rcr_rings[ring_handle->index];
 
 	MUTEX_ENTER(&ringp->lock);
 
+	/*
+	 * Are we already polling ?
+	 */
+	if (ringp->poll_flag) {
+		MUTEX_EXIT(&ringp->lock);
+		return (1);
+	}
+
 	ldgp = ringp->ldgp;
 	if (ldgp == NULL) {
 		MUTEX_EXIT(&ringp->lock);
-		return (0);
+		return (1);
 	}
 
 	/*
 	 * Enable polling
 	 */
-	if (ringp->poll_flag == 0) {
-		ringp->poll_flag = 1;
-	}
+	ringp->poll_flag = B_TRUE;
 
 	MUTEX_EXIT(&ringp->lock);
 	return (0);
@@ -1304,6 +1301,7 @@ hxge_disable_poll(void *arg)
 	p_hxge_t		hxgep;
 
 	if (ring_handle == NULL) {
+		ASSERT(ring_handle != NULL);
 		return (0);
 	}
 
@@ -1318,26 +1316,12 @@ hxge_disable_poll(void *arg)
 	if (ringp->poll_flag) {
 		hpi_handle_t		handle;
 		rdc_stat_t		cs;
-		uint8_t			channel;
 		p_hxge_ldg_t		ldgp;
 
 		/*
 		 * Get the control and status for this channel.
 		 */
 		handle = HXGE_DEV_HPI_HANDLE(hxgep);
-		channel = ringp->rdc;
-		RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
-
-		/*
-		 * Enable mailbox update
-		 * Since packets were not read and the hardware uses
-		 * bits pktread and ptrread to update the queue
-		 * length, we need to set both bits to 0.
-		 */
-		cs.bits.pktread = 0;
-		cs.bits.ptrread = 0;
-		cs.bits.mex = 1;
-		RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 		/*
 		 * Rearm this logical group if this is a single device
@@ -1345,21 +1329,37 @@ hxge_disable_poll(void *arg)
 		 */
 		ldgp = ringp->ldgp;
 		if (ldgp == NULL) {
-			ringp->poll_flag = 0;
 			MUTEX_EXIT(&ringp->lock);
-			return (0);
+			return (1);
 		}
+
+		ringp->poll_flag = B_FALSE;
+
+		/*
+		 * Enable mailbox update, to start interrupts again.
+		 */
+		cs.value = 0ULL;
+		cs.bits.mex = 1;
+		cs.bits.pktread = 0;
+		cs.bits.ptrread = 0;
+		RXDMA_REG_WRITE64(handle, RDC_STAT, ringp->rdc, cs.value);
 
 		if (ldgp->nldvs == 1) {
-			ld_intr_mgmt_t mgm;
-
-			mgm.value = 0;
-			mgm.bits.arm = 1;
-			mgm.bits.timer = ldgp->ldg_timer;
-			HXGE_REG_WR32(handle,
-			    LD_INTR_MGMT + LDSV_OFFSET(ldgp->ldg), mgm.value);
+			/*
+			 * Re-arm the group, since it is the only member
+			 * of the group.
+			 */
+			(void) hpi_intr_ldg_mgmt_set(handle, ldgp->ldg, B_TRUE,
+			    ldgp->ldg_timer);
+		} else {
+			/*
+			 * Mask-on interrupts for the device and re-arm
+			 * the group.
+			 */
+			(void) hpi_intr_mask_set(handle, ringp->ldvp->ldv, 0);
+			(void) hpi_intr_ldg_mgmt_set(handle, ldgp->ldg, B_TRUE,
+			    ldgp->ldg_timer);
 		}
-		ringp->poll_flag = 0;
 	}
 	MUTEX_EXIT(&ringp->lock);
 	return (0);
@@ -1388,23 +1388,25 @@ hxge_rx_poll(void *arg, int bytes_to_pickup)
 	ring = hxgep->rx_rcr_rings->rcr_rings[rhp->index];
 
 	MUTEX_ENTER(&ring->lock);
-	ASSERT(ring->poll_flag == 1);
+	ASSERT(ring->poll_flag == B_TRUE);
 	ASSERT(rhp->started);
 
-	/*
-	 * Make sure the ring is started and polling is
-	 * started before processing packets.
-	 */
-	if ((!rhp->started) || (ring->poll_flag == 0)) {
+	if (!ring->poll_flag) {
 		MUTEX_EXIT(&ring->lock);
 		return ((mblk_t *)NULL);
 	}
 
+	/*
+	 * Get the control and status bits for the ring.
+	 */
 	RXDMA_REG_READ64(handle, RDC_STAT, rhp->index, &cs.value);
 	cs.bits.ptrread = 0;
 	cs.bits.pktread = 0;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, rhp->index, cs.value);
 
+	/*
+	 * Process packets.
+	 */
 	mblk = hxge_rx_pkts(hxgep, ring->ldvp->vdma_index,
 	    ring->ldvp, ring, cs, bytes_to_pickup);
 	ldvp = ring->ldvp;
@@ -1413,8 +1415,22 @@ hxge_rx_poll(void *arg, int bytes_to_pickup)
 	 * Process Error Events.
 	 */
 	if (ldvp && (cs.value & RDC_STAT_ERROR)) {
+		/*
+		 * Recovery routines will grab the RCR ring lock.
+		 */
+		MUTEX_EXIT(&ring->lock);
 		(void) hxge_rx_err_evnts(hxgep, ldvp->vdma_index, ldvp, cs);
+		MUTEX_ENTER(&ring->lock);
 	}
+
+	/*
+	 * Clear any control and status bits and update
+	 * the hardware.
+	 */
+	cs.value &= RDC_STAT_WR1C;
+	cs.bits.ptrread = 0;
+	cs.bits.pktread = 0;
+	RXDMA_REG_WRITE64(handle, RDC_STAT, rhp->index, cs.value);
 
 	MUTEX_EXIT(&ring->lock);
 	return (mblk);
@@ -1444,10 +1460,6 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_pkts:vindex %d "
 	    "channel %d", vindex, ldvp->channel));
-
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
-		return (NULL);
-	}
 
 	handle = HXGE_DEV_HPI_HANDLE(hxgep);
 	channel = rcrp->rdc;
@@ -2276,6 +2288,7 @@ hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    " hxge_rx_err_evnts: fatal error on Channel #%d\n",
 		    channel));
+
 		MUTEX_ENTER(&rbrp->post_lock);
 		/* This function needs to be inside the post_lock */
 		status = hxge_rxdma_fatal_err_recover(hxgep, channel);
@@ -2284,8 +2297,8 @@ hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 			FM_SERVICE_RESTORED(hxgep);
 		}
 	}
-	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_rx_err_evnts"));
 
+	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_rx_err_evnts"));
 	return (status);
 }
 
@@ -2762,6 +2775,8 @@ hxge_map_rxdma_channel_cfg_ring(p_hxge_t hxgep, uint16_t dma_channel,
 
 	/* Map in the receive completion ring */
 	rcrp = (p_rx_rcr_ring_t)KMEM_ZALLOC(sizeof (rx_rcr_ring_t), KM_SLEEP);
+	MUTEX_INIT(&rcrp->lock, NULL, MUTEX_DRIVER,
+	    (void *) hxgep->interrupt_cookie);
 	rcrp->rdc = dma_channel;
 	rcrp->hxgep = hxgep;
 
@@ -2882,6 +2897,7 @@ hxge_unmap_rxdma_channel_cfg_ring(p_hxge_t hxgep,
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
 	    "==> hxge_unmap_rxdma_channel_cfg_ring: channel %d", rcr_p->rdc));
 
+	MUTEX_DESTROY(&rcr_p->lock);
 	KMEM_FREE(rcr_p, sizeof (rx_rcr_ring_t));
 	KMEM_FREE(rx_mbox_p, sizeof (rx_mbox_t));
 
@@ -3174,7 +3190,7 @@ hxge_unmap_rxdma_channel_buf_ring(p_hxge_t hxgep,
 		 * unmapped, so it may free <rbr_p> for us.
 		 */
 		rbr_p->rbr_state = RBR_UNMAPPED;
-		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+		HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
 		    "unmap_rxdma_buf_ring: %d %s outstanding.",
 		    rbr_p->rbr_ref_cnt,
 		    rbr_p->rbr_ref_cnt == 1 ? "msg" : "msgs"));
@@ -3468,7 +3484,6 @@ hxge_rxdma_start_channel(p_hxge_t hxgep, uint16_t channel,
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
 	    "==> hxge_rxdma_start_channel: enable done"));
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL, "<== hxge_rxdma_start_channel"));
-
 	return (HXGE_OK);
 }
 
@@ -3621,7 +3636,6 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 {
 	hpi_handle_t		handle;
 	hpi_status_t 		rs = HPI_SUCCESS;
-	hxge_status_t 		status = HXGE_OK;
 	p_rx_rbr_ring_t		rbrp;
 	p_rx_rcr_ring_t		rcrp;
 	p_rx_mbox_t		mboxp;
@@ -3635,8 +3649,6 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 	int			n_init_kick = 0;
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_rxdma_fatal_err_recover"));
-	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
-	    "Recovering from RxDMAChannel#%d error...", channel));
 
 	/*
 	 * Stop the dma channel waits for the stop done. If the stop done bit
@@ -3648,6 +3660,10 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "Rx DMA stop..."));
 
 	ring_idx = hxge_rxdma_get_ring_index(hxgep, channel);
+	if (ring_idx < 0) {
+		return (HXGE_ERROR);
+	}
+
 	rbrp = (p_rx_rbr_ring_t)hxgep->rx_rbr_rings->rbr_rings[ring_idx];
 	rcrp = (p_rx_rcr_ring_t)hxgep->rx_rcr_rings->rcr_rings[ring_idx];
 
@@ -3728,11 +3744,8 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 	 * owned by the hardware initially. The apps will post theirs
 	 * eventually.
 	 */
-	status = hxge_rxdma_start_channel(hxgep, channel, rbrp, rcrp, mboxp,
+	(void) hxge_rxdma_start_channel(hxgep, channel, rbrp, rcrp, mboxp,
 	    n_init_kick);
-	if (status != HXGE_OK) {
-		goto fail;
-	}
 
 	/*
 	 * The DMA channel may disable itself automatically.
@@ -3745,20 +3758,26 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 		    "hpi_rxdma_cfg_rdc_enable (channel %d)", channel));
 	}
 
+	/*
+	 * Delay a bit of time by doing reads.
+	 */
+	for (i = 0; i < 1024; i++) {
+		uint64_t value;
+		RXDMA_REG_READ64(HXGE_DEV_HPI_HANDLE(hxgep),
+		    RDC_INT_MASK, i & 3, &value);
+	}
+
 	MUTEX_EXIT(&rbrp->lock);
 	MUTEX_EXIT(&rcrp->lock);
 
-	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
-	    "Recovery Successful, RxDMAChannel#%d Restored", channel));
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "<== hxge_rxdma_fatal_err_recover"));
-
 	return (HXGE_OK);
 
 fail:
 	MUTEX_EXIT(&rbrp->lock);
 	MUTEX_EXIT(&rcrp->lock);
-	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "Recovery failed"));
-
+	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+	    "Error Recovery failed for channel(%d)", channel));
 	return (HXGE_ERROR | rs);
 }
 
@@ -3784,6 +3803,7 @@ hxge_rx_port_fatal_err_recover(p_hxge_t hxgep)
 
 	/* Disable RxMAC */
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "Disable RxMAC...\n"));
+	MUTEX_ENTER(&hxgep->vmac_lock);
 	if (hxge_rx_vmac_disable(hxgep) != HXGE_OK)
 		goto fail;
 
@@ -3837,6 +3857,7 @@ hxge_rx_port_fatal_err_recover(p_hxge_t hxgep)
 		    "hxge_rx_port_fatal_err_recover: Failed to enable RxMAC"));
 		goto fail;
 	}
+	MUTEX_EXIT(&hxgep->vmac_lock);
 
 	/* Reset the error mask since PEU reset cleared it */
 	HXGE_REG_WR64(hxgep->hpi_handle, RDC_FIFO_ERR_INT_MASK, 0x0);
@@ -3844,10 +3865,12 @@ hxge_rx_port_fatal_err_recover(p_hxge_t hxgep)
 	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 	    "Recovery Successful, RxPort Restored"));
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "<== hxge_rx_port_fatal_err_recover"));
-
 	return (HXGE_OK);
+
 fail:
-	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "Recovery failed"));
+	MUTEX_EXIT(&hxgep->vmac_lock);
+	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+	    "Error Recovery failed for hxge(%d)", hxgep->instance));
 	return (status);
 }
 
@@ -3856,7 +3879,6 @@ hxge_rbr_empty_restore(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p)
 {
 	hpi_status_t		hpi_status;
 	hxge_status_t		status;
-	int			i;
 	p_hxge_rx_ring_stats_t	rdc_stats;
 
 	rdc_stats = &hxgep->statsp->rdc_stats[rx_rbr_p->rdc];
@@ -3877,9 +3899,8 @@ hxge_rbr_empty_restore(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p)
 	 * to 0, since there is a hardware bug when disabling
 	 * the vmac.
 	 */
-	MUTEX_ENTER(hxgep->genlock);
-	(void) hpi_vmac_rx_set_framesize(
-	    HXGE_DEV_HPI_HANDLE(hxgep), (uint16_t)0);
+	MUTEX_ENTER(&hxgep->vmac_lock);
+	(void) hxge_rx_vmac_disable(hxgep);
 
 	hpi_status = hpi_rxdma_cfg_rdc_enable(
 	    HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc);
@@ -3895,16 +3916,9 @@ hxge_rbr_empty_restore(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p)
 		}
 	}
 
-	for (i = 0; i < 1024; i++) {
-		uint64_t value;
-		RXDMA_REG_READ64(HXGE_DEV_HPI_HANDLE(hxgep),
-		    RDC_STAT, i & 3, &value);
-	}
-
 	/*
 	 * Re-enable the RX VMAC.
 	 */
-	(void) hpi_vmac_rx_set_framesize(HXGE_DEV_HPI_HANDLE(hxgep),
-	    (uint16_t)hxgep->vmac.maxframesize);
-	MUTEX_EXIT(hxgep->genlock);
+	(void) hxge_rx_vmac_enable(hxgep);
+	MUTEX_EXIT(&hxgep->vmac_lock);
 }

@@ -111,14 +111,13 @@ hxge_intr(caddr_t arg1, caddr_t arg2)
 {
 	p_hxge_ldv_t		ldvp = (p_hxge_ldv_t)arg1;
 	p_hxge_t		hxgep = (p_hxge_t)arg2;
-	uint_t			serviced = DDI_INTR_UNCLAIMED;
 	uint8_t			ldv;
 	hpi_handle_t		handle;
 	p_hxge_ldgv_t		ldgvp;
 	p_hxge_ldg_t		ldgp, t_ldgp;
 	p_hxge_ldv_t		t_ldvp;
 	uint32_t		vector0 = 0, vector1 = 0;
-	int			i, j, nldvs, nintrs = 1;
+	int			j, nldvs;
 	hpi_status_t		rs = HPI_SUCCESS;
 
 	/*
@@ -130,23 +129,20 @@ hxge_intr(caddr_t arg1, caddr_t arg2)
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr"));
 
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
+	if (hxgep->hxge_mac_state != HXGE_MAC_STARTED) {
 		HXGE_ERROR_MSG((hxgep, INT_CTL,
-		    "<== hxge_intr: not initialized 0x%x", serviced));
-		return (serviced);
+		    "<== hxge_intr: not initialized"));
+		return (DDI_INTR_UNCLAIMED);
 	}
 
 	ldgvp = hxgep->ldgvp;
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr: ldgvp $%p", ldgvp));
 
-	if (ldvp == NULL && ldgvp) {
+	if (ldvp == NULL && ldgvp)
 		t_ldvp = ldvp = ldgvp->ldvp;
-	}
-
-	if (ldvp) {
+	if (ldvp)
 		ldgp = t_ldgp = ldvp->ldgp;
-	}
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr: "
 	    "ldgvp $%p ldvp $%p ldgp $%p", ldgvp, ldvp, ldgp));
@@ -167,65 +163,62 @@ hxge_intr(caddr_t arg1, caddr_t arg2)
 	handle = HXGE_DEV_HPI_HANDLE(hxgep);
 	t_ldgp = ldgp;
 	t_ldvp = ldgp->ldvp;
-
 	nldvs = ldgp->nldvs;
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr: #ldvs %d #intrs %d",
 	    nldvs, ldgvp->ldg_intrs));
+	HXGE_DEBUG_MSG((hxgep, INT_CTL,
+	    "==> hxge_intr(%d): #ldvs %d", i, nldvs));
 
-	serviced = DDI_INTR_CLAIMED;
-	for (i = 0; i < nintrs; i++, t_ldgp++) {
-		HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr(%d): #ldvs %d "
-		    " #intrs %d", i, nldvs, nintrs));
+	/*
+	 * Get this group's flag bits.
+	 */
+	t_ldgp->interrupted = B_FALSE;
+	rs = hpi_ldsv_ldfs_get(handle, t_ldgp->ldg, &vector0, &vector1);
+	if (rs != HPI_SUCCESS)
+		return (DDI_INTR_UNCLAIMED);
 
-		/* Get this group's flag bits. */
-		t_ldgp->interrupted = B_FALSE;
-		rs = hpi_ldsv_ldfs_get(handle, t_ldgp->ldg, &vector0, &vector1);
-		if (rs) {
-			continue;
-		}
-
-		if (!vector0 && !vector1) {
-			HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr: "
-			    "no interrupts on group %d", t_ldgp->ldg));
-			continue;
-		}
-
+	if (!vector0 && !vector1) {
 		HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr: "
-		    "vector0 0x%llx vector1 0x%llx", vector0, vector1));
-
-		t_ldgp->interrupted = B_TRUE;
-		nldvs = t_ldgp->nldvs;
-
-		for (j = 0; j < nldvs; j++, t_ldvp++) {
-			/*
-			 * Call device's handler if flag bits are on.
-			 */
-			ldv = t_ldvp->ldv;
-			if ((LDV_ON(ldv, vector0) | (LDV_ON(ldv, vector1)))) {
-				HXGE_DEBUG_MSG((hxgep, INT_CTL,
-				    "==> hxge_intr: calling device %d"
-				    " #ldvs %d #intrs %d", j, nldvs, nintrs));
-				(void) (t_ldvp->ldv_intr_handler)(
-				    (caddr_t)t_ldvp, arg2);
-			}
-		}
+		    "no interrupts on group %d", t_ldgp->ldg));
+		return (DDI_INTR_UNCLAIMED);
 	}
 
-	t_ldgp = ldgp;
-	for (i = 0; i < nintrs; i++, t_ldgp++) {
-		/* rearm group interrupts */
-		if (t_ldgp->interrupted) {
+	HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_intr: "
+	    "vector0 0x%llx vector1 0x%llx", vector0, vector1));
+
+	t_ldgp->interrupted = B_TRUE;
+	nldvs = t_ldgp->nldvs;
+
+	/*
+	 * Process all devices that share this group.
+	 */
+	for (j = 0; j < nldvs; j++, t_ldvp++) {
+		/*
+		 * Call device's handler if flag bits are on.
+		 */
+		ldv = t_ldvp->ldv;
+		if ((LDV_ON(ldv, vector0) | (LDV_ON(ldv, vector1)))) {
 			HXGE_DEBUG_MSG((hxgep, INT_CTL,
-			    "==> hxge_intr: arm group %d", t_ldgp->ldg));
-			(void) hpi_intr_ldg_mgmt_set(handle, t_ldgp->ldg,
-			    t_ldgp->arm, t_ldgp->ldg_timer);
+			    "==> hxge_intr: calling device %d"
+			    " #ldvs %d #intrs %d", j, nldvs, nintrs));
+			(void) (t_ldvp->ldv_intr_handler)(
+			    (caddr_t)t_ldvp, arg2);
 		}
 	}
 
-	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_intr: serviced 0x%x",
-	    serviced));
-	return (serviced);
+	/*
+	 * Re-arm group interrupts
+	 */
+	if (t_ldgp->interrupted) {
+		HXGE_DEBUG_MSG((hxgep, INT_CTL,
+		    "==> hxge_intr: arm group %d", t_ldgp->ldg));
+		(void) hpi_intr_ldg_mgmt_set(handle, t_ldgp->ldg,
+		    t_ldgp->arm, t_ldgp->ldg_timer);
+	}
+
+	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_intr"));
+	return (DDI_INTR_CLAIMED);
 }
 
 hxge_status_t
@@ -338,7 +331,6 @@ hxge_peu_handle_sys_errors(p_hxge_t hxgep)
 	}
 
 	HXGE_FM_REPORT_ERROR(hxgep, NULL, HXGE_FM_EREPORT_PEU_ERR);
-
 	return (HXGE_OK);
 }
 
@@ -351,10 +343,9 @@ hxge_syserr_intr(caddr_t arg1, caddr_t arg2)
 	p_hxge_ldg_t	ldgp = NULL;
 	hpi_handle_t	handle;
 	dev_err_stat_t	estat;
-	uint_t		serviced = DDI_INTR_UNCLAIMED;
 
 	if ((arg1 == NULL) && (arg2 == NULL)) {
-		return (serviced);
+		return (DDI_INTR_UNCLAIMED);
 	}
 
 	if ((arg2 == NULL) ||
@@ -375,12 +366,11 @@ hxge_syserr_intr(caddr_t arg1, caddr_t arg2)
 			    "arg2 $%p arg1 $%p", hxgep, ldvp));
 			return (DDI_INTR_UNCLAIMED);
 		}
-		/*
-		 * Get the logical device state if the function uses interrupt.
-		 */
 	}
 
-	/* This interrupt handler is for system error interrupts.  */
+	/*
+	 * This interrupt handler is for system error interrupts.
+	 */
 	handle = HXGE_DEV_HPI_HANDLE(hxgep);
 	estat.value = 0;
 	(void) hpi_fzc_sys_err_stat_get(handle, &estat);
@@ -417,8 +407,6 @@ hxge_syserr_intr(caddr_t arg1, caddr_t arg2)
 		    "==> hxge_syserr_intr: device error - unknown"));
 	}
 
-	serviced = DDI_INTR_CLAIMED;
-
 	if ((ldgp != NULL) && (ldvp != NULL) &&
 	    (ldgp->nldvs == 1) && !ldvp->use_timer) {
 		(void) hpi_intr_ldg_mgmt_set(handle, ldgp->ldg,
@@ -426,7 +414,7 @@ hxge_syserr_intr(caddr_t arg1, caddr_t arg2)
 	}
 
 	HXGE_DEBUG_MSG((hxgep, SYSERR_CTL, "<== hxge_syserr_intr"));
-	return (serviced);
+	return (DDI_INTR_CLAIMED);
 }
 
 void

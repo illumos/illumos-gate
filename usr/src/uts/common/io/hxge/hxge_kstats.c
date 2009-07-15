@@ -1234,13 +1234,18 @@ hxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 		val = 0;
 		break;
 
+	case ETHER_STAT_ADV_CAP_10GFDX:
+	case ETHER_STAT_CAP_10GFDX:
+	case ETHER_STAT_LP_CAP_10GFDX:
+		val = 0;
+		break;
+
 	default:
 		/*
 		 * Shouldn't reach here...
 		 */
 		cmn_err(CE_WARN,
 		    "hxge_m_stat: unrecognized parameter value = 0x%x", stat);
-
 		return (ENOTSUP);
 	}
 	*value = val;

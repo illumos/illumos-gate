@@ -34,11 +34,7 @@
  * (This PSARC case is limited to MSI-X vectors
  *  and SPARC platforms only).
  */
-#if defined(_BIG_ENDIAN)
 uint32_t hxge_msi_enable = 2;
-#else
-uint32_t hxge_msi_enable = 2;
-#endif
 
 /*
  * Globals: tunable parameters (/etc/system or adb)
@@ -911,6 +907,8 @@ hxge_setup_mutexes(p_hxge_t hxgep)
 	 */
 	MUTEX_INIT(hxgep->genlock, NULL,
 	    MUTEX_DRIVER, (void *) hxgep->interrupt_cookie);
+	MUTEX_INIT(&hxgep->vmac_lock, NULL,
+	    MUTEX_DRIVER, (void *) hxgep->interrupt_cookie);
 	MUTEX_INIT(&hxgep->ouraddr_lock, NULL,
 	    MUTEX_DRIVER, (void *) hxgep->interrupt_cookie);
 	RW_INIT(&hxgep->filter_lock, NULL,
@@ -935,6 +933,7 @@ hxge_destroy_mutexes(p_hxge_t hxgep)
 {
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "==> hxge_destroy_mutexes"));
 	RW_DESTROY(&hxgep->filter_lock);
+	MUTEX_DESTROY(&hxgep->vmac_lock);
 	MUTEX_DESTROY(&hxgep->ouraddr_lock);
 	MUTEX_DESTROY(hxgep->genlock);
 	MUTEX_DESTROY(&hxgep->pio_lock);
@@ -2646,6 +2645,7 @@ hxge_tx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num)
 	 * Fill in the handle for the transmit.
 	 */
 	MUTEX_ENTER(&ring->lock);
+	rhp->started = B_TRUE;
 	ring->ring_handle = rhp->ring_handle;
 	MUTEX_EXIT(&ring->lock);
 
@@ -2667,6 +2667,7 @@ hxge_tx_ring_stop(mac_ring_driver_t rdriver)
 
 	MUTEX_ENTER(&ring->lock);
 	ring->ring_handle = (mac_ring_handle_t)NULL;
+	rhp->started = B_FALSE;
 	MUTEX_EXIT(&ring->lock);
 }
 

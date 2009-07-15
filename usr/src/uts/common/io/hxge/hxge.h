@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -397,6 +398,7 @@ struct _hxge_t {
 	uint32_t 		hxge_port_rcr_size;
 	uint32_t 		hxge_port_tx_ring_size;
 
+	kmutex_t		vmac_lock;
 	kmutex_t		pio_lock;
 	hxge_timeout		timeout;
 
