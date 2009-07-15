@@ -53,6 +53,7 @@ static int fct_close(dev_t dev, int flag, int otype, cred_t *credp);
 static int fct_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
     cred_t *credp, int *rval);
 static int fct_fctiocmd(intptr_t data, int mode);
+void fct_init_kstats(fct_i_local_port_t *iport);
 
 static dev_info_t *fct_dip;
 static struct cb_ops fct_cb_ops = {
@@ -91,6 +92,7 @@ static struct dev_ops fct_ops = {
 };
 
 #define	FCT_NAME	"COMSTAR FCT"
+#define	FCT_MODULE_NAME	"fct"
 
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {
@@ -633,29 +635,111 @@ int
 fct_get_port_stats(uint8_t *port_wwn,
     fc_tgt_hba_adapter_port_stats_t *port_stats, uint32_t *error_detail)
 {
+	int ret;
 	fct_i_local_port_t *iport = fct_get_iport_per_wwn(port_wwn);
+	fct_port_link_status_t	stat;
+	uint32_t buf_size = sizeof (fc_tgt_hba_adapter_port_stats_t);
 
 	if (!iport)
 		return (ENXIO);
 	port_stats->version = FCT_HBA_ADAPTER_PORT_STATS_VERSION;
+
+	if (iport->iport_port->port_info == NULL) {
+		*error_detail = FCTIO_FAILURE;
+		return (EIO);
+	}
+	ret = iport->iport_port->port_info(FC_TGT_PORT_RLS,
+	    iport->iport_port, NULL, (uint8_t *)&stat, &buf_size);
+	if (ret != STMF_SUCCESS) {
+		*error_detail = FCTIO_FAILURE;
+		return (EIO);
+	}
+
+	port_stats->SecondsSinceLastReset = 0;
+	port_stats->TxFrames = 0;
+	port_stats->TxWords = 0;
+	port_stats->RxFrames = 0;
+	port_stats->RxWords = 0;
+	port_stats->LIPCount = 0;
+	port_stats->NOSCount = 0;
+	port_stats->ErrorFrames = 0;
+	port_stats->DumpedFrames = 0;
+	port_stats->LinkFailureCount = stat.LinkFailureCount;
+	port_stats->LossOfSyncCount = stat.LossOfSyncCount;
+	port_stats->LossOfSignalCount = stat.LossOfSignalsCount;
+	port_stats->PrimitiveSeqProtocolErrCount =
+	    stat.PrimitiveSeqProtocolErrorCount;
+	port_stats->InvalidTxWordCount =
+	    stat.InvalidTransmissionWordCount;
+	port_stats->InvalidCRCCount = stat.InvalidCRCCount;
+
+	return (ret);
+}
+
+int
+fct_get_link_status(uint8_t *port_wwn, uint64_t *dest_id,
+    fct_port_link_status_t *link_status, uint32_t *error_detail)
+{
+	fct_i_local_port_t *iport = fct_get_iport_per_wwn(port_wwn);
+	fct_i_remote_port_t *irp = NULL;
+	uint32_t buf_size = sizeof (fct_port_link_status_t);
+	stmf_status_t ret = 0;
+	int i;
+	fct_cmd_t *cmd = NULL;
+
+	if (!iport) {
+		*error_detail = FCTIO_BADWWN;
+		return (ENXIO);
+	}
+
 	/*
-	 * port_stats->SecondsSinceLastReset = ;
-	 * port_stats->TxFrames = ;
-	 * port_stats->TxWords = ;
-	 * port_stats->RxFrames = ;
-	 * port_stats->RxWords = ;
-	 * port_stats->LIPCount = ;
-	 * port_stats->NOSCount = ;
-	 * port_stats->ErrorFrames = ;
-	 * port_stats->DumpedFrames = ;
-	 * port_stats->LinkFailureCount = ;
-	 * port_stats->LossOfSyncCount = ;
-	 * port_stats->LossOfSignalCount = ;
-	 * port_stats->PrimitiveSeqProtocol = ;
-	 * port_stats->InvalidTxWordCount = ;
-	 * port_stats->InvalidCRCCount = ;
+	 * If what we are requesting is zero or same as local port,
+	 * then we use port_info()
 	 */
-	return (0);
+	if (dest_id == NULL || *dest_id == iport->iport_link_info.portid) {
+		if (iport->iport_port->port_info == NULL) {
+			*error_detail = FCTIO_FAILURE;
+			return (EIO);
+		}
+		ret = iport->iport_port->port_info(FC_TGT_PORT_RLS,
+		    iport->iport_port, NULL,
+		    (uint8_t *)link_status, &buf_size);
+		if (ret == STMF_SUCCESS) {
+			return (0);
+		} else {
+			*error_detail = FCTIO_FAILURE;
+			return (EIO);
+		}
+	}
+
+	/*
+	 * For remote port, we will send RLS
+	 */
+	for (i = 0; i < rportid_table_size; i++) {
+		irp = iport->iport_rp_tb[i];
+		while (irp) {
+			if (irp->irp_rp->rp_id == *dest_id &&
+			    irp->irp_flags & IRP_PLOGI_DONE) {
+				goto SEND_RLS_ELS;
+			}
+			irp = irp->irp_next;
+		}
+	}
+	return (ENXIO);
+
+SEND_RLS_ELS:
+	cmd = fct_create_solels(iport->iport_port,
+	    irp->irp_rp, 0, ELS_OP_RLS,
+	    0, fct_rls_cb);
+	if (!cmd)
+		return (ENOMEM);
+	iport->iport_rls_cb_data.fct_link_status = link_status;
+	CMD_TO_ICMD(cmd)->icmd_cb_private = &iport->iport_rls_cb_data;
+	fct_post_to_solcmd_queue(iport->iport_port, cmd);
+	sema_p(&iport->iport_rls_sema);
+	if (iport->iport_rls_cb_data.fct_els_res != FCT_SUCCESS)
+		ret = EIO;
+	return (ret);
 }
 
 static int
@@ -788,6 +872,19 @@ fct_fctiocmd(intptr_t data, int mode)
 		mutex_exit(&fct_global_mutex);
 		break;
 		}
+	case FCTIO_GET_LINK_STATUS: {
+		uint8_t *port_wwn = (uint8_t *)ibuf;
+		fct_port_link_status_t *link_status =
+		    (fct_port_link_status_t *)obuf;
+		uint64_t *dest_id = abuf;
+
+		mutex_enter(&fct_global_mutex);
+		ret = fct_get_link_status(port_wwn, dest_id, link_status,
+		    &fctio->fctio_errno);
+		mutex_exit(&fct_global_mutex);
+		break;
+		}
+
 	default:
 		break;
 	}
@@ -1018,6 +1115,7 @@ fct_register_local_port(fct_local_port_t *port)
 	mutex_init(&iport->iport_worker_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&iport->iport_worker_cv, NULL, CV_DRIVER, NULL);
 	rw_init(&iport->iport_lock, NULL, RW_DRIVER, NULL);
+	sema_init(&iport->iport_rls_sema, 0, NULL, SEMA_DRIVER, NULL);
 
 	/* Remote port mgmt */
 	iport->iport_rp_slots = (fct_i_remote_port_t **)kmem_zalloc(
@@ -1087,6 +1185,8 @@ fct_register_local_port(fct_local_port_t *port)
 		iport->iport_next->iport_prev = iport;
 	fct_iport_list = iport;
 	mutex_exit(&fct_global_mutex);
+
+	fct_init_kstats(iport);
 
 	fct_log_local_port_event(port, ESC_SUNFC_PORT_ATTACH);
 
@@ -1169,11 +1269,16 @@ fct_deregister_local_port(fct_local_port_t *port)
 	    sizeof (fct_i_remote_port_t *));
 	rw_destroy(&iport->iport_lock);
 	cv_destroy(&iport->iport_worker_cv);
+	sema_destroy(&iport->iport_rls_sema);
 	mutex_destroy(&iport->iport_worker_lock);
 	ddi_taskq_destroy(iport->iport_worker_taskq);
 	if (iport->iport_rp_tb) {
 		kmem_free(iport->iport_rp_tb, rportid_table_size *
 		    sizeof (fct_i_remote_port_t *));
+	}
+
+	if (iport->iport_kstat_portstat) {
+		kstat_delete(iport->iport_kstat_portstat);
 	}
 
 	fct_log_local_port_event(port, ESC_SUNFC_PORT_DETACH);
@@ -2275,6 +2380,16 @@ fct_create_solels(fct_local_port_t *port, fct_remote_port_t *rp, int implicit,
 			    kmem_zalloc(els->els_req_size, KM_SLEEP);
 			p[7] = FC_SCR_FULL_REGISTRATION;
 			break;
+		case ELS_OP_RLS:
+			els->els_resp_alloc_size = els->els_resp_size = 28;
+			els->els_resp_payload = (uint8_t *)
+			    kmem_zalloc(els->els_resp_size, KM_SLEEP);
+			els->els_req_alloc_size = els->els_req_size = 8;
+			p = els->els_req_payload = (uint8_t *)
+			    kmem_zalloc(els->els_req_size, KM_SLEEP);
+			ptid = PORT_TO_IPORT(port)->iport_link_info.portid;
+			fct_value_to_netbuf(ptid, els->els_req_payload + 5, 3);
+			break;
 
 		default:
 			ASSERT(0);
@@ -2737,6 +2852,12 @@ fct_handle_rcvd_abts(fct_cmd_t *cmd)
 		fct_queue_cmd_for_termination(cmd, FCT_NOT_LOGGED_IN);
 		return;
 	}
+
+	DTRACE_FC_3(abts__receive,
+	    fct_cmd_t, cmd,
+	    fct_local_port_t, port,
+	    fct_i_remote_port_t, irp);
+
 	cmd->cmd_rp = irp->irp_rp;
 
 	/*
@@ -3338,4 +3459,83 @@ fct_wwn_to_str(char *to_ptr, const uint8_t *from_ptr)
 	(void) sprintf(to_ptr, "%02x%02x%02x%02x%02x%02x%02x%02x",
 	    from_ptr[0], from_ptr[1], from_ptr[2], from_ptr[3],
 	    from_ptr[4], from_ptr[5], from_ptr[6], from_ptr[7]);
+}
+
+static int
+fct_update_stats(kstat_t *ks, int rw)
+{
+	fct_i_local_port_t *iport;
+	fct_port_stat_t *port_kstat;
+	fct_port_link_status_t stat;
+	uint32_t	buf_size = sizeof (stat);
+	int		ret;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	iport = (fct_i_local_port_t *)ks->ks_private;
+	port_kstat = (fct_port_stat_t *)ks->ks_data;
+
+	if (iport->iport_port->port_info == NULL) {
+		return (EIO);
+	}
+	ret = iport->iport_port->port_info(FC_TGT_PORT_RLS,
+	    iport->iport_port, NULL, (uint8_t *)&stat, &buf_size);
+	if (ret != STMF_SUCCESS) {
+		return (EIO);
+	}
+
+	port_kstat->link_failure_cnt.value.ui32 =
+	    stat.LinkFailureCount;
+	port_kstat->loss_of_sync_cnt.value.ui32 =
+	    stat.LossOfSyncCount;
+	port_kstat->loss_of_signals_cnt.value.ui32 =
+	    stat.LossOfSignalsCount;
+	port_kstat->prim_seq_protocol_err_cnt.value.ui32 =
+	    stat.PrimitiveSeqProtocolErrorCount;
+	port_kstat->invalid_tx_word_cnt.value.ui32 =
+	    stat.InvalidTransmissionWordCount;
+	port_kstat->invalid_crc_cnt.value.ui32 =
+	    stat.InvalidCRCCount;
+
+	return (0);
+}
+
+void
+fct_init_kstats(fct_i_local_port_t *iport)
+{
+	kstat_t *ks;
+	fct_port_stat_t *port_kstat;
+	char	name[256];
+
+	if (iport->iport_alias)
+		(void) sprintf(name, "iport_%s", iport->iport_alias);
+	else
+		(void) sprintf(name, "iport_%"PRIxPTR"", (uintptr_t)iport);
+	ks = kstat_create(FCT_MODULE_NAME, 0, name, "rawdata",
+	    KSTAT_TYPE_NAMED, sizeof (fct_port_stat_t) / sizeof (kstat_named_t),
+	    0);
+
+	if (ks == NULL) {
+		return;
+	}
+	port_kstat = (fct_port_stat_t *)ks->ks_data;
+
+	iport->iport_kstat_portstat = ks;
+	kstat_named_init(&port_kstat->link_failure_cnt,
+	    "Link_failure_cnt", KSTAT_DATA_UINT32);
+	kstat_named_init(&port_kstat->loss_of_sync_cnt,
+	    "Loss_of_sync_cnt", KSTAT_DATA_UINT32);
+	kstat_named_init(&port_kstat->loss_of_signals_cnt,
+	    "Loss_of_signals_cnt", KSTAT_DATA_UINT32);
+	kstat_named_init(&port_kstat->prim_seq_protocol_err_cnt,
+	    "Prim_seq_protocol_err_cnt", KSTAT_DATA_UINT32);
+	kstat_named_init(&port_kstat->invalid_tx_word_cnt,
+	    "Invalid_tx_word_cnt", KSTAT_DATA_UINT32);
+	kstat_named_init(&port_kstat->invalid_crc_cnt,
+	    "Invalid_crc_cnt", KSTAT_DATA_UINT32);
+	ks->ks_update = fct_update_stats;
+	ks->ks_private = (void *)iport;
+	kstat_install(ks);
+
 }

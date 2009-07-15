@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_FCT_IMPL_H
@@ -154,6 +154,14 @@ typedef struct fct_i_remote_port {
 } fct_i_remote_port_t;
 
 /*
+ * structure used for fct_rls_cb() callback private data
+ */
+typedef struct fct_rls_cb_data {
+	struct fct_port_link_status	*fct_link_status;
+	fct_status_t			fct_els_res;
+} fct_rls_cb_data_t;
+
+/*
  * irp flags
  */
 #define	IRP_PLOGI_DONE			0x0001
@@ -266,7 +274,9 @@ typedef struct fct_i_local_port {
 	/* rpwe = remote port with pending els(es) */
 	fct_i_remote_port_t	*iport_rpwe_head;
 	fct_i_remote_port_t	*iport_rpwe_tail;
-
+	kstat_t			*iport_kstat_portstat;
+	ksema_t			iport_rls_sema;
+	fct_rls_cb_data_t	iport_rls_cb_data;
 } fct_i_local_port_t;
 
 #define	IPORT_FLOGI_DONE(iport)	PORT_FLOGI_DONE(&(iport)->iport_link_info)
@@ -423,6 +433,7 @@ void fct_gsnn_cb(fct_i_cmd_t *icmd);
 void fct_gcs_cb(fct_i_cmd_t *icmd);
 void fct_gft_cb(fct_i_cmd_t *icmd);
 void fct_gspn_cb(fct_i_cmd_t *icmd);
+void fct_rls_cb(fct_i_cmd_t *icmd);
 disc_action_t fct_process_link_init(fct_i_local_port_t *iport);
 
 #ifdef	__cplusplus

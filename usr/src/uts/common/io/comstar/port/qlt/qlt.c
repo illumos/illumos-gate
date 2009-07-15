@@ -888,6 +888,64 @@ qlt_populate_hba_fru_details(struct fct_local_port *port,
 	    FCHBA_MODEL_DESCRIPTION_LEN, "%s", qlt->nvram->model_name);
 }
 
+/* ARGSUSED */
+fct_status_t
+qlt_info(uint32_t cmd, fct_local_port_t *port,
+    void *arg, uint8_t *buf, uint32_t *bufsizep)
+{
+	qlt_state_t	*qlt = (qlt_state_t *)port->port_fca_private;
+	mbox_cmd_t	*mcp;
+	fct_status_t	ret = FCT_SUCCESS;
+	uint8_t		*p;
+	fct_port_link_status_t	*link_status;
+
+	switch (cmd) {
+	case FC_TGT_PORT_RLS:
+		if ((*bufsizep) < sizeof (fct_port_link_status_t)) {
+			ret = FCT_FAILURE;
+			break;
+		}
+		/* send mailbox command to get link status */
+		mcp = qlt_alloc_mailbox_command(qlt, 156);
+		if (mcp == NULL) {
+			ret = FCT_ALLOC_FAILURE;
+			break;
+		}
+
+		/* GET LINK STATUS count */
+		mcp->to_fw[0] = 0x6d;
+		mcp->to_fw[8] = 156/4;
+		mcp->to_fw_mask |= BIT_1 | BIT_8;
+		mcp->from_fw_mask |= BIT_1 | BIT_2;
+
+		ret = qlt_mailbox_command(qlt, mcp);
+		if (ret != QLT_SUCCESS) {
+			qlt_free_mailbox_command(qlt, mcp);
+			break;
+		}
+		qlt_dmem_dma_sync(mcp->dbuf, DDI_DMA_SYNC_FORCPU);
+
+		p = mcp->dbuf->db_sglist[0].seg_addr;
+		link_status = (fct_port_link_status_t *)buf;
+		link_status->LinkFailureCount = LE_32(*((uint32_t *)p));
+		link_status->LossOfSyncCount = LE_32(*((uint32_t *)(p + 4)));
+		link_status->LossOfSignalsCount = LE_32(*((uint32_t *)(p + 8)));
+		link_status->PrimitiveSeqProtocolErrorCount =
+		    LE_32(*((uint32_t *)(p + 12)));
+		link_status->InvalidTransmissionWordCount =
+		    LE_32(*((uint32_t *)(p + 16)));
+		link_status->InvalidCRCCount =
+		    LE_32(*((uint32_t *)(p + 20)));
+
+		qlt_free_mailbox_command(qlt, mcp);
+		break;
+	default:
+		ret = FCT_FAILURE;
+		break;
+	}
+	return (ret);
+}
+
 fct_status_t
 qlt_port_start(caddr_t arg)
 {
@@ -940,6 +998,7 @@ qlt_port_start(caddr_t arg)
 	port->port_ctl = qlt_ctl;
 	port->port_flogi_xchg = qlt_do_flogi;
 	port->port_populate_hba_details = qlt_populate_hba_fru_details;
+	port->port_info = qlt_info;
 
 	if (fct_register_local_port(port) != FCT_SUCCESS) {
 		goto qlt_pstart_fail_2_5;

@@ -1085,6 +1085,15 @@ sdt_argdesc_t sdt_args[] = {
 	    "fc_port_info_t *" },
 	{ "fc", "xfer-done", 4, 4, "stmf_data_buf_t *",
 	    "fc_xferinfo_t *" },
+	{ "fc", "rscn-receive", 0, 0, "fct_i_local_port_t *",
+	    "conninfo_t *" },
+	{ "fc", "rscn-receive", 1, 1, "int", "int"},
+	{ "fc", "abts-receive", 0, 0, "fct_cmd_t *",
+	    "conninfo_t *" },
+	{ "fc", "abts-receive", 1, 1, "fct_i_local_port_t *",
+	    "fc_port_info_t *" },
+	{ "fc", "abts-receive", 2, 2, "fct_i_remote_port_t *",
+	    "fc_port_info_t *" },
 
 
 	{ NULL }

@@ -2671,6 +2671,52 @@ fct_gspn_cb(fct_i_cmd_t *icmd)
 	rw_exit(&iport->iport_lock);
 }
 
+void
+fct_rls_cb(fct_i_cmd_t *icmd)
+{
+	fct_els_t		*els = ICMD_TO_ELS(icmd);
+	uint8_t			*resp;
+	fct_rls_cb_data_t	*rls_cb_data = NULL;
+	fct_port_link_status_t	*rls_resp;
+	fct_i_local_port_t	*iport = ICMD_TO_IPORT(icmd);
+
+	rls_cb_data = icmd->icmd_cb_private;
+
+	if (!FCT_IS_ELS_ACC(icmd)) {
+		stmf_trace(ICMD_TO_IPORT(icmd)->iport_alias, "fct_rls_cb: "
+		    "solicited RLS is not accepted - icmd/%p", icmd);
+		if (rls_cb_data) {
+			rls_cb_data->fct_els_res = FCT_FAILURE;
+			sema_v(&iport->iport_rls_sema);
+		}
+		return;
+	}
+
+	if (!rls_cb_data) {
+		sema_v(&iport->iport_rls_sema);
+		return;
+	}
+
+	resp = els->els_resp_payload;
+
+	rls_cb_data = icmd->icmd_cb_private;
+
+	/* Get the response and store it somewhere */
+	rls_resp = (fct_port_link_status_t *)rls_cb_data->fct_link_status;
+	rls_resp->LinkFailureCount = BE_32(*((uint32_t *)(resp + 4)));
+	rls_resp->LossOfSyncCount = BE_32(*((uint32_t *)(resp + 8)));
+	rls_resp->LossOfSignalsCount = BE_32(*((uint32_t *)(resp + 12)));
+	rls_resp->PrimitiveSeqProtocolErrorCount =
+	    BE_32(*((uint32_t *)(resp + 16)));
+	rls_resp->InvalidTransmissionWordCount =
+	    BE_32(*((uint32_t *)(resp + 20)));
+	rls_resp->InvalidCRCCount = BE_32(*((uint32_t *)(resp + 24)));
+
+	rls_cb_data->fct_els_res = FCT_SUCCESS;
+	sema_v(&iport->iport_rls_sema);
+	icmd->icmd_cb_private = NULL;
+}
+
 /*
  * For lookup functions, we move locking up one level
  */
@@ -2757,6 +2803,10 @@ fct_rscn_verify(fct_i_local_port_t *iport, uint8_t *rscn_req_payload,
 	for (; page_buf <= last_page_buf; page_buf += 4) {
 		page_format = 0x03 & page_buf[0];
 		page_portid = fct_netbuf_to_value(page_buf + 1, 3);
+
+		DTRACE_FC_2(rscn__receive,
+		    fct_i_local_port_t, iport,
+		    int, page_portid);
 
 		rw_enter(&iport->iport_lock, RW_READER);
 		if (!page_format) {

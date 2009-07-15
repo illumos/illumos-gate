@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -401,6 +401,7 @@ void TgtFCHBAPort::sendRLS(uint64_t destWWN,
 	fctio_t		fctio;
 	// fc_hba_adapter_port_stats_t	fc_port_stat;
 	uint64_t	en_portWWN;
+	uint64_t	DestPortID;
 
 	// Validate the arguments
 	if (pRspBuffer == NULL ||
@@ -417,13 +418,14 @@ void TgtFCHBAPort::sendRLS(uint64_t destWWN,
 
 	/* The destWWN is either the adapter port or a discovered port. */
 	memset(&fctio, 0, sizeof (fctio));
-	fctio.fctio_cmd = FCTIO_GET_ADAPTER_PORT_STATS;
+	fctio.fctio_cmd = FCTIO_GET_LINK_STATUS;
 	fctio.fctio_ibuf = (uint64_t)(uintptr_t)&en_portWWN;
 	fctio.fctio_ilen = (uint32_t)(sizeof (en_portWWN));
 	if (portWWN != destWWN) {
 	    attrs = getDiscoveredAttributes(destWWN, tmp);
-	    fctio.fctio_abuf = (uint64_t)(uintptr_t)&attrs.PortFcId;
-	    fctio.fctio_alen = (uint32_t)(sizeof (attrs.PortFcId));
+	    DestPortID = (uint64_t)attrs.PortFcId;
+	    fctio.fctio_abuf = (uint64_t)(uintptr_t)&DestPortID;
+	    fctio.fctio_alen = (uint32_t)(sizeof (DestPortID));
 	}
 	fctio.fctio_xfer = FCTIO_XFER_READ;
 	fctio.fctio_flags = 0;

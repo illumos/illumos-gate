@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_FCTIO_H
@@ -38,6 +38,7 @@ extern "C" {
 #define	FCTIO_GET_DISCOVERED_PORT_ATTRIBUTES	(FCTIO_SUB_CMD + 0x04)
 #define	FCTIO_GET_PORT_ATTRIBUTES		(FCTIO_SUB_CMD + 0x05)
 #define	FCTIO_GET_ADAPTER_PORT_STATS		(FCTIO_SUB_CMD + 0x06)
+#define	FCTIO_GET_LINK_STATUS			(FCTIO_SUB_CMD + 0x07)
 
 /*
  * fcio_xfer definitions

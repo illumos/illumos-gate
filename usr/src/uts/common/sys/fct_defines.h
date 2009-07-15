@@ -71,6 +71,7 @@ typedef	stmf_status_t	fct_status_t;
 #define	ELS_OP_FLOGI		0x04
 #define	ELS_OP_LOGO		0x05
 #define	ELS_OP_ABTX		0x06
+#define	ELS_OP_RLS		0x0f
 #define	ELS_OP_ECHO		0x10
 #define	ELS_OP_REC		0x13
 #define	ELS_OP_SRR		0x14

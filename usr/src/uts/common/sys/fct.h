@@ -158,6 +158,9 @@ typedef struct fct_rcvd_abts {
 #define	FCHBA_DRIVER_NAME_LEN		256
 #define	FCHBA_SYMB_NAME_LEN		255
 
+#define	FC_TGT_PORT_INFO_CMD		(((uint32_t)'I') << 24)
+#define	FC_TGT_PORT_RLS			FC_TGT_PORT_INFO_CMD + 0x1
+
 typedef struct fct_port_attrs {
 	char		manufacturer[FCHBA_MANUFACTURER_LEN];
 	char		serial_number[FCHBA_SERIAL_NUMBER_LEN];
@@ -173,6 +176,15 @@ typedef struct fct_port_attrs {
 	uint32_t	supported_speed;
 	uint32_t	max_frame_size;
 } fct_port_attrs_t;
+
+typedef struct fct_port_link_status {
+	uint32_t	LinkFailureCount;
+	uint32_t	LossOfSyncCount;
+	uint32_t	LossOfSignalsCount;
+	uint32_t	PrimitiveSeqProtocolErrorCount;
+	uint32_t	InvalidTransmissionWordCount;
+	uint32_t	InvalidCRCCount;
+} fct_port_link_status_t;
 
 typedef struct fct_dbuf_store {
 	void			*fds_fct_private;
@@ -232,6 +244,9 @@ typedef struct fct_local_port {
 			struct fct_flogi_xchg *fx);
 	void			(*port_populate_hba_details)(
 		struct fct_local_port *port, struct fct_port_attrs *port_attrs);
+	fct_status_t		(*port_info)(uint32_t cmd,
+		struct fct_local_port *port, void *arg, uint8_t *buf,
+		uint32_t *bufsizep);
 } fct_local_port_t;
 
 /*
@@ -276,6 +291,15 @@ typedef struct fct_link_info {
 	uint8_t			port_rnwwn[8];
 	uint8_t			port_rpwwn[8];
 } fct_link_info_t;
+
+typedef struct fct_port_stat {
+	kstat_named_t	link_failure_cnt;
+	kstat_named_t	loss_of_sync_cnt;
+	kstat_named_t	loss_of_signals_cnt;
+	kstat_named_t	prim_seq_protocol_err_cnt;
+	kstat_named_t	invalid_tx_word_cnt;
+	kstat_named_t	invalid_crc_cnt;
+} fct_port_stat_t;
 
 /*
  * port topology
