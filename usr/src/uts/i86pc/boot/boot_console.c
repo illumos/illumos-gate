@@ -234,6 +234,7 @@ static char *
 find_boot_line_prop(const char *name)
 {
 	char *ptr;
+	char *ret = NULL;
 	char end_char;
 	size_t len;
 
@@ -256,14 +257,14 @@ find_boot_line_prop(const char *name)
 			    !ISSPACE(*ptr))
 				ptr++;
 			if (*ptr == '\0')
-				return (NULL);
+				goto out;
 			else if (*ptr != 'B')
 				continue;
 		} else {
 			while ((*ptr != '\0') && !ISSPACE(*ptr))
 				ptr++;
 			if (*ptr == '\0')
-				return (NULL);
+				goto out;
 			continue;
 		}
 
@@ -274,10 +275,15 @@ find_boot_line_prop(const char *name)
 			if ((strncmp(ptr, name, len) == 0) &&
 			    (ptr[len] == '=')) {
 				ptr += len + 1;
-				if ((*ptr == '\'') || (*ptr == '"'))
-					return (ptr + 1);
-				else
-					return (ptr);
+				if ((*ptr == '\'') || (*ptr == '"')) {
+					ret = ptr + 1;
+					end_char = *ptr;
+					ptr++;
+				} else {
+					ret = ptr;
+					end_char = ',';
+				}
+				goto consume_property;
 			}
 
 			/*
@@ -295,7 +301,7 @@ find_boot_line_prop(const char *name)
 			 * name without a value, either continue or break.
 			 */
 			if (*ptr == '\0')
-				return (NULL);
+				goto out;
 			else if (*ptr == ',')
 				continue;
 			else if (ISSPACE(*ptr))
@@ -307,6 +313,7 @@ find_boot_line_prop(const char *name)
 			 */
 			if ((*ptr == '\'') || (*ptr == '"')) {
 				end_char = *ptr;
+				ptr++;
 			} else {
 				/*
 				 * Not quoted, so the string ends at a comma
@@ -320,15 +327,17 @@ find_boot_line_prop(const char *name)
 			 * Now, we can ignore any characters until we find
 			 * end_char.
 			 */
+consume_property:
 			for (; (*ptr != '\0') && (*ptr != end_char); ptr++) {
 				if ((end_char == ',') && ISSPACE(*ptr))
 					break;
 			}
-			if (*ptr && (*ptr != ','))
+			if (*ptr && (*ptr != ',') && !ISSPACE(*ptr))
 				ptr++;
 		} while (*ptr == ',');
 	}
-	return (NULL);
+out:
+	return (ret);
 }
 
 
@@ -657,7 +666,7 @@ bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 	console_value_t *consolep;
 	int i;
 
-	if (console != CONS_USBSER) {
+	if (console != CONS_USBSER && console != CONS_SCREEN_GRAPHICS) {
 		if (console_set) {
 			/*
 			 * If the console was set on the command line,
@@ -705,13 +714,11 @@ bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 			serial_init();
 			return;
 		}
-	}
-
-
-	/*
-	 * USB serial -- we just collect data into a buffer
-	 */
-	if (console == CONS_USBSER || console == CONS_SCREEN_GRAPHICS) {
+	} else {
+		/*
+		 * USB serial and GRAPHICS console
+		 * we just collect data into a buffer
+		 */
 		extern void *defcons_init(size_t);
 		defcons_buf = defcons_cur = defcons_init(MMU_PAGESIZE);
 	}
@@ -748,7 +755,8 @@ bcons_device_change(int new_console)
 static void
 defcons_putchar(int c)
 {
-	if (defcons_cur + 1 - defcons_buf < MMU_PAGESIZE) {
+	if (defcons_buf != NULL &&
+	    defcons_cur + 1 - defcons_buf < MMU_PAGESIZE) {
 		*defcons_cur++ = c;
 		*defcons_cur = 0;
 	}
