@@ -642,9 +642,6 @@ packet_complete:
 				break;
 			}
 
-			ASSERT(code == MSE_ACK && *(mp->b_rptr + 1) == 0xAA &&
-			    *(mp->b_rptr + 2) == 0x00);
-
 			mp->b_rptr += 2;	/* Skip past the 0xAA 0x00 */
 
 			/* Reset completed successfully */
