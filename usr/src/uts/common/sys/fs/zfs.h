@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -280,14 +281,15 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_14			14ULL
 #define	SPA_VERSION_15			15ULL
 #define	SPA_VERSION_16			16ULL
+#define	SPA_VERSION_17			17ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_16
-#define	SPA_VERSION_STRING		"16"
+#define	SPA_VERSION			SPA_VERSION_17
+#define	SPA_VERSION_STRING		"17"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -303,7 +305,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_INITIAL		SPA_VERSION_1
 #define	SPA_VERSION_DITTO_BLOCKS	SPA_VERSION_2
 #define	SPA_VERSION_SPARES		SPA_VERSION_3
-#define	SPA_VERSION_RAID6		SPA_VERSION_3
+#define	SPA_VERSION_RAIDZ2		SPA_VERSION_3
 #define	SPA_VERSION_BPLIST_ACCOUNT	SPA_VERSION_3
 #define	SPA_VERSION_RAIDZ_DEFLATE	SPA_VERSION_3
 #define	SPA_VERSION_DNODE_BYTES		SPA_VERSION_3
@@ -325,6 +327,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_PASSTHROUGH_X	SPA_VERSION_14
 #define	SPA_VERSION_USERSPACE		SPA_VERSION_15
 #define	SPA_VERSION_STMF_PROP		SPA_VERSION_16
+#define	SPA_VERSION_RAIDZ3		SPA_VERSION_17
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change

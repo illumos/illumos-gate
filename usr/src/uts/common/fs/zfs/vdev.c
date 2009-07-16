@@ -405,22 +405,26 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NPARITY,
 		    &nparity) == 0) {
 			/*
-			 * Currently, we can only support 2 parity devices.
+			 * Currently, we can only support 3 parity devices.
 			 */
-			if (nparity == 0 || nparity > 2)
+			if (nparity == 0 || nparity > 3)
 				return (EINVAL);
 			/*
-			 * Older versions can only support 1 parity device.
+			 * Previous versions could only support 1 or 2 parity
+			 * device.
 			 */
-			if (nparity == 2 &&
-			    spa_version(spa) < SPA_VERSION_RAID6)
+			if (nparity > 1 &&
+			    spa_version(spa) < SPA_VERSION_RAIDZ2)
+				return (ENOTSUP);
+			if (nparity > 2 &&
+			    spa_version(spa) < SPA_VERSION_RAIDZ3)
 				return (ENOTSUP);
 		} else {
 			/*
 			 * We require the parity to be specified for SPAs that
 			 * support multiple parity levels.
 			 */
-			if (spa_version(spa) >= SPA_VERSION_RAID6)
+			if (spa_version(spa) >= SPA_VERSION_RAIDZ2)
 				return (EINVAL);
 			/*
 			 * Otherwise, we default to 1 parity device for RAID-Z.

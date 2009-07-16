@@ -246,8 +246,10 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		 * into a crufty old storage pool.
 		 */
 		ASSERT(vd->vdev_nparity == 1 ||
-		    (vd->vdev_nparity == 2 &&
-		    spa_version(spa) >= SPA_VERSION_RAID6));
+		    (vd->vdev_nparity <= 2 &&
+		    spa_version(spa) >= SPA_VERSION_RAIDZ2) ||
+		    (vd->vdev_nparity <= 3 &&
+		    spa_version(spa) >= SPA_VERSION_RAIDZ3));
 
 		/*
 		 * Note that we'll add the nparity tag even on storage pools

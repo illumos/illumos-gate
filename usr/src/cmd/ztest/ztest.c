@@ -479,7 +479,7 @@ process_options(int argc, char **argv)
 			zopt_raidz = MAX(1, value);
 			break;
 		case 'R':
-			zopt_raidz_parity = MIN(MAX(value, 1), 2);
+			zopt_raidz_parity = MIN(MAX(value, 1), 3);
 			break;
 		case 'd':
 			zopt_datasets = MAX(1, value);
