@@ -54,24 +54,30 @@ iser_ib_sendcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 
 	iser_chan = (iser_chan_t *)arg;
 
-	/* Poll completions until the CQ is empty */
+	/*
+	 * Poll for work request completion while successful. If the
+	 * queue empties or otherwise becomes invalid, stop polling.
+	 */
 	do {
 		status = iser_ib_poll_send_completions(cq_hdl, iser_chan);
-	} while (status != IBT_CQ_EMPTY);
+	} while (status == IBT_SUCCESS);
 
-	/* We've emptied the CQ, rearm it before we're done here */
-	status = ibt_enable_cq_notify(cq_hdl, IBT_NEXT_COMPLETION);
-	if (status != IBT_SUCCESS) {
-		/* Unexpected error */
-		ISER_LOG(CE_NOTE, "iser_ib_sendcq_handler: "
-		    "ibt_enable_cq_notify error (%d)", status);
-		return;
+	if (status == IBT_CQ_EMPTY) {
+		/* We've emptied the CQ, rearm it before we're done here */
+		status = ibt_enable_cq_notify(cq_hdl, IBT_NEXT_COMPLETION);
+		if (status != IBT_SUCCESS) {
+			/* Unexpected error */
+			ISER_LOG(CE_NOTE, "iser_ib_sendcq_handler: "
+			    "ibt_enable_cq_notify error (%d)", status);
+			return;
+		}
+
+		/* Now, check for more completions after the rearm */
+		do {
+			status = iser_ib_poll_send_completions(
+			    cq_hdl, iser_chan);
+		} while (status == IBT_SUCCESS);
 	}
-
-	/* Now, check for more completions after the rearm */
-	do {
-		status = iser_ib_poll_send_completions(cq_hdl, iser_chan);
-	} while (status != IBT_CQ_EMPTY);
 }
 
 static int
@@ -91,16 +97,14 @@ iser_ib_poll_send_completions(ibt_cq_hdl_t cq_hdl, iser_chan_t *iser_chan)
 
 	iser_conn = iser_chan->ic_conn;
 
-	/*
-	 * Poll ISER_IB_SCQ_POLL_MAX completions from the CQ.
-	 */
+	/* Poll ISER_IB_SCQ_POLL_MAX completions from the CQ */
 	status = ibt_poll_cq(cq_hdl, wc, ISER_IB_SCQ_POLL_MAX, &npoll);
 
 	if (status != IBT_SUCCESS) {
 		if (status != IBT_CQ_EMPTY) {
 			/* Unexpected error */
 			ISER_LOG(CE_NOTE, "iser_ib_sendcq_handler: ibt_poll_cq "
-			    "error (%d)", status);
+			    "unexpected error (%d)", status);
 		}
 		/* CQ is empty. Either way, move along... */
 		return (status);
@@ -313,24 +317,30 @@ iser_ib_recvcq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 
 	iser_chan = (iser_chan_t *)arg;
 
-	/* Poll completions until the CQ is empty */
+	/*
+	 * Poll for work request completion while successful. If the
+	 * queue empties or otherwise becomes invalid, stop polling.
+	 */
 	do {
 		status = iser_ib_poll_recv_completions(cq_hdl, iser_chan);
-	} while (status != IBT_CQ_EMPTY);
+	} while (status == IBT_SUCCESS);
 
-	/* We've emptied the CQ, rearm it before we're done here */
-	status = ibt_enable_cq_notify(cq_hdl, IBT_NEXT_COMPLETION);
-	if (status != IBT_SUCCESS) {
-		/* Unexpected error */
-		ISER_LOG(CE_NOTE, "iser_ib_recvcq_handler: "
-		    "ibt_enable_cq_notify error (%d)", status);
-		return;
+	if (status == IBT_CQ_EMPTY) {
+		/* We've emptied the CQ, rearm it before we're done here */
+		status = ibt_enable_cq_notify(cq_hdl, IBT_NEXT_COMPLETION);
+		if (status != IBT_SUCCESS) {
+			/* Unexpected error */
+			ISER_LOG(CE_NOTE, "iser_ib_recvcq_handler: "
+			    "ibt_enable_cq_notify error (%d)", status);
+			return;
+		}
+
+		/* Now, check for more completions after the rearm */
+		do {
+			status = iser_ib_poll_recv_completions(
+			    cq_hdl, iser_chan);
+		} while (status == IBT_SUCCESS);
 	}
-
-	/* Now, check for more completions after the rearm */
-	do {
-		status = iser_ib_poll_recv_completions(cq_hdl, iser_chan);
-	} while (status != IBT_CQ_EMPTY);
 }
 
 static int

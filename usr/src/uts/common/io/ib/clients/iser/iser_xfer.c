@@ -95,20 +95,27 @@ iser_xfer_hello_msg(iser_chan_t *chan)
 	wr.wr_nds	= 1;
 	wr.wr_sgl	= &msg->msg_ds;
 
-	status = ibt_post_send(chan->ic_chanhdl, &wr, 1, NULL);
-	if (status != IBT_SUCCESS) {
-		ISER_LOG(CE_NOTE, "iser_xfer_hello_msg: ibt_post_send "
-		    "failure (%d)", status);
-		iser_msg_free(msg);
-		iser_wr_free(iser_wr);
-		return (ISER_STATUS_FAIL);
-	}
-	/* Increment this channel's SQ posted count */
+	/*
+	 * Avoid race condition by incrementing this channel's
+	 * SQ posted count prior to calling ibt_post_send
+	 */
 	mutex_enter(&chan->ic_sq_post_lock);
 	chan->ic_sq_post_count++;
 	if (chan->ic_sq_post_count > chan->ic_sq_max_post_count)
 		chan->ic_sq_max_post_count = chan->ic_sq_post_count;
 	mutex_exit(&chan->ic_sq_post_lock);
+
+	status = ibt_post_send(chan->ic_chanhdl, &wr, 1, NULL);
+	if (status != IBT_SUCCESS) {
+		ISER_LOG(CE_NOTE, "iser_xfer_hello_msg: ibt_post_send "
+		    "failure (%d)", status);
+		mutex_enter(&chan->ic_sq_post_lock);
+		chan->ic_sq_post_count--;
+		mutex_exit(&chan->ic_sq_post_lock);
+		iser_msg_free(msg);
+		iser_wr_free(iser_wr);
+		return (ISER_STATUS_FAIL);
+	}
 
 	ISER_LOG(CE_NOTE, "Posting iSER Hello message: chan (0x%p): "
 	    "IP [%x to %x]", (void *)chan, chan->ic_localip.un.ip4addr,
@@ -176,21 +183,24 @@ iser_xfer_helloreply_msg(iser_chan_t *chan)
 	wr.wr_nds	= 1;
 	wr.wr_sgl	= &msg->msg_ds;
 
-	status = ibt_post_send(chan->ic_chanhdl, &wr, 1, NULL);
-	if (status != IBT_SUCCESS) {
-		ISER_LOG(CE_NOTE, "iser_xfer_helloreply_msg: ibt_post_send "
-		    "failure (%d)", status);
-		iser_msg_free(msg);
-		iser_wr_free(iser_wr);
-		return (ISER_STATUS_FAIL);
-	}
-	/* Increment this channel's SQ posted count */
 	mutex_enter(&chan->ic_sq_post_lock);
 	chan->ic_sq_post_count++;
 	if (chan->ic_sq_post_count > chan->ic_sq_max_post_count)
 		chan->ic_sq_max_post_count = chan->ic_sq_post_count;
+
 	mutex_exit(&chan->ic_sq_post_lock);
 
+	status = ibt_post_send(chan->ic_chanhdl, &wr, 1, NULL);
+	if (status != IBT_SUCCESS) {
+		ISER_LOG(CE_NOTE, "iser_xfer_helloreply_msg: ibt_post_send "
+		    "failure (%d)", status);
+		mutex_enter(&chan->ic_sq_post_lock);
+		chan->ic_sq_post_count--;
+		mutex_exit(&chan->ic_sq_post_lock);
+		iser_msg_free(msg);
+		iser_wr_free(iser_wr);
+		return (ISER_STATUS_FAIL);
+	}
 	ISER_LOG(CE_NOTE, "Posting iSER HelloReply message: chan (0x%p): "
 	    "IP [%x to %x]", (void *)chan, chan->ic_localip.un.ip4addr,
 	    chan->ic_remoteip.un.ip4addr);
@@ -228,6 +238,14 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 
 	ASSERT(chan != NULL);
 
+	mutex_enter(&chan->ic_conn->ic_lock);
+	/* Bail out if the connection is closed */
+	if ((chan->ic_conn->ic_stage == ISER_CONN_STAGE_CLOSING) ||
+	    (chan->ic_conn->ic_stage == ISER_CONN_STAGE_CLOSED)) {
+		mutex_exit(&chan->ic_conn->ic_lock);
+		return (ISER_STATUS_FAIL);
+	}
+
 	/*
 	 * All SCSI command PDU (except SCSI Read and SCSI Write) and the SCSI
 	 * Response PDU are sent to the remote end using the SendSE Message.
@@ -238,6 +256,7 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 	hca = (iser_hca_t *)chan->ic_hca;
 	if (hca == NULL) {
 		ISER_LOG(CE_NOTE, "iser_xfer_ctrlpdu: no hca handle found");
+		mutex_exit(&chan->ic_conn->ic_lock);
 		return (ISER_STATUS_FAIL);
 	}
 
@@ -245,15 +264,14 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 	if (msg == NULL) {
 		ISER_LOG(CE_NOTE, "iser_xfer_ctrlpdu: iser message cache "
 		    "alloc failed");
+		mutex_exit(&chan->ic_conn->ic_lock);
 		return (ISER_STATUS_FAIL);
 	}
 
 	/* Pull the BHS out of the PDU handle */
 	bhs = (iscsi_data_hdr_t *)pdu->isp_hdr;
 
-	ASSERT(chan->ic_conn != NULL && chan->ic_conn->ic_idmc != NULL);
 	ic = chan->ic_conn->ic_idmc;
-	ASSERT(ic != NULL);
 
 	hdr = (iser_ctrl_hdr_t *)(uintptr_t)msg->msg_ds.ds_va;
 
@@ -330,6 +348,7 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 		ISER_LOG(CE_NOTE, "iser_xfer_ctrlpdu: unable to allocate "
 		    "iser wr handle");
 		iser_msg_free(msg);
+		mutex_exit(&chan->ic_conn->ic_lock);
 		return (ISER_STATUS_FAIL);
 	}
 	iser_wr->iw_pdu = pdu;
@@ -346,15 +365,6 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 	wr.wr_nds	= 1;
 	wr.wr_sgl	= &msg->msg_ds;
 
-	/* Post Send Work Request on the specified channel */
-	status = ibt_post_send(chan->ic_chanhdl, &wr, 1, NULL);
-	if (status != IBT_SUCCESS) {
-		ISER_LOG(CE_NOTE, "iser_xfer_ctrlpdu: ibt_post_send "
-		    "failure (%d)", status);
-		iser_msg_free(msg);
-		iser_wr_free(iser_wr);
-		return (ISER_STATUS_FAIL);
-	}
 	/* Increment this channel's SQ posted count */
 	mutex_enter(&chan->ic_sq_post_lock);
 	chan->ic_sq_post_count++;
@@ -362,6 +372,21 @@ iser_xfer_ctrlpdu(iser_chan_t *chan, idm_pdu_t *pdu)
 		chan->ic_sq_max_post_count = chan->ic_sq_post_count;
 	mutex_exit(&chan->ic_sq_post_lock);
 
+	/* Post Send Work Request on the specified channel */
+	status = ibt_post_send(chan->ic_chanhdl, &wr, 1, NULL);
+	if (status != IBT_SUCCESS) {
+		ISER_LOG(CE_NOTE, "iser_xfer_ctrlpdu: ibt_post_send "
+		    "failure (%d)", status);
+		iser_msg_free(msg);
+		iser_wr_free(iser_wr);
+		mutex_enter(&chan->ic_sq_post_lock);
+		chan->ic_sq_post_count--;
+		mutex_exit(&chan->ic_sq_post_lock);
+		mutex_exit(&chan->ic_conn->ic_lock);
+		return (ISER_STATUS_FAIL);
+	}
+
+	mutex_exit(&chan->ic_conn->ic_lock);
 	return (ISER_STATUS_SUCCESS);
 }
 
@@ -388,6 +413,15 @@ iser_xfer_buf_to_ini(idm_task_t *idt, idm_buf_t *buf)
 	/* Grab the iSER resources from the task and buf handles */
 	iser_conn = (iser_conn_t *)idt->idt_ic->ic_transport_private;
 	iser_chan = iser_conn->ic_chan;
+
+	mutex_enter(&iser_chan->ic_conn->ic_lock);
+	/* Bail out if the connection is closed */
+	if ((iser_chan->ic_conn->ic_stage == ISER_CONN_STAGE_CLOSING) ||
+	    (iser_chan->ic_conn->ic_stage == ISER_CONN_STAGE_CLOSED)) {
+		mutex_exit(&iser_chan->ic_conn->ic_lock);
+		return (ISER_STATUS_FAIL);
+	}
+
 	iser_buf  = (iser_buf_t *)buf->idb_buf_private;
 	iser_hdr  = (iser_ctrl_hdr_t *)idt->idt_transport_hdr;
 
@@ -408,6 +442,7 @@ iser_xfer_buf_to_ini(idm_task_t *idt, idm_buf_t *buf)
 	if (iser_wr == NULL) {
 		ISER_LOG(CE_NOTE, "iser_xfer_buf_to_ini: unable to allocate "
 		    "iser wr handle");
+		mutex_exit(&iser_chan->ic_conn->ic_lock);
 		return (ISER_STATUS_FAIL);
 	}
 	iser_wr->iw_buf = buf;
@@ -433,13 +468,6 @@ iser_xfer_buf_to_ini(idm_task_t *idt, idm_buf_t *buf)
 	    uint32_t,  reg_rkey,
 	    uint32_t, buf->idb_xfer_len, int, XFER_BUF_TX_TO_INI);
 
-	status = ibt_post_send(iser_chan->ic_chanhdl, &wr, 1, NULL);
-	if (status != IBT_SUCCESS) {
-		ISER_LOG(CE_NOTE, "iser_xfer_buf_to_ini: ibt_post_send "
-		    "failure (%d)", status);
-		iser_wr_free(iser_wr);
-		return (ISER_STATUS_FAIL);
-	}
 	/* Increment this channel's SQ posted count */
 	mutex_enter(&iser_chan->ic_sq_post_lock);
 	iser_chan->ic_sq_post_count++;
@@ -447,6 +475,19 @@ iser_xfer_buf_to_ini(idm_task_t *idt, idm_buf_t *buf)
 		iser_chan->ic_sq_max_post_count = iser_chan->ic_sq_post_count;
 	mutex_exit(&iser_chan->ic_sq_post_lock);
 
+	status = ibt_post_send(iser_chan->ic_chanhdl, &wr, 1, NULL);
+	if (status != IBT_SUCCESS) {
+		ISER_LOG(CE_NOTE, "iser_xfer_buf_to_ini: ibt_post_send "
+		    "failure (%d)", status);
+		iser_wr_free(iser_wr);
+		mutex_enter(&iser_chan->ic_sq_post_lock);
+		iser_chan->ic_sq_post_count--;
+		mutex_exit(&iser_chan->ic_sq_post_lock);
+		mutex_exit(&iser_chan->ic_conn->ic_lock);
+		return (ISER_STATUS_FAIL);
+	}
+
+	mutex_exit(&iser_chan->ic_conn->ic_lock);
 	return (ISER_STATUS_SUCCESS);
 }
 
@@ -474,6 +515,15 @@ iser_xfer_buf_from_ini(idm_task_t *idt, idm_buf_t *buf)
 	/* Grab the iSER resources from the task and buf handles */
 	iser_conn = (iser_conn_t *)idt->idt_ic->ic_transport_private;
 	iser_chan = iser_conn->ic_chan;
+
+	mutex_enter(&iser_chan->ic_conn->ic_lock);
+	/* Bail out if the connection is closed */
+	if ((iser_chan->ic_conn->ic_stage == ISER_CONN_STAGE_CLOSING) ||
+	    (iser_chan->ic_conn->ic_stage == ISER_CONN_STAGE_CLOSED)) {
+		mutex_exit(&iser_chan->ic_conn->ic_lock);
+		return (ISER_STATUS_FAIL);
+	}
+
 	iser_buf = (iser_buf_t *)buf->idb_buf_private;
 	iser_hdr  = (iser_ctrl_hdr_t *)idt->idt_transport_hdr;
 
@@ -494,6 +544,7 @@ iser_xfer_buf_from_ini(idm_task_t *idt, idm_buf_t *buf)
 	if (iser_wr == NULL) {
 		ISER_LOG(CE_NOTE, "iser_xfer_buf_from_ini: unable to allocate "
 		    "iser wr handle");
+		mutex_exit(&iser_chan->ic_conn->ic_lock);
 		return (ISER_STATUS_FAIL);
 	}
 	iser_wr->iw_buf = buf;
@@ -519,13 +570,6 @@ iser_xfer_buf_from_ini(idm_task_t *idt, idm_buf_t *buf)
 	    uint32_t,  reg_rkey,
 	    uint32_t, buf->idb_xfer_len, int, XFER_BUF_RX_FROM_INI);
 
-	status = ibt_post_send(iser_chan->ic_chanhdl, &wr, 1, NULL);
-	if (status != IBT_SUCCESS) {
-		ISER_LOG(CE_NOTE, "iser_xfer_buf_from_ini: ibt_post_send "
-		    "failure (%d)", status);
-		iser_wr_free(iser_wr);
-		return (ISER_STATUS_FAIL);
-	}
 	/* Increment this channel's SQ posted count */
 	mutex_enter(&iser_chan->ic_sq_post_lock);
 	iser_chan->ic_sq_post_count++;
@@ -533,5 +577,18 @@ iser_xfer_buf_from_ini(idm_task_t *idt, idm_buf_t *buf)
 		iser_chan->ic_sq_max_post_count = iser_chan->ic_sq_post_count;
 	mutex_exit(&iser_chan->ic_sq_post_lock);
 
+	status = ibt_post_send(iser_chan->ic_chanhdl, &wr, 1, NULL);
+	if (status != IBT_SUCCESS) {
+		ISER_LOG(CE_NOTE, "iser_xfer_buf_from_ini: ibt_post_send "
+		    "failure (%d)", status);
+		iser_wr_free(iser_wr);
+		mutex_enter(&iser_chan->ic_sq_post_lock);
+		iser_chan->ic_sq_post_count--;
+		mutex_exit(&iser_chan->ic_sq_post_lock);
+		mutex_exit(&iser_chan->ic_conn->ic_lock);
+		return (ISER_STATUS_FAIL);
+	}
+
+	mutex_exit(&iser_chan->ic_conn->ic_lock);
 	return (ISER_STATUS_SUCCESS);
 }
