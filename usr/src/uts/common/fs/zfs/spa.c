@@ -1574,9 +1574,12 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		/*
 		 * If the config cache is stale, or we have uninitialized
 		 * metaslabs (see spa_vdev_add()), then update the config.
+		 *
+		 * If spa_load_verbatim is true, trust the current
+		 * in-core spa_config and update the disk labels.
 		 */
 		if (config_cache_txg != spa->spa_config_txg ||
-		    state == SPA_LOAD_IMPORT)
+		    state == SPA_LOAD_IMPORT || spa->spa_load_verbatim)
 			need_update = B_TRUE;
 
 		for (int c = 0; c < rvd->vdev_children; c++)
@@ -2405,6 +2408,7 @@ spa_import_rootpool(char *devpath, char *devid)
 
 	spa = spa_add(pname, NULL);
 	spa->spa_is_root = B_TRUE;
+	spa->spa_load_verbatim = B_TRUE;
 
 	/*
 	 * Build up a vdev tree based on the boot device's label config.
@@ -2493,7 +2497,7 @@ spa_import_verbatim(const char *pool, nvlist_t *config, nvlist_t *props)
 	    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), &altroot);
 	spa = spa_add(pool, altroot);
 
-	spa->spa_inactive_states_ok = B_TRUE;
+	spa->spa_load_verbatim = B_TRUE;
 
 	VERIFY(nvlist_dup(config, &spa->spa_config, 0) == 0);
 
@@ -2629,7 +2633,7 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 		/*
 		 * Update the config cache to include the newly-imported pool.
 		 */
-		spa_config_update_common(spa, SPA_CONFIG_UPDATE_POOL, B_FALSE);
+		spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
 	}
 
 	/*

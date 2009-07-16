@@ -1187,7 +1187,6 @@ vdev_validate(vdev_t *vd)
 	nvlist_t *label;
 	uint64_t guid, top_guid;
 	uint64_t state;
-	boolean_t inactive_state;
 
 	for (int c = 0; c < vd->vdev_children; c++)
 		if (vdev_validate(vd->vdev_child[c]) != 0)
@@ -1244,12 +1243,13 @@ vdev_validate(vdev_t *vd)
 
 		nvlist_free(label);
 
-		inactive_state = (state == POOL_STATE_EXPORTED ||
-		    state == POOL_STATE_DESTROYED);
-
-		if (spa->spa_load_state == SPA_LOAD_OPEN &&
-		    !(state == POOL_STATE_ACTIVE) &&
-		    !(spa->spa_inactive_states_ok && inactive_state))
+		/*
+		 * If spa->spa_load_verbatim is true, no need to check the
+		 * state of the pool.
+		 */
+		if (!spa->spa_load_verbatim &&
+		    spa->spa_load_state == SPA_LOAD_OPEN &&
+		    state != POOL_STATE_ACTIVE)
 			return (EBADF);
 
 		/*
