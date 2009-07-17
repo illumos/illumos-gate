@@ -48,6 +48,8 @@ enum ieee80211_edca_ac {
 
 #define	RT2860_MAX_SCATTER	((RT2860_TX_RING_COUNT * 2) - 1)
 
+#define	RT2860_RSSI_OFFSET	92
+
 /* HW supports up to 255 STAs */
 #define	RT2860_WCID_MAX		254
 #define	RT2860_AID2WCID(aid)	((aid) & 0xff)

@@ -79,10 +79,10 @@ static uint8_t rt2860_fw_bin [] = {
 #include "fw-rt2860/rt2860.ucode"
 };
 
-static const struct ieee80211_rateset rt2560_rateset_11b =
+static const struct ieee80211_rateset rt2860_rateset_11b =
 	{ 4, { 2, 4, 11, 22 } };
 
-static const struct ieee80211_rateset rt2560_rateset_11g =
+static const struct ieee80211_rateset rt2860_rateset_11g =
 	{ 12, { 2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108 } };
 
 static const struct {
@@ -224,7 +224,7 @@ DDI_DEFINE_STREAM_OPS(rwn_dev_ops, nulldev, nulldev, rt2860_attach,
 
 static struct modldrv rwn_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Ralink RT2700/2800 driver v1.1",	/* short description */
+	"Ralink RT2700/2800 driver v1.2",	/* short description */
 	&rwn_dev_ops		/* driver specific ops */
 };
 
@@ -1116,7 +1116,7 @@ rt2860_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	m = allocb(msgdsize(mp) + 32, BPRI_MED);
 	if (m == NULL) {
 		RWN_DEBUG(RT2860_DBG_TX, "rwn: rt2860_send():"
-		    "rt2560_mgmt_send: can't alloc mblk.\n");
+		    "rt2860_mgmt_send: can't alloc mblk.\n");
 		err = DDI_FAILURE;
 		goto fail1;
 	}
@@ -1697,6 +1697,7 @@ rt2860_tx_intr(struct rt2860_softc *sc, int qid)
 	sc->sc_tx_timer = 0;
 	mutex_exit(&sc->sc_txlock);
 }
+
 static void
 rt2860_rx_intr(struct rt2860_softc *sc)
 {
@@ -1769,7 +1770,7 @@ rt2860_rx_intr(struct rt2860_softc *sc)
 		}
 
 		ant = rt2860_maxrssi_chain(sc, rxwi);
-		rssi = rxwi->rssi[ant];
+		rssi = RT2860_RSSI_OFFSET - rxwi->rssi[ant];
 		/* grab a reference to the source node */
 		ni = ieee80211_find_rxnode(ic, wh);
 
@@ -2886,6 +2887,9 @@ rt2860_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	RWN_DEBUG(RT2860_DBG_MSG, "rwn: rt2860_attach(): "
 	    "PCI configuration is done successfully\n");
 
+	sc->amrr.amrr_min_success_threshold =  1;
+	sc->amrr.amrr_max_success_threshold = 15;
+
 	/* wait for NIC to initialize */
 	for (ntries = 0; ntries < 100; ntries++) {
 		sc->mac_rev = RT2860_READ(sc, RT2860_ASIC_VER_ID);
@@ -2958,8 +2962,8 @@ rt2860_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ic->ic_caps |= IEEE80211_C_WPA; /* Support WPA/WPA2 */
 
 	/* set supported .11b and .11g rates */
-	ic->ic_sup_rates[IEEE80211_MODE_11B] = rt2560_rateset_11b;
-	ic->ic_sup_rates[IEEE80211_MODE_11G] = rt2560_rateset_11g;
+	ic->ic_sup_rates[IEEE80211_MODE_11B] = rt2860_rateset_11b;
+	ic->ic_sup_rates[IEEE80211_MODE_11G] = rt2860_rateset_11g;
 
 	/* set supported .11b and .11g channels (1 through 14) */
 	for (i = 1; i <= 14; i++) {
@@ -2970,6 +2974,7 @@ rt2860_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ;
 	}
 
+	ic->ic_maxrssi = 63;
 	ic->ic_xmit = rt2860_send;
 
 	ieee80211_attach(ic);
@@ -3070,7 +3075,6 @@ fail5:
 fail4:
 	while (--qid >= 0)
 		rt2860_free_tx_ring(sc, &sc->txq[qid]);
-
 fail3:
 	ddi_regs_map_free(&sc->sc_io_handle);
 fail2:
