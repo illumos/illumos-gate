@@ -130,7 +130,7 @@ typedef struct sbd_lu_info_1_1 {
 	 * metadata is coming in from the correct zvol and not from a
 	 * clone. Has no meaning in any other case.
 	 */
-	uint16_t		sli_meta_fname_offset;
+	uint64_t		sli_meta_fname_offset;
 
 	/*
 	 * Data filename or the media filename when the metadata is in

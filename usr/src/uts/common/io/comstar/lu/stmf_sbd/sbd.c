@@ -762,7 +762,7 @@ sbd_swap_lu_info_1_1(sbd_lu_info_1_1_t *sli)
 	sli->sli_data_order		= SMS_DATA_ORDER;
 	sli->sli_flags			= BSWAP_32(sli->sli_flags);
 	sli->sli_lu_size		= BSWAP_64(sli->sli_lu_size);
-	sli->sli_meta_fname_offset	= BSWAP_16(sli->sli_meta_fname_offset);
+	sli->sli_meta_fname_offset	= BSWAP_64(sli->sli_meta_fname_offset);
 	sli->sli_data_fname_offset	= BSWAP_16(sli->sli_data_fname_offset);
 	sli->sli_serial_offset		= BSWAP_16(sli->sli_serial_offset);
 	sli->sli_alias_offset		= BSWAP_16(sli->sli_alias_offset);
