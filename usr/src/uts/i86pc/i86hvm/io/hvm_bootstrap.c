@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/sunddi.h>
@@ -42,21 +40,29 @@
  * these nodes (which usually happens when mounting the root disk device
  * in an hvm environment).  See the block comments at the top of pv_cmdk.c
  * for more information about why this is necessary.
+ *
+ * hvmboot_rootconf() also force attaches xnf network driver nodes so
+ * that boot interface can be plumbed when booted via the network.
  */
 int
 hvmboot_rootconf()
 {
 	dev_info_t	*xpvd_dip;
-	major_t		xdf_major;
+	major_t		dev_major;
 
-	xdf_major = ddi_name_to_major("xdf");
-	if (xdf_major == (major_t)-1)
+	dev_major = ddi_name_to_major("xdf");
+	if (dev_major == (major_t)-1)
 		cmn_err(CE_PANIC, "unable to load xdf disk driver");
 
 	if (resolve_pathname("/xpvd", &xpvd_dip, NULL, NULL) != 0)
 		cmn_err(CE_PANIC, "unable to configure /xpvd nexus");
 
-	(void) ndi_devi_config_driver(xpvd_dip, 0, xdf_major);
+	(void) ndi_devi_config_driver(xpvd_dip, 0, dev_major);
+
+	dev_major = ddi_name_to_major("xnf");
+	if (dev_major == (major_t)-1)
+		cmn_err(CE_PANIC, "unable to load xnf network driver");
+	(void) ndi_devi_config_driver(xpvd_dip, 0, dev_major);
 
 	ndi_rele_devi(xpvd_dip);
 	return (0);
