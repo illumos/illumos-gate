@@ -2940,7 +2940,8 @@ fp_port_startup(fc_local_port_t *port, job_request_t *job)
 			    p2p_info.d_id,
 			    pd_recepient, KM_NOSLEEP);
 			FP_DTRACE(FP_NHEAD1(2, 0), "Exiting fp_port_startup;"
-			    " P2P port=%p pd=%p", port, pd);
+			    " P2P port=%p pd=%p fp %x pd %x", port, pd,
+			    port->fp_port_id.port_id, p2p_info.d_id);
 			mutex_enter(&port->fp_mutex);
 			return (FC_SUCCESS);
 		}
@@ -3292,7 +3293,9 @@ fp_handle_reject(fc_packet_t *pkt)
 		break;
 
 	case FC_PKT_FS_RJT:
-		if (pkt->pkt_reason == FC_REASON_FS_LOGICAL_BUSY) {
+		if ((pkt->pkt_reason == FC_REASON_FS_LOGICAL_BUSY) ||
+		    ((pkt->pkt_reason == FC_REASON_FS_CMD_UNABLE) &&
+		    (pkt->pkt_expln == 0x00))) {
 			cmd->cmd_retry_interval = fp_retry_delay;
 			rval = fp_retry_cmd(pkt);
 		}
@@ -5888,6 +5891,8 @@ fp_flogi_intr(fc_packet_t *pkt)
 				port->fp_port_id.port_id = s_id;
 				mutex_exit(&port->fp_mutex);
 
+				FP_TRACE(FP_NHEAD1(1, 0), "fp_flogi_intr: fp %x"
+				    "pd %x", port->fp_port_id.port_id, d_id);
 				pd = fctl_create_remote_port(port,
 				    &nwwn, &dwwn, d_id, PD_PLOGI_INITIATOR,
 				    KM_NOSLEEP);
@@ -6116,6 +6121,8 @@ fp_plogi_intr(fc_packet_t *pkt)
 	if ((pd = pkt->pkt_pd) == NULL) {
 		pd = fctl_get_remote_port_by_pwwn(port, &pwwn);
 		if (pd == NULL) {
+			FP_TRACE(FP_NHEAD2(9, 0), "fp_plogi_intr: fp %x pd %x",
+			    port->fp_port_id.port_id, d_id);
 			pd = fctl_create_remote_port(port, &nwwn, &pwwn, d_id,
 			    PD_PLOGI_INITIATOR, KM_NOSLEEP);
 			if (pd == NULL) {
@@ -12091,6 +12098,8 @@ fp_login_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 		do_acc = (port->fp_statec_busy == 0) ? 1 : 0;
 		mutex_exit(&port->fp_mutex);
 
+		FP_TRACE(FP_NHEAD1(3, 0), "fp_plogi_acc_init fp %x, pd %x",
+		    port->fp_port_id.port_id, buf->ub_frame.s_id);
 		pd = fctl_create_remote_port(port, &req->node_ww_name,
 		    &req->nport_ww_name, buf->ub_frame.s_id,
 		    PD_PLOGI_RECEPIENT, sleep);
@@ -12774,6 +12783,11 @@ fp_ns_query(fc_local_port_t *port, fctl_ns_req_t *ns_cmd, job_request_t *job,
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
+	if (ns_cmd->ns_cmd_code == NS_GA_NXT) {
+		FP_TRACE(FP_NHEAD1(1, 0), "fp_ns_query GA_NXT fp %x pd %x",
+		    port->fp_port_id.port_id, ns_cmd->ns_gan_sid);
+	}
+
 	if (ns_cmd->ns_cmd_size == 0) {
 		return (FC_FAILURE);
 	}
@@ -12958,8 +12972,11 @@ fp_ns_intr(fc_packet_t *pkt)
 
 		}
 
-		FP_TRACE(FP_NHEAD1(4, 0), "NS failure; pkt state=%x reason=%x",
-		    pkt->pkt_state, pkt->pkt_reason);
+		FP_TRACE(FP_NHEAD2(9, 0), "%x NS failure pkt state=%x"
+		    "reason=%x, expln=%x, NSCMD=%04X, NSRSP=%04X",
+		    port->fp_port_id.port_id, pkt->pkt_state,
+		    pkt->pkt_reason, pkt->pkt_expln,
+		    cmd_hdr.ct_cmdrsp,  resp_hdr.ct_cmdrsp);
 
 		(void) fp_common_intr(pkt, 1);
 
@@ -13046,9 +13063,8 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 	my_did = (d_id.port_id == port->fp_port_id.port_id) ? 1 : 0;
 	mutex_exit(&port->fp_mutex);
 
-	FP_TRACE(FP_NHEAD1(1, 0), "GAN response; port=%p, d_id=%x", port,
-	    d_id.port_id);
-
+	FP_TRACE(FP_NHEAD1(1, 0), "GAN response; port=%p, fp %x pd %x", port,
+	    port->fp_port_id.port_id, d_id.port_id);
 	if (my_did == 0) {
 		la_wwn_t pwwn;
 		la_wwn_t nwwn;
@@ -13086,6 +13102,8 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 		    DDI_DEV_AUTOINCR);
 
 		if (ns_cmd->ns_flags & FCTL_NS_CREATE_DEVICE && pd == NULL) {
+			FP_TRACE(FP_NHEAD1(1, 0), "fp %x gan_hander create"
+			    "pd %x", port->fp_port_id.port_id, d_id.port_id);
 			pd = fctl_create_remote_port(port, &nwwn, &pwwn,
 			    d_id.port_id, PD_PLOGI_INITIATOR, KM_NOSLEEP);
 		}
