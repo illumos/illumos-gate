@@ -1070,15 +1070,56 @@ mode_sel_param_field_err:
 	    STMF_SAA_INVALID_FIELD_IN_PARAM_LIST);
 }
 
+/*
+ * This function parse through a string, passed to it as a pointer to a string,
+ * by adjusting the pointer to the first non-space character and returns
+ * the count/length of the first bunch of non-space characters. Multiple
+ * Management URLs are stored as a space delimited string in sl_mgmt_url
+ * field of sbd_lu_t. This function is used to retrieve one url at a time.
+ *
+ * i/p : pointer to pointer to a url string
+ * o/p : Adjust the pointer to the url to the first non white character
+ *       and returns the length of the URL
+ */
+uint16_t
+sbd_parse_mgmt_url(char **url_addr) {
+	uint16_t url_length = 0;
+	char *url;
+	url = *url_addr;
+
+	while (*url != '\0') {
+		if (*url == ' ' || *url == '\t' || *url == '\n') {
+			(*url_addr)++;
+			url = *url_addr;
+		} else {
+			break;
+		}
+	}
+
+	while (*url != '\0') {
+		if (*url == ' ' || *url == '\t' ||
+		    *url == '\n' || *url == '\0') {
+			break;
+		}
+		url++;
+		url_length++;
+	}
+	return (url_length);
+}
+
 void
-sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
-			uint8_t *p, int bsize)
+sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 {
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	uint8_t *cdbp = (uint8_t *)&task->task_cdb[0];
-	uint32_t cmd_size;
-	uint8_t page_length;
+	uint8_t *p;
 	uint8_t byte0;
+	uint8_t page_length;
+	uint16_t bsize = 512;
+	uint16_t cmd_size;
+	uint32_t xfer_size = 4;
+	uint32_t mgmt_url_size = 0;
+
 
 	byte0 = DTYPE_DIRECT;
 	/*
@@ -1096,7 +1137,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 	 * return success.
 	 */
 
-	cmd_size = (((uint32_t)cdbp[3]) << 8) | cdbp[4];
+	cmd_size = (((uint16_t)cdbp[3]) << 8) | cdbp[4];
 
 	if (cmd_size == 0) {
 		task->task_cmd_xfer_length = 0;
@@ -1108,15 +1149,23 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 		return;
 	}
 
+	if (sl->sl_mgmt_url) {
+		mgmt_url_size = strlen(sl->sl_mgmt_url);
+	}
+
 	/*
 	 * Standard inquiry
 	 */
 
 	if ((cdbp[1] & 1) == 0) {
-		struct scsi_inquiry *inq = (struct scsi_inquiry *)p;
+		int	i;
+		struct scsi_inquiry *inq;
 
-		page_length = 31;
-		bzero(inq, page_length + 5);
+		p = (uint8_t *)kmem_zalloc(bsize, KM_SLEEP);
+		inq = (struct scsi_inquiry *)p;
+
+		page_length = 69;
+		xfer_size = page_length + 5;
 
 		inq->inq_dtype = DTYPE_DIRECT;
 		inq->inq_ansi = 5;	/* SPC-3 */
@@ -1124,7 +1173,7 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 		inq->inq_rdf = 2;	/* Response data format for SPC-3 */
 		inq->inq_len = page_length;
 
-		inq->inq_tpgs = 1;
+		inq->inq_tpgs = TPGS_FAILOVER_IMPLICIT;
 		inq->inq_cmdque = 1;
 
 		if (sl->sl_flags & SL_VID_VALID) {
@@ -1145,8 +1194,59 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 			bcopy(sbd_revision, inq->inq_revision, 4);
 		}
 
+		/* Adding Version Descriptors */
+		i = 0;
+		/* SAM-3 no version */
+		inq->inq_vd[i].inq_vd_msb = 0x00;
+		inq->inq_vd[i].inq_vd_lsb = 0x60;
+		i++;
+
+		/* transport */
+		switch (task->task_lport->lport_id->protocol_id) {
+		case PROTOCOL_FIBRE_CHANNEL:
+			inq->inq_vd[i].inq_vd_msb = 0x09;
+			inq->inq_vd[i].inq_vd_lsb = 0x00;
+			i++;
+			break;
+
+		case PROTOCOL_PARALLEL_SCSI:
+		case PROTOCOL_SSA:
+		case PROTOCOL_IEEE_1394:
+			/* Currently no claims of conformance */
+			break;
+
+		case PROTOCOL_SRP:
+			inq->inq_vd[i].inq_vd_msb = 0x09;
+			inq->inq_vd[i].inq_vd_lsb = 0x40;
+			i++;
+			break;
+
+		case PROTOCOL_iSCSI:
+			inq->inq_vd[i].inq_vd_msb = 0x09;
+			inq->inq_vd[i].inq_vd_lsb = 0x60;
+			i++;
+			break;
+
+		case PROTOCOL_SAS:
+		case PROTOCOL_ADT:
+		case PROTOCOL_ATAPI:
+		default:
+			/* Currently no claims of conformance */
+			break;
+		}
+
+		/* SPC-3 no version */
+		inq->inq_vd[i].inq_vd_msb = 0x03;
+		inq->inq_vd[i].inq_vd_lsb = 0x00;
+		i++;
+
+		/* SBC-2 no version */
+		inq->inq_vd[i].inq_vd_msb = 0x03;
+		inq->inq_vd[i].inq_vd_lsb = 0x20;
+
 		sbd_handle_short_read_transfers(task, initial_dbuf, p, cmd_size,
-		    min(cmd_size, page_length + 5));
+		    min(cmd_size, xfer_size));
+		kmem_free(p, bsize);
 
 		return;
 	}
@@ -1155,18 +1255,30 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 	 * EVPD handling
 	 */
 
+	/* Default 512 bytes may not be enough, increase bsize if necessary */
+	if (cdbp[2] == 0x83 || cdbp[2] == 0x85) {
+		if (bsize <  cmd_size)
+			bsize = cmd_size;
+	}
+	p = (uint8_t *)kmem_zalloc(bsize, KM_SLEEP);
+
 	switch (cdbp[2]) {
 	case 0x00:
-		page_length = 4;
-
-		bzero(p, page_length + 4);
+		page_length = 4 + (mgmt_url_size ? 1 : 0);
 
 		p[0] = byte0;
 		p[3] = page_length;
-		p[5] = 0x80;
-		p[6] = 0x83;
-		p[7] = 0x86;
+		/* Supported VPD pages in ascending order */
+		{
+			uint8_t i = 5;
 
+			p[i++] = 0x80;
+			p[i++] = 0x83;
+			if (mgmt_url_size != 0)
+				p[i++] = 0x85;
+			p[i++] = 0x86;
+		}
+		xfer_size = page_length + 4;
 		break;
 
 	case 0x80:
@@ -1174,24 +1286,73 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 			page_length = sl->sl_serial_no_size;
 			bcopy(sl->sl_serial_no, p + 4, sl->sl_serial_no_size);
 		} else {
+			/* if no serial num is specified set 4 spaces */
+			page_length = 4;
 			bcopy("    ", p + 4, 4);
 		}
 		p[0] = byte0;
 		p[1] = 0x80;
 		p[3] = page_length;
+		xfer_size = page_length + 4;
 		break;
 
 	case 0x83:
-
-		page_length = stmf_scsilib_prepare_vpd_page83(task, p,
+		xfer_size = stmf_scsilib_prepare_vpd_page83(task, p,
 		    bsize, byte0, STMF_VPD_LU_ID|STMF_VPD_TARGET_ID|
-		    STMF_VPD_TP_GROUP|STMF_VPD_RELATIVE_TP_ID) - 4;
+		    STMF_VPD_TP_GROUP|STMF_VPD_RELATIVE_TP_ID);
 		break;
+
+	case 0x85:
+		if (mgmt_url_size == 0) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
+			kmem_free(p, bsize);
+			return;
+		}
+		{
+			uint16_t idx, newidx, sz, url_size;
+			char *url;
+
+			p[0] = byte0;
+			p[1] = 0x85;
+
+			idx = 4;
+			url = sl->sl_mgmt_url;
+			url_size = sbd_parse_mgmt_url(&url);
+			/* Creating Network Service Descriptors */
+			while (url_size != 0) {
+				/* Null terminated and 4 Byte aligned */
+				sz = url_size + 1;
+				sz += (sz % 4) ? 4 - (sz % 4) : 0;
+				newidx = idx + sz + 4;
+
+				if (newidx < bsize) {
+					/*
+					 * SPC-3r23 : Table 320  (Sec 7.6.5)
+					 * (Network service descriptor format
+					 *
+					 * Note: Hard coding service type as
+					 * "Storage Configuration Service".
+					 */
+					p[idx] = 1;
+					SCSI_WRITE16(p + idx + 2, sz);
+					bcopy(url, p + idx + 4, url_size);
+					xfer_size = newidx + 4;
+				}
+				idx = newidx;
+
+				/* skip to next mgmt url if any */
+				url += url_size;
+				url_size = sbd_parse_mgmt_url(&url);
+			}
+
+			/* Total descriptor length */
+			SCSI_WRITE16(p + 2, idx - 4);
+			break;
+		}
 
 	case 0x86:
 		page_length = 0x3c;
-
-		bzero(p, page_length + 4);
 
 		p[0] = byte0;
 		p[1] = 0x86;		/* Page 86 response */
@@ -1204,17 +1365,19 @@ sbd_handle_inquiry(struct scsi_task *task, struct stmf_data_buf *initial_dbuf,
 		 * to claim support only for Simple TA.
 		 */
 		p[5] = 1;
-
+		xfer_size = page_length + 4;
 		break;
 
 	default:
 		stmf_scsilib_send_status(task, STATUS_CHECK,
 		    STMF_SAA_INVALID_FIELD_IN_CDB);
+		kmem_free(p, bsize);
 		return;
 	}
 
 	sbd_handle_short_read_transfers(task, initial_dbuf, p, cmd_size,
-	    min(cmd_size, page_length + 4));
+	    min(cmd_size, xfer_size));
+	kmem_free(p, bsize);
 }
 
 stmf_status_t
@@ -1424,11 +1587,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	cdb1 = task->task_cdb[1];
 
 	if (cdb0 == SCMD_INQUIRY) {		/* Inquiry */
-		uint8_t *p;
-
-		p = (uint8_t *)kmem_zalloc(512, KM_SLEEP);
-		sbd_handle_inquiry(task, initial_dbuf, p, 512);
-		kmem_free(p, 512);
+		sbd_handle_inquiry(task, initial_dbuf);
 		return;
 	}
 

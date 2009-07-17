@@ -83,6 +83,7 @@ typedef struct sbd_create_and_reg_lu {
 			slu_rev_valid:1,
 			slu_serial_valid:1,
 			slu_alias_valid:1,
+			slu_mgmt_url_valid:1,
 			slu_guid_valid:1,
 			slu_company_id_valid:1,
 			slu_writeback_cache_disable_valid:1,
@@ -98,8 +99,7 @@ typedef struct sbd_create_and_reg_lu {
 	uint16_t	slu_blksize;
 	uint32_t	slu_company_id;
 	uint16_t	slu_alias_off;
-	uint8_t		slu_rsvd2;
-	uint8_t		slu_rsvd;
+	uint16_t	slu_mgmt_url_off;
 	uint32_t	slu_rsvd1;
 	char		slu_rev[4];
 	char		slu_vid[8];
@@ -120,6 +120,7 @@ typedef struct sbd_modify_lu {
 	uint32_t	mlu_lu_size_valid:1,
 			mlu_serial_valid:1,
 			mlu_alias_valid:1,
+			mlu_mgmt_url_valid:1,
 			mlu_writeback_cache_disable_valid:1,
 			mlu_writeback_cache_disable:1,
 			mlu_write_protected_valid:1,
@@ -128,9 +129,12 @@ typedef struct sbd_modify_lu {
 			mlu_by_fname:1;
 	uint64_t	mlu_lu_size;
 	uint16_t	mlu_alias_off;
+	uint16_t	mlu_mgmt_url_off;
 	uint16_t	mlu_serial_off;
 	uint16_t	mlu_serial_size;
 	uint16_t	mlu_fname_off;
+	uint16_t	mlu_rsvd1;
+	uint32_t	mlu_rsvd2;
 	uint8_t		mlu_input_guid[16];
 	char		mlu_buf[8]; /* can be more than 8 */
 } sbd_modify_lu_t;
@@ -151,6 +155,7 @@ typedef struct sbd_lu_props {
 			slp_data_fname_valid:1,
 			slp_zfs_meta:1,
 			slp_alias_valid:1,
+			slp_mgmt_url_valid:1,
 			slp_lu_vid:1,
 			slp_lu_pid:1,
 			slp_lu_rev:1,
@@ -165,6 +170,7 @@ typedef struct sbd_lu_props {
 	uint16_t	slp_serial_off;
 	uint16_t	slp_blksize;
 	uint16_t	slp_alias_off;
+	uint16_t	slp_mgmt_url_off;
 	uint32_t	slp_buf_size_needed;	/* Upon return */
 	uint16_t	slp_serial_size;
 	uint16_t	slp_rsvd;

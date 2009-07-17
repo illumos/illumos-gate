@@ -126,13 +126,15 @@ static int convertCharToPropId(char *, uint32_t *);
 #define	COMPANY_ID		    "OUI"
 #define	BLOCK_SIZE		    "BLK"
 #define	SERIAL_NUMBER		    "SERIAL"
+#define	MGMT_URL		    "MGMT-URL"
 
 #define	MODIFY_HELP "\n"\
 "Description: Modify properties of a logical unit. \n" \
 "Valid properties for -p, --lu-prop are: \n" \
-"     alias - alias for logical unit (up to 255 chars)\n" \
-"     wcd   - write cache disabled (true, false)\n" \
-"     wp    - write protect (true, false)\n\n" \
+"     alias    - alias for logical unit (up to 255 chars)\n" \
+"     mgmt-url - Management URL address\n" \
+"     wcd      - write cache disabled (true, false)\n" \
+"     wp       - write protect (true, false)\n\n" \
 "-f alters the meaning of the operand to be a file name\n" \
 "rather than a LU name. This allows for modification\n" \
 "of a logical unit that is not yet imported into stmf\n"
@@ -140,17 +142,18 @@ static int convertCharToPropId(char *, uint32_t *);
 #define	CREATE_HELP "\n"\
 "Description: Create a logical unit. \n" \
 "Valid properties for -p, --lu-prop are: \n" \
-"     alias - alias for logical unit (up to 255 chars)\n" \
-"     blk   - block size in bytes in 2^n\n" \
-"     guid  - 32 ascii hex characters in NAA format \n" \
-"     meta  - separate meta data file name\n" \
-"     oui   - organizational unique identifier\n" \
-"             6 ascii hex characters of valid format\n" \
-"     pid   - product identifier (up to 16 chars)\n" \
-"     serial- serial number (up to 252 chars)\n" \
-"     vid   - vendor identifier (up to 8 chars)\n" \
-"     wp    - write protect (true, false)\n" \
-"     wcd   - write cache disabled (true, false)\n"
+"     alias    - alias for logical unit (up to 255 chars)\n" \
+"     blk      - block size in bytes in 2^n\n" \
+"     guid     - 32 ascii hex characters in NAA format \n" \
+"     meta     - separate meta data file name\n" \
+"     mgmt-url - Management URL address\n" \
+"     oui      - organizational unique identifier\n" \
+"                6 ascii hex characters of valid format\n" \
+"     pid      - product identifier (up to 16 chars)\n" \
+"     serial   - serial number (up to 252 chars)\n" \
+"     vid      - vendor identifier (up to 8 chars)\n" \
+"     wcd      - write cache disabled (true, false)\n" \
+"     wp       - write protect (true, false)\n"
 #define	ADD_VIEW_HELP "\n"\
 "Description: Add a view entry to a logical unit. \n" \
 "A view entry is comprised of three elements; the \n" \
@@ -991,14 +994,7 @@ modifyLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 		switch (options->optval) {
 			case 'p':
 				prop = strtok_r(options->optarg, "=", &lasts);
-				if ((propVal = strtok_r(NULL, "=", &lasts))
-				    == NULL) {
-					(void) fprintf(stderr, "%s: %s: %s\n",
-					    cmdName, options->optarg,
-					gettext("invalid property specifier"
-					    "- prop=val\n"));
-					return (1);
-				}
+				propVal = strtok_r(NULL, "=", &lasts);
 				ret = convertCharToPropId(prop, &propId);
 				if (ret != 0) {
 					(void) fprintf(stderr, "%s: %s: %s\n",
@@ -1007,8 +1003,22 @@ modifyLuFunc(int operandLen, char *operands[], cmdOptions_t *options,
 					    prop);
 					return (1);
 				}
-				if (callModify(fname, &inGuid, propId, propVal,
-				    prop) != 0) {
+				if (propVal ==  NULL &&
+				    propId != STMF_LU_PROP_MGMT_URL) {
+					(void) fprintf(stderr, "%s: %s: %s\n",
+					    cmdName, options->optarg,
+					    gettext("invalid property specifier"
+					    "- prop=val\n"));
+					return (1);
+				}
+				if (propVal ==  NULL) {
+					ret = callModify(fname, &inGuid, propId,
+					    "", prop);
+				} else {
+					ret = callModify(fname, &inGuid, propId,
+					    propVal, prop);
+				}
+				if (ret != 0) {
 					return (1);
 				}
 				break;
@@ -1270,6 +1280,8 @@ convertCharToPropId(char *prop, uint32_t *propId)
 		*propId = STMF_LU_PROP_COMPANY_ID;
 	} else if (strcasecmp(prop, META_FILE) == 0) {
 		*propId = STMF_LU_PROP_META_FILENAME;
+	} else if (strcasecmp(prop, MGMT_URL) == 0) {
+		*propId = STMF_LU_PROP_MGMT_URL;
 	} else {
 		return (1);
 	}
@@ -2083,6 +2095,18 @@ printExtLuProps(stmfGuid *guid)
 	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_BLOCK_SIZE, propVal,
 	    &propValSize);
 	(void) printf(PROPS_FORMAT, "Block Size");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		(void) printf("%s\n", propVal);
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
+
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_MGMT_URL, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Management URL");
 	if (stmfRet == STMF_STATUS_SUCCESS) {
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {

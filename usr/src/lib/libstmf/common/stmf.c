@@ -1078,6 +1078,7 @@ createDiskLu(diskResource *disk, stmfGuid *createdGuid)
 	int metaFileNameLen = 0;
 	int serialNumLen = 0;
 	int luAliasLen = 0;
+	int luMgmtUrlLen = 0;
 	int sluBufSize = 0;
 	int bufOffset = 0;
 	int fd = 0;
@@ -1115,6 +1116,11 @@ createDiskLu(diskResource *disk, stmfGuid *createdGuid)
 	if (disk->luAliasValid) {
 		luAliasLen = strlen(disk->luAlias);
 		sluBufSize += luAliasLen + 1;
+	}
+
+	if (disk->luMgmtUrlValid) {
+		luMgmtUrlLen = strlen(disk->luMgmtUrl);
+		sluBufSize += luMgmtUrlLen + 1;
 	}
 
 	/*
@@ -1159,6 +1165,14 @@ createDiskLu(diskResource *disk, stmfGuid *createdGuid)
 		bcopy(disk->luAlias, &(sbdLu->slu_buf[bufOffset]),
 		    luAliasLen + 1);
 		bufOffset += luAliasLen + 1;
+	}
+
+	if (disk->luMgmtUrlValid) {
+		sbdLu->slu_mgmt_url_valid = 1;
+		sbdLu->slu_mgmt_url_off = bufOffset;
+		bcopy(disk->luMgmtUrl, &(sbdLu->slu_buf[bufOffset]),
+		    luMgmtUrlLen + 1);
+		bufOffset += luMgmtUrlLen + 1;
 	}
 
 	if (disk->luSizeValid) {
@@ -1665,6 +1679,7 @@ validateModifyDiskProp(uint32_t prop)
 	switch (prop) {
 		case STMF_LU_PROP_ALIAS:
 		case STMF_LU_PROP_SIZE:
+		case STMF_LU_PROP_MGMT_URL:
 		case STMF_LU_PROP_WRITE_PROTECT:
 		case STMF_LU_PROP_WRITE_CACHE_DISABLE:
 			return (STMF_STATUS_SUCCESS);
@@ -1680,6 +1695,7 @@ modifyDiskLu(diskResource *disk, stmfGuid *luGuid, const char *fname)
 {
 	int ret = STMF_STATUS_SUCCESS;
 	int luAliasLen = 0;
+	int luMgmtUrlLen = 0;
 	int mluBufSize = 0;
 	int bufOffset = 0;
 	int fd = 0;
@@ -1710,6 +1726,11 @@ modifyDiskLu(diskResource *disk, stmfGuid *luGuid, const char *fname)
 		mluBufSize += luAliasLen + 1;
 	}
 
+	if (disk->luMgmtUrlValid) {
+		luMgmtUrlLen = strlen(disk->luMgmtUrl);
+		mluBufSize += luMgmtUrlLen + 1;
+	}
+
 	/*
 	 * 8 is the size of the buffer set aside for
 	 * concatenation of variable length fields
@@ -1730,6 +1751,14 @@ modifyDiskLu(diskResource *disk, stmfGuid *luGuid, const char *fname)
 		bcopy(disk->luAlias, &(sbdLu->mlu_buf[bufOffset]),
 		    luAliasLen + 1);
 		bufOffset += luAliasLen + 1;
+	}
+
+	if (disk->luMgmtUrlValid) {
+		sbdLu->mlu_mgmt_url_valid = 1;
+		sbdLu->mlu_mgmt_url_off = bufOffset;
+		bcopy(disk->luMgmtUrl, &(sbdLu->mlu_buf[bufOffset]),
+		    luMgmtUrlLen + 1);
+		bufOffset += luMgmtUrlLen + 1;
 	}
 
 	if (disk->luSizeValid) {
@@ -2123,6 +2152,16 @@ loadDiskPropsFromDriver(luResourceImpl *hdl, sbd_lu_props_t *sbdProps)
 		    diskLu->serialNum, sbdProps->slp_serial_size);
 	}
 
+	if (sbdProps->slp_mgmt_url_valid) {
+		diskLu->luMgmtUrlValid = B_TRUE;
+		if (strlcpy(diskLu->luMgmtUrl,
+		    (char *)&(sbdProps->slp_buf[sbdProps->slp_mgmt_url_off]),
+		    sizeof (diskLu->luMgmtUrl)) >=
+		    sizeof (diskLu->luMgmtUrl)) {
+			return (STMF_STATUS_ERROR);
+		}
+	}
+
 	if (sbdProps->slp_alias_valid) {
 		diskLu->luAliasValid = B_TRUE;
 		if (strlcpy(diskLu->luAlias,
@@ -2245,6 +2284,16 @@ getDiskProp(luResourceImpl *hdl, uint32_t prop, char *propVal, size_t *propLen)
 				return (STMF_ERROR_NO_PROP);
 			}
 			if ((reqLen = strlcpy(propVal, diskLu->luMetaFileName,
+			    *propLen)) >= *propLen) {
+				*propLen = reqLen + 1;
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			break;
+		case STMF_LU_PROP_MGMT_URL:
+			if (diskLu->luMgmtUrlValid == B_FALSE) {
+				return (STMF_ERROR_NO_PROP);
+			}
+			if ((reqLen = strlcpy(propVal, diskLu->luMgmtUrl,
 			    *propLen)) >= *propLen) {
 				*propLen = reqLen + 1;
 				return (STMF_ERROR_INVALID_ARG);
@@ -2462,6 +2511,14 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 				return (STMF_ERROR_INVALID_PROPSIZE);
 			}
 			diskLu->luMetaFileNameValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_MGMT_URL:
+			if ((strlcpy(diskLu->luMgmtUrl, propVal,
+			    sizeof (diskLu->luMgmtUrl))) >=
+			    sizeof (diskLu->luMgmtUrl)) {
+				return (STMF_ERROR_INVALID_PROPSIZE);
+			}
+			diskLu->luMgmtUrlValid = B_TRUE;
 			break;
 		case STMF_LU_PROP_PID:
 			if ((propSize = strlen(propVal)) >
@@ -3076,9 +3133,8 @@ groupListIoctl(stmfGroupList **groupList, int groupType)
 	}
 	(*groupList)->cnt = stmfIoctl.stmf_obuf_nentries;
 	for (i = 0; i < stmfIoctl.stmf_obuf_nentries; i++) {
-		bcopy(iGroupList->name, (*groupList)->name[i],
+		bcopy(iGroupList[i].name, (*groupList)->name[i],
 		    sizeof (stmfGroupName));
-		iGroupList++;
 	}
 
 done:
@@ -3224,10 +3280,9 @@ groupMemberListIoctl(stmfGroupName *groupName, stmfGroupProperties **groupProps,
 	(*groupProps)->cnt = stmfIoctl.stmf_obuf_nentries;
 	for (i = 0; i < stmfIoctl.stmf_obuf_nentries; i++) {
 		(*groupProps)->name[i].identLength =
-		    iGroupMembers->ident_size;
-		bcopy(iGroupMembers->ident, (*groupProps)->name[i].ident,
-		    iGroupMembers->ident_size);
-		iGroupMembers++;
+		    iGroupMembers[i].ident_size;
+		bcopy(iGroupMembers[i].ident, (*groupProps)->name[i].ident,
+		    iGroupMembers[i].ident_size);
 	}
 
 done:

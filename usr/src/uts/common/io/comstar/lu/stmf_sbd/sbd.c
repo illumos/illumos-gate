@@ -1066,6 +1066,9 @@ sbd_write_lu_info(sbd_lu_t *sl)
 	if (sl->sl_alias) {
 		s += strlen(sl->sl_alias) + 1;
 	}
+	if (sl->sl_mgmt_url) {
+		s += strlen(sl->sl_mgmt_url) + 1;
+	}
 	sli = (sbd_lu_info_1_1_t *)kmem_zalloc(sizeof (*sli) + s, KM_SLEEP);
 	p = sli->sli_buf;
 	if ((sl->sl_flags & (SL_SHARED_META | SL_ZFS_META)) == 0) {
@@ -1091,6 +1094,13 @@ sbd_write_lu_info(sbd_lu_t *sl)
 		    (uintptr_t)p - (uintptr_t)sli->sli_buf;
 		sli->sli_flags |= SLI_ALIAS_VALID;
 		p += strlen(sl->sl_alias) + 1;
+	}
+	if (sl->sl_mgmt_url) {
+		(void) strcpy((char *)p, sl->sl_mgmt_url);
+		sli->sli_mgmt_url_offset =
+		    (uintptr_t)p - (uintptr_t)sli->sli_buf;
+		sli->sli_flags |= SLI_MGMT_URL_VALID;
+		p += strlen(sl->sl_mgmt_url) + 1;
 	}
 	if (sl->sl_flags & SL_WRITE_PROTECTED) {
 		sli->sli_flags |= SLI_WRITE_PROTECTED;
@@ -1338,6 +1348,9 @@ sbd_close_delete_lu(sbd_lu_t *sl, int ret)
 	if (sl->sl_alias_alloc_size) {
 		kmem_free(sl->sl_alias, sl->sl_alias_alloc_size);
 	}
+	if (sl->sl_mgmt_url_alloc_size) {
+		kmem_free(sl->sl_mgmt_url, sl->sl_mgmt_url_alloc_size);
+	}
 	stmf_free(sl->sl_lu);
 	return (ret);
 }
@@ -1368,6 +1381,8 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	    (slu->slu_data_fname_off >= sz) ||
 	    ((slu->slu_alias_valid) &&
 	    (slu->slu_alias_off >= sz)) ||
+	    ((slu->slu_mgmt_url_valid) &&
+	    (slu->slu_mgmt_url_off >= sz)) ||
 	    ((slu->slu_serial_valid) &&
 	    ((slu->slu_serial_off + slu->slu_serial_size) >= sz))) {
 		return (EINVAL);
@@ -1384,6 +1399,9 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	alloc_sz += strlen(namebuf + slu->slu_data_fname_off) + 1;
 	if (slu->slu_alias_valid) {
 		alloc_sz += strlen(namebuf + slu->slu_alias_off) + 1;
+	}
+	if (slu->slu_mgmt_url_valid) {
+		alloc_sz += strlen(namebuf + slu->slu_mgmt_url_off) + 1;
 	}
 	if (slu->slu_serial_valid) {
 		alloc_sz += slu->slu_serial_size;
@@ -1427,6 +1445,11 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 		sl->sl_alias = p;
 		(void) strcpy(p, namebuf + slu->slu_alias_off);
 		p += strlen(sl->sl_alias) + 1;
+	}
+	if (slu->slu_mgmt_url_valid) {
+		sl->sl_mgmt_url = p;
+		(void) strcpy(p, namebuf + slu->slu_mgmt_url_off);
+		p += strlen(sl->sl_mgmt_url) + 1;
 	}
 	if (slu->slu_serial_valid) {
 		sl->sl_serial_no = (uint8_t *)p;
@@ -1784,6 +1807,8 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	    (sli->sli_meta_fname_offset > sli_buf_sz)) ||
 	    ((sli->sli_flags & SLI_DATA_FNAME_VALID) &&
 	    (sli->sli_data_fname_offset > sli_buf_sz)) ||
+	    ((sli->sli_flags & SLI_MGMT_URL_VALID) &&
+	    (sli->sli_mgmt_url_offset > sli_buf_sz)) ||
 	    ((sli->sli_flags & SLI_SERIAL_VALID) &&
 	    ((sli->sli_serial_offset + sli->sli_serial_size) > sli_buf_sz)) ||
 	    ((sli->sli_flags & SLI_ALIAS_VALID) &&
@@ -1854,6 +1879,14 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 		sl->sl_alias = kmem_alloc(sl->sl_alias_alloc_size, KM_SLEEP);
 		(void) strcpy(sl->sl_alias, (char *)sli_buf_copy +
 		    sli->sli_alias_offset);
+	}
+	if (sli->sli_flags & SLI_MGMT_URL_VALID) {
+		sl->sl_mgmt_url_alloc_size = strlen((char *)sli_buf_copy +
+		    sli->sli_mgmt_url_offset) + 1;
+		sl->sl_mgmt_url = kmem_alloc(sl->sl_mgmt_url_alloc_size,
+		    KM_SLEEP);
+		(void) strcpy(sl->sl_mgmt_url, (char *)sli_buf_copy +
+		    sli->sli_mgmt_url_offset);
 	}
 	if (sli->sli_flags & SLI_WRITE_PROTECTED) {
 		sl->sl_flags |= SL_WRITE_PROTECTED;
@@ -1958,7 +1991,7 @@ int
 sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret)
 {
 	sbd_lu_t *sl = NULL;
-	int alias_sz;
+	uint16_t alias_sz;
 	int ret = 0;
 	sbd_it_data_t *it;
 	sbd_status_t sret;
@@ -1982,6 +2015,8 @@ sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret)
 	/* Lets validate offsets */
 	if (((mlu->mlu_alias_valid) &&
 	    (mlu->mlu_alias_off >= sz)) ||
+	    ((mlu->mlu_mgmt_url_valid) &&
+	    (mlu->mlu_mgmt_url_off >= sz)) ||
 	    (mlu->mlu_by_fname) &&
 	    (mlu->mlu_fname_off >= sz)) {
 		return (EINVAL);
@@ -2088,6 +2123,35 @@ sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret)
 		mutex_exit(&sl->sl_lock);
 	}
 
+	if (mlu->mlu_mgmt_url_valid) {
+		uint16_t url_sz;
+
+		url_sz = strlen((char *)mlu->mlu_buf + mlu->mlu_mgmt_url_off);
+		if (url_sz > 0)
+			url_sz++;
+
+		mutex_enter(&sl->sl_lock);
+		if (sl->sl_mgmt_url_alloc_size > 0 &&
+		    (url_sz == 0 || sl->sl_mgmt_url_alloc_size < url_sz)) {
+			kmem_free(sl->sl_mgmt_url, sl->sl_mgmt_url_alloc_size);
+			sl->sl_mgmt_url = NULL;
+			sl->sl_mgmt_url_alloc_size = 0;
+		}
+		if (url_sz > 0) {
+			if (sl->sl_mgmt_url_alloc_size == 0) {
+				sl->sl_mgmt_url = kmem_alloc(url_sz, KM_SLEEP);
+				sl->sl_mgmt_url_alloc_size = url_sz;
+			}
+			(void) strcpy(sl->sl_mgmt_url, (char *)mlu->mlu_buf +
+			    mlu->mlu_mgmt_url_off);
+		}
+		for (it = sl->sl_it_list; it != NULL;
+		    it = it->sbd_it_next) {
+			it->sbd_it_ua_conditions |=
+			    SBD_UA_MODE_PARAMETERS_CHANGED;
+		}
+		mutex_exit(&sl->sl_lock);
+	}
 
 	if (mlu->mlu_write_protected_valid) {
 		mutex_enter(&sl->sl_lock);
@@ -2368,6 +2432,9 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 		sz += strlen(sl->sl_alias) + 1;
 	}
 
+	if (sl->sl_mgmt_url) {
+		sz += strlen(sl->sl_mgmt_url) + 1;
+	}
 	bzero(oslp, sizeof (*oslp) - 8);
 	oslp->slp_buf_size_needed = sz;
 
@@ -2403,6 +2470,12 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 		oslp->slp_alias_off = off;
 		(void) strcpy((char *)&oslp->slp_buf[off], sl->sl_alias);
 		off += strlen(sl->sl_alias) + 1;
+	}
+	if (sl->sl_mgmt_url) {
+		oslp->slp_mgmt_url_valid = 1;
+		oslp->slp_mgmt_url_off = off;
+		(void) strcpy((char *)&oslp->slp_buf[off], sl->sl_mgmt_url);
+		off += strlen(sl->sl_mgmt_url) + 1;
 	}
 	if (sl->sl_serial_no_size) {
 		oslp->slp_serial_off = off;

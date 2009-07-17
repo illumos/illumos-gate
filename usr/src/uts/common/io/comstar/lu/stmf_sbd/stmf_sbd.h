@@ -145,7 +145,8 @@ typedef struct sbd_lu_info_1_1 {
 	uint8_t			sli_serial_size;
 	uint8_t			sli_rsvd1;
 	uint8_t			sli_device_id[20];
-	uint8_t			sli_rsvd2[256];
+	uint64_t		sli_mgmt_url_offset;
+	uint8_t			sli_rsvd2[248];
 
 	/*
 	 * In case there is no separate meta, sli_meta_fname_offset wont
@@ -169,6 +170,7 @@ typedef struct sbd_lu_info_1_1 {
 #define	SLI_ALIAS_VALID				0x0100
 #define	SLI_WRITEBACK_CACHE_DISABLE		0x0200
 #define	SLI_ZFS_META				0x0400
+#define	SLI_MGMT_URL_VALID			0x0800
 
 struct sbd_it_data;
 
@@ -189,6 +191,7 @@ typedef struct sbd_lu {
 	/* Metadata */
 	char		*sl_alias;
 	char		*sl_meta_filename;	/* If applicable */
+	char		*sl_mgmt_url;
 	vnode_t		*sl_meta_vp;
 	vtype_t		sl_meta_vtype;
 	uint8_t		sl_device_id[20];	/* 4(hdr) + 16(GUID) */
@@ -203,7 +206,8 @@ typedef struct sbd_lu {
 	char		sl_product_id[16];
 	char		sl_revision[4];
 	uint32_t	sl_data_fname_alloc_size; /* for an explicit alloc */
-	uint32_t	sl_alias_alloc_size;
+	uint16_t	sl_alias_alloc_size;
+	uint16_t	sl_mgmt_url_alloc_size;
 	uint8_t		sl_serial_no_alloc_size;
 	uint64_t	sl_meta_offset;
 

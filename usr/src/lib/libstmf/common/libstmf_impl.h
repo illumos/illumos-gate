@@ -55,6 +55,8 @@ typedef struct _diskResource {
 	uint32_t    companyId;
 	boolean_t   luAliasValid;
 	char	    luAlias[256];
+	boolean_t   luMgmtUrlValid;
+	char	    luMgmtUrl[1024];
 	boolean_t   vidValid;
 	char	    vid[8];
 	boolean_t   pidValid;
