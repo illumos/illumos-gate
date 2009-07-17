@@ -108,7 +108,6 @@
 
 #include <syslog.h>
 #include <sys/modctl.h>
-#include <sys/fs/sdev_node.h>
 
 #include "zoneadmd.h"
 

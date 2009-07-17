@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <limits.h>
@@ -38,7 +36,7 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/mntent.h>
-#include <sys/fs/sdev_node.h>
+#include <sys/fs/sdev_impl.h>
 
 
 #define	READFLAG_RO	1
