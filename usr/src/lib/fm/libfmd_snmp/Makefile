@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../../Makefile.lib
@@ -36,11 +35,11 @@ $(BUILD64)SUBDIRS += $(MACH64)
 
 MIBFILES = SUN-FM-MIB.mib
 
-ROOTSMAMIBDIR = $(ROOT)/etc/sma/snmp/mibs
-ROOTMIBS = $(MIBFILES:%=$(ROOTSMAMIBDIR)/%)
+ROOTNETSNMPMIBDIR = $(ROOT)/etc/net-snmp/snmp/mibs
+ROOTMIBS = $(MIBFILES:%=$(ROOTNETSNMPMIBDIR)/%)
 
 $(ROOTMIBS) := FILEMODE = 0644
-$(ROOTSMAMIBDIR) := DIRMODE = 0755
+$(ROOTNETSNMPMIBDIR) := DIRMODE = 0755
 
 all := TARGET = all
 clean := TARGET = clean
@@ -56,17 +55,17 @@ install: install_h install_mibs .WAIT $(SUBDIRS)
 
 install_h: $(ROOTFMHDRS)
 
-install_mibs: $(ROOTSMAMIBDIR) $(ROOTMIBS)
+install_mibs: $(ROOTNETSNMPMIBDIR) $(ROOTMIBS)
 
 check: $(CHECKHDRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-$(ROOTSMAMIBDIR):
+$(ROOTNETSNMPMIBDIR):
 	$(INS.dir)
 
-$(ROOTSMAMIBDIR)/%: mibs/%
+$(ROOTNETSNMPMIBDIR)/%: mibs/%
 	$(INS.file)
 
 FRC:

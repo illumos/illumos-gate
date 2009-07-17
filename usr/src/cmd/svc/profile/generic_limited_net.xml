@@ -169,7 +169,7 @@
     <instance name='default' enabled='false' />
   </service>
 
-  <service name='application/management/sma' version='1' type='service'>
+  <service name='application/management/net-snmp' version='1' type='service'>
     <instance name='default' enabled='false' />
   </service>
   <service name='application/management/seaport' version='1' type='service'>

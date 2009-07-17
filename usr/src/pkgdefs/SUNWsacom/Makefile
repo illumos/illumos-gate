@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
@@ -36,7 +35,7 @@ ACTION_all=grep SUNWter depend > /dev/null || \
 	( chmod 666 depend; \
 	echo "P SUNWmibii     Solstice Enterprise Agents SNMP daemon" >> depend; \
 	echo "P SUNWsasnm     Solstice Enterprise Agents Simple Network Management Protocol" >> depend; \
-	echo "P SUNWsmmgr     System Management Agent Startup scripts" >> depend; \
+	echo "P SUNWnet-snmp-mgr     Net-SNMP Agent configuration files and Startup scripts" >> depend; \
 	echo "P SUNWlibC      SPARCompilers Bundled libC" >> depend; \
 	chmod 444 depend )
 

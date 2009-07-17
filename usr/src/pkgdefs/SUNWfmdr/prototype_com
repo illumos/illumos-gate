@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,11 +33,11 @@ i depend
 d none etc 755 root sys
 d none etc/fm 755 root sys
 d none etc/fm/fmd 755 root sys
-d none etc/sma 755 root bin
-d none etc/sma/snmp 755 root bin
-f none etc/sma/snmp/fmd-trapgen.conf 600 root bin
-d none etc/sma/snmp/mibs 755 root bin
-f none etc/sma/snmp/mibs/SUN-FM-MIB.mib 644 root bin
+d none etc/net-snmp 755 root bin
+d none etc/net-snmp/snmp 755 root bin
+f none etc/net-snmp/snmp/fmd-trapgen.conf 600 root bin
+d none etc/net-snmp/snmp/mibs 755 root bin
+f none etc/net-snmp/snmp/mibs/SUN-FM-MIB.mib 644 root bin
 d none kernel 755 root sys
 d none kernel/drv 755 root sys
 f none kernel/drv/fm.conf 644 root sys

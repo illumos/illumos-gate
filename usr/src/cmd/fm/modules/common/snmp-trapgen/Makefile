@@ -28,10 +28,10 @@
 MODULE = snmp-trapgen
 CLASS = common
 SRCS = snmp.c
-SMASNMPCONFS = fmd-trapgen.conf
+NETSNMPCONFS = fmd-trapgen.conf
 
-ROOTSMASNMPDIR = $(ROOT)/etc/sma/snmp
-ROOTSMASNMPCONFS = $(SMASNMPCONFS:%=$(ROOTSMASNMPDIR)/%)
+ROOTNETSNMPDIR = $(ROOT)/etc/net-snmp/snmp
+ROOTNETSNMPCONFS = $(NETSNMPCONFS:%=$(ROOTNETSNMPDIR)/%)
 
 include ../../Makefile.plugin
 
@@ -42,9 +42,9 @@ LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
 LINTFLAGS += -L$(ROOT)/usr/lib/fm
 LDLIBS += $(SNMPLIBS) -lfmd_msg
 
-$(ROOTSMASNMPCONFS) := FILEMODE = 0600
+$(ROOTNETSNMPCONFS) := FILEMODE = 0600
 
-$(ROOTSMASNMPDIR)/%: %
+$(ROOTNETSNMPDIR)/%: %
 	$(INS.file)
 
-install: $(ROOTSMASNMPCONFS)
+install: $(ROOTNETSNMPCONFS)

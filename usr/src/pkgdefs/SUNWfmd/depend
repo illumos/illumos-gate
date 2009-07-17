@@ -34,6 +34,6 @@ P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWfmdr	Fault Management Daemon and Utilities (Root)
-P SUNWsmagt     System Management Agent files and libraries
+P SUNWnet-snmp-core     Net-SNMP Agent files and libraries
 P SUNWlxmlr     The XML library (Root)
 P SUNWzfsr      ZFS (Root)

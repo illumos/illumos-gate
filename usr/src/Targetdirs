@@ -220,8 +220,8 @@ ROOT.BIN= \
 	/etc/dbus-1 \
 	/etc/dbus-1/system.d \
 	/etc/saf \
-	/etc/sma \
-	/etc/sma/snmp \
+	/etc/net-snmp \
+	/etc/net-snmp/snmp \
 	/lib \
 	/lib/crypto \
 	/lib/inet \
