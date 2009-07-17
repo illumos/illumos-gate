@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@
 #include <sys/fibre-channel/ulp/fcsm.h>
 
 /* Definitions */
-#define	FCSM_VERSION		"1.26"
+#define	FCSM_VERSION		"1.27"
 #define	FCSM_NAME_VERSION	"SunFC FCSM v" FCSM_VERSION
 
 
@@ -1624,45 +1624,45 @@ fcsm_fciocmd(intptr_t arg, int mode, cred_t *credp, fcio_t *fcio)
 	}
 
 	case  FCSMIO_ADAPTER_LIST: {
-	    fc_hba_list_t	*list;
-	    int			count;
+		fc_hba_list_t	*list;
+		int		count;
 
-	    if ((fcio->fcio_xfer != FCIO_XFER_RW) ||
+		if ((fcio->fcio_xfer != FCIO_XFER_RW) ||
 		    (fcio->fcio_olen == 0) || (fcio->fcio_obuf == 0)) {
-		retval = EINVAL;
-		break;
-	    }
+			retval = EINVAL;
+			break;
+		}
 
-	    list = kmem_zalloc(fcio->fcio_olen, KM_SLEEP);
+		list = kmem_zalloc(fcio->fcio_olen, KM_SLEEP);
 
-	    if (ddi_copyin(fcio->fcio_obuf, list, fcio->fcio_olen, mode)) {
-		retval = EFAULT;
-		break;
-	    }
-	    list->version = FC_HBA_LIST_VERSION;
+		if (ddi_copyin(fcio->fcio_obuf, list, fcio->fcio_olen, mode)) {
+			retval = EFAULT;
+			break;
+		}
+		list->version = FC_HBA_LIST_VERSION;
 
-	    if (fcio->fcio_olen < MAXPATHLEN * list->numAdapters) {
-		retval = EFAULT;
-		break;
-	    }
+		if (fcio->fcio_olen < MAXPATHLEN * list->numAdapters) {
+			retval = EFAULT;
+			break;
+		}
 
-	    count = fc_ulp_get_adapter_paths((char *)list->hbaPaths,
-		list->numAdapters);
-	    if (count < 0) { /* Did something go wrong? */
-		FCSM_DEBUG(SMDL_TRACE, (CE_CONT, SM_LOG, NULL, NULL,
-		    "Error fetching adapter list."));
-		retval = ENXIO;
+		count = fc_ulp_get_adapter_paths((char *)list->hbaPaths,
+		    list->numAdapters);
+		if (count < 0) { /* Did something go wrong? */
+			FCSM_DEBUG(SMDL_TRACE, (CE_CONT, SM_LOG, NULL, NULL,
+			    "Error fetching adapter list."));
+			retval = ENXIO;
+			kmem_free(list, fcio->fcio_olen);
+			break;
+		}
+		/* Sucess (or short buffer) */
+		list->numAdapters = count;
+		if (ddi_copyout(list, fcio->fcio_obuf,
+		    fcio->fcio_olen, mode)) {
+			retval = EFAULT;
+		}
 		kmem_free(list, fcio->fcio_olen);
 		break;
-	    }
-	    /* Sucess (or short buffer) */
-	    list->numAdapters = count;
-	    if (ddi_copyout(list, fcio->fcio_obuf,
-		    fcio->fcio_olen, mode)) {
-		retval = EFAULT;
-	    }
-	    kmem_free(list, fcio->fcio_olen);
-	    break;
 	}
 
 	default:
@@ -2752,10 +2752,10 @@ fcsm_ct_intr(fcsm_cmd_t *cmd)
 	ASSERT(fcio != NULL);
 
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
-		fcsm_display(CE_WARN, SM_LOG, cmd->cmd_fcsm, pkt,
+		FCSM_DEBUG(SMDL_ERR, (CE_NOTE, SM_LOG, cmd->cmd_fcsm, pkt,
 		    "ct_intr: CT command <0x%x> to did 0x%x failed",
 		    ((fc_ct_aiu_t *)fcio->fcio_ibuf)->aiu_header.ct_cmdrsp,
-		    pkt->pkt_cmd_fhdr.d_id);
+		    pkt->pkt_cmd_fhdr.d_id));
 	} else {
 		/* Get the CT response payload */
 		FCSM_REP_RD(pkt->pkt_resp_acc, fcio->fcio_obuf,
@@ -3249,9 +3249,9 @@ fcsm_pkt_common_intr(fc_packet_t *pkt)
 	fcsm = cmd->cmd_fcsm;
 	ASSERT(fcsm != NULL);
 
-	fcsm_display(CE_WARN, SM_LOG, cmd->cmd_fcsm, pkt,
+	FCSM_DEBUG(SMDL_ERR, (CE_NOTE, SM_LOG, cmd->cmd_fcsm, pkt,
 	    "fc packet to DID 0x%x failed for pkt 0x%p",
-	    pkt->pkt_cmd_fhdr.d_id, pkt);
+	    pkt->pkt_cmd_fhdr.d_id, pkt));
 
 	mutex_enter(&fcsm->sm_mutex);
 	if (fcsm->sm_flags & FCSM_LINK_DOWN) {
