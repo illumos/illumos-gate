@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,20 +72,42 @@ static int kphysm_split_memseg(pfn_t base, pgcnt_t npgs);
 static int delspan_reserve(pfn_t, pgcnt_t);
 static void delspan_unreserve(pfn_t, pgcnt_t);
 
-static kmutex_t memseg_lists_lock;
-static struct memseg *memseg_va_avail;
+kmutex_t memseg_lists_lock;
+struct memseg *memseg_va_avail;
+struct memseg *memseg_alloc(void);
 static struct memseg *memseg_delete_junk;
 static struct memseg *memseg_edit_junk;
 void memseg_remap_init(void);
-static void memseg_remap_to_dummy(caddr_t, pgcnt_t);
+static void memseg_remap_to_dummy(struct memseg *);
 static void kphysm_addmem_error_undospan(pfn_t, pgcnt_t);
 static struct memseg *memseg_reuse(pgcnt_t);
 
 static struct kmem_cache *memseg_cache;
 
 /*
- * Add a chunk of memory to the system.  page_t's for this memory
- * are allocated in the first few pages of the chunk.
+ * Interfaces to manage externally allocated
+ * page_t memory (metadata) for a memseg.
+ */
+#pragma weak	memseg_alloc_meta
+#pragma weak	memseg_free_meta
+#pragma weak	memseg_get_metapfn
+#pragma weak	memseg_remap_meta
+
+extern int ppvm_enable;
+extern page_t *ppvm_base;
+extern int memseg_alloc_meta(pfn_t, pgcnt_t, void **, pgcnt_t *);
+extern void memseg_free_meta(void *, pgcnt_t);
+extern pfn_t memseg_get_metapfn(void *, pgcnt_t);
+extern void memseg_remap_meta(struct memseg *);
+static int memseg_is_dynamic(struct memseg *);
+static int memseg_includes_meta(struct memseg *);
+static pfn_t memseg_get_start(struct memseg *);
+static void memseg_cpu_vm_flush(void);
+
+int meta_alloc_enable;
+
+/*
+ * Add a chunk of memory to the system.
  * base: starting PAGESIZE page of new memory.
  * npgs: length in PAGESIZE pages.
  *
@@ -94,24 +116,35 @@ static struct kmem_cache *memseg_cache;
  * dynamically most likely means more hash misses, since the tables will
  * be smaller than they otherwise would be.
  */
+#ifdef	DEBUG
+static int memseg_debug;
+#define	MEMSEG_DEBUG(args...) if (memseg_debug) printf(args)
+#else
+#define	MEMSEG_DEBUG(...)
+#endif
+
 int
 kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 {
-	page_t		*pp;
-	page_t		*opp, *oepp;
+	page_t *pp;
+	page_t		*opp, *oepp, *segpp;
 	struct memseg	*seg;
 	uint64_t	avmem;
 	pfn_t		pfn;
 	pfn_t		pt_base = base;
 	pgcnt_t		tpgs = npgs;
-	pgcnt_t		metapgs;
+	pgcnt_t		metapgs = 0;
 	int		exhausted;
 	pfn_t		pnum;
 	int		mnode;
 	caddr_t		vaddr;
 	int		reuse;
 	int		mlret;
+	int		rv;
+	int		flags;
+	int		meta_alloc = 0;
 	void		*mapva;
+	void		*metabase = (void *)base;
 	pgcnt_t		nkpmpgs = 0;
 	offset_t	kpm_pages_off;
 
@@ -145,13 +178,26 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 		if (mlret == MEML_SPANOP_EALLOC) {
 			delspan_unreserve(pt_base, tpgs);
 			return (KPHYSM_ERESOURCE);
-		} else
-		if (mlret == MEML_SPANOP_ESPAN) {
+		} else if (mlret == MEML_SPANOP_ESPAN) {
 			delspan_unreserve(pt_base, tpgs);
 			return (KPHYSM_ESPAN);
 		} else {
 			delspan_unreserve(pt_base, tpgs);
 			return (KPHYSM_ERESOURCE);
+		}
+	}
+
+	if (meta_alloc_enable) {
+		/*
+		 * Allocate the page_t's from existing memory;
+		 * if that fails, allocate from the incoming memory.
+		 */
+		rv = memseg_alloc_meta(base, npgs, &metabase, &metapgs);
+		if (rv == KPHYSM_OK) {
+			ASSERT(metapgs);
+			ASSERT(btopr(npgs * sizeof (page_t)) <= metapgs);
+			meta_alloc = 1;
+			goto mapalloc;
 		}
 	}
 
@@ -220,13 +266,13 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	 */
 	if (exhausted) {
 		kphysm_addmem_error_undospan(pt_base, tpgs);
-
 		/*
 		 * There is no specific error code for 'too small'.
 		 */
 		return (KPHYSM_ERESOURCE);
 	}
 
+mapalloc:
 	/*
 	 * We may re-use a previously allocated VA space for the page_ts
 	 * eventually, but we need to initialize and lock the pages first.
@@ -242,6 +288,8 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 		cmn_err(CE_WARN, "kphysm_add_memory_dynamic:"
 		    " Can't allocate VA for page_ts");
 
+		if (meta_alloc)
+			memseg_free_meta(metabase, metapgs);
 		kphysm_addmem_error_undospan(pt_base, tpgs);
 
 		return (KPHYSM_ERESOURCE);
@@ -258,6 +306,8 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	pfn = pt_base;
 	vaddr = (caddr_t)pp;
 	for (pnum = 0; pnum < metapgs; pnum++) {
+		if (meta_alloc)
+			pfn = memseg_get_metapfn(metabase, (pgcnt_t)pnum);
 		hat_devload(kas.a_hat, vaddr, ptob(1), pfn,
 		    PROT_READ | PROT_WRITE,
 		    HAT_LOAD | HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
@@ -276,7 +326,8 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 		    HAT_UNLOAD_UNMAP|HAT_UNLOAD_UNLOCK);
 
 		vmem_free(heap_arena, mapva, ptob(metapgs));
-
+		if (meta_alloc)
+			memseg_free_meta(metabase, metapgs);
 		kphysm_addmem_error_undospan(pt_base, tpgs);
 
 		return (KPHYSM_EFAULT);
@@ -289,31 +340,26 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	 * this may change with COD or in larger SSM systems with
 	 * nested latency groups, so we must not assume that the
 	 * node does not yet exist.
-	 *
-	 * Also, using pt_base (page table base address)
-	 * and tpgs (total number of pages) to mimic the case when a
-	 * memory board is already installed in a system at boot
-	 * time.  This will ensure the entire address range is
-	 * specified in order to have proper deletion.
 	 */
 	pnum = pt_base + tpgs - 1;
-	mem_node_add_slice(pt_base, pnum);
+	mem_node_add_range(pt_base, pnum);
 
 	/*
 	 * Allocate or resize page counters as necessary to accommodate
 	 * the increase in memory pages.
 	 */
 	mnode = PFN_2_MEM_NODE(pnum);
-	if (page_ctrs_adjust(mnode) != 0) {
+	PAGE_CTRS_ADJUST(base, npgs, rv);
+	if (rv) {
 
-		mem_node_pre_del_slice(pt_base, pnum);
-		mem_node_post_del_slice(pt_base, pnum, 0);
+		mem_node_del_range(pt_base, pnum);
 
 		hat_unload(kas.a_hat, (caddr_t)pp, ptob(metapgs),
 		    HAT_UNLOAD_UNMAP|HAT_UNLOAD_UNLOCK);
 
 		vmem_free(heap_arena, mapva, ptob(metapgs));
-
+		if (meta_alloc)
+			memseg_free_meta(metabase, metapgs);
 		kphysm_addmem_error_undospan(pt_base, tpgs);
 
 		return (KPHYSM_ERESOURCE);
@@ -333,9 +379,23 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	memlist_write_unlock();
 
 	/* See if we can find a memseg to re-use. */
-	seg = memseg_reuse(metapgs);
-
-	reuse = (seg != NULL);
+	if (meta_alloc) {
+		seg = memseg_reuse(0);
+		reuse = 1;	/* force unmapping of temp mapva */
+		flags = MEMSEG_DYNAMIC | MEMSEG_META_ALLOC;
+		/*
+		 * There is a 1:1 fixed relationship between a pfn
+		 * and a page_t VA.  The pfn is used as an index into
+		 * the ppvm_base page_t table in order to calculate
+		 * the page_t base address for a given pfn range.
+		 */
+		segpp = ppvm_base + base;
+	} else {
+		seg = memseg_reuse(metapgs);
+		reuse = (seg != NULL);
+		flags = MEMSEG_DYNAMIC | MEMSEG_META_INCL;
+		segpp = pp;
+	}
 
 	/*
 	 * Initialize the memseg structure representing this memory
@@ -343,15 +403,31 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	 * initialization and add the memory to the system.
 	 * In order to prevent lock deadlocks, the add_physmem()
 	 * code is repeated here, but split into several stages.
+	 *
+	 * If a memseg is reused, invalidate memseg pointers in
+	 * all cpu vm caches.  We need to do this this since the check
+	 * 	pp >= seg->pages && pp < seg->epages
+	 * used in various places is not atomic and so the first compare
+	 * can happen before reuse and the second compare after reuse.
+	 * The invalidation ensures that a memseg is not deferenced while
+	 * it's page/pfn pointers are changing.
 	 */
 	if (seg == NULL) {
-		seg = kmem_cache_alloc(memseg_cache, KM_SLEEP);
-		bzero(seg, sizeof (struct memseg));
-		seg->msegflags = MEMSEG_DYNAMIC;
-		seg->pages = pp;
+		seg = memseg_alloc();
+		ASSERT(seg != NULL);
+		seg->msegflags = flags;
+		MEMSEG_DEBUG("memseg_get: alloc seg=0x%p, pages=0x%p",
+		    (void *)seg, (void *)(seg->pages));
+		seg->pages = segpp;
 	} else {
-		/*EMPTY*/
-		ASSERT(seg->msegflags & MEMSEG_DYNAMIC);
+		ASSERT(seg->msegflags == flags);
+		ASSERT(seg->pages_base == seg->pages_end);
+		MEMSEG_DEBUG("memseg_get: reuse seg=0x%p, pages=0x%p",
+		    (void *)seg, (void *)(seg->pages));
+		if (meta_alloc) {
+			memseg_cpu_vm_flush();
+			seg->pages = segpp;
+		}
 	}
 
 	seg->epages = seg->pages + npgs;
@@ -382,6 +458,9 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 		pfn = pt_base;
 		vaddr = (caddr_t)seg->pages;
 		for (pnum = 0; pnum < metapgs; pnum++) {
+			if (meta_alloc)
+				pfn = memseg_get_metapfn(metabase,
+				    (pgcnt_t)pnum);
 			hat_devload(kas.a_hat, vaddr, ptob(1), pfn,
 			    PROT_READ | PROT_WRITE,
 			    HAT_LOAD_REMAP | HAT_LOAD | HAT_LOAD_NOCONSIST);
@@ -509,14 +588,16 @@ kphysm_addmem_error_undospan(pfn_t pt_base, pgcnt_t tpgs)
 }
 
 /*
- * Only return an available memseg of exactly the right size.
+ * Only return an available memseg of exactly the right size
+ * if size is required.
  * When the meta data area has it's own virtual address space
  * we will need to manage this more carefully and do best fit
  * allocations, possibly splitting an available area.
  */
-static struct memseg *
+struct memseg *
 memseg_reuse(pgcnt_t metapgs)
 {
+	int type;
 	struct memseg **segpp, *seg;
 
 	mutex_enter(&memseg_lists_lock);
@@ -525,12 +606,24 @@ memseg_reuse(pgcnt_t metapgs)
 	for (; (seg = *segpp) != NULL; segpp = &seg->lnext) {
 		caddr_t end;
 
+		/*
+		 * Make sure we are reusing the right segment type.
+		 */
+		type = metapgs ? MEMSEG_META_INCL : MEMSEG_META_ALLOC;
+
+		if ((seg->msegflags & (MEMSEG_META_INCL | MEMSEG_META_ALLOC))
+		    != type)
+			continue;
+
 		if (kpm_enable)
 			end = hat_kpm_mseg_reuse(seg);
 		else
 			end = (caddr_t)seg->epages;
 
-		if (btopr(end - (caddr_t)seg->pages) == metapgs) {
+		/*
+		 * Check for the right size if it is provided.
+		 */
+		if (!metapgs || btopr(end - (caddr_t)seg->pages) == metapgs) {
 			*segpp = seg->lnext;
 			seg->lnext = NULL;
 			break;
@@ -968,25 +1061,11 @@ delspan_unreserve(pfn_t base, pgcnt_t npgs)
 
 /*
  * Return whether memseg was created by kphysm_add_memory_dynamic().
- * If this is the case and startp non zero, return also the start pfn
- * of the meta data via startp.
  */
 static int
-memseg_is_dynamic(struct memseg *seg, pfn_t *startp)
+memseg_is_dynamic(struct memseg *seg)
 {
-	pfn_t		pt_start;
-
-	if ((seg->msegflags & MEMSEG_DYNAMIC) == 0)
-		return (0);
-
-	/* Meta data is required to be at the beginning */
-	ASSERT(hat_getpfnum(kas.a_hat, (caddr_t)seg->epages) < seg->pages_base);
-
-	pt_start = hat_getpfnum(kas.a_hat, (caddr_t)seg->pages);
-	if (startp != NULL)
-		*startp = pt_start;
-
-	return (1);
+	return (seg->msegflags & MEMSEG_DYNAMIC);
 }
 
 int
@@ -1090,13 +1169,12 @@ restart:
 				/* Span and memseg don't overlap. */
 				continue;
 			}
+			mseg_start = memseg_get_start(seg);
 			/* Check that segment is suitable for delete. */
-			if (memseg_is_dynamic(seg, &mseg_start)) {
+			if (memseg_includes_meta(seg)) {
 				/*
-				 * Can only delete whole added segments
-				 * for the moment.
-				 * Check that this is completely within the
-				 * span.
+				 * Check that this segment is completely
+				 * within the span.
 				 */
 				if (mseg_start < mdsp->mds_base ||
 				    seg->pages_end > p_end) {
@@ -1105,10 +1183,6 @@ restart:
 				}
 				pages_checked += seg->pages_end - mseg_start;
 			} else {
-				/*
-				 * Set mseg_start for accounting below.
-				 */
-				mseg_start = seg->pages_base;
 				/*
 				 * If this segment is larger than the span,
 				 * try to split it. After the split, it
@@ -1231,9 +1305,7 @@ kphysm_del_span_query(
 				}
 			}
 			if (seg != NULL) {
-				if (!memseg_is_dynamic(seg, &mseg_start)) {
-					mseg_start = seg->pages_base;
-				}
+				mseg_start = memseg_get_start(seg);
 				/*
 				 * Now have the full extent of the memseg so
 				 * do the range check.
@@ -1721,11 +1793,6 @@ delete_memory_thread(caddr_t amhp)
 		for (mdsp = mhp->mh_transit.trl_spans; (mdsp != NULL) &&
 		    (mhp->mh_cancel == 0); mdsp = mdsp->mds_next) {
 			pfn_t pfn, p_end;
-
-			if (first_scan) {
-				mem_node_pre_del_slice(mdsp->mds_base,
-				    mdsp->mds_base + mdsp->mds_npgs - 1);
-			}
 
 			p_end = mdsp->mds_base + mdsp->mds_npgs;
 			for (pfn = mdsp->mds_base; (pfn < p_end) &&
@@ -2309,13 +2376,13 @@ refused:
 	kphysm_del_cleanup(mhp);
 
 	/*
-	 * mem_node_post_del_slice needs to be after kphysm_del_cleanup so
+	 * mem_node_del_range needs to be after kphysm_del_cleanup so
 	 * that the mem_node_config[] will remain intact for the cleanup.
 	 */
 	for (mdsp = mhp->mh_transit.trl_spans; mdsp != NULL;
 	    mdsp = mdsp->mds_next) {
-		mem_node_post_del_slice(mdsp->mds_base,
-		    mdsp->mds_base + mdsp->mds_npgs - 1, 0);
+		mem_node_del_range(mdsp->mds_base,
+		    mdsp->mds_base + mdsp->mds_npgs - 1);
 	}
 
 	comp_code = KPHYSM_OK;
@@ -2477,27 +2544,66 @@ memseg_remap_init()
 	mutex_exit(&pp_dummy_lock);
 }
 
-static void
-memseg_remap_to_dummy(caddr_t pp, pgcnt_t metapgs)
+/*
+ * Remap a page-aglined range of page_t's to dummy pages.
+ */
+void
+remap_to_dummy(caddr_t va, pgcnt_t metapgs)
 {
-	ASSERT(pp_dummy != NULL);
+	int phase;
+
+	ASSERT(IS_P2ALIGNED((uint64_t)va, PAGESIZE));
+
+	/*
+	 * We may start remapping at a non-zero page offset
+	 * within the dummy pages since the low/high ends
+	 * of the outgoing pp's could be shared by other
+	 * memsegs (see memseg_remap_meta).
+	 */
+	phase = btop((uint64_t)va) % pp_dummy_npages;
+	ASSERT(PAGESIZE % sizeof (page_t) || phase == 0);
 
 	while (metapgs != 0) {
 		pgcnt_t n;
-		int i;
+		int i, j;
 
 		n = pp_dummy_npages;
 		if (n > metapgs)
 			n = metapgs;
 		for (i = 0; i < n; i++) {
-			hat_devload(kas.a_hat, pp, ptob(1), pp_dummy_pfn[i],
+			j = (i + phase) % pp_dummy_npages;
+			hat_devload(kas.a_hat, va, ptob(1), pp_dummy_pfn[j],
 			    PROT_READ,
 			    HAT_LOAD | HAT_LOAD_NOCONSIST |
 			    HAT_LOAD_REMAP);
-			pp += ptob(1);
+			va += ptob(1);
 		}
 		metapgs -= n;
 	}
+}
+
+static void
+memseg_remap_to_dummy(struct memseg *seg)
+{
+	caddr_t pp;
+	pgcnt_t metapgs;
+
+	ASSERT(memseg_is_dynamic(seg));
+	ASSERT(pp_dummy != NULL);
+
+
+	if (!memseg_includes_meta(seg)) {
+		memseg_remap_meta(seg);
+		return;
+	}
+
+	pp = (caddr_t)seg->pages;
+	metapgs = seg->pages_base - memseg_get_start(seg);
+	ASSERT(metapgs != 0);
+
+	seg->pages_end = seg->pages_base;
+
+	remap_to_dummy(pp, metapgs);
 }
 
 /*
@@ -2588,9 +2694,6 @@ kphysm_del_cleanup(struct mem_handle *mhp)
 		pfn_t mseg_start;
 		pfn_t mseg_base, mseg_end;
 		pgcnt_t mseg_npgs;
-		page_t *pp;
-		pgcnt_t metapgs;
-		int dynamic;
 		int mlret;
 
 		seglist = seg->lnext;
@@ -2609,17 +2712,11 @@ kphysm_del_cleanup(struct mem_handle *mhp)
 		mseg_base = seg->pages_base;
 		mseg_end = seg->pages_end;
 		mseg_npgs = MSEG_NPAGES(seg);
-		dynamic = memseg_is_dynamic(seg, &mseg_start);
+		mseg_start = memseg_get_start(seg);
 
-		seg->pages_end = seg->pages_base;
-
-		if (dynamic) {
-			pp = seg->pages;
-			metapgs = mseg_base - mseg_start;
-			ASSERT(metapgs != 0);
-
+		if (memseg_is_dynamic(seg)) {
 			/* Remap the meta data to our special dummy area. */
-			memseg_remap_to_dummy((caddr_t)pp, metapgs);
+			memseg_remap_to_dummy(seg);
 
 			mutex_enter(&memseg_lists_lock);
 			seg->lnext = memseg_va_avail;
@@ -2627,16 +2724,13 @@ kphysm_del_cleanup(struct mem_handle *mhp)
 			mutex_exit(&memseg_lists_lock);
 		} else {
 			/*
-			 * Set for clean-up below.
-			 */
-			mseg_start = seg->pages_base;
-			/*
 			 * For memory whose page_ts were allocated
 			 * at boot, we need to find a new use for
 			 * the page_t memory.
 			 * For the moment, just leak it.
 			 * (It is held in the memseg_delete_junk list.)
 			 */
+			seg->pages_end = seg->pages_base;
 
 			mutex_enter(&memseg_lists_lock);
 			seg->lnext = memseg_delete_junk;
@@ -3019,7 +3113,7 @@ kphysm_split_memseg(
 		memsegs_unlock(1);
 		return (0);
 	}
-	if (memseg_is_dynamic(seg, (pfn_t *)NULL)) {
+	if (memseg_includes_meta(seg)) {
 		memsegs_unlock(1);
 		return (0);
 	}
@@ -3053,18 +3147,13 @@ kphysm_split_memseg(
 	seg_low = NULL;
 	seg_high = NULL;
 
-	if (size_low != 0) {
-		seg_low = kmem_cache_alloc(memseg_cache, KM_SLEEP);
-		bzero(seg_low, sizeof (struct memseg));
-	}
+	if (size_low != 0)
+		seg_low = memseg_alloc();
 
-	seg_mid = kmem_cache_alloc(memseg_cache, KM_SLEEP);
-	bzero(seg_mid, sizeof (struct memseg));
+	seg_mid = memseg_alloc();
 
-	if (size_high != 0) {
-		seg_high = kmem_cache_alloc(memseg_cache, KM_SLEEP);
-		bzero(seg_high, sizeof (struct memseg));
-	}
+	if (size_high != 0)
+		seg_high = memseg_alloc();
 
 	/*
 	 * All allocation done now.
@@ -3075,6 +3164,7 @@ kphysm_split_memseg(
 		seg_low->pages_base = seg->pages_base;
 		seg_low->pages_end = seg_low->pages_base + size_low;
 		seg_low->next = seg_mid;
+		seg_low->msegflags = seg->msegflags;
 	}
 	if (size_high != 0) {
 		seg_high->pages = seg->epages - size_high;
@@ -3082,6 +3172,7 @@ kphysm_split_memseg(
 		seg_high->pages_base = seg->pages_end - size_high;
 		seg_high->pages_end = seg_high->pages_base + size_high;
 		seg_high->next = seg->next;
+		seg_high->msegflags = seg->msegflags;
 	}
 
 	seg_mid->pages = seg->pages + size_low;
@@ -3089,6 +3180,7 @@ kphysm_split_memseg(
 	seg_mid->epages = seg->epages - size_high;
 	seg_mid->pages_end = seg->pages_end - size_high;
 	seg_mid->next = (seg_high != NULL) ? seg_high : seg->next;
+	seg_mid->msegflags = seg->msegflags;
 
 	/*
 	 * Update hat_kpm specific info of all involved memsegs and
@@ -3146,4 +3238,65 @@ mem_config_init()
 {
 	memseg_cache = kmem_cache_create("memseg_cache", sizeof (struct memseg),
 	    0, NULL, NULL, NULL, NULL, static_arena, KMC_NOHASH);
+}
+
+struct memseg *
+memseg_alloc()
+{
+	struct memseg *seg;
+
+	seg = kmem_cache_alloc(memseg_cache, KM_SLEEP);
+	bzero(seg, sizeof (struct memseg));
+
+	return (seg);
+}
+
+/*
+ * Return whether the page_t memory for this memseg
+ * is included in the memseg itself.
+ */
+static int
+memseg_includes_meta(struct memseg *seg)
+{
+	return (seg->msegflags & MEMSEG_META_INCL);
+}
+
+pfn_t
+memseg_get_start(struct memseg *seg)
+{
+	pfn_t		pt_start;
+
+	if (memseg_includes_meta(seg)) {
+		pt_start = hat_getpfnum(kas.a_hat, (caddr_t)seg->pages);
+
+		/* Meta data is required to be at the beginning */
+		ASSERT(pt_start < seg->pages_base);
+	} else
+		pt_start = seg->pages_base;
+
+	return (pt_start);
+}
+
+/*
+ * Invalidate memseg pointers in cpu private vm data caches.
+ */
+static void
+memseg_cpu_vm_flush()
+{
+	cpu_t *cp;
+	vm_cpu_data_t *vc;
+
+	mutex_enter(&cpu_lock);
+	pause_cpus(NULL);
+
+	cp = cpu_list;
+	do {
+		vc = cp->cpu_vm_data;
+		vc->vc_pnum_memseg = NULL;
+		vc->vc_pnext_memseg = NULL;
+
+	} while ((cp = cp->cpu_next) != cpu_list);
+
+	start_cpus();
+	mutex_exit(&cpu_lock);
 }

@@ -75,7 +75,7 @@ static void get_hwcaps(md_t *, mde_cookie_t);
 static void get_weakest_mem_model(md_t *, mde_cookie_t);
 static void get_q_sizes(md_t *, mde_cookie_t);
 static void get_va_bits(md_t *, mde_cookie_t);
-static size_t get_ra_limit(md_t *);
+static size_t get_ra_limit(md_t *, mde_cookie_t);
 static int get_l2_cache_node_count(md_t *);
 static unsigned long names2bits(char *tokens, size_t tokenslen,
     char *bit_formatter, char *warning);
@@ -495,7 +495,7 @@ cpu_setup_common(char **cpu_module_isa_set)
 	/*
 	 * ra_limit is the highest real address in the machine.
 	 */
-	ra_limit = get_ra_limit(mdp);
+	ra_limit = get_ra_limit(mdp, cpulist[0]);
 
 	md_free_scan_dag(mdp, &cpulist);
 
@@ -808,18 +808,37 @@ names2bits(char *tokens, size_t tokenslen, char *bit_formatter, char *warning)
 	return (ul);
 }
 
-
 uint64_t
-get_ra_limit(md_t *mdp)
+get_ra_limit(md_t *mdp, mde_cookie_t cpu_node_cookie)
 {
+	extern int ppvm_enable;
+	extern int meta_alloc_enable;
 	mde_cookie_t *mem_list;
 	mde_cookie_t *mblock_list;
 	int i;
 	int memnodes;
 	int nmblock;
+	uint64_t r;
 	uint64_t base;
 	uint64_t size;
 	uint64_t ra_limit = 0, new_limit = 0;
+
+	if (md_get_prop_val(mdp, cpu_node_cookie, "mmu-#ra-bits", &r) == 0) {
+		if (r == 0 || r > RA_ADDRESS_SPACE_BITS)
+			cmn_err(CE_PANIC, "Incorrect number of ra bits in MD");
+		else {
+			/*
+			 * Enable memory DR and metadata (page_t)
+			 * allocation from existing memory.
+			 */
+			ppvm_enable = 1;
+			meta_alloc_enable = 1;
+			return (1ULL << r);
+		}
+	}
+
+	cmn_err(CE_WARN, "mmu-#ra-bits property not found in MD");
+	cmn_err(CE_WARN, "Memory DR disabled");
 
 	memnodes = md_alloc_scan_dag(mdp,
 	    md_root_node(mdp), "memory", "fwd", &mem_list);

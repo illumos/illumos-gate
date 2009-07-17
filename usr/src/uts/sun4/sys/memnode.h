@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MEMNODE_H
 #define	_SYS_MEMNODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -104,14 +102,19 @@ struct	mem_node_conf {
 
 struct memlist;
 
+/*
+ * Common layer calls the mem_node_*_range interfaces
+ * which in turn call the platmod hooks if they exist.
+ * The platmod layer then calls the mem_node_*slice interfaces.
+ */
 extern void startup_build_mem_nodes(prom_memlist_t *, size_t);
 extern void mem_node_add_slice(pfn_t, pfn_t);
-extern void mem_node_pre_del_slice(pfn_t, pfn_t);
-extern void mem_node_post_del_slice(pfn_t, pfn_t, int);
+extern void mem_node_del_slice(pfn_t, pfn_t);
 extern int mem_node_alloc(void);
 extern pgcnt_t mem_node_memlist_pages(int, struct memlist *);
-extern void mem_node_add_slice(pfn_t start, pfn_t end);
 extern void mem_node_max_range(pfn_t *, pfn_t *);
+extern void mem_node_add_range(pfn_t, pfn_t);
+extern void mem_node_del_range(pfn_t, pfn_t);
 
 extern struct mem_node_conf	mem_node_config[];
 extern uint64_t			mem_node_physalign;

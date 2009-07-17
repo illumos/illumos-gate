@@ -82,6 +82,11 @@ vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2)
 
 /*ARGSUSED*/
 void
+vtag_unmap_perm_tl1(uint64_t addr, uint64_t ctx)
+{}
+
+/*ARGSUSED*/
+void
 vac_flushpage(pfn_t pf, int color)
 {}
 

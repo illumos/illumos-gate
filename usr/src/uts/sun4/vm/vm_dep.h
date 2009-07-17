@@ -60,7 +60,6 @@ extern "C" {
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
 #define	MNODETYPE_2_PFN(mnode, mtype, pfnlo, pfnhi)			\
-	ASSERT(mtype != MTYPE_NORELOC);					\
 	pfnlo = mem_node_config[mnode].physbase;			\
 	pfnhi = mem_node_config[mnode].physmax;
 
@@ -115,12 +114,18 @@ extern kmutex_t	*cpc_mutex[NPC_MUTEX];
  * translations requiring initializer call if color or ceq_mask changes,
  * even if pfn doesn't. MEM_NODE_ITERATOR_INIT() must also be called before
  * PFN_2_COLOR() that uses a valid iterator argument.
+ *
+ * plat_mem_node_iterator_init() starts from last mblock in continuation
+ * case which may be invalid because memory DR.  To detect this situation
+ * mi_genid is checked against mpo_genid which is incremented after a
+ * memory DR operation.  See also plat_slice_add()/plat_slice_del().
  */
 #ifdef	sun4v
 
 typedef struct mem_node_iterator {
 	uint_t mi_mnode;		/* mnode in which to iterate */
 	int mi_init;			/* set to 1 when first init */
+	int mi_genid;			/* set/checked against mpo_genid */
 	int mi_last_mblock;		/* last mblock visited */
 	uint_t mi_hash_ceq_mask;	/* cached copy of ceq_mask */
 	uint_t mi_hash_color;		/* cached copy of color */
@@ -456,6 +461,36 @@ typedef	struct {
 			_pfn += _np;					       \
 			atomic_add_long(&plcnt[_mn][MTYPE_RELOC].plc_mt_pgmax, \
 			    (_cnt < 0) ? -_np : _np);			       \
+		}							       \
+	}								       \
+}
+
+/*
+ * macro to call page_ctrs_adjust() when memory is added
+ * during a DR operation.
+ */
+#define	PAGE_CTRS_ADJUST(pfn, cnt, rv) {				       \
+	spgcnt_t _cnt = (spgcnt_t)(cnt);				       \
+	int _mn;							       \
+	pgcnt_t _np;							       \
+	if (&plat_mem_node_intersect_range != NULL) {			       \
+		for (_mn = 0; _mn < max_mem_nodes; _mn++) {		       \
+			plat_mem_node_intersect_range((pfn), _cnt, _mn, &_np); \
+			if (_np == 0)					       \
+				continue;				       \
+			if ((rv = page_ctrs_adjust(_mn)) != 0)		       \
+				break;					       \
+		}							       \
+	} else {							       \
+		pfn_t _pfn = (pfn);					       \
+		pfn_t _endpfn = _pfn + _cnt;				       \
+		while (_pfn < _endpfn) {				       \
+			_mn = PFN_2_MEM_NODE(_pfn);			       \
+			_np = MIN(_endpfn, mem_node_config[_mn].physmax + 1) - \
+			    _pfn;					       \
+			_pfn += _np;					       \
+			if ((rv = page_ctrs_adjust(_mn)) != 0)		       \
+				break;					       \
 		}							       \
 	}								       \
 }

@@ -954,6 +954,7 @@ page_ctrs_adjust(int mnode)
 	int cands_cache_nranges;
 	int old_maxmrange, new_maxmrange;
 	int rc = 0;
+	int oldmnode;
 
 	cands_cache = kmem_zalloc(sizeof (pcc_info_t *) * NPC_MUTEX *
 	    MMU_PAGE_SIZES, KM_NOSLEEP);
@@ -1048,6 +1049,21 @@ page_ctrs_adjust(int mnode)
 	 */
 	PAGE_CTRS_WRITE_LOCK(mnode);
 
+	/*
+	 * For interleaved mnodes, find the first mnode
+	 * with valid page counters since the current
+	 * mnode may have just been added and not have
+	 * valid page counters.
+	 */
+	if (interleaved_mnodes) {
+		for (i = 0; i < max_mem_nodes; i++)
+			if (PAGE_COUNTERS_COUNTERS(i, 1) != NULL)
+				break;
+		ASSERT(i < max_mem_nodes);
+		oldmnode = i;
+	} else
+		oldmnode = mnode;
+
 	old_nranges = mnode_nranges[mnode];
 	cands_cache_nranges = old_nranges;
 	mnode_nranges[mnode] = nranges;
@@ -1057,10 +1073,10 @@ page_ctrs_adjust(int mnode)
 
 	for (r = 1; r < mmu_page_sizes; r++) {
 		PAGE_COUNTERS_SHIFT(mnode, r) = PAGE_BSZS_SHIFT(r);
-		old_ctr = PAGE_COUNTERS_COUNTERS(mnode, r);
-		old_csz = PAGE_COUNTERS_ENTRIES(mnode, r);
-		oldbase = PAGE_COUNTERS_BASE(mnode, r);
-		old_npgs = old_csz << PAGE_COUNTERS_SHIFT(mnode, r);
+		old_ctr = PAGE_COUNTERS_COUNTERS(oldmnode, r);
+		old_csz = PAGE_COUNTERS_ENTRIES(oldmnode, r);
+		oldbase = PAGE_COUNTERS_BASE(oldmnode, r);
+		old_npgs = old_csz << PAGE_COUNTERS_SHIFT(oldmnode, r);
 		for (mrange = 0; mrange < MAX_MNODE_MRANGES; mrange++) {
 			old_color_array[mrange] =
 			    PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode,
@@ -1102,9 +1118,11 @@ page_ctrs_adjust(int mnode)
 			for (i = 0; i < max_mem_nodes; i++) {
 				if (i == mnode)
 					continue;
+				ASSERT(
+				    PAGE_COUNTERS_COUNTERS(i, r) == old_ctr ||
+				    PAGE_COUNTERS_COUNTERS(i, r) == NULL);
 				if (mem_node_config[i].exists == 0)
 					continue;
-				ASSERT(PAGE_COUNTERS_COUNTERS(i, r) == old_ctr);
 				PAGE_COUNTERS_COUNTERS(i, r) = new_ctr;
 				PAGE_COUNTERS_ENTRIES(i, r) = pcsz;
 				PAGE_COUNTERS_BASE(i, r) = newbase;
@@ -1126,13 +1144,14 @@ page_ctrs_adjust(int mnode)
 			int mhi = interleaved_mnodes ? max_mem_nodes :
 			    (mnode + 1);
 			int m;
-			pfn_t  pfnum = newbase;
+			pfn_t  pfnum;
 			size_t idx;
 			MEM_NODE_ITERATOR_DECL(it);
 
 			for (m = mlo; m < mhi; m++) {
 				if (mem_node_config[m].exists == 0)
 					continue;
+				pfnum = newbase;
 				MEM_NODE_ITERATOR_INIT(pfnum, m, r, &it);
 				if (pfnum == (pfn_t)-1) {
 					idx = 0;
@@ -1143,8 +1162,10 @@ page_ctrs_adjust(int mnode)
 					idx = (idx < pcsz) ? idx : 0;
 				}
 				for (mrange = 0; mrange < nranges; mrange++) {
-					PAGE_COUNTERS_CURRENT_COLOR(m,
-					    r, i, mrange) = idx;
+					if (PAGE_COUNTERS_CURRENT_COLOR_ARRAY(m,
+					    r, mrange) != NULL)
+						PAGE_COUNTERS_CURRENT_COLOR(m,
+						    r, i, mrange) = idx;
 				}
 			}
 		}
@@ -2251,13 +2272,8 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 
 	/* get pfn range for mtype */
 	len = PAGE_COUNTERS_ENTRIES(mnode, r);
-#if defined(__sparc)
-	lo = PAGE_COUNTERS_BASE(mnode, r);
-	hi = IDX_TO_PNUM(mnode, r, len);
-#else
 	MNODETYPE_2_PFN(mnode, mtype, lo, hi);
 	hi++;
-#endif
 
 	/* use lower limit if given */
 	if (pfnhi != PFNNULL && pfnhi < hi)

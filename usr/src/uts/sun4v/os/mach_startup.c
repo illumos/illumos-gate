@@ -506,6 +506,9 @@ load_mach_drivers(void)
 	if (modload("misc", "dr_io") == -1)
 		cmn_err(CE_NOTE, "!'dr_io' module failed to load");
 
+	if (modload("misc", "dr_mem") == -1)
+		cmn_err(CE_NOTE, "!'dr_mem' module failed to load");
+
 	/*
 	 * Attempt to attach any virtual device servers. These
 	 * drivers must be loaded at start of day so that they

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MD Event Generator (MDEG) Module
@@ -885,18 +883,22 @@ trunc:
 static void
 mdeg_dump_clnt(mdeg_clnt_t *clnt)
 {
-	char	str[MAX_FIELD_STR];
+	char	str[MAX_FIELD_STR] = "";
 
 	if (!clnt->valid) {
 		MDEG_DBG("  valid=B_FALSE\n");
 		return;
 	}
 
-	mdeg_spec_str(clnt->pspec, str, MAX_FIELD_STR);
-	MDEG_DBG("  pspecp=%s\n", str);
+	if (clnt->pspec) {
+		mdeg_spec_str(clnt->pspec, str, MAX_FIELD_STR);
+		MDEG_DBG("  pspecp=%s\n", str);
+	}
 
-	mdeg_match_str(clnt->nmatch, str, MAX_FIELD_STR);
-	MDEG_DBG("  nmatch=%s\n", str);
+	if (clnt->nmatch) {
+		mdeg_match_str(clnt->nmatch, str, MAX_FIELD_STR);
+		MDEG_DBG("  nmatch=%s\n", str);
+	}
 }
 
 static void

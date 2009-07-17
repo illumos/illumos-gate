@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
@@ -657,8 +655,7 @@ plat_lgrp_config(lgrp_config_flag_t evt, uintptr_t arg)
 			if (mem_node_config[mnode].exists) {
 				start = mem_node_config[mnode].physbase;
 				end = mem_node_config[mnode].physmax;
-				mem_node_pre_del_slice(start, end);
-				mem_node_post_del_slice(start, end, 0);
+				mem_node_del_slice(start, end);
 			}
 		}
 
@@ -703,8 +700,7 @@ plat_lgrp_config(lgrp_config_flag_t evt, uintptr_t arg)
 		if (tnode != -1 && mem_node_config[tnode].exists) {
 			start = mem_node_config[tnode].physbase;
 			end = mem_node_config[tnode].physmax;
-			mem_node_pre_del_slice(start, end);
-			mem_node_post_del_slice(start, end, 0);
+			mem_node_del_slice(start, end);
 		}
 
 		plat_assign_lgrphand_to_mem_node(thand, snode);

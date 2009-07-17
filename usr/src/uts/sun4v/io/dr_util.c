@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v DR Utility functions
@@ -40,6 +38,8 @@
 #include <sys/ldoms.h>
 
 #include <sys/dr_util.h>
+
+extern int ppvm_enable;
 
 boolean_t
 dr_is_disabled(dr_type_t type)
@@ -61,6 +61,11 @@ dr_is_disabled(dr_type_t type)
 	if (!domaining_enabled()) {
 		cmn_err(CE_NOTE, "!Kernel CIF handler is not enabled, DR "
 		    "is not available\n");
+		return (B_TRUE);
+	}
+
+	if (type == DR_TYPE_MEM && ppvm_enable == 0) {
+		cmn_err(CE_NOTE, "!Memory DR is disabled\n");
 		return (B_TRUE);
 	}
 

@@ -481,7 +481,6 @@ main(void)
 	 * and swap have been set up.
 	 */
 	consconfig();
-	release_bootstrap();
 
 	/*
 	 * attach drivers with ddi-forceattach prop
@@ -538,6 +537,12 @@ main(void)
 	 * Perform MP initialization, if any.
 	 */
 	start_other_cpus(0);
+
+	/*
+	 * Release bootstrap here since PROM interfaces are
+	 * used to start other CPUs above.
+	 */
+	release_bootstrap();
 
 	/*
 	 * Finish lgrp initialization after all CPUS are brought online.

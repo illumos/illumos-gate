@@ -216,7 +216,32 @@ hat_kpm_mseghash_update(pgcnt_t inx, struct memseg *msp)
 void
 hat_kpm_addmem_mseg_update(struct memseg *msp, pgcnt_t nkpmpgs,
 	offset_t kpm_pages_off)
-{}
+{
+	pfn_t base, end;
+
+	/*
+	 * kphysm_add_memory_dynamic() does not set nkpmpgs
+	 * when page_t memory is externally allocated.  That
+	 * code must properly calculate nkpmpgs in all cases
+	 * if nkpmpgs needs to be used at some point.
+	 */
+
+	base = msp->pages_base;
+	end = msp->pages_end;
+
+	hat_devload(kas.a_hat, kpm_vbase + mmu_ptob(base),
+	    mmu_ptob(end - base), base, PROT_READ | PROT_WRITE,
+	    HAT_LOAD | HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
+}
+
+/*
+ * Return end of metadata for an already setup memseg.
+ */
+caddr_t
+hat_kpm_mseg_reuse(struct memseg *msp)
+{
+	return ((caddr_t)msp->epages);
+}
 
 /*ARGSUSED*/
 void
@@ -229,16 +254,17 @@ hat_kpm_addmem_memsegs_update(struct memseg *msp)
 {}
 
 /*ARGSUSED*/
-caddr_t
-hat_kpm_mseg_reuse(struct memseg *msp)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
 void
 hat_kpm_delmem_mseg_update(struct memseg *msp, struct memseg **mspp)
-{}
+{
+	pfn_t base, end;
+
+	base = msp->pages_base;
+	end = msp->pages_end;
+
+	hat_unload(kas.a_hat, kpm_vbase +  mmu_ptob(base), mmu_ptob(end - base),
+	    HAT_UNLOAD | HAT_UNLOAD_UNLOCK | HAT_UNLOAD_UNMAP);
+}
 
 /*ARGSUSED*/
 void

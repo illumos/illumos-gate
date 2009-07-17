@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/platform_module.h>
@@ -82,9 +80,6 @@ mem_node_add_slice(pfn_t start, pfn_t end)
 		end = roundup(end, btop(mem_node_physalign)) - 1;
 	}
 
-	if (&plat_slice_add != NULL)
-		plat_slice_add(start, end);
-
 	mnode = PFN_2_MEM_NODE(start);
 	ASSERT(mnode < max_mem_nodes);
 
@@ -111,16 +106,6 @@ mem_node_add_slice(pfn_t start, pfn_t end)
 	lgrp_config(LGRP_CONFIG_MEM_ADD, mnode, MEM_NODE_2_LGRPHAND(mnode));
 }
 
-/* ARGSUSED */
-void
-mem_node_pre_del_slice(pfn_t start, pfn_t end)
-{
-	int mnode = PFN_2_MEM_NODE(start);
-
-	ASSERT(mnode < max_mem_nodes);
-	ASSERT(mem_node_config[mnode].exists == 1);
-}
-
 /*
  * Remove a PFN range from a memnode.  On some platforms,
  * the memnode will be created with physbase at the first
@@ -129,7 +114,7 @@ mem_node_pre_del_slice(pfn_t start, pfn_t end)
  * to assume physbase and up.
  */
 void
-mem_node_post_del_slice(pfn_t start, pfn_t end, int cancelled)
+mem_node_del_slice(pfn_t start, pfn_t end)
 {
 	int mnode;
 	pgcnt_t delta_pgcnt, node_size;
@@ -144,44 +129,57 @@ mem_node_post_del_slice(pfn_t start, pfn_t end, int cancelled)
 	ASSERT(mnode < max_mem_nodes);
 	ASSERT(mem_node_config[mnode].exists == 1);
 
-	if (!cancelled) {
-		delta_pgcnt = end - start;
-		node_size = mem_node_config[mnode].physmax -
-		    mem_node_config[mnode].physbase;
+	delta_pgcnt = end - start;
+	node_size = mem_node_config[mnode].physmax -
+	    mem_node_config[mnode].physbase;
 
-		if (node_size > delta_pgcnt) {
-			/*
-			 * Subtract the slice from the memnode.
-			 */
-			if (start <= mem_node_config[mnode].physbase)
-				mem_node_config[mnode].physbase = end + 1;
-			ASSERT(end <= mem_node_config[mnode].physmax);
-			if (end == mem_node_config[mnode].physmax)
-				mem_node_config[mnode].physmax = start - 1;
-		} else {
+	if (node_size > delta_pgcnt) {
+		/*
+		 * Subtract the slice from the memnode.
+		 */
+		if (start <= mem_node_config[mnode].physbase)
+			mem_node_config[mnode].physbase = end + 1;
+		ASSERT(end <= mem_node_config[mnode].physmax);
+		if (end == mem_node_config[mnode].physmax)
+			mem_node_config[mnode].physmax = start - 1;
+	} else {
 
-			/*
-			 * Let the common lgrp framework know the mnode is
-			 * leaving
-			 */
-			lgrp_config(LGRP_CONFIG_MEM_DEL, mnode,
-			    MEM_NODE_2_LGRPHAND(mnode));
+		/*
+		 * Let the common lgrp framework know the mnode is
+		 * leaving
+		 */
+		lgrp_config(LGRP_CONFIG_MEM_DEL, mnode,
+		    MEM_NODE_2_LGRPHAND(mnode));
 
-			/*
-			 * Delete the whole node.
-			 */
-			ASSERT(MNODE_PGCNT(mnode) == 0);
-			do {
-				omask = memnodes_mask;
-				nmask = omask & ~(1ull << mnode);
-			} while (cas64(&memnodes_mask, omask, nmask) != omask);
-			atomic_add_16(&num_memnodes, -1);
-			mem_node_config[mnode].exists = 0;
-		}
-
-		if (&plat_slice_del != NULL)
-			plat_slice_del(start, end);
+		/*
+		 * Delete the whole node.
+		 */
+		ASSERT(MNODE_PGCNT(mnode) == 0);
+		do {
+			omask = memnodes_mask;
+			nmask = omask & ~(1ull << mnode);
+		} while (cas64(&memnodes_mask, omask, nmask) != omask);
+		atomic_add_16(&num_memnodes, -1);
+		mem_node_config[mnode].exists = 0;
 	}
+}
+
+void
+mem_node_add_range(pfn_t start, pfn_t end)
+{
+	if (&plat_slice_add != NULL)
+		plat_slice_add(start, end);
+	else
+		mem_node_add_slice(start, end);
+}
+
+void
+mem_node_del_range(pfn_t start, pfn_t end)
+{
+	if (&plat_slice_del != NULL)
+		plat_slice_del(start, end);
+	else
+		mem_node_del_slice(start, end);
 }
 
 void
@@ -203,7 +201,7 @@ startup_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 		for (elem = 0; elem < nelems; list++, elem++) {
 			basepfn = btop(list->addr);
 			npgs = btop(list->size);
-			mem_node_add_slice(basepfn, basepfn + npgs - 1);
+			mem_node_add_range(basepfn, basepfn + npgs - 1);
 		}
 	}
 }

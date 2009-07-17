@@ -202,6 +202,16 @@ caddr_t segzio_base;		/* Base address of segzio */
 pgcnt_t segziosize = 0;		/* size of zio segment in pages */
 
 /*
+ * A static DR page_t VA map is reserved that can map the page structures
+ * for a domain's entire RA space. The pages that backs this space are
+ * dynamically allocated and need not be physically contiguous.  The DR
+ * map size is derived from KPM size.
+ */
+int ppvm_enable = 0;		/* Static virtual map for page structs */
+page_t *ppvm_base;		/* Base of page struct map */
+pgcnt_t ppvm_size = 0;		/* Size of page struct map */
+
+/*
  * debugger pages (if allocated)
  */
 struct vnode kdebugvp;
@@ -1987,6 +1997,8 @@ startup_vm(void)
 		mach_kpm_init();
 	}
 
+	va = kpm_vbase + (kpm_size * vac_colors);
+
 	if (!segzio_fromheap) {
 		size_t size;
 		size_t physmem_b = mmu_ptob(physmem);
@@ -2019,7 +2031,8 @@ startup_vm(void)
 		}
 		segziosize = mmu_btop(roundup(size, MMU_PAGESIZE));
 		/* put the base of the ZIO segment after the kpm segment */
-		segzio_base = kpm_vbase + (kpm_size * vac_colors);
+		segzio_base = va;
+		va += mmu_ptob(segziosize);
 		PRM_DEBUG(segziosize);
 		PRM_DEBUG(segzio_base);
 
@@ -2042,6 +2055,41 @@ startup_vm(void)
 		rw_exit(&kas.a_lock);
 	}
 
+	if (ppvm_enable) {
+		caddr_t ppvm_max;
+
+		/*
+		 * ppvm refers to the static VA space used to map
+		 * the page_t's for dynamically added memory.
+		 *
+		 * ppvm_base should not cross a potential VA hole.
+		 *
+		 * ppvm_size should be large enough to map the
+		 * page_t's needed to manage all of KPM range.
+		 */
+		ppvm_size =
+		    roundup(mmu_btop(kpm_size * vac_colors) * sizeof (page_t),
+		    MMU_PAGESIZE);
+		ppvm_max = (caddr_t)(0ull - ppvm_size);
+		ppvm_base = (page_t *)va;
+
+		if ((caddr_t)ppvm_base <= hole_end) {
+			cmn_err(CE_WARN,
+			    "Memory DR disabled: invalid DR map base: 0x%p\n",
+			    (void *)ppvm_base);
+			ppvm_enable = 0;
+		} else if ((caddr_t)ppvm_base > ppvm_max) {
+			uint64_t diff = (caddr_t)ppvm_base - ppvm_max;
+
+			cmn_err(CE_WARN,
+			    "Memory DR disabled: insufficient DR map size:"
+			    " 0x%lx (needed 0x%lx)\n",
+			    ppvm_size - diff, ppvm_size);
+			ppvm_enable = 0;
+		}
+		PRM_DEBUG(ppvm_size);
+		PRM_DEBUG(ppvm_base);
+	}
 
 	/*
 	 * Now create generic mapping segment.  This mapping
@@ -2541,10 +2589,15 @@ kphysm_erase(uint64_t addr, uint64_t len)
 			/*
 			 * init it, lock it, and hashin on prom_pages vp.
 			 *
+			 * Mark it as NONRELOC to let DR know the page
+			 * is locked long term, otherwise DR hangs when
+			 * trying to remove those pages.
+			 *
 			 * XXX	vnode offsets on the prom_ppages vnode
 			 *	are page numbers (gack) for >32 bit
 			 *	physical memory machines.
 			 */
+			PP_SETNORELOC(pp);
 			add_physmem_cb(pp, base);
 			if (page_trylock(pp, SE_EXCL) == 0)
 				cmn_err(CE_PANIC, "prom page locked");
@@ -2614,7 +2667,7 @@ kphysm_memseg(uint64_t addr, uint64_t len)
 			ASSERT(memseg_find(
 			    roundup(base + num, kpmpnpgs) - 1, NULL) == NULL);
 		}
-		kpm_ppleft -= num;
+		kpm_ppleft -= kpnum;
 	}
 
 	memseg_list_add(seg);
@@ -2645,6 +2698,8 @@ kphysm_add(uint64_t addr, uint64_t len, int reclaim)
 		 */
 		while (rpp < lpp) {
 			ASSERT(PAGE_EXCL(rpp) && rpp->p_vnode == &prom_ppages);
+			ASSERT(PP_ISNORELOC(rpp));
+			PP_CLRNORELOC(rpp);
 			page_pp_unlock(rpp, 0, 1);
 			page_hashout(rpp, NULL);
 			page_unlock(rpp);

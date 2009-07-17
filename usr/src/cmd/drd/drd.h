@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DRD_H
 #define	_DRD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,6 +63,10 @@ typedef struct {
 	int (*io_config_notify)(drctl_rsrc_t *rsrc, int nrsrc);
 	int (*io_unconfig_request)(drctl_rsrc_t *rsrc, int nrsrc);
 	int (*io_unconfig_notify)(drctl_rsrc_t *rsrc, int nrsrc);
+	int (*mem_config_request)(drctl_rsrc_t *rsrcs, int nrsrc);
+	int (*mem_config_notify)(drctl_rsrc_t *rsrcs, int nrsrc);
+	int (*mem_unconfig_request)(drctl_rsrc_t *rsrcs, int nrsrc);
+	int (*mem_unconfig_notify)(drctl_rsrc_t *rsrcs, int nrsrc);
 } drd_backend_t;
 
 extern drd_backend_t drd_rcm_backend;

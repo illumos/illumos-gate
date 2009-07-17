@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 #	This Makefile defines all file modules for the directory uts/sun4v
-#	and it's children. These are the source files which are sun4u
+#	and it's children. These are the source files which are sun4v
 #	"implementation architecture" dependent.
 #
 
@@ -60,6 +60,7 @@ CORE_OBJS +=	mach_xc.o
 CORE_OBJS +=	mem_cage.o
 CORE_OBJS +=	mem_config.o
 CORE_OBJS +=	memlist_new.o
+CORE_OBJS +=	memseg.o
 CORE_OBJS +=	mpo.o
 CORE_OBJS +=	ppage.o
 CORE_OBJS +=	promif_asr.o
@@ -161,6 +162,7 @@ VLDS_OBJS	= vlds.o
 BOOTDEV_OBJS	+= bootdev.o
 DR_CPU_OBJS	+= dr_cpu.o
 DR_IO_OBJS	+= dr_io.o
+DR_MEM_OBJS	+= dr_mem.o
 DRCTL_OBJS	= drctl.o drctl_impl.o dr_util.o
 DS_OBJS		= ds_common.o ds_drv.o
 FAULT_ISO_OBJS	= fault_iso.o

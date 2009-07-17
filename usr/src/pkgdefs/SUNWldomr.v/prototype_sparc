@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -75,6 +75,7 @@ d none platform/sun4v/kernel/misc 755 root sys
 d none platform/sun4v/kernel/misc/sparcv9 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/dr_cpu 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/dr_io 755 root sys
+f none platform/sun4v/kernel/misc/sparcv9/dr_mem 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/ds 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/fault_iso 755 root sys
 f none platform/sun4v/kernel/misc/sparcv9/ldc 755 root sys

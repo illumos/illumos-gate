@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MEMNODE_H
 #define	_SYS_MEMNODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -81,10 +79,11 @@ struct memlist;
 
 extern void startup_build_mem_nodes(struct memlist *);
 extern void mem_node_add_slice(pfn_t, pfn_t);
-extern void mem_node_pre_del_slice(pfn_t, pfn_t);
-extern void mem_node_post_del_slice(pfn_t, pfn_t, int);
+extern void mem_node_del_slice(pfn_t, pfn_t);
 extern int mem_node_alloc(void);
 extern pgcnt_t mem_node_memlist_pages(int, struct memlist *);
+extern void mem_node_add_range(pfn_t, pfn_t);
+extern void mem_node_del_range(pfn_t, pfn_t);
 
 extern int plat_mnode_xcheck(pfn_t);
 

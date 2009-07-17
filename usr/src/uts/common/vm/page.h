@@ -1107,6 +1107,8 @@ struct memseg {
 
 /* msegflags */
 #define	MEMSEG_DYNAMIC		0x1	/* DR: memory was added dynamically */
+#define	MEMSEG_META_INCL	0x2	/* DR: memseg includes it's metadata */
+#define	MEMSEG_META_ALLOC	0x4	/* DR: memseg allocated it's metadata */
 
 /* memseg support macros */
 #define	MSEG_NPAGES(SEG)	((SEG)->pages_end - (SEG)->pages_base)

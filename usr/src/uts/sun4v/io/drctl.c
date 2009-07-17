@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -354,6 +354,9 @@ verify_response(int cmd,
 		if (count != 1)
 			return (EIO);
 		break;
+	case DRCTL_MEM_CONFIG_REQUEST:
+	case DRCTL_MEM_UNCONFIG_REQUEST:
+		break;
 	default:
 		return (EIO);
 	}
@@ -391,12 +394,13 @@ drctl_config_common(int cmd, int flags, drctl_rsrc_t *res,
 	case DRCTL_IO_UNCONFIG_NOTIFY:
 	case DRCTL_IO_CONFIG_REQUEST:
 	case DRCTL_IO_CONFIG_NOTIFY:
-		rv = 0;
-		break;
 	case DRCTL_MEM_CONFIG_REQUEST:
 	case DRCTL_MEM_CONFIG_NOTIFY:
 	case DRCTL_MEM_UNCONFIG_REQUEST:
 	case DRCTL_MEM_UNCONFIG_NOTIFY:
+		rv = 0;
+		break;
+	default:
 		rv = ENOTSUP;
 		break;
 	}
@@ -555,9 +559,13 @@ drctl_config_fini(drctl_cookie_t ck, drctl_rsrc_t *res, int count)
 		break;
 
 	case DRCTL_MEM_CONFIG_REQUEST:
-	case DRCTL_MEM_CONFIG_NOTIFY:
+		notify_cmd = DRCTL_MEM_CONFIG_NOTIFY;
+		break;
+
 	case DRCTL_MEM_UNCONFIG_REQUEST:
-	case DRCTL_MEM_UNCONFIG_NOTIFY:
+		notify_cmd = DRCTL_MEM_UNCONFIG_NOTIFY;
+		break;
+
 	default:
 		/* none of the above should have been accepted in _init */
 		ASSERT(0);
@@ -655,6 +663,12 @@ pack_message(int cmd,
 	case DRCTL_CPU_CONFIG_NOTIFY:
 	case DRCTL_CPU_UNCONFIG_REQUEST:
 	case DRCTL_CPU_UNCONFIG_NOTIFY:
+		*data_size = count * sizeof (drctl_rsrc_t);
+		break;
+	case DRCTL_MEM_CONFIG_REQUEST:
+	case DRCTL_MEM_CONFIG_NOTIFY:
+	case DRCTL_MEM_UNCONFIG_REQUEST:
+	case DRCTL_MEM_UNCONFIG_NOTIFY:
 		*data_size = count * sizeof (drctl_rsrc_t);
 		break;
 	case DRCTL_IO_CONFIG_REQUEST:

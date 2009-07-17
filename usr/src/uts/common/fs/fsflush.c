@@ -125,7 +125,9 @@ fsflush_do_pages()
 	ulong_t		nlocked = 0;
 	ulong_t		nmodified = 0;
 	ulong_t		ncoalesce = 0;
+	ulong_t		cnt;
 	int		mod;
+	int		fspage = 1;
 	u_offset_t	offset;
 	uint_t		szc;
 
@@ -135,8 +137,7 @@ fsflush_do_pages()
 
 	static ulong_t	nscan = 0;
 	static pgcnt_t	last_total_pages = 0;
-	static void	*pp_cookie = NULL;
-	static page_t	*pp;
+	static page_t	*pp = NULL;
 
 	/*
 	 * Check to see if total_pages has changed.
@@ -146,11 +147,8 @@ fsflush_do_pages()
 		nscan = (last_total_pages * (tune.t_fsflushr))/v.v_autoup;
 	}
 
-	/*
-	 * On first time through initialize the cookie used for page_t scans
-	 */
-	if (pp_cookie == NULL)
-		pp = page_next_scan_init(&pp_cookie);
+	if (pp == NULL)
+		pp = memsegs->pages;
 
 	pcount = 0;
 	while (pcount < nscan) {
@@ -159,9 +157,19 @@ fsflush_do_pages()
 		 * move to the next page, skipping over large pages
 		 * and issuing prefetches.
 		 */
-		pp = page_next_scan_large(pp, &pcount, &pp_cookie);
+		if (pp->p_szc && fspage == 0) {
+			pfn_t pfn;
+
+			pfn  = page_pptonum(pp);
+			cnt = page_get_pagecnt(pp->p_szc);
+			cnt -= pfn & (cnt - 1);
+		} else
+			cnt = 1;
+
+		pp = page_nextn(pp, cnt);
 		prefetch_page_r((void *)pp);
 		ASSERT(pp != NULL);
+		pcount += cnt;
 
 		/*
 		 * Do a bunch of dirty tests (ie. no locking) to determine
@@ -170,6 +178,7 @@ fsflush_do_pages()
 		 */
 		++nexamined;
 		if (PP_ISSWAP(pp)) {
+			fspage = 0;
 			coal_page = NULL;
 			continue;
 		}
@@ -183,6 +192,7 @@ fsflush_do_pages()
 			 * skip pages with a file system identity or that
 			 * are already maximum size
 			 */
+			fspage = 0;
 			szc = pp->p_szc;
 			if (pp->p_vnode != NULL || szc == fsf_npgsz - 1) {
 				coal_page = NULL;
@@ -232,8 +242,10 @@ fsflush_do_pages()
 		if (PP_ISKAS(pp) ||
 		    PAGE_LOCKED(pp) ||
 		    pp->p_lckcnt != 0 ||
-		    pp->p_cowcnt != 0)
+		    pp->p_cowcnt != 0) {
+			fspage = 0;
 			continue;
+		}
 
 
 		/*
@@ -253,13 +265,17 @@ fsflush_do_pages()
 		    PP_ISFREE(pp) ||
 		    vp == NULL ||
 		    PP_ISKAS(pp) ||
-		    pp->p_lckcnt != 0 ||
-		    pp->p_cowcnt != 0 ||
 		    (vp->v_flag & VISSWAP) != 0) {
+			page_unlock(pp);
+			fspage = 0;
+			continue;
+		}
+		if (pp->p_lckcnt != 0 || pp->p_cowcnt != 0) {
 			page_unlock(pp);
 			continue;
 		}
 
+		fspage = 1;
 		ASSERT(vp->v_type != VCHR);
 
 		/*

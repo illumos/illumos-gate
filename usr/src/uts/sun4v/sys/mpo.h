@@ -1,4 +1,3 @@
-
 /*
  * CDDL HEADER START
  *
@@ -21,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MPO_H
 #define	_SYS_MPO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,14 +77,13 @@ struct lgrp_md {
 
 /* Structure to store mblock information retrieved from the MD */
 
-struct mblock_md {
+typedef struct mblock_md {
 	uint64_t	base;
 	uint64_t	size;
 	uint64_t	ra_to_pa;
-	mde_cookie_t	node;
 	pfn_t		base_pfn;
 	pfn_t		end_pfn;
-};
+} mblock_md_t;
 
 /* Structure for memnode information for use by plat_pfn_to_mem_node */
 
@@ -103,6 +99,17 @@ typedef struct {
 	pfn_t offset;   /* stripe starts at physbase - offset */
 	int exists;	/* set to 1 if mblock has memory in this mnode stripe */
 } mem_stripe_t;
+
+/* Configuration including allocation state of mblocks and stripes */
+
+typedef struct {
+	mblock_md_t	*mc_mblocks;	/* mblock array */
+	int 		mc_nmblocks;	/* number in array */
+	mem_stripe_t 	*mc_stripes;	/* stripe array */
+	int 		mc_nstripes;	/* number in array */
+	int 		mc_alloc_sz;	/* size in bytes of mc_mblocks if */
+					/* it was kmem_alloc'd, else 0 */
+} mpo_config_t;
 
 /* These are used when MPO requires preallocated kvseg32 space */
 extern	caddr_t	mpo_heap32_buf;

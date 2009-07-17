@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4v DR daemon
@@ -384,11 +382,19 @@ drd_door_server(void *cookie, char *argp, size_t arg_sz, door_desc_t *dp,
 		break;
 
 	case DRCTL_MEM_CONFIG_REQUEST:
+		(*drd_backend->mem_config_request)(rsrcs, nrsrc);
+		break;
+
 	case DRCTL_MEM_CONFIG_NOTIFY:
+		(*drd_backend->mem_config_notify)(rsrcs, nrsrc);
+		break;
+
 	case DRCTL_MEM_UNCONFIG_REQUEST:
+		(*drd_backend->mem_unconfig_request)(rsrcs, nrsrc);
+		break;
+
 	case DRCTL_MEM_UNCONFIG_NOTIFY:
-		drd_err("memory DR operations not supported yet");
-		DRD_DOOR_RETURN_ERR();
+		(*drd_backend->mem_unconfig_notify)(rsrcs, nrsrc);
 		break;
 
 	case DRCTL_IO_CONFIG_REQUEST:

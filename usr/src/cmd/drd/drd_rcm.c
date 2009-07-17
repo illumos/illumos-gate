@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * RCM backend for the DR Daemon
@@ -37,6 +35,7 @@
 #include <libnvpair.h>
 #include <librcm.h>
 #include <locale.h>
+#include <assert.h>
 
 #include "drd.h"
 
@@ -53,6 +52,10 @@ static int drd_rcm_io_config_request(drctl_rsrc_t *rsrc, int nrsrc);
 static int drd_rcm_io_config_notify(drctl_rsrc_t *rsrc, int nrsrc);
 static int drd_rcm_io_unconfig_request(drctl_rsrc_t *rsrc, int nrsrc);
 static int drd_rcm_io_unconfig_notify(drctl_rsrc_t *rsrc, int nrsrc);
+static int drd_rcm_mem_config_request(drctl_rsrc_t *rsrcs, int nrsrc);
+static int drd_rcm_mem_config_notify(drctl_rsrc_t *rsrcs, int nrsrc);
+static int drd_rcm_mem_unconfig_request(drctl_rsrc_t *rsrcs, int nrsrc);
+static int drd_rcm_mem_unconfig_notify(drctl_rsrc_t *rsrcs, int nrsrc);
 
 drd_backend_t drd_rcm_backend = {
 	drd_rcm_init,			/* init */
@@ -64,9 +67,17 @@ drd_backend_t drd_rcm_backend = {
 	drd_rcm_io_config_request,	/* io_config_request */
 	drd_rcm_io_config_notify,	/* io_config_notify */
 	drd_rcm_io_unconfig_request,	/* io_unconfig_request */
-	drd_rcm_io_unconfig_notify	/* io_unconfig_notify */
+	drd_rcm_io_unconfig_notify,	/* io_unconfig_notify */
+	drd_rcm_mem_config_request,	/* mem_config_request */
+	drd_rcm_mem_config_notify,	/* mem_config_notify */
+	drd_rcm_mem_unconfig_request,	/* mem_unconfig_request */
+	drd_rcm_mem_unconfig_notify	/* mem_unconfig_notify */
 };
 
+typedef int (*rcm_op_t)(rcm_handle_t *, char *, uint_t, nvlist_t *,
+	rcm_info_t **);
+
+#define	RCM_MEM_ALL		"SUNW_memory"
 #define	RCM_CPU_ALL		"SUNW_cpu"
 #define	RCM_CPU			RCM_CPU_ALL"/cpu"
 #define	RCM_CPU_MAX_LEN		(32)
@@ -423,7 +434,7 @@ drd_rcm_del_cpu_request(drctl_rsrc_t *rsrcs, int nrsrc)
 	if (rv != RCM_SUCCESS) {
 		drd_dbg("RCM call failed: %d", rv);
 		/*
-		 * Since the capcity change was blocked, we
+		 * Since the capacity change was blocked, we
 		 * mark all CPUs as blocked. It is up to the
 		 * user to reframe the query so that it can
 		 * succeed.
@@ -1197,4 +1208,226 @@ rcm_info_table(rcm_info_t *rinfo)
 	drd_dbg("rcm_info_table: %s\n", table);
 
 	return (table);
+}
+
+static void
+dump_mem_rsrc_list(char *prefix, drctl_rsrc_t *rsrcs, int nrsrc)
+{
+	int	idx;
+	char	*errstr;
+
+	/* just return if not debugging */
+	if (drd_debug == 0)
+		return;
+
+	if (prefix)
+		drd_dbg("%s", prefix);
+
+	for (idx = 0; idx < nrsrc; idx++) {
+
+		/* get a pointer to the error string */
+		errstr = (char *)(uintptr_t)rsrcs[idx].offset;
+
+		drd_dbg("  mem[%d]: addr=0x%llx, size=0x%llx"
+		    " status=%d, errstr='%s'", idx,
+		    rsrcs[idx].res_mem_addr, rsrcs[idx].res_mem_size,
+		    rsrcs[idx].status, (errstr != NULL) ? errstr : "");
+	}
+}
+
+static int
+drd_rcm_mem_op(rcm_op_t op, uint64_t change)
+{
+	int		rv = -1;
+	int		pgsize;
+	long		oldpages;
+	long		newpages;
+	nvlist_t	*nvl = NULL;
+	rcm_info_t	*rinfo;
+
+	/* allocate an nvlist for the RCM call */
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		goto done;
+
+	if ((pgsize = sysconf(_SC_PAGE_SIZE)) == -1 ||
+	    (newpages = sysconf(_SC_PHYS_PAGES)) == -1)
+		goto done;
+
+	/*
+	 * If this is a notify add, the capacity change
+	 * was positive and the current page count reflects
+	 * the new capacity level.
+	 *
+	 * If this is a request del, the capacity change
+	 * is negative and the current page count will
+	 * reflect the old capacity level.
+	 */
+	assert(change % pgsize == 0);
+	if (change > 0) {
+		oldpages = newpages - (long)(change / pgsize);
+	} else {
+		assert(newpages >= change / pgsize);
+		oldpages = newpages;
+		newpages = oldpages + (long)(change / pgsize);
+	}
+
+	drd_dbg("oldpages=%lld newpages=%lld delta=%lld",
+	    oldpages, newpages, newpages - oldpages);
+
+	/* setup the nvlist for the RCM call */
+	if (nvlist_add_string(nvl, "state", "capacity") != 0 ||
+	    nvlist_add_int32(nvl, "page_size", pgsize) != 0 ||
+	    nvlist_add_int32(nvl, "old_pages", oldpages) != 0 ||
+	    nvlist_add_int32(nvl, "new_pages", newpages) != 0) {
+		goto done;
+	}
+
+	rv = (*op)(rcm_hdl, RCM_MEM_ALL, 0, nvl, &rinfo);
+	rv = (rv == RCM_SUCCESS) ? 0 : -1;
+
+done:
+	s_nvfree(nvl);
+
+	return (rv);
+}
+
+/*
+ * RCM clients can interpose only on removal of resources.
+ */
+static int
+drd_rcm_mem_config_request(drctl_rsrc_t *rsrcs, int nrsrc)
+{
+	int	idx;
+
+	drd_dbg("drd_rcm_mem_config_request...");
+
+	if ((rsrcs == NULL) || (nrsrc == 0))
+		return (0);
+	dump_mem_rsrc_list(NULL, rsrcs, nrsrc);
+
+	/*
+	 * There is no RCM operation to request the addition
+	 * of resources. So, by definition, the operation for
+	 * all the memory is allowed.
+	 */
+	for (idx = 0; idx < nrsrc; idx++)
+		rsrcs[idx].status = DRCTL_STATUS_ALLOW;
+
+	dump_mem_rsrc_list("returning:", rsrcs, nrsrc);
+
+	return (0);
+}
+
+static int
+drd_rcm_mem_config_notify(drctl_rsrc_t *rsrcs, int nrsrc)
+{
+	int		idx;
+	int		rv = -1;
+	uint64_t	change = 0;
+
+	drd_dbg("drd_rcm_mem_config_notify...");
+
+	if ((rsrcs == NULL) || (nrsrc == 0)) {
+		drd_err("mem_config_notify: mem list empty");
+		goto done;
+	}
+	dump_mem_rsrc_list(NULL, rsrcs, nrsrc);
+
+	for (idx = 0; idx < nrsrc; idx++) {
+		if (rsrcs[idx].status == DRCTL_STATUS_CONFIG_SUCCESS)
+			change += rsrcs[idx].res_mem_size;
+		drd_dbg("  idx=%d addr=0x%llx size=0x%llx",
+		    idx, rsrcs[idx].res_mem_addr, rsrcs[idx].res_mem_size);
+	}
+
+	rv = drd_rcm_mem_op(rcm_notify_capacity_change, change);
+done:
+	return (rv);
+}
+
+static int
+drd_rcm_mem_unconfig_request(drctl_rsrc_t *rsrcs, int nrsrc)
+{
+	int		rv = -1;
+	int		idx;
+	uint64_t	change = 0;
+
+	drd_dbg("drd_rcm_del_mem_request...");
+
+	if ((rsrcs == NULL) || (nrsrc == 0)) {
+		drd_err("mem_unconfig_request: mem list empty");
+		goto done;
+	}
+	dump_mem_rsrc_list(NULL, rsrcs, nrsrc);
+
+	for (idx = 0; idx < nrsrc; idx++) {
+		drd_dbg("  idx=%d addr=0x%llx size=0x%llx",
+		    idx, rsrcs[idx].res_mem_addr, rsrcs[idx].res_mem_size);
+		change += rsrcs[idx].res_mem_size;
+	}
+
+	rv = drd_rcm_mem_op(rcm_request_capacity_change, -change);
+
+	if (rv != RCM_SUCCESS) {
+		drd_dbg("RCM call failed: %d", rv);
+		/*
+		 * Since the capacity change was blocked, we
+		 * mark all mblocks as blocked. It is up to the
+		 * user to reframe the query so that it can
+		 * succeed.
+		 */
+		for (idx = 0; idx < nrsrc; idx++) {
+			rsrcs[idx].status = DRCTL_STATUS_DENY;
+		}
+
+		/* tack on message to first resource */
+		rsrcs[0].offset = (uintptr_t)strdup("unable to remove "
+		    "specified amount of memory");
+		drd_dbg("  unable to remove specified amount of memory");
+	} else {
+		for (idx = 0; idx < nrsrc; idx++)
+			rsrcs[idx].status = DRCTL_STATUS_ALLOW;
+		rv = 0;
+	}
+
+done:
+
+	dump_mem_rsrc_list("returning:", rsrcs, nrsrc);
+	return (rv);
+}
+
+static int
+drd_rcm_mem_unconfig_notify(drctl_rsrc_t *rsrcs, int nrsrc)
+{
+	int		idx;
+	int		rv = -1;
+	uint64_t	change = 0;
+
+	drd_dbg("drd_rcm_mem_unconfig_notify...");
+
+	if ((rsrcs == NULL) || (nrsrc == 0)) {
+		drd_err("unconfig_mem_notify: mem list empty");
+		goto done;
+	}
+	dump_mem_rsrc_list(NULL, rsrcs, nrsrc);
+
+	/*
+	 * Filter out the memory that was configured.
+	 *
+	 * We need to notify RCM about a memory capacity change
+	 * only if the memory unconfigure request wasn't successful
+	 * because if both the RCM capacity delete request and the
+	 * memory unconfigure succeed, this notify would give a
+	 * memory capacity identical to the delete request.
+	 */
+	for (idx = 0; idx < nrsrc; idx++) {
+		if (rsrcs[idx].status != DRCTL_STATUS_CONFIG_SUCCESS)
+			change += rsrcs[idx].res_mem_size;
+		drd_dbg("  idx=%d addr=0x%llx size=0x%llx",
+		    idx, rsrcs[idx].res_mem_addr, rsrcs[idx].res_mem_size);
+	}
+
+	rv = drd_rcm_mem_op(rcm_notify_capacity_change, change);
+done:
+	return (rv);
 }
