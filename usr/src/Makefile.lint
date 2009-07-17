@@ -231,6 +231,7 @@ COMMON_SUBDIRS = \
 	cmd/pools \
 	cmd/power \
 	cmd/powertop \
+	cmd/latencytop \
 	cmd/ppgsz \
 	cmd/praudit \
 	cmd/prctl \

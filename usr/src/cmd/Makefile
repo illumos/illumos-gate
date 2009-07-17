@@ -227,6 +227,7 @@ COMMON_SUBDIRS=		\
 	kstat		\
 	last		\
 	lastcomm	\
+	latencytop	\
 	ldap		\
 	ldapcachemgr	\
 	lgrpinfo	\

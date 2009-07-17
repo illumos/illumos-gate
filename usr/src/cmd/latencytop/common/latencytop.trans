@@ -1,0 +1,425 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2008-2009, Intel Corporation.
+# All Rights Reserved.
+#
+# LatencyTOP 0.1 configuration
+#
+
+# Format:
+# <priority>    <module>`<function>     <Category>
+# Special command:
+# ; <command>  <option value>
+# <command>:
+# disable_category <category name> : do not count and display <category name>
+
+# Stream ops
+40      genunix`strdoioctl              Stream ioctl
+40      genunix`strclose                Stream close
+40      genunix`strread                 Stream read
+40      genunix`strwrite                Stream write
+
+# Door ops
+50      doorfs`door_call                Door call
+50      doorfs`door_return              Door release
+
+# sockfs
+50      sockfs`socktpi_close            Close socket
+50      sockfs`sotpi_connect            Create socket connection
+50      sockfs`socktpi_write            Write to socket
+50      sockfs`socktpi_read             Read from socket
+
+# SCSI
+40      sd`sd_ssc_send                  Execute USCSI command
+40      sd`sdread                       SCSI read
+40      sd`sdwrite                      SCSI write
+30      sd`sd_check_media               SCSI wait for device ready
+
+# UFS
+50      ufs`ufs_sync                    UFS sync
+50      ufs`ufs_fsync                   UFS sync
+50      ufs`ufs_remove                  UFS remove file
+50      ufs`ufs_create                  UFS create file
+40      ufs`ufs_getpage                 UFS getpage
+40      ufs`ufs_putpage                 UFS putpage
+40      ufs`ufs_iget_alloced            UFS get inode
+40      ufs`ufs_ialloc                  UFS create inode
+40      ufs`ldl_waito                   UFS log
+40      ufs`alloc                       UFS alloc block
+
+# ZFS
+50      zfs`zil_commit                  ZFS intent log commit
+40      zfs`zfs_fsync                   ZFS sync
+40      zfs`zfs_read                    ZFS read
+40      zfs`zfs_write                   ZFS write
+40      zfs`zfs_getattr                 ZFS get file attribute
+40      zfs`zfs_remove                  ZFS remove file
+40      zfs`zfs_create                  ZFS create file
+40      zfs`zfs_close                   ZFS close file
+40      zfs`zfs_open                    ZFS open file
+40      zfs`zfs_getsecattr              ZFS security check
+40      zfs`zfs_umount                  ZFS unmount
+30      zfs`zio_wait                    ZFS wait for I/O complete
+30      zfs`spa_export                  ZFS export storage pool
+30      zfs`spa_import                  ZFS import storage pool
+30      zfs`zio_execute                 ZFS execute IO
+30      zfs`spa_sync                    ZFS sync transaction group
+
+# Page fault
+60      unix`pagefault                  Page fault
+        
+# FIFO        
+50      fifofs`fifo_read                Read from pipe/FIFO
+50      fifofs`fifo_write               Write to pipe/FIFO
+
+# Module
+60      genunix`modload                 Loading kernel module
+
+# Devfs        
+50      devfs`dv_find                   Devfs lookup
+50      dev`sdev_lookup                 Devfs lookup
+
+# Misc.
+40      genunix`lookuppnat              File system directory operation
+
+#
+# FSFlush daemon
+#
+
+15      genunix`fsflush                 Sleep in daemon (fsflush)
+
+#
+# Pageout
+#
+
+15      genunix`pageout_scanner         Sleep in daemon (pageout)
+15      genunix`pageout                 Sleep in daemon (pageout)
+
+#
+# Syscalls
+# 
+# Syscalls have priority 10, this is the lowest priority defined as default.
+# This is to ensure a latency is traced to one of the syscalls if nothing 
+# else matches.
+#
+
+15      unix`trap                       Processor Trap
+15      genunix`post_syscall            Post Syscall
+5       unix`sys_syscall32              Syscall
+
+10      genunix`indir                   Syscall: indir
+10      genunix`rexit                   Syscall: exit
+10      genunix`forkall                 Syscall: forkall
+10      genunix`read                    Syscall: read
+10      genunix`read32                  Syscall: read
+10      genunix`write                   Syscall: write
+10      genunix`write32                 Syscall: write
+10      genunix`open                    Syscall: open
+10      genunix`open32                  Syscall: open
+10      genunix`close                   Syscall: close
+10      genunix`wait                    Syscall: wait
+10      genunix`creat                   Syscall: creat
+10      genunix`creat32                 Syscall: creat
+10      genunix`link                    Syscall: link
+10      genunix`unlink                  Syscall: unlink
+10      genunix`exec                    Syscall: exec
+10      genunix`chdir                   Syscall: chdir
+10      genunix`gtime                   Syscall: time
+10      genunix`mknod                   Syscall: mknod
+10      genunix`chmod                   Syscall: chmod
+10      genunix`chown                   Syscall: chown
+10      genunix`brk                     Syscall: brk
+10      genunix`stat                    Syscall: stat
+10      genunix`stat32                  Syscall: stat
+10      genunix`lseek64                 Syscall: lseek
+10      genunix`lseek32                 Syscall: lseek
+10      genunix`getpid                  Syscall: getpid
+10      genunix`mount                   Syscall: mount
+10      genunix`umount                  Syscall: umount
+10      genunix`setuid                  Syscall: setuid
+10      genunix`getuid                  Syscall: getuid
+10      genunix`stime                   Syscall: stime
+10      genunix`stime32                 Syscall: stime
+10      genunix`pcsample                Syscall: pcsample
+10      genunix`alarm                   Syscall: alarm
+10      genunix`fstat                   Syscall: fstat
+10      genunix`fstat32                 Syscall: fstat
+10      genunix`pause                   Syscall: pause
+10      genunix`utime                   Syscall: utime
+10      genunix`stty                    Syscall: stty
+10      genunix`gtty                    Syscall: gtty
+10      genunix`access                  Syscall: access
+10      genunix`nice                    Syscall: nice
+10      genunix`statfs32                Syscall: statfs
+10      genunix`syssync                 Syscall: sync
+10      genunix`kill                    Syscall: kill
+10      genunix`fstatfs32               Syscall: fstatfs
+10      genunix`setpgrp                 Syscall: setpgrp
+10      genunix`uucopystr               Syscall: uucopystr
+10      genunix`dup                     Syscall: dup
+10      genunix`times                   Syscall: times
+10      genunix`times32                 Syscall: times
+10      genunix`profil                  Syscall: prof
+10      genunix`setgid                  Syscall: setgid
+10      genunix`getgid                  Syscall: getgid
+10      genunix`ssig                    Syscall: sig
+10      unix`sysi86                     Syscall: sysi86
+10      genunix`ioctl                   Syscall: ioctl
+10      genunix`uadmin                  Syscall: uadmin
+10      genunix`utssys64                Syscall: utssys
+10      genunix`utssys32                Syscall: utssys
+10      genunix`fdsync                  Syscall: fdsync
+10      genunix`exece                   Syscall: exece
+10      genunix`umask                   Syscall: umask
+10      genunix`chroot                  Syscall: chroot
+10      genunix`fcntl                   Syscall: fcntl
+10      genunix`ulimit                  Syscall: ulimit
+10      genunix`ulimit32                Syscall: ulimit
+10      genunix`tasksys                 Syscall: tasksys
+10      genunix`getpagesizes            Syscall: getpagesizes
+10      genunix`getpagesizes32          Syscall: getpagesizes
+10      genunix`rctlsys                 Syscall: rctlsys
+10      genunix`sidsys                  Syscall: sidsys
+10      genunix`fsat64                  Syscall: fsat
+10      genunix`fsat32                  Syscall: fsat
+10      genunix`syslwp_park             Syscall: lwp_park
+10      genunix`sendfilev               Syscall: sendfilev
+10      genunix`rmdir                   Syscall: rmdir
+10      genunix`mkdir                   Syscall: mkdir
+10      genunix`getdents64              Syscall: getdents
+10      genunix`getdents32              Syscall: getdents
+10      genunix`privsys                 Syscall: privsys
+10      genunix`privsys32               Syscall: privsys
+10      genunix`ucredsys                Syscall: ucredsys
+10      genunix`ucredsys32              Syscall: ucredsys
+10      genunix`sysfs                   Syscall: sysfs
+10      genunix`getmsg                  Syscall: getmsg
+10      genunix`getmsg32                Syscall: getmsg
+10      genunix`putmsg                  Syscall: putmsg
+10      genunix`putmsg32                Syscall: putmsg
+10      genunix`poll                    Syscall: poll
+10      genunix`lstat                   Syscall: lstat
+10      genunix`lstat32                 Syscall: lstat
+10      genunix`symlink                 Syscall: symlink
+10      genunix`readlink                Syscall: readlink
+10      genunix`readlink32              Syscall: readlink
+10      genunix`setgroups               Syscall: setgroups
+10      genunix`getgroups               Syscall: getgroups
+10      genunix`fchmod                  Syscall: fchmod
+10      genunix`fchown                  Syscall: fchown
+10      genunix`sigprocmask             Syscall: sigprocmask
+10      genunix`sigsuspend              Syscall: sigsuspend
+10      genunix`sigaltstack             Syscall: sigaltstack
+10      genunix`sigaltstack32           Syscall: sigaltstack
+10      genunix`sigaction               Syscall: sigaction
+10      genunix`sigaction32             Syscall: sigaction
+10      genunix`sigpending              Syscall: sigpending
+10      genunix`getsetcontext           Syscall: getsetcontext
+10      genunix`getsetcontext32         Syscall: getsetcontext
+10      genunix`statvfs                 Syscall: statvfs
+10      genunix`statvfs32               Syscall: statvfs
+10      genunix`fstatvfs                Syscall: fstatvfs
+10      genunix`fstatvfs32              Syscall: fstatvfs
+10      genunix`getloadavg              Syscall: getloadavg
+10      genunix`waitsys                 Syscall: waitsys
+10      genunix`waitsys32               Syscall: waitsys
+10      genunix`sigsendsys              Syscall: sigsendset
+10      unix`hrtsys                     Syscall: hrtsys
+10      genunix`sigresend               Syscall: sigresend
+10      genunix`priocntlsys             Syscall: priocntlsys
+10      genunix`pathconf                Syscall: pathconf
+10      genunix`mincore                 Syscall: mincore
+10      genunix`smmap64                 Syscall: mmap
+10      genunix`smmap32                 Syscall: mmap
+10      genunix`mprotect                Syscall: mprotect
+10      genunix`munmap                  Syscall: munmap
+10      genunix`fpathconf               Syscall: fpathconf
+10      genunix`vfork                   Syscall: vfork
+10      genunix`fchdir                  Syscall: fchdir
+10      genunix`readv                   Syscall: readv
+10      genunix`readv32                 Syscall: readv
+10      genunix`writev                  Syscall: writev
+10      genunix`writev32                Syscall: writev
+10      genunix`xstat                   Syscall: xstat
+10      genunix`xstat32                 Syscall: xstat
+10      genunix`lxstat                  Syscall: lxstat
+10      genunix`lxstat32                Syscall: lxstat
+10      genunix`fxstat                  Syscall: fxstat
+10      genunix`fxstat32                Syscall: fxstat
+10      genunix`xmknod                  Syscall: xmknod
+10      genunix`setrlimit64             Syscall: setrlimit
+10      genunix`setrlimit32             Syscall: setrlimit
+10      genunix`getrlimit64             Syscall: getrlimit
+10      genunix`getrlimit32             Syscall: getrlimit
+10      genunix`lchown                  Syscall: lchown
+10      genunix`memcntl                 Syscall: memcntl
+10      genunix`getpmsg                 Syscall: getpmsg
+10      genunix`getpmsg32               Syscall: getpmsg
+10      genunix`putpmsg                 Syscall: putpmsg
+10      genunix`putpmsg32               Syscall: putpmsg
+10      genunix`rename                  Syscall: rename
+10      genunix`uname                   Syscall: uname
+10      genunix`setegid                 Syscall: setegid
+10      genunix`sysconfig               Syscall: sysconfig
+10      genunix`adjtime                 Syscall: adjtime
+10      genunix`systeminfo              Syscall: systeminfo
+10      genunix`seteuid                 Syscall: seteuid
+10      genunix`forksys                 Syscall: forksys
+10      genunix`fork1                   Syscall: fork1
+10      genunix`sigtimedwait            Syscall: sigtimedwait
+10      genunix`lwp_info                Syscall: lwp_info
+10      genunix`yield                   Syscall: yield
+10      genunix`lwp_sema_wait           Syscall: lwp_sema_wait
+10      genunix`lwp_sema_post           Syscall: lwp_sema_post
+10      genunix`lwp_sema_trywait        Syscall: lwp_sema_trywait
+10      genunix`lwp_detach              Syscall: lwp_detach
+10      genunix`corectl                 Syscall: corectl
+10      genunix`modctl                  Syscall: modctl
+10      genunix`fchroot                 Syscall: fchroot
+10      genunix`utimes                  Syscall: utimes
+10      genunix`vhangup                 Syscall: vhangup
+10      genunix`gettimeofday            Syscall: gettimeofday
+10      genunix`getitimer               Syscall: getitimer
+10      genunix`setitimer               Syscall: setitimer
+10      genunix`syslwp_create           Syscall: lwp_create
+10      genunix`syslwp_exit             Syscall: lwp_exit
+10      genunix`syslwp_suspend          Syscall: lwp_suspend
+10      genunix`syslwp_continue         Syscall: lwp_continue
+10      genunix`lwp_kill                Syscall: lwp_kill
+10      genunix`lwp_self                Syscall: lwp_self
+10      genunix`lwp_sigmask             Syscall: lwp_sigmask
+10      genunix`syslwp_private          Syscall: lwp_private
+10      genunix`lwp_wait                Syscall: lwp_wait
+10      genunix`lwp_mutex_wakeup        Syscall: lwp_mutex_wakeup
+10      genunix`lwp_mutex_lock          Syscall: lwp_mutex_lock
+10      genunix`lwp_cond_wait           Syscall: lwp_cond_wait
+10      genunix`lwp_cond_signal         Syscall: lwp_cond_signal
+10      genunix`lwp_cond_broadcast      Syscall: lwp_cond_broadcast
+10      genunix`pread                   Syscall: pread
+10      genunix`pread32                 Syscall: pread
+10      genunix`pwrite                  Syscall: pwrite
+10      genunix`pwrite32                Syscall: pwrite
+10      genunix`llseek32                Syscall: llseek
+10      genunix`brandsys                Syscall: brandsys
+10      genunix`lgrpsys                 Syscall: lgrpsys
+10      genunix`rusagesys               Syscall: rusagesys
+10      portfs`portfs                   Syscall: portfs
+10      portfs`portfs32                 Syscall: portfs
+10      genunix`pollsys                 Syscall: pollsys
+10      genunix`labelsys                Syscall: labelsys
+10      genunix`acl                     Syscall: acl
+10      genunix`auditsys                Syscall: auditsys
+10      genunix`processor_bind          Syscall: processor_bind
+10      genunix`processor_info          Syscall: processor_info
+10      genunix`p_online                Syscall: p_online
+10      genunix`sigqueue                Syscall: sigqueue
+10      genunix`sigqueue32              Syscall: sigqueue
+10      genunix`clock_gettime           Syscall: clock_gettime
+10      genunix`clock_settime           Syscall: clock_settime
+10      genunix`clock_getres            Syscall: clock_getres
+10      genunix`timer_create            Syscall: timer_create
+10      genunix`timer_delete            Syscall: timer_delete
+10      genunix`timer_settime           Syscall: timer_settime
+10      genunix`timer_gettime           Syscall: timer_gettime
+10      genunix`timer_getoverrun        Syscall: timer_getoverrun
+10      genunix`nanosleep               Syscall: nanosleep
+10      genunix`facl                    Syscall: facl
+10      doorfs`doorfs                   Syscall: door
+10      doorfs`doorfs32                 Syscall: door
+10      genunix`setreuid                Syscall: setreuid
+10      genunix`setregid                Syscall: setregid
+10      genunix`install_utrap           Syscall: install_utrap
+10      genunix`signotify               Syscall: signotify
+10      genunix`schedctl                Syscall: schedctl
+10      genunix`sparc_utrap_install     Syscall: sparc_utrap_install
+10      genunix`resolvepath             Syscall: resolvepath
+10      genunix`lwp_mutex_timedlock     Syscall: lwp_mutex_timedlock
+10      genunix`lwp_sema_timedwait      Syscall: lwp_sema_timedwait
+10      genunix`lwp_rwlock_sys          Syscall: lwp_rwlock_sys
+10      genunix`getdents64              Syscall: getdents64
+10      genunix`smmaplf32               Syscall: smmaplf32
+10      genunix`stat64                  Syscall: stat64
+10      genunix`stat64_32               Syscall: stat64
+10      genunix`lstat64                 Syscall: lstat64
+10      genunix`lstat64_32              Syscall: lstat64
+10      genunix`fstat64                 Syscall: fstat64
+10      genunix`fstat64_32              Syscall: fstat64
+10      genunix`statvfs64               Syscall: statvfs64
+10      genunix`statvfs64_32            Syscall: statvfs64
+10      genunix`fstatvfs64              Syscall: fstatvfs64
+10      genunix`fstatvfs64_32           Syscall: fstatvfs64
+10      genunix`setrlimit64             Syscall: setrlimit64
+10      genunix`getrlimit64             Syscall: getrlimit64
+10      genunix`pread64                 Syscall: pread64
+10      genunix`pwrite64                Syscall: pwrite64
+10      genunix`creat64                 Syscall: creat64
+10      genunix`open64                  Syscall: open64
+10      genunix`zone                    Syscall: zone
+10      genunix`getcwd                  Syscall: getcwd
+10      sockfs`so_socket                Syscall: so_socket
+10      sockfs`so_socketpair            Syscall: so_socketpair
+10      sockfs`bind                     Syscall: bind
+10      sockfs`listen                   Syscall: listen
+10      sockfs`accept                   Syscall: accept
+10      sockfs`connect                  Syscall: connect
+10      sockfs`shutdown                 Syscall: shutdown
+10      sockfs`recv                     Syscall: recv
+10      sockfs`recv32                   Syscall: recv
+10      sockfs`recvfrom                 Syscall: recvfrom
+10      sockfs`recvfrom32               Syscall: recvfrom
+10      sockfs`recvmsg                  Syscall: recvmsg
+10      sockfs`send                     Syscall: send
+10      sockfs`send32                   Syscall: send
+10      sockfs`sendmsg                  Syscall: sendmsg
+10      sockfs`sendto                   Syscall: sendto
+10      sockfs`sendto32                 Syscall: sendto
+10      sockfs`getpeername              Syscall: getpeername
+10      sockfs`getsockname              Syscall: getsockname
+10      sockfs`getsockopt               Syscall: getsockopt
+10      sockfs`setsockopt               Syscall: setsockopt
+10      sockfs`sockconfig               Syscall: sockconfig
+10      genunix`ntp_gettime             Syscall: ntp_gettime
+10      genunix`ntp_adjtime             Syscall: ntp_adjtime
+10      genunix`lwp_mutex_unlock        Syscall: lwp_mutex_unlock
+10      genunix`lwp_mutex_trylock       Syscall: lwp_mutex_trylock
+10      genunix`lwp_mutex_register      Syscall: lwp_mutex_register
+10      genunix`cladm                   Syscall: cladm
+10      genunix`uucopy                  Syscall: uucopy
+10      genunix`umount2                 Syscall: umount2
+
+# sched (pid = 0)
+5       genunix`taskq_d_thread          Sleep in daemon (sched)
+5       ufs`trans_roll                  Sleep in daemon (sched)
+5       zfs`txg_sync_thread             Sleep in daemon (sched)
+5       genunix`taskq_thread            Sleep in daemon (sched)
+5       zfs`l2arc_feed_thread           Sleep in daemon (sched)
+5       scsi`scsi_watch_thread          Sleep in daemon (sched)
+5       genunix`seg_pasync_thread       Sleep in daemon (sched)
+5       zfs`arc_reclaim_thread          Sleep in daemon (sched)
+5       zfs`txg_thread_wait             Sleep in daemon (sched) 
+5       ip`squeue_worker                Sleep in daemon (sched) 
+5       genunix`thread_reaper           Sleep in daemon (sched) 
+5       zfs`txg_quiesce_thread          Sleep in daemon (sched)
+5       ufs`ufs_thread_delete           Sleep in daemon (sched) 
+
+#; disable_cause  Sleep in daemon (fsflush)
+#; disable_cause  Sleep in daemon (pageout)
+#; disable_cause  Sleep in daemon (sched)
