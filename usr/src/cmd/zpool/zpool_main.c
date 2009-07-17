@@ -3540,6 +3540,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 14  passthrough-x aclinherit\n"));
 		(void) printf(gettext(" 15  user/group space accounting\n"));
 		(void) printf(gettext(" 16  stmf property support\n"));
+		(void) printf(gettext(" 17  Triple-parity RAID-Z\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
