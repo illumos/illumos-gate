@@ -1,0 +1,81 @@
+#!/usr/perl5/bin/perl
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+my $SVC_CUPS_SCHEDULER = 'cups/scheduler';
+my $SVCPROP = '/usr/bin/svcprop';
+
+sub svcprop {
+        local ($fmri, $property) = @_;
+        my $FH;
+
+        open($FH, "$SVCPROP -C -p $property $fmri 2>/dev/null |");
+        $result = <$FH>;
+        close($FH);
+
+        return ($result);
+}
+
+sub print_service {
+        my $service;
+
+        $service = svcprop("$SVC_CUPS_SCHEDULER:default", "general/active");
+        ($service =~ /true/) && ($service = 'cups') || ($service = 'lp');
+
+        return ($service);
+}
+
+sub kill_running_applets {
+        # cups applet daemon
+        system("pkill -f '/system-config-printer/applet.py'");
+        # lp applet daemon
+        system("pkill ospm-applet");
+}
+
+my $pid;
+
+sub handle_signal {
+        kill_running_applets ();
+}
+$SIG{USR1} = \&handle_signal;
+
+
+$SIG{CHLD} = 'IGNORE';
+my $service;
+$service =  print_service();
+$pid = fork();
+if ($pid) {
+        waitpid($pid, 0);
+        exec('/usr/bin/desktop-print-management-applet');
+}
+else {
+        if ($service eq 'lp') {
+                exec('/usr/lib/lp/bin/desktop-print-management-applet');
+        }
+        else {
+                exec('/usr/lib/cups/bin/desktop-print-management-applet');
+        }
+}
+

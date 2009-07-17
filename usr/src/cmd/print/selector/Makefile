@@ -19,21 +19,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../../Makefile.cmd
 
 SBINPROG =	print-service
+BINPROG =	desktop-print-management-applet
 LPBINLINKS =	lp lpstat cancel enable disable
 LPRBINLINKS =	lpr lpq lprm lpc
-DESKTOPLINKS =  desktop-print-management desktop-print-management-applet
-DESKTOPLINKS += desktop-print-management-prefs
+DESKTOPLINKS =  desktop-print-management desktop-print-management-prefs
 BINLINKS =	$(LPBINLINKS) $(LPRBINLINKS) $(DESKTOPLINKS)
 SBINLINKS =	accept reject lpmove lpadmin
 
 ROOTUSRSBINPROG =	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
+ROOTUSRBINPROG =	$(BINPROG:%=$(ROOTBIN)/%)
 ROOTUSRBINLINKS =	$(BINLINKS:%=$(ROOTBIN)/%)
 ROOTUSRSBINLINKS =	$(SBINLINKS:%=$(ROOTUSRSBIN)/%)
 
@@ -50,5 +51,5 @@ $(ROOTUSRSBINLINKS):
 
 all check clean clobber lint:
 
-install:	$(ROOTUSRSBINPROG) $(ROOTUSRBINLINKS) $(ROOTUSRSBINLINKS)
+install:	$(ROOTUSRSBINPROG) $(ROOTUSRBINPROG) $(ROOTUSRBINLINKS) $(ROOTUSRSBINLINKS)
 

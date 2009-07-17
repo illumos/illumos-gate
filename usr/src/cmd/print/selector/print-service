@@ -19,10 +19,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -242,6 +241,7 @@ sub select_service {
 		svcadm("enable", $SVC_CUPS_SCHEDULER, $SVC_CUPS_LPD);
 		svccfg("cups/scheduler:default",
 			"setprop general/active = boolean: true");
+		system("pkill -USR1 -f '/desktop-print-management-applet'"); 
 	} else {
 		print("disabling CUPS services...\n");
 		svcadm("disable", $SVC_CUPS_SCHEDULER, $SVC_CUPS_LPD);
@@ -251,6 +251,7 @@ sub select_service {
 		(-f '/etc/lp/printers.conf') &&
 			rename('/etc/lp/printers.conf', '/etc/printers.conf');
 		svccfg("cups/scheduler:default", "delprop general/active");
+		system("pkill -USR1 -f '/desktop-print-management-applet'"); 
 	}
 
 	# import the new print queue configuration (if migrating)

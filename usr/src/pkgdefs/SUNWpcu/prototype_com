@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -46,7 +46,7 @@ f none usr/bin/lpget 0511 root lp
 f none usr/bin/lpset 4511 root lp
 f none usr/bin/lptest 555 root lp
 s none usr/bin/desktop-print-management=../sbin/print-service
-s none usr/bin/desktop-print-management-applet=../sbin/print-service
+f none usr/bin/desktop-print-management-applet 0555 root bin
 s none usr/bin/desktop-print-management-prefs=../sbin/print-service
 d none usr/lib 0755 root bin
 d none usr/lib/lp 0755 root lp
