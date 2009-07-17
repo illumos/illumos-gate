@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3808,7 +3808,7 @@ mirror_set_clean_rr(md_mn_rr_clean_params_t *iocp)
 	rw_enter(&un->un_pernode_dirty_mx[node], RW_WRITER);
 	if (un->un_pernode_dirty_bm[node] == NULL) {
 		un->un_pernode_dirty_bm[node] = (uchar_t *)kmem_zalloc(
-		    un->un_rrd_num, KM_SLEEP);
+		    howmany(un->un_rrd_num, NBBY), KM_SLEEP);
 	}
 	rw_exit(&un->un_pernode_dirty_mx[node]);
 
