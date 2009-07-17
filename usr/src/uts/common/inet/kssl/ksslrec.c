@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -444,6 +442,15 @@ kssl_compute_handshake_hashes(
 }
 
 
+/*
+ * Minimum message length for a client hello =
+ * 2-byte client_version +
+ * 32-byte random +
+ * 1-byte session_id length +
+ * 2-byte cipher_suites length +
+ * 1-byte compression_methods length +
+ * 1-byte CompressionMethod.null
+ */
 #define	KSSL_SSL3_CH_MIN_MSGLEN	(39)
 
 static int
@@ -452,8 +459,7 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	uchar_t *msgend;
 	int err;
 	SSL3AlertDescription desc = illegal_parameter;
-	uint_t sidlen;
-	uint_t nsuites;
+	uint_t sidlen, cslen, cmlen;
 	uchar_t *suitesp;
 	uint_t i, j;
 	uint16_t suite;
@@ -498,25 +504,35 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 		mp->b_rptr += SSL3_SESSIONID_BYTES;
 	}
 
-	nsuites = ((uint_t)mp->b_rptr[0] << 8) + (uint_t)mp->b_rptr[1];
+	cslen = ((uint_t)mp->b_rptr[0] << 8) + (uint_t)mp->b_rptr[1];
 	mp->b_rptr += 2;
-	ch_msglen += nsuites;
-	if (msglen != ch_msglen) {
+	ch_msglen += cslen;
+
+	/*
+	 * This check can't be a "!=" since there can be
+	 * compression methods other than CompressionMethod.null.
+	 * Also, there can be extra data (TLS extensions) after the
+	 * compression methods field. We do not support any TLS
+	 * extensions and hence ignore them.
+	 */
+	if (msglen < ch_msglen) {
 		goto falert;
 	}
-	if (nsuites & 0x1) {
+
+	/* The length has to be even since a cipher suite is 2-byte long */
+	if (cslen & 0x1) {
 		goto falert;
 	}
 	suitesp = mp->b_rptr;
 	if (ssl->sid.cached == B_TRUE) {
 		suite = ssl->sid.cipher_suite;
-		for (j = 0; j < nsuites; j += 2) {
+		for (j = 0; j < cslen; j += 2) {
 			if (suitesp[j] == ((suite >> 8) & 0xff) &&
 			    suitesp[j + 1] == (suite & 0xff)) {
 				break;
 			}
 		}
-		if (j < nsuites) {
+		if (j < cslen) {
 			goto suite_found;
 		}
 		kssl_uncache_sid(&ssl->sid, ssl->kssl_entry);
@@ -526,13 +542,13 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	/* Check if this server is capable of the cipher suite */
 	for (i = 0; i < ssl->kssl_entry->kssl_cipherSuites_nentries; i++) {
 		suite = ssl->kssl_entry->kssl_cipherSuites[i];
-		for (j = 0; j < nsuites; j += 2) {
+		for (j = 0; j < cslen; j += 2) {
 			if (suitesp[j] == ((suite >> 8) & 0xff) &&
 			    suitesp[j + 1] == (suite & 0xff)) {
 				break;
 			}
 		}
-		if (j < nsuites) {
+		if (j < cslen) {
 			break;
 		}
 	}
@@ -547,11 +563,27 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	}
 
 suite_found:
+	mp->b_rptr += cslen;
 
-	mp->b_rptr += nsuites;
-	if (*mp->b_rptr++ != 1 || *mp->b_rptr++ != 0) {
+	/*
+	 * Check for the mandatory CompressionMethod.null. We do not
+	 * support any other compression methods.
+	 */
+	cmlen = *mp->b_rptr++;
+	ch_msglen += cmlen - 1;	/* -1 accounts for the null method */
+	if (msglen < ch_msglen) {
+		goto falert;
+	}
+
+	while (cmlen >= 1) {
+		if (*mp->b_rptr++ == 0)
+			break;
+		cmlen--;
+	}
+
+	if (cmlen == 0) {
 		desc = handshake_failure;
-		DTRACE_PROBE(kssl_err__handshake_failure);
+		DTRACE_PROBE(kssl_err__no_null_method_failure);
 		goto falert;
 	}
 
@@ -1352,8 +1384,10 @@ kssl_spec_init(ssl_t *ssl, int dir)
 		}
 	} else {
 		if (cipher_defs[ssl->pending_calg].bsize > 0) {
+			/* server_write_IV */
 			spec->cipher_mech.cm_param += spec->cipher_bsize;
 		}
+
 		/* server_write_key */
 		spec->cipher_key.ck_data =
 		    &(ssl->pending_keyblock[2 * spec->mac_hashsz +
@@ -1802,7 +1836,7 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	SSL3AlertDescription desc = illegal_parameter;
 	uint_t randlen;
 	uint_t sidlen;
-	uint_t nsuites;
+	uint_t cslen;
 	uchar_t *suitesp;
 	uchar_t *rand;
 	uint_t i, j;
@@ -1829,11 +1863,11 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	}
 	mp->b_rptr += 3;
 
-	nsuites = ((uint_t)mp->b_rptr[0] << 8) + (uint_t)mp->b_rptr[1];
+	cslen = ((uint_t)mp->b_rptr[0] << 8) + (uint_t)mp->b_rptr[1];
 	sidlen = ((uint_t)mp->b_rptr[2] << 8) + (uint_t)mp->b_rptr[3];
 	randlen = ((uint_t)mp->b_rptr[4] << 8) + (uint_t)mp->b_rptr[5];
-	if (nsuites % 3 != 0) {
-		DTRACE_PROBE1(kssl_err__nsuites_error, uint_t, nsuites);
+	if (cslen % 3 != 0) {
+		DTRACE_PROBE1(kssl_err__cipher_suites_len_error, uint_t, cslen);
 		goto falert;
 	}
 	if (randlen < SSL_MIN_CHALLENGE_BYTES ||
@@ -1843,12 +1877,12 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 		goto falert;
 	}
 	mp->b_rptr += 6;
-	ch_recsz += nsuites + sidlen + randlen;
+	ch_recsz += cslen + sidlen + randlen;
 	if (recsz != ch_recsz) {
 		goto falert;
 	}
 	suitesp = mp->b_rptr;
-	rand = suitesp + nsuites + sidlen;
+	rand = suitesp + cslen + sidlen;
 	if (randlen < SSL3_RANDOM_LENGTH) {
 		bzero(ssl->client_random, SSL3_RANDOM_LENGTH);
 	}
@@ -1857,7 +1891,7 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 
 	for (i = 0; i < ssl->kssl_entry->kssl_cipherSuites_nentries; i++) {
 		suite = ssl->kssl_entry->kssl_cipherSuites[i];
-		for (j = 0; j < nsuites; j += 3) {
+		for (j = 0; j < cslen; j += 3) {
 			if (suitesp[j] != 0) {
 				continue;
 			}
@@ -1867,7 +1901,7 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 				break;
 			}
 		}
-		if (j < nsuites) {
+		if (j < cslen) {
 			break;
 		}
 	}
@@ -1920,7 +1954,7 @@ falert:
 
 /*
  * Call back routine for asynchronously submitted RSA decryption jobs.
- * The routine retreived the pre-master secret, and proceeds to generate
+ * This routine retrieves the pre-master secret, and proceeds to generate
  * the remaining key materials.
  */
 static void
