@@ -715,27 +715,27 @@ msi_free:
 		break;
 	case DDI_INTROP_ENABLE:
 		/*
-		 * curr_nenables will be greater than 0 if rdip is using
-		 * MSI-X and also, if it is using DUP interface. If this
-		 * curr_enables is > 1, return after clearing the mask bit.
+		 * For MSI, just clear the mask bit and return if curr_nenables
+		 * is > 1. For MSI-X, program MSI address and data for every
+		 * MSI-X vector including dup vectors irrespective of current
+		 * curr_nenables value.
 		 */
-		if ((pci_is_msi_enabled(rdip, hdlp->ih_type) == DDI_SUCCESS) &&
-		    (i_ddi_intr_get_current_nenables(rdip) > 0)) {
-			return (pci_msi_clr_mask(rdip, hdlp->ih_type,
-			    hdlp->ih_inum));
+		if ((pci_is_msi_enabled(rdip, hdlp->ih_type) != DDI_SUCCESS) ||
+		    (hdlp->ih_type == DDI_INTR_TYPE_MSIX)) {
+			nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
+
+			if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
+			    nintrs, hdlp->ih_inum, msi_addr,
+			    hdlp->ih_type == DDI_INTR_TYPE_MSIX ?
+			    msi_num : msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
+				return (ret);
+
+			if (i_ddi_intr_get_current_nenables(rdip) < 1) {
+				if ((ret = pci_msi_enable_mode(rdip,
+				    hdlp->ih_type)) != DDI_SUCCESS)
+					return (ret);
+			}
 		}
-
-		nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
-
-		if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
-		    nintrs, hdlp->ih_inum, msi_addr,
-		    hdlp->ih_type == DDI_INTR_TYPE_MSIX ? msi_num :
-		    msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
-			return (ret);
-
-		if ((ret = pci_msi_enable_mode(rdip,
-		    hdlp->ih_type)) != DDI_SUCCESS)
-			return (ret);
 
 		if ((ret = pci_msi_clr_mask(rdip, hdlp->ih_type,
 		    hdlp->ih_inum)) != DDI_SUCCESS)
