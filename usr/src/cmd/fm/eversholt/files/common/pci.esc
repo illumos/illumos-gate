@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma dictionary "PCI"
 
@@ -97,6 +95,10 @@ event fault.io.pci.device-interr@PCIFN, FITrate=PCI_DEV_FIT;
 event fault.io.pci.device-invreq@PCIFN, FITrate=PCI_DEV_FIT;
 
 event fault.io.pci.device-noresp@PCIFN, FITrate=PCI_DEV_FIT;
+
+event fault.io.pci.fw_corrupt@PCIFN, FITrate=PCI_DEV_FIT, retire=0;
+
+event fault.io.pci.fw_mismatch@PCIFN, FITrate=PCI_DEV_FIT, retire=0;
 
 /*
  * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -328,6 +330,8 @@ event error.io.service.restored@PCIFN;
 
 event ereport.io.pcix.oor@PCIFN{within(5s)};
 event ereport.io.pcix.unex-sc@PCIFN{within(5s)};
+event ereport.io.device.fw_corrupt@PCIFN{within(5s)};
+event ereport.io.device.fw_mismatch@PCIFN{within(5s)};
 event ereport.io.service.lost@PCIFN{within(5s)};
 event ereport.io.service.degraded@PCIFN{within(5s)};
 event ereport.io.service.unaffected@PCIFN{within(5s)};
@@ -358,6 +362,20 @@ prop fault.io.pci.device-interr@pcibus/pcidev[fromdev]/pcifn (0)->
     error.io.pcix.scpe-u@PCI_NOT_HB,
     error.io.pcix.tx-oor@PCI_NOT_HB,
     error.io.pcix.rx-unex-sc@PCI_NOT_HB;
+
+prop fault.io.pci.fw_corrupt@PCIFN {IS_LEAF} (1)->
+    ereport.io.device.fw_corrupt@PCIFN;
+
+prop fault.io.pci.fw_corrupt@PCIFN {IS_LEAF} (0)->
+    ereport.io.service.lost@PCIFN,
+    ereport.io.service.degraded@PCIFN;
+
+prop fault.io.pci.fw_mismatch@PCIFN {IS_LEAF} (1)->
+    ereport.io.device.fw_mismatch@PCIFN;
+
+prop fault.io.pci.fw_mismatch@PCIFN {IS_LEAF} (0)->
+    ereport.io.service.lost@PCIFN,
+    ereport.io.service.degraded@PCIFN;
 
 prop fault.io.pci.device-invreq@pcibus/pcidev[fromdev]/pcifn {FD_IS_LEAF} (0)->
     error.io.pci.badreq-drw-u@PCI_NOT_HB,

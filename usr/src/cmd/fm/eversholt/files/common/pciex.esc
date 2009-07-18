@@ -110,6 +110,9 @@
 /*
  * define faults
  */
+event fault.io.pciex.fw_corrupt@PCIEXFN, FITrate=PCIEX_DEV_FIT, retire=0;
+event fault.io.pciex.fw_mismatch@PCIEXFN, FITrate=PCIEX_DEV_FIT, retire=0;
+
 event fault.io.pciex.device-interr@PCIEXFN, FITrate=PCIEX_DEV_FIT;
 
 event fault.io.pciex.device-interr-deg@PCIEXFN, FITrate=PCIEX_DEV_FIT, retire=0;
@@ -409,6 +412,8 @@ event ereport.io.pciex.dl.bdllp@PCIEXFN/PCIEXFN{within(5s)};
 event ereport.io.pciex.dl.rto@PCIEXFN/PCIEXFN{within(5s)};
 event ereport.io.pciex.dl.rnr@PCIEXFN/PCIEXFN{within(5s)};
 event ereport.io.pciex.pl.re@PCIEXFN/PCIEXFN{within(5s)};
+event ereport.io.device.fw_corrupt@PCIEXFN{within(5s)};
+event ereport.io.device.fw_mismatch@PCIEXFN{within(5s)};
 
 prop fault.io.pciex.device-noresp@PCIEXFN { IS_LF(PCIEXFN) } (1)->
     error.io.pciex.flt-nr-u@PCIEXFN;
@@ -511,6 +516,20 @@ prop fault.io.pciex.device-interr@PCIEXFN { IS_LF(PCIEXFN) } (1)->
     error.io.pciex.flt-ca-u@PCIEXFN,
     error.io.pciex.flt-mtlp-u@PCIEXFN,
     error.io.pciex.fatlink@PCIEXFN;
+
+prop fault.io.pciex.fw_corrupt@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    ereport.io.device.fw_corrupt@PCIEXFN;
+
+prop fault.io.pciex.fw_corrupt@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.service.lost@PCIEXFN,
+    ereport.io.service.degraded@PCIEXFN;
+
+prop fault.io.pciex.fw_mismatch@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    ereport.io.device.fw_mismatch@PCIEXFN;
+
+prop fault.io.pciex.fw_mismatch@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.service.lost@PCIEXFN,
+    ereport.io.service.degraded@PCIEXFN;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

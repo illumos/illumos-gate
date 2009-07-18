@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FM_IO_DDI_H
 #define	_SYS_FM_IO_DDI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,6 +43,8 @@ extern "C" {
 #define	DDI_FM_DEVICE_BADINT_LIMIT	"badint_limit"
 #define	DDI_FM_DEVICE_INTERN_CORR	"intern_corr"
 #define	DDI_FM_DEVICE_INTERN_UNCORR	"intern_uncorr"
+#define	DDI_FM_DEVICE_FW_CORRUPT	"fw_corrupt"
+#define	DDI_FM_DEVICE_FW_MISMATCH	"fw_mismatch"
 
 /* service impact ereport definitions */
 #define	DDI_FM_SERVICE_IMPACT		"service"
