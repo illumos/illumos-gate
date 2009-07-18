@@ -56,6 +56,9 @@ usr/include/libelfsign.h		sparc
 usr/lib/llib-lsoftcrypto		sparc
 usr/lib/llib-lsoftcrypto.ln		sparc
 usr/lib/sparcv9/llib-lsoftcrypto.ln	sparc
+lib/llib-lkcfd.ln			sparc
+lib/llib-lkcfd				sparc
+lib/libkcfd.so				sparc
 #
 # The following files are used by libdhcpsvc, the
 # standalone's DHCP implementation, and the kernel (nfs_dlboot).

@@ -67,6 +67,9 @@ usr/include/libelfsign.h		i386
 usr/lib/llib-lsoftcrypto		i386
 usr/lib/llib-lsoftcrypto.ln		i386
 usr/lib/amd64/llib-lsoftcrypto.ln	i386
+lib/llib-lkcfd				i386
+lib/llib-lkcfd.ln			i386
+lib/libkcfd.so				i386
 #
 # The following files are used by the DHCP service, the
 # standalone's DHCP implementation, and the kernel (nfs_dlboot).

@@ -18,59 +18,30 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/pkcs11/Makefile
-
-include ../Makefile.lib
-
-HDRS =     	cryptoki.h pkcs11.h pkcs11f.h pkcs11t.h
-HDRDIR =	include
-ROOTHDRDIR =	$(ROOT)/usr/include/security
-
-# RSA PKCS#11 sourced header files won't pass hrdchk
-CHECKHDRS =	$(HDRDIR)/cryptoki.h
-
-SUBDIRS = \
-	libpkcs11	\
-	libsoftcrypto   \
-	libkcfd
-
+# lib/pkcs11/libkcfd/Makefile
 #
-# The PKCS11 TPM provider is only available for x86.
-#
-i386_SUBDIRS = pkcs11_tpm
 
-#
-# Don't build these for OpenSolaris, since they will be replaced by
-# binaries that are signed by ON Gatekeepers.
-#
-$(CLOSED_BUILD)SUBDIRS += \
-			pkcs11_kernel	\
-			pkcs11_softtoken
+include $(SRC)/lib/Makefile.lib
 
-$(CLOSED_BUILD)SUBDIRS += $($(MACH)_SUBDIRS)
+SUBDIRS=	$(MACH)
 
-all 	:=	TARGET= all
-clean 	:=	TARGET= clean
+all	:=	TARGET= all
+clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
-install :=	TARGET= install
-lint :=		TARGET= lint
+install	:=	TARGET= install
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
-install_h: $(ROOTHDRS)
+check lint install_h:
 
-check:	$(CHECKHDRS)
-
-
-$(SUBDIRS): FRC
+$(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
-
-include ../Makefile.targ

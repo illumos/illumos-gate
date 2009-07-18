@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <link.h>
@@ -955,12 +953,14 @@ kmf_verify_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
  * where we want to force this operation to happen in
  * a specific keystore.
  * For example:
- *    libelfsign verifies signatures on crypto libraries.
- *    We cannot use libpkcs11 functions to verify the pkcs11
- *    libraries because it results in a circular dependency.
- *    So, when libelfsign is verifying library sigs, it
- *    always forces the operation to happen in OpenSSL
- *    to avoid the circular dependency.
+ *    libelfsign.so.1 verifies signatures on crypto libraries.
+ *    We must use pkcs11 functions to verify the pkcs11
+ *    plugins in order to keep the validation within the
+ *    Cryptographic Framework's FIPS-140 boundary. To avoid
+ *    a circular dependency, pksc11_softtoken.so.1 is
+ *    interposed by libkcfd.so.1 via kcfd, which prevents
+ *    libpkcs11.so.1's interfaces from being used when libkmf.so.1
+ *    is called from kcfd.
  */
 static KMF_RETURN
 plugin_verify_data_with_cert(KMF_HANDLE_T handle,
@@ -976,8 +976,6 @@ plugin_verify_data_with_cert(KMF_HANDLE_T handle,
 	/*
 	 * If NSS, use PKCS#11, we are not accessing the database(s),
 	 * we just prefer the "verify" operation from the crypto framework.
-	 * The OpenSSL version is unique in order to avoid a dependency loop
-	 * with the kcfd(1M) process.
 	 */
 	if (kstype == KMF_KEYSTORE_NSS)
 		kstype = KMF_KEYSTORE_PK11TOKEN;
@@ -3109,9 +3107,8 @@ cleanup:
 
 /*
  * Use a signer cert to verify another certificate's signature.
- * This code forces the use of the OPENSSL mechanism
- * for the verify operation to avoid a circular dependency
- * with libelfsign when it attempts to verify the PKCS#11 libraries.
+ * This code forces the use of the PKCS11 mechanism for the verify
+ * operation for the Cryptographic Framework's FIPS-140 boundary.
  */
 static KMF_RETURN
 verify_cert_with_cert(KMF_HANDLE_T handle,
@@ -3172,11 +3169,10 @@ verify_cert_with_cert(KMF_HANDLE_T handle,
 	}
 
 	/*
-	 * To avoid recursion with kcfd consumer and libpkcs11,
-	 * do the certificate verification using the OpenSSL
-	 * plugin algorithms instead of the crypto framework.
+	 * Force use of PKCS11 API for kcfd/libelfsign.  This is
+	 * required for the Cryptographic Framework's FIPS-140 boundary.
 	 */
-	ret = plugin_verify_data_with_cert(handle, KMF_KEYSTORE_OPENSSL,
+	ret = plugin_verify_data_with_cert(handle, KMF_KEYSTORE_PK11TOKEN,
 	    algid, &data_to_verify, &signature,	SignerCertData);
 
 cleanup:

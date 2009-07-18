@@ -1,0 +1,112 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+SUNW_1.1 {
+    global:
+	C_CancelFunction = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_CloseAllSessions = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_CloseSession = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_CopyObject = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_CreateObject = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Decrypt = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DecryptDigestUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DecryptFinal = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DecryptInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DecryptUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DecryptVerifyUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DeriveKey = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DestroyObject = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Digest = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DigestEncryptUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DigestFinal = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DigestInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DigestKey = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_DigestUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Encrypt = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_EncryptFinal = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_EncryptInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_EncryptUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Finalize = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_FindObjects = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_FindObjectsFinal = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_FindObjectsInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GenerateKey = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GenerateKeyPair = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GenerateRandom = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetAttributeValue = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetFunctionList = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetFunctionStatus = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetInfo = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetMechanismInfo = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetMechanismList = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetObjectSize = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetOperationState = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetSessionInfo = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetSlotInfo = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetSlotList = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_GetTokenInfo = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Initialize = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_InitPIN = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_InitToken = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Login = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Logout = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_OpenSession = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SeedRandom = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SetAttributeValue = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SetOperationState = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SetPIN = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Sign = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SignEncryptUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SignFinal = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SignInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SignRecover = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_SignRecoverInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_UnwrapKey = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_Verify = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_VerifyFinal = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_VerifyInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+    	C_VerifyRecover = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_VerifyRecoverInit = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_VerifyUpdate = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_WaitForSlotEvent = FUNCTION FILTER pkcs11_softtoken.so.1;
+	C_WrapKey = FUNCTION FILTER pkcs11_softtoken.so.1;
+    local:
+	*;
+};
+

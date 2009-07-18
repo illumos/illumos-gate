@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <limits.h>
 #include <sys/types.h>
@@ -221,7 +219,7 @@ elfcertlib_getcert(ELFsign_t ess, char *cert_pathname,
 	cert->c_verified = E_UNCHECKED;
 
 	/*
-	 * If the cert we are loading it the trust anchor (ie the CA) then
+	 * If the cert we are loading is the trust anchor (ie the CA) then
 	 * we mark it as such in cert.  This is so that we don't attempt
 	 * to verify it later.  The CA is always implicitly verified.
 	 */
@@ -473,12 +471,13 @@ elfcertlib_verifysig(ELFsign_t ess, ELFCert_t cert,
 		algid = KMF_ALGID_RSA;
 
 	/*
-	 * We tell KMF to use the OpenSSL verification
-	 * APIs here to avoid a circular dependency with
-	 * kcfd and libpkcs11.
+	 * We tell KMF to use the PKCS11 verification APIs
+	 * here to prevent the use of OpenSSL and to keep
+	 * all validation within the FIPS-140 boundary for
+	 * the Cryptographic Framework.
 	 */
 	rv = KMF_VerifyDataWithCert(ess->es_kmfhandle,
-	    KMF_KEYSTORE_OPENSSL, algid,
+	    KMF_KEYSTORE_PK11TOKEN, algid,
 	    &indata, &insig, &cert->c_cert.certificate);
 
 	return ((rv == KMF_OK));

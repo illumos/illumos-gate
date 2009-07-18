@@ -20,9 +20,7 @@
 #
 
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -52,17 +50,6 @@ CPPFLAGS +=	-I$(SRC)/uts/common
 CPPFLAGS +=	-I$(SRC)/lib/libkmf/include
 CPPFLAGS +=	-I$(SRC)/lib/libcryptoutil/common
 LDFLAGS +=	-lmd -lelf -lkmf -lcryptoutil -lc
-
-#
-# While the gate builds a libelfsign.so linked staticly against
-# pksc11_softtoken, the tools version of libelfsign is dynamically linked
-# against the build machines pkcs11_softtoken.so.
-#
-SOFTTOKENDIR =	/usr/lib/security
-SOFTTOKENLIB =	pkcs11_softtoken.so
-LDFLAGS +=	-R $(SOFTTOKENDIR) $(SOFTTOKENDIR)/$(SOFTTOKENLIB)
-
-MKDIR=	mkdir
 
 .KEEP_STATE:
 

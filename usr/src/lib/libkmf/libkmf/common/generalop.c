@@ -19,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <dlfcn.h>
@@ -325,7 +323,13 @@ InitializePlugin(KMF_KEYSTORE_TYPE kstype, char *path, KMF_PLUGIN **plugin)
 		free(p);
 		return (KMF_ERR_MEMORY);
 	}
-	p->dldesc = dlopen(path, RTLD_LAZY | RTLD_GROUP | RTLD_PARENT);
+	/*
+	 * Do not use RTLD_GROUP here, or this will cause a circular
+	 * dependency when kmf_pkcs11.so.1 gets its PKCS#11 functions
+	 * from libpkcs11.so.1 when kmf is used via libelfsign.so.1
+	 * called from kcfd.
+	 */
+	p->dldesc = dlopen(path, RTLD_LAZY | RTLD_PARENT);
 	if (p->dldesc == NULL) {
 		free(p->path);
 		free(p);

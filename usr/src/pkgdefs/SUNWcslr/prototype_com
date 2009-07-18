@@ -97,6 +97,7 @@ s none lib/libintl.so=libintl.so.1
 f none lib/libintl.so.1 755 root bin
 s none lib/libipmp.so=./libipmp.so.1
 f none lib/libipmp.so.1 755 root bin
+f none lib/libkcfd.so.1 755 root bin
 s none lib/libkmf.so=libkmf.so.1
 f none lib/libkmf.so.1 755 root bin
 s none lib/libkmfberder.so=libkmfberder.so.1
