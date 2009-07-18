@@ -2072,9 +2072,9 @@ idmap_stat2string(idmap_handle_t *handle, idmap_stat status)
 
 	for (i = 0; stattable[i].msg; i++) {
 		if (stattable[i].retcode == status)
-			return (gettext(stattable[i].msg));
+			return (dgettext(TEXT_DOMAIN, stattable[i].msg));
 	}
-	return (gettext("Unknown error"));
+	return (dgettext(TEXT_DOMAIN, "Unknown error"));
 }
 
 

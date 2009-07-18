@@ -25,8 +25,21 @@
 
 PROG =		idmapd
 MANIFEST =	idmap.xml
-SERVEROBJS =	idmapd.o init.o dbutils.o rpc_svc.o server.o adutils.o\
-	idmap_config.o nldaputils.o
+SERVEROBJS =				\
+	directory_provider_builtin.o	\
+	directory_provider_nsswitch.o	\
+	directory_provider_ad.o		\
+	directory_server.o		\
+	adutils.o			\
+	dbutils.o			\
+	idmap_config.o			\
+	idmapd.o			\
+	init.o				\
+	nldaputils.o			\
+	rpc_svc.o			\
+	server.o			\
+	wksids.o
+
 SERVERSRCS =	$(SERVEROBJS:%.o=%.c)
 OBJS =		$(SERVEROBJS)
 SRCS =		$(SERVERSRCS)
@@ -42,7 +55,16 @@ SQLITELINT =	$(ROOT)/usr/lib/llib-lsqlite.ln
 
 include ../../Makefile.cmd
 
+TEXT_DOMAIN =	SUNW_OST_OSLIB
+XGETTEXT =	$(GNUXGETTEXT)
+XGETFLAGS =	--foreign-user --strict -n -E --width=72 \
+		--omit-header --keyword=directoryError:2 \
+		--language=C --force-po
+
+C99MODE = $(C99_ENABLE)
 POFILE =	$(PROG)_all.po
+
+RPC_MSGOUT_OPT = -DRPC_MSGOUT=idmap_rpc_msgout
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 $(ROOTMANIFEST) := FILEMODE= 444
@@ -55,7 +77,18 @@ $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
 
 CFLAGS += -v
-LDLIBS += -lsecdb -lsocket -lnsl -lidmap -lscf -lsldap -lldap -luuid -ladutils
+LDLIBS += -lsecdb \
+	-lsocket \
+	-lnsl \
+	-lidmap \
+	-lscf \
+	-lsldap \
+	-lldap \
+	-luuid \
+	-ladutils \
+	-lumem
+
+rpc_svc.o := CFLAGS += $(RPC_MSGOUT_OPT)
 
 $(PROG) := MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 $(PROG) := LDFLAGS += $(MAPFILES:%=-M%)
@@ -65,7 +98,7 @@ FILEMODE = 0555
 OWNER = root
 GROUP = sys
 
-lint_SRCS := CPPFLAGS += $(INCS) -D_REENTRANT
+lint_SRCS := CPPFLAGS += $(INCS) -D_REENTRANT $(RPC_MSGOUT_OPT)
 lint := LDLIBS += $(SQLITELINT)
 
 .KEEP_STATE:

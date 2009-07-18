@@ -25,15 +25,18 @@
 
 include $(SRC)/lib/Makefile.lib
 
-HDRS =		idmap.h
+HDRS =		idmap.h directory.h
 HDRDIR =	common
 
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 POFILE =	libidmap.po
-MSGFILES =	`$(GREP) -l gettext common/*.[ch]`
-XGETFLAGS =	-a
+MSGFILES:sh =	echo common/*.[ch]
+XGETTEXT =	$(GNUXGETTEXT)
+XGETFLAGS =	--foreign-user --strict -n -E --width=72 \
+		--omit-header --keyword=directoryError:2 \
+		--language=C --force-po
 
 all := 		TARGET = all
 clean :=	TARGET = clean
@@ -49,7 +52,7 @@ install_h:	$(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 
-$(POFILE):	pofile_MSGFILES
+$(POFILE):	$(MSGFILES)
 		$(BUILDPO.msgfiles)
 
 _msg:		$(MSGDOMAINPOFILE)

@@ -26,11 +26,24 @@
 
 LIBRARY =	libidmap.a
 VERS =		.1
-OBJECTS =	idmap_xdr.o utils.o idmap_api.o namemaps.o idmap_cache.o
-LINT_OBJECTS =	utils.o idmap_api.o namemaps.o idmap_cache.o
+LINT_OBJECTS =	\
+	directory_client.o	\
+	directory_error.o	\
+	directory_helper.o		\
+	directory_rpc_clnt.o	\
+	sidutil.o		\
+	sized_array.o		\
+	idmap_api.o		\
+	idmap_cache.o		\
+	miscutils.o		\
+	namemaps.o		\
+	utils.o
+
+OBJECTS = $(LINT_OBJECTS)	\
+	idmap_xdr.o
 
 include ../../Makefile.lib
-
+C99MODE = $(C99_ENABLE)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lldap -lsldap -lavl -ladutils -lnsl

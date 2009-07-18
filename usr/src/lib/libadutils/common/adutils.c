@@ -863,12 +863,10 @@ int
 adutils_lookup_check_domain(adutils_query_state_t *qs, const char *domain)
 {
 	adutils_ad_t *ad = qs->qadh->owner;
-	int i, err;
+	int i;
 
 	for (i = 0; i < ad->num_known_domains; i++) {
-		if (u8_strcmp(domain, ad->known_domains[i].name, 0,
-		    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
-		    err == 0)
+		if (domain_eq(domain, ad->known_domains[i].name))
 			return (1);
 	}
 
@@ -1116,7 +1114,7 @@ make_entry(adutils_q_t *q, adutils_host_t *adh, LDAPMessage *search_res,
 	char		*attr = NULL, *dn = NULL, *domain = NULL;
 	adutils_entry_t	*ep;
 	adutils_attr_t	*ap;
-	int		i, j, b, err = 0, ret = -2;
+	int		i, j, b, ret = -2;
 
 	*entry = NULL;
 
@@ -1128,8 +1126,7 @@ make_entry(adutils_q_t *q, adutils_host_t *adh, LDAPMessage *search_res,
 		return (-2);
 	}
 	if (q->edomain != NULL) {
-		if (u8_strcmp(q->edomain, domain, 0, U8_STRCMP_CI_LOWER,
-		    U8_UNICODE_LATEST, &err) != 0 || err != 0) {
+		if (!domain_eq(q->edomain, domain)) {
 			ldap_memfree(dn);
 			free(domain);
 			return (-1);
@@ -1560,7 +1557,7 @@ adutils_lookup_batch_getdefdomain(adutils_query_state_t *state)
  */
 adutils_rc
 adutils_lookup_batch_add(adutils_query_state_t *state,
-	const char *filter, const char **attrs, const char *edomain,
+	const char *filter, const char * const *attrs, const char *edomain,
 	adutils_result_t **result, adutils_rc *rc)
 {
 	adutils_rc	retcode = ADUTILS_SUCCESS;
@@ -1674,4 +1671,13 @@ adutils_lookup(adutils_ad_t *ad, const char *filter, const char **attrs,
 	if (rc != ADUTILS_SUCCESS)
 		return (rc);
 	return (brc);
+}
+
+boolean_t
+domain_eq(const char *a, const char *b)
+{
+	int err;
+
+	return (u8_strcmp(a, b, 0, U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err)
+	    == 0 && err == 0);
 }

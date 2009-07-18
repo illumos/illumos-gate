@@ -1256,3 +1256,6 @@ usr/lib/locale/C/LC_MESSAGES/TEST.po	i386
 # Private idmap RPC protocol
 usr/include/rpcsvc/idmap_prot.h		i386
 usr/include/rpcsvc/idmap_prot.x		i386
+
+# Private idmap directory API
+usr/include/directory.h			i386

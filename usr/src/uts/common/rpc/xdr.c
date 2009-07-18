@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -304,6 +304,29 @@ xdr_char(XDR *xdrs, char *cp)
 	}
 	*cp = (char)i;
 	return (TRUE);
+}
+
+/*
+ * XDR an unsigned char
+ */
+bool_t
+xdr_u_char(XDR *xdrs, uchar_t *cp)
+{
+	int i;
+
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
+		i = (*cp);
+		return (XDR_PUTINT32(xdrs, &i));
+	case XDR_DECODE:
+		if (!XDR_GETINT32(xdrs, &i))
+			return (FALSE);
+		*cp = (uchar_t)i;
+		return (TRUE);
+	case XDR_FREE:
+		return (TRUE);
+	}
+	return (FALSE);
 }
 
 /*
@@ -605,6 +628,32 @@ xdr_string(XDR *xdrs, char **cpp, const uint_t maxsize)
 		return (TRUE);
 	}
 	return (FALSE);
+}
+
+/*
+ * xdr_vector():
+ *
+ * XDR a fixed length array. Unlike variable-length arrays, the storage
+ * of fixed length arrays is static and unfreeable.
+ * > basep: base of the array
+ * > size: size of the array
+ * > elemsize: size of each element
+ * > xdr_elem: routine to XDR each element
+ */
+bool_t
+xdr_vector(XDR *xdrs, char *basep, const uint_t nelem,
+	const uint_t elemsize, const xdrproc_t xdr_elem)
+{
+	uint_t i;
+	char *elptr;
+
+	elptr = basep;
+	for (i = 0; i < nelem; i++) {
+		if (!(*xdr_elem)(xdrs, elptr, LASTUNSIGNED))
+			return (FALSE);
+		elptr += elemsize;
+	}
+	return (TRUE);
 }
 
 /*

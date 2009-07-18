@@ -314,7 +314,6 @@ ad_disc_compare_trusteddomains(ad_disc_trusteddomains_t *td1,
 	int		num_td1;
 	int		num_td2;
 	boolean_t	match;
-	int 		err;
 
 	for (i = 0; td1[i].domain[0] != '\0'; i++)
 		continue;
@@ -330,9 +329,7 @@ ad_disc_compare_trusteddomains(ad_disc_trusteddomains_t *td1,
 	for (i = 0; i < num_td1; i++) {
 		match = B_FALSE;
 		for (j = 0; j < num_td2; j++) {
-			if (u8_strcmp(td1[i].domain, td2[j].domain, 0,
-			    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
-			    err == 0) {
+			if (domain_eq(td1[i].domain, td2[j].domain)) {
 				match = B_TRUE;
 				break;
 			}
@@ -373,7 +370,6 @@ ad_disc_compare_domainsinforest(ad_disc_domainsinforest_t *df1,
 	int		num_df1;
 	int		num_df2;
 	boolean_t	match;
-	int		err;
 
 	for (i = 0; df1[i].domain[0] != '\0'; i++)
 		continue;
@@ -389,9 +385,7 @@ ad_disc_compare_domainsinforest(ad_disc_domainsinforest_t *df1,
 	for (i = 0; i < num_df1; i++) {
 		match = B_FALSE;
 		for (j = 0; j < num_df2; j++) {
-			if (u8_strcmp(df1[i].domain, df2[j].domain, 0,
-			    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
-			    err == 0 &&
+			if (domain_eq(df1[i].domain, df2[j].domain) &&
 			    strcmp(df1[i].sid, df2[j].sid) == 0) {
 				match = B_TRUE;
 				break;
@@ -1077,7 +1071,7 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 
 	if (ndomains < nresults) {
 		ad_disc_domainsinforest_t *tmp;
-		tmp = realloc(domains, (ndomains+1) * sizeof (*domains));
+		tmp = realloc(domains, (ndomains + 1) * sizeof (*domains));
 		if (tmp == NULL)
 			goto err;
 		domains = tmp;
@@ -1241,8 +1235,8 @@ validate_DomainName(ad_disc_t ctx)
 
 	/* Eat any trailing dot */
 	len = strlen(dname);
-	if (len > 0 && dname[len-1] == '.')
-		dname[len-1] = '\0';
+	if (len > 0 && dname[len - 1] == '.')
+		dname[len - 1] = '\0';
 
 	update_item(&ctx->domain_name, dname, AD_STATE_AUTO, ttl);
 

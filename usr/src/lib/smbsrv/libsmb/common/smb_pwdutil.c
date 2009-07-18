@@ -45,8 +45,6 @@
 #define	SMB_PASSTEMP	"/var/smb/ptmp"
 #define	SMB_PASSLCK	"/var/smb/.pwd.lock"
 
-#define	SMB_LIB_ALT	"/usr/lib/smbsrv/libsmb_pwd.so"
-
 #define	SMB_PWD_DISABLE	"*DIS*"
 #define	SMB_PWD_BUFSIZE 256
 
@@ -172,11 +170,9 @@ smb_pwd_init(boolean_t create_cache)
 		smb_lucache_update();
 	}
 
-	smb_pwd_hdl = dlopen(SMB_LIB_ALT, RTLD_NOW | RTLD_LOCAL);
-	if (smb_pwd_hdl == NULL) {
-		/* No library is interposed */
+	smb_pwd_hdl = smb_dlopen();
+	if (smb_pwd_hdl == NULL)
 		return;
-	}
 
 	bzero((void *)&smb_pwd_ops, sizeof (smb_pwd_ops));
 
@@ -212,7 +208,7 @@ smb_pwd_init(boolean_t create_cache)
 	    smb_pwd_ops.pwop_iteropen == NULL ||
 	    smb_pwd_ops.pwop_iterclose == NULL ||
 	    smb_pwd_ops.pwop_iterate == NULL) {
-		(void) dlclose(smb_pwd_hdl);
+		smb_dlclose(smb_pwd_hdl);
 		smb_pwd_hdl = NULL;
 
 		/* If error or function(s) are missing, use original lib */
@@ -230,11 +226,9 @@ void
 smb_pwd_fini(void)
 {
 	smb_lucache_destroy();
-
-	if (smb_pwd_hdl) {
-		(void) dlclose(smb_pwd_hdl);
-		smb_pwd_hdl = NULL;
-	}
+	smb_dlclose(smb_pwd_hdl);
+	smb_pwd_hdl = NULL;
+	bzero((void *)&smb_pwd_ops, sizeof (smb_pwd_ops));
 }
 
 /*

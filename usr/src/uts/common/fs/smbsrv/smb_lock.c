@@ -52,7 +52,22 @@ static smb_lock_t *smb_lock_create(smb_request_t *, uint64_t, uint64_t,
 static void smb_lock_destroy(smb_lock_t *);
 static void smb_lock_free(smb_lock_t *);
 
+/*
+ * Return the number of range locks on the specified node.
+ */
+uint32_t
+smb_lock_get_lock_count(smb_node_t *node)
+{
+	uint32_t	count;
 
+	SMB_NODE_VALID(node);
+
+	smb_llist_enter(&node->n_lock_list, RW_READER);
+	count = smb_llist_get_count(&node->n_ofile_list);
+	smb_llist_exit(&node->n_lock_list);
+
+	return (count);
+}
 
 /*
  * smb_unlock_range

@@ -79,7 +79,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lsec -lsocket -lresolv
+LDLIBS +=	-lscf -lmd -luuid -lnsl -lpkcs11 -lsec -lsocket -lresolv
 LDLIBS +=	-lidmap -lavl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 

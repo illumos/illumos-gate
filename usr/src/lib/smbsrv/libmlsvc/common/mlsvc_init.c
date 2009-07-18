@@ -82,6 +82,8 @@ void
 mlsvc_fini(void)
 {
 	smb_logon_fini();
+	svcctl_finalize();
+	logr_finalize();
 }
 
 /*ARGSUSED*/
@@ -99,44 +101,4 @@ mlsvc_keepalive(void *arg)
 
 	/*NOTREACHED*/
 	return (NULL);
-}
-
-uint64_t
-mlsvc_get_num_users(void)
-{
-	uint32_t n_users = 0;
-
-	(void) smb_kmod_get_usernum(&n_users);
-	return ((uint64_t)n_users);
-}
-
-/*
- * The calling function must free the output parameter 'users'.
- */
-int
-mlsvc_get_user_list(smb_ulist_t *ulist)
-{
-	return (smb_kmod_get_userlist(ulist));
-}
-
-/*
- * Downcall to the kernel that is executed upon share enable and disable.
- */
-int
-mlsvc_set_share(int shrop, char *path, char *name)
-{
-	int rc;
-
-	switch (shrop) {
-	case SMB_SHROP_ADD:
-		rc = smb_kmod_share(path, name);
-		break;
-	case SMB_SHROP_DELETE:
-		rc = smb_kmod_unshare(path, name);
-		break;
-	default:
-		rc = EINVAL;
-		break;
-	}
-	return (rc);
 }

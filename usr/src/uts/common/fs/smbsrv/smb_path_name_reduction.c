@@ -367,7 +367,7 @@ smb_pathname_reduce(
  * ENOENT will be returned.
  *
  * Path components are processed one at a time so that smb_nodes can be
- * created for each component.  This allows the dir_snode field in the
+ * created for each component.  This allows the n_dnode field in the
  * smb_node to be properly populated.
  *
  * Because of the above, links are also processed in this routine

@@ -32,11 +32,13 @@
 #include <string.h>
 #include <strings.h>
 #include <stdarg.h>
+#include <dlfcn.h>
 #include <sys/synch.h>
 #include <sys/stat.h>
 #include <sys/errno.h>
 #include <ctype.h>
-#include "eventlog.h"
+#include <smbsrv/ndl/eventlog.ndl>
+#include <smbsrv/libmlsvc.h>
 
 typedef enum {
 	LOGR_MONTH = 0,
@@ -76,6 +78,12 @@ typedef struct logr_syslog_node {
 	list_node_t	ln_node;
 	char		ln_logline[LOGR_MAXENTRYLEN];
 } logr_syslog_node_t;
+
+static void *logr_interposer_hdl = NULL;
+static struct {
+	boolean_t (*logr_op_supported)(char *);
+	int (*logr_op_snapshot)(logr_context_t *);
+} logr_interposer_ops;
 
 /*
  * Set the syslog timestamp.
@@ -289,12 +297,12 @@ logr_syslog_load(FILE *fp, logr_info_t *log)
  * provided by the caller. Returns the number of entries in
  * the log.
  */
-int
-logr_syslog_snapshot(logr_info_t *loginfo)
+static int
+logr_syslog_snapshot(char *logname, logr_info_t *loginfo)
 {
 	FILE *fp;
 
-	if (loginfo == NULL)
+	if ((loginfo == NULL) || (!logr_is_supported(logname)))
 		return (-1);
 
 	if ((fp = fopen("/var/adm/messages", "r")) == 0)
@@ -310,4 +318,108 @@ logr_syslog_snapshot(logr_info_t *loginfo)
 		return (loginfo->li_idx);
 
 	return (LOGR_NMSGMASK+1);
+}
+
+/*
+ * logr_is_supported
+ *
+ * Determines if a given log is supported or not.
+ * Returns B_TRUE on success, B_FALSE on failure.
+ */
+boolean_t
+logr_is_supported(char *log_name)
+{
+	if (log_name == NULL)
+		return (B_FALSE);
+
+	if (logr_interposer_ops.logr_op_supported != NULL)
+		return (logr_interposer_ops.logr_op_supported(log_name));
+
+	if (strcasecmp(log_name, LOGR_SYSTEM_LOG) != 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * logr_get_snapshot
+ *
+ * Allocate memory and make a copy, as a snapshot, from system log.
+ * Returns 0 on success, -1 on failure.
+ */
+int
+logr_get_snapshot(logr_context_t *ctx)
+{
+	logr_read_data_t *data = NULL;
+
+	if (logr_interposer_ops.logr_op_snapshot != NULL)
+		return (logr_interposer_ops.logr_op_snapshot(ctx));
+
+	ctx->lc_cached_read_data = malloc(sizeof (logr_read_data_t));
+	if (ctx->lc_cached_read_data != NULL) {
+		data = ctx->lc_cached_read_data;
+
+		data->rd_log = (logr_info_t *)malloc(sizeof (logr_info_t));
+		if (data->rd_log == NULL) {
+			free(data);
+			return (-1);
+		}
+		bzero(data->rd_log, sizeof (logr_info_t));
+
+		data->rd_tot_recnum = logr_syslog_snapshot(ctx->lc_source_name,
+		    data->rd_log);
+		if (data->rd_tot_recnum < 0) {
+			free(data->rd_log);
+			free(data);
+			return (-1);
+		}
+
+		data->rd_first_read = 1;
+
+		return (0);
+	}
+
+	return (-1);
+}
+
+/*
+ * logr_init
+ *
+ * Initializes the Eventlog service.
+ * Checks to see if a event log utility library
+ * is interposed. If yes then it'll initializes logr_interposer_ops
+ * structure with function pointers from this library.
+ */
+void
+logr_init(void)
+{
+	logr_interposer_hdl = smb_dlopen();
+	if (logr_interposer_hdl == NULL)
+		return;
+
+	bzero((void *)&logr_interposer_ops, sizeof (logr_interposer_ops));
+
+	logr_interposer_ops.logr_op_supported =
+	    (boolean_t (*)())dlsym(logr_interposer_hdl, "logr_is_supported");
+
+	logr_interposer_ops.logr_op_snapshot =
+	    (int (*)())dlsym(logr_interposer_hdl, "logr_get_snapshot");
+
+	if (logr_interposer_ops.logr_op_supported == NULL ||
+	    logr_interposer_ops.logr_op_snapshot == NULL)
+		logr_fini();
+}
+
+/*
+ * logr_fini
+ *
+ * Finalizes the Eventlog service.
+ * Closes handle to interposed library.
+ */
+void
+logr_fini(void)
+{
+	smb_dlclose(logr_interposer_hdl);
+	logr_interposer_hdl = NULL;
+	bzero((void *)&logr_interposer_ops, sizeof (logr_interposer_ops));
 }

@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -420,6 +420,8 @@ extern bool_t	xdr_opaque(XDR *, caddr_t, const uint_t);
 extern bool_t	xdr_string(XDR *, char **, const uint_t);
 extern bool_t	xdr_union(XDR *, enum_t *, char *,
 		    const struct xdr_discrim *, const xdrproc_t);
+extern bool_t	xdr_vector(XDR *, char *, const uint_t, const uint_t,
+    const xdrproc_t);
 extern unsigned int  xdr_sizeof(xdrproc_t, void *);
 
 extern bool_t   xdr_hyper(XDR *, longlong_t *);
@@ -428,6 +430,7 @@ extern bool_t   xdr_u_hyper(XDR *, u_longlong_t *);
 extern bool_t   xdr_u_longlong_t(XDR *, u_longlong_t *);
 
 extern bool_t	xdr_char(XDR *, char *);
+extern bool_t	xdr_u_char(XDR *, uchar_t *);
 extern bool_t	xdr_wrapstring(XDR *, char **);
 extern bool_t	xdr_reference(XDR *, caddr_t *, uint_t, const xdrproc_t);
 extern bool_t	xdr_pointer(XDR *, char **, uint_t, const xdrproc_t);
@@ -446,9 +449,6 @@ extern bool_t	xdr_uint64_t(XDR *, uint64_t *);
 #endif
 
 #ifndef _KERNEL
-extern bool_t	xdr_u_char(XDR *, uchar_t *);
-extern bool_t	xdr_vector(XDR *, char *, const uint_t, const uint_t, const
-xdrproc_t);
 extern bool_t	xdr_float(XDR *, float *);
 extern bool_t	xdr_double(XDR *, double *);
 extern bool_t	xdr_quadruple(XDR *, long double *);
@@ -468,12 +468,14 @@ extern bool_t	xdr_bytes();
 extern bool_t	xdr_opaque();
 extern bool_t	xdr_string();
 extern bool_t	xdr_union();
+extern bool_t	xdr_vector();
 
 extern bool_t   xdr_hyper();
 extern bool_t   xdr_longlong_t();
 extern bool_t   xdr_u_hyper();
 extern bool_t   xdr_u_longlong_t();
 extern bool_t	xdr_char();
+extern bool_t	xdr_u_char();
 extern bool_t	xdr_reference();
 extern bool_t	xdr_pointer();
 extern void	xdr_free();
@@ -492,8 +494,6 @@ extern bool_t	xdr_uint64_t();
 #endif
 
 #ifndef _KERNEL
-extern bool_t	xdr_u_char();
-extern bool_t	xdr_vector();
 extern bool_t	xdr_float();
 extern bool_t	xdr_double();
 extern bool_t   xdr_quadruple();

@@ -47,6 +47,9 @@ int srvsvc_gettime(unsigned long *);
 void msgsvcsend_initialize(void);
 void spoolss_initialize(void);
 
+void logr_finalize(void);
+void svcctl_finalize(void);
+
 int netr_open(char *, char *, mlsvc_handle_t *);
 int netr_close(mlsvc_handle_t *);
 DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);

@@ -34,7 +34,6 @@
 #include <sys/varargs.h>
 #include "idmap_engine.h"
 #include "idmap_priv.h"
-#include "idmap_impl.h"
 
 /* Initialization values for pids/rids: */
 

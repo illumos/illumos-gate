@@ -170,6 +170,36 @@ ndr_rpc_call(mlsvc_handle_t *handle, int opnum, void *params)
 }
 
 /*
+ * Set information about the remote RPC server in the handle.
+ */
+void
+ndr_rpc_server_setinfo(mlsvc_handle_t *handle,
+    const srvsvc_server_info_t *svinfo)
+{
+	bcopy(svinfo, &handle->svinfo, sizeof (srvsvc_server_info_t));
+	handle->svinfo.sv_name = NULL;
+	handle->svinfo.sv_comment = NULL;
+
+	if (svinfo->sv_version_major > 4)
+		handle->remote_os = NATIVE_OS_WIN2000;
+	else
+		handle->remote_os = NATIVE_OS_WINNT;
+
+	smb_tracef("NdrRpcServerSetInfo: %s (version %d.%d)",
+	    svinfo->sv_name ? svinfo->sv_name : "<unknown>",
+	    svinfo->sv_version_major, svinfo->sv_version_minor);
+}
+
+/*
+ * Get information about the remote RPC server from the handle.
+ */
+void
+ndr_rpc_server_getinfo(mlsvc_handle_t *handle, srvsvc_server_info_t *svinfo)
+{
+	bcopy(&handle->svinfo, svinfo, sizeof (srvsvc_server_info_t));
+}
+
+/*
  * Returns the Native-OS of the RPC server.
  */
 int

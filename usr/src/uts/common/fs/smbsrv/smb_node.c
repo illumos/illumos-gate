@@ -153,7 +153,7 @@ static void smb_node_set_cached_timestamps(smb_node_t *, smb_attr_t *);
 #define	VALIDATE_DIR_NODE(_dir_, _node_) \
     ASSERT((_dir_)->n_magic == SMB_NODE_MAGIC); \
     ASSERT(((_dir_)->vp->v_xattrdir) || ((_dir_)->vp->v_type == VDIR)); \
-    ASSERT((_dir_)->dir_snode != (_node_));
+    ASSERT((_dir_)->n_dnode != (_node_));
 
 static kmem_cache_t	*smb_node_cache = NULL;
 static boolean_t	smb_node_initialized = B_FALSE;
@@ -246,7 +246,7 @@ smb_node_fini(void)
  * or newly created.
  *
  * If an smb_node needs to be created, a reference is also taken on the
- * dir_snode (if passed in).
+ * dnode (if passed in).
  *
  * See smb_node_release() for details on the release of these references.
  */
@@ -259,8 +259,8 @@ smb_node_lookup(
     cred_t		*cred,
     vnode_t		*vp,
     char		*od_name,
-    smb_node_t		*dir_snode,
-    smb_node_t		*unnamed_node)
+    smb_node_t		*dnode,
+    smb_node_t		*unode)
 {
 	smb_llist_t		*node_hdr;
 	smb_node_t		*node;
@@ -277,8 +277,8 @@ smb_node_lookup(
 	 * it with the list lock held.
 	 */
 
-	if (unnamed_node)
-		unnamed_vp = unnamed_node->vp;
+	if (unode)
+		unnamed_vp = unode->vp;
 
 	/*
 	 * This getattr is performed on behalf of the server
@@ -323,14 +323,13 @@ smb_node_lookup(
 				case SMB_NODE_STATE_AVAILABLE:
 					/* The node was found. */
 					node->n_refcnt++;
-					if ((node->dir_snode == NULL) &&
-					    (dir_snode != NULL) &&
+					if ((node->n_dnode == NULL) &&
+					    (dnode != NULL) &&
 					    (strcmp(od_name, "..") != 0) &&
 					    (strcmp(od_name, ".") != 0)) {
-						VALIDATE_DIR_NODE(dir_snode,
-						    node);
-						node->dir_snode = dir_snode;
-						smb_node_ref(dir_snode);
+						VALIDATE_DIR_NODE(dnode, node);
+						node->n_dnode = dnode;
+						smb_node_ref(dnode);
 					}
 
 					smb_node_audit(node);
@@ -371,17 +370,17 @@ smb_node_lookup(
 	if (op)
 		node->flags |= smb_is_executable(op->fqi.fq_last_comp);
 
-	if (dir_snode) {
-		smb_node_ref(dir_snode);
-		node->dir_snode = dir_snode;
-		ASSERT(dir_snode->dir_snode != node);
-		ASSERT((dir_snode->vp->v_xattrdir) ||
-		    (dir_snode->vp->v_type == VDIR));
+	if (dnode) {
+		smb_node_ref(dnode);
+		node->n_dnode = dnode;
+		ASSERT(dnode->n_dnode != node);
+		ASSERT((dnode->vp->v_xattrdir) ||
+		    (dnode->vp->v_type == VDIR));
 	}
 
-	if (unnamed_node) {
-		smb_node_ref(unnamed_node);
-		node->unnamed_stream_node = unnamed_node;
+	if (unode) {
+		smb_node_ref(unode);
+		node->n_unode = unode;
 	}
 
 	DTRACE_PROBE1(smb_node_lookup_miss, smb_node_t *, node);
@@ -472,8 +471,8 @@ smb_node_ref(smb_node_t *node)
  * then the caller with the local variable should call smb_node_release()
  * directly.
  *
- * smb_node_release() itself will call smb_node_release() on a node's dir_snode,
- * as smb_node_lookup() takes a hold on dir_snode.
+ * smb_node_release() itself will call smb_node_release() on a node's n_dnode,
+ * as smb_node_lookup() takes a hold on dnode.
  */
 void
 smb_node_release(smb_node_t *node)
@@ -499,16 +498,16 @@ smb_node_release(smb_node_t *node)
 			 */
 			smb_node_delete_on_close(node);
 
-			if (node->dir_snode) {
-				ASSERT(node->dir_snode->n_magic ==
+			if (node->n_dnode) {
+				ASSERT(node->n_dnode->n_magic ==
 				    SMB_NODE_MAGIC);
-				smb_node_release(node->dir_snode);
+				smb_node_release(node->n_dnode);
 			}
 
-			if (node->unnamed_stream_node) {
-				ASSERT(node->unnamed_stream_node->n_magic ==
+			if (node->n_unode) {
+				ASSERT(node->n_unode->n_magic ==
 				    SMB_NODE_MAGIC);
-				smb_node_release(node->unnamed_stream_node);
+				smb_node_release(node->n_unode);
 			}
 
 			smb_node_free(node);
@@ -529,7 +528,7 @@ smb_node_delete_on_close(smb_node_t *node)
 	int		rc = 0;
 	uint32_t	flags = 0;
 
-	d_snode = node->dir_snode;
+	d_snode = node->n_dnode;
 	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
 		node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
 		flags = node->n_delete_on_close_flags;
@@ -570,9 +569,9 @@ smb_node_rename(
 	case SMB_NODE_STATE_AVAILABLE:
 	case SMB_NODE_STATE_OPLOCK_GRANTED:
 	case SMB_NODE_STATE_OPLOCK_BREAKING:
-		ret_node->dir_snode = to_dnode;
+		ret_node->n_dnode = to_dnode;
 		mutex_exit(&ret_node->n_mutex);
-		ASSERT(to_dnode->dir_snode != ret_node);
+		ASSERT(to_dnode->n_dnode != ret_node);
 		ASSERT((to_dnode->vp->v_xattrdir) ||
 		    (to_dnode->vp->v_type == VDIR));
 		smb_node_release(from_dnode);
@@ -956,10 +955,9 @@ smb_node_alloc(
 	node->n_orig_uid = 0;
 	node->readonly_creator = NULL;
 	node->waiting_event = 0;
-	node->what = 0;
 	node->n_open_count = 0;
-	node->dir_snode = NULL;
-	node->unnamed_stream_node = NULL;
+	node->n_dnode = NULL;
+	node->n_unode = NULL;
 	node->delete_on_close_cred = NULL;
 	node->n_delete_on_close_flags = 0;
 

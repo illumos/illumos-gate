@@ -1041,13 +1041,8 @@ smb_session_lookup_user(smb_session_t *session, char *domain, char *name)
 		ASSERT(user->u_magic == SMB_USER_MAGIC);
 		if (!utf8_strcasecmp(user->u_name, name) &&
 		    !utf8_strcasecmp(user->u_domain, domain)) {
-			mutex_enter(&user->u_mutex);
-			if (user->u_state == SMB_USER_STATE_LOGGED_IN) {
-				user->u_refcnt++;
-				mutex_exit(&user->u_mutex);
+			if (smb_user_hold(user))
 				break;
-			}
-			mutex_exit(&user->u_mutex);
 		}
 		user = smb_llist_next(ulist, user);
 	}
@@ -1081,6 +1076,64 @@ smb_session_dup_user(smb_session_t *session, char *domain, char *account_name)
 	}
 
 	return (user);
+}
+
+/*
+ * Copy the session workstation/client name to buf.  If the workstation
+ * is an empty string (which it will be on TCP connections), use the
+ * client IP address.
+ */
+void
+smb_session_getclient(smb_session_t *sn, char *buf, size_t buflen)
+{
+	char		ipbuf[INET6_ADDRSTRLEN];
+	smb_inaddr_t	*ipaddr;
+
+	ASSERT(sn);
+	ASSERT(buf);
+	ASSERT(buflen);
+
+	*buf = '\0';
+
+	if (sn->workstation[0] != '\0') {
+		(void) strlcpy(buf, sn->workstation, buflen);
+		return;
+	}
+
+	ipaddr = &sn->ipaddr;
+	if (smb_inet_ntop(ipaddr, ipbuf, SMB_IPSTRLEN(ipaddr->a_family)))
+		(void) strlcpy(buf, ipbuf, buflen);
+}
+
+/*
+ * Check whether or not the specified client name is the client of this
+ * session.  The name may be in UNC format (\\CLIENT).
+ *
+ * A workstation/client name is setup on NBT connections as part of the
+ * NetBIOS session request but that isn't available on TCP connections.
+ * If the session doesn't have a client name we typically return the
+ * client IP address as the workstation name on MSRPC requests.  So we
+ * check for the IP address here in addition to the workstation name.
+ */
+boolean_t
+smb_session_isclient(smb_session_t *sn, const char *client)
+{
+	char		buf[INET6_ADDRSTRLEN];
+	smb_inaddr_t	*ipaddr;
+
+	client += strspn(client, "\\");
+
+	if (utf8_strcasecmp(client, sn->workstation) == 0)
+		return (B_TRUE);
+
+	ipaddr = &sn->ipaddr;
+	if (smb_inet_ntop(ipaddr, buf, SMB_IPSTRLEN(ipaddr->a_family)) == NULL)
+		return (B_FALSE);
+
+	if (utf8_strcasecmp(client, buf) == 0)
+		return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 /*
@@ -1171,7 +1224,7 @@ smb_request_free(smb_request_t *sr)
 void
 dump_smb_inaddr(smb_inaddr_t *ipaddr)
 {
-char ipstr[INET6_ADDRSTRLEN];
+	char ipstr[INET6_ADDRSTRLEN];
 
 	if (smb_inet_ntop(ipaddr, ipstr, SMB_IPSTRLEN(ipaddr->a_family)))
 		cmn_err(CE_WARN, "error ipstr=%s", ipstr);

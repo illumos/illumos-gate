@@ -30,57 +30,6 @@
 #endif /* _KERNEL */
 #include <smbsrv/smb_xdr.h>
 #include <sys/socket.h>
-#ifdef _KERNEL
-/*
- * xdr_vector():
- *
- * XDR a fixed length array. Unlike variable-length arrays,
- * the storage of fixed length arrays is static and unfreeable.
- * > basep: base of the array
- * > size: size of the array
- * > elemsize: size of each element
- * > xdr_elem: routine to XDR each element
- */
-#define	LASTUNSIGNED ((uint_t)0-1)
-bool_t
-xdr_vector(XDR *xdrs, char *basep, uint_t nelem,
-	uint_t elemsize, xdrproc_t xdr_elem)
-{
-	uint_t i;
-	char *elptr;
-
-	elptr = basep;
-	for (i = 0; i < nelem; i++) {
-		if (!(*xdr_elem)(xdrs, elptr, LASTUNSIGNED))
-			return (FALSE);
-		elptr += elemsize;
-	}
-	return (TRUE);
-}
-
-/*
- * XDR an unsigned char
- */
-bool_t
-xdr_u_char(XDR *xdrs, uchar_t *cp)
-{
-	int i;
-
-	switch (xdrs->x_op) {
-	case XDR_ENCODE:
-		i = (*cp);
-		return (XDR_PUTINT32(xdrs, &i));
-	case XDR_DECODE:
-		if (!XDR_GETINT32(xdrs, &i))
-			return (FALSE);
-		*cp = (uchar_t)i;
-		return (TRUE);
-	case XDR_FREE:
-		return (TRUE);
-	}
-	return (FALSE);
-}
-#endif /* _KERNEL */
 
 bool_t
 xdr_smb_dr_string_t(xdrs, objp)
@@ -160,45 +109,44 @@ smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp)
 }
 
 /*
- * Encode an opipe context structure into a buffer.
+ * Encode an smb_netuserinfo_t into a buffer.
  */
 int
-smb_opipe_context_encode(smb_opipe_context_t *ctx, uint8_t *buf,
-    uint32_t buflen, uint_t *pbytes_encoded)
+smb_netuserinfo_encode(smb_netuserinfo_t *info, uint8_t *buf,
+    uint32_t buflen, uint_t *nbytes)
 {
 	XDR xdrs;
 	int rc = 0;
 
 	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_ENCODE);
 
-	if (!smb_opipe_context_xdr(&xdrs, ctx))
+	if (!smb_netuserinfo_xdr(&xdrs, info))
 		rc = -1;
 
-	if (pbytes_encoded != NULL)
-		*pbytes_encoded = xdr_getpos(&xdrs);
-
+	if (nbytes != NULL)
+		*nbytes = xdr_getpos(&xdrs);
 	xdr_destroy(&xdrs);
 	return (rc);
 }
 
 /*
- * Decode an XDR buffer into an opipe context structure.
+ * Decode an XDR buffer into an smb_netuserinfo_t.
  */
 int
-smb_opipe_context_decode(smb_opipe_context_t *ctx, uint8_t *buf,
-    uint32_t buflen, uint_t *pbytes_decoded)
+smb_netuserinfo_decode(smb_netuserinfo_t *info, uint8_t *buf,
+    uint32_t buflen, uint_t *nbytes)
 {
 	XDR xdrs;
 	int rc = 0;
 
 	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
 
-	bzero(ctx, sizeof (smb_opipe_context_t));
-	if (!smb_opipe_context_xdr(&xdrs, ctx))
+	bzero(info, sizeof (smb_netuserinfo_t));
+	if (!smb_netuserinfo_xdr(&xdrs, info))
 		rc = -1;
 
-	if (pbytes_decoded != NULL)
-		*pbytes_decoded = xdr_getpos(&xdrs);
+	if (nbytes != NULL)
+		*nbytes = xdr_getpos(&xdrs);
 	xdr_destroy(&xdrs);
 	return (rc);
 }
@@ -219,32 +167,175 @@ xdr_smb_inaddr_t(XDR *xdrs, smb_inaddr_t *objp)
 	return (TRUE);
 }
 
+/*
+ * XDR encode/decode for smb_netuserinfo_t.
+ */
 bool_t
-smb_opipe_context_xdr(XDR *xdrs, smb_opipe_context_t *objp)
+smb_netuserinfo_xdr(XDR *xdrs, smb_netuserinfo_t *objp)
 {
-	if (!xdr_uint64_t(xdrs, &objp->oc_session_id))
+	if (!xdr_uint64_t(xdrs, &objp->ui_session_id))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->oc_uid))
+	if (!xdr_uint16_t(xdrs, &objp->ui_uid))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->oc_domain_len))
+	if (!xdr_uint16_t(xdrs, &objp->ui_domain_len))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->oc_domain, ~0))
+	if (!xdr_string(xdrs, &objp->ui_domain, ~0))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->oc_account_len))
+	if (!xdr_uint16_t(xdrs, &objp->ui_account_len))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->oc_account, ~0))
+	if (!xdr_string(xdrs, &objp->ui_account, ~0))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->oc_workstation_len))
+	if (!xdr_uint16_t(xdrs, &objp->ui_workstation_len))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->oc_workstation, ~0))
+	if (!xdr_string(xdrs, &objp->ui_workstation, ~0))
 		return (FALSE);
-	if (!xdr_smb_inaddr_t(xdrs, &objp->oc_ipaddr))
+	if (!xdr_smb_inaddr_t(xdrs, &objp->ui_ipaddr))
 		return (FALSE);
-	if (!xdr_int32_t(xdrs, &objp->oc_native_os))
+	if (!xdr_int32_t(xdrs, &objp->ui_native_os))
 		return (FALSE);
-	if (!xdr_int64_t(xdrs, &objp->oc_logon_time))
+	if (!xdr_int64_t(xdrs, &objp->ui_logon_time))
 		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->oc_flags))
+	if (!xdr_uint32_t(xdrs, &objp->ui_numopens))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ui_flags))
+		return (FALSE);
+	return (TRUE);
+}
+
+/*
+ * Encode an smb_netconnectinfo_t into a buffer.
+ */
+int
+smb_netconnectinfo_encode(smb_netconnectinfo_t *info, uint8_t *buf,
+    uint32_t buflen, uint_t *nbytes)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_ENCODE);
+
+	if (!smb_netconnectinfo_xdr(&xdrs, info))
+		rc = -1;
+
+	if (nbytes != NULL)
+		*nbytes = xdr_getpos(&xdrs);
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+/*
+ * Decode an XDR buffer into an smb_netconnectinfo_t.
+ */
+int
+smb_netconnectinfo_decode(smb_netconnectinfo_t *info, uint8_t *buf,
+    uint32_t buflen, uint_t *nbytes)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
+
+	bzero(info, sizeof (smb_netconnectinfo_t));
+	if (!smb_netconnectinfo_xdr(&xdrs, info))
+		rc = -1;
+
+	if (nbytes != NULL)
+		*nbytes = xdr_getpos(&xdrs);
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+/*
+ * XDR encode/decode for smb_netconnectinfo_t.
+ */
+bool_t
+smb_netconnectinfo_xdr(XDR *xdrs, smb_netconnectinfo_t *objp)
+{
+	if (!xdr_uint32_t(xdrs, &objp->ci_id))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ci_type))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ci_numopens))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ci_numusers))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ci_time))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ci_namelen))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->ci_sharelen))
+		return (FALSE);
+	if (!xdr_string(xdrs, &objp->ci_username, MAXNAMELEN))
+		return (FALSE);
+	if (!xdr_string(xdrs, &objp->ci_share, MAXNAMELEN))
+		return (FALSE);
+	return (TRUE);
+}
+
+/*
+ * Encode an smb_netfileinfo_t into a buffer.
+ */
+int
+smb_netfileinfo_encode(smb_netfileinfo_t *info, uint8_t *buf,
+    uint32_t buflen, uint_t *nbytes)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_ENCODE);
+
+	if (!smb_netfileinfo_xdr(&xdrs, info))
+		rc = -1;
+
+	if (nbytes != NULL)
+		*nbytes = xdr_getpos(&xdrs);
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+/*
+ * Decode an XDR buffer into an smb_netfileinfo_t.
+ */
+int
+smb_netfileinfo_decode(smb_netfileinfo_t *info, uint8_t *buf,
+    uint32_t buflen, uint_t *nbytes)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
+
+	bzero(info, sizeof (smb_netfileinfo_t));
+	if (!smb_netfileinfo_xdr(&xdrs, info))
+		rc = -1;
+
+	if (nbytes != NULL)
+		*nbytes = xdr_getpos(&xdrs);
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+/*
+ * XDR encode/decode for smb_netfileinfo_t.
+ */
+bool_t
+smb_netfileinfo_xdr(XDR *xdrs, smb_netfileinfo_t *objp)
+{
+	if (!xdr_uint16_t(xdrs, &objp->fi_fid))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->fi_uniqid))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->fi_permissions))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->fi_numlocks))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->fi_pathlen))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->fi_namelen))
+		return (FALSE);
+	if (!xdr_string(xdrs, &objp->fi_path, MAXPATHLEN))
+		return (FALSE);
+	if (!xdr_string(xdrs, &objp->fi_username, MAXNAMELEN))
 		return (FALSE);
 	return (TRUE);
 }

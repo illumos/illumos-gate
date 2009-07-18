@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -235,7 +235,7 @@ idmap_setqresults(idmap_q_t *q, char *san, char *dn, const char *attr,
 	char *sid, rid_t rid, int sid_type, char *unixname)
 {
 	char *domain;
-	int err1, err2;
+	int err1;
 
 	assert(dn != NULL);
 
@@ -252,8 +252,7 @@ idmap_setqresults(idmap_q_t *q, char *san, char *dn, const char *attr,
 
 	if (q->edomain != NULL) {
 		/* Check that this is the domain that we were looking for */
-		if (u8_strcmp(q->edomain, domain, 0, U8_STRCMP_CI_LOWER,
-		    U8_UNICODE_LATEST, &err2) != 0 || err2 != 0)
+		if (!domain_eq(q->edomain, domain))
 			goto out;
 	}
 

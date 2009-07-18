@@ -19,13 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
 /* opaque type to support non-ASCII strings */
 typedef	string	idmap_utf8str<>;
+typedef	idmap_utf8str	idmap_utf8str_list<>;
 
 /* Return status */
 typedef int idmap_retcode;
@@ -270,6 +270,76 @@ struct idmap_prop_res {
 };
 #endif
 
+/*
+ * Represents an error from the directory lookup service.
+ *
+ * code is an ASCII string that is a key for the error.  It is not
+ * localized.
+ *
+ * fmt is a format string with %n markers for where to include
+ * params[n-1].  It should be, but NEEDSWORK is not localized to
+ * the caller's locale.
+ *
+ * params is a list of parameters for the error - e.g. the name that
+ * encountered a failure, the server that reported the failure, et cetera.
+ * The values are to be used both as marked in fmt and for machine
+ * interpretation of the error.
+ */
+struct directory_error_rpc {
+	idmap_utf8str	code;
+	idmap_utf8str	fmt;
+	idmap_utf8str	params<>;
+};
+
+/*
+ * One value of a multivalued attribute.
+ */
+typedef opaque			directory_value_rpc<>;
+
+/*
+ * The value of an attribute, if found.  Note that this is a list
+ * of directory_value_rpc objects, to support multivalued attributes.
+ */
+union directory_values_rpc switch (bool found) {
+	case TRUE:
+		directory_value_rpc values<>;
+	case FALSE:
+		void;
+};
+
+/*
+ * The status of the lookup for any particular identifier.
+ */
+enum directory_lookup_status_rpc {
+	DIRECTORY_NOT_FOUND = 0,
+	DIRECTORY_FOUND = 1,
+	DIRECTORY_ERROR = 2
+};
+
+/*
+ * This is the data returned for a particular identifier, either a
+ * list of attribute values or an error.
+ */
+union directory_entry_rpc switch (directory_lookup_status_rpc status) {
+	case DIRECTORY_NOT_FOUND:
+		void;
+	case DIRECTORY_FOUND:
+		directory_values_rpc attrs<>;
+	case DIRECTORY_ERROR:
+		directory_error_rpc err;
+};
+
+/*
+ * This is the result from a request, either a list of the entries for
+ * the identifiers specified, or an error.
+ */
+union directory_results_rpc switch (bool failed) {
+	case TRUE:
+		directory_error_rpc	err;
+	case FALSE:
+		directory_entry_rpc	entries<>;
+};
+
 program IDMAP_PROG {
 	version IDMAP_V1 {
 		void
@@ -302,6 +372,27 @@ program IDMAP_PROG {
 		idmap_prop_res
 		IDMAP_GET_PROP(idmap_prop_type) = 6;
 #endif
+		/*
+		 * Retrieve directory information about a list of users
+		 * or groups by name or SID.
+		 *
+		 * ids is a list of user names, group names, or SIDs.
+		 *
+		 * types is a list of types of the ids in the id list.
+		 * If the type list is shorter than the id list, the last
+		 * type listed applies to all of the ids from that point.
+		 * The defined types are:
+		 *     'n' - name (could be user or group)
+		 *     'u' - user
+		 *     'g' - group
+		 *     's' - SID
+		 *
+		 * attrs is a list of attribute names to retrieve.
+		 */
+		directory_results_rpc DIRECTORY_GET_COMMON(
+			idmap_utf8str_list ids,
+			idmap_utf8str types,
+			idmap_utf8str_list attrs) = 7;
 
 	} = 1;
 } = 100172;

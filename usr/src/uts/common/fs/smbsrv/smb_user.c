@@ -171,6 +171,8 @@
 
 static smb_sid_t *smb_admins_sid = NULL;
 
+static boolean_t smb_user_is_logged_in(smb_user_t *);
+static int smb_user_enum_private(smb_user_t *, smb_svcenum_t *);
 static void smb_user_delete(smb_user_t *user);
 static smb_tree_t *smb_user_get_tree(smb_llist_t *, smb_tree_t *);
 
@@ -287,7 +289,8 @@ smb_user_dup(
 /*
  * smb_user_logoff
  *
- *
+ * Change the user state and disconnect trees.
+ * The user list must not be entered or modified here.
  */
 void
 smb_user_logoff(
@@ -376,6 +379,27 @@ smb_user_logoff_all(
 }
 
 /*
+ * Take a reference on a user.
+ */
+boolean_t
+smb_user_hold(smb_user_t *user)
+{
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+
+	mutex_enter(&user->u_mutex);
+
+	if (smb_user_is_logged_in(user)) {
+		user->u_refcnt++;
+		mutex_exit(&user->u_mutex);
+		return (B_TRUE);
+	}
+
+	mutex_exit(&user->u_mutex);
+	return (B_FALSE);
+}
+
+/*
  * smb_user_release
  *
  *
@@ -434,29 +458,10 @@ smb_user_lookup_by_uid(
 		ASSERT(user->u_magic == SMB_USER_MAGIC);
 		ASSERT(user->u_session == session);
 		if (user->u_uid == uid) {
-			mutex_enter(&user->u_mutex);
-			switch (user->u_state) {
-
-			case SMB_USER_STATE_LOGGED_IN:
-				/* The user exists and is still logged in. */
-				user->u_refcnt++;
-				mutex_exit(&user->u_mutex);
+			if (smb_user_hold(user)) {
 				smb_llist_exit(&session->s_user_list);
 				return (user);
-
-			case SMB_USER_STATE_LOGGING_OFF:
-			case SMB_USER_STATE_LOGGED_OFF:
-				/*
-				 * The user exists but has logged off or is in
-				 * the process of logging off.
-				 */
-				mutex_exit(&user->u_mutex);
-				smb_llist_exit(&session->s_user_list);
-				return (NULL);
-
-			default:
-				ASSERT(0);
-				mutex_exit(&user->u_mutex);
+			} else {
 				smb_llist_exit(&session->s_user_list);
 				return (NULL);
 			}
@@ -499,17 +504,11 @@ smb_user_lookup_by_state(
 	while (next) {
 		ASSERT(next->u_magic == SMB_USER_MAGIC);
 		ASSERT(next->u_session == session);
-		mutex_enter(&next->u_mutex);
-		if (next->u_state == SMB_USER_STATE_LOGGED_IN) {
-			next->u_refcnt++;
-			mutex_exit(&next->u_mutex);
+
+		if (smb_user_hold(next))
 			break;
-		} else {
-			ASSERT((next->u_state == SMB_USER_STATE_LOGGING_OFF) ||
-			    (next->u_state == SMB_USER_STATE_LOGGED_OFF));
-			mutex_exit(&next->u_mutex);
-			next = smb_llist_next(lst, next);
-		}
+
+		next = smb_llist_next(lst, next);
 	}
 	smb_llist_exit(lst);
 
@@ -712,6 +711,40 @@ smb_user_disconnect_share(
 }
 
 /*
+ * Close a file by its unique id.
+ */
+int
+smb_user_fclose(smb_user_t *user, uint32_t uniqid)
+{
+	smb_llist_t	*tree_list;
+	smb_tree_t	*tree;
+	int		rc = ENOENT;
+
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+
+	tree_list = &user->u_tree_list;
+	ASSERT(tree_list);
+
+	smb_llist_enter(tree_list, RW_READER);
+	tree = smb_llist_head(tree_list);
+
+	while ((tree != NULL) && (rc == ENOENT)) {
+		ASSERT(tree->t_user == user);
+
+		if (smb_tree_hold(tree)) {
+			rc = smb_tree_fclose(tree, uniqid);
+			smb_tree_release(tree);
+		}
+
+		tree = smb_llist_next(tree_list, tree);
+	}
+
+	smb_llist_exit(tree_list);
+	return (rc);
+}
+
+/*
  * Determine whether or not the user is an administrator.
  * Members of the administrators group have administrative rights.
  */
@@ -734,7 +767,97 @@ smb_user_is_admin(
 	return (B_FALSE);
 }
 
+/*
+ * This function should be called with a hold on the user.
+ */
+boolean_t
+smb_user_namecmp(smb_user_t *user, const char *name)
+{
+	char		*fq_name;
+	boolean_t	match;
+
+	if (utf8_strcasecmp(name, user->u_name) == 0)
+		return (B_TRUE);
+
+	fq_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	(void) snprintf(fq_name, MAXNAMELEN, "%s\\%s",
+	    user->u_domain, user->u_name);
+
+	match = (utf8_strcasecmp(name, fq_name) == 0);
+	if (!match) {
+		(void) snprintf(fq_name, MAXNAMELEN, "%s@%s",
+		    user->u_name, user->u_domain);
+
+		match = (utf8_strcasecmp(name, fq_name) == 0);
+	}
+
+	kmem_free(fq_name, MAXNAMELEN);
+	return (match);
+}
+
+/*
+ * If the enumeration request is for user data, handle the request
+ * here.  Otherwise, pass it on to the trees.
+ *
+ * This function should be called with a hold on the user.
+ */
+int
+smb_user_enum(smb_user_t *user, smb_svcenum_t *svcenum)
+{
+	smb_tree_t	*tree;
+	smb_tree_t	*next;
+	int		rc;
+
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+
+	if (svcenum->se_type == SMB_SVCENUM_TYPE_USER)
+		return (smb_user_enum_private(user, svcenum));
+
+	tree = smb_user_get_tree(&user->u_tree_list, NULL);
+	while (tree) {
+		ASSERT(tree->t_user == user);
+
+		rc = smb_tree_enum(tree, svcenum);
+		if (rc != 0) {
+			smb_tree_release(tree);
+			break;
+		}
+
+		next = smb_user_get_tree(&user->u_tree_list, tree);
+		smb_tree_release(tree);
+		tree = next;
+	}
+
+	return (rc);
+}
+
 /* *************************** Static Functions ***************************** */
+
+/*
+ * Determine whether or not a user is logged in.
+ * Typically, a reference can only be taken on a logged-in user.
+ *
+ * This is a private function and must be called with the user
+ * mutex held.
+ */
+static boolean_t
+smb_user_is_logged_in(smb_user_t *user)
+{
+	switch (user->u_state) {
+	case SMB_USER_STATE_LOGGED_IN:
+		return (B_TRUE);
+
+	case SMB_USER_STATE_LOGGING_OFF:
+	case SMB_USER_STATE_LOGGED_OFF:
+		return (B_FALSE);
+
+	default:
+		ASSERT(0);
+		return (B_FALSE);
+	}
+}
 
 /*
  * smb_user_delete
@@ -820,4 +943,105 @@ cred_t *
 smb_user_getprivcred(smb_user_t *user)
 {
 	return ((user->u_privcred)? user->u_privcred : user->u_cred);
+}
+
+/*
+ * Private function to support smb_user_enum.
+ */
+static int
+smb_user_enum_private(smb_user_t *user, smb_svcenum_t *svcenum)
+{
+	uint8_t *pb;
+	uint_t nbytes;
+	int rc;
+
+	if (svcenum->se_nskip > 0) {
+		svcenum->se_nskip--;
+		return (0);
+	}
+
+	if (svcenum->se_nitems >= svcenum->se_nlimit) {
+		svcenum->se_nitems = svcenum->se_nlimit;
+		return (0);
+	}
+
+	pb = &svcenum->se_buf[svcenum->se_bused];
+	rc = smb_user_netinfo_encode(user, pb, svcenum->se_bavail, &nbytes);
+	if (rc == 0) {
+		svcenum->se_bavail -= nbytes;
+		svcenum->se_bused += nbytes;
+		svcenum->se_nitems++;
+	}
+
+	return (rc);
+}
+
+/*
+ * Encode the NetInfo for a user into a buffer.  NetInfo contains
+ * information that is often needed in user space to support RPC
+ * requests.
+ */
+int
+smb_user_netinfo_encode(smb_user_t *user, uint8_t *buf, size_t buflen,
+    uint32_t *nbytes)
+{
+	smb_netuserinfo_t	info;
+	int			rc;
+
+	smb_user_netinfo_init(user, &info);
+	rc = smb_netuserinfo_encode(&info, buf, buflen, nbytes);
+	smb_user_netinfo_fini(&info);
+
+	return (rc);
+}
+
+void
+smb_user_netinfo_init(smb_user_t *user, smb_netuserinfo_t *info)
+{
+	smb_session_t	*session;
+	char		*buf;
+
+	ASSERT(user);
+	ASSERT(user->u_domain);
+	ASSERT(user->u_name);
+
+	session = user->u_session;
+	ASSERT(session);
+	ASSERT(session->workstation);
+
+	info->ui_session_id = session->s_kid;
+	info->ui_native_os = session->native_os;
+	info->ui_ipaddr = session->ipaddr;
+	info->ui_numopens = session->s_file_cnt;
+	info->ui_uid = user->u_uid;
+	info->ui_logon_time = user->u_logon_time;
+	info->ui_flags = user->u_flags;
+
+	info->ui_domain_len = user->u_domain_len;
+	info->ui_domain = smb_kstrdup(user->u_domain, info->ui_domain_len);
+
+	info->ui_account_len = user->u_name_len;
+	info->ui_account = smb_kstrdup(user->u_name, info->ui_account_len);
+
+	buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	smb_session_getclient(session, buf, MAXNAMELEN);
+	info->ui_workstation_len = strlen(buf) + 1;
+	info->ui_workstation = smb_kstrdup(buf, info->ui_workstation_len);
+	kmem_free(buf, MAXNAMELEN);
+}
+
+void
+smb_user_netinfo_fini(smb_netuserinfo_t *info)
+{
+	if (info == NULL)
+		return;
+
+	if (info->ui_domain)
+		kmem_free(info->ui_domain, info->ui_domain_len);
+	if (info->ui_account)
+		kmem_free(info->ui_account, info->ui_account_len);
+	if (info->ui_workstation)
+		kmem_free(info->ui_workstation, info->ui_workstation_len);
+
+	bzero(info, sizeof (smb_netuserinfo_t));
 }

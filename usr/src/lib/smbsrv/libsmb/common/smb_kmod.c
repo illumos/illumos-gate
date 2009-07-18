@@ -181,83 +181,213 @@ smb_kmod_unshare(char *path, char *name)
 }
 
 int
-smb_kmod_get_usernum(uint32_t *punum)
+smb_kmod_get_open_num(smb_opennum_t *opennum)
 {
-	smb_ioc_usernum_t ioc;
+	smb_ioc_opennum_t ioc;
 	int rc;
 
-	ioc.num = 0;
-	rc = smb_kmod_ioctl(SMB_IOC_USER_NUMBER, &ioc.hdr, sizeof (ioc));
-	if (rc == 0)
-		*punum = ioc.num;
+	bzero(&ioc, sizeof (ioc));
+	ioc.qualtype = opennum->qualtype;
+	(void) strlcpy(ioc.qualifier, opennum->qualifier, MAXNAMELEN);
+
+	rc = smb_kmod_ioctl(SMB_IOC_NUMOPEN, &ioc.hdr, sizeof (ioc));
+	if (rc == 0) {
+		opennum->open_users = ioc.open_users;
+		opennum->open_trees = ioc.open_trees;
+		opennum->open_files = ioc.open_files;
+	}
 
 	return (rc);
 }
 
-int
-smb_kmod_get_userlist(smb_ulist_t *ulist)
+/*
+ * Initialization for an smb_kmod_enum request.  If this call succeeds,
+ * smb_kmod_enum_fini() must be called later to deallocate resources.
+ */
+smb_netsvc_t *
+smb_kmod_enum_init(smb_svcenum_t *request)
 {
-	smb_opipe_context_t	*ctx;
-	smb_ioc_ulist_t		*ioc;
-	uint32_t		ioc_len;
-	uint8_t			*data;
-	uint32_t		data_len;
-	uint32_t		unum;
-	int			rc;
+	smb_netsvc_t		*ns;
+	smb_svcenum_t		*svcenum;
+	smb_ioc_svcenum_t	*ioc;
+	uint32_t		ioclen;
 
-	smb_ulist_cleanup(ulist);
+	if ((ns = calloc(1, sizeof (smb_netsvc_t))) == NULL)
+		return (NULL);
 
-	rc = smb_kmod_get_usernum(&unum);
-	if ((rc != 0) || (unum == 0))
-		return (rc);
-
-	ioc_len = sizeof (smb_ioc_ulist_t) + SMB_IOC_DATA_SIZE;
-	ioc = malloc(ioc_len);
-	if (ioc == NULL)
-		return (ENOMEM);
-
-	ctx = malloc(sizeof (smb_opipe_context_t) * unum);
-	if (ctx == NULL) {
-		free(ioc);
-		return (ENOMEM);
+	ioclen = sizeof (smb_ioc_svcenum_t) + SMB_IOC_DATA_SIZE;
+	if ((ioc = malloc(ioclen)) == NULL) {
+		free(ns);
+		return (NULL);
 	}
-	ulist->ul_users = ctx;
 
-	while (ulist->ul_cnt < unum) {
-		ioc->cookie = ulist->ul_cnt;
-		ioc->data_len = SMB_IOC_DATA_SIZE;
-		rc = smb_kmod_ioctl(SMB_IOC_USER_LIST, &ioc->hdr,
-		    ioc_len);
-		if (rc != 0)
+	bzero(ioc, ioclen);
+	svcenum = &ioc->svcenum;
+	svcenum->se_type   = request->se_type;
+	svcenum->se_level  = request->se_level;
+	svcenum->se_bavail = SMB_IOC_DATA_SIZE;
+	svcenum->se_nlimit = request->se_nlimit;
+	svcenum->se_nskip = request->se_nskip;
+	svcenum->se_buflen = SMB_IOC_DATA_SIZE;
+
+	list_create(&ns->ns_list, sizeof (smb_netsvcitem_t),
+	    offsetof(smb_netsvcitem_t, nsi_lnd));
+
+	ns->ns_ioc = ioc;
+	ns->ns_ioclen = ioclen;
+	return (ns);
+}
+
+/*
+ * Cleanup resources allocated via smb_kmod_enum_init and smb_kmod_enum.
+ */
+void
+smb_kmod_enum_fini(smb_netsvc_t *ns)
+{
+	list_t			*lst;
+	smb_netsvcitem_t	*item;
+	smb_netuserinfo_t	*user;
+	smb_netconnectinfo_t	*tree;
+	smb_netfileinfo_t	*ofile;
+	uint32_t		se_type;
+
+	if (ns == NULL)
+		return;
+
+	lst = &ns->ns_list;
+	se_type = ns->ns_ioc->svcenum.se_type;
+
+	while ((item = list_head(lst)) != NULL) {
+		list_remove(lst, item);
+
+		switch (se_type) {
+		case SMB_SVCENUM_TYPE_USER:
+			user = &item->nsi_un.nsi_user;
+			free(user->ui_domain);
+			free(user->ui_account);
+			free(user->ui_workstation);
 			break;
-
-		if ((ulist->ul_cnt + ioc->num) > unum)
-			ioc->num = unum - ulist->ul_cnt;
-
-		if (ioc->num == 0)
+		case SMB_SVCENUM_TYPE_TREE:
+			tree = &item->nsi_un.nsi_tree;
+			free(tree->ci_username);
+			free(tree->ci_share);
 			break;
-
-		data = ioc->data;
-		data_len = ioc->data_len;
-		while (ioc->num > 0) {
-			uint_t	bd = 0;
-
-			rc = smb_opipe_context_decode(ctx, data, data_len, &bd);
-			if (rc != 0)
-				break;
-
-			ctx++;
-			ioc->num--;
-			ulist->ul_cnt++;
-			data += bd;
-			data_len -= bd;
+		case SMB_SVCENUM_TYPE_FILE:
+			ofile = &item->nsi_un.nsi_ofile;
+			free(ofile->fi_path);
+			free(ofile->fi_username);
+			break;
+		default:
+			break;
 		}
 	}
 
-	if (rc != 0)
-		smb_ulist_cleanup(ulist);
+	list_destroy(&ns->ns_list);
+	free(ns->ns_items);
+	free(ns->ns_ioc);
+	free(ns);
+}
 
-	free(ioc);
+/*
+ * Enumerate users, connections or files.
+ */
+int
+smb_kmod_enum(smb_netsvc_t *ns)
+{
+	smb_ioc_svcenum_t	*ioc;
+	uint32_t		ioclen;
+	smb_svcenum_t		*svcenum;
+	smb_netsvcitem_t	*items;
+	smb_netuserinfo_t	*user;
+	smb_netconnectinfo_t	*tree;
+	smb_netfileinfo_t	*ofile;
+	uint8_t			*data;
+	uint32_t		len;
+	uint32_t		se_type;
+	uint_t			nbytes;
+	int			i;
+	int			rc;
+
+	ioc = ns->ns_ioc;
+	ioclen = ns->ns_ioclen;
+	rc = smb_kmod_ioctl(SMB_IOC_SVCENUM, &ioc->hdr, ioclen);
+	if (rc != 0)
+		return (rc);
+
+	svcenum = &ioc->svcenum;
+	items = calloc(svcenum->se_nitems, sizeof (smb_netsvcitem_t));
+	if (items == NULL)
+		return (ENOMEM);
+
+	ns->ns_items = items;
+	se_type = ns->ns_ioc->svcenum.se_type;
+	data = svcenum->se_buf;
+	len = svcenum->se_bused;
+
+	for (i = 0; i < svcenum->se_nitems; ++i) {
+		switch (se_type) {
+		case SMB_SVCENUM_TYPE_USER:
+			user = &items->nsi_un.nsi_user;
+			rc = smb_netuserinfo_decode(user, data, len, &nbytes);
+			break;
+		case SMB_SVCENUM_TYPE_TREE:
+			tree = &items->nsi_un.nsi_tree;
+			rc = smb_netconnectinfo_decode(tree, data, len,
+			    &nbytes);
+			break;
+		case SMB_SVCENUM_TYPE_FILE:
+			ofile = &items->nsi_un.nsi_ofile;
+			rc = smb_netfileinfo_decode(ofile, data, len, &nbytes);
+			break;
+		default:
+			rc = -1;
+			break;
+		}
+
+		if (rc != 0)
+			return (EINVAL);
+
+		list_insert_tail(&ns->ns_list, items);
+
+		++items;
+		data += nbytes;
+		len -= nbytes;
+	}
+
+	return (0);
+}
+
+/*
+ * A NULL pointer is a wildcard indicator, which we pass on
+ * as an empty string (by virtue of the bzero).
+ */
+int
+smb_kmod_session_close(const char *client, const char *username)
+{
+	smb_ioc_session_t ioc;
+	int rc;
+
+	bzero(&ioc, sizeof (ioc));
+
+	if (client != NULL)
+		(void) strlcpy(ioc.client, client, MAXNAMELEN);
+	if (username != NULL)
+		(void) strlcpy(ioc.username, username, MAXNAMELEN);
+
+	rc = smb_kmod_ioctl(SMB_IOC_SESSION_CLOSE, &ioc.hdr, sizeof (ioc));
+	return (rc);
+}
+
+int
+smb_kmod_file_close(uint32_t uniqid)
+{
+	smb_ioc_fileid_t ioc;
+	int rc;
+
+	bzero(&ioc, sizeof (ioc));
+	ioc.uniqid = uniqid;
+
+	rc = smb_kmod_ioctl(SMB_IOC_FILE_CLOSE, &ioc.hdr, sizeof (ioc));
 	return (rc);
 }
 

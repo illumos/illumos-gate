@@ -414,7 +414,7 @@ smb_open_subr(smb_request_t *sr)
 		    sizeof (op->fqi.fq_last_comp),
 		    "%s%s", cur_node->od_name, pn->pn_sname);
 
-		op->fqi.fq_dnode = cur_node->dir_snode;
+		op->fqi.fq_dnode = cur_node->n_dnode;
 		smb_node_ref(op->fqi.fq_dnode);
 	} else {
 		if (rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,

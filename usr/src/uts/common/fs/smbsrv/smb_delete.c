@@ -519,7 +519,7 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
 
-	rc = smb_fsop_remove(sr, sr->user_cr, node->dir_snode,
+	rc = smb_fsop_remove(sr, sr->user_cr, node->n_dnode,
 	    node->od_name, flags);
 	if (rc != 0) {
 		if (rc == ENOENT)

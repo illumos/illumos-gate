@@ -403,6 +403,7 @@ struct mslm_NetConnectInfo {
   SWITCH(switch_value)
 	union mslm_NetConnectInfoResUnion ru;
 };
+typedef struct mslm_NetConnectInfo srvsvc_NetConnectInfo_t;
 
 OPERATION(SRVSVC_OPNUM_NetConnectEnum)
 struct mslm_NetConnectEnum {
@@ -993,22 +994,19 @@ struct mslm_NetSessionEnum {
  * 
  * servername
  * [in] Pointer to a string that specifies the DNS or NetBIOS name
- * of the remote server on which the function is to execute. If this
- * parameter is NULL, the local computer is used.
- * Windows NT 4.0 and earlier: This string must begin with \\.
+ * of the server.  Servers should not validate this parameter.
+ * This parameter may be NULL and on Windows NT 4.0 and earlier it
+ * should begin with \\.
  *
  * UncClientName
- * [in] Pointer to a string that specifies the computer name of the
- * client to disconnect. If UncClientName is NULL, then all the sessions
- * of the user identified by the username parameter will be deleted on
- * the server specified by servername. For more information, see
- * NetSessionEnum.
+ * [in] Pointer to a string that specifies the name of the client
+ * to disconnect. If UncClientName is NULL, all sessions associated
+ * with the specified user will be disconnected.
  *
  * username
  * [in] Pointer to a string that specifies the name of the user whose
- * session is to be terminated. If this parameter is NULL, all users'
- * sessions from the client specified by the UncClientName parameter
- * are to be terminated.
+ * session is to be terminated. If username is NULL, all sessions
+ * from the specified client will be disconnected.
  *
  * Remarks
  * Windows 95/98/Me: You must specify the session key in the sReserved
@@ -1041,8 +1039,11 @@ struct mslm_NetSessionDel {
  */
 
 /* for svX_platform */
-#define SV_PLATFORM_ID_OS2 400
-#define SV_PLATFORM_ID_NT  500
+#define	SV_PLATFORM_ID_DOS		300
+#define	SV_PLATFORM_ID_OS2		400
+#define	SV_PLATFORM_ID_NT		500
+#define	SV_PLATFORM_ID_OSF		600
+#define	SV_PLATFORM_ID_VMS		700
 
 /* Bit-mapped values for svX_type fields */
 #define SV_TYPE_WORKSTATION         0x00000001

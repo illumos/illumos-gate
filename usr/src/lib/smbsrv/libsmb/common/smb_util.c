@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/varargs.h>
@@ -37,8 +38,11 @@
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
 #include <libzfs.h>
+#include <dlfcn.h>
 #include <smbsrv/string.h>
 #include <smbsrv/libsmb.h>
+
+#define	SMB_LIB_ALT	"/usr/lib/smbsrv/libsmbex.so"
 
 static uint_t smb_make_mask(char *, uint_t);
 static boolean_t smb_netmatch(struct netbuf *, char *);
@@ -755,6 +759,64 @@ smb_getdataset(const char *path, char *dataset, size_t len)
 }
 
 /*
+ * smb_dlopen
+ *
+ * Check to see if an interposer library exists.  If it exists
+ * and reports a valid version number and key (UUID), return
+ * a handle to the library.  Otherwise, return NULL.
+ */
+void *
+smb_dlopen(void)
+{
+	uuid_t uuid;
+	void *interposer_hdl;
+	typedef int (*smbex_versionfn_t)(smbex_version_t *);
+	smbex_versionfn_t getversion;
+	smbex_version_t *version;
+
+	bzero(&uuid, sizeof (uuid_t));
+	if (uuid_parse(SMBEX_KEY, uuid) < 0)
+		return (NULL);
+
+	interposer_hdl = dlopen(SMB_LIB_ALT, RTLD_NOW | RTLD_LOCAL);
+	if (interposer_hdl == NULL)
+		return (NULL);
+
+	bzero(&getversion, sizeof (smbex_versionfn_t));
+	getversion = (smbex_versionfn_t)dlsym(interposer_hdl,
+	    "smbex_get_version");
+	if ((getversion == NULL) ||
+	    (version = malloc(sizeof (smbex_version_t))) == NULL) {
+		(void) dlclose(interposer_hdl);
+		return (NULL);
+	}
+	bzero(version, sizeof (smbex_version_t));
+
+	if ((getversion(version) != 0) ||
+	    (version->v_version != SMBEX_VERSION) ||
+	    (uuid_compare(version->v_uuid, uuid) != 0)) {
+		free(version);
+		(void) dlclose(interposer_hdl);
+		return (NULL);
+	}
+
+	free(version);
+	return (interposer_hdl);
+}
+
+/*
+ * smb_dlclose
+ *
+ * Closes handle to the interposed library.
+ */
+void
+smb_dlclose(void *handle)
+{
+	if (handle)
+		(void) dlclose(handle);
+}
+
+/*
  * Returns the hostname given the IP address.  Wrapper for getnameinfo.
  */
 int
@@ -781,48 +843,4 @@ smb_getnameinfo(smb_inaddr_t *ip, char *hostname, int hostlen, int flags)
 	}
 	return (getnameinfo((struct sockaddr *)sp, salen,
 	    hostname, hostlen, NULL, 0, flags));
-}
-
-smb_ulist_t *
-smb_ulist_alloc(void)
-{
-	smb_ulist_t *ulist;
-
-	ulist = malloc(sizeof (smb_ulist_t));
-	if (ulist != NULL) {
-		ulist->ul_cnt = 0;
-		ulist->ul_users = NULL;
-	}
-	return (ulist);
-}
-
-void
-smb_ulist_free(smb_ulist_t *ulist)
-{
-	if (ulist != NULL) {
-		smb_ulist_cleanup(ulist);
-		free(ulist);
-	}
-}
-
-void
-smb_ulist_cleanup(smb_ulist_t *ulist)
-{
-	smb_opipe_context_t *ctx;
-
-	if (ulist->ul_users != NULL) {
-		ctx = ulist->ul_users;
-		while (ulist->ul_cnt != 0) {
-			free(ctx->oc_domain);
-			free(ctx->oc_account);
-			free(ctx->oc_workstation);
-			ctx->oc_domain = NULL;
-			ctx->oc_account = NULL;
-			ctx->oc_workstation = NULL;
-			ulist->ul_cnt--;
-			ctx++;
-		}
-		free(ulist->ul_users);
-		ulist->ul_users = NULL;
-	}
 }

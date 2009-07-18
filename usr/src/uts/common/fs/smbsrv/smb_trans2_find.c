@@ -519,8 +519,12 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	if (count != 0)
 		smb_odir_save_cookie(od, 0, cookie);
 
-	/* if eos not already detected, check if more entries */
-	if (!*eos)
+	/*
+	 * If all retrieved entries have been successfully encoded
+	 * and eos has not already been detected, check if there are
+	 * any more entries. eos will be set if there are no more.
+	 */
+	if ((rc == 0) && (!*eos))
 		(void) smb_odir_read_fileinfo(sr, od, &fileinfo, eos);
 
 	return (count);

@@ -47,8 +47,10 @@ extern "C" {
 #define	SMB_IOC_GMTOFF		_IOW(SMB_IOC_BASE, 7, int)
 #define	SMB_IOC_SHARE		_IOW(SMB_IOC_BASE, 8, int)
 #define	SMB_IOC_UNSHARE		_IOW(SMB_IOC_BASE, 9, int)
-#define	SMB_IOC_USER_NUMBER	_IOW(SMB_IOC_BASE, 10, int)
-#define	SMB_IOC_USER_LIST	_IOW(SMB_IOC_BASE, 11, int)
+#define	SMB_IOC_NUMOPEN		_IOW(SMB_IOC_BASE, 10, int)
+#define	SMB_IOC_SVCENUM		_IOW(SMB_IOC_BASE, 11, int)
+#define	SMB_IOC_FILE_CLOSE	_IOW(SMB_IOC_BASE, 12, int)
+#define	SMB_IOC_SESSION_CLOSE	_IOW(SMB_IOC_BASE, 13, int)
 
 typedef struct smb_ioc_header {
 	uint32_t	version;
@@ -80,18 +82,55 @@ typedef	struct smb_ioc_start {
 	int		udoor;
 } smb_ioc_start_t;
 
-typedef	struct smb_ioc_usernum {
+typedef	struct smb_ioc_opennum {
 	smb_ioc_header_t hdr;
-	uint32_t	num;
-} smb_ioc_usernum_t;
+	uint32_t	open_users;
+	uint32_t	open_trees;
+	uint32_t	open_files;
+	uint32_t	qualtype;
+	char		qualifier[MAXNAMELEN];
+} smb_ioc_opennum_t;
 
-typedef	struct smb_ioc_ulist {
+/*
+ * For enumeration, user and session are synonymous, as are
+ * connection and tree.
+ */
+#define	SMB_SVCENUM_TYPE_USER	0x55534552	/* 'USER' */
+#define	SMB_SVCENUM_TYPE_TREE	0x54524545	/* 'TREE' */
+#define	SMB_SVCENUM_TYPE_FILE	0x46494C45	/* 'FILE' */
+#define	SMB_SVCENUM_TYPE_SHARE	0x53484152	/* 'SHAR' */
+
+typedef struct smb_svcenum {
+	uint32_t	se_type;	/* object type to enumerate */
+	uint32_t	se_level;	/* level of detail being requested */
+	uint32_t	se_prefmaxlen;	/* client max size buffer preference */
+	uint32_t	se_resume;	/* client resume handle */
+	uint32_t	se_bavail;	/* remaining buffer space in bytes */
+	uint32_t	se_bused;	/* consumed buffer space in bytes */
+	uint32_t	se_ntotal;	/* total number of objects */
+	uint32_t	se_nlimit;	/* max number of objects to return */
+	uint32_t	se_nitems;	/* number of objects in buf */
+	uint32_t	se_nskip;	/* number of objects to skip */
+	uint32_t	se_status;	/* enumeration status */
+	uint32_t	se_buflen;	/* length of the buffer in bytes */
+	uint8_t		se_buf[1];	/* buffer to hold enumeration data */
+} smb_svcenum_t;
+
+typedef	struct smb_ioc_svcenum {
 	smb_ioc_header_t hdr;
-	uint32_t	cookie;
-	uint32_t	num;
-	uint32_t	data_len;
-	uint8_t		data[1];
-} smb_ioc_ulist_t;
+	smb_svcenum_t	svcenum;
+} smb_ioc_svcenum_t;
+
+typedef struct smb_ioc_session {
+	smb_ioc_header_t hdr;
+	char		client[MAXNAMELEN];
+	char		username[MAXNAMELEN];
+} smb_ioc_session_t;
+
+typedef	struct smb_ioc_fileid {
+	smb_ioc_header_t hdr;
+	uint32_t	uniqid;
+} smb_ioc_fileid_t;
 
 typedef struct smb_ioc_cfg {
 	smb_ioc_header_t hdr;
@@ -117,8 +156,10 @@ typedef union smb_ioc {
 	smb_ioc_cfg_t		ioc_cfg;
 	smb_ioc_start_t		ioc_start;
 	smb_ioc_listen_t	ioc_listen;
-	smb_ioc_usernum_t	ioc_unum;
-	smb_ioc_ulist_t		ioc_ulist;
+	smb_ioc_opennum_t	ioc_opennum;
+	smb_ioc_svcenum_t	ioc_svcenum;
+	smb_ioc_session_t	ioc_session;
+	smb_ioc_fileid_t	ioc_fileid;
 	smb_ioc_share_t		ioc_share;
 } smb_ioc_t;
 

@@ -518,7 +518,7 @@ static int
 lsarpc_s_GetConnectedUser(void *arg, ndr_xa_t *mxa)
 {
 	struct mslsa_GetConnectedUser *param = arg;
-	smb_opipe_context_t *ctx = &mxa->pipe->np_ctx;
+	smb_netuserinfo_t *user = &mxa->pipe->np_user;
 	DWORD status = NT_STATUS_SUCCESS;
 	smb_domain_t di;
 	int rc1;
@@ -546,8 +546,9 @@ lsarpc_s_GetConnectedUser(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	rc1 = NDR_MSTRING(mxa, ctx->oc_account, (ndr_mstring_t *)param->owner);
-	rc2 = NDR_MSTRING(mxa, ctx->oc_domain,
+	rc1 = NDR_MSTRING(mxa, user->ui_account,
+	    (ndr_mstring_t *)param->owner);
+	rc2 = NDR_MSTRING(mxa, user->ui_domain,
 	    (ndr_mstring_t *)param->domain->name);
 
 	if (rc1 == -1 || rc2 == -1)

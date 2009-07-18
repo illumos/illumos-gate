@@ -245,7 +245,7 @@ typedef struct ndr_binding {
 
 typedef struct ndr_pipe {
 	int			np_fid;
-	smb_opipe_context_t	np_ctx;
+	smb_netuserinfo_t	np_user;
 	char			*np_buf;
 	struct uio		np_uio;
 	iovec_t			np_iov;
@@ -516,7 +516,6 @@ int ndr_pipe_open(int, uint8_t *, uint32_t);
 int ndr_pipe_close(int);
 int ndr_pipe_read(int, uint8_t *, uint32_t *, uint32_t *);
 int ndr_pipe_write(int, uint8_t *, uint32_t);
-int ndr_pipe_getinfo(int, ndr_pipe_info_t *);
 
 int ndr_generic_call_stub(ndr_xa_t *);
 

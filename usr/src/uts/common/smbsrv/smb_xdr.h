@@ -33,6 +33,7 @@ extern "C" {
 #include <rpc/xdr.h>
 #include <sys/param.h>
 #include <smbsrv/smbinfo.h>
+#include <smbsrv/smb_ioctl.h>
 
 typedef struct smb_dr_kshare {
 	int32_t k_op;
@@ -45,10 +46,6 @@ typedef struct smb_dr_kshare {
 #define	xdr_uint8_t	xdr_u_char
 #define	xdr_int16_t	xdr_short
 #define	xdr_uint16_t	xdr_u_short
-
-extern bool_t xdr_u_char(XDR *xdrs, uchar_t *cp);
-extern bool_t xdr_vector(XDR *xdrs, char *basep, uint_t nelem,
-    uint_t elemsize, xdrproc_t xdr_elem);
 
 smb_dr_kshare_t *smb_share_mkabsolute(uint8_t *buf, uint32_t len);
 #else
@@ -91,25 +88,68 @@ typedef struct smb_opipe_hdr {
 	uint32_t oh_status;
 } smb_opipe_hdr_t;
 
-typedef struct smb_opipe_context {
-	uint64_t oc_session_id;
-	uint16_t oc_uid;
-	uint16_t oc_domain_len;
-	char *oc_domain;
-	uint16_t oc_account_len;
-	char *oc_account;
-	uint16_t oc_workstation_len;
-	char *oc_workstation;
-	smb_inaddr_t oc_ipaddr;
-	int32_t oc_native_os;
-	int64_t oc_logon_time;
-	uint32_t oc_flags;
-} smb_opipe_context_t;
+typedef struct smb_netuserinfo {
+	uint64_t	ui_session_id;
+	uint16_t	ui_uid;
+	uint16_t	ui_domain_len;
+	char		*ui_domain;
+	uint16_t	ui_account_len;
+	char		*ui_account;
+	uint16_t	ui_workstation_len;
+	char		*ui_workstation;
+	smb_inaddr_t	ui_ipaddr;
+	int32_t		ui_native_os;
+	int64_t		ui_logon_time;
+	uint32_t	ui_numopens;
+	uint32_t	ui_flags;
+} smb_netuserinfo_t;
 
-typedef struct smb_ulist {
-	uint32_t ul_cnt;
-	smb_opipe_context_t *ul_users;
-} smb_ulist_t;
+typedef struct smb_opennum {
+	uint32_t	open_users;
+	uint32_t	open_trees;
+	uint32_t	open_files;
+	uint32_t	qualtype;
+	char		qualifier[MAXNAMELEN];
+} smb_opennum_t;
+
+typedef struct smb_netconnectinfo {
+	uint32_t	ci_id;
+	uint32_t	ci_type;
+	uint32_t	ci_numopens;
+	uint32_t	ci_numusers;
+	uint32_t	ci_time;
+	uint32_t	ci_namelen;
+	uint32_t	ci_sharelen;
+	char		*ci_username;
+	char		*ci_share;
+} smb_netconnectinfo_t;
+
+typedef struct smb_netfileinfo {
+	uint16_t	fi_fid;
+	uint32_t	fi_uniqid;
+	uint32_t	fi_permissions;
+	uint32_t	fi_numlocks;
+	uint32_t	fi_pathlen;
+	uint32_t	fi_namelen;
+	char		*fi_path;
+	char		*fi_username;
+} smb_netfileinfo_t;
+
+typedef struct smb_netsvcitem {
+	list_node_t	nsi_lnd;
+	union {
+		smb_netuserinfo_t	nsi_user;
+		smb_netconnectinfo_t	nsi_tree;
+		smb_netfileinfo_t	nsi_ofile;
+	} nsi_un;
+} smb_netsvcitem_t;
+
+typedef struct smb_netsvc {
+	list_t			ns_list;
+	smb_netsvcitem_t	*ns_items;
+	smb_ioc_svcenum_t	*ns_ioc;
+	uint32_t		ns_ioclen;
+} smb_netsvc_t;
 
 /* xdr routines for common door arguments/results */
 extern bool_t xdr_smb_dr_string_t(XDR *, smb_dr_string_t *);
@@ -120,11 +160,18 @@ extern bool_t xdr_smb_inaddr_t(XDR *, smb_inaddr_t *);
 int smb_opipe_hdr_encode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
 int smb_opipe_hdr_decode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
 bool_t smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp);
-int smb_opipe_context_encode(smb_opipe_context_t *, uint8_t *, uint32_t,
+int smb_netuserinfo_encode(smb_netuserinfo_t *, uint8_t *, uint32_t, uint_t *);
+int smb_netuserinfo_decode(smb_netuserinfo_t *, uint8_t *, uint32_t, uint_t *);
+bool_t smb_netuserinfo_xdr(XDR *, smb_netuserinfo_t *);
+int smb_netconnectinfo_encode(smb_netconnectinfo_t *, uint8_t *, uint32_t,
     uint_t *);
-int smb_opipe_context_decode(smb_opipe_context_t *, uint8_t *, uint32_t,
+int smb_netconnectinfo_decode(smb_netconnectinfo_t *, uint8_t *, uint32_t,
     uint_t *);
-bool_t smb_opipe_context_xdr(XDR *, smb_opipe_context_t *);
+bool_t smb_netconnectinfo_xdr(XDR *, smb_netconnectinfo_t *);
+int smb_netfileinfo_encode(smb_netfileinfo_t *, uint8_t *, uint32_t, uint_t *);
+int smb_netfileinfo_decode(smb_netfileinfo_t *, uint8_t *, uint32_t, uint_t *);
+bool_t smb_netfileinfo_xdr(XDR *, smb_netfileinfo_t *);
+
 /*
  * VSS Door Structures
  */

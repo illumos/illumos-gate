@@ -507,10 +507,9 @@ typedef struct smb_node {
 	volatile int		flags;	/* FILE_NOTIFY_CHANGE_* */
 	volatile int		waiting_event; /* # of clients requesting FCN */
 	smb_times_t		n_timestamps; /* cached timestamps */
-	unsigned int		what;
 	smb_oplock_t		n_oplock;
-	struct smb_node		*dir_snode; /* Directory of node */
-	struct smb_node		*unnamed_stream_node; /* set in stream nodes */
+	struct smb_node		*n_dnode; /* directory node */
+	struct smb_node		*n_unode; /* unnamed stream node */
 	/* Credentials for delayed delete */
 	cred_t			*delete_on_close_cred;
 	uint32_t		n_delete_on_close_flags;
@@ -873,6 +872,8 @@ typedef struct smb_tree {
 	acl_type_t		t_acltype;
 	uint32_t		t_access;
 	uint32_t		t_shr_flags;
+	time_t			t_connect_time;
+	volatile uint32_t	t_open_files;
 } smb_tree_t;
 
 #define	SMB_TREE_VFS(tree)	((tree)->t_snode->vp->v_vfsp)
@@ -942,7 +943,7 @@ typedef struct smb_opipe {
 	char *p_name;
 	uint32_t p_busy;
 	smb_opipe_hdr_t p_hdr;
-	smb_opipe_context_t p_context;
+	smb_netuserinfo_t p_user;
 	uint8_t *p_doorbuf;
 	uint8_t *p_data;
 } smb_opipe_t;
@@ -1656,7 +1657,7 @@ typedef struct smb_trans2_setinfo {
 	char name[MAXNAMELEN];
 } smb_trans2_setinfo_t;
 
-#define	SMB_IS_STREAM(node) ((node)->unnamed_stream_node)
+#define	SMB_IS_STREAM(node) ((node)->n_unode)
 
 typedef struct smb_tsd {
 	void (*proc)();

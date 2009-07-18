@@ -102,9 +102,9 @@ smb_com_query_information(smb_request_t *sr)
 	timestruc_t	*mtime;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
-		    10, FILE_ATTRIBUTE_NORMAL, 0, 0, 0);
-		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
+		    ERROR_ACCESS_DENIED);
+		return (SDRC_ERROR);
 	}
 
 	if ((rc = smb_pathname_reduce(sr, sr->user_cr, path,

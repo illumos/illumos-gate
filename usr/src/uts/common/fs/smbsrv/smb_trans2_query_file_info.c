@@ -52,6 +52,8 @@
 #include <smbsrv/smb_fsops.h>
 
 uint32_t smb_pad_align(uint32_t offset, uint32_t align);
+void smb_encode_smb_datetimes(smb_request_t *, smb_xa_t *, smb_attr_t *);
+void smb_encode_nt_times(smb_request_t *, smb_xa_t *, smb_attr_t *);
 extern int smb_query_all_info_filename(smb_tree_t *, smb_node_t *,
     char *, size_t);
 
@@ -80,11 +82,10 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 	u_offset_t	datasz = 0, allocsz = 0;
 	smb_attr_t	*ap = NULL;
 	char		*namep = NULL;
-	char		*filename = NULL, *alt_nm_ptr = NULL;
+	char		*filename = NULL;
 	int		filename_len = 0;
 	smb_node_t	*node = NULL; /* only set for SMB_FTYPE_DISK files */
-	smb_node_t	*dir_snode = NULL;
-	timestruc_t	*creation_time = NULL;
+	smb_node_t	*dnode = NULL;
 	unsigned char	delete_on_close = 0;
 	unsigned char	is_dir = 0;
 	char		*filebuf = NULL;
@@ -133,7 +134,6 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		}
 
 		dattr = ap->sa_dosattr;
-		creation_time = &ap->sa_crtime;
 
 		if (smb_node_is_dir(node)) {
 			is_dir = 1;
@@ -144,31 +144,55 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 			allocsz = ap->sa_vattr.va_nblocks * DEV_BSIZE;
 		}
 
-		dir_snode = node->dir_snode;
+		dnode = node->n_dnode;
 		delete_on_close =
 		    (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) != 0;
+
+		/*
+		 * The number of links reported should be the number of
+		 * non-deleted links. Thus if delete_on_close is set,
+		 * decrement the link count.
+		 */
+		if (delete_on_close && ap->sa_vattr.va_nlink > 0)
+			--(ap->sa_vattr.va_nlink);
+
 		}
 		break;
 
 	case SMB_FTYPE_MESG_PIPE:
 		{
-		/*
-		 * The pipe is only valid for SMB_FTYPE_MESG_PIPE files.
-		 */
+		/* The pipe is only valid for SMB_FTYPE_MESG_PIPE files */
 		namep = sr->fid_ofile->f_pipe->p_name;
 		filename = namep;
 		filename_len = smb_ascii_or_unicode_strlen(sr, filename);
 
 		ap = &pipe_attr;
-		creation_time = (timestruc_t *)&ap->sa_vattr.va_ctime;
+		ap->sa_vattr.va_nlink = 1;
 		dattr = FILE_ATTRIBUTE_NORMAL;
 		datasz = allocsz = 0;
 
-		delete_on_close = 0;
+		delete_on_close = 1;
 		is_dir = 0;
+
+		/* some levels are not valid for pipes */
+		switch (infolev) {
+		case SMB_QUERY_FILE_ALT_NAME_INFO:
+		case SMB_FILE_ALT_NAME_INFORMATION:
+		case SMB_QUERY_FILE_STREAM_INFO:
+		case SMB_FILE_STREAM_INFORMATION:
+		case SMB_QUERY_FILE_COMPRESSION_INFO:
+		case SMB_FILE_COMPRESSION_INFORMATION:
+		case SMB_FILE_ATTR_TAG_INFORMATION:
+			smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
+			    ERRDOS, ERROR_INVALID_PARAMETER);
+			return (SDRC_ERROR);
+		case SMB_INFO_QUERY_ALL_EAS:
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+			    ERRDOS, ERROR_ACCESS_DENIED);
+			return (SDRC_ERROR);
+		}
 		}
 		break;
-
 	default:
 		smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 		return (SDRC_ERROR);
@@ -188,16 +212,14 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		if (allocsz > UINT_MAX)
 			allocsz = UINT_MAX;
 
+		/* unlike other levels attributes should be 0 here for pipes */
+		if (sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE)
+			dattr = 0;
+
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb,
-		    ((sr->session->native_os == NATIVE_OS_WIN95)
-		    ? "YYYllw" : "yyyllw"),
-		    smb_gmt2local(sr, creation_time->tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)datasz,
-		    (uint32_t)allocsz,
-		    dattr);
+		smb_encode_smb_datetimes(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "llw",
+		    (uint32_t)datasz, (uint32_t)allocsz, dattr);
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
@@ -206,20 +228,18 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		if (allocsz > UINT_MAX)
 			allocsz = UINT_MAX;
 
+		/* unlike other levels attributes should be 0 here for pipes */
+		if (sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE)
+			dattr = 0;
+
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb,
-		    ((sr->session->native_os == NATIVE_OS_WIN95)
-		    ? "YYYllwl" : "yyyllwl"),
-		    smb_gmt2local(sr, creation_time->tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)datasz,
-		    (uint32_t)allocsz,
-		    dattr, 0);
+		smb_encode_smb_datetimes(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "llwl",
+		    (uint32_t)datasz, (uint32_t)allocsz, dattr, 0);
 		break;
 
-	case SMB_INFO_QUERY_EAS_FROM_LIST:
 	case SMB_INFO_QUERY_ALL_EAS:
+	case SMB_INFO_QUERY_EAS_FROM_LIST:
 	case SMB_FILE_EA_INFORMATION:
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
@@ -236,12 +256,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		 * Similar change in smb_trans2_query_path_information.c.
 		 */
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.",
-		    creation_time,
-		    &ap->sa_vattr.va_atime,
-		    &ap->sa_vattr.va_mtime,
-		    &ap->sa_vattr.va_ctime,
-		    dattr);
+		smb_encode_nt_times(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "w6.", dattr);
 		break;
 
 	case SMB_QUERY_FILE_STANDARD_INFO:
@@ -294,19 +310,28 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	case SMB_QUERY_FILE_ALL_INFO:
 	case SMB_FILE_ALL_INFORMATION:
+		if (sr->fid_ofile->f_ftype == SMB_FTYPE_DISK) {
+			rc = smb_query_all_info_filename(sr->tid_tree, node,
+			    filebuf, MAXPATHLEN);
+			if (rc != 0) {
+				smbsr_errno(sr, rc);
+				kmem_free(filebuf, MAXPATHLEN+1);
+				return (SDRC_ERROR);
+			}
+			filename = filebuf;
+		} else {
+			/* If the leading \ is missing, add it. */
+			if (*namep != '\\') {
+				(void) snprintf(filebuf, MAXNAMELEN,
+				    "\\%s", namep);
+				filename = filebuf;
+			}
+		}
+		filename_len = smb_ascii_or_unicode_strlen(sr, filename);
+
 		/*
-		 * The reply of this information level on the
-		 * wire doesn't match with protocol specification.
-		 * This is what spec. needs: "TTTTwqqlbbqllqqll"
-		 * But this is actually is sent on the wire:
-		 * "TTTTw6.qqlbb2.l"
-		 * So, there is a 6-byte pad between Attributes and
-		 * AllocationSize. Also there is a 2-byte pad After
-		 * Directory field. Between Directory and FileNameLength
-		 * there is just 4 bytes that it seems is AlignmentRequirement.
-		 * There are 6 other fields between Directory and
-		 * AlignmentRequirement in spec. that aren't sent
-		 * on the wire.
+		 * There is a 6-byte pad between Attributes and AllocationSize,
+		 * and a 2-byte pad after the Directory field.
 		 */
 		if (node) {
 			rc = smb_query_all_info_filename(sr->tid_tree, node,
@@ -322,11 +347,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		}
 
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.qqlbb2.l",
-		    creation_time,
-		    &ap->sa_vattr.va_atime,
-		    &ap->sa_vattr.va_mtime,
-		    &ap->sa_vattr.va_ctime,
+		smb_encode_nt_times(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "w6.qqlbb2.l",
 		    dattr,
 		    (uint64_t)allocsz,
 		    (uint64_t)datasz,
@@ -342,43 +364,41 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_QUERY_FILE_ALT_NAME_INFO:
 	case SMB_FILE_ALT_NAME_INFORMATION:
 		/*
-		 * Conform to the rule used by Windows NT/2003 servers.
-		 * Shortname is created only if either the filename or
-		 * extension portion of a file is made up of mixed case.
-		 *
-		 * If the shortname is generated, it will be returned as
-		 * the alternative name.  Otherwise, convert the original
-		 * name to all upper-case and return it as the alternative
-		 * name.
+		 * If the shortname is generated by smb_mangle_name()
+		 * it will be returned as the alternative name.
+		 * Otherwise, convert the original name to  upper-case
+		 * and return it as the alternative name.
 		 */
 		(void) smb_mangle_name(ap->sa_vattr.va_nodeid,
 		    filename, short_name, name83, 0);
-		alt_nm_ptr = (*short_name == 0) ?
-		    utf8_strupr(filename) : short_name;
+		if (*short_name == 0) {
+			(void) strlcpy(short_name, filename, SMB_SHORTNAMELEN);
+			(void) utf8_strupr(short_name);
+		}
+
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lU", sr,
-		    mts_wcequiv_strlen(alt_nm_ptr), alt_nm_ptr);
+		    mts_wcequiv_strlen(short_name), short_name);
 		break;
 
 	case SMB_QUERY_FILE_STREAM_INFO:
 	case SMB_FILE_STREAM_INFORMATION:
 		{
 		struct smb_node *node = sr->fid_ofile->f_node;
-		if (dir_snode == NULL) {
+		if (dnode == NULL) {
 			kmem_free(filebuf, MAXPATHLEN+1);
 			smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 			return (SDRC_ERROR);
 		}
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		if (SMB_IS_STREAM(node)) {
-			ASSERT(node->unnamed_stream_node);
-			ASSERT(node->unnamed_stream_node->n_magic ==
-			    SMB_NODE_MAGIC);
-			ASSERT(node->unnamed_stream_node->n_state !=
+			ASSERT(node->n_unode);
+			ASSERT(node->n_unode->n_magic == SMB_NODE_MAGIC);
+			ASSERT(node->n_unode->n_state !=
 			    SMB_NODE_STATE_DESTROYING);
 
 			(void) smb_encode_stream_info(sr, xa,
-			    node->unnamed_stream_node, ap);
+			    node->n_unode, ap);
 		} else {
 			(void) smb_encode_stream_info(sr, xa, node, ap);
 		}
@@ -571,4 +591,46 @@ smb_pad_align(uint32_t offset, uint32_t align)
 		pad = align - pad;
 
 	return (pad);
+}
+
+/*
+ * smb_encode_smb_datetimes
+ *
+ * Encode timestamps in the SMB_DATE / SMB_TIME format.
+ */
+void
+smb_encode_smb_datetimes(smb_request_t *sr, smb_xa_t *xa, smb_attr_t *attr)
+{
+	if ((sr->fid_ofile) &&
+	    (sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE)) {
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "lll", 0, 0, 0);
+		return;
+	}
+
+	(void) smb_mbc_encodef(&xa->rep_data_mb,
+	    ((sr->session->native_os == NATIVE_OS_WIN95) ? "YYY" : "yyy"),
+	    smb_gmt2local(sr, attr->sa_crtime.tv_sec),
+	    smb_gmt2local(sr, attr->sa_vattr.va_atime.tv_sec),
+	    smb_gmt2local(sr, attr->sa_vattr.va_mtime.tv_sec));
+}
+
+/*
+ * smb_encode_nt_times
+ *
+ * Encode timestamps in LARGE INTEGER format NT Times.
+ */
+void
+smb_encode_nt_times(smb_request_t *sr, smb_xa_t *xa, smb_attr_t *attr)
+{
+	if ((sr->fid_ofile) &&
+	    (sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE)) {
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "qqqq", 0, 0, 0, 0);
+		return;
+	}
+
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTT",
+	    &attr->sa_crtime,
+	    &attr->sa_vattr.va_atime,
+	    &attr->sa_vattr.va_mtime,
+	    &attr->sa_vattr.va_ctime);
 }

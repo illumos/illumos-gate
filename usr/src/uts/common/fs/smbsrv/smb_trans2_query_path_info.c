@@ -322,6 +322,8 @@
 #include <smbsrv/smb_fsops.h>
 
 int smb_query_all_info_filename(smb_tree_t *, smb_node_t *, char *, size_t);
+extern void smb_encode_smb_datetimes(smb_request_t *, smb_xa_t *, smb_attr_t *);
+extern void smb_encode_nt_times(smb_request_t *, smb_xa_t *, smb_attr_t *);
 
 /*
  * Function: int smb_com_trans2_query_path_information(struct smb_request *)
@@ -340,11 +342,12 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	char			short_name[SMB_SHORTNAMELEN];
 	char			name83[SMB_SHORTNAMELEN];
 	unsigned char		is_dir;
+	unsigned char		delete_on_close;
 	int			len;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
-		    ERROR_ACCESS_DENIED);
+		smbsr_error(sr, NT_STATUS_INVALID_DEVICE_REQUEST, ERRDOS,
+		    ERROR_INVALID_FUNCTION);
 		return (SDRC_ERROR);
 	}
 
@@ -422,6 +425,18 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		allocsz = ap->sa_vattr.va_nblocks * DEV_BSIZE;
 	}
 
+	delete_on_close =
+	    (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) != 0;
+
+	/*
+	 * The number of links reported should be the number of
+	 * non-deleted links. Thus if delete_on_close is set,
+	 * decrement the link count.
+	 */
+	if (delete_on_close && ap->sa_vattr.va_nlink > 0)
+		--(ap->sa_vattr.va_nlink);
+
+
 
 	switch (infolev) {
 	case SMB_INFO_STANDARD:
@@ -431,15 +446,9 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 			allocsz = UINT_MAX;
 
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb,
-		    ((sr->session->native_os == NATIVE_OS_WIN95)
-		    ? "YYYllw" : "yyyllw"),
-		    smb_gmt2local(sr, ap->sa_crtime.tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)datasz,
-		    (uint32_t)allocsz,
-		    dattr);
+		smb_encode_smb_datetimes(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "llw",
+		    (uint32_t)datasz, (uint32_t)allocsz, dattr);
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
@@ -449,15 +458,9 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 			allocsz = UINT_MAX;
 
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb,
-		    ((sr->session->native_os == NATIVE_OS_WIN95)
-		    ? "YYYllwl" : "yyyllwl"),
-		    smb_gmt2local(sr, ap->sa_crtime.tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_atime.tv_sec),
-		    smb_gmt2local(sr, ap->sa_vattr.va_mtime.tv_sec),
-		    (uint32_t)datasz,
-		    (uint32_t)allocsz,
-		    dattr, 0);
+		smb_encode_smb_datetimes(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "llwl",
+		    (uint32_t)datasz, (uint32_t)allocsz, dattr, 0);
 		break;
 
 	case SMB_INFO_QUERY_EAS_FROM_LIST:
@@ -477,12 +480,8 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		 * Similar change in smb_trans2_query_file_information.c.
 		 */
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.",
-		    &ap->sa_crtime,
-		    &ap->sa_vattr.va_atime,
-		    &ap->sa_vattr.va_mtime,
-		    &ap->sa_vattr.va_ctime,
-		    dattr);
+		smb_encode_nt_times(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "w6.", dattr);
 		break;
 
 	case SMB_QUERY_FILE_STANDARD_INFO:
@@ -496,7 +495,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		    (uint64_t)allocsz,
 		    (uint64_t)datasz,
 		    ap->sa_vattr.va_nlink,
-		    (node && (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) != 0),
+		    delete_on_close,
 		    (char)(ap->sa_vattr.va_type == VDIR));
 		break;
 
@@ -520,19 +519,18 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 
 	case SMB_QUERY_FILE_ALL_INFO:
 	case SMB_FILE_ALL_INFORMATION:
+		rc = smb_query_all_info_filename(sr->tid_tree, node,
+		    name, MAXPATHLEN);
+		if (rc != 0) {
+			smbsr_errno(sr, rc);
+			smb_node_release(node);
+			kmem_free(name, MAXPATHLEN);
+			return (SDRC_ERROR);
+		}
+
 		/*
-		 * The reply of this information level on the
-		 * wire doesn't match with protocol specification.
-		 * This is what spec. needs: "TTTTwqqlbbqllqqll"
-		 * But this is actually is sent on the wire:
-		 * "TTTTw6.qqlbb2.l"
-		 * So, there is a 6-byte pad between Attributes and
-		 * AllocationSize. Also there is a 2-byte pad After
-		 * Directory field. Between Directory and FileNameLength
-		 * there is just 4 bytes that it seems is AlignmentRequirement.
-		 * There are 6 other fields between Directory and
-		 * AlignmentRequirement in spec. that aren't sent
-		 * on the wire.
+		 * There is a 6-byte pad between Attributes and AllocationSize,
+		 * and a 2-byte pad after the Directory field.
 		 */
 		rc = smb_query_all_info_filename(sr->tid_tree, node,
 		    name, MAXPATHLEN);
@@ -544,11 +542,8 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		}
 
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.qqlbb2.l",
-		    &ap->sa_crtime,
-		    &ap->sa_vattr.va_atime,
-		    &ap->sa_vattr.va_mtime,
-		    &ap->sa_vattr.va_ctime,
+		smb_encode_nt_times(sr, xa, ap);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "w6.qqlbb2.l",
 		    dattr,
 		    (uint64_t)allocsz,
 		    (uint64_t)datasz,
@@ -564,14 +559,10 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_QUERY_FILE_ALT_NAME_INFO:
 	case SMB_FILE_ALT_NAME_INFORMATION:
 		/*
-		 * Conform to the rule used by Windows NT/2003 servers.
-		 * Shortname is created only if either the filename or
-		 * extension portion of a file is made up of mixed case.
-		 *
-		 * If the shortname is generated, it will be returned as
-		 * the alternative name.  Otherwise, convert the original
-		 * name to all upper-case and return it as the alternative
-		 * name.
+		 * If the shortname is generated by smb_mangle_name()
+		 * it will be returned as the alternative name.
+		 * Otherwise, convert the original name to  upper-case
+		 * and return it as the alternative name.
 		 */
 		(void) smb_mangle_name(ap->sa_vattr.va_nodeid,
 		    name, short_name, name83, 0);
@@ -656,7 +647,7 @@ smb_query_all_info_filename(smb_tree_t *tree, smb_node_t *node,
 	buflen -= len;
 
 	if (SMB_IS_STREAM(node))
-		vp = node->unnamed_stream_node->vp;
+		vp = node->n_unode->vp;
 	else
 		vp = node->vp;
 

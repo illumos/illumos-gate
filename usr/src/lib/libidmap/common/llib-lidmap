@@ -19,13 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
 #include "idmap_impl.h"
+#include "miscutils.h"
+#include "directory.h"
+#include "directory_private.h"
+#include "sized_array.h"
+#include "directory_library_impl.h"
+#include "sidutil.h"

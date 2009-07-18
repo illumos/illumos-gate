@@ -37,7 +37,10 @@
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/ntifs.h>
-#include "svcctl_scm.h"
+#include <smbsrv/winsvc.h>
+#include <smbsrv/nterror.h>
+#include <smbsrv/ndl/svcctl.ndl>
+#include <smbsrv/libmlsvc.h>
 
 #define	SVCCTL_SECURITY_BUFSIZE		256
 #define	SVCCTL_ENUMSERVICES_MINBUFSIZE	1024
@@ -120,6 +123,13 @@ void
 svcctl_initialize(void)
 {
 	(void) ndr_svc_register(&svcctl_service);
+	svcctl_init();
+}
+
+void
+svcctl_finalize(void)
+{
+	svcctl_fini();
 }
 
 /*

@@ -59,12 +59,6 @@ static void	term_handler(int);
 static void	init_idmapd();
 static void	fini_idmapd();
 
-
-#define	_RPCSVC_CLOSEDOWN 120
-
-int _rpcsvcstate = _IDLE;	/* Set when a request is serviced */
-int _rpcsvccount = 0;		/* Number of requests being serviced */
-mutex_t _svcstate_lock;		/* lock for _rpcsvcstate, _rpcsvccount */
 idmapd_state_t	_idmapdstate;
 
 SVCXPRT *xprt = NULL;

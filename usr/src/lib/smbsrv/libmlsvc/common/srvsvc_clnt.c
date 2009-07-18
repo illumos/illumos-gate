@@ -347,6 +347,52 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 	return (0);
 }
 
+int
+srvsvc_net_server_getinfo(char *server, char *domain,
+    srvsvc_server_info_t *svinfo)
+{
+	mlsvc_handle_t handle;
+	struct mslm_NetServerGetInfo arg;
+	struct mslm_SERVER_INFO_101 *sv101;
+	int len, opnum, rc;
+	char *user = smbrdr_ipc_get_user();
+
+	if (srvsvc_open(server, domain, user, &handle) != 0)
+		return (-1);
+
+	opnum = SRVSVC_OPNUM_NetServerGetInfo;
+	bzero(&arg, sizeof (arg));
+
+	len = strlen(server) + 4;
+	arg.servername = ndr_rpc_malloc(&handle, len);
+	if (arg.servername == NULL)
+		return (-1);
+
+	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
+	arg.level = 101;
+
+	rc = ndr_rpc_call(&handle, opnum, &arg);
+	if ((rc != 0) || (arg.status != 0)) {
+		srvsvc_close(&handle);
+		return (-1);
+	}
+
+	sv101 = arg.result.bufptr.bufptr101;
+
+	bzero(svinfo, sizeof (srvsvc_server_info_t));
+	svinfo->sv_platform_id = sv101->sv101_platform_id;
+	svinfo->sv_version_major = sv101->sv101_version_major;
+	svinfo->sv_version_minor = sv101->sv101_version_minor;
+	svinfo->sv_type = sv101->sv101_type;
+	if (sv101->sv101_name)
+		svinfo->sv_name = strdup((char *)sv101->sv101_name);
+	if (sv101->sv101_comment)
+		svinfo->sv_comment = strdup((char *)sv101->sv101_comment);
+
+	srvsvc_close(&handle);
+	return (0);
+}
+
 /*
  * Synchronize the local system clock with the domain controller.
  */
@@ -490,12 +536,24 @@ void
 srvsvc_net_test(char *server, char *domain, char *netname)
 {
 	smb_domain_t di;
+	srvsvc_server_info_t svinfo;
 
 	(void) smb_tracef("%s %s %s", server, domain, netname);
 
 	if (smb_domain_getinfo(&di)) {
 		server = di.d_dc;
 		domain = di.d_info.di_nbname;
+	}
+
+	if (srvsvc_net_server_getinfo(server, domain, &svinfo) == 0) {
+		smb_tracef("NetServerGetInfo: %s %s (%d.%d) id=%d type=0x%08x",
+		    svinfo.sv_name ? svinfo.sv_name : "NULL",
+		    svinfo.sv_comment ? svinfo.sv_comment : "NULL",
+		    svinfo.sv_version_major, svinfo.sv_version_minor,
+		    svinfo.sv_platform_id, svinfo.sv_type);
+
+		free(svinfo.sv_name);
+		free(svinfo.sv_comment);
 	}
 
 	(void) srvsvc_net_share_get_info(server, domain, netname);

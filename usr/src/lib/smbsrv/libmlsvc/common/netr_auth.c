@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,19 +118,27 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 /*
  * netr_open
  *
- * Open an anonymous session to the NETLOGON pipe on a domain
- * controller and bind to the NETR RPC interface. We store the
- * remote server's native OS type - we may need it due to
- * differences between versions of Windows.
+ * Open an anonymous session to the NETLOGON pipe on a domain controller
+ * and bind to the NETR RPC interface.
+ *
+ * We store the remote server information, which is used to drive Windows
+ * version specific behavior.
  */
 int
 netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle)
 {
+	srvsvc_server_info_t svinfo;
 	char *user = smbrdr_ipc_get_user();
+
+	if (srvsvc_net_server_getinfo(server, domain, &svinfo) < 0)
+		return (-1);
 
 	if (ndr_rpc_bind(netr_handle, server, domain, user, "NETR") < 0)
 		return (-1);
 
+	ndr_rpc_server_setinfo(netr_handle, &svinfo);
+	free(svinfo.sv_name);
+	free(svinfo.sv_comment);
 	return (0);
 }
 

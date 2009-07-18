@@ -193,8 +193,13 @@ static void smb_tree_get_volname(vfs_t *, smb_tree_t *);
 static void smb_tree_get_flags(const smb_share_t *, vfs_t *, smb_tree_t *);
 static void smb_tree_log(smb_request_t *, const char *, const char *, ...);
 static void smb_tree_close_odirs(smb_tree_t *, uint16_t);
+static smb_ofile_t *smb_tree_get_ofile(smb_tree_t *, smb_ofile_t *);
 static smb_odir_t *smb_tree_get_odir(smb_tree_t *, smb_odir_t *);
 static void smb_tree_set_execsub_info(smb_tree_t *, smb_execsub_info_t *);
+static int smb_tree_enum_private(smb_tree_t *, smb_svcenum_t *);
+static int smb_tree_netinfo_encode(smb_tree_t *, uint8_t *, size_t, uint32_t *);
+static void smb_tree_netinfo_init(smb_tree_t *tree, smb_netconnectinfo_t *);
+static void smb_tree_netinfo_fini(smb_netconnectinfo_t *);
 
 /*
  * Extract the share name and share type and connect as appropriate.
@@ -362,8 +367,69 @@ smb_tree_has_feature(smb_tree_t *tree, uint32_t flags)
 	return ((tree->t_flags & flags) == flags);
 }
 
+/*
+ * If the enumeration request is for tree data, handle the request
+ * here.  Otherwise, pass it on to the ofiles.
+ *
+ * This function should be called with a hold on the tree.
+ */
+int
+smb_tree_enum(smb_tree_t *tree, smb_svcenum_t *svcenum)
+{
+	smb_ofile_t	*of;
+	smb_ofile_t	*next;
+	int		rc;
+
+	ASSERT(tree);
+	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+
+	if (svcenum->se_type == SMB_SVCENUM_TYPE_TREE)
+		return (smb_tree_enum_private(tree, svcenum));
+
+	of = smb_tree_get_ofile(tree, NULL);
+	while (of) {
+		ASSERT(of->f_tree == tree);
+
+		rc = smb_ofile_enum(of, svcenum);
+		if (rc != 0) {
+			smb_ofile_release(of);
+			break;
+		}
+
+		next = smb_tree_get_ofile(tree, of);
+		smb_ofile_release(of);
+		of = next;
+	}
+
+	return (rc);
+}
+
+/*
+ * Close a file by its unique id.
+ */
+int
+smb_tree_fclose(smb_tree_t *tree, uint32_t uniqid)
+{
+	smb_ofile_t	*of;
+
+	ASSERT(tree);
+	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+
+	if ((of = smb_ofile_lookup_by_uniqid(tree, uniqid)) == NULL)
+		return (ENOENT);
+
+	if (smb_ofile_disallow_fclose(of)) {
+		smb_ofile_release(of);
+		return (EACCES);
+	}
+
+	smb_ofile_close(of, 0);
+	smb_ofile_release(of);
+	return (0);
+}
 
 /* *************************** Static Functions ***************************** */
+
 #define	SHARES_DIR	".zfs/shares/"
 static void
 smb_tree_acl_access(cred_t *cred, const char *sharename, vnode_t *pathvp,
@@ -434,7 +500,7 @@ static smb_tree_t *
 smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 {
 	smb_user_t		*user = sr->uid_user;
-	smb_node_t		*dir_snode = NULL;
+	smb_node_t		*dnode = NULL;
 	smb_node_t		*snode = NULL;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
@@ -529,15 +595,15 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	/*
 	 * Check that the shared directory exists.
 	 */
-	rc = smb_pathname_reduce(sr, u_cred, si->shr_path, 0, 0, &dir_snode,
+	rc = smb_pathname_reduce(sr, u_cred, si->shr_path, 0, 0, &dnode,
 	    last_component);
 
 	if (rc == 0) {
 		rc = smb_fsop_lookup(sr, u_cred, SMB_FOLLOW_LINKS,
-		    sr->sr_server->si_root_smb_node, dir_snode, last_component,
+		    sr->sr_server->si_root_smb_node, dnode, last_component,
 		    &snode);
 
-		smb_node_release(dir_snode);
+		smb_node_release(dnode);
 	}
 
 	if (rc) {
@@ -704,6 +770,7 @@ smb_tree_alloc(
 	tree->t_state = SMB_TREE_STATE_CONNECTED;
 	tree->t_magic = SMB_TREE_MAGIC;
 	tree->t_access = access;
+	tree->t_connect_time = gethrestime_sec();
 
 	/* if FS is readonly, enforce that here */
 	if (tree->t_flags & SMB_TREE_READONLY)
@@ -1080,6 +1147,44 @@ smb_tree_is_connected(smb_tree_t *tree)
 }
 
 /*
+ * Get the next open ofile in the list.  A reference is taken on
+ * the ofile, which can be released later with smb_ofile_release().
+ *
+ * If the specified ofile is NULL, search from the beginning of the
+ * list.  Otherwise, the search starts just after that ofile.
+ *
+ * Returns NULL if there are no open files in the list.
+ */
+static smb_ofile_t *
+smb_tree_get_ofile(smb_tree_t *tree, smb_ofile_t *of)
+{
+	smb_llist_t *ofile_list;
+
+	ASSERT(tree);
+	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+
+	ofile_list = &tree->t_ofile_list;
+	smb_llist_enter(ofile_list, RW_READER);
+
+	if (of) {
+		ASSERT(of->f_magic == SMB_OFILE_MAGIC);
+		of = smb_llist_next(ofile_list, of);
+	} else {
+		of = smb_llist_head(ofile_list);
+	}
+
+	while (of) {
+		if (smb_ofile_hold(of))
+			break;
+
+		of = smb_llist_next(ofile_list, of);
+	}
+
+	smb_llist_exit(ofile_list);
+	return (of);
+}
+
+/*
  * smb_tree_get_odir
  *
  * Find the next odir in the tree's list of odirs, and obtain a
@@ -1156,4 +1261,97 @@ smb_tree_set_execsub_info(smb_tree_t *tree, smb_execsub_info_t *subs)
 		subs->e_cli_ipaddr = tree->t_session->ipaddr;
 		subs->e_cli_netbiosname = tree->t_session->workstation;
 		subs->e_uid = tree->t_user->u_cred->cr_uid;
+}
+
+/*
+ * Private function to support smb_tree_enum.
+ */
+static int
+smb_tree_enum_private(smb_tree_t *tree, smb_svcenum_t *svcenum)
+{
+	uint8_t *pb;
+	uint_t nbytes;
+	int rc;
+
+	if (svcenum->se_nskip > 0) {
+		svcenum->se_nskip--;
+		return (0);
+	}
+
+	if (svcenum->se_nitems >= svcenum->se_nlimit) {
+		svcenum->se_nitems = svcenum->se_nlimit;
+		return (0);
+	}
+
+	pb = &svcenum->se_buf[svcenum->se_bused];
+	rc = smb_tree_netinfo_encode(tree, pb, svcenum->se_bavail, &nbytes);
+	if (rc == 0) {
+		svcenum->se_bavail -= nbytes;
+		svcenum->se_bused += nbytes;
+		svcenum->se_nitems++;
+	}
+
+	return (rc);
+}
+
+/*
+ * Encode connection information into a buffer: connection information
+ * needed in user space to support RPC requests.
+ */
+static int
+smb_tree_netinfo_encode(smb_tree_t *tree, uint8_t *buf, size_t buflen,
+    uint32_t *nbytes)
+{
+	smb_netconnectinfo_t	info;
+	int			rc;
+
+	smb_tree_netinfo_init(tree, &info);
+	rc = smb_netconnectinfo_encode(&info, buf, buflen, nbytes);
+	smb_tree_netinfo_fini(&info);
+
+	return (rc);
+}
+
+/*
+ * Note: ci_numusers should be the number of users connected to
+ * the share rather than the number of references on the tree but
+ * we don't have a mechanism to track users/share in smbsrv yet.
+ */
+static void
+smb_tree_netinfo_init(smb_tree_t *tree, smb_netconnectinfo_t *info)
+{
+	smb_user_t	*user;
+
+	ASSERT(tree);
+
+	info->ci_id = tree->t_tid;
+	info->ci_type = tree->t_res_type;
+	info->ci_numopens = tree->t_open_files;
+	info->ci_numusers = tree->t_refcnt;
+	info->ci_time = gethrestime_sec() - tree->t_connect_time;
+
+	info->ci_sharelen = strlen(tree->t_sharename) + 1;
+	info->ci_share = smb_kstrdup(tree->t_sharename, info->ci_sharelen);
+
+	user = tree->t_user;
+	ASSERT(user);
+
+	info->ci_namelen = user->u_domain_len + user->u_name_len + 2;
+	info->ci_username = kmem_alloc(info->ci_namelen, KM_SLEEP);
+	(void) snprintf(info->ci_username, info->ci_namelen, "%s\\%s",
+	    user->u_domain, user->u_name);
+}
+
+static void
+smb_tree_netinfo_fini(smb_netconnectinfo_t *info)
+{
+	if (info == NULL)
+		return;
+
+	if (info->ci_username)
+		kmem_free(info->ci_username, info->ci_namelen);
+	if (info->ci_share)
+		kmem_free(info->ci_share, info->ci_sharelen);
+
+	bzero(info, sizeof (smb_netconnectinfo_t));
 }

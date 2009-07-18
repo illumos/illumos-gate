@@ -26,12 +26,15 @@
 #ifndef	_LIBMLSVC_H
 #define	_LIBMLSVC_H
 
+#include <uuid/uuid.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/ksynch.h>
 #include <stdio.h>
 #include <string.h>
+#include <netdb.h>
+#include <libuutil.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/smb_token.h>
@@ -59,12 +62,9 @@ extern boolean_t smb_locate_dc(char *, char *, smb_domain_t *);
 extern boolean_t smb_domain_getinfo(smb_domain_t *);
 
 
-extern uint64_t mlsvc_get_num_users(void);
-extern int mlsvc_get_user_list(smb_ulist_t *);
 extern void dssetup_clear_domain_info(void);
 extern int mlsvc_init(void);
 extern void mlsvc_fini(void);
-extern int mlsvc_set_share(int, char *, char *);
 extern DWORD mlsvc_netlogon(char *, char *);
 extern DWORD mlsvc_join(smb_domain_t *, char *, char *);
 
@@ -126,6 +126,21 @@ typedef struct ms_luid {
 } ms_luid_t;
 
 /*
+ * Information about a server as reported by NetServerGetInfo.
+ * The SV_PLATFORM and SV_TYPE definitions are in srvsvc.ndl.
+ */
+typedef struct srvsvc_server_info {
+	uint32_t	sv_platform_id;
+	char		*sv_name;
+	uint32_t	sv_version_major;
+	uint32_t	sv_version_minor;
+	uint32_t	sv_type;
+	char		*sv_comment;
+} srvsvc_server_info_t;
+
+int srvsvc_net_server_getinfo(char *, char *, srvsvc_server_info_t *);
+
+/*
  * A client_t is created while binding a client connection to hold the
  * context for calls made using that connection.
  *
@@ -137,11 +152,14 @@ typedef struct mlsvc_handle {
 	ndr_hdid_t			handle;
 	ndr_client_t			*clnt;
 	int				remote_os;
+	srvsvc_server_info_t		svinfo;
 } mlsvc_handle_t;
 
 int ndr_rpc_bind(mlsvc_handle_t *, char *, char *, char *, const char *);
 void ndr_rpc_unbind(mlsvc_handle_t *);
 int ndr_rpc_call(mlsvc_handle_t *, int, void *);
+void ndr_rpc_server_setinfo(mlsvc_handle_t *, const srvsvc_server_info_t *);
+void ndr_rpc_server_getinfo(mlsvc_handle_t *, srvsvc_server_info_t *);
 int ndr_rpc_server_os(mlsvc_handle_t *);
 void *ndr_rpc_malloc(mlsvc_handle_t *, size_t);
 ndr_heap_t *ndr_rpc_get_heap(mlsvc_handle_t *);
@@ -150,6 +168,108 @@ boolean_t ndr_is_null_handle(mlsvc_handle_t *);
 boolean_t ndr_is_bind_handle(mlsvc_handle_t *);
 void ndr_inherit_handle(mlsvc_handle_t *, mlsvc_handle_t *);
 void ndr_rpc_status(mlsvc_handle_t *, int, uint32_t);
+
+/* SVCCTL service */
+/*
+ * Calculate the wide-char equivalent string length required to
+ * store a string - including the terminating null wide-char.
+ */
+#define	SVCCTL_WNSTRLEN(S)	((strlen((S)) + 1) * sizeof (mts_wchar_t))
+
+/* An AVL-storable node representing each service in the SCM database. */
+typedef struct svcctl_svc_node {
+	uu_avl_node_t		sn_node;
+	char			*sn_name;	/* Service Name (Key) */
+	char			*sn_fmri;	/* Display Name (FMRI) */
+	char			*sn_desc;	/* Description */
+	char			*sn_state;	/* State */
+} svcctl_svc_node_t;
+
+/* This structure provides context for each svcctl_s_OpenManager call. */
+typedef struct svcctl_manager_context {
+	scf_handle_t		*mc_scf_hdl;	  /* SCF handle */
+	scf_propertygroup_t	*mc_scf_gpg;	  /* Property group */
+	scf_property_t		*mc_scf_gprop;	  /* Property */
+	scf_value_t		*mc_scf_gval;	  /* Value */
+	uint32_t		mc_scf_numsvcs;   /* Number of SMF services */
+	ssize_t			mc_scf_max_fmri_len;  /* Max FMRI length */
+	ssize_t			mc_scf_max_value_len; /* Max Value length */
+	uint32_t		mc_bytes_needed;  /* Number of bytes needed */
+	uu_avl_pool_t		*mc_svcs_pool;	  /* AVL pool */
+	uu_avl_t		*mc_svcs;	  /* AVL tree of SMF services */
+} svcctl_manager_context_t;
+
+/* This structure provides context for each svcctl_s_OpenService call. */
+typedef struct svcctl_service_context {
+	ndr_hdid_t		*sc_mgrid;	/* Manager ID */
+	char			*sc_svcname;    /* Service Name */
+} svcctl_service_context_t;
+
+typedef enum {
+	SVCCTL_MANAGER_CONTEXT = 0,
+	SVCCTL_SERVICE_CONTEXT
+} svcctl_context_type_t;
+
+/* This structure provides abstraction for service and manager context call. */
+typedef struct svcctl_context {
+	svcctl_context_type_t	c_type;
+	union {
+		svcctl_manager_context_t *uc_mgr;
+		svcctl_service_context_t *uc_svc;
+		void *uc_cp;
+	} c_ctx;
+} svcctl_context_t;
+
+/* Service Control Manager (SCM) functions */
+void svcctl_init(void);
+void svcctl_fini(void);
+int svcctl_scm_init(svcctl_manager_context_t *);
+void svcctl_scm_fini(svcctl_manager_context_t *);
+int svcctl_scm_scf_handle_init(svcctl_manager_context_t *);
+void svcctl_scm_scf_handle_fini(svcctl_manager_context_t *);
+int svcctl_scm_refresh(svcctl_manager_context_t *);
+uint32_t svcctl_scm_enum_services(svcctl_manager_context_t *, uint8_t *,
+    size_t, uint32_t *, boolean_t);
+uint32_t svcctl_scm_validate_service(svcctl_manager_context_t *, char *);
+svcctl_svc_node_t *svcctl_scm_find_service(svcctl_manager_context_t *, char *);
+uint32_t svcctl_scm_map_status(const char *);
+
+/* LOGR service */
+#define	LOGR_APPLICATION_LOG		"Application"
+#define	LOGR_SECURITY_LOG		"Security"
+#define	LOGR_SYSTEM_LOG			"System"
+#define	LOGR_NMSGMASK			1023
+#define	LOGR_MAXMSGLEN			800
+
+typedef struct logr_entry {
+	struct timeval	le_timestamp;			/* Time of log entry */
+	int		le_pri;				/* Message priority */
+	char		le_hostname[MAXHOSTNAMELEN];	/* Log hostname */
+	char		le_msg[LOGR_MAXMSGLEN];		/* Log message text */
+} logr_entry_t;
+
+typedef struct logr_info {
+	logr_entry_t	li_entry[LOGR_NMSGMASK+1];	/* Array of log entry */
+	int		li_idx;				/* Index */
+} logr_info_t;
+
+typedef struct logr_read_data {
+	int		rd_tot_recnum;		/* Total no. of record read */
+	int		rd_last_sentrec;	/* Last sentence read */
+	char		rd_first_read;		/* First sentence read */
+	logr_info_t	*rd_log;		/* Log information read */
+} logr_read_data_t;
+
+/* This structure provides the context for eventlog calls from clients. */
+typedef struct logr_context {
+	logr_read_data_t *lc_cached_read_data;
+	char *lc_source_name;
+} logr_context_t;
+
+void logr_init(void);
+void logr_fini(void);
+boolean_t logr_is_supported(char *);
+int logr_get_snapshot(logr_context_t *);
 
 #ifdef	__cplusplus
 }

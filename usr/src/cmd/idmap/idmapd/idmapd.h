@@ -47,15 +47,9 @@
 extern "C" {
 #endif
 
-/* States a server can be in wrt request */
-#define	_IDLE	0
-#define	_SERVED	1
-
 #define	SENTINEL_PID	UINT32_MAX
 #define	CHECK_NULL(s)	(s != NULL ? s : "null")
 
-extern int _rpcsvcstate;	/* set when a request is serviced */
-extern int _rpcsvccount;	/* number of requests being serviced */
 extern mutex_t _svcstate_lock;	/* lock for _rpcsvcstate, _rpcsvccount */
 
 typedef enum idmap_namemap_mode {
@@ -154,6 +148,21 @@ typedef struct msg_table {
 	const char	*msg;
 } msg_table_t;
 
+/*
+ * Data structure to store well-known SIDs and
+ * associated mappings (if any)
+ */
+typedef struct wksids_table {
+	const char	*sidprefix;
+	uint32_t	rid;
+	const char	*domain;
+	const char	*winname;
+	int		is_wuser;
+	uid_t		pid;
+	int		is_user;
+	int		direction;
+} wksids_table_t;
+
 #define	IDMAPD_SEARCH_TIMEOUT		3   /* seconds */
 #define	IDMAPD_LDAP_OPEN_TIMEOUT	1   /* secs; initial, w/ exp backoff */
 
@@ -221,6 +230,14 @@ typedef struct msg_table {
 #define	IS_REQUEST_GID(request) \
 	((request).id1.idtype == IDMAP_GID)
 
+/*
+ * Local RID ranges
+ */
+#define	LOCALRID_UID_MIN	1000U
+#define	LOCALRID_UID_MAX	((uint32_t)INT32_MAX)
+#define	LOCALRID_GID_MIN	(((uint32_t)INT32_MAX) + 1)
+#define	LOCALRID_GID_MAX	UINT32_MAX
+
 typedef idmap_retcode (*update_list_res_cb)(void *, const char **, uint64_t);
 typedef int (*list_svc_cb)(void *, int, char **, char **);
 
@@ -285,6 +302,13 @@ extern idmap_retcode	lookup_wksids_name2sid(const char *, const char *,
 extern void 	idmap_log_stderr(int);
 extern void	idmap_log_syslog(boolean_t);
 extern void	idmap_log_degraded(boolean_t);
+
+extern const wksids_table_t *find_wksid_by_pid(uid_t pid, int is_user);
+extern const wksids_table_t *find_wksid_by_sid(const char *sid, int rid,
+    int type);
+extern const wksids_table_t *find_wksid_by_name(const char *name,
+    const char *domain, int type);
+extern const wksids_table_t *find_wk_by_sid(char *sid);
 
 #ifdef __cplusplus
 }

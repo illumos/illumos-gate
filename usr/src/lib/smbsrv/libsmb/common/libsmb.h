@@ -41,6 +41,7 @@ extern "C" {
 #include <libscf.h>
 #include <libshare.h>
 #include <sqlite/sqlite.h>
+#include <uuid/uuid.h>
 
 #include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
@@ -63,7 +64,6 @@ extern "C" {
 #define	SMB_VARRUN_DIR "/var/run/smb"
 #define	SMB_CCACHE_FILE "ccache"
 #define	SMB_CCACHE_PATH SMB_VARRUN_DIR "/" SMB_CCACHE_FILE
-
 
 
 /* Max value length of all SMB properties */
@@ -272,9 +272,6 @@ extern void smb_tonetbiosname(char *, char *, char);
 extern int smb_chk_hostaccess(smb_inaddr_t *, char *);
 
 extern int smb_getnameinfo(smb_inaddr_t *, char *, int, int);
-extern smb_ulist_t *smb_ulist_alloc(void);
-extern void smb_ulist_free(smb_ulist_t *);
-extern void smb_ulist_cleanup(smb_ulist_t *);
 
 void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);
@@ -848,8 +845,24 @@ int smb_kmod_nbtreceive(void);
 void smb_kmod_unbind(void);
 int smb_kmod_share(char *, char *);
 int smb_kmod_unshare(char *, char *);
-int smb_kmod_get_usernum(uint32_t *);
-int smb_kmod_get_userlist(smb_ulist_t *);
+int smb_kmod_get_open_num(smb_opennum_t *);
+int smb_kmod_enum(smb_netsvc_t *);
+smb_netsvc_t *smb_kmod_enum_init(smb_svcenum_t *);
+void smb_kmod_enum_fini(smb_netsvc_t *);
+int smb_kmod_session_close(const char *, const char *);
+int smb_kmod_file_close(uint32_t);
+
+/*
+ * Interposer library validation
+ */
+#define	SMBEX_VERSION	1
+#define	SMBEX_KEY	"82273fdc-e32a-18c3-3f78-827929dc23ea"
+typedef struct smbex_version {
+	uint32_t v_version;
+	uuid_t v_uuid;
+} smbex_version_t;
+void *smb_dlopen(void);
+void smb_dlclose(void *);
 
 #ifdef	__cplusplus
 }

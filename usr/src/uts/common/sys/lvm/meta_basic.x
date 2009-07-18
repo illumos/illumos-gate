@@ -20,7 +20,7 @@
 % */
 %
 %/*
-% * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+% * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 % * Use is subject to license terms.
 % */
 %
@@ -177,42 +177,6 @@
 %		return (FALSE);
 %	return (TRUE);
 %}
-%
-#ifdef	_KERNEL
-%
-%#define	LASTUNSIGNED	((u_int)0-1)
-%
-%/*
-% * xdr_vector():
-% *
-% * XDR a fixed length array. Unlike variable-length arrays,
-% * the storage of fixed length arrays is static and unfreeable.
-% * > basep: base of the array
-% * > size: size of the array
-% * > elemsize: size of each element
-% * > xdr_elem: routine to XDR each element
-% */
-%bool_t
-%xdr_vector(xdrs, basep, nelem, elemsize, xdr_elem)
-%	XDR *xdrs;
-%	char *basep;
-%	u_int nelem;
-%	u_int elemsize;
-%	xdrproc_t xdr_elem;
-%{
-%	u_int i;
-%	char *elptr;
-%
-%	elptr = basep;
-%	for (i = 0; i < nelem; i++) {
-%		if (! (*xdr_elem)(xdrs, elptr, LASTUNSIGNED)) {
-%			return (FALSE);
-%		}
-%		elptr += elemsize;
-%	}
-%	return (TRUE);
-%}
-#endif /* _KERNEL */
 #endif	/* RPC_XDR */
 
 #ifdef RPC_HDR
@@ -351,11 +315,6 @@ typedef uint32_t	md_mn_nodeid_t;
 %extern	bool_t	xdr_minor_t(XDR *xdrs, minor_t *objp);
 %extern	bool_t	xdr_timeval(XDR *xdrs, struct timeval *objp);
 %extern	bool_t	xdr_clnt_stat(XDR *xdrs, enum clnt_stat *objp);
-#ifdef _KERNEL
-%extern bool_t	xdr_vector(XDR *xdrs, char *basep,
-%			u_int nelem, u_int elemsize,
-%			xdrproc_t xdr_elem);
-#endif	/* _KERNEL */
 %#else /* K&R C */
 #ifndef _KERNEL
 %extern	bool_t	xdr_uint_t();
@@ -374,9 +333,5 @@ typedef uint32_t	md_mn_nodeid_t;
 %extern	bool_t	xdr_minor_t();
 %extern	bool_t	xdr_timeval();
 %extern	bool_t	xdr_clnt_stat();
-%
-#ifdef _KERNEL
-%extern bool_t	xdr_vector();
-#endif	/* _KERNEL */
 %#endif /* K&R C */
 #endif	/* RPC_HDR */

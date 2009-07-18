@@ -236,8 +236,6 @@ static int smb_server_listen(smb_server_t *, smb_listener_daemon_t *,
     in_port_t, int, int);
 static int smb_server_lookup(smb_server_t **);
 static void smb_server_release(smb_server_t *);
-static int smb_server_ulist_geti(smb_session_list_t *, uint32_t,
-    uint8_t *, uint32_t, uint_t *);
 static void smb_server_store_cfg(smb_server_t *, smb_ioc_cfg_t *);
 static void smb_server_stop(smb_server_t *);
 static int smb_server_fsop_start(smb_server_t *);
@@ -246,6 +244,11 @@ static void smb_server_fsop_stop(smb_server_t *);
 static void smb_server_disconnect_share(char *, smb_server_t *);
 static void smb_server_thread_unexport(smb_thread_t *, void *);
 
+static void smb_server_enum_private(smb_session_list_t *, smb_svcenum_t *);
+static int smb_server_sesion_disconnect(smb_session_list_t *, const char *,
+    const char *);
+static int smb_server_fclose(smb_session_list_t *, uint32_t);
+
 static smb_llist_t	smb_servers;
 
 /*
@@ -253,7 +256,8 @@ static smb_llist_t	smb_servers;
  * **************** Functions called from the device interface *****************
  * *****************************************************************************
  *
- * These functions determine the relevant smb server to which the call apply.
+ * These functions typically have to determine the relevant smb server
+ * to which the call applies.
  */
 
 /*
@@ -759,73 +763,115 @@ smb_server_set_gmtoff(smb_ioc_gmt_t *ioc)
 }
 
 int
-smb_server_user_number(smb_ioc_usernum_t *ioc)
+smb_server_numopen(smb_ioc_opennum_t *ioc)
 {
 	smb_server_t	*sv;
 	int		rc;
 
 	if ((rc = smb_server_lookup(&sv)) == 0) {
-		ioc->num = sv->sv_open_users;
-		smb_server_release(sv);
-	}
-	return (rc);
-}
-
-int
-smb_server_user_list(smb_ioc_ulist_t *ioc)
-{
-	smb_server_t *sv;
-	uint8_t *data;
-	uint32_t data_len;
-	uint_t bytes_encoded;
-	int rc;
-
-	if ((rc = smb_server_lookup(&sv)) == 0) {
-
-		bytes_encoded = 0;
-		data = ioc->data;
-		data_len = ioc->data_len;
-		ioc->num =
-		    smb_server_ulist_geti(&sv->sv_nbt_daemon.ld_session_list,
-		    ioc->cookie, data, data_len, &bytes_encoded);
-
-		data += bytes_encoded;
-		data_len -= bytes_encoded;
-		ioc->data_len = bytes_encoded;
-		ioc->cookie += ioc->num;
-
-		ioc->num +=
-		    smb_server_ulist_geti(&sv->sv_tcp_daemon.ld_session_list,
-		    ioc->cookie, data, data_len, &bytes_encoded);
-
-		ioc->data_len += bytes_encoded;
-
+		ioc->open_users = sv->sv_open_users;
+		ioc->open_trees = sv->sv_open_trees;
+		ioc->open_files = sv->sv_open_files;
 		smb_server_release(sv);
 	}
 	return (rc);
 }
 
 /*
- * *****************************************************************************
- * ****************** Functions called from the door interface *****************
- * *****************************************************************************
- *
- * These functions determine the relevant smb server to which the call apply.
+ * Enumerate objects within the server.  The svcenum provides the
+ * enumeration context, i.e. what the caller want to get back.
  */
-
-uint32_t
-smb_server_get_user_count(void)
+int
+smb_server_enum(smb_ioc_svcenum_t *ioc)
 {
-	smb_server_t	*sv;
-	uint32_t	counter = 0;
+	smb_svcenum_t		*svcenum = &ioc->svcenum;
+	smb_server_t		*sv;
+	smb_session_list_t	*se;
+	int			rc;
 
-	if (smb_server_lookup(&sv) == 0) {
-		counter = (uint32_t)sv->sv_open_users;
-		smb_server_release(sv);
+	switch (svcenum->se_type) {
+	case SMB_SVCENUM_TYPE_USER:
+	case SMB_SVCENUM_TYPE_TREE:
+	case SMB_SVCENUM_TYPE_FILE:
+		break;
+	default:
+		return (EINVAL);
 	}
 
-	return (counter);
+	if ((rc = smb_server_lookup(&sv)) != 0)
+		return (rc);
+
+	svcenum->se_bavail = svcenum->se_buflen;
+	svcenum->se_bused = 0;
+	svcenum->se_nitems = 0;
+
+	se = &sv->sv_nbt_daemon.ld_session_list;
+	smb_server_enum_private(se, svcenum);
+
+	se = &sv->sv_tcp_daemon.ld_session_list;
+	smb_server_enum_private(se, svcenum);
+
+	smb_server_release(sv);
+	return (0);
 }
+
+/*
+ * Look for sessions to disconnect by client and user name.
+ */
+int
+smb_server_session_close(smb_ioc_session_t *ioc)
+{
+	smb_session_list_t	*se;
+	smb_server_t		*sv;
+	int			nbt_cnt;
+	int			tcp_cnt;
+	int			rc;
+
+	if ((rc = smb_server_lookup(&sv)) != 0)
+		return (rc);
+
+	se = &sv->sv_nbt_daemon.ld_session_list;
+	nbt_cnt = smb_server_sesion_disconnect(se, ioc->client, ioc->username);
+
+	se = &sv->sv_tcp_daemon.ld_session_list;
+	tcp_cnt = smb_server_sesion_disconnect(se, ioc->client, ioc->username);
+
+	smb_server_release(sv);
+
+	if ((nbt_cnt == 0) && (tcp_cnt == 0))
+		return (ENOENT);
+	return (0);
+}
+
+/*
+ * Close a file by uniqid.
+ */
+int
+smb_server_file_close(smb_ioc_fileid_t *ioc)
+{
+	uint32_t		uniqid = ioc->uniqid;
+	smb_session_list_t	*se;
+	smb_server_t		*sv;
+	int			rc;
+
+	if ((rc = smb_server_lookup(&sv)) != 0)
+		return (rc);
+
+	se = &sv->sv_nbt_daemon.ld_session_list;
+	rc = smb_server_fclose(se, uniqid);
+
+	if (rc == ENOENT) {
+		se = &sv->sv_tcp_daemon.ld_session_list;
+		rc = smb_server_fclose(se, uniqid);
+	}
+
+	smb_server_release(sv);
+	return (rc);
+}
+
+/*
+ * These functions determine the relevant smb server to which the call apply.
+ */
 
 uint32_t
 smb_server_get_session_count(void)
@@ -1422,51 +1468,140 @@ smb_server_release(smb_server_t *sv)
 	mutex_exit(&sv->sv_mutex);
 }
 
-static int
-smb_server_ulist_geti(smb_session_list_t *se, uint32_t cookie,
-    uint8_t *buf, uint32_t buf_len, uint_t *pbe)
+/*
+ * Enumerate the users associated with a session list.
+ */
+static void
+smb_server_enum_private(smb_session_list_t *se, smb_svcenum_t *svcenum)
 {
-	smb_session_t *sn = NULL;
-	smb_user_t *user;
-	smb_llist_t *ulist;
-	smb_opipe_context_t ctx;
-	uint_t bytes_encoded;
-	int rc = 0;
-	int cnt = 0;
+	smb_session_t	*sn;
+	smb_llist_t	*ulist;
+	smb_user_t	*user;
+	int		rc = 0;
 
 	rw_enter(&se->se_lock, RW_READER);
 	sn = list_head(&se->se_act.lst);
-	while ((sn != NULL) && (rc == 0)) {
+
+	while (sn != NULL) {
 		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
 		ulist = &sn->s_user_list;
 		smb_llist_enter(ulist, RW_READER);
 		user = smb_llist_head(ulist);
-		while ((user != NULL) && (rc == 0)) {
-			ASSERT(user->u_magic == SMB_USER_MAGIC);
-			mutex_enter(&user->u_mutex);
-			if ((user->u_state == SMB_USER_STATE_LOGGED_IN) &&
-			    (cookie == 0)) {
-				smb_user_context_init(user, &ctx);
-				rc = smb_opipe_context_encode(&ctx, buf,
-				    buf_len, &bytes_encoded);
-				smb_user_context_fini(&ctx);
-				if (rc == 0) {
-					*pbe += bytes_encoded;
-					buf += bytes_encoded;
-					buf_len -= bytes_encoded;
-					cnt++;
-				}
+
+		while (user != NULL) {
+			if (smb_user_hold(user)) {
+				rc = smb_user_enum(user, svcenum);
+				smb_user_release(user);
 			}
-			mutex_exit(&user->u_mutex);
+
 			user = smb_llist_next(ulist, user);
-			if (cookie > 0)
-				cookie--;
 		}
+
+		smb_llist_exit(ulist);
+
+		if (rc != 0)
+			break;
+
+		sn = list_next(&se->se_act.lst, sn);
+	}
+
+	rw_exit(&se->se_lock);
+}
+
+/*
+ * Disconnect sessions associated with the specified client and username.
+ * Empty strings are treated as wildcards.
+ */
+static int
+smb_server_sesion_disconnect(smb_session_list_t *se,
+    const char *client, const char *name)
+{
+	smb_session_t	*sn;
+	smb_llist_t	*ulist;
+	smb_user_t	*user;
+	boolean_t	match;
+	int		count = 0;
+
+	rw_enter(&se->se_lock, RW_READER);
+	sn = list_head(&se->se_act.lst);
+
+	while (sn != NULL) {
+		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
+
+		if ((*client != '\0') && (!smb_session_isclient(sn, client))) {
+			sn = list_next(&se->se_act.lst, sn);
+			continue;
+		}
+
+		ulist = &sn->s_user_list;
+		smb_llist_enter(ulist, RW_READER);
+		user = smb_llist_head(ulist);
+
+		while (user != NULL) {
+			if (smb_user_hold(user)) {
+				match = (*name == '\0');
+				if (!match)
+					match = smb_user_namecmp(user, name);
+
+				if (match) {
+					smb_llist_exit(ulist);
+					smb_user_logoff(user);
+					++count;
+					smb_user_release(user);
+					smb_llist_enter(ulist, RW_READER);
+					user = smb_llist_head(ulist);
+					continue;
+				}
+
+				smb_user_release(user);
+			}
+
+			user = smb_llist_next(ulist, user);
+		}
+
 		smb_llist_exit(ulist);
 		sn = list_next(&se->se_act.lst, sn);
 	}
+
 	rw_exit(&se->se_lock);
-	return (cnt);
+	return (count);
+}
+
+/*
+ * Close a file by its unique id.
+ */
+static int
+smb_server_fclose(smb_session_list_t *se, uint32_t uniqid)
+{
+	smb_session_t	*sn;
+	smb_llist_t	*ulist;
+	smb_user_t	*user;
+	int		rc = ENOENT;
+
+	rw_enter(&se->se_lock, RW_READER);
+	sn = list_head(&se->se_act.lst);
+
+	while ((sn != NULL) && (rc == ENOENT)) {
+		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
+		ulist = &sn->s_user_list;
+		smb_llist_enter(ulist, RW_READER);
+		user = smb_llist_head(ulist);
+
+		while ((user != NULL) && (rc == ENOENT)) {
+			if (smb_user_hold(user)) {
+				rc = smb_user_fclose(user, uniqid);
+				smb_user_release(user);
+			}
+
+			user = smb_llist_next(ulist, user);
+		}
+
+		smb_llist_exit(ulist);
+		sn = list_next(&se->se_act.lst, sn);
+	}
+
+	rw_exit(&se->se_lock);
+	return (rc);
 }
 
 static void

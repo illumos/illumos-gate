@@ -29,14 +29,14 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <strings.h>
-
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/libmlsvc.h>
-#include "eventlog.h"
+#include <smbsrv/ndl/eventlog.ndl>
 #include <smbsrv/nterror.h>
+
 
 #define	LOGR_FWD		+1
 #define	LOGR_REW		-1
@@ -162,8 +162,6 @@ static ndr_service_t logr_service = {
 	logr_stub_table			/* stub_table */
 };
 
-static int logr_get_snapshot(logr_context_t *);
-
 /*
  * logr_initialize
  *
@@ -175,6 +173,13 @@ void
 logr_initialize(void)
 {
 	(void) ndr_svc_register(&logr_service);
+	logr_init();
+}
+
+void
+logr_finalize(void)
+{
+	logr_fini();
 }
 
 /*
@@ -222,12 +227,12 @@ logr_context_data_free(void *ctxp)
 }
 
 /*
- * logr_mgr_hdalloc
+ * logr_hdalloc
  *
  * Handle allocation wrapper to setup the local manager context.
  */
 static ndr_hdid_t *
-logr_hdalloc(ndr_xa_t *mxa)
+logr_hdalloc(ndr_xa_t *mxa, char *logname)
 {
 	logr_context_t *ctx;
 
@@ -235,8 +240,13 @@ logr_hdalloc(ndr_xa_t *mxa)
 		return (NULL);
 	bzero(ctx, sizeof (logr_context_t));
 
-	ctx->lc_source_name = strdup("eventlog");
-	if ((ctx->lc_source_name != NULL) && (logr_get_snapshot(ctx) < 0)) {
+	ctx->lc_source_name = strdup(logname);
+	if (ctx->lc_source_name == NULL) {
+		free(ctx);
+		return (NULL);
+	}
+
+	if (logr_get_snapshot(ctx) != 0) {
 		free(ctx->lc_source_name);
 		free(ctx);
 		return (NULL);
@@ -287,16 +297,22 @@ logr_s_EventLogOpen(void *arg, ndr_xa_t *mxa)
 	ndr_handle_t *hd;
 	char *log_name = NULL;
 
-	if (param->log_name.length != 0)
-		log_name = (char *)param->log_name.str;
-
-	if ((log_name == NULL) || strcasecmp(log_name, "System") != 0) {
+	if (!ndr_is_admin(mxa)) {
 		bzero(&param->handle, sizeof (logr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 		return (NDR_DRC_OK);
 	}
 
-	id = logr_hdalloc(mxa);
+	if (param->log_name.length != 0)
+		log_name = (char *)param->log_name.str;
+
+	if (!logr_is_supported(log_name)) {
+		bzero(&param->handle, sizeof (logr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		return (NDR_DRC_OK);
+	}
+
+	id = logr_hdalloc(mxa, log_name);
 	if (id && ((hd = logr_hdlookup(mxa, id)) != NULL)) {
 		hd->nh_data_free = logr_context_data_free;
 		bcopy(id, &param->handle, sizeof (logr_handle_t));
@@ -307,42 +323,6 @@ logr_s_EventLogOpen(void *arg, ndr_xa_t *mxa)
 	}
 
 	return (NDR_DRC_OK);
-}
-
-/*
- * logr_get_snapshot
- *
- * Allocate memory and make a copy, as a snapshot, from system log.
- */
-static int
-logr_get_snapshot(logr_context_t *ctx)
-{
-	logr_read_data_t *data = NULL;
-
-	ctx->lc_cached_read_data = malloc(sizeof (logr_read_data_t));
-	if (ctx->lc_cached_read_data != NULL) {
-		data = ctx->lc_cached_read_data;
-
-		data->rd_log = (logr_info_t *)malloc(sizeof (logr_info_t));
-		if (data->rd_log == NULL) {
-			free(data);
-			return (-1);
-		}
-		bzero(data->rd_log, sizeof (logr_info_t));
-
-		data->rd_tot_recnum = logr_syslog_snapshot(data->rd_log);
-		if (data->rd_tot_recnum < 0) {
-			free(data->rd_log);
-			free(data);
-			return (-1);
-		}
-
-		data->rd_first_read = 1;
-
-		return (0);
-	}
-
-	return (-1);
 }
 
 /*

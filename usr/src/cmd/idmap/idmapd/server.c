@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <auth_attr.h>
 #include <secdb.h>
 #include <sys/u8_textprep.h>
+#include <note.h>
 
 #define	_VALIDATE_LIST_CB_DATA(col, val, siz)\
 	retcode = validate_list_cb_data(cb_data, argc, argv, col,\
@@ -1096,4 +1097,21 @@ idmap_prog_1_freeresult(SVCXPRT *transp, xdrproc_t xdr_result,
 {
 	(void) xdr_free(xdr_result, result);
 	return (TRUE);
+}
+
+/*
+ * This function is called by rpc_svc.c when it encounters an error.
+ */
+NOTE(PRINTFLIKE(1))
+void
+idmap_rpc_msgout(const char *fmt, ...)
+{
+	va_list va;
+	char buf[1000];
+
+	va_start(va, fmt);
+	(void) vsnprintf(buf, sizeof (buf), fmt, va);
+	va_end(va);
+
+	idmapdlog(LOG_ERR, "idmap RPC:  %s", buf);
 }

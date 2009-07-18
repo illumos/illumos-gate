@@ -245,13 +245,19 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flags, cred_t *cred,
 	case SMB_IOC_UNSHARE:
 		rc = smb_server_share_unexport(&ioc->ioc_share);
 		break;
-	case SMB_IOC_USER_NUMBER:
-		rc = smb_server_user_number(&ioc->ioc_unum);
+	case SMB_IOC_NUMOPEN:
+		rc = smb_server_numopen(&ioc->ioc_opennum);
 		copyout = B_TRUE;
 		break;
-	case SMB_IOC_USER_LIST:
-		rc = smb_server_user_list(&ioc->ioc_ulist);
+	case SMB_IOC_SVCENUM:
+		rc = smb_server_enum(&ioc->ioc_svcenum);
 		copyout = B_TRUE;
+		break;
+	case SMB_IOC_SESSION_CLOSE:
+		rc = smb_server_session_close(&ioc->ioc_session);
+		break;
+	case SMB_IOC_FILE_CLOSE:
+		rc = smb_server_file_close(&ioc->ioc_fileid);
 		break;
 	default:
 		rc = ENOTTY;

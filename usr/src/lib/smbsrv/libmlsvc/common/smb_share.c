@@ -406,7 +406,7 @@ smb_shr_add(smb_share_t *si)
 	smb_shr_cache_unlock();
 
 	/* call kernel to take a hold on the shared file system */
-	rc = mlsvc_set_share(SMB_SHROP_ADD, si->shr_path, si->shr_name);
+	rc = smb_kmod_share(si->shr_path, si->shr_name);
 
 	if (rc == 0) {
 		smb_shr_publish(si->shr_name, si->shr_container);
@@ -483,7 +483,7 @@ smb_shr_remove(char *sharename)
 	smb_shr_unpublish(sharename, container);
 
 	/* call kernel to release the hold on the shared file system */
-	(void) mlsvc_set_share(SMB_SHROP_DELETE, path, sharename);
+	(void) smb_kmod_unshare(path, sharename);
 
 	return (NERR_Success);
 }

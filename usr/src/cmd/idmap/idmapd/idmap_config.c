@@ -696,7 +696,6 @@ compare_trusteddomainsinforest(ad_disc_domainsinforest_t *df1,
 	int		num_df1 = 0;
 	int		num_df2 = 0;
 	boolean_t	match;
-	int		err;
 
 	for (i = 0; df1[i].domain[0] != '\0'; i++)
 		if (df1[i].trusted)
@@ -714,10 +713,8 @@ compare_trusteddomainsinforest(ad_disc_domainsinforest_t *df1,
 			match = B_FALSE;
 			for (j = 0; df2[j].domain[0] != '\0'; j++) {
 				if (df2[j].trusted &&
-				    u8_strcmp(df1[i].domain, df2[i].domain, 0,
-				    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err)
-				    == 0 && err == 0 &&
-				    strcmp(df1[i].sid, df2[i].sid) == 0) {
+				    domain_eq(df1[i].domain, df2[j].domain) &&
+				    strcmp(df1[i].sid, df2[j].sid) == 0) {
 					match = B_TRUE;
 					break;
 				}
@@ -756,10 +753,10 @@ update_trusted_forest(idmap_trustedforest_t **value, int *num_value,
 				    (*new)[j].forest_name) == 0 &&
 				    ad_disc_compare_ds(
 				    (*value)[i].global_catalog,
-				    (*new)[i].global_catalog) == 0 &&
+				    (*new)[j].global_catalog) == 0 &&
 				    compare_trusteddomainsinforest(
 				    (*value)[i].domains_in_forest,
-				    (*new)[i].domains_in_forest) == 0) {
+				    (*new)[j].domains_in_forest) == 0) {
 					match = B_TRUE;
 					break;
 				}
@@ -1274,7 +1271,6 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 	char *forestname;
 	int num_trusteddomains;
 	boolean_t new_forest;
-	int err;
 	char *trusteddomain;
 	idmap_ad_disc_ds_t *globalcatalog;
 	idmap_trustedforest_t *trustedforests;
@@ -1368,11 +1364,8 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 				/* Mark the domain as trusted */
 				for (l = 0;
 				    domainsinforest[l].domain[0] != '\0'; l++) {
-					if (u8_strcmp(trusteddomain,
-					    domainsinforest[l].domain, 0,
-					    U8_STRCMP_CI_LOWER,
-					    U8_UNICODE_LATEST, &err) == 0 &&
-					    err == 0) {
+					if (domain_eq(trusteddomain,
+					    domainsinforest[l].domain)) {
 						domainsinforest[l].trusted =
 						    TRUE;
 						break;
@@ -1420,11 +1413,8 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 			/* Mark the domain as trusted */
 			for (l = 0; domainsinforest[l].domain[0] != '\0';
 			    l++) {
-				if (u8_strcmp(trusteddomain,
-				    domainsinforest[l].domain, 0,
-				    U8_STRCMP_CI_LOWER,
-				    U8_UNICODE_LATEST, &err) == 0 &&
-				    err == 0) {
+				if (domain_eq(trusteddomain,
+				    domainsinforest[l].domain)) {
 					domainsinforest[l].trusted = TRUE;
 					break;
 				}
@@ -1434,6 +1424,8 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 		if (j > 0) {
 			pgcfg->num_trusted_forests = j;
 			pgcfg->trusted_forests = trustedforests;
+		} else {
+			free(trustedforests);
 		}
 	}
 

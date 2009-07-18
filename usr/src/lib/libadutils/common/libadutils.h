@@ -164,7 +164,7 @@ extern adutils_rc	adutils_lookup_batch_start(adutils_ad_t *ad,
 				void *ldap_res_search_argp,
 				adutils_query_state_t **state);
 extern adutils_rc	adutils_lookup_batch_add(adutils_query_state_t *state,
-				const char *filter, const char **attrs,
+				const char *filter, const char * const *attrs,
 				const char *edomain, adutils_result_t **result,
 				adutils_rc *rc);
 extern adutils_rc	adutils_lookup_batch_end(
@@ -180,6 +180,8 @@ extern int		adutils_lookup_check_sid_prefix(
 				adutils_query_state_t *state,
 				const char *sid);
 extern void		adutils_set_logger(adutils_logger logger);
+
+extern boolean_t	domain_eq(const char *a, const char *b);
 
 #ifdef	__cplusplus
 }

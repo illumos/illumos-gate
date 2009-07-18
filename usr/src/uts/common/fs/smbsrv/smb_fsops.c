@@ -694,7 +694,7 @@ smb_fsop_remove(
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	if (dnode->flags & NODE_XATTR_DIR) {
-		rc = smb_vop_stream_remove(dnode->dir_snode->vp,
+		rc = smb_vop_stream_remove(dnode->n_dnode->vp,
 		    name, flags, cr);
 	} else if (smb_is_stream_name(name)) {
 		smb_stream_parse_name(name, fname, sname);
@@ -1453,7 +1453,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	faccess &= sr->tid_tree->t_access;
 
 	if (acl_check) {
-		dir_vp = (snode->dir_snode) ? snode->dir_snode->vp : NULL;
+		dir_vp = (snode->n_dnode) ? snode->n_dnode->vp : NULL;
 		error = smb_vop_access(snode->vp, faccess, V_ACE_MASK, dir_vp,
 		    cr);
 	} else {
@@ -2297,7 +2297,7 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	}
 
 	if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS)) {
-		dir_vp = (snode->dir_snode) ? snode->dir_snode->vp : NULL;
+		dir_vp = (snode->n_dnode) ? snode->n_dnode->vp : NULL;
 		smb_vop_eaccess(snode->vp, (int *)eaccess, V_ACE_MASK, dir_vp,
 		    cr);
 		return;

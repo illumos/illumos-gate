@@ -41,15 +41,12 @@
 SUNWprivate {
     global:
 	dssetup_clear_domain_info;
-	mlsvc_get_num_users;
-	mlsvc_get_user_list;
 	mlsvc_fini;
 	mlsvc_init;
 	mlsvc_join;
 	mlsvc_lookup_name;
 	mlsvc_lookup_sid;
 	mlsvc_netlogon;
-	mlsvc_set_share;
 	smb_autohome_add;
 	smb_autohome_remove;
 	smb_domain_getinfo;

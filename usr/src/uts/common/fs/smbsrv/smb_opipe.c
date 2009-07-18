@@ -143,13 +143,14 @@ smb_opipe_open(smb_request_t *sr)
  * The full pipe path will be in the form \\PIPE\\SERVICE.  The first part
  * can be assumed, so all we need here are the service names.
  *
- * Returns a pointer to the pipe name (without any leading \'s) on sucess.
+ * Returns a pointer to the pipe name (without any leading \'s) on success.
  * Otherwise returns a null pointer.
  */
 static char *
 smb_opipe_lookup(const char *path)
 {
 	static char *named_pipes[] = {
+		"lsass",
 		"LSARPC",
 		"NETLOGON",
 		"SAMR",
@@ -188,14 +189,14 @@ smb_opipe_lookup(const char *path)
 static int
 smb_opipe_do_open(smb_request_t *sr, smb_opipe_t *opipe)
 {
-	smb_opipe_context_t *ctx = &opipe->p_context;
+	smb_netuserinfo_t *userinfo = &opipe->p_user;
 	smb_user_t *user = sr->uid_user;
 	uint8_t *buf = opipe->p_doorbuf;
 	uint32_t buflen = SMB_OPIPE_DOOR_BUFSIZE;
 	uint32_t len;
 
-	smb_user_context_init(user, ctx);
-	len = xdr_sizeof(smb_opipe_context_xdr, ctx);
+	smb_user_netinfo_init(user, userinfo);
+	len = xdr_sizeof(smb_netuserinfo_xdr, userinfo);
 
 	bzero(&opipe->p_hdr, sizeof (smb_opipe_hdr_t));
 	opipe->p_hdr.oh_magic = SMB_OPIPE_HDR_MAGIC;
@@ -208,7 +209,7 @@ smb_opipe_do_open(smb_request_t *sr, smb_opipe_t *opipe)
 	buf += len;
 	buflen -= len;
 
-	if (smb_opipe_context_encode(ctx, buf, buflen, NULL) == -1)
+	if (smb_netuserinfo_encode(userinfo, buf, buflen, NULL) == -1)
 		return (-1);
 
 	return (smb_opipe_door_call(opipe));
@@ -266,7 +267,7 @@ smb_opipe_close(smb_ofile_t *of)
 		kmem_free(opipe->p_doorbuf, SMB_OPIPE_DOOR_BUFSIZE);
 	}
 
-	smb_user_context_fini(&opipe->p_context);
+	smb_user_netinfo_fini(&opipe->p_user);
 	smb_opipe_exit(opipe);
 	cv_destroy(&opipe->p_cv);
 	mutex_destroy(&opipe->p_mutex);
@@ -619,49 +620,4 @@ smb_opipe_door_upcall(smb_opipe_t *opipe)
 	opipe->p_hdr.oh_datalen = hdr.oh_datalen;
 	opipe->p_hdr.oh_resid = hdr.oh_resid;
 	return (0);
-}
-
-void
-smb_user_context_init(smb_user_t *user, smb_opipe_context_t *ctx)
-{
-	smb_session_t *session;
-
-	ASSERT(user);
-	ASSERT(user->u_domain);
-	ASSERT(user->u_name);
-
-	session = user->u_session;
-	ASSERT(session);
-	ASSERT(session->workstation);
-
-	ctx->oc_session_id = session->s_kid;
-	ctx->oc_native_os = session->native_os;
-	ctx->oc_ipaddr = session->ipaddr;
-	ctx->oc_uid = user->u_uid;
-	ctx->oc_logon_time = user->u_logon_time;
-	ctx->oc_flags = user->u_flags;
-
-	ctx->oc_domain_len = user->u_domain_len;
-	ctx->oc_domain = smb_kstrdup(user->u_domain, ctx->oc_domain_len);
-
-	ctx->oc_account_len = user->u_name_len;
-	ctx->oc_account = smb_kstrdup(user->u_name, ctx->oc_account_len);
-
-	ctx->oc_workstation_len = strlen(session->workstation) + 1;
-	ctx->oc_workstation = smb_kstrdup(session->workstation,
-	    ctx->oc_workstation_len);
-}
-
-void
-smb_user_context_fini(smb_opipe_context_t *ctx)
-{
-	if (ctx) {
-		if (ctx->oc_domain)
-			kmem_free(ctx->oc_domain, ctx->oc_domain_len);
-		if (ctx->oc_account)
-			kmem_free(ctx->oc_account, ctx->oc_account_len);
-		if (ctx->oc_workstation)
-			kmem_free(ctx->oc_workstation, ctx->oc_workstation_len);
-		bzero(ctx, sizeof (smb_opipe_context_t));
-	}
 }

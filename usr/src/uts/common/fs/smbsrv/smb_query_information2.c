@@ -93,8 +93,9 @@ smb_com_query_information2(smb_request_t *sr)
 	}
 
 	if (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK) {
-		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
-		return (SDRC_ERROR);
+		rc = smbsr_encode_result(sr, 11, 0, "blllllww",
+		    11, 0, 0, 0, 0, 0, 0, 0);
+		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 
 	node = sr->fid_ofile->f_node;

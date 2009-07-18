@@ -134,6 +134,7 @@ extern idmap_stat idmap_get_prop_ds(idmap_handle_t *, idmap_prop_type,
 extern idmap_stat idmap_get_prop_str(idmap_handle_t *, idmap_prop_type,
     char **);
 
+extern idmap_logger logger;
 
 #ifdef __cplusplus
 }

@@ -80,6 +80,7 @@ SUNWprivate {
 	ad_disc_get_SiteName;
 	ad_disc_get_TrustedDomains;
 	ad_disc_get_DomainsInForest;
+	domain_eq;
     local:
 	*;
 };
