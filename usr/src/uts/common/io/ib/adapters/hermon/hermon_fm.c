@@ -1008,6 +1008,21 @@ hermon_fm_ereport(hermon_state_t *state, int type, int detail)
 			    DDI_SERVICE_LOST);
 			break;
 		case HCA_ERR_DEGRADED:
+			switch (state->hs_fm_degraded_reason) {
+			case HCA_FW_CORRUPT:
+				i_hca_fm_ereport(state->hs_dip, type,
+				    DDI_FM_DEVICE_FW_CORRUPT);
+				break;
+			case HCA_FW_MISMATCH:
+				i_hca_fm_ereport(state->hs_dip, type,
+				    DDI_FM_DEVICE_FW_MISMATCH);
+				break;
+			case HCA_FW_MISC:
+			default:
+				i_hca_fm_ereport(state->hs_dip, type,
+				    DDI_FM_DEVICE_INTERN_UNCORR);
+				break;
+			}
 			ddi_fm_service_impact(state->hs_dip,
 			    DDI_SERVICE_DEGRADED);
 			break;
@@ -1035,8 +1050,21 @@ hermon_fm_ereport(hermon_state_t *state, int type, int detail)
 			    "error. type = %d, detail = %d\n.", type, detail);
 			break;
 		case HCA_ERR_DEGRADED:
-			i_hca_fm_ereport(state->hs_dip, type,
-			    DDI_FM_DEVICE_INTERN_UNCORR);
+			switch (state->hs_fm_degraded_reason) {
+			case HCA_FW_CORRUPT:
+				i_hca_fm_ereport(state->hs_dip, type,
+				    DDI_FM_DEVICE_FW_CORRUPT);
+				break;
+			case HCA_FW_MISMATCH:
+				i_hca_fm_ereport(state->hs_dip, type,
+				    DDI_FM_DEVICE_FW_MISMATCH);
+				break;
+			case HCA_FW_MISC:
+			default:
+				i_hca_fm_ereport(state->hs_dip, type,
+				    DDI_FM_DEVICE_INTERN_UNCORR);
+				break;
+			}
 			ddi_fm_service_impact(state->hs_dip,
 			    DDI_SERVICE_DEGRADED);
 			break;

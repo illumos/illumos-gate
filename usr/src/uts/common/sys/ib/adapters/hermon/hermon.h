@@ -722,6 +722,7 @@ struct hermon_hw_eqc_s		hs_debug_eqc;
 	ddi_acc_handle_t	hs_fm_uarhdl;	/* fm-protected UAR hdl */
 	ddi_device_acc_attr_t	hs_fm_accattr;	/* fm-protected acc attr */
 	ddi_periodic_t		hs_fm_poll_thread; /* fma poll thread */
+	int32_t			hs_fm_degraded_reason;	/* degradation cause */
 #ifdef FMA_TEST
 	mod_hash_t		*hs_fm_test_hash; /* testset */
 	mod_hash_t		*hs_fm_id_hash;	/* testid */

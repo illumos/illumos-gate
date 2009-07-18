@@ -1171,6 +1171,7 @@ hermon_drv_init(hermon_state_t *state, dev_info_t *dip, int instance)
 	} else if (HERMON_IS_MAINTENANCE_MODE(state->hs_dip)) {
 		HERMON_FMANOTE(state, HERMON_FMA_MAINT);
 		state->hs_operational_mode = HERMON_MAINTENANCE_MODE;
+		state->hs_fm_degraded_reason = HCA_FW_MISC; /* not fw reason */
 		return (DDI_FAILURE);
 
 	} else {
@@ -1626,6 +1627,7 @@ hermon_hw_init(hermon_state_t *state)
 			    state->hs_fw.fw_rev_subminor);
 		}
 		state->hs_operational_mode = HERMON_MAINTENANCE_MODE;
+		state->hs_fm_degraded_reason = HCA_FW_MISMATCH;
 		hermon_hw_fini(state, cleanup);
 		HERMON_ATTACH_MSG(state->hs_attach_buf,
 		    "hw_init_checkfwver_fail");
@@ -1696,6 +1698,7 @@ hermon_hw_init(hermon_state_t *state)
 		cmn_err(CE_NOTE, "RUN_FW command failed: 0x%08x\n", status);
 		if (status == HERMON_CMD_BAD_NVMEM) {
 			state->hs_operational_mode = HERMON_MAINTENANCE_MODE;
+			state->hs_fm_degraded_reason = HCA_FW_CORRUPT;
 		}
 		hermon_hw_fini(state, cleanup);
 		HERMON_ATTACH_MSG(state->hs_attach_buf, "hw_init_run_fw_fail");

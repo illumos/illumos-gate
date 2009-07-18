@@ -202,6 +202,11 @@ typedef struct i_hca_fm_test hermon_test_t;
 #define	HCA_PIO_PERSISTENT	(2)	/* persistent error */
 #define	HCA_PIO_RETRY_CNT	(3)
 
+/* HCA firmware faults */
+#define	HCA_FW_MISC		0x1	/* firmware misc faults */
+#define	HCA_FW_CORRUPT		0x2	/* firmware corruption */
+#define	HCA_FW_MISMATCH		0x3	/* firmware version mismatch */
+
 /*
  * Hermon FM macros
  */

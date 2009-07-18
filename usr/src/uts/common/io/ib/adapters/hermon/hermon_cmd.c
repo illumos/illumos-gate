@@ -265,9 +265,11 @@ hermon_cmd_check_status(hermon_state_t *state, int status)
 			break;
 
 		case HERMON_CMD_BAD_NVMEM:
+			/*
+			 * No need of an ereport here since this case
+			 * is treated as a degradation later.
+			 */
 			HERMON_FMANOTE(state, HERMON_FMA_NVMEM);
-			hermon_fm_ereport(state, HCA_IBA_ERR,
-			    HCA_ERR_NON_FATAL);
 			break;
 
 		default:
@@ -1820,9 +1822,11 @@ hermon_run_fw_cmd_post(hermon_state_t *state)
 #ifdef FMA_TEST
 	if (hermon_test_num == -2) {
 		status = HERMON_CMD_BAD_NVMEM;
+		/*
+		 * No need of an ereport here since this case
+		 * is treated as a degradation later.
+		 */
 		HERMON_FMANOTE(state, HERMON_FMA_BADNVMEM);
-		hermon_fm_ereport(state, HCA_IBA_ERR,
-		    HCA_ERR_NON_FATAL);
 	}
 #endif
 	return (status);
