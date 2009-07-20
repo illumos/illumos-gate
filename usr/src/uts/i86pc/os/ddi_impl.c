@@ -200,6 +200,9 @@ FP hardware exhibits Pentium floating point divide problem\n");
 	check_driver_disable();
 	i_ddi_init_root();
 
+	/* reprogram devices not set up by firmware (BIOS) */
+	impl_bus_reprobe();
+
 	/*
 	 * attach the isa nexus to get ACPI resource usage
 	 * isa is "kind of" a pseudo node
@@ -218,8 +221,6 @@ FP hardware exhibits Pentium floating point divide problem\n");
 		(void) i_ddi_attach_hw_nodes("isa");
 #endif
 
-	/* reprogram devices not set up by firmware (BIOS) */
-	impl_bus_reprobe();
 #endif	/* !SAS && !MPSAS */
 }
 
@@ -2588,11 +2589,21 @@ void
 impl_bus_add_probe(void (*func)(int))
 {
 	struct bus_probe *probe;
+	struct bus_probe *lastprobe = NULL;
 
 	probe = kmem_alloc(sizeof (*probe), KM_SLEEP);
-	probe->next = bus_probes;
 	probe->probe = func;
-	bus_probes = probe;
+	probe->next = NULL;
+
+	if (!bus_probes) {
+		bus_probes = probe;
+		return;
+	}
+
+	lastprobe = bus_probes;
+	while (lastprobe->next)
+		lastprobe = lastprobe->next;
+	lastprobe->next = probe;
 }
 
 /*ARGSUSED*/
@@ -2636,12 +2647,19 @@ impl_bus_initialprobe(void)
 		if (modload("misc", "pci_autoconfig") < 0) {
 			panic("failed to load misc/pci_autoconfig");
 		}
+
+		if (modload("drv", "isa") < 0)
+			panic("failed to load drv/isa");
 	}
+
 	(void) modload("misc", "xpv_autoconfig");
 #else
 	if (modload("misc", "pci_autoconfig") < 0) {
 		panic("failed to load misc/pci_autoconfig");
 	}
+
+	if (modload("drv", "isa") < 0)
+		panic("failed to load drv/isa");
 #endif
 
 	probe = bus_probes;

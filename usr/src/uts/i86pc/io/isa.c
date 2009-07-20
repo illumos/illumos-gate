@@ -38,6 +38,7 @@
 #include <sys/psm.h>
 #include <sys/ddidmareq.h>
 #include <sys/ddi_impldefs.h>
+#include <sys/ddi_subrdefs.h>
 #include <sys/dma_engine.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -57,10 +58,10 @@ extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
     psm_intr_op_t, int *);
 extern void pci_register_isa_resources(int, uint32_t, uint32_t);
 static char USED_RESOURCES[] = "used-resources";
-static void isa_alloc_nodes(dev_info_t *);
+static void isa_enumerate(int);
 static void enumerate_BIOS_serial(dev_info_t *);
 static void adjust_prtsz(dev_info_t *isa_dip);
-static void isa_postattach(dev_info_t *);
+static void isa_create_ranges_prop(dev_info_t *);
 
 /*
  * The following typedef is used to represent an entry in the "ranges"
@@ -228,13 +229,26 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	return (mod_install(&modlinkage));
+	int	err;
+
+	if ((err = mod_install(&modlinkage)) != 0)
+		return (err);
+
+	impl_bus_add_probe(isa_enumerate);
+	return (0);
 }
 
 int
 _fini(void)
 {
-	return (mod_remove(&modlinkage));
+	int	err;
+
+	impl_bus_delete_probe(isa_enumerate);
+
+	if ((err = mod_remove(&modlinkage)) != 0)
+		return (err);
+
+	return (0);
 }
 
 int
@@ -268,19 +282,8 @@ isa_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	bzero(isa_extra_resource, MAX_EXTRA_RESOURCE * sizeof (struct regspec));
-
-	if ((rval = i_dmae_init(devi)) == DDI_SUCCESS) {
+	if ((rval = i_dmae_init(devi)) == DDI_SUCCESS)
 		ddi_report_dev(devi);
-		/*
-		 * Enumerate children -- invoking ACPICA
-		 * This is normally in bus_config(), but we need this
-		 * to happen earlier to boot.
-		 */
-		isa_alloc_nodes(devi);
-	}
-
-	isa_postattach(devi);
 
 	return (rval);
 }
@@ -329,7 +332,7 @@ isa_remove_res_from_pci(int type, int *array, uint_t size)
 }
 
 static void
-isa_postattach(dev_info_t *dip)
+isa_create_ranges_prop(dev_info_t *dip)
 {
 	dev_info_t *used;
 	int *ioarray, *memarray, status;
@@ -1036,11 +1039,11 @@ add_known_used_resources(void)
 }
 
 static void
-isa_alloc_nodes(dev_info_t *isa_dip)
+isa_enumerate(int reprogram)
 {
-	static int alloced = 0;
 	int circ, i;
 	dev_info_t *xdip;
+	dev_info_t *isa_dip = ddi_find_devinfo("isa", -1, 0);
 
 	/* hard coded isa stuff */
 	struct regspec asy_regs[] = {
@@ -1057,15 +1060,12 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 	char *acpi_prop;
 	int acpi_enum = 1; /* ACPI is default to be on */
 
-	if (alloced)
+	if (reprogram || !isa_dip)
 		return;
 
+	bzero(isa_extra_resource, MAX_EXTRA_RESOURCE * sizeof (struct regspec));
+
 	ndi_devi_enter(isa_dip, &circ);
-	if (alloced) {	/* just in case we are multi-threaded */
-		ndi_devi_exit(isa_dip, circ);
-		return;
-	}
-	alloced = 1;
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "acpi-enum", &acpi_prop) == DDI_PROP_SUCCESS) {
@@ -1086,6 +1086,8 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 
 			/* adjust parallel port size  */
 			adjust_prtsz(isa_dip);
+
+			isa_create_ranges_prop(isa_dip);
 			return;
 		}
 		cmn_err(CE_NOTE, "!Solaris did not detect ACPI BIOS");
@@ -1127,6 +1129,7 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 
 	ndi_devi_exit(isa_dip, circ);
 
+	isa_create_ranges_prop(isa_dip);
 }
 
 /*
