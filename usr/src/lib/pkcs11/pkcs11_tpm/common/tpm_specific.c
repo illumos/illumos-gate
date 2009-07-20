@@ -566,19 +566,21 @@ token_get_tpm_info(TSS_HCONTEXT hContext, TOKEN_DATA *td)
 		return (CKR_FUNCTION_FAILED);
 	}
 
-	(void) memcpy(&tpmvinfo, (void *)data, sizeof (tpmvinfo));
+	(void) memcpy(&tpmvinfo, (void *)data, datalen);
 
 	bzero(td->token_info.manufacturerID,
 	    sizeof (td->token_info.manufacturerID));
 
 	(void) memset(td->token_info.manufacturerID,  ' ',
 	    sizeof (td->token_info.manufacturerID) - 1);
+
 	(void) memcpy(td->token_info.manufacturerID,
 	    tpmvinfo.tpmVendorID, sizeof (tpmvinfo.tpmVendorID));
 
 	(void) memset(td->token_info.label, ' ',
 	    sizeof (td->token_info.label) - 1);
-	(void) memcpy(td->token_info.label, "TPM", 6);
+
+	(void) memcpy(td->token_info.label, "TPM", 3);
 
 	td->token_info.hardwareVersion.major = tpmvinfo.version.major;
 	td->token_info.hardwareVersion.minor = tpmvinfo.version.minor;
@@ -2761,6 +2763,7 @@ token_specific_rsa_verify_recover(
 	uchar_t		exp[] = { 0x01, 0x00, 0x01 };
 	int		sslrv, num;
 	BYTE		temp[MAX_RSA_KEYLENGTH];
+	BYTE		outdata[MAX_RSA_KEYLENGTH];
 	int		i;
 
 	if ((rc = token_rsa_load_key(hContext, key_obj, &hKey))) {
@@ -2792,8 +2795,10 @@ token_specific_rsa_verify_recover(
 		goto end;
 	}
 
+	rsa->flags |= RSA_FLAG_SIGN_VER;
+
 	/* use RSA_NO_PADDING because the data is already padded (PKCS1) */
-	sslrv = RSA_public_encrypt(in_data_len, in_data, out_data,
+	sslrv = RSA_public_encrypt(in_data_len, in_data, outdata,
 	    rsa, RSA_NO_PADDING);
 	if (sslrv == -1) {
 		rc = CKR_FUNCTION_FAILED;
@@ -2802,14 +2807,14 @@ token_specific_rsa_verify_recover(
 
 	/* Strip leading 0's before stripping the padding */
 	for (i = 0; i < sslrv; i++)
-		if (out_data[i] != 0)
+		if (outdata[i] != 0)
 			break;
 
 	num = BN_num_bytes(rsa->n);
 
 	/* Use OpenSSL function for stripping PKCS#1 padding */
 	sslrv = RSA_padding_check_PKCS1_type_1(temp, sizeof (temp),
-	    &out_data[i], sslrv - i, num);
+	    &outdata[i], sslrv - i, num);
 
 	if (sslrv < 0) {
 		rc = CKR_FUNCTION_FAILED;
