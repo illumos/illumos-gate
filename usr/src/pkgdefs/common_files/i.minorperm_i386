@@ -123,6 +123,7 @@ clone:rtw		0600 root sys 0666 root sys	/dev/rtw
 clone:rum		0600 root sys 0666 root sys	/dev/rum
 clone:rwd		0600 root sys 0666 root sys	/dev/rwd
 clone:rwn		0600 root sys 0666 root sys	/dev/rwn
+clone:uath		0600 root sys 0666 root sys	/dev/uath
 clone:ural		0600 root sys 0666 root sys	/dev/ural
 clone:urtw		0600 root sys 0666 root sys	/dev/urtw
 clone:wpi		0600 root sys 0666 root sys	/dev/wpi
@@ -154,6 +155,7 @@ rtw:*			0600 root sys 0666 root sys	/dev/rtw*
 rum:*			0600 root sys 0666 root sys	/dev/rum*
 rwd:*			0600 root sys 0666 root sys	/dev/rwd*
 rwn:*			0600 root sys 0666 root sys	/dev/rwn*
+uath:*			0600 root sys 0666 root sys	/dev/uath*
 ural:*			0600 root sys 0666 root sys	/dev/ural*
 urtw:*			0600 root sys 0666 root sys	/dev/urtw*
 wpi:*			0600 root sys 0666 root sys	/dev/wpi*
@@ -312,6 +314,7 @@ clone:rtw
 clone:rum
 clone:rwd
 clone:rwn
+clone:uath
 clone:ural
 clone:urtw
 clone:wpi
@@ -343,6 +346,7 @@ rtw:*
 rum:*
 rwd:*
 rwn:*
+uath:*
 ural:*
 urtw:*
 wpi:*

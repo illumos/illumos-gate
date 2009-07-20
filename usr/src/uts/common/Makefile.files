@@ -1725,6 +1725,10 @@ RWD_OBJS += rt2661.o
 
 RWN_OBJS += rt2860.o
 
+UATH_OBJS += uath.o
+
+UATHFW_OBJS += uathfw_mod.o
+
 URAL_OBJS += ural.o
 
 RTW_OBJS += rtw.o smc93cx6.o rtwphy.o rtwphyio.o

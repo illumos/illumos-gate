@@ -334,6 +334,7 @@ DRV_KMODS	+= udp
 DRV_KMODS	+= udp6
 DRV_KMODS	+= ucode
 DRV_KMODS	+= ural
+DRV_KMODS	+= uath
 DRV_KMODS	+= urtw
 DRV_KMODS	+= vgatext
 DRV_KMODS	+= heci
@@ -631,6 +632,7 @@ MISC_KMODS	+= qlc_fw_2500
 MISC_KMODS	+= qlc_fw_6322
 MISC_KMODS	+= qlc_fw_8100
 MISC_KMODS	+= hwa1480_fw
+MISC_KMODS	+= uathfw
 MISC_KMODS	+= uwba
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

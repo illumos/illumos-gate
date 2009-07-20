@@ -168,6 +168,8 @@ usr/src/uts/common/io/rwd/THIRDPARTYLICENSE
 usr/src/uts/common/io/rwn/THIRDPARTYLICENSE
 usr/src/uts/common/io/rwn/fw-rt2860/LICENSE
 usr/src/uts/common/io/sfe/THIRDPARTYLICENSE
+usr/src/uts/common/io/uath/THIRDPARTYLICENSE
+usr/src/uts/common/io/uath/uath_fw/LICENSE
 usr/src/uts/common/io/ural/THIRDPARTYLICENSE
 usr/src/uts/common/io/urtw/THIRDPARTYLICENSE
 usr/src/uts/common/io/usb/clients/hwa1480_fw/i1480/LICENSE
