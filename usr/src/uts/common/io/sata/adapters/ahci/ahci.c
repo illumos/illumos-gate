@@ -345,7 +345,12 @@ boolean_t ahci_commu_64bit_dma = B_TRUE;
  * End of global tunable variable definition
  */
 
+#if AHCI_DEBUG
+uint32_t ahci_debug_flags = 0;
+#else
 uint32_t ahci_debug_flags = (AHCIDBG_ERRS|AHCIDBG_TIMEOUT);
+#endif
+
 
 #if AHCI_DEBUG
 /* The following is needed for ahci_log() */
