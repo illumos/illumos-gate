@@ -407,8 +407,8 @@ __ns_ldap_LoadConfiguration()
 }
 
 
-static int
-_print2buf(LineBuf *line, char *toprint, int addsep)
+int
+__print2buf(LineBuf *line, const char *toprint, char *sep)
 {
 	int	newsz = 0;
 	int	newmax = 0;
@@ -418,8 +418,8 @@ _print2buf(LineBuf *line, char *toprint, int addsep)
 		return (-1);
 
 	newsz = strlen(toprint) + line->len + 1;
-	if (addsep) {
-		newsz += strlen(DOORLINESEP);
+	if (sep != NULL) {
+		newsz += strlen(sep);
 	}
 	if (line->alloc == 0 || newsz > line->alloc) {
 		/* Round up to next buffer and add 1 */
@@ -449,8 +449,8 @@ _print2buf(LineBuf *line, char *toprint, int addsep)
 	}
 	/* now add new 'toprint' data to buffer */
 	(void) strlcat(line->str, toprint, line->alloc);
-	if (addsep) {
-		(void) strlcat(line->str, DOORLINESEP, line->alloc);
+	if (sep != NULL) {
+		(void) strlcat(line->str, sep, line->alloc);
 	}
 	line->len = newsz;
 	return (0);
@@ -474,7 +474,6 @@ __ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname,
 	ns_config_t	*ptr;
 	char		errstr[MAXERROR];
 	ns_ldap_error_t	*errorp;
-	char		string[BUFSIZE];
 	char		*str;
 	ParamIndexType	i = 0;
 	int		len;
@@ -511,26 +510,19 @@ __ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname,
 			    i == NS_LDAP_ADMIN_BINDPASSWD_P)
 				continue;
 		}
-		str = __s_api_strValue(ptr, string, sizeof (string), i,
-		    NS_DOOR_FMT);
+		str = __s_api_strValue(ptr, i, NS_DOOR_FMT);
 		if (str == NULL)
 			continue;
-		if (_print2buf(configinfo, str, 1) != 0) {
+		if (__print2buf(configinfo, str, DOORLINESEP)) {
 			(void) snprintf(errstr, sizeof (errstr),
-			    gettext("_print2buf: Out of memory."));
+			    gettext("__print2buf: Out of memory."));
 			MKERROR(LOG_WARNING, errorp, NS_CONFIG_NOTLOADED,
 			    strdup(errstr), NULL);
 			__s_api_release_config(ptr);
-			if (str != (char *)&string[0]) {
-				free(str);
-				str = NULL;
-			}
+			free(str);
 			return (errorp);
 		}
-		if (str != (char *)&string[0]) {
-			free(str);
-			str = NULL;
-		}
+		free(str);
 	}
 	if (new == NULL)
 		__s_api_release_config(ptr);
@@ -582,7 +574,6 @@ __ns_ldap_DumpLdif(char *filename)
 	ns_config_t	*ptr;
 	char		errstr[MAXERROR];
 	ns_ldap_error_t	*errorp;
-	char		string[BUFSIZE];
 	char		*str;
 	FILE		*fp;
 	ParamIndexType	i = 0;
@@ -645,7 +636,7 @@ __ns_ldap_DumpLdif(char *filename)
 
 	/* For each parameter - construct value */
 	for (i = 0; i <= NS_LDAP_MAX_PIT_P; i++) {
-		str = __s_api_strValue(ptr, string, BUFSIZ, i, NS_LDIF_FMT);
+		str = __s_api_strValue(ptr, i, NS_LDIF_FMT);
 		if (str == NULL)
 			continue;
 		/*
@@ -660,10 +651,7 @@ __ns_ldap_DumpLdif(char *filename)
 		    (i != NS_LDAP_ENABLE_SHADOW_UPDATE_P) &&
 		    (i != NS_LDAP_HOST_CERTPATH_P))
 			(void) fprintf(fp, "%s\n", str);
-		if (str != (char *)&string[0]) {
-			free(str);
-			str = NULL;
-		}
+		free(str);
 	}
 
 	if (filename != NULL)
@@ -687,7 +675,6 @@ __ns_ldap_DumpConfigFiles(char **files)
 	int		fi;
 	int		docred;
 	ns_config_t	*ptr;
-	char		string[BUFSIZE];
 	char		*str;
 	char		errstr[MAXERROR];
 	ParamIndexType	i = 0;
@@ -764,8 +751,7 @@ __ns_ldap_DumpConfigFiles(char **files)
 			    (docred == 1 && cfgtype != CREDCONFIG))
 				continue;
 
-			str = __s_api_strValue(ptr, string, BUFSIZ, i,
-			    NS_FILE_FMT);
+			str = __s_api_strValue(ptr, i, NS_FILE_FMT);
 			if (str == NULL)
 				continue;
 			if (fprintf(fp, "%s\n", str) < 0) {
@@ -776,10 +762,7 @@ __ns_ldap_DumpConfigFiles(char **files)
 				file_export_error = B_TRUE;
 			}
 
-			if (str != (char *)&string[0]) {
-				free(str);
-				str = NULL;
-			}
+			free(str);
 		}
 		if (fclose(fp) != 0) {
 			/* Break if error already hit */
@@ -838,7 +821,7 @@ ns_config_t *
 __ns_ldap_make_config(ns_ldap_result_t *result)
 {
 	int		l, m;
-	char		val[BUFSIZ];
+	char		val[BUFSIZE];
 	char    	*attrname;
 	ns_ldap_entry_t	*entry;
 	ns_ldap_attr_t	*attr;
@@ -846,11 +829,12 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 	ParamIndexType	index;
 	ns_config_t	*ptr;
 	ns_ldap_error_t	*error = NULL;
-	int		firsttime;
 	int		prof_ver;
 	ns_config_t	*curr_ptr = NULL;
 	char		errstr[MAXERROR];
 	ns_ldap_error_t	*errorp;
+	LineBuf		buffer;
+	char		*sepstr;
 
 	if (result == NULL)
 		return (NULL);
@@ -928,22 +912,23 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 			}
 			break;
 		default:
-			firsttime = 1;
-			/* Single or Multiple Value */
-			val[0] = '\0';
-			for (m = 0; m < attr->value_count; m++) {
-				if (firsttime == 1) {
-					firsttime = 0;
-					(void) strlcpy(val, attrval[m],
-					    sizeof (val));
-				} else {
-					(void) strlcat(val, " ", sizeof (val));
-					(void) strlcat(val, attrval[m],
-					    sizeof (val));
-				}
-			}
-			(void) __ns_ldap_setParamValue(ptr, index, val, &error);
+			(void) memset((void *)&buffer, 0, sizeof (LineBuf));
 
+			/* Single or Multiple Value */
+			for (m = 0; m < attr->value_count; m++) {
+				sepstr = NULL;
+				if (m != attr->value_count - 1) {
+					sepstr = SPACESEP;
+				}
+				if (__print2buf(&buffer, attrval[m], sepstr))
+					goto makeconfigerror;
+			}
+			(void) __ns_ldap_setParamValue(ptr, index, buffer.str,
+			    &error);
+			if (buffer.len > 0) {
+				free(buffer.str);
+				buffer.len = 0;
+			}
 			break;
 		}
 	}
@@ -963,10 +948,10 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 		}
 		i = NS_LDAP_ENABLE_SHADOW_UPDATE_P;
 		if (curr_ptr->paramList[i].ns_ptype == INT) {
-			char *val;
-			val = __s_get_shadowupdate_name(
+			char *valt;
+			valt = __s_get_shadowupdate_name(
 			    curr_ptr->paramList[i].ns_i);
-			(void) __ns_ldap_setParamValue(ptr, i, val, &error);
+			(void) __ns_ldap_setParamValue(ptr, i, valt, &error);
 		}
 		if (curr_ptr->paramList[NS_LDAP_ADMIN_BINDDN_P].ns_ptype ==
 		    CHARPTR) {
@@ -993,6 +978,14 @@ __ns_ldap_make_config(ns_ldap_result_t *result)
 	}
 	__s_api_release_config(curr_ptr);
 	return (ptr);
+
+makeconfigerror:
+	if (buffer.len > 0)
+		free(buffer.str);
+
+	__s_api_debug_pause(LOG_ERR, NS_PARSE_ERR,
+	    "__ns_ldap_make_config: Not enough memory");
+	return (NULL);
 }
 
 /*
@@ -1004,7 +997,7 @@ int
 __ns_ldap_download(const char *profile, char *addr, char *baseDN,
 	ns_ldap_error_t **errorp)
 {
-	char filter[BUFSIZ];
+	char filter[BUFSIZE];
 	int rc;
 	ns_ldap_result_t *result = NULL;
 	ns_config_t	*ptr = NULL;
@@ -1079,7 +1072,6 @@ __ns_ldap_print_config(int verbose)
 	ns_config_t	*ptr;
 	char		errstr[MAXERROR];
 	ns_ldap_error_t *errorp;
-	char		string[BUFSIZE];
 	char		*str;
 	int		i;
 
@@ -1119,16 +1111,13 @@ __ns_ldap_print_config(int verbose)
 		    i == NS_LDAP_ADMIN_BINDPASSWD_P)
 			continue;
 
-		str = __s_api_strValue(ptr, string, BUFSIZ, i, NS_FILE_FMT);
+		str = __s_api_strValue(ptr, i, NS_FILE_FMT);
 		if (str == NULL)
 			continue;
 		if (verbose)
 			(void) putchar('\t');
 		(void) fprintf(stdout, "%s\n", str);
-		if (str != (char *)&string[0]) {
-			free(str);
-			str = NULL;
-		}
+		free(str);
 	}
 
 	__s_api_release_config(ptr);

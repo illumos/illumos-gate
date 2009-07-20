@@ -3014,21 +3014,22 @@ __ns_ldap_getParam(const ParamIndexType Param,
  */
 
 char *
-__s_api_strValue(ns_config_t *cfg, char *str,
-			int bufsz, ParamIndexType index,
-			ns_strfmt_t fmt)
+__s_api_strValue(ns_config_t *cfg, ParamIndexType index, ns_strfmt_t fmt)
 {
 	ns_default_config *def = NULL;
 	ns_param_t	*ptr;
 	ns_hash_t	*hptr;
 	ns_mapping_t	*mptr;
-	char		ibuf[14], *buf;
+	char		ibuf[14];
 	char		abuf[64], **cpp;
-	int		alen, count, i, sz;
-	int		seplen = strlen(COMMASEP) + strlen(DOORLINESEP);
-	int		first;
+	int		count, i;
+	boolean_t	first = B_TRUE;
+	LineBuf		lbuf;
+	LineBuf		*buffer = &lbuf;
+	char		*retstring;
+	char		*sepstr;
 
-	if (cfg == NULL || str == NULL)
+	if (cfg == NULL)
 		return (NULL);
 
 	/* NS_LDAP_EXP and TRANSPORT_SEC are not exported externally */
@@ -3039,10 +3040,11 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 	if (cfg->paramList[index].ns_ptype == NS_UNKNOWN)
 		return (NULL);
 
+	(void) memset((char *)buffer, 0, sizeof (LineBuf));
+
 	ptr = &(cfg->paramList[index]);
 
 	abuf[0] = '\0';
-	alen = 0;
 
 	/* get default */
 	def = get_defconfig(cfg, index);
@@ -3068,271 +3070,204 @@ __s_api_strValue(ns_config_t *cfg, char *str,
 	default:
 		break;
 	}
-	alen = strlen(abuf);
-	if (alen > bufsz)
-		return (NULL);
 
-	buf = str;
-	(void) strlcpy(buf, abuf, bufsz);
+	if (__print2buf(buffer, abuf, NULL))
+		goto strValueError;
 
 	switch (ptr->ns_ptype) {
 	case ARRAYAUTH:
 		count = ptr->ns_acnt;
-		sz = 0;
 		for (i = 0; i < count; i++) {
-			sz += strlen(__s_get_auth_name(cfg,
-			    (AuthType_t)(ptr->ns_pi[i]))) + seplen;
-		}
-		sz = sz + alen + 1;
-		if (sz <= bufsz) {
-			buf = str;
-		} else {
-			buf = (char *)calloc(sz, sizeof (char));
-			if (buf == NULL)
-				return (NULL);
-			(void) strcpy(buf, abuf);
-		}
-		for (i = 0; i < count; i++) {
-			(void) strcat(buf,
-			    __s_get_auth_name(cfg,
-			    (AuthType_t)(ptr->ns_pi[i])));
+			sepstr = NULL;
 			if (i != count-1) {
-				if (cfg->version == NS_LDAP_V1)
-					(void) strcat(buf, COMMASEP);
-				else
-					(void) strcat(buf, SEMISEP);
+				if (cfg->version == NS_LDAP_V1) {
+					sepstr = COMMASEP;
+				} else {
+					sepstr = SEMISEP;
+				}
 			}
+			if (__print2buf(buffer, __s_get_auth_name(cfg,
+			    (AuthType_t)(ptr->ns_pi[i])), sepstr))
+				goto strValueError;
 		}
 		break;
 	case ARRAYCRED:
 		count = ptr->ns_acnt;
-		sz = 0;
 		for (i = 0; i < count; i++) {
-			sz += strlen(__s_get_credlvl_name(cfg,
-			    (CredLevel_t)ptr->ns_pi[i])) + seplen;
-		}
-		sz = sz + alen + 1;
-		if (sz <= bufsz) {
-			buf = str;
-		} else {
-			buf = (char *)calloc(sz, sizeof (char));
-			if (buf == NULL)
-				return (NULL);
-			(void) strcpy(buf, abuf);
-		}
-		for (i = 0; i < count; i++) {
-			(void) strcat(buf,
-			    __s_get_credlvl_name(cfg,
-			    (CredLevel_t)ptr->ns_pi[i]));
+			sepstr = NULL;
 			if (i != count-1) {
-				(void) strcat(buf, SPACESEP);
+				sepstr = SPACESEP;
 			}
+			if (__print2buf(buffer, __s_get_credlvl_name(cfg,
+			    (CredLevel_t)ptr->ns_pi[i]), sepstr))
+				goto strValueError;
 		}
 		break;
 	case SAMLIST:
 	case SCLLIST:
 	case SSDLIST:
 		count = ptr->ns_acnt;
-		sz = 0;
 		for (i = 0; i < count; i++) {
-			sz += strlen(ptr->ns_ppc[i]) + seplen;
-		}
-		sz = sz + alen + 1;
-		/*
-		 * We need to allocate buffer depending on the 'fmt' and
-		 * on the number of ns_ptype's present(count) as we add
-		 * name' or 'profile_name' and DOORLINESEP or new line
-		 * char to the buffer - see below.
-		 */
-		switch (fmt) {
-		case NS_LDIF_FMT:
-			sz += count * (strlen(def->profile_name)
-			    + strlen(COLSPSEP) + strlen("\n"));
-			break;
-		case NS_FILE_FMT:
-			sz += count * (strlen(def->name)
-			    + strlen(EQUALSEP) + strlen("\n"));
-			break;
-		case NS_DOOR_FMT:
-			sz += count * (strlen(def->name)
-			    + strlen(EQUALSEP) + strlen(DOORLINESEP));
-			break;
-		}
-		if (sz <= bufsz) {
-			buf = str;
-		} else {
-			buf = (char *)calloc(sz, sizeof (char));
-			if (buf == NULL)
-				return (NULL);
-			(void) strcpy(buf, abuf);
-		}
-		for (i = 0; i < count; i++) {
-			(void) strcat(buf, ptr->ns_ppc[i]);
-			if (i != count-1) {
-				/* Separate items */
-				switch (fmt) {
-				case NS_DOOR_FMT:
-					(void) strcat(buf, DOORLINESEP);
-					(void) strcat(buf, def->name);
-					(void) strcat(buf, EQUALSEP);
-					break;
-				case NS_FILE_FMT:
-					(void) strcat(buf, "\n");
-					(void) strcat(buf, def->name);
-					(void) strcat(buf, EQUSPSEP);
-					break;
-				case NS_LDIF_FMT:
-					(void) strcat(buf, "\n");
-					(void) strcat(buf, def->profile_name);
-					(void) strcat(buf, COLSPSEP);
-					break;
-				}
+			if (__print2buf(buffer, ptr->ns_ppc[i], NULL))
+				goto strValueError;
+
+			if (i == count-1)
+				continue;
+
+			/* Separate items */
+			switch (fmt) {
+			case NS_DOOR_FMT:
+				if (__print2buf(buffer, DOORLINESEP, NULL) ||
+				    __print2buf(buffer, def->name, EQUALSEP))
+					goto strValueError;
+				break;
+			case NS_FILE_FMT:
+				if (__print2buf(buffer, "\n", NULL) ||
+				    __print2buf(buffer, def->name, EQUSPSEP))
+					goto strValueError;
+				break;
+			case NS_LDIF_FMT:
+				if (__print2buf(buffer, "\n", NULL) ||
+				    __print2buf(buffer, def->profile_name,
+				    COLSPSEP))
+					goto strValueError;
+				break;
 			}
 		}
 		break;
 	case ARRAYCP:
 		count = ptr->ns_acnt;
-		sz = 0;
 		for (i = 0; i < count; i++) {
-			sz += strlen(ptr->ns_ppc[i]) + seplen;
-		}
-		sz = sz + alen + 1;
-		if (sz <= bufsz) {
-			buf = str;
-		} else {
-			buf = (char *)calloc(sz, sizeof (char));
-			if (buf == NULL)
-				return (NULL);
-			(void) strcpy(buf, abuf);
-		}
-		for (i = 0; i < count; i++) {
-			(void) strcat(buf, ptr->ns_ppc[i]);
+			sepstr = NULL;
 			if (i != count-1) {
-				(void) strcat(buf, COMMASEP);
+				sepstr = COMMASEP;
 			}
+			if (__print2buf(buffer, ptr->ns_ppc[i], sepstr))
+				goto strValueError;
 		}
 		break;
 	case SERVLIST:
 		count = ptr->ns_acnt;
-		sz = 0;
 		for (i = 0; i < count; i++) {
-			sz += strlen(ptr->ns_ppc[i]) + seplen;
-		}
-		sz = sz + alen + 1;
-		if (sz <= bufsz) {
-			buf = str;
-		} else {
-			buf = (char *)calloc(sz, sizeof (char));
-			if (buf == NULL)
-				return (NULL);
-			(void) strcpy(buf, abuf);
-		}
-		for (i = 0; i < count; i++) {
-			(void) strcat(buf, ptr->ns_ppc[i]);
+			sepstr = NULL;
 			if (i != count-1) {
-				if (fmt == NS_LDIF_FMT)
-					(void) strcat(buf, SPACESEP);
-				else
-					(void) strcat(buf, COMMASEP);
+				if (fmt == NS_LDIF_FMT) {
+					sepstr = SPACESEP;
+				} else {
+					sepstr = COMMASEP;
+				}
 			}
+			if (__print2buf(buffer, ptr->ns_ppc[i], sepstr))
+				goto strValueError;
 		}
 		break;
 	case CHARPTR:
 		if (ptr->ns_pc == NULL)
 			break;
-		sz = strlen(ptr->ns_pc) + alen + 1;
-		if (sz > bufsz) {
-			buf = (char *)calloc(sz, sizeof (char));
-			if (buf == NULL)
-				return (NULL);
-			(void) strcpy(buf, abuf);
-		}
-		(void) strcat(buf, ptr->ns_pc);
+		if (__print2buf(buffer, ptr->ns_pc, NULL))
+			goto strValueError;
 		break;
 	case INT:
 		switch (def->index) {
 		case NS_LDAP_PREF_ONLY_P:
-			(void) strcat(buf,
-			    __s_get_pref_name((PrefOnly_t)ptr->ns_i));
+			if (__print2buf(buffer,
+			    __s_get_pref_name((PrefOnly_t)ptr->ns_i), NULL))
+				goto strValueError;
 			break;
 		case NS_LDAP_SEARCH_REF_P:
-			(void) strcat(buf,
-			    __s_get_searchref_name(cfg,
-			    (SearchRef_t)ptr->ns_i));
+			if (__print2buf(buffer, __s_get_searchref_name(cfg,
+			    (SearchRef_t)ptr->ns_i), NULL))
+				goto strValueError;
 			break;
 		case NS_LDAP_SEARCH_SCOPE_P:
-			(void) strcat(buf,
-			    __s_get_scope_name(cfg,
-			    (ScopeType_t)ptr->ns_i));
+			if (__print2buf(buffer,  __s_get_scope_name(cfg,
+			    (ScopeType_t)ptr->ns_i), NULL))
+				goto strValueError;
 			break;
 		case NS_LDAP_ENABLE_SHADOW_UPDATE_P:
-			(void) strlcat(buf,
-			    __s_get_shadowupdate_name(
-			    (enableShadowUpdate_t)ptr->ns_i), bufsz);
+			if (__print2buf(buffer, __s_get_shadowupdate_name(
+			    (enableShadowUpdate_t)ptr->ns_i), NULL))
+				goto strValueError;
 			break;
 		default:
 			(void) snprintf(ibuf, sizeof (ibuf),
 			    "%d", ptr->ns_i);
-			(void) strcat(buf, ibuf);
+			if (__print2buf(buffer, ibuf, NULL))
+				goto strValueError;
 			break;
 		}
 		break;
 	case ATTRMAP:
-		buf[0] = '\0';
-		first = 1;
 		for (hptr = cfg->llHead; hptr; hptr = hptr->h_llnext) {
 			if (hptr->h_type != NS_HASH_AMAP) {
 				continue;
 			}
 			if (!first) {
-				if (fmt == NS_DOOR_FMT)
-					(void) strcat(buf, DOORLINESEP);
-				else
-					(void) strcat(buf, "\n");
+				/* print abuf as "separator" */
+				if (fmt == NS_DOOR_FMT) {
+					if (__print2buf(buffer, DOORLINESEP,
+					    abuf))
+						goto strValueError;
+				} else {
+					if (__print2buf(buffer, "\n", abuf))
+						goto strValueError;
+				}
 			}
 			mptr = hptr->h_map;
-			(void) strcat(buf, abuf);
-			(void) strcat(buf, mptr->service);
-			(void) strcat(buf, COLONSEP);
-			(void) strcat(buf, mptr->orig);
-			(void) strcat(buf, EQUALSEP);
+			if (__print2buf(buffer, mptr->service, COLONSEP) ||
+			    __print2buf(buffer, mptr->orig, EQUALSEP))
+				goto strValueError;
 			for (cpp = mptr->map; cpp && *cpp; cpp++) {
+				/* print *cpp as "separator" */
+				sepstr = "";
 				if (cpp != mptr->map)
-					(void) strcat(buf, SPACESEP);
-				(void) strcat(buf, *cpp);
+					sepstr = SPACESEP;
+				if (__print2buf(buffer, sepstr, *cpp))
+					goto strValueError;
 			}
-			first = 0;
+			first = B_FALSE;
 		}
 		break;
 	case OBJMAP:
-		buf[0] = '\0';
-		first = 1;
 		for (hptr = cfg->llHead; hptr; hptr = hptr->h_llnext) {
 			if (hptr->h_type != NS_HASH_OMAP) {
 				continue;
 			}
 			if (!first) {
-				if (fmt == NS_DOOR_FMT)
-					(void) strcat(buf, DOORLINESEP);
-				else
-					(void) strcat(buf, "\n");
+				/* print abuf as "separator" */
+				if (fmt == NS_DOOR_FMT) {
+					if (__print2buf(buffer, DOORLINESEP,
+					    abuf))
+						goto strValueError;
+				} else {
+					if (__print2buf(buffer, "\n", abuf))
+						goto strValueError;
+				}
 			}
 			mptr = hptr->h_map;
-			(void) strcat(buf, abuf);
-			(void) strcat(buf, mptr->service);
-			(void) strcat(buf, COLONSEP);
-			(void) strcat(buf, mptr->orig);
-			(void) strcat(buf, EQUALSEP);
+			if (__print2buf(buffer, mptr->service, COLONSEP) ||
+			    __print2buf(buffer, mptr->orig, EQUALSEP))
+				goto strValueError;
 			for (cpp = mptr->map; cpp && *cpp; cpp++) {
+				/* print *cpp as "separator" */
+				sepstr = "";
 				if (cpp != mptr->map)
-					(void) strcat(buf, SPACESEP);
-				(void) strcat(buf, *cpp);
+					sepstr = SPACESEP;
+				if (__print2buf(buffer, sepstr, *cpp))
+					goto strValueError;
 			}
-			first = 0;
+			first = B_FALSE;
 		}
 		break;
 	}
-	return (buf);
+
+	retstring = buffer->str;
+	return (retstring);
+
+strValueError:
+	if (buffer->len > 0)
+		free(buffer->str);
+	return (NULL);
 }
 
 /* shared by __door_getldapconfig() and __door_getadmincred() */

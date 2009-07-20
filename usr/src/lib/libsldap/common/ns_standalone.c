@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	__STANDALONE_MODULE__
 
@@ -2070,12 +2068,9 @@ __ns_ldap_initStandalone(const ns_standalone_conf_t *sa_conf,
 
 		if (sa_conf->SA_BIND_DN != NULL &&
 		    sa_conf->SA_BIND_PWD != NULL) {
-			char buffer[BUFSIZE], *authMethods;
+			char *authMethods;
 
-			authMethods = __s_api_strValue(cfg,
-			    buffer,
-			    BUFSIZE,
-			    NS_LDAP_AUTH_P,
+			authMethods = __s_api_strValue(cfg, NS_LDAP_AUTH_P,
 			    NS_FILE_FMT);
 			if (authMethods != NULL &&
 			    strstr(authMethods, "sasl/GSSAPI") != NULL) {
@@ -2089,8 +2084,12 @@ __ns_ldap_initStandalone(const ns_standalone_conf_t *sa_conf,
 				    "used as an authentication method. "
 				    "The bind DN and password will "
 				    "be ignored.\n"));
+				free(authMethods);
 				break;
 			}
+
+			if (authMethods != NULL)
+				free(authMethods);
 
 			if (__ns_ldap_setParamValue(cfg,
 						NS_LDAP_BINDDN_P,

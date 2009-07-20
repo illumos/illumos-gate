@@ -98,7 +98,7 @@ extern "C" {
 #define	EQUALSEP		"="
 #define	EQUSPSEP		"= "
 #define	LAST_VALUE		(int)NS_LDAP_HOST_CERTPATH_P
-#define	BUFSIZE			1024
+#define	BUFSIZE			BUFSIZ
 #define	DEFAULTCONFIGNAME	"__default_config"
 #define	EXP_DEFAULT_TTL		"43200"	/* 12 hours TTL */
 #define	CRYPTMARK		"{NS1}"
@@ -813,8 +813,7 @@ ns_config_t	*__s_api_loadrefresh_config_global();
 void		__s_api_destroy_config(ns_config_t *ptr);
 int		__s_api_get_configtype(ParamIndexType type);
 const char	*__s_api_get_configname(ParamIndexType type);
-char		*__s_api_strValue(ns_config_t *ptr, char *str,
-			int bufsz, ParamIndexType i,
+char		*__s_api_strValue(ns_config_t *ptr, ParamIndexType i,
 			ns_strfmt_t fmt);
 void		__s_api_release_config(ns_config_t *cfg);
 
@@ -927,6 +926,8 @@ int		__s_api_sasl_bind_callback(
 
 int		__s_api_self_gssapi_only_get(void);
 int		__s_api_sasl_gssapi_init(void);
+
+int		__print2buf(LineBuf *line, const char *toprint, char *sep);
 
 #ifdef __cplusplus
 }
