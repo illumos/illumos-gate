@@ -59,6 +59,7 @@ const char *OUR_PG = "nwamd";
 boolean_t fg = B_FALSE;
 boolean_t shutting_down;
 sigset_t original_sigmask;
+static sigset_t sigwaitset;
 char zonename[ZONENAME_MAX];
 pthread_mutex_t machine_lock = PTHREAD_MUTEX_INITIALIZER;
 dladm_handle_t dld_handle = NULL;
@@ -180,14 +181,11 @@ lookup_daemon_properties(void)
 static void *
 sighandler(void *arg)
 {
-	sigset_t sigset;
 	int sig, err;
 	uint32_t now;
 
-	(void) sigfillset(&sigset);
-
 	while (!shutting_down) {
-		sig = sigwait(&sigset);
+		sig = sigwait(&sigwaitset);
 		dprintf("signal %d caught", sig);
 		switch (sig) {
 		case SIGALRM:
@@ -247,7 +245,7 @@ sighandler(void *arg)
 				(void) pthread_mutex_unlock(&machine_lock);
 			}
 			break;
-		default:
+		case SIGTERM:
 			syslog(LOG_NOTICE, "%s received, shutting down",
 			    strsignal(sig));
 			shutting_down = B_TRUE;
@@ -257,36 +255,41 @@ sighandler(void *arg)
 				exit(EXIT_FAILURE);
 			}
 			break;
+		default:
+			syslog(LOG_NOTICE, "unexpected signal %s received; "
+			    "ignoring", strsignal(sig));
+			break;
 		}
 	}
 	return (NULL);
 }
 
-/* ARGSUSED */
-static void
-sigdummy(int sig)
-{
-}
-
 static void
 init_signalhandling(void)
 {
-	struct sigaction act;
 	pthread_attr_t attr;
 	pthread_t sighand;
 	int err;
-	sigset_t new;
 
 	/*
-	 * The default is to ignore, so we need a dummy handler.
+	 * Construct the set of signals that we explicitly want
+	 * to deal with.  These will be blocked now, while we're
+	 * still single-threaded; this block will be inherited by
+	 * all the threads we create.  The signal handling thread
+	 * will then sigwait() this same set of signals, and will
+	 * thus receive and process any that are sent to the process.
 	 */
-	(void) memset(&act, 0, sizeof (act));
-	act.sa_handler = sigdummy;
-	act.sa_flags = SA_RESTART;
-	(void) sigaction(SIGTHAW, &act, NULL);
+	(void) sigemptyset(&sigwaitset);
+	(void) sigaddset(&sigwaitset, SIGHUP);
+	(void) sigaddset(&sigwaitset, SIGINT);
+	(void) sigaddset(&sigwaitset, SIGALRM);
+	(void) sigaddset(&sigwaitset, SIGTERM);
+	(void) sigaddset(&sigwaitset, SIGTHAW);
+	(void) pthread_sigmask(SIG_BLOCK, &sigwaitset, &original_sigmask);
 
-	(void) sigfillset(&new);
-	(void) pthread_sigmask(SIG_BLOCK, &new, &original_sigmask);
+	/*
+	 * now start the signal handling thread...
+	 */
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	if (err = pthread_create(&sighand, &attr, sighandler, NULL)) {
