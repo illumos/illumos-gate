@@ -227,6 +227,13 @@ struct sata_drive_info {
 	uint64_t	satadrv_max_queue_depth; /* maximum queue depth */
 	sata_id_t	satadrv_id;		/* Device Identify Data */
 	struct sata_drive_stats satadrv_stats;	/* drive statistics */
+
+	/*
+	 * saved standby timer
+	 * [0] - [3] = high - low
+	 */
+	uint8_t		satadrv_standby_timer[4];
+	uint8_t		satadrv_power_level; /* saved power level */
 };
 
 typedef struct sata_drive_info sata_drive_info_t;
@@ -311,6 +318,22 @@ struct sata_pmport_info {
 };
 
 typedef	struct sata_pmport_info sata_pmport_info_t;
+
+/*
+ * sata drive's power level
+ * default value is active
+ */
+#define	SATA_POWER_ACTIVE	0x00
+#define	SATA_POWER_IDLE		0x01
+#define	SATA_POWER_STANDBY	0x02
+#define	SATA_POWER_STOPPED	0x03
+
+/*
+ * pm-capable value definition according to PSARC 2009/310
+ */
+#define	SATA_CAP_POWER_CONDITON	PM_CAPABLE_SPC4
+#define	SATA_CAP_SMART_PAGE	PM_CAPABLE_SMART_LOG
+#define	SATA_CAP_LOG_SENSE	PM_CAPABLE_LOG_SUPPORTED
 
 /*
  * Port SSTATUS register (sata_port_scr sport_sstatus field).
@@ -470,9 +493,12 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SD_SCSI_ASC_INVALID_COMMAND_CODE		0x20
 #define	SD_SCSI_ASC_LBA_OUT_OF_RANGE			0x21
 #define	SD_SCSI_ASC_INVALID_FIELD_IN_CDB		0x24
-#define	SD_SCSI_ASC_INVALID_FIELD_IN_PARAMS_LIST 	0x26
+#define	SD_SCSI_ASC_INVALID_FIELD_IN_PARAMS_LIST	0x26
 #define	SD_SCSI_ASC_RESET				0x29
 #define	SD_SCSI_ASC_SAVING_PARAMS_NOT_SUPPORTED		0x39
+#define	SD_SCSI_ASC_CMD_SEQUENCE_ERR			0x2c
+#define	SD_SCSI_ASC_LOW_POWER_CONDITION_ON		0x5e
+#define	SD_SCSI_ASC_LU_NOT_RESPONSE			0x05
 
 
 /* SCSI defs missing from scsi headers */
@@ -483,6 +509,28 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
  * in sys/scsi/targets/sddefs.h as MODEPAGE_ERR_RECOV
  */
 #define	MODEPAGE_RW_ERRRECOV			0x01 /* read/write recovery */
+
+/*
+ * medium access command
+ */
+#define	SATA_IS_MEDIUM_ACCESS_CMD(cmd) \
+	(((cmd) == SCMD_READ) || ((cmd) == SCMD_WRITE) || \
+	((cmd) == SCMD_READ_G1) || ((cmd) == SCMD_WRITE_G1) || \
+	((cmd) == SCMD_READ_G4) || ((cmd) == SCMD_WRITE_G4) || \
+	((cmd) == SCMD_READ_G5) || ((cmd) == SCMD_WRITE_G5) || \
+	((cmd) == SCMD_VERIFY) || ((cmd) == SCMD_VERIFY_G4) || \
+	((cmd) == SCMD_VERIFY_G5) || ((cmd) == 0x7f) /* VERIFY(32) */|| \
+	((cmd) == SCMD_SYNCHRONIZE_CACHE) || ((cmd) == SCMD_SPACE_G4) || \
+	((cmd) == SCMD_READ_POSITION) || \
+	((cmd) == 0x90) /* PRE-FETCH(16) */ || \
+	((cmd) == SCMD_READ_DEFECT_LIST) || \
+	((cmd) == 0xb7) /* READ DEFECT DATA */ || \
+	((cmd) == SCMD_READ_LONG) || ((cmd) == SCMD_SVC_ACTION_IN_G4) || \
+	((cmd) == SCMD_WRITE_LONG) || ((cmd) == SCMD_SVC_ACTION_OUT_G4) || \
+	((cmd) == 0x41) || ((cmd) == 0x93) || /* WRITE SAME */ \
+	((cmd) == 0x52) || ((cmd) == 0x50) || /* XDREAD & XDWRITE */ \
+	((cmd) == 0x53) || ((cmd) == 0x51) || /* XDWRITEREAD & XPWRITE */ \
+	((cmd) == 0x7f))
 
 /*
  * Macros for accessing various structure fields

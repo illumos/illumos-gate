@@ -125,7 +125,7 @@ extern "C" {
  * Macro to retrieve the DDI instance number from the given buf struct.
  * The instance number is encoded in the minor device number.
  */
-#define	SD_GET_INSTANCE_FROM_BUF(bp)					\
+#define	SD_GET_INSTANCE_FROM_BUF(bp)				\
 	(getminor((bp)->b_edev) >> SDUNIT_SHIFT)
 
 
@@ -447,7 +447,13 @@ struct sd_lun {
 						/* sent in sdclose */
 	    un_f_devid_transport_defined :1,	/* devid defined by transport */
 	    un_f_rmw_type		 :2,	/* RMW type */
-	    un_f_reserved		:10;
+	    un_f_power_condition_disabled :1,	/* power condition disabled */
+						/* through sd configuration */
+	    un_f_power_condition_supported :1,	/* support power condition */
+						/* field by hardware */
+	    un_f_pm_log_sense_smart	:1,	/* log sense support SMART */
+						/* feature attribute */
+	    un_f_reserved		:7;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -1783,11 +1789,28 @@ struct sd_fm_internal {
 #define	SD_CONF_NOT_USED		32
 
 /*
- * Return values from "pm-capable" property
+ * "pm-capable" property values and macros
  */
 #define	SD_PM_CAPABLE_UNDEFINED		-1
-#define	SD_PM_CAPABLE_FALSE		0
-#define	SD_PM_CAPABLE_TRUE		1
+
+#define	SD_PM_CAPABLE_IS_UNDEFINED(pm_cap)	\
+	(pm_cap == SD_PM_CAPABLE_UNDEFINED)
+
+#define	SD_PM_CAPABLE_IS_FALSE(pm_cap)	\
+	((pm_cap & PM_CAPABLE_PM_MASK) == 0)
+
+#define	SD_PM_CAPABLE_IS_TRUE(pm_cap)	\
+	(!SD_PM_CAPABLE_IS_UNDEFINED(pm_cap) && \
+	    ((pm_cap & PM_CAPABLE_PM_MASK) > 0))
+
+#define	SD_PM_CAPABLE_IS_SPC_4(pm_cap)	\
+	((pm_cap & PM_CAPABLE_PM_MASK) == PM_CAPABLE_SPC4)
+
+#define	SD_PM_CAP_LOG_SUPPORTED(pm_cap)	\
+	((pm_cap & PM_CAPABLE_LOG_SUPPORTED) ? TRUE : FALSE)
+
+#define	SD_PM_CAP_SMART_LOG(pm_cap)	\
+	((pm_cap & PM_CAPABLE_SMART_LOG) ? TRUE : FALSE)
 
 /*
  * Property data values used in static configuration table
@@ -2022,6 +2045,13 @@ struct sd_fm_internal {
 #define	SD_CONF_BSET_CACHE_IS_NV	(1 << SD_CONF_SET_CACHE_IS_NV)
 
 /*
+ * Bit in flags telling driver that the power condition flag from [s]sd.conf
+ * [s]sd-config-list and driver table.
+ */
+#define	SD_CONF_SET_PC_DISABLED	19
+#define	SD_CONF_BSET_PC_DISABLED	(1 << SD_CONF_SET_PC_DISABLED)
+
+/*
  * This is the number of items currently settable in the sd.conf
  * sd-config-list.  The mask value is defined for parameter checking. The
  * item count and mask should be updated when new properties are added.
@@ -2040,6 +2070,7 @@ typedef struct {
 	int sdt_disk_sort_dis;
 	int sdt_lun_reset_enable;
 	int sdt_suppress_cache_flush;
+	int sdt_power_condition_dis;
 } sd_tunables;
 
 /* Type definition for static configuration table entries */
@@ -2050,12 +2081,20 @@ typedef struct sd_disk_config {
 } sd_disk_config_t;
 
 /*
- * byte 4 options for 1bh command
+ * first 2 bits of byte 4 options for 1bh command
  */
 #define	SD_TARGET_STOP			0x00
 #define	SD_TARGET_START			0x01
 #define	SD_TARGET_EJECT			0x02
 #define	SD_TARGET_CLOSE			0x03
+
+/*
+ * power condition of byte 4 for 1bh command
+ */
+#define	SD_TARGET_START_VALID		0x00
+#define	SD_TARGET_ACTIVE		0x01
+#define	SD_TARGET_IDLE			0x02
+#define	SD_TARGET_STANDBY		0x03
 
 
 #define	SD_MODE_SENSE_PAGE3_CODE	0x03
@@ -2143,7 +2182,47 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", mode_header_grp2))
 #define	SD_SPINDLE_UNINIT	(-1)
 #define	SD_SPINDLE_OFF		0
 #define	SD_SPINDLE_ON		1
-#define	SD_PM_NOT_SUPPORTED	2
+#define	SD_SPINDLE_STOPPED	0
+#define	SD_SPINDLE_STANDBY	1
+#define	SD_SPINDLE_IDLE		2
+#define	SD_SPINDLE_ACTIVE	3
+#define	SD_PM_NOT_SUPPORTED	4
+
+/*
+ * Power method flag
+ */
+#define	SD_START_STOP		0
+#define	SD_POWER_CONDITION	1
+
+
+/*
+ * Number of power level for start stop or power condition
+ */
+#define	SD_PM_NUM_LEVEL_SSU_SS	2
+#define	SD_PM_NUM_LEVEL_SSU_PC	4
+
+/*
+ * SD internal power state change flag
+ */
+#define	SD_PM_STATE_CHANGE	0
+#define	SD_PM_STATE_ROLLBACK	1
+
+/*
+ * Power attribute table
+ */
+typedef struct disk_power_attr_ss {
+	char *pm_comp[SD_PM_NUM_LEVEL_SSU_SS + 2];	/* pm component */
+	int ran_perf[SD_PM_NUM_LEVEL_SSU_SS];		/* random performance */
+	int pwr_saving[SD_PM_NUM_LEVEL_SSU_SS];		/* power saving */
+	int latency[SD_PM_NUM_LEVEL_SSU_SS];		/* latency */
+}sd_power_attr_ss;
+
+typedef struct disk_power_attr_pc {
+	char *pm_comp[SD_PM_NUM_LEVEL_SSU_PC + 2];	/* pm component */
+	int ran_perf[SD_PM_NUM_LEVEL_SSU_PC];		/* random performance */
+	int pwr_saving[SD_PM_NUM_LEVEL_SSU_PC];		/* power saving */
+	int latency[SD_PM_NUM_LEVEL_SSU_PC];		/* latency */
+}sd_power_attr_pc;
 
 
 /*
@@ -2166,6 +2245,30 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared data", mode_header_grp2))
 #define	SD_OK_TO_SUSPEND_SCSI_WATCHER(un)	(un->un_swr_token != NULL)
 #define	SD_DEVICE_IS_IN_LOW_POWER(un)		((un->un_f_pm_is_enabled) && \
 						    (un->un_pm_count < 0))
+#define	SD_PM_STATE_ACTIVE(un)				\
+		(un->un_f_power_condition_supported ?	\
+		SD_SPINDLE_ACTIVE : SD_SPINDLE_ON)
+#define	SD_PM_STATE_STOPPED(un)				\
+		(un->un_f_power_condition_supported ?	\
+		SD_SPINDLE_STOPPED : SD_SPINDLE_OFF)
+#define	SD_PM_IS_LEVEL_VALID(un, level)			\
+		((un->un_f_power_condition_supported &&	\
+		level >= SD_SPINDLE_STOPPED &&		\
+		level <= SD_SPINDLE_ACTIVE) ||		\
+		(!un->un_f_power_condition_supported &&	\
+		level >= SD_SPINDLE_OFF &&		\
+		level <= SD_SPINDLE_ON))
+#define	SD_PM_IS_IO_CAPABLE(un, level)			\
+		((un->un_f_power_condition_supported &&	\
+		sd_pwr_pc.ran_perf[level] > 0) ||	\
+		(!un->un_f_power_condition_supported &&	\
+		sd_pwr_ss.ran_perf[level] > 0))
+#define	SD_PM_STOP_MOTOR_NEEDED(un, level)		\
+		((un->un_f_power_condition_supported &&	\
+		level <= SD_SPINDLE_STANDBY) ||		\
+		(!un->un_f_power_condition_supported &&	\
+		level == SD_SPINDLE_OFF))
+
 /*
  * Could move this define to some thing like log sense.h in SCSA headers
  * But for now let it live here.

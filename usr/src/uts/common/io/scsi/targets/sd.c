@@ -354,6 +354,33 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_scsi_probe_cache_mutex,
 _NOTE(MUTEX_PROTECTS_DATA(sd_scsi_probe_cache_mutex,
     sd_scsi_probe_cache_head))
 
+/*
+ * Power attribute table
+ */
+static sd_power_attr_ss sd_pwr_ss = {
+	{ "NAME=spindle-motor", "0=off", "1=on", NULL },
+	{0, 100},
+	{30, 0},
+	{20000, 0}
+};
+
+static sd_power_attr_pc sd_pwr_pc = {
+	{ "NAME=spindle-motor", "0=stopped", "1=standby", "2=idle",
+		"3=active", NULL },
+	{0, 0, 0, 100},
+	{90, 90, 20, 0},
+	{15000, 15000, 1000, 0}
+};
+
+/*
+ * Power level to power condition
+ */
+static int sd_pl2pc[] = {
+	SD_TARGET_START_VALID,
+	SD_TARGET_STANDBY,
+	SD_TARGET_IDLE,
+	SD_TARGET_ACTIVE
+};
 
 /*
  * Vendor specific data name property declarations
@@ -864,9 +891,8 @@ static int sd_pm_idletime = 1;
 #define	sd_setup_pm			ssd_setup_pm
 #define	sd_create_pm_components		ssd_create_pm_components
 #define	sd_ddi_suspend			ssd_ddi_suspend
-#define	sd_ddi_pm_suspend		ssd_ddi_pm_suspend
 #define	sd_ddi_resume			ssd_ddi_resume
-#define	sd_ddi_pm_resume		ssd_ddi_pm_resume
+#define	sd_pm_state_change		ssd_pm_state_change
 #define	sdpower				ssdpower
 #define	sdattach			ssdattach
 #define	sddetach			ssddetach
@@ -1206,9 +1232,8 @@ static void sd_setup_pm(sd_ssc_t *ssc, dev_info_t *devi);
 static void sd_create_pm_components(dev_info_t *devi, struct sd_lun *un);
 
 static int  sd_ddi_suspend(dev_info_t *devi);
-static int  sd_ddi_pm_suspend(struct sd_lun *un);
 static int  sd_ddi_resume(dev_info_t *devi);
-static int  sd_ddi_pm_resume(struct sd_lun *un);
+static int  sd_pm_state_change(struct sd_lun *un, int level, int flag);
 static int  sdpower(dev_info_t *devi, int component, int level);
 
 static int  sdattach(dev_info_t *devi, ddi_attach_cmd_t cmd);
@@ -1467,8 +1492,8 @@ static int sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp,
 	uint32_t *lbap, int path_flag);
 static int sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
 	uint32_t *lbap, uint32_t *psp, int path_flag);
-static int sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int flag,
-	int path_flag);
+static int sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int pc_flag,
+	int flag, int path_flag);
 static int sd_send_scsi_INQUIRY(sd_ssc_t *ssc, uchar_t *bufaddr,
 	size_t buflen, uchar_t evpd, uchar_t page_code, size_t *residp);
 static int sd_send_scsi_TEST_UNIT_READY(sd_ssc_t *ssc, int flag);
@@ -3177,9 +3202,11 @@ sd_spin_up_unit(sd_ssc_t *ssc)
 	 * condition (0x2/0x4/0x3) if the device is "inactive," but
 	 * we don't want to fail the attach because it may become
 	 * "active" later.
+	 * We don't know if power condition is supported or not at
+	 * this stage, use START STOP bit.
 	 */
-	status = sd_send_scsi_START_STOP_UNIT(ssc, SD_TARGET_START,
-	    SD_PATH_DIRECT);
+	status = sd_send_scsi_START_STOP_UNIT(ssc, SD_START_STOP,
+	    SD_TARGET_START, SD_PATH_DIRECT);
 
 	if (status != 0) {
 		if (status == EACCES)
@@ -4022,6 +4049,20 @@ sd_set_properties(struct sd_lun *un, char *name, char *value)
 		return;
 	}
 
+	if (strcasecmp(name, "power-condition") == 0) {
+		if (strcasecmp(value, "true") == 0) {
+			un->un_f_power_condition_disabled = FALSE;
+		} else if (strcasecmp(value, "false") == 0) {
+			un->un_f_power_condition_disabled = TRUE;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "power condition disabled flag set to %d\n",
+		    un->un_f_power_condition_disabled);
+		return;
+	}
+
 	if (strcasecmp(name, "timeout-releasereservation") == 0) {
 		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
 			un->un_reserve_release_time = val;
@@ -4232,6 +4273,12 @@ sd_get_tunables_from_conf(struct sd_lun *un, int flags, int *data_list,
 			    "sd_get_tunables_from_conf: \
 			    suppress_cache_flush = %d"
 			    "\n", values->sdt_suppress_cache_flush);
+			break;
+		case SD_CONF_BSET_PC_DISABLED:
+			values->sdt_disk_sort_dis = data_list[i];
+			SD_INFO(SD_LOG_ATTACH_DETACH, un,
+			    "sd_get_tunables_from_conf: power_condition_dis = "
+			    "%d\n", values->sdt_power_condition_dis);
 			break;
 		}
 	}
@@ -4712,6 +4759,16 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 		    "sd_set_vers1_properties: suppress_cache_flush "
 		    "flag set to %d\n",
 		    prop_list->sdt_suppress_cache_flush);
+	}
+
+	if (flags & SD_CONF_BSET_PC_DISABLED) {
+		un->un_f_power_condition_disabled =
+		    (prop_list->sdt_power_condition_dis != 0) ?
+		    TRUE : FALSE;
+		SD_INFO(SD_LOG_ATTACH_DETACH, un,
+		    "sd_set_vers1_properties: power_condition_disabled "
+		    "flag set to %d\n",
+		    prop_list->sdt_power_condition_dis);
 	}
 
 	/*
@@ -5752,6 +5809,9 @@ sd_setup_pm(sd_ssc_t *ssc, dev_info_t *devi)
 	 * This complies with the new power management framework
 	 * for certain desktop machines. Create the pm_components
 	 * property as a string array property.
+	 * If un_f_pm_supported is TRUE, that means the disk
+	 * attached HBA has set the "pm-capable" property and
+	 * the value of this property is bigger than 0.
 	 */
 	if (un->un_f_pm_supported) {
 		/*
@@ -5762,9 +5822,19 @@ sd_setup_pm(sd_ssc_t *ssc, dev_info_t *devi)
 		 * device has a motor.
 		 */
 		un->un_f_start_stop_supported = TRUE;
-		rval = sd_send_scsi_START_STOP_UNIT(ssc, SD_TARGET_START,
-		    SD_PATH_DIRECT);
 
+		if (un->un_f_power_condition_supported) {
+			rval = sd_send_scsi_START_STOP_UNIT(ssc,
+			    SD_POWER_CONDITION, SD_TARGET_ACTIVE,
+			    SD_PATH_DIRECT);
+			if (rval != 0) {
+				un->un_f_power_condition_supported = FALSE;
+			}
+		}
+		if (!un->un_f_power_condition_supported) {
+			rval = sd_send_scsi_START_STOP_UNIT(ssc,
+			    SD_START_STOP, SD_TARGET_START, SD_PATH_DIRECT);
+		}
 		if (rval != 0) {
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 			un->un_f_start_stop_supported = FALSE;
@@ -5774,11 +5844,39 @@ sd_setup_pm(sd_ssc_t *ssc, dev_info_t *devi)
 		 * create pm properties anyways otherwise the parent can't
 		 * go to sleep
 		 */
-		(void) sd_create_pm_components(devi, un);
 		un->un_f_pm_is_enabled = TRUE;
+		(void) sd_create_pm_components(devi, un);
+
+		/*
+		 * If it claims that log sense is supported, check it out.
+		 */
+		if (un->un_f_log_sense_supported) {
+			rval = sd_log_page_supported(ssc,
+			    START_STOP_CYCLE_PAGE);
+			if (rval == 1) {
+				/* Page found, use it. */
+				un->un_start_stop_cycle_page =
+				    START_STOP_CYCLE_PAGE;
+			} else {
+				/*
+				 * Page not found or log sense is not
+				 * supported.
+				 * Notice we do not check the old style
+				 * START_STOP_CYCLE_VU_PAGE because this
+				 * code path does not apply to old disks.
+				 */
+				un->un_f_log_sense_supported = FALSE;
+				un->un_f_pm_log_sense_smart = FALSE;
+			}
+		}
+
 		return;
 	}
 
+	/*
+	 * For the disk whose attached HBA has not set the "pm-capable"
+	 * property, check if it supports the power management.
+	 */
 	if (!un->un_f_log_sense_supported) {
 		un->un_power_level = SD_SPINDLE_ON;
 		un->un_f_pm_is_enabled = FALSE;
@@ -5796,7 +5894,7 @@ sd_setup_pm(sd_ssc_t *ssc, dev_info_t *devi)
 
 	/*
 	 * If the start-stop cycle counter log page is not supported
-	 * or if the pm-capable property is SD_PM_CAPABLE_FALSE (0)
+	 * or if the pm-capable property is set to be false (0),
 	 * then we should not create the pm_components property.
 	 */
 	if (rval == -1) {
@@ -5886,44 +5984,53 @@ sd_setup_pm(sd_ssc_t *ssc, dev_info_t *devi)
 static void
 sd_create_pm_components(dev_info_t *devi, struct sd_lun *un)
 {
-	char *pm_comp[] = { "NAME=spindle-motor", "0=off", "1=on", NULL };
-
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
-	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, devi,
-	    "pm-components", pm_comp, 3) == DDI_PROP_SUCCESS) {
-		/*
-		 * When components are initially created they are idle,
-		 * power up any non-removables.
-		 * Note: the return value of pm_raise_power can't be used
-		 * for determining if PM should be enabled for this device.
-		 * Even if you check the return values and remove this
-		 * property created above, the PM framework will not honor the
-		 * change after the first call to pm_raise_power. Hence,
-		 * removal of that property does not help if pm_raise_power
-		 * fails. In the case of removable media, the start/stop
-		 * will fail if the media is not present.
-		 */
-		if (un->un_f_attach_spinup && (pm_raise_power(SD_DEVINFO(un), 0,
-		    SD_SPINDLE_ON) == DDI_SUCCESS)) {
-			mutex_enter(SD_MUTEX(un));
-			un->un_power_level = SD_SPINDLE_ON;
-			mutex_enter(&un->un_pm_mutex);
-			/* Set to on and not busy. */
-			un->un_pm_count = 0;
-		} else {
-			mutex_enter(SD_MUTEX(un));
-			un->un_power_level = SD_SPINDLE_OFF;
-			mutex_enter(&un->un_pm_mutex);
-			/* Set to off. */
-			un->un_pm_count = -1;
+	if (un->un_f_power_condition_supported) {
+		if (ddi_prop_update_string_array(DDI_DEV_T_NONE, devi,
+		    "pm-components", sd_pwr_pc.pm_comp, 5)
+		    != DDI_PROP_SUCCESS) {
+			un->un_power_level = SD_SPINDLE_ACTIVE;
+			un->un_f_pm_is_enabled = FALSE;
+			return;
 		}
-		mutex_exit(&un->un_pm_mutex);
-		mutex_exit(SD_MUTEX(un));
 	} else {
-		un->un_power_level = SD_SPINDLE_ON;
-		un->un_f_pm_is_enabled = FALSE;
+		if (ddi_prop_update_string_array(DDI_DEV_T_NONE, devi,
+		    "pm-components", sd_pwr_ss.pm_comp, 3)
+		    != DDI_PROP_SUCCESS) {
+			un->un_power_level = SD_SPINDLE_ON;
+			un->un_f_pm_is_enabled = FALSE;
+			return;
+		}
 	}
+	/*
+	 * When components are initially created they are idle,
+	 * power up any non-removables.
+	 * Note: the return value of pm_raise_power can't be used
+	 * for determining if PM should be enabled for this device.
+	 * Even if you check the return values and remove this
+	 * property created above, the PM framework will not honor the
+	 * change after the first call to pm_raise_power. Hence,
+	 * removal of that property does not help if pm_raise_power
+	 * fails. In the case of removable media, the start/stop
+	 * will fail if the media is not present.
+	 */
+	if (un->un_f_attach_spinup && (pm_raise_power(SD_DEVINFO(un), 0,
+	    SD_PM_STATE_ACTIVE(un)) == DDI_SUCCESS)) {
+		mutex_enter(SD_MUTEX(un));
+		un->un_power_level = SD_PM_STATE_ACTIVE(un);
+		mutex_enter(&un->un_pm_mutex);
+		/* Set to on and not busy. */
+		un->un_pm_count = 0;
+	} else {
+		mutex_enter(SD_MUTEX(un));
+		un->un_power_level = SD_PM_STATE_STOPPED(un);
+		mutex_enter(&un->un_pm_mutex);
+		/* Set to off. */
+		un->un_pm_count = -1;
+	}
+	mutex_exit(&un->un_pm_mutex);
+	mutex_exit(SD_MUTEX(un));
 }
 
 
@@ -6127,69 +6234,6 @@ sd_ddi_suspend(dev_info_t *devi)
 
 
 /*
- *    Function: sd_ddi_pm_suspend
- *
- * Description: Set the drive state to low power.
- *		Someone else is required to actually change the drive
- *		power level.
- *
- *   Arguments: un - driver soft state (unit) structure
- *
- * Return Code: DDI_FAILURE or DDI_SUCCESS
- *
- *     Context: Kernel thread context
- */
-
-static int
-sd_ddi_pm_suspend(struct sd_lun *un)
-{
-	ASSERT(un != NULL);
-	SD_TRACE(SD_LOG_POWER, un, "sd_ddi_pm_suspend: entry\n");
-
-	ASSERT(!mutex_owned(SD_MUTEX(un)));
-	mutex_enter(SD_MUTEX(un));
-
-	/*
-	 * Exit if power management is not enabled for this device, or if
-	 * the device is being used by HA.
-	 */
-	if ((un->un_f_pm_is_enabled == FALSE) || (un->un_resvd_status &
-	    (SD_RESERVE | SD_WANT_RESERVE | SD_LOST_RESERVE))) {
-		mutex_exit(SD_MUTEX(un));
-		SD_TRACE(SD_LOG_POWER, un, "sd_ddi_pm_suspend: exiting\n");
-		return (DDI_SUCCESS);
-	}
-
-	SD_INFO(SD_LOG_POWER, un, "sd_ddi_pm_suspend: un_ncmds_in_driver=%ld\n",
-	    un->un_ncmds_in_driver);
-
-	/*
-	 * See if the device is not busy, ie.:
-	 *    - we have no commands in the driver for this device
-	 *    - not waiting for resources
-	 */
-	if ((un->un_ncmds_in_driver == 0) &&
-	    (un->un_state != SD_STATE_RWAIT)) {
-		/*
-		 * The device is not busy, so it is OK to go to low power state.
-		 * Indicate low power, but rely on someone else to actually
-		 * change it.
-		 */
-		mutex_enter(&un->un_pm_mutex);
-		un->un_pm_count = -1;
-		mutex_exit(&un->un_pm_mutex);
-		un->un_power_level = SD_SPINDLE_OFF;
-	}
-
-	mutex_exit(SD_MUTEX(un));
-
-	SD_TRACE(SD_LOG_POWER, un, "sd_ddi_pm_suspend: exit\n");
-
-	return (DDI_SUCCESS);
-}
-
-
-/*
  *    Function: sd_ddi_resume
  *
  * Description: Performs system power-up operations..
@@ -6245,7 +6289,8 @@ sd_ddi_resume(dev_info_t *devi)
 	 */
 	if (un->un_f_attach_spinup) {
 		mutex_exit(SD_MUTEX(un));
-		(void) pm_raise_power(SD_DEVINFO(un), 0, SD_SPINDLE_ON);
+		(void) pm_raise_power(SD_DEVINFO(un), 0,
+		    SD_PM_STATE_ACTIVE(un));
 		mutex_enter(SD_MUTEX(un));
 	}
 
@@ -6295,42 +6340,76 @@ sd_ddi_resume(dev_info_t *devi)
 
 
 /*
- *    Function: sd_ddi_pm_resume
+ *    Function: sd_pm_state_change
  *
- * Description: Set the drive state to powered on.
- *		Someone else is required to actually change the drive
- *		power level.
+ * Description: Change the driver power state.
+ * 		Someone else is required to actually change the driver
+ * 		power level.
  *
  *   Arguments: un - driver soft state (unit) structure
+ *              level - the power level that is changed to
+ *              flag - to decide how to change the power state
  *
  * Return Code: DDI_SUCCESS
  *
  *     Context: Kernel thread context
  */
-
 static int
-sd_ddi_pm_resume(struct sd_lun *un)
+sd_pm_state_change(struct sd_lun *un, int level, int flag)
 {
 	ASSERT(un != NULL);
+	SD_TRACE(SD_LOG_POWER, un, "sd_pm_state_change: entry\n");
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 	mutex_enter(SD_MUTEX(un));
-	un->un_power_level = SD_SPINDLE_ON;
 
-	ASSERT(!mutex_owned(&un->un_pm_mutex));
-	mutex_enter(&un->un_pm_mutex);
-	if (SD_DEVICE_IS_IN_LOW_POWER(un)) {
-		un->un_pm_count++;
-		ASSERT(un->un_pm_count == 0);
+	if (flag == SD_PM_STATE_ROLLBACK || SD_PM_IS_IO_CAPABLE(un, level)) {
+		un->un_power_level = level;
+		ASSERT(!mutex_owned(&un->un_pm_mutex));
+		mutex_enter(&un->un_pm_mutex);
+		if (SD_DEVICE_IS_IN_LOW_POWER(un)) {
+			un->un_pm_count++;
+			ASSERT(un->un_pm_count == 0);
+		}
+		mutex_exit(&un->un_pm_mutex);
+	} else {
 		/*
-		 * Note: no longer do the cv_broadcast on un_suspend_cv. The
-		 * un_suspend_cv is for a system resume, not a power management
-		 * device resume. (4297749)
-		 *	 cv_broadcast(&un->un_suspend_cv);
+		 * Exit if power management is not enabled for this device,
+		 * or if the device is being used by HA.
 		 */
+		if ((un->un_f_pm_is_enabled == FALSE) || (un->un_resvd_status &
+		    (SD_RESERVE | SD_WANT_RESERVE | SD_LOST_RESERVE))) {
+			mutex_exit(SD_MUTEX(un));
+			SD_TRACE(SD_LOG_POWER, un,
+			    "sd_pm_state_change: exiting\n");
+			return (DDI_FAILURE);
+		}
+
+		SD_INFO(SD_LOG_POWER, un, "sd_pm_state_change: "
+		    "un_ncmds_in_driver=%ld\n", un->un_ncmds_in_driver);
+
+		/*
+		 * See if the device is not busy, ie.:
+		 *    - we have no commands in the driver for this device
+		 *    - not waiting for resources
+		 */
+		if ((un->un_ncmds_in_driver == 0) &&
+		    (un->un_state != SD_STATE_RWAIT)) {
+			/*
+			 * The device is not busy, so it is OK to go to low
+			 * power state. Indicate low power, but rely on someone
+			 * else to actually change it.
+			 */
+			mutex_enter(&un->un_pm_mutex);
+			un->un_pm_count = -1;
+			mutex_exit(&un->un_pm_mutex);
+			un->un_power_level = level;
+		}
 	}
-	mutex_exit(&un->un_pm_mutex);
+
 	mutex_exit(SD_MUTEX(un));
+
+	SD_TRACE(SD_LOG_POWER, un, "sd_pm_state_change: exit\n");
 
 	return (DDI_SUCCESS);
 }
@@ -6452,12 +6531,12 @@ sdpower(dev_info_t *devi, int component, int level)
 	uchar_t		state_before_pm;
 	int		got_semaphore_here;
 	sd_ssc_t	*ssc;
+	int	last_power_level;
 
 	instance = ddi_get_instance(devi);
 
 	if (((un = ddi_get_soft_state(sd_state, instance)) == NULL) ||
-	    (SD_SPINDLE_OFF > level) || (level > SD_SPINDLE_ON) ||
-	    component != 0) {
+	    !SD_PM_IS_LEVEL_VALID(un, level) || component != 0) {
 		return (DDI_FAILURE);
 	}
 
@@ -6488,10 +6567,11 @@ sdpower(dev_info_t *devi, int component, int level)
 	 * If un_ncmds_in_driver is non-zero it indicates commands are
 	 * already being processed in the driver, or if the semaphore was
 	 * not gotten here it indicates an open or close is being processed.
-	 * At the same time somebody is requesting to go low power which
-	 * can't happen, therefore we need to return failure.
+	 * At the same time somebody is requesting to go to a lower power
+	 * that can't perform I/O, which can't happen, therefore we need to
+	 * return failure.
 	 */
-	if ((level == SD_SPINDLE_OFF) &&
+	if ((!SD_PM_IS_IO_CAPABLE(un, level)) &&
 	    ((un->un_ncmds_in_driver != 0) || (got_semaphore_here == 0))) {
 		mutex_exit(SD_MUTEX(un));
 
@@ -6537,11 +6617,12 @@ sdpower(dev_info_t *devi, int component, int level)
 	mutex_exit(SD_MUTEX(un));
 
 	/*
-	 * If "pm-capable" property is set to TRUE by HBA drivers,
-	 * bypass the following checking, otherwise, check the log
-	 * sense information for this device
+	 * If log sense command is not supported, bypass the
+	 * following checking, otherwise, check the log sense
+	 * information for this device.
 	 */
-	if ((level == SD_SPINDLE_OFF) && un->un_f_log_sense_supported) {
+	if (SD_PM_STOP_MOTOR_NEEDED(un, level) &&
+	    un->un_f_log_sense_supported) {
 		/*
 		 * Get the log sense information to understand whether the
 		 * the powercycle counts have gone beyond the threshhold.
@@ -6602,17 +6683,24 @@ sdpower(dev_info_t *devi, int component, int level)
 		    (log_page_data[0x1c] << 24) | (log_page_data[0x1d] << 16) |
 		    (log_page_data[0x1E] << 8)  | log_page_data[0x1F];
 
-		sd_pm_tran_data.un.scsi_cycles.lifemax = maxcycles;
-
 		ncycles =
 		    (log_page_data[0x24] << 24) | (log_page_data[0x25] << 16) |
 		    (log_page_data[0x26] << 8)  | log_page_data[0x27];
 
-		sd_pm_tran_data.un.scsi_cycles.ncycles = ncycles;
-
-		for (i = 0; i < DC_SCSI_MFR_LEN; i++) {
-			sd_pm_tran_data.un.scsi_cycles.svc_date[i] =
-			    log_page_data[8+i];
+		if (un->un_f_pm_log_sense_smart) {
+			sd_pm_tran_data.un.smart_count.allowed = maxcycles;
+			sd_pm_tran_data.un.smart_count.consumed = ncycles;
+			sd_pm_tran_data.un.smart_count.flag = 0;
+			sd_pm_tran_data.format = DC_SMART_FORMAT;
+		} else {
+			sd_pm_tran_data.un.scsi_cycles.lifemax = maxcycles;
+			sd_pm_tran_data.un.scsi_cycles.ncycles = ncycles;
+			for (i = 0; i < DC_SCSI_MFR_LEN; i++) {
+				sd_pm_tran_data.un.scsi_cycles.svc_date[i] =
+				    log_page_data[8+i];
+			}
+			sd_pm_tran_data.un.scsi_cycles.flag = 0;
+			sd_pm_tran_data.format = DC_SCSI_FORMAT;
 		}
 
 		kmem_free(log_page_data, log_page_size);
@@ -6621,10 +6709,6 @@ sdpower(dev_info_t *devi, int component, int level)
 		 * Call pm_trans_check routine to get the Ok from
 		 * the global policy
 		 */
-
-		sd_pm_tran_data.format = DC_SCSI_FORMAT;
-		sd_pm_tran_data.un.scsi_cycles.flag = 0;
-
 		rval = pm_trans_check(&sd_pm_tran_data, &intvlp);
 #ifdef	SDDEBUG
 		if (sd_force_pm_supported) {
@@ -6705,13 +6789,14 @@ sdpower(dev_info_t *devi, int component, int level)
 		}
 	}
 
-	if (level == SD_SPINDLE_OFF) {
+	if (!SD_PM_IS_IO_CAPABLE(un, level)) {
 		/*
 		 * Save the last state... if the STOP FAILS we need it
 		 * for restoring
 		 */
 		mutex_enter(SD_MUTEX(un));
 		save_state = un->un_last_state;
+		last_power_level = un->un_power_level;
 		/*
 		 * There must not be any cmds. getting processed
 		 * in the driver when we get here. Power to the
@@ -6721,10 +6806,11 @@ sdpower(dev_info_t *devi, int component, int level)
 		mutex_exit(SD_MUTEX(un));
 
 		/*
-		 * For now suspend the device completely before spindle is
+		 * For now PM suspend the device completely before spindle is
 		 * turned off
 		 */
-		if ((rval = sd_ddi_pm_suspend(un)) == DDI_FAILURE) {
+		if ((rval = sd_pm_state_change(un, level, SD_PM_STATE_CHANGE))
+		    == DDI_FAILURE) {
 			if (got_semaphore_here != 0) {
 				sema_v(&un->un_semoclose);
 			}
@@ -6735,6 +6821,7 @@ sdpower(dev_info_t *devi, int component, int level)
 			 */
 			mutex_enter(SD_MUTEX(un));
 			un->un_state = state_before_pm;
+			un->un_power_level = last_power_level;
 			cv_broadcast(&un->un_suspend_cv);
 			mutex_exit(SD_MUTEX(un));
 			SD_TRACE(SD_LOG_IO_PM, un,
@@ -6757,19 +6844,28 @@ sdpower(dev_info_t *devi, int component, int level)
 	 * attention.  Don't do retries. Bypass the PM layer, otherwise
 	 * a deadlock on un_pm_busy_cv will occur.
 	 */
-	if (level == SD_SPINDLE_ON) {
+	if (SD_PM_IS_IO_CAPABLE(un, level)) {
 		sval = sd_send_scsi_TEST_UNIT_READY(ssc,
 		    SD_DONT_RETRY_TUR | SD_BYPASS_PM);
 		if (sval != 0)
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 	}
 
-	SD_TRACE(SD_LOG_IO_PM, un, "sdpower: sending \'%s\' unit\n",
-	    ((level == SD_SPINDLE_ON) ? "START" : "STOP"));
-
-	sval = sd_send_scsi_START_STOP_UNIT(ssc,
-	    ((level == SD_SPINDLE_ON) ? SD_TARGET_START : SD_TARGET_STOP),
-	    SD_PATH_DIRECT);
+	if (un->un_f_power_condition_supported) {
+		char *pm_condition_name[] = {"STOPPED", "STANDBY",
+		    "IDLE", "ACTIVE"};
+		SD_TRACE(SD_LOG_IO_PM, un,
+		    "sdpower: sending \'%s\' power condition",
+		    pm_condition_name[level]);
+		sval = sd_send_scsi_START_STOP_UNIT(ssc, SD_POWER_CONDITION,
+		    sd_pl2pc[level], SD_PATH_DIRECT);
+	} else {
+		SD_TRACE(SD_LOG_IO_PM, un, "sdpower: sending \'%s\' unit\n",
+		    ((level == SD_SPINDLE_ON) ? "START" : "STOP"));
+		sval = sd_send_scsi_START_STOP_UNIT(ssc, SD_START_STOP,
+		    ((level == SD_SPINDLE_ON) ? SD_TARGET_START :
+		    SD_TARGET_STOP), SD_PATH_DIRECT);
+	}
 	if (sval != 0) {
 		if (sval == EIO)
 			sd_ssc_assessment(ssc, SD_FMT_STATUS_CHECK);
@@ -6791,8 +6887,7 @@ sdpower(dev_info_t *devi, int component, int level)
 	 * In all other cases we setup for the new state
 	 * and return success.
 	 */
-	switch (level) {
-	case SD_SPINDLE_OFF:
+	if (!SD_PM_IS_IO_CAPABLE(un, level)) {
 		if ((medium_present == TRUE) && (sval != 0)) {
 			/* The stop command from above failed */
 			rval = DDI_FAILURE;
@@ -6802,17 +6897,14 @@ sdpower(dev_info_t *devi, int component, int level)
 			 * sd_pm_resume() and set the state back to
 			 * it's previous value.
 			 */
-			(void) sd_ddi_pm_resume(un);
+			(void) sd_pm_state_change(un, last_power_level,
+			    SD_PM_STATE_ROLLBACK);
 			mutex_enter(SD_MUTEX(un));
 			un->un_last_state = save_state;
 			mutex_exit(SD_MUTEX(un));
-			break;
-		}
-		/*
-		 * The stop command from above succeeded.
-		 */
-		if (un->un_f_monitor_media_state) {
+		} else if (un->un_f_monitor_media_state) {
 			/*
+			 * The stop command from above succeeded.
 			 * Terminate watch thread in case of removable media
 			 * devices going into low power state. This is as per
 			 * the requirements of pm framework, otherwise commands
@@ -6832,10 +6924,9 @@ sdpower(dev_info_t *devi, int component, int level)
 				mutex_exit(SD_MUTEX(un));
 			}
 		}
-		break;
-
-	default:	/* The level requested is spindle on... */
+	} else {
 		/*
+		 * The level requested is I/O capable.
 		 * Legacy behavior: return success on a failed spinup
 		 * if there is no media in the drive.
 		 * Do this by looking at medium_present here.
@@ -6843,37 +6934,39 @@ sdpower(dev_info_t *devi, int component, int level)
 		if ((sval != 0) && medium_present) {
 			/* The start command from above failed */
 			rval = DDI_FAILURE;
-			break;
-		}
-		/*
-		 * The start command from above succeeded
-		 * Resume the devices now that we have
-		 * started the disks
-		 */
-		(void) sd_ddi_pm_resume(un);
+		} else {
+			/*
+			 * The start command from above succeeded
+			 * PM resume the devices now that we have
+			 * started the disks
+			 */
+			(void) sd_pm_state_change(un, level,
+			    SD_PM_STATE_CHANGE);
 
-		/*
-		 * Resume the watch thread since it was suspended
-		 * when the device went into low power mode.
-		 */
-		if (un->un_f_monitor_media_state) {
-			mutex_enter(SD_MUTEX(un));
-			if (un->un_f_watcht_stopped == TRUE) {
-				opaque_t temp_token;
-
-				un->un_f_watcht_stopped = FALSE;
-				mutex_exit(SD_MUTEX(un));
-				temp_token = scsi_watch_request_submit(
-				    SD_SCSI_DEVP(un),
-				    sd_check_media_time,
-				    SENSE_LENGTH, sd_media_watch_cb,
-				    (caddr_t)dev);
+			/*
+			 * Resume the watch thread since it was suspended
+			 * when the device went into low power mode.
+			 */
+			if (un->un_f_monitor_media_state) {
 				mutex_enter(SD_MUTEX(un));
-				un->un_swr_token = temp_token;
+				if (un->un_f_watcht_stopped == TRUE) {
+					opaque_t temp_token;
+
+					un->un_f_watcht_stopped = FALSE;
+					mutex_exit(SD_MUTEX(un));
+					temp_token = scsi_watch_request_submit(
+					    SD_SCSI_DEVP(un),
+					    sd_check_media_time,
+					    SENSE_LENGTH, sd_media_watch_cb,
+					    (caddr_t)dev);
+					mutex_enter(SD_MUTEX(un));
+					un->un_swr_token = temp_token;
+				}
+				mutex_exit(SD_MUTEX(un));
 			}
-			mutex_exit(SD_MUTEX(un));
 		}
 	}
+
 	if (got_semaphore_here != 0) {
 		sema_v(&un->un_semoclose);
 	}
@@ -8594,8 +8687,8 @@ sd_unit_detach(dev_info_t *devi)
 	} else {
 		mutex_exit(&un->un_pm_mutex);
 		if ((un->un_f_pm_is_enabled == TRUE) &&
-		    (pm_lower_power(SD_DEVINFO(un), 0, SD_SPINDLE_OFF) !=
-		    DDI_SUCCESS)) {
+		    (pm_lower_power(SD_DEVINFO(un), 0, SD_PM_STATE_STOPPED(un))
+		    != DDI_SUCCESS)) {
 			SD_ERROR(SD_LOG_ATTACH_DETACH, un,
 		    "sd_dr_detach: Lower power request failed, ignoring.\n");
 			/*
@@ -9719,12 +9812,11 @@ sd_pm_entry(struct sd_lun *un)
 			/*
 			 * pm_raise_power will cause sdpower to be called
 			 * which brings the device power level to the
-			 * desired state, ON in this case. If successful,
-			 * un_pm_count and un_power_level will be updated
-			 * appropriately.
+			 * desired state, If successful, un_pm_count and
+			 * un_power_level will be updated appropriately.
 			 */
 			return_status = pm_raise_power(SD_DEVINFO(un), 0,
-			    SD_SPINDLE_ON);
+			    SD_PM_STATE_ACTIVE(un));
 
 			mutex_enter(&un->un_pm_mutex);
 
@@ -11725,6 +11817,7 @@ sd_ssc_fini(sd_ssc_t *ssc)
  * Return Code: 0 -  successful completion of the given command
  *		EIO - scsi_uscsi_handle_command() failed
  *		ENXIO  - soft state not found for specified dev
+ *		ECANCELED - command cancelled due to low power
  *		EINVAL
  *		EFAULT - copyin/copyout error
  *		return code of scsi_uscsi_handle_command():
@@ -11779,6 +11872,23 @@ sd_ssc_send(sd_ssc_t *ssc, struct uscsi_cmd *incmd, int flag,
 	 * followed to avoid missing FMA telemetries.
 	 */
 	ssc->ssc_flags |= SSC_FLAGS_NEED_ASSESSMENT;
+
+	/*
+	 * if USCSI_PMFAILFAST is set and un is in low power, fail the
+	 * command immediately.
+	 */
+	mutex_enter(SD_MUTEX(un));
+	mutex_enter(&un->un_pm_mutex);
+	if ((uscmd->uscsi_flags & USCSI_PMFAILFAST) &&
+	    SD_DEVICE_IS_IN_LOW_POWER(un)) {
+		SD_TRACE(SD_LOG_IO, un, "sd_ssc_send:"
+		    "un:0x%p is in low power\n", un);
+		mutex_exit(&un->un_pm_mutex);
+		mutex_exit(SD_MUTEX(un));
+		return (ECANCELED);
+	}
+	mutex_exit(&un->un_pm_mutex);
+	mutex_exit(SD_MUTEX(un));
 
 #ifdef SDDEBUG
 	switch (dataspace) {
@@ -20060,6 +20170,8 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
  *
  *   Arguments: ssc    - ssc contatins pointer to driver soft state (unit)
  *                       structure for this target.
+ *      pc_flag - SD_POWER_CONDITION
+ *                SD_START_STOP
  *		flag  - SD_TARGET_START
  *			SD_TARGET_STOP
  *			SD_TARGET_EJECT
@@ -20079,7 +20191,8 @@ sd_send_scsi_READ_CAPACITY_16(sd_ssc_t *ssc, uint64_t *capp,
  */
 
 static int
-sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int flag, int path_flag)
+sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int pc_flag, int flag,
+    int path_flag)
 {
 	struct	scsi_extended_sense	sense_buf;
 	union scsi_cdb		cdb;
@@ -20096,7 +20209,7 @@ sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int flag, int path_flag)
 	    "sd_send_scsi_START_STOP_UNIT: entry: un:0x%p\n", un);
 
 	if (un->un_f_check_start_stop &&
-	    ((flag == SD_TARGET_START) || (flag == SD_TARGET_STOP)) &&
+	    ((pc_flag == SD_START_STOP) && (flag != SD_TARGET_EJECT)) &&
 	    (un->un_f_start_stop_supported != TRUE)) {
 		return (0);
 	}
@@ -20120,7 +20233,8 @@ sd_send_scsi_START_STOP_UNIT(sd_ssc_t *ssc, int flag, int path_flag)
 	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
 
 	cdb.scc_cmd = SCMD_START_STOP;
-	cdb.cdb_opaque[4] = (uchar_t)flag;
+	cdb.cdb_opaque[4] = (pc_flag == SD_POWER_CONDITION) ?
+	    (uchar_t)(flag << 4) : (uchar_t)flag;
 
 	ucmd_buf.uscsi_cdb	= (char *)&cdb;
 	ucmd_buf.uscsi_cdblen	= CDB_GROUP0;
@@ -20215,6 +20329,7 @@ sd_start_stop_unit_task(void *arg)
 {
 	struct sd_lun	*un = arg;
 	sd_ssc_t	*ssc;
+	int		power_level;
 	int		rval;
 
 	ASSERT(un != NULL);
@@ -20233,16 +20348,30 @@ sd_start_stop_unit_task(void *arg)
 	}
 	mutex_exit(SD_MUTEX(un));
 
+	ssc = sd_ssc_init(un);
 	/*
 	 * When a START STOP command is issued from here, it is part of a
 	 * failure recovery operation and must be issued before any other
 	 * commands, including any pending retries. Thus it must be sent
 	 * using SD_PATH_DIRECT_PRIORITY. It doesn't matter if the spin up
 	 * succeeds or not, we will start I/O after the attempt.
+	 * If power condition is supported and the current power level
+	 * is capable of performing I/O, we should set the power condition
+	 * to that level. Otherwise, set the power condition to ACTIVE.
 	 */
-	ssc = sd_ssc_init(un);
-	rval = sd_send_scsi_START_STOP_UNIT(ssc, SD_TARGET_START,
-	    SD_PATH_DIRECT_PRIORITY);
+	if (un->un_f_power_condition_supported) {
+		mutex_enter(SD_MUTEX(un));
+		ASSERT(SD_PM_IS_LEVEL_VALID(un, un->un_power_level));
+		power_level = sd_pwr_pc.ran_perf[un->un_power_level]
+		    > 0 ? un->un_power_level : SD_SPINDLE_ACTIVE;
+		mutex_exit(SD_MUTEX(un));
+		rval = sd_send_scsi_START_STOP_UNIT(ssc, SD_POWER_CONDITION,
+		    sd_pl2pc[power_level], SD_PATH_DIRECT_PRIORITY);
+	} else {
+		rval = sd_send_scsi_START_STOP_UNIT(ssc, SD_START_STOP,
+		    SD_TARGET_START, SD_PATH_DIRECT_PRIORITY);
+	}
+
 	if (rval != 0)
 		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 	sd_ssc_fini(ssc);
@@ -22286,8 +22415,8 @@ skip_ready_valid:
 		if (!ISCD(un)) {
 			err = ENOTTY;
 		} else {
-			err = sd_send_scsi_START_STOP_UNIT(ssc, SD_TARGET_STOP,
-			    SD_PATH_STANDARD);
+			err = sd_send_scsi_START_STOP_UNIT(ssc, SD_START_STOP,
+			    SD_TARGET_STOP, SD_PATH_STANDARD);
 			goto done_with_assess;
 		}
 		break;
@@ -22297,8 +22426,8 @@ skip_ready_valid:
 		if (!ISCD(un)) {
 			err = ENOTTY;
 		} else {
-			err = sd_send_scsi_START_STOP_UNIT(ssc, SD_TARGET_START,
-			    SD_PATH_STANDARD);
+			err = sd_send_scsi_START_STOP_UNIT(ssc, SD_START_STOP,
+			    SD_TARGET_START, SD_PATH_STANDARD);
 			goto done_with_assess;
 		}
 		break;
@@ -22308,8 +22437,8 @@ skip_ready_valid:
 		if (!ISCD(un)) {
 			err = ENOTTY;
 		} else {
-			err = sd_send_scsi_START_STOP_UNIT(ssc, SD_TARGET_CLOSE,
-			    SD_PATH_STANDARD);
+			err = sd_send_scsi_START_STOP_UNIT(ssc, SD_START_STOP,
+			    SD_TARGET_CLOSE, SD_PATH_STANDARD);
 			goto done_with_assess;
 		}
 		break;
@@ -25346,7 +25475,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 		/*
 		 * use pm framework to power on HBA 1st
 		 */
-		(void) pm_raise_power(SD_DEVINFO(un), 0, SD_SPINDLE_ON);
+		(void) pm_raise_power(SD_DEVINFO(un), 0,
+		    SD_PM_STATE_ACTIVE(un));
 
 		/*
 		 * Dump no long uses sdpower to power on a device, it's
@@ -25379,7 +25509,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 			return (EIO);
 		}
 		scsi_destroy_pkt(start_pktp);
-		(void) sd_ddi_pm_resume(un);
+		(void) sd_pm_state_change(un, SD_PM_STATE_ACTIVE(un),
+		    SD_PM_STATE_CHANGE);
 	} else {
 		mutex_exit(&un->un_pm_mutex);
 	}
@@ -28359,8 +28490,8 @@ sr_eject(dev_t dev)
 	}
 
 	ssc = sd_ssc_init(un);
-	rval = sd_send_scsi_START_STOP_UNIT(ssc, SD_TARGET_EJECT,
-	    SD_PATH_STANDARD);
+	rval = sd_send_scsi_START_STOP_UNIT(ssc, SD_START_STOP,
+	    SD_TARGET_EJECT, SD_PATH_STANDARD);
 	sd_ssc_fini(ssc);
 
 	if (rval == 0) {
@@ -30307,7 +30438,7 @@ sd_faultinjection(struct scsi_pkt *pktp)
 static void
 sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 {
-	int	pm_capable_prop;
+	int	pm_cap;
 
 	ASSERT(un->un_sd);
 	ASSERT(un->un_sd->sd_inq);
@@ -30427,33 +30558,47 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 		 * power manage the device without checking the start/stop
 		 * cycle count log sense page.
 		 *
-		 * If "pm-capable" exists and is SD_PM_CAPABLE_FALSE (0)
+		 * If "pm-capable" exists and is set to be false (0),
 		 * then we should not power manage the device.
 		 *
-		 * If "pm-capable" doesn't exist then pm_capable_prop will
+		 * If "pm-capable" doesn't exist then pm_cap will
 		 * be set to SD_PM_CAPABLE_UNDEFINED (-1).  In this case,
 		 * sd will check the start/stop cycle count log sense page
 		 * and power manage the device if the cycle count limit has
 		 * not been exceeded.
 		 */
-		pm_capable_prop = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
+		pm_cap = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
 		    DDI_PROP_DONTPASS, "pm-capable", SD_PM_CAPABLE_UNDEFINED);
-		if (pm_capable_prop == SD_PM_CAPABLE_UNDEFINED) {
+		if (SD_PM_CAPABLE_IS_UNDEFINED(pm_cap)) {
 			un->un_f_log_sense_supported = TRUE;
+			if (!un->un_f_power_condition_disabled &&
+			    SD_INQUIRY(un)->inq_ansi == 6) {
+				un->un_f_power_condition_supported = TRUE;
+			}
 		} else {
 			/*
 			 * pm-capable property exists.
 			 *
-			 * Convert "TRUE" values for pm_capable_prop to
-			 * SD_PM_CAPABLE_TRUE (1) to make it easier to check
-			 * later. "TRUE" values are any values except
-			 * SD_PM_CAPABLE_FALSE (0) and
-			 * SD_PM_CAPABLE_UNDEFINED (-1)
+			 * Convert "TRUE" values for pm_cap to
+			 * SD_PM_CAPABLE_IS_TRUE to make it easier to check
+			 * later. "TRUE" values are any values defined in
+			 * inquiry.h.
 			 */
-			if (pm_capable_prop == SD_PM_CAPABLE_FALSE) {
+			if (SD_PM_CAPABLE_IS_FALSE(pm_cap)) {
 				un->un_f_log_sense_supported = FALSE;
 			} else {
+				/* SD_PM_CAPABLE_IS_TRUE case */
 				un->un_f_pm_supported = TRUE;
+				if (!un->un_f_power_condition_disabled &&
+				    SD_PM_CAPABLE_IS_SPC_4(pm_cap)) {
+					un->un_f_power_condition_supported =
+					    TRUE;
+				}
+				if (SD_PM_CAP_LOG_SUPPORTED(pm_cap)) {
+					un->un_f_log_sense_supported = TRUE;
+					un->un_f_pm_log_sense_smart =
+					    SD_PM_CAP_SMART_LOG(pm_cap);
+				}
 			}
 
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,

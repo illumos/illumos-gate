@@ -45,6 +45,7 @@ extern "C" {
 #define	SATAC_DOOR_LOCK		0xde	/* door lock */
 #define	SATAC_DOOR_UNLOCK	0xdf	/* door unlock */
 #define	SATAC_IDLE		0xe3	/* idle	*/
+#define	SATAC_STANDBY		0xe2	/* standby */
 
 /*
  * ATA/ATAPI disk commands (subset)
@@ -94,9 +95,11 @@ extern "C" {
  */
 #define	SATAC_CHECK_POWER_MODE	0xe5	/* check power mode */
 
-#define	SATA_PWRMODE_STANDBY	0	/* standby mode */
-#define	SATA_PWRMODE_IDLE	0x80	/* idle mode */
-#define	SATA_PWRMODE_ACTIVE	0xFF	/* active or idle mode, rev7 spec */
+#define	SATA_PWRMODE_STANDBY		0	/* standby mode */
+#define	SATA_PWRMODE_IDLE		0x80	/* idle mode */
+#define	SATA_PWRMODE_ACTIVE_SPINDOWN	0x40	/* PM0 and spinning down */
+#define	SATA_PWRMODE_ACTIVE_SPINUP	0x41	/* PM0 and spinning up */
+#define	SATA_PWRMODE_ACTIVE		0xFF	/* active or idle mode */
 
 
 /*
@@ -152,8 +155,8 @@ extern "C" {
  * Following is the ATA Device Identify data layout
  */
 typedef struct sata_id {
-/*  					WORD				  */
-/* 					OFFSET COMMENT			  */
+/*					WORD				  */
+/*					OFFSET COMMENT			  */
 	ushort_t  ai_config;	   /*   0  general configuration bits	  */
 	ushort_t  ai_fixcyls;	   /*   1  # of cylinders (obsolete)	  */
 	ushort_t  ai_resv0;	   /*   2  # reserved			  */
@@ -245,7 +248,7 @@ typedef struct sata_id {
 
 #define	SATA_ATA_TYPE_MASK	0x8001	/* ATA Device type mask */
 #define	SATA_ATA_TYPE		0x0000	/* ATA device */
-#define	SATA_REM_MEDIA  	0x0080 	/* Removable media */
+#define	SATA_REM_MEDIA		0x0080	/* Removable media */
 #define	SATA_INCOMPLETE_DATA	0x0004	/* Incomplete Identify Device data */
 #define	SATA_CFA_TYPE		0x848a	/* CFA feature set device */
 
@@ -297,6 +300,8 @@ typedef struct sata_id {
 
 /* Identify Device: command set supported/enabled bits - words 84 & 87 */
 #define	SATA_SMART_SELF_TEST_SUPPORTED	0x0002	/* SMART self-test supported */
+/* IDLE IMMEDIATE with UNLOAD FEATURE supported */
+#define	SATA_IDLE_UNLOAD_SUPPORTED	0x2000
 
 /* Identify (Packet) Device word 63,  ATA/ATAPI-6 & 7 */
 #define	SATA_MDMA_SEL_MASK	0x0700	/* Multiword DMA selected */
@@ -329,11 +334,11 @@ typedef struct sata_id {
 /* Identify Packet Device: general config bits  - word 0 */
 
 #define	SATA_ATAPI_TYPE_MASK	0xc000
-#define	SATA_ATAPI_TYPE		0x8000 	/* ATAPI device */
-#define	SATA_ATAPI_ID_PKT_SZ	0x0003 	/* Packet size mask */
+#define	SATA_ATAPI_TYPE		0x8000	/* ATAPI device */
+#define	SATA_ATAPI_ID_PKT_SZ	0x0003	/* Packet size mask */
 #define	SATA_ATAPI_ID_PKT_12B	0x0000  /* Packet size 12 bytes */
 #define	SATA_ATAPI_ID_PKT_16B	0x0001  /* Packet size 16 bytes */
-#define	SATA_ATAPI_ID_DRQ_TYPE	0x0060 	/* DRQ asserted in 3ms after pkt */
+#define	SATA_ATAPI_ID_DRQ_TYPE	0x0060	/* DRQ asserted in 3ms after pkt */
 #define	SATA_ATAPI_ID_DRQ_INTR	0x0020  /* Obsolete in ATA/ATAPI 7 */
 
 #define	SATA_ATAPI_ID_DEV_TYPE	0x0f00	/* device type/command set mask */
@@ -413,9 +418,9 @@ typedef struct sata_id {
  * Status bits from AT_STATUS register
  */
 #define	SATA_STATUS_BSY		0x80    /* controller busy */
-#define	SATA_STATUS_DRDY	0x40    /* drive ready 	*/
+#define	SATA_STATUS_DRDY	0x40    /* drive ready	*/
 #define	SATA_STATUS_DF		0x20    /* device fault	*/
-#define	SATA_STATUS_DSC    	0x10    /* seek operation complete */
+#define	SATA_STATUS_DSC		0x10    /* seek operation complete */
 #define	SATA_STATUS_DRQ		0x08	/* data request */
 #define	SATA_STATUS_CORR	0x04    /* obsolete */
 #define	SATA_STATUS_IDX		0x02    /* obsolete */
@@ -508,6 +513,9 @@ struct sata_ncq_error_recovery_page {
 	uint8_t ncq_checksum;
 };
 
+/* SMART attribute of Start/Stop Count */
+#define	SMART_START_STOP_COUNT_ID	0x4
+
 /*
  * SMART data structures
  */
@@ -574,6 +582,24 @@ struct read_log_ext_directory {
 };
 
 /*
+ * The definition of CONTROL byte field in SCSI command
+ * according to SAM 5
+ */
+#define	CTL_BYTE_VENDOR_MASK		0xc0
+#define	CTL_BYTE_NACA_MASK		0x04
+
+/*
+ * The definition of mask in START STOP UNIT command
+ */
+#define	START_STOP_IMMED_MASK		0x01
+#define	START_STOP_POWER_COND_MASK	0xF0
+#define	START_STOP_START_MASK		0x01
+#define	START_STOP_LOEJ_MASK		0x02
+#define	START_STOP_NOFLUSH_MASK		0x04
+#define	START_STOP_MODIFIER_MASK	0x0f
+#define	START_STOP_POWER_COND_SHIFT	4
+
+/*
  * SMART specific data
  * These eventually need to go to a generic scsi hearder file
  * for now they will reside here
@@ -583,6 +609,7 @@ struct read_log_ext_directory {
 #define	PAGE_CODE_SELF_TEST_RESULTS		0x10
 #define	PAGE_CODE_INFORMATION_EXCEPTIONS	0x2f
 #define	PAGE_CODE_SMART_READ_DATA		0x30
+#define	PAGE_CODE_START_STOP_CYCLE_COUNTER	0x0e
 
 
 struct log_parameter {

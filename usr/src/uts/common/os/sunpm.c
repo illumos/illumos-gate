@@ -6590,6 +6590,7 @@ pm_trans_check(struct pm_trans_data *datap, time_t *intervalp)
 	char *ptr;
 	int lower_bound_cycles, upper_bound_cycles, cycles_allowed;
 	int cycles_diff, cycles_over;
+	struct pm_smart_count *smart_p;
 
 	if (datap == NULL) {
 		PMD(PMD_TCHECK, ("%s: NULL data pointer!\n", pmf))
@@ -6771,6 +6772,18 @@ pm_trans_check(struct pm_trans_data *datap, time_t *intervalp)
 		PMD(PMD_TCHECK, ("%s: no cycle is allowed in %ld secs\n", pmf,
 		    *intervalp))
 		return (0);
+	} else if (datap->format == DC_SMART_FORMAT) {
+		/*
+		 * power cycles of SATA disks are reported from SMART
+		 * attributes.
+		 */
+		smart_p = &datap->un.smart_count;
+		if (smart_p->consumed >= smart_p->allowed) {
+			*intervalp = (LONG_MAX / hz);
+			PMD(PMD_TCHECK, ("%s: exceeded lifemax cycles.\n", pmf))
+			return (0);
+		} else
+			return (1);
 	}
 
 	PMD(PMD_TCHECK, ("%s: unknown format!\n", pmf))

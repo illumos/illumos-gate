@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SUNPM_H
 #define	_SYS_SUNPM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Sun Specific Power Management definitions
@@ -51,9 +49,10 @@ extern "C" {
 #ifdef	_KERNEL
 
 /*
- * Power cycle transition check is supported for these devices.
+ * Power cycle transition check is supported for SCSI and SATA devices.
  */
 #define	DC_SCSI_FORMAT		0x1		/* SCSI */
+#define	DC_SMART_FORMAT		0x2		/* SMART */
 
 #define	DC_SCSI_MFR_LEN		6		/* YYYYWW */
 
@@ -64,10 +63,17 @@ struct pm_scsi_cycles {
 	int	flag;				/* reserved for future */
 };
 
+struct pm_smart_count {
+	int	allowed;	/* normalized max cycles allowed */
+	int	consumed;	/* normalized consumed cycles */
+	int	flag;		/* type of cycles */
+};
+
 struct pm_trans_data {
 	int	format;				/* data format */
 	union {
 		struct pm_scsi_cycles scsi_cycles;
+		struct pm_smart_count smart_count;
 	} un;
 };
 

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_MODE_H
 #define	_SYS_SCSI_GENERIC_MODE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -390,6 +388,89 @@ struct mode_info_excpt_page {
 #define	MRIE_UNCOND_RECVD_ERR	0x4
 #define	MRIE_NO_SENSE		0x5
 #define	MRIE_ONLY_ON_REQUEST	0x6
+
+struct mode_info_power_cond {
+	struct mode_page mode_page;	/* common mode page header */
+	uchar_t reserved;
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t standby	:1,	/* standby bit */
+		idle	:1,	/* idle bit */
+			:6;	/* reserved */
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t		:6,	/* reserved */
+		idle	:1,	/* idle bit */
+		standby	:1;	/* standby bit */
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t	idle_cond_timer_high;
+	uchar_t idle_cond_timer_low;
+	uchar_t standby_cond_timer[4];
+};
+
+struct parameter_control {
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t fmt_link:2,	/* format and link bit */
+		tmc	:2,	/* tmc bit */
+		etc	:1,	/* etc bit */
+		tsd	:1,	/* tsd bit */
+		reserv	:1,	/* obsolete */
+		du	:1;	/* du bit */
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t	du	:1,	/* du bit */
+		reserv	:1,	/* obsolete */
+		tsd	:1,	/* tsd bit */
+		etc	:1,	/* etc bit */
+		tmc	:2,	/* tmc bit */
+		fmt_link:2;	/* format and link bit */
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+};
+
+struct start_stop_cycle_counter_log {
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t code	:6,	/* page code bit */
+		spf	:1,	/* spf bit */
+		ds	:1;	/* ds bit */
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t	ds	:1,	/* ds bit */
+		spf	:1,	/* spf bit */
+		code	:6;	/* page code bit */
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t			sub_page_code;
+	uchar_t			page_len_high;
+	uchar_t			page_len_low;
+
+	uchar_t			manufactor_date_high;
+	uchar_t			manufactor_date_low;
+	struct parameter_control param_1;
+	uchar_t			param_len_1;
+	uchar_t			year_manu[4];
+	uchar_t			week_manu[2];
+
+	uchar_t			account_date_high;
+	uchar_t			account_date_low;
+	struct parameter_control param_2;
+	uchar_t			param_len_2;
+	uchar_t			year_account[4];
+	uchar_t			week_account[2];
+
+	uchar_t			lifetime_code_high;
+	uchar_t			lifetime_code_low;
+	struct parameter_control param_3;
+	uchar_t			param_len_3;
+	uchar_t			cycle_lifetime[4];
+
+	uchar_t			cycle_code_high;
+	uchar_t			cycle_code_low;
+	struct parameter_control param_4;
+	uchar_t			param_len_4;
+	uchar_t			cycle_accumulated[4];
+};
+
 
 #ifdef	__cplusplus
 }

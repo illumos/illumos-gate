@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -425,6 +425,24 @@ struct vpd_desc {
 	/* ---- data follows ---- */
 };
 
+/*
+ * "pm-capable" integer property bit mask definitions
+ */
+#define	PM_CAPABLE_PM_MASK	0x0000ffff	/* use lower 16 bits to */
+						/* indicate PM mode */
+#define	PM_CAPABLE_CCS		RDF_CCS
+#define	PM_CAPABLE_SCSI2	RDF_SCSI2
+#define	PM_CAPABLE_SPC		RDF_SCSI_SPC
+#define	PM_CAPABLE_SPC2		RDF_SCSI_SPC2
+#define	PM_CAPABLE_SPC3		RDF_SCSI_SPC3
+#define	PM_CAPABLE_SPC4		RDF_SCSI_SPC4
+#define	PM_CAPABLE_LOG_MASK	0xffff0000	/* use upper 16 bit to */
+						/* indicate log specifics */
+#define	PM_CAPABLE_LOG_SUPPORTED	0x10000	/* Log page 0xE might be */
+						/* supported */
+#define	PM_CAPABLE_SMART_LOG		0x20000 /* Log page 0xE reports SMART */
+						/* attributes instead of the */
+						/* default SCSI Log pages */
 #ifdef	__cplusplus
 }
 #endif

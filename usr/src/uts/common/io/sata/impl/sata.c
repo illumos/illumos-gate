@@ -189,29 +189,30 @@ static	int sata_txlt_test_unit_ready(sata_pkt_txlate_t *);
 static	int sata_txlt_start_stop_unit(sata_pkt_txlate_t *);
 static	int sata_txlt_read_capacity(sata_pkt_txlate_t *);
 static	int sata_txlt_request_sense(sata_pkt_txlate_t *);
-static 	int sata_txlt_read(sata_pkt_txlate_t *);
-static 	int sata_txlt_write(sata_pkt_txlate_t *);
-static 	int sata_txlt_log_sense(sata_pkt_txlate_t *);
-static 	int sata_txlt_log_select(sata_pkt_txlate_t *);
-static 	int sata_txlt_mode_sense(sata_pkt_txlate_t *);
-static 	int sata_txlt_mode_select(sata_pkt_txlate_t *);
-static 	int sata_txlt_synchronize_cache(sata_pkt_txlate_t *);
-static 	int sata_txlt_write_buffer(sata_pkt_txlate_t *);
-static 	int sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *);
+static	int sata_txlt_read(sata_pkt_txlate_t *);
+static	int sata_txlt_write(sata_pkt_txlate_t *);
+static	int sata_txlt_log_sense(sata_pkt_txlate_t *);
+static	int sata_txlt_log_select(sata_pkt_txlate_t *);
+static	int sata_txlt_mode_sense(sata_pkt_txlate_t *);
+static	int sata_txlt_mode_select(sata_pkt_txlate_t *);
+static	int sata_txlt_synchronize_cache(sata_pkt_txlate_t *);
+static	int sata_txlt_write_buffer(sata_pkt_txlate_t *);
+static	int sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *);
 
-static 	int sata_hba_start(sata_pkt_txlate_t *, int *);
+static	int sata_hba_start(sata_pkt_txlate_t *, int *);
 static	int sata_txlt_invalid_command(sata_pkt_txlate_t *);
+static	int sata_txlt_check_condition(sata_pkt_txlate_t *, uchar_t, uchar_t);
 static	int sata_txlt_lba_out_of_range(sata_pkt_txlate_t *);
-static 	void sata_txlt_rw_completion(sata_pkt_t *);
-static 	void sata_txlt_nodata_cmd_completion(sata_pkt_t *);
-static 	void sata_txlt_download_mcode_cmd_completion(sata_pkt_t *);
-static 	int sata_emul_rw_completion(sata_pkt_txlate_t *);
-static 	struct scsi_extended_sense *sata_immediate_error_response(
+static	void sata_txlt_rw_completion(sata_pkt_t *);
+static	void sata_txlt_nodata_cmd_completion(sata_pkt_t *);
+static	void sata_txlt_download_mcode_cmd_completion(sata_pkt_t *);
+static	int sata_emul_rw_completion(sata_pkt_txlate_t *);
+static	struct scsi_extended_sense *sata_immediate_error_response(
     sata_pkt_txlate_t *, int);
 static	struct scsi_extended_sense *sata_arq_sense(sata_pkt_txlate_t *);
 
-static 	int sata_txlt_atapi(sata_pkt_txlate_t *);
-static 	void sata_txlt_atapi_completion(sata_pkt_t *);
+static	int sata_txlt_atapi(sata_pkt_txlate_t *);
+static	void sata_txlt_atapi_completion(sata_pkt_t *);
 
 /*
  * Local functions for ioctl
@@ -291,11 +292,13 @@ static	int sata_build_msense_page_1(sata_drive_info_t *, int, uint8_t *);
 static	int sata_build_msense_page_8(sata_drive_info_t *, int, uint8_t *);
 static	int sata_build_msense_page_1a(sata_drive_info_t *, int, uint8_t *);
 static	int sata_build_msense_page_1c(sata_drive_info_t *, int, uint8_t *);
+static	int sata_build_msense_page_30(sata_drive_info_t *, int, uint8_t *);
 static	int sata_mode_select_page_8(sata_pkt_txlate_t *,
     struct mode_cache_scsi3 *, int, int *, int *, int *);
+static	int sata_mode_select_page_1a(sata_pkt_txlate_t *,
+    struct mode_info_power_cond *, int, int *, int *, int *);
 static	int sata_mode_select_page_1c(sata_pkt_txlate_t *,
     struct mode_info_excpt_page *, int, int *, int *, int *);
-static	int sata_build_msense_page_30(sata_drive_info_t *, int, uint8_t *);
 static	int sata_mode_select_page_30(sata_pkt_txlate_t *,
     struct mode_acoustic_management *, int, int *, int *, int *);
 
@@ -306,6 +309,14 @@ static	int sata_build_lsense_page_2f(sata_drive_info_t *, uint8_t *,
     sata_hba_inst_t *);
 static	int sata_build_lsense_page_30(sata_drive_info_t *, uint8_t *,
     sata_hba_inst_t *);
+static	int sata_build_lsense_page_0e(sata_drive_info_t *, uint8_t *,
+    sata_pkt_txlate_t *);
+
+static	void sata_set_arq_data(sata_pkt_t *);
+static	void sata_build_read_verify_cmd(sata_cmd_t *, uint16_t, uint64_t);
+static	void sata_build_generic_cmd(sata_cmd_t *, uint8_t);
+static	uint8_t sata_get_standby_timer(uint8_t *timer);
+
 static	void sata_save_drive_settings(sata_drive_info_t *);
 static	void sata_show_drive_info(sata_hba_inst_t *, sata_drive_info_t *);
 static	void sata_log(sata_hba_inst_t *, uint_t, char *fmt, ...);
@@ -1809,8 +1820,11 @@ sata_scsi_tgt_probe(struct scsi_device *sd, int (*callback)(void))
 	sata_hba_inst_t *sata_hba_inst =
 	    (sata_hba_inst_t *)(sd->sd_address.a_hba_tran->tran_hba_private);
 	int rval;
+	uint32_t pm_cap;
 
 	rval = scsi_hba_probe(sd, callback);
+	pm_cap = SATA_CAP_POWER_CONDITON | SATA_CAP_SMART_PAGE |
+	    SATA_CAP_LOG_SENSE;
 
 	if (rval == SCSIPROBE_EXISTS) {
 		/*
@@ -1819,7 +1833,7 @@ sata_scsi_tgt_probe(struct scsi_device *sd, int (*callback)(void))
 		 * before enabling device power-management.
 		 */
 		if ((ddi_prop_update_int(DDI_DEV_T_NONE, sd->sd_dev,
-		    "pm-capable", 1)) != DDI_PROP_SUCCESS) {
+		    "pm-capable", pm_cap)) != DDI_PROP_SUCCESS) {
 			sata_log(sata_hba_inst, CE_WARN,
 			    "SATA device at port %d: "
 			    "will not be power-managed ",
@@ -2162,6 +2176,20 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		return (rval);
 	}
 	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
+
+	/*
+	 * Checking for power state, if it was on
+	 * STOPPED state, then the drive is not capable
+	 * of processing media access command.  And
+	 * TEST_UNIT_READY, REQUEST_SENSE has special handling
+	 * in the function for different power state.
+	 */
+	if (((sdinfo->satadrv_power_level == SATA_POWER_STANDBY) ||
+	    (sdinfo->satadrv_power_level == SATA_POWER_STOPPED)) &&
+	    (SATA_IS_MEDIUM_ACCESS_CMD(pkt->pkt_cdbp[0]))) {
+		return (sata_txlt_check_condition(spx, KEY_NOT_READY,
+		    SD_SCSI_ASC_LU_NOT_READY));
+	}
 
 	/* ATA Disk commands processing starts here */
 
@@ -3027,12 +3055,53 @@ sata_txlt_invalid_command(sata_pkt_txlate_t *spx)
 }
 
 /*
+ * Scsi response set up for check condition with special sense key
+ * and additional sense code.
+ *
+ * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
+ */
+static int
+sata_txlt_check_condition(sata_pkt_txlate_t *spx, uchar_t key, uchar_t code)
+{
+	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
+	int cport = SATA_TXLT_CPORT(spx);
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	struct scsi_extended_sense *sense;
+
+	mutex_enter(&SATA_CPORT_MUTEX(shi, cport));
+	scsipkt->pkt_reason = CMD_CMPLT;
+	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
+	    STATE_SENT_CMD | STATE_GOT_STATUS;
+
+	*scsipkt->pkt_scbp = STATUS_CHECK;
+
+	sense = sata_arq_sense(spx);
+	sense->es_key = key;
+	sense->es_add_code = code;
+
+	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+
+	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
+	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
+
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
+		/* scsi callback required */
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsi_hba_pkt_comp,
+		    (void *)spx->txlt_scsi_pkt,
+		    TQ_SLEEP) == NULL)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
+	return (TRAN_ACCEPT);
+}
+
+/*
  * Scsi response setup for
  * emulated non-data command that requires no action/return data
  *
  * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
  */
-static 	int
+static	int
 sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 {
 	int rval;
@@ -3289,10 +3358,10 @@ done:
 
 /*
  * SATA translate command: Request Sense.
- * Emulated command (ATA version for SATA hard disks)
- * Always NO SENSE, because any sense data should be reported by ARQ sense.
  *
  * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
+ * At the moment this is an emulated command (ATA version for SATA hard disks).
+ * May be translated into Check Power Mode command in the future.
  *
  * Note: There is a mismatch between already implemented Informational
  * Exception Mode Select page 0x1C and this function.
@@ -3306,7 +3375,9 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	struct scsi_extended_sense sense;
 	struct buf *bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
-	int rval, reason;
+	sata_drive_info_t *sdinfo;
+	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
+	int rval, reason, power_state = 0;
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
@@ -3315,13 +3386,67 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-
 
 	scsipkt->pkt_reason = CMD_CMPLT;
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
 	*scsipkt->pkt_scbp = STATUS_GOOD;
+
+	/*
+	 * when CONTROL field's NACA bit == 1
+	 * return ILLEGAL_REQUEST
+	 */
+	if (scsipkt->pkt_cdbp[5] & CTL_BYTE_NACA_MASK) {
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (sata_txlt_check_condition(spx, KEY_ILLEGAL_REQUEST,
+		    SD_SCSI_ASC_CMD_SEQUENCE_ERR));
+	}
+
+	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+	    &spx->txlt_sata_pkt->satapkt_device);
+	ASSERT(sdinfo != NULL);
+
+	spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH;
+
+	sata_build_generic_cmd(scmd, SATAC_CHECK_POWER_MODE);
+	scmd->satacmd_flags.sata_copy_out_sec_count_lsb = B_TRUE;
+	scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+	if (sata_hba_start(spx, &rval) != 0) {
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (rval);
+	} else {
+		if (scmd->satacmd_error_reg != 0) {
+			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			return (sata_txlt_check_condition(spx, KEY_NO_SENSE,
+			    SD_SCSI_ASC_NO_ADD_SENSE));
+		}
+	}
+
+	switch (scmd->satacmd_sec_count_lsb) {
+	case SATA_PWRMODE_STANDBY: /* device in standby mode */
+		if (sdinfo->satadrv_power_level == SATA_POWER_STOPPED)
+			power_state = SATA_POWER_STOPPED;
+		else {
+			power_state = SATA_POWER_STANDBY;
+			sdinfo->satadrv_power_level = SATA_POWER_STANDBY;
+		}
+		break;
+	case SATA_PWRMODE_IDLE: /* device in idle mode */
+		power_state = SATA_POWER_IDLE;
+		sdinfo->satadrv_power_level = SATA_POWER_IDLE;
+		break;
+	case SATA_PWRMODE_ACTIVE: /* device in active or idle mode */
+	default:		  /* 0x40, 0x41 active mode */
+		if (sdinfo->satadrv_power_level == SATA_POWER_IDLE)
+			power_state = SATA_POWER_IDLE;
+		else {
+			power_state = SATA_POWER_ACTIVE;
+			sdinfo->satadrv_power_level = SATA_POWER_ACTIVE;
+		}
+		break;
+	}
+
+	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
 	if (bp != NULL && bp->b_un.b_addr && bp->b_bcount) {
 		/*
@@ -3342,17 +3467,29 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 		bcopy(&sense, bp->b_un.b_addr, count);
 		scsipkt->pkt_state |= STATE_XFERRED_DATA;
 		scsipkt->pkt_resid = 0;
+		switch (power_state) {
+		case SATA_POWER_IDLE:
+		case SATA_POWER_STANDBY:
+			sense.es_add_code =
+			    SD_SCSI_ASC_LOW_POWER_CONDITION_ON;
+			break;
+		case SATA_POWER_STOPPED:
+			sense.es_add_code = SD_SCSI_ASC_NO_ADD_SENSE;
+			break;
+		case SATA_POWER_ACTIVE:
+		default:
+			break;
+		}
 	}
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n",
 	    scsipkt->pkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    (task_func_t *)scsi_hba_pkt_comp, (void *) scsipkt,
 		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
@@ -3371,6 +3508,8 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 {
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	struct scsi_extended_sense *sense;
+	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
+	sata_drive_info_t *sdinfo;
 	int power_state;
 	int rval, reason;
 
@@ -3381,37 +3520,59 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
-	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	/* At this moment, emulate it rather than execute anything */
-	power_state = SATA_PWRMODE_ACTIVE;
+	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+	    &spx->txlt_sata_pkt->satapkt_device);
+	ASSERT(sdinfo != NULL);
+
+	spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH;
+
+	/* send CHECK POWER MODE command */
+	sata_build_generic_cmd(scmd, SATAC_CHECK_POWER_MODE);
+	scmd->satacmd_flags.sata_copy_out_sec_count_lsb = B_TRUE;
+	scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+	if (sata_hba_start(spx, &rval) != 0) {
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (rval);
+	} else {
+		if (scmd->satacmd_error_reg != 0) {
+			mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+			return (sata_txlt_check_condition(spx, KEY_NOT_READY,
+			    SD_SCSI_ASC_LU_NOT_RESPONSE));
+		}
+	}
+
+	power_state = scmd->satacmd_sec_count_lsb;
+
+	/*
+	 * return NOT READY when device in STOPPED mode
+	 */
+	if (power_state == SATA_PWRMODE_STANDBY &&
+	    sdinfo->satadrv_power_level == SATA_POWER_STOPPED) {
+		*scsipkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		sense->es_key = KEY_NOT_READY;
+		sense->es_add_code = SD_SCSI_ASC_LU_NOT_READY;
+	} else {
+		/*
+		 * For other power mode, return GOOD status
+		 */
+		*scsipkt->pkt_scbp = STATUS_GOOD;
+	}
 
 	scsipkt->pkt_reason = CMD_CMPLT;
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
 	    STATE_SENT_CMD | STATE_GOT_STATUS;
 
-	switch (power_state) {
-	case SATA_PWRMODE_ACTIVE:
-	case SATA_PWRMODE_IDLE:
-		*scsipkt->pkt_scbp = STATUS_GOOD;
-		break;
-	default:
-		/* PWR mode standby */
-		*scsipkt->pkt_scbp = STATUS_CHECK;
-		sense = sata_arq_sense(spx);
-		sense->es_key = KEY_NOT_READY;
-		sense->es_add_code = SD_SCSI_ASC_LU_NOT_READY;
-		break;
-	}
+	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
 
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-	    scsipkt->pkt_comp != NULL)
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    (task_func_t *)scsi_hba_pkt_comp, (void *) scsipkt,
 		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
@@ -3419,16 +3580,26 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	return (TRAN_ACCEPT);
 }
 
-
 /*
  * SATA translate command: Start Stop Unit
  * Translation depends on a command:
- *	Start Unit translated into Idle Immediate
- *	Stop Unit translated into Standby Immediate
+ *
+ * Power condition bits will be supported
+ * and the power level should be maintained by SATL,
+ * When SATL received a command, it will check the
+ * power level firstly, and return the status according
+ * to SAT2 v2.6 and SAT-2 Standby Modifications
+ *
+ * SPC-4/SBC-3      SATL    ATA power condition  SATL      SPC/SBC
+ * -----------------------------------------------------------------------
+ * SSU_PC1 Active   <==>     ATA  Active         <==>     SSU:start_bit =1
+ * SSU_PC2 Idle     <==>     ATA  Idle           <==>     N/A
+ * SSU_PC3 Standby  <==>     ATA  Standby        <==>     N/A
+ * SSU_PC4 Stopped  <==>     ATA  Standby        <==>     SSU:start_bit = 0
+ *
  *	Unload Media / NOT SUPPORTED YET
  *	Load Media / NOT SUPPROTED YET
- * Power condition bits are ignored, so is Immediate bit
- * Requesting synchronous execution.
+ *	Immediate bit / NOT SUPPORTED YET (deferred error)
  *
  * Returns TRAN_ACCEPT or code returned by sata_hba_start() and
  * appropriate values in scsi_pkt fields.
@@ -3438,11 +3609,11 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 {
 	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
-	struct scsi_extended_sense *sense;
 	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
 	int cport = SATA_TXLT_CPORT(spx);
 	int rval, reason;
-	int synch;
+	sata_drive_info_t *sdinfo;
+	sata_id_t *sata_id;
 
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "sata_txlt_start_stop_unit: %d\n", scsipkt->pkt_scbp[4] & 1);
@@ -3455,80 +3626,303 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		return (rval);
 	}
 
-	if (scsipkt->pkt_cdbp[4] & 2) {
-		/* Load/Unload Media - invalid request */
-		*scsipkt->pkt_scbp = STATUS_CHECK;
-		sense = sata_arq_sense(spx);
-		sense->es_key = KEY_ILLEGAL_REQUEST;
-		sense->es_add_code = SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
-		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
-
-		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
-		    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
-
-		if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
-		    scsipkt->pkt_comp != NULL)
-			/* scsi callback required */
-			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
-			    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-			    TQ_SLEEP) == NULL)
-				/* Scheduling the callback failed */
-				return (TRAN_BUSY);
-
-		return (TRAN_ACCEPT);
-	}
-	scmd->satacmd_addr_type = 0;
-	scmd->satacmd_sec_count_lsb = 0;
-	scmd->satacmd_lba_low_lsb = 0;
-	scmd->satacmd_lba_mid_lsb = 0;
-	scmd->satacmd_lba_high_lsb = 0;
-	scmd->satacmd_features_reg = 0;
-	scmd->satacmd_device_reg = 0;
-	scmd->satacmd_status_reg = 0;
-	if (scsipkt->pkt_cdbp[4] & 1) {
-		/* Start Unit */
-		scmd->satacmd_cmd_reg = SATAC_IDLE_IM;
-	} else {
-		/* Stop Unit */
-		scmd->satacmd_cmd_reg = SATAC_STANDBY_IM;
-	}
-
-	if (!(spx->txlt_sata_pkt->satapkt_op_mode & SATA_OPMODE_SYNCH)) {
-		/* Need to set-up a callback function */
-		spx->txlt_sata_pkt->satapkt_comp =
-		    sata_txlt_nodata_cmd_completion;
-		synch = FALSE;
-	} else {
-		spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH;
-		synch = TRUE;
-	}
-
-	/* Transfer command to HBA */
-	if (sata_hba_start(spx, &rval) != 0) {
-		/* Pkt not accepted for execution */
+	if (scsipkt->pkt_cdbp[1] & START_STOP_IMMED_MASK) {
+		/* IMMED bit - not supported */
 		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
-		return (rval);
+		return (sata_txlt_check_condition(spx, KEY_ILLEGAL_REQUEST,
+		    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
+	}
+
+	spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH;
+	spx->txlt_sata_pkt->satapkt_comp = NULL;
+
+	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+	    &spx->txlt_sata_pkt->satapkt_device);
+	ASSERT(sdinfo != NULL);
+	sata_id = &sdinfo->satadrv_id;
+
+	switch ((scsipkt->pkt_cdbp[4] & START_STOP_POWER_COND_MASK) >> 4) {
+	case 0:
+		if (scsipkt->pkt_cdbp[4] & START_STOP_LOEJ_MASK) {
+			/* Load/Unload Media - invalid request */
+			goto err_out;
+		}
+		if (scsipkt->pkt_cdbp[4] & START_STOP_START_MASK) {
+			/* Start Unit */
+			sata_build_read_verify_cmd(scmd, 1, 5);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			/* Transfer command to HBA */
+			if (sata_hba_start(spx, &rval) != 0) {
+				/* Pkt not accepted for execution */
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			sdinfo->satadrv_power_level = SATA_POWER_ACTIVE;
+		} else {
+			/* Stop Unit */
+			sata_build_generic_cmd(scmd, SATAC_FLUSH_CACHE);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			/* ata standby immediate command */
+			sata_build_generic_cmd(scmd, SATAC_STANDBY_IM);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			sdinfo->satadrv_power_level = SATA_POWER_STOPPED;
+		}
+		break;
+	case 0x1:
+		sata_build_generic_cmd(scmd, SATAC_IDLE);
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		if (sata_hba_start(spx, &rval) != 0) {
+			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			return (rval);
+		} else {
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
+			}
+		}
+		sata_build_read_verify_cmd(scmd, 1, 5);
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		/* Transfer command to HBA */
+		if (sata_hba_start(spx, &rval) != 0) {
+			/* Pkt not accepted for execution */
+			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			return (rval);
+		} else {
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
+			}
+		}
+		sdinfo->satadrv_power_level = SATA_POWER_ACTIVE;
+		break;
+	case 0x2:
+		sata_build_generic_cmd(scmd, SATAC_FLUSH_CACHE);
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		if (!(scsipkt->pkt_cdbp[4] & START_STOP_NOFLUSH_MASK)) {
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+		}
+		sata_build_generic_cmd(scmd, SATAC_IDLE);
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		if (sata_hba_start(spx, &rval) != 0) {
+			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			return (rval);
+		} else {
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
+			}
+		}
+		if ((scsipkt->pkt_cdbp[3] & START_STOP_MODIFIER_MASK)) {
+			/*
+			 *  POWER CONDITION MODIFIER bit set
+			 *  to 0x1 or larger it will be handled
+			 *  on the same way as bit = 0x1
+			 */
+			if (!(sata_id->ai_cmdset84 &
+			    SATA_IDLE_UNLOAD_SUPPORTED)) {
+				sdinfo->satadrv_power_level = SATA_POWER_IDLE;
+				break;
+			}
+			sata_build_generic_cmd(scmd, SATAC_IDLE_IM);
+			scmd->satacmd_features_reg = 0x44;
+			scmd->satacmd_lba_low_lsb = 0x4c;
+			scmd->satacmd_lba_mid_lsb = 0x4e;
+			scmd->satacmd_lba_high_lsb = 0x55;
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+		}
+		sdinfo->satadrv_power_level = SATA_POWER_IDLE;
+		break;
+	case 0x3:
+		sata_build_generic_cmd(scmd, SATAC_FLUSH_CACHE);
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		if (!(scsipkt->pkt_cdbp[4] & START_STOP_NOFLUSH_MASK)) {
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+		}
+		sata_build_generic_cmd(scmd, SATAC_STANDBY);
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		if (sata_hba_start(spx, &rval) != 0) {
+			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			return (rval);
+		} else {
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
+			}
+		}
+		sdinfo->satadrv_power_level = SATA_POWER_STANDBY;
+		break;
+	case 0x7:
+		sata_build_generic_cmd(scmd, SATAC_CHECK_POWER_MODE);
+		scmd->satacmd_flags.sata_copy_out_sec_count_lsb = B_TRUE;
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		if (sata_hba_start(spx, &rval) != 0) {
+			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			return (rval);
+		} else {
+			if (scmd->satacmd_error_reg != 0) {
+				goto err_out;
+			}
+		}
+		switch (scmd->satacmd_sec_count_lsb) {
+		case SATA_PWRMODE_STANDBY:
+			sata_build_generic_cmd(scmd, SATAC_STANDBY);
+			scmd->satacmd_sec_count_msb = sata_get_standby_timer(
+			    sdinfo->satadrv_standby_timer);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			break;
+		case SATA_PWRMODE_IDLE:
+			sata_build_generic_cmd(scmd, SATAC_IDLE);
+			scmd->satacmd_sec_count_msb = sata_get_standby_timer(
+			    sdinfo->satadrv_standby_timer);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			break;
+		case SATA_PWRMODE_ACTIVE_SPINDOWN:
+		case SATA_PWRMODE_ACTIVE_SPINUP:
+		case SATA_PWRMODE_ACTIVE:
+			sata_build_generic_cmd(scmd, SATAC_IDLE);
+			scmd->satacmd_sec_count_msb = sata_get_standby_timer(
+			    sdinfo->satadrv_standby_timer);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			sata_build_read_verify_cmd(scmd, 1, 5);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			break;
+		default:
+			goto err_out;
+		}
+		break;
+	case 0xb:
+		if ((sata_get_standby_timer(sdinfo->satadrv_standby_timer) ==
+		    0) || (!(sata_id->ai_cap & SATA_STANDBYTIMER))) {
+			mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+			return (sata_txlt_check_condition(spx,
+			    KEY_ILLEGAL_REQUEST,
+			    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
+		}
+		sata_build_generic_cmd(scmd, SATAC_FLUSH_CACHE);
+		scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+		if (!(scsipkt->pkt_cdbp[4] & START_STOP_NOFLUSH_MASK)) {
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+			sata_build_generic_cmd(scmd, SATAC_STANDBY_IM);
+			scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+			if (sata_hba_start(spx, &rval) != 0) {
+				mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+				return (rval);
+			} else {
+				if (scmd->satacmd_error_reg != 0) {
+					goto err_out;
+				}
+			}
+		}
+		bzero(sdinfo->satadrv_standby_timer, sizeof (uchar_t) * 4);
+		break;
+	default:
+err_out:
+		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		return (sata_txlt_check_condition(spx, KEY_ILLEGAL_REQUEST,
+		    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
 	}
 
 	/*
-	 * If execution is non-synchronous,
-	 * a callback function will handle potential errors, translate
-	 * the response and will do a callback to a target driver.
-	 * If it was synchronous, check execution status using the same
-	 * framework callback.
+	 * since it was synchronous commands,
+	 * a callback function will be called directely.
 	 */
 	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
-	if (synch) {
-		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
-		    "synchronous execution status %x\n",
-		    spx->txlt_sata_pkt->satapkt_reason);
+	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
+	    "synchronous execution status %x\n",
+	    spx->txlt_sata_pkt->satapkt_reason);
+
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0) {
+		sata_set_arq_data(spx->txlt_sata_pkt);
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsi_hba_pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0) {
+			return (TRAN_BUSY);
+		}
+	}
+	else
 
 		sata_txlt_nodata_cmd_completion(spx->txlt_sata_pkt);
-	}
+
 	return (TRAN_ACCEPT);
 
 }
-
 
 /*
  * SATA translate command:  Read Capacity.
@@ -3681,7 +4075,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 		/* Build mode parameter header */
 		if (spx->txlt_scsi_pkt->pkt_cdbp[0] == SCMD_MODE_SENSE) {
 			/* 4-byte mode parameter header */
-			buf[len++] = 0;   	/* mode data length */
+			buf[len++] = 0;		/* mode data length */
 			buf[len++] = 0;		/* medium type */
 			buf[len++] = 0;		/* dev-specific param */
 			buf[len++] = bdlen;	/* Block Descriptor length */
@@ -3837,7 +4231,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 		/* fix total mode data length */
 		if (spx->txlt_scsi_pkt->pkt_cdbp[0] == SCMD_MODE_SENSE) {
 			/* 4-byte mode parameter header */
-			buf[0] = len - 1;   	/* mode data length */
+			buf[0] = len - 1;	/* mode data length */
 		} else {
 			buf[0] = (len -2) >> 8;
 			buf[1] = (len -2) & 0xff;
@@ -3902,6 +4296,7 @@ done:
  * - caching page
  * - informational exception page
  * - acoustic management page
+ * - power condition page
  * Caching setup is remembered so it could be re-stored in case of
  * an unexpected device reset.
  *
@@ -4101,6 +4496,30 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 				}
 
 				break;
+			case MODEPAGE_POWER_COND:
+				stat = sata_mode_select_page_1a(spx,
+				    (struct mode_info_power_cond *)&buf[len],
+				    pllen, &pagelen, &rval, &dmod);
+				/*
+				 * The pagelen value indicates the number of
+				 * parameter bytes already processed.
+				 * The rval is the return value from
+				 * sata_tran_start().
+				 * The stat indicates the overall status of
+				 * the operation(s).
+				 */
+				if (stat != SATA_SUCCESS)
+					/*
+					 * Page processing did not succeed -
+					 * all error info is already set-up,
+					 * just return
+					 */
+					pllen = 0; /* this breaks the loop */
+				else {
+					len += pagelen;
+					pllen -= pagelen;
+				}
+				break;
 			default:
 				*scsipkt->pkt_scbp = STATUS_CHECK;
 				sense = sata_arq_sense(spx);
@@ -4261,6 +4680,7 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 	case PAGE_CODE_SELF_TEST_RESULTS:
 	case PAGE_CODE_INFORMATION_EXCEPTIONS:
 	case PAGE_CODE_SMART_READ_DATA:
+	case PAGE_CODE_START_STOP_CYCLE_COUNTER:
 		break;
 	default:
 		*scsipkt->pkt_scbp = STATUS_CHECK;
@@ -4371,6 +4791,30 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 			len = sata_build_lsense_page_30(sdinfo, buf,
 			    spx->txlt_sata_hba_inst);
 			goto no_header;
+		case PAGE_CODE_START_STOP_CYCLE_COUNTER:
+			sata_id = &sdinfo->satadrv_id;
+			if (! (sata_id->ai_cmdset82 & SATA_SMART_SUPPORTED)) {
+				*scsipkt->pkt_scbp = STATUS_CHECK;
+				sense = sata_arq_sense(spx);
+				sense->es_key = KEY_ILLEGAL_REQUEST;
+				sense->es_add_code =
+				    SD_SCSI_ASC_INVALID_FIELD_IN_CDB;
+
+				goto done;
+			}
+			if (! (sata_id->ai_features85 & SATA_SMART_ENABLED)) {
+				*scsipkt->pkt_scbp = STATUS_CHECK;
+				sense = sata_arq_sense(spx);
+				sense->es_key = KEY_ABORTED_COMMAND;
+				sense->es_add_code =
+				    SCSI_ASC_ATA_DEV_FEAT_NOT_ENABLED;
+				sense->es_qual_code =
+				    SCSI_ASCQ_ATA_DEV_FEAT_NOT_ENABLED;
+
+				goto done;
+			}
+			len = sata_build_lsense_page_0e(sdinfo, buf, spx);
+			goto no_header;
 		default:
 			/* Invalid request */
 			*scsipkt->pkt_scbp = STATUS_CHECK;
@@ -4429,7 +4873,7 @@ done:
  * Translate command: Log Select
  * Not implemented at this time - returns invalid command response.
  */
-static 	int
+static	int
 sata_txlt_log_select(sata_pkt_txlate_t *spx)
 {
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
@@ -5846,8 +6290,22 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
  * This function may be used only if scsi_pkt is non-NULL.
  */
 
-static 	void
+static	void
 sata_txlt_nodata_cmd_completion(sata_pkt_t *sata_pkt)
+{
+	sata_pkt_txlate_t *spx =
+	    (sata_pkt_txlate_t *)sata_pkt->satapkt_framework_private;
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+
+	sata_set_arq_data(sata_pkt);
+
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
+		/* scsi callback required */
+		scsi_hba_pkt_comp(scsipkt);
+}
+
+static	void
+sata_set_arq_data(sata_pkt_t *sata_pkt)
 {
 	sata_pkt_txlate_t *spx =
 	    (sata_pkt_txlate_t *)sata_pkt->satapkt_framework_private;
@@ -5917,10 +6375,6 @@ sata_txlt_nodata_cmd_completion(sata_pkt_t *sata_pkt)
 	}
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
 	    "Scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
-
-	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0)
-		/* scsi callback required */
-		scsi_hba_pkt_comp(scsipkt);
 }
 
 
@@ -6097,20 +6551,36 @@ sata_build_msense_page_30(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 
 
 /*
- * Build Mode sense power condition page
- * NOT IMPLEMENTED.
+ * Build Mode sense power condition page.
  */
 static int
 sata_build_msense_page_1a(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 {
-#ifndef __lock_lint
-	_NOTE(ARGUNUSED(sdinfo))
-	_NOTE(ARGUNUSED(pcntrl))
-	_NOTE(ARGUNUSED(buf))
-#endif
-	return (0);
-}
+	struct mode_info_power_cond *page = (struct mode_info_power_cond *)buf;
+	sata_id_t *sata_id = &sdinfo->satadrv_id;
 
+	/*
+	 * Most of the fields are set to 0, being not supported and/or disabled
+	 * power condition page length was 0x0a
+	 */
+	bzero(buf, sizeof (struct mode_info_power_cond));
+
+	if (pcntrl == P_CNTRL_DEFAULT) {
+		/*  default paramters not supported */
+		return (0);
+	}
+
+	page->mode_page.code = MODEPAGE_POWER_COND;
+	page->mode_page.length = sizeof (struct mode_info_power_cond);
+
+	if (sata_id->ai_cap && SATA_STANDBYTIMER) {
+		page->standby = 1;
+		bcopy(sdinfo->satadrv_standby_timer, page->standby_cond_timer,
+		    sizeof (uchar_t) * 4);
+	}
+
+	return (sizeof (struct mode_info_power_cond));
+}
 
 /*
  * Process mode select caching page 8 (scsi3 format only).
@@ -6468,16 +6938,96 @@ sata_mode_select_page_30(sata_pkt_txlate_t *spx, struct
 	return (SATA_SUCCESS);
 }
 
+/*
+ * Process mode select power condition page 0x1a
+ *
+ * This function has to be called with a port mutex held.
+ *
+ * Returns SATA_SUCCESS if operation was successful, SATA_FAILURE otherwise.
+ *
+ * Cannot be called in the interrupt context.
+ */
+int
+sata_mode_select_page_1a(sata_pkt_txlate_t *spx, struct
+    mode_info_power_cond *page, int parmlen, int *pagelen,
+    int *rval, int *dmod)
+{
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	sata_drive_info_t *sdinfo;
+	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
+	sata_id_t *sata_id;
+	struct scsi_extended_sense *sense;
+	uint8_t ata_count;
+	int i, len;
 
+	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+	    &spx->txlt_sata_pkt->satapkt_device);
+	sata_id = &sdinfo->satadrv_id;
+	*dmod = 0;
 
+	len = sizeof (struct mode_info_power_cond);
+	len += sizeof (struct mode_page);
+
+	/* If parmlen is too short or the feature is not supported, drop it */
+	if ((len < parmlen) || (page->idle == 1) ||
+	    (!(sata_id->ai_cap && SATA_STANDBYTIMER) && page->standby == 1)) {
+		*scsipkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		sense->es_key = KEY_ILLEGAL_REQUEST;
+		sense->es_add_code = SD_SCSI_ASC_INVALID_FIELD_IN_PARAMS_LIST;
+		*pagelen = parmlen;
+		*rval = TRAN_ACCEPT;
+		return (SATA_FAILURE);
+	}
+
+	*pagelen = len;
+
+	/*
+	 * Set-up Internal STANDBY command(s)
+	 */
+	if (page->standby == 0)
+		goto out;
+
+	ata_count = sata_get_standby_timer(page->standby_cond_timer);
+
+	scmd->satacmd_addr_type = 0;
+	scmd->satacmd_sec_count_lsb = ata_count;
+	scmd->satacmd_lba_low_lsb = 0;
+	scmd->satacmd_lba_mid_lsb = 0;
+	scmd->satacmd_lba_high_lsb = 0;
+	scmd->satacmd_features_reg = 0;
+	scmd->satacmd_device_reg = 0;
+	scmd->satacmd_status_reg = 0;
+	scmd->satacmd_cmd_reg = SATAC_STANDBY;
+	scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
+
+	/* Transfer command to HBA */
+	if (sata_hba_start(spx, rval) != 0) {
+		return (SATA_FAILURE);
+	} else {
+		if ((scmd->satacmd_error_reg != 0) ||
+		    (spx->txlt_sata_pkt->satapkt_reason !=
+		    SATA_PKT_COMPLETED)) {
+			sata_xlate_errors(spx);
+			return (SATA_FAILURE);
+		}
+	}
+
+	for (i = 0; i < 4; i++) {
+		sdinfo->satadrv_standby_timer[i] = page->standby_cond_timer[i];
+	}
+out:
+	*dmod = 1;
+	return (SATA_SUCCESS);
+}
 
 /*
  * sata_build_lsense_page0() is used to create the
  * SCSI LOG SENSE page 0 (supported log pages)
  *
- * Currently supported pages are 0, 0x10, 0x2f and 0x30
+ * Currently supported pages are 0, 0x10, 0x2f, 0x30 and 0x0e
  * (supported log pages, self-test results, informational exceptions
- *  and Sun vendor specific ATA SMART data).
+ * Sun vendor specific ATA SMART data, and start stop cycle counter).
  *
  * Takes a sata_drive_info t * and the address of a buffer
  * in which to create the page information.
@@ -6505,6 +7055,8 @@ sata_build_lsense_page_0(sata_drive_info_t *sdinfo, uint8_t *buf)
 		*page_ptr++ = PAGE_CODE_INFORMATION_EXCEPTIONS;
 		++num_pages_supported;
 		*page_ptr++ = PAGE_CODE_SMART_READ_DATA;
+		++num_pages_supported;
+		*page_ptr++ = PAGE_CODE_START_STOP_CYCLE_COUNTER;
 		++num_pages_supported;
 	}
 
@@ -7035,6 +7587,171 @@ sata_build_lsense_page_30(
 		return (0);
 
 	return (sizeof (struct smart_data));
+}
+
+/*
+ * sata_build_lsense_page_0e() is used to create the
+ * SCSI LOG SENSE page 0e (supported log pages)
+ *
+ * Date of Manufacture (0x0001)
+ *	YEAR = "0000"
+ *	WEEK = "00"
+ * Accounting Date (0x0002)
+ *	6 ASCII space character(20h)
+ * Specified cycle count over device lifetime
+ *	VALUE - THRESH - the delta between max and min;
+ * Accumulated start-stop cycles
+ *	VALUE - WORST - the accumulated cycles;
+ *
+ * ID FLAG THRESH VALUE WORST RAW on start/stop counter attribute
+ *
+ * Takes a sata_drive_info t * and the address of a buffer
+ * in which to create the page information as well as a sata_hba_inst_t *.
+ *
+ * Returns the number of bytes valid in the buffer.
+ */
+static	int
+sata_build_lsense_page_0e(sata_drive_info_t *sdinfo, uint8_t *buf,
+	sata_pkt_txlate_t *spx)
+{
+	struct start_stop_cycle_counter_log *log_page;
+	int i, rval, index;
+	uint8_t smart_data[512], id, value, worst, thresh;
+	uint32_t max_count, cycles;
+
+	/* Now do the SMART READ DATA */
+	rval = sata_fetch_smart_data(spx->txlt_sata_hba_inst, sdinfo,
+	    (struct smart_data *)smart_data);
+	if (rval == -1)
+		return (0);
+	for (i = 0, id = 0; i < SMART_START_STOP_COUNT_ID * 2; i++) {
+		index = (i * 12) + 2;
+		id = smart_data[index];
+		if (id != SMART_START_STOP_COUNT_ID)
+			continue;
+		else {
+			thresh = smart_data[index + 2];
+			value = smart_data[index + 3];
+			worst = smart_data[index + 4];
+			break;
+		}
+	}
+	if (id != SMART_START_STOP_COUNT_ID)
+		return (0);
+	max_count = value - thresh;
+	cycles = value - worst;
+
+	log_page = (struct start_stop_cycle_counter_log *)buf;
+	bzero(log_page, sizeof (struct start_stop_cycle_counter_log));
+	log_page->code = 0x0e;
+	log_page->page_len_low = 0x24;
+
+	log_page->manufactor_date_low = 0x1;
+	log_page->param_1.fmt_link = 0x1; /* 01b */
+	log_page->param_len_1 = 0x06;
+	for (i = 0; i < 4; i++) {
+		log_page->year_manu[i] = 0x30;
+		if (i < 2)
+			log_page->week_manu[i] = 0x30;
+	}
+
+	log_page->account_date_low = 0x02;
+	log_page->param_2.fmt_link = 0x01; /* 01b */
+	log_page->param_len_2 = 0x06;
+	for (i = 0; i < 4; i++) {
+		log_page->year_account[i] = 0x20;
+		if (i < 2)
+			log_page->week_account[i] = 0x20;
+	}
+
+	log_page->lifetime_code_low = 0x03;
+	log_page->param_3.fmt_link = 0x03; /* 11b */
+	log_page->param_len_3 = 0x04;
+	/* VALUE - THRESH - the delta between max and min */
+	log_page->cycle_code_low = 0x04;
+	log_page->param_4.fmt_link = 0x03; /* 11b */
+	log_page->param_len_4 = 0x04;
+	/* WORST - THRESH - the distance from 'now' to min */
+
+	for (i = 0; i < 4; i++) {
+		log_page->cycle_lifetime[i] =
+		    (max_count >> (8 * (3 - i))) & 0xff;
+		log_page->cycle_accumulated[i] =
+		    (cycles >> (8 * (3 - i))) & 0xff;
+	}
+
+	return (sizeof (struct start_stop_cycle_counter_log));
+}
+
+/*
+ * This function was used for build a ATA read verify sector command
+ */
+static void
+sata_build_read_verify_cmd(sata_cmd_t *scmd, uint16_t sec, uint64_t lba)
+{
+	scmd->satacmd_cmd_reg = SATAC_RDVER;
+	scmd->satacmd_addr_type = ATA_ADDR_LBA28;
+
+	scmd->satacmd_sec_count_lsb = sec & 0xff;
+	scmd->satacmd_lba_low_lsb = lba & 0xff;
+	scmd->satacmd_lba_mid_lsb = (lba >> 8) & 0xff;
+	scmd->satacmd_lba_high_lsb = (lba >> 16) & 0xff;
+	scmd->satacmd_device_reg = (SATA_ADH_LBA | (lba >> 24) & 0xf);
+	scmd->satacmd_features_reg = 0;
+	scmd->satacmd_status_reg = 0;
+	scmd->satacmd_error_reg = 0;
+}
+
+/*
+ * This function was used for building an ATA
+ * command, and only command register need to
+ * be defined, other register will be zero or na.
+ */
+static void
+sata_build_generic_cmd(sata_cmd_t *scmd, uint8_t cmd)
+{
+	scmd->satacmd_addr_type = 0;
+	scmd->satacmd_cmd_reg = cmd;
+	scmd->satacmd_device_reg = 0;
+	scmd->satacmd_sec_count_lsb = 0;
+	scmd->satacmd_lba_low_lsb = 0;
+	scmd->satacmd_lba_mid_lsb = 0;
+	scmd->satacmd_lba_high_lsb = 0;
+	scmd->satacmd_features_reg = 0;
+	scmd->satacmd_status_reg = 0;
+	scmd->satacmd_error_reg = 0;
+}
+
+/*
+ * This function was used for changing the standby
+ * timer format from SCSI to ATA.
+ */
+static uint8_t
+sata_get_standby_timer(uint8_t *timer)
+{
+	uint32_t i = 0, count = 0;
+	uint8_t ata_count;
+
+	for (i = 0; i < 4; i++) {
+		count = count << 8 | timer[i];
+	}
+
+	if (count == 0)
+		return (0);
+
+	if (count >= 1 && count <= 12000)
+		ata_count = (count -1) / 50 + 1;
+	else if (count > 12000 && count <= 12600)
+		ata_count = 0xfc;
+	else if (count > 12601 && count <= 12750)
+		ata_count = 0xff;
+	else if (count > 12750 && count <= 17999)
+		ata_count = 0xf1;
+	else if (count > 18000 && count <= 198000)
+		ata_count = count / 18000 + 240;
+	else
+		ata_count = 0xfd;
+	return (ata_count);
 }
 
 /* ************************** ATAPI-SPECIFIC FUNCTIONS ********************** */
@@ -8981,6 +9698,10 @@ sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
 	} else
 		/* DMA supported, not no DMA transfer mode is selected !? */
 		sdinfo->satadrv_settings &= ~SATA_DEV_DMA;
+
+	if ((sdinfo->satadrv_id.ai_cmdset83 & 0x20) &&
+	    (sdinfo->satadrv_id.ai_features86 & 0x20))
+		sdinfo->satadrv_power_level = SATA_POWER_STANDBY;
 
 	return (rval);
 }

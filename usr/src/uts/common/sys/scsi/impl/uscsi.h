@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,8 +152,14 @@ struct uscsi_cmd32 {
 #define	USCSI_NOPARITY	0x00000010	/* run command without parity */
 #define	USCSI_NODISCON	0x00000020	/* run command without disconnects */
 
+/*
+ * suitable for FMA module for PM purpose
+ */
+#define	USCSI_PMFAILFAST	0x00100000	/* fail command if device is */
+						/* in low power */
 
-#define	USCSI_RESERVED	0xfff00000	/* Reserved Bits, must be zero */
+
+#define	USCSI_RESERVED	0xffe00000	/* Reserved Bits, must be zero */
 
 struct uscsi_rqs {
 	int		rqs_flags;	/* see below */
