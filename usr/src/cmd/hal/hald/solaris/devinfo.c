@@ -136,12 +136,12 @@ static DevinfoDevHandler *devinfo_handlers[] = {
 	&devinfo_floppy_handler,
 	&devinfo_usb_handler,
 	&devinfo_ieee1394_handler,
-	&devinfo_pci_handler,
 	&devinfo_lofi_handler,
 	&devinfo_acpi_handler,
 	&devinfo_power_button_handler,
 	&devinfo_keyboard_handler,
 	&devinfo_mouse_handler,
+	&devinfo_pci_handler,
 	&devinfo_default_handler,
 	NULL
 };
