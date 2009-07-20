@@ -89,6 +89,7 @@ SUNWprivate {
 	epclose;
 	epopen;
 	esystem;
+	eval_ftype;
 	find_ca_certs;
 	find_cl_certs;
 	find_key_cert_pair;

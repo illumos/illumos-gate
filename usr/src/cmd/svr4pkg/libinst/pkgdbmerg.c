@@ -99,7 +99,7 @@ static int	merg(struct cfextra *el_ent, struct cfent *cf_ent);
 static int	do_like_ent(VFP_T *vfpo, struct cfextra *el_ent,
 		    struct cfent *cf_ent, int ctrl);
 static int	do_new_ent(VFP_T *vfpo, struct cfextra *el_ent, int ctrl);
-static int	typechg(struct cfent *el_ent, struct cfent *cf_ent,
+static int	typechg(struct cfent *el_ent, char *curftype,
 		    struct mergstat *mstat);
 
 static void	set_change(struct cfextra *el_ent);
@@ -549,6 +549,40 @@ do_new_ent(VFP_T *vfpo, struct cfextra *el_ent, int ctrl)
 		 * about this later. Note that noconflict means NO conflict
 		 * at the file level. Even rogue files count.
 		 */
+		char myftype = '?';
+		int n = 0;
+
+		/* Get the existing file type on disk */
+		eval_ftype(el_ent->server_path, el_ent->cf_ent.ftype, &myftype);
+
+		/* Do the right thing if types are different */
+		n = typechg(&(el_ent->cf_ent), &myftype, &(el_ent->mstat));
+		switch (n) {
+			case TYPE_OK:
+					break;
+
+			/* This is an allowable change. */
+			case TYPE_WARNING:
+					el_ent->mstat.contchg = 1;
+					break;
+
+			/* Not allowed, but leaving it as is is OK. */
+			case TYPE_IGNORED:
+					break;
+
+			/* Future analysis will reveal if this is OK. */
+			case TYPE_REPLACE:
+					el_ent->mstat.replace = 1;
+					break;
+
+			/* Kill it before it does any damage. */
+			case TYPE_FATAL:
+					logerr(gettext(MSG_TYPE_ERR));
+					quit(99);
+
+			default:
+				break;
+		}
 		el_ent->mstat.shared = 1;
 		el_ent->mstat.rogue = 1;
 		set_change(el_ent);
@@ -725,20 +759,20 @@ char *types[] = {
  *	TYPE_FATAL	something awful happened
  */
 static int
-typechg(struct cfent *el_ent, struct cfent *cf_ent, struct mergstat *mstat)
+typechg(struct cfent *el_ent, char *curftype, struct mergstat *mstat)
 {
 	int	i, etype, itype, retcode;
 
 	/* If they are identical, return OK */
-	if (cf_ent->ftype == el_ent->ftype)
+	if (*curftype == el_ent->ftype)
 		return (TYPE_OK);
 
 	/*
 	 * If package database entry is ambiguous, set it to the new entity's
 	 * ftype
 	 */
-	if (cf_ent->ftype == BADFTYPE) {
-		cf_ent->ftype = el_ent->ftype;
+	if (*curftype == BADFTYPE) {
+		*curftype = el_ent->ftype;
 		return (TYPE_OK); /* do nothing; not really different */
 	}
 
@@ -751,7 +785,7 @@ typechg(struct cfent *el_ent, struct cfent *cf_ent, struct mergstat *mstat)
 	 * exclusive directory, this is very dangerous. We will continue, but
 	 * we will deny the conversion.
 	 */
-	if (el_ent->ftype == 'x' && cf_ent->ftype == 'd') {
+	if (el_ent->ftype == 'x' && *curftype == 'd') {
 		logerr(gettext(WRN_TOEXCL), el_ent->path);
 		return (TYPE_IGNORED);
 	}
@@ -768,7 +802,7 @@ typechg(struct cfent *el_ent, struct cfent *cf_ent, struct mergstat *mstat)
 
 	/* Set itype to that in the package database. */
 	for (i = 0; types[i]; ++i) {
-		if (strchr(types[i], cf_ent->ftype)) {
+		if (strchr(types[i], *curftype)) {
 			itype = i+1;
 			break;
 		}
@@ -792,36 +826,36 @@ typechg(struct cfent *el_ent, struct cfent *cf_ent, struct mergstat *mstat)
 
 	/* allow change, but warn user of possible problems */
 	switch (itype) {
-	    case 1:
-		logerr(gettext(WRN_NOTFILE), el_ent->path);
-		break;
+		case 1:
+			logerr(gettext(WRN_NOTFILE), el_ent->path);
+			break;
 
-	    case 2:
-		logerr(gettext(WRN_NOTSYMLN), el_ent->path);
-		break;
+		case 2:
+			logerr(gettext(WRN_NOTSYMLN), el_ent->path);
+			break;
 
-	    case 3:
-		logerr(gettext(WRN_NOTLINK), el_ent->path);
-		break;
+		case 3:
+			logerr(gettext(WRN_NOTLINK), el_ent->path);
+			break;
 
-	    case 4:
-		logerr(gettext(WRN_NOTDIR), el_ent->path);
-		break;
+		case 4:
+			logerr(gettext(WRN_NOTDIR), el_ent->path);
+			break;
 
-	    case 5:
-		logerr(gettext(WRN_NOTCHAR), el_ent->path);
-		break;
+		case 5:
+			logerr(gettext(WRN_NOTCHAR), el_ent->path);
+			break;
 
-	    case 6:
-		logerr(gettext(WRN_NOTBLOCK), el_ent->path);
-		break;
+		case 6:
+			logerr(gettext(WRN_NOTBLOCK), el_ent->path);
+			break;
 
-	    case 7:
-		logerr(gettext(WRN_NOTPIPE), el_ent->path);
-		break;
+		case 7:
+			logerr(gettext(WRN_NOTPIPE), el_ent->path);
+			break;
 
-	    default:
-		break;
+		default:
+			break;
 	}
 	return (retcode);
 }
@@ -867,7 +901,8 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 	 * can't figure it 'til later (d -> s) or fatal (a hook for later).
 	 */
 	if (cf_ent->ftype != el_ent->cf_ent.ftype) {
-		n = typechg(&(el_ent->cf_ent), cf_ent, &(el_ent->mstat));
+		n = typechg(&(el_ent->cf_ent), &(cf_ent->ftype),
+		    &(el_ent->mstat));
 
 		switch (n) {
 		    case TYPE_OK:
