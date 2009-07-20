@@ -1538,8 +1538,10 @@ rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp, in6_addr_t *gw_addrp,
 	 * attribute, allocate/obtain the corresponding kernel
 	 * route security attributes.
 	 */
-	*error = tsol_rtsa_init(rtm, rtsecattr, cp);
-	ASSERT(rtsecattr->rtsa_cnt <= TSOL_RTSA_REQUEST_MAX);
+	if (((cp - (caddr_t)rtm) < length) && is_system_labeled()) {
+		*error = tsol_rtsa_init(rtm, rtsecattr, cp);
+		ASSERT(rtsecattr->rtsa_cnt <= TSOL_RTSA_REQUEST_MAX);
+	}
 
 	return (found_addrs);
 }
