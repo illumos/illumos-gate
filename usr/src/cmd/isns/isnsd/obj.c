@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1333,12 +1333,14 @@ assign_attr(
 	case ISNS_DD_ISCSI_NAME_ATTR_ID:
 		if (tmp->len == 0) {
 			return (0);
-		} else if (tmp->len > attr->len) {
-			attr->value.ptr = realloc(attr->value.ptr, tmp->len);
+		} else if (tmp->len >= attr->len) {
+			attr->value.ptr = realloc(
+			    attr->value.ptr, tmp->len + 1);
 		}
 		if (attr->value.ptr != NULL) {
-			(void) strcpy((char *)attr->value.ptr,
-			    (char *)tmp->value.ptr);
+			(void) strncpy((char *)attr->value.ptr,
+			    (char *)tmp->value.ptr, tmp->len);
+			attr->value.ptr[tmp->len] = 0;
 			attr->tag = tmp->tag;
 			attr->len = tmp->len;
 		} else {

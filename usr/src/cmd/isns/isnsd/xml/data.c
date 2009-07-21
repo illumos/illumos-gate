@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -840,14 +840,10 @@ xml_init_data(
 	/* do not keep blank spaces */
 	(void) xmlKeepBlanksDefault(0);
 
-	/* test if we can write the tmp file */
-	fd = open(xml_tmp_file, O_WRONLY | O_CREAT | O_EXCL,
-	    S_IRUSR | S_IWUSR);
-	if (fd == -1) {
-		return (1);
+	/* remove the tmp file if it exists */
+	if (access(xml_tmp_file, F_OK) == 0) {
+		(void) remove(xml_tmp_file);
 	}
-	(void) close(fd);
-	(void) remove(xml_tmp_file);
 
 	/* test if we can write the bak file */
 	fd = open(xml_bak_file, O_RDWR);
