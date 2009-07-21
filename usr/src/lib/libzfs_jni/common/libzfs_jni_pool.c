@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libzfs_jni_util.h"
 #include "libzfs_jni_pool.h"
@@ -137,6 +135,7 @@ static zjni_field_mapping_t zpool_status_map[] = {
 	{ ZPOOL_STATUS_VERSION_OLDER, "ZPOOL_STATUS_VERSION_OLDER" },
 	{ ZPOOL_STATUS_RESILVERING, "ZPOOL_STATUS_RESILVERING" },
 	{ ZPOOL_STATUS_OFFLINE_DEV, "ZPOOL_STATUS_OFFLINE_DEV" },
+	{ ZPOOL_STATUS_REMOVED_DEV, "ZPOOL_STATUS_REMOVED_DEV" },
 	{ ZPOOL_STATUS_OK, "ZPOOL_STATUS_OK" },
 	{ -1, NULL }
 };

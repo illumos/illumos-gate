@@ -3118,6 +3118,17 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "replace'.\n"));
 		break;
 
+	case ZPOOL_STATUS_REMOVED_DEV:
+		(void) printf(gettext("status: One or more devices has "
+		    "been removed by the administrator.\n\tSufficient "
+		    "replicas exist for the pool to continue functioning in "
+		    "a\n\tdegraded state.\n"));
+		(void) printf(gettext("action: Online the device using "
+		    "'zpool online' or replace the device with\n\t'zpool "
+		    "replace'.\n"));
+		break;
+
+
 	case ZPOOL_STATUS_RESILVERING:
 		(void) printf(gettext("status: One or more devices is "
 		    "currently being resilvered.  The pool will\n\tcontinue "
