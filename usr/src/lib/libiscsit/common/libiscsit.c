@@ -128,6 +128,10 @@ it_config_load(it_config_t **cfg)
 		*cfg = newcfg;
 	}
 
+	if (cfg_nv) {
+		nvlist_free(cfg_nv);
+	}
+
 	return (ret);
 }
 
