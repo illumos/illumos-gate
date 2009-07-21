@@ -187,20 +187,8 @@ event ereport.io.service.degraded@PCIFN{within(5s)};
 event ereport.io.service.unaffected@PCIFN{within(5s)};
 
 event error.io.pciex.noimpact-d@PCIEXFN;
-event error.io.pciex.noimpact-d@PCIEXFN/PCIEXFN;
-event error.io.pciex.noimpact-d@PCIEXFN/PCIFN;
-event error.io.pciex.noimpact-d@PCIFN/PCIFN;
-event error.io.pciex.noimpact-d@PCIFN;
 event error.io.pciex.degraded-d@PCIEXFN;
-event error.io.pciex.degraded-d@PCIEXFN/PCIEXFN;
-event error.io.pciex.degraded-d@PCIEXFN/PCIFN;
-event error.io.pciex.degraded-d@PCIFN/PCIFN;
-event error.io.pciex.degraded-d@PCIFN;
 event error.io.pciex.lost-d@PCIEXFN;
-event error.io.pciex.lost-d@PCIEXFN/PCIEXFN;
-event error.io.pciex.lost-d@PCIEXFN/PCIFN;
-event error.io.pciex.lost-d@PCIFN/PCIFN;
-event error.io.pciex.lost-d@PCIFN;
 event error.io.service.restored@PCIEXFN;
 event error.io.service.restored@PCIFN;
 event error.io.device.nf-device@PCIEXFN;
@@ -244,47 +232,28 @@ prop error.io.device.nf-device@PCIEXFN (1)->
  * handling of service impact ereports.
  */
 prop error.io.pciex.lost-d@PCIEXFN (1)->
-    ereport.io.service.lost@PCIEXFN,
-    error.io.pciex.lost-d@PCIEXFN/PCIEXFNHZ,
-    error.io.pciex.lost-d@PCIEXFN/PCIFNHZ;
+    ereport.io.service.lost@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    ereport.io.service.lost@PCIFNHZ { is_under(PCIEXFN, PCIFNHZ) };
 
 prop error.io.pciex.lost-d@PCIEXFN (0)->
-    ereport.io.service.unaffected@PCIEXFN,
-    ereport.io.service.degraded@PCIEXFN;
-
-prop error.io.pciex.lost-d@PCIFN (1)->
-    ereport.io.service.lost@PCIFN,
-    error.io.pciex.lost-d@PCIFN/PCIFNHZ;
-
-prop error.io.pciex.lost-d@PCIFN (0)->
-    ereport.io.service.unaffected@PCIFN,
-    ereport.io.service.degraded@PCIFN;
+    ereport.io.service.unaffected@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    ereport.io.service.unaffected@PCIFNHZ { is_under(PCIEXFN, PCIFNHZ) },
+    ereport.io.service.degraded@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    ereport.io.service.degraded@PCIFNHZ { is_under(PCIEXFN, PCIFNHZ) };
 
 prop error.io.pciex.degraded-d@PCIEXFN (1)->
-    ereport.io.service.degraded@PCIEXFN,
-    error.io.pciex.degraded-d@PCIEXFN/PCIEXFNHZ,
-    error.io.pciex.degraded-d@PCIEXFN/PCIFNHZ;
+    ereport.io.service.degraded@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    ereport.io.service.degraded@PCIFNHZ { is_under(PCIEXFN, PCIFNHZ) };
 
 prop error.io.pciex.degraded-d@PCIEXFN (0)->
-    ereport.io.service.unaffected@PCIEXFN;
-
-prop error.io.pciex.degraded-d@PCIFN (1)->
-    ereport.io.service.degraded@PCIFN,
-    error.io.pciex.degraded-d@PCIFN/PCIFNHZ;
-
-prop error.io.pciex.degraded-d@PCIFN (0)->
-    ereport.io.service.unaffected@PCIFN;
+    ereport.io.service.unaffected@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    ereport.io.service.unaffected@PCIFNHZ { is_under(PCIEXFN, PCIFNHZ) };
 
 prop error.io.pciex.noimpact-d@PCIEXFN (1)->
-    ereport.io.service.unaffected@PCIEXFN,
-    error.io.service.restored@PCIEXFN,
-    error.io.pciex.noimpact-d@PCIEXFN/PCIEXFNHZ,
-    error.io.pciex.noimpact-d@PCIEXFN/PCIFNHZ;
-
-prop error.io.pciex.noimpact-d@PCIFN (1)->
-    ereport.io.service.unaffected@PCIFN,
-    error.io.service.restored@PCIFN,
-    error.io.pciex.noimpact-d@PCIFN/PCIFNHZ;
+    ereport.io.service.unaffected@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    ereport.io.service.unaffected@PCIFNHZ { is_under(PCIEXFN, PCIFNHZ) },
+    error.io.service.restored@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    error.io.service.restored@PCIFNHZ { is_under(PCIEXFN, PCIFNHZ) };
 
 prop error.io.service.restored@PCIEXFN (1)->
     ereport.io.service.lost@PCIEXFN,
@@ -831,20 +800,17 @@ prop error.io.pciex.flt-f-poisecrc-u@PCIEXFN (0)->
  */
 event error.io.pciex.fatal@PCIEXFN;
 event error.io.pciex.nonfatal@PCIEXFN;
+event error.io.pciex.nr-fwd-d@PCIEXFN;
+event error.io.pciex.mtlp-fwd-d@PCIEXFN;
 event error.io.pciex.flt-ur-u@PCIEXFN;
 event error.io.pciex.mtlp-d@PCIEXFN;
-event error.io.pciex.sw-mtlp-d@PCIEXFN;
-event error.io.pciex.mtlp-d@PCIEXFN/PCIEXFN;
 event error.io.pciex.ca-d@PCIEXFN;
 event error.io.pciex.ca-fwd-d@PCIEXFN;
-event error.io.pciex.ca-fwd-d@PCIEXFN/PCIEXFN;
 event error.io.pciex.poisreq-fwd-d@PCIEXFN;
 event error.io.pciex.poisreq-fwd-d@pciexrc/PCIEXFN;
 event error.io.pciex.poisreq-fwd-d@PCIEXFN/PCIEXFN;
 event error.io.pciex.poiscomp-fwd-d@PCIEXFN;
 event error.io.pciex.poiscomp-fwd-d@PCIEXFN/PCIEXFN;
-event error.io.pciex.ecrcreq-fwd-d@PCIEXFN/PCIEXFN;
-event error.io.pciex.ecrccomp-fwd-d@PCIEXFN/PCIEXFN;
 event error.io.pciex.ecrcreq-fwd-d@PCIEXFN;
 event error.io.pciex.ecrccomp-fwd-d@PCIEXFN;
 event error.io.pciex.source-ecrcreq-u@PCIEXFN;
@@ -852,7 +818,6 @@ event error.io.pciex.source-ecrccomp-u@PCIEXFN;
 event error.io.pciex.source-poiscomp-u@PCIEXFN;
 event error.io.pciex.source-poisreq-u@PCIEXFN;
 event error.io.pciex.badreq-d@PCIEXFN;
-event error.io.pciex.badreq-d@PCIEXFN/PCIEXFN;
 event error.io.pci.badreq-pw-d@PCIEXFN/PCIFN;
 event error.io.pci.badreq-drw-d@PCIEXFN/PCIFN;
 event error.io.pci.target-ma-d@PCIEXFN;
@@ -1139,12 +1104,12 @@ prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
  * complex is sufficient to positively identify this case.
  */
 prop error.io.pciex.ecrcreq-d@PCIEXFN (1)->
-    error.io.pciex.ecrcreq-fwd-d@PCIEXFN;
+    error.io.pciex.ecrcreq-fwd-d@PCIEXFN,
+    error.io.pciex.ecrcreq-fwd-d@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) };
 
 prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_SU(PCIEXFN) ||
     IS_SD(PCIEXFN) } (1)->
-    error.io.pciex.flt-nr-u@PCIEXFN,
-    error.io.pciex.ecrcreq-fwd-d@PCIEXFN/PCIEXFNHZ;
+    error.io.pciex.flt-nr-u@PCIEXFN;
 
 prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_SU(PCIEXFN) ||
     IS_SD(PCIEXFN) } (0)->
@@ -1179,10 +1144,8 @@ prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
  * cto only which would be an nr-d.
  */
 prop error.io.pciex.ecrccomp-d@PCIEXFN (1)->
-    error.io.pciex.ecrccomp-fwd-d@PCIEXFN;
-
-prop error.io.pciex.ecrccomp-fwd-d@PCIEXFN (1)->
-    error.io.pciex.ecrccomp-fwd-d@PCIEXFN/PCIEXFNHZ;
+    error.io.pciex.ecrccomp-fwd-d@PCIEXFN,
+    error.io.pciex.ecrccomp-fwd-d@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) };
 
 prop error.io.pciex.ecrccomp-fwd-d@PCIEXFN { IS_SU(PCIEXFN) ||
     IS_SD(PCIEXFN) } (0)->
@@ -1455,22 +1418,24 @@ prop error.io.pciex.ecrccomp-u@PCIEXFN { IS_SD(PCIEXFN)||IS_SU(PCIEXFN) } (0)->
  *   was a cto.
  */
 prop error.io.pciex.nr-d@PCIEXFN (1)->
-    error.io.pciex.nr-d@PCIEXFN/PCIEXFNHZ; 
+    error.io.pciex.nr-fwd-d@PCIEXFN { IS_BG(PCIEXFN) || IS_LF(PCIEXFN) },
+    error.io.pciex.nr-fwd-d@PCIEXFNHZ { (IS_BG(PCIEXFNHZ) ||
+    IS_LF(PCIEXFNHZ)) && is_under(PCIEXFN, PCIEXFNHZ) }; 
 
-prop error.io.pciex.nr-d@PCIEXFN { IS_BG(PCIEXFN) } (2)->
+prop error.io.pciex.nr-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (2)->
     error.io.pciex.nonfatal@PCIEXFN,
     ereport.io.pciex.tl.cto@PCIEXFN;
 
-prop error.io.pciex.nr-d@PCIEXFN { IS_BG(PCIEXFN) } (0)->
+prop error.io.pciex.nr-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (0)->
     ereport.io.pci.ma@PCIEXFN,
     ereport.io.pci.sec-sta@PCIEXFN,
     error.io.pci.nr-drw-d@PCIEXFN/PCIFN,
     error.io.pci.ta-drw-d@PCIEXFN/PCIFN;
 
-prop error.io.pciex.nr-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+prop error.io.pciex.nr-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
     error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.nr-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+prop error.io.pciex.nr-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
     ereport.io.pci.ma@PCIEXFN,
     ereport.io.pciex.tl.cto@PCIEXFN;
 
@@ -1507,22 +1472,23 @@ prop error.io.pciex.nr-u@pciexrc/PCIEXFN (0)->
  * Note that sw-mtlp-d is to handle the case where the switch is actually
  * the target of the packet (config request etc).
  */
-prop error.io.pciex.mtlp-d@PCIEXFN { IS_SD(PCIEXFN) || IS_SU(PCIEXFN) } (1)->
-    error.io.pciex.sw-mtlp-d@PCIEXFN,
-    error.io.pciex.mtlp-d@PCIEXFN/PCIEXFNHZ;
+prop error.io.pciex.mtlp-d@PCIEXFN (1)->
+    error.io.pciex.mtlp-fwd-d@PCIEXFN { !IS_SD(PCIEXFN) },
+    error.io.pciex.mtlp-fwd-d@PCIEXFNHZ { !IS_SD(PCIEXFNHZ) &&
+    is_under(PCIEXFN, PCIEXFNHZ) };
 
-prop error.io.pciex.sw-mtlp-d@PCIEXFN { IS_SU(PCIEXFN) } (2)->
+prop error.io.pciex.mtlp-fwd-d@PCIEXFN { IS_SU(PCIEXFN) } (2)->
     error.io.pciex.fatal@PCIEXFN,
     ereport.io.pciex.tl.mtlp@PCIEXFN;
 
-prop error.io.pciex.mtlp-d@PCIEXFN { IS_BG(PCIEXFN) } (2)->
+prop error.io.pciex.mtlp-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (2)->
     error.io.pciex.fatal@PCIEXFN,
     ereport.io.pciex.tl.mtlp@PCIEXFN;
 
-prop error.io.pciex.mtlp-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+prop error.io.pciex.mtlp-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
     error.io.pciex.fatal@PCIEXFN;
 
-prop error.io.pciex.mtlp-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+prop error.io.pciex.mtlp-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
     ereport.io.pciex.tl.mtlp@PCIEXFN;
 
 /*
@@ -1568,11 +1534,10 @@ prop error.io.pciex.ca-d@PCIEXFN/PCIEXFN (2)->
     ereport.io.pciex.tl.ca@PCIEXFN,
     error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.ca-d@PCIEXFN (0)->
-    error.io.pciex.ca-fwd-d@PCIEXFN;
-
-prop error.io.pciex.ca-fwd-d@PCIEXFN (1)->
-    error.io.pciex.ca-fwd-d@PCIEXFN/PCIEXFNHZ; 
+prop error.io.pciex.ca-d@PCIEXFN (1)->
+    error.io.pciex.ca-fwd-d@PCIEXFN { IS_BG(PCIEXFN) || IS_LF(PCIEXFN) },
+    error.io.pciex.ca-fwd-d@PCIEXFNHZ { (IS_BG(PCIEXFNHZ) ||
+    IS_LF(PCIEXFNHZ)) && is_under(PCIEXFN, PCIEXFNHZ) };
 
 prop error.io.pciex.ca-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (1)->
     ereport.io.pci.rta@PCIEXFN;
@@ -1685,20 +1650,13 @@ prop error.io.pciex.flt-badreq-u@PCIEXFN1 { IS_SD(PCIEXFN) &&
  * legacy pci bits ma or rta (oddly there is no equivalent in pcie error
  * reporting).
  */
-prop error.io.pciex.badreq-d@PCIEXFN { IS_SU(PCIEXFN) || IS_SD(PCIEXFN) } (1)->
+prop error.io.pciex.badreq-d@PCIEXFN (1)->
     error.io.pciex.flt-ur-u@PCIEXFN,
     error.io.pciex.flt-ca-u@PCIEXFN,
-    error.io.pciex.badreq-d@PCIEXFN/PCIEXFNHZ;
-
-prop error.io.pciex.badreq-d@PCIEXFN { IS_BG(PCIEXFN) } (1)->
-    error.io.pciex.flt-ur-u@PCIEXFN,
-    error.io.pciex.flt-ca-u@PCIEXFN,
-    error.io.pci.badreq-pw-d@PCIEXFN/PCIFNHZ,
-    error.io.pci.badreq-drw-d@PCIEXFN/PCIFNHZ;
-
-prop error.io.pciex.badreq-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
-    error.io.pciex.flt-ur-u@PCIEXFN,
-    error.io.pciex.flt-ca-u@PCIEXFN;
+    error.io.pciex.flt-ur-u@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    error.io.pciex.flt-ca-u@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    error.io.pci.badreq-pw-d@PCIEXFNHZ/PCIFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    error.io.pci.badreq-drw-d@PCIEXFNHZ/PCIFNHZ { is_under(PCIEXFN,PCIEXFNHZ) };
 
 prop error.io.pciex.flt-ur-u@PCIEXFN { !IS_LF(PCIEXFN) } (1)->
     ereport.io.pciex.tl.ur@PCIEXFN;
@@ -2085,31 +2043,20 @@ prop error.io.pci.badreq-drw-u@PCIEXFN/PCIFN { IS_SD(PCIEXFN1) &&
  * valuable when available.
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
-event error.io.pci.target-ma-d@PCIEXFN/PCIEXFN;
-event error.io.pci.target-rta-d@PCIEXFN/PCIEXFN;
 event error.io.pci.target-ma-d@PCIEXFN/PCIFN;
 event error.io.pci.target-rta-d@PCIEXFN/PCIFN;
-
 event ereport.io.pci.target-rta@PCIEXFN{within(5s)};
 event ereport.io.pci.target-ma@PCIEXFN{within(5s)};
 
-prop error.io.pci.target-ma-d@PCIEXFN (1)->
-    error.io.pci.target-ma-d@PCIEXFN/PCIEXFNHZ;
-
-prop error.io.pci.target-ma-d@PCIEXFN (1)->
-    error.io.pci.target-ma-d@PCIEXFN/PCIFNHZ;
-
 prop error.io.pci.target-ma-d@PCIEXFN (0)->
-    ereport.io.pci.target-ma@PCIEXFN;
-
-prop error.io.pci.target-rta-d@PCIEXFN (1)->
-    error.io.pci.target-rta-d@PCIEXFN/PCIEXFNHZ;
-
-prop error.io.pci.target-rta-d@PCIEXFN (1)->
-    error.io.pci.target-rta-d@PCIEXFN/PCIFNHZ;
+    ereport.io.pci.target-ma@PCIEXFN,
+    ereport.io.pci.target-ma@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    error.io.pci.target-ma-d@PCIEXFNHZ/PCIFNHZ { is_under(PCIEXFN, PCIEXFNHZ) };
 
 prop error.io.pci.target-rta-d@PCIEXFN (0)->
-    ereport.io.pci.target-rta@PCIEXFN;
+    ereport.io.pci.target-rta@PCIEXFN,
+    ereport.io.pci.target-rta@PCIEXFNHZ { is_under(PCIEXFN, PCIEXFNHZ) },
+    error.io.pci.target-rta-d@PCIEXFNHZ/PCIFNHZ { is_under(PCIEXFN,PCIEXFNHZ) };
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

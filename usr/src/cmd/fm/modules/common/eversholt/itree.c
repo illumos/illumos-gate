@@ -75,6 +75,7 @@ struct wildcardinfo {
 	struct node *nptop;		/* event node fed to vmatch */
 	struct node *oldepname;		/* epname without the wildcard part */
 	struct node *ewname;		/* wildcard path */
+	int got_wc_hz;
 	struct wildcardinfo *next;
 };
 
@@ -83,6 +84,8 @@ static struct wildcardinfo *wcproot = NULL;
 static void vmatch(struct info *infop, struct node *np, struct node *lnp,
     struct node *anp);
 static void hmatch(struct info *infop, struct node *np, struct node *nextnp);
+static void hmatch_event(struct info *infop, struct node *eventnp,
+    struct node *epname, struct config *ncp, struct node *nextnp, int rematch);
 static void itree_pbubble(int flags, struct bubble *bp);
 static void itree_pruner(void *left, void *right, void *arg);
 static void itree_destructor(void *left, void *right, void *arg);
@@ -530,6 +533,108 @@ find_or_add_event(struct info *infop, struct node *np)
 }
 
 /*
+ * Used for handling expansions where first part of oldepname is a horizontal
+ * expansion. Recurses through entire tree. oldepname argument is always the
+ * full path as in the rules. Once we find a match we go back to using
+ * hmatch_event to handle the rest.
+ */
+static void
+hmatch_full_config(struct info *infop, struct node *eventnp,
+    struct node *oldepname, struct config *ncp, struct node *nextnp,
+    struct iterinfo *iterinfop)
+{
+	char *cp_s;
+	int cp_num;
+	struct config *cp;
+	struct node *saved_ewname;
+	struct node *saved_epname;
+	struct config *pcp, *ocp;
+	struct node *cpnode;
+	struct node *ewlp, *ewfp;
+
+	for (cp = ncp; cp; cp = config_next(cp)) {
+		config_getcompname(cp, &cp_s, &cp_num);
+		if (cp_s == oldepname->u.name.s) {
+			/*
+			 * Found one.
+			 */
+			iterinfop->num = cp_num;
+
+			/*
+			 * Need to set ewname, epname for correct node as is
+			 * needed by constraint path matching. This code is
+			 * similar to that in vmatch_event.
+			 */
+			saved_ewname = eventnp->u.event.ewname;
+			saved_epname = eventnp->u.event.epname;
+			ocp = oldepname->u.name.cp;
+
+			/*
+			 * Find correct ewname by walking back up the config
+			 * tree adding each name portion as we go.
+			 */
+			pcp = config_parent(cp);
+			eventnp->u.event.ewname = NULL;
+			for (; pcp != infop->croot; pcp = config_parent(pcp)) {
+				config_getcompname(pcp, &cp_s, &cp_num);
+				cpnode = tree_name(cp_s, IT_NONE, NULL, 0);
+				cpnode->u.name.child = newnode(T_NUM, NULL, 0);
+				cpnode->u.name.child->u.ull = cp_num;
+				cpnode->u.name.cp = pcp;
+				if (eventnp->u.event.ewname != NULL) {
+					cpnode->u.name.next =
+					    eventnp->u.event.ewname;
+					cpnode->u.name.last =
+					    eventnp->u.event.ewname->
+					    u.name.last;
+				}
+				eventnp->u.event.ewname = cpnode;
+			}
+
+			/*
+			 * Now create correct epname by duping new ewname
+			 * and appending oldepname.
+			 */
+			ewfp = tname_dup(eventnp->u.event.ewname, CN_DUP);
+			ewlp = ewfp->u.name.last;
+			ewfp->u.name.last = oldepname->u.name.last;
+			ewlp->u.name.next = oldepname;
+			oldepname->u.name.cp = cp;
+			eventnp->u.event.epname = ewfp;
+
+			outfl(O_ALTFP|O_VERB3|O_NONL, infop->anp->file,
+			    infop->anp->line, "hmatch_full_config: ");
+			ptree_name_iter(O_ALTFP|O_VERB3|O_NONL,
+			    eventnp->u.event.epname);
+			out(O_ALTFP|O_VERB3, NULL);
+
+			/*
+			 * Now complete hmatch.
+			 */
+			hmatch_event(infop, eventnp, oldepname->u.name.next,
+			    config_child(cp), nextnp, 1);
+
+			/*
+			 * set everything back again
+			 */
+			oldepname->u.name.cp = ocp;
+			iterinfop->num = -1;
+			ewlp->u.name.next = NULL;
+			ewfp->u.name.last = ewlp;
+			tree_free(ewfp);
+			tree_free(eventnp->u.event.ewname);
+			eventnp->u.event.ewname = saved_ewname;
+			eventnp->u.event.epname = saved_epname;
+		}
+		/*
+		 * Try the next level down.
+		 */
+		hmatch_full_config(infop, eventnp,
+		    oldepname, config_child(cp), nextnp, iterinfop);
+	}
+}
+
+/*
  * hmatch_event -- perform any appropriate horizontal expansion on an event
  *
  * this routine is used to perform horizontal expansion on both the
@@ -630,6 +735,23 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 				ocp_num = iterinfop->num;
 			}
 		}
+		/*
+		 * handle case where this is the first section of oldepname
+		 * and it is horizontally expanded. Instead of just looking for
+		 * siblings, we want to scan the entire config tree for further
+		 * matches.
+		 */
+		if (epname == eventnp->u.event.oldepname &&
+		    epname->u.name.it == IT_HORIZONTAL) {
+			/*
+			 * Run through config looking for any that match the
+			 * name.
+			 */
+			hmatch_full_config(infop, eventnp, epname,
+			    infop->croot, nextnp, iterinfop);
+			return;
+		}
+
 		/*
 		 * Run through siblings looking for any that match the name.
 		 * If hexpand not set then num must also match ocp_num.
@@ -747,6 +869,14 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 	struct node *cpnode;
 	int newewname = 0;
 
+	/*
+	 * handle case where the first section of the path name is horizontally
+	 * expanded. The whole expansion is handled by hmatch on the first
+	 * match here - so we just skip any subsequent matches here.
+	 */
+	if (wcp->got_wc_hz == 1)
+		return;
+
 	if (np == NULL) {
 		/*
 		 * Reached the end of the name. u.name.cp pointers should be set
@@ -761,6 +891,7 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			wcp->nptop->u.event.ewname = wcp->ewname;
 			wcp->nptop->u.event.oldepname = wcp->oldepname;
 			vmatch(infop, np, lnp, anp);
+			wcp->got_wc_hz = 0;
 			return;
 		}
 		if (wcp->ewname == NULL) {
@@ -795,6 +926,7 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 		wcp->nptop->u.event.ewname = wcp->ewname;
 		wcp->nptop->u.event.oldepname = wcp->oldepname;
 		vmatch(infop, np, lnp, anp);
+		wcp->got_wc_hz = 0;
 		wcp->nptop->u.event.epname = wcp->oldepname;
 
 		/*
@@ -913,6 +1045,17 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			vmatch_event(infop, config_child(cp), np->u.name.next,
 			    lnp, anp, wcp);
 			np->u.name.cp = NULL;
+
+			/*
+			 * handle case where this is the first section of the
+			 * path name and it is horizontally expanded.
+			 * In this case we want all matching nodes in the config
+			 * to be expanded horizontally - so set got_wc_hz and
+			 * leave all further processing to hmatch.
+			 */
+			if (G.matched && np == wcp->nptop->u.event.epname &&
+			    np->u.name.it == IT_HORIZONTAL)
+				wcp->got_wc_hz = 1;
 
 			/*
 			 * forcing components into wildcard path:
@@ -1168,6 +1311,7 @@ vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 		wcp->nptop = np;
 		wcp->oldepname = np->u.event.epname;
 		wcp->ewname = NULL;
+		wcp->got_wc_hz = 0;
 
 		vmatch_event(infop, config_child(infop->croot),
 		    np->u.event.epname, lnp, anp, wcp);

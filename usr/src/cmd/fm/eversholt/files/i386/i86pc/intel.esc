@@ -242,7 +242,7 @@ prop fault.memory.intel.page_ue@
     ereport.cpu.intel.nb.fbd.ma@motherboard/memory-controller;
 
 prop fault.memory.intel.dimm_ue@
-    motherboard/memory-controller/dram-channel<channel_num>/dimm/rank[rank_num]
+    motherboard/memory-controller/dram-channel/dimm/rank[rank_num]
     { payloadprop_defined("rank") && rank_num == payloadprop("rank") } (1)->
     ereport.cpu.intel.nb.mem_ue@motherboard/memory-controller,
     ereport.cpu.intel.nb.ddr2_mem_ue@motherboard/memory-controller,
