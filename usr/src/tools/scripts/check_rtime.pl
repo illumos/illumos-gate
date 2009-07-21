@@ -211,7 +211,7 @@ $SkipUnrefObject = qr{
 	/lib.*\ of\ .*libpq\.so\.4 |				# non-OSNET
 	/lib.*\ of\ .*libpython2\.4\.so\.1\.0 |			# non-OSNET
 	/lib.*\ of\ .*kcfd |					# interposer
-	/libpkcs11\.so\.1;\.*\ of\ .*libkmf\.so\.1		# interposed
+	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1		# interposed
 }x;
 
 # Define any files that should only have unused (ldd -u) processing.
