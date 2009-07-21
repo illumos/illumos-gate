@@ -61,7 +61,7 @@ fmd_topo_rele_locked(fmd_topo_t *ftp)
 }
 
 void
-fmd_topo_update(void)
+fmd_topo_update(boolean_t need_force)
 {
 	int err;
 	topo_hdl_t *tp;
@@ -87,9 +87,15 @@ fmd_topo_update(void)
 	ftp->ft_hdl = tp;
 	ftp->ft_time_begin = fmd_time_gethrtime();
 
-	if ((id = topo_snap_hold(tp, NULL, &err)) == NULL)
-		fmd_panic("failed to get topology snapshot: %s",
-		    topo_strerror(err));
+	if (need_force) {
+		if ((id = topo_snap_hold(tp, NULL, &err)) == NULL)
+			fmd_panic("failed to get topology snapshot: %s",
+			    topo_strerror(err));
+	} else {
+		if ((id = topo_snap_hold_no_forceload(tp, NULL, &err)) == NULL)
+			fmd_panic("failed to get topology snapshot: %s",
+			    topo_strerror(err));
+	}
 
 	topo_hdl_strfree(tp, id);
 
@@ -160,7 +166,7 @@ fmd_topo_rele_hdl(topo_hdl_t *thp)
 void
 fmd_topo_init(void)
 {
-	fmd_topo_update();
+	fmd_topo_update(B_TRUE);
 }
 
 void

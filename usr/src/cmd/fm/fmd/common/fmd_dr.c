@@ -154,7 +154,7 @@ fmd_dr_event(sysevent_t *sep)
 	fmd_topo_rele(prev);
 
 	if (update_topo)
-		fmd_topo_update();
+		fmd_topo_update(B_FALSE);
 
 	ftp = fmd_topo_hold();
 	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time_end, NULL, ftp);

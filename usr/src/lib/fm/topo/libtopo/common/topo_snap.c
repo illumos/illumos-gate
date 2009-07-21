@@ -264,7 +264,7 @@ topo_close(topo_hdl_t *thp)
 }
 
 static char *
-topo_snap_create(topo_hdl_t *thp, int *errp)
+topo_snap_create(topo_hdl_t *thp, int *errp, boolean_t need_force)
 {
 	uuid_t uuid;
 	char *ustr = NULL;
@@ -292,8 +292,8 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 		return (NULL);
 	}
 
-	thp->th_di = di_init("/",
-	    DINFOFORCE | DINFOSUBTREE | DINFOMINOR | DINFOPROP | DINFOPATH);
+	thp->th_di = di_init("/", (need_force ? DINFOFORCE : 0) |
+	    DINFOSUBTREE | DINFOMINOR | DINFOPROP | DINFOPATH);
 	thp->th_pi = di_prom_init();
 
 	if (topo_tree_enum_all(thp) < 0) {
@@ -374,7 +374,41 @@ topo_snap_hold(topo_hdl_t *thp, const char *uuid, int *errp)
 	if (uuid == NULL) {
 		char *ret;
 
-		ret = topo_snap_create(thp, errp);
+		ret = topo_snap_create(thp, errp, B_TRUE);
+
+		/*
+		 * Now walk the tree and invoke any facility enumeration methods
+		 */
+		if (ret != NULL) {
+			if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
+			    fac_walker, (void *)0, errp)) == NULL) {
+				return (ret);
+			}
+			(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+			topo_walk_fini(twp);
+		}
+		return (ret);
+	}
+	return (topo_snap_log_create(thp, uuid, errp));
+}
+
+/*
+ * Return snapshot id. This variant calls di_init() without DINFOFORCE,
+ * and is intended for use on DR events where there is no need to force
+ * attach of all devices.
+ */
+char *
+topo_snap_hold_no_forceload(topo_hdl_t *thp, const char *uuid, int *errp)
+{
+	topo_walk_t *twp;
+
+	if (thp == NULL)
+		return (NULL);
+
+	if (uuid == NULL) {
+		char *ret;
+
+		ret = topo_snap_create(thp, errp, B_FALSE);
 
 		/*
 		 * Now walk the tree and invoke any facility enumeration methods

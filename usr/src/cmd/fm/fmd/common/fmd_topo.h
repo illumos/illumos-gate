@@ -45,7 +45,7 @@ typedef struct fmd_topo {
 	hrtime_t ft_time_end;
 } fmd_topo_t;
 
-extern void fmd_topo_update(void);
+extern void fmd_topo_update(boolean_t);
 extern fmd_topo_t *fmd_topo_hold(void);
 extern void fmd_topo_addref(fmd_topo_t *);
 extern void fmd_topo_rele(fmd_topo_t *);

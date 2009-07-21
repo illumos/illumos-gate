@@ -184,6 +184,7 @@ SUNWprivate {
 	topo_sensor_units_name;
 	topo_stability2name;
 	topo_snap_hold;
+	topo_snap_hold_no_forceload;
 	topo_snap_release;
 	topo_strerror;
 	topo_walk_fini;
