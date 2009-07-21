@@ -171,6 +171,7 @@ extern ACPI_STATUS acpica_eval_int(ACPI_HANDLE, char *, int *);
 extern void acpica_ddi_save_resources(dev_info_t *);
 extern void acpica_ddi_restore_resources(dev_info_t *);
 extern void acpica_get_global_FADT(ACPI_TABLE_FADT **);
+extern void acpica_write_cpupm_capabilities(boolean_t, boolean_t);
 
 extern ACPI_STATUS acpica_tag_devinfo(dev_info_t *, ACPI_HANDLE);
 extern ACPI_STATUS acpica_untag_devinfo(dev_info_t *, ACPI_HANDLE);

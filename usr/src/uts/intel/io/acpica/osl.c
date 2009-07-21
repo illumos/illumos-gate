@@ -46,6 +46,7 @@
 #include <sys/note.h>
 
 #include <sys/acpi/acpi.h>
+#include <sys/acpi/accommon.h>
 #include <sys/acpica.h>
 
 #define	MAX_DAT_FILE_SIZE	(64*1024)
@@ -2218,4 +2219,16 @@ void
 acpica_get_global_FADT(ACPI_TABLE_FADT **gbl_FADT)
 {
 	*gbl_FADT = &AcpiGbl_FADT;
+}
+
+void
+acpica_write_cpupm_capabilities(boolean_t pstates, boolean_t cstates)
+{
+	if (pstates && AcpiGbl_FADT.PstateControl != 0)
+		(void) AcpiHwRegisterWrite(ACPI_REGISTER_SMI_COMMAND_BLOCK,
+		    AcpiGbl_FADT.PstateControl);
+
+	if (cstates && AcpiGbl_FADT.CstControl != 0)
+		(void) AcpiHwRegisterWrite(ACPI_REGISTER_SMI_COMMAND_BLOCK,
+		    AcpiGbl_FADT.CstControl);
 }

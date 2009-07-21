@@ -1339,6 +1339,8 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(acpica, AcpiOsFree, nomod_minus_one) ;
 	NO_UNLOAD_STUB(acpica, acpica_get_handle_cpu, nomod_minus_one) ;
 	NO_UNLOAD_STUB(acpica, acpica_get_global_FADT, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, acpica_write_cpupm_capabilities,
+	    nomod_minus_one)		       ;
 	NO_UNLOAD_STUB(acpica, __acpi_wbinvd, nomod_minus_one) ;
 	END_MODULE(acpica);
 #endif
