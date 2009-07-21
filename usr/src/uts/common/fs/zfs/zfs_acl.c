@@ -93,6 +93,8 @@
 #define	ZFS_ACL_WIDE_FLAGS (V4_ACL_WIDE_FLAGS|ZFS_ACL_TRIVIAL|ZFS_INHERIT_ACE|\
     ZFS_ACL_OBJ_ACE)
 
+#define	ALL_MODE_EXECS (S_IXUSR | S_IXGRP | S_IXOTH)
+
 static uint16_t
 zfs_ace_v0_get_type(void *acep)
 {
@@ -917,8 +919,14 @@ zfs_mode_compute(znode_t *zp, zfs_acl_t *aclp)
 		}
 	}
 
-	if (!an_exec_denied && !(seen & (S_IXUSR | S_IXGRP | S_IXOTH)) ||
-	    !(mode & (S_IXUSR | S_IXGRP | S_IXOTH)))
+	/*
+	 * Failure to allow is effectively a deny, so execute permission
+	 * is denied if it was never mentioned or if we explicitly
+	 * weren't allowed it.
+	 */
+	if (!an_exec_denied &&
+	    ((seen & ALL_MODE_EXECS) != ALL_MODE_EXECS ||
+	    (mode & ALL_MODE_EXECS) != ALL_MODE_EXECS))
 		an_exec_denied = B_TRUE;
 
 	if (an_exec_denied)
@@ -965,7 +973,8 @@ zfs_acl_node_read_internal(znode_t *zp, boolean_t will_modify)
 }
 
 /*
- * Read an external acl object.
+ * Read an external acl object.  If the intent is to modify, always
+ * create a new acl and leave any cached acl in place.
  */
 static int
 zfs_acl_node_read(znode_t *zp, zfs_acl_t **aclpp, boolean_t will_modify)
@@ -979,14 +988,15 @@ zfs_acl_node_read(znode_t *zp, zfs_acl_t **aclpp, boolean_t will_modify)
 
 	ASSERT(MUTEX_HELD(&zp->z_acl_lock));
 
-	if (zp->z_acl_cached) {
+	if (zp->z_acl_cached && !will_modify) {
 		*aclpp = zp->z_acl_cached;
 		return (0);
 	}
 
 	if (zp->z_phys->zp_acl.z_acl_extern_obj == 0) {
 		*aclpp = zfs_acl_node_read_internal(zp, will_modify);
-		zp->z_acl_cached = *aclpp;
+		if (!will_modify)
+			zp->z_acl_cached = *aclpp;
 		return (0);
 	}
 
@@ -1019,7 +1029,9 @@ zfs_acl_node_read(znode_t *zp, zfs_acl_t **aclpp, boolean_t will_modify)
 		return (error);
 	}
 
-	zp->z_acl_cached = *aclpp = aclp;
+	*aclpp = aclp;
+	if (!will_modify)
+		zp->z_acl_cached = aclp;
 	return (0);
 }
 
@@ -1044,7 +1056,7 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, cred_t *cr, dmu_tx_t *tx)
 
 	dmu_buf_will_dirty(zp->z_dbuf, tx);
 
-	if (zp->z_acl_cached != aclp && zp->z_acl_cached) {
+	if (zp->z_acl_cached) {
 		zfs_acl_free(zp->z_acl_cached);
 		zp->z_acl_cached = NULL;
 	}
@@ -1052,8 +1064,8 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, cred_t *cr, dmu_tx_t *tx)
 	zphys->zp_mode = zfs_mode_compute(zp, aclp);
 
 	/*
-	 * Decide which opbject type to use.  If we are forced to
-	 * use old ACL format than transform ACL into zfs_oldace_t
+	 * Decide which object type to use.  If we are forced to
+	 * use old ACL format then transform ACL into zfs_oldace_t
 	 * layout.
 	 */
 	if (!zfsvfs->z_use_fuids) {
@@ -1636,7 +1648,6 @@ zfs_acl_chmod_setattr(znode_t *zp, zfs_acl_t **aclp, uint64_t mode)
 	if (error == 0) {
 		(*aclp)->z_hints = zp->z_phys->zp_flags & V4_ACL_WIDE_FLAGS;
 		zfs_acl_chmod(zp->z_zfsvfs, zp->z_phys->zp_uid, mode, *aclp);
-		zp->z_acl_cached = *aclp;
 	}
 	mutex_exit(&zp->z_acl_lock);
 	mutex_exit(&zp->z_lock);
@@ -2168,6 +2179,7 @@ top:
 
 	error = zfs_aclset_common(zp, aclp, cr, tx);
 	ASSERT(error == 0);
+	zp->z_acl_cached = aclp;
 
 	if (fuid_dirtied)
 		zfs_fuid_sync(zfsvfs, tx);
@@ -2177,7 +2189,6 @@ top:
 
 	if (fuidp)
 		zfs_fuid_info_free(fuidp);
-	zp->z_acl_cached = aclp;
 	dmu_tx_commit(tx);
 done:
 	mutex_exit(&zp->z_acl_lock);
@@ -2343,7 +2354,6 @@ zfs_zaccess_aces_check(znode_t *zp, uint32_t *working_mode,
 				    uint32_t, mask_matched);
 				if (anyaccess) {
 					mutex_exit(&zp->z_acl_lock);
-					zfs_acl_free(aclp);
 					return (0);
 				}
 			}

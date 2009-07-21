@@ -156,6 +156,7 @@ zfs_znode_cache_destructor(void *buf, void *arg)
 
 	ASSERT(zp->z_dbuf == NULL);
 	ASSERT(zp->z_dirlocks == NULL);
+	ASSERT(zp->z_acl_cached == NULL);
 }
 
 #ifdef	ZNODE_STATS
@@ -199,6 +200,7 @@ zfs_znode_move_impl(znode_t *ozp, znode_t *nzp)
 	nzp->z_sync_cnt = ozp->z_sync_cnt;
 	nzp->z_phys = ozp->z_phys;
 	nzp->z_dbuf = ozp->z_dbuf;
+	nzp->z_acl_cached = ozp->z_acl_cached;
 
 	/* Update back pointers. */
 	(void) dmu_buf_update_user(nzp->z_dbuf, ozp, nzp, &nzp->z_phys,
@@ -211,6 +213,7 @@ zfs_znode_move_impl(znode_t *ozp, znode_t *nzp)
 	 * subsequent callback.
 	 */
 	ozp->z_dbuf = NULL;
+	ozp->z_acl_cached = NULL;
 	POINTER_INVALIDATE(&ozp->z_zfsvfs);
 }
 
