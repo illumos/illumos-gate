@@ -52,11 +52,9 @@ f none kernel/drv/audio1575 755 root sys
 f none kernel/drv/audioens 755 root sys
 f none kernel/drv/audiopci 755 root sys
 f none kernel/drv/audiots 755 root sys
-f none kernel/drv/austr 755 root sys
 f none kernel/misc/amd64/ac97 755 root sys
 f none kernel/drv/amd64/audio 755 root sys
 f none kernel/drv/amd64/audio1575 755 root sys
 f none kernel/drv/amd64/audioens 755 root sys
 f none kernel/drv/amd64/audiots 755 root sys
 f none kernel/drv/amd64/audiopci 755 root sys
-f none kernel/drv/amd64/austr 755 root sys

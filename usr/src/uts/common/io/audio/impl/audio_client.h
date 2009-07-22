@@ -49,6 +49,9 @@ typedef struct audio_client_ops {
 	void		(*aco_output)(audio_client_t *);
 	void		(*aco_notify)(audio_client_t *);
 	void		(*aco_drain)(audio_client_t *);
+
+	void		(*aco_wput)(audio_client_t *, mblk_t *);
+	void		(*aco_wsrv)(audio_client_t *);
 } audio_client_ops_t;
 
 void *auclnt_get_private(audio_client_t *);
@@ -117,6 +120,8 @@ void auclnt_register_ops(minor_t, audio_client_ops_t *);
 minor_t	auclnt_get_minor(audio_client_t *);
 minor_t auclnt_get_original_minor(audio_client_t *);
 minor_t auclnt_get_minor_type(audio_client_t *);
+queue_t *auclnt_get_rq(audio_client_t *);
+queue_t *auclnt_get_wq(audio_client_t *);
 
 unsigned auclnt_produce(audio_stream_t *, unsigned);
 unsigned auclnt_produce_data(audio_stream_t *, caddr_t, unsigned);

@@ -36,10 +36,6 @@
 #include <sys/sysmacros.h>
 #include "audio_impl.h"
 
-#ifdef	DEBUG
-int audio_underruns = 0;
-#endif
-
 #define	DECL_AUDIO_EXPORT(NAME, TYPE, SAMPLE)				\
 void									\
 auimpl_export_##NAME(audio_engine_t *eng)				\
@@ -382,11 +378,9 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 					drained = B_TRUE;
 				}
 			} else {
-#ifdef	DEBUG
-				audio_underruns++;
-#endif
 				underrun = B_TRUE;
 				sp->s_errors += need;
+				eng->e_stream_underruns++;
 			}
 		}
 

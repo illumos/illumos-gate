@@ -32,16 +32,15 @@ EXIT=0
 case "${ARCH}" in
     sparc)
 	pkg_drvrem audiocs || EXIT=1
-	pkg_drvrem audiots || EXIT=1
-	pkg_drvrem audio1575 || EXIT=1
 	;;
     i386)
 	;;
 esac
 
+pkg_drvrem audiots || EXIT=1
+pkg_drvrem audio1575 || EXIT=1
 pkg_drvrem audioens || EXIT=1
 pkg_drvrem audiopci || EXIT=1
-pkg_drvrem austr || EXIT=1
 pkg_drvrem audio || EXIT=1
 
 exit ${EXIT}

@@ -971,7 +971,7 @@ nfsmapid_cfg() {
 #
 BOOMER_PRESENT_SYS=false
 BOOMER_PRESENT_BFU=false
-BOOMER_DRIVERS="audio austr"
+BOOMER_DRIVERS="audio"
 
 check_boomer_sys() {
 	typeset root=$1

@@ -171,6 +171,8 @@ struct audio_client {
 	major_t			c_major;
 	minor_t			c_minor;
 	minor_t			c_origminor;
+	queue_t			*c_rq;
+	queue_t			*c_wq;
 
 	/*
 	 * Linkage for per-device list of clients.
@@ -207,6 +209,8 @@ struct audio_client {
 #define	c_input			c_ops.aco_input
 #define	c_notify		c_ops.aco_notify
 #define	c_drain			c_ops.aco_drain
+#define	c_wput			c_ops.aco_wput
+#define	c_wsrv			c_ops.aco_wsrv
 
 	struct pollhead		c_pollhead;
 
@@ -232,6 +236,10 @@ struct audio_stats {
 	kstat_named_t		st_rate;
 	kstat_named_t		st_intrs;
 	kstat_named_t		st_errors;
+	kstat_named_t		st_engine_underruns;
+	kstat_named_t		st_engine_overruns;
+	kstat_named_t		st_stream_underruns;
+	kstat_named_t		st_stream_overruns;
 	kstat_named_t		st_suspended;
 };
 
@@ -274,6 +282,10 @@ struct audio_engine {
 
 	int			e_intrs;
 	int			e_errors;
+	int			e_overruns;
+	int			e_underruns;
+	int			e_stream_overruns;
+	int			e_stream_underruns;
 
 	audio_parms_t		e_parms;
 #define	e_format		e_parms.p_format

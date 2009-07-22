@@ -51,4 +51,3 @@ f none kernel/drv/audio1575.conf 644 root sys
 f none kernel/drv/audioens.conf 644 root sys
 f none kernel/drv/audiopci.conf 644 root sys
 f none kernel/drv/audiots.conf 644 root sys
-f none kernel/drv/austr.conf 644 root sys

@@ -146,6 +146,7 @@ audio_engine_consume(audio_engine_t *e)
 	if (e->e_tail > e->e_head) {
 		/* want more data than we have, not much we can do */
 		e->e_errors++;
+		e->e_underruns++;
 	}
 	auimpl_output_callback(e);
 	mutex_exit(&e->e_lock);
@@ -159,6 +160,7 @@ audio_engine_produce(audio_engine_t *e)
 	if ((e->e_head - e->e_tail) > e->e_nframes) {
 		/* no room for engine data, not much we can do */
 		e->e_errors++;
+		e->e_overruns++;
 	}
 	auimpl_input_callback(e);
 	mutex_exit(&e->e_lock);
@@ -789,6 +791,10 @@ auimpl_engine_ksupdate(kstat_t *ksp, int rw)
 	st->st_rate.value.ui32 = e->e_rate;
 	st->st_intrs.value.ui32 = e->e_intrs;
 	st->st_errors.value.ui32 = e->e_errors;
+	st->st_engine_underruns.value.ui32 = e->e_underruns;
+	st->st_engine_overruns.value.ui32 = e->e_overruns;
+	st->st_stream_underruns.value.ui32 = e->e_stream_underruns;
+	st->st_stream_overruns.value.ui32 = e->e_stream_overruns;
 	st->st_suspended.value.ui32 = e->e_suspended;
 	mutex_exit(&e->e_lock);
 
@@ -831,6 +837,14 @@ auimpl_engine_ksinit(audio_dev_t *d, audio_engine_t *e)
 	kstat_named_init(&st->st_rate, "rate", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_intrs, "intrhz", KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_errors, "errors", KSTAT_DATA_UINT32);
+	kstat_named_init(&st->st_engine_overruns, "engine_overruns",
+	    KSTAT_DATA_UINT32);
+	kstat_named_init(&st->st_engine_underruns, "engine_underruns",
+	    KSTAT_DATA_UINT32);
+	kstat_named_init(&st->st_stream_overruns, "stream_overruns",
+	    KSTAT_DATA_UINT32);
+	kstat_named_init(&st->st_stream_underruns, "stream_underruns",
+	    KSTAT_DATA_UINT32);
 	kstat_named_init(&st->st_suspended, "suspended", KSTAT_DATA_UINT32);
 	kstat_install(e->e_ksp);
 }

@@ -206,7 +206,6 @@ DRV_KMODS	+= audioixp
 DRV_KMODS	+= audiopci
 DRV_KMODS	+= audiots
 DRV_KMODS	+= audiovia823x
-DRV_KMODS	+= austr
 DRV_KMODS	+= bl 
 DRV_KMODS	+= bge
 DRV_KMODS	+= bofi

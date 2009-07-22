@@ -2593,6 +2593,8 @@ static struct audio_client_ops ossmix_ops = {
 	NULL,   /* output */
 	oss_notify,
 	NULL,	/* drain */
+	NULL,	/* wput */
+	NULL,	/* wsrv */
 };
 
 /* nearly the same as ossxmix; different minor name helps devfsadm */
@@ -2611,6 +2613,8 @@ static struct audio_client_ops sndstat_ops = {
 	NULL,	/* output */
 	NULL,	/* notify */
 	NULL,	/* drain */
+	NULL,	/* wput */
+	NULL,	/* wsrv */
 };
 
 void

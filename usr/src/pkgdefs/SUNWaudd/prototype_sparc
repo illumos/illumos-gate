@@ -50,6 +50,5 @@ f none kernel/drv/sparcv9/audioens 755 root sys
 f none kernel/drv/sparcv9/audiopci 755 root sys
 f none kernel/drv/sparcv9/audiots 755 root sys
 f none kernel/drv/sparcv9/audio1575 755 root sys
-f none kernel/drv/sparcv9/austr 755 root sys
 d none kernel/misc/sparcv9 755 root sys
 f none kernel/misc/sparcv9/ac97 755 root sys

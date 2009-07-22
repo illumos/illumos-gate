@@ -97,46 +97,20 @@
 #include <sys/sunddi.h>
 #include "audio_client.h"
 
-typedef struct sclient sclient_t;
-typedef struct sdev sdev_t;
-typedef struct sproc sproc_t;
-typedef struct sioc sioc_t;
-
-typedef enum {
-	COPYIN,
-	COPYOUT,
-	IOCTL,
-	ACK,
-	NAK,
-	FINI
-} sioc_state_t;
-
-struct sioc {
-	sclient_t		*i_sc;
-	int			i_cmd;
-	size_t			i_size;
-	void			*i_data;
-	mblk_t			*i_bcont;
-	int			i_step;
-	uint_t			i_model;
-	sioc_state_t		i_state;
-	mblk_t			*i_mp;
-	caddr_t			i_addr;
-	int			i_error;
-};
+typedef struct daclient daclient_t;
+typedef struct dadev dadev_t;
+typedef struct daproc daproc_t;
 
 /* common structure shared between both audioctl and audio nodes */
-struct sclient {
-	sproc_t			*s_proc;
-	sdev_t			*s_sdev;
-	audio_client_t		*s_client;
-	queue_t			*s_rq;
-	queue_t			*s_wq;
-	ldi_handle_t		s_lh;
-	unsigned		s_eof;
-	list_t			s_eofcnt;
-	kmutex_t		s_lock;
-	mblk_t			*s_draining;
+struct daclient {
+	daproc_t		*dc_proc;
+	dadev_t			*dc_dev;
+	audio_client_t		*dc_client;
+	queue_t			*dc_wq;
+	unsigned		dc_eof;
+	list_t			dc_eofcnt;
+	kmutex_t		dc_lock;
+	mblk_t			*dc_draining;
 };
 
 struct eofcnt {
@@ -144,7 +118,7 @@ struct eofcnt {
 	uint64_t		tail;
 };
 
-struct sdev {
+struct dadev {
 	audio_dev_t		*d_dev;
 
 	list_t			d_procs;
@@ -152,150 +126,24 @@ struct sdev {
 	kcondvar_t		d_cv;
 };
 
-struct sproc {
+struct daproc {
 	pid_t			p_id;
 	struct audio_info	p_info;
 	int			p_refcnt;
 	int			p_oflag;
 	list_node_t		p_linkage;
-	sdev_t			*p_sdev;
-	sclient_t		*p_writer;
-	sclient_t		*p_reader;
+	dadev_t			*p_dev;
+	audio_client_t		*p_writer;
+	audio_client_t		*p_reader;
 };
 
-int sproc_hold(audio_client_t *, ldi_handle_t, queue_t *, int);
-void sproc_release(sclient_t *);
-static void sproc_update(sproc_t *);
+int devaudio_proc_hold(audio_client_t *, int);
+void devaudio_proc_release(audio_client_t *);
+static void devaudio_proc_update(daproc_t *);
 
-
-static kmutex_t	sdev_lock;
-static dev_info_t *sdev_dip;
-
-/*
- * Alloc extra room for ioctl buffer, in case none was supplied or copyin was
- * shorter than we need for the whole struct.  On failure, returns an
- * appropriate errno, zero on success.  Any original data is preserved.
- */
-static int
-sioc_alloc(sioc_t *ip, size_t size)
-{
-	mblk_t			*nmp;
-
-	/* if we already have enough, just use what we've got */
-	if (ip->i_size >= size)
-		return (0);
-
-	if ((nmp = allocb(size, BPRI_MED)) == NULL) {
-		ip->i_state = NAK;
-		ip->i_error = ENOMEM;
-		return (ENOMEM);
-	}
-	bzero(nmp->b_rptr, size);
-
-	/* if there was already some data present, preserve it */
-	if (ip->i_size != 0) {
-		bcopy(ip->i_data, nmp->b_rptr, ip->i_size);
-		freemsg(ip->i_bcont);
-	}
-	ip->i_bcont = nmp;
-	ip->i_data = nmp->b_rptr;
-	ip->i_size = size;
-
-	return (0);
-}
-
-static void
-sioc_copyin(sioc_t *ip, size_t size)
-{
-	ip->i_state = COPYIN;
-	ip->i_size = size;
-	if (ip->i_bcont != NULL) {
-		freemsg(ip->i_bcont);
-		ip->i_bcont = NULL;
-	}
-
-	mcopyin(ip->i_mp, ip, size, ip->i_addr);
-}
-
-static void
-sioc_copyout(sioc_t *ip, size_t size)
-{
-	mblk_t			*bcont;
-
-	ASSERT(ip->i_size >= size);
-
-	bcont = ip->i_bcont;
-
-	ip->i_state = COPYOUT;
-	ip->i_bcont = NULL;
-
-	mcopyout(ip->i_mp, ip, size, ip->i_addr, bcont);
-}
-
-static void
-sioc_error(sioc_t *ip, int error)
-{
-	ip->i_state = NAK;
-	ip->i_error = error;
-}
-
-static void
-sioc_success(sioc_t *ip)
-{
-	ip->i_state = ACK;
-}
-
-static void
-sioc_fini(sioc_t *ip)
-{
-	if (ip->i_bcont != NULL)
-		freemsg(ip->i_bcont);
-
-	kmem_free(ip, sizeof (*ip));
-}
-
-static void
-sioc_finish(sioc_t *ip)
-{
-	mblk_t		*mp;
-	sclient_t	*sc;
-
-	sc = ip->i_sc;
-	mp = ip->i_mp;
-	ip->i_mp = NULL;
-
-	switch (ip->i_state) {
-	case ACK:
-		miocack(sc->s_wq, mp, 0, 0);
-		break;
-
-	case IOCTL:	/* caller didn't use sioc_success */
-		ip->i_error = ECANCELED;
-		miocnak(sc->s_wq, mp, 0, ip->i_error);
-		break;
-
-	case NAK:
-		miocnak(sc->s_wq, mp, 0, ip->i_error);
-		break;
-
-	case COPYOUT:
-	case COPYIN:
-		/* data copy to be done */
-		qreply(sc->s_wq, mp);
-		return;
-
-	case FINI:
-		if (mp != NULL) {
-			freemsg(mp);
-		}
-		break;
-	}
-
-	sioc_fini(ip);
-}
 
 static int
-sun_compose_format(audio_prinfo_t *prinfo)
+devaudio_compose_format(audio_prinfo_t *prinfo)
 {
 	switch (prinfo->precision) {
 	case 8:
@@ -324,7 +172,7 @@ sun_compose_format(audio_prinfo_t *prinfo)
 }
 
 static void
-sun_decompose_format(audio_prinfo_t *prinfo, int afmt)
+devaudio_decompose_format(audio_prinfo_t *prinfo, int afmt)
 {
 	int	e, p;
 
@@ -390,16 +238,14 @@ sun_decompose_format(audio_prinfo_t *prinfo, int afmt)
 	prinfo->precision = p;
 }
 
-static sproc_t *
-sproc_alloc(sclient_t *sc)
+static daproc_t *
+devaudio_proc_alloc(audio_client_t *c)
 {
-	audio_client_t	*c;
 	audio_info_t	*info;
 	audio_prinfo_t	*prinfo;
 	uint32_t	caps;
-	sproc_t		*proc;
+	daproc_t	*proc;
 
-	c = sc->s_client;
 	if ((proc = kmem_zalloc(sizeof (*proc), KM_NOSLEEP)) == NULL) {
 		return (NULL);
 	}
@@ -468,43 +314,43 @@ sproc_alloc(sclient_t *sc)
 }
 
 static void
-sproc_free(sproc_t *proc)
+devaudio_proc_free(daproc_t *proc)
 {
 	kmem_free(proc, sizeof (*proc));
 }
 
 int
-sproc_hold(audio_client_t *c, ldi_handle_t lh, queue_t *rq, int oflag)
+devaudio_proc_hold(audio_client_t *c, int oflag)
 {
 	pid_t		pid;
-	sproc_t		*proc;
-	sdev_t		*sdev;
-	sclient_t	*sc;
+	daproc_t	*proc;
+	dadev_t		*dev;
+	daclient_t	*dc;
 	list_t		*l;
 	audio_dev_t	*adev;
 	int		rv;
 
 	adev = auclnt_get_dev(c);
 
-	/* first allocate and initialize the sclient private data */
-	if ((sc = kmem_zalloc(sizeof (*sc), KM_NOSLEEP)) == NULL) {
+	/* first allocate and initialize the daclient private data */
+	if ((dc = kmem_zalloc(sizeof (*dc), KM_NOSLEEP)) == NULL) {
 		return (ENOMEM);
 	}
 
-	mutex_init(&sc->s_lock, NULL, MUTEX_DRIVER, NULL);
-	list_create(&sc->s_eofcnt, sizeof (struct eofcnt),
+	mutex_init(&dc->dc_lock, NULL, MUTEX_DRIVER, NULL);
+	list_create(&dc->dc_eofcnt, sizeof (struct eofcnt),
 	    offsetof(struct eofcnt, linkage));
-	auclnt_set_private(c, sc);
+	auclnt_set_private(c, dc);
 
-	sdev = auclnt_get_dev_minor_data(adev, AUDIO_MINOR_DEVAUDIO);
-	l = &sdev->d_procs;
+	dev = auclnt_get_dev_minor_data(adev, AUDIO_MINOR_DEVAUDIO);
+	l = &dev->d_procs;
 	pid = auclnt_get_pid(c);
 
 	/* set a couple of common fields */
-	sc->s_client = c;
-	sc->s_sdev = sdev;
+	dc->dc_client = c;
+	dc->dc_dev = dev;
 
-	mutex_enter(&sdev->d_mx);
+	mutex_enter(&dev->d_mx);
 	for (proc = list_head(l); proc != NULL; proc = list_next(l, proc)) {
 		if (proc->p_id == pid) {
 			proc->p_refcnt++;
@@ -512,13 +358,13 @@ sproc_hold(audio_client_t *c, ldi_handle_t lh, queue_t *rq, int oflag)
 		}
 	}
 	if (proc == NULL) {
-		if ((proc = sproc_alloc(sc)) == NULL) {
+		if ((proc = devaudio_proc_alloc(c)) == NULL) {
 			rv = ENOMEM;
 			goto failed;
 		}
 		proc->p_refcnt = 1;
 		proc->p_id = pid;
-		proc->p_sdev = sdev;
+		proc->p_dev = dev;
 		list_insert_tail(l, proc);
 	}
 
@@ -532,7 +378,7 @@ sproc_hold(audio_client_t *c, ldi_handle_t lh, queue_t *rq, int oflag)
 			proc->p_info.play.waiting++;
 		if (oflag & FREAD)
 			proc->p_info.record.waiting++;
-		if (cv_wait_sig(&sdev->d_cv, &sdev->d_mx) == 0) {
+		if (cv_wait_sig(&dev->d_cv, &dev->d_mx) == 0) {
 			/* interrupted! */
 			if (oflag & FWRITE)
 				proc->p_info.play.waiting--;
@@ -565,7 +411,7 @@ sproc_hold(audio_client_t *c, ldi_handle_t lh, queue_t *rq, int oflag)
 		auclnt_set_gain(sp, ((play->gain * 100) / AUDIO_MAX_GAIN));
 		auclnt_set_muted(sp, proc->p_info.output_muted);
 		play->open = B_TRUE;
-		proc->p_writer = sc;
+		proc->p_writer = c;
 		proc->p_oflag |= FWRITE;
 	}
 
@@ -586,99 +432,103 @@ sproc_hold(audio_client_t *c, ldi_handle_t lh, queue_t *rq, int oflag)
 
 		auclnt_set_gain(sp, ((rec->gain * 100) / AUDIO_MAX_GAIN));
 		rec->open = B_TRUE;
-		proc->p_reader = sc;
+		proc->p_reader = c;
 		proc->p_oflag |= FREAD;
 	}
 
-	sc->s_lh = lh;
-	sc->s_rq = rq;
-	sc->s_wq = WR(rq);
-	WR(rq)->q_ptr = rq->q_ptr = sc;
+
+	dc->dc_wq = auclnt_get_wq(c);
+
 	/* we update the s_proc last to avoid a race */
-	sc->s_proc = proc;
+	dc->dc_proc = proc;
 
-	sproc_update(proc);
+	devaudio_proc_update(proc);
 
-	mutex_exit(&sdev->d_mx);
+	mutex_exit(&dev->d_mx);
 
 	return (0);
 
 failed:
-	mutex_exit(&sdev->d_mx);
-	sproc_release(sc);
+	mutex_exit(&dev->d_mx);
+	devaudio_proc_release(c);
 	return (rv);
 
 }
 
 static void
-sun_clear_eof(sclient_t *sc)
+devaudio_clear_eof(audio_client_t *c)
 {
-	struct eofcnt *eof;
-	mutex_enter(&sc->s_lock);
-	while ((eof = list_remove_head(&sc->s_eofcnt)) != NULL) {
+	struct eofcnt	*eof;
+	daclient_t	*dc;
+
+	dc = auclnt_get_private(c);
+	mutex_enter(&dc->dc_lock);
+	while ((eof = list_remove_head(&dc->dc_eofcnt)) != NULL) {
 		kmem_free(eof, sizeof (*eof));
 	}
-	mutex_exit(&sc->s_lock);
+	mutex_exit(&dc->dc_lock);
 }
 
 void
-sproc_release(sclient_t *sc)
+devaudio_proc_release(audio_client_t *c)
 {
-	sproc_t		*proc;
-	sdev_t		*sdev;
+	daproc_t	*proc;
+	dadev_t		*dev;
 	mblk_t		*mp;
+	daclient_t	*dc;
 
-	proc = sc->s_proc;
-	sdev = sc->s_sdev;
-	sc->s_proc = NULL;
+	dc = auclnt_get_private(c);
+	proc = dc->dc_proc;
+	dev = dc->dc_dev;
+	dc->dc_proc = NULL;
 
-	mutex_enter(&sdev->d_mx);
+	mutex_enter(&dev->d_mx);
 
 	if (proc != NULL) {
 		proc->p_refcnt--;
 		ASSERT(proc->p_refcnt >= 0);
 
-		if (sc == proc->p_writer) {
+		if (c == proc->p_writer) {
 			proc->p_oflag &= ~FWRITE;
 			proc->p_writer = NULL;
 		}
-		if (sc == proc->p_reader) {
+		if (c == proc->p_reader) {
 			proc->p_oflag &= ~FREAD;
 			proc->p_reader = NULL;
 		}
-		cv_broadcast(&sdev->d_cv);
+		cv_broadcast(&dev->d_cv);
 
 		if (proc->p_refcnt == 0) {
-			list_remove(&sdev->d_procs, proc);
-			sproc_free(proc);
+			list_remove(&dev->d_procs, proc);
+			devaudio_proc_free(proc);
 		}
-		sc->s_proc = NULL;
+		dc->dc_proc = NULL;
 	}
 
-	mutex_exit(&sdev->d_mx);
+	mutex_exit(&dev->d_mx);
 
-	sun_clear_eof(sc);
+	devaudio_clear_eof(c);
 
-	while ((mp = sc->s_draining) != NULL) {
-		sc->s_draining = mp->b_next;
+	while ((mp = dc->dc_draining) != NULL) {
+		dc->dc_draining = mp->b_next;
 		mp->b_next = NULL;
 		freemsg(mp);
 	}
 
-	mutex_destroy(&sc->s_lock);
-	list_destroy(&sc->s_eofcnt);
-	kmem_free(sc, sizeof (*sc));
+	mutex_destroy(&dc->dc_lock);
+	list_destroy(&dc->dc_eofcnt);
+	kmem_free(dc, sizeof (*dc));
 }
 
 static void
-sun_sendup(audio_client_t *c)
+devaudio_input(audio_client_t *c)
 {
 	audio_stream_t	*sp = auclnt_input_stream(c);
-	sclient_t	*sc = auclnt_get_private(c);
+	daclient_t	*dc = auclnt_get_private(c);
 	unsigned	framesz = auclnt_get_framesz(sp);
-	queue_t		*rq = sc->s_rq;
+	queue_t		*rq = auclnt_get_rq(c);
 	mblk_t		*mp;
-	unsigned	nbytes = sc->s_proc->p_info.record.buffer_size;
+	unsigned	nbytes = dc->dc_proc->p_info.record.buffer_size;
 	unsigned	count = nbytes / framesz;
 
 	/*
@@ -714,37 +564,23 @@ sun_sendup(audio_client_t *c)
 	}
 }
 
-static int
-sun_open(audio_client_t *c, int oflag)
-{
-	_NOTE(ARGUNUSED(c));
-	_NOTE(ARGUNUSED(oflag));
-	return (0);
-}
-
 static void
-sun_close(audio_client_t *c)
-{
-	_NOTE(ARGUNUSED(c));
-}
-
-static void
-sproc_update(sproc_t *proc)
+devaudio_proc_update(daproc_t *proc)
 {
 	audio_info_t	*info;
 	audio_stream_t	*sp;
-	sclient_t	*sc;
+	audio_client_t	*c;
 
 	info = &proc->p_info;
 
-	ASSERT(mutex_owned(&proc->p_sdev->d_mx));
+	ASSERT(mutex_owned(&proc->p_dev->d_mx));
 
-	if ((sc = proc->p_writer) != NULL) {
-		sp = auclnt_output_stream(sc->s_client);
+	if ((c = proc->p_writer) != NULL) {
+		sp = auclnt_output_stream(c);
 
 		info->play.sample_rate = auclnt_get_rate(sp);
 		info->play.channels = auclnt_get_channels(sp);
-		sun_decompose_format(&info->play, auclnt_get_format(sp));
+		devaudio_decompose_format(&info->play, auclnt_get_format(sp));
 
 		info->play.gain =
 		    (auclnt_get_gain(sp) * AUDIO_MAX_GAIN) / 100;
@@ -755,12 +591,12 @@ sproc_update(sproc_t *proc)
 		info->output_muted = auclnt_get_muted(sp);
 	}
 
-	if ((sc = proc->p_reader) != NULL) {
-		sp = auclnt_input_stream(sc->s_client);
+	if ((c = proc->p_reader) != NULL) {
+		sp = auclnt_input_stream(c);
 
 		info->record.sample_rate = auclnt_get_rate(sp);
 		info->record.channels = auclnt_get_channels(sp);
-		sun_decompose_format(&info->record, auclnt_get_format(sp));
+		devaudio_decompose_format(&info->record, auclnt_get_format(sp));
 
 		info->record.gain =
 		    (auclnt_get_gain(sp) * AUDIO_MAX_GAIN) / 100;
@@ -772,33 +608,26 @@ sproc_update(sproc_t *proc)
 }
 
 static void
-sioc_getinfo(sioc_t *ip)
+devaudio_ioc_getinfo(queue_t *wq, audio_client_t *c, mblk_t *mp)
 {
-	sclient_t	*sc = ip->i_sc;
-	sproc_t		*proc = sc->s_proc;
-	int		rv;
+	daclient_t	*dc = auclnt_get_private(c);
+	daproc_t	*proc = dc->dc_proc;
+	mblk_t		*bcont;
 
-	switch (ip->i_step) {
-	case 0:
-		if ((rv = sioc_alloc(ip, sizeof (audio_info_t))) != 0) {
-			sioc_error(ip, rv);
-			break;
-		}
-
-		mutex_enter(&sc->s_sdev->d_mx);
-		sproc_update(proc);
-		mutex_exit(&sc->s_sdev->d_mx);
-
-		bcopy(&proc->p_info, ip->i_data, sizeof (audio_info_t));
-		sioc_copyout(ip, sizeof (audio_info_t));
-		break;
-	case 1:
-		sioc_success(ip);
-		break;
+	if ((bcont = allocb(sizeof (audio_info_t), BPRI_MED)) == NULL) {
+		miocnak(wq, mp, 0, ENOMEM);
+		return;
 	}
 
-	ip->i_step++;
-	sioc_finish(ip);
+	mutex_enter(&dc->dc_dev->d_mx);
+	devaudio_proc_update(proc);
+	bcopy(&proc->p_info, bcont->b_wptr, sizeof (audio_info_t));
+	mutex_exit(&dc->dc_dev->d_mx);
+
+	bcont->b_wptr += sizeof (audio_info_t);
+
+	mcopyout(mp, NULL, sizeof (audio_info_t), NULL, bcont);
+	qreply(wq, mp);
 }
 
 #define	CHANGED(new, old, field)			\
@@ -806,11 +635,13 @@ sioc_getinfo(sioc_t *ip)
 #define	CHANGED8(new, old, field)			\
 	((new->field != ((uint8_t)~0)) && (new->field != old->field))
 
-static int
-sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
+static void
+devaudio_ioc_setinfo(queue_t *wq, audio_client_t *c, mblk_t *mp)
 {
-	sproc_t		*proc = sc->s_proc;
-	audio_info_t	*oinfo = &proc->p_info;
+	daclient_t	*dc;
+	daproc_t	*proc;
+	audio_info_t	*oinfo;
+	audio_info_t	*ninfo;
 	audio_prinfo_t	*npr;
 	audio_prinfo_t	*opr;
 
@@ -822,16 +653,47 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 	boolean_t	isctl;
 	audio_stream_t	*sp;
 	int		rv;
+	caddr_t		uaddr;
+	mblk_t		*bcont;
 
-	if (auclnt_get_minor_type(sc->s_client) == AUDIO_MINOR_DEVAUDIOCTL) {
+	struct copyresp	*csp;
+
+	if (DB_TYPE(mp) == M_IOCTL) {
+		/* the special value "1" indicates that this is a copyin */
+		uaddr = *(caddr_t *)(void *)mp->b_cont->b_rptr;
+
+		mcopyin(mp, uaddr, sizeof (audio_info_t), NULL);
+		qreply(wq, mp);
+		return;
+	}
+
+	ASSERT(DB_TYPE(mp) == M_IOCDATA);
+	if (((bcont = mp->b_cont) == NULL) ||
+	    (MBLKL(mp->b_cont) != sizeof (audio_info_t))) {
+		miocnak(wq, mp, 0, EINVAL);
+		return;
+	}
+
+	mp->b_cont = NULL;
+	csp = (void *)mp->b_rptr;
+	uaddr = (void *)csp->cp_private;
+	dc = auclnt_get_private(c);
+	ninfo = (void *)bcont->b_rptr;
+
+	mutex_enter(&dc->dc_dev->d_mx);
+
+	proc = dc->dc_proc;
+	oinfo = &proc->p_info;
+
+	if (auclnt_get_minor_type(c) == AUDIO_MINOR_DEVAUDIOCTL) {
 		/* control node can do both read and write fields */
 		isctl = B_TRUE;
 		reader = B_TRUE;
 		writer = B_TRUE;
 	} else {
 		isctl = B_FALSE;
-		writer = sc == proc->p_writer;
-		reader = sc == proc->p_reader;
+		writer = (c == proc->p_writer);
+		reader = (c == proc->p_reader);
 	}
 
 	/*
@@ -843,12 +705,14 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 	if (writer && CHANGED(npr, opr, sample_rate)) {
 		if ((isctl) ||
 		    (npr->sample_rate < 5500) || (npr->sample_rate > 48000)) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 	}
 	if (writer && CHANGED(npr, opr, channels)) {
 		if ((isctl) || (npr->channels < 1) || (npr->channels > 2)) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 	}
 	if (writer &&
@@ -857,16 +721,18 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 			npr->encoding = opr->encoding;
 		if (npr->precision == (uint32_t)~0)
 			npr->precision = opr->precision;
-		pfmt = sun_compose_format(npr);
+		pfmt = devaudio_compose_format(npr);
 		if ((isctl) || (pfmt == AUDIO_FORMAT_NONE)) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 	}
 
 	/* play fields that anyone can modify */
 	if (CHANGED(npr, opr, gain)) {
 		if (npr->gain > AUDIO_MAX_GAIN) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 	}
 
@@ -876,14 +742,15 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 
 	if (reader && CHANGED(npr, opr, sample_rate)) {
 		if ((isctl) ||
-		    (npr->sample_rate < 5500) ||
-		    (npr->sample_rate > 48000)) {
-			return (EINVAL);
+		    (npr->sample_rate < 5500) || (npr->sample_rate > 48000)) {
+			rv = EINVAL;
+			goto err;
 		}
 	}
 	if (reader && CHANGED(npr, opr, channels)) {
 		if ((isctl) || (npr->channels < 1) || (npr->channels > 2)) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 	}
 	if (reader &&
@@ -892,14 +759,16 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 			npr->encoding = opr->encoding;
 		if (npr->precision == (uint32_t)~0)
 			npr->precision = opr->precision;
-		rfmt = sun_compose_format(npr);
+		rfmt = devaudio_compose_format(npr);
 		if ((isctl) || (rfmt == AUDIO_FORMAT_NONE)) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 	}
 	if (reader && CHANGED(npr, opr, buffer_size)) {
 		if (isctl) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 		/* make sure we can support 16-bit stereo samples */
 		if ((npr->buffer_size % 4) != 0) {
@@ -914,7 +783,8 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 	/* record fields that anyone can modify */
 	if (CHANGED(npr, opr, gain)) {
 		if (npr->gain > AUDIO_MAX_GAIN) {
-			return (EINVAL);
+			rv = EINVAL;
+			goto err;
 		}
 	}
 
@@ -922,24 +792,21 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 	 * Now apply the changes.
 	 */
 	if (proc->p_writer != NULL) {
-		sp = auclnt_output_stream(proc->p_writer->s_client);
+		sp = auclnt_output_stream(proc->p_writer);
 		npr = &ninfo->play;
 		opr = &oinfo->play;
 
 		if (CHANGED(npr, opr, sample_rate)) {
-			rv = auclnt_set_rate(sp, npr->sample_rate);
-			if (rv != 0)
-				return (rv);
+			if ((rv = auclnt_set_rate(sp, npr->sample_rate)) != 0)
+				goto err;
 		}
 		if (CHANGED(npr, opr, channels)) {
-			rv = auclnt_set_channels(sp, npr->channels);
-			if (rv != 0)
-				return (rv);
+			if ((rv = auclnt_set_channels(sp, npr->channels)) != 0)
+				goto err;
 		}
 		if (pfmt != AUDIO_FORMAT_NONE) {
-			rv = auclnt_set_format(sp, pfmt);
-			if (rv != 0)
-				return (rv);
+			if ((rv = auclnt_set_format(sp, pfmt)) != 0)
+				goto err;
 		}
 		if (CHANGED(npr, opr, samples)) {
 			auclnt_set_samples(sp, npr->samples);
@@ -950,7 +817,7 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 			 * prevent problems with realaudio.
 			 */
 			if (npr->eof == 0) {
-				sun_clear_eof(proc->p_writer);
+				devaudio_clear_eof(proc->p_writer);
 			}
 			opr->eof = npr->eof;
 		}
@@ -959,8 +826,9 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 				auclnt_set_paused(sp);
 			} else {
 				auclnt_clear_paused(sp);
+
 				/* qenable to start up the playback */
-				qenable(proc->p_writer->s_wq);
+				qenable(auclnt_get_wq(proc->p_writer));
 			}
 		}
 		if (CHANGED8(npr, opr, waiting) && (npr->waiting)) {
@@ -994,24 +862,21 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 	}
 
 	if (proc->p_reader != NULL) {
-		sp = auclnt_input_stream(proc->p_reader->s_client);
+		sp = auclnt_input_stream(proc->p_reader);
 		npr = &ninfo->record;
 		opr = &oinfo->record;
 
 		if (CHANGED(npr, opr, sample_rate)) {
-			rv = auclnt_set_rate(sp, npr->sample_rate);
-			if (rv != 0)
-				return (rv);
+			if ((rv = auclnt_set_rate(sp, npr->sample_rate)) != 0)
+				goto err;
 		}
 		if (CHANGED(npr, opr, channels)) {
-			rv = auclnt_set_channels(sp, npr->channels);
-			if (rv != 0)
-				return (rv);
+			if ((rv = auclnt_set_channels(sp, npr->channels)) != 0)
+				goto err;
 		}
 		if (rfmt != AUDIO_FORMAT_NONE) {
-			rv = auclnt_set_format(sp, rfmt);
-			if (rv != 0)
-				return (rv);
+			if ((rv = auclnt_set_format(sp, rfmt)) != 0)
+				goto err;
 		}
 		if (CHANGED(npr, opr, samples)) {
 			auclnt_set_samples(sp, npr->samples);
@@ -1046,102 +911,271 @@ sun_setinfo(sclient_t *sc, audio_info_t *ninfo)
 		}
 	}
 
+	devaudio_proc_update(dc->dc_proc);
+	bcopy(&dc->dc_proc->p_info, ninfo, sizeof (*ninfo));
+	
+	mutex_exit(&dc->dc_dev->d_mx);
+	mcopyout(mp, NULL, sizeof (audio_info_t), uaddr, bcont);
+	qreply(wq, mp);
+	return;
+
+err:
+	mutex_exit(&dc->dc_dev->d_mx);
+	miocnak(wq, mp, 0, rv);
+}
+
+static void
+devaudio_ioc_getdev(queue_t *wq, audio_client_t *c, mblk_t *mp)
+{
+	audio_dev_t	*d = auclnt_get_dev(c);
+	mblk_t		*bcont;
+	audio_device_t	*a;
+
+	if ((bcont = allocb(sizeof (*a), BPRI_MED)) == NULL) {
+		miocnak(wq, mp, 0, ENOMEM);
+		return;
+	}
+
+	a = (void *)bcont->b_wptr;
+	(void) snprintf(a->name, sizeof (a->name),
+	    "SUNW,%s", auclnt_get_dev_name(d));
+	(void) strlcpy(a->config,
+	    auclnt_get_dev_description(d), sizeof (a->config));
+	(void) strlcpy(a->version,
+	    auclnt_get_dev_version(d),  sizeof (a->version));
+	bcont->b_wptr += sizeof (*a);
+
+	mcopyout(mp, NULL, sizeof (*a), NULL, bcont);
+	qreply(wq, mp);
+}
+
+static int
+devaudio_sigpoll(audio_client_t *c, void *arg)
+{
+	daproc_t	*proc = arg;
+	daclient_t	*dc;
+
+	if (auclnt_get_minor_type(c) == AUDIO_MINOR_DEVAUDIOCTL) {
+		dc = auclnt_get_private(c);
+		/* we only need to notify peers in our own process */
+		if ((dc != NULL) && (dc->dc_proc == proc)) {
+			(void) putnextctl1(auclnt_get_rq(c), M_PCSIG, SIGPOLL);
+		}
+	}
+	return (AUDIO_WALK_CONTINUE);
+}
+
+static void
+devaudio_drain(audio_client_t *c)
+{
+	daclient_t	*dc = auclnt_get_private(c);
+	mblk_t		*mplist, *mp;
+
+	mutex_enter(&dc->dc_lock);
+	mplist = dc->dc_draining;
+	dc->dc_draining = NULL;
+	mutex_exit(&dc->dc_lock);
+
+	while ((mp = mplist) != NULL) {
+		mplist = mp->b_next;
+		mp->b_next = NULL;
+		miocack(auclnt_get_wq(c), mp, 0, 0);
+	}
+}
+
+static void
+devaudio_output(audio_client_t *c)
+{
+	daclient_t	*dc = auclnt_get_private(c);
+	daproc_t	*proc = dc->dc_proc;
+	uint64_t	tail;
+	struct eofcnt	*eof;
+	int		eofs = 0;
+
+	tail = auclnt_get_tail(auclnt_output_stream(c));
+
+	/* get more data! (do this early) */
+	qenable(auclnt_get_wq(c));
+
+	mutex_enter(&dc->dc_lock);
+	while (((eof = list_head(&dc->dc_eofcnt)) != NULL) &&
+	    (eof->tail < tail)) {
+		list_remove(&dc->dc_eofcnt, eof);
+		kmem_free(eof, sizeof (*eof));
+		eofs++;
+	}
+	proc->p_info.play.eof += eofs;
+	mutex_exit(&dc->dc_lock);
+
+	if (eofs) {
+		auclnt_dev_walk_clients(auclnt_get_dev(c),
+		    devaudio_sigpoll, proc);
+	}
+}
+
+static void *
+devaudio_init(audio_dev_t *adev)
+{
+	dadev_t		*dev;
+	unsigned	cap;
+
+	cap = auclnt_get_dev_capab(adev);
+	/* if not a play or record device, don't bother initializing it */
+	if ((cap & (AUDIO_CLIENT_CAP_PLAY | AUDIO_CLIENT_CAP_RECORD)) == 0) {
+		return (NULL);
+	}
+
+	dev = kmem_zalloc(sizeof (*dev), KM_SLEEP);
+	dev->d_dev = adev;
+	mutex_init(&dev->d_mx, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&dev->d_cv, NULL, CV_DRIVER, NULL);
+	list_create(&dev->d_procs, sizeof (struct daproc),
+	    offsetof(struct daproc, p_linkage));
+
+	return (dev);
+}
+
+static void
+devaudio_fini(void *arg)
+{
+	dadev_t	*dev = arg;
+
+	if (dev != NULL) {
+
+		mutex_destroy(&dev->d_mx);
+		cv_destroy(&dev->d_cv);
+		list_destroy(&dev->d_procs);
+		kmem_free(dev, sizeof (*dev));
+	}
+}
+
+static int
+devaudio_open(audio_client_t *c, int oflag)
+{
+	int	rv;
+
+	if ((rv = auclnt_open(c, AUDIO_FORMAT_PCM, oflag)) != 0) {
+		return (rv);
+	}
+
+	if ((rv = devaudio_proc_hold(c, oflag)) != 0) {
+		auclnt_close(c);
+		return (rv);
+	}
+
+	/* start up the input */
+	if (oflag & FREAD) {
+		auclnt_start(auclnt_input_stream(c));
+	}
+
+	return (0);
+}
+
+static int
+devaudioctl_open(audio_client_t *c, int oflag)
+{
+	int	rv;
+
+	_NOTE(ARGUNUSED(oflag));
+
+	oflag &= ~(FWRITE | FREAD);
+
+	if ((rv = auclnt_open(c, AUDIO_FORMAT_NONE, 0)) != 0) {
+		return (rv);
+	}
+
+	if ((rv = devaudio_proc_hold(c, oflag)) != 0) {
+		auclnt_close(c);
+		return (rv);
+	}
+
 	return (0);
 }
 
 static void
-sioc_setinfo(sioc_t *ip)
+devaudio_close(audio_client_t *c)
 {
-	int		rv;
-	sclient_t	*sc = ip->i_sc;
-	audio_info_t	*ninfo;
+	auclnt_stop(auclnt_output_stream(c));
+	auclnt_stop(auclnt_input_stream(c));
 
-	switch (ip->i_step) {
-	case 0:
-		sioc_copyin(ip, sizeof (audio_info_t));
-		break;
-
-	case 1:
-		ninfo = (audio_info_t *)ip->i_data;
-
-		mutex_enter(&sc->s_sdev->d_mx);
-		rv = sun_setinfo(ip->i_sc, ninfo);
-
-		if (rv != 0) {
-			sioc_error(ip, rv);
-		} else {
-			sproc_update(sc->s_proc);
-
-			bcopy(&sc->s_proc->p_info, ninfo, sizeof (*ninfo));
-			sioc_copyout(ip, sizeof (audio_info_t));
-		}
-		mutex_exit(&sc->s_sdev->d_mx);
-		break;
-
-	case 2:
-		sioc_success(ip);
-		break;
-	}
-
-	ip->i_step++;
-	sioc_finish(ip);
+	auclnt_close(c);
+	devaudio_proc_release(c);
 }
 
 static void
-sioc_getdev(sioc_t *ip)
+devaudioctl_close(audio_client_t *c)
 {
-	int		rv;
-	sclient_t	*sc = ip->i_sc;
-	audio_client_t	*c = sc->s_client;
-	audio_dev_t	*d = auclnt_get_dev(c);
-
-	switch (ip->i_step) {
-	case 0:
-		rv = sioc_alloc(ip, sizeof (audio_device_t));
-		if (rv == 0) {
-			audio_device_t *a = ip->i_data;
-
-			(void) snprintf(a->name, sizeof (a->name),
-			    "SUNW,%s", auclnt_get_dev_name(d));
-			(void) strlcpy(a->config,
-			    auclnt_get_dev_description(d), sizeof (a->config));
-			(void) strlcpy(a->version,
-			    auclnt_get_dev_version(d),  sizeof (a->version));
-			sioc_copyout(ip, sizeof (*a));
-		} else {
-			sioc_error(ip, rv);
-		}
-		break;
-
-	case 1:
-		sioc_success(ip);
-		break;
-	}
-
-	ip->i_step++;
-	sioc_finish(ip);
+	auclnt_close(c);
+	devaudio_proc_release(c);
 }
 
 static void
-sunstr_ioctl(sioc_t *ip)
+devaudio_miocdata(audio_client_t *c, mblk_t *mp)
 {
-	switch (ip->i_cmd) {
+	struct copyresp		*csp;
+	queue_t			*wq;
+
+	csp = (void *)mp->b_rptr;
+	wq = auclnt_get_wq(c);
+
+	/*
+	 * If a transfer error occurred, the framework already
+	 * MIOCNAK'd it.
+	 */
+	if (csp->cp_rval != 0) {
+		freemsg(mp);
+		return;
+	}
+
+	/*
+	 * If no state, then this is a response to M_COPYOUT, and we
+	 * are done.  (Audio ioctls just copyout a single structure at
+	 * completion of work.)
+	 */
+	if (csp->cp_private == NULL) {
+		miocack(wq, mp, 0, 0);
+		return;
+	}
+
+	/* now, call the handler ioctl */
+	switch (csp->cp_cmd) {
+	case AUDIO_SETINFO:
+		devaudio_ioc_setinfo(wq, c, mp);
+		break;
+	default:
+		miocnak(wq, mp, 0, EINVAL);
+		break;
+	}
+}
+
+static void
+devaudio_mioctl(audio_client_t *c, mblk_t *mp)
+{
+	struct iocblk	*iocp = (void *)mp->b_rptr;
+	queue_t		*wq = auclnt_get_wq(c);
+
+	/* BSD legacy here: we only support transparent ioctls */
+	if (iocp->ioc_count != TRANSPARENT) {
+		miocnak(wq, mp, 0, EINVAL);
+		return;
+	}
+
+	switch (iocp->ioc_cmd) {
 	case AUDIO_GETINFO:
-		sioc_getinfo(ip);
+		devaudio_ioc_getinfo(wq, c, mp);
 		break;
 
 	case AUDIO_SETINFO:
-		sioc_setinfo(ip);
+		devaudio_ioc_setinfo(wq, c, mp);
 		break;
 
 	case AUDIO_GETDEV:
-		sioc_getdev(ip);
+		devaudio_ioc_getdev(wq, c, mp);
 		break;
 
 	case AUDIO_DIAG_LOOPBACK:
 		/* we don't support this one */
-		sioc_error(ip, ENOTTY);
-		sioc_finish(ip);
+		miocnak(wq, mp, 0, ENOTTY);
 		break;
 
 	case AUDIO_MIXERCTL_GET_MODE:
@@ -1157,503 +1191,76 @@ sunstr_ioctl(sioc_t *ip)
 	case AUDIO_MIXER_MULTIPLE_OPEN:
 	case AUDIO_MIXER_GET_SAMPLE_RATES:
 	default:
-		sioc_error(ip, EINVAL);
-		sioc_finish(ip);
+		miocnak(wq, mp, 0, EINVAL);
 		break;
 	}
 }
 
-static int
-sun_sigpoll(audio_client_t *c, void *arg)
-{
-	sproc_t		*proc = arg;
-	sclient_t	*sc;
-
-	if (auclnt_get_minor_type(c) == AUDIO_MINOR_DEVAUDIOCTL) {
-		sc = auclnt_get_private(c);
-		/* we only need to notify peers in our own process */
-		if ((sc != NULL) && (sc->s_proc == proc)) {
-			(void) putnextctl1(sc->s_rq, M_PCSIG, SIGPOLL);
-		}
-	}
-	return (AUDIO_WALK_CONTINUE);
-}
-
 static void
-sun_drain(audio_client_t *c)
+devaudioctl_wput(audio_client_t *c, mblk_t *mp)
 {
-	sclient_t	*sc = auclnt_get_private(c);
-	mblk_t		*mplist, *mp;
-
-	mutex_enter(&sc->s_lock);
-	mplist = sc->s_draining;
-	sc->s_draining = NULL;
-	mutex_exit(&sc->s_lock);
-
-	while ((mp = mplist) != NULL) {
-		mplist = mp->b_next;
-		mp->b_next = NULL;
-		miocack(sc->s_wq, mp, 0, 0);
-	}
-}
-
-static void
-sun_output(audio_client_t *c)
-{
-	sclient_t	*sc = auclnt_get_private(c);
-	sproc_t		*proc = sc->s_proc;
-	uint64_t	tail;
-	struct eofcnt	*eof;
-	int		eofs = 0;
-
-	tail = auclnt_get_tail(auclnt_output_stream(c));
-
-	/* get more data! (do this early) */
-	qenable(sc->s_wq);
-
-	mutex_enter(&sc->s_lock);
-	while (((eof = list_head(&sc->s_eofcnt)) != NULL) &&
-	    (eof->tail < tail)) {
-		list_remove(&sc->s_eofcnt, eof);
-		kmem_free(eof, sizeof (*eof));
-		eofs++;
-	}
-	proc->p_info.play.eof += eofs;
-	mutex_exit(&sc->s_lock);
-
-	if (eofs) {
-		auclnt_dev_walk_clients(auclnt_get_dev(c),
-		    sun_sigpoll, proc);
-	}
-}
-
-static void
-sun_input(audio_client_t *c)
-{
-	sun_sendup(c);
-}
-
-static int
-sun_create_minors(audio_dev_t *adev, void *notused)
-{
-	char		path[MAXPATHLEN];
-	minor_t		minor;
-	int		inst;
-	int		index;
-	const char	*driver;
-	unsigned	cap;
-
-	_NOTE(ARGUNUSED(notused));
-
-	ASSERT(mutex_owned(&sdev_lock));
-
-	/* don't create device nodes for sndstat device */
-	cap = auclnt_get_dev_capab(adev);
-	if ((cap & (AUDIO_CLIENT_CAP_PLAY | AUDIO_CLIENT_CAP_RECORD)) == 0) {
-		return (AUDIO_WALK_CONTINUE);
-	}
-
-	index = auclnt_get_dev_index(adev);
-	inst = auclnt_get_dev_instance(adev);
-	driver = auclnt_get_dev_driver(adev);
-
-	if (sdev_dip != NULL) {
-
-		minor = AUDIO_MKMN(index, AUDIO_MINOR_DEVAUDIO);
-		(void) snprintf(path, sizeof (path), "sound,%s,audio%d",
-		    driver, inst);
-		(void) ddi_create_minor_node(sdev_dip, path, S_IFCHR, minor,
-		    DDI_NT_AUDIO, 0);
-
-		minor = AUDIO_MKMN(index, AUDIO_MINOR_DEVAUDIOCTL);
-		(void) snprintf(path, sizeof (path), "sound,%s,audioctl%d",
-		    driver, inst);
-		(void) ddi_create_minor_node(sdev_dip, path, S_IFCHR, minor,
-		    DDI_NT_AUDIO, 0);
-	}
-
-	return (AUDIO_WALK_CONTINUE);
-}
-
-static int
-sun_remove_minors(audio_dev_t *adev, void *notused)
-{
-	char		path[MAXPATHLEN];
-	int		inst;
-	const char	*driver;
-	unsigned	cap;
-
-	_NOTE(ARGUNUSED(notused));
-
-	ASSERT(mutex_owned(&sdev_lock));
-
-	cap = auclnt_get_dev_capab(adev);
-	/* if not a play or record device, don't bother creating minors */
-	if ((cap & (AUDIO_CLIENT_CAP_PLAY | AUDIO_CLIENT_CAP_RECORD)) == 0) {
-		return (AUDIO_WALK_CONTINUE);
-	}
-
-	inst = auclnt_get_dev_instance(adev);
-	driver = auclnt_get_dev_driver(adev);
-
-	if (sdev_dip != NULL) {
-
-		(void) snprintf(path, sizeof (path), "sound,%s,audio%d",
-		    driver, inst);
-		ddi_remove_minor_node(sdev_dip, path);
-
-		(void) snprintf(path, sizeof (path), "sound,%s,audioctl%d",
-		    driver, inst);
-		ddi_remove_minor_node(sdev_dip, path);
-	}
-
-	return (AUDIO_WALK_CONTINUE);
-}
-
-static void *
-sun_dev_init(audio_dev_t *adev)
-{
-	sdev_t		*sdev;
-	unsigned	cap;
-
-	cap = auclnt_get_dev_capab(adev);
-	/* if not a play or record device, don't bother initializing it */
-	if ((cap & (AUDIO_CLIENT_CAP_PLAY | AUDIO_CLIENT_CAP_RECORD)) == 0) {
-		return (NULL);
-	}
-
-	sdev = kmem_zalloc(sizeof (*sdev), KM_SLEEP);
-	sdev->d_dev = adev;
-	mutex_init(&sdev->d_mx, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&sdev->d_cv, NULL, CV_DRIVER, NULL);
-	list_create(&sdev->d_procs, sizeof (struct sproc),
-	    offsetof(struct sproc, p_linkage));
-
-	mutex_enter(&sdev_lock);
-	(void) sun_create_minors(adev, NULL);
-	mutex_exit(&sdev_lock);
-
-	return (sdev);
-}
-
-static void
-sun_dev_fini(void *arg)
-{
-	sdev_t	*sdev = arg;
-
-	if (sdev != NULL) {
-
-		/* remove minor nodes */
-		mutex_enter(&sdev_lock);
-		(void) sun_remove_minors(sdev->d_dev, NULL);
-		mutex_exit(&sdev_lock);
-
-		mutex_destroy(&sdev->d_mx);
-		cv_destroy(&sdev->d_cv);
-		list_destroy(&sdev->d_procs);
-		kmem_free(sdev, sizeof (*sdev));
-	}
-}
-
-static struct audio_client_ops sun_ops = {
-	"internal,audio",
-	sun_dev_init,
-	sun_dev_fini,
-	sun_open,
-	sun_close,
-	NULL,	/* read */
-	NULL,	/* write */
-	NULL,	/* ioctl */
-	NULL,	/* chpoll */
-	NULL,	/* mmap */
-	sun_input,
-	sun_output,
-	NULL,	/* notify */
-	sun_drain,
-};
-
-static struct audio_client_ops sunctl_ops = {
-	"internal,audioctl",
-	NULL,	/* dev_init */
-	NULL,	/* dev_fini */
-	sun_open,
-	sun_close,
-	NULL,	/* read */
-	NULL,	/* write */
-	NULL,	/* ioctl */
-	NULL,	/* chpoll */
-	NULL,	/* mmap */
-	NULL,	/* output */
-	NULL,	/* input */
-	NULL,	/* notify */
-	NULL,	/* drain */
-};
-
-void
-auimpl_sun_init(void)
-{
-	mutex_init(&sdev_lock, NULL, MUTEX_DRIVER, NULL);
-	sdev_dip = NULL;
-	auclnt_register_ops(AUDIO_MINOR_DEVAUDIO, &sun_ops);
-	auclnt_register_ops(AUDIO_MINOR_DEVAUDIOCTL, &sunctl_ops);
-}
-
-/*
- * This is the operations entry points that are streams specific...
- * We map "instance" numbers.
- */
-
-static int
-sunstr_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *cr)
-{
-	int			rv;
-	minor_t			minor;
-	minor_t			index;
-	minor_t			type;
-	dev_t			physdev;
-	ldi_ident_t		lid;
-	ldi_handle_t		lh = NULL;
-	audio_client_t		*c = NULL;
-	audio_dev_t		*adev;
-	unsigned		fmt;
-	int			oflag;
-	boolean_t		isopen = B_FALSE;
-
-	if (sflag != 0) {
-		/* no direct clone or module opens */
-		return (EINVAL);
-	}
-
-	/*
-	 * NB: We reuse the partitioning that the core framework is
-	 * using for instance numbering.  This does mean that we are
-	 * limited to at most AUDIO_MN_INST_MASK devices, but this
-	 * number is sufficiently large (8192) that not to be a concern.
-	 */
-
-	minor = getminor(*devp);
-	index = (minor >> AUDIO_MN_INST_SHIFT) & AUDIO_MN_INST_MASK;
-	type = (minor >> AUDIO_MN_TYPE_SHIFT) & AUDIO_MN_TYPE_MASK;
-
-	/* can't directly open a cloned node! */
-	if (minor & AUDIO_MN_CLONE_MASK) {
-		return (ENXIO);
-	}
-
-	switch (type) {
-	case AUDIO_MINOR_DEVAUDIOCTL:
-		fmt = AUDIO_FORMAT_NONE;
-		oflag = flag & ~(FWRITE | FREAD);
-		break;
-	case AUDIO_MINOR_DEVAUDIO:
-		fmt = AUDIO_FORMAT_PCM;
-		oflag = flag;
-		break;
-	default:
-		/* these minor types are not legal */
-		return (ENXIO);
-	}
-
-	/* look up and hold the matching audio device */
-	adev = auclnt_hold_dev_by_index(index);
-	if (adev == NULL) {
-		return (ENXIO);
-	}
-	/* find the matching physical devt */
-	physdev = makedevice(ddi_driver_major(auclnt_get_dev_devinfo(adev)),
-	    AUDIO_MKMN(auclnt_get_dev_instance(adev), type));
-
-	if ((rv = ldi_ident_from_stream(rq, &lid)) == 0) {
-		rv = ldi_open_by_dev(&physdev, OTYP_CHR, flag, cr, &lh, lid);
-	}
-
-	/* ldi open is done, lh holds device, and we can release our hold */
-	auclnt_release_dev(adev);
-
-	if (rv != 0) {
-		goto fail;
-	}
-	/* phys layer clones a device for us */
-	ASSERT((getminor(physdev) & AUDIO_MN_CLONE_MASK) != 0);
-
-	/*
-	 * Note: We don't need to retain the hold on the client
-	 * structure, because the client is logically "held" by the
-	 * open LDI handle.  We're just using this hold_by_devt to
-	 * locate the associated client.
-	 */
-	c = auclnt_hold_by_devt(physdev);
-	ASSERT(c != NULL);
-	auclnt_release(c);
-
-	if ((rv = auclnt_open(c, fmt, oflag)) != 0) {
-		goto fail;
-	}
-	isopen = B_TRUE;
-
-	if ((rv = sproc_hold(c, lh, rq, oflag)) != 0) {
-		goto fail;
-	}
-
-	/* start up the input */
-	if (oflag & FREAD) {
-		auclnt_start(auclnt_input_stream(c));
-	}
-
-	/* we just reuse same minor number that phys layer used */
-	*devp = makedevice(getmajor(*devp), getminor(physdev));
-
-	qprocson(rq);
-
-	return (0);
-
-fail:
-	if (isopen) {
-		auclnt_close(c);
-	}
-	if (lh != NULL) {
-		(void) ldi_close(lh, flag, cr);
-	}
-
-	return (rv);
-}
-
-static int
-sunstr_close(queue_t *rq, int flag, cred_t *cr)
-{
-	sclient_t	*sc;
-	audio_client_t	*c;
-	int		rv;
-
-	sc = rq->q_ptr;
-	c = sc->s_client;
-
-	if ((auclnt_get_minor_type(c) == AUDIO_MINOR_DEVAUDIO) &&
-	    (ddi_can_receive_sig() || (ddi_get_pid() == 0))) {
-		rv = auclnt_drain(c);
-	}
-
-	auclnt_stop(auclnt_output_stream(c));
-	auclnt_stop(auclnt_input_stream(c));
-
-	auclnt_close(c);
-
-	qprocsoff(rq);
-
-	(void) ldi_close(sc->s_lh, flag, cr);
-
-	sproc_release(sc);
-
-	return (rv);
-}
-
-static void
-sunstr_miocdata(sclient_t *sc, mblk_t *mp)
-{
-	struct copyresp		*csp;
-	sioc_t			*ip;
-	mblk_t			*bcont;
-
-	csp = (void *)mp->b_rptr;
-
-	/*
-	 * If no state, then something "bad" has happened.
-	 */
-	if (((ip = (void *)csp->cp_private) == NULL) || (ip->i_sc != sc)) {
-		miocnak(sc->s_wq, mp, 0, EFAULT);
-		return;
-	}
-
-	/*
-	 * If we failed to transfer data to/from userland, then we are
-	 * done.  (Stream head will have notified userland.)
-	 */
-	if (csp->cp_rval != 0) {
-		ip->i_state = FINI;
-		ip->i_mp = mp;
-		sioc_finish(ip);
-		return;
-	}
-
-	/*
-	 * Buffer area for ioctl is attached to chain.
-	 * For an ioctl that didn't have any data to copyin,
-	 * we might need to allocate a new buffer area.
-	 */
-	bcont = mp->b_cont;
-	ip->i_bcont = bcont;
-	mp->b_cont = NULL;
-
-	if (bcont != NULL) {
-		ip->i_data = bcont->b_rptr;
-	}
-
-	/*
-	 * Meaty part of data processing.
-	 */
-	ip->i_state = IOCTL;
-	ip->i_mp = mp;
-
-	/* now, call the handler ioctl */
-	sunstr_ioctl(ip);
-}
-
-static void
-sunstr_mioctl(sclient_t *sc, mblk_t *mp)
-{
-	struct iocblk	*iocp = (void *)mp->b_rptr;
-	sioc_t		*ip;
-
-	/* BSD legacy here: we only support transparent ioctls */
-	if (iocp->ioc_count != TRANSPARENT) {
-		miocnak(sc->s_wq, mp, 0, EINVAL);
-		return;
-	}
-
-	ip = kmem_zalloc(sizeof (*ip), KM_NOSLEEP);
-	if (ip == NULL) {
-		miocnak(sc->s_wq, mp, 0, ENOMEM);
-		return;
-	}
-
-	/* make sure everything is setup in case we need to do copyin/out */
-	ip->i_sc = sc;
-	ip->i_model = iocp->ioc_flag;
-	ip->i_cmd = iocp->ioc_cmd;
-	ip->i_addr = *(caddr_t *)(void *)mp->b_cont->b_rptr;
-	ip->i_state = IOCTL;
-	ip->i_mp = mp;
-	freemsg(mp->b_cont);
-	mp->b_cont = NULL;
-
-	/* now, call the handler ioctl */
-	sunstr_ioctl(ip);
-}
-
-static int
-sunstr_wput(queue_t *wq, mblk_t *mp)
-{
-	sclient_t	*sc = wq->q_ptr;
-	struct iocblk	*iocp;
+	queue_t		*wq = auclnt_get_wq(c);
 
 	switch (DB_TYPE(mp)) {
 	case M_IOCTL:
 		/* Drain ioctl needs to be handled on the service queue */
-		iocp = (void *)mp->b_rptr;
-		if (iocp->ioc_cmd == AUDIO_DRAIN) {
-			if (auclnt_get_minor_type(sc->s_client) ==
-			    AUDIO_MINOR_DEVAUDIO) {
-				(void) putq(wq, mp);
-			} else {
-				miocnak(wq, mp, 0, EINVAL);
-			}
+		devaudio_mioctl(c, mp);
+		break;
+
+	case M_IOCDATA:
+		devaudio_miocdata(c, mp);
+		break;
+
+	case M_FLUSH:
+		/*
+		 * We don't flush the engine.  The reason is that
+		 * other streams might be using the engine.  This is
+		 * fundamentally no different from the case where the
+		 * engine hardware has data buffered in an
+		 * inaccessible FIFO.
+		 *
+		 * Clients that want to ensure no more data is coming
+		 * should stop the stream before flushing.
+		 */
+		if (*mp->b_rptr & FLUSHW) {
+			*mp->b_rptr &= ~FLUSHW;
+		}
+		if (*mp->b_rptr & FLUSHR) {
+			qreply(wq, mp);
 		} else {
-			sunstr_mioctl(sc, mp);
+			freemsg(mp);
+		}
+		break;
+
+	case M_DATA:
+		/*
+		 * No audio data on control nodes!
+		 */
+		freemsg(mp);
+
+	default:
+		freemsg(mp);
+		break;
+	}
+}
+
+static void
+devaudio_wput(audio_client_t *c, mblk_t *mp)
+{
+	queue_t		*wq = auclnt_get_wq(c);
+
+	switch (DB_TYPE(mp)) {
+	case M_IOCTL:
+		/* Drain ioctl needs to be handled on the service queue */
+		if (*(int *)(void *)mp->b_rptr == AUDIO_DRAIN) {
+			(void) putq(wq, mp);
+		} else {
+			devaudio_mioctl(c, mp);
 		}
 		break;
 
 	case M_IOCDATA:
-		sunstr_miocdata(sc, mp);
+		devaudio_miocdata(c, mp);
 		break;
 
 	case M_FLUSH:
@@ -1669,12 +1276,12 @@ sunstr_wput(queue_t *wq, mblk_t *mp)
 		 */
 		if (*mp->b_rptr & FLUSHW) {
 			flushq(wq, FLUSHALL);
-			auclnt_flush(auclnt_output_stream(sc->s_client));
+			auclnt_flush(auclnt_output_stream(c));
 			*mp->b_rptr &= ~FLUSHW;
 		}
 		if (*mp->b_rptr & FLUSHR) {
 			flushq(RD(wq), FLUSHALL);
-			auclnt_flush(auclnt_input_stream(sc->s_client));
+			auclnt_flush(auclnt_input_stream(c));
 			qreply(wq, mp);
 		} else {
 			freemsg(mp);
@@ -1683,38 +1290,27 @@ sunstr_wput(queue_t *wq, mblk_t *mp)
 
 	case M_DATA:
 		/*
-		 * If we don't have an engine, then we can't accept
-		 * write() data.  audio(7i) says we just ignore it,
-		 * so we toss it.
+		 * Defer processing to the queue.  This keeps the data
+		 * ordered, and allows the wsrv routine to gather
+		 * multiple mblks at once.
 		 */
-		if (auclnt_get_minor_type(sc->s_client) !=
-		    AUDIO_MINOR_DEVAUDIO) {
-			freemsg(mp);
-		} else {
+		if (mp->b_cont != NULL) {
+
 			/*
-			 * Defer processing to the queue.  This keeps
-			 * the data ordered, and allows the wsrv
-			 * routine to gather multiple mblks at once.
+			 * If we need to pullup, do it here to
+			 * simplify the rest of the processing later.
+			 * This should rarely (if ever) be necessary.
 			 */
-			if (mp->b_cont != NULL) {
+			mblk_t	*nmp;
 
-				/*
-				 * If we need to pullup, do it here to
-				 * simplify the rest of the processing
-				 * later.  This should rarely (if
-				 * ever) be necessary.
-				 */
-				mblk_t	*nmp;
-
-				if ((nmp = msgpullup(mp, -1)) == NULL) {
-					freemsg(mp);
-				} else {
-					freemsg(mp);
-					(void) putq(wq, nmp);
-				}
+			if ((nmp = msgpullup(mp, -1)) == NULL) {
+				freemsg(mp);
 			} else {
-				(void) putq(wq, mp);
+				freemsg(mp);
+				(void) putq(wq, nmp);
 			}
+		} else {
+			(void) putq(wq, mp);
 		}
 		break;
 
@@ -1722,14 +1318,13 @@ sunstr_wput(queue_t *wq, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
-	return (0);
 }
 
-static int
-sunstr_wsrv(queue_t *wq)
+static void
+devaudio_wsrv(audio_client_t *c)
 {
-	sclient_t	*sc = wq->q_ptr;
-	audio_client_t	*c = sc->s_client;
+	queue_t		*wq = auclnt_get_wq(c);
+	daclient_t	*dc = auclnt_get_private(c);
 	audio_stream_t	*sp;
 	mblk_t		*mp;
 	unsigned	framesz;
@@ -1747,13 +1342,13 @@ sunstr_wsrv(queue_t *wq)
 		/* if its a drain ioctl, we need to process it here */
 		if (DB_TYPE(mp) == M_IOCTL) {
 			ASSERT((*(int *)(void *)mp->b_rptr) == AUDIO_DRAIN);
-			mutex_enter(&sc->s_lock);
-			mp->b_next = sc->s_draining;
-			sc->s_draining = mp;
-			mutex_exit(&sc->s_lock);
+			mutex_enter(&dc->dc_lock);
+			mp->b_next = dc->dc_draining;
+			dc->dc_draining = mp;
+			mutex_exit(&dc->dc_lock);
 
 			if (auclnt_start_drain(c) != 0) {
-				sun_drain(c);
+				devaudio_drain(c);
 			}
 			continue;
 		}
@@ -1771,9 +1366,9 @@ sunstr_wsrv(queue_t *wq)
 			eof = kmem_zalloc(sizeof (*eof), KM_NOSLEEP);
 			if (eof != NULL) {
 				eof->tail = auclnt_get_head(sp);
-				mutex_enter(&sc->s_lock);
-				list_insert_tail(&sc->s_eofcnt, eof);
-				mutex_exit(&sc->s_lock);
+				mutex_enter(&dc->dc_lock);
+				list_insert_tail(&dc->dc_eofcnt, eof);
+				mutex_exit(&dc->dc_lock);
 			}
 			freemsg(mp);
 			continue;
@@ -1795,173 +1390,49 @@ sunstr_wsrv(queue_t *wq)
 	/* if the stream isn't running yet, start it up */
 	if (!auclnt_is_paused(sp))
 		auclnt_start(sp);
-
-	return (0);
 }
 
-static int
-sunstr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
-{
-	if ((cmd != DDI_ATTACH) || (dip == NULL)) {
-		return (DDI_FAILURE);
-	}
-	if (ddi_get_instance(dip) != 0) {
-		return (DDI_FAILURE);
-	}
-
-	mutex_enter(&sdev_lock);
-	sdev_dip = dip;
-	auclnt_walk_devs(sun_create_minors, NULL);
-	mutex_exit(&sdev_lock);
-	ddi_report_dev(dip);
-
-	return (0);
-}
-
-static int
-sunstr_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
-{
-	if ((cmd != DDI_DETACH) || (dip == NULL)) {
-		return (DDI_FAILURE);
-	}
-	if (ddi_get_instance(dip) != 0) {
-		return (DDI_FAILURE);
-	}
-
-	mutex_enter(&sdev_lock);
-	/* remove all minors */
-	auclnt_walk_devs(sun_remove_minors, NULL);
-	sdev_dip = NULL;
-	mutex_exit(&sdev_lock);
-
-	return (0);
-}
-
-static int
-sunstr_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
-{
-	int		error;
-
-	_NOTE(ARGUNUSED(dip));
-	_NOTE(ARGUNUSED(arg));
-
-	switch (cmd) {
-	case DDI_INFO_DEVT2DEVINFO:
-		*result = sdev_dip;
-		error = DDI_SUCCESS;
-		break;
-	case DDI_INFO_DEVT2INSTANCE:
-		*result = 0;
-		error = DDI_SUCCESS;
-		break;
-	default:
-		*result = NULL;
-		error = DDI_FAILURE;
-	}
-	return (error);
-}
-
-static struct module_info sunstr_minfo = {
-	0,		/* used for strlog(1M) only, which we don't use */
-	"austr",
-	0,		/* min pkt size */
-	2048,		/* max pkt size */
-	65536,		/* hi water */
-	32768,		/* lo water */
+static struct audio_client_ops devaudio_ops = {
+	"sound,audio",
+	devaudio_init,
+	devaudio_fini,
+	devaudio_open,
+	devaudio_close,
+	NULL,	/* read */
+	NULL,	/* write */
+	NULL,	/* ioctl */
+	NULL,	/* chpoll */
+	NULL,	/* mmap */
+	devaudio_input,
+	devaudio_output,
+	NULL,	/* notify */
+	devaudio_drain,
+	devaudio_wput,
+	devaudio_wsrv
 };
 
-static struct qinit sunstr_rqinit = {
-	NULL,		/* qi_putp */
-	NULL,		/* qi_srvp */
-	sunstr_open,	/* qi_qopen */
-	sunstr_close,	/* qi_qclose */
-	NULL,		/* qi_qadmin */
-	&sunstr_minfo,	/* qi_minfo */
-	NULL,		/* qi_mstat */
-};
-
-static struct qinit sunstr_wqinit = {
-	sunstr_wput,	/* qi_putp */
-	sunstr_wsrv,	/* qi_srvp */
-	NULL,		/* qi_qopen */
-	NULL,		/* qi_qclose */
-	NULL,		/* qi_qadmin */
-	&sunstr_minfo,	/* qi_minfo */
-	NULL,		/* qi_mstat */
-};
-
-static struct streamtab sunstr_strtab = {
-	&sunstr_rqinit,
-	&sunstr_wqinit,
+static struct audio_client_ops devaudioctl_ops = {
+	"sound,audioctl",
+	NULL,	/* dev_init */
+	NULL,	/* dev_fini */
+	devaudioctl_open,
+	devaudioctl_close,
+	NULL,	/* read */
+	NULL,	/* write */
+	NULL,	/* ioctl */
+	NULL,	/* chpoll */
+	NULL,	/* mmap */
+	NULL,	/* output */
+	NULL,	/* input */
+	NULL,	/* notify */
+	NULL,	/* drain */
+	devaudioctl_wput,
 	NULL,
-	NULL
 };
 
-struct cb_ops sunstr_cb_ops = {
-	nodev,		/* open */
-	nodev,		/* close */
-	nodev,		/* strategy */
-	nodev,		/* print */
-	nodev,		/* dump */
-	nodev,		/* read */
-	nodev,		/* write */
-	nodev,		/* ioctl */
-	nodev,		/* devmap */
-	nodev,		/* mmap */
-	nodev,		/* segmap */
-	nochpoll,	/* chpoll */
-	ddi_prop_op,	/* prop_op */
-	&sunstr_strtab,	/* str */
-	D_MP,		/* flag */
-	CB_REV, 	/* rev */
-	nodev,		/* aread */
-	nodev,		/* awrite */
-};
-
-static struct dev_ops sunstr_dev_ops = {
-	DEVO_REV,		/* rev */
-	0,			/* refcnt */
-	sunstr_getinfo,		/* getinfo */
-	nulldev,		/* identify */
-	nulldev,		/* probe */
-	sunstr_attach,		/* attach */
-	sunstr_detach,		/* detach */
-	nodev,			/* reset */
-	&sunstr_cb_ops,		/* cb_ops */
-	NULL,			/* bus_ops */
-	NULL,			/* power */
-};
-
-static struct modldrv sunstr_modldrv = {
-	&mod_driverops,
-	"Audio Streams Support",
-	&sunstr_dev_ops,
-};
-
-static struct modlinkage sunstr_modlinkage = {
-	MODREV_1,			/* MODREV_1 indicated by manual */
-	&sunstr_modldrv,
-	NULL
-};
-
-int
-sunstr_init(void)
+void
+auimpl_sun_init(void)
 {
-	/*
-	 * NB: This *must* be called after the "audio" module's
-	 * _init routine has called auimpl_sun_init().
-	 */
-	return (mod_install(&sunstr_modlinkage));
-}
-
-int
-sunstr_fini(void)
-{
-	return (mod_remove(&sunstr_modlinkage));
-}
-
-int
-sunstr_info(struct modinfo *modinfop)
-{
-	return (mod_info(&sunstr_modlinkage, modinfop));
+	auclnt_register_ops(AUDIO_MINOR_DEVAUDIO, &devaudio_ops);
+	auclnt_register_ops(AUDIO_MINOR_DEVAUDIOCTL, &devaudioctl_ops);
 }

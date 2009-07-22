@@ -190,6 +190,117 @@ audio_open(dev_t *devp, int oflag, int otyp, cred_t *credp)
 }
 
 static int
+audio_stropen(queue_t *rq, dev_t *devp, int oflag, int sflag, cred_t *credp)
+{
+	int			rv;
+	audio_client_t		*c;
+
+	if (sflag != 0) {
+		/* no direct clone or module opens */
+		return (ENXIO);
+	}
+
+	/*
+	 * Make sure its a STREAMS personality - only legacy Sun API uses
+	 * STREAMS.
+	 */
+	switch (AUDIO_MN_TYPE_MASK & getminor(*devp)) {
+	case AUDIO_MINOR_DEVAUDIO:
+	case AUDIO_MINOR_DEVAUDIOCTL:
+		break;
+	default:
+		return (ENOSTR);
+	}
+
+	if ((c = auimpl_client_create(*devp)) == NULL) {
+		audio_dev_warn(NULL, "client create failed");
+		return (ENXIO);
+	}
+
+	rq->q_ptr = WR(rq)->q_ptr = c;
+	c->c_omode = oflag;
+	c->c_pid = ddi_get_pid();
+	c->c_cred = credp;
+	c->c_rq = rq;
+	c->c_wq = WR(rq);
+
+	/*
+	 * Call client/personality specific open handler.  Note that
+	 * we "insist" that there is an open.  The personality layer
+	 * will initialize/allocate any engines required.
+	 *
+	 * Hmm... do we need to pass in the cred?
+	 */
+	if ((rv = c->c_open(c, oflag)) != 0) {
+		audio_dev_warn(c->c_dev, "open failed (rv %d)", rv);
+		auimpl_client_destroy(c);
+		return (rv);
+	}
+
+	/* we do device cloning! */
+	*devp = makedevice(c->c_major, c->c_minor);
+
+	mutex_enter(&c->c_lock);
+	c->c_is_open = B_TRUE;
+	mutex_exit(&c->c_lock);
+
+	auclnt_notify_dev(c->c_dev);
+
+	qprocson(rq);
+
+	return (0);
+}
+
+static int
+audio_strclose(queue_t *rq, int flag, cred_t *credp)
+{
+	audio_client_t	*c;
+	audio_dev_t	*d;
+	int		rv;
+
+	_NOTE(ARGUNUSED(flag));
+	_NOTE(ARGUNUSED(credp));
+
+	if ((c = rq->q_ptr) == NULL) {
+		return (ENXIO);
+	}
+	if (ddi_can_receive_sig() || (ddi_get_pid() == 0)) {
+		rv = auclnt_drain(c);
+	}
+
+	mutex_enter(&c->c_lock);
+	c->c_is_open = B_FALSE;
+	mutex_exit(&c->c_lock);
+
+	/*
+	 * Pick up any data sitting around in input buffers.  This
+	 * avoids leaving record data stuck in queues.
+	 */
+	if (c->c_istream.s_engine != NULL)
+		audio_engine_produce(c->c_istream.s_engine);
+
+	/* get a local hold on the device */
+	d = c->c_dev;
+	auimpl_dev_hold(c->c_dev);
+
+	/* Turn off queue processing... */
+	qprocsoff(rq);
+
+	/* Call personality specific close handler */
+	c->c_close(c);
+
+	auimpl_client_destroy(c);
+
+	/* notify peers that a change has occurred */
+	auclnt_notify_dev(d);
+
+	/* now we can drop the release we had on the device */
+	auimpl_dev_release(d);
+
+	return (rv);
+}
+
+static int
 audio_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	audio_client_t	*c;
@@ -200,7 +311,7 @@ audio_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	_NOTE(ARGUNUSED(otyp));
 
 	if ((c = auclnt_hold_by_devt(dev)) == NULL) {
-		audio_dev_warn(NULL, "close on bugs devt %x,%x",
+		audio_dev_warn(NULL, "close on bogus devt %x,%x",
 		    getmajor(dev), getminor(dev));
 		return (ENXIO);
 	}
@@ -306,37 +417,44 @@ audio_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	return (rv);
 }
 
-struct cb_ops audio_cb_ops = {
-	audio_open,		/* open */
-	audio_close,		/* close */
-	nodev,		/* strategy */
-	nodev,		/* print */
-	nodev,		/* dump */
-	audio_read,		/* read */
-	audio_write,		/* write */
-	audio_ioctl,		/* ioctl */
-	nodev,		/* devmap */
-	nodev,		/* mmap */
-	nodev,		/* segmap */
-	audio_chpoll,	/* chpoll */
-	ddi_prop_op,	/* prop_op */
-	NULL,		/* str */
-	D_MP | D_64BIT,		/* flag */
-	CB_REV, 	/* rev */
-	nodev,		/* aread */
-	nodev,		/* awrite */
-};
+static int
+audio_wput(queue_t *wq, mblk_t *mp)
+{
+	audio_client_t	*c;
+
+	c = wq->q_ptr;
+	if (c->c_wput) {
+		c->c_wput(c, mp);
+	} else {
+		freemsg(mp);
+	}
+	return (0);
+}
+
+static int
+audio_wsrv(queue_t *wq)
+{
+	audio_client_t	*c;
+
+	c = wq->q_ptr;
+	if (c->c_wsrv) {
+		c->c_wsrv(c);
+	} else {
+		flushq(wq, FLUSHALL);
+	}
+	return (0);
+}
 
 static struct dev_ops audio_dev_ops = {
 	DEVO_REV,		/* rev */
 	0,			/* refcnt */
-	audio_getinfo,		/* getinfo */
+	NULL,			/* getinfo */
 	nulldev,		/* identify */
 	nulldev,		/* probe */
 	audio_attach,		/* attach */
 	audio_detach,		/* detach */
 	nodev,			/* reset */
-	&audio_cb_ops,		/* cb_ops */
+	NULL,			/* cb_ops */
 	NULL,			/* bus_ops */
 	NULL,			/* power */
 };
@@ -354,17 +472,50 @@ static struct modlinkage modlinkage = {
 };
 
 struct audio_ops_helper {
-	struct cb_ops		cbops;
+	struct cb_ops		cbops;	/* NB: must be first */
+	struct streamtab	strtab;
+	struct qinit		rqinit;
+	struct qinit		wqinit;
+	struct module_info	minfo;
+	char			name[MODMAXNAMELEN+1];
 };
 
 void
 audio_init_ops(struct dev_ops *devops, const char *name)
 {
-	_NOTE(ARGUNUSED(name));
-
 	struct audio_ops_helper	*helper;
 
 	helper = kmem_zalloc(sizeof (*helper), KM_SLEEP);
+
+	(void) strlcpy(helper->name, name, sizeof (helper->name));
+
+	helper->minfo.mi_idnum = 0;	/* only for strlog(1M) */
+	helper->minfo.mi_idname = helper->name;
+	helper->minfo.mi_minpsz = 0;
+	helper->minfo.mi_maxpsz = 2048;
+	helper->minfo.mi_hiwat = 65536;
+	helper->minfo.mi_lowat = 32768;
+
+	helper->wqinit.qi_putp = audio_wput;
+	helper->wqinit.qi_srvp = audio_wsrv;
+	helper->wqinit.qi_qopen = NULL;
+	helper->wqinit.qi_qclose = NULL;
+	helper->wqinit.qi_qadmin = NULL;
+	helper->wqinit.qi_minfo = &helper->minfo;
+	helper->wqinit.qi_mstat = NULL;
+
+	helper->rqinit.qi_putp = NULL;
+	helper->rqinit.qi_srvp = NULL;
+	helper->rqinit.qi_qopen = audio_stropen;
+	helper->rqinit.qi_qclose = audio_strclose;
+	helper->rqinit.qi_qadmin = NULL;
+	helper->rqinit.qi_minfo = &helper->minfo;
+	helper->rqinit.qi_mstat = NULL;
+
+	helper->strtab.st_rdinit = &helper->rqinit;
+	helper->strtab.st_wrinit = &helper->wqinit;
+	helper->strtab.st_muxrinit = NULL;
+	helper->strtab.st_muxwinit = NULL;
 
 	helper->cbops.cb_open = audio_open;
 	helper->cbops.cb_close = audio_close;
@@ -379,7 +530,7 @@ audio_init_ops(struct dev_ops *devops, const char *name)
 	helper->cbops.cb_segmap = nodev;
 	helper->cbops.cb_chpoll = audio_chpoll;
 	helper->cbops.cb_prop_op = ddi_prop_op;
-	helper->cbops.cb_str = NULL;
+	helper->cbops.cb_str = &helper->strtab;
 	helper->cbops.cb_flag = D_MP | D_64BIT;
 	helper->cbops.cb_rev = CB_REV;
 	helper->cbops.cb_aread = nodev;
@@ -437,7 +588,10 @@ _init(void)
 	auimpl_sun_init();
 	auimpl_oss_init();
 
+	audio_init_ops(&audio_dev_ops, "audio");
+
 	if ((rv = mod_install(&modlinkage)) != 0) {
+		audio_fini_ops(&audio_dev_ops);
 		auimpl_dev_fini();
 		auimpl_client_fini();
 	}

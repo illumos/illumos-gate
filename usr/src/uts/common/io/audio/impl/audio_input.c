@@ -36,10 +36,6 @@
 #include <sys/sysmacros.h>
 #include "audio_impl.h"
 
-#ifdef	DEBUG
-int	audio_overruns = 0;
-#endif
-
 #define	DECL_AUDIO_IMPORT(NAME, TYPE, SWAP, SHIFT)			\
 void									\
 auimpl_import_##NAME(audio_engine_t *eng, audio_stream_t *sp)		\
@@ -191,9 +187,8 @@ auimpl_input_callback(audio_engine_t *eng)
 
 			space = sp->s_nframes - (sp->s_head - sp->s_tail);
 			if (count > space) {
-#ifdef	DEBUG
-				audio_overruns++;
-#endif
+				eng->e_stream_overruns++;
+				eng->e_errors++;
 				sp->s_errors += count - space;
 				count = space;
 				overrun = B_TRUE;
