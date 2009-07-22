@@ -47,6 +47,7 @@
 #include <ucred.h>
 #include <idmap.h>
 #include <aclutils.h>
+#include <directory.h>
 
 #include <sys/spa.h>
 #include <sys/zap.h>
@@ -2074,6 +2075,7 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 {
 	zfs_userquota_prop_t type;
 	char *cp, *end;
+	char *numericsid = NULL;
 	boolean_t isuser;
 
 	domain[0] = '\0';
@@ -2096,33 +2098,41 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 	if (strchr(cp, '@')) {
 		/*
 		 * It's a SID name (eg "user@domain") that needs to be
-		 * turned into S-1-domainID-RID.  There should be a
-		 * better way to do this, but for now just translate it
-		 * to the (possibly ephemeral) uid and then back to the
-		 * SID.  This is like getsidname(noresolve=TRUE).
+		 * turned into S-1-domainID-RID.
 		 */
-		uid_t id;
-		idmap_rid_t rid;
-		char *mapdomain;
-
+		directory_error_t e;
 		if (zoned && getzoneid() == GLOBAL_ZONEID)
 			return (ENOENT);
-		if (sid_to_id(cp, isuser, &id) != 0)
+		if (isuser) {
+			e = directory_sid_from_user_name(NULL,
+			    cp, &numericsid);
+		} else {
+			e = directory_sid_from_group_name(NULL,
+			    cp, &numericsid);
+		}
+		if (e != NULL) {
+			directory_error_free(e);
 			return (ENOENT);
-		if (idmap_id_to_numeric_domain_rid(id, isuser,
-		    &mapdomain, &rid) != 0)
+		}
+		if (numericsid == NULL)
 			return (ENOENT);
-		(void) strlcpy(domain, mapdomain, domainlen);
-		*ridp = rid;
-	} else if (strncmp(cp, "S-1-", 4) == 0) {
+		cp = numericsid;
+		/* will be further decoded below */
+	}
+
+	if (strncmp(cp, "S-1-", 4) == 0) {
 		/* It's a numeric SID (eg "S-1-234-567-89") */
-		(void) strcpy(domain, cp);
+		(void) strlcpy(domain, cp, domainlen);
 		cp = strrchr(domain, '-');
 		*cp = '\0';
 		cp++;
 
 		errno = 0;
 		*ridp = strtoull(cp, &end, 10);
+		if (numericsid) {
+			free(numericsid);
+			numericsid = NULL;
+		}
 		if (errno != 0 || *end != '\0')
 			return (EINVAL);
 	} else if (!isdigit(*cp)) {
@@ -2158,13 +2168,14 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 			if (idmap_id_to_numeric_domain_rid(id, isuser,
 			    &mapdomain, &rid) != 0)
 				return (ENOENT);
-			(void) strcpy(domain, mapdomain);
+			(void) strlcpy(domain, mapdomain, domainlen);
 			*ridp = rid;
 		} else {
 			*ridp = id;
 		}
 	}
 
+	ASSERT3P(numericsid, ==, NULL);
 	return (0);
 }
 
