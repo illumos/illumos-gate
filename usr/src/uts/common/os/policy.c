@@ -1651,6 +1651,12 @@ secpolicy_resource(const cred_t *cr)
 	return (PRIV_POLICY(cr, PRIV_SYS_RESOURCE, B_FALSE, EPERM, NULL));
 }
 
+int
+secpolicy_resource_anon_mem(const cred_t *cr)
+{
+	return (PRIV_POLICY_ONLY(cr, PRIV_SYS_RESOURCE, B_FALSE));
+}
+
 /*
  * Processes with a real uid of 0 escape any form of accounting, much
  * like before.

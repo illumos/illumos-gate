@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -807,9 +807,16 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 	 *
 	 */
 	if (tryhard) {
+		pgcnt_t floor_pages;
+
+		if (secpolicy_resource_anon_mem(CRED())) {
+			floor_pages = swapfs_minfree;
+		} else {
+			floor_pages = swapfs_minfree + swapfs_reserve;
+		}
+
 		mutex_exit(&anoninfo_lock);
-		(void) page_reclaim_mem(mswap_pages,
-		    swapfs_minfree + swapfs_reserve, 0);
+		(void) page_reclaim_mem(mswap_pages, floor_pages, 0);
 		mutex_enter(&anoninfo_lock);
 	}
 
@@ -836,12 +843,10 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 		ASSERT(k_anoninfo.ani_max >= k_anoninfo.ani_phys_resv);
 		mutex_exit(&anoninfo_lock);
 		return (1);
-
 	} else {
 		/*
 		 * Fail if not enough memory
 		 */
-
 		if (takemem) {
 			k_anoninfo.ani_phys_resv -= pswap_pages;
 		}
