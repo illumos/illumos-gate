@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * The purpose of this lex specification is to estimate the
@@ -152,7 +151,12 @@ struct statstrct {
  *	5. writes to /dev/null
  */
 %}
-#.*$ 	return INITVAL;
+#.*$ 	{
+	if (status.in_awk == 0)
+		return INITVAL;
+	else
+		REJECT; /* No comments in the middle of an awk statement */
+	}
 
 \`	unput(' ');	/* No executable matching */
 
@@ -197,8 +201,9 @@ struct statstrct {
 \'	{
 	char ch;
 
-	if (status.in_awk != 0)
+	if (status.in_awk != 0) {
 		REJECT;;
+	}
 
 	while ((ch = input()) != '\'') {
 		if (ch == '\\') {
@@ -266,9 +271,9 @@ struct statstrct {
  */
 %}
 ^for/[\t\n ]		|
-[\t ]for/[\t\n ]	|
+^[\t ]+for/[\t\n ]	|
 ^while/[\t\n ]		|
-[\t ]while/[\t\n ] {
+^[\t ]+while/[\t\n ] {
 	status.in_loop = 1;
 	loop_depth++;
 	cur_level++;
@@ -276,12 +281,13 @@ struct statstrct {
 }
 
 ^done/[\t\n ] 	|
-[\t ]done/[\t\n ]  {
-	if (status.in_loop == 1)
+^[\t ]+done/[\t\n ]  {
+	if (status.in_loop == 1) {
 		loop_depth--;
 		cur_level--;
 		if (loop_depth == 0)
 			status.in_loop = 0;
+	}
 }
 
 %{
@@ -290,7 +296,7 @@ struct statstrct {
  */
 %}
 ^case/[\t\n ]	|
-[\t ]case/[\t\n ] {
+^[\t ]+case/[\t\n ] {
 	status.in_case = 1;
 	case_depth++;
 	cur_level++;
@@ -298,12 +304,13 @@ struct statstrct {
 }
 
 ^esac/[\t\n ] 	|
-[\t ]esac/[\t\n ] {
-	if (status.in_case == 1)
+^[\t ]+esac/[\t\n ] {
+	if (status.in_case == 1) {
 		case_depth--;
 		cur_level--;
 		if (case_depth == 0)
 			status.in_case = 0;
+	}
 }
 
 %{
@@ -312,7 +319,7 @@ struct statstrct {
  */
 %}
 ^if" "*"["	|
-[\t ]if" "*"[" {
+^[\t ]+if" "*"[" {
 	status.in_if = 1;
 	if_depth++;
 	cur_level++;
@@ -320,12 +327,13 @@ struct statstrct {
 }
 
 ^fi/[\t\n ]	|
-[\t ]fi/[\t\n ]  {
-	if (status.in_if == 1)
+^[\t ]+fi/[\t\n ]  {
+	if (status.in_if == 1) {
 		if_depth--;
 		cur_level--;
 		if (if_depth == 0)
 			status.in_if = 0;
+	}
 }
 
 %{
@@ -335,22 +343,32 @@ struct statstrct {
  */
 %}
 ^n?awk[^\n^']*\' 	|
-[\t \\\(\/]n?awk[^\n^']*\'	status.in_awk = 1;
+[\t \\\(\/]n?awk[^\n^']*\'	{status.in_awk = 1;
+#ifdef VERBOSE
+	printf("open awk statment, line %d\n", line_no);
+#endif
+}
 
 
 \' {
-	if (status.in_awk == 1)
+	if (status.in_awk == 1) {
+#ifdef VERBOSE
+		printf("close awk statement, line %d\n", line_no);
+#endif
 		status.in_awk = 0;
+	}
 }
 
 %{
 /* Detect pipe target. */
 %}
 [\$A-Za-z]	{
-	if (status.in_pipe == 1 && pipe_release == cur_level)
-	{
+	if (status.in_pipe == 1 && pipe_release == cur_level) {
 		status.in_pipe = 0;	/* target located */
 		pipe_release = 0;
+#ifdef VERBOSE
+		printf("end pipe, line %d\n", line_no);
+#endif
 		status.allow_int = 1;	/* this isn't really interactive. */
 		REJECT;	/* put it back */
 	}
@@ -363,6 +381,9 @@ struct statstrct {
 "|"		{
 	if (status.in_pipe == 0) {
 		status.in_pipe = 1;
+#ifdef VERBOSE
+		printf("start pipe, line %d\n", line_no);
+#endif
 		pipe_release = cur_level;
 	}
 }
@@ -543,8 +564,20 @@ struct statstrct {
 	return (root_level | lock_level); /* End of command without a "-R". */
 }
 
-\n	{ line_no++; status.allow_int = 0; }
-.	status.allow_int = 0;
+\n	{ line_no++; status.allow_int = 0; 
+#ifdef VERBOSE
+	printf("allow_int = 0\n");
+#endif
+}
+
+.	{
+	/*
+	XXX - bug - resets prematurely if we pipe into a while loop or
+	other such construct
+	status.allow_int = 0;
+	*/ 
+}
+
 %%
 #include <stdio.h>
 #include <limits.h>
@@ -609,7 +642,7 @@ scripteval(char *script_name, char *script_path, int mask, int silent)
 	}
 
 #ifdef VERBOSE
-	printf("Openned script\n");
+	printf("Opened script\n");
 #endif
 
 	while (val = yylex()) {
@@ -744,6 +777,41 @@ checkscripts(char *inst_dir, int silent)
 #ifdef VERBOSE
 		printf("Looking at file %s\n", dp->d_name);
 #endif
+#ifdef BUG_DEBUG
+		if ((status.in_function != 0)
+		    || (status.in_pipe != 0)
+		    || (status.in_loop != 0)
+		    || (status.in_case != 0)
+		    || (status.in_if != 0)
+		    || (status.in_awk != 0)
+		    || (pipe_release != 0)
+		    || (loop_depth != 0)
+		    || (case_depth != 0)
+		    || (if_depth != 0)
+		    || (cur_level != 0)
+		    || (braces != 0)) {
+			printf("    in_function = %d, in_awk = %d, "
+			    "in_loop = %d, in_case = %d, in_if = %d, "
+			    "in_pipe = %d\n",
+			    status.in_function, status.in_awk, status.in_loop,
+			    status.in_case, status.in_if, status.in_pipe);
+			printf("    loop_depth = %d, case_depth = %d, "
+			    "if_depth = %d, pipe_release = %d, "
+			    "cur_level = %d\n",
+			    loop_depth, case_depth, if_depth, pipe_release,
+			    cur_level);
+			printf("ERROR: found a bug: variable still open\n");
+			return (0);
+		} else {
+			printf("SUCCESS: All variables reset.\n");
+		}
+#endif
+		/* Reset all variables before processing the next file */
+		status.in_function = status.in_pipe = status.in_loop =
+		    status.in_case = status.in_if = status.in_awk = 0;
+		pipe_release = loop_depth = case_depth = if_depth =
+		    cur_level = braces = 0;
+
 		if (dp->d_name[0] == '.')
 			continue;
 

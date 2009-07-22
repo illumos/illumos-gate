@@ -51,6 +51,12 @@ CPPFLAGS +=	-I$(SRC)/cmd/svr4pkg/hdrs \
 		-I$(SRC)/lib/libinstzones/common \
 		-D_FILE_OFFSET_BITS=64
 
+# For VERBOSE mode
+#CPPFLAGS +=	-DVERBOSE
+
+# For stop-in-your-tracks debugging
+#CPPFLAGS +=	-DBUG_DEBUG
+
 # Lint flags 
 #
 LINTFLAGS += -un
