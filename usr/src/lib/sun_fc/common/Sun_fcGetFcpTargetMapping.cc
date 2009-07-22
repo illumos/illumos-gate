@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,13 +36,13 @@
 #include "HBA.h"
 #include "HBAPort.h"
 inline HBA_WWN
-getFirstAdapterPortWWN(HBA_HANDLE handle) {
+getAdapterPortWWN(HBA_HANDLE handle,HBA_UINT32 index) {
 	HBA_WWN hba_wwn;
 	memset(hba_wwn.wwn, 0, sizeof (hba_wwn));
 	try {
 	    Handle *myHandle = Handle::findHandle(handle);
 	    HBA *hba = myHandle->getHBA();
-	    HBAPort *port = hba->getPortByIndex(0);
+		HBAPort *port = hba->getPortByIndex(index);
 	    uint64_t tmp = htonll(port->getPortWWN());
 	    memcpy(hba_wwn.wwn, &tmp, sizeof (hba_wwn));
 	} catch (...) { }
@@ -70,6 +70,11 @@ Sun_fcGetFcpTargetMapping(HBA_HANDLE handle, PHBA_FCPTARGETMAPPING mapping) {
 	HBA_STATUS		    status;
 	int			    count;
 	PHBA_FCPTARGETMAPPINGV2	    mappingV2;
+	HBA_ADAPTERATTRIBUTES       attributes;
+	HBA_UINT32                  entries = mapping->NumberOfEntries;
+	HBA_UINT32                  current = 0;
+	HBA_UINT32                  port;
+	HBA_UINT32                  limit;
 
 	Trace log("Sun_fcGetFcpTargetMapping");
 
@@ -77,29 +82,44 @@ Sun_fcGetFcpTargetMapping(HBA_HANDLE handle, PHBA_FCPTARGETMAPPING mapping) {
 	    log.userError("NULL mapping argument.");
 	    return (HBA_STATUS_ERROR_ARG);
 	}
+
+	/* get adapter attributes for number of ports */
+	status = Sun_fcGetAdapterAttributes(handle,&attributes);
+	if (status != HBA_STATUS_OK) {
+		log.userError("Unable to get adapter attributes");
+		return HBA_STATUS_ERROR;
+	}
+
 	mappingV2 = (PHBA_FCPTARGETMAPPINGV2) new uchar_t[
 	    (sizeof (HBA_FCPSCSIENTRYV2)*(mapping->NumberOfEntries-1)) +
 	    sizeof (HBA_FCPTARGETMAPPINGV2)];
-	mappingV2->NumberOfEntries = mapping->NumberOfEntries;
+	mapping->NumberOfEntries = 0;
 
+	for(port = 0; port < attributes.NumberOfPorts; port++) {
+		mappingV2->NumberOfEntries = mapping->NumberOfEntries < entries ?
+		    entries - mapping->NumberOfEntries : 0 ;
+		status = Sun_fcGetFcpTargetMappingV2(handle,
+			getAdapterPortWWN(handle,port), mappingV2);
+		mapping->NumberOfEntries += mappingV2->NumberOfEntries;
 
-
-	status = Sun_fcGetFcpTargetMappingV2(handle,
-	    getFirstAdapterPortWWN(handle), mappingV2);
-	mapping->NumberOfEntries = mappingV2->NumberOfEntries;
-	if (status == HBA_STATUS_OK) {
+		if (status != HBA_STATUS_OK && status != HBA_STATUS_ERROR_MORE_DATA) {
+				log.userError("Unable to get mappings for port");
+				return status;
+		}
 		/*
 		 * need to copy from PHBA_FCPTARGETMAPPINGV2 to
 		 * PHBA_FCPTARGETMAPPING
 		 */
-		for (count = 0; count < mapping->NumberOfEntries; count++) {
+		limit = (mapping->NumberOfEntries < entries) ? mapping->NumberOfEntries : entries;
+		for (count = current; count < limit; count++) {
 			memcpy(&mapping->entry[count].ScsiId,
-			    &mappingV2->entry[count].ScsiId,
+				&mappingV2->entry[count-current].ScsiId,
 			    sizeof (mapping->entry[count].ScsiId));
 			memcpy(&mapping->entry[count].FcpId,
-			    &mappingV2->entry[count].FcpId,
+				&mappingV2->entry[count-current].FcpId,
 			    sizeof (mapping->entry[count].FcpId));
 		}
+		current = mapping->NumberOfEntries;
 	}
 
 	delete(mappingV2);
