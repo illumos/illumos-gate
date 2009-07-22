@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_USB_HID_H
 #define	_SYS_USB_HID_H
 
+#include <sys/note.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -146,6 +147,19 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per call", hid_req_t))
 
 /* Version numbers */
 #define	HID_VERSION_V_0		0
+
+/*
+ * HID IOCTLS
+ */
+#define	HIDIOC	('h'<<8)
+
+/*
+ * Each hid keyboard/mouse device instance has two streams (internal/external).
+ * This pair of ioctls is used to get/set which stream the input data should
+ * be sent to.
+ */
+#define	HIDIOCKMGDIRECT	(HIDIOC | 0)
+#define	HIDIOCKMSDIRECT	(HIDIOC | 1)
 
 #ifdef __cplusplus
 }

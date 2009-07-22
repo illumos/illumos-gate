@@ -164,16 +164,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_power_t::hid_wakeup_enabled))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_power_t::hid_pwr_states))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_power_t::hid_pm_capabilities))
 
-/*
- * multiple queue support
- */
-struct hid_state;
-typedef struct hid_queue {
-	struct hid_state	*hidq_statep;
-	queue_t			*hidq_queue;
-	minor_t			hidq_minor;
-	struct hid_queue	*hidq_next;
-} hid_queue_t;
 
 typedef struct hid_state {
 	dev_info_t		*hid_dip;	/* per-device info handle */
@@ -206,7 +196,6 @@ typedef struct hid_state {
 	usb_pipe_handle_t	hid_default_pipe;	/* default pipe */
 	usb_pipe_handle_t	hid_interrupt_pipe;	/* intr pipe handle */
 
-	int			hid_streams_flags;	/* see below */
 	int			hid_packet_size;	/* data packet size */
 
 	/* Pipe policy for the interrupt pipe is saved here */
@@ -227,14 +216,12 @@ typedef struct hid_state {
 	/* handle for outputting messages */
 	usb_log_handle_t	hid_log_handle;
 
-	/*
-	 * This is the list of STREAMS queues built upon the device. Only
-	 * one queue on this list is active at any time - the list head.
-	 * Once the active queue is closed, the next one on the list
-	 * will be activated. The USB pipes will be closed if all queues
-	 * have been closed.
-	 */
-	hid_queue_t		*hid_queue_list;
+	queue_t			*hid_internal_rq;
+	queue_t			*hid_external_rq;
+	/* which one of the above 2 streams gets the input */
+	queue_t			*hid_inuse_rq;
+	int			hid_internal_flag;	/* see below */
+	int			hid_external_flag;	/* see below */
 } hid_state_t;
 
 /* warlock directives, stable data */
@@ -252,9 +239,6 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_if_descr))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_data))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_descr))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", usb_ep_descr))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_queue_t::hidq_queue))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_queue_t::hidq_statep))
-_NOTE(SCHEME_PROTECTS_DATA("stable data", hid_queue_t::hidq_minor))
 
 
 /*
@@ -299,9 +283,15 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per call", hid_default_pipe_arg_t))
  * the fields of the structure are being set.
  */
 
-/* Value for hid_streams_flags */
+/* Value for hid_[internal|external]_flag */
 #define	HID_STREAMS_OPEN	0x00000001	/* Streams are open */
 #define	HID_STREAMS_DISMANTLING	0x00000002	/* In hid_close() */
+
+#define	HID_STREAMS_FLAG(q, hidp) ((q) == (hidp)->hid_internal_rq ? \
+	(hidp)->hid_internal_flag : (hidp)->hid_external_flag)
+
+#define	HID_IS_OPEN(hidp)	(((hidp)->hid_internal_flag == \
+	HID_STREAMS_OPEN) || ((hidp)->hid_external_flag == HID_STREAMS_OPEN))
 
 #define	HID_BAD_DESCR		0x01		/* Bad hid report descriptor */
 

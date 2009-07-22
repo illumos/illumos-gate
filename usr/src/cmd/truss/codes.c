@@ -96,6 +96,7 @@
 #include <sys/dumpadm.h>
 #include <sys/mntio.h>
 #include <sys/zcons.h>
+#include <sys/usb/clients/hid/hid.h>
 
 #include "ramdata.h"
 #include "proto.h"
@@ -1274,6 +1275,10 @@ const struct ioc {
 	/* zcons ioctls */
 	{ (uint_t)ZC_HOLDSLAVE,		"ZC_HOLDSLAVE",		NULL },
 	{ (uint_t)ZC_RELEASESLAVE,	"ZC_RELEASESLAVE",	NULL },
+
+	/* hid ioctls - ('h' << 8) - hid.h */
+	{ (uint_t)HIDIOCKMGDIRECT,	"HIDIOCKMGDIRECT",	NULL },
+	{ (uint_t)HIDIOCKMSDIRECT,	"HIDIOCKMSDIRECT",	NULL },
 
 	{ (uint_t)0, NULL, NULL	}
 };
