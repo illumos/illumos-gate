@@ -47,6 +47,7 @@ usage()
 	printf "       root_archive unpack <archive> <root>\n"
 	printf "       root_archive packmedia   <solaris_image> <root>\n"
 	printf "       root_archive unpackmedia <solaris_image> <root>\n"
+	exit 1
 }
 
 cleanup()
@@ -506,8 +507,7 @@ packmedia()
 		archive_JavaGUI "$MEDIA" "$MINIROOT"
 		archive_Misc "$MEDIA" "$MINIROOT"
 		archive_Perl "$MEDIA" "$MINIROOT"
-		MR="$MEDIA/boot/amd64/x86.miniroot"
-		pack
+		pack "$MEDIA/boot/amd64/x86.miniroot"
 
         	# Now that the 64-bit archives & miniroot have been created,
         	# restore the files from archives and save the 64-bit
@@ -530,7 +530,6 @@ packmedia()
 		archive_JavaGUI "$MEDIA" "$MINIROOT"
 		archive_Perl "$MEDIA" "$MINIROOT"
 		archive_Misc "$MEDIA" "$MINIROOT"
-		MR="$MEDIA/boot/x86.miniroot"
 	fi
 
 	# copy the install menu to menu.lst so we have a menu
@@ -621,21 +620,20 @@ unpackmedia()
 
 do_unpack()
 {
-	rm -rf "$UNPACKED_ROOT"
-	mkdir -p "$UNPACKED_ROOT"
 	(
 		cd $MNT
 		find . -print | cpio -pdum "$UNPACKED_ROOT" 2> /dev/null
 	)
-	umount $MNT
+	# increase the chances the unmount will succeed
+	umount -f $MNT
 }
 
 unpack()
 {
-
+	MR=$1
 	if [ ! -f "$MR" ] ; then
+		printf "$MR: not found\n"
 		usage
-		exit 1
 	fi
 
 	if [ `uname -i` = i86pc ] ; then
@@ -755,10 +753,8 @@ root_is_ramdisk()
 
 pack()
 {
-	if [ ! -d "$UNPACKED_ROOT" -o -z "$MR" ] ; then
-		usage
-		exit 1
-	fi
+	MR="$1"
+	[ -d "$UNPACKED_ROOT" ] || usage
 
 	# always compress if fiocompress exists
 	#
@@ -862,16 +858,12 @@ while getopts s:6c opt ; do
 	c)	COMPRESS=true
 		;;
 	*)	usage
-		exit 1
 		;;
 	esac
 done
 shift `expr $OPTIND - 1`
 
-if [ $# != 3 ] ; then
-	usage
-	exit 1
-fi
+[ $# == 3 ] || usage
 
 UNPACKED_ROOT="$3"
 BASE="`pwd`"
@@ -879,6 +871,9 @@ MNT=/tmp/mnt$$
 TMR=/tmp/mr$$
 LOFIDEV=
 MR="$2"
+
+# sanity check
+[ "$UNPACKED_ROOT" != "/" ] || usage
 
 if [ "`dirname $MR`" = . ] ; then
 	MR="$BASE/$MR"
@@ -892,32 +887,37 @@ MEDIA="$MR"
 
 trap cleanup EXIT
 
+# always unpack into a fresh root
+case $1 in
+	unpack|unpackmedia)
+		rm -rf "$UNPACKED_ROOT"
+		mkdir -p "$UNPACKED_ROOT"
+		;;
+esac
+[ -d "$UNPACKED_ROOT" ] || usage
+
 case $1 in
 	packmedia)
-		if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-			ARCHIVE=sparc.miniroot
-		else
-			ARCHIVE=x86.miniroot
-		fi
-		MR="$MEDIA/boot/$ARCHIVE"
-
 		packmedia "$MEDIA" "$UNPACKED_ROOT"
-		pack
+		if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+			pack "$MEDIA/boot/sparc.miniroot"
+		else
+			pack "$MEDIA/boot/x86.miniroot"
+		fi
 
 		;;
 	unpackmedia)
 		if [ -f "$MEDIA/boot/sparc.miniroot" ] ; then
-			ARCHIVE=sparc.miniroot
+			unpack "$MEDIA/boot/sparc.miniroot"
 		else
-			ARCHIVE=x86.miniroot
+			unpack "$MEDIA/boot/x86.miniroot"
+			unpack "$MEDIA/boot/amd64/x86.miniroot"
 		fi
-		MR="$MEDIA/boot/$ARCHIVE"
-		unpack
 		unpackmedia "$MEDIA" "$UNPACKED_ROOT"
 		;;
-	pack)	pack
+	pack)	pack "$MR"
 		;;
-	unpack)	unpack
+	unpack)	unpack "$MR"
 		;;
 	*)	usage
 		;;
