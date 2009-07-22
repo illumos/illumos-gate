@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,9 @@ extern "C" {
 
 /* Library version string */
 #define HBA_LIBVERSION 2
+
+#define	IMA_MAX_CALLBACK_PER_PLUGIN	64
+#define IMA_MAX_NUM_PLUGINS		32
 
 /* DLL imports for WIN32 operation */
 #ifdef WIN32
@@ -1327,6 +1330,26 @@ typedef struct _IMA_STATIC_TGT_PROPERTIES
 		IMA_STATIC_DISCOVERY_TARGET	staticTarget;
 
 } IMA_STATIC_DISCOVERY_TARGET_PROPERTIES;
+
+typedef struct ima_plugin_info {
+	char PluginName[64];
+        char PluginPath[256];
+#ifdef WIN32
+	HINSTANCE hPlugin; /* Handle to a loaded DLL */
+#else
+	void* hPlugin; /* Handle to a loaded DLL */
+#endif
+	IMA_UINT32 ownerId;
+#ifdef WIN32
+	HANDLE pluginMutex;
+#else
+	int pluginMutex;
+#endif
+	IMA_UINT number_of_vbcallbacks;
+        IMA_OBJECT_VISIBILITY_FN vbcallback[IMA_MAX_CALLBACK_PER_PLUGIN];
+        IMA_UINT number_of_pccallbacks;
+        IMA_OBJECT_PROPERTY_FN pccallback[IMA_MAX_CALLBACK_PER_PLUGIN];
+} IMA_PLUGIN_INFO, *PIMA_PLUGIN_INFO;
 
 
 /**

@@ -51,6 +51,7 @@
 #include <sys/types.h>
 // #include <sys/ipc.h>
 
+#include "libsun_ima.h"
 #include "ima.h"
 #include "ima-plugin.h"
 
@@ -63,40 +64,17 @@
 /* Linux only */
 #define	LIBRARY_FILE_NAME L"libima.so"
 
-#define	IMA_MAX_NUM_PLUGINS 32
-#define	IMA_MAX_CALLBACK_PER_PLUGIN 64
-
 #define	EUOS_ERROR IMA_ERROR_UNEXPECTED_OS_ERROR
 
-typedef struct ima_plugin_info {
-	char PluginName[64];
-	char PluginPath[256];
-#ifdef WIN32
-	HINSTANCE hPlugin; /* Handle to a loaded DLL */
-#else
-	void* hPlugin; /* Handle to a loaded DLL */
-#endif
-	IMA_UINT32 ownerId;
-#ifdef WIN32
-	HANDLE pluginMutex;
-#else
-	int pluginMutex;
-#endif
-	IMA_UINT number_of_vbcallbacks;
-	IMA_OBJECT_VISIBILITY_FN vbcallback[IMA_MAX_CALLBACK_PER_PLUGIN];
-	IMA_UINT number_of_pccallbacks;
-	IMA_OBJECT_PROPERTY_FN pccallback[IMA_MAX_CALLBACK_PER_PLUGIN];
-} IMA_PLUGIN_INFO, *PIMA_PLUGIN_INFO;
-
-static IMA_PLUGIN_INFO  plugintable[IMA_MAX_NUM_PLUGINS];
-static int number_of_plugins = -1;
+IMA_PLUGIN_INFO  plugintable[IMA_MAX_NUM_PLUGINS];
+int number_of_plugins = -1;
 static IMA_NODE_NAME    sharedNodeName;
 static IMA_NODE_ALIAS   sharedNodeAlias;
 
 #ifdef WIN32
 static HANDLE libMutex = NULL;
 #else
-static int libMutex = -1;
+int libMutex = -1;
 #endif
 
 void InitLibrary();

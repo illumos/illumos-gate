@@ -39,6 +39,7 @@
 #include <sys/iscsi_protocol.h>	/* iscsi protocol */
 
 #define	ISCSI_INI_TASK_TTT	0xffffffff
+#define	ISCSI_CONN_TIEMOUT_DETECT	20
 
 boolean_t iscsi_io_logging = B_FALSE;
 
@@ -68,7 +69,7 @@ static iscsi_status_t iscsi_rx_process_itt_to_icmdp(iscsi_sess_t *isp,
 static void iscsi_process_rsp_status(iscsi_sess_t *isp, iscsi_conn_t *icp,
     idm_status_t status);
 static void iscsi_drop_conn_cleanup(iscsi_conn_t *icp);
-
+static boolean_t iscsi_nop_timeout_checks(iscsi_cmd_t *icmdp);
 /* callbacks from idm */
 static idm_pdu_cb_t iscsi_tx_done;
 
@@ -3364,6 +3365,7 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 	icp = isp->sess_conn_list;
 	while (icp != NULL) {
 
+		icp->conn_timeout = B_FALSE;
 		/* ACTIVE */
 		mutex_enter(&icp->conn_state_mutex);
 		mutex_enter(&isp->sess_queue_pending.mutex);
@@ -3371,6 +3373,10 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 		for (icmdp = icp->conn_queue_active.head;
 		    icmdp; icmdp = nicmdp) {
 			nicmdp = icmdp->cmd_next;
+
+			if (iscsi_nop_timeout_checks(icmdp) == B_TRUE) {
+				icp->conn_timeout = B_TRUE;
+			}
 
 			/* Skip entries with no timeout */
 			if (icmdp->cmd_lbolt_timeout == 0)
@@ -3406,6 +3412,16 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 		mutex_exit(&isp->sess_queue_pending.mutex);
 		mutex_exit(&icp->conn_state_mutex);
 
+		icp = icp->conn_next;
+	}
+
+	icp = isp->sess_conn_list;
+	while (icp != NULL) {
+		if (icp->conn_timeout == B_TRUE) {
+			/* timeout on this connect detected */
+			idm_ini_conn_disconnect(icp->conn_ic);
+			icp->conn_timeout = B_FALSE;
+		}
 		icp = icp->conn_next;
 	}
 	rw_exit(&isp->sess_conn_list_rwlock);
@@ -3458,6 +3474,19 @@ iscsi_nop_checks(iscsi_sess_t *isp)
 	rw_exit(&isp->sess_conn_list_rwlock);
 }
 
+static boolean_t
+iscsi_nop_timeout_checks(iscsi_cmd_t *icmdp)
+{
+	if (icmdp->cmd_type == ISCSI_CMD_TYPE_NOP) {
+		if ((ddi_get_lbolt() - icmdp->cmd_lbolt_active) >
+		    SEC_TO_TICK(ISCSI_CONN_TIEMOUT_DETECT)) {
+			return (B_TRUE);
+		} else {
+			return (B_FALSE);
+		}
+	}
+	return (B_FALSE);
+}
 /*
  * +--------------------------------------------------------------------+
  * | End of wd routines						|

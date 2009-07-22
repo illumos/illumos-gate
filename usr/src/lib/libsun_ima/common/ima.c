@@ -44,6 +44,7 @@
 #include <sys/scsi/adapters/iscsi_if.h>
 #include <sys/iscsi_protocol.h>
 #include <ima.h>
+#include <libsun_ima.h>
 
 #define	LIBRARY_PROPERTY_IMPLEMENTATION_VERSION	L"1.0.0"
 #define	LIBRARY_PROPERTY_VENDOR			L"Sun Microsystems, Inc."
@@ -62,6 +63,7 @@
 #define	SUN_IMA_IP_ADDRESS_LEN		256
 #define	SUN_IMA_IP_PORT_LEN		64
 #define	SUN_IMA_MAX_RADIUS_SECRET_LEN	128
+#define	MAX_LONG_LONG_STRING_LEN	10
 
 /* Forward declaration */
 #define	BOOL_PARAM			1
@@ -3208,5 +3210,112 @@ retry_sendtgts:
 	}
 	free(stl_hdr);
 
+	return (IMA_STATUS_SUCCESS);
+}
+
+IMA_API IMA_STATUS SUN_IMA_GetTunableProperties(
+	IMA_OID oid,
+	ISCSI_TUNABLE_PARAM *param)
+{
+	int fd;
+	iscsi_tunable_object_t pg;
+
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		syslog(LOG_USER|LOG_DEBUG, "Cannot open %s (%d)",
+		    ISCSI_DRIVER_DEVCTL, errno);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+	(void) memset(&pg, 0, sizeof (iscsi_tunable_object_t));
+	pg.t_param = param->tunable_objectType;
+	pg.t_oid = (uint32_t)oid.objectSequenceNumber;
+	if (ioctl(fd, ISCSI_TUNABLE_PARAM_GET, &pg) == -1) {
+		syslog(LOG_USER|LOG_DEBUG,
+		    "ISCSI_TUNABLE_PARAM_GET ioctl failed, errno: %d", errno);
+		(void) close(fd);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	} else {
+		long long value;
+		char tmp[MAX_LONG_LONG_STRING_LEN], *ptr = NULL;
+		if (pg.t_set == B_FALSE) {
+			/* default value */
+			(void) close(fd);
+			return (IMA_STATUS_SUCCESS);
+		}
+		value = (long long)pg.t_value.v_integer;
+		ptr = lltostr(value, tmp);
+		if ((ptr != NULL) && (ptr != tmp)) {
+			*(tmp + 1) = '\0';
+		} else {
+			(void) close(fd);
+			return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+		}
+		switch (param->tunable_objectType) {
+			case ISCSI_RX_TIMEOUT_VALUE:
+				(void) strlcpy(param->tunable_objectValue,
+				    ptr, strlen(ptr));
+				break;
+			case ISCSI_CONN_DEFAULT_LOGIN_MAX:
+				(void) strlcpy(param->tunable_objectValue,
+				    ptr, strlen(ptr));
+				break;
+			case ISCSI_LOGIN_POLLING_DELAY:
+				(void) strlcpy(param->tunable_objectValue,
+				    ptr, strlen(ptr));
+				break;
+			default:
+				break;
+		}
+	}
+	(void) close(fd);
+	return (IMA_STATUS_SUCCESS);
+}
+
+IMA_API IMA_STATUS SUN_IMA_SetTunableProperties(
+	IMA_OID oid,
+	ISCSI_TUNABLE_PARAM *param)
+{
+	int fd;
+	iscsi_tunable_object_t	ps;
+
+	if ((fd = open(ISCSI_DRIVER_DEVCTL, O_RDONLY)) == -1) {
+		syslog(LOG_USER|LOG_DEBUG, "Cannot open %s (%d)",
+		    ISCSI_DRIVER_DEVCTL, errno);
+		return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+	}
+
+	(void) memset(&ps, 0, sizeof (iscsi_tunable_object_t));
+	ps.t_oid = oid.objectSequenceNumber;
+	ps.t_param = param->tunable_objectType;
+	switch (param->tunable_objectType) {
+		long tmp;
+		case ISCSI_RX_TIMEOUT_VALUE:
+		case ISCSI_CONN_DEFAULT_LOGIN_MAX:
+		case ISCSI_LOGIN_POLLING_DELAY:
+			tmp = strtol(param->tunable_objectValue,
+			    NULL, 10);
+			if (((tmp == 0) && (errno == EINVAL)) ||
+			    ((tmp == LONG_MAX) && (errno == ERANGE)) ||
+			    ((tmp == LONG_MIN) && (errno == ERANGE))) {
+				(void) close(fd);
+				return (IMA_ERROR_INVALID_PARAMETER);
+			}
+			ps.t_value.v_integer = (uint32_t)tmp;
+			break;
+		default:
+			break;
+	}
+	if (ioctl(fd, ISCSI_TUNABLE_PARAM_SET, &ps)) {
+		int tmpErrno = errno;
+		syslog(LOG_USER|LOG_DEBUG,
+		    "ISCSI_TUNABLE_PARAM_SET ioctl failed, errno: %d", errno);
+		(void) close(fd);
+		switch (tmpErrno) {
+			case ENOTSUP :
+				return (IMA_ERROR_NOT_SUPPORTED);
+			default:
+				return (IMA_ERROR_UNEXPECTED_OS_ERROR);
+		}
+	}
+	(void) close(fd);
 	return (IMA_STATUS_SUCCESS);
 }

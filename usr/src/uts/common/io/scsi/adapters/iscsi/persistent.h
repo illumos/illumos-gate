@@ -42,6 +42,10 @@ typedef struct persistent_param {
 	iscsi_login_params_t	p_params;
 } persistent_param_t;
 
+typedef struct persistent_tunable_param {
+	uint32_t		p_bitmap;	/* parameter override bitmap */
+	iscsi_tunable_params_t	p_params;
+} persistent_tunable_param_t;
 
 /*
  * Function Prototypes
@@ -99,7 +103,10 @@ boolean_t	persistent_set_config_session(char *node,
 		    iscsi_config_sess_t *ics);
 boolean_t	persistent_get_config_session(char *node,
 		    iscsi_config_sess_t *ics);
-
+boolean_t	persistent_get_tunable_param(char *node,
+		    persistent_tunable_param_t *tpsg);
+boolean_t	persistent_set_tunable_param(char *node,
+		    persistent_tunable_param_t *tpss);
 
 #ifdef __cplusplus
 }

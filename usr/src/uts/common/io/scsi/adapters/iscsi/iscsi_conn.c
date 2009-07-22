@@ -635,6 +635,7 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
 	iscsi_hba_t		*ihp;
 	int			param_id;
 	persistent_param_t	pp;
+	persistent_tunable_param_t	ptp;
 	iscsi_config_sess_t	*ics;
 	int			idx, size;
 	char			*name;
@@ -662,6 +663,8 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
 	/* First get a copy of the HBA params */
 	bcopy(&ihp->hba_params, &icp->conn_params,
 	    sizeof (iscsi_login_params_t));
+	bcopy(&ihp->hba_tunable_params, &icp->conn_tunable_params,
+	    sizeof (iscsi_tunable_params_t));
 
 	/*
 	 * Now we need to get the session configured
@@ -751,6 +754,22 @@ iscsi_conn_sync_params(iscsi_conn_t *icp)
 			default:
 				break;
 			}
+		}
+	}
+
+	if (persistent_get_tunable_param((char *)isp->sess_name, &ptp) ==
+	    B_TRUE) {
+		if (ptp.p_bitmap & ISCSI_TUNABLE_PARAM_RX_TIMEOUT_VALUE) {
+			icp->conn_tunable_params.recv_login_rsp_timeout =
+			    ptp.p_params.recv_login_rsp_timeout;
+		}
+		if (ptp.p_bitmap & ISCSI_TUNABLE_PARAM_CONN_LOGIN_MAX) {
+			icp->conn_tunable_params.conn_login_max =
+			    ptp.p_params.conn_login_max;
+		}
+		if (ptp.p_bitmap & ISCSI_TUNABLE_PARAM_LOGIN_POLLING_DELAY) {
+			icp->conn_tunable_params.polling_login_delay =
+			    ptp.p_params.polling_login_delay;
 		}
 	}
 
@@ -960,7 +979,7 @@ iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 	/* set login min/max time values */
 	iscsi_conn_set_login_min_max(icp,
 	    ISCSI_CONN_DEFAULT_LOGIN_MIN,
-	    ISCSI_CONN_DEFAULT_LOGIN_MAX);
+	    icp->conn_tunable_params.conn_login_max);
 
 	ISCSI_CONN_LOG(CE_NOTE, "DEBUG: iscsi_conn_retry: icp: %p icp: %p ",
 	    (void *)icp,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -624,6 +624,16 @@ typedef IMA_STATUS (* QIMA_SetUpdateIntervalFn)(
 
 typedef IMA_STATUS (* IMA_CommitHbaParametersFn)(
 				IMA_OID oid, IMA_COMMIT_LEVEL commitLevel
+);
+
+typedef IMA_STATUS (* SUN_IMA_GetTunablePropertiesFn) (
+		IMA_OID oid,
+       		ISCSI_TUNABLE_PARAM *param
+);
+
+typedef IMA_STATUS (* SUN_IMA_SetTunablePropertiesFn) (
+		IMA_OID oid,
+       		ISCSI_TUNABLE_PARAM *param
 );
 
 #endif

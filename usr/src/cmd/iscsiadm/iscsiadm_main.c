@@ -45,6 +45,7 @@
 #include <assert.h>
 
 #include <ima.h>
+#include <libsun_ima.h>
 #include <sys/iscsi_protocol.h>
 #include <sys/scsi/adapters/iscsi_if.h>
 
@@ -75,6 +76,7 @@
 #define	OPTIONSTRING6	"none|CRC32"
 #define	OPTIONSTRING7	"CHAP name"
 #define	OPTIONSTRING8	"<# sessions>|<IP Address>[,<IP Address>]*"
+#define	OPTIONSTRING9	"tunable-prop=value"
 #define	OPTIONVAL1	"0 to 3600"
 #define	OPTIONVAL2	"512 to 2**24 - 1"
 #define	OPTIONVAL3	"1 to 65535"
@@ -88,6 +90,9 @@
 #define	ISNS_DEFAULT_SERVER_PORT    3205
 #define	DEFAULT_RADIUS_PORT	    1812
 #define	MAX_CHAP_NAME_LEN	    512
+#define	ISCSI_DEFAULT_RX_TIMEOUT_VALUE		"60"
+#define	ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX	"180"
+#define	ISCSI_DEFAULT_LOGIN_POLLING_DELAY	"60"
 
 /* For listNode */
 #define	INF_ERROR		1
@@ -166,6 +171,8 @@ int parseTarget(char *targetStr,
     boolean_t *tpgtSpecified,
     uint16_t *tpgt,
     boolean_t *isIpv6);
+static int chkConnLoginMaxPollingLoginDelay(IMA_OID oid,
+    int key, int uintValue);
 
 /* subcommand functions */
 static int addFunc(int, char **, int, cmdOptions_t *, void *, int *);
@@ -185,17 +192,20 @@ static void printSendTargets(SUN_IMA_DISC_ADDRESS_KEY_PROPERTIES *);
 static void printDigestAlgorithm(SUN_IMA_DIGEST_ALGORITHM_VALUE *, int);
 static int setLoginParameter(IMA_OID, int, char *);
 static int setLoginParameters(IMA_OID, char *);
+static int setTunableParameters(IMA_OID, char *);
 static void printLibError(IMA_STATUS);
 /* LINTED E_STATIC_UNUSED */
 static int sunPluginChk(IMA_OID, boolean_t *);
 static int sunInitiatorFind(IMA_OID *);
 static int getAuthMethodValue(char *, IMA_AUTHMETHOD *);
 static int getLoginParam(char *);
+static int getTunableParam(char *);
 static void iSCSINameCheckStatusDisplay(iSCSINameCheckStatusType status);
 static int modifyIndividualTargetParam(cmdOptions_t *optionList,
     IMA_OID targetOid, int *);
 static void listCHAPName(IMA_OID oid);
 static int printConfiguredSessions(IMA_OID);
+static int printTunableParameters(IMA_OID oid);
 
 /* object functions per subcommand */
 static int addAddress(int, int, char *[], int *);
@@ -249,7 +259,7 @@ static char *cmdName;
  *
  * bcefgijklmnoquwxyz
  *
- * DEFGHIJKLMOQTUVWXYZ
+ * DEFGHIJKLMOQUVWXYZ
  */
 
 /*
@@ -274,6 +284,7 @@ optionTbl_t longOptions[] = {
 	{"verbose", no_arg, 'v', NULL},
 	{"scsi-target", no_arg, 'S', NULL},
 	{"configured-sessions", required_arg, 'c', OPTIONSTRING8},
+	{"tunable-param", required_arg, 'T', OPTIONSTRING9},
 	{NULL, 0, 0, 0}
 };
 
@@ -290,6 +301,13 @@ parameterTbl_t loginParams[] = {
 	{"maxrecvdataseglen", MAX_RECV_DATA_SEG_LEN},
 	{"maxconnections", MAX_CONNECTIONS},
 	{"errorrecoverylevel", ERROR_RECOVERY_LEVEL},
+	{NULL, 0}
+};
+
+parameterTbl_t tunableParams[] = {
+	{"recv-login-rsp-timeout", RECV_LOGIN_RSP_TIMEOUT},
+	{"conn-login-max", CONN_LOGIN_MAX},
+	{"polling-login-delay", POLLING_LOGIN_DELAY},
 	{NULL, 0}
 };
 
@@ -348,8 +366,8 @@ optionRules_t optionRules[] = {
 	{DISCOVERY_ADDRESS, LIST, "v", B_FALSE, NULL},
 	{ISNS_SERVER_ADDRESS, LIST, "v", B_FALSE, NULL},
 	{TARGET, LIST, "vS", B_FALSE, NULL},
-	{NODE, MODIFY, "NAhdCaRrPHc", B_TRUE, "CP"},
-	{TARGET_PARAM, MODIFY, "ahdBCpcH", B_TRUE, "C"},
+	{NODE, MODIFY, "NAhdCaRrPHcT", B_TRUE, "CP"},
+	{TARGET_PARAM, MODIFY, "ahdBCpcHT", B_TRUE, "C"},
 	{TARGET_PARAM, LIST, "v", B_FALSE, NULL},
 	{0, 0, 0, 0, 0}
 };
@@ -417,6 +435,22 @@ getLoginParam(char *arg)
 	int len;
 
 	for (paramp = loginParams; paramp->name; paramp++) {
+		len = strlen(arg);
+		if (len == strlen(paramp->name) &&
+		    strncasecmp(arg, paramp->name, len) == 0) {
+			return (paramp->val);
+		}
+	}
+	return (-1);
+}
+
+static int
+getTunableParam(char *arg)
+{
+	parameterTbl_t *paramp;
+	int len;
+
+	for (paramp = tunableParams; paramp->name != NULL; paramp++) {
 		len = strlen(arg);
 		if (len == strlen(paramp->name) &&
 		    strncasecmp(arg, paramp->name, len) == 0) {
@@ -1397,14 +1431,26 @@ setLoginParameters(IMA_OID oid, char *optarg)
 		if (sscanf(indexp, gettext("%[^=]=%s"), keyp, valp) != 2) {
 			(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 			    gettext("Unknown param"), indexp);
+			if (nameValueString) {
+				free(nameValueString);
+				nameValueString = NULL;
+			}
 			return (1);
 		}
 		if ((key = getLoginParam(keyp)) == -1) {
 			(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
 			    gettext("Unknown key"), keyp);
+			if (nameValueString) {
+				free(nameValueString);
+				nameValueString = NULL;
+			}
 			return (1);
 		}
 		if (setLoginParameter(oid, key, valp) != 0) {
+			if (nameValueString) {
+				free(nameValueString);
+				nameValueString = NULL;
+			}
 			return (1);
 		}
 		if (delim) {
@@ -1414,6 +1460,10 @@ setLoginParameters(IMA_OID oid, char *optarg)
 		}
 	}
 
+	if (nameValueString) {
+		free(nameValueString);
+		nameValueString = NULL;
+	}
 	return (0);
 }
 
@@ -1688,6 +1738,9 @@ listNode(int *funcRet)
 		(void) fprintf(stdout, "%s", gettext("unknown"));
 	}
 	(void) fprintf(stdout, "\n");
+
+	/* print tunable parameters information. */
+	ret = printTunableParameters(initiatorOid);
 
 	/* print configured session information. */
 	ret = printConfiguredSessions(initiatorOid);
@@ -2911,6 +2964,13 @@ listTargetParam(int operandLen, char *operand[], cmdOptions_t *options,
 					return (ret);
 				}
 
+				/* print tunable parameters infomation */
+				if (printTunableParameters(
+				    targetList->oids[j]) != 0) {
+					*funcRet = 1;
+					return (ret);
+				}
+
 				/* print configured session information */
 				if (printConfiguredSessions(
 				    targetList->oids[j]) != 0) {
@@ -3903,6 +3963,12 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 				}
 				break;
 
+			case 'T':
+				if (setTunableParameters(oid,
+				    optionList->optarg) != 0) {
+					return (1);
+				}
+				break;
 			default:
 				(void) fprintf(stderr, "%s: %c: %s\n",
 				    cmdName, optionList->optval,
@@ -4929,6 +4995,12 @@ modifyIndividualTargetParam(cmdOptions_t *optionList, IMA_OID targetOid,
 					return (1);
 				}
 				break;
+			case 'T':
+				if (setTunableParameters(targetOid,
+				    optionList->optarg) != 0) {
+					return (1);
+				}
+				break;
 		}
 	}
 
@@ -5450,4 +5522,245 @@ main(int argc, char *argv[])
 		ret = 1;
 	}
 	return (ret);
+}
+
+static int
+setTunableParameters(IMA_OID oid, char *optarg)
+{
+	char keyp[MAXOPTARGLEN];
+	char valp[MAXOPTARGLEN];
+	int key;
+	IMA_STATUS status;
+	IMA_UINT uintValue;
+	ISCSI_TUNABLE_PARAM	tunableObj;
+	char *nameValueString, *endptr;
+
+	if ((nameValueString = strdup(optarg)) == NULL) {
+		if (errno == ENOMEM) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName, strerror(errno));
+		} else {
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("unknown error"));
+		}
+		return (1);
+	}
+
+	(void) memset(keyp, 0, sizeof (keyp));
+	(void) memset(valp, 0, sizeof (valp));
+	if (sscanf(nameValueString, gettext("%[^=]=%s"), keyp, valp) != 2) {
+		(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
+		    gettext("Unknown param"), nameValueString);
+		if (nameValueString) {
+			free(nameValueString);
+			nameValueString = NULL;
+		}
+		return (1);
+	}
+	if ((key = getTunableParam(keyp)) == -1) {
+		(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
+		    gettext("Unknown key"), keyp);
+		if (nameValueString) {
+			free(nameValueString);
+			nameValueString = NULL;
+		}
+		return (1);
+	}
+	switch (key) {
+	case RECV_LOGIN_RSP_TIMEOUT:
+	case CONN_LOGIN_MAX:
+	case POLLING_LOGIN_DELAY:
+		errno = 0;
+		uintValue = strtoul(valp, &endptr, 0);
+		if (*endptr != '\0' || errno != 0) {
+			(void) fprintf(stderr, "%s: %s - %s\n",
+			    cmdName,
+			    gettext("invalid option argument"),
+			    optarg);
+			if (nameValueString) {
+				free(nameValueString);
+				nameValueString = NULL;
+			}
+			return (1);
+		}
+		if (uintValue > 3600) {
+			(void) fprintf(stderr, "%s: %s\n",
+			    cmdName,
+gettext("value must be between 0 and 3600"));
+			if (nameValueString) {
+				free(nameValueString);
+				nameValueString = NULL;
+			}
+			return (1);
+		}
+
+		if (chkConnLoginMaxPollingLoginDelay(oid, key, uintValue) > 0) {
+			if (nameValueString) {
+				free(nameValueString);
+				nameValueString = NULL;
+			}
+			return (1);
+		}
+
+		if (key == RECV_LOGIN_RSP_TIMEOUT) {
+			tunableObj.tunable_objectType =
+			    ISCSI_RX_TIMEOUT_VALUE;
+		} else if (key == CONN_LOGIN_MAX) {
+			tunableObj.tunable_objectType =
+			    ISCSI_CONN_DEFAULT_LOGIN_MAX;
+		} else if (key == POLLING_LOGIN_DELAY) {
+			tunableObj.tunable_objectType =
+			    ISCSI_LOGIN_POLLING_DELAY;
+		}
+		tunableObj.tunable_objectValue = valp;
+		status = SUN_IMA_SetTunableProperties(oid, &tunableObj);
+		break;
+	default:
+		(void) fprintf(stderr, "%s: %s: %s\n", cmdName,
+		    gettext("Unsupported key"), keyp);
+		if (nameValueString) {
+			free(nameValueString);
+			nameValueString = NULL;
+		}
+		return (1);
+	}
+	if (!IMA_SUCCESS(status)) {
+		printLibError(status);
+		if (nameValueString) {
+			free(nameValueString);
+			nameValueString = NULL;
+		}
+		return (1);
+	}
+
+	if (nameValueString) {
+		free(nameValueString);
+		nameValueString = NULL;
+	}
+	return (0);
+}
+
+/*
+ * Print tunable parameters information
+ */
+static int
+printTunableParameters(IMA_OID oid)
+{
+	ISCSI_TUNABLE_PARAM tunableObj;
+	char value[MAXOPTARGLEN] = "\0";
+	IMA_STATUS status;
+
+	tunableObj.tunable_objectValue = value;
+	(void) fprintf(stdout, "\t%s:\n",
+	    gettext("Tunable Parameters (Default/Configured)"));
+	tunableObj.tunable_objectType = ISCSI_RX_TIMEOUT_VALUE;
+	status = SUN_IMA_GetTunableProperties(oid, &tunableObj);
+	if (!IMA_SUCCESS(status)) {
+		printLibError(status);
+		return (1);
+	}
+	if (value[0] == '\0') {
+		value[0] = '-';
+		value[1] = '\0';
+	}
+	(void) fprintf(stdout, "\t\t%s: ",
+	    gettext("Session Login Response Time"));
+	(void) fprintf(stdout, "%s/%s\n", ISCSI_DEFAULT_RX_TIMEOUT_VALUE,
+	    tunableObj.tunable_objectValue);
+
+	value[0] = '\0';
+	tunableObj.tunable_objectType = ISCSI_CONN_DEFAULT_LOGIN_MAX;
+	status = SUN_IMA_GetTunableProperties(oid, &tunableObj);
+	if (!IMA_SUCCESS(status)) {
+		printLibError(status);
+		return (1);
+	}
+	if (value[0] == '\0') {
+		value[0] = '-';
+		value[1] = '\0';
+	}
+	(void) fprintf(stdout, "\t\t%s: ",
+	    gettext("Maximum Connection Retry Time"));
+	(void) fprintf(stdout, "%s/%s\n", ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX,
+	    tunableObj.tunable_objectValue);
+
+	value[0] = '\0';
+	tunableObj.tunable_objectType = ISCSI_LOGIN_POLLING_DELAY;
+	status = SUN_IMA_GetTunableProperties(oid, &tunableObj);
+	if (!IMA_SUCCESS(status)) {
+		printLibError(status);
+		return (1);
+	}
+	if (value[0] == '\0') {
+		value[0] = '-';
+		value[1] = '\0';
+	}
+	(void) fprintf(stdout, "\t\t%s: ",
+	    gettext("Login Retry Time Interval"));
+	(void) fprintf(stdout, "%s/%s\n", ISCSI_DEFAULT_LOGIN_POLLING_DELAY,
+	    tunableObj.tunable_objectValue);
+	return (0);
+}
+
+/*
+ * This is helper function to check conn_login_max and polling_login_delay.
+ */
+static int
+chkConnLoginMaxPollingLoginDelay(IMA_OID oid, int key, int uintValue)
+{
+	char valuep[MAXOPTARGLEN];
+	IMA_STATUS	status;
+	IMA_UINT	getValue;
+	ISCSI_TUNABLE_PARAM	getObj;
+	char *endptr;
+
+	if (key == CONN_LOGIN_MAX) {
+		getObj.tunable_objectType = ISCSI_LOGIN_POLLING_DELAY;
+	} else {
+		getObj.tunable_objectType = ISCSI_CONN_DEFAULT_LOGIN_MAX;
+	}
+	valuep[0] = '\0';
+	getObj.tunable_objectValue = valuep;
+	status = SUN_IMA_GetTunableProperties(oid, &getObj);
+	if (!IMA_SUCCESS(status)) {
+		printLibError(status);
+		return (1);
+	}
+	if (valuep[0] == '\0') {
+		if (key == CONN_LOGIN_MAX) {
+			(void) strlcpy(valuep,
+			    ISCSI_DEFAULT_LOGIN_POLLING_DELAY,
+			    strlen(ISCSI_DEFAULT_LOGIN_POLLING_DELAY) +1);
+		} else {
+			(void) strlcpy(valuep,
+			    ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX,
+			    strlen(ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX) +1);
+		}
+	}
+
+	errno = 0;
+	getValue = strtoul(valuep, &endptr, 0);
+	if (*endptr != '\0' || errno != 0) {
+		(void) fprintf(stderr, "%s: %s - %s\n",
+		    cmdName,
+		    gettext("cannot convert tunable string"),
+		    valuep);
+		return (1);
+	}
+	if (key == CONN_LOGIN_MAX) {
+		if (uintValue < getValue) {
+			(void) fprintf(stderr, "%s: %s %ld\n",
+			    cmdName, gettext("value must larger than"),
+			    getValue);
+			return (1);
+		}
+	} else {
+		if (uintValue > getValue) {
+			(void) fprintf(stderr, "%s: %s %ld\n",
+			    cmdName, gettext("value must smaller than"),
+			    getValue);
+			return (1);
+		}
+	}
+	return (0);
 }

@@ -23,8 +23,40 @@
  * Use is subject to license terms.
  */
 
-/* LINTLIBRARY */
-/* PROTOLIB1 */
+/* header file for iSCSI tunable parameters properties function */
+
+#ifndef	_LIBSUN_IMA_H
+#define	_LIBSUN_IMA_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <ima.h>
-#include <libsun_ima.h>
+
+typedef enum {
+	ISCSI_RX_TIMEOUT_VALUE = 1,
+	ISCSI_CONN_DEFAULT_LOGIN_MAX = 2,
+	ISCSI_LOGIN_POLLING_DELAY = 3
+} ISCSI_TUNABLE_OBJECT_TYPE;
+
+typedef struct _ISCSI_TUNABLE_PARAM {
+	ISCSI_TUNABLE_OBJECT_TYPE tunable_objectType;
+	IMA_CHAR *tunable_objectValue;
+} ISCSI_TUNABLE_PARAM;
+
+IMA_API IMA_STATUS SUN_IMA_SetTunableProperties(
+		IMA_OID oid,
+		ISCSI_TUNABLE_PARAM *param
+);
+
+IMA_API IMA_STATUS SUN_IMA_GetTunableProperties(
+		IMA_OID oid,
+		ISCSI_TUNABLE_PARAM *param
+);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _LIBSUN_IMA_H */

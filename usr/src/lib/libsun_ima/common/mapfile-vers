@@ -134,6 +134,8 @@ SUNWprivate_1.0 {
 	IMA_GetDiscoveryAddressOidList;
 	IMA_GetDiscoveryAddressProperties;
 	IMA_GetAddressKeys;
+	SUN_IMA_SetTunableProperties;
+	SUN_IMA_GetTunableProperties;
     local:
 	*;
 };

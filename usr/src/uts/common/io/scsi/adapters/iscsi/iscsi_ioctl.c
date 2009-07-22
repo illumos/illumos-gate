@@ -1249,3 +1249,96 @@ iscsi_ioctl_set_config_sess(iscsi_hba_t *ihp, iscsi_config_sess_t *ics)
 
 	return (0);
 }
+
+int
+iscsi_ioctl_set_tunable_param(iscsi_hba_t *ihp, iscsi_tunable_object_t *tpss)
+{
+	uchar_t *name;
+	iscsi_sess_t *isp;
+	iscsi_conn_t *icp;
+	int	param_id = 0;
+	persistent_tunable_param_t *pparam;
+
+	if (tpss->t_oid == ihp->hba_oid) {
+		name = ihp->hba_name;
+	} else {
+		/* get target name */
+		name = iscsi_targetparam_get_name(tpss->t_oid);
+		if (name == NULL) {
+			/* invalid node name */
+			return (EINVAL);
+		}
+	}
+
+	pparam = (persistent_tunable_param_t *)kmem_zalloc(sizeof (*pparam),
+	    KM_SLEEP);
+	if (persistent_get_tunable_param((char *)name, pparam) == B_FALSE) {
+		/* use default value */
+		pparam->p_params.recv_login_rsp_timeout =
+		    ISCSI_DEFAULT_RX_TIMEOUT_VALUE;
+		pparam->p_params.polling_login_delay =
+		    ISCSI_DEFAULT_LOGIN_POLLING_DELAY;
+		pparam->p_params.conn_login_max =
+		    ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX;
+	}
+
+	pparam->p_bitmap |= (1 << (tpss->t_param -1));
+	param_id = 1 << (tpss->t_param -1);
+	switch (param_id) {
+	case ISCSI_TUNABLE_PARAM_RX_TIMEOUT_VALUE:
+		pparam->p_params.recv_login_rsp_timeout =
+		    tpss->t_value.v_integer;
+		break;
+	case ISCSI_TUNABLE_PARAM_LOGIN_POLLING_DELAY:
+		pparam->p_params.polling_login_delay =
+		    tpss->t_value.v_integer;
+		break;
+	case ISCSI_TUNABLE_PARAM_CONN_LOGIN_MAX:
+		pparam->p_params.conn_login_max =
+		    tpss->t_value.v_integer;
+		break;
+	default:
+		break;
+	}
+	if (persistent_set_tunable_param((char *)name,
+	    pparam) == B_FALSE) {
+		kmem_free(pparam, sizeof (*pparam));
+		return (EINVAL);
+	}
+
+	if (tpss->t_oid == ihp->hba_oid) {
+		bcopy(&pparam->p_params, &ihp->hba_tunable_params,
+		    sizeof (iscsi_tunable_params_t));
+	}
+
+	rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
+	for (isp = ihp->hba_sess_list; isp; isp = isp->sess_next) {
+		if (isp->sess_type != ISCSI_SESS_TYPE_NORMAL) {
+			continue;
+		}
+		rw_enter(&isp->sess_conn_list_rwlock, RW_READER);
+		icp = isp->sess_conn_list;
+		while (icp != NULL) {
+			if (strcmp((const char *)name,
+			    (const char *)isp->sess_name) == 0) {
+				bcopy(&pparam->p_params,
+				    &icp->conn_tunable_params,
+				    sizeof (iscsi_tunable_params_t));
+			} else {
+				/*
+				 * this session connected target
+				 * tunable parameters not set,
+				 * use initiator's default
+				 */
+				bcopy(&ihp->hba_tunable_params,
+				    &icp->conn_tunable_params,
+				    sizeof (iscsi_tunable_params_t));
+			}
+			icp = icp->conn_next;
+		}
+		rw_exit(&isp->sess_conn_list_rwlock);
+	}
+	rw_exit(&ihp->hba_sess_list_rwlock);
+	kmem_free(pparam, sizeof (*pparam));
+	return (0);
+}

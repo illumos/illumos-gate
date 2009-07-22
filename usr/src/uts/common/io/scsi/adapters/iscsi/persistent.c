@@ -50,6 +50,7 @@
 #define	RADIUS_PARAMS_ID		"Radius"
 #define	BIDIR_AUTH_PARAMS_ID		"BidirAuth"
 #define	SESSION_PARAMS_ID		"Session"
+#define	TUNABLE_PARAMS_ID		"Tunable"
 
 /*
  *  Local Global Variables
@@ -60,7 +61,7 @@ static kmutex_t		isns_addr_data_lock;
 static kmutex_t		param_data_lock;
 static kmutex_t		chap_data_lock;
 static kmutex_t		auth_data_lock;
-
+static kmutex_t		tunable_data_lock;
 /*
  *  Local Function Prototypes
  */
@@ -233,6 +234,7 @@ persistent_init()
 	mutex_init(&param_data_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&chap_data_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&auth_data_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&tunable_data_lock, NULL, MUTEX_DRIVER, NULL);
 }
 
 /*
@@ -265,6 +267,7 @@ persistent_fini(void)
 	mutex_destroy(&param_data_lock);
 	mutex_destroy(&chap_data_lock);
 	mutex_destroy(&auth_data_lock);
+	mutex_destroy(&tunable_data_lock);
 }
 
 
@@ -835,14 +838,16 @@ persistent_param_next(void **v, char *node, persistent_param_t *param)
 boolean_t
 persistent_param_clear(char *node)
 {
-	boolean_t	rval1, rval2;
+	boolean_t	rval1, rval2, rval3;
 
 	mutex_enter(&param_data_lock);
 	rval1 = nvf_data_clear(LOGIN_PARAMS_ID, node);
 	rval2 = nvf_data_clear(SESSION_PARAMS_ID, node);
+	rval3 = nvf_data_clear(TUNABLE_PARAMS_ID, node);
 	mutex_exit(&param_data_lock);
 
-	return (((rval1 == B_TRUE) || (rval2 == B_TRUE)) ? B_TRUE : B_FALSE);
+	return (((rval1 == B_TRUE) || (rval2 == B_TRUE) || (rval3 == B_TRUE))
+	    ? B_TRUE : B_FALSE);
 }
 
 /*
@@ -923,6 +928,32 @@ persistent_get_config_session(char *node, iscsi_config_sess_t *ics)
 	ics->ics_in = in;
 
 	return (status);
+}
+
+/*
+ * persistent_get_tunable_param -- obtain tunable parameters
+ *					for a specific target
+ */
+boolean_t
+persistent_get_tunable_param(char *node, persistent_tunable_param_t *tpsg)
+{
+	return (nvf_data_get(TUNABLE_PARAMS_ID, node,
+	    (void *)tpsg, sizeof (persistent_tunable_param_t)));
+}
+
+/*
+ * persistent_set_tunable_param -- store tunable parameters
+ *					for a specific target
+ */
+boolean_t
+persistent_set_tunable_param(char *node, persistent_tunable_param_t *tpss)
+{
+	boolean_t	rval;
+	mutex_enter(&tunable_data_lock);
+	rval = nvf_data_set(TUNABLE_PARAMS_ID, node,
+	    (void *)tpss, sizeof (persistent_tunable_param_t));
+	mutex_exit(&tunable_data_lock);
+	return (rval);
 }
 
 /*

@@ -49,6 +49,7 @@
 #define	MAX_GET_NAME_SIZE	1024
 #define	MAX_NAME_PROP_SIZE	256
 #define	UNDEFINED		-1
+#define	ISCSI_DISC_DELAY	2	/* seconds */
 
 /*
  * +--------------------------------------------------------------------+
@@ -152,6 +153,10 @@ static boolean_t iscsi_cmp_boot_sess_oid(iscsi_hba_t *ihp, uint32_t oid);
 static boolean_t iscsi_enter_service_zone(iscsi_hba_t *ihp, uint32_t status);
 static void iscsi_exit_service_zone(iscsi_hba_t *ihp, uint32_t status);
 static void iscsi_check_miniroot(iscsi_hba_t *ihp);
+static void iscsi_get_tunable_default(iscsi_tunable_object_t *param);
+static int iscsi_get_persisted_tunable_param(uchar_t *name,
+    iscsi_tunable_object_t *tpsg);
+static void iscsi_set_default_tunable_params(iscsi_tunable_params_t *params);
 
 /* struct helpers prototypes */
 
@@ -502,6 +507,8 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			/* setup hba defaults */
 			iscsi_set_default_login_params(&ihp->hba_params);
+			iscsi_set_default_tunable_params(
+			    &ihp->hba_tunable_params);
 
 			/* setup minimal initiator params */
 			iscsid_set_default_initiator_node_settings(ihp, B_TRUE);
@@ -1496,6 +1503,8 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	iscsi_sockaddr_t	addr_dsc;
 	iscsi_boot_property_t	*bootProp;
 	boolean_t		discovered = B_TRUE;
+	iscsi_tunable_object_t	*tpsg;
+	iscsi_tunable_object_t	*tpss;
 
 	instance = getminor(dev);
 	ihp = (iscsi_hba_t *)ddi_get_soft_state(iscsi_state, instance);
@@ -2692,18 +2701,60 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				iscsid_addr_to_sockaddr(tmp_e.e_insize,
 				    &tmp_e.e_u, tmp_e.e_port, &addr_dsc.sin);
 
+				persistent_static_addr_unlock();
+
+				/*
+				 * If discovery in progress, try few times
+				 * before return busy
+				 */
+				retry = 0;
+				mutex_enter(&ihp->hba_discovery_events_mutex);
+				while (ihp->hba_discovery_in_progress ==
+				    B_TRUE) {
+					if (++retry == 5) {
+						rtn = EBUSY;
+						break;
+					}
+					mutex_exit(
+					    &ihp->hba_discovery_events_mutex);
+					delay(SEC_TO_TICK(
+					    ISCSI_DISC_DELAY));
+					mutex_enter(
+					    &ihp->hba_discovery_events_mutex);
+				}
+				/* remove from persistent store */
+				if (rtn == 0 && persistent_static_addr_clear(
+				    e.e_oid) == B_FALSE) {
+					rtn = EIO;
+				}
+				mutex_exit(&ihp->hba_discovery_events_mutex);
+
+				if (rtn != 0) {
+					kmem_free(name, ISCSI_MAX_NAME_LEN);
+					break;
+				}
+
 				/* Attempt to logout of target */
 				if (iscsid_del(ihp, (char *)name,
 				    iSCSIDiscoveryMethodStatic, &addr_dsc.sin)
-				    == B_TRUE) {
-					persistent_static_addr_unlock();
+				    == B_FALSE) {
+					persistent_static_addr_lock();
 
-					/* remove from persistent store */
-					if (persistent_static_addr_clear(
-					    e.e_oid) == B_FALSE) {
-						rtn = EIO;
+					/*
+					 * Restore static_tgt to
+					 * persistent store
+					 */
+					if (persistent_static_addr_set(
+					    (char *)name,
+					    &e) == B_FALSE) {
+						cmn_err(CE_WARN, "Failed to "
+						    "restore static target "
+						    "address after logout "
+						    "target failure.");
 					}
-
+					persistent_static_addr_unlock();
+					rtn = EBUSY;
+				} else {
 					iscsid_poke_discovery(ihp,
 					    iSCSIDiscoveryMethodStatic);
 					(void) iscsid_login_tgt(ihp,
@@ -2711,9 +2762,6 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 					    iSCSIDiscoveryMethodStatic,
 					    NULL);
 
-				} else {
-					persistent_static_addr_unlock();
-					rtn = EBUSY;
 				}
 			} else {
 				persistent_static_addr_unlock();
@@ -2967,15 +3015,41 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		iscsid_addr_to_sockaddr(e.e_insize,
 		    &e.e_u, e.e_port, &addr_dsc.sin);
 
+		/* If discovery in progress, try few times before return busy */
+		retry = 0;
+		mutex_enter(&ihp->hba_discovery_events_mutex);
+		while (ihp->hba_discovery_in_progress == B_TRUE) {
+			if (++retry == 5) {
+				rtn = EBUSY;
+				break;
+			}
+			mutex_exit(&ihp->hba_discovery_events_mutex);
+			delay(SEC_TO_TICK(ISCSI_DISC_DELAY));
+			mutex_enter(&ihp->hba_discovery_events_mutex);
+		}
+
+		/*
+		 * Clear discovery address first, so that any bus config
+		 * will ignore this discovery address
+		 */
+		if (rtn == 0 && persistent_disc_addr_clear(&e) == B_FALSE) {
+			rtn = EIO;
+		}
+		mutex_exit(&ihp->hba_discovery_events_mutex);
+
+		if (rtn != 0) {
+			break;
+		}
 		/* Attempt to logout of associated targets */
 		if (iscsid_del(ihp, NULL,
 		    iSCSIDiscoveryMethodSendTargets, &addr_dsc.sin) ==
-		    B_TRUE) {
-			/* Logout successful remove disc. addr. */
-			if (persistent_disc_addr_clear(&e) == B_FALSE) {
-				rtn = EIO;
+		    B_FALSE) {
+			/* Failure!, restore the discovery addr. */
+			if (persistent_disc_addr_set(&e) == B_FALSE) {
+				cmn_err(CE_WARN, "Failed to restore sendtgt "
+				    "discovery address after logout associated "
+				    "targets failures.");
 			}
-		} else {
 			rtn = EBUSY;
 		}
 		break;
@@ -2995,16 +3069,44 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		iscsid_addr_to_sockaddr(e.e_insize,
 		    &e.e_u, e.e_port, &addr_dsc.sin);
 
-		/* Attempt logout of associated targets */
-		if (iscsid_del(ihp, NULL, iSCSIDiscoveryMethodISNS,
-		    &addr_dsc.sin) == B_TRUE) {
-			/* Logout successful */
-
-			if (persistent_isns_addr_clear(&e) == B_FALSE) {
-				rtn = EIO;
+		/* If discovery in progress, try few times before return busy */
+		retry = 0;
+		mutex_enter(&ihp->hba_discovery_events_mutex);
+		while (ihp->hba_discovery_in_progress == B_TRUE) {
+			if (++retry == 5) {
+				rtn = EBUSY;
 				break;
 			}
+			mutex_exit(&ihp->hba_discovery_events_mutex);
+			delay(SEC_TO_TICK(ISCSI_DISC_DELAY));
+			mutex_enter(&ihp->hba_discovery_events_mutex);
+		}
 
+		/*
+		 * Clear isns server address first, so that any bus config
+		 * will ignore any target registerd on this isns server
+		 */
+		if (rtn == 0 && persistent_isns_addr_clear(&e) == B_FALSE) {
+			rtn = EIO;
+		}
+		mutex_exit(&ihp->hba_discovery_events_mutex);
+
+		if (rtn != 0) {
+			break;
+		}
+
+		/* Attempt logout of associated targets */
+		if (iscsid_del(ihp, NULL, iSCSIDiscoveryMethodISNS,
+		    &addr_dsc.sin) == B_FALSE) {
+			/* Failure!, restore the isns server addr. */
+
+			if (persistent_isns_addr_set(&e) == B_FALSE) {
+				cmn_err(CE_WARN, "Failed to restore isns server"
+				    " address after logout associated targets"
+				    " failures.");
+			}
+			rtn = EBUSY;
+		} else {
 			method = persistent_disc_meth_get();
 			if (method & iSCSIDiscoveryMethodISNS) {
 				boolean_t is_last_isns_server_b =
@@ -3050,8 +3152,6 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				    ISCSI_MAX_NAME_LEN);
 				initiator_node_name = NULL;
 			}
-		} else {
-			rtn = EBUSY;
 		}
 		break;
 
@@ -3085,7 +3185,6 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	/*
 	 * ISCSI_DISCOVERY_CLEAR -
 	 */
-#define	ISCSI_DISCOVERY_DELAY 2	/* seconds */
 	case ISCSI_DISCOVERY_CLEAR:
 		if (ddi_copyin((caddr_t)arg, &method, sizeof (method), mode)) {
 			rtn = EFAULT;
@@ -3101,10 +3200,9 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				break;
 			}
 			mutex_exit(&ihp->hba_discovery_events_mutex);
-			delay(SEC_TO_TICK(ISCSI_DISCOVERY_DELAY));
+			delay(SEC_TO_TICK(ISCSI_DISC_DELAY));
 			mutex_enter(&ihp->hba_discovery_events_mutex);
 		}
-#undef	ISCSI_DISCOVERY_DELAY
 
 		/*
 		 * Clear discovery first, so that any bus config or
@@ -3505,8 +3603,6 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 
 		if (name == NULL) {
-			rw_exit(
-			    &ihp->hba_sess_list_rwlock);
 			rtn = EFAULT;
 			break;
 		}
@@ -4282,6 +4378,71 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		rtn = iscsi_ioctl_copyout(bootProp, size, (caddr_t)arg, mode);
 		break;
 
+	case ISCSI_TUNABLE_PARAM_SET:
+		tpss = (iscsi_tunable_object_t *)kmem_alloc(sizeof (*tpss),
+		    KM_SLEEP);
+		if (ddi_copyin((caddr_t)arg, tpss, sizeof (*tpss), mode)) {
+			rtn = EFAULT;
+			kmem_free(tpss, sizeof (*tpss));
+			break;
+		}
+		rtn = iscsi_ioctl_set_tunable_param(ihp, tpss);
+		kmem_free(tpss, sizeof (*tpss));
+		break;
+
+	case ISCSI_TUNABLE_PARAM_GET:
+		tpsg = (iscsi_tunable_object_t *)kmem_alloc(sizeof (*tpsg),
+		    KM_SLEEP);
+		if (ddi_copyin((caddr_t)arg, tpsg, sizeof (*tpsg), mode)) {
+			rtn = EFAULT;
+			kmem_free(tpsg, sizeof (*tpsg));
+			break;
+		}
+		if (tpsg->t_oid == ihp->hba_oid) {
+			/* initiator */
+			name = ihp->hba_name;
+			if (iscsi_get_persisted_tunable_param((uchar_t *)name,
+			    tpsg) == 1) {
+				/*
+				 * no persisted tunable parameters found
+				 * for iscsi initiator, use default tunable
+				 * params for initiator node.
+				 */
+				iscsi_get_tunable_default(tpsg);
+			}
+		} else {
+			/* check whether it is a target oid */
+			name = iscsi_targetparam_get_name(tpsg->t_oid);
+			if (name == NULL) {
+				/* invalid node name */
+				rtn = EINVAL;
+				kmem_free(tpsg, sizeof (*tpsg));
+				break;
+			}
+			if (iscsi_get_persisted_tunable_param((uchar_t *)name,
+			    tpsg) == 1) {
+				/*
+				 * no persisted tunable parameters found for
+				 * iscsi target, use initiator's configure.
+				 */
+				if (iscsi_get_persisted_tunable_param(
+				    (uchar_t *)ihp->hba_name, tpsg) == -1) {
+					/*
+					 * No initiator tunable parameters set
+					 * use default value for target
+					 */
+					iscsi_get_tunable_default(tpsg);
+				}
+			}
+		}
+
+		if (ddi_copyout(tpsg, (caddr_t)arg,
+		    sizeof (iscsi_tunable_object_t), mode) != 0) {
+			rtn = EFAULT;
+		}
+		kmem_free(tpsg, sizeof (*tpsg));
+		break;
+
 	default:
 		rtn = ENOTTY;
 		cmn_err(CE_NOTE, "unrecognized ioctl 0x%x", cmd);
@@ -4704,6 +4865,14 @@ iscsi_set_default_login_params(iscsi_login_params_t *params)
 	params->ofmarker		= ISCSI_DEFAULT_OFMARKER;
 }
 
+/* Helper function to sets the driver default tunable parameters */
+static void
+iscsi_set_default_tunable_params(iscsi_tunable_params_t *params)
+{
+	params->recv_login_rsp_timeout = ISCSI_DEFAULT_RX_TIMEOUT_VALUE;
+	params->conn_login_max = ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX;
+	params->polling_login_delay = ISCSI_DEFAULT_LOGIN_POLLING_DELAY;
+}
 
 /*
  * +--------------------------------------------------------------------+
@@ -5201,4 +5370,75 @@ iscsi_check_miniroot(iscsi_hba_t *ihp) {
 		 */
 		ihp->hba_service_status = ISCSI_SERVICE_ENABLED;
 	}
+}
+
+static void
+iscsi_get_tunable_default(iscsi_tunable_object_t *param) {
+	int	param_id = 0;
+
+	param_id = 1 << (param->t_param - 1);
+	param->t_set = B_FALSE;
+	switch (param_id) {
+	case ISCSI_TUNABLE_PARAM_RX_TIMEOUT_VALUE:
+		param->t_value.v_integer = ISCSI_DEFAULT_RX_TIMEOUT_VALUE;
+		break;
+	case ISCSI_TUNABLE_PARAM_LOGIN_POLLING_DELAY:
+		param->t_value.v_integer = ISCSI_DEFAULT_LOGIN_POLLING_DELAY;
+		break;
+	case ISCSI_TUNABLE_PARAM_CONN_LOGIN_MAX:
+		param->t_value.v_integer = ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX;
+		break;
+	default:
+		break;
+	}
+}
+
+/*
+ * iscsi_get_persisted_tunable_param * - a helper to ISCSI_TUNABLE_PARAM_GET
+ * ioctl
+ * return:
+ *    0 	persisted tunable parameter found
+ *    1		persisted tunable parameter not found
+ */
+static int
+iscsi_get_persisted_tunable_param(uchar_t *name, iscsi_tunable_object_t *tpsg)
+{
+	int rtn = 1;
+	int param_id = 0;
+	persistent_tunable_param_t *pparam;
+
+	if ((name == NULL) || strlen((char *)name) == 0) {
+		return (rtn);
+	}
+
+	tpsg->t_set = B_FALSE;
+	pparam = (persistent_tunable_param_t *)kmem_zalloc(sizeof (*pparam),
+	    KM_SLEEP);
+	if (persistent_get_tunable_param((char *)name, pparam) == B_TRUE) {
+		if (pparam->p_bitmap & (1 << (tpsg->t_param - 1))) {
+			tpsg->t_set = B_TRUE;
+			param_id = 1 << (tpsg->t_param - 1);
+			switch (param_id) {
+			case ISCSI_TUNABLE_PARAM_RX_TIMEOUT_VALUE:
+				tpsg->t_value.v_integer =
+				    pparam->p_params.recv_login_rsp_timeout;
+				break;
+			case ISCSI_TUNABLE_PARAM_LOGIN_POLLING_DELAY:
+				tpsg->t_value.v_integer =
+				    pparam->p_params.polling_login_delay;
+				break;
+			case ISCSI_TUNABLE_PARAM_CONN_LOGIN_MAX:
+				tpsg->t_value.v_integer =
+				    pparam->p_params.conn_login_max;
+				break;
+			default:
+				break;
+			}
+			rtn = 0;
+		}
+	}
+
+	kmem_free(pparam, sizeof (*pparam));
+
+	return (rtn);
 }

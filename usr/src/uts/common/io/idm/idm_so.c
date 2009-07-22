@@ -50,6 +50,8 @@
 #include <sys/idm/idm_so.h>
 #include <sys/idm/idm_text.h>
 
+#define	IN_PROGRESS_DELAY	1
+
 /*
  * in6addr_any is currently all zeroes, but use the macro in case this
  * ever changes.
@@ -81,6 +83,9 @@ static uint32_t idm_fill_iov(idm_pdu_t *pdu, idm_buf_t *idb,
 
 static idm_status_t idm_so_handle_digest(idm_conn_t *it,
     nvpair_t *digest_choice, const idm_kv_xlate_t *ikvx);
+
+static void idm_so_socket_set_nonblock(struct sonode *node);
+static void idm_so_socket_set_block(struct sonode *node);
 
 /*
  * Transport ops prototypes
@@ -867,11 +872,66 @@ static idm_status_t
 idm_so_ini_conn_connect(idm_conn_t *ic)
 {
 	idm_so_conn_t	*so_conn;
+	struct sonode	*node = NULL;
+	int 		rc;
+	clock_t		lbolt, conn_login_max, conn_login_interval;
+	boolean_t	nonblock;
 
 	so_conn = ic->ic_transport_private;
+	nonblock = ic->ic_conn_params.nonblock_socket;
+	conn_login_max = ic->ic_conn_params.conn_login_max;
+	conn_login_interval = ddi_get_lbolt() +
+	    SEC_TO_TICK(ic->ic_conn_params.conn_login_interval);
 
-	if (ksocket_connect(so_conn->ic_so, &ic->ic_ini_dst_addr.sin,
-	    (SIZEOF_SOCKADDR(&ic->ic_ini_dst_addr.sin)), CRED()) != 0) {
+	if (nonblock == B_TRUE) {
+		node = ((struct sonode *)(so_conn->ic_so));
+		/* Set to none block socket mode */
+		idm_so_socket_set_nonblock(node);
+		do {
+			rc = ksocket_connect(so_conn->ic_so,
+			    &ic->ic_ini_dst_addr.sin,
+			    (SIZEOF_SOCKADDR(&ic->ic_ini_dst_addr.sin)),
+			    CRED());
+			if (rc == 0 || rc == EISCONN) {
+				/* socket success or already success */
+				rc = IDM_STATUS_SUCCESS;
+				break;
+			}
+			if ((rc == ETIMEDOUT) || (rc == ECONNREFUSED) ||
+			    (rc == ECONNRESET)) {
+				/* socket connection timeout or refuse */
+				break;
+			}
+			lbolt = ddi_get_lbolt();
+			if (lbolt > conn_login_max) {
+				/*
+				 * Connection retry timeout,
+				 * failed connect to target.
+				 */
+				break;
+			}
+			if (lbolt < conn_login_interval) {
+				if ((rc == EINPROGRESS) || (rc == EALREADY)) {
+					/* TCP connect still in progress */
+					delay(SEC_TO_TICK(IN_PROGRESS_DELAY));
+					continue;
+				} else {
+					delay(conn_login_interval - lbolt);
+				}
+			}
+			conn_login_interval = ddi_get_lbolt() +
+			    SEC_TO_TICK(ic->ic_conn_params.conn_login_interval);
+		} while (rc != 0);
+		/* resume to nonblock mode */
+		if (rc == IDM_STATUS_SUCCESS) {
+			idm_so_socket_set_block(node);
+		}
+	} else {
+		rc = ksocket_connect(so_conn->ic_so, &ic->ic_ini_dst_addr.sin,
+		    (SIZEOF_SOCKADDR(&ic->ic_ini_dst_addr.sin)), CRED());
+	}
+
+	if (rc != 0) {
 		idm_soshutdown(so_conn->ic_so);
 		return (IDM_STATUS_FAIL);
 	}
@@ -2747,4 +2807,18 @@ tx_bail:
 	idm_conn_rele(ic);
 	thread_exit();
 	/*NOTREACHED*/
+}
+
+static void
+idm_so_socket_set_nonblock(struct sonode *node)
+{
+	(void) VOP_SETFL(node->so_vnode, node->so_flag,
+	    (node->so_state | FNONBLOCK), CRED(), NULL);
+}
+
+static void
+idm_so_socket_set_block(struct sonode *node)
+{
+	(void) VOP_SETFL(node->so_vnode, node->so_flag,
+	    (node->so_state & (~FNONBLOCK)), CRED(), NULL);
 }

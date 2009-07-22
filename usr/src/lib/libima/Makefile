@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 include		../Makefile.lib
 
-HDRS=		ima.h
+HDRS=		ima.h libsun_ima.h
 HDRDIR=		common
 SUBDIRS=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)

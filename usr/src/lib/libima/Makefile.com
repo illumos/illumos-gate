@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 LIBRARY=	libima.a
 VERS=		.1
-OBJECTS=	ima-lib.o
+OBJECTS=	ima-lib.o sunima-lib.o
 CONFIGFILE=	ima.conf
 ROOTETC=	$(ROOT)/etc
 

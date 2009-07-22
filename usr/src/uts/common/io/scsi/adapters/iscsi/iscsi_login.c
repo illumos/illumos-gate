@@ -56,7 +56,6 @@ static void iscsi_login_disconnect(iscsi_conn_t *icp);
 static void iscsi_notice_key_values(iscsi_conn_t *icp);
 
 #define	ISCSI_LOGIN_RETRY_DELAY		5	/* seconds */
-#define	ISCSI_LOGIN_POLLING_DELAY	60	/* seconds */
 
 /*
  * +--------------------------------------------------------------------+
@@ -77,7 +76,6 @@ iscsi_login_start(void *arg)
 	iscsi_hba_t		*ihp;
 	unsigned char		status_class;
 	unsigned char		status_detail;
-	clock_t			lbolt;
 
 	ASSERT(itp != NULL);
 	icp = (iscsi_conn_t *)itp->t_arg;
@@ -106,12 +104,6 @@ login_start:
 		/* unable to sync params.  fail connection attempts */
 		iscsi_login_end(icp, ISCSI_STATUS_LOGIN_FAILED, itp);
 		return (ISCSI_STATUS_LOGIN_FAILED);
-	}
-
-	/* delay the login process if required */
-	lbolt = ddi_get_lbolt();
-	if (lbolt < icp->conn_login_min) {
-		delay(icp->conn_login_min - lbolt);
 	}
 
 	/*
@@ -208,7 +200,8 @@ login_retry:
 
 		if (icp->conn_state == ISCSI_CONN_STATE_POLLING) {
 			icp->conn_login_min = ddi_get_lbolt() +
-			    SEC_TO_TICK(ISCSI_LOGIN_POLLING_DELAY);
+			    SEC_TO_TICK(icp->conn_tunable_params.
+			    polling_login_delay);
 		} else {
 			icp->conn_login_min = ddi_get_lbolt() +
 			    SEC_TO_TICK(ISCSI_LOGIN_RETRY_DELAY);
@@ -487,7 +480,8 @@ iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 		 * receive.
 		 */
 		response_timeout = ddi_get_lbolt() +
-		    SEC_TO_TICK(ISCSI_RX_TIMEOUT_VALUE);
+		    SEC_TO_TICK(icp->conn_tunable_params.
+		    recv_login_rsp_timeout);
 		idm_pdu_tx(text_pdu);
 
 		/*
@@ -2109,7 +2103,11 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	/* delay the connect process if required */
 	lbolt = ddi_get_lbolt();
 	if (lbolt < icp->conn_login_min) {
-		delay(icp->conn_login_min - lbolt);
+		if (icp->conn_login_max < icp->conn_login_min) {
+			delay(icp->conn_login_max - lbolt);
+		} else {
+			delay(icp->conn_login_min - lbolt);
+		}
 	}
 
 	/* Create IDM connection context */
@@ -2151,6 +2149,29 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	 */
 	idm_conn_hold(icp->conn_ic);
 
+	/*
+	 * When iSCSI initiator to target IO timeout or connection failure
+	 * Connection retry is needed for normal operational session.
+	 */
+	if ((icp->conn_sess->sess_type == ISCSI_SESS_TYPE_NORMAL) &&
+	    ((icp->conn_state == ISCSI_CONN_STATE_FAILED) ||
+	    (icp->conn_state == ISCSI_CONN_STATE_POLLING))) {
+		icp->conn_ic->ic_conn_params.nonblock_socket = B_TRUE;
+		icp->conn_ic->ic_conn_params.conn_login_max =
+		    icp->conn_login_max;
+		if (icp->conn_state == ISCSI_CONN_STATE_POLLING) {
+			icp->conn_ic->ic_conn_params.conn_login_interval =
+			    icp->conn_tunable_params.polling_login_delay;
+		} else {
+			icp->conn_ic->ic_conn_params.conn_login_interval =
+			    ISCSI_LOGIN_RETRY_DELAY;
+		}
+
+	} else {
+		icp->conn_ic->ic_conn_params.nonblock_socket = B_FALSE;
+		icp->conn_ic->ic_conn_params.conn_login_max = 0;
+		icp->conn_ic->ic_conn_params.conn_login_interval = 0;
+	}
 	/*
 	 * Attempt connection.  Upon return we will either be ready to
 	 * login or disconnected.  If idm_ini_conn_connect fails we

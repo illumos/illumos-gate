@@ -64,6 +64,9 @@ extern "C" {
 #define	DATA_DIGEST		0x0c
 #define	MAX_CONNECTIONS		0x0d
 #define	ERROR_RECOVERY_LEVEL	0x0e
+#define	RECV_LOGIN_RSP_TIMEOUT  0x0f
+#define	CONN_LOGIN_MAX		0x10
+#define	POLLING_LOGIN_DELAY	0x11
 
 #define	AUTH_NAME		0x01
 #define	AUTH_PASSWORD		0x02

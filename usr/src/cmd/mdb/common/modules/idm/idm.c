@@ -48,9 +48,9 @@
 #define	ISCSI_ICS_NAMES
 #define	ISCSI_LOGIN_STATE_NAMES
 #include <sys/idm/idm.h>
+#include <iscsi.h>
 #include <iscsit.h>
 #include <iscsit_isns.h>
-#include <iscsi.h>
 
 /*
  * We want to be able to print multiple levels of object hierarchy with a

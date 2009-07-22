@@ -142,6 +142,8 @@ extern "C" {
 #define	ISCSI_BOOTPROP_GET		(ISCSI_IOCTL | 48)
 #define	ISCSI_SMF_OFFLINE		(ISCSI_IOCTL | 49)
 #define	ISCSI_SMF_GET			(ISCSI_IOCTL | 50)
+#define	ISCSI_TUNABLE_PARAM_GET		(ISCSI_IOCTL | 51)
+#define	ISCSI_TUNABLE_PARAM_SET		(ISCSI_IOCTL | 52)
 #define	ISCSI_DB_DUMP			(ISCSI_IOCTL | 100) /* DBG */
 
 /*
@@ -232,6 +234,10 @@ typedef struct iscsi_login_params {
 	boolean_t	ofmarker;
 } iscsi_login_params_t;
 
+#define		ISCSI_TUNABLE_PARAM_RX_TIMEOUT_VALUE		0x0001
+#define		ISCSI_TUNABLE_PARAM_CONN_LOGIN_MAX		0x0002
+#define		ISCSI_TUNABLE_PARAM_LOGIN_POLLING_DELAY		0x0004
+
 /*
  * Once parameters have been set via ISCSI_SET_PARAM the login is initiated
  * by sending an ISCSI_LOGIN ioctl with the following structure filled in.
@@ -312,6 +318,20 @@ typedef struct	iSCSILoginParamSet {
 	uint32_t		s_param;
 	iscsi_set_value_t	s_value;
 } iscsi_param_set_t;
+
+/* Data structure used for tunable object parameters */
+typedef struct _iSCSITunableValue {
+	uint32_t	v_integer;
+	boolean_t	v_bool;
+	uchar_t		v_name[ISCSI_MAX_NAME_LEN];
+} iscsi_tunable_value_t;
+
+typedef struct iSCSITunalbeParamObject {
+	boolean_t		t_set;
+	uint32_t		t_oid;
+	uint32_t		t_param;
+	iscsi_tunable_value_t	t_value;
+} iscsi_tunable_object_t;
 
 /*
  * Data in this structure is set by the user agent and consumed by

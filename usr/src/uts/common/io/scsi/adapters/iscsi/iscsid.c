@@ -1399,6 +1399,7 @@ iscsid_init_config(iscsi_hba_t *ihp)
 	char *name;
 	char *initiatorName;
 	persistent_param_t	pp;
+	persistent_tunable_param_t pparam;
 	uint32_t		param_id;
 	int			rc;
 
@@ -1422,6 +1423,13 @@ iscsid_init_config(iscsi_hba_t *ihp)
 			    (const char *)iscsiboot_prop->boot_init.ini_name,
 			    sizeof (ips.s_value.v_name));
 			(void) iscsi_set_params(&ips, ihp, B_TRUE);
+			/* use default tunable value */
+			ihp->hba_tunable_params.recv_login_rsp_timeout =
+			    ISCSI_DEFAULT_RX_TIMEOUT_VALUE;
+			ihp->hba_tunable_params.polling_login_delay =
+			    ISCSI_DEFAULT_LOGIN_POLLING_DELAY;
+			ihp->hba_tunable_params.conn_login_max =
+			    ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX;
 			cmn_err(CE_NOTE, "Set initiator's name"
 			    " from firmware");
 		} else {
@@ -1429,6 +1437,18 @@ iscsid_init_config(iscsi_hba_t *ihp)
 			    initiatorName, sizeof (ips.s_value.v_name));
 
 			(void) iscsi_set_params(&ips, ihp, B_FALSE);
+			if (persistent_get_tunable_param(initiatorName,
+			    &pparam) == B_FALSE) {
+				/* use default value */
+				pparam.p_params.recv_login_rsp_timeout =
+				    ISCSI_DEFAULT_RX_TIMEOUT_VALUE;
+				pparam.p_params.polling_login_delay =
+				    ISCSI_DEFAULT_LOGIN_POLLING_DELAY;
+				pparam.p_params.conn_login_max =
+				    ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX;
+			}
+			bcopy(&pparam.p_params, &ihp->hba_tunable_params,
+			    sizeof (iscsi_tunable_params_t));
 		}
 	} else {
 		/*

@@ -114,11 +114,10 @@ extern boolean_t iscsi_sess_logging;
 #define	ISCSI_TCP_ABORT_THRESHOLD_DEFAULT	(30 * 1000) /* milliseconds */
 #define	ISNS_TCP_ABORT_THRESHOLD_DEFAULT	(3 * 1000) /* milliseconds */
 
-/*
- * timeout value in seconds that we will poll and wait for data to be return
- * from the device
- */
-#define	ISCSI_RX_TIMEOUT_VALUE			60
+/* Default values for tunable parameters */
+#define	ISCSI_DEFAULT_RX_TIMEOUT_VALUE		60
+#define	ISCSI_DEFAULT_CONN_DEFAULT_LOGIN_MAX	180
+#define	ISCSI_DEFAULT_LOGIN_POLLING_DELAY	60
 
 /*
  * Convenient short hand defines
@@ -567,8 +566,14 @@ typedef struct iscsi_queue {
 } iscsi_queue_t;
 
 #define	ISCSI_CONN_DEFAULT_LOGIN_MIN		0
-#define	ISCSI_CONN_DEFAULT_LOGIN_MAX		180
 #define	ISCSI_CONN_DEFAULT_LOGIN_REDIRECT	10
+
+/* iSCSI tunable Parameters */
+typedef struct iscsi_tunable_params {
+	int		recv_login_rsp_timeout;	/* range: 0 - 60*60 */
+	int		conn_login_max;		/* range: 0 - 60*60 */
+	int		polling_login_delay;	/* range: 0 - 60*60 */
+} iscsi_tunable_params_t;
 
 typedef union iscsi_sockaddr {
 	struct sockaddr		sin;
@@ -734,6 +739,10 @@ typedef struct iscsi_conn {
 	clock_t			conn_login_min;
 	clock_t			conn_login_max;
 	sm_audit_buf_t		conn_state_audit;
+
+	/* active tunable parameters */
+	iscsi_tunable_params_t	conn_tunable_params;
+	boolean_t		conn_timeout;
 } iscsi_conn_t;
 
 
@@ -1154,6 +1163,9 @@ typedef struct iscsi_hba {
 	kcondvar_t		hba_service_cv;
 	uint32_t		hba_service_status;
 	uint32_t		hba_service_client_count;
+
+	/* Default HBA tunable settings */
+	iscsi_tunable_params_t  hba_tunable_params;
 } iscsi_hba_t;
 
 /*
@@ -1301,6 +1313,8 @@ int iscsi_ioctl_get_config_sess(iscsi_hba_t *ihp,
     iscsi_config_sess_t *ics);
 int iscsi_ioctl_set_config_sess(iscsi_hba_t *ihp,
     iscsi_config_sess_t *ics);
+int iscsi_ioctl_set_tunable_param(iscsi_hba_t *ihp,
+    iscsi_tunable_object_t *tpss);
 /* ioctls  prototypes */
 int iscsi_get_param(iscsi_login_params_t *params,
     boolean_t valid_flag,

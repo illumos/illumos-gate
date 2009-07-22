@@ -123,6 +123,9 @@ typedef struct idm_refcnt_s {
  */
 typedef struct idm_conn_params_s {
 	uint32_t		max_dataseglen;
+	uint32_t		conn_login_max;
+	uint32_t		conn_login_interval;
+	boolean_t		nonblock_socket;
 } idm_conn_param_t;
 
 typedef struct idm_svc_s {
