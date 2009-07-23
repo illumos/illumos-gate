@@ -214,6 +214,15 @@ ld_sym_nodirect(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 	/*
 	 * Get the associated symbol table.
 	 */
+	if ((sifshdr->sh_link == 0) || (sifshdr->sh_link >= ifl->ifl_shnum)) {
+		/*
+		 * Broken input file
+		 */
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+		    ifl->ifl_name, isp->is_name, EC_XWORD(sifshdr->sh_link));
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (0);
+	}
 	symshdr = ifl->ifl_isdesc[sifshdr->sh_link]->is_shdr;
 	symdata = ifl->ifl_isdesc[sifshdr->sh_link]->is_indata->d_buf;
 
@@ -237,7 +246,7 @@ ld_sym_nodirect(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		sym = (Sym *)(symdata + _cnt);
 		str = (char *)(strdata + sym->st_name);
 
-		if (sdp = ld_sym_find(str, SYM_NOHASH, 0, ofl)) {
+		if ((sdp = ld_sym_find(str, SYM_NOHASH, NULL, ofl)) != NULL) {
 			if (ifl != sdp->sd_file)
 				continue;
 
@@ -448,7 +457,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 			break;
 		case STV_SINGLETON:
 			sdp->sd_flags1 |= (FLG_SY1_SINGLE | FLG_SY1_NDIR);
-			ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
+			ofl->ofl_flags1 |= (FLG_OF1_NDIRECT | FLG_OF1_NGLBDIR);
 			break;
 		case STV_ELIMINATE:
 			sdp->sd_flags1 |= (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
@@ -730,7 +739,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		usdp->sd_flags1 |= flags1;
 	}
 
-	if (name && (sdp = ld_sym_find(name, SYM_NOHASH, 0, ofl)) &&
+	if (name && (sdp = ld_sym_find(name, SYM_NOHASH, NULL, ofl)) &&
 	    (sdp->sd_sym->st_shndx == SHN_UNDEF)) {
 		uchar_t	bind;
 
@@ -928,7 +937,7 @@ ld_sym_spec(Ofl_desc *ofl)
 	 * Make sure it gets assigned the appropriate special attributes.
 	 */
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U),
-	    SYM_NOHASH, 0, ofl)) != 0) && (sdp->sd_ref != REF_DYN_SEEN)) {
+	    SYM_NOHASH, NULL, ofl)) != 0) && (sdp->sd_ref != REF_DYN_SEEN)) {
 		if (sym_add_spec(MSG_ORIG(MSG_SYM_GOFTBL),
 		    MSG_ORIG(MSG_SYM_GOFTBL_U), SDAUX_ID_GOT, FLG_SY_DYNSORT,
 		    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF), ofl) == S_ERROR)
@@ -959,13 +968,13 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 *
 		 * A symbol is a candidate for auto-reduction/elimination if:
 		 *
-		 *   .  the symbol wasn't explicitly defined within a mapfile
+		 *  -	the symbol wasn't explicitly defined within a mapfile
 		 *	(in which case all the necessary state has been applied
 		 *	to the symbol), or
-		 *   .	the symbol isn't one of the family of reserved
+		 *  -	the symbol isn't one of the family of reserved
 		 *	special symbols (ie. _end, _etext, etc.), or
-		 *   .	the symbol isn't a SINGLETON, or
-		 *   .  the symbol wasn't explicitly defined within a version
+		 *  -	the symbol isn't a SINGLETON, or
+		 *  -	the symbol wasn't explicitly defined within a version
 		 *	definition associated with an input relocatable object.
 		 *
 		 * Indicate that the symbol has been reduced as it may be
@@ -1121,9 +1130,10 @@ ld_sym_validate(Ofl_desc *ofl)
 		needed = FLG_OF_FATAL;
 
 	/*
-	 * If the output image is being versioned all symbol definitions must be
-	 * associated with a version.  Any symbol that isn't is classified as
-	 * undefined and a fatal error condition will be indicated.
+	 * If the output image is being versioned, then all symbol definitions
+	 * must be associated with a version.  Any symbol that isn't associated
+	 * with a version is classified as undefined, and a fatal error
+	 * condition is indicated.
 	 */
 	if ((oflags & FLG_OF_VERDEF) && (ofl->ofl_vercnt > VER_NDX_GLOBAL))
 		verdesc = FLG_OF_FATAL;
@@ -1148,7 +1158,7 @@ ld_sym_validate(Ofl_desc *ofl)
 
 		for (i = 0; special[i] != NULL; i++) {
 			if (((sdp = ld_sym_find(special[i],
-			    SYM_NOHASH, 0, ofl)) != NULL) &&
+			    SYM_NOHASH, NULL, ofl)) != NULL) &&
 			    (sdp->sd_sym->st_size == 0)) {
 				if (ld_sym_copy(sdp) == S_ERROR)
 					return (S_ERROR);
@@ -1337,7 +1347,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			 * allow being directly bound to.
 			 */
 			if (sdp->sd_flags1 & FLG_SY1_NDIR)
-				ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
+				ofl->ofl_flags1 |= FLG_OF1_NGLBDIR;
 
 			if (sdp->sd_file->ifl_vercnt) {
 				int		vndx;
@@ -1382,15 +1392,23 @@ ld_sym_validate(Ofl_desc *ofl)
 
 		/*
 		 * If the output image is to be versioned then all symbol
-		 * definitions must be associated with a version.
+		 * definitions must be associated with a version.  Remove any
+		 * versioning that might be left associated with an undefined
+		 * symbol.
 		 */
-		if (verdesc && (sdp->sd_ref == REF_REL_NEED) &&
-		    (sym->st_shndx != SHN_UNDEF) &&
-		    (!(sdp->sd_flags1 & FLG_SY1_HIDDEN)) &&
-		    (sdp->sd_aux->sa_overndx == 0)) {
-			sym_undef_entry(ofl, sdp, NOVERSION);
-			ofl->ofl_flags |= verdesc;
-			continue;
+		if (verdesc && (sdp->sd_ref == REF_REL_NEED)) {
+			if (sym->st_shndx == SHN_UNDEF) {
+				if (sdp->sd_aux && sdp->sd_aux->sa_overndx)
+					sdp->sd_aux->sa_overndx = 0;
+			} else {
+				if ((!(sdp->sd_flags1 & FLG_SY1_HIDDEN)) &&
+				    sdp->sd_aux &&
+				    (sdp->sd_aux->sa_overndx == 0)) {
+					sym_undef_entry(ofl, sdp, NOVERSION);
+					ofl->ofl_flags |= verdesc;
+					continue;
+				}
+			}
 		}
 
 		/*
@@ -1603,8 +1621,8 @@ ld_sym_validate(Ofl_desc *ofl)
 	 */
 	ret = 0;
 	if (ofl->ofl_entry) {
-		if ((sdp =
-		    ld_sym_find(ofl->ofl_entry, SYM_NOHASH, 0, ofl)) == NULL) {
+		if ((sdp = ld_sym_find(ofl->ofl_entry, SYM_NOHASH,
+		    NULL, ofl)) == NULL) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_ARG_NOENTRY), ofl->ofl_entry);
 			ret++;
@@ -1615,12 +1633,12 @@ ld_sym_validate(Ofl_desc *ofl)
 			ofl->ofl_entry = (void *)sdp;
 		}
 	} else if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_START),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (ensure_sym_local(ofl,
+	    SYM_NOHASH, NULL, ofl)) != NULL) && (ensure_sym_local(ofl,
 	    sdp, 0) == 0)) {
 		ofl->ofl_entry = (void *)sdp;
 
 	} else if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_MAIN),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (ensure_sym_local(ofl,
+	    SYM_NOHASH, NULL, ofl)) != NULL) && (ensure_sym_local(ofl,
 	    sdp, 0) == 0)) {
 		ofl->ofl_entry = (void *)sdp;
 	}
@@ -1968,7 +1986,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * won't become part of the output image, but we must
 			 * process it to test for register conflicts.
 			 */
-			rsdp = sdp = 0;
+			rsdp = sdp = NULL;
 			if (sdflags & FLG_SY_REGSYM) {
 				/*
 				 * The presence of FLG_SY_REGSYM means that

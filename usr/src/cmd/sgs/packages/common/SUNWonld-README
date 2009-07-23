@@ -1198,7 +1198,6 @@ All the above changes are incorporated in the following patches:
 	mozilla (D)
 	PSARC/2007/413 Add -zglobalaudit option to ld
 6602294 ps_pbrandname breaks apps linked directly against librtld_db
-	(link-editor components only) 
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.10_sparc	patch T127111-07
@@ -1254,12 +1253,30 @@ Bugid   Risk Synopsis
 6805502 The addition of "inline" keywords to sgs code broke the lint
 	verification in S10
 6807864 ld.so.1 is susceptible to a fatal dlsym()/setlocale() race
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.10_sparc	patch T141692-01
+	Solaris/SunOS 5.10_x86		patch T141693-01
+NOTE: The fix for 6805502 is only applicable to s10.
+--------------------------------------------------------------------------------
 6826410 ld needs to sort sections using 32-bit sort keys
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+	Solaris/SunOS 5.10_sparc	patch T141771-01
+	Solaris/SunOS 5.10_x86		patch T141772-01
+NOTE: The fix for 6826410 is also available for s9 in the following patches:
+	Solaris/SunOS 5.9_sparc		patch T112963-33
+	Solaris/SunOS 5.9_x86		patch T113986-27
+--------------------------------------------------------------------------------
+6568447 bcp is broken by 6551627
+6599700 librtld_db needs better plugin support
+6713830 mdb dumped core reading a gcore
+6756048 rd_loadobj_iter() should always invoke brand plugin callback
+6786744 32-bit dbx failed with unknown rtld_db.so error on snv_104
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.10_sparc	patch TXXXXXX-XX
 	Solaris/SunOS 5.10_x86		patch TXXXXXX-XX
-NOTE: The fix for 6805502 is only applicable to s10.
 --------------------------------------------------------------------------------
 
 --------------
@@ -1382,7 +1399,6 @@ Bugid   Risk Synopsis
 6671255 link-editor should support cross linking (D)
 	PSARC/2008/179 cross link-editor
 6674666 elfedit dyn:posflag1 needs option to locate element via NEEDED item
-6568447 bcp is broken by 6551627 (link-editor components only)
 6675591 elfwrap - wrap data in an ELF file (D,P)
 	PSARC/2008/198 elfwrap - wrap data in an ELF file
 6678244 elfdump dynamic section sanity checking needs refinement
@@ -1405,8 +1421,6 @@ Bugid   Risk Synopsis
 6705846 multithreaded C++ application seems to get deadlocked in the dynamic
 	linker code
 6686343 ldd(1) - unused search path diagnosis should be enabled
-6599700 librtld_db needs better plugin support (link-editor components only)
-6713830 mdb dumped core reading a gcore
 6712292 ld.so.1 should fall back to an interposer for failed direct bindings
 6716350 usr/src/cmd/sgs should be linted by nightly builds
 6720509 usr/src/cmd/sgs/sgsdemangler should be removed
@@ -1430,7 +1444,6 @@ Bugid   Risk Synopsis
 	(link-editor components only)
 	PSARC/2008/622 32-bit Address Restriction Software Capabilities Flag
 6756953 customer requests that DT_CONFIG strings be honored for secure apps (D)
-6756048 rd_loadobj_iter() should always invoke brand plugin callback
 6765299 ld --version-script option not compatible with GNU ld (D)
 6748160 problem with -zrescan (D)
 	PSARC/2008/651 New ld archive rescan options
@@ -1444,7 +1457,6 @@ Bugid   Risk Synopsis
 6782977 ld segfaults after support lib version error sends bad args to vprintf()
 6773695 ld -z nopartial can break non-pic objects
 6778453 RTLD_GROUP prevents use of application defined malloc
-6786744 32-bit dbx failed with unknown rtld_db.so error on snv_104
 6789925 64-bit applications with SF1_SUNW_ADDR32 require non-default starting
 	address
 6792906 ld -z nopartial fix breaks TLS
@@ -1491,3 +1503,7 @@ Bugid   Risk Synopsis
 6853809	ld.so.1: rescan fallback optimization is invalid
 6854158	ld.so.1: interposition can be skipped because of incorrect
 	caller/destination validation
+6862967 rd_loadobj_iter() failing for core files
+6856173 streams core dumps when compiled in 64bit with a very large static
+	array size
+6834197 ld pukes when given an empty plate

@@ -133,6 +133,9 @@ typedef struct {
  *
  *		Added rtld_flags & FLG_RT_RELOCED to stable flags range
  *
+ * Valid fields for R_RTLDDB_VERSION6
+ *
+ *		rtd_dynlmlst converted from a List to APlist
  */
 #define	R_RTLDDB_VERSION1	1	/* base version level - used for core */
 					/*	file examination */
@@ -141,7 +144,8 @@ typedef struct {
 #define	R_RTLDDB_VERSION3	3
 #define	R_RTLDDB_VERSION4	4
 #define	R_RTLDDB_VERSION5	5
-#define	R_RTLDDB_VERSION	R_RTLDDB_VERSION5	/* current version */
+#define	R_RTLDDB_VERSION6	6
+#define	R_RTLDDB_VERSION	R_RTLDDB_VERSION6	/* current version */
 
 typedef struct rtld_db_priv {
 	struct r_debug	rtd_rdebug;	/* original r_debug structure */

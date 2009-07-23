@@ -54,7 +54,7 @@ typedef	enum {
 /* ARGSUSED0 */
 static void
 sym_null(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
 }
 
@@ -266,7 +266,7 @@ sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 /*ARGSUSED4*/
 static void
 sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
 	uchar_t		otype = ELF_ST_TYPE(sdp->sd_sym->st_info);
 	uchar_t		ntype = ELF_ST_TYPE(nsym->st_info);
@@ -298,7 +298,7 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 /*ARGSUSED4*/
 static void
 sym_mach_check(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
 	/*
 	 * Perform any machine specific type checking.
@@ -517,7 +517,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
 	Sym	*osym = sdp->sd_sym;
 	uchar_t	obind = ELF_ST_BIND(osym->st_info);
@@ -545,7 +545,7 @@ sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
 	Conv_inv_buf_t inv_buf1, inv_buf2;
 	Sym	*osym = sdp->sd_sym;
@@ -610,17 +610,17 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * Having provided the user with any necessary warnings, take the
 	 * appropriate symbol:
 	 *
-	 *  o	if one symbol is from a shared object and the other is from a
+	 *  -	if one symbol is from a shared object and the other is from a
 	 *	relocatable object, take the relocatable objects symbol (the
 	 *	run-time linker is always going to find the relocatable object
 	 *	symbol regardless of the binding), else
 	 *
-	 * o	if both symbols are from relocatable objects and one symbol is
+	 *  -	if both symbols are from relocatable objects and one symbol is
 	 *	weak take the non-weak symbol (two non-weak symbols would have
 	 *	generated the fatal error condition above unless -z muldefs is
 	 *	in effect), else
 	 *
-	 *  o	take the first symbol definition encountered.
+	 *  -	take the first symbol definition encountered.
 	 */
 	if ((sdp->sd_flags & FLG_SY_SOFOUND) && (nfile == ET_DYN)) {
 		if (warn)
@@ -648,7 +648,7 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
 	Conv_inv_buf_t inv_buf1, inv_buf2;
 	Sym	*osym = sdp->sd_sym;
@@ -666,12 +666,12 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Special rules for functions.
 	 *
-	 *  o	If both definitions are from relocatable objects, have the same
+	 *  -	If both definitions are from relocatable objects, have the same
 	 *	binding (ie. two weaks or two non-weaks), and the real
 	 *	definition is a function (the other must be tentative), treat
 	 *	this as a multiply defined symbol error, else
 	 *
-	 *  o	if the real symbol definition is a function within a shared
+	 *  -	if the real symbol definition is a function within a shared
 	 *	library and the tentative symbol is a relocatable object, and
 	 *	the tentative is not weak and the function real, then retain the
 	 *	tentative definition.
@@ -774,18 +774,18 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * Having provided the user with any necessary warnings, take the
 	 * appropriate symbol:
 	 *
-	 *  o   if the original symbol is from relocatable file and it is
+	 *  -	if the original symbol is from relocatable file and it is
 	 *	a protected tentative symbol, take the original one.
 	 *
-	 *  o 	if the original symbol is from shared object and the new
+	 *  -	if the original symbol is from shared object and the new
 	 *	symbol is a protected tentative symbol from a relocatable file,
 	 *	take the new one.
 	 *
-	 *  o	if the original symbol is tentative, and providing the original
+	 *  -	if the original symbol is tentative, and providing the original
 	 *	symbol isn't strong and the new symbol weak, take the real
 	 *	symbol, else
 	 *
-	 *  o	if the original symbol is weak and the new tentative symbol is
+	 *  -	if the original symbol is weak and the new tentative symbol is
 	 *	strong take the new symbol.
 	 *
 	 * Refer to the System V ABI Page 4-27 for a description of the binding
@@ -830,7 +830,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-	int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, Word nsymflags)
 {
 	Sym	*osym = sdp->sd_sym;
 	uchar_t	obind = ELF_ST_BIND(osym->st_info);
@@ -923,10 +923,10 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * Having provided the necessary warning indicate which
 		 * relocatable object we are going to take.
 		 *
-		 *  o	if one symbol is weak and the other is non-weak
+		 *  -	if one symbol is weak and the other is non-weak
 		 *	take the non-weak symbol, else
 		 *
-		 *  o	take the largest alignment (as we still have to check
+		 *  -	take the largest alignment (as we still have to check
 		 *	the symbols size simply save the largest value for
 		 *	updating later).
 		 */
@@ -972,11 +972,11 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * Having provided the necessary warning indicate what course
 		 * of action we are going to take.
 		 *
-		 *  o	if the file types differ, take the relocatable object
+		 *  -	if the file types differ, take the relocatable object
 		 *	and apply the largest symbol size, else
-		 *  o	if one symbol is weak and the other is non-weak, take
+		 *  -	if one symbol is weak and the other is non-weak, take
 		 *	the non-weak symbol, else
-		 *  o	simply take the largest symbol reference.
+		 *  -	simply take the largest symbol reference.
 		 */
 		if (nfile != ofile) {
 			if (nfile == ET_REL) {
@@ -1019,13 +1019,13 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		/*
 		 * If the sizes are the same
 		 *
-		 *  o	if the file types differ, take the relocatable object,
+		 *  -	if the file types differ, take the relocatable object,
 		 *	else
 		 *
-		 *  o	if one symbol is weak and the other is non-weak, take
+		 *  -	if one symbol is weak and the other is non-weak, take
 		 *	the non-weak symbol, else
 		 *
-		 *  o	take the first reference.
+		 *  -	take the first reference.
 		 */
 		if ((sdp->sd_flags & FLG_SY_SOFOUND) && (nfile == ET_DYN))
 			return;
@@ -1051,7 +1051,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  * procedure to be called (if any).
  */
 static void (*Action[REF_NUM * SYM_NUM * 2][SYM_NUM])(Sym_desc *,
-	Sym *, Ifl_desc *, Ofl_desc *, int, Word, Word) = {
+    Sym *, Ifl_desc *, Ofl_desc *, int, Word, Word) = {
 
 /*				defined		undef		tent	*/
 /*				ET_REL		ET_REL		ET_REL	*/
@@ -1200,8 +1200,10 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 				sdp->sd_flags1 |=
 				    (FLG_SY1_NDIR | FLG_SY1_SINGLE);
 
-				if (sdp->sd_ref == REF_REL_NEED)
-					ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
+				if (sdp->sd_ref == REF_REL_NEED) {
+					ofl->ofl_flags1 |=
+					    (FLG_OF1_NDIRECT | FLG_OF1_NGLBDIR);
+				}
 			}
 		} else if (vis == STV_PROTECTED) {
 			sdp->sd_flags1 |= FLG_SY1_PROTECT;

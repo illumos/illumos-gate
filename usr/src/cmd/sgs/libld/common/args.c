@@ -420,8 +420,8 @@ check_flags(Ofl_desc * ofl, int argc)
 			 * by -zdirect or mapfile DIRECT directives.
 			 */
 			if (Bdflag == SET_FALSE) {
-				ofl->ofl_flags1 |=
-				    (FLG_OF1_NDIRECT | FLG_OF1_ALNODIR);
+				ofl->ofl_flags1 |= (FLG_OF1_NDIRECT |
+				    FLG_OF1_NGLBDIR | FLG_OF1_ALNODIR);
 				ofl->ofl_flags |= FLG_OF_SYMINFO;
 			}
 		}
@@ -1638,7 +1638,6 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_NODIRECT)) == 0) {
 					ofl->ofl_flags1 &= ~FLG_OF1_ZDIRECT;
-					ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_IGNORE)) == 0) {
 					ofl->ofl_flags1 |= FLG_OF1_IGNORE;

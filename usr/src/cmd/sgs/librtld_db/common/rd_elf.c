@@ -30,6 +30,7 @@
 #include	<rtld_db.h>
 #include	<rtld.h>
 #include	<alist.h>
+#include	<list.h>
 #include	<_rtld_db.h>
 #include	<msg.h>
 #include	<limits.h>
@@ -54,17 +55,24 @@
 #define	validate_rdebug32	validate_rdebug64
 #define	TAPlist			APlist
 #define	TLm_list		Lm_list
+#define	TList			List
+#define	TListnode		Listnode
 #define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_64
 #else	/* ELF32 */
 #define	Rt_map			Rt_map32
 #define	Rtld_db_priv		Rtld_db_priv32
 #define	TAPlist			APlist32
 #define	TLm_list		Lm_list32
+#define	TList			List32
+#define	TListnode		Listnode32
+#define	Lm_list			Lm_list32
 #define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_32
 #endif	/* _ELF64 */
 #else	/* _LP64 */
 #define	TAPlist			APlist
 #define	TLm_list		Lm_list
+#define	TList			List
+#define	TListnode		Listnode
 #define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_32
 #endif	/* _LP64 */
 
@@ -86,6 +94,7 @@ validate_rdebug32(struct rd_agent *rap)
 
 	if (rap->rd_rdebug == 0)
 		return (RD_ERR);
+
 	/*
 	 * The rtld_db_priv structure contains both the traditional (exposed)
 	 * r_debug structure as well as private data only available to
@@ -736,8 +745,10 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 	}
 
 	/*
-	 * Read the initial APlist information that contains the link-map list
-	 * entries.
+	 * As of VERSION6, rtd_dynlmlst points to an APlist.  Prior to VERSION6
+	 * rtd_dynlmlst pointed to a List.  But, there was a window where the
+	 * version was not incremented, and this must be worked around by
+	 * interpreting the APlist data.  Read the initial APlist information.
 	 */
 	if (ps_pread(rap->rd_psp, (psaddr_t)addr, (char *)&apl,
 	    sizeof (TAPlist)) != PS_OK) {
@@ -747,50 +758,130 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 	}
 
 	/*
-	 * Iterate through each apl.ap_data[] entry.
+	 * The rtd_dynlmlst change from a List to an APlist occurred under
+	 * 6801536 in snv_112.  However, this change neglected to preserve
+	 * backward compatibility by maintaining List processing and using a
+	 * version increment to detect the change.  6862967, intergrated in
+	 * snv_121 corrects the version detection.  However, to catch objects
+	 * built between these releases, we look at the first element of the
+	 * APlist.  apl_arritems indicates the number of APlist items that are
+	 * available.  This was originally initialized with a AL_CNT_DYNLIST
+	 * value of 2 (one entry for LM_ID_BASE and one entry for LM_ID_LDSO).
+	 * It is possible that the use of an auditor results in an additional
+	 * link-map list, in which case the original apl_arritems would have
+	 * been doubled.
+	 *
+	 * Therefore, if the debugging verion is VERSION6, or the apl_arritems
+	 * entry has a value less than or equal to 4 and the debugging version
+	 * is VERSION5, then we process APlists.  Otherwise, fall back to List
+	 * processing.
 	 */
-	for (datap = (uintptr_t)((char *)(uintptr_t)addr +
-	    ((size_t)(((TAPlist *)0)->apl_data))), nitems = 0;
-	    nitems < apl.apl_nitems; nitems++, datap += sizeof (Addr)) {
-		TLm_list	lm;
-		ulong_t		ident;
+	if ((rap->rd_rdebugvers >= R_RTLDDB_VERSION6) ||
+	    ((rap->rd_rdebugvers == R_RTLDDB_VERSION5) &&
+	    (apl.apl_arritems <= 4))) {
+		/*
+		 * Iterate through each apl.ap_data[] entry.
+		 */
+		for (datap = (uintptr_t)((char *)(uintptr_t)addr +
+		    ((size_t)(((TAPlist *)0)->apl_data))), nitems = 0;
+		    nitems < apl.apl_nitems; nitems++, datap += sizeof (Addr)) {
+			TLm_list	lm;
+			ulong_t		ident;
+
+			/*
+			 * Obtain the Lm_list address for this apl.ap_data[]
+			 * entry.
+			 */
+			if (ps_pread(rap->rd_psp, (psaddr_t)datap,
+			    (char *)&addr, sizeof (Addr)) != PS_OK) {
+				LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_5),
+				    EC_ADDR(datap)));
+				return (RD_DBERR);
+			}
+
+			/*
+			 * Obtain the Lm_list data for this Lm_list address.
+			 */
+			if (ps_pread(rap->rd_psp, (psaddr_t)addr, (char *)&lm,
+			    sizeof (TLm_list)) != PS_OK) {
+				LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_6),
+				    EC_ADDR((uintptr_t)addr)));
+				return (RD_DBERR);
+			}
+
+			/*
+			 * Determine IDENT of current LM_LIST
+			 */
+			if (lm.lm_flags & LML_FLG_BASELM)
+				ident = LM_ID_BASE;
+			else if (lm.lm_flags & LML_FLG_RTLDLM)
+				ident = LM_ID_LDSO;
+			else
+				ident = (ulong_t)addr;
+
+			if ((rc = iter_map(rap, ident, (psaddr_t)lm.lm_head,
+			    cb, client_data, abort_iterp)) != RD_OK)
+				return (rc);
+
+			if (*abort_iterp != 0)
+				break;
+		}
+	} else {
+		TList		list;
+		TListnode	lnode;
+		Addr		lnp;
 
 		/*
-		 * Obtain the Lm_list address for this apl.ap_data[] entry.
+		 * Re-read the dynlmlst address to obtain a List structure.
 		 */
-		if (ps_pread(rap->rd_psp, (psaddr_t)datap, (char *)&addr,
-		    sizeof (Addr)) != PS_OK) {
-			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_5),
-			    EC_ADDR(datap)));
+		if (ps_pread(rap->rd_psp, (psaddr_t)db_priv.rtd_dynlmlst,
+		    (char *)&list, sizeof (TList)) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_3),
+			    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 			return (RD_DBERR);
 		}
 
 		/*
-		 * Obtain the Lm_list data for this Lm_list address.
+		 * Iterate through the link-map list.
 		 */
-		if (ps_pread(rap->rd_psp, (psaddr_t)addr, (char *)&lm,
-		    sizeof (TLm_list)) != PS_OK) {
-			LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_6),
-			    EC_ADDR((uintptr_t)addr)));
-			return (RD_DBERR);
-		}
+		for (lnp = (Addr)list.head; lnp; lnp = (Addr)lnode.next) {
+			Lm_list	lml;
+			ulong_t	ident;
 
-		/*
-		 * Determine IDENT of current LM_LIST
-		 */
-		if (lm.lm_flags & LML_FLG_BASELM)
-			ident = LM_ID_BASE;
-		else if (lm.lm_flags & LML_FLG_RTLDLM)
-			ident = LM_ID_LDSO;
-		else
-			ident = (ulong_t)addr;
+			/*
+			 * Iterate through the List of Lm_list's.
+			 */
+			if (ps_pread(rap->rd_psp, (psaddr_t)lnp, (char *)&lnode,
+			    sizeof (TListnode)) != PS_OK) {
+				LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_4),
+				    EC_ADDR(lnp)));
+					return (RD_DBERR);
+			}
 
-		if ((rc = iter_map(rap, ident, (psaddr_t)lm.lm_head,
-		    cb, client_data, abort_iterp)) != RD_OK) {
-			return (rc);
+			if (ps_pread(rap->rd_psp, (psaddr_t)lnode.data,
+			    (char *)&lml, sizeof (Lm_list)) != PS_OK) {
+				LOG(ps_plog(MSG_ORIG(MSG_DB_READDBGFAIL_5),
+				    EC_ADDR((uintptr_t)lnode.data)));
+					return (RD_DBERR);
+			}
+
+			/*
+			 * Determine IDENT of current LM_LIST
+			 */
+			if (lml.lm_flags & LML_FLG_BASELM)
+				ident = LM_ID_BASE;
+			else if (lml.lm_flags & LML_FLG_RTLDLM)
+				ident = LM_ID_LDSO;
+			else
+				ident = (unsigned long)lnode.data;
+
+			if ((rc = iter_map(rap, ident, (psaddr_t)lml.lm_head,
+			    cb, client_data, abort_iterp)) != RD_OK)
+				return (rc);
+
+			if (*abort_iterp != 0)
+				break;
 		}
-		if (*abort_iterp != 0)
-			break;
 	}
 
 	return (rc);

@@ -390,7 +390,7 @@ struct ofl_desc {
 #define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
 					/*	section */
 #define	FLG_OF1_MEMORY	0x00200000	/* produce a memory model */
-
+#define	FLG_OF1_NGLBDIR	0x00400000	/* no DT_1_DIRECT flag allowed */
 #define	FLG_OF1_ENCDIFF	0x00800000	/* Host running linker has different */
 					/*	byte order than output object */
 #define	FLG_OF1_VADDR	0x01000000	/* user segment defines a vaddr */
@@ -544,7 +544,7 @@ struct ifl_desc {			/* input file descriptor */
 	Word		ifl_shstrndx;	/* index to .shstrtab */
 	Word		ifl_vercnt;	/* number of versions in file */
 	Half		ifl_neededndx;	/* index to NEEDED in .dyn section */
-	Word		ifl_flags;	/* Explicit/implicit reference */
+	Word		ifl_flags;	/* explicit/implicit reference */
 	Is_desc		**ifl_isdesc;	/* isdesc[scn ndx] = Is_desc ptr */
 	Sdf_desc	*ifl_sdfdesc;	/* control definition */
 	Versym		*ifl_versym;	/* version symbol table array */
@@ -954,14 +954,14 @@ struct sym_avlnode {
  * Structure to manage the shared object definition lists.  There are two lists
  * that use this structure:
  *
- *  o	ofl_soneed; maintain the list of implicitly required dependencies
+ *  -	ofl_soneed; maintain the list of implicitly required dependencies
  *	(ie. shared objects needed by other shared objects).  These definitions
  *	may include RPATH's required to locate the dependencies, and any
  *	version requirements.
  *
- *  o	ofl_socntl; maintains the shared object control definitions.  These are
+ *  -	ofl_socntl; maintains the shared object control definitions.  These are
  *	provided by the user (via a mapfile) and are used to indicate any
- *	verion control requirements.
+ *	version control requirements.
  */
 struct	sdf_desc {
 	const char	*sdf_name;	/* the shared objects file name */
@@ -995,12 +995,12 @@ struct	sdv_desc {
  * Structures to manage versioning information.  Two versioning structures are
  * defined:
  *
- *   o	a version descriptor maintains a linked list of versions and their
+ *   -	a version descriptor maintains a linked list of versions and their
  *	associated dependencies.  This is used to build the version definitions
  *	for an image being created (see map_symbol), and to determine the
  *	version dependency graph for any input files that are versioned.
  *
- *   o	a version index array contains each version of an input file that is
+ *   -	a version index array contains each version of an input file that is
  *	being processed.  It informs us which versions are available for
  *	binding, and is used to generate any version dependency information.
  */

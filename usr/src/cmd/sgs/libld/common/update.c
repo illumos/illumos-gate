@@ -308,9 +308,9 @@ update_osym(Ofl_desc *ofl)
 	if (!(flags & FLG_OF_NOVERSEC) &&
 	    (flags & (FLG_OF_VERNEED | FLG_OF_VERDEF))) {
 		versym = (Versym *)ofl->ofl_osversym->os_outdata->d_buf;
-		versym[0] = 0;
+		versym[0] = NULL;
 	} else
-		versym = 0;
+		versym = NULL;
 
 	/*
 	 * If syminfo section exists be prepared to fill it in.
@@ -319,7 +319,7 @@ update_osym(Ofl_desc *ofl)
 		syminfo = ofl->ofl_ossyminfo->os_outdata->d_buf;
 		syminfo[0].si_flags = SYMINFO_CURRENT;
 	} else
-		syminfo = 0;
+		syminfo = NULL;
 
 	/*
 	 * Setup our string tables.
@@ -949,8 +949,8 @@ update_osym(Ofl_desc *ofl)
 	ssndx = ofl->ofl_scopecnt + ofl->ofl_elimcnt;
 
 	/*
-	 * Traverse the internal symbol table updating information and
-	 * allocating common.
+	 * Traverse the internal symbol table updating global symbol information
+	 * and allocating common.
 	 */
 	for (sav = avl_first(&ofl->ofl_symavl); sav;
 	    sav = AVL_NEXT(&ofl->ofl_symavl, sav)) {
@@ -1222,16 +1222,22 @@ update_osym(Ofl_desc *ofl)
 			if (sdp->sd_ref == REF_DYN_NEED) {
 				/*
 				 * A reference is bound to a needed dependency.
-				 * Save this symbol descriptor, as its boundto
-				 * element will need updating after the .dynamic
-				 * section has been created.  Flag whether this
-				 * reference is lazy loadable, and if a direct
-				 * binding is to be established.
+				 * Save the syminfo entry, so that when the
+				 * .dynamic section has been updated, a
+				 * DT_NEEDED entry can be associated
+				 * (see update_osyminfo()).
 				 */
 				if (aplist_append(alpp, sdp,
 				    AL_CNT_OFL_SYMINFOSYMS) == NULL)
 					return (0);
 
+				/*
+				 * Flag that the symbol has a direct association
+				 * with the external reference (this is an old
+				 * tagging, that has no real effect by itself).
+				 * And flag whether this reference is lazy
+				 * loadable.
+				 */
 				syminfo[ndx].si_flags |= SYMINFO_FLG_DIRECT;
 				if (sdp->sd_flags & FLG_SY_LAZYLD)
 					syminfo[ndx].si_flags |=
@@ -2428,11 +2434,17 @@ update_odynamic(Ofl_desc *ofl)
 	 * via a mapfile, or -znodirect was used on the command line, then
 	 * clear the DF_1_DIRECT flag.  The resultant object will use per-symbol
 	 * direct bindings rather than be enabled for global direct bindings.
+	 *
+	 * If any no-direct bindings exist within this object, set the
+	 * DF_1_NODIRECT flag.  ld(1) recognizes this flag when processing
+	 * dependencies, and performs extra work to ensure that no direct
+	 * bindings are established to the no-direct symbols that exist
+	 * within these dependencies.
 	 */
-	if (ofl->ofl_flags1 & FLG_OF1_NDIRECT) {
+	if (ofl->ofl_flags1 & FLG_OF1_NGLBDIR)
 		ofl->ofl_dtflags_1 &= ~DF_1_DIRECT;
+	if (ofl->ofl_flags1 & FLG_OF1_NDIRECT)
 		ofl->ofl_dtflags_1 |= DF_1_NODIRECT;
-	}
 
 	dyn->d_tag = DT_FLAGS_1;
 	dyn->d_un.d_val = ofl->ofl_dtflags_1;
@@ -3271,10 +3283,10 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * If we are creating a PT_SUNWDTRACE segment, remember where
 		 * the program header is.  The header values are assigned after
 		 * update_osym() has completed and the symbol table addresses
-		 * have been udpated.
+		 * have been updated.
 		 */
 		if (phdr->p_type == PT_SUNWDTRACE) {
-			if ((ofl->ofl_dtracesym) &&
+			if (ofl->ofl_dtracesym &&
 			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				dtracesgp = sgp;
 				dtracesndx = segndx;

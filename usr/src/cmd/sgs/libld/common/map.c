@@ -1600,7 +1600,8 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				    MSG_ORIG(MSG_MAP_NODIRECT)) == 0) {
 					sym_flags1 |= FLG_SY1_NDIR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
-					ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
+					ofl->ofl_flags1 |=
+					    (FLG_OF1_NDIRECT | FLG_OF1_NGLBDIR);
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_FILTER)) == 0) {
 					dftflag = filter = FLG_SY_STDFLTR;

@@ -128,7 +128,8 @@ static const Ent_desc	ent_desc[] = {
 
 #if	defined(_ELF64)		/* (amd64-only) */
 	{NULL, MSG_ORIG(MSG_ENT_LRODATA), NULL,
-		SHF_ALLOC + SHF_AMD64_LARGE, SHF_ALLOC + SHF_AMD64_LARGE,
+		SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
+		SHF_ALLOC + SHF_AMD64_LARGE,
 		(Sg_desc *)LD_LRODATA, 0, FLG_EC_BUILTIN},
 #endif
 	{NULL, MSG_ORIG(MSG_ENT_TEXT), NULL,
