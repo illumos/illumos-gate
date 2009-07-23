@@ -91,7 +91,7 @@ SUNW_1.2 {
 	scf_tmpl_visibility_to_string;
 	scf_type_to_string;
 	scf_values_destroy;
-};
+} SUNW_1.1;
 
 SUNW_1.1 {
     global:

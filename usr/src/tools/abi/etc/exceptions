@@ -141,6 +141,9 @@ PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: _valloc
 # ERRORs exempted from RULE E5 (See RULES section of intf_check manpage)
 # exempts symbols which have invalid new versions
 #############################################
+6862850: RULE E5: usr/lib/libsip.so.1
+6862850: RULE E5: usr/lib/amd64/libsip.so.1
+6862850: RULE E5: usr/lib/sparcv9/libsip.so.1
 
 #############################################
 # ERRORs exempted from RULE E6 (See RULES section of intf_check manpage) 

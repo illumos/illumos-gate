@@ -37,6 +37,12 @@
 # MAPFILE HEADER END
 #
 
+SUNW_1.2 {
+    global:
+	sip_create_dialog_req_nocontact;
+	sip_get_dialog_local_contact_uri;
+} SUNW_1.1;
+
 SUNW_1.1 {
     global:
 	sip_init_conn_object;
@@ -84,7 +90,6 @@ SUNW_1.1 {
 	sip_hold_trans;
 	sip_release_trans;
 	sip_create_dialog_req;
-	sip_create_dialog_req_nocontact;
 	sip_hold_dialog;
 	sip_release_dialog;
 	sip_delete_dialog;
@@ -97,7 +102,6 @@ SUNW_1.1 {
 	sip_get_dialog_local_uri;
 	sip_get_dialog_remote_uri;
 	sip_get_dialog_remote_target_uri;
-	sip_get_dialog_local_contact_uri;
 	sip_get_dialog_route_set;
 	sip_is_dialog_secure;
 	sip_get_dialog_local_cseq;

@@ -49,7 +49,6 @@ SUNW_1.23 {
 	aio_waitn64;
 	aio_write64;
 	aiowrite64;
-	enable_extended_FILE_stdio;
 	lio_listio64;
 	mkstemps64;
 	posix_fadvise64;
@@ -79,6 +78,8 @@ SUNW_1.22.1 {
 	atomic_or_16_nv =		NODYNSORT;
 	atomic_or_32_nv =		NODYNSORT;
 	atomic_or_64_nv =		NODYNSORT;
+
+	enable_extended_FILE_stdio;
 } SUNW_1.22;
 
 

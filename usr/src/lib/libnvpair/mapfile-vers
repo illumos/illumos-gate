@@ -39,11 +39,15 @@
 
 SUNW_1.3 {
     global:
-	nvlist_exists;
 	nvlist_lookup_nvpair;
 	nvlist_add_double;
 	nvlist_lookup_double;
 	nvpair_value_double;
+} SUNW_1.2.1;
+
+SUNW_1.2.1 {
+    global:
+	nvlist_exists;
 } SUNW_1.2;
 
 SUNW_1.2 {

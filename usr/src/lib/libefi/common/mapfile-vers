@@ -37,12 +37,16 @@
 # MAPFILE HEADER END
 #
 
+SUNW_1.2 {
+    global:
+	efi_use_whole_disk;
+} SUNW_1.1;
+
 SUNW_1.1 {
     global:
 	efi_alloc_and_init;
 	efi_alloc_and_read;
 	efi_free;
-	efi_use_whole_disk;
 	efi_write;
 };
 
