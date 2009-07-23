@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2332,7 +2332,8 @@ prgetpsinfo(proc_t *p, psinfo_t *psp)
 		} else {
 			mutex_exit(&p->p_lock);
 			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-			psp->pr_size = btopr(rm_assize(as)) * (PAGESIZE / 1024);
+			psp->pr_size = btopr(as->a_resvsize) *
+			    (PAGESIZE / 1024);
 			psp->pr_rssize = rm_asrss(as) * (PAGESIZE / 1024);
 			psp->pr_pctmem = rm_pctmemory(as);
 			AS_LOCK_EXIT(as, &as->a_lock);
@@ -2465,7 +2466,7 @@ prgetpsinfo32(proc_t *p, psinfo32_t *psp)
 			mutex_exit(&p->p_lock);
 			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 			psp->pr_size = (size32_t)
-			    (btopr(rm_assize(as)) * (PAGESIZE / 1024));
+			    (btopr(as->a_resvsize) * (PAGESIZE / 1024));
 			psp->pr_rssize = (size32_t)
 			    (rm_asrss(as) * (PAGESIZE / 1024));
 			psp->pr_pctmem = rm_pctmemory(as);

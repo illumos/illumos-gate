@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -762,7 +762,7 @@ lxpr_read_pid_statm(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	mutex_exit(&p->p_lock);
 
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-	vsize = btopr(rm_assize(as));
+	vsize = btopr(as->a_resvsize);
 	rss = rm_asrss(as);
 	AS_LOCK_EXIT(as, &as->a_lock);
 
@@ -896,7 +896,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	if ((p->p_stat != SZOMB) && !(p->p_flag & SSYS) && (as != &kas)) {
 		mutex_exit(&p->p_lock);
 		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-		vsize = rm_assize(as);
+		vsize = as->a_resvsize;
 		rss = rm_asrss(as);
 		AS_LOCK_EXIT(as, &as->a_lock);
 		mutex_enter(&p->p_lock);
@@ -1062,7 +1062,7 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	as = p->p_as;
 	mutex_exit(&p->p_lock);
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-	vsize = rm_assize(as);
+	vsize = as->a_resvsize;
 	rss = rm_asrss(as);
 	AS_LOCK_EXIT(as, &as->a_lock);
 	mutex_enter(&p->p_lock);

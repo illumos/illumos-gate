@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2029,6 +2029,9 @@ retry:
 				    svd->anon_index, npages));
 				anon_unresv_zone(oswresv - svd->swresv,
 				    seg->s_as->a_proc->p_zone);
+				if (SEG_IS_PARTIAL_RESV(seg))
+					seg->s_as->a_resvsize -= oswresv -
+					    svd->swresv;
 			} else {
 				size_t unlen;
 
@@ -2130,6 +2133,9 @@ retry:
 				    svd->anon_index, npages));
 				anon_unresv_zone(oswresv - svd->swresv,
 				    seg->s_as->a_proc->p_zone);
+				if (SEG_IS_PARTIAL_RESV(seg))
+					seg->s_as->a_resvsize -= oswresv -
+					    svd->swresv;
 			} else {
 				size_t unlen;
 
@@ -2302,6 +2308,9 @@ retry:
 			ASSERT(oswresv >= (svd->swresv + nsvd->swresv));
 			anon_unresv_zone(oswresv - (svd->swresv + nsvd->swresv),
 			    seg->s_as->a_proc->p_zone);
+			if (SEG_IS_PARTIAL_RESV(seg))
+				seg->s_as->a_resvsize -= oswresv -
+				    (svd->swresv + nsvd->swresv);
 		} else {
 			size_t unlen;
 
@@ -2443,6 +2452,8 @@ segvn_free(struct seg *seg)
 		    seg->s_as->a_proc->p_zone);
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
 		    seg, len, 0);
+		if (SEG_IS_PARTIAL_RESV(seg))
+			seg->s_as->a_resvsize -= svd->swresv;
 		svd->swresv = 0;
 	}
 	/*
@@ -2710,6 +2721,8 @@ segvn_faultpage(
 				if (anon_resv_zone(ptob(1),
 				    seg->s_as->a_proc->p_zone)) {
 					atomic_add_long(&svd->swresv, ptob(1));
+					atomic_add_long(&seg->s_as->a_resvsize,
+					    ptob(1));
 				} else {
 					err = ENOMEM;
 					goto out;
@@ -2986,6 +2999,7 @@ segvn_faultpage(
 	if ((svd->flags & MAP_NORESERVE) && (ap == NULL)) {
 		if (anon_resv_zone(ptob(1), seg->s_as->a_proc->p_zone)) {
 			atomic_add_long(&svd->swresv, ptob(1));
+			atomic_add_long(&seg->s_as->a_resvsize, ptob(1));
 		} else {
 			page_unlock(opp);
 			err = ENOMEM;

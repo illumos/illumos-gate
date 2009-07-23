@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,6 +111,14 @@ struct devmap_pmem_cookie {
 };
 
 #ifdef _KERNEL
+
+/*
+ * Mappings of /dev/null come from segdev and have no mapping type.
+ */
+
+#define	SEG_IS_DEVNULL_MAPPING(seg)	\
+	((seg)->s_ops == &segdev_ops &&	\
+	((SEGOP_GETTYPE(seg, (seg)->s_base) & (MAP_SHARED | MAP_PRIVATE)) == 0))
 
 extern void segdev_init(void);
 

@@ -2909,13 +2909,8 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	case PR_LWPIDFILE:
 		if ((p->p_flag & SSYS) || (as = p->p_as) == &kas)
 			vap->va_size = 0;
-		else {
-			mutex_exit(&p->p_lock);
-			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-			vap->va_size = rm_assize(as);
-			AS_LOCK_EXIT(as, &as->a_lock);
-			mutex_enter(&p->p_lock);
-		}
+		else
+			vap->va_size = as->a_resvsize;
 		break;
 	case PR_STATUS:
 		vap->va_size = PR_OBJSIZE(pstatus32_t, pstatus_t);

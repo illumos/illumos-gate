@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -57,86 +55,6 @@
 #include <vm/rm.h>
 #include <vm/seg.h>
 #include <vm/page.h>
-
-/*
- * Yield the size of an address space.
- *
- * The size can only be used as a hint since we cannot guarantee it
- * will stay the same size unless the as->a_lock is held by the caller.
- */
-size_t
-rm_assize(struct as *as)
-{
-	size_t size = 0;
-	struct seg *seg;
-	struct segvn_data *svd;
-	extern struct seg_ops segdev_ops;	/* needs a header file */
-
-	ASSERT(as != NULL && AS_READ_HELD(as, &as->a_lock));
-
-	if (as == &kas)
-		return (0);
-
-	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
-		if (seg->s_ops == &segdev_ops &&
-		    ((SEGOP_GETTYPE(seg, seg->s_base) &
-		    (MAP_SHARED | MAP_PRIVATE)) == 0)) {
-			/*
-			 * Don't include mappings of /dev/null.  These just
-			 * reserve address space ranges and have no memory.
-			 * We cheat by knowing that these segments come
-			 * from segdev and have no mapping type.
-			 */
-			/* EMPTY */;
-		} else if (seg->s_ops == &segvn_ops &&
-		    (svd = (struct segvn_data *)seg->s_data) != NULL &&
-		    (svd->vp == NULL || svd->vp->v_type != VREG) &&
-		    (svd->flags & MAP_NORESERVE)) {
-			/*
-			 * Don't include MAP_NORESERVE pages in the
-			 * address range unless their mappings have
-			 * actually materialized.  We cheat by knowing
-			 * that segvn is the only segment driver that
-			 * supports MAP_NORESERVE and that the actual
-			 * number of bytes reserved is in the segment's
-			 * private data structure.
-			 */
-			size += svd->swresv;
-		} else {
-			caddr_t addr = seg->s_base;
-			size_t segsize = seg->s_size;
-			vnode_t *vp;
-			vattr_t vattr;
-
-			/*
-			 * If the segment is mapped beyond the end of the
-			 * underlying mapped file, if any, then limit the
-			 * segment's size contribution to the file size.
-			 */
-			vattr.va_mask = AT_SIZE;
-			if (seg->s_ops == &segvn_ops &&
-			    SEGOP_GETVP(seg, addr, &vp) == 0 &&
-			    vp != NULL && vp->v_type == VREG &&
-			    VOP_GETATTR(vp, &vattr, ATTR_HINT,
-			    CRED(), NULL) == 0) {
-				u_offset_t filesize = vattr.va_size;
-				u_offset_t offset = SEGOP_GETOFFSET(seg, addr);
-
-				if (filesize < offset)
-					filesize = 0;
-				else
-					filesize -= offset;
-				filesize = P2ROUNDUP_TYPED(filesize, PAGESIZE,
-				    u_offset_t);
-				if ((u_offset_t)segsize > filesize)
-					segsize = filesize;
-			}
-			size += segsize;
-		}
-	}
-
-	return (size);
-}
 
 /*
  * Yield the memory claim requirement for an address space.

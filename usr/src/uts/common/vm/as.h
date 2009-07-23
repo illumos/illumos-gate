@@ -110,7 +110,7 @@ struct as {
 	caddr_t	a_userlimit;	/* highest allowable address in this as */
 	struct seg *a_seglast;	/* last segment hit on the addr space */
 	krwlock_t a_lock;	/* protects segment related fields */
-	size_t	a_size;		/* size of address space */
+	size_t	a_size;		/* total size of address space */
 	struct seg *a_lastgap;	/* last seg found by as_gap() w/ AS_HI (mmap) */
 	struct seg *a_lastgaphl; /* last seg saved in as_gap() either for */
 				/* AS_HI or AS_LO used in as_addseg() */
@@ -123,6 +123,7 @@ struct as {
 	struct as_callback *a_callbacks; /* callback list */
 	void *a_xhat;		/* list of xhat providers */
 	proc_t	*a_proc;	/* back pointer to proc */
+	size_t	a_resvsize;	/* size of reserved part of address space */
 };
 
 #define	AS_PAGLCK		0x80
@@ -276,8 +277,6 @@ int	as_incore(struct as *as, caddr_t addr, size_t size, char *vec,
 		size_t *sizep);
 int	as_ctl(struct as *as, caddr_t addr, size_t size, int func, int attr,
 		uintptr_t arg, ulong_t *lock_map, size_t pos);
-int	as_exec(struct as *oas, caddr_t ostka, size_t stksz,
-		struct as *nas, caddr_t nstka, uint_t hatflag);
 int	as_pagelock(struct as *as, struct page ***ppp, caddr_t addr,
 		size_t size, enum seg_rw rw);
 void	as_pageunlock(struct as *as, struct page **pp, caddr_t addr,

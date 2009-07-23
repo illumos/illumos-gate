@@ -1656,7 +1656,7 @@ oprgetpsinfo32(proc_t *p, prpsinfo32_t *psp, kthread_t *tp)
 		} else {
 			mutex_exit(&p->p_lock);
 			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-			psp->pr_size = (size32_t)btopr(rm_assize(as));
+			psp->pr_size = (size32_t)btopr(as->a_resvsize);
 			psp->pr_rssize = (size32_t)rm_asrss(as);
 			psp->pr_pctmem = rm_pctmemory(as);
 			AS_LOCK_EXIT(as, &as->a_lock);
@@ -3495,7 +3495,7 @@ oprgetpsinfo(proc_t *p, prpsinfo_t *psp, kthread_t *tp)
 		} else {
 			mutex_exit(&p->p_lock);
 			AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
-			psp->pr_size = btopr(rm_assize(as));
+			psp->pr_size = btopr(as->a_resvsize);
 			psp->pr_rssize = rm_asrss(as);
 			psp->pr_pctmem = rm_pctmemory(as);
 			AS_LOCK_EXIT(as, &as->a_lock);

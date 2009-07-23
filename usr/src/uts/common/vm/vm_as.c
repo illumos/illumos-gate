@@ -656,6 +656,7 @@ as_alloc(void)
 	as->a_hrm		= NULL;
 	as->a_seglast		= NULL;
 	as->a_size		= 0;
+	as->a_resvsize		= 0;
 	as->a_updatedir		= 0;
 	gethrestime(&as->a_updatetime);
 	as->a_objectdir		= NULL;
@@ -781,6 +782,7 @@ as_dup(struct as *as, struct proc *forkedproc)
 {
 	struct as *newas;
 	struct seg *seg, *newseg;
+	size_t	purgesize = 0;
 	int error;
 
 	AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
@@ -803,8 +805,10 @@ as_dup(struct as *as, struct proc *forkedproc)
 
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
 
-		if (seg->s_flags & S_PURGE)
+		if (seg->s_flags & S_PURGE) {
+			purgesize += seg->s_size;
 			continue;
+		}
 
 		newseg = seg_alloc(newas, seg->s_base, seg->s_size);
 		if (newseg == NULL) {
@@ -835,6 +839,7 @@ as_dup(struct as *as, struct proc *forkedproc)
 		}
 		newas->a_size += seg->s_size;
 	}
+	newas->a_resvsize = as->a_resvsize - purgesize;
 
 	error = hat_dup(as->a_hat, newas->a_hat, NULL, 0, HAT_DUP_ALL);
 	if (as->a_xhat != NULL)
@@ -1375,7 +1380,7 @@ as_unmap(struct as *as, caddr_t addr, size_t size)
 	struct seg *seg, *seg_next;
 	struct as_callback *cb;
 	caddr_t raddr, eaddr;
-	size_t ssize;
+	size_t ssize, rsize = 0;
 	int err;
 
 top:
@@ -1414,6 +1419,15 @@ top:
 		 * destroyed during the segment unmap operation.
 		 */
 		seg_next = AS_SEGNEXT(as, seg);
+
+		/*
+		 * We didn't count /dev/null mappings, so ignore them here.
+		 * We'll handle MAP_NORESERVE cases in segvn_unmap(). (Again,
+		 * we have to do this check here while we have seg.)
+		 */
+		if (!SEG_IS_DEVNULL_MAPPING(seg) &&
+		    !SEG_IS_PARTIAL_RESV(seg))
+			rsize = ssize;
 
 retry:
 		err = SEGOP_UNMAP(seg, raddr, ssize);
@@ -1490,6 +1504,7 @@ retry:
 		}
 
 		as->a_size -= ssize;
+		as->a_resvsize -= rsize;
 		raddr += ssize;
 	}
 	AS_LOCK_EXIT(as, &as->a_lock);
@@ -1530,6 +1545,12 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 			seg_free(seg);
 		} else {
 			as->a_size += size;
+			/*
+			 * We'll count MAP_NORESERVE mappings as we fault
+			 * pages in.
+			 */
+			if (!SEG_IS_PARTIAL_RESV(seg))
+				as->a_resvsize += size;
 		}
 		return (error);
 	}
@@ -1562,6 +1583,14 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 				return (error);
 			}
 			as->a_size += segsize;
+			/*
+			 * We'll count MAP_NORESERVE mappings as we fault
+			 * pages in.  We don't count /dev/null mappings at all.
+			 */
+			if (!SEG_IS_DEVNULL_MAPPING(seg) &&
+			    !SEG_IS_PARTIAL_RESV(seg))
+				as->a_resvsize += segsize;
+
 			*segcreated = 1;
 			if (do_off) {
 				vn_a->offset += segsize;
@@ -1590,6 +1619,14 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 				return (error);
 			}
 			as->a_size += segsize;
+			/*
+			 * We'll count MAP_NORESERVE mappings as we fault
+			 * pages in.  We don't count /dev/null mappings at all.
+			 */
+			if (!SEG_IS_DEVNULL_MAPPING(seg) &&
+			    !SEG_IS_PARTIAL_RESV(seg))
+				as->a_resvsize += segsize;
+
 			*segcreated = 1;
 			if (do_off) {
 				vn_a->offset += segsize;
@@ -1640,6 +1677,12 @@ again:
 			seg_free(seg);
 		} else {
 			as->a_size += size;
+			/*
+			 * We'll count MAP_NORESERVE mappings as we fault
+			 * pages in.
+			 */
+			if (!SEG_IS_PARTIAL_RESV(seg))
+				as->a_resvsize += size;
 		}
 		return (error);
 	}
@@ -1799,6 +1842,13 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 		 * Add size now so as_unmap will work if as_ctl fails.
 		 */
 		as->a_size += rsize;
+		/*
+		 * We'll count MAP_NORESERVE mappings as we fault
+		 * pages in.  We don't count /dev/null mappings at all.
+		 */
+		if (!SEG_IS_DEVNULL_MAPPING(seg) &&
+		    !SEG_IS_PARTIAL_RESV(seg))
+			as->a_resvsize += rsize;
 	}
 
 	as_setwatch(as);
@@ -2557,38 +2607,6 @@ lockerr:
 		goto retry;
 	}
 	return (error);
-}
-
-/*
- * Special code for exec to move the stack segment from its interim
- * place in the old address to the right place in the new address space.
- */
-/*ARGSUSED*/
-int
-as_exec(struct as *oas, caddr_t ostka, size_t stksz,
-    struct as *nas, caddr_t nstka, uint_t hatflag)
-{
-	struct seg *stkseg;
-
-	AS_LOCK_ENTER(oas, &oas->a_lock, RW_WRITER);
-	stkseg = as_segat(oas, ostka);
-	stkseg = as_removeseg(oas, stkseg);
-	ASSERT(stkseg != NULL);
-	ASSERT(stkseg->s_base == ostka && stkseg->s_size == stksz);
-	stkseg->s_as = nas;
-	stkseg->s_base = nstka;
-
-	/*
-	 * It's ok to lock the address space we are about to exec to.
-	 */
-	AS_LOCK_ENTER(nas, &nas->a_lock, RW_WRITER);
-	ASSERT(avl_numnodes(&nas->a_wpage) == 0);
-	nas->a_size += stkseg->s_size;
-	oas->a_size -= stkseg->s_size;
-	(void) as_addseg(nas, stkseg);
-	AS_LOCK_EXIT(nas, &nas->a_lock);
-	AS_LOCK_EXIT(oas, &oas->a_lock);
-	return (0);
 }
 
 int

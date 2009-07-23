@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef	_VM_SEG_VN_H
 #define	_VM_SEG_VN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/lgrp.h>
 #include <vm/anon.h>
@@ -174,6 +172,13 @@ typedef struct	segvn_data {
 
 #define	SEGVN_TR_ADDSTAT(stat)						\
 	segvn_textrepl_stats[CPU->cpu_id].tr_stat_##stat++
+
+#define	SEGVN_DATA(seg)	((struct segvn_data *)(seg)->s_data)
+#define	SEG_IS_PARTIAL_RESV(seg)	\
+	((seg)->s_ops == &segvn_ops && SEGVN_DATA(seg) != NULL && \
+	(SEGVN_DATA(seg)->vp == NULL || \
+	SEGVN_DATA(seg)->vp->v_type != VREG) &&	\
+	(SEGVN_DATA(seg)->flags & MAP_NORESERVE))
 
 /*
  * A hash table entry looked up by vnode, off/eoff and szc to find anon map to
