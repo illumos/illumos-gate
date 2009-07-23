@@ -428,6 +428,8 @@ AUDIOENS_OBJS += audioens.o
 
 AUDIOVIA823X_OBJS += audiovia823x.o
 
+AUDIOVIA97_OBJS += audiovia97.o
+
 AUDIO1575_OBJS += audio1575.o
 
 AUDIO810_OBJS += audio810.o
