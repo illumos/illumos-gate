@@ -69,6 +69,7 @@ kmutex_t prov_tab_mutex; /* ensure exclusive access to the table */
 static uint_t prov_tab_num = 0; /* number of providers in table */
 static uint_t prov_tab_max = KCF_MAX_PROVIDERS;
 
+static void kcf_free_unregistered_provs();
 #if DEBUG
 extern int kcf_frmwrk_debug;
 static void kcf_prov_tab_dump(char *message);
@@ -105,6 +106,10 @@ kcf_prov_tab_add_provider(kcf_provider_desc_t *prov_desc)
 	ASSERT(prov_tab != NULL);
 
 	mutex_enter(&prov_tab_mutex);
+
+	/* see if any slots can be freed */
+	if (kcf_need_provtab_walk)
+		kcf_free_unregistered_provs();
 
 	/* find free slot in providers table */
 	for (i = 0; i < KCF_MAX_PROVIDERS && prov_tab[i] != NULL; i++)
@@ -165,6 +170,9 @@ kcf_prov_tab_rem_provider(crypto_provider_id_t prov_id)
 		mutex_exit(&prov_tab_mutex);
 		return (CRYPTO_INVALID_PROVIDER_ID);
 	}
+
+	if (kcf_need_provtab_walk)
+		kcf_free_unregistered_provs();
 	mutex_exit(&prov_tab_mutex);
 
 	/*
@@ -370,7 +378,9 @@ kcf_alloc_provider_desc(crypto_provider_info_t *info)
 }
 
 /*
- * Free a provider descriptor.
+ * Free a provider descriptor. Caller must hold prov_tab_mutex.
+ *
+ * Caution: This routine drops prov_tab_mutex.
  */
 void
 kcf_free_provider_desc(kcf_provider_desc_t *desc)
@@ -378,7 +388,7 @@ kcf_free_provider_desc(kcf_provider_desc_t *desc)
 	if (desc == NULL)
 		return;
 
-	mutex_enter(&prov_tab_mutex);
+	ASSERT(MUTEX_HELD(&prov_tab_mutex));
 	if (desc->pd_prov_id != KCF_PROVID_INVALID) {
 		/* release the associated providers table entry */
 		ASSERT(prov_tab[desc->pd_prov_id] != NULL);
@@ -897,21 +907,23 @@ verify_unverified_providers()
 /* protected by prov_tab_mutex */
 boolean_t kcf_need_provtab_walk = B_FALSE;
 
-void
+/* Caller must hold prov_tab_mutex */
+static void
 kcf_free_unregistered_provs()
 {
 	int i;
 	kcf_provider_desc_t *pd;
 	boolean_t walk_again = B_FALSE;
 
-	mutex_enter(&prov_tab_mutex);
+	ASSERT(MUTEX_HELD(&prov_tab_mutex));
 	for (i = 0; i < KCF_MAX_PROVIDERS; i++) {
 		if ((pd = prov_tab[i]) == NULL ||
+		    pd->pd_prov_type == CRYPTO_SW_PROVIDER ||
 		    pd->pd_state != KCF_PROV_UNREGISTERED)
 			continue;
 
 		if (kcf_get_refcnt(pd, B_TRUE) == 0) {
-			mutex_exit(&prov_tab_mutex);
+			/* kcf_free_provider_desc drops prov_tab_mutex */
 			kcf_free_provider_desc(pd);
 			mutex_enter(&prov_tab_mutex);
 		} else
@@ -919,5 +931,4 @@ kcf_free_unregistered_provs()
 	}
 
 	kcf_need_provtab_walk = walk_again;
-	mutex_exit(&prov_tab_mutex);
 }

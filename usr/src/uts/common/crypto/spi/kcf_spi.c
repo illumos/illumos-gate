@@ -475,21 +475,23 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 
 	kcf_do_notify(desc, B_FALSE);
 
+	mutex_enter(&prov_tab_mutex);
 	/* Release reference held by kcf_prov_tab_lookup(). */
 	KCF_PROV_REFRELE(desc);
 
 	if (kcf_get_refcnt(desc, B_TRUE) == 0) {
+		/* kcf_free_provider_desc drops prov_tab_mutex */
 		kcf_free_provider_desc(desc);
 	} else {
 		ASSERT(desc->pd_prov_type != CRYPTO_SW_PROVIDER);
 		/*
 		 * We could avoid this if /dev/crypto can proactively
 		 * remove any holds on us from a dormant PKCS #11 app.
-		 * For now, a kcfd thread does a periodic check of the
-		 * provider table for KCF_PROV_UNREGISTERED entries
-		 * and frees them when refcnt reaches zero.
+		 * For now, we check the provider table for
+		 * KCF_PROV_UNREGISTERED entries when a provider is
+		 * added to the table or when a provider is removed from it
+		 * and free them when refcnt reaches zero.
 		 */
-		mutex_enter(&prov_tab_mutex);
 		kcf_need_provtab_walk = B_TRUE;
 		mutex_exit(&prov_tab_mutex);
 	}

@@ -1504,8 +1504,6 @@ kcf_svc_wait(int *nthrs)
 		case -1:
 			/* Timed out. Recalculate the min/max threads */
 			compute_min_max_threads();
-			if (kcf_need_provtab_walk)
-				kcf_free_unregistered_provs();
 			break;
 
 		default:

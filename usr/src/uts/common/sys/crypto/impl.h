@@ -1378,7 +1378,6 @@ extern int kcf_get_sw_prov(crypto_mech_type_t, kcf_provider_desc_t **,
 
 extern kmutex_t prov_tab_mutex;
 extern boolean_t kcf_need_provtab_walk;
-extern void kcf_free_unregistered_provs();
 extern int kcf_get_refcnt(kcf_provider_desc_t *, boolean_t);
 
 /* Access to the policy table */
