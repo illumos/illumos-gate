@@ -459,11 +459,13 @@ allocb_tmpl(size_t size, const mblk_t *tmpl)
 	if (mp != NULL) {
 		dblk_t *src = tmpl->b_datap;
 		dblk_t *dst = mp->b_datap;
-		cred_t *cr = src->db_credp;
+		cred_t *cr;
+		pid_t cpid;
 
+		cr = msg_getcred(tmpl, &cpid);
 		if (cr != NULL)
 			crhold(dst->db_credp = cr);
-		dst->db_cpid = src->db_cpid;
+		dst->db_cpid = cpid;
 		dst->db_type = src->db_type;
 	}
 	return (mp);
@@ -511,6 +513,7 @@ msg_getcred(const mblk_t *mp, pid_t *cpidp)
 {
 	cred_t *cr = NULL;
 	cred_t *cr2;
+	mblk_t *mp2;
 
 	while (mp != NULL) {
 		dblk_t *dbp = mp->b_datap;
@@ -536,13 +539,17 @@ msg_getcred(const mblk_t *mp, pid_t *cpidp)
 		 * cred_t can have a NULL cr_zone, and we skip the comparison
 		 * in that case.
 		 */
-		cr2 = msg_getcred(mp->b_cont, NULL);
-		if (cr2 != NULL) {
-			DTRACE_PROBE2(msg__getcred,
-			    cred_t *, cr, cred_t *, cr2);
-			ASSERT(crgetzoneid(cr) == crgetzoneid(cr2) ||
-			    crgetzone(cr) == NULL ||
-			    crgetzone(cr2) == NULL);
+		mp2 = mp->b_cont;
+		while (mp2 != NULL) {
+			cr2 = DB_CRED(mp2);
+			if (cr2 != NULL) {
+				DTRACE_PROBE2(msg__getcred,
+				    cred_t *, cr, cred_t *, cr2);
+				ASSERT(crgetzoneid(cr) == crgetzoneid(cr2) ||
+				    crgetzone(cr) == NULL ||
+				    crgetzone(cr2) == NULL);
+			}
+			mp2 = mp2->b_cont;
 		}
 #endif
 		return (cr);
@@ -568,6 +575,7 @@ msg_extractcred(mblk_t *mp, pid_t *cpidp)
 {
 	cred_t *cr = NULL;
 	cred_t *cr2;
+	mblk_t *mp2;
 
 	while (mp != NULL) {
 		dblk_t *dbp = mp->b_datap;
@@ -594,13 +602,17 @@ msg_extractcred(mblk_t *mp, pid_t *cpidp)
 		 * cred_t can have a NULL cr_zone, and we skip the comparison
 		 * in that case.
 		 */
-		cr2 = msg_getcred(mp->b_cont, NULL);
-		if (cr2 != NULL) {
-			DTRACE_PROBE2(msg__extractcred,
-			    cred_t *, cr, cred_t *, cr2);
-			ASSERT(crgetzoneid(cr) == crgetzoneid(cr2) ||
-			    crgetzone(cr) == NULL ||
-			    crgetzone(cr2) == NULL);
+		mp2 = mp->b_cont;
+		while (mp2 != NULL) {
+			cr2 = DB_CRED(mp2);
+			if (cr2 != NULL) {
+				DTRACE_PROBE2(msg__extractcred,
+				    cred_t *, cr, cred_t *, cr2);
+				ASSERT(crgetzoneid(cr) == crgetzoneid(cr2) ||
+				    crgetzone(cr) == NULL ||
+				    crgetzone(cr2) == NULL);
+			}
+			mp2 = mp2->b_cont;
 		}
 #endif
 		return (cr);
