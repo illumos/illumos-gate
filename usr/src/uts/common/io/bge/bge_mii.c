@@ -531,6 +531,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 {
 	uint16_t phy_status;
 	boolean_t reset_ok;
+	uint16_t extctrl, auxctrl;
 
 	BGE_TRACE(("bge_restart_copper($%p, %d)", (void *)bgep, powerdown));
 
@@ -588,6 +589,18 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5721_5751:
 		bge_phy_bit_err_fix(bgep);
 		break;
+	}
+
+	if (bgep->chipid.default_mtu > BGE_DEFAULT_MTU) {
+		/* Set the GMII Fifo Elasticity to high latency */
+		extctrl = bge_mii_get16(bgep, 0x10);
+		bge_mii_put16(bgep, 0x10, extctrl | 0x1);
+
+		/* Allow reception of extended length packets */
+		bge_mii_put16(bgep, MII_AUX_CONTROL, 0x0007);
+		auxctrl = bge_mii_get16(bgep, MII_AUX_CONTROL);
+		auxctrl |= 0x4000;
+		bge_mii_put16(bgep, MII_AUX_CONTROL, auxctrl);
 	}
 
 	/*
@@ -812,7 +825,8 @@ bge_update_copper(bge_t *bgep)
 		return (DDI_FAILURE);
 	bge_mii_put16(bgep, MII_AN_ADVERT, anar);
 	bge_mii_put16(bgep, MII_CONTROL, control);
-	bge_mii_put16(bgep, MII_AUX_CONTROL, auxctrl);
+	if (auxctrl & MII_AUX_CTRL_NORM_EXT_LOOPBACK)
+		bge_mii_put16(bgep, MII_AUX_CONTROL, auxctrl);
 	bge_mii_put16(bgep, MII_MSCONTROL, gigctrl);
 
 	BGE_DEBUG(("bge_update_copper: anar <- 0x%x", anar));

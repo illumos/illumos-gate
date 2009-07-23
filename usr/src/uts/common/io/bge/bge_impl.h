@@ -1188,7 +1188,6 @@ extern uint32_t bge_rx_ticks_norm;
 extern uint32_t bge_tx_ticks_norm;
 extern uint32_t bge_rx_count_norm;
 extern uint32_t bge_tx_count_norm;
-extern boolean_t bge_jumbo_enable;
 extern boolean_t bge_relaxed_ordering;
 
 void   bge_chip_msi_trig(bge_t *bgep);
