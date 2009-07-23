@@ -9356,7 +9356,7 @@ sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag)
 		 * Construct select buffer length based on the
 		 * length of the sense data returned.
 		 */
-		sbuflen =  hdrlen + MODE_BLK_DESC_LENGTH +
+		sbuflen =  hdrlen + bd_len +
 		    sizeof (struct mode_page) +
 		    (int)mode_caching_page->mode_page.length;
 
