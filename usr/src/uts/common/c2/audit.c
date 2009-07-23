@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1349,11 +1349,18 @@ audit_setfsat_path(int argnum)
 		tad->tad_atpath = NULL;
 	}
 	if (fd != AT_FDCWD) {
-		if ((fp = getf(fd)) == NULL)
+		if ((fp = getf(fd)) == NULL) {
+			tad->tad_ctrl |= PAD_NOPATH;
 			return;
+		}
 
 		fad = F2A(fp);
 		ASSERT(fad);
+		if (fad->fad_aupath == NULL) {
+			tad->tad_ctrl |= PAD_NOPATH;
+			releasef(fd);
+			return;
+		}
 		au_pathhold(fad->fad_aupath);
 		tad->tad_atpath = fad->fad_aupath;
 		releasef(fd);
