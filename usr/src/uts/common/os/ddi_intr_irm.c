@@ -69,9 +69,7 @@ static void	irm_balance_thread(ddi_irm_pool_t *);
 static void	i_ddi_irm_balance(ddi_irm_pool_t *);
 static void	i_ddi_irm_enqueue(ddi_irm_pool_t *, boolean_t);
 static void	i_ddi_irm_reduce(ddi_irm_pool_t *pool);
-static int	i_ddi_irm_reduce_large(ddi_irm_pool_t *, int);
-static void	i_ddi_irm_reduce_large_resort(ddi_irm_pool_t *);
-static int	i_ddi_irm_reduce_even(ddi_irm_pool_t *, int);
+static int	i_ddi_irm_reduce_by_policy(ddi_irm_pool_t *, int, int);
 static void	i_ddi_irm_reduce_new(ddi_irm_pool_t *, int);
 static void	i_ddi_irm_insertion_sort(list_t *, ddi_irm_req_t *);
 static int	i_ddi_irm_notify(ddi_irm_pool_t *, ddi_irm_req_t *);
@@ -373,10 +371,10 @@ i_ddi_irm_insert(dev_info_t *dip, int type, int count)
 	if (req_p->ireq_navail == 0) {
 		cmn_err(CE_WARN, "%s%d: interrupt pool too full.\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
-		mutex_exit(&pool_p->ipool_lock);
 		pool_p->ipool_reqno -= nreq;
 		pool_p->ipool_minno -= nmin;
 		list_remove(&pool_p->ipool_req_list, req_p);
+		mutex_exit(&pool_p->ipool_lock);
 		kmem_free(req_p, sizeof (ddi_irm_req_t));
 		return (DDI_EAGAIN);
 	}
@@ -776,7 +774,7 @@ i_ddi_irm_balance(ddi_irm_pool_t *pool_p)
 static void
 i_ddi_irm_reduce(ddi_irm_pool_t *pool_p)
 {
-	int	ret, imbalance;
+	int	imbalance;
 
 	ASSERT(pool_p != NULL);
 	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
@@ -789,21 +787,12 @@ i_ddi_irm_reduce(ddi_irm_pool_t *pool_p)
 	if ((imbalance = pool_p->ipool_resno - pool_p->ipool_totsz) <= 0)
 		return;
 
-	/* Reduce by policy */
-	switch (pool_p->ipool_policy) {
-	case DDI_IRM_POLICY_LARGE:
-		ret = i_ddi_irm_reduce_large(pool_p, imbalance);
-		break;
-	case DDI_IRM_POLICY_EVEN:
-		ret = i_ddi_irm_reduce_even(pool_p, imbalance);
-		break;
-	}
-
 	/*
-	 * If the policy based reductions failed, then
+	 * Try policy based reduction first. If it failed, then
 	 * possibly reduce new requests as a last resort.
 	 */
-	if (ret != DDI_SUCCESS) {
+	if (i_ddi_irm_reduce_by_policy(pool_p, imbalance, pool_p->ipool_policy)
+	    != DDI_SUCCESS) {
 
 		DDI_INTR_IRMDBG((CE_CONT,
 		    "i_ddi_irm_reduce: policy reductions failed.\n"));
@@ -867,198 +856,86 @@ i_ddi_irm_enqueue(ddi_irm_pool_t *pool_p, boolean_t wait_flag)
 }
 
 /*
- * Reduction Algorithms, Used For Balancing
- */
-
-/*
- * i_ddi_irm_reduce_large()
+ * i_ddi_irm_reduce_by_policy()
  *
- *	Algorithm for the DDI_IRM_POLICY_LARGE reduction policy.
+ *	Reduces requests based on reduction policies.
  *
- *	This algorithm generally reduces larger requests first, before
- *	advancing to smaller requests.  The scratch list is initially
- *	sorted in descending order by current navail values, which are
- *	maximized prior to reduction.  This sorted order is preserved,
- *	but within a range of equally sized requests they are secondarily
- *	sorted in ascending order by initial nreq value.  The head of the
- *	list is always selected for reduction, since it is the current
- *	largest request.  After being reduced, it is sorted further into
- *	the list before the next iteration.
+ *	For the DDI_IRM_POLICY_LARGE reduction policy, the algorithm
+ *	generally reduces larger requests first, before advancing
+ *	to smaller requests.
+ *	For the DDI_IRM_POLICY_EVEN reduction policy, the algorithm
+ *	reduces requests evenly, without giving a specific preference
+ *	to smaller or larger requests. Each iteration reduces all
+ *	reducible requests by the same amount until the imbalance is
+ *	corrected.
+ *
+ *	The scratch list is initially sorted in descending order by current
+ *	navail values, which are maximized prior to reduction. This sorted
+ *	order is preserved.  It avoids reducing requests below the threshold
+ *	of the interrupt pool's default allocation size.
  *
  *	Optimizations in this algorithm include trying to reduce multiple
- *	requests together if they are equally sized.  And the algorithm
- *	attempts to reduce in larger increments when possible to minimize
- *	the total number of iterations.
+ *	requests together.  And the algorithm attempts to reduce in larger
+ *	increments when possible to minimize the total number of iterations.
  */
 static int
-i_ddi_irm_reduce_large(ddi_irm_pool_t *pool_p, int imbalance)
+i_ddi_irm_reduce_by_policy(ddi_irm_pool_t *pool_p, int imbalance, int policy)
 {
-	ddi_irm_req_t	*head_p, *next_p;
-	int		next_navail, nreqs, reduction;
-
 	ASSERT(pool_p != NULL);
 	ASSERT(imbalance > 0);
 	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
 
-	DDI_INTR_IRMDBG((CE_CONT,
-	    "i_ddi_irm_reduce_large: pool_p %p imbalance %d\n", (void *)pool_p,
-	    imbalance));
-
 	while (imbalance > 0) {
+		list_t		*slist_p = &pool_p->ipool_scratch_list;
+		ddi_irm_req_t	*req_p = list_head(slist_p), *last_p;
+		uint_t		nreduce = 0, nremain = 0, stop_navail;
+		uint_t		pool_defsz = pool_p->ipool_defsz;
+		uint_t		reduction, max_redu;
 
-		head_p = list_head(&pool_p->ipool_scratch_list);
-
-		/* Fail if nothing is reducible */
-		if (head_p->ireq_navail <= pool_p->ipool_defsz) {
+		/* Fail if none are reducible */
+		if (!req_p || req_p->ireq_navail <= pool_defsz) {
 			DDI_INTR_IRMDBG((CE_CONT,
-			    "i_ddi_irm_reduce_large: Failure. "
+			    "i_ddi_irm_reduce_by_policy: Failure. "
 			    "All requests have downsized to low limit.\n"));
 			return (DDI_FAILURE);
 		}
 
-		/* Count the number of equally sized requests */
-		for (nreqs = 1, next_p = head_p;
-		    (next_p = list_next(&pool_p->ipool_scratch_list, next_p)) !=
-		    NULL && (head_p->ireq_navail == next_p->ireq_navail);
-		    nreqs++)
-			;
-
-		next_navail = next_p ? next_p->ireq_navail : 0;
-		reduction = head_p->ireq_navail -
-		    MAX(next_navail, pool_p->ipool_defsz);
-
-		if ((reduction * nreqs) > imbalance) {
-			reduction = imbalance / nreqs;
-
-			if (reduction == 0) {
-				reduction = 1;
-				nreqs = imbalance;
-			}
-		}
-
-		next_p = head_p;
-		while (nreqs--) {
-			imbalance -= reduction;
-			next_p->ireq_navail -= reduction;
-			pool_p->ipool_resno -= reduction;
-			next_p = list_next(&pool_p->ipool_scratch_list, next_p);
-		}
-
-		if (next_p && next_p->ireq_navail > head_p->ireq_navail) {
-			ASSERT(imbalance == 0);
-			i_ddi_irm_reduce_large_resort(pool_p);
-		}
-	}
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * i_ddi_irm_reduce_large_resort()
- *
- *	Helper function for i_ddi_irm_reduce_large().  Once a request
- *	is reduced, this resorts it further down into the list as necessary.
- */
-static void
-i_ddi_irm_reduce_large_resort(ddi_irm_pool_t *pool_p)
-{
-	ddi_irm_req_t	*start_p, *end_p, *next_p;
-
-	ASSERT(pool_p != NULL);
-	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
-
-	start_p = list_head(&pool_p->ipool_scratch_list);
-	end_p = list_next(&pool_p->ipool_scratch_list, start_p);
-	while (end_p && start_p->ireq_navail == end_p->ireq_navail)
-		end_p = list_next(&pool_p->ipool_scratch_list, end_p);
-
-	next_p = end_p;
-	while (next_p && (next_p->ireq_navail > start_p->ireq_navail))
-		next_p = list_next(&pool_p->ipool_scratch_list, next_p);
-
-	while (start_p != end_p) {
-		list_remove(&pool_p->ipool_scratch_list, start_p);
-		list_insert_before(&pool_p->ipool_scratch_list, next_p,
-		    start_p);
-		start_p = list_head(&pool_p->ipool_scratch_list);
-	}
-}
-
-/*
- * i_ddi_irm_reduce_even()
- *
- *	Algorithm for the DDI_IRM_POLICY_EVEN reduction policy.
- *
- *	This algorithm reduces requests evenly, without giving a
- *	specific preference to smaller or larger requests.  Each
- *	iteration reduces all reducible requests by the same amount
- *	until the imbalance is corrected.  Although when possible,
- *	it tries to avoid reducing requests below the threshold of
- *	the interrupt pool's default allocation size.
- *
- *	An optimization in this algorithm is to reduce the requests
- *	in larger increments during each iteration, to minimize the
- *	total number of iterations required.
- */
-static int
-i_ddi_irm_reduce_even(ddi_irm_pool_t *pool_p, int imbalance)
-{
-	ddi_irm_req_t	*req_p, *last_p;
-	uint_t		nmin = pool_p->ipool_defsz;
-	uint_t		nreduce, reduction;
-
-	ASSERT(pool_p != NULL);
-	ASSERT(imbalance > 0);
-	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
-
-	DDI_INTR_IRMDBG((CE_CONT,
-	    "i_ddi_irm_reduce_even: pool_p %p imbalance %d\n",
-	    (void *)pool_p, imbalance));
-
-	while (imbalance > 0) {
-
 		/* Count reducible requests */
-		nreduce = 0;
-		for (req_p = list_head(&pool_p->ipool_scratch_list); req_p;
-		    req_p = list_next(&pool_p->ipool_scratch_list, req_p)) {
-			if (req_p->ireq_navail <= nmin)
+		stop_navail = (policy == DDI_IRM_POLICY_LARGE) ?
+		    req_p->ireq_navail - 1 : pool_defsz;
+		for (; req_p; req_p = list_next(slist_p, req_p)) {
+			if (req_p->ireq_navail <= stop_navail)
 				break;
-			last_p = req_p;
 			nreduce++;
 		}
 
-		/* Fail if none are reducible */
-		if (nreduce == 0) {
-			DDI_INTR_IRMDBG((CE_CONT,
-			    "i_ddi_irm_reduce_even: Failure. "
-			    "All requests have downsized to low limit.\n"));
-			return (DDI_FAILURE);
-		}
-
 		/* Compute reduction */
-		if (nreduce < imbalance) {
-			reduction = last_p->ireq_navail - nmin;
-			if ((reduction * nreduce) > imbalance) {
-				reduction = imbalance / nreduce;
-			}
+		last_p = req_p ? list_prev(slist_p, req_p) : list_tail(slist_p);
+		if ((policy == DDI_IRM_POLICY_LARGE) && req_p &&
+		    req_p->ireq_navail > pool_defsz)
+			reduction = last_p->ireq_navail - req_p->ireq_navail;
+		else
+			reduction = last_p->ireq_navail - pool_defsz;
+
+		if ((max_redu = reduction * nreduce) > imbalance) {
+			reduction = imbalance / nreduce;
+			nremain = imbalance % nreduce;
+			pool_p->ipool_resno -= imbalance;
+			imbalance = 0;
 		} else {
-			reduction = 1;
+			pool_p->ipool_resno -= max_redu;
+			imbalance -= max_redu;
 		}
 
-		/* Start at head of list, but skip excess */
-		req_p = list_head(&pool_p->ipool_scratch_list);
-		while (nreduce > imbalance) {
-			req_p = list_next(&pool_p->ipool_scratch_list, req_p);
-			nreduce--;
-		}
-
-		/* Do reductions */
-		while (req_p && (nreduce > 0)) {
-			imbalance -= reduction;
+		/* Reduce */
+		for (req_p = list_head(slist_p); (reduction != 0) && nreduce--;
+		    req_p = list_next(slist_p, req_p)) {
 			req_p->ireq_navail -= reduction;
-			pool_p->ipool_resno -= reduction;
-			req_p = list_next(&pool_p->ipool_scratch_list, req_p);
-			nreduce--;
+		}
+
+		for (req_p = last_p; nremain--;
+		    req_p = list_prev(slist_p, req_p)) {
+			req_p->ireq_navail--;
 		}
 	}
 
@@ -1070,45 +947,35 @@ i_ddi_irm_reduce_even(ddi_irm_pool_t *pool_p, int imbalance)
  *
  *	Reduces new requests.  This is only used as a last resort
  *	after another reduction algorithm failed.
+ *
+ *	NOTE: The pool locking in i_ddi_irm_insert() ensures
+ *	there can be only one new request at a time in a pool.
  */
 static void
 i_ddi_irm_reduce_new(ddi_irm_pool_t *pool_p, int imbalance)
 {
 	ddi_irm_req_t	*req_p;
-	uint_t		nreduce;
 
 	ASSERT(pool_p != NULL);
 	ASSERT(imbalance > 0);
 	ASSERT(MUTEX_HELD(&pool_p->ipool_lock));
 
-	while (imbalance > 0) {
-		nreduce = 0;
-		for (req_p = list_head(&pool_p->ipool_scratch_list);
-		    req_p && (imbalance > 0);
-		    req_p = list_next(&pool_p->ipool_scratch_list, req_p)) {
-			if (req_p->ireq_flags & DDI_IRM_FLAG_NEW &&
-			    req_p->ireq_navail > 1) {
-				req_p->ireq_navail--;
-				pool_p->ipool_resno--;
-				imbalance--;
-				nreduce++;
-			}
-		}
+	DDI_INTR_IRMDBG((CE_CONT,
+	    "i_ddi_irm_reduce_new: pool_p %p imbalance %d\n",
+	    (void *)pool_p, imbalance));
 
-		if (nreduce == 0)
-			break;
-	}
-
-	for (req_p = list_head(&pool_p->ipool_scratch_list);
-	    req_p && (imbalance > 0);
+	for (req_p = list_head(&pool_p->ipool_scratch_list); req_p;
 	    req_p = list_next(&pool_p->ipool_scratch_list, req_p)) {
 		if (req_p->ireq_flags & DDI_IRM_FLAG_NEW) {
-			ASSERT(req_p->ireq_navail == 1);
-			req_p->ireq_navail--;
-			pool_p->ipool_resno--;
-			imbalance--;
+			ASSERT(req_p->ireq_navail >= imbalance);
+			req_p->ireq_navail -= imbalance;
+			pool_p->ipool_resno -= imbalance;
+			return;
 		}
 	}
+
+	/* should never go here */
+	ASSERT(B_FALSE);
 }
 
 /*
