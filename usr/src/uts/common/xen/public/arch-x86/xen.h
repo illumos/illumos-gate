@@ -24,11 +24,6 @@
  * Copyright (c) 2004-2006, K A Fraser
  */
 
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #include "../xen.h"
 
 #ifndef __XEN_PUBLIC_ARCH_X86_XEN_H__
@@ -44,19 +39,15 @@
 #endif
 
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
-    ___DEFINE_XEN_GUEST_HANDLE(name, type)
+    ___DEFINE_XEN_GUEST_HANDLE(name, type);   \
+    ___DEFINE_XEN_GUEST_HANDLE(const_##name, const type)
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
-#if !defined(__GNUC__) && defined(__i386__)
-#define set_xen_guest_handle_u(hnd, val)  do { (hnd).u.p = val; } while (0)
-#define get_xen_guest_handle_u(val, hnd)  do { val = (hnd).u.p; } while (0)
-#else
-#define set_xen_guest_handle_u(hnd, val)  do { (hnd).p = val; } while (0)
-#define get_xen_guest_handle_u(val, hnd)  do { val = (hnd).p; } while (0)
-#endif
 #define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
+#ifdef __XEN_TOOLS__
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
+#endif
 
 #if defined(__i386__)
 #include "xen-x86_32.h"
@@ -65,17 +56,7 @@
 #endif
 
 #ifndef __ASSEMBLY__
-/* Guest handles for primitive C types. */
-__DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
-__DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
-__DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
-DEFINE_XEN_GUEST_HANDLE(char);
-DEFINE_XEN_GUEST_HANDLE(int);
-DEFINE_XEN_GUEST_HANDLE(long);
-DEFINE_XEN_GUEST_HANDLE(void);
-
 typedef unsigned long xen_pfn_t;
-DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define PRI_xen_pfn "lx"
 #endif
 
@@ -196,8 +177,8 @@ struct arch_shared_info {
 };
 typedef struct arch_shared_info arch_shared_info_t;
 
-#define	MCA_PANICDATA_MAGIC	0x5044	/* "PD" */
-#define	MCA_PANICDATA_VERS	1
+#define	MCA_PANICDATA_MAGIC	0x5044  /* "PD" */
+#define MCA_PANICDATA_VERS	1
 
 typedef struct xpv_mca_panic_data {
 	uint16_t mpd_magic;

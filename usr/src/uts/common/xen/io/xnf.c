@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -690,7 +690,7 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Report our version to dom0.
 	 */
-	if (xenbus_printf(XBT_NULL, "hvmpv/xnf", "version", "%d",
+	if (xenbus_printf(XBT_NULL, "guest/xnf", "version", "%d",
 	    HVMPV_XNF_VERS))
 		cmn_err(CE_WARN, "xnf: couldn't write version\n");
 

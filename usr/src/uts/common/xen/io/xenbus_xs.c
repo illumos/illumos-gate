@@ -95,7 +95,7 @@
 #define	list_empty(list) (list_head(list) == NULL)
 
 struct xs_stored_msg {
-	list_t list;
+	list_node_t list;
 
 	struct xsd_sockmsg hdr;
 

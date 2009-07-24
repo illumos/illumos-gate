@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,7 +189,7 @@ gcpu_xpv_mci_process(mc_info_t *mi, int type,
 	while (idx < x86_mcinfo_nentries(mi)) {
 		if (mic->type == MC_TYPE_GLOBAL) {
 			gcpu_xpv_globalhdr_found++;
-			gcpu_xpv_proxy_logout(type == XEN_MC_F_URGENT ?
+			gcpu_xpv_proxy_logout(type == XEN_MC_URGENT ?
 			    GCPU_MPT_WHAT_MC_ERR : GCPU_MPT_WHAT_XPV_VIRQ,
 			    mi, &mic, &idx, bankregs, bankregs_sz);
 		} else {
@@ -206,16 +206,14 @@ gcpu_xpv_telem_read(mc_info_t *mci, int type, uint64_t *idp)
 	long err;
 
 	mcf.flags = type;
-	mcf.data_sz = sizeof (mc_info_t);
 	set_xen_guest_handle(mcf.data, mci);
 
-	if ((err = HYPERVISOR_mca(XEN_MC_CMD_fetch,
-	    (xen_mc_arg_t *)&mcf)) != XEN_MC_HCALL_SUCCESS) {
+	if ((err = HYPERVISOR_mca(XEN_MC_fetch, (xen_mc_arg_t *)&mcf)) != 0) {
 		gcpu_xpv_mca_hcall_fails[err < 16 ? err : 0]++;
 		return (0);
 	}
 
-	if (mcf.flags == XEN_MC_F_OK) {
+	if (mcf.flags == XEN_MC_OK) {
 		*idp = mcf.fetch_id;
 		return (1);
 	} else {
@@ -229,9 +227,9 @@ gcpu_xpv_telem_ack(int type, uint64_t fetch_id)
 {
 	struct xen_mc_fetch mcf;
 
-	mcf.flags = type | XEN_MC_F_ACK;
+	mcf.flags = type | XEN_MC_ACK;
 	mcf.fetch_id = fetch_id;
-	(void) HYPERVISOR_mca(XEN_MC_CMD_fetch, (xen_mc_arg_t *)&mcf);
+	(void) HYPERVISOR_mca(XEN_MC_fetch, (xen_mc_arg_t *)&mcf);
 }
 
 static void
@@ -249,7 +247,7 @@ mctelem_traverse(void *head, enum mctelem_direction direction,
 		    (tep + xpv_mca_panic_data->mpd_dataptr_offset);
 
 		gcpu_xpv_mci_process(*mcip,
-		    urgent ? XEN_MC_F_URGENT : XEN_MC_F_NONURGENT,
+		    urgent ? XEN_MC_URGENT : XEN_MC_NONURGENT,
 		    gcpu_xpv_bankregs, gcpu_xpv_bankregs_sz);
 
 		ntepp = (char **)(tep + noff);
@@ -289,7 +287,7 @@ gcpu_xpv_panic_callback(void)
 		mctelem_traverse(ti->mpd_nonurgent_committed, MCTELEM_REVERSE,
 		    B_FALSE);
 	} else {
-		int types[] = { XEN_MC_F_URGENT, XEN_MC_F_NONURGENT };
+		int types[] = { XEN_MC_URGENT, XEN_MC_NONURGENT };
 		uint64_t fetch_id;
 		int i;
 

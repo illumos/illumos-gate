@@ -56,6 +56,15 @@
  */
 #define XENFEAT_pae_pgdir_above_4gb        4
 
+/* x86: Does this Xen host support the MMU_PT_UPDATE_PRESERVE_AD hypercall? */
+#define XENFEAT_mmu_pt_update_preserve_ad  5
+
+/*
+ * If set, GNTTABOP_map_grant_ref honors flags to be placed into guest kernel
+ * available pte bits.
+ */
+#define XENFEAT_gnttab_map_avail_bits      7
+
 #define XENFEAT_NR_SUBMAPS 1
 
 #endif /* __XEN_PUBLIC_FEATURES_H__ */

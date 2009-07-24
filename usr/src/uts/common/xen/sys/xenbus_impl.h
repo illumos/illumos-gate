@@ -73,7 +73,7 @@ struct xenbus_watch;
 typedef void (*xenbus_watch_cb_t)(struct xenbus_watch *,
     const char **vec, unsigned int len);
 struct xenbus_watch {
-	list_t list;
+	list_node_t 		list;
 	const char		*node;	/* path being watched */
 	xenbus_watch_cb_t	callback;
 	struct xenbus_device	*dev;
@@ -84,7 +84,7 @@ struct xenbus_watch {
  * connected to the xenbus device.
  */
 struct xenbus_notify {
-	list_t list;
+	list_node_t list;
 	void (*notify_func) (int);
 };
 

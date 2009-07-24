@@ -747,6 +747,8 @@ error:
 	return (rval);
 }
 
+int aac_use_msi = 1;
+
 static int
 aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -821,7 +823,7 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    "ddi_intr_get_supported_types() ret: 0x%x", intr_types);
 
 	/* Query interrupt, and alloc/init all needed struct */
-	if (intr_types & DDI_INTR_TYPE_MSI) {
+	if ((intr_types & DDI_INTR_TYPE_MSI) && aac_use_msi) {
 		if (aac_query_intrs(softs, DDI_INTR_TYPE_MSI)
 		    != DDI_SUCCESS) {
 			AACDB_PRINT(softs, CE_WARN,
@@ -1665,6 +1667,7 @@ error:
 	kmem_free(softs->htable, intr_size);
 	return (DDI_FAILURE);
 }
+
 
 /*
  * Register FIXED or MSI interrupts, and enable them

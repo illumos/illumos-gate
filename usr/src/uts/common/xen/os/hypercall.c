@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,10 @@
  */
 
 #include <sys/types.h>
-#ifdef XPV_HVM_DRIVER
+#ifndef __xpv
 #include <sys/xpv_support.h>
+#else
+#include <sys/xpv_user.h>
 #endif
 
 #include <sys/hypervisor.h>
@@ -281,12 +283,6 @@ HYPERVISOR_mmuext_op(struct mmuext_op *req, int count, uint_t *success_count,
 }
 
 long
-HYPERVISOR_acm_op(struct xen_acmctl *arg)
-{
-	return (__hypercall1(__HYPERVISOR_acm_op, (ulong_t)arg));
-}
-
-long
 HYPERVISOR_nmi_op(int cmd, void *arg)
 {
 	return (__hypercall2(__HYPERVISOR_nmi_op, (long)cmd, (ulong_t)arg));
@@ -328,6 +324,13 @@ HYPERVISOR_hvm_op(int cmd, void *arg)
 	return (__hypercall2(__HYPERVISOR_hvm_op, (long)cmd, (ulong_t)arg));
 }
 
+#if defined(__xpv)
+long
+HYPERVISOR_xsm_op(struct xen_acmctl *arg)
+{
+	return (__hypercall1(__HYPERVISOR_xsm_op, (ulong_t)arg));
+}
+
 long
 HYPERVISOR_sysctl(xen_sysctl_t *sysctl)
 {
@@ -339,6 +342,7 @@ HYPERVISOR_domctl(xen_domctl_t *domctl)
 {
 	return (__hypercall1(__HYPERVISOR_domctl, (ulong_t)domctl));
 }
+#endif /* __xpv */
 
 /* *** __HYPERVISOR_kexec_op *** NOT IMPLEMENTED */
 
@@ -408,16 +412,15 @@ HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *arg)
 	long rv;
 
 	switch (cmd) {
-	case XEN_MC_CMD_fetch:
-	case XEN_MC_CMD_physcpuinfo:
-	case XEN_MC_CMD_msrinject:
-	case XEN_MC_CMD_mceinject:
-	case XEN_MC_CMD_offlinecpu:
+	case XEN_MC_fetch:
+	case XEN_MC_physcpuinfo:
+	case XEN_MC_msrinject:
+	case XEN_MC_mceinject:
 		if (arg == NULL)
 			return (EINVAL);
 		break;
 
-	case XEN_MC_CMD_notifydomain:
+	case XEN_MC_notifydomain:
 		return (ENOTSUP);
 
 	default:
@@ -431,7 +434,7 @@ HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *arg)
 
 	rv = __hypercall1(__HYPERVISOR_mca, (ulong_t)&xmc);
 
-	if (rv == XEN_MC_HCALL_SUCCESS && arg != NULL)
+	if (rv == 0 && arg != NULL)
 		*arg = xmc.u;
 
 	return (rv);

@@ -151,6 +151,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xsvc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # dboot stuff is always 32 bit, linked to run with phys_addr == virt_addr
 #
@@ -341,6 +345,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xsvc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 #

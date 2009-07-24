@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -35,6 +35,14 @@
         name='system/xvm/ipagent' type='service' version='1'>
 	<create_default_instance enabled='false'/>
         <single_instance />
+
+	<dependency
+		name='local'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
 
         <exec_method
                 type='method'

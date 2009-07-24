@@ -60,7 +60,14 @@ apic_irq_t	*apic_find_irq(dev_info_t *, struct intrspec *, int);
 int	apic_support_msi = 0;
 
 /* Multiple vector support for MSI */
+#if !defined(__xpv)
 int	apic_multi_msi_enable = 1;
+#else
+/*
+ * Xen hypervisor does not seem to properly support multi-MSI
+ */
+int	apic_multi_msi_enable = 0;
+#endif	/* __xpv */
 
 /* Multiple vector support for MSI-X */
 int	apic_msix_enable = 1;
@@ -124,6 +131,10 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 		msi_ctrl |= ((highbit(count) -1) << PCI_MSI_MME_SHIFT);
 		pci_config_put16(handle, cap_ptr + PCI_MSI_CTRL, msi_ctrl);
 
+#if !defined(__xpv)
+		/*
+		 * Only set vector if not on hypervisor
+		 */
 		pci_config_put32(handle,
 		    cap_ptr + PCI_MSI_ADDR_OFFSET, msi_addr);
 
@@ -149,9 +160,12 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), msi_data);
 		ddi_put64(msix_p->msix_tbl_hdl,
 		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), msi_addr);
+#endif	/* ! __xpv */
 	}
 }
 
+
+#if !defined(__xpv)
 
 /*
  * This function returns the no. of vectors available for the pri.
@@ -189,6 +203,8 @@ apic_navail_vector(dev_info_t *dip, int pri)
 	}
 	return (navail);
 }
+
+#endif	/* ! __xpv */
 
 /*
  * Finds "count" contiguous MSI vectors starting at the proper alignment
@@ -380,7 +396,6 @@ apic_set_mask(apic_irq_t *irqp)
 	intr_restore(iflag);
 }
 
-#endif	/* ! __xpv */
 
 void
 apic_free_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
@@ -413,6 +428,7 @@ apic_free_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
 	}
 }
 
+#endif	/* ! __xpv */
 
 /*
  * check whether the system supports MSI
@@ -455,6 +471,8 @@ apic_check_msi_support()
 	    "device_type found\n"));
 	return (PSM_FAILURE);
 }
+
+#if !defined(__xpv)
 
 /*
  * apic_pci_msi_unconfigure:
@@ -593,7 +611,6 @@ apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
 	}
 }
 
-#if !defined(__xpv)
 
 static int
 apic_set_cpu(int irqno, int cpu, int *result)
@@ -781,7 +798,32 @@ set_grp_intr_done:
 	return (PSM_SUCCESS);
 }
 
-#endif	/* !__xpv */
+#else	/* !__xpv */
+
+/*
+ * We let the hypervisor deal with msi configutation
+ * so just stub these out.
+ */
+
+/* ARGSUSED */
+void
+apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
+{
+}
+
+/* ARGSUSED */
+void
+apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
+{
+}
+
+/* ARGSUSED */
+void
+apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
+{
+}
+
+#endif	/* __xpv */
 
 int
 apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)

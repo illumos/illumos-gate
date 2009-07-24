@@ -26,7 +26,7 @@
 #ifndef _XEN_PUBLIC_ACM_H
 #define _XEN_PUBLIC_ACM_H
 
-#include "xen.h"
+#include "../xen.h"
 
 /* if ACM_DEBUG defined, all hooks should
  * print a short trace message (comment it out
@@ -91,7 +91,7 @@
  * whenever the interpretation of the related
  * policy's data structure changes
  */
-#define ACM_POLICY_VERSION 3
+#define ACM_POLICY_VERSION 4
 #define ACM_CHWALL_VERSION 1
 #define ACM_STE_VERSION  1
 
@@ -99,8 +99,10 @@
 typedef uint32_t ssidref_t;
 
 /* hooks that are known to domains */
-#define ACMHOOK_none    0
-#define ACMHOOK_sharing 1
+#define ACMHOOK_none          0
+#define ACMHOOK_sharing       1
+#define ACMHOOK_authorization 2
+#define ACMHOOK_conflictset   3
 
 /* -------security policy relevant type definitions-------- */
 
@@ -129,6 +131,10 @@ typedef uint16_t domaintype_t;
 /* high-16 = version, low-16 = check magic */
 #define ACM_MAGIC  0x0001debc
 
+/* size of the SHA1 hash identifying the XML policy from which the
+   binary policy was created */
+#define ACM_SHA1_HASH_SIZE    20
+
 /* each offset in bytes from start of the struct they
  * are part of */
 
@@ -149,8 +155,8 @@ struct acm_policy_version
  * tools that assume packed representations (e.g. the java tool)
  */
 struct acm_policy_buffer {
-    uint32_t policy_version; /* ACM_POLICY_VERSION */
     uint32_t magic;
+    uint32_t policy_version; /* ACM_POLICY_VERSION */
     uint32_t len;
     uint32_t policy_reference_offset;
     uint32_t primary_policy_code;
@@ -158,6 +164,7 @@ struct acm_policy_buffer {
     uint32_t secondary_policy_code;
     uint32_t secondary_buffer_offset;
     struct acm_policy_version xml_pol_version; /* add in V3 */
+    uint8_t xml_policy_hash[ACM_SHA1_HASH_SIZE]; /* added in V4 */
 };
 
 

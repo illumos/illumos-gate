@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -450,37 +450,4 @@ reassign_pfn(pfn_t pfn, mfn_t mfn)
 
 	if (kpm_vbase != NULL && xen_kpm_page(pfn, PT_VALID | PT_WRITABLE) < 0)
 		panic("reassign_pfn(): failed to enable kpm mapping");
-}
-
-/*
- * XXPV code to work around problems with GNTTABOP_map_grant_ref
- * Hopefully we can remove this when GNTTABOP_map_grant_ref is fixed.
- */
-void
-xen_fix_foreign(struct hat *hat, uint64_t va)
-{
-	uintptr_t v = va;
-	htable_t *ht;
-	uint_t entry;
-	x86pte_t pte;
-
-	/*
-	 * Look up the PTE for VA. If it is not marked foreign,
-	 * add the appropriate soft bits and reinstall the new PTE.
-	 */
-	ht = htable_getpage(hat, v, &entry);
-	if (ht == NULL) {
-		cmn_err(CE_WARN, "xen_fix_foreign(va=0x%p) htable not found",
-		    (void *)v);
-		return;
-	}
-
-	pte = x86pte_get(ht, entry);
-	if ((pte & PT_SOFTWARE) < PT_FOREIGN) {
-		pte |= PT_FOREIGN;
-		if (HYPERVISOR_update_va_mapping(v, pte, UVMF_NONE) != 0)
-			cmn_err(CE_WARN, "xen_fix_foreign(va=0x%p) failed, pte="
-			    FMT_PTE, (void *)v, pte);
-	}
-	htable_release(ht);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,9 +246,10 @@ static int
 xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	extern void xvdi_watch_devices(int);
-
 #ifdef XPV_HVM_DRIVER
-	if (xen_info == NULL) {
+	extern dev_info_t *xpv_dip;
+
+	if (xpv_dip == NULL) {
 		if (ddi_hold_installed_driver(ddi_name_to_major("xpv")) ==
 		    NULL) {
 			cmn_err(CE_WARN, "Couldn't initialize xpv framework");
@@ -275,7 +276,7 @@ xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/*
 	 * Report our version to dom0.
 	 */
-	if (xenbus_printf(XBT_NULL, "hvmpv/xpvd", "version", "%d",
+	if (xenbus_printf(XBT_NULL, "guest/xpvd", "version", "%d",
 	    HVMPV_XPVD_VERS))
 		cmn_err(CE_WARN, "xpvd: couldn't write version\n");
 #endif /* XPV_HVM_DRIVER */

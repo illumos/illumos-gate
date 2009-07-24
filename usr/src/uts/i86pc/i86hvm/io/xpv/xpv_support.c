@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,32 +55,11 @@
 #define	XPV_MINOR 0
 #define	XPV_BUFSIZE 128
 
-/*
- * This structure is ordinarily constructed by Xen. In the HVM world, we
- * manually fill in the few fields the PV drivers need.
- */
-start_info_t *xen_info = NULL;
-
-/* Xen version number. */
-int xen_major, xen_minor;
-
-/* Metadata page shared between domain and Xen */
-shared_info_t *HYPERVISOR_shared_info = NULL;
-
-/* Page containing code to issue hypercalls.  */
-extern caddr_t hypercall_page;
-
-/* Is the hypervisor 64-bit? */
-int xen_is_64bit = -1;
-
 /* virtual addr for the store_mfn page */
 caddr_t xb_addr;
 
 dev_info_t *xpv_dip;
 static dev_info_t *xpvd_dip;
-
-/* saved pfn of the shared info page */
-static pfn_t shared_info_frame;
 
 #ifdef DEBUG
 int xen_suspend_debug;
@@ -263,7 +242,7 @@ xen_printf(const char *fmt, ...)
  */
 /*ARGSUSED*/
 void
-xen_release_pfn(pfn_t pfn, caddr_t va)
+xen_release_pfn(pfn_t pfn)
 {
 	panic("xen_release_pfn() is not supported in HVM domains");
 }
@@ -300,18 +279,6 @@ kbm_map_ma(maddr_t ma, uintptr_t va, uint_t level)
 
 	hat_devload(kas.a_hat, (caddr_t)va, MMU_PAGESIZE,
 	    mmu_btop(ma), PROT_READ | PROT_WRITE, HAT_LOAD);
-}
-
-static uint64_t
-hvm_get_param(int param_id)
-{
-	struct xen_hvm_param xhp;
-
-	xhp.domid = DOMID_SELF;
-	xhp.index = param_id;
-	if ((HYPERVISOR_hvm_op(HVMOP_get_param, &xhp) < 0))
-		return (-1);
-	return (xhp.value);
 }
 
 /*ARGSUSED*/
@@ -533,7 +500,7 @@ xen_suspend_domain(void)
 	xatp.domid = DOMID_SELF;
 	xatp.idx = 0;
 	xatp.space = XENMAPSPACE_shared_info;
-	xatp.gpfn = shared_info_frame;
+	xatp.gpfn = xen_shared_info_frame;
 	if ((err = HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp)) != 0)
 		panic("Could not set shared_info page. error: %d", err);
 
@@ -693,123 +660,17 @@ again:
 }
 
 static int
-xen_pv_init(dev_info_t *xpv_dip)
+xpv_drv_init(void)
 {
-	struct cpuid_regs cp;
-	uint32_t xen_signature[4];
-	char *xen_str;
-	struct xen_add_to_physmap xatp;
-	xen_capabilities_info_t caps;
-	pfn_t pfn;
-	uint64_t msrval;
-	int err;
-
-	/*
-	 * Xen's pseudo-cpuid function 0x40000000 returns a string
-	 * representing the Xen signature in %ebx, %ecx, and %edx.
-	 * %eax contains the maximum supported cpuid function.
-	 */
-	cp.cp_eax = 0x40000000;
-	(void) __cpuid_insn(&cp);
-	xen_signature[0] = cp.cp_ebx;
-	xen_signature[1] = cp.cp_ecx;
-	xen_signature[2] = cp.cp_edx;
-	xen_signature[3] = 0;
-	xen_str = (char *)xen_signature;
-	if (strcmp("XenVMMXenVMM", xen_str) != 0 ||
-	    cp.cp_eax < 0x40000002) {
-		cmn_err(CE_WARN,
-		    "Attempting to load Xen drivers on non-Xen system");
+	if (xpv_feature(XPVF_HYPERCALLS) < 0 ||
+	    xpv_feature(XPVF_SHARED_INFO) < 0)
 		return (-1);
-	}
-
-	/*
-	 * cpuid function 0x40000001 returns the Xen version in %eax.  The
-	 * top 16 bits are the major version, the bottom 16 are the minor
-	 * version.
-	 */
-	cp.cp_eax = 0x40000001;
-	(void) __cpuid_insn(&cp);
-	xen_major = cp.cp_eax >> 16;
-	xen_minor = cp.cp_eax & 0xffff;
-
-	/*
-	 * The xpv driver is incompatible with xen versions older than 3.1. This
-	 * is due to the changes in the vcpu_info and shared_info structs used
-	 * to communicate with the hypervisor (the event channels in particular)
-	 * that were introduced with 3.1.
-	 */
-	if (xen_major < 3 || (xen_major == 3 && xen_minor < 1)) {
-		cmn_err(CE_WARN, "Xen version %d.%d is not supported",
-		    xen_major, xen_minor);
-		return (-1);
-	}
-
-	/*
-	 * cpuid function 0x40000002 returns information about the
-	 * hypercall page.  %eax nominally contains the number of pages
-	 * with hypercall code, but according to the Xen guys, "I'll
-	 * guarantee that remains one forever more, so you can just
-	 * allocate a single page and get quite upset if you ever see CPUID
-	 * return more than one page."  %ebx contains an MSR we use to ask
-	 * Xen to remap each page at a specific pfn.
-	 */
-	cp.cp_eax = 0x40000002;
-	(void) __cpuid_insn(&cp);
-
-	/*
-	 * Let Xen know where we want the hypercall page mapped.  We
-	 * already have a page allocated in the .text section to simplify
-	 * the wrapper code.
-	 */
-	pfn = hat_getpfnum(kas.a_hat, (caddr_t)&hypercall_page);
-	msrval = mmu_ptob(pfn);
-	wrmsr(cp.cp_ebx, msrval);
-
-	/* Fill in the xen_info data */
-	xen_info = kmem_zalloc(sizeof (start_info_t), KM_SLEEP);
-	(void) sprintf(xen_info->magic, "xen-%d.%d", xen_major, xen_minor);
-	xen_info->store_mfn = (mfn_t)hvm_get_param(HVM_PARAM_STORE_PFN);
-	xen_info->store_evtchn = (int)hvm_get_param(HVM_PARAM_STORE_EVTCHN);
-
-	/* Figure out whether the hypervisor is 32-bit or 64-bit.  */
-	if ((HYPERVISOR_xen_version(XENVER_capabilities, &caps) == 0)) {
-		((char *)(caps))[sizeof (caps) - 1] = '\0';
-		if (strstr(caps, "x86_64") != NULL)
-			xen_is_64bit = 1;
-		else if (strstr(caps, "x86_32") != NULL)
-			xen_is_64bit = 0;
-	}
-	if (xen_is_64bit < 0) {
-		cmn_err(CE_WARN, "Couldn't get capability info from Xen.");
-		return (-1);
-	}
-#ifdef __amd64
-	ASSERT(xen_is_64bit == 1);
-#endif
-
-	/*
-	 * Allocate space for the shared_info page and tell Xen where it
-	 * is.
-	 */
-	HYPERVISOR_shared_info = xen_alloc_pages(1);
-	shared_info_frame = hat_getpfnum(kas.a_hat,
-	    (caddr_t)HYPERVISOR_shared_info);
-	xatp.domid = DOMID_SELF;
-	xatp.idx = 0;
-	xatp.space = XENMAPSPACE_shared_info;
-	xatp.gpfn = shared_info_frame;
-	if ((err = HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp)) != 0) {
-		cmn_err(CE_WARN, "Could not get shared_info page from Xen."
-		    "  error: %d", err);
-		return (-1);
-	}
 
 	/* Set up the grant tables.  */
 	gnttab_init();
 
 	/* Set up event channel support */
-	if (ec_init(xpv_dip) != 0)
+	if (ec_init() != 0)
 		return (-1);
 
 	/* Set up xenbus */
@@ -831,8 +692,6 @@ xen_pv_init(dev_info_t *xpv_dip)
 static void
 xen_pv_fini()
 {
-	if (xen_info != NULL)
-		kmem_free(xen_info, sizeof (start_info_t));
 	ec_fini();
 }
 
@@ -869,7 +728,7 @@ xpv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	xpv_dip = dip;
 
-	if (xen_pv_init(dip) != 0)
+	if (xpv_drv_init() != 0)
 		return (DDI_FAILURE);
 
 	ddi_report_dev(dip);
@@ -883,7 +742,7 @@ xpv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Report our version to dom0.
 	 */
-	if (xenbus_printf(XBT_NULL, "hvmpv/xpv", "version", "%d",
+	if (xenbus_printf(XBT_NULL, "guest/xpv", "version", "%d",
 	    HVMPV_XPV_VERS))
 		cmn_err(CE_WARN, "xpv: couldn't write version\n");
 

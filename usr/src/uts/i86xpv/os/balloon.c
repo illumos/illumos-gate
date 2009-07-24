@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/balloon_impl.h>
 #include <sys/hypervisor.h>
@@ -973,7 +971,7 @@ balloon_replace_pages(uint_t nextents, page_t **pp, uint_t addr_bits,
 	set_xen_guest_handle(memres.extent_start, mfns);
 	memres.domid = DOMID_SELF;
 	memres.nr_extents = nextents;
-	memres.address_bits = addr_bits;
+	memres.mem_flags = XENMEMF_address_bits(addr_bits);
 	memres.extent_order = order;
 	cnt = HYPERVISOR_memory_op(XENMEM_increase_reservation, &memres);
 	/* assign the new MFNs to the current PFNs */

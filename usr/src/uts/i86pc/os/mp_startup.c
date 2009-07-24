@@ -661,35 +661,6 @@ opteron_get_nnodes(void)
 	return (nnodes);
 }
 
-#if defined(__xpv)
-
-/*
- * On dom0, we can determine the number of physical cpus on the machine.
- * This number is important when figuring out what workarounds are
- * appropriate, so compute it now.
- */
-uint_t
-xen_get_nphyscpus(void)
-{
-	static uint_t nphyscpus = 0;
-
-	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
-
-	if (nphyscpus == 0) {
-		xen_sysctl_t op;
-		xen_sysctl_physinfo_t *pi = &op.u.physinfo;
-
-		op.cmd = XEN_SYSCTL_physinfo;
-		op.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
-		if (HYPERVISOR_sysctl(&op) == 0)
-			nphyscpus = pi->threads_per_core *
-			    pi->cores_per_socket * pi->sockets_per_node *
-			    pi->nr_nodes;
-	}
-	return (nphyscpus);
-}
-#endif
-
 uint_t
 do_erratum_298(struct cpu *cpu)
 {
@@ -932,7 +903,7 @@ workaround_errata(struct cpu *cpu)
 #if defined(__xpv)
 		if (!DOMAIN_IS_INITDOMAIN(xen_info))
 			break;
-		if (!opteron_erratum_122 && xen_get_nphyscpus() == 1)
+		if (!opteron_erratum_122 && xpv_nr_phys_cpus() == 1)
 			break;
 #else
 		if (!opteron_erratum_122 && opteron_get_nnodes() == 1 &&
@@ -1020,7 +991,7 @@ workaround_errata(struct cpu *cpu)
 #if defined(__xpv)
 		if (!DOMAIN_IS_INITDOMAIN(xen_info))
 			break;
-		if (xen_get_nphyscpus() < 4)
+		if (xpv_nr_phys_cpus() < 4)
 			break;
 #else
 		if (opteron_get_nnodes() * cpuid_get_ncpu_per_chip(cpu) < 4)
@@ -1061,7 +1032,7 @@ workaround_errata(struct cpu *cpu)
 			opteron_workaround_6336786++;
 #if defined(__xpv)
 		} else if ((DOMAIN_IS_INITDOMAIN(xen_info) &&
-		    xen_get_nphyscpus() > 1) ||
+		    xpv_nr_phys_cpus() > 1) ||
 		    opteron_workaround_6336786_UP) {
 			/*
 			 * XXPV	Hmm.  We can't walk the Northbridges on
@@ -1123,7 +1094,7 @@ workaround_errata(struct cpu *cpu)
 				 * XXPV	Use dom0_msr here when extended
 				 *	operations are supported?
 				 */
-				if (xen_get_nphyscpus() > 1)
+				if (xpv_nr_phys_cpus() > 1)
 					opteron_workaround_6323525++;
 			} else {
 				/*

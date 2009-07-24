@@ -1177,14 +1177,7 @@ mach_getcpufreq(void)
 	 * using the DOM0_PHYSINFO hypercall.
 	 */
 	if (DOMAIN_IS_INITDOMAIN(xen_info) && xpv_cpufreq_workaround) {
-		xen_sysctl_t op0, *op = &op0;
-
-		op->cmd = XEN_SYSCTL_physinfo;
-		op->interface_version = XEN_SYSCTL_INTERFACE_VERSION;
-		if (HYPERVISOR_sysctl(op) != 0)
-			panic("physinfo op refused");
-
-		cpu_hz = 1000 * (uint64_t)op->u.physinfo.cpu_khz;
+		cpu_hz = 1000 * xpv_cpu_khz();
 	} else {
 		cpu_hz = (UINT64_C(1000000000) << 32) / vti->tsc_to_system_mul;
 

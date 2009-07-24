@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch-x86/xen-mca.h
+ * arch-x86/mca.h
  * 
  * Contributed by Advanced Micro Devices, Inc.
  * Author: Christoph Egger <Christoph.Egger@amd.com>
@@ -50,18 +50,11 @@
  *     and tell Xen to trigger a machine check
  */
 
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef __XEN_PUBLIC_ARCH_X86_MCA_H__
 #define __XEN_PUBLIC_ARCH_X86_MCA_H__
 
 /* Hypercall */
 #define __HYPERVISOR_mca __HYPERVISOR_arch_0
-
-#define	XEN_MC_HCALL_SUCCESS	0
 
 /*
  * The xen-unstable repo has interface version 0x03000001; out interface
@@ -69,31 +62,32 @@
  * choose a different version number range that is numerically less
  * than that used in xen-unstable.
  */
-#define XEN_MCA_INTERFACE_VERSION 0x01ecc001
+#define XEN_MCA_INTERFACE_VERSION 0x01ecc002
 
 /* IN: Dom0 calls hypercall to retrieve nonurgent telemetry */
-#define XEN_MC_F_NONURGENT	0x0001
-/* IN: Dom0 calls hypercall to retrieve urgent telemetry */
-#define XEN_MC_F_URGENT		0x0002
+#define XEN_MC_NONURGENT  0x0001
+/* IN: Dom0/DomU calls hypercall to retrieve urgent telemetry */
+#define XEN_MC_URGENT     0x0002
 /* IN: Dom0 acknowledges previosly-fetched telemetry */
-#define	XEN_MC_F_ACK		0x0004
+#define XEN_MC_ACK        0x0004
 
-/* OUT: All is ok - all flags bits clear */
-#define XEN_MC_F_OK           0x0
+/* OUT: All is ok */
+#define XEN_MC_OK           0x0
 /* OUT: Domain could not fetch data. */
-#define XEN_MC_F_FETCHFAILED  0x0001
+#define XEN_MC_FETCHFAILED  0x1
 /* OUT: There was no machine check data to fetch. */
-#define XEN_MC_F_NODATA       0x0002
+#define XEN_MC_NODATA       0x2
 /* OUT: Between notification time and this hypercall an other
  *  (most likely) correctable error happened. The fetched data,
  *  does not match the original machine check data. */
-#define XEN_MC_F_NOMATCH      0x0004
+#define XEN_MC_NOMATCH      0x4
 
 /* OUT: DomU did not register MC NMI handler. Try something else. */
-#define XEN_MC_F_CANNOTHANDLE 0x0008
+#define XEN_MC_CANNOTHANDLE 0x8
 /* OUT: Notifying DomU failed. Retry later or try something else. */
-#define XEN_MC_F_NOTDELIVERED 0x0010
-/* Note, XEN_MC_F_CANNOTHANDLE and XEN_MC_F_NOTDELIVERED are mutually exclusive. */
+#define XEN_MC_NOTDELIVERED 0x10
+/* Note, XEN_MC_CANNOTHANDLE and XEN_MC_NOTDELIVERED are mutually exclusive. */
+
 
 #ifndef __ASSEMBLY__
 
@@ -112,15 +106,18 @@
 #define MC_TYPE_EXTENDED        2
 
 struct mcinfo_common {
-    uint16_t type;      /* structure type - one of MC_TYPE_* above */
+    uint16_t type;      /* structure type */
     uint16_t size;      /* size of this struct in bytes */
 };
 
-#define MC_FLAG_CORRECTABLE     0x00000001
-#define MC_FLAG_UNCORRECTABLE   0x00000002
-#define	MC_FLAG_MCE		0x00000004
-#define	MC_FLAG_POLLED		0x00000008
 
+#define MC_FLAG_CORRECTABLE     (1 << 0)
+#define MC_FLAG_UNCORRECTABLE   (1 << 1)
+#define MC_FLAG_RECOVERABLE	(1 << 2)
+#define MC_FLAG_POLLED		(1 << 3)
+#define MC_FLAG_RESET		(1 << 4)
+#define MC_FLAG_CMCI		(1 << 5)
+#define MC_FLAG_MCE		(1 << 6)
 /* contains global x86 mc information */
 struct mcinfo_global {
     struct mcinfo_common common;
@@ -129,12 +126,11 @@ struct mcinfo_global {
     uint16_t mc_domid;
     uint32_t mc_socketid; /* physical socket of the physical core */
     uint16_t mc_coreid; /* physical impacted core */
+    uint32_t mc_apicid;
     uint16_t mc_core_threadid; /* core thread of physical core */
-    uint8_t  mc_apicid;	/* APIC id of physical core */
     uint16_t mc_vcpuid; /* virtual cpu scheduled for mc_domid */
-    uint32_t mc_pad0;
     uint64_t mc_gstatus; /* global status */
-    uint32_t mc_flags; /* see MC_FLAG_* above */
+    uint32_t mc_flags;
 };
 
 /* contains bank local x86 mc information */
@@ -148,6 +144,8 @@ struct mcinfo_bank {
     uint64_t mc_addr;   /* bank address, only valid
                          * if addr bit is set in mc_status */
     uint64_t mc_misc;
+    uint64_t mc_ctrl2;
+    uint64_t mc_tsc;
 };
 
 
@@ -166,17 +164,24 @@ struct mcinfo_extended {
      * multiple times. */
 
     uint32_t mc_msrs; /* Number of msr with valid values. */
-    struct mcinfo_msr mc_msr[12];
+    /*
+     * Currently Intel extended MSR (32/64) including all gp registers
+     * and E(R)DI, E(R)BP, E(R)SP, E(R)FLAGS, E(R)IP, E(R)MISC, only 10
+     * of them might be useful. So expend this array to 10.
+    */
+    struct mcinfo_msr mc_msr[10];
 };
 
+#define MCINFO_HYPERCALLSIZE	1024
 #define MCINFO_MAXSIZE		768
 
-typedef struct mc_info {
+struct mc_info {
     /* Number of mcinfo_* entries in mi_data */
     uint32_t mi_nentries;
 
     uint8_t mi_data[MCINFO_MAXSIZE - sizeof(uint32_t)];
-} mc_info_t;
+};
+typedef struct mc_info mc_info_t;
 DEFINE_XEN_GUEST_HANDLE(mc_info_t);
 
 #define __MC_MSR_ARRAYSIZE 8
@@ -191,28 +196,30 @@ DEFINE_XEN_GUEST_HANDLE(mc_info_t);
 #define MC_CAPS_AMD_ECX	6	/* cpuid level 0x80000001 (%ecx) */
 
 typedef struct mcinfo_logical_cpu {
-    unsigned int mc_cpunr;          
+    uint32_t mc_cpunr;          
     uint32_t mc_chipid; 
     uint16_t mc_coreid;
     uint16_t mc_threadid;
-    uint8_t mc_apicid;
-    unsigned int mc_ncores;
-    unsigned int mc_ncores_active;
-    unsigned int mc_nthreads;
-    int mc_cpuid_level;
-    unsigned int mc_family;
-    unsigned int mc_vendor;
-    unsigned int mc_model;
-    unsigned int mc_step;
+    uint32_t mc_apicid;
+    uint32_t mc_clusterid;
+    uint32_t mc_ncores;
+    uint32_t mc_ncores_active;
+    uint32_t mc_nthreads;
+    int32_t mc_cpuid_level;
+    uint32_t mc_family;
+    uint32_t mc_vendor;
+    uint32_t mc_model;
+    uint32_t mc_step;
     char mc_vendorid[16];
     char mc_brandid[64];
     uint32_t mc_cpu_caps[MC_NCAPS];
-    unsigned int mc_cache_size;
-    unsigned int mc_cache_alignment;
-    unsigned int mc_nmsrvals;
+    uint32_t mc_cache_size;
+    uint32_t mc_cache_alignment;
+    int32_t mc_nmsrvals;
     struct mcinfo_msr mc_msrvalues[__MC_MSR_ARRAYSIZE];
 } xen_mc_logical_cpu_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
+
 
 /* 
  * OS's should use these instead of writing their own lookup function
@@ -273,18 +280,16 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
  * Fetch machine check data from hypervisor.
  * Note, this hypercall is special, because both Dom0 and DomU must use this.
  */
-#define XEN_MC_CMD_fetch            1
+#define XEN_MC_fetch            1
 struct xen_mc_fetch {
-    /* IN/OUT */
-    uint32_t flags;	/*  IN: XEN_MC_F_NONURGENT or XEN_MC_F_URGENT, 
-			 *      XEN_MC_F_ACK if ack'ing an earlier fetch
-			 * OUT: XEN_MC_F_OK, XEN_MC_F_FETCHFAILED,
-			 *      XEN_MC_F_NODATA, XEN_MC_F_NOMATCH */
-    uint32_t data_sz;	/* IN: size of data area */
-    uint64_t fetch_id;	/* OUT: id for ack; IN: id we are ack'ing */
+    /* IN/OUT variables. */
+    uint32_t flags;	/* IN: XEN_MC_NONURGENT, XEN_MC_URGENT,
+                           XEN_MC_ACK if ack'ing an earlier fetch */
+			/* OUT: XEN_MC_OK, XEN_MC_FETCHFAILED,
+			   XEN_MC_NODATA, XEN_MC_NOMATCH */
+    uint64_t fetch_id;	/* OUT: id for ack, IN: id we are ack'ing */
 
-
-    /* OUT */
+    /* OUT variables. */
     XEN_GUEST_HANDLE(mc_info_t) data;
 };
 typedef struct xen_mc_fetch xen_mc_fetch_t;
@@ -294,22 +299,23 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_fetch_t);
 /* Usecase 4
  * This tells the hypervisor to notify a DomU about the machine check error
  */
-#define XEN_MC_CMD_notifydomain     2
+#define XEN_MC_notifydomain     2
 struct xen_mc_notifydomain {
     /* IN variables. */
-    uint16_t mc_domid;	/* The unprivileged domain to notify. */
-    uint16_t mc_vcpuid;	/* The vcpu in mc_domid to notify.
-                       	 * Usually echo'd value from the fetch hypercall. */
+    uint16_t mc_domid;    /* The unprivileged domain to notify. */
+    uint16_t mc_vcpuid;   /* The vcpu in mc_domid to notify.
+                           * Usually echo'd value from the fetch hypercall. */
 
     /* IN/OUT variables. */
-    uint32_t flags;	/*  IN: XEN_MC_F_URGENT, XEN_MC_F_TRAP
-			 * OUT: XEN_MC_F_OK, XEN_MC_F_CANNOTHANDLE,
-			 * XEN_MC_NOTDELIVERED, XEN_MC_NOMATCH */
+    uint32_t flags;
+
+/* IN: XEN_MC_CORRECTABLE, XEN_MC_TRAP */
+/* OUT: XEN_MC_OK, XEN_MC_CANNOTHANDLE, XEN_MC_NOTDELIVERED, XEN_MC_NOMATCH */
 };
 typedef struct xen_mc_notifydomain xen_mc_notifydomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mc_notifydomain_t);
 
-#define XEN_MC_CMD_physcpuinfo	3
+#define XEN_MC_physcpuinfo 3
 struct xen_mc_physcpuinfo {
 	/* IN/OUT */
 	uint32_t ncpus;
@@ -318,47 +324,31 @@ struct xen_mc_physcpuinfo {
 	XEN_GUEST_HANDLE(xen_mc_logical_cpu_t) info;
 };
 
-#define	XEN_MC_CMD_msrinject	4
-#define	MC_MSRINJ_MAXMSRS	8
+#define XEN_MC_msrinject    4
+#define MC_MSRINJ_MAXMSRS       8
 struct xen_mc_msrinject {
-	/* IN */
-	unsigned int mcinj_cpunr;	/* target processor id */
-	uint32_t mcinj_flags;		/* see MC_MSRINJ_F_* below */
-	uint32_t mcinj_count;		/* 0 .. count-1 in array are valid */
+       /* IN */
+	unsigned int mcinj_cpunr;       /* target processor id */
+	uint32_t mcinj_flags;           /* see MC_MSRINJ_F_* below */
+	uint32_t mcinj_count;           /* 0 .. count-1 in array are valid */
 	uint32_t mcinj_pad0;
 	struct mcinfo_msr mcinj_msr[MC_MSRINJ_MAXMSRS];
 };
 
 /* Flags for mcinj_flags above; bits 16-31 are reserved */
-#define	MC_MSRINJ_F_INTERPOSE	0x1
+#define MC_MSRINJ_F_INTERPOSE   0x1
 
-#define	XEN_MC_CMD_mceinject	5
+#define XEN_MC_mceinject    5
 struct xen_mc_mceinject {
-	unsigned int mceinj_cpunr;	/* target processor id */
+	unsigned int mceinj_cpunr;      /* target processor id */
 };
-
-#define XEN_MC_CMD_offlinecpu 6
-struct xen_mc_offline {
-	/* IN */
-	unsigned int mco_cpu;
-	/* IN / OUT */
-	int mco_flag;		/* MC_CPU_P_* */
-};
-
-#define	MC_CPU_P_STATUS		0x0000
-#define	MC_CPU_P_ONLINE		0x0001
-#define	MC_CPU_P_OFFLINE	0x0002
-#define	MC_CPU_P_FAULTED	0x0004
-#define	MC_CPU_P_SPARE		0x0008
-#define	MC_CPU_P_POWEROFF	0x0010
 
 typedef union {
-        struct xen_mc_fetch        mc_fetch;
-        struct xen_mc_notifydomain mc_notifydomain;
-        struct xen_mc_physcpuinfo  mc_physcpuinfo;
-	struct xen_mc_msrinject	   mc_msrinject;
-	struct xen_mc_mceinject	   mc_mceinject;
-	struct xen_mc_offline      mc_offline;
+    struct xen_mc_fetch        mc_fetch;
+    struct xen_mc_notifydomain mc_notifydomain;
+    struct xen_mc_physcpuinfo  mc_physcpuinfo;
+    struct xen_mc_msrinject    mc_msrinject;
+    struct xen_mc_mceinject    mc_mceinject;
 } xen_mc_arg_t;
 
 struct xen_mc {

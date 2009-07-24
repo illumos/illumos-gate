@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * evtchn.c
@@ -192,12 +190,6 @@ static kthread_t *evtchn_owner_thread[NR_EVENT_CHANNELS];
 static irq_info_t irq_info[NR_IRQS];
 static mec_info_t ipi_info[MAXIPL];
 static mec_info_t virq_info[NR_VIRQS];
-/*
- * Mailbox for communication with the evtchn device driver.
- * We rely on only cpu 0 servicing the event channels associated
- * with the driver.  i.e. all evtchn driver evtchns are bound to cpu 0.
- */
-volatile int ec_dev_mbox;	/* mailbox for evtchn device driver */
 
 /*
  * See the locking description above.
@@ -454,6 +446,13 @@ irq_evtchn(irq_info_t *irqp)
 	return (evtchn);
 }
 
+int
+ec_is_edge_pirq(int irq)
+{
+	return (irq_info[irq].ii_type == IRQT_PIRQ &&
+	    !TEST_EVTCHN_BIT(irq, &pirq_needs_eoi[0]));
+}
+
 static void
 unbind_evtchn(ushort_t *evtchnp)
 {
@@ -498,28 +497,12 @@ end_pirq(int irq)
 {
 	int evtchn = irq_evtchn(&irq_info[irq]);
 
-	ec_unmask_evtchn(evtchn);
-	pirq_unmask_notify(IRQ_TO_PIRQ(irq));
-}
-
-/*
- * probe if a pirq is available to bind to, return 1 if available
- * else return 0.
- * Note that for debug versions of xen this probe may cause an in use IRQ
- * warning message from xen.
- */
-int
-ec_probe_pirq(int pirq)
-{
-	evtchn_bind_pirq_t bind;
-
-	bind.pirq = pirq;
-	bind.flags = 0;
-	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &bind) != 0) {
-		return (0);
-	} else {
-		(void) xen_close_evtchn(bind.port);
-		return (1);
+	/*
+	 * If it is an edge-triggered interrupt we have already unmasked
+	 */
+	if (TEST_EVTCHN_BIT(irq, &pirq_needs_eoi[0])) {
+		ec_unmask_evtchn(evtchn);
+		pirq_unmask_notify(IRQ_TO_PIRQ(irq));
 	}
 }
 
@@ -1201,7 +1184,7 @@ ec_resume(void)
 	}
 }
 
-void
+int
 ec_init(void)
 {
 	int i;
@@ -1226,6 +1209,8 @@ ec_init(void)
 	for (i = PIRQ_BASE; i < NR_PIRQS; i++) {
 		irq_info[PIRQ_TO_IRQ(i)].ii_type = IRQT_PIRQ;
 	}
+
+	return (0);
 }
 
 void
@@ -1247,6 +1232,7 @@ ec_init_debug_irq()
 	((si)->evtchn_pending[ix] & ~(si)->evtchn_mask[ix] & \
 		(cpe)->evt_affinity[ix])
 
+
 /*
  * This is the entry point for processing events from xen
  *
@@ -1267,13 +1253,14 @@ void
 xen_callback_handler(struct regs *rp, trap_trace_rec_t *ttp)
 {
 	ulong_t pending_sels, pe, selbit;
-	int i, j, port, pri, curpri, irq;
-	uint16_t pending_ints;
+	int i, j, port, pri, curpri, irq, sipri;
+	uint16_t pending_ints, sip;
 	struct cpu *cpu = CPU;
 	volatile shared_info_t *si = HYPERVISOR_shared_info;
 	volatile vcpu_info_t *vci = cpu->cpu_m.mcpu_vcpu_info;
 	volatile struct xen_evt_data *cpe = cpu->cpu_m.mcpu_evt_pend;
 	volatile uint16_t *cpu_ipp = &cpu->cpu_m.mcpu_intr_pending;
+	extern void dosoftint(struct regs *);
 
 	ASSERT(rp->r_trapno == T_AST && rp->r_err == 0);
 	ASSERT(&si->vcpu_info[cpu->cpu_id] == vci);
@@ -1355,6 +1342,21 @@ xen_callback_handler(struct regs *rp, trap_trace_rec_t *ttp)
 					cpe->pending_sel[pri] |= selbit;
 					cpe->pending_evts[pri][i] |= (1ul << j);
 					pending_ints |= 1 << pri;
+					/*
+					 * We have recorded a pending interrupt
+					 * for this cpu.  If it is an edge
+					 * triggered interrupt then we go ahead
+					 * and clear the pending and mask bits
+					 * from the shared info to avoid having
+					 * the hypervisor see the pending event
+					 * again and possibly disabling the
+					 * interrupt.  This should also help
+					 * keep us from missing an interrupt.
+					 */
+					if (ec_is_edge_pirq(irq)) {
+						ec_clear_evtchn(port);
+						ec_unmask_evtchn(port);
+					}
 				} else {
 					/*
 					 * another cpu serviced this event
@@ -1378,12 +1380,15 @@ xen_callback_handler(struct regs *rp, trap_trace_rec_t *ttp)
 	 * any unserviced interrupts and re-post an upcall to process
 	 * any unserviced pending events.
 	 */
+restart:
 	curpri = cpu->cpu_pri;
-	for (pri = bsrw_insn(*cpu_ipp); pri > curpri; pri--) {
+	pri = bsrw_insn(*cpu_ipp);
+	while (pri > curpri) {
 		while ((pending_sels = cpe->pending_sel[pri]) != 0) {
 			i = ffs(pending_sels) - 1;
 			while ((pe = cpe->pending_evts[pri][i]) != 0) {
 				j = ffs(pe) - 1;
+				port = (i << EVTCHN_SHIFT) + j;
 				pe &= ~(1ul << j);
 				cpe->pending_evts[pri][i] = pe;
 				if (pe == 0) {
@@ -1400,7 +1405,6 @@ xen_callback_handler(struct regs *rp, trap_trace_rec_t *ttp)
 					if (pending_sels == 0)
 						*cpu_ipp &= ~(1 << pri);
 				}
-				port = (i << EVTCHN_SHIFT) + j;
 				irq = evtchn_to_irq[port];
 				if (irq == INVALID_IRQ) {
 					/*
@@ -1413,19 +1417,8 @@ xen_callback_handler(struct regs *rp, trap_trace_rec_t *ttp)
 					continue;
 				}
 				if (irq == ec_dev_irq) {
-					volatile int *tptr = &ec_dev_mbox;
-
-					ASSERT(ec_dev_mbox == 0);
-					/*
-					 * NOTE: this gross store thru a pointer
-					 * is necessary because of a Sun C
-					 * compiler bug that does not properly
-					 * honor a volatile declaration.
-					 * we really should just be able to say
-					 * 	ec_dev_mbox = port;
-					 * here
-					 */
-					*tptr = port;
+					ASSERT(cpu->cpu_m.mcpu_ec_mbox == 0);
+					cpu->cpu_m.mcpu_ec_mbox = port;
 				}
 				/*
 				 * Set up the regs struct to
@@ -1438,17 +1431,34 @@ xen_callback_handler(struct regs *rp, trap_trace_rec_t *ttp)
 				 * Check for cpu priority change
 				 * Can happen if int thread blocks
 				 */
-				if (cpu->cpu_pri > curpri)
-					return;
+				if (cpu->cpu_pri != curpri)
+					goto restart;
 			}
 		}
+		/*
+		 * Dispatch any soft interrupts that are
+		 * higher priority than any hard ones remaining.
+		 */
+		pri = bsrw_insn(*cpu_ipp);
+		sip = (uint16_t)cpu->cpu_softinfo.st_pending;
+		if (sip != 0) {
+			sipri = bsrw_insn(sip);
+			if (sipri > pri && sipri > cpu->cpu_pri)
+				dosoftint(rp);
+		}
 	}
+	/*
+	 * Deliver any pending soft interrupts.
+	 */
+	if (cpu->cpu_softinfo.st_pending)
+		dosoftint(rp);
 }
+
 
 void
 ec_unmask_evtchn(unsigned int ev)
 {
-	uint_t evi;
+	uint_t evi, evb;
 	volatile shared_info_t *si = HYPERVISOR_shared_info;
 	volatile vcpu_info_t *vci = CPU->cpu_m.mcpu_vcpu_info;
 	volatile ulong_t *ulp;
@@ -1462,9 +1472,9 @@ ec_unmask_evtchn(unsigned int ev)
 		return;
 	}
 	evi = ev >> EVTCHN_SHIFT;
-	ev &= (1ul << EVTCHN_SHIFT) - 1;
+	evb = ev & ((1ul << EVTCHN_SHIFT) - 1);
 	ulp = (volatile ulong_t *)&si->evtchn_mask[evi];
-	atomic_and_ulong(ulp, ~(1ul << ev));
+	atomic_and_ulong(ulp, ~(1ul << evb));
 	/*
 	 * The following is basically the equivalent of
 	 * 'hw_resend_irq'. Just like a real IO-APIC we 'lose the
@@ -1473,7 +1483,7 @@ ec_unmask_evtchn(unsigned int ev)
 	 * an extra upcall.
 	 */
 	membar_enter();
-	if (si->evtchn_pending[evi] & (1ul << ev)) {
+	if (si->evtchn_pending[evi] & (1ul << evb)) {
 		membar_consumer();
 		ulp = (volatile ulong_t *)&vci->evtchn_pending_sel;
 		if (!(*ulp & (1ul << evi))) {

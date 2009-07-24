@@ -2081,6 +2081,14 @@ update_contig_pfnlist(pfn_t pfn, mfn_t oldmfn, mfn_t newmfn)
 		 */
 		if (--contig_pfn_cnt <= next_alloc_pfn)
 			next_alloc_pfn = 0;
+		if (contig_pfn_cnt < 2) { /* no contig pfns */
+			contig_pfn_cnt = 0;
+			kmem_free(contig_pfn_list,
+			    contig_pfn_max * sizeof (pfn_t));
+			contig_pfn_list = NULL;
+			contig_pfn_max = 0;
+			goto done;
+		}
 		ovbcopy(&contig_pfn_list[probe_pos + 1],
 		    &contig_pfn_list[probe_pos],
 		    (contig_pfn_cnt - probe_pos) * sizeof (pfn_t));
@@ -2223,11 +2231,27 @@ long contig_search_restarts;	/* count of contig ranges tried */
 long contig_search_failed;	/* count of contig alloc failures */
 
 /*
+ * Free partial page list
+ */
+static void
+free_partial_list(page_t **pplist)
+{
+	page_t *pp;
+
+	while (*pplist != NULL) {
+		pp = *pplist;
+		page_io_pool_sub(pplist, pp, pp);
+		page_free(pp, 1);
+	}
+}
+
+/*
  * Look thru the contiguous pfns that are not part of the io_pool for
  * contiguous free pages.  Return a list of the found pages or NULL.
  */
 page_t *
-find_contig_free(uint_t npages, uint_t flags, uint64_t pfnseg)
+find_contig_free(uint_t npages, uint_t flags, uint64_t pfnseg,
+    pgcnt_t pfnalign)
 {
 	page_t *pp, *plist = NULL;
 	mfn_t mfn, prev_mfn, start_mfn;
@@ -2269,22 +2293,28 @@ retry:
 			PP_CLRFREE(pp);
 			page_io_pool_add(&plist, pp);
 			pages_needed--;
-			if (prev_mfn == 0)
+			if (prev_mfn == 0) {
+				if (pfnalign &&
+				    mfn != P2ROUNDUP(mfn, pfnalign)) {
+					/*
+					 * not properly aligned
+					 */
+					contig_search_restarts++;
+					free_partial_list(&plist);
+					pages_needed = pages_requested;
+					start_mfn = prev_mfn = 0;
+					goto skip;
+				}
 				start_mfn = mfn;
+			}
 			prev_mfn = mfn;
 		} else {
 			contig_search_restarts++;
-			/*
-			 * free partial page list
-			 */
-			while (plist != NULL) {
-				pp = plist;
-				page_io_pool_sub(&plist, pp, pp);
-				page_free(pp, 1);
-			}
+			free_partial_list(&plist);
 			pages_needed = pages_requested;
 			start_mfn = prev_mfn = 0;
 		}
+skip:
 		if (++next_alloc_pfn == contig_pfn_cnt)
 			next_alloc_pfn = 0;
 		if (next_alloc_pfn == search_start)
@@ -2297,11 +2327,7 @@ retry:
 		 * Failed to find enough contig pages.
 		 * free partial page list
 		 */
-		while (plist != NULL) {
-			pp = plist;
-			page_io_pool_sub(&plist, pp, pp);
-			page_free(pp, 1);
-		}
+		free_partial_list(&plist);
 	}
 	return (plist);
 }
@@ -2601,10 +2627,14 @@ page_get_contigpages(
 	if (align > MMU_PAGESIZE)
 		pfnalign = mmu_btop(align);
 
+	contig = flags & PG_PHYSCONTIG;
+	if (npages == -1) {
+		npages = 1;
+		pfnalign = 0;
+	}
 	/*
 	 * Clear the contig flag if only one page is needed.
 	 */
-	contig = flags & PG_PHYSCONTIG;
 	if (npages == 1) {
 		getone = 1;
 		contig = 0;
@@ -2613,8 +2643,8 @@ page_get_contigpages(
 	/*
 	 * Check if any page in the system is fine.
 	 */
-	anyaddr = lo_mfn == 0 && hi_mfn >= max_mfn && !pfnalign;
-	if (!contig && anyaddr) {
+	anyaddr = lo_mfn == 0 && hi_mfn >= max_mfn;
+	if (!contig && anyaddr && !pfnalign) {
 		flags &= ~PG_PHYSCONTIG;
 		plist = page_create_va(vp, off, npages * MMU_PAGESIZE,
 		    flags, &kvseg, vaddr);
@@ -2630,13 +2660,14 @@ page_get_contigpages(
 			minctg = npages;
 		mcpl = NULL;
 		/*
-		 * We could just want unconstrained but contig pages.
+		 * We could want contig pages with no address range limits.
 		 */
 		if (anyaddr && contig) {
 			/*
 			 * Look for free contig pages to satisfy the request.
 			 */
-			mcpl = find_contig_free(minctg, flags, pfnseg);
+			mcpl = find_contig_free(minctg, flags, pfnseg,
+			    pfnalign);
 		}
 		/*
 		 * Try the reserved io pools next
@@ -2773,7 +2804,7 @@ page_create_io(
 	 * other constraints the pages may have.
 	 */
 	while (npages--) {
-		dummy = 1;
+		dummy = -1;
 		pp = page_get_contigpages(vp, off, &dummy, flags, vaddr, mattr);
 		if (pp == NULL)
 			goto fail;

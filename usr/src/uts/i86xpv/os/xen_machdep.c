@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,11 @@
 /*
  * Section 3 of the above license was updated in response to bug 6379571.
  */
+
+#include <sys/xpv_user.h>
+
+/* XXX 3.3. TODO remove this include */
+#include <xen/public/arch-x86/xen-mca.h>
 
 #include <sys/ctype.h>
 #include <sys/types.h>
@@ -949,7 +954,7 @@ startup_xen_mca(void)
 
 	if (xen_phys_cpus == NULL) {
 		cmn_err(CE_WARN,
-		    "xen_get_physinfo failure: can't allocate CPU array");
+		    "xen_get_mc_physinfo failure: can't allocate CPU array");
 		return;
 	}
 
@@ -1079,7 +1084,7 @@ xen_xlate_errcode(int error)
 	CASE(ENODEV);	CASE(EISDIR);	CASE(EINVAL);
 	CASE(ENOSPC);	CASE(ESPIPE);	CASE(EROFS);
 	CASE(ENOSYS);	CASE(ENOTEMPTY); CASE(EISCONN);
-	CASE(ENODATA);
+	CASE(ENODATA);	CASE(EAGAIN);
 
 #undef CASE
 
@@ -1179,25 +1184,6 @@ done:
 }
 
 int
-xen_get_physinfo(xen_sysctl_physinfo_t *pi)
-{
-	xen_sysctl_t op;
-	int ret;
-
-	bzero(&op, sizeof (op));
-	op.cmd = XEN_SYSCTL_physinfo;
-	op.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
-
-	ret = HYPERVISOR_sysctl(&op);
-
-	if (ret != 0)
-		return (ret);
-
-	bcopy(&op.u.physinfo, pi, sizeof (op.u.physinfo));
-	return (0);
-}
-
-int
 xen_get_mc_physcpuinfo(xen_mc_logical_cpu_t *log_cpus, uint_t *ncpus)
 {
 	struct xen_mc_physcpuinfo cpi;
@@ -1206,8 +1192,7 @@ xen_get_mc_physcpuinfo(xen_mc_logical_cpu_t *log_cpus, uint_t *ncpus)
 	/*LINTED: constant in conditional context*/
 	set_xen_guest_handle(cpi.info, log_cpus);
 
-	if (HYPERVISOR_mca(XEN_MC_CMD_physcpuinfo, (xen_mc_arg_t *)&cpi) !=
-	    XEN_MC_HCALL_SUCCESS)
+	if (HYPERVISOR_mca(XEN_MC_physcpuinfo, (xen_mc_arg_t *)&cpi) != 0)
 		return (-1);
 
 	*ncpus = cpi.ncpus;
@@ -1317,32 +1302,91 @@ xen_map_gref(uint_t cmd, gnttab_map_grant_ref_t *mapop, uint_t count,
     boolean_t uvaddr)
 {
 	long rc;
+	uint_t i;
 
 	ASSERT(cmd == GNTTABOP_map_grant_ref);
-	rc = HYPERVISOR_grant_table_op(cmd, mapop, count);
 
 #if !defined(_BOOT)
-	/*
-	 * XXPV --
-	 * The map_grant_ref call suffers a poor design flaw.
-	 * It's the only hypervisor interface that creates page table mappings
-	 * that doesn't take an entire PTE. Hence we can't create the
-	 * mapping with a particular setting of the software PTE bits, NX, etc.
-	 *
-	 * Until the interface is fixed, we need to minimize the possiblity
-	 * of dtrace or kmdb blowing up on a foreign mapping that doesn't
-	 * have a correct setting for the soft bits. We'll force them here.
-	 */
-	if ((rc == 0) && (uvaddr == B_FALSE)) {
-		extern void xen_fix_foreign(struct hat *, uint64_t);
-		uint_t i;
+	if (uvaddr == B_FALSE) {
 		for (i = 0; i < count; ++i) {
-			if (mapop[i].status == GNTST_okay) {
-				xen_fix_foreign(kas.a_hat, mapop[i].host_addr);
-			}
+			mapop[i].flags |= (PT_FOREIGN <<_GNTMAP_guest_avail0);
 		}
 	}
 #endif
 
+	rc = HYPERVISOR_grant_table_op(cmd, mapop, count);
+
 	return (rc);
+}
+
+static int
+xpv_get_physinfo(xen_sysctl_physinfo_t *pi)
+{
+	xen_sysctl_t op;
+	struct sp { void *p; } *sp = (struct sp *)&op.u.physinfo.cpu_to_node;
+	int ret;
+
+	bzero(&op, sizeof (op));
+	op.cmd = XEN_SYSCTL_physinfo;
+	op.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+	/*LINTED: constant in conditional context*/
+	set_xen_guest_handle(*sp, NULL);
+
+	ret = HYPERVISOR_sysctl(&op);
+
+	if (ret != 0)
+		return (xen_xlate_errcode(ret));
+
+	bcopy(&op.u.physinfo, pi, sizeof (op.u.physinfo));
+	return (0);
+}
+
+/*
+ * On dom0, we can determine the number of physical cpus on the machine.
+ * This number is important when figuring out what workarounds are
+ * appropriate, so compute it now.
+ */
+uint_t
+xpv_nr_phys_cpus(void)
+{
+	static uint_t nphyscpus = 0;
+
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+
+	if (nphyscpus == 0) {
+		xen_sysctl_physinfo_t pi;
+		int ret;
+
+		if ((ret = xpv_get_physinfo(&pi)) != 0)
+			panic("xpv_get_physinfo() failed: %d\n", ret);
+		nphyscpus = pi.nr_cpus;
+	}
+	return (nphyscpus);
+}
+
+pgcnt_t
+xpv_nr_phys_pages(void)
+{
+	xen_sysctl_physinfo_t pi;
+	int ret;
+
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+
+	if ((ret = xpv_get_physinfo(&pi)) != 0)
+		panic("xpv_get_physinfo() failed: %d\n", ret);
+
+	return ((pgcnt_t)pi.total_pages);
+}
+
+uint64_t
+xpv_cpu_khz(void)
+{
+	xen_sysctl_physinfo_t pi;
+	int ret;
+
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+
+	if ((ret = xpv_get_physinfo(&pi)) != 0)
+		panic("xpv_get_physinfo() failed: %d\n", ret);
+	return ((uint64_t)pi.cpu_khz);
 }

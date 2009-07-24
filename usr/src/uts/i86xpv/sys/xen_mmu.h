@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_XEN_MMU_H
 #define	_SYS_XEN_MMU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,12 +42,17 @@ extern "C" {
 #define	__target_amd64
 #endif
 
+typedef uint64_t maddr_t;
+#define	mfn_to_ma(mfn)	((maddr_t)(mfn) << MMU_PAGESHIFT)
+
+#ifdef __xpv
+
 #ifdef __target_amd64
 
 #define	IN_HYPERVISOR_VA(va) \
 	((va) >= HYPERVISOR_VIRT_START && (va) < HYPERVISOR_VIRT_END)
 
-#else
+#else /* __target_amd64 */
 
 #define	IN_HYPERVISOR_VA(va) ((va) >= xen_virt_start)
 
@@ -59,15 +62,13 @@ extern "C" {
 #undef	HYPERVISOR_VIRT_START
 #undef	machine_to_phys_mapping
 
-#endif
+#endif /* __target_amd64 */
 
 #undef __target_amd64
 
-typedef uint64_t maddr_t;
-
 paddr_t ma_to_pa(maddr_t);
 maddr_t pa_to_ma(paddr_t);
-#define	mfn_to_ma(mfn)	((maddr_t)(mfn) << MMU_PAGESHIFT)
+#endif /* __xpv */
 
 extern uintptr_t xen_virt_start;
 extern pfn_t *mfn_to_pfn_mapping;
@@ -82,7 +83,6 @@ extern pfn_t *mfn_to_pfn_mapping;
  * - a way to change the machine address behind a physical address.
  */
 typedef ulong_t mfn_t;
-
 extern mfn_t *mfn_list;
 extern mfn_t *mfn_list_pages;
 extern mfn_t *mfn_list_pages_page;
@@ -102,8 +102,10 @@ extern void xen_end_migrate(void);
  * Conversion between machine (hardware) addresses and pseudo-physical
  * addresses.
  */
+#ifdef __xpv
 pfn_t mfn_to_pfn(mfn_t);
 mfn_t pfn_to_mfn(pfn_t);
+#endif
 
 struct page;
 

@@ -47,9 +47,12 @@
 #include <sys/mach_intr.h>
 #include <sys/pci.h>
 #include <sys/note.h>
+#include <sys/boot_console.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
+
+extern int console_hypervisor_device;
 #endif
 
 extern int pseudo_isa;
@@ -816,6 +819,19 @@ isa_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		if (psm_intr_ops == NULL)
 			return (DDI_FAILURE);
 
+#if defined(__xpv)
+		/*
+		 * if the hypervisor is using an isa serial port for the
+		 * console, make sure we don't try to use that interrupt as
+		 * it will cause us to panic when xen_bind_pirq() fails.
+		 */
+		if (((ispec->intrspec_vec == 4) &&
+		    (console_hypervisor_device == CONS_TTYA)) ||
+		    ((ispec->intrspec_vec == 3) &&
+		    (console_hypervisor_device == CONS_TTYB))) {
+			return (DDI_FAILURE);
+		}
+#endif
 		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
 		(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR,
 		    (int *)&hdlp->ih_vector);
@@ -1097,13 +1113,10 @@ isa_enumerate(int reprogram)
 	/* serial ports */
 	for (i = 0; i < 2; i++) {
 #if defined(__xpv)
-		/*
-		 * the hypervisor may be reserving the serial ports for console
-		 * and/or debug use.  Probe the irqs to see if they are
-		 * available.
-		 */
-		if (ec_probe_pirq(asy_intrs[i]) == 0)
-			continue; /* in use */
+		if ((i == 0 && console_hypervisor_device == CONS_TTYA) ||
+		    (i == 1 && console_hypervisor_device == CONS_TTYB)) {
+			continue;
+		}
 #endif
 		ndi_devi_alloc_sleep(isa_dip, "asy",
 		    (pnode_t)DEVI_SID_NODEID, &xdip);
@@ -1220,47 +1233,40 @@ enumerate_BIOS_serial(dev_info_t *isa_dip)
 			isa_extra_count++;
 		}
 	}
-#if defined(__xpv)
+
 	/*
-	 * Check each serial port to see if it is in use by the hypervisor.
-	 * If it is in use, then remove the node from the device tree.
+	 * An asy node may have been attached via ACPI enumeration, or
+	 * directly from this file.  Check each serial port to see if it
+	 * is in use by the hypervisor.  If it is in use, then remove
+	 * the node from the device tree.
 	 */
+#if defined(__xpv)
 	i = 0;
+
 	for (xdip = ddi_get_child(isa_dip); xdip != NULL; ) {
-		int asy_intr;
 		dev_info_t *curdip;
 
 		curdip = xdip;
 		xdip = ddi_get_next_sibling(xdip);
-		if (strncmp(ddi_node_name(curdip), "asy", 3) != 0) {
-			/* skip non asy */
-			continue;
-		}
-		/*
-		 * Check if the hypervisor is using the serial port by probing
-		 * the irq and if it is using it remove the node
-		 * from the device tree
-		 */
-		asy_intr = ddi_prop_get_int(DDI_DEV_T_ANY, curdip,
-		    DDI_PROP_DONTPASS, "interrupts", -1);
-		if (asy_intr == -1) {
-			/* error */
-			continue;
-		}
 
-		if (ec_probe_pirq(asy_intr)) {
+		if (strncmp(ddi_node_name(curdip), "asy", 3) != 0)
 			continue;
-		}
-		ret = ndi_devi_free(curdip);
-		if (ret != DDI_SUCCESS)
-			cmn_err(CE_WARN,
-			    "could not remove asy%d node", i);
-		else
+
+		if ((i == 0 && console_hypervisor_device == CONS_TTYA) ||
+		    (i == 1 && console_hypervisor_device == CONS_TTYB)) {
+			ret = ndi_devi_free(curdip);
+			if (ret != DDI_SUCCESS) {
+				cmn_err(CE_WARN,
+				    "could not remove asy%d node", i);
+			}
+
 			cmn_err(CE_NOTE, "!asy%d unavailable, reserved"
 			    " to hypervisor", i);
+		}
+
 		i++;
 	}
-#endif	/* __xpv */
+#endif
 
 	psm_unmap((caddr_t)bios_data, size);
 }

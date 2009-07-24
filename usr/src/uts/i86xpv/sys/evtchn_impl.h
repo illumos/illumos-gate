@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -55,8 +55,6 @@
 
 #ifndef _SYS_EVTCHN_H
 #define	_SYS_EVTCHN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -122,7 +120,6 @@ extern "C" {
 #define	INVALID_IRQ -1
 
 extern int ec_dev_irq;
-extern volatile int ec_dev_mbox;
 extern kmutex_t ec_lock;
 
 typedef struct mec_info {
@@ -146,7 +143,8 @@ typedef struct irq_info {
 	} ii_u2;
 } irq_info_t;
 
-extern void ec_init(void);
+extern int ec_is_edge_pirq(int);
+extern int ec_init(void);
 extern void ec_init_debug_irq(void);
 extern void ec_suspend(void);
 extern void ec_resume(void);
@@ -154,7 +152,6 @@ extern void ec_wait_on_evtchn(int, int (*)(void *), void *);
 extern void ec_wait_on_ipi(int, int (*)(void *), void *);
 
 extern void ec_setup_pirq(int, int, cpuset_t *);
-extern int ec_probe_pirq(int);
 extern void ec_set_irq_affinity(int, cpuset_t);
 extern int ec_set_irq_priority(int, int);
 

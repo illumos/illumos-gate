@@ -45,6 +45,9 @@
 #include <sys/modctl.h>
 #include <sys/trap.h>
 #include <sys/panic.h>
+#include <sys/sysmacros.h>
+#include <sys/pci_intr_lib.h>
+#include <vm/hat_i86.h>
 
 #include <xen/public/vcpu.h>
 #include <xen/public/physdev.h>
@@ -80,11 +83,6 @@ cpuset_t xen_psm_cpus_online;	/* online cpus */
 int xen_psm_ncpus = 1;		/* cpu count */
 int xen_psm_next_bind_cpu;	/* next cpu to bind an interrupt to */
 
-/*
- * XXPV we flag MSI as not supported, since the hypervisor currently doesn't
- * support MSI at all.  Change this initialization to zero when MSI is
- * supported.
- */
 int xen_support_msi = -1;
 
 static int xen_clock_irq = INVALID_IRQ;
@@ -112,7 +110,12 @@ uint32_t xen_psm_dummy_apic[APIC_IRR_REG + 1];
 static struct psm_info xen_psm_info;
 static void xen_psm_setspl(int);
 
-static int apic_alloc_vectors(dev_info_t *, int, int, int, int, int);
+int
+apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
+    int behavior);
+int
+apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
+    int behavior);
 
 /*
  * Local support routines
@@ -125,19 +128,20 @@ static int apic_alloc_vectors(dev_info_t *, int, int, int, int, int);
 int
 xen_psm_bind_intr(int irq)
 {
-	int bind_cpu, test_cpu;
+	int bind_cpu;
 	apic_irq_t *irqptr;
 
+	bind_cpu = IRQ_UNBOUND;
 	if (xen_psm_intr_policy == INTR_LOWEST_PRIORITY)
-		return (IRQ_UNBOUND);
+		return (bind_cpu);
 	if (irq <= APIC_MAX_VECTOR)
 		irqptr = apic_irq_table[irq];
 	else
 		irqptr = NULL;
-	if (irqptr && (irqptr->airq_cpu & IRQ_USER_BOUND)) {
-		bind_cpu = irqptr->airq_cpu;
-		test_cpu = bind_cpu & ~IRQ_USER_BOUND;
-		if (!CPU_IN_SET(xen_psm_cpus_online, test_cpu))
+	if (irqptr && (irqptr->airq_cpu != IRQ_UNBOUND))
+		bind_cpu = irqptr->airq_cpu & ~IRQ_USER_BOUND;
+	if (bind_cpu != IRQ_UNBOUND) {
+		if (!CPU_IN_SET(xen_psm_cpus_online, bind_cpu))
 			bind_cpu = 0;
 		goto done;
 	}
@@ -529,7 +533,8 @@ xen_psm_intr_enter(int ipl, int *vector)
 	ASSERT(intno < NR_IRQS);
 	ASSERT(cpu->cpu_m.mcpu_vcpu_info->evtchn_upcall_mask != 0);
 
-	ec_clear_irq(intno);
+	if (!ec_is_edge_pirq(intno))
+		ec_clear_irq(intno);
 
 	newipl = autovect[intno].avh_hi_pri;
 	if (newipl == 0) {
@@ -639,6 +644,9 @@ xen_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 
 	switch (intr_op) {
 	case PSM_INTR_OP_CHECK_MSI:
+		/*
+		 * Till PCI passthru is supported, only dom0 has MSI/MSIX
+		 */
 		if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
 			*result = hdlp->ih_type & ~(DDI_INTR_TYPE_MSI |
 			    DDI_INTR_TYPE_MSIX);
@@ -671,9 +679,14 @@ xen_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			    DDI_INTR_TYPE_MSIX);
 		break;
 	case PSM_INTR_OP_ALLOC_VECTORS:
-		*result = apic_alloc_vectors(dip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, hdlp->ih_pri, hdlp->ih_type,
-		    (int)(uintptr_t)hdlp->ih_scratch2);
+		if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
+			*result = apic_alloc_msi_vectors(dip, hdlp->ih_inum,
+			    hdlp->ih_scratch1, hdlp->ih_pri,
+			    (int)(uintptr_t)hdlp->ih_scratch2);
+		else
+			*result = apic_alloc_msix_vectors(dip, hdlp->ih_inum,
+			    hdlp->ih_scratch1, hdlp->ih_pri,
+			    (int)(uintptr_t)hdlp->ih_scratch2);
 		break;
 	case PSM_INTR_OP_FREE_VECTORS:
 		apic_free_vectors(dip, hdlp->ih_inum, hdlp->ih_scratch1,
@@ -929,11 +942,13 @@ apic_allocate_vector(int ipl, int irq, int pri)
 {
 	physdev_irq_t irq_op;
 	uchar_t vector;
+	int rc;
 
 	irq_op.irq = irq;
 
-	if (HYPERVISOR_physdev_op(PHYSDEVOP_alloc_irq_vector, &irq_op))
-		panic("Hypervisor alloc vector failed");
+	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_alloc_irq_vector, &irq_op))
+	    != 0)
+		panic("Hypervisor alloc vector failed err: %d", -rc);
 	vector = irq_op.vector;
 	/*
 	 * No need to worry about vector colliding with our reserved vectors
@@ -952,25 +967,218 @@ apic_free_vector(uchar_t vector)
 }
 
 /*
- * This function allocate "count" vector(s) for the given "dip/pri/type"
+ * This function returns the no. of vectors available for the pri.
+ * dip is not used at this moment.  If we really don't need that,
+ * it will be removed.  Since priority is not limited by hardware
+ * when running on the hypervisor we simply return the maximum no.
+ * of available contiguous vectors.
+ */
+/*ARGSUSED*/
+int
+apic_navail_vector(dev_info_t *dip, int pri)
+{
+	int	lowest, highest, i, navail, count;
+
+	DDI_INTR_IMPLDBG((CE_CONT, "apic_navail_vector: dip: %p, pri: %x\n",
+	    (void *)dip, pri));
+
+	highest = APIC_MAX_VECTOR;
+	lowest = APIC_BASE_VECT;
+	navail = count = 0;
+
+	/* It has to be contiguous */
+	for (i = lowest; i < highest; i++) {
+		count = 0;
+		while ((apic_vector_to_irq[i] == APIC_RESV_IRQ) &&
+		    (i < highest)) {
+			count++;
+			i++;
+		}
+		if (count > navail)
+			navail = count;
+	}
+	return (navail);
+}
+
+static physdev_manage_pci_t *managed_devlist;
+static int mdev_cnt;
+static int mdev_size = 128;
+static uchar_t	msi_vector_to_pirq[APIC_MAX_VECTOR+1];
+
+/*
+ * Add devfn on given bus to devices managed by hypervisor
  */
 static int
-apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
+xen_manage_device(uint8_t bus, uint8_t devfn)
+{
+	physdev_manage_pci_t manage_pci, *newlist;
+	int rc, i, oldsize;
+
+	/*
+	 * Check if bus/devfn already managed.  If so just return success.
+	 */
+	if (managed_devlist == NULL) {
+		managed_devlist = kmem_alloc(sizeof (physdev_manage_pci_t) *
+		    mdev_size, KM_NOSLEEP);
+		if (managed_devlist == NULL) {
+			cmn_err(CE_WARN,
+			    "Can't alloc space for managed device list");
+			return (0);
+		}
+	};
+	for (i = 0; i < mdev_cnt; i++) {
+		if (managed_devlist[i].bus == bus &&
+		    managed_devlist[i].devfn == devfn)
+			return (1); /* device already managed */
+	}
+	manage_pci.bus = bus;
+	manage_pci.devfn = devfn;
+	rc = HYPERVISOR_physdev_op(PHYSDEVOP_manage_pci_add, &manage_pci);
+	if (rc < 0) {
+		cmn_err(CE_WARN,
+		    "hypervisor add pci device call failed bus:0x%x"
+		    " devfn:0x%x", bus, devfn);
+		return (0);
+	}
+	/*
+	 * Add device to the managed device list
+	 */
+	if (i == mdev_size) {
+		/*
+		 * grow the managed device list
+		 */
+		oldsize = mdev_size * sizeof (physdev_manage_pci_t);
+		mdev_size *= 2;
+		newlist = kmem_alloc(sizeof (physdev_manage_pci_t) * mdev_size,
+		    KM_NOSLEEP);
+		if (newlist == NULL) {
+			cmn_err(CE_WARN, "Can't grow managed device list");
+			return (0);
+		}
+		bcopy(managed_devlist, newlist, oldsize);
+		kmem_free(managed_devlist, oldsize);
+		managed_devlist = newlist;
+	}
+	managed_devlist[i].bus = bus;
+	managed_devlist[i].devfn = devfn;
+	mdev_cnt++;
+	return (1);
+}
+
+/*
+ * allocate an apic irq struct for an MSI interrupt
+ */
+static int
+msi_allocate_irq(int irq)
+{
+	apic_irq_t *irqptr = apic_irq_table[irq];
+
+	if (irqptr == NULL) {
+		irqptr = kmem_zalloc(sizeof (apic_irq_t), KM_NOSLEEP);
+		if (irqptr == NULL) {
+			cmn_err(CE_WARN, "xpv_psm: NO memory to allocate IRQ");
+			return (-1);
+		}
+		apic_irq_table[irq] = irqptr;
+	} else {
+		if (irq == APIC_RESV_IRQ && irqptr->airq_mps_intr_index == 0)
+			irqptr->airq_mps_intr_index = FREE_INDEX;
+		if (irqptr->airq_mps_intr_index != FREE_INDEX) {
+			cmn_err(CE_WARN, "xpv_psm: MSI IRQ already in use");
+			return (-1);
+		}
+	}
+	irqptr->airq_mps_intr_index = FREE_INDEX;
+	return (irq);
+}
+
+/*
+ * read MSI/MSIX vector out of config space
+ */
+static uchar_t
+xpv_psm_get_msi_vector(dev_info_t *dip, int type, int entry)
+{
+	uint64_t		msi_data = 0;
+	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(dip);
+	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(dip);
+	ushort_t		msi_ctrl;
+	uchar_t			vector;
+
+	ASSERT((handle != NULL) && (cap_ptr != 0));
+	if (type == DDI_INTR_TYPE_MSI) {
+		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
+		/*
+		 * Get vector
+		 */
+		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
+			msi_data = pci_config_get16(handle,
+			    cap_ptr + PCI_MSI_64BIT_DATA);
+		} else {
+			msi_data = pci_config_get16(handle,
+			    cap_ptr + PCI_MSI_32BIT_DATA);
+		}
+	} else if (type == DDI_INTR_TYPE_MSIX) {
+		uintptr_t	off;
+		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(dip);
+
+		/* Offset into the given entry in the MSI-X table */
+		off = (uintptr_t)msix_p->msix_tbl_addr +
+		    (entry  * PCI_MSIX_VECTOR_SIZE);
+
+		msi_data = ddi_get32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET));
+	}
+	vector = msi_data & 0xff;
+	return (vector);
+}
+
+
+static void
+get_busdevfn(dev_info_t *dip, int *busp, int *devfnp)
+{
+	pci_regspec_t *regspec;
+	int reglen;
+
+	/*
+	 * Get device reg spec, first word has PCI bus and
+	 * device/function info we need.
+	 */
+	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS, "reg",
+	    (caddr_t)&regspec, &reglen) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "get_busdevfn() failed to get regspec.");
+		return;
+	}
+	/*
+	 * get PCI bus # from reg spec for device
+	 */
+	*busp = PCI_REG_BUS_G(regspec[0].pci_phys_hi);
+	/*
+	 * get combined device/function from reg spec for device.
+	 */
+	*devfnp = (regspec[0].pci_phys_hi & (PCI_REG_FUNC_M | PCI_REG_DEV_M)) >>
+	    PCI_REG_FUNC_SHIFT;
+
+	kmem_free(regspec, reglen);
+}
+
+/*
+ * This function allocates "count" MSI vector(s) for the given "dip/pri/type"
+ */
+int
+apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
     int behavior)
 {
-	int	rcount, i;
+	int	rcount, i, rc, irqno;
 	uchar_t	vector, cpu;
-	int irqno;
 	major_t	major;
 	apic_irq_t	*irqptr;
+	physdev_map_pirq_t map_irq;
+	int busnum, devfn;
 
-	/* only supports MSI at the moment, will add MSI-X support later */
-	if (type != DDI_INTR_TYPE_MSI)
-		return (0);
-
-	DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: dip=0x%p type=%d "
+	DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msi_vectors: dip=0x%p "
 	    "inum=0x%x  pri=0x%x count=0x%x behavior=%d\n",
-	    (void *)dip, type, inum, pri, count, behavior));
+	    (void *)dip, inum, pri, count, behavior));
 
 	if (count > 1) {
 		if (behavior == DDI_INTR_ALLOC_STRICT &&
@@ -980,38 +1188,75 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 			count = 1;
 	}
 
+	if ((rcount = apic_navail_vector(dip, pri)) > count)
+		rcount = count;
+	else if (rcount == 0 || (rcount < count &&
+	    behavior == DDI_INTR_ALLOC_STRICT))
+		return (0);
+
+	/* if not ISP2, then round it down */
+	if (!ISP2(rcount))
+		rcount = 1 << (highbit(rcount) - 1);
+
 	/*
-	 * XXPV - metal version takes all vectors avail at given pri.
-	 * Why do that?  For now just allocate count vectors.
+	 * get PCI bus #  and devfn from reg spec for device
 	 */
-	rcount = count;
+	get_busdevfn(dip, &busnum, &devfn);
+
+	/*
+	 * Tell xen about this pci device
+	 */
+	if (!xen_manage_device(busnum, devfn))
+		return (0);
 
 	mutex_enter(&airq_mutex);
 
-	/*
-	 * XXPV - currently the hypervisor does not support MSI at all.
-	 * It doesn't return consecutive vectors.  This code is a first
-	 * cut for the (future) time that MSI is supported.
-	 */
-	major = (dip != NULL) ? ddi_driver_major(dip) : 0;
+	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
 	for (i = 0; i < rcount; i++) {
-		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
-		    INVALID_IRQ) {
+		/*
+		 * use PHYSDEVOP_map_pirq to have xen map MSI to a pirq
+		 */
+		map_irq.domid = DOMID_SELF;
+		map_irq.type = MAP_PIRQ_TYPE_MSI;
+		map_irq.index = -1; /* hypervisor auto allocates vector */
+		map_irq.pirq = -1;
+		map_irq.bus = busnum;
+		map_irq.devfn = devfn;
+		map_irq.entry_nr = 0;
+		map_irq.table_base = 0;
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq);
+		irqno = map_irq.pirq;
+		if (rc < 0) {
 			mutex_exit(&airq_mutex);
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: "
-			    "apic_allocate_irq failed\n"));
-			return (i);
+			cmn_err(CE_WARN, "map MSI irq failed err: %d", -rc);
+			return (0);
 		}
+		if (irqno < 0) {
+			mutex_exit(&airq_mutex);
+			cmn_err(CE_NOTE,
+			    "!hypervisor not configured for MSI support");
+			xen_support_msi = -1;
+			return (0);
+		}
+		if (msi_allocate_irq(irqno) < 0) {
+			mutex_exit(&airq_mutex);
+			return (0);
+		}
+		/*
+		 * Find out what vector the hypervisor assigned
+		 */
+		vector = xpv_psm_get_msi_vector(dip, DDI_INTR_TYPE_MSI, 0);
 		apic_max_device_irq = max(irqno, apic_max_device_irq);
 		apic_min_device_irq = min(irqno, apic_min_device_irq);
 		irqptr = apic_irq_table[irqno];
-		vector = apic_allocate_vector(pri, irqno, 0);
-		apic_vector_to_irq[vector] = (uchar_t)irqno;
+		ASSERT(irqptr != NULL);
 #ifdef	DEBUG
 		if (apic_vector_to_irq[vector] != APIC_RESV_IRQ)
-			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: "
+			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msi_vectors: "
 			    "apic_vector_to_irq is not APIC_RESV_IRQ\n"));
 #endif
+		apic_vector_to_irq[vector] = (uchar_t)irqno;
+		msi_vector_to_pirq[vector] = (uchar_t)irqno;
 
 		irqptr->airq_vector = vector;
 		irqptr->airq_ioapicindex = (uchar_t)inum;	/* start */
@@ -1022,18 +1267,196 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 		irqptr->airq_mps_intr_index = MSI_INDEX;
 		irqptr->airq_dip = dip;
 		irqptr->airq_major = major;
-		if (i == 0) /* they all bound to the same cpu */
-			cpu = irqptr->airq_cpu = apic_bind_intr(dip, irqno,
-			    0xff, 0xff);
+		if (i == 0) /* they all bind to the same cpu */
+			cpu = irqptr->airq_cpu = xen_psm_bind_intr(irqno);
 		else
 			irqptr->airq_cpu = cpu;
-		DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: irq=0x%x "
+		DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_msi_vectors: irq=0x%x "
 		    "dip=0x%p vector=0x%x origirq=0x%x pri=0x%x\n", irqno,
 		    (void *)irqptr->airq_dip, irqptr->airq_vector,
 		    irqptr->airq_origirq, pri));
 	}
 	mutex_exit(&airq_mutex);
 	return (rcount);
+}
+
+/*
+ * This function allocates "count" MSI-X vector(s) for the given "dip/pri/type"
+ */
+int
+apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
+    int behavior)
+{
+	int	rcount, i, rc;
+	major_t	major;
+	physdev_map_pirq_t map_irq;
+	int busnum, devfn;
+	ddi_intr_msix_t *msix_p = i_ddi_get_msix(dip);
+	uint64_t table_base;
+	pfn_t pfnum;
+
+	if (msix_p == NULL) {
+		msix_p = pci_msix_init(dip);
+		if (msix_p != NULL) {
+			i_ddi_set_msix(dip, msix_p);
+		} else {
+			cmn_err(CE_WARN, "apic_alloc_msix_vectors()"
+			    " msix_init failed");
+			return (0);
+		}
+	}
+	/*
+	 * Hypervisor wants PCI config space address of msix table
+	 */
+	pfnum = hat_getpfnum(kas.a_hat, (caddr_t)msix_p->msix_tbl_addr) &
+	    ~PFN_IS_FOREIGN_MFN;
+	table_base = (uint64_t)((pfnum << PAGESHIFT) |
+	    ((uintptr_t)msix_p->msix_tbl_addr & PAGEOFFSET));
+	/*
+	 * get PCI bus #  and devfn from reg spec for device
+	 */
+	get_busdevfn(dip, &busnum, &devfn);
+
+	/*
+	 * Tell xen about this pci device
+	 */
+	if (!xen_manage_device(busnum, devfn))
+		return (0);
+	mutex_enter(&airq_mutex);
+
+	if ((rcount = apic_navail_vector(dip, pri)) > count)
+		rcount = count;
+	else if (rcount == 0 || (rcount < count &&
+	    behavior == DDI_INTR_ALLOC_STRICT)) {
+		rcount = 0;
+		goto out;
+	}
+
+	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
+	for (i = 0; i < rcount; i++) {
+		int irqno;
+		uchar_t	vector;
+		apic_irq_t	*irqptr;
+
+		/*
+		 * use PHYSDEVOP_map_pirq to have xen map MSI-X to a pirq
+		 */
+		map_irq.domid = DOMID_SELF;
+		map_irq.type = MAP_PIRQ_TYPE_MSI;
+		map_irq.index = -1; /* hypervisor auto allocates vector */
+		map_irq.pirq = -1;
+		map_irq.bus = busnum;
+		map_irq.devfn = devfn;
+		map_irq.entry_nr = i;
+		map_irq.table_base = table_base;
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq);
+		irqno = map_irq.pirq;
+		if (rc < 0) {
+			mutex_exit(&airq_mutex);
+			cmn_err(CE_WARN, "map MSI irq failed err: %d", -rc);
+			return (0);
+		}
+		if (irqno < 0) {
+			mutex_exit(&airq_mutex);
+			cmn_err(CE_NOTE,
+			    "!hypervisor not configured for MSI support");
+			xen_support_msi = -1;
+			return (0);
+		}
+		/*
+		 * Find out what vector the hypervisor assigned
+		 */
+		vector = xpv_psm_get_msi_vector(dip, DDI_INTR_TYPE_MSIX, i);
+		if (msi_allocate_irq(irqno) < 0) {
+			mutex_exit(&airq_mutex);
+			return (0);
+		}
+		apic_vector_to_irq[vector] = (uchar_t)irqno;
+		msi_vector_to_pirq[vector] = (uchar_t)irqno;
+		apic_max_device_irq = max(irqno, apic_max_device_irq);
+		apic_min_device_irq = min(irqno, apic_min_device_irq);
+		irqptr = apic_irq_table[irqno];
+		ASSERT(irqptr != NULL);
+		irqptr->airq_vector = (uchar_t)vector;
+		irqptr->airq_ipl = pri;
+		irqptr->airq_origirq = (uchar_t)(inum + i);
+		irqptr->airq_share_id = 0;
+		irqptr->airq_mps_intr_index = MSIX_INDEX;
+		irqptr->airq_dip = dip;
+		irqptr->airq_major = major;
+		irqptr->airq_cpu = IRQ_UNBOUND; /* will be bound when addspl */
+	}
+out:
+	mutex_exit(&airq_mutex);
+	return (rcount);
+}
+
+
+/*
+ * This finds the apic_irq_t associated with the dip, ispec and type.
+ * The entry should have already been freed, but it can not have been
+ * reused yet since the hypervisor can not have reassigned the pirq since
+ * we have not freed that yet.
+ */
+static apic_irq_t *
+msi_find_irq(dev_info_t *dip, struct intrspec *ispec)
+{
+	apic_irq_t	*irqp;
+	int i;
+
+	for (i = apic_min_device_irq; i <= apic_max_device_irq; i++) {
+		if ((irqp = apic_irq_table[i]) == NULL)
+			continue;
+		if ((irqp->airq_dip == dip) &&
+		    (irqp->airq_origirq == ispec->intrspec_vec) &&
+		    (irqp->airq_ipl == ispec->intrspec_pri)) {
+			return (irqp);
+		}
+	}
+	return (NULL);
+}
+
+void
+apic_free_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
+{
+	int i, rc;
+	physdev_unmap_pirq_t unmap_pirq;
+	apic_irq_t *irqptr;
+	struct intrspec ispec;
+
+	DDI_INTR_IMPLDBG((CE_CONT, "apic_free_vectors: dip: %p inum: %x "
+	    "count: %x pri: %x type: %x\n",
+	    (void *)dip, inum, count, pri, type));
+
+	/* for MSI/X only */
+	if (!DDI_INTR_IS_MSI_OR_MSIX(type))
+		return;
+
+	for (i = 0; i < count; i++) {
+		DDI_INTR_IMPLDBG((CE_CONT, "apic_free_vectors: inum=0x%x "
+		    "pri=0x%x count=0x%x\n", inum, pri, count));
+		ispec.intrspec_vec = inum + i;
+		ispec.intrspec_pri = pri;
+		if ((irqptr = msi_find_irq(dip, &ispec)) == NULL) {
+			cmn_err(CE_WARN,
+			    "couldn't find irq %s,%s dip: 0x%p vec: %x pri: %x",
+			    ddi_get_name(dip), ddi_get_name_addr(dip),
+			    (void *)dip, inum + i, pri);
+			continue;
+		}
+		/*
+		 * use PHYSDEVOP_unmap_pirq to have xen unmap MSI from a pirq
+		 */
+		unmap_pirq.domid = DOMID_SELF;
+		unmap_pirq.pirq = msi_vector_to_pirq[irqptr->airq_vector];
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_unmap_pirq, &unmap_pirq);
+		if (rc < 0) {
+			cmn_err(CE_WARN, "unmap pirq failed");
+			return;
+		}
+		irqptr->airq_mps_intr_index = FREE_INDEX;
+		apic_vector_to_irq[irqptr->airq_vector] = APIC_RESV_IRQ;
+	}
 }
 
 /*
@@ -1144,18 +1567,6 @@ apic_setup_io_intr(void *p, int irq, boolean_t deferred)
 	int rv, cpu;
 	cpuset_t cpus;
 
-	/*
-	 * Set cpu based on xen idea of online cpu's not apic tables.
-	 * Note that xen ignores/sets to it's own preferred value the
-	 * target cpu field when programming ioapic anyway.
-	 */
-	if ((cpu = xen_psm_bind_intr(irq)) == IRQ_UNBOUND) {
-		CPUSET_ZERO(cpus);
-		CPUSET_OR(cpus, xen_psm_cpus_online);
-	} else {
-		CPUSET_ONLY(cpus, cpu & ~IRQ_USER_BOUND);
-	}
-	apic_irq_table[irq]->airq_cpu = cpu;
 	if (deferred) {
 		drep = (struct ioapic_reprogram_data *)p;
 		ASSERT(drep != NULL);
@@ -1164,10 +1575,28 @@ apic_setup_io_intr(void *p, int irq, boolean_t deferred)
 		irqptr = (apic_irq_t *)p;
 	}
 	ASSERT(irqptr != NULL);
+	/*
+	 * Set cpu based on xen idea of online cpu's not apic tables.
+	 * Note that xen ignores/sets to it's own preferred value the
+	 * target cpu field when programming ioapic anyway.
+	 */
+	if (irqptr->airq_mps_intr_index == MSI_INDEX)
+		cpu = irqptr->airq_cpu; /* MSI cpus are already set */
+	else {
+		cpu = xen_psm_bind_intr(irq);
+		irqptr->airq_cpu = cpu;
+	}
+	if (cpu == IRQ_UNBOUND) {
+		CPUSET_ZERO(cpus);
+		CPUSET_OR(cpus, xen_psm_cpus_online);
+	} else {
+		CPUSET_ONLY(cpus, cpu & ~IRQ_USER_BOUND);
+	}
 	rv = apic_rebind(irqptr, cpu, drep);
 	if (rv) {
 		/* CPU is not up or interrupt is disabled. Fall back to 0 */
 		cpu = 0;
+		irqptr->airq_cpu = cpu;
 		rv = apic_rebind(irqptr, cpu, drep);
 	}
 	/*

@@ -45,10 +45,21 @@
 #include "arch-x86/xen.h"
 #elif defined(__ia64__)
 #include "arch-ia64.h"
-#elif defined(__powerpc__)
-#include "arch-powerpc.h"
 #else
 #error "Unsupported architecture"
+#endif
+
+#ifndef __ASSEMBLY__
+/* Guest handles for primitive C types. */
+DEFINE_XEN_GUEST_HANDLE(char);
+__DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
+DEFINE_XEN_GUEST_HANDLE(int);
+__DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
+DEFINE_XEN_GUEST_HANDLE(long);
+__DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
+DEFINE_XEN_GUEST_HANDLE(void);
+
+DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #endif
 
 /*
@@ -81,7 +92,7 @@
 #define __HYPERVISOR_vcpu_op              24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
-#define __HYPERVISOR_acm_op               27
+#define __HYPERVISOR_xsm_op               27
 #define __HYPERVISOR_nmi_op               28
 #define __HYPERVISOR_sched_op             29
 #define __HYPERVISOR_callback_op          30
@@ -180,9 +191,14 @@
  * ptr[:2]  -- Machine address within the frame whose mapping to modify.
  *             The frame must belong to the FD, if one is specified.
  * val      -- Value to write into the mapping entry.
+ * 
+ * ptr[1:0] == MMU_PT_UPDATE_PRESERVE_AD:
+ * As MMU_NORMAL_PT_UPDATE above, but A/D bits currently in the PTE are ORed
+ * with those in @val.
  */
-#define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
-#define MMU_MACHPHYS_UPDATE      1 /* ptr = MA of frame to modify entry for  */
+#define MMU_NORMAL_PT_UPDATE      0 /* checked '*ptr = val'. ptr is MA.      */
+#define MMU_MACHPHYS_UPDATE       1 /* ptr = MA of frame to modify entry for */
+#define MMU_PT_UPDATE_PRESERVE_AD 2 /* atomically: *ptr = val | (*ptr&(A|D)) */
 
 /*
  * MMU EXTENDED OPERATIONS
@@ -257,7 +273,11 @@ struct mmuext_op {
         /* SET_LDT */
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
-        XEN_GUEST_HANDLE_00030205(void) vcpumask;
+#if __XEN_INTERFACE_VERSION__ >= 0x00030205
+        XEN_GUEST_HANDLE(void) vcpumask;
+#else
+        void *vcpumask;
+#endif
     } arg2;
 };
 typedef struct mmuext_op mmuext_op_t;
@@ -547,6 +567,7 @@ typedef struct start_info start_info_t;
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
+#define SIF_PM_MASK       (0xFF<<8) /* reserve 1 byte for xen-pm options */
 
 #define XEN_CONSOLE_INVALID   -1
 #define XEN_CONSOLE_COM1       0
@@ -583,6 +604,12 @@ typedef struct dom0_vga_console_info {
             uint8_t  green_pos, green_size;
             uint8_t  blue_pos, blue_size;
             uint8_t  rsvd_pos, rsvd_size;
+#if __XEN_INTERFACE_VERSION__ >= 0x00030206
+            /* VESA capabilities (offset 0xa, VESA command 0x4f00). */
+            uint32_t gbl_caps;
+            /* Mode attributes (offset 0x0, VESA command 0x4f01). */
+            uint16_t mode_attrs;
+#endif
         } vesa_lfb;
     } u;
 } dom0_vga_console_info_t;
@@ -595,10 +622,10 @@ typedef uint8_t xen_domain_handle_t[16];
 #define __mk_unsigned_long(x) x ## UL
 #define mk_unsigned_long(x) __mk_unsigned_long(x)
 
-DEFINE_XEN_GUEST_HANDLE(uint8_t);
-DEFINE_XEN_GUEST_HANDLE(uint16_t);
-DEFINE_XEN_GUEST_HANDLE(uint32_t);
-DEFINE_XEN_GUEST_HANDLE(uint64_t);
+__DEFINE_XEN_GUEST_HANDLE(uint8,  uint8_t);
+__DEFINE_XEN_GUEST_HANDLE(uint16, uint16_t);
+__DEFINE_XEN_GUEST_HANDLE(uint32, uint32_t);
+__DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 
 #else /* __ASSEMBLY__ */
 
@@ -608,19 +635,14 @@ DEFINE_XEN_GUEST_HANDLE(uint64_t);
 #endif /* !__ASSEMBLY__ */
 
 /* Default definitions for macros used by domctl/sysctl. */
-/*
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
-*/
 #ifndef uint64_aligned_t
 #define uint64_aligned_t uint64_t
 #endif
 #ifndef XEN_GUEST_HANDLE_64
 #define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
 #endif
-/*
 #endif
-*/
-
 
 #endif /* __XEN_PUBLIC_XEN_H__ */
 

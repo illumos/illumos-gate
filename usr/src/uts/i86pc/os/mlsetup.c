@@ -56,6 +56,8 @@
 #include <sys/pci_cfgspace.h>
 #ifdef __xpv
 #include <sys/hypervisor.h>
+#else
+#include <sys/xpv_support.h>
 #endif
 
 /*
@@ -154,6 +156,9 @@ mlsetup(struct regs *rp)
 	init_desctbls();
 
 #if !defined(__xpv)
+
+	if (get_hwenv() == HW_XEN_HVM)
+		xen_hvm_init();
 
 	/*
 	 * Patch the tsc_read routine with appropriate set of instructions,

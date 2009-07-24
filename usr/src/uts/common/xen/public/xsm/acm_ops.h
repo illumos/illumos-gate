@@ -26,7 +26,7 @@
 #ifndef __XEN_PUBLIC_ACM_OPS_H__
 #define __XEN_PUBLIC_ACM_OPS_H__
 
-#include "xen.h"
+#include "../xen.h"
 #include "acm.h"
 
 /*

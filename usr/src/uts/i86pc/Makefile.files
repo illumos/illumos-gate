@@ -65,6 +65,8 @@ CORE_OBJS +=			\
 	hold_page.o		\
 	hrtimers.o		\
 	htable.o		\
+	hypercall.o		\
+	hypersubr.o		\
 	i86_mmu.o		\
 	ibft.o			\
 	instr_size.o		\
@@ -106,6 +108,7 @@ CORE_OBJS +=			\
 	todpc_subr.o		\
 	trap.o			\
 	vm_machdep.o		\
+	xpv_platform.o		\
 	x_call.o
 
 #
@@ -201,6 +204,7 @@ XSVC_OBJS += xsvc.o
 #
 ALL_DEFS	+= -Di86pc
 INC_PATH	+= -I$(UTSBASE)/i86pc -I$(SRC)/common
+INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/common/xen
 
 #
 # Since the assym files are derived, the dependencies must be explicit for

@@ -1069,7 +1069,7 @@ xdb_params_init(xdb_t *vdp)
 {
 	dev_info_t		*dip = vdp->xs_dip;
 	char			*str, *xsname;
-	int			err, watch_params = B_FALSE;
+	int			err;
 
 	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
 	ASSERT(vdp->xs_params_path == NULL);
@@ -1077,21 +1077,11 @@ xdb_params_init(xdb_t *vdp)
 	if ((xsname = xvdi_get_xsname(dip)) == NULL)
 		return (B_FALSE);
 
-	if ((err = xenbus_read_str(xsname,
-	    "dynamic-device-path", &str)) == ENOENT) {
-		err = xenbus_read_str(xsname, "params", &str);
-		watch_params = B_TRUE;
-	}
-	if (err != 0)
+	err = xenbus_read_str(xsname, "params", &str);
+	if (err != 0) {
 		return (B_FALSE);
+	}
 	vdp->xs_params_path = str;
-
-	/*
-	 * If we got our backing store path from "dynamic-device-path" then
-	 * there's no reason to watch "params"
-	 */
-	if (!watch_params)
-		return (B_TRUE);
 
 	if (xvdi_add_xb_watch_handler(dip, xsname, "params",
 	    xdb_watch_params_cb, NULL) != DDI_SUCCESS) {
@@ -1220,6 +1210,9 @@ xdb_open_device(xdb_t *vdp)
 	uint64_t devsize;
 	int blksize;
 	char *nodepath;
+	char *xsname;
+	char *str;
+	int err;
 
 	ASSERT(MUTEX_HELD(&vdp->xs_cbmutex));
 
@@ -1234,6 +1227,18 @@ xdb_open_device(xdb_t *vdp)
 		ASSERT(vdp->xs_ldi_li == NULL);
 		ASSERT(vdp->xs_ldi_hdl == NULL);
 		return (DDI_SUCCESS);
+	}
+
+	/*
+	 * after the hotplug scripts have "connected" the device, check to see
+	 * if we're using a dynamic device.  If so, replace the params path
+	 * with the dynamic one.
+	 */
+	xsname = xvdi_get_xsname(dip);
+	err = xenbus_read_str(xsname, "dynamic-device-path", &str);
+	if (err == 0) {
+		strfree(vdp->xs_params_path);
+		vdp->xs_params_path = str;
 	}
 
 	if (ldi_ident_from_dip(dip, &vdp->xs_ldi_li) != 0)

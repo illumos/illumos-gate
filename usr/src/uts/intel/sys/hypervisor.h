@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,10 @@
 extern "C" {
 #endif
 
-#ifdef XPV_HVM_DRIVER
+#define	xen_mb	membar_enter
+#define	xen_wmb	membar_producer
+
+#ifndef __xpv
 #include <sys/xpv_support.h>
 #else
 #include <sys/xpv_impl.h>
@@ -67,7 +70,7 @@ extern "C" {
 
 #include <sys/processor.h>
 #include <sys/cpuvar.h>
-#ifndef XPV_HVM_DRIVER
+#ifdef __xpv
 #include <sys/xen_mmu.h>
 #endif
 #include <sys/systm.h>
@@ -80,11 +83,9 @@ extern "C" {
 #include <xen/public/nmi.h>
 #include <xen/public/physdev.h>
 #include <xen/public/sched.h>
-#include <xen/public/sysctl.h>
 #include <xen/public/platform.h>
 #include <xen/public/vcpu.h>
 #include <xen/public/version.h>
-#include <xen/public/acm_ops.h>
 #include <xen/public/hvm/params.h>
 
 extern shared_info_t *HYPERVISOR_shared_info;
@@ -154,15 +155,19 @@ extern long xen_vcpu_down(processorid_t);
 extern void xen_enable_user_iopl(void);
 extern void xen_disable_user_iopl(void);
 
-extern int xen_get_physinfo(xen_sysctl_physinfo_t *);
 extern int xen_get_mc_physcpuinfo(xen_mc_logical_cpu_t *, uint_t *);
 extern uint_t xen_phys_ncpus;
 extern xen_mc_logical_cpu_t *xen_phys_cpus;
 
+extern uint_t xpv_nr_phys_cpus(void);
+extern pgcnt_t xpv_nr_phys_pages(void);
+extern uint64_t xpv_cpu_khz(void);
+
+
 /*
  * A quick way to ask if we're DOM0 or not ..
  */
-#ifdef XPV_HVM_DRIVER
+#ifndef __xpv
 
 #define	DOMAIN_IS_INITDOMAIN(info)	(__lintzero)
 #define	DOMAIN_IS_PRIVILEGED(info)	(__lintzero)
@@ -229,7 +234,6 @@ extern long HYPERVISOR_vcpu_op(int, int, void *);
 extern long HYPERVISOR_set_segment_base(int, ulong_t);
 #endif	/* __amd64 */
 extern int HYPERVISOR_mmuext_op(struct mmuext_op *, int, uint_t *, domid_t);
-extern long HYPERVISOR_acm_op(struct xen_acmctl *);
 extern long HYPERVISOR_nmi_op(int cmd, void *);
 extern long HYPERVISOR_sched_op(int, void *);
 extern long HYPERVISOR_callback_op(int, void *);
@@ -237,11 +241,8 @@ extern long HYPERVISOR_callback_op(int, void *);
 extern long HYPERVISOR_event_channel_op(int, void *); /* does return long */
 extern long HYPERVISOR_physdev_op(int, void *);
 extern long HYPERVISOR_hvm_op(int cmd, void *);
-extern long HYPERVISOR_sysctl(xen_sysctl_t *);
-extern long HYPERVISOR_domctl(xen_domctl_t *domctl);
 /* *** __HYPERVISOR_kexec_op *** NOT IMPLEMENTED */
 extern long HYPERVISOR_mca(uint32_t, xen_mc_arg_t *);
-
 
 /*
  * HYPERCALL HELPER ROUTINES

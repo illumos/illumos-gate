@@ -63,15 +63,37 @@
  * Each CPU buffer consists of a metadata header followed by the trace records.
  * The metadata consists of a producer/consumer pair of pointers into the buffer
  * that point to the next record to be written and the next record to be read
- * respectively. The trace record format is as follows:
+ * respectively.
  *
+ * A trace record can be in one of two forms, depending on if the TSC is
+ * included. The record header indicates whether or not the TSC field is
+ * present.
+ *
+ * 1. Trace record without TSC:
+ * +------------------------------------------------------------+
+ * | HEADER(uint32_t) |            DATA FIELDS                  |
+ * +------------------------------------------------------------+
+ *
+ * 2. Trace record with TSC:
  * +--------------------------------------------------------------------------+
- * | CPUID(uint_t) | TSC(uint64_t) | EVENTID(uint32_t) |     DATA FIELDS      |
+ * | HEADER(uint32_t) | TSC(uint64_t) |              DATA FIELDS              |
  * +--------------------------------------------------------------------------+
+ *
+ * Where,
+ *
+ * HEADER bit field:
+ * +--------------------------------------------------------------------------+
+ * | C |  NDATA  |                        EVENT                               |
+ * +--------------------------------------------------------------------------+
+ *  31  30     28 27                                                         0
+ *
+ * EVENT: Event ID.
+ * NDATA: Number of populated data fields.
+ *     C: TSC included.
  *
  * DATA FIELDS:
  * +--------------------------------------------------------------------------+
- * | D1(uint32_t) | D2(uint32_t) | D3(uint32_t) | D4(uint32_t) | D5(uint32_t) |
+ * | D1(uint32_t) | D2(uint32_t) | D3(uint32_t) |     . . .    | D7(uint32_t) |
  * +--------------------------------------------------------------------------+
  *
  *
@@ -88,6 +110,8 @@
  * attempt to infer anything beyond what is supplied via the probe arguments.
  */
 
+#include <sys/xpv_user.h>
+
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/modctl.h>
@@ -102,6 +126,7 @@
 #include <sys/cyclic.h>
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
+
 #include <sys/hypervisor.h>
 #include <xen/public/trace.h>
 #include <xen/public/sched.h>
@@ -142,7 +167,8 @@
 #define	XDT_SCHED			0
 #define	XDT_MEM				1
 #define	XDT_HVM				2
-#define	XDT_NCLASSES			3
+#define	XDT_GEN				3
+#define	XDT_NCLASSES			4
 
 /* Probe events */
 #define	XDT_EVT_INVALID			(-(int)1)
@@ -163,7 +189,8 @@
 #define	XDT_MEM_PAGE_GRANT_TRANSFER	14
 #define	XDT_HVM_VMENTRY			15
 #define	XDT_HVM_VMEXIT			16
-#define	XDT_NEVENTS			17
+#define	XDT_TRC_LOST_RECORDS		17
+#define	XDT_NEVENTS			18
 
 typedef struct {
 	const char	*pr_mod;	/* probe module */
@@ -266,10 +293,11 @@ static xdt_probe_t xdt_probe[] = {
 	{ "hvm", "vmentry", XDT_HVM_VMENTRY, XDT_HVM },
 	{ "hvm", "vmexit", XDT_HVM_VMEXIT, XDT_HVM },
 
+	/* Trace buffer related probes */
+	{ "trace", "records-lost", XDT_TRC_LOST_RECORDS, XDT_GEN },
+
 	{ NULL }
 };
-
-extern uint_t xen_get_nphyscpus(void);
 
 static inline uint32_t
 xdt_nr_active_probes()
@@ -289,6 +317,7 @@ xdt_init_trace_masks(void)
 	xdt_classinfo[XDT_SCHED].trc_mask = TRC_SCHED;
 	xdt_classinfo[XDT_MEM].trc_mask = TRC_MEM;
 	xdt_classinfo[XDT_HVM].trc_mask = TRC_HVM;
+	xdt_classinfo[XDT_GEN].trc_mask = TRC_GEN;
 }
 
 static int
@@ -474,22 +503,26 @@ xdt_detach_trace_buffers(void)
 	kmem_free(tbuf.data, tbuf.cnt * sizeof (*tbuf.data));
 }
 
-static inline void
+static inline size_t
 xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 {
 	xdt_schedinfo_t *sp = &xdt_cpu_schedinfo[cpuid];
 	int eid;
+	uint32_t *data;
+	size_t rec_size;
 
 	ASSERT(rec != NULL);
-	ASSERT(xdt_ncpus == xen_get_nphyscpus());
+	ASSERT(xdt_ncpus == xpv_nr_phys_cpus());
 
 	if (cpuid >= xdt_ncpus) {
 		tbuf.stat_spurious_cpu++;
-		return;
+		goto done;
 	}
 
-	switch (rec->event) {
+	data = rec->cycles_included ? rec->u.cycles.extra_u32 :
+	    rec->u.nocycles.extra_u32;
 
+	switch (rec->event) {
 	/*
 	 * Sched probes
 	 */
@@ -497,44 +530,44 @@ xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 		/*
 		 * Info on vCPU being de-scheduled
 		 *
-		 * rec->data[0] = prev domid
-		 * rec->data[1] = time spent on pcpu
+		 * data[0] = prev domid
+		 * data[1] = time spent on pcpu
 		 */
-		sp->prev_domid = rec->data[0];
-		sp->prev_ctime = rec->data[1];
+		sp->prev_domid = data[0];
+		sp->prev_ctime = data[1];
 		break;
 
 	case TRC_SCHED_SWITCH_INFNEXT:
 		/*
 		 * Info on next vCPU to be scheduled
 		 *
-		 * rec->data[0] = next domid
-		 * rec->data[1] = time spent waiting to get on cpu
-		 * rec->data[2] = time slice
+		 * data[0] = next domid
+		 * data[1] = time spent waiting to get on cpu
+		 * data[2] = time slice
 		 */
-		sp->next_domid = rec->data[0];
-		sp->next_wtime = rec->data[1];
-		sp->next_ts = rec->data[2];
+		sp->next_domid = data[0];
+		sp->next_wtime = data[1];
+		sp->next_ts = data[2];
 		break;
 
 	case TRC_SCHED_SWITCH:
 		/*
 		 * vCPU switch
 		 *
-		 * rec->data[0] = prev domid
-		 * rec->data[1] = prev vcpuid
-		 * rec->data[2] = next domid
-		 * rec->data[3] = next vcpuid
+		 * data[0] = prev domid
+		 * data[1] = prev vcpuid
+		 * data[2] = next domid
+		 * data[3] = next vcpuid
 		 */
-		if (rec->data[0] != sp->prev_domid &&
-		    rec->data[2] != sp->next_domid) {
+		if (data[0] != sp->prev_domid &&
+		    data[2] != sp->next_domid) {
 			/* prev and next info don't match doms being sched'd */
 			tbuf.stat_spurious_switch++;
-			return;
+			goto done;
 		}
 
-		sp->prev_vcpuid = rec->data[1];
-		sp->next_vcpuid = rec->data[3];
+		sp->prev_vcpuid = data[1];
+		sp->next_vcpuid = data[3];
 
 		XDT_PROBE3(IS_IDLE_DOM(sp->prev_domid)?
 		    XDT_SCHED_IDLE_OFF_CPU:XDT_SCHED_OFF_CPU,
@@ -550,51 +583,51 @@ xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 		/*
 		 * vCPU blocked
 		 *
-		 * rec->data[0] = domid
-		 * rec->data[1] = vcpuid
+		 * data[0] = domid
+		 * data[1] = vcpuid
 		 */
-		XDT_PROBE2(XDT_SCHED_BLOCK, cpuid, rec->data[0], rec->data[1]);
+		XDT_PROBE2(XDT_SCHED_BLOCK, cpuid, data[0], data[1]);
 		break;
 
 	case TRC_SCHED_SLEEP:
 		/*
 		 * Put vCPU to sleep
 		 *
-		 * rec->data[0] = domid
-		 * rec->data[1] = vcpuid
+		 * data[0] = domid
+		 * data[1] = vcpuid
 		 */
-		XDT_PROBE2(XDT_SCHED_SLEEP, cpuid, rec->data[0], rec->data[1]);
+		XDT_PROBE2(XDT_SCHED_SLEEP, cpuid, data[0], data[1]);
 		break;
 
 	case TRC_SCHED_WAKE:
 		/*
 		 * Wake up vCPU
 		 *
-		 * rec->data[0] = domid
-		 * rec->data[1] = vcpuid
+		 * data[0] = domid
+		 * data[1] = vcpuid
 		 */
-		XDT_PROBE2(XDT_SCHED_WAKE, cpuid, rec->data[0], rec->data[1]);
+		XDT_PROBE2(XDT_SCHED_WAKE, cpuid, data[0], data[1]);
 		break;
 
 	case TRC_SCHED_YIELD:
 		/*
 		 * vCPU yielded
 		 *
-		 * rec->data[0] = domid
-		 * rec->data[1] = vcpuid
+		 * data[0] = domid
+		 * data[1] = vcpuid
 		 */
-		XDT_PROBE2(XDT_SCHED_YIELD, cpuid, rec->data[0], rec->data[1]);
+		XDT_PROBE2(XDT_SCHED_YIELD, cpuid, data[0], data[1]);
 		break;
 
 	case TRC_SCHED_SHUTDOWN:
 		/*
 		 * Guest shutting down
 		 *
-		 * rec->data[0] = domid
-		 * rec->data[1] = initiating vcpu
-		 * rec->data[2] = shutdown code
+		 * data[0] = domid
+		 * data[1] = initiating vcpu
+		 * data[2] = shutdown code
 		 */
-		switch (rec->data[2]) {
+		switch (data[2]) {
 		case SHUTDOWN_poweroff:
 			eid = XDT_SCHED_SHUTDOWN_POWEROFF;
 			break;
@@ -609,10 +642,10 @@ xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 			break;
 		default:
 			tbuf.stat_unknown_shutdown++;
-			return;
+			goto done;
 		}
 
-		XDT_PROBE1(eid, cpuid, rec->data[0]);
+		XDT_PROBE1(eid, cpuid, data[0]);
 		break;
 
 	/*
@@ -622,27 +655,27 @@ xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 		/*
 		 * Guest mapped page grant
 		 *
-		 * rec->data[0] = domid
+		 * data[0] = domid
 		 */
-		XDT_PROBE1(XDT_MEM_PAGE_GRANT_MAP, cpuid, rec->data[0]);
+		XDT_PROBE1(XDT_MEM_PAGE_GRANT_MAP, cpuid, data[0]);
 		break;
 
 	case TRC_MEM_PAGE_GRANT_UNMAP:
 		/*
 		 * Guest unmapped page grant
 		 *
-		 * rec->data[0] = domid
+		 * data[0] = domid
 		 */
-		XDT_PROBE1(XDT_MEM_PAGE_GRANT_UNMAP, cpuid, rec->data[0]);
+		XDT_PROBE1(XDT_MEM_PAGE_GRANT_UNMAP, cpuid, data[0]);
 		break;
 
 	case TRC_MEM_PAGE_GRANT_TRANSFER:
 		/*
 		 * Page grant is being transferred
 		 *
-		 * rec->data[0] = target domid
+		 * data[0] = target domid
 		 */
-		XDT_PROBE1(XDT_MEM_PAGE_GRANT_TRANSFER, cpuid, rec->data[0]);
+		XDT_PROBE1(XDT_MEM_PAGE_GRANT_TRANSFER, cpuid, data[0]);
 		break;
 
 	/*
@@ -652,25 +685,28 @@ xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 		/*
 		 * Return to guest via vmx_launch/vmrun
 		 *
-		 * rec->data[0] = (domid<<16 + vcpuid)
+		 * data[0] = (domid<<16 + vcpuid)
 		 */
-		XDT_PROBE2(XDT_HVM_VMENTRY, cpuid, HVM_DOMID(rec->data[0]),
-		    HVM_VCPUID(rec->data[0]));
+		XDT_PROBE2(XDT_HVM_VMENTRY, cpuid, HVM_DOMID(data[0]),
+		    HVM_VCPUID(data[0]));
 		break;
 
-	case TRC_HVM_VMEXIT:
+	case TRC_HVM_VMEXIT64:
 		/*
 		 * Entry into VMEXIT handler
 		 *
-		 * rec->data[0] = (domid<<16 + vcpuid)
-		 * rec->data[1] = guest rip
-		 * rec->data[2] = cpu vendor specific exit code
+		 * data[0] = (domid<<16 + vcpuid)
+		 * data[1] = cpu vendor specific exit code
+		 * data[2] = guest rip(0:31)
+		 * data[3] = guest rip(32:64)
 		 */
-		XDT_PROBE4(XDT_HVM_VMEXIT, cpuid, HVM_DOMID(rec->data[0]),
-		    HVM_VCPUID(rec->data[0]), rec->data[1], rec->data[2]);
+		XDT_PROBE4(XDT_HVM_VMEXIT, cpuid, HVM_DOMID(data[0]),
+		    HVM_VCPUID(data[0]), data[1],
+		    ((uint64_t)data[3]<<32) | data[2]);
 		break;
 
 	case TRC_LOST_RECORDS:
+		XDT_PROBE0(XDT_TRC_LOST_RECORDS, cpuid);
 		tbuf.stat_dropped_recs++;
 		break;
 
@@ -678,6 +714,10 @@ xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 		tbuf.stat_unknown_recs++;
 		break;
 	}
+
+done:
+	rec_size = 4 + (rec->cycles_included ? 8 : 0) + (rec->extra_u32 * 4);
+	return (rec_size);
 }
 
 /*ARGSUSED*/
@@ -685,22 +725,52 @@ static void
 xdt_tbuf_scan(void *arg)
 {
 	uint_t cpuid;
-	size_t nrecs;
+	size_t tbuf_data_size;
 	struct t_rec *rec;
-	uint32_t prod;
+	uintptr_t data;
+	uint32_t prod, cons;
+	uint32_t offset, end_offset;
 
-	nrecs = (tbuf.size - sizeof (struct t_buf)) / sizeof (struct t_rec);
+	tbuf_data_size = tbuf.size - sizeof (struct t_buf);
 
 	/* scan all cpu buffers for new records */
 	for (cpuid = 0; cpuid < tbuf.cnt; cpuid++) {
+		cons = tbuf.meta[cpuid]->cons;
 		prod = tbuf.meta[cpuid]->prod;
 		membar_consumer(); /* read prod /then/ data */
-		while (tbuf.meta[cpuid]->cons != prod) {
-			rec = tbuf.data[cpuid] + tbuf.meta[cpuid]->cons % nrecs;
-			xdt_process_rec(cpuid, rec);
-			membar_exit(); /* read data /then/ update cons */
-			tbuf.meta[cpuid]->cons++;
+
+		/* see <xen/public/trace.h> */
+		ASSERT(cons < 2 * tbuf_data_size);
+		ASSERT(prod < 2 * tbuf_data_size);
+
+		if (prod == cons)
+			continue;
+
+		offset = cons % tbuf_data_size;
+		end_offset = prod % tbuf_data_size;
+
+		if (offset >= end_offset) {
+			/* read up to the end of the buffer */
+			while (offset != tbuf_data_size) {
+				data = (uintptr_t)tbuf.data[cpuid] + offset;
+				rec = (struct t_rec *)data;
+				ASSERT((caddr_t)rec < tbuf.va + (tbuf.size *
+				    (cpuid + 1)));
+				offset += xdt_process_rec(cpuid, rec);
+			}
+			offset = 0; /* wrap around */
 		}
+
+		while (offset != end_offset) {
+			data = (uintptr_t)tbuf.data[cpuid] + offset;
+			rec = (struct t_rec *)data;
+			ASSERT((caddr_t)rec < tbuf.va + (tbuf.size *
+			    (cpuid + 1)));
+			offset += xdt_process_rec(cpuid, rec);
+		}
+
+		membar_exit(); /* read data /then/ update cons */
+		tbuf.meta[cpuid]->cons = prod;
 	}
 }
 
@@ -917,7 +987,7 @@ xdt_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	xdt_ncpus = xen_get_nphyscpus();
+	xdt_ncpus = xpv_nr_phys_cpus();
 	ASSERT(xdt_ncpus > 0);
 
 	if (ddi_create_minor_node(devi, "xdt", S_IFCHR, 0, DDI_PSEUDO, 0) ==
@@ -1028,7 +1098,7 @@ static struct dev_ops xdt_ops = {
 	&xdt_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
 	NULL,			/* power(9E) */
-	ddi_quiesce_not_needed,		/* devo_quiesce */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 

@@ -120,7 +120,15 @@ uint_t enable486;
 /*
  * This is set to platform type Solaris is running on.
  */
-static int platform_type = HW_NATIVE;
+static int platform_type = -1;
+
+#if !defined(__xpv)
+/*
+ * Variable to patch if hypervisor platform detection needs to be
+ * disabled (e.g. platform_type will always be HW_NATIVE if this is 0).
+ */
+int enable_platform_detection = 1;
+#endif
 
 /*
  * monitor/mwait info.
@@ -441,6 +449,11 @@ determine_platform()
 	char *xen_str;
 	uint32_t xen_signature[4];
 
+	platform_type = HW_NATIVE;
+
+	if (!enable_platform_detection)
+		return;
+
 	/*
 	 * In a fully virtualized domain, Xen's pseudo-cpuid function
 	 * 0x40000000 returns a string representing the Xen signature in
@@ -464,6 +477,9 @@ determine_platform()
 int
 get_hwenv(void)
 {
+	if (platform_type == -1)
+		determine_platform();
+
 	return (platform_type);
 }
 

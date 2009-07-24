@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -786,6 +786,12 @@ blk_ring_request_get(blk_ring_t ring, blkif_request_t *req)
 
 
 	mutex_enter(&ring->ri_mutex);
+
+	if (ring->ri_if_status != BLK_IF_CONNECTED) {
+		mutex_exit(&ring->ri_mutex);
+		return (B_FALSE);
+	}
+
 	src = xvdi_ring_get_request(ring->ri_ring);
 	if (src == NULL) {
 		mutex_exit(&ring->ri_mutex);
@@ -837,7 +843,16 @@ blk_ring_request_get(blk_ring_t ring, blkif_request_t *req)
 void
 blk_ring_request_requeue(blk_ring_t ring)
 {
+	mutex_enter(&ring->ri_mutex);
+
+	if (ring->ri_if_status != BLK_IF_CONNECTED) {
+		mutex_exit(&ring->ri_mutex);
+		return;
+	}
+
 	ring->ri_ring->xr_sring.br.req_cons--;
+
+	mutex_exit(&ring->ri_mutex);
 }
 
 
@@ -847,9 +862,18 @@ blk_ring_request_requeue(blk_ring_t ring)
 void
 blk_ring_response_put(blk_ring_t ring, blkif_response_t *src)
 {
-	blkif_response_t *rsp = xvdi_ring_get_response(ring->ri_ring);
+	blkif_response_t *rsp;
 	int e;
 
+
+	mutex_enter(&ring->ri_mutex);
+
+	if (ring->ri_if_status != BLK_IF_CONNECTED) {
+		mutex_exit(&ring->ri_mutex);
+		return;
+	}
+
+	rsp = xvdi_ring_get_response(ring->ri_ring);
 	ASSERT(rsp);
 
 	switch (ring->ri_protocol) {
@@ -872,6 +896,8 @@ blk_ring_response_put(blk_ring_t ring, blkif_response_t *src)
 	if (e != 0) {
 		xvdi_notify_oe(ring->ri_dip);
 	}
+
+	mutex_exit(&ring->ri_mutex);
 }
 
 

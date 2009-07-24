@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 #
@@ -29,8 +29,8 @@
 
 interval=$1
 
-xs_ipaddr_path="ipaddr/0"
-xs_link_path="device-misc/vif/default-link"
+xs_ipaddr_path="guest/ipv4/0/address"
+xs_link_path="guest/ipv4/default-link"
 link=""
 
 #
@@ -38,7 +38,7 @@ link=""
 #
 link_to_addr()
 {
-	tmp=`netstat -I $1 -in | awk '{print $4}' | grep -v Address`;
+	tmp=`netstat -I $1 -in -f inet | awk '{print $4}' | grep -v Address`;
 	if [ -z "$tmp" ] || [ "$tmp" = "0.0.0.0" ];
 	then
 		addr="(none)";

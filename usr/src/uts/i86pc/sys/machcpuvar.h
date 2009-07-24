@@ -125,6 +125,7 @@ struct	machcpu {
 	uint64_t	mcpu_gdtpa;	/* hypervisor: GDT physical address */
 
 	uint16_t mcpu_intr_pending;	/* hypervisor: pending intrpt levels */
+	uint16_t mcpu_ec_mbox;		/* hypervisor: evtchn_dev mailbox */
 	struct xen_evt_data *mcpu_evt_pend; /* hypervisor: pending events */
 
 	volatile uint32_t *mcpu_mwait;	/* MONITOR/MWAIT buffer */

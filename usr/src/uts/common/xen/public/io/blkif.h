@@ -54,16 +54,27 @@
 #define BLKIF_OP_WRITE             1
 /*
  * Recognised only if "feature-barrier" is present in backend xenbus info.
- * The "feature_barrier" node contains a boolean indicating whether barrier
- * requests or disk cache flush requests are likely to succeed or fail.
- * Either way, a barrier request or a disk cache flush request
+ * The "feature-barrier" node contains a boolean indicating whether barrier
+ * requests are likely to succeed or fail. Either way, a barrier request
  * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
  * the underlying block-device hardware. The boolean simply indicates whether
- * or not it is worthwhile for the frontend to attempt barrier/flush requests.
+ * or not it is worthwhile for the frontend to attempt barrier requests.
  * If a backend does not recognise BLKIF_OP_WRITE_BARRIER, it should *not*
  * create the "feature-barrier" node!
  */
 #define BLKIF_OP_WRITE_BARRIER     2
+/*
+ * Recognised if "feature-flush-cache" is present in backend xenbus
+ * info.  A flush will ask the underlying storage hardware to flush its
+ * non-volatile caches as appropriate.  The "feature-flush-cache" node
+ * contains a boolean indicating whether flush requests are likely to
+ * succeed or fail. Either way, a flush request may fail at any time
+ * with BLKIF_RSP_EOPNOTSUPP if it is unsupported by the underlying
+ * block-device hardware. The boolean simply indicates whether or not it
+ * is worthwhile for the frontend to attempt flushes.  If a backend does
+ * not recognise BLKIF_OP_WRITE_FLUSH_CACHE, it should *not* create the
+ * "feature-flush-cache" node!
+ */
 #define BLKIF_OP_FLUSH_DISKCACHE   3
 
 /*

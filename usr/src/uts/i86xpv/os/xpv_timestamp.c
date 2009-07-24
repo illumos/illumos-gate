@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/clock.h>
@@ -68,8 +66,8 @@
  *	a hypervisor interface, as hrtime_addend may well be non-zero.
  */
 
+int hrtime_fake_mt = 1;
 static volatile hrtime_t hrtime_last;
-static int hrtime_fake_mt = 1;
 static hrtime_t hrtime_suspend_time;
 static hrtime_t hrtime_addend;
 

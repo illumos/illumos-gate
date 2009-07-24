@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,7 +185,9 @@ typedef struct xkb {
 	mmu_info_t xkb_mmu;
 	debug_info_t xkb_info;
 
-	struct vcpu_guest_context *xkb_vcpus;
+	void *xkb_vcpu_data;
+	size_t xkb_vcpu_data_sz;
+	struct vcpu_guest_context **xkb_vcpus;
 
 	char *xkb_pages;
 	mfn_t *xkb_p2m;
@@ -299,9 +301,21 @@ xkb_identify(const char *file, int *longmode)
 		vers = (struct xc_elf_version *)desc;
 
 		if (strstr(vers->xev_capabilities, "x86_64")) {
-			*longmode = 1;
+			/*
+			 * 64-bit hypervisor, but it can still be
+			 * a 32-bit domain core. 32-bit domain cores
+			 * are also dumped in Elf64 format, but they
+			 * have e_machine set to EM_386, not EM_AMD64.
+			 */
+			if (gf->gf_ehdr.e_machine == EM_386)
+				*longmode = 0;
+			else
+				*longmode = 1;
 		} else if (strstr(vers->xev_capabilities, "x86_32") ||
 		    strstr(vers->xev_capabilities, "x86_32p")) {
+			/*
+			 * 32-bit hypervisor, can only be a 32-bit core.
+			 */
 			*longmode = 0;
 		} else {
 			mdb_warn("couldn't derive word size of dump; "
@@ -480,12 +494,13 @@ xkb_build_fake_p2m(xkb_t *xkb)
 	}
 
 	for (i = 0; i < xkb->xkb_nr_pages; i++) {
-		if (p2pfn[i] > xkb->xkb_max_pfn)
+		if (p2pfn[i] != PFN_INVALID && p2pfn[i] > xkb->xkb_max_pfn)
 			xkb->xkb_max_pfn = p2pfn[i];
 	}
 
 	size = sizeof (xen_pfn_t) * (xkb->xkb_max_pfn + 1);
 	xkb->xkb_p2m = mdb_alloc(size, UM_SLEEP);
+
 	size = sizeof (size_t) * (xkb->xkb_max_pfn + 1);
 	xe->xe_off = mdb_alloc(size, UM_SLEEP);
 
@@ -495,6 +510,8 @@ xkb_build_fake_p2m(xkb_t *xkb)
 	}
 
 	for (i = 0; i < xkb->xkb_nr_pages; i++) {
+		if (p2pfn[i] == PFN_INVALID)
+			continue;
 		xkb->xkb_p2m[p2pfn[i]] = p2pfn[i];
 		xe->xe_off[p2pfn[i]] = i;
 	}
@@ -531,7 +548,7 @@ xkb_as_to_mfn(xkb_t *xkb, struct as *as)
 static mfn_t
 xkb_cr3_to_pfn(xkb_t *xkb)
 {
-	uint64_t cr3 = xkb->xkb_vcpus[0].ctrlreg[3];
+	uint64_t cr3 = xkb->xkb_vcpus[0]->ctrlreg[3];
 	if (xkb->xkb_is_hvm)
 		return (cr3 >> PAGE_SHIFT);
 	return (xen_cr3_to_pfn(cr3));
@@ -1043,6 +1060,8 @@ xkb_open_core(xkb_t *xkb)
 {
 	xkb_core_t *xc = &xkb->xkb_core;
 	size_t sz;
+	int i;
+	struct vcpu_guest_context *vcp;
 
 	xkb->xkb_type = XKB_FORMAT_CORE;
 
@@ -1070,13 +1089,20 @@ xkb_open_core(xkb_t *xkb)
 	xkb->xkb_max_pfn = xc->xc_hdr.xch_nr_pages - 1;
 	xkb->xkb_nr_vcpus = xc->xc_hdr.xch_nr_vcpus;
 
-	sz = xkb->xkb_nr_vcpus * sizeof (*xkb->xkb_vcpus);
+	sz = xkb->xkb_nr_vcpus * sizeof (struct vcpu_guest_context);
+	xkb->xkb_vcpu_data_sz = sz;
+	xkb->xkb_vcpu_data = mdb_alloc(sz, UM_SLEEP);
 
-	xkb->xkb_vcpus = mdb_alloc(sz, UM_SLEEP);
-
-	if (pread64(xkb->xkb_fd, xkb->xkb_vcpus, sz,
+	if (pread64(xkb->xkb_fd, xkb->xkb_vcpu_data, sz,
 	    xc->xc_hdr.xch_ctxt_offset) != sz)
 		return (xkb_fail(xkb, "cannot read VCPU contexts"));
+
+	sz = xkb->xkb_nr_vcpus * sizeof (struct vcpu_guest_context *);
+	xkb->xkb_vcpus = mdb_alloc(sz, UM_SLEEP);
+
+	vcp = xkb->xkb_vcpu_data;
+	for (i = 0; i < xkb->xkb_nr_vcpus; i++)
+		xkb->xkb_vcpus[i] = &vcp[i];
 
 	/*
 	 * Try to map all the data pages. If we can't, fall back to the
@@ -1108,6 +1134,9 @@ xkb_open_elf(xkb_t *xkb)
 	char *notes;
 	char *pos;
 	mdb_io_t *io;
+	size_t sz;
+	int i;
+	void *dp;
 
 	if ((io = mdb_fdio_create_path(NULL, xkb->xkb_path,
 	    O_RDONLY, 0)) == NULL)
@@ -1163,7 +1192,7 @@ xkb_open_elf(xkb_t *xkb)
 			break;
 
 		case XEN_ELFNOTE_DUMPCORE_XEN_VERSION:
-			if (nhdr->n_descsz != sizeof (struct xc_elf_version)) {
+			if (nhdr->n_descsz < sizeof (struct xc_elf_version)) {
 				return (xkb_fail(xkb, "invalid ELF note "
 				    "XEN_ELFNOTE_DUMPCORE_XEN_VERSION\n"));
 			}
@@ -1212,13 +1241,29 @@ xkb_open_elf(xkb_t *xkb)
 	if (sect == NULL)
 		return (xkb_fail(xkb, "cannot find section .xen_prstatus"));
 
-	if (sect->gs_shdr.sh_entsize != sizeof (vcpu_guest_context_t))
+	if (sect->gs_shdr.sh_entsize < sizeof (vcpu_guest_context_t))
 		return (xkb_fail(xkb, "invalid section .xen_prstatus"));
 
 	xkb->xkb_nr_vcpus = sect->gs_shdr.sh_size / sect->gs_shdr.sh_entsize;
 
-	if ((xkb->xkb_vcpus = mdb_gelf_sect_load(xe->xe_gelf, sect)) == NULL)
+	xkb->xkb_vcpu_data = mdb_gelf_sect_load(xe->xe_gelf, sect);
+	if (xkb->xkb_vcpu_data == NULL)
 		return (xkb_fail(xkb, "cannot load section .xen_prstatus"));
+	xkb->xkb_vcpu_data_sz = sect->gs_shdr.sh_size;
+
+	/*
+	 * The vcpu_guest_context structures saved in the core file
+	 * are actually unions of the 64-bit and 32-bit versions.
+	 * Don't rely on the entry size to match the size of
+	 * the structure, but set up an array of pointers.
+	 */
+	sz = xkb->xkb_nr_vcpus * sizeof (struct vcpu_guest_context *);
+	xkb->xkb_vcpus = mdb_alloc(sz, UM_SLEEP);
+	for (i = 0; i < xkb->xkb_nr_vcpus; i++) {
+		dp = ((char *)xkb->xkb_vcpu_data +
+		    i * sect->gs_shdr.sh_entsize);
+		xkb->xkb_vcpus[i] = dp;
+	}
 
 	sect = mdb_gelf_sect_by_name(xe->xe_gelf, ".xen_pages");
 
@@ -1353,7 +1398,7 @@ xkb_open(const char *namelist, const char *corefile, const char *swapfile,
 int
 xkb_close(xkb_t *xkb)
 {
-	size_t i;
+	size_t i, sz;
 
 	if (xkb == NULL)
 		return (0);
@@ -1383,7 +1428,6 @@ xkb_close(xkb_t *xkb)
 
 	if (xkb->xkb_type == XKB_FORMAT_ELF) {
 		xkb_elf_t *xe = &xkb->xkb_elf;
-		size_t sz;
 
 		if (xe->xe_gelf != NULL)
 			mdb_gelf_destroy(xe->xe_gelf);
@@ -1397,9 +1441,9 @@ xkb_close(xkb_t *xkb)
 
 		if (xe->xe_off != NULL)
 			mdb_free(xe->xe_off, sz);
+
 	} else if (xkb->xkb_type == XKB_FORMAT_CORE) {
 		xkb_core_t *xc = &xkb->xkb_core;
-		size_t sz;
 
 		if (xkb->xkb_fd != -1)
 			(void) close(xkb->xkb_fd);
@@ -1410,11 +1454,14 @@ xkb_close(xkb_t *xkb)
 		if (xc->xc_p2m_buf != (xen_pfn_t *)MAP_FAILED)
 			(void) munmap(xc->xc_p2m_buf, sz);
 
-		if (xkb->xkb_vcpus != NULL) {
-			sz = sizeof (struct vcpu_guest_context) *
-			    xkb->xkb_nr_vcpus;
-			mdb_free(xkb->xkb_vcpus, sz);
-		}
+		if (xkb->xkb_vcpu_data != NULL)
+			mdb_free(xkb->xkb_vcpu_data, xkb->xkb_vcpu_data_sz);
+	}
+
+	if (xkb->xkb_vcpus != NULL) {
+		sz = sizeof (struct vcpu_guest_context *) *
+		    xkb->xkb_nr_vcpus;
+		mdb_free(xkb->xkb_vcpus, sz);
 	}
 
 	free(xkb->xkb_path);
@@ -1467,7 +1514,7 @@ xkb_getmregs(xkb_t *xkb, uint_t cpu, struct privmregs *mregs)
 
 	bzero(mregs, sizeof (*mregs));
 
-	vcpu = &xkb->xkb_vcpus[cpu];
+	vcpu = xkb->xkb_vcpus[cpu];
 	ur = &vcpu->user_regs;
 	regs = &mregs->pm_gregs;
 

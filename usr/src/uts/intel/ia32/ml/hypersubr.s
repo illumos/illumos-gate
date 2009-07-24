@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
-#ifdef XPV_HVM_DRIVER
+#ifndef __xpv
 #include <sys/xpv_support.h>
 #endif
 #include <sys/hypervisor.h>
@@ -142,9 +140,19 @@ __hypercall5_int(int callnum,
  * hypercall page requires a call and several more instructions than simply
  * issuing the proper trap.
  */
-#if defined(XPV_HVM_DRIVER)
+#if !defined(__xpv)
 
-#define	HYPERCALL_PAGESIZE	0x1000
+#define	HYPERCALL_PAGESIZE		0x1000
+#define	HYPERCALL_SHINFO_PAGESIZE	0x1000
+
+	.data
+	.align	HYPERCALL_SHINFO_PAGESIZE
+	.globl	hypercall_shared_info_page
+	.type	hypercall_shared_info_page, @object
+	.size	hypercall_shared_info_page, HYPERCALL_SHINFO_PAGESIZE
+hypercall_shared_info_page:
+	.skip	HYPERCALL_SHINFO_PAGESIZE
+
 	.text
 	.align	HYPERCALL_PAGESIZE
 	.globl	hypercall_page
@@ -164,14 +172,14 @@ hypercall_page:
 	call	*%eax
 #endif
 
-#else /* XPV_HVM_DRIVER */
+#else /* !_xpv */
 
 #if defined(__amd64)
 #define	TRAP_INSTR	syscall
 #elif defined(__i386)
 #define	TRAP_INSTR	int $0x82
 #endif
-#endif /* XPV_HVM_DRIVER */
+#endif /* !__xpv */
 
 
 #if defined(__amd64) 

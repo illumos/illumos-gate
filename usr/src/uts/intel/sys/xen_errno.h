@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_XEN_ERRNO_H
 #define	_SYS_XEN_ERRNO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,7 +41,7 @@ extern "C" {
  *
  * This set of errno values match Xen 3.0.3; sigh.
  *
- * In a better world, Xen would make it's namespace explicitly different
+ * In a better world, Xen would make its namespace explicitly different
  * e.g. something like below.
  */
 
@@ -55,6 +53,7 @@ extern "C" {
 #define	X_ENXIO		6
 #define	X_E2BIG		7
 
+#define	X_EAGAIN	11
 #define	X_ENOMEM	12
 #define	X_EACCES	13
 #define	X_EFAULT	14

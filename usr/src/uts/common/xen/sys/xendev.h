@@ -30,7 +30,7 @@
 
 #include <sys/hypervisor.h>
 #include <sys/taskq.h>
-#ifdef	XPV_HVM_DRIVER
+#ifndef	__xpv
 #include <public/io/ring.h>
 #include <public/event_channel.h>
 #include <public/grant_table.h>

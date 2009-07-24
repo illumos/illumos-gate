@@ -1538,7 +1538,7 @@ startup_modules(void)
 	clconf_init();
 
 #if defined(__xpv)
-	ec_init();
+	(void) ec_init();
 	gnttab_init();
 	(void) xs_early_init();
 #endif /* __xpv */

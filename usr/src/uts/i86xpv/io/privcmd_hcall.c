@@ -19,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#include <sys/xpv_user.h>
 
 #include <sys/types.h>
 #include <sys/file.h>
@@ -55,6 +57,18 @@ static import_export_t null_ie = {NULL, NULL, 0, 0};
 #define	IE_EXPORT	0x0002		/* Data needs to be copied out */
 #define	IE_FREE		0x0004
 #define	IE_IMPEXP	(IE_IMPORT | IE_EXPORT)
+
+static void *
+uaddr_from_handle(void *field)
+{
+	struct { void *p; } *hdl = field;
+	void *ptr;
+
+	/*LINTED: constant in conditional context*/
+	get_xen_guest_handle(ptr, (*hdl));
+	return (ptr);
+}
+
 
 /*
  * Import a buffer from user-space.  If the caller provides a kernel
@@ -137,8 +151,7 @@ import_handle(import_export_t *iep, void *field, size_t size, int flags)
 	void *ptr;
 	int err;
 
-	/*LINTED: constant in conditional context*/
-	get_xen_guest_handle(ptr, (*hdl));
+	ptr = uaddr_from_handle(field);
 	err = import_buffer(iep, ptr, NULL, size, (flags));
 	if (err == 0) {
 		/*LINTED: constant in conditional context*/
@@ -228,17 +241,11 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 		DTRACE_XPV1(dom__unpause__start, domid_t, op.domain);
 		break;
 
-	case XEN_DOMCTL_getdomaininfo:
-		break;
-
 	case XEN_DOMCTL_getmemlist: {
 		error = import_handle(&sub_ie, &op.u.getmemlist.buffer,
 		    op.u.getmemlist.max_pfns * sizeof (xen_pfn_t), IE_EXPORT);
 		break;
 	}
-
-	case XEN_DOMCTL_getpageframeinfo:
-		break;
 
 	case XEN_DOMCTL_getpageframeinfo2: {
 		error = import_handle(&sub_ie, &op.u.getpageframeinfo2.array,
@@ -255,9 +262,6 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 		    &op.u.shadow_op.dirty_bitmap, size, IE_IMPEXP);
 		break;
 	}
-
-	case XEN_DOMCTL_max_mem:
-		break;
 
 	case XEN_DOMCTL_setvcpucontext: {
 		vcpu_guest_context_t *taddr;
@@ -297,6 +301,9 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 		break;
 	}
 
+	case XEN_DOMCTL_getdomaininfo:
+	case XEN_DOMCTL_getpageframeinfo:
+	case XEN_DOMCTL_max_mem:
 	case XEN_DOMCTL_resumedomain:
 	case XEN_DOMCTL_getvcpuinfo:
 	case XEN_DOMCTL_setvcpuaffinity:
@@ -312,8 +319,25 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 	case XEN_DOMCTL_arch_setup:
 	case XEN_DOMCTL_settimeoffset:
 	case XEN_DOMCTL_real_mode_area:
-	case XEN_DOMCTL_set_address_size:
 	case XEN_DOMCTL_sendtrigger:
+	case XEN_DOMCTL_assign_device:
+	case XEN_DOMCTL_bind_pt_irq:
+	case XEN_DOMCTL_get_address_size:
+	case XEN_DOMCTL_set_address_size:
+	case XEN_DOMCTL_get_ext_vcpucontext:
+	case XEN_DOMCTL_set_ext_vcpucontext:
+	case XEN_DOMCTL_set_opt_feature:
+	case XEN_DOMCTL_memory_mapping:
+	case XEN_DOMCTL_ioport_mapping:
+	case XEN_DOMCTL_pin_mem_cacheattr:
+	case XEN_DOMCTL_test_assign_device:
+	case XEN_DOMCTL_set_target:
+	case XEN_DOMCTL_deassign_device:
+	case XEN_DOMCTL_set_cpuid:
+	case XEN_DOMCTL_get_device_group:
+	case XEN_DOMCTL_get_machine_address_size:
+	case XEN_DOMCTL_set_machine_address_size:
+	case XEN_DOMCTL_suppress_spurious_page_faults:
 		break;
 
 	default:
@@ -355,7 +379,7 @@ privcmd_HYPERVISOR_domctl(xen_domctl_t *opp)
 static int
 privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 {
-	xen_sysctl_t op;
+	xen_sysctl_t op, dop;
 	import_export_t op_ie, sub_ie, sub2_ie;
 	int error = 0;
 
@@ -388,9 +412,94 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 	}
 
 	case XEN_SYSCTL_tbuf_op:
-	case XEN_SYSCTL_physinfo:
-	case XEN_SYSCTL_sched_id:
+	case XEN_SYSCTL_physinfo: {
+		if (uaddr_from_handle(&op.u.physinfo.cpu_to_node) != NULL &&
+		    op.u.physinfo.max_cpu_id != 0) {
+			error = import_handle(&sub_ie,
+			    &op.u.physinfo.cpu_to_node,
+			    op.u.physinfo.max_cpu_id * sizeof (uint32_t),
+			    IE_EXPORT);
+		}
 		break;
+	}
+	case XEN_SYSCTL_sched_id:
+	case XEN_SYSCTL_availheap:
+	case XEN_SYSCTL_cpu_hotplug:
+		break;
+	case XEN_SYSCTL_get_pmstat: {
+		unsigned int maxs;
+
+		switch (op.u.get_pmstat.type) {
+		case PMSTAT_get_pxstat:
+			/*
+			 * This interface is broken. Xen always copies out
+			 * all the state information, and the interface
+			 * does not specify how much space the caller has
+			 * reserved. So, the only thing to do is just mirror
+			 * the hypervisor and libxc behavior, and use the
+			 * maximum amount of data.
+			 */
+			dop.cmd = XEN_SYSCTL_get_pmstat;
+			dop.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+			dop.u.get_pmstat.cpuid = op.u.get_pmstat.cpuid;
+			dop.u.get_pmstat.type = PMSTAT_get_max_px;
+			error = HYPERVISOR_sysctl(&dop);
+			if (error != 0)
+				break;
+
+			maxs = dop.u.get_pmstat.u.getpx.total;
+			if (maxs == 0) {
+				error = -X_EINVAL;
+				break;
+			}
+
+			error = import_handle(&sub_ie,
+			    &op.u.get_pmstat.u.getpx.trans_pt,
+			    maxs * maxs * sizeof (uint64_t), IE_EXPORT);
+			if (error != 0)
+				break;
+
+			error = import_handle(&sub2_ie,
+			    &op.u.get_pmstat.u.getpx.pt,
+			    maxs * sizeof (pm_px_val_t), IE_EXPORT);
+			break;
+		case PMSTAT_get_cxstat:
+			/* See above */
+			dop.cmd = XEN_SYSCTL_get_pmstat;
+			dop.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+			dop.u.get_pmstat.cpuid = op.u.get_pmstat.cpuid;
+			dop.u.get_pmstat.type = PMSTAT_get_max_cx;
+			error = HYPERVISOR_sysctl(&dop);
+			if (error != 0)
+				break;
+
+			maxs = dop.u.get_pmstat.u.getcx.nr;
+			if (maxs == 0) {
+				error = -X_EINVAL;
+				break;
+			}
+
+			error = import_handle(&sub_ie,
+			    &op.u.get_pmstat.u.getcx.triggers,
+			    maxs * sizeof (uint64_t), IE_EXPORT);
+			if (error != 0)
+				break;
+			error = import_handle(&sub2_ie,
+			    &op.u.get_pmstat.u.getcx.residencies,
+			    maxs * sizeof (uint64_t), IE_EXPORT);
+			break;
+
+		case PMSTAT_get_max_px:
+		case PMSTAT_reset_pxstat:
+		case PMSTAT_get_max_cx:
+		case PMSTAT_reset_cxstat:
+			break;
+		default:
+			error = -X_EINVAL;
+			break;
+		}
+		break;
+	}
 
 	case XEN_SYSCTL_perfc_op: {
 		xen_sysctl_perfc_desc_t *scdp;
@@ -407,8 +516,6 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 			static int numvals = -1;
 
 			if (numcounters == -1) {
-				xen_sysctl_t dop;
-
 				dop.cmd = XEN_SYSCTL_perfc_op;
 				dop.interface_version =
 				    XEN_SYSCTL_INTERFACE_VERSION;
@@ -470,7 +577,7 @@ privcmd_HYPERVISOR_sysctl(xen_sysctl_t *opp)
 static int
 privcmd_HYPERVISOR_platform_op(xen_platform_op_t *opp)
 {
-	import_export_t op_ie, sub_ie;
+	import_export_t op_ie, sub_ie, sub2_ie;
 	xen_platform_op_t op;
 	int error;
 
@@ -478,6 +585,7 @@ privcmd_HYPERVISOR_platform_op(xen_platform_op_t *opp)
 		return (-X_EFAULT);
 
 	sub_ie = null_ie;
+	sub2_ie = null_ie;
 
 	/*
 	 * Check this first because our wrapper will forcibly overwrite it.
@@ -499,16 +607,88 @@ privcmd_HYPERVISOR_platform_op(xen_platform_op_t *opp)
 	case XENPF_del_memtype:
 	case XENPF_read_memtype:
 	case XENPF_platform_quirk:
+	case XENPF_enter_acpi_sleep:
+	case XENPF_change_freq:
+	case XENPF_panic_init:
 		break;
 
 	case XENPF_microcode_update:
 		error = import_handle(&sub_ie, &op.u.microcode.data,
 		    op.u.microcode.length, IE_IMPORT);
 		break;
+	case XENPF_getidletime:
+		error = import_handle(&sub_ie, &op.u.getidletime.cpumap_bitmap,
+		    op.u.getidletime.cpumap_nr_cpus, IE_IMPEXP);
+		if (error != 0)
+			break;
 
+		error = import_handle(&sub2_ie, &op.u.getidletime.idletime,
+		    op.u.getidletime.cpumap_nr_cpus * sizeof (uint64_t),
+		    IE_EXPORT);
+		break;
+
+	case XENPF_set_processor_pminfo: {
+		size_t s;
+
+		switch (op.u.set_pminfo.type) {
+		case XEN_PM_PX:
+			s = op.u.set_pminfo.u.perf.state_count *
+			    sizeof (xen_processor_px_t);
+			if (op.u.set_pminfo.u.perf.flags & XEN_PX_PSS) {
+				error = import_handle(&sub_ie,
+				    &op.u.set_pminfo.u.perf.states, s,
+				    IE_IMPORT);
+			}
+			break;
+		case XEN_PM_CX:
+			s = op.u.set_pminfo.u.power.count *
+			    sizeof (xen_processor_cx_t);
+			error = import_handle(&sub_ie,
+			    &op.u.set_pminfo.u.power.states, s, IE_IMPORT);
+			break;
+		case XEN_PM_TX:
+			break;
+		default:
+			error = -X_EINVAL;
+			break;
+		}
+		break;
+	}
+	case XENPF_firmware_info: {
+		uint16_t len;
+		void *uaddr;
+
+		switch (op.u.firmware_info.type) {
+		case XEN_FW_DISK_INFO:
+			/*
+			 * Ugh.. another hokey interface. The first 16 bits
+			 * of the buffer are also used as the (input) length.
+			 */
+			uaddr = uaddr_from_handle(
+			    &op.u.firmware_info.u.disk_info.edd_params);
+			error = ddi_copyin(uaddr, &len, sizeof (len), 0);
+			if (error != 0)
+				break;
+			error = import_handle(&sub_ie,
+			    &op.u.firmware_info.u.disk_info.edd_params, len,
+			    IE_IMPEXP);
+			break;
+		case XEN_FW_VBEDDC_INFO:
+			error = import_handle(&sub_ie,
+			    &op.u.firmware_info.u.vbeddc_info.edid, 128,
+			    IE_EXPORT);
+			break;
+		case XEN_FW_DISK_MBR_SIGNATURE:
+		default:
+			break;
+		}
+		break;
+	}
 	default:
+		/* FIXME: see this with non-existed ID 38 ???? */
 #ifdef DEBUG
-		printf("unrecognized HYPERVISOR_platform_op %d\n", op.cmd);
+		printf("unrecognized HYPERVISOR_platform_op %d pid %d\n",
+		    op.cmd, curthread->t_procp->p_pid);
 #endif
 		return (-X_EINVAL);
 	}
@@ -518,6 +698,7 @@ privcmd_HYPERVISOR_platform_op(xen_platform_op_t *opp)
 
 	export_buffer(&op_ie, &error);
 	export_buffer(&sub_ie, &error);
+	export_buffer(&sub2_ie, &error);
 
 	return (error);
 }
@@ -833,7 +1014,7 @@ privcmd_HYPERVISOR_xen_version(int cmd, void *arg)
 }
 
 static int
-privcmd_HYPERVISOR_acm_op(void *uacmctl)
+privcmd_HYPERVISOR_xsm_op(void *uacmctl)
 {
 	int error;
 	struct xen_acmctl *acmctl;
@@ -857,6 +1038,8 @@ privcmd_HYPERVISOR_acm_op(void *uacmctl)
 		return (error);
 	}
 
+	/* FIXME: flask ops??? */
+
 	switch (acmctl->cmd) {
 	case ACMOP_setpolicy:
 	case ACMOP_getpolicy:
@@ -865,16 +1048,17 @@ privcmd_HYPERVISOR_acm_op(void *uacmctl)
 	case ACMOP_getdecision:
 	case ACMOP_chgpolicy:
 	case ACMOP_relabeldoms:
+		/* flags = IE_IMPEXP; */
 		break;
 	default:
 #ifdef DEBUG
-		printf("unrecognized HYPERVISOR_acm_op op %d\n", acmctl->cmd);
+		printf("unrecognized HYPERVISOR_xsm_op op %d\n", acmctl->cmd);
 #endif
 		return (-X_EINVAL);
 	}
 
 	if (error == 0)
-		error = HYPERVISOR_acm_op(acmctl);
+		error = HYPERVISOR_xsm_op(acmctl);
 	export_buffer(&op_ie, &error);
 
 	return (error);
@@ -940,6 +1124,15 @@ privcmd_HYPERVISOR_hvm_op(int cmd, void *arg)
 	case HVMOP_set_pci_link_route:
 		size = sizeof (struct xen_hvm_set_pci_link_route);
 		break;
+	case HVMOP_track_dirty_vram:
+		size = sizeof (struct xen_hvm_track_dirty_vram);
+		break;
+	case HVMOP_modified_memory:
+		size = sizeof (struct xen_hvm_modified_memory);
+		break;
+	case HVMOP_set_mem_type:
+		size = sizeof (struct xen_hvm_set_mem_type);
+		break;
 
 	default:
 #ifdef DEBUG
@@ -979,40 +1172,6 @@ privcmd_HYPERVISOR_sched_op(int cmd, void *arg)
 	if (error == 0)
 		error = HYPERVISOR_sched_op(cmd, (arg == NULL) ? NULL : &op);
 	export_buffer(&op_ie, &error);
-
-	return (error);
-}
-
-static int
-privcmd_HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *uargp)
-{
-	xen_mc_arg_t cmdarg;
-	import_export_t cmdarg_ie, sub_ie;
-	int error = 0;
-
-	if (import_buffer(&cmdarg_ie, uargp, &cmdarg, sizeof (cmdarg),
-	    IE_IMPEXP) != 0)
-		return (-X_EFAULT);
-
-	sub_ie = null_ie;
-
-	switch (cmd) {
-	case XEN_MC_CMD_physcpuinfo:
-		error = import_handle(&sub_ie, &cmdarg.mc_physcpuinfo.info,
-		    (cmdarg.mc_physcpuinfo.ncpus *
-		    sizeof (xen_mc_logical_cpu_t)), IE_EXPORT);
-		break;
-	case XEN_MC_CMD_offlinecpu:
-		break;
-	default:
-		return (-X_EINVAL);
-	}
-
-	if (error == 0)
-		error = HYPERVISOR_mca(cmd, &cmdarg);
-
-	export_buffer(&cmdarg_ie, &error);
-	export_buffer(&sub_ie, &error);
 
 	return (error);
 }
@@ -1065,8 +1224,8 @@ do_privcmd_hypercall(void *uarg, int mode, cred_t *cr, int *rval)
 		    (struct mmuext_op *)hc->arg[0], (int)hc->arg[1],
 		    (uint_t *)hc->arg[2], (domid_t)hc->arg[3]);
 		break;
-	case __HYPERVISOR_acm_op:
-		error = privcmd_HYPERVISOR_acm_op((void *)hc->arg[0]);
+	case __HYPERVISOR_xsm_op:
+		error = privcmd_HYPERVISOR_xsm_op((void *)hc->arg[0]);
 		break;
 	case __HYPERVISOR_hvm_op:
 		error = privcmd_HYPERVISOR_hvm_op(
@@ -1075,10 +1234,6 @@ do_privcmd_hypercall(void *uarg, int mode, cred_t *cr, int *rval)
 	case __HYPERVISOR_sched_op:
 		error = privcmd_HYPERVISOR_sched_op(
 		    (int)hc->arg[0], (void *)hc->arg[1]);
-		break;
-	case __HYPERVISOR_mca:
-		error = privcmd_HYPERVISOR_mca((uint32_t)hc->arg[0],
-		    (xen_mc_arg_t *)hc->arg[1]);
 		break;
 	default:
 		if (allow_all_hypercalls)

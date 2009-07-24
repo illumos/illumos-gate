@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,7 @@ ec_bind_evtchn_to_handler(int evtchn, pri_t pri, ec_handler_fcn_t handler,
 {
 	ddi_softint_handle_t hdl;
 
-	if (evtchn < 0 || evtchn > NR_EVENT_CHANNELS) {
+	if (evtchn < 0 || evtchn >= NR_EVENT_CHANNELS) {
 		cmn_err(CE_WARN, "Binding invalid event channel: %d", evtchn);
 		return;
 	}
@@ -102,7 +102,7 @@ ec_unbind_evtchn(int evtchn)
 	evtchn_close_t close;
 	ddi_softint_handle_t hdl;
 
-	if (evtchn < 0 || evtchn > NR_EVENT_CHANNELS) {
+	if (evtchn < 0 || evtchn >= NR_EVENT_CHANNELS) {
 		cmn_err(CE_WARN, "Unbinding invalid event channel: %d", evtchn);
 		return;
 	}
@@ -321,7 +321,7 @@ ec_fini()
 }
 
 int
-ec_init(dev_info_t *dip)
+ec_init(void)
 {
 	int i;
 	int rv, actual;
@@ -349,7 +349,7 @@ ec_init(dev_info_t *dip)
 	 * hypervisor's "hey you have events pending!" interrupt.
 	 */
 	ihp = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_SLEEP);
-	rv = ddi_intr_alloc(dip, ihp, DDI_INTR_TYPE_FIXED, 0, 1, &actual,
+	rv = ddi_intr_alloc(xpv_dip, ihp, DDI_INTR_TYPE_FIXED, 0, 1, &actual,
 	    DDI_INTR_ALLOC_NORMAL);
 	if (rv < 0 || actual != 1) {
 		cmn_err(CE_WARN, "Could not allocate evtchn interrupt: %d",

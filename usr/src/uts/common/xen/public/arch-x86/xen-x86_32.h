@@ -37,11 +37,7 @@
  */
 
 /*
- * XXPV HACK, we don't support the hypercall page yet.
- * #if __XEN_INTERFACE_VERSION__ < 0x00030203
- */
-/*
- * Legacy hypercall interface:
+ * Direct hypercall interface:
  * As above, except the entry sequence to the hypervisor is:
  *  mov $hypercall-number*32,%eax ; int $0x82
  */
@@ -50,10 +46,6 @@
 #else
 #define TRAP_INSTR int $0x82
 #endif
-/*
- * XXPV HACK, we don't support the hypercall page yet.
- * #endif
- */
 
 /*
  * These flat segments are in the Xen-private section of every GDT. Since these
@@ -84,6 +76,7 @@
 #define MACH2PHYS_VIRT_END_PAE         \
     mk_unsigned_long(__MACH2PHYS_VIRT_END_PAE)
 
+/* Non-PAE bounds are obsolete. */
 #define __HYPERVISOR_VIRT_START_NONPAE 0xFC000000
 #define __MACH2PHYS_VIRT_START_NONPAE  0xFC000000
 #define __MACH2PHYS_VIRT_END_NONPAE    0xFC400000
@@ -94,15 +87,9 @@
 #define MACH2PHYS_VIRT_END_NONPAE      \
     mk_unsigned_long(__MACH2PHYS_VIRT_END_NONPAE)
 
-#ifdef CONFIG_X86_PAE
 #define __HYPERVISOR_VIRT_START __HYPERVISOR_VIRT_START_PAE
 #define __MACH2PHYS_VIRT_START  __MACH2PHYS_VIRT_START_PAE
 #define __MACH2PHYS_VIRT_END    __MACH2PHYS_VIRT_END_PAE
-#else
-#define __HYPERVISOR_VIRT_START __HYPERVISOR_VIRT_START_NONPAE
-#define __MACH2PHYS_VIRT_START  __MACH2PHYS_VIRT_START_NONPAE
-#define __MACH2PHYS_VIRT_END    __MACH2PHYS_VIRT_END_NONPAE
-#endif
 
 #ifndef HYPERVISOR_VIRT_START
 #define HYPERVISOR_VIRT_START mk_unsigned_long(__HYPERVISOR_VIRT_START)
@@ -116,30 +103,39 @@
 #endif
 
 /* 32-/64-bit invariability for control interfaces (domctl/sysctl). */
-#undef __DEFINE_XEN_GUEST_HANDLE
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+#undef ___DEFINE_XEN_GUEST_HANDLE
 
 #ifdef __GNUC__
-#define __DEFINE_XEN_GUEST_HANDLE(name, type)                   \
+
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
     typedef struct { type *p; }                                 \
         __guest_handle_ ## name;                                \
     typedef struct { union { type *p; uint64_aligned_t q; }; }  \
         __guest_handle_64_ ## name
-#define uint64_aligned_t uint64_t __attribute__((aligned(8)))
-#else
-#define __DEFINE_XEN_GUEST_HANDLE(name, type)                   \
+
+#else /* __GNUC__ */
+
+/*
+ * Workaround for 6671857.
+ */
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
     typedef struct { type *p; }                                 \
         __guest_handle_ ## name;                                \
-    typedef struct { union { type *p; uint64_aligned_t q; }u; }  \
+    typedef struct { union { type *p; uint64_aligned_t q; } u; }\
         __guest_handle_64_ ## name
-#define uint64_aligned_t uint64_t
-#endif
+
+#endif /* __GNUC__ */
 
 #undef set_xen_guest_handle
 #define set_xen_guest_handle(hnd, val)                      \
     do { if ( sizeof(hnd) == 8 ) *(uint64_t *)&(hnd) = 0;   \
          (hnd).p = val;                                     \
     } while ( 0 )
-#define XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name
+#define uint64_aligned_t uint64_t __attribute__((aligned(8)))
+#define __XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name
+#define XEN_GUEST_HANDLE_64(name) __XEN_GUEST_HANDLE_64(name)
+#endif
 
 #ifndef __ASSEMBLY__
 

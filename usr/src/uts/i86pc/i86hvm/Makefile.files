@@ -41,7 +41,7 @@ XDF_OBJS		+= xdf.o
 XNF_OBJS		+= xnf.o
 XPV_OBJS		+= xpv_support.o xvdi.o gnttab.o evtchn.o \
 				xenbus_comms.o xenbus_client.o xenbus_probe.o \
-				xenbus_xs.o hypercall.o hypersubr.o
+				xenbus_xs.o
 XPVD_OBJS		+= xpvd.o
 
 #

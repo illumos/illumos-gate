@@ -59,7 +59,7 @@ static int cons_color = CONS_COLOR;
 int console = CONS_SCREEN_TEXT;
 #if defined(__xpv)
 static int console_hypervisor_redirect = B_FALSE;
-static int console_hypervisor_device = CONS_INVALID;
+int console_hypervisor_device = CONS_INVALID;
 #endif /* __xpv */
 
 static int serial_ischar(void);
@@ -134,25 +134,6 @@ screen_putchar(int c)
 		break;
 	}
 }
-
-/* serial port stuff */
-#if defined(__xpv) && defined(_BOOT)
-static int
-ec_probe_pirq(int pirq)
-{
-	evtchn_bind_pirq_t bind;
-	evtchn_close_t close;
-
-	bind.pirq = pirq;
-	bind.flags = 0;
-	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &bind) != 0)
-		return (0);
-
-	close.port = bind.port;
-	(void) HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
-	return (1);
-}
-#endif /* __xpv && _BOOT */
 
 static int port;
 

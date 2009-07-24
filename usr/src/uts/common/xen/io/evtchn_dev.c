@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,13 +91,12 @@ struct evtsoftdata {
 	evtchn_port_t *ring;
 	unsigned int ring_cons, ring_prod, ring_overflow;
 
-	/* Processes wait on this queue when ring is empty. */
-	kcondvar_t evtchn_wait;
+	kcondvar_t evtchn_wait; /* Processes wait on this when ring is empty. */
 	kmutex_t evtchn_lock;
 	struct pollhead evtchn_pollhead;
 
-	/* last pid to bind to this event channel. debug aid. */
-	pid_t pid;
+	pid_t pid;		/* last pid to bind to this event channel. */
+	processorid_t cpu;	/* cpu thread/evtchn is bound to */
 };
 
 static void *evtchndrv_statep;
@@ -120,15 +119,15 @@ evtchn_device_upcall()
 
 	/*
 	 * This is quite gross, we had to leave the evtchn that led to this
-	 * invocation in a global mailbox, retrieve it now.
+	 * invocation in a per-cpu mailbox, retrieve it now.
 	 * We do this because the interface doesn't offer us a way to pass
 	 * a dynamic argument up through the generic interrupt service layer.
 	 * The mailbox is safe since we either run with interrupts disabled or
 	 * non-preemptable till we reach here.
 	 */
-	port = ec_dev_mbox;
+	port = CPU->cpu_m.mcpu_ec_mbox;
 	ASSERT(port != 0);
-	ec_dev_mbox = 0;
+	CPU->cpu_m.mcpu_ec_mbox = 0;
 	ec_clear_evtchn(port);
 	mutex_enter(&port_user_lock);
 
@@ -242,26 +241,28 @@ evtchndrv_write(dev_t dev, struct uio *uio, cred_t *cr)
 	struct evtsoftdata *ep;
 	ulong_t flags;
 	minor_t minor = getminor(dev);
+	evtchn_port_t sbuf[32];
 
 	if (secpolicy_xvm_control(cr))
 		return (EPERM);
 
 	ep = EVTCHNDRV_INST2SOFTS(EVTCHNDRV_MINOR2INST(minor));
 
-	kbuf = kmem_alloc(PAGESIZE, KM_SLEEP);
 
 	/* Whole number of ports. */
 	count = uio->uio_resid;
 	count &= ~(sizeof (evtchn_port_t) - 1);
 
-	if (count == 0) {
-		rc = 0;
-		goto out;
-	}
+	if (count == 0)
+		return (0);
 
 	if (count > PAGESIZE)
 		count = PAGESIZE;
 
+	if (count <= sizeof (sbuf))
+		kbuf = sbuf;
+	else
+		kbuf = kmem_alloc(PAGESIZE, KM_SLEEP);
 	if ((rc = uiomove(kbuf, count, UIO_WRITE, uio)) != 0)
 		goto out;
 
@@ -276,7 +277,8 @@ evtchndrv_write(dev_t dev, struct uio *uio, cred_t *cr)
 	mutex_exit(&port_user_lock);
 
 out:
-	kmem_free(kbuf, PAGESIZE);
+	if (kbuf != sbuf)
+		kmem_free(kbuf, PAGESIZE);
 	return (rc);
 }
 

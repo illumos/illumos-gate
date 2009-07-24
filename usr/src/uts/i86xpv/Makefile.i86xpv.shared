@@ -22,7 +22,7 @@
 #
 # uts/i86xpv/Makefile.i86xpv.shared
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -256,12 +256,12 @@ DRV_KMODS	+= xnbu
 DRV_KMODS	+= xnf
 DRV_KMODS	+= xdb
 DRV_KMODS	+= xdf
-DRV_KMODS	+= xdt
 DRV_KMODS	+= privcmd
 DRV_KMODS	+= domcaps
 DRV_KMODS	+= evtchn
 DRV_KMODS	+= balloon
 DRV_KMODS	+= xpvtap
+DRV_KMODS	+= xdt
 
 #
 #	CPU Modules

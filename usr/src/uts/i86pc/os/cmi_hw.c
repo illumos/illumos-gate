@@ -28,6 +28,10 @@
  * CPU Module Interface - hardware abstraction.
  */
 
+#ifdef __xpv
+#include <sys/xpv_user.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/cpu_module.h>
 #include <sys/kmem.h>
@@ -44,10 +48,6 @@
 #include <sys/trap.h>
 #include <sys/mca_x86.h>
 #include <sys/processor.h>
-
-#ifdef __xpv
-#include <sys/hypervisor.h>
-#endif
 
 /*
  * Outside of this file consumers use the opaque cmi_hdl_t.  This
@@ -947,8 +947,8 @@ xpv_wrmsr_cmn(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val, boolean_t intpose)
 	mci.mcinj_msr[0].reg = msr;
 	mci.mcinj_msr[0].value = val;
 
-	return (HYPERVISOR_mca(XEN_MC_CMD_msrinject, (xen_mc_arg_t *)&mci) ==
-	    XEN_MC_HCALL_SUCCESS ?  CMI_SUCCESS : CMIERR_NOTSUP);
+	return (HYPERVISOR_mca(XEN_MC_msrinject, (xen_mc_arg_t *)&mci) ==
+	    0 ?  CMI_SUCCESS : CMIERR_NOTSUP);
 }
 
 static cmi_errno_t
@@ -979,61 +979,53 @@ xpv_int(cmi_hdl_impl_t *hdl, int int_no)
 
 	mce.mceinj_cpunr = xen_physcpu_logical_id(HDLPRIV(hdl));
 
-	(void) HYPERVISOR_mca(XEN_MC_CMD_mceinject, (xen_mc_arg_t *)&mce);
-}
-
-#define	CSM_XLATE_SUNOS2XEN	1
-#define	CSM_XLATE_XEN2SUNOS	2
-
-#define	CSM_MAPENT(suffix)	{ P_##suffix, MC_CPU_P_##suffix }
-
-static int
-cpu_status_xlate(int in, int direction, int *outp)
-{
-	struct cpu_status_map {
-		int csm_val[2];
-	} map[] = {
-		CSM_MAPENT(STATUS),
-		CSM_MAPENT(ONLINE),
-		CSM_MAPENT(OFFLINE),
-		CSM_MAPENT(FAULTED),
-		CSM_MAPENT(SPARE),
-		CSM_MAPENT(POWEROFF)
-	};
-
-	int cmpidx = (direction == CSM_XLATE_XEN2SUNOS);
-	int i;
-
-	for (i = 0; i < sizeof (map) / sizeof (struct cpu_status_map); i++) {
-		if (map[i].csm_val[cmpidx] == in) {
-			*outp = map[i].csm_val[!cmpidx];
-			return (1);
-		}
-	}
-
-	return (0);
+	(void) HYPERVISOR_mca(XEN_MC_mceinject, (xen_mc_arg_t *)&mce);
 }
 
 static int
 xpv_online(cmi_hdl_impl_t *hdl, int new_status, int *old_status)
 {
-	struct xen_mc_offline mco;
-	int flag, rc;
+	xen_sysctl_t xs;
+	int op, rc, status;
 
 	new_status &= ~P_FORCED;
 
-	if (!cpu_status_xlate(new_status, CSM_XLATE_SUNOS2XEN, &flag))
-		return (ENOSYS);
+	switch (new_status) {
+	case P_STATUS:
+		op = XEN_SYSCTL_CPU_HOTPLUG_STATUS;
+		break;
+	case P_FAULTED:
+	case P_OFFLINE:
+		op = XEN_SYSCTL_CPU_HOTPLUG_OFFLINE;
+		break;
+	case P_ONLINE:
+		op = XEN_SYSCTL_CPU_HOTPLUG_ONLINE;
+		break;
+	default:
+		return (-1);
+	}
 
-	mco.mco_cpu = xen_physcpu_logical_id(HDLPRIV(hdl));
-	mco.mco_flag = flag;
+	xs.cmd = XEN_SYSCTL_cpu_hotplug;
+	xs.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+	xs.u.cpu_hotplug.cpu = xen_physcpu_logical_id(HDLPRIV(hdl));
+	xs.u.cpu_hotplug.op = op;
 
-	if ((rc = HYPERVISOR_mca(XEN_MC_CMD_offlinecpu,
-	    (xen_mc_arg_t *)&mco)) == XEN_MC_HCALL_SUCCESS) {
-		flag = mco.mco_flag;
-		if (!cpu_status_xlate(flag, CSM_XLATE_XEN2SUNOS, old_status))
-			cmn_err(CE_NOTE, "xpv_online: unknown status %d.",
-			    flag);
+	if ((rc = HYPERVISOR_sysctl(&xs)) >= 0) {
+		status = rc;
+		rc = 0;
+		switch (status) {
+		case XEN_CPU_HOTPLUG_STATUS_NEW:
+			*old_status = P_OFFLINE;
+			break;
+		case XEN_CPU_HOTPLUG_STATUS_OFFLINE:
+			*old_status = P_FAULTED;
+			break;
+		case XEN_CPU_HOTPLUG_STATUS_ONLINE:
+			*old_status = P_ONLINE;
+			break;
+		default:
+			return (-1);
+		}
 	}
 
 	return (-rc);

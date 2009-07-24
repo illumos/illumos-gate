@@ -1161,16 +1161,8 @@ num_phys_pages()
 	struct memlist *mp;
 
 #if defined(__xpv)
-	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-		xen_sysctl_t op;
-
-		op.cmd = XEN_SYSCTL_physinfo;
-		op.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
-		if (HYPERVISOR_sysctl(&op) != 0)
-			panic("physinfo op refused");
-
-		return ((pgcnt_t)op.u.physinfo.total_pages);
-	}
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+		return (xpv_nr_phys_pages());
 #endif /* __xpv */
 
 	for (mp = phys_install; mp != NULL; mp = mp->next)

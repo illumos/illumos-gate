@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,7 @@ static gcpu_poll_trace_ctl_t gcpu_xpv_poll_trace_ctl;
 static uint_t
 gcpu_xpv_virq_intr(void)
 {
-	int types[] = { XEN_MC_F_URGENT, XEN_MC_F_NONURGENT };
+	int types[] = { XEN_MC_URGENT, XEN_MC_NONURGENT };
 	uint64_t fetch_id;
 	int count = 0;
 	int i;

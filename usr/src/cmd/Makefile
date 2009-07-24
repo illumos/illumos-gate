@@ -431,7 +431,6 @@ COMMON_SUBDIRS=		\
 	valtools	\
 	vgrind		\
 	vi		\
-	vna		\
 	volcheck	\
 	volrmmount	\
 	vscan		\

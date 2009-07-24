@@ -980,12 +980,15 @@ do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 		switch_sp_and_call(newsp, dispatch_hardint, vector, oldipl);
 	}
 
+#if !defined(__xpv)
 	/*
 	 * Deliver any pending soft interrupts.
 	 */
 	if (cpu->cpu_softinfo.st_pending)
 		dosoftint(rp);
+#endif	/* !__xpv */
 }
+
 
 /*
  * Common tasks always done by _sys_rtt, called with interrupts disabled.

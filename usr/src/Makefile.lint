@@ -298,7 +298,6 @@ COMMON_SUBDIRS = \
 	cmd/utmp_update \
 	cmd/utmpd \
 	cmd/valtools \
-	cmd/vna \
 	cmd/vt \
 	cmd/wall \
 	cmd/wbem \
