@@ -499,12 +499,10 @@ extern void	ds_order(char *list[]);
 extern void	ds_putinfo(char *buf);
 extern void	ds_skiptoend(char *device);
 extern void	ecleanup(void);
-extern int	eval_ftype(char *path, char ftype, char *myftype);
 /*PRINTFLIKE1*/
 extern void	logerr(char *fmt, ...);
 extern int	mappath(int flag, char *path);
 extern int	mapvar(int flag, char *varname);
-extern void	reperr(char *fmt, ...);
 /*PRINTFLIKE1*/
 extern void	progerr(char *fmt, ...);
 extern void	pkgerr(PKG_ERR *);
@@ -628,7 +626,6 @@ extern int	isFstypeRemote();
 extern int	isPathRemote();
 extern int	iscpio();
 extern int	isdir();
-extern int	eval_ftype();
 extern int	isfile();
 extern int	pkgexecl();
 extern int	pkgexecv();
@@ -656,7 +653,6 @@ extern void	ds_putinfo();
 extern void	ds_skiptoend();
 extern void	ecleanup();
 extern void	logerr();
-extern void	reperr();
 extern int	mappath();
 extern int	mapvar();
 extern void	progerr();

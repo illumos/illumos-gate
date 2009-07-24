@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,6 @@
 #include <string.h>
 #include "pkglocale.h"
 #include "pkglibmsgs.h"
-#include "pkglib.h"
 
 /*
  * Defines for cpio/compression checks.
@@ -78,7 +77,6 @@ int isFstypeRemote(char *a_fstype);
 int isdir(char *path);
 int isfile(char *dir, char *file);
 int iscpio(char *path, int *iscomp);
-int eval_ftype(char *path, char ftype, char *myftype);
 
 /*
  * Name:	isdir
@@ -390,84 +388,4 @@ _InitRemoteFstypes(void)
 	/* close database file and return */
 
 	(void) fclose(fp);
-}
-
-/*
- * Name:	eval_ftype
- * Description: Evaluate the target's file type
- * Arguments:	path      - Path on filesystem
- *		ftype     - Type to be changed to
- *		myftype   - Address into which current
- *			    type of target will be stored
- * Returns:	int
- *			0	 - Success
- *			VE_EXIST - Path does not exist
- *			VE_FTYPE - Path file type is not recognized,
- *				   is not supported,
- *				   or is not what is expected
- */
-int
-eval_ftype(char *path, char ftype, char *myftype)
-{
-	struct stat status;
-	int retcode = 0;
-	int statError = 0;
-
-	/* If we are to process symlinks the old way then we follow the link */
-	if (nonABI_symlinks()) {
-		if ((ftype == 's') ? lstat(path, &status) :
-		    stat(path, &status)) {
-			(void) reperr(pkg_gt(ERR_EXIST));
-			retcode = VE_EXIST;
-			*myftype = '?';
-			statError++;
-		}
-	/* If not then we inspect the target of the link */
-	} else {
-		if (lstat(path, &status) == -1) {
-			reperr(pkg_gt(ERR_EXIST));
-			retcode = VE_EXIST;
-			*myftype = '?';
-			statError++;
-		}
-	}
-	if (!statError) {
-		/* determining actual type of existing object */
-		switch (status.st_mode & S_IFMT) {
-			case S_IFLNK:
-					*myftype = 's';
-					break;
-
-			case S_IFIFO:
-					*myftype = 'p';
-					break;
-
-			case S_IFCHR:
-					*myftype = 'c';
-					break;
-
-			case S_IFDIR:
-					*myftype = 'd';
-					break;
-
-			case S_IFBLK:
-					*myftype = 'b';
-					break;
-
-			case S_IFREG:
-			case 0:
-					*myftype = 'f';
-					break;
-
-			case S_IFDOOR:
-					*myftype = 'D';
-					break;
-
-			default:
-					*myftype = '?';
-					return (VE_FTYPE);
-		}
-		retcode = 0;
-	}
-	return (retcode);
 }
