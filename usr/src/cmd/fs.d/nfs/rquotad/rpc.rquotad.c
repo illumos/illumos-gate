@@ -468,6 +468,24 @@ quotactl(cmd, mountp, uid, dqp)
 }
 
 /*
+ * Reduce unneeded slashes in the given path. e.g. "//the//dir/"
+ */
+static void
+reduce_slashes(char *path)
+{
+	char *p, *q = path;
+
+	for (p = path; *p != '\0'; p++) {
+		if (p[0] == '/' && p[1] == '/')
+			continue;
+		*q++ = *p;
+	}
+	if ((q - path > 1) && q[-1] == '/')
+		q--;
+	*q = '\0';
+}
+
+/*
  * Return the quota information for the given path.  Returns NULL if none
  * was found.
  */
@@ -505,6 +523,9 @@ findfsq(dir)
 		return (NULL);
 	if (stat(dir, &sb) < 0)
 		return (NULL);
+
+	reduce_slashes(dir);
+
 	for (fsqp = fsqlist; fsqp != NULL; fsqp = fsqp->fsq_next) {
 		if (strcmp(fsqp->fsq_fstype, MNTTYPE_ZFS) == 0) {
 			if (strcmp(fsqp->fsq_dir, dir) == 0)
