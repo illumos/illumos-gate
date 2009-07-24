@@ -31,6 +31,7 @@
 
 #pragma weak	dn_expand
 #pragma weak	res_ninit
+#pragma weak	res_ndestroy
 #pragma weak	res_nsearch
 #pragma weak	res_nclose
 #pragma weak	ns_get16
@@ -272,19 +273,6 @@ _nss_dns_constr(dns_backend_op_t ops[], int n_ops)
 }
 
 /*
- * __res_ndestroy is a simplified version of the non-public function
- * res_ndestroy in libresolv.so.2. Before res_ndestroy can be made
- * public, __res_ndestroy will be used to make sure the memory pointed
- * by statp->_u._ext.ext is freed after res_nclose() is called.
- */
-static void
-__res_ndestroy(res_state statp) {
-	res_nclose(statp);
-	if (statp->_u._ext.ext != NULL)
-		free(statp->_u._ext.ext);
-}
-
-/*
  * name_is_alias(aliases_ptr, name_ptr)
  * Verify name matches an alias in the provided aliases list.
  *
@@ -412,14 +400,14 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	blen = 0;
 	sret = nss_packed_getkey(buffer, bufsize, &dbname, &dbop, &arg);
 	if (sret != NSS_SUCCESS) {
-		__res_ndestroy(statp);
+		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 
 	if (ipnode) {
 		/* initially only handle the simple cases */
 		if (arg.key.ipnode.flags != 0) {
-			__res_ndestroy(statp);
+			res_ndestroy(statp);
 			return (NSS_ERROR);
 		}
 		name = arg.key.ipnode.name;
@@ -437,11 +425,11 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 			pbuf->p_herrno = HOST_NOT_FOUND;
 			pbuf->p_status = NSS_NOTFOUND;
 			pbuf->data_len = 0;
-			__res_ndestroy(statp);
+			res_ndestroy(statp);
 			return (NSS_NOTFOUND);
 		}
 		/* else lookup error - handle in general code */
-		__res_ndestroy(statp);
+		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 
@@ -454,23 +442,23 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	qdcount = ntohs(hp->qdcount);
 	cp += HFIXEDSZ;
 	if (qdcount != 1) {
-		__res_ndestroy(statp);
+		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 	n = dn_expand(bom, eom, cp, host, MAXHOSTNAMELEN);
 	if (n < 0) {
-		__res_ndestroy(statp);
+		res_ndestroy(statp);
 		return (NSS_ERROR);
 	} else
 		hlen = strlen(host);
 	/* no host name is an error, return */
 	if (hlen <= 0) {
-		__res_ndestroy(statp);
+		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 	cp += n + QFIXEDSZ;
 	if (cp > eom) {
-		__res_ndestroy(statp);
+		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 	while (ancount-- > 0 && cp < eom && blen < bsize) {
@@ -483,7 +471,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 			if ((isans = strncasecmp(host, ans, hlen)) != 0 &&
 			    (alen == 0 || name_is_alias(aliases, ans)
 			    == NSS_NOTFOUND)) {
-				__res_ndestroy(statp);
+				res_ndestroy(statp);
 				return (NSS_ERROR);	/* spoof? */
 			}
 		}
@@ -523,7 +511,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 					 * Append host to alias list.
 					 */
 					if (alen + hlen + 2 > NS_MAXMSG) {
-						__res_ndestroy(statp);
+						res_ndestroy(statp);
 						return (NSS_ERROR);
 					}
 					*apc++ = ' ';
@@ -538,7 +526,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 				 */
 				if (strlcpy(host, aname, MAXHOSTNAMELEN) >=
 				    MAXHOSTNAMELEN) {
-					__res_ndestroy(statp);
+					res_ndestroy(statp);
 					return (NSS_ERROR);
 				}
 				hlen = len;
@@ -559,7 +547,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		af = (type == T_A ? AF_INET : AF_INET6);
 		np = inet_ntop(af, (void *)cp, nbuf, INET6_ADDRSTRLEN);
 		if (np == NULL) {
-			__res_ndestroy(statp);
+			res_ndestroy(statp);
 			return (NSS_ERROR);
 		}
 		cp += n;
@@ -570,7 +558,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		if (alen > 0)
 			len++;
 		if (blen + len > bsize) {
-			__res_ndestroy(statp);
+			res_ndestroy(statp);
 			return (NSS_ERROR);
 		}
 		(void) strlcpy(bptr, np, bsize - blen);
@@ -596,7 +584,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	/* still room? */
 	if (len + sizeof (nssuint_t) > pbuf->data_len) {
 		/* sigh, no, what happened? */
-		__res_ndestroy(statp);
+		res_ndestroy(statp);
 		return (NSS_ERROR);
 	}
 	pbuf->ext_off = pbuf->data_off + len;
@@ -604,6 +592,6 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	pbuf->data_len = blen;
 	pttl = (nssuint_t *)((void *)((char *)pbuf + pbuf->ext_off));
 	*pttl = ttl;
-	__res_ndestroy(statp);
+	res_ndestroy(statp);
 	return (NSS_SUCCESS);
 }
