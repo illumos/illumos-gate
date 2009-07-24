@@ -49,7 +49,7 @@ INCS += -I../../../common/zfs
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevinfo -ldevid -lgen -lnvpair -luutil -lavl -lefi \
-	-lidmap -lsec
+	-lidmap
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
