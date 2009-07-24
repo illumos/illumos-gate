@@ -585,10 +585,18 @@ devaudio_proc_update(daproc_t *proc)
 		info->play.gain =
 		    (auclnt_get_gain(sp) * AUDIO_MAX_GAIN) / 100;
 		info->play.pause = auclnt_is_paused(sp);
-		info->play.active = !info->play.pause;
+		info->play.active = auclnt_is_running(sp);
 		info->play.samples = auclnt_get_samples(sp);
 		info->play.error = auclnt_get_errors(sp) ? B_TRUE : B_FALSE;
 		info->output_muted = auclnt_get_muted(sp);
+	} else {
+		info->play.encoding = AUDIO_ENCODING_NONE;
+		info->play.precision = 0;
+		info->play.sample_rate = 0;
+		info->play.pause = B_FALSE;
+		info->play.active = B_FALSE;
+		info->play.error = B_FALSE;
+		info->play.samples = 0;
 	}
 
 	if ((c = proc->p_reader) != NULL) {
@@ -601,9 +609,17 @@ devaudio_proc_update(daproc_t *proc)
 		info->record.gain =
 		    (auclnt_get_gain(sp) * AUDIO_MAX_GAIN) / 100;
 		info->record.pause = auclnt_is_paused(sp);
-		info->record.active = !info->record.pause;
+		info->record.active = auclnt_is_running(sp);
 		info->record.samples = auclnt_get_samples(sp);
 		info->record.error = auclnt_get_errors(sp) ? B_TRUE : B_FALSE;
+	} else {
+		info->record.encoding = AUDIO_ENCODING_NONE;
+		info->record.precision = 0;
+		info->record.sample_rate = 0;
+		info->record.pause = B_FALSE;
+		info->record.active = B_FALSE;
+		info->record.error = B_FALSE;
+		info->record.samples = 0;
 	}
 }
 
@@ -852,7 +868,7 @@ devaudio_ioc_setinfo(queue_t *wq, audio_client_t *c, mblk_t *mp)
 			opr->buffer_size = npr->buffer_size;
 		}
 	} else {
-		/* these vaalues are preserved even if /dev/audio not open */
+		/* these values are preserved even if /dev/audio not open */
 		if (CHANGED(npr, opr, gain)) {
 			opr->gain = npr->gain;
 		}
@@ -913,7 +929,7 @@ devaudio_ioc_setinfo(queue_t *wq, audio_client_t *c, mblk_t *mp)
 
 	devaudio_proc_update(dc->dc_proc);
 	bcopy(&dc->dc_proc->p_info, ninfo, sizeof (*ninfo));
-	
+
 	mutex_exit(&dc->dc_dev->d_mx);
 	mcopyout(mp, NULL, sizeof (audio_info_t), uaddr, bcont);
 	qreply(wq, mp);

@@ -743,6 +743,12 @@ auclnt_get_muted(audio_stream_t *sp)
 	return (sp->s_muted);
 }
 
+boolean_t
+auclnt_is_running(audio_stream_t *sp)
+{
+	return (sp->s_running);
+}
+
 void
 auclnt_start(audio_stream_t *sp)
 {

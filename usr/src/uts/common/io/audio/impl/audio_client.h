@@ -84,6 +84,7 @@ void auclnt_set_errors(audio_stream_t *, uint64_t);
 uint64_t auclnt_get_eof(audio_stream_t *);
 void auclnt_set_eof(audio_stream_t *, uint64_t);
 
+boolean_t auclnt_is_running(audio_stream_t *);
 void auclnt_start(audio_stream_t *);
 void auclnt_stop(audio_stream_t *);
 
