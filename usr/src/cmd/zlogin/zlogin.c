@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * zlogin provides three types of login which allow users in the global
@@ -694,11 +692,11 @@ static int
 process_raw_input(int stdin_fd, int appin_fd)
 {
 	int cc;
-	struct stat sb;
+	struct stat64 sb;
 	char ibuf[ZLOGIN_RDBUFSIZ];
 
 	/* Check how much data is already in the pipe */
-	if (fstat(appin_fd, &sb) == -1) {
+	if (fstat64(appin_fd, &sb) == -1) {
 		perror("stat failed");
 		return (-1);
 	}
