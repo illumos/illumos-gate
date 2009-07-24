@@ -358,6 +358,7 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
     ib_gid_t *sgid, ib_gid_t *dgid)
 {
 	ibcm_arp_streams_t	*ib_s;
+	ibcm_arp_prwqn_t	*wqnp;
 	int			ret = 0;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr(%p, %p, %p, %p)",
@@ -394,9 +395,8 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 
 	(void) ibcm_arp_unlink_drivers(ib_s);
 	mutex_enter(&ib_s->lock);
-	ret = ib_s->status;
-	if (ret == 0) {
-		ibcm_arp_prwqn_t *wqnp = ib_s->wqnp;
+	wqnp = ib_s->wqnp;
+	if (ib_s->status == 0) {
 		if (sgid)
 			*sgid = ib_s->wqnp->sgid;
 		if (dgid)
@@ -407,10 +407,17 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 		    ib_s->wqnp->sgid.gid_prefix, ib_s->wqnp->sgid.gid_guid,
 		    ib_s->wqnp->dgid.gid_prefix, ib_s->wqnp->dgid.gid_guid);
 
-		mutex_exit(&ib_s->lock);
 		ibcm_arp_prwqn_delete(wqnp);
-		mutex_enter(&ib_s->lock);
+	} else if (ret == 0) {
+		/*
+		 * We come here only when lookup has returned empty (failed)
+		 * via callback routine - ibcm_arp_get_ibaddr_cb
+		 * i.e. ib_s->status is non-zero, while ret is zero.
+		 */
+		if (wqnp)
+			kmem_free(wqnp, sizeof (ibcm_arp_prwqn_t));
 	}
+	ret = ib_s->status;
 	mutex_exit(&ib_s->lock);
 
 arp_ibaddr_error:

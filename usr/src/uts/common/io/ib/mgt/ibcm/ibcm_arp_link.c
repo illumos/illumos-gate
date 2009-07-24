@@ -787,9 +787,6 @@ ibcm_ipv6_lookup(ibcm_arp_prwqn_t *wqnp, ill_t *ill, zoneid_t zoneid)
 	ip2m.ip2mac_ifindex = ill->ill_phyint->phyint_ifindex;
 
 	wqnp->flags |= IBCM_ARP_PR_RESOLVE_PENDING;
-	wqnp->timeout_id = timeout(ibcm_arp_timeout, wqnp,
-	    drv_usectohz(IBCM_ARP_TIMEOUT * 1000));
-
 	/*
 	 * XXX XTBD set the scopeid?
 	 * issue the request to IP for Neighbor Discovery
@@ -836,11 +833,6 @@ ibcm_ipv6_resolver_ack(ip2mac_t *ip2macp, void *arg)
 
 	ib_s = (ibcm_arp_streams_t *)wqnp->arg;
 	mutex_enter(&ib_s->lock);
-
-	/*
-	 * cancel the timeout for this request
-	 */
-	(void) untimeout(wqnp->timeout_id);
 
 	if (ip2macp->ip2mac_err != 0) {
 		wqnp->flags &= ~IBCM_ARP_PR_RESOLVE_PENDING;
