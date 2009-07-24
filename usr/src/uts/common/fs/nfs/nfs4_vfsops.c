@@ -3742,8 +3742,8 @@ nfs4_move_mi(mntinfo4_t *mi, servinfo4_t *old, servinfo4_t *new)
 	nfs4_add_mi_to_server(np, mi);
 
 	mutex_exit(&op->s_lock);
-	nfs4_server_rele(op);
 	mutex_exit(&np->s_lock);
+	nfs4_server_rele(op);
 
 	return (np);
 }
