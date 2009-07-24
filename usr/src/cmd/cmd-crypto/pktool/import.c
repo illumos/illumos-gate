@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the import operation for this tool.
@@ -287,6 +285,7 @@ pk_import_pk12_nss(
 	}
 
 	if (rv == KMF_OK) {
+		numattr = 0;
 		NEW_ATTRLIST(attrlist, (3 + (2 * ncerts)));
 
 		kmf_set_attr_at_index(attrlist, numattr,
