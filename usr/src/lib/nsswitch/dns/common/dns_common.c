@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	dns_common.c
@@ -299,7 +297,7 @@ __res_ndestroy(res_state statp) {
  * INPUT:
  *  aliases_ptr: space separated list of alias names.
  *  name_ptr: name to look for in aliases_ptr list.
- * RETURNS: NSS_SUCCESS or NSS_ERROR
+ * RETURNS: NSS_SUCCESS or NSS_NOTFOUND
  *  NSS_SUCCESS indicates that the name is listed in the collected aliases.
  */
 static nss_status_t
@@ -332,7 +330,7 @@ name_is_alias(char *aliases_ptr, char *name_ptr) {
 		/* Step over separator character. */
 		while (*aliases_ptr == ' ') aliases_ptr++;
 	}
-	return (NSS_ERROR);
+	return (NSS_NOTFOUND);
 }
 
 /*
@@ -397,7 +395,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 	/* misc variables */
 	int		af;
 	char		*ap, *apc;
-	int		hlen = 0, alen, iplen, len;
+	int		hlen = 0, alen, iplen, len, isans;
 
 	statp = &stat;
 	(void) memset(statp, '\0', sizeof (struct __res_state));
@@ -482,8 +480,9 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 			 * Check that the expanded name is either the
 			 * name we asked for or a learned alias.
 			 */
-			if (strncasecmp(host, ans, hlen) != 0 && (alen == 0 ||
-			    name_is_alias(aliases, ans) == NSS_ERROR)) {
+			if ((isans = strncasecmp(host, ans, hlen)) != 0 &&
+			    (alen == 0 || name_is_alias(aliases, ans)
+			    == NSS_NOTFOUND)) {
 				__res_ndestroy(statp);
 				return (NSS_ERROR);	/* spoof? */
 			}
@@ -494,7 +493,7 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		cp += INT16SZ;
 		class = ns_get16(cp);			/* class */
 		cp += INT16SZ;
-		nttl = (nssuint_t)ns_get32(cp);	/* ttl in sec */
+		nttl = (nssuint_t)ns_get32(cp);		/* ttl in sec */
 		if (nttl < ttl)
 			ttl = nttl;
 		cp += INT32SZ;
@@ -507,34 +506,42 @@ _nss_dns_gethost_withttl(void *buffer, size_t bufsize, int ipnode)
 		eor = cp + n;
 		if (type == T_CNAME) {
 			/*
-			 * The name we looked up is really an alias
-			 * and the canonical name should be in the
-			 * RDATA.  A canonical name may have several
-			 * aliases but an alias should only have one
-			 * canonical name. However multiple CNAMEs and
-			 * CNAME chains do exist!  So for caching
-			 * purposes maintain the alias as the host
-			 * name, and the CNAME as an alias.
+			 * The name looked up is really an alias and the
+			 * canonical name should be in the RDATA.
+			 * A canonical name may have several aliases but an
+			 * alias should only have one canonical name.
+			 * However multiple CNAMEs and CNAME chains do exist!
+			 *
+			 * Just error out on attempted buffer overflow exploit,
+			 * generic code will syslog.
+			 *
 			 */
 			n = dn_expand(bom, eor, cp, aname, MAXHOSTNAMELEN);
-			if (n > 0) {
-				len = strlen(aname);
-				if (len > 0) {
+			if (n > 0 && (len = strlen(aname)) > 0) {
+				if (isans == 0) { /* host matched ans. */
 					/*
-					 * Just error out if there is an
-					 * attempted buffer overflow exploit
-					 * generic code will do a syslog
+					 * Append host to alias list.
 					 */
-					if (alen + len + 2 > NS_MAXMSG) {
+					if (alen + hlen + 2 > NS_MAXMSG) {
 						__res_ndestroy(statp);
 						return (NSS_ERROR);
 					}
 					*apc++ = ' ';
 					alen++;
-					(void) strlcpy(apc, aname, len + 1);
-					alen += len;
-					apc += len;
+					(void) strlcpy(apc, host,
+					    NS_MAXMSG - alen);
+					alen += hlen;
+					apc += hlen;
 				}
+				/*
+				 * Overwrite host with canonical name.
+				 */
+				if (strlcpy(host, aname, MAXHOSTNAMELEN) >=
+				    MAXHOSTNAMELEN) {
+					__res_ndestroy(statp);
+					return (NSS_ERROR);
+				}
+				hlen = len;
 			}
 			cp += n;
 			continue;
