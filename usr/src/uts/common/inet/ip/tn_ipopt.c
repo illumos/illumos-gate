@@ -113,18 +113,20 @@ tsol2cipso_tt1(const bslabel_t *sl, unsigned char *cop, uint32_t doi)
 }
 
 /*
- * The following routine copies a datagram's option into the specified buffer
- * (if buffer pointer is non-null), or returns a pointer to the label within
- * the streams message (if buffer is null).  In both cases, tsol_get_option
- * returns the option's type.
+ * The following routine searches for a security label in an IPv4 datagram.
+ * It returns label_type of:
+ *    OPT_CIPSO if a CIPSO IP option is found.
+ *    OPT_NONE if no security label is found.
  *
- * tsol_get_option assumes that the specified buffer is large enough to
- * hold the largest valid CIPSO option.  Since the total number of
- * IP header options cannot exceed 40 bytes, a 40 byte buffer is a good choice.
+ * If OPT_CIPSO, a pointer to the CIPSO IP option will be returned in
+ * the buffer parameter.
+ *
+ * The function will return with B_FALSE if an IP format error
+ * is encountered.
  */
 
-tsol_ip_label_t
-tsol_get_option(mblk_t *mp, uchar_t **buffer)
+boolean_t
+tsol_get_option_v4(mblk_t *mp, tsol_ip_label_t *label_type, uchar_t **buffer)
 {
 	ipha_t	*ipha;
 	uchar_t	*opt;
@@ -132,19 +134,22 @@ tsol_get_option(mblk_t *mp, uchar_t **buffer)
 	uint32_t	optval;
 	uint32_t	optlen;
 
-	ipha = (ipha_t *)mp->b_rptr;
+	*label_type = OPT_NONE;
 
 	/*
 	 * Get length (in 4 byte octets) of IP header options.
-	 * If header doesn't contain options, then return OPT_NONE.
+	 * If header doesn't contain options, then return a label_type
+	 * of OPT_NONE.
 	 */
+	ipha = (ipha_t *)mp->b_rptr;
 	totallen = ipha->ipha_version_and_hdr_length -
-	    (uint8_t)((IP_VERSION << 4) + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
-
-	if (totallen == 0)
-		return (OPT_NONE);
-
+	    (uint8_t)((IP_VERSION << 4));
 	totallen <<= 2;
+	if (totallen < IP_SIMPLE_HDR_LENGTH || totallen > MBLKL(mp))
+		return (B_FALSE);
+	totallen -= IP_SIMPLE_HDR_LENGTH;
+	if (totallen == 0)
+		return (B_TRUE);
 
 	/*
 	 * Search for CIPSO option.
@@ -154,35 +159,112 @@ tsol_get_option(mblk_t *mp, uchar_t **buffer)
 	while (totallen != 0) {
 		switch (optval = opt[IPOPT_OPTVAL]) {
 		case IPOPT_EOL:
-			return (OPT_NONE);
+			return (B_TRUE);
 		case IPOPT_NOP:
 			optlen = 1;
 			break;
 		default:
 			if (totallen <= IPOPT_OLEN)
-				return (OPT_NONE);
+				return (B_FALSE);
 			optlen = opt[IPOPT_OLEN];
 			if (optlen < 2)
-				return (OPT_NONE);
+				return (B_FALSE);
 		}
 		if (optlen > totallen)
-			return (OPT_NONE);
+			return (B_FALSE);
 		/*
 		 * Copy pointer to option into '*buffer' and
 		 * return the option type.
 		 */
 		switch (optval) {
 		case IPOPT_COMSEC:
-			*buffer = opt;
 			if (TSOL_CIPSO_TAG_OFFSET < optlen &&
-			    opt[TSOL_CIPSO_TAG_OFFSET] == 1)
-				return (OPT_CIPSO);
-			return (OPT_NONE);
+			    opt[TSOL_CIPSO_TAG_OFFSET] == 1) {
+				*label_type = OPT_CIPSO;
+				*buffer = opt;
+				return (B_TRUE);
+			}
+			return (B_FALSE);
 		}
 		totallen -= optlen;
 		opt += optlen;
 	}
-	return (OPT_NONE);
+	return (B_TRUE);
+}
+
+/*
+ * The following routine searches for a security label in an IPv6 datagram.
+ * It returns label_type of:
+ *    OPT_CIPSO if a CIPSO IP option is found.
+ *    OPT_NONE if no security label is found.
+ *
+ * If OPT_CIPSO, a pointer to the IPv4 portion of the CIPSO IP option will
+ * be returned in the buffer parameter.
+ *
+ * The function will return with B_FALSE if an IP format error
+ * or an unexpected label content error is encountered.
+ */
+
+boolean_t
+tsol_get_option_v6(mblk_t *mp, tsol_ip_label_t *label_type, uchar_t **buffer)
+{
+	uchar_t		*opt_ptr = NULL;
+	uchar_t		*after_secopt;
+	boolean_t	hbh_needed;
+	const uchar_t	*ip6hbh;
+	size_t		optlen;
+	uint32_t	doi;
+	const ip6_t	*ip6h;
+
+	*label_type = OPT_NONE;
+	*buffer = NULL;
+	ip6h = (const ip6_t *)mp->b_rptr;
+	if (ip6h->ip6_nxt != IPPROTO_HOPOPTS)
+		return (B_TRUE);
+	ip6hbh = (const uchar_t *)&ip6h[1];
+	if (ip6hbh + MIN_EHDR_LEN > mp->b_wptr)
+		return (B_FALSE);
+	optlen = (ip6hbh[1] + 1) << 3;
+	if (ip6hbh + optlen > mp->b_wptr)
+		return (B_FALSE);
+	if (!tsol_find_secopt_v6(ip6hbh, optlen,
+	    &opt_ptr, &after_secopt, &hbh_needed))
+		return (B_FALSE);
+	/* tsol_find_secopt_v6 guarantees some sanity */
+	if (opt_ptr != NULL) {
+		/*
+		 * IPv6 Option
+		 *   opt_ptr[0]: Option type
+		 *   opt_ptr[1]: Length of option data in bytes
+		 *   opt_ptr[2]: First byte of option data
+		 */
+		if ((optlen = opt_ptr[1]) < 8)
+			return (B_FALSE);
+		opt_ptr += 2;
+		/*
+		 * From "Generalized Labeled Security Option for IPv6" draft
+		 *   opt_ptr[0] - opt_ptr[4]: DOI = IP6LS_DOI_V4
+		 *   opt_ptr[4]: Tag type = IP6LS_TT_V4
+		 *   opt_ptr[5]: Tag length in bytes starting at Tag type field
+		 * IPv4 CIPSO Option
+		 *   opt_ptr[6]: option type
+		 *   opt_ptr[7]: option length in bytes starting at type field
+		 */
+		bcopy(opt_ptr, &doi, sizeof (doi));
+		doi = ntohl(doi);
+		if (doi == IP6LS_DOI_V4 &&
+		    opt_ptr[4] == IP6LS_TT_V4 &&
+		    opt_ptr[5] <= optlen - 4 &&
+		    opt_ptr[7] <= optlen - 6 &&
+		    opt_ptr[7] <= opt_ptr[5] - 2) {
+			opt_ptr += sizeof (doi) + 2;
+			*label_type = OPT_CIPSO;
+			*buffer = opt_ptr;
+			return (B_TRUE);
+		}
+		return (B_FALSE);
+	}
+	return (B_TRUE);
 }
 
 /*
@@ -256,7 +338,7 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 		 * (3) SO_MAC_EXEMPT is on and this is the global zone
 		 */
 		if (dst_rhtp->tpc_tp.tp_doi != tsl->tsl_doi) {
-			DTRACE_PROBE4(tx__tnopt__log__info__labeling__doi, 
+			DTRACE_PROBE4(tx__tnopt__log__info__labeling__doi,
 			    char *, "unlabeled dest ip(1)/tpc(2) doi does "
 			    "not match msg label(3) doi.", void *, dst,
 			    tsol_tpc_t *, dst_rhtp, ts_label_t *, tsl);
@@ -1004,11 +1086,15 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
  * Also return the start of the next non-pad option in after_secoptp.
  * Usually the label option is the first option at least when packets
  * are generated, but for generality we don't assume that on received packets.
+ *
+ * The function will return with B_FALSE if an IP format error
+ * or an unexpected label content error is encountered.
  */
-uchar_t *
+boolean_t
 tsol_find_secopt_v6(
     const uchar_t *ip6hbh,	/* Start of the hop-by-hop extension header */
     uint_t hbhlen,		/* Length of the hop-by-hop extension header */
+    uchar_t **secoptp,		/* Location of IP6OPT_LS label option */
     uchar_t **after_secoptp,	/* Non-pad option following the label option */
     boolean_t *hbh_needed)	/* Is hop-by-hop hdr needed w/o label */
 {
@@ -1016,8 +1102,8 @@ tsol_find_secopt_v6(
 	uint_t	optused;
 	const uchar_t *optptr;
 	uchar_t	opt_type;
-	const uchar_t *secopt = NULL;
 
+	*secoptp = NULL;
 	*hbh_needed = B_FALSE;
 	*after_secoptp = NULL;
 	optlen = hbhlen - 2;
@@ -1030,10 +1116,10 @@ tsol_find_secopt_v6(
 			continue;
 		}
 		if (optlen == 1)
-			break;
+			return (B_FALSE);
 		optused = 2 + optptr[1];
 		if (optused > optlen)
-			break;
+			return (B_FALSE);
 		/*
 		 * if we get here, ip6opt_ls can
 		 * not be 0 because it will always
@@ -1041,9 +1127,12 @@ tsol_find_secopt_v6(
 		 * Therefore ip6opt_ls == 0 forces
 		 * this test to always fail here.
 		 */
-		if (opt_type == ip6opt_ls)
-			secopt = optptr;
-		else switch (opt_type) {
+		if (opt_type == ip6opt_ls) {
+			if (*secoptp != NULL)
+				/* More than one security option found */
+				return (B_FALSE);
+			*secoptp = (uchar_t *)optptr;
+		} else switch (opt_type) {
 		case IP6OPT_PADN:
 			break;
 		default:
@@ -1052,16 +1141,16 @@ tsol_find_secopt_v6(
 			 * the label option. So the hop-by-hop header is needed
 			 */
 			*hbh_needed = B_TRUE;
-			if (secopt != NULL) {
+			if (*secoptp != NULL) {
 				*after_secoptp = (uchar_t *)optptr;
-				return ((uchar_t *)secopt);
+				return (B_TRUE);
 			}
 			break;
 		}
 		optlen -= optused;
 		optptr += optused;
 	}
-	return ((uchar_t *)secopt);
+	return (B_TRUE);
 }
 
 /*
@@ -1095,8 +1184,18 @@ tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
 	 * Locate the start of the label option if it exists and the end
 	 * of the label option including pads if any.
 	 */
-	secopt = tsol_find_secopt_v6(ip6hbh, hbhlen, &after_secopt,
-	    &hbh_needed);
+	if (!tsol_find_secopt_v6(ip6hbh, hbhlen, &secopt, &after_secopt,
+	    &hbh_needed)) {
+		/*
+		 * This function should not see invalid messages.
+		 * If one occurs, it would indicate either an
+		 * option previously verified in the forwarding
+		 * path has been corrupted or an option was
+		 * incorrectly generated locally.
+		 */
+		ASSERT(0);
+		return (0);
+	}
 	if (secopt == NULL)
 		return (0);
 	if (!hbh_needed) {
@@ -1307,8 +1406,18 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
 	if (ip6h->ip6_nxt == IPPROTO_HOPOPTS) {
 		ip6hbh = (uchar_t *)&ip6h[1];
 		hbhlen = (ip6hbh[1] + 1) << 3;
-		secopt = tsol_find_secopt_v6(ip6hbh, hbhlen, &after_secopt,
-		    &hbh_needed);
+		if (!tsol_find_secopt_v6(ip6hbh, hbhlen, &secopt,
+		    &after_secopt, &hbh_needed)) {
+			/*
+			 * This function should not see invalid messages.
+			 * If one occurs, it would indicate either an
+			 * option previously verified in the forwarding
+			 * path has been corrupted or an option was
+			 * incorrectly generated locally.
+			 */
+			ASSERT(0);
+			return (EACCES);
+		}
 	}
 
 	if (sec_opt_len == 0 && secopt == NULL) {

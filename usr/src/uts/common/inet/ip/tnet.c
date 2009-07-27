@@ -666,9 +666,9 @@ cipso_to_sl(const uchar_t *option, bslabel_t *sl)
  * to be forwarded packets. The forwarding path needs to examine the label
  * to determine how to forward the packet.
  *
- * For IPv4, IP header options have been pulled up, but other headers might not
- * have been.  For IPv6, any hop-by-hop options have been pulled up, but any
- * other headers might not be present.
+ * This routine pulls all message text up into the first mblk.
+ * For IPv4, only the first 20 bytes of the IP header are guaranteed
+ * to exist. For IPv6, only the IPv6 header is guaranteed to exist.
  */
 boolean_t
 tsol_get_pkt_label(mblk_t *mp, int version)
@@ -691,39 +691,17 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 		return (B_FALSE);
 
 	if (version == IPV4_VERSION) {
+		ASSERT(MBLKL(mp) >= IP_SIMPLE_HDR_LENGTH);
 		ipha = (const ipha_t *)mp->b_rptr;
 		src = &ipha->ipha_src;
-		label_type = tsol_get_option(mp, &opt_ptr);
+		if (!tsol_get_option_v4(mp, &label_type, &opt_ptr))
+			return (B_FALSE);
 	} else {
-		uchar_t		*after_secopt;
-		boolean_t	hbh_needed;
-		const uchar_t	*ip6hbh;
-		size_t		optlen;
-
-		label_type = OPT_NONE;
+		ASSERT(MBLKL(mp) >= IPV6_HDR_LEN);
 		ip6h = (const ip6_t *)mp->b_rptr;
 		src = &ip6h->ip6_src;
-		if (ip6h->ip6_nxt == IPPROTO_HOPOPTS) {
-			ip6hbh = (const uchar_t *)&ip6h[1];
-			optlen = (ip6hbh[1] + 1) << 3;
-			ASSERT(ip6hbh + optlen <= mp->b_wptr);
-			opt_ptr = tsol_find_secopt_v6(ip6hbh, optlen,
-			    &after_secopt, &hbh_needed);
-			/* tsol_find_secopt_v6 guarantees some sanity */
-			if (opt_ptr != NULL &&
-			    (optlen = opt_ptr[1]) >= 8) {
-				opt_ptr += 2;
-				bcopy(opt_ptr, &doi, sizeof (doi));
-				doi = ntohl(doi);
-				if (doi == IP6LS_DOI_V4 &&
-				    opt_ptr[4] == IP6LS_TT_V4 &&
-				    opt_ptr[5] <= optlen - 4 &&
-				    opt_ptr[7] <= optlen - 6) {
-					opt_ptr += sizeof (doi) + 2;
-					label_type = OPT_CIPSO;
-				}
-			}
-		}
+		if (!tsol_get_option_v6(mp, &label_type, &opt_ptr))
+			return (B_FALSE);
 	}
 
 	switch (label_type) {
@@ -765,38 +743,24 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 				const struct icmp *icmp = (const struct icmp *)
 				    (mp->b_rptr + IPH_HDR_LENGTH(ipha));
 
-				if ((uchar_t *)icmp > mp->b_wptr) {
-					if (!pullupmsg(mp,
-					    (uchar_t *)icmp - mp->b_rptr + 1))
-						return (B_FALSE);
-					icmp = (const struct icmp *)
-					    (mp->b_rptr +
-					    IPH_HDR_LENGTH(ipha));
-				}
+				if ((uchar_t *)icmp + ICMP_MINLEN > mp->b_wptr)
+					return (B_FALSE);
 				if (icmp->icmp_type == ICMP_ROUTERADVERT ||
 				    icmp->icmp_type == ICMP_ROUTERSOLICIT)
 					return (B_TRUE);
 			}
-			src = &ipha->ipha_src;
 		} else {
 			if (ip6h->ip6_nxt == IPPROTO_ICMPV6) {
 				const icmp6_t *icmp6 = (const icmp6_t *)
 				    (mp->b_rptr + IPV6_HDR_LEN);
 
 				if ((uchar_t *)icmp6 + ICMP6_MINLEN >
-				    mp->b_wptr) {
-					if (!pullupmsg(mp,
-					    (uchar_t *)icmp6 - mp->b_rptr +
-					    ICMP6_MINLEN))
-						return (B_FALSE);
-					icmp6 = (const icmp6_t *)
-					    (mp->b_rptr + IPV6_HDR_LEN);
-				}
+				    mp->b_wptr)
+					return (B_FALSE);
 				if (icmp6->icmp6_type >= MLD_LISTENER_QUERY &&
 				    icmp6->icmp6_type <= ICMP6_MAX_INFO_TYPE)
 					return (B_TRUE);
 			}
-			src = &ip6h->ip6_src;
 		}
 
 		/*
@@ -1503,6 +1467,8 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 		 */
 		off_link = ((ipha->ipha_dst != ire->ire_addr) ||
 		    (ire->ire_gateway_addr != INADDR_ANY));
+		if (!tsol_get_option_v4(mp, &label_type, &opt_ptr))
+			return (NULL);
 	} else {
 		ASSERT(ire->ire_ipversion == IPV6_VERSION);
 		ip6h = (ip6_t *)mp->b_rptr;
@@ -1525,12 +1491,12 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 
 		/* destination not directly reachable? */
 		off_link = !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6);
+		if (!tsol_get_option_v6(mp, &label_type, &opt_ptr))
+			return (NULL);
 	}
 
 	if ((tsl = msg_getlabel(mp)) == NULL)
 		return (mp);
-
-	label_type = tsol_get_option(mp, &opt_ptr);
 
 	ASSERT(psrc != NULL && pdst != NULL);
 	dst_rhtp = find_tpc(pdst, ire->ire_ipversion, B_FALSE);
