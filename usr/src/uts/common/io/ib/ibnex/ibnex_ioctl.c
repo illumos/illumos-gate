@@ -3117,6 +3117,7 @@ ibnex_ctl_query_hca_port(dev_t dev, int cmd, intptr_t arg, int mode,
 	ibnex_ctl_query_hca_port_32_t	*query_hca_port_32 = NULL;
 	uint_t				sgid_tbl_sz;
 	uint16_t			pkey_tbl_sz;
+	ibt_hca_attr_t			hca_attr;
 
 	IBTF_DPRINTF_L4("ibnex", "\tctl_query_hca_port: cmd=%x, arg=%p, "
 	    "mode=%x, cred=%p, rval=%p, dev=0x%x", cmd, arg, mode, credp,
@@ -3163,8 +3164,15 @@ ibnex_ctl_query_hca_port(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 	}
 
-	if (query_hca_port->port_num == 0) {
-		rv = EINVAL;
+	if (ibt_query_hca_byguid(query_hca_port->hca_guid, &hca_attr) !=
+	    IBT_SUCCESS) {
+		rv = ENXIO;
+		goto out;
+	}
+
+	if (query_hca_port->port_num == 0 ||
+	    query_hca_port->port_num > hca_attr.hca_nports) {
+		rv = ENOENT;
 		goto out;
 	}
 
@@ -3174,7 +3182,7 @@ ibnex_ctl_query_hca_port(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	if (ibt_query_hca_ports_byguid(query_hca_port->hca_guid,
 	    query_hca_port->port_num, &ibt_pi, &nports, &size) != IBT_SUCCESS) {
-		rv = EINVAL;
+		rv = ENXIO;
 		goto out;
 	}
 

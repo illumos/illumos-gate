@@ -161,7 +161,7 @@ typedef struct ibnex_ioctl_data_32 {
  * IBNEX_CTL_GET_HCA_LIST
  * ======================
  *
- * Gets GUIDs for all HCAs in the system
+ * Gets GUIDs of all HCAs in the system
  *
  * arg - pointer to a structure of type ibnex_ctl_get_hca_list_t
  *
@@ -190,9 +190,9 @@ typedef struct ibnex_ioctl_data_32 {
  *
  * Upon successful return from the IOCTL, hca_info will contain HCA attributes
  * for the specified GUID. hca_info.hca_device_path_len will contain the actual
- * string length of the hca device path plus the terminating null character.
- * hca_info.hca_device_path will point to null terminated hca device path
- * string if the caller allocated memory for the hca device path is large
+ * string length of the hca device path plus one (for the terminating null
+ * character). hca_info.hca_device_path will point to null terminated hca device
+ * path string if the caller allocated memory for the hca device path is large
  * enough to hold the hca device path and the terminating null character.
  * Otherwise hca_info.hca_device_path will be set to NULL.
  *
@@ -226,6 +226,14 @@ typedef struct ibnex_ioctl_data_32 {
  * port_info.p_pkey_tbl will point to an array containing pkeys. The number of
  * pkeys in the array is pkey_tbl_alloc_sz or port_info.p_pkey_tbl_sz
  * whichever is smaller.
+ *
+ * Error numbers for the above ioctls upon failure:
+ *   EINVAL	Invalid parameter passed
+ *   EFAULT	A fault occurred copying data to or from the user space
+ *		to the kernel space.
+ *   ENXIO	Specified HCA GUID does not exist
+ *   ENOENT	Specified HCA port does not exist
+ *
  */
 
 
@@ -292,8 +300,8 @@ typedef struct ibnex_ctl_hca_info_s {
 
 	/*
 	 * hca device path and the length.
-	 * hca_device_path_len is string length of the actual hca device path
-	 * plus the terminating null character.
+	 * hca_device_path_len contains the string length of the actual hca
+	 * device path plus one (for the terminating null character).
 	 */
 	char		*hca_device_path;
 	uint_t		hca_device_path_len;
@@ -387,8 +395,8 @@ typedef struct ibnex_ctl_hca_info_32_s {
 
 	/*
 	 * hca device path and the length.
-	 * hca_device_path_len is string length of the actual hca device path
-	 * plus the terminating null character.
+	 * hca_device_path_len contains the string length of the actual hca
+	 * device path plus one (for the terminating null character).
 	 */
 	caddr32_t	hca_device_path;
 	uint_t		hca_device_path_len;
