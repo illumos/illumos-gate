@@ -37,6 +37,7 @@
 i pkginfo
 i copyright
 i depend
+i preinstall
 i preremove
 i i.manifest
 i r.manifest

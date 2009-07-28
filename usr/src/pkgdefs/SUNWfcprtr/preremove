@@ -25,9 +25,35 @@
 #
 #
 
-PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
+exitcode=0
 
-SERVICE="svc:/network/npiv_config:default"
+disable_service() 
+{
+	#
+	# Confirm service is installed, otherwise exit.
+	#
+	/usr/bin/svcprop -q ${SERVICE} 
+	if [ $? -ne 0 ]; then
+		return
+	fi
+
+	SVCPROP=`svcprop -c -p general/enabled ${SERVICE}`
+
+	#
+	# Check to see if the service is running and if so disable it.
+	#
+	if [ "${SVCPROP}" = "true" ]; then
+		svcadm disable ${SERVICE}
+		if [ $? -ne 0 ]; then
+			echo "\n$0 Disabling of ${SERVICE} failed!\n" >&2
+			exitcode = 1
+			return
+		fi
+		svcadm refresh ${SERVICE}
+	fi
+}
+
+PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
 
 #
 # The following case implies that the installation was not on the root disk
@@ -39,43 +65,10 @@ if [ "${PKG_INSTALL_ROOT}" != "" -a "${PKG_INSTALL_ROOT}" != "/" ]; then
 	exit 0
 fi
 
-#
-# Confirm service is installed, otherwise exit.
-#
-/usr/bin/svcprop -q ${SERVICE} || exit 0
+SERVICE="svc:/network/npiv_config:default"
+disable_service
 
-SVCPROP=`svcprop -p general/enabled ${SERVICE}`
+SERVICE="svc:/system/fcoe_target:default"
+disable_service
 
-#
-# Check to see if the service is running and if so disable it.
-#
-if [ "${SVCPROP}" = "true" ]; then
-	svcadm disable ${SERVICE}
-	if [ $? -ne 0 ]; then
-		echo "\n$0 Disabling of ${SERVICE} failed!\n" >&2
-		exit 1
-	fi
-	svcadm refresh ${SERVICE}
-fi
-
-SERVICE="svc:/network/fcoe_config:default"
-
-#
-# Confirm service is installed, otherwise exit.
-#
-/usr/bin/svcprop -q ${SERVICE} || exit 0
-
-SVCPROP=`svcprop -p general/enabled ${SERVICE}`
-
-#
-# Check to see if the service is running and if so disable it.
-#
-if [ "${SVCPROP}" = "true" ]; then
-	svcadm disable ${SERVICE}
-	if [ $? -ne 0 ]; then
-		echo "\n$0 Disabling of ${SERVICE} failed!\n" >&2
-		exit 1
-	fi
-	svcadm refresh ${SERVICE}
-fi
-exit 0
+exit $exitcode
