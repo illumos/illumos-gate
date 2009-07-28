@@ -433,9 +433,11 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			if (iscsiboot_prop == NULL) {
 				ihp->hba_service_status =
 				    ISCSI_SERVICE_DISABLED;
+				ihp->hba_service_status_overwrite = B_FALSE;
 			} else {
 				ihp->hba_service_status =
 				    ISCSI_SERVICE_ENABLED;
+				ihp->hba_service_status_overwrite = B_TRUE;
 			}
 			ihp->hba_service_client_count = 0;
 
@@ -3957,6 +3959,14 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			rtn = EFAULT;
 			break;
 		}
+
+		/* doesn't need to overwrite the status anymore */
+		mutex_enter(&ihp->hba_service_lock);
+		if (ihp->hba_service_status_overwrite == B_TRUE) {
+			ihp->hba_service_status = ISCSI_SERVICE_DISABLED;
+			ihp->hba_service_status_overwrite = B_FALSE;
+		}
+		mutex_exit(&ihp->hba_service_lock);
 
 		if (iscsi_enter_service_zone(ihp, ISCSI_SERVICE_ENABLED) ==
 		    B_FALSE) {

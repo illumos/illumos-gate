@@ -898,7 +898,7 @@ iscsi_sess_redrive_io(iscsi_sess_t *isp)
 	while (icp != NULL) {
 		if (ISCSI_CONN_STATE_FULL_FEATURE(
 		    icp->conn_state)) {
-			iscsi_thread_send_wakeup(
+			(void) iscsi_thread_send_wakeup(
 			    icp->conn_tx_thread);
 		}
 		icp = icp->conn_next;

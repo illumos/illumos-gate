@@ -1166,6 +1166,7 @@ typedef struct iscsi_hba {
 
 	/* Default HBA tunable settings */
 	iscsi_tunable_params_t  hba_tunable_params;
+	boolean_t		hba_service_status_overwrite;
 } iscsi_hba_t;
 
 /*

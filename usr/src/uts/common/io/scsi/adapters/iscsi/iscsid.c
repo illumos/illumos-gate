@@ -428,7 +428,8 @@ iscsid_enable_discovery(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t idm,
 					break;
 				}
 				if (poke == B_TRUE) {
-					iscsi_thread_send_wakeup(dt->thr_id);
+					(void) iscsi_thread_send_wakeup(
+					    dt->thr_id);
 				}
 			} else {
 				/*
@@ -510,6 +511,7 @@ iscsid_poke_discovery(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method)
 
 	iSCSIDiscoveryMethod_t	dm;
 	iscsid_thr_table	*dt;
+	boolean_t		send_wakeup;
 
 	ASSERT(ihp != NULL);
 
@@ -523,15 +525,19 @@ iscsid_poke_discovery(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method)
 	dm = persistent_disc_meth_get();
 	for (dt = &iscsid_thr[0]; dt->method != iSCSIDiscoveryMethodUnknown;
 	    dt++) {
+		send_wakeup = B_FALSE;
+
 		if ((method == iSCSIDiscoveryMethodUnknown) ||
 		    (method == dt->method)) {
 			if ((dm & dt->method) && (dt->thr_id != NULL)) {
-				iscsi_thread_send_wakeup(dt->thr_id);
-			} else {
-				iscsi_discovery_event(ihp, dt->method, B_TRUE);
-				iscsi_discovery_event(ihp, dt->method, B_FALSE);
+				if (iscsi_thread_send_wakeup(dt->thr_id) ==
+				    B_TRUE) {
+					send_wakeup = B_TRUE;
+				}
 			}
-		} else {
+		}
+
+		if (send_wakeup == B_FALSE) {
 			iscsi_discovery_event(ihp, dt->method, B_TRUE);
 			iscsi_discovery_event(ihp, dt->method, B_FALSE);
 		}

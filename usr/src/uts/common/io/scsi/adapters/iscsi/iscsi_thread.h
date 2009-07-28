@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,6 @@ typedef struct _iscsi_thread {
 	iscsi_thread_ep_t	entry_point;
 	void			*arg;
 	dev_info_t		*dip;
-	boolean_t		running;
 	struct {
 		uint32_t	bitmap;
 		kmutex_t	mtx;
@@ -101,7 +100,7 @@ iscsi_thread_send_kill(
 	iscsi_thread_t		*thread
 );
 
-void
+boolean_t
 iscsi_thread_send_wakeup(
 	iscsi_thread_t		*thread
 );

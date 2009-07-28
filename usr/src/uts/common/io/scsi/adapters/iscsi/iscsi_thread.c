@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,11 +245,13 @@ iscsi_thread_send_kill(
 /*
  * iscsi_thread_send_wakeup -
  */
-void
+boolean_t
 iscsi_thread_send_wakeup(
 	iscsi_thread_t		*thread
 )
 {
+	boolean_t	ret = B_FALSE;
+
 	ASSERT(thread != NULL);
 	ASSERT(thread->signature == SIG_ISCSI_THREAD);
 
@@ -265,12 +267,14 @@ iscsi_thread_send_wakeup(
 			cv_signal(&thread->sign.cdv);
 		}
 		mutex_exit(&thread->sign.mtx);
+		ret = B_TRUE;
 		break;
 
 	default:
 		break;
 	}
 	mutex_exit(&thread->mgnt.mtx);
+	return (ret);
 }
 
 /*

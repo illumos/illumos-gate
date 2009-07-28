@@ -293,7 +293,7 @@ iscsi_enqueue_completed_cmd(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	++isp->sess_queue_completion.count;
 	mutex_exit(&isp->sess_queue_completion.mutex);
 
-	iscsi_thread_send_wakeup(isp->sess_ic_thread);
+	(void) iscsi_thread_send_wakeup(isp->sess_ic_thread);
 }
 
 /*

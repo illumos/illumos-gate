@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSNS Client
@@ -703,7 +703,7 @@ create_esi_scn_thr(uint8_t *lhba_handle, iscsi_addr_t *isns_server_address)
 			mutex_exit(&esi_scn_thr_mutex);
 			return (ISNS_INTERNAL_ERR);
 		}
-		iscsi_thread_send_wakeup(esi_scn_thr_id);
+		(void) iscsi_thread_send_wakeup(esi_scn_thr_id);
 	}
 	mutex_exit(&esi_scn_thr_mutex);
 
