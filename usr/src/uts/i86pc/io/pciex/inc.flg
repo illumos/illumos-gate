@@ -21,11 +21,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # This file brings down all that is needed to build the
 # x86 PCI Express code. 
@@ -58,7 +56,7 @@ find_files "s.*"	\
 	usr/src/uts/i86pc/npe			\
 	usr/src/uts/i86xpv/npe			\
 	usr/src/uts/intel/pci_autoconfig	\
-	usr/src/uts/intel/pcie_pci		\
+	usr/src/uts/intel/pcieb			\
 	usr/src/uts/intel/pciehpc		\
 	usr/src/uts/intel/pcicfg
 

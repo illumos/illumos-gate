@@ -31,7 +31,6 @@
 #include <sys/iommutsb.h>
 #include <sys/pci.h>
 #include <sys/hotplug/pci/pciehpc.h>
-#include <pcie_pwr.h>
 #include <px_obj.h>
 #include "px_regs.h"
 #include "oberon_regs.h"

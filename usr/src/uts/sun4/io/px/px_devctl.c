@@ -42,7 +42,7 @@
 #include "px_obj.h"
 #include <sys/pci_tools.h>
 #include "px_tools_ext.h"
-#include "pcie_pwr.h"
+#include <sys/pcie_pwr.h>
 
 /*LINTLIBRARY*/
 

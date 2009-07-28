@@ -41,7 +41,6 @@
 #include <sys/membar.h>
 #include <sys/machcpuvar.h>
 #include <sys/platform_module.h>
-#include "pcie_pwr.h"
 #include "px_lib4u.h"
 #include "px_err.h"
 #include "px_err_impl.h"

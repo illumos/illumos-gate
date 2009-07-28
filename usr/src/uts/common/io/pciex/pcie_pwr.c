@@ -19,16 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/kmem.h>
-#include <sys/async.h>
 #include <sys/sysmacros.h>
 #include <sys/sunddi.h>
 #include <sys/sunpm.h>
@@ -39,7 +36,7 @@
 #include <sys/pcie.h>
 #include <sys/pcie_impl.h>
 #include <sys/promif.h>		/* prom_printf */
-#include "pcie_pwr.h"
+#include <sys/pcie_pwr.h>
 
 #if defined(DEBUG)
 
@@ -125,6 +122,11 @@ pcie_power(dev_info_t *dip, int component, int level)
 	int *counters = pwr_p->pwr_counters;
 	int pmcaps = pwr_p->pwr_pmcaps;
 	int ret = DDI_FAILURE;
+
+#if defined(__i386) || defined(__amd64)
+	if (dip)
+		return (DDI_SUCCESS);
+#endif /* defined(__i386) || defined(__amd64) */
 
 	ASSERT(level != PM_LEVEL_UNKNOWN);
 	/* PM should not asking for a level, which is unsupported */
@@ -275,6 +277,11 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 	int old_level;
 	int rv = DDI_SUCCESS;
 	int level_allowed, comp;
+
+#if defined(__i386) || defined(__amd64)
+	if (dip)
+		return (DDI_SUCCESS);
+#endif /* defined(__i386) || defined(__amd64) */
 
 	switch (op) {
 	case BUS_POWER_PRE_NOTIFICATION:
@@ -520,7 +527,7 @@ pcie_add_comps(dev_info_t *dip, dev_info_t *cdip, pcie_pwr_t *pwr_p)
 	 * Allocate counters per child. This is a part of pcie
 	 * pm info. If there is no pcie pm info, allocate it here.
 	 * pcie pm info might already be there for pci express nexus
-	 * driver e.g. px_pci. For all leaf nodes, it is allocated here.
+	 * driver e.g. pcieb. For all leaf nodes, it is allocated here.
 	 */
 	if ((pcie_pm_p = PCIE_PMINFO(cdip)) == NULL) {
 		pcie_pm_p = (pcie_pm_t *)kmem_zalloc(
@@ -576,7 +583,7 @@ pcie_remove_comps(dev_info_t *dip, dev_info_t *cdip, pcie_pwr_t *pwr_p)
 }
 
 /*
- * Power management related initialization common to px and px_pci
+ * Power management related initialization common to px and pcieb
  */
 int
 pwr_common_setup(dev_info_t *dip)
@@ -822,13 +829,18 @@ pcie_is_pcie(dev_info_t *dip)
 }
 
 /*
- * Called by px_attach or pxb_attach:: DDI_RESUME
+ * Called by px_attach or pcieb_attach:: DDI_RESUME
  */
 int
 pcie_pwr_resume(dev_info_t *dip)
 {
 	dev_info_t *cdip;
 	pcie_pwr_t *pwr_p = NULL;
+
+#if defined(__i386) || defined(__amd64)
+	if (dip)
+		return (DDI_SUCCESS);
+#endif /* defined(__i386) || defined(__amd64) */
 
 	if (PCIE_PMINFO(dip))
 		pwr_p = PCIE_NEXUS_PMINFO(dip);
@@ -907,6 +919,11 @@ pcie_pwr_suspend(dev_info_t *dip)
 	int i, *counters; /* per nexus counters */
 	int *child_counters = NULL; /* per child dip counters */
 	pcie_pwr_t *pwr_p = NULL;
+
+#if defined(__i386) || defined(__amd64)
+	if (dip)
+		return (DDI_SUCCESS);
+#endif /* defined(__i386) || defined(__amd64) */
 
 	if (PCIE_PMINFO(dip))
 		pwr_p = PCIE_NEXUS_PMINFO(dip);

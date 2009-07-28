@@ -7759,6 +7759,18 @@ mondo_loop() {
 	rmdir $root/usr/include/sys/i2o/ 2>/dev/null
 
 	#
+	# Remove px_pci, pxb_plx, pxb_bcm, pcie_pci
+	#
+	rm -f $root/kernel/drv/px_pci.conf
+	rm -f $root/kernel/drv/sparcv9/px_pci
+	rm -f $root/kernel/drv/pxb_plx.conf
+	rm -f $root/kernel/drv/sparcv9/pxb_plx
+	rm -f $root/kernel/drv/sparcv9/pxb_bcm
+	rm -f $root/kernel/drv/pcie_pci.conf
+	rm -f $root/kernel/drv/pcie_pci
+	rm -f $root/kernel/drv/amd64/pcie_pci
+
+	#
 	# Remove /usr/ccs/bin dependency files that now live in
 	# /usr/share/lib/ccs
 	#

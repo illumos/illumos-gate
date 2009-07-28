@@ -1,6 +1,6 @@
 npe "pciex_root_complex"
-pcie_pci "pciexclass,060400"
-pcie_pci "pciexclass,060401"
+pcieb "pciexclass,060400"
+pcieb "pciexclass,060401"
 pci_pci "pciclass,060400"
 pci_pci "pciclass,060401"
 pci_pci "pci1011,1"

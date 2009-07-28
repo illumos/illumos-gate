@@ -37,7 +37,7 @@ extern "C" {
 #define	PCI_GET_SEC_BUS(dip)	\
 	PCIE_DIP2BUS(dip)->bus_bdg_secbus
 #define	PCI_GET_PCIE2PCI_SECBUS(dip) \
-	PCIE_DIP2BUS(dip)->bus_pcie2pci_secbus
+	PCIE_DIP2BUS(dip)->bus_bdg_secbus
 
 #define	DEVI_PORT_TYPE_PCI \
 	((PCI_CLASS_BRIDGE << 16) | (PCI_BRIDGE_PCI << 8) | \
@@ -124,7 +124,7 @@ extern "C" {
 
 /*
  * The following flag is used for Broadcom 5714/5715 bridge prefetch issue.
- * This flag will be used both by px and px_pci nexus drivers.
+ * This flag will be used both by px and pcieb nexus drivers.
  */
 #define	PX_DMAI_FLAGS_MAP_BUFZONE	0x40000
 
@@ -253,7 +253,6 @@ typedef struct pcie_bus {
 	uint32_t	bus_dev_ven_id;		/* device/vendor ID */
 	uint8_t		bus_rev_id;		/* revision ID */
 	uint8_t		bus_hdr_type;		/* pci header type, see pci.h */
-	pcie_req_id_t	bus_pcie2pci_secbus;	/* PCIe2PCI Bridge secbus num */
 	uint16_t	bus_dev_type;		/* PCI-E dev type, see pcie.h */
 	uint8_t		bus_bdg_secbus;		/* Bridge secondary bus num */
 	uint16_t	bus_pcie_off;		/* PCIe Capability Offset */

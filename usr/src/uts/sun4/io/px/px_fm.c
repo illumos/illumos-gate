@@ -77,12 +77,6 @@ px_fm_attach(px_t *px_p)
 	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 	/*
-	 * Initialize pci_target_queue for FMA handling of
-	 * pci errors.
-	 */
-	pci_targetq_init();
-
-	/*
 	 * check parents' capability
 	 */
 	ddi_fm_init(dip, &px_p->px_fm_cap, &px_p->px_fm_ibc);

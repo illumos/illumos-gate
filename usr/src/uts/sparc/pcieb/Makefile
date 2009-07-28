@@ -19,14 +19,12 @@
 # CDDL HEADER END
 #
 #
-# uts/sparc/pxb_bcm/Makefile
+# uts/sparc/pcieb/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the pxb_bcm driver kernel module
+#	This makefile drives the production of the pcieb driver kernel module
 #
 #	sparc implementation architecture dependent
 #
@@ -39,10 +37,11 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= pxb_bcm
-OBJECTS		= $(PX_PCI_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PX_PCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= pcieb		
+OBJECTS		= $(PCIEB_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIEB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/common/io/pciex/
 
 #
 #	Include common rules.
@@ -52,14 +51,9 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY)
+ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-
-#
-#	Include sun4 specific headers files
-#
-INC_PATH	+= -I$(UTSBASE)/sun4
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 # lint pass one enforcement
@@ -72,10 +66,10 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS += -dalign
 
 #
-# Enable Broadcom 5714/5715 workaround code and lint duplicate symbol
+# Enable PLX workaround code and lint duplicate symbol
 # avoidance hack
 #
-CPPFLAGS += -DBCM_SW_WORKAROUNDS -DPX_MOD_NAME=pxb_bcm
+CPPFLAGS += -DPX_PLX
 
 #
 #	Dependency
@@ -88,7 +82,6 @@ LDFLAGS += -dy -Nmisc/pcie -Nmisc/pcishpc -Nmisc/pcihp -Nmisc/pciehpc
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 #

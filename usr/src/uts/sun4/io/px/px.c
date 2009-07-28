@@ -43,7 +43,7 @@
 #include "px_obj.h"
 #include <sys/pci_tools.h>
 #include "px_tools_ext.h"
-#include "pcie_pwr.h"
+#include <sys/pcie_pwr.h>
 
 /*LINTLIBRARY*/
 
@@ -62,8 +62,6 @@ static void px_pwr_teardown(dev_info_t *dip);
 static void px_set_mps(px_t *px_p);
 
 extern int pcie_max_mps;
-
-extern errorq_t *pci_target_queue;
 
 /*
  * function prototypes for hotplug routines:
@@ -174,13 +172,6 @@ _fini(void)
 	e = mod_remove(&modlinkage);
 	if (e != DDI_SUCCESS)
 		return (e);
-	/*
-	 * Destroy pci_target_queue, and set it to NULL.
-	 */
-	if (pci_target_queue)
-		errorq_destroy(pci_target_queue);
-
-	pci_target_queue = NULL;
 
 	/* Free px soft state */
 	ddi_soft_state_fini(&px_state_p);
@@ -720,7 +711,7 @@ px_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 * There may be a need to differentiate between PCI
 		 * and PCI-Ex devices so the following range check is
 		 * done correctly, depending on the implementation of
-		 * px_pci bridge nexus driver.
+		 * pcieb bridge nexus driver.
 		 */
 		if ((off >= PCIE_CONF_HDR_SIZE) ||
 		    (len > PCIE_CONF_HDR_SIZE) ||

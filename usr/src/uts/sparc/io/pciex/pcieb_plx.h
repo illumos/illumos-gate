@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_PXB_PLX_H
-#define	_SYS_PXB_PLX_H
+#ifndef	_SYS_PCIEB_PLX_H
+#define	_SYS_PCIEB_PLX_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -51,8 +51,12 @@ extern "C" {
 #define	PLX_CAM_PORT_12			0x2f8
 #define	PLX_RO_MODE_BIT			0x20
 
+#define	IS_PLX_VENDORID(x)		(x == PXB_VENDOR_PLX)
+
+static int pxb_tlp_count = 64;
+
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_PXB_PLX_H */
+#endif	/* _SYS_PCIEB_PLX_H */

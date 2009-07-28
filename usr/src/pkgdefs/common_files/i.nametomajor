@@ -21,10 +21,9 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
 
@@ -104,6 +103,9 @@ obsolete_sparc()
 		obs["soc"] = 1;
 		obs["sc_nct"] = 1;
 		obs["tomtppm"] = 1;
+		obs["px_pci"] = 1;
+		obs["pxb_bcm"] = 1;
+		obs["pxb_plx"] = 1;
 	} !($1 in obs) { print $0 }'
 }
 
@@ -179,6 +181,7 @@ obsolete_i386()
 		obs["pci_to_i2o"] = 1;
 		obs["i2o_scsi"] = 1;
 		obs["i2o_bs"] = 1;
+		obs["pcie_pci"] = 1;
 	} !($1 in obs) { print $0 }'
 }
 

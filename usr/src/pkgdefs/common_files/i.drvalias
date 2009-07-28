@@ -21,10 +21,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
 
@@ -89,6 +88,28 @@ obsolete_sparc()
 	    -e '/^[ 	]*px_pci[ 	][ 	]*"pci10b5,8532"[ 	#].*$/d' \
 	    -e '/^[ 	]*px_pci[ 	][ 	]*"pci10b5,8516"$/d' \
 	    -e '/^[ 	]*px_pci[ 	][ 	]*"pci10b5,8516"[ 	#].*$/d' \
+	    -e '/^[ 	]*px_pci[ 	][ 	]*"pciexclass,060400"$/d' \
+	    -e '/^[ 	]*px_pci[ 	][ 	]*"pciexclass,060400"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_bcm[ 	][ 	]*"pciex1166,103"$/d' \
+	    -e '/^[ 	]*pxb_bcm[ 	][ 	]*"pciex1166,103"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8114"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8114"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8532"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8532"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8516"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8516"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8548"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8548"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8533"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8533"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8517"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8517"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8518"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex10b5,8518"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex108e,9010"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex108e,9010"[ 	#].*$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex108e,9020"$/d' \
+	    -e '/^[ 	]*pxb_plx[ 	][ 	]*"pciex108e,9020"[ 	#].*$/d' \
 	    -e '/^[ 	]*sx[ 	][ 	]*SUNW,sx$/d' \
 	    -e '/^[ 	]*sx[ 	][ 	]*SUNW,sx[ 	#].*$/d' \
 	    -e '/^[ 	]*sx[ 	][ 	]*"SUNW,sx"$/d' \
@@ -150,6 +171,10 @@ obsolete_i386() {
 	    -e '/^[ 	]*pcie_pci[ 	][ 	]*"pciex1011,21"[ 	#].*$/d' \
 	    -e '/^[ 	]*pcie_pci[ 	][ 	]*"pciex1014,22"$/d' \
 	    -e '/^[ 	]*pcie_pci[ 	][ 	]*"pciex1014,22"[ 	#].*$/d' \
+	    -e '/^[ 	]*pcie_pci[ 	][ 	]*"pciexclass,060400"$/d' \
+	    -e '/^[ 	]*pcie_pci[ 	][ 	]*"pciexclass,060400"[ 	#].*$/d' \
+	    -e '/^[ 	]*pcie_pci[ 	][ 	]*"pciexclass,060401"$/d' \
+	    -e '/^[ 	]*pcie_pci[ 	][ 	]*"pciexclass,060401"[ 	#].*$/d' \
 	    -e '/^[ 	]*spwr[ 	][ 	]*"pci10b8,0005"$/d' \
 	    -e '/^[ 	]*spwr[ 	][ 	]*"pci10b8,0005"[ 	#].*$/d' \
 	    -e '/^[ 	]*chs[ 	][ 	]*"pci1014,2e"$/d' \

@@ -1850,7 +1850,7 @@ pf_get_pcie_bridge(pf_data_t *pfd_p, pcie_req_id_t secbus)
 	for (bdg_pfd_p = pfd_p->pe_next; bdg_pfd_p;
 	    bdg_pfd_p = bdg_pfd_p->pe_next) {
 		if (PCIE_IS_PCIE_BDG(PCIE_PFD2BUS(bdg_pfd_p)) &&
-		    PCIE_PFD2BUS(bdg_pfd_p)->bus_pcie2pci_secbus == secbus)
+		    PCIE_PFD2BUS(bdg_pfd_p)->bus_bdg_secbus == secbus)
 			return (bdg_pfd_p);
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@
 #include <sys/sunndi.h>
 #include <sys/ddi_impldefs.h>
 #include "px_obj.h"
-#include "pcie_pwr.h"
+#include <sys/pcie_pwr.h>
 
 /*LINTLIBRARY*/
 

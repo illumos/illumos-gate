@@ -577,8 +577,6 @@ pcie_init_bus(dev_info_t *cdip)
 	/* Save the Header Type */
 	bus_p->bus_hdr_type = PCIE_GET(8, bus_p, PCI_CONF_HEADER);
 	bus_p->bus_hdr_type &= PCI_HEADER_TYPE_M;
-	bus_p->bus_pcie2pci_secbus = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, 0,
-	    "pcie2pci-sec-bus", 0);
 
 	/* Figure out the device type and all the relavant capability offsets */
 	if ((PCI_CAP_LOCATE(eh, PCI_CAP_ID_PCI_E, &bus_p->bus_pcie_off))
@@ -1027,7 +1025,7 @@ pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip)
 	/*
 	 * As part of the probing, the PCI fcode interpreter may setup a DMA
 	 * request if a given card has a fcode on it using dip and rdip of the
-	 * AP (attachment point) i.e, dip and rdip of px/px_pci driver. In this
+	 * AP (attachment point) i.e, dip and rdip of px/pcieb driver. In this
 	 * case, return a invalid value for the bdf since we cannot get to the
 	 * bdf value of the actual device which will be initiating this DMA.
 	 */
@@ -1037,7 +1035,7 @@ pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip)
 	cdip = pcie_get_my_childs_dip(dip, rdip);
 
 	/*
-	 * For a given rdip, return the bdf value of dip's (px or px_pci)
+	 * For a given rdip, return the bdf value of dip's (px or pcieb)
 	 * immediate child or secondary bus-id if dip is a PCIe2PCI bridge.
 	 *
 	 * XXX - For now, return a invalid bdf value for all PCI and PCI-X

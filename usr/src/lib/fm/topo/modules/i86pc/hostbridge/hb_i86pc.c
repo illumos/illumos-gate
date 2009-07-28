@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
@@ -120,7 +118,7 @@ pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 				}
 				hbcnt++;
 			}
-			if (strcmp(di_driver_name(cnode), PCIE_PCI) == 0) {
+			if (strcmp(di_driver_name(cnode), PCIEB) == 0) {
 				if (rc_process(mod, ptn, hbcnt, cnode) < 0) {
 					if (hbcnt == 0)
 						topo_node_range_destroy(ptn,

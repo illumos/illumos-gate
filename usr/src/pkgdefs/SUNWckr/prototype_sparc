@@ -63,8 +63,7 @@ d none kernel/dacf/sparcv9 755 root sys
 f none kernel/dacf/sparcv9/consconfig_dacf 755 root sys
 f none kernel/dacf/sparcv9/net_dacf 755 root sys
 f none kernel/drv/dad.conf 644 root sys
-f none kernel/drv/px_pci.conf 644 root sys
-f none kernel/drv/pxb_plx.conf 644 root sys
+f none kernel/drv/pcieb.conf 644 root sys
 e sdconf kernel/drv/sd.conf 644 root sys
 e preserve kernel/drv/uata.conf 644 root sys
 d none kernel/drv/sparcv9 755 root sys
@@ -113,9 +112,8 @@ f none kernel/drv/sparcv9/poll 755 root sys
 f none kernel/drv/sparcv9/pseudo 755 root sys
 f none kernel/drv/sparcv9/ptc 755 root sys
 f none kernel/drv/sparcv9/ptsl 755 root sys
-f none kernel/drv/sparcv9/px_pci 755 root sys
-f none kernel/drv/sparcv9/pxb_bcm 755 root sys
-f none kernel/drv/sparcv9/pxb_plx 755 root sys
+f none kernel/drv/sparcv9/pcieb 755 root sys
+f none kernel/drv/sparcv9/pcieb_bcm 755 root sys
 f none kernel/drv/sparcv9/ramdisk 755 root sys
 f none kernel/drv/sparcv9/random 755 root sys
 f none kernel/drv/sparcv9/rts 755 root sys

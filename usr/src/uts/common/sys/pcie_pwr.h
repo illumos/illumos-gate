@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PCIE_PWR_H
 #define	_SYS_PCIE_PWR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -147,8 +145,8 @@ typedef struct pcie_pm {
  */
 
 /*
- * We link pcie_pwr.o into several drivers (px, px_pci, pxb_bcm, pxb_plx), which
- * causes the symbols below to be duplicated.  This isn't an issue in
+ * We link pcie_pwr.o into several drivers (px, pcieb, pcieb_bcm, pcieb_plx),
+ * which causes the symbols below to be duplicated.  This isn't an issue in
  * practice, since they aren't used from outside the module that they're
  * part of.  However, lint does not know this, and when it does global
  * crosschecks for the kernel, it complains.  To prevent this, we rename the

@@ -191,7 +191,7 @@ npe_disable_empty_bridges_workaround(dev_info_t *child)
 	 * Do not bind drivers to empty bridges.
 	 * Fail above, if the bridge is found to be hotplug capable
 	 */
-	if (ddi_driver_major(child) == ddi_name_to_major("pcie_pci") &&
+	if (ddi_driver_major(child) == ddi_name_to_major("pcieb") &&
 	    ddi_get_child(child) == NULL &&
 	    ddi_prop_get_int(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 	    "pci-hotplug-type", INBAND_HPC_NONE) == INBAND_HPC_NONE)

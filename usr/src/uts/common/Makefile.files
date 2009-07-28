@@ -1771,6 +1771,7 @@ INCLUDE_PATH    += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
 
 #
 PCIE_MISC_OBJS += pcie.o pcie_fault.o
+PCIEB_OBJS += pcieb.o pcie_pwr.o
 
 #	Chelsio N110 10G NIC driver module
 #

@@ -64,8 +64,8 @@ FD_OBJS	+=	fd_asm.o
 
 CPR_SPARC_OBJS +=	cpr_sparc.o
 PCI_PCI_OBJS +=		pci_pci.o pci_debug.o pci_pwr.o pcix.o
-PX_PCI_OBJS +=		px_pci.o pcie_pwr.o
 PCIE_MISC_OBJS += 	pcie_plat.o
+PCIEB_OBJS +=		pcieb_sparc.o
 FCODE_OBJS +=		fcode.o
 NSKERN_OBJS +=		nsc_asm.o
 

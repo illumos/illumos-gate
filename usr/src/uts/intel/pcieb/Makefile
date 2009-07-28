@@ -19,14 +19,12 @@
 # CDDL HEADER END
 #
 #
-# uts/intel/pcie_pci/Makefile
+# uts/intel/pcieb/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the pcie_pci driver kernel
+#	This makefile drives the production of the pcieb driver kernel
 #	module.
 #
 
@@ -38,11 +36,11 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= pcie_pci
-OBJECTS		= $(PCI_E_PCINEXUS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCI_E_PCINEXUS_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= pcieb
+OBJECTS		= $(PCIEB_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIEB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/intel/io/pciex
+CONF_SRCDIR	= $(UTSBASE)/common/io/pciex
 
 #
 #	Include common rules.

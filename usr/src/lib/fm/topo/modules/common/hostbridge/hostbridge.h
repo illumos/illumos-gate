@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _HOSTBRIDGE_H
 #define	_HOSTBRIDGE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libdevinfo.h>
 
@@ -45,7 +43,7 @@ extern "C" {
 #define	SCHIZO		"pcisch"
 #define	PSYCHO		"pcipsy"
 #define	NPE		"npe"
-#define	PCIE_PCI	"pcie_pci"
+#define	PCIEB		"pcieb"
 #define	PCI_PCI		"pci_pci"
 #define	PCI		"pci"
 #define	PX		"px"

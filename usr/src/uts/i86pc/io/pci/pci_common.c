@@ -178,7 +178,7 @@ pci_get_priority(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp, int *pri)
 
 
 
-static int pcie_pci_intr_pri_counter = 0;
+static int pcieb_intr_pri_counter = 0;
 
 /*
  * pci_common_intr_ops: bus_intr_op() function for interrupt support
@@ -311,13 +311,13 @@ SUPPORTED_TYPES_OUT:
 		    (psm_intr_ops != NULL) &&
 		    (pci_get_priority(rdip, hdlp, &priority) == DDI_SUCCESS)) {
 			/*
-			 * Following check is a special case for 'pcie_pci'.
+			 * Following check is a special case for 'pcieb'.
 			 * This makes sure vectors with the right priority
-			 * are allocated for pcie_pci during ALLOC time.
+			 * are allocated for pcieb during ALLOC time.
 			 */
-			if (strcmp(ddi_driver_name(rdip), "pcie_pci") == 0) {
+			if (strcmp(ddi_driver_name(rdip), "pcieb") == 0) {
 				hdlp->ih_pri =
-				    (pcie_pci_intr_pri_counter % 2) ? 4 : 7;
+				    (pcieb_intr_pri_counter % 2) ? 4 : 7;
 				pciepci = 1;
 			} else
 				hdlp->ih_pri = priority;
@@ -394,7 +394,7 @@ SUPPORTED_TYPES_OUT:
 				ispec = (struct intrspec *)isp;
 				if (ispec)
 					ispec->intrspec_pri = hdlp->ih_pri;
-				++pcie_pci_intr_pri_counter;
+				++pcieb_intr_pri_counter;
 			}
 
 		} else if (hdlp->ih_type == DDI_INTR_TYPE_FIXED) {

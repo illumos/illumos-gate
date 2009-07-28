@@ -43,7 +43,7 @@
 #include <sys/hotplug/pci/pciehpc.h>
 #include <sys/spl.h>
 #include <px_obj.h>
-#include <pcie_pwr.h>
+#include <sys/pcie_pwr.h>
 #include "px_tools_var.h"
 #include <px_regs.h>
 #include <px_csr.h>

@@ -189,7 +189,7 @@ ntwdt 240
 dld 241
 aggr 242
 px 243
-px_pci 244
+pcieb 244
 qcn 245
 vnex 246
 glvc 247
@@ -212,8 +212,7 @@ scfd 263
 mc-opl 264
 dm2s 265
 oplkmdrv 266
-pxb_bcm 267
-pxb_plx 268
+pcieb_bcm 267
 n2rng 269
 physmem 270
 ds_snmp 271
