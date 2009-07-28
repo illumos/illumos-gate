@@ -2296,9 +2296,11 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		 * If the server does not support the flavor, return
 		 * error.
 		 *
-		 * If no mount option is given then use the first supported
-		 * security flavor (by the client) in the auth list returned
-		 * from the server.
+		 * If no mount option is given then look for default auth
+		 * (default auth entry in /etc/nfssec.conf) in the auth list
+		 * returned from server. If default auth not found, then use
+		 * the first supported security flavor (by the client) in the
+		 * auth list returned from the server.
 		 *
 		 */
 		auths =
@@ -2308,26 +2310,61 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 		    mountres3.mountres3_u.mountinfo.auth_flavors
 		    .auth_flavors_len;
 
+		if (count <= 0) {
+			pr_err(gettext(
+			    "server %s did not return any security mode\n"),
+			    fshost);
+			clnt_destroy(cl);
+			return (RET_ERR);
+		}
+
 		if (sec_opt) {
 			for (i = 0; i < count; i++) {
 				if (auths[i] == nfs_sec.sc_nfsnum)
 					break;
 			}
-			if (i >= count)
+			if (i == count)
 				goto autherr;
 		} else {
-			if (count < 0)
-				break;
+			seconfig_t default_sec;
 
-			for (i = 0; i < count; i++) {
-				if (!nfs_getseconfig_bynumber(auths[i],
-				    &nfs_sec)) {
-					sec_opt++;
-					break;
+			/*
+			 * Get client configured default auth.
+			 */
+			nfs_sec.sc_nfsnum = -1;
+			default_sec.sc_nfsnum = -1;
+			(void) nfs_getseconfig_default(&default_sec);
+
+			/*
+			 * Look for clients default auth in servers list.
+			 */
+			if (default_sec.sc_nfsnum != -1) {
+				for (i = 0; i < count; i++) {
+					if (auths[i] == default_sec.sc_nfsnum) {
+						sec_opt++;
+						nfs_sec = default_sec;
+						break;
+					}
 				}
 			}
 
-			if (i >= count)
+			/*
+			 * Could not find clients default auth in servers list.
+			 * Pick the first auth from servers list that is
+			 * also supported on the client.
+			 */
+			if (nfs_sec.sc_nfsnum == -1) {
+				for (i = 0; i < count; i++) {
+					if (!nfs_getseconfig_bynumber(auths[i],
+					    &nfs_sec)) {
+						sec_opt++;
+						break;
+
+					}
+				}
+			}
+
+			if (i == count)
 				goto autherr;
 		}
 		break;
