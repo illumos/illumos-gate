@@ -145,10 +145,6 @@ static pd_checkf_t	do_check_zone, do_check_autopush, do_check_rate,
 
 static dladm_status_t	i_dladm_speed_get(dladm_handle_t, prop_desc_t *,
 			    datalink_id_t, char **, uint_t *, uint_t, uint_t *);
-static dladm_status_t	i_dladm_wlan_get_legacy_ioctl(dladm_handle_t,
-			    datalink_id_t, void *, uint_t, uint_t);
-static dladm_status_t	i_dladm_wlan_set_legacy_ioctl(dladm_handle_t,
-			    datalink_id_t, void *, uint_t, uint_t);
 static dladm_status_t	i_dladm_macprop(dladm_handle_t, void *, boolean_t);
 static const char	*dladm_perm2str(uint_t, char *);
 
@@ -415,7 +411,7 @@ static prop_desc_t	prop_table[] = {
 	    NULL, NULL, i_dladm_status_get, NULL,
 	    0, DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
-	{ "adv_autoneg_cap", { "1", 1 },
+	{ "adv_autoneg_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
 	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
@@ -2856,59 +2852,6 @@ i_dladm_getset_defval(dladm_handle_t handle, prop_desc_t *pdp,
 	return (status);
 }
 
-int
-macprop_to_wifi(mac_prop_id_t wl_prop)
-{
-	switch (wl_prop) {
-	case MAC_PROP_WL_ESSID:
-		return (WL_ESSID);
-	case MAC_PROP_WL_BSSID:
-		return (WL_BSSID);
-	case MAC_PROP_WL_BSSTYPE:
-		return (WL_BSS_TYPE);
-	case MAC_PROP_WL_LINKSTATUS:
-		return (WL_LINKSTATUS);
-	case MAC_PROP_WL_DESIRED_RATES:
-		return (WL_DESIRED_RATES);
-	case MAC_PROP_WL_SUPPORTED_RATES:
-		return (WL_SUPPORTED_RATES);
-	case MAC_PROP_WL_AUTH_MODE:
-		return (WL_AUTH_MODE);
-	case MAC_PROP_WL_ENCRYPTION:
-		return (WL_ENCRYPTION);
-	case MAC_PROP_WL_RSSI:
-		return (WL_RSSI);
-	case MAC_PROP_WL_PHY_CONFIG:
-		return (WL_PHY_CONFIG);
-	case MAC_PROP_WL_CAPABILITY:
-		return (WL_CAPABILITY);
-	case MAC_PROP_WL_WPA:
-		return (WL_WPA);
-	case MAC_PROP_WL_SCANRESULTS:
-		return (WL_SCANRESULTS);
-	case MAC_PROP_WL_POWER_MODE:
-		return (WL_POWER_MODE);
-	case MAC_PROP_WL_RADIO:
-		return (WL_RADIO);
-	case MAC_PROP_WL_ESS_LIST:
-		return (WL_ESS_LIST);
-	case MAC_PROP_WL_KEY_TAB:
-		return (WL_WEP_KEY_TAB);
-	case MAC_PROP_WL_CREATE_IBSS:
-		return (WL_CREATE_IBSS);
-	case MAC_PROP_WL_SETOPTIE:
-		return (WL_SETOPTIE);
-	case MAC_PROP_WL_DELKEY:
-		return (WL_DELKEY);
-	case MAC_PROP_WL_KEY:
-		return (WL_KEY);
-	case MAC_PROP_WL_MLME:
-		return (WL_MLME);
-	default:
-		return (-1);
-	}
-}
-
 dladm_status_t
 i_dladm_wlan_param(dladm_handle_t handle, datalink_id_t linkid, void *buf,
     mac_prop_id_t cmd, size_t len, boolean_t set)
@@ -2942,60 +2885,12 @@ i_dladm_wlan_param(dladm_handle_t handle, datalink_id_t linkid, void *buf,
 		(void) memcpy(dp, buf, len);
 
 	status = i_dladm_macprop(handle, dip, set);
-	if (status == DLADM_STATUS_NOTSUP) {
-		if (set) {
-			status = i_dladm_wlan_set_legacy_ioctl(handle, linkid,
-			    buf, len, macprop_to_wifi(cmd));
-		} else {
-			status = i_dladm_wlan_get_legacy_ioctl(handle, linkid,
-			    buf, len, macprop_to_wifi(cmd));
-		}
-	} else if (status == DLADM_STATUS_OK) {
+	if (status == DLADM_STATUS_OK) {
 		if (!set)
 			(void) memcpy(buf, dp, len);
 	}
 
 	free(dip);
-	return (status);
-}
-
-static dladm_status_t
-i_dladm_wlan_get_legacy_ioctl(dladm_handle_t handle, datalink_id_t linkid,
-    void *buf, uint_t buflen, uint_t id)
-{
-	wldp_t *gbuf;
-	dladm_status_t status;
-
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
-		return (DLADM_STATUS_NOMEM);
-
-	(void) memset(gbuf, 0, MAX_BUF_LEN);
-	status = i_dladm_wlan_legacy_ioctl(handle, linkid, gbuf, id,
-	    MAX_BUF_LEN, WLAN_GET_PARAM, sizeof (wldp_t));
-	if (status == DLADM_STATUS_OK)
-		(void) memcpy(buf, gbuf->wldp_buf, buflen);
-
-	free(gbuf);
-	return (status);
-}
-
-static dladm_status_t
-i_dladm_wlan_set_legacy_ioctl(dladm_handle_t handle, datalink_id_t linkid,
-    void *buf, uint_t buflen, uint_t id)
-{
-	wldp_t *gbuf;
-	dladm_status_t status = DLADM_STATUS_OK;
-
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
-		return (DLADM_STATUS_NOMEM);
-
-	(void) memset(gbuf, 0, MAX_BUF_LEN);
-	(void) memcpy(gbuf->wldp_buf, buf, buflen);
-	buflen += WIFI_BUF_OFFSET;
-	status = i_dladm_wlan_legacy_ioctl(handle, linkid, gbuf, id, buflen,
-	    WLAN_SET_PARAM, buflen);
-
-	free(gbuf);
 	return (status);
 }
 

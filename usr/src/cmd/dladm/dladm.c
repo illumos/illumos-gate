@@ -5878,7 +5878,9 @@ reset_one_linkprop(dladm_handle_t dh, datalink_id_t linkid,
 
 	status = dladm_set_linkprop(dh, linkid, propname, NULL, 0,
 	    DLADM_OPT_ACTIVE);
-	if (status != DLADM_STATUS_OK) {
+	if (status != DLADM_STATUS_OK &&
+	    status != DLADM_STATUS_PROPRDONLY &&
+	    status != DLADM_STATUS_NOTSUP) {
 		warn_dlerr(status, "cannot reset link property '%s' on '%s'",
 		    propname, statep->ls_name);
 	}

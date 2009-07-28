@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2569,7 +2569,6 @@ ipw2200_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	case MAC_PROP_WL_DESIRED_RATES:
 		IPW2200_DBG(IPW2200_DBG_BRUSSELS, (sc->sc_dip, CE_CONT,
 		    "ipw2200_m_getprop(): Not Support DESIRED_RATES\n"));
-		err = ENOTSUP;
 		break;
 	case MAC_PROP_WL_RADIO:
 		*(wl_linkstatus_t *)wldp_buf = ipw2200_radio_status(sc);

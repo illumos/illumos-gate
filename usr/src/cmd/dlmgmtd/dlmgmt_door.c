@@ -945,7 +945,6 @@ dlmgmt_upcall_linkprop_init(void *argp, void *retp)
 {
 	dlmgmt_door_linkprop_init_t	*lip = argp;
 	dlmgmt_linkprop_init_retval_t	*retvalp = retp;
-	dlmgmt_link_t			*linkp;
 	boolean_t			do_linkprop = B_FALSE;
 
 	/*
@@ -955,10 +954,8 @@ dlmgmt_upcall_linkprop_init(void *argp, void *retp)
 	 * not the DLD control device.
 	 */
 	dlmgmt_table_lock(B_FALSE);
-	if ((linkp = link_by_id(lip->ld_linkid)) == NULL)
+	if (link_by_id(lip->ld_linkid) == NULL)
 		retvalp->lr_err = ENOENT;
-	else if (linkp->ll_media == DL_WIFI)
-		retvalp->lr_err = 0;
 	else
 		do_linkprop = B_TRUE;
 	dlmgmt_table_unlock();

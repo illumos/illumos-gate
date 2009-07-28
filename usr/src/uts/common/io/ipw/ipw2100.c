@@ -2480,7 +2480,6 @@ ipw2100_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	case MAC_PROP_WL_DESIRED_RATES:
 		IPW2100_DBG(IPW2100_DBG_BRUSSELS, (sc->sc_dip, CE_CONT,
 		    "ipw2100_m_getprop(): Not Support DESIRED_RATES\n"));
-		err = ENOTSUP;
 		break;
 	case MAC_PROP_WL_RADIO:
 		*(wl_linkstatus_t *)wldp_buf = ipw2100_get_radio(sc);

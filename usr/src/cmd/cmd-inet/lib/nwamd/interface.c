@@ -1108,8 +1108,6 @@ initialize_interfaces(void)
 			wait_time = NWAM_IF_WAIT_DELTA_MAX;
 	}
 
-	(void) dladm_init_linkprop(dld_handle, DATALINK_ALL_LINKID, B_FALSE);
-
 	(void) icfg_iterate_if(AF_INET, ICFG_PLUMBED, NULL, do_add_interface);
 
 	print_interface_list();

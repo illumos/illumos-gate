@@ -245,17 +245,6 @@ if [ -n "$ipmp6_list" ]; then
 	    "$ipmp6_failed"
 fi
 
-if smf_is_globalzone; then
-	#
-	# Wifi drivers use special property interfaces that are not supported
-	# by the existing property persistence mechanism, so if a wifi driver
-	# unloads and then is subsequently reloaded, associated links' properties
-	# will not be restored.  For now, wait until after interfaces have been
-	# plumbed (above) to initialize link properties.
-	#
-	/sbin/dladm init-linkprop -w
-fi
-
 #
 # Process the /etc/hostname[6].* files for IPMP interfaces.  Processing these
 # before non-IPMP interfaces avoids accidental implicit IPMP group creation.
