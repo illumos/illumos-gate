@@ -118,6 +118,7 @@ i386_SUBDIRS= \
 	SUNWatu \
 	SUNWaudiocmi \
 	SUNWaudiohd \
+	SUNWaudiovia97 \
 	SUNWbfe	\
 	SUNWcakr.i \
 	SUNWcakrx.i \
