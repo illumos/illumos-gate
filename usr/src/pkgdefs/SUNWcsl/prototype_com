@@ -352,6 +352,8 @@ f none usr/lib/security/audit_binfile.so.1 755 root bin
 s none usr/lib/security/audit_binfile.so=./audit_binfile.so.1
 f none usr/lib/security/audit_syslog.so.1 755 root bin
 s none usr/lib/security/audit_syslog.so=./audit_syslog.so.1
+f none usr/lib/security/audit_remote.so.1 755 root bin
+s none usr/lib/security/audit_remote.so=./audit_remote.so.1
 f none usr/lib/security/pkcs11_kernel.so.1 755 root bin
 s none usr/lib/security/pkcs11_kernel.so=./pkcs11_kernel.so.1
 f none usr/lib/security/pkcs11_softtoken.so.1 755 root bin

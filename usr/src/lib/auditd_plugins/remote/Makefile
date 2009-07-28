@@ -24,56 +24,34 @@
 #
 #
 
-include ../../Makefile.master
-include ../Makefile.lib
+include $(SRC)/lib/Makefile.lib
 
-SUBDIRS =	binfile		\
-		remote		\
-		syslog
+SUBDIRS = $(MACH)
 
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-package :=	TARGET= package
-_msg :=		TARGET= _msg
+TEXT_DOMAIN=	SUNW_OST_OSCMD
+POFILE= 	audit_remote.po
+MSGFILES=	audit_remote.c transport.c
 
-all package clean clobber install: $(SUBDIRS)
-
-HDRS= auditd.h
-ROOTDIRS= $(ROOT)/usr/include/security
-
-ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
-$(ROOTHDRS) := FILEMODE = 644
-
-CHECKHDRS= $(HDRS:%.h=%.check)
-
-# install rule
-$(ROOTDIRS)/%: %
-	$(INS.file)
+all	:=	TARGET= all
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
+install	:=	TARGET= install
+lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-.PARALLEL: $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
-install: install_h $(SUBDIRS)
+$(POFILE): $(MSGFILES)
+	$(BUILDPO.msgfiles)
 
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS)
+_msg: $(MSGDOMAINPOFILE)
 
-_msg: $(SUBDIRS)
-
-catalog: $(SUBDIRS)
-
-check: $(CHECKHDRS)
-
-lint: $(SUBDIRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include $(SRC)/lib/Makefile.targ
+include $(SRC)/Makefile.msg.targ

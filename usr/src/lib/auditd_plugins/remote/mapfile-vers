@@ -24,56 +24,25 @@
 #
 #
 
-include ../../Makefile.master
-include ../Makefile.lib
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
 
-SUBDIRS =	binfile		\
-		remote		\
-		syslog
-
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-package :=	TARGET= package
-_msg :=		TARGET= _msg
-
-all package clean clobber install: $(SUBDIRS)
-
-HDRS= auditd.h
-ROOTDIRS= $(ROOT)/usr/include/security
-
-ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
-$(ROOTHDRS) := FILEMODE = 644
-
-CHECKHDRS= $(HDRS:%.h=%.check)
-
-# install rule
-$(ROOTDIRS)/%: %
-	$(INS.file)
-
-.KEEP_STATE:
-
-.PARALLEL: $(SUBDIRS)
-
-install: install_h $(SUBDIRS)
-
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS)
-
-_msg: $(SUBDIRS)
-
-catalog: $(SUBDIRS)
-
-check: $(CHECKHDRS)
-
-lint: $(SUBDIRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+SUNWprivate_1.1 {
+    global:
+	auditd_plugin;
+	auditd_plugin_close;
+	auditd_plugin_open;
+    local:
+	*;
+};

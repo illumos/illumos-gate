@@ -24,56 +24,6 @@
 #
 #
 
-include ../../Makefile.master
-include ../Makefile.lib
+include ../Makefile.com
 
-SUBDIRS =	binfile		\
-		remote		\
-		syslog
-
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-package :=	TARGET= package
-_msg :=		TARGET= _msg
-
-all package clean clobber install: $(SUBDIRS)
-
-HDRS= auditd.h
-ROOTDIRS= $(ROOT)/usr/include/security
-
-ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
-$(ROOTHDRS) := FILEMODE = 644
-
-CHECKHDRS= $(HDRS:%.h=%.check)
-
-# install rule
-$(ROOTDIRS)/%: %
-	$(INS.file)
-
-.KEEP_STATE:
-
-.PARALLEL: $(SUBDIRS)
-
-install: install_h $(SUBDIRS)
-
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS)
-
-_msg: $(SUBDIRS)
-
-catalog: $(SUBDIRS)
-
-check: $(CHECKHDRS)
-
-lint: $(SUBDIRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+install: all $(ROOTLIBS) $(ROOTLINKS)

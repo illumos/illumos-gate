@@ -24,56 +24,27 @@
 #
 #
 
-include ../../Makefile.master
-include ../Makefile.lib
+LIBRARY=	audit_remote.a
+VERS=		.1
+OBJECTS=	audit_remote.o transport.o
 
-SUBDIRS =	binfile		\
-		remote		\
-		syslog
+LIBBSM=		$(SRC)/lib/libbsm/common
 
-all :=		TARGET= all
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-delete :=	TARGET= delete
-install :=	TARGET= install
-lint :=		TARGET= lint
-package :=	TARGET= package
-_msg :=		TARGET= _msg
+include		$(SRC)/lib/Makefile.lib
 
-all package clean clobber install: $(SUBDIRS)
+LIBS=		$(DYNLIB)
+LDLIBS		+= -lbsm -lsecdb -lc -lnsl -lsocket -lgss -lmtmalloc
 
-HDRS= auditd.h
-ROOTDIRS= $(ROOT)/usr/include/security
+CFLAGS		+= $(CCVERBOSE)
+CPPFLAGS	+= -D_REENTRANT -I$(LIBBSM)
+CPPFLAGS	+= -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
-ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
-$(ROOTHDRS) := FILEMODE = 644
-
-CHECKHDRS= $(HDRS:%.h=%.check)
-
-# install rule
-$(ROOTDIRS)/%: %
-	$(INS.file)
+ROOTLIBDIR=	$(ROOT)/usr/lib/security
 
 .KEEP_STATE:
 
-.PARALLEL: $(SUBDIRS)
+all:	$(LIBS)
 
-install: install_h $(SUBDIRS)
+lint:	lintcheck
 
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS)
-
-_msg: $(SUBDIRS)
-
-catalog: $(SUBDIRS)
-
-check: $(CHECKHDRS)
-
-lint: $(SUBDIRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+include		../../../Makefile.targ
