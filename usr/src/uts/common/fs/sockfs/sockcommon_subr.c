@@ -651,6 +651,33 @@ so_process_new_message(struct sonode *so, mblk_t *mp_head, mblk_t *mp_last_head)
 	}
 }
 
+/*
+ * Check flow control on a given sonode.  Must have so_lock held, and
+ * this function will release the hold.
+ */
+
+static void
+so_check_flow_control(struct sonode *so)
+{
+	ASSERT(MUTEX_HELD(&so->so_lock));
+
+	if (so->so_flowctrld && so->so_rcv_queued < so->so_rcvlowat) {
+		so->so_flowctrld = B_FALSE;
+		mutex_exit(&so->so_lock);
+		/*
+		 * Open up flow control. SCTP does not have any downcalls, and
+		 * it will clr flow ctrl in sosctp_recvmsg().
+		 */
+		if (so->so_downcalls != NULL &&
+		    so->so_downcalls->sd_clr_flowctrl != NULL) {
+			(*so->so_downcalls->sd_clr_flowctrl)
+			    (so->so_proto_handle);
+		}
+	} else {
+		mutex_exit(&so->so_lock);
+	}
+}
+
 int
 so_dequeue_msg(struct sonode *so, mblk_t **mctlp, struct uio *uiop,
     rval_t *rvalp, int flags)
@@ -829,37 +856,30 @@ again1:
 						so->so_state |= SS_RCVATMARK;
 					}
 				}
-				if (so->so_flowctrld && so->so_rcv_queued <
-				    so->so_rcvlowat) {
-					so->so_flowctrld = B_FALSE;
-					mutex_exit(&so->so_lock);
-					/*
-					 * Open up flow control. SCTP does
-					 * not have any downcalls, and it will
-					 * clr flow ctrl in sosctp_recvmsg().
-					 */
-					if (so->so_downcalls != NULL &&
-					    so->so_downcalls->sd_clr_flowctrl !=
-					    NULL) {
-						(*so->so_downcalls->
-						    sd_clr_flowctrl)
-						    (so->so_proto_handle);
-					}
-				} else {
-					mutex_exit(&so->so_lock);
-				}
+				/*
+				 * so_check_flow_control() will drop
+				 * so->so_lock.
+				 */
+				so_check_flow_control(so);
 			}
 		}
 		if (mp != NULL) { /* more data blocks in msg */
 			more |= MOREDATA;
 			if ((flags & (MSG_PEEK|MSG_TRUNC))) {
-				if (flags & MSG_TRUNC &&
-				    ((flags & MSG_PEEK) == 0)) {
+				if (flags & MSG_PEEK) {
+					freemsg(mp);
+				} else {
+					unsigned int msize = msgdsize(mp);
+
+					freemsg(mp);
 					mutex_enter(&so->so_lock);
-					so->so_rcv_queued -= msgdsize(mp);
-					mutex_exit(&so->so_lock);
+					so->so_rcv_queued -= msize;
+					/*
+					 * so_check_flow_control() will drop
+					 * so->so_lock.
+					 */
+					so_check_flow_control(so);
 				}
-				freemsg(mp);
 			} else if (partial_read && !somsghasdata(mp)) {
 				/*
 				 * Avoid queuing a zero-length tail part of
@@ -1012,6 +1032,7 @@ done:
 	}
 #endif
 	rvalp->r_val1 = more;
+	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 	return (error);
 }
 
