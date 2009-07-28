@@ -1045,27 +1045,33 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 	case PSM_INTR_OP_GET_SHARED:
 		if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
 			return (PSM_FAILURE);
+		ispec = ((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp;
 		if ((irqp = apic_find_irq(dip, ispec, hdlp->ih_type)) == NULL)
 			return (PSM_FAILURE);
-		*result = irqp->airq_share ? 1: 0;
+		*result = (irqp->airq_share > 1) ? 1: 0;
 		break;
 	case PSM_INTR_OP_SET_PRI:
 		old_priority = hdlp->ih_pri;	/* save old value */
 		new_priority = *(int *)result;	/* try the new value */
 
-		/* First, check if "hdlp->ih_scratch1" vectors exist? */
-		if (apic_navail_vector(dip, new_priority) < hdlp->ih_scratch1)
-			return (PSM_FAILURE);
+		if (hdlp->ih_type == DDI_INTR_TYPE_FIXED) {
+			return (PSM_SUCCESS);
+		}
 
 		/* Now allocate the vectors */
-		if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
+		if (hdlp->ih_type == DDI_INTR_TYPE_MSI) {
+			/* SET_PRI does not support the case of multiple MSI */
+			if (i_ddi_intr_get_current_nintrs(hdlp->ih_dip) > 1)
+				return (PSM_FAILURE);
+
 			count_vec = apic_alloc_msi_vectors(dip, hdlp->ih_inum,
-			    hdlp->ih_scratch1, new_priority,
+			    1, new_priority,
 			    DDI_INTR_ALLOC_STRICT);
-		else
+		} else {
 			count_vec = apic_alloc_msix_vectors(dip, hdlp->ih_inum,
-			    hdlp->ih_scratch1, new_priority,
+			    1, new_priority,
 			    DDI_INTR_ALLOC_STRICT);
+		}
 
 		/* Did we get new vectors? */
 		if (!count_vec)
@@ -1074,7 +1080,6 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		/* Finally, free the previously allocated vectors */
 		apic_free_vectors(dip, hdlp->ih_inum, count_vec,
 		    old_priority, hdlp->ih_type);
-		hdlp->ih_pri = new_priority; /* set the new value */
 		break;
 	case PSM_INTR_OP_SET_CPU:
 	case PSM_INTR_OP_GRP_SET_CPU:

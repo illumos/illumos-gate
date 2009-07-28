@@ -451,16 +451,40 @@ SUPPORTED_TYPES_OUT:
 		if (psm_intr_ops == NULL)
 			return (DDI_FAILURE);
 
+		isp = pci_intx_get_ispec(pdip, rdip, (int)hdlp->ih_inum);
+		ispec = (struct intrspec *)isp;
+		if (ispec == NULL)
+			return (DDI_FAILURE);
+
+		/* For fixed interrupts */
+		if (hdlp->ih_type == DDI_INTR_TYPE_FIXED) {
+			/* if interrupt is shared, return failure */
+			((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
+			psm_rval = (*psm_intr_ops)(rdip, hdlp,
+			    PSM_INTR_OP_GET_SHARED, &psm_status);
+			/*
+			 * For fixed interrupts, the irq may not have been
+			 * allocated when SET_PRI is called, and the above
+			 * GET_SHARED op may return PSM_FAILURE. This is not
+			 * a real error and is ignored below.
+			 */
+			if ((psm_rval != PSM_FAILURE) && (psm_status == 1)) {
+				DDI_INTR_NEXDBG((CE_CONT,
+				    "pci_common_intr_ops: "
+				    "dip 0x%p cannot setpri, psm_rval=%d,"
+				    "psm_status=%d\n", (void *)rdip, psm_rval,
+				    psm_status));
+				return (DDI_FAILURE);
+			}
+		}
+
 		/* Change the priority */
 		if ((*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_SET_PRI, result) ==
 		    PSM_FAILURE)
 			return (DDI_FAILURE);
 
 		/* update ispec */
-		isp = pci_intx_get_ispec(pdip, rdip, (int)hdlp->ih_inum);
-		ispec = (struct intrspec *)isp;
-		if (ispec)
-			ispec->intrspec_pri = *(int *)result;
+		ispec->intrspec_pri = *(int *)result;
 		break;
 	case DDI_INTROP_ADDISR:
 		/* update ispec */
@@ -768,8 +792,10 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 	ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip, (int)inum);
 	if (ispec == NULL)
 		return (DDI_FAILURE);
-	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type))
+	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type)) {
 		ispec->intrspec_vec = inum;
+		ispec->intrspec_pri = hdlp->ih_pri;
+	}
 	ihdl_plat_datap->ip_ispecp = ispec;
 
 	/* translate the interrupt if needed */
@@ -802,8 +828,10 @@ pci_disable_intr(dev_info_t *pdip, dev_info_t *rdip,
 	ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip, (int)inum);
 	if (ispec == NULL)
 		return;
-	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type))
+	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type)) {
 		ispec->intrspec_vec = inum;
+		ispec->intrspec_pri = hdlp->ih_pri;
+	}
 	ihdl_plat_datap->ip_ispecp = ispec;
 
 	/* translate the interrupt if needed */

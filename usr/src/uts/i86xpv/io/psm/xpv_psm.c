@@ -738,10 +738,11 @@ xen_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		if (DOMAIN_IS_INITDOMAIN(xen_info)) {
 			if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
 				return (PSM_FAILURE);
+			ispec = ((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp;
 			if ((irqp = apic_find_irq(dip, ispec, hdlp->ih_type))
 			    == NULL)
 				return (PSM_FAILURE);
-			*result = irqp->airq_share ? 1: 0;
+			*result = (irqp->airq_share > 1) ? 1: 0;
 		} else {
 			return (PSM_FAILURE);
 		}
