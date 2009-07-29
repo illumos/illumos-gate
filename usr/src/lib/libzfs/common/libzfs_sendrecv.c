@@ -113,6 +113,9 @@ fsavl_destroy(avl_tree_t *avl)
 	free(avl);
 }
 
+/*
+ * Given an nvlist, produce an avl tree of snapshots, ordered by guid
+ */
 static avl_tree_t *
 fsavl_create(nvlist_t *fss)
 {
@@ -276,6 +279,11 @@ send_iterate_prop(zfs_handle_t *zhp, nvlist_t *nv)
 	}
 }
 
+/*
+ * recursively generate nvlists describing datasets.  See comment
+ * for the data structure send_data_t above for description of contents
+ * of the nvlist.
+ */
 static int
 send_iterate_fs(zfs_handle_t *zhp, void *arg)
 {
@@ -691,9 +699,20 @@ again:
 }
 
 /*
- * Dumps a backup of tosnap, incremental from fromsnap if it isn't NULL.
- * If 'doall', dump all intermediate snaps.
- * If 'replicate', dump special header and do recursively.
+ * Generate a send stream for the dataset identified by the argument zhp.
+ *
+ * The content of the send stream is the snapshot identified by
+ * 'tosnap'.  Incremental streams are requested in two ways:
+ *     - from the snapshot identified by "fromsnap" (if non-null) or
+ *     - from the origin of the dataset identified by zhp, which must
+ *	 be a clone.  In this case, "fromsnap" is null and "fromorigin"
+ *	 is TRUE.
+ *
+ * The send stream is recursive (i.e. dumps a hierarchy of snapshots) and
+ * uses a special header (with a version field of DMU_BACKUP_HEADER_VERSION)
+ * if "replicate" is set.  If "doall" is set, dump all the intermediate
+ * snapshots. The DMU_BACKUP_HEADER_VERSION header is used in the "doall"
+ * case too.
  */
 int
 zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
@@ -1777,11 +1796,13 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			/* We can't do online recv in this case */
 			clp = changelist_gather(zhp, ZFS_PROP_NAME, 0, 0);
 			if (clp == NULL) {
+				zfs_close(zhp);
 				zcmd_free_nvlists(&zc);
 				return (-1);
 			}
 			if (changelist_prefix(clp) != 0) {
 				changelist_free(clp);
+				zfs_close(zhp);
 				zcmd_free_nvlists(&zc);
 				return (-1);
 			}
@@ -1938,7 +1959,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	 * (if created, or if we tore them down to do an incremental
 	 * restore), and the /dev links for the new snapshot (if
 	 * created). Also mount any children of the target filesystem
-	 * if we did an incremental receive.
+	 * if we did a replication receive (indicated by stream_avl
+	 * being non-NULL).
 	 */
 	cp = strchr(zc.zc_value, '@');
 	if (cp && (ioctl_err == 0 || !newfs)) {
@@ -1954,7 +1976,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 				if (err == 0 && ioctl_err == 0)
 					err = zvol_create_link(hdl,
 					    zc.zc_value);
-			} else if (newfs) {
+			} else if (newfs || stream_avl) {
 				/*
 				 * Track the first/top of hierarchy fs,
 				 * for mounting and sharing later.
