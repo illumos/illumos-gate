@@ -262,6 +262,7 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 	ASSERT(!list_link_active(&ds->ds_synced_link));
 
 	mutex_destroy(&ds->ds_lock);
+	mutex_destroy(&ds->ds_recvlock);
 	mutex_destroy(&ds->ds_opening_lock);
 	mutex_destroy(&ds->ds_deadlist.bpl_lock);
 	rw_destroy(&ds->ds_rwlock);
@@ -359,6 +360,7 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 		ds->ds_phys = dbuf->db_data;
 
 		mutex_init(&ds->ds_lock, NULL, MUTEX_DEFAULT, NULL);
+		mutex_init(&ds->ds_recvlock, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&ds->ds_opening_lock, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&ds->ds_deadlist.bpl_lock, NULL, MUTEX_DEFAULT,
 		    NULL);
@@ -377,6 +379,7 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			 * just opened it.
 			 */
 			mutex_destroy(&ds->ds_lock);
+			mutex_destroy(&ds->ds_recvlock);
 			mutex_destroy(&ds->ds_opening_lock);
 			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			rw_destroy(&ds->ds_rwlock);
@@ -448,6 +451,7 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 				dsl_dataset_drop_ref(ds->ds_prev, ds);
 			dsl_dir_close(ds->ds_dir, ds);
 			mutex_destroy(&ds->ds_lock);
+			mutex_destroy(&ds->ds_recvlock);
 			mutex_destroy(&ds->ds_opening_lock);
 			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			rw_destroy(&ds->ds_rwlock);

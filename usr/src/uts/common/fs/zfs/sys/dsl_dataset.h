@@ -111,6 +111,9 @@ typedef struct dsl_dataset {
 	/* has internal locking: */
 	bplist_t ds_deadlist;
 
+	/* to protect against multiple concurrent incremental recv */
+	kmutex_t ds_recvlock;
+
 	/* protected by lock on pool's dp_dirty_datasets list */
 	txg_node_t ds_dirty_link;
 	list_node_t ds_synced_link;

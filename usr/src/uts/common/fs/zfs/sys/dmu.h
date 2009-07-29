@@ -646,10 +646,9 @@ typedef struct dmu_recv_cookie {
 } dmu_recv_cookie_t;
 
 int dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *,
-    boolean_t force, objset_t *origin, boolean_t online, dmu_recv_cookie_t *);
+    boolean_t force, objset_t *origin, dmu_recv_cookie_t *);
 int dmu_recv_stream(dmu_recv_cookie_t *drc, struct vnode *vp, offset_t *voffp);
 int dmu_recv_end(dmu_recv_cookie_t *drc);
-void dmu_recv_abort_cleanup(dmu_recv_cookie_t *drc);
 
 /* CRC64 table */
 #define	ZFS_CRC64_POLY	0xC96C5795D7870F42ULL	/* ECMA-182, reflected form */

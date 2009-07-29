@@ -2708,7 +2708,6 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	file_t *fp;
 	objset_t *os;
 	dmu_recv_cookie_t drc;
-	zfsvfs_t *zfsvfs = NULL;
 	boolean_t force = (boolean_t)zc->zc_guid;
 	int error, fd;
 	offset_t off;
@@ -2740,24 +2739,11 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		return (EBADF);
 	}
 
-	if (getzfsvfs(tofs, &zfsvfs) == 0) {
-		if (!mutex_tryenter(&zfsvfs->z_online_recv_lock)) {
-			VFS_RELE(zfsvfs->z_vfs);
-			zfsvfs = NULL;
-			error = EBUSY;
-			goto out;
-		}
+	if (props && dmu_objset_open(tofs, DMU_OST_ANY,
+	    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
 		/*
 		 * If new properties are supplied, they are to completely
 		 * replace the existing ones, so stash away the existing ones.
-		 */
-		if (props)
-			(void) dsl_prop_get_all(zfsvfs->z_os, &origprops, TRUE);
-	} else if (props && dmu_objset_open(tofs, DMU_OST_ANY,
-	    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
-		/*
-		 * Get the props even if there was no zfsvfs (zvol or
-		 * unmounted zpl).
 		 */
 		(void) dsl_prop_get_all(os, &origprops, TRUE);
 
@@ -2772,7 +2758,7 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	}
 
 	error = dmu_recv_begin(tofs, tosnap, &zc->zc_begin_record,
-	    force, origin, zfsvfs != NULL, &drc);
+	    force, origin, &drc);
 	if (origin)
 		dmu_objset_close(origin);
 	if (error)
@@ -2793,25 +2779,33 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	off = fp->f_offset;
 	error = dmu_recv_stream(&drc, fp->f_vnode, &off);
 
-	if (error == 0 && zfsvfs) {
-		char *osname;
-		int mode;
+	if (error == 0) {
+		zfsvfs_t *zfsvfs = NULL;
 
-		/* online recv */
-		osname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		error = zfs_suspend_fs(zfsvfs, osname, &mode);
-		if (error == 0) {
-			int resume_err;
+		if (getzfsvfs(tofs, &zfsvfs) == 0) {
+			/* online recv */
+			int end_err;
+			char *osname;
+			int mode;
 
-			error = dmu_recv_end(&drc);
-			resume_err = zfs_resume_fs(zfsvfs, osname, mode);
-			error = error ? error : resume_err;
+			osname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+			error = zfs_suspend_fs(zfsvfs, osname, &mode);
+			/*
+			 * If the suspend fails, then the recv_end will
+			 * likely also fail, and clean up after itself.
+			 */
+			end_err = dmu_recv_end(&drc);
+			if (error == 0) {
+				int resume_err =
+				    zfs_resume_fs(zfsvfs, osname, mode);
+				error = error ? error : resume_err;
+			}
+			error = error ? error : end_err;
+			VFS_RELE(zfsvfs->z_vfs);
+			kmem_free(osname, MAXNAMELEN);
 		} else {
-			dmu_recv_abort_cleanup(&drc);
+			error = dmu_recv_end(&drc);
 		}
-		kmem_free(osname, MAXNAMELEN);
-	} else if (error == 0) {
-		error = dmu_recv_end(&drc);
 	}
 
 	zc->zc_cookie = off - fp->f_offset;
@@ -2826,10 +2820,6 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		(void) zfs_set_prop_nvlist(tofs, origprops);
 	}
 out:
-	if (zfsvfs) {
-		mutex_exit(&zfsvfs->z_online_recv_lock);
-		VFS_RELE(zfsvfs->z_vfs);
-	}
 	nvlist_free(props);
 	nvlist_free(origprops);
 	releasef(fd);

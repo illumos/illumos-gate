@@ -483,7 +483,7 @@ recv_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 /* ARGSUSED */
 static void
-recv_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+recv_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ohds = arg1;
 	struct recvbeginsyncarg *rbsa = arg2;
@@ -513,27 +513,13 @@ recv_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    dp->dp_spa, tx, cr, "dataset = %lld", dsobj);
 }
 
-/* ARGSUSED */
-static void
-recv_offline_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
-{
-	dsl_dataset_t *ds = arg1;
-
-	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
-
-	spa_history_internal_log(LOG_DS_REPLAY_INC_SYNC,
-	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "dataset = %lld",
-	    ds->ds_object);
-}
-
 /*
  * NB: callers *MUST* call dmu_recv_stream() if dmu_recv_begin()
  * succeeds; otherwise we will leak the holds on the datasets.
  */
 int
 dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
-    boolean_t force, objset_t *origin, boolean_t online, dmu_recv_cookie_t *drc)
+    boolean_t force, objset_t *origin, dmu_recv_cookie_t *drc)
 {
 	int err = 0;
 	boolean_t byteswap;
@@ -582,36 +568,8 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 	/*
 	 * Process the begin in syncing context.
 	 */
-	if (rbsa.fromguid && !(flags & DRR_FLAG_CLONE) && !online) {
-		/* offline incremental receive */
-		err = dsl_dataset_own(tofs, 0, dmu_recv_tag, &ds);
-		if (err)
-			return (err);
-
-		/*
-		 * Only do the rollback if the most recent snapshot
-		 * matches the incremental source
-		 */
-		if (force) {
-			if (ds->ds_prev == NULL ||
-			    ds->ds_prev->ds_phys->ds_guid !=
-			    rbsa.fromguid) {
-				dsl_dataset_disown(ds, dmu_recv_tag);
-				return (ENODEV);
-			}
-			(void) dsl_dataset_rollback(ds, DMU_OST_NONE);
-		}
-		rbsa.force = B_FALSE;
-		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
-		    recv_incremental_check,
-		    recv_offline_incremental_sync, ds, &rbsa, 1);
-		if (err) {
-			dsl_dataset_disown(ds, dmu_recv_tag);
-			return (err);
-		}
-		drc->drc_logical_ds = drc->drc_real_ds = ds;
-	} else if (rbsa.fromguid && !(flags & DRR_FLAG_CLONE)) {
-		/* online incremental receive */
+	if (rbsa.fromguid && !(flags & DRR_FLAG_CLONE)) {
+		/* incremental receive */
 
 		/* tmp clone name is: tofs/%tosnap" */
 		(void) snprintf(rbsa.clonelastname, sizeof (rbsa.clonelastname),
@@ -622,11 +580,18 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 		if (err)
 			return (err);
 
+		/* must not have an incremental recv already in progress */
+		if (!mutex_tryenter(&ds->ds_recvlock)) {
+			dsl_dataset_rele(ds, dmu_recv_tag);
+			return (EBUSY);
+		}
+
 		rbsa.force = force;
 		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 		    recv_incremental_check,
-		    recv_online_incremental_sync, ds, &rbsa, 5);
+		    recv_incremental_sync, ds, &rbsa, 5);
 		if (err) {
+			mutex_exit(&ds->ds_recvlock);
 			dsl_dataset_rele(ds, dmu_recv_tag);
 			return (err);
 		}
@@ -931,26 +896,6 @@ restore_free(struct restorearg *ra, objset_t *os,
 	return (err);
 }
 
-void
-dmu_recv_abort_cleanup(dmu_recv_cookie_t *drc)
-{
-	if (drc->drc_newfs || drc->drc_real_ds != drc->drc_logical_ds) {
-		/*
-		 * online incremental or new fs: destroy the fs (which
-		 * may be a clone) that we created
-		 */
-		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag);
-		if (drc->drc_real_ds != drc->drc_logical_ds)
-			dsl_dataset_rele(drc->drc_logical_ds, dmu_recv_tag);
-	} else {
-		/*
-		 * offline incremental: rollback to most recent snapshot.
-		 */
-		(void) dsl_dataset_rollback(drc->drc_real_ds, DMU_OST_NONE);
-		dsl_dataset_disown(drc->drc_real_ds, dmu_recv_tag);
-	}
-}
-
 /*
  * NB: callers *must* call dmu_recv_end() if this succeeds.
  */
@@ -1078,11 +1023,16 @@ out:
 
 	if (ra.err != 0) {
 		/*
-		 * rollback or destroy what we created, so we don't
-		 * leave it in the restoring state.
+		 * destroy what we created, so we don't leave it in the
+		 * inconsistent restoring state.
 		 */
 		txg_wait_synced(drc->drc_real_ds->ds_dir->dd_pool, 0);
-		dmu_recv_abort_cleanup(drc);
+
+		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag);
+		if (drc->drc_real_ds != drc->drc_logical_ds) {
+			mutex_exit(&drc->drc_logical_ds->ds_recvlock);
+			dsl_dataset_rele(drc->drc_logical_ds, dmu_recv_tag);
+		}
 	}
 
 	kmem_free(ra.buf, ra.bufsize);
@@ -1150,6 +1100,7 @@ dmu_recv_end(dmu_recv_cookie_t *drc)
 		}
 		/* dsl_dataset_destroy() will disown the ds */
 		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag);
+		mutex_exit(&drc->drc_logical_ds->ds_recvlock);
 		if (err)
 			return (err);
 	}

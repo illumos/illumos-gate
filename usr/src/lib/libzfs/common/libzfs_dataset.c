@@ -1675,21 +1675,13 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_OBJSET_ZPLPROPS, &zc)) {
 			zcmd_free_nvlists(&zc);
-			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
-			    "unable to get %s property"),
-			    zfs_prop_to_name(prop));
-			return (zfs_error(zhp->zfs_hdl, EZFS_BADVERSION,
-			    dgettext(TEXT_DOMAIN, "internal error")));
+			return (-1);
 		}
 		if (zcmd_read_dst_nvlist(zhp->zfs_hdl, &zc, &zplprops) != 0 ||
 		    nvlist_lookup_uint64(zplprops, zfs_prop_to_name(prop),
 		    val) != 0) {
 			zcmd_free_nvlists(&zc);
-			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
-			    "unable to get %s property"),
-			    zfs_prop_to_name(prop));
-			return (zfs_error(zhp->zfs_hdl, EZFS_NOMEM,
-			    dgettext(TEXT_DOMAIN, "internal error")));
+			return (-1);
 		}
 		if (zplprops)
 			nvlist_free(zplprops);
