@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef	_TRUSS_PRINT_H
 #define	_TRUSS_PRINT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6   */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -135,7 +133,8 @@ extern "C" {
 #define	FXF	93		/* print forkx flags */
 #define	SPF	94		/* print rctlsys_projset flags */
 #define	UN1	95		/* unsigned except for -1 */
-#define	HID	96		/* hidden argument, don't print */
+#define	MOB	96		/* print mmapobj() flags */
+#define	HID	97		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

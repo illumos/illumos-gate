@@ -347,7 +347,7 @@ const struct systable systable[] = {
 {"lxstat",	3, DEC, NOV, DEC, STG, HEX},			/* 124 */
 {"fxstat",	3, DEC, NOV, DEC, DEC, HEX},			/* 125 */
 {"xmknod",	4, DEC, NOV, DEC, STG, OCT, HEX},		/* 126 */
-{"mmapobj",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 127 */
+{"mmapobj",	5, DEC, NOV, DEC, MOB, HEX, HEX, HEX},		/* 127 */
 {"setrlimit",	2, DEC, NOV, RLM, HEX},				/* 128 */
 {"getrlimit",	2, DEC, NOV, RLM, HEX},				/* 129 */
 {"lchown",	3, DEC, NOV, STG, DEC, DEC},			/* 130 */

@@ -780,6 +780,27 @@ prt_mty(private_t *pri, int raw, long val) /* print mmap() mapping type flags */
 		outstring(pri, s);
 }
 
+void
+prt_mob(private_t *pri, int raw, long val) /* print mmapobj() flags */
+{
+	if (val == 0)
+		prt_dec(pri, 0, val);
+	else if (raw || (val & ~(MMOBJ_PADDING|MMOBJ_INTERPRET)) != 0)
+		prt_hhx(pri, 0, val);
+	else {
+#define	CBSIZE	sizeof (pri->code_buf)
+		char *s = pri->code_buf;
+
+		*s = '\0';
+		if (val & MMOBJ_PADDING)
+			(void) strlcat(s, "|MMOBJ_PADDING", CBSIZE);
+		if (val & MMOBJ_INTERPRET)
+			(void) strlcat(s, "|MMOBJ_INTERPRET", CBSIZE);
+		outstring(pri, s + 1);
+#undef CBSIZE
+	}
+}
+
 /*ARGSUSED*/
 void
 prt_mcf(private_t *pri, int raw, long val)	/* print memcntl() function */
@@ -2704,5 +2725,6 @@ void (* const Print[])() = {
 	prt_fxf,	/* FXF -- print forkx() flags */
 	prt_spf,	/* SPF -- print rctlsys_projset() flags */
 	prt_un1,	/* UN1 -- as prt_uns except for -1 */
+	prt_mob,	/* MOB -- print mmapobj() flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };
