@@ -1665,7 +1665,8 @@ lofi_map_compressed_file(struct lofi_state *lsp, char *buf)
 	 * actual uncompressed data size rather than the
 	 * compressed file size.
 	 */
-	lsp->ls_vp_size = (lsp->ls_comp_index_sz - 2) * lsp->ls_uncomp_seg_sz
+	lsp->ls_vp_size =
+	    (u_offset_t)(lsp->ls_comp_index_sz - 2) * lsp->ls_uncomp_seg_sz
 	    + lsp->ls_uncomp_last_seg_sz;
 
 	/*
