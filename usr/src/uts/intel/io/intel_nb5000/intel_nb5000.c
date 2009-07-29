@@ -226,10 +226,10 @@ nf_memory_error(const nb_regs_t *rp, void *data)
 	sp->offset = -1;
 	ferr_nf_fbd = rp->nb.nf_fbd_regs.ferr_nf_fbd;
 	if ((ferr_nf_fbd & ERR_NF_FBD_MASK) == 0) {
+		/* unknown ereport if a recognizable error was not found */
 		sp->branch = -1;
 		sp->channel = -1;
-		sp->intel_error_list =
-		    intel_nf_fbd_err(rp->nb.nf_fbd_regs.nerr_nf_fbd);
+		sp->intel_error_list = -1;
 		return (intr);
 	}
 	sp->intel_error_list = intel_nf_fbd_err(ferr_nf_fbd);

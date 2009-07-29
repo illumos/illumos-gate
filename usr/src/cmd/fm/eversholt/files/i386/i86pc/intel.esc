@@ -355,6 +355,7 @@ event fault.cpu.intel.nb.otf@motherboard, retire=0, response=0;
 prop fault.cpu.intel.nb.otf@motherboard (1)->
     ereport.cpu.intel.nb.otf@motherboard;
 
+event ereport.cpu.intel.nb.unknown@motherboard {within(12s)};
 event ereport.cpu.intel.nb.unknown@memory-controller {within(12s)};
 event ereport.cpu.intel.nb.unknown@memory-controller/dram-channel {within(12s)};
 event ereport.cpu.intel.nb.spd@memory-controller/dram-channel {within(12s)};
@@ -363,6 +364,7 @@ event ereport.cpu.intel.nb.ddr2_spd@
 event upset.discard@memory-controller;
 
 prop upset.discard@memory-controller (0)->
+    ereport.cpu.intel.nb.unknown@motherboard,
     ereport.cpu.intel.nb.unknown@memory-controller,
     ereport.cpu.intel.nb.unknown@memory-controller/dram-channel,
     ereport.cpu.intel.nb.spd@memory-controller/dram-channel,
