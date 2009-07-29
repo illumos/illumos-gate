@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -105,12 +105,7 @@ ITPROG=			$(TPROG:%=$(RSTAT)/%)
 IETCFILES=		$(ETCFILES:%=$(ROOTETC)/%)
 
 # non-default file attributes
-$(ROOTDIRS) :=					OWNER=		root
-$(ROOTDIRS) :=					GROUP=		sys
-
 $(ROOTETC)/rpc :=				FILEMODE=	0644
-$(ROOTETC)/rpc :=				OWNER=		root
-$(ROOTETC)/rpc :=				GROUP=		sys
 
 all:=		TARGET= all
 install:=	TARGET= install

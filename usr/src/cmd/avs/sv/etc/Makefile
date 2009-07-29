@@ -28,8 +28,6 @@ include ../../Makefile.com
 SHFILES = sv sv.cluster
 ROOTINIT_D = $(ROOTETC)/init.d
 
-OWNER = root
-GROUP = sys
 FILEMODE = 0744
 
 ROOTINIT_DPROG1 = $(ROOTINIT_D)/sv

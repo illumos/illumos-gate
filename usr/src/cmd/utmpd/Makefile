@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= utmpd
@@ -35,8 +33,6 @@ include ../Makefile.cmd
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 FILEMODE = 555
-OWNER = root
-GROUP = bin
 
 .KEEP_STATE:
 

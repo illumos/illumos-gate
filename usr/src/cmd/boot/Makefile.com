@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -35,14 +33,10 @@ ROOTBOOTSOLARISBIN=	$(ROOTBOOTSOLARIS)/bin
 
 ROOTBOOTSOLARISBINPROG=	$(BOOTPROG:%=$(ROOTBOOTSOLARISBIN)/%)
 
-$(ROOTBOOTSOLARISBINPROG) := OWNER= root
-$(ROOTBOOTSOLARISBINPROG) := GROUP= bin
 $(ROOTBOOTSOLARISBINPROG) := FILEMODE= 0555
 
 ROOTBOOTSOLARISDATA=	$(DATA:%=$(ROOTBOOTSOLARIS)/%)
 
-$(ROOTBOOTSOLARISDATA) := OWNER= root
-$(ROOTBOOTSOLARISDATA) := GROUP= sys
 $(ROOTBOOTSOLARISDATA) := FILEMODE= 0644
 
 ROOTUSRSBINLINKS= $(SBINLINKS:%=$(ROOTUSRSBIN)/%)

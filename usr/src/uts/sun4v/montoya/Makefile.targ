@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Common targets for sun4v platform-implementation specific modules.
@@ -82,7 +79,7 @@ $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
 
 $(USR_MONTOYA_SBIN_LINKS): $(USR_MONTOYA_SBIN_DIR)
 	$(RM) -r $@; 
-	$(SYMLINK) ../../$(PLATFORM)/sbin/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(SYMLINK) ../../$(PLATFORM)/sbin/$(@F) $@
 
 #
 #	Include common targets.

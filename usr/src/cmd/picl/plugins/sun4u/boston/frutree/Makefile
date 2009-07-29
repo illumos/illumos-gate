@@ -20,12 +20,10 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/picl/plugins/sun4u/boston/frutree/Makefile
 #
@@ -40,8 +38,6 @@ ROOT_PLATFORM = $(USR_PLAT_DIR)/SUNW,Sun-Fire-V445
 include	$(SRC)/cmd/picl/plugins/Makefile.com
 
 ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
-ROOTLIBDIR	:= OWNER = root
-ROOTLIBDIR	:= GROUP = sys
 
 INCDIR1		= .
 INCDIR2		= ../frudr

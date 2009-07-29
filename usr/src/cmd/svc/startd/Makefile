@@ -79,8 +79,6 @@ LDLIBS_i386 +=	-lgrubmgmt
 LDLIBS +=	$(LDLIBS_$(MACH))
 
 FILEMODE = 0555
-OWNER = root
-GROUP = sys
 
 # lint doesn't like the unused _umem_*_init()
 # And lint thinks uadmin() is undefined.

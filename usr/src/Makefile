@@ -175,8 +175,6 @@ bldtools: closedbins sgs
 #
 rootdirs: $(ROOTDIRS)
 	$(INS) -d -m 775 $(ROOT)/var/mail/:saved
-	$(CH)$(CHOWN) root $(ROOT)/var/mail/:saved
-	$(CH)$(CHGRP) mail $(ROOT)/var/mail/:saved
 
 lint: FRC
 	$(MAKE) -f Makefile.lint

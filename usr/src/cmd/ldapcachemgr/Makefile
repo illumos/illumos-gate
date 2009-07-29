@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=	ldap_cachemgr
@@ -67,8 +65,6 @@ LDLIBS += 	-lumem -lsldap
 
 # install macros and rule
 #
-GROUP=	bin
-OWNER=	root
 
 .KEEP_STATE:
 

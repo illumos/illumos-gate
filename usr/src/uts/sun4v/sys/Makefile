@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -37,7 +37,6 @@ include ../Makefile.sun4v
 # Override defaults.
 #
 FILEMODE	 = 644
-GROUP = bin
 
 SUN4_HDRS=			\
 	clock.h			\
@@ -148,7 +147,7 @@ $(ROOTDIRS):
 
 # -r because this used to be a directory and is now a link.
 $(ROOTLINK):	$(ROOTDIRS)
-	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@ $(CHOWNLINK) $(CHGRPLINK)
+	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@
 
 mon/%.check:	mon/%.h
 	$(DOT_H_CHECK)

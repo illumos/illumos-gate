@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -42,7 +40,6 @@ HDRDIR=		.
 ETCFILES=	pam.conf
 ROOTETC=	$(ROOT)/etc
 IETCFILES=	$(ETCFILES:%=$(ROOTETC)/%)
-$(IETCFILES) := GROUP= sys
 
 all :=		TARGET= all
 clean :=	TARGET= clean

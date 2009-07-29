@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -30,12 +30,8 @@ ROOTLIBLPBIN =		$(ROOTLIBLP)/bin
 ROOTVARLP =		$(ROOTVAR)/lp
 ROOTVARLPPPD =		$(ROOTVARLP)/ppd
 
-$(ROOTVARSPOOLPRINT)	:= OWNER=root
-$(ROOTVARLP)		:= OWNER=lp
 $(ROOTVARLP)		:= DIRMODE=0775
 
-OWNER =			root
-GROUP =			lp
 FILEMODE =		0755
 
 MSGFILES =              lpadmin ppdmgr
@@ -52,14 +48,10 @@ $(ROOTUSRSBINPROG)		:= FILEMODE=555
 
 PCONF=	 		printers.conf
 ROOTPCONF=		$(PCONF:%=$(ROOTETC)/%)
-$(ROOTPCONF)		:= OWNER=root
-$(ROOTPCONF)		:= GROUP=sys
 $(ROOTPCONF)		:= FILEMODE=644
 
 MANUFALIASES= 		manufaliases
 ROOTMANUFALIASES=	$(MANUFALIASES:%=$(ROOTVARLPPPD)/%)
-$(ROOTMANUFALIASES)	:= OWNER=root
-$(ROOTMANUFALIASES)	:= GROUP=lp
 $(ROOTMANUFALIASES)	:= FILEMODE=444
 
 LIBLPPROGS=	 	getmakes getmodels getppdfile getppds ppdfilename2mmp \
@@ -69,8 +61,6 @@ LIBLPPROGS=	 	getmakes getmodels getppdfile getppds ppdfilename2mmp \
 			desktop-print-management-prefs
 
 ROOTLIBLPPROGS=		$(LIBLPPROGS:%=$(ROOTLIBLPBIN)/%)
-$(ROOTLIBLPPROGS)		:= OWNER=root
-$(ROOTLIBLPPROGS)		:= GROUP=lp
 $(ROOTLIBLPPROGS)		:= FILEMODE=555
 
 LIBLINKS=		$(ROOTLIB)/lpadmin $(ROOTLIB)/lpsystem

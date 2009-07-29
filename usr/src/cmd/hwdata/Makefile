@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.cmd
 
@@ -31,8 +30,6 @@ HWDATADIR =	$(ROOT)/usr/share/hwdata
 ROOTHWDATA =	$(HWDATA:%=$(HWDATADIR)/%)
 
 $(ROOTHWDATA) :=	FILEMODE = 444
-$(ROOTHWDATA) :=	OWNER = root
-$(ROOTHWDATA) :=	GROUP = bin
 
 all:
 

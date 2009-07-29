@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/cfgadm_plugins/Makefile.com
 
@@ -71,7 +69,7 @@ LINKED_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)
 LINKED_CFG_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/cfgadm)
 
-INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@
 
 $(LINKED_DIRS):		$(USR_PLAT_DIR)
 	-$(INS.dir.root.sys)

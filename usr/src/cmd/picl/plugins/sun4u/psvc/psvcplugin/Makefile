@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/picl/plugins/sun4u/psvc/psvcplugin/Makefile
 #
@@ -50,20 +48,11 @@ PLAT_PLATFORM += $(USR_PLAT_DIR)/SUNW,Sun-Fire-480R
 PLAT_PLATFORM += $(USR_PLAT_DIR)/SUNW,Sun-Fire-V490
 PLAT_PLATFORM += $(USR_PLAT_DIR)/SUNW,Sun-Fire-V890
 
-PLAT_PLATFORM := OWNER= root
-PLAT_PLATFORM := GROUP= sys
-
 PLAT_LIB_DIR = $(PLAT_PLATFORM:%=%/lib)
-PLAT_LIB_DIR := OWNER= root
-PLAT_LIB_DIR := GROUP= bin
 
 PLAT_PICL_DIR = $(PLAT_LIB_DIR:%=%/picl)
-PLAT_PICL_DIR := OWNER= root
-PLAT_PICL_DIR := GROUP= sys
 
 PLAT_PLUGINS_DIRS = $(PLAT_PICL_DIR:%=%/plugins)
-PLAT_PLUGINS_DIRS := OWNER= root
-PLAT_PLUGINS_DIRS := GROUP= sys
 
 USR_PLAT_PLUGINS_DYNLIBS = $(PLAT_PLUGINS_DIRS:%=%/$(DYNLIB))
 USR_PLAT_PLUGINS_LIBLINKS = $(PLAT_PLUGINS_DIRS:%=%/$(LIBLINKS))

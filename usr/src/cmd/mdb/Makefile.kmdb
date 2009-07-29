@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -121,7 +121,6 @@ $(KCTLTGTS) := ASFLAGS += -D_KERNEL
 ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
 
 INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
-$(CH)INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) -u root -g sys $@
 
 $(ROOTMISC) $(ROOTMISC64) := FILEMODE = 0755
 

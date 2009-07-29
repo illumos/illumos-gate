@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/print/Makefile.sp
 # Common makefile definitions (should be) used by all print(lp) makefiles
@@ -55,23 +53,6 @@ ROOTLIBPRINTBIN=	$(ROOTLIBPRINT)/bin
 ROOTUSRUCB=	$(ROOT)/usr/ucb
 
 
-
-#
-# Typical owner and group for LP things. These can be overridden
-# in the individual makefiles.
-#
-OWNER	=	root
-GROUP	=	lp
-SUPER	=	root
-
-$(ROOTINIT_D) :=	GROUP = sys
-$(ROOTRC0_D) :=		GROUP = sys
-$(ROOTRCS_D) :=		GROUP = sys
-$(ROOTRC1_D) :=		GROUP = sys
-$(ROOTRC2_D) :=		GROUP = sys
-$(ROOTUSRUCB) :=	GROUP = bin
-$(ROOTUSRSBIN) :=	GROUP = bin
-$(ROOTBIN) :=		GROUP = bin
 #
 # $(EMODES): Modes for executables
 # $(SMODES): Modes for setuid executables

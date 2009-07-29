@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -47,8 +45,6 @@ SRCS=		$(OBJECTS:%.o=%.c)
 LIBS=		$(DYNLIB)
 
 ROOTLIBDIR      = $(ROOT_PLATFORM)/lib
-ROOTLIBDIR      := OWNER = root
-ROOTLIBDIR      := GROUP = sys
 
 CLEANFILES=	$(LINTOUT) $(LINTLIB)
 CLOBBERFILES += $(LIBLINKS)

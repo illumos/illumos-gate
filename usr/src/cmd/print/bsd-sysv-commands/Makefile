@@ -46,7 +46,6 @@ ROOTLIBLPPROGS =	$(LIBLPPROGS:%=$(ROOTLIBLPBIN)/%)
 
 
 FILEMODE =	0555
-OWNER =		root
 
 include ../../Makefile.cmd
 

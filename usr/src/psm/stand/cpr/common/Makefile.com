@@ -72,8 +72,6 @@ AS_CPPFLAGS =	$(CPPINCS) $(CPPFLAGS.master)
 # install values
 CPRFILES=	$(ALL:%=$(ROOT_PSM_DIR)/$(ARCH)/%)
 FILEMODE=	644
-OWNER=		root
-GROUP=		sys
 
 # lint stuff
 LINTFLAGS += -Dlint

@@ -37,7 +37,6 @@ include ../../Makefile.cmd
 POFILE = 	$(PROG)_all.po
 LDLIBS +=	-lidmap
 FILEMODE =	0555
-GROUP =		bin
 
 INCS += -I. -I../../../lib/libidmap/common -I$(IDMAP_PROT_DIR)
 

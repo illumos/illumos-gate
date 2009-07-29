@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -52,8 +52,6 @@ ROOTAPPFILE =	$(ROOTAPPDIR)/solaris-print-manager.desktop
 $(ROOTAPPFILE):= FILEMODE	= 444
 
 $(ROOTBINPROG):= FILEMODE	= 644
-$(ROOTBINPROG):= OWNER		= root
-$(ROOTBINPROG):= GROUP		= lp
 
 .KEEP_STATE:
 

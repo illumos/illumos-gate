@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # snmp/mib/Makefile
 #
@@ -36,8 +34,6 @@ MIBDIR =	$(ROOT)/var/snmp/mib
 ROOTMIBS =	$(MIBS:%=$(MIBDIR)/%)
 
 $(ROOTMIBS) :=	FILEMODE = 644
-$(ROOTMIBS) :=	OWNER = root
-$(ROOTMIBS) :=	GROUP = sys
 
 
 $(MIBDIR)/%: %

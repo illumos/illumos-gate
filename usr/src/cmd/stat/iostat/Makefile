@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = iostat
@@ -35,7 +33,6 @@ include $(SRC)/cmd/stat/Makefile.stat
 LDLIBS += -lkstat -ldevinfo -lavl
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
 FILEMODE= 0555
-GROUP= bin
 
 lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)
 
@@ -48,7 +45,7 @@ install: all $(ROOTPROG)
 $(PROG): $(OBJS) $(COMMON_OBJS)
 	$(LINK.c) -o $(PROG) $(OBJS) $(COMMON_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
-	
+
 %.o : $(STATCOMMONDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

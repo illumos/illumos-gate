@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 UTSBASE = ../..
 
@@ -65,7 +63,7 @@ $(ROOTDIRS):
 	$(INS.dir.root.bin)
 
 $(ROOTLINK):	$(ROOTDIRS)
-	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@ $(CHOWNLINK) $(CHGRPLINK)
+	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@
 
 FRC:
 

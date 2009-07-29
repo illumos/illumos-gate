@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -20,8 +20,6 @@ TABFILES = continent.tab country.tab zone_sun.tab
 OBJS= zic.o scheck.o ialloc.o
 SRCS= $(OBJS:%.o=%.c)
 NOBJS= $(OBJS:%=$(NATIVE)/%)
-OWNER= root
-GROUP= bin
 
 CLOBBERFILES= $(NOBJS) $(KSHPROG) $(NPROG) $(NATIVE)/zic.c $(NATIVE)/tzfile.h
 
@@ -59,8 +57,6 @@ $(PROG): $(OBJS)
 
 install: all $(DIRS) $(ROOTTZSRCD) $(ROOTTZTABD) $(ROOTUSRSBINPROG) $(ROOTLIBTZSRCFILES) $(ROOTLIBTZTABFILES) $(ROOTKSHPROG)
 	$(NPROG) -d $(ROOTTZD) $(TZFILES)
-	$(CH) $(CHOWN) -R $(OWNER) $(ROOTTZD)
-	$(CH) $(CHGRP) -R $(GROUP) $(ROOTTZD)
 
 $(NPROG): $(NATIVE) $(NOBJS)
 	$(NATIVECC) -o $@ $(NOBJS)

@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/oplhpd/Makefile
 #
@@ -49,8 +48,6 @@ LDLIBS64 += -lsysevent -lnvpair -lcfgadm -ldevinfo
 PSMPROG = $(USR_PSM_LIB64_DIR)/$(PROG)
 
 $(PSMPROG) :=	FILEMODE = 0755
-$(PSMPROG) :=	OWNER = root
-$(PSMPROG) :=	GROUP = sys
 
 .KEEP_STATE:
 

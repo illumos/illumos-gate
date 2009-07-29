@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 BINPROG = ypmatch ypwhich ypcat
@@ -60,7 +58,6 @@ ypset :=	LDLIBS += -lnsl
 makedbm :=	MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 makedbm :=	LDFLAGS += $(MAPFILES:%=-M%)
 
-$(ROOTVAR_YP)/aliases :=	GROUP=bin
 $(ROOTVAR_YP)/aliases :=	FILEMODE=555
 
 YPFILES = Makefile aliases nicknames updaters
@@ -153,15 +150,12 @@ ypxfr.o := CPPFLAGS += $(NIS2LDAPINC)
 yppush.o := CPPFLAGS += $(NIS2LDAPINC)
 $(NIS2LDAPPROG) := CPPFLAGS += $(NIS2LDAPINC)
 $(SHAREDOBJ) := CPPFLAGS += -I$(SRC)/lib/libnisdb/yptol
-$(IBINPROG) := GROUP= other
 $(ROOTVAR_YP)/Makefile := FILEMODE= 555
 $(ROOTVAR_YP)/nicknames := FILEMODE= 644
 $(ROOTVAR_YP)/updaters := FILEMODE= 500
 $(ROOTETC)/publickey := FILEMODE= 644
 # non-default file attributes to avoid conflict with rpcsrc
-$(NETSVC) :=	GROUP=          sys
 NETYP =		$(NETSVC)/yp
-$(NETYP) :=	GROUP=bin
 
 
 all:=		TARGET= all

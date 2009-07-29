@@ -44,8 +44,6 @@ ISNS_SVC	= $(XML_DIR)/isns_server.xml
 
 MANIFEST	= isns_server.xml
 ROOTMANIFESTDIR	= $(ROOTSVCNETWORK)
-$(ROOTSVCNETWORK)/isns_server.xml	:= OWNER = root
-$(ROOTSVCNETWORK)/isns_server.xml	:= GROUP = bin
 $(ROOTSVCNETWORK)/isns_server.xml	:= FILEMODE = 0444
 
 CFLAGS 		+=	$(CCVERBOSE)

@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -697,9 +696,7 @@ $(BUILD64) $(ROOT)/usr/ucblib/64:=	LINKDEST=$(MACH64)
 # a symlink.
 #
 $(SYMLINKS:%=$(ROOT)%):= \
-   INS.dir= -$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@; \
-	     $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
-
+   INS.dir= -$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@
 
 # Special symlinks to populate usr/ccs/lib, whose objects
 # have actually been moved to usr/lib
@@ -867,12 +864,10 @@ SYM.USRCCSLIB64= \
 
 
 $(SYM.USRCCSLIB:%=$(ROOT)%):= \
-    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
-	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
 
 $(SYM.USRCCSLIB64:%=$(ROOT)%):= \
-    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
-	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
 
 # Special symlinks to direct libraries that have been moved
 # from /usr/lib to /lib in order to live in the root filesystem.
@@ -1904,10 +1899,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/nss_user.so.1
 
 $(SYM.USRLIB:%=$(ROOT)%):= \
-    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
-	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
 
 $(SYM.USRLIB64:%=$(ROOT)%):= \
-    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \
-	       $(CHOWN) $(OWNER) $@; $(CHGRP) $(GROUP) $@
+    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
 

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libtsalarm/sparc/Makefile
 
@@ -46,7 +44,7 @@ include ../Makefile.com
 #
 
 $(PLATLIBS)/libtsalarm.so:
-	$(RM) -r $@; $(SYMLINK) libtsalarm.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) -r $@; $(SYMLINK) libtsalarm.so.1 $@
 
 $(USR_PSM_LIB_DIR)/% := FILEMODE= 644
 

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 NETYPPROG =	rpc.ypupdated
@@ -55,7 +53,6 @@ OBJS =			$(RPCYPUPDATEOBJ)
 SRCS =			$(OBJS:%.o=%.c)
 
 #conditional assignments
-$(INETSVC)   := GROUP=bin
 $(INETSVC)   := FILEMODE=555
 
 #install rules

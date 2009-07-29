@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../../Makefile.cmd
 include ../Makefile.hal
@@ -32,8 +31,6 @@ XMLDIR =	$(ROOT)/usr/share/lib/xml/dtd
 ROOTDTDS =	$(DTDS:%=$(XMLDIR)/%)
 
 $(ROOTDTDS) :=	FILEMODE = 444
-$(ROOTDTDS) :=	OWNER = root
-$(ROOTDTDS) :=	GROUP = bin
 
 FDIS =		information/10freedesktop/10-camera-ptp.fdi \
 		information/10freedesktop/10-cd-dvd-burner.fdi \
@@ -57,8 +54,6 @@ FDIDIR =	$(ROOT_HAL_FDI)
 ROOTFDIS =	$(FDIS:%=$(FDIDIR)/%)
 
 $(ROOTFDIS) :=	FILEMODE = 444
-$(ROOTFDIS) :=	OWNER = root
-$(ROOTFDIS) :=	GROUP = bin
 
 all:
 

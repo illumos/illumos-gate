@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 UTSBASE	  = ../../..
@@ -37,7 +35,6 @@ include ../Makefile.sunfire
 # Override defaults.
 #
 FILEMODE	 = 644
-GROUP = bin
 
 HDRS=			ac.h environ.h fhc.h simmstat.h sysctrl.h sram.h
 

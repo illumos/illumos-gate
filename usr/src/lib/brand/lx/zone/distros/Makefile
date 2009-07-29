@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../../Makefile.lx
@@ -36,8 +34,6 @@ ROOTDISTRODIR=	$(ROOTBRANDDIR)/distros
 ROOTDISTROS=	$(DISTROS:%=$(ROOTDISTRODIR)/%)
 
 $(ROOTDISTROS) :=	FILEMODE = 444
-$(ROOTDISTROS) :=	OWNER = root
-$(ROOTDISTROS) :=	GROUP = bin
 
 $(ROOTDISTRODIR):
 	$(INS.dir)

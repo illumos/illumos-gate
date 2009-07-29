@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for policy testing code
 #
@@ -61,12 +59,8 @@ ROOTDTDS=	$(DTDDIR)/kmfpolicy.dtd
 ROOTXML=	$(XMLDIR)/kmfpolicy.xml
 
 $(ROOTDTDS) :=	FILEMODE = 444
-$(ROOTDTDS) :=	OWNER = root
-$(ROOTDTDS) :=	GROUP = bin
 
 $(ROOTXML)  :=	FILEMODE = 644
-$(ROOTXML)  :=	OWNER = root
-$(ROOTXML)  :=	GROUP = bin
 
 all:	$(PROG) $(ROOTDTDS)
 

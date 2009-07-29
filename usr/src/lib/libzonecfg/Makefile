@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../Makefile.lib
@@ -50,8 +48,6 @@ DTDDIR =	$(ROOT)/usr/share/lib/xml
 ROOTDTDS=	$(DTDS:%=$(DTDDIR)/%)
 
 $(ROOTDTDS) :=	FILEMODE = 444
-$(ROOTDTDS) :=	OWNER = root
-$(ROOTDTDS) :=	GROUP = bin
 
 $(DTDDIR)/%: %
 	$(INS.file)

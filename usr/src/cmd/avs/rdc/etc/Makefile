@@ -30,8 +30,6 @@ PROG3 = rdc.cluster
 SHFILES = $(PROG1) $(PROG2) $(PROG3)
 ROOTINIT_D = $(ROOTETC)/init.d
 
-OWNER = root
-GROUP = sys
 FILEMODE = 0744
 
 ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)

@@ -43,8 +43,6 @@ CCVERBOSE	=
 LDLIBS += -ldoor -lnsl
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKISCSI)
-$(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := OWNER = root
-$(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := GROUP = bin
 $(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := FILEMODE = 0444
 
 .KEEP_STATE:

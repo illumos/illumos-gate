@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for name service cache daemon
 #
@@ -80,7 +78,6 @@ NISPROGLIBS=	$(LDLIBS) -lnsl
 
 # install macros and rule
 #
-GROUP=		bin
 ROOTPROG=	${ROOTUSRSBIN}/nscd
 ROOTNISPROG=	${ROOTLIB}/nscd_nischeck
 

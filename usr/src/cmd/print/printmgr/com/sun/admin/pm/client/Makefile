@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for Java Print Manager client
 #
@@ -95,8 +93,6 @@ MSGDIR =	$(ROOT)/usr/share/lib/locale/com/sun/admin/pm/client
 MSGJAVAFILES =	pmResources.java pmHelpResources.java
 MSGFILES =	$(MSGJAVAFILES:%=$(MSGDIR)/%)
 
-$(MSGFILES):=	OWNER = root
-$(MSGFILES):=	GROUP = lp
 $(MSGFILES):=	FILEMODE = 644
 
 CLEANFILES=	*.class pmHelpResources.java pmCopyright.java \

@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sun4u/ngdr/sys/Makefile
@@ -34,8 +31,6 @@ include ../../Makefile.sun4u
 # Override defaults.
 #
 FILEMODE=	644
-OWNER=		root
-GROUP=		bin
 
 HDRS=
 

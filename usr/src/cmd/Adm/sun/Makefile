@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 ETCFILES= ioctl.syscon passwd shadow motd
@@ -36,10 +34,8 @@ ROOTUSRKVMFILES= $(KVMFILES:%=$(ROOTUSRKVM)/%)
 ROOTVARSMBFILES= $(SMBFILES:%=$(ROOTVARSMB)/%)
 
 FILEMODE= 0644
-OWNER= root
-GROUP= sys
 
-$(ROOTETC)/shadow :=	FILEMODE =	400
+$(ROOTETC)/shadow 	:=	FILEMODE =	400
 $(ROOTVARSMB)/smbpasswd :=	FILEMODE =	0400
 
 .KEEP_STATE:

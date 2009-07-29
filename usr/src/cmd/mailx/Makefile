@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/mailx/Makefile
 
@@ -59,7 +57,6 @@ ROOTUCBMAIL=	$(ROOT)/usr/ucb/mail
 ROOTUCBCAPMAIL=	$(ROOT)/usr/ucb/Mail
 
 $(ROOTPROG) :=		FILEMODE =	02511
-$(ROOTPROG) :=		GROUP =		mail
 $(ROOTMAILXHELP) :=	FILEMODE =	0644
 $(ROOTMAILXRC) :=	FILEMODE =	0644
 $(ROOTUCBMAILRC) :=	FILEMODE =	0644

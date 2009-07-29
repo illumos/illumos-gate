@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -32,8 +32,6 @@ MANIFESTDIR=	$(ROOT)/var/svc/manifest/network/dns
 ROOTMANIFEST=	$(MANIFEST:%=$(MANIFESTDIR)/%)
 
 $(ROOTMANIFEST) :=	FILEMODE = 444
-$(ROOTMANIFEST) :=	OWNER = root
-$(ROOTMANIFEST) :=	GROUP = bin
 
 CHKMANIFEST=	$(MANIFEST:%.xml=%.xmlchk)
 

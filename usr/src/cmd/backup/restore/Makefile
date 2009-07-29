@@ -1,8 +1,6 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/backup/restore/Makefile
 #
@@ -52,7 +50,6 @@ UFSROOTLINK=	$(UFSROOTUSRSBIN)/$(PROG)
 LINKVALUE=	../lib/fs/$(FSTYPE)/$(PROG)
 
 FILEMODE=	04555
-OWNER=		root
 
 .KEEP_STATE:
 

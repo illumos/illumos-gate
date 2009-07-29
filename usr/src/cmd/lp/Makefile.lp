@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -45,13 +43,6 @@ ROOTLIBLPLOCL =	$(ROOTLIBLP)/local
 
 ROOTUSRUCB=	$(ROOT)/usr/ucb
 
-#
-# Typical owner and group for LP things. These can be overridden
-# in the individual makefiles.
-#
-OWNER	=	root
-GROUP	=	lp
-SUPER	=	root
 
 #
 # $(EMODES): Modes for executables

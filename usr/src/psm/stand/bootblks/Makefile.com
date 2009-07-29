@@ -64,8 +64,6 @@ TOKENIZE	= tokenize
 #
 FILEMODE	= 444
 DIRMODE		= 755
-OWNER		= root
-GROUP		= sys
 
 #
 # For building lint objects

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 NETYPPROG =	rpc.yppasswdd # pwconv passmgmt
@@ -73,10 +71,8 @@ OBJS = 			$(RPCYPPASSWDDOBJ) \
 SRCS =			$(OBJS:%.o=%.c)
 
 #conditional assignments
-$(INETSVC)   := GROUP=bin
 $(INETSVC)   := FILEMODE=555
 
-$(ETCDFLTFILE) := GROUP=sys
 $(ETCDFLTFILE) := FILEMODE=0444
 
 #install rules

@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/cmd-inet/etc/init.d/Makefile
 
@@ -43,8 +40,6 @@ INITD= $(ROOTETC)/init.d
 DIRS= $(INITD) $(ROOTETC)/rc0.d $(ROOTETC)/rcS.d $(ROOTETC)/rc1.d \
 	$(ROOTETC)/rc2.d $(ROOTETC)/rc3.d
 FILEMODE= 0744
-OWNER= root
-GROUP= sys
 
 ETCINITPROG=	$(PROG:%=$(INITD)/%)
 

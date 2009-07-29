@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/dodatadm/Makefile
@@ -35,8 +35,6 @@ RC2D= $(ROOTETC)/rc2.d
 DIRS= $(INITD) $(RC2D)
 
 FILEMODE= 0744
-OWNER= root
-GROUP= sys
 
 ETCINITPROG=	$(SCRIPT:%=$(INITD)/%)
 

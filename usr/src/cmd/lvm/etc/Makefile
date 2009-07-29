@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Makefile for logical volume management 
@@ -60,26 +56,12 @@ ETCFLASHPREPROG= $(FLASHPREPROG:%=$(ETCFLASHPRED)/%)
 ETCFLASHPOSTPROG= $(FLASHPOSTPROG:%=$(ETCFLASHPOSTD)/%)
 
 $(ETCLVMD) :=	DIRMODE=	755
-$(ETCLVMD) :=	OWNER=          root
-$(ETCLVMD) :=	GROUP=          sys
 $(ETCFLASHD) :=	DIRMODE=	755
-$(ETCFLASHD) :=	OWNER=          root
-$(ETCFLASHD) :=	GROUP=          sys
 $(ETCFLASHPRED) :=	DIRMODE=	755
-$(ETCFLASHPRED) :=	OWNER=          root
-$(ETCFLASHPRED) :=	GROUP=          sys
 $(ETCFLASHPOSTD) :=	DIRMODE=	755
-$(ETCFLASHPOSTD) :=	OWNER=          root
-$(ETCFLASHPOSTD) :=	GROUP=          sys
 $(ETCLVMINITPROG) :=	FILEMODE=       0644
-$(ETCLVMINITPROG) :=	OWNER=          root
-$(ETCLVMINITPROG) :=	GROUP=          sys
 $(ETCFLASHPREPROG) :=	FILEMODE=       0744
-$(ETCFLASHPREPROG) :=	OWNER=          root
-$(ETCFLASHPREPROG) :=	GROUP=          sys
 $(ETCFLASHPOSTPROG) :=	FILEMODE=       0744
-$(ETCFLASHPOSTPROG) :=	OWNER=          root
-$(ETCFLASHPOSTPROG) :=	GROUP=          sys
 
 .KEEP_STATE:
 

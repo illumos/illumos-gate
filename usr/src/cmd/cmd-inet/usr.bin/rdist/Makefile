@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/cmd-inet/usr.bin/rdist/Makefile
 
@@ -53,7 +51,6 @@ ROOTSYMLINK=	$(ROOT)/usr/ucb/$(PROG)
 
 # conditional assignments
 $(ROOTPROG) :=      FILEMODE=       04555
-$(ROOTPROG) :=      OWNER=          root
 
 .KEEP_STATE:
 

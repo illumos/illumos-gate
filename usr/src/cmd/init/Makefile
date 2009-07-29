@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= init 
@@ -32,9 +30,6 @@ ROOTFS_PROG= $(PROG)
 DEFAULTFILES= init.dfl
 
 include ../Makefile.cmd
-
-OWNER = root
-GROUP = sys
 
 LDLIBS += -lpam -lbsm -lcontract -lscf
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2

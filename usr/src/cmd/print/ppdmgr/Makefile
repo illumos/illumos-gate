@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MANIFEST=		ppd-cache-update.xml
@@ -37,7 +35,6 @@ ROOTVARLP=		$(ROOTVAR)/lp
 ROOTVARLPPPD=		$(ROOTVARLP)/ppd
 ROOTVARLPPPDCACHES=	$(ROOTVARLPPPD)/caches
 
-$(ROOTVARLP):=		OWNER= lp
 $(ROOTVARLP):=		DIRMODE= 775
 
 .KEEP_STATE:

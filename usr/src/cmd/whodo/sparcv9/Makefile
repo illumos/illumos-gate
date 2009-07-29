@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/whodo/sparcv9/Makefile
@@ -39,7 +39,6 @@ CFLAGS64	+= $(CCVERBOSE)
 lint	:= LINTFLAGS64 = -x -m64
 
 FILEMODE= 04555
-OWNER= root
 
 .KEEP_STATE:
 

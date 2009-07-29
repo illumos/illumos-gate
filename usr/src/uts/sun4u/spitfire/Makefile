@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -116,7 +116,7 @@ $(SYM_MOD):	$(UNIX_O) $(CPULIB)
 	    CPU_DIR=$(HERE) SYM_MOD=$(HERE)/$(SYM_MOD) $(MAKE) symcheck)
 
 $(ROOTSOFTLINKS): $(ROOTMODULE)
-	$(RM) $@; $(SYMLINK) $(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) $@; $(SYMLINK) $(MODULE) $@
 
 #	Include common targets.
 #

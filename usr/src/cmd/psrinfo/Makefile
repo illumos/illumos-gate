@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/psrinfo/Makefile
@@ -30,9 +27,6 @@
 PROG=	psrinfo
 
 include	../Makefile.cmd
-
-OWNER = root
-GROUP = sys
 
 .KEEP_STATE:
 

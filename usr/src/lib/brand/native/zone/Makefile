@@ -27,8 +27,6 @@
 ETCBRANDDIR=	$(ROOT)/etc/brand/native
 ETCUSER=	$(USERFILES:%=$(ETCBRANDDIR)/%)
 $(ETCUSER) :=	FILEMODE = 644
-$(ETCUSER) :=	OWNER = root
-$(ETCUSER) :=	GROUP = sys
 
 $(ETCBRANDDIR)/%: %
 	$(INS.file)

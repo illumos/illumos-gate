@@ -53,8 +53,6 @@ include ../../Makefile.cmd
 ROOTALIASPROG= $(ALIASPROG:%=$(ROOTBIN)/%)
 
 FILEMODE= 555
-OWNER= root
-GROUP= bin
 
 .KEEP_STATE:
 
@@ -75,7 +73,6 @@ OBJECTS= \
 
 SRCS=	$(OBJECTS:%.o=%.c)
 
-GROUP= bin
 LDLIBS += -lshell -last
 
 CPPFLAGS = \

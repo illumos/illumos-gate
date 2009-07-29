@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/ufs/sparc/Makefile
@@ -44,7 +41,6 @@ USR_SBIN_INSTALLBOOT	= $(USR_SBIN)/$(INSTALLBOOT)
 # Overrides for installing installboot.
 #
 INS.file.555		= $(RM) $@; $(INS) -s -m 555 -f $(@D) $<
-$(CH)INS.file.555	= $(INS) -s -m 555 -u $(OWNER) -g $(GROUP) -f $(@D) $<
 
 
 SUBDIRS	= sun4u sun4v

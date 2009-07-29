@@ -158,8 +158,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 lint :=		TARGET= lint
 
-$(ROOTETC_RCM) :=		GROUP = sys
-$(ROOTETC_RCM_SCRIPT) :=	GROUP = sys
 $(ROOTLIB_RCM_SCRIPTS) :=	FILEMODE = 555
 
 .KEEP_STATE:

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	rtld.a
@@ -55,7 +53,6 @@ LINTFLAGS64 += 	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 
 LINTSRCS=	$(COMOBJS:%.o=../common/%.c) $(BLTDATA)
 
-GROUP=		sys
 FILEMODE=	555
 
 DYNLIB=		ld.so

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PLATFORM = sun4u
@@ -43,7 +41,6 @@ CPPFLAGS += $(IFLAGS) $(ARCHOPTS)
 LINTFLAGS += $(LDLIBS) -u
 
 FILEMODE= 0555
-GROUP= bin
 
 CLEANFILES += $(OBJS)
 

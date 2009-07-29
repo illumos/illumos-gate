@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/sun4u/daktari/sys/Makefile
 #
@@ -37,8 +35,6 @@ include ../Makefile.daktari
 # Override defaults.
 #
 FILEMODE	 = 644
-OWNER = root
-GROUP = bin
 
 HDRS=	daktari.h hpc3130_events.h
 

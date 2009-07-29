@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # usr/src/cmd/prtdscp/sparc/sun4u/Makefile
 #
@@ -51,8 +48,6 @@ LINT_FLAGS=	-c -Nlevel=4 -Ncheck $($(CONCURR_MODE)_FLAGS)
 
 # Definitions for installation of the program
 FILEMODE=	0755
-OWNER=		root
-GROUP=		sys
 ROOTPSMPROG	= $(USR_PSM_SBIN_DIR)/$(PROG)
 
 all: $(ROOTFS_PROG)

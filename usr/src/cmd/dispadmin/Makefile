@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/dispadmin/Makefile
 #
@@ -55,8 +53,6 @@ ROOTIA=		$(IA:%=$(ROOTDIR)/IA/%)
 ROOTFSS=	$(FSS:%=$(ROOTDIR)/FSS/%)
 ROOTFX=		$(FX:%=$(ROOTDIR)/FX/%)
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
-
-GROUP = bin
 
 # this would be simpler if we renamed rtdispadmin.c and tsdispadmin.c
 OBJECTS= $(PROG).o rt$(PROG).o ts$(PROG).o ia$(PROG).o \

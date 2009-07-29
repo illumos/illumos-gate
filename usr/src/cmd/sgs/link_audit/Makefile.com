@@ -89,8 +89,6 @@ $(WHOLIB):=	MAPFILES = mapfile-vers-who
 $(SYMBINDREP):=	MAPFILES = mapfile-vers-symbindrep
 $(BINDLIB):=	MAPFILES = mapfile-vers-bindings
 
-$(ROOTCCSLIB) :=	OWNER =		root
-$(ROOTCCSLIB) :=	GROUP =		bin
 $(ROOTCCSLIB) :=	DIRMODE =	755
 
 CPPFLAGS +=	-D_REENTRANT

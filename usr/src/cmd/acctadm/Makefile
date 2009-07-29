@@ -39,8 +39,6 @@ LDLIBS += -lexacct -lscf -lsecdb -ldladm
 POFILE = acctadm.po
 XGETFLAGS = -a -x acctadm.xcl
 FILEMODE = 0555
-OWNER = root
-GROUP = bin
 
 .KEEP_STATE:
 

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/sun4u/sys/Makefile
 #
@@ -38,8 +36,6 @@ include ../Makefile.lw8
 # Override defaults.
 #
 FILEMODE	 = 644
-OWNER = root
-GROUP = bin
 
 HDRS=	
 

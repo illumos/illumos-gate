@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootlst/common/Makefile.com
@@ -71,8 +68,6 @@ AS_CPPFLAGS =	$(CPPINCS) $(CPPFLAGS.master)
 # install values
 LSTFILES=	$(ALL:%=$(ROOT_PSM_DIR)/$(ARCH)/%)
 FILEMODE=	644
-OWNER=		root
-GROUP=		sys
 
 # lint stuff
 LINTFLAGS += -Dlint

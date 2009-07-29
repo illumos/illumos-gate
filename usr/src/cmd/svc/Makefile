@@ -48,8 +48,6 @@ XMLDIR =	$(ROOT)/usr/share/lib/xml
 ROOTDTDS =	$(DTDS:%=$(XMLDIR)/%)
 
 $(ROOTDTDS) :=	FILEMODE = 444
-$(ROOTDTDS) :=	OWNER = root
-$(ROOTDTDS) :=	GROUP = bin
 
 #
 # Definitions for class action scripts

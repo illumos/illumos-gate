@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile definitions for Sun Fire 15000 Key Management Daemon (sckmd)
 #
@@ -44,9 +42,6 @@ LINT_FILES=	$(LINT_SRCS:%.c=%.ln)
 include ../../../Makefile.cmd
 include ../../../../Makefile.psm
 
-
-OWNER=		root
-GROUP=		sys
 
 USRPSMPROG=	$(USR_PSM_LIB_DIR)/$(PROG)
 $(USRPSMPROG) :=	FILEMODE =	0755

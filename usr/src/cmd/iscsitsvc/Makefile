@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -43,8 +43,6 @@ MANIFEST    = iscsi-target.xml
 SVCMETHOD   = iscsi-target
 
 ROOTMANIFESTDIR	= $(ROOTSVCNETWORKISCSI)
-$(ROOTSVCNETWORKISCSI)/iscsi-target.xml	:= OWNER = root
-$(ROOTSVCNETWORKISCSI)/iscsi-target.xml	:= GROUP = bin
 $(ROOTSVCNETWORKISCSI)/iscsi-target.xml	:= FILEMODE = 0444
 
 .KEEP_STATE:

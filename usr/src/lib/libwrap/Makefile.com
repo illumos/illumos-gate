@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libwrap.a
@@ -60,8 +58,6 @@ DISTFILES =	clean_exit.c diag.c eval.c fix_options.c fromhost.c \
 		workarounds.c
 
 ROOTSRC =	$(ROOT)/usr/share/src/tcp_wrappers
-$(ROOTSRC) :=   OWNER = root
-$(ROOTSRC) :=   GROUP = bin
 ROOTSRCFILES = $(DISTFILES:%=$(ROOTSRC)/%)
 
 .KEEP_STATE:

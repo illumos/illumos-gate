@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -53,8 +50,6 @@ ECHO=		echo
 ROOTSHARELIBDIR	= $(ROOT)/usr/share/lib
 ROOTTABDIR	= $(ROOTSHARELIBDIR)/tabset
 ROOTTERMDIR	= $(ROOTSHARELIBDIR)/terminfo
-OWNER		= root
-GROUP		= bin
 DIRS=		$(ROOTTERMDIR) $(ROOTTABDIR)
 
 ROOTSYMLINK	= $(ROOTETC)/termcap
@@ -82,8 +77,6 @@ $(PROG).src:	$(PARTS)
 
 $(ROOTTERMDIR)/s/sun: $(PROG).src
 	TERMINFO=$(ROOTTERMDIR) 2>&1 $(TIC) -v $(PROG).src > errs
-	$(CHOWN) -R $(OWNER) $(ROOTTERMDIR)
-	$(CHGRP) -R $(GROUP) $(ROOTTERMDIR)
 	@$(ECHO) "\n`2>/dev/null cat errs|wc -l` entries have been compiled\n"
 	@-(	2>/dev/null cat errs|grep -iv "^mkdir"|grep -iv "^create"|grep -iv "^link"|grep -vi terminfo.src|grep -vi touch|grep -vi "working"; \
 	 	if [ $$? -ne 0 ] ; \

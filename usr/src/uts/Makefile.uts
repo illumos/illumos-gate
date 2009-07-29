@@ -266,8 +266,6 @@ CLOBBERFILES	= $(BINARY) $(CLEANFILES)
 #
 FILEMODE	 = 755
 DIRMODE		 = 755
-OWNER		 = root
-GROUP		 = sys
 CFILEMODE	 = 644
 
 #
@@ -294,9 +292,6 @@ ROOT_CONFFILE		= $(ROOT_CONFFILE_$(CLASS))
 
 INS.conffile= \
 	$(RM) $@; $(INS) -s -m $(CFILEMODE) -f $(@D) $(SRC_CONFFILE)
-$(CH)INS.conffile= \
-    $(INS) -s -m $(CFILEMODE) -u $(OWNER) -g $(GROUP) -f $(@D) $(SRC_CONFFILE)
-
 
 #
 # The CTF merge of child kernel modules is performed against one of the genunix
@@ -555,25 +550,17 @@ USR_MOD_DIRS_32		+= $(USR_DTRACE_DIR_32) $(USR_BRAND_DIR_32)
 include $(SRC)/Makefile.psm
 
 #
-#       Set ownership on links.
-#
-CHOWNLINK=
-$(CH)CHOWNLINK= ; $(CHOWN) $(OWNER) $@
-CHGRPLINK=
-$(CH)CHGRPLINK= ; $(CHGRP) $(GROUP) $@
-
-#
 #	The "-r" on the remove may be considered temporary, but is required
 #	while the replacement of the SUNW,SPARCstation-10,SX directory by
 #	a symbolic link is being propagated.
 #
-INS.slink1= $(RM) -r $@; $(SYMLINK) $(PLATFORM) $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink2= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink3= $(RM) -r $@; $(SYMLINK) $(IMPLEMENTED_PLATFORM) $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink4= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/include $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink5= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/sbin $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink6= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink7= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink1= $(RM) -r $@; $(SYMLINK) $(PLATFORM) $@
+INS.slink2= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/$(@F) $@
+INS.slink3= $(RM) -r $@; $(SYMLINK) $(IMPLEMENTED_PLATFORM) $@
+INS.slink4= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/include $@
+INS.slink5= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/sbin $@
+INS.slink6= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@
+INS.slink7= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/$(@F) $@
 
 ROOT_PLAT_LINKS		 = $(PLAT_LINKS:%=$(ROOT_PLAT_DIR)/%)
 ROOT_PLAT_LINKS_2	 = $(PLAT_LINKS_2:%=$(ROOT_PLAT_DIR)/%)

@@ -19,11 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #     This makefile drives the production of all MonteCarlo system
 #     dependent modules for the sun4u architecture.
@@ -33,8 +30,6 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE		= ../..
-GROUP		= sys
-CHGRP		= /usr/bin/chgrp -h
 
 #
 #	Include common rules.
@@ -76,14 +71,12 @@ se.conf:	$(ROOT_MONTECARLO_DRV_DIR)
 		$(CP) $(UTSBASE)/sun4u/montecarlo/io/$@ \
 		$(ROOT_MONTECARLO_DRV_DIR)/$@
 		$(CHMOD) $(CFILEMODE) $(ROOT_MONTECARLO_DRV_DIR)/$@
-		$(CHGRP) $(GROUP) $(ROOT_MONTECARLO_DRV_DIR)/$@
 
 ttymux.conf:	$(ROOT_MONTECARLO_DRV_DIR)
 		-@$(RM) $(ROOT_MONTECARLO_DRV_DIR)/$@
 		$(CP) $(UTSBASE)/sun4u/montecarlo/io/$@ \
 		$(ROOT_MONTECARLO_DRV_DIR)/$@
 		$(CHMOD) $(CFILEMODE) $(ROOT_MONTECARLO_DRV_DIR)/$@
-		$(CHGRP) $(GROUP) $(ROOT_MONTECARLO_DRV_DIR)/$@
 
 install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)

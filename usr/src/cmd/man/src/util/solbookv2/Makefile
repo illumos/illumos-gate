@@ -20,12 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Makefile for cmd/man/src
 #
 
 include		../../../../Makefile.cmd
@@ -41,7 +37,6 @@ SOLBOOKV2DIR =  $(SGMLDTDDIR)/solbookv2
 
 ROOTSOLBOOKV2 = $(SOLBOOKV2:%=$(SOLBOOKV2DIR)/%)
 
-GROUP =		bin
 FILEMODE = 	0644
 
 .KEEP_STATE :

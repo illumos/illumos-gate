@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = fsstat
@@ -39,7 +37,6 @@ COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 LDLIBS += -lkstat
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
 FILEMODE= 0555
-GROUP= bin
 
 lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)
 

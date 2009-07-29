@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # There should be a mapfile here
@@ -39,32 +37,20 @@ CFLAGS		+= $(CCVERBOSE)
 DYNFLAGS	+= $(ZNOLAZYLOAD)
 
 ROOTLIBDIR := DIRMODE=	0755
-ROOTLIBDIR := OWNER=		root
-ROOTLIBDIR := GROUP=		sys
 
 FILEMODE=	0755
 DIRMODE=	0755
-OWNER=		root
-GROUP=		sys
 
 ROOT_PLATFORM := DIRMODE= 0755
-ROOT_PLATFORM := OWNER= root
-ROOT_PLATFORM := GROUP= sys
 
 ROOT_PLAT_LIBDIR = $(ROOT_PLATFORM)/lib
 ROOT_PLAT_LIBDIR := DIRMODE= 0755
-ROOT_PLAT_LIBDIR := OWNER= root
-ROOT_PLAT_LIBDIR := GROUP= bin
 
 ROOT_PLAT_PICLDIR = $(ROOT_PLAT_LIBDIR)/picl
 ROOT_PLAT_PICLDIR := DIRMODE= 0755
-ROOT_PLAT_PICLDIR := OWNER= root
-ROOT_PLAT_PICLDIR := GROUP= sys
 
 ROOT_PLAT_PLUGINDIR = $(ROOT_PLAT_PICLDIR)/plugins
 ROOT_PLAT_PLUGINDIR := DIRMODE= 0755
-ROOT_PLAT_PLUGINDIR := OWNER= root
-ROOT_PLAT_PLUGINDIR := GROUP= sys
 
 USR_LIB_PICLDIR = $(ROOT)/usr/lib/picl
 USR_LIB_PLUGINDIR = $(USR_LIB_PICLDIR)/plugins

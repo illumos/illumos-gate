@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -105,8 +105,6 @@ MINIROOT_DESCRIPTIONS= \
 	../../nscd/name-service-cache.xml \
 	../../syslogd/system-log.xml
 
-OWNER = root
-GROUP = sys
 FILEMODE = 0600
 SEEDFILEMODE = 0444		# seeds are not intended for editing, but may
 				# be copied

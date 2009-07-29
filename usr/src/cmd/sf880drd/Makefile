@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/sf880drd/Makefile
 #
@@ -44,8 +42,6 @@ LDLIBS += -lcfgadm
 PSMPROG = $(USR_PSM_LIB_DIR)/$(PROG)
 
 $(PSMPROG) :=	FILEMODE = 0755
-$(PSMPROG) :=	OWNER = root
-$(PSMPROG) :=	GROUP = sys
 
 .KEEP_STATE:
 
@@ -71,7 +67,6 @@ $(USR_PSM_LIB_DIR):	$(USR_PSM_DIR)
 $(USR_PSM_LIB_DIR)/%:		% $(USR_PSM_LIB_DIR)
 	$(INS.file)
 	cd $(USR_PLAT_DIR)/$(LINKED_PLATFORM)/lib; $(RM) $(PROG); \
-	$(SYMLINK) ../../$(PLATFORM)/lib/$(PROG) $(PROG) $(CHOWNLINK) \
-	$(CHGRPLINK)
+	$(SYMLINK) ../../$(PLATFORM)/lib/$(PROG) $(PROG)
 
 include ../Makefile.targ

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= libpcp.a
@@ -51,9 +49,9 @@ LIBS = $(DYNLIB) $(LINTLIB)
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc -lumem -ldevinfo
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib
-INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink8=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/llib-lpcp.ln $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so.1 $@
+INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so $@
+INS.slink8=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/llib-lpcp.ln $@
 
 .KEEP_STATE:
 

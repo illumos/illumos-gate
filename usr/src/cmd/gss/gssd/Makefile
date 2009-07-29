@@ -67,9 +67,6 @@ ROOTLIB=	$(ROOT)/usr/lib/gss
 
 DIRS=	$(ROOTLIB)
 
-$(ROOTLIB)/gssd :=	OWNER=	root
-$(ROOTLIB)/gssd :=	GROUP=	bin
-
 CPPFLAGS += -I$(SRC)/uts/common/gssapi/include
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 

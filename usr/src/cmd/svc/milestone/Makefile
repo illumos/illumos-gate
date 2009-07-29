@@ -25,8 +25,6 @@
 
 include ../../Makefile.cmd
 
-OWNER = root
-GROUP = sys
 FILEMODE = 0444
 
 BUILTXML= \

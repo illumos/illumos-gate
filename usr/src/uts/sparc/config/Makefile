@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,10 +20,8 @@
 #
 #
 # uts/sparc/config/Makefile
-# Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the kernel configuration files.
 #
@@ -50,8 +47,6 @@ CONFIGFILES	= name_to_major minor_perm driver_aliases name_to_sysnum \
 		  driver_classes dacf.conf $(PATH2INST)
 SECCONFIG	= device_policy priv_names
 FILEMODE	= 644
-OWNER		= root
-GROUP		= sys
 ROOTETC		= $(ROOT)/etc
 ROOTETCSEC	= $(ROOTETC)/security
 
@@ -74,7 +69,6 @@ install: all $(ROOTCONFIGFILES)
 #     etc/path_to_inst has permissions different from the other config files
 #
 $(ROOTETC)/$(PATH2INST):= FILEMODE=444
-$(ROOTETC)/$(PATH2INST):= GROUP=root
 
 $(ROOTETC)/%: $(SRCDIR)/%
 	$(INS.file)

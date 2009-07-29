@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile definitions for Domain Configuration Server (DCS)
 #
@@ -74,8 +72,6 @@ LINT_FILES=	$(LINT_SRCS:%.c=%.ln)
 POFILES=	dcs_msg.po
 
 $(ROOTLIBPROG) :=	FILEMODE=	0755
-$(ROOTLIBPROG) :=	OWNER=		root
-$(ROOTLIBPROG) :=	GROUP=		bin
 
 ROOTMANIFESTDIR=	$(ROOTSVCPLATFORMSUN4U)
 

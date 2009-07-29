@@ -41,8 +41,6 @@ MANIFEST    = fcoe_target.xml
 SVCMETHOD   = svc-fcoet
 
 ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)
-$(ROOTSVCSYSTEM)/fcoe_target.xml	:= OWNER = root
-$(ROOTSVCSYSTEM)/fcoe_target.xml	:= GROUP = bin
 $(ROOTSVCSYSTEM)/fcoe_target.xml	:= FILEMODE = 0444
 
 .KEEP_STATE:

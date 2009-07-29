@@ -44,7 +44,6 @@ CFLAGS64	+= $(CCVERBOSE)
 LDLIBS		+= -lcurses -ldtrace -lkstat
 
 FILEMODE	= 0555
-GROUP		= bin
 
 CLEANFILES	+= $(COMMON_OBJS)
 

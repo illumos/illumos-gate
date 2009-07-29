@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/devfsadm/Makefile
@@ -48,10 +45,6 @@ lint	:=	TARGET= lint
 ROOTETCDEV=	$(ROOTETC)/dev
 ROOTETCDEVFILES=$(ETCDEVFILES:%=$(ROOTETCDEV)/%)
 $(ROOTETCDEV) :=	DIRMODE=	755
-$(ROOTETCDEV) :=	OWNER=          root
-$(ROOTETCDEV) :=	GROUP=          sys
-$(ROOTETCDEVFILES) :=	OWNER = root
-$(ROOTETCDEVFILES) :=	GROUP = sys
 $(ROOTETCDEVFILES) :=	FILEMODE = 0644
 
 .KEEP_STATE:

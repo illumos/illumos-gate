@@ -18,18 +18,13 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG= strchg strconf
 
 include ../../Makefile.cmd
-
-OWNER= root
-GROUP= root
 
 .KEEP_STATE:
 

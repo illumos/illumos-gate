@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -94,7 +92,7 @@ $(LW2PLUS_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(LW2PLUS_PLAT_LINKS_2):
-	$(RM) $@; $(SYMLINK) $(LINKS2DESTDIR)/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) $@; $(SYMLINK) $(LINKS2DESTDIR)/$(@F) $@
 
 $(LW2PLUS_CRYPTO_LINKS): $(ROOT_LW2PLUS_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_LW2PLUS_CRYPTO_DIR_64)/$@;

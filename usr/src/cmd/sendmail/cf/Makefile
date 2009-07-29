@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/sendmail/cf/Makefile
 #
@@ -130,9 +128,6 @@ SCRIPTS=	$(ROOTUSRSBIN)/check-hostname \
 
 FILEMODE=	444
 M4FLAGS=	-DSUN_HIDE_INTERNAL_DETAILS
-
-$(BUILDPARTS) := OWNER=root
-$(BUILDPARTS) := GROUP=mail
 
 .KEEP_STATE:
 

@@ -1,8 +1,6 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/backup/dump/Makefile
 #
@@ -79,14 +77,9 @@ UFSROOTLINK=		$(UFSROOTUSRSBIN)/$(PROG)
 LINKVALUE=		../lib/fs/$(FSTYPE)/$(PROG)
 LIBDIR=			$(UFSROOTUSRLIBFS)/$(FSTYPE)
 $(UFSROOTDUMPDATES):=	FILEMODE=	0664
-$(UFSROOTDUMPDATES):=	OWNER=		root
-$(UFSROOTDUMPDATES):=	GROUP=		sys
 $(LIBDIR):=		DIRMODE=	0755
-$(LIBDIR):=		OWNER=		root
-$(LIBDIR):=		GROUP=		sys
 
 FILEMODE=	04555
-OWNER=		root
 
 .KEEP_STATE:
 

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../../Makefile.cmd
@@ -76,8 +74,6 @@ $(ROOTETCINITD)/README :=	FILEMODE = 0644
 $(ROOTETCRCSD)/README :=	FILEMODE = 0644
 $(ROOTETCRC2D)/README :=	FILEMODE = 0644
 $(ROOTETCRC3D)/README :=	FILEMODE = 0644
-OWNER = root
-GROUP = sys
 
 .KEEP_STATE:
 

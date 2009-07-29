@@ -146,10 +146,9 @@ SOFT_PSR64_LINKS = \
 	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/$(MACH64)/$(MODULE))
 
 INS.slink6 = $(RM) -r $@; \
-	$(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@
 INS.slink64 = $(RM) -r $@; \
-	$(SYMLINK) ../../../$(PLATFORM)/lib/$(MACH64)/$(MODULE) \
-	$@ $(CHOWNLINK) $(CHGRPLINK)
+	$(SYMLINK) ../../../$(PLATFORM)/lib/$(MACH64)/$(MODULE) $@
 
 $(SOFT_PSR_DIRS) \
 $(SOFT_PSR64_DIRS):

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/sun4u/opl/sys/Makefile
 #
@@ -39,8 +37,6 @@ include ../Makefile.opl
 # Override defaults.
 #
 FILEMODE	 = 644
-OWNER = bin
-GROUP = bin
 
 HDRS=		opl_hwdesc.h
 

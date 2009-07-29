@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libpiclwd.a
@@ -44,8 +42,6 @@ ROOT_PLATFORM = $(USR_PLAT_DIR)/SUNW,Netra-CP2300
 CLEANFILES=	$(LINTOUT) $(LINTLIB)
 
 ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
-ROOTLIBDIR	:= OWNER = root
-ROOTLIBDIR	:= GROUP = sys
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRC)/uts/sun4u/sys -I$(SRC)/uts/common

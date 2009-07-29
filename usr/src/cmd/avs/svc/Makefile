@@ -46,8 +46,6 @@ $(SHFILES): $(XML:%=manifest/%)
 	$(RM) $(@F)
 	$(CP) $(@F:%=manifest/%) .
 
-OWNER = root
-GROUP = sys
 FILEMODE = 0444
 
 $(ROOTSVCSYSFILES): $(SHFILES)

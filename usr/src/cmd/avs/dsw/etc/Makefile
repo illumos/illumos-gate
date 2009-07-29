@@ -30,8 +30,6 @@ SHFILES = ii ii.cluster
 ROOTINIT_D = $(ROOTETC)/init.d
 USRTOOL_D = $(ROOTUSRTOOLS)
 
-OWNER = root
-GROUP = sys
 FILEMODE = 0744
 
 ROOTINIT_DPROG = $(ROOTINIT_D)/ii

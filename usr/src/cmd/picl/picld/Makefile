@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		picld
@@ -36,8 +34,6 @@ ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 ROOTLIBPICLD= 		$(ROOTLIB)/picl
 ROOTLIBPICLDDAEMON=	$(PROG:%=$(ROOTLIBPICLD)/%)
 
-$(ROOTLIBPICLD) := OWNER= root
-$(ROOTLIBPICLD) := GROUP= sys
 $(ROOTLIBPICLD) := FILEMODE= 755
 
 CPPFLAGS += -I../../../lib/libpicltree -I../../../lib/libpicl

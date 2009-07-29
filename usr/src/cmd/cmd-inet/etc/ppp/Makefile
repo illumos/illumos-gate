@@ -38,9 +38,6 @@ ETCPEERSDIR=	$(ETCPPPDIR)/peers
 ETCPPPPROG=	$(ETCPROG:%=$(ETCPPPDIR)/%) $(ETCPEERS:%=$(ETCPEERSDIR)/%)
 ETCPPPPROGROOT=	$(ETCPROGROOT:%=$(ETCPPPDIR)/%)
 
-OWNER=		root
-GROUP=		sys
-
 # This is here to allow the make command to override this value;
 # setting it to 0644 simplifies packaging.
 SECRETSMODE=	0600

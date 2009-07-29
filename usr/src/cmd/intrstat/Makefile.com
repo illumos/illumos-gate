@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = intrstat
@@ -36,7 +34,6 @@ CFLAGS64 += $(CCVERBOSE)
 LDLIBS += -ldtrace
 
 FILEMODE = 0555
-GROUP = bin
 
 CLEANFILES += $(OBJS)
 

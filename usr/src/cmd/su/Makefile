@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # build two versions, su and su.static
 # su.static is dynamically linked; the .static suffix is historical.
@@ -40,8 +38,6 @@ PROG_STATIC = $(ROOTSBIN)/$(ROOTFS_PROG)
 
 # set /usr/bin/su to 4555; set /sbin/su.static to 0555
 FILEMODE =	04555
-
-GROUP =		sys
 
 $(PROG_STATIC) := FILEMODE = 0555
 

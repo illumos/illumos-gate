@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= iscsitgtd
@@ -46,8 +44,6 @@ MANIFEST	= iscsi_target.xml
 SVCMETHOD	= svc-iscsitgt
 
 ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)
-$(ROOTSVCSYSTEM)/iscsi_target.xml	:= OWNER = root
-$(ROOTSVCSYSTEM)/iscsi_target.xml	:= GROUP = bin
 $(ROOTSVCSYSTEM)/iscsi_target.xml	:= FILEMODE = 0444
 
 DLIBSRCS = iscsi.d

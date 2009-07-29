@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -70,22 +70,16 @@ clean clobber delete: $(SUBDIRS)
 
 ROOTETCSECURITY = 	$(ROOT)/etc/security
 $(ROOTETCSECURITY) := 	DIRMODE = 0755
-$(ROOTETCSECURITY) := 	OWNER = root
-$(ROOTETCSECURITY) := 	GROUP = sys
 
 ESFILES =		audit_class audit_control audit_event audit_user
 ESSRC =			$(ESFILES:%=%.txt)
 ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
 $(ETCSECURITYFILES) :=	FILEMODE = 0644
-$(ETCSECURITYFILES) :=	OWNER = root
-$(ETCSECURITYFILES) :=	GROUP = sys
 
 EESFILES =		audit_startup
 EESSRC =		$(EESFILES:%=%.txt)
 EETCSECURITYFILES =	$(EESFILES:%=$(ROOTETCSECURITY)/%)
 $(EETCSECURITYFILES) :=	FILEMODE = 0744
-$(EETCSECURITYFILES) :=	OWNER = root
-$(EETCSECURITYFILES) :=	GROUP = sys
 
 #
 # /etc/security/audit/localhost/files is a symbolic link to /var/audit.
@@ -96,8 +90,6 @@ RESAL=$(RESA)/localhost
 VARAUDIT=$(ROOT)/var/audit
 AUDITDIRS=$(RESA) $(RESAL) $(VARAUDIT)
 $(AUDITDIRS) := FILEMODE = 0750
-$(AUDITDIRS) := OWNER = root
-$(AUDITDIRS) := GROUP = sys
 
 ARSYMLNK=$(RESAL)/files
 
@@ -121,12 +113,8 @@ ROOTXMLDIRS =	$(ROOTXMLDIR) $(ROOTDTDDIR) $(ROOTXSLDIR)
 ROOTXMLFILES =	$(ROOTDTD) $(ROOTXSL)
 
 $(ROOTXMLDIRS) :=  FILEMODE = 755
-$(ROOTXMLDIRS) :=  OWNER = root
-$(ROOTXMLDIRS) :=  GROUP = sys
 
 $(ROOTXMLFILES) :=  FILEMODE = 444
-$(ROOTXMLFILES) :=  OWNER = root
-$(ROOTXMLFILES) :=  GROUP = bin
 
 
 CPPFLAGS += -I$(COMMONDIR)

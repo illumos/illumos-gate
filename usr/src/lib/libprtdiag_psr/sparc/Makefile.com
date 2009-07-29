@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= libprtdiag_psr.a
@@ -57,7 +55,7 @@ IFLAGS +=	-I $(UTSCLOSED)/sun4u/sunfire -I $(UTSBASE)/sun4u/sunfire
 CPPFLAGS =	$(IFLAGS) $(CPPFLAGS.master)
 LDLIBS +=	-L $(ROOT)/usr/platform/$(PSR_MACH)/lib -lprtdiag -lc
 DYNFLAGS +=	-R /usr/platform/$(PSR_MACH)/lib
-INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libprtdiag_psr.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libprtdiag_psr.so.1 $@
 
 .KEEP_STATE:
 

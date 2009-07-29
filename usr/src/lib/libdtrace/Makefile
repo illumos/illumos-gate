@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -45,8 +43,6 @@ yydebug := TARGET = yydebug
 all clean clobber lint yydebug: $(SUBDIRS)
 
 install: install_h $(SUBDIRS)
-
-$(ROOTHDRS) := GROUP = bin
 
 install_h: $(ROOTHDRS)
 

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include 	./Makefile.lp
@@ -81,8 +79,6 @@ $(ROOTVARSP)/lp :=		DIRMODE = 775
 $(ROOTVARSP)/lp/admins :=	DIRMODE = 775
 $(ROOTVARSP)/lp/requests :=	DIRMODE = 775
 $(ROOTVARSP)/lp/system :=	DIRMODE = 775
-$(LPOWNSDIRS) :=		OWNER = lp
-$(LPOWNSDIRS) :=		GROUP = lp
 $(ROOTLIB)/print :=		DIRMODE = 0755
 
 POFILE= lp.po

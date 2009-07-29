@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/ufs/Makefile.ufs
@@ -61,7 +59,6 @@ USR_SBIN_INSTALLBOOT	= $(USR_SBIN)/$(INSTALLBOOT)
 # Overrides for installing installboot.
 #
 INS.file.555		= $(RM) $@; $(INS) -s -m 555 -f $(@D) $<
-$(CH)INS.file.555	= $(INS) -s -m 555 -u $(OWNER) -g $(GROUP) -f $(@D) $<
 
 %.fcode:	$(UFS_DIR)/%.fth
 	$(TOKENIZE) $<

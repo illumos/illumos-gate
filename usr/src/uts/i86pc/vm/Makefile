@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/i86pc/vm/Makefile
 #
@@ -37,7 +35,6 @@ include ../Makefile.i86pc
 # Override defaults.
 #
 FILEMODE = 644
-GROUP = bin
 
 HDRS=		hat_i86.h hat_pte.h hment.h htable.h kboot_mmu.h
 
@@ -70,7 +67,7 @@ $(ROOTDIRS):
 
 # -r because this used to be a directory and is now a link.
 $(ROOTLINK):    $(ROOTDIRS)
-	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@ $(CHOWNLINK) $(CHGRPLINK)
+	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@
 
 CLEANFILES=
 

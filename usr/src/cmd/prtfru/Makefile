@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/prtfru/Makefile
 #
@@ -40,8 +38,6 @@ LINTFLAGS += -u
 EXTRA_LDLIBS    = -lfru -lfrureg -lfruutils
 
 FILEMODE = 755
-OWNER    = root
-GROUP    = bin
 
 .KEEP_STATE:
 

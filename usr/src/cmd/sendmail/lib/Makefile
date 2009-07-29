@@ -41,7 +41,6 @@ ROOTETCMAILSYMLINKS =	$(ROOTETCMAIL)/sendmail.hf
 
 # conditional assignments
 $(ROOTETCMAILF) :=	FILEMODE =	644
-$(ROOTETCMAILF) :=	OWNER =		root
 
 .KEEP_STATE:
 

@@ -22,10 +22,8 @@
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 COMMON_STOPLST="27boot.server"
@@ -35,9 +33,6 @@ INSDIR=${ROOT}/etc/rc0.d
 if [ ! -d ${INSDIR} ]
 then
 	mkdir ${INSDIR}
-	eval ${CH}chmod 755 ${INSDIR}
-	eval ${CH}chgrp sys ${INSDIR}
-	eval ${CH}chown root ${INSDIR}
 fi 
 for f in ${COMMON_STOPLST}
 do 

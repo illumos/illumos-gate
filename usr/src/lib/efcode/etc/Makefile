@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Efcode cleanup
@@ -50,15 +47,9 @@ DIRS=   $(ETCFLASHD) $(ETCFLASHPOSTD)
 
 ETCFLASHPOSTDPROG= $(FLASHPOSTDPROG:%=$(ETCFLASHPOSTD)/%)
 
-$(ETCFLASHD)			:= DIRMODE=		755
-$(ETCFLASHD)			:= OWNER=		root
-$(ETCFLASHD)			:= GROUP=		sys
-$(ETCFLASHPOSTD)		:= DIRMODE=		755
-$(ETCFLASHPOSTD)		:= OWNER=		root
-$(ETCFLASHPOSTD)		:= GROUP=		sys
+$(ETCFLASHD)		:= DIRMODE=	755
+$(ETCFLASHPOSTD)	:= DIRMODE=	755
 $(ETCFLASHPOSTDPROG)	:= FILEMODE=	0744
-$(ETCFLASHPOSTDPROG)	:= OWNER=		root
-$(ETCFLASHPOSTDPROG)	:= GROUP=		sys
 
 .KEEP_STATE:
 

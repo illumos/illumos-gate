@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -42,7 +42,6 @@ LIBSHELLSRC=$(LIBSHELLBASE)/common/sh
 
 SRCS=	$(OBJECTS:%.o=$(LIBSHELLSRC)/%.c)
 
-GROUP= bin
 LDLIBS += -lshell
 
 # Set common AST build flags (e.g., needed to support the math stuff).

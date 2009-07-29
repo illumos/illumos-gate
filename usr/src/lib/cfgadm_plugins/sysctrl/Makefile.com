@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/lib/cfgadm_plugins/Makefile.com
@@ -37,9 +35,7 @@ OBJECTS= cfga.o
 include $(SRC)/lib/Makefile.lib
 
 INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
-$(CH)INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) -u root -g sys $@
 INS.dir.root.bin=	$(INS) -s -d -m $(DIRMODE) $@
-$(CH)INS.dir.root.bin=	$(INS) -s -d -m $(DIRMODE) -u root -g bin $@
 
 USR_PLAT_DIR		= $(ROOT)/usr/platform
 USR_PSM_DIR		= $(USR_PLAT_DIR)/sun4u

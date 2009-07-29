@@ -41,41 +41,33 @@ _msg:=		TARGET= _msg
 
 ROOTETC = 		$(ROOT)/etc
 ROOTETCSECURITY =	$(ROOTETC)/security
-$(ROOTETCSECURITY) :=	GROUP = sys
 
 EFILES =	user_attr
 EFILESRC =	$(EFILES:%=%)
 ETCFILES =	$(EFILES:%=$(ROOTETC)/%)
-$(ETCFILES) :=	GROUP = sys
 
 ESFILES =		auth_attr exec_attr prof_attr policy.conf
 ESSRC =			$(ESFILES:%=%)
 ETCSECURITYFILES =	$(ESFILES:%=$(ROOTETCSECURITY)/%)
-$(ETCSECURITYFILES) :=	GROUP = sys
 
 MFSTFILES =	rbac.xml
 MANIFESTDIR =	$(ROOT)/var/svc/manifest/system
 MANIFEST =	$(MFSTFILES:%=$(MANIFESTDIR)/%)
 $(MANIFEST) :=	FILEMODE = 0444
-$(MANIFEST) :=	GROUP = sys
 
 METHODFILES =	svc-rbac
 METHODDIR =	$(ROOT)/lib/svc/method
 METHOD =	$(METHODFILES:%=$(METHODDIR)/%)
 $(METHOD) :=	FILEMODE = 0555
-$(METHOD) :=	GROUP = bin
 
 SCRIPTS =		i.rbac r.rbac
 CLASS_SCR_SRC_DIR =	$(SRC)/pkgdefs/common_files
 INSTALL_DIR =		$(ROOT)/usr/sadm/install
-$(INSTALL_DIR) :=	GROUP = bin
 
 CLASS_SCR_DIR =		$(INSTALL_DIR)/scripts
-$(CLASS_SCR_DIR) :=	GROUP = bin
 
 CLASS_SCR_FILES =	$(SCRIPTS:%=$(CLASS_SCR_DIR)/%)
 $(CLASS_SCR_FILES) :=	FILEMODE = 0555
-$(CLASS_SCR_FILES) :=	GROUP = sys
 
 all clean clobber delete install lint package: $(SUBDIRS)
 _msg: $(MSGSUBDIRS)

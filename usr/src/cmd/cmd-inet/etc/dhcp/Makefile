@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/cmd-inet/etc/dhcp/Makefile
@@ -35,7 +32,6 @@ ETCDHCPDIR=	$(ROOTETC)/dhcp
 ETCDHCPFILES=	$(DHCPFILES:%=$(ETCDHCPDIR)/%)
 
 FILEMODE=	0644
-GROUP=		sys
 
 .KEEP_STATE:
 

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= login
@@ -39,9 +37,7 @@ LOGINDEVPERMSRC= $(LOGINDEVPERM).sh
 ROOTLOGINDEVPERM= $(LOGINDEVPERM:%=$(ROOTETC)/%)
 
 $(ROOTLOGINDEVPERM) := FILEMODE = 644
-$(ROOTLOGINDEVPERM) := GROUP = sys
 FILEMODE= 4555
-OWNER= root
 
 CLOBBERFILES +=	$(LOGINDEVPERM) $(ONC_SRCS)
 

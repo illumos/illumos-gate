@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -81,8 +79,6 @@ ROOTDIRS =	$(ROOT)/usr/sadm/admin \
 ROOTLIBDIR =	$(ROOT)/usr/sadm/admin/printmgr/lib
 ROOTLIBS=       $(LIBS:%=$(ROOTLIBDIR)/%)
 
-$(ROOTLINKS):=	OWNER = root
-$(ROOTLINKS):=	GROUP = lp
 
 # Following variables define where to find header files
 CPPFLAGS +=	-I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris -I.

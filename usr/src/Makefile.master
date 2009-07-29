@@ -28,20 +28,9 @@
 #
 ROOT=		/proto
 
-# Historically, ON builds were always done with root permissions, and the
-# owner/group information was duplicated in the Makefiles and the packaging
-# data and kept in sync by manual intervention.  This is no longer true.
-# The only source of this information is packaging.  The proto area ($ROOT)
-# does not have definitive onwer/group information, and no Makefile should
-# attempt to set this.  CH once toggled operations restricted to root.  It
-# is now just set to `#'.
 #
-# At some point in the future, CH, CHOWN, CHGRP, OWNER, and GROUP should all
-# be stripped completely from the source base.  They are kept for now until
-# on10-based projects can merge and transition away from them.
-#
-# RELEASE_BUILD should be cleared for final release builds. This is completely
-# independent of CH. NOT_RELEASE_BUILD is exactly what the name implies.
+# RELEASE_BUILD should be cleared for final release builds.
+# NOT_RELEASE_BUILD is exactly what the name implies.
 #
 # INTERNAL_RELEASE_BUILD is a subset of RELEASE_BUILD. It mostly controls
 # identification strings. Enabling RELEASE_BUILD automatically enables
@@ -71,7 +60,6 @@ ROOT=		/proto
 # cause a noticable slowdown in build times.
 #
 POUND_SIGN:sh=				echo \\043
-CH=					$(POUND_SIGN)
 
 NOT_RELEASE_BUILD=
 INTERNAL_RELEASE_BUILD=			$(POUND_SIGN)
@@ -137,8 +125,6 @@ TRUE=		true
 SYMLINK=	/usr/bin/ln -s
 LN=		/usr/bin/ln
 CHMOD=		/usr/bin/chmod
-CHOWN=		$(TRUE)
-CHGRP=		$(TRUE)
 MV=		/usr/bin/mv -f
 RM=		/usr/bin/rm -f
 CUT=		/usr/bin/cut
@@ -186,13 +172,6 @@ UNIQ=		/usr/bin/uniq
 
 FILEMODE=	644
 DIRMODE=	755
-
-# Note: owner and group for proto area objects is no longer set by
-# Makefiles at all.  These have no real effect and are kept here for
-# transition purposes.  They (along with CH, CHOWN, and CHGRP) should be
-# removed early in the s11 development cycle.
-OWNER=		root
-GROUP=		bin
 
 #
 # The version of the patch makeup table optimized for build-time use.  Used

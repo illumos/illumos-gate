@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/bnu/Makefile
@@ -65,8 +62,6 @@ POFILES =	$(PROG:%=%.cat)
 
 CPPFLAGS =	-I. $(SMALLFLAG) $(CPPFLAGS.master) # -DSMALL
 
-OWNER =		uucp
-GROUP =		uucp
 FILEMODE =	4511
 
 # if you change these directories, change them in uucp.h as well
@@ -120,22 +115,15 @@ REMOTESYMDEST =	../../usr/lib/uucp
 $(USERPROG1) := CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 # Mode is assigned in Targetdirs.  It shoudn't be re-assigned here
-#$(ROOTSPPUB) :=				DIRMODE = 1777
 $(USERPROG1:%=$(ROOTBIN)/%) :=		FILEMODE = 0555
-$(USERPROG1:%=$(ROOTBIN)/%) :=		OWNER = root
 $(ROOTSHELLS) :=			FILEMODE = 0555
-$(ROOTSHELLS) :=			OWNER = root
 $(ROOTLIBSHELLS) :=			FILEMODE = 0555
-$(ROOTLIBSHELLS) :=			OWNER = root
 $(UUCPPROG1:%=$(ROOTLIBUUCP)/%) :=	FILEMODE = 0510
 $(ROOTCRONTAB) :=			FILEMODE = 0444
-$(ROOTCRONTAB) :=			OWNER = root
 $(ROOTFILES) :=				FILEMODE = 0644
 $(ROOTETCUUCP)/Permissions :=		FILEMODE = 0600
 $(ROOTETCUUCP)/Systems :=		FILEMODE = 0600
-$(ROOTBIN)/ct :=			OWNER = root
 $(ROOTSPROG) :=				FILEMODE = 0555
-$(ROOTSPROG) :=				OWNER = root
 
 include		./Makefile.inc
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -44,8 +44,6 @@ MANIFEST    = stmf.xml
 SVCMETHOD   = svc-stmf
 
 ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)
-$(ROOTSVCSYSTEM)/stmf.xml	:= OWNER = root
-$(ROOTSVCSYSTEM)/stmf.xml	:= GROUP = bin
 $(ROOTSVCSYSTEM)/stmf.xml	:= FILEMODE = 0444
 
 .KEEP_STATE:

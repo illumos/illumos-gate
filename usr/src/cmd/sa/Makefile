@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/sa/Makefile
 #
@@ -89,13 +87,7 @@ ENTRY3=		'$(COMMENT_CHAR) 5 18 * * 1-5 /usr/lib/sa/sa2 -s 8:00 -e 18:01 -i 1200 
 CLOBBERFILES=	$(PROGS) $(SHELLS)
 
 # Conditionals
-$(SYSCRONTAB)		:= OWNER = root
-$(SYSCRONTAB)     	:= GROUP = sys
-$(ROOTBIN)/$(TIMEX)	:= GROUP = sys
-# $(ROOTUSRSBIN)/$(SADP) 	:= FILEMODE = 2555
-# $(ROOTUSRSBIN)/$(SADP) 	:= GROUP = sys
 $(LIBSAD)/$(SADC) 	:= FILEMODE = 0555
-$(LIBSAD)/$(SADC) 	:= GROUP = bin
 
 .KEEP_STATE:
 

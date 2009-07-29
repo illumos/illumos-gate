@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libpcp/sparc/Makefile
@@ -53,7 +52,7 @@ include ../Makefile.com
 #
 
 $(PLATLIBS)/libpcp.so:
-	$(RM) -r $@; $(SYMLINK) libpcp.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) -r $@; $(SYMLINK) libpcp.so.1 $@
 
 $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(INS.file)

@@ -31,10 +31,6 @@ BINPROGS = dscfg_reconfigure.cluster
 SHFILES = $(INITPROGS) $(BINPROGS)
 ROOTINIT_D = $(ROOTETC)/init.d
 
-OWNER = root
-GROUP = sys
-
-
 ROOTBINPROGS= $(BINPROGS:%=$(ROOTBIN)/%)
 ROOTINITPROGS= $(INITPROGS:%=$(ROOTINIT_D)/%)
 

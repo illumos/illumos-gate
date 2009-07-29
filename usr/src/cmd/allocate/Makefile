@@ -90,14 +90,8 @@ SRCS =		$(OBJS:%.o=%.c)
 
 $(ROOTUSRSBIN)/% :=	FILEMODE = 555
 $(ROOTUSRSBIN)/allocate :=	FILEMODE = 4555
-$(ROOTUSRSBIN)/% :=     OWNER = root 
-$(ROOTUSRSBIN)/% :=     GROUP = bin 
 $(ROOTSECDEV)/% :=	FILEMODE = 0400
-$(ROOTSECDEV)/% :=	OWNER = root
-$(ROOTSECDEV)/% :=	GROUP = bin
 $(ROOTSECLIB)/% :=	FILEMODE = 0555
-$(ROOTSECLIB)/% :=	OWNER = root
-$(ROOTSECLIB)/% :=	GROUP = sys
 
 lint :=			LDLIBS += -lbsm -lsec -lsecdb -ldevinfo -ltsol
 

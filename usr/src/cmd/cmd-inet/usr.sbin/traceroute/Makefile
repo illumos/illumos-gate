@@ -1,8 +1,6 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #  Copyright (c) 1988, 1989, 1990, 1991, 1992, 1995, 1996, 1997
@@ -33,7 +31,6 @@ SRCS=		$(OBJS:.o=.c)
 include	../../../Makefile.cmd
 
 $(ROOTUSRSBIN)/traceroute	:=	FILEMODE= 04555
-$(ROOTUSRSBIN)/traceroute	:=	OWNER= root
 
 # Traceroute uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to

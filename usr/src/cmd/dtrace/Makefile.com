@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = dtrace
@@ -37,7 +35,6 @@ CFLAGS64 += $(CCVERBOSE)
 LDLIBS += -ldtrace -lproc -lctf -lelf
 
 FILEMODE = 0555
-GROUP = bin
 
 CLEANFILES += $(OBJS)
 

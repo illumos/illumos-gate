@@ -19,11 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #
 # uts/sun4u/makaha/Makefile
 #
@@ -35,8 +32,6 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE		= ../..
-GROUP		= sys
-CHGRP		= /usr/bin/chgrp -h
 
 #
 #	Include common rules.
@@ -84,7 +79,6 @@ acebus.conf:	$(ROOT_MAKAHA_DRV_DIR)
 		$(CP) $(UTSBASE)/sun4u/makaha/io/$@ \
 		$(ROOT_MAKAHA_DRV_DIR)/$@
 		$(CHMOD) $(CFILEMODE) $(ROOT_MAKAHA_DRV_DIR)/$@
-		$(CHGRP) $(GROUP) $(ROOT_MAKAHA_DRV_DIR)/$@
 
 pcf8574:	$(ROOT_MAKAHA_DRV_DIR_64)
 		-@$(RM) $(ROOT_MAKAHA_DRV_DIR_64)/$@

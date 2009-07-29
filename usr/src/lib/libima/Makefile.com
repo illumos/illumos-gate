@@ -34,8 +34,6 @@ include ../../Makefile.lib
 
 IETCFILES=	$(CONFIGFILE:%=$(ROOTETC)/%)
 IETCFILES:=	FILEMODE= 644
-IETCFILES:=	OWNER= root
-IETCFILES:=	GROUP= sys
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc

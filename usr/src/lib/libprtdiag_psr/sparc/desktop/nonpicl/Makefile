@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libprtdiag_psr/sparc/desktop/nonpicl/Makefile
 
@@ -79,7 +77,7 @@ $(USR_PSM_LIB_DIR):
 #
 $(USR_DEF_PSM_LIB_DIR)/%: % $(USR_DEF_PSM_LIB_DIR)
 	$(RM) -r $@; \
-	$(SYMLINK) ../../$(PLATFORM)/lib/libprtdiag_psr.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(SYMLINK) ../../$(PLATFORM)/lib/libprtdiag_psr.so.1 $@
 
 $(USR_DEF_PSM_LIB_DIR):
 	cd $(UTSBASE)/sun4u; $(MAKE) $(USR_DEF_PSM_LIB_DIR)

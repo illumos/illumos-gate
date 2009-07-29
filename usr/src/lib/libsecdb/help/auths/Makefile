@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libsecdb/help/auths/Makefile
@@ -176,8 +176,6 @@ MSGFILES=	$(HTMLENTS)
 MSGS=		$(MSGFILES:%=$(MSGDIR)/%)
 
 FILEMODE= 0444
-$(HELPFILES) := OWNER = root
-$(HELPFILES) := GROUP = bin
 
 .KEEP_STATE:
 

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =		mod_ipp.a
@@ -41,8 +39,6 @@ ROOTDIRS =	$(ROOT)/usr/apache $(APACHEMODDIR) $(APACHECONFDIR) \
 
 $(ROOT)/var/lp:=	DIRMODE = 775
 $(ROOT)/var/lp:=	FILEMODE = 775
-$(ROOT)/var/lp:=	OWNER = lp
-$(ROOT)/var/lp:=	GROUP = lp
 
 LIBS =			$(DYNLIB)
 
@@ -75,8 +71,6 @@ $(APACHECONFFILE)         := FILEMODE= 644
 LISTENERFILE=	$(LISTENERDIR)/index.html
 $(LISTENERFILE)         := FILEMODE= 444
 
-$(ROOT)/var/lp:=	OWNER = lp
-$(ROOT)/var/lp:=	GROUP = lp
 $(ROOT)/var/lp:=	FILEMODE = 0775
 
 $(APACHEMODDIR)/$(LIBLINKS):=	FILEMODE = 0555

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = iscsitgtd
@@ -51,8 +49,6 @@ NATIVE_CFLAGS += $(CTF_FLAGS)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE=1 -I/usr/include/libxml2
 CFLAGS64 +=	$(CCVERBOSE)
-
-GROUP = sys
 
 CLEANFILES += $(OBJS) ../$(DTRACE_HEADER)
 

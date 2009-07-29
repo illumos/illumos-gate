@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Suffixes for files that flag a particular check
@@ -56,8 +54,6 @@ ROOTXML=	$(ROOTSHLIB)/xml
 # Rule/definitions for DTDs
 ROOTXMLDTD=	$(ROOTXML)/dtd
 ROOTXMLDTDFILES=	$(DTDFILES:%=$(ROOTXMLDTD)/%)
-$(ROOTXMLDTDFILES) :=	OWNER = root
-$(ROOTXMLDTDFILES) :=	GROUP = sys
 $(ROOTXMLDTDFILES) :=	FILEMODE = 0444
 
 $(ROOTXMLDTD)/%: %
@@ -66,8 +62,6 @@ $(ROOTXMLDTD)/%: %
 # Rule/definitions for XSL style sheets
 ROOTXMLSTYLE=	$(ROOTXML)/style
 ROOTXMLSTYLEFILES=	$(STYLEFILES:%=$(ROOTXMLSTYLE)/%)
-$(ROOTXMLSTYLEFILES) :=	OWNER = root
-$(ROOTXMLSTYLEFILES) :=	GROUP = sys
 $(ROOTXMLSTYLEFILES) :=	FILEMODE = 0444
 
 $(ROOTXMLSTYLE)/%: %

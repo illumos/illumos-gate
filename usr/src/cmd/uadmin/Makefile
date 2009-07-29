@@ -28,9 +28,6 @@ ROOTFS_PROG= $(PROG)
 
 include ../Makefile.cmd
 
-OWNER = root
-GROUP = sys
-
 i386_LDLIBS += -lscf
 LDLIBS += -lbsm
 LDLIBS += $($(MACH)_LDLIBS)

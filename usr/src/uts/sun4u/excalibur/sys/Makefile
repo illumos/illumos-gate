@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 UTSBASE	= ../../..
@@ -35,8 +32,6 @@ include ../Makefile.excalibur
 # Override defaults.
 #
 FILEMODE	 = 644
-OWNER = bin
-GROUP = bin
 
 HDRS=	xcalppm_reg.h xcalppm_var.h
 

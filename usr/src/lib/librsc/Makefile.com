@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= librsc.a
@@ -53,9 +51,9 @@ LIBS = $(DYNLIB) $(LINTLIB)
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib/
-INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/librsc.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/librsc.so $@ $(CHOWNLINK) $(CHGRPLINK)
-INS.slink8=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/llib-lrsc.ln $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/librsc.so.1 $@
+INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/librsc.so $@
+INS.slink8=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/llib-lrsc.ln $@
 
 .KEEP_STATE:
 
@@ -69,7 +67,7 @@ lint:	lintcheck
 # install rules
 #
 $(PLATLIBS)/librsc.so:
-	$(RM) -r $@; $(SYMLINK) librsc.so.1 $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) -r $@; $(SYMLINK) librsc.so.1 $@
 
 install:	all $(USR_PSM_LIBS) $(PLATLIBS)/librsc.so \
 		$(LINKED_DIRS) $(LINKED_LIB_DIRS) \

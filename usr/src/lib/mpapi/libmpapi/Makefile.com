@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -48,8 +48,6 @@ CONFDIR =	../common
 CONFFILE =	$(CONFDIR)/mpapi.conf
 IETCFILES =     $(CONFFILE:$(CONFDIR)/%=$(ROOTETC)/%)
 $(IETCFILES) := FILEMODE = 0644
-$(IETCFILES) := OWNER = root
-$(IETCFILES) := GROUP = sys 
 
 .KEEP_STATE:
 

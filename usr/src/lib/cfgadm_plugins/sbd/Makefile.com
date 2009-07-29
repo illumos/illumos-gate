@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PLATFORM=	sun4u
@@ -35,9 +33,7 @@ OBJECTS= ap.o ap_msg.o ap_rcm.o ap_sbd.o ap_seq.o cfga.o ap_err.o
 include ../../../Makefile.lib
 
 INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
-$(CH)INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) -u root -g sys $@
 INS.dir.root.bin=	$(INS) -s -d -m $(DIRMODE) $@
-$(CH)INS.dir.root.bin=	$(INS) -s -d -m $(DIRMODE) -u root -g bin $@
 
 USR_PLAT_DIR		= $(ROOT)/usr/platform
 USR_PSM_DIR		= $(USR_PLAT_DIR)/sun4u

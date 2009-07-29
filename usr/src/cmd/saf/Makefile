@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= sac sacadm pmadm
@@ -57,8 +55,6 @@ ROOTADMF= $(ADMF:%=$(ROOTUSRSBIN)/%)
 LDLIBS += -lnsl
 LDFLAGS += $(MAPFILE.NGB:%=-M%)
 LINTFLAGS += -b -x
-OWNER= root
-GROUP= sys
 
 util1.o := CPPFLAGS += -DSAC
 util2.o := CPPFLAGS += -USAC

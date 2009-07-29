@@ -39,8 +39,6 @@ CLEANFILES=	$(PROG) $(OBJS) $(SHFILES)
 
 include ../../../src/tools/Makefile.tools
 
-OWNER=	root
-GROUP=	bin
 CFLAGS += $(CCVERBOSE)
 CFLAGS += -_gcc=-fasm
 

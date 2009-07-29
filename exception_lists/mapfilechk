@@ -35,6 +35,7 @@ exception_lists/mapfilechk
 usr/src/cmd/mdb/common/kmdb/mapfile_skel
 usr/src/cmd/sgs/rtld/common/mapfile-order-*
 usr/src/common/bignum/*/cap_mapfile
+usr/src/common/mapfiles/*/Makefile
 usr/src/lib/README.mapfiles
 usr/src/lib/libc/*_hwcap*/mapfile
 usr/src/lib/libc/sparc_hwcap1/sparc*/mapfile

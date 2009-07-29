@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libexacct/demo/Makefile
 #
@@ -56,12 +54,8 @@ $(ROOTDEMODIR)/%: %
 
 $(ROOTDEMOFILES): $(ROOTDEMODIR)
 
-$(ROOTDEMODIR) := OWNER = root
-$(ROOTDEMODIR) := GROUP = bin
 $(ROOTDEMODIR) := DIRMODE = 755
 
-$(ROOTDEMOFILES) := OWNER = root
-$(ROOTDEMOFILES) := GROUP = bin
 $(ROOTDEMOFILES) := FILEMODE = 555
 
 include ../../../cmd/Makefile.targ

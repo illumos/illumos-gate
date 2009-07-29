@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/picl/plugins/sun4u/boston/frudr/Makefile
 #
@@ -38,8 +36,6 @@ FRUDR_LINKTO_PLATFORM = SUNW,Sun-Fire-V240
 include	$(SRC)/cmd/picl/plugins/Makefile.com
 
 ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
-ROOTLIBDIR	:= OWNER = root
-ROOTLIBDIR	:= GROUP = sys
 
 CONFS		= fru_PS0.conf fru_PS1.conf fru_PS2.conf fru_PS3.conf
 CONFS		+= fru_HDD0.conf fru_HDD1.conf fru_HDD2.conf

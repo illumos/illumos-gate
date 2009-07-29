@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -106,7 +106,7 @@ NOBJS=		$(CRONOBJS) $(ATOBJS) $(ATRMOBJS1) $(ATQOBJS) $(CRONTABOBJS1) \
 		$(COMMONOBJS)
 OBJS =		$(NOBJS) $(XPG4COMMONOBJS) $(XPG4ATOBJS) $(XPG4CTOBJS) \
 		$(XPG6COMMONOBJS) $(XPG6CTOBJS) $(GETRESPOBJ)
-		
+
 SRCS =		$(NOBJS:%.o=%.c) $(GETRESPSRC)
 
 CLOBBERFILES +=	$(SCRIPT) $(XPG4SCRIPT)
@@ -115,26 +115,13 @@ $(ROOTLIBCRON) :=		SYMLNKDEST = ../../etc/cron.d
 $(ROOTETC)/cron :=		SYMLNKDEST = ../usr/sbin/cron
 
 $(ROOTBIN)/at :=		FILEMODE = 04755
-$(ROOTBIN)/at :=		OWNER = root   
-$(ROOTBIN)/at :=		GROUP = sys
 $(ROOTXPG4BIN)/at :=		FILEMODE = 04755
-$(ROOTXPG4BIN)/at :=		OWNER = root
-$(ROOTXPG4BIN)/at :=		GROUP = sys
 $(ROOTBIN)/atrm :=		FILEMODE = 04755
-$(ROOTBIN)/atrm :=		OWNER = root   
-$(ROOTBIN)/atrm :=		GROUP = sys
 $(ROOTBIN)/atq :=		FILEMODE = 04755
-$(ROOTBIN)/atq :=		OWNER = root   
-$(ROOTBIN)/atq :=		GROUP = sys
 $(ROOTBIN)/crontab :=		FILEMODE = 04555
-$(ROOTBIN)/crontab :=		OWNER = root
 $(ROOTXPG6BIN)/crontab :=	FILEMODE = 04555
-$(ROOTXPG6BIN)/crontab :=	OWNER = root
 $(ROOTXPG4BIN)/crontab :=	FILEMODE = 04555
-$(ROOTXPG4BIN)/crontab :=	OWNER = root
 $(ROOTUSRSBIN)/cron :=		FILEMODE = 0555
-$(ROOTUSRSBIN)/cron :=		OWNER = root
-$(ROOTUSRSBIN)/cron :=		GROUP = sys
 
 LDLIBS +=	-lbsm
 

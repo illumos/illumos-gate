@@ -25,7 +25,6 @@
 
 include $(SRC)/uts/Makefile.uts
 
-GROUP=bin
 FILEMODE=644
 
 #

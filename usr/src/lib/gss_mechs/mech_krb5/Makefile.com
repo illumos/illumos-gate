@@ -34,7 +34,6 @@
 LIBRARY= mech_krb5.a
 VERS = .1
 
-GROUP=	sys
 FILEMODE=	755
 
 # objects are listed by source directory

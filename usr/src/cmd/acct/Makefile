@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG=		acctcms acctcom acctcon acctcon1 acctcon2 \
 		acctdisk acctdusg acctmerg accton acctprc acctprc1 \
@@ -84,17 +82,9 @@ ETCACCTPROG=	$(ETCPROG:%=$(ETCACCTD)/%)
 ETCINITPROG=	$(INITPROG:%=$(ETCINITD)/%)
 
 $(LIBACCTD) :=		DIRMODE=	755
-$(ETCACCTD) :=		OWNER=		adm
-$(ETCACCTD) :=		GROUP=		adm
 $(ETCACCTD) :=		DIRMODE=	755
-$(WKDIRS) :=		OWNER=		adm
-$(WKDIRS) :=		GROUP=		adm
 $(WKDIRS) :=		DIRMODE=	775
-$(LIBACCTD)/accton:=	OWNER=		root
-$(LIBACCTD)/accton:=	GROUP=		adm
 $(LIBACCTD)/accton :=	FILEMODE=	04755
-$(ETCINITPROG) :=	OWNER=		root
-$(ETCINITPROG) :=	GROUP=		sys
 $(ETCINITPROG) :=	FILEMODE=	0744
 $(ETCACCTPROG) :=	FILEMODE=	0644
 

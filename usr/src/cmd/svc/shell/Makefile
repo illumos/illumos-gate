@@ -23,8 +23,6 @@
 
 include ../../Makefile.cmd
 
-OWNER = root
-GROUP = bin
 FILEMODE = 0444
 
 SRCS = \

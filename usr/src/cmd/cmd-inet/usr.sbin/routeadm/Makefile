@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 
@@ -46,8 +44,6 @@ ROOTSVCMANIFEST=	$(ROOTSVCNETWORKROUTING)/legacy-routing.xml \
 
 include ../../Makefile.cmd-inet
 
-$(ROOTSVCMANIFEST)	:=	OWNER= root
-$(ROOTSVCMANIFEST)	:=	GROUP= sys
 $(ROOTSVCMANIFEST)	:=	FILEMODE= 444
 
 ROOTUSRSBINLINKS=	$(PROG:%=$(ROOTUSRSBIN)/%)

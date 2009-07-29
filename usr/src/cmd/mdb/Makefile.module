@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -123,8 +122,6 @@ $(KMODOBJS) := CFLAGS64 += $(STAND_FLAGS_64)
 # Override this to pull source files from another directory
 #
 MODSRCS_DIR = ../../../common/modules/genunix
-
-GROUP = sys
 
 all: $$(TARGETS)
 

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		sh
@@ -50,7 +48,6 @@ CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DACCT
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
 LDLIBS += -lgen -lsecdb
-GROUP =	root
 
 .KEEP_STATE:
 

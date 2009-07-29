@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MINCONN =	minconn.so
@@ -67,25 +65,15 @@ CLOBBERFILES +=	$(LIBRARIES)
 LIBPPPPLUGIN=	$(LIBRARIES:%=$(LIBPPPPLUGINDIR)/%)
 
 $(LIBPPPPLUGIN):=	FILEMODE = 0544
-$(LIBPPPPLUGIN):=	OWNER = root
-$(LIBPPPPLUGIN):=	GROUP = bin
 
 $(LIBPPPPLUGINDIR):=	FILEMODE = 0755
-$(LIBPPPPLUGINDIR):=	OWNER = root
-$(LIBPPPPLUGINDIR):=	GROUP = bin
 
 # This is needed because install doesn't handle -g well.
 UTILDIR=	$(ROOT)/usr/share/src/ppputil
-$(UTILDIR):=	OWNER = root
-$(UTILDIR):=	GROUP = bin
 ROOTSRC=	$(UTILDIR)/plugins
 SRCFILES=	Makefile minconn.c passprompt.c pppd.h
 ROOTSRCFILES=	$(SRCFILES:%=$(ROOTSRC)/%)
-$(ROOTSRC):=	OWNER = root
-$(ROOTSRC):=	GROUP = bin
 $(ROOTSRCFILES):=	FILEMODE= 0444
-$(ROOTSRCFILES):=	OWNER = root
-$(ROOTSRCFILES):=	GROUP = bin
 
 .KEEP_STATE:
 

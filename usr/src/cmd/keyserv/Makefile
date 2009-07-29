@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SBINPROG = keyserv newkey
@@ -62,17 +60,8 @@ ISBINPROG=		$(SBINPROG:%=$(ROOTUSRSBIN)/%)
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKRPC)
 
-$(ROOTUSRSBIN)/keyserv \
-$(ROOTUSRSBIN)/newkey :=			OWNER=		root
-$(ROOTUSRSBIN)/keyserv \
-$(ROOTUSRSBIN)/newkey :=			GROUP=		sys
-
-$(ROOTBIN)/chkey :=				OWNER=		root
-$(ROOTBIN)/chkey :=				GROUP=		sys
 $(ROOTBIN)/chkey :=				FILEMODE=	4555
 
-$(ROOTKEYSERVDFLT) :=				OWNER=		root
-$(ROOTKEYSERVDFLT) :=				GROUP=		sys
 $(ROOTKEYSERVDFLT) :=				FILEMODE=	444
 
 CPPFLAGS += -I. -I$(SRC)/lib/libnsl/include -I$(SRC)/lib/libsldap/common \

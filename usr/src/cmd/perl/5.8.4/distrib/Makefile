@@ -252,14 +252,11 @@ install_files:
 
 	$(RM) $(ROOTPROG)
 	$(LN) -s ../perl5/$(PERL_VERSION)/bin/perl $(ROOTPROG)
-	@ $(CHOWN) $(OWNER):$(GROUP) $(ROOTPROG)
 
 	$(RM) $(PERL_ARCHLIB_DIR)/Config.pm
 	$(SED) $(SED_UN_CC) $(SED_UN_CC_E) $(PERL_CONFIG_PM) \
 	    > $(PERL_ARCHLIB_DIR)/Config.pm
 	$(CHMOD) 444 $(PERL_ARCHLIB_DIR)/Config.pm
-
-	@ $(CHOWN) -R $(OWNER):$(GROUP) $(PERL_ROOT_STEM) 
 
 install: all .WAIT install_files
 

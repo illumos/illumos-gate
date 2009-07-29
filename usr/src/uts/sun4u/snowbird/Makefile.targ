@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # uts/sun4u/snowbird/Makefile.targ
 #	Common targets for sun4u snowbird implementation specific modules.
@@ -89,13 +87,13 @@ $(USR_SNOWBIRD_SBIN_DIR): $(USR_SNOWBIRD_DIR)
 	-$(INS.dir.root.bin)
 
 $(USR_SNOWBIRD_SBIN_PRTDIAG): $(USR_SNOWBIRD_SBIN_DIR)
-	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@
 
 $(USR_SNOWBIRD_SBIN_TRAPSTAT): $(USR_SNOWBIRD_SBIN_DIR)
-	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/trapstat $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/trapstat $@
 
 $(USR_SNOWBIRD_SBIN_FRUADM): $(USR_SNOWBIRD_SBIN_DIR)
-	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/fruadm $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/fruadm $@
 
 $(USR_SNOWBIRD_LIB_DIR): $(USR_SNOWBIRD_DIR)
 	-$(INS.dir.root.bin)

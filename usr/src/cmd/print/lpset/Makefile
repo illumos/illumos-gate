@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/lp/client/lpset/Makefile
 #
@@ -38,7 +36,6 @@ OBJS=		$(SRCS:.c=.o)
 ROOTBINPROG=	$(PROG:%=$(ROOTBIN)/%)
 
 FILEMODE=	04511
-OWNER=		root
 
 CPPFLAGS +=	-I$(NPRTINC)
 LDLIBS +=	$(LIBNPRT) -lsecdb

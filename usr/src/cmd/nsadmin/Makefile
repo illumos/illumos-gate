@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG= profile .login ksh.kshrc system
 PROGSKEL= local.login local.profile local.cshrc
@@ -32,8 +31,6 @@ include ../Makefile.cmd
 ROOTETCSKEL= $(ROOTETC)/skel
 ROOTETCSKELPROG= $(PROGSKEL:%=$(ROOTETCSKEL)/%)
 FILEMODE= 0644
-OWNER= root
-GROUP= sys
 
 .login: login.csh
 	$(RM) .login; $(CP) login.csh .login

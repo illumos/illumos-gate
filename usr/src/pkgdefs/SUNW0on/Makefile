@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # pkgdefs/SUNW0on/Makefile
@@ -32,8 +32,6 @@ ROOTMSGDIR=$(ROOTDIR)/LC_MESSAGES
 ROOTTIMEDIR=$(ROOTDIR)/LC_TIME
 
 SED=	/usr/bin/sed
-OWNER=		root
-GROUP=		sys
 FILEMODE=	644
 
 PO_LABEL=' The following lines are contents of '
@@ -67,8 +65,6 @@ _msg:
 			$(SED) -e '/^# msg/d' -e '/^domain/d' $$f >> \
 			    $(ROOTMSGDIR)/$$d.po; \
 		done; \
-		$(CHOWN) $(OWNER) $(ROOTMSGDIR)/$$d.po; \
-		$(CHGRP) $(GROUP) $(ROOTMSGDIR)/$$d.po; \
 		$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/$$d.po; \
 		fi; \
 		x="`$(ECHO) $$d/*.msg`"; \
@@ -79,8 +75,6 @@ _msg:
 			x="`basename $$f`"; \
 			$(RM) $(ROOTMSGDIR)/$$x; \
 			$(CP) $$f $(ROOTMSGDIR); \
-			$(CHOWN) $(OWNER) $(ROOTMSGDIR)/$$x; \
-			$(CHGRP) $(GROUP) $(ROOTMSGDIR)/$$x; \
 			$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/$$x; \
 		done; \
 		fi; \
@@ -95,37 +89,23 @@ _msg:
 			$(SED) -e '/^# msg/d' -e '/^domain/d' $$f >> \
 			    $(ROOTTIMEDIR)/$$d.po; \
 		done; \
-		$(CHOWN) $(OWNER) $(ROOTTIMEDIR)/$$d.po; \
-		$(CHGRP) $(GROUP) $(ROOTTIMEDIR)/$$d.po; \
 		$(CHMOD) $(FILEMODE) $(ROOTTIMEDIR)/$$d.po; \
 	done)
 	-$(RM) $(ROOTMSGDIR)/magic
 	$(CP) $(SRC)/cmd/file/magic $(ROOTMSGDIR)
-	-$(CHOWN) $(OWNER) $(ROOTMSGDIR)/magic
-	-$(CHGRP) $(GROUP) $(ROOTMSGDIR)/magic
 	-$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/magic
 	-$(RM) $(ROOTMSGDIR)/priv_names
 	$(CP) $(ROOT)/etc/security/priv_names $(ROOTMSGDIR)
-	-$(CHOWN) $(OWNER) $(ROOTMSGDIR)/priv_names
-	-$(CHGRP) $(GROUP) $(ROOTMSGDIR)/priv_names
 	-$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/priv_names
 	-$(RM) $(ROOTMSGDIR)/mailx.help
 	$(CP) $(SRC)/cmd/mailx/misc/mailx.help $(ROOTMSGDIR)
-	-$(CHOWN) $(OWNER) $(ROOTMSGDIR)/mailx.help
-	-$(CHGRP) $(GROUP) $(ROOTMSGDIR)/mailx.help
 	-$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/mailx.help
 	-$(RM) $(ROOTMSGDIR)/more.help
 	$(CP) $(SRC)/cmd/more/more.help $(ROOTMSGDIR)
-	-$(CHOWN) $(OWNER) $(ROOTMSGDIR)/more.help
-	-$(CHGRP) $(GROUP) $(ROOTMSGDIR)/more.help
 	-$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/more.help
 	-$(RM) $(ROOTMSGDIR)/uxlibc.src
 	$(CP) uxlibc.src $(ROOTMSGDIR)
-	-$(CHOWN) $(OWNER) $(ROOTMSGDIR)/uxlibc.src
-	-$(CHGRP) $(GROUP) $(ROOTMSGDIR)/uxlibc.src
 	-$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/uxlibc.src
 	-$(RM) $(ROOTMSGDIR)/SUNW_OST_LINFO
 	($(ECHO) "yes"; $(ECHO) "no" ) > $(ROOTMSGDIR)/SUNW_OST_LINFO
-	-$(CHOWN) $(OWNER) $(ROOTMSGDIR)/SUNW_OST_LINFO
-	-$(CHGRP) $(GROUP) $(ROOTMSGDIR)/SUNW_OST_LINFO
 	-$(CHMOD) $(FILEMODE) $(ROOTMSGDIR)/SUNW_OST_LINFO

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		$(SRC)/Makefile.master
@@ -37,10 +35,8 @@ FILES=		$(ROOTDIR64)/map.above4G $(ROOTDIR64)/map.below4G
 install: $(DIRS) $(FILES) map.link
 
 $(FILES):=	FILEMODE=444
-$(FILES):=	GROUP=bin
 
 $(DIRS):=	DIRMODE=755
-$(DIRS):=	GROUP=bin
 
 map.link:
 	$(RM) $(ROOTDIR64)/map.default

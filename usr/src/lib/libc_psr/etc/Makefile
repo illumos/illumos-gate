@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Makefile for libc_psr (hwcap) flarcreate precreation scripts
@@ -52,20 +48,10 @@ DIRS=		$(ETCFLASHPREC) $(ETCFLASHPREE) $(ETCFLASHPOSTC)
 ETCFLASHPREPROG=	$(FLASHPREPROG:%=$(ETCFLASHPREC)/%)
 
 $(ETCFLASHD) :=	DIRMODE=	755
-$(ETCFLASHD) :=	OWNER=          root
-$(ETCFLASHD) :=	GROUP=          sys
 $(ETCFLASHPREC) :=	DIRMODE=	700
-$(ETCFLASHPREC) :=	OWNER=          root
-$(ETCFLASHPREC) :=	GROUP=          sys
 $(ETCFLASHPREE) :=	DIRMODE=	700
-$(ETCFLASHPREE) :=	OWNER=          root
-$(ETCFLASHPREE) :=	GROUP=          sys
 $(ETCFLASHPOSTC) :=	DIRMODE=	700
-$(ETCFLASHPOSTC) :=	OWNER=          root
-$(ETCFLASHPOSTC) :=	GROUP=          sys
 $(ETCFLASHPREPROG) :=	FILEMODE=       0500
-$(ETCFLASHPREPROG) :=	OWNER=          root
-$(ETCFLASHPREPROG) :=	GROUP=          sys
 
 .KEEP_STATE:
 

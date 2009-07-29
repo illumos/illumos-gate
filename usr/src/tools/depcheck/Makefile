@@ -38,8 +38,6 @@ MAN1FILES= \
 
 include ../Makefile.tools
 
-OWNER=		root
-GROUP=		bin
 $(ROOTONBLDETCFILES) := FILEMODE=	644
 $(ROOTONBLDMAN1FILES) := FILEMODE=	644
 

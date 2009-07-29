@@ -1,16 +1,14 @@
 #
-# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Makefile for intermachine communications package.
 #
 # Files are:
 #	/etc/remote		remote host description file
-#	/etc/phones		phone number file, owned by $(OWNER) and
+#	/etc/phones		phone number file, owned by uucp and
 #				  mode 6??
-#	/var/adm/aculog		ACU accounting file, owned by $(OWNER) and
+#	/var/adm/aculog		ACU accounting file, owned by uucp and
 #				  mode 6?? (if ACULOG defined)
 # Presently supports:
 #	BIZCOMP
@@ -57,10 +55,8 @@ ROOTACULOGD=	$(ROOT)/var/adm
 ROOTACULOG=	$(ROOTACULOGD)/aculog
 
 $(ROOTPROG) :=		FILEMODE =	4511
-$(ROOTPROG) :=		OWNER =		uucp
 $(ROOTETCREMOTE) :=	FILEMODE =	644
 $(ROOTACULOG) :=	FILEMODE =	600
-$(ROOTACULOG) :=	OWNER =		uucp
 
 LINTFLAGS +=	-u
 CPPFLAGS +=	-DDEFBR=300 -DDEFFS=BUFSIZ -DACULOG -DUSG

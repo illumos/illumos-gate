@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the sun4u lw8 platform
 #	module.
@@ -106,13 +104,13 @@ LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 $(LW8_PLAT_LINKS_2): $(ROOT_LW8_MOD_DIR)
-	$(RM) $@; $(SYMLINK) $(LINKS2DESTDIR)/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) $@; $(SYMLINK) $(LINKS2DESTDIR)/$(@F) $@
 
 $(LW8_PLAT_LINKS_3): $(ROOT_LW8_DRV_DIR_64)
-	$(RM) $@; $(SYMLINK) $(LINKS3DESTDIR)/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) $@; $(SYMLINK) $(LINKS3DESTDIR)/$(@F) $@
 
 $(LW8_PLAT_LINKS_4): $(ROOT_LW8_DRV_DIR_64)
-	$(RM) $@; $(SYMLINK) $(LINKS4DESTDIR)/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
+	$(RM) $@; $(SYMLINK) $(LINKS4DESTDIR)/$(@F) $@
 
 $(LW8_CRYPTO_LINKS): $(ROOT_LW8_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_LW8_CRYPTO_DIR_64)/$@;

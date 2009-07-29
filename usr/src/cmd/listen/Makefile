@@ -20,18 +20,16 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 PROG= listen nlps_server
 
 DBGOBJ	= doprnt.o
 DBGSRC	= doprnt.c
- 
+
 LSOBJS  =	listen.o lslog.o lsdbf.o lsdata.o nstoa.o nlsaddr.o
- 
+
 NLPSOBJS =	nlps_serv.o lsdbf.o lssmb.o nstoa.o lslog.o lsdata.o
 
 OBJS= $(LSOBJS) $(NLPSOBJS)
@@ -57,8 +55,6 @@ ROOTSAFPROG= $(PROG:%=$(LIBSAFD)/%)
 LDLIBS += -lnsl
 LDFLAGS += $(MAPFILE.NGB:%=-M%)
 LINTFLAGS = -b -x
-OWNER= root
-GROUP= sys
 FILEMODE= 0755
 
 $(LIBSAFD)/% : %

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 RELEASECERTS =		SUNW_SunOS_5.10
@@ -53,11 +51,6 @@ ROOTCRYPTODIR=		$(ROOT)/etc/crypto
 ROOTCRYPTOCERTSDIR=	$(ROOTCRYPTODIR)/certs
 
 ROOTETCCERTSDIR=	$(ROOT)/etc/certs
-
-$(ROOTCRYPTODIR):=	OWNER= root
-$(ROOTCRYPTODIR):=	GROUP= sys
-$(ROOTETCCERTSDIR):=	OWNER= root
-$(ROOTETCCERTSDIR):=	GROUP= sys
 
 IETCCRYPTOFILES=	$(ETCCRYPTOFILES:%=$(ROOTCRYPTODIR)/%)
 IETCCERTSFILES=		$(ETCCERTSFILES:%=$(ROOTETCCERTSDIR)/%)
@@ -96,11 +89,7 @@ $(ANNOTATEDFILES:%.annot=%): \
 				$(@:%=%.annot) > $@
 
 $(IETCCRYPTOFILES):=	FILEMODE= 644
-$(IETCCRYPTOFILES):=	OWNER= root
-$(IETCCRYPTOFILES):=	GROUP= sys
 $(IETCCERTSFILES):=	FILEMODE= 644
-$(IETCCERTSFILES):=	OWNER= root
-$(IETCCERTSFILES):=	GROUP= sys
 
 install:	$(IETCCRYPTOFILES) $(IETCCERTSFILES)
 

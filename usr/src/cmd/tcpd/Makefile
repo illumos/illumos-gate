@@ -1,8 +1,6 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		safe_finger tcpd tcpdchk tcpdmatch try-from
@@ -55,8 +53,6 @@ DISTFILES =	environ.c fakelog.c hosts_access.3 hosts_access.4 \
 		tcpdmatch.c try-from.c README.sfw $(SRCONLY)
 
 ROOTSRC =	$(ROOT)/usr/share/src/tcp_wrappers
-$(ROOTSRC) :=	OWNER = root
-$(ROOTSRC) :=	GROUP = bin
 ROOTMAN = $(ROOT)/usr/share/man
 ROOTMANPAGES = $(MANPAGES:%=$(ROOTMAN)/%)
 ROOTMANDIRS = $(MANDIRS:%=$(ROOTMAN)/%)

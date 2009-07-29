@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/sendmail/Makefile
 #
@@ -37,10 +35,7 @@ SUBDIRS=	cf lib db libsm libsmdb libsmutil .WAIT src aux
 include 	../Makefile.cmd
 
 ROOTDIRS=	$(ROOT)/var/spool/mqueue $(ROOT)/var/spool/clientmqueue
-$(ROOTDIRS):= 	OWNER = root
 $(ROOTDIRS):=	DIRMODE = 0750
-$(ROOT)/var/spool/clientmqueue:=	OWNER = smmsp
-$(ROOT)/var/spool/clientmqueue:=	GROUP = smmsp
 $(ROOT)/var/spool/clientmqueue:=	DIRMODE = 0770
 
 all:=           TARGET= all
