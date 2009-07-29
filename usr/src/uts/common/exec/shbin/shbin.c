@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,8 +46,8 @@
  */
 #include <sys/modctl.h>
 
-/* Prototype */
-int
+/* Local prototypes */
+static int
 shbinexec(
 	struct vnode *vp,
 	struct execa *uap,
@@ -151,7 +151,7 @@ checkshbinmagic(struct vnode *vp)
 	return (0);
 }
 
-int
+static int
 shbinexec(
 	struct vnode *vp,
 	struct execa *uap,
@@ -174,8 +174,6 @@ shbinexec(
 	char devfd[19]; /* 32-bit int fits in 10 digits + 8 for "/dev/fd/" */
 	int fd = -1;
 	int i;
-
-	(void) memset(&idata, 0, sizeof (idata));
 
 	if (level) {		/* Can't recurse */
 		error = ENOEXEC;
@@ -215,6 +213,16 @@ shbinexec(
 		pn_free(&resolvepn);
 		goto fail;
 	}
+
+	/*
+	 * Setup interpreter data
+	 * "--" is passed to mark the end-of-arguments before adding
+	 * the scripts file name, preventing problems when a
+	 * a script's name starts with a '-' character.
+	 */
+	idata.intp = NULL;
+	idata.intp_name = shell_list[i];
+	idata.intp_arg = "--";
 
 	opath = args->pathname;
 	args->pathname = resolvepn.pn_path;
