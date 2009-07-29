@@ -243,7 +243,9 @@ send_iterate_prop(zfs_handle_t *zhp, nvlist_t *nv)
 			continue;
 
 		verify(nvpair_value_nvlist(elem, &propnv) == 0);
-		if (prop == ZFS_PROP_QUOTA || prop == ZFS_PROP_RESERVATION) {
+		if (prop == ZFS_PROP_QUOTA || prop == ZFS_PROP_RESERVATION ||
+		    prop == ZFS_PROP_REFQUOTA ||
+		    prop == ZFS_PROP_REFRESERVATION) {
 			/* these guys are modifyable, but have no source */
 			uint64_t value;
 			verify(nvlist_lookup_uint64(propnv,
