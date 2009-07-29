@@ -3296,6 +3296,7 @@ END_DATE=`date`
 echo "==== Nightly $maketype build completed: $END_DATE ====" | \
     tee -a $LOGFILE >> $build_time_file
 
+typeset -i10 hours
 typeset -Z2 minutes
 typeset -Z2 seconds
 
