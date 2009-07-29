@@ -133,35 +133,11 @@ extern "C" {
 #define	M_SEGM_ORIGIN	(Addr)0x400000ULL	/* default 1st segment origin */
 #define	M_SEGM_AORIGIN	(Addr)0x10000ULL	/* alternative 1st segment */
 						/*    origin */
-#define	M_WORD_ALIGN	8
 #else
 #define	M_STACK_GAP	(0x08000000)
 #define	M_STACK_PGS	(0x00048000)
 #define	M_SEGM_ORIGIN	(Addr)(M_STACK_GAP + M_STACK_PGS)
 #define	M_SEGM_AORIGIN	M_SEGM_ORIGIN
-#define	M_WORD_ALIGN	4
-#endif
-
-
-/*
- * Plt and Got information; the first few .got and .plt entries are reserved
- *	PLT[0]	jump to dynamic linker
- *	GOT[0]	address of _DYNAMIC
- */
-#define	M_PLT_ENTSIZE	16		/* plt entry size in bytes */
-#define	M_PLT_ALIGN	M_WORD_ALIGN	/* alignment of .plt section */
-#define	M_PLT_INSSIZE	6		/* single plt instruction size */
-#define	M_PLT_RESERVSZ	M_PLT_ENTSIZE	/* PLT[0] reserved */
-
-#define	M_GOT_XDYNAMIC	0		/* got index for _DYNAMIC */
-#define	M_GOT_XLINKMAP	1		/* got index for link map */
-#define	M_GOT_XRTLD	2		/* got index for rtbinder */
-#define	M_GOT_XNumber	3		/* reserved no. of got entries */
-
-#ifdef	_ELF64
-#define	M_GOT_ENTSIZE	8		/* got entry size in bytes */
-#else /* ELF32 */
-#define	M_GOT_ENTSIZE	4		/* got entry size in bytes */
 #endif
 
 /*

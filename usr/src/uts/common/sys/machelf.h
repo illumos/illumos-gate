@@ -20,20 +20,18 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MACHELF_H
 #define	_SYS_MACHELF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#if defined(__amd64)
+#if defined(__amd64) || (defined(__i386) && defined(_ELF64))
 #include <sys/elf_amd64.h>
 #elif defined(__i386)
 #include <sys/elf_386.h>

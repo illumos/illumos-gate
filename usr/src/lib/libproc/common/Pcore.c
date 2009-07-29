@@ -810,9 +810,16 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 
 	if (symtab->sh_addr == 0 ||
 	    (mp = Paddr2mptr(P, symtab->sh_addr)) == NULL ||
-	    (fp = mp->map_file) == NULL ||
-	    fp->file_symtab.sym_data_pri != NULL) {
+	    (fp = mp->map_file) == NULL) {
 		dprintf("fake_up_symtab: invalid section\n");
+		dprintf("fp->file_symtab.sym_data_pri == %lx\n",
+		    (long)fp->file_symtab.sym_data_pri);
+		return;
+	}
+
+	if (fp->file_symtab.sym_data_pri != NULL) {
+		dprintf("Symbol table already loaded (sh_addr 0x%lx)\n",
+		    (long)symtab->sh_addr);
 		return;
 	}
 

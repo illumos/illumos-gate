@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	__sparcv9cpu
 
@@ -31,6 +29,7 @@
 #include <sys/regset.h>
 #include <sys/frame.h>
 #include <sys/sysmacros.h>
+#include <sys/machelf.h>
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -42,18 +41,6 @@
 #include "Pstack.h"
 #include "Pisadep.h"
 #include "P32ton.h"
-
-#define	M_PLT32_NRSV		4	/* reserved PLT entries */
-#define	M_PLT32_ENTSIZE		12	/* size of each PLT entry */
-
-#define	M_PLT64_NRSV		4	/* reserved bit PLT entries */
-#define	M_PLT64_ENTSIZE		32	/* size of each PLT entry */
-#define	M_PLT64_FENTSIZE	24	/* size of far PLT entry */
-#define	M_PLT64_NEARPLTS	0x8000	/* # of NEAR PLTS we can have */
-#define	M_PLT64_FBLKCNTS	160	/* # of plts in far PLT blocks */
-#define	M_PLT64_FBLOCKSZ	(M_PLT64_FBLKCNTS * \
-				(M_PLT64_FENTSIZE + sizeof (uint64_t)))
-					/* size of far PLT block */
 
 #define	SYSCALL32 0x91d02008	/* 32-bit syscall (ta 8) instruction */
 #define	SYSCALL64 0x91d02040	/* 64-bit syscall (ta 64) instruction */
@@ -79,18 +66,18 @@ Ppltdest(struct ps_prochandle *P, uintptr_t pltaddr)
 		uintptr_t	pltoff;
 
 		pltoff = pltaddr - fp->file_plt_base;
-		if (pltoff < (M_PLT64_NEARPLTS * M_PLT64_ENTSIZE)) {
+		if (pltoff < (M64_PLT_NEARPLTS * M64_PLT_ENTSIZE)) {
 			i = (pltaddr - fp->file_plt_base -
-			    M_PLT64_NRSV * M_PLT64_ENTSIZE) / M_PLT64_ENTSIZE;
+			    M_PLT_XNumber * M64_PLT_ENTSIZE) / M64_PLT_ENTSIZE;
 		} else {
 			uintptr_t	pltblockoff;
-			pltblockoff = pltoff - (M_PLT64_NEARPLTS *
-				M_PLT64_ENTSIZE);
-			i = M_PLT64_NEARPLTS +
-				((pltblockoff / M_PLT64_FBLOCKSZ) *
-				M_PLT64_FBLKCNTS) + ((pltblockoff %
-				M_PLT64_FBLOCKSZ) / M_PLT64_FENTSIZE) -
-				M_PLT64_NRSV;
+			pltblockoff = pltoff - (M64_PLT_NEARPLTS *
+			    M64_PLT_ENTSIZE);
+			i = M64_PLT_NEARPLTS +
+			    ((pltblockoff / M64_PLT_FBLOCKSZ) *
+			    M64_PLT_FBLKCNTS) + ((pltblockoff %
+			    M64_PLT_FBLOCKSZ) / M64_PLT_FENTSIZE) -
+			    M_PLT_XNumber;
 		}
 
 		r_addr = fp->file_jmp_rel + i * sizeof (Elf64_Rela);
@@ -108,7 +95,7 @@ Ppltdest(struct ps_prochandle *P, uintptr_t pltaddr)
 		Elf32_Rela r;
 
 		i = (pltaddr - fp->file_plt_base -
-		    M_PLT32_NRSV * M_PLT32_ENTSIZE) / M_PLT32_ENTSIZE;
+		    M_PLT_XNumber * M32_PLT_ENTSIZE) / M32_PLT_ENTSIZE;
 
 		r_addr = fp->file_jmp_rel + i * sizeof (Elf32_Rela);
 
@@ -445,14 +432,14 @@ Psyscall_setup(struct ps_prochandle *P, int nargs, int sysindex, uintptr_t sp)
 
 	if (model == PR_MODEL_LP64) {
 		sp -= (nargs > 6)?
-			WINDOWSIZE64 + sizeof (int64_t) * nargs :
-			WINDOWSIZE64 + sizeof (int64_t) * 6;
+		    WINDOWSIZE64 + sizeof (int64_t) * nargs :
+		    WINDOWSIZE64 + sizeof (int64_t) * 6;
 		sp = PSTACK_ALIGN64(sp);
 		ret = sp + WINDOWSIZE32 + sizeof (int32_t);
 	} else {
 		sp -= (nargs > 6)?
-			WINDOWSIZE32 + sizeof (int32_t) * (1 + nargs) :
-			WINDOWSIZE32 + sizeof (int32_t) * (1 + 6);
+		    WINDOWSIZE32 + sizeof (int32_t) * (1 + nargs) :
+		    WINDOWSIZE32 + sizeof (int32_t) * (1 + 6);
 		sp = PSTACK_ALIGN32(sp);
 		ret = sp + WINDOWSIZE64 + sizeof (int32_t);
 	}

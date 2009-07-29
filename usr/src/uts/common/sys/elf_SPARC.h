@@ -23,14 +23,12 @@
  *	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ELF_SPARC_H
 #define	_SYS_ELF_SPARC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2 */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -176,6 +174,82 @@ extern "C" {
 #define	STO_SPARC_REGISTER_G6	0x6		/* register %g6 */
 #define	STO_SPARC_REGISTER_G7	0x7		/* register %g7 */
 
+/*
+ * There are consumers of this file that want to include elf defines for
+ * all architectures.  This is a problem for the defines below, because
+ * while they are architecture specific they have common names.  Hence to
+ * prevent attempts to redefine these variables we'll check if any of
+ * the other elf architecture header files have been included.  If
+ * they have then we'll just stick with the existing definitions.
+ */
+#if !defined(_SYS_ELF_MACH_COMMON)
+#define	_SYS_ELF_MACH_COMMON
+
+/*
+ * Plt and Got information; the first few .got and .plt entries are reserved
+ *	PLT[0]	jump to dynamic linker
+ *	GOT[0]	address of _DYNAMIC
+ */
+#define	M_PLT_INSSIZE		4	/* single plt instruction size */
+#define	M_PLT_XNumber		4	/* reserved no. of plt entries */
+#define	M_GOT_XDYNAMIC		0	/* got index for _DYNAMIC */
+#define	M_GOT_XNumber		1	/* reserved no. of got entries */
+
+/*
+ * ELF32 bit PLT constants
+ */
+#define	M32_WORD_ALIGN		4
+#define	M32_PLT_ENTSIZE		12	/* plt entry size in bytes */
+#define	M32_PLT_ALIGN		M_WORD_ALIGN /* alignment of .plt section */
+#define	M32_GOT_ENTSIZE		4	/* got entry size in bytes */
+#define	M32_GOT_MAXSMALL	2048	/* maximum no. of small gots */
+#define	M32_PLT_RESERVSZ	(M_PLT_XNumber * \
+				M32_PLT_ENTSIZE) /* first 4 plt's reserved */
+
+/*
+ * ELF64 bit PLT constants
+ */
+#define	M64_WORD_ALIGN		8
+#define	M64_PLT_ENTSIZE		32	/* plt entry size in bytes */
+#define	M64_PLT_ALIGN		256	/* alignment of .plt section */
+#define	M64_GOT_ENTSIZE		8	/* got entry size in bytes */
+#define	M64_GOT_MAXSMALL	1024	/* maximum no. of small gots */
+#define	M64_PLT_RESERVSZ	(M_PLT_XNumber * \
+				M64_PLT_ENTSIZE) /* first 4 plt's reserved */
+
+#define	M64_PLT_NEARPLTS	0x8000	/* # of NEAR PLTS we can have */
+#define	M64_PLT_FENTSIZE	24	/* size of far plt is 6 instructions */
+					/*	x 4bytes */
+#define	M64_PLT_PSIZE		8		/* size of PLTP pointer */
+#define	M64_PLT_FBLKCNTS	160	/* # of plts in far PLT blocks */
+#define	M64_PLT_FBLOCKSZ	(M64_PLT_FBLKCNTS *\
+				M64_PLT_ENTSIZE) /* size of far PLT block */
+
+
+/*
+ * Make common alias for the 32/64 bit specific defines based on _ELF64
+ */
+#ifdef _ELF64
+/* architecture common defines */
+#define	M_WORD_ALIGN		M64_WORD_ALIGN
+#define	M_PLT_ENTSIZE		M64_PLT_ENTSIZE
+#define	M_PLT_ALIGN		M64_PLT_ALIGN
+#define	M_PLT_RESERVSZ		M64_PLT_RESERVSZ
+#define	M_GOT_ENTSIZE		M64_GOT_ENTSIZE
+/* sparc specific defines */
+#define	M_GOT_MAXSMALL		M64_GOT_MAXSMALL
+#else /* !_ELF64 */
+/* architecture common defines */
+#define	M_WORD_ALIGN		M32_WORD_ALIGN
+#define	M_PLT_ENTSIZE		M32_PLT_ENTSIZE
+#define	M_PLT_ALIGN		M32_PLT_ALIGN
+#define	M_PLT_RESERVSZ		M32_PLT_RESERVSZ
+#define	M_GOT_ENTSIZE		M32_GOT_ENTSIZE
+/* sparc specific defines */
+#define	M_GOT_MAXSMALL		M32_GOT_MAXSMALL
+#endif /* !_ELF64 */
+
+#endif /* !_SYS_ELF_MACH_COMMON */
 
 #ifdef	__cplusplus
 }

@@ -113,56 +113,10 @@ extern "C" {
 #define	M_BIND_ADJ	4		/* adjustment for end of */
 					/*	elf_rtbndr() address */
 
-
-/*
- * Plt and Got information; the first few .got and .plt entries are reserved
- *	PLT[0]	jump to dynamic linker
- *	GOT[0]	address of _DYNAMIC
- */
-#define	M_PLT_INSSIZE	4		/* single plt instruction size */
-#define	M_GOT_XDYNAMIC	0		/* got index for _DYNAMIC */
-#define	M_GOT_XNumber	1		/* reserved no. of got entries */
-
-/*
- * ELF32 bit PLT constants
- */
-#define	M32_PLT_ENTSIZE		12	/* 32bit plt entry size in bytes */
-
-/*
- * ELF64 bit PLT constants
- */
-#define	M64_PLT_NEARPLTS	0x8000	/* # of NEAR PLTS we can have */
-#define	M64_PLT_ENTSIZE		32	/* plt entry size in bytes */
-#define	M64_PLT_FENTSIZE	24	/* size of far plt is 6 instructions */
-					/*	x 4bytes */
-#define	M64_PLT_PSIZE		8		/* size of PLTP pointer */
-#define	M64_PLT_FBLKCNTS	160	/* # of plts in far PLT blocks */
-#define	M64_PLT_FBLOCKSZ	(M64_PLT_FBLKCNTS *\
-				M64_PLT_ENTSIZE) /* size of far PLT block */
-
-
-#ifdef _ELF64
-#define	M_PLT_ENTSIZE	M64_PLT_ENTSIZE	/* plt entry size in bytes */
-#define	M_PLT_XNumber	4		/* reserved no. of plt entries */
-#define	M_PLT_ALIGN	256		/* alignment of .plt section */
-#define	M_PLT_RESERVSZ	(M_PLT_XNumber * \
-			M_PLT_ENTSIZE)	/* first 4 plt's reserved */
-#define	M_GOT_ENTSIZE	8		/* got entry size in bytes */
-#define	M_GOT_MAXSMALL	1024		/* maximum no. of small gots */
-#else /* Elf32 */
-#define	M_PLT_ENTSIZE	M32_PLT_ENTSIZE	/* plt entry size in bytes */
-#define	M_PLT_XNumber	4		/* reserved no. of plt entries */
-#define	M_PLT_ALIGN	M_WORD_ALIGN	/* alignment of .plt section */
-#define	M_PLT_RESERVSZ	(M_PLT_XNumber * \
-			M_PLT_ENTSIZE)	/* first 4 plt's reserved */
-#define	M_GOT_ENTSIZE	4		/* got entry size in bytes */
-#define	M_GOT_MAXSMALL	2048		/* maximum no. of small gots */
-#endif /* _ELF64 */
-					/* transition flags for got sizing */
+/* transition flags for got sizing */
 #define	M_GOT_LARGE	(Sword)(-M_GOT_MAXSMALL - 1)
 #define	M_GOT_SMALL	(Sword)(-M_GOT_MAXSMALL - 2)
 #define	M_GOT_MIXED	(Sword)(-M_GOT_MAXSMALL - 3)
-
 
 /*
  * Other machine dependent entities
@@ -179,13 +133,11 @@ extern "C" {
 #define	M_SEGM_ORIGIN	(Addr)0x100000000ULL	/* default 1st segment origin */
 #define	M_SEGM_AORIGIN	(Addr)0x100000ULL	/* alternative 1st segment */
 						/*    origin */
-#define	M_WORD_ALIGN	8
 #else
 #define	M_SEGM_ALIGN	ELF_SPARC_MAXPGSZ
 #define	M_SEGM_ORIGIN	(Addr)0x10000		/* default 1st segment origin */
 #define	M_SEGM_AORIGIN	M_SEGM_ORIGIN		/* alternative 1st segment */
 						/*    origin */
-#define	M_WORD_ALIGN	4
 #endif
 
 /*

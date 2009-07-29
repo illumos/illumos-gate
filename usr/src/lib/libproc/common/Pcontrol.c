@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Chad Mynhier
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -59,6 +58,7 @@
 int	_libproc_debug;		/* set non-zero to enable debugging printfs */
 int	_libproc_no_qsort;	/* set non-zero to inhibit sorting */
 				/* of symbol tables */
+int	_libproc_incore_elf;	/* only use in-core elf data */
 
 sigset_t blockable_sigs;	/* signals to block when we need to be safe */
 static	int	minfd;	/* minimum file descriptor returned by dupfd(fd, 0) */
@@ -99,6 +99,7 @@ _libproc_init(void)
 {
 	_libproc_debug = getenv("LIBPROC_DEBUG") != NULL;
 	_libproc_no_qsort = getenv("LIBPROC_NO_QSORT") != NULL;
+	_libproc_incore_elf = getenv("LIBPROC_INCORE_ELF") != NULL;
 
 	(void) sigfillset(&blockable_sigs);
 	(void) sigdelset(&blockable_sigs, SIGKILL);

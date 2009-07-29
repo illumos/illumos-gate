@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ELF_AMD64_H
 #define	_SYS_ELF_AMD64_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <sys/elf_386.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -127,14 +127,44 @@ extern "C" {
 
 #define	SHF_AMD64_LARGE		0x10000000
 #define	SHF_X86_64_LARGE	SHF_AMD64_LARGE
-#define	SHF_ORDERED		0x40000000
-#define	SHF_EXCLUDE		0x80000000
 
-#define	SHN_BEFORE		0xff00
-#define	SHN_AFTER		0xff01
 #define	SHN_AMD64_LCOMMON	0xff02
 #define	SHN_X86_64_LCOMMON	SHN_AMD64_LCOMMON
 
+/*
+ * There are consumers of this file that want to include elf defines for
+ * all architectures.  This is a problem for the defines below, because
+ * while they are architecture specific they have common names.  Hence to
+ * prevent attempts to redefine these variables we'll check if any of
+ * the other elf architecture header files have been included.  If
+ * they have then we'll just stick with the existing definitions.
+ */
+#if defined(_SYS_ELF_MACH_386)
+
+/*
+ * Plt and Got information; the first few .got and .plt entries are reserved
+ *	PLT[0]	jump to dynamic linker
+ *	GOT[0]	address of _DYNAMIC
+ */
+#define	M64_WORD_ALIGN		8
+#define	M64_PLT_ENTSIZE		M32_PLT_ENTSIZE
+#define	M64_PLT_ALIGN		M64_WORD_ALIGN	/* alignment of .plt section */
+#define	M64_GOT_ENTSIZE		8	/* got entry size in bytes */
+#define	M64_PLT_RESERVSZ	M32_PLT_RESERVSZ
+
+/*
+ * Make common alias for the 32/64 bit specific defines based on _ELF64
+ */
+#if defined(_ELF64)
+/* architecture common defines */
+#define	M_WORD_ALIGN		M64_WORD_ALIGN
+#define	M_PLT_ENTSIZE		M64_PLT_ENTSIZE
+#define	M_PLT_ALIGN		M64_PLT_ALIGN
+#define	M_PLT_RESERVSZ		M64_PLT_RESERVSZ
+#define	M_GOT_ENTSIZE		M64_GOT_ENTSIZE
+#endif /* _ELF64 */
+
+#endif /* _SYS_ELF_MACH_386 */
 
 #ifdef	__cplusplus
 }

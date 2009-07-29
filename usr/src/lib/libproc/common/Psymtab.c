@@ -1587,6 +1587,31 @@ optimize_symtab(sym_tbl_t *symtab)
 	free(syms);
 }
 
+
+static Elf *
+build_fake_elf(struct ps_prochandle *P, file_info_t *fptr, GElf_Ehdr *ehdr,
+	size_t *nshdrs, Elf_Data **shdata)
+{
+	size_t shstrndx;
+	Elf_Scn *scn;
+	Elf *elf;
+
+	if ((elf = fake_elf(P, fptr)) == NULL ||
+	    elf_kind(elf) != ELF_K_ELF ||
+	    gelf_getehdr(elf, ehdr) == NULL ||
+	    elf_getshdrnum(elf, nshdrs) == -1 ||
+	    elf_getshdrstrndx(elf, &shstrndx) == -1 ||
+	    (scn = elf_getscn(elf, shstrndx)) == NULL ||
+	    (*shdata = elf_getdata(scn, NULL)) == NULL) {
+		if (elf != NULL)
+			(void) elf_end(elf);
+		dprintf("failed to fake up ELF file\n");
+		return (NULL);
+	}
+
+	return (elf);
+}
+
 /*
  * Build the symbol table for the given mapped file.
  */
@@ -1657,20 +1682,22 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	 * name. If anything goes wrong try to fake up an elf file from
 	 * the in-core elf image.
 	 */
-	if ((fptr->file_fd = open(objectfile, O_RDONLY)) < 0) {
+
+	if (_libproc_incore_elf) {
+		dprintf("Pbuild_file_symtab: using in-core data for: %s\n",
+		    fptr->file_pname);
+
+		if ((elf = build_fake_elf(P, fptr, &ehdr, &nshdrs, &shdata)) ==
+		    NULL)
+			return;
+
+	} else if ((fptr->file_fd = open(objectfile, O_RDONLY)) < 0) {
 		dprintf("Pbuild_file_symtab: failed to open %s: %s\n",
 		    objectfile, strerror(errno));
 
-		if ((elf = fake_elf(P, fptr)) == NULL ||
-		    elf_kind(elf) != ELF_K_ELF ||
-		    gelf_getehdr(elf, &ehdr) == NULL ||
-		    elf_getshdrnum(elf, &nshdrs) == -1 ||
-		    elf_getshdrstrndx(elf, &shstrndx) == -1 ||
-		    (scn = elf_getscn(elf, shstrndx)) == NULL ||
-		    (shdata = elf_getdata(scn, NULL)) == NULL) {
-			dprintf("failed to fake up ELF file\n");
+		if ((elf = build_fake_elf(P, fptr, &ehdr, &nshdrs, &shdata)) ==
+		    NULL)
 			return;
-		}
 
 	} else if ((elf = elf_begin(fptr->file_fd, ELF_C_READ, NULL)) == NULL ||
 	    elf_kind(elf) != ELF_K_ELF ||
@@ -1683,17 +1710,11 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 
 		dprintf("failed to process ELF file %s: %s\n",
 		    objectfile, (err == 0) ? "<null>" : elf_errmsg(err));
+		(void) elf_end(elf);
 
-		if ((elf = fake_elf(P, fptr)) == NULL ||
-		    elf_kind(elf) != ELF_K_ELF ||
-		    gelf_getehdr(elf, &ehdr) == NULL ||
-		    elf_getshdrnum(elf, &nshdrs) == -1 ||
-		    elf_getshdrstrndx(elf, &shstrndx) == -1 ||
-		    (scn = elf_getscn(elf, shstrndx)) == NULL ||
-		    (shdata = elf_getdata(scn, NULL)) == NULL) {
-			dprintf("failed to fake up ELF file\n");
-			goto bad;
-		}
+		if ((elf = build_fake_elf(P, fptr, &ehdr, &nshdrs, &shdata)) ==
+		    NULL)
+			return;
 
 	} else if (file_differs(P, elf, fptr)) {
 		Elf *newelf;
@@ -1704,23 +1725,14 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		 * they don't agree, we try to fake up a new elf file and
 		 * proceed with that instead.
 		 */
-
 		dprintf("ELF file %s (%lx) doesn't match in-core image\n",
 		    fptr->file_pname,
 		    (ulong_t)fptr->file_map->map_pmap.pr_vaddr);
 
-		if ((newelf = fake_elf(P, fptr)) == NULL ||
-		    elf_kind(newelf) != ELF_K_ELF ||
-		    gelf_getehdr(newelf, &ehdr) == NULL ||
-		    elf_getshdrnum(newelf, &nshdrs) == -1 ||
-		    elf_getshdrstrndx(newelf, &shstrndx) == -1 ||
-		    (scn = elf_getscn(newelf, shstrndx)) == NULL ||
-		    (shdata = elf_getdata(scn, NULL)) == NULL) {
-			dprintf("failed to fake up ELF file\n");
-		} else {
+		if ((newelf = build_fake_elf(P, fptr, &ehdr, &nshdrs, &shdata))
+		    != NULL) {
 			(void) elf_end(elf);
 			elf = newelf;
-
 			dprintf("switched to faked up ELF file\n");
 		}
 	}
@@ -1910,12 +1922,35 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		GElf_Dyn d;
 
 		for (i = 0; i < ndyn; i++) {
-			if (gelf_getdyn(dyn->c_data, i, &d) != NULL &&
-			    d.d_tag == DT_JMPREL) {
+			if (gelf_getdyn(dyn->c_data, i, &d) == NULL)
+				continue;
+
+			switch (d.d_tag) {
+			case DT_JMPREL:
 				dprintf("DT_JMPREL is %p\n",
 				    (void *)(uintptr_t)d.d_un.d_ptr);
 				fptr->file_jmp_rel =
 				    d.d_un.d_ptr + fptr->file_dyn_base;
+				break;
+			case DT_STRTAB:
+				dprintf("DT_STRTAB is %p\n",
+				    (void *)(uintptr_t)d.d_un.d_ptr);
+				break;
+			case DT_PLTGOT:
+				dprintf("DT_PLTGOT is %p\n",
+				    (void *)(uintptr_t)d.d_un.d_ptr);
+				break;
+			case DT_SUNW_SYMTAB:
+				dprintf("DT_SUNW_SYMTAB is %p\n",
+				    (void *)(uintptr_t)d.d_un.d_ptr);
+				break;
+			case DT_SYMTAB:
+				dprintf("DT_SYMTAB is %p\n",
+				    (void *)(uintptr_t)d.d_un.d_ptr);
+				break;
+			case DT_HASH:
+				dprintf("DT_HASH is %p\n",
+				    (void *)(uintptr_t)d.d_un.d_ptr);
 				break;
 			}
 		}

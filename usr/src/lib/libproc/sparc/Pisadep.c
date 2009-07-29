@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stack.h>
 #include <sys/regset.h>
 #include <sys/frame.h>
 #include <sys/sysmacros.h>
+#include <sys/machelf.h>
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -39,9 +38,6 @@
 #include "Pcontrol.h"
 #include "Pstack.h"
 #include "Pisadep.h"
-
-#define	M_PLT_NRSV	4			/* reserved PLT entries */
-#define	M_PLT_ENTSIZE	12			/* size of each PLT entry */
 
 #define	SYSCALL32 0x91d02008	/* 32-bit syscall (ta 8) instruction */
 
@@ -67,7 +63,7 @@ Ppltdest(struct ps_prochandle *P, uintptr_t pltaddr)
 	}
 
 	i = (pltaddr - fp->file_plt_base -
-	    M_PLT_NRSV * M_PLT_ENTSIZE) / M_PLT_ENTSIZE;
+	    M_PLT_XNumber * M32_PLT_ENTSIZE) / M32_PLT_ENTSIZE;
 
 	r_addr = fp->file_jmp_rel + i * sizeof (Elf32_Rela);
 
@@ -328,8 +324,8 @@ uintptr_t
 Psyscall_setup(struct ps_prochandle *P, int nargs, int sysindex, uintptr_t sp)
 {
 	sp -= (nargs > 6)?
-		WINDOWSIZE32 + sizeof (int32_t) * (1 + nargs) :
-		WINDOWSIZE32 + sizeof (int32_t) * (1 + 6);
+	    WINDOWSIZE32 + sizeof (int32_t) * (1 + nargs) :
+	    WINDOWSIZE32 + sizeof (int32_t) * (1 + 6);
 	sp = PSTACK_ALIGN32(sp);
 
 	P->status.pr_lwp.pr_reg[R_G1] = sysindex;

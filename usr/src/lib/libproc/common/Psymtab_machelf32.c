@@ -20,15 +20,15 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <string.h>
 #include <memory.h>
 #include <sys/sysmacros.h>
 #include <sys/machelf.h>
@@ -146,14 +146,14 @@
  * We can figure out the size of the .plt section, but it takes some
  * doing. We need to use the following information:
  *
- *	DT_PLTGOT	base of the PLT
+ *	DT_PLTGOT	GOT PLT entry offset (on x86) or PLT offset (on sparc)
  *	DT_JMPREL	base of the PLT's relocation section
  *	DT_PLTRELSZ	size of the PLT's relocation section
  *	DT_PLTREL	type of the PLT's relocation section
  *
- * We can use the relocation section to figure out the address of the
- * last entry and subtract off the value of DT_PLTGOT to calculate
- * the size of the PLT.
+ * We can use the number of relocation entries to calculate the size of
+ * the PLT.  We get the address of the PLT by looking up the
+ * _PROCEDURE_LINKAGE_TABLE_ symbol.
  *
  * For more information, check out the System V Generic ABI.
  */
@@ -245,7 +245,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	size_t size = 0;
 	caddr_t elfdata = NULL;
 	Elf *elf;
-	size_t dynsym_size, ldynsym_size;
+	size_t dynsym_size = 0, ldynsym_size;
 	int dynstr_shndx;
 	Ehdr *ep;
 	Shdr *sp;
@@ -253,7 +253,9 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	Dyn *d[DI_NENT] = { 0 };
 	uint_t i;
 	Off off;
-	size_t pltsz = 0, pltentsz;
+	size_t pltsz = 0, pltentries = 0;
+	uintptr_t hptr = NULL;
+	Word hnchains, hnbuckets;
 
 	if (ehdr->e_type == ET_DYN)
 		phdr->p_vaddr += addr;
@@ -327,18 +329,6 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 		goto bad;
 	}
 
-	if (ehdr->e_type == ET_DYN) {
-		if (d[DI_PLTGOT] != NULL)
-			d[DI_PLTGOT]->d_un.d_ptr += addr;
-		if (d[DI_JMPREL] != NULL)
-			d[DI_JMPREL]->d_un.d_ptr += addr;
-		d[DI_SYMTAB]->d_un.d_ptr += addr;
-		d[DI_HASH]->d_un.d_ptr += addr;
-		d[DI_STRTAB]->d_un.d_ptr += addr;
-		if (d[DI_SUNW_SYMTAB] != NULL)
-			d[DI_SUNW_SYMTAB]->d_un.d_ptr += addr;
-	}
-
 	/* SUNW_ldynsym must be adjacent to dynsym. Ignore if not */
 	if ((d[DI_SUNW_SYMTAB] != NULL) && (d[DI_SUNW_SYMSZ] != NULL) &&
 	    ((d[DI_SYMTAB]->d_un.d_ptr <= d[DI_SUNW_SYMTAB]->d_un.d_ptr) ||
@@ -359,6 +349,23 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	size += sizeof (Shdr);
 	size += roundup(sizeof (shstr), SH_ADDRALIGN);
 
+	if (d[DI_HASH] != NULL) {
+		Word hash[2];
+
+		hptr = d[DI_HASH]->d_un.d_ptr;
+		if (ehdr->e_type == ET_DYN)
+			hptr += addr;
+
+		if (Pread(P, hash, sizeof (hash), hptr) != sizeof (hash)) {
+			dprintf("Pread of .hash at %lx failed\n",
+			    (long)(hptr));
+			goto bad;
+		}
+
+		hnbuckets = hash[0];
+		hnchains = hash[1];
+	}
+
 	/*
 	 * .dynsym and .SUNW_ldynsym sections.
 	 *
@@ -374,16 +381,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 		ldynsym_size -= dynsym_size;
 		dynstr_shndx = 4;
 	} else {
-		Word nchain;
-
-		if (Pread(P, &nchain, sizeof (nchain),
-		    d[DI_HASH]->d_un.d_ptr + sizeof (nchain)) !=
-		    sizeof (nchain)) {
-			dprintf("Pread of .dynsym at %lx failed\n",
-			    (long)(d[DI_HASH]->d_un.d_val + sizeof (nchain)));
-			goto bad;
-		}
-		dynsym_size = sizeof (Sym) * nchain;
+		dynsym_size = sizeof (Sym) * hnchains;
 		ldynsym_size = 0;
 		dynstr_shndx = 3;
 	}
@@ -400,64 +398,41 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	/* .plt section */
 	if (d[DI_PLTGOT] != NULL && d[DI_JMPREL] != NULL &&
 	    d[DI_PLTRELSZ] != NULL && d[DI_PLTREL] != NULL) {
-		uintptr_t penult, ult;
-		uintptr_t jmprel = d[DI_JMPREL]->d_un.d_ptr;
 		size_t pltrelsz = d[DI_PLTRELSZ]->d_un.d_val;
 
 		if (d[DI_PLTREL]->d_un.d_val == DT_RELA) {
-			uint_t entries = pltrelsz / sizeof (Rela);
-			Rela r[2];
-
-			if (entries < PLTREL_MIN_ENTRIES) {
-				dprintf("too few PLT relocation entries "
-				    "(found %d, expected at least %d)\n",
-				    entries, PLTREL_MIN_ENTRIES);
-				goto bad;
-			}
-			if (entries < PLTREL_MIN_ENTRIES + 2)
-				goto done_with_plt;
-
-			if (Pread(P, r, sizeof (r), jmprel + sizeof (r[0]) *
-			    entries - sizeof (r)) != sizeof (r)) {
-				dprintf("Pread of DT_RELA failed\n");
-				goto bad;
-			}
-
-			penult = r[0].r_offset;
-			ult = r[1].r_offset;
-
+			pltentries = pltrelsz / sizeof (Rela);
 		} else if (d[DI_PLTREL]->d_un.d_val == DT_REL) {
-			uint_t entries = pltrelsz / sizeof (Rel);
-			Rel r[2];
-
-			if (entries < PLTREL_MIN_ENTRIES) {
-				dprintf("too few PLT relocation entries "
-				    "(found %d, expected at least %d)\n",
-				    entries, PLTREL_MIN_ENTRIES);
-				goto bad;
-			}
-			if (entries < PLTREL_MIN_ENTRIES + 2)
-				goto done_with_plt;
-
-			if (Pread(P, r, sizeof (r), jmprel + sizeof (r[0]) *
-			    entries - sizeof (r)) != sizeof (r)) {
-				dprintf("Pread of DT_REL failed\n");
-				goto bad;
-			}
-
-			penult = r[0].r_offset;
-			ult = r[1].r_offset;
+			pltentries = pltrelsz / sizeof (Rel);
 		} else {
-			dprintf(".plt: unknown jmprel value\n");
-			goto bad;
+			/* fall back to the platform default */
+#if ((defined(__i386) || defined(__amd64)) && !defined(_ELF64))
+			pltentries = pltrelsz / sizeof (Rel);
+			dprintf("DI_PLTREL not found, defaulting to Rel");
+#else /* (!(__i386 || __amd64)) || _ELF64 */
+			pltentries = pltrelsz / sizeof (Rela);
+			dprintf("DI_PLTREL not found, defaulting to Rela");
+#endif /* (!(__i386 || __amd64) || _ELF64 */
 		}
 
-		pltentsz = ult - penult;
+		if (pltentries < PLTREL_MIN_ENTRIES) {
+			dprintf("too few PLT relocation entries "
+			    "(found %lu, expected at least %d)\n",
+			    (long)pltentries, PLTREL_MIN_ENTRIES);
+			goto bad;
+		}
+		if (pltentries < PLTREL_MIN_ENTRIES + 2)
+			goto done_with_plt;
 
-		if (ehdr->e_type == ET_DYN)
-			ult += addr;
-
-		pltsz = ult - d[DI_PLTGOT]->d_un.d_ptr + pltentsz;
+		/*
+		 * Now that we know the number of plt relocation entries
+		 * we can calculate the size of the plt.
+		 */
+		pltsz = (pltentries + M_PLT_XNumber) * M_PLT_ENTSIZE;
+#if defined(__sparc)
+		/* The sparc PLT always has a (delay slot) nop at the end */
+		pltsz += 4;
+#endif /* __sparc */
 
 		size += sizeof (Shdr);
 		size += roundup(pltsz, SH_ADDRALIGN);
@@ -532,7 +507,7 @@ done_with_plt:
 		sp->sh_flags = SHF_ALLOC;
 		sp->sh_addr = d[DI_SUNW_SYMTAB]->d_un.d_ptr;
 		if (ehdr->e_type == ET_DYN)
-			sp->sh_addr -= addr;
+			sp->sh_addr += addr;
 		sp->sh_offset = off;
 		sp->sh_size = ldynsym_size;
 		sp->sh_link = dynstr_shndx;
@@ -542,9 +517,9 @@ done_with_plt:
 		sp->sh_entsize = sizeof (Sym);
 
 		if (Pread(P, &elfdata[off], sp->sh_size,
-		    d[DI_SUNW_SYMTAB]->d_un.d_ptr) != sp->sh_size) {
+		    sp->sh_addr) != sp->sh_size) {
 			dprintf("failed to read .SUNW_ldynsym at %lx\n",
-			    (long)d[DI_SUNW_SYMTAB]->d_un.d_ptr);
+			    (long)sp->sh_addr);
 			goto bad;
 		}
 		off += sp->sh_size;
@@ -560,7 +535,7 @@ done_with_plt:
 	sp->sh_flags = SHF_ALLOC;
 	sp->sh_addr = d[DI_SYMTAB]->d_un.d_ptr;
 	if (ehdr->e_type == ET_DYN)
-		sp->sh_addr -= addr;
+		sp->sh_addr += addr;
 	sp->sh_offset = off;
 	sp->sh_size = dynsym_size;
 	sp->sh_link = dynstr_shndx;
@@ -569,9 +544,9 @@ done_with_plt:
 	sp->sh_entsize = sizeof (Sym);
 
 	if (Pread(P, &elfdata[off], sp->sh_size,
-	    d[DI_SYMTAB]->d_un.d_ptr) != sp->sh_size) {
+	    sp->sh_addr) != sp->sh_size) {
 		dprintf("failed to read .dynsym at %lx\n",
-		    (long)d[DI_SYMTAB]->d_un.d_ptr);
+		    (long)sp->sh_addr);
 		goto bad;
 	}
 
@@ -586,7 +561,7 @@ done_with_plt:
 	sp->sh_flags = SHF_ALLOC | SHF_STRINGS;
 	sp->sh_addr = d[DI_STRTAB]->d_un.d_ptr;
 	if (ehdr->e_type == ET_DYN)
-		sp->sh_addr -= addr;
+		sp->sh_addr += addr;
 	sp->sh_offset = off;
 	sp->sh_size = d[DI_STRSZ]->d_un.d_val;
 	sp->sh_link = 0;
@@ -595,7 +570,7 @@ done_with_plt:
 	sp->sh_entsize = 0;
 
 	if (Pread(P, &elfdata[off], sp->sh_size,
-	    d[DI_STRTAB]->d_un.d_ptr) != sp->sh_size) {
+	    sp->sh_addr) != sp->sh_size) {
 		dprintf("failed to read .dynstr\n");
 		goto bad;
 	}
@@ -626,27 +601,107 @@ done_with_plt:
 	 * Section Header: .plt
 	 */
 	if (pltsz != 0) {
+		ulong_t		plt_symhash;
+		uint_t		htmp, ndx;
+		uintptr_t	strtabptr, strtabname;
+		Sym		sym, *symtabptr;
+		uint_t		*hash;
+		char		strbuf[sizeof ("_PROCEDURE_LINKAGE_TABLE_")];
+
+		/*
+		 * Now we need to find the address of the plt by looking
+		 * up the "_PROCEDURE_LINKAGE_TABLE_" symbol.
+		 */
+
+		/* get the address of the symtab and strtab sections */
+		strtabptr = d[DI_STRTAB]->d_un.d_ptr;
+		symtabptr = (Sym *)(uintptr_t)d[DI_SYMTAB]->d_un.d_ptr;
+		if (ehdr->e_type == ET_DYN) {
+			strtabptr += addr;
+			symtabptr = (Sym*)((uintptr_t)symtabptr + addr);
+		}
+
+		/* find the .hash bucket address for this symbol */
+		plt_symhash = elf_hash("_PROCEDURE_LINKAGE_TABLE_");
+		htmp = plt_symhash % hnbuckets;
+		hash = &((uint_t *)hptr)[2 + htmp];
+
+		/* read the elf hash bucket index */
+		if (Pread(P, &ndx, sizeof (ndx), (uintptr_t)hash) !=
+		    sizeof (ndx)) {
+			dprintf("Pread of .hash at %lx failed\n", (long)hash);
+			goto bad;
+		}
+
+		while (ndx) {
+			if (Pread(P, &sym, sizeof (sym),
+			    (uintptr_t)&symtabptr[ndx]) != sizeof (sym)) {
+				dprintf("Pread of .symtab at %lx failed\n",
+				    (long)&symtabptr[ndx]);
+				goto bad;
+			}
+
+			strtabname = strtabptr + sym.st_name;
+			if (Pread_string(P, strbuf, sizeof (strbuf),
+			    strtabname) < 0) {
+				dprintf("Pread of .strtab at %lx failed\n",
+				    (long)strtabname);
+				goto bad;
+			}
+
+			if (strcmp("_PROCEDURE_LINKAGE_TABLE_", strbuf) == 0)
+				break;
+
+			hash = &((uint_t *)hptr)[2 + hnbuckets + ndx];
+			if (Pread(P, &ndx, sizeof (ndx), (uintptr_t)hash) !=
+			    sizeof (ndx)) {
+				dprintf("Pread of .hash at %lx failed\n",
+				    (long)hash);
+				goto bad;
+			}
+		}
+
+#if defined(__sparc)
+		if (sym.st_value != d[DI_PLTGOT]->d_un.d_ptr) {
+			dprintf("warning: DI_PLTGOT (%lx) doesn't match "
+			    ".plt symbol pointer (%lx)",
+			    (long)d[DI_PLTGOT]->d_un.d_ptr,
+			    (long)sym.st_value);
+		}
+#endif /* __sparc */
+
+		if (ndx == 0) {
+			dprintf(
+			    "Failed to find \"_PROCEDURE_LINKAGE_TABLE_\"\n");
+			goto bad;
+		}
+
 		sp->sh_name = SHSTR_NDX_plt;
 		sp->sh_type = SHT_PROGBITS;
 		sp->sh_flags = SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR;
-		sp->sh_addr = d[DI_PLTGOT]->d_un.d_ptr;
+		sp->sh_addr = sym.st_value;
 		if (ehdr->e_type == ET_DYN)
-			sp->sh_addr -= addr;
+			sp->sh_addr += addr;
 		sp->sh_offset = off;
 		sp->sh_size = pltsz;
 		sp->sh_link = 0;
 		sp->sh_info = 0;
 		sp->sh_addralign = SH_ADDRALIGN;
-		sp->sh_entsize = pltentsz;
+		sp->sh_entsize = M_PLT_ENTSIZE;
 
-		if (Pread(P, &elfdata[off], sp->sh_size,
-		    d[DI_PLTGOT]->d_un.d_ptr) != sp->sh_size) {
-			dprintf("failed to read .plt\n");
+		if (Pread(P, &elfdata[off], sp->sh_size, sp->sh_addr) !=
+		    sp->sh_size) {
+			dprintf("failed to read .plt at %lx\n",
+			    (long)sp->sh_addr);
 			goto bad;
 		}
 		off += roundup(sp->sh_size, SH_ADDRALIGN);
 		sp++;
 	}
+
+	/* make sure we didn't write past the end of allocated memory */
+	sp++;
+	assert(((uintptr_t)(sp) - 1) < ((uintptr_t)elfdata + size));
 
 	free(dp);
 	if ((elf = elf_memory(elfdata, size)) == NULL) {
@@ -664,6 +719,4 @@ bad:
 	if (elfdata != NULL)
 		free(elfdata);
 	return (NULL);
-
-
 }
