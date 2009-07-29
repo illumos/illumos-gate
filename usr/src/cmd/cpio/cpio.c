@@ -49,7 +49,6 @@
 #include <grp.h>
 #include <signal.h>
 #include <ctype.h>
-#include <archives.h>
 #include <locale.h>
 #include <sys/ioctl.h>
 #include <sys/mtio.h>
@@ -98,6 +97,7 @@ typedef	ulong_t		u_off_t;
 #define	ARCHIVE_NORMAL	0
 #define	ARCHIVE_ACL	1
 #define	ARCHIVE_XATTR	2
+#define	ARCHIVE_SPARSE	3
 
 #ifndef	VIEW_READONLY
 #define	VIEW_READONLY	"SUNWattr_ro"
@@ -158,7 +158,6 @@ static int matched(void);
 static int missdir(char *nam_p);
 static long mklong(short v[]);
 static void mkshort(short sval[], long v);
-static void msg(int severity, const char *fmt, ...);
 static int openout(int dirfd);
 static int read_hdr(int hdr);
 static void reclaim(struct Lnk *l_p);
@@ -172,7 +171,7 @@ static void sigint(int sig);
 static void swap(char *buf_p, int cnt);
 static void usage(void);
 static void verbose(char *nam_p);
-static void write_hdr(int secflag, off_t len);
+static void write_hdr(int arcflag, off_t len);
 static void write_trail(void);
 static int ustar_dir(void);
 static int ustar_spec(void);
@@ -187,7 +186,7 @@ static int g_read(int, int, char *, unsigned);
 static int g_write(int, int, char *, unsigned);
 static int is_floppy(int);
 static int is_tape(int);
-static void write_ancillary(char *secinfo, int len);
+static void write_ancillary(char *buf, size_t len, boolean_t padding);
 static int remove_dir(char *);
 static int save_cwd(void);
 static void rest_cwd(int cwd);
@@ -267,6 +266,7 @@ struct gen_hdr {
 	int	g_passdirfd;	/* directory fd to pass to */
 	int	g_rw_sysattr;	/* read-write system attribute */
 	int	g_baseparent_fd;	/* base file's parent fd */
+	holes_info_t *g_holes;	/* sparse file information */
 
 } Gen, *G_p;
 
@@ -318,12 +318,13 @@ typedef struct sl_info
 
 typedef struct data_in
 {
-	int	data_in_swapfile;
-	int	data_in_proc_mode;
-	int	data_in_partialflg;
-	int	data_in_compress_flag;
-	long	data_in_cksumval;
-	FILE	*data_in_pipef;
+	int		data_in_errno;
+	int		data_in_swapfile;
+	int		data_in_proc_mode;
+	int		data_in_partialflg;
+	int		data_in_compress_flag;
+	long		data_in_cksumval;
+	FILE		*data_in_pipef;
 } data_in_t;
 
 /*
@@ -423,7 +424,6 @@ char	*myname,		/* program name */
 	Ttyname[] = "/dev/tty",	/* Controlling console */
 	T_lname[MAXPATHLEN],	/* Array to hold links name for tar */
 	*Buf_p,			/* Buffer for file system I/O */
-	*Empty,			/* Empty block for TARTYP headers */
 	*Full_p,		/* Pointer to full pathname */
 	*Efil_p,		/* -E pattern file string */
 	*Eom_p = "Change to part %d and press RETURN key. [q] ",
@@ -449,6 +449,7 @@ static
 int	Append = 0,	/* Flag set while searching to end of archive */
 	Archive,	/* File descriptor of the archive */
 	Buf_error = 0,	/* I/O error occurred during buffer fill */
+	Compress_sparse = 0,	/* Compress sparse files */
 	Def_mode = 0777,	/* Default file/directory protection modes */
 	Device,		/* Device type being accessed (used with libgenIO) */
 	Error_cnt = 0,	/* Cumulative count of I/O errors */
@@ -652,7 +653,6 @@ static struct xattr_buf	*xattr_linkp;
 static int 		xattrbadhead;	/* is extended attribute header bad? */
 
 static int	append_secattr(char **, int *, acl_t *);
-static void	write_ancillary(char *, int);
 
 /*
  * Note regarding cpio and changes to ensure cpio doesn't try to second
@@ -685,17 +685,6 @@ static void	write_ancillary(char *, int);
 #ifdef WAITAROUND
 int waitaround = 0;		/* wait for rendezvous with the debugger */
 #endif
-
-/*
- * Allocation wrappers and their flags
- */
-#define	E_NORMAL	0x0	/* Return NULL if allocation fails */
-#define	E_EXIT		0x1	/* Exit if allocation fails */
-
-static void *e_realloc(int flag, void *old, size_t newsize);
-static char *e_strdup(int flag, const char *arg);
-static void *e_valloc(int flag, size_t size);
-static void *e_zalloc(int flag, size_t size);
 
 #define	EXIT_CODE	(Error_cnt > 255 ? 255 : Error_cnt)
 
@@ -792,6 +781,7 @@ main(int argc, char **argv)
 		Gen.g_dirfd = -1;
 		Gen.g_passdirfd = -1;
 		Gen.g_dirpath = NULL;
+		Compress_sparse = 1;
 		while (getname()) {
 			/*
 			 * If file is a fully qualified path then
@@ -1064,7 +1054,7 @@ chgreel(int dir)
 		do { /* tryagain */
 			if (IOfil_p) {
 				do {
-					msg(EPOST, gettext(Eom_p), Volcnt);
+					msg(EPOST, Eom_p, Volcnt);
 					if (!Rtty_p || fgets(str, sizeof (str),
 					    Rtty_p) == NULL)
 						msg(EXT, "Cannot read tty.");
@@ -1264,7 +1254,8 @@ ckopts(long mask)
 		msg(ERR, "-a and -m are mutually exclusive.");
 	}
 
-	if ((mask & OCc) && (mask & OCH) && (strcmp("odc", Hdr_p))) {
+	if ((mask & OCc) && (mask & OCH) &&
+	    (strcmp("odc", Hdr_p) != 0 && strcmp("odc_sparse", Hdr_p) != 0)) {
 		msg(ERR, "-c and -H are mutually exclusive.");
 	}
 
@@ -1312,6 +1303,17 @@ ckopts(long mask)
 			Max_namesz = CPATH;
 			Onecopy = 0;
 			Use_old_stat = 1;
+		} else if (!(strcmp("odc_sparse", Hdr_p))) {
+			Hdr_type = CHR;
+			Max_namesz = CPATH;
+			Onecopy = 0;
+			Use_old_stat = 1;
+			Compress_sparse = 1;
+		} else if (!(strcmp("ascii_sparse", Hdr_p))) {
+			Hdr_type = ASC;
+			Max_namesz = APATH;
+			Onecopy = 1;
+			Compress_sparse = 1;
 		} else if (!(strcmp("crc", Hdr_p))) {
 			Hdr_type = CRC;
 			Max_namesz = APATH;
@@ -1624,7 +1626,7 @@ creat_hdr(void)
 			if (dgroup == NULL) {
 				msg(EPOST,
 				    "cpio: could not get group information "
-				    "for %s%s%S",
+				    "for %s%s%s",
 				    (Gen.g_attrnam_p == NULL) ?
 				    Gen.g_nam_p : Gen.g_attrfnam_p,
 				    (Gen.g_attrnam_p == NULL) ?
@@ -2255,21 +2257,213 @@ read_chunk(int ifd, char *buffer, size_t datasize, data_in_t *data_in_info)
 	}
 }
 
+/*
+ * Read as much data as we can.
+ *
+ * ifd		- input file descriptor.
+ * buf		- Buffer (allocated by caller) to copy data to.
+ * bytes	- The amount of data to read from the input file
+ *		and copy to the buffer.
+ * rdblocksz	- The size of the chunk of data to read.
+ *
+ * return 0 upon success.
+ */
+static int
+read_bytes(int ifd, char *buf, size_t bytes, size_t rdblocksz,
+    data_in_t *data_in_info)
+{
+	size_t	bytesread;
+	ssize_t	got;
+
+	for (bytesread = 0; bytesread < bytes; bytesread += got) {
+		/*
+		 * Read the data from either the input file descriptor
+		 * or the archive file.  read_chunk() will only return
+		 * <= 0 if data_copy() was called from data_pass().
+		 */
+		errno = 0;
+		if ((got = read_chunk(ifd, buf + bytesread,
+		    min(bytes - bytesread, rdblocksz),
+		    data_in_info)) <= 0) {
+			data_in_info->data_in_errno = errno;
+			/*
+			 * If data couldn't be read from the input file
+			 * descriptor, set corrupt to indicate the error
+			 * and return.
+			 */
+			return (-1);
+		}
+	}
+	return (0);
+}
 
 /*
- * Copy data from the input file to output file descriptor.
- * If ifd is -1, then the input file is the archive file.
+ * Write as much data as we can.
+ *
+ * ofd		- output file descriptor.
+ * buf		- Source buffer to output data from.
+ * maxwrite	- The amount of data to write to the output.
+ *
+ * return 0 upon success.
+ */
+static int
+write_bytes(int ofd, char *buf, size_t maxwrite, data_in_t *data_in_info)
+{
+	ssize_t	cnt;
+
+	if ((cnt = write(ofd, buf, maxwrite)) < (ssize_t)maxwrite) {
+		data_in_info->data_in_errno = errno;
+		/*
+		 * data_in() needs to know if it was an actual write(2)
+		 * failure, or if we just couldn't write all of the data
+		 * requested so that we know that the rest of the file's
+		 * data can be read but not written.
+		 */
+		if (cnt != -1 && data_in_info != NULL) {
+			data_in_info->data_in_partialflg = 1;
+		}
+		return (1);
+	} else if (Args & OCp) {
+		Blocks += (u_longlong_t)((cnt + (Bufsize - 1)) / Bufsize);
+	}
+	return (0);
+}
+
+/*
+ * Perform I/O for given byte size with using limited i/o block size
+ * and supplied buffer.
+ *
+ * ifd/ofd	- i/o file descriptor
+ * buf		- buffer to be used for i/o
+ * bytes	- Amount to read/write
+ * wrblocksz	- Output block size.
+ * rdblocksz	- Read block size.
+ *
+ * Return 0 upon success. Return negative if read failed.
+ * Return positive non-zero if write failed.
+ */
+static int
+rdwr_bytes(int ifd, int ofd, char *buf, off_t bytes,
+    size_t wrblocksz, size_t rdblocksz, data_in_t *data_in_info)
+{
+	int rv;
+	int error = 0;
+	int write_it = (data_in_info == NULL ||
+	    data_in_info->data_in_proc_mode != P_SKIP);
+
+	while (bytes > 0) {
+		/*
+		 * If the number of bytes left to write is smaller than
+		 * the preferred I/O size, then we're about to do our final
+		 * write to the file, so just set wrblocksz to the number of
+		 * bytes left to write.
+		 */
+		if (bytes < wrblocksz)
+			wrblocksz = bytes;
+
+		/* Read input till satisfy output block size */
+		rv = read_bytes(ifd, buf, wrblocksz, rdblocksz, data_in_info);
+		if (rv != 0)
+			return (rv);
+
+		if (write_it) {
+			rv = write_bytes(ofd, buf, wrblocksz, data_in_info);
+			if (rv != 0) {
+				/*
+				 * If we wrote partial, we return and quits.
+				 * Otherwise, read through the rest of input
+				 * to go to the next file.
+				 */
+				if ((Args & OCp) ||
+				    data_in_info->data_in_partialflg) {
+					return (rv);
+				} else {
+					write_it = 0;
+				}
+				error = 1;
+			}
+		}
+		bytes -= wrblocksz;
+	}
+	return (error);
+}
+
+/*
+ * Write zeros for give size.
+ *
+ * ofd		- output file descriptor
+ * buf		- buffer to fill with zeros
+ * bytes	- Amount to write
+ * wrblocksz	- Write block size
+ *
+ * return 0 upon success.
+ */
+static int
+write_zeros(int ofd, char *buf, off_t bytes, size_t wrblocksz,
+    data_in_t *data_in_info)
+{
+	int	rv;
+
+	(void) memset(buf, 0, min(bytes, wrblocksz));
+	while (bytes > 0) {
+		if (bytes < wrblocksz)
+			wrblocksz = bytes;
+		rv = write_bytes(ofd, buf, wrblocksz, data_in_info);
+		if (rv != 0)
+			return (rv);
+		bytes -= wrblocksz;
+	}
+	return (0);
+}
+
+/*
+ * To figure out the size of the buffer used to accumulate data from
+ * readtape() and to write to the file, we need to determine the largest
+ * chunk of data to be written to the file at one time. This is determined
+ * based on the following three things:
+ *	1) The size of the archived file.
+ *	2) The preferred I/O size of the file.
+ *	3) If the file is a read-write system attribute file.
+ * If the size of the file is less than the preferred I/O size or it's a
+ * read-write system attribute file, which must be written in one operation,
+ * then set the maximum write size to the size of the archived file.
+ * Otherwise, the maximum write size is preferred I/O size.
+ */
+static int
+calc_maxwrite(int ofd, int rw_sysattr, off_t bytes, size_t blocksize)
+{
+	struct stat tsbuf;
+	size_t maxwrite;
+	size_t piosize;		/* preferred I/O size */
+
+	if (rw_sysattr || bytes < blocksize) {
+		maxwrite = bytes;
+	} else {
+		if (fstat(ofd, &tsbuf) == 0) {
+			piosize = tsbuf.st_blksize;
+		} else {
+			piosize = blocksize;
+		}
+		maxwrite = min(bytes, piosize);
+	}
+	return (maxwrite);
+}
+/*
+ * data_copy() and data_copy_with_holes() copy data from the input
+ * file to output file descriptor. If ifd is -1, then the input file is
+ * the archive file.
  *
  * Parameters
  *	ifd		- Input file descriptor to read from.
  *	ofd		- Output file descriptor of extracted file.
  *	rw_sysattr	- Flag indicating if a file is an extended
  *			system attribute file.
- *	bytes		- Amount of data of copy/write.
+ *	bytes		- Amount of data (file size) of copy/write.
  *	blocksize	- Amount of data to read at a time from either
  *			the input file descriptor or from the archive.
  *	data_in_info	- information needed while reading data when
  *			called by data_in().
+ *	holes		- Information of holes in the input file.
  *
  * Return code
  *	0		Success
@@ -2283,122 +2477,174 @@ data_copy(int ifd, int ofd, int rw_sysattr, off_t bytes,
     size_t blocksize, data_in_t *data_in_info)
 {
 	char *buf;
-	int write_it = ((data_in_info == NULL) ||
-	    data_in_info->data_in_proc_mode != P_SKIP);
-	size_t bytesread;
 	size_t maxwrite;
-	size_t piosize;		/* preferred I/O size */
-	ssize_t got;
-	ssize_t cnt;
-	struct stat tsbuf;
+	int rv;
 
 	/* No data to copy. */
-	if (bytes == 0) {
+	if (bytes == 0)
 		return (0);
+
+	maxwrite = calc_maxwrite(ofd, rw_sysattr, bytes, blocksize);
+	buf = e_zalloc(E_EXIT, maxwrite);
+
+	rv = rdwr_bytes(ifd, ofd, buf, bytes, maxwrite,
+	    blocksize, data_in_info);
+
+	free(buf);
+	return (rv);
+}
+
+static int
+data_copy_with_holes(int ifd, int ofd, int rw_sysattr, off_t bytes,
+    size_t blocksize, data_in_t *data_in_info, holes_info_t *holes)
+{
+	holes_list_t	*hl;
+	off_t		curpos, noff, datasize;
+	char		*buf;
+	size_t		maxwrite;
+	int		rv, error;
+
+	if (bytes == 0)
+		return (0);
+
+	maxwrite = calc_maxwrite(ofd, rw_sysattr, bytes, blocksize);
+	buf = e_zalloc(E_EXIT, maxwrite);
+
+	error = 0;
+	curpos = 0;
+	for (hl = holes->holes_list; hl != NULL; hl = hl->hl_next) {
+		if (curpos != hl->hl_data) {
+			/* adjust output position */
+			noff = lseek(ofd, hl->hl_data, SEEK_SET);
+			if (noff != hl->hl_data) {
+				/*
+				 * Can't seek to the target, try to adjust
+				 * position by filling with zeros.
+				 */
+				datasize = hl->hl_data - curpos;
+				rv = write_zeros(ofd, buf, datasize,
+				    maxwrite, data_in_info);
+				if (rv != 0)
+					goto errout;
+			}
+			/*
+			 * Data is contiguous in the archive, but fragmented
+			 * in the regular file, so we also adjust the input
+			 * file position in pass mode.
+			 */
+			if (Args & OCp) {
+				/* adjust input position */
+				(void) lseek(ifd, hl->hl_data, SEEK_SET);
+			}
+			curpos = hl->hl_data;
+		}
+		datasize = hl->hl_hole - hl->hl_data;
+		if (datasize == 0) {
+			/*
+			 * There is a hole at the end of file. To create
+			 * such hole, we append one byte, and truncate the
+			 * last block. This is necessary because ftruncate(2)
+			 * alone allocates one block on the end of file.
+			 */
+			rv = write_zeros(ofd, buf, 1, maxwrite, data_in_info);
+			if (rv != 0)
+				goto errout;
+			(void) ftruncate(ofd, hl->hl_data);
+			break;
+		}
+		rv = rdwr_bytes(ifd, ofd, buf, datasize, maxwrite,
+		    blocksize, data_in_info);
+		if (rv != 0) {
+errout:
+			/*
+			 * Return if we got a read error or in pass mode,
+			 * or failed with partial write. Otherwise, we'll
+			 * read through the input till next file.
+			 */
+			if (rv < 0 || (Args & OCp) ||
+			    data_in_info->data_in_partialflg) {
+				free(buf);
+				return (rv);
+			}
+			error = 1;
+			hl = hl->hl_next;
+			break;
+		}
+		curpos += datasize;
 	}
 
 	/*
-	 * To figure out the size of the buffer used to accumulate data
-	 * from readtape() and to write to the file, we need to determine
-	 * the largest chunk of data to be written to the file at one time.
-	 * This is determined based on the following three things:
-	 *	1) The size of the archived file.
-	 *	2) The preferred I/O size of the file.
-	 *	3) If the file is a read-write system attribute file.
-	 *
-	 * If the size of the file is less than the preferred I/O
-	 * size or it's a read-write system attribute file, which must be
-	 * written in one operation, then set the maximum write size to the
-	 * size of the archived file.  Otherwise, the maximum write size is
-	 * preferred I/O size.
+	 * We should read through the input data to go to the next
+	 * header when non-fatal error occured.
 	 */
-	if (rw_sysattr || (bytes < blocksize)) {
-		maxwrite = bytes;
-	} else {
-		if (fstat(ofd, &tsbuf) == 0) {
-			piosize = tsbuf.st_blksize;
-		} else {
-			piosize = blocksize;
-		}
-		maxwrite = min(bytes, piosize);
-	}
-	buf = e_zalloc(E_EXIT, maxwrite);
-
-	while (bytes > 0) {
-		/*
-		 * Read as much data as we can.  We're limited by
-		 * the smallest of:
-		 *	- the number of bytes left to be read,
-		 *	- the size of the chunk of data to read (blocksize).
-		 */
-		for (bytesread = 0; bytesread < maxwrite; bytesread += got) {
-
-			/*
-			 * Read the data from either the input file descriptor
-			 * or the archive file.  read_chunk() will only return
-			 * <= 0 if called from data_pass().
-			 */
-			errno = 0;
-			if ((got = read_chunk(ifd, buf + bytesread,
-			    min(maxwrite - bytesread, blocksize),
-			    data_in_info)) <= 0) {
-
-				/*
-				 * If data couldn't be read from the input file
-				 * descriptor, set corrupt to indicate the error
-				 * and return.
-				 */
-				free(buf);
-				return (-1);
-			}
-		}
-
-		/*
-		 * write_it will always be true when called from data_pass(),
-		 * however, it will not be true when called from data_in()
-		 * if we are just doing a table of contents or if there
-		 * there was a problem writing to the file earlier and now
-		 * we're just reading the data without writing it order to
-		 * process the next file.
-		 */
-		if (write_it) {
-			errno = 0;
-			if ((cnt = write(ofd, buf, maxwrite)) < maxwrite) {
-				/*
-				 * data_in() needs to know if it was an
-				 * actual write(2) failure, or if we just
-				 * couldn't write all of the data requested
-				 * so that we know that the rest of the file's
-				 * data can be read but not written.
-				 */
-				if ((cnt != -1) && (data_in_info != NULL)) {
-					data_in_info->data_in_partialflg = 1;
-				}
-				free(buf);
-				return (1);
-			} else if (Args & OCp) {
-				Blocks += (u_longlong_t)((cnt +
-				    (Bufsize - 1)) / Bufsize);
-			}
-		}
-		bytes -= maxwrite;
-
-		/*
-		 * If we've reached this point and there is still data
-		 * to be written, maxwrite had to have been determined
-		 * by the preferred I/O size.  If the number of bytes
-		 * left to write is smaller than the preferred I/O size,
-		 * then we're about to do our final write to the file, so
-		 * just set maxwrite to the number of bytes left to write.
-		 */
-		if ((bytes > 0) && (bytes < maxwrite)) {
-			maxwrite = bytes;
+	if (error) {
+		data_in_info->data_in_proc_mode = P_SKIP;
+		while (hl != NULL) {
+			datasize = hl->hl_hole - hl->hl_data;
+			rv = rdwr_bytes(ifd, ofd, buf, datasize, maxwrite,
+			    blocksize, data_in_info);
+			if (rv != 0)
+				break;
+			hl = hl->hl_next;
 		}
 	}
+
 	free(buf);
+	return (error);
+}
 
+/*
+ * Strip off the sparse file information that is prepended to
+ * the compressed sparse file. The information is in the following
+ * format:
+ * 	<prepended info size><SP><orig file size><SP><holes info>
+ * where prepended info size is long right justified in 10 bytes.
+ * Holesdata consists of the series of offset pairs:
+ * 	<data offset><SP><hole offset><SP><data offset><SP><hole offset>...
+ * prepended info size and original file size have been read in gethdr().
+ * We read the rest of holes information here in this function.
+ */
+static int
+read_holesdata(holes_info_t *holes, off_t *fileszp,
+    char *nam_p, data_in_t *data_in_info)
+{
+	char		*holesdata;
+	size_t		holesdata_sz;
+
+	/* We've already read the header. */
+	holesdata_sz = holes->holesdata_sz - MIN_HOLES_HDRSIZE;
+
+	if ((holesdata = e_zalloc(E_NORMAL, holesdata_sz)) == NULL) {
+		msg(ERRN, "Could not allocate memory for "
+		    "sparse file information", nam_p);
+		return (1);
+	}
+	/*
+	 * This function is called only in OCi mode. Therefore,
+	 * read_bytes() won't fail, and won't return if error occurs in
+	 * input stream. See rstbuf().
+	 */
+	(void) read_bytes(-1, holesdata, holesdata_sz, CPIOBSZ, data_in_info);
+	*fileszp -= holesdata_sz;
+
+	/* The string should be terminated. */
+	if (holesdata[holesdata_sz - 1] != '\0') {
+invalid:
+		free(holesdata);
+		msg(ERR, "invalid sparse file information", nam_p);
+		return (1);
+	}
+	if (parse_holesdata(holes, holesdata) != 0)
+		goto invalid;
+
+	/* sanity check */
+	if (*fileszp != holes->data_size)
+		goto invalid;
+
+	free(holesdata);
 	return (0);
 }
+
 /*
  * data_in:  If proc_mode == P_PROC, bread() the file's data from the archive
  * and write(2) it to the open fdes gotten from openout().  If proc_mode ==
@@ -2409,15 +2655,15 @@ data_copy(int ifd, int ofd, int rw_sysattr, off_t bytes,
  * If the CRC header was selected, calculate a running checksum as each buffer
  * is processed.
  */
-
 static void
 data_in(int proc_mode)
 {
 	char *nam_p;
-	int pad;
-	int rv;
+	int pad, rv;
+	int error = 0;
 	int swapfile = 0;
 	int cstatus = 0;
+	off_t	filesz;
 	data_in_t *data_in_info;
 
 	if (G_p->g_attrnam_p != NULL) {
@@ -2448,15 +2694,63 @@ data_in(int proc_mode)
 	}
 
 	data_in_info = e_zalloc(E_EXIT, sizeof (data_in_t));
+	data_in_info->data_in_errno = 0;
 	data_in_info->data_in_swapfile = swapfile;
 	data_in_info->data_in_proc_mode = proc_mode;
 	data_in_info->data_in_partialflg = 0;
 	data_in_info->data_in_cksumval = 0L;
 	data_in_info->data_in_compress_flag = 0;
 
+	filesz = G_p->g_filesz;
+
+	if (S_ISSPARSE(G_p->g_mode) && G_p->g_holes != NULL) {
+		/* We've already read the header in gethdr() */
+		filesz -= MIN_HOLES_HDRSIZE;
+
+		/*
+		 * Strip rest of the sparse file information. This includes
+		 * the data/hole offset pairs which will be used to restore
+		 * the holes in the file.
+		 */
+		if (proc_mode == P_SKIP) {
+			/* holes info isn't necessary to skip file */
+			free_holes_info(G_p->g_holes);
+			G_p->g_holes = NULL;
+		} else {
+			rv = read_holesdata(G_p->g_holes, &filesz,
+			    nam_p, data_in_info);
+			if (rv != 0) {
+				/*
+				 * We got an error. Skip this file. holes info
+				 * is no longer necessary.
+				 */
+				free_holes_info(G_p->g_holes);
+				G_p->g_holes = NULL;
+
+				data_in_info->data_in_proc_mode = P_SKIP;
+				error = 1;
+			}
+		}
+	}
+
+	if (G_p->g_holes != NULL) {
+		rv = data_copy_with_holes(-1, Ofile,
+		    (G_p->g_attrnam_p == NULL) ? 0 : G_p->g_rw_sysattr,
+		    G_p->g_holes->orig_size,
+		    CPIOBSZ, data_in_info, G_p->g_holes);
+
+		free_holes_info(G_p->g_holes);
+		G_p->g_holes = NULL;
+	} else {
+		rv = data_copy(-1, Ofile,
+		    (G_p->g_attrnam_p == NULL) ? 0 : G_p->g_rw_sysattr,
+		    filesz, CPIOBSZ, data_in_info);
+	}
+
 	/* This writes out the file from the archive */
-	if ((rv = data_copy(-1, Ofile, (G_p->g_attrnam_p == NULL) ? 0 :
-	    G_p->g_rw_sysattr, G_p->g_filesz, CPIOBSZ, data_in_info)) != 0) {
+	if (rv != 0 || error) {
+		errno = data_in_info->data_in_errno;
+
 		if (data_in_info->data_in_partialflg) {
 			msg(EXTN, "Cannot write \"%s%s%s\"",
 			    (G_p->g_attrnam_p == NULL) ? "" :
@@ -2465,7 +2759,7 @@ data_in(int proc_mode)
 			    G_p->g_rw_sysattr ?
 			    gettext(" System Attribute ") :
 			    gettext(" Attribute "), nam_p);
-		} else {
+		} else if (!error) {
 			msg(ERRN, "Cannot write \"%s%s%s\"",
 			    (G_p->g_attrnam_p == NULL) ? "" :
 			    G_p->g_attrfnam_p,
@@ -2476,13 +2770,11 @@ data_in(int proc_mode)
 		}
 
 		/*
-		 * Even though we couldn't write to the file,
-		 * we need to continue reading the data for this
-		 * file so that we can process the next file in
-		 * the archive.
+		 * We've failed to write to the file, and input data
+		 * has been skiped to the next file. We'll need to restore
+		 * the original file, and skip the rest of work.
 		 */
 		proc_mode = P_SKIP;
-		data_in_info->data_in_proc_mode = proc_mode;
 		rstfiles(U_KEEP, G_p->g_dirfd);
 		cstatus = close(Ofile);
 		Ofile = 0;
@@ -2491,6 +2783,7 @@ data_in(int proc_mode)
 		}
 	}
 
+	/* we must use g_filesz for the amount of padding */
 	pad = (Pad_val + 1 - (G_p->g_filesz & Pad_val)) & Pad_val;
 	if (pad != 0) {
 		FILL(pad);
@@ -2522,19 +2815,167 @@ data_in(int proc_mode)
 }
 
 /*
+ * Read regular file. Return number of bytes which weren't read.
+ * Upon return, real_filesz will be real file size of input file.
+ * When read_exact is specified, read size is adjusted to the given
+ * file size.
+ */
+static off_t
+read_file(char *nam_p, off_t file_size, off_t *real_filesz,
+	boolean_t read_exact)
+{
+	int	amount_read;
+	off_t	amt_to_read;
+	off_t	readsz;
+
+	if (file_size == 0)
+		return (0);
+
+	amt_to_read = file_size;
+	do {
+		if (read_exact && amt_to_read < CPIOBSZ)
+			readsz = amt_to_read;
+		else
+			readsz = CPIOBSZ;
+
+		FLUSH(readsz);
+		errno = 0;
+
+		if ((amount_read = read(Ifile, Buffr.b_in_p, readsz)) < 0) {
+			msg(EXTN, "Cannot read \"%s%s%s\"",
+			    (Gen.g_attrnam_p == NULL) ?
+			    nam_p : Gen.g_attrfnam_p,
+			    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (Gen.g_attrnam_p == NULL) ? "" : nam_p);
+			break;
+		}
+
+		if (amount_read == 0) {
+			/* got EOF. the file has shrunk */
+			*real_filesz = file_size - amt_to_read;
+			break;
+		} else if (amount_read > amt_to_read) {
+			/* the file has grown */
+			*real_filesz = file_size +
+			    (amount_read - amt_to_read);
+			amount_read = amt_to_read;
+		} else if (amount_read == amt_to_read) {
+			/* the file is the same size */
+			*real_filesz = file_size;
+		}
+
+		Buffr.b_in_p += amount_read;
+		Buffr.b_cnt += (long)amount_read;
+
+		amt_to_read -= (off_t)amount_read;
+		if (!read_exact &&
+		    amt_to_read == 0 && amount_read == CPIOBSZ) {
+			/*
+			 * If the file size is multiple of CPIOBSZ, we may
+			 * be able to read more from the file even though
+			 * amt_to_read already gets 0.
+			 */
+			FLUSH(CPIOBSZ);
+			amount_read = read(Ifile, Buffr.b_in_p, CPIOBSZ);
+			if (amount_read != 0) {
+				/* the file has grown */
+				*real_filesz = file_size + amount_read;
+			}
+		}
+	} while (amt_to_read != 0);
+
+	return (amt_to_read);
+}
+
+/*
+ * Read through the data in files skipping holes.
+ */
+static off_t
+read_compress_holes(char *nam_p, off_t file_size, off_t *real_filesz,
+    holes_info_t *holes, int *hole_changed)
+{
+	off_t		left;
+	off_t		datasize, realsz;
+	off_t		curpos, npos;
+	holes_list_t	*hl = holes->holes_list;
+
+	curpos = 0;
+	for (hl = holes->holes_list; hl != NULL; hl = hl->hl_next) {
+		datasize = hl->hl_hole - hl->hl_data;
+
+		npos = lseek(Ifile, curpos, SEEK_DATA);
+		if (npos == -1 && errno == ENXIO) {
+			/*
+			 * No more data. There are two cases.
+			 * - we have a hole toward the end of file.
+			 * - file has been shrunk, and we've reached EOF.
+			 */
+			*real_filesz = lseek(Ifile, 0, SEEK_END);
+			if (hl->hl_data == file_size)
+				return (0);
+			/*
+			 * File has been shrunk. Check the amount of data
+			 * left.
+			 */
+			left = 0;
+			while (hl != NULL) {
+				left += (hl->hl_hole - hl->hl_data);
+				hl = hl->hl_next;
+			}
+			return (left);
+		}
+
+		/* found data */
+		curpos = npos;
+		if (curpos != hl->hl_data) {
+			/*
+			 * File has been changed. We shouldn't read data
+			 * from different offset since we've already put
+			 * the holes data.
+			 */
+			*hole_changed = 1;
+			(void) lseek(Ifile, hl->hl_data, SEEK_SET);
+			curpos = hl->hl_data;
+		}
+		left = read_file(nam_p, datasize, &realsz, B_TRUE);
+		if (left != 0) {
+			/* file has been shrunk */
+			*real_filesz = curpos + datasize - left;
+			left = file_size - *real_filesz;
+			return (left);
+		}
+		curpos += datasize;
+	}
+	/*
+	 * We've read exact size of holes. We need to make sure
+	 * that file hasn't grown by reading from the EOF.
+	 */
+	realsz = 0;
+	(void) read_file(nam_p, CPIOBSZ, &realsz, B_FALSE);
+
+	*real_filesz = curpos + realsz;
+	return (0);
+}
+
+/*
  * data_out:  open(2) the file to be archived, compute the checksum
  * of it's data if the CRC header was specified and write the header.
  * read(2) each block of data and bwrite() it to the archive.  For TARTYP (TAR
  * and USTAR) archives, pad the data with NULLs to the next 512 byte boundary.
  */
-
 static void
 data_out(void)
 {
-	char *nam_p;
-	int cnt, amount_read, pad;
-	off_t amt_to_read, real_filesz;
-	int	errret = 0;
+	char		*nam_p;
+	int		cnt, pad;
+	off_t		amt_to_read;
+	off_t		real_filesz;
+	int		errret = 0;
+	int		hole_changed = 0;
+	off_t		orig_filesz;
+	holes_info_t	*holes = NULL;
 
 	nam_p = G_p->g_nam_p;
 	if (Aspec) {
@@ -2551,8 +2992,8 @@ data_out(void)
 
 			if (len > 0) {
 			/* write ancillary only if there is sec info */
-				(void) write_hdr(ARCHIVE_ACL, (off_t)len);
-				(void) write_ancillary(secinfo, len);
+				write_hdr(ARCHIVE_ACL, (off_t)len);
+				write_ancillary(secinfo, len, B_TRUE);
 			}
 		}
 		write_hdr(ARCHIVE_NORMAL, (off_t)0);
@@ -2586,7 +3027,7 @@ data_out(void)
 		pad = (Pad_val + 1 - (size & Pad_val)) & Pad_val;
 		if (pad != 0) {
 			FLUSH(pad);
-			(void) memcpy(Buffr.b_in_p, Empty, pad);
+			(void) memset(Buffr.b_in_p, 0, pad);
 			Buffr.b_in_p += pad;
 			Buffr.b_cnt += pad;
 		}
@@ -2629,6 +3070,47 @@ data_out(void)
 		return;
 	}
 
+	/* save original file size */
+	orig_filesz = G_p->g_filesz;
+
+	/*
+	 * Calculate the new compressed file size of a sparse file
+	 * before any of the header information is written
+	 * to the archive.
+	 */
+	if (Compress_sparse && S_ISREG(G_p->g_mode)) {
+		/*
+		 * If the file being processed is a sparse file, gather the
+		 * hole information and the compressed file size.
+		 * G_p->g_filesz will need to be changed to be the size of
+		 * the compressed sparse file plus the the size of the hole
+		 * information that will be prepended to the compressed file
+		 * in the archive.
+		 */
+		holes = get_holes_info(Ifile, G_p->g_filesz, B_FALSE);
+		if (holes != NULL)
+			G_p->g_filesz = holes->holesdata_sz + holes->data_size;
+
+		if (G_p->g_filesz > Max_offset) {
+			msg(ERR, "%s%s%s: too large to archive "
+			    "in current mode",
+			    G_p->g_nam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    ((G_p->g_attrparent_p == NULL) ?
+			    G_p->g_attrnam_p:
+			    G_p->g_attrpath_p));
+
+			(void) close(Ifile);
+			if (holes != NULL)
+				free_holes_info(holes);
+			return; /* do not archive if it's too big */
+		}
+	}
+
 	/*
 	 * Dump extended attribute header.
 	 */
@@ -2648,6 +3130,8 @@ data_out(void)
 			    gettext(" System Attribute ") :
 			    gettext(" Attribute "),
 			    (Gen.g_attrnam_p == NULL) ? "" : nam_p);
+			if (holes != NULL)
+				free_holes_info(holes);
 			(void) close(Ifile);
 			return;
 		}
@@ -2671,54 +3155,40 @@ data_out(void)
 
 		if (len > 0) {
 		/* write ancillary only if there is sec info */
-			(void) write_hdr(ARCHIVE_ACL, (off_t)len);
-			(void) write_ancillary(secinfo, len);
+			write_hdr(ARCHIVE_ACL, (off_t)len);
+			write_ancillary(secinfo, len, B_TRUE);
 		}
 	}
 
-	write_hdr(ARCHIVE_NORMAL, (off_t)0);
+	if (holes != NULL) {
+		/*
+		 * Write the header info with a modified c_mode field to
+		 * indicate a compressed sparse file is being archived,
+		 * as well as the new file size, including the size of the
+		 * compressed file as well as all the prepended data.
+		 */
+		write_hdr(ARCHIVE_SPARSE, (off_t)0);
+		/* Prepend sparse file info */
+		write_ancillary(holes->holesdata,
+		    holes->holesdata_sz, B_FALSE);
+	} else {
+		write_hdr(ARCHIVE_NORMAL, (off_t)0);
+	}
 
 	real_filesz = 0;
 
-	for (amt_to_read = G_p->g_filesz;
-	    amt_to_read > 0;
-	    amt_to_read -= (off_t)amount_read) {
-		FLUSH(CPIOBSZ);
-		errno = 0;
-
-		if ((amount_read = read(Ifile, Buffr.b_in_p, CPIOBSZ)) < 0) {
-			msg(EXTN, "Cannot read \"%s%s%s\"",
-			    (Gen.g_attrnam_p == NULL) ?
-			    nam_p : Gen.g_attrfnam_p,
-			    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
-			    gettext(" System Attribute ") :
-			    gettext(" Attribute "),
-			    (Gen.g_attrnam_p == NULL) ? "" : nam_p);
-			break;
-		}
-
-		if (amount_read == 0) {
-			/* the file has shrunk */
-			real_filesz = G_p->g_filesz - amt_to_read;
-			break;
-		} else if (amount_read > amt_to_read) {
-			/* the file has grown */
-			real_filesz = G_p->g_filesz +
-			    (amount_read - amt_to_read);
-			amount_read = amt_to_read;
-		} else if (amount_read == amt_to_read) {
-			/* the file is the same size */
-			real_filesz = G_p->g_filesz;
-		}
-
-		Buffr.b_in_p += amount_read;
-		Buffr.b_cnt += (long)amount_read;
+	if (holes != NULL) {
+		amt_to_read = read_compress_holes(nam_p, G_p->g_filesz,
+		    &real_filesz, holes, &hole_changed);
+	} else {
+		amt_to_read = read_file(nam_p, G_p->g_filesz,
+		    &real_filesz, B_FALSE);
 	}
 
 	while (amt_to_read > 0) {
 		cnt = (amt_to_read > CPIOBSZ) ? CPIOBSZ : (int)amt_to_read;
 		FLUSH(cnt);
-		(void) memset(Buffr.b_in_p, NULL, cnt);
+		(void) memset(Buffr.b_in_p, 0, cnt);
 		Buffr.b_in_p += cnt;
 		Buffr.b_cnt += cnt;
 		amt_to_read -= cnt;
@@ -2727,29 +3197,41 @@ data_out(void)
 	pad = (Pad_val + 1 - (G_p->g_filesz & Pad_val)) & Pad_val;
 	if (pad != 0) {
 		FLUSH(pad);
-		(void) memcpy(Buffr.b_in_p, Empty, pad);
+		(void) memset(Buffr.b_in_p, 0, pad);
 		Buffr.b_in_p += pad;
 		Buffr.b_cnt += pad;
 	}
 
-	if (real_filesz > G_p->g_filesz) {
+	if (hole_changed == 1) {
+		msg(ERR,
+		    "File data and hole offsets of \"%s%s%s\" have changed",
+		    (Gen.g_attrnam_p == NULL) ?
+		    G_p->g_nam_p : Gen.g_attrfnam_p,
+		    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (Gen.g_attrnam_p == NULL) ? "" : G_p->g_nam_p);
+	}
+	if (real_filesz > orig_filesz) {
 		msg(ERR, "File size of \"%s%s%s\" has increased by %lld",
 		    (Gen.g_attrnam_p == NULL) ?
 		    G_p->g_nam_p : Gen.g_attrfnam_p,
 		    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
 		    gettext(" System Attribute ") : gettext(" Attribute "),
 		    (Gen.g_attrnam_p == NULL) ? "" : G_p->g_nam_p,
-		    (real_filesz - G_p->g_filesz));
+		    (real_filesz - orig_filesz));
 	}
-	if (real_filesz < G_p->g_filesz) {
+	if (real_filesz < orig_filesz) {
 		msg(ERR, "File size of \"%s%s%s\" has decreased by %lld",
 		    (Gen.g_attrnam_p == NULL) ?
 		    G_p->g_nam_p : Gen.g_attrfnam_p,
 		    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
 		    gettext(" System Attribute ") : gettext(" Attribute "),
 		    (Gen.g_attrnam_p == NULL) ? "" : G_p->g_nam_p,
-		    (G_p->g_filesz - real_filesz));
+		    (orig_filesz - real_filesz));
 	}
+
+	if (holes != NULL)
+		free_holes_info(holes);
 
 	(void) close(Ifile);
 	rstfiles(U_KEEP, G_p->g_dirfd);
@@ -2761,14 +3243,13 @@ data_out(void)
  * transferred, read(2) each block of data and write(2) it to the output file
  * Ofile, which was opened in file_pass().
  */
-
 static void
 data_pass(void)
 {
 	int rv;
-	int done = 1;
 	int cstatus;
 	char *namep = Nam_p;
+	holes_info_t *holes = NULL;
 
 	if (G_p->g_attrnam_p != NULL) {
 		namep = G_p->g_attrnam_p;
@@ -2798,8 +3279,21 @@ data_pass(void)
 		return;
 	}
 
-	if ((rv = data_copy(Ifile, Ofile, (G_p->g_attrnam_p == NULL) ? 0 :
-	    G_p->g_rw_sysattr, G_p->g_filesz, Bufsize, NULL)) != 0) {
+	if (S_ISREG(G_p->g_mode))
+		holes = get_holes_info(Ifile, G_p->g_filesz, B_TRUE);
+
+	if (holes != NULL) {
+		rv = data_copy_with_holes(Ifile, Ofile,
+		    (G_p->g_attrnam_p == NULL) ? 0 : G_p->g_rw_sysattr,
+		    G_p->g_filesz, Bufsize, NULL, holes);
+
+		free_holes_info(holes);
+	} else {
+		rv = data_copy(Ifile, Ofile,
+		    (G_p->g_attrnam_p == NULL) ? 0 : G_p->g_rw_sysattr,
+		    G_p->g_filesz, Bufsize, NULL);
+	}
+	if (rv != 0) {
 		/* read error */
 		if (rv < 0) {
 			msg(ERRN, "Cannot read \"%s%s%s\"",
@@ -2829,10 +3323,9 @@ data_pass(void)
 				    "" : G_p->g_attrnam_p);
 			}
 		}
-		done = 0;
 	}
 
-	if (done) {
+	if (rv == 0) {
 		rstfiles(U_OVER, G_p->g_passdirfd);
 	} else {
 		rstfiles(U_KEEP, G_p->g_passdirfd);
@@ -2849,75 +3342,6 @@ data_pass(void)
 }
 
 /*
- * Allocation wrappers.  Used to centralize error handling for
- * failed allocations.
- */
-static void *
-e_alloc_fail(int flag)
-{
-	if (flag == E_EXIT) {
-		msg(EXTN, "Out of memory");
-	}
-
-	return (NULL);
-}
-
-/*
- *  Note: unlike the other e_*lloc functions, e_realloc does not zero out the
- *  additional memory it returns.  Ensure that you do not trust its contents
- *  when you call it.
- */
-
-static void *
-e_realloc(int flag, void *old, size_t newsize)
-{
-	void *ret = realloc(old, newsize);
-
-	if (ret == NULL) {
-		return (e_alloc_fail(flag));
-	}
-
-	return (ret);
-}
-
-static char *
-e_strdup(int flag, const char *arg)
-{
-	char *ret = strdup(arg);
-
-	if (ret == NULL) {
-		return (e_alloc_fail(flag));
-	}
-
-	return (ret);
-}
-
-static void *
-e_valloc(int flag, size_t size)
-{
-	void *ret = valloc(size);
-
-	if (ret == NULL) {
-		return (e_alloc_fail(flag));
-	}
-
-	return (ret);
-}
-
-static void *
-e_zalloc(int flag, size_t size)
-{
-	void *ret = malloc(size);
-
-	if (ret == NULL) {
-		return (e_alloc_fail(flag));
-	}
-
-	(void) memset(ret, 0, size);
-	return (ret);
-}
-
-/*
  * file_in:  Process an object from the archive.  If a TARTYP (TAR or USTAR)
  * archive and g_nlink == 1, link this file to the file name in t_linkname
  * and return.  Handle linked files in one of two ways.  If Onecopy == 0, this
@@ -2929,7 +3353,6 @@ e_zalloc(int flag, size_t size)
  * for xtraction is created and the data is read from the archive.
  * All subsequent links that are accepted are linked to this file.
  */
-
 static void
 file_in(void)
 {
@@ -3212,7 +3635,6 @@ file_in(void)
  * g_filesz set to 0, write the final (nth) header with the correct g_filesz
  * value and write the data for the file to the archive.
  */
-
 static
 int
 file_out(void)
@@ -3224,8 +3646,12 @@ file_out(void)
 	G_p = &Gen;
 	if (!Aspec && IDENT(SrcSt, ArchSt))
 		return (1); /* do not archive the archive if it's a reg file */
-	if (G_p->g_filesz > Max_offset) {
-		msg(ERR, "cpio: %s%s%s: too large to archive in current mode",
+	/*
+	 * If compressing sparse files, wait until the compressed file size
+	 * is known to check if file size is too big.
+	 */
+	if (Compress_sparse == 0 && G_p->g_filesz > Max_offset) {
+		msg(ERR, "%s%s%s: too large to archive in current mode",
 		    G_p->g_nam_p,
 		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_rw_sysattr ?
 		    gettext(" System Attribute ") : gettext(" Attribute "),
@@ -3296,8 +3722,8 @@ file_out(void)
 
 			if (len > 0) {
 			/* write ancillary */
-				(void) write_hdr(ARCHIVE_ACL, (off_t)len);
-				(void) write_ancillary(secinfo, len);
+				write_hdr(ARCHIVE_ACL, (off_t)len);
+				write_ancillary(secinfo, len, B_TRUE);
 			}
 		}
 
@@ -4519,6 +4945,31 @@ gethdr(void)
 		return (2);
 	} /* acl */
 
+	/*
+	 * Sparse file support
+	 * Read header of holesdata to get original file size.
+	 * This is necessary because ckname() or file_in() shows file size
+	 * with OCt before data_in() extracts the holesdata. data_in()
+	 * actually doesn't extract the holesdata since proc_mode will be
+	 * P_SKIP in the OCt mode.
+	 */
+	if ((Hdr_type == CHR || Hdr_type == ASC) &&
+	    S_ISSPARSE(Gen.g_mode) && Gen.g_filesz > MIN_HOLES_HDRSIZE) {
+		char	holesdata[MIN_HOLES_HDRSIZE + 1];
+
+		FILL(MIN_HOLES_HDRSIZE);
+		(void) memcpy(holesdata, Buffr.b_out_p, MIN_HOLES_HDRSIZE);
+		holesdata[MIN_HOLES_HDRSIZE] = '\0';
+
+		Gen.g_holes = read_holes_header(holesdata, Gen.g_filesz);
+		if (Gen.g_holes == NULL) {
+			msg(EXT, "invalid sparse file information");
+		} else {
+			Buffr.b_out_p += MIN_HOLES_HDRSIZE;
+			Buffr.b_cnt -= MIN_HOLES_HDRSIZE;
+		}
+	}
+
 	Adir = (ftype == S_IFDIR);
 	Aspec = (ftype == S_IFBLK || ftype == S_IFCHR || ftype == S_IFIFO ||
 	    ftype == S_IFSOCK);
@@ -4968,8 +5419,7 @@ mkshort(short sval[], long v)
  * without the errno (ERRN or ERR), or print an error message with or without
  * the errno and exit (EXTN or EXT).
  */
-
-static void
+void
 msg(int severity, const char *fmt, ...)
 {
 	FILE *file_p;
@@ -6132,7 +6582,6 @@ setup(int largc, char **largv)
 	largv += optind;
 	ckopts(Args);
 	if (!Error_cnt) {
-		Empty = e_valloc(E_EXIT, TARSZ);
 		if (Args & OCr) {
 			Renam_p = e_zalloc(E_EXIT, APATH + 1);
 			Renametmp_p = e_zalloc(E_EXIT, APATH + 1);
@@ -6435,6 +6884,7 @@ verbose(char *nam_p)
 	int i, j, temp;
 	mode_t mode;
 	char modestr[12];
+	time_t	ttime;
 
 	/*
 	 * The printf format and associated arguments to print the current
@@ -6553,32 +7003,32 @@ verbose(char *nam_p)
 			(void) printf("%s%4d ", modestr, (int)Gen.g_nlink+1);
 		else
 			(void) printf("%s%4d ", modestr, (int)Gen.g_nlink);
-		if (Lastuid == (int)Gen.g_uid) {
-			if (Lastuid == -1)
+		if (Lastuid == (uid_t)Gen.g_uid) {
+			if (Lastuid == (uid_t)-1)
 				(void) printf("-1       ");
 			else
 				(void) printf("%-9s", Curpw_p->pw_name);
 		} else {
 			if (Curpw_p = getpwuid((int)Gen.g_uid)) {
 				(void) printf("%-9s", Curpw_p->pw_name);
-				Lastuid = (int)Gen.g_uid;
+				Lastuid = (uid_t)Gen.g_uid;
 			} else {
 				(void) printf("%-9d", (int)Gen.g_uid);
-				Lastuid = -1;
+				Lastuid = (uid_t)-1;
 			}
 		}
-		if (Lastgid == (int)Gen.g_gid) {
-			if (Lastgid == -1)
+		if (Lastgid == (gid_t)Gen.g_gid) {
+			if (Lastgid == (gid_t)-1)
 				(void) printf("-1       ");
 			else
 				(void) printf("%-9s", Curgr_p->gr_name);
 		} else {
 			if (Curgr_p = getgrgid((int)Gen.g_gid)) {
 				(void) printf("%-9s", Curgr_p->gr_name);
-				Lastgid = (int)Gen.g_gid;
+				Lastgid = (gid_t)Gen.g_gid;
 			} else {
 				(void) printf("%-9d", (int)Gen.g_gid);
-				Lastgid = -1;
+				Lastgid = (gid_t)-1;
 			}
 		}
 
@@ -6586,19 +7036,23 @@ verbose(char *nam_p)
 		if (!Aspec || ((Gen.g_mode & Ftype) == S_IFIFO) ||
 		    ((Gen.g_mode & Ftype) == S_IFSOCK) ||
 		    (Hdr_type == BAR && bar_linkflag == SYMTYPE)) {
-			if (Gen.g_filesz < (1LL << 31))
-				(void) printf("%7lld ",
-				    (offset_t)Gen.g_filesz);
+			off_t filesz = Gen.g_filesz;
+
+			if (S_ISSPARSE(Gen.g_mode) && Gen.g_holes != NULL)
+				filesz = Gen.g_holes->orig_size;
+
+			if (filesz < (1LL << 31))
+				(void) printf("%7lld ", (offset_t)filesz);
 			else
-				(void) printf("%11lld ",
-				    (offset_t)Gen.g_filesz);
+				(void) printf("%11lld ", (offset_t)filesz);
 		} else
 			(void) printf("%3d,%3d ", (int)major(Gen.g_rdev),
 			    (int)minor(Gen.g_rdev));
-		(void) cftime(Time, dcgettext(NULL, FORMAT, LC_TIME),
-		    (time_t *)&Gen.g_mtime);
+		ttime = Gen.g_mtime;
+		(void) strftime(Time, sizeof (Time),
+		    dcgettext(NULL, FORMAT, LC_TIME), localtime(&ttime));
 		(void) printf("%s, ", Time);
-		(void) printf(name_fmt, name, attribute);
+		str_fprintf(stdout, name_fmt, name, attribute);
 		if ((Gen.g_mode & Ftype) == S_IFLNK) {
 			if (Hdr_type == USTAR || Hdr_type == TAR)
 				(void) strcpy(Symlnk_p,
@@ -6631,7 +7085,7 @@ verbose(char *nam_p)
 		}
 		(void) printf("\n");
 	} else if ((Args & OCt) || (Args & OCv)) {
-		(void) fprintf(Out_p, name_fmt, name, attribute);
+		str_fprintf(Out_p, name_fmt, name, attribute);
 		(void) fputc('\n', Out_p);
 	} else { /* OCV */
 		(void) fputc('.', Out_p);
@@ -6648,13 +7102,10 @@ verbose(char *nam_p)
 /*
  * write_hdr: Transfer header information for the generic structure
  * into the format for the selected header and bwrite() the header.
- * ACL support: add two new argumnets. secflag indicates that it's an
- *	ancillary file. len is the size of the file (incl. all security
- *	attributes). We only have acls now.
  */
 
 static void
-write_hdr(int secflag, off_t len)
+write_hdr(int arcflag, off_t len)
 {
 	int cnt, pad;
 	mode_t mode;
@@ -6662,15 +7113,18 @@ write_hdr(int secflag, off_t len)
 	gid_t gid;
 	const char warnfmt[] = "%s%s%s : %s";
 
-	if (secflag == ARCHIVE_ACL) {
+	switch (arcflag) {
+	case ARCHIVE_ACL:
 		mode = SECMODE;
-	} else {
+		break;
+
+	case ARCHIVE_XATTR:
+	case ARCHIVE_NORMAL:
 		/*
 		 * If attribute is being archived in cpio format then
 		 * zap off the file type bits since those are truly a
 		 * mask and reset them with _XATTR_CPIO_MODE
 		 */
-
 		/*
 		 * len is the value of g_filesz for normal files
 		 * and the length of the special header buffer in
@@ -6682,9 +7136,15 @@ write_hdr(int secflag, off_t len)
 		} else {
 			mode = G_p->g_mode;
 		}
-		if (secflag != ARCHIVE_XATTR) {
+		if (arcflag != ARCHIVE_XATTR) {
 			len = G_p->g_filesz;
 		}
+		break;
+
+	case ARCHIVE_SPARSE:
+		mode = G_p->g_mode | C_ISSPARSE;
+		len = G_p->g_filesz;
+		break;
 	}
 
 	uid = G_p->g_uid;
@@ -6785,15 +7245,17 @@ write_hdr(int secflag, off_t len)
 		(void) memcpy(Buffr.b_in_p, &Hdr, cnt);
 		break;
 	case CHR:
+		/*LINTED*/
 		(void) sprintf(Buffr.b_in_p,
 		    "%.6lo%.6lo%.6lo%.6lo%.6lo%.6lo%.6lo%.6lo%.11lo%.6lo%."
 		    "11llo%s", G_p->g_magic, G_p->g_dev, G_p->g_ino, mode,
-		    uid, gid, G_p->g_nlink, MK_USHORT(G_p->g_rdev),
+		    (long)uid, (long)gid, G_p->g_nlink, MK_USHORT(G_p->g_rdev),
 		    G_p->g_mtime, (long)G_p->g_namesz, (offset_t)len,
 		    G_p->g_nam_p);
 		break;
 	case ASC:
 	case CRC:
+		/*LINTED*/
 		(void) sprintf(Buffr.b_in_p,
 		    "%.6lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%."
 		    "8lx%.8lx%.8lx%.8lx%s",
@@ -6805,7 +7267,7 @@ write_hdr(int secflag, off_t len)
 		break;
 	case USTAR:
 		Thdr_p = (union tblock *)Buffr.b_in_p;
-		(void) memcpy(Thdr_p, Empty, TARSZ);
+		(void) memset(Thdr_p, 0, TARSZ);
 		(void) strncpy(Thdr_p->tbuf.t_name, G_p->g_tname,
 		    (int)strlen(G_p->g_tname));
 		(void) sprintf(Thdr_p->tbuf.t_mode, "%07o", (int)mode);
@@ -6814,9 +7276,9 @@ write_hdr(int secflag, off_t len)
 		(void) sprintf(Thdr_p->tbuf.t_size, "%011llo",
 		    (offset_t)len);
 		(void) sprintf(Thdr_p->tbuf.t_mtime, "%011lo", G_p->g_mtime);
-		if (secflag == ARCHIVE_ACL) {
+		if (arcflag == ARCHIVE_ACL) {
 			Thdr_p->tbuf.t_typeflag = 'A';	/* ACL file type */
-		} else if (secflag == ARCHIVE_XATTR ||
+		} else if (arcflag == ARCHIVE_XATTR ||
 		    (G_p->g_attrnam_p != NULL)) {
 			Thdr_p->tbuf.t_typeflag = _XATTR_HDRTYPE;
 		} else {
@@ -6835,28 +7297,27 @@ write_hdr(int secflag, off_t len)
 			(void) strncpy(Thdr_p->tbuf.t_linkname, T_lname,
 			    strlen(T_lname));
 		}
-		(void) sprintf(Thdr_p->tbuf.t_magic, "%s", TMAGIC);
-		(void) sprintf(Thdr_p->tbuf.t_version, "%2s", TVERSION);
-		(void) sprintf(Thdr_p->tbuf.t_uname, "%s",  G_p->g_uname);
-		(void) sprintf(Thdr_p->tbuf.t_gname, "%s", G_p->g_gname);
+		(void) strcpy(Thdr_p->tbuf.t_magic, TMAGIC);
+		(void) strcpy(Thdr_p->tbuf.t_version, TVERSION);
+		(void) strcpy(Thdr_p->tbuf.t_uname, G_p->g_uname);
+		(void) strcpy(Thdr_p->tbuf.t_gname, G_p->g_gname);
 		(void) sprintf(Thdr_p->tbuf.t_devmajor, "%07o",
 		    (int)major(G_p->g_rdev));
 		(void) sprintf(Thdr_p->tbuf.t_devminor, "%07o",
 		    (int)minor(G_p->g_rdev));
 		if (Gen.g_prefix) {
-			(void) sprintf(Thdr_p->tbuf.t_prefix, "%s",
-			    Gen.g_prefix);
+			(void) strcpy(Thdr_p->tbuf.t_prefix, Gen.g_prefix);
 			free(Gen.g_prefix);
 			Gen.g_prefix = NULL;
 		} else {
-			(void) sprintf(Thdr_p->tbuf.t_prefix, "%s", "");
+			Thdr_p->tbuf.t_prefix[0] = '\0';
 		}
 		(void) sprintf(Thdr_p->tbuf.t_cksum, "%07o",
 		    (int)cksum(TARTYP, 0, NULL));
 		break;
 	case TAR:
 		Thdr_p = (union tblock *)Buffr.b_in_p;
-		(void) memcpy(Thdr_p, Empty, TARSZ);
+		(void) memset(Thdr_p, 0, TARSZ);
 		(void) strncpy(Thdr_p->tbuf.t_name, G_p->g_nam_p,
 		    G_p->g_namesz);
 		(void) sprintf(Thdr_p->tbuf.t_mode, "%07o ", (int)mode);
@@ -6883,7 +7344,7 @@ write_hdr(int secflag, off_t len)
 	pad = ((cnt + Pad_val) & ~Pad_val) - cnt;
 	if (pad != 0) {
 		FLUSH(pad);
-		(void) memcpy(Buffr.b_in_p, Empty, pad);
+		(void) memset(Buffr.b_in_p, 0, pad);
 		Buffr.b_in_p += pad;
 		Buffr.b_cnt += pad;
 	}
@@ -6938,7 +7399,7 @@ write_trail(void)
 	case USTAR: /* TAR and USTAR */
 		for (cnt = 0; cnt < 3; cnt++) {
 			FLUSH(TARSZ);
-			(void) memcpy(Buffr.b_in_p, Empty, TARSZ);
+			(void) memset(Buffr.b_in_p, 0, TARSZ);
 			Buffr.b_in_p += TARSZ;
 			Buffr.b_cnt += TARSZ;
 		}
@@ -6955,7 +7416,7 @@ write_trail(void)
 			cnt = (need < TARSZ) ? need : TARSZ;
 			need -= cnt;
 			FLUSH(cnt);
-			(void) memcpy(Buffr.b_in_p, Empty, cnt);
+			(void) memset(Buffr.b_in_p, 0, cnt);
 			Buffr.b_in_p += cnt;
 			Buffr.b_cnt += cnt;
 		}
@@ -7565,7 +8026,6 @@ append_secattr(
 	switch (acl_type(aclp)) {
 	case ACLENT_T:
 	case ACE_T:
-		/* LINTED alignment */
 		attrtext = acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT |
 		    ACL_SID_FMT);
 		if (attrtext == NULL) {
@@ -7612,33 +8072,35 @@ append_secattr(
 	return (0);
 }
 
+/*
+ * Append size amount of data from buf to the archive.
+ */
 static void
-write_ancillary(char *secinfo, int len)
+write_ancillary(char *buf, size_t len, boolean_t padding)
 {
-	long    pad;
-	long    cnt;
+	int	pad, cnt;
 
-	/* Just tranditional permissions or no security attribute info */
-	if (len == 0) {
+	if (len == 0)
 		return;
-	}
 
-	/* write out security info */
 	while (len > 0) {
 		cnt = (unsigned)(len > CPIOBSZ) ? CPIOBSZ : len;
 		FLUSH(cnt);
 		errno = 0;
-		(void) memcpy(Buffr.b_in_p, secinfo, (unsigned)cnt);
+		(void) memcpy(Buffr.b_in_p, buf, (unsigned)cnt);
 		Buffr.b_in_p += cnt;
-		Buffr.b_cnt += (long)cnt;
-		len -= (long)cnt;
+		Buffr.b_cnt += cnt;
+		len -= cnt;
+		buf += cnt;
 	}
-	pad = (Pad_val + 1 - (cnt & Pad_val)) & Pad_val;
-	if (pad != 0) {
-		FLUSH(pad);
-		(void) memcpy(Buffr.b_in_p, Empty, pad);
-		Buffr.b_in_p += pad;
-		Buffr.b_cnt += pad;
+	if (padding) {
+		pad = (Pad_val + 1 - (cnt & Pad_val)) & Pad_val;
+		if (pad != 0) {
+			FLUSH(pad);
+			(void) memset(Buffr.b_in_p, 0, pad);
+			Buffr.b_in_p += pad;
+			Buffr.b_cnt += pad;
+		}
 	}
 }
 
@@ -8141,7 +8603,7 @@ prepare_xattr_hdr(
 	 * first fill in the fixed header
 	 */
 	hptr = (struct xattr_hdr *)bufhead;
-	(void) sprintf(hptr->h_version, "%s", XATTR_ARCH_VERS);
+	(void) strcpy(hptr->h_version, XATTR_ARCH_VERS);
 	(void) sprintf(hptr->h_component_len, "%0*d",
 	    sizeof (hptr->h_component_len) - 1, complen);
 	(void) sprintf(hptr->h_link_component_len, "%0*d",
@@ -8513,7 +8975,6 @@ write_xattr_hdr()
 	char *namep;
 	struct Lnk *tl_p, *linkinfo;
 
-
 	/*
 	 * namep was allocated in xattrs_out.  It is big enough to hold
 	 * either the name + .hdr on the end or just the attr name
@@ -8541,8 +9002,9 @@ write_xattr_hdr()
 		    linkinfo, &attrlen);
 		Gen.g_filesz = attrlen;
 		write_hdr(ARCHIVE_XATTR, (off_t)attrlen);
+		/*LINTED*/
 		(void) sprintf(namep, "%s/%s", DEVNULL, Gen.g_attrnam_p);
-		(void) write_ancillary(attrbuf, attrlen);
+		write_ancillary(attrbuf, attrlen, B_TRUE);
 	}
 
 	(void) creat_hdr();

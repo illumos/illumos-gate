@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,11 +29,12 @@
 #ifndef	_CPIO_H
 #define	_CPIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <stdio.h>
+#include <archives.h>
 
 /* Option Character keys (OC#), where '#' is the option character specified. */
 
@@ -69,6 +70,13 @@ extern "C" {
 #define	BSM	0x20000000
 #define	OCP	0x40000000
 
+/* Sparse file support */
+#define	C_ISSPARSE	0200000
+#define	S_IFSPARSE	0x10000
+#define	HIGH_ORD_MASK	0x30000
+#define	S_ISSPARSE(mode) \
+	(S_ISREG(mode) && (mode & HIGH_ORD_MASK) == S_IFSPARSE)
+
 /* Invalid option masks for each action option (-i, -o or -p). */
 
 #define	INV_MSK4i	(OCo | OCp | OCA | OCL | OCO)
@@ -92,6 +100,9 @@ extern "C" {
 
 #define	TAR	7	/* Regular tar */
 #define	USTAR	8	/* IEEE data interchange standard */
+
+#define	ULL_MAX_SIZE	20
+#define	UL_MAX_SIZE	10
 
 /* constants for bar, used for extracting bar archives */
 #define	BAR	9
@@ -268,7 +279,19 @@ typedef struct cpioinfo {
 	time_t	st_modtime;
 } cpioinfo_t;
 
-void stat_to_svr32_stat(cpioinfo_t *TmpSt, struct stat *FromStat);
+extern void msg(int severity, const char *fmt, ...);
+extern void stat_to_svr32_stat(cpioinfo_t *TmpSt, struct stat *FromStat);
+
+/*
+ * Allocation wrappers and their flags
+ */
+#define	E_NORMAL	0x0	/* Return NULL if allocation fails */
+#define	E_EXIT		0x1	/* Exit if allocation fails */
+
+extern void *e_realloc(int flag, void *old, size_t newsize);
+extern char *e_strdup(int flag, const char *arg);
+extern void *e_valloc(int flag, size_t size);
+extern void *e_zalloc(int flag, size_t size);
 
 /*
  * If compiling on a system that doesn't
@@ -281,6 +304,32 @@ void stat_to_svr32_stat(cpioinfo_t *TmpSt, struct stat *FromStat);
 #define	_XATTR_CPIO_MODE	0xB000
 #define	_XATTR_HDRTYPE		'E'
 #endif /* O_XATTR */
+
+/*
+ * Sparse file support
+ */
+#define	MIN_HOLES_HDRSIZE	(UL_MAX_SIZE + 1 + ULL_MAX_SIZE + 1)
+
+typedef struct holes_list {
+	off_t	hl_data;
+	off_t	hl_hole;
+	struct holes_list *hl_next;
+} holes_list_t;
+
+typedef struct holes_info {
+	holes_list_t	*holes_list;	/* linked list of holes_list */
+	off_t		orig_size;	/* original file size */
+	off_t		data_size;	/* compressed file size */
+	char		*holesdata;	/* holesdata string */
+	size_t		holesdata_sz;	/* string size */
+} holes_info_t;
+
+extern	holes_info_t *get_holes_info(int, off_t, boolean_t);
+extern	holes_info_t *read_holes_header(const char *, off_t);
+extern	int	parse_holesdata(holes_info_t *, const char *);
+extern	void	free_holes_info(holes_info_t *);
+
+extern	void	str_fprintf(FILE *, const char *, ...);
 
 #ifdef	__cplusplus
 }

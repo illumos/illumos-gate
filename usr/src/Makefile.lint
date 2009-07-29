@@ -89,6 +89,7 @@ COMMON_SUBDIRS = \
 	cmd/consadm \
 	cmd/coreadm \
 	cmd/cpc \
+	cmd/cpio \
 	cmd/crypt \
 	cmd/csplit \
 	cmd/ctrun \
