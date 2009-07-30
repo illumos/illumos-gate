@@ -855,6 +855,10 @@ zfs_get_done(dmu_buf_t *db, void *vzgd)
 	kmem_free(zgd, sizeof (zgd_t));
 }
 
+#ifdef DEBUG
+static int zil_fault_io = 0;
+#endif
+
 /*
  * Get data to generate a TX_WRITE intent log record.
  */
@@ -936,7 +940,21 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		zgd->zgd_rl = rl;
 		zgd->zgd_zilog = zfsvfs->z_log;
 		zgd->zgd_bp = &lr->lr_blkptr;
-		VERIFY(0 == dmu_buf_hold(os, lr->lr_foid, boff, zgd, &db));
+#ifdef DEBUG
+		if (zil_fault_io) {
+			error = EIO;
+			zil_fault_io = 0;
+		} else {
+			error = dmu_buf_hold(os, lr->lr_foid, boff, zgd, &db);
+		}
+#else
+		error = dmu_buf_hold(os, lr->lr_foid, boff, zgd, &db);
+#endif
+		if (error != 0) {
+			kmem_free(zgd, sizeof (zgd_t));
+			goto out;
+		}
+
 		ASSERT(boff == db->db_offset);
 		lr->lr_blkoff = off - boff;
 		error = dmu_sync(zio, db, &lr->lr_blkptr,
