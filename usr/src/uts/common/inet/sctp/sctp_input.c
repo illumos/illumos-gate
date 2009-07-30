@@ -1201,6 +1201,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 			(sctp)->sctp_force_sack = 1;			\
 	} else if (SEQ_GT(tsn, sctp->sctp_ftsn)) {			\
 		/* Got a gap; record it */				\
+		BUMP_LOCAL(sctp->sctp_outseqtsns);			\
 		dprint(2, ("data_chunk: acking gap %x\n", tsn));	\
 		sctp_ack_add(&sctp->sctp_sack_info, tsn,		\
 		    &sctp->sctp_sack_gaps);				\
@@ -1217,6 +1218,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	/* Check for duplicates */
 	if (SEQ_LT(tsn, sctp->sctp_ftsn)) {
 		dprint(4, ("sctp_data_chunk: dropping duplicate\n"));
+		BUMP_LOCAL(sctp->sctp_idupchunks);
 		sctp->sctp_force_sack = 1;
 		sctp_add_dup(dc->sdh_tsn, dups);
 		return;
@@ -1230,6 +1232,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 				dprint(4,
 				    ("sctp_data_chunk: dropping dup > "
 				    "cumtsn\n"));
+				BUMP_LOCAL(sctp->sctp_idupchunks);
 				sctp->sctp_force_sack = 1;
 				sctp_add_dup(dc->sdh_tsn, dups);
 				return;
@@ -1617,6 +1620,7 @@ sctp_fill_sack(sctp_t *sctp, unsigned char *dst, int sacklen)
 	}
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
+	BUMP_LOCAL(sctp->sctp_osacks);
 }
 
 mblk_t *
@@ -2514,6 +2518,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
+	BUMP_LOCAL(sctp->sctp_isacks);
 	chunklen = ntohs(sch->sch_len);
 	if (chunklen < (sizeof (*sch) + sizeof (*sc)))
 		return (0);
@@ -2574,6 +2579,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			 */
 			fp = sctp->sctp_current;
 			fp->rto = fp->srtt + 4 * fp->rttvar;
+			SCTP_MAX_RTO(sctp, fp);
 			/* Resend the ZWP */
 			pkt = sctp_rexmit_packet(sctp, &meta, &mp1, fp,
 			    &pkt_len);
@@ -2596,6 +2602,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			 */
 			fp = sctp->sctp_current;
 			fp->rto = fp->srtt + 4 * fp->rttvar;
+			SCTP_MAX_RTO(sctp, fp);
 			sctp->sctp_zero_win_probe = B_FALSE;
 			/* This is probably not required */
 			if (!sctp->sctp_rexmitting) {
@@ -2615,6 +2622,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		}
 	}
 	num_gaps = ntohs(sc->ssc_numfrags);
+	UPDATE_LOCAL(sctp->sctp_gapcnt, num_gaps);
 	if (num_gaps == 0 || mp == NULL || !SCTP_CHUNK_ISSENT(mp) ||
 	    chunklen < (sizeof (*sch) + sizeof (*sc) +
 	    num_gaps * sizeof (*ssf))) {

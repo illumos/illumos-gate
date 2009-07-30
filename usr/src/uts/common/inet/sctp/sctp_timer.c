@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -506,8 +506,7 @@ sctp_heartbeat_timer(sctp_t *sctp)
 						    sctp->sctp_rto_initial;
 						goto dead_addr;
 					} else {
-						SCTP_CALC_RXT(fp,
-						    sctp->sctp_rto_max);
+						SCTP_CALC_RXT(sctp, fp);
 						fp->hb_expiry = now + fp->rto;
 					}
 					break;
@@ -571,7 +570,6 @@ void
 sctp_rexmit_timer(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	mblk_t 		*mp;
-	uint32_t	rto_max = sctp->sctp_rto_max;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	ASSERT(fp != NULL);
@@ -649,7 +647,6 @@ rxmit_init:
 			BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
 			sctp_add_sendq(sctp, mp);
 		}
-		rto_max = sctp->sctp_init_rto_max;
 		break;
 	case SCTPS_COOKIE_ECHOED: {
 		ipha_t *iph;
@@ -668,7 +665,6 @@ rxmit_init:
 			iph->ipha_ident = 0;
 		sctp_add_sendq(sctp, mp);
 		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
-		rto_max = sctp->sctp_init_rto_max;
 		break;
 	}
 	case SCTPS_SHUTDOWN_SENT:
@@ -693,7 +689,7 @@ rxmit_init:
 
 	fp->strikes++;
 	sctp->sctp_strikes++;
-	SCTP_CALC_RXT(fp, rto_max);
+	SCTP_CALC_RXT(sctp, fp);
 
 	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 }
@@ -744,6 +740,7 @@ sctp_update_rtt(sctp_t *sctp, sctp_faddr_t *fp, clock_t delta)
 		fp->rto = sctp->sctp_rto_max;
 	}
 
+	SCTP_MAX_RTO(sctp, fp);
 	fp->rtt_updates++;
 }
 

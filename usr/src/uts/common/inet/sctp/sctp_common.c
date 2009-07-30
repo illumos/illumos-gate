@@ -203,6 +203,7 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		if (fp->rto > sctp->sctp_rto_max) {
 			fp->rto = sctp->sctp_rto_max;
 		}
+		SCTP_MAX_RTO(sctp, fp);
 	}
 
 	/*
@@ -1864,6 +1865,7 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	}
 	fp->cwnd = sctps->sctps_slow_start_initial * fp->sfa_pmss;
 	fp->rto = MIN(sctp->sctp_rto_initial, sctp->sctp_init_rto_max);
+	SCTP_MAX_RTO(sctp, fp);
 	fp->srtt = -1;
 	fp->rtt_updates = 0;
 	fp->strikes = 0;

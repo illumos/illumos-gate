@@ -79,6 +79,11 @@ typedef int32_t	sctp_assoc32_t;
 #define	SCTP_PRSCTP			23
 
 /*
+ * SCTP socket option used to read per endpoint association statistics.
+ */
+#define	SCTP_GET_ASSOC_STATS		24
+
+/*
  * Ancillary data identifiers
  */
 #define	SCTP_SNDRCV		0x100
@@ -479,6 +484,27 @@ struct sctp_status {
 struct sctp_setadaptation {
 	uint32_t   ssb_adaptation_ind;
 };
+
+/*
+ * A socket user request reads local per endpoint association stats.
+ * All stats are counts except sas_maxrto, which is the max value
+ * since the last user request for stats on this endpoint.
+ */
+typedef struct sctp_assoc_stats {
+	uint64_t	sas_rtxchunks; /* Retransmitted Chunks */
+	uint64_t	sas_gapcnt; /* Gap Acknowledgements Received */
+	uint64_t	sas_maxrto; /* Maximum Observed RTO this period */
+	uint64_t	sas_outseqtsns; /* TSN received > next expected */
+	uint64_t	sas_osacks; /* SACKs sent */
+	uint64_t	sas_isacks; /* SACKs received */
+	uint64_t	sas_octrlchunks; /* Control chunks sent - no dups */
+	uint64_t	sas_ictrlchunks; /* Control chunks received - no dups */
+	uint64_t	sas_oodchunks; /* Ordered data chunks sent */
+	uint64_t	sas_iodchunks; /* Ordered data chunks received */
+	uint64_t	sas_ouodchunks; /* Unordered data chunks sent */
+	uint64_t	sas_iuodchunks; /* Unordered data chunks received */
+	uint64_t	sas_idupchunks; /* Dups received (ordered+unordered) */
+} sctp_assoc_stats_t;
 
 /*
  * Private ioctl option structure

@@ -167,10 +167,24 @@ typedef struct sctpparam_s {
 		(fp)->timer_running = 0;		\
 	}
 
-#define	SCTP_CALC_RXT(fp, max)		\
-{					\
-	if (((fp)->rto <<= 1) > (max))	\
-		(fp)->rto = (max);	\
+/* For per endpoint association statistics */
+#define	SCTP_MAX_RTO(sctp, fp) {			\
+	/*						\
+	 * Record the maximum observed RTO,		\
+	 * sctp_maxrto is zeroed elsewhere		\
+	 * at the end of each stats request.		\
+	 */						\
+	(sctp)->sctp_maxrto =				\
+	    MAX((sctp)->sctp_maxrto, (fp)->rto);	\
+	DTRACE_PROBE2(sctp__maxrto, sctp_t *,		\
+	    sctp, struct sctp_faddr_s, fp);		\
+}
+
+#define	SCTP_CALC_RXT(sctp, fp)				\
+{							\
+	if (((fp)->rto <<= 1) > (sctp)->sctp_rto_max)	\
+		(fp)->rto = (sctp)->sctp_rto_max;	\
+	SCTP_MAX_RTO(sctp, fp);				\
 }
 
 
@@ -938,6 +952,25 @@ typedef struct sctp_s {
 
 	pid_t		sctp_cpid;	/* Process id when this was opened */
 	uint64_t	sctp_open_time;	/* time when this was opened */
+
+	/* additional source data for per endpoint association statistics */
+	uint64_t	sctp_outseqtsns;	/* TSN rx > expected TSN */
+	uint64_t	sctp_osacks;		/* total sacks sent */
+	uint64_t	sctp_isacks;		/* total sacks received */
+	uint64_t	sctp_idupchunks;	/* rx dups, ord or unord */
+	uint64_t	sctp_gapcnt;		/* total gap acks rx */
+
+	/*
+	 * When non-zero, this is the maximum observed RTO since assoc stats
+	 * were last requested. When zero, no RTO update has occurred since
+	 * the previous user request for stats on this endpoint.
+	 */
+	int	sctp_maxrto;
+	/*
+	 * The stored value of sctp_maxrto passed to user during the previous
+	 * user request for stats on this endpoint.
+	 */
+	int	sctp_prev_maxrto;
 } sctp_t;
 
 #define	SCTP_TXQ_LEN(sctp)	((sctp)->sctp_unsent + (sctp)->sctp_unacked)

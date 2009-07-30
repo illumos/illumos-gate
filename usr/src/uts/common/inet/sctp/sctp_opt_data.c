@@ -884,6 +884,53 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		case SCTP_PRSCTP:
 			*i1 = sctp->sctp_prsctp_aware ? 1 : 0;
 			break;
+
+		case SCTP_GET_ASSOC_STATS: {
+			sctp_assoc_stats_t *sas;
+
+			if (buflen < sizeof (sctp_assoc_stats_t)) {
+				retval = EINVAL;
+				break;
+			}
+
+			sas = (sctp_assoc_stats_t *)ptr;
+
+			/*
+			 * Copy the current stats to the stats struct.
+			 */
+			sas->sas_rtxchunks =  sctp->sctp_rxtchunks;
+			sas->sas_gapcnt = sctp->sctp_gapcnt;
+			sas->sas_outseqtsns = sctp->sctp_outseqtsns;
+			sas->sas_osacks = sctp->sctp_osacks;
+			sas->sas_isacks = sctp->sctp_isacks;
+			sas->sas_octrlchunks = sctp->sctp_obchunks;
+			sas->sas_ictrlchunks = sctp->sctp_ibchunks;
+			sas->sas_oodchunks = sctp->sctp_odchunks;
+			sas->sas_iodchunks = sctp->sctp_idchunks;
+			sas->sas_ouodchunks = sctp->sctp_oudchunks;
+			sas->sas_iuodchunks = sctp->sctp_iudchunks;
+			sas->sas_idupchunks = sctp->sctp_idupchunks;
+
+			/*
+			 * Copy out the maximum observed RTO since the
+			 * time this data was last requested
+			 */
+			if (sctp->sctp_maxrto == 0) {
+				/* unchanged during obervation period */
+				sas->sas_maxrto = sctp->sctp_prev_maxrto;
+			} else {
+				/* record new period maximum */
+				sas->sas_maxrto = sctp->sctp_maxrto;
+			}
+			/* Record the value sent to the user this period */
+			sctp->sctp_prev_maxrto = sas->sas_maxrto;
+
+			/* Mark beginning of a new observation period */
+			sctp->sctp_maxrto = 0;
+
+			*optlen = sizeof (sctp_assoc_stats_t);
+			break;
+		}
 		case SCTP_I_WANT_MAPPED_V4_ADDR:
 		case SCTP_MAXSEG:
 		case SCTP_DISABLE_FRAGMENTS:

@@ -1817,7 +1817,7 @@ out:
 		oldfp->strikes++;
 		sctp->sctp_strikes++;
 
-		SCTP_CALC_RXT(oldfp, sctp->sctp_rto_max);
+		SCTP_CALC_RXT(sctp, oldfp);
 		if (oldfp != fp && oldfp->suna != 0)
 			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->rto);
 		SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
@@ -2032,7 +2032,7 @@ done_bundle:
 restart_timer:
 	oldfp->strikes++;
 	sctp->sctp_strikes++;
-	SCTP_CALC_RXT(oldfp, sctp->sctp_rto_max);
+	SCTP_CALC_RXT(sctp, oldfp);
 	/*
 	 * If there is still some data in the oldfp, restart the
 	 * retransmission timer.  If there is no data, the heartbeat will
