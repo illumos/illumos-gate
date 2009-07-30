@@ -19,21 +19,29 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LC_ALL=C
 export LC_ALL
+GREP=/usr/bin/grep
+LN=/usr/bin/ln
+CP=/usr/bin/cp
+MV=/usr/bin/mv
+PSRINFO=/usr/sbin/psrinfo
+SED=/usr/bin/sed
+UNAME=/usr/bin/uname
+AWK=/usr/bin/awk
+WC=/usr/bin/wc
 
 # Add the 'gk' account with the same password as root
-grep gk $BASEDIR/etc/passwd >/dev/null 2>&1
+$GREP "^gk:" $BASEDIR/etc/passwd >/dev/null 2>&1
 if [ "$?" != "0" ]; then
 	echo "Installing 'gk' account"
 	echo "gk:x:0:1:Gatekeeper:/opt/onbld/gk:/usr/bin/csh" \
 	    >> $BASEDIR/etc/passwd
-	grep "^root:" $BASEDIR/etc/shadow | sed -e 's/^root:/gk:/' \
+	$GREP "^root:" $BASEDIR/etc/shadow | $SED -e 's/^root:/gk:/' \
 	    >> $BASEDIR/etc/shadow
 fi
 
@@ -42,7 +50,7 @@ if [ "(" -f $BASEDIR/opt/onbld/gk/.make.machines ")" -a "!" "(" -f \
     $BASEDIR/opt/onbld/gk/.make.machines.orig ")" ]; then
 	echo "Backing up $BASEDIR/opt/onbld/gk/.make.machines" \
 		"to $BASEDIR/opt/onbld/gk/.make.machines.orig";
-	cp $BASEDIR/opt/onbld/gk/.make.machines \
+	$CP $BASEDIR/opt/onbld/gk/.make.machines \
 		$BASEDIR/opt/onbld/gk/.make.machines.orig;
 fi
 
@@ -51,30 +59,30 @@ if [ "(" -f $BASEDIR/.make.machines ")" -a "!" "(" -f \
     $BASEDIR/.make.machines.orig ")" ]; then
 	echo "Backing up $BASEDIR/.make.machines to" \
 		"$BASEDIR/.make.machines.orig";
-	mv $BASEDIR/.make.machines \
+	$MV $BASEDIR/.make.machines \
 		$BASEDIR/.make.machines.orig;
 fi
 
 # Create a .make.machines file for dmake.  Preserve concurrency setting
 # for the local machine if present.
-grep `uname -n` $BASEDIR/opt/onbld/gk/.make.machines >/dev/null 2>&1;
+$GREP `$UNAME -n` $BASEDIR/opt/onbld/gk/.make.machines >/dev/null 2>&1;
 if [ "$?" = "0" ]; then
 	echo "Preserving existing dmake concurrency.";
-	grep `uname -n` $BASEDIR/opt/onbld/gk/.make.machines \
+	$GREP `$UNAME -n` $BASEDIR/opt/onbld/gk/.make.machines \
 		> /tmp/.make.machines;
-	mv /tmp/.make.machines $BASEDIR/opt/onbld/gk/.make.machines;
+	$MV /tmp/.make.machines $BASEDIR/opt/onbld/gk/.make.machines;
 else
-	cpus=`psrinfo | grep on-line | wc -l`;
+	cpus=`$PSRINFO | $GREP on-line | $WC -l`;
 	max=`expr '(' $cpus + 1 ')' '*' 2`;
-	speed=`psrinfo -v | head -3 | awk '/MHz/ { print $6 }'`;
+	speed=`$PSRINFO -v | head -3 | $AWK '/MHz/ { print $6 }'`;
 	if [ $speed -gt "500" ]; then
 		max=`expr $max '*' 2`;
 	fi
-	echo "`uname -n` max=$max" > $BASEDIR/opt/onbld/gk/.make.machines;
+	echo "`$UNAME -n` max=$max" > $BASEDIR/opt/onbld/gk/.make.machines;
 	echo "dmake concurrency set to $max.";
 fi
 
 # Create link for root's .make.machines.
 cd $BASEDIR ;
-ln -s opt/onbld/gk/.make.machines .make.machines >/dev/null 2>&1 ;
+$LN -s opt/onbld/gk/.make.machines .make.machines >/dev/null 2>&1 ;
 exit 0 ;
