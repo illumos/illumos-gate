@@ -48,10 +48,11 @@ static void		warn(const char *, ...);
 static void		die(const char *, ...);
 
 static void
-usage()
+usage(void)
 {
-	(void) fprintf(stderr, "Usage: %s [-d | -r] <interface>\n", progname);
-	exit(1);
+	(void) fprintf(stderr, gettext("Usage: %s -d | -r <ifname>\n"),
+	    progname);
+	exit(EXIT_FAILURE);
 }
 
 static const char *
@@ -59,10 +60,11 @@ mpadm_errmsg(uint32_t error)
 {
 	switch (error) {
 	case IPMP_EUNKIF:
-		return ("not a physical interface or not in an IPMP group");
+		return (gettext("not a physical interface or not in an "
+		    "IPMP group"));
 	case IPMP_EMINRED:
-		return ("no other functioning interfaces are in its IPMP "
-		    "group");
+		return (gettext("no other functioning interfaces are in its "
+		    "IPMP group"));
 	default:
 		return (ipmp_errmsg(error));
 	}
@@ -95,7 +97,7 @@ main(int argc, char **argv)
 			ifname = optarg;
 			ofuncp = undo_offline;
 			break;
-		default :
+		default:
 			usage();
 		}
 	}
@@ -166,7 +168,7 @@ do_offline(const char *ifname, ipmp_handle_t handle)
 
 		if (!set_lifflags(ifaddrp->ia_name,
 		    ifaddrp->ia_flags & ~IFF_UP))
-			warn("cannot bring down address on %s\n",
+			warn("cannot bring down address on %s",
 			    ifaddrp->ia_name);
 	}
 
@@ -193,8 +195,7 @@ undo_offline(const char *ifname, ipmp_handle_t handle)
 			warn("IFF_OFFLINE vanished on %s\n", ifaddrp->ia_name);
 
 		if (!set_lifflags(ifaddrp->ia_name, ifaddrp->ia_flags | IFF_UP))
-			warn("cannot bring up address on %s\n",
-			    ifaddrp->ia_name);
+			warn("cannot bring up address on %s", ifaddrp->ia_name);
 	}
 
 	ifaddrlistx_free(ifaddrs);
