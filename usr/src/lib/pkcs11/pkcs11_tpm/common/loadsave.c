@@ -1197,7 +1197,11 @@ delete_token_object(OBJECT *obj)
 	if (islink(objidx) != 0)
 		return (CKR_FUNCTION_FAILED);
 
-	if (islink(idxtmp) != 0)
+	/*
+	 * idxtmp is a temporary file (and should not exist yet), only fail
+	 * if it is already an existing link.
+	 */
+	if (islink(idxtmp) == 1)
 		return (CKR_FUNCTION_FAILED);
 
 	fp1 = fopen(objidx, "r");
