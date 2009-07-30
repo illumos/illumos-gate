@@ -51,6 +51,7 @@
 #include <limits.h>
 #endif
 
+#include "compat.h"
 #include "volume.h"
 #include "attrib.h"
 #include "mft.h"

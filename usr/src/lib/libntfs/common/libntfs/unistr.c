@@ -40,6 +40,7 @@
 #include <errno.h>
 #endif
 
+#include "compat.h"
 #include "attrib.h"
 #include "endians.h"
 #include "types.h"

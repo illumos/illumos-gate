@@ -39,6 +39,7 @@
 #endif
 #include <libgnomevfs/gnome-vfs-utils.h>
 
+#include "compat.h"
 #include "volume.h"
 #include "dir.h"
 

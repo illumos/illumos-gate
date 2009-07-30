@@ -34,6 +34,7 @@
 #include <errno.h>
 #endif
 
+#include "compat.h"
 #include "types.h"
 #include "attrib.h"
 #include "bitmap.h"

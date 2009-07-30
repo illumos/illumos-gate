@@ -63,6 +63,7 @@
 #include <linux/hdreg.h>
 #endif
 
+#include "compat.h"
 #include "types.h"
 #include "mst.h"
 #include "debug.h"

@@ -28,6 +28,7 @@
 #include <string.h>
 #endif
 
+#include "compat.h"
 #include "collate.h"
 #include "debug.h"
 #include "unistr.h"

@@ -38,6 +38,7 @@
 #include <errno.h>
 #endif
 
+#include "compat.h"
 #include "attrib.h"
 #include "debug.h"
 #include "volume.h"

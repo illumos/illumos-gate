@@ -57,6 +57,7 @@
 #include <errno.h>
 #endif
 
+#include "compat.h"
 #include "attrib.h"
 #include "types.h"
 #include "volume.h"
