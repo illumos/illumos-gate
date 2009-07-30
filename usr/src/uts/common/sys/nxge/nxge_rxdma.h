@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -423,8 +424,6 @@ void nxge_fixup_rxdma_rings(p_nxge_t);
 nxge_status_t nxge_dump_rxdma_channel(p_nxge_t, uint8_t);
 
 void nxge_rxdma_fix_channel(p_nxge_t, uint16_t);
-void nxge_rxdma_fixup_channel(p_nxge_t, uint16_t, int);
-int nxge_rxdma_get_ring_index(p_nxge_t, uint16_t);
 
 mblk_t *nxge_rx_poll(void *, int);
 int nxge_enable_poll(void *);

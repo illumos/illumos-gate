@@ -1328,8 +1328,7 @@ nxge_fixup_rxdma_rings(p_nxge_t nxgep)
 				    "==> nxge_fixup_rxdma_rings: "
 				    "channel %d ring $%px",
 				    rdc, ring));
-				(void) nxge_rxdma_fixup_channel
-				    (nxgep, rdc, rdc);
+				(void) nxge_rxdma_fix_channel(nxgep, rdc);
 			}
 		}
 	}
@@ -1339,24 +1338,6 @@ nxge_fixup_rxdma_rings(p_nxge_t nxgep)
 
 void
 nxge_rxdma_fix_channel(p_nxge_t nxgep, uint16_t channel)
-{
-	int		i;
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_fix_channel"));
-	i = nxge_rxdma_get_ring_index(nxgep, channel);
-	if (i < 0) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		    "<== nxge_rxdma_fix_channel: no entry found"));
-		return;
-	}
-
-	nxge_rxdma_fixup_channel(nxgep, channel, i);
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_fix_channel"));
-}
-
-void
-nxge_rxdma_fixup_channel(p_nxge_t nxgep, uint16_t channel, int entry)
 {
 	int			ndmas;
 	p_rx_rbr_rings_t 	rx_rbr_rings;
@@ -1373,7 +1354,7 @@ nxge_rxdma_fixup_channel(p_nxge_t nxgep, uint16_t channel, int entry)
 	p_nxge_dma_common_t 	dmap;
 	nxge_status_t		status = NXGE_OK;
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_fixup_channel"));
+	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_fix_channel"));
 
 	(void) nxge_rxdma_stop_channel(nxgep, channel);
 
@@ -1382,14 +1363,14 @@ nxge_rxdma_fixup_channel(p_nxge_t nxgep, uint16_t channel, int entry)
 
 	if (!dma_buf_poolp->buf_allocated || !dma_cntl_poolp->buf_allocated) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		    "<== nxge_rxdma_fixup_channel: buf not allocated"));
+		    "<== nxge_rxdma_fix_channel: buf not allocated"));
 		return;
 	}
 
 	ndmas = dma_buf_poolp->ndmas;
 	if (!ndmas) {
 		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-		    "<== nxge_rxdma_fixup_channel: no dma allocated"));
+		    "<== nxge_rxdma_fix_channel: no dma allocated"));
 		return;
 	}
 
@@ -1401,10 +1382,9 @@ nxge_rxdma_fixup_channel(p_nxge_t nxgep, uint16_t channel, int entry)
 	rx_mbox_p = rx_mbox_areas_p->rxmbox_areas;
 
 	/* Reinitialize the receive block and completion rings */
-	rbrp = (p_rx_rbr_ring_t)rbr_rings[entry],
-	    rcrp = (p_rx_rcr_ring_t)rcr_rings[entry],
-	    mboxp = (p_rx_mbox_t)rx_mbox_p[entry];
-
+	rbrp = (p_rx_rbr_ring_t)rbr_rings[channel],
+	    rcrp = (p_rx_rcr_ring_t)rcr_rings[channel],
+	    mboxp = (p_rx_mbox_t)rx_mbox_p[channel];
 
 	rbrp->rbr_wr_index = (rbrp->rbb_max - 1);
 	rbrp->rbr_rd_index = 0;
@@ -1417,66 +1397,16 @@ nxge_rxdma_fixup_channel(p_nxge_t nxgep, uint16_t channel, int entry)
 	status = nxge_rxdma_start_channel(nxgep, channel,
 	    rbrp, rcrp, mboxp);
 	if (status != NXGE_OK) {
-		goto nxge_rxdma_fixup_channel_fail;
-	}
-	if (status != NXGE_OK) {
-		goto nxge_rxdma_fixup_channel_fail;
-	}
-
-nxge_rxdma_fixup_channel_fail:
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-	    "==> nxge_rxdma_fixup_channel: failed (0x%08x)", status));
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_fixup_channel"));
-}
-
-/*
- * Convert an absolute RDC number to a Receive Buffer Ring index.  That is,
- * map <channel> to an index into nxgep->rx_rbr_rings.
- * (device ring index -> port ring index)
- */
-int
-nxge_rxdma_get_ring_index(p_nxge_t nxgep, uint16_t channel)
-{
-	int			i, ndmas;
-	uint16_t		rdc;
-	p_rx_rbr_rings_t	rx_rbr_rings;
-	p_rx_rbr_ring_t		*rbr_rings;
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-	    "==> nxge_rxdma_get_ring_index: channel %d", channel));
-
-	rx_rbr_rings = nxgep->rx_rbr_rings;
-	if (rx_rbr_rings == NULL) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		    "<== nxge_rxdma_get_ring_index: NULL ring pointer"));
-		return (-1);
-	}
-	ndmas = rx_rbr_rings->ndmas;
-	if (!ndmas) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		    "<== nxge_rxdma_get_ring_index: no channel"));
-		return (-1);
+		goto nxge_rxdma_fix_channel_fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-	    "==> nxge_rxdma_get_ring_index (ndmas %d)", ndmas));
+	    "<== nxge_rxdma_fix_channel: success (0x%08x)", status));
+	return;
 
-	rbr_rings = rx_rbr_rings->rbr_rings;
-	for (i = 0; i < ndmas; i++) {
-		rdc = rbr_rings[i]->rdc;
-		if (channel == rdc) {
-			NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			    "==> nxge_rxdma_get_rbr_ring: channel %d "
-			    "(index %d) ring %d", channel, i, rbr_rings[i]));
-			return (i);
-		}
-	}
-
+nxge_rxdma_fix_channel_fail:
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-	    "<== nxge_rxdma_get_rbr_ring_index: not found"));
-
-	return (-1);
+	    "<== nxge_rxdma_fix_channel: failed (0x%08x)", status));
 }
 
 p_rx_rbr_ring_t
@@ -4603,7 +4533,6 @@ nxge_rxdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel)
 	p_rx_mbox_t		mboxp;
 	rx_dma_ent_msk_t	ent_mask;
 	p_nxge_dma_common_t	dmap;
-	int			ring_idx;
 	uint32_t		ref_cnt;
 	p_rx_msg_t		rx_msg_p;
 	int			i;
@@ -4622,9 +4551,8 @@ nxge_rxdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel)
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "Rx DMA stop..."));
 
-	ring_idx = nxge_rxdma_get_ring_index(nxgep, channel);
-	rbrp = (p_rx_rbr_ring_t)nxgep->rx_rbr_rings->rbr_rings[ring_idx];
-	rcrp = (p_rx_rcr_ring_t)nxgep->rx_rcr_rings->rcr_rings[ring_idx];
+	rbrp = (p_rx_rbr_ring_t)nxgep->rx_rbr_rings->rbr_rings[channel];
+	rcrp = (p_rx_rcr_ring_t)nxgep->rx_rcr_rings->rcr_rings[channel];
 
 	MUTEX_ENTER(&rcrp->lock);
 	MUTEX_ENTER(&rbrp->lock);
@@ -4664,8 +4592,7 @@ nxge_rxdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel)
 
 	nxge_port_rcr_size = nxgep->nxge_port_rcr_size;
 
-	mboxp =
-	    (p_rx_mbox_t)nxgep->rx_mbox_areas_p->rxmbox_areas[ring_idx];
+	mboxp = (p_rx_mbox_t)nxgep->rx_mbox_areas_p->rxmbox_areas[channel];
 
 	rbrp->rbr_wr_index = (rbrp->rbb_max - 1);
 	rbrp->rbr_rd_index = 0;
