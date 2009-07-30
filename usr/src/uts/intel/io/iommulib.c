@@ -576,7 +576,7 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 
 	*errorp = 0;
 
-	if (IOMMULIB_HDL(rdip))
+	if (IOMMU_USED(rdip))
 		return (DDI_SUCCESS);
 
 	ASSERT(DEVI(rdip)->devi_iommulib_handle == NULL);

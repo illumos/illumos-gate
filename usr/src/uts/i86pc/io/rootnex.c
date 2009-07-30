@@ -236,11 +236,6 @@ static int rootnex_coredma_sync(dev_info_t *dip, dev_info_t *rdip,
 static int rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, uint_t win, off_t *offp, size_t *lenp,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp);
-static int rootnex_coredma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep);
-static int rootnex_coredma_mctl(dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
-    size_t *lenp, caddr_t *objpp, uint_t cache_flags);
 
 static struct bus_ops rootnex_bus_ops = {
 	BUSO_REV,
@@ -320,8 +315,8 @@ static iommulib_nexops_t iommulib_nexops = {
 	rootnex_coredma_get_sleep_flags,
 	rootnex_coredma_sync,
 	rootnex_coredma_win,
-	rootnex_coredma_map,
-	rootnex_coredma_mctl
+	rootnex_dma_map,
+	rootnex_dma_mctl
 };
 #endif
 
@@ -1764,7 +1759,7 @@ rootnex_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
 		return (DDI_FAILURE);
 	}
 
-	ASSERT(IOMMULIB_HDL(rdip));
+	ASSERT(IOMMU_USED(rdip));
 
 	/* has an IOMMU */
 	return (iommulib_nexdma_allochdl(dip, rdip, attr,
@@ -1811,7 +1806,7 @@ static int
 rootnex_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(handle)) {
+	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_freehdl(dip, rdip, handle));
 	}
 #endif
@@ -2085,7 +2080,7 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(handle)) {
+	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_bindhdl(dip, rdip, handle, dmareq,
 		    cookiep, ccountp));
 	}
@@ -2183,7 +2178,7 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(handle)) {
+	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_unbindhdl(dip, rdip, handle));
 	}
 #endif
@@ -4239,7 +4234,7 @@ rootnex_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     off_t off, size_t len, uint_t cache_flags)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(handle)) {
+	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_sync(dip, rdip, handle, off, len,
 		    cache_flags));
 	}
@@ -4526,7 +4521,7 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     uint_t *ccountp)
 {
 #if !defined(__xpv)
-	if (IOMMU_USED(handle)) {
+	if (IOMMU_USED(rdip)) {
 		return (iommulib_nexdma_win(dip, rdip, handle, win, offp, lenp,
 		    cookiep, ccountp));
 	}
@@ -4542,9 +4537,14 @@ rootnex_dma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
  * ************************
  */
 
+/*
+ * rootnex_dma_map()
+ *    called from ddi_dma_setup()
+ * NO IOMMU in 32 bit mode. The below routines doesn't work in 64 bit mode.
+ */
 /* ARGSUSED */
 static int
-rootnex_coredma_map(dev_info_t *dip, dev_info_t *rdip,
+rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
     struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
 {
 #if defined(__amd64)
@@ -4620,25 +4620,13 @@ rootnex_coredma_map(dev_info_t *dip, dev_info_t *rdip,
 }
 
 /*
- * rootnex_dma_map()
- *    called from ddi_dma_setup()
- */
-/* ARGSUSED */
-static int
-rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip,
-    struct ddi_dma_req *dmareq, ddi_dma_handle_t *handlep)
-{
-	/* NO IOMMU in 32 bit mode */
-	return (rootnex_coredma_map(dip, rdip, dmareq, handlep));
-}
-
-/*
  * rootnex_dma_mctl()
  *
+ * No IOMMU in 32 bit mode. The below routine doesn't work in 64 bit mode.
  */
 /* ARGSUSED */
 static int
-rootnex_coredma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
+rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
     enum ddi_dma_ctlops request, off_t *offp, size_t *lenp, caddr_t *objpp,
     uint_t cache_flags)
 {
@@ -4821,21 +4809,6 @@ rootnex_coredma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 
 	return (DDI_FAILURE);
 #endif /* defined(__amd64) */
-}
-
-/*
- * rootnex_dma_mctl()
- *
- */
-/* ARGSUSED */
-static int
-rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
-    enum ddi_dma_ctlops request, off_t *offp, size_t *lenp, caddr_t *objpp,
-    uint_t cache_flags)
-{
-	/* NO IOMMU in 32 bit mode */
-	return (rootnex_coredma_mctl(dip, rdip, handle, request, offp,
-	    lenp, objpp, cache_flags));
 }
 
 /*

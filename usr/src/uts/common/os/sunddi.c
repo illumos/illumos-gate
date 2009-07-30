@@ -884,7 +884,8 @@ ddi_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 {
 	int (*fp)();
 
-	dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_ctl;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_ctl;
 	fp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_ctl;
 	return ((*fp) (dip, rdip, handle, request, offp, lenp, objp, flags));
 }
@@ -988,40 +989,40 @@ int
 ddi_dma_map(dev_info_t *dip, dev_info_t *rdip,
 	struct ddi_dma_req *dmareqp, ddi_dma_handle_t *handlep)
 {
-	dev_info_t	*hdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, struct ddi_dma_req *,
 	    ddi_dma_handle_t *);
 
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_map;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_map;
 
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_map;
-	return ((*funcp)(hdip, rdip, dmareqp, handlep));
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_map;
+	return ((*funcp)(dip, rdip, dmareqp, handlep));
 }
 
 int
 ddi_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
     int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
 {
-	dev_info_t	*hdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_attr_t *,
 	    int (*)(caddr_t), caddr_t, ddi_dma_handle_t *);
 
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_allochdl;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_allochdl;
 
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_allochdl;
-	return ((*funcp)(hdip, rdip, attr, waitfp, arg, handlep));
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_allochdl;
+	return ((*funcp)(dip, rdip, attr, waitfp, arg, handlep));
 }
 
 int
 ddi_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handlep)
 {
-	dev_info_t	*hdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t);
 
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_allochdl;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_allochdl;
 
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_freehdl;
-	return ((*funcp)(hdip, rdip, handlep));
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_freehdl;
+	return ((*funcp)(dip, rdip, handlep));
 }
 
 int
@@ -1029,27 +1030,27 @@ ddi_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, struct ddi_dma_req *dmareq,
     ddi_dma_cookie_t *cp, uint_t *ccountp)
 {
-	dev_info_t	*hdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
 	    struct ddi_dma_req *, ddi_dma_cookie_t *, uint_t *);
 
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_bindhdl;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_bindhdl;
 
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_bindhdl;
-	return ((*funcp)(hdip, rdip, handle, dmareq, cp, ccountp));
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_bindhdl;
+	return ((*funcp)(dip, rdip, handle, dmareq, cp, ccountp));
 }
 
 int
 ddi_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle)
 {
-	dev_info_t	*hdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t);
 
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_unbindhdl;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_unbindhdl;
 
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_unbindhdl;
-	return ((*funcp)(hdip, rdip, handle));
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_unbindhdl;
+	return ((*funcp)(dip, rdip, handle));
 }
 
 
@@ -1058,14 +1059,14 @@ ddi_dma_flush(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, off_t off, size_t len,
     uint_t cache_flags)
 {
-	dev_info_t	*hdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
 	    off_t, size_t, uint_t);
 
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_flush;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_flush;
 
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_flush;
-	return ((*funcp)(hdip, rdip, handle, off, len, cache_flags));
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_flush;
+	return ((*funcp)(dip, rdip, handle, off, len, cache_flags));
 }
 
 int
@@ -1073,14 +1074,14 @@ ddi_dma_win(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, uint_t win, off_t *offp,
     size_t *lenp, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
-	dev_info_t	*hdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
 	    uint_t, off_t *, size_t *, ddi_dma_cookie_t *, uint_t *);
 
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_win;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_win;
 
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_win;
-	return ((*funcp)(hdip, rdip, handle, win, offp, lenp,
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_win;
+	return ((*funcp)(dip, rdip, handle, win, offp, lenp,
 	    cookiep, ccountp));
 }
 
@@ -1088,7 +1089,7 @@ int
 ddi_dma_sync(ddi_dma_handle_t h, off_t o, size_t l, uint_t whom)
 {
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)h;
-	dev_info_t *hdip, *dip;
+	dev_info_t *dip, *rdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t, off_t,
 	    size_t, uint_t);
 
@@ -1101,23 +1102,25 @@ ddi_dma_sync(ddi_dma_handle_t h, off_t o, size_t l, uint_t whom)
 	if ((hp->dmai_rflags & DMP_NOSYNC) == DMP_NOSYNC)
 		return (DDI_SUCCESS);
 
-	dip = hp->dmai_rdip;
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_flush;
-	funcp = DEVI(hdip)->devi_ops->devo_bus_ops->bus_dma_flush;
-	return ((*funcp)(hdip, dip, h, o, l, whom));
+	dip = rdip = hp->dmai_rdip;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_flush;
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_flush;
+	return ((*funcp)(dip, rdip, h, o, l, whom));
 }
 
 int
 ddi_dma_unbind_handle(ddi_dma_handle_t h)
 {
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)h;
-	dev_info_t *hdip, *dip;
+	dev_info_t *dip, *rdip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t);
 
-	dip = hp->dmai_rdip;
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_unbindhdl;
-	funcp = DEVI(dip)->devi_bus_dma_unbindfunc;
-	return ((*funcp)(hdip, dip, h));
+	dip = rdip = hp->dmai_rdip;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_unbindhdl;
+	funcp = DEVI(rdip)->devi_bus_dma_unbindfunc;
+	return ((*funcp)(dip, rdip, h));
 }
 
 #endif	/* !__sparc */
@@ -7114,7 +7117,7 @@ ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
 	ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	dev_info_t *hdip, *dip;
+	dev_info_t *dip, *rdip;
 	struct ddi_dma_req dmareq;
 	int (*funcp)();
 
@@ -7157,10 +7160,11 @@ ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
 		}
 	}
 
-	dip = hp->dmai_rdip;
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_bindhdl;
-	funcp = DEVI(dip)->devi_bus_dma_bindfunc;
-	return ((*funcp)(hdip, dip, handle, &dmareq, cookiep, ccountp));
+	dip = rdip = hp->dmai_rdip;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_bindhdl;
+	funcp = DEVI(rdip)->devi_bus_dma_bindfunc;
+	return ((*funcp)(dip, rdip, handle, &dmareq, cookiep, ccountp));
 }
 
 int
@@ -7169,7 +7173,7 @@ ddi_dma_addr_bind_handle(ddi_dma_handle_t handle, struct as *as,
 	caddr_t arg, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
-	dev_info_t *hdip, *dip;
+	dev_info_t *dip, *rdip;
 	struct ddi_dma_req dmareq;
 	int (*funcp)();
 
@@ -7185,10 +7189,11 @@ ddi_dma_addr_bind_handle(ddi_dma_handle_t handle, struct as *as,
 	dmareq.dmar_object.dmao_obj.virt_obj.v_addr = addr;
 	dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
 
-	dip = hp->dmai_rdip;
-	hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_bindhdl;
-	funcp = DEVI(dip)->devi_bus_dma_bindfunc;
-	return ((*funcp)(hdip, dip, handle, &dmareq, cookiep, ccountp));
+	dip = rdip = hp->dmai_rdip;
+	if (dip != ddi_root_node())
+		dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_bindhdl;
+	funcp = DEVI(rdip)->devi_bus_dma_bindfunc;
+	return ((*funcp)(dip, rdip, handle, &dmareq, cookiep, ccountp));
 }
 
 void
