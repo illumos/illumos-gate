@@ -648,20 +648,15 @@ kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		int i;
 		kmem_slab_usage_t *ksu;
 
-		mdb_printf("  %d complete, %d partial",
+		mdb_printf("  %d complete (%d), %d partial:",
 		    (stats.ks_slabs - stats.ks_partial_slabs),
+		    stats.ks_max_buffers_per_slab,
 		    stats.ks_partial_slabs);
-		if (stats.ks_partial_slabs > 0) {
-			mdb_printf(" (%d):", stats.ks_max_buffers_per_slab);
-		}
+
 		for (i = 0; i < stats.ks_partial_slabs; i++) {
 			ksu = &stats.ks_usage[i];
-			if (ksu->ksu_nomove) {
-				const char *symbol = "*";
-				mdb_printf(" %d%s", ksu->ksu_refcnt, symbol);
-			} else {
-				mdb_printf(" %d", ksu->ksu_refcnt);
-			}
+			mdb_printf(" %d%s", ksu->ksu_refcnt,
+			    (ksu->ksu_nomove ? "*" : ""));
 		}
 		mdb_printf("\n\n");
 	}

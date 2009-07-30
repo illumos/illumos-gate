@@ -291,6 +291,9 @@ typedef struct kmem_defrag {
 	uint64_t	kmd_dont_need;		/* DONT_NEED responses */
 	uint64_t	kmd_dont_know;		/* DONT_KNOW responses */
 	uint64_t	kmd_hunt_found;		/* DONT_KNOW: # found in mag */
+	uint64_t	kmd_slabs_freed;	/* slabs freed by moves */
+	uint64_t	kmd_defrags;		/* kmem_cache_defrag() */
+	uint64_t	kmd_scans;		/* kmem_cache_scan() */
 
 	/*
 	 * Consolidator fields
@@ -300,9 +303,11 @@ typedef struct kmem_defrag {
 	size_t		kmd_deadcount;		/* # of slabs in kmd_deadlist */
 	uint8_t		kmd_reclaim_numer;	/* slab usage threshold */
 	uint8_t		kmd_pad1;		/* compiler padding */
+	uint16_t	kmd_consolidate;	/* triggers consolidator */
+	uint32_t	kmd_pad2;		/* compiler padding */
 	size_t		kmd_slabs_sought;	/* reclaimable slabs sought */
 	size_t		kmd_slabs_found;	/* reclaimable slabs found */
-	size_t		kmd_scans;		/* nth scan interval counter */
+	size_t		kmd_tries;		/* nth scan interval counter */
 	/*
 	 * Fields used to ASSERT that the client does not kmem_cache_free()
 	 * objects passed to the move callback.
@@ -326,7 +331,8 @@ struct kmem_cache {
 	uint64_t	cache_buftotal;		/* total buffers */
 	uint64_t	cache_bufmax;		/* max buffers ever */
 	uint64_t	cache_bufslab;		/* buffers free in slab layer */
-	uint64_t	cache_rescale;		/* # of hash table rescales */
+	uint64_t	cache_reap;		/* cache reaps */
+	uint64_t	cache_rescale;		/* hash table rescales */
 	uint64_t	cache_lookup_depth;	/* hash lookup depth */
 	uint64_t	cache_depot_contention;	/* mutex contention count */
 	uint64_t	cache_depot_contention_prev; /* previous snapshot */
@@ -413,6 +419,7 @@ typedef struct kmem_log_header {
 /* kmem_move kmm_flags */
 #define	KMM_DESPERATE		0x1
 #define	KMM_NOTIFY		0x2
+#define	KMM_DEBUG		0x4
 
 typedef struct kmem_move {
 	kmem_slab_t	*kmm_from_slab;

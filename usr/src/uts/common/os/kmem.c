@@ -861,13 +861,18 @@ struct kmem_cache_kstat {
 	kstat_named_t	kmc_full_magazines;
 	kstat_named_t	kmc_empty_magazines;
 	kstat_named_t	kmc_magazine_size;
-	kstat_named_t	kmc_move_callbacks;
+	kstat_named_t	kmc_reap; /* number of kmem_cache_reap() calls */
+	kstat_named_t	kmc_defrag; /* attempts to defrag all partial slabs */
+	kstat_named_t	kmc_scan; /* attempts to defrag one partial slab */
+	kstat_named_t	kmc_move_callbacks; /* sum of yes, no, later, dn, dk */
 	kstat_named_t	kmc_move_yes;
 	kstat_named_t	kmc_move_no;
 	kstat_named_t	kmc_move_later;
 	kstat_named_t	kmc_move_dont_need;
-	kstat_named_t	kmc_move_dont_know;
-	kstat_named_t	kmc_move_hunt_found;
+	kstat_named_t	kmc_move_dont_know; /* obj unrecognized by client ... */
+	kstat_named_t	kmc_move_hunt_found; /* ... but found in mag layer */
+	kstat_named_t	kmc_move_slabs_freed; /* slabs freed by consolidator */
+	kstat_named_t	kmc_move_reclaimable; /* buffers, if consolidator ran */
 } kmem_cache_kstat = {
 	{ "buf_size",		KSTAT_DATA_UINT64 },
 	{ "align",		KSTAT_DATA_UINT64 },
@@ -895,6 +900,9 @@ struct kmem_cache_kstat {
 	{ "full_magazines",	KSTAT_DATA_UINT64 },
 	{ "empty_magazines",	KSTAT_DATA_UINT64 },
 	{ "magazine_size",	KSTAT_DATA_UINT64 },
+	{ "reap",		KSTAT_DATA_UINT64 },
+	{ "defrag",		KSTAT_DATA_UINT64 },
+	{ "scan",		KSTAT_DATA_UINT64 },
 	{ "move_callbacks",	KSTAT_DATA_UINT64 },
 	{ "move_yes",		KSTAT_DATA_UINT64 },
 	{ "move_no",		KSTAT_DATA_UINT64 },
@@ -902,6 +910,8 @@ struct kmem_cache_kstat {
 	{ "move_dont_need",	KSTAT_DATA_UINT64 },
 	{ "move_dont_know",	KSTAT_DATA_UINT64 },
 	{ "move_hunt_found",	KSTAT_DATA_UINT64 },
+	{ "move_slabs_freed",	KSTAT_DATA_UINT64 },
+	{ "move_reclaimable",	KSTAT_DATA_UINT64 },
 };
 
 static kmutex_t kmem_cache_kstat_lock;
@@ -1045,19 +1055,19 @@ static vmem_t		*kmem_firewall_arena;
 /*
  * kmem slab consolidator thresholds (tunables)
  */
-static size_t kmem_frag_minslabs = 101;	/* minimum total slabs */
-static size_t kmem_frag_numer = 1;	/* free buffers (numerator) */
-static size_t kmem_frag_denom = KMEM_VOID_FRACTION; /* buffers (denominator) */
+size_t kmem_frag_minslabs = 101;	/* minimum total slabs */
+size_t kmem_frag_numer = 1;		/* free buffers (numerator) */
+size_t kmem_frag_denom = KMEM_VOID_FRACTION; /* buffers (denominator) */
 /*
  * Maximum number of slabs from which to move buffers during a single
  * maintenance interval while the system is not low on memory.
  */
-static size_t kmem_reclaim_max_slabs = 1;
+size_t kmem_reclaim_max_slabs = 1;
 /*
  * Number of slabs to scan backwards from the end of the partial slab list
  * when searching for buffers to relocate.
  */
-static size_t kmem_reclaim_scan_range = 12;
+size_t kmem_reclaim_scan_range = 12;
 
 #ifdef	KMEM_STATS
 static struct {
@@ -1067,8 +1077,8 @@ static struct {
 	uint64_t kms_later;
 	uint64_t kms_dont_need;
 	uint64_t kms_dont_know;
-	uint64_t kms_hunt_found_slab;
 	uint64_t kms_hunt_found_mag;
+	uint64_t kms_hunt_found_slab;
 	uint64_t kms_hunt_alloc_fail;
 	uint64_t kms_hunt_lucky;
 	uint64_t kms_notify;
@@ -1077,9 +1087,9 @@ static struct {
 	uint64_t kms_already_pending;
 	uint64_t kms_callback_alloc_fail;
 	uint64_t kms_callback_taskq_fail;
+	uint64_t kms_endscan_slab_dead;
 	uint64_t kms_endscan_slab_destroyed;
 	uint64_t kms_endscan_nomem;
-	uint64_t kms_endscan_slab_all_used;
 	uint64_t kms_endscan_refcnt_changed;
 	uint64_t kms_endscan_nomove_changed;
 	uint64_t kms_endscan_freelist;
@@ -1087,13 +1097,16 @@ static struct {
 	uint64_t kms_avl_noupdate;
 	uint64_t kms_no_longer_reclaimable;
 	uint64_t kms_notify_no_longer_reclaimable;
+	uint64_t kms_notify_slab_dead;
+	uint64_t kms_notify_slab_destroyed;
 	uint64_t kms_alloc_fail;
 	uint64_t kms_constructor_fail;
 	uint64_t kms_dead_slabs_freed;
 	uint64_t kms_defrags;
+	uint64_t kms_scans;
 	uint64_t kms_scan_depot_ws_reaps;
 	uint64_t kms_debug_reaps;
-	uint64_t kms_debug_move_scans;
+	uint64_t kms_debug_scans;
 } kmem_move_stats;
 #endif	/* KMEM_STATS */
 
@@ -1105,12 +1118,13 @@ static boolean_t kmem_move_any_partial;
 
 #ifdef	DEBUG
 /*
+ * kmem consolidator debug tunables:
  * Ensure code coverage by occasionally running the consolidator even when the
  * caches are not fragmented (they may never be). These intervals are mean time
  * in cache maintenance intervals (kmem_cache_update).
  */
-static int kmem_mtb_move = 60;		/* defrag 1 slab (~15min) */
-static int kmem_mtb_reap = 1800;	/* defrag all slabs (~7.5hrs) */
+uint32_t kmem_mtb_move = 60;	/* defrag 1 slab (~15min) */
+uint32_t kmem_mtb_reap = 1800;	/* defrag all slabs (~7.5hrs) */
 #endif	/* DEBUG */
 
 static kmem_cache_t	*kmem_defrag_cache;
@@ -2614,6 +2628,7 @@ static void
 kmem_cache_reap(kmem_cache_t *cp)
 {
 	ASSERT(taskq_member(kmem_taskq, curthread));
+	cp->cache_reap++;
 
 	/*
 	 * Ask the cache's owner to free some memory if possible.
@@ -2958,7 +2973,6 @@ static void kmem_update(void *);
 static void
 kmem_update_timeout(void *dummy)
 {
-
 	(void) timeout(kmem_update, dummy, kmem_reap_interval);
 }
 
@@ -2984,6 +2998,7 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 	uint64_t cpu_buf_avail;
 	uint64_t buf_avail = 0;
 	int cpu_seqid;
+	long reap;
 
 	ASSERT(MUTEX_HELD(&kmem_cache_kstat_lock));
 
@@ -3031,6 +3046,9 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 	kmcp->kmc_free.value.ui64		+= cp->cache_empty.ml_alloc;
 	buf_avail += cp->cache_full.ml_total * cp->cache_magtype->mt_magsize;
 
+	reap = MIN(cp->cache_full.ml_reaplimit, cp->cache_full.ml_min);
+	reap = MIN(reap, cp->cache_full.ml_total);
+
 	mutex_exit(&cp->cache_depot_lock);
 
 	kmcp->kmc_buf_size.value.ui64	= cp->cache_bufsize;
@@ -3050,6 +3068,7 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 	kmcp->kmc_hash_lookup_depth.value.ui64	= cp->cache_lookup_depth;
 	kmcp->kmc_hash_rescale.value.ui64	= cp->cache_rescale;
 	kmcp->kmc_vmem_source.value.ui64	= cp->cache_arena->vm_id;
+	kmcp->kmc_reap.value.ui64	= cp->cache_reap;
 
 	if (cp->cache_defrag == NULL) {
 		kmcp->kmc_move_callbacks.value.ui64	= 0;
@@ -3059,7 +3078,13 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 		kmcp->kmc_move_dont_need.value.ui64	= 0;
 		kmcp->kmc_move_dont_know.value.ui64	= 0;
 		kmcp->kmc_move_hunt_found.value.ui64	= 0;
+		kmcp->kmc_move_slabs_freed.value.ui64	= 0;
+		kmcp->kmc_defrag.value.ui64		= 0;
+		kmcp->kmc_scan.value.ui64		= 0;
+		kmcp->kmc_move_reclaimable.value.ui64	= 0;
 	} else {
+		int64_t reclaimable;
+
 		kmem_defrag_t *kd = cp->cache_defrag;
 		kmcp->kmc_move_callbacks.value.ui64	= kd->kmd_callbacks;
 		kmcp->kmc_move_yes.value.ui64		= kd->kmd_yes;
@@ -3068,6 +3093,14 @@ kmem_cache_kstat_update(kstat_t *ksp, int rw)
 		kmcp->kmc_move_dont_need.value.ui64	= kd->kmd_dont_need;
 		kmcp->kmc_move_dont_know.value.ui64	= kd->kmd_dont_know;
 		kmcp->kmc_move_hunt_found.value.ui64	= kd->kmd_hunt_found;
+		kmcp->kmc_move_slabs_freed.value.ui64	= kd->kmd_slabs_freed;
+		kmcp->kmc_defrag.value.ui64		= kd->kmd_defrags;
+		kmcp->kmc_scan.value.ui64		= kd->kmd_scans;
+
+		reclaimable = cp->cache_bufslab - (cp->cache_maxchunks - 1);
+		reclaimable = MAX(reclaimable, 0);
+		reclaimable += ((uint64_t)reap * cp->cache_magtype->mt_magsize);
+		kmcp->kmc_move_reclaimable.value.ui64	= reclaimable;
 	}
 
 	mutex_exit(&cp->cache_lock);
@@ -4107,12 +4140,21 @@ kmem_slab_allocated(kmem_cache_t *cp, kmem_slab_t *sp, void *buf)
 static boolean_t
 kmem_slab_is_reclaimable(kmem_cache_t *cp, kmem_slab_t *sp, int flags)
 {
-	long refcnt;
+	long refcnt = sp->slab_refcnt;
 
 	ASSERT(cp->cache_defrag != NULL);
 
+	/*
+	 * For code coverage we want to be able to move an object within the
+	 * same slab (the only partial slab) even if allocating the destination
+	 * buffer resulted in a completely allocated slab.
+	 */
+	if (flags & KMM_DEBUG) {
+		return ((flags & KMM_DESPERATE) ||
+		    ((sp->slab_flags & KMEM_SLAB_NOMOVE) == 0));
+	}
+
 	/* If we're desperate, we don't care if the client said NO. */
-	refcnt = sp->slab_refcnt;
 	if (flags & KMM_DESPERATE) {
 		return (refcnt < sp->slab_chunks); /* any partial */
 	}
@@ -4121,12 +4163,8 @@ kmem_slab_is_reclaimable(kmem_cache_t *cp, kmem_slab_t *sp, int flags)
 		return (B_FALSE);
 	}
 
-	if (kmem_move_any_partial) {
+	if ((refcnt == 1) || kmem_move_any_partial) {
 		return (refcnt < sp->slab_chunks);
-	}
-
-	if ((refcnt == 1) && (refcnt < sp->slab_chunks)) {
-		return (B_TRUE);
 	}
 
 	/*
@@ -4300,6 +4338,13 @@ static void kmem_move_end(kmem_cache_t *, kmem_move_t *);
  * buffers (old and new) passed to the move callback function, the slab of the
  * old buffer, and flags related to the move request, such as whether or not the
  * system was desperate for memory.
+ *
+ * Slabs are not freed while there is a pending callback, but instead are kept
+ * on a deadlist, which is drained after the last callback completes. This means
+ * that slabs are safe to access until kmem_move_end(), no matter how many of
+ * their buffers have been freed. Once slab_refcnt reaches zero, it stays at
+ * zero for as long as the slab remains on the deadlist and until the slab is
+ * freed.
  */
 static void
 kmem_move_buffer(kmem_move_t *callback)
@@ -4389,6 +4434,9 @@ kmem_move_buffer(kmem_move_t *callback)
 		KMEM_STAT_ADD(kmem_move_stats.kms_yes);
 		cp->cache_defrag->kmd_yes++;
 		kmem_slab_free_constructed(cp, callback->kmm_from_buf, B_FALSE);
+		/* slab safe to access until kmem_move_end() */
+		if (sp->slab_refcnt == 0)
+			cp->cache_defrag->kmd_slabs_freed++;
 		mutex_enter(&cp->cache_lock);
 		kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
 		mutex_exit(&cp->cache_lock);
@@ -4426,6 +4474,8 @@ kmem_move_buffer(kmem_move_t *callback)
 		KMEM_STAT_ADD(kmem_move_stats.kms_dont_need);
 		cp->cache_defrag->kmd_dont_need++;
 		kmem_slab_free_constructed(cp, callback->kmm_from_buf, B_FALSE);
+		if (sp->slab_refcnt == 0)
+			cp->cache_defrag->kmd_slabs_freed++;
 		mutex_enter(&cp->cache_lock);
 		kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
 		mutex_exit(&cp->cache_lock);
@@ -4438,6 +4488,8 @@ kmem_move_buffer(kmem_move_t *callback)
 			cp->cache_defrag->kmd_hunt_found++;
 			kmem_slab_free_constructed(cp, callback->kmm_from_buf,
 			    B_TRUE);
+			if (sp->slab_refcnt == 0)
+				cp->cache_defrag->kmd_slabs_freed++;
 			mutex_enter(&cp->cache_lock);
 			kmem_slab_move_yes(cp, sp, callback->kmm_from_buf);
 			mutex_exit(&cp->cache_lock);
@@ -4459,6 +4511,7 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 	void *to_buf;
 	avl_index_t index;
 	kmem_move_t *callback, *pending;
+	ulong_t n;
 
 	ASSERT(taskq_member(kmem_taskq, curthread));
 	ASSERT(MUTEX_NOT_HELD(&cp->cache_lock));
@@ -4476,7 +4529,8 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 
 	mutex_enter(&cp->cache_lock);
 
-	if (avl_numnodes(&cp->cache_partial_slabs) <= 1) {
+	n = avl_numnodes(&cp->cache_partial_slabs);
+	if ((n == 0) || ((n == 1) && !(flags & KMM_DEBUG))) {
 		mutex_exit(&cp->cache_lock);
 		kmem_cache_free(kmem_move_cache, callback);
 		return (B_TRUE); /* there is no need for the move request */
@@ -4590,14 +4644,14 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 	ASSERT(MUTEX_HELD(&cp->cache_lock));
 	ASSERT(kmem_move_cache != NULL);
 	ASSERT(cp->cache_move != NULL && cp->cache_defrag != NULL);
-	ASSERT(avl_numnodes(&cp->cache_partial_slabs) > 1);
+	ASSERT((flags & KMM_DEBUG) ? !avl_is_empty(&cp->cache_partial_slabs) :
+	    avl_numnodes(&cp->cache_partial_slabs) > 1);
 
 	if (kmem_move_blocked) {
 		return (0);
 	}
 
 	if (kmem_move_fulltilt) {
-		max_slabs = 0;
 		flags |= KMM_DESPERATE;
 	}
 
@@ -4615,9 +4669,10 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 	}
 
 	sp = avl_last(&cp->cache_partial_slabs);
-	ASSERT(sp != NULL && KMEM_SLAB_IS_PARTIAL(sp));
-	for (i = 0, s = 0; (i < max_scan) && (s < max_slabs) &&
-	    (sp != avl_first(&cp->cache_partial_slabs));
+	ASSERT(KMEM_SLAB_IS_PARTIAL(sp));
+	for (i = 0, s = 0; (i < max_scan) && (s < max_slabs) && (sp != NULL) &&
+	    ((sp != avl_first(&cp->cache_partial_slabs)) ||
+	    (flags & KMM_DEBUG));
 	    sp = AVL_PREV(&cp->cache_partial_slabs, sp), i++) {
 
 		if (!kmem_slab_is_reclaimable(cp, sp, flags)) {
@@ -4662,28 +4717,51 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 			 * Now, before the lock is reacquired, kmem could
 			 * process all pending move requests and purge the
 			 * deadlist, so that upon reacquiring the lock, sp has
-			 * been remapped. Therefore, the KMEM_SLAB_MOVE_PENDING
+			 * been remapped. Or, the client may free all the
+			 * objects on the slab while the pending moves are still
+			 * on the taskq. Therefore, the KMEM_SLAB_MOVE_PENDING
 			 * flag causes the slab to be put at the end of the
-			 * deadlist and prevents it from being purged, since we
-			 * plan to destroy it here after reacquiring the lock.
+			 * deadlist and prevents it from being destroyed, since
+			 * we plan to destroy it here after reacquiring the
+			 * lock.
 			 */
 			mutex_enter(&cp->cache_lock);
 			ASSERT(sp->slab_flags & KMEM_SLAB_MOVE_PENDING);
 			sp->slab_flags &= ~KMEM_SLAB_MOVE_PENDING;
 
-			/*
-			 * Destroy the slab now if it was completely freed while
-			 * we dropped cache_lock.
-			 */
 			if (sp->slab_refcnt == 0) {
 				list_t *deadlist =
 				    &cp->cache_defrag->kmd_deadlist;
-
-				ASSERT(!list_is_empty(deadlist));
-				ASSERT(list_link_active((list_node_t *)
-				    &sp->slab_link));
-
 				list_remove(deadlist, sp);
+
+				if (!avl_is_empty(
+				    &cp->cache_defrag->kmd_moves_pending)) {
+					/*
+					 * A pending move makes it unsafe to
+					 * destroy the slab, because even though
+					 * the move is no longer needed, the
+					 * context where that is determined
+					 * requires the slab to exist.
+					 * Fortunately, a pending move also
+					 * means we don't need to destroy the
+					 * slab here, since it will get
+					 * destroyed along with any other slabs
+					 * on the deadlist after the last
+					 * pending move completes.
+					 */
+					list_insert_head(deadlist, sp);
+					KMEM_STAT_ADD(kmem_move_stats.
+					    kms_endscan_slab_dead);
+					return (-1);
+				}
+
+				/*
+				 * Destroy the slab now if it was completely
+				 * freed while we dropped cache_lock and there
+				 * are no pending moves. Since slab_refcnt
+				 * cannot change once it reaches zero, no new
+				 * pending moves from that slab are possible.
+				 */
 				cp->cache_defrag->kmd_deadcount--;
 				cp->cache_slab_destroy++;
 				mutex_exit(&cp->cache_lock);
@@ -4707,18 +4785,8 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 				 * for the request and say nothing about the
 				 * number of reclaimable slabs.
 				 */
-				KMEM_STAT_ADD(
+				KMEM_STAT_COND_ADD(s < max_slabs,
 				    kmem_move_stats.kms_endscan_nomem);
-				return (-1);
-			}
-
-			/*
-			 * The slab may have been completely allocated while the
-			 * lock was dropped.
-			 */
-			if (KMEM_SLAB_IS_ALL_USED(sp)) {
-				KMEM_STAT_ADD(
-				    kmem_move_stats.kms_endscan_slab_all_used);
 				return (-1);
 			}
 
@@ -4728,30 +4796,51 @@ kmem_move_buffers(kmem_cache_t *cp, size_t max_scan, size_t max_slabs,
 			 * sequence any more.
 			 */
 			if (sp->slab_refcnt != refcnt) {
-				KMEM_STAT_ADD(
+				/*
+				 * If this is a KMM_DEBUG move, the slab_refcnt
+				 * may have changed because we allocated a
+				 * destination buffer on the same slab. In that
+				 * case, we're not interested in counting it.
+				 */
+				KMEM_STAT_COND_ADD(!(flags & KMM_DEBUG) &&
+				    (s < max_slabs),
 				    kmem_move_stats.kms_endscan_refcnt_changed);
 				return (-1);
 			}
 			if ((sp->slab_flags & KMEM_SLAB_NOMOVE) != nomove) {
-				KMEM_STAT_ADD(
+				KMEM_STAT_COND_ADD(s < max_slabs,
 				    kmem_move_stats.kms_endscan_nomove_changed);
 				return (-1);
 			}
 
 			/*
 			 * Generating a move request allocates a destination
-			 * buffer from the slab layer, bumping the first slab if
-			 * it is completely allocated.
+			 * buffer from the slab layer, bumping the first partial
+			 * slab if it is completely allocated. If the current
+			 * slab becomes the first partial slab as a result, we
+			 * can't continue to scan backwards.
+			 *
+			 * If this is a KMM_DEBUG move and we allocated the
+			 * destination buffer from the last partial slab, then
+			 * the buffer we're moving is on the same slab and our
+			 * slab_refcnt has changed, causing us to return before
+			 * reaching here if there are no partial slabs left.
 			 */
 			ASSERT(!avl_is_empty(&cp->cache_partial_slabs));
 			if (sp == avl_first(&cp->cache_partial_slabs)) {
+				/*
+				 * We're not interested in a second KMM_DEBUG
+				 * move.
+				 */
 				goto end_scan;
 			}
 		}
 	}
 end_scan:
 
-	KMEM_STAT_COND_ADD(sp == avl_first(&cp->cache_partial_slabs),
+	KMEM_STAT_COND_ADD(!(flags & KMM_DEBUG) &&
+	    (s < max_slabs) &&
+	    (sp == avl_first(&cp->cache_partial_slabs)),
 	    kmem_move_stats.kms_endscan_freelist);
 
 	return (s);
@@ -4807,17 +4896,24 @@ kmem_cache_move_notify_task(void *arg)
 		sp->slab_flags &= ~KMEM_SLAB_MOVE_PENDING;
 		if (sp->slab_refcnt == 0) {
 			list_t *deadlist = &cp->cache_defrag->kmd_deadlist;
-
-			ASSERT(!list_is_empty(deadlist));
-			ASSERT(list_link_active((list_node_t *)
-			    &sp->slab_link));
-
 			list_remove(deadlist, sp);
+
+			if (!avl_is_empty(
+			    &cp->cache_defrag->kmd_moves_pending)) {
+				list_insert_head(deadlist, sp);
+				mutex_exit(&cp->cache_lock);
+				KMEM_STAT_ADD(kmem_move_stats.
+				    kms_notify_slab_dead);
+				return;
+			}
+
 			cp->cache_defrag->kmd_deadcount--;
 			cp->cache_slab_destroy++;
 			mutex_exit(&cp->cache_lock);
 			kmem_slab_destroy(cp, sp);
 			KMEM_STAT_ADD(kmem_move_stats.kms_dead_slabs_freed);
+			KMEM_STAT_ADD(kmem_move_stats.
+			    kms_notify_slab_destroyed);
 			return;
 		}
 	} else {
@@ -4854,8 +4950,9 @@ kmem_cache_defrag(kmem_cache_t *cp)
 	n = avl_numnodes(&cp->cache_partial_slabs);
 	if (n > 1) {
 		/* kmem_move_buffers() drops and reacquires cache_lock */
-		(void) kmem_move_buffers(cp, n, 0, KMM_DESPERATE);
 		KMEM_STAT_ADD(kmem_move_stats.kms_defrags);
+		cp->cache_defrag->kmd_defrags++;
+		(void) kmem_move_buffers(cp, n, 0, KMM_DESPERATE);
 	}
 	mutex_exit(&cp->cache_lock);
 }
@@ -4864,9 +4961,6 @@ kmem_cache_defrag(kmem_cache_t *cp)
 static boolean_t
 kmem_cache_frag_threshold(kmem_cache_t *cp, uint64_t nfree)
 {
-	if (avl_numnodes(&cp->cache_partial_slabs) <= 1)
-		return (B_FALSE);
-
 	/*
 	 *	nfree		kmem_frag_numer
 	 * ------------------ > ---------------
@@ -4885,12 +4979,21 @@ kmem_cache_is_fragmented(kmem_cache_t *cp, boolean_t *doreap)
 	ASSERT(MUTEX_HELD(&cp->cache_lock));
 	*doreap = B_FALSE;
 
-	if (!kmem_move_fulltilt && ((cp->cache_complete_slab_count +
-	    avl_numnodes(&cp->cache_partial_slabs)) < kmem_frag_minslabs))
-		return (B_FALSE);
+	if (kmem_move_fulltilt) {
+		if (avl_numnodes(&cp->cache_partial_slabs) > 1) {
+			return (B_TRUE);
+		}
+	} else {
+		if ((cp->cache_complete_slab_count + avl_numnodes(
+		    &cp->cache_partial_slabs)) < kmem_frag_minslabs) {
+			return (B_FALSE);
+		}
+	}
 
 	nfree = cp->cache_bufslab;
-	fragmented = kmem_cache_frag_threshold(cp, nfree);
+	fragmented = ((avl_numnodes(&cp->cache_partial_slabs) > 1) &&
+	    kmem_cache_frag_threshold(cp, nfree));
+
 	/*
 	 * Free buffers in the magazine layer appear allocated from the point of
 	 * view of the slab layer. We want to know if the slab layer would
@@ -4919,14 +5022,21 @@ static void
 kmem_cache_scan(kmem_cache_t *cp)
 {
 	boolean_t reap = B_FALSE;
+	kmem_defrag_t *kmd;
 
 	ASSERT(taskq_member(kmem_taskq, curthread));
-	ASSERT(cp->cache_defrag != NULL);
 
 	mutex_enter(&cp->cache_lock);
 
+	kmd = cp->cache_defrag;
+	if (kmd->kmd_consolidate > 0) {
+		kmd->kmd_consolidate--;
+		mutex_exit(&cp->cache_lock);
+		kmem_cache_reap(cp);
+		return;
+	}
+
 	if (kmem_cache_is_fragmented(cp, &reap)) {
-		kmem_defrag_t *kmd = cp->cache_defrag;
 		size_t slabs_found;
 
 		/*
@@ -4939,6 +5049,8 @@ kmem_cache_scan(kmem_cache_t *cp)
 		 *
 		 * kmem_move_buffers() drops and reacquires cache_lock.
 		 */
+		KMEM_STAT_ADD(kmem_move_stats.kms_scans);
+		kmd->kmd_scans++;
 		slabs_found = kmem_move_buffers(cp, kmem_reclaim_scan_range,
 		    kmem_reclaim_max_slabs, 0);
 		if (slabs_found >= 0) {
@@ -4946,8 +5058,8 @@ kmem_cache_scan(kmem_cache_t *cp)
 			kmd->kmd_slabs_found += slabs_found;
 		}
 
-		if (++kmd->kmd_scans >= kmem_reclaim_scan_range) {
-			kmd->kmd_scans = 0;
+		if (++kmd->kmd_tries >= kmem_reclaim_scan_range) {
+			kmd->kmd_tries = 0;
 
 			/*
 			 * If we had difficulty finding candidate slabs in
@@ -4966,26 +5078,27 @@ kmem_cache_scan(kmem_cache_t *cp)
 	} else {
 		kmem_reset_reclaim_threshold(cp->cache_defrag);
 #ifdef	DEBUG
-		if (avl_numnodes(&cp->cache_partial_slabs) > 1) {
+		if (!avl_is_empty(&cp->cache_partial_slabs)) {
 			/*
 			 * In a debug kernel we want the consolidator to
 			 * run occasionally even when there is plenty of
 			 * memory.
 			 */
-			uint32_t debug_rand;
+			uint16_t debug_rand;
 
-			(void) random_get_bytes((uint8_t *)&debug_rand, 4);
+			(void) random_get_bytes((uint8_t *)&debug_rand, 2);
 			if (!kmem_move_noreap &&
 			    ((debug_rand % kmem_mtb_reap) == 0)) {
 				mutex_exit(&cp->cache_lock);
-				kmem_cache_reap(cp);
 				KMEM_STAT_ADD(kmem_move_stats.kms_debug_reaps);
+				kmem_cache_reap(cp);
 				return;
 			} else if ((debug_rand % kmem_mtb_move) == 0) {
+				KMEM_STAT_ADD(kmem_move_stats.kms_scans);
+				KMEM_STAT_ADD(kmem_move_stats.kms_debug_scans);
+				kmd->kmd_scans++;
 				(void) kmem_move_buffers(cp,
-				    kmem_reclaim_scan_range, 1, 0);
-				KMEM_STAT_ADD(kmem_move_stats.
-				    kms_debug_move_scans);
+				    kmem_reclaim_scan_range, 1, KMM_DEBUG);
 			}
 		}
 #endif	/* DEBUG */
