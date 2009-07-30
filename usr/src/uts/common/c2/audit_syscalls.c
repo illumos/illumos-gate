@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1822,46 +1822,6 @@ setpmask(caddr_t data)
 	return (0);
 }
 
-static int
-getfsize(caddr_t data)
-{
-	au_fstat_t fstat;
-	au_kcontext_t	*kctx = GET_KCTX_PZ;
-
-	mutex_enter(&(kctx->auk_fstat_lock));
-	fstat.af_filesz = kctx->auk_file_stat.af_filesz;
-	fstat.af_currsz = kctx->auk_file_stat.af_currsz;
-	mutex_exit(&(kctx->auk_fstat_lock));
-
-	if (copyout(&fstat, data, sizeof (au_fstat_t)))
-		return (EFAULT);
-
-	return (0);
-}
-
-static int
-setfsize(caddr_t data)
-{
-	au_fstat_t fstat;
-	au_kcontext_t	*kctx;
-
-	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
-		return (EINVAL);
-
-	kctx = GET_KCTX_NGZ;
-
-	if (copyin(data, &fstat, sizeof (au_fstat_t)))
-		return (EFAULT);
-
-	if ((fstat.af_filesz != 0) && (fstat.af_filesz < AU_MIN_FILE_SZ))
-		return (EINVAL);
-
-	mutex_enter(&(kctx->auk_fstat_lock));
-	kctx->auk_file_stat.af_filesz = fstat.af_filesz;
-	mutex_exit(&(kctx->auk_fstat_lock));
-
-	return (0);
-}
 /*
  * The out of control system call
  * This is audit kitchen sink aka auditadm, aka auditon
@@ -1882,7 +1842,6 @@ auditctl(
 	case A_GETCAR:
 	case A_GETCLASS:
 	case A_GETCWD:
-	case A_GETFSIZE:
 	case A_GETKAUDIT:
 	case A_GETKMASK:
 	case A_GETPINFO:
@@ -1962,12 +1921,6 @@ auditctl(
 		break;
 	case A_SETPMASK:
 		result = setpmask(data);
-		break;
-	case A_SETFSIZE:
-		result = setfsize(data);
-		break;
-	case A_GETFSIZE:
-		result = getfsize(data);
 		break;
 	default:
 		result = EINVAL;

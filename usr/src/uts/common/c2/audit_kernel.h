@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -315,8 +315,6 @@ struct au_kcontext {
 	struct auditinfo_addr	auk_info;
 	kmutex_t		auk_eagain_mutex; /* door call retry */
 	kcondvar_t		auk_eagain_cv;
-	kmutex_t		auk_fstat_lock;	/* audit file statistics lock */
-	au_fstat_t		auk_file_stat;	/* file statistics */
 
 	taskq_t			*auk_taskq;	/* output thread */
 

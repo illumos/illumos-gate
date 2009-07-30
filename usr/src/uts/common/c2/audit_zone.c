@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,8 +81,6 @@ au_zone_init(zoneid_t zone)
 
 	/* locks and cv's */
 
-	mutex_init(&(kctx->auk_fstat_lock), NULL, MUTEX_DEFAULT, NULL);
-
 	mutex_init(&(kctx->auk_eagain_mutex), NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&(kctx->auk_eagain_cv), NULL, CV_DRIVER, NULL);
 
@@ -127,8 +125,6 @@ au_zone_destroy(zoneid_t zone, void *arg)
 	au_kcontext_t	*kctx = arg;
 
 	ASSERT(kctx->auk_auditstate == AUC_NOAUDIT);
-
-	mutex_destroy(&(kctx->auk_fstat_lock));
 
 	mutex_destroy(&(kctx->auk_eagain_mutex));
 	cv_destroy(&(kctx->auk_eagain_cv));

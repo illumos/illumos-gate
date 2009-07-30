@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,6 @@ enum	commands {
 	AC_ARG_GETCOND,
 	AC_ARG_GETCWD,
 	AC_ARG_GETESTATE,
-	AC_ARG_GETFSIZE,
 	AC_ARG_GETKAUDIT,
 	AC_ARG_GETKMASK,
 	AC_ARG_GETPINFO,
@@ -92,7 +91,6 @@ enum	commands {
 	AC_ARG_SETAUDIT,
 	AC_ARG_SETAUID,
 	AC_ARG_SETCLASS,
-	AC_ARG_SETFSIZE,
 	AC_ARG_SETKAUDIT,
 	AC_ARG_SETKMASK,
 	AC_ARG_SETPMASK,
@@ -161,7 +159,6 @@ static struct arg_entry arg_table[] = {
 	{ "-getcond",		"",			AC_ARG_GETCOND},
 	{ "-getcwd",		"",			AC_ARG_GETCWD},
 	{ "-getestate",		"event",		AC_ARG_GETESTATE},
-	{ "-getfsize",		"",			AC_ARG_GETFSIZE},
 	{ "-getkaudit",		"",			AC_ARG_GETKAUDIT},
 	{ "-getkmask",		"",			AC_ARG_GETKMASK},
 	{ "-getpinfo",		"pid",			AC_ARG_GETPINFO},
@@ -180,7 +177,6 @@ static struct arg_entry arg_table[] = {
 							AC_ARG_SETAUDIT},
 	{ "-setauid",		"auid [cmd]",		AC_ARG_SETAUID},
 	{ "-setclass",		"event audit_flags",	AC_ARG_SETCLASS},
-	{ "-setfsize",		"filesize",		AC_ARG_SETFSIZE},
 	{ "-setkaudit",		"type IP_address",	AC_ARG_SETKAUDIT},
 	{ "-setkmask",		"audit_flags",		AC_ARG_SETKMASK},
 	{ "-setpmask",		"pid audit_flags",	AC_ARG_SETPMASK},
@@ -284,8 +280,6 @@ static void do_setqdelay(char *delay);
 static void do_setqhiwater(char *hiwater);
 static void do_setqlowater(char *lowater);
 static void do_setstat(void);
-static void do_getfsize(void);
-static void do_setfsize(char *size);
 static void str2mask(char *mask_str, au_mask_t *mp);
 static void str2tid(char *tid_str, au_tid_addr_t *tp);
 static void strsplit(char *s, char *p1, char *p2, char c);
@@ -562,19 +556,6 @@ parse_args(char **argv)
 			if (!*argv)
 				exit_usage(1);
 			str2mask(*argv, &mask);
-			break;
-
-		case AC_ARG_GETFSIZE:
-			break;
-
-		case AC_ARG_SETFSIZE:
-			++argv;
-			if (!*argv)
-				exit_usage(1);
-			if (!strisnum(*argv)) {
-				exit_error(gettext(
-				    "Invalid hiwater specified."));
-			}
 			break;
 
 		default:
@@ -866,13 +847,6 @@ do_args(char **argv)
 				audit_flags = *argv;
 				do_setumask(auid_str, audit_flags);
 			}
-			break;
-		case AC_ARG_GETFSIZE:
-			do_getfsize();
-			break;
-		case AC_ARG_SETFSIZE:
-			++argv;
-			do_setfsize(*argv);
 			break;
 
 		default:
@@ -1447,21 +1421,6 @@ do_gettermid(void)
  */
 
 static void
-do_getfsize(void)
-{
-	au_fstat_t fstat;
-
-	eauditon(A_GETFSIZE, (caddr_t)&fstat, 0);
-	(void) printf(gettext("Maximum file size %d, current file size %d\n"),
-	    fstat.af_filesz, fstat.af_currsz);
-}
-
-/*
- * The returned value is for the global zone unless AUDIT_PERZONE is
- * set.
- */
-
-static void
 do_lsevent(void)
 {
 	register au_event_ent_t *evp;
@@ -1768,20 +1727,6 @@ do_setqlowater(char *lowater)
 	eauditon(A_GETQCTRL, (caddr_t)&qctrl, 0);
 	qctrl.aq_lowater = atol(lowater);
 	eauditon(A_SETQCTRL, (caddr_t)&qctrl, 0);
-}
-
-/*
- * AUDIT_PERZONE set:  valid in all zones
- * AUDIT_PERZONE not set: valid in global zone only
- */
-
-static void
-do_setfsize(char *size)
-{
-	au_fstat_t fstat;
-
-	fstat.af_filesz = atol(size);
-	eauditon(A_SETFSIZE, (caddr_t)&fstat, 0);
 }
 
 static void

@@ -250,8 +250,6 @@ typedef au_id_t auid_t;
 #define	A_SETCLASS	23	/* set audit event to class mapping */
 #define	A_GETPINFO	24	/* get audit info for an arbitrary pid */
 #define	A_SETPMASK	25	/* set preselection mask for an given pid */
-#define	A_SETFSIZE	26	/* set audit file size */
-#define	A_GETFSIZE	27	/* get audit file size */
 #define	A_GETPINFO_ADDR	28	/* get audit info for an arbitrary pid */
 #define	A_GETKAUDIT	29	/* get kernel audit characteristics */
 #define	A_SETKAUDIT	30	/* set kernel audit characteristics */
@@ -434,16 +432,6 @@ struct audit_stat {
 	uint32_t as_memused;		/* no longer used */
 };
 typedef struct audit_stat au_stat_t;
-
-/*
- * Secondary stat structure for file size stuff.  The stat structure was
- * not combined to preserve the semantics of the 5.1 - 5.3 A_GETSTAT call
- */
-struct audit_fstat {
-	unsigned int af_filesz;
-	unsigned int af_currsz;
-};
-typedef struct audit_fstat au_fstat_t;
 
 /* get kernel audit context dependent on AUDIT_PERZONE policy */
 #define	GET_KCTX_PZ	(audit_policy & AUDIT_PERZONE) ?\
