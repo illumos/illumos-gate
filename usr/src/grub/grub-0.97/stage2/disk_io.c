@@ -431,15 +431,8 @@ attempt_mount (void)
 {
 #ifndef STAGE1_5
   for (fsys_type = 0; fsys_type < NUM_FSYS; fsys_type++)
-  {
-    /*
-     * (re)set errnum to 0 in order to clear any state that may have
-     * been left from a previous mount (or other) routine.
-     */
-    errnum = 0;
     if ((fsys_table[fsys_type].mount_func) ())
       break;
-  }
 
   if (fsys_type == NUM_FSYS && errnum == ERR_NONE)
     errnum = ERR_FSYS_MOUNT;

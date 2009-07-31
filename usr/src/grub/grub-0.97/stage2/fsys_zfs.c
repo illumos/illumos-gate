@@ -1283,6 +1283,7 @@ zfs_mount(void)
 	char tmp_devid[MAXNAMELEN];
 	uint64_t tmp_guid;
 	uint64_t adjpl = (uint64_t)part_length << SPA_MINBLOCKSHIFT;
+	int err = errnum; /* preserve previous errnum state */
 
 	/* if it's our first time here, zero the best uberblock out */
 	if (best_drive == 0 && best_part == 0 && find_best_root) {
@@ -1340,6 +1341,13 @@ zfs_mount(void)
 		}
 	}
 
+	/*
+	 * While some fs impls. (tftp) rely on setting and keeping
+	 * global errnums set, others won't reset it and will break
+	 * when issuing rawreads. The goal here is to simply not
+	 * have zfs mount attempts impact the previous state.
+	 */
+	errnum = err;
 	return (0);
 }
 
