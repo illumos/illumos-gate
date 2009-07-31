@@ -50,6 +50,7 @@
 #include <sys/vtrace.h>
 #include <sys/sysinfo.h>
 #include <sys/procfs.h>
+#include <sys/prsystm.h>
 #include <c2/audit.h>
 #include <sys/modctl.h>
 #include <sys/aio_impl.h>
@@ -719,6 +720,7 @@ sig_check:
 	}
 	if (CPU->cpu_runrun || t->t_schedflag & TS_ANYWAITQ)
 		preempt();
+	prunstop();
 
 	lwp->lwp_errno = 0;		/* clear error for next time */
 

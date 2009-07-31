@@ -790,11 +790,6 @@ retry:
 	}
 	/*
 	 * Block for the lock.
-	 * Put the lwp in an orderly state for debugging.
-	 * Calling prstop() has to be done here, and not in
-	 * turnstile_block(), since the preceding call to
-	 * turnstile_lookup() raises the PIL to a level
-	 * at which calls to prstop() should not be made.
 	 */
 	if ((error = lwptp->lwpt_time_error) != 0) {
 		/*
@@ -805,7 +800,6 @@ retry:
 		mutex_exit(&upibp->upib_lock);
 		goto out;
 	}
-	prstop(PR_REQUESTED, 0);
 	if (lwptp->lwpt_tsp != NULL) {
 		/*
 		 * Unlike the protocol for other lwp timedwait operations,
@@ -1147,6 +1141,12 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 	if ((caddr_t)lp >= p->p_as->a_userlimit)
 		return (set_errno(EFAULT));
 
+	/*
+	 * Put the lwp in an orderly state for debugging,
+	 * in case we are stopped while sleeping, below.
+	 */
+	prstop(PR_REQUESTED, 0);
+
 	timedwait = (caddr_t)tsp;
 	if ((time_error = lwp_timer_copyin(&lwpt, tsp)) == 0 &&
 	    lwpt.lwpt_imm_timeout) {
@@ -1230,10 +1230,6 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 			watched = 0;
 		}
 
-		/*
-		 * Put the lwp in an orderly state for debugging.
-		 */
-		prstop(PR_REQUESTED, 0);
 		if (timedwait) {
 			/*
 			 * If we successfully queue the timeout,
@@ -1582,6 +1578,12 @@ lwp_cond_wait(lwp_cond_t *cv, lwp_mutex_t *mp, timespec_t *tsp, int check_park)
 	    (caddr_t)mp >= p->p_as->a_userlimit)
 		return (set_errno(EFAULT));
 
+	/*
+	 * Put the lwp in an orderly state for debugging,
+	 * in case we are stopped while sleeping, below.
+	 */
+	prstop(PR_REQUESTED, 0);
+
 	timedwait = (caddr_t)tsp;
 	if ((error = lwp_timer_copyin(&lwpt, tsp)) != 0)
 		return (set_errno(error));
@@ -1713,10 +1715,6 @@ lwp_cond_wait(lwp_cond_t *cv, lwp_mutex_t *mp, timespec_t *tsp, int check_park)
 		cvwatched = 0;
 	}
 
-	/*
-	 * Put the lwp in an orderly state for debugging.
-	 */
-	prstop(PR_REQUESTED, 0);
 	if (check_park && (!schedctl_is_park() || t->t_unpark)) {
 		/*
 		 * We received a signal at user-level before calling here
@@ -2028,6 +2026,12 @@ lwp_sema_timedwait(lwp_sema_t *sp, timespec_t *tsp, int check_park)
 	if ((caddr_t)sp >= p->p_as->a_userlimit)
 		return (set_errno(EFAULT));
 
+	/*
+	 * Put the lwp in an orderly state for debugging,
+	 * in case we are stopped while sleeping, below.
+	 */
+	prstop(PR_REQUESTED, 0);
+
 	timedwait = (caddr_t)tsp;
 	if ((time_error = lwp_timer_copyin(&lwpt, tsp)) == 0 &&
 	    lwpt.lwpt_imm_timeout) {
@@ -2071,10 +2075,6 @@ lwp_sema_timedwait(lwp_sema_t *sp, timespec_t *tsp, int check_park)
 		suword8_noerr(&sp->sema_waiters, 1);
 		if (watched)
 			watch_enable_addr((caddr_t)sp, sizeof (*sp), S_WRITE);
-		/*
-		 * Put the lwp in an orderly state for debugging.
-		 */
-		prstop(PR_REQUESTED, 0);
 		if (check_park && (!schedctl_is_park() || t->t_unpark)) {
 			/*
 			 * We received a signal at user-level before calling
@@ -2353,6 +2353,12 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 	if ((caddr_t)rw >= p->p_as->a_userlimit)
 		return (set_errno(EFAULT));
 
+	/*
+	 * Put the lwp in an orderly state for debugging,
+	 * in case we are stopped while sleeping, below.
+	 */
+	prstop(PR_REQUESTED, 0);
+
 	/* We must only report this error if we are about to sleep (later). */
 	timedwait = (caddr_t)tsp;
 	if ((time_error = lwp_timer_copyin(&lwpt, tsp)) == 0 &&
@@ -2594,10 +2600,6 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 		watched = 0;
 	}
 
-	/*
-	 * Put the LWP in an orderly state for debugging.
-	 */
-	prstop(PR_REQUESTED, 0);
 	if (timedwait) {
 		/*
 		 * If we successfully queue the timeout,

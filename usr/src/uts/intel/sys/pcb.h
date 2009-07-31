@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PCB_H
 #define	_SYS_PCB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/regset.h>
 #include <sys/segments.h>
@@ -63,6 +62,7 @@ typedef struct pcb {
 
 /* pcb_flags */
 #define	DEBUG_PENDING	0x02	/* single-step of lcall for a sys call */
+#define	PRSTOP_CALLED	0x04	/* prstop() has been called for this lwp */
 #define	INSTR_VALID	0x08	/* value in pcb_instr is valid (/proc) */
 #define	NORMAL_STEP	0x10	/* normal debugger-requested single-step */
 #define	WATCH_STEP	0x20	/* single-stepping in watchpoint emulation */

@@ -18,16 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -133,7 +131,7 @@ prgregset_32ton(klwp_t *lwp, prgregset32_t src, prgregset_t dst)
 	dst[REG_SS] = (uint16_t)src[SS];
 	dst[REG_RSP] = (uint32_t)src[UESP];
 	dst[REG_RFL] =
-		(rp->r_ps & ~PSL_USERMASK) | (src[EFL] & PSL_USERMASK);
+	    (rp->r_ps & ~PSL_USERMASK) | (src[EFL] & PSL_USERMASK);
 	dst[REG_CS] = (uint16_t)src[CS];
 	dst[REG_RIP] = (uint32_t)src[EIP];
 	dst[REG_ERR] = (uint32_t)src[ERR];
@@ -349,7 +347,7 @@ prisstep(klwp_t *lwp)
 	ASSERT(MUTEX_NOT_HELD(&lwptoproc(lwp)->p_lock));
 
 	return ((lwp->lwp_pcb.pcb_flags &
-		(NORMAL_STEP|WATCH_STEP|DEBUG_PENDING)) != 0);
+	    (NORMAL_STEP|WATCH_STEP|DEBUG_PENDING)) != 0);
 }
 
 /*
@@ -423,7 +421,14 @@ prmapout(struct as *as, caddr_t addr, caddr_t vaddr, int writing)
 /*
  * Make sure the lwp is in an orderly state
  * for inspection by a debugger through /proc.
- * Called from stop() and from syslwp_create().
+ *
+ * This needs to be called only once while the current thread remains in the
+ * kernel and needs to be called while holding no resources (mutex locks, etc).
+ *
+ * As a hedge against these conditions, if prstop() is called repeatedly
+ * before prunstop() is called, it does nothing and just returns.
+ *
+ * prunstop() must be called before the thread returns to user level.
  */
 /* ARGSUSED */
 void
@@ -431,6 +436,9 @@ prstop(int why, int what)
 {
 	klwp_t *lwp = ttolwp(curthread);
 	struct regs *r = lwptoregs(lwp);
+
+	if (lwp->lwp_pcb.pcb_flags & PRSTOP_CALLED)
+		return;
 
 	/*
 	 * Make sure we don't deadlock on a recursive call
@@ -440,7 +448,7 @@ prstop(int why, int what)
 	lwp->lwp_nostop = 1;
 
 	if (copyin_nowatch((caddr_t)r->r_pc, &lwp->lwp_pcb.pcb_instr,
-		    sizeof (lwp->lwp_pcb.pcb_instr)) == 0)
+	    sizeof (lwp->lwp_pcb.pcb_instr)) == 0)
 		lwp->lwp_pcb.pcb_flags |= INSTR_VALID;
 	else {
 		lwp->lwp_pcb.pcb_flags &= ~INSTR_VALID;
@@ -450,6 +458,19 @@ prstop(int why, int what)
 	(void) save_syscall_args();
 	ASSERT(lwp->lwp_nostop == 1);
 	lwp->lwp_nostop = 0;
+
+	lwp->lwp_pcb.pcb_flags |= PRSTOP_CALLED;
+	aston(curthread);	/* so prunstop() will be called */
+}
+
+/*
+ * Inform prstop() that it should do its work again
+ * the next time it is called.
+ */
+void
+prunstop(void)
+{
+	ttolwp(curthread)->lwp_pcb.pcb_flags &= ~PRSTOP_CALLED;
 }
 
 /*

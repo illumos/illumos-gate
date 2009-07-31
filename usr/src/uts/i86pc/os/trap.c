@@ -1522,6 +1522,7 @@ out:	/* We can't get here from a system trap */
 	}
 	if (CPU->cpu_runrun || curthread->t_schedflag & TS_ANYWAITQ)
 		preempt();
+	prunstop();
 	(void) new_mstate(ct, mstate);
 
 	/* Kernel probe */

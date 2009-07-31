@@ -814,6 +814,7 @@ sig_check:
 	}
 	if (CPU->cpu_runrun || t->t_schedflag & TS_ANYWAITQ)
 		preempt();
+	prunstop();
 
 	/*
 	 * t_post_sys will be set if pcb_step is active.

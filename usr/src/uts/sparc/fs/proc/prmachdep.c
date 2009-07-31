@@ -861,7 +861,14 @@ prundostep(void)
 /*
  * Make sure the lwp is in an orderly state
  * for inspection by a debugger through /proc.
- * Called from stop() and from syslwp_create().
+ *
+ * This needs to be called only once while the current thread remains in the
+ * kernel and needs to be called while holding no resources (mutex locks, etc).
+ *
+ * As a hedge against these conditions, if prstop() is called repeatedly
+ * before prunstop() is called, it does nothing and just returns.
+ *
+ * prunstop() must be called before the thread returns to user level.
  */
 /* ARGSUSED */
 void
@@ -875,6 +882,9 @@ prstop(int why, int what)
 	caddr_t pc;
 	int watched;
 	extern void fp_prsave(kfpu_t *);
+
+	if (lwp->lwp_pcb.pcb_flags & PRSTOP_CALLED)
+		return;
 
 	/*
 	 * Make sure we don't deadlock on a recursive call
@@ -966,6 +976,19 @@ prstop(int why, int what)
 	(void) save_syscall_args();
 	ASSERT(lwp->lwp_nostop == 1);
 	lwp->lwp_nostop = 0;
+
+	lwp->lwp_pcb.pcb_flags |= PRSTOP_CALLED;
+	aston(curthread);	/* so prunstop() will be called */
+}
+
+/*
+ * Inform prstop() that it should do its work again
+ * the next time it is called.
+ */
+void
+prunstop(void)
+{
+	ttolwp(curthread)->lwp_pcb.pcb_flags &= ~PRSTOP_CALLED;
 }
 
 /*
