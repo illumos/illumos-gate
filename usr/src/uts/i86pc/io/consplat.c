@@ -214,16 +214,22 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 	    (strcmp(dev_type, "pciex") == 0)) {
 		ddi_acc_handle_t pci_conf;
 		uint16_t data16;
+		char *nodename;
 
 		ddi_prop_free(dev_type);
 
-		if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
-			return (DDI_WALK_CONTINUE);
+		nodename = ddi_node_name(dip);
 
-		if (pci_config_setup(dip, &pci_conf) != DDI_SUCCESS) {
-			/* This happends when it's the host bridge */
+		if (strcmp(nodename, "pci") == 0) {
+			/* pci root dip */
 			return (DDI_WALK_CONTINUE);
 		}
+
+		if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
+			return (DDI_WALK_PRUNECHILD);
+
+		if (pci_config_setup(dip, &pci_conf) != DDI_SUCCESS)
+			return (DDI_WALK_PRUNECHILD);
 
 		data16 = pci_config_get16(pci_conf, PCI_BCNF_BCNTRL);
 		pci_config_teardown(&pci_conf);
@@ -242,11 +248,11 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 	ddi_prop_free(dev_type);
 
 	if ((pdip = ddi_get_parent(dip)) == NULL)
-		return (DDI_WALK_CONTINUE);
+		return (DDI_WALK_PRUNECHILD);
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip, DDI_PROP_DONTPASS,
 	    "device_type", &parent_type) != DDI_SUCCESS)
-		return (DDI_WALK_CONTINUE);
+		return (DDI_WALK_PRUNECHILD);
 
 	if ((strcmp(parent_type, "isa") == 0) ||
 	    (strcmp(parent_type, "eisa") == 0)) {
@@ -263,23 +269,23 @@ find_fb_dev(dev_info_t *dip, void *found_dip)
 		ddi_prop_free(parent_type);
 
 		if (i_ddi_attach_node_hierarchy(dip) != DDI_SUCCESS)
-			return (DDI_WALK_CONTINUE);
+			return (DDI_WALK_PRUNECHILD);
 
 		if (pci_config_setup(dip, &pci_conf) != DDI_SUCCESS)
-			return (DDI_WALK_CONTINUE);
+			return (DDI_WALK_PRUNECHILD);
 
 		data16 = pci_config_get16(pci_conf, PCI_CONF_COMM);
 		pci_config_teardown(&pci_conf);
 
 		if (!(data16 & PCI_COMM_IO))
-			return (DDI_WALK_CONTINUE);
+			return (DDI_WALK_PRUNECHILD);
 
 		*(dev_info_t **)found_dip = dip;
 		return (DDI_WALK_TERMINATE);
 	}
 
 	ddi_prop_free(parent_type);
-	return (DDI_WALK_CONTINUE);
+	return (DDI_WALK_PRUNECHILD);
 }
 
 /*
