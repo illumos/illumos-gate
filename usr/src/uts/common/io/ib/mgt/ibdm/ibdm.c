@@ -1679,6 +1679,7 @@ ibdm_probe_gid_thread(void *args)
 	if (ibdm_is_dev_mgt_supported(gid_info) != IBDM_SUCCESS) {
 		mutex_enter(&gid_info->gl_mutex);
 		gid_info->gl_state = IBDM_GID_PROBING_FAILED;
+		gid_info->gl_is_dm_capable = B_FALSE;
 		mutex_exit(&gid_info->gl_mutex);
 		ibdm_delete_glhca_list(gid_info);
 		mutex_enter(&ibdm.ibdm_mutex);
@@ -1687,6 +1688,13 @@ ibdm_probe_gid_thread(void *args)
 		mutex_exit(&ibdm.ibdm_mutex);
 		return;
 	}
+
+	/*
+	 * This GID is Device management capable
+	 */
+	mutex_enter(&gid_info->gl_mutex);
+	gid_info->gl_is_dm_capable = B_TRUE;
+	mutex_exit(&gid_info->gl_mutex);
 
 	/* Get the nodeguid and portguid of the port */
 	if (ibdm_get_node_port_guids(gid_info->gl_sa_hdl, gid_info->gl_dlid,
@@ -4284,6 +4292,7 @@ ibdm_probe_ioc(ib_guid_t nodeguid, ib_guid_t ioc_guid, int reprobe_flag)
 				node_gid->gl_gid = temp_gid;
 				node_gid->gl_ngids++;
 			}
+			new_gid->gl_is_dm_capable = B_TRUE;
 			new_gid->gl_nodeguid = nodeguid;
 			new_gid->gl_portguid = dgid.gid_guid;
 			ibdm_addto_glhcalist(new_gid, hca_list);
@@ -5805,20 +5814,47 @@ ibdm_saa_event_cb(ibmf_saa_handle_t ibmf_saa_handle,
 	if (ibmf_saa_event != IBMF_SAA_EVENT_GID_UNAVAILABLE)
 		return;
 
-	event_arg = (ibdm_saa_event_arg_t *)kmem_alloc(
-	    sizeof (ibdm_saa_event_arg_t), KM_SLEEP);
-	event_arg->ibmf_saa_handle = ibmf_saa_handle;
-	event_arg->ibmf_saa_event = ibmf_saa_event;
-	bcopy(event_details, &event_arg->event_details,
-	    sizeof (ibmf_saa_event_details_t));
-	event_arg->callback_arg = callback_arg;
-
-	if (taskq_dispatch(system_taskq, ibdm_saa_event_taskq,
-	    (void *)event_arg, TQ_NOSLEEP) == NULL) {
+	/*
+	 * GID UNAVAIL EVENT: Try to locate the GID in the GID list.
+	 * If we don't find it we just return.
+	 */
+	mutex_enter(&ibdm.ibdm_mutex);
+	gid_info = ibdm.ibdm_dp_gidlist_head;
+	while (gid_info) {
+		if (gid_info->gl_portguid ==
+		    event_details->ie_gid.gid_guid) {
+			break;
+		}
+		gid_info = gid_info->gl_next;
+	}
+	mutex_exit(&ibdm.ibdm_mutex);
+	if (gid_info == NULL) {
 		IBTF_DPRINTF_L2("ibdm", "\tsaa_event_cb: "
-		    "taskq_dispatch failed");
-		ibdm_free_saa_event_arg(event_arg);
+		    "GID for GUID %llX not found during GID UNAVAIL event",
+		    event_details->ie_gid.gid_guid);
 		return;
+	}
+
+	/*
+	 * If this GID is DM capable, we'll have to check whether this DGID
+	 * is reachable via another port.
+	 */
+	if (gid_info->gl_is_dm_capable == B_TRUE) {
+		event_arg = (ibdm_saa_event_arg_t *)kmem_alloc(
+		    sizeof (ibdm_saa_event_arg_t), KM_SLEEP);
+		event_arg->ibmf_saa_handle = ibmf_saa_handle;
+		event_arg->ibmf_saa_event = ibmf_saa_event;
+		bcopy(event_details, &event_arg->event_details,
+		    sizeof (ibmf_saa_event_details_t));
+		event_arg->callback_arg = callback_arg;
+
+		if (taskq_dispatch(system_taskq, ibdm_saa_event_taskq,
+		    (void *)event_arg, TQ_NOSLEEP) == NULL) {
+			IBTF_DPRINTF_L2("ibdm", "\tsaa_event_cb: "
+			    "taskq_dispatch failed");
+			ibdm_free_saa_event_arg(event_arg);
+			return;
+		}
 	}
 }
 
@@ -6680,7 +6716,7 @@ ibdm_reset_all_dgids(ibmf_saa_handle_t port_sa_hdl)
 				 * going down. This is ensured by
 				 * setting gl_disconnected to 1.
 				 */
-				if (gid_info->gl_nodeguid == 0)
+				if (gid_info->gl_is_dm_capable == B_FALSE)
 					gid_info->gl_disconnected = 1;
 				else
 					ibdm_reset_gidinfo(gid_info);

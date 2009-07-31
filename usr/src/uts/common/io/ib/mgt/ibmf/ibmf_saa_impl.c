@@ -78,6 +78,7 @@ int	ibmf_saa_max_wait_time = IBMF_SAA_MAX_WAIT_TIME_IN_SECS;
 int	ibmf_saa_trans_wait_time = IBMF_SAA_TRANS_WAIT_TIME_IN_SECS;
 int	ibmf_saa_max_resp_time = IBMF_SAA_MAX_RESP_TIME;
 int	ibmf_saa_max_subnet_timeout = IBMF_SAA_MAX_SUBNET_TIMEOUT;
+int	ibmf_saa_retrans_retries = IBMF_SAA_RETRANS_RETRIES;
 
 /*
  * ibmf_saa_impl_init:
@@ -3138,6 +3139,16 @@ ibmf_saa_check_sa_and_retry(saa_port_t *saa_portp, ibmf_msg_t *msgp,
 			msgp->im_msgbufs_send.im_bufs_mad_hdr->TransactionID =
 			    h2b64(saa_portp->saa_pt_current_tid++);
 
+			/*
+			 * We are going to retry the access to the SM but
+			 * Master SMLID could have changed due to a port change
+			 * event. So update the remote_lid of the message with
+			 * the SMLID from saa_portp for this port before the
+			 * retry.
+			 */
+			msgp->im_local_addr.ia_remote_lid =
+			    saa_portp->saa_pt_ibmf_addr_info.ia_remote_lid;
+
 			bcopy(&saa_portp->saa_pt_ibmf_retrans,
 			    &ibmf_retrans, sizeof (ibmf_retrans_t));
 
@@ -3710,7 +3721,7 @@ ibmf_saa_impl_set_transaction_params(saa_port_t *saa_portp,
 	_NOTE(ASSUMING_PROTECTED(*saa_portp))
 
 	saa_portp->saa_pt_ibmf_retrans.retrans_retries =
-	    IBMF_SAA_RETRANS_RETRIES;
+	    ibmf_saa_retrans_retries;
 	/*
 	 * For the first transaction (generally getting the
 	 * classportinfo) have ibmf pick our timeouts.  It should be using the

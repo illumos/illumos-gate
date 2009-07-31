@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,6 +176,7 @@ typedef struct ibdm_dp_gidinfo_s {
 	ib_guid_t		gl_nodeguid;
 	ib_guid_t		gl_portguid;
 	ib_pkey_t		gl_p_key;
+	boolean_t		gl_is_dm_capable;
 	boolean_t		gl_redirected;
 	uint32_t		gl_redirect_dlid;
 	uint32_t		gl_redirect_QP;
