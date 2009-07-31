@@ -473,6 +473,7 @@ PSARC 2007/397: RULE W3: usr/lib/sparcv9/libndmp.so.1
 6788995: RULE W3: usr/lib/mms/libmmsadm.so.1
 6788995: RULE W3: usr/lib/mms/libpg.so.1
 PSARC 2006/379: RULE W3: lib/libfdisk.so.1
+PSARC 2009/208: RULE W3: usr/lib/security/audit_remote.so.1
 
 #############################################
 # WARNINGs exempted from RULE W4 (See RULES section of intf_check manpage) 
