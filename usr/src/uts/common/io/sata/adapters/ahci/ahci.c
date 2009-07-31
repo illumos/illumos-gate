@@ -2923,7 +2923,10 @@ ahci_initialize_port(ahci_ctl_t *ahci_ctlp,
 
 	    /* Check interface status */
 	    port_task_file & AHCI_TFD_STS_BSY ||
-	    port_task_file & AHCI_TFD_STS_DRQ) {
+	    port_task_file & AHCI_TFD_STS_DRQ ||
+
+	    /* Check whether port reset must be executed */
+	    ahci_ctlp->ahcictl_cap & AHCI_CAP_INIT_PORT_RESET) {
 
 		/* Incorrect task file state, we need to reset port */
 		ret = ahci_port_reset(ahci_ctlp, ahci_portp, port);
@@ -3063,6 +3066,10 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	 * AMD/ATI SB600 (1002,4380) AHCI chipset doesn't support 64-bit DMA
 	 * addressing for both data buffer and communication memory descriptors
 	 * though S64A bit of CAP register declares the support.
+	 *
+	 * We found this chipset must do port reset during initialization,
+	 * otherwise, when retrieving device signature, software reset will
+	 * get time out.
 	 */
 	if (venid == 0x1002 && devid == 0x4380) {
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
@@ -3071,6 +3078,7 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 		    "support, so force it to use 32-bit DMA", NULL);
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_BUF_32BIT_DMA;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_INIT_PORT_RESET;
 	}
 
 	/*

@@ -289,6 +289,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_SCLO			0x20
 /* 32-bit DMA addressing for communication memory descriptors */
 #define	AHCI_CAP_COMMU_32BIT_DMA	0x40
+/* Port reset is needed for initialization */
+#define	AHCI_CAP_INIT_PORT_RESET	0x80
 
 
 /* Flags controlling the restart port behavior */
