@@ -3125,8 +3125,8 @@ groupListIoctl(stmfGroupList **groupList, int groupType)
 	}
 
 	/* allocate and copy to caller's buffer */
-	*groupList = (stmfGroupList *)calloc(1, sizeof (stmfGroupList) *
-	    stmfIoctl.stmf_obuf_nentries);
+	*groupList = (stmfGroupList *)calloc(1, sizeof (stmfGroupList) +
+	    sizeof (stmfGroupName) * stmfIoctl.stmf_obuf_nentries);
 	if (*groupList == NULL) {
 		ret = STMF_ERROR_NOMEM;
 		goto done;
@@ -3272,7 +3272,8 @@ groupMemberListIoctl(stmfGroupName *groupName, stmfGroupProperties **groupProps,
 
 	/* allocate and copy to caller's buffer */
 	*groupProps = (stmfGroupProperties *)calloc(1,
-	    sizeof (stmfGroupProperties) * stmfIoctl.stmf_obuf_nentries);
+	    sizeof (stmfGroupProperties) +
+	    sizeof (stmfDevid) * stmfIoctl.stmf_obuf_nentries);
 	if (*groupProps == NULL) {
 		ret = STMF_ERROR_NOMEM;
 		goto done;
