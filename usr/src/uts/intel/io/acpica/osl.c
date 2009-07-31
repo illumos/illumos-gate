@@ -44,6 +44,7 @@
 #include <sys/taskq.h>
 #include <sys/strlog.h>
 #include <sys/note.h>
+#include <sys/promif.h>
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpi/accommon.h>
@@ -1164,12 +1165,20 @@ acpica_pr_buf(char *buf)
 		*outp++ = c;
 		if (c == '\n' || --out_remaining == 0) {
 			*outp = '\0';
-			if (acpica_console_out)
+			switch (acpica_console_out) {
+			case 1:
 				printf(acpica_outbuf);
-			else
+				break;
+			case 2:
+				prom_printf(acpica_outbuf);
+				break;
+			case 0:
+			default:
 				(void) strlog(0, 0, 0,
 				    SL_CONSOLE | SL_NOTE | SL_LOGONLY,
 				    acpica_outbuf);
+				break;
+			}
 			acpica_outbuf_offset = 0;
 			outp = acpica_outbuf;
 			out_remaining = ACPICA_OUTBUF_LEN - 1;
