@@ -2491,6 +2491,9 @@ zfs_fastaccesschk_execute(znode_t *zdp, cred_t *cr)
 		if (zdp->z_phys->zp_mode & S_IXUSR) {
 			mutex_exit(&zdp->z_acl_lock);
 			return (0);
+		} else {
+			mutex_exit(&zdp->z_acl_lock);
+			goto slow;
 		}
 	}
 	if (groupmember(gowner, cr)) {
@@ -2498,6 +2501,9 @@ zfs_fastaccesschk_execute(znode_t *zdp, cred_t *cr)
 		if (zdp->z_phys->zp_mode & S_IXGRP) {
 			mutex_exit(&zdp->z_acl_lock);
 			return (0);
+		} else {
+			mutex_exit(&zdp->z_acl_lock);
+			goto slow;
 		}
 	}
 	if (!owner && !groupmbr) {
