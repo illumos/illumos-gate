@@ -236,7 +236,7 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tunmount [-f] "
 		    "<-a | filesystem|mountpoint>\n"));
 	case HELP_UNSHARE:
-		return (gettext("\tunshare [-f] "
+		return (gettext("\tunshare "
 		    "<-a | filesystem|mountpoint>\n"));
 	case HELP_ALLOW:
 		return (gettext("\tallow <filesystem|volume>\n"
@@ -1613,7 +1613,7 @@ zfs_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 1   Initial ZFS filesystem version\n"));
 		(void) printf(gettext(" 2   Enhanced directory entries\n"));
 		(void) printf(gettext(" 3   Case insensitive and File system "
-		    "unique identifer (FUID)\n"));
+		    "unique identifier (FUID)\n"));
 		(void) printf(gettext(" 4   userquota, groupquota "
 		    "properties\n"));
 		(void) printf(gettext("\nFor more information on a particular "

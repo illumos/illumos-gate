@@ -702,7 +702,7 @@ acl_strerror(int errnum)
 		    "ACL entry doesn't exist"));
 	case EACL_DIFF_TYPE:
 		return (dgettext(TEXT_DOMAIN,
-		    "ACL type's are different"));
+		    "Different file system ACL types cannot be merged"));
 	case EACL_INVALID_USER_GROUP:
 		return (dgettext(TEXT_DOMAIN, "Invalid user or group"));
 	case EACL_INVALID_STR:
