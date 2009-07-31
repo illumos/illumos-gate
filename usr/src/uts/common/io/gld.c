@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2765,9 +2765,9 @@ gld_sendup_vlan(gld_vlan_t *vlan, pktinfo_t *pktinfo, mblk_t *mp,
 	for (gld = vlan->gldv_str_next; gld != (gld_t *)&vlan->gldv_str_next;
 	    gld = gld->gld_next) {
 #ifdef GLD_VERBOSE_DEBUG
-		cmn_err(CE_NOTE, "gld_sendup: SAP: %4x QPTR: %p "QSTATE: %s",
-		    gld->gld_sap, (void *)gld->gld_qptr,
-		    gld->gld_state == DL_IDLE ? "IDLE": "NOT IDLE");
+		cmn_err(CE_NOTE, "gld_sendup_vlan: SAP: %4x QPTR: %p "
+		    "QSTATE: %s", gld->gld_sap, (void *)gld->gld_qptr,
+		    gld->gld_state == DL_IDLE ? "IDLE" : "NOT IDLE");
 #endif
 		ASSERT(gld->gld_qptr != NULL);
 		ASSERT(gld->gld_state == DL_IDLE ||
