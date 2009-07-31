@@ -982,6 +982,7 @@ init()
     WC="/usr/bin/wc"
     CAT="/usr/bin/cat"
     SED="/usr/bin/sed"
+    MV="/usr/bin/mv"
 
     DOM=""              # Set to NULL
     # If DNS domain (resolv.conf) exists use that, otherwise use domainname.
@@ -4209,6 +4210,30 @@ EOF
     fi
 }
 
+#
+# keep_backward_compatibility(): Modify schema for the backward compatibility if
+# there are the incompatible attributes already
+#
+keep_backward_compatibility()
+{
+    ${EVAL} "${LDAPSEARCH} ${SERVER_ARGS} -b cn=schema -s base \
+        \"objectclass=*\" attributeTypes | ${GREP} -i memberGid-oid ${VERB}"
+    if [ $? -eq 0 ]; then
+        ${SED} -e 's/1\.3\.6\.1\.4\.1\.42\.2\.27\.5\.1\.30\ /memberGid-oid\ /' \
+            ${TMPDIR}/schema_attr > ${TMPDIR}/schema_attr.new
+        ${MV} ${TMPDIR}/schema_attr.new ${TMPDIR}/schema_attr
+    fi
+
+    ${EVAL} "${LDAPSEARCH} ${SERVER_ARGS} -b cn=schema -s base \
+        \"objectclass=*\" attributeTypes | ${GREP} -i rfc822mailMember-oid \
+        ${VERB}"
+    if [ $? -eq 0 ]; then
+        ${SED} -e \
+            's/1\.3\.6\.1\.4\.1\.42\.2\.27\.2\.1\.15\ /rfc822mailMember-oid\ /' \
+            ${TMPDIR}/schema_attr > ${TMPDIR}/schema_attr.new
+        ${MV} ${TMPDIR}/schema_attr.new ${TMPDIR}/schema_attr
+    fi
+}
 
 #
 # update_schema_attr(): Update Schema to support Naming.
@@ -4318,6 +4343,8 @@ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.1.67 NAME 'ipTnetTemplateName' DESC 'Tru
 attributetypes: ( 1.3.6.1.4.1.42.2.27.5.1.68 NAME 'ipTnetNumber' DESC 'Trusted Solaris network template ip_address' SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
 EOF
 ) > ${TMPDIR}/schema_attr
+
+    keep_backward_compatibility
 
     # Add the entry.
     ${EVAL} "${LDAPMODIFY} ${LDAP_ARGS} -f ${TMPDIR}/schema_attr ${VERB}"
