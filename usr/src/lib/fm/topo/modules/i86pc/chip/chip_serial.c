@@ -37,7 +37,7 @@
 #include "chip.h"
 
 #define	BUFSZ	128
-#define	JEDEC_TBL_SZ	4
+#define	JEDEC_TBL_SZ	5
 
 /*
  * The following table maps DIMM manufacturer names to a JEDEC ID as sourced
@@ -47,6 +47,7 @@
  */
 static const char *jedec_tbl[JEDEC_TBL_SZ][2] =
 {
+	{ "HYUNDAI ELECTRONICS", "00AD" },
 	{ "INFINEON", "00C1" },
 	{ "MICRON TECHNOLOGY", "002C" },
 	{ "QIMONDA", "7F51" },
@@ -204,97 +205,37 @@ int
 get_dimm_serial(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
-	char *fmtstr, ipmi_tag[BUFSZ], fru_serial[FRU_INFO_MAXLEN];
-	tnode_t *chip;
-	int ret;
-	uint32_t offset;
-	nvlist_t *args;
+	char **entity_refs, fru_serial[FRU_INFO_MAXLEN];
+	int err, rv = 0, i;
+	uint_t nelems;
+	boolean_t found_serial = B_FALSE;
 
-	topo_mod_dprintf(mod, "get_dimm_serial() called\n");
-	if ((ret = nvlist_lookup_nvlist(in, "args", &args)) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
-		    strerror(ret));
+	if (topo_prop_get_string_array(node, TOPO_PGROUP_IPMI, "entity_ref",
+	    &entity_refs, &nelems, &err) != 0) {
+		topo_mod_dprintf(mod, "%s: Failed to lookup entity_ref property"
+		    " (%s)", __func__, topo_strerror(err));
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
-		    strerror(ret));
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+
+	for (i = 0; i < nelems; i++) {
+		if (ipmi_serial_lookup(mod, entity_refs[i], fru_serial) == 0) {
+			found_serial = B_TRUE;
+			break;
+		} else
+			topo_mod_dprintf(mod, "Failed to lookup serial for "
+			    "%s\n", entity_refs[i]);
 	}
-	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
-		/* topo errno set */
-		topo_mod_dprintf(mod, "Failed to retrieve format arg\n");
-		return (-1);
-	}
-
-	chip = topo_node_parent(topo_node_parent(node));
-
-	/* LINTED: E_SEC_PRINTF_VAR_FMT */
-	(void) snprintf(ipmi_tag, BUFSZ, fmtstr, topo_node_instance(chip),
-	    (topo_node_instance(node) + offset));
-
-	if (ipmi_serial_lookup(mod, ipmi_tag, fru_serial) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup serial for %s\n",
-		    ipmi_tag);
+	if (! found_serial)
 		(void) strcpy(fru_serial, "");
-	}
 
 	if (store_prop_val(mod, fru_serial, "serial", out) != 0) {
 		topo_mod_dprintf(mod, "Failed to set serial\n");
 		/* topo errno already set */
-		return (-1);
+		rv = -1;
 	}
-	return (0);
-}
+	for (i = 0; i < nelems; i++)
+		topo_mod_strfree(mod, entity_refs[i]);
+	topo_mod_free(mod, entity_refs, (nelems * sizeof (char *)));
 
-/* ARGSUSED */
-int
-get_cs_serial(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
-    nvlist_t *in, nvlist_t **out)
-{
-	char *fmtstr, ipmi_tag[BUFSZ], fru_serial[FRU_INFO_MAXLEN];
-	tnode_t *chip, *chan;
-	int ret, dimm_num;
-	uint32_t offset;
-	nvlist_t *args;
-
-	topo_mod_dprintf(mod, "get_cs_serial() called\n");
-	if ((ret = nvlist_lookup_nvlist(in, "args", &args)) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
-		    strerror(ret));
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-	}
-	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
-		    strerror(ret));
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-	}
-	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
-		/* topo errno set */
-		topo_mod_dprintf(mod, "Failed to retrieve format arg\n");
-		return (-1);
-	}
-
-	chip = topo_node_parent(topo_node_parent(topo_node_parent(node)));
-	chan = topo_node_parent(node);
-
-	dimm_num = topo_node_instance(node) - (topo_node_instance(node) % 2)
-	    + topo_node_instance(chan) + offset;
-
-	/* LINTED: E_SEC_PRINTF_VAR_FMT */
-	(void) snprintf(ipmi_tag, BUFSZ, fmtstr, topo_node_instance(chip),
-	    dimm_num);
-
-	if (ipmi_serial_lookup(mod, ipmi_tag, fru_serial) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup serial for %s\n",
-		    ipmi_tag);
-		(void) strcpy(fru_serial, "");
-	}
-
-	if (store_prop_val(mod, fru_serial, "serial", out) != 0) {
-		topo_mod_dprintf(mod, "Failed to set serial\n");
-		/* topo errno already set */
-		return (-1);
-	}
-	return (0);
+	return (rv);
 }

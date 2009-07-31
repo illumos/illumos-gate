@@ -101,6 +101,9 @@ static const topo_method_t ses_component_methods[] = {
 	    TOPO_METH_PRESENT_VERSION0, TOPO_STABILITY_INTERNAL, ses_present },
 	{ TOPO_METH_FAC_ENUM, TOPO_METH_FAC_ENUM_DESC, 0,
 	    TOPO_STABILITY_INTERNAL, ses_node_enum_facility },
+	{ TOPO_METH_SENSOR_FAILURE, TOPO_METH_SENSOR_FAILURE_DESC,
+	    TOPO_METH_SENSOR_FAILURE_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_method_sensor_failure },
 	{ NULL }
 };
 

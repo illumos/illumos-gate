@@ -55,6 +55,16 @@ static int decorate_nodes(topo_mod_t *, tf_rdata_t *, xmlNodePtr, tnode_t *,
     tf_pad_t **);
 
 
+static void
+strarr_free(topo_mod_t *mod, char **arr, uint_t nelems)
+{
+	int i;
+
+	for (i = 0; i < nelems; i++)
+		topo_mod_strfree(mod, arr[i]);
+	topo_mod_free(mod, arr, (nelems * sizeof (char *)));
+}
+
 int
 xmlattr_to_stab(topo_mod_t *mp, xmlNodePtr n, const char *stabname,
     topo_stability_t *rs)
@@ -159,6 +169,18 @@ xmlattr_to_type(topo_mod_t *mp, xmlNodePtr xn, xmlChar *attr)
 		rv = TOPO_TYPE_FMRI;
 	} else if (xmlStrcmp(str, (xmlChar *)String) == 0) {
 		rv = TOPO_TYPE_STRING;
+	} else if (xmlStrcmp(str, (xmlChar *)Int32_Arr) == 0) {
+		rv = TOPO_TYPE_INT32_ARRAY;
+	} else if (xmlStrcmp(str, (xmlChar *)UInt32_Arr) == 0) {
+		rv = TOPO_TYPE_UINT32_ARRAY;
+	} else if (xmlStrcmp(str, (xmlChar *)Int64_Arr) == 0) {
+		rv = TOPO_TYPE_INT64_ARRAY;
+	} else if (xmlStrcmp(str, (xmlChar *)UInt64_Arr) == 0) {
+		rv = TOPO_TYPE_UINT64_ARRAY;
+	} else if (xmlStrcmp(str, (xmlChar *)String_Arr) == 0) {
+		rv = TOPO_TYPE_STRING_ARRAY;
+	} else if (xmlStrcmp(str, (xmlChar *)FMRI_Arr) == 0) {
+		rv = TOPO_TYPE_FMRI_ARRAY;
 	} else {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 		    "Unrecognized type attribute value '%s'.\n", str);
@@ -176,11 +198,15 @@ const char *name)
 {
 	int rv;
 	uint64_t ui;
+	uint_t i = 0, nelems = 0;
 	nvlist_t *fmri;
 	xmlChar *str;
+	char **strarrbuf;
+	void *arrbuf;
+	nvlist_t **nvlarrbuf;
+	xmlNodePtr cn;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "xlate_common (name=%s)\n",
-	    name);
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "xlate_common(name=%s)\n", name);
 	switch (ptype) {
 	case TOPO_TYPE_INT32:
 		if (xmlattr_to_int(mp, xn, Value, &ui) < 0)
@@ -214,11 +240,179 @@ const char *name)
 		rv = nvlist_add_string(nvl, name, (char *)str);
 		xmlFree(str);
 		break;
+	case TOPO_TYPE_INT32_ARRAY:
+	case TOPO_TYPE_UINT32_ARRAY:
+	case TOPO_TYPE_INT64_ARRAY:
+	case TOPO_TYPE_UINT64_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next)
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0))
+				nelems++;
+
+		if (nelems < 1) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "No <propitem> "
+			    "or <argitem> elements found for array val");
+			return (-1);
+		}
+		if ((arrbuf = topo_mod_alloc(mp, (nelems * sizeof (uint64_t))))
+		    == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
+		break;
+	case TOPO_TYPE_STRING_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next)
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0))
+				nelems++;
+
+		if (nelems < 1) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "No <propitem> "
+			    "or <argitem> elements found for array val");
+			return (-1);
+		}
+		if ((strarrbuf = topo_mod_alloc(mp, (nelems * sizeof (char *))))
+		    == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
+		break;
+	case TOPO_TYPE_FMRI_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next)
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0))
+				nelems++;
+
+		if (nelems < 1) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "No <propitem> "
+			    "elements found for array prop");
+			return (-1);
+		}
+		if ((nvlarrbuf = topo_mod_alloc(mp, (nelems *
+		    sizeof (nvlist_t *)))) == NULL)
+			return (topo_mod_seterrno(mp, ETOPO_NOMEM));
+		break;
 	default:
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
-		    "Unrecognized type attribute.\n");
+		    "Unrecognized type attribute (ptype = %d)\n", ptype);
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_BADTYPE));
 	}
+
+	switch (ptype) {
+	case TOPO_TYPE_INT32_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
+
+				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				    == NULL)
+					return (-1);
+
+				((int32_t *)arrbuf)[i++]
+				    = atoi((const char *)str);
+				xmlFree(str);
+			}
+		}
+
+		rv = nvlist_add_int32_array(nvl, name, (int32_t *)arrbuf,
+		    nelems);
+		free(arrbuf);
+		break;
+	case TOPO_TYPE_UINT32_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
+
+				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				    == NULL)
+					return (-1);
+
+				((uint32_t *)arrbuf)[i++]
+				    = atoi((const char *)str);
+				xmlFree(str);
+			}
+		}
+
+		rv = nvlist_add_uint32_array(nvl, name, (uint32_t *)arrbuf,
+		    nelems);
+		free(arrbuf);
+		break;
+	case TOPO_TYPE_INT64_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
+
+				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				    == NULL)
+					return (-1);
+
+				((int64_t *)arrbuf)[i++]
+				    = atol((const char *)str);
+				xmlFree(str);
+			}
+		}
+
+		rv = nvlist_add_int64_array(nvl, name, (int64_t *)arrbuf,
+		    nelems);
+		free(arrbuf);
+		break;
+	case TOPO_TYPE_UINT64_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
+
+				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				    == NULL)
+					return (-1);
+
+				((uint64_t *)arrbuf)[i++]
+				    = atol((const char *)str);
+				xmlFree(str);
+			}
+		}
+
+		rv = nvlist_add_uint64_array(nvl, name, arrbuf,
+		    nelems);
+		free(arrbuf);
+		break;
+	case TOPO_TYPE_STRING_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
+
+				if ((str = xmlGetProp(cn, (xmlChar *)Value))
+				    == NULL)
+					return (-1);
+
+				strarrbuf[i++] =
+				    topo_mod_strdup(mp, (const char *)str);
+				xmlFree(str);
+			}
+		}
+
+		rv = nvlist_add_string_array(nvl, name, strarrbuf, nelems);
+		strarr_free(mp, strarrbuf, nelems);
+		break;
+	case TOPO_TYPE_FMRI_ARRAY:
+		for (cn = xn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
+			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
+
+				if ((str = xmlGetProp(xn, (xmlChar *)Value))
+				    == NULL)
+					return (-1);
+
+				if (topo_mod_str2nvl(mp, (const char *)str,
+				    &(nvlarrbuf[i++])) < 0) {
+					xmlFree(str);
+					return (-1);
+				}
+				xmlFree(str);
+			}
+		}
+
+		rv = nvlist_add_nvlist_array(nvl, name, nvlarrbuf,
+		    nelems);
+		free(nvlarrbuf);
+		break;
+	}
+
 	if (rv != 0) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 		    "Nvlist construction failed.\n");
@@ -325,12 +519,13 @@ prop_create(topo_mod_t *mp,
     nvlist_t *pfmri, tnode_t *ptn, const char *gnm, const char *pnm,
     topo_type_t ptype, int flag)
 {
-	nvlist_t *fmri;
-	uint32_t ui32;
-	uint64_t ui64;
-	int32_t i32;
-	int64_t i64;
-	char *str;
+	nvlist_t *fmri, **fmriarr;
+	uint32_t ui32, *ui32arr;
+	uint64_t ui64, *ui64arr;
+	int32_t i32, *i32arr;
+	int64_t i64, *i64arr;
+	uint_t nelem;
+	char *str, **strarr;
 	int err, e;
 
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "prop_create(pgrp = %s, "
@@ -353,6 +548,29 @@ prop_create(topo_mod_t *mp,
 		break;
 	case TOPO_TYPE_STRING:
 		e = nvlist_lookup_string(pfmri, INV_PVAL, &str);
+		break;
+	case TOPO_TYPE_INT32_ARRAY:
+		e = nvlist_lookup_int32_array(pfmri, INV_PVAL, &i32arr, &nelem);
+		break;
+	case TOPO_TYPE_UINT32_ARRAY:
+		e = nvlist_lookup_uint32_array(pfmri, INV_PVAL, &ui32arr,
+		    &nelem);
+		break;
+	case TOPO_TYPE_INT64_ARRAY:
+		e = nvlist_lookup_int64_array(pfmri, INV_PVAL, &i64arr,
+		    &nelem);
+		break;
+	case TOPO_TYPE_UINT64_ARRAY:
+		e = nvlist_lookup_uint64_array(pfmri, INV_PVAL, &ui64arr,
+		    &nelem);
+		break;
+	case TOPO_TYPE_STRING_ARRAY:
+		e = nvlist_lookup_string_array(pfmri, INV_PVAL, &strarr,
+		    &nelem);
+		break;
+	case TOPO_TYPE_FMRI_ARRAY:
+		e = nvlist_lookup_nvlist_array(pfmri, INV_PVAL, &fmriarr,
+		    &nelem);
 		break;
 	default:
 		e = ETOPO_PRSR_BADTYPE;
@@ -380,6 +598,30 @@ prop_create(topo_mod_t *mp,
 		break;
 	case TOPO_TYPE_STRING:
 		e = topo_prop_set_string(ptn, gnm, pnm, flag, str, &err);
+		break;
+	case TOPO_TYPE_INT32_ARRAY:
+		e = topo_prop_set_int32_array(ptn, gnm, pnm, flag, i32arr,
+		    nelem, &err);
+		break;
+	case TOPO_TYPE_UINT32_ARRAY:
+		e = topo_prop_set_uint32_array(ptn, gnm, pnm, flag, ui32arr,
+		    nelem, &err);
+		break;
+	case TOPO_TYPE_INT64_ARRAY:
+		e = topo_prop_set_int64_array(ptn, gnm, pnm, flag, i64arr,
+		    nelem, &err);
+		break;
+	case TOPO_TYPE_UINT64_ARRAY:
+		e = topo_prop_set_uint64_array(ptn, gnm, pnm, flag, ui64arr,
+		    nelem, &err);
+		break;
+	case TOPO_TYPE_STRING_ARRAY:
+		e = topo_prop_set_string_array(ptn, gnm, pnm, flag,
+		    (const char **)strarr, nelem, &err);
+		break;
+	case TOPO_TYPE_FMRI_ARRAY:
+		e = topo_prop_set_fmri_array(ptn, gnm, pnm, flag,
+		    (const nvlist_t **)fmriarr, nelem, &err);
 		break;
 	}
 	if (e != 0 && err != ETOPO_PROP_DEFD) {
@@ -1664,12 +1906,19 @@ topo_xml_walk(topo_mod_t *mp,
 	 * If we haven't found a set that contains our product AND a default set
 	 * exists, then we'll process it.
 	 */
-	if (!joined_set && def_set)
-		if (topo_xml_walk(mp, xinfo, def_set, troot) == NULL) {
+	if (!joined_set && def_set) {
+		if ((rdp = topo_xml_walk(mp, xinfo, def_set, troot)) == NULL) {
 			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
 			    "topo_xml_walk: failed2\n");
 		}
-
+		if (pr == NULL) {
+			rr = pr = rdp;
+		} else {
+			pr->rd_next = rdp;
+			pr = rdp;
+		}
+		rr->rd_cnt++;
+	}
 	/*
 	 * Now we're interested in children xmlNodes of croot tagged
 	 * as 'ranges'.  These define what topology nodes may exist, and need

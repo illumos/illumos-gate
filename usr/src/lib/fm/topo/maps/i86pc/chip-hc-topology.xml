@@ -64,9 +64,11 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                    <argval name='format' type='string' value='MB/P%d' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -92,9 +94,11 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                    <argval name='format' type='string' value='cpu%d.vpd' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='cpu%d.vpd' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -119,9 +123,11 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                    <argval name='format' type='string' value='p%d.fru' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -150,9 +156,12 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                    <argval name='format' type='string' value='p%d.fru' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		        <argitem value='p%d.fru' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -164,8 +173,13 @@
             <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                 <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                     <propval name='type' type='uint32' value='0' />
-                    <propmethod name='ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                        <argval name='format' type='string' value='p%d.led' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.led' />
+			    <argitem value='MB/P%d/SVC' />
+			</argval>
                         <argval name='offset' type='uint32' value='0' />
                         <argval name='nparams' type='uint32' value='1' />
                     </propmethod>
@@ -195,9 +209,11 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-                            propname='entity_ref' proptype='string' >
+                            propname='entity_ref' proptype='string_array' >
 
-                    <argval name='format' type='string' value='p%d.fru' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -209,8 +225,12 @@
             <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                 <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                     <propval name='type' type='uint32' value='0' />
-                    <propmethod name='ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                        <argval name='format' type='string' value='p%d.fail.led' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.fail.led' />
+			</argval>
                         <argval name='offset' type='uint32' value='0' />
                         <argval name='nparams' type='uint32' value='1' />
                     </propmethod>
@@ -241,9 +261,12 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                    <argval name='format' type='string' value='p%d.fru' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		        <argitem value='p%d.fru' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -255,8 +278,13 @@
             <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                 <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                     <propval name='type' type='uint32' value='0' />
-                    <propmethod name='ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                        <argval name='format' type='string' value='p%d.led' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='P%d/SVC' />
+			    <argitem value='p%d.led' />
+			</argval>
                         <argval name='offset' type='uint32' value='0' />
                         <argval name='nparams' type='uint32' value='1' />
                     </propmethod>
@@ -286,9 +314,11 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                    <argval name='format' type='string' value='p%d.fru' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -300,8 +330,12 @@
             <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                 <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                     <propval name='type' type='uint32' value='0' />
-                    <propmethod name='ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                        <argval name='format' type='string' value='p%d.led' />
+                    <propmethod name='ipmi_entity' version='0'
+		        propname='entity_ref' proptype='string_array' >
+
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.led' />
+			</argval>
                         <argval name='offset' type='uint32' value='0' />
                         <argval name='nparams' type='uint32' value='1' />
                     </propmethod>
@@ -326,6 +360,19 @@
 
                 </propmethod>
 
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
+              
+                    <argval name='format' type='string_array'>
+		        <argitem value='MB/P%d' />
+		    </argval>
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
             </propgroup>
         </set> 
         <set type='product'
@@ -383,9 +430,11 @@
             <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                  <propmethod name='ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                    <argval name='format' type='string' value='p%d.fru' />
+                    <argval name='format' type='string_array'>
+		        <argitem value='p%d.fru' />
+		    </argval>
                     <argval name='offset' type='uint32' value='0' />
                     <argval name='nparams' type='uint32' value='1' />
 
@@ -397,8 +446,11 @@
             <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                 <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                     <propval name='type' type='uint32' value='0' />
-                    <propmethod name='ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                        <argval name='format' type='string' value='p%d.led' />
+                    <propmethod name='ipmi_entity' version='0' propname='entity_ref'
+		       proptype='string_array' >
+                        <argval name='format' type='string_array'>
+			    <argitem value='p%d.led' />
+			</argval>
                         <argval name='offset' type='uint32' value='0' />
                         <argval name='nparams' type='uint32' value='1' />
                     </propmethod>
@@ -461,6 +513,7 @@
 		  -->
           	  <set type='product' setlist='SUN-BLADE-X6240-SERVER-MODULE|Sun-Blade-X6240-Server-Module'>
 
+	                <fac-enum provider='fac_prov_ipmi' />
                         <propgroup name='protocol' version='1'
                                name-stability='Private'
                                data-stability='Private' >
@@ -473,16 +526,24 @@
                                 <argval name='offset' type='uint32' value='0' />
                             </propmethod>
 
-                            <propmethod name='get_cs_serial' version='0'
+                            <propmethod name='get_dimm_serial' version='0'
                                     propname='serial' proptype='string'
-				    nonvolatile='1' >
+				    nonvolatile='1' />
 
-                                <argval name='format' type='string'
-                                    value='P%d/D%d' />
+                        </propgroup>
+                        <propgroup name='ipmi' version='1'
+                    	    name-stability='Private' data-stability='Private' >
+			
+                            <propmethod name='cs_ipmi_entity' version='0'
+		               propname='entity_ref' proptype='string_array' >
+              
+                                <argval name='format' type='string_array'>
+			            <argitem value='MB/P%d/D%d' />
+			            <argitem value='p%d.d%d.fru' />
+			        </argval>
                                 <argval name='offset' type='uint32' value='0' />
 
                             </propmethod>
-
                         </propgroup>
 
                     </set>
@@ -494,6 +555,7 @@
 		  -->
                   <set type='product' setlist='SUN-BLADE-X6440-SERVER-MODULE|Sun-Blade-X6440-Server-Module'>
 
+	                <fac-enum provider='fac_prov_ipmi' />
                         <propgroup name='protocol' version='1'
                                name-stability='Private'
                                data-stability='Private' >
@@ -506,16 +568,24 @@
                                 <argval name='offset' type='uint32' value='0' />
                             </propmethod>
 
-                            <propmethod name='get_cs_serial' version='0'
+                            <propmethod name='get_dimm_serial' version='0'
                                     propname='serial' proptype='string'
-				    nonvolatile='1' >
+				    nonvolatile='1' />
 
-                                <argval name='format' type='string'
-                                    value='P%d/D%d' />
+                        </propgroup>
+                        <propgroup name='ipmi' version='1'
+                    	    name-stability='Private' data-stability='Private' >
+			
+                            <propmethod name='cs_ipmi_entity' version='0'
+		               propname='entity_ref' proptype='string_array' >
+              
+                                <argval name='format' type='string_array'>
+			            <argitem value='MB/P%d/D%d' />
+			            <argitem value='p%d.d%d.fru' />
+			        </argval>
                                 <argval name='offset' type='uint32' value='0' />
 
                             </propmethod>
-
                         </propgroup>
 
                     </set>
@@ -523,6 +593,7 @@
 
                     <set type='product' setlist='Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
 		    
+	                <fac-enum provider='fac_prov_ipmi' />
                         <propgroup name='protocol' version='1'
                                name-stability='Private'
 			       data-stability='Private' >
@@ -535,7 +606,23 @@
                                 <argval name='offset' type='uint32' value='0' />
 
                             </propmethod>
+                            <propmethod name='get_dimm_serial' version='0'
+                                    propname='serial' proptype='string'
+				    nonvolatile='1' />
+                        </propgroup>
+                        <propgroup name='ipmi' version='1'
+                    	    name-stability='Private' data-stability='Private' >
+			
+                            <propmethod name='cs_ipmi_entity' version='0'
+		               propname='entity_ref' proptype='string_array' >
+              
+                                <argval name='format' type='string_array'>
+			            <argitem value='MB/P%d/D%d' />
+			            <argitem value='p%d.d%d.fru' />
+			        </argval>
+                                <argval name='offset' type='uint32' value='0' />
 
+                            </propmethod>
                         </propgroup>
 
                     </set>
@@ -583,14 +670,21 @@
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
 			            propname='serial' proptype='string'
-				    nonvolatile='1' >
+				    nonvolatile='1' />
+
+                    </propgroup>
+                    <propgroup name='ipmi' version='1'
+                    	name-stability='Private' data-stability='Private' >
+			
+                         <propmethod name='dimm_ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string_array' >
               
-                            <argval name='format' type='string'
-			        value='cpu%d.mem%d.vpd' />
+                            <argval name='format' type='string_array'>
+			        <argitem value='cpu%d.mem%d.vpd' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
 
                         </propmethod>
-
                     </propgroup>
                 </set>
                 <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E'>
@@ -614,22 +708,17 @@
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
 			            propname='serial' proptype='string'
-				    nonvolatile='1' >
-              
-                            <argval name='format' type='string'
-			        value='p%d.d%d.fru' />
-                            <argval name='offset' type='uint32' value='0' />
-
-                        </propmethod>
+				    nonvolatile='1' />
                     </propgroup>
                     <propgroup name='ipmi' version='1'
                     	name-stability='Private' data-stability='Private' >
 			
                          <propmethod name='dimm_ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                            <argval name='format' type='string' 
-			        value='p%d.d%d.fru' />
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
 
                         </propmethod>
@@ -637,8 +726,12 @@
                     <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                         <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                           <propval name='type' type='uint32' value='0' />
-                          <propmethod name='dimm_ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                            <argval name='format' type='string' value='p%d.d%d.led' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.led' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
                           </propmethod>
                           <propmethod name='ipmi_indicator_mode' version='0'
@@ -668,22 +761,17 @@
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
 			            propname='serial' proptype='string'
-				    nonvolatile='1' >
-              
-                            <argval name='format' type='string'
-			        value='p%d.d%d.fru' />
-                            <argval name='offset' type='uint32' value='0' />
-
-                        </propmethod>
+				    nonvolatile='1' />
                     </propgroup>
                     <propgroup name='ipmi' version='1'
                     	name-stability='Private' data-stability='Private' >
 			
                          <propmethod name='dimm_ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                            <argval name='format' type='string' 
-			        value='p%d.d%d.fru' />
+                            <argval name='format' type='string_array'> 
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
 
                         </propmethod>
@@ -691,8 +779,12 @@
                     <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                         <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                           <propval name='type' type='uint32' value='0' />
-                          <propmethod name='dimm_ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                            <argval name='format' type='string' value='p%d.d%d.fail.led' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+                            
+			    <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.fail.led' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
                           </propmethod>
                           <propmethod name='ipmi_indicator_mode' version='0'
@@ -717,23 +809,18 @@
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
 			            propname='serial' proptype='string'
-				    nonvolatile='1' >
-              
-                            <argval name='format' type='string'
-			        value='p%d.d%d.fru' />
-                            <argval name='offset' type='uint32' value='0' />
-
-                        </propmethod>
+				    nonvolatile='1' />
 
                     </propgroup>
                     <propgroup name='ipmi' version='1'
                     	name-stability='Private' data-stability='Private' >
 			
                          <propmethod name='dimm_ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                            <argval name='format' type='string' 
-			        value='p%d.d%d.fru' />
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
 
                         </propmethod>
@@ -744,8 +831,12 @@
                     <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                         <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                           <propval name='type' type='uint32' value='0' />
-                          <propmethod name='dimm_ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                            <argval name='format' type='string' value='p%d.d%d.led' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+			      
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.led' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
                           </propmethod>
                           <propmethod name='ipmi_indicator_mode' version='0'
@@ -771,23 +862,18 @@
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
 			            propname='serial' proptype='string'
-				    nonvolatile='1' >
-              
-                            <argval name='format' type='string'
-			        value='p%d.d%d.fru' />
-                            <argval name='offset' type='uint32' value='0' />
-
-                        </propmethod>
+				    nonvolatile='1' />
 
                     </propgroup>
                     <propgroup name='ipmi' version='1'
                     	name-stability='Private' data-stability='Private' >
 			
                          <propmethod name='dimm_ipmi_entity' version='0'
-		            propname='entity_ref' proptype='string' >
+		            propname='entity_ref' proptype='string_array' >
               
-                            <argval name='format' type='string' 
-			        value='p%d.d%d.fru' />
+                            <argval name='format' type='string_array'> 
+			        <argitem value='p%d.d%d.fru' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
 
                         </propmethod>
@@ -798,8 +884,12 @@
                     <facility name='service' type='indicator' provider='fac_prov_ipmi' >
                         <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
                           <propval name='type' type='uint32' value='0' />
-                          <propmethod name='dimm_ipmi_entity' version='0' propname='entity_ref' proptype='string' >
-                            <argval name='format' type='string' value='p%d.d%d.led' />
+                          <propmethod name='dimm_ipmi_entity' version='0'
+			      propname='entity_ref' proptype='string_array' >
+
+                            <argval name='format' type='string_array'>
+			        <argitem value='p%d.d%d.led' />
+			    </argval>
                             <argval name='offset' type='uint32' value='0' />
                           </propmethod>
                           <propmethod name='ipmi_indicator_mode' version='0'

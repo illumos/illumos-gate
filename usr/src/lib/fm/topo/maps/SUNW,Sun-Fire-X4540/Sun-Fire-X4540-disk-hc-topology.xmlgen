@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl -w
 #
 # CDDL HEADER START
 #
@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -82,12 +82,15 @@ print <<EOF;
 	data-stability='Private' >
 	<propval name='type' type='uint32' value='1' />
 	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
-	  proptype='string' >
-	  <argval name='format' type='string' value='hdd\%d.ok2rm.led' />
+	  proptype='string_array' >
+	  <argval name='format' type='string_array'>
+	      <argitem value='DBP/HDD\%d/OK2RM' />
+	      <argitem value='hdd\%d.ok2rm.led' />
+	  </argval>
 	  <argval name='offset' type='uint32' value='0' />
 	  <argval name='nparams' type='uint32' value='1' />
 	</propmethod>
-	<propmethod name='thumper_locate_mode' version='0'
+	<propmethod name='bay_locate_mode' version='0'
 	  propname='mode' proptype='uint32' mutable='1'>
 	</propmethod>
       </propgroup>
@@ -97,12 +100,17 @@ print <<EOF;
 	data-stability='Private' >
 	<propval name='type' type='uint32' value='2' />
 	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
-	  proptype='string' >
-	  <argval name='format' type='string' value='hdd\%d.state' />
+	  proptype='string_array' >
+	  <argval name='format' type='string_array'>
+	      <argitem value='DBP/HDD\%d/STATE' />
+	      <argitem value='hdd\%d.state' />
+	      <argitem value='DBP/HDD\%d/OK2RM' />
+	      <argitem value='hdd\%d.ok2rm.led' />
+	  </argval>
 	  <argval name='offset' type='uint32' value='0' />
 	  <argval name='nparams' type='uint32' value='1' />
 	</propmethod>
-	<propmethod name='thumper_indicator_mode' version='0'
+	<propmethod name='bay_indicator_mode' version='0'
 	  propname='mode' proptype='uint32' mutable='1'>
 	</propmethod>
       </propgroup>
@@ -112,29 +120,19 @@ print <<EOF;
 	data-stability='Private' >
 	<propval name='type' type='uint32' value='0' />
 	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
-	  proptype='string' >
-	  <argval name='format' type='string' value='hdd\%d.state' />
+	  proptype='string_array' >
+	  <argval name='format' type='string_array'>
+	      <argitem value='DBP/HDD\%d/STATE' />
+	      <argitem value='hdd\%d.state' />
+	      <argitem value='DBP/HDD\%d/SVC' />
+	      <argitem value='hdd\%d.fail.led' />
+	  </argval>
 	  <argval name='offset' type='uint32' value='0' />
 	  <argval name='nparams' type='uint32' value='1' />
 	</propmethod>
-	<propmethod name='thumper_indicator_mode' version='0' propname='mode'
+	<propmethod name='bay_indicator_mode' version='0' propname='mode'
 	  proptype='uint32' mutable='1'>
 	</propmethod>
-      </propgroup>
-    </facility>
-    <facility name='present' type='indicator' provider='fac_prov_ipmi' >
-      <propgroup name='facility' version='1' name-stability='Private'
-	data-stability='Private' >
-        <propval name='type' type='uint32' value='3' />
-	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
-	  proptype='string' >
-	  <argval name='format' type='string' value='hdd\%d.state' />
-	  <argval name='offset' type='uint32' value='0' />
-	  <argval name='nparams' type='uint32' value='1' />
-	</propmethod>
-        <propmethod name='thumper_indicator_mode' version='0' propname='mode'
-	  proptype='uint32' mutable='1'>
-        </propmethod>
       </propgroup>
     </facility>
 EOF

@@ -228,6 +228,8 @@ extern int topo_prop_set_fmri_array(tnode_t *, const char *, const char *,
 #define	TOPO_PROP_ISA		"isa"
 #define	TOPO_PROP_MACHINE	"machine"
 
+#define	TOPO_PGROUP_IPMI	"ipmi"
+
 /*
  * These enum definitions are used to define a set of error tags associated with
  * libtopo error conditions occuring during the adminstration of

@@ -36,7 +36,7 @@
   XInclude support
 
     Topologies may be composed via the xi:include tag.
-    libtopo(3LIB) interfaces enforce that all composed topologies be of the
+    libtopo interfaces enforce that all composed topologies be of the
     same scheme.
 -->
 
@@ -69,18 +69,41 @@
 		name	The name of this property.
 
 		type	The data type for this property.
-
+		
 		value	The value for this property.  Must match type
 			restriction of type attribute.
+			
+			This is optional for array types
+			
 -->
 
-<!ELEMENT propval EMPTY >
+<!ELEMENT propval (propitem*) >
 
 <!ATTLIST propval
 	name		CDATA #REQUIRED
 	type		( int32 | uint32 | int64 | uint64 |
-			  string | fmri ) #REQUIRED
+			  string | fmri | int32_array | uint32_array |
+			  int64_array | uint64_array | string_array |
+			  fmri_array ) #REQUIRED
+	value		CDATA "" >
+<!--
+  propitem
+
+ 	This element is an optional child element of propval and is used to
+	specify the values for array elements
+
+	Its attributes are
+
+		value	The value for this property.  Must match type
+			restriction of type attribute.
+			
+-->
+
+<!ELEMENT propitem EMPTY >
+
+<!ATTLIST propitem
 	value		CDATA #REQUIRED >
+
 
 <!--
   propgroup
@@ -154,15 +177,40 @@
  
 		name    The name of the argument.
 		type    The data type of the argument.
-		value	The value of the arg
+		value	The value for this argument.  Must match type
+			restriction of type attribute.
+			
+			This attribute is optional for array types
 -->
 
-<!ELEMENT argval EMPTY>
+<!ELEMENT argval (argitem*) >
 
 <!ATTLIST argval
         name            CDATA #REQUIRED
-        type            CDATA #REQUIRED
-        value           CDATA #REQUIRED >
+	type		( int32 | uint32 | int64 | uint64 |
+			  string | fmri | int32_array | uint32_array |
+			  int64_array | uint64_array | string_array |
+			  fmri_array ) #REQUIRED
+        value           CDATA "">
+
+<!--
+  argitem
+
+ 	This element is an optional child element of argval and is used to
+	specify the values for array elements
+
+	Its attributes are
+
+		value	The value for this property.  Must match type
+			restriction of type attribute.
+			
+-->
+
+<!ELEMENT argitem EMPTY >
+
+<!ATTLIST argitem
+	value		CDATA #REQUIRED >
+
 
 <!--
    propmethod

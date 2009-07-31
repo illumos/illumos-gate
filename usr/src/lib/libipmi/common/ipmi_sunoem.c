@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libipmi.h>
 #include <stddef.h>
@@ -44,6 +42,8 @@ typedef struct ipmi_cmd_sunoem_led_set {
 	    ic_sls_accessaddr		:7);	/* (from SDR record */
 	uint8_t		ic_sls_hwinfo;		/* OEM hardware info */
 	uint8_t		ic_sls_mode;		/* LED mode */
+	uint8_t		ic_sls_eid;		/* entity ID */
+	uint8_t		ic_sls_einst;		/* entity instance */
 	uint8_t		ic_sls_force;		/* force direct access */
 	uint8_t		ic_sls_role;		/* BMC authorization */
 } ipmi_cmd_sunoem_led_set_t;
@@ -57,6 +57,8 @@ typedef struct ipmi_cmd_sunoem_led_get {
 	    __reserved			:1,	/* device access address */
 	    ic_slg_accessaddr		:7);	/* (from SDR record */
 	uint8_t		ic_slg_hwinfo;		/* OEM hardware info */
+	uint8_t		ic_slg_eid;		/* entity ID */
+	uint8_t		ic_slg_einst;		/* entity instance */
 	uint8_t		ic_slg_force;		/* force direct access */
 } ipmi_cmd_sunoem_led_get_t;
 
@@ -144,6 +146,8 @@ ipmi_sunoem_led_set(ipmi_handle_t *ihp, ipmi_sdr_generic_locator_t *dev,
 	cmd.ic_sls_accessaddr = dev->is_gl_accessaddr;
 	cmd.ic_sls_hwinfo = dev->is_gl_oem;
 	cmd.ic_sls_mode = mode;
+	cmd.ic_sls_eid = dev->is_gl_entity;
+	cmd.ic_sls_einst = dev->is_gl_instance;
 
 	return (ipmi_send_sunoem_led_set(ihp, &cmd));
 }
@@ -162,6 +166,8 @@ ipmi_sunoem_led_get(ipmi_handle_t *ihp, ipmi_sdr_generic_locator_t *dev,
 	cmd.ic_slg_type = dev->is_gl_oem;
 	cmd.ic_slg_accessaddr = dev->is_gl_accessaddr;
 	cmd.ic_slg_hwinfo = dev->is_gl_oem;
+	cmd.ic_slg_eid = dev->is_gl_entity;
+	cmd.ic_slg_einst = dev->is_gl_instance;
 
 	return (ipmi_send_sunoem_led_get(ihp, &cmd, mode));
 }

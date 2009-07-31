@@ -80,15 +80,15 @@ my @platforms = (
 		label => "FT %d",
 		count => 5,
 		fru => "self",
-		entity_ref => "ft%d.prsnt",
+		entity_ref => "FT%d/PRSNT,ft%d.prsnt",
 		entity_ref_nparams => 1,
-		fm_service_indctr => "ft%d.service.led",
-		fm_ok2rm_indctr => "ft%d.ok2rm.led",
+		fm_service_indctr => "FT%d/SVC,ft%d.service.led",
+		fm_ok2rm_indctr => "FT%d/OK,ft%d.ok2rm.led",
 	    }, {
 	        fac_enum => 1,
 		provider => "fac_prov_ipmi",
 		count => 2,
-		entity_ref => "ft%d.f%d.speed",
+		entity_ref => "FT%d/FAN%d/TACH,ft%d.f%d.speed",
 		entity_ref_nparams => 2,
 		fru => "parent"
 	    }
@@ -120,16 +120,16 @@ my @platforms = (
 		count => 3,
 		fru => "self",
 		provider => "fac_prov_ipmi",
-		entity_present => "fb%d.fm%d.prsnt",
-		fm_service_indctr=> "fb%d.fm%d.led",
+		entity_present => "FB%d/FM%d/PRSNT,fb%d.fm%d.prsnt",
+		fm_service_indctr=> "FB%d/FM%d/SERVICE,fb%d.fm%d.led",
 		entity_ref_nparams => 2
 	    }, {
 		fac_enum => 1,
 		count => 2,
 		fru => "parent",
 		provider => "fac_prov_ipmi",
-		entity_ref => "fb%d.fm%d.f%d.speed",
-		entity_present => "fb%d.fm%d.prsnt",
+		entity_ref => "FB%d/FM%d/F%d/TACH,fb%d.fm%d.f%d.speed",
+		entity_present => "FB%d/FM%d/PRSNT,fb%d.fm%d.prsnt",
 		entity_ref_nparams => 3
 	    }
 
@@ -137,7 +137,7 @@ my @platforms = (
     },
 
     #
-    # Fan Module/Fan topology for G4F platforms.
+    # Fan Module/Fan topology for the Sun Fire X4600/X4600 M2 platforms.
     #
     # These systems have 4 fan assemblies with a single fan per assembly.
     # Each fan assembly is a FRU.  The fan assemblies have a service LED
@@ -160,7 +160,7 @@ my @platforms = (
     },
 
     #
-    # Fan Module/Fan topology for Durado 1U.
+    # Fan Module/Fan topology for Sun Fire X4140.
     #
     # There are two fan boards, which are FRU's.  The first fanboard has 4
     # fanmodules (which are also FRU's).  The second fan board has 3 fan
@@ -179,21 +179,21 @@ my @platforms = (
 		label => "FANBD%d FM%d",
 		count => 4,
 		fru => "self",
-		fm_service_indctr=> "fb%d.fm%d.led",
+		fm_service_indctr=> "FB%d/FM%d/SERVICE,fb%d.fm%d.led",
 		entity_ref_nparams => 2
 	    }, {
 		fac_enum => 1,
 		provider => "fac_prov_ipmi",
 		count => 2,
 		fru => "parent",
-		entity_ref => "fb%d.fm%d.f%d.speed",
+		entity_ref => "FB%d/FM%d/F%d/TACH,fb%d.fm%d.f%d.speed",
 		entity_ref_nparams => 3
 	    }
 
 	]
     },
     #
-    # Fan Module/Fan topology for Duradi 1U.
+    # Fan Module/Fan topology for the Sun Fire X4150.
     #
     # There are two fan boards, which are FRU's.  The first fanboard has 4
     # fanmodules (which are also FRU's).  The second fan board has 3 fan
@@ -233,7 +233,7 @@ my @platforms = (
     # fanmodules (which are also FRU's). Each fanmodule contains two fans.
     #
     {
-	set => "SUN-FIRE-X4250",
+	set => "SUN-FIRE-X4250|SUN-FIRE-X4450",
 	topology => [
 	    {
 		count => 2,
@@ -310,11 +310,19 @@ sub process_topology
 			printf("%*s<propval name='type' type='uint32' ".
 			    "value='0' />\n", $indent+6, "");
 			printf("%*s<propmethod name='ipmi_entity' version='0' ".
-			    "propname='entity_ref' proptype='string' >\n",
+			    "propname='entity_ref' proptype='string_array' >\n",
 			    $indent+6, "");
-			printf("%*s<argval name='format' type='string' ".
-			    "value='%s' />\n", $indent+8, "",
-			    $level->{fm_service_indctr});
+
+			printf("%*s<argval name='format' type='string_array'>\n",
+			    $indent+8, "");
+			my @refs = split(/\,/, $level->{fm_service_indctr});
+			foreach my $ref (@refs) {
+				printf("%*s<argitem value='", $indent+10, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			
+			printf("%*s</argval>\n", $indent+8, "");
 			printf("%*s<argval name='offset' type='uint32' ".
 			    "value='0' />\n", $indent+8, "");
 			printf("%*s<argval name='nparams' type='uint32' ".
@@ -337,11 +345,18 @@ sub process_topology
 			printf("%*s<propval name='type' type='uint32' ".
 			    "value='2' />\n", $indent+6, "");
 			printf("%*s<propmethod name='ipmi_entity' version='0' ".
-			    "propname='entity_ref' proptype='string' >\n",
+			    "propname='entity_ref' proptype='string_array' >\n",
 			    $indent+6, "");
-			printf("%*s<argval name='format' type='string' ".
-			    "value='%s' />\n", $indent+8, "",
-			    $level->{fm_ok2rm_indctr});
+
+			printf("%*s<argval name='format' type='string_array'>\n",
+			    $indent+8, "");
+			my @refs = split(/\,/, $level->{fm_ok2rm_indctr});
+			foreach my $ref (@refs) {
+				printf("%*s<argitem value='", $indent+10, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			printf("%*s</argval>\n", $indent+8, "");
 			printf("%*s<argval name='offset' type='uint32' ".
 			    "value='0' />\n", $indent+8, "");
 			printf("%*s<argval name='nparams' type='uint32' ".
@@ -389,10 +404,16 @@ sub process_topology
 			printf("%*s<propgroup name='ipmi' version='1' " .
 			    "name-stability='Private' " .
 			    "data-stability='Private' >\n", $indent, "");
-			printf("%*s<propval name='entity_ref' " .
-			    "type='string' value='", $indent + 2, "");
-			printf($val, @indices);
-			printf("' />\n");
+
+			printf("%*s<propval name='entity_ref' ".
+			    "type='string_array'>\n", $indent + 2, "");
+			my @refs = split(/\,/, $val);
+			foreach my $ref (@refs) {
+				printf("%*s<propitem value='", $indent+4, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			printf("%*s</propval>\n", $indent+2, "");
 			printf("%*s</propgroup>\n", $indent, "");
 		}
 		if ($level->{entity_present}) {
@@ -400,10 +421,16 @@ sub process_topology
 			printf("%*s<propgroup name='ipmi' version='1' " .
 			    "name-stability='Private' " .
 			    "data-stability='Private' >\n", $indent, "");
+
 			printf("%*s<propval name='entity_present' " .
-			    "type='string' value='", $indent + 2, "");
-			printf($val, @indices);
-			printf("' />\n");
+			    "type='string_array'>\n", $indent + 2, "");
+			my @refs = split(/\,/, $val);
+			foreach my $ref (@refs) {
+				printf("%*s<propitem value='", $indent+4, "");
+				printf($ref, @indices);
+				printf("' />\n");
+			}
+			printf("%*s</propval>\n", $indent+4, "");
 			printf("%*s</propgroup>\n", $indent, "");
 		}
 

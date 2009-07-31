@@ -25,6 +25,7 @@
  */
 
 #include <sys/fm/protocol.h>
+#include <fm/fmd_msg.h>
 #include <strings.h>
 #include <alloca.h>
 #include <stdio.h>
@@ -143,6 +144,8 @@ fmd_protocol_list(const char *class, nvlist_t *de_fmri, const char *uuid,
 	int64_t tod[2];
 	nvlist_t *nvl;
 	int err = 0;
+	fmd_msg_hdl_t *msghdl;
+	char *severity;
 
 	tod[0] = tvp->tv_sec;
 	tod[1] = tvp->tv_usec;
@@ -169,6 +172,25 @@ fmd_protocol_list(const char *class, nvlist_t *de_fmri, const char *uuid,
 		err |= nvlist_add_uint8_array(nvl,
 		    FM_SUSPECT_FAULT_STATUS, flagv, argc);
 	}
+
+	/*
+	 * Attempt to lookup the severity associated with this diagnosis from
+	 * the portable object file using the diag code.  Failure to init
+	 * libfmd_msg or add to the nvlist will be treated as fatal.  However,
+	 * we won't treat a fmd_msg_getitem_id failure as fatal since during
+	 * development it's not uncommon to be working with po/dict files that
+	 * haven't yet been updated with newly added diagnoses.
+	 */
+	msghdl = fmd_msg_init(fmd.d_rootdir, FMD_MSG_VERSION);
+	if (msghdl == NULL)
+		fmd_panic("failed to initialize libfmd_msg\n");
+
+	if ((severity = fmd_msg_getitem_id(msghdl, NULL, code,
+	    FMD_MSG_ITEM_SEVERITY)) != NULL) {
+		err |= nvlist_add_string(nvl, FM_SUSPECT_SEVERITY, severity);
+		free(severity);
+	}
+	fmd_msg_fini(msghdl);
 
 	if (err != 0)
 		fmd_panic("failed to populate nvlist: %s\n", fmd_strerror(err));

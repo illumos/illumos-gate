@@ -182,6 +182,7 @@ typedef struct uurec {
 	ari_list_t *ari_uuid_list;
 	name_list_t *asru;
 	uint64_t sec;
+	nvlist_t *event;
 } uurec_t;
 
 typedef struct uurec_select {
@@ -1052,6 +1053,8 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 	uurec_p->uuid = strdup(uuid);
 	uurec_p->sec = sec;
 	uurec_p->ari_uuid_list = NULL;
+	uurec_p->event = NULL;
+	(void) nvlist_dup(nvl, &uurec_p->event, 0);
 	host = find_hostid(nvl);
 	if (not_suppressed && !opt_g)
 		status_rec_p = NULL;
@@ -1145,9 +1148,9 @@ print_line(char *label, char *buf)
 }
 
 static void
-print_dict_info_line(char *msgid, fmd_msg_item_t what, const char *linehdr)
+print_dict_info_line(nvlist_t *e, fmd_msg_item_t what, const char *linehdr)
 {
-	char *cp = fmd_msg_getitem_id(fmadm_msghdl, NULL, msgid, what);
+	char *cp = fmd_msg_getitem_nv(fmadm_msghdl, NULL, e, what);
 
 	if (cp) {
 		print_line(dgettext("FMD", linehdr), cp);
@@ -1156,12 +1159,12 @@ print_dict_info_line(char *msgid, fmd_msg_item_t what, const char *linehdr)
 }
 
 static void
-print_dict_info(char *msgid)
+print_dict_info(nvlist_t *nvl)
 {
-	print_dict_info_line(msgid, FMD_MSG_ITEM_DESC, "Description : ");
-	print_dict_info_line(msgid, FMD_MSG_ITEM_RESPONSE, "Response    : ");
-	print_dict_info_line(msgid, FMD_MSG_ITEM_IMPACT, "Impact      : ");
-	print_dict_info_line(msgid, FMD_MSG_ITEM_ACTION, "Action      : ");
+	print_dict_info_line(nvl, FMD_MSG_ITEM_DESC, "Description : ");
+	print_dict_info_line(nvl, FMD_MSG_ITEM_RESPONSE, "Response    : ");
+	print_dict_info_line(nvl, FMD_MSG_ITEM_IMPACT, "Impact      : ");
+	print_dict_info_line(nvl, FMD_MSG_ITEM_ACTION, "Action      : ");
 }
 
 static void
@@ -1483,7 +1486,7 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 		print_name_list(srp->serial, dgettext("FMD", "Serial ID.  :"),
 		    NULL, 0, 0, NULL, full);
 	}
-	print_dict_info(srp->msgid);
+	print_dict_info(srp->uurec->event);
 	(void) printf("\n");
 }
 
@@ -1699,7 +1702,7 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 					if (msgid == NULL ||
 					    strcmp(msgid, srp->msgid) != 0) {
 						msgid = srp->msgid;
-						print_dict_info(srp->msgid);
+						print_dict_info(uurp->event);
 					}
 					slp = slp->next;
 				} while (slp != end);
@@ -1817,7 +1820,8 @@ get_cases_from_fmd(fmd_adm_t *adm, uurec_select_t *uurecp, int opt_i)
 	int rt = FMADM_EXIT_SUCCESS;
 
 	/*
-	 * These calls may fail with Protocol error if message payload is to big
+	 * These calls may fail with Protocol error if message payload is
+	 * too big
 	 */
 	if (fmd_adm_case_iter(adm, NULL, dfault_rec, uurecp) != 0)
 		die("failed to get case list from fmd");

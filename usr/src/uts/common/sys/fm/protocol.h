@@ -86,6 +86,7 @@ extern "C" {
 #define	FM_SUSPECT_MESSAGE		"message"
 #define	FM_SUSPECT_RETIRE		"retire"
 #define	FM_SUSPECT_RESPONSE		"response"
+#define	FM_SUSPECT_SEVERITY		"severity"
 
 #define	FM_SUSPECT_VERS0		0
 #define	FM_SUSPECT_VERSION		FM_SUSPECT_VERS0

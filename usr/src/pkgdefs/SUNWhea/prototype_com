@@ -667,6 +667,7 @@ f none usr/include/sys/acpi_drv.h 644 root bin
 f none usr/include/sys/bitmap.h 644 root bin
 f none usr/include/sys/bitset.h 644 root bin
 f none usr/include/sys/bl.h 644 root bin
+f none usr/include/sys/bmc_intf.h 644 root bin
 f none usr/include/sys/bofi.h 644 root bin
 f none usr/include/sys/bofi_impl.h 644 root bin
 f none usr/include/sys/bootconf.h 644 root bin

@@ -19,16 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = i86pc
 CLASS = arch
 DTDFILE = topology.dtd.1
 TOPOFILE = i86pc-hc-topology.xml chip-hc-topology.xml psu-hc-topology.xml \
-fan-hc-topology.xml
+fan-hc-topology.xml chassis-hc-topology.xml
 
 SRCDIR = ../i86pc
 

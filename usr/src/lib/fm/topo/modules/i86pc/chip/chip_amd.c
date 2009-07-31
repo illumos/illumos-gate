@@ -104,8 +104,8 @@ static const topo_method_t gen_cs_methods[] = {
 	    mem_asru_compute },
 	{ SIMPLE_CS_LBL_MP, "Property method", 0,
 	    TOPO_STABILITY_INTERNAL, simple_cs_label_mp},
-	{ GET_CS_SERIAL, "Property method", 0,
-	    TOPO_STABILITY_INTERNAL, get_cs_serial},
+	{ GET_DIMM_SERIAL, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, get_dimm_serial},
 	{ NULL }
 };
 

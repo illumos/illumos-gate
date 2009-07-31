@@ -418,6 +418,16 @@ uint32_def:
 			topo_hdl_strfree(thp, fmri);
 			break;
 		}
+		case DATA_TYPE_INT32_ARRAY: {
+			int32_t *val;
+
+			(void) nvpair_value_int32_array(pv_nvp, &val, &nelem);
+			(void) printf(" [ ");
+			for (i = 0; i < nelem; i++)
+				(void) printf("%d ", val[i]);
+			(void) printf("]");
+			break;
+		}
 		case DATA_TYPE_UINT32_ARRAY: {
 			uint32_t *val;
 
@@ -438,13 +448,23 @@ uint32_def:
 			(void) printf("]");
 			break;
 		}
+		case DATA_TYPE_UINT64_ARRAY: {
+			uint64_t *val;
+
+			(void) nvpair_value_uint64_array(pv_nvp, &val, &nelem);
+			(void) printf(" [ ");
+			for (i = 0; i < nelem; i++)
+				(void) printf("%llu ", val[i]);
+			(void) printf("]");
+			break;
+		}
 		case DATA_TYPE_STRING_ARRAY: {
 			char **val;
 
 			(void) nvpair_value_string_array(pv_nvp, &val, &nelem);
 			(void) printf(" [ ");
 			for (i = 0; i < nelem; i++)
-				(void) printf("%s ", val[i]);
+				(void) printf("\"%s\" ", val[i]);
 			(void) printf("]");
 			break;
 		}

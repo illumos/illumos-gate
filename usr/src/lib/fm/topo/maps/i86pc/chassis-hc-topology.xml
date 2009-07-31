@@ -1,0 +1,243 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+-->
+
+<topology name='chassis' scheme='hc'>
+  <range name='chassis' min='0' max='0'>
+    <node instance='0'>
+        <set type='product' setlist='Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
+          <fac-enum provider='fac_prov_ipmi' />
+          <propgroup name='ipmi' version='1'
+              name-stability='Private' data-stability='Private' >
+             <propval name='entity_ref' type='string_array' >
+	         <propitem value='INTSW' />
+	         <propitem value='sys.intsw' />
+	     </propval>
+          </propgroup>
+	  <!--
+	  	chassis service LED for X4140/X4240/X4440
+	  -->
+          <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='SERVICE' />
+			<propitem value='fp.alert.led' />
+		    </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='chassis_service_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+        </set>
+        <set type='product' setlist='SUN-FIRE-X4150|SUN-FIRE-X4250|SUN-FIRE-X4450'>
+          <fac-enum provider='fac_prov_ipmi' />
+          <propgroup name='ipmi' version='1'
+              name-stability='Private' data-stability='Private' >
+             <propval name='entity_ref' type='string_array' >
+	         <propitem value='/SYS/VPS' />
+	     </propval>
+          </propgroup>
+        </set>
+        <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
+          <fac-enum provider='fac_prov_ipmi' />
+          <propgroup name='ipmi' version='1'
+              name-stability='Private' data-stability='Private' >
+             <propval name='entity_ref' type='string_array' >
+	         <propitem value='sys.intsw' />
+	     </propval>
+          </propgroup>
+	  <!--
+	  	chassis back-panel and front-panel locate and service LED's 
+		for X4100/X4200/X4100M2/X4200M2
+	  -->
+          <facility name='fp.locate' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='fp.locate.led' />
+		    </propval>
+                    <propval name='type' type='uint32' value='1' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='bp.locate' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='bp.locate.led' />
+		    </propval>
+                    <propval name='type' type='uint32' value='1' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='fp.service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='fp.alert.led' />
+		    </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='bp.service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='bp.alert.led' />
+		    </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+        </set>
+        <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540'>
+          <fac-enum provider='fac_prov_ipmi' />
+          <propgroup name='ipmi' version='1'
+              name-stability='Private' data-stability='Private' >
+             <propval name='entity_ref' type='string_array'>
+		 <propitem value='sys.intsw' />
+	         <propitem value='INTRUSION' />
+             </propval>
+          </propgroup>
+	  <!--
+	  	chassis back-panel and front-panel locate and service LED's for X4500/X4540
+	  -->
+          <facility name='fp.locate' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='fp.locate.led' />
+			<propitem value='LOCATE' />
+		    </propval>
+                    <propval name='type' type='uint32' value='1' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='bp.locate' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='bp.locate.led' />
+			<propitem value='LOCATE' />
+		    </propval>
+                    <propval name='type' type='uint32' value='1' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='fp.service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='fp.alert.led' />
+			<propitem value='SERVICE' />
+	            </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='bp.service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='bp.alert.led' />
+			<propitem value='SERVICE' />
+		    </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='sys.top_svc.led' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='sys.top_svc.led' />
+			<propitem value='TOP_SVC' />
+		    </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='sys.rear_svc.led' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='sys.rear_svc.led' />
+			<propitem value='REAR_SVC' />
+		    </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+        </set>
+        <set type='product' setlist='Sun-Fire-X4600-M2'>
+          <fac-enum provider='fac_prov_ipmi' />
+          <propgroup name='ipmi' version='1'
+              name-stability='Private' data-stability='Private' >
+             <propval name='entity_ref' type='string_array' >
+	         <propitem value='sys.intsw' />
+             </propval>
+          </propgroup>
+	  <!--
+	  	chassis locate and service LED's for X4600M2
+	  -->
+          <facility name='locate' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='sys.locate.led' />
+		    </propval>
+                    <propval name='type' type='uint32' value='1' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+          <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+                <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+		    <propval name='entity_ref' type='string_array' >
+		        <propitem value='sys.alert.led' />
+		    </propval>
+                    <propval name='type' type='uint32' value='0' />
+                    <propmethod name='ipmi_indicator_mode' version='0'
+                       propname='mode' proptype='uint32' mutable='1' >
+                    </propmethod>
+                </propgroup>
+          </facility>
+        </set>
+    </node>
+  </range>
+</topology>
