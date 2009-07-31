@@ -978,6 +978,9 @@ use_tools() {
 	PATH="${TOOLSROOT}/opt/onbld/bin:${PATH}"
 	export PATH
 
+	ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}
+	export ONBLD_TOOLS
+
 	echo "\n==== New environment settings. ====\n" >> $LOGFILE
 	echo "STABS=${STABS}" >> $LOGFILE
 	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
@@ -987,6 +990,7 @@ use_tools() {
 	echo "CTFFINDMOD=${CTFFINDMOD}" >> $LOGFILE
 	echo "ELFSIGN=${ELFSIGN}" >> $LOGFILE
 	echo "PATH=${PATH}" >> $LOGFILE
+	echo "ONBLD_TOOLS=${ONBLD_TOOLS}" >> $LOGFILE
 }
 
 staffer() {
@@ -2648,7 +2652,6 @@ if [[ "$t_FLAG" = "y" || "$O_FLAG" = y ]]; then
 
 	if [[ $tools_build_ok = y && "$t_FLAG" = y ]]; then
 		use_tools $TOOLS_PROTO
-		export ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}
 	fi
 fi
 
