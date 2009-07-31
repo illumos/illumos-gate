@@ -157,6 +157,9 @@ PSARC 2006/477: RULE E3: usr/lib/amd64/watchmalloc.so.1: _valloc
 PSARC 2009/363: RULE E7: lib/libelf.so.1
 PSARC 2009/363: RULE E7: lib/amd64/libelf.so.1
 PSARC 2009/363: RULE E7: lib/sparcv9/libelf.so.1
+PSARC 2009/369: RULE E7: usr/lib/libima.so.1
+PSARC 2009/369: RULE E7: usr/lib/amd64/libima.so.1
+PSARC 2009/369: RULE E7: usr/lib/sparcv9/libima.so.1
 
 #############################################
 # ERRORs exempted from RULE E8 (See RULES section of intf_check manpage)

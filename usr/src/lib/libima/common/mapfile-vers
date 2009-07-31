@@ -37,13 +37,13 @@
 #
 # MAPFILE HEADER END
 #
-SUNW_1.2 {		# update to libima, Solaris 11
+SUNW_1.1 {		# update to libima, Solaris 11
     global:
 	SUN_IMA_SetTunableProperties;
 	SUN_IMA_GetTunableProperties;
-} SUNW_1.1;
+} SUNW_1.0;
 	
-SUNW_1.1 {		# first release of libima, Solaris 10
+SUNW_1.0 {		# first release of libima in S10u2_02
     global:
 	IMA_GetErrorRecoveryLevelProperties;
 	IMA_GetNetworkPortalProperties;
