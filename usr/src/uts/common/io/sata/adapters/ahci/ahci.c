@@ -3088,18 +3088,6 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	}
 
 	/*
-	 * nVidia MCP78 AHCI controller (pci10de,0ad4) will be forced to use
-	 * Fixed interrupt until the known CR 6766472 (MSIs do not function
-	 * on most Nvidia boards) is fixed.
-	 */
-	if (venid == 0x10de && devid == 0x0ad4) {
-		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
-		    "Force nVidia MCP78 AHCI controller to use "
-		    "fixed interrupts", NULL);
-		ahci_msi_enabled = B_FALSE;
-	}
-
-	/*
 	 * Check if capabilities list is supported and if so,
 	 * get initial capabilities pointer and clear bits 0,1.
 	 */
