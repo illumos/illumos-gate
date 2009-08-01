@@ -70,6 +70,8 @@ static int ql_configure_fabric(ql_adapter_state_t *);
 static int ql_configure_device_d_id(ql_adapter_state_t *);
 static void ql_set_max_read_req(ql_adapter_state_t *);
 static void ql_configure_n_port_info(ql_adapter_state_t *);
+static void ql_clear_mcp(ql_adapter_state_t *);
+
 /*
  * ql_initialize_adapter
  *	Initialize board.
@@ -1080,8 +1082,8 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 	 */
 	if (CFG_IST(ha, CFG_CTRL_81XX)) {
 		dst = (caddr_t)icb->enode_mac_addr;
-		src = (caddr_t)nv->mac_address;
-		index = sizeof (nv->mac_address);
+		src = (caddr_t)nv->fw.isp8001.e_node_mac_addr;
+		index = sizeof (nv->fw.isp8001.e_node_mac_addr);
 		while (index--) {
 			*dst++ = *src++;
 		}
@@ -1091,6 +1093,10 @@ ql_nvram_24xx_config(ql_adapter_state_t *ha)
 		while (index--) {
 			*dst++ = *src++;
 		}
+		EL(ha, "e_node_mac_addr=%02x-%02x-%02x-%02x-%02x-%02x\n",
+		    icb->enode_mac_addr[0], icb->enode_mac_addr[1],
+		    icb->enode_mac_addr[2], icb->enode_mac_addr[3],
+		    icb->enode_mac_addr[4], icb->enode_mac_addr[5]);
 	} else {
 		icb->firmware_options_1[0] = (uint8_t)
 		    (icb->firmware_options_1[0] | BIT_1);
@@ -1725,8 +1731,12 @@ ql_common_properties(ql_adapter_state_t *ha)
 		ha->pci_max_read_req = (uint16_t)(data);
 	}
 
+	/*
+	 * Set default fw wait, adjusted for slow FCF's.
+	 * Revisit when FCF's as fast as FC switches.
+	 */
+	ha->fwwait = (uint8_t)(CFG_IST(ha, CFG_CTRL_81XX) ? 45 : 10);
 	/* Get the attach fw_ready override value. */
-	ha->fwwait = 10;
 	if ((data = ql_get_prop(ha, "init-loop-sync-wait")) != 0xffffffff) {
 		if (data > 0 && data <= 240) {
 			ha->fwwait = (uint8_t)data;
@@ -3534,9 +3544,12 @@ ql_reset_chip(ql_adapter_state_t *vha)
 	/* Insure mailbox registers are free. */
 	WRT16_IO_REG(ha, hccr, HC_CLR_RISC_INT);
 	WRT16_IO_REG(ha, hccr, HC_CLR_HOST_INT);
+
+	/* clear the mailbox command pointer. */
+	ql_clear_mcp(ha);
+
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags &
 	    ~(MBX_BUSY_FLG | MBX_WANT_FLG | MBX_ABORT | MBX_INTERRUPT));
-	ha->mcp = NULL;
 
 	/* Bus Master is disabled so chip reset is safe. */
 	if (CFG_IST(ha, (CFG_CTRL_2300 | CFG_CTRL_6322))) {
@@ -3660,10 +3673,12 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 		drv_usecwait(100);
 	}
 
+	/* clear the mailbox command pointer. */
+	ql_clear_mcp(ha);
+
 	/* Insure mailbox registers are free. */
 	ha->mailbox_flags = (uint8_t)(ha->mailbox_flags &
 	    ~(MBX_BUSY_FLG | MBX_WANT_FLG | MBX_ABORT | MBX_INTERRUPT));
-	ha->mcp = NULL;
 
 	if (ha->flags & MPI_RESET_NEEDED) {
 		WRT32_IO_REG(ha, hccr, HC24_CLR_RISC_INT);
@@ -3693,6 +3708,39 @@ ql_reset_24xx_chip(ql_adapter_state_t *ha)
 		ql_24xx_protect_flash(ha);
 	}
 }
+
+/*
+ * ql_clear_mcp
+ *	Carefully clear the mailbox command pointer in the ha struct.
+ *
+ * Input:
+ *	ha = adapter block pointer.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+
+static void
+ql_clear_mcp(ql_adapter_state_t *ha)
+{
+	uint32_t cnt;
+
+	/* Don't null ha->mcp without the lock, but don't hang either. */
+	if (MBX_REGISTER_LOCK_OWNER(ha) == curthread) {
+		ha->mcp = NULL;
+	} else {
+		for (cnt = 0; cnt < 300000; cnt++) {
+			if (TRY_MBX_REGISTER_LOCK(ha) != 0) {
+				ha->mcp = NULL;
+				MBX_REGISTER_UNLOCK(ha);
+				break;
+			} else {
+				drv_usecwait(10);
+			}
+		}
+	}
+}
+
 
 /*
  * ql_abort_isp
@@ -3776,9 +3824,18 @@ ql_abort_isp(ql_adapter_state_t *vha)
 	/* Reset the chip. */
 	ql_reset_chip(ha);
 
+	/*
+	 * Even though we have waited for outstanding commands to complete,
+	 * except for ones marked SRB_COMMAND_TIMEOUT, and reset the ISP,
+	 * there could still be an interrupt thread active.  The interrupt
+	 * lock will prevent us from getting an sp from the outstanding
+	 * cmds array that the ISR may be using.
+	 */
+
 	/* Place all commands in outstanding cmd list on device queue. */
 	for (index = 1; index < MAX_OUTSTANDING_COMMANDS; index++) {
 		REQUEST_RING_LOCK(ha);
+		INTR_LOCK(ha);
 		if ((link = ha->pending_cmds.first) != NULL) {
 			sp = link->base_address;
 			ql_remove_link(&ha->pending_cmds, &sp->cmd);
@@ -3788,9 +3845,22 @@ ql_abort_isp(ql_adapter_state_t *vha)
 		} else {
 			REQUEST_RING_UNLOCK(ha);
 			if ((sp = ha->outstanding_cmds[index]) == NULL) {
+				INTR_UNLOCK(ha);
 				continue;
 			}
 		}
+
+		/*
+		 * It's not obvious but the index for commands pulled from
+		 * pending will be zero and that entry in the outstanding array
+		 * is not used so nulling it is "no harm, no foul".
+		 */
+
+		ha->outstanding_cmds[index] = NULL;
+		sp->handle = 0;
+		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+
+		INTR_UNLOCK(ha);
 
 		/* If command timeout. */
 		if (sp->flags & SRB_COMMAND_TIMEOUT) {
@@ -3802,10 +3872,6 @@ ql_abort_isp(ql_adapter_state_t *vha)
 			ql_done(&sp->cmd);
 			continue;
 		}
-
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
 
 		/* Acquire target queue lock. */
 		lq = sp->lun_queue;

@@ -344,8 +344,6 @@ ql_busy_notification(ql_adapter_state_t *ha)
 
 	QL_PM_LOCK(ha);
 	if (ha->power_level != PM_LEVEL_D0) {
-		ASSERT(ha->power_level == PM_LEVEL_D3);
-
 		QL_PM_UNLOCK(ha);
 		if (pm_raise_power(ha->dip, 0, 1) != DDI_SUCCESS) {
 			QL_PM_LOCK(ha);
@@ -391,7 +389,6 @@ ql_idle_notification(ql_adapter_state_t *ha)
 	}
 
 	QL_PM_LOCK(ha);
-	ASSERT(ha->busy > 0);
 	ha->busy--;
 	QL_PM_UNLOCK(ha);
 
@@ -425,8 +422,6 @@ ql_get_feature_bits(ql_adapter_state_t *ha, uint16_t *features)
 	 * the following code breaks if the offset isn't at
 	 * 2 byte boundary.
 	 */
-	ASSERT(offset <= 0xFF && (offset & 0x1) == 0);
-
 	rval = ql_lock_nvram(ha, &start_addr, LNF_NVRAM_DATA);
 	if (rval != QL_SUCCESS) {
 		EL(ha, "failed, ql_lock_nvram=%xh\n", rval);

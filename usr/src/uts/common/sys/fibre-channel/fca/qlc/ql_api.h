@@ -1838,6 +1838,8 @@ typedef struct ql_adapter_state {
 #define	DEVICE_QUEUE_LOCK(q)		mutex_enter(&q->mutex)
 #define	DEVICE_QUEUE_UNLOCK(q)		mutex_exit(&q->mutex)
 
+#define	TRY_MBX_REGISTER_LOCK(ha)	mutex_tryenter(&ha->pha->mbx_mutex)
+#define	MBX_REGISTER_LOCK_OWNER(ha)	mutex_owner(&ha->pha->mbx_mutex)
 #define	MBX_REGISTER_LOCK(ha)		mutex_enter(&ha->pha->mbx_mutex)
 #define	MBX_REGISTER_UNLOCK(ha)		mutex_exit(&ha->pha->mbx_mutex)
 

@@ -181,6 +181,8 @@ static void ql_fca_isp_els_request(ql_adapter_state_t *, fc_packet_t *,
 static void ql_isp_els_request_ctor(els_descriptor_t *,
     els_passthru_entry_t *);
 static int ql_p2p_plogi(ql_adapter_state_t *, fc_packet_t *);
+static int ql_wait_for_td_stop(ql_adapter_state_t *ha);
+
 /*
  * Global data
  */
@@ -1151,7 +1153,6 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 					    " raise power or initialize"
 					    " adapter", QL_NAME, instance);
 				}
-				ASSERT(ha->power_level == PM_LEVEL_D0);
 			}
 		} else {
 			/* Initialize adapter. */
@@ -1224,7 +1225,11 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		/* Allocate a transport structure for this instance */
 		tran = kmem_zalloc(sizeof (fc_fca_tran_t), KM_SLEEP);
-		ASSERT(tran != NULL);
+		if (tran == NULL) {
+			cmn_err(CE_WARN, "%s(%d): failed to allocate transport",
+			    QL_NAME, instance);
+			goto attach_failed;
+		}
 
 		progress |= QL_FCA_TRAN_ALLOCED;
 
@@ -1418,9 +1423,6 @@ attach_failed:
 
 			ql_fcache_rel(ha->fcache);
 
-			ASSERT(ha->dev && ha->outstanding_cmds &&
-			    ha->ub_array && ha->adapter_stats);
-
 			kmem_free(ha->adapter_stats,
 			    sizeof (*ha->adapter_stats));
 
@@ -1450,7 +1452,6 @@ attach_failed:
 			ddi_soft_state_free(ql_state, instance);
 			progress &= ~QL_SOFT_STATE_ALLOCED;
 		}
-		ASSERT(progress == 0);
 
 		ddi_prop_remove_all(dip);
 		rval = DDI_FAILURE;
@@ -1570,7 +1571,7 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	ql_adapter_state_t	*ha, *vha;
 	ql_tgt_t		*tq;
-	int			try;
+	int			delay_cnt;
 	uint16_t		index;
 	ql_link_t		*link;
 	char			*buf;
@@ -1594,38 +1595,24 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ha->flags |= (ADAPTER_SUSPENDED | ABORT_CMDS_LOOP_DOWN_TMO);
 		ADAPTER_STATE_UNLOCK(ha);
 
-		/* Acquire task daemon lock. */
 		TASK_DAEMON_LOCK(ha);
 
-		ha->task_daemon_flags |= TASK_DAEMON_STOP_FLG;
-		cv_signal(&ha->cv_task_daemon);
+		if (ha->task_daemon_flags & TASK_DAEMON_ALIVE_FLG) {
+			ha->task_daemon_flags |= TASK_DAEMON_STOP_FLG;
+			cv_signal(&ha->cv_task_daemon);
 
-		/* Release task daemon lock. */
-		TASK_DAEMON_UNLOCK(ha);
-
-		/*
-		 * Wait for task daemon to stop running.
-		 * Internal command timeout is approximately
-		 * 30 seconds, so it would help in some corner
-		 * cases to wait that long
-		 */
-		try = 0;
-		while ((ha->task_daemon_flags & TASK_DAEMON_STOP_FLG) &&
-		    try < 3000) {
-			ql_delay(ha, 10000);
-			try++;
-		}
-
-		TASK_DAEMON_LOCK(ha);
-		if (ha->task_daemon_flags & TASK_DAEMON_STOP_FLG) {
-			ha->task_daemon_flags &= ~TASK_DAEMON_STOP_FLG;
 			TASK_DAEMON_UNLOCK(ha);
-			EL(ha, "failed, could not stop task daemon\n");
-			return (DDI_FAILURE);
+
+			(void) ql_wait_for_td_stop(ha);
+
+			TASK_DAEMON_LOCK(ha);
+			if (ha->task_daemon_flags & TASK_DAEMON_STOP_FLG) {
+				ha->task_daemon_flags &= ~TASK_DAEMON_STOP_FLG;
+				EL(ha, "failed, could not stop task daemon\n");
+			}
 		}
 		TASK_DAEMON_UNLOCK(ha);
 
-		/* Acquire global state lock. */
 		GLOBAL_STATE_LOCK();
 
 		/* Disable driver timer if no adapters. */
@@ -1758,9 +1745,6 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			kmem_free(ha->pi_attrs, sizeof (fca_port_attrs_t));
 		}
 
-		ASSERT(ha->dev && ha->outstanding_cmds && ha->ub_array &&
-		    ha->adapter_stats);
-
 		kmem_free(ha->adapter_stats, sizeof (*ha->adapter_stats));
 
 		kmem_free(ha->ub_array, sizeof (*ha->ub_array) * QL_UB_LIMIT);
@@ -1787,9 +1771,9 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		ADAPTER_STATE_LOCK(ha);
 
-		try = 0;
+		delay_cnt = 0;
 		ha->flags |= ADAPTER_SUSPENDED;
-		while (ha->flags & ADAPTER_TIMER_BUSY && try++ < 10) {
+		while (ha->flags & ADAPTER_TIMER_BUSY && delay_cnt++ < 10) {
 			ADAPTER_STATE_UNLOCK(ha);
 			delay(drv_usectohz(1000000));
 			ADAPTER_STATE_LOCK(ha);
@@ -1810,13 +1794,12 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			(void) ql_shutdown_ip(ha);
 		}
 
-		try = ql_suspend_adapter(ha);
-		if (try != QL_SUCCESS) {
+		if ((rval = ql_suspend_adapter(ha)) != QL_SUCCESS) {
 			ADAPTER_STATE_LOCK(ha);
 			ha->flags &= ~ADAPTER_SUSPENDED;
 			ADAPTER_STATE_UNLOCK(ha);
 			cmn_err(CE_WARN, "%s(%d): Fail suspend rval %xh",
-			    QL_NAME, ha->instance, try);
+			    QL_NAME, ha->instance, rval);
 
 			/* Restart IP if it was running. */
 			if (ha->flags & IP_ENABLED &&
@@ -1868,6 +1851,7 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (rval);
 }
 
+
 /*
  * ql_power
  *	Power a device attached to the system.
@@ -1916,8 +1900,6 @@ ql_power(dev_info_t *dip, int component, int level)
 	GLOBAL_HW_LOCK();
 	csr = (uint8_t)ql_pci_config_get8(ha, PCI_CONF_CAP_PTR) + PCI_PMCSR;
 	GLOBAL_HW_UNLOCK();
-
-	ASSERT(csr == QL_PM_CS_REG);
 
 	(void) snprintf(buf, sizeof (buf),
 	    "Qlogic %s(%d): %s\n\t", QL_NAME, ddi_get_instance(dip),
@@ -2401,8 +2383,6 @@ ql_init_pkt(opaque_t fca_handle, fc_packet_t *pkt, int sleep)
 	}
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	ASSERT(ha->power_level == PM_LEVEL_D0);
-
 	sp = (ql_srb_t *)pkt->pkt_fca_private;
 	sp->flags = 0;
 
@@ -2459,16 +2439,12 @@ ql_un_init_pkt(opaque_t fca_handle, fc_packet_t *pkt)
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
 	sp = (ql_srb_t *)pkt->pkt_fca_private;
-	ASSERT(sp->magic_number == QL_FCA_BRAND);
 
 	if (sp->magic_number != QL_FCA_BRAND) {
 		EL(ha, "failed, FC_BADPACKET\n");
 		rval = FC_BADPACKET;
 	} else {
 		sp->magic_number = NULL;
-
-		ASSERT((sp->flags & (SRB_IN_DEVICE_QUEUE |
-		    SRB_IN_TOKEN_ARRAY)) == 0);
 
 		rval = FC_SUCCESS;
 	}
@@ -2515,8 +2491,6 @@ ql_els_send(opaque_t fca_handle, fc_packet_t *pkt)
 		return (FC_INVALID_REQUEST);
 	}
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-
-	ASSERT(ha->power_level == PM_LEVEL_D0);
 
 	/* Wait for suspension to end. */
 	TASK_DAEMON_LOCK(ha);
@@ -2866,8 +2840,6 @@ ql_getmap(opaque_t fca_handle, fc_lilpmap_t *mapbuf)
 	}
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	ASSERT(ha->power_level == PM_LEVEL_D0);
-
 	mapbuf->lilp_magic = (uint16_t)MAGIC_LIRP;
 	mapbuf->lilp_myalpa = ha->d_id.b.al_pa;
 
@@ -2964,11 +2936,6 @@ ql_transport(opaque_t fca_handle, fc_packet_t *pkt)
 	QL_PRINT_3(CE_CONT, "(%d): command:\n", ha->instance);
 	QL_DUMP_3((uint8_t *)pkt->pkt_cmd, 8, pkt->pkt_cmdlen);
 #endif
-	if (ha->flags & ADAPTER_SUSPENDED) {
-		ASSERT(pkt->pkt_tran_flags & FC_TRAN_DUMPING);
-	}
-
-	ASSERT(ha->power_level == PM_LEVEL_D0);
 
 	/* Reset SRB flags. */
 	sp->flags &= ~(SRB_ISP_STARTED | SRB_ISP_COMPLETED | SRB_RETRY |
@@ -3534,8 +3501,6 @@ ql_abort(opaque_t fca_handle, fc_packet_t *pkt, int flags)
 
 	QL_PRINT_3(CE_CONT, "(%d,%d): started\n", ha->instance, ha->vp_index);
 
-	ASSERT(pha->power_level == PM_LEVEL_D0);
-
 	/* Get target queue pointer. */
 	d_id.b24 = pkt->pkt_cmd_fhdr.d_id;
 	tq = ql_d_id_to_queue(ha, d_id);
@@ -3692,8 +3657,6 @@ ql_reset(opaque_t fca_handle, uint32_t cmd)
 	QL_PRINT_3(CE_CONT, "(%d,%d): started, cmd=%d\n", ha->instance,
 	    ha->vp_index, cmd);
 
-	ASSERT(ha->power_level == PM_LEVEL_D0);
-
 	switch (cmd) {
 	case FC_FCA_CORE:
 		/* dump firmware core if specified. */
@@ -3839,8 +3802,6 @@ ql_port_manage(opaque_t fca_handle, fc_fca_pm_t *cmd)
 
 	QL_PRINT_3(CE_CONT, "(%d): started=%xh\n", ha->instance,
 	    cmd->pm_cmd_code);
-
-	ASSERT(pha->power_level == PM_LEVEL_D0);
 
 	ql_awaken_task_daemon(ha, NULL, DRIVER_STALL, 0);
 
@@ -5027,7 +4988,7 @@ ql_els_flogi(ql_adapter_state_t *ha, fc_packet_t *pkt)
 	if (CFG_IST(ha, CFG_CTRL_2425) && ha->topology & QL_N_PORT) {
 		/*
 		 * d_id of zero in a FLOGI accept response in a point to point
-		 * topology triggers evulation of N Port login initiative.
+		 * topology triggers evaluation of N Port login initiative.
 		 */
 		pkt->pkt_resp_fhdr.d_id = 0;
 		/*
@@ -5992,7 +5953,6 @@ ql_els_rnid(ql_adapter_state_t *ha, fc_packet_t *pkt)
 
 	/* Allocate memory for rnid status block */
 	rnid_acc = kmem_zalloc(req_len, KM_SLEEP);
-	ASSERT(rnid_acc != NULL);
 
 	bzero(&acc, sizeof (acc));
 
@@ -6054,7 +6014,6 @@ ql_els_rls(ql_adapter_state_t *ha, fc_packet_t *pkt)
 
 	/* Allocate memory for link error status block */
 	rls_acc = kmem_zalloc(sizeof (*rls_acc), KM_SLEEP);
-	ASSERT(rls_acc != NULL);
 
 	bzero(&acc, sizeof (la_els_rls_acc_t));
 
@@ -6467,8 +6426,6 @@ ql_login_fabric_port(ql_adapter_state_t *ha, ql_tgt_t *tq, uint16_t loop_id)
 			 * code is needed to bail out when the worst
 			 * case happens - or as used to happen before
 			 */
-			ASSERT(newq->d_id.b24 == d_id.b24);
-
 			QL_PRINT_2(CE_CONT, "(%d,%d): Loop ID is now "
 			    "reassigned; old pairs: [%xh, %xh] and [%xh, %xh];"
 			    "new pairs: [%xh, unknown] and [%xh, %xh]\n",
@@ -6923,8 +6880,6 @@ ql_task_mgmt(ql_adapter_state_t *ha, ql_tgt_t *tq, fc_packet_t *pkt,
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	ASSERT(pkt->pkt_cmd_dma == NULL && pkt->pkt_resp_dma == NULL);
-
 	fcpr = (fcp_rsp_t *)pkt->pkt_resp;
 	rsp = (struct fcp_rsp_info *)pkt->pkt_resp + sizeof (fcp_rsp_t);
 
@@ -7075,7 +7030,6 @@ ql_fc_services(ql_adapter_state_t *ha, fc_packet_t *pkt)
 	/* Do some sanity checks */
 	cnt = (uint32_t)((uint32_t)(hdr.ct_aiusize * 4) +
 	    sizeof (fc_ct_header_t));
-	ASSERT(cnt <= (uint32_t)pkt->pkt_rsplen);
 	if (cnt > (uint32_t)pkt->pkt_rsplen) {
 		EL(ha, "FC_ELS_MALFORMED, cnt=%xh, size=%xh\n", cnt,
 		    pkt->pkt_rsplen);
@@ -7310,7 +7264,6 @@ ql_start_cmd(ql_adapter_state_t *ha, ql_tgt_t *tq, fc_packet_t *pkt,
 		} else {
 			poll_wait = pkt->pkt_timeout;
 		}
-		ASSERT(poll_wait != 0);
 	}
 
 	if (ha->pha->flags & ABORT_CMDS_LOOP_DOWN_TMO &&
@@ -7325,8 +7278,6 @@ ql_start_cmd(ql_adapter_state_t *ha, ql_tgt_t *tq, fc_packet_t *pkt,
 	} else {
 		if (ddi_in_panic() && (sp->flags & SRB_POLL)) {
 			int do_lip = 0;
-
-			ASSERT(ha->pha->outstanding_cmds[0] == NULL);
 
 			DEVICE_QUEUE_UNLOCK(tq);
 
@@ -7371,16 +7322,11 @@ ql_start_cmd(ql_adapter_state_t *ha, ql_tgt_t *tq, fc_packet_t *pkt,
 
 	/* If polling, wait for finish. */
 	if (poll_wait) {
-		ASSERT(sp->flags & SRB_POLL);
-
 		if (ql_poll_cmd(ha, sp, poll_wait) != QL_SUCCESS) {
 			int	res;
 
 			res = ql_abort((opaque_t)ha, pkt, 0);
 			if (res != FC_SUCCESS && res != FC_ABORTED) {
-				ASSERT(res == FC_OFFLINE ||
-				    res == FC_ABORT_FAILED);
-
 				DEVICE_QUEUE_LOCK(tq);
 				ql_remove_link(&lq->cmd, &sp->cmd);
 				sp->flags &= ~SRB_IN_DEVICE_QUEUE;
@@ -7393,11 +7339,7 @@ ql_start_cmd(ql_adapter_state_t *ha, ql_tgt_t *tq, fc_packet_t *pkt,
 			rval = FC_TRANSPORT_ERROR;
 		}
 
-		ASSERT((sp->flags & (SRB_IN_DEVICE_QUEUE |
-		    SRB_IN_TOKEN_ARRAY)) == 0);
-
 		if (ddi_in_panic()) {
-			ASSERT(ha->pha->outstanding_cmds[0] == NULL);
 			if (pkt->pkt_state != FC_PKT_SUCCESS) {
 				port_id_t d_id;
 
@@ -7417,7 +7359,6 @@ ql_start_cmd(ql_adapter_state_t *ha, ql_tgt_t *tq, fc_packet_t *pkt,
 		 */
 		if (!(pkt->pkt_tran_flags & FC_TRAN_NO_INTR) &&
 		    pkt->pkt_comp) {
-			ASSERT(pkt->pkt_tran_flags & FC_TRAN_DUMPING);
 			sp->flags &= ~SRB_POLL;
 			(*pkt->pkt_comp)(pkt);
 		}
@@ -8330,9 +8271,6 @@ ql_task_thread(ql_adapter_state_t *ha)
 
 			/* Release task daemon lock. */
 			TASK_DAEMON_UNLOCK(ha);
-
-			ASSERT((sp->flags & (SRB_IN_DEVICE_QUEUE |
-			    SRB_IN_TOKEN_ARRAY)) == 0);
 
 			/* Do callback. */
 			if (sp->flags & SRB_UB_CALLBACK) {
@@ -10451,7 +10389,6 @@ ql_fca_handle_to_state(opaque_t fca_handle)
 		QL_PRINT_2(CE_CONT, "failed\n");
 	}
 
-	ASSERT(ha != NULL);
 #endif /* QL_DEBUG_ROUTINES */
 
 	return ((ql_adapter_state_t *)fca_handle);
@@ -14416,7 +14353,6 @@ ql_save_config_regs(dev_info_t *dip)
 	caddr_t			prop = "ql-config-space";
 
 	ha = ddi_get_soft_state(ql_state, ddi_get_instance(dip));
-	ASSERT(ha != NULL);
 	if (ha == NULL) {
 		QL_PRINT_2(CE_CONT, "(%d): no adapter\n",
 		    ddi_get_instance(dip));
@@ -14482,7 +14418,6 @@ ql_restore_config_regs(dev_info_t *dip)
 	caddr_t			prop = "ql-config-space";
 
 	ha = ddi_get_soft_state(ql_state, ddi_get_instance(dip));
-	ASSERT(ha != NULL);
 	if (ha == NULL) {
 		QL_PRINT_2(CE_CONT, "(%d): no adapter\n",
 		    ddi_get_instance(dip));
@@ -15221,8 +15156,6 @@ ql_suspend_adapter(ql_adapter_state_t *ha)
 void
 ql_add_link_b(ql_head_t *head, ql_link_t *link)
 {
-	ASSERT(link->base_address != NULL);
-
 	/* at the end there isn't a next */
 	link->next = NULL;
 
@@ -15251,8 +15184,6 @@ ql_add_link_b(ql_head_t *head, ql_link_t *link)
 void
 ql_add_link_t(ql_head_t *head, ql_link_t *link)
 {
-	ASSERT(link->base_address != NULL);
-
 	link->prev = NULL;
 
 	if ((link->next = head->first) == NULL)	{
@@ -15280,8 +15211,6 @@ ql_add_link_t(ql_head_t *head, ql_link_t *link)
 void
 ql_remove_link(ql_head_t *head, ql_link_t *link)
 {
-	ASSERT(link->base_address != NULL);
-
 	if (link->prev != NULL) {
 		if ((link->prev->next = link->next) == NULL) {
 			head->last = link->prev;
@@ -16932,6 +16861,45 @@ ql_wwn_cmp(ql_adapter_state_t *ha, la_wwn_t *first, la_wwn_t *second)
 			rval = 1;
 		} else {
 			rval = -1;
+		}
+	}
+	return (rval);
+}
+
+/*
+ * ql_wait_for_td_stop
+ *	Wait for task daemon to stop running.  Internal command timeout
+ *	is approximately 30 seconds, so it may help in some corner
+ *	cases to wait that long
+ *
+ * Input:
+ *	ha = adapter state pointer.
+ *
+ * Returns:
+ *	DDI_SUCCESS or DDI_FAILURE.
+ *
+ * Context:
+ *	Kernel context.
+ */
+
+static int
+ql_wait_for_td_stop(ql_adapter_state_t *ha)
+{
+	int	rval = DDI_FAILURE;
+	UINT16	wait_cnt;
+
+	for (wait_cnt = 0; wait_cnt < 3000; wait_cnt++) {
+		/* The task daemon clears the stop flag on exit. */
+		if (ha->task_daemon_flags & TASK_DAEMON_STOP_FLG) {
+			if (ha->cprinfo.cc_events & CALLB_CPR_START ||
+			    ddi_in_panic()) {
+				drv_usecwait(10000);
+			} else {
+				delay(drv_usectohz(10000));
+			}
+		} else {
+			rval = DDI_SUCCESS;
+			break;
 		}
 	}
 	return (rval);

@@ -87,6 +87,9 @@ static void ql_report_id_entry(ql_adapter_state_t *, report_id_1_t *,
     ql_head_t *, uint32_t *, uint32_t *);
 static void ql_els_passthru_entry(ql_adapter_state_t *,
     els_passthru_entry_rsp_t *, ql_head_t *, uint32_t *, uint32_t *);
+static ql_srb_t *ql_verify_preprocessed_cmd(ql_adapter_state_t *, uint32_t *,
+    uint32_t *, uint32_t *);
+static void ql_signal_abort(ql_adapter_state_t *ha, uint32_t *set_flags);
 
 /*
  * ql_isr
@@ -1337,9 +1340,6 @@ ql_fast_fcp_post(ql_srb_t *sp)
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	ASSERT(sp->flags & SRB_FCP_CMD_PKT && ha &&
-	    sp->pkt->pkt_reason == CS_COMPLETE);
-
 	/* Acquire device queue lock. */
 	DEVICE_QUEUE_LOCK(tq);
 
@@ -1602,7 +1602,7 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
     uint32_t *set_flags, uint32_t *reset_flags)
 {
 	ql_srb_t	*sp;
-	uint32_t	index, cnt;
+	uint32_t	index, resp_identifier;
 
 	if (pkt->entry_type == INVALID_ENTRY_TYPE) {
 		EL(ha, "Aborted command\n");
@@ -1628,15 +1628,35 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
 		EL(ha, "UNKNOWN flag = %xh error\n", pkt->entry_status);
 	}
 
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
-	index = cnt & OSC_INDEX_MASK;
+	/* Validate the response entry handle. */
+	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
+	index = resp_identifier & OSC_INDEX_MASK;
+	if (index < MAX_OUTSTANDING_COMMANDS) {
+		/* the index seems reasonable */
+		sp = ha->outstanding_cmds[index];
+		if (sp != NULL) {
+			if (sp->handle == resp_identifier) {
+				/* Neo, you're the one... */
+				ha->outstanding_cmds[index] = NULL;
+				sp->handle = 0;
+				sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+			} else {
+				EL(ha, "IOCB handle mismatch pkt=%xh, sp=%xh\n",
+				    resp_identifier, sp->handle);
+				sp = NULL;
+				ql_signal_abort(ha, set_flags);
+			}
+		} else {
+			sp = ql_verify_preprocessed_cmd(ha,
+			    (uint32_t *)&pkt->handle, set_flags, reset_flags);
+		}
+	} else {
+		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
+		    index, resp_identifier);
+		ql_signal_abort(ha, set_flags);
+	}
 
-	/* Validate handle. */
-	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
-
-	if (sp != NULL && sp->handle == cnt) {
+	if (sp != NULL) {
 		ha->outstanding_cmds[index] = NULL;
 		sp->handle = 0;
 		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
@@ -1658,23 +1678,7 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
 		/* Place command on done queue. */
 		ql_add_link_b(done_q, &sp->cmd);
 
-	} else {
-		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", cnt);
-		} else {
-			EL(ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    cnt, sp->handle);
-		}
-
-		(void) ql_binary_fw_dump(ha, FALSE);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
-		}
 	}
-
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }
 
@@ -1701,21 +1705,41 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
     ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
 {
 	ql_srb_t		*sp;
-	uint32_t		index, cnt;
+	uint32_t		index, resp_identifier;
 	uint16_t		comp_status;
 	int			rval = 0;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
-	index = cnt & OSC_INDEX_MASK;
+	/* Validate the response entry handle. */
+	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
+	index = resp_identifier & OSC_INDEX_MASK;
+	if (index < MAX_OUTSTANDING_COMMANDS) {
+		/* the index seems reasonable */
+		sp = ha->outstanding_cmds[index];
+		if (sp != NULL) {
+			if (sp->handle == resp_identifier) {
+				/* Neo, you're the one... */
+				ha->outstanding_cmds[index] = NULL;
+				sp->handle = 0;
+				sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+			} else {
+				EL(ha, "IOCB handle mismatch pkt=%xh, sp=%xh\n",
+				    resp_identifier, sp->handle);
+				sp = NULL;
+				ql_signal_abort(ha, set_flags);
+			}
+		} else {
+			sp = ql_verify_preprocessed_cmd(ha,
+			    (uint32_t *)&pkt->handle, set_flags, reset_flags);
+		}
+	} else {
+		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
+		    index, resp_identifier);
+		ql_signal_abort(ha, set_flags);
+	}
 
-	/* Validate handle. */
-	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
-
-	if (sp != NULL && sp->handle == cnt) {
+	if (sp != NULL) {
 		comp_status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
 		    &pkt->comp_status);
 
@@ -1789,23 +1813,7 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
 		}
 		rval = ql_status_error(ha, sp, pkt, done_q, set_flags,
 		    reset_flags);
-	} else {
-		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", cnt);
-		} else {
-			EL(ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    cnt, sp->handle);
-		}
-
-		(void) ql_binary_fw_dump(ha, FALSE);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
-		}
 	}
-
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
 	return (rval);
@@ -1833,31 +1841,46 @@ static int
 ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
     ql_head_t *done_q, uint32_t *set_flags, uint32_t *reset_flags)
 {
-	ql_srb_t		*sp;
-	uint32_t		index;
-	uint32_t		resp_identifier;
+	ql_srb_t		*sp = NULL;
 	uint16_t		comp_status;
+	uint32_t		index, resp_identifier;
 	int			rval = 0;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	/* Get the response identifier. */
+	/* Validate the response entry handle. */
 	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt->handle);
-
-	/* extract the outstanding cmds index */
 	index = resp_identifier & OSC_INDEX_MASK;
+	if (index < MAX_OUTSTANDING_COMMANDS) {
+		/* the index seems reasonable */
+		sp = ha->outstanding_cmds[index];
+		if (sp != NULL) {
+			if (sp->handle == resp_identifier) {
+				/* Neo, you're the one... */
+				ha->outstanding_cmds[index] = NULL;
+				sp->handle = 0;
+				sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+			} else {
+				EL(ha, "IOCB handle mismatch pkt=%xh, sp=%xh\n",
+				    resp_identifier, sp->handle);
+				sp = NULL;
+				ql_signal_abort(ha, set_flags);
+			}
+		} else {
+			sp = ql_verify_preprocessed_cmd(ha,
+			    (uint32_t *)&pkt->handle, set_flags, reset_flags);
+		}
+	} else {
+		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
+		    index, resp_identifier);
+		ql_signal_abort(ha, set_flags);
+	}
 
-	/* Validate the index and get the associated srb pointer */
-	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
-
-	if (sp != NULL && sp->handle == resp_identifier) {
+	if (sp != NULL) {
 		comp_status = (uint16_t)ddi_get16(ha->hba_buf.acc_handle,
 		    &pkt->comp_status);
 
-		/*
-		 * We dont care about SCSI QFULLs.
-		 */
+		/* We dont care about SCSI QFULLs. */
 		if (comp_status == CS_QUEUE_FULL) {
 			EL(sp->ha, "CS_QUEUE_FULL, d_id=%xh, lun=%xh\n",
 			    sp->lun_queue->target_queue->d_id.b24,
@@ -1888,24 +1911,6 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 			comp_status = CS_ABORTED;
 		}
 
-		if (sp->flags & SRB_MS_PKT) {
-			/*
-			 * Ideally it should never be true. But there
-			 * is a bug in FW which upon receiving invalid
-			 * parameters in MS IOCB returns it as
-			 * status entry and not as ms entry type.
-			 */
-			ql_ms_entry(ha, (ms_entry_t *)pkt, done_q,
-			    set_flags, reset_flags);
-			QL_PRINT_3(CE_CONT, "(%d): ql_ms_entry done\n",
-			    ha->instance);
-			return (0);
-		}
-
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
-
 		/*
 		 * Fast path to good SCSI I/O completion
 		 */
@@ -1922,27 +1927,68 @@ ql_24xx_status_entry(ql_adapter_state_t *ha, sts_24xx_entry_t *pkt,
 		}
 		rval = ql_status_error(ha, sp, (sts_entry_t *)pkt, done_q,
 		    set_flags, reset_flags);
-	} else {
-		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", resp_identifier);
-		} else {
-			EL(sp->ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    resp_identifier, sp->handle);
-		}
-
-		(void) ql_binary_fw_dump(ha, FALSE);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
-		}
 	}
-
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 
 	return (rval);
 }
+
+/*
+ * ql_verify_preprocessed_cmd
+ *	Handles preprocessed cmds..
+ *
+ * Input:
+ *	ha:		adapter state pointer.
+ *	pkt_handle:	handle pointer.
+ *	set_flags:	task daemon flags to set.
+ *	reset_flags:	task daemon flags to reset.
+ *
+ * Returns:
+ *	srb pointer or NULL
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+/* ARGSUSED */
+ql_srb_t *
+ql_verify_preprocessed_cmd(ql_adapter_state_t *ha, uint32_t *pkt_handle,
+    uint32_t *set_flags, uint32_t *reset_flags)
+{
+	ql_srb_t		*sp = NULL;
+	uint32_t		index, resp_identifier;
+	uint32_t		get_handle = 10;
+
+	while (get_handle) {
+		/* Get handle. */
+		resp_identifier = ddi_get32(ha->hba_buf.acc_handle, pkt_handle);
+		index = resp_identifier & OSC_INDEX_MASK;
+		/* Validate handle. */
+		if (index < MAX_OUTSTANDING_COMMANDS) {
+			sp = ha->outstanding_cmds[index];
+		}
+
+		if (sp != NULL) {
+			EL(ha, "sp=%x, resp_id=%x, get=%d\n", sp,
+			    resp_identifier, get_handle);
+			break;
+		} else {
+			get_handle -= 1;
+			drv_usecwait(10000);
+			if (get_handle == 1) {
+				/* Last chance, Sync whole DMA buffer. */
+				(void) ddi_dma_sync(ha->hba_buf.dma_handle,
+				    RESPONSE_Q_BUFFER_OFFSET,
+				    RESPONSE_QUEUE_SIZE,
+				    DDI_DMA_SYNC_FORKERNEL);
+				EL(ha, "last chance DMA sync\n");
+			}
+		}
+	}
+	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+
+	return (sp);
+}
+
 
 /*
  * ql_status_error
@@ -2517,23 +2563,40 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
     uint32_t *set_flags, uint32_t *reset_flags)
 {
 	ql_srb_t	*sp;
-	uint32_t	index, cnt;
+	uint32_t	index, resp_identifier;
 	ql_tgt_t	*tq;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &pkt23->handle);
-	index = cnt & OSC_INDEX_MASK;
+	/* Validate the response entry handle. */
+	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt23->handle);
+	index = resp_identifier & OSC_INDEX_MASK;
+	if (index < MAX_OUTSTANDING_COMMANDS) {
+		/* the index seems reasonable */
+		sp = ha->outstanding_cmds[index];
+		if (sp != NULL) {
+			if (sp->handle == resp_identifier) {
+				/* Neo, you're the one... */
+				ha->outstanding_cmds[index] = NULL;
+				sp->handle = 0;
+				sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+			} else {
+				EL(ha, "IOCB handle mismatch pkt=%xh, sp=%xh\n",
+				    resp_identifier, sp->handle);
+				sp = NULL;
+				ql_signal_abort(ha, set_flags);
+			}
+		} else {
+			sp = ql_verify_preprocessed_cmd(ha,
+			    (uint32_t *)&pkt23->handle, set_flags, reset_flags);
+		}
+	} else {
+		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
+		    index, resp_identifier);
+		ql_signal_abort(ha, set_flags);
+	}
 
-	/* Validate handle. */
-	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
-
-	if (sp != NULL && sp->handle == cnt) {
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+	if (sp != NULL) {
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
@@ -2613,23 +2676,7 @@ ql_ip_entry(ql_adapter_state_t *ha, ip_entry_t *pkt23, ql_head_t *done_q,
 
 		ql_add_link_b(done_q, &sp->cmd);
 
-	} else {
-		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", cnt);
-		} else {
-			EL(ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    cnt, sp->handle);
-		}
-
-		(void) ql_binary_fw_dump(ha, FALSE);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
-		}
 	}
-
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }
 
@@ -2821,21 +2868,41 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
     uint32_t *set_flags, uint32_t *reset_flags)
 {
 	ql_srb_t		*sp;
-	uint32_t		index, cnt;
+	uint32_t		index, cnt, resp_identifier;
 	ql_tgt_t		*tq;
 	ct_passthru_entry_t	*pkt24 = (ct_passthru_entry_t *)pkt23;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
 
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &pkt23->handle);
-	index = cnt & OSC_INDEX_MASK;
+	/* Validate the response entry handle. */
+	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &pkt23->handle);
+	index = resp_identifier & OSC_INDEX_MASK;
+	if (index < MAX_OUTSTANDING_COMMANDS) {
+		/* the index seems reasonable */
+		sp = ha->outstanding_cmds[index];
+		if (sp != NULL) {
+			if (sp->handle == resp_identifier) {
+				/* Neo, you're the one... */
+				ha->outstanding_cmds[index] = NULL;
+				sp->handle = 0;
+				sp->flags &= ~SRB_IN_TOKEN_ARRAY;
+			} else {
+				EL(ha, "IOCB handle mismatch pkt=%xh, sp=%xh\n",
+				    resp_identifier, sp->handle);
+				sp = NULL;
+				ql_signal_abort(ha, set_flags);
+			}
+		} else {
+			sp = ql_verify_preprocessed_cmd(ha,
+			    (uint32_t *)&pkt23->handle, set_flags, reset_flags);
+		}
+	} else {
+		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
+		    index, resp_identifier);
+		ql_signal_abort(ha, set_flags);
+	}
 
-	/* Validate handle. */
-	sp = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
-
-	if (sp != NULL && sp->handle == cnt) {
+	if (sp != NULL) {
 		if (!(sp->flags & SRB_MS_PKT)) {
 			EL(ha, "Not SRB_MS_PKT flags=%xh, isp_abort_needed",
 			    sp->flags);
@@ -2843,9 +2910,6 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 			return;
 		}
 
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
 		tq = sp->lun_queue->target_queue;
 
 		/* Set ISP completion status */
@@ -2908,7 +2972,6 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 				}
 				ADAPTER_STATE_UNLOCK(ha);
 			}
-
 			/* Release device queue specific lock. */
 			DEVICE_QUEUE_UNLOCK(tq);
 
@@ -2955,23 +3018,7 @@ ql_ms_entry(ql_adapter_state_t *ha, ms_entry_t *pkt23, ql_head_t *done_q,
 		/* Place command on done queue. */
 		ql_add_link_b(done_q, &sp->cmd);
 
-	} else {
-		if (sp == NULL) {
-			EL(ha, "unknown IOCB handle=%xh\n", cnt);
-		} else {
-			EL(ha, "mismatch IOCB handle pkt=%xh, sp=%xh\n",
-			    cnt, sp->handle);
-		}
-
-		(void) ql_binary_fw_dump(ha, FALSE);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
-		}
 	}
-
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
 }
 
@@ -3046,30 +3093,48 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 	ql_tgt_t	*tq;
 	port_id_t	d_id, s_id;
 	ql_srb_t	*srb;
-	uint32_t	cnt, index;
+	uint32_t	index, resp_identifier;
 
 	QL_PRINT_3(CE_CONT, "(%d): started\n", ha->instance);
-	/* Get handle. */
-	cnt = ddi_get32(ha->hba_buf.acc_handle, &rsp->handle);
-	index = cnt & OSC_INDEX_MASK;
 
-	/* Validate handle. */
-	srb = index < MAX_OUTSTANDING_COMMANDS ? ha->outstanding_cmds[index] :
-	    NULL;
+	/* Validate the response entry handle. */
+	resp_identifier = ddi_get32(ha->hba_buf.acc_handle, &rsp->handle);
+	index = resp_identifier & OSC_INDEX_MASK;
+	if (index < MAX_OUTSTANDING_COMMANDS) {
+		/* the index seems reasonable */
+		srb = ha->outstanding_cmds[index];
+		if (srb != NULL) {
+			if (srb->handle == resp_identifier) {
+				/* Neo, you're the one... */
+				ha->outstanding_cmds[index] = NULL;
+				srb->handle = 0;
+				srb->flags &= ~SRB_IN_TOKEN_ARRAY;
+			} else {
+				EL(ha, "IOCB handle mismatch pkt=%xh, sp=%xh\n",
+				    resp_identifier, srb->handle);
+				srb = NULL;
+				ql_signal_abort(ha, set_flags);
+			}
+		} else {
+			srb = ql_verify_preprocessed_cmd(ha,
+			    (uint32_t *)&rsp->handle, set_flags, reset_flags);
+		}
+	} else {
+		EL(ha, "osc index out of range, index=%xh, handle=%xh\n",
+		    index, resp_identifier);
+		ql_signal_abort(ha, set_flags);
+	}
 
-	(void) ddi_dma_sync(srb->pkt->pkt_resp_dma, 0, 0,
-	    DDI_DMA_SYNC_FORKERNEL);
-
-	if (srb != NULL && srb->handle == cnt) {
+	if (srb != NULL) {
 		if (!(srb->flags & SRB_ELS_PKT)) {
 			EL(ha, "Not SRB_ELS_PKT flags=%xh, isp_abort_needed",
 			    srb->flags);
 			*set_flags |= ISP_ABORT_NEEDED;
 			return;
 		}
-		ha->outstanding_cmds[index] = NULL;
-		srb->handle = 0;
-		srb->flags &= ~SRB_IN_TOKEN_ARRAY;
+
+		(void) ddi_dma_sync(srb->pkt->pkt_resp_dma, 0, 0,
+		    DDI_DMA_SYNC_FORKERNEL);
 
 		/* Set ISP completion status */
 		srb->pkt->pkt_reason = ddi_get16(
@@ -3159,14 +3224,26 @@ ql_els_passthru_entry(ql_adapter_state_t *ha, els_passthru_entry_rsp_t *rsp,
 		}
 		/* invoke the callback */
 		ql_awaken_task_daemon(ha, srb, 0, 0);
-	} else {
-		EL(ha, "unexpected IOCB handle=%xh\n", srb);
-
-		if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED |
-		    ABORT_ISP_ACTIVE))) {
-			EL(ha, "ISP Invalid handle, isp_abort_needed\n");
-			*set_flags |= ISP_ABORT_NEEDED;
-		}
 	}
 	QL_PRINT_3(CE_CONT, "(%d): done\n", ha->instance);
+}
+
+/*
+ * ql_signal_abort
+ *	Signal to the task daemon that a condition warranting an
+ *	isp reset has been detected.
+ *
+ * Input:
+ *	ha:		adapter state pointer.
+ *	set_flags:	task daemon flags to set.
+ *
+ * Context:
+ *	Interrupt or Kernel context, no mailbox commands allowed.
+ */
+static void
+ql_signal_abort(ql_adapter_state_t *ha, uint32_t *set_flags)
+{
+if (!(ha->task_daemon_flags & (ISP_ABORT_NEEDED | ABORT_ISP_ACTIVE))) {
+		*set_flags |= ISP_ABORT_NEEDED;
+	}
 }
