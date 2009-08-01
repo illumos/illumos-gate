@@ -19,11 +19,9 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the export operation for this tool.
@@ -588,7 +586,7 @@ done:
 
 static KMF_RETURN
 pk_export_pk11_objects(KMF_HANDLE_T kmfhandle, char *token_spec,
-	char *certlabel, char *issuer, char *subject,
+	KMF_CREDENTIAL *cred, char *certlabel, char *issuer, char *subject,
 	KMF_BIGINT *serial, KMF_ENCODE_FORMAT kfmt,
 	char *filename)
 {
@@ -600,14 +598,18 @@ pk_export_pk11_objects(KMF_HANDLE_T kmfhandle, char *token_spec,
 
 	rv = select_token(kmfhandle, token_spec, TRUE);
 
-	if (rv != KMF_OK) {
+	if (rv != KMF_OK)
 		return (rv);
-	}
 
 	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
 	    &kstype, sizeof (kstype));
 	numattr++;
 
+	if (cred != NULL) {
+		kmf_set_attr_at_index(attrlist, numattr, KMF_CREDENTIAL_ATTR,
+		    cred, sizeof (KMF_CREDENTIAL));
+		numattr++;
+	}
 	if (certlabel != NULL) {
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_CERT_LABEL_ATTR, certlabel,
@@ -867,10 +869,10 @@ pk_export(int argc, char *argv[])
 		serial.len = bytelen;
 	}
 
-	if ((kstype == KMF_KEYSTORE_PK11TOKEN ||
-	    kstype == KMF_KEYSTORE_NSS) &&
-	    (oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ) ||
-	    kfmt == KMF_FORMAT_PKCS12)) {
+	if (kstype == KMF_KEYSTORE_PK11TOKEN ||
+	    ((kstype == KMF_KEYSTORE_NSS) &&
+	    (oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ))) ||
+	    kfmt == KMF_FORMAT_PKCS12) {
 			(void) get_token_password(kstype, token_spec,
 			    &tokencred);
 	}
@@ -896,7 +898,7 @@ pk_export(int argc, char *argv[])
 				    certlabel, filename, oclass);
 			else
 				rv = pk_export_pk11_objects(kmfhandle,
-				    token_spec, certlabel,
+				    token_spec, &tokencred, certlabel,
 				    issuer, subject, &serial, kfmt,
 				    filename);
 			break;

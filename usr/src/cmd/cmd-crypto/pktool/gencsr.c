@@ -551,9 +551,15 @@ pk_gencsr(int argc, char *argv[])
 				altname = optarg_av;
 				break;
 			case 'i':
-				if (interactive || subject)
+				if (interactive)
 					return (PK_ERR_USAGE);
-				else
+				else if (subject) {
+					cryptoerror(LOG_STDERR,
+					    gettext("Interactive (-i) and "
+					    "subject options are mutually "
+					    "exclusive.\n"));
+					return (PK_ERR_USAGE);
+				} else
 					interactive = B_TRUE;
 				break;
 			case 'k':
@@ -562,9 +568,15 @@ pk_gencsr(int argc, char *argv[])
 					return (PK_ERR_USAGE);
 				break;
 			case 's':
-				if (interactive || subject)
+				if (subject)
 					return (PK_ERR_USAGE);
-				else
+				else if (interactive) {
+					cryptoerror(LOG_STDERR,
+					    gettext("Interactive (-i) and "
+					    "subject options are mutually "
+					    "exclusive.\n"));
+					return (PK_ERR_USAGE);
+				} else
 					subject = optarg_av;
 				break;
 			case 'l':
@@ -798,9 +810,15 @@ pk_gencsr(int argc, char *argv[])
 	}
 
 end:
-	if (rv != KMF_OK)
+	if (rv != KMF_OK) {
 		display_error(kmfhandle, rv,
 		    gettext("Error creating CSR or keypair"));
+
+		if (rv == KMF_ERR_RDN_PARSER) {
+			cryptoerror(LOG_STDERR, gettext("subject or "
+			    "issuer name must be in proper DN format.\n"));
+		}
+	}
 
 	if (ekulist != NULL)
 		free_eku_list(ekulist);

@@ -296,10 +296,10 @@ static int	pk_help(int argc, char *argv[]);
 #define	GENCERT_VERB "gencert"
 #define	GENCERT_SUMM gettext("creates a self-signed X.509v3 certificate")
 #define	GENCERT_SYN \
-	"gencert [-i] keystore=nss\n\t\t" \
+	"gencert keystore=nss\n\t\t" \
 	"label=cert-nickname\n\t\t" \
 	"serial=serial number hex string]\n\t\t" \
-	"subject=subject-DN\n\t\t" \
+	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
@@ -311,10 +311,10 @@ static int	pk_help(int argc, char *argv[]);
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ lifetime=number-hour|number-day|number-year ]\n\t" \
  \
-	"gencert [-i] [ keystore=pkcs11 ]\n\t\t" \
+	"gencert [ keystore=pkcs11 ]\n\t\t" \
 	"label=key/cert-label\n\t\t" \
-	"subject=subject-DN\n\t\t" \
 	"serial=serial number hex string\n\t\t" \
+	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
@@ -323,11 +323,11 @@ static int	pk_help(int argc, char *argv[]);
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ lifetime=number-hour|number-day|number-year ]\n\t" \
  \
-	"gencert [-i] keystore=file\n\t\t" \
+	"gencert keystore=file\n\t\t" \
 	"outcert=cert_filename\n\t\t" \
 	"outkey=key_filename\n\t\t" \
-	"subject=subject-DN\n\t\t" \
 	"serial=serial number hex string\n\t\t" \
+	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ format=der|pem ]\n\t\t" \
@@ -343,10 +343,10 @@ static int	pk_help(int argc, char *argv[]);
 	"request file")
 
 #define	GENCSR_SYN \
-	"gencsr [-i] keystore=nss \n\t\t" \
+	"gencsr keystore=nss \n\t\t" \
 	"nickname=cert-nickname\n\t\t" \
 	"outcsr=csr-fn\n\t\t" \
-	"subject=subject-DN\n\t\t" \
+	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
@@ -357,10 +357,10 @@ static int	pk_help(int argc, char *argv[]);
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ format=pem|der ]\n\t" \
  \
-	"gencsr [-i] [ keystore=pkcs11 ]\n\t\t" \
+	"gencsr [ keystore=pkcs11 ]\n\t\t" \
 	"label=key-label\n\t\t" \
 	"outcsr=csr-fn\n\t\t" \
-	"subject=subject-DN\n\t\t" \
+	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ token=token[:manuf[:serial]]]\n\t\t" \
@@ -369,10 +369,10 @@ static int	pk_help(int argc, char *argv[]);
 	"[ eku=[critical:]EKU name,...]\n\t\t" \
 	"[ format=pem|der ]]\n\t" \
  \
-	"gencsr [-i] keystore=file\n\t\t" \
+	"gencsr keystore=file\n\t\t" \
 	"outcsr=csr-fn\n\t\t" \
 	"outkey=key-fn\n\t\t" \
-	"subject=subject-DN\n\t\t" \
+	"[ -i ] | [subject=subject-DN]\n\t\t" \
 	"[ altname=[critical:]SubjectAltName ]\n\t\t" \
 	"[ keyusage=[critical:]usage,usage,...]\n\t\t" \
 	"[ keytype=rsa|dsa ]\n\t\t" \

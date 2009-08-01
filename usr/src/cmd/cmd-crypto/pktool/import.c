@@ -960,6 +960,8 @@ pk_import(int argc, char *argv[])
 	}
 
 	if ((rv = kmf_get_file_format(filename, &kfmt)) != KMF_OK) {
+		char *kmferrstr = NULL;
+		KMF_RETURN rv2;
 		/*
 		 * Allow for raw key data to be imported.
 		 */
@@ -981,8 +983,19 @@ pk_import(int argc, char *argv[])
 				return (KMF_ERR_BAD_PARAMETER);
 			}
 		} else {
-			cryptoerror(LOG_STDERR,
-			    gettext("File format not recognized."));
+			if (rv == KMF_ERR_OPEN_FILE) {
+				cryptoerror(LOG_STDERR,
+				    gettext("Cannot open file (%s)\n."),
+				    filename);
+			} else {
+				rv2 = kmf_get_kmf_error_str(rv, &kmferrstr);
+				if (rv2 == KMF_OK && kmferrstr) {
+					cryptoerror(LOG_STDERR,
+					    gettext("libkmf error: %s"),
+					    kmferrstr);
+					kmf_free_str(kmferrstr);
+				}
+			}
 			return (rv);
 		}
 	}
