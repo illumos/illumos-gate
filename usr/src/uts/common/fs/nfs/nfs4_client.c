@@ -4254,14 +4254,19 @@ fn_move(nfs4_fname_t *fnp, nfs4_fname_t *newparent, char *newname)
 
 	/*
 	 * Remove fnp from its current parent, change its name, then add it
-	 * to newparent.
+	 * to newparent. It might happen that fnp was replaced by another
+	 * nfs4_fname_t with the same fn_name in parent->fn_children.
+	 * In such case, fnp->fn_parent is NULL and we skip the removal
+	 * of fnp from its current parent.
 	 */
 	mutex_enter(&fnp->fn_lock);
 	parent = fnp->fn_parent;
-	mutex_enter(&parent->fn_lock);
-	avl_remove(&parent->fn_children, fnp);
-	mutex_exit(&parent->fn_lock);
-	fn_rele(&fnp->fn_parent);
+	if (parent != NULL) {
+		mutex_enter(&parent->fn_lock);
+		avl_remove(&parent->fn_children, fnp);
+		mutex_exit(&parent->fn_lock);
+		fn_rele(&fnp->fn_parent);
+	}
 
 	newlen = strlen(newname);
 	if (newlen != fnp->fn_len) {
