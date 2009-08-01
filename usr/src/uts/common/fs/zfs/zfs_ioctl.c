@@ -761,6 +761,20 @@ zfs_secpolicy_userspace_upgrade(zfs_cmd_t *zc, cred_t *cr)
 	return (zfs_secpolicy_setprop(zc->zc_name, ZFS_PROP_VERSION, cr));
 }
 
+static int
+zfs_secpolicy_hold(zfs_cmd_t *zc, cred_t *cr)
+{
+	return (zfs_secpolicy_write_perms(zc->zc_name,
+	    ZFS_DELEG_PERM_HOLD, cr));
+}
+
+static int
+zfs_secpolicy_release(zfs_cmd_t *zc, cred_t *cr)
+{
+	return (zfs_secpolicy_write_perms(zc->zc_name,
+	    ZFS_DELEG_PERM_RELEASE, cr));
+}
+
 /*
  * Returns the nvlist as specified by the user in the zfs_cmd_t.
  */
@@ -2466,7 +2480,7 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	 */
 	if (error == 0) {
 		if ((error = zfs_set_prop_nvlist(zc->zc_name, nvprops)) != 0)
-			(void) dmu_objset_destroy(zc->zc_name);
+			(void) dmu_objset_destroy(zc->zc_name, B_FALSE);
 	}
 	nvlist_free(nvprops);
 	return (error);
@@ -2553,8 +2567,9 @@ zfs_unmount_snap(char *name, void *arg)
 
 /*
  * inputs:
- * zc_name	name of filesystem
- * zc_value	short name of snapshot
+ * zc_name		name of filesystem
+ * zc_value		short name of snapshot
+ * zc_defer_destroy	mark for deferred destroy
  *
  * outputs:	none
  */
@@ -2569,13 +2584,15 @@ zfs_ioc_destroy_snaps(zfs_cmd_t *zc)
 	    zfs_unmount_snap, zc->zc_value, DS_FIND_CHILDREN);
 	if (err)
 		return (err);
-	return (dmu_snapshots_destroy(zc->zc_name, zc->zc_value));
+	return (dmu_snapshots_destroy(zc->zc_name, zc->zc_value,
+	    zc->zc_defer_destroy));
 }
 
 /*
  * inputs:
  * zc_name		name of dataset to destroy
  * zc_objset_type	type of objset
+ * zc_defer_destroy	mark for deferred destroy
  *
  * outputs:		none
  */
@@ -2588,7 +2605,7 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 			return (err);
 	}
 
-	return (dmu_objset_destroy(zc->zc_name));
+	return (dmu_objset_destroy(zc->zc_name, zc->zc_defer_destroy));
 }
 
 /*
@@ -3422,6 +3439,69 @@ zfs_ioc_smb_acl(zfs_cmd_t *zc)
 }
 
 /*
+ * inputs:
+ * zc_name	name of filesystem
+ * zc_value	short name of snap
+ * zc_string	user-supplied tag for this reference
+ * zc_cookie	recursive flag
+ *
+ * outputs:		none
+ */
+static int
+zfs_ioc_hold(zfs_cmd_t *zc)
+{
+	boolean_t recursive = zc->zc_cookie;
+
+	if (snapshot_namecheck(zc->zc_value, NULL, NULL) != 0)
+		return (EINVAL);
+
+	return (dsl_dataset_user_hold(zc->zc_name, zc->zc_value,
+	    zc->zc_string, recursive));
+}
+
+/*
+ * inputs:
+ * zc_name	name of dataset from which we're releasing a user reference
+ * zc_value	short name of snap
+ * zc_string	user-supplied tag for this reference
+ * zc_cookie	recursive flag
+ *
+ * outputs:		none
+ */
+static int
+zfs_ioc_release(zfs_cmd_t *zc)
+{
+	boolean_t recursive = zc->zc_cookie;
+
+	if (snapshot_namecheck(zc->zc_value, NULL, NULL) != 0)
+		return (EINVAL);
+
+	return (dsl_dataset_user_release(zc->zc_name, zc->zc_value,
+	    zc->zc_string, recursive));
+}
+
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ *
+ * outputs:
+ * zc_nvlist_src{_size}	nvlist of snapshot holds
+ */
+static int
+zfs_ioc_get_holds(zfs_cmd_t *zc)
+{
+	nvlist_t *nvp;
+	int error;
+
+	if ((error = dsl_dataset_get_holds(zc->zc_name, &nvp)) == 0) {
+		error = put_nvlist(zc, nvp);
+		nvlist_free(nvp);
+	}
+
+	return (error);
+}
+
+/*
  * pool create, destroy, and export don't log the history as part of
  * zfsdev_ioctl, but rather zfs_ioc_pool_create, and zfs_ioc_pool_export
  * do the logging of those commands.
@@ -3524,6 +3604,11 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	    DATASET_NAME, B_FALSE, B_FALSE },
 	{ zfs_ioc_userspace_upgrade, zfs_secpolicy_userspace_upgrade,
 	    DATASET_NAME, B_FALSE, B_TRUE },
+	{ zfs_ioc_hold, zfs_secpolicy_hold, DATASET_NAME, B_TRUE, B_TRUE },
+	{ zfs_ioc_release, zfs_secpolicy_release, DATASET_NAME, B_TRUE,
+	    B_TRUE },
+	{ zfs_ioc_get_holds, zfs_secpolicy_read, DATASET_NAME, B_FALSE,
+	    B_TRUE }
 };
 
 int

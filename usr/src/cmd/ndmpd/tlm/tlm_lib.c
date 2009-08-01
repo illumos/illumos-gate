@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1237,7 +1237,7 @@ chkpnt_backup_successful(char *volname, char *jname)
 		(void) mutex_unlock(&zlib_mtx);
 		return (-1);
 	}
-	(void) zfs_destroy(zhp);
+	(void) zfs_destroy(zhp, B_FALSE);
 	zfs_close(zhp);
 	(void) mutex_unlock(&zlib_mtx);
 

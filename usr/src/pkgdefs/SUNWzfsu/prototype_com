@@ -69,7 +69,11 @@ f none usr/lib/python2.4/vendor-packages/zfs/dataset.py 644 root bin
 f none usr/lib/python2.4/vendor-packages/zfs/dataset.pyc 644 root bin
 f none usr/lib/python2.4/vendor-packages/zfs/groupspace.py 644 root bin
 f none usr/lib/python2.4/vendor-packages/zfs/groupspace.pyc 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/holds.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/holds.pyc 644 root bin
 f none usr/lib/python2.4/vendor-packages/zfs/ioctl.so 755 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/table.py 644 root bin
+f none usr/lib/python2.4/vendor-packages/zfs/table.pyc 644 root bin
 f none usr/lib/python2.4/vendor-packages/zfs/unallow.py 644 root bin
 f none usr/lib/python2.4/vendor-packages/zfs/unallow.pyc 644 root bin
 f none usr/lib/python2.4/vendor-packages/zfs/userspace.py 644 root bin

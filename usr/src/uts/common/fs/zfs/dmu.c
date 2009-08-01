@@ -87,6 +87,7 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	zap_byteswap,		TRUE,	"scrub work queue"	},
 	{	zap_byteswap,		TRUE,	"ZFS user/group used"	},
 	{	zap_byteswap,		TRUE,	"ZFS user/group quota"	},
+	{	zap_byteswap,		TRUE,	"snapshot refcount tags"},
 };
 
 int

@@ -61,6 +61,7 @@ SUNWprivate_1.1 {
 	zfs_get_pool_handle;
 	zfs_get_user_props;
 	zfs_get_type;
+	zfs_hold;
 	zfs_iscsi_perm_check;
 	zfs_is_mounted;
 	zfs_is_shared;
@@ -105,6 +106,7 @@ SUNWprivate_1.1 {
 	zfs_prune_proplist;
 	zfs_receive;
 	zfs_refresh_properties;
+	zfs_release;
 	zfs_rename;
 	zfs_rollback;
 	zfs_send;

@@ -45,7 +45,7 @@
 
 static int zfs_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
-static void zfs_release(topo_mod_t *, tnode_t *);
+static void zfs_rele(topo_mod_t *, tnode_t *);
 static int zfs_fmri_nvl2str(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
@@ -56,7 +56,7 @@ const topo_method_t zfs_methods[] = {
 };
 
 static const topo_modops_t zfs_ops =
-	{ zfs_enum, zfs_release };
+	{ zfs_enum, zfs_rele };
 static const topo_modinfo_t zfs_info =
 	{ ZFS, FM_FMRI_SCHEME_ZFS, ZFS_VERSION, &zfs_ops };
 
@@ -109,7 +109,7 @@ zfs_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 
 /*ARGSUSED*/
 static void
-zfs_release(topo_mod_t *mp, tnode_t *node)
+zfs_rele(topo_mod_t *mp, tnode_t *node)
 {
 	topo_method_unregister_all(mp, node);
 }

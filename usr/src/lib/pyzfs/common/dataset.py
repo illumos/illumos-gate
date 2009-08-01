@@ -109,7 +109,7 @@ class Dataset(object):
 
 		types is an iterable of strings specifying which types
 		of datasets are permitted.  Accepted strings are
-		"filesystem" and "volume".  Defaults to acceptying all
+		"filesystem" and "volume".  Defaults to accepting all
 		types.
 
 		snaps is a boolean specifying if snapshots are acceptable.
@@ -203,3 +203,29 @@ class Dataset(object):
 		Return a dict("whostr": { "perm" -> None })."""
 
 		return zfs.ioctl.get_fsacl(self.name)
+
+	def get_holds(self):
+		"""Get the user holds on this Dataset.
+
+		Return a dict("tag": timestamp)."""
+
+		return zfs.ioctl.get_holds(self.name)
+
+def snapshots_fromcmdline(dsnames, recursive):
+	for dsname in dsnames:
+		ds = Dataset(dsname)
+		if not "@" in dsname:
+			raise zfs.util.ZFSError(errno.EINVAL,
+			    _("cannot open %s") % dsname,
+			    _("operation only applies to snapshots"))
+		yield ds
+		if recursive:
+			(base, snapname) = dsname.split('@')
+			parent = Dataset(base)
+			for child in parent.descendents():
+				try:
+					yield Dataset(child.name + "@" +
+					    snapname)
+				except zfs.util.ZFSError, e:
+					if e.errno != errno.ENOENT:
+						raise

@@ -2766,7 +2766,7 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
  * isn't mounted, and that there are no active dependents.
  */
 int
-zfs_destroy(zfs_handle_t *zhp)
+zfs_destroy(zfs_handle_t *zhp, boolean_t defer)
 {
 	zfs_cmd_t zc = { 0 };
 
@@ -2790,6 +2790,7 @@ zfs_destroy(zfs_handle_t *zhp)
 		zc.zc_objset_type = DMU_OST_ZFS;
 	}
 
+	zc.zc_defer_destroy = defer;
 	if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_DESTROY, &zc) != 0) {
 		return (zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
@@ -2846,7 +2847,7 @@ zfs_remove_link_cb(zfs_handle_t *zhp, void *arg)
  * Destroys all snapshots with the given name in zhp & descendants.
  */
 int
-zfs_destroy_snaps(zfs_handle_t *zhp, char *snapname)
+zfs_destroy_snaps(zfs_handle_t *zhp, char *snapname, boolean_t defer)
 {
 	zfs_cmd_t zc = { 0 };
 	int ret;
@@ -2863,6 +2864,7 @@ zfs_destroy_snaps(zfs_handle_t *zhp, char *snapname)
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
+	zc.zc_defer_destroy = defer;
 
 	ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_DESTROY_SNAPS, &zc);
 	if (ret != 0) {
@@ -3278,7 +3280,7 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 
 			logstr = zhp->zfs_hdl->libzfs_log_str;
 			zhp->zfs_hdl->libzfs_log_str = NULL;
-			cbp->cb_error |= zfs_destroy(zhp);
+			cbp->cb_error |= zfs_destroy(zhp, B_FALSE);
 			zhp->zfs_hdl->libzfs_log_str = logstr;
 		}
 	} else {
@@ -3292,7 +3294,7 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 			zfs_close(zhp);
 			return (0);
 		}
-		if (zfs_destroy(zhp) != 0)
+		if (zfs_destroy(zhp, B_FALSE) != 0)
 			cbp->cb_error = B_TRUE;
 		else
 			changelist_remove(clp, zhp->zfs_name);
@@ -4091,4 +4093,80 @@ zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,
 	}
 
 	return (error);
+}
+
+int
+zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
+    boolean_t recursive)
+{
+	zfs_cmd_t zc = { 0 };
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
+
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
+	(void) strlcpy(zc.zc_string, tag, sizeof (zc.zc_string));
+	zc.zc_cookie = recursive;
+
+	if (zfs_ioctl(hdl, ZFS_IOC_HOLD, &zc) != 0) {
+		char errbuf[ZFS_MAXNAMELEN+32];
+
+		/*
+		 * if it was recursive, the one that actually failed will be in
+		 * zc.zc_name.
+		 */
+		(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
+		    "cannot hold '%s@%s'"), zc.zc_name, snapname);
+		switch (errno) {
+		case ENOTSUP:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "pool must be upgraded"));
+			return (zfs_error(hdl, EZFS_BADVERSION, errbuf));
+		case EINVAL:
+			return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
+		case EEXIST:
+			return (zfs_error(hdl, EZFS_REFTAG_HOLD, errbuf));
+		default:
+			return (zfs_standard_error_fmt(hdl, errno, errbuf));
+		}
+	}
+
+	return (0);
+}
+
+int
+zfs_release(zfs_handle_t *zhp, const char *snapname, const char *tag,
+    boolean_t recursive)
+{
+	zfs_cmd_t zc = { 0 };
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
+
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
+	(void) strlcpy(zc.zc_string, tag, sizeof (zc.zc_string));
+	zc.zc_cookie = recursive;
+
+	if (zfs_ioctl(hdl, ZFS_IOC_RELEASE, &zc) != 0) {
+		char errbuf[ZFS_MAXNAMELEN+32];
+
+		/*
+		 * if it was recursive, the one that actually failed will be in
+		 * zc.zc_name.
+		 */
+		(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
+		    "cannot release '%s@%s'"), zc.zc_name, snapname);
+		switch (errno) {
+		case ESRCH:
+			return (zfs_error(hdl, EZFS_REFTAG_RELE, errbuf));
+		case ENOTSUP:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "pool must be upgraded"));
+			return (zfs_error(hdl, EZFS_BADVERSION, errbuf));
+		case EINVAL:
+			return (zfs_error(hdl, EZFS_BADTYPE, errbuf));
+		default:
+			return (zfs_standard_error_fmt(hdl, errno, errbuf));
+		}
+	}
+
+	return (0);
 }

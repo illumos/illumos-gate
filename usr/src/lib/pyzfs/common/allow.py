@@ -217,6 +217,8 @@ perms_subcmd = dict(
     mount=_("Allows mount/umount of ZFS datasets"),
     share=_("Allows sharing file systems over NFS or SMB\n\t\t\t\tprotocols"),
     send="",
+    hold=_("Allows adding a user hold to a snapshot"),
+    release=_("Allows releasing a user hold which\n\t\t\t\tmight destroy the snapshot"),
 )
 
 perms_other = dict(
@@ -265,7 +267,7 @@ def print_perms():
 			print(fmt % (name, _("property"), ""))
 
 def do_allow():
-	"""Implementes the "zfs allow" and "zfs unallow" subcommands."""
+	"""Implements the "zfs allow" and "zfs unallow" subcommands."""
 	un = (sys.argv[1] == "unallow")
 
 	def usage(msg=None):

@@ -350,6 +350,25 @@ py_set_fsacl(PyObject *self, PyObject *args)
 }
 
 static PyObject *
+py_get_holds(PyObject *self, PyObject *args)
+{
+	zfs_cmd_t zc = { 0 };
+	char *name;
+	PyObject *nvl;
+
+	if (!PyArg_ParseTuple(args, "s", &name))
+		return (NULL);
+
+	(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
+
+	nvl = ioctl_with_dstnv(ZFS_IOC_GET_HOLDS, &zc);
+	if (nvl == NULL)
+		seterr(_("cannot get holds for %s"), name);
+
+	return (nvl);
+}
+
+static PyObject *
 py_userspace_many(PyObject *self, PyObject *args)
 {
 	zfs_cmd_t zc = { 0 };
@@ -582,6 +601,7 @@ static PyMethodDef zfsmethods[] = {
 	    "Map SID to name@domain."},
 	{"isglobalzone", py_isglobalzone, METH_NOARGS,
 	    "Determine if this is the global zone."},
+	{"get_holds", py_get_holds, METH_VARARGS, "Get user holds."},
 	{NULL, NULL, 0, NULL}
 };
 

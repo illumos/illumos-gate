@@ -29,7 +29,7 @@ OBJECTS =	ioctl.o
 
 PYSRCS=		__init__.py util.py dataset.py \
 	allow.py unallow.py \
-	userspace.py groupspace.py
+	userspace.py groupspace.py holds.py table.py
 
 
 include ../../Makefile.lib

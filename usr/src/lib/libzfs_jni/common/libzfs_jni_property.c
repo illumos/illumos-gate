@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libzfs_jni_property.h"
 #include "libzfs_jni_util.h"
@@ -89,6 +87,7 @@ zfs_prop_t props_boolean[] = {
 	ZFS_PROP_READONLY,
 	ZFS_PROP_SETUID,
 	ZFS_PROP_ZONED,
+	ZFS_PROP_DEFER_DESTROY,
 	ZPROP_INVAL
 };
 
@@ -102,6 +101,7 @@ zfs_prop_t props_long[] = {
 	ZFS_PROP_VOLSIZE,
 	ZFS_PROP_REFQUOTA,
 	ZFS_PROP_REFRESERVATION,
+	ZFS_PROP_USERREFS,
 	ZPROP_INVAL
 };
 

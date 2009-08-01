@@ -1103,6 +1103,12 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_USERSPACE_UPGRADE,	"ZFS_IOC_USERSPACE_UPGRADE",
 		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_HOLD,			"ZFS_IOC_HOLD",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_RELEASE,		"ZFS_IOC_RELEASE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_GET_HOLDS,		"ZFS_IOC_GET_HOLDS",
+		"zfs_cmd_t" },
 
 	/* kssl ioctls */
 	{ (uint_t)KSSL_ADD_ENTRY,		"KSSL_ADD_ENTRY",

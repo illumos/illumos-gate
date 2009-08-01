@@ -921,11 +921,12 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 	if (err)
 		return (err);
 
+	zc.zc_objset_type = DMU_OST_ZFS;
+	(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
+
 	if (tryname) {
 		(void) strcpy(newname, tryname);
 
-		zc.zc_objset_type = DMU_OST_ZFS;
-		(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
 		(void) strlcpy(zc.zc_value, tryname, sizeof (zc.zc_value));
 
 		if (flags.verbose) {
@@ -980,12 +981,18 @@ recv_destroy(libzfs_handle_t *hdl, const char *name, int baselen,
 	int err = 0;
 	prop_changelist_t *clp;
 	zfs_handle_t *zhp;
+	boolean_t defer = B_FALSE;
+	int spa_version;
 
 	zhp = zfs_open(hdl, name, ZFS_TYPE_DATASET);
 	if (zhp == NULL)
 		return (-1);
 	clp = changelist_gather(zhp, ZFS_PROP_NAME, 0,
 	    flags.force ? MS_FORCE : 0);
+	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT &&
+	    zfs_spa_version(zhp, &spa_version) == 0 &&
+	    spa_version >= SPA_VERSION_USERREFS)
+		defer = B_TRUE;
 	zfs_close(zhp);
 	if (clp == NULL)
 		return (-1);
@@ -994,12 +1001,12 @@ recv_destroy(libzfs_handle_t *hdl, const char *name, int baselen,
 		return (err);
 
 	zc.zc_objset_type = DMU_OST_ZFS;
+	zc.zc_defer_destroy = defer;
 	(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
 
 	if (flags.verbose)
 		(void) printf("attempting destroy %s\n", zc.zc_name);
 	err = ioctl(hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc);
-
 	if (err == 0) {
 		if (flags.verbose)
 			(void) printf("success\n");
@@ -1009,7 +1016,12 @@ recv_destroy(libzfs_handle_t *hdl, const char *name, int baselen,
 	(void) changelist_postfix(clp);
 	changelist_free(clp);
 
-	if (err != 0)
+	/*
+	 * Deferred destroy should always succeed. Since we can't tell
+	 * if it destroyed the dataset or just marked it for deferred
+	 * destroy, always do the rename just in case.
+	 */
+	if (err != 0 || defer)
 		err = recv_rename(hdl, name, NULL, baselen, newname, flags);
 
 	return (err);

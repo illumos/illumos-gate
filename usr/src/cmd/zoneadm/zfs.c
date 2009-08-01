@@ -671,7 +671,7 @@ rm_snap(zfs_handle_t *zhp, void *data)
 	}
 
 	if (zfs_unmount(zhp, NULL, 0) == 0) {
-		(void) zfs_destroy(zhp);
+		(void) zfs_destroy(zhp, B_FALSE);
 	}
 
 	zfs_close(zhp);
@@ -961,7 +961,7 @@ clone_zfs(char *source_zonepath, char *zonepath, char *presnapbuf,
 		if ((zhp = zfs_open(g_zfs, snap_name, ZFS_TYPE_SNAPSHOT))
 		    != NULL) {
 			if (zfs_unmount(zhp, NULL, 0) == 0)
-				(void) zfs_destroy(zhp);
+				(void) zfs_destroy(zhp, B_FALSE);
 			zfs_close(zhp);
 		}
 
@@ -1018,7 +1018,7 @@ create_zfs_zonepath(char *zonepath)
 	if (zfs_mount(zhp, NULL, 0) != 0) {
 		(void) fprintf(stderr, gettext("cannot mount ZFS dataset %s: "
 		    "%s\n"), zfs_name, libzfs_error_description(g_zfs));
-		(void) zfs_destroy(zhp);
+		(void) zfs_destroy(zhp, B_FALSE);
 	} else {
 		if (chmod(zonepath, S_IRWXU) != 0) {
 			(void) fprintf(stderr, gettext("file system %s "
@@ -1085,7 +1085,7 @@ destroy_zfs(char *zonepath)
 		return (Z_ERR);
 	}
 
-	if (zfs_destroy(zhp) != 0) {
+	if (zfs_destroy(zhp, B_FALSE) != 0) {
 		/*
 		 * If the destroy fails for some reason, try to remount
 		 * the file system so that we can use "rm -rf" to clean up
@@ -1118,7 +1118,7 @@ destroy_zfs(char *zonepath)
 		    ZFS_TYPE_SNAPSHOT)) != NULL) {
 			if (zfs_iter_dependents(ohp, B_TRUE, has_dependent,
 			    NULL) == 0 && zfs_unmount(ohp, NULL, 0) == 0)
-				(void) zfs_destroy(ohp);
+				(void) zfs_destroy(ohp, B_FALSE);
 			zfs_close(ohp);
 		}
 	}

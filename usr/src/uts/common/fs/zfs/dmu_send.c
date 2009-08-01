@@ -393,6 +393,7 @@ recv_full_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	dsl_dataset_t *ds = arg1;
 	struct recvbeginsyncarg *rbsa = arg2;
 	int err;
+	struct dsl_ds_destroyarg dsda = {0};
 
 	/* must be a head ds */
 	if (ds->ds_phys->ds_next_snap_obj != 0)
@@ -402,7 +403,8 @@ recv_full_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	if (dsl_dir_is_clone(ds->ds_dir))
 		return (EINVAL);
 
-	err = dsl_dataset_destroy_check(ds, rbsa->tag, tx);
+	dsda.ds = ds;
+	err = dsl_dataset_destroy_check(&dsda, rbsa->tag, tx);
 	if (err)
 		return (err);
 
@@ -427,13 +429,16 @@ recv_full_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsl_dir_t *dd = ds->ds_dir;
 	uint64_t flags = DS_FLAG_INCONSISTENT | rbsa->dsflags;
 	uint64_t dsobj;
+	struct dsl_ds_destroyarg dsda = {0};
 
 	/*
 	 * NB: caller must provide an extra hold on the dsl_dir_t, so it
 	 * won't go away when dsl_dataset_destroy_sync() closes the
 	 * dataset.
 	 */
-	dsl_dataset_destroy_sync(ds, rbsa->tag, cr, tx);
+	dsda.ds = ds;
+	dsl_dataset_destroy_sync(&dsda, rbsa->tag, cr, tx);
+	ASSERT3P(dsda.rm_origin, ==, NULL);
 
 	dsobj = dsl_dataset_create_sync_dd(dd, rbsa->origin, flags, tx);
 
@@ -1028,7 +1033,8 @@ out:
 		 */
 		txg_wait_synced(drc->drc_real_ds->ds_dir->dd_pool, 0);
 
-		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag);
+		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag,
+		    B_FALSE);
 		if (drc->drc_real_ds != drc->drc_logical_ds) {
 			mutex_exit(&drc->drc_logical_ds->ds_recvlock);
 			dsl_dataset_rele(drc->drc_logical_ds, dmu_recv_tag);
@@ -1099,7 +1105,8 @@ dmu_recv_end(dmu_recv_cookie_t *drc)
 			dsl_dataset_rele(ds, dmu_recv_tag);
 		}
 		/* dsl_dataset_destroy() will disown the ds */
-		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag);
+		(void) dsl_dataset_destroy(drc->drc_real_ds, dmu_recv_tag,
+		    B_FALSE);
 		mutex_exit(&drc->drc_logical_ds->ds_recvlock);
 		if (err)
 			return (err);
@@ -1114,7 +1121,8 @@ dmu_recv_end(dmu_recv_cookie_t *drc)
 	if (err) {
 		if (drc->drc_newfs) {
 			ASSERT(ds == drc->drc_real_ds);
-			(void) dsl_dataset_destroy(ds, dmu_recv_tag);
+			(void) dsl_dataset_destroy(ds, dmu_recv_tag,
+			    B_FALSE);
 			return (err);
 		} else {
 			(void) dsl_dataset_rollback(ds, DMU_OST_NONE);

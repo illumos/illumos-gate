@@ -679,7 +679,7 @@ dmu_objset_create(const char *name, dmu_objset_type_t type,
 }
 
 int
-dmu_objset_destroy(const char *name)
+dmu_objset_destroy(const char *name, boolean_t defer)
 {
 	objset_t *os;
 	int error;
@@ -696,7 +696,7 @@ dmu_objset_destroy(const char *name)
 		dsl_dataset_t *ds = os->os->os_dsl_dataset;
 		zil_destroy(dmu_objset_zil(os), B_FALSE);
 
-		error = dsl_dataset_destroy(ds, os);
+		error = dsl_dataset_destroy(ds, os, defer);
 		/*
 		 * dsl_dataset_destroy() closes the ds.
 		 */
