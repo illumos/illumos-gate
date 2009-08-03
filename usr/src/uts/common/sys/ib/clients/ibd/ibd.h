@@ -297,6 +297,7 @@ typedef struct ibd_state_s {
 	uint16_t		id_pkix;
 	uint8_t			id_port;
 	ibt_mcg_info_t		*id_mcinfo;
+	boolean_t		id_bgroup_created;
 
 	mac_handle_t		id_mh;
 	mac_resource_handle_t	id_rh;

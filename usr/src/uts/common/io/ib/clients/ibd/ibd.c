@@ -135,6 +135,7 @@ uint_t ibd_separate_cqs = 1;
 uint_t ibd_txcomp_poll = 0;
 uint_t ibd_rx_softintr = 1;
 uint_t ibd_tx_softintr = 1;
+uint_t ibd_create_broadcast_group = 1;
 #ifdef IBD_LOGGING
 uint_t ibd_log_sz = 0x20000;
 #endif
@@ -261,6 +262,7 @@ static uint_t ibd_rxcomp_usec = 10;
 #define	IBD_RECV			1
 #define	IB_MGID_IPV4_LOWGRP_MASK	0xFFFFFFFF
 #define	IBD_DEF_MAX_SDU			2044
+#define	IBD_DEFAULT_QKEY		0xB1B
 #ifdef IBD_LOGGING
 #define	IBD_DMAX_LINE			100
 #endif
@@ -420,6 +422,7 @@ static ibd_ace_t *ibd_acache_lookup(ibd_state_t *, ipoib_mac_t *, int *, int);
 static ibd_ace_t *ibd_acache_get_unref(ibd_state_t *);
 static boolean_t ibd_acache_recycle(ibd_state_t *, ipoib_mac_t *, boolean_t);
 static void ibd_link_mod(ibd_state_t *, ibt_async_code_t);
+static int ibd_locate_pkey(ib_pkey_t *, uint16_t, ib_pkey_t, uint16_t *);
 
 /*
  * Helpers for attach/start routines
@@ -1957,6 +1960,28 @@ ibd_async_link(ibd_state_t *state, ibd_req_t *req)
 }
 
 /*
+ * Check the pkey table to see if we can find the pkey we're looking for.
+ * Set the pkey index in 'pkix' if found. Return 0 on success and -1 on
+ * failure.
+ */
+static int
+ibd_locate_pkey(ib_pkey_t *pkey_tbl, uint16_t pkey_tbl_sz, ib_pkey_t pkey,
+    uint16_t *pkix)
+{
+	uint16_t ndx;
+
+	ASSERT(pkix != NULL);
+
+	for (ndx = 0; ndx < pkey_tbl_sz; ndx++) {
+		if (pkey_tbl[ndx] == pkey) {
+			*pkix = ndx;
+			return (0);
+		}
+	}
+	return (-1);
+}
+
+/*
  * When the link is notified up, we need to do a few things, based
  * on the port's current p_init_type_reply claiming a reinit has been
  * done or not. The reinit steps are:
@@ -1973,11 +1998,14 @@ ibd_async_link(ibd_state_t *state, ibd_req_t *req)
 static void
 ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 {
-	ibt_hca_portinfo_t *port_infop;
+	ibt_hca_portinfo_t *port_infop = NULL;
 	ibt_status_t ibt_status;
 	uint_t psize, port_infosz;
 	ibd_link_op_t opcode;
 	ibd_req_t *req;
+	link_state_t new_link_state = LINK_STATE_UP;
+	uint8_t itreply;
+	uint16_t pkix;
 
 	/*
 	 * Do not send a request to the async daemon if it has not
@@ -2002,85 +2030,117 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 		return;
 	}
 
-	if ((code == IBT_EVENT_PORT_UP) || (code == IBT_CLNT_REREG_EVENT) ||
-	    (code == IBT_PORT_CHANGE_EVENT)) {
-		uint8_t itreply;
-		boolean_t badup = B_FALSE;
+	/*
+	 * If this routine was called in response to a port down event,
+	 * we just need to see if this should be informed.
+	 */
+	if (code == IBT_ERROR_PORT_DOWN) {
+		new_link_state = LINK_STATE_DOWN;
+		goto update_link_state;
+	}
 
-		ibt_status = ibt_query_hca_ports(state->id_hca_hdl,
-		    state->id_port, &port_infop, &psize, &port_infosz);
-		if ((ibt_status != IBT_SUCCESS) || (psize != 1)) {
+	/*
+	 * If it's not a port down event we've received, try to get the port
+	 * attributes first. If we fail here, the port is as good as down.
+	 * Otherwise, if the link went down by the time the handler gets
+	 * here, give up - we cannot even validate the pkey/gid since those
+	 * are not valid and this is as bad as a port down anyway.
+	 */
+	ibt_status = ibt_query_hca_ports(state->id_hca_hdl, state->id_port,
+	    &port_infop, &psize, &port_infosz);
+	if ((ibt_status != IBT_SUCCESS) || (psize != 1) ||
+	    (port_infop->p_linkstate != IBT_PORT_ACTIVE)) {
+		new_link_state = LINK_STATE_DOWN;
+		goto update_link_state;
+	}
+
+	/*
+	 * Check the SM InitTypeReply flags. If both NoLoadReply and
+	 * PreserveContentReply are 0, we don't know anything about the
+	 * data loaded into the port attributes, so we need to verify
+	 * if gid0 and pkey are still valid.
+	 */
+	itreply = port_infop->p_init_type_reply;
+	if (((itreply & SM_INIT_TYPE_REPLY_NO_LOAD_REPLY) == 0) &&
+	    ((itreply & SM_INIT_TYPE_PRESERVE_CONTENT_REPLY) == 0)) {
+		/*
+		 * Check to see if the subnet part of GID0 has changed. If
+		 * not, check the simple case first to see if the pkey
+		 * index is the same as before; finally check to see if the
+		 * pkey has been relocated to a different index in the table.
+		 */
+		if (bcmp(port_infop->p_sgid_tbl,
+		    &state->id_sgid, sizeof (ib_gid_t)) != 0) {
+
+			new_link_state = LINK_STATE_DOWN;
+
+		} else if (port_infop->p_pkey_tbl[state->id_pkix] ==
+		    state->id_pkey) {
+
+			new_link_state = LINK_STATE_UP;
+
+		} else if (ibd_locate_pkey(port_infop->p_pkey_tbl,
+		    port_infop->p_pkey_tbl_sz, state->id_pkey, &pkix) == 0) {
+
+			ibt_free_portinfo(port_infop, port_infosz);
 			mutex_exit(&state->id_link_mutex);
-			DPRINT(10, "ibd_link_up : failed in"
-			    " ibt_query_port()\n");
+
+			ibd_m_stop(state);
+			if ((ibt_status = ibd_m_start(state)) != IBT_SUCCESS) {
+				DPRINT(10, "link_mod: cannot "
+				    "restart, ret=%d", ibt_status);
+			}
 			return;
-		}
-
-		/*
-		 * If the link already went down by the time the handler gets
-		 * here, give up; we can not even validate pkey/gid since those
-		 * are not valid.
-		 */
-		if (port_infop->p_linkstate != IBT_PORT_ACTIVE)
-			badup = B_TRUE;
-
-		itreply = port_infop->p_init_type_reply;
-
-		/*
-		 * In InitTypeReply, check if NoLoadReply ==
-		 * PreserveContentReply == 0, in which case, verify Pkey/GID0.
-		 */
-		if (((itreply & SM_INIT_TYPE_REPLY_NO_LOAD_REPLY) == 0) &&
-		    ((itreply & SM_INIT_TYPE_PRESERVE_CONTENT_REPLY) == 0) &&
-		    (!badup)) {
-			/*
-			 * Check that the subnet part of GID0 has not changed.
-			 */
-			if (bcmp(port_infop->p_sgid_tbl, &state->id_sgid,
-			    sizeof (ib_gid_t)) != 0)
-				badup = B_TRUE;
-
-			/*
-			 * Check that Pkey/index mapping is still valid.
-			 */
-			if ((port_infop->p_pkey_tbl_sz <= state->id_pkix) ||
-			    (port_infop->p_pkey_tbl[state->id_pkix] !=
-			    state->id_pkey))
-				badup = B_TRUE;
-		}
-
-		/*
-		 * In InitTypeReply, if PreservePresenceReply indicates the SM
-		 * has ensured that the port's presence in mcg, traps etc is
-		 * intact, nothing more to do.
-		 */
-		opcode = IBD_LINK_UP_ABSENT;
-		if ((itreply & SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY) ==
-		    SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY)
-			opcode = IBD_LINK_UP;
-
-		ibt_free_portinfo(port_infop, port_infosz);
-
-		if (badup) {
-			code = IBT_ERROR_PORT_DOWN;
-		} else if (code == IBT_PORT_CHANGE_EVENT) {
-			mutex_exit(&state->id_link_mutex);
-			return;
+		} else {
+			new_link_state = LINK_STATE_DOWN;
 		}
 	}
 
-	if (!ibd_async_safe(state)) {
-		state->id_link_state = (((code == IBT_EVENT_PORT_UP) ||
-		    (code == IBT_CLNT_REREG_EVENT)) ?  LINK_STATE_UP :
-		    LINK_STATE_DOWN);
+update_link_state:
+	if (port_infop) {
+		ibt_free_portinfo(port_infop, port_infosz);
+	}
+
+	/*
+	 * If the old state is the same as the new state, nothing to do
+	 */
+	if (state->id_link_state == new_link_state) {
 		mutex_exit(&state->id_link_mutex);
 		return;
 	}
+
+	/*
+	 * Ok, so there was a link state change; see if it's safe to ask
+	 * the async thread to do the work
+	 */
+	if (!ibd_async_safe(state)) {
+		state->id_link_state = new_link_state;
+		mutex_exit(&state->id_link_mutex);
+		return;
+	}
+
 	mutex_exit(&state->id_link_mutex);
 
-	if (code == IBT_ERROR_PORT_DOWN)
+	/*
+	 * If we're reporting a link up, check InitTypeReply to see if
+	 * the SM has ensured that the port's presence in mcg, traps,
+	 * etc. is intact.
+	 */
+	if (new_link_state == LINK_STATE_DOWN) {
 		opcode = IBD_LINK_DOWN;
+	} else {
+		if ((itreply & SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY) ==
+		    SM_INIT_TYPE_PRESERVE_PRESENCE_REPLY) {
+			opcode = IBD_LINK_UP;
+		} else {
+			opcode = IBD_LINK_UP_ABSENT;
+		}
+	}
 
+	/*
+	 * Queue up a request for ibd_async_link() to handle this link
+	 * state change event
+	 */
 	req = kmem_cache_alloc(state->id_req_kmc, KM_SLEEP);
 	req->rq_ptr = (void *)opcode;
 	ibd_queue_work_slot(state, req, IBD_ASYNC_LINK);
@@ -2559,10 +2619,6 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	state->id_req_kmc = kmem_cache_create(buf, sizeof (ibd_req_t),
 	    0, NULL, NULL, NULL, NULL, NULL, 0);
 
-#ifdef IBD_LOGGING
-	mutex_init(&ibd_lbuf_lock, NULL, MUTEX_DRIVER, NULL);
-#endif
-
 	return (DDI_SUCCESS);
 }
 
@@ -2586,10 +2642,6 @@ ibd_state_fini(ibd_state_t *state)
 	cv_destroy(&state->id_trap_cv);
 	mutex_destroy(&state->id_trap_lock);
 	mutex_destroy(&state->id_link_mutex);
-
-#ifdef IBD_LOGGING
-	mutex_destroy(&ibd_lbuf_lock);
-#endif
 }
 
 /*
@@ -2964,8 +3016,9 @@ ibd_leave_group(ibd_state_t *state, ib_gid_t mgid, uint8_t jstate)
 		 * In case we are handling a mcg trap, we might not find
 		 * the mcg in the non list.
 		 */
-		if (mce == NULL)
+		if (mce == NULL) {
 			return;
+		}
 	} else {
 		mce = IBD_MCACHE_FIND_FULL(state, mgid);
 
@@ -2978,8 +3031,9 @@ ibd_leave_group(ibd_state_t *state, ib_gid_t mgid, uint8_t jstate)
 		 */
 		if (jstate == IB_MC_JSTATE_SEND_ONLY_NON) {
 			if ((mce == NULL) || (mce->mc_jstate ==
-			    IB_MC_JSTATE_FULL))
+			    IB_MC_JSTATE_FULL)) {
 				return;
+			}
 		} else {
 			ASSERT(jstate == IB_MC_JSTATE_FULL);
 
@@ -2988,8 +3042,9 @@ ibd_leave_group(ibd_state_t *state, ib_gid_t mgid, uint8_t jstate)
 			 * This is because in GLDv3 driver, set multicast
 			 *  will always return success.
 			 */
-			if (mce == NULL)
+			if (mce == NULL) {
 				return;
+			}
 
 			mce->mc_fullreap = B_TRUE;
 		}
@@ -3034,7 +3089,12 @@ ibd_find_bgroup(ibd_state_t *state)
 	    IB_MC_SCOPE_GLOBAL };
 	int i, mcgmtu;
 	boolean_t found = B_FALSE;
+	int ret;
+	ibt_mcg_info_t mcg_info;
 
+	state->id_bgroup_created = B_FALSE;
+
+query_bcast_grp:
 	bzero(&mcg_attr, sizeof (ibt_mcg_attr_t));
 	mcg_attr.mc_pkey = state->id_pkey;
 	state->id_mgid.gid_guid = IB_MGID_IPV4_LOWGRP_MASK;
@@ -3055,12 +3115,51 @@ ibd_find_bgroup(ibd_state_t *state)
 			found = B_TRUE;
 			break;
 		}
-
 	}
 
 	if (!found) {
-		ibd_print_warn(state, "IPoIB broadcast group absent");
-		return (IBT_FAILURE);
+		if (ibd_create_broadcast_group) {
+			/*
+			 * If we created the broadcast group, but failed to
+			 * find it, we can't do anything except leave the
+			 * one we created and return failure.
+			 */
+			if (state->id_bgroup_created) {
+				ibd_print_warn(state, "IPoIB broadcast group "
+				    "absent. Unable to query after create.");
+				goto find_bgroup_fail;
+			}
+
+			/*
+			 * Create the ipoib broadcast group if it didn't exist
+			 */
+			bzero(&mcg_attr, sizeof (ibt_mcg_attr_t));
+			mcg_attr.mc_qkey = IBD_DEFAULT_QKEY;
+			mcg_attr.mc_join_state = IB_MC_JSTATE_FULL;
+			mcg_attr.mc_scope = IB_MC_SCOPE_SUBNET_LOCAL;
+			mcg_attr.mc_pkey = state->id_pkey;
+			mcg_attr.mc_flow = 0;
+			mcg_attr.mc_sl = 0;
+			mcg_attr.mc_tclass = 0;
+			state->id_mgid.gid_prefix =
+			    (((uint64_t)IB_MCGID_IPV4_PREFIX << 32) |
+			    ((uint64_t)IB_MC_SCOPE_SUBNET_LOCAL << 48) |
+			    ((uint32_t)(state->id_pkey << 16)));
+			mcg_attr.mc_mgid = state->id_mgid;
+
+			if ((ret = ibt_join_mcg(state->id_sgid, &mcg_attr,
+			    &mcg_info, NULL, NULL)) != IBT_SUCCESS) {
+				ibd_print_warn(state, "IPoIB broadcast group "
+				    "absent, create failed: ret = %d\n", ret);
+				state->id_bgroup_created = B_FALSE;
+				return (IBT_FAILURE);
+			}
+			state->id_bgroup_created = B_TRUE;
+			goto query_bcast_grp;
+		} else {
+			ibd_print_warn(state, "IPoIB broadcast group absent");
+			return (IBT_FAILURE);
+		}
 	}
 
 	/*
@@ -3071,11 +3170,21 @@ ibd_find_bgroup(ibd_state_t *state)
 		ibd_print_warn(state, "IPoIB broadcast group MTU %d "
 		    "greater than port's maximum MTU %d", mcgmtu,
 		    state->id_mtu);
-		return (IBT_FAILURE);
+		ibt_free_mcg_info(state->id_mcinfo, 1);
+		goto find_bgroup_fail;
 	}
 	state->id_mtu = mcgmtu;
 
 	return (IBT_SUCCESS);
+
+find_bgroup_fail:
+	if (state->id_bgroup_created) {
+		(void) ibt_leave_mcg(state->id_sgid,
+		    mcg_info.mc_adds_vect.av_dgid, state->id_sgid,
+		    IB_MC_JSTATE_FULL);
+	}
+
+	return (IBT_FAILURE);
 }
 
 static int
@@ -4185,7 +4294,9 @@ ibd_undo_m_start(ibd_state_t *state)
 	 * to be returned and give up after 5 seconds.
 	 */
 	if (progress & IBD_DRV_RCQ_NOTIFY_ENABLED) {
+
 		ibt_set_cq_handler(state->id_rcq_hdl, 0, 0);
+
 		attempts = 50;
 		while (state->id_rx_list.dl_bufs_outstanding > 0) {
 			delay(drv_usectohz(100000));
@@ -4229,8 +4340,11 @@ ibd_undo_m_start(ibd_state_t *state)
 		 * This call is guaranteed to return successfully for
 		 * UD QPNs.
 		 */
-		ret = ibt_flush_channel(state->id_chnl_hdl);
-		ASSERT(ret == IBT_SUCCESS);
+		if ((ret = ibt_flush_channel(state->id_chnl_hdl)) !=
+		    IBT_SUCCESS) {
+			DPRINT(10, "undo_m_start: flush_channel "
+			    "failed, ret=%d", ret);
+		}
 
 		/*
 		 * Turn off Tx interrupts and poll. By the time the polling
@@ -4239,8 +4353,9 @@ ibd_undo_m_start(ibd_state_t *state)
 		 * ibt_set_cq_handler() returns, the old handler is
 		 * guaranteed not to be invoked anymore.
 		 */
-		if (ibd_separate_cqs == 1)
+		if (ibd_separate_cqs == 1) {
 			ibt_set_cq_handler(state->id_scq_hdl, 0, 0);
+		}
 		ibd_poll_compq(state, state->id_scq_hdl);
 
 		state->id_mac_state &= (~IBD_DRV_SCQ_NOTIFY_ENABLED);
@@ -4301,7 +4416,12 @@ ibd_undo_m_start(ibd_state_t *state)
 	}
 
 	if (progress & IBD_DRV_UD_CHANNEL_SETUP) {
-		(void) ibt_free_channel(state->id_chnl_hdl);
+		if ((ret = ibt_free_channel(state->id_chnl_hdl)) !=
+		    IBT_SUCCESS) {
+			DPRINT(10, "undo_m_start: free_channel "
+			    "failed, ret=%d", ret);
+		}
+
 		state->id_mac_state &= (~IBD_DRV_UD_CHANNEL_SETUP);
 	}
 
@@ -4309,12 +4429,19 @@ ibd_undo_m_start(ibd_state_t *state)
 		if (ibd_separate_cqs == 1) {
 			kmem_free(state->id_txwcs,
 			    sizeof (ibt_wc_t) * state->id_txwcs_size);
-			(void) ibt_free_cq(state->id_scq_hdl);
+			if ((ret = ibt_free_cq(state->id_scq_hdl)) !=
+			    IBT_SUCCESS) {
+				DPRINT(10, "undo_m_start: free_cq(scq) "
+				    "failed, ret=%d", ret);
+			}
 		}
 
 		kmem_free(state->id_rxwcs,
 		    sizeof (ibt_wc_t) * state->id_rxwcs_size);
-		(void) ibt_free_cq(state->id_rcq_hdl);
+		if ((ret = ibt_free_cq(state->id_rcq_hdl)) != IBT_SUCCESS) {
+			DPRINT(10, "undo_m_start: free_cq(rcq) failed, "
+			    "ret=%d", ret);
+		}
 
 		state->id_txwcs = NULL;
 		state->id_rxwcs = NULL;
@@ -4332,7 +4459,18 @@ ibd_undo_m_start(ibd_state_t *state)
 	}
 
 	if (progress & IBD_DRV_BCAST_GROUP_FOUND) {
+		/*
+		 * If we'd created the ipoib broadcast group and had
+		 * successfully joined it, leave it now
+		 */
+		if (state->id_bgroup_created) {
+			mgid = state->id_mcinfo->mc_adds_vect.av_dgid;
+			jstate = IB_MC_JSTATE_FULL;
+			(void) ibt_leave_mcg(state->id_sgid, mgid,
+			    state->id_sgid, jstate);
+		}
 		ibt_free_mcg_info(state->id_mcinfo, 1);
+
 		state->id_mac_state &= (~IBD_DRV_BCAST_GROUP_FOUND);
 	}
 
@@ -4349,6 +4487,7 @@ ibd_m_start(void *arg)
 	ibd_state_t *state = arg;
 	kthread_t *kht;
 	int err;
+	ibt_status_t ret;
 
 	if (state->id_mac_state & IBD_DRV_STARTED)
 		return (DDI_SUCCESS);
@@ -4419,10 +4558,10 @@ ibd_m_start(void *arg)
 	 */
 	if ((ibd_separate_cqs == 1) && (ibd_txcomp_poll == 0)) {
 		ibt_set_cq_handler(state->id_scq_hdl, ibd_scq_handler, state);
-		if (ibt_enable_cq_notify(state->id_scq_hdl,
-		    IBT_NEXT_COMPLETION) != IBT_SUCCESS) {
-			DPRINT(10,
-			    "ibd_m_start: ibt_enable_cq_notify(scq) failed");
+		if ((ret = ibt_enable_cq_notify(state->id_scq_hdl,
+		    IBT_NEXT_COMPLETION)) != IBT_SUCCESS) {
+			DPRINT(10, "ibd_m_start: ibt_enable_cq_notify(scq) "
+			    "failed, ret=%d", ret);
 			err = EINVAL;
 			goto m_start_fail;
 		}
@@ -4476,9 +4615,10 @@ ibd_m_start(void *arg)
 	 * Setup the receive cq handler
 	 */
 	ibt_set_cq_handler(state->id_rcq_hdl, ibd_rcq_handler, state);
-	if (ibt_enable_cq_notify(state->id_rcq_hdl,
-	    IBT_NEXT_COMPLETION) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibt_enable_cq_notify(rcq) failed");
+	if ((ret = ibt_enable_cq_notify(state->id_rcq_hdl,
+	    IBT_NEXT_COMPLETION)) != IBT_SUCCESS) {
+		DPRINT(10, "ibd_m_start: ibt_enable_cq_notify(rcq) "
+		    "failed, ret=%d", ret);
 		err = EINVAL;
 		goto m_start_fail;
 	}
@@ -5597,6 +5737,11 @@ ibd_m_tx(void *arg, mblk_t *mp)
 	ibd_state_t *state = (ibd_state_t *)arg;
 	mblk_t *next;
 
+	if (state->id_link_state != LINK_STATE_UP) {
+		freemsgchain(mp);
+		mp = NULL;
+	}
+
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;
@@ -6161,6 +6306,8 @@ ibd_log_init(void)
 {
 	ibd_lbuf = kmem_zalloc(IBD_LOG_SZ, KM_SLEEP);
 	ibd_lbuf_ndx = 0;
+
+	mutex_init(&ibd_lbuf_lock, NULL, MUTEX_DRIVER, NULL);
 }
 
 static void
@@ -6170,6 +6317,8 @@ ibd_log_fini(void)
 		kmem_free(ibd_lbuf, IBD_LOG_SZ);
 	ibd_lbuf_ndx = 0;
 	ibd_lbuf = NULL;
+
+	mutex_destroy(&ibd_lbuf_lock);
 }
 
 static void
