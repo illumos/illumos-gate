@@ -4019,6 +4019,8 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
  * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
  */
 
+#define	LLBAA	0x10	/* Long LBA Accepted */
+
 static int
 sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 {
@@ -4067,7 +4069,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 		bdlen = 0;
 		if (!(scsipkt->pkt_cdbp[1] & 8)) {
 			if (scsipkt->pkt_cdbp[0] == SCMD_MODE_SENSE_G1 &&
-			    (scsipkt->pkt_cdbp[0] & 0x10))
+			    (scsipkt->pkt_cdbp[1] & LLBAA))
 				bdlen = 16;
 			else
 				bdlen = 8;
@@ -6478,7 +6480,7 @@ sata_build_msense_page_1c(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 	else
 		page->dexcpt = 1;	/* Only changeable parameter */
 
-	return (PAGELENGTH_INFO_EXCPT + sizeof (struct mode_info_excpt_page));
+	return (PAGELENGTH_INFO_EXCPT + sizeof (struct mode_page));
 }
 
 
@@ -6586,7 +6588,7 @@ sata_build_msense_page_1a(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
  * Process mode select caching page 8 (scsi3 format only).
  * Read Ahead (same as read cache) and Write Cache may be turned on and off
  * if these features are supported by the device. If these features are not
- * supported, quietly ignore them.
+ * supported, the command will be terminated with STATUS_CHECK.
  * This function fails only if the SET FEATURE command sent to
  * the device fails. The page format is not varified, assuming that the
  * target driver operates correctly - if parameters length is too short,
@@ -6632,8 +6634,8 @@ sata_mode_select_page_8(sata_pkt_txlate_t *spx, struct mode_cache_scsi3 *page,
 	*dmod = 0;
 
 	/* Verify parameters length. If too short, drop it */
-	if (PAGELENGTH_DAD_MODE_CACHE_SCSI3 +
-	    sizeof (struct mode_page) < parmlen) {
+	if ((PAGELENGTH_DAD_MODE_CACHE_SCSI3 +
+	    sizeof (struct mode_page)) > parmlen) {
 		*scsipkt->pkt_scbp = STATUS_CHECK;
 		sense = sata_arq_sense(spx);
 		sense->es_key = KEY_ILLEGAL_REQUEST;
@@ -6644,19 +6646,6 @@ sata_mode_select_page_8(sata_pkt_txlate_t *spx, struct mode_cache_scsi3 *page,
 	}
 
 	*pagelen = PAGELENGTH_DAD_MODE_CACHE_SCSI3 + sizeof (struct mode_page);
-
-	/*
-	 * We can manipulate only write cache and read ahead
-	 * (read cache) setting.
-	 */
-	if (!SATA_READ_AHEAD_SUPPORTED(*sata_id) &&
-	    !SATA_WRITE_CACHE_SUPPORTED(*sata_id)) {
-		/*
-		 * None of the features is supported - ignore
-		 */
-		*rval = TRAN_ACCEPT;
-		return (SATA_SUCCESS);
-	}
 
 	/* Current setting of Read Ahead (and Read Cache) */
 	if (SATA_READ_AHEAD_ENABLED(*sata_id))
@@ -6686,57 +6675,79 @@ sata_mode_select_page_8(sata_pkt_txlate_t *spx, struct mode_cache_scsi3 *page,
 	scmd->satacmd_error_reg = 0;
 	scmd->satacmd_cmd_reg = SATAC_SET_FEATURES;
 	if (page->dra != dra || page->rcd != dra) {
-		/* Need to flip read ahead setting */
-		if (dra == 0)
-			/* Disable read ahead / read cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_DISABLE_READ_AHEAD;
-		else
-			/* Enable read ahead  / read cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_ENABLE_READ_AHEAD;
+		if (SATA_READ_AHEAD_SUPPORTED(*sata_id)) {
+			/* Need to flip read ahead setting */
+			if (dra == 0)
+				/* Disable read ahead / read cache */
+				scmd->satacmd_features_reg =
+				    SATAC_SF_DISABLE_READ_AHEAD;
+			else
+				/* Enable read ahead  / read cache */
+				scmd->satacmd_features_reg =
+				    SATAC_SF_ENABLE_READ_AHEAD;
 
-		/* Transfer command to HBA */
-		if (sata_hba_start(spx, rval) != 0)
-			/*
-			 * Pkt not accepted for execution.
-			 */
+			/* Transfer command to HBA */
+			if (sata_hba_start(spx, rval) != 0)
+				/*
+				 * Pkt not accepted for execution.
+				 */
+				return (SATA_FAILURE);
+
+			*dmod = 1;
+
+			/* Now process return */
+			if (spx->txlt_sata_pkt->satapkt_reason !=
+			    SATA_PKT_COMPLETED) {
+				goto failure;	/* Terminate */
+			}
+		} else {
+			*scsipkt->pkt_scbp = STATUS_CHECK;
+			sense = sata_arq_sense(spx);
+			sense->es_key = KEY_ILLEGAL_REQUEST;
+			sense->es_add_code =
+			    SD_SCSI_ASC_INVALID_FIELD_IN_PARAMS_LIST;
+			*pagelen = parmlen;
+			*rval = TRAN_ACCEPT;
 			return (SATA_FAILURE);
-
-		*dmod = 1;
-
-		/* Now process return */
-		if (spx->txlt_sata_pkt->satapkt_reason !=
-		    SATA_PKT_COMPLETED) {
-			goto failure;	/* Terminate */
 		}
 	}
 
 	/* Note that the packet is not removed, so it could be re-used */
 	if (page->wce != wce) {
-		/* Need to flip Write Cache setting */
-		if (page->wce == 1)
-			/* Enable write cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_ENABLE_WRITE_CACHE;
-		else
-			/* Disable write cache */
-			scmd->satacmd_features_reg =
-			    SATAC_SF_DISABLE_WRITE_CACHE;
+		if (SATA_WRITE_CACHE_SUPPORTED(*sata_id)) {
+			/* Need to flip Write Cache setting */
+			if (page->wce == 1)
+				/* Enable write cache */
+				scmd->satacmd_features_reg =
+				    SATAC_SF_ENABLE_WRITE_CACHE;
+			else
+				/* Disable write cache */
+				scmd->satacmd_features_reg =
+				    SATAC_SF_DISABLE_WRITE_CACHE;
 
-		/* Transfer command to HBA */
-		if (sata_hba_start(spx, rval) != 0)
-			/*
-			 * Pkt not accepted for execution.
-			 */
+			/* Transfer command to HBA */
+			if (sata_hba_start(spx, rval) != 0)
+				/*
+				 * Pkt not accepted for execution.
+				 */
+				return (SATA_FAILURE);
+
+			*dmod = 1;
+
+			/* Now process return */
+			if (spx->txlt_sata_pkt->satapkt_reason !=
+			    SATA_PKT_COMPLETED) {
+				goto failure;
+			}
+		} else {
+			*scsipkt->pkt_scbp = STATUS_CHECK;
+			sense = sata_arq_sense(spx);
+			sense->es_key = KEY_ILLEGAL_REQUEST;
+			sense->es_add_code =
+			    SD_SCSI_ASC_INVALID_FIELD_IN_PARAMS_LIST;
+			*pagelen = parmlen;
+			*rval = TRAN_ACCEPT;
 			return (SATA_FAILURE);
-
-		*dmod = 1;
-
-		/* Now process return */
-		if (spx->txlt_sata_pkt->satapkt_reason !=
-		    SATA_PKT_COMPLETED) {
-			goto failure;
 		}
 	}
 	return (SATA_SUCCESS);
@@ -6797,7 +6808,7 @@ sata_mode_select_page_1c(
 	*dmod = 0;
 
 	/* Verify parameters length. If too short, drop it */
-	if (((PAGELENGTH_INFO_EXCPT + sizeof (struct mode_page)) < parmlen) ||
+	if (((PAGELENGTH_INFO_EXCPT + sizeof (struct mode_page)) > parmlen) ||
 	    page->perf || page->test || (page->mrie != MRIE_ONLY_ON_REQUEST)) {
 		*scsipkt->pkt_scbp = STATUS_CHECK;
 		sense = sata_arq_sense(spx);
@@ -6885,7 +6896,7 @@ sata_mode_select_page_30(sata_pkt_txlate_t *spx, struct
 
 	/* If parmlen is too short or the feature is not supported, drop it */
 	if (((PAGELENGTH_DAD_MODE_ACOUSTIC_MANAGEMENT +
-	    sizeof (struct mode_page)) < parmlen) ||
+	    sizeof (struct mode_page)) > parmlen) ||
 	    (! (sata_id->ai_cmdset83 & SATA_ACOUSTIC_MGMT))) {
 		*scsipkt->pkt_scbp = STATUS_CHECK;
 		sense = sata_arq_sense(spx);
