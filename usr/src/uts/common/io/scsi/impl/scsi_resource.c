@@ -285,6 +285,37 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 			kf = KM_SLEEP;
 		else
 			kf = KM_NOSLEEP;
+		/*
+		 * By using kmem_cache_alloc(), the layout of the
+		 * scsi_pkt, scsi_pkt_cache_wrapper, hba private data,
+		 * cdb, tgt driver private data, and status block is
+		 * as below.
+		 *
+		 * This is a piece of contiguous memory starting from
+		 * the first structure field scsi_pkt in the struct
+		 * scsi_pkt_cache_wrapper, followed by the hba private
+		 * data, pkt_cdbp, the tgt driver private data and
+		 * pkt_scbp.
+		 *
+		 * |----------------------------|--------------------->
+		 * |	struct scsi_pkt		|	struct
+		 * |	......			|scsi_pkt_cache_wrapper
+		 * |	pcw_flags		|
+		 * |----------------------------|<---------------------
+		 * |	hba private data	|tranp->tran_hba_len
+		 * |----------------------------|
+		 * |	pkt_cdbp		|DEFAULT_CDBLEN
+		 * |----------------------------|
+		 * |	tgt private data	|DEFAULT_PRIVLEN
+		 * |----------------------------|
+		 * |	pkt_scbp		|DEFAULT_SCBLEN
+		 * |----------------------------|
+		 *
+		 * If the actual data length of the cdb, or the tgt
+		 * driver private data, or the status block is bigger
+		 * than the default data length, kmem_alloc() will be
+		 * called to get extra space.
+		 */
 		pktw = kmem_cache_alloc(tranp->tran_pkt_cache_ptr,
 		    kf);
 		if (pktw == NULL)
@@ -450,7 +481,7 @@ fail5:
 		kmem_free(in_pktp->pkt_scbp, statuslen);
 		in_pktp->pkt_scbp = (opaque_t)((char *)in_pktp +
 		    tranp->tran_hba_len + DEFAULT_PRIVLEN +
-		    sizeof (struct scsi_pkt));
+		    sizeof (struct scsi_pkt_cache_wrapper));
 		if ((A_TO_TRAN(ap))->tran_hba_flags & SCSI_HBA_TRAN_CDB)
 			in_pktp->pkt_scbp = (opaque_t)((in_pktp->pkt_scbp) +
 			    DEFAULT_CDBLEN);
@@ -467,7 +498,7 @@ fail3:
 		kmem_free(in_pktp->pkt_cdbp, cmdlen);
 		in_pktp->pkt_cdbp = (opaque_t)((char *)in_pktp +
 		    tranp->tran_hba_len +
-		    sizeof (struct scsi_pkt));
+		    sizeof (struct scsi_pkt_cache_wrapper));
 		in_pktp->pkt_cdblen = 0;
 	}
 	pktw->pcw_flags &=
