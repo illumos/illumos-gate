@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -293,15 +293,20 @@ okm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 int
 okm_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
-	okms_t	*okmsp;
+	okms_t	*okmsp = &okms_global;
 	minor_t	minor;
 	int	ret = DDI_FAILURE;
 
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
+		/*
+		 * We have the case here where the minor number
+		 * is the same as the instance number. So, just
+		 * make sure we have the right minor node in our
+		 * global state. If we don't, set the result to NULL.
+		 */
 		minor = getminor((dev_t)arg);
-		okmsp = ddi_get_driver_private(dip);
-		if (okmsp == NULL) {
+		if (okmsp->km_inst != minor) {
 			*result = NULL;
 		} else {
 			*result = okmsp->km_dip;
