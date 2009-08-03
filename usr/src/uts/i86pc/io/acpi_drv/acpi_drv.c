@@ -1562,11 +1562,10 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 	if ((info->Valid & ACPI_VALID_HID) == 0) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo(): _HID not available");
-		(void) strncpy(p->uid, "\0", ID_LEN);
+		(void) strncpy(p->hid, "\0", ID_LEN);
 	} else {
 		(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
 	}
-	(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
 
 	/*
 	 * This object is optional, but is required when the device
@@ -2071,11 +2070,10 @@ acpi_drv_dev_init(struct acpi_drv_dev *p)
 	if ((info->Valid & ACPI_VALID_HID) == 0) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "!AcpiGetObjectInfo(): _HID not available");
-		(void) strncpy(p->uid, "\0", ID_LEN);
+		(void) strncpy(p->hid, "\0", ID_LEN);
 	} else {
 		(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
 	}
-	(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
 
 	/*
 	 * This object is optional, but is required when the device
