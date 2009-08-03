@@ -2295,6 +2295,7 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 	struct ipart	*efdp2 = &eparts[1];
 	int		ext_part_exists = 0;
 	int		ld_count = 0;
+	int		is_linux_swap;
 #endif
 
 	ASSERT(cl != NULL);
@@ -2443,7 +2444,6 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 			uint32_t logdrive_offset;
 			uint32_t ext_numsect;
 			uint32_t abs_secnum;
-			int is_linux_swap;
 
 			ext_part_exists = 1;
 
@@ -2539,7 +2539,14 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 		 */
 		if ((uidx == -1) || (fdp->bootid == ACTIVE)) {
 #if defined(__i386) || defined(__amd64)
-			if (cmlb_is_linux_swap(cl, relsect, tg_cookie) != 0) {
+			is_linux_swap = 0;
+			if (fdp->systid == SUNIXOS) {
+				if (cmlb_is_linux_swap(cl, relsect,
+				    tg_cookie) == 0) {
+					is_linux_swap = 1;
+				}
+			}
+			if (!is_linux_swap) {
 #endif
 				uidx = i;
 				solaris_offset = relsect;
