@@ -91,13 +91,13 @@ typedef struct 	pci_acc_cfblk {
 } pci_acc_cfblk_t;
 
 struct pci_bus_resource {
-	struct memlist *io_ports;	/* available free io res */
-	struct memlist *io_ports_used;	/* used io res */
-	struct memlist *mem_space;	/* available free mem res */
-	struct memlist *mem_space_used;	/* used mem res */
-	struct memlist *pmem_space; /* available free prefetchable mem res */
-	struct memlist *pmem_space_used; /* used prefetchable mem res */
-	struct memlist *bus_space;	/* available free bus res */
+	struct memlist *io_avail;	/* available free io res */
+	struct memlist *io_used;	/* used io res */
+	struct memlist *mem_avail;	/* available free mem res */
+	struct memlist *mem_used;	/* used mem res */
+	struct memlist *pmem_avail; /* available free prefetchable mem res */
+	struct memlist *pmem_used; /* used prefetchable mem res */
+	struct memlist *bus_avail;	/* available free bus res */
 			/* bus_space_used not needed; can read from regs */
 	dev_info_t *dip;	/* devinfo node */
 	void *privdata;		/* private data for configuration */
@@ -126,6 +126,7 @@ extern uint64_t memlist_find(struct memlist **, uint64_t, int);
 extern uint64_t memlist_find_with_startaddr(struct memlist **, uint64_t,
     uint64_t, int);
 extern void memlist_dump(struct memlist *);
+extern void memlist_subsume(struct memlist **, struct memlist **);
 extern void memlist_merge(struct memlist **, struct memlist **);
 extern struct memlist *memlist_dup(struct memlist *);
 extern int memlist_count(struct memlist *);

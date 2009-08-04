@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,21 @@ memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
 
 	/* find the location in list */
 	next = *listp;
-	while (next && next->address < addr) {
+	while (next && next->address <= addr) {
+		/*
+		 * Drop if this entry already exists, in whole
+		 * or in part
+		 */
+		if (next->address <= addr &&
+		    next->address + next->size >= addr + size) {
+			/* next already contains this entire element; drop */
+			return;
+		}
+
+		/* Is this a "grow block size" request? */
+		if (next->address == addr) {
+			break;
+		}
 		prev = next;
 		next = prev->next;
 	}
@@ -272,10 +286,10 @@ memlist_find_with_startaddr(struct memlist **listp, uint64_t address,
 }
 
 /*
- * Merge memlist src into memlist dest
+ * Subsume memlist src into memlist dest
  */
 void
-memlist_merge(struct memlist **src, struct memlist **dest)
+memlist_subsume(struct memlist **src, struct memlist **dest)
 {
 	struct memlist *head, *prev;
 
@@ -287,6 +301,21 @@ memlist_merge(struct memlist **src, struct memlist **dest)
 		memlist_free(prev);
 	}
 	*src = 0;
+}
+
+/*
+ * Merge memlist src into memlist dest; don't destroy src
+ */
+void
+memlist_merge(struct memlist **src, struct memlist **dest)
+{
+	struct memlist *p;
+
+	p = *src;
+	while (p) {
+		memlist_insert(dest, p->address, p->size);
+		p = p->next;
+	}
 }
 
 /*
