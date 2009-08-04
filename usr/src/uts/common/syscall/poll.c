@@ -389,8 +389,16 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	old_nfds = ps->ps_nfds;
 	if (nfds != old_nfds) {
 
-		kmem_free(ps->ps_pollfd, old_nfds * sizeof (pollfd_t));
-		pollfdp = kmem_alloc(nfds * sizeof (pollfd_t), KM_SLEEP);
+		if (old_nfds != 0)
+			kmem_free(ps->ps_pollfd, old_nfds * sizeof (pollfd_t));
+
+		if ((pollfdp =
+		    kmem_alloc(nfds * sizeof (pollfd_t), KM_NOSLEEP)) == NULL) {
+			ps->ps_nfds = 0;
+			error = EAGAIN;
+			goto pollout;
+		}
+
 		ps->ps_pollfd = pollfdp;
 		ps->ps_nfds = nfds;
 	}
