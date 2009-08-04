@@ -774,8 +774,12 @@ create_global_ovr_rules()
 	# Get and process override policy
 	#
 	ovr_policy=`svcprop -p ${FW_CONFIG_OVR_PG}/${POLICY_PROP} $IPF_FMRI`
-	TEMP=`mktemp /var/run/ipf_ovr.conf.pid$$.XXXXXX`
+	if [ "$ovr_policy" = "none" ]; then 
+		echo "# global override policy is 'none'" >$IPFILOVRCONF
+		return 0
+	fi
 
+	TEMP=`mktemp /var/run/ipf_ovr.conf.pid$$.XXXXXX`
 	[ "$ovr_policy" = "deny" ] && acmd="block in log quick"
 	[ "$ovr_policy" = "allow" ] && acmd="pass in log"
 
