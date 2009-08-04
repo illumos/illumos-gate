@@ -118,7 +118,7 @@ int	apic_oneshot_enable = 1; /* to allow disabling one-shot capability */
 /* Now the ones for Dynamic Interrupt distribution */
 int	apic_enable_dynamic_migration = 0;
 
-int apic_have_32bit_cr8 = 0;
+extern int apic_have_32bit_cr8;
 
 /*
  * These variables are frequently accessed in apic_intr_enter(),

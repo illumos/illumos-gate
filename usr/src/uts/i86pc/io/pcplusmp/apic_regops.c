@@ -83,7 +83,7 @@ static apic_reg_ops_t x2apic_regs_ops = {
 	apic_send_EOI,
 };
 
-extern int apic_have_32bit_cr8;
+int apic_have_32bit_cr8 = 0;
 
 /* The default ops is local APIC (Memory Mapped IO) */
 apic_reg_ops_t *apic_reg_ops = &local_apic_regs_ops;
