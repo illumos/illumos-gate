@@ -1914,6 +1914,12 @@ ISCSI_INITIATOR_OBJS =	chap.o iscsi_io.o iscsi_thread.o	\
 #
 NTXN_OBJS =	unm_nic_init.o unm_gem.o unm_nic_hw.o unm_ndd.o	\
 			unm_nic_main.o unm_nic_isr.o unm_nic_ctx.o niu.o
+
+#
+#	Myricom 10Gb NIC driver module
+#
+MYRI10GE_OBJS =	myri10ge.o myri10ge_lro.o
+
 #	nulldriver module
 #
 NULLDRIVER_OBJS =	nulldriver.o

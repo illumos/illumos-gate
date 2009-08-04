@@ -347,6 +347,7 @@ COMMON_SUBDIRS= \
 	SUNWmptsas \
 	SUNWmrsas \
 	SUNWmxfe \
+	SUNWmyri10ge \
 	SUNWncar \
 	SUNWncau \
 	SUNWndmpr \

@@ -103,6 +103,7 @@ systrace:systrace	0600 root sys 0644 root sys /dev/dtrace/provider/systrace
 clone:bge		0600 root sys 0666 root sys	/dev/bge
 clone:igb		0600 root sys 0666 root sys	/dev/igb
 clone:ixgbe		0600 root sys 0666 root sys	/dev/ixgbe
+clone:myri10ge		0600 root sys 0666 root sys	/dev/myri10ge
 clone:rge		0600 root sys 0666 root sys	/dev/rge
 clone:xge		0600 root sys 0666 root sys	/dev/xge
 clone:nge		0600 root sys 0666 root sys	/dev/nge
@@ -134,6 +135,7 @@ clone:mxfe		0600 root sys 0666 root sys	/dev/mxfe
 bge:*			0600 root sys 0666 root sys	/dev/bge*
 igb:*			0600 root sys 0666 root sys	/dev/igb*
 ixgbe:*			0600 root sys 0666 root sys	/dev/ixgbe*
+myri10ge:*		0600 root sys 0666 root sys	/dev/myri10ge*
 rge:*			0600 root sys 0666 root sys	/dev/rge*
 xge:*			0600 root sys 0666 root sys	/dev/xge*
 nge:*			0600 root sys 0666 root sys	/dev/nge*
@@ -293,6 +295,7 @@ cpuid:self
 clone:bge
 clone:igb
 clone:ixgbe
+clone:myri10ge
 clone:rge
 clone:xge
 clone:nge
@@ -325,6 +328,7 @@ clone:mxfe
 bge:*
 igb:*
 ixgbe:*
+myri10ge:*
 rge:*
 xge:*
 nge:*
