@@ -656,6 +656,20 @@ idm_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl)
 }
 
 /*
+ * idm_declare_key_values()
+ * Activate an operational set of declarative parameters from the config_nvl,
+ * and return the selected values in the outgoing_nvl.
+ */
+kv_status_t
+idm_declare_key_values(idm_conn_t *ic, nvlist_t *config_nvl,
+    nvlist_t *outgoing_nvl)
+{
+	ASSERT(ic->ic_transport_ops != NULL);
+	return (ic->ic_transport_ops->it_declare_key_values(ic, config_nvl,
+	    outgoing_nvl));
+}
+
+/*
  * idm_buf_tx_to_ini
  *
  * This is IDM's implementation of the 'Put_Data' operational primitive.

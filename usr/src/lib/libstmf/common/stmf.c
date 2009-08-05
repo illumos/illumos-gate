@@ -3541,7 +3541,7 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 	int cmd = STMF_IOCTL_SESSION_LIST;
 	int i;
 	stmf_iocdata_t stmfIoctl;
-	slist_scsi_session_t *fSessionList;
+	slist_scsi_session_t *fSessionList, *fSessionListP = NULL;
 	uint8_t ident[260];
 	uint32_t fSessionListSize;
 
@@ -3567,8 +3567,10 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 	fSessionListSize = ALLOC_SESSION;
 	fSessionListSize = fSessionListSize * (sizeof (slist_scsi_session_t));
 	fSessionList = (slist_scsi_session_t *)calloc(1, fSessionListSize);
+	fSessionListP = fSessionList;
 	if (fSessionList == NULL) {
-		return (STMF_ERROR_NOMEM);
+		ret = STMF_ERROR_NOMEM;
+		goto done;
 	}
 
 	ident[IDENT_LENGTH_BYTE] = devid->identLength;
@@ -3611,8 +3613,10 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 		    sizeof (slist_scsi_session_t);
 		fSessionList = realloc(fSessionList, fSessionListSize);
 		if (fSessionList == NULL) {
-			return (STMF_ERROR_NOMEM);
+			ret = STMF_ERROR_NOMEM;
+			goto done;
 		}
+		fSessionListP = fSessionList;
 		stmfIoctl.stmf_obuf_size = fSessionListSize;
 		stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)fSessionList;
 		ioctlRet = ioctl(fd, cmd, &stmfIoctl);
@@ -3667,6 +3671,7 @@ stmfGetSessionList(stmfDevid *devid, stmfSessionList **sessionList)
 	}
 done:
 	(void) close(fd);
+	free(fSessionListP);
 	return (ret);
 }
 

@@ -380,6 +380,10 @@ idm_negotiate_key_values(idm_conn_t *ic, nvlist_t *request_nvl,
 void
 idm_notice_key_values(idm_conn_t *ic, nvlist_t *negotiated_nvl);
 
+kv_status_t
+idm_declare_key_values(idm_conn_t *ic, nvlist_t *config_nvl,
+    nvlist_t *outgoing_nvl);
+
 /*
  * Buffer services
  */

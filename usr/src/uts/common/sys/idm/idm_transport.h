@@ -109,6 +109,10 @@ typedef kv_status_t (transport_negotiate_key_values_op_t)(struct
 typedef void (transport_notice_key_values_op_t)(struct idm_conn_s *ic,
     nvlist_t *negotiated_nvl);
 
+/* Declare the declarative key value pairs */
+typedef kv_status_t (transport_declare_key_values_op_t)(struct idm_conn_s *ic,
+    nvlist_t *config_nvl, nvlist_t *outgoing_nvl);
+
 /* Transport capability probe */
 typedef boolean_t (transport_conn_is_capable_op_t)(idm_conn_req_t *ic,
     struct idm_transport_caps_s *caps);
@@ -178,6 +182,7 @@ typedef struct idm_transport_ops_s {
 	transport_ini_conn_destroy_op_t		*it_ini_conn_destroy;
 	transport_ini_conn_connect_op_t		*it_ini_conn_connect;
 	transport_ini_conn_disconnect_op_t	*it_ini_conn_disconnect;
+	transport_declare_key_values_op_t	*it_declare_key_values;
 } idm_transport_ops_t;
 
 /*

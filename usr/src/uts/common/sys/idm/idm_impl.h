@@ -122,7 +122,8 @@ typedef struct idm_refcnt_s {
  * connection create, or during key-value negotiation at login
  */
 typedef struct idm_conn_params_s {
-	uint32_t		max_dataseglen;
+	uint32_t		max_recv_dataseglen;
+	uint32_t		max_xmit_dataseglen;
 	uint32_t		conn_login_max;
 	uint32_t		conn_login_interval;
 	boolean_t		nonblock_socket;

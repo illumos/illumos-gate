@@ -48,6 +48,8 @@ static idm_status_t iser_tgt_enable_datamover(idm_conn_t *ic);
 static idm_status_t iser_ini_enable_datamover(idm_conn_t *ic);
 static void iser_notice_key_values(struct idm_conn_s *ic,
     nvlist_t *negotiated_nvl);
+static kv_status_t iser_declare_key_values(struct idm_conn_s *ic,
+    nvlist_t *config_nvl, nvlist_t *outgoing_nvl);
 static idm_status_t iser_free_task_rsrcs(idm_task_t *idt);
 static kv_status_t iser_negotiate_key_values(idm_conn_t *ic,
     nvlist_t *request_nvl, nvlist_t *response_nvl, nvlist_t *negotiated_nvl);
@@ -114,7 +116,8 @@ idm_transport_ops_t iser_transport_ops = {
 	&iser_ini_conn_create,		/* it_ini_conn_create */
 	&iser_conn_destroy,		/* it_ini_conn_destroy */
 	&iser_ini_conn_connect,		/* it_ini_conn_connect */
-	&iser_conn_disconnect		/* it_ini_conn_disconnect */
+	&iser_conn_disconnect,		/* it_ini_conn_disconnect */
+	&iser_declare_key_values	/* it_declare_key_values */
 };
 
 /*
@@ -838,6 +841,31 @@ iser_handle_numerical(nvpair_t *nvp, uint64_t value, const idm_kv_xlate_t *ikvx,
 	}
 
 	return (idm_nvstat_to_kvstat(nvrc));
+}
+
+/*
+ * iser_declare_key_values() declares the declarative key values for
+ * this connection.
+ */
+/* ARGSUSED */
+static kv_status_t
+iser_declare_key_values(idm_conn_t *ic, nvlist_t *config_nvl,
+    nvlist_t *outgoing_nvl)
+{
+	kv_status_t		kvrc;
+	int			nvrc;
+	uint64_t		uint64_val;
+
+	if ((nvrc = nvlist_lookup_uint64(config_nvl,
+	    ISER_KV_KEY_NAME_MAX_OUTSTANDING_PDU, &uint64_val)) != ENOENT) {
+		ASSERT(nvrc == 0);
+		if (outgoing_nvl) {
+			nvrc = nvlist_add_uint64(outgoing_nvl,
+			    ISER_KV_KEY_NAME_MAX_OUTSTANDING_PDU, uint64_val);
+		}
+	}
+	kvrc = idm_nvstat_to_kvstat(nvrc);
+	return (kvrc);
 }
 
 /*

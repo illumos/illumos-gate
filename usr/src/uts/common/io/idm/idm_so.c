@@ -46,6 +46,7 @@
 #include <net/if.h>
 #include <sys/sockio.h>
 #include <sys/ksocket.h>
+#include <sys/iscsi_protocol.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
 #include <sys/idm/idm_text.h>
@@ -101,6 +102,8 @@ static kv_status_t idm_so_negotiate_key_values(idm_conn_t *it,
     nvlist_t *request_nvl, nvlist_t *response_nvl, nvlist_t *negotiated_nvl);
 static void idm_so_notice_key_values(idm_conn_t *it,
     nvlist_t *negotiated_nvl);
+static kv_status_t idm_so_declare_key_values(idm_conn_t *it,
+    nvlist_t *config_nvl, nvlist_t *outgoing_nvl);
 static boolean_t idm_so_conn_is_capable(idm_conn_req_t *ic,
     idm_transport_caps_t *caps);
 static idm_status_t idm_so_buf_alloc(idm_buf_t *idb, uint64_t buflen);
@@ -152,7 +155,8 @@ idm_transport_ops_t idm_so_transport_ops = {
 	idm_so_ini_conn_create,		/* it_ini_conn_create */
 	idm_so_ini_conn_destroy,	/* it_ini_conn_destroy */
 	idm_so_ini_conn_connect,	/* it_ini_conn_connect */
-	idm_so_conn_disconnect		/* it_ini_conn_disconnect */
+	idm_so_conn_disconnect,		/* it_ini_conn_disconnect */
+	idm_so_declare_key_values	/* it_declare_key_values */
 };
 
 /*
@@ -760,6 +764,12 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	pdu->isp_hdrlen = sizeof (iscsi_hdr_t) +
 	    (bhs->hlength * sizeof (uint32_t));
 	pdu->isp_datalen = n2h24(bhs->dlength);
+	if (ic->ic_conn_type == CONN_TYPE_TGT &&
+	    pdu->isp_datalen > ic->ic_conn_params.max_recv_dataseglen) {
+		IDM_CONN_LOG(CE_WARN,
+		    "idm_sorecvhdr: exceeded the max data segment length");
+		return (IDM_STATUS_FAIL);
+	}
 	if (bhs->hlength > IDM_SORX_CACHE_AHSLEN) {
 		/* Allocate a new header segment and change the callback */
 		new_hdr = kmem_alloc(pdu->isp_hdrlen, KM_SLEEP);
@@ -985,6 +995,10 @@ idm_so_conn_create_common(idm_conn_t *ic, ksocket_t new_so)
 
 	/* Set the scoreboarding flag on this connection */
 	ic->ic_conn_flags |= IDM_CONN_USE_SCOREBOARD;
+	ic->ic_conn_params.max_recv_dataseglen =
+	    ISCSI_DEFAULT_MAX_RECV_SEG_LEN;
+	ic->ic_conn_params.max_xmit_dataseglen =
+	    ISCSI_DEFAULT_MAX_XMIT_SEG_LEN;
 
 	/*
 	 * Initialize tx thread mutex and list
@@ -1380,6 +1394,7 @@ idm_so_notice_key_values(idm_conn_t *it, nvlist_t *negotiated_nvl)
 	int			nvrc;
 	idm_status_t		idm_status;
 	const idm_kv_xlate_t	*ikvx;
+	uint64_t		num_val;
 
 	for (nvp = nvlist_next_nvpair(negotiated_nvl, NULL);
 	    nvp != NULL; nvp = next_nvp) {
@@ -1398,12 +1413,64 @@ idm_so_notice_key_values(idm_conn_t *it, nvlist_t *negotiated_nvl)
 			    negotiated_nvl, ikvx->ik_key_name);
 			ASSERT(nvrc == 0);
 			break;
+		case KI_MAX_RECV_DATA_SEGMENT_LENGTH:
+			/*
+			 * Just pass the value down to idm layer.
+			 * No need to remove it from negotiated_nvl list here.
+			 */
+			nvrc = nvpair_value_uint64(nvp, &num_val);
+			ASSERT(nvrc == 0);
+			it->ic_conn_params.max_xmit_dataseglen =
+			    (uint32_t)num_val;
+			break;
 		default:
 			break;
 		}
 	}
 }
 
+/*
+ * idm_so_declare_key_values() declares the key values for this connection
+ */
+/* ARGSUSED */
+static kv_status_t
+idm_so_declare_key_values(idm_conn_t *it, nvlist_t *config_nvl,
+    nvlist_t *outgoing_nvl)
+{
+	char			*nvp_name;
+	nvpair_t		*nvp;
+	nvpair_t		*next_nvp;
+	kv_status_t		kvrc;
+	int			nvrc = 0;
+	const idm_kv_xlate_t	*ikvx;
+	uint64_t		num_val;
+
+	for (nvp = nvlist_next_nvpair(config_nvl, NULL);
+	    nvp != NULL && nvrc == 0; nvp = next_nvp) {
+		next_nvp = nvlist_next_nvpair(config_nvl, nvp);
+		nvp_name = nvpair_name(nvp);
+
+		ikvx = idm_lookup_kv_xlate(nvp_name, strlen(nvp_name));
+		switch (ikvx->ik_key_id) {
+		case KI_MAX_RECV_DATA_SEGMENT_LENGTH:
+			if ((nvrc = nvpair_value_uint64(nvp, &num_val)) != 0) {
+				break;
+			}
+			if (outgoing_nvl &&
+			    (nvrc = nvlist_add_uint64(outgoing_nvl,
+			    nvp_name, num_val)) != 0) {
+				break;
+			}
+			it->ic_conn_params.max_recv_dataseglen =
+			    (uint32_t)num_val;
+			break;
+		default:
+			break;
+		}
+	}
+	kvrc = idm_nvstat_to_kvstat(nvrc);
+	return (kvrc);
+}
 
 static idm_status_t
 idm_so_handle_digest(idm_conn_t *it, nvpair_t *digest_choice,
@@ -2489,7 +2556,7 @@ idm_so_send_buf_region(idm_task_t *idt, idm_buf_t *idb,
 
 	ic = idt->idt_ic;
 
-	max_dataseglen = 8192; /* Need value from login negotiation */
+	max_dataseglen = ic->ic_conn_params.max_xmit_dataseglen;
 	remainder = buf_region_length;
 
 	while (remainder) {
