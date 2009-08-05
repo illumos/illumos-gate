@@ -273,8 +273,6 @@ ROOT.BIN= \
 	/usr/lib/drv \
 	/usr/lib/elfedit \
 	/usr/lib/font \
-	/usr/lib/fp \
-	/usr/lib/fp/libp \
 	/usr/lib/inet \
 	/usr/lib/inet/dhcp \
 	/usr/lib/inet/dhcp/nsu \
@@ -304,7 +302,6 @@ ROOT.BIN= \
 	/usr/lib/secure \
 	/usr/lib/security \
 	/usr/lib/smbsrv \
-	/usr/lib/term \
 	/usr/lib/vscan \
 	/usr/lib/zfs \
 	/usr/lib/zones \
@@ -376,7 +373,6 @@ ROOT.BIN64= \
 	/usr/lib/brand/sn1/$(MACH64) \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
-	/usr/lib/fp/libp/$(MACH64) \
 	/usr/lib/inet/$(MACH64) \
 	/usr/lib/krb5/$(MACH64) \
 	/usr/lib/libp/$(MACH64) \
@@ -488,7 +484,6 @@ SYM.ROOT.BIN= \
 	/etc/lib/nss_files.so.1 \
 	/usr/spool \
 	/usr/lib/tmac \
-	/usr/ccs/lib/fp \
 	/usr/ccs/lib/link_audit \
 	/usr/news \
 	/usr/preserve \
@@ -670,7 +665,6 @@ $(ROOT)/usr/lib/libp/32:=		LINKDEST=.
 $(ROOT)/usr/lib/lwp/32:=		LINKDEST=.
 $(ROOT)/usr/lib/link_audit/32:=		LINKDEST=.
 $(ROOT)/usr/lib/secure/32:=		LINKDEST=.
-$(ROOT)/usr/ccs/lib/fp:=		LINKDEST=../../lib/fp
 $(ROOT)/usr/ccs/lib/link_audit:=	LINKDEST=../../lib/link_audit
 $(ROOT)/var/ld/32:=			LINKDEST=.
 $(ROOT)/usr/ucblib/32:=			LINKDEST=.

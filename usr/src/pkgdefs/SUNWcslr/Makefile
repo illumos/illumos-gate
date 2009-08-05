@@ -25,8 +25,6 @@
 
 include ../Makefile.com
 
-DATAFILES += depend
-
 LICENSEFILES_i386 = \
 	../../common/crypto/aes/amd64/THIRDPARTYLICENSE.gladman \
 	../../common/crypto/aes/amd64/THIRDPARTYLICENSE.openssl \

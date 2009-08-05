@@ -47,5 +47,6 @@ P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
+P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWaudd      Audio Drivers (32 bit)
 P SUNWuwb	Ultra Wideband (UWB) support modules

@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
@@ -31,7 +30,7 @@ DATAFILES += i.ipsecalgsbase i.preserve i.sock2path
 
 .KEEP_STATE:
 
-all: $(FILES) postinstall depend
+all: $(FILES) postinstall
 
 install: all pkg
 

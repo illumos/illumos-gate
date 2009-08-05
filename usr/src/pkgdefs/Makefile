@@ -126,7 +126,6 @@ i386_SUBDIRS= \
 	SUNWcarx.i  \
 	SUNWcpc.i \
 	SUNWcpr.i \
-	SUNWdfb.i  \
 	SUNWdrmr \
 	SUNWgrub \
 	SUNWgrubS \
@@ -227,7 +226,6 @@ COMMON_SUBDIRS= \
 	SUNWcstl \
 	SUNWdcaf \
 	SUNWdcar \
-	SUNWdfbh  \
 	SUNWdhcm  \
 	SUNWdhcsb  \
 	SUNWdhcsr  \
@@ -542,7 +540,6 @@ COMMON_XMODS= \
 	SUNWibsdpib \
 	SUNWkdcr \
 	SUNWkdcu \
-	SUNWstatl \
 	SUNWsvvs \
 	SUNWwbint \
 	SUNWwbsup

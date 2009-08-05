@@ -20,12 +20,10 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-
 # This package information file defines software dependencies associated
 # with the pkg.  You can define three types of pkg dependencies with this file:
 #        P indicates a prerequisite for installation
@@ -44,6 +42,13 @@
 P SUNWcsr	Core Solaris, (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsl	Core Solaris Libraries
+P SUNWcar	Core Architecture, (Root)
+P SUNWcakr	Core Solaris Kernel Architecture (Root)
+P SUNWkvm	Core Architecture, (Kvm)
+P SUNWckr	Core Solaris Kernel (Root)
+P SUNWcnetr	Core Solaris Network Infrastructure (Root)
+P SUNWcsd	Core Solaris Devices
+P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWlibmsr	Math & Microtasking Libraries (Root)
 P SUNWfmd	Fault Management Daemon and Utilities
 P SUNWfsr	FP Scrubber configuration files (ROOT)

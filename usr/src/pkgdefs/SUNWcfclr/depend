@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -39,12 +39,13 @@
 # ...
 
 P SUNWcar	Core Architecture, (Root)
-P SUNWcakr      Core Solaris Kernel Architecture (Root)
+P SUNWcakr	Core Solaris Kernel Architecture (Root)
 P SUNWkvm	Core Architecture, (Kvm)
 P SUNWcsr	Core Solaris, (Root)
-P SUNWckr       Core Solaris Kernel (Root)
-P SUNWcnetr     Core Solaris Network Infrastructure (Root)
+P SUNWckr	Core Solaris Kernel (Root)
+P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
+P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWcfcl	Common Fibre Channel HBA API Library (Usr)

@@ -46,5 +46,6 @@ P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
+P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWiscsitr	Sun iSCSI COMSTAR port provider (Root)
 P SUNWstmfu	Sun Common Multipotocol SCSI Target Libraries and Tools

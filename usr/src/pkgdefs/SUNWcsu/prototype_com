@@ -717,7 +717,6 @@ f none usr/lib/t300 555 root bin
 f none usr/lib/t300s 555 root bin
 f none usr/lib/t4014 555 root bin
 f none usr/lib/t450 555 root bin
-d none usr/lib/term 755 root bin
 f none usr/lib/utmp_update 4555 root bin
 f none usr/lib/utmpd 555 root bin
 f none usr/lib/vplot 555 root bin

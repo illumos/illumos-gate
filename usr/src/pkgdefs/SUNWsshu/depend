@@ -46,6 +46,7 @@ P SUNWckr	Core Solaris Kernel (Root)
 P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsl	Core Solaris Libraries
+P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWcsd	Core Solaris Devices
 P SUNWgss	GSSAPI V2
 P SUNWsshcu	SSH Common, (Usr)

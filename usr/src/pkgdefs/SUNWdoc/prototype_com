@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,9 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 1990-93,1998 by Sun Microsystems, Inc.
-# All rights reserved.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -54,7 +51,6 @@ f none usr/bin/apropos 555 root bin
 l none usr/bin/catman=../../usr/bin/apropos
 f none usr/bin/checkeq 555 root bin
 f none usr/bin/checknr 555 root bin
-f none usr/bin/daps 555 root bin
 f none usr/bin/deroff 555 root bin
 f none usr/bin/diffmk 555 root bin
 f none usr/bin/eqn 555 root bin
@@ -75,66 +71,6 @@ f none usr/bin/vgrind 555 root bin
 l none usr/bin/whatis=../../usr/bin/apropos
 d none usr/lib 755 root bin
 d none usr/lib/font 755 root bin
-d none usr/lib/font/devaps 755 root bin
-f none usr/lib/font/devaps/B.add 644 root bin
-f none usr/lib/font/devaps/B.out 644 root bin
-f none usr/lib/font/devaps/BI.out 644 root bin
-f none usr/lib/font/devaps/C.out 644 root bin
-f none usr/lib/font/devaps/CE.out 644 root bin
-f none usr/lib/font/devaps/CI.out 644 root bin
-f none usr/lib/font/devaps/CT.add 644 root bin
-f none usr/lib/font/devaps/CT.out 644 root bin
-f none usr/lib/font/devaps/CW.add 644 root bin
-f none usr/lib/font/devaps/CW.out 644 root bin
-f none usr/lib/font/devaps/CX.add 644 root bin
-f none usr/lib/font/devaps/CX.out 644 root bin
-f none usr/lib/font/devaps/DESC.out 644 root bin
-f none usr/lib/font/devaps/G.out 644 root bin
-f none usr/lib/font/devaps/GB.add 644 root bin
-f none usr/lib/font/devaps/GB.out 644 root bin
-f none usr/lib/font/devaps/GI.add 644 root bin
-f none usr/lib/font/devaps/GI.out 644 root bin
-f none usr/lib/font/devaps/GR.add 644 root bin
-f none usr/lib/font/devaps/GR.out 644 root bin
-f none usr/lib/font/devaps/GS.add 644 root bin
-f none usr/lib/font/devaps/GS.out 644 root bin
-f none usr/lib/font/devaps/H.out 644 root bin
-f none usr/lib/font/devaps/HB.out 644 root bin
-f none usr/lib/font/devaps/HI.add 644 root bin
-f none usr/lib/font/devaps/HI.out 644 root bin
-f none usr/lib/font/devaps/HK.add 644 root bin
-f none usr/lib/font/devaps/HK.out 644 root bin
-f none usr/lib/font/devaps/HL.out 644 root bin
-f none usr/lib/font/devaps/HM.out 644 root bin
-f none usr/lib/font/devaps/HX.add 644 root bin
-f none usr/lib/font/devaps/HX.out 644 root bin
-f none usr/lib/font/devaps/I.add 644 root bin
-f none usr/lib/font/devaps/I.out 644 root bin
-f none usr/lib/font/devaps/MB.out 644 root bin
-f none usr/lib/font/devaps/MI.out 644 root bin
-f none usr/lib/font/devaps/MR.out 644 root bin
-f none usr/lib/font/devaps/MX.out 644 root bin
-f none usr/lib/font/devaps/PA.out 644 root bin
-f none usr/lib/font/devaps/PB.out 644 root bin
-f none usr/lib/font/devaps/PI.out 644 root bin
-f none usr/lib/font/devaps/PO.add 644 root bin
-f none usr/lib/font/devaps/PO.out 644 root bin
-f none usr/lib/font/devaps/PX.add 644 root bin
-f none usr/lib/font/devaps/PX.out 644 root bin
-f none usr/lib/font/devaps/R.add 644 root bin
-f none usr/lib/font/devaps/R.out 644 root bin
-f none usr/lib/font/devaps/S.add 644 root bin
-f none usr/lib/font/devaps/S.out 644 root bin
-f none usr/lib/font/devaps/S1.add 644 root bin
-f none usr/lib/font/devaps/S1.out 644 root bin
-f none usr/lib/font/devaps/SC.add 644 root bin
-f none usr/lib/font/devaps/SC.out 644 root bin
-f none usr/lib/font/devaps/SM.add 644 root bin
-f none usr/lib/font/devaps/SM.out 644 root bin
-f none usr/lib/font/devaps/TB.out 644 root bin
-f none usr/lib/font/devaps/TX.add 644 root bin
-f none usr/lib/font/devaps/TX.out 644 root bin
-f none usr/lib/font/devaps/version 644 root bin
 d none usr/lib/font/devpost 755 root lp
 f none usr/lib/font/devpost/AB 444 root lp
 f none usr/lib/font/devpost/AB.name 444 root lp

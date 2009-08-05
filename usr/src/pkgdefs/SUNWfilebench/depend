@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This package information file defines software dependencies associated
@@ -40,12 +40,16 @@
 # ...
 #
 
-P SUNWcar	Core Architecture, (Root)
-P SUNWcakr	Core Solaris Kernel Architecture (Root)
-P SUNWkvm	Core Architecture, (Kvm)
-P SUNWcsr	Core Solaris, (Root)
-P SUNWcsu	Core Solaris, (Usr)
-P SUNWcsl	Core Solaris Libraries
+P SUNWcar		Core Architecture, (Root)
+P SUNWcakr		Core Solaris Kernel Architecture (Root)
+P SUNWkvm		Core Architecture, (Kvm)
+P SUNWcsr		Core Solaris, (Root)
+P SUNWcsu		Core Solaris, (Usr)
+P SUNWcsl		Core Solaris Libraries
+P SUNWckr		Core Solaris Kernel (Root)
+P SUNWcslr		Core Solaris Libraries (Root)
+P SUNWcnetr		Core Solaris Network Infrastructure (Root)
+P SUNWcsd		Core Solaris Devices
 P SUNWperl584core	Perl 5.8.4 (core)
-P SUNWlibmsr	
-P SUNWtecla	Tecla command-line editing library
+P SUNWlibmsr		Math & Microtasking Libraries (Root)	
+P SUNWtecla		Tecla command-line editing library

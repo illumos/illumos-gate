@@ -47,7 +47,8 @@ P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
-P SUNWrsg	RPCSEC_GSS
+P SUNWcslr      Core Solaris Libraries (Root)
+P SUNWrsg       RPCSEC_GSS
 P SUNWgss	Generic Security Service App Program Int, Ver 2 - user
 P SUNWlldap	LDAP Libraries
 P SUNWsmbsu	SMB Server (Usr)

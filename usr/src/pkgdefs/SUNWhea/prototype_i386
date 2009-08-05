@@ -80,11 +80,8 @@ f none usr/include/sys/bootregs.h 644 root bin
 f none usr/include/sys/bootsvcs.h 644 root bin
 f none usr/include/sys/controlregs.h 644 root bin
 f none usr/include/sys/debugreg.h 644 root bin
-d none usr/include/sys/dktp 755 root bin
 f none usr/include/sys/dktp/altsctr.h 644 root bin
 f none usr/include/sys/dktp/cmpkt.h 644 root bin
-f none usr/include/sys/dktp/dadkio.h 644 root bin
-f none usr/include/sys/dktp/fdisk.h 644 root bin
 f none usr/include/sys/dma_engine.h 644 root bin
 f none usr/include/sys/fp.h 644 root bin
 f none usr/include/sys/hypervisor.h 644 root bin
@@ -96,7 +93,6 @@ f none usr/include/sys/mca_amd.h 644 root bin
 f none usr/include/sys/mca_x86.h 644 root bin
 f none usr/include/sys/mc_intel.h 644 root bin
 f none usr/include/sys/mutex_impl.h 644 root bin
-f none usr/include/sys/obpdefs.h 644 root bin
 f none usr/include/sys/pcic_reg.h 644 root bin
 f none usr/include/sys/pcic_var.h 644 root bin
 f none usr/include/sys/pic.h 644 root bin
@@ -112,17 +108,14 @@ f none usr/include/sys/rtc.h 644 root bin
 d none usr/include/sys/sata 755 root sys
 f none usr/include/sys/sata/sata_hba.h 644 root bin
 f none usr/include/sys/sata/sata_defs.h 644 root bin
-f none usr/include/sys/scsi/targets/stdef.h 644 root bin
 f none usr/include/sys/segment.h 644 root bin
 f none usr/include/sys/segments.h 644 root bin
 f none usr/include/sys/sysi86.h 644 root bin
-f none usr/include/sys/spl.h 644 root bin
 f none usr/include/sys/traptrace.h 644 root bin
 f none usr/include/sys/tss.h 644 root bin
 f none usr/include/sys/x86_archext.h 644 root bin
 f none usr/include/sys/ucode.h 644 root bin
 f none usr/include/sys/xen_errno.h 644 root bin
-d none usr/platform 755 root sys
 d none usr/platform/i86pc 755 root sys
 d none usr/platform/i86pc/include 755 root bin
 d none usr/platform/i86pc/include/sys 755 root bin

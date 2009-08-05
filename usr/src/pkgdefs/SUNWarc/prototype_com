@@ -48,9 +48,6 @@ i preremove
 d none usr 755 root sys
 d none usr/ccs 755 root bin
 d none usr/ccs/lib 755 root bin
-d none usr/lib/fp 755 root bin
-d none usr/lib/fp/libp 755 root bin
-s none usr/ccs/lib/fp=../../lib/fp
 f none usr/lib/crti.o 644 root bin
 f none usr/lib/crtn.o 644 root bin
 f none usr/lib/values-xpg4.o 644 root bin

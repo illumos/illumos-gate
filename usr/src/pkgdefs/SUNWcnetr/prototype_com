@@ -35,7 +35,6 @@
 #!<param>=<value>			# puts parameter in pkg environment
 
 # packaging files
-i depend
 i pkginfo
 i copyright
 i postinstall

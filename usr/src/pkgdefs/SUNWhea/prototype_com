@@ -770,6 +770,9 @@ f none usr/include/sys/disp.h 644 root bin
 f none usr/include/sys/dkbad.h 644 root bin
 f none usr/include/sys/dkio.h 644 root bin
 f none usr/include/sys/dklabel.h 644 root bin
+d none usr/include/sys/dktp 755 root bin
+f none usr/include/sys/dktp/dadkio.h 644 root bin
+f none usr/include/sys/dktp/fdisk.h 644 root bin
 f none usr/include/sys/dl.h 644 root bin
 f none usr/include/sys/dlpi.h 644 root bin
 f none usr/include/sys/dma_i8237A.h 644 root bin
@@ -803,6 +806,7 @@ f none usr/include/sys/exacct_impl.h 644 root bin
 f none usr/include/sys/exec.h 644 root bin
 f none usr/include/sys/exechdr.h 644 root bin
 f none usr/include/sys/fault.h 644 root bin
+f none usr/include/sys/fbio.h 0644 root bin
 f none usr/include/sys/fbuf.h 644 root bin
 d none usr/include/sys/fc4 755 root bin
 f none usr/include/sys/fc4/fc.h 644 root bin
@@ -1073,6 +1077,7 @@ f none usr/include/sys/nvpair.h 644 root bin
 f none usr/include/sys/nvpair_impl.h 644 root bin
 f none usr/include/sys/objfs.h 644 root bin
 f none usr/include/sys/objfs_impl.h 644 root bin
+f none usr/include/sys/obpdefs.h 644 root bin
 f none usr/include/sys/old_procfs.h 644 root bin
 f none usr/include/sys/open.h 644 root bin
 f none usr/include/sys/openpromio.h 644 root bin
@@ -1212,6 +1217,7 @@ f none usr/include/sys/scsi/targets/sesio.h 644 root bin
 f none usr/include/sys/scsi/targets/sgendef.h 644 root bin
 f none usr/include/sys/scsi/targets/sddef.h 644 root bin
 f none usr/include/sys/scsi/targets/smp.h 644 root bin
+f none usr/include/sys/scsi/targets/stdef.h 644 root bin
 f none usr/include/sys/select.h 644 root bin
 f none usr/include/sys/sem.h 644 root bin
 f none usr/include/sys/sem_impl.h 644 root bin
@@ -1238,6 +1244,7 @@ f none usr/include/sys/socket_impl.h 644 root bin
 f none usr/include/sys/socketvar.h 644 root bin
 f none usr/include/sys/sockio.h 644 root bin
 f none usr/include/sys/socket_proto.h 644 root bin
+f none usr/include/sys/spl.h 644 root bin
 f none usr/include/sys/sservice.h 644 root bin
 f none usr/include/sys/squeue.h 644 root bin
 f none usr/include/sys/squeue_impl.h 644 root bin
@@ -1361,6 +1368,7 @@ f none usr/include/sys/vfs.h 644 root bin
 f none usr/include/sys/vfs_opreg.h 644 root bin
 f none usr/include/sys/vfstab.h 644 root bin
 f none usr/include/sys/videodev2.h 644 root bin
+f none usr/include/sys/visual_io.h 644 root bin
 f none usr/include/sys/vm.h 644 root bin
 f none usr/include/sys/vm_usage.h 644 root bin
 f none usr/include/sys/vmem.h 644 root bin
@@ -1451,6 +1459,7 @@ f none usr/include/wordexp.h 644 root bin
 f none usr/include/xti.h 644 root bin
 f none usr/include/xti_inet.h 644 root bin
 f none usr/include/zone.h 644 root bin
+d none usr/platform 755 root sys
 d none usr/share 755 root sys
 d none usr/share/src 755 root sys
 d none usr/share/src/uts 755 root bin

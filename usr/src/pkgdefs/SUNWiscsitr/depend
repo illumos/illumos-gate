@@ -46,6 +46,7 @@ P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
+P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWiscsidmr	Sun iSCSI Data Mover (Root)
 P SUNWiscsidmu	Sun iSCSI Data Mover (Usr)
 P SUNWstmf	Sun Common Multipotocol SCSI Target

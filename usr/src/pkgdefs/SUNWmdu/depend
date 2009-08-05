@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This package information file defines software dependencies associated
 # with the pkg.  You can define three types of pkg dependencies with this file:
@@ -49,6 +48,8 @@ P SUNWcsu	Core Sparc, (Usr)
 P SUNWcar	Core Architecture, (Root)
 P SUNWcakr	Core Solaris Kernel Architecture (Root)
 P SUNWkvm	Core Architecture, (Kvm)
+P SUNWcsl	Core Solaris Libraries
+P SUNWcslr	Core Solaris Libraries (Root)
 
 # Other packages this package has dependencies
 # upon at install-time or run-time.
