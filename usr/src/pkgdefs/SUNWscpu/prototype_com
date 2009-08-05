@@ -35,7 +35,6 @@
 # packaging files
 i pkginfo
 i copyright
-i postinstall
 i depend
 #
 # source locations relative to the prototype file
@@ -58,7 +57,6 @@ f none usr/ucb/atoplot 755 root bin
 f none usr/ucb/basename 755 root bin
 f none usr/ucb/bgplot 755 root bin
 f none usr/ucb/biff 755 root bin
-f none usr/ucb/cc 555 root bin
 f none usr/ucb/chown 755 root bin
 s none usr/ucb/clear=../bin/clear
 f none usr/ucb/crtplot 755 root bin
@@ -87,8 +85,6 @@ f none usr/ucb/hp7221plot 755 root bin
 f none usr/ucb/hpplot 755 root bin
 f none usr/ucb/implot 755 root bin
 f none usr/ucb/install 755 root bin
-f none usr/ucb/ld 555 root bin
-f none usr/ucb/lint 555 root bin
 f none usr/ucb/ln 755 root bin
 s none usr/ucb/logger=../bin/logger
 f none usr/ucb/ls 755 root bin

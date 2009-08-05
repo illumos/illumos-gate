@@ -32,7 +32,6 @@ include $(SRC)/ucbcmd/Makefile.ucbcmd
 COMMON_SUBDIRS=		\
 	basename	\
 	biff		\
-	cc		\
 	chown		\
 	df		\
 	du		\
@@ -44,8 +43,6 @@ COMMON_SUBDIRS=		\
 	from		\
 	groups		\
 	install.d	\
-	ld		\
-	lint.d		\
 	ln		\
 	ls		\
 	mkstr		\
