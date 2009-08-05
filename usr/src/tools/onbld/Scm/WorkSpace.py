@@ -440,70 +440,64 @@ class WorkSpace(object):
         self.ui = self.repo.ui
         self.name = self.repo.root
 
-        parent = self.repo.ui.expandpath('default')
-        if parent == 'default':
-            parent = None
-        self.parentrepo = parent
-
         self.activecache = {}
         self.outgoingcache = {}
 
     def parent(self, spec=None):
-        '''Return canonical workspace parent, either SPEC if passed,
-        or default parent otherwise'''
-        return spec or self.parentrepo
+        '''Return the canonical workspace parent, either SPEC (which
+        will be expanded) if provided or the default parent
+        otherwise.'''
 
-    def _localtip(self, bases, heads):
-        '''Return a tuple (changectx, workingctx) representing the most
-        representative head to act as the local tip.
+        if spec:
+            return self.ui.expandpath(spec)
 
-        If the working directory is modified, the changectx is its
-        tipmost local parent (or tipmost parent, if neither is
-        local), and the workingctx is non-null.
+        p = self.ui.expandpath('default')
+        if p == 'default':
+            return None
+        else:
+            return p
 
-        If the working directory is clean, the workingctx is null.
-        The changectx is the tip-most local head on the current branch.
-        If this can't be determined for some reason (e.g., the parent
-        repo is inacessible), changectx is the tip-most head on the
-        current branch.
+    def _localtip(self, outgoing, wctx):
+        '''Return the most representative changeset to act as the
+        localtip.
 
-        If the workingctx is non-null it is the actual local tip (and would
-        be the local tip in any generated ActiveList, for instance),
-        the better parent revision is returned also to aid callers needing
-        a real changeset to act as a surrogate for an uncommitted change.'''
+        If the working directory is modified (has file changes, is a
+        merge, or has switched branches), this will be a workingctx.
 
-        def tipmost_of(nodes):
-            return sorted(nodes, cmp=lambda x, y: cmp(x.rev(), y.rev()))[-1]
-
-        #
-        # We need a full set of outgoing nodes such that we can limit
-        # local branch heads to those which are outgoing
-        #
-        outnodes = self.repo.changelog.nodesbetween(bases, heads)[0]
-        wctx = self.workingctx()
+        If the working directory is unmodified, this will be the most
+        recent (highest revision number) local (outgoing) head on the
+        current branch, if no heads are determined to be outgoing, it
+        will be the most recent head on the current branch.
+        '''
 
         #
-        # A modified working context is seen as a proto-branch, where
-        # the 'heads' from our view are the parent revisions of that
-        # context.
-        # (and the working head is it)
+        # A modified working copy is seen as a proto-branch, and thus
+        # our only option as the local tip.
         #
         if (wctx.files() or len(wctx.parents()) > 1 or
             wctx.branch() != wctx.parents()[0].branch()):
-            heads = wctx.parents()
-        else:
-            heads = [self.repo.changectx(n) for n in heads]
-            wctx = None
+            return wctx
 
-        localchoices = [n for n in heads if n.node() in outnodes]
-        return (tipmost_of(localchoices or heads), wctx)
+        heads = self.repo.heads(start=wctx.parents()[0].node())
+        headctxs = [self.repo.changectx(n) for n in heads]
+        localctxs = [c for c in headctxs if c.node() in outgoing]
 
-    def _parenttip(self, localtip, parent=None):
-        '''Find the closest approximation of the parents tip, as best
-        as we can.
+        ltip = sorted(localctxs or headctxs, key=lambda x: x.rev())[-1]
 
-        In parent-less workspaces returns our tip (given the best
-        we can do is deal with uncommitted changes)'''
+        if len(heads) > 1:
+            self.ui.warn('The current branch has more than one head, '
+                         'using %s\n' % ltip.rev())
+
+        return ltip
+
+    def _parenttip(self, heads, outgoing):
+        '''Return the highest-numbered, non-outgoing changeset that is
+        an ancestor of a changeset in heads.
+
+        This is intended to find the most recent changeset on a given
+        branch that is shared between a parent and child workspace,
+        such that it can act as a stand-in for the parent workspace.
+        '''
 
         def tipmost_shared(head, outnodes):
             '''Return the tipmost node on the same branch as head that is not
@@ -514,15 +508,20 @@ class WorkSpace(object):
             and return the first node we see in the iter phase that
             was previously collected.
 
+            If no node is found (all revisions >= 0 are outgoing), the
+            only possible parenttip is the null node (node.nullid)
+            which is returned explicitly.
+
             See the docstring of mercurial.cmdutil.walkchangerevs()
             for the phased approach to the iterator returned.  The
             important part to note is that the 'add' phase gathers
             nodes, which the 'iter' phase then iterates through.'''
 
+            opts = {'rev': ['%s:0' % head.rev()],
+                    'follow': True}
             get = util.cachefunc(lambda r: self.repo.changectx(r).changeset())
             changeiter = cmdutil.walkchangerevs(self.repo.ui, self.repo, [],
-                                                get, {'rev': ['%s:0' % head],
-                                                      'follow': True})[0]
+                                                get, opts)[0]
             seen = []
             for st, rev, fns in changeiter:
                 n = self.repo.changelog.node(rev)
@@ -532,22 +531,10 @@ class WorkSpace(object):
                 elif st == 'iter':
                     if n in seen:
                         return rev
-            return None
+            return self.repo.changelog.rev(node.nullid)
 
-        tipctx, wctx = localtip
-        parent = self.parent(parent)
-        outgoing = None
-
-        if parent:
-            outgoing = self.findoutgoing(parent)
-
-        if wctx:
-            possible_branches = wctx.parents()
-        else:
-            possible_branches = [tipctx]
-
-        nodes = self.repo.changelog.nodesbetween(outgoing)[0]
-        ptips = map(lambda x: tipmost_shared(x.rev(), nodes), possible_branches)
+        nodes = set(outgoing)
+        ptips = map(lambda x: tipmost_shared(x, nodes), heads)
         return self.repo.changectx(sorted(ptips)[-1])
 
     def status(self, base=None, head=None):
@@ -614,30 +601,26 @@ class WorkSpace(object):
 
         if parent:
             outgoing = self.findoutgoing(parent)
+            outnodes = self.repo.changelog.nodesbetween(outgoing)[0]
         else:
             outgoing = []       # No parent, no outgoing nodes
+            outnodes = []
 
-        branchheads = self.repo.heads(start=self.repo.dirstate.parents()[0])
-        ourhead, workinghead = self._localtip(outgoing, branchheads)
+        localtip = self._localtip(outnodes, self.workingctx())
 
-        if len(branchheads) > 1:
-            self.ui.warn('The current branch has more than one head, '
-                         'using %s\n' % ourhead.rev())
-
-        if workinghead:
-            parents = workinghead.parents()
-            ctxs = [self.repo.changectx(n) for n in
-                    self.repo.changelog.nodesbetween(outgoing,
-                                                     [h.node() for h in
-                                                      parents])[0]]
-            ctxs.append(workinghead)
+        if localtip.rev() is None:
+            heads = localtip.parents()
         else:
-            ctxs = [self.repo.changectx(n) for n in
-                    self.repo.changelog.nodesbetween(outgoing,
-                                                     [ourhead.node()])[0]]
+            heads = [localtip]
 
-        act = ActiveList(self, self._parenttip((ourhead, workinghead), parent),
-                         ctxs)
+        ctxs = [self.repo.changectx(n) for n in
+                self.repo.changelog.nodesbetween(outgoing,
+                                                 [h.node() for h in heads])[0]]
+
+        if localtip.rev() is None:
+            ctxs.append(localtip)
+
+        act = ActiveList(self, self._parenttip(heads, outnodes), ctxs)
 
         self.activecache[parent] = act
         return act

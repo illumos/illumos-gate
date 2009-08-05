@@ -75,47 +75,22 @@ def yes_no(ui, msg, default):
         return False
 
 
-def _buildfilelist(repo, args):
-    '''build a list of files in which we're interested
+def buildfilelist(ws, parent, files):
+    '''Build a list of files in which we're interested.
 
-    If no files are specified, then we'll default to using
-    the entire active list.
+    If no files are specified take files from the active list relative
+    to 'parent'.
 
-    Returns a dictionary, wherein the keys are cwd-relative file paths,
-    and the values (when present) are entries from the active list.
-    Instead of warning the user explicitly about files not in the active
-    list, we'll attempt to do checks on them.'''
+    Return a list of 2-tuples the first element being a path relative
+    to the current directory and the second an entry from the active
+    list, or None if an explicit file list was given.'''
 
-    fdict = {}
-
-    #
-    # If the user specified files on the command line, we'll only check
-    # those files.  We won't pull the active list at all.  That means we
-    # won't be smart about skipping deleted files and such, so the user
-    # needs to be smart enough to not explicitly specify a nonexistent
-    # file path.  Which seems reasonable.
-    #
-    if args:
-        for f in args:
-            fdict[f] = None
-
-    #
-    # Otherwise, if no files were listed explicitly, we assume that the
-    # checks should be run on all files in the active list.  So we determine
-    # it here.
-    #
-    # Tracking the file paths is a slight optimization, in that multiple
-    # check functions won't need to derive it themselves.  This also dovetails
-    # nicely with the expectation that explicitly specified files will be
-    # ${CWD}-relative paths, so the fdict keyspace will be consistent either
-    # way.
-    #
+    if files:
+        return [(path, None) for path in sorted(files)]
     else:
-        active = wslist[repo].active()
-        for e in sorted(active):
-            fdict[wslist[repo].filepath(e.name)] = e
-
-    return fdict
+        active = ws.active(parent=parent)
+        return [(ws.filepath(e.name), e) for e in sorted(active)]
+buildfilelist = util.cachefunc(buildfilelist)
 
 
 def not_check(repo, cmd):
@@ -303,16 +278,14 @@ def cdm_cddlchk(ui, repo, *args, **opts):
     See http://www.opensolaris.org/os/community/on/devref_toc/devref_7/#7_2_3_nonformatting_considerations
     for more info.'''
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
-
-    ui.write('CDDL block check:\n')
-
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'cddlchk')
     lenient = True
     ret = 0
 
-    exclude = not_check(repo, 'cddlchk')
+    ui.write('CDDL block check:\n')
 
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif (e or opts.get('honour_nots')) and exclude(f):
@@ -336,14 +309,13 @@ def cdm_mapfilechk(ui, repo, *args, **opts):
     header comment directing the reader to the document containing
     Solaris object versioning rules (README.mapfile).'''
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'mapfilechk')
+    ret = 0
 
     ui.write('Mapfile comment check:\n')
 
-    ret = 0
-    exclude = not_check(repo, 'mapfilechk')
-
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif f.find('mapfile') == -1:
@@ -366,14 +338,13 @@ def cdm_copyright(ui, repo, *args, **opts):
     See http://www.opensolaris.org/os/project/muskoka/on_dev/golden_rules.txt
     for more info.'''
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'copyright')
+    ret = 0
 
     ui.write('Copyright check:\n')
 
-    ret = 0
-    exclude = not_check(repo, 'copyright')
-
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif (e or opts.get('honour_nots')) and exclude(f):
@@ -389,14 +360,13 @@ def cdm_copyright(ui, repo, *args, **opts):
 def cdm_hdrchk(ui, repo, *args, **opts):
     '''check active header files conform to O/N rules'''
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'hdrchk')
+    ret = 0
 
     ui.write('Header format check:\n')
 
-    ret = 0
-    exclude = not_check(repo, 'hdrchk')
-
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif not f.endswith('.h'):
@@ -416,14 +386,13 @@ def cdm_cstyle(ui, repo, *args, **opts):
 
     See http://opensolaris.org/os/community/documentation/getting_started_docs/cstyle.ms.pdf'''
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'cstyle')
+    ret = 0
 
     ui.write('C style check:\n')
 
-    ret = 0
-    exclude = not_check(repo, 'cstyle')
-
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif not (f.endswith('.c') or f.endswith('.h')):
@@ -443,14 +412,13 @@ def cdm_cstyle(ui, repo, *args, **opts):
 def cdm_jstyle(ui, repo, *args, **opts):
     'check active Java source files for common stylistic errors'
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'jstyle')
+    ret = 0
 
     ui.write('Java style check:\n')
 
-    ret = 0
-    exclude = not_check(repo, 'jstyle')
-
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif not f.endswith('.java'):
@@ -468,14 +436,13 @@ def cdm_jstyle(ui, repo, *args, **opts):
 def cdm_permchk(ui, repo, *args, **opts):
     '''check active files permission - warn +x (execute) mode'''
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'permchk')
+    exeFiles = []
 
     ui.write('File permission check:\n')
 
-    exeFiles = []
-    exclude = not_check(repo, 'permchk')
-
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif (e or opts.get('honour_nots')) and exclude(f):
@@ -606,14 +573,13 @@ def cdm_rtichk(ui, repo, **opts):
 def cdm_keywords(ui, repo, *args, **opts):
     '''check source files do not contain SCCS keywords'''
 
-    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+    filelist = buildfilelist(wslist[repo], opts.get('parent'), args)
+    exclude = not_check(repo, 'keywords')
+    ret = 0
 
     ui.write('Keywords check:\n')
 
-    ret = 0
-    exclude = not_check(repo, 'keywords')
-
-    for f, e in filelist.iteritems():
+    for f, e in filelist:
         if e and e.is_removed():
             continue
         elif (e or opts.get('honour_nots')) and exclude(f):
@@ -671,20 +637,17 @@ def run_checks(ws, cmds, *args, **opts):
 
     ret = 0
 
-    flist = _buildfilelist(ws.repo, args)
-
     for cmd in cmds:
         name = cmd.func_name.split('_')[1]
         if not ws.ui.configbool('cdm', name, True):
             ws.ui.status('Skipping %s check...\n' % name)
         else:
             ws.ui.pushbuffer()
+            result = cmd(ws.ui, ws.repo, honour_nots=True, *args, **opts)
+            output = ws.ui.popbuffer()
 
-            result = cmd(ws.ui, ws.repo, filelist=flist,
-                         honour_nots=True, *args, **opts)
             ret |= result
 
-            output = ws.ui.popbuffer()
             if not ws.ui.quiet or result != 0:
                 ws.ui.write(output, '\n')
     return ret
