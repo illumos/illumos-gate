@@ -16697,6 +16697,13 @@ sdintr(struct scsi_pkt *pktp)
 			un->un_mediastate = DKIO_DEV_GONE;
 			cv_broadcast(&un->un_state_cv);
 		}
+		/*
+		 * If the command happens to be the REQUEST SENSE command,
+		 * free up the rqs buf and fail the original command.
+		 */
+		if (bp == un->un_rqs_bp) {
+			bp = sd_mark_rqs_idle(un, xp);
+		}
 		sd_return_failed_command(un, bp, EIO);
 		goto exit;
 	}
