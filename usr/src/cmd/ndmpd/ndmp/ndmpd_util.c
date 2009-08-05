@@ -2182,7 +2182,7 @@ char *
 cctime(time_t *t)
 {
 	char *bp, *cp;
-	char tbuf[BUFSIZ];
+	static char tbuf[BUFSIZ];
 
 	if (!t)
 		return ("");
@@ -2190,7 +2190,9 @@ cctime(time_t *t)
 	if (*t == (time_t)0)
 		return ("the epoch");
 
-	bp = ctime_r(t, tbuf, BUFSIZ);
+	if ((bp = ctime_r(t, tbuf, BUFSIZ)) == NULL)
+		return ("");
+
 	cp = strchr(bp, '\n');
 	if (cp)
 		*cp = '\0';

@@ -72,6 +72,7 @@ static int output_xattr_header(char *fname,
     tlm_cmd_t *);
 
 extern  libzfs_handle_t *zlibh;
+extern  mutex_t zlib_mtx;
 
 
 /*
@@ -1262,8 +1263,10 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 	(void) strlcpy(mhp->nh_magic, ZFS_META_MAGIC, sizeof (mhp->nh_magic));
 	(void) strlcpy(mhp->nh_dataset, dataset, sizeof (mhp->nh_dataset));
 
+	(void) mutex_lock(&zlib_mtx);
 	if ((mhp->nh_handle = zfs_open(zlibh, dataset,
 	    ZFS_TYPE_DATASET)) == NULL) {
+		(void) mutex_unlock(&zlib_mtx);
 		free(mhp);
 		return (ZPROP_INVAL);
 	}
@@ -1283,6 +1286,7 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 		    nvlist_lookup_string(ulist, ZPROP_VALUE, &sval) != 0 ||
 		    nvlist_lookup_string(ulist, ZPROP_SOURCE, &ssrc) != 0) {
 			zfs_close(mhp->nh_handle);
+			(void) mutex_unlock(&zlib_mtx);
 			free(mhp);
 			return (-1);
 		}
@@ -1296,6 +1300,7 @@ ndmp_include_zfs(ndmp_context_t *nctx, const char *dataset)
 	}
 
 	zfs_close(mhp->nh_handle);
+	(void) mutex_unlock(&zlib_mtx);
 
 	if ((wbuf = get_write_buffer(size, &actual_size, TRUE,
 	    lcmd)) != NULL) {
