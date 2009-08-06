@@ -202,11 +202,8 @@ zfs_znode_move_impl(znode_t *ozp, znode_t *nzp)
 	nzp->z_dbuf = ozp->z_dbuf;
 
 	/*
-	 * Release any cached ACL, since it *may* have
-	 * zfs_acl_node_t's that directly references an
-	 * embedded ACL in the zp_acl of the old znode_phys_t
-	 *
-	 * It will be recached the next time the ACL is needed.
+	 * Since this is just an idle znode and kmem is already dealing with
+	 * memory pressure, release any cached ACL.
 	 */
 	if (ozp->z_acl_cached) {
 		zfs_acl_free(ozp->z_acl_cached);
@@ -571,6 +568,7 @@ zfs_znode_dmu_init(zfsvfs_t *zfsvfs, znode_t *zp, dmu_buf_t *db)
 	mutex_enter(&zp->z_lock);
 
 	ASSERT(zp->z_dbuf == NULL);
+	ASSERT(zp->z_acl_cached == NULL);
 	zp->z_dbuf = db;
 	nzp = dmu_buf_set_user_ie(db, zp, &zp->z_phys, znode_evict_error);
 
@@ -1002,6 +1000,13 @@ zfs_rezget(znode_t *zp)
 		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 		return (EIO);
 	}
+
+	mutex_enter(&zp->z_acl_lock);
+	if (zp->z_acl_cached) {
+		zfs_acl_free(zp->z_acl_cached);
+		zp->z_acl_cached = NULL;
+	}
+	mutex_exit(&zp->z_acl_lock);
 
 	zfs_znode_dmu_init(zfsvfs, zp, db);
 	zp->z_unlinked = (zp->z_phys->zp_links == 0);
