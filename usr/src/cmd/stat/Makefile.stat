@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/stat/Makefile.stat
 
 STATSRC = $(SRC)/cmd/stat
 STATCOMMONDIR = $(STATSRC)/common
 
-COMMON_OBJS = acquire.o walkers.o acquire_iodevs.o dsr.o mnt.o common.o
+COMMON_OBJS = acquire.o walkers.o acquire_iodevs.o dsr.o mnt.o common.o \
+	timestamp.o
 COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)

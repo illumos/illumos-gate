@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include "statcommon.h"
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -32,6 +32,12 @@
 #include <bsm/audit.h>
 #include <bsm/libbsm.h>
 #include <unistd.h>
+#include <locale.h>
+
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it isn't */
+#endif
+
 
 /*
  * Display header every HEADER_MOD lines printed
@@ -51,6 +57,7 @@ static int	count;
 static int	flags;
 static int	header_mod = DFLT_HEADER_MOD;
 static int	interval;
+static uint_t timestamp_fmt = NODATE;
 
 static void	display_stats();
 static void	eauditon();
@@ -66,6 +73,9 @@ char	**argv;
 	register int	i;
 	au_stat_t s;
 
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
+
 	(void) setbuf(stdout, (char *)0);
 	(void) setbuf(stderr, (char *)0);
 
@@ -73,6 +83,8 @@ char	**argv;
 
 	if (!flags) {
 		eauditon(A_GETSTAT, (caddr_t)&s, NULL);
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 		display_stats(&s, 0);
 		exit(0);
 	}
@@ -92,6 +104,8 @@ char	**argv;
 	/* CSTYLED */
 	for (i = 0;; i++) {
 		eauditon(A_GETSTAT, (caddr_t)&s, NULL);
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 		display_stats(&s, i);
 		if ((flags & CFLG) && count)
 			if (i == count - 1)
@@ -126,7 +140,8 @@ au_stat_t *s;
 		s->as_memused / ONEK, 	&(offset[11]));
 
 	/* print a properly aligned header every HEADER_MOD lines */
-	if (header_mod && (!cnt || !(cnt % header_mod))) {
+	if (header_mod && (!cnt || ((timestamp_fmt != NODATE) ?
+	    !(cnt % (header_mod / 2)) : !(cnt % header_mod)))) {
 		(void) printf(
 			"%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s\n",
 			offset[0] - 1,			"gen",
@@ -167,7 +182,7 @@ char	**argv;
 {
 	int	c;
 
-	while ((c = getopt(argc, argv, "c:h:i:vn")) != -1) {
+	while ((c = getopt(argc, argv, "c:h:i:vnT:")) != -1) {
 		switch (c) {
 		case 'c':
 			if (flags & CFLG)
@@ -212,6 +227,18 @@ char	**argv;
 				usage_exit();
 			flags |= VFLG;
 			break;
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage_exit();
+			} else {
+				usage_exit();
+			}
+			break;
 		case '?':
 		default:
 			usage_exit();
@@ -226,7 +253,7 @@ usage_exit()
 {
 	(void) fprintf(stderr,
 	    "auditstat: usage: auditstat [-c count] [-h lines] "
-	    "[-i interval] [-n] [-v]\n");
+	    "[-T d|u] [-i interval] [-n] [-v]\n");
 	exit(1);
 }
 

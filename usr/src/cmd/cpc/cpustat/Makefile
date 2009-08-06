@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		cpustat
@@ -31,23 +29,29 @@ SRCS =		$(OBJS:%.o=../common/%.c)
 
 include ../../Makefile.cmd
 
+STATCOMMONDIR = $(SRC)/cmd/stat/common
+
+STAT_COMMON_OBJS = timestamp.o
+STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+SRCS += $(STAT_COMMON_SRCS)
+
 CFLAGS		+= $(CCVERBOSE) $(CTF_FLAGS)
-CPPFLAGS	+= -D_REENTRANT -I$(SRC)/lib/libcpc/common
+CPPFLAGS	+= -D_REENTRANT -I$(SRC)/lib/libcpc/common -I$(STATCOMMONDIR)
 LDLIBS +=	-lcpc -lkstat
 
 .KEEP_STATE:
 
 all:	$(PROG)
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
+	$(LINK.c) $(OBJS) $(STAT_COMMON_OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
-	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS) $(STAT_COMMON_OBJS)
 
 install: all $(ROOTUSRSBINPROG)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
 
 lint:	lint_SRCS
 
@@ -55,6 +59,10 @@ strip: all
 	$(STRIP) $(PROG)
 
 %.o:	../common/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o:	$(STATCOMMONDIR)/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 

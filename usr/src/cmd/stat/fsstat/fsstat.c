@@ -117,7 +117,7 @@ static char units[] = "num KMGTPE";
 char		*cmdname;	/* name of this command */
 int		caught_cont = 0;	/* have caught a SIGCONT */
 
-extern uint_t	timestamp_fmt;	/* print timestamp with stats */
+static uint_t	timestamp_fmt = NODATE;	/* print timestamp with stats */
 
 static int	vs_i = 0;	/* Index of current vs[] slot */
 
@@ -1001,7 +1001,7 @@ main(int argc, char *argv[])
 
 	/* Initial timestamp */
 	if (timestamp_fmt != NODATE) {
-		print_timestamp();
+		print_timestamp(timestamp_fmt);
 		linesout++;
 	}
 
@@ -1062,7 +1062,7 @@ main(int argc, char *argv[])
 		sleep_until(&start_n, period_n, forever, &caught_cont);
 
 		if (timestamp_fmt != NODATE) {
-			print_timestamp();
+			print_timestamp(timestamp_fmt);
 			linesout++;
 		}
 

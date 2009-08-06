@@ -31,7 +31,7 @@
 char *cmdname = "vmstat";
 int caught_cont = 0;
 
-extern uint_t timestamp_fmt;
+static uint_t timestamp_fmt = NODATE;
 
 static	int	hz;
 static	int	pagesize;
@@ -279,7 +279,7 @@ dovmstats(struct snapshot *old, struct snapshot *new)
 	updates = denom(DELTA(s_sys.ss_sysinfo.updates));
 
 	if (timestamp_fmt != NODATE) {
-		print_timestamp();
+		print_timestamp(timestamp_fmt);
 		lines--;
 	}
 

@@ -33,6 +33,14 @@ COMMON=	nfs_sec.o
 OBJS=	nfsstat.o $(COMMON)
 SRCS=	nfsstat.c ../lib/nfs_sec.c
 
+STATCOMMONDIR = $(SRC)/cmd/stat/common
+
+STAT_COMMON_OBJS = timestamp.o
+STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+SRCS += $(STAT_COMMON_SRCS)
+OBJS += $(STAT_COMMON_OBJS)
+
+CPPFLAGS += -I$(STATCOMMONDIR)
 LDLIBS += -lkstat -lnsl
 
 $(PROG):	$(OBJS)
@@ -47,6 +55,9 @@ all:		$(PROG)
 
 nfs_sec.o:	../lib/nfs_sec.c
 		$(COMPILE.c) ../lib/nfs_sec.c
+
+%.o:    $(STATCOMMONDIR)/%.c
+	$(COMPILE.c) $<
 
 install:	all $(ROOTPROG)
 

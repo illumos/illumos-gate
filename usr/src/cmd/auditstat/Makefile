@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,25 +19,41 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1992, 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= auditstat
+OBJS = auditstat.o
+SRCS = $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
 include ../Makefile.cmd.bsm
 
-LDLIBS += -lbsm 
+STATCOMMONDIR = $(SRC)/cmd/stat/common
+
+STAT_COMMON_OBJS = timestamp.o
+STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+SRCS += $(STAT_COMMON_SRCS)
+
+LDLIBS += -lbsm
+CPPFLAGS += -I$(STATCOMMONDIR)
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-clean:
+$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(STAT_COMMON_OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-lint:	lint_PROG
+%.o: $(STATCOMMONDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+clean:
+	-$(RM) $(OBJS) $(STAT_COMMON_OBJS)
+
+lint:	lint_SRCS
 
 include ../Makefile.targ

@@ -53,7 +53,7 @@
 char *cmdname = "mpstat";
 int caught_cont = 0;
 
-extern uint_t timestamp_fmt;
+static uint_t timestamp_fmt = NODATE;
 
 static int hz;
 static int display_pset = -1;
@@ -490,7 +490,7 @@ show_cpu_usage(struct snapshot *old, struct snapshot *new, int display_agg)
 	snapshot_cb cb = compare_cpu;
 
 	if (timestamp_fmt != NODATE)
-		print_timestamp();
+		print_timestamp(timestamp_fmt);
 
 	if (lines_until_reprint == 0 || nr_active_cpus(new) > 1) {
 		print_header(display_agg, show_set);

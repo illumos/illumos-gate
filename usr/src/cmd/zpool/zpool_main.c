@@ -50,6 +50,8 @@
 #include "zpool_util.h"
 #include "zfs_comutil.h"
 
+#include "statcommon.h"
+
 static int zpool_do_create(int, char **);
 static int zpool_do_destroy(int, char **);
 
@@ -173,6 +175,8 @@ static zpool_command_t command_table[] = {
 zpool_command_t *current_command;
 static char history_str[HIS_MAX_RECORD_LEN];
 
+static uint_t timestamp_fmt = NODATE;
+
 static const char *
 get_usage(zpool_help_t idx) {
 	switch (idx) {
@@ -203,7 +207,7 @@ get_usage(zpool_help_t idx) {
 		    "\t    [-d dir | -c cachefile] [-D] [-f] [-R root] "
 		    "<pool | id> [newpool]\n"));
 	case HELP_IOSTAT:
-		return (gettext("\tiostat [-v] [pool] ... [interval "
+		return (gettext("\tiostat [-v] [-T d|u] [pool] ... [interval "
 		    "[count]]\n"));
 	case HELP_LIST:
 		return (gettext("\tlist [-H] [-o property[,...]] "
@@ -2070,8 +2074,9 @@ get_namewidth(zpool_handle_t *zhp, void *data)
 }
 
 /*
- * zpool iostat [-v] [pool] ... [interval [count]]
+ * zpool iostat [-T d|u] [-v] [pool] ... [interval [count]]
  *
+ *	-T	Display a timestamp in date(1) or Unix format
  *	-v	Display statistics for individual vdevs
  *
  * This command can be tricky because we want to be able to deal with pool
@@ -2092,8 +2097,20 @@ zpool_do_iostat(int argc, char **argv)
 	iostat_cbdata_t cb;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "v")) != -1) {
+	while ((c = getopt(argc, argv, "T:v")) != -1) {
 		switch (c) {
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage(B_FALSE);
+			} else {
+				usage(B_FALSE);
+			}
+			break;
 		case 'v':
 			verbose = B_TRUE;
 			break;
@@ -2209,6 +2226,9 @@ zpool_do_iostat(int argc, char **argv)
 		 */
 		cb.cb_namewidth = 0;
 		(void) pool_list_iter(list, B_FALSE, get_namewidth, &cb);
+
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 
 		/*
 		 * If it's the first time, or verbose mode, print the header.

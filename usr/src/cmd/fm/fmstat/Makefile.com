@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -36,8 +34,14 @@ LINTFILES = $(SRCS:%.c=%.ln)
 PROG = fmstat
 ROOTPROG = $(ROOTUSRSBIN)/$(PROG)
 
+STATCOMMONDIR = $(SRC)/cmd/stat/common
+
+STAT_COMMON_OBJS = timestamp.o
+STAT_LINTFILES = $(STAT_COMMON_OBJS:%.o=%.ln)
+LINTFILES += $(STAT_LINTFILES)
+
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
-CPPFLAGS += -I. -I../common
+CPPFLAGS += -I. -I../common -I$(STATCOMMONDIR)
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm
 LDFLAGS += -R/usr/lib/fm
@@ -48,9 +52,9 @@ LINTFLAGS += -mnu
 
 all: $(PROG)
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
+$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
+	$(LINK.c) $(OBJS)  $(STAT_COMMON_OBJS) -o $@ $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS) $(STAT_COMMON_OBJS)
 	$(POST_PROCESS)
 
 %.o: ../common/%.c
@@ -61,11 +65,18 @@ $(PROG): $(OBJS)
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
+%.o : $(STATCOMMONDIR)/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
 clean:
-	$(RM) $(OBJS) $(LINTFILES)
+	$(RM) $(OBJS) $(STAT_COMMON_OBJS) $(LINTFILES)
 
 clobber: clean
 	$(RM) $(PROG)
+
+%.ln: $(STATCOMMONDIR)/%.c
+	$(LINT.c) -c $<
 
 %.ln: ../common/%.c
 	$(LINT.c) -c $<

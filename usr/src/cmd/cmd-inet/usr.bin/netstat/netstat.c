@@ -58,6 +58,7 @@
 #include <ctype.h>
 #include <kstat.h>
 #include <assert.h>
+#include <locale.h>
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -91,6 +92,8 @@
 
 #include <libtsnet.h>
 #include <tsol/label.h>
+
+#include "statcommon.h"
 
 extern void	unixpr(kstat_ctl_t *kc);
 
@@ -211,7 +214,6 @@ static void		sum_icmp6_stats(mib2_ipv6IfIcmpEntry_t *icmp6,
 static void		m_report(void);
 static void		dhcp_report(char *);
 
-	void		fail(int, char *, ...);
 static	uint64_t	kstat_named_value(kstat_t *, char *);
 static	kid_t		safe_kstat_read(kstat_ctl_t *, kstat_t *, void *);
 static int		isnum(char *);
@@ -335,6 +337,12 @@ struct filter_rule {
  */
 static filter_t *filters[NFILTERKEYS];
 
+static uint_t timestamp_fmt = NODATE;
+
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it isn't */
+#endif
+
 int
 main(int argc, char **argv)
 {
@@ -368,7 +376,10 @@ main(int argc, char **argv)
 		    default_ip_str, DEFAULT_IP, INET_DEFAULT_FILE);
 	free(default_ip_str);
 
-	while ((c = getopt(argc, argv, "adimnrspMgvf:P:I:DR")) != -1) {
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
+
+	while ((c = getopt(argc, argv, "adimnrspMgvf:P:I:DRT:")) != -1) {
 		switch ((char)c) {
 		case 'a':		/* all connections */
 			Aflag = B_TRUE;
@@ -471,6 +482,19 @@ main(int argc, char **argv)
 			Iflag_only = 0;
 			break;
 
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage(name);
+			} else {
+				usage(name);
+			}
+			break;
+
 		case '?':
 		default:
 			usage(name);
@@ -565,6 +589,9 @@ main(int argc, char **argv)
 	/* 'for' loop 1: */
 	for (;;) {
 		mib_item_t *curritem = NULL; /* only for -[M]s */
+
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 
 		/* netstat: AF_INET[6] behaviour */
 		if (family_selected(AF_INET) || family_selected(AF_INET6)) {
@@ -3347,6 +3374,9 @@ dhcp_do_ipc(dhcp_ipc_type_t type, const char *ifname, boolean_t printed_one)
 		free(reply);
 		fail(0, "dhcp_do_ipc: %s", dhcp_ipc_strerror(error));
 	}
+
+	if (timestamp_fmt != NODATE)
+		print_timestamp(timestamp_fmt);
 
 	if (!printed_one)
 		(void) printf("%s", dhcp_status_hdr_string());
@@ -6225,20 +6255,21 @@ ifindex2str(uint_t ifindex, char *ifname)
 static void
 usage(char *cmdname)
 {
-	(void) fprintf(stderr, "usage: %s [-anv] [-f address_family]\n",
-	    cmdname);
+	(void) fprintf(stderr, "usage: %s [-anv] [-f address_family] "
+	    "[-T d|u]\n", cmdname);
 	(void) fprintf(stderr, "       %s [-n] [-f address_family] "
-	    "[-P protocol] [-g | -p | -s [interval [count]]]\n", cmdname);
-	(void) fprintf(stderr, "       %s -m [-v] "
+	    "[-P protocol] [-T d|u] [-g | -p | -s [interval [count]]]\n",
+	    cmdname);
+	(void) fprintf(stderr, "       %s -m [-v] [-T d|u] "
 	    "[interval [count]]\n", cmdname);
 	(void) fprintf(stderr, "       %s -i [-I interface] [-an] "
-	    "[-f address_family] [interval [count]]\n", cmdname);
+	    "[-f address_family] [-T d|u] [interval [count]]\n", cmdname);
 	(void) fprintf(stderr, "       %s -r [-anv] "
-	    "[-f address_family|filter]\n", cmdname);
-	(void) fprintf(stderr, "       %s -M [-ns] [-f address_family]\n",
-	    cmdname);
+	    "[-f address_family|filter] [-T d|u]\n", cmdname);
+	(void) fprintf(stderr, "       %s -M [-ns] [-f address_family] "
+	    "[-T d|u]\n", cmdname);
 	(void) fprintf(stderr, "       %s -D [-I interface] "
-	    "[-f address_family]\n", cmdname);
+	    "[-f address_family] [-T d|u]\n", cmdname);
 	exit(EXIT_FAILURE);
 }
 

@@ -126,7 +126,7 @@ static	uint_t	do_conversions;		/* display disks as cXtYdZ (-n) */
 static	uint_t	do_megabytes;		/* display data in MB/sec (-M) */
 static  uint_t	do_controller;		/* display controller info (-C) */
 static  uint_t	do_raw;			/* emit raw format (-r) */
-extern	uint_t	timestamp_fmt;		/* timestamp  each display (-T) */
+static	uint_t	timestamp_fmt = NODATE;	/* timestamp  each display (-T) */
 static	uint_t	do_devid;		/* -E should show devid */
 
 /*
@@ -293,6 +293,10 @@ main(int argc, char **argv)
 		if (formatter_list) {
 			format_t *tmp;
 			tmp = formatter_list;
+
+			if (timestamp_fmt != NODATE)
+				print_timestamp(timestamp_fmt);
+
 			while (tmp) {
 				(tmp->nfunc)();
 				tmp = tmp->next;
@@ -1355,9 +1359,6 @@ do_format(void)
 		 */
 		dh_len = strlen(disk_header) - 2;
 	}
-
-	if (timestamp_fmt != NODATE)
-		setup(print_timestamp);
 
 	/*
 	 * -n *and* (-E *or* -e *or* -x)

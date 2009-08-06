@@ -23,11 +23,9 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * nfsstat: Network File System statistics
@@ -65,7 +63,9 @@
 #include <sys/time.h>
 #include <strings.h>
 #include <ctype.h>
+#include <locale.h>
 
+#include "statcommon.h"
 
 static kstat_ctl_t *kc = NULL;		/* libkstat cookie */
 static kstat_t *rpc_clts_client_kstat, *rpc_clts_server_kstat;
@@ -97,14 +97,13 @@ static void sa_print(int, int);
 static void req_print(kstat_t *, kstat_t *, int, int, int);
 static void req_print_v4(kstat_t *, kstat_t *, int, int);
 static void stat_print(const char *, kstat_t *, kstat_t *, int, int);
-static void kstat_sum(kstat_t *, kstat_t *, kstat_t *);
+static void nfsstat_kstat_sum(kstat_t *, kstat_t *, kstat_t *);
 static void stats_timer(int);
 static void safe_zalloc(void **, uint_t, int);
 static int safe_strtoi(char const *, char *);
 
 
-static void kstat_copy(kstat_t *, kstat_t *, int);
-static void fail(int, char *, ...);
+static void nfsstat_kstat_copy(kstat_t *, kstat_t *, int);
 static kid_t safe_kstat_read(kstat_ctl_t *, kstat_t *, void *);
 static kid_t safe_kstat_write(kstat_ctl_t *, kstat_t *, void *);
 
@@ -149,7 +148,11 @@ static old_kstat_t old_rfsreqcnt_v3_kstat, old_rfsreqcnt_v4_kstat;
 static old_kstat_t old_aclproccnt_v2_kstat, old_aclproccnt_v3_kstat;
 static old_kstat_t old_aclreqcnt_v2_kstat, old_aclreqcnt_v3_kstat;
 
+static uint_t timestamp_fmt = NODATE;
 
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it isn't */
+#endif
 
 int
 main(int argc, char *argv[])
@@ -170,7 +173,10 @@ main(int argc, char *argv[])
 	count = 0;
 	go_forever = 0;
 
-	while ((c = getopt(argc, argv, "cnrsmzav:")) != EOF) {
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
+
+	while ((c = getopt(argc, argv, "cnrsmzav:T:")) != EOF) {
 		switch (c) {
 		case 'c':
 			cflag++;
@@ -199,6 +205,18 @@ main(int argc, char *argv[])
 			vflag = atoi(optarg);
 			if ((vflag < 2) || (vflag > 4))
 				fail(0, "Invalid version number\n");
+			break;
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage();
+			} else {
+				usage();
+			}
 			break;
 		case '?':
 		default:
@@ -255,6 +273,8 @@ main(int argc, char *argv[])
 		if (mflag) {
 			mi_print();
 		} else {
+			if (timestamp_fmt != NODATE)
+				print_timestamp(timestamp_fmt);
 
 			if (sflag &&
 			    (rpc_clts_server_kstat == NULL ||
@@ -619,7 +639,8 @@ cn_print(int zflag, int vflag)
 		return;
 
 	if (vflag == 0) {
-		kstat_sum(nfs_client_kstat, nfs4_client_kstat, ksum_kstat);
+		nfsstat_kstat_sum(nfs_client_kstat, nfs4_client_kstat,
+		    ksum_kstat);
 		stat_print("\nClient nfs:", ksum_kstat, &old_ksum_kstat.kst,
 		    field_width, zflag);
 	}
@@ -810,9 +831,9 @@ req_print(kstat_t *req, kstat_t *req_old, int ver, int field_width,
 			knp[i].value.ui64 = 0;
 	}
 	if (knp_old != NULL)
-		kstat_copy(req, req_old, 1);
+		nfsstat_kstat_copy(req, req_old, 1);
 	else
-		kstat_copy(req, req_old, 0);
+		nfsstat_kstat_copy(req, req_old, 0);
 }
 
 /*
@@ -918,9 +939,9 @@ req_print_v4(kstat_t *req, kstat_t *req_old, int field_width, int zflag)
 			kptr[i].value.ui64 = 0;
 	}
 	if (kptr_old != NULL)
-		kstat_copy(req, req_old, 1);
+		nfsstat_kstat_copy(req, req_old, 1);
 	else
-		kstat_copy(req, req_old, 0);
+		nfsstat_kstat_copy(req, req_old, 0);
 }
 
 static void
@@ -969,13 +990,13 @@ stat_print(const char *title_string, kstat_t *req, kstat_t  *req_old,
 	}
 
 	if (knp_old != NULL)
-		kstat_copy(req, req_old, 1);
+		nfsstat_kstat_copy(req, req_old, 1);
 	else
-		kstat_copy(req, req_old, 0);
+		nfsstat_kstat_copy(req, req_old, 0);
 }
 
 static void
-kstat_sum(kstat_t *kstat1, kstat_t *kstat2, kstat_t *sum)
+nfsstat_kstat_sum(kstat_t *kstat1, kstat_t *kstat2, kstat_t *sum)
 {
 	int i;
 	kstat_named_t *knp1, *knp2, *knpsum;
@@ -985,7 +1006,7 @@ kstat_sum(kstat_t *kstat1, kstat_t *kstat2, kstat_t *sum)
 	knp1 = KSTAT_NAMED_PTR(kstat1);
 	knp2 = KSTAT_NAMED_PTR(kstat2);
 	if (sum->ks_data == NULL)
-		kstat_copy(kstat1, sum, 0);
+		nfsstat_kstat_copy(kstat1, sum, 0);
 	knpsum = KSTAT_NAMED_PTR(sum);
 
 	for (i = 0; i < (kstat1->ks_ndata); i++)
@@ -1297,12 +1318,12 @@ void
 usage(void)
 {
 	fprintf(stderr, "Usage: nfsstat [-cnrsza [-v version] "
-	    "[interval [count]]\n");
+	    "[-T d|u] [interval [count]]\n");
 	fprintf(stderr, "Usage: nfsstat -m [pathname..]\n");
 	exit(1);
 }
 
-static void
+void
 fail(int do_perror, char *message, ...)
 {
 	va_list args;
@@ -1385,7 +1406,7 @@ handle_sig(int x)
 }
 
 static void
-kstat_copy(kstat_t *src, kstat_t *dst, int fr)
+nfsstat_kstat_copy(kstat_t *src, kstat_t *dst, int fr)
 {
 
 	if (fr)

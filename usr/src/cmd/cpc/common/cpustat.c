@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/processor.h>
@@ -49,6 +47,7 @@
 #include <sys/resource.h>
 
 #include "cpucmds.h"
+#include "statcommon.h"
 
 static struct options {
 	int debug;
@@ -93,6 +92,8 @@ static int	*chip_designees;    /* cpuid of CPU which counts for phs chip */
 static int	smt = 0;	    /* If set, cpustat needs to be SMT-aware. */
 static pcinfo_t	fxinfo = { 0, "FX", NULL }; /* FX scheduler class info */
 
+static uint_t timestamp_fmt = NODATE;
+
 /*ARGSUSED*/
 static void
 cpustat_errfn(const char *fn, int subcode, const char *fmt, va_list ap)
@@ -136,8 +137,8 @@ main(int argc, char *argv[])
 	if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
 		errstr = strerror(errno);
 		(void) fprintf(stderr,
-			gettext("%s: setrlimit failed - %s\n"),
-			opts->pgmname, errstr);
+		    gettext("%s: setrlimit failed - %s\n"),
+		    opts->pgmname, errstr);
 	}
 
 	if ((cpc = cpc_open(CPC_VER_CURRENT)) == NULL) {
@@ -167,7 +168,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
-	while ((c = getopt(argc, argv, "Dc:hntsp:")) != EOF && errcnt == 0)
+	while ((c = getopt(argc, argv, "Dc:hntT:sp:")) != EOF && errcnt == 0)
 		switch (c) {
 		case 'D':			/* enable debugging */
 			opts->debug++;
@@ -195,6 +196,18 @@ main(int argc, char *argv[])
 			break;
 		case 't':			/* print %tick */
 			opts->dotick = 1;
+			break;
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					errcnt++;
+			} else {
+				errcnt++;
+			}
 			break;
 		case 'h':			/* help */
 			opts->dohelp = 1;
@@ -239,12 +252,14 @@ main(int argc, char *argv[])
 	    (opts->nsets = cpc_setgrp_numsets(opts->master)) == 0) {
 		(void) fprintf(opts->dohelp ? stdout : stderr, gettext(
 		    "Usage:\n\t%s [-c events] [-p period] [-nstD] "
-			"[interval [count]]\n\n"
+		    "[-T d|u] [interval [count]]\n\n"
 		    "\t-c events specify processor events to be monitored\n"
 		    "\t-n\t  suppress titles\n"
 		    "\t-p period cycle through event list periodically\n"
 		    "\t-s\t  run user soaker thread for system-only events\n"
 		    "\t-t\t  include %s register\n"
+		    "\t-T d|u\t  Display a timestamp in date (d) or unix "
+		    "time_t (u)\n"
 		    "\t-D\t  enable debug mode\n"
 		    "\t-h\t  print extended usage information\n\n"
 		    "\tUse cputrack(1) to monitor per-process statistics.\n"),
@@ -347,6 +362,8 @@ print_sample(processorid_t cpuid, cpc_buf_t *buf, int nreq, const char *setname,
 		}
 	}
 
+	if (timestamp_fmt != NODATE)
+		print_timestamp(timestamp_fmt);
 	if (ccnt > sizeof (line))
 		ccnt = sizeof (line);
 	if (ccnt > 0)
@@ -513,7 +530,7 @@ gtick(void *arg)
 			 * If periodic behavior was requested, rest here.
 			 */
 			if (opts->doperiod && opts->mseconds_rest > 0 &&
-				(sample_cnt % opts->nsets) == 0) {
+			    (sample_cnt % opts->nsets) == 0) {
 				/*
 				 * Stop the soaker while the tool rests.
 				 */
@@ -609,7 +626,7 @@ cpustat(void)
 	max_chip_id = sysconf(_SC_CPUID_MAX);
 	if ((chip_designees = malloc(max_chip_id * sizeof (int))) == NULL) {
 		(void) fprintf(stderr, gettext(
-			"%s: out of heap\n"), opts->pgmname);
+		    "%s: out of heap\n"), opts->pgmname);
 		return (1);
 	}
 	for (i = 0; i < max_chip_id; i++)
@@ -618,16 +635,16 @@ cpustat(void)
 	if (smt) {
 		if ((kc = kstat_open()) == NULL) {
 			(void) fprintf(stderr, gettext(
-				"%s: kstat_open() failed: %s\n"), opts->pgmname,
+			    "%s: kstat_open() failed: %s\n"), opts->pgmname,
 			    strerror(errno));
-			    return (1);
+			return (1);
 		}
 	}
 
 	if (opts->dosoaker)
 		if (priocntl(0, 0, PC_GETCID, &fxinfo) == -1) {
 			(void) fprintf(stderr, gettext(
-				"%s: couldn't get FX scheduler class: %s\n"),
+			    "%s: couldn't get FX scheduler class: %s\n"),
 			    opts->pgmname, strerror(errno));
 			return (1);
 		}

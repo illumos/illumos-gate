@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ctfs.h>
@@ -43,6 +41,10 @@
 #include <locale.h>
 #include <langinfo.h>
 
+#include "statcommon.h"
+
+static uint_t timestamp_fmt = NODATE;
+
 static int opt_verbose = 0;
 static int opt_showall = 0;
 
@@ -55,7 +57,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext("Usage: %s [-a] [-i ctidlist] "
-	    "[-t typelist] [-v] [interval [count]]\n"), uu_getpname());
+	    "[-t typelist] [-T d|u] [-v] [interval [count]]\n"), uu_getpname());
 	exit(UU_EXIT_USAGE);
 }
 
@@ -770,13 +772,25 @@ main(int argc, char **argv)
 
 	(void) uu_setpname(argv[0]);
 
-	while ((s = getopt(argc, argv, "ai:t:v")) != EOF) {
+	while ((s = getopt(argc, argv, "ai:T:t:v")) != EOF) {
 		switch (s) {
 		case 'a':
 			opt_showall = 1;
 			break;
 		case 'i':
 			nids = parse_ids(optarg, (int **)&ids, nids);
+			break;
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage();
+			} else {
+				usage();
+			}
 			break;
 		case 't':
 			ntypes = parse_types(optarg, &types, ntypes);
@@ -814,6 +828,8 @@ main(int argc, char **argv)
 	for (i = 0; count == 0 || i < count; i++) {
 		if (i)
 			(void) sleep(interval);
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 		print_header();
 		if (nids && ntypes)
 			scan_all(types, ntypes, ids, nids);

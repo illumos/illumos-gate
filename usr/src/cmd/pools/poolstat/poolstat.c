@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include "utils.h"
 #include "poolstat.h"
 #include "poolstat_utils.h"
+#include "statcommon.h"
 
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SYS_TEST"
@@ -54,6 +55,8 @@
 	(lf->plf_ffs[(i)].pff_prt & X_FIELD))
 
 typedef int (* formatter) (char *, int, int, poolstat_field_format_t *, char *);
+
+static uint_t timestamp_fmt = NODATE;
 
 /* available field formatters	*/
 static int default_f(char *, int, int, poolstat_field_format_t *, char *);
@@ -163,8 +166,8 @@ usage(void)
 {
 	(void) fprintf(stderr, gettext(
 "Usage:\n"
-"poolstat [-p pool-list] [-r rset-list] [interval [count]]\n"
-"poolstat [-p pool-list] [-o format -r rset-list] [interval [count]]\n"
+"poolstat [-p pool-list] [-r rset-list] [-T d|u] [interval [count]]\n"
+"poolstat [-p pool-list] [-o format -r rset-list] [-T d|u] [interval [count]]\n"
 "  \'pool-list\' is a space-separated list of pool IDs or names\n"
 "  \'rset-list\' is \'all\' or \'pset\'\n"
 "  \'format\' for all resource types is one or more of:\n"
@@ -211,7 +214,7 @@ main(int argc, char *argv[])
 	/* Don't let buffering interfere with piped output. */
 	(void) setvbuf(stdout, NULL, _IOLBF, 0);
 
-	while ((c = getopt(argc, argv, ":p:r:o:")) != EOF) {
+	while ((c = getopt(argc, argv, ":p:r:o:T:")) != EOF) {
 		switch (c) {
 		case 'p':	/* pool name specification	*/
 			pflag++;
@@ -230,6 +233,18 @@ main(int argc, char *argv[])
 				usage();
 			break;
 			}
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage();
+			} else {
+					usage();
+			}
+			break;
 		case ':': {
 			(void) fprintf(stderr,
 			    gettext(ERR_OPTION_ARGS), optopt);
@@ -287,6 +302,8 @@ main(int argc, char *argv[])
 	/* collect and print out statistics	*/
 	while (count-- != 0) {
 		sa_update(pool_sbag, SA_REFRESH);
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 		if (pool_sbag->sb_changed & POU_POOL)
 				(void) printf(
 				"<<State change>>\n");

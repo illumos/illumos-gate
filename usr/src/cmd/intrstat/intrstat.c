@@ -34,12 +34,21 @@
 #include <strings.h>
 #include <termio.h>
 #include <signal.h>
+#include <locale.h>
+
+#include "statcommon.h"
 
 #define	INTRSTAT_COLUMN_OFFS		14
 #define	INTRSTAT_COLUMNS_PER_CPU	15
 #define	INTRSTAT_CPUS_PER_LINE(w)	\
 	(((w) - INTRSTAT_COLUMN_OFFS) / INTRSTAT_COLUMNS_PER_CPU)
-#define	INTRSTAT_OPTSTR			"x:c:C:"
+#define	INTRSTAT_OPTSTR			"x:c:C:T:"
+
+static uint_t timestamp_fmt = NODATE;
+
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it isn't */
+#endif
 
 static dtrace_hdl_t *g_dtp;
 static int *g_present;
@@ -78,7 +87,7 @@ usage(void)
 {
 	(void) fprintf(stderr,
 	    "usage:  intrstat [ -C psrset | -c cpulist ]  [-x opt[=val]] "
-	    "[interval [ count]]\n");
+	    "[-T d|u] [interval [ count]]\n");
 
 	exit(EXIT_FAILURE);
 }
@@ -358,6 +367,9 @@ main(int argc, char **argv)
 	hrtime_t last, now;
 	dtrace_optval_t statustime;
 
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
+
 	(void) sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
 	act.sa_handler = set_width;
@@ -451,6 +463,19 @@ main(int argc, char **argv)
 			select_pset(pset);
 			break;
 		}
+
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage();
+			} else {
+				usage();
+			}
+			break;
 
 		default:
 			if (strchr(INTRSTAT_OPTSTR, c) == NULL)
@@ -579,6 +604,9 @@ main(int argc, char **argv)
 			fatal("failed to add to aggregate");
 
 		g_start = g_end = 0;
+
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 
 		do {
 			g_header = 1;

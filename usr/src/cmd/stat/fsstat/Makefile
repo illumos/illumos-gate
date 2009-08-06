@@ -30,8 +30,7 @@ SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/stat/Makefile.stat
 
-# Only want one object
-COMMON_OBJS = common.o
+COMMON_OBJS = common.o timestamp.o
 COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 
 LDLIBS += -lkstat

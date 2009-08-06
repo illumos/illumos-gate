@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_adm.h>
 
@@ -36,6 +33,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <poll.h>
+#include <locale.h>
+
+#include "statcommon.h"
 
 #define	FMSTAT_EXIT_SUCCESS	0
 #define	FMSTAT_EXIT_ERROR	1
@@ -109,6 +109,12 @@ static struct modstats {
 	double m_pct_b;
 	double m_pct_w;
 } *g_mods;
+
+static uint_t timestamp_fmt = NODATE;
+
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"		/* Use this only if it isn't */
+#endif
 
 static void
 vwarn(const char *format, va_list ap)
@@ -672,10 +678,11 @@ static int
 usage(FILE *fp)
 {
 	(void) fprintf(fp, "Usage: %s [-astTz] [-m module] "
-	    "[-P prog] [interval [count]]\n\n", g_pname);
+	    "[-P prog] [-d d|u] [interval [count]]\n\n", g_pname);
 
 	(void) fprintf(fp,
 	    "\t-a show all statistics, including those kept by fmd\n"
+	    "\t-d display a timestamp in date (d) or unix time_t (u)\n"
 	    "\t-m show module-specific statistics\n"
 	    "\t-P connect to alternate fmd program\n"
 	    "\t-s show module-specific serd engines\n"
@@ -707,10 +714,25 @@ main(int argc, char *argv[])
 	else
 		program = FMD_ADM_PROGRAM;
 
-	while ((c = getopt(argc, argv, "am:P:stTz")) != EOF) {
+	(void) setlocale(LC_ALL, "");
+	(void) textdomain(TEXT_DOMAIN);
+
+	while ((c = getopt(argc, argv, "ad:m:P:stTz")) != EOF) {
 		switch (c) {
 		case 'a':
 			opt_a++;
+			break;
+		case 'd':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					return (usage(stderr));
+			} else {
+				return (usage(stderr));
+			}
 			break;
 		case 'm':
 			opt_m = optarg;
@@ -768,6 +790,8 @@ main(int argc, char *argv[])
 		die(NULL); /* fmd_adm_errmsg() has enough info */
 
 	while (iter < 0 || iter-- > 0) {
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 		if (opt_s)
 			stat_mod_serd(opt_m);
 		else if (opt_T)

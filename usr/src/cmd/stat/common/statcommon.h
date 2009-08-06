@@ -324,7 +324,7 @@ void sleep_until(hrtime_t *wakeup, hrtime_t interval, int forever,
 void cont_handler(int sig_number);
 
 /* Print a timestamp in either Unix or standard format. */
-void print_timestamp(void);
+void print_timestamp(uint_t);
 
 #ifdef __cplusplus
 }

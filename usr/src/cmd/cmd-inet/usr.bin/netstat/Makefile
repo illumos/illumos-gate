@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright (c) 1990 Mentat Inc.
 #
@@ -32,16 +30,22 @@ PROG=		netstat
 
 LOCALOBJS=	netstat.o unix.o
 COMMONOBJS=	compat.o
-OBJS=		$(LOCALOBJS) $(COMMONOBJS)
 
 include ../../../Makefile.cmd
 include ../../Makefile.cmd-inet
 
 LOCALSRCS=	$(LOCALOBJS:%.o=%.c)
 COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
-SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
-CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR)
+STATCOMMONDIR = $(SRC)/cmd/stat/common
+
+STAT_COMMON_OBJS = timestamp.o
+STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
+
+OBJS=		$(LOCALOBJS) $(COMMONOBJS) $(STAT_COMMON_OBJS)
+SRCS=		$(LOCALSRCS) $(COMMONSRCS) $(STAT_COMMON_SRCS)
+
+CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR) -I$(STATCOMMONDIR)
 LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat -ltsnet -ltsol
 
 .KEEP_STATE:
@@ -53,6 +57,10 @@ ROOTPROG=   $(PROG:%=$(ROOTBIN)/%)
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
+
+%.o : $(STATCOMMONDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 install: all $(ROOTPROG) 
 

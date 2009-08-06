@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -40,12 +38,15 @@
 #include "rcapd.h"
 #include "utils.h"
 #include "rcapd_stat.h"
+#include "statcommon.h"
 
 static char mode[RC_MODE_LEN];
 static rcapd_stat_hdr_t hdr;
 static int global;
 static int unformatted;
 static time_t stat_mod = 0;
+
+static uint_t timestamp_fmt = NODATE;
 
 typedef struct col {
 	rcid_t		col_id;
@@ -119,7 +120,8 @@ static void
 usage()
 {
 	(void) fprintf(stderr,
-	    gettext("usage: rcapstat [-g] [-p | -z] [interval [count]]\n"));
+	    gettext("usage: rcapstat [-g] [-p | -z] [-T d|u] "
+	    "[interval [count]]\n"));
 	exit(E_USAGE);
 }
 
@@ -366,7 +368,7 @@ main(int argc, char *argv[])
 	(void) setprogname("rcapstat");
 
 	global = unformatted = 0;
-	while ((opt = getopt(argc, argv, "gpuz")) != (int)EOF) {
+	while ((opt = getopt(argc, argv, "gpuzT:")) != (int)EOF) {
 		switch (opt) {
 		case 'g':
 			global = 1;
@@ -381,6 +383,18 @@ main(int argc, char *argv[])
 		case 'z':
 			stat_type = RCIDT_ZONE;
 			zones = 1;
+			break;
+		case 'T':
+			if (optarg) {
+				if (*optarg == 'u')
+					timestamp_fmt = UDATE;
+				else if (*optarg == 'd')
+					timestamp_fmt = DDATE;
+				else
+					usage();
+			} else {
+				usage();
+			}
 			break;
 		default:
 			usage();
@@ -401,6 +415,8 @@ main(int argc, char *argv[])
 	while (always || count-- > 0) {
 		if (read_stats(stat_type) != E_SUCCESS)
 			return (E_ERROR);
+		if (timestamp_fmt != NODATE)
+			print_timestamp(timestamp_fmt);
 		if (!unformatted) {
 			print_stats(stat_type);
 			(void) fflush(stdout);
