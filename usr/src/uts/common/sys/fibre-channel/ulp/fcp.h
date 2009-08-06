@@ -19,13 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FCP_H
 #define	_FCP_H
-
 
 /*
  * Frame format and protocol definitions for transferring
@@ -49,7 +48,6 @@ extern "C" {
 #define	FCP_SCSI_CMD		0x02	/* frame contains SCSI command */
 #define	FCP_SCSI_RSP		0x03	/* frame contains SCSI response */
 #define	FCP_SCSI_XFER_RDY	0x05	/* frame contains xfer rdy block */
-
 
 /*
  * fcp SCSI control structure
@@ -109,7 +107,6 @@ typedef struct fcp_cntl {
 #define	FCP_QTYPE_ACA_Q_TAG	4		/* ACA queueing */
 #define	FCP_QTYPE_UNTAGGED	5		/* Untagged */
 
-
 /*
  * fcp SCSI entity address
  *
@@ -124,7 +121,6 @@ typedef struct fcp_ent_addr {
 	ushort_t ent_addr_2;		/* entity address 2 */
 	ushort_t ent_addr_3;		/* entity address 3 */
 } fcp_ent_addr_t;
-
 
 /*
  * maximum size of SCSI cdb in fcp SCSI command
@@ -142,7 +138,6 @@ typedef struct fcp_cmd {
 	uchar_t		fcp_cdb[FCP_CDB_SIZE];		/* SCSI cdb */
 	int		fcp_data_len;			/* data length */
 } fcp_cmd_t;
-
 
 /*
  * fcp SCSI status
@@ -170,7 +165,6 @@ typedef struct fcp_status {
 	uchar_t	scsi_status;			/* status of cmd */
 } fcp_status_t;
 
-
 /*
  * fcp SCSI response payload
  */
@@ -190,10 +184,8 @@ typedef struct fcp_rsp {
 	 */
 } fcp_rsp_t;
 
-
 /* MAde 256 for sonoma as it wants to give tons of sense info */
 #define	FCP_MAX_RSP_IU_SIZE	256
-
 
 /*
  * fcp rsp_info field format
@@ -218,7 +210,6 @@ struct fcp_rsp_info {
 #define		FCP_DATA_RO_MISMATCH		0x3
 #define		FCP_TASK_MGMT_NOT_SUPPTD	0x4
 #define		FCP_TASK_MGMT_FAILED		0x5
-
 
 #ifdef	THIS_NEEDED_YET
 
@@ -289,32 +280,50 @@ struct fcp_prli {
 
 };
 
-
 /*
  * fcp PRLI ACC payload
  */
 struct fcp_prli_acc {
 	uchar_t		type;
-	uchar_t		resvd1;
+	uchar_t		resvd1; /* type code extension */
 
-	uint32_t	orig_process_assoc_valid : 1;
-	uint32_t	resp_process_assoc_valid : 1;
-	uint32_t	image_pair_established : 1;
-	uint32_t	resvd2 : 1;
-	uint32_t	accept_response_code : 4;
-	uint32_t	resvd3 : 8;
+#if	defined(_BIT_FIELDS_HTOL)
+	uint16_t	orig_process_assoc_valid : 1,
+			resp_process_assoc_valid : 1,
+			image_pair_established : 1,
+			resvd2 : 1,
+			accept_response_code : 4,
+			resvd3 : 8;
+#elif	defined(_BIT_FIELDS_LTOH)
+	uint16_t	resvd3 : 8,
+			accept_response_code : 4,
+			resvd2 : 1,
+			image_pair_established : 1,
+			resp_process_assoc_valid : 1,
+			orig_process_assoc_valid : 1;
+#endif
+
 	uint32_t	orig_process_associator;
 	uint32_t	resp_process_associator;
-	uint32_t	resvd4 : 26;
-	uint32_t	initiator_fn : 1;
-	uint32_t	target_fn : 1;
-	uint32_t	cmd_data_mixed : 1;
-	uint32_t	data_resp_mixed : 1;
-	uint32_t	read_xfer_rdy_disabled : 1;
-	uint32_t	write_xfer_rdy_disabled : 1;
 
+#if	defined(_BIT_FIELDS_HTOL)
+	uint32_t	resvd4 : 26,
+			initiator_fn : 1,
+			target_fn : 1,
+			cmd_data_mixed : 1,
+			data_resp_mixed : 1,
+			read_xfer_rdy_disabled : 1,
+			write_xfer_rdy_disabled : 1;
+#elif	defined(_BIT_FIELDS_LTOH)
+	uint32_t	write_xfer_rdy_disabled : 1,
+			read_xfer_rdy_disabled : 1,
+			data_resp_mixed : 1,
+			cmd_data_mixed : 1,
+			target_fn : 1,
+			initiator_fn : 1,
+			resvd4 : 26;
+#endif
 };
-
 
 #define	FC_UB_FCP_CDB_FLAG	0x0001		/* UB has valid cdb */
 #define	FC_UB_FCP_PORT_LOGOUT	0x0002		/* Port logout UB */

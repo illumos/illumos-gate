@@ -894,6 +894,8 @@ FCOE_OBJS += fcoe.o fcoe_eth.o fcoe_fc.o
 
 FCOET_OBJS += fcoet.o fcoet_eth.o fcoet_fc.o
 
+FCOEI_OBJS += fcoei.o fcoei_eth.o fcoei_lv.o
+
 ISCSIT_SHARED_OBJS += \
 		iscsit_common.o
 

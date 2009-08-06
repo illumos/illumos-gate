@@ -57,10 +57,8 @@ extern "C" {
 #define	FLOGI_REQ_PAYLOAD_SIZE	116
 #define	FLOGI_ACC_PAYLOAD_SIZE	116
 
-/*
- * Minimum MTU size
- */
 #define	FCOE_MIN_MTU_SIZE	2500
+#define	FCOE_MAX_FC_FRAME_SIZE	2136
 
 /*
  * 24 byte FC frame header
@@ -96,10 +94,19 @@ struct fcoe_port;
 typedef struct fcoe_frame {
 	uint32_t		 frm_flags;
 	void			*frm_netb;
+
+	/*
+	 * frm_hdr will be cleared by fcoe explicitly
+	 */
 	fcoe_fc_frame_header_t	*frm_hdr;
 	uint8_t			*frm_ofh1;
 	uint8_t			*frm_ofh2;
 	uint8_t			*frm_fc_frame;
+
+	/*
+	 * fcoe client need clear FC payload explicitly,
+	 * except for RD/WR data frames
+	 */
 	uint8_t			*frm_payload;
 	uint32_t		 frm_fc_frame_size;
 	uint32_t		 frm_payload_size;
@@ -107,6 +114,7 @@ typedef struct fcoe_frame {
 	struct fcoe_port	*frm_eport;
 	void			*frm_fcoe_private;
 	void			*frm_client_private;
+	clock_t			 frm_clock;
 } fcoe_frame_t;
 
 /*
@@ -122,6 +130,7 @@ typedef struct fcoe_port {
 	uint32_t	   eport_mtu;
 	uint64_t	   eport_link_speed;
 	uint8_t		   eport_efh_dst[ETHERADDRL];
+
 	void		 (*eport_tx_frame)(fcoe_frame_t *frame);
 	fcoe_frame_t	*(*eport_alloc_frame)(struct fcoe_port *eport,
 	    uint32_t this_fc_frame_size, void *netb);
@@ -152,7 +161,23 @@ typedef struct fcoe_port {
 #define	FCOE_CMD_PORT_ONLINE		(FCOE_PORT_CTL_CMDS | 0x01)
 #define	FCOE_CMD_PORT_OFFLINE		(FCOE_PORT_CTL_CMDS | 0x02)
 
+/*
+ * FCoE version control
+ */
+typedef enum fcoe_ver
+{
+	FCOE_VER_1 = 0xAA01,
+	FCOE_VER_2,
+	FCOE_VER_3,
+	FCOE_VER_4,
+	FCOE_VER_5
+} fcoe_ver_e;
+
+#define	FCOE_VER_NOW FCOE_VER_1
+extern const fcoe_ver_e fcoe_ver_now;
+
 typedef struct fcoe_client {
+	fcoe_ver_e	 ect_fcoe_ver;
 	uint32_t	 ect_eport_flags;
 	uint32_t	 ect_max_fc_frame_size;
 	uint32_t	 ect_private_frame_struct_size;
@@ -262,6 +287,7 @@ typedef struct fcoe_client {
  * frame header checking
  */
 #define	FRM_IS_LAST_FRAME(x_frm)		(FRM_F_CTL(x_frm) & (1 << 19))
+#define	FRM_SENDER_IS_XCH_RESPONDER(x_frm)	(FRM_F_CTL(x_frm) & (1 << 23))
 
 /*
  * FCOET/FCOEI will only call this fcoe function explicitly, all others
@@ -336,7 +362,24 @@ typedef struct fcoe_fcp_xfer_rdy {
 /*
  * FCOE project global functions
  */
+#if !defined(__FUNCTION__)
+#define	__FUNCTION__ ((caddr_t)__func__)
+#endif
+
+#define	FCOE_STR_LEN 32
+
+/*
+ * timestamp (golbal variable in sys/systm.h)
+ */
+#define	CURRENT_CLOCK lbolt
 #define	FCOE_SEC2TICK(x_sec)	(drv_usectohz((x_sec) * 1000000))
+
+/*
+ * Form/convert mod_hash_key from/to xch ID
+ */
+#define	FMHK(x_xid)		(mod_hash_key_t)(uintptr_t)(x_xid)
+#define	CMHK(x_key)		(uint16_t)(uintptr_t)(x_key)
+
 typedef void (*TQ_FUNC_P)(void *);
 extern void fcoe_trace(caddr_t ident, const char *fmt, ...);
 

@@ -453,6 +453,8 @@ fcoet_attach_init(fcoet_soft_state_t *ss)
 	client_fcoet.ect_port_event = fcoet_port_event;
 	client_fcoet.ect_release_sol_frame = fcoet_release_sol_frame;
 	client_fcoet.ect_client_port_struct = ss;
+	client_fcoet.ect_fcoe_ver = FCOE_VER_NOW;
+	FCOET_LOG(__FUNCTION__, "version: %x %x", FCOE_VER_NOW, fcoe_ver_now);
 	ret = ddi_prop_get_int(DDI_DEV_T_ANY, ss->ss_dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "mac_id", -1);
 	if (ret == -1) {

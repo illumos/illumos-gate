@@ -195,7 +195,7 @@ static struct dev_ops fcoe_ops = {
 	ddi_quiesce_not_needed
 };
 
-#define	FCOE_VERSION	"20090311-1.00"
+#define	FCOE_VERSION	"20090729-1.01"
 #define	FCOE_NAME	"FCoE Transport v" FCOE_VERSION
 #define	TASKQ_NAME_LEN	32
 
@@ -223,6 +223,7 @@ static int	fcoe_trace_buf_size	= (1 * 1024 * 1024);
 /*
  * Driver's global variables
  */
+const fcoe_ver_e	 fcoe_ver_now	  = FCOE_VER_NOW;
 static void		*fcoe_state	  = NULL;
 fcoe_soft_state_t	*fcoe_global_ss	  = NULL;
 int			 fcoe_use_ext_log = 1;
@@ -409,23 +410,19 @@ fcoe_bus_ctl(dev_info_t *fcoe_dip, dev_info_t *rip,
 static int
 fcoe_initchild(dev_info_t *fcoe_dip, dev_info_t *client_dip)
 {
-	char		 name[32];
-	static int	 inicounter = 0;
-	static int	 tgtcounter = 0;
-	int		*counter;
+	char	client_addr[FCOE_STR_LEN];
+	int	rval;
 
-	if (strcmp(ddi_driver_name(client_dip), FCOET_DRIVER_NAME) == 0) {
-		counter = &tgtcounter;
-		tgtcounter++;
-	} else {
-		counter = &inicounter;
-		inicounter++;
+	rval = ddi_prop_get_int(DDI_DEV_T_ANY, client_dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "mac_id", -1);
+	if (rval == -1) {
+		FCOE_LOG(__FUNCTION__, "no mac_id property: %p", client_dip);
+		return (DDI_FAILURE);
 	}
 
-	bzero(name, 32);
-	(void) sprintf((char *)name, "%x,0", *counter);
-	ddi_set_name_addr(client_dip, name);
-
+	bzero(client_addr, FCOE_STR_LEN);
+	(void) sprintf((char *)client_addr, "%x,0", rval);
+	ddi_set_name_addr(client_dip, client_addr);
 	return (DDI_SUCCESS);
 }
 
@@ -778,11 +775,9 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 		mutex_enter(&ss->ss_ioctl_mutex);
 		ret = fcoe_delete_port(ss->ss_dip, fcoeio,
 		    del_port_param->fdp_mac_linkid, is_target);
-		if (ret != 0) {
-			FCOE_LOG("fcoe",
-			    "fcoe_delete_port failed: %d", ret);
-		}
 		mutex_exit(&ss->ss_ioctl_mutex);
+		FCOE_LOG("fcoe", "fcoe_delete_port %x return: %d",
+		    del_port_param->fdp_mac_linkid, ret);
 		break;
 	}
 
@@ -818,8 +813,8 @@ fcoe_iocmd(fcoe_soft_state_t *ss, intptr_t data, int mode)
 		return (ENOTTY);
 	}
 
-	FCOE_LOG("fcoe", "fcoe_ioctl returned %d, fcoeio_status = %d",
-	    ret, fcoeio->fcoeio_status);
+	FCOE_LOG("fcoe", "fcoe_ioctl %x returned %d, fcoeio_status = %d",
+	    fcoeio->fcoeio_cmd, ret, fcoeio->fcoeio_status);
 
 fcoeiocmd_release_buf:
 	if (ret == 0) {

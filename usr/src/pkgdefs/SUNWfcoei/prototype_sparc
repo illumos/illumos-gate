@@ -9,7 +9,7 @@
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
 # and limitations under the License.
-#
+
 # When distributing Covered Code, include this CDDL HEADER in each
 # file and include the License file at usr/src/OPENSOLARIS.LICENSE.
 # If applicable, add the following below this CDDL HEADER, with the
@@ -32,26 +32,21 @@
 #!include <filename>			# include another 'prototype' file
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
-
-# packaging files
-i pkginfo
-i copyright
-i depend
-i preinstall
-i preremove
-i i.manifest
-i r.manifest
-d none var 755 root sys
-d none var/svc 755 root sys
-d none var/svc/manifest 755 root sys
-d none var/svc/manifest/network 0755 root sys
-d none var/svc/manifest/system 0755 root sys
-f manifest var/svc/manifest/network/npiv_config.xml 0444 root sys
-f manifest var/svc/manifest/system/fcoe_initiator.xml 0444 root sys
-f manifest var/svc/manifest/system/fcoe_target.xml 0444 root sys
-d none lib 755 root bin
-d none lib/svc 755 root bin
-d none lib/svc/method 755 root bin
-f none lib/svc/method/npivconfig 0555 root bin
-f none lib/svc/method/svc-fcoei 0555 root bin
-f none lib/svc/method/svc-fcoet 0555 root bin
+#
+# Include ISA independent files (prototype_com)
+#
+!include prototype_com
+#
+#
+# List files which are SPARC specific here
+#
+# source locations relative to the prototype file
+#
+#
+# SUNWfcoei
+#
+d none kernel 0755 root sys
+d none kernel/drv 0755 root sys
+f none kernel/drv/fcoei.conf 0644 root sys
+d none kernel/drv/sparcv9 0755 root sys
+f none kernel/drv/sparcv9/fcoei 0755 root sys

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Fibre channel Transport Library (fctl)
@@ -30,48 +30,48 @@
  *		Internal functions begin with fctl_
  *
  * Fibre channel packet layout:
- *        +---------------------+<--------+
- *        |                     |         |
- *        | ULP Packet private  |         |
- *        |                     |         |
- *        +---------------------+         |
- *        |                     |---------+
- *        |  struct  fc_packet  |---------+
- *        |                     |         |
- *        +---------------------+<--------+
- *        |                     |
- *        | FCA Packet private  |
- *        |                     |
- *        +---------------------+
+ *	  +---------------------+<--------+
+ *	  |			|	  |
+ *	  | ULP Packet private	|	  |
+ *	  |			|	  |
+ *	  +---------------------+	  |
+ *	  |			|---------+
+ *	  |  struct  fc_packet	|---------+
+ *	  |			|	  |
+ *	  +---------------------+<--------+
+ *	  |			|
+ *	  | FCA Packet private	|
+ *	  |			|
+ *	  +---------------------+
  *
- * So you  loved  the  ascii  art ?  It's  strongly  desirable  to  cache
+ * So you  loved  the  ascii  art ?  It's  strongly  desirable	to  cache
  * allocate the entire packet in one common  place.  So we define a set a
- * of rules.  In a  contiguous  block of memory,  the top  portion of the
- * block points to ulp packet  private  area, next follows the  fc_packet
+ * of rules.  In a  contiguous	block of memory,  the top  portion of the
+ * block points to ulp packet  private	area, next follows the	fc_packet
  * structure used  extensively by all the consumers and what follows this
- * is the FCA packet private.  Note that given a packet  structure, it is
- * possible  to get to the  ULP  and  FCA  Packet  private  fields  using
+ * is the FCA packet private.  Note that given a packet	 structure, it is
+ * possible  to get to the  ULP	 and  FCA  Packet  private  fields  using
  * ulp_private and fca_private fields (which hold pointers) respectively.
  *
  * It should be noted with a grain of salt that ULP Packet  private  size
  * varies  between two different  ULP types, So this poses a challenge to
- * compute the correct  size of the whole block on a per port basis.  The
+ * compute the correct	size of the whole block on a per port basis.  The
  * transport  layer  doesn't have a problem in dealing with  FCA   packet
  * private  sizes as it is the sole  manager of ports  underneath.  Since
  * it's not a good idea to cache allocate  different  sizes of memory for
  * different ULPs and have the ability to choose from one of these caches
  * based on ULP type during every packet  allocation,  the transport some
- * what  wisely (?)  hands off this job of cache  allocation  to the ULPs
+ * what	 wisely (?)  hands off this job of cache  allocation  to the ULPs
  * themselves.
  *
  * That means FCAs need to make their  packet  private size  known to the
- * transport   to  pass  it  up  to  the   ULPs.  This  is  done   during
+ * transport   to  pass	 it  up	 to  the   ULPs.  This	is  done   during
  * fc_fca_attach().  And the transport passes this size up to ULPs during
  * fc_ulp_port_attach() of each ULP.
  *
- * This  leaves  us with  another  possible  question;  How  are  packets
- * allocated for ELS's started by the transport  itself ?  Well, the port
- * driver  during  attach  time, cache  allocates  on a per port basis to
+ * This	 leaves	 us with  another  possible  question;	How  are  packets
+ * allocated for ELS's started by the transport	 itself ?  Well, the port
+ * driver  during  attach  time, cache	allocates  on a per port basis to
  * handle ELSs too.
  */
 
@@ -103,8 +103,8 @@
 int did_table_size = D_ID_HASH_TABLE_SIZE;
 int pwwn_table_size = PWWN_HASH_TABLE_SIZE;
 
-static fc_ulp_module_t 	*fctl_ulp_modules;
-static fc_fca_port_t 	*fctl_fca_portlist;
+static fc_ulp_module_t	*fctl_ulp_modules;
+static fc_fca_port_t	*fctl_fca_portlist;
 static fc_ulp_list_t	*fctl_ulp_list;
 
 static char fctl_greeting[] =
@@ -127,7 +127,7 @@ static krwlock_t fctl_mod_ports_lock;
 
 /*
  * fctl_port_lock protects the linked list of local port structures
- * (fctl_fca_portlist).  When walking the list, this lock must be obtained
+ * (fctl_fca_portlist).	 When walking the list, this lock must be obtained
  * prior to any local port locks.
  */
 
@@ -149,9 +149,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ulp_ports::port_mutex, ulp_ports::port_statec
     ulp_ports::port_dstate))
 #endif /* lint */
 
-#define	FCTL_VERSION		"1.69"
+#define	FCTL_VERSION		"20090729-1.70"
 #define	FCTL_NAME_VERSION	"SunFC Transport v" FCTL_VERSION
-
 
 char *fctl_version = FCTL_NAME_VERSION;
 
@@ -201,51 +200,51 @@ static struct bus_ops fctl_fca_busops = {
 struct kmem_cache *fctl_job_cache;
 
 static fc_errmap_t fc_errlist [] = {
-	{ FC_FAILURE, 		"Operation failed" 			},
-	{ FC_SUCCESS, 		"Operation success" 			},
-	{ FC_CAP_ERROR, 	"Capability error" 			},
-	{ FC_CAP_FOUND, 	"Capability found" 			},
-	{ FC_CAP_SETTABLE, 	"Capability settable" 			},
-	{ FC_UNBOUND, 		"Port not bound" 			},
-	{ FC_NOMEM, 		"No memory" 				},
-	{ FC_BADPACKET, 	"Bad packet" 				},
-	{ FC_OFFLINE, 		"Port offline" 				},
-	{ FC_OLDPORT, 		"Old Port" 				},
-	{ FC_NO_MAP, 		"No map available" 			},
-	{ FC_TRANSPORT_ERROR, 	"Transport error" 			},
-	{ FC_ELS_FREJECT, 	"ELS Frejected" 			},
-	{ FC_ELS_PREJECT, 	"ELS PRejected" 			},
-	{ FC_ELS_BAD, 		"Bad ELS request" 			},
-	{ FC_ELS_MALFORMED, 	"Malformed ELS request" 		},
-	{ FC_TOOMANY, 		"Too many commands" 			},
-	{ FC_UB_BADTOKEN, 	"Bad Unsolicited buffer token" 		},
-	{ FC_UB_ERROR, 		"Unsolicited buffer error" 		},
-	{ FC_UB_BUSY, 		"Unsolicited buffer busy" 		},
-	{ FC_BADULP, 		"Bad ULP" 				},
-	{ FC_BADTYPE, 		"Bad Type" 				},
-	{ FC_UNCLAIMED, 	"Not Claimed" 				},
-	{ FC_ULP_SAMEMODULE, 	"Same ULP Module" 			},
-	{ FC_ULP_SAMETYPE, 	"Same ULP Type" 			},
-	{ FC_ABORTED, 		"Command Aborted" 			},
-	{ FC_ABORT_FAILED, 	"Abort Failed" 				},
-	{ FC_BADEXCHANGE, 	"Bad Exchange" 				},
-	{ FC_BADWWN, 		"Bad World Wide Name" 			},
-	{ FC_BADDEV, 		"Bad Device" 				},
-	{ FC_BADCMD, 		"Bad Command" 				},
-	{ FC_BADOBJECT, 	"Bad Object" 				},
-	{ FC_BADPORT, 		"Bad Port" 				},
-	{ FC_NOTTHISPORT, 	"Not on this Port" 			},
-	{ FC_PREJECT, 		"Operation Prejected" 			},
-	{ FC_FREJECT, 		"Operation Frejected" 			},
-	{ FC_PBUSY, 		"Operation Pbusyed" 			},
-	{ FC_FBUSY, 		"Operation Fbusyed" 			},
-	{ FC_ALREADY, 		"Already done" 				},
-	{ FC_LOGINREQ, 		"PLOGI Required" 			},
-	{ FC_RESETFAIL, 	"Reset operation failed" 		},
-	{ FC_INVALID_REQUEST, 	"Invalid Request" 			},
-	{ FC_OUTOFBOUNDS, 	"Out of Bounds" 			},
-	{ FC_TRAN_BUSY, 	"Command transport Busy" 		},
-	{ FC_STATEC_BUSY, 	"State change Busy" 			},
+	{ FC_FAILURE,		"Operation failed"			},
+	{ FC_SUCCESS,		"Operation success"			},
+	{ FC_CAP_ERROR,		"Capability error"			},
+	{ FC_CAP_FOUND,		"Capability found"			},
+	{ FC_CAP_SETTABLE,	"Capability settable"			},
+	{ FC_UNBOUND,		"Port not bound"			},
+	{ FC_NOMEM,		"No memory"				},
+	{ FC_BADPACKET,		"Bad packet"				},
+	{ FC_OFFLINE,		"Port offline"				},
+	{ FC_OLDPORT,		"Old Port"				},
+	{ FC_NO_MAP,		"No map available"			},
+	{ FC_TRANSPORT_ERROR,	"Transport error"			},
+	{ FC_ELS_FREJECT,	"ELS Frejected"				},
+	{ FC_ELS_PREJECT,	"ELS PRejected"				},
+	{ FC_ELS_BAD,		"Bad ELS request"			},
+	{ FC_ELS_MALFORMED,	"Malformed ELS request"			},
+	{ FC_TOOMANY,		"Too many commands"			},
+	{ FC_UB_BADTOKEN,	"Bad Unsolicited buffer token"		},
+	{ FC_UB_ERROR,		"Unsolicited buffer error"		},
+	{ FC_UB_BUSY,		"Unsolicited buffer busy"		},
+	{ FC_BADULP,		"Bad ULP"				},
+	{ FC_BADTYPE,		"Bad Type"				},
+	{ FC_UNCLAIMED,		"Not Claimed"				},
+	{ FC_ULP_SAMEMODULE,	"Same ULP Module"			},
+	{ FC_ULP_SAMETYPE,	"Same ULP Type"				},
+	{ FC_ABORTED,		"Command Aborted"			},
+	{ FC_ABORT_FAILED,	"Abort Failed"				},
+	{ FC_BADEXCHANGE,	"Bad Exchange"				},
+	{ FC_BADWWN,		"Bad World Wide Name"			},
+	{ FC_BADDEV,		"Bad Device"				},
+	{ FC_BADCMD,		"Bad Command"				},
+	{ FC_BADOBJECT,		"Bad Object"				},
+	{ FC_BADPORT,		"Bad Port"				},
+	{ FC_NOTTHISPORT,	"Not on this Port"			},
+	{ FC_PREJECT,		"Operation Prejected"			},
+	{ FC_FREJECT,		"Operation Frejected"			},
+	{ FC_PBUSY,		"Operation Pbusyed"			},
+	{ FC_FBUSY,		"Operation Fbusyed"			},
+	{ FC_ALREADY,		"Already done"				},
+	{ FC_LOGINREQ,		"PLOGI Required"			},
+	{ FC_RESETFAIL,		"Reset operation failed"		},
+	{ FC_INVALID_REQUEST,	"Invalid Request"			},
+	{ FC_OUTOFBOUNDS,	"Out of Bounds"				},
+	{ FC_TRAN_BUSY,		"Command transport Busy"		},
+	{ FC_STATEC_BUSY,	"State change Busy"			},
 	{ FC_DEVICE_BUSY,	"Port driver is working on this device"	}
 };
 
@@ -256,7 +255,7 @@ fc_pkt_reason_t remote_stop_reasons [] = {
 };
 
 fc_pkt_reason_t general_reasons [] = {
-	{ FC_REASON_HW_ERROR,		"Hardware Error" 		},
+	{ FC_REASON_HW_ERROR,		"Hardware Error"		},
 	{ FC_REASON_SEQ_TIMEOUT,	"Sequence Timeout"		},
 	{ FC_REASON_ABORTED,		"Aborted"			},
 	{ FC_REASON_ABORT_FAILED,	"Abort Failed"			},
@@ -292,7 +291,7 @@ fc_pkt_reason_t rjt_reasons [] = {
 	{ FC_REASON_PERM_UNAVAILABLE,	"Permamnently Unavailable"	},
 	{ FC_REASON_CLASS_NOT_SUPP,	"Class Not Supported",		},
 	{ FC_REASON_DELIMTER_USAGE_ERROR,
-					"Delimeter Usage Error"		},
+	    "Delimeter Usage Error"		},
 	{ FC_REASON_TYPE_NOT_SUPP,	"Type Not Supported"		},
 	{ FC_REASON_INVALID_LINK_CTRL,	"Invalid Link Control"		},
 	{ FC_REASON_INVALID_R_CTL,	"Invalid R_CTL"			},
@@ -307,13 +306,13 @@ fc_pkt_reason_t rjt_reasons [] = {
 	{ FC_REASON_PROTOCOL_ERROR,	"Protocol Error"		},
 	{ FC_REASON_INCORRECT_LENGTH,	"Incorrect Length"		},
 	{ FC_REASON_UNEXPECTED_ACK,	"Unexpected Ack"		},
-	{ FC_REASON_UNEXPECTED_LR,	"Unexpected Link reset" 	},
+	{ FC_REASON_UNEXPECTED_LR,	"Unexpected Link reset"		},
 	{ FC_REASON_LOGIN_REQUIRED,	"Login Required"		},
 	{ FC_REASON_EXCESSIVE_SEQS,	"Excessive Sequences"
-					" Attempted"			},
+	    " Attempted"			},
 	{ FC_REASON_EXCH_UNABLE,	"Exchange incapable"		},
 	{ FC_REASON_ESH_NOT_SUPP,	"Expiration Security Header "
-					"Not Supported"			},
+	    "Not Supported"			},
 	{ FC_REASON_NO_FABRIC_PATH,	"No Fabric Path"		},
 	{ FC_REASON_VENDOR_UNIQUE,	"Vendor Unique"			},
 	{ FC_REASON_INVALID,		NULL				}
@@ -384,10 +383,10 @@ fc_pkt_error_t fc_pkt_errlist[] = {
 		NULL
 	},
 	{	FC_PKT_REMOTE_STOP,
-		"Remote Stop",
-		remote_stop_reasons,
-		NULL,
-		NULL
+	    "Remote Stop",
+	    remote_stop_reasons,
+	    NULL,
+	    NULL
 	},
 	{
 		FC_PKT_LOCAL_RJT,
@@ -608,9 +607,9 @@ fctl_cache_destructor(void *buf, void *cdarg)
  *		FC_SUCCESS
  *		FC_FAILURE
  *
- *   fc_ulp_add  prints  a warning message if there is  already a
+ *   fc_ulp_add	 prints	 a warning message if there is	already a
  *   similar ULP type  attached and this is unlikely to change as
- *   we trudge along.  Further, this  function  returns a failure
+ *   we trudge along.  Further, this  function	returns a failure
  *   code if the same  module  attempts to add more than once for
  *   the same FC-4 type.
  */
@@ -619,9 +618,9 @@ fc_ulp_add(fc_ulp_modinfo_t *ulp_info)
 {
 	fc_ulp_module_t *mod;
 	fc_ulp_module_t *prev;
-	job_request_t 	*job;
+	job_request_t	*job;
 	fc_ulp_list_t	*new;
-	fc_fca_port_t 	*fca_port;
+	fc_fca_port_t	*fca_port;
 	int		ntry = 0;
 
 	ASSERT(ulp_info != NULL);
@@ -653,8 +652,8 @@ fc_ulp_add(fc_ulp_modinfo_t *ulp_info)
 	while (rw_tryenter(&fctl_ulp_lock, RW_WRITER) == 0) {
 		delay(drv_usectohz(1000000));
 		if (ntry++ > FC_ULP_ADD_RETRY_COUNT) {
-			fc_ulp_list_t   *list;
-			fc_ulp_list_t   *last;
+			fc_ulp_list_t	*list;
+			fc_ulp_list_t	*last;
 			mutex_enter(&fctl_ulp_list_mutex);
 			for (last = NULL, list = fctl_ulp_list; list != NULL;
 			    list = list->ulp_next) {
@@ -712,7 +711,6 @@ fc_ulp_add(fc_ulp_modinfo_t *ulp_info)
 	mutex_enter(&fctl_port_lock);
 	for (fca_port = fctl_fca_portlist; fca_port != NULL;
 	    fca_port = fca_port->port_next) {
-
 		job = fctl_alloc_job(JOB_ATTACH_ULP, JOB_TYPE_FCTL_ASYNC,
 		    NULL, NULL, KM_SLEEP);
 
@@ -816,7 +814,7 @@ fc_ulp_remove(fc_ulp_modinfo_t *ulp_info)
  * The caller is required to ensure that pkt_pd is populated with the
  * handle that it was given when the transport notified it about the
  * device this packet is associated with.  If there is no associated
- * device, pkt_pd must be set to NULL.  A non-NULL pkt_pd will cause an
+ * device, pkt_pd must be set to NULL.	A non-NULL pkt_pd will cause an
  * increment of the reference count for said pd.  When the packet is freed,
  * the reference count will be decremented.  This reference count, in
  * combination with the PD_GIVEN_TO_ULPS flag guarantees that the pd
@@ -1037,11 +1035,11 @@ int
 fc_ulp_login(opaque_t port_handle, fc_packet_t **ulp_pkt, uint32_t listlen)
 {
 	int			rval = FC_SUCCESS;
-	int 			job_flags;
+	int			job_flags;
 	uint32_t		count;
 	fc_packet_t		**tmp_array;
-	job_request_t 		*job;
-	fc_local_port_t 	*port = port_handle;
+	job_request_t		*job;
+	fc_local_port_t		*port = port_handle;
 	fc_ulp_rscn_info_t	*rscnp =
 	    (fc_ulp_rscn_info_t *)(ulp_pkt[0])->pkt_ulp_rscn_infop;
 
@@ -1153,9 +1151,9 @@ opaque_t
 fc_ulp_get_remote_port(opaque_t port_handle, la_wwn_t *pwwn, int *error,
     int create)
 {
-	fc_local_port_t 	*port;
+	fc_local_port_t		*port;
 	job_request_t		*job;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	port = port_handle;
 	pd = fctl_get_remote_port_by_pwwn(port, pwwn);
@@ -1174,7 +1172,7 @@ fc_ulp_get_remote_port(opaque_t port_handle, la_wwn_t *pwwn, int *error,
 	mutex_enter(&port->fp_mutex);
 	if (FC_IS_TOP_SWITCH(port->fp_topology) && create) {
 		uint32_t	d_id;
-		fctl_ns_req_t 	*ns_cmd;
+		fctl_ns_req_t	*ns_cmd;
 
 		mutex_exit(&port->fp_mutex);
 
@@ -1272,7 +1270,7 @@ fc_ulp_get_remote_port(opaque_t port_handle, la_wwn_t *pwwn, int *error,
 int
 fc_ulp_port_ns(opaque_t port_handle, opaque_t pd, fc_ns_cmd_t *ns_req)
 {
-	int 		rval;
+	int		rval;
 	int		fabric;
 	job_request_t	*job;
 	fctl_ns_req_t	*ns_cmd;
@@ -1357,7 +1355,7 @@ int
 fc_ulp_transport(opaque_t port_handle, fc_packet_t *pkt)
 {
 	int			rval;
-	fc_local_port_t 	*port;
+	fc_local_port_t		*port;
 	fc_remote_port_t	*pd, *newpd;
 	fc_ulp_rscn_info_t	*rscnp =
 	    (fc_ulp_rscn_info_t *)pkt->pkt_ulp_rscn_infop;
@@ -1480,7 +1478,7 @@ int
 fc_ulp_issue_els(opaque_t port_handle, fc_packet_t *pkt)
 {
 	int			rval;
-	fc_local_port_t 	*port = port_handle;
+	fc_local_port_t		*port = port_handle;
 	fc_remote_port_t	*pd;
 	fc_ulp_rscn_info_t	*rscnp =
 	    (fc_ulp_rscn_info_t *)pkt->pkt_ulp_rscn_infop;
@@ -1723,7 +1721,7 @@ opaque_t
 fc_ulp_get_port_handle(int port_instance)
 {
 	opaque_t	port_handle = NULL;
-	fc_fca_port_t 	*cur;
+	fc_fca_port_t	*cur;
 
 	mutex_enter(&fctl_port_lock);
 	for (cur = fctl_fca_portlist; cur; cur = cur->port_next) {
@@ -1805,7 +1803,7 @@ fc_ulp_pwwn_to_portmap(opaque_t port_handle, la_wwn_t *bytes, fc_portmap_t *map)
 {
 	fc_local_port_t		*port = port_handle;
 	fc_remote_node_t	*node;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	pd = fctl_get_remote_port_by_pwwn(port, bytes);
 	if (pd == NULL) {
@@ -1905,7 +1903,7 @@ fc_ulp_enable_relogin(opaque_t *fc_port, la_wwn_t *pwwn)
 
 /*
  * fc_fca_init
- * 		Overload the FCA bus_ops vector in its dev_ops with
+ *		Overload the FCA bus_ops vector in its dev_ops with
  *		fctl_fca_busops to handle all the INITchilds for "sf"
  *		in one common place.
  *
@@ -2077,8 +2075,8 @@ fc_wwn_to_str(la_wwn_t *wwn, caddr_t str)
 	*str = '\0';
 }
 
-#define	FC_ATOB(x)	(((x) >= '0' && (x) <= '9') ? ((x) - '0') :\
-			((x) >= 'a' && (x) <= 'f') ?\
+#define	FC_ATOB(x)	(((x) >= '0' && (x) <= '9') ? ((x) - '0') :	\
+			((x) >= 'a' && (x) <= 'f') ?			\
 			((x) - 'a' + 10) : ((x) - 'A' + 10))
 
 void
@@ -2101,7 +2099,7 @@ fc_str_to_wwn(caddr_t str, la_wwn_t *wwn)
  */
 static int
 fctl_fca_bus_ctl(dev_info_t *fca_dip, dev_info_t *rip,
-	ddi_ctl_enum_t op, void *arg, void *result)
+    ddi_ctl_enum_t op, void *arg, void *result)
 {
 	switch (op) {
 	case DDI_CTLOPS_REPORTDEV:
@@ -2133,11 +2131,11 @@ fctl_fca_bus_ctl(dev_info_t *fca_dip, dev_info_t *rip,
 static int
 fctl_initchild(dev_info_t *fca_dip, dev_info_t *port_dip)
 {
-	int 		rval;
-	int 		port_no;
-	int 		port_len;
-	char 		name[20];
-	fc_fca_tran_t 	*tran;
+	int		rval;
+	int		port_no;
+	int		port_len;
+	char		name[20];
+	fc_fca_tran_t	*tran;
 	dev_info_t	*dip;
 	int		portprop;
 
@@ -2218,8 +2216,9 @@ fctl_findchild(dev_info_t *pdip, char *cname, char *caddr)
 
 	for (dip = ddi_get_child(pdip); dip != NULL;
 	    dip = ddi_get_next_sibling(dip)) {
-		if (strcmp(cname, ddi_node_name(dip)) != 0)
+		if (strcmp(cname, ddi_node_name(dip)) != 0) {
 			continue;
+		}
 
 		if ((addr = ddi_get_name_addr(dip)) == NULL) {
 			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
@@ -2232,8 +2231,9 @@ fctl_findchild(dev_info_t *pdip, char *cname, char *caddr)
 				ddi_prop_free(addr);
 			}
 		} else {
-			if (strcmp(caddr, addr) == 0)
+			if (strcmp(caddr, addr) == 0) {
 				return (dip);
+			}
 		}
 	}
 
@@ -2308,7 +2308,7 @@ fctl_fca_create_npivport(dev_info_t *parent,
     dev_info_t *phydip, char *nname, char *pname, uint32_t *vindex)
 {
 	int rval = 0, devstrlen;
-	char    *devname, *cname, *caddr, *devstr;
+	char	*devname, *cname, *caddr, *devstr;
 	dev_info_t	*child = NULL;
 	int		portnum;
 
@@ -2425,9 +2425,9 @@ fctl_add_port(fc_local_port_t *port)
 void
 fctl_remove_port(fc_local_port_t *port)
 {
-	fc_ulp_module_t 	*mod;
-	fc_fca_port_t 		*prev;
-	fc_fca_port_t 		*list;
+	fc_ulp_module_t		*mod;
+	fc_fca_port_t		*prev;
+	fc_fca_port_t		*list;
 	fc_ulp_ports_t		*ulp_port;
 
 	rw_enter(&fctl_ulp_lock, RW_WRITER);
@@ -2477,8 +2477,8 @@ fctl_attach_ulps(fc_local_port_t *port, fc_attach_cmd_t cmd,
 	int			rval;
 	uint32_t		s_id;
 	uint32_t		state;
-	fc_ulp_module_t 	*mod;
-	fc_ulp_port_info_t 	info;
+	fc_ulp_module_t		*mod;
+	fc_ulp_port_info_t	info;
 	fc_ulp_ports_t		*ulp_port;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
@@ -2531,14 +2531,22 @@ fctl_attach_ulps(fc_local_port_t *port, fc_attach_cmd_t cmd,
 	rw_enter(&fctl_mod_ports_lock, RW_WRITER);
 
 	for (mod = fctl_ulp_modules; mod; mod = mod->mod_next) {
+		if ((port->fp_soft_state & FP_SOFT_FCA_IS_NODMA) &&
+		    (mod->mod_info->ulp_type == FC_TYPE_IS8802_SNAP)) {
+			/*
+			 * We don't support IP over FC on FCOE HBA
+			 */
+			continue;
+		}
+
 		if ((ulp_port = fctl_get_ulp_port(mod, port)) == NULL) {
 			ulp_port = fctl_add_ulp_port(mod, port, KM_SLEEP);
 			ASSERT(ulp_port != NULL);
 
 			mutex_enter(&ulp_port->port_mutex);
-			ulp_port->port_statec = (info.port_state &
+			ulp_port->port_statec = ((info.port_state &
 			    FC_STATE_ONLINE) ? FC_ULP_STATEC_ONLINE :
-			    FC_ULP_STATEC_OFFLINE;
+			    FC_ULP_STATEC_OFFLINE);
 			mutex_exit(&ulp_port->port_mutex);
 		}
 	}
@@ -2546,6 +2554,14 @@ fctl_attach_ulps(fc_local_port_t *port, fc_attach_cmd_t cmd,
 	rw_downgrade(&fctl_mod_ports_lock);
 
 	for (mod = fctl_ulp_modules; mod; mod = mod->mod_next) {
+		if ((port->fp_soft_state & FP_SOFT_FCA_IS_NODMA) &&
+		    (mod->mod_info->ulp_type == FC_TYPE_IS8802_SNAP)) {
+			/*
+			 * We don't support IP over FC on FCOE HBA
+			 */
+			continue;
+		}
+
 		ulp_port = fctl_get_ulp_port(mod, port);
 		ASSERT(ulp_port != NULL);
 
@@ -2674,8 +2690,8 @@ fctl_detach_ulps(fc_local_port_t *port, fc_detach_cmd_t cmd,
     struct modlinkage *linkage)
 {
 	int			rval = FC_SUCCESS;
-	fc_ulp_module_t 	*mod;
-	fc_ulp_port_info_t 	info;
+	fc_ulp_module_t		*mod;
+	fc_ulp_port_info_t	info;
 	fc_ulp_ports_t		*ulp_port;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
@@ -2727,36 +2743,36 @@ fctl_detach_ulps(fc_local_port_t *port, fc_detach_cmd_t cmd,
 
 static	void
 fctl_init_dma_attr(fc_local_port_t *port, fc_ulp_module_t *mod,
-    fc_ulp_port_info_t 	*info)
+    fc_ulp_port_info_t	*info)
 {
 
-		if ((strcmp(mod->mod_info->ulp_name, "fcp") == 0) ||
-		    (strcmp(mod->mod_info->ulp_name, "ltct") == 0)) {
-			info->port_cmd_dma_attr =
-			    port->fp_fca_tran->fca_dma_fcp_cmd_attr;
-			info->port_data_dma_attr =
-			    port->fp_fca_tran->fca_dma_fcp_data_attr;
-			info->port_resp_dma_attr =
-			    port->fp_fca_tran->fca_dma_fcp_rsp_attr;
-		} else if (strcmp(mod->mod_info->ulp_name, "fcsm") == 0) {
-			info->port_cmd_dma_attr =
-			    port->fp_fca_tran->fca_dma_fcsm_cmd_attr;
-			info->port_data_dma_attr =
-			    port->fp_fca_tran->fca_dma_attr;
-			info->port_resp_dma_attr =
-			    port->fp_fca_tran->fca_dma_fcsm_rsp_attr;
-		} else if (strcmp(mod->mod_info->ulp_name, "fcip") == 0) {
-			info->port_cmd_dma_attr =
-			    port->fp_fca_tran->fca_dma_fcip_cmd_attr;
-			info->port_data_dma_attr =
-			    port->fp_fca_tran->fca_dma_attr;
-			info->port_resp_dma_attr =
-			    port->fp_fca_tran->fca_dma_fcip_rsp_attr;
-		} else {
-			info->port_cmd_dma_attr = info->port_data_dma_attr =
-			    info->port_resp_dma_attr =
-			    port->fp_fca_tran->fca_dma_attr; /* default */
-		}
+	if ((strcmp(mod->mod_info->ulp_name, "fcp") == 0) ||
+	    (strcmp(mod->mod_info->ulp_name, "ltct") == 0)) {
+		info->port_cmd_dma_attr =
+		    port->fp_fca_tran->fca_dma_fcp_cmd_attr;
+		info->port_data_dma_attr =
+		    port->fp_fca_tran->fca_dma_fcp_data_attr;
+		info->port_resp_dma_attr =
+		    port->fp_fca_tran->fca_dma_fcp_rsp_attr;
+	} else if (strcmp(mod->mod_info->ulp_name, "fcsm") == 0) {
+		info->port_cmd_dma_attr =
+		    port->fp_fca_tran->fca_dma_fcsm_cmd_attr;
+		info->port_data_dma_attr =
+		    port->fp_fca_tran->fca_dma_attr;
+		info->port_resp_dma_attr =
+		    port->fp_fca_tran->fca_dma_fcsm_rsp_attr;
+	} else if (strcmp(mod->mod_info->ulp_name, "fcip") == 0) {
+		info->port_cmd_dma_attr =
+		    port->fp_fca_tran->fca_dma_fcip_cmd_attr;
+		info->port_data_dma_attr =
+		    port->fp_fca_tran->fca_dma_attr;
+		info->port_resp_dma_attr =
+		    port->fp_fca_tran->fca_dma_fcip_rsp_attr;
+	} else {
+		info->port_cmd_dma_attr = info->port_data_dma_attr =
+		    info->port_resp_dma_attr =
+		    port->fp_fca_tran->fca_dma_attr; /* default */
+	}
 }
 
 static int
@@ -2984,8 +3000,8 @@ fctl_ulp_statec_cb(void *arg)
 	uint32_t		new_state;
 	fc_local_port_t		*port;
 	fc_ulp_ports_t		*ulp_port;
-	fc_ulp_module_t 	*mod;
-	fc_port_clist_t 	*clist = (fc_port_clist_t *)arg;
+	fc_ulp_module_t		*mod;
+	fc_port_clist_t		*clist = (fc_port_clist_t *)arg;
 
 	ASSERT(clist != NULL);
 
@@ -3018,15 +3034,15 @@ fctl_ulp_statec_cb(void *arg)
 	 * sanity check for presence of OLD devices in the hash lists
 	 */
 	if (clist->clist_size) {
-		int 			count;
+		int			count;
 		fc_remote_port_t	*pd;
 
 		ASSERT(clist->clist_map != NULL);
 		for (count = 0; count < clist->clist_len; count++) {
 			if (clist->clist_map[count].map_state ==
 			    PORT_DEVICE_INVALID) {
-				la_wwn_t 	pwwn;
-				fc_portid_t 	d_id;
+				la_wwn_t	pwwn;
+				fc_portid_t	d_id;
 
 				pd = clist->clist_map[count].map_pd;
 				if (pd != NULL) {
@@ -3055,7 +3071,7 @@ fctl_ulp_statec_cb(void *arg)
 	 * Check for duplicate map entries
 	 */
 	if (clist->clist_size) {
-		int 			count;
+		int			count;
 		fc_remote_port_t	*pd1, *pd2;
 
 		ASSERT(clist->clist_map != NULL);
@@ -3142,7 +3158,7 @@ fctl_ulp_statec_cb(void *arg)
 	rw_exit(&fctl_ulp_lock);
 
 	if (clist->clist_size) {
-		int 			count;
+		int			count;
 		fc_remote_node_t	*node;
 		fc_remote_port_t	*pd;
 
@@ -3197,7 +3213,7 @@ fctl_ulp_statec_cb(void *arg)
 
 /*
  * Allocate an fc_remote_node_t struct to represent a remote node for the
- * given nwwn.  This will also add the nwwn to the global nwwn table.
+ * given nwwn.	This will also add the nwwn to the global nwwn table.
  *
  * Returns a pointer to the newly-allocated struct.  Returns NULL if
  * the kmem_zalloc fails or if the enlist_wwn attempt fails.
@@ -3264,9 +3280,9 @@ fctl_destroy_remote_node(fc_remote_node_t *rnodep)
 int
 fctl_enlist_nwwn_table(fc_remote_node_t *rnodep, int sleep)
 {
-	int 			index;
-	fctl_nwwn_elem_t 	*new;
-	fctl_nwwn_list_t 	*head;
+	int			index;
+	fctl_nwwn_elem_t	*new;
+	fctl_nwwn_list_t	*head;
 
 	ASSERT(!MUTEX_HELD(&rnodep->fd_mutex));
 
@@ -3302,10 +3318,10 @@ fctl_enlist_nwwn_table(fc_remote_node_t *rnodep, int sleep)
 void
 fctl_delist_nwwn_table(fc_remote_node_t *rnodep)
 {
-	int 			index;
-	fctl_nwwn_list_t 	*head;
-	fctl_nwwn_elem_t 	*elem;
-	fctl_nwwn_elem_t 	*prev;
+	int			index;
+	fctl_nwwn_list_t	*head;
+	fctl_nwwn_elem_t	*elem;
+	fctl_nwwn_elem_t	*prev;
 
 	ASSERT(MUTEX_HELD(&fctl_nwwn_hash_mutex));
 	ASSERT(MUTEX_HELD(&rnodep->fd_mutex));
@@ -3355,10 +3371,10 @@ fctl_delist_nwwn_table(fc_remote_node_t *rnodep)
 fc_remote_node_t *
 fctl_get_remote_node_by_nwwn(la_wwn_t *node_wwn)
 {
-	int 			index;
-	fctl_nwwn_elem_t 	*elem;
+	int			index;
+	fctl_nwwn_elem_t	*elem;
 	fc_remote_node_t	*next;
-	fc_remote_node_t 	*rnodep = NULL;
+	fc_remote_node_t	*rnodep = NULL;
 
 	index = HASH_FUNC(WWN_HASH_KEY(node_wwn->raw_wwn),
 	    fctl_nwwn_table_size);
@@ -3395,10 +3411,10 @@ fctl_get_remote_node_by_nwwn(la_wwn_t *node_wwn)
 fc_remote_node_t *
 fctl_lock_remote_node_by_nwwn(la_wwn_t *node_wwn)
 {
-	int 			index;
-	fctl_nwwn_elem_t 	*elem;
+	int			index;
+	fctl_nwwn_elem_t	*elem;
 	fc_remote_node_t	*next;
-	fc_remote_node_t 	*rnodep = NULL;
+	fc_remote_node_t	*rnodep = NULL;
 
 	index = HASH_FUNC(WWN_HASH_KEY(node_wwn->raw_wwn),
 	    fctl_nwwn_table_size);
@@ -3428,7 +3444,7 @@ fctl_lock_remote_node_by_nwwn(la_wwn_t *node_wwn)
 
 /*
  * Allocate and initialize an fc_remote_port_t struct & returns a pointer to
- * the newly allocated struct.  Only fails if the kmem_zalloc() fails.
+ * the newly allocated struct.	Only fails if the kmem_zalloc() fails.
  */
 fc_remote_port_t *
 fctl_alloc_remote_port(fc_local_port_t *port, la_wwn_t *port_wwn,
@@ -3535,8 +3551,8 @@ fctl_unlink_remote_port_from_remote_node(fc_remote_node_t *rnodep,
     fc_remote_port_t *pd)
 {
 	int			rcount = 0;
-	fc_remote_port_t 	*last;
-	fc_remote_port_t 	*ports;
+	fc_remote_port_t	*last;
+	fc_remote_port_t	*ports;
 
 	ASSERT(!MUTEX_HELD(&rnodep->fd_mutex));
 	ASSERT(!MUTEX_HELD(&pd->pd_mutex));
@@ -3613,7 +3629,7 @@ fctl_enlist_did_table(fc_local_port_t *port, fc_remote_port_t *pd)
 #ifdef	DEBUG
 	{
 		int			index;
-		fc_remote_port_t 	*tmp_pd;
+		fc_remote_port_t	*tmp_pd;
 		struct d_id_hash	*tmp_head;
 
 		/*
@@ -3663,9 +3679,9 @@ void
 fctl_delist_did_table(fc_local_port_t *port, fc_remote_port_t *pd)
 {
 	uint32_t		d_id;
-	struct d_id_hash 	*head;
-	fc_remote_port_t 	*pd_next;
-	fc_remote_port_t 	*last;
+	struct d_id_hash	*head;
+	fc_remote_port_t	*pd_next;
+	fc_remote_port_t	*last;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 	ASSERT(MUTEX_HELD(&pd->pd_mutex));
@@ -3726,7 +3742,7 @@ fctl_enlist_pwwn_table(fc_local_port_t *port, fc_remote_port_t *pd)
 #ifdef	DEBUG
 	{
 		int			index;
-		fc_remote_port_t 	*tmp_pd;
+		fc_remote_port_t	*tmp_pd;
 		struct pwwn_hash	*tmp_head;
 
 		/*
@@ -3781,9 +3797,9 @@ fctl_delist_pwwn_table(fc_local_port_t *port, fc_remote_port_t *pd)
 {
 	int			index;
 	la_wwn_t		pwwn;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd_next;
-	fc_remote_port_t 	*last;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd_next;
+	fc_remote_port_t	*last;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 	ASSERT(MUTEX_HELD(&pd->pd_mutex));
@@ -3835,8 +3851,8 @@ fctl_delist_pwwn_table(fc_local_port_t *port, fc_remote_port_t *pd)
 fc_remote_port_t *
 fctl_get_remote_port_by_did(fc_local_port_t *port, uint32_t d_id)
 {
-	struct d_id_hash 	*head;
-	fc_remote_port_t 	*pd;
+	struct d_id_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -3888,8 +3904,8 @@ fc_ulp_hold_remote_port(opaque_t port_handle)
 fc_remote_port_t *
 fctl_hold_remote_port_by_did(fc_local_port_t *port, uint32_t d_id)
 {
-	struct d_id_hash 	*head;
-	fc_remote_port_t 	*pd;
+	struct d_id_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -3929,8 +3945,8 @@ fc_remote_port_t *
 fctl_get_remote_port_by_pwwn(fc_local_port_t *port, la_wwn_t *pwwn)
 {
 	int			index;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -3964,8 +3980,8 @@ fc_remote_port_t *
 fctl_get_remote_port_by_pwwn_mutex_held(fc_local_port_t *port, la_wwn_t *pwwn)
 {
 	int			index;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
@@ -4002,8 +4018,8 @@ fc_remote_port_t *
 fctl_hold_remote_port_by_pwwn(fc_local_port_t *port, la_wwn_t *pwwn)
 {
 	int			index;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -4043,15 +4059,15 @@ fctl_hold_remote_port_by_pwwn(fc_local_port_t *port, la_wwn_t *pwwn)
  * PD_ELS_IN_PROGRESS & PD_ELS_MARK settings in the pd_flags), then
  * fctl_destroy_remote_port_t() is called to deconstruct/free the given
  * fc_remote_port_t (which will also remove it from the d_id and pwwn tables
- * on the associated fc_local_port_t).  If the associated fc_remote_node_t is no
+ * on the associated fc_local_port_t).	If the associated fc_remote_node_t is no
  * longer in use, then it too is deconstructed/freed.
  */
 void
 fctl_release_remote_port(fc_remote_port_t *pd)
 {
 	int			remove = 0;
-	fc_remote_node_t 	*node;
-	fc_local_port_t 	*port;
+	fc_remote_node_t	*node;
+	fc_local_port_t		*port;
 
 	mutex_enter(&pd->pd_mutex);
 	port = pd->pd_port;
@@ -4099,9 +4115,9 @@ fctl_fillout_map(fc_local_port_t *port, fc_portmap_t **map, uint32_t *len,
 	int			full_list;
 	int			initiator;
 	uint32_t		topology;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
-	fc_remote_port_t 	*old_pd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
+	fc_remote_port_t	*old_pd;
 	fc_remote_port_t	*last_pd;
 	fc_portmap_t		*listptr;
 
@@ -4390,11 +4406,8 @@ fctl_jobdone(job_request_t *job)
 
 
 /*
- * Compare two WWNs. The NAA is omitted for comparison.
- *
- * Note particularly that the indentation used in this
- * function  isn't according to Sun recommendations. It
- * is indented to make reading a bit easy.
+ * Compare two WWNs.
+ * The NAA can't be omitted for comparison.
  *
  * Return Values:
  *   if src == dst return  0
@@ -4404,25 +4417,29 @@ fctl_jobdone(job_request_t *job)
 int
 fctl_wwn_cmp(la_wwn_t *src, la_wwn_t *dst)
 {
-	la_wwn_t tmpsrc, tmpdst;
+	uint8_t *l, *r;
+	int i;
+	uint64_t wl, wr;
 
-	/*
-	 * Fibre Channel protocol is big endian, so compare
-	 * as big endian values
-	 */
-	tmpsrc.i_wwn[0] = BE_32(src->i_wwn[0]);
-	tmpsrc.i_wwn[1] = BE_32(src->i_wwn[1]);
+	l = (uint8_t *)src;
+	r = (uint8_t *)dst;
 
-	tmpdst.i_wwn[0] = BE_32(dst->i_wwn[0]);
-	tmpdst.i_wwn[1] = BE_32(dst->i_wwn[1]);
+	for (i = 0, wl = 0; i < 8; i++) {
+		wl <<= 8;
+		wl |= l[i];
+	}
+	for (i = 0, wr = 0; i < 8; i++) {
+		wr <<= 8;
+		wr |= r[i];
+	}
 
-	return (
-	    (tmpsrc.w.nport_id == tmpdst.w.nport_id) ?
-		((tmpsrc.w.wwn_hi == tmpdst.w.wwn_hi) ?
-		    ((tmpsrc.w.wwn_lo == tmpdst.w.wwn_lo) ? 0 :
-		    (tmpsrc.w.wwn_lo > tmpdst.w.wwn_lo) ? 1 : -1) :
-		(tmpsrc.w.wwn_hi > tmpdst.w.wwn_hi) ? 1 : -1) :
-	    (tmpsrc.w.nport_id > tmpdst.w.nport_id) ? 1 : -1);
+	if (wl > wr) {
+		return (1);
+	} else if (wl == wr) {
+		return (0);
+	} else {
+		return (-1);
+	}
 }
 
 
@@ -4499,7 +4516,7 @@ fctl_create_remote_port(fc_local_port_t *port, la_wwn_t *node_wwn,
 {
 	int			invalid = 0;
 	fc_remote_node_t	*rnodep;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	rnodep = fctl_get_remote_node_by_nwwn(node_wwn);
 	if (rnodep) {
@@ -4526,7 +4543,7 @@ fctl_create_remote_port(fc_local_port_t *port, la_wwn_t *node_wwn,
 
 	/*
 	 * See if there already is an fc_remote_port_t struct in existence
-	 * on the specified fc_local_port_t for the given pwwn.  If so, then
+	 * on the specified fc_local_port_t for the given pwwn.	 If so, then
 	 * grab a reference to it. The 'held' here just means that fp_mutex
 	 * is held by the caller -- no reference counts are updated.
 	 */
@@ -4643,7 +4660,7 @@ fctl_create_remote_port(fc_local_port_t *port, la_wwn_t *node_wwn,
 			 * OK the old & new d_id's match, and the remote
 			 * port struct is not marked as PORT_DEVICE_OLD, so
 			 * presume that it's still the same device and is
-			 * still in good shape.  Also this presumes that we
+			 * still in good shape.	 Also this presumes that we
 			 * do not need to update d_id or pwwn hash tables.
 			 */
 			/* sanitize device values */
@@ -4684,7 +4701,7 @@ fctl_create_remote_port(fc_local_port_t *port, la_wwn_t *node_wwn,
 	}
 
 	/*
-	 * Add  the fc_remote_port_t onto the linked list of remote port
+	 * Add	the fc_remote_port_t onto the linked list of remote port
 	 * devices associated with the given fc_remote_node_t (remote node).
 	 */
 	fctl_link_remote_port_to_remote_node(rnodep, pd);
@@ -4705,7 +4722,7 @@ fctl_create_remote_port(fc_local_port_t *port, la_wwn_t *node_wwn,
  * If pd_ref_count in the given fc_remote_port_t is nonzero, then this
  * function just sets the pd->pd_aux_flags |= PD_NEEDS_REMOVAL and the
  * pd->pd_type = PORT_DEVICE_OLD and lets some other function(s) worry about
- * the cleanup.  The function then also returns '1'
+ * the cleanup.	 The function then also returns '1'
  * instead of the actual number of remaining fc_remote_port_t structs
  *
  * If there are no more remote ports on the remote node, return 0.
@@ -4714,7 +4731,7 @@ fctl_create_remote_port(fc_local_port_t *port, la_wwn_t *node_wwn,
 int
 fctl_destroy_remote_port(fc_local_port_t *port, fc_remote_port_t *pd)
 {
-	fc_remote_node_t 	*rnodep;
+	fc_remote_node_t	*rnodep;
 	int			rcount = 0;
 
 	mutex_enter(&pd->pd_mutex);
@@ -4775,7 +4792,7 @@ fctl_destroy_remote_port(fc_local_port_t *port, fc_remote_port_t *pd)
  * For each fc_remote_port_t found, this will:
  *
  *  - Remove the fc_remote_port_t from the linked list of remote ports for
- *    the associated fc_remote_node_t.  If the linked list goes empty, then this
+ *    the associated fc_remote_node_t.	If the linked list goes empty, then this
  *    tries to deconstruct & free the fc_remote_node_t (that also removes the
  *    fc_remote_node_t from the global fctl_nwwn_hash_table[]).
  *
@@ -4793,7 +4810,7 @@ fctl_destroy_all_remote_ports(fc_local_port_t *port)
 	int			index;
 	fc_remote_port_t	*pd;
 	fc_remote_node_t	*rnodep;
-	struct d_id_hash 	*head;
+	struct d_id_hash	*head;
 
 	mutex_enter(&port->fp_mutex);
 
@@ -4889,7 +4906,7 @@ fctl_ulp_unsol_cb(fc_local_port_t *port, fc_unsol_buf_t *buf, uchar_t type)
 	int			check_type;
 	int			rval;
 	uint32_t		claimed;
-	fc_ulp_module_t 	*mod;
+	fc_ulp_module_t		*mod;
 	fc_ulp_ports_t		*ulp_port;
 
 	claimed = 0;
@@ -5048,14 +5065,14 @@ fctl_copy_portmap(fc_portmap_t *map, fc_remote_port_t *pd)
 static int
 fctl_update_host_ns_values(fc_local_port_t *port, fc_ns_cmd_t *ns_req)
 {
-	int 	rval = FC_SUCCESS;
+	int	rval = FC_SUCCESS;
 
 	switch (ns_req->ns_cmd) {
 	case NS_RFT_ID: {
 		int		count;
 		uint32_t	*src;
 		uint32_t	*dst;
-		ns_rfc_type_t 	*rfc;
+		ns_rfc_type_t	*rfc;
 
 		rfc = (ns_rfc_type_t *)ns_req->ns_req_payload;
 
@@ -5140,7 +5157,7 @@ fctl_update_host_ns_values(fc_local_port_t *port, fc_ns_cmd_t *ns_req)
 static int
 fctl_retrieve_host_ns_values(fc_local_port_t *port, fc_ns_cmd_t *ns_req)
 {
-	int 	rval = FC_SUCCESS;
+	int	rval = FC_SUCCESS;
 
 	switch (ns_req->ns_cmd) {
 	case NS_GFT_ID: {
@@ -5279,8 +5296,8 @@ fctl_ulp_port_ioctl(fc_local_port_t *port, dev_t dev, int cmd,
 {
 	int			ret;
 	int			save;
-	uint32_t 		claimed;
-	fc_ulp_module_t 	*mod;
+	uint32_t		claimed;
+	fc_ulp_module_t		*mod;
 	fc_ulp_ports_t		*ulp_port;
 
 	save = *rval;
@@ -5456,14 +5473,14 @@ fc_delete_npiv_port(fc_local_port_t *port, la_wwn_t *pwwn)
  * only ONE port on the adapter will be returned.
  * pathList should be (count * MAXPATHLEN) long.
  * The return value will be set to the number of
- * HBAs that were found on the system.  If the value
+ * HBAs that were found on the system.	If the value
  * is greater than count, the routine should be retried
  * with a larger buffer.
  */
 int
 fc_ulp_get_adapter_paths(char *pathList, int count)
 {
-	fc_fca_port_t 	*fca_port;
+	fc_fca_port_t	*fca_port;
 	int		in = 0, out = 0, check, skip, maxPorts = 0;
 	fc_local_port_t		**portList;
 	fc_local_port_t		*new_port, *stored_port;
@@ -5493,67 +5510,73 @@ fc_ulp_get_adapter_paths(char *pathList, int count)
 
 		/* Filter out secondary ports from the list */
 		for (check = 0; check < out; check++) {
-		if (portList[check] == NULL) {
-			continue;
-		}
-		/* Guard against duplicates (should never happen) */
-		if (portList[check] == fca_port->port_handle) {
-			/* Same port */
-			skip = 1;
-			break;
-		}
-
-		/* Lock the already stored port for comparison */
-		stored_port = portList[check];
-		mutex_enter(&stored_port->fp_mutex);
-		stored_fru = &stored_port->fp_hba_port_attrs.hba_fru_details;
-
-		/* Are these ports on the same HBA? */
-		if (new_fru->high == stored_fru->high &&
-			new_fru->low == stored_fru->low) {
-		    /* Now double check driver */
-		    if (strncmp(new_port->fp_hba_port_attrs.driver_name,
-			    stored_port->fp_hba_port_attrs.driver_name,
-			    FCHBA_DRIVER_NAME_LEN) == 0) {
-			/* we no we don't need to grow the list */
-			skip = 1;
-			/* Are we looking at a lower port index? */
-			if (new_fru->port_index < stored_fru->port_index) {
-				/* Replace the port in the list */
-				mutex_exit(&stored_port->fp_mutex);
-				if (new_port->fp_npiv_type == FC_NPIV_PORT) {
-					break;
-				}
-				portList[check] = new_port;
+			if (portList[check] == NULL) {
+				continue;
+			}
+			/* Guard against duplicates (should never happen) */
+			if (portList[check] == fca_port->port_handle) {
+				/* Same port */
+				skip = 1;
 				break;
-			} /* Else, just skip this port */
-		    }
-		}
+			}
 
-		mutex_exit(&stored_port->fp_mutex);
-	    }
-	    mutex_exit(&new_port->fp_mutex);
+			/* Lock the already stored port for comparison */
+			stored_port = portList[check];
+			mutex_enter(&stored_port->fp_mutex);
+			stored_fru =
+			    &stored_port->fp_hba_port_attrs.hba_fru_details;
 
-	    if (!skip) {
-		/*
-		 * Either this is the first port for this HBA, or
-		 * it's a secondary port and we haven't stored the
-		 * primary/first port for that HBA.  In the latter case,
-		 * will just filter it out as we proceed to loop.
-		 */
-		if (fca_port->port_handle->fp_npiv_type == FC_NPIV_PORT) {
-			continue;
-		} else {
-			portList[out++] = fca_port->port_handle;
+			/* Are these ports on the same HBA? */
+			if (new_fru->high == stored_fru->high &&
+			    new_fru->low == stored_fru->low) {
+				/* Now double check driver */
+				if (strncmp(
+				    new_port->fp_hba_port_attrs.driver_name,
+				    stored_port->fp_hba_port_attrs.driver_name,
+				    FCHBA_DRIVER_NAME_LEN) == 0) {
+					/* we don't need to grow the list */
+					skip = 1;
+					/* looking at a lower port index? */
+					if (new_fru->port_index <
+					    stored_fru->port_index) {
+						/* Replace the port in list */
+						mutex_exit(
+						    &stored_port->fp_mutex);
+						if (new_port->fp_npiv_type ==
+						    FC_NPIV_PORT) {
+							break;
+						}
+						portList[check] = new_port;
+						break;
+					} /* Else, just skip this port */
+				}
+			}
+
+			mutex_exit(&stored_port->fp_mutex);
 		}
-	    }
+		mutex_exit(&new_port->fp_mutex);
+
+		if (!skip) {
+			/*
+			 * Either this is the first port for this HBA, or
+			 * it's a secondary port and we haven't stored the
+			 * primary/first port for that HBA.  In the latter case,
+			 * will just filter it out as we proceed to loop.
+			 */
+			if (fca_port->port_handle->fp_npiv_type ==
+			    FC_NPIV_PORT) {
+				continue;
+			} else {
+				portList[out++] = fca_port->port_handle;
+			}
+		}
 	}
 
 	if (out <= count) {
-	    for (in = 0; in < out; in++) {
-		(void) ddi_pathname(portList[in]->fp_port_dip,
-		    &pathList[MAXPATHLEN * in]);
-	    }
+		for (in = 0; in < out; in++) {
+			(void) ddi_pathname(portList[in]->fp_port_dip,
+			    &pathList[MAXPATHLEN * in]);
+		}
 	}
 	mutex_exit(&fctl_port_lock);
 	kmem_free(portList, sizeof (*portList) * maxPorts);
@@ -5588,7 +5611,7 @@ fctl_add_orphan_held(fc_local_port_t *port, fc_remote_port_t *pd)
 {
 	int		rval = FC_FAILURE;
 	la_wwn_t	pwwn;
-	fc_orphan_t 	*orp;
+	fc_orphan_t	*orp;
 	fc_orphan_t	*orphan;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
@@ -5625,7 +5648,7 @@ fctl_add_orphan(fc_local_port_t *port, fc_remote_port_t *pd, int sleep)
 {
 	int		rval = FC_FAILURE;
 	la_wwn_t	pwwn;
-	fc_orphan_t 	*orp;
+	fc_orphan_t	*orp;
 	fc_orphan_t	*orphan;
 
 	mutex_enter(&port->fp_mutex);
@@ -5669,7 +5692,7 @@ fctl_remove_if_orphan(fc_local_port_t *port, la_wwn_t *pwwn)
 {
 	int		rval = FC_FAILURE;
 	fc_orphan_t	*prev = NULL;
-	fc_orphan_t 	*orp;
+	fc_orphan_t	*orp;
 
 	mutex_enter(&port->fp_mutex);
 	for (orp = port->fp_orphan_list; orp != NULL; orp = orp->orp_next) {
@@ -5699,9 +5722,9 @@ fctl_remove_if_orphan(fc_local_port_t *port, la_wwn_t *pwwn)
 static void
 fctl_print_if_not_orphan(fc_local_port_t *port, fc_remote_port_t *pd)
 {
-	char 		ww_name[17];
-	la_wwn_t 	pwwn;
-	fc_orphan_t 	*orp;
+	char		ww_name[17];
+	la_wwn_t	pwwn;
+	fc_orphan_t	*orp;
 
 	mutex_enter(&port->fp_mutex);
 
@@ -5772,7 +5795,7 @@ fctl_pkt_error(fc_packet_t *pkt, char **state, char **reason,
     char **action, char **expln)
 {
 	int		ret;
-	int 		len;
+	int		len;
 	int		index;
 	fc_pkt_error_t	*error;
 	fc_pkt_reason_t	*reason_b;	/* Base pointer */
@@ -5840,9 +5863,9 @@ fctl_remove_oldies(fc_local_port_t *port)
 	int			index;
 	int			initiator;
 	fc_remote_node_t	*node;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
-	fc_remote_port_t 	*old_pd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
+	fc_remote_port_t	*old_pd;
 	fc_remote_port_t	*last_pd;
 
 	/*
@@ -5954,7 +5977,7 @@ fctl_lookup_pd_by_did(fc_local_port_t *port, uint32_t d_id)
 {
 	int			index;
 	struct pwwn_hash	*head;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
@@ -5984,7 +6007,7 @@ void
 fc_trace_debug(fc_trace_logq_t *logq, caddr_t name, int dflag, int dlevel,
     int errno, const char *fmt, ...)
 {
-	char 	buf[FC_MAX_TRACE_BUF_LEN + 3]; /* 3 is for "\n" */
+	char	buf[FC_MAX_TRACE_BUF_LEN + 3]; /* 3 is for "\n" */
 	char	*bufptr = buf;
 	va_list	ap;
 	int	cnt = 0;
@@ -5995,16 +6018,16 @@ fc_trace_debug(fc_trace_logq_t *logq, caddr_t name, int dflag, int dlevel,
 
 	if (name) {
 		cnt = snprintf(buf, FC_MAX_TRACE_BUF_LEN + 1, "%d=>%s::",
-			logq->il_id++, name);
+		    logq->il_id++, name);
 	} else {
 		cnt = snprintf(buf, FC_MAX_TRACE_BUF_LEN + 1, "%d=>trace::",
-			logq->il_id++);
+		    logq->il_id++);
 	}
 
 	if (cnt < FC_MAX_TRACE_BUF_LEN) {
 		va_start(ap, fmt);
 		cnt += vsnprintf(buf + cnt, FC_MAX_TRACE_BUF_LEN + 1 - cnt,
-			fmt, ap);
+		    fmt, ap);
 		va_end(ap);
 	}
 
@@ -6013,7 +6036,7 @@ fc_trace_debug(fc_trace_logq_t *logq, caddr_t name, int dflag, int dlevel,
 	}
 	if (errno && (cnt < FC_MAX_TRACE_BUF_LEN)) {
 		cnt += snprintf(buf + cnt, FC_MAX_TRACE_BUF_LEN + 1 - cnt,
-			"error=0x%x\n", errno);
+		    "error=0x%x\n", errno);
 	}
 	(void) snprintf(buf + cnt, FC_MAX_TRACE_BUF_LEN + 3 - cnt, "\n");
 
@@ -6175,21 +6198,21 @@ fctl_lookup_pd_by_index(fc_local_port_t *port, uint32_t index)
 	int			outer;
 	int			match = 0;
 	struct pwwn_hash	*head;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
 	for (outer = 0;
-		outer < pwwn_table_size && match <= index;
-		outer++) {
-	    head = &port->fp_pwwn_table[outer];
-	    pd = head->pwwn_head;
-	    if (pd != NULL) match ++;
-
-	    while (pd != NULL && match <= index) {
-		pd = pd->pd_wwn_hnext;
+	    outer < pwwn_table_size && match <= index;
+	    outer++) {
+		head = &port->fp_pwwn_table[outer];
+		pd = head->pwwn_head;
 		if (pd != NULL) match ++;
-	    }
+
+		while (pd != NULL && match <= index) {
+			pd = pd->pd_wwn_hnext;
+			if (pd != NULL) match ++;
+		}
 	}
 
 	return (pd);
@@ -6203,7 +6226,7 @@ fctl_lookup_pd_by_wwn(fc_local_port_t *port, la_wwn_t wwn)
 {
 	int			index;
 	struct pwwn_hash	*head;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
@@ -6211,21 +6234,21 @@ fctl_lookup_pd_by_wwn(fc_local_port_t *port, la_wwn_t wwn)
 		head = &port->fp_pwwn_table[index];
 		pd = head->pwwn_head;
 
-	    while (pd != NULL) {
-		mutex_enter(&pd->pd_mutex);
-		if (bcmp(pd->pd_port_name.raw_wwn, wwn.raw_wwn,
-			sizeof (la_wwn_t)) == 0) {
-		    mutex_exit(&pd->pd_mutex);
-		    return (pd);
+		while (pd != NULL) {
+			mutex_enter(&pd->pd_mutex);
+			if (bcmp(pd->pd_port_name.raw_wwn, wwn.raw_wwn,
+			    sizeof (la_wwn_t)) == 0) {
+				mutex_exit(&pd->pd_mutex);
+				return (pd);
+			}
+			if (bcmp(pd->pd_remote_nodep->fd_node_name.raw_wwn,
+			    wwn.raw_wwn, sizeof (la_wwn_t)) == 0) {
+				mutex_exit(&pd->pd_mutex);
+				return (pd);
+			}
+			mutex_exit(&pd->pd_mutex);
+			pd = pd->pd_wwn_hnext;
 		}
-		if (bcmp(pd->pd_remote_nodep->fd_node_name.raw_wwn, wwn.raw_wwn,
-			sizeof (la_wwn_t)) == 0) {
-		    mutex_exit(&pd->pd_mutex);
-		    return (pd);
-		}
-		mutex_exit(&pd->pd_mutex);
-		pd = pd->pd_wwn_hnext;
-	    }
 	}
 	/* No match */
 	return (NULL);
@@ -6244,7 +6267,7 @@ int
 fctl_count_fru_ports(fc_local_port_t *port, int npivflag)
 {
 	fca_hba_fru_details_t	*fru;
-	fc_fca_port_t 	*fca_port;
+	fc_fca_port_t	*fca_port;
 	fc_local_port_t	*tmpPort = NULL;
 	uint32_t	count = 1;
 
@@ -6262,11 +6285,11 @@ fctl_count_fru_ports(fc_local_port_t *port, int npivflag)
 
 	for (fca_port = fctl_fca_portlist; fca_port != NULL;
 	    fca_port = fca_port->port_next) {
-	    tmpPort = fca_port->port_handle;
-	    if (tmpPort == port) {
-		continue;
-	    }
-	    mutex_enter(&tmpPort->fp_mutex);
+		tmpPort = fca_port->port_handle;
+		if (tmpPort == port) {
+			continue;
+		}
+		mutex_enter(&tmpPort->fp_mutex);
 
 		/*
 		 * If an FCA driver returns unique fru->high and fru->low for
@@ -6344,7 +6367,7 @@ fc_local_port_t *
 fctl_get_adapter_port_by_index(fc_local_port_t *port, uint32_t port_index)
 {
 	fca_hba_fru_details_t	*fru;
-	fc_fca_port_t 	*fca_port;
+	fc_fca_port_t	*fca_port;
 	fc_local_port_t	*tmpPort = NULL;
 	fc_fca_port_t	*list = NULL, *tmpEntry;
 	fc_local_port_t		*phyPort, *virPort = NULL;
@@ -6374,41 +6397,43 @@ fctl_get_adapter_port_by_index(fc_local_port_t *port, uint32_t port_index)
 	/* Loop through all known ports */
 	for (fca_port = fctl_fca_portlist; fca_port != NULL;
 	    fca_port = fca_port->port_next) {
-	    tmpPort = fca_port->port_handle;
-	    if (tmpPort == port) {
-		/* Skip over the port that was passed in as the argument */
-		continue;
-	    }
-	    mutex_enter(&tmpPort->fp_mutex);
+		tmpPort = fca_port->port_handle;
+		if (tmpPort == port) {
+			/* Skip the port that was passed in as the argument */
+			continue;
+		}
+		mutex_enter(&tmpPort->fp_mutex);
 
-	    /* See if this port is on the same HBA FRU (fast check) */
-	    if (tmpPort->fp_hba_port_attrs.hba_fru_details.high ==
+		/* See if this port is on the same HBA FRU (fast check) */
+		if (tmpPort->fp_hba_port_attrs.hba_fru_details.high ==
 		    fru->high &&
 		    tmpPort->fp_hba_port_attrs.hba_fru_details.low ==
 		    fru->low) {
-		/* Now double check driver (slower check) */
-		if (strncmp(port->fp_hba_port_attrs.driver_name,
-			tmpPort->fp_hba_port_attrs.driver_name,
-			FCHBA_DRIVER_NAME_LEN) == 0) {
+			/* Now double check driver (slower check) */
+			if (strncmp(port->fp_hba_port_attrs.driver_name,
+			    tmpPort->fp_hba_port_attrs.driver_name,
+			    FCHBA_DRIVER_NAME_LEN) == 0) {
 
-		    fru = &tmpPort->fp_hba_port_attrs.hba_fru_details;
-		    /* Check for the matching port_index */
-			if ((tmpPort->fp_npiv_type != FC_NPIV_PORT) &&
-			    (fru->port_index == port_index)) {
-				/* Found it! */
-				mutex_exit(&tmpPort->fp_mutex);
-				mutex_exit(&port->fp_mutex);
-				mutex_exit(&fctl_port_lock);
-				fctl_local_port_list_free(list);
-				return (tmpPort);
-			}
-			if (tmpPort->fp_npiv_type != FC_NPIV_PORT) {
-				(void) fctl_local_port_list_add(list, tmpPort);
-				phyPortNum++;
-			}
-		} /* Else, different FCA driver */
-	    } /* Else not the same HBA FRU */
-	    mutex_exit(&tmpPort->fp_mutex);
+				fru =
+				    &tmpPort->fp_hba_port_attrs.hba_fru_details;
+				/* Check for the matching port_index */
+				if ((tmpPort->fp_npiv_type != FC_NPIV_PORT) &&
+				    (fru->port_index == port_index)) {
+					/* Found it! */
+					mutex_exit(&tmpPort->fp_mutex);
+					mutex_exit(&port->fp_mutex);
+					mutex_exit(&fctl_port_lock);
+					fctl_local_port_list_free(list);
+					return (tmpPort);
+				}
+				if (tmpPort->fp_npiv_type != FC_NPIV_PORT) {
+					(void) fctl_local_port_list_add(list,
+					    tmpPort);
+					phyPortNum++;
+				}
+			} /* Else, different FCA driver */
+		} /* Else not the same HBA FRU */
+		mutex_exit(&tmpPort->fp_mutex);
 
 	}
 
@@ -6461,7 +6486,7 @@ fctl_busy_port(fc_local_port_t *port)
 		 * This wouldn't be a problem except that if we have
 		 * registered our PM components in the meantime, we will
 		 * then be idling a component that was never busied.  PM
-		 * will be very unhappy if we do this.  Thus, we keep
+		 * will be very unhappy if we do this.	Thus, we keep
 		 * track of this with port->fp_pm_busy_nocomp.
 		 */
 		port->fp_pm_busy_nocomp++;
@@ -6533,12 +6558,10 @@ fctl_idle_port(fc_local_port_t *port)
  *
  * Return Value: Nothing
  *
- *      Context: Kernel context.
+ *	Context: Kernel context.
  */
 static void
-fctl_tc_timer(
-    void	*arg
-)
+fctl_tc_timer(void *arg)
 {
 	timed_counter_t	*tc = (timed_counter_t *)arg;
 
@@ -6559,21 +6582,17 @@ fctl_tc_timer(
  *  Description: Constructs a timed counter.
  *
  *    Arguments: *tc		Address where the timed counter will reside.
- *		 max_value      Maximum value the counter is allowed to take.
+ *		 max_value	Maximum value the counter is allowed to take.
  *		 timer		Number of microseconds after which the counter
  *				will be reset. The timer is started when the
  *				value of the counter goes from 0 to 1.
  *
  * Return Value: Nothing
  *
- *      Context: Kernel context.
+ *	Context: Kernel context.
  */
 void
-fctl_tc_constructor(
-    timed_counter_t	*tc,
-    uint32_t		max_value,
-    clock_t		timer
-)
+fctl_tc_constructor(timed_counter_t *tc, uint32_t max_value, clock_t timer)
 {
 	ASSERT(tc != NULL);
 	ASSERT(tc->sig != tc);
@@ -6596,12 +6615,10 @@ fctl_tc_constructor(
  *
  * Return Value: Nothing
  *
- *      Context: Kernel context.
+ *	Context: Kernel context.
  */
 void
-fctl_tc_destructor(
-    timed_counter_t	*tc
-)
+fctl_tc_destructor(timed_counter_t *tc)
 {
 	ASSERT(tc != NULL);
 	ASSERT(tc->sig == tc);
@@ -6627,12 +6644,10 @@ fctl_tc_destructor(
  * Return Value: B_TRUE		Counter reached the max value.
  *		 B_FALSE	Counter hasn't reached the max value.
  *
- *      Context: Kernel or interrupt context.
+ *	Context: Kernel or interrupt context.
  */
 boolean_t
-fctl_tc_increment(
-    timed_counter_t *tc
-)
+fctl_tc_increment(timed_counter_t *tc)
 {
 	ASSERT(tc != NULL);
 	ASSERT(tc->sig == tc);
@@ -6667,12 +6682,10 @@ fctl_tc_increment(
  * Return Value: 0		Counter reached the max value.
  *		 Not 0		Counter hasn't reached the max value.
  *
- *      Context: Kernel or interrupt context.
+ *	Context: Kernel or interrupt context.
  */
 void
-fctl_tc_reset(
-    timed_counter_t *tc
-)
+fctl_tc_reset(timed_counter_t *tc)
 {
 	ASSERT(tc != NULL);
 	ASSERT(tc->sig == tc);

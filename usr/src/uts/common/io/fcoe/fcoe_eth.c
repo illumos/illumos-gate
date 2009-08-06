@@ -199,6 +199,9 @@ fcoe_enable_callback(fcoe_mac_t *mac)
 	    mac_stat_get(mac->fm_handle, MAC_STAT_LINK_UP)?
 	    FCOE_MAC_LINK_STATE_UP:FCOE_MAC_LINK_STATE_DOWN;
 
+	mac->fm_eport.eport_link_speed =
+	    mac_client_stat_get(mac->fm_cli_handle, MAC_STAT_IFSPEED);
+
 	/*
 	 * Add a notify function so that we get updates from MAC
 	 */
@@ -259,6 +262,7 @@ fcoe_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t loopback)
 		frame_size = raw_frame_size - PADDING_SIZE;
 		frm = fcoe_allocate_frame(&mac->fm_eport, frame_size, mp);
 		if (frm != NULL) {
+			frm->frm_clock = CURRENT_CLOCK;
 			fcoe_post_frame(frm);
 		}
 
@@ -290,7 +294,6 @@ fcoe_mac_notify(void *arg, mac_notify_type_t type)
 			mac->fm_eport.eport_link_speed =
 			    mac_client_stat_get(mac->fm_cli_handle,
 			    MAC_STAT_IFSPEED);
-
 			(void) fcoe_mac_set_address(&mac->fm_eport,
 			    mac->fm_primary_addr, B_FALSE);
 

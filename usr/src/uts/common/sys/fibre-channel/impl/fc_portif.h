@@ -19,20 +19,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FC_PORTIF_H
 #define	_FC_PORTIF_H
 
-
 #include <sys/note.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
 
 /*
  * To remove the port WWN from the orphan list; An orphan list
@@ -103,6 +101,7 @@ extern "C" {
 #define	FP_DETACH_INPROGRESS		0x0200
 #define	FP_DETACH_FAILED		0x0400
 #define	FP_SOFT_NO_PMCOMP		0x0800
+#define	FP_SOFT_FCA_IS_NODMA		0x1000
 
 /*
  * Instruct the port driver to just accept logins from these addresses
@@ -144,14 +143,14 @@ extern "C" {
 /*
  * Structure for issuing a work request to the per-instance "job handler"
  * thread. Primarily allocated/initialized by fctl_alloc_job() and freed by
- * fctl_dealloc_job().  fctl keeps a kmem_cache of these structs anchored by the
+ * fctl_dealloc_job().	fctl keeps a kmem_cache of these structs anchored by the
  * fctl_job_cache global variable.  The cache is created at fctl's _init(9E) and
  * destroyed at fctl's _fini(9E).  See also fctl_cache_constructor()
  * and fctl_cache_destructor().
  */
 typedef struct job_request {
 	/*
-	 * ID code for the job or task to be performed.  Set by fctl_alloc_job()
+	 * ID code for the job or task to be performed.	 Set by fctl_alloc_job()
 	 * and read by fp_job_handler().
 	 */
 	int		job_code;
@@ -197,7 +196,7 @@ typedef struct job_request {
 	 * maintained on a per-instance basis by the fp_port_head and
 	 * fp_port_tail pointers in the fc_local_port_t struct.
 	 */
-	struct job_request 	*job_next;
+	struct job_request	*job_next;
 } job_request_t;
 
 
@@ -250,7 +249,7 @@ _NOTE(MUTEX_PROTECTS_DATA(job_request::job_mutex, job_request::job_counter))
  *
  * JOB_TYPE_FCTL_ASYNC is set in various places in fp and fctl. If set then
  * fctl_jobdone() will call the completion function in the job_comp field and
- * deallocate the job_request_t struct.  If not set then fctl_jobdone() will
+ * deallocate the job_request_t struct.	 If not set then fctl_jobdone() will
  * sema_v() the job_fctl_sema to wake up any waiting thread.  This bit is also
  * checked in fc_ulp_login(): if *clear* then fc_ulp_login() will call
  * fctl_jobwait() in order to block the calling thread in the job_fctl_sema, and
@@ -258,7 +257,7 @@ _NOTE(MUTEX_PROTECTS_DATA(job_request::job_mutex, job_request::job_counter))
  *
  * JOB_TYPE_FP_ASYNC is set in various places in fp. If set then fp_jobdone()
  * will call fctl_jobdone(); if clear then fp_jobdone() will sema_v() the
- * job_port_sema in the job_request_t.  fp_port_shutdown() also looks for
+ * job_port_sema in the job_request_t.	fp_port_shutdown() also looks for
  * JOB_TYPE_FP_ASYNC.  Just to keep thing interesting, JOB_TYPE_FP_ASYNC is
  * also set in fp_validate_area_domain() and cleared in fp_fcio_login() and
  * fp_ns_get_devcount()
@@ -281,7 +280,7 @@ typedef struct fc_port_clist {
 	uint32_t	clist_state;		/* port state */
 	uint32_t	clist_len;		/* map len */
 	uint32_t	clist_size;		/* alloc len */
-	fc_portmap_t 	*clist_map;		/* changelist */
+	fc_portmap_t	*clist_map;		/* changelist */
 	uint32_t	clist_flags;		/* port topology */
 	uint32_t	clist_wait;		/* for synchronous requests */
 	kmutex_t	clist_mutex;		/* clist lock */
@@ -329,12 +328,33 @@ typedef struct fc_orphan {
 	struct fc_orphan	*orp_next;	/* Next orphan */
 } fc_orphan_t;
 
+#define	FC_GET_RSP(x_port, x_handle, x_dest, x_src, x_size, x_flag)	\
+	{								\
+		if (!((x_port)->fp_soft_state & FP_SOFT_FCA_IS_NODMA)) {\
+			ddi_rep_get8((x_handle), (uint8_t *)(x_dest),	\
+				    (uint8_t *)(x_src), (x_size),	\
+				    (x_flag));				\
+		} else {						\
+			bcopy((x_src), (x_dest), (x_size));		\
+		}							\
+	}
+
+#define	FC_SET_CMD(x_port, x_handle, x_src, x_dest, x_size, x_flag)	\
+	{								\
+		if (!((x_port)->fp_soft_state & FP_SOFT_FCA_IS_NODMA)) {\
+			ddi_rep_put8((x_handle), (uint8_t *)(x_src),	\
+				    (uint8_t *)(x_dest), (x_size),	\
+				    (x_flag));				\
+		} else {						\
+			bcopy((x_src), (x_dest), (x_size));		\
+		}							\
+	}
+
 #if	!defined(__lint)
 _NOTE(SCHEME_PROTECTS_DATA("scans don't interleave",
-	fc_orphan::orp_nscan fc_orphan::orp_pwwn fc_orphan::orp_tstamp))
+    fc_orphan::orp_nscan fc_orphan::orp_pwwn fc_orphan::orp_tstamp))
 _NOTE(MUTEX_PROTECTS_DATA(fc_local_port::fp_mutex, fc_orphan::orp_next))
 #endif /* __lint */
-
 
 fc_remote_node_t *fctl_create_remote_node(la_wwn_t *nwwn, int sleep);
 void fctl_destroy_remote_node(fc_remote_node_t *rnp);

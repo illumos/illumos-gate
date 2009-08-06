@@ -26,8 +26,6 @@
 #ifndef	_FCPVAR_H
 #define	_FCPVAR_H
 
-
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -127,7 +125,7 @@ struct fcp_stats {
  * This is the master structure off of which all the others will be hanging at
  * some point and is the Solaris per-instance soft-state structure.
  */
-struct fcp_port {
+typedef struct fcp_port {
 	/*
 	 * This mutex protects the access to this structure (or most of its
 	 * fields).
@@ -409,7 +407,7 @@ struct fcp_port {
 	 * list.
 	 */
 	int			port_dmacookie_sz;
-};
+} fcp_port_t;
 
 /*
  * We need to save the target change count values in a map tag so as
@@ -437,6 +435,11 @@ typedef int fcp_map_tag_t;
  * indication to fcp_scsi_start that the target's status might change.
  */
 #define	FCP_STATE_IN_CB_DEVC		0x0400
+
+/*
+ * FCP_STATE_FCA_IS_NODMA indicates that FCA doesn't support DMA at all
+ */
+#define	FCP_STATE_FCA_IS_NODMA		0x80000000
 
 #define	FCP_MAX_DEVICES			127
 
@@ -521,7 +524,7 @@ typedef int fcp_map_tag_t;
  * (a)	The underlying FCA does NOT support DMA for this field
  * (b)	The underlying FCA supports DMA for this field
  */
-struct fcp_pkt {
+typedef struct fcp_pkt {
 	/*
 	 * The two following fields are used to queue fcp_pkt in the double
 	 * link list of the lun structure.  The packet is queued in
@@ -578,7 +581,7 @@ struct fcp_pkt {
 	 * fp/fctl.
 	 */
 	struct fc_packet	cmd_fc_packet;
-};
+} fcp_pkt_t;
 
 /*
  * fcp_ipkt : Packet for internal commands.
@@ -645,7 +648,7 @@ struct fcp_pkt {
  * (a)	The underlying FCA does NOT support DMA for this field
  * (b)	The underlying FCA supports DMA for this field
  */
-struct fcp_ipkt {
+typedef struct fcp_ipkt {
 	/*
 	 * Pointer to the port (fcp_port) in behalf of which this internal
 	 * packet was allocated.
@@ -713,7 +716,7 @@ struct fcp_ipkt {
 	 * FC packet.
 	 */
 	struct fc_packet	ipkt_fc_packet;
-};
+} fcp_ipkt_t;
 
 /*
  * cmd_state definitions
@@ -725,7 +728,9 @@ struct fcp_ipkt {
 /*
  * These are the defined cmd_flags for this structure.
  */
-#define	CFLAG_IN_QUEUE		0x2000	/* command in fcp queue */
+#define	CFLAG_NONE		0x0000
+#define	CFLAG_IS_READ		0x0001
+#define	CFLAG_IN_QUEUE		0x0002	/* command in fcp queue */
 
 /*
  * Target structure
@@ -735,7 +740,7 @@ struct fcp_ipkt {
  * structure doesn't represent the object registered with the OS (NDI or
  * MPxIO...).
  */
-struct fcp_tgt {
+typedef struct fcp_tgt {
 	/*
 	 * This field is used to queue the target structure in one of the
 	 * buckets of the fcp_port target hash table port_tgt_hash_table[].
@@ -850,7 +855,7 @@ struct fcp_tgt {
 	 * used to detect user unconfig when auto configuration is enabled.
 	 */
 	uint32_t		tgt_manual_config_only;
-};
+} fcp_tgt_t;
 
 /*
  * Target States
@@ -964,7 +969,7 @@ typedef void		*child_info_t;
  * structure is the one representing the object registered with the OS (NDI
  * or MPxIO...).
  */
-struct fcp_lun {
+typedef struct fcp_lun {
 	/*
 	 * Mutex protecting the access to this structure.
 	 */
@@ -1058,7 +1063,7 @@ struct fcp_lun {
 	 * LUN inquiry data (as returned by the INQUIRY command).
 	 */
 	struct scsi_inquiry	lun_inq;
-};
+} fcp_lun_t;
 
 
 /*
@@ -1297,10 +1302,10 @@ typedef struct fcp_black_list_entry {
 	int				masked;
 } fcp_black_list_entry_t;
 
-#define	ADDR2FCP(ap)	((struct fcp_port *) \
-			    ((ap)->a_hba_tran->tran_hba_private))
-#define	ADDR2LUN(ap)	((struct fcp_lun *) \
-			scsi_device_hba_private_get(scsi_address_device(ap)))
+#define	ADDR2FCP(ap)	((struct fcp_port *)		\
+		((ap)->a_hba_tran->tran_hba_private))
+#define	ADDR2LUN(ap)	((struct fcp_lun *)				\
+		scsi_device_hba_private_get(scsi_address_device(ap)))
 #define	CMD2PKT(cmd)	((cmd)->cmd_pkt)
 #define	PKT2CMD(pkt)	((struct fcp_pkt *)((pkt)->pkt_ha_private))
 
@@ -1366,13 +1371,28 @@ _NOTE(SCHEME_PROTECTS_DATA("Safe Data",
     scsi_pkt scsi_arq_status scsi_device scsi_hba_tran scsi_cdb))
 #endif	/* __lint */
 
-#define	FCP_CP_IN(s, d, handle, len)	(ddi_rep_get8((handle), \
-					(uint8_t *)(d), (uint8_t *)(s), \
-					(len), DDI_DEV_AUTOINCR))
+/*
+ * Local variable "pptr" must exist before using these
+ */
+#define	FCP_CP_IN(s, d, handle, len)					\
+	{								\
+		if (!((pptr)->port_state & FCP_STATE_FCA_IS_NODMA)) {	\
+			ddi_rep_get8((handle), (uint8_t *)(d),		\
+			    (uint8_t *)(s), (len), DDI_DEV_AUTOINCR);	\
+		} else {						\
+			bcopy((s), (d), (len));				\
+		}							\
+	}
 
-#define	FCP_CP_OUT(s, d, handle, len)	(ddi_rep_put8((handle), \
-					(uint8_t *)(s), (uint8_t *)(d), \
-					(len), DDI_DEV_AUTOINCR))
+#define	FCP_CP_OUT(s, d, handle, len)				\
+	{								\
+		if (!((pptr)->port_state & FCP_STATE_FCA_IS_NODMA)) {	\
+			ddi_rep_put8((handle), (uint8_t *)(s),		\
+			    (uint8_t *)(d), (len), DDI_DEV_AUTOINCR);	\
+		} else {						\
+			bcopy((s), (d), (len));				\
+		}							\
+	}
 
 #define	FCP_ONLINE			0x1
 #define	FCP_OFFLINE			0x2

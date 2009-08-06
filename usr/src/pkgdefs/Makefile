@@ -255,6 +255,7 @@ COMMON_SUBDIRS= \
 	SUNWfcoe \
 	SUNWfcoeu \
 	SUNWfcoet \
+	SUNWfcoei \
 	SUNWfilebench \
 	SUNWfmd  \
 	SUNWfmdr  \

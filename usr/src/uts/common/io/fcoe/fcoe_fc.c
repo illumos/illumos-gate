@@ -72,7 +72,11 @@ fcoe_register_client(fcoe_client_t *client)
 	fcoe_mac_t	*mac;
 	fcoe_port_t	*eport;
 
-	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
+	if (client->ect_fcoe_ver != fcoe_ver_now) {
+		cmn_err(CE_WARN, "FCoE modules version mismatch, "
+		    "fail registering client.");
+		return (NULL);
+	}
 
 	/*
 	 * We will not come here, when someone is changing ss_mac_list,
@@ -131,8 +135,6 @@ fcoe_deregister_client(fcoe_port_t *eport)
 {
 	fcoe_mac_t	*mac = EPORT2MAC(eport);
 
-	ASSERT(MUTEX_HELD(&fcoe_global_ss->ss_ioctl_mutex));
-
 	/*
 	 * Wait for all the related frame to be freed, this should be fast
 	 * because before deregister fcoei/fcoet will make sure its port
@@ -144,6 +146,11 @@ fcoe_deregister_client(fcoe_port_t *eport)
 	}
 
 	atomic_and_32(&EPORT2MAC(eport)->fm_flags, ~FCOE_MAC_FLAG_BOUND);
+	atomic_and_32(&mac->fm_eport.eport_flags, ~EPORT_FLAG_MAC_IN_USE);
+	if (!(EPORT2MAC(eport)->fm_flags & FCOE_MAC_FLAG_USER_DEL)) {
+		(void) fcoe_close_mac(mac);
+		fcoe_destroy_mac(mac);
+	}
 }
 
 /* ARGSUSED */
@@ -466,14 +473,21 @@ fcoe_delete_port(dev_info_t *parent, fcoeio_t *fcoeio, datalink_id_t linkid,
 	}
 
 	*is_target = EPORT_CLT_TYPE(&mac->fm_eport);
-
 	if ((mac->fm_flags & FCOE_MAC_FLAG_ENABLED) != FCOE_MAC_FLAG_ENABLED) {
 		fcoeio->fcoeio_status = FCOEIOE_ALREADY;
 		return (EALREADY);
 	}
 
-	atomic_and_32(&mac->fm_eport.eport_flags, ~EPORT_FLAG_MAC_IN_USE);
+	if (!(mac->fm_flags & FCOE_MAC_FLAG_BOUND)) {
+		/*
+		 * It means that deferred detach has finished
+		 * of last delete operation
+		 */
+		goto skip_devi_offline;
+	}
 
+	atomic_and_32(&mac->fm_eport.eport_flags, ~EPORT_FLAG_MAC_IN_USE);
+	mac->fm_flags |= FCOE_MAC_FLAG_USER_DEL;
 	rval = ndi_devi_offline(mac->fm_client_dev, NDI_DEVI_REMOVE);
 	if (rval != NDI_SUCCESS) {
 		FCOE_LOG("fcoe", "fcoe%d: offline_driver %s failed",
@@ -485,6 +499,8 @@ fcoe_delete_port(dev_info_t *parent, fcoeio_t *fcoeio, datalink_id_t linkid,
 		fcoeio->fcoeio_status = FCOEIOE_OFFLINE_FAILURE;
 		return (EBUSY);
 	}
+
+skip_devi_offline:
 	(void) fcoe_close_mac(mac);
 	fcoe_destroy_mac(mac);
 	return (0);

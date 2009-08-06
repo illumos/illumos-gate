@@ -24,31 +24,43 @@
 # Use is subject to license terms.
 #
 
-PROG =	svc-fcoet
+PROGFCOET	= svc-fcoet
+PROGFCOEI	= svc-fcoei
+PROG		= ${PROGFCOET} ${PROGFCOEI}
 
 include ../Makefile.cmd
 
-COMMONBASE = ../../common
+COMMONBASE	= ../../common
 
-LOCAL_OBJS = fcoetsvc.o
-LOCAL_SRCS =	$(LOCAL_OBJS:%.o=%.c)
-OBJS =	$(LOCAL_OBJS)
-SRCS = $(LOCAL_SRCS)
+OBJSFCOET	= fcoetsvc.o
+OBJSFCOEI	= fcoeisvc.o
+SRCSFCOET	= $(OBJSFCOET:%.o=%.c)
+SRCSFCOEI	= $(OBJSFCOEI:%.o=%.c)
+SRCS		= $(SRCSFCOET) ${SRCSFCOEI}
 
-LDLIBS += -lfcoe
+LDLIBS		+= -lfcoe
 
-MANIFEST    = fcoe_target.xml
-SVCMETHOD   = svc-fcoet
+MANIFEST	= fcoe_target.xml
+MANIFEST	+= fcoe_initiator.xml
+SVCMETHOD	= svc-fcoet
+SVCMETHOD	+= svc-fcoei
 
 ROOTMANIFESTDIR	= $(ROOTSVCSYSTEM)
 $(ROOTSVCSYSTEM)/fcoe_target.xml	:= FILEMODE = 0444
+$(ROOTSVCSYSTEM)/fcoe_initiator.xml	:= OWNER = root
+$(ROOTSVCSYSTEM)/fcoe_initiator.xml	:= GROUP = bin
+$(ROOTSVCSYSTEM)/fcoe_initiator.xml	:= FILEMODE = 0444
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+$(PROGFCOET): $(OBJSFCOET)
+	$(LINK.c) -o $@ $(OBJSFCOET) $(LDLIBS)
+	$(POST_PROCESS)
+
+$(PROGFCOEI): $(OBJSFCOEI)
+	$(LINK.c) -o $@ $(OBJSFCOEI) $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
@@ -56,13 +68,11 @@ install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 check:	$(CHKMANIFEST)
 	$(CSTYLE) -pPc $(SRCS:%=%)
 
-cmdparse.o:
-	    $(COMPILE.c) -o $@
-	    $(POST_PROCESS_O)
-
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJSFCOET) ${OBJSFCOEI}
 
-lint:	lint_SRCS
+lint:
+	$(LINT.c) $(SRCSFCOET) $(LDLIBS)
+	$(LINT.c) $(SRCSFCOEI) ${LDLIBS}
 
 include ../Makefile.targ

@@ -156,6 +156,7 @@ typedef struct fcoe_mac
 
 #define	FCOE_MAC_FLAG_ENABLED		0x01
 #define	FCOE_MAC_FLAG_BOUND		0x02
+#define	FCOE_MAC_FLAG_USER_DEL		0x04
 
 typedef struct fcoe_frame_header {
 	uint8_t		 ffh_ver[1];	/* version field - upper 4 bits */

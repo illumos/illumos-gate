@@ -70,6 +70,9 @@ extern "C" {
 #define	FC_STATE_FULL_SPEED		FC_STATE_1GBIT_SPEED
 #define	FC_STATE_DOUBLE_SPEED		FC_STATE_2GBIT_SPEED
 
+/* pi_port_state, used only when binding port */
+#define	FC_STATE_FCA_IS_NODMA		0x80000000
+
 /*
  * Macros to discriminate between the link state byte and the link speed
  * byte in fp_state (also good for improved code obfuscation and job security
@@ -97,7 +100,6 @@ extern "C" {
 #define	FC_NOTIFY_VALUE_MASK(cmd)	((cmd) & 0xFFFFFF00)
 #define	FC_NOTIFY_GET_FLAG(cmd)		FC_NOTIFY_FLAG_MASK(cmd)
 #define	FC_NOTIFY_GET_VALUE(cmd)	(FC_NOTIFY_VALUE_MASK(cmd) >> 8)
-
 
 /*
  * pkt_tran_flags definitions
@@ -151,7 +153,7 @@ typedef struct fc_packet {
 	struct buf		*pkt_data_buf;		/* reserved */
 	void			(*pkt_ulp_comp)(struct fc_packet *);
 							/* framework private */
-	opaque_t		pkt_ulp_private; 	/* caller's private */
+	opaque_t		pkt_ulp_private;	/* caller's private */
 	void			(*pkt_comp)(struct fc_packet *); /* callback */
 	struct fc_remote_port	*pkt_pd;		/* port device */
 	ddi_dma_handle_t	pkt_cmd_dma;		/* command DMA */
@@ -162,12 +164,12 @@ typedef struct fc_packet {
 	ddi_dma_cookie_t	*pkt_resp_cookie;	/* response cookie */
 	ddi_dma_handle_t	pkt_data_dma;		/* data DMA */
 	ddi_acc_handle_t	pkt_data_acc;		/* data access */
-	ddi_dma_cookie_t	*pkt_data_cookie; 	/* data cookie */
+	ddi_dma_cookie_t	*pkt_data_cookie;	/* data cookie */
 	uint_t			pkt_cmd_cookie_cnt;
 	uint_t			pkt_resp_cookie_cnt;
 	uint_t			pkt_data_cookie_cnt;	/* of a window */
 	fc_frame_hdr_t		pkt_cmd_fhdr;		/* command frame hdr */
-	opaque_t		pkt_fca_private; 	/* FCA private */
+	opaque_t		pkt_fca_private;	/* FCA private */
 	uchar_t			pkt_state;		/* packet state */
 	uchar_t			pkt_action;		/* packet action */
 	uchar_t			pkt_expln;		/* reason explanation */
@@ -228,7 +230,7 @@ typedef struct fca_hba_fru_details {
 #define	FC_HBA_PORTSPEED_4GBIT		8    /* 4 GBit/sec */
 #define	FC_HBA_PORTSPEED_8GBIT		16   /* 8 GBit/sec */
 #define	FC_HBA_PORTSPEED_16GBIT		32   /* 16 GBit/sec */
-#define	FC_HBA_PORTSPEED_NOT_NEGOTIATED	(1<<15)   /* Speed not established */
+#define	FC_HBA_PORTSPEED_NOT_NEGOTIATED	(1<<15)	  /* Speed not established */
 
 #define	FCHBA_MANUFACTURER_LEN		64
 #define	FCHBA_SERIAL_NUMBER_LEN		64
@@ -275,7 +277,7 @@ typedef struct unsolicited_buffer {
 	opaque_t	ub_port_handle;
 	opaque_t	ub_resp_token;		/* Response token */
 	uint64_t	ub_token;
-	fc_frame_hdr_t 	ub_frame;
+	fc_frame_hdr_t	ub_frame;
 } fc_unsol_buf_t;
 
 #define	FC_UB_RESP_LOGIN_REQUIRED	0x4000

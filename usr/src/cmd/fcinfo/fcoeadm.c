@@ -86,11 +86,11 @@ printFCOEPortInfo(FCOE_PORT_ATTRIBUTE *attr)
 
 	fprintf(stdout, gettext("\tMTU Size: %d\n"), attr->mtu_size);
 
-	fprintf(stdout, gettext("\tMAC Factory Address: "));
+	fprintf(stdout, gettext("\tPrimary MAC Address: "));
 	for (i = 0; i < 6; i++) {
 		fprintf(stdout, gettext("%02x"), attr->mac_factory_addr[i]);
 	}
-	fprintf(stdout, gettext("\n\tMAC Current Address: "));
+	fprintf(stdout, gettext("\n\tCurrent MAC Address: "));
 	for (i = 0; i < 6; i++) {
 		fprintf(stdout, gettext("%02x"), attr->mac_current_addr[i]);
 	}
@@ -268,6 +268,9 @@ fcoe_adm_delete_port(int objects, char *argv[])
 {
 	FCOE_STATUS status;
 	FCOE_UINT8	*macLinkName;
+	FCOE_UINT32		port_num;
+	FCOE_PORT_ATTRIBUTE	*portlist = NULL;
+	int			i;
 
 	/* check the mac name operand */
 	assert(objects == 1);
@@ -312,9 +315,39 @@ fcoe_adm_delete_port(int objects, char *argv[])
 			break;
 
 		case  FCOE_STATUS_ERROR_OFFLINE_DEV:
-			fprintf(stderr,
-			    gettext("Error: Please use stmfadm to offline "
-			    "the FCoE target first\n"));
+			status = FCOE_GetPortList(&port_num, &portlist);
+			if (status != FCOE_STATUS_OK || port_num == 0) {
+				fprintf(stderr,
+				    gettext("Error: FCoE port not found on the "
+				    "specified MAC link\n"));
+				break;
+			}
+			for (i = 0; i < port_num; i++) {
+				if (strcmp(
+				    (char *)portlist[i].mac_link_name,
+				    (char *)macLinkName) == 0) {
+					if (portlist[i].port_type ==
+					    FCOE_PORTTYPE_TARGET) {
+						fprintf(stderr,
+						    gettext("Error: Please use "
+						    "stmfadm to offline the "
+						    "FCoE target first\n"));
+					} else {
+						fprintf(stderr,
+						    gettext("Error: Failed to "
+						    "delete FCoE port because "
+						    "unable to offline the "
+						    "device\n"));
+					}
+					break;
+				}
+			}
+			free(portlist);
+			if (i == port_num) {
+				fprintf(stderr,
+				    gettext("Error: FCoE port not found on the "
+				    "specified MAC link\n"));
+			}
 			break;
 
 		case FCOE_STATUS_ERROR_GET_LINKINFO:

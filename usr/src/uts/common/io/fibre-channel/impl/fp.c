@@ -95,7 +95,7 @@ static struct dev_ops fp_ops = {
 	ddi_quiesce_not_needed 		/* quiesce */
 };
 
-#define	FP_VERSION		"1.99"
+#define	FP_VERSION		"20090729-1.100"
 #define	FP_NAME_VERSION		"SunFC Port v" FP_VERSION
 
 char *fp_version = FP_NAME_VERSION;
@@ -928,13 +928,10 @@ fp_attach_handler(dev_info_t *dip)
 	char pwwn[17], nwwn[17];
 
 	instance = ddi_get_instance(dip);
-
 	port_len = sizeof (port_num);
-
 	rval = ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN_AND_VAL_BUF,
 	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "port",
 	    (caddr_t)&port_num, &port_len);
-
 	if (rval != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "fp(%d): No port property in devinfo",
 		    instance);
@@ -1884,17 +1881,22 @@ fp_cache_constructor(void *buf, void *cdarg, int kmflags)
 	cmd->cmd_port = port;
 	pkt = &cmd->cmd_pkt;
 
-	if (ddi_dma_alloc_handle(port->fp_fca_dip,
-	    port->fp_fca_tran->fca_dma_attr, cb, NULL,
-	    &pkt->pkt_cmd_dma) != DDI_SUCCESS) {
-		return (-1);
-	}
+	if (!(port->fp_soft_state & FP_SOFT_FCA_IS_NODMA)) {
+		if (ddi_dma_alloc_handle(port->fp_fca_dip,
+		    port->fp_fca_tran->fca_dma_attr, cb, NULL,
+		    &pkt->pkt_cmd_dma) != DDI_SUCCESS) {
+			return (-1);
+		}
 
-	if (ddi_dma_alloc_handle(port->fp_fca_dip,
-	    port->fp_fca_tran->fca_dma_attr, cb, NULL,
-	    &pkt->pkt_resp_dma) != DDI_SUCCESS) {
-		ddi_dma_free_handle(&pkt->pkt_cmd_dma);
-		return (-1);
+		if (ddi_dma_alloc_handle(port->fp_fca_dip,
+		    port->fp_fca_tran->fca_dma_attr, cb, NULL,
+		    &pkt->pkt_resp_dma) != DDI_SUCCESS) {
+			ddi_dma_free_handle(&pkt->pkt_cmd_dma);
+			return (-1);
+		}
+	} else {
+		pkt->pkt_cmd_dma = 0;
+		pkt->pkt_resp_dma = 0;
 	}
 
 	pkt->pkt_cmd_acc = pkt->pkt_resp_acc = NULL;
@@ -1951,6 +1953,13 @@ fp_cache_destructor(void *buf, void *cdarg)
  * ensures that the pd_ref_count for the fc_remote_port_t is valid.
  * If there is no fc_remote_port_t associated with the fc_packet_t, then
  * fp_alloc_pkt() must be called with pd set to NULL.
+ *
+ * fp/fctl will resue fp_cmd_t somewhere, and change pkt_cmdlen/rsplen,
+ * actually, it's a design fault. But there's no problem for physical
+ * FCAs. But it will cause memory leak or panic for virtual FCAs like fcoei.
+ *
+ * For FCAs that don't support DMA, such as fcoei, we will use
+ * pkt_fctl_rsvd1/rsvd2 to keep the real cmd_len/resp_len.
  */
 
 static fp_cmd_t *
@@ -1986,6 +1995,10 @@ fp_alloc_pkt(fc_local_port_t *port, int cmd_len, int resp_len, int kmflags,
 	pkt->pkt_action = 0;
 	pkt->pkt_reason = 0;
 	pkt->pkt_expln = 0;
+	pkt->pkt_cmd = NULL;
+	pkt->pkt_resp = NULL;
+	pkt->pkt_fctl_rsvd1 = NULL;
+	pkt->pkt_fctl_rsvd2 = NULL;
 
 	/*
 	 * Init pkt_pd with the given pointer; this must be done _before_
@@ -1998,7 +2011,7 @@ fp_alloc_pkt(fc_local_port_t *port, int cmd_len, int resp_len, int kmflags,
 		goto alloc_pkt_failed;
 	}
 
-	if (cmd_len) {
+	if (cmd_len && !(port->fp_soft_state & FP_SOFT_FCA_IS_NODMA)) {
 		ASSERT(pkt->pkt_cmd_dma != NULL);
 
 		rval = ddi_dma_mem_alloc(pkt->pkt_cmd_dma, cmd_len,
@@ -2047,9 +2060,12 @@ fp_alloc_pkt(fc_local_port_t *port, int cmd_len, int resp_len, int kmflags,
 			ddi_dma_nextcookie(pkt->pkt_cmd_dma, &pkt_cookie);
 			*cp = pkt_cookie;
 		}
+	} else if (cmd_len != 0) {
+		pkt->pkt_cmd = kmem_alloc(cmd_len, KM_SLEEP);
+		pkt->pkt_fctl_rsvd1 = (opaque_t)(uintptr_t)cmd_len;
 	}
 
-	if (resp_len) {
+	if (resp_len && !(port->fp_soft_state & FP_SOFT_FCA_IS_NODMA)) {
 		ASSERT(pkt->pkt_resp_dma != NULL);
 
 		rval = ddi_dma_mem_alloc(pkt->pkt_resp_dma, resp_len,
@@ -2099,6 +2115,9 @@ fp_alloc_pkt(fc_local_port_t *port, int cmd_len, int resp_len, int kmflags,
 			ddi_dma_nextcookie(pkt->pkt_resp_dma, &pkt_cookie);
 			*cp = pkt_cookie;
 		}
+	} else if (resp_len != 0) {
+		pkt->pkt_resp = kmem_alloc(resp_len, KM_SLEEP);
+		pkt->pkt_fctl_rsvd2 = (opaque_t)(uintptr_t)resp_len;
 	}
 
 	pkt->pkt_cmdlen = cmd_len;
@@ -2121,6 +2140,16 @@ alloc_pkt_failed:
 		kmem_free(pkt->pkt_resp_cookie,
 		    pkt->pkt_resp_cookie_cnt * sizeof (ddi_dma_cookie_t));
 		pkt->pkt_resp_cookie = NULL;
+	}
+
+	if (port->fp_soft_state & FP_SOFT_FCA_IS_NODMA) {
+		if (pkt->pkt_cmd) {
+			kmem_free(pkt->pkt_cmd, cmd_len);
+		}
+
+		if (pkt->pkt_resp) {
+			kmem_free(pkt->pkt_resp, resp_len);
+		}
 	}
 
 	kmem_cache_free(port->fp_pkt_cache, cmd);
@@ -2158,6 +2187,18 @@ fp_free_pkt(fp_cmd_t *cmd)
 		kmem_free(pkt->pkt_resp_cookie, pkt->pkt_resp_cookie_cnt *
 		    sizeof (ddi_dma_cookie_t));
 		pkt->pkt_resp_cookie = NULL;
+	}
+
+	if (port->fp_soft_state & FP_SOFT_FCA_IS_NODMA) {
+		if (pkt->pkt_cmd) {
+			kmem_free(pkt->pkt_cmd,
+			    (uint32_t)(uintptr_t)pkt->pkt_fctl_rsvd1);
+		}
+
+		if (pkt->pkt_resp) {
+			kmem_free(pkt->pkt_resp,
+			    (uint32_t)(uintptr_t)pkt->pkt_fctl_rsvd2);
+		}
 	}
 
 	fp_free_dma(cmd);
@@ -4153,16 +4194,16 @@ fp_register_login(ddi_acc_handle_t *handle, fc_remote_port_t *pd,
 	}
 
 	if (handle) {
-		ddi_rep_get8(*handle, (uint8_t *)&pd->pd_csp,
+		FC_GET_RSP(pd->pd_port, *handle, (uint8_t *)&pd->pd_csp,
 		    (uint8_t *)&acc->common_service,
 		    sizeof (acc->common_service), DDI_DEV_AUTOINCR);
-		ddi_rep_get8(*handle, (uint8_t *)&pd->pd_clsp1,
+		FC_GET_RSP(pd->pd_port, *handle, (uint8_t *)&pd->pd_clsp1,
 		    (uint8_t *)&acc->class_1, sizeof (acc->class_1),
 		    DDI_DEV_AUTOINCR);
-		ddi_rep_get8(*handle, (uint8_t *)&pd->pd_clsp2,
+		FC_GET_RSP(pd->pd_port, *handle, (uint8_t *)&pd->pd_clsp2,
 		    (uint8_t *)&acc->class_2, sizeof (acc->class_2),
 		    DDI_DEV_AUTOINCR);
-		ddi_rep_get8(*handle, (uint8_t *)&pd->pd_clsp3,
+		FC_GET_RSP(pd->pd_port, *handle, (uint8_t *)&pd->pd_clsp3,
 		    (uint8_t *)&acc->class_3, sizeof (acc->class_3),
 		    DDI_DEV_AUTOINCR);
 	} else {
@@ -4183,7 +4224,7 @@ fp_register_login(ddi_acc_handle_t *handle, fc_remote_port_t *pd,
 
 	mutex_enter(&node->fd_mutex);
 	if (handle) {
-		ddi_rep_get8(*handle, (uint8_t *)node->fd_vv,
+		FC_GET_RSP(pd->pd_port, *handle, (uint8_t *)node->fd_vv,
 		    (uint8_t *)acc->vendor_version, sizeof (node->fd_vv),
 		    DDI_DEV_AUTOINCR);
 	} else {
@@ -4405,12 +4446,12 @@ fp_xlogi_init(fc_local_port_t *port, fp_cmd_t *cmd, uint32_t s_id,
 	payload.ls_code = ls_code;
 	payload.mbz = 0;
 
-	ddi_rep_put8(cmd->cmd_pkt.pkt_cmd_acc,
+	FC_SET_CMD(port, cmd->cmd_pkt.pkt_cmd_acc,
 	    (uint8_t *)&port->fp_service_params,
 	    (uint8_t *)cmd->cmd_pkt.pkt_cmd, sizeof (port->fp_service_params),
 	    DDI_DEV_AUTOINCR);
 
-	ddi_rep_put8(cmd->cmd_pkt.pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, cmd->cmd_pkt.pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)cmd->cmd_pkt.pkt_cmd, sizeof (payload),
 	    DDI_DEV_AUTOINCR);
 }
@@ -4444,7 +4485,7 @@ fp_logo_init(fc_remote_port_t *pd, fp_cmd_t *cmd, job_request_t *job)
 	payload.nport_ww_name = port->fp_service_params.nport_ww_name;
 	payload.nport_id = port->fp_port_id;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -4477,7 +4518,7 @@ fp_rnid_init(fp_cmd_t *cmd, uint16_t flag, job_request_t *job)
 	payload.ls_code.mbz = 0;
 	payload.data_format = flag;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -4510,7 +4551,7 @@ fp_rls_init(fp_cmd_t *cmd, job_request_t *job)
 	payload.ls_code.mbz = 0;
 	payload.rls_portid = port->fp_port_id;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -4547,7 +4588,7 @@ fp_adisc_init(fp_cmd_t *cmd, job_request_t *job)
 	payload.node_wwn = port->fp_service_params.node_ww_name;
 	payload.hard_addr = port->fp_hard_addr;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -4943,31 +4984,31 @@ fp_plogi_group(fc_local_port_t *port, job_request_t *job)
 			ls_code.ls_code = LA_ELS_ACC;
 			ls_code.mbz = 0;
 
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&ls_code, (uint8_t *)&els_data->ls_code,
 			    sizeof (ls_code_t), DDI_DEV_AUTOINCR);
 
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&pd->pd_csp,
 			    (uint8_t *)&els_data->common_service,
 			    sizeof (pd->pd_csp), DDI_DEV_AUTOINCR);
 
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&pd->pd_port_name,
 			    (uint8_t *)&els_data->nport_ww_name,
 			    sizeof (pd->pd_port_name), DDI_DEV_AUTOINCR);
 
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&pd->pd_clsp1,
 			    (uint8_t *)&els_data->class_1,
 			    sizeof (pd->pd_clsp1), DDI_DEV_AUTOINCR);
 
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&pd->pd_clsp2,
 			    (uint8_t *)&els_data->class_2,
 			    sizeof (pd->pd_clsp2), DDI_DEV_AUTOINCR);
 
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&pd->pd_clsp3,
 			    (uint8_t *)&els_data->class_3,
 			    sizeof (pd->pd_clsp3), DDI_DEV_AUTOINCR);
@@ -4979,13 +5020,12 @@ fp_plogi_group(fc_local_port_t *port, job_request_t *job)
 			mutex_exit(&pd->pd_mutex);
 
 			mutex_enter(&node->fd_mutex);
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&node->fd_node_name,
 			    (uint8_t *)(&els_data->node_ww_name),
 			    sizeof (node->fd_node_name), DDI_DEV_AUTOINCR);
 
-
-			ddi_rep_put8(ulp_pkt->pkt_resp_acc,
+			FC_SET_CMD(pd->pd_port, ulp_pkt->pkt_resp_acc,
 			    (uint8_t *)&node->fd_vv,
 			    (uint8_t *)(&els_data->vendor_version),
 			    sizeof (node->fd_vv), DDI_DEV_AUTOINCR);
@@ -5299,7 +5339,7 @@ fp_ns_fini(fc_local_port_t *port, job_request_t *job)
 	payload.ls_code.mbz = 0;
 	payload.nport_ww_name = port->fp_service_params.nport_ww_name;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 
 	if (fp_sendcmd(port, cmd, port->fp_fca_handle) != FC_SUCCESS) {
@@ -5379,7 +5419,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		}
 		rxn.rxn_port_id = s_id;
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&rxn,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&rxn,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (rxn), DDI_DEV_AUTOINCR);
 
@@ -5406,7 +5446,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		}
 		rcos.rcos_port_id = s_id;
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&rcos,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&rcos,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (rcos), DDI_DEV_AUTOINCR);
 
@@ -5438,7 +5478,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		}
 		rfc.rfc_port_id = s_id;
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&rfc,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&rfc,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (rfc), DDI_DEV_AUTOINCR);
 
@@ -5474,23 +5514,24 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 
 		spn = s_id;
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&spn, (uint8_t *)
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&spn, (uint8_t *)
 		    (pkt->pkt_cmd + sizeof (fc_ct_header_t)), sizeof (spn),
 		    DDI_DEV_AUTOINCR);
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&name_len,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&name_len,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)
 		    + sizeof (fc_portid_t)), 1, DDI_DEV_AUTOINCR);
 
 		if (pd == NULL) {
 			mutex_enter(&port->fp_mutex);
-			ddi_rep_put8(pkt->pkt_cmd_acc,
+			FC_SET_CMD(port, pkt->pkt_cmd_acc,
 			    (uint8_t *)port->fp_sym_port_name, (uint8_t *)
 			    (pkt->pkt_cmd + sizeof (fc_ct_header_t) +
 			    sizeof (spn) + 1), name_len, DDI_DEV_AUTOINCR);
 			mutex_exit(&port->fp_mutex);
 		} else {
 			mutex_enter(&pd->pd_mutex);
-			ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)pd->pd_spn,
+			FC_SET_CMD(port, pkt->pkt_cmd_acc,
+			    (uint8_t *)pd->pd_spn,
 			    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t) +
 			    sizeof (spn) + 1), name_len, DDI_DEV_AUTOINCR);
 			mutex_exit(&pd->pd_mutex);
@@ -5518,7 +5559,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		}
 		rpt.rpt_port_id = s_id;
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&rpt,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&rpt,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (rpt), DDI_DEV_AUTOINCR);
 
@@ -5562,7 +5603,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 			mutex_exit(&node->fd_mutex);
 		}
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&rip,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&rip,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (rip), DDI_DEV_AUTOINCR);
 
@@ -5599,7 +5640,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 			mutex_exit(&node->fd_mutex);
 		}
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&ipa,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&ipa,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (ipa), DDI_DEV_AUTOINCR);
 
@@ -5642,7 +5683,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 
 		if (pd == NULL) {
 			mutex_enter(&port->fp_mutex);
-			ddi_rep_put8(pkt->pkt_cmd_acc,
+			FC_SET_CMD(port, pkt->pkt_cmd_acc,
 			    (uint8_t *)port->fp_sym_node_name, (uint8_t *)
 			    (pkt->pkt_cmd + sizeof (fc_ct_header_t) +
 			    sizeof (snn) + 1), name_len, DDI_DEV_AUTOINCR);
@@ -5650,17 +5691,17 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		} else {
 			ASSERT(node != NULL);
 			mutex_enter(&node->fd_mutex);
-			ddi_rep_put8(pkt->pkt_cmd_acc,
+			FC_SET_CMD(port, pkt->pkt_cmd_acc,
 			    (uint8_t *)node->fd_snn,
 			    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t) +
 			    sizeof (snn) + 1), name_len, DDI_DEV_AUTOINCR);
 			mutex_exit(&node->fd_mutex);
 		}
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&snn,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&snn,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (snn), DDI_DEV_AUTOINCR);
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&name_len,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&name_len,
 		    (uint8_t *)(pkt->pkt_cmd
 		    + sizeof (fc_ct_header_t) + sizeof (snn)),
 		    1, DDI_DEV_AUTOINCR);
@@ -5693,7 +5734,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 #else
 		rall.rem_port_id = s_id;
 #endif
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&rall,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&rall,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    sizeof (rall), DDI_DEV_AUTOINCR);
 
@@ -5843,7 +5884,7 @@ fp_flogi_intr(fc_packet_t *pkt)
 	 */
 	acc = (la_els_logi_t *)pkt->pkt_resp;
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp, (uint8_t *)acc,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&resp, (uint8_t *)acc,
 	    sizeof (resp), DDI_DEV_AUTOINCR);
 
 	ASSERT(resp.ls_code == LA_ELS_ACC);
@@ -5852,7 +5893,7 @@ fp_flogi_intr(fc_packet_t *pkt)
 		return;
 	}
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&csp,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&csp,
 	    (uint8_t *)&acc->common_service, sizeof (csp), DDI_DEV_AUTOINCR);
 
 	f_port = FP_IS_F_PORT(csp.cmn_features) ? 1 : 0;
@@ -5863,15 +5904,15 @@ fp_flogi_intr(fc_packet_t *pkt)
 	state = FC_PORT_STATE_MASK(port->fp_state);
 	mutex_exit(&port->fp_mutex);
 
-	if (pkt->pkt_resp_fhdr.d_id == 0) {
-		if (f_port == 0 && state != FC_STATE_LOOP) {
+	if (f_port == 0) {
+		if (state != FC_STATE_LOOP) {
 			swwn = &port->fp_service_params.nport_ww_name;
 
-			ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&dwwn,
+			FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&dwwn,
 			    (uint8_t *)&acc->nport_ww_name, sizeof (la_wwn_t),
 			    DDI_DEV_AUTOINCR);
 
-			ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&nwwn,
+			FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&nwwn,
 			    (uint8_t *)&acc->node_ww_name, sizeof (la_wwn_t),
 			    DDI_DEV_AUTOINCR);
 
@@ -5948,7 +5989,7 @@ fp_flogi_intr(fc_packet_t *pkt)
 			} else {
 				port->fp_topology = FC_TOP_FABRIC;
 
-				ddi_rep_get8(pkt->pkt_resp_acc,
+				FC_GET_RSP(port, pkt->pkt_resp_acc,
 				    (uint8_t *)&port->fp_fabric_name,
 				    (uint8_t *)&acc->node_ww_name,
 				    sizeof (la_wwn_t),
@@ -6088,7 +6129,7 @@ fp_plogi_intr(fc_packet_t *pkt)
 
 	acc = (la_els_logi_t *)pkt->pkt_resp;
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp, (uint8_t *)acc,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&resp, (uint8_t *)acc,
 	    sizeof (resp), DDI_DEV_AUTOINCR);
 
 	ASSERT(resp.ls_code == LA_ELS_ACC);
@@ -6107,11 +6148,11 @@ fp_plogi_intr(fc_packet_t *pkt)
 
 	ASSERT(acc == (la_els_logi_t *)pkt->pkt_resp);
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&pwwn,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&pwwn,
 	    (uint8_t *)&acc->nport_ww_name, sizeof (la_wwn_t),
 	    DDI_DEV_AUTOINCR);
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&nwwn,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&nwwn,
 	    (uint8_t *)&acc->node_ww_name, sizeof (la_wwn_t),
 	    DDI_DEV_AUTOINCR);
 
@@ -6507,13 +6548,13 @@ fp_adisc_intr(fc_packet_t *pkt)
 	if (pkt->pkt_state == FC_PKT_SUCCESS && pkt->pkt_resp_resid == 0) {
 		acc = (la_els_adisc_t *)pkt->pkt_resp;
 
-		ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp,
+		FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&resp,
 		    (uint8_t *)acc, sizeof (resp), DDI_DEV_AUTOINCR);
 
 		if (resp.ls_code == LA_ELS_ACC) {
 			int	is_private;
 
-			ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&ha,
+			FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&ha,
 			    (uint8_t *)&acc->hard_addr, sizeof (ha),
 			    DDI_DEV_AUTOINCR);
 
@@ -6625,7 +6666,7 @@ fp_adisc_intr(fc_packet_t *pkt)
 		if (adiscfail) {
 			mutex_enter(&pd->pd_mutex);
 			initiator =
-			    (pd->pd_recepient == PD_PLOGI_INITIATOR) ? 1 : 0;
+			    ((pd->pd_recepient == PD_PLOGI_INITIATOR) ? 1 : 0);
 			pd->pd_state = PORT_DEVICE_VALID;
 			pd->pd_aux_flags |= PD_LOGGED_OUT;
 			if (pd->pd_aux_flags & PD_DISABLE_RELOGIN) {
@@ -6670,12 +6711,13 @@ static void
 fp_logo_intr(fc_packet_t *pkt)
 {
 	ls_code_t	resp;
+	fc_local_port_t *port = ((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port;
 
 	mutex_enter(&((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_mutex);
 	((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_out_fpcmds--;
 	mutex_exit(&((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_mutex);
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&resp,
 	    (uint8_t *)pkt->pkt_resp, sizeof (resp), DDI_DEV_AUTOINCR);
 
 	if (FP_IS_PKT_ERROR(pkt)) {
@@ -6707,8 +6749,9 @@ fp_rnid_intr(fc_packet_t *pkt)
 	job_request_t		*job;
 	fp_cmd_t		*cmd;
 	la_els_rnid_acc_t	*acc;
+	fc_local_port_t *port = ((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port;
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&resp,
 	    (uint8_t *)pkt->pkt_resp, sizeof (resp), DDI_DEV_AUTOINCR);
 	cmd = pkt->pkt_ulp_private;
 
@@ -6728,7 +6771,7 @@ fp_rnid_intr(fc_packet_t *pkt)
 	/* Save node_id memory allocated in ioctl code */
 	acc = (la_els_rnid_acc_t *)pkt->pkt_resp;
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)job->job_private,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)job->job_private,
 	    (uint8_t *)acc, sizeof (la_els_rnid_acc_t), DDI_DEV_AUTOINCR);
 
 	/* wakeup the ioctl thread and free the pkt */
@@ -6746,8 +6789,9 @@ fp_rls_intr(fc_packet_t *pkt)
 	job_request_t		*job;
 	fp_cmd_t		*cmd;
 	la_els_rls_acc_t	*acc;
+	fc_local_port_t *port = ((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port;
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&resp,
 	    (uint8_t *)pkt->pkt_resp, sizeof (resp), DDI_DEV_AUTOINCR);
 	cmd = pkt->pkt_ulp_private;
 
@@ -6767,7 +6811,7 @@ fp_rls_intr(fc_packet_t *pkt)
 	/* Save link error status block in memory allocated in ioctl code */
 	acc = (la_els_rls_acc_t *)pkt->pkt_resp;
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)job->job_private,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)job->job_private,
 	    (uint8_t *)&acc->rls_link_params, sizeof (fc_rls_acc_t),
 	    DDI_DEV_AUTOINCR);
 
@@ -6984,7 +7028,7 @@ fp_ns_scr(fc_local_port_t *port, job_request_t *job, uchar_t scr_func,
 	payload.scr_rsvd = 0;
 	payload.scr_func = scr_func;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 
 	job->job_counter = 1;
@@ -10521,6 +10565,7 @@ fp_linit_intr(fc_packet_t *pkt)
 	fp_cmd_t		*cmd;
 	job_request_t		*job;
 	fc_linit_resp_t		acc;
+	fc_local_port_t *port = ((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port;
 
 	cmd = (fp_cmd_t *)pkt->pkt_ulp_private;
 
@@ -10534,7 +10579,8 @@ fp_linit_intr(fc_packet_t *pkt)
 	}
 
 	job = cmd->cmd_job;
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&acc,
+
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&acc,
 	    (uint8_t *)pkt->pkt_resp, sizeof (acc), DDI_DEV_AUTOINCR);
 	if (acc.status != FC_LINIT_SUCCESS) {
 		job->job_result = FC_FAILURE;
@@ -11068,7 +11114,7 @@ fp_ba_rjt_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 	payload.explanation = FC_EXPLN_NONE;
 	payload.vendor = 0;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -11105,7 +11151,7 @@ fp_els_rjt_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 	payload.reserved = 0;
 	payload.vu = 0;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -11171,7 +11217,7 @@ fp_prlo_acc_init(fc_local_port_t *port, fc_remote_port_t *pd,
 		flags |= SP_RESP_CODE_REQ_EXECUTED;
 		req->flags = htons(flags);
 
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)req,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)req,
 		    (uint8_t *)pkt->pkt_cmd, len, DDI_DEV_AUTOINCR);
 	}
 	return (cmd);
@@ -11203,7 +11249,7 @@ fp_els_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 	payload.ls_code = LA_ELS_ACC;
 	payload.mbz = 0;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -11535,6 +11581,7 @@ fp_unsol_resp_init(fc_packet_t *pkt, fc_unsol_buf_t *buf,
 	pkt->pkt_cmd_fhdr.rsvd = 0;
 	pkt->pkt_comp = fp_unsol_intr;
 	pkt->pkt_timeout = FP_ELS_TIMEOUT;
+	pkt->pkt_ub_resp_token = (opaque_t)buf;
 }
 
 /*
@@ -11655,18 +11702,6 @@ fp_i_handle_unsol_els(fc_local_port_t *port, fc_unsol_buf_t *buf)
 				cmd->cmd_pkt.pkt_rsplen = 0;
 
 				/*
-				 * Sometime later, we should validate
-				 * the service parameters instead of
-				 * just accepting it.
-				 */
-				fp_login_acc_init(port, cmd, buf, NULL,
-				    KM_NOSLEEP);
-				FP_TRACE(FP_NHEAD1(3, 0),
-				    "fp_i_handle_unsol_els: Accepting PLOGI,"
-				    " f_port=%d, small=%d, do_acc=%d,"
-				    " sent=%d.", f_port, small, do_acc,
-				    sent);
-				/*
 				 * If fp_port_id is zero and topology is
 				 * Point-to-Point, get the local port id from
 				 * the d_id in the PLOGI request.
@@ -11684,6 +11719,19 @@ fp_i_handle_unsol_els(fc_local_port_t *port, fc_unsol_buf_t *buf)
 					    buf->ub_frame.d_id;
 				}
 				mutex_exit(&port->fp_mutex);
+
+				/*
+				 * Sometime later, we should validate
+				 * the service parameters instead of
+				 * just accepting it.
+				 */
+				fp_login_acc_init(port, cmd, buf, NULL,
+				    KM_NOSLEEP);
+				FP_TRACE(FP_NHEAD1(3, 0),
+				    "fp_i_handle_unsol_els: Accepting PLOGI,"
+				    " f_port=%d, small=%d, do_acc=%d,"
+				    " sent=%d.", f_port, small, do_acc,
+				    sent);
 			}
 		} else {
 			if (FP_IS_CLASS_1_OR_2(buf->ub_class) ||
@@ -12163,7 +12211,7 @@ fp_login_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 	payload = port->fp_service_params;
 	payload.ls_code.ls_code = LA_ELS_ACC;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 
 	FP_TRACE(FP_NHEAD1(3, 0), "login_acc_init: ELS:0x%x d_id:0x%x "
@@ -12494,13 +12542,13 @@ fp_fillout_new_nsmap(fc_local_port_t *port, ddi_acc_handle_t *handle,
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
 	if (handle) {
-		ddi_rep_get8(*handle, (uint8_t *)&port_map->map_pwwn,
+		FC_GET_RSP(port, *handle, (uint8_t *)&port_map->map_pwwn,
 		    (uint8_t *)&gan_resp->gan_pwwn, sizeof (gan_resp->gan_pwwn),
 		    DDI_DEV_AUTOINCR);
-		ddi_rep_get8(*handle, (uint8_t *)&port_map->map_nwwn,
+		FC_GET_RSP(port, *handle, (uint8_t *)&port_map->map_nwwn,
 		    (uint8_t *)&gan_resp->gan_nwwn, sizeof (gan_resp->gan_nwwn),
 		    DDI_DEV_AUTOINCR);
-		ddi_rep_get8(*handle, (uint8_t *)port_map->map_fc4_types,
+		FC_GET_RSP(port, *handle, (uint8_t *)port_map->map_fc4_types,
 		    (uint8_t *)gan_resp->gan_fc4types,
 		    sizeof (gan_resp->gan_fc4types), DDI_DEV_AUTOINCR);
 	} else {
@@ -12686,7 +12734,7 @@ fp_remote_lip(fc_local_port_t *port, la_wwn_t *pwwn, int sleep,
 	payload.lip_b3 = 0xF7;		/* Normal LIP */
 	payload.lip_b4 = 0xF7;		/* No valid source AL_PA */
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 
 	job->job_counter = 1;
@@ -12727,7 +12775,7 @@ fp_stuff_device_with_gan(ddi_acc_handle_t *handle, fc_remote_port_t *pd,
 
 	mutex_enter(&pd->pd_mutex);
 
-	ddi_rep_get8(*handle, (uint8_t *)&type,
+	FC_GET_RSP(port, *handle, (uint8_t *)&type,
 	    (uint8_t *)&gan_resp->gan_type_id, sizeof (type), DDI_DEV_AUTOINCR);
 
 	pd->pd_porttype.port_type = type.port_type;
@@ -12735,18 +12783,18 @@ fp_stuff_device_with_gan(ddi_acc_handle_t *handle, fc_remote_port_t *pd,
 
 	pd->pd_spn_len = gan_resp->gan_spnlen;
 	if (pd->pd_spn_len) {
-		ddi_rep_get8(*handle, (uint8_t *)pd->pd_spn,
+		FC_GET_RSP(port, *handle, (uint8_t *)pd->pd_spn,
 		    (uint8_t *)gan_resp->gan_spname, pd->pd_spn_len,
 		    DDI_DEV_AUTOINCR);
 	}
 
-	ddi_rep_get8(*handle, (uint8_t *)pd->pd_ip_addr,
+	FC_GET_RSP(port, *handle, (uint8_t *)pd->pd_ip_addr,
 	    (uint8_t *)gan_resp->gan_ip, sizeof (pd->pd_ip_addr),
 	    DDI_DEV_AUTOINCR);
-	ddi_rep_get8(*handle, (uint8_t *)&pd->pd_cos,
+	FC_GET_RSP(port, *handle, (uint8_t *)&pd->pd_cos,
 	    (uint8_t *)&gan_resp->gan_cos, sizeof (pd->pd_cos),
 	    DDI_DEV_AUTOINCR);
-	ddi_rep_get8(*handle, (uint8_t *)pd->pd_fc4types,
+	FC_GET_RSP(port, *handle, (uint8_t *)pd->pd_fc4types,
 	    (uint8_t *)gan_resp->gan_fc4types, sizeof (pd->pd_fc4types),
 	    DDI_DEV_AUTOINCR);
 
@@ -12755,13 +12803,13 @@ fp_stuff_device_with_gan(ddi_acc_handle_t *handle, fc_remote_port_t *pd,
 
 	mutex_enter(&node->fd_mutex);
 
-	ddi_rep_get8(*handle, (uint8_t *)node->fd_ipa,
+	FC_GET_RSP(port, *handle, (uint8_t *)node->fd_ipa,
 	    (uint8_t *)gan_resp->gan_ipa, sizeof (node->fd_ipa),
 	    DDI_DEV_AUTOINCR);
 
 	node->fd_snn_len = gan_resp->gan_snnlen;
 	if (node->fd_snn_len) {
-		ddi_rep_get8(*handle, (uint8_t *)node->fd_snn,
+		FC_GET_RSP(port, *handle, (uint8_t *)node->fd_snn,
 		    (uint8_t *)gan_resp->gan_snname, node->fd_snn_len,
 		    DDI_DEV_AUTOINCR);
 	}
@@ -12865,8 +12913,8 @@ fp_ct_init(fc_local_port_t *port, fp_cmd_t *cmd, fctl_ns_req_t *ns_cmd,
 	ct.ct_expln = 0;
 	ct.ct_vendor = 0;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&ct, (uint8_t *)pkt->pkt_cmd,
-	    sizeof (ct), DDI_DEV_AUTOINCR);
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&ct,
+	    (uint8_t *)pkt->pkt_cmd, sizeof (ct), DDI_DEV_AUTOINCR);
 
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_UNSOL_CONTROL;
 	pkt->pkt_cmd_fhdr.d_id = 0xFFFFFC;
@@ -12887,7 +12935,7 @@ fp_ct_init(fc_local_port_t *port, fp_cmd_t *cmd, fctl_ns_req_t *ns_cmd,
 	pkt->pkt_timeout = FP_NS_TIMEOUT;
 
 	if (cmd_buf) {
-		ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)cmd_buf,
+		FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)cmd_buf,
 		    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 		    cmd_len, DDI_DEV_AUTOINCR);
 	}
@@ -12921,12 +12969,12 @@ fp_ns_intr(fc_packet_t *pkt)
 	port->fp_out_fpcmds--;
 	mutex_exit(&port->fp_mutex);
 
-	ddi_rep_get8(pkt->pkt_cmd_acc, (uint8_t *)&cmd_hdr,
+	FC_GET_RSP(port, pkt->pkt_cmd_acc, (uint8_t *)&cmd_hdr,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (cmd_hdr), DDI_DEV_AUTOINCR);
 	ns_cmd = (fctl_ns_req_t *)
 	    (((fp_cmd_t *)(pkt->pkt_ulp_private))->cmd_private);
 	if (!FP_IS_PKT_ERROR(pkt)) {
-		ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp_hdr,
+		FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&resp_hdr,
 		    (uint8_t *)pkt->pkt_resp, sizeof (resp_hdr),
 		    DDI_DEV_AUTOINCR);
 
@@ -13035,7 +13083,7 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 
 	gan_resp = (ns_resp_gan_t *)(pkt->pkt_resp + sizeof (fc_ct_header_t));
 
-	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&d_id,
+	FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&d_id,
 	    (uint8_t *)&gan_resp->gan_type_id, sizeof (d_id), DDI_DEV_AUTOINCR);
 
 	*(uint32_t *)&d_id = BE_32(*(uint32_t *)&d_id);
@@ -13093,11 +13141,11 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 		    gan_resp->gan_nwwn.raw_wwn[6],
 		    gan_resp->gan_nwwn.raw_wwn[7]);
 
-		ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&nwwn,
+		FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&nwwn,
 		    (uint8_t *)&gan_resp->gan_nwwn, sizeof (nwwn),
 		    DDI_DEV_AUTOINCR);
 
-		ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&pwwn,
+		FC_GET_RSP(port, pkt->pkt_resp_acc, (uint8_t *)&pwwn,
 		    (uint8_t *)&gan_resp->gan_pwwn, sizeof (pwwn),
 		    DDI_DEV_AUTOINCR);
 
@@ -13128,7 +13176,7 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 
 				userbuf->dev_did = d_id;
 
-				ddi_rep_get8(pkt->pkt_resp_acc,
+				FC_GET_RSP(port, pkt->pkt_resp_acc,
 				    (uint8_t *)userbuf->dev_type,
 				    (uint8_t *)gan_resp->gan_fc4types,
 				    sizeof (userbuf->dev_type),
@@ -13174,7 +13222,7 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 				dst_ptr = ns_cmd->ns_data_buf +
 				    (NS_GAN_RESP_LEN) * ns_cmd->ns_gan_index++;
 
-				ddi_rep_get8(pkt->pkt_resp_acc,
+				FC_GET_RSP(port, pkt->pkt_resp_acc,
 				    (uint8_t *)dst_ptr, (uint8_t *)gan_resp,
 				    NS_GAN_RESP_LEN, DDI_DEV_AUTOINCR);
 			}
@@ -13189,7 +13237,7 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 
 	gan_req.pid = d_id;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&gan_req,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&gan_req,
 	    (uint8_t *)(pkt->pkt_cmd + sizeof (fc_ct_header_t)),
 	    sizeof (gan_req), DDI_DEV_AUTOINCR);
 
@@ -13232,7 +13280,8 @@ fp_ns_query_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 
 	if (xfer_len <= ns_cmd->ns_data_len) {
 		src_ptr = (caddr_t)pkt->pkt_resp + sizeof (fc_ct_header_t);
-		ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)ns_cmd->ns_data_buf,
+		FC_GET_RSP(port, pkt->pkt_resp_acc,
+		    (uint8_t *)ns_cmd->ns_data_buf,
 		    (uint8_t *)src_ptr, xfer_len, DDI_DEV_AUTOINCR);
 	}
 
@@ -13341,7 +13390,7 @@ fp_adisc_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 	payload.port_wwn = port->fp_service_params.nport_ww_name;
 	payload.node_wwn = port->fp_service_params.node_ww_name;
 
-	ddi_rep_put8(pkt->pkt_cmd_acc, (uint8_t *)&payload,
+	FC_SET_CMD(port, pkt->pkt_cmd_acc, (uint8_t *)&payload,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 }
 
@@ -13714,6 +13763,14 @@ fp_bind_callbacks(fc_local_port_t *port)
 	if (port->fp_fca_handle == NULL) {
 		rval = DDI_FAILURE;
 		goto exit;
+	}
+
+	/*
+	 * Only fcoei will set this bit
+	 */
+	if (port_info->pi_port_state & FC_STATE_FCA_IS_NODMA) {
+		port->fp_soft_state |= FP_SOFT_FCA_IS_NODMA;
+		port_info->pi_port_state &= ~(FC_STATE_FCA_IS_NODMA);
 	}
 
 	port->fp_bind_state = port->fp_state = port_info->pi_port_state;
@@ -14133,7 +14190,6 @@ fp_validate_area_domain(fc_local_port_t *port, uint32_t id, uint32_t mask,
 					job->job_result = rval;
 					fp_jobdone(job);
 				}
-
 				FP_TRACE(FP_NHEAD2(4, 0),
 				    "PLOGI succeeded:no skip(1) for "
 				    "D_ID %x", d_id);

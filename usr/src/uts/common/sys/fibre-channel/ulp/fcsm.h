@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FCSM_H
 #define	_FCSM_H
-
-
 
 #ifdef	__cplusplus
 extern "C" {
@@ -95,7 +93,7 @@ typedef struct fcsm_job {
 	ksema_t		job_sema;		/* To wait for completion */
 	struct fcsm_job	*job_next;		/* for linked list */
 	int		job_retry_count;	/* Retry count */
-	void		*job_priv;		/* for fcsm private use  */
+	void		*job_priv;		/* for fcsm private use	 */
 	uint32_t	job_priv_flags;		/* fcsm private flags */
 } fcsm_job_t;
 
@@ -163,6 +161,7 @@ typedef struct fcsm_cmd {
 #define	FCSM_LINK_DOWN			0x1000
 #define	FCSM_MGMT_SERVER_LOGGED_IN	0x2000
 #define	FCSM_MGMT_SERVER_LOGIN_IN_PROG	0x4000
+#define	FCSM_USING_NODMA_FCA		0x8000
 
 /* Command flags for Job structure */
 #define	FCSM_JOBFLAG_SYNC		0x01
@@ -197,48 +196,29 @@ typedef struct fcsm_cmd {
 
 /*
  * Macros to address endian issues
+ * local variable "fcsm" must exist before using these
  */
-#define	FCSM_RD8(acchandle, addr)       \
-	ddi_get8((acchandle), (uint8_t *)(addr))
-#define	FCSM_RD16(acchandle, addr)      \
-	ddi_get16((acchandle), (uint16_t *)(addr))
-#define	FCSM_RD32(acchandle, addr)      \
-	ddi_get32((acchandle), (uint32_t *)(addr))
-#define	FCSM_RD64(acchandle, addr)      \
-	ddi_get64((acchandle), (uint64_t *)(addr))
+#define	FCSM_REP_RD(handle, hostaddr, devaddr, cnt)			\
+	{								\
+		if (!((fcsm)->sm_flags & FCSM_USING_NODMA_FCA)) {	\
+			ddi_rep_get8((handle), (uint8_t *)(hostaddr),	\
+				    (uint8_t *)(devaddr), (cnt),	\
+				    DDI_DEV_AUTOINCR);			\
+		} else {						\
+			bcopy((devaddr), (hostaddr), (cnt));		\
+		}							\
+	}
 
-#define	FCSM_WR8(acchandle, addr, val)  \
-	ddi_put8((acchandle), (uint8_t *)(addr), (uint8_t)(val))
-#define	FCSM_WR16(acchandle, addr, val) \
-	ddi_put16((acchandle), (uint16_t *)(addr), (uint16_t)(val))
-#define	FCSM_WR32(acchandle, addr, val) \
-	ddi_put32((acchandle), (uint32_t *)(addr), (uint32_t)(val))
-#define	FCSM_WR64(acchandle, addr, val) \
-	ddi_put64((acchandle), (uint64_t *)(addr), (uint64_t)(val))
-
-#define	FCSM_REP_RD(acchandle, hostaddr, devaddr, cnt)  \
-	ddi_rep_get8((acchandle), (uint8_t *)(hostaddr), (uint8_t *)(devaddr),\
-	    (size_t)(cnt), DDI_DEV_AUTOINCR)
-#define	FCSM_REP_RD32(acchandle, hostaddr, devaddr, cnt)        \
-	ddi_rep_get32((acchandle), (uint32_t *)(hostaddr),      \
-	    (uint32_t *)(devaddr), ((size_t)(cnt)) >> 2, DDI_DEV_AUTOINCR)
-
-#define	FCSM_REP_WR(acchandle, hostaddr, devaddr, cnt)  \
-	ddi_rep_put8((acchandle), (uint8_t *)(hostaddr), (uint8_t *)(devaddr),\
-	    (size_t)(cnt), DDI_DEV_AUTOINCR)
-#define	FCSM_REP_WR32(acchandle, hostaddr, devaddr, cnt)        \
-	ddi_rep_put32((acchandle), (uint32_t *)(hostaddr),\
-	    (uint32_t *)(devaddr), ((size_t)(cnt)) >> 2, DDI_DEV_AUTOINCR)
-
-/*
- * Macros to perform DMA Sync
- */
-#define	FCSM_SYNC_FOR_DEV(dmahandle, offset, length)    \
-	(void) ddi_dma_sync((dmahandle), (offset),\
-	    (size_t)(length), DDI_DMA_SYNC_FORDEV)
-#define	FCSM_SYNC_FOR_KERNEL(dmahandle, offset, length) \
-	(void) ddi_dma_sync((acchandle), (offset),\
-	    (length), DDI_DMA_SYNC_FORKERNEL)
+#define	FCSM_REP_WR(handle, hostaddr, devaddr, cnt)			\
+	{								\
+		if (!((fcsm)->sm_flags & FCSM_USING_NODMA_FCA)) {	\
+			ddi_rep_put8((handle), (uint8_t *)(hostaddr),	\
+				    (uint8_t *)(devaddr), (cnt),	\
+				    DDI_DEV_AUTOINCR);			\
+		} else {						\
+			bcopy((hostaddr), (devaddr), (cnt));		\
+		}							\
+	}
 
 #endif /* _KERNEL */
 

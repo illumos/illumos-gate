@@ -71,4 +71,7 @@ disable_service
 SERVICE="svc:/system/fcoe_target:default"
 disable_service
 
+SERVICE="svc:/system/fcoe_initiator:default"
+disable_service
+
 exit $exitcode

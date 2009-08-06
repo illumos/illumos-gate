@@ -78,6 +78,7 @@ optionTbl_t fcadmlongOptions[] = {
 	{"scsi-target", no_argument,	's', NULL},
 	{"fcoe-force-promisc", no_argument, 'f', NULL},
 	{"target", no_argument,		't', NULL},
+	{"initiator", no_argument,	'i', NULL},
 	{NULL, 0, 0}
 };
 
@@ -113,13 +114,13 @@ subCommandProps_t fcadmsubcommands[] = {
 	    npivCreatePortListFunc, NULL, NULL, NULL,
 	    OPERAND_NONE, NULL},
 	{"create-fcoe-port",
-	    fcoeAdmCreatePortFunc, "tpnf", "t", NULL,
+	    fcoeAdmCreatePortFunc, "itpnf", NULL, NULL,
 		OPERAND_MANDATORY_SINGLE, "Network Interface Name"},
 	{"delete-fcoe-port",
 	    fcoeAdmDeletePortFunc, NULL, NULL, NULL,
 		OPERAND_MANDATORY_SINGLE, "Network Interface Name"},
 	{"list-fcoe-ports",
-	    fcoeListPortsFunc, "t", NULL, NULL,
+	    fcoeListPortsFunc, "it", NULL, NULL,
 		OPERAND_NONE, NULL},
 	{NULL, 0, NULL, NULL, NULL, 0, NULL, NULL}
 };

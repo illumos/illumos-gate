@@ -625,6 +625,21 @@ static void fcp_add_one_mask(char *curr_pwwn, uint32_t lun_id,
 static int fcp_should_mask(la_wwn_t *wwn, uint32_t lun_id);
 static void fcp_cleanup_blacklist(struct fcp_black_list_entry **lun_blacklist);
 
+/*
+ * New functions to support software FCA (like fcoei)
+ */
+static struct scsi_pkt *fcp_pseudo_init_pkt(
+	struct scsi_address *ap, struct scsi_pkt *pkt,
+	struct buf *bp, int cmdlen, int statuslen,
+	int tgtlen, int flags, int (*callback)(), caddr_t arg);
+static void fcp_pseudo_destroy_pkt(
+	struct scsi_address *ap, struct scsi_pkt *pkt);
+static void fcp_pseudo_sync_pkt(
+	struct scsi_address *ap, struct scsi_pkt *pkt);
+static int fcp_pseudo_start(struct scsi_address *ap, struct scsi_pkt *pkt);
+static void fcp_pseudo_dmafree(
+	struct scsi_address *ap, struct scsi_pkt *pkt);
+
 extern struct mod_ops	mod_driverops;
 /*
  * This variable is defined in modctl.c and set to '1' after the root driver
@@ -717,7 +732,7 @@ extern dev_info_t	*scsi_vhci_dip;
 	(es)->es_add_code == 0x25 &&		\
 	(es)->es_qual_code == 0x0)
 
-#define	FCP_VERSION		"1.189"
+#define	FCP_VERSION		"20090729-1.190"
 #define	FCP_NAME_VERSION	"SunFC FCP v" FCP_VERSION
 
 #define	FCP_NUM_ELEMENTS(array)			\
@@ -1076,6 +1091,29 @@ char *fcp_symmetric_disk_table[] = {
 
 int fcp_symmetric_disk_table_size =
 	sizeof (fcp_symmetric_disk_table)/sizeof (char *);
+
+/*
+ * This structure is bogus. scsi_hba_attach_setup() requires, as in the kernel
+ * will panic if you don't pass this in to the routine, this information.
+ * Need to determine what the actual impact to the system is by providing
+ * this information if any. Since dma allocation is done in pkt_init it may
+ * not have any impact. These values are straight from the Writing Device
+ * Driver manual.
+ */
+static ddi_dma_attr_t pseudo_fca_dma_attr = {
+	DMA_ATTR_V0,	/* ddi_dma_attr version */
+	0,		/* low address */
+	0xffffffff,	/* high address */
+	0x00ffffff,	/* counter upper bound */
+	1,		/* alignment requirements */
+	0x3f,		/* burst sizes */
+	1,		/* minimum DMA access */
+	0xffffffff,	/* maximum DMA access */
+	(1 << 24) - 1,	/* segment boundary restrictions */
+	1,		/* scater/gather list length */
+	512,		/* device granularity */
+	0		/* DMA flags */
+};
 
 /*
  * The _init(9e) return value should be that of mod_install(9f). Under
@@ -2836,6 +2874,7 @@ fcp_is_reconfig_needed(struct fcp_tgt *ptgt,
 	struct fcp_reportlun_resp	*report_lun;
 	uint8_t			reconfig_needed = FALSE;
 	uint8_t			lun_exists = FALSE;
+	fcp_port_t			*pptr		 = ptgt->tgt_port;
 
 	report_lun = kmem_zalloc(fpkt->pkt_datalen, KM_SLEEP);
 
@@ -3255,8 +3294,9 @@ fcp_tgt_send_plogi(struct fcp_tgt *ptgt, int *fc_status, int *fc_pkt_state,
 
 	/* Alloc internal packet */
 	icmd = fcp_icmd_alloc(pptr, ptgt, sizeof (la_els_logi_t),
-	    sizeof (la_els_logi_t), 0, 0, lcount, tcount, 0,
-	    FC_INVALID_RSCN_COUNT);
+	    sizeof (la_els_logi_t), 0,
+	    pptr->port_state & FCP_STATE_FCA_IS_NODMA,
+	    lcount, tcount, 0, FC_INVALID_RSCN_COUNT);
 
 	if (icmd == NULL) {
 		ret = ENOMEM;
@@ -5056,7 +5096,8 @@ fcp_handle_mapflags(struct fcp_port	*pptr, struct fcp_tgt	*ptgt,
 
 	alloc = FCP_MAX(sizeof (la_els_logi_t), sizeof (la_els_prli_t));
 
-	icmd = fcp_icmd_alloc(pptr, ptgt, alloc, alloc, 0, 0, lcount, tcount,
+	icmd = fcp_icmd_alloc(pptr, ptgt, alloc, alloc, 0,
+	    pptr->port_state & FCP_STATE_FCA_IS_NODMA, lcount, tcount,
 	    cause, map_entry->map_rscn_info.ulp_rscn_count);
 
 	if (icmd == NULL) {
@@ -5134,7 +5175,8 @@ fcp_send_els(struct fcp_port *pptr, struct fcp_tgt *ptgt,
 	if (icmd == NULL) {
 		alloc = FCP_MAX(sizeof (la_els_logi_t),
 		    sizeof (la_els_prli_t));
-		icmd = fcp_icmd_alloc(pptr, ptgt, alloc, alloc, 0, 0,
+		icmd = fcp_icmd_alloc(pptr, ptgt, alloc, alloc, 0,
+		    pptr->port_state & FCP_STATE_FCA_IS_NODMA,
 		    lcount, tcount, cause, FC_INVALID_RSCN_COUNT);
 		if (icmd == NULL) {
 			FCP_TGT_TRACE(ptgt, tcount, FCP_TGT_TRACE_10);
@@ -5545,6 +5587,7 @@ fcp_unsol_resp_init(fc_packet_t *pkt, fc_unsol_buf_t *buf,
 	pkt->pkt_cmd_fhdr.rsvd = 0;
 	pkt->pkt_comp = fcp_unsol_callback;
 	pkt->pkt_pd = NULL;
+	pkt->pkt_ub_resp_token = (opaque_t)buf;
 }
 
 
@@ -5564,22 +5607,24 @@ fcp_unsol_prli(struct fcp_port *pptr, fc_unsol_buf_t *buf)
 
 	from = (struct la_els_prli *)buf->ub_buffer;
 	orig = (struct fcp_prli *)from->service_params;
-
 	if ((ptgt = fcp_get_target_by_did(pptr, buf->ub_frame.s_id)) !=
 	    NULL) {
 		mutex_enter(&ptgt->tgt_mutex);
 		tcount = ptgt->tgt_change_cnt;
 		mutex_exit(&ptgt->tgt_mutex);
 	}
+
 	mutex_enter(&pptr->port_mutex);
 	lcount = pptr->port_link_cnt;
 	mutex_exit(&pptr->port_mutex);
 
 	if ((icmd = fcp_icmd_alloc(pptr, ptgt, sizeof (la_els_prli_t),
-	    sizeof (la_els_prli_t), 0, 0, lcount, tcount, 0,
-	    FC_INVALID_RSCN_COUNT)) == NULL) {
+	    sizeof (la_els_prli_t), 0,
+	    pptr->port_state & FCP_STATE_FCA_IS_NODMA,
+	    lcount, tcount, 0, FC_INVALID_RSCN_COUNT)) == NULL) {
 		return (FC_FAILURE);
 	}
+
 	fpkt = icmd->ipkt_fpkt;
 	fpkt->pkt_tran_flags = FC_TRAN_CLASS3 | FC_TRAN_INTR;
 	fpkt->pkt_tran_type = FC_PKT_OUTBOUND;
@@ -5637,7 +5682,8 @@ fcp_unsol_prli(struct fcp_port *pptr, fc_unsol_buf_t *buf)
 
 		if ((rval = fc_ulp_issue_els(pptr->port_fp_handle, fpkt)) !=
 		    FC_SUCCESS) {
-			if (rval == FC_STATEC_BUSY || rval == FC_OFFLINE) {
+			if ((rval == FC_STATEC_BUSY || rval == FC_OFFLINE) &&
+			    ptgt != NULL) {
 				fcp_queue_ipkt(pptr, fpkt);
 				return (FC_SUCCESS);
 			}
@@ -5951,7 +5997,8 @@ fcp_alloc_dma(struct fcp_port *pptr, struct fcp_ipkt *icmd,
 		cmd_resp++;
 	}
 
-	if (fpkt->pkt_datalen != 0) {
+	if ((fpkt->pkt_datalen != 0) &&
+	    !(pptr->port_state & FCP_STATE_FCA_IS_NODMA)) {
 		/*
 		 * set up DMA handle and memory for the data in this packet
 		 */
@@ -5998,6 +6045,16 @@ fcp_alloc_dma(struct fcp_port *pptr, struct fcp_ipkt *icmd,
 			*cp = pkt_data_cookie;
 		}
 
+	} else if (fpkt->pkt_datalen != 0) {
+		/*
+		 * If it's a pseudo FCA, then it can't support DMA even in
+		 * SCSI data phase.
+		 */
+		fpkt->pkt_data = kmem_alloc(fpkt->pkt_datalen, flags);
+		if (fpkt->pkt_data == NULL) {
+			goto fail;
+		}
+
 	}
 
 	return (FC_SUCCESS);
@@ -6012,6 +6069,10 @@ fail:
 			ddi_dma_mem_free(&fpkt->pkt_data_acc);
 		}
 		ddi_dma_free_handle(&fpkt->pkt_data_dma);
+	} else {
+		if (fpkt->pkt_data) {
+			kmem_free(fpkt->pkt_data, fpkt->pkt_datalen);
+		}
 	}
 
 	if (nodma) {
@@ -6042,6 +6103,13 @@ fcp_free_dma(struct fcp_port *pptr, struct fcp_ipkt *icmd)
 			ddi_dma_mem_free(&fpkt->pkt_data_acc);
 		}
 		ddi_dma_free_handle(&fpkt->pkt_data_dma);
+	} else {
+		if (fpkt->pkt_data) {
+			kmem_free(fpkt->pkt_data, fpkt->pkt_datalen);
+		}
+		/*
+		 * Need we reset pkt_* to zero???
+		 */
 	}
 
 	if (icmd->ipkt_nodma) {
@@ -6471,7 +6539,6 @@ fcp_send_scsi(struct fcp_lun *plun, uchar_t opcode, int alloc_len,
 	    "fcp_send_scsi: d_id=0x%x opcode=0x%x", ptgt->tgt_d_id, opcode);
 
 	nodma = (pptr->port_fcp_dma == FC_NO_DVMA_SPACE) ? 1 : 0;
-
 	icmd = fcp_icmd_alloc(pptr, ptgt, sizeof (struct fcp_cmd),
 	    FCP_MAX_RSP_IU_SIZE, alloc_len, nodma, lcount, tcount, cause,
 	    rscn_count);
@@ -6838,6 +6905,10 @@ fcp_scsi_callback(fc_packet_t *fpkt)
 	struct fcp_lun	*plun;
 	struct fcp_rsp		response, *rsp;
 
+	ptgt = icmd->ipkt_tgt;
+	pptr = ptgt->tgt_port;
+	plun = icmd->ipkt_lun;
+
 	if (icmd->ipkt_nodma) {
 		rsp = (struct fcp_rsp *)fpkt->pkt_resp;
 	} else {
@@ -6845,10 +6916,6 @@ fcp_scsi_callback(fc_packet_t *fpkt)
 		FCP_CP_IN(fpkt->pkt_resp, rsp, fpkt->pkt_resp_acc,
 		    sizeof (struct fcp_rsp));
 	}
-
-	ptgt = icmd->ipkt_tgt;
-	pptr = ptgt->tgt_port;
-	plun = icmd->ipkt_lun;
 
 	FCP_TRACE(fcp_logq, pptr->port_instbuf,
 	    fcp_trace, FCP_BUF_LEVEL_2, 0,
@@ -7079,8 +7146,10 @@ fcp_scsi_callback(fc_packet_t *fpkt)
 	}
 
 	ASSERT(rsp->fcp_u.fcp_status.scsi_status == STATUS_GOOD);
-
-	(void) ddi_dma_sync(fpkt->pkt_data_dma, 0, 0, DDI_DMA_SYNC_FORCPU);
+	if (!(pptr->port_state & FCP_STATE_FCA_IS_NODMA)) {
+		(void) ddi_dma_sync(fpkt->pkt_data_dma, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+	}
 
 	switch (icmd->ipkt_opcode) {
 	case SCMD_INQUIRY:
@@ -8730,7 +8799,7 @@ fcp_complete_pkt(fc_packet_t *fpkt)
 
 		pkt->pkt_resid = 0;
 
-		if (cmd->cmd_pkt->pkt_numcookies) {
+		if (fpkt->pkt_datalen) {
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 			if (fpkt->pkt_data_resid) {
 				error++;
@@ -9762,17 +9831,30 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 			kmem_free(pathname, MAXPATHLEN);
 		}
 	}
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(pptr->port_link_cnt))
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(pptr->port_link_cnt));
 	pptr->port_link_cnt = 1;
-	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(pptr->port_link_cnt))
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(pptr->port_link_cnt));
 	pptr->port_id = s_id;
 	pptr->port_instance = instance;
-	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(pptr->port_state))
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(pptr->port_state));
 	pptr->port_state = FCP_STATE_INIT;
-	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(pptr->port_state))
+	if (pinfo->port_acc_attr == NULL) {
+		/*
+		 * The corresponding FCA doesn't support DMA at all
+		 */
+		pptr->port_state |= FCP_STATE_FCA_IS_NODMA;
+	}
 
-	pptr->port_dmacookie_sz = (pptr->port_data_dma_attr.dma_attr_sgllen *
-	    sizeof (ddi_dma_cookie_t));
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(pptr->port_state));
+
+	if (!(pptr->port_state & FCP_STATE_FCA_IS_NODMA)) {
+		/*
+		 * If FCA supports DMA in SCSI data phase, we need preallocate
+		 * dma cookie, so stash the cookie size
+		 */
+		pptr->port_dmacookie_sz = sizeof (ddi_dma_cookie_t) *
+		    pptr->port_data_dma_attr.dma_attr_sgllen;
+	}
 
 	/*
 	 * The two mutexes of fcp_port are initialized.	 The variable
@@ -9832,6 +9914,22 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	tran->tran_teardown_pkt		= fcp_pkt_teardown;
 	tran->tran_hba_len		= pptr->port_priv_pkt_len +
 	    sizeof (struct fcp_pkt) + pptr->port_dmacookie_sz;
+	if (pptr->port_state & FCP_STATE_FCA_IS_NODMA) {
+		/*
+		 * If FCA don't support DMA, then we use different vectors to
+		 * minimize the effects on DMA code flow path
+		 */
+		tran->tran_start	   = fcp_pseudo_start;
+		tran->tran_init_pkt	   = fcp_pseudo_init_pkt;
+		tran->tran_destroy_pkt	   = fcp_pseudo_destroy_pkt;
+		tran->tran_sync_pkt	   = fcp_pseudo_sync_pkt;
+		tran->tran_dmafree	   = fcp_pseudo_dmafree;
+		tran->tran_setup_pkt	   = NULL;
+		tran->tran_teardown_pkt	   = NULL;
+		tran->tran_pkt_constructor = NULL;
+		tran->tran_pkt_destructor  = NULL;
+		pptr->port_data_dma_attr   = pseudo_fca_dma_attr;
+	}
 
 	/*
 	 * Allocate an ndi event handle
@@ -12214,10 +12312,15 @@ fcp_cp_pinfo(struct fcp_port *pptr, fc_ulp_port_info_t *pinfo)
 	pptr->port_fp_modlinkage = *pinfo->port_linkage;
 	pptr->port_dip = pinfo->port_dip;
 	pptr->port_fp_handle = pinfo->port_handle;
-	pptr->port_data_dma_attr = *pinfo->port_data_dma_attr;
-	pptr->port_cmd_dma_attr = *pinfo->port_cmd_dma_attr;
-	pptr->port_resp_dma_attr = *pinfo->port_resp_dma_attr;
-	pptr->port_dma_acc_attr = *pinfo->port_acc_attr;
+	if (pinfo->port_acc_attr != NULL) {
+		/*
+		 * FCA supports DMA
+		 */
+		pptr->port_data_dma_attr = *pinfo->port_data_dma_attr;
+		pptr->port_cmd_dma_attr = *pinfo->port_cmd_dma_attr;
+		pptr->port_resp_dma_attr = *pinfo->port_resp_dma_attr;
+		pptr->port_dma_acc_attr = *pinfo->port_acc_attr;
+	}
 	pptr->port_priv_pkt_len = pinfo->port_fca_pkt_size;
 	pptr->port_max_exch = pinfo->port_fca_max_exch;
 	pptr->port_phys_state = pinfo->port_state;
@@ -13043,9 +13146,13 @@ again:
 		 */
 		if (!i_ddi_devi_attached(ddi_get_parent(cdip))) {
 			rval = ndi_devi_bind_driver(cdip, flags);
+			FCP_TRACE(fcp_logq, pptr->port_instbuf,
+			    fcp_trace, FCP_BUF_LEVEL_3, 0,
+			    "!Invoking ndi_devi_bind_driver: rval=%d", rval);
 		} else {
 			rval = ndi_devi_online(cdip, flags);
 		}
+
 		/*
 		 * We log the message into trace buffer if the device
 		 * is "ses" and into syslog for any other device
@@ -15916,4 +16023,249 @@ fcp_cleanup_blacklist(struct fcp_black_list_entry **pplun_blacklist) {
 		kmem_free(current_entry, sizeof (struct fcp_black_list_entry));
 	}
 	*pplun_blacklist = NULL;
+}
+
+/*
+ * In fcp module,
+ *   pkt@scsi_pkt, cmd@fcp_pkt, icmd@fcp_ipkt, fpkt@fc_packet, pptr@fcp_port
+ */
+static struct scsi_pkt *
+fcp_pseudo_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
+    struct buf *bp, int cmdlen, int statuslen, int tgtlen,
+    int flags, int (*callback)(), caddr_t arg)
+{
+	fcp_port_t	*pptr = ADDR2FCP(ap);
+	fcp_pkt_t	*cmd  = NULL;
+	fc_frame_hdr_t	*hp;
+
+	/*
+	 * First step: get the packet
+	 */
+	if (pkt == NULL) {
+		pkt = scsi_hba_pkt_alloc(pptr->port_dip, ap, cmdlen, statuslen,
+		    tgtlen, sizeof (fcp_pkt_t) + pptr->port_priv_pkt_len,
+		    callback, arg);
+		if (pkt == NULL) {
+			return (NULL);
+		}
+
+		/*
+		 * All fields in scsi_pkt will be initialized properly or
+		 * set to zero. We need do nothing for scsi_pkt.
+		 */
+		/*
+		 * But it's our responsibility to link other related data
+		 * structures. Their initialization will be done, just
+		 * before the scsi_pkt will be sent to FCA.
+		 */
+		cmd		= PKT2CMD(pkt);
+		cmd->cmd_pkt	= pkt;
+		cmd->cmd_fp_pkt = &cmd->cmd_fc_packet;
+		/*
+		 * fc_packet_t
+		 */
+		cmd->cmd_fp_pkt->pkt_ulp_private = (opaque_t)cmd;
+		cmd->cmd_fp_pkt->pkt_fca_private = (opaque_t)((caddr_t)cmd +
+		    sizeof (struct fcp_pkt));
+		cmd->cmd_fp_pkt->pkt_cmd = (caddr_t)&cmd->cmd_fcp_cmd;
+		cmd->cmd_fp_pkt->pkt_cmdlen = sizeof (struct fcp_cmd);
+		cmd->cmd_fp_pkt->pkt_resp = cmd->cmd_fcp_rsp;
+		cmd->cmd_fp_pkt->pkt_rsplen = FCP_MAX_RSP_IU_SIZE;
+		/*
+		 * Fill in the Fabric Channel Header
+		 */
+		hp = &cmd->cmd_fp_pkt->pkt_cmd_fhdr;
+		hp->r_ctl = R_CTL_COMMAND;
+		hp->rsvd = 0;
+		hp->type = FC_TYPE_SCSI_FCP;
+		hp->f_ctl = F_CTL_SEQ_INITIATIVE | F_CTL_FIRST_SEQ;
+		hp->seq_id = 0;
+		hp->df_ctl  = 0;
+		hp->seq_cnt = 0;
+		hp->ox_id = 0xffff;
+		hp->rx_id = 0xffff;
+		hp->ro = 0;
+	} else {
+		/*
+		 * We need think if we should reset any elements in
+		 * related data structures.
+		 */
+		FCP_TRACE(fcp_logq, pptr->port_instbuf,
+		    fcp_trace, FCP_BUF_LEVEL_6, 0,
+		    "reusing pkt, flags %d", flags);
+		cmd = PKT2CMD(pkt);
+		if (cmd->cmd_fp_pkt->pkt_pd) {
+			cmd->cmd_fp_pkt->pkt_pd = NULL;
+		}
+	}
+
+	/*
+	 * Second step:	 dma allocation/move
+	 */
+	if (bp && bp->b_bcount != 0) {
+		/*
+		 * Mark if it's read or write
+		 */
+		if (bp->b_flags & B_READ) {
+			cmd->cmd_flags |= CFLAG_IS_READ;
+		} else {
+			cmd->cmd_flags &= ~CFLAG_IS_READ;
+		}
+
+		bp_mapin(bp);
+		cmd->cmd_fp_pkt->pkt_data = bp->b_un.b_addr;
+		cmd->cmd_fp_pkt->pkt_datalen = bp->b_bcount;
+		cmd->cmd_fp_pkt->pkt_data_resid = 0;
+	} else {
+		/*
+		 * It seldom happens, except when CLUSTER or SCSI_VHCI wants
+		 * to send zero-length read/write.
+		 */
+		cmd->cmd_fp_pkt->pkt_data = NULL;
+		cmd->cmd_fp_pkt->pkt_datalen = 0;
+	}
+
+	return (pkt);
+}
+
+static void
+fcp_pseudo_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
+{
+	fcp_port_t	*pptr = ADDR2FCP(ap);
+
+	/*
+	 * First we let FCA to uninitilize private part.
+	 */
+	fc_ulp_uninit_packet(pptr->port_fp_handle, PKT2CMD(pkt)->cmd_fp_pkt);
+
+	/*
+	 * Then we uninitialize fc_packet.
+	 */
+
+	/*
+	 * Thirdly, we uninitializae fcp_pkt.
+	 */
+
+	/*
+	 * In the end, we free scsi_pkt.
+	 */
+	scsi_hba_pkt_free(ap, pkt);
+}
+
+static int
+fcp_pseudo_start(struct scsi_address *ap, struct scsi_pkt *pkt)
+{
+	fcp_port_t	*pptr = ADDR2FCP(ap);
+	fcp_lun_t	*plun = ADDR2LUN(ap);
+	fcp_tgt_t	*ptgt = plun->lun_tgt;
+	fcp_pkt_t	*cmd  = PKT2CMD(pkt);
+	fcp_cmd_t	*fcmd = &cmd->cmd_fcp_cmd;
+	fc_packet_t	*fpkt = cmd->cmd_fp_pkt;
+	int		 rval;
+
+	fpkt->pkt_pd = ptgt->tgt_pd_handle;
+	fc_ulp_init_packet(pptr->port_fp_handle, cmd->cmd_fp_pkt, 1);
+
+	/*
+	 * Firstly, we need initialize fcp_pkt_t
+	 * Secondly, we need initialize fcp_cmd_t.
+	 */
+	bcopy(pkt->pkt_cdbp, fcmd->fcp_cdb, pkt->pkt_cdblen);
+	fcmd->fcp_data_len = fpkt->pkt_datalen;
+	fcmd->fcp_ent_addr = plun->lun_addr;
+	if (pkt->pkt_flags & FLAG_HTAG) {
+		fcmd->fcp_cntl.cntl_qtype = FCP_QTYPE_HEAD_OF_Q;
+	} else if (pkt->pkt_flags & FLAG_OTAG) {
+		fcmd->fcp_cntl.cntl_qtype = FCP_QTYPE_ORDERED;
+	} else if (pkt->pkt_flags & FLAG_STAG) {
+		fcmd->fcp_cntl.cntl_qtype = FCP_QTYPE_SIMPLE;
+	} else {
+		fcmd->fcp_cntl.cntl_qtype = FCP_QTYPE_UNTAGGED;
+	}
+
+	if (cmd->cmd_flags & CFLAG_IS_READ) {
+		fcmd->fcp_cntl.cntl_read_data = 1;
+		fcmd->fcp_cntl.cntl_write_data = 0;
+	} else {
+		fcmd->fcp_cntl.cntl_read_data = 0;
+		fcmd->fcp_cntl.cntl_write_data = 1;
+	}
+
+	/*
+	 * Then we need initialize fc_packet_t too.
+	 */
+	fpkt->pkt_timeout = pkt->pkt_time + 2;
+	fpkt->pkt_cmd_fhdr.d_id = ptgt->tgt_d_id;
+	fpkt->pkt_cmd_fhdr.s_id = pptr->port_id;
+	if (cmd->cmd_flags & CFLAG_IS_READ) {
+		fpkt->pkt_tran_type = FC_PKT_FCP_READ;
+	} else {
+		fpkt->pkt_tran_type = FC_PKT_FCP_WRITE;
+	}
+
+	if (pkt->pkt_flags & FLAG_NOINTR) {
+		fpkt->pkt_comp = NULL;
+		fpkt->pkt_tran_flags = (FC_TRAN_CLASS3 | FC_TRAN_NO_INTR);
+	} else {
+		fpkt->pkt_comp = fcp_cmd_callback;
+		fpkt->pkt_tran_flags = (FC_TRAN_CLASS3 | FC_TRAN_INTR);
+		if (pkt->pkt_flags & FLAG_IMMEDIATE_CB) {
+			fpkt->pkt_tran_flags |= FC_TRAN_IMMEDIATE_CB;
+		}
+	}
+
+	/*
+	 * Lastly, we need initialize scsi_pkt
+	 */
+	pkt->pkt_reason = CMD_CMPLT;
+	pkt->pkt_state = 0;
+	pkt->pkt_statistics = 0;
+	pkt->pkt_resid = 0;
+
+	/*
+	 * if interrupts aren't allowed (e.g. at dump time) then we'll
+	 * have to do polled I/O
+	 */
+	if (pkt->pkt_flags & FLAG_NOINTR) {
+		return (fcp_dopoll(pptr, cmd));
+	}
+
+	cmd->cmd_state = FCP_PKT_ISSUED;
+	rval = fcp_transport(pptr->port_fp_handle, fpkt, 0);
+	if (rval == FC_SUCCESS) {
+		return (TRAN_ACCEPT);
+	}
+
+	/*
+	 * Need more consideration
+	 *
+	 * pkt->pkt_flags & FLAG_NOQUEUE could abort other pkt
+	 */
+	cmd->cmd_state = FCP_PKT_IDLE;
+	if (rval == FC_TRAN_BUSY) {
+		return (TRAN_BUSY);
+	} else {
+		return (TRAN_FATAL_ERROR);
+	}
+}
+
+/*
+ * scsi_poll will always call tran_sync_pkt for pseudo FC-HBAs
+ * SCSA will initialize it to scsi_sync_cache_pkt for physical FC-HBAs
+ */
+static void
+fcp_pseudo_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
+{
+	FCP_TRACE(fcp_logq, "fcp_pseudo_sync_pkt", fcp_trace,
+	    FCP_BUF_LEVEL_2, 0, "ap-%p, scsi_pkt-%p", ap, pkt);
+}
+
+/*
+ * scsi_dmafree will always call tran_dmafree, when STATE_ARQ_DONE
+ */
+static void
+fcp_pseudo_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
+{
+	FCP_TRACE(fcp_logq, "fcp_pseudo_dmafree", fcp_trace,
+	    FCP_BUF_LEVEL_2, 0, "ap-%p, scsi_pkt-%p", ap, pkt);
 }

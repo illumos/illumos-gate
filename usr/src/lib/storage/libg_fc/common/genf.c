@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,7 @@
 /* Bus strings - for internal use by g_get_path_type() only */
 #define	PCI_BUS			1
 #define	SBUS			2
+#define	FCOE			3
 
 struct str_type {
 	char *string;
@@ -87,6 +88,7 @@ struct str_type {
 static struct str_type ValidBusStrings[] = {
 	{"pci@", PCI_BUS},
 	{"sbus@", SBUS},
+	{"fcoe", FCOE},
 	{NULL, 0}
 };
 

@@ -353,6 +353,7 @@ DRV_KMODS	+= stmf_sbd
 DRV_KMODS	+= fct
 DRV_KMODS	+= fcoe
 DRV_KMODS	+= fcoet
+DRV_KMODS	+= fcoei
 DRV_KMODS	+= qlt
 DRV_KMODS	+= iscsit
 DRV_KMODS	+= ncall nsctl sdbc nskern sv

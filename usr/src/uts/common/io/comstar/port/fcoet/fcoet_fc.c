@@ -234,6 +234,7 @@ fcoet_xfer_scsi_data(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		 * If it's write type command, we need send xfer_rdy now
 		 * We may need to consider bidirectional command later
 		 */
+		dbuf->db_sglist_length = 0;
 		frm = CMD2SS(cmd)->ss_eport->eport_alloc_frame(
 		    CMD2SS(cmd)->ss_eport, sizeof (fcoe_fcp_xfer_rdy_t) +
 		    FCFH_SIZE, NULL);

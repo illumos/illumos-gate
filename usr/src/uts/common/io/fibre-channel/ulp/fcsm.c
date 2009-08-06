@@ -33,16 +33,13 @@
 #include <sys/scsi/scsi.h>
 #include <sys/var.h>
 #include <sys/byteorder.h>
-
 #include <sys/fibre-channel/fc.h>
 #include <sys/fibre-channel/impl/fc_ulpif.h>
 #include <sys/fibre-channel/ulp/fcsm.h>
 
 /* Definitions */
-#define	FCSM_VERSION		"1.27"
+#define	FCSM_VERSION		"20090729-1.28"
 #define	FCSM_NAME_VERSION	"SunFC FCSM v" FCSM_VERSION
-
-
 
 /* Global Variables */
 static char		fcsm_name[] = "FCSM";
@@ -68,7 +65,7 @@ static clock_t		fcsm_offline_ticks;
 
 #ifdef DEBUG
 uint32_t		fcsm_debug = (SMDL_TRACE | SMDL_IO |
-			    SMDL_ERR | SMDL_INFO);
+    SMDL_ERR | SMDL_INFO);
 #endif
 
 
@@ -289,7 +286,7 @@ int
 _fini(void)
 {
 	int	rval;
-#ifdef  DEBUG
+#ifdef	DEBUG
 	int	status;
 #endif /* DEBUG */
 
@@ -668,6 +665,12 @@ fcsm_handle_port_attach(fc_ulp_port_info_t *pinfo, uint32_t s_id, int instance)
 	fcsm->sm_flags |= FCSM_ATTACHED;
 	fcsm->sm_port_top = pinfo->port_flags;
 	fcsm->sm_port_state = pinfo->port_state;
+	if (pinfo->port_acc_attr == NULL) {
+		/*
+		 * The corresponding FCA doesn't support DMA at all
+		 */
+		fcsm->sm_flags |= FCSM_USING_NODMA_FCA;
+	}
 	mutex_exit(&fcsm->sm_mutex);
 
 	(void) ddi_pathname(fcsm->sm_port_info.port_dip, fcsm_pathname);
@@ -972,18 +975,18 @@ fcsm_port_detach(opaque_t ulph, fc_ulp_port_info_t *pinfo, fc_detach_cmd_t cmd)
 	 */
 
 	switch (cmd) {
-		case FC_CMD_DETACH:
-		case FC_CMD_SUSPEND:
-		case FC_CMD_POWER_DOWN:
-			break;
+	case FC_CMD_DETACH:
+	case FC_CMD_SUSPEND:
+	case FC_CMD_POWER_DOWN:
+		break;
 
-		default:
-			FCSM_DEBUG(SMDL_TRACE, (CE_CONT, SM_LOG, fcsm, NULL,
-			    "port_detach: port unknown cmd 0x%x", cmd));
-			mutex_enter(&fcsm_global_mutex);
-			fcsm_num_detaching--;
-			mutex_exit(&fcsm_global_mutex);
-			return (rval);
+	default:
+		FCSM_DEBUG(SMDL_TRACE, (CE_CONT, SM_LOG, fcsm, NULL,
+		    "port_detach: port unknown cmd 0x%x", cmd));
+		mutex_enter(&fcsm_global_mutex);
+		fcsm_num_detaching--;
+		mutex_exit(&fcsm_global_mutex);
+		return (rval);
 	};
 
 	if (fcsm_handle_port_detach(pinfo, fcsm, cmd) == DDI_SUCCESS) {
@@ -1020,25 +1023,25 @@ fcsm_handle_port_detach(fc_ulp_port_info_t *pinfo, fcsm_t *fcsm,
 	mutex_enter(&fcsm->sm_mutex);
 
 	switch (cmd) {
-		case FC_CMD_DETACH:
-			flag = FCSM_DETACHING;
-			break;
+	case FC_CMD_DETACH:
+		flag = FCSM_DETACHING;
+		break;
 
-		case FC_CMD_SUSPEND:
-		case FC_CMD_POWER_DOWN:
-			(cmd == FC_CMD_SUSPEND) ? (flag = FCSM_SUSPENDED) : \
-			    (flag = FCSM_POWER_DOWN);
-			if (fcsm->sm_flags &
-			    (FCSM_POWER_DOWN | FCSM_SUSPENDED)) {
-				fcsm->sm_flags |= flag;
-				mutex_exit(&fcsm->sm_mutex);
-				return (DDI_SUCCESS);
-			}
-			break;
-
-		default:
+	case FC_CMD_SUSPEND:
+	case FC_CMD_POWER_DOWN:
+		((cmd == FC_CMD_SUSPEND) ? (flag = FCSM_SUSPENDED) :
+		    (flag = FCSM_POWER_DOWN));
+		if (fcsm->sm_flags &
+		    (FCSM_POWER_DOWN | FCSM_SUSPENDED)) {
+			fcsm->sm_flags |= flag;
 			mutex_exit(&fcsm->sm_mutex);
-			return (DDI_FAILURE);
+			return (DDI_SUCCESS);
+		}
+		break;
+
+	default:
+		mutex_exit(&fcsm->sm_mutex);
+		return (DDI_FAILURE);
 	};
 
 	fcsm->sm_flags |= flag;
@@ -1625,7 +1628,7 @@ fcsm_fciocmd(intptr_t arg, int mode, cred_t *credp, fcio_t *fcio)
 
 	case  FCSMIO_ADAPTER_LIST: {
 		fc_hba_list_t	*list;
-		int		count;
+		int			count;
 
 		if ((fcio->fcio_xfer != FCIO_XFER_RW) ||
 		    (fcio->fcio_olen == 0) || (fcio->fcio_obuf == 0)) {
@@ -1648,7 +1651,8 @@ fcsm_fciocmd(intptr_t arg, int mode, cred_t *credp, fcio_t *fcio)
 
 		count = fc_ulp_get_adapter_paths((char *)list->hbaPaths,
 		    list->numAdapters);
-		if (count < 0) { /* Did something go wrong? */
+		if (count < 0) {
+			/* Did something go wrong? */
 			FCSM_DEBUG(SMDL_TRACE, (CE_CONT, SM_LOG, NULL, NULL,
 			    "Error fetching adapter list."));
 			retval = ENXIO;
@@ -1851,17 +1855,17 @@ fcsm_display(int level, int flags, fcsm_t *fcsm, fc_packet_t *pkt,
 	}
 
 	switch (flags) {
-		case SM_LOG:
-			cmn_err(level, "!%s", buf);
-			break;
+	case SM_LOG:
+		cmn_err(level, "!%s", buf);
+		break;
 
-		case SM_CONSOLE:
-			cmn_err(level, "^%s", buf);
-			break;
+	case SM_CONSOLE:
+		cmn_err(level, "^%s", buf);
+		break;
 
-		default:
-			cmn_err(level, "%s", buf);
-			break;
+	default:
+		cmn_err(level, "%s", buf);
+		break;
 	}
 
 	kmem_free(buf, 256);
@@ -1974,16 +1978,25 @@ fcsm_cmd_cache_constructor(void *buf, void *cdarg, int kmflags)
 	pkt->pkt_fca_private = (opaque_t)((caddr_t)cmd + sizeof (fcsm_cmd_t));
 	pkt->pkt_ulp_private = (opaque_t)cmd;
 
-	pinfo = &fcsm->sm_port_info;
-	if (ddi_dma_alloc_handle(pinfo->port_dip, pinfo->port_cmd_dma_attr,
-	    callback, NULL, &pkt->pkt_cmd_dma) != DDI_SUCCESS) {
-		return (1);
-	}
+	if (!(fcsm->sm_flags & FCSM_USING_NODMA_FCA)) {
+		pinfo = &fcsm->sm_port_info;
+		if (ddi_dma_alloc_handle(pinfo->port_dip,
+		    pinfo->port_cmd_dma_attr,
+		    callback, NULL, &pkt->pkt_cmd_dma) != DDI_SUCCESS) {
+			return (1);
+		}
 
-	if (ddi_dma_alloc_handle(pinfo->port_dip, pinfo->port_resp_dma_attr,
-	    callback, NULL, &pkt->pkt_resp_dma) != DDI_SUCCESS) {
-		ddi_dma_free_handle(&pkt->pkt_cmd_dma);
-		return (1);
+		if (ddi_dma_alloc_handle(pinfo->port_dip,
+		    pinfo->port_resp_dma_attr,
+		    callback, NULL, &pkt->pkt_resp_dma) != DDI_SUCCESS) {
+			ddi_dma_free_handle(&pkt->pkt_cmd_dma);
+			return (1);
+		}
+	} else {
+		pkt->pkt_cmd_dma  = NULL;
+		pkt->pkt_cmd	  = NULL;
+		pkt->pkt_resp_dma = NULL;
+		pkt->pkt_resp	  = NULL;
 	}
 
 	pkt->pkt_cmd_acc = pkt->pkt_resp_acc = NULL;
@@ -2071,7 +2084,7 @@ fcsm_alloc_cmd(fcsm_t *fcsm, uint32_t cmd_len, uint32_t resp_len, int sleep)
 		return (NULL);
 	}
 
-	if (cmd_len) {
+	if ((cmd_len) && !(fcsm->sm_flags & FCSM_USING_NODMA_FCA)) {
 		ASSERT(pkt->pkt_cmd_dma != NULL);
 
 		rval = ddi_dma_mem_alloc(pkt->pkt_cmd_dma, cmd_len,
@@ -2140,9 +2153,11 @@ fcsm_alloc_cmd(fcsm_t *fcsm, uint32_t cmd_len, uint32_t resp_len, int sleep)
 			ddi_dma_nextcookie(pkt->pkt_cmd_dma, &pkt_cookie);
 			*cp = pkt_cookie;
 		}
+	} else if (cmd_len != 0) {
+		pkt->pkt_cmd = kmem_zalloc(cmd_len, KM_SLEEP);
 	}
 
-	if (resp_len) {
+	if ((resp_len) && !(fcsm->sm_flags & FCSM_USING_NODMA_FCA)) {
 		ASSERT(pkt->pkt_resp_dma != NULL);
 
 		rval = ddi_dma_mem_alloc(pkt->pkt_resp_dma, resp_len,
@@ -2211,6 +2226,8 @@ fcsm_alloc_cmd(fcsm_t *fcsm, uint32_t cmd_len, uint32_t resp_len, int sleep)
 			ddi_dma_nextcookie(pkt->pkt_resp_dma, &pkt_cookie);
 			*cp = pkt_cookie;
 		}
+	} else if (resp_len != 0) {
+		pkt->pkt_resp = kmem_zalloc(resp_len, KM_SLEEP);
 	}
 
 	pkt->pkt_cmdlen = cmd_len;
@@ -2246,6 +2263,18 @@ fcsm_free_cmd_dma(fcsm_cmd_t *cmd)
 
 	pkt = cmd->cmd_fp_pkt;
 	ASSERT(pkt != NULL);
+
+	if (cmd->cmd_fcsm->sm_flags & FCSM_USING_NODMA_FCA) {
+		if (pkt->pkt_cmd) {
+			kmem_free(pkt->pkt_cmd, pkt->pkt_cmdlen);
+			pkt->pkt_cmd = NULL;
+		}
+
+		if (pkt->pkt_resp) {
+			kmem_free(pkt->pkt_resp, pkt->pkt_rsplen);
+			pkt->pkt_resp = NULL;
+		}
+	}
 
 	pkt->pkt_cmdlen = 0;
 	pkt->pkt_rsplen = 0;
@@ -2320,7 +2349,7 @@ fcsm_alloc_job(int sleep)
 		job->job_code		= FCSM_JOB_NONE;
 		job->job_flags		= 0;
 		job->job_port_instance	= -1;
-		job->job_result 	= -1;
+		job->job_result		= -1;
 		job->job_arg		= (opaque_t)0;
 		job->job_caller_priv	= (opaque_t)0;
 		job->job_comp		= NULL;
@@ -2349,8 +2378,8 @@ fcsm_init_job(fcsm_job_t *job, int instance, uint32_t command, uint32_t flags,
 	job->job_port_instance	= instance;
 	job->job_code		= command;
 	job->job_flags		= flags;
-	job->job_arg 		= arg;
-	job->job_caller_priv 	= caller_priv;
+	job->job_arg		= arg;
+	job->job_caller_priv	= caller_priv;
 	job->job_comp		= comp;
 	job->job_comp_arg	= comp_arg;
 	job->job_retry_count	= 0;
@@ -2743,6 +2772,7 @@ fcsm_ct_intr(fcsm_cmd_t *cmd)
 	fc_packet_t	*pkt;
 	fcsm_job_t	*job;
 	fcio_t		*fcio;
+	fcsm_t		*fcsm;
 
 	pkt = cmd->cmd_fp_pkt;
 	job = cmd->cmd_job;
@@ -2758,6 +2788,7 @@ fcsm_ct_intr(fcsm_cmd_t *cmd)
 		    pkt->pkt_cmd_fhdr.d_id));
 	} else {
 		/* Get the CT response payload */
+		fcsm = cmd->cmd_fcsm;
 		FCSM_REP_RD(pkt->pkt_resp_acc, fcio->fcio_obuf,
 		    pkt->pkt_resp, fcio->fcio_olen);
 	}
@@ -3121,7 +3152,6 @@ fcsm_xlogi_intr(fcsm_cmd_t *cmd)
 		    pkt->pkt_resp, sizeof (la_els_logi_t));
 	}
 
-
 	job->job_result =
 	    fcsm_pkt_state_to_rval(pkt->pkt_state, pkt->pkt_reason);
 
@@ -3257,7 +3287,7 @@ fcsm_pkt_common_intr(fc_packet_t *pkt)
 	if (fcsm->sm_flags & FCSM_LINK_DOWN) {
 		/*
 		 * No need to retry the command. The link previously
-		 * suffered an offline  timeout.
+		 * suffered an offline	timeout.
 		 */
 		mutex_exit(&fcsm->sm_mutex);
 		FCSM_DEBUG(SMDL_TRACE, (CE_CONT, SM_LOG, cmd->cmd_fcsm, NULL,
@@ -3548,7 +3578,7 @@ fcsm_retry_timeout(void *handle)
 
 			/*
 			 * No need to retry the command. The link has
-			 * suffered an offline  timeout.
+			 * suffered an offline	timeout.
 			 */
 			pkt = cmd->cmd_fp_pkt;
 			pkt->pkt_state = FC_PKT_PORT_OFFLINE;

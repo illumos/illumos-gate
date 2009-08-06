@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,6 +153,9 @@ extern "C" {
 #define	NSRJTX_NOPERM		0x10	/* Access denied */
 #define	NSRJTX_BADPORTID	0x11	/* Unacceptable port ID */
 #define	NSRJTX_DBEMPTY		0x12	/* Data base empty */
+
+/* Management Service Command Codes */
+#define	MS_GIEL		0x0101	/* Get Interconnect Element List */
 
 #define	FC_NS_CLASSF		0x01
 #define	FC_NS_CLASS1		0x02

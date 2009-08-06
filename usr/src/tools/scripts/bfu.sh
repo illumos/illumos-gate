@@ -313,6 +313,7 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/svc-drd
 	lib/svc/method/svc-dscp
 	lib/svc/method/svc-dumpadm
+	lib/svc/method/svc-fcoei
 	lib/svc/method/svc-fcoet
 	lib/svc/method/svc-intrd
 	lib/svc/method/svc-hal
@@ -383,6 +384,7 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/system/device/devices-audio.xml
 	var/svc/manifest/system/device/devices-fc-fabric.xml
 	var/svc/manifest/system/dumpadm.xml
+	var/svc/manifest/system/fcoe_initiator.xml
 	var/svc/manifest/system/fcoe_target.xml
 	var/svc/manifest/system/filesystem/rmvolmgr.xml
 	var/svc/manifest/system/fmd.xml

@@ -540,9 +540,11 @@ fcoet_process_sol_fcp_data(fcoe_frame_t *frm)
 
 	bcopy(frm->frm_payload, dbuf->db_sglist[sge_idx].seg_addr,
 	    frm->frm_payload_size);
+	atomic_add_16(&dbuf->db_sglist_length, 1);
 
 	xch->xch_left_data_size -= frm->frm_payload_size;
-	if (xch->xch_left_data_size <= 0) {
+	if ((xch->xch_left_data_size <= 0) ||
+	    dbuf->db_sglist_length >= FCOET_GET_SEG_NUM(dbuf)) {
 		fc_st = FCT_SUCCESS;
 		iof = 0;
 		dbuf->db_xfer_status = fc_st;
