@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_GENASSYM
 #define	_GENASSYM
@@ -184,7 +182,7 @@ main(int argc, char *argv[])
 #if defined(__xpv)
 	printf("#define\tSHUTDOWN_reboot 0x%x\n", SHUTDOWN_reboot);
 	printf("#define\tSCHEDOP_block 0x%x\n", SCHEDOP_block);
-	printf("#define\tVGCF_IN_SYSCALL 0x%x\n", VGCF_IN_KERNEL);
+	printf("#define\tVGCF_IN_KERNEL 0x%x\n", VGCF_IN_KERNEL);
 #endif
 	return (0);
 }

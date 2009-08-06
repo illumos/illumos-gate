@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MACHPRIVREGS_H
 #define	_SYS_MACHPRIVREGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/hypervisor.h>
 
@@ -374,7 +372,7 @@ extern "C" {
 	ud2	/* die nastily if we return! */
 
 #define	IRET	HYPERVISOR_IRET(0)
-#define	SYSRETQ	HYPERVISOR_IRET(VGCF_IN_SYSCALL)
+#define	SYSRETQ	HYPERVISOR_IRET(VGCF_IN_KERNEL)
 #define	SYSRETL	ud2		/* 32-bit syscall/sysret not supported */
 #define	SWAPGS	/* empty - handled in hypervisor */
 
