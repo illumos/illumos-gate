@@ -61,8 +61,10 @@ def do_holds():
 	fields = ("name", "tag", "timestamp")
 	rjustfields = ()
 	printing = False 
+	gotone = False
 	t = zfs.table.Table(fields, rjustfields) 
 	for ds in zfs.dataset.snapshots_fromcmdline(args, options.recursive):
+		gotone = True
 		for tag, tm in ds.get_holds().iteritems():
 			val = {"name": ds.name, "tag": tag,
 			    "timestamp": time.ctime(tm)}
@@ -70,3 +72,5 @@ def do_holds():
 			printing = True
 	if printing:
 		t.printme()
+	elif not gotone:
+		raise zfs.util.ZFSError(errno.ENOENT, _("no matching datasets"))

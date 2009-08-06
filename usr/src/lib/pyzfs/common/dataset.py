@@ -213,12 +213,16 @@ class Dataset(object):
 
 def snapshots_fromcmdline(dsnames, recursive):
 	for dsname in dsnames:
-		ds = Dataset(dsname)
 		if not "@" in dsname:
 			raise zfs.util.ZFSError(errno.EINVAL,
 			    _("cannot open %s") % dsname,
 			    _("operation only applies to snapshots"))
-		yield ds
+		try:
+			ds = Dataset(dsname)
+			yield ds
+		except zfs.util.ZFSError, e:
+			if not recursive or e.errno != errno.ENOENT:
+				raise
 		if recursive:
 			(base, snapname) = dsname.split('@')
 			parent = Dataset(base)
