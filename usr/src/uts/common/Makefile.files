@@ -625,7 +625,8 @@ SOFTMAC_OBJS += softmac_main.o softmac_ctl.o softmac_capab.o \
 NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_output.o net80211_node.o net80211_crypto.o \
 		 net80211_crypto_none.o net80211_crypto_wep.o net80211_ioctl.o \
-		 net80211_crypto_tkip.o net80211_crypto_ccmp.o
+		 net80211_crypto_tkip.o net80211_crypto_ccmp.o	\
+		 net80211_ht.o
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
 

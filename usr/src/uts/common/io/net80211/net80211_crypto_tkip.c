@@ -5,7 +5,7 @@
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -147,7 +147,7 @@ tkip_encap(struct ieee80211_key *k, mblk_t *mp, uint8_t keyid)
 	if (ic->ic_flags & IEEE80211_F_COUNTERM)
 		return (0);
 
-	hdrlen = ieee80211_hdrspace(mp->b_rptr);
+	hdrlen = ieee80211_hdrspace(ic, mp->b_rptr);
 	/*
 	 * Copy down 802.11 header and add the IV, KeyID, and ExtIV.
 	 */
@@ -194,7 +194,6 @@ tkip_decap(struct ieee80211_key *k, mblk_t *mp, int hdrlen)
 {
 	struct tkip_ctx *ctx = k->wk_private;
 	struct ieee80211com *ic = ctx->tc_ic;
-	struct ieee80211_frame tmp;
 	uint8_t *ivp;
 	uint64_t pn;
 
@@ -242,8 +241,7 @@ tkip_decap(struct ieee80211_key *k, mblk_t *mp, int hdrlen)
 	/*
 	 * Copy up 802.11 header and strip crypto bits.
 	 */
-	bcopy(mp->b_rptr, &tmp, hdrlen);
-	bcopy(&tmp, mp->b_rptr + tkip.ic_header, hdrlen);
+	(void) memmove(mp->b_rptr + tkip.ic_header, mp->b_rptr, hdrlen);
 	mp->b_rptr += tkip.ic_header;
 	mp->b_wptr -= tkip.ic_trailer;
 
@@ -262,7 +260,7 @@ tkip_enmic(struct ieee80211_key *k, mblk_t *mp, int force)
 		int hdrlen;
 		uint8_t *mic;
 
-		hdrlen = ieee80211_hdrspace(mp->b_rptr);
+		hdrlen = ieee80211_hdrspace(ctx->tc_ic, mp->b_rptr);
 		mic = mp->b_wptr;
 		mp->b_wptr += tkip.ic_miclen;
 
@@ -287,7 +285,7 @@ tkip_demic(struct ieee80211_key *k, mblk_t *mp, int force)
 	struct tkip_ctx *ctx = k->wk_private;
 
 	if (force || (k->wk_flags & IEEE80211_KEY_SWMIC)) {
-		int hdrlen = ieee80211_hdrspace(mp->b_rptr);
+		int hdrlen = ieee80211_hdrspace(ctx->tc_ic, mp->b_rptr);
 		uint8_t mic[IEEE80211_WEP_MICLEN];
 		uint8_t mic0[IEEE80211_WEP_MICLEN];
 
@@ -640,7 +638,12 @@ michael_mic_hdr(const struct ieee80211_frame *wh0, uint8_t hdr[16])
 		break;
 	}
 
-	hdr[12] = 0; /* QoS not supported */
+	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
+		const struct ieee80211_qosframe *qwh =
+		    (const struct ieee80211_qosframe *)wh;
+		hdr[12] = qwh->i_qos[0] & IEEE80211_QOS_TID;
+	} else
+		hdr[12] = 0;
 	hdr[13] = hdr[14] = hdr[15] = 0; /* reserved */
 }
 

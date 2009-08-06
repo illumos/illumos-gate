@@ -82,9 +82,11 @@ ieee80211_send_setup(ieee80211com_t *ic, ieee80211_node_t *in,
 		IEEE80211_ADDR_COPY(wh->i_addr3, bssid);
 	}
 	*(uint16_t *)&wh->i_dur[0] = 0;	/* set duration */
-	*(uint16_t *)&wh->i_seq[0] =	/* set sequence number */
-	    LE_16(in->in_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
-	in->in_txseqs[0]++;		/* increase sequence number by 1 */
+	/* NB: use non-QoS tid */
+	*(uint16_t *)&wh->i_seq[0] =
+	    LE_16(in->in_txseqs[IEEE80211_NONQOS_TID] <<
+	    IEEE80211_SEQ_SEQ_SHIFT);
+	in->in_txseqs[IEEE80211_NONQOS_TID]++;
 }
 
 /*
@@ -96,7 +98,7 @@ ieee80211_send_setup(ieee80211com_t *ic, ieee80211_node_t *in,
  *
  * Return 0 on success
  */
-static int
+int
 ieee80211_mgmt_output(ieee80211com_t *ic, ieee80211_node_t *in, mblk_t *mp,
     int type, int timer)
 {
@@ -173,13 +175,70 @@ ieee80211_encap(ieee80211com_t *ic, mblk_t *mp, ieee80211_node_t *in)
 {
 	struct ieee80211_frame	*wh;
 	struct ieee80211_key *key;
+	int addqos, ac, tid;
 
 	ASSERT(mp != NULL && MBLKL(mp) >= sizeof (struct ieee80211_frame));
+	/*
+	 * Some ap's don't handle QoS-encapsulated EAPOL
+	 * frames so suppress use.  This may be an issue if other
+	 * ap's require all data frames to be QoS-encapsulated
+	 * once negotiated in which case we'll need to make this
+	 * configurable.
+	 */
+	addqos = in->in_flags & (IEEE80211_NODE_QOS | IEEE80211_NODE_HT);
 	wh = (struct ieee80211_frame *)mp->b_rptr;
 	*(uint16_t *)wh->i_dur = 0;
-	*(uint16_t *)wh->i_seq =
-	    LE_16(in->in_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
-	in->in_txseqs[0]++;
+	if (addqos) {
+		struct ieee80211_qosframe *qwh =
+		    (struct ieee80211_qosframe *)wh;
+
+		ac = ieee80211_classify(ic, mp, in);
+		/* map from access class/queue to 11e header priorty value */
+		tid = WME_AC_TO_TID(ac);
+		qwh->i_qos[0] = tid & IEEE80211_QOS_TID;
+		/*
+		 * Check if A-MPDU tx aggregation is setup or if we
+		 * should try to enable it.  The sta must be associated
+		 * with HT and A-MPDU enabled for use.  On the first
+		 * frame that goes out We issue an ADDBA request and
+		 * wait for a reply.  The frame being encapsulated
+		 * will go out w/o using A-MPDU, or possibly it might
+		 * be collected by the driver and held/retransmit.
+		 * ieee80211_ampdu_request handles staggering requests
+		 * in case the receiver NAK's us or we are otherwise
+		 * unable to establish a BA stream.
+		 */
+		if ((in->in_flags & IEEE80211_NODE_AMPDU_TX) &&
+		    (ic->ic_flags_ext & IEEE80211_FEXT_AMPDU_TX)) {
+			struct ieee80211_tx_ampdu *tap = &in->in_tx_ampdu[ac];
+
+			if (IEEE80211_AMPDU_RUNNING(tap)) {
+				/*
+				 * Operational, mark frame for aggregation.
+				 */
+				qwh->i_qos[0] |= IEEE80211_QOS_ACKPOLICY_BA;
+			} else if (!IEEE80211_AMPDU_REQUESTED(tap)) {
+				/*
+				 * Not negotiated yet, request service.
+				 */
+				(void) ieee80211_ampdu_request(in, tap);
+			}
+		}
+		/* works even when BA marked above */
+		if (ic->ic_wme.wme_wmeChanParams.cap_wmeParams[ac].
+		    wmep_noackPolicy) {
+			qwh->i_qos[0] |= IEEE80211_QOS_ACKPOLICY_NOACK;
+		}
+
+		*(uint16_t *)wh->i_seq =
+		    LE_16(in->in_txseqs[tid] << IEEE80211_SEQ_SEQ_SHIFT);
+		in->in_txseqs[tid]++;
+	} else {
+		*(uint16_t *)wh->i_seq =
+		    LE_16(in->in_txseqs[IEEE80211_NONQOS_TID] <<
+		    IEEE80211_SEQ_SEQ_SHIFT);
+		in->in_txseqs[IEEE80211_NONQOS_TID]++;
+	}
 
 	if (ic->ic_flags & IEEE80211_F_PRIVACY)
 		key = ieee80211_crypto_getkey(ic);
@@ -192,9 +251,8 @@ ieee80211_encap(ieee80211com_t *ic, mblk_t *mp, ieee80211_node_t *in)
 	 */
 	if (key != NULL && (ic->ic_flags & IEEE80211_F_WPA)) {
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
-		if (!ieee80211_crypto_enmic(isc, key, mp, 0)) {
+		if (!ieee80211_crypto_enmic(isc, key, mp, 0))
 			ieee80211_err("ieee80211_crypto_enmic failed.\n");
-		}
 	}
 
 	return (mp);
@@ -233,6 +291,72 @@ ieee80211_add_xrates(uint8_t *frm, const struct ieee80211_rateset *rs)
 	}
 	return (frm);
 }
+
+#define	WME_OUI_BYTES		0x00, 0x50, 0xf2
+/*
+ * Add a WME information element to a frame.
+ */
+/* ARGSUSED */
+static uint8_t *
+ieee80211_add_wme_info(uint8_t *frm, struct ieee80211_wme_state *wme)
+{
+	static const struct ieee80211_wme_info info = {
+		.wme_id		= IEEE80211_ELEMID_VENDOR,
+		.wme_len	= sizeof (struct ieee80211_wme_info) - 2,
+		.wme_oui	= { WME_OUI_BYTES },
+		.wme_type	= WME_OUI_TYPE,
+		.wme_subtype	= WME_INFO_OUI_SUBTYPE,
+		.wme_version	= WME_VERSION,
+		.wme_info	= 0,
+	};
+	(void) memcpy(frm, &info, sizeof (info));
+	return (frm + sizeof (info));
+}
+
+/*
+ * Add a WME parameters element to a frame.
+ */
+static uint8_t *
+ieee80211_add_wme_param(uint8_t *frm, struct ieee80211_wme_state *wme)
+{
+#define	SM(_v, _f)	(((_v) << _f##_S) & _f)
+#define	ADDSHORT(frm, v) do {			\
+	_NOTE(CONSTCOND)			\
+	frm[0] = (v) & 0xff;			\
+	frm[1] = (v) >> 8;			\
+	frm += 2;				\
+	_NOTE(CONSTCOND)			\
+} while (0)
+	/* NB: this works 'cuz a param has an info at the front */
+	static const struct ieee80211_wme_info param = {
+		.wme_id		= IEEE80211_ELEMID_VENDOR,
+		.wme_len	= sizeof (struct ieee80211_wme_param) - 2,
+		.wme_oui	= { WME_OUI_BYTES },
+		.wme_type	= WME_OUI_TYPE,
+		.wme_subtype	= WME_PARAM_OUI_SUBTYPE,
+		.wme_version	= WME_VERSION,
+	};
+	int i;
+
+	(void) memcpy(frm, &param, sizeof (param));
+	frm += offsetof(struct ieee80211_wme_info, wme_info);
+	*frm++ = wme->wme_bssChanParams.cap_info;	/* AC info */
+	*frm++ = 0;					/* reserved field */
+	for (i = 0; i < WME_NUM_AC; i++) {
+		const struct wmeParams *ac =
+		    &wme->wme_bssChanParams.cap_wmeParams[i];
+		*frm++ = SM(i, WME_PARAM_ACI)
+		    | SM(ac->wmep_acm, WME_PARAM_ACM)
+		    | SM(ac->wmep_aifsn, WME_PARAM_AIFSN);
+		*frm++ = SM(ac->wmep_logcwmax, WME_PARAM_LOGCWMAX)
+		    | SM(ac->wmep_logcwmin, WME_PARAM_LOGCWMIN);
+		ADDSHORT(frm, ac->wmep_txopLimit);
+	}
+	return (frm);
+#undef SM
+#undef ADDSHORT
+}
+#undef WME_OUI_BYTES
 
 /*
  * Add SSID element to a frame
@@ -379,6 +503,10 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		 *	[tlv] extended supported rates
 		 *	[tlv] WPA
 		 *	[tlv] WME (optional)
+		 *	[tlv] HT capabilities
+		 *	[tlv] HT information
+		 *	[tlv] Vendor OUI HT capabilities (optional)
+		 *	[tlv] Vendor OUI HT information (optional)
 		 */
 		mp = ieee80211_getmgtframe(&frm,
 		    8			/* time stamp  */
@@ -394,8 +522,12 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		    2 * sizeof (struct ieee80211_ie_wpa) : 0)
 					/* [tlv] WPA  */
 		    + (ic->ic_flags & IEEE80211_F_WME ?
-		    sizeof (struct ieee80211_wme_param) : 0));
+		    sizeof (struct ieee80211_wme_param) : 0)
 					/* [tlv] WME  */
+		    /* check for cluster requirement */
+		    + 2 * sizeof (struct ieee80211_ie_htcap) + 4
+		    + 2 * sizeof (struct ieee80211_ie_htinfo) + 4);
+
 		if (mp == NULL)
 			return (ENOMEM);
 
@@ -434,12 +566,30 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 			*frm++ = IEEE80211_IBSS_LEN;
 			*frm++ = 0; *frm++ = 0;		/* ATIM window */
 		}
-		/* ERP */
 		if (IEEE80211_IS_CHAN_ANYG(ic->ic_curchan))
 			frm = ieee80211_add_erp(frm, ic);
-		/* Extended supported rates */
 		frm = ieee80211_add_xrates(frm, &in->in_rates);
-		mp->b_wptr = frm;
+		/*
+		 * NB: legacy 11b clients do not get certain ie's.
+		 * The caller identifies such clients by passing
+		 * a token in arg to us.  Could expand this to be
+		 * any legacy client for stuff like HT ie's.
+		 */
+		if (IEEE80211_IS_CHAN_HT(ic->ic_curchan) &&
+		    arg != IEEE80211_SEND_LEGACY_11B) {
+			frm = ieee80211_add_htcap(frm, in);
+			frm = ieee80211_add_htinfo(frm, in);
+		}
+		if (ic->ic_flags & IEEE80211_F_WME)
+			frm = ieee80211_add_wme_param(frm, &ic->ic_wme);
+		if (IEEE80211_IS_CHAN_HT(ic->ic_curchan) &&
+		    (ic->ic_flags_ext & IEEE80211_FEXT_HTCOMPAT) &&
+		    arg != IEEE80211_SEND_LEGACY_11B) {
+			frm = ieee80211_add_htcap_vendor(frm, in);
+			frm = ieee80211_add_htinfo_vendor(frm, in);
+		}
+		mp->b_wptr = frm;	/* allocated is greater than used */
+
 		break;
 
 	case IEEE80211_FC0_SUBTYPE_AUTH:
@@ -517,6 +667,8 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
 		 *	[tlv] WME
+		 *	[tlv] HT capabilities
+		 *	[tlv] Vendor OUI HT capabilities (optional)
 		 *	[tlv] user-specified ie's
 		 */
 		mp = ieee80211_getmgtframe(&frm,
@@ -525,6 +677,8 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		    + 2 + IEEE80211_NWID_LEN
 		    + 2 + IEEE80211_RATE_SIZE
 		    + 2 + IEEE80211_XRATE_SIZE
+		    + sizeof (struct ieee80211_wme_info)
+		    + 2 * sizeof (struct ieee80211_ie_htcap) + 4
 		    + ic->ic_opt_ie_len);
 		if (mp == NULL)
 			return (ENOMEM);
@@ -556,6 +710,16 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		frm = ieee80211_add_ssid(frm, in->in_essid, in->in_esslen);
 		frm = ieee80211_add_rates(frm, &in->in_rates);
 		frm = ieee80211_add_xrates(frm, &in->in_rates);
+		if ((ic->ic_flags_ext & IEEE80211_FEXT_HT) &&
+		    in->in_htcap_ie != NULL &&
+		    in->in_htcap_ie[0] == IEEE80211_ELEMID_HTCAP)
+			frm = ieee80211_add_htcap(frm, in);
+		if ((ic->ic_flags & IEEE80211_F_WME) && in->in_wme_ie != NULL)
+			frm = ieee80211_add_wme_info(frm, &ic->ic_wme);
+		if ((ic->ic_flags_ext & IEEE80211_FEXT_HT) &&
+		    in->in_htcap_ie != NULL &&
+		    in->in_htcap_ie[0] == IEEE80211_ELEMID_VENDOR)
+			frm = ieee80211_add_htcap_vendor(frm, in);
 		if (ic->ic_opt_ie != NULL) {
 			bcopy(ic->ic_opt_ie, frm, ic->ic_opt_ie_len);
 			frm += ic->ic_opt_ie_len;
@@ -575,6 +739,8 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
 		 *	[tlv] WME (if enabled and STA enabled)
+		 *	[tlv] HT capabilities (standard or vendor OUI)
+		 *	[tlv] HT information (standard or vendor OUI)
 		 */
 		mp = ieee80211_getmgtframe(&frm,
 		    3 * sizeof (uint16_t)
@@ -629,7 +795,6 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 	struct ieee80211_rateset *rs;
 	mblk_t *m;
 	uint8_t *frm;
-	uint8_t *efrm;
 	int pktlen;
 	uint16_t capinfo;
 
@@ -647,6 +812,10 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 	 *	[tlv] extended supported rates
 	 *	[tlv] WME parameters
 	 *	[tlv] WPA/RSN parameters
+	 *	[tlv] HT capabilities
+	 *	[tlv] HT information
+	 *	[tlv] Vendor OUI HT capabilities (optional)
+	 *	[tlv] Vendor OUI HT information (optional)
 	 * Vendor-specific OIDs (e.g. Atheros)
 	 * NB: we allocate the max space required for the TIM bitmap.
 	 */
@@ -659,7 +828,13 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 	    + 2 + 1			/* DS parameters */
 	    + 2 + 4 + ic->ic_tim_len	/* DTIM/IBSSPARMS */
 	    + 2 + 1			/* ERP */
-	    + 2 + IEEE80211_XRATE_SIZE;
+	    + 2 + IEEE80211_XRATE_SIZE
+	    + (ic->ic_caps & IEEE80211_C_WME ?	/* WME */
+	    sizeof (struct ieee80211_wme_param) : 0)
+	    /* conditional? */
+	    + 4 + 2 * sizeof (struct ieee80211_ie_htcap)	/* HT caps */
+	    + 4 + 2 * sizeof (struct ieee80211_ie_htinfo);	/* HT info */
+
 	m = ieee80211_getmgtframe(&frm, pktlen);
 	if (m == NULL) {
 		ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_beacon_alloc: "
@@ -716,9 +891,23 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 		bo->bo_erp = frm;
 		frm = ieee80211_add_erp(frm, ic);
 	}
-	efrm = ieee80211_add_xrates(frm, rs);
-	bo->bo_trailer_len = _PTRDIFF(efrm, bo->bo_trailer);
-	m->b_wptr = efrm;
+	frm = ieee80211_add_xrates(frm, rs);
+	if (IEEE80211_IS_CHAN_HT(ic->ic_curchan)) {
+		frm = ieee80211_add_htcap(frm, in);
+		bo->bo_htinfo = frm;
+		frm = ieee80211_add_htinfo(frm, in);
+	}
+	if (ic->ic_flags & IEEE80211_F_WME) {
+		bo->bo_wme = frm;
+		frm = ieee80211_add_wme_param(frm, &ic->ic_wme);
+	}
+	if (IEEE80211_IS_CHAN_HT(ic->ic_curchan) &&
+	    (ic->ic_flags_ext & IEEE80211_FEXT_HTCOMPAT)) {
+		frm = ieee80211_add_htcap_vendor(frm, in);
+		frm = ieee80211_add_htinfo_vendor(frm, in);
+	}
+	bo->bo_trailer_len = _PTRDIFF(frm, bo->bo_trailer);
+	m->b_wptr = frm;
 
 	wh = (struct ieee80211_frame *)m->b_rptr;
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
@@ -751,4 +940,45 @@ ieee80211_beacon_update(ieee80211com_t *ic, ieee80211_node_t *in,
 
 	IEEE80211_UNLOCK(ic);
 	return (0);
+}
+
+/*
+ * Assign priority to a frame based on any vlan tag assigned
+ * to the station and/or any Diffserv setting in an IP header.
+ * Finally, if an ACM policy is setup (in station mode) it's
+ * applied.
+ */
+int
+ieee80211_classify(struct ieee80211com *ic, mblk_t *m,
+    struct ieee80211_node *ni)
+/* ARGSUSED */
+{
+	int ac;
+
+	if ((ni->in_flags & IEEE80211_NODE_QOS) == 0)
+		return (WME_AC_BE);
+
+	/* Process VLan */
+	/* Process IPQoS */
+
+	ac = WME_AC_BE;
+
+	/*
+	 * Apply ACM policy.
+	 */
+	if (ic->ic_opmode == IEEE80211_M_STA) {
+		static const int acmap[4] = {
+			WME_AC_BK,	/* WME_AC_BE */
+			WME_AC_BK,	/* WME_AC_BK */
+			WME_AC_BE,	/* WME_AC_VI */
+			WME_AC_VI,	/* WME_AC_VO */
+		};
+		while (ac != WME_AC_BK &&
+		    ic->ic_wme.wme_wmeBssChanParams.cap_wmeParams[ac].
+		    wmep_acm) {
+			ac = acmap[ac];
+		}
+	}
+
+	return (ac);
 }

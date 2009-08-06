@@ -1,11 +1,11 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,8 +34,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * IEEE 802.11 WEP crypto support.
@@ -135,7 +133,7 @@ wep_encap(struct ieee80211_key *k, mblk_t *mp, uint8_t keyid)
 
 	if (mp == NULL)
 		return (0);
-	hdrlen = ieee80211_hdrspace(wh);
+	hdrlen = ieee80211_hdrspace(ctx->wc_ic, wh);
 
 	ivp = (uint8_t *)wh;
 	ivp += hdrlen;
@@ -182,10 +180,6 @@ wep_encap(struct ieee80211_key *k, mblk_t *mp, uint8_t keyid)
 static int
 wep_decap(struct ieee80211_key *k, mblk_t *mp, int hdrlen)
 {
-	struct ieee80211_frame *wh, whbuf;
-
-	wh = (struct ieee80211_frame *)mp->b_rptr;
-
 	/*
 	 * Check if the device handled the decrypt in hardware.
 	 * If so we just strip the header; otherwise we need to
@@ -200,9 +194,8 @@ wep_decap(struct ieee80211_key *k, mblk_t *mp, int hdrlen)
 	/*
 	 * Copy up 802.11 header and strip crypto bits.
 	 */
-	bcopy(wh, &whbuf, sizeof (whbuf));
+	(void) memmove(mp->b_rptr + wep.ic_header, mp->b_rptr, hdrlen);
 	mp->b_rptr += wep.ic_header;
-	bcopy(&whbuf, mp->b_rptr, hdrlen);
 	mp->b_wptr -= wep.ic_trailer;
 
 	return (1);

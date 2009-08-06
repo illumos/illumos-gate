@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/ethernet.h>
 #include <sys/net80211_proto.h>
 #include <sys/net80211_crypto.h>
+#include <sys/net80211_ht.h>
 #include <net/wpa.h>
 
 /*
@@ -85,6 +86,17 @@ extern "C" {
 
 #define	IEEE80211_C_CRYPTO	0x0000001f	/* CAPABILITY: crypto alg's */
 
+/*
+ * ic_htcaps: HT-specific device/driver capabilities
+ *
+ * NB: the low 16-bits are the 802.11 definitions, the upper
+ *     16-bits are used to define s/w/driver capabilities.
+ */
+#define	IEEE80211_HTC_AMPDU	0x00010000	/* CAPABILITY: A-MPDU tx */
+#define	IEEE80211_HTC_AMSDU	0x00020000	/* CAPABILITY: A-MSDU tx */
+/* NB: HT40 is implied by IEEE80211_HTCAP_CHWIDTH40 */
+#define	IEEE80211_HTC_HT	0x00040000	/* CAPABILITY: HT operation */
+
 /* ic_flags */
 /* NB: bits 0x4c available */
 #define	IEEE80211_F_FF		0x00000001	/* CONF: ATH FF enabled */
@@ -124,25 +136,52 @@ extern "C" {
 #define	IEEE80211_F_WMEUPDATE	0x20000000	/* STATUS: update beacon wme */
 
 /* ic_flags_ext */
-#define	IEEE80211_FEXT_WDS	0x00000001	/* CONF: 4 addr allowed */
+#define	IEEE80211_FEXT_NONHT_PR	0x00000001	/* STATUS: non-HT sta present */
+#define	IEEE80211_FEXT_INACT	0x00000002	/* CONF: sta inact handling */
 /* 0x00000006 reserved */
 #define	IEEE80211_FEXT_BGSCAN	0x00000008
 				/* STATUS: enable full bgscan completion */
 #define	IEEE80211_FEXT_ERPUPDATE 0x00000200	/* STATUS: update ERP element */
 #define	IEEE80211_FEXT_SWBMISS	0x00000400	/* CONF: do bmiss in s/w */
+#define	IEEE80211_FEXT_PROBECHAN 0x00020000	/* CONF: probe passive chan */
+#define	IEEE80211_FEXT_HT	0x00080000	/* CONF: HT supported */
+#define	IEEE80211_FEXT_AMPDU_TX	0x00100000	/* CONF: A-MPDU tx supported */
+#define	IEEE80211_FEXT_AMPDU_RX	0x00200000	/* CONF: A-MPDU tx supported */
+#define	IEEE80211_FEXT_AMSDU_TX	0x00400000	/* CONF: A-MSDU tx supported */
+#define	IEEE80211_FEXT_AMSDU_RX	0x00800000	/* CONF: A-MSDU tx supported */
+#define	IEEE80211_FEXT_USEHT40	0x01000000	/* CONF: 20/40 use enabled */
+#define	IEEE80211_FEXT_PUREN	0x02000000	/* CONF: 11n w/o legacy sta's */
+#define	IEEE80211_FEXT_SHORTGI20 0x04000000	/* CONF: short GI in HT20 */
+#define	IEEE80211_FEXT_SHORTGI40 0x08000000	/* CONF: short GI in HT40 */
+#define	IEEE80211_FEXT_HTCOMPAT 0x10000000	/* CONF: HT vendor OUI's */
 
 /*
  * Channel attributes (ich_flags)
  * bits 0-3 are for private use by drivers
  */
-#define	IEEE80211_CHAN_TURBO	0x0010	/* Turbo channel */
-#define	IEEE80211_CHAN_CCK	0x0020	/* CCK channel */
-#define	IEEE80211_CHAN_OFDM	0x0040	/* OFDM channel */
-#define	IEEE80211_CHAN_2GHZ	0x0080	/* 2 GHz spectrum channel. */
-#define	IEEE80211_CHAN_5GHZ	0x0100	/* 5 GHz spectrum channel */
-#define	IEEE80211_CHAN_PASSIVE	0x0200	/* Only passive scan allowed */
-#define	IEEE80211_CHAN_DYN	0x0400	/* Dynamic CCK-OFDM channel */
-#define	IEEE80211_CHAN_GFSK	0x0800	/* GFSK channel (FHSS PHY) */
+#define	IEEE80211_CHAN_TURBO	0x00000010 /* Turbo channel */
+#define	IEEE80211_CHAN_CCK	0x00000020 /* CCK channel */
+#define	IEEE80211_CHAN_OFDM	0x00000040 /* OFDM channel */
+#define	IEEE80211_CHAN_2GHZ	0x00000080 /* 2 GHz spectrum channel. */
+#define	IEEE80211_CHAN_5GHZ	0x00000100 /* 5 GHz spectrum channel */
+#define	IEEE80211_CHAN_PASSIVE	0x00000200 /* Only passive scan allowed */
+#define	IEEE80211_CHAN_DYN	0x00000400 /* Dynamic CCK-OFDM channel */
+#define	IEEE80211_CHAN_GFSK	0x00000800 /* GFSK channel (FHSS PHY) */
+#define	IEEE80211_CHAN_GSM	0x00001000 /* 900 MHz spectrum channel */
+#define	IEEE80211_CHAN_STURBO	0x00002000 /* 11a static turbo channel only */
+#define	IEEE80211_CHAN_HALF	0x00004000 /* Half rate channel */
+#define	IEEE80211_CHAN_QUARTER	0x00008000 /* Quarter rate channel */
+#define	IEEE80211_CHAN_HT20	0x00010000 /* HT 20 channel */
+#define	IEEE80211_CHAN_HT40U	0x00020000 /* HT 40 channel w/ ext above */
+#define	IEEE80211_CHAN_HT40D	0x00040000 /* HT 40 channel w/ ext below */
+#define	IEEE80211_CHAN_DFS	0x00080000 /* DFS required */
+#define	IEEE80211_CHAN_4MSXMIT	0x00100000 /* 4ms limit on frame length */
+#define	IEEE80211_CHAN_NOADHOC	0x00200000 /* adhoc mode not allowed */
+#define	IEEE80211_CHAN_NOHOSTAP	0x00400000 /* hostap mode not allowed */
+#define	IEEE80211_CHAN_11D	0x00800000 /* 802.11d required */
+
+#define	IEEE80211_CHAN_HT40	(IEEE80211_CHAN_HT40U | IEEE80211_CHAN_HT40D)
+#define	IEEE80211_CHAN_HT	(IEEE80211_CHAN_HT20 | IEEE80211_CHAN_HT40)
 
 #define	IEEE80211_CHAN_MAX	255
 #define	IEEE80211_CHAN_BYTES	32	/* howmany(IEEE80211_CHAN_MAX, NBBY) */
@@ -155,10 +194,30 @@ extern "C" {
 #define	IEEE80211_IS_CHAN_5GHZ(_c)	\
 	(((_c)->ich_flags & IEEE80211_CHAN_5GHZ) != 0)
 
+#define	IEEE80211_NODE_CHWUPDATE 0x0400		/* 11n channel width change */
 #define	IEEE80211_NODE_HASHSIZE	32
 
+#define	IEEE80211_NODE_AUTH	0x0001		/* authorized for data */
+#define	IEEE80211_NODE_QOS	0x0002		/* QoS enabled */
+#define	IEEE80211_NODE_ERP	0x0004		/* ERP enabled */
+/* NB: this must have the same value as IEEE80211_FC1_PWR_MGT */
+#define	IEEE80211_NODE_PWR_MGT	0x0010		/* power save mode enabled */
+#define	IEEE80211_NODE_AREF	0x0020		/* authentication ref held */
+#define	IEEE80211_NODE_HT	0x0040		/* HT enabled */
+#define	IEEE80211_NODE_HTCOMPAT	0x0080		/* HT setup w/ vendor OUI's */
+#define	IEEE80211_NODE_AMPDU_RX	0x0400		/* AMPDU rx enabled */
+#define	IEEE80211_NODE_AMPDU_TX	0x0800		/* AMPDU tx enabled */
+
+#define	IEEE80211_NODE_AMPDU \
+	(IEEE80211_NODE_AMPDU_RX | IEEE80211_NODE_AMPDU_TX)
+
 #define	IEEE80211_FIXED_RATE_NONE	0
-#define	IEEE80211_MCAST_RATE_DEFAULT	(2*1)	/* default mcast rate (1M) */
+
+#define	WME_OUI			0xf25000
+#define	WME_OUI_TYPE		0x02
+#define	WME_INFO_OUI_SUBTYPE	0x00
+#define	WME_PARAM_OUI_SUBTYPE	0x01
+#define	WME_VERSION		1
 
 /* WME stream classes */
 #define	WME_AC_BE		0	/* best effort */
@@ -168,6 +227,25 @@ extern "C" {
 
 #define	MAX_EVENT		16
 #define	MAX_IEEE80211STR	256
+
+/* For IEEE80211_RADIOTAP_FLAGS */
+#define	IEEE80211_RADIOTAP_F_CFP	0x01
+					/* sent/received during CFP */
+#define	IEEE80211_RADIOTAP_F_SHORTPRE	0x02
+					/* sent/received with short preamble */
+#define	IEEE80211_RADIOTAP_F_WEP	0x04
+					/* sent/received with WEP encryption */
+#define	IEEE80211_RADIOTAP_F_FRAG	0x08
+					/* sent/received with fragmentation */
+#define	IEEE80211_RADIOTAP_F_DATAPAD	0x20
+					/*
+					 * frame has padding between 802.11
+					 * header and payload (to 32-bit
+					 * boundary
+					 */
+#define	IEEE80211_RADIOTAP_F_FCS	0x10	/* frame includes FCS */
+#define	IEEE80211_RADIOTAP_F_BADFCS	0x40	/* does not pass FCS check */
+#define	IEEE80211_RADIOTAP_F_SHORTGI	0x80	/* HT short GI */
 
 /*
  * Authentication mode.
@@ -204,11 +282,26 @@ struct ieee80211_rateset {
 };
 
 /*
+ * 802.11n variant of ieee80211_rateset.  Instead
+ * legacy rates the entries are MCS rates.  We define
+ * the structure such that it can be used interchangeably
+ * with an ieee80211_rateset (modulo structure size).
+ */
+#define	IEEE80211_HTRATE_MAXSIZE 127
+
+struct ieee80211_htrateset {
+	uint8_t			rs_nrates;
+	uint8_t			rs_rates[IEEE80211_HTRATE_MAXSIZE];
+};
+
+#define	IEEE80211_RATE_MCS	0x80
+
+/*
  * Channels are specified by frequency and attributes.
  */
 struct ieee80211_channel {
 	uint16_t		ich_freq;	/* setting in Mhz */
-	uint16_t		ich_flags;	/* see below */
+	uint32_t		ich_flags;	/* see below */
 };
 
 struct ieee80211_device_stats {
@@ -254,6 +347,9 @@ struct ieee80211_node_table {
 	list_t			nt_hash[IEEE80211_NODE_HASHSIZE];
 };
 
+#define	IEEE80211_TID_SIZE	(WME_NUM_TID+1)	/* WME TID's +1 for non-QoS */
+#define	IEEE80211_NONQOS_TID	WME_NUM_TID	/* index for non-QoS sta */
+
 /*
  * Node specific information.  Note that drivers are expected
  * to derive from this structure to add device-specific per-node
@@ -274,8 +370,8 @@ struct ieee80211_node {
 	 * index 0 is used when QoS is not enabled. index 1-16 is used
 	 * when QoS is enabled. 1-16 corresponds to TID 0-15.
 	 */
-	uint16_t		in_txseqs[17];	/* tx seq per-tid */
-	uint16_t		in_rxseqs[17];	/* rx seq previous per-tid */
+	uint16_t		in_txseqs[IEEE80211_TID_SIZE];
+	uint16_t		in_rxseqs[IEEE80211_TID_SIZE];
 	clock_t			in_rxfragstamp;	/* time stamp of last rx frag */
 	mblk_t			*in_rxfrag;	/* rx frag reassembly */
 	uint32_t		in_scangen;	/* gen# for timeout scan */
@@ -311,15 +407,65 @@ struct ieee80211_node {
 	uint32_t		*in_challenge;	/* shared-key challenge */
 	struct ieee80211_key	in_ucastkey;	/* unicast key */
 	uint8_t			*in_wpa_ie;	/* captured WPA/RSN ie */
+	uint8_t			*in_wme_ie;	/* captured WME ie */
+
+	/* 11n state */
+	uint8_t			*in_htcap_ie;	/* captured HTCAP ie */
+	uint16_t		in_htcap;	/* HT capabilities */
+	uint8_t			in_htparam;	/* HT params */
+	uint8_t			in_htctlchan;	/* HT control channel */
+	uint8_t			in_ht2ndchan;	/* HT 2nd channel */
+	uint8_t			in_htopmode;	/* HT operating mode */
+	uint8_t			in_htstbc;	/* HT */
+	uint8_t			in_reqcw;	/* requested tx channel width */
+	uint8_t			in_chw;		/* negotiated channel width */
+	struct ieee80211_htrateset in_htrates;	/* negotiated ht rate set */
+	struct ieee80211_tx_ampdu in_tx_ampdu[WME_NUM_AC];
+	struct ieee80211_rx_ampdu in_rx_ampdu[WME_NUM_TID];
 
 	/* others */
 	int32_t			in_fails;	/* failure count to associate */
 	int16_t			in_inact;	/* inactivity mark count */
 	int16_t			in_inact_reload; /* inactivity reload value */
-	int32_t			in_txrate;	/* index to ni_rates[] */
+	int32_t			in_txrate;	/* index to in_rates[] */
 
 	list_node_t		in_node;	/* element of nt->nt_node */
 	list_node_t		in_hash;	/* element of nt->nt_hash */
+};
+
+/*
+ * WME/WMM support.
+ */
+struct wmeParams {
+	uint8_t		wmep_acm;
+	uint8_t		wmep_aifsn;
+	uint8_t		wmep_logcwmin;		/* log2(cwmin) */
+	uint8_t		wmep_logcwmax;		/* log2(cwmax) */
+	uint8_t		wmep_txopLimit;
+	uint8_t		wmep_noackPolicy;	/* 0 (ack), 1 (no ack) */
+};
+#define	IEEE80211_TXOP_TO_US(_txop)	((_txop)<<5)
+#define	IEEE80211_US_TO_TXOP(_us)	((_us)>>5)
+
+struct chanAccParams {
+	uint8_t		cap_info;		/* version of the current set */
+	struct wmeParams cap_wmeParams[WME_NUM_AC];
+};
+
+struct ieee80211_wme_state {
+	uint_t	wme_flags;
+#define	WME_F_AGGRMODE	0x00000001	/* STATUS: WME agressive mode */
+	uint_t	wme_hipri_traffic; /* VI/VO frames in beacon interval */
+	uint_t	wme_hipri_switch_thresh; /* agressive mode switch thresh */
+	uint_t	wme_hipri_switch_hysteresis;
+					/* agressive mode switch hysteresis */
+	struct wmeParams wme_params[4]; /* from assoc resp for each AC */
+	struct chanAccParams wme_wmeChanParams; /* WME params applied to self */
+	struct chanAccParams wme_wmeBssChanParams;
+					/* WME params bcast to stations */
+	struct chanAccParams wme_chanParams; /* params applied to self */
+	struct chanAccParams wme_bssChanParams; /* params bcast to stations */
+	int (*wme_update)(struct ieee80211com *);
 };
 
 struct ieee80211com {
@@ -328,6 +474,7 @@ struct ieee80211com {
 	/* Initialized by driver */
 	uint8_t			ic_macaddr[IEEE80211_ADDR_LEN];
 	uint32_t		ic_caps;	/* capabilities */
+	uint32_t		ic_htcaps;	/* HT capabilities */
 	enum ieee80211_phytype	ic_phytype;	/* XXX wrong for multi-mode */
 	enum ieee80211_opmode	ic_opmode;	/* current operation mode */
 	enum ieee80211_state	ic_state;	/* current 802.11 state */
@@ -348,7 +495,6 @@ struct ieee80211com {
 	uint8_t			ic_bmissthreshold;
 	uint16_t		ic_rtsthreshold;
 	uint16_t		ic_fragthreshold;
-	int32_t			ic_mcast_rate;	/* rate for mcast frames */
 	uint8_t			ic_fixed_rate;	/* value of fixed rate */
 	int32_t			ic_des_esslen;	/* length of desired essid */
 	uint8_t			ic_des_essid[IEEE80211_NWID_LEN];
@@ -377,6 +523,22 @@ struct ieee80211com {
 	struct ieee80211_device_stats	ic_stats;
 	struct ieee80211_node_table	ic_scan; /* STA: scan candidates */
 	struct ieee80211_node_table	ic_sta; /* AP:stations/IBSS:neighbors */
+
+	struct ieee80211_wme_state ic_wme;	/* WME/WMM state */
+
+	int			ic_ampdu_rxmax;	/* A-MPDU rx limit (bytes) */
+	int			ic_ampdu_density; /* A-MPDU density */
+	int			ic_ampdu_limit;	/* A-MPDU tx limit (bytes) */
+	int			ic_amsdu_limit;	/* A-MSDU tx limit (bytes) */
+
+	uint16_t		ic_sta_assoc;	/* stations associated */
+	uint16_t		ic_ht_sta_assoc; /* HT stations associated */
+	uint16_t		ic_ht40_sta_assoc; /* HT40 station associated */
+	uint8_t			ic_curhtprotmode; /* HTINFO bss state */
+	enum ieee80211_protmode	ic_htprotmode;	/* HT protection mode */
+	int			ic_lastnonerp;	/* last time nonERP sta noted */
+	int			ic_lastnonht;	/* last time non-HT sta noted */
+
 
 	/* callback functions */
 	/*
@@ -423,6 +585,29 @@ struct ieee80211com {
 	void			(*ic_node_cleanup)(ieee80211_node_t *);
 	void			(*ic_node_free)(ieee80211_node_t *);
 	uint8_t			(*ic_node_getrssi)(const ieee80211_node_t *);
+	void			(*ic_set_channel)(ieee80211com_t *);
+
+	/*
+	 * 802.11n ADDBA support.  A simple/generic implementation
+	 * of A-MPDU tx aggregation is provided; the driver may
+	 * override these methods to provide their own support.
+	 * A-MPDU rx re-ordering happens automatically if the
+	 * driver passes out-of-order frames to ieee80211_input
+	 * from an assocated HT station.
+	 */
+	void			(*ic_recv_action)(ieee80211_node_t *,
+				    const uint8_t *, const uint8_t *);
+	int			(*ic_send_action)(ieee80211_node_t *,
+				    int, int, uint16_t[4]);
+	/* start/stop doing A-MPDU tx aggregation for a station */
+	int			(*ic_addba_request)(ieee80211_node_t *,
+				    struct ieee80211_tx_ampdu *,
+				    int, int, int);
+	int			(*ic_addba_response)(ieee80211_node_t *,
+				    struct ieee80211_tx_ampdu *,
+				    int, int, int);
+	void			(*ic_addba_stop)(ieee80211_node_t *,
+				    struct ieee80211_tx_ampdu *);
 
 	kmutex_t		ic_genlock;
 	void			*ic_private;	/* ieee80211 private data */
@@ -431,6 +616,7 @@ struct ieee80211com {
 #define	ic_def_txkey		ic_crypto.cs_def_txkey
 
 extern	const char *ieee80211_state_name[IEEE80211_S_MAX];
+extern	const char *ieee80211_wme_acnames[];
 
 #define	IEEE80211_RATE(_ix)			\
 	(in->in_rates.ir_rates[(_ix)] & IEEE80211_RATE_VAL)
@@ -533,6 +719,12 @@ void ieee80211_dump_pkt(const uint8_t *, int32_t, int32_t, int32_t);
 void ieee80211_watchdog(void *);
 void ieee80211_start_watchdog(ieee80211com_t *, uint32_t);
 void ieee80211_stop_watchdog(ieee80211com_t *);
+int ieee80211_classify(struct ieee80211com *, mblk_t *,
+    struct ieee80211_node *);
+int ieee80211_hdrsize(const void *);
+int ieee80211_hdrspace(ieee80211com_t *, const void *);
+int ieee80211_anyhdrsize(const void *);
+int ieee80211_anyhdrspace(ieee80211com_t *, const void *);
 
 void *ieee80211_malloc(size_t);
 void ieee80211_free(void *);
@@ -540,6 +732,12 @@ int ieee80211_setprop(void *, const char *, mac_prop_id_t, uint_t,
     const void *);
 int ieee80211_getprop(void *, const char *, mac_prop_id_t, uint_t, uint_t,
     void *, uint_t *);
+
+struct ieee80211_channel *ieee80211_find_channel(ieee80211com_t *, int, int);
+const struct ieee80211_rateset *ieee80211_get_suprates(ieee80211com_t *,
+    struct ieee80211_channel *);
+
+/* HT */
 
 #ifdef	__cplusplus
 }

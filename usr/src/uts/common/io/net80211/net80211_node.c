@@ -184,7 +184,18 @@ ieee80211_node_setchan(ieee80211com_t *ic, ieee80211_node_t *in,
 	if (chan == IEEE80211_CHAN_ANYC)
 		chan = ic->ic_curchan;
 	in->in_chan = chan;
-	in->in_rates = ic->ic_sup_rates[ieee80211_chan2mode(ic, chan)];
+	if (IEEE80211_IS_CHAN_HT(chan)) {
+		/*
+		 * Gotta be careful here; the rate set returned by
+		 * ieee80211_get_suprates is actually any HT rate
+		 * set so blindly copying it will be bad.  We must
+		 * install the legacy rate est in ni_rates and the
+		 * HT rate set in ni_htrates.
+		 */
+		in->in_htrates = *ieee80211_get_suphtrates(ic, chan);
+	}
+	in->in_rates = *ieee80211_get_suprates(ic, chan);
+	/* in->in_rates = ic->ic_sup_rates[ieee80211_chan2mode(ic, chan)]; */
 }
 
 /*
@@ -434,7 +445,8 @@ ieee80211_match_bss(ieee80211com_t *ic, ieee80211_node_t *in)
 		if (in->in_capinfo & IEEE80211_CAPINFO_PRIVACY)
 			fail |= IEEE80211_BADPRIVACY;
 	}
-	rate = ieee80211_fix_rate(in, IEEE80211_F_DONEGO | IEEE80211_F_DOFRATE);
+	rate = ieee80211_fix_rate(in, &in->in_rates,
+	    IEEE80211_F_DONEGO | IEEE80211_F_DOFRATE);
 	if (rate & IEEE80211_RATE_BASIC)
 		fail |= IEEE80211_BADRATE;
 	if (ic->ic_des_esslen != 0 &&
@@ -660,6 +672,18 @@ ieee80211_ibss_merge(ieee80211_node_t *in)
 }
 
 /*
+ * Change the bss channel.
+ */
+void
+ieee80211_setcurchan(ieee80211com_t *ic, struct ieee80211_channel *c)
+{
+	ic->ic_curchan = c;
+	ic->ic_curmode = ieee80211_chan2mode(ic, ic->ic_curchan);
+	if (ic->ic_set_channel != NULL)
+		ic->ic_set_channel(ic);
+}
+
+/*
  * Join the specified IBSS/BSS network.  The node is assumed to
  * be passed in with a held reference.
  */
@@ -677,7 +701,8 @@ ieee80211_sta_join(ieee80211com_t *ic, ieee80211_node_t *selbs)
 		 * Delete unusable rates; we've already checked
 		 * that the negotiated rate set is acceptable.
 		 */
-		(void) ieee80211_fix_rate(selbs, IEEE80211_F_DODEL);
+		(void) ieee80211_fix_rate(selbs, &selbs->in_rates,
+		    IEEE80211_F_DODEL);
 		/*
 		 * Fillin the neighbor table
 		 */
@@ -706,6 +731,7 @@ ieee80211_sta_join(ieee80211com_t *ic, ieee80211_node_t *selbs)
 	 * mode is locked.
 	 */
 	ieee80211_reset_erp(ic);
+	ieee80211_wme_initparams(ic);
 
 	IEEE80211_UNLOCK(ic);
 	if (ic->ic_opmode == IEEE80211_M_STA)
@@ -773,6 +799,10 @@ ieee80211_node_free(ieee80211_node_t *in)
 	ic->ic_node_cleanup(in);
 	if (in->in_wpa_ie != NULL)
 		ieee80211_free(in->in_wpa_ie);
+	if (in->in_wme_ie != NULL)
+		ieee80211_free(in->in_wme_ie);
+	if (in->in_htcap_ie != NULL)
+		ieee80211_free(in->in_htcap_ie);
 	kmem_free(in, sizeof (ieee80211_node_t));
 }
 
@@ -1108,7 +1138,12 @@ ieee80211_add_scan(ieee80211com_t *ic, const struct ieee80211_scanparams *sp,
 	 * Record optional information elements that might be
 	 * used by applications or drivers.
 	 */
+	saveie(&in->in_wme_ie, sp->wme);
 	saveie(&in->in_wpa_ie, sp->wpa);
+	saveie(&in->in_htcap_ie, sp->htcap);
+	/* parsed in ieee80211_sta_join() */
+	if (sp->htcap != NULL)
+		ieee80211_parse_htcap(in, in->in_htcap_ie);
 
 	/* NB: must be after in_chan is setup */
 	(void) ieee80211_setup_rates(in, sp->rates, sp->xrates,
@@ -1137,6 +1172,8 @@ ieee80211_init_neighbor(ieee80211_node_t *in, const struct ieee80211_frame *wh,
 	in->in_fhindex = sp->fhindex;
 	in->in_erp = sp->erp;
 	in->in_tim_off = sp->timoff;
+	if (sp->wme != NULL)
+		ieee80211_saveie(&in->in_wme_ie, sp->wme);
 
 	/* NB: must be after in_chan is setup */
 	(void) ieee80211_setup_rates(in, sp->rates, sp->xrates,
@@ -1164,8 +1201,16 @@ ieee80211_add_neighbor(ieee80211com_t *ic, const struct ieee80211_frame *wh,
 	return (in);
 }
 
-#define	IEEE80211_IS_CTL(wh) \
+#define	IEEE80211_IS_CTL(wh)	\
 	((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
+
+#define	IEEE80211_IS_PSPOLL(wh)	\
+	((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==	\
+	    IEEE80211_FC0_SUBTYPE_PS_POLL)
+
+#define	IEEE80211_IS_BAR(wh)	\
+	((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==	\
+	    IEEE80211_FC0_SUBTYPE_BAR)
 
 /*
  * Locate the node for sender, track state, and then pass the
@@ -1190,7 +1235,8 @@ ieee80211_find_rxnode(ieee80211com_t *ic, const struct ieee80211_frame *wh)
 	}
 
 	IEEE80211_NODE_LOCK(nt);
-	if (IEEE80211_IS_CTL(wh))
+	if (IEEE80211_IS_CTL(wh) &&
+	    !IEEE80211_IS_PSPOLL(wh) && !IEEE80211_IS_BAR(wh))
 		in = ieee80211_find_node_locked(nt, wh->i_addr1);
 	else
 		in = ieee80211_find_node_locked(nt, wh->i_addr2);
@@ -1201,6 +1247,10 @@ ieee80211_find_rxnode(ieee80211com_t *ic, const struct ieee80211_frame *wh)
 
 	return (in);
 }
+
+#undef IEEE80211_IS_BAR
+#undef IEEE80211_IS_PSPOLL
+#undef IEEE80211_IS_CTL
 
 /*
  * Return a reference to the appropriate node for sending

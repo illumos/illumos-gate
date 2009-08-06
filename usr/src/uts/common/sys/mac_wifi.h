@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_MAC_WIFI_H
 #define	_SYS_MAC_WIFI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WiFi MAC-Type Plugin
@@ -47,7 +45,7 @@ extern "C" {
  * Maximum size of a WiFi header based on current implementation.
  * May change in the future as new features are added.
  */
-#define	WIFI_HDRSIZE (sizeof (struct ieee80211_frame) + \
+#define	WIFI_HDRSIZE (sizeof (struct ieee80211_qosframe_addr4) + \
     IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + IEEE80211_WEP_EXTIVLEN + \
     sizeof (struct ieee80211_llc))
 
@@ -99,12 +97,18 @@ enum wifi_secmode {
  *			transmission.  The plugin will allocate header
  *		        space for the security portion, and fill in any
  *			fixed-contents fields.
+ *
+ *	wd_qospad	Generally, QoS data field takes 2 bytes, but
+ *			some special hardwares, such as Atheros, will need the
+ *			802.11 header padded to a 32-bit boundary for 4-address
+ *			and QoS frames, at this time, it's 4 bytes.
  */
 typedef struct wifi_data {
 	uint_t			wd_opts;
 	uint8_t			wd_bssid[IEEE80211_ADDR_LEN];
 	enum ieee80211_opmode	wd_opmode;
 	enum wifi_secmode	wd_secalloc;
+	uint_t			wd_qospad;
 } wifi_data_t;
 
 extern uint8_t wifi_bcastaddr[];

@@ -390,6 +390,7 @@ CHKHDRS=			\
 	ndi_impldefs.h		\
 	net80211.h		\
 	net80211_crypto.h	\
+	net80211_ht.h		\
 	net80211_proto.h	\
 	netconfig.h		\
 	neti.h			\

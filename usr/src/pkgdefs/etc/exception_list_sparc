@@ -677,8 +677,9 @@ usr/include/net/simnet.h		sparc
 usr/include/net/wpa.h			sparc
 # Private net80211 headers
 usr/include/sys/net80211.h		sparc
-usr/include/sys/net80211_proto.h	sparc
 usr/include/sys/net80211_crypto.h	sparc
+usr/include/sys/net80211_ht.h		sparc
+usr/include/sys/net80211_proto.h	sparc
 #
 # User<->kernel interface used by cfgadm/USB only
 #

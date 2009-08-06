@@ -719,6 +719,7 @@ wifi_wait_scan(struct ieee80211com *ic)
 }
 
 #define	WIFI_HAVE_CAP(in, flag)	(((in)->in_capinfo & (flag)) ? 1 : 0)
+#define	WIFI_HAVE_HTCAP(in)	(((in)->in_htcap != 0) ? 1 : 0)
 
 /*
  * Callback function used by ieee80211_iterate_nodes() in
@@ -768,6 +769,7 @@ wifi_read_ap(void *arg, struct ieee80211_node *in)
 		    (wl_ofdm_t *)&((conf->wl_phy_conf).wl_phy_ofdm_conf);
 		ofdm->wl_ofdm_subtype = WL_OFDM;
 		ofdm->wl_ofdm_frequency = chan->ich_freq;
+		ofdm->wl_ofdm_ht_enabled = WIFI_HAVE_HTCAP(in);
 	} else {
 		switch (in->in_phytype) {
 		case IEEE80211_T_FH: {
@@ -809,6 +811,7 @@ wifi_read_ap(void *arg, struct ieee80211_node *in)
 			    WIFI_HAVE_CAP(in, IEEE80211_CAPINFO_DSSSOFDM);
 			erp->wl_erp_sst_enabled = WIFI_HAVE_CAP(in,
 			    IEEE80211_CAPINFO_SHORT_SLOTTIME);
+			erp->wl_erp_ht_enabled = WIFI_HAVE_HTCAP(in);
 			break;
 		} /* case IEEE80211_T_OFDM */
 		} /* switch in->in_phytype */
@@ -1863,12 +1866,15 @@ wl_set_phy(struct ieee80211com *ic, const void* wldp_buf)
 	return (err);
 }
 
+#define	WIFI_HT_MODE(in)	(((in)->in_flags & IEEE80211_NODE_HT) ? 1 : 0)
+
 static int
 wl_get_phy(struct ieee80211com *ic, void *wldp_buf)
 {
 	int err = 0;
 	wl_phy_conf_t *ow_phy;
 	struct ieee80211_channel *ch = ic->ic_curchan;
+	struct ieee80211_node *in = ic->ic_bss;
 
 	ow_phy = (wl_phy_conf_t *)wldp_buf;
 	bzero(wldp_buf, sizeof (wl_phy_conf_t));
@@ -1878,6 +1884,7 @@ wl_get_phy(struct ieee80211com *ic, void *wldp_buf)
 		wl_ofdm_t *ofdm = (wl_ofdm_t *)ow_phy;
 		ofdm->wl_ofdm_subtype = WL_OFDM;
 		ofdm->wl_ofdm_frequency = ch->ich_freq;
+		ofdm->wl_ofdm_ht_enabled = WIFI_HT_MODE(in);
 	} else {
 		switch (ic->ic_phytype) {
 		case IEEE80211_T_FH: {
@@ -1899,6 +1906,7 @@ wl_get_phy(struct ieee80211com *ic, void *wldp_buf)
 			erp->wl_erp_subtype = WL_ERP;
 			erp->wl_erp_channel =
 			    ieee80211_chan2ieee(ic, ch);
+			erp->wl_erp_ht_enabled = WIFI_HT_MODE(in);
 			break;
 		}
 		default:

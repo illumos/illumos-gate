@@ -1,10 +1,10 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation
+ * Copyright (c) 2009, Intel Corporation
  * All rights reserved.
  */
 
@@ -18,7 +18,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2005 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2005 - 2009 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU Geeral Public License as
@@ -43,7 +43,7 @@
  *
  * BSD LICENSE
  *
- * Copyright(c) 2005 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2005 - 2009 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -621,6 +621,12 @@ extern "C" {
 #define	FH_RCSR_RX_CONFIG_RDRBD_ENABLE_VAL	(0x20000000)
 
 #define	IWH_FH_RCSR_RX_CONFIG_REG_VAL_RB_SIZE_4K	(0x00000000)
+#define	IWH_TX_RTS_RETRY_LIMIT		(60)
+#define	IWH_TX_DATA_RETRY_LIMIT		(15)
+
+#define	IWH_FH_RCSR_RX_CONFIG_REG_VAL_RB_SIZE_8K	(0x00010000)
+#define	IWH_FH_RCSR_RX_CONFIG_REG_VAL_RB_SIZE_12K	(0x00020000)
+#define	IWH_FH_RCSR_RX_CONFIG_REG_VAL_RB_SIZE_16K	(0x00030000)
 
 /*
  * RCSR channel 0 config register values
@@ -1248,110 +1254,146 @@ extern "C" {
 /*
  * QoS  definitions
  */
-#define	CW_MIN_OFDM	15
-#define	CW_MAX_OFDM	1023
-#define	CW_MIN_CCK	31
-#define	CW_MAX_CCK	1023
 
-#define	QOS_TX0_CW_MIN_OFDM	CW_MIN_OFDM
-#define	QOS_TX1_CW_MIN_OFDM	CW_MIN_OFDM
-#define	QOS_TX2_CW_MIN_OFDM	((CW_MIN_OFDM + 1) / 2 - 1)
-#define	QOS_TX3_CW_MIN_OFDM	((CW_MIN_OFDM + 1) / 4 - 1)
+#define	AC_NUM		(4)	/* the number of access category */
 
-#define	QOS_TX0_CW_MIN_CCK	CW_MIN_CCK
-#define	QOS_TX1_CW_MIN_CCK	CW_MIN_CCK
-#define	QOS_TX2_CW_MIN_CCK	((CW_MIN_CCK + 1) / 2 - 1)
-#define	QOS_TX3_CW_MIN_CCK	((CW_MIN_CCK + 1) / 4 - 1)
+/*
+ * index of every AC in firmware
+ */
+#define	QOS_AC_BK	(0)
+#define	QOS_AC_BE	(1)
+#define	QOS_AC_VI	(2)
+#define	QOS_AC_VO	(3)
+#define	QOS_AC_INVALID	(-1)
 
-#define	QOS_TX0_CW_MAX_OFDM	CW_MAX_OFDM
-#define	QOS_TX1_CW_MAX_OFDM	CW_MAX_OFDM
-#define	QOS_TX2_CW_MAX_OFDM	CW_MIN_OFDM
-#define	QOS_TX3_CW_MAX_OFDM	((CW_MIN_OFDM + 1) / 2 - 1)
+#define	QOS_CW_RANGE_MIN	(0)	/* exponential of 2 */
+#define	QOS_CW_RANGE_MAX	(15)	/* exponential of 2 */
+#define	QOS_TXOP_MIN		(0)	/* unit of 32 microsecond */
+#define	QOS_TXOP_MAX		(255)	/* unit of 32 microsecond */
+#define	QOS_AIFSN_MIN		(2)
+#define	QOS_AIFSN_MAX		(15)	/* undefined */
 
-#define	QOS_TX0_CW_MAX_CCK	CW_MAX_CCK
-#define	QOS_TX1_CW_MAX_CCK	CW_MAX_CCK
-#define	QOS_TX2_CW_MAX_CCK	CW_MIN_CCK
-#define	QOS_TX3_CW_MAX_CCK	((CW_MIN_CCK + 1) / 2 - 1)
+/*
+ * masks for flags of QoS parameter command
+ */
+#define	QOS_PARAM_FLG_UPDATE_EDCA	(0x01)
+#define	QOS_PARAM_FLG_TGN		(0x02)
 
-#define	QOS_TX0_AIFS	(3)
-#define	QOS_TX1_AIFS	(7)
-#define	QOS_TX2_AIFS	(2)
-#define	QOS_TX3_AIFS	(2)
+/*
+ * index of TX queue for every AC
+ */
+#define	QOS_AC_BK_TO_TXQ	(3)
+#define	QOS_AC_BE_TO_TXQ	(2)
+#define	QOS_AC_VI_TO_TXQ	(1)
+#define	QOS_AC_VO_TO_TXQ	(0)
+#define	TXQ_FOR_AC_MIN		(0)
+#define	TXQ_FOR_AC_MAX		(3)
+#define	TXQ_FOR_AC_INVALID	(-1)
+#define	NON_QOS_TXQ		QOS_AC_BE_TO_TXQ
+#define	QOS_TXQ_FOR_MGT		QOS_AC_VO_TO_TXQ
 
-#define	QOS_TX0_ACM	0
-#define	QOS_TX1_ACM	0
-#define	QOS_TX2_ACM	0
-#define	QOS_TX3_ACM	0
+#define	WME_TID_MIN	(0)
+#define	WME_TID_MAX	(7)
+#define	WME_TID_INVALID	(-1)
 
-#define	QOS_TX0_TXOP_LIMIT_CCK	0
-#define	QOS_TX1_TXOP_LIMIT_CCK	0
-#define	QOS_TX2_TXOP_LIMIT_CCK	6016
-#define	QOS_TX3_TXOP_LIMIT_CCK	3264
+/*
+ * HT definitions
+ */
 
-#define	QOS_TX0_TXOP_LIMIT_OFDM	0
-#define	QOS_TX1_TXOP_LIMIT_OFDM	0
-#define	QOS_TX2_TXOP_LIMIT_OFDM	3008
-#define	QOS_TX3_TXOP_LIMIT_OFDM	1504
+/*
+ * HT capabilities masks
+ */
+#define	HT_CAP_SUP_WIDTH	(0x0002)
+#define	HT_CAP_MIMO_PS		(0x000c)
+#define	HT_CAP_GRN_FLD		(0x0010)
+#define	HT_CAP_SGI_20		(0x0020)
+#define	HT_CAP_SGI_40		(0x0040)
+#define	HT_CAP_DELAY_BA		(0x0400)
+#define	HT_CAP_MAX_AMSDU	(0x0800)
+#define	HT_CAP_MCS_TX_DEFINED	(0x01)
+#define	HT_CAP_MCS_TX_RX_DIFF	(0x02)
+#define	HT_CAP_MCS_TX_STREAMS	(0x0c)
+#define	HT_CAP_MCS_TX_UEQM	(0x10)
 
-#define	DEF_TX0_CW_MIN_OFDM	CW_MIN_OFDM
-#define	DEF_TX1_CW_MIN_OFDM	CW_MIN_OFDM
-#define	DEF_TX2_CW_MIN_OFDM	CW_MIN_OFDM
-#define	DEF_TX3_CW_MIN_OFDM	CW_MIN_OFDM
+#define	HT_CAP_MIMO_PS_STATIC	(0)
+#define	HT_CAP_MIMO_PS_DYNAMIC	(1)
+#define	HT_CAP_MIMO_PS_INVALID	(2)
+#define	HT_CAP_MIMO_PS_NONE	(3)
 
-#define	DEF_TX0_CW_MIN_CCK	CW_MIN_CCK
-#define	DEF_TX1_CW_MIN_CCK	CW_MIN_CCK
-#define	DEF_TX2_CW_MIN_CCK	CW_MIN_CCK
-#define	DEF_TX3_CW_MIN_CCK	CW_MIN_CCK
+#define	HT_RX_AMPDU_FACTOR_8K	(0x0)
+#define	HT_RX_AMPDU_FACTOR_16K	(0x1)
+#define	HT_RX_AMPDU_FACTOR_32K	(0x2)
+#define	HT_RX_AMPDU_FACTOR_64K	(0x3)
+#define	HT_RX_AMPDU_FACTOR	HT_RX_AMPDU_FACTOR_8K
+#define	HT_RX_AMPDU_FACTOR_MSK	(0x3)
 
-#define	DEF_TX0_CW_MAX_OFDM	CW_MAX_OFDM
-#define	DEF_TX1_CW_MAX_OFDM	CW_MAX_OFDM
-#define	DEF_TX2_CW_MAX_OFDM	CW_MAX_OFDM
-#define	DEF_TX3_CW_MAX_OFDM	CW_MAX_OFDM
+#define	HT_MPDU_DENSITY_4USEC	(0x5)
+#define	HT_MPDU_DENSITY_8USEC	(0x6)
+#define	HT_MPDU_DENSITY		HT_MPDU_DENSITY_4USEC
+#define	HT_MPDU_DENSITY_MSK	(0x1c)
+#define	HT_MPDU_DENSITY_POS	(2)
 
-#define	DEF_TX0_CW_MAX_CCK	CW_MAX_CCK
-#define	DEF_TX1_CW_MAX_CCK	CW_MAX_CCK
-#define	DEF_TX2_CW_MAX_CCK	CW_MAX_CCK
-#define	DEF_TX3_CW_MAX_CCK	CW_MAX_CCK
+#define	HT_RATESET_NUM		(16)
+#define	HT_1CHAIN_RATE_MIN_IDX	(0x0)
+#define	HT_1CHAIN_RATE_MAX_IDX	(0x7)
+#define	HT_2CHAIN_RATE_MIN_IDX	(0x8)
+#define	HT_2CHAIN_RATE_MAX_IDX	(0xf)
 
-#define	DEF_TX0_AIFS		(2)
-#define	DEF_TX1_AIFS		(2)
-#define	DEF_TX2_AIFS		(2)
-#define	DEF_TX3_AIFS		(2)
+struct iwh_ampdu_param {
+	uint8_t	factor;
+	uint8_t	density;
+};
 
-#define	DEF_TX0_ACM		(0)
-#define	DEF_TX1_ACM		(0)
-#define	DEF_TX2_ACM		(0)
-#define	DEF_TX3_ACM		(0)
+typedef	struct iwh_ht_conf {
+	uint8_t			ht_support;
+	uint16_t		cap;
+	struct iwh_ampdu_param	ampdu_p;
+	uint8_t			tx_support_mcs[HT_RATESET_NUM];
+	uint8_t			rx_support_mcs[HT_RATESET_NUM];
+	uint8_t			valid_chains;
+	uint8_t			tx_stream_count;
+	uint8_t			rx_stream_count;
+	uint8_t			ht_protection;
+} iwh_ht_conf_t;
 
-#define	DEF_TX0_TXOP_LIMIT_CCK	(0)
-#define	DEF_TX1_TXOP_LIMIT_CCK	(0)
-#define	DEF_TX2_TXOP_LIMIT_CCK	(0)
-#define	DEF_TX3_TXOP_LIMIT_CCK	(0)
+#define	NO_HT_PROT		(0)
+#define	HT_PROT_CHAN_NON_HT	(1)
+#define	HT_PROT_FAT		(2)
+#define	HT_PROT_ASSOC_NON_HT	(3)
 
-#define	DEF_TX0_TXOP_LIMIT_OFDM	(0)
-#define	DEF_TX1_TXOP_LIMIT_OFDM	(0)
-#define	DEF_TX2_TXOP_LIMIT_OFDM	(0)
-#define	DEF_TX3_TXOP_LIMIT_OFDM	(0)
+/*
+ * HT flags for RXON command.
+ */
+#define	RXON_FLG_CONTROL_CHANNEL_LOCATION_MSK	0x400000
+#define	RXON_FLG_CONTROL_CHANNEL_LOC_LOW_MSK	0x000000
+#define	RXON_FLG_CONTROL_CHANNEL_LOC_HIGH_MSK	0x400000
 
-#define	QOS_QOS_SETS		(3)
-#define	QOS_PARAM_SET_ACTIVE	(0)
-#define	QOS_PARAM_SET_DEF_CCK	(1)
-#define	QOS_PARAM_SET_DEF_OFDM	(2)
+#define	RXON_FLG_HT_OPERATING_MODE_POS		(23)
+#define	RXON_FLG_HT_PROT_MSK			0x800000
+#define	RXON_FLG_FAT_PROT_MSK			0x1000000
 
-#define	CTRL_QOS_NO_ACK			(0x0020)
-#define	DCT_FLAG_EXT_QOS_ENABLED	(0x10)
+#define	RXON_FLG_CHANNEL_MODE_POS		(25)
+#define	RXON_FLG_CHANNEL_MODE_MSK		0x06000000
+#define	RXON_FLG_CHANNEL_MODE_LEGACY_MSK	0x00000000
+#define	RXON_FLG_CHANNEL_MODE_PURE_40_MSK	0x02000000
+#define	RXON_FLG_CHANNEL_MODE_MIXED_MSK		0x04000000
 
-#define	IWH_TX_QUEUE_AC0		(0)
-#define	IWH_TX_QUEUE_AC1		(1)
-#define	IWH_TX_QUEUE_AC2		(2)
-#define	IWH_TX_QUEUE_AC3		(3)
-#define	IWH_TX_QUEUE_HCCA_1		(5)
-#define	IWH_TX_QUEUE_HCCA_2    	(6)
-
-#define	U32_PAD(n)	((4-(n%4))%4)
-
-#define	AC_BE_TID_MASK 0x9	/* TID 0 and 3 */
-#define	AC_BK_TID_MASK 0x6	/* TID 1 and 2 */
+#define	RXON_RX_CHAIN_DRIVER_FORCE_MSK		(0x1<<0)
+#define	RXON_RX_CHAIN_VALID_MSK			(0x7<<1)
+#define	RXON_RX_CHAIN_VALID_POS			(1)
+#define	RXON_RX_CHAIN_FORCE_SEL_MSK		(0x7<<4)
+#define	RXON_RX_CHAIN_FORCE_SEL_POS		(4)
+#define	RXON_RX_CHAIN_FORCE_MIMO_SEL_MSK	(0x7<<7)
+#define	RXON_RX_CHAIN_FORCE_MIMO_SEL_POS	(7)
+#define	RXON_RX_CHAIN_CNT_MSK			(0x3<<10)
+#define	RXON_RX_CHAIN_CNT_POS			(10)
+#define	RXON_RX_CHAIN_MIMO_CNT_MSK		(0x3<<12)
+#define	RXON_RX_CHAIN_MIMO_CNT_POS		(12)
+#define	RXON_RX_CHAIN_MIMO_FORCE_MSK		(0x1<<14)
+#define	RXON_RX_CHAIN_MIMO_FORCE_POS		(14)
+#define	RXON_RX_CHAIN_A_MSK			(1)
+#define	RXON_RX_CHAIN_B_MSK			(2)
+#define	RXON_RX_CHAIN_C_MSK			(4)
 
 /*
  * Generic queue structure
@@ -1442,40 +1484,32 @@ typedef struct iwh_tx_power_table_cmd {
 	struct iwh_tx_power_db	db;
 } iwh_tx_power_table_cmd_t;
 
-
-
 /*
- * HT flags
+ * Hardware rate scaling set by iwh_ap_lq function.
+ * Given a particular initial rate and mode, the driver uses the
+ * following formula to fill the rs_table[LINK_QUAL_MAX_RETRY_NUM]
+ * rate table in the Link Quality command:
+ *
+ * 1) If using High-throughput(HT)(SISO or MIMO) initial rate:
+ *    a) Use this same initial rate for first 3 entries.
+ *    b) Find next lower available rate using same mode(SISO or MIMO),
+ *	 use for next 3 entries. If no lower rate available, switch to
+ *	 legacy mode(no FAT channel, no MIMO, no short guard interval).
+ *    c) If using MIMO, set command's mimo_delimeter to number of
+ *	 entries using MIMO(3 or 6).
+ *    d) After trying 2 HT rates, switch to legacy mode(no FAT channel,
+ *	 no MIMO, no short qguard interval), at the next lower bit rate
+ *	 (e.g. if second HT bit rate was 54, try 48 legacy),and follow
+ *   legacy procedure for remaining table entries.
+ *
+ * 2) If using legacy initial rate:
+ *    a) Use the initial rate for only one entry.
+ *    b) For each following entry, reduce the rate to next lower available
+ *	 rate, until reaching the lowest available rate.
+ *    c) When reducing rate, also switch antenna selection.
+ *    b) Once lowest available rate is reached, repreat this rate until
+ *   rate table is filled(16 entries),switching antenna each entry.
  */
-#define	RXON_FLG_CONTROL_CHANNEL_LOCATION_MSK	0x400000
-#define	RXON_FLG_CONTROL_CHANNEL_LOC_LOW_MSK	0x000000
-#define	RXON_FLG_CONTROL_CHANNEL_LOC_HIGH_MSK	0x400000
-
-#define	RXON_FLG_HT_OPERATING_MODE_POS		(23)
-#define	RXON_FLG_HT_PROT_MSK			0x800000
-#define	RXON_FLG_FAT_PROT_MSK			0x1000000
-
-#define	RXON_FLG_CHANNEL_MODE_POS		(25)
-#define	RXON_FLG_CHANNEL_MODE_MSK		0x06000000
-#define	RXON_FLG_CHANNEL_MODE_LEGACY_MSK	0x00000000
-#define	RXON_FLG_CHANNEL_MODE_PURE_40_MSK	0x02000000
-#define	RXON_FLG_CHANNEL_MODE_MIXED_MSK		0x04000000
-
-#define	RXON_RX_CHAIN_DRIVER_FORCE_MSK		(0x1<<0)
-#define	RXON_RX_CHAIN_VALID_MSK			(0x7<<1)
-#define	RXON_RX_CHAIN_VALID_POS			(1)
-#define	RXON_RX_CHAIN_FORCE_SEL_MSK		(0x7<<4)
-#define	RXON_RX_CHAIN_FORCE_SEL_POS		(4)
-#define	RXON_RX_CHAIN_FORCE_MIMO_SEL_MSK	(0x7<<7)
-#define	RXON_RX_CHAIN_FORCE_MIMO_SEL_POS	(7)
-#define	RXON_RX_CHAIN_CNT_MSK			(0x3<<10)
-#define	RXON_RX_CHAIN_CNT_POS			(10)
-#define	RXON_RX_CHAIN_MIMO_CNT_MSK		(0x3<<12)
-#define	RXON_RX_CHAIN_MIMO_CNT_POS		(12)
-#define	RXON_RX_CHAIN_MIMO_FORCE_MSK		(0x1<<14)
-#define	RXON_RX_CHAIN_MIMO_FORCE_POS		(14)
-
-#define	MCS_DUP_6M_PLCP (0x20)
 
 /*
  * OFDM HT rate masks
@@ -2204,20 +2238,6 @@ typedef struct iwh_assoc {
 } iwh_assoc_t;
 
 /*
- * structure for command IWH_CMD_SET_WME
- */
-typedef struct iwh_wme_setup {
-	uint32_t	flags;
-	struct {
-		uint16_t	cwmin;
-		uint16_t	cwmax;
-		uint8_t		aifsn;
-		uint8_t		reserved;
-		uint16_t	txop;
-	} ac[WME_NUM_AC];
-} iwh_wme_setup_t;
-
-/*
  * structure for command IWH_CMD_TSF
  */
 typedef struct iwh_cmd_tsf {
@@ -2233,6 +2253,20 @@ typedef struct iwh_cmd_tsf {
 /*
  * structure for IWH_CMD_ADD_NODE
  */
+#define	STA_MODE_ADD_MSK		(0)
+#define	STA_MODE_MODIFY_MSK		(1)
+
+#define	STA_FLG_RTS_MIMO_PROT		(1 << 17)
+#define	STA_FLG_MAX_AMPDU_POS		(19)
+#define	STA_FLG_AMPDU_DENSITY_POS	(23)
+#define	STA_FLG_FAT_EN			(1 << 21)
+
+#define	STA_MODIFY_KEY_MASK		(0x01)
+#define	STA_MODIFY_TID_DISABLE_TX	(0x02)
+#define	STA_MODIFY_TX_RATE_MSK		(0x04)
+#define	STA_MODIFY_ADDBA_TID_MSK	(0x08)
+#define	STA_MODIFY_DELBA_TID_MSK	(0x10)
+
 struct	sta_id_modify {
 	uint8_t		addr[6];
 	uint16_t	reserved1;
@@ -2458,6 +2492,30 @@ typedef struct iwh_bt_cmd {
 	uint32_t	kill_ack_mask;
 	uint32_t	kill_cts_mask;
 } iwh_bt_cmd_t;
+
+typedef struct iwh_wme_param {
+	uint8_t		aifsn;
+	uint8_t		cwmin_e;
+	uint8_t		cwmax_e;
+	uint16_t	txop;
+} iwh_wme_param_t;
+/*
+ * QoS parameter command (REPLY_QOS_PARAM = 0x13)
+ * FIFO0-background, FIFO1-best effort, FIFO2-video, FIFO3-voice
+ */
+
+struct iwh_edca_param {
+	uint16_t	cw_min;
+	uint16_t	cw_max;
+	uint8_t		aifsn;
+	uint8_t		reserved;
+	uint16_t	txop;
+};
+
+typedef struct iwh_qos_param_cmd {
+	uint32_t	flags;
+	struct iwh_edca_param	ac[AC_NUM];
+} iwh_qos_param_cmd_t;
 
 /*
  * firmware image header

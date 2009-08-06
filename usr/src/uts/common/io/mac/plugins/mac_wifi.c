@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,7 @@ static mac_stat_info_t wifi_stats[] = {
 
 static struct modlmisc mac_wifi_modlmisc = {
 	&mod_miscops,
-	"WiFi MAC plugin"
+	"WiFi MAC plugin 1.4"
 };
 
 static struct modlinkage mac_wifi_modlinkage = {
@@ -200,7 +200,7 @@ mac_wifi_header(const void *saddr, const void *daddr, uint32_t sap,
 	 * Fill in the fixed parts of the ieee80211_frame.
 	 */
 	wh = (struct ieee80211_frame *)mp->b_rptr;
-	mp->b_wptr += sizeof (struct ieee80211_frame);
+	mp->b_wptr += sizeof (struct ieee80211_frame) + wdp->wd_qospad;
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
 
 	switch (wdp->wd_opmode) {
@@ -225,6 +225,13 @@ mac_wifi_header(const void *saddr, const void *daddr, uint32_t sap,
 		IEEE80211_ADDR_COPY(wh->i_addr2, wdp->wd_bssid);
 		IEEE80211_ADDR_COPY(wh->i_addr3, saddr);
 		break;
+	}
+
+	if (wdp->wd_qospad) {
+		struct ieee80211_qosframe *qwh =
+		    (struct ieee80211_qosframe *)wh;
+		qwh->i_qos[1] = 0;
+		qwh->i_fc[0] |= IEEE80211_FC0_SUBTYPE_QOS;
 	}
 
 	switch (wdp->wd_secalloc) {
@@ -280,6 +287,14 @@ mac_wifi_header_info(mblk_t *mp, void *pdata, mac_header_info_t *mhp)
 
 	wh = (struct ieee80211_frame *)mp->b_rptr;
 	llcp = mp->b_rptr + sizeof (struct ieee80211_frame);
+
+	/*
+	 * Generally, QoS data field takes 2 bytes, but some special hardware,
+	 * such as Atheros, will need the 802.11 header padded to a 32-bit
+	 * boundary for 4-address and QoS frames, at this time, it's 4 bytes.
+	 */
+	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS)
+		llcp += wdp->wd_qospad;
 
 	/*
 	 * When we receive frames from other hosts, the hardware will have

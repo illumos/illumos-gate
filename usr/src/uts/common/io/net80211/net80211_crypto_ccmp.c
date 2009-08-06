@@ -1,11 +1,11 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -118,10 +118,11 @@ ccmp_setkey(struct ieee80211_key *k)
 static int
 ccmp_encap(struct ieee80211_key *k, mblk_t *mp, uint8_t keyid)
 {
+	struct ccmp_ctx *ctx = k->wk_private;
 	uint8_t *ivp;
 	int hdrlen;
 
-	hdrlen = ieee80211_hdrspace(mp->b_rptr);
+	hdrlen = ieee80211_hdrspace(ctx->cc_ic, mp->b_rptr);
 	/*
 	 * Copy down 802.11 header and add the IV, KeyID, and ExtIV.
 	 */
@@ -156,7 +157,6 @@ ccmp_encap(struct ieee80211_key *k, mblk_t *mp, uint8_t keyid)
 static int
 ccmp_decap(struct ieee80211_key *k, mblk_t *mp, int hdrlen)
 {
-	struct ieee80211_frame tmp;
 	uint8_t *ivp;
 	uint64_t pn;
 
@@ -194,8 +194,7 @@ ccmp_decap(struct ieee80211_key *k, mblk_t *mp, int hdrlen)
 	/*
 	 * Copy up 802.11 header and strip crypto bits.
 	 */
-	bcopy(mp->b_rptr, &tmp, hdrlen);
-	bcopy(&tmp, mp->b_rptr + ccmp.ic_header, hdrlen);
+	(void) memmove(mp->b_rptr + ccmp.ic_header, mp->b_rptr, hdrlen);
 	mp->b_rptr += ccmp.ic_header;
 	mp->b_wptr -= ccmp.ic_trailer;
 
@@ -406,9 +405,18 @@ ccmp_init(struct ieee80211_frame *wh, uint64_t pn, size_t dlen,
 	 * initial block as we know whether or not we have
 	 * a QOS frame.
 	 */
-	*(uint16_t *)&aad[24] = 0;
-	b0[1] = 0;
-	aad[1] = 22;
+	if (IEEE80211_QOS_HAS_SEQ(wh)) {
+		struct ieee80211_qosframe *qwh =
+		    (struct ieee80211_qosframe *)wh;
+		aad[24] = qwh->i_qos[0] & 0x0f;	/* just priority bits */
+		aad[25] = 0;
+		b0[1] = aad[24];
+		aad[1] = 22 + 2;
+	} else {
+		*(uint16_t *)&aad[24] = 0;
+		b0[1] = 0;
+		aad[1] = 22;
+	}
 	*(uint16_t *)&aad[26] = 0;
 	*(uint32_t *)&aad[28] = 0;
 }

@@ -670,8 +670,9 @@ usr/include/sys/1394/t1394.h		i386
 usr/include/sys/1394/id1394.h		i386
 # Private net80211 headers
 usr/include/sys/net80211.h		i386
-usr/include/sys/net80211_proto.h	i386
 usr/include/sys/net80211_crypto.h	i386
+usr/include/sys/net80211_ht.h		i386
+usr/include/sys/net80211_proto.h	i386
 #
 # PPPoE files not delivered to customers.
 usr/include/net/pppoe.h			i386

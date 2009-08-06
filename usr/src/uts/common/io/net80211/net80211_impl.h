@@ -1,11 +1,11 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -133,12 +133,15 @@ extern "C" {
 	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_TURBO)
 #define	IEEE80211_CHAN_108G	\
 	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_TURBO)
+#define	IEEE80211_CHAN_ST	\
+	(IEEE80211_CHAN_T | IEEE80211_CHAN_STURBO)
 
 #define	IEEE80211_CHAN_ALL	\
 	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_GFSK | \
-	IEEE80211_CHAN_CCK | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_DYN)
+	IEEE80211_CHAN_CCK | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_DYN |	\
+	IEEE80211_CHAN_HT)
 #define	IEEE80211_CHAN_ALLTURBO	\
-	(IEEE80211_CHAN_ALL | IEEE80211_CHAN_TURBO)
+	(IEEE80211_CHAN_ALL | IEEE80211_CHAN_TURBO | IEEE80211_CHAN_STURBO)
 
 #define	IEEE80211_IS_CHAN_FHSS(_c)	\
 	(((_c)->ich_flags & IEEE80211_CHAN_FHSS) == IEEE80211_CHAN_FHSS)
@@ -154,8 +157,11 @@ extern "C" {
 	(IEEE80211_IS_CHAN_PUREG(_c) || IEEE80211_IS_CHAN_G(_c))
 #define	IEEE80211_IS_CHAN_T(_c)		\
 	(((_c)->ich_flags & IEEE80211_CHAN_T) == IEEE80211_CHAN_T)
+		/* IEEE80211_IS_CHAN_108A */
 #define	IEEE80211_IS_CHAN_108G(_c)	\
 	(((_c)->ich_flags & IEEE80211_CHAN_108G) == IEEE80211_CHAN_108G)
+#define	IEEE80211_IS_CHAN_ST(_c)	\
+	(((_c)->ich_flags & IEEE80211_CHAN_ST) == IEEE80211_CHAN_ST)
 
 #define	IEEE80211_IS_CHAN_OFDM(_c)	\
 	((_c)->ich_flags & IEEE80211_CHAN_OFDM)
@@ -165,6 +171,45 @@ extern "C" {
 	((_c)->ich_flags & IEEE80211_CHAN_GFSK)
 #define	IEEE80211_IS_CHAN_PASSIVE(_c)	\
 	((_c)->ich_flags & IEEE80211_CHAN_PASSIVE)
+
+#define	IEEE80211_IS_CHAN_STURBO(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_STURBO)
+#define	IEEE80211_IS_CHAN_DTURBO(_c) \
+	(((_c)->ich_flags & \
+	(IEEE80211_CHAN_TURBO | IEEE80211_CHAN_STURBO)) == IEEE80211_CHAN_TURBO)
+#define	IEEE80211_IS_CHAN_HALF(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_HALF)
+#define	IEEE80211_IS_CHAN_QUARTER(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_QUARTER)
+#define	IEEE80211_IS_CHAN_FULL(_c) \
+	((_c)->ich_flags & (IEEE80211_CHAN_QUARTER | IEEE80211_CHAN_HALF))
+#define	IEEE80211_IS_CHAN_GSM(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_GSM)
+
+#define	IEEE80211_IS_CHAN_HT(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_HT)
+#define	IEEE80211_IS_CHAN_HT20(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_HT20)
+#define	IEEE80211_IS_CHAN_HT40(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_HT40)
+#define	IEEE80211_IS_CHAN_HT40U(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_HT40U)
+#define	IEEE80211_IS_CHAN_HT40D(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_HT40D)
+#define	IEEE80211_IS_CHAN_HTA(_c) \
+	(IEEE80211_IS_CHAN_5GHZ(_c) && \
+	((_c)->ich_flags & IEEE80211_CHAN_HT))
+#define	IEEE80211_IS_CHAN_HTG(_c) \
+	(IEEE80211_IS_CHAN_2GHZ(_c) && \
+	((_c)->ich_flags & IEEE80211_CHAN_HT))
+#define	IEEE80211_IS_CHAN_DFS(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_DFS)
+#define	IEEE80211_IS_CHAN_NOADHOC(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_NOADHOC)
+#define	IEEE80211_IS_CHAN_NOHOSTAP(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_NOHOSTAP)
+#define	IEEE80211_IS_CHAN_11D(_c) \
+	((_c)->ich_flags & IEEE80211_CHAN_11D)
 
 /* ni_chan encoding for FH phy */
 #define	IEEE80211_FH_CHANMOD	80
@@ -211,6 +256,8 @@ extern "C" {
 #define	IEEE80211_MSG_INACT	0x00000080	/* inactivity handling */
 #define	IEEE80211_MSG_ROAM	0x00000040	/* sta-mode roaming */
 #define	IEEE80211_MSG_CONFIG	0x00000020	/* wificonfig/dladm */
+#define	IEEE80211_MSG_ACTION	0x00000010	/* action frame handling */
+#define	IEEE80211_MSG_HT	0x00000008	/* 11n mode debug */
 #define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
 
 /* Error flags returned by ieee80211_match_bss */
@@ -268,6 +315,8 @@ struct ieee80211_scanparams {
 	uint8_t			*xrates;
 	uint8_t			*wpa;
 	uint8_t			*wme;
+	uint8_t			*htcap;
+	uint8_t			*htinfo;
 };
 
 #define	IEEE80211_SEND_MGMT(_ic, _in, _type, _arg)			\
@@ -351,7 +400,6 @@ extern const char *ieee80211_phymode_name[];
 
 void ieee80211_err(const int8_t *, ...);
 void ieee80211_dbg(uint32_t, const int8_t *, ...);
-int ieee80211_hdrspace(const void *);
 
 void ieee80211_notify(ieee80211com_t *, wpa_event_type);
 void ieee80211_mac_update(ieee80211com_t *);
@@ -374,10 +422,11 @@ void ieee80211_create_ibss(ieee80211com_t *, struct ieee80211_channel *);
 ieee80211_node_t *ieee80211_fakeup_adhoc_node(ieee80211_node_table_t *,
     const uint8_t *);
 ieee80211_node_t *ieee80211_tmp_node(ieee80211com_t *, const uint8_t *);
+void ieee80211_setcurchan(ieee80211com_t *, struct ieee80211_channel *);
 
 /* proto */
 void ieee80211_proto_attach(ieee80211com_t *);
-int ieee80211_fix_rate(ieee80211_node_t *, int);
+int ieee80211_fix_rate(ieee80211_node_t *, struct ieee80211_rateset *, int);
 void ieee80211_setbasicrates(struct ieee80211_rateset *,
     enum ieee80211_phymode);
 void ieee80211_reset_erp(ieee80211com_t *);
@@ -395,6 +444,8 @@ int ieee80211_send_probereq(ieee80211_node_t *, const uint8_t *,
     size_t);
 int ieee80211_send_mgmt(ieee80211com_t *, ieee80211_node_t *, int, int);
 int ieee80211_send_nulldata(ieee80211_node_t *);
+int ieee80211_mgmt_output(ieee80211com_t *, ieee80211_node_t *, mblk_t *,
+    int, int);
 
 /* crypto */
 struct ieee80211_key *ieee80211_crypto_getkey(ieee80211com_t *);
@@ -404,6 +455,10 @@ uint8_t ieee80211_crypto_getciphertype(ieee80211com_t *);
 mblk_t *ieee80211_getmgtframe(uint8_t **, int);
 void ieee80211_notify_node_join(ieee80211com_t *, ieee80211_node_t *);
 void ieee80211_notify_node_leave(ieee80211com_t *, ieee80211_node_t *);
+
+/* WME */
+void	ieee80211_wme_initparams(struct ieee80211com *);
+void	ieee80211_wme_updateparams(struct ieee80211com *);
 
 #ifdef	__cplusplus
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,6 +122,8 @@ static val_desc_t	mode_vals[] = {
 	{ "a",		DLADM_WLAN_MODE_80211A		},
 	{ "b",		DLADM_WLAN_MODE_80211B		},
 	{ "g",		DLADM_WLAN_MODE_80211G		},
+	{ "n",		DLADM_WLAN_MODE_80211GN		},
+	{ "n",		DLADM_WLAN_MODE_80211AN		}
 };
 
 static val_desc_t	auth_vals[] = {
@@ -161,11 +163,16 @@ dladm_wlan_wlresult2status(wldp_t *gbuf)
 static dladm_wlan_mode_t
 do_convert_mode(wl_phy_conf_t *phyp)
 {
+	wl_erp_t *wlep = &phyp->wl_phy_erp_conf;
+	wl_ofdm_t *wlop = &phyp->wl_phy_ofdm_conf;
+
 	switch (phyp->wl_phy_fhss_conf.wl_fhss_subtype) {
 	case WL_ERP:
-		return (DLADM_WLAN_MODE_80211G);
+		return (wlep->wl_erp_ht_enabled ?
+		    DLADM_WLAN_MODE_80211GN : DLADM_WLAN_MODE_80211G);
 	case WL_OFDM:
-		return (DLADM_WLAN_MODE_80211A);
+		return (wlop->wl_ofdm_ht_enabled ?
+		    DLADM_WLAN_MODE_80211AN : DLADM_WLAN_MODE_80211A);
 	case WL_DSSS:
 	case WL_FHSS:
 		return (DLADM_WLAN_MODE_80211B);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,9 @@ const char *ieee80211_phymode_name[] = {
 	"FH",		/* IEEE80211_MODE_FH */
 	"turboA",	/* IEEE80211_MODE_TURBO_A */
 	"turboG",	/* IEEE80211_MODE_TURBO_G */
+	"sturboA",	/* IEEE80211_MODE_STURBO_A */
+	"11na",		/* IEEE80211_MODE_11NA */
+	"11ng",		/* IEEE80211_MODE_11NG */
 };
 
 #define	IEEE80211_DPRINT(_level, _fmt)	do {	\
@@ -122,6 +125,12 @@ ieee80211_mac_update(ieee80211com_t *ic)
 	wd.wd_secalloc = ieee80211_crypto_getciphertype(ic);
 	wd.wd_opmode = ic->ic_opmode;
 	IEEE80211_ADDR_COPY(wd.wd_bssid, in->in_bssid);
+	wd.wd_qospad = 0;
+	if (in->in_flags & (IEEE80211_NODE_QOS|IEEE80211_NODE_HT)) {
+		wd.wd_qospad = 2;
+		if (ic->ic_flags & IEEE80211_F_DATAPAD)
+			wd.wd_qospad = roundup(wd.wd_qospad, sizeof (uint32_t));
+	}
 	(void) mac_pdata_update(ic->ic_mach, &wd, sizeof (wd));
 	mac_tx_update(ic->ic_mach);
 	ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_mac_update"
@@ -380,6 +389,9 @@ ieee80211_setmode(ieee80211com_t *ic, enum ieee80211_phymode mode)
 		IEEE80211_CHAN_FHSS,	/* IEEE80211_MODE_FH */
 		IEEE80211_CHAN_T,	/* IEEE80211_MODE_TURBO_A */
 		IEEE80211_CHAN_108G,	/* IEEE80211_MODE_TURBO_G */
+		IEEE80211_CHAN_ST,	/* IEEE80211_MODE_STURBO_A */
+		IEEE80211_CHAN_A,	/* IEEE80211_MODE_11NA (check legacy) */
+		IEEE80211_CHAN_G,	/* IEEE80211_MODE_11NG (check legacy) */
 	};
 	struct ieee80211_channel *ch;
 	uint32_t modeflags;
@@ -465,6 +477,7 @@ ieee80211_setmode(ieee80211com_t *ic, enum ieee80211_phymode mode)
 		ic->ic_bss->in_rates = ic->ic_sup_rates[mode];
 	ic->ic_curmode = mode;
 	ieee80211_reset_erp(ic);	/* reset ERP state */
+	ieee80211_wme_initparams(ic);	/* reset WME stat */
 
 	return (0);
 }
@@ -475,35 +488,74 @@ ieee80211_setmode(ieee80211com_t *ic, enum ieee80211_phymode mode)
  * where multiple operating modes are possible (e.g. 11g+11b).
  * In those cases we defer to the current operating mode when set.
  */
+/* ARGSUSED */
 enum ieee80211_phymode
 ieee80211_chan2mode(ieee80211com_t *ic, struct ieee80211_channel *chan)
 {
-	if (IEEE80211_IS_CHAN_T(chan)) {
+	if (IEEE80211_IS_CHAN_HTA(chan))
+		return (IEEE80211_MODE_11NA);
+	else if (IEEE80211_IS_CHAN_HTG(chan))
+		return (IEEE80211_MODE_11NG);
+	else if (IEEE80211_IS_CHAN_108G(chan))
+		return (IEEE80211_MODE_TURBO_G);
+	else if (IEEE80211_IS_CHAN_ST(chan))
+		return (IEEE80211_MODE_STURBO_A);
+	else if (IEEE80211_IS_CHAN_T(chan))
 		return (IEEE80211_MODE_TURBO_A);
-	} else if (IEEE80211_IS_CHAN_5GHZ(chan)) {
+	else if (IEEE80211_IS_CHAN_A(chan))
 		return (IEEE80211_MODE_11A);
-	} else if (IEEE80211_IS_CHAN_FHSS(chan)) {
-		return (IEEE80211_MODE_FH);
-	} else if (chan->ich_flags & (IEEE80211_CHAN_OFDM|IEEE80211_CHAN_DYN)) {
-		/*
-		 * This assumes all 11g channels are also usable
-		 * for 11b, which is currently true.
-		 */
-		if (ic->ic_curmode == IEEE80211_MODE_TURBO_G)
-			return (IEEE80211_MODE_TURBO_G);
-		if (ic->ic_curmode == IEEE80211_MODE_11B)
-			return (IEEE80211_MODE_11B);
+	else if (IEEE80211_IS_CHAN_ANYG(chan))
 		return (IEEE80211_MODE_11G);
-	} else {
+	else if (IEEE80211_IS_CHAN_B(chan))
 		return (IEEE80211_MODE_11B);
+	else if (IEEE80211_IS_CHAN_FHSS(chan))
+		return (IEEE80211_MODE_FH);
+
+	/* NB: should not get here */
+	ieee80211_err("cannot map channel to mode; freq %u flags 0x%x\n",
+	    chan->ich_freq, chan->ich_flags);
+
+	return (IEEE80211_MODE_11B);
+}
+
+const struct ieee80211_rateset *
+ieee80211_get_suprates(ieee80211com_t *ic, struct ieee80211_channel *c)
+{
+	if (IEEE80211_IS_CHAN_HTA(c))
+		return (&ic->ic_sup_rates[IEEE80211_MODE_11A]);
+	if (IEEE80211_IS_CHAN_HTG(c)) {
+		return (&ic->ic_sup_rates[IEEE80211_MODE_11G]);
 	}
+	return (&ic->ic_sup_rates[ieee80211_chan2mode(ic, c)]);
+}
+
+/*
+ * Locate a channel given a frequency+flags.  We cache
+ * the previous lookup to optimize swithing between two
+ * channels--as happens with dynamic turbo.
+ */
+struct ieee80211_channel *
+ieee80211_find_channel(ieee80211com_t *ic, int freq, int flags)
+{
+	struct ieee80211_channel *c;
+	int i;
+
+	flags &= IEEE80211_CHAN_ALLTURBO;
+	/* brute force search */
+	for (i = 0; i < IEEE80211_CHAN_MAX; i++) {
+		c = &ic->ic_sup_channels[i];
+		if (c->ich_freq == freq &&
+		    (c->ich_flags & IEEE80211_CHAN_ALLTURBO) == flags)
+			return (c);
+	}
+	return (NULL);
 }
 
 /*
  * Return the size of the 802.11 header for a management or data frame.
  */
 int
-ieee80211_hdrspace(const void *data)
+ieee80211_hdrsize(const void *data)
 {
 	const struct ieee80211_frame *wh = data;
 	int size = sizeof (struct ieee80211_frame);
@@ -513,7 +565,56 @@ ieee80211_hdrspace(const void *data)
 	    IEEE80211_FC0_TYPE_CTL);
 	if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS)
 		size += IEEE80211_ADDR_LEN;
+	if (IEEE80211_QOS_HAS_SEQ(wh))
+		size += sizeof (uint16_t);
 
+	return (size);
+}
+
+/*
+ * Return the space occupied by the 802.11 header and any
+ * padding required by the driver.  This works for a
+ * management or data frame.
+ */
+int
+ieee80211_hdrspace(ieee80211com_t *ic, const void *data)
+{
+	int size = ieee80211_hdrsize(data);
+	if (ic->ic_flags & IEEE80211_F_DATAPAD)
+		size = roundup(size, sizeof (uint32_t));
+	return (size);
+}
+
+/*
+ * Like ieee80211_hdrsize, but handles any type of frame.
+ */
+int
+ieee80211_anyhdrsize(const void *data)
+{
+	const struct ieee80211_frame *wh = data;
+
+	if ((wh->i_fc[0]&IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) {
+		switch (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) {
+		case IEEE80211_FC0_SUBTYPE_CTS:
+		case IEEE80211_FC0_SUBTYPE_ACK:
+			return (sizeof (struct ieee80211_frame_ack));
+		case IEEE80211_FC0_SUBTYPE_BAR:
+			return (sizeof (struct ieee80211_frame_bar));
+		}
+		return (sizeof (struct ieee80211_frame_min));
+	} else
+		return (ieee80211_hdrsize(data));
+}
+
+/*
+ * Like ieee80211_hdrspace, but handles any type of frame.
+ */
+int
+ieee80211_anyhdrspace(ieee80211com_t *ic, const void *data)
+{
+	int size = ieee80211_anyhdrsize(data);
+	if (ic->ic_flags & IEEE80211_F_DATAPAD)
+		size = roundup(size, sizeof (uint32_t));
 	return (size);
 }
 
@@ -566,6 +667,7 @@ ieee80211_notify_node_leave(ieee80211com_t *ic, ieee80211_node_t *in)
 		mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
 	ieee80211_notify(ic, EVENT_DISASSOC);	/* notify WPA service */
 }
+
 
 /*
  * Get 802.11 kstats defined in ieee802.11(5)
@@ -674,6 +776,12 @@ ieee80211_attach(ieee80211com_t *ic)
 				ic->ic_modecaps |= 1 << IEEE80211_MODE_TURBO_A;
 			if (IEEE80211_IS_CHAN_108G(ch))
 				ic->ic_modecaps |= 1 << IEEE80211_MODE_TURBO_G;
+			if (IEEE80211_IS_CHAN_ST(ch))
+				ic->ic_modecaps |= 1 << IEEE80211_MODE_STURBO_A;
+			if (IEEE80211_IS_CHAN_HTA(ch))
+				ic->ic_modecaps |= 1 << IEEE80211_MODE_11NA;
+			if (IEEE80211_IS_CHAN_HTG(ch))
+				ic->ic_modecaps |= 1 << IEEE80211_MODE_11NG;
 			if (ic->ic_curchan == NULL) {
 				/* arbitrarily pick the first channel */
 				ic->ic_curchan = &ic->ic_sup_channels[i];
@@ -686,6 +794,8 @@ ieee80211_attach(ieee80211com_t *ic)
 	ic->ic_des_chan = IEEE80211_CHAN_ANYC;	/* any channel is ok */
 	(void) ieee80211_setmode(ic, ic->ic_curmode);
 
+	if (ic->ic_caps & IEEE80211_C_WME)	/* enable if capable */
+		ic->ic_flags |= IEEE80211_F_WME;
 	if (ic->ic_caps & IEEE80211_C_BURST)
 		ic->ic_flags |= IEEE80211_F_BURST;
 	ic->ic_bintval = IEEE80211_BINTVAL_DEFAULT;
@@ -698,6 +808,7 @@ ieee80211_attach(ieee80211com_t *ic)
 	ieee80211_node_attach(ic);
 	ieee80211_proto_attach(ic);
 	ieee80211_crypto_attach(ic);
+	ieee80211_ht_attach(ic);
 
 	ic->ic_watchdog_timer = 0;
 }
@@ -717,6 +828,7 @@ ieee80211_detach(ieee80211com_t *ic)
 	if (ic->ic_opt_ie != NULL)
 		ieee80211_free(ic->ic_opt_ie);
 
+	ieee80211_ht_detach(ic);
 	ieee80211_node_detach(ic);
 	ieee80211_crypto_detach(ic);
 
@@ -726,7 +838,7 @@ ieee80211_detach(ieee80211com_t *ic)
 
 static struct modlmisc	i_wifi_modlmisc = {
 	&mod_miscops,
-	"IEEE80211 Kernel Module v1.3"
+	"IEEE80211 Kernel Module v2.0"
 };
 
 static struct modlinkage	i_wifi_modlinkage = {

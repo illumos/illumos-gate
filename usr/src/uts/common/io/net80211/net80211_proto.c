@@ -41,6 +41,12 @@
 
 #include "net80211_impl.h"
 
+/* tunables */
+#define	AGGRESSIVE_MODE_SWITCH_HYSTERESIS	3	/* pkts / 100ms */
+#define	HIGH_PRI_SWITCH_THRESH			10	/* pkts / 100ms */
+
+#define	IEEE80211_RATE2MBS(r)	(((r) & IEEE80211_RATE_VAL) / 2)
+
 const char *ieee80211_mgt_subtype_name[] = {
 	"assoc_req",	"assoc_resp",	"reassoc_req",	"reassoc_resp",
 	"probe_req",	"probe_resp",	"reserved#6",	"reserved#7",
@@ -60,6 +66,13 @@ const char *ieee80211_state_name[IEEE80211_S_MAX] = {
 	"ASSOC",	/* IEEE80211_S_ASSOC */
 	"RUN"		/* IEEE80211_S_RUN */
 };
+const char *ieee80211_wme_acnames[] = {
+	"WME_AC_BE",
+	"WME_AC_BK",
+	"WME_AC_VI",
+	"WME_AC_VO",
+	"WME_UPSD",
+};
 
 static int ieee80211_newstate(ieee80211com_t *, enum ieee80211_state, int);
 
@@ -75,9 +88,11 @@ ieee80211_proto_attach(ieee80211com_t *ic)
 	ic->ic_rtsthreshold = IEEE80211_RTS_DEFAULT;
 	ic->ic_fragthreshold = IEEE80211_FRAG_DEFAULT;
 	ic->ic_fixed_rate = IEEE80211_FIXED_RATE_NONE;
-	ic->ic_mcast_rate = IEEE80211_MCAST_RATE_DEFAULT;
 	ic->ic_protmode = IEEE80211_PROT_CTSONLY;
 	im->im_bmiss_max = IEEE80211_BMISS_MAX;
+
+	ic->ic_wme.wme_hipri_switch_hysteresis =
+	    AGGRESSIVE_MODE_SWITCH_HYSTERESIS;
 
 	/* protocol state change handler */
 	ic->ic_newstate = ieee80211_newstate;
@@ -210,11 +225,11 @@ ieee80211_dump_pkt(const uint8_t *buf, int32_t len, int32_t rate, int32_t rssi)
  * The highest bit of returned rate value is set to 1 on failure.
  */
 int
-ieee80211_fix_rate(ieee80211_node_t *in, int flags)
+ieee80211_fix_rate(ieee80211_node_t *in,
+    struct ieee80211_rateset *nrs, int flags)
 {
 	ieee80211com_t *ic = in->in_ic;
 	struct ieee80211_rateset *srs;
-	struct ieee80211_rateset *nrs;
 	boolean_t ignore;
 	int i;
 	int okrate;
@@ -235,7 +250,6 @@ ieee80211_fix_rate(ieee80211_node_t *in, int flags)
 	}
 	okrate = badrate = fixedrate = 0;
 	srs = &ic->ic_sup_rates[ieee80211_chan2mode(ic, in->in_chan)];
-	nrs = &in->in_rates;
 	for (i = 0; i < nrs->ir_nrates; ) {
 		int j;
 
@@ -393,7 +407,12 @@ ieee80211_setbasicrates(struct ieee80211_rateset *rs,
 		{ 4, { 2, 4, 11, 22 } }, /* IEEE80211_MODE_11G mixed b/g */
 		{ 0 },			/* IEEE80211_MODE_FH */
 		{ 3, { 12, 24, 48 } },	/* IEEE80211_MODE_TURBO_A */
-		{ 4, { 2, 4, 11, 22 } }	/* IEEE80211_MODE_TURBO_G (mixed b/g) */
+		{ 4, { 2, 4, 11, 22 } },
+					/* IEEE80211_MODE_TURBO_G (mixed b/g) */
+		{ 0 },			/* IEEE80211_MODE_STURBO_A */
+		{ 3, { 12, 24, 48 } },	/* IEEE80211_MODE_11NA */
+					/* IEEE80211_MODE_11NG (mixed b/g) */
+		{ 7, { 2, 4, 11, 22, 12, 24, 48 } }
 	};
 	int i, j;
 
@@ -407,6 +426,301 @@ ieee80211_setbasicrates(struct ieee80211_rateset *rs,
 			}
 		}
 	}
+}
+
+/*
+ * WME protocol support.  The following parameters come from the spec.
+ */
+typedef struct phyParamType {
+	uint8_t aifsn;
+	uint8_t logcwmin;
+	uint8_t logcwmax;
+	uint16_t txopLimit;
+	uint8_t acm;
+} paramType;
+
+static const paramType phyParamForAC_BE[IEEE80211_MODE_MAX] = {
+	{ 3, 4,  6,  0, 0 },	/* IEEE80211_MODE_AUTO */
+	{ 3, 4,  6,  0, 0 },	/* IEEE80211_MODE_11A */
+	{ 3, 4,  6,  0, 0 },	/* IEEE80211_MODE_11B */
+	{ 3, 4,  6,  0, 0 },	/* IEEE80211_MODE_11G */
+	{ 3, 4,  6,  0, 0 },	/* IEEE80211_MODE_FH */
+	{ 2, 3,  5,  0, 0 },	/* IEEE80211_MODE_TURBO_A */
+	{ 2, 3,  5,  0, 0 },	/* IEEE80211_MODE_TURBO_G */
+	{ 2, 3,  5,  0, 0 },	/* IEEE80211_MODE_STURBO_A */
+	{ 3, 4,  6,  0, 0 },	/* IEEE80211_MODE_11NA */
+	{ 3, 4,  6,  0, 0 }	/* IEEE80211_MODE_11NG */
+};
+static const struct phyParamType phyParamForAC_BK[IEEE80211_MODE_MAX] = {
+	{ 7, 4, 10,  0, 0 },	/* IEEE80211_MODE_AUTO */
+	{ 7, 4, 10,  0, 0 },	/* IEEE80211_MODE_11A */
+	{ 7, 4, 10,  0, 0 },	/* IEEE80211_MODE_11B */
+	{ 7, 4, 10,  0, 0 },	/* IEEE80211_MODE_11G */
+	{ 7, 4, 10,  0, 0 },	/* IEEE80211_MODE_FH */
+	{ 7, 3, 10,  0, 0 },	/* IEEE80211_MODE_TURBO_A */
+	{ 7, 3, 10,  0, 0 },	/* IEEE80211_MODE_TURBO_G */
+	{ 7, 3, 10,  0, 0 },	/* IEEE80211_MODE_STURBO_A */
+	{ 7, 4, 10,  0, 0 },	/* IEEE80211_MODE_11NA */
+	{ 7, 4, 10,  0, 0 },	/* IEEE80211_MODE_11NG */
+};
+static const struct phyParamType phyParamForAC_VI[IEEE80211_MODE_MAX] = {
+	{ 1, 3, 4,  94, 0 },	/* IEEE80211_MODE_AUTO */
+	{ 1, 3, 4,  94, 0 },	/* IEEE80211_MODE_11A */
+	{ 1, 3, 4, 188, 0 },	/* IEEE80211_MODE_11B */
+	{ 1, 3, 4,  94, 0 },	/* IEEE80211_MODE_11G */
+	{ 1, 3, 4, 188, 0 },	/* IEEE80211_MODE_FH */
+	{ 1, 2, 3,  94, 0 },	/* IEEE80211_MODE_TURBO_A */
+	{ 1, 2, 3,  94, 0 },	/* IEEE80211_MODE_TURBO_G */
+	{ 1, 2, 3,  94, 0 },	/* IEEE80211_MODE_STURBO_A */
+	{ 1, 3, 4,  94, 0 },	/* IEEE80211_MODE_11NA */
+	{ 1, 3, 4,  94, 0 },	/* IEEE80211_MODE_11NG */
+};
+static const struct phyParamType phyParamForAC_VO[IEEE80211_MODE_MAX] = {
+	{ 1, 2, 3,  47, 0 },	/* IEEE80211_MODE_AUTO */
+	{ 1, 2, 3,  47, 0 },	/* IEEE80211_MODE_11A */
+	{ 1, 2, 3, 102, 0 },	/* IEEE80211_MODE_11B */
+	{ 1, 2, 3,  47, 0 },	/* IEEE80211_MODE_11G */
+	{ 1, 2, 3, 102, 0 },	/* IEEE80211_MODE_FH */
+	{ 1, 2, 2,  47, 0 },	/* IEEE80211_MODE_TURBO_A */
+	{ 1, 2, 2,  47, 0 },	/* IEEE80211_MODE_TURBO_G */
+	{ 1, 2, 2,  47, 0 },	/* IEEE80211_MODE_STURBO_A */
+	{ 1, 2, 3,  47, 0 },	/* IEEE80211_MODE_11NA */
+	{ 1, 2, 3,  47, 0 },	/* IEEE80211_MODE_11NG */
+};
+
+static const struct phyParamType bssPhyParamForAC_BE[IEEE80211_MODE_MAX] = {
+	{ 3, 4, 10,  0, 0 },	/* IEEE80211_MODE_AUTO */
+	{ 3, 4, 10,  0, 0 },	/* IEEE80211_MODE_11A */
+	{ 3, 4, 10,  0, 0 },	/* IEEE80211_MODE_11B */
+	{ 3, 4, 10,  0, 0 },	/* IEEE80211_MODE_11G */
+	{ 3, 4, 10,  0, 0 },	/* IEEE80211_MODE_FH */
+	{ 2, 3, 10,  0, 0 },	/* IEEE80211_MODE_TURBO_A */
+	{ 2, 3, 10,  0, 0 },	/* IEEE80211_MODE_TURBO_G */
+	{ 2, 3, 10,  0, 0 },	/* IEEE80211_MODE_STURBO_A */
+	{ 3, 4, 10,  0, 0 },	/* IEEE80211_MODE_11NA */
+	{ 3, 4, 10,  0, 0 },	/* IEEE80211_MODE_11NG */
+};
+static const struct phyParamType bssPhyParamForAC_VI[IEEE80211_MODE_MAX] = {
+	{ 2, 3, 4,  94, 0 },	/* IEEE80211_MODE_AUTO */
+	{ 2, 3, 4,  94, 0 },	/* IEEE80211_MODE_11A */
+	{ 2, 3, 4, 188, 0 },	/* IEEE80211_MODE_11B */
+	{ 2, 3, 4,  94, 0 },	/* IEEE80211_MODE_11G */
+	{ 2, 3, 4, 188, 0 },	/* IEEE80211_MODE_FH */
+	{ 2, 2, 3,  94, 0 },	/* IEEE80211_MODE_TURBO_A */
+	{ 2, 2, 3,  94, 0 },	/* IEEE80211_MODE_TURBO_G */
+	{ 2, 2, 3,  94, 0 },	/* IEEE80211_MODE_STURBO_A */
+	{ 2, 3, 4,  94, 0 },	/* IEEE80211_MODE_11NA */
+	{ 2, 3, 4,  94, 0 },	/* IEEE80211_MODE_11NG */
+};
+static const struct phyParamType bssPhyParamForAC_VO[IEEE80211_MODE_MAX] = {
+	{ 2, 2, 3,  47, 0 },	/* IEEE80211_MODE_AUTO */
+	{ 2, 2, 3,  47, 0 },	/* IEEE80211_MODE_11A */
+	{ 2, 2, 3, 102, 0 },	/* IEEE80211_MODE_11B */
+	{ 2, 2, 3,  47, 0 },	/* IEEE80211_MODE_11G */
+	{ 2, 2, 3, 102, 0 },	/* IEEE80211_MODE_FH */
+	{ 1, 2, 2,  47, 0 },	/* IEEE80211_MODE_TURBO_A */
+	{ 1, 2, 2,  47, 0 },	/* IEEE80211_MODE_TURBO_G */
+	{ 1, 2, 2,  47, 0 },	/* IEEE80211_MODE_STURBO_A */
+	{ 2, 2, 3,  47, 0 },	/* IEEE80211_MODE_11NA */
+	{ 2, 2, 3,  47, 0 },	/* IEEE80211_MODE_11NG */
+};
+
+void
+ieee80211_wme_initparams(struct ieee80211com *ic)
+{
+	struct ieee80211_wme_state *wme = &ic->ic_wme;
+	const paramType *pPhyParam, *pBssPhyParam;
+	struct wmeParams *wmep;
+	enum ieee80211_phymode mode;
+	int i;
+
+	if ((ic->ic_caps & IEEE80211_C_WME) == 0)
+		return;
+
+	/*
+	 * Select mode; we can be called early in which case we
+	 * always use auto mode.  We know we'll be called when
+	 * entering the RUN state with bsschan setup properly
+	 * so state will eventually get set correctly
+	 */
+	if (ic->ic_curchan != IEEE80211_CHAN_ANYC)
+		mode = ieee80211_chan2mode(ic, ic->ic_curchan);
+	else
+		mode = IEEE80211_MODE_AUTO;
+	for (i = 0; i < WME_NUM_AC; i++) {
+		switch (i) {
+		case WME_AC_BK:
+			pPhyParam = &phyParamForAC_BK[mode];
+			pBssPhyParam = &phyParamForAC_BK[mode];
+			break;
+		case WME_AC_VI:
+			pPhyParam = &phyParamForAC_VI[mode];
+			pBssPhyParam = &bssPhyParamForAC_VI[mode];
+			break;
+		case WME_AC_VO:
+			pPhyParam = &phyParamForAC_VO[mode];
+			pBssPhyParam = &bssPhyParamForAC_VO[mode];
+			break;
+		case WME_AC_BE:
+		default:
+			pPhyParam = &phyParamForAC_BE[mode];
+			pBssPhyParam = &bssPhyParamForAC_BE[mode];
+			break;
+		}
+
+		wmep = &wme->wme_wmeChanParams.cap_wmeParams[i];
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+			wmep->wmep_acm = pPhyParam->acm;
+			wmep->wmep_aifsn = pPhyParam->aifsn;
+			wmep->wmep_logcwmin = pPhyParam->logcwmin;
+			wmep->wmep_logcwmax = pPhyParam->logcwmax;
+			wmep->wmep_txopLimit = pPhyParam->txopLimit;
+		} else {
+			wmep->wmep_acm = pBssPhyParam->acm;
+			wmep->wmep_aifsn = pBssPhyParam->aifsn;
+			wmep->wmep_logcwmin = pBssPhyParam->logcwmin;
+			wmep->wmep_logcwmax = pBssPhyParam->logcwmax;
+			wmep->wmep_txopLimit = pBssPhyParam->txopLimit;
+
+		}
+		ieee80211_dbg(IEEE80211_MSG_WME, "ieee80211_wme_initparams: "
+		    "%s chan [acm %u aifsn %u log2(cwmin) %u "
+		    "log2(cwmax) %u txpoLimit %u]\n",
+		    ieee80211_wme_acnames[i],
+		    wmep->wmep_acm,
+		    wmep->wmep_aifsn,
+		    wmep->wmep_logcwmin,
+		    wmep->wmep_logcwmax,
+		    wmep->wmep_txopLimit);
+
+		wmep = &wme->wme_wmeBssChanParams.cap_wmeParams[i];
+		wmep->wmep_acm = pBssPhyParam->acm;
+		wmep->wmep_aifsn = pBssPhyParam->aifsn;
+		wmep->wmep_logcwmin = pBssPhyParam->logcwmin;
+		wmep->wmep_logcwmax = pBssPhyParam->logcwmax;
+		wmep->wmep_txopLimit = pBssPhyParam->txopLimit;
+		ieee80211_dbg(IEEE80211_MSG_WME, "ieee80211_wme_initparams: "
+		    "%s  bss [acm %u aifsn %u log2(cwmin) %u "
+		    "log2(cwmax) %u txpoLimit %u]\n",
+		    ieee80211_wme_acnames[i],
+		    wmep->wmep_acm,
+		    wmep->wmep_aifsn,
+		    wmep->wmep_logcwmin,
+		    wmep->wmep_logcwmax,
+		    wmep->wmep_txopLimit);
+	}
+	/* NB: check ic_bss to avoid NULL deref on initial attach */
+	if (ic->ic_bss != NULL) {
+		/*
+		 * Calculate agressive mode switching threshold based
+		 * on beacon interval.  This doesn't need locking since
+		 * we're only called before entering the RUN state at
+		 * which point we start sending beacon frames.
+		 */
+		wme->wme_hipri_switch_thresh =
+		    (HIGH_PRI_SWITCH_THRESH * ic->ic_bss->in_intval) / 100;
+		ieee80211_wme_updateparams(ic);
+	}
+}
+
+/*
+ * Update WME parameters for ourself and the BSS.
+ */
+void
+ieee80211_wme_updateparams(struct ieee80211com *ic)
+{
+	static const paramType phyParam[IEEE80211_MODE_MAX] = {
+		{ 2, 4, 10, 64, 0 },	/* IEEE80211_MODE_AUTO */
+		{ 2, 4, 10, 64, 0 },	/* IEEE80211_MODE_11A */
+		{ 2, 5, 10, 64, 0 },	/* IEEE80211_MODE_11B */
+		{ 2, 4, 10, 64, 0 },	/* IEEE80211_MODE_11G */
+		{ 2, 5, 10, 64, 0 },	/* IEEE80211_MODE_FH */
+		{ 1, 3, 10, 64, 0 },	/* IEEE80211_MODE_TURBO_A */
+		{ 1, 3, 10, 64, 0 },	/* IEEE80211_MODE_TURBO_G */
+		{ 1, 3, 10, 64, 0 },	/* IEEE80211_MODE_STURBO_A */
+		{ 2, 4, 10, 64, 0 },	/* IEEE80211_MODE_11NA */
+		{ 2, 4, 10, 64, 0 },	/* IEEE80211_MODE_11NG */
+	};
+	struct ieee80211_wme_state *wme = &ic->ic_wme;
+	const struct wmeParams *wmep;
+	struct wmeParams *chanp, *bssp;
+	enum ieee80211_phymode mode;
+	int i;
+
+	if ((ic->ic_caps & IEEE80211_C_WME) == 0)
+		return;
+
+	/* set up the channel access parameters for the physical device */
+	for (i = 0; i < WME_NUM_AC; i++) {
+		chanp = &wme->wme_chanParams.cap_wmeParams[i];
+		wmep = &wme->wme_wmeChanParams.cap_wmeParams[i];
+		chanp->wmep_aifsn = wmep->wmep_aifsn;
+		chanp->wmep_logcwmin = wmep->wmep_logcwmin;
+		chanp->wmep_logcwmax = wmep->wmep_logcwmax;
+		chanp->wmep_txopLimit = wmep->wmep_txopLimit;
+
+		chanp = &wme->wme_bssChanParams.cap_wmeParams[i];
+		wmep = &wme->wme_wmeBssChanParams.cap_wmeParams[i];
+		chanp->wmep_aifsn = wmep->wmep_aifsn;
+		chanp->wmep_logcwmin = wmep->wmep_logcwmin;
+		chanp->wmep_logcwmax = wmep->wmep_logcwmax;
+		chanp->wmep_txopLimit = wmep->wmep_txopLimit;
+	}
+
+	/*
+	 * Select mode; we can be called early in which case we
+	 * always use auto mode.  We know we'll be called when
+	 * entering the RUN state with bsschan setup properly
+	 * so state will eventually get set correctly
+	 */
+	if (ic->ic_curchan != IEEE80211_CHAN_ANYC)
+		mode = ieee80211_chan2mode(ic, ic->ic_curchan);
+	else
+		mode = IEEE80211_MODE_AUTO;
+
+	/*
+	 * This implements agressive mode as found in certain
+	 * vendors' AP's.  When there is significant high
+	 * priority (VI/VO) traffic in the BSS throttle back BE
+	 * traffic by using conservative parameters.  Otherwise
+	 * BE uses agressive params to optimize performance of
+	 * legacy/non-QoS traffic.
+	 */
+	if ((ic->ic_opmode == IEEE80211_M_HOSTAP &&
+	    (wme->wme_flags & WME_F_AGGRMODE) != 0) ||
+	    (ic->ic_opmode == IEEE80211_M_STA &&
+	    (ic->ic_bss->in_flags & IEEE80211_NODE_QOS) == 0) ||
+	    (ic->ic_flags & IEEE80211_F_WME) == 0) {
+		chanp = &wme->wme_chanParams.cap_wmeParams[WME_AC_BE];
+		bssp = &wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE];
+
+		chanp->wmep_aifsn = bssp->wmep_aifsn = phyParam[mode].aifsn;
+		chanp->wmep_logcwmin = bssp->wmep_logcwmin =
+		    phyParam[mode].logcwmin;
+		chanp->wmep_logcwmax = bssp->wmep_logcwmax =
+		    phyParam[mode].logcwmax;
+		chanp->wmep_txopLimit = bssp->wmep_txopLimit =
+		    (ic->ic_flags & IEEE80211_F_BURST) ?
+		    phyParam[mode].txopLimit : 0;
+		ieee80211_dbg(IEEE80211_MSG_WME,
+		    "ieee80211_wme_updateparams_locked: "
+		    "%s [acm %u aifsn %u log2(cwmin) %u "
+		    "log2(cwmax) %u txpoLimit %u]\n",
+		    ieee80211_wme_acnames[WME_AC_BE],
+		    chanp->wmep_acm,
+		    chanp->wmep_aifsn,
+		    chanp->wmep_logcwmin,
+		    chanp->wmep_logcwmax,
+		    chanp->wmep_txopLimit);
+	}
+
+	wme->wme_update(ic);
+
+	ieee80211_dbg(IEEE80211_MSG_WME, "ieee80211_wme_updateparams(): "
+	    "%s: WME params updated, cap_info 0x%x\n",
+	    ic->ic_opmode == IEEE80211_M_STA ?
+	    wme->wme_wmeChanParams.cap_info :
+	    wme->wme_bssChanParams.cap_info);
 }
 
 /*
@@ -496,8 +810,8 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			switch (ic->ic_opmode) {
 			case IEEE80211_M_STA:
 				IEEE80211_SEND_MGMT(ic, in,
-				    IEEE80211_FC0_SUBTYPE_DISASSOC,
-				    IEEE80211_REASON_ASSOC_LEAVE);
+				    IEEE80211_FC0_SUBTYPE_DEAUTH,
+				    IEEE80211_REASON_AUTH_LEAVE);
 				ieee80211_sta_leave(ic, in);
 				break;
 			case IEEE80211_M_IBSS:
@@ -644,6 +958,15 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			wd.wd_secalloc = ieee80211_crypto_getciphertype(ic);
 			wd.wd_opmode = ic->ic_opmode;
 			IEEE80211_ADDR_COPY(wd.wd_bssid, in->in_bssid);
+			wd.wd_qospad = 0;
+			if (in->in_flags &
+			    (IEEE80211_NODE_QOS|IEEE80211_NODE_HT)) {
+				wd.wd_qospad = 2;
+				if (ic->ic_flags & IEEE80211_F_DATAPAD) {
+					wd.wd_qospad = roundup(wd.wd_qospad,
+					    sizeof (uint32_t));
+				}
+			}
 			(void) mac_pdata_update(ic->ic_mach, &wd, sizeof (wd));
 			break;
 		}

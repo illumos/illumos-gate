@@ -4,7 +4,7 @@
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation
+ * Copyright (c) 2009, Intel Corporation
  * All rights reserved.
  */
 
@@ -87,12 +87,13 @@ typedef struct iwh_rx_ring {
 
 
 typedef struct iwh_amrr {
-	ieee80211_node_t in;	/* must be the first */
-	int	txcnt;
-	int	retrycnt;
-	int	success;
-	int	success_threshold;
-	int	recovery;
+	ieee80211_node_t in;
+	uint32_t	txcnt;
+	uint32_t	retrycnt;
+	uint32_t	success;
+	uint32_t	success_threshold;
+	int		recovery;
+	volatile uint32_t	ht_mcs_idx;
 } iwh_amrr_t;
 
 struct	iwh_phy_rx {
@@ -113,12 +114,18 @@ typedef struct iwh_softc {
 	dev_info_t		*sc_dip;
 	int			(*sc_newstate)(struct ieee80211com *,
 	    enum ieee80211_state, int);
+	void			(*sc_recv_action)(ieee80211_node_t *,
+				    const uint8_t *, const uint8_t *);
+	int			(*sc_send_action)(ieee80211_node_t *,
+				    int, int, uint16_t[4]);
+	volatile uint32_t	sc_cmd_flag;
+	volatile uint32_t	sc_cmd_accum;
 
 	enum ieee80211_state	sc_ostate;
 	kmutex_t		sc_glock;
 	kmutex_t		sc_mt_lock;
 	kmutex_t		sc_tx_lock;
-	kmutex_t		sc_ucode_lock;
+	kmutex_t		sc_suspend_lock;
 	kcondvar_t		sc_mt_cv;
 	kcondvar_t		sc_tx_cv;
 	kcondvar_t		sc_cmd_cv;
@@ -177,6 +184,8 @@ typedef struct iwh_softc {
 
 	struct iwh_alive_resp	sc_card_alive_run;
 	struct iwh_init_alive_resp	sc_card_alive_init;
+	iwh_ht_conf_t		sc_ht_conf;
+	uint16_t		sc_dev_id;
 
 	uint32_t		sc_tx_timer;
 	uint32_t		sc_scan_pending;
@@ -197,6 +206,10 @@ typedef struct iwh_softc {
 	uint32_t		sc_tx_retries;
 } iwh_sc_t;
 
+#define	SC_CMD_FLG_NONE		(0)
+#define	SC_CMD_FLG_PENDING	(1)
+#define	SC_CMD_FLG_DONE		(2)
+
 #define	IWH_F_ATTACHED		(1 << 0)
 #define	IWH_F_CMD_DONE		(1 << 1)
 #define	IWH_F_FW_INIT		(1 << 2)
@@ -214,6 +227,33 @@ typedef struct iwh_softc {
 
 #define	IWH_SUCCESS		0
 #define	IWH_FAIL		EIO
+
+/*
+ * Interaction steps for 802.11e/n between net80211 module
+ * and iwh driver:
+ * -- setup link with 802.11n AP: net80211 module is responsible
+ *    for setup link with 802.11n AP. iwh driver monitors current
+ *    state and make relevant configurations according work mode.
+ * -- QoS parameter updating: net80211 module is responsible for
+ *    extract EDCA parameters from the fram of AP, iwh driver get
+ *    these parameters and make relevant configuration to HW.
+ * -- TX queue management: iwh driver place a frame into suitable
+ *    TX queue according to frame type and user priority extracted
+ *    from frame head.
+ * -- MIMO: iwh driver make relevant configurations in TX and RX
+ *    direction according to AP mode from net80211 module.
+ * -- Link aggregation: AMSDU is implemented by net80211 module and
+ *    AMPDU is implemented by both iwh driver and net80211 module.
+ *    iwh driver distinguish frames in one AMPDU frame and net80211
+ *    module is responsible reordering every frame.
+ * -- Block ACK: net80211 module is responsible for setup agreement
+ *    with AP and iwh driver is responsible for realistic ACK.
+ * -- Rate scaling: This function is implemented independently by
+ *    iwh driver.
+ * -- HT protection: This feature is also implemented by iwh driver
+ *    no interaction with net80211 module.
+ */
+
 #ifdef __cplusplus
 }
 #endif

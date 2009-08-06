@@ -359,11 +359,6 @@ void arn_setdefantenna(struct arn_softc *sc, uint32_t antenna);
 #define	WME_BA_BMP_SIZE		64
 #define	WME_MAX_BA		WME_BA_BMP_SIZE
 #define	ATH_TID_MAX_BUFS	(2 * WME_MAX_BA)
-#define	TID_TO_WME_AC(_tid)				\
-	((((_tid) == 0) || ((_tid) == 3)) ? WME_AC_BE :	\
-	(((_tid) == 1) || ((_tid) == 2)) ? WME_AC_BK :	\
-	(((_tid) == 4) || ((_tid) == 5)) ? WME_AC_VI :	\
-	WME_AC_VO)
 
 /* Wireless Multimedia Extension Defines */
 #define	WME_AC_BE	0 /* best effort */

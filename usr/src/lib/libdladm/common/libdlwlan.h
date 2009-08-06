@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,9 @@ typedef enum {
 	DLADM_WLAN_MODE_NONE = 0,
 	DLADM_WLAN_MODE_80211A,
 	DLADM_WLAN_MODE_80211B,
-	DLADM_WLAN_MODE_80211G
+	DLADM_WLAN_MODE_80211G,
+	DLADM_WLAN_MODE_80211GN,
+	DLADM_WLAN_MODE_80211AN
 } dladm_wlan_mode_t;
 
 typedef enum {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef	__WIFI_IOCTL_H
 #define	__WIFI_IOCTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -262,6 +260,7 @@ typedef struct wl_ofdm {
 	uint32_t wl_ofdm_subtype;
 	uint32_t wl_ofdm_frequency;
 	uint32_t wl_ofdm_freq_supported;
+	boolean_t wl_ofdm_ht_enabled;
 } wl_ofdm_t;
 
 typedef struct wl_erp {
@@ -277,6 +276,7 @@ typedef struct wl_erp {
 	boolean_t wl_erp_dsss_ofdm_enabled;
 	boolean_t wl_erp_have_sst;
 	boolean_t wl_erp_sst_enabled;
+	boolean_t wl_erp_ht_enabled;
 } wl_erp_t;
 
 typedef union wl_phy_conf {
