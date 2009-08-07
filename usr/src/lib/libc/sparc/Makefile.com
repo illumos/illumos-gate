@@ -1011,6 +1011,11 @@ CPPFLAGS += -DWORDEXP_KSH93=$(ON_BUILD_KSH93_AS_BINKSH)
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
 DYNFLAGS +=	$(RTLDINFO)
 
+# Force libc's internal references to be resolved immediately upon loading
+# in order to avoid critical region problems.  Since almost all libc symbols
+# are marked 'protected' in the mapfiles, this is a minimal set (15 to 20).
+DYNFLAGS +=	-znow
+
 DYNFLAGS +=	-e __rtboot
 DYNFLAGS +=	$(EXTN_DYNFLAGS)
 

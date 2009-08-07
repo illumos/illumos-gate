@@ -947,6 +947,11 @@ pics/proc64_id.o	:= CFLAGS64 += -I$(SRC)/uts/intel
 RTLDINFO =	-z rtldinfo=tls_rtldinfo
 DYNFLAGS +=	$(RTLDINFO)
 
+# Force libc's internal references to be resolved immediately upon loading
+# in order to avoid critical region problems.  Since almost all libc symbols
+# are marked 'protected' in the mapfiles, this is a minimal set (15 to 20).
+DYNFLAGS +=	-znow
+
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 
 # Override this top level flag so the compiler builds in its native
