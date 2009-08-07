@@ -45,8 +45,6 @@ static char *dsl_reaper = "the grim reaper";
 
 static dsl_checkfunc_t dsl_dataset_destroy_begin_check;
 static dsl_syncfunc_t dsl_dataset_destroy_begin_sync;
-static dsl_checkfunc_t dsl_dataset_rollback_check;
-static dsl_syncfunc_t dsl_dataset_rollback_sync;
 static dsl_syncfunc_t dsl_dataset_set_reservation_sync;
 
 #define	DS_REF_MAX	(1ULL << 62)
@@ -243,8 +241,6 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 	dsl_dataset_t *ds = dsv;
 
 	ASSERT(ds->ds_owner == NULL || DSL_DATASET_IS_DESTROYED(ds));
-
-	dprintf_ds(ds, "evicting %s\n", "");
 
 	unique_remove(ds->ds_fsid_guid);
 
@@ -867,15 +863,11 @@ dsl_snapshot_destroy_one(char *name, void *arg)
 	dsl_dataset_t *ds;
 	int err;
 	char *dsname;
-	size_t buflen;
 
-	/* alloc a buffer to hold name@snapname, plus the terminating NULL */
-	buflen = strlen(name) + strlen(da->snapname) + 2;
-	dsname = kmem_alloc(buflen, KM_SLEEP);
-	(void) snprintf(dsname, buflen, "%s@%s", name, da->snapname);
+	dsname = kmem_asprintf("%s@%s", name, da->snapname);
 	err = dsl_dataset_own(dsname, DS_MODE_READONLY | DS_MODE_INCONSISTENT,
 	    da->dstg, &ds);
-	kmem_free(dsname, buflen);
+	strfree(dsname);
 	if (err == 0) {
 		struct dsl_ds_destroyarg *dsda;
 
@@ -1181,25 +1173,6 @@ out:
 	return (err);
 }
 
-int
-dsl_dataset_rollback(dsl_dataset_t *ds, dmu_objset_type_t ost)
-{
-	int err;
-
-	ASSERT(ds->ds_owner);
-
-	dsl_dataset_make_exclusive(ds, ds->ds_owner);
-	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
-	    dsl_dataset_rollback_check, dsl_dataset_rollback_sync,
-	    ds, &ost, 0);
-	/* drop exclusive access */
-	mutex_enter(&ds->ds_lock);
-	rw_exit(&ds->ds_rwlock);
-	cv_broadcast(&ds->ds_exclusive_cv);
-	mutex_exit(&ds->ds_lock);
-	return (err);
-}
-
 void *
 dsl_dataset_set_user_ptr(dsl_dataset_t *ds,
     void *p, dsl_dataset_evict_func_t func)
@@ -1341,145 +1314,6 @@ kill_blkptr(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
 	}
 
 	return (0);
-}
-
-/* ARGSUSED */
-static int
-dsl_dataset_rollback_check(void *arg1, void *arg2, dmu_tx_t *tx)
-{
-	dsl_dataset_t *ds = arg1;
-	dmu_objset_type_t *ost = arg2;
-
-	/*
-	 * We can only roll back to emptyness if it is a ZPL objset.
-	 */
-	if (*ost != DMU_OST_ZFS &&
-	    ds->ds_phys->ds_prev_snap_txg < TXG_INITIAL)
-		return (EINVAL);
-
-	/*
-	 * This must not be a snapshot.
-	 */
-	if (ds->ds_phys->ds_next_snap_obj != 0)
-		return (EINVAL);
-
-	/*
-	 * If we made changes this txg, traverse_dataset won't find
-	 * them.  Try again.
-	 */
-	if (ds->ds_phys->ds_bp.blk_birth >= tx->tx_txg)
-		return (EAGAIN);
-
-	return (0);
-}
-
-/* ARGSUSED */
-static void
-dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
-{
-	dsl_dataset_t *ds = arg1;
-	dmu_objset_type_t *ost = arg2;
-	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
-
-	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-
-	if (ds->ds_user_ptr != NULL) {
-		/*
-		 * We need to make sure that the objset_impl_t is reopened after
-		 * we do the rollback, otherwise it will have the wrong
-		 * objset_phys_t.  Normally this would happen when this
-		 * dataset-open is closed, thus causing the
-		 * dataset to be immediately evicted.  But when doing "zfs recv
-		 * -F", we reopen the objset before that, so that there is no
-		 * window where the dataset is closed and inconsistent.
-		 */
-		ds->ds_user_evict_func(ds, ds->ds_user_ptr);
-		ds->ds_user_ptr = NULL;
-	}
-
-	/* Transfer space that was freed since last snap back to the head. */
-	{
-		uint64_t used;
-
-		VERIFY(0 == bplist_space_birthrange(&ds->ds_deadlist,
-		    ds->ds_origin_txg, UINT64_MAX, &used));
-		dsl_dir_transfer_space(ds->ds_dir, used,
-		    DD_USED_SNAP, DD_USED_HEAD, tx);
-	}
-
-	/* Zero out the deadlist. */
-	bplist_close(&ds->ds_deadlist);
-	bplist_destroy(mos, ds->ds_phys->ds_deadlist_obj, tx);
-	ds->ds_phys->ds_deadlist_obj =
-	    bplist_create(mos, DSL_DEADLIST_BLOCKSIZE, tx);
-	VERIFY(0 == bplist_open(&ds->ds_deadlist, mos,
-	    ds->ds_phys->ds_deadlist_obj));
-
-	{
-		/*
-		 * Free blkptrs that we gave birth to - this covers
-		 * claimed but not played log blocks too.
-		 */
-		zio_t *zio;
-		struct killarg ka;
-
-		zio = zio_root(tx->tx_pool->dp_spa, NULL, NULL,
-		    ZIO_FLAG_MUSTSUCCEED);
-		ka.ds = ds;
-		ka.zio = zio;
-		ka.tx = tx;
-		(void) traverse_dataset(ds, ds->ds_phys->ds_prev_snap_txg,
-		    TRAVERSE_POST, kill_blkptr, &ka);
-		(void) zio_wait(zio);
-	}
-
-	ASSERT(!DS_UNIQUE_IS_ACCURATE(ds) || ds->ds_phys->ds_unique_bytes == 0);
-
-	if (ds->ds_prev && ds->ds_prev != ds->ds_dir->dd_pool->dp_origin_snap) {
-		/* Change our contents to that of the prev snapshot */
-
-		ASSERT3U(ds->ds_prev->ds_object, ==,
-		    ds->ds_phys->ds_prev_snap_obj);
-		ASSERT3U(ds->ds_phys->ds_used_bytes, <=,
-		    ds->ds_prev->ds_phys->ds_used_bytes);
-
-		ds->ds_phys->ds_bp = ds->ds_prev->ds_phys->ds_bp;
-		ds->ds_phys->ds_used_bytes =
-		    ds->ds_prev->ds_phys->ds_used_bytes;
-		ds->ds_phys->ds_compressed_bytes =
-		    ds->ds_prev->ds_phys->ds_compressed_bytes;
-		ds->ds_phys->ds_uncompressed_bytes =
-		    ds->ds_prev->ds_phys->ds_uncompressed_bytes;
-		ds->ds_phys->ds_flags = ds->ds_prev->ds_phys->ds_flags;
-
-		if (ds->ds_prev->ds_phys->ds_next_snap_obj == ds->ds_object) {
-			dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);
-			ds->ds_prev->ds_phys->ds_unique_bytes = 0;
-		}
-	} else {
-		objset_impl_t *osi;
-
-		ASSERT(*ost != DMU_OST_ZVOL);
-		ASSERT3U(ds->ds_phys->ds_used_bytes, ==, 0);
-		ASSERT3U(ds->ds_phys->ds_compressed_bytes, ==, 0);
-		ASSERT3U(ds->ds_phys->ds_uncompressed_bytes, ==, 0);
-
-		bzero(&ds->ds_phys->ds_bp, sizeof (blkptr_t));
-		ds->ds_phys->ds_flags = 0;
-		ds->ds_phys->ds_unique_bytes = 0;
-		if (spa_version(ds->ds_dir->dd_pool->dp_spa) >=
-		    SPA_VERSION_UNIQUE_ACCURATE)
-			ds->ds_phys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
-
-		osi = dmu_objset_create_impl(ds->ds_dir->dd_pool->dp_spa, ds,
-		    &ds->ds_phys->ds_bp, *ost, tx);
-#ifdef _KERNEL
-		zfs_create_fs(&osi->os, kcred, NULL, tx);
-#endif
-	}
-
-	spa_history_internal_log(LOG_DS_ROLLBACK, ds->ds_dir->dd_pool->dp_spa,
-	    tx, cr, "dataset = %llu", ds->ds_object);
 }
 
 /* ARGSUSED */
@@ -1991,7 +1825,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 			origin->ds_user_ptr = NULL;
 		}
 
-		dsl_dataset_rele(origin, tag);
+		dsl_dataset_rele(origin, ds);
 		ds->ds_prev = NULL;
 
 		ndsda.ds = origin;
@@ -3002,9 +2836,11 @@ dsl_dataset_clone_swap_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	if (csa->cds->ds_prev != csa->ohds->ds_prev)
 		return (EINVAL);
 
-	/* cds should be the clone */
-	if (csa->cds->ds_prev->ds_phys->ds_next_snap_obj !=
-	    csa->ohds->ds_object)
+	/* cds should be the clone (unless they are unrelated) */
+	if (csa->cds->ds_prev != NULL &&
+	    csa->cds->ds_prev != csa->cds->ds_dir->dd_pool->dp_origin_snap &&
+	    csa->ohds->ds_object !=
+	    csa->cds->ds_prev->ds_phys->ds_next_snap_obj)
 		return (EINVAL);
 
 	/* the clone should be a child of the origin */
@@ -3042,7 +2878,6 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	dmu_buf_will_dirty(csa->cds->ds_dbuf, tx);
 	dmu_buf_will_dirty(csa->ohds->ds_dbuf, tx);
-	dmu_buf_will_dirty(csa->cds->ds_prev->ds_dbuf, tx);
 
 	if (csa->cds->ds_user_ptr != NULL) {
 		csa->cds->ds_user_evict_func(csa->cds, csa->cds->ds_user_ptr);
@@ -3055,10 +2890,16 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		csa->ohds->ds_user_ptr = NULL;
 	}
 
-	/* reset origin's unique bytes */
-	VERIFY(0 == bplist_space_birthrange(&csa->cds->ds_deadlist,
-	    csa->cds->ds_prev->ds_phys->ds_prev_snap_txg, UINT64_MAX,
-	    &csa->cds->ds_prev->ds_phys->ds_unique_bytes));
+	/*
+	 * Reset origin's unique bytes, if it exists.
+	 */
+	if (csa->cds->ds_prev) {
+		dsl_dataset_t *origin = csa->cds->ds_prev;
+		dmu_buf_will_dirty(origin->ds_dbuf, tx);
+		VERIFY(0 == bplist_space_birthrange(&csa->cds->ds_deadlist,
+		    origin->ds_phys->ds_prev_snap_txg, UINT64_MAX,
+		    &origin->ds_phys->ds_unique_bytes));
+	}
 
 	/* swap blkptrs */
 	{
@@ -3144,8 +2985,10 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 }
 
 /*
- * Swap 'clone' with its origin head file system.  Used at the end
- * of "online recv" to swizzle the file system to the new version.
+ * Swap 'clone' with its origin head datasets.  Used at the end of "zfs
+ * recv" into an existing fs to swizzle the file system to the new
+ * version, and by "zfs rollback".  Can also be used to swap two
+ * independent head datasets if neither has any snapshots.
  */
 int
 dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,
@@ -3481,14 +3324,11 @@ dsl_dataset_user_hold_one(char *dsname, void *arg)
 	dsl_dataset_t *ds;
 	int error;
 	char *name;
-	size_t buflen;
 
 	/* alloc a buffer to hold dsname@snapname plus terminating NULL */
-	buflen = strlen(dsname) + strlen(ha->snapname) + 2;
-	name = kmem_alloc(buflen, KM_SLEEP);
-	(void) snprintf(name, buflen, "%s@%s", dsname, ha->snapname);
+	name = kmem_asprintf("%s@%s", dsname, ha->snapname);
 	error = dsl_dataset_hold(name, ha->dstg, &ds);
-	kmem_free(name, buflen);
+	strfree(name);
 	if (error == 0) {
 		ha->gotone = B_TRUE;
 		dsl_sync_task_create(ha->dstg, dsl_dataset_user_hold_check,
@@ -3678,7 +3518,6 @@ dsl_dataset_user_release_one(char *dsname, void *arg)
 	int error;
 	void *dtag = ha->dstg;
 	char *name;
-	size_t buflen;
 	boolean_t own = B_FALSE;
 	boolean_t might_destroy;
 
@@ -3686,11 +3525,9 @@ dsl_dataset_user_release_one(char *dsname, void *arg)
 		return (ENAMETOOLONG);
 
 	/* alloc a buffer to hold dsname@snapname, plus the terminating NULL */
-	buflen = strlen(dsname) + strlen(ha->snapname) + 2;
-	name = kmem_alloc(buflen, KM_SLEEP);
-	(void) snprintf(name, buflen, "%s@%s", dsname, ha->snapname);
+	name = kmem_asprintf("%s@%s", dsname, ha->snapname);
 	error = dsl_dataset_hold(name, dtag, &ds);
-	kmem_free(name, buflen);
+	strfree(name);
 	if (error == ENOENT && ha->recursive)
 		return (0);
 	(void) strcpy(ha->failed, dsname);

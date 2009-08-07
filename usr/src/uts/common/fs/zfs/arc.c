@@ -3160,11 +3160,14 @@ arc_write_done(zio_t *zio)
 			 * sync-to-convergence, because we remove
 			 * buffers from the hash table when we arc_free().
 			 */
-			ASSERT(zio->io_flags & ZIO_FLAG_IO_REWRITE);
-			ASSERT(DVA_EQUAL(BP_IDENTITY(&zio->io_bp_orig),
-			    BP_IDENTITY(zio->io_bp)));
-			ASSERT3U(zio->io_bp_orig.blk_birth, ==,
-			    zio->io_bp->blk_birth);
+			if (!(zio->io_flags & ZIO_FLAG_IO_REWRITE) ||
+			    !DVA_EQUAL(BP_IDENTITY(&zio->io_bp_orig),
+			    BP_IDENTITY(zio->io_bp)) ||
+			    zio->io_bp_orig.blk_birth !=
+			    zio->io_bp->blk_birth) {
+				panic("bad overwrite, hdr=%p exists=%p",
+				    (void *)hdr, (void *)exists);
+			}
 
 			ASSERT(refcount_is_zero(&exists->b_refcnt));
 			arc_change_state(arc_anon, exists, hash_lock);

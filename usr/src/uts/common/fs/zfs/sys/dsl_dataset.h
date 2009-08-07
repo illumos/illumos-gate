@@ -195,7 +195,6 @@ dsl_checkfunc_t dsl_dataset_destroy_check;
 dsl_syncfunc_t dsl_dataset_destroy_sync;
 dsl_checkfunc_t dsl_dataset_snapshot_check;
 dsl_syncfunc_t dsl_dataset_snapshot_sync;
-int dsl_dataset_rollback(dsl_dataset_t *ds, dmu_objset_type_t ost);
 int dsl_dataset_rename(char *name, const char *newname, boolean_t recursive);
 int dsl_dataset_promote(const char *name);
 int dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,

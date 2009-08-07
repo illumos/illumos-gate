@@ -183,6 +183,7 @@ dev_t expldev(dev32_t);
 int bcmp(const void *, const void *, size_t) __PURE;
 int stoi(char **);
 void numtos(ulong_t, char *);
+char *kmem_asprintf(const char *fmt, ...);
 int strident_valid(const char *);
 void strident_canon(char *, size_t);
 int getsubopt(char **optionsp, char * const *tokens, char **valuep);

@@ -114,11 +114,11 @@ typedef struct objset_impl {
 int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
     objset_t **osp);
 void dmu_objset_close(objset_t *os);
-int dmu_objset_create(const char *name, dmu_objset_type_t type,
-    objset_t *clone_parent, uint64_t flags,
+int dmu_objset_create(const char *name, dmu_objset_type_t type, uint64_t flags,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);
+int dmu_objset_clone(const char *name, struct dsl_dataset *clone_origin,
+    uint64_t flags);
 int dmu_objset_destroy(const char *name, boolean_t defer);
-int dmu_objset_rollback(objset_t *os);
 int dmu_objset_snapshot(char *fsname, char *snapname, nvlist_t *props,
     boolean_t recursive);
 void dmu_objset_stats(objset_t *os, nvlist_t *nv);

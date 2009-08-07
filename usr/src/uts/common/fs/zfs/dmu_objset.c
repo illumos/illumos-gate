@@ -564,7 +564,7 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 struct oscarg {
 	void (*userfunc)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx);
 	void *userarg;
-	dsl_dataset_t *clone_parent;
+	dsl_dataset_t *clone_origin;
 	const char *lastname;
 	dmu_objset_type_t type;
 	uint64_t flags;
@@ -585,17 +585,13 @@ dmu_objset_create_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	if (err != ENOENT)
 		return (err ? err : EEXIST);
 
-	if (oa->clone_parent != NULL) {
-		/*
-		 * You can't clone across pools.
-		 */
-		if (oa->clone_parent->ds_dir->dd_pool != dd->dd_pool)
+	if (oa->clone_origin != NULL) {
+		/* You can't clone across pools. */
+		if (oa->clone_origin->ds_dir->dd_pool != dd->dd_pool)
 			return (EXDEV);
 
-		/*
-		 * You can only clone snapshots, not the head datasets.
-		 */
-		if (oa->clone_parent->ds_phys->ds_num_children == 0)
+		/* You can only clone snapshots, not the head datasets. */
+		if (!dsl_dataset_is_snapshot(oa->clone_origin))
 			return (EINVAL);
 	}
 
@@ -607,37 +603,37 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct oscarg *oa = arg2;
-	dsl_dataset_t *ds;
-	blkptr_t *bp;
 	uint64_t dsobj;
 
 	ASSERT(dmu_tx_is_syncing(tx));
 
 	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
-	    oa->clone_parent, oa->flags, cr, tx);
+	    oa->clone_origin, oa->flags, cr, tx);
 
-	VERIFY(0 == dsl_dataset_hold_obj(dd->dd_pool, dsobj, FTAG, &ds));
-	bp = dsl_dataset_get_blkptr(ds);
-	if (BP_IS_HOLE(bp)) {
+	if (oa->clone_origin == NULL) {
+		dsl_dataset_t *ds;
+		blkptr_t *bp;
 		objset_impl_t *osi;
 
-		/* This is an empty dmu_objset; not a clone. */
+		VERIFY(0 == dsl_dataset_hold_obj(dd->dd_pool, dsobj,
+		    FTAG, &ds));
+		bp = dsl_dataset_get_blkptr(ds);
+		ASSERT(BP_IS_HOLE(bp));
+
 		osi = dmu_objset_create_impl(dsl_dataset_get_spa(ds),
 		    ds, bp, oa->type, tx);
 
 		if (oa->userfunc)
 			oa->userfunc(&osi->os, oa->userarg, cr, tx);
+		dsl_dataset_rele(ds, FTAG);
 	}
 
 	spa_history_internal_log(LOG_DS_CREATE, dd->dd_pool->dp_spa,
 	    tx, cr, "dataset = %llu", dsobj);
-
-	dsl_dataset_rele(ds, FTAG);
 }
 
 int
-dmu_objset_create(const char *name, dmu_objset_type_t type,
-    objset_t *clone_parent, uint64_t flags,
+dmu_objset_create(const char *name, dmu_objset_type_t type, uint64_t flags,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg)
 {
 	dsl_dir_t *pdd;
@@ -654,24 +650,39 @@ dmu_objset_create(const char *name, dmu_objset_type_t type,
 		return (EEXIST);
 	}
 
-	dprintf("name=%s\n", name);
-
 	oa.userfunc = func;
 	oa.userarg = arg;
 	oa.lastname = tail;
 	oa.type = type;
 	oa.flags = flags;
 
-	if (clone_parent != NULL) {
-		/*
-		 * You can't clone to a different type.
-		 */
-		if (clone_parent->os->os_phys->os_type != type) {
-			dsl_dir_close(pdd, FTAG);
-			return (EINVAL);
-		}
-		oa.clone_parent = clone_parent->os->os_dsl_dataset;
+	err = dsl_sync_task_do(pdd->dd_pool, dmu_objset_create_check,
+	    dmu_objset_create_sync, pdd, &oa, 5);
+	dsl_dir_close(pdd, FTAG);
+	return (err);
+}
+
+int
+dmu_objset_clone(const char *name, dsl_dataset_t *clone_origin, uint64_t flags)
+{
+	dsl_dir_t *pdd;
+	const char *tail;
+	int err = 0;
+	struct oscarg oa = { 0 };
+
+	ASSERT(strchr(name, '@') == NULL);
+	err = dsl_dir_open(name, FTAG, &pdd, &tail);
+	if (err)
+		return (err);
+	if (tail == NULL) {
+		dsl_dir_close(pdd, FTAG);
+		return (EEXIST);
 	}
+
+	oa.lastname = tail;
+	oa.clone_origin = clone_origin;
+	oa.flags = flags;
+
 	err = dsl_sync_task_do(pdd->dd_pool, dmu_objset_create_check,
 	    dmu_objset_create_sync, pdd, &oa, 5);
 	dsl_dir_close(pdd, FTAG);
@@ -685,10 +696,11 @@ dmu_objset_destroy(const char *name, boolean_t defer)
 	int error;
 
 	/*
-	 * If it looks like we'll be able to destroy it, and there's
-	 * an unplayed replay log sitting around, destroy the log.
-	 * It would be nicer to do this in dsl_dataset_destroy_sync(),
-	 * but the replay log objset is modified in open context.
+	 * dsl_dataset_destroy() can free any claimed-but-unplayed
+	 * intent log, but if there is an active log, it has blocks that
+	 * are allocated, but may not yet be reflected in the on-disk
+	 * structure.  Only the ZIL knows how to free them, so we have
+	 * to call into it here.
 	 */
 	error = dmu_objset_open(name, DMU_OST_ANY,
 	    DS_MODE_OWNER|DS_MODE_READONLY|DS_MODE_INCONSISTENT, &os);
@@ -697,41 +709,11 @@ dmu_objset_destroy(const char *name, boolean_t defer)
 		zil_destroy(dmu_objset_zil(os), B_FALSE);
 
 		error = dsl_dataset_destroy(ds, os, defer);
-		/*
-		 * dsl_dataset_destroy() closes the ds.
-		 */
+		/* dsl_dataset_destroy() closes the ds. */
 		kmem_free(os, sizeof (objset_t));
 	}
 
 	return (error);
-}
-
-/*
- * This will close the objset.
- */
-int
-dmu_objset_rollback(objset_t *os)
-{
-	int err;
-	dsl_dataset_t *ds;
-
-	ds = os->os->os_dsl_dataset;
-
-	if (!dsl_dataset_tryown(ds, TRUE, os)) {
-		dmu_objset_close(os);
-		return (EBUSY);
-	}
-
-	err = dsl_dataset_rollback(ds, os->os->os_phys->os_type);
-
-	/*
-	 * NB: we close the objset manually because the rollback
-	 * actually implicitly called dmu_objset_evict(), thus freeing
-	 * the objset_impl_t.
-	 */
-	dsl_dataset_disown(ds, os);
-	kmem_free(os, sizeof (objset_t));
-	return (err);
 }
 
 struct snaparg {

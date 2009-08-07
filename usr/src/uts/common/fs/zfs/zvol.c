@@ -435,7 +435,6 @@ zvol_create_minor(const char *name, major_t maj)
 	int ds_mode = DS_MODE_OWNER;
 	vnode_t *vp = NULL;
 	char *devpath;
-	size_t devpathlen = strlen(ZVOL_FULL_DEV_DIR) + strlen(name) + 1;
 	char chrbuf[30], blkbuf[30];
 	int error;
 
@@ -468,13 +467,9 @@ zvol_create_minor(const char *name, major_t maj)
 	 * If there's an existing /dev/zvol symlink, try to use the
 	 * same minor number we used last time.
 	 */
-	devpath = kmem_alloc(devpathlen, KM_SLEEP);
-
-	(void) sprintf(devpath, "%s%s", ZVOL_FULL_DEV_DIR, name);
-
+	devpath = kmem_asprintf("%s%s", ZVOL_FULL_DEV_DIR, name);
 	error = lookupname(devpath, UIO_SYSSPACE, NO_FOLLOW, NULL, &vp);
-
-	kmem_free(devpath, devpathlen);
+	strfree(devpath);
 
 	if (error == 0 && vp->v_type != VLNK)
 		error = EINVAL;
@@ -1612,14 +1607,11 @@ zvol_is_swap(zvol_state_t *zv)
 	vnode_t *vp;
 	boolean_t ret = B_FALSE;
 	char *devpath;
-	size_t devpathlen;
 	int error;
 
-	devpathlen = strlen(ZVOL_FULL_DEV_DIR) + strlen(zv->zv_name) + 1;
-	devpath = kmem_alloc(devpathlen, KM_SLEEP);
-	(void) sprintf(devpath, "%s%s", ZVOL_FULL_DEV_DIR, zv->zv_name);
+	devpath = kmem_asprintf("%s%s", ZVOL_FULL_DEV_DIR, zv->zv_name);
 	error = lookupname(devpath, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
-	kmem_free(devpath, devpathlen);
+	strfree(devpath);
 
 	ret = !error && IS_SWAPVP(common_specvp(vp));
 
