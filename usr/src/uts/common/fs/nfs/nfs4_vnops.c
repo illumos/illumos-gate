@@ -13994,6 +13994,7 @@ nfs4frlock_final_cleanup(nfs4_lock_call_type_t ctype, COMPOUND4args_clnt *argsp,
 	rnode4_t	*rp = VTOR4(vp);
 	int		error = *errorp;
 	nfs_argop4	*argop;
+	int	do_flush_pages = 0;
 
 	ASSERT(nfs_zone() == mi->mi_zone);
 	/*
@@ -14018,22 +14019,11 @@ nfs4frlock_final_cleanup(nfs4_lock_call_type_t ctype, COMPOUND4args_clnt *argsp,
 		 * work since VOP_PUTPAGE can call nfs4_commit which calls
 		 * nfs4_start_fop. We flush the pages below after calling
 		 * nfs4_end_fop above
+		 * The flush of the page cache must be done after
+		 * nfs4_end_open_seqid_sync() to avoid a 4-way hang.
 		 */
-		if (!error && resp && resp->status == NFS4_OK) {
-			int error;
-
-			error = VOP_PUTPAGE(vp, (u_offset_t)0,
-			    0, B_INVAL, cred, NULL);
-
-			if (error && (error == ENOSPC || error == EDQUOT)) {
-				rnode4_t *rp = VTOR4(vp);
-
-				mutex_enter(&rp->r_statelock);
-				if (!rp->r_error)
-					rp->r_error = error;
-				mutex_exit(&rp->r_statelock);
-			}
-		}
+		if (!error && resp && resp->status == NFS4_OK)
+			do_flush_pages = 1;
 	}
 	if (argsp) {
 		ASSERT(argsp->array_len == 2);
@@ -14062,6 +14052,9 @@ nfs4frlock_final_cleanup(nfs4_lock_call_type_t ctype, COMPOUND4args_clnt *argsp,
 		nfs4_end_open_seqid_sync(oop);
 		open_owner_rele(oop);
 	}
+
+	if (do_flush_pages)
+		nfs4_flush_pages(vp, cred);
 
 	(void) convoff(vp, flk, whence, offset);
 

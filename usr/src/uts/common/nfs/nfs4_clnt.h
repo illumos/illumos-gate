@@ -1461,6 +1461,7 @@ extern void	nfs4_purge_rddir_cache(vnode_t *);
 extern void	nfs4_invalidate_pages(vnode_t *, u_offset_t, cred_t *);
 extern void	nfs4_purge_caches(vnode_t *, int, cred_t *, int);
 extern void	nfs4_purge_stale_fh(int, vnode_t *, cred_t *);
+extern void	nfs4_flush_pages(vnode_t *vp, cred_t *cr);
 
 extern void	nfs4rename_update(vnode_t *, vnode_t *, nfs_fh4 *, char *);
 extern void	nfs4_update_paths(vnode_t *, char *, vnode_t *, char *,

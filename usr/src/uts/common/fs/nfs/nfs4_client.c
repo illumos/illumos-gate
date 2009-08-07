@@ -106,7 +106,6 @@ static	callb_id_t cid = 0;
 static int	nfs4renew(nfs4_server_t *);
 static void	nfs4_attrcache_va(vnode_t *, nfs4_ga_res_t *, int);
 static void	nfs4_pgflush_thread(pgflush_t *);
-static void	flush_pages(vnode_t *, cred_t *);
 
 static boolean_t nfs4_client_cpr_callb(void *, int);
 
@@ -302,7 +301,7 @@ nfs4_purge_caches(vnode_t *vp, int purge_dnlc, cred_t *cr, int asyncpg)
 	if (nfs4_has_pages(vp) && !pgflush) {
 		if (!asyncpg) {
 			(void) nfs4_waitfor_purge_complete(vp);
-			flush_pages(vp, cr);
+			nfs4_flush_pages(vp, cr);
 		} else {
 			pgflush_t *args;
 
@@ -343,8 +342,8 @@ nfs4_purge_caches(vnode_t *vp, int purge_dnlc, cred_t *cr, int asyncpg)
  * ones.
  */
 
-static void
-flush_pages(vnode_t *vp, cred_t *cr)
+void
+nfs4_flush_pages(vnode_t *vp, cred_t *cr)
 {
 	int error;
 	rnode4_t *rp = VTOR4(vp);
@@ -373,7 +372,7 @@ nfs4_pgflush_thread(pgflush_t *args)
 	rp->r_pgflush = curthread;
 	mutex_exit(&rp->r_statelock);
 
-	flush_pages(args->vp, args->cr);
+	nfs4_flush_pages(args->vp, args->cr);
 
 	mutex_enter(&rp->r_statelock);
 	rp->r_pgflush = NULL;
