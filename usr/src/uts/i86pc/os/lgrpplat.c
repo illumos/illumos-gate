@@ -547,6 +547,7 @@ plat_build_mem_nodes(struct memlist *list)
 					 * that span more than 1 memory node.
 					 */
 					endcnt = 1;
+					physinstalled--;
 				}
 			}
 
