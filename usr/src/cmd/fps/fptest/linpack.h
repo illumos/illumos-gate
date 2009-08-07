@@ -85,9 +85,11 @@ struct LinpVals {
 #undef FPS_LAPA_LIB13
 #undef FPS_LAPA_UNK
 
+/* SS12 U1 */
+#if (LAPA_COMP_PERF_6 == 1)
+#define	FPS_LAPA_LIB13
 
-/* SS13 */
-#if (LAPA_COMP_PERF_5 == 1)
+#elif (LAPA_COMP_PERF_5 == 1)
 #define	FPS_LAPA_LIB13
 
 /* QA SS12 */
@@ -132,7 +134,7 @@ struct LinpVals {
 #endif
 
 #ifdef FPS_LAPA_LIB13
-#include <singdoub64v9b_ss13.h>
+#include <singdoub64v9b_ss12u1.h>
 #endif
 
 #else
@@ -155,7 +157,7 @@ struct LinpVals {
 #endif
 
 #ifdef FPS_LAPA_LIB13
-#include <singdoub64_ss13.h>
+#include <singdoub64_ss12u1.h>
 #endif
 
 #endif /* V9B */

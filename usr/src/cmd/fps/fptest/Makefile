@@ -111,12 +111,12 @@ benchmarks.o: benchmarks.c visfps.il
 	$(POST_PROCESS_O)
 
 S.linpack.o: linpack.c
-	$(COMPILE.c) linpack.c -o $@
+	$(COMPILE.c) -DLAPA_COMP_PERF_$(VER) linpack.c -o $@
 	$(CTFCONVERT_O)
 	$(POST_PROCESS_O)
 
 D.linpack.o: linpack.c
-	$(COMPILE.c) linpack.c -DDP -o $@
+	$(COMPILE.c) -DLAPA_COMP_PERF_$(VER) linpack.c -DDP -o $@
 	$(CTFCONVERT_O)
 	$(POST_PROCESS_O)
 

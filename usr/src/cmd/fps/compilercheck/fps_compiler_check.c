@@ -66,7 +66,9 @@ v_d version_details[] = {
 	{0x590, 7, 124870, 3, /* 4-SS12 QA */
 	"Sun Performance Library 7 Patch_124870-03 2008/05/28" },
 	{0x5100, 8, 0, 0,
-	"Sun Performance Library 8 2008/10/24"}, /* 5 - SS13 */
+	"Sun Performance Library 8 2008/10/24"}, /* 5 */
+	{0x5100, 8, 0, 0,
+	"Sun Performance Library 8 2009/04/28"}, /* 6 - SS12 U1 */
 	{0, 0, 0, 0, NULL}
 };
 
