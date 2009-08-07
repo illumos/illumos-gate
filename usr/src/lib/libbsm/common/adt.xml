@@ -1891,109 +1891,125 @@ Use is subject to license terms.
 
 <!-- TPM events recorded by tcsd(8) -->
 
-    <event id="AUE_tpm_takeownership" instance_of="AUE_generic_basic"
+    <event id="AUE_generic_tpm" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="message">
+		<internal token="text"/>
+		<external opt="optional" type="msg tpm_e"/>
+		<comment>TPM error message</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_tpm_takeownership" instance_of="AUE_generic_tpm"
 	header="0" idNo="99" omit="JNI">
 	<title>TPM_TakeOwnership</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_setoperatorauth" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_setoperatorauth" instance_of="AUE_generic_tpm"
 	header="0" idNo="100" omit="JNI">
 	<title>TPM_SetOperatorAuth</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_setownerinstall" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_setownerinstall" instance_of="AUE_generic_tpm"
 	header="0" idNo="101" omit="JNI">
 	<title>TPM_SetOwnerInstall</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_selftestfull" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_selftestfull" instance_of="AUE_generic_tpm"
 	header="0" idNo="102" omit="JNI">
 	<title>TPM_SelfTestFull</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_certifyselftest" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_certifyselftest" instance_of="AUE_generic_tpm"
 	header="0" idNo="103" omit="JNI">
 	<title>TPM_CertifySelfTest</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_continueselftest" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_continueselftest" instance_of="AUE_generic_tpm"
 	header="0" idNo="104" omit="JNI">
 	<title>TPM_ContinueSelfTest</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_ownersetdisable" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_ownersetdisable" instance_of="AUE_generic_tpm"
 	header="0" idNo="105" omit="JNI">
 	<title>TPM_OwnerSetDisable</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_ownerclear" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_ownerclear" instance_of="AUE_generic_tpm"
 	header="0" idNo="106" omit="JNI">
 	<title>TPM_OwnerClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_disableownerclear" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_disableownerclear" instance_of="AUE_generic_tpm"
 	header="0" idNo="107" omit="JNI">
 	<title>TPM_DisableOwnerClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_forceclear" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_forceclear" instance_of="AUE_generic_tpm"
 	header="0" idNo="108" omit="JNI">
 	<title>TPM_ForceClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_disableforceclear" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_disableforceclear" instance_of="AUE_generic_tpm"
 	header="0" idNo="109" omit="JNI">
 	<title>TPM_DisableForceClear</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_physicaldisable" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_physicaldisable" instance_of="AUE_generic_tpm"
 	header="0" idNo="110" omit="JNI">
 	<title>TPM_PhysicalDisable</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_physicalenable" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_physicalenable" instance_of="AUE_generic_tpm"
 	header="0" idNo="111" omit="JNI">
 	<title>TPM_PhysicalEnsable</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_physicaldeactivate" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_physicaldeactivate" instance_of="AUE_generic_tpm"
 	header="0" idNo="112" omit="JNI">
 	<title>TPM_PhysicalSetDeactivated</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_settempdeactivated" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_settempdeactivated" instance_of="AUE_generic_tpm"
 	header="0" idNo="113" omit="JNI">
 	<title>TPM_SetTempDeactivated</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_physicalpresence" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_physicalpresence" instance_of="AUE_generic_tpm"
 	header="0" idNo="114" omit="JNI">
 	<title>TPM_PhysicalPresence</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_fieldupgrade" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_fieldupgrade" instance_of="AUE_generic_tpm"
 	header="0" idNo="115" omit="JNI">
 	<title>TPM_FieldUpgrade</title>
 	<program>/usr/lib/tcsd</program>
 	<see>tcsd(8)</see>
     </event>
-    <event id="AUE_tpm_resetlockvalue" instance_of="AUE_generic_basic"
+    <event id="AUE_tpm_resetlockvalue" instance_of="AUE_generic_tpm"
 	header="0" idNo="116" omit="JNI">
 	<title>TPM_ResetLockValue</title>
 	<program>/usr/lib/tcsd</program>
