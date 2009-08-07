@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -119,6 +119,7 @@ OBJECTS	=	Lockable.o \
 		HandleNPIVPort.o \
 		AdapterDeviceEventListener.o \
 		Sun_fcRegisterForAdapterDeviceEvents.o \
+		Sun_fcDoForceLip.o \
 		Sun_fcAdapterCreateWWN.o \
 		Sun_fcAdapterReturnWWN.o
 

@@ -146,6 +146,7 @@ int fc_util_list_logicalunit(int pathCount, char **argv, cmdOptions_t *options);
 int fc_util_delete_npivport(int wwnCount, char **argv, cmdOptions_t *options);
 int fc_util_create_npivport(int wwnCount, char **argv, cmdOptions_t *options);
 int fc_util_create_portlist();
+int fc_util_force_lip(int objects, char *argv[]);
 
 int fcoe_adm_create_port(int objects, char *argv[],
     cmdOptions_t *options);

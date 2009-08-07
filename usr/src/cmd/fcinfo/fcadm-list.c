@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -939,6 +939,52 @@ out:
 	}
 	if (valueLookup != NULL) {
 		scf_value_destroy(valueLookup);
+	}
+
+	return (0);
+}
+
+/* ARGSUSED */
+int
+fc_util_force_lip(int objects, char *argv[])
+{
+	uint64_t	hbaWWN;
+	HBA_WWN		myWWN;
+	HBA_HANDLE	handle;
+	HBA_STATUS	status;
+	int		rval = 0;
+
+	if ((status = HBA_LoadLibrary()) != HBA_STATUS_OK) {
+		fprintf(stderr, gettext("Failed to load FC-HBA library\n"));
+		printStatus(status);
+		fprintf(stderr, "\n");
+		return (1);
+	}
+
+	sscanf(argv[0], "%016llx", &hbaWWN);
+	hbaWWN = htonll(hbaWWN);
+	memcpy(myWWN.wwn, &hbaWWN, sizeof (hbaWWN));
+
+	/*
+	 * Try target mode first
+	 */
+	if ((status = Sun_HBA_OpenTgtAdapterByWWN(&handle, myWWN)) !=
+	    HBA_STATUS_OK) {
+		/*
+		 * Continue to try initiator mode
+		 */
+		if ((status = HBA_OpenAdapterByWWN(&handle, myWWN)) !=
+		    HBA_STATUS_OK) {
+			fprintf(stderr, gettext("Error: HBA %s not found\n"),
+			    argv[0]);
+			return (0);
+		}
+	}
+
+	status = Sun_HBA_ForceLip(handle, &rval);
+	if ((status != HBA_STATUS_OK) || (rval != 0)) {
+		fprintf(stderr, gettext("Error: Failed to reinitialize the "
+		    "link of HBA %s\n"), argv[0]);
 	}
 
 	return (0);

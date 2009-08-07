@@ -113,6 +113,7 @@ SUNW_2.0 {
 	Sun_HBA_OpenTgtAdapterByWWN;
 	Sun_HBA_AdapterCreateWWN;
 	Sun_HBA_AdapterReturnWWN;
+	Sun_HBA_ForceLip;
 
     local:
 	*;

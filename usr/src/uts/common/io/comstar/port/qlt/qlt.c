@@ -1646,17 +1646,37 @@ qlt_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 	return (ret);
 }
 
+static fct_status_t
+qlt_force_lip(qlt_state_t *qlt)
+{
+	mbox_cmd_t	*mcp;
+	fct_status_t	 rval;
+
+	mcp = qlt_alloc_mailbox_command(qlt, 0);
+	mcp->to_fw[0] = 0x0072;
+	mcp->to_fw[1] = BIT_4;
+	mcp->to_fw[3] = 1;
+	mcp->to_fw_mask |= BIT_1 | BIT_3;
+	rval = qlt_mailbox_command(qlt, mcp);
+	if (rval != FCT_SUCCESS) {
+		QLT_LOG(qlt->qlt_port_alias, "qlt FLIP MB failed: rval=%x");
+	} else {
+		if (mcp->from_fw[0] != 0x4000) {
+			QLT_LOG(qlt->qlt_port_alias, "qlt FLIP: fw[0]=%x",
+			    mcp->from_fw[0]);
+			rval = FCT_FAILURE;
+		}
+	}
+	qlt_free_mailbox_command(qlt, mcp);
+	return (rval);
+}
+
 static void
 qlt_ctl(struct fct_local_port *port, int cmd, void *arg)
 {
-	stmf_change_status_t		st;
+	stmf_change_status_t		 st;
 	stmf_state_change_info_t	*ssci = (stmf_state_change_info_t *)arg;
 	qlt_state_t			*qlt;
-
-	ASSERT((cmd == FCT_CMD_PORT_ONLINE) ||
-	    (cmd == FCT_CMD_PORT_OFFLINE) ||
-	    (cmd == FCT_ACK_PORT_ONLINE_COMPLETE) ||
-	    (cmd == FCT_ACK_PORT_OFFLINE_COMPLETE));
 
 	qlt = (qlt_state_t *)port->port_fca_private;
 	st.st_completion_status = FCT_SUCCESS;
@@ -1726,6 +1746,15 @@ qlt_ctl(struct fct_local_port *port, int cmd, void *arg)
 				    qlt->qlt_port_alias);
 			}
 		}
+		break;
+
+	case FCT_CMD_FORCE_LIP:
+		*((fct_status_t *)arg) = qlt_force_lip(qlt);
+		QLT_LOG(qlt->qlt_port_alias, "qlt_ctl: forcelip done");
+		break;
+
+	default:
+		QLT_LOG(qlt->qlt_port_alias, "qlt_ctl: unsupport-0x%02X", cmd);
 		break;
 	}
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ public:
      */
     virtual std::string		    getName();
     virtual HBA_ADAPTERATTRIBUTES   getHBAAttributes();
+    virtual int 		    doForceLip();
     static void loadAdapters(std::vector<HBA*> &list);
     virtual HBA_ADAPTERATTRIBUTES   npivGetHBAAttributes() {
 					throw NotSupportedException(); }

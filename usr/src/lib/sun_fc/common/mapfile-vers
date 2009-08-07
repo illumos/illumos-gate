@@ -108,6 +108,7 @@ SUNWprivate {
 	Sun_fcSetBindingSupport;
 	Sun_fcSetPersistentBindingV2;
 	Sun_fcSetRNIDMgmtInfo;
+	Sun_fcDoForceLip;
 
     local:
 	*;

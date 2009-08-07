@@ -39,6 +39,7 @@ extern "C" {
 #define	FCTIO_GET_PORT_ATTRIBUTES		(FCTIO_SUB_CMD + 0x05)
 #define	FCTIO_GET_ADAPTER_PORT_STATS		(FCTIO_SUB_CMD + 0x06)
 #define	FCTIO_GET_LINK_STATUS			(FCTIO_SUB_CMD + 0x07)
+#define	FCTIO_FORCE_LIP				(FCTIO_SUB_CMD + 0x08)
 
 /*
  * fcio_xfer definitions

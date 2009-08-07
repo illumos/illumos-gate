@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@ public:
 	bool				containsWWN(uint64_t wwn);
 
 	virtual HBA_ADAPTERATTRIBUTES	getHBAAttributes() = 0;
+	virtual int			doForceLip() = 0;
 	virtual HBA_ADAPTERATTRIBUTES	npivGetHBAAttributes() = 0;
 	void				setRNID(HBA_MGMTINFO info);
 	/*

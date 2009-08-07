@@ -743,6 +743,30 @@ SEND_RLS_ELS:
 }
 
 static int
+fct_forcelip(uint8_t *port_wwn, uint32_t *fctio_errno)
+{
+	fct_status_t		 rval;
+	fct_i_local_port_t	*iport;
+
+	mutex_enter(&fct_global_mutex);
+	iport = fct_get_iport_per_wwn(port_wwn);
+	mutex_exit(&fct_global_mutex);
+	if (iport == NULL) {
+		return (-1);
+	}
+
+	iport->iport_port->port_ctl(iport->iport_port,
+	    FCT_CMD_FORCE_LIP, &rval);
+	if (rval != FCT_SUCCESS) {
+		*fctio_errno = FCTIO_FAILURE;
+	} else {
+		*fctio_errno = 0;
+	}
+
+	return (0);
+}
+
+static int
 fct_fctiocmd(intptr_t data, int mode)
 {
 	int ret	 = 0;
@@ -884,6 +908,10 @@ fct_fctiocmd(intptr_t data, int mode)
 		mutex_exit(&fct_global_mutex);
 		break;
 		}
+
+	case FCTIO_FORCE_LIP:
+		ret = fct_forcelip((uint8_t *)ibuf, &fctio->fctio_errno);
+		break;
 
 	default:
 		break;

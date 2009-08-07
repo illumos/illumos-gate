@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,6 +202,51 @@ HBA_ADAPTERATTRIBUTES FCHBA::getHBAAttributes() {
     memcpy(&attributes.NodeWWN, &attrs.NodeWWN, 8);
 
     return (attributes);
+}
+
+int FCHBA::doForceLip() {
+    Trace	 log("FCHBA::doForceLip");
+    int		 fd;
+    fcio_t	 fcio;
+    uint64_t	 wwn  = 0;
+    HBAPort	*port = getPortByIndex(0);
+
+    errno = 0;
+    if ((fd = open(port->getPath().c_str(), O_RDONLY | O_EXCL)) == -1) {
+	if (errno == EBUSY) {
+	    throw BusyException();
+	} else if (errno == EAGAIN) {
+	    throw TryAgainException();
+	} else if (errno == ENOTSUP) {
+	    throw NotSupportedException();
+	} else {
+	    throw IOError(port);
+	}
+    }
+
+    memset(&fcio, 0, sizeof (fcio));
+    fcio.fcio_cmd = FCIO_RESET_LINK;
+    fcio.fcio_xfer = FCIO_XFER_WRITE;
+    fcio.fcio_ilen = sizeof (wwn);
+    fcio.fcio_ibuf = (caddr_t)&wwn;
+
+    errno = 0;
+    if (ioctl(fd, FCIO_CMD, &fcio) != 0) {
+	close(fd);
+
+	if (errno == EBUSY) {
+	    throw BusyException();
+	} else if (errno == EAGAIN) {
+	    throw TryAgainException();
+	} else if (errno == ENOTSUP) {
+	    throw NotSupportedException();
+	} else {
+	    throw IOError("Unable to reinitialize the link");
+	}
+    } else {
+        close(fd);
+	return (fcio.fcio_errno);
+    }
 }
 
 HBA_ADAPTERATTRIBUTES FCHBA::npivGetHBAAttributes() {

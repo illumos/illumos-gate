@@ -18,7 +18,7 @@
  *************************************************************************
  */
 /*
- * 	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * 	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * 	Use is subject to license terms.
  */
 
@@ -102,7 +102,7 @@ extern int _hbaapi_sysloginit;
 	}\
     }
 #endif /* WIN32*/
- 
+
 #else /* Not both USESYSLOG and USELOGFILE */
 #if defined(USESYSLOG)
 int _hbaapi_sysloginit = 0;
@@ -142,11 +142,11 @@ FILE *_hbaapi_debug_fd = NULL;
 #endif /* WIN32 */
 #endif /* USELOGFILE */
 #endif /* Not both USELOGFILE and USESYSLOG */
- 
+
 #ifdef POSIX_THREADS
 #include <pthread.h>
 /*
- * When multiple mutex's are grabed, they must be always be grabbed in 
+ * When multiple mutex's are grabed, they must be always be grabbed in
  * the same order, or deadlock can result.  There are three levels
  * of mutex's involved in this API.  If LL_mutex is grabbed, always grap
  * it first.  If AL_mutex is grabbed, it may not be grabbed before
@@ -167,11 +167,11 @@ FILE *_hbaapi_debug_fd = NULL;
 #define RELEASE_MUTEX(M)
 #define RELEASE_MUTEX_RETURN(M,RET)	return(RET)
 #endif
- 
+
 /*
  * HBA_LIBRARY_STATUS and HBA_LIBRARY_INFO are redefined here.
  * Avoid any change in the common code.
- */ 
+ */
 typedef enum {
     HBA_LIBRARY_UNKNOWN,
     HBA_LIBRARY_LOADED,
@@ -232,6 +232,7 @@ typedef	HBA_STATUS	(* Sun_HBAGetPortNPIVAttributesFunc)
 typedef	HBA_STATUS	(* Sun_HBARegisterForAdapterDeviceEventsFunc)
 			    (void (*)(void *, HBA_WWN, HBA_UINT32, HBA_UINT32),
 			    void *, HBA_HANDLE, HBA_WWN, HBA_CALLBACKHANDLE *);
+typedef	HBA_STATUS	(* Sun_HBADoForceLipFunc)(HBA_HANDLE, int *);
 
 /*
  * Individual adapter (hba) information
@@ -324,7 +325,7 @@ Sun_HBA_GetNumberOfTgtAdapters()
             GetTgtAdapterNameFunc = (Sun_HBAGetTgtAdapterNameFunc)
 		dlsym(lib_infop->hLibrary, "Sun_fcGetTgtAdapterName");
 	    if (GetNumberOfTgtAdaptersFunc == NULL ||
-		GetTgtAdapterNameFunc == NULL)	{	    
+		GetTgtAdapterNameFunc == NULL)	{
 		GetNumberOfTgtAdaptersFunc = GetTgtAdapterNameFunc = NULL;
                 continue;
             }
@@ -334,10 +335,10 @@ Sun_HBA_GetNumberOfTgtAdapters()
 
 	num_adapters = ((GetNumberOfTgtAdaptersFunc)());
 #ifndef WIN32
-	DEBUG(1, "HBAAPI: number of target mode adapters for %s = %d\n", 
+	DEBUG(1, "HBAAPI: number of target mode adapters for %s = %d\n",
 	      lib_infop->LibraryName, num_adapters, 0);
 #else
-	DEBUG(1, "HBAAPI: number of target mode_adapters for %s = %d\n", 
+	DEBUG(1, "HBAAPI: number of target mode_adapters for %s = %d\n",
 	      lib_infop->LibraryPath, num_adapters, 0);
 #endif
 
@@ -380,7 +381,7 @@ Sun_HBA_GetNumberOfTgtAdapters()
 		adapt_infop->name = strdup(adaptername);
 	    } else {
 		char dummyname[512];
-		sprintf(dummyname, "NULLADAPTER-%s-%03d", 
+		sprintf(dummyname, "NULLADAPTER-%s-%03d",
 			lib_infop->LibraryPath, _hbaapi_total_tgtadapter_count);
 		dummyname[255] = '\0';
 		adapt_infop->name = strdup(dummyname);
@@ -421,7 +422,7 @@ Sun_HBA_GetTgtAdapterName(
 	adapt_infop = adapt_infop->next) {
 
 	if(adapt_infop->index == adapterindex) {
-	    if(adapt_infop->name != NULL && 
+	    if(adapt_infop->name != NULL &&
 	       adapt_infop->GNstatus == HBA_STATUS_OK) {
 		strcpy(adaptername, adapt_infop->name);
 	    } else {
@@ -517,13 +518,13 @@ Sun_HBA_OpenTgtAdapterByWWN(HBA_HANDLE *phandle, HBA_WWN nodeWWN)
         OpenTgtAdapterByWWNFunc = (Sun_HBAOpenTgtAdapterByWWNFunc)
 		dlsym(lib_infop->hLibrary, "Sun_fcOpenTgtAdapterByWWN");
 	if (GetNumberOfTgtAdaptersFunc == NULL ||
-		OpenTgtAdapterByWWNFunc == NULL) {	    
+		OpenTgtAdapterByWWNFunc == NULL) {
 		GetNumberOfTgtAdaptersFunc = OpenTgtAdapterByWWNFunc = NULL;
                 continue;
         }
 
 	(void) ((GetNumberOfTgtAdaptersFunc)());
- 
+
 	if((status = (OpenTgtAdapterByWWNFunc)(&handle, nodeWWN))
 	    != HBA_STATUS_OK) {
 	    GetNumberOfTgtAdaptersFunc = OpenTgtAdapterByWWNFunc = NULL;
@@ -841,4 +842,26 @@ Sun_HBA_RegisterForAdapterDeviceEvents (
 	RELEASE_MUTEX(&_hbaapi_APE_mutex);
 
 	RELEASE_MUTEX_RETURN(&_hbaapi_LL_mutex, HBA_STATUS_OK);
+}
+
+HBA_STATUS
+Sun_HBA_ForceLip(HBA_HANDLE handle, int *rval)
+{
+	HBA_STATUS		status;
+	HBA_LIBRARY_INFO	*lib_infop;
+	HBA_HANDLE		vendorHandle;
+
+	Sun_HBADoForceLipFunc	DoForceLipFunc;
+
+	DEBUG(2, "Sun_HBA_DoForceLip", 0, 0, 0);
+
+	NPIVCHECKLIBRARY();
+	DoForceLipFunc = (Sun_HBADoForceLipFunc)
+		dlsym(lib_infop->hLibrary, "Sun_fcDoForceLip");
+	if (DoForceLipFunc != NULL) {
+		status = ((DoForceLipFunc)(vendorHandle, rval));
+	} else {
+		status = HBA_STATUS_ERROR_NOT_SUPPORTED;
+	}
+	RELEASE_MUTEX_RETURN(&_hbaapi_LL_mutex, status);
 }

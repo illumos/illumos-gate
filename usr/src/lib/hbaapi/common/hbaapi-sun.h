@@ -20,7 +20,7 @@
  * *******************************************************************************
  */
 /*
- * 	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * 	Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * 	Use is subject to license terms.
  */
 
@@ -140,6 +140,9 @@ HBA_API HBA_STATUS Sun_HBA_RegisterForAdapterDeviceEvents(
     HBA_CALLBACKHANDLE	*callbackHandle
     );
 
+HBA_API HBA_STATUS Sun_HBA_ForceLip(
+    HBA_HANDLE handle,
+    int *rval);
 
 #endif /* HBA_API_SUN_H */
 

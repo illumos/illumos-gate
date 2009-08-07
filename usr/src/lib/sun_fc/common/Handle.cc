@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,7 +123,7 @@ Handle::Handle(HBA *myhba, MODE m) {
 
 
 	// if initiator mode call constructor for initiator.
-	if (m == INITIATOR) { 
+	if (m == INITIATOR) {
 		Handle(myhba, TARGET);
 	}
 
@@ -371,6 +371,24 @@ HBA_ADAPTERATTRIBUTES Handle::getHBAAttributes() {
 	    HBA_ADAPTERATTRIBUTES attributes = hba->getHBAAttributes();
 	    unlock();
 	    return (attributes);
+	} catch (...) {
+	    unlock();
+	    throw;
+	}
+}
+
+/**
+ * @memo	    Do FORCELIP
+ *
+ * @see		    HBA::doForceLip
+ */
+int Handle::doForceLip() {
+	Trace log("Handle::doForceLip");
+	lock();
+	try {
+	    int rval = hba->doForceLip();
+	    unlock();
+	    return (rval);
 	} catch (...) {
 	    unlock();
 	    throw;

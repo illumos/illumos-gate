@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,63 @@ HBA_ADAPTERATTRIBUTES TgtFCHBA::getHBAAttributes()
     return (attributes);
 }
 
+int TgtFCHBA::doForceLip()
+{
+    Trace	 log("TgtFCHBA::doForceLip");
+    int		 fd;
+    HBAPort	*port = getPortByIndex(0);
+    fctio_t	 fctio;
+    uint64_t	 portwwn;
+
+    errno = 0;
+    if ((fd = open(FCT_DRIVER_PATH.c_str(), O_NDELAY | O_RDONLY)) == -1) {
+	if (errno == EBUSY) {
+	    throw BusyException();
+	} else if (errno == EAGAIN) {
+	    throw TryAgainException();
+	} else if (errno == ENOTSUP) {
+	    throw NotSupportedException();
+	} else {
+	    throw IOError(port);
+	}
+    }
+
+    try {
+	    std::string path = port->getPath();
+	    string::size_type offset = path.find_last_of(".");
+	    if (offset >= 0) {
+		string portwwnString = path.substr(offset+1);
+		portwwn = strtoull(portwwnString.c_str(), NULL, 16);
+	    }
+    } catch (...) {
+	    throw BadArgumentException();
+    }
+
+    uint64_t en_wwn = htonll(portwwn);
+    memset(&fctio, 0, sizeof (fctio));
+    fctio.fctio_cmd = FCTIO_FORCE_LIP;
+    fctio.fctio_xfer = FCTIO_XFER_READ;
+    fctio.fctio_ilen = 8;
+    fctio.fctio_ibuf = (uint64_t)(uintptr_t)&en_wwn;
+
+    errno = 0;
+    if (ioctl(fd, FCTIO_CMD, &fctio) != 0) {
+	close(fd);
+	if (errno == EBUSY) {
+	    throw BusyException();
+	} else if (errno == EAGAIN) {
+	    throw TryAgainException();
+	} else if (errno == ENOTSUP) {
+	    throw NotSupportedException();
+	} else {
+	    throw IOError("Unable to reinitialize the link");
+	}
+    } else {
+	close(fd);
+	return ((int)fctio.fctio_errno);
+    }
+}
+
 void TgtFCHBA::loadAdapters(vector<HBA*> &list)
 {
     Trace log("TgtFCHBA::loadAdapters");
@@ -257,11 +314,11 @@ void TgtFCHBA::loadAdapters(vector<HBA*> &list)
 	try {
 	    std::string hbapath = FCT_ADAPTER_NAME_PREFIX.c_str();
 	    hbapath += ".";
-	    // move the row with two dimentional uint8 array for WWN 
+	    // move the row with two dimentional uint8 array for WWN
 	    uint64_t tmp = ntohll(*((uint64_t *)&tgthbaList->port_wwn[i][0]));
 	    sprintf(wwnStr, "%llx", tmp);
 	    hbapath += wwnStr;
-	    
+
 	    HBA *hba = new TgtFCHBA(hbapath);
 	    list.insert(list.begin(), hba);
 	} catch (...) {

@@ -53,6 +53,7 @@ static int npivListRemotePortFunc(int, char **, cmdOptions_t *, void *);
 static int fcoeAdmCreatePortFunc(int, char **, cmdOptions_t *, void *);
 static int fcoeListPortsFunc(int, char **, cmdOptions_t *, void *);
 static int fcoeAdmDeletePortFunc(int, char **, cmdOptions_t *, void *);
+static int fcadmForceLipFunc(int, char **, cmdOptions_t *, void *);
 static char *getExecBasename(char *);
 
 /*
@@ -122,6 +123,9 @@ subCommandProps_t fcadmsubcommands[] = {
 	{"list-fcoe-ports",
 	    fcoeListPortsFunc, "it", NULL, NULL,
 		OPERAND_NONE, NULL},
+	{"force-lip",
+	    fcadmForceLipFunc, NULL, NULL, NULL,
+		OPERAND_MANDATORY_SINGLE, "WWN"},
 	{NULL, 0, NULL, NULL, NULL, 0, NULL, NULL}
 };
 
@@ -237,6 +241,17 @@ fcoeListPortsFunc(int objects, char *argv[], cmdOptions_t *options,
     void *addArgs)
 {
 	return (fcoe_adm_list_ports(options));
+}
+
+/*
+ * Pass in options/arguments, rest of arguments
+ */
+/*ARGSUSED*/
+static int
+fcadmForceLipFunc(int objects, char *argv[], cmdOptions_t *options,
+    void *addArgs)
+{
+	return (fc_util_force_lip(objects, argv));
 }
 
 /*

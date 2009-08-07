@@ -23,40 +23,38 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_FCHBA_H
-#define	_FCHBA_H
+#include "Handle.h"
+#include "Trace.h"
+#include "Exceptions.h"
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
-
-
-
-#include "HBA.h"
-#include "FCHBAPort.h"
-#include <map>
-#include <string>
-#include <hbaapi.h>
-
-
-/*
- * Represents an individual FCHBA
+/**
+ * @memo	    Retrieves the attributes for an adapter
+ * @precondition    Library must be loaded
+ * @return	    HBA_STATUS_OK if attributes were filled in
+ * @param	    handle The desired HBA
+ * @param	    rval Return value
+ *
  */
-class FCHBA : public HBA {
-public:
-    FCHBA(std::string path);
-    /*
-     * Fetch the name, excluding the trailing "-" and index number
-     */
-    virtual std::string		    getName();
-    virtual HBA_ADAPTERATTRIBUTES   getHBAAttributes();
-    virtual int 		    doForceLip();
-    virtual HBA_ADAPTERATTRIBUTES	npivGetHBAAttributes();
-    static void loadAdapters(std::vector<HBA*> &list);
+HBA_STATUS Sun_fcDoForceLip(HBA_HANDLE handle,
+	    int *rval) {
+	Trace log("Sun_fcDoForceLip");
 
-private:
-    std::string			name;
-    static const std::string	FCSM_DRIVER_PATH;
-    static const std::string	FCSM_DRIVER_PKG;
-    static const int		MAX_FCIO_MSG_LEN;
-};
+	try {
+	    Handle *myHandle = Handle::findHandle(handle);
+	    *rval = myHandle->doForceLip();
+	    return (HBA_STATUS_OK);
+	} catch (HBAException &e) {
+	    return (e.getErrorCode());
+	} catch (...) {
+	    log.internalError(
+		"Uncaught exception");
+	    return (HBA_STATUS_ERROR);
+	}
+}
 
-
-#endif /* _FCHBA_H */
+#ifdef	__cplusplus
+}
+#endif
