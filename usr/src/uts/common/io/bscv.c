@@ -82,7 +82,6 @@ static void *bscv_statep = NULL;
 static int bscv_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int bscv_attach(dev_info_t *, ddi_attach_cmd_t);
 static int bscv_detach(dev_info_t *, ddi_detach_cmd_t);
-static int bscv_reset(dev_info_t *, ddi_reset_cmd_t);
 static int bscv_quiesce(dev_info_t *);
 static int bscv_map_regs(bscv_soft_state_t *);
 static void bscv_unmap_regs(bscv_soft_state_t *);
@@ -370,7 +369,7 @@ static struct dev_ops bscv_dev_ops = {
 	nulldev,		/* devo_probe */
 	bscv_attach,		/* devo_attach */
 	bscv_detach,		/* devo_detach */
-	bscv_reset,		/* devo_reset */
+	nodev,			/* devo_reset */
 	&bscv_cb_ops,		/* devo_cb_ops */
 	(struct bus_ops *)0,	/* devo_bus_ops */
 	NULL,			/* devo_power */
@@ -751,25 +750,6 @@ static int
 bscv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	return (DDI_FAILURE);
-}
-
-/*
- * function	- bscv_reset
- * description	- routine that implements the obsolete devo_reset entry point.
- *		  MAN page declares that devo_quiesce subsumes devo_reset
- *		  functionality.
- * inputs	- device information structure, DDI_RESET command
- * outputs	- DDI_SUCCESS or DDI_FAILURE
- */
-static int
-bscv_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
-{
-	switch (cmd) {
-	case DDI_RESET_FORCE:
-		return (bscv_quiesce(dip));
-	default:
-		return (DDI_FAILURE);
-	}
 }
 
 /*
