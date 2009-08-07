@@ -1523,7 +1523,11 @@ static void
 emlxs_handle_unsol_prlo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
+#ifdef ULP_PATCH4
+#ifdef ULP_PATCH6
 	emlxs_hba_t *hba = HBA;
+#endif /* ULP_PATCH6 */
+#endif /* ULP_PATCH4 */
 	IOCB *iocb;
 	uint32_t sid;
 #ifndef ULP_PATCH4

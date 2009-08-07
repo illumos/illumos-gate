@@ -213,7 +213,7 @@ emlxs_fct_io_trace(emlxs_port_t *port, fct_cmd_t *fct_cmd, uint32_t data)
 
 #ifdef MODSYM_SUPPORT
 
-static int
+extern int
 emlxs_fct_modopen()
 {
 	int err;
@@ -913,10 +913,6 @@ emlxs_fct_init(emlxs_hba_t *hba)
 	if (!hba->tgt_mode) {
 		return;
 	}
-#ifdef MODSYM_SUPPORT
-	/* Open COMSTAR */
-	(void) emlxs_fct_modopen();
-#endif /* MODSYM_SUPPORT */
 
 	/* Check if COMSTAR is present */
 	if (((void *)MODSYM(stmf_alloc) == NULL) ||

@@ -46,7 +46,7 @@ extern "C" {
 
 /* This patch enables the driver to auto respond to unsolicited PRLO's */
 /* This is needed because ULP is known to panic sometimes */
-#define	ULP_PATCH4
+/* #define	ULP_PATCH4 -  Obsolete */
 
 /* This patch enables the driver to fail pkt abort requests */
 #define	ULP_PATCH5

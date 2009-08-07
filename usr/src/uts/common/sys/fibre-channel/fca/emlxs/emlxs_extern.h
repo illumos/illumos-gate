@@ -737,6 +737,7 @@ extern int			emlxs_fct_port_shutdown(emlxs_port_t *port);
 extern int			emlxs_fct_port_initialize(emlxs_port_t *port);
 
 #ifdef MODSYM_SUPPORT
+extern int			emlxs_fct_modopen();
 extern void			emlxs_fct_modclose();
 #endif /* MODSYM_SUPPORT */
 

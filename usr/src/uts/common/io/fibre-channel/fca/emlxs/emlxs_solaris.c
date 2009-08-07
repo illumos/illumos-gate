@@ -1114,8 +1114,30 @@ _init(void)
 		return (ret);
 	}
 
+#ifdef MODSYM_SUPPORT
+	/* Open SFS */
+	(void) emlxs_fca_modopen();
+#ifdef SFCT_SUPPORT
+	/* Open FCT */
+	(void) emlxs_fct_modopen();
+#endif /* SFCT_SUPPORT */
+#endif /* MODSYM_SUPPORT */
+
+	/* Setup devops for SFS */
+	MODSYM(fc_fca_init)(&emlxs_ops);
+
 	if ((ret = mod_install(&emlxs_modlinkage)) != 0) {
 		(void) ddi_soft_state_fini(&emlxs_soft_state);
+#ifdef MODSYM_SUPPORT
+		/* Close SFS */
+		emlxs_fca_modclose();
+#ifdef SFCT_SUPPORT
+		/* Close FCT */
+		emlxs_fct_modclose();
+#endif /* SFCT_SUPPORT */
+#endif /* MODSYM_SUPPORT */
+
+		return (ret);
 	}
 
 #ifdef SAN_DIAG_SUPPORT
@@ -5542,10 +5564,6 @@ emlxs_fca_init(emlxs_hba_t *hba)
 	if (!hba->ini_mode) {
 		return;
 	}
-#ifdef MODSYM_SUPPORT
-	/* Open SFS */
-	(void) emlxs_fca_modopen();
-#endif /* MODSYM_SUPPORT */
 
 	/* Check if SFS present */
 	if (((void *)MODSYM(fc_fca_init) == NULL) ||
@@ -5554,9 +5572,6 @@ emlxs_fca_init(emlxs_hba_t *hba)
 		    "SFS not present. Initiator mode disabled.");
 		goto failed;
 	}
-
-	/* Setup devops for SFS */
-	MODSYM(fc_fca_init)(&emlxs_ops);
 
 	/* Check if our SFS driver interface matches the current SFS stack */
 	if (MODSYM(fc_fca_attach) (hba->dip, hba->fca_tran) != DDI_SUCCESS) {
