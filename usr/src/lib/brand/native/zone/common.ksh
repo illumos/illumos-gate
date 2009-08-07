@@ -409,6 +409,15 @@ install_cpio()
 	stage1=$1
 	archive=$2
 
+	# Check the first few members of the archive for an absolute path.
+	for i in `$stage1 "$archive" | cpio -it | head | cut -b1`
+	do
+		if [[ "$i" == "/" ]]; then
+			umnt_fs
+			fatal "$e_absolute_archive"
+		fi
+	done
+
 	cpioopts="-idmfE $ipdcpiofile"
 
 	vlog "cd \"$ZONEROOT\" && $stage1 \"$archive\" | cpio $cpioopts"
@@ -427,6 +436,15 @@ install_cpio()
 install_pax()
 {
 	archive=$1
+
+	# Check the first few members of the archive for an absolute path.
+	for i in `pax -f "$archive" | head | cut -b1`
+	do
+		if [[ "$i" == "/" ]]; then
+			umnt_fs
+			fatal "$e_absolute_archive"
+		fi
+	done
 
 	if [[ -s $ipdpaxfile ]]; then
 		filtopt="-c $(/usr/bin/cat $ipdpaxfile)"
@@ -822,6 +840,7 @@ e_install_abort=$(gettext "Installation aborted.")
 e_not_readable=$(gettext "Cannot read directory '%s'")
 e_not_dir=$(gettext "Error: must be a directory")
 e_unknown_archive=$(gettext "Error: Unknown archive format. Must be a flash archive, a cpio archive (can also be gzipped or bzipped), a pax XUSTAR archive, or a level 0 ufsdump archive.")
+e_absolute_archive=$(gettext "Error: archive contains absolute paths instead of relative paths.")
 e_tmpfile=$(gettext "Unable to create temporary file")
 e_root_full=$(gettext "Zonepath root %s exists and contains data; remove or move aside prior to install.")
 
