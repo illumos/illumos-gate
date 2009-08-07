@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,20 +41,7 @@
 #include <sys/error.h>
 #include <sys/mmu.h>
 #include <vm/hat_sfmmu.h>
-
 #define	INTR_REPORT_SIZE	64
-#define	ERRH_ASI_SHIFT		56		/* bits[63:56]; see errh_er_t */
-#define	NRE_ASI			0x00000001	/* ASI observed in attr field */
-#define	NRE_CTX			0x00000002	/* ASI equals ASI_MMU_CTX */
-#define	CRP_OBSERVED		(NRE_ASI | NRE_CTX)
-
-#define	OR_MCPU_NRE_ERROR(reg1,reg2,val)	\
-	add	reg1, CPU_MCPU, reg2;		\
-	add	reg2, MCPU_NRE_ERROR, reg2;	\
-	ldxa	[reg2]ASI_MEM, reg1;		\
-	or	reg1, val, reg1;		\
-	stxa	reg1, [reg2]ASI_MEM
-	
 
 #ifdef TRAPTRACE
 #include <sys/traptrace.h>
@@ -533,10 +520,6 @@ nonresumable_error(void)
 
 	CPU_PADDR(%g1, %g4)			! %g1 = cpu struct paddr
 
-	add	%g1, CPU_MCPU, %g4
-	add	%g4, MCPU_NRE_ERROR, %g4	! &CPU->cpu_m.cpu_nre_error
-	stxa	%g0, [%g4]ASI_MEM		! clear cpu_nre_error
-
 2:	set	CPU_NRQ_BASE_OFF, %g4
 	ldxa	[%g1 + %g4]ASI_MEM, %g4		! %g4 = queue base PA
 	add	%g6, %g4, %g4			! %g4 = PA of ER in Q		
@@ -548,7 +531,7 @@ nonresumable_error(void)
 	bne,pn	%xcc, 1f			! first 8 byte is not 0
 	nop
 
-	/* BEGIN: move 64 bytes from queue to buf */
+	/* Now we can move 64 bytes from queue to buf */
 	set	0, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 0 - 7	
@@ -558,14 +541,7 @@ nonresumable_error(void)
 	add	%g5, 8, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 16 - 23
-	/* Check for sun4v ASI */
-	and	%g1, ERRH_ATTR_ASI, %g1		! isolate ASI bit
-	cmp	%g1, ERRH_ATTR_ASI
-	bne,pt	%xcc, 3f
-	  nop
-	CPU_PADDR(%g1, %g5)
-	OR_MCPU_NRE_ERROR(%g1, %g5, NRE_ASI)	! cpu_nre_error |= NRE_ASI
-3:	set	24, %g5
+	add	%g5, 8, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 24 - 31
 	add	%g5, 8, %g5
@@ -574,20 +550,12 @@ nonresumable_error(void)
 	add	%g5, 8, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 40 - 47
-	/* Check for ASI==ASI_MMU_CTX */
-	srlx	%g1, ERRH_ASI_SHIFT, %g1	! isolate the ASI field
-	cmp	%g1, ASI_MMU_CTX		! ASI=0x21 for CRP
-	bne,pt	%xcc, 4f
-	  nop
-	CPU_PADDR(%g1, %g5)
-	OR_MCPU_NRE_ERROR(%g1, %g5, NRE_CTX)	! cpu_nre_error |= NRE_CTX
-4:	set	48, %g5
+	add	%g5, 8, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 48 - 55
 	add	%g5, 8, %g5
 	ldxa	[%g4 + %g5]ASI_MEM, %g1
 	stxa	%g1, [%g7 + %g5]ASI_MEM		! byte 56 - 63
-	/* END: move 64 bytes from queue to buf */
 
 	set	CPU_NRQ_SIZE, %g5		! %g5 = queue size
 	sub	%g5, 1, %g5			! %g5 = queu size mask
@@ -608,36 +576,6 @@ nonresumable_error(void)
 	membar	#Sync
 
 	/*
-	 * For CRP, force a hat reload as if the context were stolen
-	 * by storing INVALID_CONTEXT in the secondary and nulling TSB.
-	 * Primary will be reset by usr_rtt for user-mode traps, or 
-	 * has been reset in iae_crp or dae_crp for kernel-mode.
-	 */
-	CPU_PADDR(%g1, %g5)
-	add	%g1, CPU_MCPU, %g5
-	add	%g5, MCPU_NRE_ERROR, %g5	! &CPU->cpu_m.cpu_nre_error
-	ldxa	[%g5]ASI_MEM, %g4
-	cmp	%g4, CRP_OBSERVED		! confirm CRP
-	bne,pt	%xcc, 5f
-	  nop
-	mov	INVALID_CONTEXT, %g5		! force hat reload of context
-	mov	MMU_SCONTEXT, %g7
-	sethi	%hi(FLUSH_ADDR), %g4
-	stxa	%g5, [%g7]ASI_MMU_CTX		! set secondary context reg
-	flush	%g4
-	mov	%o0, %g4
-	mov	%o1, %g5
-	mov	%o5, %g7
-	mov	%g0, %o0
-	mov	%g0, %o1
-	mov	MMU_TSB_CTXNON0, %o5
-	ta      FAST_TRAP			! null TSB
-	  nop
-	mov	%g4, %o0
-	mov	%g5, %o1
-	mov	%g7, %o5
-
-	/*
 	 * Call sys_trap. %g2 is TL(arg2), %g3 is head and tail
 	 * offset(arg3).
 	 * %g3 looks like following:
@@ -648,7 +586,7 @@ nonresumable_error(void)
 	 *
 	 * Run at PIL 14 unless we're already at PIL 15.
 	 */
-5:	sllx	%g3, 32, %g3			! %g3.h = tail offset
+	sllx	%g3, 32, %g3			! %g3.h = tail offset
 	or	%g3, %g2, %g3			! %g3.l = head offset
 	rdpr	%tl, %g2			! %g2 = current tl
 

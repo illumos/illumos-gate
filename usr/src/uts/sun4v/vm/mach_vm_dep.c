@@ -52,7 +52,6 @@
 #include <sys/stack.h>
 #include <sys/atomic.h>
 #include <sys/promif.h>
-#include <sys/hsvc.h>
 
 uint_t page_colors = 0;
 uint_t page_colors_mask = 0;
@@ -150,7 +149,6 @@ static	vmem_t		*contig_mem_slab_arena;
 static	vmem_t		*contig_mem_arena;
 static	vmem_t		*contig_mem_reloc_arena;
 static	kmutex_t	contig_mem_lock;
-static	kmutex_t	contig_mem_sleep_lock;
 #define	CONTIG_MEM_ARENA_QUANTUM	64
 #define	CONTIG_MEM_SLAB_ARENA_QUANTUM	MMU_PAGESIZE64K
 
@@ -617,15 +615,14 @@ contig_mem_alloc(size_t size)
 }
 
 /*
- * contig_mem_alloc_align_flag allocates real contiguous memory with the
+ * contig_mem_alloc_align allocates real contiguous memory with the
  * specified alignment up to contig_mem_import_size_max. The alignment must
  * be a power of 2 and no greater than contig_mem_import_size_max. We assert
  * the aligment is a power of 2. For non-debug, vmem_xalloc will panic
  * for non power of 2 alignments.
  */
-static	void *
-contig_mem_alloc_align_flag(size_t size, size_t align, int flag,
-    kmutex_t *lockp)
+void *
+contig_mem_alloc_align(size_t size, size_t align)
 {
 	void *buf;
 
@@ -644,46 +641,25 @@ contig_mem_alloc_align_flag(size_t size, size_t align, int flag,
 	 * allocations also prevents us from trying to allocate
 	 * more spans than necessary.
 	 */
-	mutex_enter(lockp);
+	mutex_enter(&contig_mem_lock);
 
 	buf = vmem_xalloc(contig_mem_arena, size, align, 0, 0,
-	    NULL, NULL, flag | VM_NORELOC);
+	    NULL, NULL, VM_NOSLEEP | VM_NORELOC);
 
 	if ((buf == NULL) && (size <= MMU_PAGESIZE)) {
-		mutex_exit(lockp);
+		mutex_exit(&contig_mem_lock);
 		return (vmem_xalloc(static_alloc_arena, size, align, 0, 0,
-		    NULL, NULL, flag));
+		    NULL, NULL, VM_NOSLEEP));
 	}
 
 	if (buf == NULL) {
 		buf = vmem_xalloc(contig_mem_reloc_arena, size, align, 0, 0,
-		    NULL, NULL, flag);
+		    NULL, NULL, VM_NOSLEEP);
 	}
 
-	mutex_exit(lockp);
+	mutex_exit(&contig_mem_lock);
 
 	return (buf);
-}
-
-void *
-contig_mem_alloc_align(size_t size, size_t align)
-{
-	return (contig_mem_alloc_align_flag
-	    (size, align, VM_NOSLEEP, &contig_mem_lock));
-}
-
-/*
- * This function is provided for callers that need physically contiguous
- * allocations but can sleep. We use the contig_mem_sleep_lock so that we
- * don't interfere with contig_mem_alloc_align calls that should never sleep.
- * Similarly to contig_mem_alloc_align, we use a lock to prevent allocating
- * unnecessary spans when called in parallel.
- */
-void *
-contig_mem_alloc_align_sleep(size_t size, size_t align)
-{
-	return (contig_mem_alloc_align_flag
-	    (size, align, VM_SLEEP, &contig_mem_sleep_lock));
 }
 
 void
@@ -709,7 +685,6 @@ void
 contig_mem_init(void)
 {
 	mutex_init(&contig_mem_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&contig_mem_sleep_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	contig_mem_slab_arena = vmem_xcreate("contig_mem_slab_arena", NULL, 0,
 	    CONTIG_MEM_SLAB_ARENA_QUANTUM, contig_vmem_xalloc_aligned_wrapper,
@@ -810,97 +785,4 @@ exec_get_spslew(void)
 {
 	uint_t spcolor = atomic_inc_32_nv(&sp_current_color);
 	return ((size_t)((spcolor & sp_color_mask) * SA(sp_color_stride)));
-}
-
-/*
- * This flag may be set via /etc/system to force the synchronization
- * of I-cache with memory after every bcopy.  The default is 0, meaning
- * that there is no need for an I-cache flush after each bcopy.  This
- * flag is relevant only on platforms that have non-coherent I-caches.
- */
-uint_t	force_sync_icache_after_bcopy = 0;
-
-/*
- * This flag may be set via /etc/system to force the synchronization
- * of I-cache to memory after every DMA. The default is 0, meaning
- * that there is no need for an I-cache flush after each dma write to
- * memory. This flag is relevant only on platforms that have
- * non-coherent I-caches.
- */
-uint_t	force_sync_icache_after_dma = 0;
-
-/*
- * This internal flag enables mach_sync_icache_pa, which is always
- * called from common code if it is defined. However, not all
- * platforms support the hv_mem_iflush firmware call.
- */
-static uint_t	do_mach_sync_icache_pa = 0;
-
-int	hsvc_kdi_mem_iflush_negotiated = B_FALSE;
-
-#define	MEM_IFLUSH_MAJOR	1
-#define	MEM_IFLUSH_MINOR	0
-static hsvc_info_t kdi_mem_iflush_hsvc = {
-	HSVC_REV_1,		/* HSVC rev num */
-	NULL,			/* Private */
-	HSVC_GROUP_MEM_IFLUSH,	/* Requested API Group */
-	MEM_IFLUSH_MAJOR,	/* Requested Major */
-	MEM_IFLUSH_MINOR,	/* Requested Minor */
-	"kdi"			/* Module name */
-};
-
-/*
- * Setup soft exec mode.
- * Since /etc/system is read later on init, it
- * may be used to override these flags.
- */
-void
-mach_setup_icache(uint_t coherency)
-{
-	int		status;
-	uint64_t	sup_minor;
-
-	if (coherency == 0 && icache_is_coherent) {
-		extern void kdi_flush_caches(void);
-		status = hsvc_register(&kdi_mem_iflush_hsvc, &sup_minor);
-		if (status != 0)
-			cmn_err(CE_PANIC, "I$ flush not implemented on "
-			    "I$ incoherent system");
-		hsvc_kdi_mem_iflush_negotiated = B_TRUE;
-		kdi_flush_caches();
-		icache_is_coherent = 0;
-		do_mach_sync_icache_pa = 1;
-	}
-}
-
-/*
- * Flush specified physical address range from I$ via hv_mem_iflush interface
- */
-/*ARGSUSED*/
-void
-mach_sync_icache_pa(caddr_t paddr, size_t size)
-{
-	if (do_mach_sync_icache_pa) {
-		uint64_t pa = (uint64_t)paddr;
-		uint64_t sz = (uint64_t)size;
-		uint64_t i, flushed;
-
-		for (i = 0; i < sz; i += flushed) {
-			if (hv_mem_iflush(pa + i, sz - i, &flushed) != H_EOK) {
-				cmn_err(CE_PANIC, "Flushing the Icache failed");
-				break;
-			}
-		}
-	}
-}
-
-/*
- * Flush the page if it has been marked as executed
- */
-/*ARGSUSED*/
-void
-mach_sync_icache_pp(page_t *pp)
-{
-	if (PP_ISEXEC(pp))
-		mach_sync_icache_pa((caddr_t)ptob(pp->p_pagenum), PAGESIZE);
 }

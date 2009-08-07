@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright 2007 Jason King.  All rights reserved.
+ * Copyright 2009 Jason King.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,12 +155,12 @@ static const table_t Bicc_table = {
 };
 
 static const inst_t BPr_table_def[16] = {
-	INST("brnr",  V9, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
+	INVALID,
 	INST("brz",   V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brlez", V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brlz",  V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 
-	INST("brr",  V9, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
+	INVALID,
 	INST("brnz",  V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brgz",  V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
 	INST("brgez", V9|V9S, FLG_PRED|FLG_DISP(DISP16)|FLG_RS1(REG_INT)),
@@ -483,10 +483,7 @@ static const inst_t tr_table_def[32] = {
 
 	/* 0x10 */
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
-	INST("commit", V9, 0),
-	INVALID
-
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID
 };
 
 static const table_t tr_table = {
@@ -637,12 +634,7 @@ static const inst_t FPop1_table_def[512] = {
 	INST("fsqrtq", VALL,
 		FLG_P1(REG_NONE)|FLG_P2(REG_FPQ)|FLG_NOIMM|FLG_P3(REG_FPQ)),
 
-	INVALID,
-	INST("frsqrt1xs", V9,
-		FLG_P1(REG_NONE)|FLG_P2(REG_FPQ)|FLG_NOIMM|FLG_P3(REG_FPQ)),
-	INST("frsqrt1xd", VALL,
-		FLG_P1(REG_NONE)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
-	INVALID,
+	INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x30 */
 	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
@@ -683,31 +675,11 @@ static const inst_t FPop1_table_def[512] = {
 		FLG_P1(REG_FPQ)|FLG_P2(REG_FPQ)|FLG_NOIMM|FLG_P3(REG_FPQ)),
 
 	/* 0x050 */
-	INVALID,
-	INST("fnadds", V9S,
-		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
-	INST("fnaddd", V9S,
-		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
-	INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID,
-	INST("fnmuls", V9S,
-		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
-	INST("fnmuld", V9S,
-		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
-	INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x060 */
-	INVALID,
-	INST("fhadds", V9,
-		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
-	INST("fhaddd", V9,
-		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
-	INVALID, INVALID,
-	INST("fhsubs", V9S,
-		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
-	INST("fhsubd", V9S,
-		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
-	INVALID,
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x068 */
 	INVALID,
@@ -723,16 +695,8 @@ static const inst_t FPop1_table_def[512] = {
 	INVALID,
 
 	/* 0x070 */
-	INVALID,
-	INST("fnhadds", V9S,
-		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FP)),
-	INST("fnhaddd", V9S,
-		FLG_P1(REG_FPD)|FLG_P2(REG_FPD)|FLG_NOIMM|FLG_P3(REG_FPD)),
-	INVALID, INVALID, INVALID, INVALID, INVALID,
-	INVALID,
-	INST("fnsmuld", V9S,
-		FLG_P1(REG_FP)|FLG_P2(REG_FP)|FLG_NOIMM|FLG_P3(REG_FPD)),
-	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
+	INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID, INVALID,
 
 	/* 0x080 */
 	INVALID,
@@ -1600,40 +1564,6 @@ static const table_t fused_table = {
 	.tbl_inp   = fused_table_def
 };
 
-static const inst_t unfused_table_def[16] = {
-	/* 0x0 */
-	INVALID,
-	INST("fumadds", V9, FLG_P1(REG_FP)),
-	INST("fumaddd", V9, FLG_P1(REG_FPD)),
-	INVALID,
-
-	/* 0x4 */
-	INVALID,
-	INST("fumsubs", V9, FLG_P1(REG_FP)),
-	INST("fumsubd", V9, FLG_P1(REG_FPD)),
-	INVALID,
-
-	/* 0x8 */
-	INVALID,
-	INST("fnumsubs", V9, FLG_P1(REG_FP)),
-	INST("fnumsubd", V9, FLG_P1(REG_FPD)),
-	INVALID,
-
-	/* 0xc */
-	INVALID,
-	INST("fnumadds", V9, FLG_P1(REG_FP)),
-	INST("fnumaddd", V9, FLG_P1(REG_FPD)),
-	INVALID
-};
-
-static const table_t unfused_table = {
-	.tbl_field = 8,
-	.tbl_len   = 4,
-	.tbl_ovp   = NULL,
-	.tbl_fmt   = fmt_fused,
-	.tbl_inp   = unfused_table_def
-};
-
 static const inst_t alu_table_def[64] = {
 	/* 0x00 */
 	INST("add",		VALL,	0),
@@ -1722,7 +1652,7 @@ static const inst_t alu_table_def[64] = {
 	INST("save",		VALL,	0),
 	INST("restore",		VALL,	0),
 	TABLE(tr_table,		V9|V9S),
-	TABLE(unfused_table,	V9|V9S)
+	INVALID
 };
 
 

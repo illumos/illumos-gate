@@ -98,7 +98,6 @@ machcpu
 	cpu_nrq_base_pa		MCPU_NRQ_BASE
 	cpu_nrq_size		MCPU_NRQ_SIZE
 	cpu_tstat_flags		MCPU_TSTAT_FLAGS
-	cpu_nre_error		MCPU_NRE_ERROR
 
 \#define	CPU_MPCB_PA	(CPU_MCPU + MCPU_MPCB_PA)
 \#define	CPU_KWBUF_FULL	(CPU_MCPU + MCPU_KWBUF_FULL)
@@ -145,8 +144,6 @@ hat	HAT_SIZE
 	sfmmu_cext
 	sfmmu_ctx_lock
 	sfmmu_ctxs
-	sfmmu_pgsz_order
-	sfmmu_pgsz_map
 
 sf_scd SCD_SIZE
 	scd_sfmmup
@@ -184,7 +181,6 @@ tsbmiss		TSBMISS_SIZE
 	scratch		TSBMISS_SCRATCH
 	shmermap	TSBMISS_SHMERMAP
 	scd_shmermap	TSBMISS_SCDSHMERMAP
-	pgsz_bitmap	TSBMISS_PGSZ_BITMAP
 
 \#define	TSB_TAGACC	(0 * TSBMISS_SCRATCH_INCR)
 \#define	TSBMISS_HMEBP	(1 * TSBMISS_SCRATCH_INCR)
@@ -251,9 +247,6 @@ tsb_info	TSBINFO_SIZE
 hv_tsb_block
 	hv_tsb_info_pa
 	hv_tsb_info_cnt
-
-hv_pgsz_order
-	hv_pgsz_order_pa
 
 cpu_node	CPU_NODE_SIZE
 	nodeid

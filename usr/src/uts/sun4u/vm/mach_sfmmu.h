@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,12 +110,6 @@ label/**/2:					          ;\
 	flush   tmp2					  ;\
 label/**/3:
 	/* END CSTYLED */
-
-/*
- * This macro is to control the pagesizes used for shared context on
- * Rock systems.
- */
-#define	CHECK_SHARED_PGSZ(tsbarea, tte, tmp, use_shctx, label)
 
 /*
  * This macro is used in the MMU code to check if TL should be lowered from
@@ -267,12 +261,6 @@ label/**/3:
 	/* CSTYLED */							\
 label/**/1:
 
-/*
- * No support for non-coherent I-cache in sun4u
- */
-#define	TTE_SET_EXEC_ML(tte, ttepa, tmp1, label)
-#define	TTE_CLR_SOFTEXEC_ML(tte)
-#define	TTE_CHK_SOFTEXEC_ML(tte)	andcc tte, 0, %g0
 
 /*
  * TTE_SET_REF_ML is a macro that updates the reference bit if it is

@@ -20,12 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright 2008 Jason King.  All rights reserved.
+ * Copyright 2009 Jason King.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,15 +389,15 @@ typedef struct formatmbr {
 	uint32_t op3:6;
 	uint32_t rs1:5;
 	uint32_t i:1;
-	uint32_t undef:5;
-	uint32_t cmask:4;
+	uint32_t undef:6;
+	uint32_t cmask:3;
 	uint32_t mmask:4;
 } formatmbr_t;
 #elif defined(_BIT_FIELDS_LTOH)
 typedef struct formatmbr {
 	uint32_t mmask:4;
-	uint32_t cmask:4;
-	uint32_t undef:5;
+	uint32_t cmask:3;
+	uint32_t undef:6;
 	uint32_t i:1;
 	uint32_t rs1:5;
 	uint32_t op3:6;
@@ -566,8 +566,8 @@ static const char *membar_mmask[4] = {
 	"#LoadLoad", "#StoreLoad", "#LoadStore", "#StoreStore"
 };
 
-static const char *membar_cmask[4] = {
-	"#Lookaside", "#MemIssue", "#Sync", "#Halt"
+static const char *membar_cmask[3] = {
+	"#Lookaside", "#MemIssue", "#Sync"
 };
 
 /* v8 ancillary state register names */
@@ -592,15 +592,15 @@ static const char *v9_asr_names[32] = {
 	"%pcr",		"%pic",		"%dcr",	"%gsr",
 	"%softint_set",	"%softint_clr",	"%softint",	"%tick_cmpr",
 	"%stick",	"%stick_cmpr",	NULL,	NULL,
-	"%cps",		NULL,		NULL,	NULL
+	NULL,		NULL,		NULL,	NULL
 };
 /*
  * on v9, only certain registers are valid for read or writing
  * these are bitmasks corresponding to which registers are valid in which
- * case
+ * case. Any access to %dcr is illegal.
  */
-static const uint32_t v9_asr_rdmask = 0x13cb007d;
-static const uint32_t v9_asr_wrmask = 0x13fb004d;
+static const uint32_t v9_asr_rdmask = 0x03cb007d;
+static const uint32_t v9_asr_wrmask = 0x03fb004d;
 
 /* privledged register names on v9 */
 /* TODO: compat - NULL to %priv_nn */
@@ -617,7 +617,7 @@ static const char *v9_privreg_names[32] = {
 
 /* hyper privileged register names on v9 */
 static const char *v9_hprivreg_names[32] = {
-	"%hpstate",	 "%htstate",	"%hrstba",  "%hintp",
+	"%hpstate",	 "%htstate",	NULL,  "%hintp",
 	NULL,	"%htba",	 "%hver",  NULL,
 	NULL,	NULL,	NULL,	NULL,
 	NULL,	NULL,	NULL,	NULL,
@@ -629,8 +629,8 @@ static const char *v9_hprivreg_names[32] = {
 
 static const uint32_t v9_pr_rdmask = 0x80017fff;
 static const uint32_t v9_pr_wrmask = 0x00017fff;
-static const uint32_t v9_hpr_rdmask = 0x8000006f;
-static const uint32_t v9_hpr_wrmask = 0x8000006f;
+static const uint32_t v9_hpr_rdmask = 0x8000006b;
+static const uint32_t v9_hpr_wrmask = 0x8000006b;
 
 static const char *prefetch_str[32] = {
 	"#n_reads", "#one_read",
@@ -784,7 +784,6 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	int32_t disp;
 	uint32_t flags = inp->in_data.in_def.in_flags;
 	int octal = ((dhp->dh_flags & DIS_OCTAL) != 0);
-	int chkpt = 0;
 
 	if ((dhp->dh_debug & DIS_DEBUG_PRTFMT) != 0) {
 		prt_field("op", f->f2.op, 2);
@@ -820,13 +819,6 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	    f->f2b.cc == 0x02 && ((dhp->dh_debug & DIS_DEBUG_SYN_ALL) != 0)) {
 		name = "iprefetch";
 		flags = FLG_RS1(REG_NONE)|FLG_DISP(DISP19);
-	}
-
-	if (f->f2b.op2 == 0x01 && f->f2b.a == 1 &&
-	    f->f2b.p == 0 && f->f2b.cond == 0x8 && f->f2b.cc == 0x01) {
-		name = "chkpt";
-		flags = FLG_RS1(REG_NONE)|FLG_DISP(DISP19);
-		chkpt = 1;
 	}
 
 
@@ -867,11 +859,7 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		}
 	}
 
-	if (!chkpt) {
-		(void) snprintf(buf, sizeof (buf), "%s%s%s", name, annul, pred);
-	} else {
-		(void) snprintf(buf, sizeof (buf), "%s", name);
-	}
+	(void) snprintf(buf, sizeof (buf), "%s%s%s", name, annul, pred);
 	prt_name(dhp, buf, 1);
 
 
@@ -884,19 +872,11 @@ fmt_branch(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		break;
 
 	case DISP19:
-		if (!chkpt) {
-			bprintf(dhp,
-			    (octal != 0) ? "%s, %s0%-5lo <" :
-			    "%s, %s0x%-04lx <",
-			    r,
-			    (disp < 0) ? "-" : "+",
-			    (disp < 0) ? (-disp) : disp);
-		} else {
-			bprintf(dhp,
-			    (octal != 0) ? "%s0%-5lo <" : "%s0x%-04lx <",
-			    (disp < 0) ? "-" : "+",
-			    (disp < 0) ? (-disp) : disp);
-		}
+		bprintf(dhp,
+		    (octal != 0) ? "%s, %s0%-5lo <" :
+		    "%s, %s0x%-04lx <", r,
+		    (disp < 0) ? "-" : "+",
+		    (disp < 0) ? (-disp) : disp);
 		break;
 
 	case DISP16:
@@ -1328,7 +1308,7 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 
 			first = 0;
 
-			for (i = 0; i < 5; ++i) {
+			for (i = 0; i < 4; ++i) {
 				if ((f->fmb.cmask & (1L << i)) != 0) {
 					bprintf(dhp, "%s%s",
 					    (first != 0) ? "|" : "",
@@ -1503,7 +1483,6 @@ fmt_trap(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 
 	int v9 = ((dhp->dh_flags & (DIS_SPARC_V9|DIS_SPARC_V9_SGI)) != 0);
 	int p_rs1, p_t;
-	char failstr[8] = "fail";
 
 	if (f->ftcc.undef != 0)
 		return (-1);
@@ -1530,26 +1509,13 @@ fmt_trap(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		    (p_rs1 != 0) ? " + " : "",
 		    (p_t != 0) ? reg_names[f->f3.rs2] : "");
 	} else {
-		if ((p_rs1 == 0) && (f->ftcc.immtrap == 0xF)) {
-		(void) strlcat(failstr,
-		    (const char *)&(inp->in_data.in_def.in_name[1]),
-		    sizeof (failstr));
-
-		prt_name(dhp, failstr, 1);
-		bprintf(dhp, "%s%s%s",
-		    (v9 != 0) ? icc_names[f->ftcc2.cc] : "",
-		    (p_rs1 != 0) ? reg_names[f->ftcc2.rs1] : "",
-		    (p_rs1 != 0) ? " + " : "");
-		} else {
 		bprintf(dhp, "%-9s %s%s%s%s0x%x", inp->in_data.in_def.in_name,
 		    (v9 != 0) ? icc_names[f->ftcc2.cc] : "",
 		    (v9 != 0) ? ", " : "",
 		    (p_rs1 != 0) ? reg_names[f->ftcc2.rs1] : "",
 		    (p_rs1 != 0) ? " + " : "",
 		    f->ftcc.immtrap);
-		}
 	}
-
 	return (0);
 }
 
@@ -1894,17 +1860,9 @@ fmt_alu(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		return (0);
 
 	case 0x3b:
-		if (f->f3.rd == 1) {
-			/* flusha */
-			prt_name(dhp, "flusha", 1);
-			prt_address(dhp, instr, 0);
-			(void) strlcat(dhp->dh_buf, " ", dhp->dh_buflen);
-			prt_asi(dhp, instr);
-		} else {
-			/* flush */
-			prt_name(dhp, name, 1);
-			prt_address(dhp, instr, 0);
-		}
+		/* flush */
+		prt_name(dhp, name, 1);
+		prt_address(dhp, instr, 0);
 		return (0);
 
 	case 0x3c:

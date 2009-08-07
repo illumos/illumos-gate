@@ -535,7 +535,7 @@ page_retire_destroy(page_t *pp)
 	ASSERT(!hat_page_is_mapped(pp));
 	ASSERT(!pp->p_vnode);
 
-	page_clr_all_props(pp, 0);
+	page_clr_all_props(pp);
 	pagescrub(pp, 0, MMU_PAGESIZE);
 
 	pp->p_next = NULL;

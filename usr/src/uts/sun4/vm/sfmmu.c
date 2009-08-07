@@ -199,10 +199,6 @@ hat_kern_setup(void)
 		sfmmu_patch_shctx();
 	}
 
-	if (&mmu_enable_pgsz_search) {
-		mmu_enable_pgsz_search();
-	}
-
 	/*
 	 * The 8K-indexed kernel TSB space is used to hold
 	 * translations below...

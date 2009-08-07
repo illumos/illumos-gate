@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,6 @@
 #include <sys/kdi_impl.h>
 #include <sys/ctf_api.h>
 #include <vm/seg_kmem.h>
-#include <vm/hat.h>
 
 kctl_t kctl;
 
@@ -153,9 +152,8 @@ kctl_dseg_alloc(caddr_t addr, size_t sz)
 	if (hat_getpfnum(kas.a_hat, addr) != PFN_INVALID)
 		return (EAGAIN);
 
-	/* Set HAT_ATTR_TEXT to override soft execute mode */
-	if (segkmem_xalloc(NULL, addr, sz, VM_NOSLEEP, HAT_ATTR_TEXT,
-	    segkmem_page_create, NULL) == NULL)
+	if (segkmem_xalloc(NULL, addr, sz, VM_NOSLEEP, 0, segkmem_page_create,
+	    NULL) == NULL)
 		return (ENOMEM);
 
 	return (0);

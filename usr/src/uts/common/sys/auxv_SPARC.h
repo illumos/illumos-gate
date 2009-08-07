@@ -45,7 +45,6 @@ extern "C" {
 #define	AV_SPARC_VIS2	0x0040	/* VIS2 instruction set supported */
 #define	AV_SPARC_ASI_BLK_INIT	0x0080	/* ASI_BLK_INIT_xxx ASI */
 #define	AV_SPARC_FMAF	0x0100	/* Fused Multiply-Add */
-#define	AV_SPARC_FMAU	0x0200  /* Unfused Multiply-Add */
 #define	AV_SPARC_VIS3	0x0400  /* VIS3 instruction set extensions */
 #define	AV_SPARC_HPC	0x0800  /* High Performance Computing insns */
 #define	AV_SPARC_RANDOM	0x1000  /* random instruction */
@@ -57,7 +56,7 @@ extern "C" {
 #define	FMT_AV_SPARC	\
 	"\20" \
 	"\21cspare"	\
-	"\20ima\17fjfmau\16trans\15random\14hpc\13vis3\12fmau\11fmaf" 	\
+	"\20ima\17fjfmau\16trans\15random\14hpc\13vis3\12-\11fmaf" 	\
 	"\10ASIBlkInit\7vis2\6vis\5popc\4v8plus\3fsmuld\2div32\1mul32"
 
 /*

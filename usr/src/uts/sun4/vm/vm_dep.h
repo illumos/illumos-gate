@@ -859,16 +859,6 @@ extern void *ndata_extra_base(struct memlist *, size_t, caddr_t);
 extern size_t ndata_maxsize(struct memlist *);
 extern size_t ndata_spare(struct memlist *, size_t, size_t);
 
-/*
- * Platform specific support for non-coherent I-cache and soft exec
- */
-extern uint_t	icache_is_coherent;
-extern uint_t	force_sync_icache_after_bcopy;
-extern uint_t	force_sync_icache_after_dma;
-
-extern void	mach_setup_icache(uint_t);
-#pragma weak	mach_setup_icache
-
 #ifdef	__cplusplus
 }
 #endif

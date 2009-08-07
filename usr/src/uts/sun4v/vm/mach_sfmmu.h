@@ -36,7 +36,6 @@
 
 #include <sys/x_call.h>
 #include <sys/hypervisor_api.h>
-#include <sys/mmu.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -61,28 +60,7 @@ struct hv_tsb_block {
 	hv_tsb_info_t	hv_tsb_info[NHV_TSB_INFO]; /* hypervisor TSB info */
 };
 
-/*
- * Defines for hypervisor pagesize search API.
- */
-
-#define	TLB_PGSZ_ENABLE_SHIFT	15
-#define	TLB_PGSZ_CTX_SHIFT	7
-#define	TLB_PGSZ_ENABLE		(1<<TLB_PGSZ_ENABLE_SHIFT)
-#define	TLB_PGSZ_CONTEXT1	(1<<TLB_PGSZ_CTX_SHIFT)
-#define	TLB_PGSZ_CONTEXT1_ENABLE (TLB_PGSZ_ENABLE|TLB_PGSZ_CONTEXT1)
-
-struct hv_pgsz_order {
-	uint64_t hv_pgsz_order_pa;	/* hypervisor pagesize order PA */
-					/* hypervisor pagesize order */
-	uint16_t hv_pgsz_order[MAX_PGSZ_SEARCH_ORDER];
-};
-
-#define	sfmmu_pgsz_order_hv sfmmu_pgsz_order.hv_pgsz_order
-
 #endif /* _ASM */
-
-/* value for sfmmu_pgsz_map if all shared pagesizes are allowed */
-#define	TLB_ALL_SHARED_PGSZ	0xff
 
 #ifdef _ASM
 
@@ -333,47 +311,6 @@ struct hv_pgsz_order {
 label/**/1:
 
 /*
- * Support for non-coherent I$.
- *
- * In sun4v we use tte bit 3 as a software flag indicating whether
- * execute permission is given. IMMU miss traps cause the real execute
- * permission to be set. sfmmu_ttesync() will see if execute permission
- * has been set, and then set P_EXEC in page_t. This causes I-cache
- * flush when the page is freed.
- *
- * However, the hypervisor reserves bit 3 as part of a 4-bit page size.
- * We allow this flag to be set in hme TTE, but never in TSB or TLB.
- */
-#define	TTE_CLR_SOFTEXEC_ML(tte)	bclr TTE_SOFTEXEC_INT, tte
-#define	TTE_CHK_SOFTEXEC_ML(tte)	andcc tte, TTE_SOFTEXEC_INT, %g0
-
-/*
- * TTE_SET_EXEC_ML is a macro that updates the exec bit if it is
- * not already set. Will also set reference bit at the same time.
- *
- * Caller must check EXECPRM. Do not call if it is already set in the tte.
- *
- * Parameters:
- * tte      = reg containing tte
- * ttepa    = physical pointer to tte
- * tmp1     = tmp reg
- * label    = temporary label
- */
-
-#define	TTE_SET_EXEC_ML(tte, ttepa, tmp1, label)			\
-	/* BEGIN CSTYLED */						\
-	/* update execprm bit */					\
-label/**/1:								\
-	or	tte, (TTE_EXECPRM_INT | TTE_REF_INT), tmp1;		\
-	casxa	[ttepa]ASI_MEM, tte, tmp1; 	/* update bits */	\
-	cmp	tte, tmp1;						\
-	bne,a,pn %xcc, label/**/1;					\
-	  mov	tmp1, tte;						\
-	or	tte, (TTE_EXECPRM_INT | TTE_REF_INT), tte;		\
-	/* END CSTYLED */
-
-
-/*
  * TTE_SET_REF_ML is a macro that updates the reference bit if it is
  * not already set.
  *
@@ -595,27 +532,6 @@ label/**/1:								\
 	  stx	ctx1, [tmp + MMFSA_I_CTX]				;\
 	stx	ctx1, [tmp + MMFSA_D_CTX]				;\
 label:
-	/* END CSTYLED */
-
-/*
- * For shared context mappings, check against the page size bitmap in the
- * tsbmiss area to decide if we should use private mappings instead to reduce
- * the number of shared page size searches on Rock based platforms.
- * In:
- *   tsbarea (not clobbered)
- *   tte (not clobbered)
- *   tmp (clobbered)
- * Out:
- *   use_shctx - changed to 0 if page size bit is not set in mask.
- */
-#define	CHECK_SHARED_PGSZ(tsbarea, tte, tmp, use_shctx, label)  \
-	/* BEGIN CSTYLED */					     \
-	brz     use_shctx, label/**/1				    ;\
-	 and    tte, TTE_SZ_BITS, tmp			    	    ;\
-	ldub    [tsbarea + TSBMISS_PGSZ_BITMAP], use_shctx	    ;\
-	srlx    use_shctx, tmp, use_shctx			    ;\
-	and     use_shctx, 0x1, use_shctx			    ;\
-label/**/1:
 	/* END CSTYLED */
 
 #endif /* _ASM */

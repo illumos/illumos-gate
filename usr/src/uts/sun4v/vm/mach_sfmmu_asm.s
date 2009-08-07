@@ -41,7 +41,6 @@
 #include <sys/pte.h>
 #include <sys/mmu.h>
 #include <vm/hat_sfmmu.h>
-#include <vm/mach_sfmmu.h>
 #include <vm/seg_spt.h>
 #include <sys/machparam.h>
 #include <sys/privregs.h>
@@ -50,7 +49,6 @@
 #include <sys/machthread.h>
 #include <sys/clock.h>
 #include <sys/trapstat.h>
-#include <sys/rock_hypervisor_api.h>
 
 /*
  * sfmmu related subroutines
@@ -79,7 +77,8 @@ sfmmu_setctx_sec(uint_t ctx)
 /* ARGSUSED */
 void
 sfmmu_load_mmustate(sfmmu_t *sfmmup)
-{}
+{
+}
 
 #else	/* lint */
 
@@ -282,7 +281,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	sethi	%hi(ksfmmup), %o3
 	ldx	[%o3 + %lo(ksfmmup)], %o3
 	cmp	%o3, %o0
-	be,pn	%xcc, 8f			! if kernel as, do nothing
+	be,pn	%xcc, 7f			! if kernel as, do nothing
 	  nop
 	
 	set     MMU_SCONTEXT, %o3
@@ -340,7 +339,7 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 
 	ldx	[%g2 + SCD_SFMMUP], %g3		! %g3 = scdp->scd_sfmmup
 	ldx	[%g3 + SFMMU_TSB], %o1		! %o1 = first scd tsbinfo
-	brz,pn %o1, 1f
+	brz,pn %o1, 9f
 	  nop					! panic if no third TSB
 
 	/* make 3rd UTSBREG */
@@ -383,26 +382,9 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	mov	MMU_TSB_CTXNON0, %o5
 	ta	FAST_TRAP			! set TSB info for user process
 	brnz,a,pn %o0, panic_bad_hcall
-	  mov	MMU_TSB_CTXNON0, %o1
-	mov	%o3, %o0			! restore saved sfmmup to %o0
+	mov	MMU_TSB_CTXNON0, %o1
+	mov	%o3, %o0			! restore %o0
 6:
-	/*
-	 * If the TLB pagesize register is supported and pgsz_search_on is set
-	 * then we patch out the following branch instruction.
-	 */
-	.global sfmmu_pgsz_load_mmustate_patch
-sfmmu_pgsz_load_mmustate_patch:
-	ba,a	7f				! branch around pgsz search hcall
-	mov	%o0, %o3			! preserve sfmmup in %o3
-	ldx	[%o3 + SFMMU_PGSZ_ORDER + HV_PGSZ_ORDER_PA], %o0
-	mov	TLB_SO_ID, %o1			! flags apply to I and D
-	mov	MMU_SET_NONPRIV_SEARCH, %o5
-	ta	FAST_TRAP			! set page size search order
-	brnz,a,pn %o0, panic_bad_hcall
-	  mov	MMU_SET_NONPRIV_SEARCH, %o1
-	mov	%o3, %o0			! restore saved sfmmup to %o0
-7:	
-	mov	%o1, %o5			! preserve pgsz_search_on
 	ldx	[%o0 + SFMMU_ISMBLKPA], %o1	! copy members of sfmmu
 	CPU_TSBMISS_AREA(%o2, %o3)		! %o2 = tsbmiss area
 	stx	%o1, [%o2 + TSBMISS_ISMBLKPA]	! sfmmu_tsb_miss into the
@@ -413,7 +395,7 @@ sfmmu_pgsz_load_mmustate_patch:
 	stub	%o3, [%o2 + TSBMISS_UTTEFLAGS]
 	stub	%o4,  [%o2 + TSBMISS_URTTEFLAGS]
 	stx	%o1, [%o2 +  TSBMISS_SHARED_UHATID]
-	brz,pn	%o1, 8f				! check for sfmmu_srdp
+	brz,pn	%o1, 7f				! check for sfmmu_srdp
 	  add	%o0, SFMMU_HMERMAP, %o1
 	add	%o2, TSBMISS_SHMERMAP, %o2
 	mov	SFMMU_HMERGNMAP_WORDS, %o3
@@ -423,38 +405,31 @@ sfmmu_pgsz_load_mmustate_patch:
 	ldx	[%o0 + SFMMU_SCDP], %o4		! %o4 = sfmmu_scd
 	CPU_TSBMISS_AREA(%o2, %o3)		! %o2 = tsbmiss area
 	mov	SFMMU_HMERGNMAP_WORDS, %o3
-	brnz,pt	%o4, 9f				! check for sfmmu_scdp else
-	  nop
-	add	%o2, TSBMISS_SCDSHMERMAP, %o2	! zero tsbmiss scd_shmermap
+	brnz,pt	%o4, 8f				! check for sfmmu_scdp else
+	  add	%o2, TSBMISS_SCDSHMERMAP, %o2	! zero tsbmiss scd_shmermap
 	ZERO_REGION_MAP(%o2, %o3, zero_scd_mmustate)
-8:
+7:
 	retl
 	nop
-9:						
-	brz,a	%o5, 0f				! test pgsz_search_on
-	  or	%g0, TLB_ALL_SHARED_PGSZ, %o1	! enable all page sizes
-	ldub	[%o0 + SFMMU_PGSZ_MAP], %o1
-0:
-	stub	%o1, [%o2 + TSBMISS_PGSZ_BITMAP] ! set tsbmiss pgsz bitmap
-	add	%o2, TSBMISS_SCDSHMERMAP, %o2	! set tsbmiss scd_shmermap
-	add	%o4, SCD_HMERMAP, %o1	
+8:						! set tsbmiss scd_shmermap
+	add	%o4, SCD_HMERMAP, %o1
 	SET_REGION_MAP(%o1, %o2, %o3, %o4, load_scd_mmustate)
-	
 	retl
 	  nop
-1:
+9:
 	sethi   %hi(panicstr), %g1		! panic if no 3rd TSB  
         ldx     [%g1 + %lo(panicstr)], %g1                             
         tst     %g1
 	                                                   
-        bnz,pn  %xcc, 8b                                            
+        bnz,pn  %xcc, 7b                                            
           nop                                                            
                                                                         
         sethi   %hi(sfmmu_panic10), %o0                                 
         call    panic                                                 
           or      %o0, %lo(sfmmu_panic10), %o0                         
-	SET_SIZE(sfmmu_load_mmustate)
 
+	SET_SIZE(sfmmu_load_mmustate)
+	
 #endif /* lint */
 
 #if defined(lint)

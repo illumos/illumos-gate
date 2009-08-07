@@ -111,8 +111,7 @@ typedef enum {
 	PP_MFG_NAME,
 	PP_MODEL_NAME,
 	PP_DESCRIPTION,
-	PP_LABEL,
-	PP_HUMIDITY
+	PP_LABEL
 } sp_propid_t;
 
 /*

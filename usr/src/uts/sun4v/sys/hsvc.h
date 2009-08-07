@@ -42,7 +42,6 @@ extern "C" {
 #define	HSVC_GROUP_CORE			0x0001
 #define	HSVC_GROUP_INTR			0x0002
 #define	HSVC_GROUP_SOFT_STATE		0x0003
-#define	HSVC_GROUP_MEM_IFLUSH		0x0010
 #define	HSVC_GROUP_TM			0x0080
 #define	HSVC_GROUP_VPCI			0x0100
 #define	HSVC_GROUP_LDC			0x0101
@@ -54,9 +53,6 @@ extern "C" {
 #define	HSVC_GROUP_NIAGARA2_CPU		0x0202
 #define	HSVC_GROUP_NIU			0x0204
 #define	HSVC_GROUP_VFALLS_CPU		0x0205
-#define	HSVC_GROUP_RKPERF		0x0206
-#define	HSVC_GROUP_RKMMU_EXT		0x0207
-#define	HSVC_GROUP_RKCPU		0x0208
 #define	HSVC_GROUP_DIAG			0x0300
 
 #ifndef _ASM
@@ -81,8 +77,6 @@ typedef struct hsvc_info hsvc_info_t;
  * hsvc_rev field
  */
 #define	HSVC_REV_1		1
-
-extern	int	hsvc_kdi_mem_iflush_negotiated;
 
 /*
  * External interface

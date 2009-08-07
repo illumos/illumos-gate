@@ -112,14 +112,6 @@ struct fpuinfo_kstat fpuinfo = {
 	{ "fpu_sim_fnmaddd",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_fnmsubs",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_fnmsubd",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fumadds",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fumaddd",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fumsubs",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fumsubd",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fnumadds",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fnumaddd",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fnumsubs",		KSTAT_DATA_UINT64},
-	{ "fpu_sim_fnumsubd",		KSTAT_DATA_UINT64},
 	{ "fpu_sim_invalid",		KSTAT_DATA_UINT64},
 };
 
@@ -185,14 +177,12 @@ _fp_fpu_simulator(
 	enum fcc_type	cc;
 	uint32_t	nfcc;		/* fcc number field. */
 	uint64_t	lusr;
-	uint_t		fmau_mul_exceptions;
 
 	nrs1 = inst.rs1;
 	nrs2 = inst.rs2;
 	nrd = inst.rd;
 	fsr = *pfsr;
 	pfpsd->fp_current_exceptions = 0;	/* Init current exceptions. */
-	fmau_mul_exceptions = 0;
 	pfpsd->fp_fsrtem    = fsr.tem;		/* Obtain fsr's tem */
 	/*
 	 * Obtain rounding direction and precision
@@ -200,7 +190,7 @@ _fp_fpu_simulator(
 	pfpsd->fp_direction = GSR_IM(gsr) ? GSR_IRND(gsr) : fsr.rnd;
 	pfpsd->fp_precision = fsr.rnp;
 
-	if (inst.op3 == 0x37) { /* FMA-fused opcode */
+	if (inst.op3 == 0x37) { /* IMPDEP2B FMA-fused opcode */
 		fp_fma_inst_type *fma_inst;
 		uint32_t	nrs3;
 		unpacked	us3;
@@ -262,121 +252,6 @@ _fp_fpu_simulator(
 			}
 			FPUINFO_KSTAT_PREC(fma_inst->sz, fpu_sim_fnmsubs,
 			    fpu_sim_fnmsubd, fpu_sim_invalid);
-		}
-	} else if (inst.op3 == fmau) { /* FMA-unfused opcode */
-		fp_fma_inst_type *fmau_inst;
-		uint32_t	nrs3;
-		unpacked	us3;
-		unpacked	ust;
-		/*
-		 * For FMA-unfused, if either the multiply part or the add
-		 * part raises an exception whose trap is enabled, we trap
-		 * with cexc indicating only that exception and aexc un-
-		 * changed.  If neither part raises an exception whose trap
-		 * is enabled, the instruction completes with cexc indicating
-		 * just those exceptions that occurred in the add part and
-		 * aexc accumulating all exceptions that occurred in either
-		 * part.  We use fmau_mul_exceptions to keep track of the
-		 * exceptions that occurred in the multiply part while we
-		 * simulate the add part.
-		 */
-		fmau_inst = (fp_fma_inst_type *) &inst;
-		nrs2 = fmau_inst->rs2;
-		nrs3 = fmau_inst->rs3;
-		switch (fmau_inst->var) {
-		case fmadd:
-			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
-			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
-			_fp_mul(pfpsd, &us1, &us2, &ust);
-			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
-			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
-				fmau_mul_exceptions =
-				    pfpsd->fp_current_exceptions;
-				pfpsd->fp_current_exceptions = 0;
-				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
-				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
-				_fp_add(pfpsd, &ust, &us3, &ud);
-				/* ensure QSNaN1 has precedence over QNaN3 */
-				if ((us3.fpclass == fp_quiet) &&
-				    ((us1.fpclass == fp_signaling) ||
-				    (us2.fpclass == fp_signaling)))
-					ud = ust;
-				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
-			}
-			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fumadds,
-			    fpu_sim_fumaddd, fpu_sim_invalid);
-			break;
-		case fmsub:
-			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
-			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
-			_fp_mul(pfpsd, &us1, &us2, &ust);
-			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
-			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
-				fmau_mul_exceptions =
-				    pfpsd->fp_current_exceptions;
-				pfpsd->fp_current_exceptions = 0;
-				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
-				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
-				_fp_sub(pfpsd, &ust, &us3, &ud);
-				/* ensure QSNaN1 has precedence over QNaN3 */
-				if ((us3.fpclass == fp_quiet) &&
-				    ((us1.fpclass == fp_signaling) ||
-				    (us2.fpclass == fp_signaling)))
-					ud = ust;
-				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
-			}
-			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fumsubs,
-			    fpu_sim_fumsubd, fpu_sim_invalid);
-			break;
-		case fnmadd:
-			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
-			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
-			_fp_mul(pfpsd, &us1, &us2, &ust);
-			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
-			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
-				fmau_mul_exceptions =
-				    pfpsd->fp_current_exceptions;
-				pfpsd->fp_current_exceptions = 0;
-				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
-				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
-				if (ust.fpclass != fp_quiet &&
-				    ust.fpclass != fp_signaling)
-					ust.sign ^= 1;
-				_fp_sub(pfpsd, &ust, &us3, &ud);
-				/* ensure QSNaN1 has precedence over QNaN3 */
-				if ((us3.fpclass == fp_quiet) &&
-				    ((us1.fpclass == fp_signaling) ||
-				    (us2.fpclass == fp_signaling)))
-					ud = ust;
-				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
-			}
-			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fnumadds,
-			    fpu_sim_fnumaddd, fpu_sim_invalid);
-			break;
-		case fnmsub:
-			_fp_unpack(pfpsd, &us1, nrs1, fmau_inst->sz);
-			_fp_unpack(pfpsd, &us2, nrs2, fmau_inst->sz);
-			_fp_mul(pfpsd, &us1, &us2, &ust);
-			_fp_pack(pfpsd, &ust, nrd, fmau_inst->sz);
-			if ((pfpsd->fp_current_exceptions & fsr.tem) == 0) {
-				fmau_mul_exceptions =
-				    pfpsd->fp_current_exceptions;
-				pfpsd->fp_current_exceptions = 0;
-				_fp_unpack(pfpsd, &us3, nrs3, fmau_inst->sz);
-				_fp_unpack(pfpsd, &ust, nrd, fmau_inst->sz);
-				if (ust.fpclass != fp_quiet &&
-				    ust.fpclass != fp_signaling)
-					ust.sign ^= 1;
-				_fp_add(pfpsd, &ust, &us3, &ud);
-				/* ensure QSNaN1 has precedence over QNaN3 */
-				if ((us3.fpclass == fp_quiet) &&
-				    ((us1.fpclass == fp_signaling) ||
-				    (us2.fpclass == fp_signaling)))
-					ud = ust;
-				_fp_pack(pfpsd, &ud, nrd, fmau_inst->sz);
-			}
-			FPUINFO_KSTAT_PREC(fmau_inst->sz, fpu_sim_fnumsubs,
-			    fpu_sim_fnumsubd, fpu_sim_invalid);
 		}
 	} else {
 		nfcc = nrd & 0x3;
@@ -645,7 +520,7 @@ _fp_fpu_simulator(
 		*pfsr = fsr;
 		return (ftt_ieee);
 	} else {	/* Just set accrued exception field. */
-		fsr.aexc |= pfpsd->fp_current_exceptions | fmau_mul_exceptions;
+		fsr.aexc |= pfpsd->fp_current_exceptions;
 	}
 	*pfsr = fsr;
 	return (ftt_none);
@@ -697,7 +572,7 @@ fpu_vis_sim(
 			return (ftt);
 	} else if ((fp.inst.hibits == 2) &&
 	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
-	    (fp.inst.op3 == 0x37) || (fp.inst.op3 == 0x3f))) {
+	    (fp.inst.op3 == 0x37))) {
 		ftt =  _fp_fpu_simulator(pfpsd, fp.inst, pfsr, gsr);
 		if (ftt == ftt_none || ftt == ftt_ieee) {
 			pregs->r_pc = pregs->r_npc;
@@ -776,7 +651,7 @@ fp_emulator(
 
 	if ((fp.inst.hibits == 2) &&
 	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
-	    (fp.inst.op3 == 0x37) || (fp.inst.op3 == 0x3f))) {
+	    (fp.inst.op3 == 0x37))) {
 		ftt = _fp_fpu_simulator(pfpsd, fp.inst, (fsr_type *)&tfsr, gsr);
 		/* Do not retry emulated instruction. */
 		pregs->r_pc = pregs->r_npc;
@@ -816,7 +691,7 @@ again:
 		return (ftt);
 	if ((fp.inst.hibits == 2) &&		/* fpops */
 	    ((fp.inst.op3 == 0x34) || (fp.inst.op3 == 0x35) ||
-	    (fp.inst.op3 == 0x37) || (fp.inst.op3 == 0x3f))) {
+	    (fp.inst.op3 == 0x37))) {
 		ftt = _fp_fpu_simulator(pfpsd, fp.inst, (fsr_type *)&tfsr, gsr);
 		/* Do not retry emulated instruction. */
 		pfpu->fpu_fsr = tfsr;

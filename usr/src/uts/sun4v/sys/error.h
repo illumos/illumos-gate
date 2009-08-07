@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +118,7 @@ typedef	struct {
 	uint64_t	stick;		/* Value of the %STICK register */
 	uint32_t	desc;		/* Error Descriptor */
 	uint32_t	attr;		/* error attributes bit field */
-	uint64_t	addr;		/* va for ERRH_ATTR_ASI, otherwise ra */
+	uint64_t	ra;		/* Real address */
 	uint32_t	sz;		/* Size of affected mem region */
 	uint16_t	cpuid;		/* Virtual ID of the affected CPU */
 	uint16_t	secs;		/* Seconds */

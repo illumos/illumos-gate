@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -882,15 +882,6 @@ segkmem_xalloc(vmem_t *vmp, void *inaddr, size_t size, int vmflag, uint_t attr,
 #endif
 	else
 		allocflag = 0;
-
-	/*
-	 * Support for non-coherent I-cache.
-	 * Set HAT_LOAD_TEXT to override soft execute.
-	 */
-	if (attr & HAT_ATTR_TEXT) {
-		attr &= ~HAT_ATTR_TEXT;
-		allocflag |= HAT_LOAD_TEXT;
-	}
 
 	while (ppl != NULL) {
 		page_t *pp = ppl;

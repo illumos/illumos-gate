@@ -28,8 +28,7 @@ LIBCBASE=	$(SRC)/lib/libc/sparc
 
 LIBRARY=	libc_hwcap1.a
 
-EXTN_CPPFLAGS=	-DSMT_PAUSE_FUNCTION=_rock_pause \
-		-I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
+EXTN_CPPFLAGS=	-I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include
 EXTN_ASFLAGS=	-xarch=v8plusd
 EXTN_DYNFLAGS=	-M mapfile
 
@@ -40,10 +39,10 @@ OPTIMIZED_LIBCBASE=../common
 
 PRFOBJS=		\
 	memcpy.o	\
+	memmove.o	\
 	memset.o	\
 	strlen.o	\
 	strcpy.o	\
-	misc.o
 
 MAPFILE_AUX =	mapfile-vers-aux
 

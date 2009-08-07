@@ -150,10 +150,7 @@ static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
 		AV_SPARC_FMAF, STRDESC("AV_SPARC_FMAF"),
 		STRDESC("FMAF"), STRDESC("fmaf"),
 	},
-	{						/* 0x00000200 */
-		AV_SPARC_FMAU, STRDESC("AV_SPARC_FMAU"),
-		STRDESC("FMAU"), STRDESC("fmau"),
-	},
+	RESERVED_ELFCAP_DESC,				/* 0x00000200 */
 	{						/* 0x00000400 */
 		AV_SPARC_VIS3, STRDESC("AV_SPARC_VIS3"),
 		STRDESC("VIS3"), STRDESC("vis3"),

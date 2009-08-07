@@ -1396,10 +1396,6 @@ etrap_table:
  * (0=kernel, 1=invalid, or 2=user) rather than context ID)
  */
 	ALTENTRY(exec_fault)
-	set	icache_is_coherent, %g6		/* check soft exec mode */
-	ld	[%g6], %g6
-	brz,pn	%g6, sfmmu_slow_immu_miss
-	  nop
 	TRACE_TSBHIT(TT_MMU_EXEC)
 	MMU_FAULT_STATUS_AREA(%g4)
 	ldx	[%g4 + MMFSA_I_ADDR], %g2	/* g2 = address */

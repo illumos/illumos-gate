@@ -156,18 +156,6 @@ extern "C" {
 #define	MIN_NSHCONTEXTS			1
 #define	MIN_NTSBS			4
 
-/*
- * The number of shared contexts supported in search list entries for the
- * pagesize register.
- */
-#define	NSEARCH_SHCONTEXTS		1
-
-/*
- * The maximum number of entries allowed in a search list for the pagesize
- * register.
- */
-#define	MAX_PGSZ_SEARCH_ORDER		8
-
 #ifdef	__cplusplus
 }
 #endif

@@ -41,7 +41,6 @@
 #include <sys/cmp.h>
 #include <sys/async.h>
 #include <vm/page.h>
-#include <vm/vm_dep.h>
 #include <vm/hat_sfmmu.h>
 #include <sys/sysmacros.h>
 #include <sys/mach_descrip.h>
@@ -66,7 +65,6 @@ static uint64_t get_mmu_ctx_bits(md_t *, mde_cookie_t);
 static uint64_t get_mmu_tsbs(md_t *, mde_cookie_t);
 static uint64_t	get_mmu_shcontexts(md_t *, mde_cookie_t);
 static uint64_t get_cpu_pagesizes(md_t *, mde_cookie_t);
-static int check_mmu_pgsz_search(md_t *, mde_cookie_t);
 static char *construct_isalist(md_t *, mde_cookie_t, char **);
 static void init_md_broken(md_t *, mde_cookie_t *);
 static int get_l2_cache_info(md_t *, mde_cookie_t, uint64_t *, uint64_t *,
@@ -356,65 +354,10 @@ found:
 			}
 			md_free_scan_dag(mdp, &node);
 		}
+
+
 		md_free_scan_dag(mdp, &eunit);
 	}
-}
-
-/*
- * Setup instruction cache coherency.  The "memory-coherent" property
- * is optional.  Default for Icache_coherency is 1 (I$ is coherent).
- * If we find an Icache with coherency == 0, then enable non-coherent
- * Icache support.
- */
-void
-setup_icache_coherency(md_t *mdp)
-{
-	int ncache;
-	mde_cookie_t *cachelist;
-	int i;
-
-	ncache = md_alloc_scan_dag(mdp, md_root_node(mdp), "cache",
-	    "fwd", &cachelist);
-
-	/*
-	 * The "cache" node is optional in MD, therefore ncaches can be 0.
-	 */
-	if (ncache < 1) {
-		return;
-	}
-
-	for (i = 0; i < ncache; i++) {
-		uint64_t cache_level;
-		uint64_t memory_coherent;
-		uint8_t *type;
-		int typelen;
-
-		if (md_get_prop_val(mdp, cachelist[i], "level",
-		    &cache_level))
-			continue;
-
-		if (cache_level != 1)
-			continue;
-
-		if (md_get_prop_data(mdp, cachelist[i], "type",
-		    &type, &typelen))
-			continue;
-
-		if (strcmp((char *)type, "instn") != 0)
-			continue;
-
-		if (md_get_prop_val(mdp, cachelist[i], "memory-coherent",
-		    &memory_coherent))
-			continue;
-
-		if (memory_coherent != 0)
-			continue;
-
-		mach_setup_icache(memory_coherent);
-		break;
-	}
-
-	md_free_scan_dag(mdp, &cachelist);
 }
 
 /*
@@ -461,11 +404,6 @@ cpu_setup_common(char **cpu_module_isa_set)
 		shctx_on = 1;
 	}
 
-	/*
-	 *  Get and check page search register properties.
-	 */
-	pgsz_search_on = check_mmu_pgsz_search(mdp, cpulist[0]);
-
 	for (i = 0; i < nocpus; i++)
 		fill_cpu(mdp, cpulist[i]);
 
@@ -474,7 +412,6 @@ cpu_setup_common(char **cpu_module_isa_set)
 
 	setup_chip_mappings(mdp);
 	setup_exec_unit_mappings(mdp);
-	setup_icache_coherency(mdp);
 
 	/*
 	 * If MD is broken then append the passed ISA set,
@@ -1115,51 +1052,4 @@ init_md_broken(md_t *mdp, mde_cookie_t *cpulist)
 		broken_md_flag = 1;
 
 	md_free_scan_dag(mdp, &platlist);
-}
-
-/*
- * This routine gets the MD properties associated with the TLB search order API
- * and compares these against the expected values for a processor which supports
- * this API. The return value is used to determine whether use the API.
- */
-static int
-check_mmu_pgsz_search(md_t *mdp, mde_cookie_t cpu_node_cookie)
-{
-
-	uint64_t mmu_search_nshared_contexts;
-	uint64_t mmu_max_search_order;
-	uint64_t mmu_non_priv_search_unified;
-	uint64_t mmu_search_page_size_list;
-
-	if (md_get_prop_val(mdp, cpu_node_cookie,
-	    "mmu-search-#shared-contexts", &mmu_search_nshared_contexts))
-		mmu_search_nshared_contexts = 0;
-
-	if (mmu_search_nshared_contexts == 0 ||
-	    mmu_search_nshared_contexts != NSEARCH_SHCONTEXTS)
-		return (0);
-
-	if (md_get_prop_val(mdp, cpu_node_cookie, "mmu-max-search-order",
-	    &mmu_max_search_order))
-		mmu_max_search_order = 0;
-
-	if (mmu_max_search_order == 0 || mmu_max_search_order !=
-	    MAX_PGSZ_SEARCH_ORDER)
-		return (0);
-
-	if (md_get_prop_val(mdp, cpu_node_cookie,
-	    "mmu-non-priv-search-unified", &mmu_non_priv_search_unified))
-		mmu_non_priv_search_unified = -1;
-
-	if (mmu_non_priv_search_unified != 1) {
-		return (0);
-	}
-
-	if (md_get_prop_val(mdp, cpu_node_cookie,
-	    "mmu-search-page-size-list", &mmu_search_page_size_list)) {
-		mmu_search_page_size_list = 0;
-		return (0);
-	}
-
-	return (1);
 }

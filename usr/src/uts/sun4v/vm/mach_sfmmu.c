@@ -45,7 +45,6 @@
 #include <sys/vmsystm.h>
 #include <sys/bitmap.h>
 #include <vm/rm.h>
-#include <vm/vm_dep.h>
 #include <sys/t_lock.h>
 #include <sys/vm_machparam.h>
 #include <sys/promif.h>
@@ -60,7 +59,6 @@
 #include <sys/reboot.h>
 #include <sys/kdi.h>
 #include <sys/hypervisor_api.h>
-#include <sys/hsvc.h>
 
 /*
  * External routines and data structures
@@ -169,7 +167,7 @@ sfmmu_remap_kernel(void)
 		prom_panic("can't find kernel text pfn");
 	pfn &= TTE_PFNMASK(TTE4M);
 
-	attr = PROC_TEXT | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC;
+	attr = PROC_TEXT | HAT_NOSYNC;
 	flags = HAT_LOAD_LOCK | SFMMU_NO_TSBLOAD;
 	sfmmu_memtte(&ktext_tte, pfn, attr, TTE4M);
 	/*
@@ -185,7 +183,7 @@ sfmmu_remap_kernel(void)
 		prom_panic("can't find kernel data pfn");
 	pfn &= TTE_PFNMASK(TTE4M);
 
-	attr = PROC_DATA | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC;
+	attr = PROC_DATA | HAT_NOSYNC;
 	sfmmu_memtte(&kdata_tte, pfn, attr, TTE4M);
 	/*
 	 * We set the lock bit in the tte to lock the translation in
@@ -210,7 +208,7 @@ sfmmu_remap_kernel(void)
 		ASSERT(tsbsz >= MMU_PAGESIZE4M);
 		ASSERT(IS_P2ALIGNED(tsbsz, tsbsz));
 		ASSERT(IS_P2ALIGNED(va, tsbsz));
-		attr = PROC_DATA | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC;
+		attr = PROC_DATA | HAT_NOSYNC;
 		while (tsbsz != 0) {
 			ASSERT(i < MAX_BIGKTSB_TTES);
 			pfn = va_to_pfn(va);
@@ -294,8 +292,7 @@ kdi_tlb_page_lock(caddr_t va, int do_dtlb)
 	pfn_t pfn = va_to_pfn(va);
 	uint64_t ret;
 
-	sfmmu_memtte(&tte, pfn, PROC_TEXT | HAT_NOSYNC | HAT_ATTR_NOSOFTEXEC,
-	    TTE8K);
+	sfmmu_memtte(&tte, pfn, (PROC_TEXT | HAT_NOSYNC), TTE8K);
 	ret = hv_mmu_map_perm_addr(va, KCONTEXT, *(uint64_t *)&tte,
 	    MAP_ITLB | (do_dtlb ? MAP_DTLB : 0));
 
@@ -480,23 +477,4 @@ sfmmu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 void
 sfmmu_cache_flushall()
 {
-}
-
-/*
- * Initialise the real address field in sfmmu_pgsz_order.
- */
-void
-sfmmu_init_pgsz_hv(sfmmu_t *sfmmup)
-{
-	int i;
-
-	/*
-	 * Initialize mmu counts for pagesize register programming.
-	 */
-	for (i = 0; i < max_mmu_page_sizes; i++) {
-		sfmmup->sfmmu_mmuttecnt[i] = 0;
-	}
-
-	sfmmup->sfmmu_pgsz_order.hv_pgsz_order_pa =
-	    va_to_pa(&sfmmup->sfmmu_pgsz_order.hv_pgsz_order);
 }

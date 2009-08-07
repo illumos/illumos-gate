@@ -204,7 +204,7 @@ enum fp_opcode {	/* FPU op codes, minus precision and leading 0. */
 	ft_op_38	= 0x38,
 	fp_op_39 = 0x39, fp_op_3a = 0x3a, fp_op_3b = 0x3b,
 	fp_op_3c	= 0x3c,
-	fp_op_3d = 0x3d, fp_op_3e = 0x3e, fmau = 0x3f
+	fp_op_3d = 0x3d, fp_op_3e = 0x3e, fp_op_3f = 0x3f
 };
 
 typedef			/* FPU instruction. */
@@ -219,14 +219,14 @@ typedef			/* FPU instruction. */
 	uint32_t		rs2	: 5;	/* Second operand. */
 } fp_inst_type;
 
-enum fp_op_fma_var {	/* FMA-fused/unfused instr. variations */
+enum fp_op_fma_var {	/* IMPDEP2B FMA-fused instr. variations */
 	fmadd	=	0,
 	fmsub	=	1,
 	fnmsub	=	2,
 	fnmadd	=	3
 };
 
-typedef		/* FPU FMA-fused/unfused instructions. */
+typedef		/* IMPDEP2B FPU FMA-fused instruction. */
 	struct {
 	uint32_t		hibits	: 2;	/* Top two bits. */
 	uint32_t		rd	: 5;	/* Destination. */
@@ -330,14 +330,6 @@ struct fpuinfo_kstat {
 	struct kstat_named		fpu_sim_fnmaddd;
 	struct kstat_named		fpu_sim_fnmsubs;
 	struct kstat_named		fpu_sim_fnmsubd;
-	struct kstat_named		fpu_sim_fumadds;
-	struct kstat_named		fpu_sim_fumaddd;
-	struct kstat_named		fpu_sim_fumsubs;
-	struct kstat_named		fpu_sim_fumsubd;
-	struct kstat_named		fpu_sim_fnumadds;
-	struct kstat_named		fpu_sim_fnumaddd;
-	struct kstat_named		fpu_sim_fnumsubs;
-	struct kstat_named		fpu_sim_fnumsubd;
 	struct kstat_named		fpu_sim_invalid;
 };
 

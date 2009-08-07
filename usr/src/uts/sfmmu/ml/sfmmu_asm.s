@@ -248,7 +248,6 @@
 	 */								;\
 	sllx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
 	ldxa	[ttepa]ASI_MEM, tte					;\
-	TTE_CLR_SOFTEXEC_ML(tte)					;\
 	srlx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
 	add	tsbep, TSBE_TAG, tmp1					;\
@@ -371,7 +370,6 @@ label:									;\
 #define	TSB_UPDATE(tsbep, tteva, tagtarget, tmp1, tmp2, label)		\
 	/* can't rd tteva after locking tsb because it can tlb miss */	;\
 	ldx	[tteva], tteva			/* load tte */		;\
-	TTE_CLR_SOFTEXEC_ML(tteva)					;\
 	TSB_LOCK_ENTRY(tsbep, tmp1, tmp2, label)			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
 	add	tsbep, TSBE_TAG, tmp1					;\
@@ -946,11 +944,6 @@ sfmmu_patch_shctx(void)
 {
 }
 
-void
-sfmmu_patch_pgsz_reg(void)
-{
-}
-
 /* ARGSUSED */
 void
 sfmmu_load_tsbe(struct tsbe *tsbep, uint64_t vaddr, tte_t *ttep, int phys)
@@ -1440,19 +1433,6 @@ do_patch:
 	flush	%o0
 #endif /* sun4u */
 	SET_SIZE(sfmmu_patch_shctx)
-
-	ENTRY_NP(sfmmu_patch_pgsz_reg)
-#ifdef sun4u
-	retl
-	  nop
-#else /* sun4u */
-	set	sfmmu_pgsz_load_mmustate_patch, %o0
-	MAKE_NOP_INSTR(%o1)
-	st	%o1, [%o0]
-	retl
-	flush	%o0
-#endif /* sun4u */
-	SET_SIZE(sfmmu_patch_pgsz_reg)
 
 	/*
 	 * Routine that loads an entry into a tsb using virtual addresses.
@@ -2408,13 +2388,6 @@ label/**/4:								;\
 	ba,a,pt	%xcc, label/**/8					;\
 label/**/6:								;\
 	GET_SCDSHMERMAP(tsbarea, hmeblkpa, hatid, hmemisc)		;\
-	/*                                  				;\
-	 * hmemisc is set to 1 if this is a shared mapping. It will	;\
-	 * be cleared by CHECK_SHARED_PGSZ if this pagesize is not	;\
-	 * allowed, in order to limit the number of entries in the	;\
-	 * pagesize register.						;\
-	 */								;\
-	CHECK_SHARED_PGSZ(tsbarea, tte, hatid, hmemisc, label/**/9)	;\
 	ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)], hatid 	;\
 label/**/7:								;\
 	set	TTE_SUSPEND, hatid					;\
@@ -3295,36 +3268,7 @@ tsb_shme_checktte:
 	stub    %g1, [%g6 + TSBMISS_URTTEFLAGS]
 
 	SAVE_CTX1(%g7, %g2, %g1, tsb_shmel)	
-	ba	tsb_validtte
 #endif /* sun4u && !UTSB_PHYS */
-
-tsb_ism_validtte:
-#ifdef sun4v
-	/*
-	 * Check pagesize against bitmap for Rock page size register,
-	 * for ism mappings.
-	 *
-	 * %g1, %g2 = scratch
-	 * %g3 = tte
-	 * g4 = tte pa
-	 * g5 = tte va
-	 * g6 = tsbmiss area
-	 * %g7 = tt
-	 */
-	ldub    [%g6 + TSBMISS_URTTEFLAGS], %g1
-	and     %g1, HAT_CHKCTX1_FLAG, %g2
-	/*
-	 * Clear the HAT_CHKCTX1_FLAG in %g2 if this shared pagesize is not allowed
-	 * to limit the number of entries in the pagesize search register.
-	 */
-	CHECK_SHARED_PGSZ(%g6, %g3, %g7, %g2, ism_chk_pgsz)
-	andn	%g1, HAT_CHKCTX1_FLAG, %g1
-	or      %g1, %g2, %g1
-	stub    %g1, [%g6 + TSBMISS_URTTEFLAGS]
-	brz     %g2, tsb_validtte
-	  rdpr  %tt, %g7
-	SAVE_CTX1(%g7, %g1, %g2, tsb_shctxl)
-#endif /* sun4v */
 
 tsb_validtte:
 	/*
@@ -3355,11 +3299,9 @@ tsb_validtte:
 	ba,pt	%xcc, tsb_update_tl1
 	  nop
 4:
-	/*
-	 * ITLB translation was found but execute permission is
-	 * disabled. If we have software execute permission (soft exec
-	 * bit is set), then enable hardware execute permission.
-	 * Otherwise continue with a protection violation.
+	/* 
+	 * If ITLB miss check exec bit.
+	 * If not set treat as invalid TTE.
 	 */
 	cmp     %g7, T_INSTR_MMU_MISS
 	be,pn	%icc, 5f
@@ -3368,11 +3310,9 @@ tsb_validtte:
 	bne,pt %icc, 3f
 	  andcc   %g3, TTE_EXECPRM_INT, %g0	/* check execute bit is set */
 5:
-	bnz,pn %icc, 3f
-	  TTE_CHK_SOFTEXEC_ML(%g3)		/* check soft execute */
 	bz,pn %icc, tsb_protfault
 	  nop
-	TTE_SET_EXEC_ML(%g3, %g4, %g7, tsb_lset_exec)
+
 3:
 	/*
 	 * Set reference bit if not already set
@@ -3415,7 +3355,6 @@ tsb_validtte:
 #endif /* sun4v */
 
 tsb_update_tl1:
-	TTE_CLR_SOFTEXEC_ML(%g3)
 	srlx	%g2, TTARGET_CTX_SHIFT, %g7
 	brz,pn	%g7, tsb_kernel
 #ifdef sun4v
@@ -3658,7 +3597,10 @@ tsb_ism:
 	ldub    [%g6 + TSBMISS_URTTEFLAGS], %g5
 	or      %g5, HAT_CHKCTX1_FLAG, %g5
 	stub    %g5, [%g6 + TSBMISS_URTTEFLAGS]
+	rdpr    %tt, %g5
+	SAVE_CTX1(%g5, %g3, %g1, tsb_shctxl)
 #endif /* defined(sun4v) || defined(UTSB_PHYS) */
+
 	/*
 	 * ISM pages are always locked down.
 	 * If we can't find the tte then pagefault
@@ -3690,7 +3632,7 @@ tsb_ism_32M:
 	/* NOT REACHED */
 	
 tsb_ism_32M_found:
-	brlz,a,pt %g3, tsb_ism_validtte
+	brlz,a,pt %g3, tsb_validtte
 	  rdpr	%tt, %g7
 	ba,pt	%xcc, tsb_ism_4M
 	  nop
@@ -3708,7 +3650,7 @@ tsb_ism_256M:
 	    tsb_ism_4M)
 
 tsb_ism_256M_found:
-	brlz,a,pt %g3, tsb_ism_validtte
+	brlz,a,pt %g3, tsb_validtte
 	  rdpr	%tt, %g7
 
 tsb_ism_4M:
@@ -3721,7 +3663,7 @@ tsb_ism_4M:
 	/* NOT REACHED */
 
 tsb_ism_4M_found:
-	brlz,a,pt %g3, tsb_ism_validtte
+	brlz,a,pt %g3, tsb_validtte
 	  rdpr	%tt, %g7
 
 tsb_ism_8K:
@@ -3735,7 +3677,7 @@ tsb_ism_8K:
 	/* NOT REACHED */
 
 tsb_ism_8K_found:
-	brlz,a,pt %g3, tsb_ism_validtte
+	brlz,a,pt %g3, tsb_validtte
 	  rdpr	%tt, %g7
 
 tsb_pagefault:
