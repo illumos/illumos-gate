@@ -361,7 +361,8 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 				    intr_dist_cpuid();
 			else if ((ino_p->ino_cpuid !=
 			    ino_p->ino_default_cpuid) &&
-			    (cpu_intr_on(cpu[ino_p->ino_default_cpuid])))
+			    cpu[ino_p->ino_default_cpuid] &&
+			    cpu_intr_on(cpu[ino_p->ino_default_cpuid]))
 				ino_p->ino_cpuid = ino_p->ino_default_cpuid;
 			else if (!cpu_intr_on(cpu[ino_p->ino_cpuid]))
 				ino_p->ino_cpuid = intr_dist_cpuid();
