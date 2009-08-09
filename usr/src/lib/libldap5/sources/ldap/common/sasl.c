@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef LDAP_SASLIO_HOOKS
 #include <assert.h>
@@ -587,10 +585,21 @@ nsldapi_sasl_open(LDAP *ld)
 	return( LDAP_SUCCESS );
 }
 
+static void
+destroy_sasliobuf(Sockbuf *sb)
+{
+	if (sb != NULL && sb->sb_sasl_ibuf != NULL) {
+		NSLDAPI_FREE(sb->sb_sasl_ibuf);
+		sb->sb_sasl_ibuf = NULL;
+	}
+}
+
 static int
 nsldapi_sasl_close( LDAP *ld, Sockbuf *sb )
 {
 	sasl_conn_t	*ctx = (sasl_conn_t *)sb->sb_sasl_ctx;
+
+	destroy_sasliobuf(sb);
 
 	if( ctx != NULL ) {
 		sasl_dispose( &ctx );
