@@ -417,11 +417,11 @@ mac_init(void)
 
 	/*
 	 * Allocate an id space to manage minor numbers. The range of the
-	 * space will be from MAC_MAX_MINOR+1 to MAXMIN32 (maximum legal
-	 * minor number is MAXMIN, but id_t is type of integer and does not
-	 * allow MAXMIN).
+	 * space will be from MAC_MAX_MINOR+1 to MAC_PRIVATE_MINOR-1.  This
+	 * leaves half of the 32-bit minors available for driver private use.
 	 */
-	minor_ids = id_space_create("mac_minor_ids", MAC_MAX_MINOR+1, MAXMIN32);
+	minor_ids = id_space_create("mac_minor_ids", MAC_MAX_MINOR+1,
+	    MAC_PRIVATE_MINOR-1);
 	ASSERT(minor_ids != NULL);
 	minor_count = 0;
 
