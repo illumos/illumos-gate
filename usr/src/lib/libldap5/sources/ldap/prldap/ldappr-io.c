@@ -1,10 +1,7 @@
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * The contents of this file are subject to the Netscape Public
@@ -437,8 +434,13 @@ prldap_connect( const char *hostlist, int defport, int timeout,
 	}
 
 #ifdef _SOLARIS_SDK
-	if ( NULL != hostname ) ldap_memfree(hostname);
-	hostname = nsldapi_strdup(host);
+	if ( NULL != hostname ) {
+		ldap_memfree(hostname);
+		hostname = NULL;
+	}
+	if ( rc >= 0 ) {
+		hostname = nsldapi_strdup(host);
+	}
 #endif	/* _SOLARIS_SDK */
 	ldap_memfree( host );
     }
