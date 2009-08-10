@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -818,8 +816,11 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 	case CKM_RC4:
 	{
 		ARCFour_key *key = (ARCFour_key *)session_p->encrypt.context;
-		bzero(key, sizeof (*key));
+		/* Remaining data size is always zero for RC4. */
 		*pulLastEncryptedPartLen = 0;
+		if (pLastEncryptedPart == NULL)
+			goto clean1;
+		bzero(key, sizeof (*key));
 		break;
 	}
 	default:
