@@ -2685,7 +2685,8 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			    sizeof (lu->prop.deviceFileName));
 
 			if ((svl != NULL) &&
-			    SCSI_FAILOVER_IS_ASYM(svl)) {
+			    (SCSI_FAILOVER_IS_ASYM(svl) ||
+			    SCSI_FAILOVER_IS_TPGS(svl->svl_fops))) {
 				lu->prop.asymmetric = 1;
 			}
 
