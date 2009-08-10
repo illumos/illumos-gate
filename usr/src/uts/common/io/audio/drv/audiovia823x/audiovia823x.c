@@ -203,20 +203,14 @@ auvia_intr(caddr_t argp, caddr_t nocare)
 {
 	auvia_devc_t	*devc = (void *)argp;
 	auvia_portc_t	*portc;
-	uint32_t	gstat;
 	uint8_t		status;
 	unsigned	intrs = 0;
+	boolean_t	claimed = B_FALSE;
 
 	_NOTE(ARGUNUSED(nocare));
 
 	mutex_enter(&devc->mutex);
 	if (devc->suspended) {
-		mutex_exit(&devc->mutex);
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	gstat = INL(devc, devc->base + REG_GSTAT);
-	if (gstat == 0) {
 		mutex_exit(&devc->mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
@@ -242,13 +236,18 @@ auvia_intr(caddr_t argp, caddr_t nocare)
 		if (portc->started) {
 			intrs |= (1U << i);
 		}
-		/* XXX: do we really need to do this? */
+		/* let the chip know we are acking the interrupt */
 		OUTB(devc, portc->base + OFF_STATUS, status);
+
+		claimed = B_TRUE;
 	}
 
-	OUTL(devc, devc->base + REG_GSTAT, gstat);
-
 	mutex_exit(&devc->mutex);
+
+	if (!claimed) {
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	if (intrs & (1U << AUVIA_PLAY_SGD_NUM)) {
 		audio_engine_consume(devc->portc[AUVIA_PLAY_SGD_NUM]->engine);
 	}
