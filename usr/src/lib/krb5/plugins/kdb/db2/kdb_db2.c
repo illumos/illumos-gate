@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -569,14 +569,14 @@ krb5_db2_db_end_update(krb5_context context)
 	    /* Solaris Kerberos: Better error logging */
 	    snprintf(errbuf, sizeof(errbuf), gettext("Failed to modify "
 	        "access and modification times for \"%s\": "),
-	        db_ctx->db_lf_file);
+	        db_ctx->db_lf_name);
 	    krb5_db2_prepend_err_str(context, errbuf, retval, retval);
 	}
     } else {
 	retval = errno;
 	/* Solaris Kerberos: Better error logging */
 	snprintf(errbuf, sizeof(errbuf), gettext("Failed to stat \"%s\": "),
-	    db_ctx->db_lf_file);
+	    db_ctx->db_lf_name);
 	krb5_db2_prepend_err_str(context, errbuf, retval, retval);
     }
     if (!retval) {
@@ -586,7 +586,7 @@ krb5_db2_db_end_update(krb5_context context)
 	    retval = errno;
 	    /* Solaris Kerberos: Better error logging */
 	    snprintf(errbuf, sizeof(errbuf), gettext("Failed to stat \"%s\": "),
-	        db_ctx->db_lf_file);
+	        db_ctx->db_lf_name);
 	    krb5_db2_prepend_err_str(context, errbuf, retval, retval);
 	}
     }
@@ -648,7 +648,7 @@ krb5_db2_db_lock(krb5_context context, int in_mode)
 	    /* Solaris Kerberos: Better error logging */
 	    snprintf(errbuf, sizeof(errbuf),
 	        gettext("Failed to exclusively lock \"%s\": "),
-	        db_ctx->db_lf_file);
+	        db_ctx->db_lf_name);
 	    krb5_db2_prepend_err_str(context, errbuf, EBADF, EBADF);
 
 	    return KRB5_KDB_CANTLOCK_DB;
@@ -660,7 +660,7 @@ krb5_db2_db_lock(krb5_context context, int in_mode)
 	/* Solaris Kerberos: Better error logging */
 	snprintf(errbuf, sizeof(errbuf),
 	    gettext("Failed to lock \"%s\": "),
-	    db_ctx->db_lf_file);
+	    db_ctx->db_lf_name);
 	krb5_db2_prepend_err_str(context, errbuf, retval, retval);
     }
 
