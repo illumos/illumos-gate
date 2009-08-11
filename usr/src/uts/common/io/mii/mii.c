@@ -1278,8 +1278,8 @@ phy_start(phy_handle_t *ph)
 	ph->phy_speed = 0;
 
 	phy_write(ph, MII_AN_ADVERT, anar);
-	phy_write(ph, MII_CONTROL,
-	    bmcr & ~(MII_CONTROL_ANE|MII_CONTROL_RSAN|MII_CONTROL_LOOPBACK));
+	phy_write(ph, MII_CONTROL, bmcr & ~(MII_CONTROL_RSAN));
+
 	switch (ph->phy_type) {
 	case XCVR_1000T:
 	case XCVR_1000X:
