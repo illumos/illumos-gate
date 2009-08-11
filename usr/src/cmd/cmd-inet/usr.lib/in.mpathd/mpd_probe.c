@@ -1,3 +1,4 @@
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -103,11 +104,11 @@ static int64_t		tv2ns(struct timeval *);
  * The state of a phyint that is capable of being probed, is completely
  * specified by the 3-tuple <pi_state, pg_state, I>.
  *
- * A phyint starts in either PI_RUNNING or PI_FAILED, depending on the state
- * of the link (according to the driver).  If the phyint is also configured
- * with a test address (the common case) and probe targets, then a phyint must
- * also successfully be able to send and receive probes in order to remain in
- * the PI_RUNNING state (otherwise, it transitions to PI_FAILED).
+ * A phyint starts in either PI_RUNNING or PI_OFFLINE, depending on whether
+ * IFF_OFFLINE is set.  If the phyint is also configured with a test address
+ * (the common case) and probe targets, then a phyint must also successfully
+ * be able to send and receive probes in order to remain in the PI_RUNNING
+ * state (otherwise, it transitions to PI_FAILED).
  *
  * Further, if a PI_RUNNING phyint is configured with a test address but is
  * unable to find any probe targets, it will transition to the PI_NOTARGETS
@@ -1360,11 +1361,11 @@ phyint_activate_another(struct phyint *pi)
 }
 
 /*
- * Transition a phyint back to PI_RUNNING (from PI_FAILED or PI_OFFLINE).  The
- * caller must ensure that the transition is appropriate.  Clears IFF_OFFLINE
- * or IFF_FAILED, as appropriate.  Also sets IFF_INACTIVE on this or other
- * interfaces as appropriate (see comment below).  Finally, also updates the
- * phyint's group state to account for the change.
+ * Transition a phyint to PI_RUNNING.  The caller must ensure that the
+ * transition is appropriate.  Clears IFF_OFFLINE or IFF_FAILED if
+ * appropriate.  Also sets IFF_INACTIVE on this or other interfaces as
+ * appropriate (see comment below).  Finally, also updates the phyint's group
+ * state to account for the change.
  */
 void
 phyint_transition_to_running(struct phyint *pi)
@@ -1373,6 +1374,7 @@ phyint_transition_to_running(struct phyint *pi)
 	struct phyint *actstandbypi = NULL;
 	uint_t nactive = 0, nnonstandby = 0;
 	boolean_t onlining = (pi->pi_state == PI_OFFLINE);
+	boolean_t initial = (pi->pi_state == PI_INIT);
 	uint64_t set, clear;
 
 	/*
@@ -1422,7 +1424,7 @@ phyint_transition_to_running(struct phyint *pi)
 	} else if (onlining || failback_enabled) {		/* case 2 */
 		if (nactive >= nnonstandby && actstandbypi != NULL)
 			(void) change_pif_flags(actstandbypi, IFF_INACTIVE, 0);
-	} else if (!GROUP_FAILED(pi->pi_group)) {		/* case 3 */
+	} else if (!initial && !GROUP_FAILED(pi->pi_group)) {	/* case 3 */
 		set |= IFF_INACTIVE;
 	}
 	(void) change_pif_flags(pi, set, clear);

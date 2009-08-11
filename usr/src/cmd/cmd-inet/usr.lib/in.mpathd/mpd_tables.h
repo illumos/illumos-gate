@@ -167,6 +167,7 @@ struct phyint_group {
  * Phyint states; see below for the phyint definition.
  */
 enum pi_state {
+	PI_INIT		= 0,	/* Phyint is being initialized */
 	PI_NOTARGETS	= 1,	/* Phyint has no targets */
 	PI_RUNNING	= 2,	/* Phyint is functioning */
 	PI_FAILED	= 3,	/* Phyint is failed */

@@ -386,15 +386,7 @@ phyint_create(char *pi_name, struct phyint_group *pg, uint_t ifindex,
 	pi->pi_ifindex = ifindex;
 	pi->pi_icmpid = htons(((getpid() & 0xFF) << 8) | (ifindex & 0xFF));
 
-	/*
-	 * If the interface is offline, we set the state to PI_OFFLINE.
-	 * Otherwise, we optimistically start in the PI_RUNNING state.  Later
-	 * (in process_link_state_changes()), we will adjust this to match the
-	 * current state of the link.  Further, if test addresses are
-	 * subsequently assigned, we will transition to PI_NOTARGETS and then
-	 * to either PI_RUNNING or PI_FAILED depending on the probe results.
-	 */
-	pi->pi_state = (flags & IFF_OFFLINE) ? PI_OFFLINE : PI_RUNNING;
+	pi->pi_state = PI_INIT;
 	pi->pi_flags = PHYINT_FLAGS(flags);
 
 	/*
@@ -416,6 +408,19 @@ phyint_create(char *pi_name, struct phyint_group *pg, uint_t ifindex,
 	 * list of phyint group members
 	 */
 	phyint_insert(pi, pg);
+
+	/*
+	 * If the interface is offline, we set the state to PI_OFFLINE.
+	 * Otherwise, optimistically consider this interface running.  Later
+	 * (in process_link_state_changes()), we will adjust this to match the
+	 * current state of the link.  Further, if test addresses are
+	 * subsequently assigned, we will transition to PI_NOTARGETS and then
+	 * to either PI_RUNNING or PI_FAILED depending on the probe results.
+	 */
+	if (flags & IFF_OFFLINE)
+		phyint_chstate(pi, PI_OFFLINE);
+	else
+		phyint_transition_to_running(pi); /* calls phyint_chstate() */
 
 	return (pi);
 }
@@ -2677,6 +2682,9 @@ static ipmp_if_state_t
 ifstate(struct phyint *pi)
 {
 	switch (pi->pi_state) {
+	case PI_INIT:
+		return (IPMP_IF_UNKNOWN);
+
 	case PI_NOTARGETS:
 		if (pi->pi_flags & IFF_FAILED)
 			return (IPMP_IF_FAILED);
