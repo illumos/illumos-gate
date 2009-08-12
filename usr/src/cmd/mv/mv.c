@@ -66,6 +66,7 @@
 #define	ISDEV(A)	((A.st_mode & S_IFMT) == S_IFCHR || \
 			(A.st_mode & S_IFMT) == S_IFBLK || \
 			(A.st_mode & S_IFMT) == S_IFIFO)
+#define	ISSOCK(A)	((A.st_mode & S_IFMT) == S_IFSOCK)
 
 #define	BLKSIZE	4096
 #define	PATHSIZE 1024
@@ -477,7 +478,7 @@ lnkfil(char *source, char *target)
 
 	/*
 	 * Make sure source file is not a directory,
-	 * we can't link directories...
+	 * we cannot link directories...
 	 */
 
 	if (ISDIR(s1)) {
@@ -643,15 +644,24 @@ cpymve(char *source, char *target)
 			return (n);
 		}
 
-		/* doors can't be moved across filesystems */
+		/* doors cannot be moved across filesystems */
 		if (ISDOOR(s1)) {
 			(void) fprintf(stderr,
-			    gettext("%s: %s: can't move door "
+			    gettext("%s: %s: cannot move door "
 			    "across file systems\n"), cmd, source);
 			return (1);
 		}
+
+		/* sockets cannot be moved across filesystems */
+		if (ISSOCK(s1)) {
+			(void) fprintf(stderr,
+			    gettext("%s: %s: cannot move socket "
+			    "across file systems\n"), cmd, source);
+			return (1);
+		}
+
 		/*
-		 * File can't be renamed, try to recreate the symbolic
+		 * File cannot be renamed, try to recreate the symbolic
 		 * link or special device, or copy the file wholesale
 		 * between file systems.
 		 */
@@ -1212,7 +1222,7 @@ getrealpath(char *path, char *rpath)
 	if (realpath(path, rpath) == NULL) {
 		int	errno_save = errno;
 		(void) fprintf(stderr, gettext(
-		    "%s: can't resolve path %s: "), cmd, path);
+		    "%s: cannot resolve path %s: "), cmd, path);
 		errno = errno_save;
 		perror("");
 		return (0);
