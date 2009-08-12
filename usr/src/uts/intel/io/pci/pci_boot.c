@@ -600,7 +600,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	int rv, cap_ptr, physhi;
 	dev_info_t *dip;
 	uint16_t cmd_reg;
-	struct memlist *list;
+	struct memlist *list, *scratch_list;
 
 	/* skip root (peer) PCI busses */
 	if (pci_bus_res[secbus].par_bus == (uchar_t)-1)
@@ -785,13 +785,13 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	io_limit = ((io_limit & 0xf0) << 8) | 0xfff;
 
 	/* Form list of all resources passed (avail + used) */
-	list = memlist_dup(pci_bus_res[secbus].io_avail);
-	memlist_merge(&pci_bus_res[secbus].io_used, &list);
+	scratch_list = memlist_dup(pci_bus_res[secbus].io_avail);
+	memlist_merge(&pci_bus_res[secbus].io_used, &scratch_list);
 
 	if ((pci_bus_res[parbus].io_reprogram ||
 	    (io_base > io_limit) ||
 	    (!(cmd_reg & PCI_COMM_IO))) &&
-	    !list_is_vga_only(list, IO)) {
+	    !list_is_vga_only(scratch_list, IO)) {
 		if (pci_bus_res[secbus].io_used) {
 			memlist_subsume(&pci_bus_res[secbus].io_used,
 			    &pci_bus_res[secbus].io_avail);
@@ -857,6 +857,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			    bus, dev, func, io_base, io_limit);
 		}
 	}
+	memlist_free_all(&scratch_list);
 
 	/*
 	 * Check memory space as we did I/O space.
@@ -866,13 +867,13 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	mem_limit = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_LIMIT);
 	mem_limit = ((mem_limit & 0xfff0) << 16) | 0xfffff;
 
-	list = memlist_dup(pci_bus_res[secbus].mem_avail);
-	memlist_merge(&pci_bus_res[secbus].mem_used, &list);
+	scratch_list = memlist_dup(pci_bus_res[secbus].mem_avail);
+	memlist_merge(&pci_bus_res[secbus].mem_used, &scratch_list);
 
 	if ((pci_bus_res[parbus].mem_reprogram ||
 	    (mem_base > mem_limit) ||
 	    (!(cmd_reg & PCI_COMM_MAE))) &&
-	    !list_is_vga_only(list, MEM)) {
+	    !list_is_vga_only(scratch_list, MEM)) {
 		if (pci_bus_res[secbus].mem_used) {
 			memlist_subsume(&pci_bus_res[secbus].mem_used,
 			    &pci_bus_res[secbus].mem_avail);
@@ -959,6 +960,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			    bus, dev, func, mem_base, mem_limit);
 		}
 	}
+	memlist_free_all(&scratch_list);
 
 cmd_enable:
 	if (pci_bus_res[secbus].io_avail)
