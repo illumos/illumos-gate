@@ -774,9 +774,6 @@ get_ra_limit(md_t *mdp, mde_cookie_t cpu_node_cookie)
 		}
 	}
 
-	cmn_err(CE_WARN, "mmu-#ra-bits property not found in MD");
-	cmn_err(CE_WARN, "Memory DR disabled");
-
 	memnodes = md_alloc_scan_dag(mdp,
 	    md_root_node(mdp), "memory", "fwd", &mem_list);
 

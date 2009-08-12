@@ -233,7 +233,7 @@ static void
 unmap_prom_mappings(struct translation *transroot, size_t ntransroot)
 {
 	int i, j, rv;
-	int npgs, nunmapped, nfreed, nskipped;
+	int npgs, nunmapped, nfreed, nskipped, nskipped_io;
 	char *p;
 	tte_t tte;
 	pfn_t pfn;
@@ -256,6 +256,7 @@ unmap_prom_mappings(struct translation *transroot, size_t ntransroot)
 	nfreed = 0;
 	nunmapped = 0;
 	nskipped = 0;
+	nskipped_io = 0;
 
 	for (i = 0, promt = transroot; i < ntransroot; i++, promt++) {
 		ASSERT(promt->tte_hi != 0);
@@ -292,34 +293,41 @@ unmap_prom_mappings(struct translation *transroot, size_t ntransroot)
 			ASSERT(TTE_IS_8K(&tte));
 
 			/*
-			 * Unload the current mapping for the page and
-			 * if it is the last mapping, free the page.
+			 * Unload the current mapping for the pfn and
+			 * if it is the last mapping for a memory page,
+			 * free the page.
 			 */
-			pp = page_numtopp_nolock(pfn);
-			PMFREE_DEBUG("unmap vaddr=0x%lx pfn=0x%lx pp=0x%p",
-			    vaddr, pfn, (void *)pp);
-			ASSERT(pp);
-			ASSERT(PAGE_EXCL(pp));
-			ASSERT(PP_ISNORELOC(pp));
-			ASSERT(!PP_ISFREE(pp));
-			ASSERT(page_find(&prom_ppages, pfn));
-			ASSERT(page_get_pagecnt(pp->p_szc) == 1);
+			PMFREE_DEBUG("unmap vaddr=0x%lx pfn=0x%lx", vaddr, pfn);
 
 			hat_unload(kas.a_hat, (caddr_t)vaddr, PAGESIZE,
 			    HAT_UNLOAD_UNLOCK);
 
-			if (pp->p_mapping) {
-				PMFREE_DEBUG(" skip\n");
+			if (pf_is_memory(pfn)) {
+				pp = page_numtopp_nolock(pfn);
+				PMFREE_DEBUG(" pp=0x%p", (void *)pp);
+				ASSERT(pp);
+				ASSERT(PAGE_EXCL(pp));
+				ASSERT(PP_ISNORELOC(pp));
+				ASSERT(!PP_ISFREE(pp));
+				ASSERT(page_find(&prom_ppages, pfn));
+				ASSERT(page_get_pagecnt(pp->p_szc) == 1);
+
+				if (pp->p_mapping) {
+					PMFREE_DEBUG(" skip\n");
+				} else {
+					PP_CLRNORELOC(pp);
+					page_destroy(pp, 0);
+					memlist_write_lock();
+					rv = memlist_add_span(pfn << PAGESHIFT,
+					    PAGESIZE, &phys_avail);
+					ASSERT(rv == MEML_SPANOP_OK);
+					memlist_write_unlock();
+					PMFREE_DEBUG(" free\n");
+					nfreed++;
+				}
 			} else {
-				PP_CLRNORELOC(pp);
-				page_destroy(pp, 0);
-				memlist_write_lock();
-				rv = memlist_add_span(pfn << PAGESHIFT,
-				    PAGESIZE, &phys_avail);
-				ASSERT(rv == MEML_SPANOP_OK);
-				memlist_write_unlock();
-				PMFREE_DEBUG(" free\n");
-				nfreed++;
+				nskipped_io++;
+				PMFREE_DEBUG(" skip IO\n");
 			}
 			nunmapped++;
 			vaddr += PAGESIZE;
@@ -327,8 +335,9 @@ unmap_prom_mappings(struct translation *transroot, size_t ntransroot)
 	}
 
 	if (transroot) {
-		PMFREE_DEBUG("nunmapped=%d nfreed=%d nskipped=%d\n",
-		    nunmapped, nfreed, nskipped);
+		PMFREE_DEBUG(
+		    "nunmapped=%d nfreed=%d nskipped=%d nskipped_io=%d\n",
+		    nunmapped, nfreed, nskipped, nskipped_io);
 		kmem_free(transroot, ntransroot * sizeof (*transroot));
 	}
 
