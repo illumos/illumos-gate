@@ -80,6 +80,7 @@
 #include "zfs_namecheck.h"
 
 static void *zvol_state;
+static char *zvol_tag = "zvol_tag";
 
 #define	ZVOL_DUMPSIZE		"dumpsize"
 
@@ -109,7 +110,7 @@ typedef struct zvol_state {
 	uint8_t		zv_min_bs;	/* minimum addressable block shift */
 	uint8_t		zv_flags;	/* readonly, dumpified, etc. */
 	objset_t	*zv_objset;	/* objset handle */
-	uint32_t	zv_mode;	/* DS_MODE_* flags at open time */
+	boolean_t 	zv_issnap;	/* is a snapshot (read-only) */
 	uint32_t	zv_open_count[OTYPCNT];	/* open counts */
 	uint32_t	zv_total_opens;	/* total open count */
 	zilog_t		*zv_zilog;	/* ZIL handle */
@@ -432,7 +433,6 @@ zvol_create_minor(const char *name, major_t maj)
 	uint64_t volsize;
 	minor_t minor = 0;
 	struct pathname linkpath;
-	int ds_mode = DS_MODE_OWNER;
 	vnode_t *vp = NULL;
 	char *devpath;
 	char chrbuf[30], blkbuf[30];
@@ -445,10 +445,8 @@ zvol_create_minor(const char *name, major_t maj)
 		return (EEXIST);
 	}
 
-	if (strchr(name, '@') != 0)
-		ds_mode |= DS_MODE_READONLY;
-
-	error = dmu_objset_open(name, DMU_OST_ZVOL, ds_mode, &os);
+	/* lie and say we're read-only */
+	error = dmu_objset_own(name, DMU_OST_ZVOL, B_TRUE, zvol_tag, &os);
 
 	if (error) {
 		mutex_exit(&zvol_state_lock);
@@ -458,7 +456,7 @@ zvol_create_minor(const char *name, major_t maj)
 	error = zap_lookup(os, ZVOL_ZAP_OBJ, "size", 8, 1, &volsize);
 
 	if (error) {
-		dmu_objset_close(os);
+		dmu_objset_disown(os, zvol_tag);
 		mutex_exit(&zvol_state_lock);
 		return (error);
 	}
@@ -500,13 +498,13 @@ zvol_create_minor(const char *name, major_t maj)
 		minor = zvol_minor_alloc();
 
 	if (minor == 0) {
-		dmu_objset_close(os);
+		dmu_objset_disown(os, zvol_tag);
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
 
 	if (ddi_soft_state_zalloc(zvol_state, minor) != DDI_SUCCESS) {
-		dmu_objset_close(os);
+		dmu_objset_disown(os, zvol_tag);
 		mutex_exit(&zvol_state_lock);
 		return (EAGAIN);
 	}
@@ -519,7 +517,7 @@ zvol_create_minor(const char *name, major_t maj)
 	if (ddi_create_minor_node(zfs_dip, chrbuf, S_IFCHR,
 	    minor, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_soft_state_free(zvol_state, minor);
-		dmu_objset_close(os);
+		dmu_objset_disown(os, zvol_tag);
 		mutex_exit(&zvol_state_lock);
 		return (EAGAIN);
 	}
@@ -530,7 +528,7 @@ zvol_create_minor(const char *name, major_t maj)
 	    minor, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(zfs_dip, chrbuf);
 		ddi_soft_state_free(zvol_state, minor);
-		dmu_objset_close(os);
+		dmu_objset_disown(os, zvol_tag);
 		mutex_exit(&zvol_state_lock);
 		return (EAGAIN);
 	}
@@ -542,7 +540,7 @@ zvol_create_minor(const char *name, major_t maj)
 	zv->zv_minor = minor;
 	zv->zv_volsize = volsize;
 	zv->zv_objset = os;
-	zv->zv_mode = ds_mode;
+	zv->zv_issnap = dmu_objset_is_snapshot(os);
 	zv->zv_zilog = zil_open(os, zvol_get_data);
 	mutex_init(&zv->zv_znode.z_range_lock, NULL, MUTEX_DEFAULT, NULL);
 	avl_create(&zv->zv_znode.z_range_avl, zfs_range_compare,
@@ -600,7 +598,7 @@ zvol_remove_minor(const char *name)
 
 	zil_close(zv->zv_zilog);
 	zv->zv_zilog = NULL;
-	dmu_objset_close(zv->zv_objset);
+	dmu_objset_disown(zv->zv_objset, zvol_tag);
 	zv->zv_objset = NULL;
 	avl_destroy(&zv->zv_znode.z_range_avl);
 	mutex_destroy(&zv->zv_znode.z_range_lock);
@@ -704,7 +702,7 @@ zvol_set_volsize(const char *name, major_t maj, uint64_t volsize)
 		 * If we are doing a "zfs clone -o volsize=", then the
 		 * minor node won't exist yet.
 		 */
-		error = dmu_objset_open(name, DMU_OST_ZVOL, DS_MODE_OWNER,
+		error = dmu_objset_own(name, DMU_OST_ZVOL, B_FALSE, FTAG,
 		    &state.zv_objset);
 		if (error != 0)
 			goto out;
@@ -717,7 +715,7 @@ zvol_set_volsize(const char *name, major_t maj, uint64_t volsize)
 	    doi.doi_data_block_size)) != 0)
 		goto out;
 
-	if (zv->zv_flags & ZVOL_RDONLY || (zv->zv_mode & DS_MODE_READONLY)) {
+	if (zv->zv_flags & ZVOL_RDONLY || zv->zv_issnap) {
 		error = EROFS;
 		goto out;
 	}
@@ -760,7 +758,7 @@ zvol_set_volsize(const char *name, major_t maj, uint64_t volsize)
 
 out:
 	if (state.zv_objset)
-		dmu_objset_close(state.zv_objset);
+		dmu_objset_disown(state.zv_objset, FTAG);
 
 	mutex_exit(&zvol_state_lock);
 
@@ -788,7 +786,7 @@ zvol_set_volblocksize(const char *name, uint64_t volblocksize)
 			mutex_exit(&zvol_state_lock);
 		return (ENXIO);
 	}
-	if (zv->zv_flags & ZVOL_RDONLY || (zv->zv_mode & DS_MODE_READONLY)) {
+	if (zv->zv_flags & ZVOL_RDONLY || zv->zv_issnap) {
 		if (needlock)
 			mutex_exit(&zvol_state_lock);
 		return (EROFS);
@@ -836,7 +834,7 @@ zvol_open(dev_t *devp, int flag, int otyp, cred_t *cr)
 	ASSERT(zv->zv_objset != NULL);
 
 	if ((flag & FWRITE) &&
-	    (zv->zv_flags & ZVOL_RDONLY || (zv->zv_mode & DS_MODE_READONLY))) {
+	    (zv->zv_flags & ZVOL_RDONLY || zv->zv_issnap)) {
 		mutex_exit(&zvol_state_lock);
 		return (EROFS);
 	}
@@ -1160,8 +1158,7 @@ zvol_strategy(buf_t *bp)
 	}
 
 	if (!(bp->b_flags & B_READ) &&
-	    (zv->zv_flags & ZVOL_RDONLY ||
-	    zv->zv_mode & DS_MODE_READONLY)) {
+	    (zv->zv_flags & ZVOL_RDONLY || zv->zv_issnap)) {
 		bioerror(bp, EROFS);
 		biodone(bp);
 		return (0);
@@ -1721,7 +1718,7 @@ zvol_dumpify(zvol_state_t *zv)
 	dmu_tx_t *tx;
 	objset_t *os = zv->zv_objset;
 
-	if (zv->zv_flags & ZVOL_RDONLY || (zv->zv_mode & DS_MODE_READONLY))
+	if (zv->zv_flags & ZVOL_RDONLY || zv->zv_issnap)
 		return (EROFS);
 
 	/*

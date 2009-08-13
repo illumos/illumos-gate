@@ -42,8 +42,6 @@ struct dsl_dataset;
 struct dsl_dir;
 struct dsl_pool;
 
-typedef void dsl_dataset_evict_func_t(struct dsl_dataset *, void *);
-
 #define	DS_FLAG_INCONSISTENT	(1ULL<<0)
 #define	DS_IS_INCONSISTENT(ds)	\
 	((ds)->ds_phys->ds_flags & DS_FLAG_INCONSISTENT)
@@ -132,8 +130,7 @@ typedef struct dsl_dataset {
 	 * Protected by ds_lock:
 	 */
 	kmutex_t ds_lock;
-	void *ds_user_ptr;
-	dsl_dataset_evict_func_t *ds_user_evict_func;
+	objset_t *ds_objset;
 	uint64_t ds_userrefs;
 
 	/*
@@ -174,17 +171,17 @@ struct dsl_ds_destroyarg {
 int dsl_dataset_hold(const char *name, void *tag, dsl_dataset_t **dsp);
 int dsl_dataset_hold_obj(struct dsl_pool *dp, uint64_t dsobj,
     void *tag, dsl_dataset_t **);
-int dsl_dataset_own(const char *name, int flags, void *owner,
-    dsl_dataset_t **dsp);
+int dsl_dataset_own(const char *name, boolean_t inconsistentok,
+    void *tag, dsl_dataset_t **dsp);
 int dsl_dataset_own_obj(struct dsl_pool *dp, uint64_t dsobj,
-    int flags, void *owner, dsl_dataset_t **);
+    boolean_t inconsistentok, void *tag, dsl_dataset_t **dsp);
 void dsl_dataset_name(dsl_dataset_t *ds, char *name);
 void dsl_dataset_rele(dsl_dataset_t *ds, void *tag);
-void dsl_dataset_disown(dsl_dataset_t *ds, void *owner);
+void dsl_dataset_disown(dsl_dataset_t *ds, void *tag);
 void dsl_dataset_drop_ref(dsl_dataset_t *ds, void *tag);
 boolean_t dsl_dataset_tryown(dsl_dataset_t *ds, boolean_t inconsistentok,
-    void *owner);
-void dsl_dataset_make_exclusive(dsl_dataset_t *ds, void *owner);
+    void *tag);
+void dsl_dataset_make_exclusive(dsl_dataset_t *ds, void *tag);
 uint64_t dsl_dataset_create_sync(dsl_dir_t *pds, const char *lastname,
     dsl_dataset_t *origin, uint64_t flags, cred_t *, dmu_tx_t *);
 uint64_t dsl_dataset_create_sync_dd(dsl_dir_t *dd, dsl_dataset_t *origin,
@@ -204,10 +201,6 @@ int dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 int dsl_dataset_user_release(char *dsname, char *snapname, char *htag,
     boolean_t recursive);
 int dsl_dataset_get_holds(const char *dsname, nvlist_t **nvp);
-
-void *dsl_dataset_set_user_ptr(dsl_dataset_t *ds,
-    void *p, dsl_dataset_evict_func_t func);
-void *dsl_dataset_get_user_ptr(dsl_dataset_t *ds);
 
 blkptr_t *dsl_dataset_get_blkptr(dsl_dataset_t *ds);
 void dsl_dataset_set_blkptr(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx);
@@ -244,6 +237,8 @@ int dsl_dataset_set_reservation(const char *dsname, uint64_t reservation);
 void dsl_dataset_set_flags(dsl_dataset_t *ds, uint64_t flags);
 int64_t dsl_dataset_new_refreservation(dsl_dataset_t *ds, uint64_t reservation,
     dmu_tx_t *tx);
+
+int dsl_destroy_inconsistent(char *dsname, void *arg);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_ds(ds, fmt, ...) do { \

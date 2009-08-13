@@ -241,7 +241,7 @@ static int
 objset_name(uintptr_t addr, char *buf)
 {
 	static int gotid;
-	static mdb_ctf_id_t osi_id, ds_id;
+	static mdb_ctf_id_t os_id, ds_id;
 	uintptr_t os_dsl_dataset;
 	char ds_snapname[MAXNAMELEN];
 	uintptr_t ds_dir;
@@ -249,9 +249,9 @@ objset_name(uintptr_t addr, char *buf)
 	buf[0] = '\0';
 
 	if (!gotid) {
-		if (mdb_ctf_lookup_by_name("struct objset_impl",
-		    &osi_id) == -1) {
-			mdb_warn("couldn't find struct objset_impl");
+		if (mdb_ctf_lookup_by_name("struct objset",
+		    &os_id) == -1) {
+			mdb_warn("couldn't find struct objset");
 			return (DCMD_ERR);
 		}
 		if (mdb_ctf_lookup_by_name("struct dsl_dataset",
@@ -263,7 +263,7 @@ objset_name(uintptr_t addr, char *buf)
 		gotid = TRUE;
 	}
 
-	if (GETMEMBID(addr, &osi_id, os_dsl_dataset, os_dsl_dataset))
+	if (GETMEMBID(addr, &os_id, os_dsl_dataset, os_dsl_dataset))
 		return (DCMD_ERR);
 
 	if (os_dsl_dataset == 0) {
@@ -2158,7 +2158,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "dbuf", ":", "print dmu_buf_impl_t", dbuf },
 	{ "dbuf_stats", ":", "dbuf stats", dbuf_stats },
 	{ "dbufs",
-	    "\t[-O objset_impl_t*] [-n objset_name | \"mos\"] "
+	    "\t[-O objset_t*] [-n objset_name | \"mos\"] "
 	    "[-o object | \"mdn\"] \n"
 	    "\t[-l level] [-b blkid | \"bonus\"]",
 	    "find dmu_buf_impl_t's that match specified criteria", dbufs },

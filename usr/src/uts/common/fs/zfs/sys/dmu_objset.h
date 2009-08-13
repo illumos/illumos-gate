@@ -40,7 +40,6 @@ extern "C" {
 
 struct dsl_dataset;
 struct dmu_tx;
-struct objset_impl;
 
 #define	OBJSET_PHYS_SIZE 2048
 #define	OBJSET_OLD_PHYS_SIZE 1024
@@ -59,11 +58,6 @@ typedef struct objset_phys {
 } objset_phys_t;
 
 struct objset {
-	struct objset_impl *os;
-	int os_mode;
-};
-
-typedef struct objset_impl {
 	/* Immutable: */
 	struct dsl_dataset *os_dsl_dataset;
 	spa_t *os_spa;
@@ -73,7 +67,6 @@ typedef struct objset_impl {
 	dnode_t *os_userused_dnode;
 	dnode_t *os_groupused_dnode;
 	zilog_t *os_zil;
-	objset_t os;
 	uint8_t os_checksum;	/* can change, under dsl_dir's locks */
 	uint8_t os_compress;	/* can change, under dsl_dir's locks */
 	uint8_t os_copies;	/* can change, under dsl_dir's locks */
@@ -101,7 +94,7 @@ typedef struct objset_impl {
 	/* stuff we store for the user */
 	kmutex_t os_user_ptr_lock;
 	void *os_user_ptr;
-} objset_impl_t;
+};
 
 #define	DMU_META_DNODE_OBJECT	0
 #define	DMU_OBJECT_IS_SPECIAL(obj) ((int64_t)(obj) <= 0)
@@ -111,9 +104,13 @@ typedef struct objset_impl {
 	(os)->os_secondary_cache == ZFS_CACHE_METADATA)
 
 /* called from zpl */
-int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
-    objset_t **osp);
-void dmu_objset_close(objset_t *os);
+int dmu_objset_hold(const char *name, void *tag, objset_t **osp);
+int dmu_objset_own(const char *name, dmu_objset_type_t type,
+    boolean_t readonly, void *tag, objset_t **osp);
+void dmu_objset_rele(objset_t *os, void *tag);
+void dmu_objset_disown(objset_t *os, void *tag);
+int dmu_objset_from_ds(struct dsl_dataset *ds, objset_t **osp);
+
 int dmu_objset_create(const char *name, dmu_objset_type_t type, uint64_t flags,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);
 int dmu_objset_clone(const char *name, struct dsl_dataset *clone_origin,
@@ -135,14 +132,14 @@ void dmu_objset_byteswap(void *buf, size_t size);
 int dmu_objset_evict_dbufs(objset_t *os);
 
 /* called from dsl */
-void dmu_objset_sync(objset_impl_t *os, zio_t *zio, dmu_tx_t *tx);
-objset_impl_t *dmu_objset_create_impl(spa_t *spa, struct dsl_dataset *ds,
+void dmu_objset_sync(objset_t *os, zio_t *zio, dmu_tx_t *tx);
+objset_t *dmu_objset_create_impl(spa_t *spa, struct dsl_dataset *ds,
     blkptr_t *bp, dmu_objset_type_t type, dmu_tx_t *tx);
 int dmu_objset_open_impl(spa_t *spa, struct dsl_dataset *ds, blkptr_t *bp,
-    objset_impl_t **osip);
-void dmu_objset_evict(struct dsl_dataset *ds, void *arg);
-void dmu_objset_do_userquota_callbacks(objset_impl_t *os, dmu_tx_t *tx);
-boolean_t dmu_objset_userused_enabled(objset_impl_t *os);
+    objset_t **osp);
+void dmu_objset_evict(objset_t *os);
+void dmu_objset_do_userquota_callbacks(objset_t *os, dmu_tx_t *tx);
+boolean_t dmu_objset_userused_enabled(objset_t *os);
 int dmu_objset_userspace_upgrade(objset_t *os);
 boolean_t dmu_objset_userspace_present(objset_t *os);
 

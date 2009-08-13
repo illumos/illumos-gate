@@ -132,8 +132,8 @@ typedef struct zfid_long {
 
 extern uint_t zfs_fsyncer_key;
 
-extern int zfs_suspend_fs(zfsvfs_t *zfsvfs, char *osname, int *mode);
-extern int zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname, int mode);
+extern int zfs_suspend_fs(zfsvfs_t *zfsvfs);
+extern int zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname);
 extern int zfs_userspace_one(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
     const char *domain, uint64_t rid, uint64_t *valuep);
 extern int zfs_userspace_many(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
@@ -143,7 +143,7 @@ extern int zfs_set_userquota(zfsvfs_t *zfsvfs, zfs_userquota_prop_t type,
 extern boolean_t zfs_usergroup_overquota(zfsvfs_t *zfsvfs,
     boolean_t isgroup, uint64_t fuid);
 extern int zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers);
-extern int zfsvfs_create(const char *name, int mode, zfsvfs_t **zvp);
+extern int zfsvfs_create(const char *name, zfsvfs_t **zvp);
 extern void zfsvfs_free(zfsvfs_t *zfsvfs);
 
 #ifdef	__cplusplus

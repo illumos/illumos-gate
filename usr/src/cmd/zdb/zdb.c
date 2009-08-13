@@ -724,11 +724,11 @@ dump_indirect(dnode_t *dn)
 
 	(void) printf("Indirect blocks:\n");
 
-	SET_BOOKMARK(&czb, dmu_objset_id(&dn->dn_objset->os),
+	SET_BOOKMARK(&czb, dmu_objset_id(dn->dn_objset),
 	    dn->dn_object, dnp->dn_nlevels - 1, 0);
 	for (j = 0; j < dnp->dn_nblkptr; j++) {
 		czb.zb_blkid = j;
-		(void) visit_indirect(dmu_objset_spa(&dn->dn_objset->os), dnp,
+		(void) visit_indirect(dmu_objset_spa(dn->dn_objset), dnp,
 		    &dnp->dn_blkptr[j], &czb);
 	}
 
@@ -1073,7 +1073,7 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	}
 
 	if (object == 0) {
-		dn = os->os->os_meta_dnode;
+		dn = os->os_meta_dnode;
 	} else {
 		error = dmu_bonus_hold(os, object, FTAG, &db);
 		if (error)
@@ -1191,21 +1191,21 @@ dump_dir(objset_t *os)
 
 	if (dds.dds_type == DMU_OST_META) {
 		dds.dds_creation_txg = TXG_INITIAL;
-		usedobjs = os->os->os_rootbp->blk_fill;
-		refdbytes = os->os->os_spa->spa_dsl_pool->
+		usedobjs = os->os_rootbp->blk_fill;
+		refdbytes = os->os_spa->spa_dsl_pool->
 		    dp_mos_dir->dd_phys->dd_used_bytes;
 	} else {
 		dmu_objset_space(os, &refdbytes, &scratch, &usedobjs, &scratch);
 	}
 
-	ASSERT3U(usedobjs, ==, os->os->os_rootbp->blk_fill);
+	ASSERT3U(usedobjs, ==, os->os_rootbp->blk_fill);
 
 	nicenum(refdbytes, numbuf);
 
 	if (verbosity >= 4) {
 		(void) sprintf(blkbuf + strlen(blkbuf), ", rootbp ");
 		(void) sprintf_blkptr(blkbuf + strlen(blkbuf),
-		    BP_SPRINTF_LEN - strlen(blkbuf), os->os->os_rootbp);
+		    BP_SPRINTF_LEN - strlen(blkbuf), os->os_rootbp);
 	} else {
 		blkbuf[0] = '\0';
 	}
@@ -1227,7 +1227,7 @@ dump_dir(objset_t *os)
 	if (verbosity < 2)
 		return;
 
-	if (os->os->os_rootbp->blk_birth == 0)
+	if (os->os_rootbp->blk_birth == 0)
 		return;
 
 	if (zopt_objects != 0) {
@@ -1240,8 +1240,8 @@ dump_dir(objset_t *os)
 
 	dump_object(os, 0, verbosity, &print_header);
 	object_count = 0;
-	if (os->os->os_userused_dnode &&
-	    os->os->os_userused_dnode->dn_type != 0) {
+	if (os->os_userused_dnode &&
+	    os->os_userused_dnode->dn_type != 0) {
 		dump_object(os, DMU_USERUSED_OBJECT, verbosity, &print_header);
 		dump_object(os, DMU_GROUPUSED_OBJECT, verbosity, &print_header);
 	}
@@ -1398,14 +1398,13 @@ dump_one_dir(char *dsname, void *arg)
 	int error;
 	objset_t *os;
 
-	error = dmu_objset_open(dsname, DMU_OST_ANY,
-	    DS_MODE_USER | DS_MODE_READONLY, &os);
+	error = dmu_objset_own(dsname, DMU_OST_ANY, B_TRUE, FTAG, &os);
 	if (error) {
 		(void) printf("Could not open %s\n", dsname);
 		return (0);
 	}
 	dump_dir(os);
-	dmu_objset_close(os);
+	dmu_objset_disown(os, FTAG);
 	fuid_table_destroy();
 	return (0);
 }
@@ -2474,8 +2473,8 @@ main(int argc, char **argv)
 
 	if (error == 0) {
 		if (strchr(argv[0], '/') != NULL) {
-			error = dmu_objset_open(argv[0], DMU_OST_ANY,
-			    DS_MODE_USER | DS_MODE_READONLY, &os);
+			error = dmu_objset_own(argv[0], DMU_OST_ANY,
+			    B_TRUE, FTAG, &os);
 		} else {
 			error = spa_open(argv[0], &spa, FTAG);
 		}
@@ -2499,7 +2498,7 @@ main(int argc, char **argv)
 
 	if (os != NULL) {
 		dump_dir(os);
-		dmu_objset_close(os);
+		dmu_objset_disown(os, FTAG);
 	} else {
 		dump_zpool(spa);
 		spa_close(spa, FTAG);

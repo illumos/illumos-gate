@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,8 +162,8 @@ object_from_path(const char *dataset, const char *path, struct stat64 *statbuf,
 	 */
 	sync();
 
-	if ((err = dmu_objset_open(dataset, DMU_OST_ZFS,
-	    DS_MODE_USER | DS_MODE_READONLY, &os)) != 0) {
+	err = dmu_objset_own(dataset, DMU_OST_ZFS, B_TRUE, FTAG, &os);
+	if (err != 0) {
 		(void) fprintf(stderr, "cannot open dataset '%s': %s\n",
 		    dataset, strerror(err));
 		return (-1);
@@ -172,7 +172,7 @@ object_from_path(const char *dataset, const char *path, struct stat64 *statbuf,
 	record->zi_objset = dmu_objset_id(os);
 	record->zi_object = statbuf->st_ino;
 
-	dmu_objset_close(os);
+	dmu_objset_disown(os, FTAG);
 
 	return (0);
 }
@@ -247,17 +247,17 @@ calculate_range(const char *dataset, err_type_t type, int level, char *range,
 	 * Get the dnode associated with object, so we can calculate the block
 	 * size.
 	 */
-	if ((err = dmu_objset_open(dataset, DMU_OST_ANY,
-	    DS_MODE_USER | DS_MODE_READONLY, &os)) != 0) {
+	if ((err = dmu_objset_own(dataset, DMU_OST_ANY,
+	    B_TRUE, FTAG, &os)) != 0) {
 		(void) fprintf(stderr, "cannot open dataset '%s': %s\n",
 		    dataset, strerror(err));
 		goto out;
 	}
 
 	if (record->zi_object == 0) {
-		dn = os->os->os_meta_dnode;
+		dn = os->os_meta_dnode;
 	} else {
-		err = dnode_hold(os->os, record->zi_object, FTAG, &dn);
+		err = dnode_hold(os, record->zi_object, FTAG, &dn);
 		if (err != 0) {
 			(void) fprintf(stderr, "failed to hold dnode "
 			    "for object %llu\n",
@@ -306,11 +306,11 @@ calculate_range(const char *dataset, err_type_t type, int level, char *range,
 	ret = 0;
 out:
 	if (dn) {
-		if (dn != os->os->os_meta_dnode)
+		if (dn != os->os_meta_dnode)
 			dnode_rele(dn, FTAG);
 	}
 	if (os)
-		dmu_objset_close(os);
+		dmu_objset_disown(os, FTAG);
 
 	return (ret);
 }

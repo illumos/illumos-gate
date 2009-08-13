@@ -244,8 +244,8 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 
 	unique_remove(ds->ds_fsid_guid);
 
-	if (ds->ds_user_ptr != NULL)
-		ds->ds_user_evict_func(ds, ds->ds_user_ptr);
+	if (ds->ds_objset != NULL)
+		dmu_objset_evict(ds->ds_objset);
 
 	if (ds->ds_prev) {
 		dsl_dataset_drop_ref(ds->ds_prev, ds);
@@ -545,17 +545,14 @@ dsl_dataset_hold_obj(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 }
 
 int
-dsl_dataset_own_obj(dsl_pool_t *dp, uint64_t dsobj, int flags, void *owner,
-    dsl_dataset_t **dsp)
+dsl_dataset_own_obj(dsl_pool_t *dp, uint64_t dsobj, boolean_t inconsistentok,
+    void *tag, dsl_dataset_t **dsp)
 {
-	int err = dsl_dataset_hold_obj(dp, dsobj, owner, dsp);
-
-	ASSERT(DS_MODE_TYPE(flags) != DS_MODE_USER);
-
+	int err = dsl_dataset_hold_obj(dp, dsobj, tag, dsp);
 	if (err)
 		return (err);
-	if (!dsl_dataset_tryown(*dsp, DS_MODE_IS_INCONSISTENT(flags), owner)) {
-		dsl_dataset_rele(*dsp, owner);
+	if (!dsl_dataset_tryown(*dsp, inconsistentok, tag)) {
+		dsl_dataset_rele(*dsp, tag);
 		*dsp = NULL;
 		return (EBUSY);
 	}
@@ -622,18 +619,14 @@ out:
 }
 
 int
-dsl_dataset_own(const char *name, int flags, void *owner, dsl_dataset_t **dsp)
+dsl_dataset_own(const char *name, boolean_t inconsistentok,
+    void *tag, dsl_dataset_t **dsp)
 {
-	int err = dsl_dataset_hold(name, owner, dsp);
+	int err = dsl_dataset_hold(name, tag, dsp);
 	if (err)
 		return (err);
-	if ((*dsp)->ds_phys->ds_num_children > 0 &&
-	    !DS_MODE_IS_READONLY(flags)) {
-		dsl_dataset_rele(*dsp, owner);
-		return (EROFS);
-	}
-	if (!dsl_dataset_tryown(*dsp, DS_MODE_IS_INCONSISTENT(flags), owner)) {
-		dsl_dataset_rele(*dsp, owner);
+	if (!dsl_dataset_tryown(*dsp, inconsistentok, tag)) {
+		dsl_dataset_rele(*dsp, tag);
 		return (EBUSY);
 	}
 	return (0);
@@ -705,9 +698,9 @@ dsl_dataset_rele(dsl_dataset_t *ds, void *tag)
 }
 
 void
-dsl_dataset_disown(dsl_dataset_t *ds, void *owner)
+dsl_dataset_disown(dsl_dataset_t *ds, void *tag)
 {
-	ASSERT((ds->ds_owner == owner && ds->ds_dbuf) ||
+	ASSERT((ds->ds_owner == tag && ds->ds_dbuf) ||
 	    (DSL_DATASET_IS_DESTROYED(ds) && ds->ds_dbuf == NULL));
 
 	mutex_enter(&ds->ds_lock);
@@ -718,20 +711,20 @@ dsl_dataset_disown(dsl_dataset_t *ds, void *owner)
 	}
 	mutex_exit(&ds->ds_lock);
 	if (ds->ds_dbuf)
-		dsl_dataset_drop_ref(ds, owner);
+		dsl_dataset_drop_ref(ds, tag);
 	else
 		dsl_dataset_evict(ds->ds_dbuf, ds);
 }
 
 boolean_t
-dsl_dataset_tryown(dsl_dataset_t *ds, boolean_t inconsistentok, void *owner)
+dsl_dataset_tryown(dsl_dataset_t *ds, boolean_t inconsistentok, void *tag)
 {
 	boolean_t gotit = FALSE;
 
 	mutex_enter(&ds->ds_lock);
 	if (ds->ds_owner == NULL &&
 	    (!DS_IS_INCONSISTENT(ds) || inconsistentok)) {
-		ds->ds_owner = owner;
+		ds->ds_owner = tag;
 		if (!dsl_pool_sync_context(ds->ds_dir->dd_pool))
 			rw_exit(&ds->ds_rwlock);
 		gotit = TRUE;
@@ -865,16 +858,15 @@ dsl_snapshot_destroy_one(char *name, void *arg)
 	char *dsname;
 
 	dsname = kmem_asprintf("%s@%s", name, da->snapname);
-	err = dsl_dataset_own(dsname, DS_MODE_READONLY | DS_MODE_INCONSISTENT,
-	    da->dstg, &ds);
+	err = dsl_dataset_own(dsname, B_TRUE, da->dstg, &ds);
 	strfree(dsname);
 	if (err == 0) {
 		struct dsl_ds_destroyarg *dsda;
 
 		dsl_dataset_make_exclusive(ds, da->dstg);
-		if (ds->ds_user_ptr) {
-			ds->ds_user_evict_func(ds, ds->ds_user_ptr);
-			ds->ds_user_ptr = NULL;
+		if (ds->ds_objset != NULL) {
+			dmu_objset_evict(ds->ds_objset);
+			ds->ds_objset = NULL;
 		}
 		dsda = kmem_zalloc(sizeof (struct dsl_ds_destroyarg), KM_SLEEP);
 		dsda->ds = ds;
@@ -958,13 +950,12 @@ dsl_dataset_zvol_cleanup(dsl_dataset_t *ds, const char *name)
 	int error;
 	objset_t *os;
 
-	error = dmu_objset_open_ds(ds, DMU_OST_ANY, &os);
+	error = dmu_objset_from_ds(ds, &os);
 	if (error)
 		return (error);
 
 	if (dmu_objset_type(os) == DMU_OST_ZVOL)
 		error = zvol_remove_minor(name);
-	dmu_objset_close(os);
 
 	return (error);
 }
@@ -1003,9 +994,7 @@ dsl_dataset_origin_rm_prep(struct dsl_ds_destroyarg *dsda, void *tag)
 			return (error);
 		}
 #endif
-		error = dsl_dataset_own(name,
-		    DS_MODE_READONLY | DS_MODE_INCONSISTENT,
-		    tag, &origin);
+		error = dsl_dataset_own(name, B_TRUE, tag, &origin);
 		kmem_free(name, namelen);
 		if (error)
 			return (error);
@@ -1036,9 +1025,9 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 		/* Destroying a snapshot is simpler */
 		dsl_dataset_make_exclusive(ds, tag);
 
-		if (ds->ds_user_ptr) {
-			ds->ds_user_evict_func(ds, ds->ds_user_ptr);
-			ds->ds_user_ptr = NULL;
+		if (ds->ds_objset != NULL) {
+			dmu_objset_evict(ds->ds_objset);
+			ds->ds_objset = NULL;
 		}
 		/* NOTE: defer is always B_FALSE for non-snapshots */
 		dsda.defer = defer;
@@ -1060,7 +1049,7 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	if (err)
 		goto out;
 
-	err = dmu_objset_open_ds(ds, DMU_OST_ANY, &os);
+	err = dmu_objset_from_ds(ds, &os);
 	if (err)
 		goto out;
 
@@ -1089,7 +1078,7 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	 * context, the user space accounting should be zero.
 	 */
 	if (ds->ds_phys->ds_bp.blk_fill == 0 &&
-	    dmu_objset_userused_enabled(os->os)) {
+	    dmu_objset_userused_enabled(os)) {
 		uint64_t count;
 
 		ASSERT(zap_count(os, DMU_USERUSED_OBJECT, &count) != 0 ||
@@ -1098,7 +1087,6 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 		    count == 0);
 	}
 
-	dmu_objset_close(os);
 	if (err != ESRCH)
 		goto out;
 
@@ -1109,7 +1097,7 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	if (err)
 		goto out;
 
-	if (ds->ds_user_ptr) {
+	if (ds->ds_objset) {
 		/*
 		 * We need to sync out all in-flight IO before we try
 		 * to evict (the dataset evict func is trying to clear
@@ -1122,9 +1110,9 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	 * Blow away the dsl_dir + head dataset.
 	 */
 	dsl_dataset_make_exclusive(ds, tag);
-	if (ds->ds_user_ptr) {
-		ds->ds_user_evict_func(ds, ds->ds_user_ptr);
-		ds->ds_user_ptr = NULL;
+	if (ds->ds_objset) {
+		dmu_objset_evict(ds->ds_objset);
+		ds->ds_objset = NULL;
 	}
 
 	/*
@@ -1173,28 +1161,6 @@ out:
 	return (err);
 }
 
-void *
-dsl_dataset_set_user_ptr(dsl_dataset_t *ds,
-    void *p, dsl_dataset_evict_func_t func)
-{
-	void *old;
-
-	mutex_enter(&ds->ds_lock);
-	old = ds->ds_user_ptr;
-	if (old == NULL) {
-		ds->ds_user_ptr = p;
-		ds->ds_user_evict_func = func;
-	}
-	mutex_exit(&ds->ds_lock);
-	return (old);
-}
-
-void *
-dsl_dataset_get_user_ptr(dsl_dataset_t *ds)
-{
-	return (ds->ds_user_ptr);
-}
-
 blkptr_t *
 dsl_dataset_get_blkptr(dsl_dataset_t *ds)
 {
@@ -1228,7 +1194,7 @@ dsl_dataset_dirty(dsl_dataset_t *ds, dmu_tx_t *tx)
 	if (ds == NULL) /* this is the meta-objset */
 		return;
 
-	ASSERT(ds->ds_user_ptr != NULL);
+	ASSERT(ds->ds_objset != NULL);
 
 	if (ds->ds_phys->ds_next_snap_obj != 0)
 		panic("dirtying snapshot!");
@@ -1820,12 +1786,12 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		struct dsl_ds_destroyarg ndsda = {0};
 
 		ASSERT3P(origin, ==, dsda->rm_origin);
-		if (origin->ds_user_ptr) {
-			origin->ds_user_evict_func(origin, origin->ds_user_ptr);
-			origin->ds_user_ptr = NULL;
+		if (origin->ds_objset) {
+			dmu_objset_evict(origin->ds_objset);
+			origin->ds_objset = NULL;
 		}
 
-		dsl_dataset_rele(origin, ds);
+		dsl_dataset_rele(ds->ds_prev, ds);
 		ds->ds_prev = NULL;
 
 		ndsda.ds = origin;
@@ -2010,7 +1976,7 @@ void
 dsl_dataset_sync(dsl_dataset_t *ds, zio_t *zio, dmu_tx_t *tx)
 {
 	ASSERT(dmu_tx_is_syncing(tx));
-	ASSERT(ds->ds_user_ptr != NULL);
+	ASSERT(ds->ds_objset != NULL);
 	ASSERT(ds->ds_phys->ds_next_snap_obj == 0);
 
 	/*
@@ -2021,7 +1987,7 @@ dsl_dataset_sync(dsl_dataset_t *ds, zio_t *zio, dmu_tx_t *tx)
 	ds->ds_phys->ds_fsid_guid = ds->ds_fsid_guid;
 
 	dsl_dir_dirty(ds->ds_dir, tx);
-	dmu_objset_sync(ds->ds_user_ptr, zio, tx);
+	dmu_objset_sync(ds->ds_objset, zio, tx);
 }
 
 void
@@ -2577,9 +2543,9 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		dsl_dataset_t *ds = snap->ds;
 
 		/* unregister props as dsl_dir is changing */
-		if (ds->ds_user_ptr) {
-			ds->ds_user_evict_func(ds, ds->ds_user_ptr);
-			ds->ds_user_ptr = NULL;
+		if (ds->ds_objset) {
+			dmu_objset_evict(ds->ds_objset);
+			ds->ds_objset = NULL;
 		}
 		/* move snap name entry */
 		VERIFY(0 == dsl_dataset_get_snapname(ds));
@@ -2879,15 +2845,14 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dmu_buf_will_dirty(csa->cds->ds_dbuf, tx);
 	dmu_buf_will_dirty(csa->ohds->ds_dbuf, tx);
 
-	if (csa->cds->ds_user_ptr != NULL) {
-		csa->cds->ds_user_evict_func(csa->cds, csa->cds->ds_user_ptr);
-		csa->cds->ds_user_ptr = NULL;
+	if (csa->cds->ds_objset != NULL) {
+		dmu_objset_evict(csa->cds->ds_objset);
+		csa->cds->ds_objset = NULL;
 	}
 
-	if (csa->ohds->ds_user_ptr != NULL) {
-		csa->ohds->ds_user_evict_func(csa->ohds,
-		    csa->ohds->ds_user_ptr);
-		csa->ohds->ds_user_ptr = NULL;
+	if (csa->ohds->ds_objset != NULL) {
+		dmu_objset_evict(csa->ohds->ds_objset);
+		csa->ohds->ds_objset = NULL;
 	}
 
 	/*
@@ -3463,9 +3428,9 @@ dsl_dataset_user_release_check(void *arg1, void *tag, dmu_tx_t *tx)
 			 */
 			if (!ra->own)
 				return (EBUSY);
-			if (ds->ds_user_ptr) {
-				ds->ds_user_evict_func(ds, ds->ds_user_ptr);
-				ds->ds_user_ptr = NULL;
+			if (ds->ds_objset) {
+				dmu_objset_evict(ds->ds_objset);
+				ds->ds_objset = NULL;
 			}
 		}
 		dsda.ds = ds;
@@ -3557,8 +3522,7 @@ dsl_dataset_user_release_one(char *dsname, void *arg)
 			return (error);
 		}
 #endif
-		if (!dsl_dataset_tryown(ds,
-		    DS_MODE_READONLY | DS_MODE_INCONSISTENT, dtag)) {
+		if (!dsl_dataset_tryown(ds, B_TRUE, dtag)) {
 			dsl_dataset_rele(ds, dtag);
 			return (EBUSY);
 		} else {
@@ -3664,5 +3628,26 @@ dsl_dataset_get_holds(const char *dsname, nvlist_t **nvp)
 		kmem_free(za, sizeof (zap_attribute_t));
 	}
 	dsl_dataset_rele(ds, FTAG);
+	return (0);
+}
+
+/*
+ * Note, this fuction is used as the callback for dmu_objset_find().  We
+ * always return 0 so that we will continue to find and process
+ * inconsistent datasets, even if we encounter an error trying to
+ * process one of them.
+ */
+/* ARGSUSED */
+int
+dsl_destroy_inconsistent(char *dsname, void *arg)
+{
+	dsl_dataset_t *ds;
+
+	if (dsl_dataset_own(dsname, B_TRUE, FTAG, &ds) == 0) {
+		if (DS_IS_INCONSISTENT(ds))
+			(void) dsl_dataset_destroy(ds, FTAG, B_FALSE);
+		else
+			dsl_dataset_disown(ds, FTAG);
+	}
 	return (0);
 }

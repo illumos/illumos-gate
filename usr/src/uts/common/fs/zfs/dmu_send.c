@@ -216,8 +216,8 @@ int
 dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
     vnode_t *vp, offset_t *off)
 {
-	dsl_dataset_t *ds = tosnap->os->os_dsl_dataset;
-	dsl_dataset_t *fromds = fromsnap ? fromsnap->os->os_dsl_dataset : NULL;
+	dsl_dataset_t *ds = tosnap->os_dsl_dataset;
+	dsl_dataset_t *fromds = fromsnap ? fromsnap->os_dsl_dataset : NULL;
 	dmu_replay_record_t *drr;
 	struct backuparg ba;
 	int err;
@@ -257,7 +257,7 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 	drr->drr_u.drr_begin.drr_version = DMU_BACKUP_STREAM_VERSION;
 	drr->drr_u.drr_begin.drr_creation_time =
 	    ds->ds_phys->ds_creation_time;
-	drr->drr_u.drr_begin.drr_type = tosnap->os->os_phys->os_type;
+	drr->drr_u.drr_begin.drr_type = tosnap->os_phys->os_type;
 	if (fromorigin)
 		drr->drr_u.drr_begin.drr_flags |= DRR_FLAG_CLONE;
 	drr->drr_u.drr_begin.drr_toguid = ds->ds_phys->ds_guid;
@@ -362,7 +362,7 @@ recv_new_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsobj = dsl_dataset_create_sync(dd, strrchr(rbsa->tofs, '/') + 1,
 	    rbsa->origin, flags, cr, tx);
 	VERIFY(0 == dsl_dataset_own_obj(dd->dd_pool, dsobj,
-	    DS_MODE_INCONSISTENT, dmu_recv_tag, &rbsa->ds));
+	    B_TRUE, dmu_recv_tag, &rbsa->ds));
 
 	if (rbsa->origin == NULL) {
 		(void) dmu_objset_create_impl(dd->dd_pool->dp_spa,
@@ -431,8 +431,7 @@ recv_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	/* create and open the temporary clone */
 	dsobj = dsl_dataset_create_sync(ohds->ds_dir, rbsa->clonelastname,
 	    ohds->ds_prev, flags, cr, tx);
-	VERIFY(0 == dsl_dataset_own_obj(dp, dsobj,
-	    DS_MODE_INCONSISTENT, dmu_recv_tag, &cds));
+	VERIFY(0 == dsl_dataset_own_obj(dp, dsobj, B_TRUE, dmu_recv_tag, &cds));
 
 	/*
 	 * If we actually created a non-clone, we need to create the
@@ -477,7 +476,7 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 
 	rbsa.tofs = tofs;
 	rbsa.tosnap = tosnap;
-	rbsa.origin = origin ? origin->os->os_dsl_dataset : NULL;
+	rbsa.origin = origin ? origin->os_dsl_dataset : NULL;
 	rbsa.fromguid = drrb->drr_fromguid;
 	rbsa.type = drrb->drr_type;
 	rbsa.tag = FTAG;
@@ -880,7 +879,7 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp)
 	/*
 	 * Open the objset we are modifying.
 	 */
-	VERIFY(dmu_objset_open_ds(drc->drc_real_ds, DMU_OST_ANY, &os) == 0);
+	VERIFY(dmu_objset_from_ds(drc->drc_real_ds, &os) == 0);
 
 	ASSERT(drc->drc_real_ds->ds_phys->ds_flags & DS_FLAG_INCONSISTENT);
 
@@ -950,8 +949,6 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp)
 	ASSERT(ra.err != 0);
 
 out:
-	dmu_objset_close(os);
-
 	if (ra.err != 0) {
 		/*
 		 * destroy what we created, so we don't leave it in the

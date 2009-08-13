@@ -739,5 +739,5 @@ dsl_deleg_destroy(objset_t *mos, uint64_t zapobj, dmu_tx_t *tx)
 boolean_t
 dsl_delegation_on(objset_t *os)
 {
-	return (os->os->os_spa->spa_delegation);
+	return (os->os_spa->spa_delegation);
 }

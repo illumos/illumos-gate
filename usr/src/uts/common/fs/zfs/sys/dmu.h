@@ -59,7 +59,6 @@ struct drr_end;
 struct zbookmark;
 struct spa;
 struct nvlist;
-struct objset_impl;
 struct arc_buf;
 
 typedef struct objset objset_t;
@@ -140,16 +139,6 @@ void zfs_oldacl_byteswap(void *buf, size_t size);
 void zfs_acl_byteswap(void *buf, size_t size);
 void zfs_znode_byteswap(void *buf, size_t size);
 
-#define	DS_MODE_NOHOLD		0	/* internal use only */
-#define	DS_MODE_USER		1	/* simple access, no special needs */
-#define	DS_MODE_OWNER		2	/* the "main" access, e.g. a mount */
-#define	DS_MODE_TYPE_MASK	0x3
-#define	DS_MODE_TYPE(x)		((x) & DS_MODE_TYPE_MASK)
-#define	DS_MODE_READONLY	0x8
-#define	DS_MODE_IS_READONLY(x)	((x) & DS_MODE_READONLY)
-#define	DS_MODE_INCONSISTENT	0x10
-#define	DS_MODE_IS_INCONSISTENT(x)	((x) & DS_MODE_INCONSISTENT)
-
 #define	DS_FIND_SNAPSHOTS	(1<<0)
 #define	DS_FIND_CHILDREN	(1<<1)
 
@@ -166,11 +155,13 @@ void zfs_znode_byteswap(void *buf, size_t size);
 /*
  * Public routines to create, destroy, open, and close objsets.
  */
-int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
-    objset_t **osp);
-int dmu_objset_open_ds(struct dsl_dataset *ds, dmu_objset_type_t type,
-    objset_t **osp);
-void dmu_objset_close(objset_t *os);
+int dmu_objset_hold(const char *name, void *tag, objset_t **osp);
+int dmu_objset_own(const char *name, dmu_objset_type_t type,
+    boolean_t readonly, void *tag, objset_t **osp);
+void dmu_objset_rele(objset_t *os, void *tag);
+void dmu_objset_disown(objset_t *os, void *tag);
+int dmu_objset_open_ds(struct dsl_dataset *ds, objset_t **osp);
+
 int dmu_objset_evict_dbufs(objset_t *os);
 int dmu_objset_create(const char *name, dmu_objset_type_t type, uint64_t flags,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);
@@ -309,7 +300,7 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
  * Decide how many copies of a given block we should make.  Can be from
  * 1 to SPA_DVAS_PER_BP.
  */
-int dmu_get_replication_level(struct objset_impl *, struct zbookmark *zb,
+int dmu_get_replication_level(objset_t *os, struct zbookmark *zb,
     dmu_object_type_t ot);
 /*
  * The bonus data is accessed more or less like a regular buffer.

@@ -210,8 +210,7 @@ extern "C" {
  *
  * ds_lock
  *    protects:
- *    	ds_user_ptr
- *    	ds_user_evict_func
+ *    	ds_objset
  *    	ds_open_refcount
  *    	ds_snapname
  *    	ds_phys accounting

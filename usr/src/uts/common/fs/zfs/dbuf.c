@@ -109,7 +109,7 @@ dmu_buf_impl_t *
 dbuf_find(dnode_t *dn, uint8_t level, uint64_t blkid)
 {
 	dbuf_hash_table_t *h = &dbuf_hash_table;
-	objset_impl_t *os = dn->dn_objset;
+	objset_t *os = dn->dn_objset;
 	uint64_t obj = dn->dn_object;
 	uint64_t hv = DBUF_HASH(os, obj, level, blkid);
 	uint64_t idx = hv & h->hash_table_mask;
@@ -140,7 +140,7 @@ static dmu_buf_impl_t *
 dbuf_hash_insert(dmu_buf_impl_t *db)
 {
 	dbuf_hash_table_t *h = &dbuf_hash_table;
-	objset_impl_t *os = db->db_objset;
+	objset_t *os = db->db_objset;
 	uint64_t obj = db->db.db_object;
 	int level = db->db_level;
 	uint64_t blkid = db->db_blkid;
@@ -894,7 +894,7 @@ dbuf_dirty_record_t *
 dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 {
 	dnode_t *dn = db->db_dnode;
-	objset_impl_t *os = dn->dn_objset;
+	objset_t *os = dn->dn_objset;
 	dbuf_dirty_record_t **drp, *dr;
 	int drop_struct_lock = FALSE;
 	boolean_t do_free_accounting = B_FALSE;
@@ -1488,7 +1488,7 @@ static dmu_buf_impl_t *
 dbuf_create(dnode_t *dn, uint8_t level, uint64_t blkid,
     dmu_buf_impl_t *parent, blkptr_t *blkptr)
 {
-	objset_impl_t *os = dn->dn_objset;
+	objset_t *os = dn->dn_objset;
 	dmu_buf_impl_t *db, *odb;
 
 	ASSERT(RW_LOCK_HELD(&dn->dn_struct_rwlock));
@@ -2011,7 +2011,7 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 	arc_buf_t **datap = &dr->dt.dl.dr_data;
 	dmu_buf_impl_t *db = dr->dr_dbuf;
 	dnode_t *dn = db->db_dnode;
-	objset_impl_t *os = dn->dn_objset;
+	objset_t *os = dn->dn_objset;
 	uint64_t txg = tx->tx_txg;
 
 	ASSERT(dmu_tx_is_syncing(tx));
@@ -2182,7 +2182,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 {
 	dmu_buf_impl_t *db = dr->dr_dbuf;
 	dnode_t *dn = db->db_dnode;
-	objset_impl_t *os = dn->dn_objset;
+	objset_t *os = dn->dn_objset;
 	dmu_buf_impl_t *parent = db->db_parent;
 	uint64_t txg = tx->tx_txg;
 	zbookmark_t zb;
@@ -2279,7 +2279,7 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 {
 	dmu_buf_impl_t *db = vdb;
 	dnode_t *dn = db->db_dnode;
-	objset_impl_t *os = dn->dn_objset;
+	objset_t *os = dn->dn_objset;
 	blkptr_t *bp = zio->io_bp;
 	blkptr_t *bp_orig = &zio->io_bp_orig;
 	uint64_t fill = 0;

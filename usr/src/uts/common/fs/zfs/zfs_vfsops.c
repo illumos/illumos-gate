@@ -835,32 +835,30 @@ zfs_usergroup_overquota(zfsvfs_t *zfsvfs, boolean_t isgroup, uint64_t fuid)
 }
 
 int
-zfsvfs_create(const char *osname, int mode, zfsvfs_t **zvp)
+zfsvfs_create(const char *osname, zfsvfs_t **zvp)
 {
 	objset_t *os;
 	zfsvfs_t *zfsvfs;
 	uint64_t zval;
 	int i, error;
 
-	if (error = dsl_prop_get_integer(osname, "readonly", &zval, NULL))
-		return (error);
-	if (zval)
-		mode |= DS_MODE_READONLY;
+	zfsvfs = kmem_zalloc(sizeof (zfsvfs_t), KM_SLEEP);
 
-	error = dmu_objset_open(osname, DMU_OST_ZFS, mode, &os);
-	if (error == EROFS) {
-		mode |= DS_MODE_READONLY;
-		error = dmu_objset_open(osname, DMU_OST_ZFS, mode, &os);
-	}
-	if (error)
+	/*
+	 * We claim to always be readonly so we can open snapshots;
+	 * other ZPL code will prevent us from writing to snapshots.
+	 */
+	error = dmu_objset_own(osname, DMU_OST_ZFS, B_TRUE, zfsvfs, &os);
+	if (error) {
+		kmem_free(zfsvfs, sizeof (zfsvfs_t));
 		return (error);
+	}
 
 	/*
 	 * Initialize the zfs-specific filesystem structure.
 	 * Should probably make this a kmem cache, shuffle fields,
 	 * and just bzero up to z_hold_mtx[].
 	 */
-	zfsvfs = kmem_zalloc(sizeof (zfsvfs_t), KM_SLEEP);
 	zfsvfs->z_vfs = NULL;
 	zfsvfs->z_parent = zfsvfs;
 	zfsvfs->z_max_blksz = SPA_MAXBLOCKSIZE;
@@ -948,7 +946,7 @@ zfsvfs_create(const char *osname, int mode, zfsvfs_t **zvp)
 	return (0);
 
 out:
-	dmu_objset_close(os);
+	dmu_objset_disown(os, zfsvfs);
 	*zvp = NULL;
 	kmem_free(zfsvfs, sizeof (zfsvfs_t));
 	return (error);
@@ -966,9 +964,9 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 	/*
 	 * Set the objset user_ptr to track its zfsvfs.
 	 */
-	mutex_enter(&zfsvfs->z_os->os->os_user_ptr_lock);
+	mutex_enter(&zfsvfs->z_os->os_user_ptr_lock);
 	dmu_objset_set_user(zfsvfs->z_os, zfsvfs);
-	mutex_exit(&zfsvfs->z_os->os->os_user_ptr_lock);
+	mutex_exit(&zfsvfs->z_os->os_user_ptr_lock);
 
 	zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
 	if (zil_disable) {
@@ -1084,7 +1082,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	ASSERT(vfsp);
 	ASSERT(osname);
 
-	error = zfsvfs_create(osname, DS_MODE_OWNER, &zfsvfs);
+	error = zfsvfs_create(osname, &zfsvfs);
 	if (error)
 		return (error);
 	zfsvfs->z_vfs = vfsp;
@@ -1146,9 +1144,9 @@ zfs_domount(vfs_t *vfsp, char *osname)
 		xattr_changed_cb(zfsvfs, pval);
 		zfsvfs->z_issnap = B_TRUE;
 
-		mutex_enter(&zfsvfs->z_os->os->os_user_ptr_lock);
+		mutex_enter(&zfsvfs->z_os->os_user_ptr_lock);
 		dmu_objset_set_user(zfsvfs->z_os, zfsvfs);
-		mutex_exit(&zfsvfs->z_os->os->os_user_ptr_lock);
+		mutex_exit(&zfsvfs->z_os->os_user_ptr_lock);
 	} else {
 		error = zfsvfs_setup(zfsvfs, B_TRUE);
 	}
@@ -1157,7 +1155,7 @@ zfs_domount(vfs_t *vfsp, char *osname)
 		zfsctl_create(zfsvfs);
 out:
 	if (error) {
-		dmu_objset_close(zfsvfs->z_os);
+		dmu_objset_disown(zfsvfs->z_os, zfsvfs);
 		zfsvfs_free(zfsvfs);
 	} else {
 		atomic_add_32(&zfs_active_fs_count, 1);
@@ -1725,14 +1723,14 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		/*
 		 * Unset the objset user_ptr.
 		 */
-		mutex_enter(&os->os->os_user_ptr_lock);
+		mutex_enter(&os->os_user_ptr_lock);
 		dmu_objset_set_user(os, NULL);
-		mutex_exit(&os->os->os_user_ptr_lock);
+		mutex_exit(&os->os_user_ptr_lock);
 
 		/*
 		 * Finally release the objset
 		 */
-		dmu_objset_close(os);
+		dmu_objset_disown(os, zfsvfs);
 	}
 
 	/*
@@ -1835,17 +1833,13 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
  * 'z_teardown_inactive_lock' write held.
  */
 int
-zfs_suspend_fs(zfsvfs_t *zfsvfs, char *name, int *modep)
+zfs_suspend_fs(zfsvfs_t *zfsvfs)
 {
 	int error;
 
 	if ((error = zfsvfs_teardown(zfsvfs, B_FALSE)) != 0)
 		return (error);
-
-	*modep = zfsvfs->z_os->os_mode;
-	if (name)
-		dmu_objset_name(zfsvfs->z_os, name);
-	dmu_objset_close(zfsvfs->z_os);
+	dmu_objset_disown(zfsvfs->z_os, zfsvfs);
 
 	return (0);
 }
@@ -1854,14 +1848,15 @@ zfs_suspend_fs(zfsvfs_t *zfsvfs, char *name, int *modep)
  * Reopen zfsvfs_t::z_os and release VOPs.
  */
 int
-zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname, int mode)
+zfs_resume_fs(zfsvfs_t *zfsvfs, const char *osname)
 {
 	int err;
 
 	ASSERT(RRW_WRITE_HELD(&zfsvfs->z_teardown_lock));
 	ASSERT(RW_WRITE_HELD(&zfsvfs->z_teardown_inactive_lock));
 
-	err = dmu_objset_open(osname, DMU_OST_ZFS, mode, &zfsvfs->z_os);
+	err = dmu_objset_own(osname, DMU_OST_ZFS, B_FALSE, zfsvfs,
+	    &zfsvfs->z_os);
 	if (err) {
 		zfsvfs->z_os = NULL;
 	} else {

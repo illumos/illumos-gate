@@ -703,7 +703,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 	 */
 	if (first && tx->tx_objset) {
 		int error;
-		dsl_dataset_t *ds = tx->tx_objset->os->os_dsl_dataset;
+		dsl_dataset_t *ds = tx->tx_objset->os_dsl_dataset;
 
 		error = dsl_dataset_check_quota(ds, checkrefquota,
 		    asize, est_inflight, &used_on_disk, &ref_rsrv);

@@ -99,7 +99,7 @@ dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
 	dmu_buf_impl_t *db;
 	int err;
 
-	err = dnode_hold(os->os, object, FTAG, &dn);
+	err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
 		return (err);
 	blkid = dbuf_whichblock(dn, offset);
@@ -150,7 +150,7 @@ dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **dbp)
 	dmu_buf_impl_t *db;
 	int error;
 
-	error = dnode_hold(os->os, object, FTAG, &dn);
+	error = dnode_hold(os, object, FTAG, &dn);
 	if (error)
 		return (error);
 
@@ -282,7 +282,7 @@ dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
 	dnode_t *dn;
 	int err;
 
-	err = dnode_hold(os->os, object, FTAG, &dn);
+	err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
 		return (err);
 
@@ -335,7 +335,7 @@ dmu_prefetch(objset_t *os, uint64_t object, uint64_t offset, uint64_t len)
 		return;
 
 	if (len == 0) {  /* they're interested in the bonus buffer */
-		dn = os->os->os_meta_dnode;
+		dn = os->os_meta_dnode;
 
 		if (object == 0 || object >= DN_MAX_OBJECT)
 			return;
@@ -352,7 +352,7 @@ dmu_prefetch(objset_t *os, uint64_t object, uint64_t offset, uint64_t len)
 	 * already cached, we will do a *synchronous* read in the
 	 * dnode_hold() call.  The same is true for any indirects.
 	 */
-	err = dnode_hold(os->os, object, FTAG, &dn);
+	err = dnode_hold(os, object, FTAG, &dn);
 	if (err != 0)
 		return;
 
@@ -484,7 +484,7 @@ dmu_free_long_range(objset_t *os, uint64_t object,
 	dnode_t *dn;
 	int err;
 
-	err = dnode_hold(os->os, object, FTAG, &dn);
+	err = dnode_hold(os, object, FTAG, &dn);
 	if (err != 0)
 		return (err);
 	err = dmu_free_long_range_impl(os, dn, offset, length, FALSE);
@@ -499,7 +499,7 @@ dmu_free_object(objset_t *os, uint64_t object)
 	dmu_tx_t *tx;
 	int err;
 
-	err = dnode_hold_impl(os->os, object, DNODE_MUST_BE_ALLOCATED,
+	err = dnode_hold_impl(os, object, DNODE_MUST_BE_ALLOCATED,
 	    FTAG, &dn);
 	if (err != 0)
 		return (err);
@@ -527,7 +527,7 @@ dmu_free_range(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t size, dmu_tx_t *tx)
 {
 	dnode_t *dn;
-	int err = dnode_hold(os->os, object, FTAG, &dn);
+	int err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
 		return (err);
 	ASSERT(offset < UINT64_MAX);
@@ -545,7 +545,7 @@ dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	dmu_buf_t **dbp;
 	int numbufs, err;
 
-	err = dnode_hold(os->os, object, FTAG, &dn);
+	err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
 		return (err);
 
@@ -852,8 +852,7 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
 		dbuf_rele(db, FTAG);
 	} else {
 		dbuf_rele(db, FTAG);
-		ASSERT(dn->dn_objset->os.os == dn->dn_objset);
-		dmu_write(&dn->dn_objset->os, dn->dn_object, offset, blksz,
+		dmu_write(dn->dn_objset, dn->dn_object, offset, blksz,
 		    buf->b_data, tx);
 		dmu_return_arcbuf(buf);
 	}
@@ -930,7 +929,7 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
     blkptr_t *bp, uint64_t txg, dmu_sync_cb_t *done, void *arg)
 {
 	dmu_buf_impl_t *db = (dmu_buf_impl_t *)db_fake;
-	objset_impl_t *os = db->db_objset;
+	objset_t *os = db->db_objset;
 	dsl_pool_t *dp = os->os_dsl_dataset->ds_dir->dd_pool;
 	tx_state_t *tx = &dp->dp_tx;
 	dbuf_dirty_record_t *dr;
@@ -1078,7 +1077,7 @@ dmu_object_set_blocksize(objset_t *os, uint64_t object, uint64_t size, int ibs,
 	dnode_t *dn;
 	int err;
 
-	err = dnode_hold(os->os, object, FTAG, &dn);
+	err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
 		return (err);
 	err = dnode_set_blksz(dn, size, ibs, tx);
@@ -1093,7 +1092,7 @@ dmu_object_set_checksum(objset_t *os, uint64_t object, uint8_t checksum,
 	dnode_t *dn;
 
 	/* XXX assumes dnode_hold will not get an i/o error */
-	(void) dnode_hold(os->os, object, FTAG, &dn);
+	(void) dnode_hold(os, object, FTAG, &dn);
 	ASSERT(checksum < ZIO_CHECKSUM_FUNCTIONS);
 	dn->dn_checksum = checksum;
 	dnode_setdirty(dn, tx);
@@ -1107,7 +1106,7 @@ dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 	dnode_t *dn;
 
 	/* XXX assumes dnode_hold will not get an i/o error */
-	(void) dnode_hold(os->os, object, FTAG, &dn);
+	(void) dnode_hold(os, object, FTAG, &dn);
 	ASSERT(compress < ZIO_COMPRESS_FUNCTIONS);
 	dn->dn_compress = compress;
 	dnode_setdirty(dn, tx);
@@ -1120,7 +1119,7 @@ dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole, uint64_t *off)
 	dnode_t *dn;
 	int i, err;
 
-	err = dnode_hold(os->os, object, FTAG, &dn);
+	err = dnode_hold(os, object, FTAG, &dn);
 	if (err)
 		return (err);
 	/*
@@ -1134,7 +1133,7 @@ dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole, uint64_t *off)
 	if (i != TXG_SIZE) {
 		dnode_rele(dn, FTAG);
 		txg_wait_synced(dmu_objset_pool(os), 0);
-		err = dnode_hold(os->os, object, FTAG, &dn);
+		err = dnode_hold(os, object, FTAG, &dn);
 		if (err)
 			return (err);
 	}
@@ -1176,7 +1175,7 @@ int
 dmu_object_info(objset_t *os, uint64_t object, dmu_object_info_t *doi)
 {
 	dnode_t *dn;
-	int err = dnode_hold(os->os, object, FTAG, &dn);
+	int err = dnode_hold(os, object, FTAG, &dn);
 
 	if (err)
 		return (err);

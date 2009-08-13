@@ -58,9 +58,9 @@ dmu_tx_create_dd(dsl_dir_t *dd)
 dmu_tx_t *
 dmu_tx_create(objset_t *os)
 {
-	dmu_tx_t *tx = dmu_tx_create_dd(os->os->os_dsl_dataset->ds_dir);
+	dmu_tx_t *tx = dmu_tx_create_dd(os->os_dsl_dataset->ds_dir);
 	tx->tx_objset = os;
-	tx->tx_lastsnap_txg = dsl_dataset_prev_snap_txg(os->os->os_dsl_dataset);
+	tx->tx_lastsnap_txg = dsl_dataset_prev_snap_txg(os->os_dsl_dataset);
 	return (tx);
 }
 
@@ -98,7 +98,7 @@ dmu_tx_hold_object_impl(dmu_tx_t *tx, objset_t *os, uint64_t object,
 	int err;
 
 	if (object != DMU_NEW_OBJECT) {
-		err = dnode_hold(os->os, object, tx, &dn);
+		err = dnode_hold(os, object, tx, &dn);
 		if (err) {
 			tx->tx_err = err;
 			return (NULL);
@@ -376,7 +376,7 @@ static void
 dmu_tx_count_dnode(dmu_tx_hold_t *txh)
 {
 	dnode_t *dn = txh->txh_dnode;
-	dnode_t *mdn = txh->txh_tx->tx_objset->os->os_meta_dnode;
+	dnode_t *mdn = txh->txh_tx->tx_objset->os_meta_dnode;
 	uint64_t space = mdn->dn_datablksz +
 	    ((mdn->dn_nlevels-1) << mdn->dn_indblkshift);
 
@@ -688,7 +688,7 @@ dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name)
 		 * access the name in this fat-zap so that we'll check
 		 * for i/o errors to the leaf blocks, etc.
 		 */
-		err = zap_lookup(&dn->dn_objset->os, dn->dn_object, name,
+		err = zap_lookup(dn->dn_objset, dn->dn_object, name,
 		    8, 0, NULL);
 		if (err == EIO) {
 			tx->tx_err = err;
@@ -696,7 +696,7 @@ dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, const char *name)
 		}
 	}
 
-	err = zap_count_write(&dn->dn_objset->os, dn->dn_object, name, add,
+	err = zap_count_write(dn->dn_objset, dn->dn_object, name, add,
 	    &txh->txh_space_towrite, &txh->txh_space_tooverwrite);
 
 	/*
@@ -771,7 +771,7 @@ dmu_tx_dirty_buf(dmu_tx_t *tx, dmu_buf_impl_t *db)
 	dnode_t *dn = db->db_dnode;
 
 	ASSERT(tx->tx_txg != 0);
-	ASSERT(tx->tx_objset == NULL || dn->dn_objset == tx->tx_objset->os);
+	ASSERT(tx->tx_objset == NULL || dn->dn_objset == tx->tx_objset);
 	ASSERT3U(dn->dn_object, ==, db->db.db_object);
 
 	if (tx->tx_anyobj)
@@ -931,7 +931,7 @@ dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how)
 	 * assume that we won't be able to free or overwrite anything.
 	 */
 	if (tx->tx_objset &&
-	    dsl_dataset_prev_snap_txg(tx->tx_objset->os->os_dsl_dataset) >
+	    dsl_dataset_prev_snap_txg(tx->tx_objset->os_dsl_dataset) >
 	    tx->tx_lastsnap_txg) {
 		towrite += tooverwrite;
 		tooverwrite = tofree = 0;

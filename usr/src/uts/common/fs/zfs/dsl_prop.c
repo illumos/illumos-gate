@@ -552,7 +552,7 @@ dsl_props_set(const char *dsname, nvlist_t *nvl)
 int
 dsl_prop_get_all(objset_t *os, nvlist_t **nvp, boolean_t local)
 {
-	dsl_dataset_t *ds = os->os->os_dsl_dataset;
+	dsl_dataset_t *ds = os->os_dsl_dataset;
 	dsl_dir_t *dd = ds->ds_dir;
 	boolean_t snapshot = dsl_dataset_is_snapshot(ds);
 	int err = 0;

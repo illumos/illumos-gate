@@ -500,7 +500,7 @@ zil_claim(char *osname, void *txarg)
 	objset_t *os;
 	int error;
 
-	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_USER, &os);
+	error = dmu_objset_hold(osname, FTAG, &os);
 	if (error) {
 		cmn_err(CE_WARN, "can't open objset for %s", osname);
 		return (0);
@@ -549,7 +549,7 @@ zil_claim(char *osname, void *txarg)
 	}
 
 	ASSERT3U(first_txg, ==, (spa_last_synced_txg(zilog->zl_spa) + 1));
-	dmu_objset_close(os);
+	dmu_objset_rele(os, FTAG);
 	return (0);
 }
 
@@ -571,7 +571,7 @@ zil_check_log_chain(char *osname, void *txarg)
 	zil_trailer_t *ztp;
 	int error;
 
-	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_USER, &os);
+	error = dmu_objset_hold(osname, FTAG, &os);
 	if (error) {
 		cmn_err(CE_WARN, "can't open objset for %s", osname);
 		return (0);
@@ -581,7 +581,7 @@ zil_check_log_chain(char *osname, void *txarg)
 	zh = zil_header_in_syncing_context(zilog);
 	blk = zh->zh_log;
 	if (BP_IS_HOLE(&blk)) {
-		dmu_objset_close(os);
+		dmu_objset_rele(os, FTAG);
 		return (0); /* no chain */
 	}
 
@@ -594,7 +594,7 @@ zil_check_log_chain(char *osname, void *txarg)
 		blk = ztp->zit_next_blk;
 		VERIFY(arc_buf_remove_ref(abuf, &abuf) == 1);
 	}
-	dmu_objset_close(os);
+	dmu_objset_rele(os, FTAG);
 	if (error == ECKSUM)
 		return (0); /* normal end of chain */
 	return (error);
@@ -1658,7 +1658,7 @@ zil_vdev_offline(char *osname, void *arg)
 	zilog_t *zilog;
 	int error;
 
-	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_USER, &os);
+	error = dmu_objset_hold(osname, FTAG, &os);
 	if (error)
 		return (error);
 
@@ -1667,6 +1667,6 @@ zil_vdev_offline(char *osname, void *arg)
 		error = EEXIST;
 	else
 		zil_resume(zilog);
-	dmu_objset_close(os);
+	dmu_objset_rele(os, FTAG);
 	return (error);
 }

@@ -401,70 +401,8 @@ zfs_refresh_properties(zfs_handle_t *zhp)
 static int
 make_dataset_handle_common(zfs_handle_t *zhp, zfs_cmd_t *zc)
 {
-	char *logstr;
-	libzfs_handle_t *hdl = zhp->zfs_hdl;
-
-	/*
-	 * Preserve history log string.
-	 * any changes performed here will be
-	 * logged as an internal event.
-	 */
-	logstr = zhp->zfs_hdl->libzfs_log_str;
-	zhp->zfs_hdl->libzfs_log_str = NULL;
-
-top:
-	if (put_stats_zhdl(zhp, zc) != 0) {
-		zhp->zfs_hdl->libzfs_log_str = logstr;
+	if (put_stats_zhdl(zhp, zc) != 0)
 		return (-1);
-	}
-
-
-	if (zhp->zfs_dmustats.dds_inconsistent) {
-		zfs_cmd_t zc2 = { 0 };
-
-		/*
-		 * If it is dds_inconsistent, then we've caught it in
-		 * the middle of a 'zfs receive' or 'zfs destroy', and
-		 * it is inconsistent from the ZPL's point of view, so
-		 * can't be mounted.  However, it could also be that we
-		 * have crashed in the middle of one of those
-		 * operations, in which case we need to get rid of the
-		 * inconsistent state.  We do that by either rolling
-		 * back to the previous snapshot (which will fail if
-		 * there is none), or destroying the filesystem.  Note
-		 * that if we are still in the middle of an active
-		 * 'receive' or 'destroy', then the rollback and destroy
-		 * will fail with EBUSY and we will drive on as usual.
-		 */
-
-		(void) strlcpy(zc2.zc_name, zhp->zfs_name,
-		    sizeof (zc2.zc_name));
-
-		if (zhp->zfs_dmustats.dds_type == DMU_OST_ZVOL) {
-			(void) zvol_remove_link(hdl, zhp->zfs_name);
-			zc2.zc_objset_type = DMU_OST_ZVOL;
-		} else {
-			zc2.zc_objset_type = DMU_OST_ZFS;
-		}
-
-		/*
-		 * If we can successfully destroy it, pretend that it
-		 * never existed.
-		 */
-		if (ioctl(hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc2) == 0) {
-			zhp->zfs_hdl->libzfs_log_str = logstr;
-			errno = ENOENT;
-			return (-1);
-		}
-		/* If we can successfully roll it back, reset the stats */
-		if (ioctl(hdl->libzfs_fd, ZFS_IOC_ROLLBACK, &zc2) == 0) {
-			if (get_stats_ioctl(zhp, zc) != 0) {
-				zhp->zfs_hdl->libzfs_log_str = logstr;
-				return (-1);
-			}
-			goto top;
-		}
-	}
 
 	/*
 	 * We've managed to open the dataset and gather statistics.  Determine
@@ -486,7 +424,6 @@ top:
 	else
 		abort();	/* we should never see any other types */
 
-	zhp->zfs_hdl->libzfs_log_str = logstr;
 	zhp->zpool_hdl = zpool_handle(zhp);
 	return (0);
 }

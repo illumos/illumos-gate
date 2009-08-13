@@ -1372,8 +1372,7 @@ ztest_destroy_cb(char *name, void *arg)
 	/*
 	 * Verify that the dataset contains a directory object.
 	 */
-	error = dmu_objset_open(name, DMU_OST_OTHER,
-	    DS_MODE_USER | DS_MODE_READONLY, &os);
+	error = dmu_objset_hold(name, FTAG, &os);
 	ASSERT3U(error, ==, 0);
 	error = dmu_object_info(os, ZTEST_DIROBJ, doi);
 	if (error != ENOENT) {
@@ -1382,16 +1381,15 @@ ztest_destroy_cb(char *name, void *arg)
 		ASSERT3U(doi->doi_type, ==, DMU_OT_UINT64_OTHER);
 		ASSERT3S(doi->doi_physical_blks, >=, 0);
 	}
-	dmu_objset_close(os);
+	dmu_objset_rele(os, FTAG);
 
 	/*
 	 * Destroy the dataset.
 	 */
 	error = dmu_objset_destroy(name, B_FALSE);
 	if (error) {
-		(void) dmu_objset_open(name, DMU_OST_OTHER,
-		    DS_MODE_USER | DS_MODE_READONLY, &os);
-		fatal(0, "dmu_objset_destroy(os=%p) = %d\n", &os, error);
+		(void) dmu_objset_hold(name, FTAG, &os);
+		fatal(0, "dmu_objset_destroy(os=%p) = %d\n", os, error);
 	}
 	return (0);
 }
@@ -1434,7 +1432,6 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	int error;
 	objset_t *os, *os2;
 	char name[100];
-	int basemode, expected_error;
 	zilog_t *zilog;
 	uint64_t seq;
 	uint64_t objects;
@@ -1443,19 +1440,15 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	(void) snprintf(name, 100, "%s/%s_temp_%llu", za->za_pool, za->za_pool,
 	    (u_longlong_t)za->za_instance);
 
-	basemode = DS_MODE_TYPE(za->za_instance);
-	if (basemode != DS_MODE_USER && basemode != DS_MODE_OWNER)
-		basemode = DS_MODE_USER;
-
 	/*
 	 * If this dataset exists from a previous run, process its replay log
 	 * half of the time.  If we don't replay it, then dmu_objset_destroy()
 	 * (invoked from ztest_destroy_cb() below) should just throw it away.
 	 */
 	if (ztest_random(2) == 0 &&
-	    dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_OWNER, &os) == 0) {
+	    dmu_objset_own(name, DMU_OST_OTHER, B_FALSE, FTAG, &os) == 0) {
 		zil_replay(os, os, ztest_replay_vector);
-		dmu_objset_close(os);
+		dmu_objset_disown(os, FTAG);
 	}
 
 	/*
@@ -1469,7 +1462,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	/*
 	 * Verify that the destroyed dataset is no longer in the namespace.
 	 */
-	error = dmu_objset_open(name, DMU_OST_OTHER, basemode, &os);
+	error = dmu_objset_hold(name, FTAG, &os);
 	if (error != ENOENT)
 		fatal(1, "dmu_objset_open(%s) found destroyed dataset %p",
 		    name, os);
@@ -1488,7 +1481,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 		fatal(0, "dmu_objset_create(%s) = %d", name, error);
 	}
 
-	error = dmu_objset_open(name, DMU_OST_OTHER, basemode, &os);
+	error = dmu_objset_own(name, DMU_OST_OTHER, B_FALSE, FTAG, &os);
 	if (error) {
 		fatal(0, "dmu_objset_open(%s) = %d", name, error);
 	}
@@ -1538,27 +1531,23 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 		fatal(0, "created existing dataset, error = %d", error);
 
 	/*
-	 * Verify that multiple dataset holds are allowed, but only when
-	 * the new access mode is compatible with the base mode.
+	 * Verify that we can hold an objset that is also owned.
 	 */
-	if (basemode == DS_MODE_OWNER) {
-		error = dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_USER,
-		    &os2);
-		if (error)
-			fatal(0, "dmu_objset_open('%s') = %d", name, error);
-		else
-			dmu_objset_close(os2);
-	}
-	error = dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_OWNER, &os2);
-	expected_error = (basemode == DS_MODE_OWNER) ? EBUSY : 0;
-	if (error != expected_error)
-		fatal(0, "dmu_objset_open('%s') = %d, expected %d",
-		    name, error, expected_error);
-	if (error == 0)
-		dmu_objset_close(os2);
+	error = dmu_objset_hold(name, FTAG, &os2);
+	if (error)
+		fatal(0, "dmu_objset_open('%s') = %d", name, error);
+	dmu_objset_rele(os2, FTAG);
+
+	/*
+	 * Verify that we can not own an objset that is already owned.
+	 */
+	error = dmu_objset_own(name, DMU_OST_OTHER, B_FALSE, FTAG, &os2);
+	if (error != EBUSY)
+		fatal(0, "dmu_objset_open('%s') = %d, expected EBUSY",
+		    name, error);
 
 	zil_close(zilog);
-	dmu_objset_close(os);
+	dmu_objset_disown(os, FTAG);
 
 	error = dmu_objset_destroy(name, B_FALSE);
 	if (error)
@@ -1670,13 +1659,12 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 		fatal(0, "dmu_take_snapshot(%s) = %d", snap1name, error);
 	}
 
-	error = dmu_objset_open(snap1name, DMU_OST_OTHER,
-	    DS_MODE_USER | DS_MODE_READONLY, &clone);
+	error = dmu_objset_hold(snap1name, FTAG, &clone);
 	if (error)
 		fatal(0, "dmu_open_snapshot(%s) = %d", snap1name, error);
 
 	error = dmu_objset_clone(clone1name, dmu_objset_ds(clone), 0);
-	dmu_objset_close(clone);
+	dmu_objset_rele(clone, FTAG);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_objset_create");
@@ -1705,13 +1693,12 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 		fatal(0, "dmu_open_snapshot(%s) = %d", snap3name, error);
 	}
 
-	error = dmu_objset_open(snap3name, DMU_OST_OTHER,
-	    DS_MODE_USER | DS_MODE_READONLY, &clone);
+	error = dmu_objset_hold(snap3name, FTAG, &clone);
 	if (error)
 		fatal(0, "dmu_open_snapshot(%s) = %d", snap3name, error);
 
 	error = dmu_objset_clone(clone2name, dmu_objset_ds(clone), 0);
-	dmu_objset_close(clone);
+	dmu_objset_rele(clone, FTAG);
 	if (error) {
 		if (error == ENOSPC) {
 			ztest_record_enospc("dmu_objset_create");
@@ -1720,7 +1707,7 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 		fatal(0, "dmu_objset_create(%s) = %d", clone2name, error);
 	}
 
-	error = dsl_dataset_own(snap1name, DS_MODE_READONLY, FTAG, &ds);
+	error = dsl_dataset_own(snap1name, B_FALSE, FTAG, &ds);
 	if (error)
 		fatal(0, "dsl_dataset_own(%s) = %d", snap1name, error);
 	error = dsl_dataset_promote(clone2name);
@@ -3806,8 +3793,7 @@ ztest_run(char *pool)
 				fatal(0, "dmu_objset_create(%s) = %d",
 				    name, error);
 			}
-			error = dmu_objset_open(name, DMU_OST_OTHER,
-			    DS_MODE_USER, &za[d].za_os);
+			error = dmu_objset_hold(name, FTAG, &za[d].za_os);
 			if (error)
 				fatal(0, "dmu_objset_open('%s') = %d",
 				    name, error);
@@ -3827,7 +3813,7 @@ ztest_run(char *pool)
 		VERIFY(thr_join(za[t].za_thread, NULL, NULL) == 0);
 		if (t < zopt_datasets) {
 			zil_close(za[t].za_zilog);
-			dmu_objset_close(za[t].za_os);
+			dmu_objset_rele(za[t].za_os, FTAG);
 		}
 	}
 

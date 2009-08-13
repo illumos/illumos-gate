@@ -371,12 +371,14 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 					break;
 				}
 
-				if (error = dmu_objset_open(strval, DMU_OST_ZFS,
-				    DS_MODE_USER | DS_MODE_READONLY, &os))
+				if (error = dmu_objset_hold(strval, FTAG, &os))
 					break;
 
-				/* We don't support gzip bootable datasets */
-				if ((error = dsl_prop_get_integer(strval,
+				/* Must be ZPL and not gzip compressed. */
+
+				if (dmu_objset_type(os) != DMU_OST_ZFS) {
+					error = ENOTSUP;
+				} else if ((error = dsl_prop_get_integer(strval,
 				    zfs_prop_to_name(ZFS_PROP_COMPRESSION),
 				    &compress, NULL)) == 0 &&
 				    !BOOTFS_COMPRESS_VALID(compress)) {
@@ -384,7 +386,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				} else {
 					objnum = dmu_objset_id(os);
 				}
-				dmu_objset_close(os);
+				dmu_objset_rele(os, FTAG);
 			}
 			break;
 
@@ -1598,6 +1600,12 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		 */
 		if (vdev_resilver_needed(rvd, NULL, NULL))
 			spa_async_request(spa, SPA_ASYNC_RESILVER);
+
+		/*
+		 * Delete any inconsistent datasets.
+		 */
+		(void) dmu_objset_find(spa_name(spa),
+		    dsl_destroy_inconsistent, NULL, DS_FIND_CHILDREN);
 	}
 
 	error = 0;

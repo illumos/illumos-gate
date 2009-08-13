@@ -88,7 +88,7 @@ extern "C" {
 #define	EPB(blkshift, typeshift)	(1 << (blkshift - typeshift))
 
 struct dmu_buf_impl;
-struct objset_impl;
+struct objset;
 struct zio;
 
 enum dnode_dirtycontext {
@@ -136,7 +136,7 @@ typedef struct dnode {
 	list_node_t dn_link;
 
 	/* immutable: */
-	struct objset_impl *dn_objset;
+	struct objset *dn_objset;
 	uint64_t dn_object;
 	struct dmu_buf_impl *dn_dbuf;
 	dnode_phys_t *dn_phys; /* pointer into dn->dn_dbuf->db.db_data */
@@ -202,14 +202,14 @@ typedef struct free_range {
 	uint64_t fr_nblks;
 } free_range_t;
 
-dnode_t *dnode_special_open(struct objset_impl *dd, dnode_phys_t *dnp,
+dnode_t *dnode_special_open(struct objset *dd, dnode_phys_t *dnp,
     uint64_t object);
 void dnode_special_close(dnode_t *dn);
 
 void dnode_setbonuslen(dnode_t *dn, int newsize, dmu_tx_t *tx);
-int dnode_hold(struct objset_impl *dd, uint64_t object,
+int dnode_hold(struct objset *dd, uint64_t object,
     void *ref, dnode_t **dnp);
-int dnode_hold_impl(struct objset_impl *dd, uint64_t object, int flag,
+int dnode_hold_impl(struct objset *dd, uint64_t object, int flag,
     void *ref, dnode_t **dnp);
 boolean_t dnode_add_ref(dnode_t *dn, void *ref);
 void dnode_rele(dnode_t *dn, void *ref);

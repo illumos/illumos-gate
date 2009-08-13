@@ -75,7 +75,6 @@ typedef enum dbuf_states {
 	DB_EVICTING
 } dbuf_states_t;
 
-struct objset_impl;
 struct dnode;
 struct dmu_tx;
 
@@ -148,7 +147,7 @@ typedef struct dmu_buf_impl {
 	dmu_buf_t db;
 
 	/* the objset we belong to */
-	struct objset_impl *db_objset;
+	struct objset *db_objset;
 
 	/*
 	 * the dnode we belong to (NULL when evicted)
