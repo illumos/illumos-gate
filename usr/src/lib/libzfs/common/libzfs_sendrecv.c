@@ -1334,12 +1334,13 @@ again:
 		VERIFY(0 == nvlist_lookup_uint64(stream_nvfs,
 		    "parentfromsnap", &stream_parent_fromsnap_guid));
 
+		s1 = strrchr(fsname, '/');
+		s2 = strrchr(stream_fsname, '/');
+
 		/* check for rename */
 		if ((stream_parent_fromsnap_guid != 0 &&
 		    stream_parent_fromsnap_guid != parent_fromsnap_guid) ||
-		    ((s1 = strrchr(fsname, '/')) &&
-		    (s2 = strrchr(stream_fsname, '/')) &&
-		    strcmp(s1, s2) != 0)) {
+		    ((s1 != NULL) && (s2 != NULL) && strcmp(s1, s2) != 0)) {
 			nvlist_t *parent;
 			char tryname[ZFS_MAXNAMELEN];
 
