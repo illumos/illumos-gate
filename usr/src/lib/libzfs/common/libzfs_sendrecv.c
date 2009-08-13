@@ -1139,6 +1139,7 @@ recv_incremental_replication(libzfs_handle_t *hdl, const char *tofs,
 	char newname[ZFS_MAXNAMELEN];
 	int error;
 	boolean_t needagain, progress;
+	char *s1, *s2;
 
 	VERIFY(0 == nvlist_lookup_string(stream_nv, "fromsnap", &fromsnap));
 	VERIFY(0 == nvlist_lookup_string(stream_nv, "tosnap", &tosnap));
@@ -1336,8 +1337,9 @@ again:
 		/* check for rename */
 		if ((stream_parent_fromsnap_guid != 0 &&
 		    stream_parent_fromsnap_guid != parent_fromsnap_guid) ||
-		    strcmp(strrchr(fsname, '/'),
-		    strrchr(stream_fsname, '/')) != 0) {
+		    ((s1 = strrchr(fsname, '/')) &&
+		    (s2 = strrchr(stream_fsname, '/')) &&
+		    strcmp(s1, s2) != 0)) {
 			nvlist_t *parent;
 			char tryname[ZFS_MAXNAMELEN];
 
