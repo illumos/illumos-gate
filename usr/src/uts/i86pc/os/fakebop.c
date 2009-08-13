@@ -1087,9 +1087,9 @@ build_fastboot_cmdline(void)
  * Fast Reboot.
  */
 static void
-save_boot_info(multiboot_info_t *mbi)
+save_boot_info(multiboot_info_t *mbi, struct xboot_info *xbi)
 {
-	mb_module_t *mbp;
+	struct boot_modules *modp;
 	int i;
 
 	bcopy(mbi, &saved_mbi, sizeof (multiboot_info_t));
@@ -1115,12 +1115,14 @@ save_boot_info(multiboot_info_t *mbi)
 	/*
 	 * Current file sizes.  Used by fastboot.c to figure out how much
 	 * memory to reserve for panic reboot.
+	 * Use the module list from the dboot-constructed xboot_info
+	 * instead of the list referenced by the multiboot structure
+	 * because that structure may not be addressable now.
 	 */
 	saved_file_size[FASTBOOT_NAME_UNIX] = FOUR_MEG - PAGESIZE;
-	for (i = 0, mbp = (mb_module_t *)(uintptr_t)mbi->mods_addr;
-	    i < mbi->mods_count; i++, mbp += sizeof (mb_module_t)) {
-		saved_file_size[FASTBOOT_NAME_BOOTARCHIVE] +=
-		    mbp->mod_end - mbp->mod_start;
+	for (i = 0, modp = (struct boot_modules *)(uintptr_t)xbi->bi_modules;
+	    i < xbi->bi_module_cnt; i++, modp++) {
+		saved_file_size[FASTBOOT_NAME_BOOTARCHIVE] += modp->bm_size;
 	}
 
 }
@@ -1379,7 +1381,7 @@ build_boot_properties(void)
 	/*
 	 * Save various boot information for Fast Reboot
 	 */
-	save_boot_info(mbi);
+	save_boot_info(mbi, xbootp);
 
 	if (mbi != NULL && mbi->flags & 0x2) {
 		boot_device = mbi->boot_device >> 24;

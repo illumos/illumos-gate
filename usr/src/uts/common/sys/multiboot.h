@@ -35,8 +35,13 @@ extern "C" {
  * Definitions of structures/data for using a multiboot compliant OS loader.
  */
 #define	MB_HEADER_MAGIC		 0x1BADB002	/* magic */
-#define	MB_HEADER_FLAGS		 0x00010003	/* flags we use */
-#define	MB_HEADER_CHECKSUM	-0x1BAEB005	/* -(magic + flag) */
+
+/* The 32-bit kernel does not require the use of the AOUT kludge */
+#define	MB_HEADER_FLAGS_32	 0x00000003	/* flags we use */
+#define	MB_HEADER_CHECKSUM_32	-0x1BADB005	/* -(magic + flag) */
+
+#define	MB_HEADER_FLAGS_64	 0x00010003	/* flags we use */
+#define	MB_HEADER_CHECKSUM_64	-0x1BAEB005	/* -(magic + flag) */
 
 /*
  * passed by boot loader to kernel

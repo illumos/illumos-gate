@@ -799,6 +799,10 @@ init_mem_alloc(void)
 	DBG_MSG("Entered init_mem_alloc()\n");
 	DBG((uintptr_t)mb_info);
 
+	if (mb_info->mods_count > MAX_MODULES) {
+		dboot_panic("Too many modules (%d) -- the maximum is %d.",
+		    mb_info->mods_count, MAX_MODULES);
+	}
 	/*
 	 * search the modules to find the last used address
 	 * we'll build the module list while we're walking through here
@@ -814,7 +818,11 @@ init_mem_alloc(void)
 			    (ulong_t)mod->mod_start, (ulong_t)mod->mod_end);
 		}
 		modules[i].bm_addr = mod->mod_start;
-		modules[i].bm_size = mod->mod_end;
+		if (mod->mod_start > mod->mod_end) {
+			dboot_panic("module[%d]: Invalid module start address "
+			    "(0x%llx)", i, (uint64_t)mod->mod_start);
+		}
+		modules[i].bm_size = mod->mod_end - mod->mod_start;
 
 		check_higher(mod->mod_end);
 	}

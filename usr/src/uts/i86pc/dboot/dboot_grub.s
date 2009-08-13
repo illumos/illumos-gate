@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,13 +57,20 @@ _start:
 	.globl	mb_header
 mb_header:
 	.long	MB_HEADER_MAGIC	/* magic number */
-	.long	MB_HEADER_FLAGS	/* flags */
-	.long	MB_HEADER_CHECKSUM	/* checksum */
-	.long	0x11111111	/* header_addr: patched by elfpatch */
-	.long	0x100000	/* load_addr: patched by elfpatch */
+#if defined(_BOOT_TARGET_i386)
+	.long	MB_HEADER_FLAGS_32	/* flags */
+	.long	MB_HEADER_CHECKSUM_32	/* checksum */
+#elif defined (_BOOT_TARGET_amd64)
+	.long	MB_HEADER_FLAGS_64	/* flags */
+	.long	MB_HEADER_CHECKSUM_64	/* checksum */
+#else
+#error No architecture defined
+#endif
+	.long	0x11111111	/* header_addr: patched by mbh_patch */
+	.long	0x100000	/* load_addr: patched by mbh_patch */
 	.long	0		/* load_end_addr - 0 means entire file */
 	.long	0		/* bss_end_addr */
-	.long	0x2222222	/* entry_addr: patched by elfpatch */
+	.long	0x2222222	/* entry_addr: patched by mbh_patch */
 	.long	0		/* video mode.. */
 	.long	0		/* width 0 == don't care */
 	.long	0		/* height 0 == don't care */
