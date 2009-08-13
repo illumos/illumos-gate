@@ -5208,7 +5208,7 @@ pm_set_keeping(dev_info_t *keeper, dev_info_t *kept)
 	ASSERT(keeper != kept);
 	if (PM_GET_PM_INFO(keeper) == NULL) {
 		cmn_err(CE_CONT, "!device %s@%s(%s#%d) keeps up device "
-		    "%s@%s(%s#%d), but the latter is not power managed",
+		    "%s@%s(%s#%d), but the former is not power managed",
 		    PM_DEVICE(keeper), PM_DEVICE(kept));
 		PMD((PMD_FAIL | PMD_KEEPS), ("%s: keeper %s@%s(%s#%d) is not"
 		    "power managed\n", pmf, PM_DEVICE(keeper)))
