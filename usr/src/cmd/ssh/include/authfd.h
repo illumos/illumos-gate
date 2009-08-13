@@ -3,8 +3,6 @@
 #ifndef	_AUTHFD_H
 #define	_AUTHFD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -58,6 +56,7 @@ extern "C" {
 #define SSH2_AGENTC_ADD_ID_CONSTRAINED		25
 
 #define	SSH_AGENT_CONSTRAIN_LIFETIME		1
+#define	SSH_AGENT_CONSTRAIN_CONFIRM		2
 
 /* extended failure messages */
 #define SSH2_AGENT_FAILURE			30

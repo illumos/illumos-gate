@@ -1,4 +1,9 @@
 /*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,13 +30,12 @@
 #include "includes.h"
 RCSID("$OpenBSD: readpass.c,v 1.27 2002/03/26 15:58:46 markus Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "xmalloc.h"
 #include "readpass.h"
 #include "pathnames.h"
 #include "log.h"
 #include "ssh.h"
+#include <langinfo.h>
 
 static char *
 ssh_askpass(char *askpass, const char *msg)
@@ -129,4 +133,31 @@ read_passphrase(const char *prompt, int flags)
 	ret = xstrdup(buf);
 	memset(buf, 'x', sizeof buf);
 	return ret;
+}
+
+int
+ask_permission(const char *fmt, ...)
+{
+	va_list args;
+	char *p, prompt[1024];
+	int allowed = 0;
+	char *yeschar = nl_langinfo(YESSTR);
+
+	va_start(args, fmt);
+	vsnprintf(prompt, sizeof(prompt), fmt, args);
+	va_end(args);
+
+	p = read_passphrase(prompt, RP_USE_ASKPASS|RP_ALLOW_EOF);
+	if (p != NULL) {
+		/*
+		 * Accept empty responses and responses consisting
+		 * of the word "yes" as affirmative.
+		 */
+		if (*p == '\0' || *p == '\n' ||
+		    strncasecmp(p, yeschar, 1) == 0)
+			allowed = 1;
+		xfree(p);
+	}
+
+	return (allowed);
 }

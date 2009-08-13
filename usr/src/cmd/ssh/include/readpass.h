@@ -3,8 +3,6 @@
 #ifndef	_READPASS_H
 #define	_READPASS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,8 +23,12 @@ extern "C" {
 #define RP_ECHO			0x0001
 #define RP_ALLOW_STDIN		0x0002
 #define RP_ALLOW_EOF		0x0004
+#define RP_USE_ASKPASS          0x0008
 
 char	*read_passphrase(const char *, int);
+int	ask_permission(const char *, ...)
+    __attribute__((format(printf, 1, 2)));
+int	read_keyfile_line(FILE *, const char *, char *, size_t, u_long *);
 
 #ifdef __cplusplus
 }

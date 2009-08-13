@@ -40,7 +40,7 @@
 
 #include "includes.h"
 #include "sys-queue.h"
-RCSID("$OpenBSD: ssh-agent.c,v 1.105 2002/10/01 20:34:12 markus Exp $");
+RCSID("$OpenBSD: ssh-agent.c,v 1.159 2008/06/28 14:05:15 djm Exp $");
 
 #ifdef HAVE_SOLARIS_PRIVILEGE
 #include <priv.h>
@@ -54,11 +54,12 @@ RCSID("$OpenBSD: ssh-agent.c,v 1.105 2002/10/01 20:34:12 markus Exp $");
 #include "buffer.h"
 #include "bufaux.h"
 #include "xmalloc.h"
-#include "getput.h"
 #include "key.h"
 #include "authfd.h"
 #include "compat.h"
 #include "log.h"
+#include "readpass.h"
+#include "misc.h"
 
 typedef enum {
 	AUTH_UNUSED,
@@ -82,6 +83,7 @@ typedef struct identity {
 	Key *key;
 	char *comment;
 	u_int death;
+	u_int confirm;
 } Identity;
 
 typedef struct {
@@ -96,10 +98,11 @@ int max_fd = 0;
 
 /* pid of shell == parent of agent */
 pid_t parent_pid = -1;
+u_int parent_alive_interval = 0;
 
 /* pathname and directory for AUTH_SOCKET */
-char socket_name[1024];
-char socket_dir[1024];
+char socket_name[MAXPATHLEN];
+char socket_dir[MAXPATHLEN];
 
 /* locking */
 int locked = 0;
@@ -110,6 +113,9 @@ extern char *__progname;
 #else
 char *__progname;
 #endif
+
+/* Default lifetime (0 == forever) */
+static int lifetime = 0;
 
 static void
 close_socket(SocketEntry *e)
@@ -162,6 +168,23 @@ lookup_identity(Key *key, int version)
 			return (id);
 	}
 	return (NULL);
+}
+
+/* Check confirmation of keysign request */
+static int
+confirm_key(Identity *id)
+{
+	char *p;
+	int ret = -1;
+
+	p = key_fingerprint(id->key, SSH_FP_MD5, SSH_FP_HEX);
+	if (ask_permission(
+	    gettext("Allow use of key %s?\nKey fingerprint %s."),
+	    id->comment, p))
+		ret = 0;
+	xfree(p);
+
+	return (ret);
 }
 
 /* send list of supported public keys to 'client' */
@@ -227,7 +250,7 @@ process_authentication_challenge1(SocketEntry *e)
 		goto failure;
 
 	id = lookup_identity(key, 1);
-	if (id != NULL) {
+	if (id != NULL && (!id->confirm || confirm_key(id) == 0)) {
 		Key *private = id->key;
 		/* Decrypt the challenge using the private key. */
 		if (rsa_private_decrypt(challenge, challenge, private->rsa) <= 0)
@@ -270,6 +293,8 @@ process_sign_request2(SocketEntry *e)
 {
 	u_char *blob, *data, *signature = NULL;
 	u_int blen, dlen, slen = 0;
+	extern uint32_t datafellows;
+	int odatafellows;
 	int ok = -1, flags;
 	Buffer msg;
 	Key *key;
@@ -280,16 +305,17 @@ process_sign_request2(SocketEntry *e)
 	data = buffer_get_string(&e->request, &dlen);
 
 	flags = buffer_get_int(&e->request);
+	odatafellows = datafellows;
 	if (flags & SSH_AGENT_OLD_SIGNATURE)
 		datafellows = SSH_BUG_SIGBLOB;
 
 	key = key_from_blob(blob, blen);
 	if (key != NULL) {
 		Identity *id = lookup_identity(key, 2);
-		if (id != NULL)
+		if (id != NULL && (!id->confirm || confirm_key(id) == 0))
 			ok = key_sign(id->key, &signature, &slen, data, dlen);
+		key_free(key);
 	}
-	key_free(key);
 	buffer_init(&msg);
 	if (ok == 0) {
 		buffer_put_char(&msg, SSH2_AGENT_SIGN_RESPONSE);
@@ -305,6 +331,7 @@ process_sign_request2(SocketEntry *e)
 	xfree(blob);
 	if (signature != NULL)
 		xfree(signature);
+	datafellows = odatafellows;
 }
 
 /* shared */
@@ -338,7 +365,7 @@ process_remove_identity(SocketEntry *e, int version)
 		if (id != NULL) {
 			/*
 			 * We have this key.  Free the old key.  Since we
-			 * don\'t want to leave empty slots in the middle of
+			 * don't want to leave empty slots in the middle of
 			 * the array, we actually free the key there and move
 			 * all the entries between the empty slot and the end
 			 * of the array.
@@ -381,10 +408,11 @@ process_remove_all_identities(SocketEntry *e, int version)
 	buffer_put_char(&e->output, SSH_AGENT_SUCCESS);
 }
 
-static void
+/* removes expired keys and returns number of seconds until the next expiry */
+static u_int
 reaper(void)
 {
-	u_int now = time(NULL);
+	u_int deadline = 0, now = time(NULL);
 	Identity *id, *nxt;
 	int version;
 	Idtab *tab;
@@ -393,20 +421,30 @@ reaper(void)
 		tab = idtab_lookup(version);
 		for (id = TAILQ_FIRST(&tab->idlist); id; id = nxt) {
 			nxt = TAILQ_NEXT(id, next);
-			if (id->death != 0 && now >= id->death) {
+			if (id->death == 0)
+				continue;
+			if (now >= id->death) {
+				debug("expiring key '%s'", id->comment);
 				TAILQ_REMOVE(&tab->idlist, id, next);
 				free_identity(id);
 				tab->nentries--;
-			}
+			} else
+				deadline = (deadline == 0) ? id->death :
+				    MIN(deadline, id->death);
 		}
 	}
+	if (deadline == 0 || deadline <= now)
+		return 0;
+	else
+		return (deadline - now);
 }
 
 static void
 process_add_identity(SocketEntry *e, int version)
 {
 	Idtab *tab = idtab_lookup(version);
-	int type, success = 0, death = 0;
+	Identity *id;
+	int type, success = 0, death = 0, confirm = 0;
 	char *type_name, *comment;
 	Key *k = NULL;
 
@@ -457,33 +495,54 @@ process_add_identity(SocketEntry *e, int version)
 		}
 		break;
 	}
+	/* enable blinding */
+	switch (k->type) {
+	case KEY_RSA:
+	case KEY_RSA1:
+		if (RSA_blinding_on(k->rsa, NULL) != 1) {
+			error("process_add_identity: RSA_blinding_on failed");
+			key_free(k);
+			goto send;
+		}
+		break;
+	}
 	comment = buffer_get_string(&e->request, NULL);
 	if (k == NULL) {
 		xfree(comment);
 		goto send;
 	}
-	success = 1;
 	while (buffer_len(&e->request)) {
-		switch (buffer_get_char(&e->request)) {
+		switch ((type = buffer_get_char(&e->request))) {
 		case SSH_AGENT_CONSTRAIN_LIFETIME:
 			death = time(NULL) + buffer_get_int(&e->request);
 			break;
-		default:
+		case SSH_AGENT_CONSTRAIN_CONFIRM:
+			confirm = 1;
 			break;
+		default:
+			error("process_add_identity: "
+			    "Unknown constraint type %d", type);
+			xfree(comment);
+			key_free(k);
+			goto send;
 		}
 	}
-	if (lookup_identity(k, version) == NULL) {
-		Identity *id = xmalloc(sizeof(Identity));
+	success = 1;
+	if (lifetime && !death)
+		death = time(NULL) + lifetime;
+	if ((id = lookup_identity(k, version)) == NULL) {
+		id = xmalloc(sizeof(Identity));
 		id->key = k;
-		id->comment = comment;
-		id->death = death;
 		TAILQ_INSERT_TAIL(&tab->idlist, id, next);
 		/* Increment the number of identities. */
 		tab->nentries++;
 	} else {
 		key_free(k);
-		xfree(comment);
+		xfree(id->comment);
 	}
+	id->comment = comment;
+	id->death = death;
+	id->confirm = confirm;
 send:
 	buffer_put_int(&e->output, 1);
 	buffer_put_char(&e->output,
@@ -540,13 +599,10 @@ process_message(SocketEntry *e)
 	u_int msg_len, type;
 	u_char *cp;
 
-	/* kill dead keys */
-	reaper();
-
 	if (buffer_len(&e->input) < 5)
 		return;		/* Incomplete message. */
 	cp = buffer_ptr(&e->input);
-	msg_len = GET_32BIT(cp);
+	msg_len = get_u32(cp);
 	if (msg_len > 256 * 1024) {
 		close_socket(e);
 		return;
@@ -631,10 +687,9 @@ process_message(SocketEntry *e)
 static void
 new_socket(sock_type type, int fd)
 {
-	u_int i, old_alloc;
+	u_int i, old_alloc, new_alloc;
 
-	if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)
-		error("fcntl O_NONBLOCK: %s", strerror(errno));
+	set_nonblock(fd);
 
 	if (fd > max_fd)
 		max_fd = fd;
@@ -642,32 +697,32 @@ new_socket(sock_type type, int fd)
 	for (i = 0; i < sockets_alloc; i++)
 		if (sockets[i].type == AUTH_UNUSED) {
 			sockets[i].fd = fd;
-			sockets[i].type = type;
 			buffer_init(&sockets[i].input);
 			buffer_init(&sockets[i].output);
 			buffer_init(&sockets[i].request);
+			sockets[i].type = type;
 			return;
 		}
 	old_alloc = sockets_alloc;
-	sockets_alloc += 10;
-	if (sockets)
-		sockets = xrealloc(sockets, sockets_alloc * sizeof(sockets[0]));
-	else
-		sockets = xmalloc(sockets_alloc * sizeof(sockets[0]));
-	for (i = old_alloc; i < sockets_alloc; i++)
+	new_alloc = sockets_alloc + 10;
+	sockets = xrealloc(sockets, new_alloc * sizeof(sockets[0]));
+	for (i = old_alloc; i < new_alloc; i++)
 		sockets[i].type = AUTH_UNUSED;
-	sockets[old_alloc].type = type;
+	sockets_alloc = new_alloc;
 	sockets[old_alloc].fd = fd;
 	buffer_init(&sockets[old_alloc].input);
 	buffer_init(&sockets[old_alloc].output);
 	buffer_init(&sockets[old_alloc].request);
+	sockets[old_alloc].type = type;
 }
 
 static int
-prepare_select(fd_set **fdrp, fd_set **fdwp, int *fdl, int *nallocp)
+prepare_select(fd_set **fdrp, fd_set **fdwp, int *fdl, u_int *nallocp,
+    struct timeval **tvpp)
 {
-	u_int i, sz;
+	u_int i, sz, deadline;
 	int n = 0;
+	static struct timeval tv;
 
 	for (i = 0; i < sockets_alloc; i++) {
 		switch (sockets[i].type) {
@@ -711,6 +766,17 @@ prepare_select(fd_set **fdrp, fd_set **fdwp, int *fdl, int *nallocp)
 			break;
 		}
 	}
+	deadline = reaper();
+	if (parent_alive_interval != 0)
+		deadline = (deadline == 0) ? parent_alive_interval :
+		    MIN(deadline, parent_alive_interval);
+	if (deadline == 0) {
+		*tvpp = NULL;
+	} else {
+		tv.tv_sec = deadline;
+		tv.tv_usec = 0;
+		*tvpp = &tv;
+	}
 	return (1);
 }
 
@@ -733,7 +799,7 @@ after_select(fd_set *readset, fd_set *writeset)
 			if (FD_ISSET(sockets[i].fd, readset)) {
 				slen = sizeof(sunaddr);
 				sock = accept(sockets[i].fd,
-				    (struct sockaddr *) &sunaddr, &slen);
+				    (struct sockaddr *)&sunaddr, &slen);
 				if (sock < 0) {
 					error("accept from AUTH_SOCKET: %s",
 					    strerror(errno));
@@ -763,7 +829,8 @@ after_select(fd_set *readset, fd_set *writeset)
 					    buffer_ptr(&sockets[i].output),
 					    buffer_len(&sockets[i].output));
 					if (len == -1 && (errno == EAGAIN ||
-					    errno == EINTR))
+					    errno == EINTR ||
+					    errno == EWOULDBLOCK))
 						continue;
 					break;
 				} while (1);
@@ -777,7 +844,8 @@ after_select(fd_set *readset, fd_set *writeset)
 				do {
 					len = read(sockets[i].fd, buf, sizeof(buf));
 					if (len == -1 && (errno == EAGAIN ||
-					    errno == EINTR))
+					    errno == EINTR ||
+					    errno == EWOULDBLOCK))
 						continue;
 					break;
 				} while (1);
@@ -795,7 +863,7 @@ after_select(fd_set *readset, fd_set *writeset)
 }
 
 static void
-cleanup_socket(void *p)
+cleanup_socket(void)
 {
 	if (socket_name[0])
 		unlink(socket_name);
@@ -803,32 +871,29 @@ cleanup_socket(void *p)
 		rmdir(socket_dir);
 }
 
-static void
+void
 cleanup_exit(int i)
 {
-	cleanup_socket(NULL);
-	exit(i);
+	cleanup_socket();
+	_exit(i);
 }
 
+/*ARGSUSED*/
 static void
 cleanup_handler(int sig)
 {
-	cleanup_socket(NULL);
+	cleanup_socket();
 	_exit(2);
 }
 
 static void
-check_parent_exists(int sig)
+check_parent_exists(void)
 {
-	int save_errno = errno;
-
-	if (parent_pid != -1 && getppid() != parent_pid) {
+	if (parent_pid != -1 && kill(parent_pid, 0) < 0) {
 		/* printf("Parent has died - Authentication agent exiting.\n"); */
-		cleanup_handler(sig); /* safe */
+		cleanup_socket();
+		_exit(2);
 	}
-	signal(SIGALRM, check_parent_exists);
-	alarm(10);
-	errno = save_errno;
 }
 
 static void
@@ -841,7 +906,8 @@ usage(void)
 		    "  -s          Generate Bourne shell commands on stdout.\n"
 		    "  -k          Kill the current agent.\n"
 		    "  -d          Debug mode.\n"
-		    "  -a socket   Bind agent socket to given name.\n"),
+		    "  -a socket   Bind agent socket to given name.\n"
+		    "  -t life     Default identity lifetime (seconds).\n"),
 		__progname);
 	exit(1);
 }
@@ -849,7 +915,9 @@ usage(void)
 int
 main(int ac, char **av)
 {
-	int sock, c_flag = 0, d_flag = 0, k_flag = 0, s_flag = 0, ch, nalloc;
+	int c_flag = 0, d_flag = 0, k_flag = 0, s_flag = 0;
+	int sock, fd, ch, result, saved_errno;
+	u_int nalloc;
 	char *shell, *pidstr, *agentsocket = NULL;
 	const char *format;
 	fd_set *readsetp = NULL, *writesetp = NULL;
@@ -857,22 +925,22 @@ main(int ac, char **av)
 #ifdef HAVE_SETRLIMIT
 	struct rlimit rlim;
 #endif
-#ifdef HAVE_CYGWIN
 	int prev_mask;
-#endif
 	extern int optind;
 	extern char *optarg;
 	pid_t pid;
 	char pidstrbuf[1 + 3 * sizeof pid];
+	struct timeval *tvp = NULL;
 #ifdef HAVE_SOLARIS_PRIVILEGE
 	priv_set_t *myprivs;
 #endif /* HAVE_SOLARIS_PRIVILEGE */
 
+	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
+	sanitise_stdfd();
+
 	/* drop */
 	setegid(getgid());
 	setgid(getgid());
-
-	(void) g11n_setlocale(LC_ALL, "");
 
 	SSLeay_add_all_algorithms();
 
@@ -880,7 +948,7 @@ main(int ac, char **av)
 	init_rng();
 	seed_rng();
 
-	while ((ch = getopt(ac, av, "cdksa:")) != -1) {
+	while ((ch = getopt(ac, av, "cdksa:t:")) != -1) {
 		switch (ch) {
 		case 'c':
 			if (s_flag)
@@ -903,6 +971,12 @@ main(int ac, char **av)
 		case 'a':
 			agentsocket = optarg;
 			break;
+		case 't':
+			if ((lifetime = convtime(optarg)) == -1) {
+				fprintf(stderr, gettext("Invalid lifetime\n"));
+				usage();
+			}
+			break;
 		default:
 			usage();
 		}
@@ -915,7 +989,8 @@ main(int ac, char **av)
 
 	if (ac == 0 && !c_flag && !s_flag) {
 		shell = getenv("SHELL");
-		if (shell != NULL && strncmp(shell + strlen(shell) - 3, "csh", 3) == 0)
+		if (shell != NULL &&
+		    strncmp(shell + strlen(shell) - 3, "csh", 3) == 0)
 			c_flag = 1;
 	}
 	if (k_flag) {
@@ -929,8 +1004,8 @@ main(int ac, char **av)
 		pid = atoi(pidstr);
 		if (pid < 1) {
 			fprintf(stderr,
-			    gettext("%s=\")%s\", which is not a good PID\n"),
-			    SSH_AGENTPID_ENV_NAME, pidstr);
+				gettext("%s not set, cannot kill agent\n"),
+				SSH_AGENTPID_ENV_NAME);
 			exit(1);
 		}
 		if (kill(pid, SIGTERM) == -1) {
@@ -948,7 +1023,7 @@ main(int ac, char **av)
 
 	if (agentsocket == NULL) {
 		/* Create private directory for agent socket */
-		strlcpy(socket_dir, "/tmp/ssh-XXXXXXXX", sizeof socket_dir);
+		strlcpy(socket_dir, "/tmp/ssh-XXXXXXXXXX", sizeof socket_dir);
 		if (mkdtemp(socket_dir) == NULL) {
 			perror("mkdtemp: private socket dir");
 			exit(1);
@@ -968,25 +1043,21 @@ main(int ac, char **av)
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (sock < 0) {
 		perror("socket");
+		*socket_name = '\0'; /* Don't unlink any existing file */
 		cleanup_exit(1);
 	}
 	memset(&sunaddr, 0, sizeof(sunaddr));
 	sunaddr.sun_family = AF_UNIX;
 	strlcpy(sunaddr.sun_path, socket_name, sizeof(sunaddr.sun_path));
-#ifdef HAVE_CYGWIN
 	prev_mask = umask(0177);
-#endif
-	if (bind(sock, (struct sockaddr *) & sunaddr, sizeof(sunaddr)) < 0) {
+	if (bind(sock, (struct sockaddr *) &sunaddr, sizeof(sunaddr)) < 0) {
 		perror("bind");
-#ifdef HAVE_CYGWIN
+		*socket_name = '\0'; /* Don't unlink any existing file */
 		umask(prev_mask);
-#endif
 		cleanup_exit(1);
 	}
-#ifdef HAVE_CYGWIN
 	umask(prev_mask);
-#endif
-	if (listen(sock, 128) < 0) {
+	if (listen(sock, SSH_LISTEN_BACKLOG) < 0) {
 		perror("listen");
 		cleanup_exit(1);
 	}
@@ -1019,7 +1090,7 @@ main(int ac, char **av)
 			printf(format, SSH_AGENTPID_ENV_NAME, pidstrbuf,
 			    SSH_AGENTPID_ENV_NAME);
 			printf("echo ");
-			printf(gettext("Agent pid %ld;\n"), (long)pid);
+                        printf(gettext("Agent pid %ld;\n"), (long)pid);
 			exit(0);
 		}
 		if (setenv(SSH_AUTHSOCKET_ENV_NAME, socket_name, 1) == -1 ||
@@ -1062,9 +1133,14 @@ main(int ac, char **av)
 	}
 
 	(void)chdir("/");
-	close(0);
-	close(1);
-	close(2);
+	if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
+		/* XXX might close listen socket */
+		(void)dup2(fd, STDIN_FILENO);
+		(void)dup2(fd, STDOUT_FILENO);
+		(void)dup2(fd, STDERR_FILENO);
+		if (fd > 2)
+			close(fd);
+	}
 
 #ifdef HAVE_SETRLIMIT
 	/* deny core dumps, since memory contains unencrypted private keys */
@@ -1076,12 +1152,9 @@ main(int ac, char **av)
 #endif
 
 skip:
-	fatal_add_cleanup(cleanup_socket, NULL);
 	new_socket(AUTH_SOCKET, sock);
-	if (ac > 0) {
-		signal(SIGALRM, check_parent_exists);
-		alarm(10);
-	}
+	if (ac > 0)
+		parent_alive_interval = 10;
 	idtab_init();
 	if (!d_flag)
 		signal(SIGINT, SIG_IGN);
@@ -1091,13 +1164,18 @@ skip:
 	nalloc = 0;
 
 	while (1) {
-		prepare_select(&readsetp, &writesetp, &max_fd, &nalloc);
-		if (select(max_fd + 1, readsetp, writesetp, NULL, NULL) < 0) {
-			if (errno == EINTR)
+		prepare_select(&readsetp, &writesetp, &max_fd, &nalloc, &tvp);
+		result = select(max_fd + 1, readsetp, writesetp, NULL, tvp);
+		saved_errno = errno;
+		if (parent_alive_interval != 0)
+			check_parent_exists();
+		(void) reaper();	/* remove expired keys */
+		if (result < 0) {
+			if (saved_errno == EINTR)
 				continue;
-			fatal("select: %s", strerror(errno));
-		}
-		after_select(readsetp, writesetp);
+			fatal("select: %s", strerror(saved_errno));
+		} else if (result > 0)
+			after_select(readsetp, writesetp);
 	}
 	/* NOTREACHED */
 	return (0);	/* keep lint happy */
