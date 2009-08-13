@@ -256,6 +256,14 @@ static uint_t ibd_rxcomp_usec = 10;
 #define	IBD_DRV_STARTED			0x80000
 
 /*
+ * Start/stop in-progress flags; note that restart must always remain
+ * the OR of start and stop flag values.
+ */
+#define	IBD_DRV_START_IN_PROGRESS	0x10000000
+#define	IBD_DRV_STOP_IN_PROGRESS	0x20000000
+#define	IBD_DRV_RESTART_IN_PROGRESS	0x30000000
+
+/*
  * Miscellaneous constants
  */
 #define	IBD_SEND			0
@@ -433,7 +441,10 @@ static int ibd_unattach(ibd_state_t *, dev_info_t *);
 static int ibd_get_port_details(ibd_state_t *);
 static int ibd_alloc_cqs(ibd_state_t *);
 static int ibd_setup_ud_channel(ibd_state_t *);
-static int ibd_undo_m_start(ibd_state_t *);
+static int ibd_start(ibd_state_t *);
+static int ibd_undo_start(ibd_state_t *, link_state_t);
+static void ibd_set_mac_progress(ibd_state_t *, uint_t);
+static void ibd_clr_mac_progress(ibd_state_t *, uint_t);
 
 
 /*
@@ -2006,19 +2017,14 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 	link_state_t new_link_state = LINK_STATE_UP;
 	uint8_t itreply;
 	uint16_t pkix;
+	int ret;
 
 	/*
-	 * Do not send a request to the async daemon if it has not
-	 * yet been created or is being destroyed. If the async
-	 * daemon has not yet been created, we still need to track
-	 * last known state of the link. If this code races with the
-	 * detach path, then we are assured that the detach path has
-	 * not yet done the ibt_close_hca (which waits for all async
-	 * events to complete). If the code races with the attach path,
-	 * we need to validate the pkey/gid (in the link_up case) if
-	 * the initialization path has already set these up and created
-	 * IBTF resources based on the values.
+	 * Let's not race with a plumb or an unplumb; if we detect a
+	 * pkey relocation event later on here, we may have to restart.
 	 */
+	ibd_set_mac_progress(state, IBD_DRV_RESTART_IN_PROGRESS);
+
 	mutex_enter(&state->id_link_mutex);
 
 	/*
@@ -2027,7 +2033,7 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 	 */
 	if (state->id_link_state == LINK_STATE_UNKNOWN) {
 		mutex_exit(&state->id_link_mutex);
-		return;
+		goto link_mod_return;
 	}
 
 	/*
@@ -2085,12 +2091,21 @@ ibd_link_mod(ibd_state_t *state, ibt_async_code_t code)
 			ibt_free_portinfo(port_infop, port_infosz);
 			mutex_exit(&state->id_link_mutex);
 
-			ibd_m_stop(state);
-			if ((ibt_status = ibd_m_start(state)) != IBT_SUCCESS) {
-				DPRINT(10, "link_mod: cannot "
-				    "restart, ret=%d", ibt_status);
+			/*
+			 * Currently a restart is required if our pkey has moved
+			 * in the pkey table. If we get the ibt_recycle_ud() to
+			 * work as documented (expected), we may be able to
+			 * avoid a complete restart.  Note that we've already
+			 * marked both the start and stop 'in-progress' flags,
+			 * so it is ok to go ahead and do this restart.
+			 */
+			ibd_undo_start(state, LINK_STATE_DOWN);
+			if ((ret = ibd_start(state)) != 0) {
+				DPRINT(10, "ibd_restart: cannot restart, "
+				    "ret=%d", ret);
 			}
-			return;
+
+			goto link_mod_return;
 		} else {
 			new_link_state = LINK_STATE_DOWN;
 		}
@@ -2106,7 +2121,7 @@ update_link_state:
 	 */
 	if (state->id_link_state == new_link_state) {
 		mutex_exit(&state->id_link_mutex);
-		return;
+		goto link_mod_return;
 	}
 
 	/*
@@ -2116,7 +2131,7 @@ update_link_state:
 	if (!ibd_async_safe(state)) {
 		state->id_link_state = new_link_state;
 		mutex_exit(&state->id_link_mutex);
-		return;
+		goto link_mod_return;
 	}
 
 	mutex_exit(&state->id_link_mutex);
@@ -2144,6 +2159,9 @@ update_link_state:
 	req = kmem_cache_alloc(state->id_req_kmc, KM_SLEEP);
 	req->rq_ptr = (void *)opcode;
 	ibd_queue_work_slot(state, req, IBD_ASYNC_LINK);
+
+link_mod_return:
+	ibd_clr_mac_progress(state, IBD_DRV_RESTART_IN_PROGRESS);
 }
 
 /*
@@ -2619,6 +2637,9 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 	state->id_req_kmc = kmem_cache_create(buf, sizeof (ibd_req_t),
 	    0, NULL, NULL, NULL, NULL, NULL, 0);
 
+	mutex_init(&state->id_macst_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&state->id_macst_cv, NULL, CV_DEFAULT, NULL);
+
 	return (DDI_SUCCESS);
 }
 
@@ -2628,6 +2649,9 @@ ibd_state_init(ibd_state_t *state, dev_info_t *dip)
 static void
 ibd_state_fini(ibd_state_t *state)
 {
+	cv_destroy(&state->id_macst_cv);
+	mutex_destroy(&state->id_macst_lock);
+
 	kmem_cache_destroy(state->id_req_kmc);
 
 	mutex_destroy(&state->id_rxpost_lock);
@@ -4050,7 +4074,7 @@ ibd_get_port_details(ibd_state_t *state)
 		mutex_exit(&state->id_link_mutex);
 		DPRINT(10, "ibd_get_port_details: ibt_query_hca_ports() "
 		    "failed, ret=%d", ret);
-		return (DDI_FAILURE);
+		return (ENETDOWN);
 	}
 
 	/*
@@ -4061,7 +4085,7 @@ ibd_get_port_details(ibd_state_t *state)
 		mutex_exit(&state->id_link_mutex);
 		ibt_free_portinfo(port_infop, port_infosz);
 		DPRINT(10, "ibd_get_port_details: port is not active");
-		return (DDI_FAILURE);
+		return (ENETDOWN);
 	}
 
 	/*
@@ -4073,7 +4097,7 @@ ibd_get_port_details(ibd_state_t *state)
 		ibt_free_portinfo(port_infop, port_infosz);
 		DPRINT(10, "ibd_get_port_details: ibt_pkey2index "
 		    "failed, ret=%d", ret);
-		return (DDI_FAILURE);
+		return (ENONET);
 	}
 
 	state->id_mtu = (128 << port_infop->p_mtu);
@@ -4088,7 +4112,7 @@ ibd_get_port_details(ibd_state_t *state)
 	 */
 	state->id_link_speed = ibd_get_portspeed(state);
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 static int
@@ -4263,7 +4287,7 @@ ibd_setup_ud_channel(ibd_state_t *state)
 }
 
 static int
-ibd_undo_m_start(ibd_state_t *state)
+ibd_undo_start(ibd_state_t *state, link_state_t cur_link_state)
 {
 	uint32_t progress = state->id_mac_state;
 	uint_t attempts;
@@ -4273,17 +4297,23 @@ ibd_undo_m_start(ibd_state_t *state)
 	uint8_t jstate;
 
 	/*
-	 * Before we try to stop/undo whatever we did in ibd_m_start(),
-	 * we need to mark the link state as unknown to prevent nw
-	 * layer from using this instance for any new transfers.
+	 * Before we try to stop/undo whatever we did in ibd_start(),
+	 * we need to mark the link state appropriately to prevent the
+	 * ip layer from using this instance for any new transfers. Note
+	 * that if the original state of the link was "up" when we're
+	 * here, we'll set the final link state to "unknown", to behave
+	 * in the same fashion as other ethernet drivers.
 	 */
-	if (progress & IBD_DRV_PORT_DETAILS_OBTAINED) {
+	mutex_enter(&state->id_link_mutex);
+	if (cur_link_state == LINK_STATE_DOWN) {
+		state->id_link_state = cur_link_state;
+	} else {
 		state->id_link_state = LINK_STATE_UNKNOWN;
-		mac_link_update(state->id_mh, state->id_link_state);
-
-		state->id_mac_state &= (~IBD_DRV_PORT_DETAILS_OBTAINED);
 	}
+	mutex_exit(&state->id_link_mutex);
+	mac_link_update(state->id_mh, state->id_link_state);
 
+	state->id_mac_state &= (~IBD_DRV_PORT_DETAILS_OBTAINED);
 	if (progress & IBD_DRV_STARTED) {
 		state->id_mac_state &= (~IBD_DRV_STARTED);
 	}
@@ -4309,7 +4339,7 @@ ibd_undo_m_start(ibd_state_t *state)
 				 * we turned off the notification and
 				 * return failure.
 				 */
-				DPRINT(2, "ibd_undo_m_start: "
+				DPRINT(2, "ibd_undo_start: "
 				    "reclaiming failed");
 				ibd_poll_compq(state, state->id_rcq_hdl);
 				ibt_set_cq_handler(state->id_rcq_hdl,
@@ -4342,7 +4372,7 @@ ibd_undo_m_start(ibd_state_t *state)
 		 */
 		if ((ret = ibt_flush_channel(state->id_chnl_hdl)) !=
 		    IBT_SUCCESS) {
-			DPRINT(10, "undo_m_start: flush_channel "
+			DPRINT(10, "ibd_undo_start: flush_channel "
 			    "failed, ret=%d", ret);
 		}
 
@@ -4394,7 +4424,7 @@ ibd_undo_m_start(ibd_state_t *state)
 		 * has also been suppressed at this point. Thus, no locks
 		 * are required while traversing the mc full list.
 		 */
-		DPRINT(2, "ibd_undo_m_start: clear full cache entries");
+		DPRINT(2, "ibd_undo_start: clear full cache entries");
 		mce = list_head(&state->id_mc_full);
 		while (mce != NULL) {
 			mgid = mce->mc_info.mc_adds_vect.av_dgid;
@@ -4418,7 +4448,7 @@ ibd_undo_m_start(ibd_state_t *state)
 	if (progress & IBD_DRV_UD_CHANNEL_SETUP) {
 		if ((ret = ibt_free_channel(state->id_chnl_hdl)) !=
 		    IBT_SUCCESS) {
-			DPRINT(10, "undo_m_start: free_channel "
+			DPRINT(10, "ibd_undo_start: free_channel "
 			    "failed, ret=%d", ret);
 		}
 
@@ -4431,7 +4461,7 @@ ibd_undo_m_start(ibd_state_t *state)
 			    sizeof (ibt_wc_t) * state->id_txwcs_size);
 			if ((ret = ibt_free_cq(state->id_scq_hdl)) !=
 			    IBT_SUCCESS) {
-				DPRINT(10, "undo_m_start: free_cq(scq) "
+				DPRINT(10, "ibd_undo_start: free_cq(scq) "
 				    "failed, ret=%d", ret);
 			}
 		}
@@ -4439,7 +4469,7 @@ ibd_undo_m_start(ibd_state_t *state)
 		kmem_free(state->id_rxwcs,
 		    sizeof (ibt_wc_t) * state->id_rxwcs_size);
 		if ((ret = ibt_free_cq(state->id_rcq_hdl)) != IBT_SUCCESS) {
-			DPRINT(10, "undo_m_start: free_cq(rcq) failed, "
+			DPRINT(10, "ibd_undo_start: free_cq(rcq) failed, "
 			    "ret=%d", ret);
 		}
 
@@ -4478,6 +4508,34 @@ ibd_undo_m_start(ibd_state_t *state)
 }
 
 /*
+ * These pair of routines are used to set/clear the condition that
+ * the caller is likely to do something to change the id_mac_state.
+ * If there's already someone doing either a start or a stop (possibly
+ * due to the async handler detecting a pkey relocation event, a plumb
+ * or dlpi_open, or an unplumb or dlpi_close coming in), we wait until
+ * that's done.
+ */
+static void
+ibd_set_mac_progress(ibd_state_t *state, uint_t flag)
+{
+	mutex_enter(&state->id_macst_lock);
+	while (state->id_mac_state & IBD_DRV_RESTART_IN_PROGRESS)
+		cv_wait(&state->id_macst_cv, &state->id_macst_lock);
+
+	state->id_mac_state |= flag;
+	mutex_exit(&state->id_macst_lock);
+}
+
+static void
+ibd_clr_mac_progress(ibd_state_t *state, uint_t flag)
+{
+	mutex_enter(&state->id_macst_lock);
+	state->id_mac_state &= (~flag);
+	cv_signal(&state->id_macst_cv);
+	mutex_exit(&state->id_macst_lock);
+}
+
+/*
  * GLDv3 entry point to start hardware.
  */
 /*ARGSUSED*/
@@ -4485,6 +4543,20 @@ static int
 ibd_m_start(void *arg)
 {
 	ibd_state_t *state = arg;
+	int	ret;
+
+	ibd_set_mac_progress(state, IBD_DRV_START_IN_PROGRESS);
+
+	ret = ibd_start(state);
+
+	ibd_clr_mac_progress(state, IBD_DRV_START_IN_PROGRESS);
+
+	return (ret);
+}
+
+static int
+ibd_start(ibd_state_t *state)
+{
 	kthread_t *kht;
 	int err;
 	ibt_status_t ret;
@@ -4494,11 +4566,11 @@ ibd_m_start(void *arg)
 
 	/*
 	 * Get port details; if we fail here, very likely the port
-	 * state is inactive or the pkey can't be verified
+	 * state is inactive or the pkey can't be verified.
 	 */
-	if (ibd_get_port_details(state) != DDI_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibd_get_port_details() failed");
-		return (EAGAIN);
+	if ((err = ibd_get_port_details(state)) != 0) {
+		DPRINT(10, "ibd_start: ibd_get_port_details() failed");
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_PORT_DETAILS_OBTAINED;
 
@@ -4506,9 +4578,9 @@ ibd_m_start(void *arg)
 	 * Find the IPoIB broadcast group
 	 */
 	if (ibd_find_bgroup(state) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibd_find_bgroup() failed");
-		err = ENOENT;
-		goto m_start_fail;
+		DPRINT(10, "ibd_start: ibd_find_bgroup() failed");
+		err = ENOTACTIVE;
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_BCAST_GROUP_FOUND;
 
@@ -4517,9 +4589,9 @@ ibd_m_start(void *arg)
 	 * it is most likely due to a lack of resources
 	 */
 	if (ibd_acache_init(state) != DDI_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibd_acache_init() failed");
+		DPRINT(10, "ibd_start: ibd_acache_init() failed");
 		err = ENOMEM;
-		goto m_start_fail;
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_ACACHE_INITIALIZED;
 
@@ -4527,9 +4599,9 @@ ibd_m_start(void *arg)
 	 * Allocate send and receive completion queues
 	 */
 	if (ibd_alloc_cqs(state) != DDI_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibd_alloc_cqs() failed");
+		DPRINT(10, "ibd_start: ibd_alloc_cqs() failed");
 		err = ENOMEM;
-		goto m_start_fail;
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_CQS_ALLOCD;
 
@@ -4538,8 +4610,8 @@ ibd_m_start(void *arg)
 	 */
 	if (ibd_setup_ud_channel(state) != DDI_SUCCESS) {
 		err = ENOMEM;
-		DPRINT(10, "ibd_m_start: ibd_setup_ud_channel() failed");
-		goto m_start_fail;
+		DPRINT(10, "ibd_start: ibd_setup_ud_channel() failed");
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_UD_CHANNEL_SETUP;
 
@@ -4547,9 +4619,9 @@ ibd_m_start(void *arg)
 	 * Allocate and initialize the tx buffer list
 	 */
 	if (ibd_init_txlist(state) != DDI_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibd_init_txlist() failed");
+		DPRINT(10, "ibd_start: ibd_init_txlist() failed");
 		err = ENOMEM;
-		goto m_start_fail;
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_TXLIST_ALLOCD;
 
@@ -4560,10 +4632,10 @@ ibd_m_start(void *arg)
 		ibt_set_cq_handler(state->id_scq_hdl, ibd_scq_handler, state);
 		if ((ret = ibt_enable_cq_notify(state->id_scq_hdl,
 		    IBT_NEXT_COMPLETION)) != IBT_SUCCESS) {
-			DPRINT(10, "ibd_m_start: ibt_enable_cq_notify(scq) "
+			DPRINT(10, "ibd_start: ibt_enable_cq_notify(scq) "
 			    "failed, ret=%d", ret);
 			err = EINVAL;
-			goto m_start_fail;
+			goto start_fail;
 		}
 		state->id_mac_state |= IBD_DRV_SCQ_NOTIFY_ENABLED;
 	}
@@ -4572,9 +4644,9 @@ ibd_m_start(void *arg)
 	 * Allocate and initialize the rx buffer list
 	 */
 	if (ibd_init_rxlist(state) != DDI_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibd_init_rxlist() failed");
+		DPRINT(10, "ibd_start: ibd_init_rxlist() failed");
 		err = ENOMEM;
-		goto m_start_fail;
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_RXLIST_ALLOCD;
 
@@ -4582,9 +4654,9 @@ ibd_m_start(void *arg)
 	 * Join IPoIB broadcast group
 	 */
 	if (ibd_join_group(state, state->id_mgid, IB_MC_JSTATE_FULL) == NULL) {
-		DPRINT(10, "ibd_m_start: ibd_join_group() failed");
-		err = EINVAL;
-		goto m_start_fail;
+		DPRINT(10, "ibd_start: ibd_join_group() failed");
+		err = ENOTACTIVE;
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_BCAST_GROUP_JOINED;
 
@@ -4617,10 +4689,10 @@ ibd_m_start(void *arg)
 	ibt_set_cq_handler(state->id_rcq_hdl, ibd_rcq_handler, state);
 	if ((ret = ibt_enable_cq_notify(state->id_rcq_hdl,
 	    IBT_NEXT_COMPLETION)) != IBT_SUCCESS) {
-		DPRINT(10, "ibd_m_start: ibt_enable_cq_notify(rcq) "
+		DPRINT(10, "ibd_start: ibt_enable_cq_notify(rcq) "
 		    "failed, ret=%d", ret);
 		err = EINVAL;
-		goto m_start_fail;
+		goto start_fail;
 	}
 	state->id_mac_state |= IBD_DRV_RCQ_NOTIFY_ENABLED;
 
@@ -4656,14 +4728,14 @@ ibd_m_start(void *arg)
 
 	return (DDI_SUCCESS);
 
-m_start_fail:
+start_fail:
 	/*
-	 * If we ran into a problem during ibd_m_start() and ran into
+	 * If we ran into a problem during ibd_start() and ran into
 	 * some other problem during undoing our partial work, we can't
 	 * do anything about it.  Ignore any errors we might get from
-	 * ibd_undo_m_start() and just return the original error we got.
+	 * ibd_undo_start() and just return the original error we got.
 	 */
-	(void) ibd_undo_m_start(state);
+	(void) ibd_undo_start(state, LINK_STATE_DOWN);
 	return (err);
 }
 
@@ -4674,15 +4746,13 @@ m_start_fail:
 static void
 ibd_m_stop(void *arg)
 {
-	ibd_state_t *state = arg;
+	ibd_state_t *state = (ibd_state_t *)arg;
 
-	/*
-	 * Since ibd_m_stop() doesn't expect any return, we cannot
-	 * fail even if we run into some problem with ibd_undo_m_start().
-	 * The best we can do is to leave it in a good state, so
-	 * perhaps a future unplumb will succeed.
-	 */
-	(void) ibd_undo_m_start(state);
+	ibd_set_mac_progress(state, IBD_DRV_STOP_IN_PROGRESS);
+
+	(void) ibd_undo_start(state, state->id_link_state);
+
+	ibd_clr_mac_progress(state, IBD_DRV_STOP_IN_PROGRESS);
 }
 
 /*
