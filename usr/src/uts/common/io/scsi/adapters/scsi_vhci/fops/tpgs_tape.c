@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,7 +96,11 @@ static int
 tpgs_tape_device_probe(struct scsi_device *sd, struct scsi_inquiry *inq,
     void **ctpriv)
 {
-	int		mode, state, xlf, preferred = 0;
+	int mode;
+	int state;
+	int xlf;
+	int preferred = 0;
+	int support;
 
 	VHCI_DEBUG(6, (CE_NOTE, NULL, "tpgs_tape_device_probe: vidpid %s\n",
 	    inq->inq_vid));
@@ -104,48 +108,58 @@ tpgs_tape_device_probe(struct scsi_device *sd, struct scsi_inquiry *inq,
 	if (inq->inq_tpgs == TPGS_FAILOVER_NONE) {
 		VHCI_DEBUG(4, (CE_WARN, NULL,
 		    "!tpgs_tape_device_probe: not a standard tpgs device"));
-		return (SFO_DEVICE_PROBE_PHCI);
-	}
-
-	if (inq->inq_dtype != DTYPE_SEQUENTIAL) {
+		support = SFO_DEVICE_PROBE_PHCI;
+	} else if (inq->inq_dtype != DTYPE_SEQUENTIAL) {
 		VHCI_DEBUG(4, (CE_NOTE, NULL,
 		    "!tpgs_tape_device_probe: Detected a "
 		    "Standard Asymmetric device "
 		    "not yet supported\n"));
-		return (SFO_DEVICE_PROBE_PHCI);
-	}
-
-	if (vhci_tpgs_get_target_fo_mode(sd, &mode, &state, &xlf, &preferred)) {
+		support = SFO_DEVICE_PROBE_PHCI;
+	} else if (vhci_tpgs_get_target_fo_mode(sd, &mode, &state, &xlf,
+	    &preferred)) {
 		VHCI_DEBUG(4, (CE_WARN, NULL, "!unable to fetch fo "
 		    "mode: sd(%p)", (void *) sd));
-		return (SFO_DEVICE_PROBE_PHCI);
-	}
-
-	if (inq->inq_tpgs == TPGS_FAILOVER_IMPLICIT) {
+		support = SFO_DEVICE_PROBE_PHCI;
+	} else if (inq->inq_tpgs == TPGS_FAILOVER_IMPLICIT) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL,
 		    "!tpgs_tape_device_probe: Detected a "
 		    "Standard Asymmetric device "
 		    "with implicit failover\n"));
-		return (SFO_DEVICE_PROBE_VHCI);
-	}
-	if (inq->inq_tpgs == TPGS_FAILOVER_EXPLICIT) {
+		support = SFO_DEVICE_PROBE_VHCI;
+	} else if (inq->inq_tpgs == TPGS_FAILOVER_EXPLICIT) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL,
 		    "!tpgs_tape_device_probe: Detected a "
 		    "Standard Asymmetric device "
 		    "with explicit failover\n"));
-		return (SFO_DEVICE_PROBE_VHCI);
-	}
-	if (inq->inq_tpgs == TPGS_FAILOVER_BOTH) {
+		support = SFO_DEVICE_PROBE_VHCI;
+	} else if (inq->inq_tpgs == TPGS_FAILOVER_BOTH) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL,
 		    "!tpgs_tape_device_probe: Detected a "
 		    "Standard Asymmetric device "
 		    "which supports both implicit and explicit failover\n"));
-		return (SFO_DEVICE_PROBE_VHCI);
+		support = SFO_DEVICE_PROBE_VHCI;
+	} else {
+		VHCI_DEBUG(1, (CE_WARN, NULL,
+		    "!tpgs_tape_device_probe: "
+		    "Unknown tpgs_bits: %x", inq->inq_tpgs));
+		support = SFO_DEVICE_PROBE_PHCI;
 	}
-	VHCI_DEBUG(1, (CE_WARN, NULL,
-	    "!tpgs_tape_device_probe: "
-	    "Unknown tpgs_bits: %x", inq->inq_tpgs));
-	return (SFO_DEVICE_PROBE_PHCI);
+
+	if (support == SFO_DEVICE_PROBE_VHCI) {
+		/*
+		 * Policy only applies to 'client' probe, not
+		 * vhci_is_dev_supported() pHCI probe. Detect difference
+		 * based on ctpriv.
+		 */
+		if (ctpriv &&
+		    (mdi_set_lb_policy(sd->sd_dev, LOAD_BALANCE_NONE) !=
+		    MDI_SUCCESS)) {
+			VHCI_DEBUG(6, (CE_NOTE, NULL, "!fail load balance none"
+			    ": %s\n", inq->inq_vid));
+			support = SFO_DEVICE_PROBE_PHCI;
+		}
+	}
+	return (support);
 }
 
 static void
