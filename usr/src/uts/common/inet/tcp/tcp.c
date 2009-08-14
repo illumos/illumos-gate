@@ -789,7 +789,6 @@ static mblk_t	*tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp);
 static void	tcp_process_options(tcp_t *, tcph_t *);
 static void	tcp_rput_common(tcp_t *tcp, mblk_t *mp);
 static void	tcp_rsrv(queue_t *q);
-static int	tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd);
 static int	tcp_snmp_state(tcp_t *tcp);
 static void	tcp_timer(void *arg);
 static void	tcp_timer_callback(void *);
@@ -1373,6 +1372,28 @@ static int cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *),
 	    iph, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha,		\
 	    ip6_t *, ip6h, int, 0);
 
+static void
+tcp_set_recv_threshold(tcp_t *tcp, uint32_t new_rcvthresh)
+{
+	uint32_t default_threshold = SOCKET_RECVHIWATER >> 3;
+
+	if (IPCL_IS_NONSTR(tcp->tcp_connp)) {
+		conn_t *connp = tcp->tcp_connp;
+		struct sock_proto_props sopp;
+
+		/*
+		 * only increase rcvthresh upto default_threshold
+		 */
+		if (new_rcvthresh > default_threshold)
+			new_rcvthresh = default_threshold;
+
+		sopp.sopp_flags = SOCKOPT_RCVTHRESH;
+		sopp.sopp_rcvthresh = new_rcvthresh;
+
+		(*connp->conn_upcalls->su_set_proto_props)
+		    (connp->conn_upper_handle, &sopp);
+	}
+}
 /*
  * Figure out the value of window scale opton.  Note that the rwnd is
  * ASSUMED to be rounded up to the nearest MSS before the calculation.
@@ -5536,10 +5557,10 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	/*
-	 * listener->tcp_rq->q_hiwat should be the default window size or a
-	 * window size changed via SO_RCVBUF option.  First round up the
-	 * eager's tcp_rwnd to the nearest MSS.  Then find out the window
-	 * scale option value if needed.  Call tcp_rwnd_set() to finish the
+	 * listeners tcp_recv_hiwater should be the default window size or a
+	 * window size changed via SO_RCVBUF option. First round up the
+	 * eager's tcp_rwnd to the nearest MSS. Then find out the window
+	 * scale option value if needed. Call tcp_rwnd_set() to finish the
 	 * setting.
 	 *
 	 * Note if there is a rpipe metric associated with the remote host,
@@ -7568,8 +7589,6 @@ tcp_reinit(tcp_t *tcp)
 	tcp->tcp_ip_src_v6 = tcp->tcp_bound_source_v6;
 
 	ASSERT(tcp->tcp_ptpbhn != NULL);
-	if (!IPCL_IS_NONSTR(tcp->tcp_connp))
-		tcp->tcp_rq->q_hiwat = tcps->tcps_recv_hiwat;
 	tcp->tcp_recv_hiwater = tcps->tcps_recv_hiwat;
 	tcp->tcp_recv_lowater = tcp_rinfo.mi_lowat;
 	tcp->tcp_rwnd = tcps->tcps_recv_hiwat;
@@ -7857,7 +7876,7 @@ tcp_reinit_values(tcp)
 	tcp->tcp_unfusable = B_FALSE;
 	tcp->tcp_fused_sigurg = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
-	tcp->tcp_fuse_rcv_hiwater = 0;
+	tcp->tcp_recv_hiwater = 0;
 
 	tcp->tcp_lso = B_FALSE;
 
@@ -7961,7 +7980,7 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_unfusable = B_FALSE;
 	tcp->tcp_fused_sigurg = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
-	tcp->tcp_fuse_rcv_hiwater = 0;
+	tcp->tcp_recv_hiwater = 0;
 
 	/* Initialize the header template */
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
@@ -8902,7 +8921,7 @@ tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
 	if (TCP_IS_DETACHED(tcp))
 		return (mss);
 	if (tcp->tcp_fused) {
-		maxpsz = tcp_fuse_maxpsz_set(tcp);
+		maxpsz = tcp_fuse_maxpsz(tcp);
 		mss = INFPSZ;
 	} else if (tcp->tcp_mdt || tcp->tcp_lso || tcp->tcp_maxpsz == 0) {
 		/*
@@ -9321,8 +9340,6 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 			return (NULL);
 		}
 		q = connp->conn_rq;
-	} else {
-		RD(q)->q_hiwat = tcps->tcps_recv_hiwat;
 	}
 
 	SOCK_CONNID_INIT(tcp->tcp_connid);
@@ -15650,7 +15667,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 
 	if (canputnext(q)) {
 		/* Not flow-controlled, open rwnd */
-		tcp->tcp_rwnd = q->q_hiwat;
+		tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
 
 		/*
 		 * Send back a window update immediately if TCP is above
@@ -15725,7 +15742,7 @@ tcp_rsrv(queue_t *q)
  * XXX - Should allow a lower rwnd than tcp_recv_hiwat_minmss * mss if the
  * user requests so.
  */
-static int
+int
 tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 {
 	uint32_t	mss = tcp->tcp_mss;
@@ -15739,25 +15756,11 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 		tcp_t *peer_tcp = tcp->tcp_loopback_peer;
 
 		ASSERT(peer_tcp != NULL);
-		/*
-		 * Record the stream head's high water mark for
-		 * this endpoint; this is used for flow-control
-		 * purposes in tcp_fuse_output().
-		 */
 		sth_hiwat = tcp_fuse_set_rcv_hiwat(tcp, rwnd);
 		if (!tcp_detached) {
 			(void) proto_set_rx_hiwat(tcp->tcp_rq, tcp->tcp_connp,
 			    sth_hiwat);
-			if (IPCL_IS_NONSTR(tcp->tcp_connp)) {
-				conn_t *connp = tcp->tcp_connp;
-				struct sock_proto_props sopp;
-
-				sopp.sopp_flags = SOCKOPT_RCVTHRESH;
-				sopp.sopp_rcvthresh = sth_hiwat >> 3;
-
-				(*connp->conn_upcalls->su_set_proto_props)
-				    (connp->conn_upper_handle, &sopp);
-			}
+			tcp_set_recv_threshold(tcp, sth_hiwat >> 3);
 		}
 
 		/*
@@ -15767,7 +15770,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 		 * have changed we need to update the peer's maxpsz.
 		 */
 		(void) tcp_maxpsz_set(peer_tcp, B_TRUE);
-		return (rwnd);
+		return (sth_hiwat);
 	}
 
 	if (tcp_detached) {
@@ -15840,14 +15843,11 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 
 	if (tcp_detached)
 		return (rwnd);
-	/*
-	 * We set the maximum receive window into rq->q_hiwat if it is
-	 * a STREAMS socket.
-	 * This is not actually used for flow control.
-	 */
-	if (!IPCL_IS_NONSTR(tcp->tcp_connp))
-		tcp->tcp_rq->q_hiwat = rwnd;
+
+	tcp_set_recv_threshold(tcp, rwnd >> 3);
+
 	tcp->tcp_recv_hiwater = rwnd;
+
 	/*
 	 * Set the STREAM head high water mark. This doesn't have to be
 	 * here, since we are simply using default values, but we would
@@ -17258,19 +17258,13 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	/*
-	 * Set the max window size (tcp_rq->q_hiwat) of the acceptor
-	 * properly.  This is the first time we know of the acceptor'
-	 * queue.  So we do it here.
-	 *
-	 * XXX
+	 * Set max window size (tcp_recv_hiwater) of the acceptor.
 	 */
 	if (tcp->tcp_rcv_list == NULL) {
 		/*
 		 * Recv queue is empty, tcp_rwnd should not have changed.
 		 * That means it should be equal to the listener's tcp_rwnd.
 		 */
-		if (!IPCL_IS_NONSTR(connp))
-			tcp->tcp_rq->q_hiwat = tcp->tcp_rwnd;
 		tcp->tcp_recv_hiwater = tcp->tcp_rwnd;
 	} else {
 #ifdef DEBUG
@@ -17286,8 +17280,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		ASSERT(cnt != 0 && tcp->tcp_rcv_cnt == cnt);
 #endif
 		/* There is some data, add them back to get the max. */
-		if (!IPCL_IS_NONSTR(connp))
-			tcp->tcp_rq->q_hiwat = tcp->tcp_rwnd + tcp->tcp_rcv_cnt;
 		tcp->tcp_recv_hiwater = tcp->tcp_rwnd + tcp->tcp_rcv_cnt;
 	}
 	/*
@@ -17298,10 +17290,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	sopp_flags = SOCKOPT_RCVHIWAT | SOCKOPT_MAXBLK | SOCKOPT_WROFF;
 	sopp_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
 
-	/*
-	 * Record the stream head's high water mark for this endpoint;
-	 * this is used for flow-control purposes.
-	 */
 	sopp_rxhiwat = tcp->tcp_fused ?
 	    tcp_fuse_set_rcv_hiwat(tcp, tcp->tcp_recv_hiwater) :
 	    MAX(tcp->tcp_recv_hiwater, tcps->tcps_sth_rcv_hiwat);
@@ -17455,7 +17443,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			/* We drain directly in case of fused tcp loopback */
 
 			if (!tcp->tcp_fused && canputnext(q)) {
-				tcp->tcp_rwnd = q->q_hiwat;
+				tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
 				if (tcp->tcp_state >= TCPS_ESTABLISHED &&
 				    tcp_rwnd_reopen(tcp) == TH_ACK_NEEDED) {
 					tcp_xmit_ctl(NULL,
@@ -25639,7 +25627,6 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
 	cred_t	*ecr;
 	ts_label_t	*tsl;
 	uint32_t	mss;
-	queue_t	*q = tcp->tcp_rq;
 	conn_t	*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
@@ -25748,8 +25735,6 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
 		 */
 		tcp->tcp_rwnd = MAX(MSS_ROUNDUP(tcp->tcp_rwnd, mss),
 		    tcps->tcps_recv_hiwat_minmss * mss);
-		if (!IPCL_IS_NONSTR(connp))
-			q->q_hiwat = tcp->tcp_rwnd;
 		tcp->tcp_recv_hiwater = tcp->tcp_rwnd;
 		tcp_set_ws_value(tcp);
 		U32_TO_ABE16((tcp->tcp_rwnd >> tcp->tcp_rcv_ws),
@@ -26799,9 +26784,7 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	    tcp->tcp_tcps->tcps_wroff_xtra);
 	if (tcp->tcp_snd_sack_ok)
 		stropt->so_wroff += TCPOPT_MAX_SACK_LEN;
-	stropt->so_hiwat = tcp->tcp_fused ?
-	    tcp_fuse_set_rcv_hiwat(tcp, tcp->tcp_recv_hiwater) :
-	    MAX(tcp->tcp_recv_hiwater, tcp->tcp_tcps->tcps_sth_rcv_hiwat);
+	stropt->so_hiwat = tcp->tcp_recv_hiwater;
 	stropt->so_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
 
 	putnext(RD(q), stropt_mp);

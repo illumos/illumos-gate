@@ -536,7 +536,6 @@ typedef struct tcp_s {
 	 */
 	struct tcp_s *tcp_loopback_peer;	/* peer tcp for loopback */
 	mblk_t	*tcp_fused_sigurg_mp;		/* M_PCSIG mblk for SIGURG */
-	size_t	tcp_fuse_rcv_hiwater;		/* fusion receive queue size */
 
 	uint32_t
 		tcp_fused : 1,		/* loopback tcp in fusion mode */

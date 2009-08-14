@@ -222,8 +222,9 @@ extern boolean_t tcp_fuse_output(tcp_t *, mblk_t *, uint32_t);
 extern void	tcp_fuse_output_urg(tcp_t *, mblk_t *);
 extern boolean_t tcp_fuse_rcv_drain(queue_t *, tcp_t *, mblk_t **);
 extern size_t	tcp_fuse_set_rcv_hiwat(tcp_t *, size_t);
-extern int	tcp_fuse_maxpsz_set(tcp_t *);
-extern void	tcp_fuse_backenable(tcp_t *tcp);
+extern int	tcp_fuse_maxpsz(tcp_t *);
+extern void	tcp_fuse_backenable(tcp_t *);
+extern int	tcp_rwnd_set(tcp_t *, uint32_t);
 
 /*
  * Object to represent database of options to search passed to

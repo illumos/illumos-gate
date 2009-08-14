@@ -136,14 +136,14 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	ASSERT(tcp->tcp_loopback);
 	ASSERT(tcp->tcp_loopback_peer == NULL);
 	/*
-	 * We need to inherit q_hiwat of the listener tcp, but we can't
-	 * really use tcp_listener since we get here after sending up
-	 * T_CONN_IND and tcp_wput_accept() may be called independently,
-	 * at which point tcp_listener is cleared; this is why we use
-	 * tcp_saved_listener.  The listener itself is guaranteed to be
-	 * around until tcp_accept_finish() is called on this eager --
-	 * this won't happen until we're done since we're inside the
-	 * eager's perimeter now.
+	 * We need to inherit tcp_recv_hiwater of the listener tcp,
+	 * but we can't really use tcp_listener since we get here after
+	 * sending up T_CONN_IND and tcp_wput_accept() may be called
+	 * independently, at which point tcp_listener is cleared;
+	 * this is why we use tcp_saved_listener. The listener itself
+	 * is guaranteed to be around until tcp_accept_finish() is called
+	 * on this eager -- this won't happen until we're done since we're
+	 * inside the eager's perimeter now.
 	 *
 	 * We can also get called in the case were a connection needs
 	 * to be re-fused. In this case tcp_saved_listener will be
@@ -272,29 +272,19 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		tcp_timers_stop(tcp);
 		tcp_timers_stop(peer_tcp);
 
-		/*
-		 * At this point we are a detached eager tcp and therefore
-		 * don't have a queue assigned to us until accept happens.
-		 * In the mean time the peer endpoint may immediately send
-		 * us data as soon as fusion is finished, and we need to be
-		 * able to flow control it in case it sends down huge amount
-		 * of data while we're still detached.  To prevent that we
-		 * inherit the listener's recv_hiwater value; this is temporary
-		 * since we'll repeat the process in tcp_accept_finish().
-		 */
 		if (!tcp->tcp_refuse) {
-			(void) tcp_fuse_set_rcv_hiwat(tcp,
-			    tcp->tcp_saved_listener->tcp_recv_hiwater);
+			/*
+			 * Set receive buffer and max packet size for the
+			 * active open tcp.
+			 * eager's values will be set in tcp_accept_finish.
+			 */
+
+			(void) tcp_rwnd_set(peer_tcp,
+			    peer_tcp->tcp_recv_hiwater);
 
 			/*
-			 * Set the stream head's write offset value to zero
-			 * since we won't be needing any room for TCP/IP
-			 * headers; tell it to not break up the writes (this
-			 * would reduce the amount of work done by kmem); and
-			 * configure our receive buffer. Note that we can only
-			 * do this for the active connect tcp since our eager is
-			 * still detached; it will be dealt with later in
-			 * tcp_accept_finish().
+			 * Set the write offset value to zero since we won't
+			 * be needing any room for TCP/IP headers.
 			 */
 			if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
 				struct stroptions *stropt;
@@ -303,18 +293,8 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 				mp->b_wptr += sizeof (*stropt);
 
 				stropt = (struct stroptions *)mp->b_rptr;
-				stropt->so_flags = SO_MAXBLK|SO_WROFF|SO_HIWAT;
-				stropt->so_maxblk = tcp_maxpsz_set(peer_tcp,
-				    B_FALSE);
+				stropt->so_flags = SO_WROFF;
 				stropt->so_wroff = 0;
-
-				/*
-				 * Record the stream head's high water mark for
-				 * peer endpoint; this is used for flow-control
-				 * purposes in tcp_fuse_output().
-				 */
-				stropt->so_hiwat = tcp_fuse_set_rcv_hiwat(
-				    peer_tcp, peer_rq->q_hiwat);
 
 				/* Send the options up */
 				putnext(peer_rq, mp);
@@ -324,16 +304,8 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 				/* The peer is a non-STREAMS end point */
 				ASSERT(IPCL_IS_TCP(peer_connp));
 
-				(void) tcp_fuse_set_rcv_hiwat(tcp,
-				    tcp->tcp_saved_listener->tcp_recv_hiwater);
-
-				sopp.sopp_flags = SOCKOPT_MAXBLK |
-				    SOCKOPT_WROFF | SOCKOPT_RCVHIWAT;
-				sopp.sopp_maxblk = tcp_maxpsz_set(peer_tcp,
-				    B_FALSE);
+				sopp.sopp_flags = SOCKOPT_WROFF;
 				sopp.sopp_wroff = 0;
-				sopp.sopp_rxhiwat = tcp_fuse_set_rcv_hiwat(
-				    peer_tcp, peer_tcp->tcp_recv_hiwater);
 				(*peer_connp->conn_upcalls->su_set_proto_props)
 				    (peer_connp->conn_upper_handle, &sopp);
 			}
@@ -789,7 +761,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	mutex_enter(&tcp->tcp_non_sq_lock);
 	flow_stopped = tcp->tcp_flow_stopped;
 	if ((TCP_IS_DETACHED(peer_tcp) &&
-	    (peer_tcp->tcp_rcv_cnt >= peer_tcp->tcp_fuse_rcv_hiwater)) ||
+	    (peer_tcp->tcp_rcv_cnt >= peer_tcp->tcp_recv_hiwater)) ||
 	    (!TCP_IS_DETACHED(peer_tcp) &&
 	    !IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
 	    !canputnext(peer_tcp->tcp_rq))) {
@@ -989,7 +961,12 @@ tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
 	 * after SO_SNDBUF; the latter is also similarly rounded up.
 	 */
 	rwnd = P2ROUNDUP_TYPED(rwnd, PAGESIZE, size_t);
-	tcp->tcp_fuse_rcv_hiwater = rwnd;
+
+	/*
+	 * Record high water mark, this is used for flow-control
+	 * purposes in tcp_fuse_output().
+	 */
+	tcp->tcp_recv_hiwater = rwnd;
 	return (rwnd);
 }
 
@@ -997,7 +974,7 @@ tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
  * Calculate the maximum outstanding unread data block for a fused tcp endpoint.
  */
 int
-tcp_fuse_maxpsz_set(tcp_t *tcp)
+tcp_fuse_maxpsz(tcp_t *tcp)
 {
 	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
 	uint_t sndbuf = tcp->tcp_xmit_hiwater;
@@ -1005,7 +982,7 @@ tcp_fuse_maxpsz_set(tcp_t *tcp)
 
 	ASSERT(tcp->tcp_fused);
 	ASSERT(peer_tcp != NULL);
-	ASSERT(peer_tcp->tcp_fuse_rcv_hiwater != 0);
+	ASSERT(peer_tcp->tcp_recv_hiwater != 0);
 	/*
 	 * In the fused loopback case, we want the stream head to split
 	 * up larger writes into smaller chunks for a more accurate flow-
@@ -1014,8 +991,8 @@ tcp_fuse_maxpsz_set(tcp_t *tcp)
 	 * We round up the buffer to system page size due to the lack of
 	 * TCP MSS concept in Fusion.
 	 */
-	if (maxpsz > peer_tcp->tcp_fuse_rcv_hiwater)
-		maxpsz = peer_tcp->tcp_fuse_rcv_hiwater;
+	if (maxpsz > peer_tcp->tcp_recv_hiwater)
+		maxpsz = peer_tcp->tcp_recv_hiwater;
 	maxpsz = P2ROUNDUP_TYPED(maxpsz, PAGESIZE, uint_t) >> 1;
 
 	return (maxpsz);
