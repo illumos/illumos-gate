@@ -141,6 +141,7 @@ check_add_drv -i		\
 	"pciex8086,10f7"
 	"pciex8086,10f9"
 	"pciex8086,10fb"
+	"pciex8086,10fc"
 	"pciex8086,1507"
 	"pciex8086,1508"
 	"pciex8086,1514"'	\

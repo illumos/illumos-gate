@@ -87,7 +87,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	size_t mbsize;
 	int desc_num;
 	boolean_t copy_done, eop;
-	mblk_t *current_mp, *next_mp, *nmp;
+	mblk_t *current_mp, *next_mp, *nmp, *pull_mp = NULL;
 	tx_control_block_t *tcb;
 	ixgbe_tx_context_t tx_context, *ctx;
 	link_list_t pending_list;
@@ -400,34 +400,54 @@ adjust_threshold:
 		/*
 		 * pull up the mblk and send it out with bind way
 		 */
-		if ((nmp = msgpullup(mp, -1)) == NULL) {
-			freemsg(mp);
-			return (NULL);
-		} else {
-			freemsg(mp);
-			mp = nmp;
+		if ((pull_mp = msgpullup(mp, -1)) == NULL) {
+			tx_ring->reschedule = B_TRUE;
+			return (mp);
 		}
 
 		LINK_LIST_INIT(&pending_list);
+		desc_total = 0;
+
+		/*
+		 * if the packet is a LSO packet, we simply
+		 * transmit the header in one descriptor using the copy way
+		 */
+		if ((ctx != NULL) && ctx->lso_flag) {
+			hdr_len = ctx->ip_hdr_len + ctx->mac_hdr_len +
+			    ctx->l4_hdr_len;
+
+			tcb = ixgbe_get_free_list(tx_ring);
+			if (tcb == NULL) {
+				IXGBE_DEBUG_STAT(tx_ring->stat_fail_no_tcb);
+				goto tx_failure;
+			}
+			desc_num = ixgbe_tx_copy(tx_ring, tcb, pull_mp,
+			    hdr_len, B_TRUE);
+			LIST_PUSH_TAIL(&pending_list, &tcb->link);
+			desc_total  += desc_num;
+
+			pull_mp->b_rptr += hdr_len;
+		}
+
 		tcb = ixgbe_get_free_list(tx_ring);
 		if (tcb == NULL) {
 			IXGBE_DEBUG_STAT(tx_ring->stat_fail_no_tcb);
-			freemsg(mp);
-			return (NULL);
+			goto tx_failure;
+		}
+		if ((ctx != NULL) && ctx->lso_flag) {
+			desc_num = ixgbe_tx_bind(tx_ring, tcb, pull_mp,
+			    mbsize - hdr_len);
+		} else {
+			desc_num = ixgbe_tx_bind(tx_ring, tcb, pull_mp,
+			    mbsize);
+		}
+		if (desc_num < 0) {
+			goto tx_failure;
 		}
 		LIST_PUSH_TAIL(&pending_list, &tcb->link);
 
-		desc_num = ixgbe_tx_bind(tx_ring, tcb, mp, mbsize);
-		if ((desc_num < 0) ||
-		    ((desc_num + 1) > IXGBE_TX_DESC_LIMIT)) {
-			ixgbe_free_tcb(tcb);
-			ixgbe_put_free_list(tx_ring, &pending_list);
-			freemsg(mp);
-			return (NULL);
-		}
-
-		desc_total = desc_num;
-		tcb->mp = mp;
+		desc_total += desc_num;
+		tcb->mp = pull_mp;
 	}
 
 	/*
@@ -462,9 +482,24 @@ adjust_threshold:
 
 	mutex_exit(&tx_ring->tx_lock);
 
+	/*
+	 * now that the transmission succeeds, need to free the original
+	 * mp if we used the pulling up mblk for transmission.
+	 */
+	if (pull_mp) {
+		freemsg(mp);
+	}
+
 	return (NULL);
 
 tx_failure:
+	/*
+	 * If transmission fails, need to free the pulling up mblk.
+	 */
+	if (pull_mp) {
+		freemsg(pull_mp);
+	}
+
 	/*
 	 * Discard the mblk and free the used resources
 	 */

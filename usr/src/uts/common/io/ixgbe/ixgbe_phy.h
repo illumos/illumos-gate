@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.32 v2-7-8_2009-4-7 */
+/* IntelVersion: 1.34 v2-9-1-1_2009-6-10_NSW1 */
 
 #ifndef _IXGBE_PHY_H
 #define	_IXGBE_PHY_H
@@ -43,10 +43,10 @@
 #define	IXGBE_SFF_VENDOR_OUI_BYTE2	0x27
 #define	IXGBE_SFF_1GBE_COMP_CODES	0x6
 #define	IXGBE_SFF_10GBE_COMP_CODES	0x3
-#define	IXGBE_SFF_TRANSMISSION_MEDIA	0x9
+#define	IXGBE_SFF_CABLE_TECHNOLOGY	0x8
 
 /* Bitmasks */
-#define	IXGBE_SFF_TWIN_AX_CAPABLE	0x80
+#define	IXGBE_SFF_DA_PASSIVE_CABLE	0x4
 #define	IXGBE_SFF_1GBASESX_CAPABLE	0x1
 #define	IXGBE_SFF_1GBASELX_CAPABLE	0x2
 #define	IXGBE_SFF_10GBASESR_CAPABLE	0x10
@@ -101,6 +101,8 @@ s32 ixgbe_get_copper_link_capabilities_generic(struct ixgbe_hw *hw,
 s32 ixgbe_check_phy_link_tnx(struct ixgbe_hw *hw,
     ixgbe_link_speed *speed, bool *link_up);
 s32 ixgbe_get_phy_firmware_version_tnx(struct ixgbe_hw *hw,
+    u16 *firmware_version);
+s32 ixgbe_get_phy_firmware_version_aq(struct ixgbe_hw *hw,
     u16 *firmware_version);
 
 s32 ixgbe_reset_phy_nl(struct ixgbe_hw *hw);

@@ -26,13 +26,14 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.138 v2-7-8_2009-4-7 */
+/* IntelVersion: 1.144 v2-9-1-1_2009-6-10_NSW1 */
 
 #include "ixgbe_type.h"
 #include "ixgbe_api.h"
 #include "ixgbe_common.h"
 #include "ixgbe_phy.h"
 
+u32 ixgbe_get_pcie_msix_count_82598(struct ixgbe_hw *hw);
 s32 ixgbe_init_ops_82598(struct ixgbe_hw *hw);
 static s32 ixgbe_get_link_capabilities_82598(struct ixgbe_hw *hw,
     ixgbe_link_speed *speed, bool *autoneg);
@@ -59,6 +60,7 @@ s32 ixgbe_read_i2c_eeprom_82598(struct ixgbe_hw *hw, u8 byte_offset,
     u8 *eeprom_data);
 u32 ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw);
 s32 ixgbe_init_phy_ops_82598(struct ixgbe_hw *hw);
+void ixgbe_set_lan_id_multi_port_pcie_82598(struct ixgbe_hw *hw);
 
 /*
  * ixgbe_get_pcie_msix_count_82598 - Gets MSI-X vector count
@@ -113,6 +115,7 @@ ixgbe_init_ops_82598(struct ixgbe_hw *hw)
 	    &ixgbe_get_supported_physical_layer_82598;
 	mac->ops.read_analog_reg8 = &ixgbe_read_analog_reg8_82598;
 	mac->ops.write_analog_reg8 = &ixgbe_write_analog_reg8_82598;
+	mac->ops.set_lan_id = &ixgbe_set_lan_id_multi_port_pcie_82598;
 
 	/* RAR, Multicast, VLAN */
 	mac->ops.set_vmdq = &ixgbe_set_vmdq_82598;
@@ -132,12 +135,6 @@ ixgbe_init_ops_82598(struct ixgbe_hw *hw)
 
 	/* SFP+ Module */
 	phy->ops.read_i2c_eeprom = &ixgbe_read_i2c_eeprom_82598;
-
-	/*
-	 * Call PHY identify routine to assign the phy type for PHY init
-	 * and media type determination
-	 */
-	phy->ops.identify(hw);
 
 	/* Link */
 	mac->ops.check_link = &ixgbe_check_mac_link_82598;
@@ -183,6 +180,10 @@ ixgbe_init_phy_ops_82598(struct ixgbe_hw *hw)
 		phy->ops.check_link = &ixgbe_check_phy_link_tnx;
 		phy->ops.get_firmware_version =
 		    &ixgbe_get_phy_firmware_version_tnx;
+		break;
+	case ixgbe_phy_aq:
+		phy->ops.get_firmware_version =
+		    &ixgbe_get_phy_firmware_version_aq;
 		break;
 	case ixgbe_phy_nl:
 		phy->ops.reset = &ixgbe_reset_phy_nl;
@@ -283,7 +284,8 @@ ixgbe_get_media_type_82598(struct ixgbe_hw *hw)
 
 	/* Detect if there is a copper PHY attached. */
 	if (hw->phy.type == ixgbe_phy_cu_unknown ||
-	    hw->phy.type == ixgbe_phy_tn) {
+	    hw->phy.type == ixgbe_phy_tn ||
+	    hw->phy.type == ixgbe_phy_aq) {
 		media_type = ixgbe_media_type_copper;
 		goto out;
 	}
@@ -411,7 +413,7 @@ ixgbe_fc_enable_82598(struct ixgbe_hw *hw, s32 packetbuf_num)
 	}
 
 	/* Configure pause time (2 TCs per register) */
-	reg = IXGBE_READ_REG(hw, IXGBE_FCTTV(packetbuf_num));
+	reg = IXGBE_READ_REG(hw, IXGBE_FCTTV(packetbuf_num / 2));
 	if ((packetbuf_num & 1) == 0)
 		reg = (reg & 0xFFFF0000) | hw->fc.pause_time;
 	else
@@ -673,6 +675,7 @@ static s32
 ixgbe_reset_hw_82598(struct ixgbe_hw *hw)
 {
 	s32 status = IXGBE_SUCCESS;
+	s32 phy_status = IXGBE_SUCCESS;
 	u32 ctrl;
 	u32 gheccr;
 	u32 i;
@@ -720,13 +723,16 @@ ixgbe_reset_hw_82598(struct ixgbe_hw *hw)
 		/* PHY ops must be identified and initialized prior to reset */
 
 		/* Init PHY and function pointers, perform SFP setup */
-		status = hw->phy.ops.init(hw);
-		/* Do not return error if SFP module is not supported. */
-		status = IXGBE_SUCCESS;
+		phy_status = hw->phy.ops.init(hw);
+		if (phy_status == IXGBE_ERR_SFP_NOT_SUPPORTED)
+			goto reset_hw_out;
+		else if (phy_status == IXGBE_ERR_SFP_NOT_PRESENT)
+			goto no_phy_reset;
 
 		hw->phy.ops.reset(hw);
 	}
 
+no_phy_reset:
 	/*
 	 * Prevent the PCI-E bus from from hanging by disabling PCI-E master
 	 * access and verify no pending requests before reset
@@ -776,14 +782,18 @@ ixgbe_reset_hw_82598(struct ixgbe_hw *hw)
 		IXGBE_WRITE_REG(hw, IXGBE_AUTOC, hw->mac.orig_autoc);
 	}
 
+	/* Store the permanent mac address */
+	hw->mac.ops.get_mac_addr(hw, hw->mac.perm_addr);
+
 	/*
 	 * Store MAC address from RAR0, clear receive address registers, and
 	 * clear the multicast table
 	 */
 	hw->mac.ops.init_rx_addrs(hw);
 
-	/* Store the permanent mac address */
-	hw->mac.ops.get_mac_addr(hw, hw->mac.perm_addr);
+reset_hw_out:
+	if (phy_status != IXGBE_SUCCESS)
+		status = phy_status;
 
 	return (status);
 }
@@ -1106,4 +1116,34 @@ ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw)
 
 out:
 	return (physical_layer);
+}
+
+/*
+ * ixgbe_set_lan_id_multi_port_pcie_82598 - Set LAN id for PCIe multiple
+ * port devices.
+ * @hw: pointer to the HW structure
+ *
+ * Calls common function and corrects issue with some single port devices
+ * that enable LAN1 but not LAN0.
+ */
+void
+ixgbe_set_lan_id_multi_port_pcie_82598(struct ixgbe_hw *hw)
+{
+	struct ixgbe_bus_info *bus = &hw->bus;
+	u16 pci_gen, pci_ctrl2;
+
+	ixgbe_set_lan_id_multi_port_pcie(hw);
+
+	/* check if LAN0 is disabled */
+	hw->eeprom.ops.read(hw, IXGBE_PCIE_GENERAL_PTR, &pci_gen);
+	if ((pci_gen != 0) && (pci_gen != 0xFFFF)) {
+		hw->eeprom.ops.read(hw, pci_gen + IXGBE_PCIE_CTRL2, &pci_ctrl2);
+
+		/* if LAN0 is completely disabled force function to 0 */
+		if ((pci_ctrl2 & IXGBE_PCIE_CTRL2_LAN_DISABLE) &&
+		    !(pci_ctrl2 & IXGBE_PCIE_CTRL2_DISABLE_SELECT) &&
+		    !(pci_ctrl2 & IXGBE_PCIE_CTRL2_DUMMY_ENABLE)) {
+			bus->func = 0;
+		}
+	}
 }

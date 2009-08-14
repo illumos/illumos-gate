@@ -1212,7 +1212,7 @@ static int
 ixgbe_chip_start(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	int i;
+	int ret_val, i;
 
 	ASSERT(mutex_owned(&ixgbe->gen_lock));
 
@@ -1237,9 +1237,17 @@ ixgbe_chip_start(ixgbe_t *ixgbe)
 	/*
 	 * Configure/Initialize hardware
 	 */
-	if (ixgbe_init_hw(hw) != IXGBE_SUCCESS) {
-		ixgbe_error(ixgbe, "Failed to initialize hardware");
-		return (IXGBE_FAILURE);
+	ret_val = ixgbe_init_hw(hw);
+	if (ret_val != IXGBE_SUCCESS) {
+		if (ret_val == IXGBE_ERR_EEPROM_VERSION) {
+			ixgbe_error(ixgbe,
+			    "This 82599 device is pre-release and contains"
+			    " outdated firmware, please contact your hardware"
+			    " vendor for a replacement.");
+		} else {
+			ixgbe_error(ixgbe, "Failed to initialize hardware");
+			return (IXGBE_FAILURE);
+		}
 	}
 
 	/*
@@ -2476,8 +2484,8 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    DEFAULT_RX_LIMIT_PER_INTR);
 
 	/*
-	 * Interrupt throttling is per 256ns in 82598 and 2 usec increments
-	 * in 82599.
+	 * Interrupt throttling is per 256ns in 82598 and 2.048usec
+	 * (256ns * 8) increments in 82599.
 	 */
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
@@ -2491,6 +2499,14 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 		    PROP_INTR_THROTTLING,
 		    MIN_INTR_THROTTLING, MAX_INTR_THROTTLING_82599,
 		    DEFAULT_INTR_THROTTLING_82599);
+
+		/*
+		 * 82599 requires the interupt throttling rate is
+		 * a multiple of 8. This is enforced by the register
+		 * definiton.
+		 */
+		ixgbe->intr_throttling[0] = ixgbe->intr_throttling[0] &
+		    0xFF8;
 		break;
 	}
 }
@@ -2740,7 +2756,9 @@ ixgbe_stall_check(ixgbe_t *ixgbe)
 	result = B_FALSE;
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
 		tx_ring = &ixgbe->tx_rings[i];
-		tx_ring->tx_recycle(tx_ring);
+		if (tx_ring->tbd_free <= tx_ring->recycle_thresh) {
+			tx_ring->tx_recycle(tx_ring);
+		}
 
 		if (tx_ring->recycle_fail > 0)
 			tx_ring->stall_watchdog++;
@@ -3296,8 +3314,8 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 		if ((ddi_taskq_dispatch(ixgbe->lsc_taskq,
 		    ixgbe_sfp_check, (void *)ixgbe,
 		    DDI_NOSLEEP)) != DDI_SUCCESS) {
-			ixgbe_log(ixgbe,
-			    "No memory available to dispatch taskq");
+			ixgbe_log(ixgbe, "No memory available to dispatch "
+			    "taskq for SFP check");
 		}
 	}
 }
@@ -4633,6 +4651,13 @@ ixgbe_rx_ring_intr_enable(mac_intr_handle_t intrh)
 	ixgbe_enable_ivar(ixgbe, r_idx, 0);
 
 	BT_SET(ixgbe->vect_map[v_idx].rx_map, r_idx);
+
+	/*
+	 * To trigger a Rx interrupt to on this ring
+	 */
+	IXGBE_WRITE_REG(&ixgbe->hw, IXGBE_EICS, (1 << v_idx));
+	IXGBE_WRITE_FLUSH(&ixgbe->hw);
+
 	mutex_exit(&ixgbe->gen_lock);
 
 	return (0);

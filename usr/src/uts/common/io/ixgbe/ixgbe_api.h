@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.73 v2-7-8_2009-4-7  */
+/* IntelVersion: 1.74 v2-9-1-1_2009-6-10_NSW1 */
 
 #ifndef _IXGBE_API_H
 #define	_IXGBE_API_H
@@ -147,5 +147,7 @@ s32 ixgbe_write_i2c_eeprom(struct ixgbe_hw *hw, u8 byte_offset, u8 eeprom_data);
 s32 ixgbe_get_san_mac_addr(struct ixgbe_hw *hw, u8 *san_mac_addr);
 s32 ixgbe_set_san_mac_addr(struct ixgbe_hw *hw, u8 *san_mac_addr);
 s32 ixgbe_get_device_caps(struct ixgbe_hw *hw, u16 *device_caps);
+s32 ixgbe_acquire_swfw_semaphore(struct ixgbe_hw *hw, u16 mask);
+void ixgbe_release_swfw_semaphore(struct ixgbe_hw *hw, u16 mask);
 
 #endif /* _IXGBE_API_H */

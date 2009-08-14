@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.90 v2-7-8_2009-4-7 */
+/* IntelVersion: 1.90 v2-9-1-1_2009-6-10_NSW1 */
 
 #ifndef _IXGBE_COMMON_H
 #define	_IXGBE_COMMON_H

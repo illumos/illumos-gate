@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.117 v2-7-8_2009-4-7 */
+/* IntelVersion: 1.120 v2-9-1-1_2009-6-10_NSW1 */
 
 #include "ixgbe_api.h"
 #include "ixgbe_common.h"
@@ -102,6 +102,7 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 			break;
 		case IXGBE_DEV_ID_82599_KX4:
 		case IXGBE_DEV_ID_82599_KX4_SIK:
+		case IXGBE_DEV_ID_82599_XAUI_LOM:
 		case IXGBE_DEV_ID_82599_SFP:
 		case IXGBE_DEV_ID_82599_SPW:
 		case IXGBE_DEV_ID_82599_CX4:
@@ -985,4 +986,34 @@ ixgbe_enable_rx_dma(struct ixgbe_hw *hw, u32 regval)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.enable_rx_dma,
 	    (hw, regval), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_acquire_swfw_semaphore - Acquire SWFW semaphore
+ * @hw: pointer to hardware structure
+ * @mask: Mask to specify which semaphore to acquire
+ *
+ * Acquires the SWFW semaphore through SW_FW_SYNC register for the specified
+ * function (CSR, PHY0, PHY1, EEPROM, Flash)
+ */
+s32
+ixgbe_acquire_swfw_semaphore(struct ixgbe_hw *hw, u16 mask)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.acquire_swfw_sync,
+	    (hw, mask), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_release_swfw_semaphore - Release SWFW semaphore
+ * @hw: pointer to hardware structure
+ * @mask: Mask to specify which semaphore to release
+ *
+ * Releases the SWFW semaphore through SW_FW_SYNC register for the specified
+ * function (CSR, PHY0, PHY1, EEPROM, Flash)
+ */
+void
+ixgbe_release_swfw_semaphore(struct ixgbe_hw *hw, u16 mask)
+{
+	if (hw->mac.ops.release_swfw_sync)
+		hw->mac.ops.release_swfw_sync(hw, mask);
 }
