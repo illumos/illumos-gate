@@ -116,6 +116,7 @@ typedef enum {
 	ZFS_PROP_STMF_SHAREINFO,	/* not exposed to the user */
 	ZFS_PROP_DEFER_DESTROY,
 	ZFS_PROP_USERREFS,
+	ZFS_PROP_LOGBIAS,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -244,6 +245,11 @@ typedef enum {
 	ZFS_CANMOUNT_ON = 1,
 	ZFS_CANMOUNT_NOAUTO = 2
 } zfs_canmount_type_t;
+
+typedef enum {
+	ZFS_LOGBIAS_LATENCY = 0,
+	ZFS_LOGBIAS_THROUGHPUT = 1
+} zfs_logbias_op_t;
 
 typedef enum zfs_share_op {
 	ZFS_SHARE_NFS = 0,

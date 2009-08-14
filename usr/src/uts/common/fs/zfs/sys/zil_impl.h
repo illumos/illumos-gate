@@ -83,6 +83,7 @@ struct zilog {
 	uint8_t		zl_stop_sync;	/* for debugging */
 	uint8_t		zl_writer;	/* boolean: write setup in progress */
 	uint8_t		zl_log_error;	/* boolean: log write error */
+	uint8_t		zl_logbias;	/* latency or throughput */
 	list_t		zl_itx_list;	/* in-memory itx list */
 	uint64_t	zl_itx_list_sz;	/* total size of records on list */
 	uint64_t	zl_cur_used;	/* current commit log size used */

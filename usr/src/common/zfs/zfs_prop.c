@@ -152,6 +152,12 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t logbias_table[] = {
+		{ "latency",	ZFS_LOGBIAS_LATENCY },
+		{ "throughput",	ZFS_LOGBIAS_THROUGHPUT },
+		{ NULL }
+	};
+
 	static zprop_index_t canmount_table[] = {
 		{ "off",	ZFS_CANMOUNT_OFF },
 		{ "on",		ZFS_CANMOUNT_ON },
@@ -196,6 +202,9 @@ zfs_prop_init(void)
 	    ZFS_CACHE_ALL, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
 	    "all | none | metadata", "SECONDARYCACHE", cache_table);
+	register_index(ZFS_PROP_LOGBIAS, "logbias", ZFS_LOGBIAS_LATENCY,
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    "latency | throughput", "LOGBIAS", logbias_table);
 
 	/* inherit index (boolean) properties */
 	register_index(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,

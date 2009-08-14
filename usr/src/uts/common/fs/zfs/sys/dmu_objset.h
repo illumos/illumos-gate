@@ -72,6 +72,7 @@ struct objset {
 	uint8_t os_copies;	/* can change, under dsl_dir's locks */
 	uint8_t os_primary_cache;	/* can change, under dsl_dir's locks */
 	uint8_t os_secondary_cache;	/* can change, under dsl_dir's locks */
+	uint8_t os_logbias;	/* can change, under dsl_dir's locks */
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */

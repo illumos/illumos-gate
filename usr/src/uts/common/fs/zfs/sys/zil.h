@@ -397,6 +397,8 @@ extern void	zil_resume(zilog_t *zilog);
 
 extern void	zil_add_block(zilog_t *zilog, blkptr_t *bp);
 
+extern void	zil_set_logbias(zilog_t *zilog, uint64_t slogval);
+
 extern int zil_disable;
 
 #ifdef	__cplusplus

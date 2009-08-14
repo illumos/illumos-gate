@@ -91,6 +91,12 @@ dmu_objset_id(objset_t *os)
 	return (ds ? ds->ds_object : 0);
 }
 
+uint64_t
+dmu_objset_logbias(objset_t *os)
+{
+	return (os->os_logbias);
+}
+
 static void
 checksum_changed_cb(void *arg, uint64_t newval)
 {
@@ -157,6 +163,18 @@ secondary_cache_changed_cb(void *arg, uint64_t newval)
 	    newval == ZFS_CACHE_METADATA);
 
 	os->os_secondary_cache = newval;
+}
+
+static void
+logbias_changed_cb(void *arg, uint64_t newval)
+{
+	objset_t *os = arg;
+
+	ASSERT(newval == ZFS_LOGBIAS_LATENCY ||
+	    newval == ZFS_LOGBIAS_THROUGHPUT);
+	os->os_logbias = newval;
+	if (os->os_zil)
+		zil_set_logbias(os->os_zil, newval);
 }
 
 void
@@ -262,6 +280,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 			if (err == 0)
 				err = dsl_prop_register(ds, "copies",
 				    copies_changed_cb, os);
+			if (err == 0)
+				err = dsl_prop_register(ds, "logbias",
+				    logbias_changed_cb, os);
 		}
 		if (err) {
 			VERIFY(arc_buf_remove_ref(os->os_phys_buf,
@@ -447,6 +468,8 @@ dmu_objset_evict(objset_t *os)
 			    compression_changed_cb, os));
 			VERIFY(0 == dsl_prop_unregister(ds, "copies",
 			    copies_changed_cb, os));
+			VERIFY(0 == dsl_prop_unregister(ds, "logbias",
+			    logbias_changed_cb, os));
 		}
 		VERIFY(0 == dsl_prop_unregister(ds, "primarycache",
 		    primary_cache_changed_cb, os));

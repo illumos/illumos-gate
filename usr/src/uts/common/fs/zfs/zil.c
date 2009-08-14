@@ -367,7 +367,7 @@ zil_create(zilog_t *zilog)
 		}
 
 		error = zio_alloc_blk(zilog->zl_spa, ZIL_MIN_BLKSZ, &blk,
-		    NULL, txg);
+		    NULL, txg, zilog->zl_logbias != ZFS_LOGBIAS_LATENCY);
 
 		if (error == 0)
 			zil_init_log_chain(zilog, &blk);
@@ -791,7 +791,8 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 
 	BP_ZERO(bp);
 	/* pass the old blkptr in order to spread log blocks across devs */
-	error = zio_alloc_blk(spa, zil_blksz, bp, &lwb->lwb_blk, txg);
+	error = zio_alloc_blk(spa, zil_blksz, bp, &lwb->lwb_blk, txg,
+	    zilog->zl_logbias != ZFS_LOGBIAS_LATENCY);
 	if (error) {
 		dmu_tx_t *tx = dmu_tx_create_assigned(zilog->zl_dmu_pool, txg);
 
@@ -1280,6 +1281,12 @@ zil_fini(void)
 	kmem_cache_destroy(zil_lwb_cache);
 }
 
+void
+zil_set_logbias(zilog_t *zilog, uint64_t logbias)
+{
+	zilog->zl_logbias = logbias;
+}
+
 zilog_t *
 zil_alloc(objset_t *os, zil_header_t *zh_phys)
 {
@@ -1292,6 +1299,7 @@ zil_alloc(objset_t *os, zil_header_t *zh_phys)
 	zilog->zl_spa = dmu_objset_spa(os);
 	zilog->zl_dmu_pool = dmu_objset_pool(os);
 	zilog->zl_destroy_txg = TXG_INITIAL - 1;
+	zilog->zl_logbias = dmu_objset_logbias(os);
 
 	mutex_init(&zilog->zl_lock, NULL, MUTEX_DEFAULT, NULL);
 

@@ -474,14 +474,19 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	itx_wr_state_t write_state;
 	boolean_t slogging;
 	uintptr_t fsync_cnt;
+	ssize_t immediate_write_sz;
 
 	if (zilog == NULL || zp->z_unlinked)
 		return;
 
 	ZFS_HANDLE_REPLAY(zilog, tx); /* exits if replay */
 
-	slogging = spa_has_slogs(zilog->zl_spa);
-	if (resid > zfs_immediate_write_sz && !slogging && resid <= zp->z_blksz)
+	immediate_write_sz = (zilog->zl_logbias == ZFS_LOGBIAS_THROUGHPUT)
+	    ? 0 : zfs_immediate_write_sz;
+
+	slogging = spa_has_slogs(zilog->zl_spa) &&
+	    (zilog->zl_logbias == ZFS_LOGBIAS_LATENCY);
+	if (resid > immediate_write_sz && !slogging && resid <= zp->z_blksz)
 		write_state = WR_INDIRECT;
 	else if (ioflag & (FSYNC | FDSYNC))
 		write_state = WR_COPIED;

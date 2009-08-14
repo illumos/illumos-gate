@@ -1716,12 +1716,13 @@ zio_dva_unallocate(zio_t *zio, zio_gang_node_t *gn, blkptr_t *bp)
  */
 int
 zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp, blkptr_t *old_bp,
-    uint64_t txg)
+    uint64_t txg, boolean_t bypass_slog)
 {
-	int error;
+	int error = 1;
 
-	error = metaslab_alloc(spa, spa->spa_log_class, size,
-	    new_bp, 1, txg, old_bp, METASLAB_HINTBP_AVOID);
+	if (!bypass_slog)
+		error = metaslab_alloc(spa, spa->spa_log_class, size,
+		    new_bp, 1, txg, old_bp, METASLAB_HINTBP_AVOID);
 
 	if (error)
 		error = metaslab_alloc(spa, spa->spa_normal_class, size,
