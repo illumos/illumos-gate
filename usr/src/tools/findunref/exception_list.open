@@ -34,87 +34,87 @@
 # Ignore oddly-named text files scattered about -- someday these should be
 # suffixed with .txt so we don't have to list them.
 #
-./src/cmd/oawk/EXPLAIN
-./src/cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
-./src/cmd/vi/port/ex.news
-./src/cmd/ssh/doc
+./usr/src/cmd/oawk/EXPLAIN
+./usr/src/cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
+./usr/src/cmd/vi/port/ex.news
+./usr/src/cmd/ssh/doc
 
 #
 # Ignore everything under trees that may be resynched from outside ON.
 #
-./src/cmd/perl
-./src/cmd/sqlite
-./src/lib/libsqlite
-./src/cmd/tcpd
-./src/common/openssl
-./src/grub
-./src/uts/intel/sys/acpi
+./usr/src/cmd/perl
+./usr/src/cmd/sqlite
+./usr/src/lib/libsqlite
+./usr/src/cmd/tcpd
+./usr/src/common/openssl
+./usr/src/grub
+./usr/src/uts/intel/sys/acpi
 
 #
 # Ignore ksh93/ast-related files that are only used to resync our build
 # configuration with upstream.
 #
-./src/lib/libast/*/src/lib/libast/FEATURE
-./src/lib/libast/common/comp/conf.*
-./src/lib/libast/common/features
-./src/lib/libast/common/include/ast_windows.h
-./src/lib/libast/common/port/lc.tab
-./src/lib/libast/common/port/lcgen.c
-./src/lib/libcmd/*/src/lib/libcmd/FEATURE
-./src/lib/libcmd/common/features
-./src/lib/libdll/*/src/lib/libdll/FEATURE
-./src/lib/libdll/common/features
-./src/lib/libpp/*/pp.*
-./src/lib/libpp/common/gentab.sh
-./src/lib/libpp/common/ppsym.c
-./src/lib/libpp/i386/ppdebug.h
-./src/lib/libpp/sparc/ppdebug.h
-./src/lib/libshell/*/src/cmd/ksh93/FEATURE
-./src/lib/libshell/common/data/math.tab
-./src/lib/libshell/common/features
-./src/lib/libshell/misc/buildksh93.sh
-./src/lib/libshell/misc/buildksh93.readme
+./usr/src/lib/libast/*/src/lib/libast/FEATURE
+./usr/src/lib/libast/common/comp/conf.*
+./usr/src/lib/libast/common/features
+./usr/src/lib/libast/common/include/ast_windows.h
+./usr/src/lib/libast/common/port/lc.tab
+./usr/src/lib/libast/common/port/lcgen.c
+./usr/src/lib/libcmd/*/src/lib/libcmd/FEATURE
+./usr/src/lib/libcmd/common/features
+./usr/src/lib/libdll/*/src/lib/libdll/FEATURE
+./usr/src/lib/libdll/common/features
+./usr/src/lib/libpp/*/pp.*
+./usr/src/lib/libpp/common/gentab.sh
+./usr/src/lib/libpp/common/ppsym.c
+./usr/src/lib/libpp/i386/ppdebug.h
+./usr/src/lib/libpp/sparc/ppdebug.h
+./usr/src/lib/libshell/*/src/cmd/ksh93/FEATURE
+./usr/src/lib/libshell/common/data/math.tab
+./usr/src/lib/libshell/common/features
+./usr/src/lib/libshell/misc/buildksh93.sh
+./usr/src/lib/libshell/misc/buildksh93.readme
 
 #
 # Ignore ksh93/ast-related "iffe" (if feature enabled) probe
 #
-./src/lib/libsum/common/features/sum
+./usr/src/lib/libsum/common/features/sum
 
 #
 # Ignore ksh93/ast-related upstream source, currently superseded by
 # a per-platform version of sum.h, since we use libmd.so.1 for some
 # ciphers.
 #
-./src/lib/libsum/common/sum.h
+./usr/src/lib/libsum/common/sum.h
 
 #
 # Ignore ksh93/ast-related test programs.
 #
-./src/cmd/ast/msgcc/msgcc.tst
-./src/lib/libast/common/port/astmath.c
+./usr/src/cmd/ast/msgcc/msgcc.tst
+./usr/src/lib/libast/common/port/astmath.c
 
 #
 # Ignore ksh93/ast-related source components that are not currently
 # used but may be useful later.
 #
-./src/lib/libcmd/common/cksum.c
-./src/lib/libcmd/common/md5sum.c
-./src/lib/libcmd/common/sum.c
-./src/lib/libshell/common/bltins/mkservice.c
-./src/lib/libshell/common/data/bash_pre_rc.sh
-./src/lib/libshell/common/include/env.h
-./src/lib/libshell/common/sh/bash.c
-./src/lib/libshell/common/sh/env.c
-./src/lib/libshell/common/sh/shcomp.c
-./src/lib/libshell/common/sh/suid_exec.c
+./usr/src/lib/libcmd/common/cksum.c
+./usr/src/lib/libcmd/common/md5sum.c
+./usr/src/lib/libcmd/common/sum.c
+./usr/src/lib/libshell/common/bltins/mkservice.c
+./usr/src/lib/libshell/common/data/bash_pre_rc.sh
+./usr/src/lib/libshell/common/include/env.h
+./usr/src/lib/libshell/common/sh/bash.c
+./usr/src/lib/libshell/common/sh/env.c
+./usr/src/lib/libshell/common/sh/shcomp.c
+./usr/src/lib/libshell/common/sh/suid_exec.c
 
 #
 # Ignore any files built as part of the nightly program itself.
 #
 # ISUSED - let checkpaths know that the next entry is good.
-./src/*.out
+./usr/src/*.out
 # ISUSED - let checkpaths know that the next entry is good.
-./src/*.ref
+./usr/src/*.ref
 
 #
 # Ignore internal test directories and test programs.
@@ -123,145 +123,145 @@
 */test
 *Test.java
 *_test.[ch]
-./src/cmd/ldap/common/*test.c
-./src/cmd/logadm/tester
-./src/cmd/print/printmgr/com/sun/admin/pm/client/helptools/extract
-./src/cmd/print/printmgr/com/sun/admin/pm/server/pmtest
-./src/cmd/sendmail/libsm/t-*.c
-./src/cmd/sort/common/convert.c
-./src/cmd/sort/common/invoke.c
-./src/lib/crypt_modules/sha256/test.c
-./src/lib/efcode/fcode_test
-./src/lib/libkvm/common/test.c
+./usr/src/cmd/ldap/common/*test.c
+./usr/src/cmd/logadm/tester
+./usr/src/cmd/print/printmgr/com/sun/admin/pm/client/helptools/extract
+./usr/src/cmd/print/printmgr/com/sun/admin/pm/server/pmtest
+./usr/src/cmd/sendmail/libsm/t-*.c
+./usr/src/cmd/sort/common/convert.c
+./usr/src/cmd/sort/common/invoke.c
+./usr/src/lib/crypt_modules/sha256/test.c
+./usr/src/lib/efcode/fcode_test
+./usr/src/lib/libkvm/common/test.c
 
 #
 # Ignore debugging code.
 #
-./src/cmd/fs.d/pcfs/fsck/inject.c
-./src/cmd/sort/common/statistics.c
+./usr/src/cmd/fs.d/pcfs/fsck/inject.c
+./usr/src/cmd/sort/common/statistics.c
 
 #
 # Ignore internal packages, scripts, and tools that are intentionally not
 # built or used during a nightly.
 #
-./src/cmd/mdb/packages
-./src/cmd/sgs/packages
-./src/cmd/sgs/rtld.4.x
-./src/prototypes
-./src/cmd/pools/poold/com/sun/solaris/*/*/package.html
-./src/uts/intel/io/acpica/cmp_ca.sh
+./usr/src/cmd/mdb/packages
+./usr/src/cmd/sgs/packages
+./usr/src/cmd/sgs/rtld.4.x
+./usr/src/prototypes
+./usr/src/cmd/pools/poold/com/sun/solaris/*/*/package.html
+./usr/src/uts/intel/io/acpica/cmp_ca.sh
 
 #
 # Ignore files that are only used by internal packages.
 #
-./src/cmd/sgs/*/*/*chk.msg
+./usr/src/cmd/sgs/*/*/*chk.msg
 
 #
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
 #
-./src/common/crypto/aes/Makefile
-./src/common/crypto/arcfour/Makefile
-./src/common/crypto/blowfish/Makefile
-./src/common/crypto/des/Makefile
-./src/common/crypto/rsa/Makefile
-./src/lib/gss_mechs/mech_dh/backend/mapfile-vers
-./src/lib/gss_mechs/mech_dh/dh1024/mapfile-vers
-./src/lib/gss_mechs/mech_dh/dh192/mapfile-vers
-./src/lib/gss_mechs/mech_dh/dh640/mapfile-vers
-./src/lib/gss_mechs/mech_krb5/mapfile-vers-clean
-./src/lib/gss_mechs/mech_spnego/mapfile-vers-clean
-./src/lib/pkcs11/pkcs11_softtoken/common/Makefile
-./src/uts/common/Makefile
-./src/uts/common/crypto/io/Makefile
-./src/uts/common/gssapi/include/Makefile
-./src/uts/common/gssapi/mechs/dummy/Makefile
-./src/uts/common/gssapi/mechs/krb5/Makefile
-./src/xmod
+./usr/src/common/crypto/aes/Makefile
+./usr/src/common/crypto/arcfour/Makefile
+./usr/src/common/crypto/blowfish/Makefile
+./usr/src/common/crypto/des/Makefile
+./usr/src/common/crypto/rsa/Makefile
+./usr/src/lib/gss_mechs/mech_dh/backend/mapfile-vers
+./usr/src/lib/gss_mechs/mech_dh/dh1024/mapfile-vers
+./usr/src/lib/gss_mechs/mech_dh/dh192/mapfile-vers
+./usr/src/lib/gss_mechs/mech_dh/dh640/mapfile-vers
+./usr/src/lib/gss_mechs/mech_krb5/mapfile-vers-clean
+./usr/src/lib/gss_mechs/mech_spnego/mapfile-vers-clean
+./usr/src/lib/pkcs11/pkcs11_softtoken/common/Makefile
+./usr/src/uts/common/Makefile
+./usr/src/uts/common/crypto/io/Makefile
+./usr/src/uts/common/gssapi/include/Makefile
+./usr/src/uts/common/gssapi/mechs/dummy/Makefile
+./usr/src/uts/common/gssapi/mechs/krb5/Makefile
+./usr/src/xmod
 
 #
 # Ignore Makefiles which are used by developers but not used by nightly
 # itself.  This is a questionable practice, since they tend to rot.
 #
-./src/cmd/syslogd/sparcv9/Makefile
-./src/uts/sparc/uhci/Makefile
-./src/lib/pam_modules/smb/amd64/Makefile
-./src/lib/pam_modules/smb/sparcv9/Makefile
-./src/cmd/isns/isnsd/xml_def/isnsmgmtSchema.xsd
+./usr/src/cmd/syslogd/sparcv9/Makefile
+./usr/src/uts/sparc/uhci/Makefile
+./usr/src/lib/pam_modules/smb/amd64/Makefile
+./usr/src/lib/pam_modules/smb/sparcv9/Makefile
+./usr/src/cmd/isns/isnsd/xml_def/isnsmgmtSchema.xsd
 
 #
 # Ignore dtrace scripts only used by developers
 #
-./src/cmd/vscan/vscand/vscan.d
+./usr/src/cmd/vscan/vscand/vscan.d
 
 #
 # Ignore sample source code.
 #
-./src/cmd/sendmail/libmilter/example.c
-./src/lib/libdhcpsvc/modules/templates
+./usr/src/cmd/sendmail/libmilter/example.c
+./usr/src/lib/libdhcpsvc/modules/templates
 
 #
 # Ignore .xcl files that aren't used because the program is statically linked.
 #
-./src/cmd/cmd-inet/sbin/dhcpagent/dhcpagent.xcl
+./usr/src/cmd/cmd-inet/sbin/dhcpagent/dhcpagent.xcl
 
 #
 # Ignore sendmail files included for completeness' sake, but which won't
 # be used until certain _FFR (for future release) #define's go live.
 #
-./src/cmd/sendmail/src/statusd_shm.h
+./usr/src/cmd/sendmail/src/statusd_shm.h
 
 #
 # Ignore files originally supplied by ISC (Internet Software Consortium) 
 # as part of a BIND release.
 #
-./src/lib/libresolv2/common/cylink/bn68000.c
-./src/lib/libresolv2/common/cylink/bn8086.c
-./src/lib/libresolv2/common/cylink/lbn68000.c
-./src/lib/libresolv2/common/cylink/lbn68000.h
-./src/lib/libresolv2/common/cylink/lbn68020.c
-./src/lib/libresolv2/common/cylink/lbn68020.h
-./src/lib/libresolv2/common/cylink/lbn80386.h
-./src/lib/libresolv2/common/cylink/lbn8086.h
-./src/lib/libresolv2/common/cylink/lbnppc.c
-./src/lib/libresolv2/common/cylink/lbnppc.h
-./src/lib/libresolv2/common/cylink/ppcasm.h
-./src/lib/libresolv2/common/cylink/sizetest.c
-./src/lib/libresolv2/common/irs/getaddrinfo.c
-./src/lib/libresolv2/common/irs/nis_p.h
-./src/lib/libresolv2/common/resolv/res_mkupdate.h
-./src/lib/libresolv2/include/err.h
+./usr/src/lib/libresolv2/common/cylink/bn68000.c
+./usr/src/lib/libresolv2/common/cylink/bn8086.c
+./usr/src/lib/libresolv2/common/cylink/lbn68000.c
+./usr/src/lib/libresolv2/common/cylink/lbn68000.h
+./usr/src/lib/libresolv2/common/cylink/lbn68020.c
+./usr/src/lib/libresolv2/common/cylink/lbn68020.h
+./usr/src/lib/libresolv2/common/cylink/lbn80386.h
+./usr/src/lib/libresolv2/common/cylink/lbn8086.h
+./usr/src/lib/libresolv2/common/cylink/lbnppc.c
+./usr/src/lib/libresolv2/common/cylink/lbnppc.h
+./usr/src/lib/libresolv2/common/cylink/ppcasm.h
+./usr/src/lib/libresolv2/common/cylink/sizetest.c
+./usr/src/lib/libresolv2/common/irs/getaddrinfo.c
+./usr/src/lib/libresolv2/common/irs/nis_p.h
+./usr/src/lib/libresolv2/common/resolv/res_mkupdate.h
+./usr/src/lib/libresolv2/include/err.h
 
 #
 # Ignore mont_mulf.c. It is used as a starting point for some hand optimized
 # assembly files. We keep it around for future reference.
 #
-./src/common/bignum/mont_mulf.c
+./usr/src/common/bignum/mont_mulf.c
 
 #
 # Ignore the sparc Makefiles for x86-only drivers;
 # they're used to build warlock only.
 #
-./src/uts/sparc/sata/Makefile
-./src/uts/sparc/si3124/Makefile
-./src/uts/sparc/nv_sata/Makefile
-./src/uts/sparc/ahci/Makefile
+./usr/src/uts/sparc/sata/Makefile
+./usr/src/uts/sparc/si3124/Makefile
+./usr/src/uts/sparc/nv_sata/Makefile
+./usr/src/uts/sparc/ahci/Makefile
 
 #
 # Ignore uttrack.c.  It is provided as part of the standard
 # ACPI CA source code but provides optional resource tracking
 # functionality which is not used.
 #
-./src/uts/intel/io/acpica/utilities/uttrack.c
+./usr/src/uts/intel/io/acpica/utilities/uttrack.c
 
 #
 # Ignore any files that get used during a gcc build only.
 #
-./src/cmd/sgs/rtld/common/mapfile-order-gcc
+./usr/src/cmd/sgs/rtld/common/mapfile-order-gcc
 
 #
 # Ignore compiler dependent header files for fpscrubber
 # and sparc prototype files
 #
-./src/cmd/fps/fptest/singdoub*
-./src/pkgdefs/SUNWfsu/prototype_gcc_sparc
-./src/pkgdefs/SUNWfsu/prototype_cc_sparc
+./usr/src/cmd/fps/fptest/singdoub*
+./usr/src/pkgdefs/SUNWfsu/prototype_gcc_sparc
+./usr/src/pkgdefs/SUNWfsu/prototype_cc_sparc

@@ -182,6 +182,7 @@ f none opt/onbld/man/man1/checkpaths.1 644 root bin
 f none opt/onbld/man/man1/codereview.1 644 root bin
 f none opt/onbld/man/man1/cstyle.1 644 root bin
 f none opt/onbld/man/man1/cw.1 644 root bin
+f none opt/onbld/man/man1/findunref.1 644 root bin
 f none opt/onbld/man/man1/flg.flp.1 644 root bin
 f none opt/onbld/man/man1/get_depend_info.1 644 root bin
 f none opt/onbld/man/man1/intf_check.1 644 root bin

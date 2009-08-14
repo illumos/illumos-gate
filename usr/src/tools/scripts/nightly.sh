@@ -3159,19 +3159,9 @@ if [ "$f_FLAG" = "y" -a "$build_ok" = "y" ]; then
 		mv $SRC/unref-${MACH}.out $SRC/unref-${MACH}.ref
 	fi
 
-	#
-	# For any SCM other than teamware, we want to disable the
-	# managed-by-SCCS test in findunref
-	#
-	findunref_all=""
-	if [ "$SCM_TYPE" != teamware ]; then
-		findunref_all="-a"
-	fi
- 
-	findunref $findunref_all -t $SRC/.build.tstamp $SRC/.. \
+	findunref -S $SCM_TYPE -t $SRC/.build.tstamp -s usr $CODEMGR_WS \
 	    ${TOOLS}/findunref/exception_list 2>> $mail_msg_file | \
-	    sort | sed -e s=^./src/=./= -e s=^./closed/=../closed/= \
-	    > $SRC/unref-${MACH}.out
+	    sort > $SRC/unref-${MACH}.out
 
 	if [ ! -f $SRC/unref-${MACH}.ref ]; then
 		cp $SRC/unref-${MACH}.out $SRC/unref-${MACH}.ref

@@ -17,13 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Finds all unreferenced files in a source tree that do not match a list of
@@ -55,18 +52,54 @@ typedef struct {
 	unsigned int	maxpaths;
 } pnset_t;
 
+/*
+ * Data associated with the current Mercurial manifest.
+ */
+typedef struct hgdata {
+	pnset_t		*manifest;
+	char		hgpath[MAXPATHLEN];
+	char		root[MAXPATHLEN];
+	unsigned int	rootlen;
+	boolean_t	rootwarn;
+} hgdata_t;
+
+/*
+ * Hooks used to check if a given unreferenced file is known to an SCM
+ * (currently Mercurial and TeamWare).
+ */
+typedef int checkscm_func_t(const char *, const struct FTW *);
+typedef void chdirscm_func_t(const char *);
+
+typedef struct {
+	const char	*name;
+	checkscm_func_t	*checkfunc;
+	chdirscm_func_t	*chdirfunc;
+} scm_t;
+
+static checkscm_func_t check_tw, check_hg;
+static chdirscm_func_t chdir_hg;
 static int	pnset_add(pnset_t *, const char *);
 static int	pnset_check(const pnset_t *, const char *);
 static void	pnset_empty(pnset_t *);
+static void	pnset_free(pnset_t *);
 static int	checkpath(const char *, const struct stat *, int, struct FTW *);
 static pnset_t	*make_exset(const char *);
 static void	warn(const char *, ...);
 static void	die(const char *, ...);
 
+static const scm_t scms[] = {
+	{ "tw",		check_tw,	NULL		},
+	{ "teamware",	check_tw,	NULL		},
+	{ "hg",		check_hg,	chdir_hg 	},
+	{ "mercurial",	check_hg,	chdir_hg	},
+	{ NULL,		NULL, 		NULL		}
+};
+
+static const scm_t	*scm;
+static hgdata_t		hgdata;
 static time_t		tstamp;		/* timestamp to compare files to */
 static pnset_t		*exsetp;	/* pathname globs to ignore */
 static const char	*progname;
-static boolean_t	allfiles = B_FALSE;
 
 int
 main(int argc, char *argv[])
@@ -83,10 +116,10 @@ main(int argc, char *argv[])
 	else
 		progname++;
 
-	while ((c = getopt(argc, argv, "as:t:")) != EOF) {
+	while ((c = getopt(argc, argv, "as:t:S:")) != EOF) {
 		switch (c) {
 		case 'a':
-			allfiles = B_TRUE;
+			/* for compatibility; now the default */
 			break;
 
 		case 's':
@@ -95,6 +128,15 @@ main(int argc, char *argv[])
 
 		case 't':
 			tstampfile = optarg;
+			break;
+
+		case 'S':
+			for (scm = scms; scm->name != NULL; scm++) {
+				if (strcmp(scm->name, optarg) == 0)
+					break;
+			}
+			if (scm->name == NULL)
+				die("unsupported SCM `%s'\n", optarg);
 			break;
 
 		default:
@@ -107,8 +149,9 @@ main(int argc, char *argv[])
 	argv += optind;
 
 	if (argc != 2) {
-usage:		(void) fprintf(stderr, "usage: %s [-a] [-s subtree] "
-		    "[-t tstampfile] srcroot exceptfile\n", progname);
+usage:		(void) fprintf(stderr, "usage: %s [-s <subtree>] "
+		    "[-t <tstampfile>] [-S hg|tw] <srcroot> <exceptfile>\n",
+		    progname);
 		return (EXIT_FAILURE);
 	}
 
@@ -134,12 +177,151 @@ usage:		(void) fprintf(stderr, "usage: %s [-a] [-s subtree] "
 	/*
 	 * Walk the specified subtree of the tree rooted at argv[0].
 	 */
-	(void) chdir(argv[0]);
+	if (chdir(argv[0]) == -1)
+		die("cannot change directory to \"%s\"", argv[0]);
+
 	if (nftw(subtree, checkpath, 100, FTW_PHYS) != 0)
 		die("cannot walk tree rooted at \"%s\"\n", argv[0]);
 
 	pnset_empty(exsetp);
 	return (EXIT_SUCCESS);
+}
+
+/*
+ * Load and return a pnset for the manifest for the Mercurial repo at `hgroot'.
+ */
+static pnset_t *
+load_manifest(const char *hgroot)
+{
+	FILE	*fp = NULL;
+	char	*hgcmd = NULL;
+	char	*newline;
+	pnset_t	*pnsetp;
+	char	path[MAXPATHLEN];
+
+	pnsetp = calloc(sizeof (pnset_t), 1);
+	if (pnsetp == NULL ||
+	    asprintf(&hgcmd, "/usr/bin/hg manifest -R %s", hgroot) == -1)
+		goto fail;
+
+	fp = popen(hgcmd, "r");
+	if (fp == NULL)
+		goto fail;
+
+	while (fgets(path, sizeof (path), fp) != NULL) {
+		newline = strrchr(path, '\n');
+		if (newline != NULL)
+			*newline = '\0';
+
+		if (pnset_add(pnsetp, path) == 0)
+			goto fail;
+	}
+
+	(void) pclose(fp);
+	free(hgcmd);
+	return (pnsetp);
+fail:
+	warn("cannot load hg manifest at %s", hgroot);
+	if (fp != NULL)
+		(void) pclose(fp);
+	free(hgcmd);
+	pnset_free(pnsetp);
+	return (NULL);
+}
+
+/*
+ * If necessary, change our active manifest to be appropriate for `path'.
+ */
+static void
+chdir_hg(const char *path)
+{
+	char hgpath[MAXPATHLEN];
+	char basepath[MAXPATHLEN];
+	char *slash;
+
+	(void) snprintf(hgpath, MAXPATHLEN, "%s/.hg", path);
+
+	/*
+	 * Change our active manifest if any one of the following is true:
+	 *
+	 *   1. No manifest is loaded.  Find the nearest hgroot to load from.
+	 *
+	 *   2. A manifest is loaded, but we've moved into a directory with
+	 *	its own hgroot (e.g., usr/closed).  Load from its hgroot.
+	 *
+	 *   3. A manifest is loaded, but no longer applies (e.g., the manifest
+	 *	under usr/closed is loaded, but we've moved to usr/src).
+	 */
+	if (hgdata.manifest == NULL ||
+	    strcmp(hgpath, hgdata.hgpath) != 0 && access(hgpath, X_OK) == 0 ||
+	    strncmp(path, hgdata.root, hgdata.rootlen - 1) != 0) {
+		pnset_free(hgdata.manifest);
+		hgdata.manifest = NULL;
+
+		(void) strlcpy(basepath, path, MAXPATHLEN);
+
+		/*
+		 * Walk up the directory tree looking for .hg subdirectories.
+		 */
+		while (access(hgpath, X_OK) == -1) {
+			slash = strrchr(basepath, '/');
+			if (slash == NULL) {
+				if (!hgdata.rootwarn) {
+					warn("no hg root for \"%s\"\n", path);
+					hgdata.rootwarn = B_TRUE;
+				}
+				return;
+			}
+			*slash = '\0';
+			(void) snprintf(hgpath, MAXPATHLEN, "%s/.hg", basepath);
+		}
+
+		/*
+		 * We found a directory with an .hg subdirectory; record it
+		 * and load its manifest.
+		 */
+		(void) strlcpy(hgdata.hgpath, hgpath, MAXPATHLEN);
+		(void) strlcpy(hgdata.root, basepath, MAXPATHLEN);
+		hgdata.manifest = load_manifest(hgdata.root);
+
+		/*
+		 * The logic in check_hg() depends on hgdata.root having a
+		 * single trailing slash, so only add it if it's missing.
+		 */
+		if (hgdata.root[strlen(hgdata.root) - 1] != '/')
+			(void) strlcat(hgdata.root, "/", MAXPATHLEN);
+		hgdata.rootlen = strlen(hgdata.root);
+	}
+}
+
+/*
+ * Check if a file is under Mercurial control by checking against the manifest.
+ */
+/* ARGSUSED */
+static int
+check_hg(const char *path, const struct FTW *ftwp)
+{
+	/*
+	 * The manifest paths are relative to the manifest root; skip past it.
+	 */
+	path += hgdata.rootlen;
+
+	return (hgdata.manifest != NULL && pnset_check(hgdata.manifest, path));
+}
+
+/*
+ * Check if a file is under TeamWare control by checking for its corresponding
+ * SCCS "s-dot" file.
+ */
+static int
+check_tw(const char *path, const struct FTW *ftwp)
+{
+	char sccspath[MAXPATHLEN];
+
+	(void) snprintf(sccspath, MAXPATHLEN, "%.*s/SCCS/s.%s", ftwp->base,
+	    path, path + ftwp->base);
+
+	return (access(sccspath, F_OK) == 0);
 }
 
 /*
@@ -189,8 +371,7 @@ make_exset(const char *exceptfile)
 	(void) fclose(fp);
 	return (pnsetp);
 fail:
-	pnset_empty(pnsetp);
-	free(pnsetp);
+	pnset_free(pnsetp);
 	return (NULL);
 }
 
@@ -201,8 +382,6 @@ static int
 checkpath(const char *path, const struct stat *statp, int type,
     struct FTW *ftwp)
 {
-	char sccspath[MAXPATHLEN];
-
 	switch (type) {
 	case FTW_F:
 		/*
@@ -212,26 +391,28 @@ checkpath(const char *path, const struct stat *statp, int type,
 			return (0);
 
 		/*
-		 * If not explicitly checking all files, restrict ourselves
-		 * to unreferenced files under SCCS control.
+		 * If requested, restrict ourselves to unreferenced files
+		 * under SCM control.
 		 */
-		if (!allfiles) {
-			(void) snprintf(sccspath, MAXPATHLEN, "%.*s/SCCS/s.%s",
-			    ftwp->base, path, path + ftwp->base);
-
-			if (access(sccspath, F_OK) == -1)
-				return (0);
-		}
-
-		(void) puts(path);
+		if (scm == NULL || scm->checkfunc(path, ftwp))
+			(void) puts(path);
 		return (0);
 
 	case FTW_D:
 		/*
 		 * Prune any directories in the exception list.
 		 */
-		if (pnset_check(exsetp, path))
+		if (pnset_check(exsetp, path)) {
 			ftwp->quit = FTW_PRUNE;
+			return (0);
+		}
+
+		/*
+		 * If necessary, advise the SCM logic of our new directory.
+		 */
+		if (scm != NULL && scm->chdirfunc != NULL)
+			scm->chdirfunc(path);
+
 		return (0);
 
 	case FTW_DNR:
@@ -256,14 +437,15 @@ static int
 pnset_add(pnset_t *pnsetp, const char *path)
 {
 	char **newpaths;
+	unsigned int maxpaths;
 
 	if (pnsetp->npath == pnsetp->maxpaths) {
-		newpaths = realloc(pnsetp->paths, sizeof (const char *) *
-		    (pnsetp->maxpaths + 15));
+		maxpaths = (pnsetp->maxpaths == 0) ? 512 : pnsetp->maxpaths * 2;
+		newpaths = realloc(pnsetp->paths, sizeof (char *) * maxpaths);
 		if (newpaths == NULL)
 			return (0);
 		pnsetp->paths = newpaths;
-		pnsetp->maxpaths += 15;
+		pnsetp->maxpaths = maxpaths;
 	}
 
 	pnsetp->paths[pnsetp->npath] = strdup(path);
@@ -300,6 +482,18 @@ pnset_empty(pnset_t *pnsetp)
 
 	free(pnsetp->paths);
 	pnsetp->maxpaths = 0;
+}
+
+/*
+ * Free the pnset_t pointed to by `pnsetp'.
+ */
+static void
+pnset_free(pnset_t *pnsetp)
+{
+	if (pnsetp != NULL) {
+		pnset_empty(pnsetp);
+		free(pnsetp);
+	}
 }
 
 /* PRINTFLIKE1 */

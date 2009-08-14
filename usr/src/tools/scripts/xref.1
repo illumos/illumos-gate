@@ -1,10 +1,8 @@
-.\" ident	"%Z%%M%	%I%	%E% SMI"
 .\" " CDDL HEADER START
 .\" "
 .\" " The contents of this file are subject to the terms of the
-.\" " Common Development and Distribution License, Version 1.0 only
-.\" " (the "License").  You may not use this file except in compliance
-.\" " with the License.
+.\" " Common Development and Distribution License (the "License").
+.\" " You may not use this file except in compliance with the License.
 .\" "
 .\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" " or http://www.opensolaris.org/os/licensing.
@@ -19,9 +17,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2006 Sun Microsystems, Inc.  All rights reserved."
+.\" "Copyright 2009 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH xref 1 "10 Feb 2006"
+.TH xref 1 "10 Aug 2009"
 .SH NAME
 .I xref
 \- build and maintain source cross-references
@@ -40,7 +38,7 @@ files reported by flg.flp(1).  File eligibility is determined by pattern
 matching -- by default, files matching the following patterns are
 eligible:
 
-	*.[Ccshlxy] Makefile* *.il* *.cc *.adb llib-*
+	*.[Ccdshlxy] Makefile* *.il* *.cc llib-* *.xml *.dtd.* *.ndl
 
 However, this default behavior can be changed, either through command-line
 options or by setting the cross-reference customization macros (see
@@ -165,5 +163,5 @@ locate the etags utility and the -x option has not been specified, then
 xref will silently not build etags.
 .LP
 The ETAGS environment variable can be used to specify an alternate
-path to the etags utility.  For instance, to use the one packaged with
-Sun Freeware, set ETAGS to /opt/sfw/bin/etags prior to invoking xref.
+path to the etags utility.  For instance, to use the one included with
+SUNWgnu-emacs, set ETAGS to /usr/gnu/bin/etags prior to invoking xref.

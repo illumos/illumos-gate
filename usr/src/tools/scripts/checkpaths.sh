@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Quis custodiet ipsos custodies?
@@ -97,10 +95,9 @@ done
 #
 # The exception_list is generated from whichever input files are appropriate
 # for this workspace, so checking it obviates the need to check the inputs.
-elist=""
+
 if [ -r $SRC/tools/findunref/exception_list ]; then
-	validate_paths -k ISUSED -r -e '^\*' -b $SRC/.. \
-		$SRC/tools/findunref/exception_list
+	validate_paths -k ISUSED -r -e '^\*' $SRC/tools/findunref/exception_list
 fi
 
 # These are straightforward.

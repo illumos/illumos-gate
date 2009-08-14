@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -36,19 +34,19 @@
 # Ignore internal packages, scripts, and tools that are intentionally not
 # built or used during a nightly.
 #
-./closed/cmd/zic/makefile.tzpkg
-./closed/cmd/zic/tzpkg.awk
+./usr/closed/cmd/zic/makefile.tzpkg
+./usr/closed/cmd/zic/tzpkg.awk
 
 #
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
 #
-./closed/uts/sun4v/io/n2cp/Makefile
-./closed/uts/sun4v/io/ncp/Makefile
+./usr/closed/uts/sun4v/io/n2cp/Makefile
+./usr/closed/uts/sun4v/io/ncp/Makefile
 
 #
 # Ignore files that are only used for warlock
 #
-./closed/uts/sparc/marvell88sx/Makefile
+./usr/closed/uts/sparc/marvell88sx/Makefile
 
 #
 # An unfortunate artifact of the bridged, split gate is that closed-source
@@ -59,4 +57,4 @@
 # won't exist, so we need the ISUSED directive here.
 #
 # ISUSED - let checkpaths know that the next entry is good.
-./closed/deleted_files
+./usr/closed/deleted_files

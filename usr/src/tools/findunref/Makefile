@@ -20,17 +20,18 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-PROG	= findunref
+PROG	  = findunref
+MAN1FILES = findunref.1
 CFLAGS += $(CCVERBOSE)
 LINTFLAGS += -ux
 
 include ../Makefile.tools
+
+$(ROOTONBLDMAN1FILES) := FILEMODE=      644
 
 EXCEPTION_SRC=	$(SCM_TYPE:none=) common open
 $(CLOSED_BUILD)EXCEPTION_SRC += closed
@@ -42,7 +43,7 @@ CLOBBERFILES += exception_list
 
 all:    $(PROG) exception_list
 
-install: all .WAIT $(ROOTONBLDMACHPROG)
+install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDMAN1FILES)
 
 lint:	lint_PROG
 
