@@ -392,7 +392,6 @@ start:
 	np->r_vnode = vp;
 	np->n_mount = mi;
 	np->r_hashq = rhtp;
-	np->n_direof = -1;
 	np->n_fid = SMB_FID_UNUSED;
 	np->n_uid = UID_NOBODY;
 	np->n_gid = GID_NOBODY;

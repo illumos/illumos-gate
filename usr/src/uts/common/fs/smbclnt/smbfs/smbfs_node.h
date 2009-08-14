@@ -217,12 +217,11 @@ typedef struct smbnode {
 	uint32_t	n_flag;
 	smbmntinfo_t	*n_mount;
 	ino64_t		n_ino;
-	/* Lock for the next 8 is r_lkserlock */
+	/* Lock for the next 7 is r_lkserlock */
 	enum vtype	n_ovtype;	/* vnode type opened */
 	int		n_dirrefs;
 	struct smbfs_fctx	*n_dirseq;	/* ff context */
-	long		n_dirofs;	/* last ff offset */
-	long		n_direof;	/* End of dir. offset. */
+	int		n_dirofs;	/* last ff offset */
 	int		n_vcgenid;	/* gereration no. (reconnect) */
 	int		n_fidrefs;
 	uint16_t	n_fid;		/* file handle */

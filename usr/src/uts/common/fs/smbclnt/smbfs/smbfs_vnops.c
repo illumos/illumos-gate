@@ -66,6 +66,17 @@
 #include <fs/fs_subr.h>
 
 /*
+ * We assign directory offsets like the NFS client, where the
+ * offset increments by _one_ after each directory entry.
+ * Further, the entries "." and ".." are always at offsets
+ * zero and one (respectively) and the "real" entries from
+ * the server appear at offsets starting with two.  This
+ * macro is used to initialize the n_dirofs field after
+ * setting n_dirseq with a _findopen call.
+ */
+#define	FIRST_DIROFS	2
+
+/*
  * These characters are illegal in NTFS file names.
  * ref: http://support.microsoft.com/kb/147438
  *
@@ -285,9 +296,18 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	}
 
 	/*
-	 * Directory open is easy.
+	 * Directory open.  See smbfs_readvdir()
 	 */
 	if (vp->v_type == VDIR) {
+		if (np->n_dirseq == NULL) {
+			/* first open */
+			error = smbfs_smb_findopen(np, "*", 1,
+			    SMB_FA_SYSTEM | SMB_FA_HIDDEN | SMB_FA_DIR,
+			    &scred, &np->n_dirseq);
+			if (error != 0)
+				goto out;
+		}
+		np->n_dirofs = FIRST_DIROFS;
 		np->n_dirrefs++;
 		goto have_fid;
 	}
@@ -307,18 +327,16 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	    np->n_vcgenid == ssp->ss_vcgenid) {
 		int upgrade = 0;
 
-		/* BEGIN CSTYLED */
 		if ((flag & FWRITE) &&
 		    !(np->n_rights & (SA_RIGHT_FILE_WRITE_DATA |
-				GENERIC_RIGHT_ALL_ACCESS |
-				GENERIC_RIGHT_WRITE_ACCESS)))
+		    GENERIC_RIGHT_ALL_ACCESS |
+		    GENERIC_RIGHT_WRITE_ACCESS)))
 			upgrade = 1;
 		if ((flag & FREAD) &&
 		    !(np->n_rights & (SA_RIGHT_FILE_READ_DATA |
-				GENERIC_RIGHT_ALL_ACCESS |
-				GENERIC_RIGHT_READ_ACCESS)))
+		    GENERIC_RIGHT_ALL_ACCESS |
+		    GENERIC_RIGHT_READ_ACCESS)))
 			upgrade = 1;
-		/* END CSTYLED */
 		if (!upgrade) {
 			/*
 			 *  the existing open is good enough
@@ -509,6 +527,7 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 			goto out;
 		if ((fctx = np->n_dirseq) != NULL) {
 			np->n_dirseq = NULL;
+			np->n_dirofs = 0;
 			error = smbfs_smb_findclose(fctx, &scred);
 		}
 	} else {
@@ -2573,49 +2592,69 @@ static int
 smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	caller_context_t *ct)
 {
-	size_t		dbufsiz;
-	struct dirent64 *dp;
+	/*
+	 * Note: "limit" tells the SMB-level FindFirst/FindNext
+	 * functions how many directory entries to request in
+	 * each OtW call.  It needs to be large enough so that
+	 * we don't make lots of tiny OtW requests, but there's
+	 * no point making it larger than the maximum number of
+	 * OtW entries that would fit in a maximum sized trans2
+	 * response (64k / 48).  Beyond that, it's just tuning.
+	 * WinNT used 512, Win2k used 1366.  We use 1000.
+	 */
+	static const int limit = 1000;
+	/* Largest possible dirent size. */
+	static const size_t dbufsiz = DIRENT64_RECLEN(SMB_MAXFNAMELEN);
 	struct smb_cred scred;
 	vnode_t		*newvp;
 	struct smbnode	*np = VTOSMB(vp);
-	int		nmlen, reclen, error = 0;
-	long		offset, limit;
 	struct smbfs_fctx *ctx;
+	struct dirent64 *dp;
+	ssize_t		save_resid;
+	offset_t	save_offset; /* 64 bits */
+	int		offset; /* yes, 32 bits */
+	int		nmlen, error;
+	ushort_t	reclen;
 
 	ASSERT(curproc->p_zone == VTOSMI(vp)->smi_zone);
 
 	/* Make sure we serialize for n_dirseq use. */
 	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_WRITER));
 
-	/* Min size is DIRENT64_RECLEN(256) rounded up. */
-	if (uio->uio_resid < 512 || uio->uio_offset < 0)
+	/*
+	 * Make sure smbfs_open filled in n_dirseq
+	 */
+	if (np->n_dirseq == NULL)
+		return (EBADF);
+
+	/* Check for overflow of (32-bit) directory offset. */
+	if (uio->uio_loffset < 0 || uio->uio_loffset > INT32_MAX ||
+	    (uio->uio_loffset + uio->uio_resid) > INT32_MAX)
 		return (EINVAL);
 
+	/* Require space for at least one dirent. */
+	if (uio->uio_resid < dbufsiz)
+		return (EINVAL);
+
+#ifdef USE_DNLC
 	/*
 	 * This dnlc_purge_vp ensures that name cache for this dir will be
 	 * current - it'll only have the items for which the smbfs_nget
 	 * MAKEENTRY happened.
 	 */
-#ifdef NOT_YET
 	if (smbfs_fastlookup)
 		dnlc_purge_vp(vp);
 #endif
 	SMBVDEBUG("dirname='%s'\n", np->n_rpath);
 	smb_credinit(&scred, cr);
-	dbufsiz = DIRENT64_RECLEN(SMB_MAXFNAMELEN);
 	dp = kmem_alloc(dbufsiz, KM_SLEEP);
 
-	offset = uio->uio_offset; /* NB: "cookie" */
-	limit = uio->uio_resid / DIRENT64_RECLEN(1);
-	SMBVDEBUG("offset=0x%ld, limit=0x%ld\n", offset, limit);
-
-	if (offset == 0) {
-		/* Don't know EOF until findclose */
-		np->n_direof = -1;
-	} else if (offset == np->n_direof) {
-		/* Arrived at end of directory. */
-		goto out;
-	}
+	save_resid = uio->uio_resid;
+	save_offset = uio->uio_loffset;
+	offset = uio->uio_offset;
+	SMBVDEBUG("in: offset=%d, resid=%d\n",
+	    (int)uio->uio_offset, (int)uio->uio_resid);
+	error = 0;
 
 	/*
 	 * Generate the "." and ".." entries here so we can
@@ -2623,20 +2662,24 @@ smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	 * (2) deal with getting their I numbers which the
 	 * findnext below does only for normal names.
 	 */
-	while (limit && offset < 2) {
-		limit--;
+	while (offset < FIRST_DIROFS) {
+		/*
+		 * Tricky bit filling in the first two:
+		 * offset 0 is ".", offset 1 is ".."
+		 * so strlen of these is offset+1.
+		 */
 		reclen = DIRENT64_RECLEN(offset + 1);
+		if (uio->uio_resid < reclen)
+			goto out;
 		bzero(dp, reclen);
-		/*LINTED*/
 		dp->d_reclen = reclen;
-		/* Tricky: offset 0 is ".", offset 1 is ".." */
 		dp->d_name[0] = '.';
 		dp->d_name[1] = '.';
 		dp->d_name[offset + 1] = '\0';
 		/*
 		 * Want the real I-numbers for the "." and ".."
 		 * entries.  For these two names, we know that
-		 * smbfslookup can do this all locally.
+		 * smbfslookup can get the nodes efficiently.
 		 */
 		error = smbfslookup(vp, dp->d_name, &newvp, cr, 1, ct);
 		if (error) {
@@ -2645,21 +2688,29 @@ smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 			dp->d_ino = VTOSMB(newvp)->n_ino;
 			VN_RELE(newvp);
 		}
-		dp->d_off = offset + 1;  /* see d_off below */
-		error = uiomove(dp, dp->d_reclen, UIO_READ, uio);
+		/*
+		 * Note: d_off is the offset that a user-level program
+		 * should seek to for reading the NEXT directory entry.
+		 * See libc: readdir, telldir, seekdir
+		 */
+		dp->d_off = offset + 1;
+		error = uiomove(dp, reclen, UIO_READ, uio);
 		if (error)
 			goto out;
+		/*
+		 * Note: uiomove updates uio->uio_offset,
+		 * but we want it to be our "cookie" value,
+		 * which just counts dirents ignoring size.
+		 */
 		uio->uio_offset = ++offset;
 	}
-	if (limit == 0)
-		goto out;
-	if (offset != np->n_dirofs || np->n_dirseq == NULL) {
-		SMBVDEBUG("Reopening search %ld:%ld\n", offset, np->n_dirofs);
-		if (np->n_dirseq) {
-			(void) smbfs_smb_findclose(np->n_dirseq, &scred);
-			np->n_dirseq = NULL;
-		}
-		np->n_dirofs = 2;
+
+	/*
+	 * If there was a backward seek, we have to reopen.
+	 */
+	if (offset < np->n_dirofs) {
+		SMBVDEBUG("Reopening search %d:%d\n",
+		    offset, np->n_dirofs);
 		error = smbfs_smb_findopen(np, "*", 1,
 		    SMB_FA_SYSTEM | SMB_FA_HIDDEN | SMB_FA_DIR,
 		    &scred, &ctx);
@@ -2667,72 +2718,97 @@ smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 			SMBVDEBUG("can not open search, error = %d", error);
 			goto out;
 		}
+		/* free the old one */
+		(void) smbfs_smb_findclose(np->n_dirseq, &scred);
+		/* save the new one */
 		np->n_dirseq = ctx;
-	} else
+		np->n_dirofs = FIRST_DIROFS;
+	} else {
 		ctx = np->n_dirseq;
-	while (np->n_dirofs < offset) {
-		if (smbfs_smb_findnext(ctx, offset - np->n_dirofs++,
-		    &scred) != 0) {
-			(void) smbfs_smb_findclose(np->n_dirseq, &scred);
-			np->n_dirseq = NULL;
-			np->n_direof = np->n_dirofs;
-			np->n_dirofs = 0;
-			*eofp = 1;
-			error = 0;
-			goto out;
-		}
 	}
-	error = 0;
-	for (; limit; limit--) {
+
+	/*
+	 * Skip entries before the requested offset.
+	 */
+	while (np->n_dirofs < offset) {
 		error = smbfs_smb_findnext(ctx, limit, &scred);
-		if (error) {
-			if (error == EBADRPC)
-				error = ENOENT;
-			(void) smbfs_smb_findclose(np->n_dirseq, &scred);
-			np->n_dirseq = NULL;
-			np->n_direof = np->n_dirofs;
-			np->n_dirofs = 0;
-			*eofp = 1;
-			error = 0;
-			break;
-		}
+		if (error != 0)
+			goto out;
 		np->n_dirofs++;
+	}
+
+	/*
+	 * While there's room in the caller's buffer:
+	 *	get a directory entry from SMB,
+	 *	convert to a dirent, copyout.
+	 * We stop when there is no longer room for a
+	 * maximum sized dirent because we must decide
+	 * before we know anything about the next entry.
+	 */
+	while (uio->uio_resid >= dbufsiz) {
+		error = smbfs_smb_findnext(ctx, limit, &scred);
+		if (error != 0)
+			goto out;
+		np->n_dirofs++;
+
 		/* Sanity check the name length. */
 		nmlen = ctx->f_nmlen;
 		if (nmlen > SMB_MAXFNAMELEN) {
 			nmlen = SMB_MAXFNAMELEN;
 			SMBVDEBUG("Truncating name: %s\n", ctx->f_name);
 		}
-		reclen = DIRENT64_RECLEN(nmlen);
-		if (uio->uio_resid < reclen)
-			break;
-		bzero(dp, reclen);
-		/*LINTED*/
-		dp->d_reclen = reclen;
-		dp->d_ino = ctx->f_attr.fa_ino;
-		/*
-		 * Note: d_off is the offset that a user-level program
-		 * should seek to for reading the _next_ directory entry.
-		 * See libc: readdir, telldir, seekdir
-		 */
-		dp->d_off = offset + 1;
-		bcopy(ctx->f_name, dp->d_name, nmlen);
-		dp->d_name[nmlen] = '\0';
 #ifdef NOT_YET
 		if (smbfs_fastlookup) {
-			if (smbfs_nget(vp, ctx->f_name,
-			    ctx->f_nmlen, &ctx->f_attr, &newvp) == 0)
+			if (smbfs_nget(vp, ctx->f_name, nmlen,
+			    &ctx->f_attr, &newvp) == 0)
 				VN_RELE(newvp);
 		}
 #endif /* NOT_YET */
-		error = uiomove(dp, dp->d_reclen, UIO_READ, uio);
+
+		reclen = DIRENT64_RECLEN(nmlen);
+		bzero(dp, reclen);
+		dp->d_reclen = reclen;
+		bcopy(ctx->f_name, dp->d_name, nmlen);
+		dp->d_name[nmlen] = '\0';
+		dp->d_ino = ctx->f_attr.fa_ino;
+		dp->d_off = offset + 1;	/* See d_off comment above */
+		error = uiomove(dp, reclen, UIO_READ, uio);
 		if (error)
-			break;
+			goto out;
+		/* See comment re. uio_offset above. */
 		uio->uio_offset = ++offset;
 	}
-	if (error == ENOENT)
-		error = 0;
+
 out:
+	/*
+	 * When we come to the end of a directory, the
+	 * SMB-level functions return ENOENT, but the
+	 * caller is not expecting an error return.
+	 *
+	 * Also note that we must delay the call to
+	 * smbfs_smb_findclose(np->n_dirseq, ...)
+	 * until smbfs_close so that all reads at the
+	 * end of the directory will return no data.
+	 */
+	if (error == ENOENT) {
+		error = 0;
+		if (eofp)
+			*eofp = 1;
+	}
+	/*
+	 * If we encountered an error (i.e. "access denied")
+	 * from the FindFirst call, we will have copied out
+	 * the "." and ".." entries leaving offset == 2.
+	 * In that case, restore the original offset/resid
+	 * so the caller gets no data with the error.
+	 */
+	if (error != 0 && offset == FIRST_DIROFS) {
+		uio->uio_loffset = save_offset;
+		uio->uio_resid = save_resid;
+	}
+	SMBVDEBUG("out: offset=%d, resid=%d\n",
+	    (int)uio->uio_offset, (int)uio->uio_resid);
+
 	kmem_free(dp, dbufsiz);
 	smb_credrele(&scred);
 	return (error);

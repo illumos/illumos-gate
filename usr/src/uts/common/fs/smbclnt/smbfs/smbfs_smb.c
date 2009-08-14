@@ -560,18 +560,6 @@ smbfs_smb_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *fsa,
 		md_get_mem(mdp, fsa->fsa_tname, nlen, MB_MSYSTEM);
 	}
 
-	/*
-	 * If fs_name isn't NTFS they probably require resume keys.
-	 * This is another example of the client trying to fix a server
-	 * bug. This code uses the logic created by PR-3983209. See
-	 * long block comment in smbfs_smb_findnextLM2.
-	 */
-	if (strcmp(fsa->fsa_tname, "NTFS")) {
-		SMB_SS_LOCK(ssp);
-		ssp->ss_flags |= SMBS_RESUMEKEYS;
-		SMB_SS_UNLOCK(ssp);
-	}
-
 	smb_t2_done(t2p);
 	return (0);
 }
@@ -2304,14 +2292,13 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 	struct smb_vc *vcp = SSTOVC(ctx->f_ssp);
 	struct mbchain *mbp;
 	struct mdchain *mdp;
-	uint16_t tw, flags;
+	uint16_t ecnt, eos, lno, flags;
 	int len, error;
 
 	if (ctx->f_t2) {
 		smb_t2_done(ctx->f_t2);
 		ctx->f_t2 = NULL;
 	}
-	ctx->f_flags &= ~SMBFS_RDD_GOTRNAME;
 	flags = FIND2_RETURN_RESUME_KEYS | FIND2_CLOSE_ON_EOS;
 	if (ctx->f_flags & SMBFS_RDD_FINDSINGLE) {
 		flags |= FIND2_CLOSE_AFTER_REQUEST;
@@ -2330,7 +2317,6 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 		mb_put_uint16le(mbp, flags);
 		mb_put_uint16le(mbp, ctx->f_infolevel);
 		mb_put_uint32le(mbp, 0);
-		/* mb_put_uint8(mbp, SMB_DT_ASCII); specs? hah! */
 		len = ctx->f_wclen;
 		error = smbfs_fullpath(mbp, vcp, ctx->f_dnp, ctx->f_wildcard,
 		    &len, '\\');
@@ -2347,11 +2333,10 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 		mb_put_uint16le(mbp, ctx->f_Sid);
 		mb_put_uint16le(mbp, ctx->f_limit);
 		mb_put_uint16le(mbp, ctx->f_infolevel);
-		if (ctx->f_ssp->ss_flags & SMBS_RESUMEKEYS) {
-			mb_put_uint32le(mbp, ctx->f_rkey);
-		} else
-			mb_put_uint32le(mbp, 0);
+		/* Send whatever resume key we received... */
+		mb_put_uint32le(mbp, ctx->f_rkey);
 		mb_put_uint16le(mbp, flags);
+		/* ... and the resume name if we have one. */
 		if (ctx->f_rname) {
 			/* resume file name */
 			mb_put_mem(mbp, ctx->f_rname, ctx->f_rnamelen,
@@ -2361,67 +2346,66 @@ smbfs_smb_trans2find2(struct smbfs_fctx *ctx)
 		if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp)))
 			mb_put_uint8(mbp, 0);	/* 1st byte NULL Unicode char */
 		mb_put_uint8(mbp, 0);
-#if 0
-		struct timespec ts;
-		ts.tv_sec = 0;
-		ts.tv_nsec = 200 * 1000 * 1000;	/* 200ms */
-		if (vcp->vc_flags & SMBC_WIN95) {
-			/*
-			 * some implementations suggests to sleep here
-			 * for 200ms, due to the bug in the Win95.
-			 * I've didn't notice any problem, but put code
-			 * for it.
-			 */
-			msleep(&flags, 0, PVFS, "fix95", &ts);
-		}
-#endif
 	}
 	t2p->t2_maxpcount = 5 * 2;
-	t2p->t2_maxdcount = vcp->vc_txmax;
+	t2p->t2_maxdcount = 0xF000;	/* 64K less some overhead */
 	error = smb_t2_request(t2p);
 	if (error)
 		return (error);
+
+	/*
+	 * This is the "resume name" we just sent.
+	 * We want the new one (if any) that may be
+	 * found in the response we just received and
+	 * will now begin parsing.  Free the old one
+	 * now so we'll know if we found a new one.
+	 */
+	if (ctx->f_rname) {
+		kmem_free(ctx->f_rname, ctx->f_rnamelen);
+		ctx->f_rname = NULL;
+		ctx->f_rnamelen = 0;
+	}
+
 	mdp = &t2p->t2_rparam;
 	if (ctx->f_flags & SMBFS_RDD_FINDFIRST) {
 		if ((error = md_get_uint16le(mdp, &ctx->f_Sid)) != 0)
-			return (error);
+			goto nodata;
 		ctx->f_flags &= ~SMBFS_RDD_FINDFIRST;
 	}
-	if ((error = md_get_uint16le(mdp, &tw)) != 0)
-		return (error);
-	ctx->f_ecnt = tw; /* search count - # entries returned */
-	if ((error = md_get_uint16le(mdp, &tw)) != 0)
-		return (error);
+	md_get_uint16le(mdp, &ecnt);		/* entry count */
+	md_get_uint16le(mdp, &eos);		/* end of search */
+	md_get_uint16le(mdp, NULL);		/* EA err. off. */
+	error = md_get_uint16le(mdp, &lno);	/* last name off. */
+	if (error != 0)
+		goto nodata;
+
 	/*
-	 * tw now is the "end of search" flag. against an XP server tw
+	 * The "end of search" flag from an XP server sometimes
 	 * comes back zero when the prior find_next returned exactly
 	 * the number of entries requested.  in which case we'd try again
-	 * but the search has in fact been closed so an EBADF results.  our
-	 * circumvention is to check here for a zero search count.
+	 * but the search has in fact been closed so an EBADF results.
+	 * our circumvention is to check here for a zero entry count.
 	 */
-	if (tw || ctx->f_ecnt == 0)
+	ctx->f_ecnt = ecnt;
+	if (eos || ctx->f_ecnt == 0)
 		ctx->f_flags |= SMBFS_RDD_EOF | SMBFS_RDD_NOCLOSE;
-	if ((error = md_get_uint16le(mdp, &tw)) != 0)
-		return (error);
-	if ((error = md_get_uint16le(mdp, &tw)) != 0)
-		return (error);
 	if (ctx->f_ecnt == 0)
 		return (ENOENT);
-	ctx->f_rnameofs = tw;
-	mdp = &t2p->t2_rdata;
-	if (mdp->md_top == NULL) {
-		SMBVDEBUG("ecnt = %d, but data is NULL\n", ctx->f_ecnt);
-		return (ENOENT);
-	}
-#ifdef APPLE
-	if (mdp->md_top->m_len == 0) {
-		printf("bug: ecnt = %d, but m_len = 0 and m_next = %p "
-		    "(please report)\n", ctx->f_ecnt, mbp->mb_top->m_next);
-		return (ENOENT);
-	}
-#endif
+
+	/* Last Name Off (LNO) is the entry with the resume name. */
+	ctx->f_rnameofs = lno;
 	ctx->f_eofs = 0;
 	return (0);
+
+nodata:
+	/*
+	 * Failed parsing the FindFirst or FindNext response.
+	 * Force this directory listing closed, otherwise the
+	 * calling process may hang in an infinite loop.
+	 */
+	ctx->f_ecnt = 0; /* Force closed. */
+	ctx->f_flags |= SMBFS_RDD_EOF;
+	return (EIO);
 }
 
 static int
@@ -2478,11 +2462,9 @@ smbfs_smb_findnextLM2(struct smbfs_fctx *ctx, uint16_t limit)
 	uint16_t date, time, wattr;
 	uint32_t size, next, dattr, resumekey = 0;
 	uint64_t llongint;
-	int error, svtz, cnt, fxsz, nmlen, recsz, otw;
+	int error, svtz, cnt, fxsz, nmlen, recsz;
 	struct timespec ts;
 
-again:
-	otw = 0;	/* nothing sent Over The Wire (yet) */
 	if (ctx->f_ecnt == 0) {
 		if (ctx->f_flags & SMBFS_RDD_EOF)
 			return (ENOENT);
@@ -2493,7 +2475,6 @@ again:
 			return (error);
 		ctx->f_attr.fa_reqtime = ts;
 		ctx->f_otws++;
-		otw = 1;
 	}
 	t2p = ctx->f_t2;
 	mdp = &t2p->t2_rdata;
@@ -2515,7 +2496,9 @@ again:
 		md_get_uint32le(mdp, NULL);	/* allocation size */
 		md_get_uint16le(mdp, &wattr);
 		ctx->f_attr.fa_attr = wattr;
-		md_get_uint8(mdp, &tb);
+		error = md_get_uint8(mdp, &tb);
+		if (error)
+			goto nodata;
 		size = nmlen = tb;
 		fxsz = 23;
 		recsz = next = 24 + nmlen;	/* docs misses zero byte @end */
@@ -2537,7 +2520,9 @@ again:
 		/* freebsd bug: fa_attr endian bug */
 		md_get_uint32le(mdp, &dattr);	/* extended file attributes */
 		ctx->f_attr.fa_attr = dattr;
-		md_get_uint32le(mdp, &size);	/* name len */
+		error = md_get_uint32le(mdp, &size);	/* name len */
+		if (error)
+			goto nodata;
 		fxsz = 64; /* size ofinfo up to filename */
 		if (ctx->f_infolevel == SMB_FIND_BOTH_DIRECTORY_INFO) {
 			/*
@@ -2545,7 +2530,9 @@ again:
 			 * a reserved byte, and ShortName(8.3 means 24 bytes,
 			 * as Leach defined it to always be Unicode)
 			 */
-			md_get_mem(mdp, NULL, 30, MB_MSYSTEM);
+			error = md_get_mem(mdp, NULL, 30, MB_MSYSTEM);
+			if (error)
+				goto nodata;
 			fxsz += 30;
 		}
 		recsz = next ? next : fxsz + size;
@@ -2565,15 +2552,16 @@ again:
 
 	error = md_get_mem(mdp, cp, nmlen, MB_MSYSTEM);
 	if (error)
-		return (error);
+		goto nodata;
 	if (next) {
+		/* How much data to skip? */
 		cnt = next - nmlen - fxsz;
+		if (cnt < 0) {
+			SMBVDEBUG("out of sync\n");
+			goto nodata;
+		}
 		if (cnt > 0)
 			md_get_mem(mdp, NULL, cnt, MB_MSYSTEM);
-		else if (cnt < 0) {
-			SMBVDEBUG("out of sync\n");
-			return (EBADRPC);
-		}
 	}
 	/* Don't count any trailing null in the name. */
 	if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp))) {
@@ -2584,63 +2572,27 @@ again:
 			nmlen--;
 	}
 	if (nmlen == 0)
-		return (EBADRPC);
+		goto nodata;
 
 	/*
-	 * Ref radar 3983209.  On a find-next we expect a server will
-	 * 1) if the continue bit is set, use the server's idea of current loc,
-	 * 2) else if the resume key is non-zero, use that location,
-	 * 3) else if the resume name is set, use that location,
-	 * 4) else use the server's idea of current location.
+	 * On a find-next we expect that the server will:
+	 * 1) if the continue bit is set, use the server's offset,
+	 * 2) else if the resume key is non-zero, use that offset,
+	 * 3) else if the resume name is set, use that offset,
+	 * 4) else use the server's idea of current offset.
 	 *
-	 * Current NetApps don't do that.  If we send no continue bit, a zero
-	 * resume key, and a resume name, the NetApp ignores the resume name
-	 * and acts on the (zero) resume key, sending back the start of the
-	 * directory again.  Panther doesn't expose the netapp bug; Panther used
-	 * the continue bit, but that was changed for 2866172. Win2000 as a
-	 * client also relies upon the resume name, but they request a very
-	 * large number of files, so the bug would be seen only with very
-	 * large directories.
-	 *
-	 * Our fix is to notice if the second OTW op (the first find-next)
-	 * returns, in the first filename, the same filename we got back
-	 * at the start of the first OTW (the find-first).  In that case
-	 * we've detected the server bug and set SMBS_RESUMEKEYS, causing us
-	 * to send non-zero resume keys henceforth.
-	 *
-	 * Caveat: if there's a netapp so old it doesn't negotiate NTLM 0.12
-	 * then we get no resume keys so f_rkey stays zero and this "fix"
-	 * changes nothing.
-	 *
-	 * Note due to a similar problem (4051871) we also set SMBS_RESUMEKEYS
-	 * for FAT volumes, at mount time.
+	 * We always set the resume key flag. If the server returns
+	 * a resume key then we should always send it back to them.
 	 */
-	if (otw && !(ctx->f_ssp->ss_flags & SMBS_RESUMEKEYS)) {
-		if (ctx->f_otws == 1) {
-			ctx->f_firstnmlen = nmlen;
-			ctx->f_firstnm = kmem_alloc(nmlen, KM_SLEEP);
-			bcopy(ctx->f_name, ctx->f_firstnm, nmlen);
-		} else if (ctx->f_otws == 2 && nmlen == ctx->f_firstnmlen &&
-		    !(bcmp(ctx->f_name, ctx->f_firstnm, nmlen) == 0)) {
-			struct smb_share *ssp = ctx->f_ssp;
-			SMBERROR(
-			    "server resume_name bug seen; using resume keys\n");
-			SMB_SS_LOCK(ssp);
-			ssp->ss_flags |= SMBS_RESUMEKEYS;
-			SMB_SS_UNLOCK(ssp);
-			ctx->f_ecnt = 0;
-			goto again; /* must redo last otw op! */
-		}
-	}
 	ctx->f_rkey = resumekey;
 
 	next = ctx->f_eofs + recsz;
 	if (ctx->f_rnameofs &&
-	    (ctx->f_flags & SMBFS_RDD_GOTRNAME) == 0 &&
-	    (ctx->f_rnameofs >= ctx->f_eofs &&
-	    ctx->f_rnameofs < (int)next)) {
+	    ctx->f_rnameofs >= ctx->f_eofs &&
+	    ctx->f_rnameofs < (int)next) {
 		/*
-		 * Server needs a resume filename.
+		 * This entry is the "resume name".
+		 * Save it for the next request.
 		 */
 		if (ctx->f_rnamelen != nmlen) {
 			if (ctx->f_rname)
@@ -2649,7 +2601,6 @@ again:
 			ctx->f_rnamelen = nmlen;
 		}
 		bcopy(ctx->f_name, ctx->f_rname, nmlen);
-		ctx->f_flags |= SMBFS_RDD_GOTRNAME;
 	}
 	ctx->f_nmlen = nmlen;
 	ctx->f_eofs = next;
@@ -2658,6 +2609,18 @@ again:
 
 	smbfs_fname_tolocal(ctx);
 	return (0);
+
+nodata:
+	/*
+	 * Something bad has happened and we ran out of data
+	 * before we could parse all f_ecnt entries expected.
+	 * Force this directory listing closed, otherwise the
+	 * calling process may hang in an infinite loop.
+	 */
+	SMBVDEBUG("ran out of data\n");
+	ctx->f_ecnt = 0; /* Force closed. */
+	ctx->f_flags |= SMBFS_RDD_EOF;
+	return (EIO);
 }
 
 static int
@@ -2715,22 +2678,9 @@ smbfs_smb_findnext(struct smbfs_fctx *ctx, int limit, struct smb_cred *scrp)
 
 	/*
 	 * Note: "limit" (maxcount) needs to fit in a short!
-	 *
-	 * smb_lookup always uses 1, which is OK (no wildcards).
-	 * Otherwise, this is smbfs_readdir, and we want to force
-	 * limit to be in the range 3 to 1000.  The low limit (3)
-	 * is so we can always give the caller one "real" entry
-	 * (something other than "." or "..") The high limit is
-	 * just tuning. WinNT used 512, Win2k 1366.  We use 1000.
-	 *
-	 * XXX: Move the [skip . ..] gunk to our caller (readdir).
 	 */
-	if ((ctx->f_flags & SMBFS_RDD_FINDSINGLE) == 0) {
-		if (limit < 3)
-			limit = 3;
-		if (limit > 1000)
-			limit = 1000;
-	}
+	if (limit > 0xffff)
+		limit = 0xffff;
 
 	ctx->f_scred = scrp;
 	for (;;) {

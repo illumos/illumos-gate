@@ -93,7 +93,6 @@ typedef enum {
 #define	SMBFS_RDD_FINDSINGLE	0x04
 /* note	SMBFS_RDD_USESEARCH	0x08 replaced by smbfs_fctx_type */
 #define	SMBFS_RDD_NOCLOSE	0x10
-#define	SMBFS_RDD_GOTRNAME	0x1000
 
 /*
  * Search context supplied by server
