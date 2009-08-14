@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # usr/src/cmd/cmd-inet/lib/nwamd/Makefile
@@ -43,7 +43,7 @@ POFILES=	interface.po wireless.po
 ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
 
 LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm \
-		-lgen -ldoor -lsecdb -lbsm -lsysevent -lnvpair
+		-lgen -lsecdb -lbsm -lsysevent -lnvpair
 
 .KEEP_STATE:
 

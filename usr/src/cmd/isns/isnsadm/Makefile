@@ -19,7 +19,7 @@
 # CDDL HEADER END
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,7 +29,7 @@ OBJS = $(SRCS:%.c=%.o)
 
 include ../../Makefile.cmd
 
-LDLIBS += -lxml2 -ldoor -lscf -lc
+LDLIBS += -lxml2 -lscf -lc
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I. -I/usr/include/libxml2 -I../isnsd
 POFILE = isnsadm_all.po

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -44,7 +44,7 @@ CPPFLAGS += -I../include -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS
 
 CFLAGS += $(CCMT)
 
-LDLIBS  += -lc -ldevinfo -ldoor -lkstat -lscf -lgen
+LDLIBS  += -lc -ldevinfo -lkstat -lscf -lgen
 
 LDFLAGS += $(ZIGNORE)
 

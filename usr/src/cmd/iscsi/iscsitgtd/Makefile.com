@@ -56,7 +56,7 @@ CLEANFILES += $(OBJS) ../$(DTRACE_HEADER)
 
 all: $(PROG)
 
-LDLIBS	+= -lumem -luuid -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
+LDLIBS	+= -lumem -luuid -lsocket -lnsl -lavl -lmd5 -ladm -lefi
 LDLIBS  += -liscsitgt -lzfs -ldlpi -lscf -lsasl
 XMLLIB   = -lxml2
 

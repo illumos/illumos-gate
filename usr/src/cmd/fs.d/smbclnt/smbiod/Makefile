@@ -44,7 +44,7 @@ C99MODE= $(C99_ENABLE)
 
 # This is a multi-thread program but Nevada
 # no longer needs -lthread
-LDLIBS += -lsmbfs -ldoor
+LDLIBS += -lsmbfs
 
 CPPFLAGS += -I$(SRC)/lib/libsmbfs \
 	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common

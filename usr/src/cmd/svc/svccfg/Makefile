@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -103,7 +103,7 @@ $(NATIVE_BUILD)LDFLAGS =
 $(NATIVE_BUILD)LDLIBS = \
 	-L$(LIBUUTIL)/native -R $(LIBUUTIL)/native \
 	-L$(LIBSCF)/native -R $(LIBSCF)/native \
-	$(SVCCFG_EXTRA_LIBS) -ldoor
+	$(SVCCFG_EXTRA_LIBS)
 
 svccfg_lex.o svccfg_grammar.o := CCVERBOSE =
 

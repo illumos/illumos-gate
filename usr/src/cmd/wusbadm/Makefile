@@ -39,7 +39,7 @@ POFILES=$(OBJS:%.o=%.po)
 
 
 CPPFLAGS += -I$(SRC)/uts/common
-LDLIBS += -lpkcs11 -lkmf -ldoor -lsysevent -lnvpair -lsecdb
+LDLIBS += -lpkcs11 -lkmf -lsysevent -lnvpair -lsecdb
 
 .KEEP_STATE:
 

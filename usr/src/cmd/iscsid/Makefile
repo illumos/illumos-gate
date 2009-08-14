@@ -40,7 +40,7 @@ POFILE= iscsi-initiator.po
 include ../Makefile.cmd
 
 CCVERBOSE	=
-LDLIBS += -ldoor -lnsl
+LDLIBS += -lnsl
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKISCSI)
 $(ROOTSVCNETWORKISCSI)/iscsi-initiator.xml := FILEMODE = 0444

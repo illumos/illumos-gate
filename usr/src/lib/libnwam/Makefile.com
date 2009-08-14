@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -38,7 +38,7 @@ SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-LDLIBS +=	-ldoor -ldladm -lc
+LDLIBS +=	-ldladm -lc
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -I$(NWAMDIR)

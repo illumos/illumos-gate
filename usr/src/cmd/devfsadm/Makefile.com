@@ -22,6 +22,11 @@
 # Use is subject to license terms.
 #
 
+# This target builds both a command (daemon) and various shared objects.  This
+# isn't a typical target, and the inclusion of both library and command
+# Makefiles were probably not in their original design.  However, there doesn't
+# presently seem to be a clash of any required definitions.
+include ../../../lib/Makefile.lib
 include ../../Makefile.cmd
 
 COMMON = ..
@@ -90,10 +95,15 @@ LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 
-LDLIBS += -ldevinfo -lgen -lsysevent -lnvpair -ldoor -lzonecfg -lbsm
+# Define the dependencies required by devfsadm and all shared objects.
+LDLIBS +=		-ldevinfo
+devfsadm :=		LDLIBS += -lgen -lsysevent -lnvpair -lzonecfg -lbsm
+SUNW_md_link.so :=	LDLIBS += -lmeta
 
-LINK_MOD_LDLIBS=
-SUNW_md_link.so :=	LINK_MOD_LDLIBS=	-lmeta
+# All libraries are built from the same SUNW_%.so rule (see below), and define
+# their own SONAME using -h explicitly.  Null the generic -h macro that gets
+# inherited from Makefile.lib, otherwise we'll get two -h definitions.
+HSONAME =
 
 SRCS = $(DEVFSADM_SRC) $(LINK_SRCS)
 OBJS = $(DEVFSADM_OBJ) $(LINK_OBJS)
@@ -164,8 +174,8 @@ $(DEVFSADM_MOD): $(DEVFSADM_OBJ)
 	$(LINK.c) -o $@ $< $(DEVFSADM_OBJ) $(LDLIBS)
 	$(POST_PROCESS)
 
-SUNW_%.so: %.o
-	$(LINK.c) -o $@ $(GSHARED) -h $@ $< $(LINK_MOD_LDLIBS)
+SUNW_%.so: %.o $(MAPFILES)
+	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) -h $@ $< $(LDLIBS) -lc
 	$(POST_PROCESS_SO)
 
 %.o: $(COMMON)/%.c

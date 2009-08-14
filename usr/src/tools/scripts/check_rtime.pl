@@ -71,7 +71,6 @@ use strict;
 
 # Define any directories we should skip completely.
 $SkipDirs = qr{ 
-	usr/lib/devfsadm |		# 4382889
 	usr/lib/libc |			# optimized libc
 	usr/lib/rcm |			# 4426119
 	usr/perl5 |			# alan's taking care of these :-)
@@ -229,15 +228,18 @@ $SkipInterps = qr{
 
 # Catch libintl and libw, although ld(1) will bind to these and thus determine
 # they're needed, their content was moved into libc as of on297 build 7.
-# libthread and libpthread were completely moved into libc as of on10 build 53.
-# libdl was moved into libc as of on10 build 49.  librt and libaio were moved
-# into libc as of Nevada build 44.
+# libsched was moved into libc as of on10 build 36.  libdl was moved into libc
+# as of on10 build 49.  libthread and libpthread were into libc as of on10 build
+# 53.  libdoor was moved into libc as of Nevada build 12.  librt and libaio were
+# moved into libc in Nevada build 44.
 $OldDeps = qr{ ^(?:
 	libintl\.so\.1 |
 	libw\.so\.1 |
+	libsched\.so\.1 |
+	libdl\.so\.1 |
 	libthread\.so\.1 |
 	libpthread\.so\.1 |
-	libdl\.so\.1 |
+	libdoor\.so\.1 |
 	librt\.so\.1 |
 	libaio\.so\.1
 	)$

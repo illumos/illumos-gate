@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,7 +35,7 @@ LOCAL	  =	mountd.o netgroup.o rmtab.o nfsauth.o \
 OBJS	  = 	$(LOCAL) $(COMMON)
 SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c \
 		../lib/sharetab.c ../lib/daemon.c
-LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ldoor -ltsnet -ltsol
+LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol
 CPPFLAGS +=	-D_REENTRANT
 
 $(TYPEPROG):	$(OBJS)
