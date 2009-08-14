@@ -73,11 +73,15 @@
 /* vgen proxy entry points */
 int vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
     const uint8_t *macaddr, void **vgenhdl);
+int vgen_init_mdeg(void *arg);
 void vgen_uninit(void *arg);
 int vgen_dds_tx(void *arg, void *dmsg);
 void vgen_mod_init(void);
 int vgen_mod_cleanup(void);
 void vgen_mod_fini(void);
+int vgen_enable_intr(void *arg);
+int vgen_disable_intr(void *arg);
+mblk_t *vgen_poll(void *arg, int bytes_to_pickup);
 static int vgen_start(void *arg);
 static void vgen_stop(void *arg);
 static mblk_t *vgen_tx(void *arg, mblk_t *mp);
@@ -151,6 +155,7 @@ static int vgen_num_txpending(vgen_ldc_t *ldcp);
 static int vgen_tx_dring_full(vgen_ldc_t *ldcp);
 static int vgen_ldc_txtimeout(vgen_ldc_t *ldcp);
 static void vgen_ldc_watchdog(void *arg);
+static mblk_t *vgen_ldc_poll(vgen_ldc_t *ldcp, int bytes_to_pickup);
 
 /* vgen handshake functions */
 static vgen_ldc_t *vh_nextphase(vgen_ldc_t *ldcp);
@@ -200,7 +205,7 @@ static void vgen_stop_rcv_thread(vgen_ldc_t *ldcp);
 static void vgen_drain_rcv_thread(vgen_ldc_t *ldcp);
 static void vgen_ldc_rcv_worker(void *arg);
 static void vgen_handle_evt_read(vgen_ldc_t *ldcp);
-static void vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp);
+static void vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp, mblk_t *bpt);
 static void vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp);
 static void vgen_reset_vnet_proto_ops(vgen_ldc_t *ldcp);
 static void vgen_link_update(vgen_t *vgenp, link_state_t link_state);
@@ -536,13 +541,6 @@ vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
 	if (rv != 0) {
 		goto vgen_init_fail;
 	}
-
-	/* register with MD event generator */
-	rv = vgen_mdeg_reg(vgenp);
-	if (rv != DDI_SUCCESS) {
-		goto vgen_init_fail;
-	}
-
 	*vgenhdl = (void *)vgenp;
 
 	DBG1(NULL, NULL, "vnet(%d): exit\n", instance);
@@ -560,6 +558,15 @@ vgen_init_fail:
 	}
 	KMEM_FREE(vgenp);
 	return (DDI_FAILURE);
+}
+
+int
+vgen_init_mdeg(void *arg)
+{
+	vgen_t	*vgenp = (vgen_t *)arg;
+
+	/* register with MD event generator */
+	return (vgen_mdeg_reg(vgenp));
 }
 
 /*
@@ -2094,13 +2101,21 @@ mdeg_reg_fail:
 static void
 vgen_mdeg_unreg(vgen_t *vgenp)
 {
-	(void) mdeg_unregister(vgenp->mdeg_dev_hdl);
-	(void) mdeg_unregister(vgenp->mdeg_port_hdl);
-	kmem_free(vgenp->mdeg_parentp->specp, sizeof (vgen_prop_template));
-	KMEM_FREE(vgenp->mdeg_parentp);
-	vgenp->mdeg_parentp = NULL;
-	vgenp->mdeg_dev_hdl = NULL;
-	vgenp->mdeg_port_hdl = NULL;
+	if (vgenp->mdeg_dev_hdl != NULL) {
+		(void) mdeg_unregister(vgenp->mdeg_dev_hdl);
+		vgenp->mdeg_dev_hdl = NULL;
+	}
+	if (vgenp->mdeg_port_hdl != NULL) {
+		(void) mdeg_unregister(vgenp->mdeg_port_hdl);
+		vgenp->mdeg_port_hdl = NULL;
+	}
+
+	if (vgenp->mdeg_parentp != NULL) {
+		kmem_free(vgenp->mdeg_parentp->specp,
+		    sizeof (vgen_prop_template));
+		KMEM_FREE(vgenp->mdeg_parentp);
+		vgenp->mdeg_parentp = NULL;
+	}
 }
 
 /* mdeg callback function for the port node */
@@ -2907,6 +2922,7 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	mutex_init(&ldcp->tclock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ldcp->wrlock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ldcp->rxlock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&ldcp->pollq_lock, NULL, MUTEX_DRIVER, NULL);
 
 	attach_state |= AST_mutex_init;
 
@@ -3032,6 +3048,7 @@ ldc_attach_failed:
 		mutex_destroy(&ldcp->cblock);
 		mutex_destroy(&ldcp->wrlock);
 		mutex_destroy(&ldcp->rxlock);
+		mutex_destroy(&ldcp->pollq_lock);
 	}
 	if (attach_state & AST_ldc_alloc) {
 		KMEM_FREE(ldcp);
@@ -3100,6 +3117,7 @@ vgen_ldc_detach(vgen_ldc_t *ldcp)
 		mutex_destroy(&ldcp->cblock);
 		mutex_destroy(&ldcp->wrlock);
 		mutex_destroy(&ldcp->rxlock);
+		mutex_destroy(&ldcp->pollq_lock);
 
 		/* unlink it from the list */
 		*prev_ldcp = ldcp->nextp;
@@ -6278,7 +6296,7 @@ vgen_recv_retry:
 			 */
 			if (bp != NULL) {
 				DTRACE_PROBE1(vgen_rcv_msgs, int, count);
-				vgen_rx(ldcp, bp);
+				vgen_rx(ldcp, bp, bpt);
 				count = 0;
 				bp = bpt = NULL;
 			}
@@ -6459,7 +6477,7 @@ vgen_recv_retry:
 
 		if (count++ > vgen_chain_len) {
 			DTRACE_PROBE1(vgen_rcv_msgs, int, count);
-			vgen_rx(ldcp, bp);
+			vgen_rx(ldcp, bp, bpt);
 			count = 0;
 			bp = bpt = NULL;
 		}
@@ -6512,7 +6530,7 @@ error_ret:
 	/* send up packets received so far */
 	if (bp != NULL) {
 		DTRACE_PROBE1(vgen_rcv_msgs, int, count);
-		vgen_rx(ldcp, bp);
+		vgen_rx(ldcp, bp, bpt);
 		bp = bpt = NULL;
 	}
 	DBG1(vgenp, ldcp, "exit rv(%d)\n", rv);
@@ -6996,18 +7014,57 @@ vgen_print_ldcinfo(vgen_ldc_t *ldcp)
  * Send received packets up the stack.
  */
 static void
-vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp)
+vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp, mblk_t *bpt)
 {
 	vio_net_rx_cb_t vrx_cb = ldcp->portp->vcb.vio_net_rx_cb;
+	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 
 	if (ldcp->rcv_thread != NULL) {
 		ASSERT(MUTEX_HELD(&ldcp->rxlock));
-		mutex_exit(&ldcp->rxlock);
 	} else {
 		ASSERT(MUTEX_HELD(&ldcp->cblock));
+	}
+
+	mutex_enter(&ldcp->pollq_lock);
+
+	if (ldcp->polling_on == B_TRUE) {
+		/*
+		 * If we are in polling mode, simply queue
+		 * the packets onto the poll queue and return.
+		 */
+		if (ldcp->pollq_headp == NULL) {
+			ldcp->pollq_headp = bp;
+			ldcp->pollq_tailp = bpt;
+		} else {
+			ldcp->pollq_tailp->b_next = bp;
+			ldcp->pollq_tailp = bpt;
+		}
+
+		mutex_exit(&ldcp->pollq_lock);
+		return;
+	}
+
+	/*
+	 * Prepend any pending mblks in the poll queue, now that we
+	 * are in interrupt mode, before sending up the chain of pkts.
+	 */
+	if (ldcp->pollq_headp != NULL) {
+		DBG2(vgenp, ldcp, "vgen_rx(%lx), pending pollq_headp\n",
+		    (uintptr_t)ldcp);
+		ldcp->pollq_tailp->b_next = bp;
+		bp = ldcp->pollq_headp;
+		ldcp->pollq_headp = ldcp->pollq_tailp = NULL;
+	}
+
+	mutex_exit(&ldcp->pollq_lock);
+
+	if (ldcp->rcv_thread != NULL) {
+		mutex_exit(&ldcp->rxlock);
+	} else {
 		mutex_exit(&ldcp->cblock);
 	}
 
+	/* Send up the packets */
 	vrx_cb(ldcp->portp->vhp, bp);
 
 	if (ldcp->rcv_thread != NULL) {
@@ -7231,6 +7288,145 @@ vgen_ldc_reset(vgen_ldc_t *ldcp)
 	}
 
 	vgen_handshake_retry(ldcp);
+}
+
+int
+vgen_enable_intr(void *arg)
+{
+	vgen_port_t		*portp = (vgen_port_t *)arg;
+	vgen_ldclist_t		*ldclp;
+	vgen_ldc_t		*ldcp;
+
+	ldclp = &portp->ldclist;
+	READ_ENTER(&ldclp->rwlock);
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->headp == NULL) {
+		RW_EXIT(&ldclp->rwlock);
+		return (1);
+	}
+	ldcp = ldclp->headp;
+
+	mutex_enter(&ldcp->pollq_lock);
+	ldcp->polling_on = B_FALSE;
+	mutex_exit(&ldcp->pollq_lock);
+
+	RW_EXIT(&ldclp->rwlock);
+
+	return (0);
+}
+
+int
+vgen_disable_intr(void *arg)
+{
+	vgen_port_t		*portp = (vgen_port_t *)arg;
+	vgen_ldclist_t		*ldclp;
+	vgen_ldc_t		*ldcp;
+
+	ldclp = &portp->ldclist;
+	READ_ENTER(&ldclp->rwlock);
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->headp == NULL) {
+		RW_EXIT(&ldclp->rwlock);
+		return (1);
+	}
+	ldcp = ldclp->headp;
+
+
+	mutex_enter(&ldcp->pollq_lock);
+	ldcp->polling_on = B_TRUE;
+	mutex_exit(&ldcp->pollq_lock);
+
+	RW_EXIT(&ldclp->rwlock);
+
+	return (0);
+}
+
+mblk_t *
+vgen_poll(void *arg, int bytes_to_pickup)
+{
+	vgen_port_t		*portp = (vgen_port_t *)arg;
+	vgen_ldclist_t		*ldclp;
+	vgen_ldc_t		*ldcp;
+	mblk_t			*mp = NULL;
+
+	ldclp = &portp->ldclist;
+	READ_ENTER(&ldclp->rwlock);
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->headp == NULL) {
+		RW_EXIT(&ldclp->rwlock);
+		return (NULL);
+	}
+	ldcp = ldclp->headp;
+
+	mp = vgen_ldc_poll(ldcp, bytes_to_pickup);
+
+	RW_EXIT(&ldclp->rwlock);
+	return (mp);
+}
+
+static mblk_t *
+vgen_ldc_poll(vgen_ldc_t *ldcp, int bytes_to_pickup)
+{
+	mblk_t	*bp = NULL;
+	mblk_t	*bpt = NULL;
+	mblk_t	*mp = NULL;
+	size_t	mblk_sz = 0;
+	size_t	sz = 0;
+	uint_t	count = 0;
+
+	mutex_enter(&ldcp->pollq_lock);
+
+	bp = ldcp->pollq_headp;
+	while (bp != NULL) {
+		/* get the size of this packet */
+		mblk_sz = msgdsize(bp);
+
+		/* if adding this pkt, exceeds the size limit, we are done. */
+		if (sz + mblk_sz >  bytes_to_pickup) {
+			break;
+		}
+
+		/* we have room for this packet */
+		sz += mblk_sz;
+
+		/* increment the # of packets being sent up */
+		count++;
+
+		/* track the last processed pkt */
+		bpt = bp;
+
+		/* get the next pkt */
+		bp = bp->b_next;
+	}
+
+	if (count != 0) {
+		/*
+		 * picked up some packets; save the head of pkts to be sent up.
+		 */
+		mp = ldcp->pollq_headp;
+
+		/* move the pollq_headp to skip over the pkts being sent up */
+		ldcp->pollq_headp = bp;
+
+		/* picked up all pending pkts in the queue; reset tail also */
+		if (ldcp->pollq_headp == NULL) {
+			ldcp->pollq_tailp = NULL;
+		}
+
+		/* terminate the tail of pkts to be sent up */
+		bpt->b_next = NULL;
+	}
+
+	mutex_exit(&ldcp->pollq_lock);
+
+	DTRACE_PROBE1(vgen_poll_pkts, uint_t, count);
+	return (mp);
 }
 
 #if DEBUG

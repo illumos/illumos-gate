@@ -623,7 +623,8 @@ aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 	/*
 	 * Get the list the the underlying HW rings.
 	 */
-	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &port->lp_hwgh, hw_rh);
+	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &port->lp_hwgh, hw_rh,
+	    MAC_RING_TYPE_RX);
 
 	if (port->lp_hwgh != NULL) {
 		/*
@@ -689,7 +690,8 @@ aggr_rem_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 		goto done;
 
 	ASSERT(rx_grp->arg_gh != NULL);
-	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &hwgh, hw_rh);
+	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &hwgh, hw_rh,
+	    MAC_RING_TYPE_RX);
 
 	/*
 	 * If hw_rh_cnt is 0, it means that the underlying port does not

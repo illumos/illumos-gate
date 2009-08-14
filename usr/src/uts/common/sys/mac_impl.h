@@ -262,7 +262,7 @@ struct mac_group_s {
 #define	MAC_RING_TX_DEFAULT(mip, mp)			\
 	((mip->mi_default_tx_ring == NULL) ?		\
 	mip->mi_tx(mip->mi_driver, mp) :		\
-	mac_ring_tx(mip->mi_default_tx_ring, mp))
+	mac_hwring_tx(mip->mi_default_tx_ring, mp))
 
 #define	MAC_TX(mip, ring, mp, mcip) {					\
 	/*								\
@@ -275,7 +275,7 @@ struct mac_group_s {
 	    (ring == NULL))						\
 		mp = MAC_RING_TX_DEFAULT(mip, mp);			\
 	else								\
-		mp = mac_ring_tx(ring, mp);				\
+		mp = mac_hwring_tx(ring, mp);				\
 }
 
 /* mci_tx_flag */
@@ -585,7 +585,7 @@ extern int mac_group_addmac(mac_group_t *, const uint8_t *);
 extern int mac_group_remmac(mac_group_t *, const uint8_t *);
 extern int mac_rx_group_add_flow(mac_client_impl_t *, flow_entry_t *,
     mac_group_t *);
-extern mblk_t *mac_ring_tx(mac_ring_handle_t, mblk_t *);
+extern mblk_t *mac_hwring_tx(mac_ring_handle_t, mblk_t *);
 extern mac_ring_t *mac_reserve_tx_ring(mac_impl_t *, mac_ring_t *);
 extern void mac_release_tx_ring(mac_ring_handle_t);
 extern mac_group_t *mac_reserve_tx_group(mac_impl_t *, mac_share_handle_t);

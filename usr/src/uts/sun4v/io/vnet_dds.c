@@ -113,6 +113,8 @@ static void vdds_release_range_prop(dev_info_t *nexus_dip, uint64_t cookie);
 
 /* Functions imported from other files */
 extern int vnet_send_dds_msg(vnet_t *vnetp, void *dmsg);
+extern int vnet_hio_mac_init(vnet_t *vnetp, char *ifname);
+extern void vnet_hio_mac_cleanup(vnet_t *vnetp);
 
 /* HV functions that are used in this file */
 extern uint64_t vdds_hv_niu_vr_getinfo(uint32_t hvcookie,
@@ -412,7 +414,31 @@ vdds_process_dds_msg_task(void *arg)
 		} else {
 			vdds->hio_dip = dip;
 			vdds->hio_cookie = hio_cookie;
-			(void) vdds_send_dds_resp_msg(vnetp, dmsg, B_TRUE);
+			sprintf(vdds->hio_ifname, "%s%d", ddi_driver_name(dip),
+			    ddi_get_instance(dip));
+
+			rv = vnet_hio_mac_init(vnetp, vdds->hio_ifname);
+			if (rv != 0) {
+				/* failed - cleanup, send failed DDS message */
+				DERR(vdds, "HIO mac init failed, cleaning up");
+				rv = vdds_destroy_niu_node(dip, hio_cookie);
+				if (rv == 0) {
+					/* use DERR to print by default */
+					DERR(vdds, "Successfully destroyed"
+					    " Hybrid node");
+				} else {
+					cmn_err(CE_WARN, "vnet%d:Failed to "
+					    "destroy Hybrid node",
+					    vnetp->instance);
+				}
+				vdds->hio_dip = NULL;
+				vdds->hio_cookie = 0;
+				(void) vdds_send_dds_resp_msg(vnetp,
+				    dmsg, B_FALSE);
+			} else {
+				(void) vdds_send_dds_resp_msg(vnetp,
+				    dmsg, B_TRUE);
+			}
 			/* DERR used only print by default */
 			DERR(vdds, "Successfully created HIO node");
 		}
@@ -424,6 +450,7 @@ vdds_process_dds_msg_task(void *arg)
 			DBG2(vdds, "NACK: No HIO device destroy");
 			(void) vdds_send_dds_resp_msg(vnetp, dmsg, B_FALSE);
 		} else {
+			vnet_hio_mac_cleanup(vnetp);
 			rv = vdds_destroy_niu_node(vnetp->vdds_info.hio_dip,
 			    vdds->hio_cookie);
 			if (rv == 0) {
@@ -444,6 +471,7 @@ vdds_process_dds_msg_task(void *arg)
 	case VNET_DDS_TASK_REL_SHARE:
 		DBG2(vdds, "REL_SHARE task...");
 		if (vnetp->vdds_info.hio_dip != NULL) {
+			vnet_hio_mac_cleanup(vnetp);
 			rv = vdds_destroy_niu_node(vnetp->vdds_info.hio_dip,
 			    vdds->hio_cookie);
 			if (rv == 0) {

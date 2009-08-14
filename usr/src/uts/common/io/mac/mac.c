@@ -1426,35 +1426,54 @@ mac_hwrings_rx_process(void *arg, mac_resource_handle_t srs,
  */
 int
 mac_hwrings_get(mac_client_handle_t mch, mac_group_handle_t *hwgh,
-    mac_ring_handle_t *hwrh)
+    mac_ring_handle_t *hwrh, mac_ring_type_t rtype)
 {
 	mac_client_impl_t	*mcip = (mac_client_impl_t *)mch;
-	flow_entry_t		*flent = mcip->mci_flent;
-	mac_group_t		*grp = flent->fe_rx_ring_group;
-	mac_ring_t		*ring;
 	int			cnt = 0;
 
-	/*
-	 * The mac client did not reserve any RX group, return directly.
-	 * This is probably because the underlying MAC does not support
-	 * any RX groups.
-	 */
-	*hwgh = NULL;
-	if (grp == NULL)
-		return (0);
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		flow_entry_t	*flent = mcip->mci_flent;
+		mac_group_t	*grp;
+		mac_ring_t	*ring;
 
-	/*
-	 * This RX group must be reserved by this mac client.
-	 */
-	ASSERT((grp->mrg_state == MAC_GROUP_STATE_RESERVED) &&
-	    (mch == (mac_client_handle_t)(MAC_RX_GROUP_ONLY_CLIENT(grp))));
-
-	for (ring = grp->mrg_rings; ring != NULL; ring = ring->mr_next) {
-		ASSERT(cnt < MAX_RINGS_PER_GROUP);
-		hwrh[cnt++] = (mac_ring_handle_t)ring;
+		grp = flent->fe_rx_ring_group;
+		/*
+		 * The mac client did not reserve any RX group, return directly.
+		 * This is probably because the underlying MAC does not support
+		 * any groups.
+		 */
+		*hwgh = NULL;
+		if (grp == NULL)
+			return (0);
+		/*
+		 * This group must be reserved by this mac client.
+		 */
+		ASSERT((grp->mrg_state == MAC_GROUP_STATE_RESERVED) &&
+		    (mch == (mac_client_handle_t)
+		    (MAC_RX_GROUP_ONLY_CLIENT(grp))));
+		for (ring = grp->mrg_rings;
+		    ring != NULL; ring = ring->mr_next, cnt++) {
+			ASSERT(cnt < MAX_RINGS_PER_GROUP);
+			hwrh[cnt] = (mac_ring_handle_t)ring;
+		}
+		*hwgh = (mac_group_handle_t)grp;
+		return (cnt);
 	}
-	*hwgh = (mac_group_handle_t)grp;
-	return (cnt);
+	case MAC_RING_TYPE_TX: {
+		mac_soft_ring_set_t	*tx_srs;
+		mac_srs_tx_t		*tx;
+
+		tx_srs = MCIP_TX_SRS(mcip);
+		tx = &tx_srs->srs_tx;
+		for (; cnt < tx->st_ring_count; cnt++)
+			hwrh[cnt] = tx->st_rings[cnt];
+		return (cnt);
+	}
+	default:
+		ASSERT(B_FALSE);
+		return (-1);
+	}
 }
 
 /*
@@ -1522,6 +1541,22 @@ mac_hwring_poll(mac_ring_handle_t rh, int bytes_to_pickup)
 	mac_ring_info_t *info = &rr_ring->mr_info;
 
 	return (info->mri_poll(info->mri_driver, bytes_to_pickup));
+}
+
+/*
+ * Send packets through the selected tx ring.
+ */
+mblk_t *
+mac_hwring_tx(mac_ring_handle_t rh, mblk_t *mp)
+{
+	mac_ring_t *ring = (mac_ring_t *)rh;
+	mac_ring_info_t *info = &ring->mr_info;
+
+	ASSERT(ring->mr_type == MAC_RING_TYPE_TX);
+	ASSERT(ring->mr_state >= MR_INUSE);
+	ASSERT(info->mri_tx != NULL);
+
+	return (info->mri_tx(info->mri_driver, mp));
 }
 
 int
@@ -3426,22 +3461,6 @@ mac_release_tx_ring(mac_ring_handle_t rh)
 
 	ring->mr_state = MR_FREE;
 	ring->mr_flag = 0;
-}
-
-/*
- * Send packets through a selected tx ring.
- */
-mblk_t *
-mac_ring_tx(mac_ring_handle_t rh, mblk_t *mp)
-{
-	mac_ring_t *ring = (mac_ring_t *)rh;
-	mac_ring_info_t *info = &ring->mr_info;
-
-	ASSERT(ring->mr_type == MAC_RING_TYPE_TX);
-	ASSERT(ring->mr_state >= MR_INUSE);
-	ASSERT(info->mri_tx != NULL);
-
-	return (info->mri_tx(info->mri_driver, mp));
 }
 
 /*

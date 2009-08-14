@@ -35,44 +35,7 @@
 #include <sys/nxge/nxge_fzc.h>
 #include <sys/nxge/nxge_rxdma.h>
 #include <sys/nxge/nxge_txdma.h>
-
 #include <sys/nxge/nxge_hio.h>
-
-/*
- * nxge_hio_unregister
- *
- *	Unregister with the VNET module.
- *
- * Arguments:
- * 	nxge
- *
- * Notes:
- *	We must uninitialize all DMA channels associated with the VR, too.
- *
- *	We're assuming that the channels will be disabled & unassigned
- *	in the service domain, after we're done here.
- *
- * Context:
- *	Guest domain
- */
-void
-nxge_hio_unregister(
-	nxge_t *nxge)
-{
-	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
-
-	if (nhd == 0) {
-		return;
-	}
-
-#if defined(sun4v)
-	/* Unregister with vNet. */
-	if (nhd->hio.vio.unregister) {
-		if (nxge->hio_vr)
-			(*nhd->hio.vio.unregister)(nxge->hio_vr->vhp);
-	}
-#endif
-}
 
 /*
  * nxge_guest_regs_map
@@ -95,8 +58,7 @@ static ddi_device_acc_attr_t nxge_guest_register_access_attributes = {
 };
 
 int
-nxge_guest_regs_map(
-	nxge_t *nxge)
+nxge_guest_regs_map(nxge_t *nxge)
 {
 	dev_regs_t 	*regs;
 	off_t		regsize;
@@ -211,31 +173,22 @@ static void nxge_check_guest_state(nxge_hio_vr_t *);
 int
 nxge_hio_vr_add(nxge_t *nxge)
 {
-	extern mac_callbacks_t nxge_m_callbacks;
+	extern nxge_status_t	nxge_mac_register(p_nxge_t);
 
-	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
-	nxge_hio_vr_t *vr;
-	nxge_hio_dc_t *dc;
-
-	int *reg_val;
-	uint_t reg_len;
-	uint8_t vr_index;
-
-	nxhv_vr_fp_t *fp;
-	uint64_t vr_address, vr_size;
-	uint32_t cookie;
-
-	nxhv_dc_fp_t *tx, *rx;
-	uint64_t tx_map, rx_map;
-
-	uint64_t hv_rv;
-
-	/* Variables needed to register with vnet. */
-	mac_register_t *mac_info;
-	ether_addr_t mac_addr;
-	nx_vio_fp_t *vio;
-
-	int i;
+	nxge_hio_data_t		*nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
+	nxge_hio_vr_t		*vr;
+	nxge_hio_dc_t		*dc;
+	int			*reg_val;
+	uint_t			reg_len;
+	uint8_t			vr_index;
+	nxhv_vr_fp_t		*fp;
+	uint64_t		vr_address, vr_size;
+	uint32_t		cookie;
+	nxhv_dc_fp_t		*tx, *rx;
+	uint64_t		tx_map, rx_map;
+	uint64_t		hv_rv;
+	int			i;
+	nxge_status_t		status;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_vr_add"));
 
@@ -384,39 +337,12 @@ nxge_hio_vr_add(nxge_t *nxge)
 		}
 	}
 
-	/*
-	 * Register with vnet.
-	 */
-	if ((mac_info = mac_alloc(MAC_VERSION)) == NULL)
-		return (NXGE_ERROR);
-
-	mac_info->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
-	mac_info->m_driver = nxge;
-	mac_info->m_dip = nxge->dip;
-	mac_info->m_src_addr = KMEM_ZALLOC(MAXMACADDRLEN, KM_SLEEP);
-	mac_info->m_dst_addr = KMEM_ZALLOC(MAXMACADDRLEN, KM_SLEEP);
-	(void) memset(mac_info->m_src_addr, 0xff, sizeof (MAXMACADDRLEN));
-	mac_info->m_callbacks = &nxge_m_callbacks;
-	mac_info->m_min_sdu = 0;
-	mac_info->m_max_sdu = NXGE_MTU_DEFAULT_MAX -
-	    sizeof (struct ether_header) - ETHERFCSL - 4;
-
-	(void) memset(&mac_addr, 0xff, sizeof (mac_addr));
-
-	/* Register with vio_net. */
-	vio = &nhd->hio.vio;
-	if ((*vio->__register)(mac_info, VIO_NET_RES_HYBRID,
-	    nxge->hio_mac_addr, mac_addr, &vr->vhp, &vio->cb)) {
-		NXGE_DEBUG_MSG((nxge, HIO_CTL, "HIO registration() failed"));
-		KMEM_FREE(mac_info->m_src_addr, MAXMACADDRLEN);
-		KMEM_FREE(mac_info->m_dst_addr, MAXMACADDRLEN);
-		mac_free(mac_info);
-		return (NXGE_ERROR);
+	status = nxge_mac_register(nxge);
+	if (status != NXGE_OK) {
+		cmn_err(CE_WARN, "nxge(%d): nxge_mac_register failed\n",
+		    nxge->instance);
+		return (status);
 	}
-
-	KMEM_FREE(mac_info->m_src_addr, MAXMACADDRLEN);
-	KMEM_FREE(mac_info->m_dst_addr, MAXMACADDRLEN);
-	mac_free(mac_info);
 
 	nxge->hio_vr = vr;	/* For faster lookups. */
 

@@ -34,6 +34,8 @@ extern "C" {
 #include <sys/vnet_res.h>
 #include <sys/vnet_mailbox.h>
 #include <sys/modhash.h>
+#include <net/if.h>
+#include <sys/mac_client.h>
 
 #define	VNET_SUCCESS		(0)	/* successful return */
 #define	VNET_FAILURE		(-1)	/* unsuccessful return */
@@ -117,6 +119,7 @@ typedef struct vnet_res {
 	uint32_t		refcnt;		/* reference count */
 	struct	vnet		*vnetp;		/* back pointer to vnet */
 	kstat_t			*ksp;		/* hio kstats */
+	void			*rx_ringp;	/* assoc pseudo rx ring */
 } vnet_res_t;
 
 #define	VNET_DDS_TASK_ADD_SHARE		0x01
@@ -131,6 +134,7 @@ typedef struct vnet_dds_info {
 	vio_dds_msg_t	dmsg;		/* Pending DDS message */
 	dev_info_t	*hio_dip;	/* Hybrid device's dip */
 	uint64_t	hio_cookie;	/* Hybrid device's cookie */
+	char		hio_ifname[LIFNAMSIZ];  /* Hybrid interface name */
 	ddi_taskq_t	*dds_taskqp;	/* Taskq's used for DDS */
 	struct vnet	*vnetp;		/* Back pointer to vnetp */
 } vnet_dds_info_t;
@@ -155,11 +159,102 @@ typedef struct vnet_dds_info {
 
 typedef enum {
 		AST_init = 0x0, AST_vnet_alloc = 0x1,
-		AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
-		AST_vgen_init = 0x8, AST_fdbh_alloc = 0x10,
-		AST_vdds_init = 0x20, AST_taskq_create = 0x40,
-		AST_vnet_list = 0x80, AST_macreg = 0x100
+		AST_ring_init = 0x2, AST_vdds_init = 0x4,
+		AST_read_macaddr = 0x8, AST_fdbh_alloc = 0x10,
+		AST_taskq_create = 0x20, AST_vnet_list = 0x40,
+		AST_vgen_init = 0x80, AST_macreg = 0x100,
+		AST_init_mdeg = 0x200
 } vnet_attach_progress_t;
+
+#define	VNET_NUM_PSEUDO_GROUPS		1	/* # of pseudo ring grps */
+#define	VNET_NUM_HYBRID_RINGS		2	/* # of Hybrid tx/rx rings */
+#define	VNET_HYBRID_RXRING_INDEX	1	/* Hybrid rx ring start index */
+
+/*
+ * # of Pseudo TX Rings is defined based on the possible
+ * # of TX Hardware Rings from a Hybrid resource.
+ */
+#define	VNET_NUM_PSEUDO_TXRINGS		VNET_NUM_HYBRID_RINGS
+
+/*
+ * # of Pseudo RX Rings that are reserved and exposed by default.
+ * 1 for LDC resource to vsw + 2 for RX rings of Hybrid resource.
+ */
+#define	VNET_NUM_PSEUDO_RXRINGS_DEFAULT	(VNET_NUM_HYBRID_RINGS + 1)
+
+/* Pseudo RX Ring States */
+typedef enum {
+	VNET_RXRING_FREE = 0x0,		/* Free */
+	VNET_RXRING_INUSE = 0x1,	/* In use */
+	VNET_RXRING_LDC_SERVICE = 0x2,	/* Mapped to vswitch */
+	VNET_RXRING_LDC_GUEST = 0x4,	/* Mapped to a peer vnet */
+	VNET_RXRING_HYBRID = 0x8,	/* Mapped to Hybrid resource */
+	VNET_RXRING_STARTED = 0x10	/* Started */
+} vnet_rxring_state_t;
+
+/* Pseudo TX Ring States */
+typedef enum {
+	VNET_TXRING_FREE = 0x0,		/* Free */
+	VNET_TXRING_INUSE = 0x1,	/* In use */
+	VNET_TXRING_SHARED = 0x2,	/* Shared among LDCs */
+	VNET_TXRING_HYBRID = 0x4,	/* Shared among LDCs, Hybrid resource */
+	VNET_TXRING_STARTED = 0x8	/* Started */
+} vnet_txring_state_t;
+
+/*
+ * Psuedo TX Ring
+ */
+typedef struct vnet_pseudo_tx_ring {
+	uint_t			index;		/* ring index */
+	vnet_txring_state_t	state;		/* ring state */
+	void			*grp;		/* grp associated */
+	void			*vnetp;		/* vnet associated */
+	mac_ring_handle_t	handle;		/* ring handle in mac layer */
+	mac_ring_handle_t	hw_rh;	/* Resource type dependent, internal */
+					/* ring handle. Hybrid res: ring hdl */
+					/* of hardware rx ring; LDC res: hdl */
+					/* to the res itself (vnet_res_t)    */
+} vnet_pseudo_tx_ring_t;
+
+/*
+ * Psuedo RX Ring
+ */
+typedef struct vnet_pseudo_rx_ring {
+	uint_t			index;		/* ring index */
+	vnet_rxring_state_t	state;		/* ring state */
+	void			*grp;		/* grp associated */
+	void			*vnetp;		/* vnet associated */
+	mac_ring_handle_t	handle;		/* ring handle in mac layer */
+	mac_ring_handle_t	hw_rh;	/* Resource type dependent, internal */
+					/* ring handle. Hybrid res: ring hdl */
+					/* of hardware tx ring; otherwise    */
+					/* NULL */
+	uint64_t		gen_num;	/* Mac layer gen_num */
+} vnet_pseudo_rx_ring_t;
+
+/*
+ * Psuedo TX Ring Group
+ */
+typedef struct vnet_pseudo_tx_group {
+	uint_t			index;		/* group index */
+	void			*vnetp;		/* vnet associated */
+	mac_group_handle_t	handle;		/* grp handle in mac layer */
+	uint_t			ring_cnt;	/* total # of rings in grp */
+	vnet_pseudo_tx_ring_t	*rings;		/* array of rings */
+} vnet_pseudo_tx_group_t;
+
+/*
+ * Psuedo RX Ring Group
+ */
+typedef struct vnet_pseudo_rx_group {
+	krwlock_t		lock;		/* sync rings access in grp */
+	int			index;		/* group index */
+	void			*vnetp;		/* vnet this grp belongs to */
+	mac_group_handle_t	handle;		/* grp handle in mac layer */
+	uint_t			max_ring_cnt;	/* total # of rings in grp */
+	uint_t			ring_cnt;	/* # of rings in use */
+	vnet_pseudo_rx_ring_t	*rings;		/* array of rings */
+} vnet_pseudo_rx_group_t;
 
 /*
  * vnet instance state information
@@ -194,6 +289,18 @@ typedef struct vnet {
 	vnet_dds_info_t		vdds_info;	/* DDS related info */
 	krwlock_t		vrwlock;	/* Resource list lock */
 	ddi_taskq_t		*taskqp;	/* Resource taskq */
+
+	/* pseudo ring groups */
+	vnet_pseudo_rx_group_t	rx_grp[VNET_NUM_PSEUDO_GROUPS];
+	vnet_pseudo_tx_group_t	tx_grp[VNET_NUM_PSEUDO_GROUPS];
+
+	vio_net_handle_t	hio_vhp;	/* HIO resource hdl */
+	mac_handle_t		hio_mh;		/* HIO mac hdl */
+	mac_client_handle_t	hio_mch;	/* HIO mac client hdl */
+	mac_unicast_handle_t	hio_muh;	/* HIO mac unicst hdl */
+	mac_notify_handle_t	hio_mnh;	/* HIO notify cb hdl */
+	mac_group_handle_t	rx_hwgh;	/* HIO rx ring-group hdl */
+	mac_group_handle_t	tx_hwgh;	/* HIO tx ring-group hdl */
 } vnet_t;
 
 #ifdef DEBUG

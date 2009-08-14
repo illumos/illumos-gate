@@ -180,6 +180,7 @@ typedef struct vgen_ldc {
 	kmutex_t		tclock;		/* tx reclaim lock */
 	kmutex_t		wrlock;		/* sync transmits */
 	kmutex_t		rxlock;		/* sync reception */
+	kmutex_t		pollq_lock;	/* sync polling and rxworker */
 
 	/* channel info from ldc layer */
 	uint64_t		ldc_id;		/* channel number */
@@ -247,6 +248,11 @@ typedef struct vgen_ldc {
 	uint32_t		rcv_thr_flags;	/* receive thread flags */
 	kmutex_t		rcv_thr_lock;	/* lock for receive thread */
 	kcondvar_t		rcv_thr_cv;	/* cond.var for recv thread */
+
+	/* receive polling fields */
+	boolean_t		polling_on;	/* polling enabled ? */
+	mblk_t			*pollq_headp;	/* head of pkts in pollq */
+	mblk_t			*pollq_tailp;	/* tail of pkts in pollq */
 
 	/* channel statistics */
 	vgen_stats_t		stats;		/* channel statistics */

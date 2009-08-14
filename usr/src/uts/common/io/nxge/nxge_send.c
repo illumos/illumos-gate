@@ -66,20 +66,9 @@ nxge_tx_ring_task(void *arg)
 	(void) nxge_txdma_reclaim(ring->nxgep, ring, 0);
 	MUTEX_EXIT(&ring->lock);
 
-	if (!isLDOMguest(ring->nxgep) && !ring->tx_ring_offline)
+	if (!ring->tx_ring_offline) {
 		mac_tx_ring_update(ring->nxgep->mach, ring->tx_ring_handle);
-#if defined(sun4v)
-	else {
-		nxge_hio_data_t *nhd =
-		    (nxge_hio_data_t *)ring->nxgep->nxge_hw_p->hio;
-		nx_vio_fp_t *vio = &nhd->hio.vio;
-
-		/* Call back vnet. */
-		if (vio->cb.vio_net_tx_update) {
-			(*vio->cb.vio_net_tx_update)(ring->nxgep->hio_vr->vhp);
-		}
 	}
-#endif
 }
 
 static void
@@ -140,65 +129,6 @@ nxge_tx_ring_send(void *arg, mblk_t *mp)
 
 	return ((mblk_t *)NULL);
 }
-
-#if defined(sun4v)
-
-/*
- * Hashing policy for load balancing over the set of TX rings
- * available to the driver.
- */
-static uint8_t nxge_tx_hash_policy = MAC_PKT_HASH_L4;
-
-/*
- * nxge_m_tx() is needed for Hybrid I/O operation of the vnet in
- *	the guest domain.  See CR 6778758 for long term solution.
- *
- *	The guest domain driver will for now hash the packet
- *	to pick a DMA channel from the only group it has group 0.
- */
-
-mblk_t *
-nxge_m_tx(void *arg, mblk_t *mp)
-{
-	p_nxge_t		nxgep = (p_nxge_t)arg;
-	mblk_t			*next;
-	uint64_t		rindex;
-	p_tx_ring_t		tx_ring_p;
-	int			status;
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_m_tx"));
-
-	/*
-	 * Hash to pick a ring from Group 0, the only TX group
-	 * for a guest domain driver.
-	 */
-	rindex = mac_pkt_hash(DL_ETHER, mp, nxge_tx_hash_policy, B_TRUE);
-	rindex = rindex % nxgep->pt_config.tdc_grps[0].max_tdcs;
-
-	/*
-	 * Get the ring handle.
-	 */
-	tx_ring_p = nxgep->tx_rings->rings[rindex];
-
-	while (mp != NULL) {
-		next = mp->b_next;
-		mp->b_next = NULL;
-
-		status = nxge_start(nxgep, tx_ring_p, mp);
-		if (status != 0) {
-			mp->b_next = next;
-			nxge_tx_ring_dispatch(tx_ring_p);
-			return (mp);
-		}
-
-		mp = next;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_m_tx"));
-	return ((mblk_t *)NULL);
-}
-
-#endif
 
 int
 nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)

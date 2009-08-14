@@ -3994,6 +3994,9 @@ nxge_get_rxring_index(p_nxge_t nxgep, int groupid, int ringidx)
 	p_dma_cfgp = &nxgep->pt_config;
 	p_cfgp = &p_dma_cfgp->hw_config;
 
+	if (isLDOMguest(nxgep))
+		return (ringidx);
+
 	for (i = 0; i < groupid; i++) {
 		rdc_grp_p =
 		    &p_dma_cfgp->rdc_grps[p_cfgp->def_mac_rxdma_grpid + i];

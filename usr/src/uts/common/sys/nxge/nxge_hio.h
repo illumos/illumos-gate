@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,6 @@ extern "C" {
 #include <nxge_ipp.h>
 #include <nxge_fflp.h>
 #include <sys/mac_provider.h>
-#if defined(sun4v)
-#include <sys/vnet_res.h>
-#endif
 
 #define	isLDOMservice(nxge) \
 	(nxge->environs == SOLARIS_SERVICE_DOMAIN)
@@ -45,6 +42,9 @@ extern "C" {
 	(nxge->environs == SOLARIS_GUEST_DOMAIN)
 #define	isLDOMs(nxge) \
 	(isLDOMservice(nxge) || isLDOMguest(nxge))
+
+#define	NXGE_HIO_SHARE_MIN_CHANNELS	2
+#define	NXGE_HIO_SHARE_MAX_CHANNELS	2
 
 /* ------------------------------------------------------------------ */
 typedef uint8_t nx_rdc_t;
@@ -88,37 +88,19 @@ typedef struct {
 	dc_getinfo	getinfo;
 } nxhv_dc_fp_t;
 
-#if defined(sun4v)
-typedef struct {
-	vio_net_resource_reg_t	__register;
-	vio_net_resource_unreg_t unregister;
-
-	vio_net_callbacks_t	cb;
-
-} nx_vio_fp_t;
-#endif
-
 typedef struct {
 	boolean_t	ldoms;
-
 	nxhv_vr_fp_t	vr;
 	nxhv_dc_fp_t	tx;
 	nxhv_dc_fp_t	rx;
-
-#if defined(sun4v)
-	nx_vio_fp_t	vio;
-#endif
-
 } nxhv_fp_t;
 
 /* ------------------------------------------------------------------ */
 #define	NXGE_VR_SR_MAX		8 /* There are 8 subregions (SR). */
 
 typedef enum {
-
 	NXGE_HIO_TYPE_SERVICE,	/* We are a service domain driver. */
 	NXGE_HIO_TYPE_GUEST	/* We are a guest domain driver. */
-
 } nxge_hio_type_t;
 
 typedef enum {
@@ -130,7 +112,6 @@ typedef enum {
 	FUNC2_VIR = 0x5000000,
 	FUNC3_MNT = 0x6000000,
 	FUNC3_VIR = 0x7000000
-
 } vr_base_address_t;
 
 #define	VR_STEP		0x2000000
@@ -146,7 +127,6 @@ typedef enum {			/* 0-8 */
 	FUNC3_VIR0,
 	FUNC3_VIR1,
 	FUNC_VIR_MAX
-
 } vr_region_t;
 
 typedef enum {
@@ -159,13 +139,11 @@ typedef enum {
 	VP_CHANNEL_6,
 	VP_CHANNEL_7,
 	VP_CHANNEL_MAX
-
 } vp_channel_t;
 
 typedef enum {
 	VP_BOUND_TX = 1,
 	VP_BOUND_RX
-
 } vpc_type_t;
 
 #define	VP_VC_OFFSET(channel)	(channel << 10)
@@ -254,9 +232,6 @@ typedef struct nxge_hio_vr {
 	ether_addr_t	altmac;	/* The alternate MAC address. */
 	int		slot;	/* According to nxge_m_mmac_add(). */
 
-#if defined(sun4v)
-	vio_net_handle_t vhp;	/* The handle given to us by the vnet. */
-#endif
 	nxge_grp_t	rx_group;
 	nxge_grp_t	tx_group;
 
@@ -273,7 +248,6 @@ typedef struct {
 	uint64_t	map;	/* Currently unused */
 
 	int		vector;	/* The DDI vector number (index) */
-
 } hio_ldg_t;
 
 /*

@@ -120,7 +120,7 @@ extern void	mac_rx_client_quiesce(mac_client_handle_t);
 extern void	mac_rx_client_restart(mac_client_handle_t);
 extern void	mac_srs_perm_quiesce(mac_client_handle_t, boolean_t);
 extern int	mac_hwrings_get(mac_client_handle_t, mac_group_handle_t *,
-		    mac_ring_handle_t *);
+		    mac_ring_handle_t *, mac_ring_type_t);
 extern void	mac_hwring_setup(mac_ring_handle_t, mac_resource_handle_t);
 extern void	mac_hwring_teardown(mac_ring_handle_t);
 extern int	mac_hwring_disable_intr(mac_ring_handle_t);

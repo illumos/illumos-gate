@@ -272,14 +272,11 @@ static void nxge_m_stop(void *);
 static int nxge_m_multicst(void *, boolean_t, const uint8_t *);
 static int nxge_m_promisc(void *, boolean_t);
 static void nxge_m_ioctl(void *, queue_t *, mblk_t *);
-static nxge_status_t nxge_mac_register(p_nxge_t);
+nxge_status_t nxge_mac_register(p_nxge_t);
 static int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
 	int slot, int rdctbl, boolean_t usetbl);
 void nxge_mmac_kstat_update(p_nxge_t nxgep, int slot,
 	boolean_t factory);
-#if defined(sun4v)
-extern mblk_t *nxge_m_tx(void *arg, mblk_t *mp);
-#endif
 
 static void nxge_m_getfactaddr(void *, uint_t, uint8_t *);
 static	boolean_t nxge_m_getcapab(void *, mac_capab_t, void *);
@@ -630,11 +627,6 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (nxgep->niu_type != N2_NIU) {
 		nxge_set_pci_replay_timeout(nxgep);
 	}
-#if defined(sun4v)
-	if (isLDOMguest(nxgep)) {
-		nxge_m_callbacks.mc_tx = nxge_m_tx;
-	}
-#endif
 
 #if defined(sun4v)
 	/* This is required by nxge_hio_init(), which follows. */
@@ -961,11 +953,7 @@ nxge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
 
-	if (isLDOMguest(nxgep)) {
-		if (nxgep->nxge_mac_state == NXGE_MAC_STARTED)
-			nxge_m_stop((void *)nxgep);
-		nxge_hio_unregister(nxgep);
-	} else if (nxgep->mach && (status = mac_unregister(nxgep->mach)) != 0) {
+	if (nxgep->mach && (status = mac_unregister(nxgep->mach)) != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "<== nxge_detach status = 0x%08X", status));
 		return (DDI_FAILURE);
@@ -4294,10 +4282,13 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	case MAC_CAPAB_MULTIFACTADDR: {
 		mac_capab_multifactaddr_t	*mfacp = cap_data;
 
-		mutex_enter(nxgep->genlock);
-		mfacp->mcm_naddr = nxgep->nxge_mmac_info.num_factory_mmac;
-		mfacp->mcm_getaddr = nxge_m_getfactaddr;
-		mutex_exit(nxgep->genlock);
+		if (!isLDOMguest(nxgep)) {
+			mutex_enter(nxgep->genlock);
+			mfacp->mcm_naddr =
+			    nxgep->nxge_mmac_info.num_factory_mmac;
+			mfacp->mcm_getaddr = nxge_m_getfactaddr;
+			mutex_exit(nxgep->genlock);
+		}
 		break;
 	}
 
@@ -4325,33 +4316,67 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 
 		mutex_enter(nxgep->genlock);
 		if (cap_rings->mr_type == MAC_RING_TYPE_RX) {
-			cap_rings->mr_group_type = MAC_GROUP_TYPE_DYNAMIC;
-			cap_rings->mr_rnum = p_cfgp->max_rdcs;
-			cap_rings->mr_rget = nxge_fill_ring;
-			cap_rings->mr_gnum = p_cfgp->max_rdc_grpids;
-			cap_rings->mr_gget = nxge_hio_group_get;
-			cap_rings->mr_gaddring = nxge_group_add_ring;
-			cap_rings->mr_gremring = nxge_group_rem_ring;
+			if (isLDOMguest(nxgep))  {
+				cap_rings->mr_group_type =
+				    MAC_GROUP_TYPE_STATIC;
+				cap_rings->mr_rnum =
+				    NXGE_HIO_SHARE_MAX_CHANNELS;
+				cap_rings->mr_rget = nxge_fill_ring;
+				cap_rings->mr_gnum = 1;
+				cap_rings->mr_gget = nxge_hio_group_get;
+				cap_rings->mr_gaddring = NULL;
+				cap_rings->mr_gremring = NULL;
+			} else {
+				/*
+				 * Service Domain.
+				 */
+				cap_rings->mr_group_type =
+				    MAC_GROUP_TYPE_DYNAMIC;
+				cap_rings->mr_rnum = p_cfgp->max_rdcs;
+				cap_rings->mr_rget = nxge_fill_ring;
+				cap_rings->mr_gnum = p_cfgp->max_rdc_grpids;
+				cap_rings->mr_gget = nxge_hio_group_get;
+				cap_rings->mr_gaddring = nxge_group_add_ring;
+				cap_rings->mr_gremring = nxge_group_rem_ring;
+			}
 
 			NXGE_DEBUG_MSG((nxgep, RX_CTL,
 			    "==> nxge_m_getcapab: rx nrings[%d] ngroups[%d]",
 			    p_cfgp->max_rdcs, p_cfgp->max_rdc_grpids));
 		} else {
-			cap_rings->mr_group_type = MAC_GROUP_TYPE_DYNAMIC;
-			cap_rings->mr_rnum = p_cfgp->tdc.count;
-			cap_rings->mr_rget = nxge_fill_ring;
-			if (isLDOMservice(nxgep)) {
-				/* share capable */
-				/* Do not report the default ring: hence -1 */
+			/*
+			 * TX Rings.
+			 */
+			if (isLDOMguest(nxgep)) {
+				cap_rings->mr_group_type =
+				    MAC_GROUP_TYPE_STATIC;
+				cap_rings->mr_rnum =
+				    NXGE_HIO_SHARE_MAX_CHANNELS;
+				cap_rings->mr_rget = nxge_fill_ring;
+				cap_rings->mr_gnum = 0;
+				cap_rings->mr_gget = NULL;
+				cap_rings->mr_gaddring = NULL;
+				cap_rings->mr_gremring = NULL;
+			} else {
+				/*
+				 * Service Domain.
+				 */
+				cap_rings->mr_group_type =
+				    MAC_GROUP_TYPE_DYNAMIC;
+				cap_rings->mr_rnum = p_cfgp->tdc.count;
+				cap_rings->mr_rget = nxge_fill_ring;
+
+				/*
+				 * Share capable.
+				 *
+				 * Do not report the default group: hence -1
+				 */
 				cap_rings->mr_gnum =
 				    NXGE_MAX_TDC_GROUPS / nxgep->nports - 1;
-			} else {
-				cap_rings->mr_gnum = 0;
+				cap_rings->mr_gget = nxge_hio_group_get;
+				cap_rings->mr_gaddring = nxge_group_add_ring;
+				cap_rings->mr_gremring = nxge_group_rem_ring;
 			}
-
-			cap_rings->mr_gget = nxge_hio_group_get;
-			cap_rings->mr_gaddring = nxge_group_add_ring;
-			cap_rings->mr_gremring = nxge_group_rem_ring;
 
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
 			    "==> nxge_m_getcapab: tx rings # of rings %d",
@@ -6372,7 +6397,7 @@ nxge_intrs_disable(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_intrs_disable"));
 }
 
-static nxge_status_t
+nxge_status_t
 nxge_mac_register(p_nxge_t nxgep)
 {
 	mac_register_t *macp;
@@ -6386,7 +6411,13 @@ nxge_mac_register(p_nxge_t nxgep)
 	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	macp->m_driver = nxgep;
 	macp->m_dip = nxgep->dip;
-	macp->m_src_addr = nxgep->ouraddr.ether_addr_octet;
+	if (!isLDOMguest(nxgep)) {
+		macp->m_src_addr = nxgep->ouraddr.ether_addr_octet;
+	} else {
+		macp->m_src_addr = KMEM_ZALLOC(MAXMACADDRLEN, KM_SLEEP);
+		macp->m_dst_addr = KMEM_ZALLOC(MAXMACADDRLEN, KM_SLEEP);
+		(void) memset(macp->m_src_addr, 0xff, sizeof (MAXMACADDRLEN));
+	}
 	macp->m_callbacks = &nxge_m_callbacks;
 	macp->m_min_sdu = 0;
 	nxgep->mac.default_mtu = nxgep->mac.maxframesize -
@@ -6395,7 +6426,12 @@ nxge_mac_register(p_nxge_t nxgep)
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = nxge_priv_props;
 	macp->m_priv_prop_count = NXGE_MAX_PRIV_PROPS;
-	macp->m_v12n = MAC_VIRT_HIO | MAC_VIRT_LEVEL1 | MAC_VIRT_SERIALIZE;
+	if (isLDOMguest(nxgep)) {
+		macp->m_v12n = MAC_VIRT_LEVEL1 | MAC_VIRT_SERIALIZE;
+	} else {
+		macp->m_v12n = MAC_VIRT_HIO | MAC_VIRT_LEVEL1 | \
+		    MAC_VIRT_SERIALIZE;
+	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_mac_register: instance %d "
@@ -6406,6 +6442,10 @@ nxge_mac_register(p_nxge_t nxgep)
 	    NXGE_EHEADER_VLAN_CRC));
 
 	status = mac_register(macp, &nxgep->mach);
+	if (isLDOMguest(nxgep)) {
+		KMEM_FREE(macp->m_src_addr, MAXMACADDRLEN);
+		KMEM_FREE(macp->m_dst_addr, MAXMACADDRLEN);
+	}
 	mac_free(macp);
 
 	if (status != 0) {

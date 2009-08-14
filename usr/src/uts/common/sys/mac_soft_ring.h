@@ -131,6 +131,9 @@ typedef struct mac_srs_tx_s {
 	void		*st_arg1;
 	void		*st_arg2;
 	mac_group_t	*st_group;	/* TX group for share */
+	uint32_t	st_ring_count;	/* no. of tx rings */
+	mac_ring_handle_t	*st_rings;
+
 	boolean_t	st_woken_up;
 
 	/*
