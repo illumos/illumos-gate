@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,7 @@ static struct srnstate {
 	int		srn_type[SRN_MAX_CLONE]; /* type of handshake */
 	int		srn_delivered[SRN_MAX_CLONE];
 	srn_event_info_t srn_pending[SRN_MAX_CLONE];
+	int		srn_fault[SRN_MAX_CLONE];
 } srn = { NULL, -1};
 typedef struct srnstate *srn_state_t;
 
@@ -85,6 +86,9 @@ kcondvar_t	srn_clones_cv[SRN_MAX_CLONE];
 uint_t		srn_poll_cnt[SRN_MAX_CLONE];	/* count of events for poll */
 int		srn_apm_count;
 int		srn_autosx_count;
+/* Number of seconds to wait for clients to ack a poll */
+int		srn_timeout = 10;
+
 struct pollhead	srn_pollhead[SRN_MAX_CLONE];
 
 static int	srn_open(dev_t *, int, int, cred_t *);
@@ -251,7 +255,7 @@ static int
 srn_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	struct pollhead **phpp)
 {
-	extern struct pollhead srn_pollhead[];	/* common/os/sunpm.c */
+	extern struct pollhead srn_pollhead[];
 	int	clone;
 
 	clone = SRN_MINOR_TO_CLONE(getminor(dev));
@@ -342,6 +346,7 @@ srn_close(dev_t dev, int flag, int otyp, cred_t *cr)
 	crfree(srn.srn_cred[clone]);
 	srn.srn_cred[clone] = 0;
 	srn_poll_cnt[clone] = 0;
+	srn.srn_fault[clone] = 0;
 	if (srn.srn_pending[clone].ae_type || srn.srn_delivered[clone]) {
 		srn.srn_pending[clone].ae_type = 0;
 		srn.srn_delivered[clone] = 0;
@@ -407,6 +412,7 @@ srn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		}
 		ASSERT(srn.srn_type[clone] == SRN_TYPE_APM);
 		srn.srn_type[clone] = SRN_TYPE_AUTOSX;
+		srn.srn_fault[clone] = 0;
 		srn_apm_count--;
 		ASSERT(srn_apm_count >= 0);
 		ASSERT(srn_autosx_count >= 0);
@@ -423,6 +429,11 @@ srn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 		 * then wake up the kernel thread sleeping for the delivery
 		 */
 		PMD(PMD_SX, ("SRN_IOC_NEXTEVENT entered\n"))
+		if (srn.srn_fault[clone]) {
+			PMD(PMD_SX, ("SRN_IOC_NEXTEVENT clone %d fault "
+			    "cleared\n", clone))
+			srn.srn_fault[clone] = 0;
+		}
 		mutex_enter(&srn_clone_lock);
 		if (srn_poll_cnt[clone] == 0) {
 			mutex_exit(&srn_clone_lock);
@@ -450,6 +461,11 @@ srn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 	case SRN_IOC_SUSPEND:
 		/* ack suspend */
 		PMD(PMD_SX, ("SRN_IOC_SUSPEND entered clone %d\n", clone))
+		if (srn.srn_fault[clone]) {
+			PMD(PMD_SX, ("SRN_IOC_SUSPEND clone %d fault "
+			    "cleared\n", clone))
+			srn.srn_fault[clone] = 0;
+		}
 		mutex_enter(&srn_clone_lock);
 		if (srn.srn_delivered[clone] != SRN_SUSPEND_REQ) {
 			mutex_exit(&srn_clone_lock);
@@ -467,6 +483,11 @@ srn_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval_p)
 	case SRN_IOC_RESUME:
 		/* ack resume */
 		PMD(PMD_SX, ("SRN_IOC_RESUME entered clone %d\n", clone))
+		if (srn.srn_fault[clone]) {
+			PMD(PMD_SX, ("SRN_IOC_RESUME clone %d fault "
+			    "cleared\n", clone))
+			srn.srn_fault[clone] = 0;
+		}
 		mutex_enter(&srn_clone_lock);
 		if (srn.srn_delivered[clone] != SRN_NORMAL_RESUME) {
 			mutex_exit(&srn_clone_lock);
@@ -522,11 +543,13 @@ srn_notify(int type, int event)
 	PMD(PMD_SX, ("count %d\n", count))
 	for (clone = 0; clone < SRN_MAX_CLONE; clone++) {
 		if (srn.srn_type[clone] == type) {
+#ifdef DEBUG
 			if (type == SRN_TYPE_APM) {
 				ASSERT(srn.srn_pending[clone].ae_type == 0);
 				ASSERT(srn_poll_cnt[clone] == 0);
 				ASSERT(srn.srn_delivered[clone] == 0);
 			}
+#endif
 			srn.srn_pending[clone].ae_type = event;
 			srn_poll_cnt[clone] = 1;
 			PMD(PMD_SX, ("pollwake %d\n", clone))
@@ -544,7 +567,7 @@ srn_notify(int type, int event)
 	/* otherwise wait for acks */
 restart:
 	/*
-	 * We wait untill all of the pending events are cleared.
+	 * We wait until all of the pending events are cleared.
 	 * We have to start over every time we do a cv_wait because
 	 * we give up the mutex and can be re-entered
 	 */
@@ -552,10 +575,22 @@ restart:
 		if (srn.srn_clones[clone] == 0 ||
 		    srn.srn_type[clone] != SRN_TYPE_APM)
 			continue;
-		if (srn.srn_pending[clone].ae_type) {
+		if (srn.srn_pending[clone].ae_type && !srn.srn_fault[clone]) {
 			PMD(PMD_SX, ("srn_notify waiting for ack for clone %d, "
 			    "event %x\n", clone, event))
-			cv_wait(&srn_clones_cv[clone], &srn_clone_lock);
+			if (cv_timedwait(&srn_clones_cv[clone],
+			    &srn_clone_lock, ddi_get_lbolt() +
+			    drv_usectohz(srn_timeout * 1000000)) == -1) {
+				/*
+				 * Client didn't respond, mark it as faulted
+				 * and continue as if a regular signal.
+				 */
+				PMD(PMD_SX, ("srn_notify: clone %d did not "
+				    "ack event %x\n", clone, event))
+				cmn_err(CE_WARN, "srn_notify: clone %d did "
+				    "not ack event %x\n", clone, event);
+				srn.srn_fault[clone] = 1;
+			}
 			goto restart;
 		}
 	}
