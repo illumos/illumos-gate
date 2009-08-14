@@ -1647,17 +1647,10 @@ sbd_pgr_out_preempt(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	pgr->pgr_PRgeneration++;
 
 	if (pr_out->action == PR_OUT_PREEMPT_ABORT) {
-		/*
-		 * XXX iscsi port provider doesn't like this idea
-		 * Need to implement abort differently
-		 *
-		 * task->task_mgmt_function = TM_ABORT_TASK_SET;
-		 * stmf_scsilib_handle_task_mgmt(task);
-		 */
-		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
-	} else {
-		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
+		stmf_abort(STMF_QUEUE_ABORT_LU, task, STMF_ABORTED,
+		    (void *)slu->sl_lu);
 	}
+	stmf_scsilib_send_status(task, STATUS_GOOD, 0);
 }
 
 static void
