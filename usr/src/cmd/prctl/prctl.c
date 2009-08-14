@@ -77,6 +77,7 @@ typedef struct prctl_value {
 
 typedef struct prctl_list {
 	char *name;
+	rctl_qty_t *usage;
 	prctl_value_t *val_list;
 	struct prctl_list *next;
 } prctl_list_t;
@@ -1220,6 +1221,34 @@ store_rctls(const char *rctlname, void *walk_data)
 		rblk1 = rblk2;
 		rblk2 = rblk_tmp;
 	}
+
+	/*
+	 * Get the current usage for the resource control if it matched the
+	 * privilege and entity type criteria.
+	 */
+	if (list != NULL) {
+		if (pr_getrctl(Pr, rctlname, NULL, rblk2, RCTL_USAGE) == 0) {
+			list->usage = (rctl_qty_t *)malloc(sizeof (rctl_qty_t));
+			if (list->usage == NULL) {
+				preserve_error(gettext("malloc failed: %s"),
+				    strerror(errno));
+				free(rblk1);
+				free(rblk2);
+				return (1);
+			}
+			*list->usage = rctlblk_get_value(rblk2);
+		} else {
+			list->usage = NULL;
+			if (errno != ENOTSUP) {
+				preserve_error(gettext("failed to get "
+				    "resource control usage for %s: %s"),
+				    rctlname, strerror(errno));
+				free(rblk1);
+				free(rblk2);
+				return (1);
+			}
+		}
+	}
 	free(rblk1);
 	free(rblk2);
 	return (0);
@@ -1323,6 +1352,7 @@ free_lists()
 			old_val = new_val;
 		}
 		free(old_list->name);
+		free(old_list->usage);
 		new_list = old_list->next;
 		free(old_list);
 		old_list = new_list;
@@ -1432,6 +1462,23 @@ print_rctls(pr_info_handle_t *p)
 			unit = SCALED_UNIT_NONE;
 			scale = scale_metric;
 		}
+
+		/* print the current usage for the rctl if available */
+		if (iter_list->usage != NULL) {
+			rblk_value = *(iter_list->usage);
+			if (!arg_parseable_mode) {
+				(void) uint64toscaled(rblk_value, 4, "E",
+				    rctl_valuestring, NULL, NULL,
+				    scale, NULL, 0);
+
+				(void) fprintf(stdout, "%8s%-16s%5s%-4s\n",
+				    "", "usage", rctl_valuestring, unit);
+			} else {
+				(void) fprintf(stdout, "%s %s %llu - - -\n",
+				    iter_list->name, "usage", rblk_value);
+			}
+		}
+
 		/* iterate over an print all control values */
 		while (iter_val != NULL) {
 
