@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2894,6 +2894,9 @@ rx_done_int:
 		    ETX_COMPLETION_MASK);
 
 		macupdate |= eri_reclaim(erip, erip->tx_completion);
+		if (macupdate)
+			erip->wantw = B_FALSE;
+
 		mutex_exit(&erip->xmitlock);
 	}
 
@@ -2960,8 +2963,6 @@ rx_done_int:
 		}
 		erip->rx_completion = rmdi;
 	}
-
-	erip->wantw = B_FALSE;
 
 	mutex_exit(&erip->intrlock);
 
@@ -3454,7 +3455,6 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 	uint_t		start_offset = 0;
 	uint_t		stuff_offset = 0;
 	uint_t		flags = 0;
-	boolean_t	macupdate = B_FALSE;
 
 	caddr_t	ptr;
 	uint32_t	offset;
@@ -3514,8 +3514,15 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 	if (i > (ERI_TPENDING - 4))
 		goto notmds;
 
-	if (i >= (ERI_TPENDING >> 1) && !(erip->starts & 0x7))
+	if (i >= (ERI_TPENDING >> 1) && !(erip->starts & 0x7)) {
 		int_me = ERI_TMD_INTME;
+
+		if (!erip->tx_int_me) {
+			PUT_GLOBREG(intmask, GET_GLOBREG(intmask) &
+			    ~(ERI_G_MASK_TX_INT_ME));
+			erip->tx_int_me = 1;
+		}
+	}
 
 	i = tmdp - tbasep; /* index */
 
@@ -3562,12 +3569,9 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 	if (erip->tx_cur_cnt >= tx_interrupt_rate) {
 		erip->tx_completion = (uint32_t)(GET_ETXREG(tx_completion) &
 		    ETX_COMPLETION_MASK);
-		macupdate |= eri_reclaim(erip, erip->tx_completion);
+		(void) eri_reclaim(erip, erip->tx_completion);
 	}
 	mutex_exit(&erip->xmitlock);
-
-	if (macupdate)
-		mac_tx_update(erip->mh);
 
 	return (B_TRUE);
 
@@ -3575,22 +3579,7 @@ notmds:
 	HSTAT(erip, notmds);
 	erip->wantw = B_TRUE;
 
-	if (!erip->tx_int_me) {
-		PUT_GLOBREG(intmask, GET_GLOBREG(intmask) &
-		    ~(ERI_G_MASK_TX_INT_ME));
-		erip->tx_int_me = 1;
-	}
-
-	if (erip->tx_cur_cnt >= tx_interrupt_rate) {
-		erip->tx_completion = (uint32_t)(GET_ETXREG(tx_completion) &
-		    ETX_COMPLETION_MASK);
-		macupdate |= eri_reclaim(erip, erip->tx_completion);
-	}
-
 	mutex_exit(&erip->xmitlock);
-
-	if (macupdate)
-		mac_tx_update(erip->mh);
 
 	return (B_FALSE);
 }
