@@ -57,6 +57,14 @@ static void iscsi_notice_key_values(iscsi_conn_t *icp);
 
 #define	ISCSI_LOGIN_RETRY_DELAY		5	/* seconds */
 
+#define	ISCSI_LOGIN_TRANSIT_FFP(flags) \
+	(!(flags & ISCSI_FLAG_LOGIN_CONTINUE) && \
+	(flags & ISCSI_FLAG_LOGIN_TRANSIT) && \
+	(ISCSI_LOGIN_CURRENT_STAGE(flags) == \
+	ISCSI_OP_PARMS_NEGOTIATION_STAGE) && \
+	(ISCSI_LOGIN_NEXT_STAGE(flags) == \
+	ISCSI_FULL_FEATURE_PHASE))
+
 /*
  * +--------------------------------------------------------------------+
  * | External Login Interface						|
@@ -310,7 +318,11 @@ iscsi_login_end(iscsi_conn_t *icp, iscsi_status_t status, iscsi_task_t *itp)
 				}
 			}
 			break;
+		case ISCSI_CONN_STATE_FREE:
+			mutex_exit(&icp->conn_state_mutex);
+			break;
 		default:
+			mutex_exit(&icp->conn_state_mutex);
 			ASSERT(0);
 			break;
 		}
@@ -535,6 +547,18 @@ iscsi_login(iscsi_conn_t *icp, uint8_t *status_class, uint8_t *status_detail)
 			    icp->conn_login_max_data_length);
 			/* pass back whatever error we discovered */
 			if (!ISCSI_SUCCESS(rval)) {
+				if (ISCSI_LOGIN_TRANSIT_FFP(ilrhp->flags)) {
+					/*
+					 * iSCSI connection transit to next
+					 * FFP stage while iscsi params
+					 * ngeotiate error, LOGIN_ERROR
+					 * marked so CN_FFP_ENABLED can
+					 * be fully handled before
+					 * CN_FFP_DISABLED can be processed.
+					 */
+					iscsi_login_update_state(icp,
+					    LOGIN_ERROR);
+				}
 				goto iscsi_login_done;
 			}
 

@@ -478,13 +478,14 @@ iscsi_client_notify_task(void *cn_task_void)
 
 		/*
 		 * This logic assumes that the IDM login-snooping code
-		 * and the initiator login code will agree on whether
-		 * the connection is in FFP.  The reason we do this
-		 * is that we don't want to process CN_FFP_DISABLED until
-		 * CN_FFP_ENABLED has been full handled.
+		 * and the initiator login code will agree to go when
+		 * the connection is in FFP or final error received.
+		 * The reason we do this is that we don't want to process
+		 * CN_FFP_DISABLED until CN_FFP_ENABLED has been full handled.
 		 */
 		mutex_enter(&icp->conn_login_mutex);
-		while (icp->conn_login_state != LOGIN_FFP) {
+		while ((icp->conn_login_state != LOGIN_FFP) &&
+		    (icp->conn_login_state != LOGIN_ERROR)) {
 			cv_wait(&icp->conn_login_cv, &icp->conn_login_mutex);
 		}
 		mutex_exit(&icp->conn_login_mutex);
@@ -524,8 +525,13 @@ iscsi_client_notify_task(void *cn_task_void)
 
 		case FD_CONN_FAIL:
 		default:
-			iscsi_conn_update_state_locked(icp,
-			    ISCSI_CONN_STATE_FAILED);
+			if (icp->conn_state == ISCSI_CONN_STATE_IN_LOGIN) {
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_FREE);
+			} else {
+				iscsi_conn_update_state_locked(icp,
+				    ISCSI_CONN_STATE_FAILED);
+			}
 			break;
 		}
 
@@ -544,7 +550,8 @@ iscsi_client_notify_task(void *cn_task_void)
 		 * what CN_CONNECT_LOST means to us.
 		 */
 		in_login = (boolean_t)data;
-		if (in_login) {
+		if (in_login ||
+		    (icp->conn_prev_state == ISCSI_CONN_STATE_IN_LOGIN)) {
 			mutex_enter(&icp->conn_state_mutex);
 
 			icp->conn_state_idm_connected = B_FALSE;
