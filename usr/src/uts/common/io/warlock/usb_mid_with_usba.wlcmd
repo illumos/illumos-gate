@@ -120,6 +120,8 @@ root	usb_register_hotplug_cbs
 root    usb_register_client
 root	usb_reset_device
 root	usb_ugen_power
+root	usb_register_dev_driver
+root	usb_unregister_dev_driver
 
 root    hubd_root_hub_cleanup_thread
 root	hubd_restore_state_cb

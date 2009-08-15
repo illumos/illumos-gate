@@ -73,8 +73,11 @@ uint_t usba_ugen_force_binding;
 /*
  * compatible name handling
  */
-/* allowing for 15 compat names, plus one force bind name */
-#define	USBA_MAX_COMPAT_NAMES		16
+/*
+ * allowing for 15 compat names, plus one force bind name and
+ * one possible specified client driver name
+ */
+#define	USBA_MAX_COMPAT_NAMES		17
 #define	USBA_MAX_COMPAT_NAME_LEN	64
 
 /* double linked list for usba_devices */
@@ -1841,7 +1844,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	usb_dev_descr_t	*usb_dev_descr;
 	uint_t		n_cfgs;	/* number of configs */
 	uint_t		n_ifs;	/* number of interfaces */
-	uint_t		port;
+	uint_t		port, bus_num;
 	size_t		usb_config_length;
 	uchar_t 	*usb_config;
 	int		reg[1];
@@ -1867,7 +1870,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	usb_dev_descr = usba_device->usb_dev_descr;
 	n_cfgs = usba_device->usb_n_cfgs;
 	n_ifs = usba_device->usb_n_ifs;
-
+	bus_num = usba_device->usb_addr;
 
 	if (address != ROOT_HUB_ADDR) {
 		size = usb_parse_if_descr(
@@ -1972,6 +1975,35 @@ usba_ready_device_node(dev_info_t *child_dip)
 		(void) ndi_devi_set_nodename(child_dip, force_bind, 0);
 		(void) strncpy(usba_name[n++], force_bind,
 		    USBA_MAX_COMPAT_NAME_LEN);
+	}
+
+	/*
+	 * If the callback function of specified driver is registered,
+	 * it will be called here to check whether to take over the device.
+	 */
+	if (usb_cap.usba_dev_driver_cb != NULL) {
+		char		*dev_drv = NULL;
+		usb_dev_str_t	dev_str;
+		char		*pathname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+
+		dev_str.usb_mfg = usba_device->usb_mfg_str;
+		dev_str.usb_product = usba_device->usb_product_str;
+		dev_str.usb_serialno = usba_device->usb_serialno_str;
+
+		(void) ddi_pathname(child_dip, pathname);
+
+		if ((usb_cap.usba_dev_driver_cb(usb_dev_descr, &dev_str,
+		    pathname, bus_num, port, &dev_drv, NULL) == USB_SUCCESS) &&
+		    (dev_drv != NULL)) {
+			USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
+			    "usba_ready_device_node: dev_driver=%s, port =%d,"
+			    "bus =%d, path=%s\n\t",
+			    dev_drv, port, bus_num, pathname);
+
+			(void) strncpy(usba_name[n++], dev_drv,
+			    USBA_MAX_COMPAT_NAME_LEN);
+		}
+		kmem_free(pathname, MAXPATHLEN);
 	}
 
 	/* create compatible names */

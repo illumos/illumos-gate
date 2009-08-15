@@ -89,6 +89,8 @@ root	usb_get_current_cfgidx
 root    usb_register_client
 root	usb_reset_device
 root	usb_ugen_power
+root	usb_register_dev_driver
+root	usb_unregister_dev_driver
 
 root	hcdi_autoclearing
 root	hcdi_cb_thread

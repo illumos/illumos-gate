@@ -100,7 +100,8 @@ root	usb_ugen_poll
 root	usb_ugen_read
 root	usb_ugen_reconnect_ev_cb
 root	usb_ugen_write
-
+root	usb_register_dev_driver
+root	usb_unregister_dev_driver
 
 root	hcdi_autoclearing
 root	hcdi_cb_thread

@@ -435,6 +435,15 @@ void	usba_check_for_leaks(usba_device_t *);
 /* free request wrappers */
 void	usba_req_wrapper_free(usba_req_wrapper_t *);
 
+/* usb device capture for the specific client driver */
+typedef struct usb_dev_cap {
+	dev_info_t			*dip;
+	usb_dev_driver_callback_t	usba_dev_driver_cb;
+} usb_dev_cap_t;
+
+usb_dev_cap_t usb_cap;
+_NOTE(SCHEME_PROTECTS_DATA("unique device capture data", usb_cap))
+
 #ifdef __cplusplus
 }
 #endif

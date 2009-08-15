@@ -95,6 +95,8 @@ root usb_register_hotplug_cbs
 root usb_get_current_cfgidx
 root usb_register_client
 root usb_reset_device
+root usb_register_dev_driver
+root usb_unregister_dev_driver
 
 root usb_ugen_attach
 root usb_ugen_close

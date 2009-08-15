@@ -2555,6 +2555,65 @@ int usb_reset_device(
 
 
 /*
+ * **************************************************************************
+ * USB device driver registration and callback functions remaining
+ * Contracted Project Private (for VirtualBox USB Device Capture)
+ * **************************************************************************
+ */
+
+/*
+ * getting the device strings of manufacturer, product and serial number
+ */
+typedef struct usb_dev_str {
+	char	*usb_mfg;	/* manufacturer string */
+	char	*usb_product;	/* product string */
+	char	*usb_serialno;	/* serial number string */
+} usb_dev_str_t;
+
+/*
+ * It is the callback function type for capture driver.
+ * Arguments:
+ *	dev_descr	- pointer to device descriptor
+ *	dev_str		- pointer to device strings
+ *	path		- pointer to device physical path
+ *	bus		- USB bus address
+ *	port		- USB port number
+ *	drv		- capture driver name.
+ *			  It is returned by the callback func.
+ * Return Values:
+ *      USB_SUCCESS     - VirtualBox will capture the device
+ *      USB_FAILURE     - VirtualBox will not capture the device
+ */
+typedef int (*usb_dev_driver_callback_t)(
+	usb_dev_descr_t	*dev_descr,
+	usb_dev_str_t	*dev_str,
+	char		*path,
+	int		bus,
+	int		port,
+	char		**drv,
+	void		*reserved);
+
+/*
+ * Register the callback function in the usba.
+ * Argument:
+ *	dip		- client driver's devinfo pointer
+ *	cb		- callback function
+ *
+ * Return Values:
+ *	USB_SUCCESS	- the registeration was successful
+ *	USB_FAILURE	- the registeration failed
+ */
+int usb_register_dev_driver(
+	dev_info_t			*dip,
+	usb_dev_driver_callback_t	cb);
+
+/*
+ * Unregister the callback function in the usba.
+ */
+void usb_unregister_dev_driver(dev_info_t *dip);
+
+
+/*
  * ***************************************************************************
  * USB Device and interface class, subclass and protocol codes
  * ***************************************************************************

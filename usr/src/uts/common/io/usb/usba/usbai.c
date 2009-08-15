@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,6 @@ static hrtime_t usba_last_timestamp;	/* last time stamp in trace */
  * Set to 1 to enable PM.
  */
 int usb_force_enable_pm = 0;
-
 
 /* USBA framework initializations */
 void
@@ -1287,4 +1286,39 @@ int
 usb_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)
 {
 	return (usba_hubdi_reset_device(dip, reset_level));
+}
+
+/*
+ * usb device driver registration
+ */
+int
+usb_register_dev_driver(dev_info_t *dip, usb_dev_driver_callback_t cb)
+{
+	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
+	    "usb_register_dev_driver: register the specified driver "
+	    "in usba: dip = 0x%p", (void *)dip);
+
+	if (cb != NULL) {
+		usb_cap.dip = dip;
+		usb_cap.usba_dev_driver_cb = cb;
+
+		return (USB_SUCCESS);
+	}
+
+	return (USB_FAILURE);
+}
+
+/*
+ * usb device driver unregistration
+ */
+void
+usb_unregister_dev_driver(dev_info_t *dip)
+{
+	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
+	    "usb_unregister_dev_driver: unregister the registered "
+	    "driver: dip =0x%p", (void *)dip);
+
+	ASSERT(dip == usb_cap.dip);
+	usb_cap.dip = NULL;
+	usb_cap.usba_dev_driver_cb = NULL;
 }
