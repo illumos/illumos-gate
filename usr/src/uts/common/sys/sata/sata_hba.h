@@ -52,7 +52,6 @@ extern "C" {
 /* SATA Framework definitions */
 
 #define	SATA_MAX_CPORTS		32	/* Max number of controller ports */
-
 					/* Multiplier (PMult) */
 #define	SATA_MAX_PMPORTS	16	/* Maximum number of ports on PMult */
 #define	SATA_PMULT_HOSTPORT	0xf	/* Port Multiplier host port number */
@@ -105,6 +104,21 @@ struct sata_port_scr
 typedef struct sata_port_scr sata_port_scr_t;
 
 /*
+ * SATA Port Multiplier general status and control register block.
+ * The gscr0, gscr1, gscr2 are the copyies of the register on port multiplier.
+ * GSCR[0], GSCR[1], GSCR[2] are defined in SATA defined by Port Multiplier
+ * 1.0/1.1/1.2 spec.
+ */
+struct sata_pmult_gscr {
+	uint32_t	gscr0;		/* Product Identifier register */
+	uint32_t	gscr1;		/* Resrved Information register */
+	uint32_t	gscr2;		/* Port Information register */
+	uint32_t	gscr64;		/* Feature register */
+};
+
+typedef struct sata_pmult_gscr sata_pmult_gscr_t;
+
+/*
  * SATA Device Structure (rev 1)
  * Used to request/return state of the controller, port, port multiplier
  * or an attached drive:
@@ -122,7 +136,8 @@ typedef struct sata_port_scr sata_port_scr_t;
  *	a value specific for a reported event.
  */
 #define	SATA_DEVICE_REV_1	1
-#define	SATA_DEVICE_REV		SATA_DEVICE_REV_1
+#define	SATA_DEVICE_REV_2	2
+#define	SATA_DEVICE_REV		SATA_DEVICE_REV_2
 
 struct sata_device
 {
@@ -131,6 +146,9 @@ struct sata_device
 	uint32_t	satadev_state;		/* Port or device state */
 	uint32_t	satadev_type;		/* Attached device type */
 	struct sata_port_scr satadev_scr; 	/* Port status and ctrl regs */
+	struct sata_pmult_gscr satadev_gscr;	/* Port multiplier specific */
+						/* global status and control */
+						/* registers */
 	uint32_t	satadev_add_info;	/* additional information, */
 						/* function specific */
 };
@@ -162,6 +180,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_device))
 #define	SATA_DSTATE_PWR_IDLE		0x000200
 #define	SATA_DSTATE_PWR_STANDBY		0x000400
 #define	SATA_DSTATE_RESET		0x001000
+#define	SATA_DSTATE_PMULT_INIT		0x002000
 #define	SATA_DSTATE_FAILED		0x008000
 
 /* Mask for drive power states */
@@ -547,6 +566,12 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_pkt))
 #define	SATA_ERR_RETR_PKT_TYPE_ATAPI	2
 
 /*
+ * Read/write port multiplier packet types
+ */
+#define	SATA_RDWR_PMULT_PKT_TYPE_READ	1
+#define	SATA_RDWR_PMULT_PKT_TYPE_WRITE	2
+
+/*
  * Hoplug functions vector structure (rev 1)
  */
 #define	SATA_TRAN_HOTPLUG_OPS_REV_1	1
@@ -602,7 +627,8 @@ typedef struct sata_tran_pwrmgt_ops sata_tran_pwrmgt_ops_t;
  */
 #define	SATA_TRAN_HBA_REV_1	1
 #define	SATA_TRAN_HBA_REV_2	2
-#define	SATA_TRAN_HBA_REV	SATA_TRAN_HBA_REV_2
+#define	SATA_TRAN_HBA_REV_3	3
+#define	SATA_TRAN_HBA_REV	SATA_TRAN_HBA_REV_3
 
 struct sata_hba_tran {
 	int		sata_tran_hba_rev;	/* version */
@@ -643,6 +669,7 @@ typedef struct sata_hba_tran sata_hba_tran_t;
 #define	SATA_CTLF_ASN			0x040 /* Asynchronous Event Support */
 #define	SATA_CTLF_QCMD			0x080 /* Queued commands support */
 #define	SATA_CTLF_NCQ			0x100 /* NCQ support */
+#define	SATA_CTLF_PMULT_FBS		0x200 /* FIS-based switching support */
 
 /*
  * sata_tran_start() return values.
@@ -693,6 +720,9 @@ typedef struct sata_hba_tran sata_hba_tran_t;
  * SATA_EVNT_PWR_LEVEL_CHANGED
  * A port or entire SATA controller power level has changed
  *
+ * SATA_EVNT_PMULT_LINK_CHANGED
+ * Port multiplier detect change on a link of its device port
+ *
  */
 #define	SATA_EVNT_DEVICE_ATTACHED	0x01
 #define	SATA_EVNT_DEVICE_DETACHED	0x02
@@ -701,6 +731,7 @@ typedef struct sata_hba_tran sata_hba_tran_t;
 #define	SATA_EVNT_PORT_FAILED		0x10
 #define	SATA_EVNT_DEVICE_RESET		0x20
 #define	SATA_EVNT_PWR_LEVEL_CHANGED	0x40
+#define	SATA_EVNT_PMULT_LINK_CHANGED	0x80
 
 /*
  * SATA Framework interface entry points
@@ -712,6 +743,10 @@ void 	sata_hba_fini(struct modlinkage *);
 void 	sata_hba_event_notify(dev_info_t *, sata_device_t *, int);
 sata_pkt_t *sata_get_error_retrieval_pkt(dev_info_t *, sata_device_t *, int);
 void	sata_free_error_retrieval_pkt(sata_pkt_t *);
+sata_pkt_t *sata_get_rdwr_pmult_pkt(dev_info_t *, sata_device_t *, uint8_t,
+    uint32_t, uint32_t);
+void	sata_free_rdwr_pmult_pkt(sata_pkt_t *);
+int	sata_check_pmult_blacklist(sata_device_t *);
 void	sata_free_dma_resources(sata_pkt_t *);
 
 /*

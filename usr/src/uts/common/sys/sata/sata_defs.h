@@ -91,6 +91,12 @@ extern "C" {
 
 #define	SATA_LOG_PAGE_10	0x10	/* log page 0x10 - SATA error */
 /*
+ * Port Multiplier Commands
+ */
+#define	SATAC_READ_PORTMULT	0xe4	/* read port multiplier */
+#define	SATAC_WRITE_PORTMULT	0xe8	/* write port multiplier */
+
+/*
  * Power Managment Commands (subset)
  */
 #define	SATAC_CHECK_POWER_MODE	0xe5	/* check power mode */
@@ -656,6 +662,41 @@ struct mode_acoustic_management {
 #define	ACOUSTIC_ENABLED	1
 
 #define	MODEPAGE_ACOUSTIC_MANAG 0x30
+
+/*
+ * Port Multiplier registers' offsets
+ */
+#define	SATA_PMULT_GSCR0		0x0
+#define	SATA_PMULT_GSCR1		0x1
+#define	SATA_PMULT_GSCR2		0x2
+#define	SATA_PMULT_GSCR32		0x20
+#define	SATA_PMULT_GSCR33		0x21
+#define	SATA_PMULT_GSCR64		0x40
+#define	SATA_PMULT_GSCR96		0x60
+
+#define	SATA_PMULT_PORTNUM_MASK		0xf
+
+#define	SATA_PMULT_PSCR0		0x0
+#define	SATA_PMULT_PSCR1		0x1
+#define	SATA_PMULT_PSCR2		0x2
+#define	SATA_PMULT_PSCR3		0x3
+#define	SATA_PMULT_PSCR4		0x4
+
+#define	SATA_PMULT_REG_SSTS		(SATA_PMULT_PSCR0)
+#define	SATA_PMULT_REG_SERR		(SATA_PMULT_PSCR1)
+#define	SATA_PMULT_REG_SCTL		(SATA_PMULT_PSCR2)
+#define	SATA_PMULT_REG_SACT		(SATA_PMULT_PSCR3)
+#define	SATA_PMULT_REG_SNTF		(SATA_PMULT_PSCR4)
+
+/*
+ * Port Multiplier capabilities
+ * (Indicated by GSCR64, and enabled by GSCR96)
+ */
+#define	SATA_PMULT_CAP_BIST		(1 << 0)
+#define	SATA_PMULT_CAP_PMREQ		(1 << 1)
+#define	SATA_PMULT_CAP_SSC		(1 << 2)
+#define	SATA_PMULT_CAP_SNOTIF		(1 << 3)
+#define	SATA_PMULT_CAP_PHYEVENT		(1 << 4)
 
 /*
  * sstatus field definitions

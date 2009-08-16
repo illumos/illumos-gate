@@ -244,8 +244,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_drive_info))
 /* Port Multiplier & host port info and state */
 struct sata_pmult_info {
 	sata_address_t	pmult_addr;		/* this PMult SATA Address */
-	kmutex_t	pmult_mutex;		/* pmult (host port) mutex */
-
 						/*
 						 * PMult state flags
 						 * SATA_STATE_UNKNOWN
@@ -256,12 +254,16 @@ struct sata_pmult_info {
 						 */
 	uint32_t	pmult_state;
 	uint32_t	pmult_event_flags;	/* Undefined for now */
-	struct sata_port_scr pmult_scr;		/* Host port SCR block */
+	struct sata_pmult_gscr pmult_gscr;	/* PMult GSCR block */
 	uint32_t	pmult_num_dev_ports; 	/* Number of data ports */
 	struct sata_pmport_info	*pmult_dev_port[SATA_MAX_PMPORTS - 1];
 };
 
 typedef	struct sata_pmult_info sata_pmult_info_t;
+
+_NOTE(SCHEME_PROTECTS_DATA("unshared data", sata_pmult_info))
+_NOTE(MUTEX_PROTECTS_DATA(sata_cport_info::cport_mutex, \
+    sata_pmult_info::pmult_dev_port))
 
 /* Port Multiplier's device port info & state */
 struct sata_pmport_info {
@@ -414,6 +416,7 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 					SATA_EVNT_DEVICE_DETACHED | \
 					SATA_EVNT_LINK_LOST | \
 					SATA_EVNT_LINK_ESTABLISHED | \
+					SATA_EVNT_PMULT_LINK_CHANGED | \
 					SATA_EVNT_PORT_FAILED | \
 					SATA_EVNT_TARGET_NODE_CLEANUP | \
 					SATA_EVNT_AUTOONLINE_DEVICE)
@@ -618,6 +621,10 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 	sata_hba_inst->satahba_dev_port[cport]->\
 	cport_devp.cport_sata_pmult->pmult_num_dev_ports
 
+#define	SATA_PMPORT_MUTEX(sata_hba_inst, cport, pmport) \
+	sata_hba_inst->satahba_dev_port[cport]->\
+	cport_devp.cport_sata_pmult->pmult_dev_port[pmport]->pmport_mutex
+
 #define	SATA_PMPORT_INFO(sata_hba_inst, cport, pmport) \
 	sata_hba_inst->satahba_dev_port[cport]->\
 	cport_devp.cport_sata_pmult->pmult_dev_port[pmport]
@@ -639,6 +646,11 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 	sata_hba_inst->satahba_dev_port[cport]->\
 	cport_devp.cport_sata_pmult->pmult_dev_port[pmport]->pmport_dev_type
 
+#define	SATA_PMPORT_EVENT_FLAGS(sata_hba_inst, cport, pmport) \
+	sata_hba_inst->satahba_dev_port[cport]->\
+	cport_devp.cport_sata_pmult->pmult_dev_port[pmport]->\
+	pmport_event_flags
+
 #define	SATA_PMPORTINFO_DRV_TYPE(pmportinfo) \
 	pmportinfo->pmport_dev_type
 
@@ -650,6 +662,12 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 
 #define	SATA_TXLT_CPORT(spx) \
 	spx->txlt_sata_pkt->satapkt_device.satadev_addr.cport
+
+#define	SATA_TXLT_PMPORT(spx) \
+	spx->txlt_sata_pkt->satapkt_device.satadev_addr.pmport
+
+#define	SATA_TXLT_QUAL(spx) \
+	spx->txlt_sata_pkt->satapkt_device.satadev_addr.qual
 
 #define	SATA_TXLT_CPORT_MUTEX(spx) \
 	spx->txlt_sata_hba_inst->\
@@ -785,6 +803,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SATA_DBG_ATAPI		0x1000
 #define	SATA_DBG_ATAPI_PACKET	0x8000
 #define	SATA_DBG_INTR_CTX	0x10000
+#define	SATA_DBG_PMULT		0x20000
 
 typedef struct sata_atapi_cmd {
 	uint8_t acdb[SATA_ATAPI_MAX_CDB_LEN];
@@ -816,7 +835,7 @@ typedef struct sata_atapi_cmd {
 
 #endif
 
-/* sata_rev_tag 1.43 */
+/* sata_rev_tag 1.44 */
 
 #ifdef	__cplusplus
 }

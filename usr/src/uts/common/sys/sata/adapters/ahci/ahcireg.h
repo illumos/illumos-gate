@@ -212,7 +212,17 @@ extern "C" {
 #define	AHCI_TFD_ERR_SHIFT	8
 #define	AHCI_TFD_ERR_SGS	(0x1 << 0) /* DDR1: Send_good_status */
 
+/* FIS-Based Switching Control Register */
+#define	AHCI_FBS_SWE_MASK	(0xf << 16)	/* Device With Error */
+#define	AHCI_FBS_ADO_MASK	(0xf << 12)	/* Active Device Optimization */
+#define	AHCI_FBS_DEV_MASK	(0xf << 8)	/* Device To Issue */
+#define	AHCI_FBS_SDE		(0x1 << 2)	/* Single Device Error */
+#define	AHCI_FBS_DEC		(0x1 << 1)	/* Device Error Clear */
+#define	AHCI_FBS_EN		(0x1 << 0)	/* Enable */
+
+/* Sxxx Registers */
 #define	AHCI_SERROR_CLEAR_ALL			0xffffffff
+#define	AHCI_SNOTIF_CLEAR_ALL			0xffffffff
 
 /* per port registers offset */
 #define	AHCI_PORT_OFFSET(ahci_ctlp, port)			\
@@ -262,6 +272,9 @@ extern "C" {
 	/* SNotification */
 #define	AHCI_PORT_PxSNTF(ahci_ctlp, port)			\
 			(AHCI_PORT_OFFSET(ahci_ctlp, port) + 0x3c)
+	/* FIS-Based Switching Control */
+#define	AHCI_PORT_PxFBS(ahci_ctlp, port)			\
+			(AHCI_PORT_OFFSET(ahci_ctlp, port) + 0x40)
 
 #define	AHCI_SLOT_MASK(ahci_ctlp)				\
 	((ahci_ctlp->ahcictl_num_cmd_slots == AHCI_PORT_MAX_CMD_SLOTS) ? \
@@ -269,18 +282,13 @@ extern "C" {
 #define	AHCI_NCQ_SLOT_MASK(ahci_portp)				\
 	((ahci_portp->ahciport_max_ncq_tags == AHCI_PORT_MAX_CMD_SLOTS) ? \
 	0xffffffff : ((0x1 << ahci_portp->ahciport_max_ncq_tags) - 1))
+#define	AHCI_PMPORT_MASK(ahci_portp)				\
+	((0x1 << ahci_portp->ahciport_pmult_info->ahcipmi_num_dev_ports) - 1)
 
 /* Device signatures */
 #define	AHCI_SIGNATURE_PORT_MULTIPLIER	0x96690101
 #define	AHCI_SIGNATURE_ATAPI		0xeb140101
 #define	AHCI_SIGNATURE_DISK		0x00000101
-
-/*
- * The address of the control port for the port multiplier, which is
- * used for control and status communication with the port multiplier
- * itself.
- */
-#define	AHCI_PORTMULT_CONTROL_PORT	0x0f
 
 #define	AHCI_H2D_REGISTER_FIS_TYPE	0x27
 #define	AHCI_H2D_REGISTER_FIS_LENGTH	5

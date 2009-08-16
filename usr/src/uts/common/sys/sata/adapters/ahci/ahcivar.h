@@ -32,17 +32,104 @@
 extern "C" {
 #endif
 
+/*
+ * AHCI address qualifier flags (in qual field of ahci_addr struct).
+ */
+#define	AHCI_ADDR_NULL		0x00
+#define	AHCI_ADDR_PORT		0x01
+#define	AHCI_ADDR_PMPORT	0x02
+#define	AHCI_ADDR_PMULT		0x04
+#define	AHCI_ADDR_VALID		(AHCI_ADDR_PORT | \
+				AHCI_ADDR_PMULT | \
+				AHCI_ADDR_PMPORT)
+
+/*
+ * AHCI address structure.
+ */
+struct ahci_addr {
+
+	/* HBA port number */
+	uint8_t			aa_port;
+
+	/* Port multiplier port number */
+	uint8_t			aa_pmport;
+
+	/*
+	 * AHCI_ADDR_NULL
+	 * AHCI_ADDR_PORT
+	 * AHCI_ADDR_PMPORT
+	 * AHCI_ADDR_PMULT
+	 */
+	uint8_t			aa_qual;
+};
+typedef struct ahci_addr ahci_addr_t;
+
+_NOTE(SCHEME_PROTECTS_DATA("unshared data", ahci_addr))
+
+#define	AHCI_ADDR_IS_PORT(addrp)					\
+	((addrp)->aa_qual & AHCI_ADDR_PORT)
+#define	AHCI_ADDR_IS_PMPORT(addrp)					\
+	((addrp)->aa_qual & AHCI_ADDR_PMPORT)
+#define	AHCI_ADDR_IS_PMULT(addrp)					\
+	((addrp)->aa_qual & AHCI_ADDR_PMULT)
+#define	AHCI_ADDR_IS_VALID(addrp)					\
+	((addrp)->aa_port < SATA_MAX_CPORTS) &&				\
+	((addrp)->aa_pmport < SATA_MAX_PMPORTS) &&			\
+	((addrp)->aa_qual & AHCI_ADDR_VALID)
+
+#define	AHCI_ADDR_SET(addrp, port, pmport, qual)			\
+	{								\
+		(addrp)->aa_port = port;				\
+		(addrp)->aa_pmport = pmport;				\
+		(addrp)->aa_qual = qual;				\
+	}
+#define	AHCI_ADDR_SET_PORT(addrp, port)					\
+	AHCI_ADDR_SET(addrp, port, 0, AHCI_ADDR_PORT)
+#define	AHCI_ADDR_SET_PMPORT(addrp, port, pmport)			\
+	AHCI_ADDR_SET(addrp, port, pmport, AHCI_ADDR_PMPORT)
+#define	AHCI_ADDR_SET_PMULT(addrp, port)				\
+	AHCI_ADDR_SET(addrp, port, SATA_PMULT_HOSTPORT, AHCI_ADDR_PMULT)
+
 /* Type for argument of event handler */
 typedef	struct ahci_event_arg {
 	void		*ahciea_ctlp;
 	void		*ahciea_portp;
+	void		*ahciea_addrp;
 	uint32_t	ahciea_event;
 } ahci_event_arg_t;
 
 /* Warlock annotation */
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_ctlp))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_portp))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_addrp))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_event))
+
+
+/*
+ * ahci_pmult_info stores the information of a port multiplier and its
+ * sub-devices in case a port multiplier is attached to an HBA port.
+ */
+struct ahci_pmult_info {
+
+	/* Number of the device ports */
+	int			ahcipmi_num_dev_ports;
+
+	/* Device type of the sub-devices of the port multipler */
+	uint8_t			ahcipmi_device_type[SATA_MAX_PMPORTS];
+
+	/* State of port multiplier port */
+	uint32_t		ahcipmi_port_state[SATA_MAX_PMPORTS];
+
+	/*
+	 * Port multiplier port on which there is outstanding NCQ
+	 * commands. Only make sense in command based switching mode.
+	 */
+	uint8_t			ahcipmi_ncq_pmport;
+
+	/* Pending asynchronous notification events tags */
+	uint32_t		ahcipmi_snotif_tags;
+};
+typedef struct ahci_pmult_info ahci_pmult_info_t;
 
 /*
  * flags for ahciport_flags
@@ -69,14 +156,31 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(ahci_event_arg_t::ahciea_event))
  *
  * AHCI_PORT_FLAG_NODEV: this flag will be set when a device is found gone
  * during ahci_restart_port_wait_till_ready process.
+ *
+ * AHCI_PORT_FLAG_RDWR_PMULT: this flags will be set when a READ/WRITE
+ * PORTMULT command is being executed.
+ *
+ * AHCI_PORT_FLAG_IGNORE_IPMS: this flags will be set when enumerating a port
+ * multiplier. According AHCI spec, IPMS error should be ignore during
+ * enumeration of port multiplier.
+ *
+ * AHCI_PORT_FLAG_PMULT_SNTF: this flags will be set when the a asynchronous
+ * notification event on the port multiplier is being handled.
+ *
+ * AHCI_PORT_FLAG_HOTPLUG: this flags will be set when a hot plug event is
+ * being handled.
  */
-#define	AHCI_PORT_FLAG_SPINUP	0x01
-#define	AHCI_PORT_FLAG_MOPPING	0x02
-#define	AHCI_PORT_FLAG_POLLING	0x04
-#define	AHCI_PORT_FLAG_RQSENSE	0x08
-#define	AHCI_PORT_FLAG_STARTED	0x10
-#define	AHCI_PORT_FLAG_RDLOGEXT	0x20
-#define	AHCI_PORT_FLAG_NODEV	0x40
+#define	AHCI_PORT_FLAG_SPINUP		0x01
+#define	AHCI_PORT_FLAG_MOPPING		0x02
+#define	AHCI_PORT_FLAG_POLLING		0x04
+#define	AHCI_PORT_FLAG_RQSENSE		0x08
+#define	AHCI_PORT_FLAG_STARTED		0x10
+#define	AHCI_PORT_FLAG_RDLOGEXT		0x20
+#define	AHCI_PORT_FLAG_NODEV		0x40
+#define	AHCI_PORT_FLAG_RDWR_PMULT	0x80
+#define	AHCI_PORT_FLAG_IGNORE_IPMS	0x100
+#define	AHCI_PORT_FLAG_PMULT_SNTF	0x200
+#define	AHCI_PORT_FLAG_HOTPLUG		0x400
 
 typedef struct ahci_port {
 	/* The physical port number */
@@ -87,6 +191,9 @@ typedef struct ahci_port {
 	/* State of the port */
 	uint32_t		ahciport_port_state;
 
+	/* Port multiplier struct */
+	ahci_pmult_info_t	*ahciport_pmult_info;
+
 	/*
 	 * AHCI_PORT_FLAG_SPINUP
 	 * AHCI_PORT_FLAG_MOPPING
@@ -95,6 +202,10 @@ typedef struct ahci_port {
 	 * AHCI_PORT_FLAG_STARTED
 	 * AHCI_PORT_FLAG_RDLOGEXT
 	 * AHCI_PORT_FLAG_NODEV
+	 * AHCI_PORT_FLAG_RDWR_PMULT
+	 * AHCI_PORT_FLAG_IGNORE_IPMS
+	 * AHCI_PORT_FLAG_PMULT_SNTF
+	 * AHCI_PORT_FLAG_HOTPLUG
 	 */
 	int			ahciport_flags;
 
@@ -146,6 +257,9 @@ typedef struct ahci_port {
 	/* Keep the error retrieval sata packet */
 	sata_pkt_t		*ahciport_err_retri_pkt;
 
+	/* Keep the read/write port multiplier packet */
+	sata_pkt_t		*ahciport_rdwr_pmult_pkt;
+
 	/*
 	 * SATA HBA driver is supposed to remember and maintain device
 	 * reset state. While the reset is in progress, it doesn't accept
@@ -185,6 +299,50 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_event_taskq))
 
+#define	AHCI_NUM_PORTS(ctlp)						\
+	(ctlp)->ahcictl_num_ports
+
+#define	AHCIPORT_NUM_PMPORTS(portp)					\
+	(portp)->ahciport_pmult_info->ahcipmi_num_dev_ports
+
+#define	AHCIPORT_NCQ_PMPORT(ahci_portp)					\
+	(ahci_portp->ahciport_pmult_info->ahcipmi_ncq_pmport)
+
+#define	AHCIPORT_DEV_TYPE(portp, addrp)					\
+	(portp)->ahciport_device_type
+
+#define	AHCIPORT_PMDEV_TYPE(portp, addrp)				\
+	(portp)->ahciport_pmult_info->ahcipmi_device_type		\
+	[(addrp)->aa_pmport]
+
+#define	AHCIPORT_GET_DEV_TYPE(portp, addrp)				\
+	(AHCI_ADDR_IS_PORT(addrp) | AHCI_ADDR_IS_PMULT(addrp) ?		\
+	AHCIPORT_DEV_TYPE(portp, addrp) :				\
+	AHCIPORT_PMDEV_TYPE(portp, addrp))
+
+#define	AHCIPORT_SET_DEV_TYPE(portp, addrp, type)			\
+	if (AHCI_ADDR_IS_PORT(addrp) | AHCI_ADDR_IS_PMULT(addrp))	\
+		AHCIPORT_DEV_TYPE(portp, addrp) = type;			\
+	else								\
+		AHCIPORT_PMDEV_TYPE(portp, addrp) = type;
+
+#define	AHCIPORT_STATE(portp, addrp)					\
+	(portp)->ahciport_port_state
+
+#define	AHCIPORT_PMSTATE(portp, addrp)					\
+	(portp)->ahciport_pmult_info->ahcipmi_port_state		\
+	[(addrp)->aa_pmport]
+
+#define	AHCIPORT_GET_STATE(portp, addrp)				\
+	(AHCI_ADDR_IS_PORT(addrp) | AHCI_ADDR_IS_PMULT(addrp) ?		\
+	AHCIPORT_STATE(portp, addrp) : AHCIPORT_PMSTATE(portp, addrp))
+
+#define	AHCIPORT_SET_STATE(portp, addrp, state)				\
+	if (AHCI_ADDR_IS_PORT(addrp) | AHCI_ADDR_IS_PMULT(addrp))	\
+		AHCIPORT_STATE(portp, addrp) = state;			\
+	else								\
+		AHCIPORT_PMSTATE(portp, addrp) = state;
+
 typedef struct ahci_ctl {
 	dev_info_t		*ahcictl_dip;
 	/* To map port number to cport number */
@@ -213,6 +371,10 @@ typedef struct ahci_ctl {
 	 * AHCI_CAP_PM
 	 * AHCI_CAP_32BIT_DMA
 	 * AHCI_CAP_SCLO
+	 * AHCI_CAP_INIT_PORT_RESET
+	 * AHCI_CAP_SNTF
+	 * AHCI_CAP_PMULT_CBSS
+	 * AHCI_CAP_PMULT_FBSS
 	 */
 	int			ahcictl_cap;
 
@@ -291,7 +453,12 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_COMMU_32BIT_DMA	0x40
 /* Port reset is needed for initialization */
 #define	AHCI_CAP_INIT_PORT_RESET	0x80
-
+/* Port Asychronous Notification */
+#define	AHCI_CAP_SNTF			0x100
+/* Port Multiplier Command-Based Switching Support (PMULT_CBSS) */
+#define	AHCI_CAP_PMULT_CBSS		0x200
+/* Port Multiplier FIS-Based Switching Support (PMULT_FBSS) */
+#define	AHCI_CAP_PMULT_FBSS		0x400
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
@@ -300,6 +467,10 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	ERR_RETRI_CMD_IN_PROGRESS(ahci_portp)		\
 	(ahci_portp->ahciport_flags &			\
 	(AHCI_PORT_FLAG_RQSENSE|AHCI_PORT_FLAG_RDLOGEXT))
+
+#define	RDWR_PMULT_CMD_IN_PROGRESS(ahci_portp)		\
+	(ahci_portp->ahciport_flags &			\
+	AHCI_PORT_FLAG_RDWR_PMULT)
 
 #define	NON_NCQ_CMD_IN_PROGRESS(ahci_portp)		\
 	(!ERR_RETRI_CMD_IN_PROGRESS(ahci_portp) &&	\
@@ -314,6 +485,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_NON_NCQ_CMD	0x0
 #define	AHCI_NCQ_CMD		0x1
 #define	AHCI_ERR_RETRI_CMD	0x2
+#define	AHCI_RDWR_PMULT_CMD	0x4
 
 /* State values for ahci_attach */
 #define	AHCI_ATTACH_STATE_NONE			(0x1 << 0)
@@ -374,6 +546,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCIDBG_PM		0x8000
 #define	AHCIDBG_UNDERFLOW	0x10000
 #define	AHCIDBG_MSI		0x20000
+#define	AHCIDBG_PMULT		0x40000
 
 extern uint32_t ahci_debug_flags;
 

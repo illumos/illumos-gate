@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,7 @@ static char *sata_help[] = {
 	NULL,
 	"SATA specific commands:\n",
 	" cfgadm -c [configure|unconfigure|disconnect|connect] ap_id "
-	"[ap_id...]\n",
+	    "[ap_id...]\n",
 	" cfgadm -x sata_reset_port ap_id  [ap_id...]\n",
 	" cfgadm -x sata_reset_device ap_id [ap_id...]\n",
 	" cfgadm -x sata_reset_all ap_id\n",
@@ -114,7 +114,7 @@ static msgcvt_t sata_msgs[] = {
 
 	/* CFGA_SATA_DEVCTL / CFGA_LIB_ERROR -> "Library error" */
 	{ CVT, CFGA_LIB_ERROR, "Internal error: "
-	    "Cannot allocate devctl handle " },
+		"Cannot allocate devctl handle " },
 
 	/*
 	 * CFGA_SATA_DEV_CONFIGURE /
@@ -226,15 +226,15 @@ verify_params(const char *ap_id, const char *options, char **errstring);
 
 static cfga_sata_ret_t
 setup_for_devctl_cmd(const char *ap_id, devctl_hdl_t *devctl_hdl,
-	nvlist_t **user_nvlistp, uint_t oflag);
+    nvlist_t **user_nvlistp, uint_t oflag);
 
 static cfga_sata_ret_t
 port_state(devctl_hdl_t hdl, nvlist_t *list,
-	ap_rstate_t *rstate, ap_ostate_t *ostate);
+    ap_rstate_t *rstate, ap_ostate_t *ostate);
 
 static cfga_sata_ret_t
 do_control_ioctl(const char *ap_id, sata_cfga_apctl_t subcommand, uint_t arg,
-	void **descrp, size_t *sizep);
+    void **descrp, size_t *sizep);
 
 static void
 cleanup_after_devctl_cmd(devctl_hdl_t devctl_hdl, nvlist_t *user_nvlist);
@@ -245,6 +245,8 @@ sata_get_devicepath(const char *ap_id);
 static int
 sata_confirm(struct cfga_confirm *confp, char *msg);
 
+static cfga_sata_ret_t
+get_port_num(const char *ap_id, uint32_t *port);
 
 /* Utilities */
 
@@ -399,8 +401,8 @@ get_msg(uint_t msg_index, msgcvt_t *msg_tbl, uint_t tbl_size)
 	}
 
 	return ((msg_tbl[msg_index].intl) ?
-		dgettext(TEXT_DOMAIN, msg_tbl[msg_index].msgstr) :
-		msg_tbl[msg_index].msgstr);
+	    dgettext(TEXT_DOMAIN, msg_tbl[msg_index].msgstr) :
+	    msg_tbl[msg_index].msgstr);
 }
 
 /*
@@ -453,10 +455,10 @@ set_msg(char **ret_str, ...)
 
 cfga_err_t
 sata_err_msg(
-	char **errstring,
-	cfga_sata_ret_t rv,
-	const char *ap_id,
-	int l_errno)
+    char **errstring,
+    cfga_sata_ret_t rv,
+    const char *ap_id,
+    int l_errno)
 {
 	if (errstring == NULL) {
 		return (sata_msgs[rv].cfga_err);
@@ -488,7 +490,7 @@ sata_err_msg(
 		/* hardware-specific help needed */
 		set_msg(errstring, ERR_STR(rv), NULL);
 		set_msg(errstring, "\n",
-			dgettext(TEXT_DOMAIN, sata_help[HELP_HEADER]), NULL);
+		    dgettext(TEXT_DOMAIN, sata_help[HELP_HEADER]), NULL);
 		set_msg(errstring, sata_help[HELP_RESET_PORT], NULL);
 		set_msg(errstring, sata_help[HELP_RESET_DEVICE], NULL);
 		set_msg(errstring, sata_help[HELP_RESET_ALL],  NULL);
@@ -559,13 +561,13 @@ sata_err_msg(
 /*ARGSUSED*/
 cfga_err_t
 cfga_change_state(
-	cfga_cmd_t state_change_cmd,
-	const char *ap_id,
-	const char *options,
-	struct cfga_confirm *confp,
-	struct cfga_msg *msgp,
-	char **errstring,
-	cfga_flags_t flags)
+    cfga_cmd_t state_change_cmd,
+    const char *ap_id,
+    const char *options,
+    struct cfga_confirm *confp,
+    struct cfga_msg *msgp,
+    char **errstring,
+    cfga_flags_t flags)
 {
 	int		ret;
 	int 		len;
@@ -577,6 +579,9 @@ cfga_change_state(
 	devctl_hdl_t	hdl = NULL;
 	cfga_sata_ret_t	rv = CFGA_SATA_OK;
 	char		*pdyn;
+	char		*str_type;
+	size_t		size;
+	boolean_t	pmult = B_FALSE;
 
 	/*
 	 * All sub-commands which can change state of device require
@@ -593,12 +598,30 @@ cfga_change_state(
 	}
 
 	if ((rv = setup_for_devctl_cmd(ap_id, &hdl, &nvl,
-		DC_RDONLY)) != CFGA_SATA_OK) {
+	    DC_RDONLY)) != CFGA_SATA_OK) {
 		goto bailout;
+	}
+
+	/*
+	 * Checking device type. A port multiplier is not configurable - it is
+	 * already configured as soon as it is connected.
+	 */
+	if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_AP_TYPE, NULL,
+	    (void **)&str_type, &size)) != CFGA_SATA_OK) {
+		/* no such deivce */
+		goto bailout;
+	}
+	if (strncmp(str_type, "sata-pmult", sizeof ("sata-pmult")) == 0) {
+		pmult = B_TRUE;
 	}
 
 	switch (state_change_cmd) {
 	case CFGA_CMD_CONFIGURE:
+		if (pmult == B_TRUE) {
+			rv = CFGA_SATA_HWOPNOTSUPP;
+			goto bailout;
+		}
+
 		if ((rv = port_state(hdl, nvl, &rstate, &ostate)) !=
 		    CFGA_SATA_OK)
 			goto bailout;
@@ -647,6 +670,11 @@ cfga_change_state(
 		break;
 
 	case CFGA_CMD_UNCONFIGURE:
+		if (pmult == B_TRUE) {
+			rv = CFGA_SATA_HWOPNOTSUPP;
+			goto bailout;
+		}
+
 		if ((rv = port_state(hdl, nvl, &rstate, &ostate)) !=
 		    CFGA_SATA_OK)
 			goto bailout;
@@ -668,13 +696,13 @@ cfga_change_state(
 		rv = CFGA_SATA_OK;
 
 		len = strlen(SATA_CONFIRM_DEVICE) +
-			strlen(SATA_CONFIRM_DEVICE_SUSPEND) +
-			strlen("Unconfigure") + strlen(ap_id);
+		    strlen(SATA_CONFIRM_DEVICE_SUSPEND) +
+		    strlen("Unconfigure") + strlen(ap_id);
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len + 3, "Unconfigure"
-				" %s%s\n%s",
-				SATA_CONFIRM_DEVICE, ap_id,
-				SATA_CONFIRM_DEVICE_SUSPEND);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_DEVICE, ap_id,
+			    SATA_CONFIRM_DEVICE_SUSPEND);
 		}
 
 		if (!sata_confirm(confp, msg)) {
@@ -687,7 +715,7 @@ cfga_change_state(
 		devpath = sata_get_devicepath(ap_id);
 		if (devpath == NULL) {
 			(void) printf(
-				"cfga_change_state: get device path failed\n");
+			    "cfga_change_state: get device path failed\n");
 			rv = CFGA_SATA_DEV_UNCONFIGURE;
 			break;
 		}
@@ -705,10 +733,10 @@ cfga_change_state(
 				rv = CFGA_SATA_BUSY;
 			}
 			(void) sata_rcm_online(ap_id, errstring, devpath,
-				flags);
+			    flags);
 		} else {
 			(void) sata_rcm_remove(ap_id, errstring, devpath,
-				flags);
+			    flags);
 
 		}
 		S_FREE(devpath);
@@ -733,15 +761,14 @@ cfga_change_state(
 
 		rv = CFGA_SATA_OK; /* other statuses don't matter */
 
-
 		/*
 		 * If the port originally with device attached and was
 		 * unconfigured already, the devicepath for the sd will be
 		 * removed. sata_get_devicepath in this case is not necessary.
 		 */
-
 		/* only call rcm_offline if the state was CONFIGURED */
-		if (ostate == AP_OSTATE_CONFIGURED) {
+		if (ostate == AP_OSTATE_CONFIGURED &&
+		    pmult == B_FALSE) {
 			devpath = sata_get_devicepath(ap_id);
 			if (devpath == NULL) {
 				(void) printf(
@@ -751,14 +778,14 @@ cfga_change_state(
 			}
 
 			len = strlen(SATA_CONFIRM_DEVICE) +
-				strlen(SATA_CONFIRM_DEVICE_SUSPEND) +
-				strlen("Disconnect") + strlen(ap_id);
+			    strlen(SATA_CONFIRM_DEVICE_SUSPEND) +
+			    strlen("Disconnect") + strlen(ap_id);
 			if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 				(void) snprintf(msg, len + 3,
-					"Disconnect"
-					" %s%s\n%s",
-					SATA_CONFIRM_DEVICE, ap_id,
-					SATA_CONFIRM_DEVICE_SUSPEND);
+				    "Disconnect"
+				    " %s%s\n%s",
+				    SATA_CONFIRM_DEVICE, ap_id,
+				    SATA_CONFIRM_DEVICE_SUSPEND);
 			}
 			if (!sata_confirm(confp, msg)) {
 				free(msg);
@@ -780,7 +807,7 @@ cfga_change_state(
 				if (errno == EBUSY)
 					rv = CFGA_SATA_BUSY;
 				(void) sata_rcm_online(ap_id, errstring,
-					devpath, flags);
+				    devpath, flags);
 				S_FREE(devpath);
 
 				/*
@@ -796,20 +823,20 @@ cfga_change_state(
 				(void) printf("%s\n",
 				    ERR_STR(CFGA_SATA_DEVICE_UNCONFIGURED));
 				(void) sata_rcm_remove(ap_id, errstring,
-					devpath, flags);
+				    devpath, flags);
 			}
 			S_FREE(devpath);
 		} else if (rstate == AP_RSTATE_CONNECTED ||
 		    rstate == AP_RSTATE_EMPTY) {
 			len = strlen(SATA_CONFIRM_PORT) +
-				strlen(SATA_CONFIRM_PORT_DISABLE) +
-				strlen("Deactivate Port") + strlen(ap_id);
+			    strlen(SATA_CONFIRM_PORT_DISABLE) +
+			    strlen("Deactivate Port") + strlen(ap_id);
 			if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 				(void) snprintf(msg, len +3,
-					"Disconnect"
-					" %s%s\n%s",
-					SATA_CONFIRM_PORT, ap_id,
-					SATA_CONFIRM_PORT_DISABLE);
+				    "Disconnect"
+				    " %s%s\n%s",
+				    SATA_CONFIRM_PORT, ap_id,
+				    SATA_CONFIRM_PORT_DISABLE);
 			}
 			if (!sata_confirm(confp, msg)) {
 				free(msg);
@@ -837,13 +864,13 @@ cfga_change_state(
 		}
 
 		len = strlen(SATA_CONFIRM_PORT) +
-			strlen(SATA_CONFIRM_PORT_ENABLE) +
-			strlen("Activate Port") + strlen(ap_id);
+		    strlen(SATA_CONFIRM_PORT_ENABLE) +
+		    strlen("Activate Port") + strlen(ap_id);
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Activate"
-				" %s%s\n%s",
-				SATA_CONFIRM_PORT, ap_id,
-				SATA_CONFIRM_PORT_ENABLE);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_PORT, ap_id,
+			    SATA_CONFIRM_PORT_ENABLE);
 		}
 		if (!sata_confirm(confp, msg)) {
 			rv = CFGA_SATA_NACK;
@@ -886,13 +913,13 @@ bailout:
 /* cfgadm entry point */
 cfga_err_t
 cfga_private_func(
-	const char *func,
-	const char *ap_id,
-	const char *options,
-	struct cfga_confirm *confp,
-	struct cfga_msg *msgp,
-	char **errstring,
-	cfga_flags_t flags)
+    const char *func,
+    const char *ap_id,
+    const char *options,
+    struct cfga_confirm *confp,
+    struct cfga_msg *msgp,
+    char **errstring,
+    cfga_flags_t flags)
 {
 	int			len;
 	char 			*msg;
@@ -943,9 +970,9 @@ cfga_private_func(
 
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Reset"
-				" %s%s\n%s",
-				SATA_CONFIRM_PORT, ap_id,
-				SATA_CONFIRM_DEVICE_ABORT);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_PORT, ap_id,
+			    SATA_CONFIRM_DEVICE_ABORT);
 		} else {
 			rv = CFGA_SATA_NACK;
 			goto bailout;
@@ -957,7 +984,7 @@ cfga_private_func(
 		}
 
 		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_PORT, NULL,
-			(void **)&str_p, &size);
+		    (void **)&str_p, &size);
 
 	} else if (strcmp(func, SATA_RESET_DEVICE) == 0) {
 		if ((rv = port_state(hdl, list, &rstate, &ostate)) !=
@@ -977,9 +1004,9 @@ cfga_private_func(
 
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Reset"
-				" %s%s\n%s",
-				SATA_CONFIRM_DEVICE, ap_id,
-				SATA_CONFIRM_DEVICE_ABORT);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_DEVICE, ap_id,
+			    SATA_CONFIRM_DEVICE_ABORT);
 		} else {
 			rv = CFGA_SATA_NACK;
 			goto bailout;
@@ -1000,9 +1027,9 @@ cfga_private_func(
 
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Reset"
-				" %s%s\n%s",
-				SATA_CONFIRM_CONTROLLER, ap_id,
-				SATA_CONFIRM_CONTROLLER_ABORT);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_CONTROLLER, ap_id,
+			    SATA_CONFIRM_CONTROLLER_ABORT);
 		} else {
 			rv = CFGA_SATA_NACK;
 			goto bailout;
@@ -1013,7 +1040,7 @@ cfga_private_func(
 			goto bailout;
 		}
 		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_ALL, NULL,
-			(void **)&str_p, &size);
+		    (void **)&str_p, &size);
 
 	} else if (strcmp(func, SATA_PORT_DEACTIVATE) == 0) {
 		len = strlen(SATA_CONFIRM_PORT) +
@@ -1022,9 +1049,9 @@ cfga_private_func(
 
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Deactivate"
-				" %s%s\n%s",
-				SATA_CONFIRM_PORT, ap_id,
-				SATA_CONFIRM_PORT_DISABLE);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_PORT, ap_id,
+			    SATA_CONFIRM_PORT_DISABLE);
 		} else {
 			rv = CFGA_SATA_NACK;
 			goto bailout;
@@ -1035,7 +1062,7 @@ cfga_private_func(
 		}
 
 		rv = do_control_ioctl(ap_id, SATA_CFGA_PORT_DEACTIVATE, NULL,
-			(void **)&str_p, &size);
+		    (void **)&str_p, &size);
 
 	} else if (strcmp(func, SATA_PORT_ACTIVATE) == 0) {
 		len = strlen(SATA_CONFIRM_PORT) +
@@ -1044,9 +1071,9 @@ cfga_private_func(
 
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Activate"
-				" %s%s\n%s",
-				SATA_CONFIRM_PORT, ap_id,
-				SATA_CONFIRM_PORT_ENABLE);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_PORT, ap_id,
+			    SATA_CONFIRM_PORT_ENABLE);
 		} else {
 			rv = CFGA_SATA_NACK;
 			goto bailout;
@@ -1058,7 +1085,7 @@ cfga_private_func(
 
 		rv = do_control_ioctl(ap_id, SATA_CFGA_PORT_ACTIVATE,
 		    NULL, (void **)&str_p, &size);
-			goto bailout;
+		goto bailout;
 
 	} else if (strcmp(func, SATA_PORT_SELF_TEST) == 0) {
 		len = strlen(SATA_CONFIRM_PORT) +
@@ -1067,9 +1094,9 @@ cfga_private_func(
 
 		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Self Test"
-				" %s%s\n%s",
-				SATA_CONFIRM_PORT, ap_id,
-				SATA_CONFIRM_DEVICE_SUSPEND);
+			    " %s%s\n%s",
+			    SATA_CONFIRM_PORT, ap_id,
+			    SATA_CONFIRM_DEVICE_SUSPEND);
 		} else {
 			rv = CFGA_SATA_NACK;
 			goto bailout;
@@ -1080,7 +1107,7 @@ cfga_private_func(
 		}
 
 		rv = do_control_ioctl(ap_id, SATA_CFGA_PORT_SELF_TEST,
-			NULL, (void **)&str_p, &size);
+		    NULL, (void **)&str_p, &size);
 	} else {
 		/* Unrecognized operation request */
 		rv = CFGA_SATA_HWOPNOTSUPP;
@@ -1097,11 +1124,11 @@ bailout:
 /*ARGSUSED*/
 cfga_err_t
 cfga_test(
-	const char *ap_id,
-	const char *options,
-	struct cfga_msg *msgp,
-	char **errstring,
-	cfga_flags_t flags)
+    const char *ap_id,
+    const char *options,
+    struct cfga_msg *msgp,
+    char **errstring,
+    cfga_flags_t flags)
 {
 	/* Should call ioctl for self test - phase 2 */
 	return (CFGA_OPNOTSUPP);
@@ -1382,13 +1409,13 @@ bailout:
 /*ARGSUSED*/
 cfga_err_t
 cfga_list_ext(
-	const char *ap_id,
-	cfga_list_data_t **ap_id_list,
-	int *nlistp,
-	const char *options,
-	const char *listopts,
-	char **errstring,
-	cfga_flags_t flags)
+    const char *ap_id,
+    cfga_list_data_t **ap_id_list,
+    int *nlistp,
+    const char *options,
+    const char *listopts,
+    char **errstring,
+    cfga_flags_t flags)
 {
 	int			l_errno;
 	char			*ap_id_log = NULL;
@@ -1398,6 +1425,8 @@ cfga_list_ext(
 	cfga_sata_ret_t		rv = CFGA_SATA_OK;
 	devctl_ap_state_t	devctl_ap_state;
 	char			*pdyn;
+	boolean_t		pmult = B_FALSE;
+	uint32_t		port;
 
 
 	if ((rv = verify_params(ap_id, options, errstring)) != CFGA_SATA_OK) {
@@ -1472,61 +1501,61 @@ cfga_list_ext(
 	    sizeof ((*ap_id_list)->ap_phys_id));
 
 	switch (devctl_ap_state.ap_rstate) {
-		case AP_RSTATE_EMPTY:
-			(*ap_id_list)->ap_r_state = CFGA_STAT_EMPTY;
-			break;
+	case AP_RSTATE_EMPTY:
+		(*ap_id_list)->ap_r_state = CFGA_STAT_EMPTY;
+		break;
 
-		case AP_RSTATE_DISCONNECTED:
-			(*ap_id_list)->ap_r_state = CFGA_STAT_DISCONNECTED;
-			break;
+	case AP_RSTATE_DISCONNECTED:
+		(*ap_id_list)->ap_r_state = CFGA_STAT_DISCONNECTED;
+		break;
 
-		case AP_RSTATE_CONNECTED:
-			(*ap_id_list)->ap_r_state = CFGA_STAT_CONNECTED;
-			break;
+	case AP_RSTATE_CONNECTED:
+		(*ap_id_list)->ap_r_state = CFGA_STAT_CONNECTED;
+		break;
 
-		default:
-			rv = CFGA_SATA_STATE;
-			goto bailout;
+	default:
+		rv = CFGA_SATA_STATE;
+		goto bailout;
 	}
 
 	switch (devctl_ap_state.ap_ostate) {
-		case AP_OSTATE_CONFIGURED:
-			(*ap_id_list)->ap_o_state = CFGA_STAT_CONFIGURED;
-			break;
+	case AP_OSTATE_CONFIGURED:
+		(*ap_id_list)->ap_o_state = CFGA_STAT_CONFIGURED;
+		break;
 
-		case AP_OSTATE_UNCONFIGURED:
-			(*ap_id_list)->ap_o_state = CFGA_STAT_UNCONFIGURED;
-			break;
+	case AP_OSTATE_UNCONFIGURED:
+		(*ap_id_list)->ap_o_state = CFGA_STAT_UNCONFIGURED;
+		break;
 
-		default:
-			rv = CFGA_SATA_STATE;
-			goto bailout;
+	default:
+		rv = CFGA_SATA_STATE;
+		goto bailout;
 	}
 
 	switch (devctl_ap_state.ap_condition) {
-		case AP_COND_OK:
-			(*ap_id_list)->ap_cond = CFGA_COND_OK;
-			break;
+	case AP_COND_OK:
+		(*ap_id_list)->ap_cond = CFGA_COND_OK;
+		break;
 
-		case AP_COND_FAILING:
-			(*ap_id_list)->ap_cond = CFGA_COND_FAILING;
-			break;
+	case AP_COND_FAILING:
+		(*ap_id_list)->ap_cond = CFGA_COND_FAILING;
+		break;
 
-		case AP_COND_FAILED:
-			(*ap_id_list)->ap_cond = CFGA_COND_FAILED;
-			break;
+	case AP_COND_FAILED:
+		(*ap_id_list)->ap_cond = CFGA_COND_FAILED;
+		break;
 
-		case AP_COND_UNUSABLE:
-			(*ap_id_list)->ap_cond = CFGA_COND_UNUSABLE;
-			break;
+	case AP_COND_UNUSABLE:
+		(*ap_id_list)->ap_cond = CFGA_COND_UNUSABLE;
+		break;
 
-		case AP_COND_UNKNOWN:
-			(*ap_id_list)->ap_cond = CFGA_COND_UNKNOWN;
-			break;
+	case AP_COND_UNKNOWN:
+		(*ap_id_list)->ap_cond = CFGA_COND_UNKNOWN;
+		break;
 
-		default:
-			rv = CFGA_SATA_STATE;
-			goto bailout;
+	default:
+		rv = CFGA_SATA_STATE;
+		goto bailout;
 	}
 
 	(*ap_id_list)->ap_class[0] = '\0';	/* Filled by libcfgadm */
@@ -1545,7 +1574,7 @@ cfga_list_ext(
 		if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_MODEL_INFO,
 		    NULL, (void **)&str_p, &size)) != CFGA_SATA_OK) {
 			(void) printf(
-				"SATA_CFGA_GET_MODULE_INFO ioctl failed\n");
+			    "SATA_CFGA_GET_MODULE_INFO ioctl failed\n");
 			goto bailout;
 		}
 		/* drop leading and trailing spaces */
@@ -1558,9 +1587,9 @@ cfga_list_ext(
 		}
 
 		(void) strlcpy((*ap_id_list)->ap_info, "Mod: ",
-			sizeof ((*ap_id_list)->ap_info));
+		    sizeof ((*ap_id_list)->ap_info));
 		(void) strlcat((*ap_id_list)->ap_info, str_p + skip,
-			sizeof ((*ap_id_list)->ap_info));
+		    sizeof ((*ap_id_list)->ap_info));
 
 		free(str_p);
 
@@ -1584,9 +1613,9 @@ cfga_list_ext(
 				break;
 		}
 		(void) strlcat((*ap_id_list)->ap_info, " FRev: ",
-			sizeof ((*ap_id_list)->ap_info));
+		    sizeof ((*ap_id_list)->ap_info));
 		(void) strlcat((*ap_id_list)->ap_info, str_p + skip,
-			sizeof ((*ap_id_list)->ap_info));
+		    sizeof ((*ap_id_list)->ap_info));
 
 		free(str_p);
 
@@ -1611,9 +1640,9 @@ cfga_list_ext(
 				break;
 		}
 		(void) strlcat((*ap_id_list)->ap_info, " SN: ",
-				sizeof ((*ap_id_list)->ap_info));
+		    sizeof ((*ap_id_list)->ap_info));
 		(void) strlcat((*ap_id_list)->ap_info, str_p + skip,
-				sizeof ((*ap_id_list)->ap_info));
+		    sizeof ((*ap_id_list)->ap_info));
 
 		free(str_p);
 
@@ -1624,16 +1653,25 @@ cfga_list_ext(
 		if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_AP_TYPE, NULL,
 		    (void **)&str_p, &size)) != CFGA_SATA_OK) {
 			(void) printf(
-				"SATA_CFGA_GET_AP_TYPE ioctl failed\n");
+			    "SATA_CFGA_GET_AP_TYPE ioctl failed\n");
 			goto bailout;
 		}
 
 		(void) strlcpy((*ap_id_list)->ap_type, str_p,
-			sizeof ((*ap_id_list)->ap_type));
+		    sizeof ((*ap_id_list)->ap_type));
 
 		free(str_p);
 
-		if ((*ap_id_list)->ap_o_state == CFGA_STAT_CONFIGURED) {
+		/*
+		 * Checking device type. Port multiplier has no dynamic
+		 * suffix.
+		 */
+		if (strncmp((*ap_id_list)->ap_type, "sata-pmult",
+		    sizeof ("sata-pmult")) == 0)
+			pmult = B_TRUE;
+
+		if ((*ap_id_list)->ap_o_state == CFGA_STAT_CONFIGURED &&
+		    pmult == B_FALSE) {
 
 			char *dyncomp = NULL;
 
@@ -1647,18 +1685,27 @@ cfga_list_ext(
 				goto bailout;
 			if (dyncomp != NULL) {
 				(void) strcat((*ap_id_list)->ap_log_id,
-					DYN_SEP);
+				    DYN_SEP);
 				(void) strlcat((*ap_id_list)->ap_log_id,
-					dyncomp,
-					sizeof ((*ap_id_list)->ap_log_id));
+				    dyncomp,
+				    sizeof ((*ap_id_list)->ap_log_id));
 				free(dyncomp);
 			}
 		}
 
 	} else {
-		/* Change it when port multiplier is supported */
-		(void) strlcpy((*ap_id_list)->ap_type, "sata-port",
-			sizeof ((*ap_id_list)->ap_type));
+		/* This is an empty port */
+		if (get_port_num(ap_id, &port) != SATA_CFGA_OK) {
+			goto bailout;
+		}
+
+		if (port & SATA_CFGA_PMPORT_QUAL) {
+			(void) strlcpy((*ap_id_list)->ap_type, "pmult-port",
+			    sizeof ((*ap_id_list)->ap_type));
+		} else {
+			(void) strlcpy((*ap_id_list)->ap_type, "sata-port",
+			    sizeof ((*ap_id_list)->ap_type));
+		}
 	}
 
 	return (sata_err_msg(errstring, rv, ap_id, errno));
@@ -1694,8 +1741,7 @@ cfga_msg(struct cfga_msg *msgp, const char *str)
 	}
 
 	if ((q = (char *)calloc(len + 1, 1)) == NULL) {
-		perror("cfga_msg"
-);
+		perror("cfga_msg");
 		return;
 	}
 
@@ -1766,9 +1812,9 @@ verify_valid_apid(const char *ap_id)
  */
 static cfga_sata_ret_t
 verify_params(
-	const char *ap_id,
-	const char *options,
-	char **errstring)
+    const char *ap_id,
+    const char *options,
+    char **errstring)
 {
 	char *pdyn, *lap_id;
 	int rv;
@@ -1802,29 +1848,35 @@ verify_params(
 
 /*
  * Takes a validated ap_id and extracts the port number.
- * For now, we do not support port multiplier port .
+ * Port multiplier is supported now.
  */
 static cfga_sata_ret_t
 get_port_num(const char *ap_id, uint32_t *port)
 {
-	char *port_nbr_str;
-	char *temp;
-	uint32_t cport;
-	uint32_t pmport = 0;	/* port multiplier not supported yet */
-	int pmport_qual = 0;	/* port multiplier not supported yet */
+	uint32_t	cport, pmport = 0, qual = 0;
+	char		*cport_str, *pmport_str;
 
-	port_nbr_str = strrchr(ap_id, (int)*MINOR_SEP) + strlen(MINOR_SEP);
-	if ((temp = strrchr(ap_id, (int)*PORT_SEPARATOR)) != 0) {
-		port_nbr_str = temp + strlen(PORT_SEPARATOR);
-	}
+	/* Get the cport number */
+	cport_str = strrchr(ap_id, (int)*MINOR_SEP) + strlen(MINOR_SEP);
 
 	errno = 0;
-	cport = strtol(port_nbr_str, NULL, 10);
-	if ((cport & ~SATA_CFGA_CPORT_MASK) != 0 || errno != 0)
+	cport = strtol(cport_str, NULL, 10);
+	if ((cport & ~SATA_CFGA_CPORT_MASK) != 0 || errno != 0) {
 		return (CFGA_SATA_PORT);
+	}
 
-	*port = cport + (pmport << SATA_CFGA_PMPORT_SHIFT) + pmport_qual;
+	/* Get pmport number if there is a PORT_SEPARATOR */
+	errno = 0;
+	if ((pmport_str = strrchr(ap_id, (int)*PORT_SEPARATOR)) != 0) {
+		pmport_str += strlen(PORT_SEPARATOR);
+		pmport = strtol(pmport_str, NULL, 10);
+		qual = SATA_CFGA_PMPORT_QUAL;
+		if ((pmport & ~SATA_CFGA_PMPORT_MASK) != 0 || errno != 0) {
+			return (CFGA_SATA_PORT);
+		}
+	}
 
+	*port = cport | (pmport << SATA_CFGA_PMPORT_SHIFT) | qual;
 	return (CFGA_SATA_OK);
 }
 
@@ -1844,10 +1896,10 @@ cleanup_after_devctl_cmd(devctl_hdl_t devctl_hdl, nvlist_t *user_nvlist)
 
 static cfga_sata_ret_t
 setup_for_devctl_cmd(
-	const char *ap_id,
-	devctl_hdl_t *devctl_hdl,
-	nvlist_t **user_nvlistp,
-	uint_t oflag)
+    const char *ap_id,
+    devctl_hdl_t *devctl_hdl,
+    nvlist_t **user_nvlistp,
+    uint_t oflag)
 {
 
 	uint_t	port;
@@ -1887,8 +1939,8 @@ setup_for_devctl_cmd(
 	 */
 	if ((rv = get_port_num(lap_id, &port)) != CFGA_SATA_OK) {
 		(void) printf(
-			"setup_for_devctl_cmd: get_port_num, errno: %d\n",
-			errno);
+		    "setup_for_devctl_cmd: get_port_num, errno: %d\n",
+		    errno);
 		goto bailout;
 	}
 
@@ -1912,7 +1964,7 @@ bailout:
 
 static cfga_sata_ret_t
 port_state(devctl_hdl_t hdl, nvlist_t *list,
-	ap_rstate_t *rstate, ap_ostate_t *ostate)
+    ap_rstate_t *rstate, ap_ostate_t *ostate)
 {
 	devctl_ap_state_t	devctl_ap_state;
 
@@ -1936,7 +1988,7 @@ port_state(devctl_hdl_t hdl, nvlist_t *list,
  */
 cfga_sata_ret_t
 do_control_ioctl(const char *ap_id, sata_cfga_apctl_t subcommand, uint_t arg,
-		void **descrp, size_t *sizep)
+    void **descrp, size_t *sizep)
 {
 	int			fd = -1;
 	uint_t			port;
@@ -1954,7 +2006,7 @@ do_control_ioctl(const char *ap_id, sata_cfga_apctl_t subcommand, uint_t arg,
 
 	if ((fd = open(ap_id, O_RDONLY)) == -1) {
 		(void) printf("do_control_ioctl: open failed: errno:%d\n",
-			errno);
+		    errno);
 		rv = CFGA_SATA_OPEN;
 		if (errno == EBUSY) {
 			rv = CFGA_SATA_BUSY;
