@@ -29,7 +29,7 @@
 #include "igb_sw.h"
 
 static char ident[] = "Intel 1Gb Ethernet";
-static char igb_version[] = "igb 1.1.7";
+static char igb_version[] = "igb 1.1.8";
 
 /*
  * Local function protoypes
@@ -2584,8 +2584,7 @@ igb_setup_multicst(igb_t *igb)
 	/*
 	 * Update the multicase addresses to the MTA registers
 	 */
-	e1000_update_mc_addr_list(hw, mc_addr_list, mc_addr_count,
-	    igb->unicst_total, hw->mac.rar_entry_count);
+	e1000_update_mc_addr_list(hw, mc_addr_list, mc_addr_count);
 }
 
 /*
@@ -2680,7 +2679,7 @@ igb_get_conf(igb_t *igb)
 	igb->rx_ring_size = igb_get_prop(igb, PROP_RX_RING_SIZE,
 	    MIN_RX_RING_SIZE, MAX_RX_RING_SIZE, DEFAULT_RX_RING_SIZE);
 
-	igb->mr_enable = igb_get_prop(igb, PROP_MR_ENABLE, 0, 1, 1);
+	igb->mr_enable = igb_get_prop(igb, PROP_MR_ENABLE, 0, 1, 0);
 	igb->num_rx_groups = igb_get_prop(igb, PROP_RX_GROUP_NUM,
 	    MIN_RX_GROUP_NUM, MAX_RX_GROUP_NUM, DEFAULT_RX_GROUP_NUM);
 	/*

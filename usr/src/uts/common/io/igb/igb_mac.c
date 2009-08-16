@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.92 v2008-10-7 */
+/* IntelVersion: 1.104 v2-9-8_2009-6-12 */
 
 #include "igb_api.h"
 
@@ -34,6 +34,7 @@ static s32 e1000_set_default_fc_generic(struct e1000_hw *hw);
 static s32 e1000_commit_fc_settings_generic(struct e1000_hw *hw);
 static s32 e1000_poll_fiber_serdes_link_generic(struct e1000_hw *hw);
 static s32 e1000_validate_mdi_setting_generic(struct e1000_hw *hw);
+static void e1000_set_lan_id_multi_port_pcie(struct e1000_hw *hw);
 
 /*
  * e1000_init_mac_ops_generic - Initialize MAC function pointers
@@ -53,6 +54,7 @@ e1000_init_mac_ops_generic(struct e1000_hw *hw)
 	mac->ops.reset_hw = e1000_null_ops_generic;
 	mac->ops.setup_physical_interface = e1000_null_ops_generic;
 	mac->ops.get_bus_info = e1000_null_ops_generic;
+	mac->ops.set_lan_id = e1000_set_lan_id_multi_port_pcie;
 	mac->ops.read_mac_addr = e1000_read_mac_addr_generic;
 	mac->ops.config_collision_dist = e1000_config_collision_dist_generic;
 	mac->ops.clear_hw_cntrs = e1000_null_mac_generic;
@@ -133,10 +135,10 @@ e1000_null_mng_mode(struct e1000_hw *hw)
  * @hw: pointer to the HW structure
  */
 void
-e1000_null_update_mc(struct e1000_hw *hw, u8 *h, u32 a, u32 b, u32 c)
+e1000_null_update_mc(struct e1000_hw *hw, u8 *h, u32 a)
 {
 	DEBUGFUNC("e1000_null_update_mc");
-	UNREFERENCED_5PARAMETER(hw, h, a, b, c);
+	UNREFERENCED_3PARAMETER(hw, h, a);
 }
 
 /*
@@ -173,67 +175,6 @@ e1000_null_rar_set(struct e1000_hw *hw, u8 *h, u32 a)
 }
 
 /*
- * e1000_get_bus_info_pci_generic - Get PCI(x) bus information
- * @hw: pointer to the HW structure
- *
- * Determines and stores the system bus information for a particular
- * network interface.  The following bus information is determined and stored:
- * bus speed, bus width, type (PCI/PCIx), and PCI(-x) function.
- */
-s32
-e1000_get_bus_info_pci_generic(struct e1000_hw *hw)
-{
-	struct e1000_bus_info *bus = &hw->bus;
-	u32 status = E1000_READ_REG(hw, E1000_STATUS);
-	s32 ret_val = E1000_SUCCESS;
-	u16 pci_header_type;
-
-	DEBUGFUNC("e1000_get_bus_info_pci_generic");
-
-	/* PCI or PCI-X? */
-	bus->type = (status & E1000_STATUS_PCIX_MODE)
-	    ? e1000_bus_type_pcix
-	    : e1000_bus_type_pci;
-
-	/* Bus speed */
-	if (bus->type == e1000_bus_type_pci) {
-		bus->speed = (status & E1000_STATUS_PCI66)
-		    ? e1000_bus_speed_66
-		    : e1000_bus_speed_33;
-	} else {
-		switch (status & E1000_STATUS_PCIX_SPEED) {
-		case E1000_STATUS_PCIX_SPEED_66:
-			bus->speed = e1000_bus_speed_66;
-			break;
-		case E1000_STATUS_PCIX_SPEED_100:
-			bus->speed = e1000_bus_speed_100;
-			break;
-		case E1000_STATUS_PCIX_SPEED_133:
-			bus->speed = e1000_bus_speed_133;
-			break;
-		default:
-			bus->speed = e1000_bus_speed_reserved;
-			break;
-		}
-	}
-
-	/* Bus width */
-	bus->width = (status & E1000_STATUS_BUS64)
-	    ? e1000_bus_width_64
-	    : e1000_bus_width_32;
-
-	/* Which PCI(-X) function? */
-	e1000_read_pci_cfg(hw, PCI_HEADER_TYPE_REGISTER, &pci_header_type);
-	if (pci_header_type & PCI_HEADER_TYPE_MULTIFUNC)
-		bus->func = (status & E1000_STATUS_FUNC_MASK)
-		    >> E1000_STATUS_FUNC_SHIFT;
-	else
-		bus->func = 0;
-
-	return (ret_val);
-}
-
-/*
  * e1000_get_bus_info_pcie_generic - Get PCIe bus information
  * @hw: pointer to the HW structure
  *
@@ -244,10 +185,10 @@ e1000_get_bus_info_pci_generic(struct e1000_hw *hw)
 s32
 e1000_get_bus_info_pcie_generic(struct e1000_hw *hw)
 {
+	struct e1000_mac_info *mac = &hw->mac;
 	struct e1000_bus_info *bus = &hw->bus;
 	s32 ret_val;
-	u32 status;
-	u16 pcie_link_status, pci_header_type;
+	u16 pcie_link_status;
 
 	DEBUGFUNC("e1000_get_bus_info_pcie_generic");
 
@@ -262,16 +203,45 @@ e1000_get_bus_info_pcie_generic(struct e1000_hw *hw)
 		bus->width = (enum e1000_bus_width)((pcie_link_status &
 		    PCIE_LINK_WIDTH_MASK) >> PCIE_LINK_WIDTH_SHIFT);
 
-	e1000_read_pci_cfg(hw, PCI_HEADER_TYPE_REGISTER, &pci_header_type);
-	if (pci_header_type & PCI_HEADER_TYPE_MULTIFUNC) {
-		status = E1000_READ_REG(hw, E1000_STATUS);
-		bus->func = (status & E1000_STATUS_FUNC_MASK)
-		    >> E1000_STATUS_FUNC_SHIFT;
-	} else {
-		bus->func = 0;
-	}
+	mac->ops.set_lan_id(hw);
 
 	return (E1000_SUCCESS);
+}
+
+/*
+ * e1000_set_lan_id_multi_port_pcie - Set LAN id for PCIe multiple port devices
+ *
+ * @hw: pointer to the HW structure
+ *
+ * Determines the LAN function id by reading memory-mapped registers
+ * and swaps the port value if requested.
+ */
+static void
+e1000_set_lan_id_multi_port_pcie(struct e1000_hw *hw)
+{
+	struct e1000_bus_info *bus = &hw->bus;
+	u32 reg;
+
+	/*
+	 * The status register reports the correct function number
+	 * for the device regardless of function swap state.
+	 */
+	reg = E1000_READ_REG(hw, E1000_STATUS);
+	bus->func = (reg & E1000_STATUS_FUNC_MASK) >> E1000_STATUS_FUNC_SHIFT;
+}
+
+/*
+ * e1000_set_lan_id_single_port - Set LAN id for a single port device
+ * @hw: pointer to the HW structure
+ *
+ * Sets the LAN function id to zero for a single port device.
+ */
+void
+e1000_set_lan_id_single_port(struct e1000_hw *hw)
+{
+	struct e1000_bus_info *bus = &hw->bus;
+
+	bus->func = 0;
 }
 
 /*
@@ -325,6 +295,7 @@ void
 e1000_init_rx_addrs_generic(struct e1000_hw *hw, u16 rar_count)
 {
 	u32 i;
+	u8 mac_addr[ETH_ADDR_LEN] = {0};
 
 	DEBUGFUNC("e1000_init_rx_addrs_generic");
 
@@ -335,12 +306,8 @@ e1000_init_rx_addrs_generic(struct e1000_hw *hw, u16 rar_count)
 
 	/* Zero out the other (rar_entry_count - 1) receive addresses */
 	DEBUGOUT1("Clearing RAR[1-%u]\n", rar_count-1);
-	for (i = 1; i < rar_count; i++) {
-		E1000_WRITE_REG_ARRAY(hw, E1000_RA, (i << 1), 0);
-		E1000_WRITE_FLUSH(hw);
-		E1000_WRITE_REG_ARRAY(hw, E1000_RA, ((i << 1) + 1), 0);
-		E1000_WRITE_FLUSH(hw);
-	}
+	for (i = 1; i < rar_count; i++)
+		hw->mac.ops.rar_set(hw, mac_addr, i);
 }
 
 /*
@@ -350,9 +317,10 @@ e1000_init_rx_addrs_generic(struct e1000_hw *hw, u16 rar_count)
  * Checks the nvm for an alternate MAC address.  An alternate MAC address
  * can be setup by pre-boot software and must be treated like a permanent
  * address and must override the actual permanent MAC address.  If an
- * alternate MAC address is found it is saved in the hw struct and
- * programmed into RAR0 and the function returns success, otherwise the
- * function returns an error.
+ * alternate MAC address is found it is programmed into RAR0, replacing
+ * the permanent address that was installed into RAR0 by the Si on reset.
+ * This function will return SUCCESS unless it encounters an error while
+ * reading the EEPROM.
  */
 s32
 e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
@@ -372,13 +340,12 @@ e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 	}
 
 	if (nvm_alt_mac_addr_offset == 0xFFFF) {
-		ret_val = -(E1000_NOT_IMPLEMENTED);
+		/* There is no Alternate MAC Address */
 		goto out;
 	}
 
 	if (hw->bus.func == E1000_FUNC_1)
-		nvm_alt_mac_addr_offset += ETH_ADDR_LEN / sizeof (u16);
-
+		nvm_alt_mac_addr_offset += E1000_ALT_MAC_ADDRESS_OFFSET_LAN1;
 	for (i = 0; i < ETH_ADDR_LEN; i += 2) {
 		offset = nvm_alt_mac_addr_offset + (i >> 1);
 		ret_val = hw->nvm.ops.read(hw, offset, 1, &nvm_data);
@@ -393,14 +360,16 @@ e1000_check_alt_mac_addr_generic(struct e1000_hw *hw)
 
 	/* if multicast bit is set, the alternate address will not be used */
 	if (alt_mac_addr[0] & 0x01) {
-		ret_val = -(E1000_NOT_IMPLEMENTED);
+		DEBUGOUT("Ignoring Alternate Mac Address with MC bit set\n");
 		goto out;
 	}
 
-	for (i = 0; i < ETH_ADDR_LEN; i++)
-		hw->mac.addr[i] = hw->mac.perm_addr[i] = alt_mac_addr[i];
-
-	hw->mac.ops.rar_set(hw, hw->mac.perm_addr, 0);
+	/*
+	 * We have a valid alternate MAC address, and we want to treat it the
+	 * same as the normal permanent MAC address stored by the HW into the
+	 * RAR. Do this by mapping this address into RAR0.
+	 */
+	hw->mac.ops.rar_set(hw, alt_mac_addr, 0);
 
 out:
 	return (ret_val);
@@ -436,8 +405,15 @@ e1000_rar_set_generic(struct e1000_hw *hw, u8 *addr, u32 index)
 	if (rar_low || rar_high)
 		rar_high |= E1000_RAH_AV;
 
+	/*
+	 * Some bridges will combine consecutive 32-bit writes into
+	 * a single burst write, which will malfunction on some parts.
+	 * The flushes avoid this.
+	 */
 	E1000_WRITE_REG(hw, E1000_RAL(index), rar_low);
+	E1000_WRITE_FLUSH(hw);
 	E1000_WRITE_REG(hw, E1000_RAH(index), rar_high);
+	E1000_WRITE_FLUSH(hw);
 }
 
 /*
@@ -482,56 +458,37 @@ e1000_mta_set_generic(struct e1000_hw *hw, u32 hash_value)
  * @hw: pointer to the HW structure
  * @mc_addr_list: array of multicast addresses to program
  * @mc_addr_count: number of multicast addresses to program
- * @rar_used_count: the first RAR register free to program
- * @rar_count: total number of supported Receive Address Registers
  *
- * Updates the Receive Address Registers and Multicast Table Array.
+ * Updates the Multicast Table Array.
  * The caller must have a packed mc_addr_list of multicast addresses.
- * The parameter rar_count will usually be hw->mac.rar_entry_count
- * unless there are workarounds that change this.
  */
 void
 e1000_update_mc_addr_list_generic(struct e1000_hw *hw,
-    u8 *mc_addr_list, u32 mc_addr_count,
-    u32 rar_used_count, u32 rar_count)
+    u8 *mc_addr_list, u32 mc_addr_count)
 {
-	u32 hash_value;
-	u32 i;
+	u32 hash_value, hash_bit, hash_reg;
+	int i;
 
 	DEBUGFUNC("e1000_update_mc_addr_list_generic");
 
-	/*
-	 * Load the first set of multicast addresses into the exact
-	 * filters (RAR).  If there are not enough to fill the RAR
-	 * array, clear the filters.
-	 */
-	for (i = rar_used_count; i < rar_count; i++) {
-		if (mc_addr_count) {
-			hw->mac.ops.rar_set(hw, mc_addr_list, i);
-			mc_addr_count--;
-			mc_addr_list += ETH_ADDR_LEN;
-		} else {
-			E1000_WRITE_REG_ARRAY(hw, E1000_RA, i << 1, 0);
-			E1000_WRITE_FLUSH(hw);
-			E1000_WRITE_REG_ARRAY(hw, E1000_RA, (i << 1) + 1, 0);
-			E1000_WRITE_FLUSH(hw);
-		}
-	}
+	/* clear mta_shadow */
+	memset(&hw->mac.mta_shadow, 0, sizeof (hw->mac.mta_shadow));
 
-	/* Clear the old settings from the MTA */
-	DEBUGOUT("Clearing MTA\n");
-	for (i = 0; i < hw->mac.mta_reg_count; i++) {
-		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
-		E1000_WRITE_FLUSH(hw);
-	}
-
-	/* Load any remaining multicast addresses into the hash table. */
-	for (; mc_addr_count > 0; mc_addr_count--) {
+	/* update mta_shadow from mc_addr_list */
+	for (i = 0; (u32) i < mc_addr_count; i++) {
 		hash_value = e1000_hash_mc_addr_generic(hw, mc_addr_list);
-		DEBUGOUT1("Hash value = 0x%03X\n", hash_value);
-		hw->mac.ops.mta_set(hw, hash_value);
-		mc_addr_list += ETH_ADDR_LEN;
+
+		hash_reg = (hash_value >> 5) & (hw->mac.mta_reg_count - 1);
+		hash_bit = hash_value & 0x1F;
+
+		hw->mac.mta_shadow[hash_reg] |= (1 << hash_bit);
+		mc_addr_list += (ETH_ADDR_LEN);
 	}
+
+	/* replace the entire MTA table */
+	for (i = hw->mac.mta_reg_count - 1; i >= 0; i--)
+		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, hw->mac.mta_shadow[i]);
+	E1000_WRITE_FLUSH(hw);
 }
 
 /*
@@ -606,44 +563,6 @@ e1000_hash_mc_addr_generic(struct e1000_hw *hw, u8 *mc_addr)
 	    (((u16) mc_addr[5]) << bit_shift)));
 
 	return (hash_value);
-}
-
-/*
- * e1000_pcix_mmrbc_workaround_generic - Fix incorrect MMRBC value
- * @hw: pointer to the HW structure
- *
- * In certain situations, a system BIOS may report that the PCIx maximum
- * memory read byte count (MMRBC) value is higher than than the actual
- * value. We check the PCIx command register with the current PCIx status
- * register.
- */
-void
-e1000_pcix_mmrbc_workaround_generic(struct e1000_hw *hw)
-{
-	u16 cmd_mmrbc;
-	u16 pcix_cmd;
-	u16 pcix_stat_hi_word;
-	u16 stat_mmrbc;
-
-	DEBUGFUNC("e1000_pcix_mmrbc_workaround_generic");
-
-	/* Workaround for PCI-X issue when BIOS sets MMRBC incorrectly */
-	if (hw->bus.type != e1000_bus_type_pcix)
-		return;
-
-	e1000_read_pci_cfg(hw, PCIX_COMMAND_REGISTER, &pcix_cmd);
-	e1000_read_pci_cfg(hw, PCIX_STATUS_REGISTER_HI, &pcix_stat_hi_word);
-	cmd_mmrbc = (pcix_cmd & PCIX_COMMAND_MMRBC_MASK) >>
-	    PCIX_COMMAND_MMRBC_SHIFT;
-	stat_mmrbc = (pcix_stat_hi_word & PCIX_STATUS_HI_MMRBC_MASK) >>
-	    PCIX_STATUS_HI_MMRBC_SHIFT;
-	if (stat_mmrbc == PCIX_STATUS_HI_MMRBC_4K)
-		stat_mmrbc = PCIX_STATUS_HI_MMRBC_2K;
-	if (cmd_mmrbc > stat_mmrbc) {
-		pcix_cmd &= ~PCIX_COMMAND_MMRBC_MASK;
-		pcix_cmd |= stat_mmrbc << PCIX_COMMAND_MMRBC_SHIFT;
-		e1000_write_pci_cfg(hw, PCIX_COMMAND_REGISTER, &pcix_cmd);
-	}
 }
 
 /*

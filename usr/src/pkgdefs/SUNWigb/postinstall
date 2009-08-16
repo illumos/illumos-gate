@@ -133,5 +133,7 @@ check_add_drv -i		\
 	"pciex8086,10d6"
 	"pciex8086,10e6"
 	"pciex8086,10e7"
-	"pciex8086,10e8"'	\
+	"pciex8086,10e8"
+	"pciex8086,150a"
+	"pciex8086,150d"'	\
 	-b "$BASEDIR" igb

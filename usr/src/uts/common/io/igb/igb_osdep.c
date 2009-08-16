@@ -31,22 +31,6 @@
 
 
 void
-e1000_pci_set_mwi(struct e1000_hw *hw)
-{
-	uint16_t val = hw->bus.pci_cmd_word | CMD_MEM_WRT_INVALIDATE;
-
-	e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &val);
-}
-
-void
-e1000_pci_clear_mwi(struct e1000_hw *hw)
-{
-	uint16_t val = hw->bus.pci_cmd_word & ~CMD_MEM_WRT_INVALIDATE;
-
-	e1000_write_pci_cfg(hw, PCI_COMMAND_REGISTER, &val);
-}
-
-void
 e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 {
 	pci_config_put16(OS_DEP(hw)->cfg_handle, reg, *value);
@@ -61,25 +45,50 @@ e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 
 /*
  * Return the 16-bit value from pci-e config space at offset reg into the pci-e
- * capability block.
+ * capability block.  Note that this refers to the pci-e capability block in
+ * standard pci config space, not the block in pci-e extended config space.
  */
 int32_t
 e1000_read_pcie_cap_reg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 {
-	uint32_t pcie_cap = PCI_EX_CONF_CAP;	/* default */
+	uint8_t pcie_id = PCI_CAP_ID_PCI_E;
+	uint16_t pcie_cap;
+	int32_t status;
 
-	switch (hw->mac.type) {
-	case e1000_82575:
-		pcie_cap = 0xa0;
-		break;
-	case e1000_82576:
-		pcie_cap = 0xa0;
-		break;
+	/* locate the pci-e capability block */
+	status = pci_lcap_locate((OS_DEP(hw))->cfg_handle, pcie_id, &pcie_cap);
+	if (status == DDI_SUCCESS) {
+
+		/* read at given offset into block */
+		*value = pci_config_get16(OS_DEP(hw)->cfg_handle,
+		    (pcie_cap + reg));
 	}
 
-	*value = pci_config_get16(OS_DEP(hw)->cfg_handle, (pcie_cap + reg));
+	return (status);
+}
 
-	return (0);
+/*
+ * Write the given 16-bit value to pci-e config space at offset reg into the
+ * pci-e capability block.  Note that this refers to the pci-e capability block
+ * in standard pci config space, not the block in pci-e extended config space.
+ */
+int32_t
+e1000_write_pcie_cap_reg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
+{
+	uint8_t pcie_id = PCI_CAP_ID_PCI_E;
+	uint16_t pcie_cap;
+	int32_t status;
+
+	/* locate the pci-e capability block */
+	status = pci_lcap_locate(OS_DEP(hw)->cfg_handle, pcie_id, &pcie_cap);
+	if (status == DDI_SUCCESS) {
+
+		/* write at given offset into block */
+		pci_config_put16(OS_DEP(hw)->cfg_handle,
+		    (off_t)(pcie_cap + reg), *value);
+	}
+
+	return (status);
 }
 
 /*

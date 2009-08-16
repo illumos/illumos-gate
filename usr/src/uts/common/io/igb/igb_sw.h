@@ -830,6 +830,10 @@ typedef struct igb_stat {
 /*
  * Function prototypes in e1000_osdep.c
  */
+void e1000_write_pci_cfg(struct e1000_hw *, uint32_t, uint16_t *);
+void e1000_read_pci_cfg(struct e1000_hw *, uint32_t, uint16_t *);
+int32_t e1000_read_pcie_cap_reg(struct e1000_hw *, uint32_t, uint16_t *);
+int32_t e1000_write_pcie_cap_reg(struct e1000_hw *, uint32_t, uint16_t *);
 void e1000_rar_clear(struct e1000_hw *hw, uint32_t);
 void e1000_rar_set_vmdq(struct e1000_hw *hw, const uint8_t *, uint32_t,
     uint32_t, uint8_t);

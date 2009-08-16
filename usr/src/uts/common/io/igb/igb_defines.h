@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.79 v2008-10-7 */
+/* IntelVersion: 1.111 v2-9-8_2009-6-12 */
 
 #ifndef _IGB_DEFINES_H
 #define	_IGB_DEFINES_H
@@ -131,6 +131,8 @@ extern "C" {
 #define	E1000_CTRL_EXT_PFRSTD	0x00004000
 #define	E1000_CTRL_EXT_SPD_BYPS	0x00008000 /* Speed Select Bypass */
 #define	E1000_CTRL_EXT_RO_DIS	0x00020000 /* Relaxed Ordering disable */
+/* DMA Dynamic Clock Gating */
+#define	E1000_CTRL_EXT_DMA_DYN_CLK_EN	0x00080000
 #define	E1000_CTRL_EXT_LINK_MODE_MASK	0x00C00000
 #define	E1000_CTRL_EXT_LINK_MODE_GMII	0x00000000
 #define	E1000_CTRL_EXT_LINK_MODE_TBI	0x00C00000
@@ -382,6 +384,7 @@ extern "C" {
 #define	E1000_CTRL_SWDPIN0	0x00040000  /* SWDPIN 0 value */
 #define	E1000_CTRL_SWDPIN1	0x00080000  /* SWDPIN 1 value */
 #define	E1000_CTRL_SWDPIN2	0x00100000  /* SWDPIN 2 value */
+#define	E1000_CTRL_ADVD3WUC	0x00100000  /* D3 WUC */
 #define	E1000_CTRL_SWDPIN3	0x00200000  /* SWDPIN 3 value */
 #define	E1000_CTRL_SWDPIO0	0x00400000  /* SWDPIN 0 Input or output */
 #define	E1000_CTRL_SWDPIO1	0x00800000  /* SWDPIN 1 input or output */
@@ -458,6 +461,7 @@ extern "C" {
 #define	E1000_STATUS_LAN_INIT_DONE 0x00000200 /* Lan Init Completion by NVM */
 #define	E1000_STATUS_ASDV	0x00000300 /* Auto speed detect value */
 /* Change in Dock/Undock state. Clear on write '0'. */
+#define	E1000_STATUS_PHYRA	0x00000400 /* PHY Reset Asserted */
 #define	E1000_STATUS_DOCK_CI	0x00000800
 #define	E1000_STATUS_GIO_MASTER_ENABLE	0x00080000 /* Master request status */
 #define	E1000_STATUS_MTXCKOK	0x00000400 /* MTX clock running OK */
@@ -667,14 +671,19 @@ extern "C" {
 /* PBA constants */
 #define	E1000_PBA_6K	0x0006	/* 6KB */
 #define	E1000_PBA_8K	0x0008	/* 8KB */
+#define	E1000_PBA_10K	0x000A	/* 10KB */
 #define	E1000_PBA_12K	0x000C	/* 12KB */
+#define	E1000_PBA_14K	0x000E	/* 14KB */
 #define	E1000_PBA_16K	0x0010	/* 16KB */
+#define	E1000_PBA_18K	0x0012
 #define	E1000_PBA_20K	0x0014
 #define	E1000_PBA_22K	0x0016
 #define	E1000_PBA_24K	0x0018
+#define	E1000_PBA_26K	0x001A
 #define	E1000_PBA_30K	0x001E
 #define	E1000_PBA_32K	0x0020
 #define	E1000_PBA_34K	0x0022
+#define	E1000_PBA_35K	0x0023
 #define	E1000_PBA_38K	0x0026
 #define	E1000_PBA_40K	0x0028
 #define	E1000_PBA_48K	0x0030    /* 48KB */
@@ -694,6 +703,9 @@ extern "C" {
 #define	E1000_SWSM_SWESMBI	0x00000002 /* FW Semaphore bit */
 #define	E1000_SWSM_WMNG		0x00000004 /* Wake MNG Clock */
 #define	E1000_SWSM_DRV_LOAD	0x00000008 /* Driver Loaded Bit */
+
+/* Secondary driver semaphore bit */
+#define	E1000_SWSM2_LOCK	0x00000002
 
 /* Interrupt Cause Read */
 #define	E1000_ICR_TXDW		0x00000001 /* Transmit desc written back */
@@ -871,6 +883,8 @@ extern "C" {
 #define	E1000_EICS_TCP_TIMER	E1000_EICR_TCP_TIMER /* TCP Timer */
 #define	E1000_EICS_OTHER	E1000_EICR_OTHER   /* Interrupt Cause Active */
 
+#define	E1000_EITR_ITR_INT_MASK	0x0000FFFF
+
 /* Transmit Descriptor Control */
 #define	E1000_TXDCTL_PTHRESH	0x0000003F /* TXDCTL Prefetch Threshold */
 #define	E1000_TXDCTL_HTHRESH	0x00003F00 /* TXDCTL Host Threshold */
@@ -901,6 +915,10 @@ extern "C" {
  */
 #define	E1000_RAR_ENTRIES	15
 #define	E1000_RAH_AV		0x80000000	/* Receive descriptor valid */
+#define	E1000_RAL_MAC_ADDR_LEN	4
+#define	E1000_RAH_MAC_ADDR_LEN	2
+#define	E1000_RAH_POOL_MASK	0x03FC0000
+#define	E1000_RAH_POOL_1	0x00040000
 
 /* Error Codes */
 #define	E1000_SUCCESS		0
@@ -916,6 +934,7 @@ extern "C" {
 #define	E1000_BLK_PHY_RESET	12
 #define	E1000_ERR_SWFW_SYNC	13
 #define	E1000_NOT_IMPLEMENTED	14
+#define	E1000_ERR_MBX		15
 
 /* Loop limit on how long we wait for auto-negotiation to complete */
 #define	FIBER_LINK_UP_LIMIT	50
@@ -965,6 +984,10 @@ extern "C" {
 #define	E1000_GCR_TXD_NO_SNOOP		0x00000008
 #define	E1000_GCR_TXDSCW_NO_SNOOP	0x00000010
 #define	E1000_GCR_TXDSCR_NO_SNOOP	0x00000020
+#define	E1000_GCR_CMPL_TMOUT_MASK	0x0000F000
+#define	E1000_GCR_CMPL_TMOUT_10ms	0x00001000
+#define	E1000_GCR_CMPL_TMOUT_RESEND	0x00010000
+#define	E1000_GCR_CAP_VER2		0x00040000
 
 #define	PCIE_NO_SNOOP_ALL (E1000_GCR_RXD_NO_SNOOP	| \
 			E1000_GCR_RXDSCW_NO_SNOOP	| \
@@ -1080,6 +1103,8 @@ extern "C" {
 #define	PHY_1000T_STATUS	0x0A /* 1000Base-T Status Reg */
 #define	PHY_EXT_STATUS		0x0F /* Extended Status Reg */
 
+#define	PHY_CONTROL_LB		0x4000 /* PHY Loopback bit */
+
 /* NVM Control */
 #define	E1000_EECD_SK		0x00000001 /* NVM Clock */
 #define	E1000_EECD_CS		0x00000002 /* NVM Chip Select */
@@ -1110,6 +1135,7 @@ extern "C" {
 #define	E1000_EECD_SHADV	0x00200000 /* Shadow RAM Data Valid */
 #define	E1000_EECD_SEC1VAL	0x00400000 /* Sector One Valid */
 #define	E1000_EECD_SECVAL_SHIFT		22
+#define	E1000_EECD_SEC1VAL_VALID_MASK	(E1000_EECD_AUTO_RD | E1000_EECD_PRES)
 
 #define	E1000_NVM_SWDPIN0	0x0001	/* SWDPIN 0 NVM Value */
 #define	E1000_NVM_LED_LOGIC	0x0020	/* Led Logic Word */
@@ -1213,22 +1239,14 @@ extern "C" {
 #define	IGP_LED3_MODE		0x07000000
 
 /* PCI/PCI-X/PCI-EX Config space */
-#define	PCIX_COMMAND_REGISTER		0xE6
-#define	PCIX_STATUS_REGISTER_LO		0xE8
-#define	PCIX_STATUS_REGISTER_HI		0xEA
 #define	PCI_HEADER_TYPE_REGISTER	0x0E
 #define	PCIE_LINK_STATUS		0x12
+#define	PCIE_DEVICE_CONTROL2		0x28
 
-#define	PCIX_COMMAND_MMRBC_MASK		0x000C
-#define	PCIX_COMMAND_MMRBC_SHIFT	0x2
-#define	PCIX_STATUS_HI_MMRBC_MASK	0x0060
-#define	PCIX_STATUS_HI_MMRBC_SHIFT	0x5
-#define	PCIX_STATUS_HI_MMRBC_4K		0x3
-#define	PCIX_STATUS_HI_MMRBC_2K		0x2
-#define	PCIX_STATUS_LO_FUNC_MASK	0x7
 #define	PCI_HEADER_TYPE_MULTIFUNC	0x80
 #define	PCIE_LINK_WIDTH_MASK		0x3F0
 #define	PCIE_LINK_WIDTH_SHIFT		4
+#define	PCIE_DEVICE_CONTROL2_16ms	0x0005
 
 #ifndef ETH_ADDR_LEN
 #define	ETH_ADDR_LEN			6

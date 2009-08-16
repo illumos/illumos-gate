@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.55 v2008-10-7 */
+/* IntelVersion: 1.69 v2-9-8_2009-6-12 */
 
 #ifndef _IGB_PHY_H
 #define	_IGB_PHY_H
@@ -43,12 +43,14 @@ s32 e1000_null_write_reg(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_check_downshift_generic(struct e1000_hw *hw);
 s32 e1000_check_polarity_m88(struct e1000_hw *hw);
 s32 e1000_check_polarity_igp(struct e1000_hw *hw);
+s32 e1000_check_polarity_ife(struct e1000_hw *hw);
 s32 e1000_check_reset_block_generic(struct e1000_hw *hw);
 s32 e1000_copper_link_autoneg(struct e1000_hw *hw);
 s32 e1000_copper_link_setup_igp(struct e1000_hw *hw);
 s32 e1000_copper_link_setup_m88(struct e1000_hw *hw);
 s32 e1000_phy_force_speed_duplex_igp(struct e1000_hw *hw);
 s32 e1000_phy_force_speed_duplex_m88(struct e1000_hw *hw);
+s32 e1000_phy_force_speed_duplex_ife(struct e1000_hw *hw);
 s32 e1000_get_cable_length_m88(struct e1000_hw *hw);
 s32 e1000_get_cable_length_igp_2(struct e1000_hw *hw);
 s32 e1000_get_cfg_done_generic(struct e1000_hw *hw);
@@ -73,6 +75,7 @@ s32 e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
     u32 usec_interval, bool *success);
 s32 e1000_phy_init_script_igp3(struct e1000_hw *hw);
 enum e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
+s32 e1000_determine_phy_address(struct e1000_hw *hw);
 void e1000_power_up_phy_copper(struct e1000_hw *hw);
 void e1000_power_down_phy_copper(struct e1000_hw *hw);
 s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);
@@ -112,7 +115,7 @@ s32 e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
 #define	IGP01E1000_PLHR_SS_DOWNGRADE	0x8000
 
 #define	IGP01E1000_PSSR_POLARITY_REVERSED	0x0002
-#define	IGP01E1000_PSSR_MDIX			0x0008
+#define	IGP01E1000_PSSR_MDIX			0x0800
 #define	IGP01E1000_PSSR_SPEED_MASK		0xC000
 #define	IGP01E1000_PSSR_SPEED_1000MBPS		0xC000
 
@@ -135,6 +138,8 @@ s32 e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
 #define	E1000_KMRNCTRLSTA_OFFSET_SHIFT	16
 #define	E1000_KMRNCTRLSTA_REN		0x00200000
 #define	E1000_KMRNCTRLSTA_DIAG_OFFSET	0x3	/* Kumeran Diagnostic */
+#define	E1000_KMRNCTRLSTA_TIMEOUTS	0x4	/* Kumeran Timeouts */
+#define	E1000_KMRNCTRLSTA_INBAND_PARAM	0x9	/* Kumeran InBand Parameters */
 #define	E1000_KMRNCTRLSTA_DIAG_NELPBK	0x1000	/* Nearend Loopback mode */
 
 #define	IFE_PHY_EXTENDED_STATUS_CONTROL	0x10

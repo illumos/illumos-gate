@@ -48,6 +48,7 @@ extern "C" {
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
 #include <sys/pci.h>
+#include <sys/pci_cap.h>
 #include <sys/atomic.h>
 #include <sys/note.h>
 #include "igb_debug.h"

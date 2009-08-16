@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.112 v2008-10-7 */
+/* IntelVersion: 1.140 v2-9-8_2009-6-12 */
 
 #include "igb_api.h"
 
@@ -1283,6 +1283,76 @@ out:
 }
 
 /*
+ * e1000_phy_force_speed_duplex_ife - Force PHY speed & duplex
+ * @hw: pointer to the HW structure
+ *
+ * Forces the speed and duplex settings of the PHY.
+ * This is a function pointer entry point only called by
+ * PHY setup routines.
+ */
+s32
+e1000_phy_force_speed_duplex_ife(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 data;
+	bool link;
+
+	DEBUGFUNC("e1000_phy_force_speed_duplex_ife");
+
+	if (phy->type != e1000_phy_ife) {
+		ret_val = e1000_phy_force_speed_duplex_igp(hw);
+		goto out;
+	}
+
+	ret_val = phy->ops.read_reg(hw, PHY_CONTROL, &data);
+	if (ret_val)
+		goto out;
+
+	e1000_phy_force_speed_duplex_setup(hw, &data);
+
+	ret_val = phy->ops.write_reg(hw, PHY_CONTROL, data);
+	if (ret_val)
+		goto out;
+
+	/* Disable MDI-X support for 10/100 */
+	ret_val = phy->ops.read_reg(hw, IFE_PHY_MDIX_CONTROL, &data);
+	if (ret_val)
+		goto out;
+
+	data &= ~IFE_PMC_AUTO_MDIX;
+	data &= ~IFE_PMC_FORCE_MDIX;
+
+	ret_val = phy->ops.write_reg(hw, IFE_PHY_MDIX_CONTROL, data);
+	if (ret_val)
+		goto out;
+
+	DEBUGOUT1("IFE PMC: %X\n", data);
+
+	usec_delay(1);
+
+	if (phy->autoneg_wait_to_complete) {
+		DEBUGOUT("Waiting for forced speed/duplex link on IFE phy.\n");
+
+		ret_val = e1000_phy_has_link_generic(hw,
+		    PHY_FORCE_LIMIT, 100000, &link);
+		if (ret_val)
+			goto out;
+
+		if (!link)
+			DEBUGOUT("Link taking longer than expected.\n");
+
+		/* Try once more */
+		ret_val = e1000_phy_has_link_generic(hw,
+		    PHY_FORCE_LIMIT, 100000, &link);
+		if (ret_val)
+			goto out;
+	}
+
+out:
+	return (ret_val);
+}
+/*
  * e1000_phy_force_speed_duplex_setup - Configure forced PHY speed/duplex
  * @hw: pointer to the HW structure
  * @phy_ctrl: pointer to current value of PHY_CONTROL
@@ -1566,6 +1636,41 @@ out:
 }
 
 /*
+ * e1000_check_polarity_ife - Check cable polarity for IFE PHY
+ * @hw: pointer to the HW structure
+ *
+ * Polarity is determined on the polarity reversal feature being enabled.
+ */
+s32
+e1000_check_polarity_ife(struct e1000_hw *hw)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val;
+	u16 phy_data, offset, mask;
+
+	DEBUGFUNC("e1000_check_polarity_ife");
+
+	/*
+	 * Polarity is determined based on the reversal feature being enabled.
+	 */
+	if (phy->polarity_correction) {
+		offset = IFE_PHY_EXTENDED_STATUS_CONTROL;
+		mask = IFE_PESC_POLARITY_REVERSED;
+	} else {
+		offset = IFE_PHY_SPECIAL_CONTROL;
+		mask = IFE_PSC_FORCE_POLARITY;
+	}
+
+	ret_val = phy->ops.read_reg(hw, offset, &phy_data);
+
+	if (!ret_val)
+		phy->cable_polarity = (phy_data & mask)
+		    ? e1000_rev_polarity_reversed
+		    : e1000_rev_polarity_normal;
+
+	return (ret_val);
+}
+/*
  * e1000_wait_autoneg_generic - Wait for auto-neg completion
  * @hw: pointer to the HW structure
  *
@@ -1631,9 +1736,16 @@ e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
 		 * it across the board.
 		 */
 		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &phy_status);
-		if (ret_val)
-			break;
-		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &phy_status);
+		if (ret_val) {
+			/*
+			 * If the first read fails, another entity may have
+			 * ownership of the resources, wait and try again to
+			 * see if they have relinquished the resources yet.
+			 */
+			usec_delay(usec_interval);
+			ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS,
+			    &phy_status);
+		}
 		if (ret_val)
 			break;
 		if (phy_status & MII_SR_LINK_STATUS)
@@ -1680,14 +1792,15 @@ e1000_get_cable_length_m88(struct e1000_hw *hw)
 	index = (phy_data & M88E1000_PSSR_CABLE_LENGTH) >>
 	    M88E1000_PSSR_CABLE_LENGTH_SHIFT;
 	if (index < (M88E1000_CABLE_LENGTH_TABLE_SIZE + 1)) {
-		phy->min_cable_length = e1000_m88_cable_length_table[index];
-		phy->max_cable_length = e1000_m88_cable_length_table[index+1];
-
-		phy->cable_length = (phy->min_cable_length +
-		    phy->max_cable_length) / 2;
-	} else {
 		ret_val = E1000_ERR_PHY;
+		goto out;
 	}
+
+	phy->min_cable_length = e1000_m88_cable_length_table[index];
+	phy->max_cable_length = e1000_m88_cable_length_table[index+1];
+
+	phy->cable_length = (phy->min_cable_length +
+	    phy->max_cable_length) / 2;
 
 out:
 	return (ret_val);
@@ -2139,6 +2252,48 @@ e1000_get_phy_type_from_id(u32 phy_id)
 	return (phy_type);
 }
 
+/*
+ * e1000_determine_phy_address - Determines PHY address.
+ * @hw: pointer to the HW structure
+ *
+ * This uses a trial and error method to loop through possible PHY
+ * addresses. It tests each by reading the PHY ID registers and
+ * checking for a match.
+ */
+s32
+e1000_determine_phy_address(struct e1000_hw *hw)
+{
+	s32 ret_val = -E1000_ERR_PHY_TYPE;
+	u32 phy_addr = 0;
+	u32 i;
+	enum e1000_phy_type phy_type = e1000_phy_unknown;
+
+	hw->phy.id = phy_type;
+
+	for (phy_addr = 0; phy_addr < E1000_MAX_PHY_ADDR; phy_addr++) {
+		hw->phy.addr = phy_addr;
+		i = 0;
+
+		do {
+			e1000_get_phy_id(hw);
+			phy_type = e1000_get_phy_type_from_id(hw->phy.id);
+
+			/*
+			 * If phy_type is valid, break - we found our
+			 * PHY address
+			 */
+			if (phy_type  != e1000_phy_unknown) {
+				ret_val = E1000_SUCCESS;
+				goto out;
+			}
+			msec_delay(1);
+			i++;
+		} while (i < 10);
+	}
+
+out:
+	return (ret_val);
+}
 /*
  * e1000_power_up_phy_copper - Restore copper link in case of PHY power down
  * @hw: pointer to the HW structure

@@ -26,7 +26,7 @@
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.61 v2008-10-7 */
+/* IntelVersion: 1.70 v2-9-8_2009-6-12 */
 
 #ifndef _IGB_REGS_H
 #define	_IGB_REGS_H
@@ -426,6 +426,7 @@ extern "C" {
 #define	E1000_GIOCTL		0x05B44 /* GIO Analog Control Register */
 #define	E1000_SCCTL		0x05B4C /* PCIc PLL Configuration Register */
 #define	E1000_GCR		0x05B00 /* PCI-Ex Control */
+#define	E1000_GCR2		0x05B64 /* PCI-Ex Control #2 */
 #define	E1000_GSCL_1		0x05B10 /* PCI-Ex Statistic Control #1 */
 #define	E1000_GSCL_2		0x05B14 /* PCI-Ex Statistic Control #2 */
 #define	E1000_GSCL_3		0x05B18 /* PCI-Ex Statistic Control #3 */
@@ -434,6 +435,8 @@ extern "C" {
 #define	E1000_FACTPS		0x05B30
 #define	E1000_SWSM		0x05B50 /* SW Semaphore */
 #define	E1000_FWSM		0x05B54 /* FW Semaphore */
+/* Driver-only SW semaphore (not used by BOOT agents) */
+#define	E1000_SWSM2		0x05B58
 #define	E1000_DCA_ID		0x05B70 /* DCA Requester ID Information - RO */
 #define	E1000_DCA_CTRL		0x05B74 /* DCA Control - RW */
 #define	E1000_FFLT_DBG		0x05F04 /* Debug Register */
@@ -472,7 +475,6 @@ extern "C" {
 #define	E1000_VFTE	0x00C90 /* VF Transmit Enables */
 #define	E1000_QDE	0x02408 /* Queue Drop Enable - RW */
 #define	E1000_DTXSWC	0x03500 /* DMA Tx Switch Control - RW */
-#define	E1000_VLVF	0x05D00 /* VLAN Virtual Machine Filter - RW */
 #define	E1000_RPLOLR	0x05AF0 /* Replication Offload - RW */
 #define	E1000_UTA	0x0A000 /* Unicast Table Array - RW */
 #define	E1000_IOVTCL	0x05BBC /* IOV Control Register */
@@ -483,12 +485,15 @@ extern "C" {
 #define	E1000_VMBMEM(_n)	(0x00800 + (64 * (_n)))
 #define	E1000_VFVMBMEM(_n)	(0x00800 + (_n))
 #define	E1000_VMOLR(_n)		(0x05AD0 + (4 * (_n)))
+/* VLAN Virtual Machine Filter - RW */
+#define	E1000_VLVF(_n)		(0x05D00 + (4 * (_n)))
 
 /* Filtering Registers */
 #define	E1000_SAQF(_n)	(0x05980 + (4 * (_n))) /* Source Address Queue Fltr */
 #define	E1000_DAQF(_n)	(0x059A0 + (4 * (_n))) /* Dest Address Queue Fltr */
 #define	E1000_SPQF(_n)	(0x059C0 + (4 * (_n))) /* Source Port Queue Fltr */
 #define	E1000_FTQF(_n)	(0x059E0 + (4 * (_n))) /* 5-tuple Queue Fltr */
+#define	E1000_TTQF(_n)	(0x059E0 + (4 * (_n))) /* 2-tuple Queue Fltr */
 #define	E1000_SYNQF(_n)	(0x055FC + (4 * (_n))) /* SYN Packet Queue Fltr */
 #define	E1000_ETQF(_n)	(0x05CB0 + (4 * (_n))) /* EType Queue Fltr */
 
