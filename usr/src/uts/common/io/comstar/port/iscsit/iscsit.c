@@ -1235,22 +1235,26 @@ iscsit_dbuf_alloc(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
 	idm_buf_t *idm_buffer;
 	iscsit_buf_t	*ibuf;
 	stmf_data_buf_t *result;
+	uint32_t	bsize;
 
 	/*
-	 * Once the iSER picture is better understood it might make sense
-	 * to pre-allocate some registered buffers, similar to what
-	 * fct/qlt are doing.  In the meantime hopefully stmf can allocate
-	 * these things quickly.
-	 *
-	 * We can't support a transfer larger than MaxBurstLength bytes.
+	 * If iscsit is requested to allocate a buffer larger than
+	 * MaxBurstLength, then the allocation fails (dbuf = NULL)
+	 * and pminsize is modified to be equal to MaxBurstLength.
+	 * stmf/sbd then should re-invoke this function with the
+	 * corrected values for transfer. iscsit allocates a buffer
+	 * whose size is a minimum of the requested size and the
+	 * configured MaxBurstLength.
 	 */
-	if (size > itask->it_ict->ict_op.op_max_burst_length) {
+	ASSERT(pminsize);
+	bsize = min(size, *pminsize);
+	if (bsize > itask->it_ict->ict_op.op_max_burst_length) {
 		*pminsize = itask->it_ict->ict_op.op_max_burst_length;
 		return (NULL);
 	}
 
 	/* Alloc buffer */
-	idm_buffer = idm_buf_alloc(itask->it_ict->ict_ic, NULL, size);
+	idm_buffer = idm_buf_alloc(itask->it_ict->ict_ic, NULL, bsize);
 	if (idm_buffer != NULL) {
 		result = stmf_alloc(STMF_STRUCT_DATA_BUF,
 		    sizeof (iscsit_buf_t), 0);
@@ -1261,8 +1265,8 @@ iscsit_dbuf_alloc(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
 			ibuf->ibuf_stmf_buf = result;
 			ibuf->ibuf_is_immed = B_FALSE;
 			result->db_flags = DB_DONT_CACHE;
-			result->db_buf_size = size;
-			result->db_data_size = size;
+			result->db_buf_size = bsize;
+			result->db_data_size = bsize;
 			result->db_sglist_length = 1;
 			result->db_sglist[0].seg_addr = idm_buffer->idb_buf;
 			result->db_sglist[0].seg_length =
