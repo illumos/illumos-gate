@@ -49,6 +49,7 @@ typedef struct cmlb_geom {
 
 typedef struct tg_attribute {
 	int media_is_writable;
+	int media_is_solid_state;
 } tg_attribute_t;
 
 

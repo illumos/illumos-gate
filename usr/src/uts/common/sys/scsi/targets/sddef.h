@@ -453,7 +453,8 @@ struct sd_lun {
 						/* field by hardware */
 	    un_f_pm_log_sense_smart	:1,	/* log sense support SMART */
 						/* feature attribute */
-	    un_f_reserved		:7;
+	    un_f_is_solid_state		:1,	/* has solid state media */
+	    un_f_reserved		:6;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -2357,6 +2358,7 @@ typedef struct disk_power_attr_pc {
 #define	SD_VPD_ASCII_OP_PG	0x08	/* 0x82 - ASCII Op Defs */
 #define	SD_VPD_DEVID_WWN_PG	0x10	/* 0x83 - Device Identification */
 #define	SD_VPD_EXTENDED_DATA_PG	0x80	/* 0x86 - Extended data about the lun */
+#define	SD_VPD_DEV_CHARACTER_PG	0x400	/* 0xB1 - Device Characteristics */
 
 /*
  * Non-volatile cache support

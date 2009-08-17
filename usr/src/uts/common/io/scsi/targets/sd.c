@@ -879,6 +879,7 @@ static int sd_pm_idletime = 1;
 #define	sd_blank_cmp			ssd_blank_cmp
 #define	sd_chk_vers1_data		ssd_chk_vers1_data
 #define	sd_set_vers1_properties		ssd_set_vers1_properties
+#define	sd_check_solid_state		ssd_check_solid_state
 
 #define	sd_get_physical_geometry	ssd_get_physical_geometry
 #define	sd_get_virtual_geometry		ssd_get_virtual_geometry
@@ -1271,6 +1272,7 @@ static int   sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag);
 static int   sd_get_write_cache_enabled(sd_ssc_t *ssc, int *is_enabled);
 static void  sd_get_nv_sup(sd_ssc_t *ssc);
 static dev_t sd_make_device(dev_info_t *devi);
+static void  sd_check_solid_state(sd_ssc_t *ssc);
 
 static void  sd_update_block_info(struct sd_lun *un, uint32_t lbasize,
 	uint64_t capacity);
@@ -5667,8 +5669,8 @@ sd_write_deviceid(sd_ssc_t *ssc)
  * Description: This routine sends an inquiry command with the EVPD bit set and
  *		a page code of 0x00 to the device. It is used to determine which
  *		vital product pages are available to find the devid. We are
- *		looking for pages 0x83 or 0x80.  If we return a negative 1, the
- *		device does not support that command.
+ *		looking for pages 0x83 0x80 or 0xB1.  If we return a negative 1,
+ *		the device does not support that command.
  *
  *   Arguments: un  - driver soft state (unit) structure
  *
@@ -5724,7 +5726,7 @@ sd_check_vpd_page_support(sd_ssc_t *ssc)
 		 * Pages are returned in ascending order, and 0x83 is what we
 		 * are hoping for.
 		 */
-		while ((page_list[counter] <= 0x86) &&
+		while ((page_list[counter] <= 0xB1) &&
 		    (counter <= (page_list[VPD_PAGE_LENGTH] +
 		    VPD_HEAD_OFFSET))) {
 			/*
@@ -5750,6 +5752,9 @@ sd_check_vpd_page_support(sd_ssc_t *ssc)
 				break;
 			case 0x86:
 				un->un_vpd_page_mask |= SD_VPD_EXTENDED_DATA_PG;
+				break;
+			case 0xB1:
+				un->un_vpd_page_mask |= SD_VPD_DEV_CHARACTER_PG;
 				break;
 			}
 			counter++;
@@ -8091,6 +8096,11 @@ sd_unit_attach(dev_info_t *devi)
 	ddi_report_dev(devi);
 
 	un->un_mediastate = DKIO_NONE;
+
+	/*
+	 * Check if this is a SSD(Solid State Drive).
+	 */
+	sd_check_solid_state(ssc);
 
 	cmlb_alloc_handle(&un->un_cmlbhandle);
 
@@ -30828,6 +30838,8 @@ sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie)
 		mutex_enter(SD_MUTEX(un));
 		((tg_attribute_t *)arg)->media_is_writable =
 		    un->un_f_mmc_writable_media;
+		((tg_attribute_t *)arg)->media_is_solid_state =
+		    un->un_f_is_solid_state;
 		mutex_exit(SD_MUTEX(un));
 		return (0);
 	default:
@@ -31288,4 +31300,74 @@ sd_ssc_extract_info(sd_ssc_t *ssc, struct sd_lun *un, struct scsi_pkt *pktp,
 	if (xp->xb_ena == 0)
 		xp->xb_ena = fm_ena_generate(0, FM_ENA_FMT1);
 	ssc->ssc_uscsi_info->ui_ena = xp->xb_ena;
+}
+
+
+/*
+ *     Function: sd_check_solid_state
+ *
+ * Description: Query the optional INQUIRY VPD page 0xb1. If the device
+ *              supports VPD page 0xb1, sd examines the MEDIUM ROTATION
+ *              RATE. If the MEDIUM ROTATION RATE is 1, sd assumes the
+ *              device is a solid state drive.
+ *
+ *     Context: Kernel thread or interrupt context.
+ */
+
+static void
+sd_check_solid_state(sd_ssc_t *ssc)
+{
+	int		rval		= 0;
+	uchar_t		*inqb1		= NULL;
+	size_t		inqb1_len	= MAX_INQUIRY_SIZE;
+	size_t		inqb1_resid	= 0;
+	struct sd_lun	*un;
+
+	ASSERT(ssc != NULL);
+	un = ssc->ssc_un;
+	ASSERT(un != NULL);
+	ASSERT(!mutex_owned(SD_MUTEX(un)));
+
+	mutex_enter(SD_MUTEX(un));
+	un->un_f_is_solid_state = FALSE;
+
+	if (ISCD(un)) {
+		mutex_exit(SD_MUTEX(un));
+		return;
+	}
+
+	if (sd_check_vpd_page_support(ssc) == 0 &&
+	    un->un_vpd_page_mask & SD_VPD_DEV_CHARACTER_PG) {
+		mutex_exit(SD_MUTEX(un));
+		/* collect page b1 data */
+		inqb1 = kmem_zalloc(inqb1_len, KM_SLEEP);
+
+		rval = sd_send_scsi_INQUIRY(ssc, inqb1, inqb1_len,
+		    0x01, 0xB1, &inqb1_resid);
+
+		if (rval == 0 && (inqb1_len - inqb1_resid > 5)) {
+			SD_TRACE(SD_LOG_COMMON, un,
+			    "sd_check_solid_state: \
+			    successfully get VPD page: %x \
+			    PAGE LENGTH: %x BYTE 4: %x \
+			    BYTE 5: %x", inqb1[1], inqb1[3], inqb1[4],
+			    inqb1[5]);
+
+			mutex_enter(SD_MUTEX(un));
+			/*
+			 * Check the MEDIUM ROTATION RATE. If it is set
+			 * to 1, the device is a solid state drive.
+			 */
+			if (inqb1[4] == 0 && inqb1[5] == 1) {
+				un->un_f_is_solid_state = TRUE;
+			}
+			mutex_exit(SD_MUTEX(un));
+		} else if (rval != 0) {
+			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+		}
+
+		kmem_free(inqb1, inqb1_len);
+	} else {
+		mutex_exit(SD_MUTEX(un));
+	}
 }
