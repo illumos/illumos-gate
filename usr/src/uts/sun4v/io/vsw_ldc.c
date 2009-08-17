@@ -1187,7 +1187,7 @@ vsw_drain_ldcs(vsw_port_t *port)
 			while (ldc_unreg_callback(ldcp->ldc_handle)
 			    == EWOULDBLOCK)
 				(void) cv_timedwait(&ldcp->drain_cv,
-				    &ldcp->drain_cv_lock, lbolt + hz);
+				    &ldcp->drain_cv_lock, ddi_get_lbolt() + hz);
 
 			mutex_exit(&ldcp->drain_cv_lock);
 			D2(vswp, "%s: unreg callback for chan %ld after "
