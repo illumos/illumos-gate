@@ -149,11 +149,23 @@ iser_ib_handle_cm_req(idm_svc_t *svc_hdl, ibt_cm_event_t *evp,
 	    ipcm_info.dst_addr.un.ip4addr);
 
 	/* Allocate a channel to establish the new connection */
-	chan = iser_ib_alloc_rc_channel(&ipcm_info.dst_addr,
-	    &ipcm_info.src_addr);
+	chan = iser_ib_alloc_channel_nopathlookup(
+	    evp->cm_event.req.req_hca_guid,
+	    evp->cm_event.req.req_prim_hca_port);
 	if (chan == NULL) {
+		ISER_LOG(CE_NOTE, "iser_ib_handle_cm_req: failed to allocate "
+		    "a channel from src IP (0x%08x) src port (0x%04x) "
+		    "to dst IP: (0x%08x) on hca(%llx %d)",
+		    ipcm_info.src_addr.un.ip4addr, ipcm_info.src_port,
+		    ipcm_info.dst_addr.un.ip4addr,
+		    (longlong_t)evp->cm_event.req.req_hca_guid,
+		    evp->cm_event.req.req_prim_hca_port);
 		return (IBT_CM_REJECT);
 	}
+
+	/* Set the local and remote ip */
+	chan->ic_localip = ipcm_info.dst_addr;
+	chan->ic_remoteip = ipcm_info.src_addr;
 
 	/* Set the local and remote port numbers on the channel handle */
 	chan->ic_lport = svc_hdl->is_svc_req.sr_port;

@@ -392,7 +392,7 @@ iser_channel_alloc(idm_sockaddr_t *laddr, idm_sockaddr_t *raddr)
 	iser_ib_conv_sockaddr2ibtaddr(raddr, &remote_ip);
 	iser_ib_conv_sockaddr2ibtaddr(laddr, &local_ip);
 
-	return (iser_ib_alloc_rc_channel(&local_ip, &remote_ip));
+	return (iser_ib_alloc_channel_pathlookup(&local_ip, &remote_ip));
 }
 
 /*

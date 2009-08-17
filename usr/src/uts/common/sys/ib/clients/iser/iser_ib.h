@@ -178,8 +178,13 @@ int iser_ib_get_paths(
     ibt_ip_addr_t *local_ip, ibt_ip_addr_t *remote_ip, ibt_path_info_t *path,
     ibt_path_ip_src_t *path_src_ip);
 
-iser_chan_t *iser_ib_alloc_rc_channel(ibt_ip_addr_t *local_ip,
-    ibt_ip_addr_t *remote_ip);
+iser_chan_t *iser_ib_alloc_channel_pathlookup(
+    ibt_ip_addr_t *local_ip, ibt_ip_addr_t *remote_ip);
+
+iser_chan_t *iser_ib_alloc_channel_nopathlookup(
+    ib_guid_t hca_guid, uint8_t hca_port);
+
+iser_chan_t *iser_ib_alloc_rc_channel(iser_hca_t *hca, uint8_t hca_port);
 
 int iser_ib_open_rc_channel(iser_chan_t *chan);
 
