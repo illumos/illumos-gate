@@ -1651,9 +1651,8 @@ pcieb_init_hotplug(pcieb_devstate_t *pcieb)
 fail:
 	pcieb->pcieb_hpc_type = HPC_NONE;
 	pcieb->pcieb_hotplug_capable = B_FALSE;
-	cmn_err(CE_WARN, "%s%d: Failed setting hotplug framework",
-	    ddi_driver_name(pcieb->pcieb_dip),
-	    ddi_get_instance(pcieb->pcieb_dip));
+	PCIEB_DEBUG(DBG_ATTACH, pcieb->pcieb_dip, "Failed setting hotplug"
+	    " framework\n");
 
 	return (DDI_FAILURE);
 }
