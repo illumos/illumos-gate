@@ -14190,7 +14190,7 @@ fp_validate_area_domain(fc_local_port_t *port, uint32_t id, uint32_t mask,
 					job->job_result = rval;
 					fp_jobdone(job);
 				}
-				FP_TRACE(FP_NHEAD2(4, 0),
+				FP_TRACE(FP_NHEAD1(1, 0),
 				    "PLOGI succeeded:no skip(1) for "
 				    "D_ID %x", d_id);
 				list[index].map_flags |=
@@ -14511,7 +14511,7 @@ fp_validate_rscn_page(fc_local_port_t *port, fc_affected_id_t *page,
 				struct fc_portmap *map =
 				    listptr + *listindex - 1;
 
-				FP_TRACE(FP_NHEAD2(4, 0),
+				FP_TRACE(FP_NHEAD1(1, 0),
 				    "PLOGI succeeded: no skip(2)"
 				    " for D_ID %x", page->aff_d_id);
 				map->map_flags |=
