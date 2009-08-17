@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <scsi/libses.h>
 #include "ses_impl.h"
@@ -155,7 +153,8 @@ enc_vs(const ses2_ed_impl_t *tp, nvlist_t *nvl, const char *name)
 	int nverr;
 
 	SES_NV_ADD(byte_array, nverr, nvl, name, (uchar_t *)tp->st_priv,
-	    tp->st_hdr.sehi_ed_len - offsetof(ses2_ed_impl_t, st_priv[0]));
+	    tp->st_hdr.sehi_ed_len - offsetof(ses2_ed_impl_t, st_priv[0]) +
+	    offsetof(ses2_ed_impl_t, st_hdr.sehi_ed_len) + 1);
 
 	return (0);
 }

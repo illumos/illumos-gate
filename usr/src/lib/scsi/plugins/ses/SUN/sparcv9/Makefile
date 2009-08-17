@@ -24,16 +24,9 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS = 			\
-	libses			\
-	ses2			\
-	LSILOGIC-SASX28-A.0	\
-	SUN			\
-	SUN-Storage-J4400	\
-	SUN-Storage-J4500
+include ../Makefile.com
+include $(SRC)/Makefile.master.64
 
-.KEEP_STATE:
+install: all $(ROOTPROG64) $(ROOTALIASES64)
 
-.PARALLEL:
-
-include ../../Makefile.subdirs
+include ../../Makefile.targ

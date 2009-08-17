@@ -24,16 +24,8 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS = 			\
-	libses			\
-	ses2			\
-	LSILOGIC-SASX28-A.0	\
-	SUN			\
-	SUN-Storage-J4400	\
-	SUN-Storage-J4500
+HDRS = 
+HDRDIR = common
+PLUGINTYPE = vendor
 
-.KEEP_STATE:
-
-.PARALLEL:
-
-include ../../Makefile.subdirs
+include ../Makefile.plugin
