@@ -974,6 +974,8 @@ nfsmapid_cfg() {
 BOOMER_PRESENT_SYS=false
 BOOMER_PRESENT_BFU=false
 BOOMER_DRIVERS="audio"
+AUSTR_PRESENT_SYS=false
+AUSTR_PRESENT_BFU=false
 
 check_boomer_sys() {
 	typeset root=$1
@@ -994,6 +996,23 @@ check_boomer_bfu() {
 	    grep devices-audio.xml > /dev/null 2>&1
 }
 
+check_austr_sys() {
+	typeset root=$1
+	typeset n2m=$root/etc/name_to_major
+	typeset drv
+
+	if ! grep -w austr $n2m > /dev/null 2>&1; then
+		return 1
+	fi
+	return 0
+}
+
+check_austr_bfu() {
+	$ZCAT $cpiodir/generic.kernel$ZFIX | cpio -it 2>/dev/null |
+	    grep austr > /dev/null 2>&1
+}
+
+#
 #
 # Define global variables
 #
@@ -2962,6 +2981,7 @@ bfucmd="
 	/usr/sbin/pkgrm
 	/usr/sbin/prtconf
 	/usr/sbin/reboot
+	/usr/sbin/rem_drv
 	/usr/sbin/sync
 	/usr/sbin/tar
 	/usr/sbin/uadmin
@@ -7125,6 +7145,8 @@ mondo_loop() {
 	#
 	check_boomer_sys $root && BOOMER_PRESENT_SYS=true
 	check_boomer_bfu && BOOMER_PRESENT_BFU=true
+	check_austr_sys $root && AUSTR_PRESENT_SYS=true
+	check_austr_bfu $root && AUSTR_PRESENT_BFU=true
 
 	if $BOOMER_PRESENT_BFU; then
 	    rm -f $usr/include/sys/audiovar.h
@@ -7170,6 +7192,17 @@ mondo_loop() {
 		rm -f $root/dev/sound/*
 
 		touch $root/reconfigure
+	fi
+	#
+	# If updating to a BFU where austr is removed, make sure we
+	# remove the driver from kernel state, and clean up the binaries.
+	#
+	if $AUSTR_PRESENT_SYS && ! $AUSTR_PRESENT_BFU; then
+		/tmp/bfubin/rem_drv -b $root austr >/dev/null 2>&1
+		rm -f $root/kernel/drv/austr
+		rm -f $root/kernel/drv/austr.conf
+		rm -f $root/kernel/drv/sparcv9/austr
+		rm -f $root/kernel/drv/amd64/austr
 	fi
 
 	#
