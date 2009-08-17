@@ -747,7 +747,7 @@ error:
 	return (rval);
 }
 
-int aac_use_msi = 1;
+int aac_use_msi = 0;
 
 static int
 aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)

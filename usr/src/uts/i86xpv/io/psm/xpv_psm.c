@@ -83,7 +83,7 @@ cpuset_t xen_psm_cpus_online;	/* online cpus */
 int xen_psm_ncpus = 1;		/* cpu count */
 int xen_psm_next_bind_cpu;	/* next cpu to bind an interrupt to */
 
-int xen_support_msi = -1;
+int xen_support_msi = 0;
 
 static int xen_clock_irq = INVALID_IRQ;
 
@@ -1307,11 +1307,11 @@ apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
 		}
 	}
 	/*
-	 * Hypervisor wants PCI config space address of msix table
+	 * Hypervisor wants PCI config space address of msix table base
 	 */
 	pfnum = hat_getpfnum(kas.a_hat, (caddr_t)msix_p->msix_tbl_addr) &
 	    ~PFN_IS_FOREIGN_MFN;
-	table_base = (uint64_t)((pfnum << PAGESHIFT) |
+	table_base = (uint64_t)((pfnum << PAGESHIFT) - msix_p->msix_tbl_offset |
 	    ((uintptr_t)msix_p->msix_tbl_addr & PAGEOFFSET));
 	/*
 	 * get PCI bus #  and devfn from reg spec for device

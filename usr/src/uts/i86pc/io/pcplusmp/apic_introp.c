@@ -535,6 +535,7 @@ apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 	}
 }
 
+#endif	/* __xpv */
 
 /*
  * apic_pci_msi_enable_mode:
@@ -611,6 +612,7 @@ apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
 	}
 }
 
+#if !defined(__xpv)
 
 static int
 apic_set_cpu(int irqno, int cpu, int *result)
@@ -798,28 +800,16 @@ set_grp_intr_done:
 	return (PSM_SUCCESS);
 }
 
-#else	/* !__xpv */
+#else	/* __xpv */
 
 /*
  * We let the hypervisor deal with msi configutation
- * so just stub these out.
+ * so just stub this out.
  */
 
 /* ARGSUSED */
 void
 apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
-{
-}
-
-/* ARGSUSED */
-void
-apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
-{
-}
-
-/* ARGSUSED */
-void
-apic_pci_msi_disable_mode(dev_info_t *rdip, int type)
 {
 }
 
