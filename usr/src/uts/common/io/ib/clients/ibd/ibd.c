@@ -136,6 +136,7 @@ uint_t ibd_txcomp_poll = 0;
 uint_t ibd_rx_softintr = 1;
 uint_t ibd_tx_softintr = 1;
 uint_t ibd_create_broadcast_group = 1;
+uint_t ibd_force_lso_disable = 1;
 #ifdef IBD_LOGGING
 uint_t ibd_log_sz = 0x20000;
 #endif
@@ -2308,6 +2309,17 @@ ibd_record_capab(ibd_state_t *state, dev_info_t *dip)
 	} else {
 		state->id_lso_policy = B_FALSE;
 	}
+
+	/*
+	 * Work-around for Bug 6866957. Ignore policy from ibd.conf.
+	 * Turn off LSO forcibly. Remove it when the work-around is no longer
+	 * needed.
+	 */
+	if (ibd_force_lso_disable) {
+		state->id_lso_policy = B_FALSE;
+	}
+	/* End of Workaround */
+
 	if (hca_attrs.hca_max_lso_size > 0) {
 		state->id_lso_capable = B_TRUE;
 		if (hca_attrs.hca_max_lso_size > IBD_LSO_MAXLEN)
