@@ -668,7 +668,6 @@ void
 startup(void)
 {
 #if !defined(__xpv)
-	extern void startup_bios_disk(void);
 	extern void startup_pci_bios(void);
 	extern int post_fastreboot;
 #endif
@@ -706,10 +705,7 @@ startup(void)
 	startup_xen_mca();
 #endif
 	startup_modules();
-#if !defined(__xpv)
-	if (!post_fastreboot)
-		startup_bios_disk();
-#endif
+
 	startup_end();
 	progressbar_start();
 }

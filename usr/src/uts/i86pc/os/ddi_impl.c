@@ -2514,6 +2514,10 @@ pci_peekpoke_check(dev_info_t *dip, dev_info_t *rdip,
 void
 impl_setup_ddi(void)
 {
+#if !defined(__xpv)
+	extern void startup_bios_disk(void);
+	extern int post_fastreboot;
+#endif
 	dev_info_t *xdip, *isa_dip;
 	rd_existing_t rd_mem_prop;
 	int err;
@@ -2555,11 +2559,15 @@ impl_setup_ddi(void)
 	 */
 	get_boot_properties();
 
-	/* do bus dependent probes. */
-	impl_bus_initialprobe();
-
 	/* not framebuffer should be enumerated, if present */
 	get_vga_properties();
+
+#if !defined(__xpv)
+	if (!post_fastreboot)
+		startup_bios_disk();
+#endif
+	/* do bus dependent probes. */
+	impl_bus_initialprobe();
 }
 
 dev_t
