@@ -217,6 +217,9 @@ static bool_t	stats_enabled = FALSE;
 static uint64_t max_unsignaled_rws = 5;
 int nfs_rdma_port = NFS_RDMA_PORT;
 
+#define	RIBNETID_TCP	"tcp"
+#define	RIBNETID_TCP6	"tcp6"
+
 /*
  * rib_stat: private data pointer used when registering
  *	with the IBTF.  It is returned to the consumer
@@ -2095,6 +2098,9 @@ rib_disconnect_channel(CONN *conn, rib_conn_list_t *conn_list)
 	if (conn->c_laddr.buf != NULL) {
 		kmem_free(conn->c_laddr.buf, conn->c_laddr.len);
 	}
+	if (conn->c_netid != NULL) {
+		kmem_free(conn->c_netid, (strlen(conn->c_netid) + 1));
+	}
 
 	/*
 	 * Credit control cleanup.
@@ -3042,19 +3048,35 @@ rib_srv_cm_handler(void *any, ibt_cm_event_t *event,
 		switch (ipinfo.src_addr.family) {
 		case AF_INET:
 
+			conn->c_netid = kmem_zalloc(strlen(RIBNETID_TCP) + 1,
+			    KM_SLEEP);
+			(void) strcpy(conn->c_netid, RIBNETID_TCP);
+
 			conn->c_raddr.maxlen =
 			    conn->c_raddr.len = sin_size;
 			conn->c_raddr.buf = kmem_zalloc(sin_size, KM_SLEEP);
 
 			s = (struct sockaddr_in *)conn->c_raddr.buf;
 			s->sin_family = AF_INET;
-
 			bcopy((void *)&ipinfo.src_addr.un.ip4addr,
+			    &s->sin_addr, in_size);
+
+			conn->c_laddr.maxlen =
+			    conn->c_laddr.len = sin_size;
+			conn->c_laddr.buf = kmem_zalloc(sin_size, KM_SLEEP);
+
+			s = (struct sockaddr_in *)conn->c_laddr.buf;
+			s->sin_family = AF_INET;
+			bcopy((void *)&ipinfo.dst_addr.un.ip4addr,
 			    &s->sin_addr, in_size);
 
 			break;
 
 		case AF_INET6:
+
+			conn->c_netid = kmem_zalloc(strlen(RIBNETID_TCP6) + 1,
+			    KM_SLEEP);
+			(void) strcpy(conn->c_netid, RIBNETID_TCP6);
 
 			conn->c_raddr.maxlen =
 			    conn->c_raddr.len = sin6_size;
@@ -3063,6 +3085,16 @@ rib_srv_cm_handler(void *any, ibt_cm_event_t *event,
 			s6 = (struct sockaddr_in6 *)conn->c_raddr.buf;
 			s6->sin6_family = AF_INET6;
 			bcopy((void *)&ipinfo.src_addr.un.ip6addr,
+			    &s6->sin6_addr,
+			    sizeof (struct in6_addr));
+
+			conn->c_laddr.maxlen =
+			    conn->c_laddr.len = sin6_size;
+			conn->c_laddr.buf = kmem_zalloc(sin6_size, KM_SLEEP);
+
+			s6 = (struct sockaddr_in6 *)conn->c_laddr.buf;
+			s6->sin6_family = AF_INET6;
+			bcopy((void *)&ipinfo.dst_addr.un.ip6addr,
 			    &s6->sin6_addr,
 			    sizeof (struct in6_addr));
 
@@ -4338,6 +4370,14 @@ rib_connect(struct netbuf *s_svcaddr, struct netbuf *d_svcaddr,
 	cn->c_laddr.buf = kmem_alloc(s_addr_len, KM_SLEEP);
 	bcopy(s_addr_buf, cn->c_laddr.buf, s_addr_len);
 	cn->c_laddr.len = cn->c_laddr.maxlen = s_addr_len;
+
+	if (rpt->srcip.family == AF_INET) {
+		cn->c_netid = kmem_zalloc(strlen(RIBNETID_TCP) + 1, KM_SLEEP);
+		(void) strcpy(cn->c_netid, RIBNETID_TCP);
+	} else {
+		cn->c_netid = kmem_zalloc(strlen(RIBNETID_TCP6) + 1, KM_SLEEP);
+		(void) strcpy(cn->c_netid, RIBNETID_TCP6);
+	}
 
 	/*
 	 * Add to conn list.

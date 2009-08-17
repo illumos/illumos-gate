@@ -264,12 +264,6 @@ svc_rdma_kcreate(char *netid, SVC_CALLOUT_TABLE *sct, int id,
 		q->q_ptr = &rd->rd_xprt;
 		xprt->xp_netid = NULL;
 
-		if (netid != NULL) {
-			xprt->xp_netid = kmem_alloc(strlen(netid) + 1,
-			    KM_SLEEP);
-			(void) strcpy(xprt->xp_netid, netid);
-		}
-
 		xprt->xp_addrmask.maxlen =
 		    xprt->xp_addrmask.len = sizeof (struct sockaddr_in);
 		xprt->xp_addrmask.buf =
@@ -340,7 +334,6 @@ svc_rdma_kdestroy(SVCMASTERXPRT *xprt)
 
 	mutex_destroy(&xprt->xp_req_lock);
 	mutex_destroy(&xprt->xp_thread_lock);
-	kmem_free(xprt->xp_netid, strlen(xprt->xp_netid) + 1);
 	kmem_free(rd, sizeof (*rd));
 	kmem_free(xprt->xp_addrmask.buf, xprt->xp_addrmask.maxlen);
 	kmem_free(xprt, sizeof (*xprt));
@@ -398,7 +391,6 @@ svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 {
 	XDR	*xdrs;
 	CONN	*conn;
-
 	rdma_recv_data_t	*rdp = (rdma_recv_data_t *)mp->b_rptr;
 	struct clone_rdma_data *crdp;
 	struct clist	*cl = NULL;
@@ -552,6 +544,20 @@ svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	clone_xprt->xp_rtaddr.buf = conn->c_raddr.buf;
 	clone_xprt->xp_rtaddr.len = conn->c_raddr.len;
 	clone_xprt->xp_rtaddr.maxlen = conn->c_raddr.len;
+
+	clone_xprt->xp_lcladdr.buf = conn->c_laddr.buf;
+	clone_xprt->xp_lcladdr.len = conn->c_laddr.len;
+	clone_xprt->xp_lcladdr.maxlen = conn->c_laddr.len;
+
+	/*
+	 * In case of RDMA, connection management is
+	 * entirely done in rpcib module and netid in the
+	 * SVCMASTERXPRT is NULL. Initialize the clone netid
+	 * from the connection.
+	 */
+
+	clone_xprt->xp_netid = conn->c_netid;
+
 	clone_xprt->xp_xid = xid;
 	crdp->conn = conn;
 

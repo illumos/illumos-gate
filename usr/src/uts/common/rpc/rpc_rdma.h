@@ -342,6 +342,7 @@ typedef enum {
  */
 typedef struct conn {
 	rdma_mod_t	*c_rdmamod;	/* RDMA transport info for conn */
+	char 		*c_netid;	/* tcp or tcp6 token */
 	struct netbuf	c_raddr;	/* remote address */
 	struct netbuf	c_laddr;	/* local address */
 	int		c_ref;		/* no. of clients of connection */

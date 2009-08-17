@@ -390,6 +390,7 @@ typedef struct __svcxprt_common {
 	int		xpc_msg_size;	/* TSDU or TIDU size		*/
 	struct netbuf	xpc_rtaddr;	/* remote transport address	*/
 	struct netbuf	xpc_lcladdr;	/* local transport address	*/
+	char		*xpc_netid;	/* network token		*/
 	SVC_CALLOUT_TABLE *xpc_sct;
 } __SVCXPRT_COMMON;
 
@@ -402,6 +403,7 @@ typedef struct __svcxprt_common {
 #define	xp_rtaddr	xp_xpc.xpc_rtaddr
 #define	xp_lcladdr	xp_xpc.xpc_lcladdr
 #define	xp_sct		xp_xpc.xpc_sct
+#define	xp_netid	xp_xpc.xpc_netid
 
 struct __svcmasterxprt {
 	SVCMASTERXPRT 	*xp_next;	/* Next transport in the list	*/
@@ -416,7 +418,6 @@ struct __svcmasterxprt {
 	kmutex_t	xp_thread_lock;	/* Thread count lock		*/
 	void		(*xp_closeproc)(const SVCMASTERXPRT *);
 					/* optional; see comments above	*/
-	char		*xp_netid;	/* network token		*/
 	struct netbuf	xp_addrmask;	/* address mask			*/
 
 	caddr_t		xp_p2;		/* private: for use by svc ops  */
@@ -501,7 +502,7 @@ struct __svcxprt {
 #ifdef _KERNEL
 #define	svc_getcaller(x) (&(x)->xp_rtaddr.buf)
 #define	svc_getaddrmask(x) (&(x)->xp_master->xp_addrmask)
-#define	svc_getnetid(x) ((x)->xp_master->xp_netid)
+#define	svc_getnetid(x) ((x)->xp_netid)
 #endif	/* _KERNEL */
 
 /*
