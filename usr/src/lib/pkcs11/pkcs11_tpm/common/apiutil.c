@@ -453,7 +453,7 @@ Valid_Session(Session_Struct_t *pSession, ST_SESSION_T *rSession)
 int
 API_Initialized()
 {
-	return (Anchor != NULL && global_shm != NULL);
+	return (Anchor != NULL);
 }
 
 void

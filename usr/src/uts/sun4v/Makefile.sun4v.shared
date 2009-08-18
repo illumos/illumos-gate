@@ -344,7 +344,6 @@ DRV_KMODS	+= px
 DRV_KMODS	+= qcn
 DRV_KMODS	+= rootnex
 DRV_KMODS       += su
-DRV_KMODS	+= tpm
 DRV_KMODS	+= trapstat
 DRV_KMODS	+= vcc
 DRV_KMODS	+= vdc

@@ -36,26 +36,25 @@
 #define	TIS_MEM_BASE	0xFED40000
 #define	TIS_MEM_LEN    	0x5000
 
-#define	TPM_LOCALITY_OFFSET(x)	((x) << 12)
-
+/* Different locality(x)'s Offsets for TPM Registers (TIS 1.2 pg33-36) */
 /* Used to gain ownership */
-#define	TPM_ACCESS		0x0000
+#define	TPM_ACCESS_(x)		(0x0000 | ((x)<<12))
 /* Enable Interrupts */
-#define	TPM_INT_ENABLE		0x0008
+#define	TPM_INT_ENABLE_(x)	(0x0008 | ((x)<<12))
 /* Interrupt vector (SIRQ values) */
-#define	TPM_INT_VECTOR		0x000C
+#define	TPM_INT_VECTOR_(x)	(0x000C | ((x)<<12))
 /* What caused interrupt */
-#define	TPM_INT_STATUS		0x0010
+#define	TPM_INT_STATUS_(x)	(0x0010 | ((x)<<12))
 /* Supported Interrupts */
-#define	TPM_INTF_CAP		0x0014
+#define	TPM_INTF_CAP_(x)	(0x0014 | ((x)<<12))
 /* Status Register */
-#define	TPM_STS			0x0018
+#define	TPM_STS_(x)		(0x0018 | ((x)<<12))
 /* I/O FIFO */
-#define	TPM_DATA_FIFO   	0x0024
+#define	TPM_DATA_FIFO_(x)   	(0x0024 | ((x)<<12))
 /* Vendor and Device ID */
-#define	TPM_DID_VID		0x0F00
+#define	TPM_DID_VID_(x)		(0x0F00 | ((x)<<12))
 /* Revision ID */
-#define	TPM_RID			0x0F04
+#define	TPM_RID_(x)		(0x0F04 | ((x)<<12))
 
 /* The number of all ordinals */
 #define	TSC_ORDINAL_MAX		12

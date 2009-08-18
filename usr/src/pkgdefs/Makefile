@@ -158,6 +158,7 @@ i386_SUBDIRS= \
 	SUNWrwd	\
 	SUNWrwn	\
 	SUNWsi3124 \
+	SUNWtpm \
 	SUNWuath \
 	SUNWural \
 	SUNWurtw \
@@ -492,7 +493,6 @@ COMMON_SUBDIRS= \
 	SUNWtnfc  \
 	SUNWtnfd  \
 	SUNWtoo  \
-	SUNWtpm \
 	SUNWtsg  \
 	SUNWtsr  \
 	SUNWtsu  \

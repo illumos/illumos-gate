@@ -30,8 +30,12 @@ SUBDIRS1 = \
 	digest \
 	elfsign \
 	pktool \
-	kmfcfg \
-	tpmadm
+	kmfcfg
+
+#
+# tpmadm is x86 only until we have SPARC support for the TSS and TPM
+#
+i386_SUBDIRS = tpmadm
 
 $(CLOSED_BUILD)SUBDIRS1 += \
 	$(CLOSED)/cmd/cmd-crypto/kcfd

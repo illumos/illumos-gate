@@ -167,9 +167,6 @@ extern "C" {
 #define	MMU_STAT_AREA		0xfc
 #endif /* SET_MMU_STATS */
 
-#define	HV_TPM_GET		0x176
-#define	HV_TPM_PUT		0x177
-
 #define	HV_TM_ENABLE		0x180
 
 #define	HV_RA2PA		0x200

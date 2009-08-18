@@ -20,9 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 while read src dest
 do
@@ -52,21 +53,6 @@ do
 
 		mv -f ${dest}.$$ ${dest}
 
-		#
-		# Check if destination already has pkcs11_tpm
-		#
-		egrep 'pkcs11_tpm' $dest > /dev/null 2>& 1
-		if [ $? != 0 ] ; then
-                        pkcs11tpm="/usr/lib/security/\$ISA/pkcs11_tpm.so"
-                        export pkcs11tpm
-			if [ $? = 0 ] ; then
-				nawk '/^# End SUNWcsr/ \
-                        		{ print ENVIRON["pkcs11tpm"] } \
-                        		{ print } \
-				' ${dest} > ${dest}.$$
-				mv -f ${dest}.$$ ${dest}
-			fi
-		fi
 	fi
 done
 exit 0

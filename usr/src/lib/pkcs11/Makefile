@@ -39,13 +39,17 @@ SUBDIRS = \
 	libkcfd
 
 #
+# The PKCS11 TPM provider is only available for x86.
+#
+i386_SUBDIRS = pkcs11_tpm
+
+#
 # Don't build these for OpenSolaris, since they will be replaced by
 # binaries that are signed by ON Gatekeepers.
 #
 $(CLOSED_BUILD)SUBDIRS += \
 			pkcs11_kernel	\
-			pkcs11_softtoken \
-			pkcs11_tpm
+			pkcs11_softtoken
 
 $(CLOSED_BUILD)SUBDIRS += $($(MACH)_SUBDIRS)
 

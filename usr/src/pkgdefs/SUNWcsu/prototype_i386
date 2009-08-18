@@ -63,6 +63,7 @@ f none usr/bin/i86/savecore 555 root bin
 f none usr/bin/i86/setuname 555 root bin
 f none usr/bin/i86/uptime 4555 root bin
 l none usr/bin/i86/w=uptime
+f none usr/bin/tpmadm 555 root bin
 f none usr/kernel/drv/dump 755 root sys
 f none usr/kernel/drv/fssnap 755 root sys
 f none usr/kernel/drv/kstat 755 root sys

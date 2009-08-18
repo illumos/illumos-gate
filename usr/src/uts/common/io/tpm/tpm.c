@@ -42,16 +42,8 @@
 #include <sys/cred.h>		/* used by open,close,read */
 #include <sys/uio.h>		/* used by read */
 #include <sys/stat.h>		/* defines S_IFCHR */
-#include <sys/crypto/common.h>
-#include <sys/crypto/impl.h>
-#include <sys/crypto/spi.h>
 
 #include <sys/byteorder.h>	/* for ntohs, ntohl, htons, htonl */
-
-#ifdef sun4v
-#include <sys/hypervisor_api.h>
-#include <sys/hsvc.h>
-#endif
 
 #include <tss/platform.h> 	/* from SUNWtss */
 #include <tss/tpm.h> 		/* from SUNWtss */
@@ -96,7 +88,6 @@ typedef enum {
 #define	TEN_MILLISECONDS	10000	/* 10 milliseconds */
 #define	FOUR_HUNDRED_MILLISECONDS 400000	/* 4 hundred milliseconds */
 
-#define	DEFAULT_LOCALITY 0
 /*
  * TPM input/output buffer offsets
  */
@@ -146,7 +137,7 @@ static int tis_recv_data(tpm_state_t *, uint8_t *, size_t);
 
 /* Auxilliary */
 static int receive_data(tpm_state_t *, uint8_t *, size_t);
-static inline int tpm_io_lock(tpm_state_t *);
+static inline int tpm_lock(tpm_state_t *);
 static inline void tpm_unlock(tpm_state_t *);
 static void tpm_cleanup(dev_info_t *, tpm_state_t *);
 
@@ -220,158 +211,7 @@ static struct modlinkage tpm_ml = {
 	NULL
 };
 
-#ifdef KCF_TPM_RNG_PROVIDER
-
-#define	IDENT_TPMRNG	"TPM Random Number Generator"
-/*
- * CSPI information (entry points, provider info, etc.)
- */
-static void tpmrng_provider_status(crypto_provider_handle_t, uint_t *);
-
-static crypto_control_ops_t tpmrng_control_ops = {
-	tpmrng_provider_status
-};
-
-static int tpmrng_seed_random(crypto_provider_handle_t, crypto_session_id_t,
-    uchar_t *, size_t, uint_t, uint32_t, crypto_req_handle_t);
-
-static int tpmrng_generate_random(crypto_provider_handle_t,
-    crypto_session_id_t, uchar_t *, size_t, crypto_req_handle_t);
-
-static crypto_random_number_ops_t tpmrng_random_number_ops = {
-	tpmrng_seed_random,
-	tpmrng_generate_random
-};
-
-static int tpmrng_ext_info(crypto_provider_handle_t,
-	crypto_provider_ext_info_t *,
-	crypto_req_handle_t);
-
-static crypto_provider_management_ops_t tpmrng_extinfo_op = {
-	tpmrng_ext_info,
-	NULL,
-	NULL,
-	NULL
-};
-
-static int tpmrng_register(tpm_state_t *);
-static int tpmrng_unregister(tpm_state_t *);
-
-static crypto_ops_t tpmrng_crypto_ops = {
-	&tpmrng_control_ops,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	&tpmrng_random_number_ops,
-	NULL,
-	NULL,
-	NULL,
-	&tpmrng_extinfo_op,
-	NULL,
-	NULL
-};
-
-static crypto_provider_info_t tpmrng_prov_info = {
-	CRYPTO_SPI_VERSION_2,
-	"TPM Random Number Provider",
-	CRYPTO_HW_PROVIDER,
-	NULL,
-	NULL,
-	&tpmrng_crypto_ops,
-	0,
-	NULL,
-	0,
-	NULL
-};
-#endif /* KCF_TPM_RNG_PROVIDER */
-
 static void *statep = NULL;
-
-/*
- * Inline code to get exclusive lock on the TPM device and to make sure
- * the device is not suspended.  This grabs the primary TPM mutex (pm_mutex)
- * and then checks the suspend status.  If suspended, it will wait until
- * the device is "resumed" before releasing the pm_mutex and continuing.
- */
-#define	TPM_EXCLUSIVE_LOCK(tpm)  { \
-	mutex_enter(&tpm->pm_mutex); \
-	while (tpm->suspended) \
-		cv_wait(&tpm->suspend_cv, &tpm->pm_mutex); \
-	mutex_exit(&tpm->pm_mutex); }
-
-/*
- * TPM accessor functions
- */
-#ifdef sun4v
-
-extern uint64_t
-hcall_tpm_get(uint64_t, uint64_t, uint64_t, uint64_t *);
-
-extern uint64_t
-hcall_tpm_put(uint64_t, uint64_t, uint64_t, uint64_t);
-
-static inline uint8_t
-tpm_get8(tpm_state_t *tpm, unsigned long offset)
-{
-	uint64_t value;
-
-	ASSERT(tpm != NULL);
-	(void) hcall_tpm_get(tpm->locality, offset, sizeof (uint8_t), &value);
-	return ((uint8_t)value);
-}
-
-static inline uint32_t
-tpm_get32(tpm_state_t *tpm, unsigned long offset)
-{
-	uint64_t value;
-
-	ASSERT(tpm != NULL);
-	(void) hcall_tpm_get(tpm->locality, offset, sizeof (uint32_t), &value);
-	return ((uint32_t)value);
-}
-
-static inline void
-tpm_put8(tpm_state_t *tpm, unsigned long offset, uint8_t value)
-{
-	ASSERT(tpm != NULL);
-	(void) hcall_tpm_put(tpm->locality, offset, sizeof (uint8_t), value);
-}
-
-#else
-
-static inline uint8_t
-tpm_get8(tpm_state_t *tpm, unsigned long offset)
-{
-	ASSERT(tpm != NULL);
-
-	return (ddi_get8(tpm->handle,
-	    (uint8_t *)(TPM_LOCALITY_OFFSET(tpm->locality) |
-	    (uintptr_t)tpm->addr + offset)));
-}
-
-static inline uint32_t
-tpm_get32(tpm_state_t *tpm, unsigned long offset)
-{
-	ASSERT(tpm != NULL);
-	return (ddi_get32(tpm->handle,
-	    (uint32_t *)(TPM_LOCALITY_OFFSET(tpm->locality) |
-	    (uintptr_t)tpm->addr + offset)));
-}
-
-static inline void
-tpm_put8(tpm_state_t *tpm, unsigned long offset, uint8_t value)
-{
-	ASSERT(tpm != NULL);
-	ddi_put8(tpm->handle,
-	    (uint8_t *)(TPM_LOCALITY_OFFSET(tpm->locality) |
-	    (uintptr_t)tpm->addr + offset), value);
-}
-
-#endif /* sun4v */
 
 /*
  * TPM commands to get the TPM's properties, e.g.,timeout
@@ -740,13 +580,8 @@ itpm_command(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz)
 	/* Check the return code */
 	ret = load32(buf, TPM_RETURN_OFFSET);
 	if (ret != TPM_SUCCESS) {
-		if (ret == TPM_E_DEACTIVATED)
-			cmn_err(CE_WARN, "%s: TPM is deactivated", myname);
-		else if (ret == TPM_E_DISABLED)
-			cmn_err(CE_WARN, "%s: TPM is disabled", myname);
-		else
-			cmn_err(CE_WARN, "%s: TPM error code 0x%0x",
-			    myname, ret);
+		cmn_err(CE_WARN, "%s: command failed with ret code: %x",
+		    myname, ret);
 		return (DDI_FAILURE);
 	}
 
@@ -777,8 +612,12 @@ tpm_get_burstcount(tpm_state_t *tpm) {
 		 * burstcnt is stored as a little endian value
 		 * 'ntohs' doesn't work since the value is not word-aligned
 		 */
-		burstcnt = tpm_get8(tpm, TPM_STS + 1);
-		burstcnt += tpm_get8(tpm, TPM_STS + 2) << 8;
+		burstcnt = ddi_get8(tpm->handle,
+		    (uint8_t *)(tpm->addr+
+		    TPM_STS_(tpm->locality)+1));
+		burstcnt += ddi_get8(tpm->handle,
+		    (uint8_t *)(tpm->addr+
+		    TPM_STS_(tpm->locality)+2)) << 8;
 
 		if (burstcnt)
 			return (burstcnt);
@@ -797,7 +636,11 @@ tpm_get_burstcount(tpm_state_t *tpm) {
  */
 static void
 tpm_set_ready(tpm_state_t *tpm) {
-	tpm_put8(tpm, TPM_STS, TPM_STS_CMD_READY);
+	ASSERT(tpm != NULL);
+
+	ddi_put8(tpm->handle,
+	    (uint8_t *)(tpm->addr+TPM_STS_(tpm->locality)),
+	    TPM_STS_CMD_READY);
 }
 
 static int
@@ -814,7 +657,7 @@ retry:
 	while (size < bufsiz &&
 		(tpm_wait_for_stat(tpm,
 		    (TPM_STS_DATA_AVAIL|TPM_STS_VALID),
-		    tpm->timeout_c) == DDI_SUCCESS)) {
+		    (ddi_get_lbolt() + tpm->timeout_c)) == DDI_SUCCESS)) {
 		/*
 		 * Burstcount should be available within TIMEOUT_D
 		 * after STS is set to valid
@@ -822,14 +665,18 @@ retry:
 		 */
 		burstcnt = tpm_get_burstcount(tpm);
 		for (; burstcnt > 0 && size < bufsiz; burstcnt--) {
-			buf[size++] = tpm_get8(tpm, TPM_DATA_FIFO);
+			buf[size++] = ddi_get8(tpm->handle,
+			    (uint8_t *)(tpm->addr +
+			    TPM_DATA_FIFO_(tpm->locality)));
 		}
 	}
 	stsbits = tis_get_status(tpm);
 	/* check to see if we need to retry (just once) */
 	if (size < bufsiz && !(stsbits & TPM_STS_DATA_AVAIL) && retried == 0) {
 		/* issue responseRetry (TIS 1.2 pg 54) */
-		tpm_put8(tpm, TPM_STS, TPM_STS_RESPONSE_RETRY);
+		ddi_put8(tpm->handle,
+		    (uint8_t *)(tpm->addr+TPM_STS_(tpm->locality)),
+		    TPM_STS_RESPONSE_RETRY);
 		/* update the retry counter so we only retry once */
 		retried++;
 		/* reset the size to 0 and reread the entire response */
@@ -887,7 +734,8 @@ tis_recv_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	}
 
 	/* The TPM MUST set the state to stsValid within TIMEOUT_C */
-	ret = tpm_wait_for_stat(tpm, TPM_STS_VALID, tpm->timeout_c);
+	ret = tpm_wait_for_stat(tpm, TPM_STS_VALID,
+	    ddi_get_lbolt() + tpm->timeout_c);
 
 	status = tis_get_status(tpm);
 	if (ret != DDI_SUCCESS) {
@@ -935,12 +783,21 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 		return (DDI_FAILURE);
 	}
 
+	/* Be in the right locality (aren't we always in locality 0?) */
+	if (tis_request_locality(tpm, 0) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: tis_request_locality didn't enter "
+		    "locality 0", myname);
+		return (DDI_FAILURE);
+	}
+
 	/* Put the TPM in ready state */
 	status = tis_get_status(tpm);
 
 	if (!(status & TPM_STS_CMD_READY)) {
 		tpm_set_ready(tpm);
-		ret = tpm_wait_for_stat(tpm, TPM_STS_CMD_READY, tpm->timeout_b);
+		ret = tpm_wait_for_stat(tpm,
+		    TPM_STS_CMD_READY,
+		    (ddi_get_lbolt() + tpm->timeout_b));
 		if (ret != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s: could not put the TPM "
 			    "in the command ready state:"
@@ -966,12 +823,14 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 		}
 
 		for (; burstcnt > 0 && count < bufsiz - 1; burstcnt--) {
-			tpm_put8(tpm, TPM_DATA_FIFO, buf[count]);
+			ddi_put8(tpm->handle, (uint8_t *)(tpm->addr+
+			    TPM_DATA_FIFO_(tpm->locality)), buf[count]);
 			count++;
 		}
 		/* Wait for TPM to indicate that it is ready for more data */
 		ret = tpm_wait_for_stat(tpm,
-		    (TPM_STS_VALID | TPM_STS_DATA_EXPECT), tpm->timeout_c);
+		    (TPM_STS_VALID | TPM_STS_DATA_EXPECT),
+		    (ddi_get_lbolt() + tpm->timeout_c));
 		if (ret != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s: TPM didn't enter stsvalid "
 			    "state after sending the data:", myname);
@@ -981,11 +840,13 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	/* We can't exit the loop above unless we wrote bufsiz-1 bytes */
 
 	/* Write last byte */
-	tpm_put8(tpm, TPM_DATA_FIFO, buf[count]);
+	ddi_put8(tpm->handle, (uint8_t *)(tpm->addr +
+	    TPM_DATA_FIFO_(tpm->locality)), buf[count]);
 	count++;
 
 	/* Wait for the TPM to enter Valid State */
-	ret = tpm_wait_for_stat(tpm, TPM_STS_VALID, tpm->timeout_c);
+	ret = tpm_wait_for_stat(tpm,
+	    TPM_STS_VALID, (ddi_get_lbolt() + tpm->timeout_c));
 	if (ret == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s: tpm didn't enter Valid state", myname);
 		goto FAIL;
@@ -1004,13 +865,14 @@ tis_send_data(tpm_state_t *tpm, uint8_t *buf, size_t bufsiz) {
 	 * Final step: Writing TPM_STS_GO to TPM_STS
 	 * register will actually send the command.
 	 */
-	tpm_put8(tpm, TPM_STS, TPM_STS_GO);
+	ddi_put8(tpm->handle, (uint8_t *)(tpm->addr+TPM_STS_(tpm->locality)),
+	    TPM_STS_GO);
 
 	/* Ordinal/Command_code is located in buf[6..9] */
 	ordinal = load32(buf, TPM_COMMAND_CODE_OFFSET);
 
 	ret = tpm_wait_for_stat(tpm, TPM_STS_DATA_AVAIL | TPM_STS_VALID,
-	    tpm_get_ordinal_duration(tpm, ordinal));
+	    ddi_get_lbolt() + tpm_get_ordinal_duration(tpm, ordinal));
 	if (ret == DDI_FAILURE) {
 		status = tis_get_status(tpm);
 		if (!(status & TPM_STS_DATA_AVAIL) ||
@@ -1042,14 +904,17 @@ tis_release_locality(tpm_state_t *tpm, char locality, int force) {
 	ASSERT(tpm != NULL && locality >= 0 && locality < 5);
 
 	if (force ||
-	    (tpm_get8(tpm, TPM_ACCESS) &
-	    (TPM_ACCESS_REQUEST_PENDING | TPM_ACCESS_VALID)) ==
-	    (TPM_ACCESS_REQUEST_PENDING | TPM_ACCESS_VALID)) {
+	    (ddi_get8(tpm->handle,
+		(uchar_t *)(tpm->addr+TPM_ACCESS_(locality)))
+	    & (TPM_ACCESS_REQUEST_PENDING | TPM_ACCESS_VALID))
+	    == (TPM_ACCESS_REQUEST_PENDING | TPM_ACCESS_VALID)) {
 		/*
 		 * Writing 1 to active locality bit in TPM_ACCESS
 		 * register reliquishes the control of the locality
 		 */
-		tpm_put8(tpm, TPM_ACCESS, TPM_ACCESS_ACTIVE_LOCALITY);
+		ddi_put8(tpm->handle,
+		    (uint8_t *)(tpm->addr+TPM_ACCESS_(locality)),
+		    TPM_ACCESS_ACTIVE_LOCALITY);
 	}
 }
 
@@ -1060,25 +925,17 @@ tis_release_locality(tpm_state_t *tpm, char locality, int force) {
 static int
 tis_check_active_locality(tpm_state_t *tpm, char locality) {
 	uint8_t access_bits;
-	uint8_t old_locality;
 
 	ASSERT(tpm != NULL && locality >= 0 && locality < 5);
 
-	old_locality = tpm->locality;
-	tpm->locality = locality;
-
-	/* Just check to see if the requested localit works */
-	access_bits = tpm_get8(tpm, TPM_ACCESS);
+	access_bits = ddi_get8(tpm->handle,
+	    (uint8_t *)(tpm->addr+TPM_ACCESS_(locality)));
 	access_bits &= (TPM_ACCESS_ACTIVE_LOCALITY | TPM_ACCESS_VALID);
 
-	/* this was just a check, not a request to switch */
-	tpm->locality = old_locality;
-
-	if (access_bits == (TPM_ACCESS_ACTIVE_LOCALITY | TPM_ACCESS_VALID)) {
+	if (access_bits == (TPM_ACCESS_ACTIVE_LOCALITY | TPM_ACCESS_VALID))
 		return (DDI_SUCCESS);
-	} else {
+	else
 		return (DDI_FAILURE);
-	}
 }
 
 /* Request the TPM to be in the given locality */
@@ -1098,7 +955,8 @@ tis_request_locality(tpm_state_t *tpm, char locality) {
 		return (DDI_SUCCESS);
 	}
 
-	tpm_put8(tpm, TPM_ACCESS, TPM_ACCESS_REQUEST_USE);
+	ddi_put8(tpm->handle, tpm->addr+TPM_ACCESS_(locality),
+	    TPM_ACCESS_REQUEST_USE);
 	timeout = ddi_get_lbolt() + tpm->timeout_a;
 
 	/* Using polling */
@@ -1106,8 +964,8 @@ tis_request_locality(tpm_state_t *tpm, char locality) {
 		!= DDI_SUCCESS) {
 		if (ddi_get_lbolt() >= timeout) {
 			cmn_err(CE_WARN, "%s (interrupt-disabled) "
-			    "tis_request_locality timed out (timeout_a = %ld)",
-			    myname, tpm->timeout_a);
+			    "tis_request_locality timed out",
+			    myname);
 			return (DDI_FAILURE);
 		}
 		delay(tpm->timeout_poll);
@@ -1120,21 +978,21 @@ tis_request_locality(tpm_state_t *tpm, char locality) {
 /* Read the status register */
 static uint8_t
 tis_get_status(tpm_state_t *tpm) {
-	return (tpm_get8(tpm, TPM_STS));
+	return (ddi_get8(tpm->handle,
+	    (uint8_t *)(tpm->addr+TPM_STS_(tpm->locality))));
 }
 
 static int
-tpm_wait_for_stat(tpm_state_t *tpm, uint8_t mask, clock_t timeout) {
+tpm_wait_for_stat(tpm_state_t *tpm, uint8_t mask, clock_t absolute_timeout) {
 	char *myname = "tpm_wait_for_stat";
-	clock_t absolute_timeout = ddi_get_lbolt() + timeout;
 
 	/* Using polling */
 	while ((tis_get_status(tpm) & mask) != mask) {
 		if (ddi_get_lbolt() >= absolute_timeout) {
 			/* Timeout reached */
 			cmn_err(CE_WARN, "%s: using "
-			    "polling - reached timeout (%ld usecs)",
-			    myname, drv_hztousec(timeout));
+			    "polling:reached timeout",
+			    myname);
 			return (DDI_FAILURE);
 		}
 		delay(tpm->timeout_poll);
@@ -1154,6 +1012,7 @@ tis_init(tpm_state_t *tpm) {
 	uint32_t intf_caps;
 	int ret;
 	char *myname = "tis_init";
+	uintptr_t aptr = (uintptr_t)tpm->addr;
 
 	/*
 	 * Temporarily set up timeouts before we get the real timeouts
@@ -1176,7 +1035,8 @@ tis_init(tpm_state_t *tpm) {
 	tpm->duration[TPM_UNDEFINED] = drv_usectohz(TPM_DEFAULT_DURATION);
 
 	/* Find out supported capabilities */
-	intf_caps = tpm_get32(tpm, TPM_INTF_CAP);
+	intf_caps = ddi_get32(tpm->handle,
+	    (uint32_t *)(aptr + TPM_INTF_CAP_(0)));
 
 	/* Upper 3 bytes should always return 0 */
 	if (intf_caps & 0x7FFFFF00) {
@@ -1203,10 +1063,9 @@ tis_init(tpm_state_t *tpm) {
 	 * Before we start writing anything to TPM's registers,
 	 * make sure we are in locality 0
 	 */
-	ret = tis_request_locality(tpm, DEFAULT_LOCALITY);
+	ret = tis_request_locality(tpm, 0);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "%s: Unable to request locality %d", myname,
-		    DEFAULT_LOCALITY);
+		cmn_err(CE_WARN, "%s: Unable to request locality 0", myname);
 		return (DDI_FAILURE);
 	} /* Now we can refer to the locality as tpm->locality */
 
@@ -1255,10 +1114,8 @@ _init(void)
 
 	ret = ddi_soft_state_init(&statep, sizeof (tpm_state_t), 1);
 	if (ret)
-{
-		cmn_err(CE_WARN, "ddi_soft_state_init failed: %d", ret);
 		return (ret);
-}
+
 	ret = mod_install(&tpm_ml);
 	if (ret != 0) {
 		cmn_err(CE_WARN, "_init: mod_install returned non-zero");
@@ -1284,11 +1141,10 @@ int
 _fini()
 {
 	int ret;
-
 	ret = mod_remove(&tpm_ml);
-	if (ret != 0)
+	if (ret != 0) {
 		return (ret);
-
+	}
 	ddi_soft_state_fini(&statep);
 
 	return (ret);
@@ -1310,58 +1166,40 @@ tpm_resume(tpm_state_t *tpm)
 	return (DDI_SUCCESS);
 }
 
-#ifdef sun4v
-static uint64_t hsvc_tpm_minor = 0;
-static hsvc_info_t hsvc_tpm = {
-	HSVC_REV_1, NULL, HSVC_GROUP_TPM, 1, 0, NULL
-};
-#endif
-
 /*
  * Sun DDI/DDK entry points
  */
 static int
 tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int ret;
+	int ret, idx;
 	int instance;
-#ifndef sun4v
-	int idx, nregs;
-#endif
+	int nregs;
 	char *myname = "tpm_attach";
 	tpm_state_t *tpm = NULL;
 
 	ASSERT(dip != NULL);
 
 	instance = ddi_get_instance(dip);
-	if (instance < 0)
-		return (DDI_FAILURE);
 
 	/* Nothing out of ordinary here */
 	switch (cmd) {
 	case DDI_ATTACH:
-		if (ddi_soft_state_zalloc(statep, instance) == DDI_SUCCESS) {
-			tpm = ddi_get_soft_state(statep, instance);
-			if (tpm == NULL) {
-				cmn_err(CE_WARN,
-				    "%s: cannot get state information.",
-				    myname);
-				return (DDI_FAILURE);
-			}
-			tpm->dip = dip;
-		} else {
-			cmn_err(CE_WARN,
-			    "%s: cannot allocate state information.",
+		ret = ddi_soft_state_zalloc(statep, instance);
+		if (ret != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "%s could not allocate tpm_state_t",
 			    myname);
-			return (DDI_FAILURE);
+			goto FAIL;
 		}
+		tpm = ddi_get_soft_state(statep, instance);
+		tpm->dip = dip;
 		break;
 	case DDI_RESUME:
 		tpm = ddi_get_soft_state(statep, instance);
 		if (tpm == NULL) {
-			cmn_err(CE_WARN, "%s: cannot get state information.",
+			cmn_err(CE_WARN, "%s: tpm_state_t is NULL",
 			    myname);
-			return (DDI_FAILURE);
+			goto FAIL;
 		}
 		return (tpm_resume(tpm));
 	default:
@@ -1373,15 +1211,6 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Zeroize the flag, which is used to keep track of what is allocated */
 	tpm->flags = 0;
 
-#ifdef sun4v
-	ret = hsvc_register(&hsvc_tpm, &hsvc_tpm_minor);
-	if (ret != 0) {
-		cmn_err(CE_WARN, "%s: failed to register with "
-		    "hypervisor: 0x%0x", myname, ret);
-		goto FAIL;
-	}
-	tpm->flags |= TPM_HSVC_REGISTERED;
-#else
 	tpm->accattr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	tpm->accattr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
 	tpm->accattr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
@@ -1419,19 +1248,17 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto FAIL;
 	}
 	tpm->flags |= TPM_DIDREGSMAP;
-#endif
+
 	/* Enable TPM device according to the TIS specification */
 	ret = tis_init(tpm);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "%s: tis_init() failed with error %d",
+		cmn_err(CE_WARN, "%s: tis_init() failed ret: %d",
 		    myname, ret);
 
 		/* We need to clean up the ddi_regs_map_setup call */
-		if (tpm->flags & TPM_DIDREGSMAP) {
-			ddi_regs_map_free(&tpm->handle);
-			tpm->handle = NULL;
-			tpm->flags &= ~TPM_DIDREGSMAP;
-		}
+		ddi_regs_map_free(&tpm->handle);
+		tpm->handle = NULL;
+		tpm->flags &= ~TPM_DIDREGSMAP;
 		goto FAIL;
 	}
 
@@ -1453,6 +1280,10 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Initialize the buffer and the lock associated with it */
 	tpm->bufsize = TPM_IO_BUF_SIZE;
 	tpm->iobuf = kmem_zalloc((sizeof (uint8_t))*(tpm->bufsize), KM_SLEEP);
+	if (tpm->iobuf == NULL) {
+		cmn_err(CE_WARN, "%s: failed to allocate iobuf", myname);
+		goto FAIL;
+	}
 	tpm->flags |= TPM_DID_IO_ALLOC;
 
 	mutex_init(&tpm->iobuf_lock, NULL, MUTEX_DRIVER, NULL);
@@ -1470,16 +1301,8 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	tpm->flags |= TPM_DIDMINOR;
 
-#ifdef KCF_TPM_RNG_PROVIDER
-	/* register RNG with kcf */
-	if (tpmrng_register(tpm) != DDI_SUCCESS)
-		cmn_err(CE_WARN, "%s: tpm RNG failed to register with kcf",
-		    myname);
-#endif
-
 	return (DDI_SUCCESS);
 FAIL:
-	cmn_err(CE_WARN, "%s: tpm failed to attach", myname);
 	if (tpm != NULL) {
 		tpm_cleanup(dip, tpm);
 		ddi_soft_state_free(statep, instance);
@@ -1499,16 +1322,6 @@ tpm_cleanup(dev_info_t *dip, tpm_state_t *tpm)
 	if (tpm == NULL)
 		return;
 
-#ifdef KCF_TPM_RNG_PROVIDER
-	(void) tpmrng_unregister(tpm);
-#endif
-
-#ifdef sun4v
-	if (tpm->flags & TPM_HSVC_REGISTERED) {
-		(void) hsvc_unregister(&hsvc_tpm);
-		tpm->flags &= ~(TPM_HSVC_REGISTERED);
-	}
-#endif
 	if (tpm->flags & TPM_DID_MUTEX) {
 		mutex_destroy(&tpm->dev_lock);
 		tpm->flags &= ~(TPM_DID_MUTEX);
@@ -1565,9 +1378,6 @@ tpm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ASSERT(dip != NULL);
 
 	instance = ddi_get_instance(dip);
-	if (instance < 0)
-		return (DDI_FAILURE);
-
 	if ((tpm = ddi_get_soft_state(statep, instance)) == NULL) {
 		cmn_err(CE_WARN, "%s: stored pointer to tpm state is NULL",
 		    myname);
@@ -1653,7 +1463,10 @@ tpm_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 		    myname, otyp, OTYP_CHR);
 		return (EINVAL);
 	}
-	TPM_EXCLUSIVE_LOCK(tpm);
+	mutex_enter(&tpm->pm_mutex);
+	while (tpm->suspended)
+		cv_wait(&tpm->suspend_cv, &tpm->pm_mutex);
+	mutex_exit(&tpm->pm_mutex);
 
 	mutex_enter(&tpm->dev_lock);
 	if (tpm->dev_held) {
@@ -1689,7 +1502,10 @@ tpm_close(dev_t dev, int flag, int otyp, cred_t *cred)
 		    myname, otyp, OTYP_CHR);
 		return (EINVAL);
 	}
-	TPM_EXCLUSIVE_LOCK(tpm);
+	mutex_enter(&tpm->pm_mutex);
+	while (tpm->suspended)
+		cv_wait(&tpm->suspend_cv, &tpm->pm_mutex);
+	mutex_exit(&tpm->pm_mutex);
 
 	ASSERT(tpm->dev_held);
 
@@ -1722,10 +1538,13 @@ tpm_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		return (EFAULT);
 	}
 
-	TPM_EXCLUSIVE_LOCK(tpm);
+	mutex_enter(&tpm->pm_mutex);
+	while (tpm->suspended)
+		cv_wait(&tpm->suspend_cv, &tpm->pm_mutex);
+	mutex_exit(&tpm->pm_mutex);
 
 	/* Receive the data after requiring the lock */
-	ret = tpm_io_lock(tpm);
+	ret = tpm_lock(tpm);
 
 	/* Timeout reached */
 	if (ret == ETIME)
@@ -1795,7 +1614,10 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		return (EFAULT);
 	}
 
-	TPM_EXCLUSIVE_LOCK(tpm);
+	mutex_enter(&tpm->pm_mutex);
+	while (tpm->suspended)
+		cv_wait(&tpm->suspend_cv, &tpm->pm_mutex);
+	mutex_exit(&tpm->pm_mutex);
 
 	len = uiop->uio_resid;
 	if (len == 0) {
@@ -1804,7 +1626,7 @@ tpm_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	}
 
 	/* Get the lock for using iobuf */
-	ret = tpm_io_lock(tpm);
+	ret = tpm_lock(tpm);
 	/* Timeout Reached */
 	if (ret == ETIME)
 		return (ret);
@@ -1860,7 +1682,7 @@ OUT:
  * This is to deal with the contentions for the iobuf
  */
 static inline int
-tpm_io_lock(tpm_state_t *tpm)
+tpm_lock(tpm_state_t *tpm)
 {
 	int ret;
 	clock_t timeout;
@@ -1876,10 +1698,8 @@ tpm_io_lock(tpm_state_t *tpm)
 		if (ret <= 0) {
 			/* Timeout reached */
 			mutex_exit(&tpm->iobuf_lock);
-#ifdef DEBUG
-			cmn_err(CE_WARN, "tpm_io_lock:iorequest timed out");
-#endif
-			return (CRYPTO_BUSY);
+			cmn_err(CE_WARN, "tpm_lock:iorequest timed out");
+			return (ETIME);
 		}
 	}
 	tpm->iobuf_inuse = 1;
@@ -1900,244 +1720,3 @@ tpm_unlock(tpm_state_t *tpm)
 	cv_broadcast(&tpm->iobuf_cv);
 	mutex_exit(&tpm->iobuf_lock);
 }
-
-#ifdef KCF_TPM_RNG_PROVIDER
-/*
- * Random number generator entry points
- */
-static void
-strncpy_spacepad(uchar_t *s1, char *s2, int n)
-{
-	int s2len = strlen(s2);
-	(void) strncpy((char *)s1, s2, n);
-	if (s2len < n)
-		(void) memset(s1 + s2len, ' ', n - s2len);
-}
-
-/*ARGSUSED*/
-static int
-tpmrng_ext_info(crypto_provider_handle_t prov,
-	crypto_provider_ext_info_t *ext_info,
-	crypto_req_handle_t cfreq)
-{
-	tpm_state_t *tpm = (tpm_state_t *)prov;
-	char buf[64];
-
-	if (tpm == NULL)
-		return (DDI_FAILURE);
-
-	strncpy_spacepad(ext_info->ei_manufacturerID,
-	    (char *)tpm->vers_info.tpmVendorID,
-	    sizeof (ext_info->ei_manufacturerID));
-
-	strncpy_spacepad(ext_info->ei_model, "0",
-	    sizeof (ext_info->ei_model));
-	strncpy_spacepad(ext_info->ei_serial_number, "0",
-	    sizeof (ext_info->ei_serial_number));
-
-	ext_info->ei_flags = CRYPTO_EXTF_RNG | CRYPTO_EXTF_SO_PIN_LOCKED;
-	ext_info->ei_max_session_count = CRYPTO_EFFECTIVELY_INFINITE;
-	ext_info->ei_max_pin_len = 0;
-	ext_info->ei_min_pin_len = 0;
-	ext_info->ei_total_public_memory = CRYPTO_UNAVAILABLE_INFO;
-	ext_info->ei_free_public_memory = CRYPTO_UNAVAILABLE_INFO;
-	ext_info->ei_total_private_memory = CRYPTO_UNAVAILABLE_INFO;
-	ext_info->ei_free_public_memory = CRYPTO_UNAVAILABLE_INFO;
-	ext_info->ei_time[0] = 0;
-
-	ext_info->ei_hardware_version.cv_major = tpm->vers_info.version.major;
-	ext_info->ei_hardware_version.cv_minor = tpm->vers_info.version.minor;
-	ext_info->ei_firmware_version.cv_major =
-	    tpm->vers_info.version.revMajor;
-	ext_info->ei_firmware_version.cv_minor =
-	    tpm->vers_info.version.revMinor;
-
-	(void) snprintf(buf, sizeof (buf), "tpmrng TPM RNG");
-
-	strncpy_spacepad(ext_info->ei_label, buf,
-	    sizeof (ext_info->ei_label));
-#undef	BUFSZ
-	return (CRYPTO_SUCCESS);
-
-}
-
-static int
-tpmrng_register(tpm_state_t *tpm)
-{
-	int		ret;
-	char 		ID[64];
-	crypto_mech_name_t	*rngmech;
-
-	ASSERT(tpm != NULL);
-
-	(void) snprintf(ID, sizeof (ID), "tpmrng %s", IDENT_TPMRNG);
-
-	tpmrng_prov_info.pi_provider_description = ID;
-	tpmrng_prov_info.pi_provider_dev.pd_hw = tpm->dip;
-	tpmrng_prov_info.pi_provider_handle = tpm;
-
-	ret = crypto_register_provider(&tpmrng_prov_info, &tpm->n_prov);
-	if (ret != CRYPTO_SUCCESS) {
-		tpm->n_prov = NULL;
-		return (DDI_FAILURE);
-	}
-
-	crypto_provider_notification(tpm->n_prov, CRYPTO_PROVIDER_READY);
-
-	rngmech = kmem_zalloc(strlen("random") + 1, KM_SLEEP);
-	(void) memcpy(rngmech, "random", 6);
-	ret = crypto_load_dev_disabled("tpm", ddi_get_instance(tpm->dip),
-	    1, rngmech);
-	if (ret != CRYPTO_SUCCESS) {
-		cmn_err(CE_WARN, "crypto_load_dev_disabled failed (%d)", ret);
-	}
-	return (DDI_SUCCESS);
-}
-
-static int
-tpmrng_unregister(tpm_state_t *tpm)
-{
-	int ret;
-	ASSERT(tpm != NULL);
-	if (tpm->n_prov) {
-		ret = crypto_unregister_provider(tpm->n_prov);
-		tpm->n_prov = NULL;
-		if (ret != CRYPTO_SUCCESS)
-			return (DDI_FAILURE);
-	}
-	return (DDI_SUCCESS);
-}
-
-/*ARGSUSED*/
-static void
-tpmrng_provider_status(crypto_provider_handle_t provider, uint_t *status)
-{
-	*status = CRYPTO_PROVIDER_READY;
-}
-
-/*ARGSUSED*/
-static int
-tpmrng_seed_random(crypto_provider_handle_t provider, crypto_session_id_t sid,
-    uchar_t *buf, size_t len, uint_t entropy_est, uint32_t flags,
-    crypto_req_handle_t req)
-{
-	int ret;
-	tpm_state_t *tpm;
-	uint32_t len32;
-	/* Max length of seed is 256 bytes, add 14 for header. */
-	uint8_t cmdbuf[270] = {
-		0, 193,		/* TPM_TAG_RQU COMMAND */
-		0, 0, 0, 0x0A,	/* paramsize in bytes */
-		0, 0, 0, TPM_ORD_StirRandom,
-		0, 0, 0, 0 	/* number of input bytes (< 256) */
-	};
-	uint32_t buflen;
-
-	if (len == 0 || len > 255 || buf == NULL)
-		return (CRYPTO_ARGUMENTS_BAD);
-
-	tpm = (tpm_state_t *)provider;
-	if (tpm == NULL)
-		return (CRYPTO_INVALID_CONTEXT);
-
-	/* Acquire lock for exclusive use of TPM */
-	TPM_EXCLUSIVE_LOCK(tpm);
-
-	ret = tpm_io_lock(tpm);
-	/* Timeout reached */
-	if (ret == CRYPTO_BUSY)
-		return (ret);
-
-	/* TPM only handles 32 bit length, so truncate if too big. */
-	len32 = (uint32_t)len;
-	buflen = len32 + 14;
-
-	/* The length must be in network order */
-	buflen = htonl(buflen);
-	bcopy(&buflen, cmdbuf + 2, sizeof (uint32_t));
-
-	/* Convert it back */
-	buflen = ntohl(buflen);
-
-	/* length must be in network order */
-	len32 = htonl(len32);
-	bcopy(&len32, cmdbuf + 10, sizeof (uint32_t));
-
-	/* convert it back */
-	len32 = ntohl(len32);
-
-	bcopy(buf,  cmdbuf + 14, len32);
-
-	ret = itpm_command(tpm, cmdbuf, buflen);
-	tpm_unlock(tpm);
-
-	if (ret != DDI_SUCCESS) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "tpmrng_seed_random failed");
-#endif
-		return (CRYPTO_FAILED);
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
-/* ARGSUSED */
-static int
-tpmrng_generate_random(crypto_provider_handle_t provider,
-    crypto_session_id_t sid, uchar_t *buf, size_t len, crypto_req_handle_t req)
-{
-	int ret;
-	tpm_state_t *tpm;
-	uint8_t hdr[14] = {
-		0, 193,		/* TPM_TAG_RQU COMMAND */
-		0, 0, 0, 14,	/* paramsize in bytes */
-		0, 0, 0, TPM_ORD_GetRandom,
-		0, 0, 0, 0
-	};
-	uint8_t *cmdbuf = NULL;
-	uint32_t len32 = (uint32_t)len;
-	uint32_t buflen = len32 + sizeof (hdr);
-
-	if (len == 0 || buf == NULL)
-		return (CRYPTO_ARGUMENTS_BAD);
-
-	tpm = (tpm_state_t *)provider;
-	if (tpm == NULL)
-		return (CRYPTO_INVALID_CONTEXT);
-
-	TPM_EXCLUSIVE_LOCK(tpm);
-
-	ret = tpm_io_lock(tpm);
-	/* Timeout reached */
-	if (ret == CRYPTO_BUSY)
-		return (ret);
-
-	cmdbuf = kmem_zalloc(buflen, KM_SLEEP);
-	bcopy(hdr, cmdbuf, sizeof (hdr));
-
-	/* Length is written in network byte order */
-	len32 = htonl(len32);
-	bcopy(&len32, cmdbuf + 10, sizeof (uint32_t));
-
-	ret = itpm_command(tpm, cmdbuf, buflen);
-	if (ret != DDI_SUCCESS) {
-#ifdef DEBUG
-		cmn_err(CE_WARN, "tpmrng_generate_random failed");
-#endif
-		kmem_free(cmdbuf, buflen);
-		tpm_unlock(tpm);
-		return (CRYPTO_FAILED);
-	}
-
-	/* Find out how many bytes were really returned */
-	len32 = load32(cmdbuf, 10);
-
-	/* Copy the random bytes back to the callers buffer */
-	bcopy(cmdbuf + 14, buf, len32);
-
-	kmem_free(cmdbuf, buflen);
-	tpm_unlock(tpm);
-
-	return (CRYPTO_SUCCESS);
-}
-#endif /* KCF_TPM_RNG_PROVIDER */

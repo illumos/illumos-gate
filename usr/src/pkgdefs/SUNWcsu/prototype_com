@@ -281,7 +281,6 @@ f none usr/bin/time 555 root bin
 f none usr/bin/tip 4511 uucp bin
 l none usr/bin/touch=../../usr/bin/settime
 f none usr/bin/tplot 555 root bin
-f none usr/bin/tpmadm 555 root bin
 f none usr/bin/tput 555 root bin
 f none usr/bin/tr 555 root bin
 f none usr/bin/true 555 root bin

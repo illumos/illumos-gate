@@ -414,7 +414,6 @@ typedef struct _LW_SHM_TYPE
 	CK_ULONG	num_publ_tok_obj;
 	CK_BBOOL	priv_loaded;
 	CK_BBOOL	publ_loaded;
-	CK_BBOOL	token_available;
 	TOK_OBJ_ENTRY  publ_tok_objs[ MAX_TOK_OBJS ];
 	TOK_OBJ_ENTRY  priv_tok_objs[ MAX_TOK_OBJS ];
 } LW_SHM_TYPE;
