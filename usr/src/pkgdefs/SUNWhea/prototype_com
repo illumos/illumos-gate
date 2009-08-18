@@ -1253,6 +1253,7 @@ f none usr/include/sys/stat.h 644 root bin
 f none usr/include/sys/stat_impl.h 644 root bin
 f none usr/include/sys/statfs.h 644 root bin
 f none usr/include/sys/statvfs.h 644 root bin
+f none usr/include/sys/stdbool.h 644 root bin
 f none usr/include/sys/stdint.h 644 root bin
 f none usr/include/sys/stermio.h 644 root bin
 f none usr/include/sys/stream.h 644 root bin

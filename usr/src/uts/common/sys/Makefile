@@ -505,6 +505,7 @@ CHKHDRS=			\
 	stat.h			\
 	statfs.h		\
 	statvfs.h		\
+	stdbool.h		\
 	stdint.h		\
 	stermio.h		\
 	stmf.h			\
