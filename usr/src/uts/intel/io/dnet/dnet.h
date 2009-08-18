@@ -100,7 +100,6 @@ enum	{ DEFAULT_TYPE, COGENT_EM_TYPE, ASANTE_TYPE};
 #define	DNET_100MBPS		100	/* 21140 chip speeds */
 #define	DNET_10MBPS		10
 
-
 /* User defined PCI config space registers */
 #define	PCI_DNET_CONF_CFDD	0x40
 #define	CFDD_SLEEP		(1UL<<31)
@@ -396,12 +395,13 @@ struct dnetinstance {
 						/* used for xmit */
 	caddr_t			*rx_buf_vaddr;	/* recv buf addresses (virt) */
 	uint32_t		*rx_buf_paddr;	/* recv buf addresses (phys) */
+	ddi_iblock_cookie_t	icookie;
 	kmutex_t		txlock;
 	kmutex_t		intrlock;
 	boolean_t		suspended;
 	boolean_t		running;
-	int	need_gld_sched;
-
+	boolean_t		need_tx_update;
+	mac_handle_t		mac_handle;
 	uint32_t	stat_errrcv;
 	uint32_t	stat_overflow;
 	uint32_t	stat_intr;

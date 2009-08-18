@@ -36,7 +36,7 @@
  * XXX NEEDSWORK
  *	All media SHOULD work, FX is untested
  *
- * Depends on the Generic LAN Driver utility functions in /kernel/misc/gld
+ * Depends on the Generic LAN Driver utility functions in /kernel/misc/mac
  */
 
 #define	BUG_4010796	/* See 4007871, 4010796 */
@@ -55,15 +55,17 @@
 #include <sys/debug.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
-#include <sys/gld.h>
+#include <sys/vlan.h>
+#include <sys/mac.h>
+#include <sys/mac_ether.h>
+#include <sys/mac_provider.h>
 #include <sys/pci.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/strsun.h>
 
 #include "dnet_mii.h"
 #include "dnet.h"
-
-char _depends_on[] = "misc/gld";
 
 /*
  *	Declarations and Module Linkage
@@ -101,53 +103,55 @@ struct rbuf_list {
 };
 
 /* Required system entry points */
-static int dnetdevinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
-static int dnetprobe(dev_info_t *);
-static int dnetattach(dev_info_t *, ddi_attach_cmd_t);
-static int dnetdetach(dev_info_t *, ddi_detach_cmd_t);
+static int dnet_probe(dev_info_t *);
+static int dnet_attach(dev_info_t *, ddi_attach_cmd_t);
+static int dnet_detach(dev_info_t *, ddi_detach_cmd_t);
+static int dnet_quiesce(dev_info_t *);
 
-/* Required driver entry points for GLD */
-static int dnet_reset(gld_mac_info_t *);
-static int dnet_start_board(gld_mac_info_t *);
-static int dnet_stop_board(gld_mac_info_t *);
-static int dnet_set_mac_addr(gld_mac_info_t *, uchar_t *);
-static int dnet_set_multicast(gld_mac_info_t *, uchar_t *, int);
-static int dnet_set_promiscuous(gld_mac_info_t *, int);
-static int dnet_get_stats(gld_mac_info_t *, struct gld_stats *);
-static int dnet_send(gld_mac_info_t *, mblk_t *);
-static uint_t dnetintr(gld_mac_info_t *);
+/* Required driver entry points for GLDv3 */
+static int dnet_m_start(void *);
+static void dnet_m_stop(void *);
+static int dnet_m_getstat(void *, uint_t, uint64_t *);
+static int dnet_m_setpromisc(void *, boolean_t);
+static int dnet_m_multicst(void *, boolean_t, const uint8_t *);
+static int dnet_m_unicst(void *, const uint8_t *);
+static mblk_t *dnet_m_tx(void *, mblk_t *);
+
+static uint_t dnet_intr(caddr_t);
 
 /* Internal functions used by the above entry points */
 static void write_gpr(struct dnetinstance *dnetp, uint32_t val);
-static void dnet_reset_board(gld_mac_info_t *);
-static void dnet_init_board(gld_mac_info_t *);
-static void dnet_chip_init(gld_mac_info_t *);
-static unsigned int hashindex(uchar_t *);
-static int dnet_start(gld_mac_info_t *);
-static int dnet_set_addr(gld_mac_info_t *);
+static void dnet_reset_board(struct dnetinstance *);
+static void dnet_init_board(struct dnetinstance *);
+static void dnet_chip_init(struct dnetinstance *);
+static uint32_t hashindex(const uint8_t *);
+static int dnet_start(struct dnetinstance *);
+static int dnet_set_addr(struct dnetinstance *);
 
-static void dnet_getp(gld_mac_info_t *);
-static void update_rx_stats(gld_mac_info_t *, int);
-static void update_tx_stats(gld_mac_info_t *, int);
+static boolean_t dnet_send(struct dnetinstance *, mblk_t *);
+
+static void dnet_getp(struct dnetinstance *);
+static void update_rx_stats(struct dnetinstance *, int);
+static void update_tx_stats(struct dnetinstance *, int);
 
 /* Media Selection Setup Routines */
-static void set_gpr(gld_mac_info_t *macinfo);
-static void set_opr(gld_mac_info_t *macinfo);
-static void set_sia(gld_mac_info_t *macinfo);
+static void set_gpr(struct dnetinstance *);
+static void set_opr(struct dnetinstance *);
+static void set_sia(struct dnetinstance *);
 
 /* Buffer Management Routines */
-static int dnet_alloc_bufs(gld_mac_info_t *);
-static void dnet_free_bufs(gld_mac_info_t *);
-static void dnet_init_txrx_bufs(gld_mac_info_t *);
-static int alloc_descriptor(gld_mac_info_t *);
-static void dnet_reclaim_Tx_desc(gld_mac_info_t *);
+static int dnet_alloc_bufs(struct dnetinstance *);
+static void dnet_free_bufs(struct dnetinstance *);
+static void dnet_init_txrx_bufs(struct dnetinstance *);
+static int alloc_descriptor(struct dnetinstance *);
+static void dnet_reclaim_Tx_desc(struct dnetinstance *);
 static int dnet_rbuf_init(dev_info_t *, int);
 static int dnet_rbuf_destroy();
 static struct rbuf_list *dnet_rbuf_alloc(dev_info_t *, int);
 static void dnet_rbuf_free(caddr_t);
 static void dnet_freemsg_buf(struct free_ptr *);
 
-static void setup_block(gld_mac_info_t *macinfo);
+static void setup_block(struct dnetinstance *);
 
 /* SROM read functions */
 static int dnet_read_srom(dev_info_t *, int, ddi_acc_handle_t, caddr_t,
@@ -161,12 +165,12 @@ static void dnet_dump_leaf(LEAF_FORMAT *leaf);
 static void dnet_dump_block(media_block_t *block);
 #ifdef BUG_4010796
 static void set_alternative_srom_image(dev_info_t *, uchar_t *, int);
-static int dnethack(dev_info_t *);
+static int dnet_hack(dev_info_t *);
 #endif
 
-static int dnet_hack_interrupts(gld_mac_info_t *, int);
+static int dnet_hack_interrupts(struct dnetinstance *, int);
 static int dnet_detach_hacked_interrupt(dev_info_t *devinfo);
-static void enable_interrupts(struct dnetinstance *dnetp, int enable_xmit);
+static void enable_interrupts(struct dnetinstance *);
 
 /* SROM parsing functions */
 static void dnet_parse_srom(struct dnetinstance *dnetp, SROM_FORMAT *sr,
@@ -179,9 +183,9 @@ static int check_srom_valid(uchar_t *);
 static void dnet_dumpbin(char *msg, uchar_t *, int size, int len);
 static void setup_legacy_blocks();
 /* Active Media Determination Routines */
-static void find_active_media(gld_mac_info_t *);
-static int send_test_packet(gld_mac_info_t *);
-static int dnet_link_sense(gld_mac_info_t *macinfo);
+static void find_active_media(struct dnetinstance *);
+static int send_test_packet(struct dnetinstance *);
+static int dnet_link_sense(struct dnetinstance *);
 
 /* PHY MII Routines */
 static ushort_t dnet_mii_read(dev_info_t *dip, int phy_addr, int reg_num);
@@ -189,8 +193,9 @@ static void dnet_mii_write(dev_info_t *dip, int phy_addr, int reg_num,
 			int reg_dat);
 static void write_mii(struct dnetinstance *, uint32_t, int);
 static void mii_tristate(struct dnetinstance *);
-static void do_phy(gld_mac_info_t *);
+static void do_phy(struct dnetinstance *);
 static void dnet_mii_link_cb(dev_info_t *, int, enum mii_phy_state);
+static void dnet_mii_link_up(struct dnetinstance *);
 static void set_leaf(SROM_FORMAT *sr, LEAF_FORMAT *leaf);
 
 #ifdef DNETDEBUG
@@ -219,7 +224,8 @@ static LEAF_FORMAT leaf_cogent_100;
 static LEAF_FORMAT leaf_21041;
 static LEAF_FORMAT leaf_21040;
 
-int rx_buf_size = (ETHERMAX + ETHERFCSL + 3) & ~3;	/* roundup to 4 */
+/* rx buffer size (rounded up to 4) */
+int rx_buf_size = (ETHERMAX + ETHERFCSL + VLAN_TAGSZ + 3) & ~3;
 
 int max_rx_desc_21040 = MAX_RX_DESC_21040;
 int max_rx_desc_21140 = MAX_RX_DESC_21140;
@@ -283,67 +289,37 @@ static ddi_device_acc_attr_t accattr = {
 
 uchar_t dnet_broadcastaddr[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-/* Standard Streams initialization */
-static struct module_info minfo = {
-	DNETIDNUM, "dnet", 0, INFPSZ, DNETHIWAT, DNETLOWAT
-};
-
-static struct qinit rinit = {	/* read queues */
-	NULL, gld_rsrv, gld_open, gld_close, NULL, &minfo, NULL
-};
-
-static struct qinit winit = {	/* write queues */
-	gld_wput, gld_wsrv, NULL, NULL, NULL, &minfo, NULL
-};
-
-static struct streamtab dnetinfo = {&rinit, &winit, NULL, NULL};
-
 /* Standard Module linkage initialization for a Streams driver */
 extern struct mod_ops mod_driverops;
 
-static struct cb_ops cb_dnetops = {
-	nulldev,		/* cb_open */
-	nulldev,		/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	&dnetinfo,		/* cb_stream */
-	(int)(D_MP | D_HOTPLUG)	/* cb_flag */
-};
+DDI_DEFINE_STREAM_OPS(dnet_devops, nulldev, dnet_probe, dnet_attach,
+    dnet_detach, nodev, NULL, D_MP, NULL, dnet_quiesce);
 
-static struct dev_ops dnetops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	gld_getinfo,		/* devo_getinfo */
-	nulldev,		/* devo_identify */
-	dnetprobe,		/* devo_probe */
-	dnetattach,		/* devo_attach */
-	dnetdetach,		/* devo_detach */
-	nodev,			/* devo_reset */
-	&cb_dnetops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL,			/* devo_power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
-};
-
-static struct modldrv modldrv = {
+static struct modldrv dnet_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
 	IDENT,			/* short description */
-	&dnetops		/* driver specific ops */
+	&dnet_devops		/* driver specific ops */
 };
 
-static struct modlinkage modlinkage = {
-	MODREV_1, (void *)&modldrv, NULL
+static struct modlinkage dnet_modlinkage = {
+	MODREV_1,		/* ml_rev */
+	{ &dnet_modldrv, NULL }	/* ml_linkage */
 };
 
+static mac_callbacks_t dnet_m_callbacks = {
+	0,			/* mc_callbacks */
+	dnet_m_getstat,		/* mc_getstat */
+	dnet_m_start,		/* mc_start */
+	dnet_m_stop,		/* mc_stop */
+	dnet_m_setpromisc,	/* mc_setpromisc */
+	dnet_m_multicst,	/* mc_multicst */
+	dnet_m_unicst,		/* mc_unicst */
+	dnet_m_tx,		/* mc_tx */
+	NULL,			/* mc_ioctl */
+	NULL,			/* mc_getcapab */
+	NULL,			/* mc_open */
+	NULL			/* mc_close */
+};
 
 /*
  * Passed to the hacked interrupt for multiport Cogent and ZNYX cards with
@@ -352,7 +328,7 @@ static struct modlinkage modlinkage = {
 #define	MAX_INST 8 /* Maximum instances on a multiport adapter. */
 struct hackintr_inf
 {
-	gld_mac_info_t *macinfos[MAX_INST]; /* macinfos for each port */
+	struct dnetinstance *dnetps[MAX_INST]; /* dnetps for each port */
 	dev_info_t *devinfo;		    /* Devinfo of the primary device */
 	kmutex_t lock;
 		/* Ensures the interrupt doesn't get called while detaching */
@@ -366,10 +342,6 @@ static char printsrom_propname[] = "print-srom";
 
 static uint_t dnet_hack_intr(struct hackintr_inf *);
 
-/*
- *	========== Module Loading Entry Points ==========
- */
-
 int
 _init(void)
 {
@@ -378,7 +350,11 @@ _init(void)
 	/* Configure fake sroms for legacy cards */
 	mutex_init(&dnet_rbuf_lock, NULL, MUTEX_DRIVER, NULL);
 	setup_legacy_blocks();
-	if ((i = mod_install(&modlinkage)) != 0) {
+
+	mac_init_ops(&dnet_devops, "dnet");
+
+	if ((i = mod_install(&dnet_modlinkage)) != 0) {
+		mac_fini_ops(&dnet_devops);
 		mutex_destroy(&dnet_rbuf_lock);
 	}
 	return (i);
@@ -388,7 +364,10 @@ int
 _fini(void)
 {
 	int i;
-	if ((i = mod_remove(&modlinkage)) == 0) { /* module can be unloaded */
+
+	if ((i = mod_remove(&dnet_modlinkage)) == 0) {
+		mac_fini_ops(&dnet_devops);
+
 		/* loop until all the receive buffers are freed */
 		while (dnet_rbuf_destroy() != 0) {
 			delay(drv_usectohz(100000));
@@ -405,27 +384,18 @@ _fini(void)
 int
 _info(struct modinfo *modinfop)
 {
-	return (mod_info(&modlinkage, modinfop));
+	return (mod_info(&dnet_modlinkage, modinfop));
 }
-
-/*
- *	========== DDI Entry Points ==========
- */
 
 /*
  * probe(9E) -- Determine if a device is present
  */
 static int
-dnetprobe(dev_info_t *devinfo)
+dnet_probe(dev_info_t *devinfo)
 {
 	ddi_acc_handle_t handle;
 	uint16_t	vendorid;
 	uint16_t	deviceid;
-
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETDDI)
-		cmn_err(CE_NOTE, "dnetprobe(0x%p)", (void *) devinfo);
-#endif
 
 	if (pci_config_setup(devinfo, &handle) != DDI_SUCCESS)
 		return (DDI_PROBE_FAILURE);
@@ -453,7 +423,7 @@ dnetprobe(dev_info_t *devinfo)
 #ifndef BUG_4010796
 	return (DDI_PROBE_SUCCESS);
 #else
-	return (dnethack(devinfo));
+	return (dnet_hack(devinfo));
 #endif
 }
 
@@ -466,7 +436,7 @@ dnetprobe(dev_info_t *devinfo)
  * our DNET_SROM property, and our primary sibling has not yet probed.
  */
 static int
-dnethack(dev_info_t *devinfo)
+dnet_hack(dev_info_t *devinfo)
 {
 	uchar_t 	vendor_info[SROM_SIZE];
 	uint32_t	csr;
@@ -478,11 +448,6 @@ dnethack(dev_info_t *devinfo)
 	caddr_t		io_reg;
 
 #define	DNET_PCI_RNUMBER	1
-
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETDDI)
-		cmn_err(CE_NOTE, "dnethack(0x%p)", (void *) devinfo);
-#endif
 
 	if (pci_config_setup(devinfo, &handle) != DDI_SUCCESS)
 		return (DDI_PROBE_FAILURE);
@@ -537,11 +502,11 @@ dnethack(dev_info_t *devinfo)
  * Called once for each board successfully probed.
  */
 static int
-dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
+dnet_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
 	uint16_t revid;
 	struct dnetinstance 	*dnetp;		/* Our private device info */
-	gld_mac_info_t		*macinfo;		/* GLD structure */
+	mac_register_t		*macp;
 	uchar_t 		vendor_info[SROM_SIZE];
 	uint32_t		csr;
 	uint16_t		deviceid;
@@ -550,33 +515,26 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 #define	DNET_PCI_RNUMBER	1
 
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETDDI)
-		cmn_err(CE_NOTE, "dnetattach(0x%p)", (void *) devinfo);
-#endif
-
 	switch (cmd) {
 	case DDI_ATTACH:
 		break;
 
 	case DDI_RESUME:
-
-		/* Get the driver private (gld_mac_info_t) structure */
-		macinfo = ddi_get_driver_private(devinfo);
-		dnetp = (struct dnetinstance *)(macinfo->gldm_private);
+		/* Get the driver private (dnetinstance) structure */
+		dnetp = ddi_get_driver_private(devinfo);
 
 		mutex_enter(&dnetp->intrlock);
 		mutex_enter(&dnetp->txlock);
-		dnet_reset_board(macinfo);
-		dnet_init_board(macinfo);
+		dnet_reset_board(dnetp);
+		dnet_init_board(dnetp);
 		dnetp->suspended = B_FALSE;
 
 		if (dnetp->running) {
-			dnetp->need_gld_sched = 0;
+			dnetp->need_tx_update = B_FALSE;
 			mutex_exit(&dnetp->txlock);
-			(void) dnet_start(macinfo);
+			(void) dnet_start(dnetp);
 			mutex_exit(&dnetp->intrlock);
-			gld_sched(macinfo);
+			mac_tx_update(dnetp->mac_handle);
 		} else {
 			mutex_exit(&dnetp->txlock);
 			mutex_exit(&dnetp->intrlock);
@@ -585,6 +543,7 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	default:
 		return (DDI_FAILURE);
 	}
+
 	if (pci_config_setup(devinfo, &handle) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -614,23 +573,13 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	revid = pci_config_get8(handle, PCI_CONF_REVID);
 	pci_config_teardown(&handle);
 
-	/*
-	 *	Allocate gld_mac_info_t and dnetinstance structures
-	 */
-	if ((macinfo = gld_mac_alloc(devinfo)) == NULL)
-		return (DDI_FAILURE);
-
-	if ((dnetp = (struct dnetinstance *)
-	    kmem_zalloc(sizeof (struct dnetinstance), KM_SLEEP)) == NULL) {
-		gld_mac_free(macinfo);
-		return (DDI_FAILURE);
-	}
+	dnetp = kmem_zalloc(sizeof (struct dnetinstance), KM_SLEEP);
+	ddi_set_driver_private(devinfo, dnetp);
 
 	/* Now map I/O register */
 	if (ddi_regs_map_setup(devinfo, DNET_PCI_RNUMBER, &dnetp->io_reg,
 	    0, 0, &accattr, &dnetp->io_handle) != DDI_SUCCESS) {
 		kmem_free(dnetp, sizeof (struct dnetinstance));
-		gld_mac_free(macinfo);
 		return (DDI_FAILURE);
 	}
 
@@ -638,46 +587,9 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	dnetp->board_type = deviceid;
 
 	/*
-	 * Initialize our private fields in macinfo and dnetinstance
-	 */
-	macinfo->gldm_private = (caddr_t)dnetp;
-
-	/*
-	 * Initialize pointers to device specific functions which will be
-	 * used by the generic layer.
-	 */
-	macinfo->gldm_reset	= dnet_reset;
-	macinfo->gldm_start	= dnet_start_board;
-	macinfo->gldm_stop	= dnet_stop_board;
-	macinfo->gldm_set_mac_addr	= dnet_set_mac_addr;
-	macinfo->gldm_set_multicast	= dnet_set_multicast;
-	macinfo->gldm_set_promiscuous	= dnet_set_promiscuous;
-	macinfo->gldm_get_stats	= dnet_get_stats;
-	macinfo->gldm_send	= dnet_send;
-	macinfo->gldm_intr	= dnetintr;
-	macinfo->gldm_ioctl	= NULL;
-
-	/*
-	 *	Initialize board characteristics needed by the generic layer.
-	 */
-	macinfo->gldm_ident = IDENT;
-	macinfo->gldm_type = DL_ETHER;
-	macinfo->gldm_minpkt = 0;		/* assumes we pad ourselves */
-	macinfo->gldm_maxpkt = DNETMAXPKT;
-	macinfo->gldm_addrlen = ETHERADDRL;
-	macinfo->gldm_saplen = -2;
-
-	/* Other required initialization */
-	macinfo->gldm_ppa = ddi_get_instance(devinfo);
-	macinfo->gldm_vendor_addr = dnetp->vendor_addr;
-	macinfo->gldm_broadcast_addr = dnet_broadcastaddr;
-	macinfo->gldm_devinfo = devinfo;
-
-
-	/*
 	 * Get the iblock cookie with which to initialize the mutexes.
 	 */
-	if (ddi_get_iblock_cookie(devinfo, 0, &macinfo->gldm_cookie)
+	if (ddi_get_iblock_cookie(devinfo, 0, &dnetp->icookie)
 	    != DDI_SUCCESS)
 		goto fail;
 
@@ -689,10 +601,8 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Lock ordering rules: always lock intrlock first before
 	 * txlock if both are required.
 	 */
-	mutex_init(&dnetp->txlock,
-	    NULL, MUTEX_DRIVER, macinfo->gldm_cookie);
-	mutex_init(&dnetp->intrlock,
-	    NULL, MUTEX_DRIVER, macinfo->gldm_cookie);
+	mutex_init(&dnetp->txlock, NULL, MUTEX_DRIVER, dnetp->icookie);
+	mutex_init(&dnetp->intrlock, NULL, MUTEX_DRIVER, dnetp->icookie);
 
 	/*
 	 * Get the BNC/TP indicator from the conf file for 21040
@@ -735,7 +645,7 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	else if (dnetp->bnc_indicator == 2) /* Force AUI only */
 		dnetp->disallowed_media = (uint32_t)~(1U<<MEDIA_AUI);
 
-	dnet_reset_board(macinfo);
+	dnet_reset_board(dnetp);
 
 	secondary = dnet_read_srom(devinfo, dnetp->board_type, dnetp->io_handle,
 	    dnetp->io_reg, vendor_info, sizeof (vendor_info));
@@ -757,7 +667,6 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	BCOPY((caddr_t)dnetp->sr.netaddr,
 	    (caddr_t)dnetp->curr_macaddr, ETHERADDRL);
 
-
 	/*
 	 * determine whether to implement workaround from DEC
 	 * for DMA overrun errata.
@@ -774,9 +683,9 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Add the interrupt handler if dnet_hack_interrupts() returns 0.
 	 * Otherwise dnet_hack_interrupts() itself adds the handler.
 	 */
-	if (!dnet_hack_interrupts(macinfo, secondary)) {
+	if (!dnet_hack_interrupts(dnetp, secondary)) {
 		(void) ddi_add_intr(devinfo, 0, NULL,
-		    NULL, gld_intr, (caddr_t)macinfo);
+		    NULL, dnet_intr, (caddr_t)dnetp);
 	}
 
 	dnetp->max_tx_desc = max_tx_desc;
@@ -787,31 +696,36 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		dnetp->max_rx_desc = max_rx_desc_21140;
 
 	/* Allocate the TX and RX descriptors/buffers. */
-	if (dnet_alloc_bufs(macinfo) == FAILURE) {
+	if (dnet_alloc_bufs(dnetp) == FAILURE) {
 		cmn_err(CE_WARN, "DNET: Not enough DMA memory for buffers.");
 		goto fail2;
 	}
 
 	/*
-	 *	Register ourselves with the GLD interface
-	 *
-	 *	gld_register will:
-	 *	link us with the GLD system;
-	 *	set our ddi_set_driver_private(9F) data to the macinfo pointer;
-	 *	save the devinfo pointer in macinfo->gldm_devinfo;
-	 *	map the registers, putting the kvaddr into macinfo->gldm_memp;
-	 *	add the interrupt, putting the cookie in gldm_cookie;
-	 *	init the gldm_intrlock mutex which will block that interrupt;
-	 *	create the minor node.
+	 *	Register ourselves with the GLDv3 interface
 	 */
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
+		goto fail2;
 
-	if (gld_register(devinfo, "dnet", macinfo) == DDI_SUCCESS) {
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = dnetp;
+	macp->m_dip = devinfo;
+	macp->m_src_addr = dnetp->curr_macaddr;
+	macp->m_callbacks = &dnet_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = ETHERMTU;
+	macp->m_margin = VLAN_TAGSZ;
+
+	if (mac_register(macp, &dnetp->mac_handle) == 0) {
+		mac_free(macp);
+
 		mutex_enter(&dnetp->intrlock);
+
 		dnetp->phyaddr = -1;
 		if (dnetp->board_type == DEVICE_ID_21140 ||
 		    dnetp->board_type == DEVICE_ID_21143)
-			do_phy(macinfo);	/* Initialize the PHY, if any */
-		find_active_media(macinfo);
+			do_phy(dnetp);	/* Initialize the PHY, if any */
+		find_active_media(dnetp);
 
 		/* if the chosen media is non-MII, stop the port monitor */
 		if (dnetp->selected_media_block->media_code != MEDIA_MII &&
@@ -827,14 +741,19 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 			    media_str[dnetp->selected_media_block->media_code]);
 #endif
 		bzero(dnetp->setup_buf_vaddr, SETUPBUF_SIZE);
-		dnet_reset_board(macinfo);
-		dnet_init_board(macinfo);
-		/* XXX function return value ignored */
+
+		dnet_reset_board(dnetp);
+		dnet_init_board(dnetp);
+
 		mutex_exit(&dnetp->intrlock);
-		/* dropped intrlock as dnet_stop_board() grabs intrlock */
-		(void) dnet_stop_board(macinfo);
+
+		(void) dnet_m_unicst(dnetp, dnetp->curr_macaddr);
+		(void) dnet_m_multicst(dnetp, B_TRUE, dnet_broadcastaddr);
+
 		return (DDI_SUCCESS);
 	}
+
+	mac_free(macp);
 fail2:
 	/* XXX function return value ignored */
 	/*
@@ -842,14 +761,13 @@ fail2:
 	 * interrupt for the non-hacked case also.
 	 */
 	(void) dnet_detach_hacked_interrupt(devinfo);
-	dnet_free_bufs(macinfo);
+	dnet_free_bufs(dnetp);
 fail1:
 	mutex_destroy(&dnetp->txlock);
 	mutex_destroy(&dnetp->intrlock);
 fail:
 	ddi_regs_map_free(&dnetp->io_handle);
 	kmem_free(dnetp, sizeof (struct dnetinstance));
-	gld_mac_free(macinfo);
 	return (DDI_FAILURE);
 }
 
@@ -857,21 +775,14 @@ fail:
  * detach(9E) -- Detach a device from the system
  */
 static int
-dnetdetach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
+dnet_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	int32_t rc;
-	gld_mac_info_t	*macinfo;		/* GLD structure */
 	struct dnetinstance *dnetp;		/* Our private device info */
 	int32_t		proplen;
 
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETDDI)
-		cmn_err(CE_NOTE, "dnetdetach(0x%p)", (void *) devinfo);
-#endif
-
-	/* Get the driver private (gld_mac_info_t) structure */
-	macinfo = ddi_get_driver_private(devinfo);
-	dnetp = (struct dnetinstance *)(macinfo->gldm_private);
+	/* Get the driver private (dnetinstance) structure */
+	dnetp = ddi_get_driver_private(devinfo);
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -886,7 +797,7 @@ dnetdetach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		mutex_enter(&dnetp->intrlock);
 		mutex_enter(&dnetp->txlock);
 		dnetp->suspended = B_TRUE;
-		dnet_reset_board(macinfo);
+		dnet_reset_board(dnetp);
 		mutex_exit(&dnetp->txlock);
 		mutex_exit(&dnetp->intrlock);
 		return (DDI_SUCCESS);
@@ -896,20 +807,13 @@ dnetdetach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	}
 
 	/*
-	 *	Unregister ourselves from the GLD interface
-	 *
-	 *	gld_unregister will:
-	 *	remove the minor node;
-	 *	unmap the registers;
-	 *	remove the interrupt;
-	 *	destroy the gldm_intrlock mutex;
-	 *	unlink us from the GLD system.
+	 *	Unregister ourselves from the GLDv3 interface
 	 */
-	if (gld_unregister(macinfo) != DDI_SUCCESS)
+	if (mac_unregister(dnetp->mac_handle) != 0)
 		return (DDI_FAILURE);
 
 	/* stop the board if it is running */
-	dnet_reset_board(macinfo);
+	dnet_reset_board(dnetp);
 
 	if ((rc = dnet_detach_hacked_interrupt(devinfo)) != DDI_SUCCESS)
 		return (rc);
@@ -921,11 +825,10 @@ dnetdetach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	set_leaf(&dnetp->sr, NULL);
 
 	ddi_regs_map_free(&dnetp->io_handle);
-	dnet_free_bufs(macinfo);
+	dnet_free_bufs(dnetp);
 	mutex_destroy(&dnetp->txlock);
 	mutex_destroy(&dnetp->intrlock);
 	kmem_free(dnetp, sizeof (struct dnetinstance));
-	gld_mac_free(macinfo);
 
 #ifdef BUG_4010796
 	if (ddi_getproplen(DDI_DEV_T_ANY, devinfo, 0,
@@ -951,65 +854,29 @@ dnetdetach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/*
- *	========== GLD Entry Points ==========
- */
-
-/*
- *	dnet_reset() -- reset the board to initial state;
- */
-static int
-dnet_reset(gld_mac_info_t *macinfo)
+int
+dnet_quiesce(dev_info_t *dip)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_reset(0x%p)", (void *) macinfo);
-#endif
+	struct dnetinstance *dnetp = ddi_get_driver_private(dip);
 
-	mutex_enter(&dnetp->intrlock);
 	/*
-	 * Initialize internal data structures
+	 * Reset chip (disables interrupts).
 	 */
-	bzero(dnetp->setup_buf_vaddr, SETUPBUF_SIZE);
-	bzero(dnetp->multicast_cnt, MCASTBUF_SIZE);
-	dnetp->promisc = 0;
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, INT_MASK_REG), 0);
+	ddi_put32(dnetp->io_handle,
+	    REG32(dnetp->io_reg, BUS_MODE_REG), SW_RESET);
 
-	mutex_enter(&dnetp->txlock);
-	dnetp->need_saddr = 0;
-	mutex_exit(&dnetp->txlock);
-
-	if (dnetp->suspended) {
-		mutex_exit(&dnetp->intrlock);
-		return (0);
-	}
-	dnet_reset_board(macinfo);
-
-	if (ddi_getprop(DDI_DEV_T_ANY, dnetp->devinfo, DDI_PROP_DONTPASS,
-	    "reset_do_find_active_media", 0)) {
-		find_active_media(macinfo);	/* Redetermine active media */
-		/* Go back to a good state */
-		bzero(dnetp->setup_buf_vaddr, SETUPBUF_SIZE);
-		dnet_reset_board(macinfo);
-	}
-	dnet_init_board(macinfo);
-	mutex_exit(&dnetp->intrlock);
-	return (0);
+	return (DDI_SUCCESS);
 }
 
 static void
-dnet_reset_board(gld_mac_info_t *macinfo)
+dnet_reset_board(struct dnetinstance *dnetp)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
 	uint32_t	val;
 
 	/*
 	 * before initializing the dnet should be in STOP state
 	 */
-	/* XXX function return value ignored */
-	/* (void) dnet_stop_board(macinfo); */
 	val = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG));
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 	    val & ~(START_TRANSMIT | START_RECEIVE));
@@ -1029,32 +896,25 @@ dnet_reset_board(gld_mac_info_t *macinfo)
  * called with intrlock held.
  */
 static void
-dnet_init_board(gld_mac_info_t *macinfo)
+dnet_init_board(struct dnetinstance *dnetp)
 {
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_init_board(0x%p)", (void *) macinfo);
-#endif
-	set_opr(macinfo);
-	set_gpr(macinfo);
-	set_sia(macinfo);
-	dnet_chip_init(macinfo);
+	set_opr(dnetp);
+	set_gpr(dnetp);
+	set_sia(dnetp);
+	dnet_chip_init(dnetp);
 }
 
 /* dnet_chip_init() - called with intrlock held */
 static void
-dnet_chip_init(gld_mac_info_t *macinfo)
+dnet_chip_init(struct dnetinstance *dnetp)
 {
-	struct dnetinstance	*dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
-
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, BUS_MODE_REG),
 	    CACHE_ALIGN | BURST_SIZE);		/* CSR0 */
 
 	/*
 	 * Initialize the TX and RX descriptors/buffers
 	 */
-	dnet_init_txrx_bufs(macinfo);
+	dnet_init_txrx_bufs(dnetp);
 
 	/*
 	 * Set the base address of the Rx descriptor list in CSR3
@@ -1071,7 +931,7 @@ dnet_chip_init(gld_mac_info_t *macinfo)
 	dnetp->tx_current_desc = dnetp->rx_current_desc = 0;
 	dnetp->transmitted_desc = 0;
 	dnetp->free_desc = dnetp->max_tx_desc;
-	enable_interrupts(dnetp, 1);
+	enable_interrupts(dnetp);
 }
 
 /*
@@ -1079,16 +939,9 @@ dnet_chip_init(gld_mac_info_t *macinfo)
  *  Called with intrlock held.
  */
 static int
-dnet_start(gld_mac_info_t *macinfo)
+dnet_start(struct dnetinstance *dnetp)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
-	uint32_t		val;
-
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_start(0x%p)", (void *) macinfo);
-#endif
+	uint32_t val;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
 	/*
@@ -1097,27 +950,18 @@ dnet_start(gld_mac_info_t *macinfo)
 	val = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG));
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 	    val | START_TRANSMIT);
-	(void) dnet_set_addr(macinfo);
+	(void) dnet_set_addr(dnetp);
 	val = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG));
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 	    val | START_RECEIVE);
-	enable_interrupts(dnetp, 1);
+	enable_interrupts(dnetp);
 	return (0);
 }
 
-/*
- *	dnet_start_board() -- start the board receiving and allow transmits.
- */
 static int
-dnet_start_board(gld_mac_info_t *macinfo)
+dnet_m_start(void *arg)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
-
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_start_board(0x%p)", (void *) macinfo);
-#endif
+	struct dnetinstance *dnetp = arg;
 
 	mutex_enter(&dnetp->intrlock);
 	dnetp->running = B_TRUE;
@@ -1125,30 +969,29 @@ dnet_start_board(gld_mac_info_t *macinfo)
 	 * start the board and enable receiving
 	 */
 	if (!dnetp->suspended)
-		(void) dnet_start(macinfo);
+		(void) dnet_start(dnetp);
+	dnet_mii_link_up(dnetp);
 	mutex_exit(&dnetp->intrlock);
 	return (0);
 }
 
-/*
- *	dnet_stop_board() -- stop board receiving
- */
-static int
-dnet_stop_board(gld_mac_info_t *macinfo)
+static void
+dnet_m_stop(void *arg)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
-	uint32_t		val;
+	struct dnetinstance *dnetp = arg;
+	uint32_t val;
 
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_stop_board(0x%p)", (void *) macinfo);
-#endif
 	/*
 	 * stop the board and disable transmit/receive
 	 */
 	mutex_enter(&dnetp->intrlock);
 	if (!dnetp->suspended) {
+		if (dnetp->mii_up) {
+			dnetp->mii_up = 0;
+			dnetp->mii_speed = 0;
+			dnetp->mii_duplex = 0;
+		}
+		mac_link_update(dnetp->mac_handle, LINK_STATE_UNKNOWN);
 		val = ddi_get32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, OPN_MODE_REG));
 		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
@@ -1156,7 +999,6 @@ dnet_stop_board(gld_mac_info_t *macinfo)
 	}
 	dnetp->running = B_FALSE;
 	mutex_exit(&dnetp->intrlock);
-	return (0);
 }
 
 /*
@@ -1164,19 +1006,13 @@ dnet_stop_board(gld_mac_info_t *macinfo)
  *  Called with intrlock held.
  */
 static int
-dnet_set_addr(gld_mac_info_t *macinfo)
+dnet_set_addr(struct dnetinstance *dnetp)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
 	struct tx_desc_type *desc;
 	int 		current_desc;
 	uint32_t	val;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_set_addr(0x%p)", (void *) macinfo);
-#endif
 
 	val = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG));
 	if (!(val & START_TRANSMIT))
@@ -1189,7 +1025,7 @@ dnet_set_addr(gld_mac_info_t *macinfo)
 	dnetp->need_saddr = 0;
 	mutex_exit(&dnetp->txlock);
 
-	if ((alloc_descriptor(macinfo)) == FAILURE) {
+	if ((alloc_descriptor(dnetp)) == FAILURE) {
 		mutex_enter(&dnetp->txlock);
 		dnetp->need_saddr = 1;
 		mutex_exit(&dnetp->txlock);
@@ -1217,21 +1053,13 @@ dnet_set_addr(gld_mac_info_t *macinfo)
 	return (0);
 }
 
-/*
- *	dnet_set_mac_addr() -- set the physical network address on the board
- */
 static int
-dnet_set_mac_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
+dnet_m_unicst(void *arg, const uint8_t *macaddr)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
+	struct dnetinstance *dnetp = arg;
 	uint32_t	index;
 	uint32_t	*hashp;
 
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_set_mac_addr(0x%p)", (void *) macinfo);
-#endif
 	mutex_enter(&dnetp->intrlock);
 
 	bcopy(macaddr, dnetp->curr_macaddr, ETHERADDRL);
@@ -1254,42 +1082,30 @@ dnet_set_mac_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 	 * Since filtering is imperfect, it is OK if that happens.
 	 */
 	hashp = (uint32_t *)dnetp->setup_buf_vaddr;
-	index = hashindex((uchar_t *)dnet_broadcastaddr);
+	index = hashindex((uint8_t *)dnet_broadcastaddr);
 	hashp[ index / 16 ] |= 1 << (index % 16);
 
-	index = hashindex((uchar_t *)dnetp->curr_macaddr);
+	index = hashindex((uint8_t *)dnetp->curr_macaddr);
 	hashp[ index / 16 ] |= 1 << (index % 16);
 
 	if (!dnetp->suspended)
-		(void) dnet_set_addr(macinfo);
+		(void) dnet_set_addr(dnetp);
 	mutex_exit(&dnetp->intrlock);
 	return (0);
 }
 
-/*
- *	dnet_set_multicast() -- set (enable) or disable a multicast address
- *
- *	Program the hardware to enable/disable the multicast address
- *	in "mcast".  Enable if "op" is non-zero, disable if zero.
- */
 static int
-dnet_set_multicast(gld_mac_info_t *macinfo, uchar_t *mcast, int op)
+dnet_m_multicst(void *arg, boolean_t add, const uint8_t *macaddr)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
+	struct dnetinstance *dnetp = arg;
 	uint32_t	index;
 	uint32_t	*hashp;
 	uint32_t	retval;
 
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_set_multicast(0x%p, %s)",
-		    (void *) macinfo, op ? "ON" : "OFF");
-#endif
 	mutex_enter(&dnetp->intrlock);
-	index = hashindex(mcast);
+	index = hashindex(macaddr);
 	hashp = (uint32_t *)dnetp->setup_buf_vaddr;
-	if (op == GLD_MULTI_ENABLE) {
+	if (add) {
 		if (dnetp->multicast_cnt[index]++) {
 			mutex_exit(&dnetp->intrlock);
 			return (0);
@@ -1303,7 +1119,7 @@ dnet_set_multicast(gld_mac_info_t *macinfo, uchar_t *mcast, int op)
 		hashp[ index / 16 ] &= ~ (1 << (index % 16));
 	}
 	if (!dnetp->suspended)
-		retval = dnet_set_addr(macinfo);
+		retval = dnet_set_addr(dnetp);
 	else
 		retval = 0;
 	mutex_exit(&dnetp->intrlock);
@@ -1315,7 +1131,7 @@ dnet_set_multicast(gld_mac_info_t *macinfo, uchar_t *mcast, int op)
  * node address or a multicast address
  */
 static uint32_t
-hashindex(uchar_t *address)
+hashindex(const uint8_t *address)
 {
 	uint32_t	crc = (uint32_t)HASH_CRC;
 	uint32_t const 	POLY = HASH_POLY;
@@ -1345,37 +1161,23 @@ hashindex(uchar_t *address)
 	return (index);
 }
 
-/*
- * dnet_set_promiscuous() -- set or reset promiscuous mode on the board
- *
- *	Program the hardware to enable/disable promiscuous mode.
- *	Enable if "on" is non-zero, disable if zero.
- */
-
 static int
-dnet_set_promiscuous(gld_mac_info_t *macinfo, int on)
+dnet_m_setpromisc(void *arg, boolean_t on)
 {
-	struct dnetinstance *dnetp;
+	struct dnetinstance *dnetp = arg;
 	uint32_t val;
 
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_set_promiscuous(0x%p, %s)",
-		    (void *) macinfo, on ? "ON" : "OFF");
-#endif
-
-	dnetp = (struct dnetinstance *)macinfo->gldm_private;
 	mutex_enter(&dnetp->intrlock);
 	if (dnetp->promisc == on) {
 		mutex_exit(&dnetp->intrlock);
-		return (SUCCESS);
+		return (0);
 	}
 	dnetp->promisc = on;
 
 	if (!dnetp->suspended) {
 		val = ddi_get32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, OPN_MODE_REG));
-		if (on != GLD_MAC_PROMISC_NONE)
+		if (on)
 			ddi_put32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, OPN_MODE_REG),
 			    val | PROM_MODE);
@@ -1385,115 +1187,163 @@ dnet_set_promiscuous(gld_mac_info_t *macinfo, int on)
 			    val & (~PROM_MODE));
 	}
 	mutex_exit(&dnetp->intrlock);
-	return (DDI_SUCCESS);
+	return (0);
 }
-
-/*
- * dnet_get_stats() -- update statistics
- *
- *	GLD calls this routine just before it reads the driver's statistics
- *	structure.  If your board maintains statistics, this is the time to
- *	read them in and update the values in the structure.  If the driver
- *	maintains statistics continuously, this routine need do nothing.
- */
 
 static int
-dnet_get_stats(gld_mac_info_t *macinfo, struct gld_stats *sp)
+dnet_m_getstat(void *arg, uint_t stat, uint64_t *val)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_get_stats(0x%p)", (void *) macinfo);
-#endif
-	sp->glds_errrcv = dnetp->stat_errrcv;
-	sp->glds_overflow = dnetp->stat_overflow;
-	sp->glds_intr = dnetp->stat_intr;
-	sp->glds_defer = dnetp->stat_defer;
-	sp->glds_missed	= dnetp->stat_missed;
-	sp->glds_norcvbuf = dnetp->stat_norcvbuf;
-	sp->glds_crc = dnetp->stat_crc;
-	sp->glds_short = dnetp->stat_short;
-	sp->glds_frame = dnetp->stat_frame;
-	sp->glds_errxmt = dnetp->stat_errxmt;
-	sp->glds_collisions	= dnetp->stat_collisions;
-	sp->glds_xmtlatecoll = dnetp->stat_xmtlatecoll;
-	sp->glds_excoll = dnetp->stat_excoll;
-	sp->glds_underflow = dnetp->stat_underflow;
-	sp->glds_nocarrier = dnetp->stat_nocarrier;
+	struct dnetinstance *dnetp = arg;
 
-	/* stats from instance structure */
-	if (dnetp->mii_up) {
-		sp->glds_speed = dnetp->mii_speed * 1000000;
-		sp->glds_duplex = dnetp->mii_duplex ?
-		    GLD_DUPLEX_FULL : GLD_DUPLEX_HALF;
-	} else {
-		sp->glds_speed = dnetp->speed * 1000000;
-		sp->glds_duplex =
-		    dnetp->full_duplex ? GLD_DUPLEX_FULL : GLD_DUPLEX_HALF;
+	switch (stat) {
+	case MAC_STAT_IFSPEED:
+		*val = (dnetp->mii_up ?
+		    dnetp->mii_speed : dnetp->speed) * 1000000;
+		break;
+
+	case MAC_STAT_NORCVBUF:
+		*val = dnetp->stat_norcvbuf;
+		break;
+
+	case MAC_STAT_IERRORS:
+		*val = dnetp->stat_errrcv;
+		break;
+
+	case MAC_STAT_OERRORS:
+		*val = dnetp->stat_errxmt;
+		break;
+
+	case MAC_STAT_COLLISIONS:
+		*val = dnetp->stat_collisions;
+		break;
+
+	case ETHER_STAT_DEFER_XMTS:
+		*val = dnetp->stat_defer;
+		break;
+
+	case ETHER_STAT_CARRIER_ERRORS:
+		*val = dnetp->stat_nocarrier;
+		break;
+
+	case ETHER_STAT_TOOSHORT_ERRORS:
+		*val = dnetp->stat_short;
+		break;
+
+	case ETHER_STAT_LINK_DUPLEX:
+		if (!dnetp->running) {
+			*val = LINK_DUPLEX_UNKNOWN;
+			break;
+		}
+
+		if (dnetp->mii_up) {
+			*val = dnetp->mii_duplex ?
+			    LINK_DUPLEX_FULL : LINK_DUPLEX_HALF;
+		} else {
+			*val = dnetp->full_duplex ?
+			    LINK_DUPLEX_FULL : LINK_DUPLEX_HALF;
+		}
+		break;
+
+	case ETHER_STAT_TX_LATE_COLLISIONS:
+		*val = dnetp->stat_xmtlatecoll;
+		break;
+
+	case ETHER_STAT_EX_COLLISIONS:
+		*val = dnetp->stat_excoll;
+		break;
+
+	case MAC_STAT_OVERFLOWS:
+		*val = dnetp->stat_overflow;
+		break;
+
+	case MAC_STAT_UNDERFLOWS:
+		*val = dnetp->stat_underflow;
+		break;
+
+	default:
+		return (ENOTSUP);
 	}
 
-	return (DDI_SUCCESS);
+	return (0);
 }
-
-/*
- *	dnet_send() -- send a packet
- *
- *	Called when a packet is ready to be transmitted. A pointer to an
- *	M_DATA message that contains the packet is passed to this routine.
- *	The complete LLC header is contained in the message's first message
- *	block, and the remainder of the packet is contained within
- *	additional M_DATA message blocks linked to the first message block.
- */
 
 #define	NextTXIndex(index) (((index)+1) % dnetp->max_tx_desc)
 #define	PrevTXIndex(index) (((index)-1) < 0 ? dnetp->max_tx_desc - 1: (index)-1)
 
-static int
-dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
+static mblk_t *
+dnet_m_tx(void *arg, mblk_t *mp)
 {
-	struct dnetinstance *dnetp =		/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
+	struct dnetinstance *dnetp = arg;
+
+	mutex_enter(&dnetp->txlock);
+
+	/* if suspended, drop the packet on the floor, we missed it */
+	if (dnetp->suspended) {
+		mutex_exit(&dnetp->txlock);
+		freemsg(mp);
+		return (NULL);
+	}
+
+	if (dnetp->need_saddr) {
+		/* XXX function return value ignored */
+		mutex_exit(&dnetp->txlock);
+		mutex_enter(&dnetp->intrlock);
+		(void) dnet_set_addr(dnetp);
+		mutex_exit(&dnetp->intrlock);
+		mutex_enter(&dnetp->txlock);
+	}
+
+	while (mp != NULL) {
+		if (!dnet_send(dnetp, mp)) {
+			mutex_exit(&dnetp->txlock);
+			return (mp);
+		}
+		mp = mp->b_next;
+	}
+
+	mutex_exit(&dnetp->txlock);
+
+	/*
+	 * Enable xmit interrupt in case we are running out of xmit descriptors
+	 * or there are more packets on the queue waiting to be transmitted.
+	 */
+	mutex_enter(&dnetp->intrlock);
+
+	enable_interrupts(dnetp);
+
+	/*
+	 * Kick the transmitter
+	 */
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, TX_POLL_REG),
+	    TX_POLL_DEMAND);
+
+	mutex_exit(&dnetp->intrlock);
+
+	return (NULL);
+}
+
+static boolean_t
+dnet_send(struct dnetinstance *dnetp, mblk_t *mp)
+{
 	struct tx_desc_type	*ring = dnetp->tx_desc;
 	int		mblen, totlen;
 	int		index, end_index, start_index;
 	int		avail;
 	int		error;
 	int		bufn;
-	int		bp_count;
 	int		retval;
 	mblk_t		*bp;
-	uint32_t	tx_interrupt_mask;
 
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETSEND)
-		cmn_err(CE_NOTE, "dnet_send(0x%p, 0x%p)",
-		    (void *) macinfo, (void *) mp);
-#endif
-	mutex_enter(&dnetp->txlock);
-	/* if suspended, drop the packet on the floor, we missed it */
-	if (dnetp->suspended) {
-		mutex_exit(&dnetp->txlock);
-		freemsg(mp);
-		return (0);
-	}
-	if (dnetp->need_saddr) {
-		/* XXX function return value ignored */
-		mutex_exit(&dnetp->txlock);
-		mutex_enter(&dnetp->intrlock);
-		(void) dnet_set_addr(macinfo);
-		mutex_exit(&dnetp->intrlock);
-		mutex_enter(&dnetp->txlock);
-	}
+	ASSERT(MUTEX_HELD(&dnetp->txlock));
 
 	/* reclaim any xmit descriptors completed */
-	dnet_reclaim_Tx_desc(macinfo);
+	dnet_reclaim_Tx_desc(dnetp);
 
 	/*
 	 * Use the data buffers from the message and construct the
 	 * scatter/gather list by calling ddi_dma_addr_bind_handle().
 	 */
-	error = bp_count = 0;
+	error = 0;
 	totlen = 0;
 	bp = mp;
 	bufn = 0;
@@ -1503,19 +1353,7 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 		uint_t ncookies;
 		ddi_dma_cookie_t dma_cookie;
 
-		if (++bp_count > DNET_MAX_FRAG) {
-#ifndef DNET_NOISY
-			(void) pullupmsg(bp, -1);
-#else
-			if (pullupmsg(bp, -1))
-				cmn_err(CE_NOTE, "DNET: pulled up send msg");
-			else
-				cmn_err(CE_NOTE,
-				    "DNET: couldn't pullup send msg");
-#endif
-		}
-
-		mblen = (int)(bp->b_wptr - bp->b_rptr);
+		mblen = MBLKL(bp);
 
 		if (!mblen) {	/* skip zero-length message blocks */
 			bp = bp->b_cont;
@@ -1589,22 +1427,19 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 	if (error == 1) {
 		dnetp->stat_defer++;
 		dnetp->free_desc = avail;
-		dnetp->need_gld_sched = 1;
-		mutex_exit(&dnetp->txlock);
-		return (GLD_TX_RESEND);
+		dnetp->need_tx_update = B_TRUE;
+		return (B_FALSE);
 	} else if (error) {
 		dnetp->free_desc = avail;
-		mutex_exit(&dnetp->txlock);
 		freemsg(mp);
-		return (0);	/* Drop packet, don't retry */
+		return (B_TRUE);	/* Drop packet, don't retry */
 	}
 
-	if (totlen > ETHERMAX) {
+	if (totlen > ETHERMAX + VLAN_TAGSZ) {
 		cmn_err(CE_WARN, "DNET: tried to send large %d packet", totlen);
 		dnetp->free_desc = avail;
-		mutex_exit(&dnetp->txlock);
 		freemsg(mp);
-		return (0);	/* We don't want to repeat this attempt */
+		return (B_TRUE);	/* Don't repeat this attempt */
 	}
 
 	/*
@@ -1633,52 +1468,21 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 	 */
 	ASSERT(ring[dnetp->max_tx_desc-1].desc1.end_of_ring != 0);
 
-	/*
-	 * Enable xmit interrupt if we are running out of xmit descriptors
-	 * or there are more packets on the queue waiting to be transmitted.
-	 */
-#ifdef GLD_INTR_WAIT	/* XXX This relies on new GLD changes */
-	if (dnetp->free_desc <= dnet_xmit_threshold)
-		tx_interrupt_mask = TX_INTERRUPT_MASK;
-	else
-		tx_interrupt_mask = (macinfo->gldm_GLD_flags & GLD_INTR_WAIT) ?
-		    TX_INTERRUPT_MASK : 0;
-#else
-	tx_interrupt_mask = TX_INTERRUPT_MASK;
-#endif
-
-	mutex_exit(&dnetp->txlock);
-	mutex_enter(&dnetp->intrlock);
-	enable_interrupts(dnetp, tx_interrupt_mask);
-
-	/*
-	 * Kick the transmitter
-	 */
-	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, TX_POLL_REG),
-	    TX_POLL_DEMAND);
-	mutex_exit(&dnetp->intrlock);
-	return (GLD_TX_OK);		/* successful transmit attempt */
+	return (B_TRUE);
 }
 
 /*
- *	dnetintr() -- interrupt from board to inform us that a receive or
+ *	dnet_intr() -- interrupt from board to inform us that a receive or
  *	transmit has completed.
  */
-
-
 static uint_t
-dnetintr(gld_mac_info_t *macinfo)
+dnet_intr(caddr_t arg)
 {
-	struct dnetinstance *dnetp =	/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
-	uint32_t		int_status;
-	uint32_t		tx_interrupt_mask;
+	struct dnetinstance *dnetp = (struct dnetinstance *)arg;
+	uint32_t int_status;
 
 	mutex_enter(&dnetp->intrlock);
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETINT)
-		cmn_err(CE_NOTE, "dnetintr(0x%p)", (void *)macinfo);
-#endif
+
 	if (dnetp->suspended) {
 		mutex_exit(&dnetp->intrlock);
 		return (DDI_INTR_UNCLAIMED);
@@ -1710,16 +1514,16 @@ dnetintr(gld_mac_info_t *macinfo)
 		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, STATUS_REG), TX_INTR);
 		mutex_enter(&dnetp->txlock);
-		if (dnetp->need_gld_sched) {
+		if (dnetp->need_tx_update) {
 			mutex_exit(&dnetp->txlock);
 			mutex_exit(&dnetp->intrlock);
-			gld_sched(macinfo);
+			mac_tx_update(dnetp->mac_handle);
 			mutex_enter(&dnetp->intrlock);
 			mutex_enter(&dnetp->txlock);
-			dnetp->need_gld_sched = 0;
+			dnetp->need_tx_update = B_FALSE;
 		}
 		/* reclaim any xmit descriptors that are completed */
-		dnet_reclaim_Tx_desc(macinfo);
+		dnet_reclaim_Tx_desc(dnetp);
 		mutex_exit(&dnetp->txlock);
 	}
 
@@ -1730,7 +1534,7 @@ dnetintr(gld_mac_info_t *macinfo)
 		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, STATUS_REG),
 		    int_status & (RX_INTR | RX_UNAVAIL_INTR));
-		dnet_getp(macinfo);
+		dnet_getp(dnetp);
 	}
 
 	if (int_status & ABNORMAL_INTR_SUMM) {
@@ -1762,47 +1566,31 @@ dnetintr(gld_mac_info_t *macinfo)
 		if (dnetdebug & DNETINT)
 			cmn_err(CE_NOTE, "Trying to reset...");
 #endif
-		dnet_reset_board(macinfo);
-		dnet_init_board(macinfo);
+		dnet_reset_board(dnetp);
+		dnet_init_board(dnetp);
 		/* XXX function return value ignored */
-		(void) dnet_start(macinfo);
+		(void) dnet_start(dnetp);
 	}
 
 	/*
-	 * Enable the interrupts. Enable xmit interrupt only if we are
+	 * Enable the interrupts. Enable xmit interrupt in case we are
 	 * running out of free descriptors or if there are packets
 	 * in the queue waiting to be transmitted.
 	 */
-#ifdef GLD_INTR_WAIT	/* XXX This relies on new GLD changes */
-	if (dnetp->free_desc <= dnet_xmit_threshold)
-		tx_interrupt_mask = TX_INTERRUPT_MASK;
-	else
-		tx_interrupt_mask = (macinfo->gldm_GLD_flags & GLD_INTR_WAIT) ?
-		    TX_INTERRUPT_MASK : 0;
-#else
-	tx_interrupt_mask = TX_INTERRUPT_MASK;
-#endif
-	enable_interrupts(dnetp, tx_interrupt_mask);
+	enable_interrupts(dnetp);
 	mutex_exit(&dnetp->intrlock);
 	return (DDI_INTR_CLAIMED);	/* Indicate it was our interrupt */
 }
 
 static void
-dnet_getp(gld_mac_info_t *macinfo)
+dnet_getp(struct dnetinstance *dnetp)
 {
-	struct dnetinstance *dnetp =
-	    (struct dnetinstance *)macinfo->gldm_private;
 	int packet_length, index;
 	mblk_t	*mp;
 	caddr_t 	virtual_address;
 	struct	rx_desc_type *desc = dnetp->rx_desc;
 	int marker = dnetp->rx_current_desc;
 	int misses;
-
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETRECV)
-		cmn_err(CE_NOTE, "dnet_getp(0x%p)", (void *)macinfo);
-#endif
 
 	if (!dnetp->overrun_workaround) {
 		/*
@@ -1909,14 +1697,6 @@ dnet_getp(gld_mac_info_t *macinfo)
 		 */
 		packet_length -= ETHERFCSL;
 
-#ifdef DNETDEBUG
-		if (dnetdebug & DNETRECV) {
-			if (packet_length > ETHERMAX)
-				cmn_err(CE_WARN, "dnet: large packet size %d",
-				    packet_length);
-		}
-#endif
-
 		/* get the virtual address of the packet received */
 		virtual_address =
 		    dnetp->rx_buf_vaddr[index];
@@ -1935,7 +1715,9 @@ dnet_getp(gld_mac_info_t *macinfo)
 		rp = NULL;
 		newbuf = NULL;
 		mp = NULL;
-		if (!desc[index].desc0.err_summary) {
+		if (!desc[index].desc0.err_summary ||
+		    (desc[index].desc0.frame2long &&
+		    packet_length < rx_buf_size)) {
 			ASSERT(packet_length < rx_buf_size);
 			/*
 			 * Allocate another receive buffer for this descriptor.
@@ -1968,11 +1750,12 @@ dnet_getp(gld_mac_info_t *macinfo)
 			}
 		}
 
-		if (desc[index].desc0.err_summary || (mp == NULL)) {
+		if ((desc[index].desc0.err_summary &&
+		    packet_length >= rx_buf_size) || mp == NULL) {
 
 			/* Update gld statistics */
 			if (desc[index].desc0.err_summary)
-				update_rx_stats(macinfo, index);
+				update_rx_stats(dnetp, index);
 			else
 				dnetp->stat_norcvbuf++;
 
@@ -2031,7 +1814,7 @@ dnet_getp(gld_mac_info_t *macinfo)
 
 		/* send the packet upstream */
 		mutex_exit(&dnetp->intrlock);
-		gld_recv(macinfo, mp);
+		mac_rx(dnetp->mac_handle, NULL, mp);
 		mutex_enter(&dnetp->intrlock);
 	}
 }
@@ -2039,10 +1822,8 @@ dnet_getp(gld_mac_info_t *macinfo)
  * Function to update receive statistics
  */
 static void
-update_rx_stats(gld_mac_info_t *macinfo, int index)
+update_rx_stats(struct dnetinstance *dnetp, int index)
 {
-	struct	dnetinstance	*dnetp =
-	    (struct dnetinstance *)macinfo->gldm_private;
 	struct rx_desc_type *descp = &(dnetp->rx_desc[index]);
 
 	/*
@@ -2074,8 +1855,7 @@ update_rx_stats(gld_mac_info_t *macinfo, int index)
 	if (descp->desc0.desc_err) {
 		/*EMPTY*/
 		/* Not enough receive descriptors */
-		/* This condition is accounted in dnetintr() */
-		/* macinfo->gldm_stats.glds_missed++; */
+		/* This condition is accounted in dnet_intr() */
 	}
 
 	if (descp->desc0.frame2long) {
@@ -2087,10 +1867,8 @@ update_rx_stats(gld_mac_info_t *macinfo, int index)
  * Function to update transmit statistics
  */
 static void
-update_tx_stats(gld_mac_info_t *macinfo, int index)
+update_tx_stats(struct dnetinstance *dnetp, int index)
 {
-	struct	dnetinstance	*dnetp =
-	    (struct dnetinstance *)macinfo->gldm_private;
 	struct tx_desc_type *descp = &(dnetp->tx_desc[index]);
 	int	fd;
 	media_block_t	*block = dnetp->selected_media_block;
@@ -2185,12 +1963,10 @@ read_gpr(struct dnetinstance *dnetp)
 }
 
 static void
-set_gpr(gld_mac_info_t *macinfo)
+set_gpr(struct dnetinstance *dnetp)
 {
 	uint32_t *sequence;
 	int len;
-	struct dnetinstance *dnetp = (struct dnetinstance *)
-	    macinfo->gldm_private;
 	LEAF_FORMAT *leaf = &dnetp->sr.leaf[dnetp->leaf];
 	media_block_t *block = dnetp->selected_media_block;
 	int i;
@@ -2233,12 +2009,10 @@ set_gpr(gld_mac_info_t *macinfo)
 /* set_opr() - must be called with intrlock held */
 
 static void
-set_opr(gld_mac_info_t *macinfo)
+set_opr(struct dnetinstance *dnetp)
 {
 	uint32_t fd, mb1, sf;
 
-	struct dnetinstance *dnetp =
-	    (struct dnetinstance *)macinfo->gldm_private;
 	int 		opnmode_len;
 	uint32_t val;
 	media_block_t *block = dnetp->selected_media_block;
@@ -2265,7 +2039,7 @@ set_opr(gld_mac_info_t *macinfo)
 	if (opnmode_len) {
 		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, OPN_MODE_REG), val);
-		dnet_reset_board(macinfo);
+		dnet_reset_board(dnetp);
 		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, OPN_MODE_REG), val);
 		return;
@@ -2306,15 +2080,13 @@ set_opr(gld_mac_info_t *macinfo)
 		cmn_err(CE_NOTE, "OPN: %x", val);
 #endif
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG), val);
-	dnet_reset_board(macinfo);
+	dnet_reset_board(dnetp);
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG), val);
 }
 
 static void
-set_sia(gld_mac_info_t *macinfo)
+set_sia(struct dnetinstance *dnetp)
 {
-	struct dnetinstance *dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 	media_block_t *block = dnetp->selected_media_block;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
@@ -2361,20 +2133,14 @@ set_sia(gld_mac_info_t *macinfo)
 }
 
 /*
- *	========== Buffer Management Routines ==========
- */
-
-/*
  * This function (re)allocates the receive and transmit buffers and
  * descriptors.  It can be called more than once per instance, though
  * currently it is only called from attach.  It should only be called
  * while the device is reset.
  */
 static int
-dnet_alloc_bufs(gld_mac_info_t *macinfo)
+dnet_alloc_bufs(struct dnetinstance *dnetp)
 {
-	struct dnetinstance	*dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 	int i;
 	size_t len;
 	int page_size;
@@ -2398,7 +2164,7 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
 	/* free up the old buffers if we are reallocating them */
 	if (realloc) {
 		nrecv_desc_old = dnetp->nrecv_desc;
-		dnet_free_bufs(macinfo); /* free the old buffers */
+		dnet_free_bufs(dnetp); /* free the old buffers */
 	}
 
 	if (dnetp->dma_handle == NULL)
@@ -2538,11 +2304,9 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
  * should only be called while the device is reset.
  */
 static void
-dnet_free_bufs(gld_mac_info_t *macinfo)
+dnet_free_bufs(struct dnetinstance *dnetp)
 {
 	int i;
-	struct dnetinstance	*dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 	/* free up any xmit descriptors/buffers */
 	if (dnetp->tx_desc != NULL) {
 		ddi_dma_mem_free(&dnetp->tx_desc_acchdl);
@@ -2618,11 +2382,9 @@ dnet_free_bufs(gld_mac_info_t *macinfo)
  * Initialize transmit and receive descriptors.
  */
 static void
-dnet_init_txrx_bufs(gld_mac_info_t *macinfo)
+dnet_init_txrx_bufs(struct dnetinstance *dnetp)
 {
 	int		i;
-	struct dnetinstance	*dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 
 	/*
 	 * Initilize all the Tx descriptors
@@ -2670,11 +2432,9 @@ dnet_init_txrx_bufs(gld_mac_info_t *macinfo)
 }
 
 static int
-alloc_descriptor(gld_mac_info_t *macinfo)
+alloc_descriptor(struct dnetinstance *dnetp)
 {
 	int index;
-	struct dnetinstance *dnetp =	/* Our private device info */
-	    (struct dnetinstance *)macinfo->gldm_private;
 	struct tx_desc_type    *ring = dnetp->tx_desc;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
@@ -2682,7 +2442,7 @@ alloctop:
 	mutex_enter(&dnetp->txlock);
 	index = dnetp->tx_current_desc;
 
-	dnet_reclaim_Tx_desc(macinfo);
+	dnet_reclaim_Tx_desc(dnetp);
 
 	/* we do have free descriptors, right? */
 	if (dnetp->free_desc <= 0) {
@@ -2708,7 +2468,7 @@ alloctop:
 		mutex_exit(&dnetp->txlock);
 		/* XXX function return value ignored */
 		if (!dnetp->suspended)
-			(void) dnet_set_addr(macinfo);
+			(void) dnet_set_addr(dnetp);
 		goto alloctop;
 	}
 
@@ -2733,19 +2493,12 @@ alloctop:
  * dnet_reclaim_Tx_desc() - called with txlock held.
  */
 static void
-dnet_reclaim_Tx_desc(gld_mac_info_t *macinfo)
+dnet_reclaim_Tx_desc(struct dnetinstance *dnetp)
 {
-	struct dnetinstance	*dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 	struct tx_desc_type	*desc = dnetp->tx_desc;
 	int index;
 
 	ASSERT(MUTEX_HELD(&dnetp->txlock));
-#ifdef DNETDEBUG
-	if (dnetdebug & DNETTRACE)
-		cmn_err(CE_NOTE, "dnet_reclaim_Tx_desc(0x%p)",
-		    (void *) macinfo);
-#endif
 
 	index = dnetp->transmitted_desc;
 	while (((dnetp->free_desc == 0) || (index != dnetp->tx_current_desc)) &&
@@ -2757,7 +2510,7 @@ dnet_reclaim_Tx_desc(gld_mac_info_t *macinfo)
 		if (desc[index].desc1.setup_packet == 0 &&
 		    desc[index].desc1.last_desc &&
 		    desc[index].desc0.err_summary)
-			update_tx_stats(macinfo, index);
+			update_tx_stats(dnetp, index);
 
 		/*
 		 * If we have used the streams message buffer for this
@@ -3396,27 +3149,23 @@ linkset_isset(uint32_t linkset, int media)
  * find_active_media() - called with intrlock held.
  */
 static void
-find_active_media(gld_mac_info_t *macinfo)
+find_active_media(struct dnetinstance *dnetp)
 {
 	int i;
 	media_block_t *block;
 	media_block_t *best_allowed = NULL;
 	media_block_t *hd_found = NULL;
 	media_block_t *fd_found = NULL;
-	struct dnetinstance	*dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 	LEAF_FORMAT *leaf = &dnetp->sr.leaf[dnetp->leaf];
 	uint32_t checked = 0, links_up = 0;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
-#ifdef SROMDEBUG
-	cmn_err(CE_NOTE, "find_active_media 0x%x,0x%x", sr->version, macinfo);
-#endif
+
 	dnetp->selected_media_block = leaf->default_block;
 
 	if (dnetp->phyaddr != -1) {
 		dnetp->selected_media_block = leaf->mii_block;
-		setup_block(macinfo);
+		setup_block(dnetp);
 
 		if (ddi_getprop(DDI_DEV_T_ANY, dnetp->devinfo,
 		    DDI_PROP_DONTPASS, "portmon", 1)) {
@@ -3469,8 +3218,8 @@ find_active_media(gld_mac_info_t *macinfo)
 		switch (block->type) {
 
 		case 2: /* SIA Media block: Best we can do is send a packet */
-			setup_block(macinfo);
-			if (send_test_packet(macinfo)) {
+			setup_block(dnetp);
+			if (send_test_packet(dnetp)) {
 				if (!is_fdmedia(media))
 					return;
 				if (!fd_found)
@@ -3484,8 +3233,8 @@ find_active_media(gld_mac_info_t *macinfo)
 				linkset_add(&checked, media);
 				if (((media == MEDIA_BNC ||
 				    media == MEDIA_AUI) &&
-				    send_test_packet(macinfo)) ||
-				    dnet_link_sense(macinfo))
+				    send_test_packet(dnetp)) ||
+				    dnet_link_sense(dnetp))
 					linkset_add(&links_up, media);
 			}
 
@@ -3511,7 +3260,7 @@ find_active_media(gld_mac_info_t *macinfo)
 					 * chosen but now we force it through to
 					 * 100.
 					 */
-					setup_block(macinfo);
+					setup_block(dnetp);
 					return;
 				} else if (!is_fdmedia(media)) {
 					/*
@@ -3539,7 +3288,7 @@ find_active_media(gld_mac_info_t *macinfo)
 		 * setup causes a PHY reset
 		 */
 		case 1: case 3:
-			setup_block(macinfo);
+			setup_block(dnetp);
 			for (i = 0; ; i++) {
 				if (mii_linkup(dnetp->mii, dnetp->phyaddr)) {
 					/* XXX function return value ignored */
@@ -3569,7 +3318,7 @@ find_active_media(gld_mac_info_t *macinfo)
 		dnetp->selected_media_block = best_allowed;
 		cmn_err(CE_WARN, "!dnet: Default media selected\n");
 	}
-	setup_block(macinfo);
+	setup_block(dnetp);
 }
 
 /*
@@ -3577,17 +3326,17 @@ find_active_media(gld_mac_info_t *macinfo)
  * setup_block() - called with intrlock held.
  */
 static void
-setup_block(gld_mac_info_t *macinfo)
+setup_block(struct dnetinstance *dnetp)
 {
-	dnet_reset_board(macinfo);
-	dnet_init_board(macinfo);
+	dnet_reset_board(dnetp);
+	dnet_init_board(dnetp);
 	/* XXX function return value ignored */
-	(void) dnet_start(macinfo);
+	(void) dnet_start(dnetp);
 }
 
 /* dnet_link_sense() - called with intrlock held */
 static int
-dnet_link_sense(gld_mac_info_t *macinfo)
+dnet_link_sense(struct dnetinstance *dnetp)
 {
 	/*
 	 * This routine makes use of the command word from the srom config.
@@ -3595,8 +3344,6 @@ dnet_link_sense(gld_mac_info_t *macinfo)
 	 * be found in the "Digital Semiconductor 21X4 Serial ROM Format v3.03"
 	 * spec. Section 4.3.2.1, and 4.5.2.1.3
 	 */
-	struct dnetinstance *dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 	media_block_t *block = dnetp->selected_media_block;
 	uint32_t link, status, mask, polarity;
 	int settletime, stabletime, waittime, upsamples;
@@ -3623,7 +3370,7 @@ dnet_link_sense(gld_mac_info_t *macinfo)
 	 * to work
 	 */
 	dnetp->disable_scrambler = 1;
-	setup_block(macinfo);
+	setup_block(dnetp);
 	dnetp->disable_scrambler = 0;
 
 	if (block->media_code == MEDIA_TP || block->media_code == MEDIA_TP_FD)
@@ -3659,11 +3406,9 @@ dnet_link_sense(gld_mac_info_t *macinfo)
 }
 
 static int
-send_test_packet(gld_mac_info_t *macinfo)
+send_test_packet(struct dnetinstance *dnetp)
 {
 	int packet_delay;
-	struct dnetinstance	*dnetp = (struct dnetinstance *)
-	    (macinfo->gldm_private);
 	struct tx_desc_type *desc;
 	int bufindex;
 	int media_code = dnetp->selected_media_block->media_code;
@@ -3692,7 +3437,7 @@ send_test_packet(gld_mac_info_t *macinfo)
 	desc = dnetp->tx_desc;
 
 	bufindex = dnetp->tx_current_desc;
-	if (alloc_descriptor(macinfo) == FAILURE) {
+	if (alloc_descriptor(dnetp) == FAILURE) {
 		cmn_err(CE_WARN, "DNET: send_test_packet: alloc_descriptor"
 		    "failed");
 		return (0);
@@ -3754,18 +3499,17 @@ send_test_packet(gld_mac_info_t *macinfo)
 
 /* enable_interrupts - called with intrlock held */
 static void
-enable_interrupts(struct dnetinstance *dnetp, int enable_xmit)
+enable_interrupts(struct dnetinstance *dnetp)
 {
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
 	/* Don't enable interrupts if they have been forced off */
 	if (dnetp->interrupts_disabled)
 		return;
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, INT_MASK_REG),
-	    NORMAL_INTR_MASK | ABNORMAL_INTR_MASK | TX_UNDERFLOW_MASK |
-	    (enable_xmit ? TX_INTERRUPT_MASK : 0) |
+	    ABNORMAL_INTR_MASK | NORMAL_INTR_MASK | SYSTEM_ERROR_MASK |
 	    (dnetp->timer.cb ? GPTIMER_INTR : 0) |
-	    RX_INTERRUPT_MASK | SYSTEM_ERROR_MASK | TX_JABBER_MASK);
-
+	    RX_INTERRUPT_MASK |
+	    TX_INTERRUPT_MASK | TX_JABBER_MASK | TX_UNDERFLOW_MASK);
 }
 
 /*
@@ -3773,10 +3517,10 @@ enable_interrupts(struct dnetinstance *dnetp, int enable_xmit)
  * Second and subsequent devices are incorrectly configured by the BIOS
  * (either in their ILINE configuration or the MP Configuration Table for PC+MP
  * systems).
- * The hack stops gldregister() registering the interrupt routine for the
- * FIRST device on the adapter, and registers its own. It builds up a table
- * of macinfo structures for each device, and the new interrupt routine
- * calls gldintr for each of them.
+ * The hack stops registering the interrupt routine for the FIRST
+ * device on the adapter, and registers its own. It builds up a table
+ * of dnetp structures for each device, and the new interrupt routine
+ * calls dnet_intr for each of them.
  * Known cards that suffer from this problem are:
  *	All Cogent multiport cards;
  * 	Znyx 314;
@@ -3789,12 +3533,10 @@ enable_interrupts(struct dnetinstance *dnetp, int enable_xmit)
  * indicated by "secondary")
  */
 static int
-dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
+dnet_hack_interrupts(struct dnetinstance *dnetp, int secondary)
 {
 	int i;
 	struct hackintr_inf *hackintr_inf;
-	struct dnetinstance *dnetp =
-	    (struct dnetinstance *)macinfo->gldm_private;
 	dev_info_t *devinfo = dnetp->devinfo;
 	uint32_t oui = 0;	/* Organizationally Unique ID */
 
@@ -3853,7 +3595,7 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 		if (hackintr_inf == NULL)
 			goto fail;
 
-		hackintr_inf->macinfos[0] = macinfo;
+		hackintr_inf->dnetps[0] = dnetp;
 		hackintr_inf->devinfo = devinfo;
 
 		/*
@@ -3869,7 +3611,7 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 
 
 		/* Register our hacked interrupt routine */
-		if (ddi_add_intr(devinfo, 0, &macinfo->gldm_cookie, NULL,
+		if (ddi_add_intr(devinfo, 0, &dnetp->icookie, NULL,
 		    (uint_t (*)(char *))dnet_hack_intr,
 		    (caddr_t)hackintr_inf) != DDI_SUCCESS) {
 			/* XXX function return value ignored */
@@ -3884,13 +3626,13 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 		 * when detaching devices
 		 */
 		mutex_init(&hackintr_inf->lock, NULL, MUTEX_DRIVER,
-		    macinfo->gldm_cookie);
+		    dnetp->icookie);
 
 		/* Stop GLD registering an interrupt */
 		return (-1);
 	} else {
 
-		/* Add the macinfo for this secondary device to the table */
+		/* Add the dnetp for this secondary device to the table */
 
 		hackintr_inf = (struct hackintr_inf *)(uintptr_t)
 		    ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(devinfo),
@@ -3901,14 +3643,14 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 
 		/* Find an empty slot */
 		for (i = 0; i < MAX_INST; i++)
-			if (hackintr_inf->macinfos[i] == NULL)
+			if (hackintr_inf->dnetps[i] == NULL)
 				break;
 
 		/* More than 8 ports on adapter ?! */
 		if (i == MAX_INST)
 			goto fail;
 
-		hackintr_inf->macinfos[i] = macinfo;
+		hackintr_inf->dnetps[i] = dnetp;
 
 		/*
 		 * Allow GLD to register a handler for this
@@ -3927,9 +3669,8 @@ fail:
 }
 
 /*
- * Call gld_intr for all adapters on a multiport card
+ * Call dnet_intr for all adapters on a multiport card
  */
-
 static uint_t
 dnet_hack_intr(struct hackintr_inf *hackintr_inf)
 {
@@ -3940,9 +3681,11 @@ dnet_hack_intr(struct hackintr_inf *hackintr_inf)
 	mutex_enter(&hackintr_inf->lock);
 
 	for (i = 0; i < MAX_INST; i++) {
-		if (hackintr_inf->macinfos[i] &&
-		    gld_intr(hackintr_inf->macinfos[i]) == DDI_INTR_CLAIMED)
+		if (hackintr_inf->dnetps[i] &&
+		    dnet_intr((caddr_t)hackintr_inf->dnetps[i]) ==
+		    DDI_INTR_CLAIMED) {
 			claimed = DDI_INTR_CLAIMED;
+		}
 	}
 	mutex_exit(&hackintr_inf->lock);
 	return (claimed);
@@ -3960,7 +3703,8 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 {
 	int i;
 	struct hackintr_inf *hackintr_inf;
-	gld_mac_info_t *mac, *macinfo = ddi_get_driver_private(devinfo);
+	struct dnetinstance *altdnetp, *dnetp =
+	    ddi_get_driver_private(devinfo);
 
 	hackintr_inf = (struct hackintr_inf *)(uintptr_t)
 	    ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(devinfo),
@@ -3972,15 +3716,15 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 	 */
 	if (!hackintr_inf) {
 		/* remove the interrupt for the non-hacked case */
-		ddi_remove_intr(devinfo, 0, macinfo->gldm_cookie);
+		ddi_remove_intr(devinfo, 0, dnetp->icookie);
 		return (DDI_SUCCESS);
 	}
 
 	/* Remove this device from the handled table */
 	mutex_enter(&hackintr_inf->lock);
 	for (i = 0; i < MAX_INST; i++) {
-		if (hackintr_inf->macinfos[i] == macinfo) {
-			hackintr_inf->macinfos[i] = NULL;
+		if (hackintr_inf->dnetps[i] == dnetp) {
+			hackintr_inf->dnetps[i] = NULL;
 			break;
 		}
 	}
@@ -3996,9 +3740,7 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 	 * must have their interrupts disabled before we remove the handler
 	 */
 	for (i = 0; i < MAX_INST; i++) {
-		if ((mac = hackintr_inf->macinfos[i]) != NULL) {
-			struct dnetinstance *altdnetp =
-			    (struct dnetinstance *)mac->gldm_private;
+		if ((altdnetp = hackintr_inf->dnetps[i]) != NULL) {
 			altdnetp->interrupts_disabled = 1;
 			ddi_put32(altdnetp->io_handle,
 			    REG32(altdnetp->io_reg, INT_MASK_REG), 0);
@@ -4007,7 +3749,7 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 
 	/* It should now be safe to remove the interrupt handler */
 
-	ddi_remove_intr(devinfo, 0, macinfo->gldm_cookie);
+	ddi_remove_intr(devinfo, 0, dnetp->icookie);
 	mutex_destroy(&hackintr_inf->lock);
 	/* XXX function return value ignored */
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, ddi_get_parent(devinfo),
@@ -4016,17 +3758,11 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 	return (DDI_SUCCESS);
 }
 
-/*
- *	========== PHY MII Routines ==========
- */
-
 /* do_phy() - called with intrlock held */
 static void
-do_phy(gld_mac_info_t *macinfo)
+do_phy(struct dnetinstance *dnetp)
 {
 	dev_info_t *dip;
-	struct dnetinstance
-	    *dnetp = (struct dnetinstance *)macinfo->gldm_private;
 	LEAF_FORMAT *leaf = dnetp->sr.leaf + dnetp->leaf;
 	media_block_t *block;
 	int phy;
@@ -4055,7 +3791,7 @@ do_phy(gld_mac_info_t *macinfo)
 	dnetp->selected_media_block = leaf->mii_block ?
 	    leaf->mii_block : leaf->default_block;
 
-	setup_block(macinfo);
+	setup_block(dnetp);
 	/* XXX function return value ignored */
 	(void) mii_create(dip, dnet_mii_write, dnet_mii_read, &dnetp->mii);
 
@@ -4086,7 +3822,6 @@ do_phy(gld_mac_info_t *macinfo)
 static ushort_t
 dnet_mii_read(dev_info_t *dip, int phy_addr, int reg_num)
 {
-	gld_mac_info_t *macinfo;
 	struct dnetinstance *dnetp;
 
 	uint32_t command_word;
@@ -4096,8 +3831,7 @@ dnet_mii_read(dev_info_t *dip, int phy_addr, int reg_num)
 	int bits_in_ushort = ((sizeof (ushort_t))*8);
 	int turned_around = 0;
 
-	macinfo = ddi_get_driver_private(dip);
-	dnetp = (struct dnetinstance *)macinfo->gldm_private;
+	dnetp = ddi_get_driver_private(dip);
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
 	/* Write Preamble */
@@ -4138,13 +3872,11 @@ dnet_mii_read(dev_info_t *dip, int phy_addr, int reg_num)
 static void
 dnet_mii_write(dev_info_t *dip, int phy_addr, int reg_num, int reg_dat)
 {
-	gld_mac_info_t *macinfo;
 	struct dnetinstance *dnetp;
 	uint32_t command_word;
 	int bits_in_ushort = ((sizeof (ushort_t))*8);
 
-	macinfo = ddi_get_driver_private(dip);
-	dnetp = (struct dnetinstance *)macinfo->gldm_private;
+	dnetp = ddi_get_driver_private(dip);
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
 	write_mii(dnetp, MII_PRE, 2*bits_in_ushort);
@@ -4217,29 +3949,49 @@ set_leaf(SROM_FORMAT *sr, LEAF_FORMAT *leaf)
 static void
 dnet_mii_link_cb(dev_info_t *dip, int phy, enum mii_phy_state state)
 {
-	gld_mac_info_t *macinfo = ddi_get_driver_private(dip);
-	struct dnetinstance *dnetp =
-	    (struct dnetinstance *)macinfo->gldm_private;
+	struct dnetinstance *dnetp = ddi_get_driver_private(dip);
 	LEAF_FORMAT *leaf;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
+
 	leaf = dnetp->sr.leaf + dnetp->leaf;
 	if (state == phy_state_linkup) {
 		dnetp->mii_up = 1;
-		/* XXX function return value ignored */
-		(void) mii_getspeed(dnetp->mii,
-		    dnetp->phyaddr, &dnetp->mii_speed,
-		    &dnetp->mii_duplex);
+
+		(void) mii_getspeed(dnetp->mii, dnetp->phyaddr,
+		    &dnetp->mii_speed, &dnetp->mii_duplex);
+
 		dnetp->selected_media_block = leaf->mii_block;
-		setup_block(macinfo);
+		setup_block(dnetp);
 	} else {
 		/* NEEDSWORK: Probably can call find_active_media here */
 		dnetp->mii_up = 0;
-		dnetp->mii_speed = 0;
-		dnetp->mii_duplex = 0;
+
 		if (leaf->default_block->media_code == MEDIA_MII)
 			dnetp->selected_media_block = leaf->default_block;
-		setup_block(macinfo);
+		setup_block(dnetp);
+	}
+	dnet_mii_link_up(dnetp);
+}
+
+static void
+dnet_mii_link_up(struct dnetinstance *dnetp)
+{
+	if (!dnetp->running) {
+		return;
+	}
+
+	if (dnetp->mii_up) {
+		(void) mii_getspeed(dnetp->mii, dnetp->phyaddr,
+		    &dnetp->mii_speed, &dnetp->mii_duplex);
+
+		mac_link_update(dnetp->mac_handle, LINK_STATE_UP);
+
+	} else {
+		dnetp->mii_speed = 0;
+		dnetp->mii_duplex = 0;
+
+		mac_link_update(dnetp->mac_handle, LINK_STATE_DOWN);
 	}
 }
 
@@ -4869,7 +4621,7 @@ dnet_usectimeout(struct dnetinstance *dnetp, uint32_t usecs, int contin,
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, GP_TIMER_REG),
 	    dnetp->timer.start_ticks | (contin ? GPTIMER_CONT : 0));
 	if (dnetp->timer.cb)
-		enable_interrupts(dnetp, 1);
+		enable_interrupts(dnetp);
 	mutex_exit(&dnetp->intrlock);
 }
 
