@@ -1126,11 +1126,6 @@ nge_chip_reset(nge_t *ngep)
 		nge_reg_put32(ngep, NGE_PM_CNTL2, pm_cntl2.cntl_val);
 	}
 
-	/*
-	 * Reset the external phy
-	 */
-	if (!nge_phy_reset(ngep))
-		return (DDI_FAILURE);
 	ngep->nge_chip_state = NGE_CHIP_RESET;
 	return (DDI_SUCCESS);
 }
