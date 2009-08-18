@@ -144,6 +144,8 @@ f none usr/lib/security/sparcv9/pkcs11_kernel.so.1 755 root bin
 s none usr/lib/security/sparcv9/pkcs11_kernel.so=./pkcs11_kernel.so.1
 f none usr/lib/security/sparcv9/pkcs11_softtoken.so.1 755 root bin
 s none usr/lib/security/sparcv9/pkcs11_softtoken.so=./pkcs11_softtoken.so.1
+f none usr/lib/security/sparcv9/pkcs11_tpm.so.1 755 root bin
+s none usr/lib/security/sparcv9/pkcs11_tpm.so=./pkcs11_tpm.so.1
 s none usr/lib/64=sparcv9
 d none usr/lib/sparcv9 755 root bin
 f none usr/lib/sparcv9/libadutils.so.1 755 root bin

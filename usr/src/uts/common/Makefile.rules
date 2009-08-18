@@ -1404,6 +1404,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.s
+	$(COMPILE.s) -o $@ $<
+
 #
 # SVM
 #
@@ -2438,6 +2441,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/hxge/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/tpm/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/tpm/%.s
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/vr/%.c

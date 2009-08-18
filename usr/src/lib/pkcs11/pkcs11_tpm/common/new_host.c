@@ -156,11 +156,23 @@ ST_Initialize(void *FunctionList,
 		initedpid = getpid();
 		SC_SetFunctionList();
 
+		if (flist != NULL)
+			(*flist) = function_list;
+
 		/* Always call the token_specific_init function.... */
 		rc = token_specific.t_init((char *)Correlator, SlotNumber,
 		    &hContext);
-		if (rc != 0)
+		if (rc != 0) {
+			/*
+			 * The token could not be initialized, return OK, but
+			 * present no slots.
+			 */
+			rc = CKR_OK;
 			goto done;
+		} else {
+			/* Mark the token as available */
+			global_shm->token_available = TRUE;
+		}
 	}
 
 	rc = load_token_data(hContext, nv_token_data);
@@ -179,8 +191,6 @@ ST_Initialize(void *FunctionList,
 
 	init_slot_info(nv_token_data);
 
-	if (flist != NULL)
-		(*flist) = function_list;
 done:
 	if (hContext)
 		Tspi_Context_Close(hContext);

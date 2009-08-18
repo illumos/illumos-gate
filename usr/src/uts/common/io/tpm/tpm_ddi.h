@@ -52,7 +52,10 @@ enum tpm_ddi_resources_flags {
 	TPM_DID_IO_MUTEX = 0x200,
 	TPM_DID_IO_CV = 0x400,
 	TPM_DID_MUTEX = 0x800,
-	TPM_DID_SOFT_STATE = 0x1000
+	TPM_DID_SOFT_STATE = 0x1000,
+#ifdef sun4v
+	TPM_HSVC_REGISTERED = 0x2000
+#endif
 };
 
 typedef struct tpm_state tpm_state_t;
@@ -104,6 +107,9 @@ struct tpm_state {
 	kmutex_t	pm_mutex;
 	kcondvar_t	suspend_cv;
 	uint32_t	suspended;
+
+	/* For RNG */
+	crypto_kcf_provider_handle_t	n_prov;
 };
 
 #endif	/* _TPM_DDI_H */

@@ -402,7 +402,8 @@ C_CloseAllSessions(CK_SLOT_ID slotID)
 	LOG("CloseAllSessions");
 	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	if (slotID > NUMBER_SLOTS_MANAGED)
+
+	if (!global_shm->token_available || (slotID > NUMBER_SLOTS_MANAGED))
 		return (CKR_SLOT_ID_INVALID);
 	/*
 	 * Proc Mutex is locked when we remove from the seesion list in
@@ -1346,17 +1347,22 @@ C_GetInfo(CK_INFO_PTR pInfo)
 	pInfo->cryptokiVersion.major = 2;
 	pInfo->cryptokiVersion.minor = 20;
 
-	if (open_tss_context(&hContext))
-		return (CKR_FUNCTION_FAILED);
+	if (open_tss_context(&hContext) == 0) {
+		/*
+		 * Only populate the TPM info if we can establish
+		 * a context, but don't return failure because
+		 * the framework needs to know some of the info.
+		 */
+		(void) token_get_tpm_info(hContext, &td);
 
-	(void) token_get_tpm_info(hContext, &td);
+		(void) Tspi_Context_Close(hContext);
 
-	(void) Tspi_Context_Close(hContext);
+		(void) memcpy(pInfo->manufacturerID,
+		    &(td.token_info.manufacturerID),
+		    sizeof (pInfo->manufacturerID) - 1);
 
-	(void) memcpy(pInfo->manufacturerID, &(td.token_info.manufacturerID),
-	    sizeof (pInfo->manufacturerID) - 1);
-
-	pInfo->flags = td.token_info.flags;
+		pInfo->flags = td.token_info.flags;
+	}
 	(void) strcpy((char *)pInfo->libraryDescription,
 	    "PKCS11 Interface for TPM");
 
@@ -1372,12 +1378,12 @@ C_GetMechanismInfo(CK_SLOT_ID	slotID,
 	CK_MECHANISM_INFO_PTR	pInfo)
 {
 	CK_RV rv;
-	if (API_Initialized() == FALSE) {
+	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (slotID > NUMBER_SLOTS_MANAGED) {
+
+	if (!global_shm->token_available || (slotID > NUMBER_SLOTS_MANAGED))
 		return (CKR_SLOT_ID_INVALID);
-	}
+
 	if (FuncList.ST_GetMechanismInfo) {
 		rv = FuncList.ST_GetMechanismInfo(slotID, type, pInfo);
 	} else {
@@ -1393,13 +1399,13 @@ C_GetMechanismList(CK_SLOT_ID slotID,
 {
 	CK_RV rv;
 
-	if (API_Initialized() == FALSE) {
+	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
+
 	if (! pulCount)
 		return (CKR_ARGUMENTS_BAD);
 
-	if (slotID > NUMBER_SLOTS_MANAGED)
+	if (!global_shm->token_available || (slotID > NUMBER_SLOTS_MANAGED))
 		return (CKR_SLOT_ID_INVALID);
 
 	if (FuncList.ST_GetMechanismList) {
@@ -1499,13 +1505,13 @@ CK_RV
 C_GetSlotInfo(CK_SLOT_ID slotID,
 	CK_SLOT_INFO_PTR pInfo)
 {
-	if (API_Initialized() == FALSE) {
+	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (!pInfo) {
+
+	if (!pInfo)
 		return (CKR_FUNCTION_FAILED);
-	}
-	if (slotID != TPM_SLOTID)
+
+	if (!global_shm->token_available || (slotID > NUMBER_SLOTS_MANAGED))
 		return (CKR_SLOT_ID_INVALID);
 
 	copy_slot_info(slotID, pInfo);
@@ -1528,6 +1534,13 @@ C_GetSlotList(CK_BBOOL tokenPresent,
 		return (CKR_FUNCTION_FAILED);
 
 	count = 0;
+	/*
+	 * If we can't talk to the TPM, present no slots
+	 */
+	if (!global_shm->token_available) {
+		*pulCount = 0;
+		return (CKR_OK);
+	}
 
 	copy_slot_info(TPM_SLOTID, &slotInfo);
 	if ((slotInfo.flags & CKF_TOKEN_PRESENT))
@@ -1551,15 +1564,15 @@ C_GetTokenInfo(CK_SLOT_ID slotID,
 {
 	CK_RV rv;
 
-	if (API_Initialized() == FALSE) {
+	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (! pInfo) {
+
+	if (!pInfo)
 		return (CKR_ARGUMENTS_BAD);
-	}
-	if (slotID > NUMBER_SLOTS_MANAGED) {
+
+	if (!global_shm->token_available || (slotID > NUMBER_SLOTS_MANAGED))
 		return (CKR_SLOT_ID_INVALID);
-	}
+
 	slotID = TPM_SLOTID;
 	if (FuncList.ST_GetTokenInfo) {
 		rv = FuncList.ST_GetTokenInfo(slotID, pInfo);
@@ -1651,24 +1664,23 @@ C_InitPIN(CK_SESSION_HANDLE hSession,
 	CK_RV rv;
 	ST_SESSION_T rSession;
 
-	if (API_Initialized() == FALSE) {
+	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (! pPin && ulPinLen) {
-		return (CKR_ARGUMENTS_BAD);
-	}
-	if (! Valid_Session((Session_Struct_t *)hSession, &rSession)) {
-		return (CKR_SESSION_HANDLE_INVALID);
-	}
 
-	if (rSession.slotID > NUMBER_SLOTS_MANAGED) {
+	if (! pPin && ulPinLen)
+		return (CKR_ARGUMENTS_BAD);
+
+	if (! Valid_Session((Session_Struct_t *)hSession, &rSession))
+		return (CKR_SESSION_HANDLE_INVALID);
+
+	if (rSession.slotID > NUMBER_SLOTS_MANAGED)
 		return (CKR_SLOT_ID_INVALID);
-	}
-	if (FuncList.ST_InitPIN) {
+
+	if (FuncList.ST_InitPIN)
 		rv = FuncList.ST_InitPIN(rSession, pPin, ulPinLen);
-	} else {
+	else
 		rv = CKR_FUNCTION_NOT_SUPPORTED;
-	}
+
 	return (rv);
 }
 
@@ -1680,20 +1692,23 @@ C_InitToken(CK_SLOT_ID  slotID,
 {
 	CK_RV rv;
 
-	if (API_Initialized() == FALSE) {
+	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (! pPin && ulPinLen) {
+
+	if (! pPin && ulPinLen)
 		return (CKR_ARGUMENTS_BAD);
-	}
-	if (! pLabel) {
+
+	if (! pLabel)
 		return (CKR_ARGUMENTS_BAD);
-	}
-	if (FuncList.ST_InitToken) {
+
+	if (!global_shm->token_available)
+		return (CKR_SLOT_ID_INVALID);
+
+	if (FuncList.ST_InitToken)
 		rv = FuncList.ST_InitToken(slotID, pPin, ulPinLen, pLabel);
-	} else {
+	else
 		rv = CKR_FUNCTION_NOT_SUPPORTED;
-	}
+
 	return (rv);
 }
 
@@ -1752,22 +1767,22 @@ C_OpenSession(
 	CK_RV rv;
 	Session_Struct_t  *apiSessp;
 
-	if (API_Initialized() == FALSE) {
+	if (API_Initialized() == FALSE)
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
-	}
-	if (slotID > NUMBER_SLOTS_MANAGED) {
+
+	if (!global_shm->token_available || (slotID > NUMBER_SLOTS_MANAGED))
 		return (CKR_SLOT_ID_INVALID);
-	}
-	if (! phSession) {
+
+	if (! phSession)
 		return (CKR_FUNCTION_FAILED);
-	}
-	if ((flags & CKF_SERIAL_SESSION) == 0) {
+
+	if ((flags & CKF_SERIAL_SESSION) == 0)
 		return (CKR_SESSION_PARALLEL_NOT_SUPPORTED);
-	}
+
 	if ((apiSessp = (Session_Struct_t *)malloc(
-	    sizeof (Session_Struct_t))) == NULL) {
+	    sizeof (Session_Struct_t))) == NULL)
 		return (CKR_HOST_MEMORY);
-	}
+
 	if (FuncList.ST_OpenSession) {
 		rv = FuncList.ST_OpenSession(slotID, flags,
 		    &(apiSessp->RealHandle));

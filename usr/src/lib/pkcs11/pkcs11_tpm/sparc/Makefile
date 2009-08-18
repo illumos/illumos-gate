@@ -21,25 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
 
-# packaging files
-i copyright
-i depend
-i pkginfo
-i postinstall
-i preremove
+include ../Makefile.com
 
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
-#
-#
-# source locations relative to the prototype file
-#
-# SUNWtpm
-#
+install: all $(ROOTLIBS) $(ROOTLINKS) 
