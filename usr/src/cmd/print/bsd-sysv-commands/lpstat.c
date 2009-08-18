@@ -414,7 +414,6 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 				int i = 0;
 				int32_t jobid = 0;
 				int32_t jstate = 0;
-				int flag = 0;
 
 				for (i = 0; j[i] != NULL; ++i) {
 					papi_attribute_t **attr =
@@ -424,18 +423,33 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 					    NULL, "job-state", &jstate);
 					papiAttributeListGetInteger(attr,
 					    NULL, "job-id", &jobid);
+					/*
+					 * For lpd protocol "job-id-requested"
+					 * should be read.
+					 */
+					papiAttributeListGetInteger(attr,
+					    NULL, "job-id-requested", &jobid);
 
 					/*
-					 * If the job-state is in
-					 * RS_PRINTING then only print.
+					 * When lpd protocol is used job-state
+					 * cannot be retrieved, therefore
+					 * job-state will be 0.
+					 * When ipp protocol is used, the
+					 * active/printing job-state will be
+					 * RS_PRINTING (0x0008) post s10u5.
+					 * For pre-s10u5 job-state will be
+					 * RS_ACTIVE (0x05). So print only when
+					 * the job-state is RS_PRINTING (0x0008)
+					 * or RS_ACTIVE (0x05) or 0
 					 */
-					if (jstate == 0x0008) {
-						if (flag == 0)
-							printf(gettext
-							    ("now printing"\
-							    " %s-%d. enabled"),
-							    name, jobid);
-						flag = 1;
+					if ((jstate == 0x0008) ||
+					    (jstate == 0x05) ||
+					    (jstate == 0)) {
+						printf(gettext
+						    ("now printing"\
+						    " %s-%d. enabled"),
+						    name, jobid);
+						break;
 					}
 				}
 				papiJobListFree(j);
