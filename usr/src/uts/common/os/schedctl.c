@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -333,14 +331,15 @@ schedctl_sigblock(kthread_t *t)
  * its signal mask to block all maskable signals, then clear the
  * sc_sigblock field.  This finishes what user-level code requested
  * to be done when it set tdp->sc_shared->sc_sigblock non-zero.
- * Called by signal-related code that holds the process's p_lock.
+ * Called from signal-related code either by the current thread for
+ * itself or by a thread that holds the process's p_lock (/proc code).
  */
 void
 schedctl_finish_sigblock(kthread_t *t)
 {
 	sc_shared_t *tdp = t->t_schedctl;
 
-	ASSERT(MUTEX_HELD(&ttoproc(t)->p_lock));
+	ASSERT(t == curthread || MUTEX_HELD(&ttoproc(t)->p_lock));
 
 	if (tdp != NULL && tdp->sc_sigblock) {
 		t->t_hold.__sigbits[0] = FILLSET0 & ~CANTMASK0;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,15 +20,12 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -163,14 +159,14 @@ restorecontext(ucontext_t *ucp)
 	}
 
 	if (ucp->uc_flags & UC_SIGMASK) {
-		proc_t *p = ttoproc(t);
-
-		mutex_enter(&p->p_lock);
+		/*
+		 * We don't need to acquire p->p_lock here;
+		 * we are manipulating thread-private data.
+		 */
 		schedctl_finish_sigblock(t);
 		sigutok(&ucp->uc_sigmask, &t->t_hold);
-		if (sigcheck(p, t))
+		if (sigcheck(ttoproc(t), t))
 			t->t_sig_check = 1;
-		mutex_exit(&p->p_lock);
 	}
 }
 
@@ -202,12 +198,7 @@ getsetcontext(int flag, void *arg)
 		return (set_errno(EINVAL));
 
 	case GETCONTEXT:
-		if (schedctl_sigblock(curthread)) {
-			proc_t *p = ttoproc(curthread);
-			mutex_enter(&p->p_lock);
-			schedctl_finish_sigblock(curthread);
-			mutex_exit(&p->p_lock);
-		}
+		schedctl_finish_sigblock(curthread);
 		savecontext(&uc, curthread->t_hold);
 		/*
 		 * When using floating point it should not be possible to
@@ -453,12 +444,7 @@ getsetcontext32(int flag, void *arg)
 		return (set_errno(EINVAL));
 
 	case GETCONTEXT:
-		if (schedctl_sigblock(curthread)) {
-			proc_t *p = ttoproc(curthread);
-			mutex_enter(&p->p_lock);
-			schedctl_finish_sigblock(curthread);
-			mutex_exit(&p->p_lock);
-		}
+		schedctl_finish_sigblock(curthread);
 		savecontext32(&uc, curthread->t_hold, NULL);
 		/*
 		 * When using floating point it should not be possible to
@@ -530,8 +516,7 @@ getsetcontext32(int flag, void *arg)
 			 * bytes to copy out.  We just *know* that wbcnt
 			 * is the first element of the structure.
 			 */
-			gwin = kmem_zalloc(sizeof (gwindows32_t),
-							KM_SLEEP);
+			gwin = kmem_zalloc(sizeof (gwindows32_t), KM_SLEEP);
 			if (copyin((void *)(uintptr_t)uc.uc_mcontext.gwins,
 			    &gwin->wbcnt, sizeof (gwin->wbcnt))) {
 				kmem_free(gwin, sizeof (gwindows32_t));

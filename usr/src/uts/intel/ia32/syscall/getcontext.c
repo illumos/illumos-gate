@@ -18,16 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -166,14 +164,14 @@ restorecontext(ucontext_t *ucp)
 		setfpregs(lwp, &ucp->uc_mcontext.fpregs);
 
 	if (ucp->uc_flags & UC_SIGMASK) {
-		proc_t *p = ttoproc(t);
-
-		mutex_enter(&p->p_lock);
+		/*
+		 * We don't need to acquire p->p_lock here;
+		 * we are manipulating thread-private data.
+		 */
 		schedctl_finish_sigblock(t);
 		sigutok(&ucp->uc_sigmask, &t->t_hold);
-		if (sigcheck(p, t))
+		if (sigcheck(ttoproc(t), t))
 			t->t_sig_check = 1;
-		mutex_exit(&p->p_lock);
 	}
 }
 
@@ -199,12 +197,7 @@ getsetcontext(int flag, void *arg)
 		return (set_errno(EINVAL));
 
 	case GETCONTEXT:
-		if (schedctl_sigblock(curthread)) {
-			proc_t *p = ttoproc(curthread);
-			mutex_enter(&p->p_lock);
-			schedctl_finish_sigblock(curthread);
-			mutex_exit(&p->p_lock);
-		}
+		schedctl_finish_sigblock(curthread);
 		savecontext(&uc, curthread->t_hold);
 		if (copyout(&uc, arg, sizeof (uc)))
 			return (set_errno(EFAULT));
@@ -331,12 +324,7 @@ getsetcontext32(int flag, void *arg)
 		return (set_errno(EINVAL));
 
 	case GETCONTEXT:
-		if (schedctl_sigblock(curthread)) {
-			proc_t *p = ttoproc(curthread);
-			mutex_enter(&p->p_lock);
-			schedctl_finish_sigblock(curthread);
-			mutex_exit(&p->p_lock);
-		}
+		schedctl_finish_sigblock(curthread);
 		savecontext32(&uc, curthread->t_hold);
 		if (copyout(&uc, arg, sizeof (uc)))
 			return (set_errno(EFAULT));

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,7 +229,6 @@ int
 sigresend(int sig, siginfo_t *siginfo, sigset_t *mask)
 {
 	kthread_t *t = curthread;
-	proc_t *p = ttoproc(t);
 	klwp_t *lwp = ttolwp(t);
 	sigqueue_t *sqp = kmem_zalloc(sizeof (*sqp), KM_SLEEP);
 	sigset_t set;
@@ -261,9 +260,11 @@ sigresend(int sig, siginfo_t *siginfo, sigset_t *mask)
 	}
 	sigutok(&set, &kset);
 
-	mutex_enter(&p->p_lock);
+	/*
+	 * We don't need to acquire p->p_lock here;
+	 * we are manipulating thread-private data.
+	 */
 	if (lwp->lwp_cursig || lwp->lwp_curinfo) {
-		mutex_exit(&p->p_lock);
 		t->t_sig_check = 1;
 		error = EAGAIN;
 		goto bad;
@@ -272,8 +273,6 @@ sigresend(int sig, siginfo_t *siginfo, sigset_t *mask)
 	lwp->lwp_curinfo = sqp;
 	schedctl_finish_sigblock(t);
 	t->t_hold = kset;
-	mutex_exit(&p->p_lock);
-
 	t->t_sig_check = 1;
 	return (0);
 bad:

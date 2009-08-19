@@ -2535,48 +2535,152 @@ trapsig(k_siginfo_t *ip, int restartable)
 }
 
 /*
+ * Dispatch the real time profiling signal in the traditional way,
+ * honoring all of the /proc tracing mechanism built into issig().
+ */
+static void
+realsigprof_slow(int sysnum, int nsysarg, int error)
+{
+	kthread_t *t = curthread;
+	proc_t *p = ttoproc(t);
+	klwp_t *lwp = ttolwp(t);
+	k_siginfo_t *sip = &lwp->lwp_siginfo;
+	void (*func)();
+
+	mutex_enter(&p->p_lock);
+	func = PTOU(p)->u_signal[SIGPROF - 1];
+	if (p->p_rprof_cyclic == CYCLIC_NONE ||
+	    func == SIG_DFL || func == SIG_IGN) {
+		bzero(t->t_rprof, sizeof (*t->t_rprof));
+		mutex_exit(&p->p_lock);
+		return;
+	}
+	if (sigismember(&t->t_hold, SIGPROF)) {
+		mutex_exit(&p->p_lock);
+		return;
+	}
+	sip->si_signo = SIGPROF;
+	sip->si_code = PROF_SIG;
+	sip->si_errno = error;
+	hrt2ts(gethrtime(), &sip->si_tstamp);
+	sip->si_syscall = sysnum;
+	sip->si_nsysarg = nsysarg;
+	sip->si_fault = lwp->lwp_lastfault;
+	sip->si_faddr = lwp->lwp_lastfaddr;
+	lwp->lwp_lastfault = 0;
+	lwp->lwp_lastfaddr = NULL;
+	sigtoproc(p, t, SIGPROF);
+	mutex_exit(&p->p_lock);
+	ASSERT(lwp->lwp_cursig == 0);
+	if (issig(FORREAL))
+		psig();
+	sip->si_signo = 0;
+	bzero(t->t_rprof, sizeof (*t->t_rprof));
+}
+
+/*
+ * We are not tracing the SIGPROF signal, or doing any other unnatural
+ * acts, like watchpoints, so dispatch the real time profiling signal
+ * directly, bypassing all of the overhead built into issig().
+ */
+static void
+realsigprof_fast(int sysnum, int nsysarg, int error)
+{
+	kthread_t *t = curthread;
+	proc_t *p = ttoproc(t);
+	klwp_t *lwp = ttolwp(t);
+	k_siginfo_t *sip = &lwp->lwp_siginfo;
+	void (*func)();
+	int rc;
+	int code;
+
+	/*
+	 * We don't need to acquire p->p_lock here;
+	 * we are manipulating thread-private data.
+	 */
+	func = PTOU(p)->u_signal[SIGPROF - 1];
+	if (p->p_rprof_cyclic == CYCLIC_NONE ||
+	    func == SIG_DFL || func == SIG_IGN) {
+		bzero(t->t_rprof, sizeof (*t->t_rprof));
+		return;
+	}
+	if (lwp->lwp_cursig != 0 ||
+	    lwp->lwp_curinfo != NULL ||
+	    sigismember(&t->t_hold, SIGPROF)) {
+		return;
+	}
+	sip->si_signo = SIGPROF;
+	sip->si_code = PROF_SIG;
+	sip->si_errno = error;
+	hrt2ts(gethrtime(), &sip->si_tstamp);
+	sip->si_syscall = sysnum;
+	sip->si_nsysarg = nsysarg;
+	sip->si_fault = lwp->lwp_lastfault;
+	sip->si_faddr = lwp->lwp_lastfaddr;
+	lwp->lwp_lastfault = 0;
+	lwp->lwp_lastfaddr = NULL;
+	if (t->t_flag & T_TOMASK)
+		t->t_flag &= ~T_TOMASK;
+	else
+		lwp->lwp_sigoldmask = t->t_hold;
+	sigorset(&t->t_hold, &PTOU(p)->u_sigmask[SIGPROF - 1]);
+	if (!sigismember(&PTOU(p)->u_signodefer, SIGPROF))
+		sigaddset(&t->t_hold, SIGPROF);
+	lwp->lwp_extsig = 0;
+	lwp->lwp_ru.nsignals++;
+	if (p->p_model == DATAMODEL_NATIVE)
+		rc = sendsig(SIGPROF, sip, func);
+#ifdef _SYSCALL32_IMPL
+	else
+		rc = sendsig32(SIGPROF, sip, func);
+#endif	/* _SYSCALL32_IMPL */
+	sip->si_signo = 0;
+	bzero(t->t_rprof, sizeof (*t->t_rprof));
+	if (rc == 0) {
+		/*
+		 * sendsig() failed; we must dump core with a SIGSEGV.
+		 * See psig().  This code is copied from there.
+		 */
+		lwp->lwp_cursig = SIGSEGV;
+		code = CLD_KILLED;
+		proc_is_exiting(p);
+		if (exitlwps(1) != 0) {
+			mutex_enter(&p->p_lock);
+			lwp_exit();
+		}
+		if (audit_active)
+			audit_core_start(SIGSEGV);
+		if (core(SIGSEGV, 0) == 0)
+			code = CLD_DUMPED;
+		if (audit_active)
+			audit_core_finish(code);
+		exit(code, SIGSEGV);
+	}
+}
+
+/*
  * Arrange for the real time profiling signal to be dispatched.
  */
 void
 realsigprof(int sysnum, int nsysarg, int error)
 {
-	proc_t *p;
-	klwp_t *lwp;
+	kthread_t *t = curthread;
+	proc_t *p = ttoproc(t);
 
-	if (curthread->t_rprof->rp_anystate == 0)
+	if (t->t_rprof->rp_anystate == 0)
 		return;
-	p = ttoproc(curthread);
-	lwp = ttolwp(curthread);
-	mutex_enter(&p->p_lock);
-	if (p->p_rprof_cyclic == CYCLIC_NONE) {
-		bzero(curthread->t_rprof, sizeof (*curthread->t_rprof));
-		mutex_exit(&p->p_lock);
-		return;
+
+	schedctl_finish_sigblock(t);
+
+	/* test for any activity that requires p->p_lock */
+	if (tracing(p, SIGPROF) || pr_watch_active(p) ||
+	    sigismember(&PTOU(p)->u_sigresethand, SIGPROF)) {
+		/* do it the classic slow way */
+		realsigprof_slow(sysnum, nsysarg, error);
+	} else {
+		/* do it the cheating-a-little fast way */
+		realsigprof_fast(sysnum, nsysarg, error);
 	}
-	if (sigismember(&p->p_ignore, SIGPROF) ||
-	    signal_is_blocked(curthread, SIGPROF)) {
-		mutex_exit(&p->p_lock);
-		return;
-	}
-	lwp->lwp_siginfo.si_signo = SIGPROF;
-	lwp->lwp_siginfo.si_code = PROF_SIG;
-	lwp->lwp_siginfo.si_errno = error;
-	hrt2ts(gethrtime(), &lwp->lwp_siginfo.si_tstamp);
-	lwp->lwp_siginfo.si_syscall = sysnum;
-	lwp->lwp_siginfo.si_nsysarg = nsysarg;
-	lwp->lwp_siginfo.si_fault = lwp->lwp_lastfault;
-	lwp->lwp_siginfo.si_faddr = lwp->lwp_lastfaddr;
-	lwp->lwp_lastfault = 0;
-	lwp->lwp_lastfaddr = NULL;
-	sigtoproc(p, curthread, SIGPROF);
-	mutex_exit(&p->p_lock);
-	ASSERT(lwp->lwp_cursig == 0);
-	if (issig(FORREAL))
-		psig();
-	mutex_enter(&p->p_lock);
-	lwp->lwp_siginfo.si_signo = 0;
-	bzero(curthread->t_rprof, sizeof (*curthread->t_rprof));
-	mutex_exit(&p->p_lock);
 }
 
 #ifdef _SYSCALL32_IMPL
