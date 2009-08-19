@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -41,8 +39,19 @@ extern md_set_t	md_set[];
 extern int	*md_nm_snarfed;
 void		*lookup_entry(struct nm_next_hdr *, set_t,
 			side_t, mdkey_t, md_dev64_t, int);
+void		*lookup_entry_common(struct nm_next_hdr *, set_t,
+			side_t, mdkey_t, md_dev64_t, int, void **, size_t *);
+void		*lookup_entry_record_offset(struct nm_next_hdr *, set_t,
+			side_t, mdkey_t, md_dev64_t, int, void *, size_t *);
+
 void		*lookup_shared_entry(struct nm_next_hdr *,
 			mdkey_t, char *, mddb_recid_t *, int);
+void		*lookup_shared_entry_common(struct nm_next_hdr *,
+			mdkey_t, char *, mddb_recid_t *, int, void **,
+			size_t *);
+void		*lookup_shared_entry_record_offset(struct nm_next_hdr *,
+			mdkey_t, char *, mddb_recid_t *, int, void *, size_t *);
+
 static void	add_to_devid_list(ddi_devid_t did);
 static int	devid_is_unique(ddi_devid_t did);
 static size_t	free_devid_list(int *count);
@@ -128,7 +137,7 @@ unused_key(struct nm_next_hdr *nh, int shared, mdkey_t key)
 		return (0);
 
 	if ((shared & NM_SHARED) && (lookup_shared_entry(nh, key, (char *)0,
-		NULL, nmspace) != NULL))
+	    NULL, nmspace) != NULL))
 		return (0);
 
 	/*
@@ -136,7 +145,7 @@ unused_key(struct nm_next_hdr *nh, int shared, mdkey_t key)
 	 * we dont keep track of the nonshared in the devid nmspace
 	 */
 	if (!(shared & NM_NOTSHARED) &&
-		(lookup_entry(nh, 0, -1, key, NODEV64, 0L) != NULL))
+	    (lookup_entry(nh, 0, -1, key, NODEV64, 0L) != NULL))
 		return (0);
 
 	return (1);
@@ -193,8 +202,8 @@ create_hdr(set_t setno, int shared)
 		 * Deal with the device id name space
 		 */
 		nmid = md_set[setno].s_did_nmid =
-			mddb_createrec(sizeof (struct nm_header),
-				MDDB_DID_NM_HDR, 1, MD_CRO_32BIT, setno);
+		    mddb_createrec(sizeof (struct nm_header),
+		    MDDB_DID_NM_HDR, 1, MD_CRO_32BIT, setno);
 		/*
 		 * Out of space
 		 */
@@ -202,8 +211,8 @@ create_hdr(set_t setno, int shared)
 			return (nmid);
 	} else {
 		nmid = md_set[setno].s_nmid =
-			mddb_createrec(sizeof (struct nm_header),
-				MDDB_NM_HDR, 1, MD_CRO_32BIT, setno);
+		    mddb_createrec(sizeof (struct nm_header),
+		    MDDB_NM_HDR, 1, MD_CRO_32BIT, setno);
 		/*
 		 * Out of space
 		 */
@@ -262,28 +271,28 @@ create_record(
 		 * Device id name space
 		 */
 		rec_type = ((shared & NM_SHARED) ?
-			MDDB_DID_SHR_NM : MDDB_DID_NM);
+		    MDDB_DID_SHR_NM : MDDB_DID_NM);
 		used_size = ((shared & NM_SHARED) ?
-			(sizeof (struct devid_shr_rec) -
-				sizeof (struct did_shr_name)) :
-			(sizeof (struct devid_min_rec) -
-				sizeof (struct did_min_name)));
+		    (sizeof (struct devid_shr_rec) -
+		    sizeof (struct did_shr_name)) :
+		    (sizeof (struct devid_min_rec) -
+		    sizeof (struct did_min_name)));
 		alloc_size = ((shared & NM_SHARED) ?
-			NM_DID_ALLOC_SIZE : NM_ALLOC_SIZE);
+		    NM_DID_ALLOC_SIZE : NM_ALLOC_SIZE);
 	} else {
 		rec_type = ((shared & NM_SHARED) ?
-			MDDB_SHR_NM : MDDB_NM);
+		    MDDB_SHR_NM : MDDB_NM);
 		used_size = ((shared & NM_SHARED) ?
-			(sizeof (struct nm_shr_rec) -
-				sizeof (struct nm_shared_name)) :
-			(sizeof (struct nm_rec) - sizeof (struct nm_name)));
+		    (sizeof (struct nm_shr_rec) -
+		    sizeof (struct nm_shared_name)) :
+		    (sizeof (struct nm_rec) - sizeof (struct nm_name)));
 		alloc_size = NM_ALLOC_SIZE;
 	}
 
 	used_size += needed_space;
 
 	new_id = mddb_createrec((size_t)alloc_size, rec_type, 1,
-		MD_CRO_32BIT, setno);
+	    MD_CRO_32BIT, setno);
 	if (new_id < 0)
 		return (new_id);
 
@@ -297,7 +306,7 @@ create_record(
 
 	((struct nm_rec_hdr *)new_nh->nmn_record)->r_alloc_size = alloc_size;
 	((struct nm_rec_hdr *)new_nh->nmn_record)->r_used_size =
-		(uint_t)used_size;
+	    (uint_t)used_size;
 
 	mddb_commitrecs_wrapper(recids);
 	return (0);
@@ -312,7 +321,7 @@ expand_record(
 {
 	struct nm_rec_hdr	*rh = (struct nm_rec_hdr *)nh->nmn_record;
 	struct nm_rec_hdr	*parent_rh = (struct nm_rec_hdr *)
-						parent_nh->nmn_record;
+	    parent_nh->nmn_record;
 	struct nm_rec_hdr	*new_rh;
 	void			*new_rec;
 	mddb_recid_t		new_id;
@@ -329,16 +338,16 @@ expand_record(
 		 * Device id name space
 		 */
 		rec_type = ((shared & NM_SHARED) ?
-			MDDB_DID_SHR_NM : MDDB_DID_NM);
+		    MDDB_DID_SHR_NM : MDDB_DID_NM);
 		alloc_size = ((shared & NM_SHARED) ?
-			NM_DID_ALLOC_SIZE : NM_ALLOC_SIZE);
+		    NM_DID_ALLOC_SIZE : NM_ALLOC_SIZE);
 	} else {
 		rec_type = ((shared & NM_SHARED) ? MDDB_SHR_NM : MDDB_NM);
 		alloc_size = NM_ALLOC_SIZE;
 	}
 
 	new_id = mddb_createrec((size_t)rh->r_alloc_size + alloc_size, rec_type,
-			1, MD_CRO_32BIT, setno);
+	    1, MD_CRO_32BIT, setno);
 	/*
 	 * No space
 	 */
@@ -465,12 +474,12 @@ alloc_entry(
 		 * Device id name space
 		 */
 		needed_space = ((shared & NM_SHARED) ?
-			sizeof (struct did_shr_name) :
-			sizeof (struct did_min_name)) + len - 1;
+		    sizeof (struct did_shr_name) :
+		    sizeof (struct did_min_name)) + len - 1;
 	else
 		needed_space = ((shared & NM_SHARED) ?
-			sizeof (struct nm_shared_name) :
-			sizeof (struct nm_name)) + len - 1;
+		    sizeof (struct nm_shared_name) :
+		    sizeof (struct nm_name)) + len - 1;
 
 	needed_space = roundup(needed_space, sizeof (uint_t));
 
@@ -484,13 +493,16 @@ alloc_entry(
 			this_rec = this_nh->nmn_record;
 
 			if (shared & NM_DEVID)
-			    this_rh = ((shared & NM_SHARED) ?
-			    &((struct devid_shr_rec *)this_rec)->did_rec_hdr :
-			    &((struct devid_min_rec *)this_rec)->min_rec_hdr);
+				this_rh = ((shared & NM_SHARED) ?
+				    &((struct devid_shr_rec *)
+				    this_rec)->did_rec_hdr :
+				    &((struct devid_min_rec *)
+				    this_rec)->min_rec_hdr);
 			else
-			    this_rh = ((shared & NM_SHARED) ?
-			    &((struct nm_shr_rec *)this_rec)->sr_rec_hdr :
-			    &((struct nm_rec *)this_rec)->r_rec_hdr);
+				this_rh = ((shared & NM_SHARED) ?
+				    &((struct nm_shr_rec *)
+				    this_rec)->sr_rec_hdr :
+				    &((struct nm_rec *)this_rec)->r_rec_hdr);
 
 			/* check for space in this record */
 			if ((this_rh->r_alloc_size - this_rh->r_used_size) >=
@@ -530,7 +542,7 @@ get_next_entry(
 {
 
 	if (((struct nm_rec_hdr *)nh->nmn_record)->r_used_size <=
-			(*off + ent_size)) {
+	    (*off + ent_size)) {
 		if (nh->nmn_nextp == NULL)
 			return ((caddr_t)0);
 
@@ -555,8 +567,8 @@ rem_entry(
 	struct nm_next_hdr	*first_nh;
 	mddb_recid_t		recids[3];
 	size_t			c = ((struct nm_rec_hdr *)
-				    nh->nmn_record)->r_used_size - offset -
-				    ent_size;
+	    nh->nmn_record)->r_used_size - offset -
+	    ent_size;
 	set_t			setno;
 	mdkey_t			ent_key;
 
@@ -567,11 +579,11 @@ rem_entry(
 
 	recids[0] = id;
 	recids[1] = ((devid_nm & NM_DEVID) ? md_set[setno].s_did_nmid :
-		md_set[setno].s_nmid);
+	    md_set[setno].s_nmid);
 	recids[2] = 0;
 	ent_key = ((devid_nm & NM_DEVID) ?
-		((struct did_min_name *)ent)->min_key :
-		((struct nm_name *)ent)->n_key);
+	    ((struct did_min_name *)ent)->min_key :
+	    ((struct nm_name *)ent)->n_key);
 
 	if (c == 0)
 		(void) bzero(ent, ent_size);	/* last entry */
@@ -604,8 +616,8 @@ rem_shr_entry(
 	struct nm_next_hdr	*first_nh;
 	mddb_recid_t		recids[3];
 	size_t			c = ((struct nm_rec_hdr *)
-				    nh->nmn_record)->r_used_size - offset -
-				    ent_size;
+	    nh->nmn_record)->r_used_size - offset -
+	    ent_size;
 	set_t			setno;
 	uint_t			count;
 
@@ -615,7 +627,7 @@ rem_shr_entry(
 
 	recids[0] = id;
 	recids[1] = ((devid_nm & NM_DEVID) ? md_set[setno].s_did_nmid :
-		md_set[setno].s_nmid);
+	    md_set[setno].s_nmid);
 	recids[2] = 0;
 
 	if (devid_nm & NM_DEVID) {
@@ -628,8 +640,8 @@ rem_shr_entry(
 		mdkey_t	ent_key;
 
 		ent_key = ((devid_nm & NM_DEVID) ?
-			((struct did_shr_name *)ent)->did_key :
-			((struct nm_shared_name *)ent)->sn_key);
+		    ((struct did_shr_name *)ent)->did_key :
+		    ((struct nm_shared_name *)ent)->sn_key);
 
 		if (c == 0)
 			(void) bzero(ent, ent_size);	/* last entry */
@@ -639,7 +651,7 @@ rem_shr_entry(
 		}
 
 		((struct nm_rec_hdr *)nh->nmn_record)->r_used_size -=
-			(uint_t)ent_size;
+		    (uint_t)ent_size;
 		destroy_key(first_nh, devid_nm | NM_SHARED, ent_key);
 	}
 
@@ -704,8 +716,8 @@ setshared_name(set_t setno, char *shrname, mdkey_t shrkey, int devid_nm)
 
 		/* allocate an entry and fill it in */
 		if ((did_shn = (struct did_shr_name *)alloc_entry(nh,
-			md_set[setno].s_did_nmid, len, shared | NM_DEVID,
-			&recid)) == NULL)
+		    md_set[setno].s_did_nmid, len, shared | NM_DEVID,
+		    &recid)) == NULL)
 			return (MD_KEYBAD);
 		did_shn->did_key = create_key(nh);
 		did_shn->did_count = 1;
@@ -718,7 +730,7 @@ setshared_name(set_t setno, char *shrname, mdkey_t shrkey, int devid_nm)
 		key = did_shn->did_key;
 	} else {
 		if ((shn = (struct nm_shared_name *)lookup_shared_entry(nh,
-			0, shrname, &recid, 0L)) != NULL) {
+		    0, shrname, &recid, 0L)) != NULL) {
 			/* Increment reference count */
 			shn->sn_count++;
 			if (!(devid_nm & NM_NOCOMMIT))
@@ -739,7 +751,7 @@ setshared_name(set_t setno, char *shrname, mdkey_t shrkey, int devid_nm)
 
 	recids[0] = recid;
 	recids[1] = ((devid_nm & NM_DEVID) ? md_set[setno].s_did_nmid :
-			md_set[setno].s_nmid);
+	    md_set[setno].s_nmid);
 	recids[2] = 0;
 
 	if (!(devid_nm & NM_NOCOMMIT))
@@ -758,15 +770,15 @@ getshared_name(set_t setno, mdkey_t shrkey, int devid_nm)
 		return ((void *)0);
 
 	shn = (char *)((devid_nm & NM_DEVID) ?
-		lookup_shared_entry(nh, shrkey, (char *)0, &recid, devid_nm) :
-		lookup_shared_entry(nh, shrkey, (char *)0, &recid, 0L));
+	    lookup_shared_entry(nh, shrkey, (char *)0, &recid, devid_nm) :
+	    lookup_shared_entry(nh, shrkey, (char *)0, &recid, 0L));
 
 	if (shn == NULL)
 		return ((void *)0);
 
 	return ((void *)((devid_nm & NM_DEVID) ?
-		((struct did_shr_name *)shn)->did_devid :
-		((struct nm_shared_name *)shn)->sn_name));
+	    ((struct did_shr_name *)shn)->did_devid :
+	    ((struct nm_shared_name *)shn)->sn_name));
 }
 
 static mdkey_t
@@ -785,8 +797,8 @@ getshared_key(set_t setno, char *shrname, int devid_nm)
 		return (MD_KEYBAD);
 
 	return (((devid_nm & NM_DEVID) ?
-		((struct did_shr_name *)shn)->did_key :
-		((struct nm_shared_name *)shn)->sn_key));
+	    ((struct did_shr_name *)shn)->did_key :
+	    ((struct nm_shared_name *)shn)->sn_key));
 }
 
 static int
@@ -800,7 +812,7 @@ setshared_data(set_t setno, mdkey_t shrkey, caddr_t data)
 		return (ENOENT);
 
 	shn = (struct nm_shared_name *)lookup_shared_entry(nh, shrkey,
-		(char *)0, &recid, 0L);
+	    (char *)0, &recid, 0L);
 	if (shn == NULL)
 		return (ENOENT);
 	shn->sn_data = (uint32_t)(uintptr_t)data;
@@ -825,17 +837,17 @@ update_entry(
 	side_t			n_side;
 
 	n_offset = offset = ((devid_nm & NM_DEVID) ?
-		(sizeof (struct devid_min_rec) - sizeof (struct did_min_name))
-				:
-		(sizeof (struct nm_rec) - sizeof (struct nm_name)));
+	    (sizeof (struct devid_min_rec) - sizeof (struct did_min_name))
+	    :
+	    (sizeof (struct nm_rec) - sizeof (struct nm_name)));
 
 	this_rh = ((devid_nm & NM_DEVID) ?
-		&((struct devid_min_rec *)record)->min_rec_hdr :
-		&((struct nm_rec *)record)->r_rec_hdr);
+	    &((struct devid_min_rec *)record)->min_rec_hdr :
+	    &((struct nm_rec *)record)->r_rec_hdr);
 
 	n = ((devid_nm & NM_DEVID) ?
-		((caddr_t)&((struct devid_min_rec *)record)->minor_name[0]) :
-		((caddr_t)&((struct nm_rec *)record)->r_name[0]));
+	    ((caddr_t)&((struct devid_min_rec *)record)->minor_name[0]) :
+	    ((caddr_t)&((struct nm_rec *)record)->r_name[0]));
 
 	/*CONSTCOND*/
 	while (1) {
@@ -872,10 +884,10 @@ update_entry(
 			    :
 			    &((struct nm_rec *)record)->r_rec_hdr);
 			n = ((devid_nm & NM_DEVID) ?
-				((caddr_t)&((struct devid_min_rec *)
-					record)->minor_name[0]) :
-				((caddr_t)&((struct nm_rec *)
-					record)->r_name[0]));
+			    ((caddr_t)&((struct devid_min_rec *)
+			    record)->minor_name[0]) :
+			    ((caddr_t)&((struct nm_rec *)
+			    record)->r_name[0]));
 		}
 	}
 	/*NOTREACHED*/
@@ -899,17 +911,17 @@ remove_entry(
 	side_t			n_side;
 
 	n_offset = offset = ((devid_nm & NM_DEVID) ?
-		(sizeof (struct devid_min_rec) - sizeof (struct did_min_name))
-				:
-		(sizeof (struct nm_rec) - sizeof (struct nm_name)));
+	    (sizeof (struct devid_min_rec) - sizeof (struct did_min_name))
+	    :
+	    (sizeof (struct nm_rec) - sizeof (struct nm_name)));
 
 	this_rh = ((devid_nm & NM_DEVID) ?
-		&((struct devid_min_rec *)record)->min_rec_hdr :
-		&((struct nm_rec *)record)->r_rec_hdr);
+	    &((struct devid_min_rec *)record)->min_rec_hdr :
+	    &((struct nm_rec *)record)->r_rec_hdr);
 
 	n = ((devid_nm & NM_DEVID) ?
-		((caddr_t)&((struct devid_min_rec *)record)->minor_name[0]) :
-		((caddr_t)&((struct nm_rec *)record)->r_name[0]));
+	    ((caddr_t)&((struct devid_min_rec *)record)->minor_name[0]) :
+	    ((caddr_t)&((struct nm_rec *)record)->r_name[0]));
 
 	/*CONSTCOND*/
 	while (1) {
@@ -926,7 +938,7 @@ remove_entry(
 
 		if ((side == n_side) && (key == n_key))
 			return (rem_entry(this_nh, recid, (char *)n, n_size,
-				offset, devid_nm));
+			    offset, devid_nm));
 
 		n = (caddr_t)get_next_entry(this_nh, n, n_size, &offset);
 
@@ -940,14 +952,14 @@ remove_entry(
 			record = this_nh->nmn_record;
 			recid = this_rh->r_next_recid;
 			this_rh = ((devid_nm & NM_DEVID) ?
-				&((struct devid_min_rec *)record)->min_rec_hdr
-					:
-				&((struct nm_rec *)record)->r_rec_hdr);
+			    &((struct devid_min_rec *)record)->min_rec_hdr
+			    :
+			    &((struct nm_rec *)record)->r_rec_hdr);
 			n = ((devid_nm & NM_DEVID) ?
-				((caddr_t)&((struct devid_min_rec *)
-					record)->minor_name[0]) :
-				((caddr_t)&((struct nm_rec *)
-					record)->r_name[0]));
+			    ((caddr_t)&((struct devid_min_rec *)
+			    record)->minor_name[0]) :
+			    ((caddr_t)&((struct nm_rec *)
+			    record)->r_name[0]));
 		}
 	}
 	/*NOTREACHED*/
@@ -980,22 +992,22 @@ remove_shared_entry(
 	} else {
 		/* How long is the name? */
 		nm_len = ((devid_nm & NM_DEVID) ?
-			ddi_devid_sizeof((ddi_devid_t)nm) :
-			(strlen(nm) + 1));
+		    ddi_devid_sizeof((ddi_devid_t)nm) :
+		    (strlen(nm) + 1));
 	}
 
 	this_rh = ((devid_nm & NM_DEVID) ?
-		&((struct devid_shr_rec *)record)->did_rec_hdr :
-		&((struct nm_shr_rec *)record)->sr_rec_hdr);
+	    &((struct devid_shr_rec *)record)->did_rec_hdr :
+	    &((struct nm_shr_rec *)record)->sr_rec_hdr);
 
 	shn_offset = offset = ((devid_nm & NM_DEVID) ?
-		(sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name))
-			:
-		(sizeof (struct nm_shr_rec) - sizeof (struct nm_shared_name)));
+	    (sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name))
+	    :
+	    (sizeof (struct nm_shr_rec) - sizeof (struct nm_shared_name)));
 
 	shn = ((devid_nm & NM_DEVID) ?
-		((caddr_t)&((struct devid_shr_rec *)record)->device_id[0]) :
-		((caddr_t)&((struct nm_shr_rec *)record)->sr_name[0]));
+	    ((caddr_t)&((struct devid_shr_rec *)record)->device_id[0]) :
+	    ((caddr_t)&((struct nm_shr_rec *)record)->sr_name[0]));
 
 	/*CONSTCOND*/
 	while (1) {
@@ -1012,15 +1024,15 @@ remove_shared_entry(
 
 		if ((key != 0) && (key == shn_key))
 			return (rem_shr_entry(this_nh, recid, (char *)shn,
-				shn_size, offset, devid_nm));
+			    shn_size, offset, devid_nm));
 
 		if (nm_len == shn_namlen) {
 			if (!devid_nm) {
-			    if (strcmp(nm, ((struct nm_shared_name *)
-					shn)->sn_name) == 0)
+				if (strcmp(nm, ((struct nm_shared_name *)
+				    shn)->sn_name) == 0)
 				return (rem_shr_entry(this_nh, recid,
-					(char *)shn, shn_size, offset,
-					devid_nm));
+				    (char *)shn, shn_size, offset,
+				    devid_nm));
 			} else {
 
 				if (nm == NULL ||
@@ -1028,17 +1040,17 @@ remove_shared_entry(
 				    == NULL) {
 					return (0);
 				}
-			    if (ddi_devid_compare((ddi_devid_t)nm,
-				(ddi_devid_t)(((struct did_shr_name *)shn)->
-					did_devid)) == 0)
+				if (ddi_devid_compare((ddi_devid_t)nm,
+				    (ddi_devid_t)(((struct did_shr_name *)shn)->
+				    did_devid)) == 0)
 				return (rem_shr_entry(this_nh, recid,
-					(char *)shn, shn_size, offset,
-					devid_nm));
+				    (char *)shn, shn_size, offset,
+				    devid_nm));
 			}
 		}
 
 		shn = (caddr_t)get_next_entry(this_nh,
-			(caddr_t)shn, shn_size, &offset);
+		    (caddr_t)shn, shn_size, &offset);
 
 		if (shn == (caddr_t)0) {
 			if (offset)
@@ -1050,13 +1062,13 @@ remove_shared_entry(
 			record = this_nh->nmn_record;
 			recid = this_rh->r_next_recid;
 			this_rh = ((devid_nm & NM_DEVID) ?
-				&((struct devid_shr_rec *)record)->did_rec_hdr :
-				&((struct nm_shr_rec *)record)->sr_rec_hdr);
+			    &((struct devid_shr_rec *)record)->did_rec_hdr :
+			    &((struct nm_shr_rec *)record)->sr_rec_hdr);
 			shn = ((devid_nm & NM_DEVID) ?
-				((caddr_t)&((struct devid_shr_rec *)
-					record)->device_id[0]) :
-				((caddr_t)&((struct nm_shr_rec *)
-					record)->sr_name[0]));
+			    ((caddr_t)&((struct devid_shr_rec *)
+			    record)->device_id[0]) :
+			    ((caddr_t)&((struct nm_shr_rec *)
+			    record)->sr_name[0]));
 		}
 	}
 	/*NOTREACHED*/
@@ -1088,6 +1100,22 @@ build_device_number(set_t setno, struct nm_name *n)
 }
 
 void *
+lookup_entry_record_offset(
+struct	nm_next_hdr	*nh, /* head record header */
+	set_t		setno, /* set to lookup in */
+	side_t		side, /* (key 1) side number */
+	mdkey_t		key, /* (key 2) from md_setdevname */
+	md_dev64_t	dev, /* (alt. key 2) use if key == KEYWILD */
+	int		devid_nm, /* Which name space? */
+	void		*recp, /* pointer to the record containing the result */
+	size_t		*offsetp /* offset in the above record of result */
+)
+{
+	return (lookup_entry_common(nh, setno, side, key, dev, devid_nm,
+	    &recp, offsetp));
+}
+
+void *
 lookup_entry(
 	struct nm_next_hdr	*nh,	/* head record header */
 	set_t			setno,	/* set to lookup in */
@@ -1095,6 +1123,22 @@ lookup_entry(
 	mdkey_t			key,	/* (key 2) from md_setdevname */
 	md_dev64_t		dev,	/* (alt. key 2) use if key == KEYWILD */
 	int			devid_nm /* Which name space? */
+)
+{
+	return (lookup_entry_common(nh, setno, side, key, dev, devid_nm,
+	    NULL, NULL));
+}
+
+void *
+lookup_entry_common(
+	struct nm_next_hdr	*nh,	/* head record header */
+	set_t			setno,	/* set to lookup in */
+	side_t			side,	/* (key 1) side number */
+	mdkey_t			key,	/* (key 2) from md_setdevname */
+	md_dev64_t		dev,	/* (alt. key 2) use if key == KEYWILD */
+	int			devid_nm,	/* Which name space? */
+	void			**recp, /* record containing the result */
+	size_t			*offsetp /* offset in the record of result */
 )
 {
 	struct nm_next_hdr	*this_nh = nh->nmn_nextp;
@@ -1114,8 +1158,8 @@ lookup_entry(
 	record = this_nh->nmn_record;
 
 	this_rh = ((devid_nm & NM_DEVID) ?
-		&((struct devid_min_rec *)record)->min_rec_hdr :
-		&((struct nm_rec *)record)->r_rec_hdr);
+	    &((struct devid_min_rec *)record)->min_rec_hdr :
+	    &((struct nm_rec *)record)->r_rec_hdr);
 
 	/* code to see if EMPTY record */
 	while (this_nh && this_rh->r_used_size == sizeof (struct nm_rec_hdr)) {
@@ -1125,20 +1169,20 @@ lookup_entry(
 			return ((void *)0);
 		record = this_nh->nmn_record;
 		this_rh = ((devid_nm & NM_DEVID) ?
-			&((struct devid_min_rec *)record)->min_rec_hdr :
-			&((struct nm_rec *)record)->r_rec_hdr);
+		    &((struct devid_min_rec *)record)->min_rec_hdr :
+		    &((struct nm_rec *)record)->r_rec_hdr);
 	}
 
 	/*
 	 * n_offset will be used to reset offset
 	 */
 	n_offset = offset = ((devid_nm & NM_DEVID) ?
-		(sizeof (struct devid_min_rec) - sizeof (struct did_min_name)) :
-		(sizeof (struct nm_rec) - sizeof (struct nm_name)));
+	    (sizeof (struct devid_min_rec) - sizeof (struct did_min_name)) :
+	    (sizeof (struct nm_rec) - sizeof (struct nm_name)));
 
 	n = ((devid_nm & NM_DEVID) ?
-		((caddr_t)&((struct devid_min_rec *)record)->minor_name[0]) :
-		((caddr_t)&((struct nm_rec *)record)->r_name[0]));
+	    ((caddr_t)&((struct devid_min_rec *)record)->minor_name[0]) :
+	    ((caddr_t)&((struct nm_rec *)record)->r_name[0]));
 
 	/*CONSTCOND*/
 	while (1) {
@@ -1155,23 +1199,34 @@ lookup_entry(
 
 		if ((side == n_side) || (side == MD_SIDEWILD)) {
 
-			if ((key != MD_KEYWILD) && (key == n_key))
+			if ((key != MD_KEYWILD) && (key == n_key)) {
+				if (recp)
+					*recp = record;
+				if (offsetp)
+					*offsetp = offset;
 				return ((void *)n);
+			}
 
 			if ((key == MD_KEYWILD) && !devid_nm &&
 			    (dev == build_device_number(setno,
-			    (struct nm_name *)n)))
+			    (struct nm_name *)n))) {
+				if (recp)
+					*recp = record;
+				if (offsetp)
+					*offsetp = offset;
 				return ((void *)n);
+			}
+
 		}
 
 		n = (caddr_t)get_next_entry(this_nh, n, n_size, &offset);
 
 		if (n == NULL) {
 			/*
-			 * No next record, return
+			 * No next record, return NULL
 			 */
-			if (offset)
-				return ((void *)n);
+			if (this_nh->nmn_nextp == NULL)
+				return (NULL);
 
 			/* Go to next record */
 			offset = n_offset;
@@ -1181,10 +1236,10 @@ lookup_entry(
 			    &((struct devid_min_rec *)record)->min_rec_hdr :
 			    &((struct nm_rec *)record)->r_rec_hdr);
 			n = ((devid_nm & NM_DEVID) ?
-				((caddr_t)&((struct devid_min_rec *)
-					record)->minor_name[0]) :
-				((caddr_t)&((struct nm_rec *)
-					record)->r_name[0]));
+			    ((caddr_t)&((struct devid_min_rec *)
+			    record)->minor_name[0]) :
+			    ((caddr_t)&((struct nm_rec *)
+			    record)->r_name[0]));
 		}
 	}
 	/*NOTREACHED*/
@@ -1200,7 +1255,7 @@ is_meta_drive(set_t setno, mdkey_t key)
 	if ((nh = get_first_record(setno, 0, NM_SHARED)) == NULL)
 		return (FALSE);
 	if ((shn = (struct nm_shared_name *)lookup_shared_entry(nh,
-		key, NULL, NULL, NM_SHARED)) == NULL) {
+	    key, NULL, NULL, NM_SHARED)) == NULL) {
 		return (FALSE);
 	}
 
@@ -1300,7 +1355,7 @@ lookup_deventry(
 			if (strcmp(getshared_name(setno, n->n_drv_key, 0L),
 			    MD_HOTSPARES) == 0 && (side == n->n_side) &&
 			    find_hot_spare_pool(setno,
-				KEY_TO_HSP_ID(setno, n->n_key)) == NULL) {
+			    KEY_TO_HSP_ID(setno, n->n_key)) == NULL) {
 				/*
 				 * All entries removed
 				 */
@@ -1314,9 +1369,9 @@ lookup_deventry(
 			 * It is metadevice and we are trying to add it twice
 			 */
 			if (md_set[setno].s_un[MD_MIN2UNIT(n->n_minor)]
-				== NULL && (side == n->n_side) &&
+			    == NULL && (side == n->n_side) &&
 			    ddi_name_to_major(getshared_name(setno,
-				n->n_drv_key, 0L)) == md_major) {
+			    n->n_drv_key, 0L)) == md_major) {
 				/*
 				 * Apparently it is invalid so
 				 * clean it up
@@ -1330,17 +1385,17 @@ lookup_deventry(
 
 			/* First see if the two drives are metadevices. */
 			if (is_meta_drive(setno, drvkey) &&
-				is_meta_drive(setno, n->n_drv_key)) {
+			    is_meta_drive(setno, n->n_drv_key)) {
 				both_meta = TRUE;
 			} else {
 				both_meta = FALSE;
 			}
 			/* Check rest of the parameters. */
 			if ((both_meta == TRUE) &&
-				((key != n->n_key) ||
-				(mnum != n->n_minor) ||
-				(drvkey != n->n_drv_key) ||
-				(dirkey != n->n_dir_key))) {
+			    ((key != n->n_key) ||
+			    (mnum != n->n_minor) ||
+			    (drvkey != n->n_drv_key) ||
+			    (dirkey != n->n_dir_key))) {
 				return (LOOKUP_DEV_CONFLICT);
 			}
 		}
@@ -1364,6 +1419,21 @@ lookup_deventry(
 }
 
 void *
+lookup_shared_entry_record_offset(
+	struct nm_next_hdr *nh,	/* First record header to start lookup */
+	mdkey_t		key,	/* Shared key, used as key if nm is NULL */
+	char *nm,		/* Shared name, used as key if non-NULL */
+	mddb_recid_t *id,	/* mddb record id of record entry is found in */
+	int devid_nm,		/* which name space? */
+	void *recp,		/* pointer to record containing the result */
+	size_t *offset_p	/* offest in the above record of the result */
+)
+{
+	return (lookup_shared_entry_common(nh, key, nm, id, devid_nm, &recp,
+	    offset_p));
+}
+
+void *
 lookup_shared_entry(
 	struct nm_next_hdr *nh,	/* First record header to start lookup */
 	mdkey_t key,		/* Shared key, used as key if nm is NULL */
@@ -1371,6 +1441,22 @@ lookup_shared_entry(
 	mddb_recid_t *id,	/* mddb record id of record entry is found in */
 	int	devid_nm)	/* which name space? */
 {
+	return (lookup_shared_entry_common(nh, key, nm, id, devid_nm, NULL,
+	    NULL));
+}
+
+void *
+lookup_shared_entry_common(
+	struct nm_next_hdr *nh, /* First record header to start lookup */
+	mdkey_t key,		/* Shared key, used as key if nm is NULL */
+	char *nm,		/* Shared name, used as key if non-NULL */
+	mddb_recid_t *id,	/* mddb record id of record entry is found in */
+	int	devid_nm,	/* which name space? */
+	void	**recp,		/* pointer to record containing the result */
+	size_t	*offsetp	/* offest in the above record of the result */
+)
+{
+
 	struct nm_rec_hdr	*rh = (struct nm_rec_hdr *)nh->nmn_record;
 	struct nm_next_hdr	*this_nh = nh->nmn_nextp;
 	void			*record;
@@ -1382,21 +1468,21 @@ lookup_shared_entry(
 	ushort_t		shn_namlen;
 
 	if (this_nh == NULL)
-		return ((void *)0);
+		return ((void *) 0);
 
 	record = this_nh->nmn_record;
 
 	if (nm != (char *)0)
 		nm_len = ((devid_nm & NM_DEVID) ?
-			ddi_devid_sizeof((ddi_devid_t)nm) :
-			(strlen(nm) + 1));
+		    ddi_devid_sizeof((ddi_devid_t)nm) :
+		    (strlen(nm) + 1));
 
 	if (id != NULL)
 		*id = rh->r_next_recid;
 
 	this_rh = ((devid_nm & NM_DEVID) ?
-		&((struct devid_shr_rec *)record)->did_rec_hdr :
-		&((struct nm_shr_rec *)record)->sr_rec_hdr);
+	    &((struct devid_shr_rec *)record)->did_rec_hdr :
+	    &((struct nm_shr_rec *)record)->sr_rec_hdr);
 
 	/* code to see if EMPTY record */
 	while (this_nh && this_rh->r_used_size == sizeof (struct nm_rec_hdr)) {
@@ -1409,20 +1495,20 @@ lookup_shared_entry(
 			*id = this_rh->r_next_recid;
 
 		this_rh = ((devid_nm & NM_DEVID) ?
-			&((struct devid_shr_rec *)record)->did_rec_hdr :
-			&((struct nm_shr_rec *)record)->sr_rec_hdr);
+		    &((struct devid_shr_rec *)record)->did_rec_hdr :
+		    &((struct nm_shr_rec *)record)->sr_rec_hdr);
 	}
 
 	/*
 	 * shn_offset will be used to reset offset
 	 */
 	shn_offset = offset = ((devid_nm & NM_DEVID) ?
-		(sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name)) :
-		(sizeof (struct nm_shr_rec) - sizeof (struct nm_shared_name)));
+	    (sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name)) :
+	    (sizeof (struct nm_shr_rec) - sizeof (struct nm_shared_name)));
 
 	shn = ((devid_nm & NM_DEVID) ?
-		((caddr_t)&((struct devid_shr_rec *)record)->device_id[0]) :
-		((caddr_t)&((struct nm_shr_rec *)record)->sr_name[0]));
+	    ((caddr_t)&((struct devid_shr_rec *)record)->device_id[0]) :
+	    ((caddr_t)&((struct nm_shr_rec *)record)->sr_name[0]));
 
 	/*CONSTCOND*/
 	while (1) {
@@ -1437,31 +1523,51 @@ lookup_shared_entry(
 			shn_size = SHR_NAMSIZ((struct nm_shared_name *)shn);
 		}
 
-		if ((key != 0) && (key == shn_key))
+		if ((key != 0) && (key == shn_key)) {
+			if (recp)
+				*recp = record;
+			if (offsetp)
+				*offsetp = offset;
 			return ((void *)shn);
+		}
 
 		/* Lookup by name */
 		if (nm != NULL) {
-		    if (devid_nm & NM_IMP_SHARED) {
+			if (devid_nm & NM_IMP_SHARED) {
 			/*
 			 * the nm passed in is "/dev/md" in the import case
 			 * and we want to do a partial match on that.
 			 */
 			if (strncmp(nm, ((struct nm_shared_name *)shn)->sn_name,
-			    strlen(nm)) == 0)
-			    return ((void *)shn);
-		    } else if (nm_len == shn_namlen) {
-			if (devid_nm & NM_DEVID) {
-			    if (ddi_devid_compare((ddi_devid_t)nm,
-				(ddi_devid_t)(((struct did_shr_name *)shn)->
-					did_devid)) == 0)
-				return ((void *)shn);
-			} else {
-			    if (strcmp(nm, ((struct nm_shared_name *)
-					shn)->sn_name) == 0)
+			    strlen(nm)) == 0) {
+				if (recp)
+					*recp = record;
+				if (offsetp)
+					*offsetp = offset;
 				return ((void *)shn);
 			}
-		    }
+			} else if (nm_len == shn_namlen) {
+			if (devid_nm & NM_DEVID) {
+				if (ddi_devid_compare((ddi_devid_t)nm,
+				    (ddi_devid_t)(((struct did_shr_name *)shn)->
+				    did_devid)) == 0) {
+					if (recp)
+						*recp = record;
+					if (offsetp)
+						*offsetp = offset;
+					return ((void *)shn);
+				}
+			} else {
+				if (strcmp(nm, ((struct nm_shared_name *)
+				    shn)->sn_name) == 0) {
+					if (recp)
+						*recp = record;
+					if (offsetp)
+						*offsetp = offset;
+					return ((void *)shn);
+				}
+			}
+			}
 		}
 
 		shn = (caddr_t)get_next_entry(this_nh,
@@ -1471,8 +1577,8 @@ lookup_shared_entry(
 			/*
 			 * No next record, return
 			 */
-			if (offset)
-				return ((void *)shn);
+			if (this_nh->nmn_nextp == NULL)
+				return (NULL);
 
 			/* Go to next record */
 			offset = shn_offset;
@@ -1481,13 +1587,13 @@ lookup_shared_entry(
 			if (id != NULL)
 				*id = this_rh->r_next_recid;
 			this_rh = ((devid_nm & NM_DEVID) ?
-				&((struct devid_shr_rec *)record)->did_rec_hdr :
-				&((struct nm_shr_rec *)record)->sr_rec_hdr);
+			    &((struct devid_shr_rec *)record)->did_rec_hdr :
+			    &((struct nm_shr_rec *)record)->sr_rec_hdr);
 			shn = ((devid_nm & NM_DEVID) ?
-				((caddr_t)&((struct devid_shr_rec *)
-					record)->device_id[0]) :
-				((caddr_t)&((struct nm_shr_rec *)
-					record)->sr_name[0]));
+			    ((caddr_t)&((struct devid_shr_rec *)
+			    record)->device_id[0]) :
+			    ((caddr_t)&((struct nm_shr_rec *)
+			    record)->sr_name[0]));
 		}
 	}
 	/*NOTREACHED*/
@@ -1578,13 +1684,16 @@ lookup_hspentry(
 				 */
 				if (key == MD_KEYWILD) {
 					if (setname != NULL)
-					    (void) snprintf(tmpname, MAXPATHLEN,
-						"%s/%s", setname,
-						((struct nm_name *)n)->n_name);
+						(void) snprintf(tmpname,
+						    MAXPATHLEN, "%s/%s",
+						    setname,
+						    ((struct nm_name *)
+						    n)->n_name);
 					else
-					    (void) snprintf(tmpname, MAXPATHLEN,
-						"%s",
-						((struct nm_name *)n)->n_name);
+						(void) snprintf(tmpname,
+						    MAXPATHLEN, "%s",
+						    ((struct nm_name *)
+						    n)->n_name);
 
 					if ((strcmp(name, tmpname)) == 0)
 						goto done;
@@ -1657,13 +1766,16 @@ build_rec_hdr_list(struct nm_next_hdr *nh, mddb_recid_t recid, int shared)
 
 	if (shared & NM_DEVID)
 		overhead_size = ((shared & NM_SHARED) ?
-		(sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name))
-				:
-		(sizeof (struct devid_min_rec) - sizeof (struct did_min_name)));
+		    (sizeof (struct devid_shr_rec) -
+		    sizeof (struct did_shr_name))
+		    :
+		    (sizeof (struct devid_min_rec) -
+		    sizeof (struct did_min_name)));
 	else
 		overhead_size = ((shared & NM_SHARED) ?
-		(sizeof (struct nm_shr_rec) - sizeof (struct nm_shared_name)) :
-		(sizeof (struct nm_rec) - sizeof (struct nm_name)));
+		    (sizeof (struct nm_shr_rec) -
+		    sizeof (struct nm_shared_name)) :
+		    (sizeof (struct nm_rec) - sizeof (struct nm_name)));
 
 	while (rh->r_next_recid > 0) {
 		this_nh = kmem_zalloc(sizeof (*this_nh), KM_SLEEP);
@@ -1673,15 +1785,18 @@ build_rec_hdr_list(struct nm_next_hdr *nh, mddb_recid_t recid, int shared)
 		ASSERT(this_nh->nmn_record != NULL);
 
 		if (shared & NM_DEVID)
-		    this_rh = ((shared & NM_SHARED) ?
-		    &((struct devid_shr_rec *)this_nh->nmn_record)->did_rec_hdr
-			:
-		    &((struct devid_min_rec *)
-		    this_nh->nmn_record)->min_rec_hdr);
+			this_rh = ((shared & NM_SHARED) ?
+			    &((struct devid_shr_rec *)
+			    this_nh->nmn_record)->did_rec_hdr
+			    :
+			    &((struct devid_min_rec *)
+			    this_nh->nmn_record)->min_rec_hdr);
 		else
-		    this_rh = ((shared & NM_SHARED) ?
-		    &((struct nm_shr_rec *)this_nh->nmn_record)->sr_rec_hdr :
-		    &((struct nm_rec *)this_nh->nmn_record)->r_rec_hdr);
+			this_rh = ((shared & NM_SHARED) ?
+			    &((struct nm_shr_rec *)
+			    this_nh->nmn_record)->sr_rec_hdr
+			    :
+			    &((struct nm_rec *)this_nh->nmn_record)->r_rec_hdr);
 
 		/*
 		 * Check for empty records and clean them up.
@@ -1691,7 +1806,7 @@ build_rec_hdr_list(struct nm_next_hdr *nh, mddb_recid_t recid, int shared)
 		    (multi_node && md_set[setno].s_am_i_master)) {
 			if (this_rh->r_used_size == overhead_size) {
 				mddb_setrecprivate(rh->r_next_recid,
-					MD_PRV_PENDDEL);
+				    MD_PRV_PENDDEL);
 				rh->r_next_recid = this_rh->r_next_recid;
 				kmem_free(this_nh, sizeof (*this_nh));
 				nh->nmn_nextp = NULL;
@@ -1934,7 +2049,7 @@ md_setdevname(
 	 * If it already there in the name space
 	 */
 	lookup_res = lookup_deventry(nh, setno, side, key, drvnm, mnum, dname,
-		fname, &n);
+	    fname, &n);
 
 	/* If we are importing the set */
 	if (imp_flag && (lookup_res == LOOKUP_DEV_FOUND)) {
@@ -1991,11 +2106,11 @@ md_setdevname(
 			 */
 			if ((did_n = (struct did_min_name *)
 			    lookup_entry(did_nh, setno, side, n->n_key,
-				NODEV64, NM_DEVID)) != NULL) {
+			    NODEV64, NM_DEVID)) != NULL) {
 
 				did_n->min_count++;
 				(void) update_entry(did_nh, did_n->min_side,
-						did_n->min_key, NM_DEVID);
+				    did_n->min_key, NM_DEVID);
 			} else {
 				/*
 				 * If a disk device does not support
@@ -2035,8 +2150,8 @@ md_setdevname(
 		 * If MDE_DB_NOSPACE occurs
 		 */
 		if (((n->n_drv_key =
-			setshared_name(setno, drvnm, MD_KEYWILD, 0L)) ==
-			MD_KEYBAD)) {
+		    setshared_name(setno, drvnm, MD_KEYWILD, 0L)) ==
+		    MD_KEYBAD)) {
 			/*
 			 * Remove entry allocated by alloc_entry
 			 * and return MD_KEYBAD
@@ -2050,14 +2165,14 @@ md_setdevname(
 		} else {
 			/* We have a directory name to save. */
 			if ((n->n_dir_key =
-				setshared_name(setno, dname, MD_KEYWILD, 0L)) ==
-				MD_KEYBAD) {
+			    setshared_name(setno, dname, MD_KEYWILD, 0L)) ==
+			    MD_KEYBAD) {
 				/*
 				 * Remove entry allocated by alloc_entry
 				 * and return MD_KEYBAD
 				 */
 				(void) remove_entry(nh, n->n_side, n->n_key,
-					0L);
+				    0L);
 				goto out;
 			}
 		}
@@ -2120,18 +2235,18 @@ add_devid:
 
 	if (shared & NM_DEVID) {
 		new_did_n = (struct did_min_name *)alloc_entry(did_nh,
-			md_set[setno].s_did_nmid, min_len,
-			shared, &recids[0]);
+		    md_set[setno].s_did_nmid, min_len,
+		    shared, &recids[0]);
 
 		/*
 		 * No space
 		 */
 		if (new_did_n == NULL) {
-		    if (new) {
+			if (new) {
 			(void) remove_entry(nh, n->n_side, n->n_key, 0L);
 			retval = MD_KEYBAD;
-		    }
-		    goto out;
+			}
+			goto out;
 		}
 
 		new_did_n->min_side = side;
@@ -2176,10 +2291,11 @@ add_devid:
 			 * Remove entry allocated by alloc_entry
 			 */
 			(void) remove_entry(did_nh, new_did_n->min_side,
-				new_did_n->min_key, NM_DEVID);
+			    new_did_n->min_key, NM_DEVID);
 			if (new) {
-			    (void) remove_entry(nh, n->n_side, n->n_key, 0L);
-			    retval = MD_KEYBAD;
+				(void) remove_entry(nh, n->n_side, n->n_key,
+				    0L);
+				retval = MD_KEYBAD;
 			}
 		} else {
 			recids[1] = md_set[setno].s_did_nmid;
@@ -2266,19 +2382,19 @@ md_get_invdid(
 		int		compare_rc = 1;
 
 		did_n = (struct did_min_name *)lookup_entry(
-				did_nh, setno, side, key, NODEV64, NM_DEVID);
+		    did_nh, setno, side, key, NODEV64, NM_DEVID);
 		if (did_n == NULL) {
 			continue;
 		}
 		did_shr_n = (struct did_shr_name *)lookup_shared_entry(
-				did_shr_nh, did_n->min_devid_key, (char *)0,
-				NULL, NM_DEVID);
+		    did_shr_nh, did_n->min_devid_key, (char *)0,
+		    NULL, NM_DEVID);
 		if ((did_shr_n->did_data & NM_DEVID_VALID) != NULL) {
 			continue;
 		}
 		/* found invalid device id. Add to list */
 		devt = md_dev64_to_dev(
-				md_getdevnum(setno, side, key, MD_TRUST_DEVT));
+		    md_getdevnum(setno, side, key, MD_TRUST_DEVT));
 		get_rc = ddi_lyr_get_devid(devt, &rtn_devid);
 		if (get_rc == DDI_SUCCESS) {
 			compare_rc = ddi_devid_compare(rtn_devid,
@@ -2294,7 +2410,7 @@ md_get_invdid(
 				return (-1);
 			}
 			n = (struct nm_name *)lookup_entry(
-					nh, setno, side, key, NODEV64, 0L);
+			    nh, setno, side, key, NODEV64, 0L);
 			if (n == NULL) {
 				rw_exit(&nm_lock.lock);
 				return ((int)NODEV64);
@@ -2307,7 +2423,7 @@ md_get_invdid(
 				return (-1);
 			}
 			if ((tmpname = strrchr(diskname, 's')) != NULL)
-			    *tmpname = '\0';
+				*tmpname = '\0';
 			dont_add_it = 0;
 			for (i = 0; i < (cnt - 1); i++) {
 				if (strcmp(diskname, tmpctd) == 0) {
@@ -2397,19 +2513,19 @@ md_validate_devid(
 		int		compare_rc = 1;
 
 		did_n = (struct did_min_name *)lookup_entry(
-				did_nh, setno, side, key, NODEV64, NM_DEVID);
+		    did_nh, setno, side, key, NODEV64, NM_DEVID);
 		if (did_n == NULL) {
 			continue;
 		}
 		did_shr_n = (struct did_shr_name *)lookup_shared_entry(
-				did_shr_nh, did_n->min_devid_key, (char *)0,
-				NULL, NM_DEVID);
+		    did_shr_nh, did_n->min_devid_key, (char *)0,
+		    NULL, NM_DEVID);
 		if ((did_shr_n->did_data & NM_DEVID_VALID) != 0) {
 			continue;
 		}
 
 		devt = md_dev64_to_dev(
-				md_getdevnum(setno, side, key, MD_TRUST_DEVT));
+		    md_getdevnum(setno, side, key, MD_TRUST_DEVT));
 		get_rc = ddi_lyr_get_devid(devt, &rtn_devid);
 		if (get_rc == DDI_SUCCESS) {
 			compare_rc = ddi_devid_compare(rtn_devid,
@@ -2423,7 +2539,7 @@ md_validate_devid(
 			/* device id is invalid */
 			cnt++;
 			n = (struct nm_name *)lookup_entry(
-					nh, setno, side, key, NODEV64, 0L);
+			    nh, setno, side, key, NODEV64, 0L);
 			if (n == NULL) {
 				rw_exit(&nm_lock.lock);
 				return ((int)NODEV64);
@@ -2509,7 +2625,7 @@ md_getdevname_common(
 
 	if ((n = (struct nm_name *)lookup_entry(nh, setno, side, key,
 	    dev, 0L))
-		== NULL) {
+	    == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
@@ -2759,7 +2875,7 @@ md_getnment(
 
 	if ((n = (struct nm_name *)lookup_entry(nh, setno, side, key,
 	    dev, 0L))
-		== NULL) {
+	    == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
@@ -2817,22 +2933,23 @@ md_getdevnum(
 	 * so that this check is only done once.
 	 */
 	if (!(md_get_setstatus(setno) & MD_SET_DIDCLUP)) {
-	    if ((MD_MNSET_SETNO(setno) && (md_set[setno].s_am_i_master)) ||
-		(!(MD_MNSET_SETNO(setno)))) {
-		    if (!(((mddb_set_t *)md_set[setno].s_db)->s_lbp->lb_flags
-			& MDDB_DEVID_STYLE) || md_devid_destroy) {
-			    (void) md_load_namespace(setno, NULL, NM_DEVID);
-			    (void) md_devid_cleanup(setno, 1);
-		    }
-	    }
-	    md_set_setstatus(setno, MD_SET_DIDCLUP);
+		if ((MD_MNSET_SETNO(setno) && (md_set[setno].s_am_i_master)) ||
+		    (!(MD_MNSET_SETNO(setno)))) {
+			if (!(((mddb_set_t *)
+			    md_set[setno].s_db)->s_lbp->lb_flags
+			    & MDDB_DEVID_STYLE) || md_devid_destroy) {
+				(void) md_load_namespace(setno, NULL, NM_DEVID);
+				(void) md_devid_cleanup(setno, 1);
+			}
+		}
+		md_set_setstatus(setno, MD_SET_DIDCLUP);
 	}
 
 	/*
 	 * Test the MDDB_DEVID_STYLE bit
 	 */
 	if (((mddb_set_t *)md_set[setno].s_db)->s_lbp->lb_flags
-		& MDDB_DEVID_STYLE) {
+	    & MDDB_DEVID_STYLE) {
 		(void) md_load_namespace(setno, NULL, NM_DEVID);
 		devid_nm = 1;
 	}
@@ -2855,8 +2972,8 @@ md_getdevnum(
 	 * If not even in the primary name space, bail out
 	 */
 	if (((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) ||
-		((n = (struct nm_name *)lookup_entry(nh, setno, side, key,
-			NODEV64, 0L)) == NULL)) {
+	    ((n = (struct nm_name *)lookup_entry(nh, setno, side, key,
+	    NODEV64, 0L)) == NULL)) {
 		rw_exit(&nm_lock.lock);
 		return (NODEV64);
 	}
@@ -2875,11 +2992,12 @@ md_getdevnum(
 	 * Reference the device id namespace
 	 */
 	if (devid_nm) {
-	    if (((did_nh = get_first_record(setno, 1, NM_DEVID | NM_NOTSHARED))
-		== NULL) || ((did_shr_nh = get_first_record(setno, 1,
-			NM_DEVID | NM_SHARED)) == NULL)) {
-		devid_nm = 0;
-	    }
+		if (((did_nh = get_first_record(setno, 1, NM_DEVID |
+		    NM_NOTSHARED)) == NULL) || ((did_shr_nh =
+		    get_first_record(setno, 1, NM_DEVID | NM_SHARED))
+		    == NULL)) {
+			devid_nm = 0;
+		}
 	}
 
 	/*
@@ -2887,16 +3005,16 @@ md_getdevnum(
 	 * this device has disk tracking info stored
 	 */
 	if (devid_nm && ((did_n = (struct did_min_name *)lookup_entry(did_nh,
-		setno, side, key, NODEV64, NM_DEVID)) != NULL)) {
+	    setno, side, key, NODEV64, NM_DEVID)) != NULL)) {
 		/*
 		 * Get the minor name and the device id
 		 */
 		devid = (ddi_devid_t)getshared_name(setno,
-						did_n->min_devid_key, NM_DEVID);
+		    did_n->min_devid_key, NM_DEVID);
 
 		did_shr_n = (struct did_shr_name *)lookup_shared_entry(
-					did_shr_nh, did_n->min_devid_key,
-					(char *)0, NULL, NM_DEVID);
+		    did_shr_nh, did_n->min_devid_key,
+		    (char *)0, NULL, NM_DEVID);
 
 		if ((devid == NULL) || (did_shr_n == NULL)) {
 			rw_exit(&nm_lock.lock);
@@ -2905,7 +3023,7 @@ md_getdevnum(
 
 
 		if (ddi_lyr_devid_to_devlist(devid, did_n->min_name, &ndevs,
-			&devs) == DDI_SUCCESS) {
+		    &devs) == DDI_SUCCESS) {
 
 			md_dev64_t tdev;
 			int cnt;
@@ -2943,10 +3061,10 @@ md_getdevnum(
 			 */
 			if (MD_UPGRADE)
 				drvnm = md_targ_major_to_name(md_getmajor
-					(md_xlate_mini_2_targ(retval)));
+				    (md_xlate_mini_2_targ(retval)));
 			else
 				drvnm = ddi_major_to_name(
-						md_getmajor(retval));
+				    md_getmajor(retval));
 
 			/*
 			 * It is a valid device id
@@ -3064,17 +3182,17 @@ md_getdevnum(
 			 * If retval has a device id, add them
 			 */
 			if ((ddi_lyr_get_devid(md_dev64_to_dev(retval), &devid)
-							== DDI_SUCCESS) &&
+			    == DDI_SUCCESS) &&
 			    (ddi_lyr_get_minor_name(md_dev64_to_dev(retval),
-							S_IFBLK, &mname)
-							== DDI_SUCCESS)) {
+			    S_IFBLK, &mname)
+			    == DDI_SUCCESS)) {
 				/*
 				 * Add them into the devid name space
 				 */
 				did_n = (struct did_min_name *)alloc_entry(
-					did_nh, md_set[setno].s_did_nmid,
-					strlen(mname)+1, NM_DEVID|NM_NOTSHARED,
-					&recids[0]);
+				    did_nh, md_set[setno].s_did_nmid,
+				    strlen(mname)+1, NM_DEVID|NM_NOTSHARED,
+				    &recids[0]);
 
 				if (did_n) {
 					did_n->min_side = side;
@@ -3085,16 +3203,16 @@ md_getdevnum(
 					    (ushort_t)(strlen(mname)+1);
 					did_n->min_devid_key =
 					    setshared_name(setno,
-						(char *)devid, MD_KEYWILD,
-						NM_DEVID);
+					    (char *)devid, MD_KEYWILD,
+					    NM_DEVID);
 					/*
 					 * Commit the change to the record
 					 */
 					if (did_n->min_devid_key == MD_KEYBAD) {
 						(void) remove_entry(did_nh,
-							did_n->min_side,
-							did_n->min_key,
-							NM_DEVID);
+						    did_n->min_side,
+						    did_n->min_key,
+						    NM_DEVID);
 					} else {
 						recids[1] =
 						    md_set[setno].s_did_nmid;
@@ -3112,7 +3230,7 @@ md_getdevnum(
 				kmem_free(mname, strlen(mname) + 1);
 		} else {
 			retval = md_makedevice(md_major,
-						md_getminor(retval_targ));
+			    md_getminor(retval_targ));
 		}
 	}
 
@@ -3155,15 +3273,15 @@ md_getnextkey(
 	}
 
 	for (key++; key < ((struct nm_rec_hdr *)nh->nmn_record)->r_next_key;
-			key++) {
+	    key++) {
 		if ((n = (struct nm_name *)lookup_entry(nh, setno, side, key,
-			NODEV64, 0L)) != NULL)
+		    NODEV64, 0L)) != NULL)
 			break;
 	}
 
 	if (n != NULL) {
 		if (cnt != NULL)
-		    *cnt = n->n_count;
+			*cnt = n->n_count;
 
 		retval = n->n_key;
 	}
@@ -3190,8 +3308,7 @@ md_update_namespace_did(
 	mdkey_t			ent_did_key;
 	uint32_t		ent_did_count;
 	uint32_t		ent_did_data;
-	struct nm_next_hdr	*this_did_shr_nh;
-	void			*record;
+	void			*record, *n_record;
 	size_t			offset;
 	struct did_shr_name	*shn;
 	mddb_recid_t		recids[3];
@@ -3199,7 +3316,7 @@ md_update_namespace_did(
 	struct nm_next_hdr	*this_did_nh;
 	struct did_min_name	*n;
 	struct did_shr_name	*shr_n;
-	mdkey_t			o_key, devid_key;
+	mdkey_t			devid_key;
 	size_t			ent_size, size;
 
 	(void) md_load_namespace(setno, NULL, NM_DEVID);
@@ -3211,7 +3328,7 @@ md_update_namespace_did(
 
 	offset = (sizeof (struct devid_shr_rec) - sizeof (struct did_shr_name));
 	if ((nh = get_first_record(setno, 0, NM_DEVID | NM_NOTSHARED)) ==
-									NULL) {
+	    NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
@@ -3226,16 +3343,18 @@ md_update_namespace_did(
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
+
 	if ((n = (struct did_min_name *)lookup_entry(nh, setno, side, key,
 	    NODEV64, NM_DEVID)) == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
 	devid_key = n->min_devid_key;
-
 	rw_exit(&nm_lock.lock);
+
 	devt = md_dev64_to_dev(
-			md_getdevnum(setno, side, key, MD_TRUST_DEVT));
+	    md_getdevnum(setno, side, key, MD_TRUST_DEVT));
+
 	rw_enter(&nm_lock.lock, RW_WRITER);
 	if (ddi_lyr_get_devid(devt, &rtn_devid) == DDI_SUCCESS) {
 		did_shr_nh = get_first_record(setno, 0, NM_DEVID | NM_SHARED);
@@ -3244,31 +3363,19 @@ md_update_namespace_did(
 			rw_exit(&nm_lock.lock);
 			return ((int)NODEV64);
 		}
-		this_did_shr_nh = did_shr_nh->nmn_nextp;
-		record = this_did_shr_nh->nmn_record;
-		shn = &((struct devid_shr_rec *)record)->device_id[0];
-		shr_n = (struct did_shr_name *)lookup_shared_entry(
-				did_shr_nh, n->min_devid_key, (char *)0,
-				&recids[0], NM_DEVID);
+
+		n_record = did_shr_nh->nmn_nextp->nmn_record;
+
+		shr_n = (struct did_shr_name *)
+		    lookup_shared_entry_record_offset(did_shr_nh, devid_key,
+		    (char *)0, &recids[0], NM_DEVID, n_record, &offset);
+
 		if (shr_n == NULL) {
 			ddi_devid_free(rtn_devid);
 			rw_exit(&nm_lock.lock);
 			return (ENOENT);
 		}
-		o_key = shn->did_key;
-		while (devid_key != o_key) {
-			shn = (struct did_shr_name *)get_next_entry(
-					this_did_shr_nh, (caddr_t)shn,
-					DID_SHR_NAMSIZ(shn), &offset);
-			if (shn == NULL) {
-				if (offset) {
-					ddi_devid_free(rtn_devid);
-					rw_exit(&nm_lock.lock);
-					return (ENOENT);
-				}
-			}
-			o_key = shn->did_key;
-		}
+
 		devid = (ddi_devid_t)shr_n->did_devid;
 		if (ddi_devid_compare(rtn_devid, devid) != 0) {
 			/* remove old devid info */
@@ -3276,8 +3383,19 @@ md_update_namespace_did(
 			ent_did_count = shr_n->did_count;
 			ent_did_data = shr_n->did_data;
 			ent_size = DID_SHR_NAMSIZ(shr_n);
-			size = ((struct nm_rec_hdr *)this_did_shr_nh->
-			    nmn_record)->r_used_size - offset - ent_size;
+
+			/*
+			 * So we're going to overwrite this record; if it's the
+			 * last entry, just bzero() it. If it's not, then copy
+			 * the remaining entries back to the start of our entry
+			 */
+
+			size = ((struct nm_rec_hdr *)n_record)->r_used_size
+			    - offset - ent_size;
+
+			ASSERT(size + offset <= ((struct nm_rec_hdr *)
+			    n_record)->r_used_size);
+
 			if (size == 0) {
 				(void) bzero(shr_n, ent_size);
 			} else {
@@ -3285,8 +3403,8 @@ md_update_namespace_did(
 				    size);
 				(void) bzero((caddr_t)shr_n + size, ent_size);
 			}
-			((struct nm_rec_hdr *)this_did_shr_nh->nmn_record)->
-			    r_used_size -= ent_size;
+			((struct nm_rec_hdr *)n_record)->r_used_size -=
+			    ent_size;
 			/* add in new devid info */
 			if ((shn = (struct did_shr_name *)alloc_entry(
 			    did_shr_nh, md_set[setno].s_did_nmid,
@@ -3336,18 +3454,15 @@ md_update_namespace(
 {
 	struct nm_next_hdr	*nh;
 	struct nm_name		*n;
-	struct nm_name		*o_n;
-	struct nm_next_hdr	*this_nh;
 	struct nm_next_hdr	*snh;
 	struct nm_shared_name	*shn;
-	void			*record;
+	void			*n_record;
 	mddb_recid_t		recids[3];
 	size_t			size;
 	mdkey_t			ent_key, ent_drv_key, ent_dir_key, new_dir_key;
 	uint32_t		ent_count;
 	side_t			ent_side;
 	size_t			offset;
-	mdkey_t			o_key = NULL;
 	char			*old_pathname;
 	int			ent_size;
 
@@ -3363,27 +3478,14 @@ md_update_namespace(
 		return (ENOENT);
 	}
 
-	this_nh = nh->nmn_nextp;
-	record = this_nh->nmn_record;
-	o_n = &((struct nm_rec *)record)->r_name[0];
-	if ((n = (struct nm_name *)lookup_entry(nh, setno, side, key, NODEV64,
-	    0L)) == NULL) {
+	n_record = nh->nmn_nextp->nmn_record;
+
+	if ((n = (struct nm_name *)lookup_entry_record_offset(nh, setno, side,
+	    key, NODEV64, 0L, n_record, &offset)) == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
 
-	o_key = o_n->n_key;
-	while (key != o_key) {
-		o_n = (struct nm_name *)get_next_entry(this_nh, (caddr_t)o_n,
-		    NAMSIZ(o_n), &offset);
-		if (o_n == NULL) {
-			if (offset) {
-				rw_exit(&nm_lock.lock);
-				return (ENOENT);
-			}
-		}
-		o_key = o_n->n_key;
-	}
 	/* save the values from the old record */
 	ent_side = n->n_side;
 	ent_key = n->n_key;
@@ -3391,8 +3493,16 @@ md_update_namespace(
 	ent_drv_key = n->n_drv_key;
 	ent_dir_key = n->n_dir_key;
 	ent_size = NAMSIZ(n);
-	size = ((struct nm_rec_hdr *)this_nh->nmn_record)->r_used_size - offset
-	    - ent_size;
+
+	/*
+	 * So we're going to overwrite this record; if it's the last
+	 * entry, just bzero() it. If it's not, then copy the
+	 * remaining entries back to the start of our entry
+	 */
+
+	size = ((struct nm_rec_hdr *)n_record)->r_used_size - offset - ent_size;
+
+	ASSERT(offset + size <= ((struct nm_rec_hdr *)n_record)->r_alloc_size);
 
 	if (size == 0) {
 		(void) bzero(n, ent_size);    /* last entry */
@@ -3400,7 +3510,7 @@ md_update_namespace(
 		(void) ovbcopy((caddr_t)n + ent_size, n, size);
 		(void) bzero((caddr_t)n + size, ent_size);
 	}
-	((struct nm_rec_hdr *)this_nh->nmn_record)->r_used_size -= ent_size;
+	((struct nm_rec_hdr *)n_record)->r_used_size -= ent_size;
 
 	rw_exit(&nm_lock.lock);
 	/* check to see if we have a new pathname */
@@ -3635,7 +3745,7 @@ md_remdevname(
 	 * If it is not in the primary name space, nothing to remove
 	 */
 	if ((n = (struct nm_name *)lookup_entry(nh, setno, side, key, NODEV64,
-		0L)) == NULL) {
+	    0L)) == NULL) {
 		rw_exit(&nm_lock.lock);
 		return (ENOENT);
 	}
@@ -3646,11 +3756,11 @@ md_remdevname(
 	 */
 	if (md_set[setno].s_did_nm &&
 	    ((did_nh = get_first_record(setno, 0, NM_DEVID | NM_NOTSHARED))
-		!= NULL) &&
+	    != NULL) &&
 	    ((did_shr_nh = get_first_record(setno, 0, NM_DEVID | NM_SHARED))
-		!= NULL)) {
+	    != NULL)) {
 		did_n = (struct did_min_name *)lookup_entry(did_nh, setno,
-			side, key, NODEV64, NM_DEVID);
+		    side, key, NODEV64, NM_DEVID);
 	}
 
 	n->n_count--;
@@ -3680,7 +3790,7 @@ md_remdevname(
 	}
 
 	if (remove_shared_entry(shared_nh, drv_key, (char *)0, 0L) ||
-		remove_shared_entry(shared_nh, dir_key, (char *)0, 0L)) {
+	    remove_shared_entry(shared_nh, dir_key, (char *)0, 0L)) {
 		rw_exit(&nm_lock.lock);
 		return (EINVAL);
 	}
@@ -3695,7 +3805,7 @@ md_remdevname(
 		}
 
 		if (remove_shared_entry(did_shr_nh, did_key, (char *)0,
-			NM_DEVID)) {
+		    NM_DEVID)) {
 			rw_exit(&nm_lock.lock);
 			return (EINVAL);
 		}
@@ -3858,7 +3968,7 @@ md_load_namespace(set_t setno, md_error_t *ep, int devid_nm)
 	if (hdr_recid < 0) {
 		if (ep != NULL)
 			return (mddbstatus2error(ep, hdr_recid, NODEV32,
-							setno));
+			    setno));
 		return (0);
 	}
 
@@ -3902,9 +4012,9 @@ md_load_namespace(set_t setno, md_error_t *ep, int devid_nm)
 		mddb_setrecprivate(hdr_recid, MD_PRV_GOTIT);
 
 		build_rec_hdr_list(&hdr->hh_names, hdr_recid,
-				devid_nm | NM_NOTSHARED);
+		    devid_nm | NM_NOTSHARED);
 		build_rec_hdr_list(&hdr->hh_shared, hdr_recid,
-				devid_nm | NM_SHARED);
+		    devid_nm | NM_SHARED);
 
 		/*
 		 * Only cleanup a MN diskset if this node is master.
@@ -3943,8 +4053,8 @@ md_unload_namespace(set_t setno, int devid_nm)
 	rw_enter(&nm_lock.lock, RW_WRITER);
 
 	hhdr = ((devid_nm & NM_DEVID) ?
-		(struct nm_header_hdr *)md_set[setno].s_did_nm :
-		(struct nm_header_hdr *)md_set[setno].s_nm);
+	    (struct nm_header_hdr *)md_set[setno].s_did_nm :
+	    (struct nm_header_hdr *)md_set[setno].s_nm);
 
 	if (devid_nm) {
 		md_set[setno].s_did_nmid = 0;
@@ -4024,14 +4134,14 @@ md_nm_did_chkspace(set_t setno)
 	 */
 	while ((key = md_getnextkey(setno, side, key, NULL)) != MD_KEYWILD) {
 		if ((n = (struct nm_name *)lookup_entry(nh, setno, side, key,
-			NODEV64, 0L)) == NULL) {
+		    NODEV64, 0L)) == NULL) {
 			break;
 		} else {
 			md_dev64_t dev64 = build_device_number(setno, n);
 			dev_t dev = md_dev64_to_dev(dev64);
 
 			if (ddi_lyr_get_minor_name(dev, S_IFBLK, &mname)
-						!= DDI_SUCCESS) {
+			    != DDI_SUCCESS) {
 				continue;
 			} else {
 				if (mname) {
@@ -4203,10 +4313,10 @@ md_devid_cleanup(set_t setno, uint_t all)
 	 * If it is an empty name space
 	 */
 	if (((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) ||
-		((did_nh = get_first_record(setno, 1, NM_DEVID | NM_NOTSHARED))
-			== NULL) ||
-		((did_shr_nh = get_first_record(setno, 1, NM_DEVID |
-			NM_SHARED)) == NULL)) {
+	    ((did_nh = get_first_record(setno, 1, NM_DEVID | NM_NOTSHARED))
+	    == NULL) ||
+	    ((did_shr_nh = get_first_record(setno, 1, NM_DEVID |
+	    NM_SHARED)) == NULL)) {
 		return;
 	}
 
@@ -4225,7 +4335,7 @@ md_devid_cleanup(set_t setno, uint_t all)
 	 * Not empty
 	 */
 	n_offset = offset = (sizeof (struct devid_min_rec) -
-		sizeof (struct did_min_name));
+	    sizeof (struct did_min_name));
 	did_n = &(record->minor_name[0]);
 
 	/*CONSTCOND*/
@@ -4237,13 +4347,13 @@ md_devid_cleanup(set_t setno, uint_t all)
 		 * It is not in the primary, remove it from the devid nmspace
 		 */
 		doit = (all ? 1 :
-			(lookup_entry(nh, setno, MD_SIDEWILD, did_n->min_key,
-				NODEV64, 0L) == NULL));
+		    (lookup_entry(nh, setno, MD_SIDEWILD, did_n->min_key,
+		    NODEV64, 0L) == NULL));
 		if (doit) {
 			(void) remove_entry(did_nh, did_n->min_side,
-					did_n->min_key, NM_DEVID);
+			    did_n->min_key, NM_DEVID);
 			(void) remove_shared_entry(did_shr_nh, did_key,
-					(char *)0, NM_DEVID);
+			    (char *)0, NM_DEVID);
 			/*
 			 * We delete something so reset scan
 			 */
@@ -4257,7 +4367,7 @@ md_devid_cleanup(set_t setno, uint_t all)
 		}
 
 		did_n = (struct did_min_name *)get_next_entry(this_nh,
-			(caddr_t)did_n, n_size, &offset);
+		    (caddr_t)did_n, n_size, &offset);
 
 		/*
 		 * Next record?
@@ -4295,7 +4405,7 @@ md_resolve_bydevid(minor_t mnum, md_dev64_t device, mdkey_t key)
 	ddi_devid_t		devid;
 	dev_t			*devs; /* ddi returns dev_t not md_dev64_t */
 	int			ndevs,
-				cnt;
+	    cnt;
 	set_t			setno;
 	int			update = 0;
 	md_dev64_t		targ_dev;
@@ -4309,8 +4419,8 @@ md_resolve_bydevid(minor_t mnum, md_dev64_t device, mdkey_t key)
 	setno = MD_MIN2SET(mnum);
 
 	if (((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) ||
-		((n = (struct nm_name *)lookup_entry(nh, setno, MD_SIDEWILD,
-			key, NODEV64, 0L)) == NULL)) {
+	    ((n = (struct nm_name *)lookup_entry(nh, setno, MD_SIDEWILD,
+	    key, NODEV64, 0L)) == NULL)) {
 		return (NODEV64);
 	}
 
@@ -4320,17 +4430,17 @@ md_resolve_bydevid(minor_t mnum, md_dev64_t device, mdkey_t key)
 	 * then return whatever passed in
 	 */
 	if (((did_nh = get_first_record(setno, 0, NM_DEVID | NM_NOTSHARED))
-		!= NULL) && ((did_n = (struct did_min_name *)lookup_entry
-		(did_nh, setno, MD_SIDEWILD, key, NODEV64, NM_DEVID))
-		!= NULL)) {
+	    != NULL) && ((did_n = (struct did_min_name *)lookup_entry
+	    (did_nh, setno, MD_SIDEWILD, key, NODEV64, NM_DEVID))
+	    != NULL)) {
 		/*
 		 * Get the current devt and update mddb devt if necessary
 		 */
 		devid =	(ddi_devid_t)getshared_name(setno,
-			did_n->min_devid_key, NM_DEVID);
+		    did_n->min_devid_key, NM_DEVID);
 
 		if (devid && (ddi_lyr_devid_to_devlist(devid, did_n->min_name,
-			&ndevs, &devs) == DDI_SUCCESS)) {
+		    &ndevs, &devs) == DDI_SUCCESS)) {
 
 			/*
 			 * This device has been powered off
@@ -4357,7 +4467,7 @@ md_resolve_bydevid(minor_t mnum, md_dev64_t device, mdkey_t key)
 				return (NODEV64);
 
 			if (update &&
-				!(md_get_setstatus(setno) & MD_SET_STALE)) {
+			    !(md_get_setstatus(setno) & MD_SET_STALE)) {
 				n->n_minor = md_getminor(targ_dev);
 				/*
 				 * If we have the key for the driver get
