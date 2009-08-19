@@ -110,8 +110,8 @@ extern "C" {
 #define	X2APIC_SELF_IPI		0xFC
 
 /* General x2APIC constants used at various places */
-#define	APIC_SVR		12
-#define	APIC_DIRECTED_EOI	24
+#define	APIC_SVR_SUPPRESS_BROADCAST_EOI		0x1000
+#define	APIC_DIRECTED_EOI_BIT			0x1000000
 
 /* IRR register	*/
 #define	APIC_IRR_REG		0x80
@@ -428,6 +428,12 @@ struct apic_io_intr {
 #define	MSI_ADDR_DM_SHIFT	2
 
 /*
+ * TM is either edge or level.
+ */
+#define	TRIGGER_MODE_EDGE		0x0	/* edge sensitive */
+#define	TRIGGER_MODE_LEVEL		0x1	/* level sensitive */
+
+/*
  * definitions for MSI Data
  */
 #define	MSI_DATA_DELIVERY_FIXED		0x0	/* Fixed delivery */
@@ -437,8 +443,8 @@ struct apic_io_intr {
 #define	MSI_DATA_DELIVERY_INIT		0x5
 #define	MSI_DATA_DELIVERY_EXTINT	0x7
 #define	MSI_DATA_DELIVERY_SHIFT		8
-#define	MSI_DATA_TM_EDGE		0x0	/* MSI is edge sensitive */
-#define	MSI_DATA_TM_LEVEL		0x1	/* level sensitive */
+#define	MSI_DATA_TM_EDGE		TRIGGER_MODE_EDGE
+#define	MSI_DATA_TM_LEVEL		TRIGGER_MODE_LEVEL
 #define	MSI_DATA_TM_SHIFT		15
 #define	MSI_DATA_LEVEL_DEASSERT		0x0
 #define	MSI_DATA_LEVEL_ASSERT		0x1	/* Edge always assert */
@@ -552,7 +558,7 @@ typedef struct msi_regs {
  */
 typedef struct apic_intrr_ops {
 	int	(*apic_intrr_init)(int);
-	void	(*apic_intrr_enable)(void);
+	void	(*apic_intrr_enable)(int);
 	void	(*apic_intrr_alloc_entry)(apic_irq_t *);
 	void	(*apic_intrr_map_entry)(apic_irq_t *, void *);
 	void	(*apic_intrr_free_entry)(apic_irq_t *);
@@ -850,10 +856,11 @@ extern int apic_sci_vect;
 extern uchar_t apic_ipls[];
 extern apic_reg_ops_t *apic_reg_ops;
 extern int apic_mode;
-extern int apic_direct_EOI;
 extern void x2apic_update_psm();
 extern void apic_change_ops();
 extern void apic_common_send_ipi(int, int);
+extern void apic_set_directed_EOI_handler();
+extern int apic_directed_EOI_supported();
 
 extern apic_intrr_ops_t *apic_vt_ops;
 

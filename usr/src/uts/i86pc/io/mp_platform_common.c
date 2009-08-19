@@ -645,6 +645,13 @@ acpi_probe(char *modname)
 	}
 #endif
 
+	/*
+	 * Check for directed-EOI capability in the local APIC.
+	 */
+	if (apic_directed_EOI_supported() == 1) {
+		apic_set_directed_EOI_handler();
+	}
+
 	id = apic_reg_ops->apic_read(APIC_LID_REG);
 	local_ids[0] = (uchar_t)(id >> 24);
 	apic_nproc = index = 1;

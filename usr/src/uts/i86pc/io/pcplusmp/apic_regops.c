@@ -91,8 +91,6 @@ apic_reg_ops_t *apic_reg_ops = &local_apic_regs_ops;
 /*
  * APIC register ops related data sturctures and functions.
  */
-int	apic_direct_EOI = 0;			/* Directed EOI Support */
-
 void apic_send_EOI();
 void apic_send_directed_EOI(uint32_t irq);
 
@@ -289,9 +287,21 @@ apic_local_mode(void)
 }
 
 void
-apic_change_eoi()
+apic_set_directed_EOI_handler()
 {
 	apic_reg_ops->apic_send_eoi = apic_send_directed_EOI;
+}
+
+int
+apic_directed_EOI_supported()
+{
+	uint32_t ver;
+
+	ver = apic_reg_ops->apic_read(APIC_VERS_REG);
+	if (ver & APIC_DIRECTED_EOI_BIT)
+		return (1);
+
+	return (0);
 }
 
 /*

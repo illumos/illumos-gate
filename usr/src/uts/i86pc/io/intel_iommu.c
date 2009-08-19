@@ -208,9 +208,15 @@ static char *qinv_dsc_type[] = {
 static uint_t intrr_irta_s = INTRR_MAX_IRTA_SIZE;
 
 /*
- * whether disable interrupt remapping in LOCAL_APIC mode
+ * If true, arrange to suppress broadcast EOI by setting edge-triggered mode
+ * even for level-triggered interrupts in the interrupt-remapping engine.
+ * If false, broadcast EOI can still be suppressed if the CPU supports the
+ * APIC_SVR_SUPPRESS_BROADCAST_EOI bit.  In both cases, the IOAPIC is still
+ * programmed with the correct trigger mode, and pcplusmp must send an EOI
+ * to the IOAPIC by writing to the IOAPIC's EOI register to make up for the
+ * missing broadcast EOI.
  */
-static int intrr_only_for_x2apic = 1;
+static int intrr_suppress_brdcst_eoi = 0;
 
 /*
  * whether verify the source id of interrupt request
@@ -282,7 +288,7 @@ static void intr_remap_get_iommu(apic_irq_t *);
 static void intr_remap_get_sid(apic_irq_t *);
 
 static int intr_remap_init(int);
-static void intr_remap_enable(void);
+static void intr_remap_enable(int);
 static void intr_remap_alloc_entry(apic_irq_t *);
 static void intr_remap_map_entry(apic_irq_t *, void *);
 static void intr_remap_free_entry(apic_irq_t *);
@@ -4265,13 +4271,6 @@ intr_remap_init(int apic_mode)
 
 	intrr_apic_mode = apic_mode;
 
-	if ((intrr_apic_mode != LOCAL_X2APIC) && intrr_only_for_x2apic) {
-		/*
-		 * interrupt remapping is not a must in apic mode
-		 */
-		return (DDI_FAILURE);
-	}
-
 	for_each_in_list(&iommu_states, iommu) {
 		if ((iommu->iu_enabled & QINV_ENABLE) &&
 		    IOMMU_ECAP_GET_IR(iommu->iu_excapability)) {
@@ -4294,9 +4293,11 @@ intr_remap_init(int apic_mode)
 
 /* enable interrupt remapping */
 static void
-intr_remap_enable(void)
+intr_remap_enable(int suppress_brdcst_eoi)
 {
 	intel_iommu_state_t *iommu;
+
+	intrr_suppress_brdcst_eoi = suppress_brdcst_eoi;
 
 	for_each_in_list(&iommu_states, iommu) {
 		if (iommu->iu_intr_remap_tbl)
@@ -4508,10 +4509,17 @@ intr_remap_map_entry(apic_irq_t *irq_ptr, void *intr_data)
 		tm = RDT_TM(irdt->ir_lo);
 		dlm = RDT_DLM(irdt->ir_lo);
 		dst = irdt->ir_hi;
+
+		/*
+		 * Mark the IRTE's TM as Edge to suppress broadcast EOI.
+		 */
+		if (intrr_suppress_brdcst_eoi) {
+			tm = TRIGGER_MODE_EDGE;
+		}
 	} else {
 		dm = MSI_ADDR_DM_PHYSICAL;
 		rh = MSI_ADDR_RH_FIXED;
-		tm = MSI_DATA_TM_EDGE;
+		tm = TRIGGER_MODE_EDGE;
 		dlm = 0;
 		dst = mregs->mr_addr;
 	}
