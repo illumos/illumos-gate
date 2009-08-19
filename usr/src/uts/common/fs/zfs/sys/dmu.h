@@ -200,6 +200,7 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_HISTORY		"history"
 #define	DMU_POOL_PROPS			"pool_props"
 #define	DMU_POOL_L2CACHE		"l2cache"
+#define	DMU_POOL_TMP_USERREFS		"tmp_userrefs"
 
 /* 4x8 zbookmark_t */
 #define	DMU_POOL_SCRUB_BOOKMARK		"scrub_bookmark"

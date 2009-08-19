@@ -119,6 +119,7 @@ enum {
 	EZFS_UNPLAYED_LOGS,	/* log device has unplayed logs */
 	EZFS_REFTAG_RELE,	/* snapshot release: tag not found */
 	EZFS_REFTAG_HOLD,	/* snapshot hold: tag already exists */
+	EZFS_TAGTOOLONG,	/* snapshot hold/rele: tag too long */
 	EZFS_UNKNOWN
 };
 
@@ -450,6 +451,7 @@ extern int zfs_iter_children(zfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_iter_dependents(zfs_handle_t *, boolean_t, zfs_iter_f, void *);
 extern int zfs_iter_filesystems(zfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_iter_snapshots(zfs_handle_t *, zfs_iter_f, void *);
+extern int zfs_iter_snapshots_sorted(zfs_handle_t *, zfs_iter_f, void *);
 
 /*
  * Functions to create and destroy datasets.
@@ -466,8 +468,13 @@ extern int zfs_rename(zfs_handle_t *, const char *, boolean_t);
 extern int zfs_send(zfs_handle_t *, const char *, const char *,
     boolean_t, boolean_t, boolean_t, boolean_t, int);
 extern int zfs_promote(zfs_handle_t *);
-extern int zfs_hold(zfs_handle_t *, const char *, const char *, boolean_t);
+extern int zfs_hold(zfs_handle_t *, const char *, const char *, boolean_t,
+    boolean_t);
+extern int zfs_hold_range(zfs_handle_t *, const char *, const char *,
+    const char *, boolean_t);
 extern int zfs_release(zfs_handle_t *, const char *, const char *, boolean_t);
+extern int zfs_release_range(zfs_handle_t *, const char *, const char *,
+    const char *);
 
 typedef int (*zfs_userspace_cb_t)(void *arg, const char *domain,
     uid_t rid, uint64_t space);

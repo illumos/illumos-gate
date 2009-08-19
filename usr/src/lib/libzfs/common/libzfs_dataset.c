@@ -4034,15 +4034,18 @@ zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,
 
 int
 zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
-    boolean_t recursive)
+    boolean_t recursive, boolean_t temphold)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
-	(void) strlcpy(zc.zc_string, tag, sizeof (zc.zc_string));
+	if (strlcpy(zc.zc_string, tag, sizeof (zc.zc_string))
+	    >= sizeof (zc.zc_string))
+		return (zfs_error(hdl, EZFS_TAGTOOLONG, tag));
 	zc.zc_cookie = recursive;
+	zc.zc_temphold = temphold;
 
 	if (zfs_ioctl(hdl, ZFS_IOC_HOLD, &zc) != 0) {
 		char errbuf[ZFS_MAXNAMELEN+32];
@@ -4070,6 +4073,86 @@ zfs_hold(zfs_handle_t *zhp, const char *snapname, const char *tag,
 	return (0);
 }
 
+struct hold_range_arg {
+	zfs_handle_t	*origin;
+	const char	*fromsnap;
+	const char	*tosnap;
+	char		lastsnapheld[ZFS_MAXNAMELEN];
+	const char	*tag;
+	boolean_t	temphold;
+	boolean_t	seento;
+	boolean_t	seenfrom;
+	boolean_t	holding;
+};
+
+static int
+zfs_hold_range_one(zfs_handle_t *zhp, void *arg)
+{
+	struct hold_range_arg *hra = arg;
+	const char *thissnap;
+	int error;
+
+	thissnap = strchr(zfs_get_name(zhp), '@') + 1;
+
+	if (hra->fromsnap && !hra->seenfrom &&
+	    strcmp(hra->fromsnap, thissnap) == 0)
+		hra->seenfrom = B_TRUE;
+
+	/* snap is older or newer than the desired range, ignore it */
+	if (hra->seento || !hra->seenfrom) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	if (hra->holding) {
+		error = zfs_hold(hra->origin, thissnap, hra->tag, B_FALSE,
+		    hra->temphold);
+		if (error == 0) {
+			(void) strlcpy(hra->lastsnapheld, zfs_get_name(zhp),
+			    sizeof (hra->lastsnapheld));
+		}
+	} else {
+		error = zfs_release(hra->origin, thissnap, hra->tag, B_FALSE);
+	}
+
+	if (!hra->seento && strcmp(hra->tosnap, thissnap) == 0)
+		hra->seento = B_TRUE;
+
+	zfs_close(zhp);
+	return (error);
+}
+
+/*
+ * Add a user hold on the set of snapshots starting with fromsnap up to
+ * and including tosnap. If we're unable to to acquire a particular hold,
+ * undo any holds up to that point.
+ */
+int
+zfs_hold_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
+    const char *tag, boolean_t temphold)
+{
+	struct hold_range_arg arg = { 0 };
+	int error;
+
+	arg.origin = zhp;
+	arg.fromsnap = fromsnap;
+	arg.tosnap = tosnap;
+	arg.tag = tag;
+	arg.temphold = temphold;
+	arg.holding = B_TRUE;
+
+	error = zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg);
+
+	/*
+	 * Make sure we either hold the entire range or none.
+	 */
+	if (error && arg.lastsnapheld[0] != '\0') {
+		(void) zfs_release_range(zhp, fromsnap,
+		    (const char *)arg.lastsnapheld, tag);
+	}
+	return (error);
+}
+
 int
 zfs_release(zfs_handle_t *zhp, const char *snapname, const char *tag,
     boolean_t recursive)
@@ -4079,7 +4162,9 @@ zfs_release(zfs_handle_t *zhp, const char *snapname, const char *tag,
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
-	(void) strlcpy(zc.zc_string, tag, sizeof (zc.zc_string));
+	if (strlcpy(zc.zc_string, tag, sizeof (zc.zc_string))
+	    >= sizeof (zc.zc_string))
+		return (zfs_error(hdl, EZFS_TAGTOOLONG, tag));
 	zc.zc_cookie = recursive;
 
 	if (zfs_ioctl(hdl, ZFS_IOC_RELEASE, &zc) != 0) {
@@ -4106,4 +4191,22 @@ zfs_release(zfs_handle_t *zhp, const char *snapname, const char *tag,
 	}
 
 	return (0);
+}
+
+/*
+ * Release a user hold from the set of snapshots starting with fromsnap
+ * up to and including tosnap.
+ */
+int
+zfs_release_range(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
+    const char *tag)
+{
+	struct hold_range_arg arg = { 0 };
+
+	arg.origin = zhp;
+	arg.fromsnap = fromsnap;
+	arg.tosnap = tosnap;
+	arg.tag = tag;
+
+	return (zfs_iter_snapshots_sorted(zhp, zfs_hold_range_one, &arg));
 }

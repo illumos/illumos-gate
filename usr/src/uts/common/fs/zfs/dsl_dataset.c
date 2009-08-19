@@ -1000,6 +1000,11 @@ dsl_dataset_origin_rm_prep(struct dsl_ds_destroyarg *dsda, void *tag)
 			return (error);
 		dsda->rm_origin = origin;
 		dsl_dataset_make_exclusive(origin, tag);
+
+		if (origin->ds_objset != NULL) {
+			dmu_objset_evict(origin->ds_objset);
+			origin->ds_objset = NULL;
+		}
 	}
 
 	return (0);
@@ -1721,6 +1726,11 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		ASSERT3U(err, ==, 0);
 		ASSERT(!DS_UNIQUE_IS_ACCURATE(ds) ||
 		    ds->ds_phys->ds_unique_bytes == 0);
+
+		if (ds->ds_prev != NULL) {
+			dsl_dataset_rele(ds->ds_prev, ds);
+			ds->ds_prev = ds_prev = NULL;
+		}
 	}
 
 	err = zio_wait(zio);
@@ -1782,19 +1792,9 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		/*
 		 * Remove the origin of the clone we just destroyed.
 		 */
-		dsl_dataset_t *origin = ds->ds_prev;
 		struct dsl_ds_destroyarg ndsda = {0};
 
-		ASSERT3P(origin, ==, dsda->rm_origin);
-		if (origin->ds_objset) {
-			dmu_objset_evict(origin->ds_objset);
-			origin->ds_objset = NULL;
-		}
-
-		dsl_dataset_rele(ds->ds_prev, ds);
-		ds->ds_prev = NULL;
-
-		ndsda.ds = origin;
+		ndsda.ds = dsda->rm_origin;
 		dsl_dataset_destroy_sync(&ndsda, tag, cr, tx);
 	}
 }
@@ -3210,11 +3210,22 @@ dsl_dataset_set_reservation(const char *dsname, uint64_t reservation)
 	return (err);
 }
 
+struct dsl_ds_holdarg {
+	dsl_sync_task_group_t *dstg;
+	char *htag;
+	char *snapname;
+	boolean_t recursive;
+	boolean_t gotone;
+	boolean_t temphold;
+	char failed[MAXPATHLEN];
+};
+
 static int
 dsl_dataset_user_hold_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	char *htag = arg2;
+	struct dsl_ds_holdarg *ha = arg2;
+	char *htag = ha->htag;
 	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
 	int error = 0;
 
@@ -3223,9 +3234,6 @@ dsl_dataset_user_hold_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 	if (!dsl_dataset_is_snapshot(ds))
 		return (EINVAL);
-
-	if (strlen(htag) >= ZAP_MAXNAMELEN)
-		return (ENAMETOOLONG);
 
 	/* tags must be unique */
 	mutex_enter(&ds->ds_lock);
@@ -3246,8 +3254,10 @@ static void
 dsl_dataset_user_hold_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	char *htag = arg2;
-	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
+	struct dsl_ds_holdarg *ha = arg2;
+	char *htag = ha->htag;
+	dsl_pool_t *dp = ds->ds_dir->dd_pool;
+	objset_t *mos = dp->dp_meta_objset;
 	time_t now = gethrestime_sec();
 	uint64_t zapobj;
 
@@ -3268,19 +3278,15 @@ dsl_dataset_user_hold_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	VERIFY(0 == zap_add(mos, zapobj, htag, 8, 1, &now, tx));
 
-	spa_history_internal_log(LOG_DS_USER_HOLD,
-	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "<%s> dataset = %llu",
-	    htag, ds->ds_object);
-}
+	if (ha->temphold) {
+		VERIFY(0 == dsl_pool_user_hold(dp, ds->ds_object,
+		    htag, &now, tx));
+	}
 
-struct dsl_ds_holdarg {
-	dsl_sync_task_group_t *dstg;
-	char *htag;
-	char *snapname;
-	boolean_t recursive;
-	boolean_t gotone;
-	char failed[MAXPATHLEN];
-};
+	spa_history_internal_log(LOG_DS_USER_HOLD,
+	    dp->dp_spa, tx, cr, "<%s> temp = %d dataset = %llu", htag,
+	    (int)ha->temphold, ds->ds_object);
+}
 
 static int
 dsl_dataset_user_hold_one(char *dsname, void *arg)
@@ -3297,7 +3303,7 @@ dsl_dataset_user_hold_one(char *dsname, void *arg)
 	if (error == 0) {
 		ha->gotone = B_TRUE;
 		dsl_sync_task_create(ha->dstg, dsl_dataset_user_hold_check,
-		    dsl_dataset_user_hold_sync, ds, ha->htag, 0);
+		    dsl_dataset_user_hold_sync, ds, ha, 0);
 	} else if (error == ENOENT && ha->recursive) {
 		error = 0;
 	} else {
@@ -3308,7 +3314,7 @@ dsl_dataset_user_hold_one(char *dsname, void *arg)
 
 int
 dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
-    boolean_t recursive)
+    boolean_t recursive, boolean_t temphold)
 {
 	struct dsl_ds_holdarg *ha;
 	dsl_sync_task_t *dst;
@@ -3329,6 +3335,7 @@ dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
 	ha->htag = htag;
 	ha->snapname = snapname;
 	ha->recursive = recursive;
+	ha->temphold = temphold;
 	if (recursive) {
 		error = dmu_objset_find(dsname, dsl_dataset_user_hold_one,
 		    ha, DS_FIND_CHILDREN);
@@ -3446,16 +3453,19 @@ dsl_dataset_user_release_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 {
 	struct dsl_ds_releasearg *ra = arg1;
 	dsl_dataset_t *ds = ra->ds;
-	spa_t *spa = ds->ds_dir->dd_pool->dp_spa;
-	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
+	dsl_pool_t *dp = ds->ds_dir->dd_pool;
+	objset_t *mos = dp->dp_meta_objset;
 	uint64_t zapobj;
 	uint64_t dsobj = ds->ds_object;
 	uint64_t refs;
+	int error;
 
 	mutex_enter(&ds->ds_lock);
 	ds->ds_userrefs--;
 	refs = ds->ds_userrefs;
 	mutex_exit(&ds->ds_lock);
+	error = dsl_pool_user_release(dp, ds->ds_object, ra->htag, tx);
+	VERIFY(error == 0 || error == ENOENT);
 	zapobj = ds->ds_phys->ds_userrefs_obj;
 	VERIFY(0 == zap_remove(mos, zapobj, ra->htag, tx));
 	if (ds->ds_userrefs == 0 && ds->ds_phys->ds_num_children == 1 &&
@@ -3470,7 +3480,7 @@ dsl_dataset_user_release_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 	}
 
 	spa_history_internal_log(LOG_DS_USER_RELEASE,
-	    spa, tx, cr, "<%s> %lld dataset = %llu",
+	    dp->dp_spa, tx, cr, "<%s> %lld dataset = %llu",
 	    ra->htag, (longlong_t)refs, dsobj);
 }
 
@@ -3485,9 +3495,6 @@ dsl_dataset_user_release_one(char *dsname, void *arg)
 	char *name;
 	boolean_t own = B_FALSE;
 	boolean_t might_destroy;
-
-	if (strlen(ha->htag) >= ZAP_MAXNAMELEN)
-		return (ENAMETOOLONG);
 
 	/* alloc a buffer to hold dsname@snapname, plus the terminating NULL */
 	name = kmem_asprintf("%s@%s", dsname, ha->snapname);
@@ -3599,6 +3606,34 @@ dsl_dataset_user_release(char *dsname, char *snapname, char *htag,
 	kmem_free(ha, sizeof (struct dsl_ds_holdarg));
 	spa_close(spa, FTAG);
 	return (error);
+}
+
+/*
+ * Called at spa_load time to release a stale temporary user hold.
+ */
+int
+dsl_dataset_user_release_tmp(dsl_pool_t *dp, uint64_t dsobj, char *htag)
+{
+	dsl_dataset_t *ds;
+	char *snap;
+	char *name;
+	int namelen;
+	int error;
+
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	error = dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds);
+	rw_exit(&dp->dp_config_rwlock);
+	if (error)
+		return (error);
+	namelen = dsl_dataset_namelen(ds)+1;
+	name = kmem_alloc(namelen, KM_SLEEP);
+	dsl_dataset_name(ds, name);
+	dsl_dataset_rele(ds, FTAG);
+
+	snap = strchr(name, '@');
+	*snap = '\0';
+	++snap;
+	return (dsl_dataset_user_release(name, snap, htag, B_FALSE));
 }
 
 int

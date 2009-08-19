@@ -1606,6 +1606,11 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		 */
 		(void) dmu_objset_find(spa_name(spa),
 		    dsl_destroy_inconsistent, NULL, DS_FIND_CHILDREN);
+
+		/*
+		 * Clean up any stale temporary dataset userrefs.
+		 */
+		dsl_pool_clean_tmp_userrefs(spa->spa_dsl_pool);
 	}
 
 	error = 0;

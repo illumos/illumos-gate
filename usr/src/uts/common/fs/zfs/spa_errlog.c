@@ -58,7 +58,6 @@
  * This is a stripped-down version of strtoull, suitable only for converting
  * lowercase hexidecimal numbers that don't overflow.
  */
-#ifdef _KERNEL
 uint64_t
 strtonum(const char *str, char **nptr)
 {
@@ -85,7 +84,6 @@ strtonum(const char *str, char **nptr)
 
 	return (val);
 }
-#endif
 
 /*
  * Convert a bookmark to a string.

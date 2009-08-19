@@ -62,6 +62,7 @@ SUNWprivate_1.1 {
 	zfs_get_user_props;
 	zfs_get_type;
 	zfs_hold;
+	zfs_hold_range;
 	zfs_iscsi_perm_check;
 	zfs_is_mounted;
 	zfs_is_shared;
@@ -73,6 +74,7 @@ SUNWprivate_1.1 {
 	zfs_iter_filesystems;
 	zfs_iter_root;
 	zfs_iter_snapshots;
+	zfs_iter_snapshots_sorted;
 	zfs_mount;
 	zfs_name_to_prop;
 	zfs_name_valid;
@@ -107,6 +109,7 @@ SUNWprivate_1.1 {
 	zfs_receive;
 	zfs_refresh_properties;
 	zfs_release;
+	zfs_release_range;
 	zfs_rename;
 	zfs_rollback;
 	zfs_send;

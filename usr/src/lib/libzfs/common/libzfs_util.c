@@ -218,6 +218,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_REFTAG_HOLD:
 		return (dgettext(TEXT_DOMAIN, "tag already exists on this "
 		    "dataset"));
+	case EZFS_TAGTOOLONG:
+		return (dgettext(TEXT_DOMAIN, "tag too long"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

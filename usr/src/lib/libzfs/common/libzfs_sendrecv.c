@@ -415,7 +415,7 @@ zfs_snapshot_compare(const void *larg, const void *rarg)
 		return (0);
 }
 
-static int
+int
 zfs_iter_snapshots_sorted(zfs_handle_t *zhp, zfs_iter_f callback, void *data)
 {
 	int ret = 0;
@@ -724,6 +724,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	int err;
 	nvlist_t *fss = NULL;
 	avl_tree_t *fsavl = NULL;
+	char holdtag[128];
+	static uint64_t holdseq;
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot send '%s'"), zhp->zfs_name);
@@ -742,6 +744,12 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 
 		assert(fromsnap || doall);
 
+		(void) snprintf(holdtag, sizeof (holdtag), ".send-%d-%llu",
+		    getpid(), (u_longlong_t)holdseq);
+		++holdseq;
+		err = zfs_hold_range(zhp, fromsnap, tosnap, holdtag, B_TRUE);
+		if (err)
+			return (err);
 		if (replicate) {
 			nvlist_t *hdrnv;
 
@@ -754,8 +762,11 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 
 			err = gather_nvlist(zhp->zfs_hdl, zhp->zfs_name,
 			    fromsnap, tosnap, &fss, &fsavl);
-			if (err)
+			if (err) {
+				(void) zfs_release_range(zhp, fromsnap, tosnap,
+				    holdtag);
 				return (err);
+			}
 			VERIFY(0 == nvlist_add_nvlist(hdrnv, "fss", fss));
 			err = nvlist_pack(hdrnv, &packbuf, &buflen,
 			    NV_ENCODE_XDR, 0);
@@ -763,6 +774,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 			if (err) {
 				fsavl_destroy(fsavl);
 				nvlist_free(fss);
+				(void) zfs_release_range(zhp, fromsnap, tosnap,
+				    holdtag);
 				return (zfs_standard_error(zhp->zfs_hdl,
 				    err, errbuf));
 			}
@@ -788,6 +801,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		if (err == -1) {
 			fsavl_destroy(fsavl);
 			nvlist_free(fss);
+			(void) zfs_release_range(zhp, fromsnap, tosnap,
+			    holdtag);
 			return (zfs_standard_error(zhp->zfs_hdl,
 			    errno, errbuf));
 		}
@@ -801,6 +816,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 			if (err == -1) {
 				fsavl_destroy(fsavl);
 				nvlist_free(fss);
+				(void) zfs_release_range(zhp, fromsnap, tosnap,
+				    holdtag);
 				return (zfs_standard_error(zhp->zfs_hdl,
 				    errno, errbuf));
 			}
@@ -833,6 +850,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 			return (zfs_standard_error(zhp->zfs_hdl,
 			    errno, errbuf));
 		}
+		(void) zfs_release_range(zhp, fromsnap, tosnap, holdtag);
 	}
 
 	return (err || sdd.err);

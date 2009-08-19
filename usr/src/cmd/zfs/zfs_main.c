@@ -2681,14 +2681,18 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 	int i;
 	const char *tag;
 	boolean_t recursive = B_FALSE;
+	boolean_t temphold = B_FALSE;
+	const char *opts = holding ? "rt" : "r";
 	int c;
-	int (*func)(zfs_handle_t *, const char *, const char *, boolean_t);
 
 	/* check options */
-	while ((c = getopt(argc, argv, "r")) != -1) {
+	while ((c = getopt(argc, argv, opts)) != -1) {
 		switch (c) {
 		case 'r':
 			recursive = B_TRUE;
+			break;
+		case 't':
+			temphold = B_TRUE;
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -2708,16 +2712,10 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 	--argc;
 	++argv;
 
-	if (holding) {
-		if (tag[0] == '.') {
-			/* tags starting with '.' are reserved for libzfs */
-			(void) fprintf(stderr,
-			    gettext("tag may not start with '.'\n"));
-			usage(B_FALSE);
-		}
-		func = zfs_hold;
-	} else {
-		func = zfs_release;
+	if (holding && tag[0] == '.') {
+		/* tags starting with '.' are reserved for libzfs */
+		(void) fprintf(stderr, gettext("tag may not start with '.'\n"));
+		usage(B_FALSE);
 	}
 
 	for (i = 0; i < argc; ++i) {
@@ -2742,8 +2740,14 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 			++errors;
 			continue;
 		}
-		if (func(zhp, delim+1, tag, recursive) != 0)
-			++errors;
+		if (holding) {
+			if (zfs_hold(zhp, delim+1, tag, recursive,
+			    temphold) != 0)
+				++errors;
+		} else {
+			if (zfs_release(zhp, delim+1, tag, recursive) != 0)
+				++errors;
+		}
 		zfs_close(zhp);
 	}
 
@@ -2751,9 +2755,10 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 }
 
 /*
- * zfs hold [-r] <tag> <snap> ...
+ * zfs hold [-r] [-t] <tag> <snap> ...
  *
  * 	-r	Recursively hold
+ *	-t	Temporary hold (hidden option)
  *
  * Apply a user-hold with the given tag to the list of snapshots.
  */

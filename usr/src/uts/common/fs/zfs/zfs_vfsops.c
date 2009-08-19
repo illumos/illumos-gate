@@ -630,7 +630,6 @@ static void
 fuidstr_to_sid(zfsvfs_t *zfsvfs, const char *fuidstr,
     char *domainbuf, int buflen, uid_t *ridp)
 {
-	extern uint64_t strtonum(const char *str, char **nptr);
 	uint64_t fuid;
 	const char *domain;
 

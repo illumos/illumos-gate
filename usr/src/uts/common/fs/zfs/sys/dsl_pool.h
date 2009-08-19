@@ -85,6 +85,7 @@ typedef struct dsl_pool {
 	hrtime_t dp_read_overhead;
 	uint64_t dp_throughput;
 	uint64_t dp_write_limit;
+	uint64_t dp_tmp_userrefs_obj;
 
 	/* Uses dp_lock */
 	kmutex_t dp_lock;
@@ -145,6 +146,12 @@ void dsl_pool_scrub_sync(dsl_pool_t *dp, dmu_tx_t *tx);
 void dsl_pool_scrub_restart(dsl_pool_t *dp);
 
 taskq_t *dsl_pool_vnrele_taskq(dsl_pool_t *dp);
+
+extern int dsl_pool_user_hold(dsl_pool_t *dp, uint64_t dsobj,
+    const char *tag, time_t *t, dmu_tx_t *tx);
+extern int dsl_pool_user_release(dsl_pool_t *dp, uint64_t dsobj,
+    const char *tag, dmu_tx_t *tx);
+extern void dsl_pool_clean_tmp_userrefs(dsl_pool_t *dp);
 
 #ifdef	__cplusplus
 }

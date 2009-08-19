@@ -197,9 +197,11 @@ int dsl_dataset_promote(const char *name);
 int dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,
     boolean_t force);
 int dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,
-    boolean_t recursive);
+    boolean_t recursive, boolean_t temphold);
 int dsl_dataset_user_release(char *dsname, char *snapname, char *htag,
     boolean_t recursive);
+int dsl_dataset_user_release_tmp(struct dsl_pool *dp, uint64_t dsobj,
+    char *htag);
 int dsl_dataset_get_holds(const char *dsname, nvlist_t **nvp);
 
 blkptr_t *dsl_dataset_get_blkptr(dsl_dataset_t *ds);

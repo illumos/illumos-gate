@@ -142,6 +142,14 @@ dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 			goto out;
 	}
 
+	err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_TMP_USERREFS, sizeof (uint64_t), 1,
+	    &dp->dp_tmp_userrefs_obj);
+	if (err == ENOENT)
+		err = 0;
+	if (err)
+		goto out;
+
 	/* get scrub status */
 	err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_SCRUB_FUNC, sizeof (uint32_t), 1,
@@ -648,4 +656,109 @@ taskq_t *
 dsl_pool_vnrele_taskq(dsl_pool_t *dp)
 {
 	return (dp->dp_vnrele_taskq);
+}
+
+/*
+ * Walk through the pool-wide zap object of temporary snapshot user holds
+ * and release them.
+ */
+void
+dsl_pool_clean_tmp_userrefs(dsl_pool_t *dp)
+{
+	zap_attribute_t za;
+	zap_cursor_t zc;
+	objset_t *mos = dp->dp_meta_objset;
+	uint64_t zapobj = dp->dp_tmp_userrefs_obj;
+
+	if (zapobj == 0)
+		return;
+	ASSERT(spa_version(dp->dp_spa) >= SPA_VERSION_USERREFS);
+
+	for (zap_cursor_init(&zc, mos, zapobj);
+	    zap_cursor_retrieve(&zc, &za) == 0;
+	    zap_cursor_advance(&zc)) {
+		char *htag;
+		uint64_t dsobj;
+
+		htag = strchr(za.za_name, '-');
+		*htag = '\0';
+		++htag;
+		dsobj = strtonum(za.za_name, NULL);
+		(void) dsl_dataset_user_release_tmp(dp, dsobj, htag);
+	}
+	zap_cursor_fini(&zc);
+}
+
+/*
+ * Create the pool-wide zap object for storing temporary snapshot holds.
+ */
+void
+dsl_pool_user_hold_create_obj(dsl_pool_t *dp, dmu_tx_t *tx)
+{
+	objset_t *mos = dp->dp_meta_objset;
+
+	ASSERT(dp->dp_tmp_userrefs_obj == 0);
+	ASSERT(dmu_tx_is_syncing(tx));
+
+	dp->dp_tmp_userrefs_obj = zap_create(mos, DMU_OT_USERREFS,
+	    DMU_OT_NONE, 0, tx);
+
+	VERIFY(zap_add(mos, DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_TMP_USERREFS,
+	    sizeof (uint64_t), 1, &dp->dp_tmp_userrefs_obj, tx) == 0);
+}
+
+static int
+dsl_pool_user_hold_rele_impl(dsl_pool_t *dp, uint64_t dsobj,
+    const char *tag, time_t *t, dmu_tx_t *tx, boolean_t holding)
+{
+	objset_t *mos = dp->dp_meta_objset;
+	uint64_t zapobj = dp->dp_tmp_userrefs_obj;
+	char *name;
+	int error;
+
+	ASSERT(spa_version(dp->dp_spa) >= SPA_VERSION_USERREFS);
+	ASSERT(dmu_tx_is_syncing(tx));
+
+	/*
+	 * If the pool was created prior to SPA_VERSION_USERREFS, the
+	 * zap object for temporary holds might not exist yet.
+	 */
+	if (zapobj == 0) {
+		if (holding) {
+			dsl_pool_user_hold_create_obj(dp, tx);
+			zapobj = dp->dp_tmp_userrefs_obj;
+		} else {
+			return (ENOENT);
+		}
+	}
+
+	name = kmem_asprintf("%llx-%s", (u_longlong_t)dsobj, tag);
+	if (holding)
+		error = zap_add(mos, zapobj, name, 8, 1, t, tx);
+	else
+		error = zap_remove(mos, zapobj, name, tx);
+	strfree(name);
+
+	return (error);
+}
+
+/*
+ * Add a temporary hold for the given dataset object and tag.
+ */
+int
+dsl_pool_user_hold(dsl_pool_t *dp, uint64_t dsobj, const char *tag,
+    time_t *t, dmu_tx_t *tx)
+{
+	return (dsl_pool_user_hold_rele_impl(dp, dsobj, tag, t, tx, B_TRUE));
+}
+
+/*
+ * Release a temporary hold for the given dataset object and tag.
+ */
+int
+dsl_pool_user_release(dsl_pool_t *dp, uint64_t dsobj, const char *tag,
+    dmu_tx_t *tx)
+{
+	return (dsl_pool_user_hold_rele_impl(dp, dsobj, tag, NULL,
+	    tx, B_FALSE));
 }

@@ -166,6 +166,7 @@ typedef struct zfs_cmd {
 	struct drr_begin zc_begin_record;
 	zinject_record_t zc_inject_record;
 	boolean_t	zc_defer_destroy;
+	boolean_t	zc_temphold;
 } zfs_cmd_t;
 
 typedef struct zfs_useracct {
