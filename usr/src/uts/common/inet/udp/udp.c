@@ -8095,8 +8095,9 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		zone = crgetzone(cr);
 		connp->conn_mlp_type = udp->udp_recvucred ? mlptBoth :
 		    mlptSingle;
-		addrtype = tsol_mlp_addr_type(zone->zone_id, IPV6_VERSION,
-		    &v6src, us->us_netstack->netstack_ip);
+		addrtype = tsol_mlp_addr_type(
+		    connp->conn_allzones ? ALL_ZONES : zone->zone_id,
+		    IPV6_VERSION, &v6src, us->us_netstack->netstack_ip);
 		if (addrtype == mlptSingle) {
 			rw_enter(&udp->udp_rwlock, RW_WRITER);
 			udp->udp_pending_op = -1;

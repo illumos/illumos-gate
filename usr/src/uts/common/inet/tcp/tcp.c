@@ -25932,7 +25932,8 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 		connp = tcp->tcp_connp;
 		if (connp->conn_anon_mlp && is_system_labeled()) {
 			zone = crgetzone(cr);
-			addrtype = tsol_mlp_addr_type(zone->zone_id,
+			addrtype = tsol_mlp_addr_type(
+			    connp->conn_allzones ? ALL_ZONES : zone->zone_id,
 			    IPV6_VERSION, &v6addr,
 			    tcps->tcps_netstack->netstack_ip);
 			if (addrtype == mlptSingle) {
@@ -25983,7 +25984,8 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 		connp = tcp->tcp_connp;
 		if (is_system_labeled()) {
 			zone = crgetzone(cr);
-			addrtype = tsol_mlp_addr_type(zone->zone_id,
+			addrtype = tsol_mlp_addr_type(
+			    connp->conn_allzones ? ALL_ZONES : zone->zone_id,
 			    IPV6_VERSION, &v6addr,
 			    tcps->tcps_netstack->netstack_ip);
 			if (addrtype == mlptSingle) {

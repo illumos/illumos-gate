@@ -2234,7 +2234,7 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	 */
 	connp->conn_fully_bound = B_FALSE;
 
-	zoneid = connp->conn_zoneid;
+	zoneid = IPCL_ZONEID(connp);
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(v6src)) {
 		src_ire = ire_route_lookup_v6(v6src, 0, 0,

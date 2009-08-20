@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -574,7 +574,9 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 				 * and that the user's requested binding
 				 * is permitted.
 				 */
-				addrtype = tsol_mlp_addr_type(zone->zone_id,
+				addrtype = tsol_mlp_addr_type(
+				    connp->conn_allzones ? ALL_ZONES :
+				    zone->zone_id,
 				    sctp->sctp_ipversion,
 				    sctp->sctp_ipversion == IPV4_VERSION ?
 				    (void *)&sctp->sctp_ipha->ipha_src :
