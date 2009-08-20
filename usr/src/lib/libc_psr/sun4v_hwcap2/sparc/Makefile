@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -49,6 +47,8 @@ MODULE		= libc_psr_hwcap2.so.1
 LIBC_PSR_DIR	= $(ROOT_PSM_LIB_DIR)/libc_psr
 LIBC_PSR_LIB	= $(LIBC_PSR_DIR)/$(MODULE)
 INS.libc	= $(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(MODULE)
+
+$(LIBC_PSR_LIB) := FILEMODE= 0755
 
 $(LIBC_PSR_DIR):
 	-$(INS.dir.root.bin)

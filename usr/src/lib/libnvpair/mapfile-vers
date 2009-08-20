@@ -39,13 +39,17 @@
 
 SUNW_1.3 {
     global:
-	nvlist_lookup_nvpair;
 	nvlist_add_double;
 	nvlist_lookup_double;
 	nvpair_value_double;
+} SUNW_1.2.2;
+
+SUNW_1.2.2 {		# s10u8 - SunOS 5.10 (Solaris 10) patch additions
+    global:
+	nvlist_lookup_nvpair;
 } SUNW_1.2.1;
 
-SUNW_1.2.1 {
+SUNW_1.2.1 {		# s10u7 - SunOS 5.10 (Solaris 10) patch additions
     global:
 	nvlist_exists;
 } SUNW_1.2;

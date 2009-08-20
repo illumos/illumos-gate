@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -141,22 +141,22 @@ f none usr/platform/sun4u/sbin/trapstat 555 root bin
 f none usr/platform/sun4u/sbin/prtdiag 2755 root sys
 f none usr/platform/sun4u/lib/libprtdiag.so.1 755 root bin
 s none usr/platform/sun4u/lib/libprtdiag.so=./libprtdiag.so.1
-f none usr/platform/SUNW,Netra-CP3010/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Ultra-2/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,SPARC-Enterprise/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Netra-CP3010/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Ultra-2/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,SPARC-Enterprise/lib/libprtdiag_psr.so.1 755 root bin
 s none usr/platform/sun4u/lib/libprtdiag_psr.so.1=../../SUNW,Ultra-2/lib/libprtdiag_psr.so.1
-f none usr/platform/SUNW,Ultra-250/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Ultra-4/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Ultra-Enterprise/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Ultra-Enterprise-10000/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Sun-Fire/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Sun-Fire-280R/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Sun-Fire-15000/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Sun-Fire-880/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Sun-Fire-480R/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Ultra-250/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Ultra-4/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Ultra-Enterprise/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Ultra-Enterprise-10000/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Sun-Fire/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Sun-Fire-280R/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Sun-Fire-15000/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Sun-Fire-880/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Sun-Fire-480R/lib/libprtdiag_psr.so.1 755 root bin
 s none usr/platform/SUNW,Sun-Fire-V890/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Fire-880/lib/libprtdiag_psr.so.1
 s none usr/platform/SUNW,Sun-Fire-V490/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Fire-480R/lib/libprtdiag_psr.so.1
-f none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/libprtdiag_psr.so.1 755 root bin
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libprtdiag_psr.so.1=../../SUNW,UltraSPARC-IIi-Netract/lib/libprtdiag_psr.so.1
 #
 # create lib directory for sun4u and for all other sun4u platforms

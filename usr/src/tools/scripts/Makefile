@@ -64,12 +64,19 @@ SHFILES= \
 
 PERLFILES= \
 	check_rtime \
+	find_elf \
+	interface_check \
+	interface_cmp \
 	jstyle \
 	mkreadme_osol \
 	mktpl \
 	validate_flg \
 	validate_paths \
 	wdiff
+
+PERLMODULES= \
+	onbld_elfmod.pm
+
 
 PYFILES= \
 	cddlchk \
@@ -89,8 +96,11 @@ MAN1FILES= \
 	checkpaths.1 \
 	check_rtime.1 \
 	cstyle.1 \
+	find_elf.1 \
 	flg.flp.1 \
 	hdrchk.1 \
+	interface_check.1 \
+	interface_cmp.1 \
 	hgsetup.1 \
 	jstyle.1 \
 	mapfilechk.1 \
@@ -116,22 +126,31 @@ ETCFILES= \
 	its.conf \
 	its.reg
 
+EXCEPTFILES= \
+	check_rtime \
+	interface_check \
+	interface_cmp
+
 CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) bldenv.1
 
 include ../Makefile.tools
 
 
 $(ROOTONBLDETCFILES)	:= FILEMODE=	644
+$(ROOTONBLDEXCEPTFILES)	:= FILEMODE=	644
+$(ROOTONBLDPERLMODULES)	:= FILEMODE=	644
 $(ROOTONBLDMAKEFILES)	:= FILEMODE=	644
 $(ROOTONBLDMAN1FILES)	:= FILEMODE=	644
 
 .KEEP_STATE:
 
-all:	$(SHFILES) $(PERLFILES) $(PYFILES) $(MAN1FILES) $(MAKEFILES)
+all:	$(SHFILES) $(PERLFILES) $(PERLMODULES) $(PYFILES) \
+	$(MAN1FILES) $(MAKEFILES)
 
 install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDPERLFILES)	\
-		$(ROOTONBLDPYFILES) $(ROOTONBLDMAN1FILES)	\
-		$(ROOTONBLDMAKEFILES) $(ROOTONBLDETCFILES)
+		$(ROOTONBLDPERLMODULES) $(ROOTONBLDPYFILES)	\
+		$(ROOTONBLDMAN1FILES) $(ROOTONBLDMAKEFILES)	\
+		$(ROOTONBLDETCFILES) $(ROOTONBLDEXCEPTFILES)
 
 clean:
 	$(RM) $(CLEANFILES)

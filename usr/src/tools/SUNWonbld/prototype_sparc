@@ -27,7 +27,6 @@
 # SUNWonbld
 #
 d none opt/onbld/bin/sparc 755 root bin
-f none opt/onbld/bin/sparc/abi_audit 555 root bin
 f none opt/onbld/bin/sparc/bfuld 555 root bin
 f none opt/onbld/bin/sparc/chk4ubin 555 root bin
 f none opt/onbld/bin/sparc/codereview 555 root bin

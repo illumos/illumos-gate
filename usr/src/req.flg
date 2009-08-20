@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 echo_file usr/src/Makefile
 echo_file usr/src/Targetdirs
@@ -34,9 +33,6 @@ echo_file usr/src/Makefile.msg.targ
 echo_file usr/src/Makefile.psm
 echo_file usr/src/Makefile.psm.targ
 echo_file usr/src/xmod/xmod_files
-echo_file usr/src/tools/abi/etc/ABI_sparc.db
-echo_file usr/src/tools/abi/etc/ABI_i386.db
-echo_file usr/src/tools/abi/etc/exceptions
 echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetCF
 echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetCFLimited
 echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnetSE

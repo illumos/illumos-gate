@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 
 This directory contains the tools used to do a full build of the
 OS/Net workspace.  They usually live in the /opt/onbld directory on build
@@ -40,7 +39,7 @@ Layout of /opt/onbld
 
 /opt/onbld/etc/abi
 	contains Solaris ABI database (ABI_*.db) and exceptions
-	for ABI Auditing tool (intf_check).
+	for ABI Auditing tool (interface_check, interface_cmp).
 
 /opt/onbld/gk
 	gk account's home directory.
@@ -177,6 +176,11 @@ elfsigncmp
 	verify that the signing caused no damage before updating
 	the object to be signed.
 	
+find_elf
+	Search a directory tree for ELF objects, and produce one line of
+	output per object. Used by check_rtime and interface_check to locate
+	the objects to examine.
+
 findunref
 	Finds all files in a source tree that have access times older than a
 	certain time and are not in a specified list of exceptions.  Since
@@ -212,8 +216,18 @@ install.bin
 	faster now. One speedup includes avoiding the name service for the
 	well-known, never-changing password entries like 'root' and 'sys.'
 
-intf_check
-	detects and reports ABI versioning and stability problems.
+interface_check
+	detects and reports invalid versioning in ELF objects.
+	Optionally generates an interface description file for
+	the workspace.
+
+interface_cmp
+	Compares two interface description files, as produced by
+	interface_check, and flags invalid deviations in ELF object
+	versioning between them. interface_cmp can be used between Solaris
+	gates to ensure that older releases remain compatible with the
+	development gate. It can also be used to validate new changes to
+	the development gate before they are integrated.
 
 lintdump
 	dumps the contents of one or more lint libraries; see lintdump(1)

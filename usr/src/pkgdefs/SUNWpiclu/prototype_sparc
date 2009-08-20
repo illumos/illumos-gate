@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -125,15 +123,15 @@ s none usr/platform/SUNW,Sun-Fire-V445/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Bl
 d none usr/platform/SUNW,Sun-Fire-V215 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V215/lib 755 root bin
 s none usr/platform/SUNW,Sun-Fire-V215/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
-f none usr/platform/SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1 755 root bin
 s none usr/platform/SUNW,Sun-Blade-1000/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
-f none usr/platform/SUNW,Netra-T12/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Netra-T12/lib/libprtdiag_psr.so.1 755 root bin
 s none usr/platform/SUNW,Netra-T4/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
 d none usr/platform/SUNW,Netra-CP2300 755 root sys
 d none usr/platform/SUNW,Netra-CP2300/lib 755 root bin 
 f none usr/platform/SUNW,Netra-CP2300/lib/libctsmc.so.1 755 root sys
 s none usr/platform/SUNW,Netra-CP2300/lib/libctsmc.so=libctsmc.so.1 755 root sys
-f none usr/platform/SUNW,Netra-CP2300/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Netra-CP2300/lib/libprtdiag_psr.so.1 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V240 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V240/lib 755 root bin
 s none usr/platform/SUNW,Sun-Fire-V240/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1

@@ -46,7 +46,7 @@ include ../Makefile.com
 $(PLATLIBS)/libtsalarm.so:
 	$(RM) -r $@; $(SYMLINK) libtsalarm.so.1 $@
 
-$(USR_PSM_LIB_DIR)/% := FILEMODE= 644
+$(USR_PSM_LIB_DIR)/% := FILEMODE= 755
 
 $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(INS.file)

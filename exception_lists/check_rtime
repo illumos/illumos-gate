@@ -1,0 +1,226 @@
+
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# This file provides exceptions to the usual rules applied to ELF objects by
+# check_rtime. All strings are Perl regular expressions that are compared to
+# file paths. In addition to the standard Perl syntax, there is one extension:
+#
+#	MACH(dir)
+#
+# is expanded into a regular expression that matches the given
+# directory, or a 64-bit subdirectory of the directory with the
+# name of a 64-bit architecture. For example, MACH(lib) will match
+# any of the following:
+#
+#	lib
+#	lib/amd64
+#	lib/sparcv9
+
+
+# Directory hierarchies to skip completely
+SKIP		^usr/lib/libc/			# optimized libc
+SKIP		^usr/lib/rcm/			# 4426119
+SKIP		^usr/perl5/			# alan's taking care of these :-)
+SKIP		^usr/src/			# no objects in source code
+
+# Individual files that we don't examine
+SKIP		^boot/grub/bin/grub$
+SKIP		^usr/apache/libexec/mod_ipp.so$	# Apache loadable module
+# USIII specific extns. cause ldd noise on USII bld. m/c
+SKIP		^usr/lib/fps/sun4u/UltraSPARC.*/fptest$
+SKIP		^usr/MACH(lib)/lddstub$		# lddstub has no dependencies
+SKIP		^usr/MACH(lib)/libssagent\.so\.1$	# 4328854
+SKIP		^usr/lib/MACH(iconv)/geniconvtbl.so$	# 4384329
+
+# picl file exclusions (4385799)
+SKIP		^usr/platform/.*/libpsvcplugin_psr\.so\.1
+SKIP		^usr/platform/.*/libpsvcpolicy_psr\.so\.1
+SKIP		^usr/platform/.*/libpsvcpolicy\.so\.1
+SKIP		^usr/lib/sysevent/modules/picl_slm.so$
+
+# Objects that don't require a non-executable stack definition
+EXEC_STACK	^platform/.*/MACH(kernel)/unix$
+EXEC_STACK	^platform/.*/multiboot$
+
+# Objects for which we allow relocations to the text segment
+TEXTREL		^platform/.*/MACH(kernel)/unix$
+
+# Directories and files that are allowed to have no direct bound symbols
+NODIRECT	^platform/.*/MACH(kernel)/unix$
+NODIRECT	^usr/ucb
+NODIRECT	^usr/4lib/sbcp$
+
+# Identify any files that should be skipped when building a crle(1)
+# configuration file.  As the hwcap libraries can be loop-back mounted onto
+# libc, these can confuse crle(1) because of their identical dev/inode.
+NOCRLEALT	^usr/lib/libc/libc_hwcap[1-3].so.1$
+
+# Files that should contain debugging information.
+STAB	^platform/.*/MACH(kernel)/unix$
+
+# Files that are allowed undefined references
+UNDEF_REF	^usr/lib/libnisdb\.so\.2$
+UNDEF_REF	^usr/snadm/lib/libsvm\.so\.1$
+
+# Objects allowed to have unused dependencies
+UNUSED_DEPS	^usr/lib/picl/plugins/		# require devtree dependencies
+UNUSED_DEPS	^usr/lib/libp	# profile libc makes libm an unused dep of libc
+
+# libm.so.2 dependency
+UNUSED_OBJ	unused object=.*MACH(libm)/libm_hwcap1\.so\.2
+
+# Unused runpaths due to dlopen() use
+UNUSED_RPATH	/usr/lib/fs/autofs.*\ from\ .automountd
+UNUSED_RPATH	/etc/ppp/plugins.*\ from\ .*pppd
+UNUSED_RPATH	/usr/lib/inet/ppp.*\ from\ .*pppd
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libipsecutil\.so\.1
+UNUSED_RPATH	/usr/platform/.*rsmlib.*\ from\ .*librsm\.so\.2
+UNUSED_RPATH	\$ORIGIN.*\ from\ .*fcode.so
+UNUSED_RPATH	/opt/VRTSvxvm/lib.*\ from\ .*libdiskmgt\.so\.1
+
+# Unused runpaths in picl code
+UNUSED_RPATH	/usr/platform/.*\ from\ .*/usr/platform
+UNUSED_RPATH	/usr/lib/picl/.*\ from\ .*/usr/platform
+UNUSED_RPATH	/usr/platform/.*\ from\ .*/usr/lib/picl
+
+# Unused runpaths in non-OSNET objects we can't change
+UNUSED_RPATH	/usr/lib/mps/secv1.*\ from\ .*libnss3\.so
+UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnss3\.so
+UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnssutil3.so
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-1\.so\.3
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-glib-1\.so\.2
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libglib-2\.0\.so\.0
+UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libglib-2\.0\.so\.0
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgmodule-2\.0\.so\.0
+UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgmodule-2\.0\.so\.0
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgnomevfs-2\.so\.0
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgobject-2\.0\.so\.0
+UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgobject-2\.0\.so\.0
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgthread-2\.0\.so\.0
+UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgthread-2\.0\.so\.0
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.15
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1
+UNUSED_RPATH	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5
+UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libpq\.so\.5
+
+# Unused runpaths for reasons not captured above
+UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs
+UNUSED_RPATH	/usr.*\ from\ .*tst\.gcc\.exe			# gcc built
+
+
+# Unreferenced objects of non-OSnet objects we can't change
+UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
+UNREF_OBJ	/lib.*\ of\ .*libjvm\.so
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmp\.so\.15
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmpagent\.so\.15
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmpmibs\.so\.15
+UNREF_OBJ	/lib.*\ of\ .*libnetsnmphelpers\.so\.15
+UNREF_OBJ	/lib.*\ of\ .*libnspr4\.so
+UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.5
+UNREF_OBJ	/lib.*\ of\ .*libsoftokn3\.so
+UNREF_OBJ	/lib.*\ of\ .*libspmicommon\.so\.1
+UNREF_OBJ	/lib.*\ of\ .*libspmocommon\.so\.1
+UNREF_OBJ	/lib.*\ of\ .*libssl3\.so
+UNREF_OBJ	/lib.*\ of\ .*libtspi\.so\.1
+UNREF_OBJ	/lib.*\ of\ .*libxml2\.so\.2
+UNREF_OBJ	/lib.*\ of\ .*libxslt\.so\.1
+UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.4
+UNREF_OBJ	/lib.*\ of\ .*libpython2\.4\.so\.1\.0
+
+# Unreferenced object of objects we can't change for other reasons
+UNREF_OBJ	/libmapmalloc\.so\.1;\ unused\ dependency\ of	# interposer
+UNREF_OBJ	/libstdc\+\+\.so\.6;\ unused\ dependency\ of	# gcc build
+UNREF_OBJ	/libm\.so\.2.*\ of\ .*libstdc\+\+\.so\.6	# gcc build
+UNREF_OBJ	/lib.*\ of\ .*/lib/picl/plugins/		# picl
+UNREF_OBJ	/lib.*\ of\ .*kcfd				# interposer
+UNREF_OBJ	/libpkcs11\.so\.1; .*\ of\ .*libkmf\.so\.1	# interposed
+
+# Objects that used to contain system functionalty that has since
+# migrated to libc. We preserve these libraries as pure filters for
+# backward compatability but nothing needs to link to them.
+OLDDEP		libaio\.so\.1			# onnv build 44
+OLDDEP		libdl\.so\.1			# on10 build 49
+OLDDEP		libdoor\.so\.1			# onnv build 12
+OLDDEP		libintl\.so\.1			# on297 build 7
+OLDDEP		libpthread\.so\.1		# on10 build 53
+OLDDEP		librt\.so\.1			# onnv build 44
+OLDDEP		libsched\.so\.1			# on10 build 36
+OLDDEP		libthread\.so\.1		# on10 build 53
+OLDDEP		libw\.so\.1			# on297 build 7
+
+# Files for which we skip checking of duplicate addresses in the
+# symbol sort sections. Such exceptions should be rare --- most code will
+# not have duplicate addresses, since it takes assember or a "#pragma weak"
+# to do such aliasing in C. C++ is different: The compiler generates aliases
+# for implementation reasons, and the mangled names used to encode argument
+# and return value types are difficult to handle well in mapfiles.
+# Furthermore, the Sun compiler and gcc use different and incompatible
+# name mangling conventions. Since ON must be buildable by either, we
+# would have to maintain two sets of mapfiles for each such object.
+# C++ use is rare in ON, so this is not worth pursuing.
+#
+NOSYMSORT	opt/SUNWdtrt/tst/common/pid/tst.weak2.exe	# DTrace test
+NOSYMSORT	lib/amd64/libnsl\.so\.1				# C++
+NOSYMSORT	lib/sparcv9/libnsl\.so\.1			# C++
+NOSYMSORT	lib/sparcv9/libfru\.so\.1			# C++
+NOSYMSORT	usr/lib/sgml/nsgmls				# C++
+NOSYMSORT	usr/lib/lms					# C++
+NOSYMSORT	ld\.so\.1					# libc_pic.a user
+NOSYMSORT	lib/libsun_fc\.so\.1				# C++
+NOSYMSORT	lib/amd64/libsun_fc\.so\.1			# C++
+NOSYMSORT	lib/sparcv9/libsun_fc\.so\.1 			# C++
+
+
+# The libprtdiag_psr.so.1 objects built under usr/src/lib/libprtdiag_psr
+# are a family, all built using the same makefile, targeted at different
+# sparc hardware variants. There are a small number of cases where this
+# one size fits all approach causes an object to be linked against an
+# unneeded library.
+UNREF_OBJ	lib/(libdevinfo|libcfgadm)\.so\.1; .*\ of\ .*SUNW,Netra-CP2300/lib/libprtdiag_psr\.so\.1
+
+
+# Remove this once the following integrates:
+#	6858961 check_rtime issues with fwflash plugins (IB transports)
+#
+SKIP	^usr/lib/fwflash/identify/hermon\.so$
+SKIP	^usr/lib/fwflash/identify/tavor\.so$
+SKIP	^usr/lib/fwflash/verify/hermon-MELLANOX\.so$
+SKIP	^usr/lib/fwflash/verify/tavor-MELLANOX\.so$
+
+
+# Remove this once the following integrates:
+#	6858954 check_rtime issues with fwflash plugins (scsi transports)
+#
+SKIP	^usr/lib/fwflash/identify/sd\.so$
+SKIP	^usr/lib/fwflash/identify/ses\.so$
+SKIP	^usr/lib/fwflash/identify/sgen\.so$
+SKIP	^usr/lib/fwflash/verify/sd-GENERIC\.so$
+SKIP	^usr/lib/fwflash/verify/ses-LSILOGIC\.so$
+SKIP	^usr/lib/fwflash/verify/ses-SUN\.so$
+SKIP	^usr/lib/fwflash/verify/sgen-LSILOGIC\.so$
+SKIP	^usr/lib/fwflash/verify/sgen-SUN\.so$

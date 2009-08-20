@@ -33,7 +33,6 @@ BOOT_SUBDIRS= \
 	cw
 
 COMMON_SUBDIRS= \
-	abi \
 	bfuld \
 	codereview \
 	codesign \
@@ -98,6 +97,7 @@ ROOTDIRS= \
 	$(ROOTONBLD)/bin/$(MACH) \
 	$(ROOTONBLD)/lib \
 	$(ROOTONBLD)/lib/$(MACH) \
+	$(ROOTONBLD)/lib/perl \
 	$(ROOTONBLD)/lib/python \
 	$(ROOTONBLD)/lib/python/onbld \
 	$(ROOTONBLD)/lib/python/onbld/Checks \
@@ -105,7 +105,7 @@ ROOTDIRS= \
 	$(ROOTONBLD)/lib/python/onbld/Scm \
 	$(ROOTONBLD)/env \
 	$(ROOTONBLD)/etc \
-	$(ROOTONBLD)/etc/abi \
+	$(ROOTONBLD)/etc/exception_lists \
 	$(ROOTONBLD)/gk \
 	$(ROOTONBLD)/man \
 	$(ROOTONBLD)/man/man1

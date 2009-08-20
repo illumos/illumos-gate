@@ -1,0 +1,109 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# This file provides exceptions to the usual rules applied to sharable
+# objects by intf_check. All strings are Perl regular expressions that
+# are compared to file names. In addition to the standard Perl syntax,
+# there is one extension:
+#
+#	MACH(dir)
+#
+# is expanded into a regular expression that matches the given
+# directory, or a 64-bit subdirectory of the directory with the
+# name of a 64-bit architecture. For example, MACH(lib) will match
+# any of the following:
+#
+#	lib
+#	lib/amd64
+#	lib/sparcv9
+
+
+# Sharable objects underneath these parts of the tree are taken to be plugins.
+# Plugins are not required to have versioned file names, and are not required
+# to be internally versioned.
+#
+PLUGIN		^usr/apache/libexec
+PLUGIN		^usr/lib/devfsadm
+PLUGIN		^usr/lib/efcode/.*\.so$
+PLUGIN		^usr/lib/elfedit
+PLUGIN		^usr/lib/fm/fmd/plugins
+PLUGIN		^usr/lib/fm/fmd/schemes
+PLUGIN		^usr/lib/fm/topo/plugins
+PLUGIN		^usr/lib/fwflash
+PLUGIN		^usr/lib/iconv
+PLUGIN		^usr/lib/inet/ppp
+PLUGIN		^usr/lib/mdb
+PLUGIN		^usr/lib/mms
+PLUGIN		^usr/lib/pci
+PLUGIN		^usr/lib/picl/plugins
+PLUGIN		^usr/lib/python2.4
+PLUGIN		^usr/lib/rcm/modules
+PLUGIN		^usr/lib/scsi/plugins
+PLUGIN		^usr/lib/sysevent/modules
+PLUGIN		^usr/perl5/5\.[^\\]*/lib
+PLUGIN		^usr/platform
+PLUGIN		^usr/sadm/lib/wbem
+
+
+# sbcp is a special case, and not a plugin. However, it does not have a
+# versioned name, and does not contain versioning, so the PLUGIN exemptions fit.
+PLUGIN	^usr/4lib/sbcp$
+
+
+# Objects that are not expected to contain versioning information.
+# Note that PLUGIN objects are automatically exempt from this,
+# so these directives are generally applied to non-plugin objects
+NOVERDEF	^usr/4lib/libc\.so\.
+NOVERDEF	^usr/MACH(lib)/0\@0\.so\.1$
+NOVERDEF	^usr/lib/MACH(abi)/apptrace\.so\.1$
+NOVERDEF	^usr/MACH(lib)/libfru.*\.so\.1$
+NOVERDEF	^usr/MACH(lib)/libkrb5\.so\.1$
+NOVERDEF	^usr/MACH(lib)/libzpool\.so\.1$
+NOVERDEF	^usr/MACH(lib)/madv\.so\.1$
+NOVERDEF	^usr/MACH(lib)/mpss\.so\.1$
+NOVERDEF	^usr/MACH(lib)/sn1_brand\.so\.1$
+NOVERDEF	^usr/lib/fs/[^/]*/fstyp\.so\.1$
+NOVERDEF	^usr/lib/libmilter\.so\.1$
+NOVERDEF	^usr/lib/libwrap\.so\.1\.0$
+NOVERDEF	^usr/lib/locale/MACH(iso_8859_1)/iso_8859_1\.so\.3$
+NOVERDEF	^usr/lib/picl/plugins$
+NOVERDEF	^usr/sadm/admin/dhcpmgr/dhcpmgr\.so\.1$
+NOVERDEF	^usr/sadm/admin/printmgr/lib/libpmgr\.so\.1$
+
+
+# Objects that are allowed to deviate from our standard version
+# names.
+NONSTD_VERNAME	^usr/MACH(lib)/libtecla\.so\.1$
+
+
+# These libc variants have an SONAME of libc\.so\.1$
+NONSTD_VERNAME	^usr/MACH(lib)/libc/libc_hwcap[1-3]+\.so\.1$
+
+
+# The ABI requires the SONAME for libsys.so.1 to be /usr/lib/ld.so.1
+# That means that the base version will also be /usr/lib/ld.so.1, which
+# is non-standard.
+NONSTD_VERNAME	^usr/lib/libsys\.so\.1$

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -92,9 +92,9 @@ d none usr/platform/SUNW,Netra-T5440/lib/sparcv9 755 root bin
 #
 # add binary and libraries for prtdiag
 #
-f none usr/platform/SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Netra-CP3060/lib/libprtdiag_psr.so.1 644 root bin
-f none usr/platform/SUNW,Netra-CP3260/lib/libprtdiag_psr.so.1 644 root bin
+f none usr/platform/SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Netra-CP3060/lib/libprtdiag_psr.so.1 755 root bin
+f none usr/platform/SUNW,Netra-CP3260/lib/libprtdiag_psr.so.1 755 root bin
 
 #
 # create libpcp library
@@ -204,7 +204,7 @@ s none usr/platform/SUNW,Netra-CP3060/sbin/trapstat=../../sun4v/sbin/trapstat
 #
 # add library for tsalarm
 #
-f none usr/platform/sun4v/lib/libtsalarm.so.1 644 root bin
+f none usr/platform/sun4v/lib/libtsalarm.so.1 755 root bin
 s none usr/platform/sun4v/lib/libtsalarm.so=./libtsalarm.so.1
 d none usr/platform/sun4v/include 755 root bin
 f none usr/platform/sun4v/include/tsalarm.h 644 root bin

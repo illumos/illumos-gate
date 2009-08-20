@@ -44,9 +44,6 @@
 #
 #	For example: LINTDIRS="$SRC/uts n $SRC/stand y $SRC/psm y"
 #
-# -A flag in NIGHTLY_OPTIONS checks ABI diffs in .so files
-# This option requires a couple of scripts.
-#
 # OPTHOME and TEAMWARE may be set in the environment to override /opt
 # and /opt/teamware defaults.
 #
@@ -2989,127 +2986,87 @@ if [ "$U_FLAG" = "y" -a "$build_ok" = "y" ]; then
 fi
 
 #
-# do shared library interface verification
+# ELF verification: ABI (-A) and runtime (-r) checks
 #
+if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
+	# Directory ELF-data.$MACH holds the files produced by these tests.
+	elf_ddir=$SRC/ELF-data.$MACH
 
-if [ "$A_FLAG" = "y" -a "$build_ok" = "y" ]; then
-	echo "\n==== Check versioning and ABI information ====\n"  | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	rm -rf $SRC/interfaces.ref
-	if [ -d $SRC/interfaces.out ]; then
-		mv $SRC/interfaces.out $SRC/interfaces.ref
+	# If there is a previous ELF-data backup directory, remove it. Then,
+	# rotate current ELF-data directory into its place and create a new
+	# empty directory
+	rm -rf $elf_ddir.ref
+	if [[ -d $elf_ddir ]]; then
+		mv $elf_ddir $elf_ddir.ref
 	fi
-	rm -rf $SRC/interfaces.out
-	mkdir -p $SRC/interfaces.out
+	mkdir -p $elf_ddir
 
-	intf_check -V -m -o -b $SRC/tools/abi/etc \
-		-d $SRC/interfaces.out $checkroot 2>&1 | sort \
-		> $SRC/interfaces.out/log
+	# Call find_elf to produce a list of the ELF objects in the proto area.
+	# This list is passed to check_rtime and interface_check, preventing
+	# them from separately calling find_elf to do the same work twice.
+	find_elf -fr $checkroot > $elf_ddir/object_list
 
-	# report any ERROR found in log file
-	fgrep 'ERROR' $SRC/interfaces.out/log | sed 's/^ERROR: //' | \
-		tee -a $LOGFILE >> $mail_msg_file
+	if [[ $A_FLAG = y ]]; then
+	       	echo "\n==== Check versioning and ABI information ====\n"  | \
+		    tee -a $LOGFILE >> $mail_msg_file
 
-	if [ ! -d $SRC/interfaces.ref ] ; then
-		mkdir -p $SRC/interfaces.ref
-		if [ -d  $SRC/interfaces.out ]; then
-			cp -r $SRC/interfaces.out/* $SRC/interfaces.ref
+		# Produce interface description for the proto. Report errors.
+		interface_check -o -w $elf_ddir -f object_list \
+			-i interface -E interface.err
+		if [[ -s $elf_ddir/interface.err ]]; then
+			tee -a $LOGFILE < $elf_ddir/interface.err \
+				>> $mail_msg_file
+		fi
+
+	       	echo "\n==== Compare versioning and ABI information to" \
+		    "baseline ====\n"  | tee -a $LOGFILE >> $mail_msg_file
+
+		# Compare new interface to baseline interface. Report errors.
+		interface_cmp -d -o $SRC/tools/abi/interface.$MACH \
+			$elf_ddir/interface > $elf_ddir/interface.cmp
+		if [[ -s $elf_ddir/interface.cmp ]]; then
+			tee -a $LOGFILE < $elf_ddir/interface.cmp \
+				>> $mail_msg_file
 		fi
 	fi
 
-	echo "\n==== Diff versioning warnings (since last build) ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	out_vers=`grep ^VERSION $SRC/interfaces.out/log`;
-	ref_vers=`grep ^VERSION $SRC/interfaces.ref/log`;
-
-	# Report any differences in WARNING messages between last
-	# and current build.
-	if [ "$out_vers" = "$ref_vers" ]; then
-		diff $SRC/interfaces.ref/log $SRC/interfaces.out/log | \
-		    fgrep 'WARNING' | sed 's/WARNING: //' | \
+	if [[ $r_FLAG = y ]]; then
+		echo "\n==== Check ELF runtime attributes ====\n" | \
 		    tee -a $LOGFILE >> $mail_msg_file
+
+		# If we're doing a debug build the proto area will be left
+		# with debuggable objects, thus don't assert -s.
+		if [[ $D_FLAG = y ]]; then
+			rtime_sflag=""
+		else
+			rtime_sflag="-s"
+		fi
+		check_rtime -i -m -v $rtime_sflag -o -w $elf_ddir \
+			-D object_list  -f object_list -E runtime.err \
+			-I runtime.attr
+
+		# Report errors
+		if [[ -s $elf_ddir/runtime.err ]]; then
+			tee -a $LOGFILE < $elf_ddir/runtime.err \
+				>> $mail_msg_file
+		fi
+
+		# If there is an ELF-data directory from a previous build,
+		# then diff the attr files. These files contain information
+		# about dependencies, versioning, and runpaths. There is some
+		# overlap with the ABI checking done above, but this also
+		# flushes out non-ABI interface differences along with the
+		# other information.
+		echo "\n==== Diff ELF runtime attributes" \
+		    "(since last build) ====\n" | \
+		    tee -a $LOGFILE >> $mail_msg_file >> $mail_msg_file
+
+		if [[ -f $elf_ddir.ref/runtime.attr ]]; then
+			diff $elf_ddir.ref/runtime.attr \
+				$elf_ddir/runtime.attr \
+				>> $mail_msg_file
+		fi
 	fi
-fi
-
-if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
-	echo "\n==== Check ELF runtime attributes ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	LDDWRONG="wrong class"
-	CRLERROR="^crle:"
-	CRLECONF="^crle: configuration file:"
-
-	RUNTIMEREF=$SRC/runtime-${MACH}.ref
-	RUNTIMEOUT=$SRC/runtime-${MACH}.out
-
-	rm -f $RUNTIMEREF
-	if [ -f $RUNTIMEOUT ]; then
-		egrep -v "$LDDWRONG|$CRLERROR|$CRLECONF" \
-			$RUNTIMEOUT > $RUNTIMEREF
-	fi
-
-	# If we're doing a debug build the proto area will be left with
-	# debuggable objects, thus don't assert -s.
-	if [ "$D_FLAG" = "y" ]; then
-		rtime_sflag=""
-	else
-		rtime_sflag="-s"
-	fi
-	check_rtime -d $checkroot -i -m -v -o $rtime_sflag $checkroot 2>&1 | \
-	    egrep -v ": unreferenced object=$checkroot/.*/lib(w|intl|thread|pthread).so" | \
-	    egrep -v ": unused object=$checkroot/.*/lib(w|intl|thread|pthread).so" | \
-	    sort > $RUNTIMEOUT
-
-	# Determine any processing errors that will affect the final output
-	# and display these first.
-	grep -l "$LDDWRONG" $RUNTIMEOUT > /dev/null
-	if (( $? == 0 )) ; then
-	    echo "WARNING: wrong class message detected.  ldd(1) was unable" | \
-		tee -a $LOGFILE >> $mail_msg_file
-	    echo "to execute an object, thus it could not be checked fully." | \
-		tee -a $LOGFILE >> $mail_msg_file
-	    echo "Perhaps a 64-bit object was encountered on a 32-bit system," | \
-		tee -a $LOGFILE >> $mail_msg_file
-	    echo "or an i386 object was encountered on a sparc system?\n" | \
-		tee -a $LOGFILE >> $mail_msg_file
-	fi
-	grep -l "$CRLECONF" $RUNTIMEOUT > /dev/null
-	if (( $? == 0 )) ; then
-	    echo "WARNING: creation of an alternative dependency cache failed." | \
-		tee -a $LOGFILE >> $mail_msg_file
-	    echo "Dependencies will bind to the base system libraries.\n" | \
-		tee -a $LOGFILE >> $mail_msg_file
-	    grep "$CRLECONF" $RUNTIMEOUT | \
-		tee -a $LOGFILE >> $mail_msg_file
-	    grep "$CRLERROR" $RUNTIMEOUT | grep -v "$CRLECONF" | \
-		tee -a $LOGFILE >> $mail_msg_file
-	    echo "\n" | tee -a $LOGFILE >> $mail_msg_file
-	fi
-
-	egrep '<dependency no longer necessary>' $RUNTIMEOUT | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	# NEEDED= and RPATH= are generated by the -i option
-	# VERDEF= and VERSION= are generated by the -v option.
-	# These lines are informational; report anything else that we
-	# haven't already.
-	egrep -v "NEEDED=|RPATH=|VERDEF=|VERSION=" $RUNTIMEOUT \
-		| egrep -v "$LDDWRONG|$CRLERROR|$CRLECONF" \
-		| tee -a $LOGFILE >> $mail_msg_file
-
-	# probably should compare against a 'known ok runpaths' list
-	if [ ! -f $RUNTIMEREF ]; then
-		egrep -v "$LDDWRONG|$CRLERROR|$CRLECONF" \
-			$RUNTIMEOUT >  $RUNTIMEREF
-	fi
-
-	echo "\n==== Diff ELF runtime attributes (since last build) ====\n" \
-	    >> $mail_msg_file
-
-	egrep -v "$LDDWRONG|$CRLERROR|$CRLECONF" $RUNTIMEOUT | \
-	    diff $RUNTIMEREF - >> $mail_msg_file
 fi
 
 # DEBUG lint of kernel begins

@@ -1,0 +1,146 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# This file provides exceptions to the usual rules applied to sharable
+# objects by intf_cmp. All strings are Perl regular expressions that
+# are compared to file, version, and symbol names. In addition to the
+# standard Perl syntax, there is one extension:
+#
+#	MACH(dir)
+#
+# is expanded into a regular expression that matches the given
+# directory, or a 64-bit subdirectory of the directory with the
+# name of a 64-bit architecture. For example, MACH(lib) will match
+# any of the following:
+#
+#	lib
+#	lib/amd64
+#	lib/sparcv9
+# 
+
+
+## libbsm
+#
+# - Removed interfaces: setauclassfile, setaueventfile setauuserfile testac
+#	4686423 undocumented interfaces are not used
+# - Removed interfaces: auditsvc
+#	6638707 implement the removal of auditsvc(2) as noted in PSARC/2002/665
+#
+DELSYM	^(auditsvc|setauclassfile|setaueventfile|setauuserfile|testac)$	\
+	^SUNW_(0\.[7-8]|1\.[1-2])$	\
+	^MACH(lib)/libbsm\.so\.1$
+
+
+## libmalloc / libmapmalloc
+#
+# - Objects that provide malloc implementations had functions intentionally
+#   removed by:
+#	6464344 malloc library cleanup
+#	PSARC 2006/477 malloc library cleanup
+#
+DELSYM	^(_cfree|_mallinfo|_mallopt)$	\
+	^SUNW_1\.1$	\
+	^usr/MACH(lib)/libmalloc\.so\.1$
+DELSYM	^(mallinfo|mallopt)$	\
+	^SUNW_(0\.7|1\.1)$	\
+	^usr/MACH(lib)/libmapmalloc\.so\.1$
+DELSYM	^(_cfree|_?mallinfo|_?mallopt|_memalign|_valloc)$	\
+	^SUNW_1\.1$	\
+	^usr/MACH(lib)/watchmalloc\.so\.1$
+
+
+## libc
+#
+# - In Solaris 10, libc version SUNW_1.23 was incorrectly defined. In a
+#   subsequent update, those symbols were properly transfered to SUNW_1.22.4.
+#   However, SUNW_1.23 had to remain in place as an empty version to satisfy
+#   executables already in the field that were bound to it.
+#	6763000 libc versioning needs a little tlc in Solaris 10
+#   The following excludes an empty top version SUNW_1.23 from triggering
+#   a flood of "added interface" errors.
+#
+EMPTY_TOPVERSION	^SUNW_1\.23$	^MACH(lib)/libc\.so\.1$
+EMPTY_TOPVERSION	^SUNW_1\.23$	^usr/lib/libc/libc_hwcap\d+\.so\.1$
+
+
+## libnsl
+#
+# - The function _inet_aton was removed from libnsl.so.1 as part of
+#	6700179 expunge synonyms.h
+#	PSARC 2008/309 expunge synonyms.h
+# - Version SUN_1.10 was vacated when inet_aton was backported into SUNW_1.9.1
+#	4944187 getaddrinfo doesn't convert broadcast address if dns
+#		isn't in nsswitch.conf
+#	6747055 Solaris 10 apps using recent version of libnsl.so do
+#		not run on Nevada
+#
+DELSYM	^_inet_aton$	^SUNW_1\.9\.1$	^MACH(lib)/libnsl\.so\.1$
+EMPTY_TOPVERSION	^SUNW_1\.10$	^MACH(lib)/libnsl\.so\.1$
+
+
+## libpapi
+#
+# - FSG_1.0 is a label for the Free Standards Group, version 1 of this library
+#	6346505 print commands should use PAPI for service interaction
+#		(LSARC/2003/547)
+#
+EMPTY_TOPVERSION	^FSG_1\.0$	^usr/lib/libpapi.so.0$
+
+
+## libresolv2
+#
+# - Version SUNW_2.3 is empty
+#	6689937 libresolv2's mapfile-vers needs updating to line up
+#		with S10 changes
+#
+EMPTY_TOPVERSION	^SUNW_2\.3$	^MACH(lib)/libresolv\.so\.2$
+
+
+## librtld_db
+#
+# - rd_fix_phdrs() was introduced into Solaris 10 to support branded zones,
+#   and was removed as part of:
+#	6599700 librtld_db needs better plugin support
+#
+DELSYM	^rd_fix_phdrs$	^SUNW_1\.1$	^MACH(lib)/librtld_db\.so\.1$
+
+
+## libtecla
+#
+#    - gl_completion_action() was renamed pca_path_completions()
+#    - gl_set_term_size was moved from tecla_1.4 to tecla_l.5
+#    - The version tecla_l.5 (note the "el" (l) instead of a one (1) is
+#      intentional. See the libtecla mapfile for details.
+#
+DELSYM	^gl_completion_action$	\
+	^tecla_1\.[2-4]$	\
+	^usr/MACH(lib)/libtecla\.so\.1$
+DELSYM	^gl_set_term_size$	\
+	^tecla_1\.4$		\
+	^usr/MACH(lib)/libtecla\.so\.1$
+ADDSYM	^pca_path_completions$		\
+	^(tecla_1\.[2346]|tecla_l\.5)$	\
+	^usr/MACH(lib)/libtecla\.so\.1$
