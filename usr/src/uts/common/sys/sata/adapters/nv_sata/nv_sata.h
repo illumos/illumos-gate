@@ -103,7 +103,7 @@ typedef struct nv_ctl {
 	int		nvc_mcp5x_flag;	/* is the controller MCP51/MCP55 */
 	uint8_t		nvc_ctlr_num;	/* controller number within the part */
 	uint32_t	nvc_sgp_csr;	/* SGPIO CSR i/o address */
-	volatile nv_sgp_cb_t *nvc_sgp_cbp; /* SGPIO Command Block */
+	volatile nv_sgp_cb_t *nvc_sgp_cbp; /* SGPIO Control Block */
 	nv_sgp_cmn_t	*nvc_sgp_cmn;	/* SGPIO shared data */
 #endif
 } nv_ctl_t;
@@ -208,15 +208,20 @@ typedef struct nv_slot {
 
 #ifdef SGPIO_SUPPORT
 struct nv_sgp_cmn {
-	uint16_t	nvs_magic;	/* verification of valid structure */
 	uint8_t		nvs_in_use;	/* bit-field of active ctlrs */
 	uint8_t		nvs_connected;	/* port connected bit-field flag */
 	uint8_t		nvs_activity;	/* port usage bit-field flag */
+	int		nvs_cbp;	/* SGPIO Control Block Pointer */
 	int		nvs_taskq_delay; /* rest time for activity LED taskq */
 	kmutex_t	nvs_slock;	/* lock for shared data */
 	kmutex_t	nvs_tlock;	/* lock for taskq */
 	kcondvar_t	nvs_cv;		/* condition variable for taskq wait */
 	ddi_taskq_t	*nvs_taskq;	/* activity LED taskq */
+};
+
+struct nv_sgp_cbp2cmn {
+	uint32_t	c2cm_cbp;	/* ctlr block ptr from pci cfg space */
+	nv_sgp_cmn_t	*c2cm_cmn;	/* point to common space */
 };
 #endif
 
@@ -677,7 +682,9 @@ typedef struct prde {
 #define	NV_COPY_SSREGS   0x04	/* SS port registers */
 
 #ifdef SGPIO_SUPPORT
-#define	SGPIO_MAGIC		0x39da	/* verifies good sgpio struct */
+#define	NV_MAX_CBPS	16		/* Maximum # of Control Block */
+					/* Pointers.  Corresponds to */
+					/* each MCP55 and IO55 */
 #define	SGPIO_LOOP_WAIT_USECS	62500	/* 1/16 second (in usecs) */
 #define	SGPIO_TQ_NAME_LEN	32
 

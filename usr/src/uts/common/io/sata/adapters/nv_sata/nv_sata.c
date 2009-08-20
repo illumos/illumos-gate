@@ -171,8 +171,6 @@ static void nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
 static int nv_sgp_detect(ddi_acc_handle_t pci_conf_handle, uint16_t *csrpp,
     uint32_t *cbpp);
 static int nv_sgp_init(nv_ctl_t *nvc);
-static void nv_sgp_reset(nv_ctl_t *nvc);
-static int nv_sgp_init_cmd(nv_ctl_t *nvc);
 static int nv_sgp_check_set_cmn(nv_ctl_t *nvc);
 static int nv_sgp_csr_read(nv_ctl_t *nvc);
 static void nv_sgp_csr_write(nv_ctl_t *nvc, uint32_t val);
@@ -352,6 +350,34 @@ int non_ncq_commands = 0;
  */
 static void *nv_statep	= NULL;
 
+/*
+ * Map from CBP to shared space
+ *
+ * When a MCP55/IO55 parts supports SGPIO, there is a single CBP (SGPIO
+ * Control Block Pointer as well as the corresponding Control Block) that
+ * is shared across all driver instances associated with that part.  The
+ * Control Block is used to update and query the LED state for the devices
+ * on the controllers associated with those instances.  There is also some
+ * driver state (called the 'common' area here) associated with each SGPIO
+ * Control Block.  The nv_sgp_cpb2cmn is used to map a given CBP to its
+ * control area.
+ *
+ * The driver can also use this mapping array to determine whether the
+ * common area for a given CBP has been initialized, and, if it isn't
+ * initialized, initialize it.
+ *
+ * When a driver instance with a CBP value that is already in the array is
+ * initialized, it will use the pointer to the previously initialized common
+ * area associated with that SGPIO CBP value, rather than initialize it
+ * itself.
+ *
+ * nv_sgp_c2c_mutex is used to synchronize access to this mapping array.
+ */
+#ifdef SGPIO_SUPPORT
+static kmutex_t nv_sgp_c2c_mutex;
+static struct nv_sgp_cbp2cmn nv_sgp_cbp2cmn[NV_MAX_CBPS];
+#endif
+
 /* We still have problems in 40-bit DMA support, so disable it by default */
 int nv_sata_40bit_dma = B_FALSE;
 
@@ -369,6 +395,9 @@ int
 _init(void)
 {
 	int	error;
+#ifdef SGPIO_SUPPORT
+	int	i;
+#endif
 
 	error = ddi_soft_state_init(&nv_statep, sizeof (nv_ctl_t), 0);
 
@@ -378,6 +407,14 @@ _init(void)
 	}
 
 	mutex_init(&nv_log_mutex, NULL, MUTEX_DRIVER, NULL);
+#ifdef SGPIO_SUPPORT
+	mutex_init(&nv_sgp_c2c_mutex, NULL, MUTEX_DRIVER, NULL);
+
+	for (i = 0; i < NV_MAX_CBPS; i++) {
+		nv_sgp_cbp2cmn[i].c2cm_cbp = 0;
+		nv_sgp_cbp2cmn[i].c2cm_cmn = NULL;
+	}
+#endif
 
 	if ((error = sata_hba_init(&modlinkage)) != 0) {
 		ddi_soft_state_fini(&nv_statep);
@@ -417,6 +454,9 @@ _fini(void)
 	 * remove the resources allocated in _init()
 	 */
 	mutex_destroy(&nv_log_mutex);
+#ifdef SGPIO_SUPPORT
+	mutex_destroy(&nv_sgp_c2c_mutex);
+#endif
 	sata_hba_fini(&modlinkage);
 	ddi_soft_state_fini(&nv_statep);
 
@@ -2390,7 +2430,7 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	}
 
 
-	stran.sata_tran_hba_rev = SATA_TRAN_HBA_REV_2;
+	stran.sata_tran_hba_rev = SATA_TRAN_HBA_REV;
 	stran.sata_tran_hba_dip = nvc->nvc_dip;
 	stran.sata_tran_hba_num_cports = NV_NUM_CPORTS;
 	stran.sata_tran_hba_features_support =
@@ -5742,6 +5782,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	uint16_t csrp;		/* SGPIO_CSRP from PCI config space */
 	uint32_t cbp;		/* SGPIO_CBP from PCI config space */
 	nv_sgp_cmn_t *cmn;	/* shared data structure */
+	int i;
 	char tqname[SGPIO_TQ_NAME_LEN];
 	extern caddr_t psm_map_phys_new(paddr_t, size_t, int);
 
@@ -5752,6 +5793,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	 */
 	nvc->nvc_sgp_csr = 0;
 	nvc->nvc_sgp_cbp = NULL;
+	nvc->nvc_sgp_cmn = NULL;
 
 	/*
 	 * Only try to initialize SGPIO LED support if this property
@@ -5787,7 +5829,7 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	/* save off the SGPIO_CSR I/O address */
 	nvc->nvc_sgp_csr = csrp;
 
-	/* map in Command Block */
+	/* map in Control Block */
 	nvc->nvc_sgp_cbp = (nv_sgp_cb_t *)psm_map_phys_new(cbp,
 	    sizeof (nv_sgp_cb_t), PROT_READ | PROT_WRITE);
 
@@ -5797,14 +5839,39 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		    "!Unable to initialize SGPIO");
 	}
 
-	if (nvc->nvc_ctlr_num == 0) {
+	/*
+	 * Initialize the shared space for this instance.  This could
+	 * involve allocating the space, saving a pointer to the space
+	 * and starting the taskq that actually turns the LEDs on and off.
+	 * Or, it could involve just getting the pointer to the already
+	 * allocated space.
+	 */
+
+	mutex_enter(&nv_sgp_c2c_mutex);
+
+	/* try and find our CBP in the mapping table */
+	cmn = NULL;
+	for (i = 0; i < NV_MAX_CBPS; i++) {
+		if (nv_sgp_cbp2cmn[i].c2cm_cbp == cbp) {
+			cmn = nv_sgp_cbp2cmn[i].c2cm_cmn;
+			break;
+		}
+
+		if (nv_sgp_cbp2cmn[i].c2cm_cbp == 0)
+			break;
+	}
+
+	if (i >= NV_MAX_CBPS) {
 		/*
-		 * Controller 0 on the MCP5X/IO55 initialized the SGPIO
-		 * and the data that is shared between the controllers.
-		 * The clever thing to do would be to let the first controller
-		 * that comes up be the one that initializes all this.
-		 * However, SGPIO state is not necessarily zeroed between
-		 * between OS reboots, so there might be old data there.
+		 * CBP to shared space mapping table is full
+		 */
+		nvc->nvc_sgp_cmn = NULL;
+		nv_cmn_err(CE_WARN, nvc, NULL,
+		    "!LED handling not initialized - too many controllers");
+	} else if (cmn == NULL) {
+		/*
+		 * Allocate the shared space, point the SGPIO scratch register
+		 * at it and start the led update taskq.
 		 */
 
 		/* allocate shared space */
@@ -5819,10 +5886,10 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 		nvc->nvc_sgp_cmn = cmn;
 
 		/* initialize the shared data structure */
-		cmn->nvs_magic = SGPIO_MAGIC;
 		cmn->nvs_in_use = (1 << nvc->nvc_ctlr_num);
 		cmn->nvs_connected = 0;
 		cmn->nvs_activity = 0;
+		cmn->nvs_cbp = cbp;
 
 		mutex_init(&cmn->nvs_slock, NULL, MUTEX_DRIVER, NULL);
 		mutex_init(&cmn->nvs_tlock, NULL, MUTEX_DRIVER, NULL);
@@ -5834,6 +5901,12 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 #else
 		nvc->nvc_sgp_cbp->sgpio_sr = (uint32_t)cmn;
 #endif
+
+		/* add an entry to the cbp to cmn mapping table */
+
+		/* i should be the next available table position */
+		nv_sgp_cbp2cmn[i].c2cm_cbp = cbp;
+		nv_sgp_cbp2cmn[i].c2cm_cmn = cmn;
 
 		/* start the activity LED taskq */
 
@@ -5853,27 +5926,12 @@ nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 			(void) ddi_taskq_dispatch(cmn->nvs_taskq,
 			    nv_sgp_activity_led_ctl, nvc, DDI_SLEEP);
 		}
-
-	} else if (nvc->nvc_ctlr_num == 1) {
-		/*
-		 * Controller 1 confirms that SGPIO has been initialized
-		 * and, if so, try to get the shared data pointer, otherwise
-		 * get the shared data pointer when accessing the data.
-		 */
-
-		if (nvc->nvc_sgp_cbp->sgpio_sr != 0) {
-			cmn = (nv_sgp_cmn_t *)nvc->nvc_sgp_cbp->sgpio_sr;
-
-			/*
-			 * It looks like a pointer, but is it the shared data?
-			 */
-			if (cmn->nvs_magic == SGPIO_MAGIC) {
-				nvc->nvc_sgp_cmn = cmn;
-
-				cmn->nvs_in_use |= (1 << nvc->nvc_ctlr_num);
-			}
-		}
+	} else {
+		nvc->nvc_sgp_cmn = cmn;
+		cmn->nvs_in_use |= (1 << nvc->nvc_ctlr_num);
 	}
+
+	mutex_exit(&nv_sgp_c2c_mutex);
 }
 
 /*
@@ -5903,38 +5961,89 @@ nv_sgp_detect(ddi_acc_handle_t pci_conf_handle, uint16_t *csrpp,
 
 /*
  * nv_sgp_init
- * Initialize SGPIO.  The process is specified by NVIDIA.
+ * Initialize SGPIO.
+ * The initialization process is described by NVIDIA, but the hardware does
+ * not always behave as documented, so several steps have been changed and/or
+ * omitted.
  */
 static int
 nv_sgp_init(nv_ctl_t *nvc)
 {
+	int seq;
+	int rval = NV_SUCCESS;
+	hrtime_t start, end;
+	uint32_t cmd;
 	uint32_t status;
 	int drive_count;
 
-	/*
-	 * if SGPIO status set to SGPIO_STATE_RESET, logic has been
-	 * reset and needs to be initialized.
-	 */
 	status = nv_sgp_csr_read(nvc);
 	if (SGPIO_CSR_SSTAT(status) == SGPIO_STATE_RESET) {
-		if (nv_sgp_init_cmd(nvc) == NV_FAILURE) {
-			/* reset and try again */
-			nv_sgp_reset(nvc);
-			if (nv_sgp_init_cmd(nvc) == NV_FAILURE) {
+		/* SGPIO logic is in reset state and requires initialization */
+
+		/* noting the Sequence field value */
+		seq = SGPIO_CSR_SEQ(status);
+
+		/* issue SGPIO_CMD_READ_PARAMS command */
+		cmd = SGPIO_CSR_CMD_SET(SGPIO_CMD_READ_PARAMS);
+		nv_sgp_csr_write(nvc, cmd);
+
+		DTRACE_PROBE2(sgpio__cmd, int, cmd, int, status);
+
+		/* poll for command completion */
+		start = gethrtime();
+		end = start + NV_SGP_CMD_TIMEOUT;
+		for (;;) {
+			status = nv_sgp_csr_read(nvc);
+
+			/* break on error */
+			if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_ERROR) {
 				NVLOG((NVDBG_ALWAYS, nvc, NULL,
-				    "SGPIO init failed"));
-				return (NV_FAILURE);
+				    "Command error during initialization"));
+				rval = NV_FAILURE;
+				break;
 			}
+
+			/* command processing is taking place */
+			if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_OK) {
+				if (SGPIO_CSR_SEQ(status) != seq) {
+					NVLOG((NVDBG_ALWAYS, nvc, NULL,
+					    "Sequence number change error"));
+				}
+
+				break;
+			}
+
+			/* if completion not detected in 2000ms ... */
+
+			if (gethrtime() > end)
+				break;
+
+			/* wait 400 ns before checking again */
+			NV_DELAY_NSEC(400);
 		}
+	}
+
+	if (rval == NV_FAILURE)
+		return (rval);
+
+	if (SGPIO_CSR_SSTAT(status) != SGPIO_STATE_OPERATIONAL) {
+		NVLOG((NVDBG_ALWAYS, nvc, NULL,
+		    "SGPIO logic not operational after init - state %d",
+		    SGPIO_CSR_SSTAT(status)));
+		/*
+		 * Should return (NV_FAILURE) but the hardware can be
+		 * operational even if the SGPIO Status does not indicate
+		 * this.
+		 */
 	}
 
 	/*
 	 * NVIDIA recommends reading the supported drive count even
-	 * though they also indicate that it is 4 at this time.
+	 * though they also indicate that it is always 4 at this time.
 	 */
 	drive_count = SGP_CR0_DRV_CNT(nvc->nvc_sgp_cbp->sgpio_cr0);
 	if (drive_count != SGPIO_DRV_CNT_VALUE) {
-		NVLOG((NVDBG_ALWAYS, nvc, NULL,
+		NVLOG((NVDBG_INIT, nvc, NULL,
 		    "SGPIO reported undocumented drive count - %d",
 		    drive_count));
 	}
@@ -5943,109 +6052,22 @@ nv_sgp_init(nv_ctl_t *nvc)
 	    "initialized ctlr: %d csr: 0x%08x",
 	    nvc->nvc_ctlr_num, nvc->nvc_sgp_csr));
 
-	return (NV_SUCCESS);
-}
-
-static void
-nv_sgp_reset(nv_ctl_t *nvc)
-{
-	uint32_t cmd;
-	uint32_t status;
-
-	cmd = SGPIO_CMD_RESET;
-	nv_sgp_csr_write(nvc, cmd);
-
-	status = nv_sgp_csr_read(nvc);
-
-	if (SGPIO_CSR_CSTAT(status) != SGPIO_CMD_OK) {
-		NVLOG((NVDBG_ALWAYS, nvc, NULL,
-		    "SGPIO reset failed: CSR - 0x%x", status));
-	}
-}
-
-static int
-nv_sgp_init_cmd(nv_ctl_t *nvc)
-{
-	int seq;
-	hrtime_t start, end;
-	uint32_t status;
-	uint32_t cmd;
-
-	/* get the old sequence value */
-	status = nv_sgp_csr_read(nvc);
-	seq = SGPIO_CSR_SEQ(status);
-
-	/* check the state since we have the info anyway */
-	if (SGPIO_CSR_SSTAT(status) != SGPIO_STATE_OPERATIONAL) {
-		NVLOG((NVDBG_ALWAYS, nvc, NULL,
-		    "SGPIO init_cmd: state not operational"));
-	}
-
-	/* issue command */
-	cmd = SGPIO_CSR_CMD_SET(SGPIO_CMD_READ_PARAMS);
-	nv_sgp_csr_write(nvc, cmd);
-
-	DTRACE_PROBE2(sgpio__cmd, int, cmd, int, status);
-
-	/* poll for completion */
-	start = gethrtime();
-	end = start + NV_SGP_CMD_TIMEOUT;
-	for (;;) {
-		status = nv_sgp_csr_read(nvc);
-
-		/* break on error */
-		if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_ERROR)
-			break;
-
-		/* break on command completion (seq changed) */
-		if (SGPIO_CSR_SEQ(status) != seq) {
-			if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_ACTIVE) {
-				NVLOG((NVDBG_ALWAYS, nvc, NULL,
-				    "Seq changed but command still active"));
-			}
-
-			break;
-		}
-
-		/* Wait 400 ns and try again */
-		NV_DELAY_NSEC(400);
-
-		if (gethrtime() > end)
-			break;
-	}
-
-	if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_OK)
-		return (NV_SUCCESS);
-
-	return (NV_FAILURE);
+	return (rval);
 }
 
 static int
 nv_sgp_check_set_cmn(nv_ctl_t *nvc)
 {
-	nv_sgp_cmn_t *cmn;
+	nv_sgp_cmn_t *cmn = nvc->nvc_sgp_cmn;
 
-	if (nvc->nvc_sgp_cbp == NULL)
+	if (cmn == NULL)
 		return (NV_FAILURE);
 
-	/* check to see if Scratch Register is set */
-	if (nvc->nvc_sgp_cbp->sgpio_sr != 0) {
-		nvc->nvc_sgp_cmn =
-		    (nv_sgp_cmn_t *)nvc->nvc_sgp_cbp->sgpio_sr;
+	mutex_enter(&cmn->nvs_slock);
+	cmn->nvs_in_use |= (1 << nvc->nvc_ctlr_num);
+	mutex_exit(&cmn->nvs_slock);
 
-		if (nvc->nvc_sgp_cmn->nvs_magic != SGPIO_MAGIC)
-			return (NV_FAILURE);
-
-		cmn = nvc->nvc_sgp_cmn;
-
-		mutex_enter(&cmn->nvs_slock);
-		cmn->nvs_in_use |= (1 << nvc->nvc_ctlr_num);
-		mutex_exit(&cmn->nvs_slock);
-
-		return (NV_SUCCESS);
-	}
-
-	return (NV_FAILURE);
+	return (NV_SUCCESS);
 }
 
 /*
@@ -6078,7 +6100,7 @@ nv_sgp_csr_write(nv_ctl_t *nvc, uint32_t val)
 
 /*
  * nv_sgp_write_data
- * Cause SGPIO to send Command Block data
+ * Cause SGPIO to send Control Block data
  */
 static int
 nv_sgp_write_data(nv_ctl_t *nvc)
@@ -6306,7 +6328,7 @@ nv_sgp_drive_active(nv_ctl_t *nvc, int drive)
 /*
  * nv_sgp_locate
  * Turns the Locate/OK2RM LED off or on for a particular drive.  State is
- * maintained in the SGPIO Command Block.
+ * maintained in the SGPIO Control Block.
  */
 static void
 nv_sgp_locate(nv_ctl_t *nvc, int drive, int value)
@@ -6347,7 +6369,7 @@ nv_sgp_locate(nv_ctl_t *nvc, int drive, int value)
 /*
  * nv_sgp_error
  * Turns the Error/Failure LED off or on for a particular drive.  State is
- * maintained in the SGPIO Command Block.
+ * maintained in the SGPIO Control Block.
  */
 static void
 nv_sgp_error(nv_ctl_t *nvc, int drive, int value)
@@ -6388,7 +6410,7 @@ nv_sgp_error(nv_ctl_t *nvc, int drive, int value)
 static void
 nv_sgp_cleanup(nv_ctl_t *nvc)
 {
-	int drive;
+	int drive, i;
 	uint8_t drv_leds;
 	uint32_t led_state;
 	volatile nv_sgp_cb_t *cb = nvc->nvc_sgp_cbp;
@@ -6396,7 +6418,7 @@ nv_sgp_cleanup(nv_ctl_t *nvc)
 	extern void psm_unmap_phys(caddr_t, size_t);
 
 	/*
-	 * If the SGPIO command block isn't mapped or the shared data
+	 * If the SGPIO Control Block isn't mapped or the shared data
 	 * structure isn't present in this instance, there isn't much that
 	 * can be cleaned up.
 	 */
@@ -6447,6 +6469,17 @@ nv_sgp_cleanup(nv_ctl_t *nvc)
 
 		cb->sgpio_sr = NULL;
 
+		/* zero out the CBP to cmn mapping */
+		for (i = 0; i < NV_MAX_CBPS; i++) {
+			if (nv_sgp_cbp2cmn[i].c2cm_cbp == cmn->nvs_cbp) {
+				nv_sgp_cbp2cmn[i].c2cm_cmn = NULL;
+				break;
+			}
+
+			if (nv_sgp_cbp2cmn[i].c2cm_cbp == 0)
+				break;
+		}
+
 		/* free resources */
 		cv_destroy(&cmn->nvs_cv);
 		mutex_destroy(&cmn->nvs_tlock);
@@ -6457,7 +6490,7 @@ nv_sgp_cleanup(nv_ctl_t *nvc)
 
 	nvc->nvc_sgp_cmn = NULL;
 
-	/* unmap the SGPIO Command Block */
+	/* unmap the SGPIO Control Block */
 	psm_unmap_phys((caddr_t)nvc->nvc_sgp_cbp, sizeof (nv_sgp_cb_t));
 }
 #endif	/* SGPIO_SUPPORT */

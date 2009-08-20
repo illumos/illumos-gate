@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,9 @@ extern "C" {
 #endif
 
 /*
- * SGPIO Command Timeout (2000ms, in usecs)
+ * SGPIO Command Timeout (2000ms, in nsecs)
  */
-#define	NV_SGP_CMD_TIMEOUT	2000000
+#define	NV_SGP_CMD_TIMEOUT	2000000000
 
 /*
  * SGPIO Configuration Space Offsets
