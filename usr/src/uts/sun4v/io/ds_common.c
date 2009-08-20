@@ -711,7 +711,8 @@ ds_send_msg(ds_port_t *port, caddr_t msg, size_t msglen)
 		if (rv != 0) {
 			if (rv == ECONNRESET) {
 				mutex_exit(&port->tx_lock);
-				ds_handle_down_reset_events(port);
+				(void) ds_sys_dispatch_func((void (*)(void *))
+				    ds_handle_down_reset_events, port);
 				return (rv);
 			} else if ((rv == EWOULDBLOCK) &&
 			    (loopcnt++ < ds_retries)) {
