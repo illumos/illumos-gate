@@ -283,10 +283,10 @@ audit_savepath(
 	 *	closes.
 	 */
 	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & PAD_SAVPATH)) ||
-		((tad->tad_ctrl & PAD_PATHFND) &&
-		!(kctx->auk_policy & AUDIT_PATH)) ||
-		(tad->tad_ctrl & PAD_NOPATH)) {
-			return (0);
+	    ((tad->tad_ctrl & PAD_PATHFND) &&
+	    !(kctx->auk_policy & AUDIT_PATH)) ||
+	    (tad->tad_ctrl & PAD_NOPATH)) {
+		return (0);
 	}
 
 	tad->tad_ctrl |= PAD_NOPATH;		/* prevent possible reentry */
@@ -437,10 +437,10 @@ audit_addcomponent(struct pathname *pnp)
 	 *	closes.
 	 */
 	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & PAD_SAVPATH)) ||
-		((tad->tad_ctrl & PAD_PATHFND) &&
-		!(kctx->auk_policy & AUDIT_PATH)) ||
-		(tad->tad_ctrl & PAD_NOPATH)) {
-			return;
+	    ((tad->tad_ctrl & PAD_PATHFND) &&
+	    !(kctx->auk_policy & AUDIT_PATH)) ||
+	    (tad->tad_ctrl & PAD_NOPATH)) {
+		return;
 	}
 
 	return;
@@ -499,10 +499,10 @@ audit_anchorpath(struct pathname *pnp, int flag)
 	 *	closes.
 	 */
 	if ((tad->tad_flag == 0 && !(tad->tad_ctrl & PAD_SAVPATH)) ||
-		((tad->tad_ctrl & PAD_PATHFND) &&
-		!(kctx->auk_policy & AUDIT_PATH)) ||
-		(tad->tad_ctrl & PAD_NOPATH)) {
-			return;
+	    ((tad->tad_ctrl & PAD_PATHFND) &&
+	    !(kctx->auk_policy & AUDIT_PATH)) ||
+	    (tad->tad_ctrl & PAD_NOPATH)) {
+		return;
 	}
 
 	if (flag) {
@@ -570,11 +570,11 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
 	 *	closes.
 	 */
 	if ((tad->tad_flag == 0 &&
-		!(tad->tad_ctrl & PAD_SAVPATH)) ||
-		((tad->tad_ctrl & PAD_PATHFND) &&
-		!(kctx->auk_policy & AUDIT_PATH)) ||
-		(tad->tad_ctrl & PAD_NOPATH)) {
-			return;
+	    !(tad->tad_ctrl & PAD_SAVPATH)) ||
+	    ((tad->tad_ctrl & PAD_PATHFND) &&
+	    !(kctx->auk_policy & AUDIT_PATH)) ||
+	    (tad->tad_ctrl & PAD_NOPATH)) {
+		return;
 	}
 
 	/*
@@ -1391,7 +1391,7 @@ audit_symlink_create(vnode_t *dvp, char *sname, char *target, int error)
 		return;
 
 	error = VOP_LOOKUP(dvp, sname, &vp, NULL, 0, NULL, CRED(),
-			NULL, NULL, NULL);
+	    NULL, NULL, NULL);
 	if (error == 0) {
 		audit_attributes(vp);
 		VN_RELE(vp);
@@ -1448,7 +1448,7 @@ audit_vncreate_finish(struct vnode *vp, int error)
 	}
 
 	if (!error && ((tad->tad_event == AUE_MKNOD) ||
-			(tad->tad_event == AUE_MKDIR))) {
+	    (tad->tad_event == AUE_MKDIR))) {
 		audit_attributes(vp);
 	}
 
@@ -2224,7 +2224,7 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 	AS_INC(as_generated, 1, kctx);
 	AS_INC(as_kernel, 1, kctx);
 
-	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CRYPTOADM, 0);
+	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CRYPTOADM, tad->tad_evmod);
 }
 
 /*
@@ -2294,7 +2294,7 @@ audit_kssl(int cmd, void *params, int error)
 	AS_INC(as_generated, 1, kctx);
 	AS_INC(as_kernel, 1, kctx);
 
-	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CONFIGKSSL, 0);
+	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CONFIGKSSL, tad->tad_evmod);
 }
 
 /*
@@ -2426,7 +2426,7 @@ audit_pf_policy(int cmd, cred_t *cred, netstack_t *ns, char *tun,
 		AS_INC(as_kernel, 1, kctx);
 
 	}
-	au_close(kctx, (caddr_t *)&ad, flag, tad->tad_event, 0);
+	au_close(kctx, (caddr_t *)&ad, flag, tad->tad_event, tad->tad_evmod);
 
 	/*
 	 * clear the ctrl flag so that we don't have spurious collection of
