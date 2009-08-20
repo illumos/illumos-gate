@@ -1927,4 +1927,4 @@ MYRI10GE_OBJS =	myri10ge.o myri10ge_lro.o
 #
 NULLDRIVER_OBJS =	nulldriver.o
 
-TPM_OBJS =	tpm.o
+TPM_OBJS =	tpm.o tpm_hcall.o

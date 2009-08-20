@@ -30,6 +30,7 @@ TMP=/tmp/$$
 
 DRV=tpm
 REM_DRV=/usr/sbin/rem_drv
+
 #
 # Check if the BASEDIR option is needed
 #
@@ -43,14 +44,4 @@ fi
 
 ${REM_DRV} ${REM_DRV_FLAGS} ${DRV}
 
-# Remove our entry from /etc/devlink.tab
-# Note: the tab after ${DRV} here is important.
-
-grep -v "^type=ddi_pseudo;name=${DRV}	" ${DEVLINK_TAB} >$TMP.devlink
-
-# Must use 'cp' here in order to preserve the original
-# mode, owner and group of devlink.tab
-
-cp $TMP.devlink ${DEVLINK_TAB}
-rm -f $TMP.devlink
 exit 0

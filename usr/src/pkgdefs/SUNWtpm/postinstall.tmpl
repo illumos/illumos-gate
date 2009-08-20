@@ -28,7 +28,6 @@ DRV=tpm
 DRVPERM='* 0600 root sys'
 ADD_DRV=/usr/sbin/add_drv
 
-DEVLINKTB=${BASEDIR}/etc/devlink.tab
 ACPITABLE=${BASEDIR}/boot/solaris/devicedb/master
 TMP=/tmp/$$
 
@@ -36,12 +35,7 @@ ISA_TYPE_I386="i386"
 ISA_TYPE_SPARC="sparc"
 ISA_TYPE="$ARCH"
 
-#
-# TPM support is only available on x86 platforms.
-#
-if [ "${ISA_TYPE}" != "${ISA_TYPE_I386}" ]; then
-	exit 0
-fi
+MACH=`/usr/bin/uname -m`
 
 #
 # Check if the BASEDIR option is needed
@@ -73,20 +67,6 @@ add_driver()
 }
 
 #
-# add_devlink - adds an entry to ${DEVLINKTB}
-#
-add_devlink()
-{
-	PATTERN="$1"
-	LINK="$2"
-	PLINK="`echo $LINK | sed 's/[$*^|\]/\\\&/g'`"
-	grep -v "^$PATTERN	$PLINK$" ${DEVLINKTB} >$TMP.devlink
-	echo "$PATTERN\t$LINK" >>$TMP.devlink
-	cp $TMP.devlink ${DEVLINKTB}
-	rm -f $TMP.devlink
-}
-
-#
 # Update ACPI table if the entry is not already present.
 #
 add_acpi()
@@ -99,9 +79,17 @@ add_acpi()
 
 # Add entry to /etc/devlink.tab if not there already
 # Note: the tab after ${DRV} here is important.
-
-add_devlink 'type=ddi_pseudo;name=tpm' '\\D'
-add_acpi
-add_driver
+if [ "${ISA_TYPE}" = "${ISA_TYPE_I386}" ]; then
+	add_acpi
+	add_driver
+else 
+	if [ "${ISA_TYPE}" = "${ISA_TYPE_SPARC}" -a "${MACH}" = "sun4v" ]; then
+		#
+		# sun4v TPM device has a unique identifier
+		#
+		ADD_DRV_FLAGS="${ADD_DRV_FLAGS} -i 'SUNW,sun4v-ptpm'"
+		add_driver
+	fi
+fi
 
 exit 0

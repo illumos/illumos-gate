@@ -27,19 +27,24 @@
 # Can be created via a text editor or through use of the 'pkgproto' command.
 
 # packaging files
-i copyright
-i depend
-i pkginfo
-i postinstall
-i preremove
-
 #!search <pathname pathname ...>	# where to find pkg objects
 #!include <filename>			# include another 'prototype' file
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 #
+
+!include prototype_com
+
+#
+# List files which are sparc specific here
 #
 # source locations relative to the prototype file
 #
 # SUNWtpm
 #
+d none platform 0755 root sys
+d none platform/sun4v 0755 root sys
+d none platform/sun4v/kernel 0755 root sys
+d none platform/sun4v/kernel/drv 0755 root sys
+d none platform/sun4v/kernel/drv/sparcv9 0755 root sys
+f none platform/sun4v/kernel/drv/sparcv9/tpm 755 root sys

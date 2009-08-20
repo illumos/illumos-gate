@@ -596,24 +596,13 @@ attach_shm() {
 	if (global_shm != NULL)
 		return (CKR_OK);
 
-	global_shm = (LW_SHM_TYPE *)malloc(sizeof (LW_SHM_TYPE));
+	global_shm = (LW_SHM_TYPE *)calloc(1, sizeof (LW_SHM_TYPE));
 	if (global_shm == NULL) {
 		return (CKR_HOST_MEMORY);
 	}
 	CreateXProcLock(&global_shm->mutex);
 
 	xproclock = (void *)&global_shm->mutex;
-	(void) XProcLock(xproclock);
-
-	global_shm->num_publ_tok_obj = 0;
-	global_shm->num_priv_tok_obj = 0;
-
-	(void) memset(&global_shm->publ_tok_objs, 0x0,
-	    2048 * sizeof (TOK_OBJ_ENTRY));
-	(void) memset(&global_shm->priv_tok_objs, 0x0,
-	    2048 * sizeof (TOK_OBJ_ENTRY));
-
-	(void) XProcUnLock(xproclock);
 
 	return (CKR_OK);
 }
