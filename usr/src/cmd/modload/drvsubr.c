@@ -108,7 +108,7 @@ append_to_file(
 	char *entry_separator,
 	int quoted)
 {
-	int	i, len;
+	int	i, len, line_len;
 	int	fpint;
 	char	*current_head, *previous_head;
 	char	*line, *one_entry;
@@ -133,7 +133,11 @@ append_to_file(
 
 	previous_head = entry_list;
 
-	line = calloc(strlen(driver_name) + len + 4, 1);
+	line_len = strlen(driver_name) + len + 4;
+	if (quoted)
+		line_len += 2;
+
+	line = calloc(line_len, 1);
 	if (line == NULL) {
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
 		(void) fclose(fp);
@@ -149,21 +153,20 @@ append_to_file(
 		for (i = 0; i <= len; i++)
 			one_entry[i] = 0;
 
-		for (i = 0; i <= (int)strlen(line); i++)
-			line[i] = 0;
+		bzero(line, line_len);
 
 		current_head = get_entry(previous_head, one_entry,
 		    list_separator, quoted);
 		previous_head = current_head;
 
-		(void) strcpy(line, driver_name);
-		(void) strcat(line, entry_separator);
+		(void) strlcpy(line, driver_name, line_len);
+		(void) strlcat(line, entry_separator, line_len);
 		if (quoted)
-			(void) strcat(line, "\"");
-		(void) strcat(line, one_entry);
+			(void) strlcat(line, "\"", line_len);
+		(void) strlcat(line, one_entry, line_len);
 		if (quoted)
-			(void) strcat(line, "\"");
-		(void) strcat(line, "\n");
+			(void) strlcat(line, "\"", line_len);
+		(void) strlcat(line, "\n", line_len);
 
 		if ((fputs(line, fp)) == EOF) {
 			perror(NULL);
