@@ -101,6 +101,11 @@ cpupm_state_domains_t *cpupm_cstate_domains = NULL;
 /*
  * c-state tunables
  *
+ * cpupm_cs_sample_interval is the length of time we wait before
+ * recalculating c-state statistics.  When a CPU goes idle it checks
+ * to see if it has been longer than cpupm_cs_sample_interval since it last
+ * caculated which C-state to go to.
+ *
  * cpupm_cs_idle_cost_tunable is the ratio of time CPU spends executing + idle
  * divided by time spent in the idle state transitions.
  * A value of 10 means the CPU will not spend more than 1/10 of its time
@@ -110,7 +115,7 @@ cpupm_state_domains_t *cpupm_cstate_domains = NULL;
  * cpupm_cs_idle_save_tunable is how long we must stay in a deeper C-state
  * before it is worth going there.  Expressed as a multiple of latency.
  */
-uint32_t cpupm_cs_sample_tunable = 5;		/* samples in decision period */
+uint32_t cpupm_cs_sample_interval = 100*1000*1000;	/* 100 milliseconds */
 uint32_t cpupm_cs_idle_cost_tunable = 10;	/* work time / latency cost */
 uint32_t cpupm_cs_idle_save_tunable = 2;	/* idle power savings */
 uint16_t cpupm_C2_idle_pct_tunable = 70;
@@ -868,18 +873,17 @@ cpupm_next_cstate(cma_c_state_t *cs_data, cpu_acpi_cstate_t *cstates,
 	hrtime_t duration;
 	hrtime_t ave_interval;
 	hrtime_t ave_idle_time;
-	uint32_t i;
+	uint32_t i, smpl_cnt;
 
 	duration = cs_data->cs_idle_exit - cs_data->cs_idle_enter;
 	scalehrtime(&duration);
 	cs_data->cs_idle += duration;
 	cs_data->cs_idle_enter = start;
 
-	++cs_data->cs_cnt;
-	if (cs_data->cs_cnt > cpupm_cs_sample_tunable) {
-		cs_data->cs_smpl_len = start - cs_data->cs_smpl_start;
-		scalehrtime(&cs_data->cs_smpl_len);
-		cs_data->cs_smpl_len |= 1;	/* protect from DIV 0 */
+	smpl_cnt = ++cs_data->cs_cnt;
+	cs_data->cs_smpl_len = start - cs_data->cs_smpl_start;
+	scalehrtime(&cs_data->cs_smpl_len);
+	if (cs_data->cs_smpl_len > cpupm_cs_sample_interval) {
 		cs_data->cs_smpl_idle = cs_data->cs_idle;
 		cs_data->cs_idle = 0;
 		cs_data->cs_smpl_idle_pct = ((100 * cs_data->cs_smpl_idle) /
@@ -901,8 +905,7 @@ cpupm_next_cstate(cma_c_state_t *cs_data, cpu_acpi_cstate_t *cstates,
 		/*
 		 * Will CPU be idle long enough to save power?
 		 */
-		ave_idle_time = (cs_data->cs_smpl_idle /
-		    cpupm_cs_sample_tunable) / 1000;
+		ave_idle_time = (cs_data->cs_smpl_idle / smpl_cnt) / 1000;
 		for (i = 1; i < cs_count; ++i) {
 			if (ave_idle_time < (cstates[i].cs_latency *
 			    cpupm_cs_idle_save_tunable)) {
@@ -916,8 +919,7 @@ cpupm_next_cstate(cma_c_state_t *cs_data, cpu_acpi_cstate_t *cstates,
 		 * Wakeup often (even when non-idle time is very short)?
 		 * Some producer/consumer type loads fall into this category.
 		 */
-		ave_interval = (cs_data->cs_smpl_len / cpupm_cs_sample_tunable)
-		    / 1000;
+		ave_interval = (cs_data->cs_smpl_len / smpl_cnt) / 1000;
 		for (i = 1; i < cs_count; ++i) {
 			if (ave_interval <= (cstates[i].cs_latency *
 			    cpupm_cs_idle_cost_tunable)) {
