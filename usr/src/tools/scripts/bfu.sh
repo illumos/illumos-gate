@@ -7876,6 +7876,54 @@ mondo_loop() {
 	rm -f $root/dev/sr[0-9]*
 	rm -f $root/dev/rsr[0-9]*
 
+	#
+	# The pkg* commands should not be used after this point and before
+	# archive extraction as libcrypto/libssl may not be available.
+	#
+	# Remove old OpenSSL from /usr/sfw.
+	if [[ -f $root/lib/libcrypto.so.0.9.8 ]] ||
+	    archive_file_exists generic.lib "lib/libcrypto.so.0.9.8"; then
+
+		# SUNWopenssl-libraries
+		rm -f $root/usr/sfw/lib/libcrypto.so
+		rm -f $root/usr/sfw/lib/libcrypto.so.0.9.8
+		rm -f $root/usr/sfw/lib/llib-lcrypto
+		rm -f $root/usr/sfw/lib/llib-lcrypto.ln
+		rm -f $root/usr/sfw/lib/libssl.so
+		rm -f $root/usr/sfw/lib/libssl.so.0.9.8
+		rm -f $root/usr/sfw/lib/llib-lssl
+		rm -f $root/usr/sfw/lib/llib-lssl.ln
+		rm -f $root/usr/sfw/lib/amd64/libcrypto.so
+		rm -f $root/usr/sfw/lib/amd64/libcrypto.so.0.9.8
+		rm -f $root/usr/sfw/lib/amd64/llib-lcrypto.ln
+		rm -f $root/usr/sfw/lib/amd64/libssl.so
+		rm -f $root/usr/sfw/lib/amd64/libssl.so.0.9.8
+		rm -f $root/usr/sfw/lib/amd64/llib-lssl.ln
+		rm -f $root/usr/sfw/lib/sparcv9/libcrypto.so
+		rm -f $root/usr/sfw/lib/sparcv9/libcrypto.so.0.9.8
+		rm -f $root/usr/sfw/lib/sparcv9/llib-lcrypto.ln
+		rm -f $root/usr/sfw/lib/sparcv9/libssl.so
+		rm -f $root/usr/sfw/lib/sparcv9/libssl.so.0.9.8
+		rm -f $root/usr/sfw/lib/sparcv9/llib-lssl.ln
+		
+		# SUNWopenssl-commands
+		rm -f $root/usr/sfw/bin/CA.pl
+
+		# SUNWopenssl-include
+		rm -rf $root/usr/sfw/include/openssl
+
+		# SUNWopenssl-man
+		# Listing the man pages individually would add about 1000
+		# lines so it's simpler to pull them out of the package db.
+		opensslman=$(nawk -F '[ =]'\
+			'/usr\/sfw\/share\/man.* [fs] .*SUNWopenssl-man/ {print $1}' \
+			$root/var/sadm/install/contents)
+		for manpage in $opensslman
+		do
+			rm -f $root/$manpage
+		done
+	fi
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then
