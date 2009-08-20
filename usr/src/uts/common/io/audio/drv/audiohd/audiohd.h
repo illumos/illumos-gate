@@ -42,6 +42,7 @@ extern "C" {
  */
 #define	AUDIOHD_CODEC_IDT7608	0x111d7608
 #define	AUDIOHD_CODEC_IDT76B2	0x111d76b2
+#define	AUDIOHD_CODEC_AD1981	0x11d41981
 #define	AUDIOHD_CODECID_ALC888	0x10ec0888
 #define	AUDIOHD_CODECID_SONY1	0x10ec0260
 #define	AUDIOHD_CODECID_SONY2	0x10ec0262
@@ -789,7 +790,14 @@ struct audiohd_state {
 	caddr_t				hda_reg_base;
 	ddi_acc_handle_t		hda_pci_handle;
 	ddi_acc_handle_t		hda_reg_handle;
-	ddi_iblock_cookie_t		hda_intr_cookie;
+
+	ddi_intr_handle_t 	*htable; 	/* For array of interrupts */
+	int			intr_type;	/* What type of interrupt */
+	int			intr_rqst;	/* # of request intrs count */
+	int			intr_cnt;	/* # of intrs count returned */
+	uint_t			intr_pri;	/* Interrupt priority */
+	int			intr_cap;	/* Interrupt capabilities */
+	boolean_t		msi_enable;
 
 	audiohd_dma_t	hda_dma_corb;
 	audiohd_dma_t	hda_dma_rirb;

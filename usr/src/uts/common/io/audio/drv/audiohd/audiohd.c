@@ -42,7 +42,7 @@ static int audiohd_resume(audiohd_state_t *);
 static int audiohd_suspend(audiohd_state_t *);
 
 /* interrupt handler */
-static uint_t audiohd_intr(caddr_t);
+static uint_t audiohd_intr(caddr_t, caddr_t);
 
 /*
  * Local routines
@@ -212,11 +212,159 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	audio_dev_set_version(statep->adev, vers);
 }
 
+
+/*
+ * audiohd_add_intrs:
+ *
+ * Register FIXED or MSI interrupts.
+ */
+static int
+audiohd_add_intrs(audiohd_state_t *statep, int intr_type)
+{
+	dev_info_t 		*dip = statep->hda_dip;
+	ddi_intr_handle_t	ihandle;
+	int 			avail;
+	int 			actual;
+	int 			intr_size;
+	int 			count;
+	int 			i, j;
+	int 			ret;
+
+	/* Get number of interrupts */
+	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
+	if ((ret != DDI_SUCCESS) || (count == 0)) {
+		audio_dev_warn(statep->adev, "ddi_intr_get_nintrs() failure,"
+		    "ret: %d, count: %d", ret, count);
+		return (DDI_FAILURE);
+	}
+
+	/* Get number of available interrupts */
+	ret = ddi_intr_get_navail(dip, intr_type, &avail);
+	if ((ret != DDI_SUCCESS) || (avail == 0)) {
+		audio_dev_warn(statep->adev, "ddi_intr_get_navail() failure, "
+		    "ret: %d, avail: %d", ret, avail);
+		return (DDI_FAILURE);
+	}
+
+	/* Allocate an array of interrupt handles */
+	intr_size = count * sizeof (ddi_intr_handle_t);
+	statep->htable = kmem_alloc(intr_size, KM_SLEEP);
+	statep->intr_rqst = count;
+
+	/* Call ddi_intr_alloc() */
+	ret = ddi_intr_alloc(dip, statep->htable, intr_type, 0,
+	    count, &actual, DDI_INTR_ALLOC_NORMAL);
+	if (ret != DDI_SUCCESS || actual == 0) {
+		audio_dev_warn(statep->adev, "ddi_intr_alloc() failed %d",
+		    ret);
+		kmem_free(statep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+	if (actual < count) {
+		audio_dev_warn(statep->adev, "ddi_intr_alloc() Requested: %d,"
+		    "Received: %d",
+		    count, actual);
+	}
+	statep->intr_cnt = actual;
+
+	/*
+	 * Get priority for first msi, assume remaining are all the same
+	 */
+	if ((ret = ddi_intr_get_pri(statep->htable[0], &statep->intr_pri)) !=
+	    DDI_SUCCESS) {
+		audio_dev_warn(statep->adev, "ddi_intr_get_pri() failed %d",
+		    ret);
+		/* Free already allocated intr */
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_free(statep->htable[i]);
+		}
+		kmem_free(statep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+
+	/* Test for high level mutex */
+	if (statep->intr_pri >= ddi_intr_get_hilevel_pri()) {
+		audio_dev_warn(statep->adev,
+		    "Hi level interrupt not supported");
+		for (i = 0; i < actual; i++)
+			(void) ddi_intr_free(statep->htable[i]);
+		kmem_free(statep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+
+	/* Call ddi_intr_add_handler() */
+	for (i = 0; i < actual; i++) {
+		if ((ret = ddi_intr_add_handler(statep->htable[i], audiohd_intr,
+		    (caddr_t)statep, (caddr_t)(uintptr_t)i)) != DDI_SUCCESS) {
+			audio_dev_warn(statep->adev, "ddi_intr_add_handler() "
+			    "failed %d", ret);
+			/* Remove already added intr */
+			for (j = 0; j < i; j++) {
+				ihandle = statep->htable[j];
+				(void) ddi_intr_remove_handler(ihandle);
+			}
+			/* Free already allocated intr */
+			for (i = 0; i < actual; i++) {
+				(void) ddi_intr_free(statep->htable[i]);
+			}
+			kmem_free(statep->htable, intr_size);
+			return (DDI_FAILURE);
+		}
+	}
+
+	if ((ret = ddi_intr_get_cap(statep->htable[0], &statep->intr_cap))
+	    != DDI_SUCCESS) {
+		audio_dev_warn(statep->adev,
+		    "ddi_intr_get_cap() failed %d", ret);
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_remove_handler(statep->htable[i]);
+			(void) ddi_intr_free(statep->htable[i]);
+		}
+		kmem_free(statep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * audiohd_rem_intrs:
+ *
+ * Unregister FIXED or MSI interrupts
+ */
+static void
+audiohd_rem_intrs(audiohd_state_t *statep)
+{
+
+	int i;
+
+	/* Disable all interrupts */
+	if (statep->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_disable() */
+		(void) ddi_intr_block_disable(statep->htable, statep->intr_cnt);
+	} else {
+		for (i = 0; i < statep->intr_cnt; i++) {
+			(void) ddi_intr_disable(statep->htable[i]);
+		}
+	}
+
+	/* Call ddi_intr_remove_handler() */
+	for (i = 0; i < statep->intr_cnt; i++) {
+		(void) ddi_intr_remove_handler(statep->htable[i]);
+		(void) ddi_intr_free(statep->htable[i]);
+	}
+
+	kmem_free(statep->htable,
+	    statep->intr_rqst * sizeof (ddi_intr_handle_t));
+}
+
 static int
 audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	audiohd_state_t		*statep;
 	int			instance;
+	int 			intr_types;
+	int			i;
 
 	instance = ddi_get_instance(dip);
 	switch (cmd) {
@@ -289,15 +437,60 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* disable interrupts and clear interrupt status */
 	audiohd_disable_intr(statep);
 
-	/* set up the interrupt handler */
-	if (ddi_add_intr(dip, 0, &statep->hda_intr_cookie,
-	    (ddi_idevice_cookie_t *)NULL, audiohd_intr, (caddr_t)statep) !=
-	    DDI_SUCCESS) {
+	/*
+	 * Get supported interrupt types
+	 */
+	if (ddi_intr_get_supported_types(dip, &intr_types) != DDI_SUCCESS) {
 		audio_dev_warn(statep->adev,
-		    "bad interrupt specification ");
+		    "ddi_intr_get_supported_types failed");
 		goto error;
 	}
-	statep->intr_added = B_TRUE;
+
+	/*
+	 * Add the h/w interrupt handler and initialise mutexes
+	 */
+
+	if ((intr_types & DDI_INTR_TYPE_MSI) && statep->msi_enable) {
+		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_MSI) !=
+		    DDI_SUCCESS) {
+			audio_dev_warn(statep->adev, "MSI registration failed, "
+			    "trying FIXED interrupt type");
+		} else {
+			statep->intr_type = DDI_INTR_TYPE_MSI;
+			statep->intr_added = B_TRUE;
+		}
+	}
+	if (!(statep->intr_added) &&
+	    (intr_types & DDI_INTR_TYPE_FIXED)) {
+		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_FIXED) !=
+		    DDI_SUCCESS) {
+			audio_dev_warn(statep->adev, "FIXED interrupt "
+			    "registration failed");
+			goto error;
+		}
+		audio_dev_warn(statep->adev, "Using FIXED interrupt type");
+		statep->intr_type = DDI_INTR_TYPE_FIXED;
+		statep->intr_added = B_TRUE;
+	}
+	if (!(statep->intr_added)) {
+		audio_dev_warn(statep->adev, "No interrupts registered");
+		goto error;
+	}
+	mutex_init(&statep->hda_mutex, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(statep->intr_pri));
+
+	/*
+	 * Now that mutex lock is initialized, enable interrupts.
+	 */
+	if (statep->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_enable() for MSI interrupts */
+		(void) ddi_intr_block_enable(statep->htable, statep->intr_cnt);
+	} else {
+		/* Call ddi_intr_enable for MSI or FIXED interrupts */
+		for (i = 0; i < statep->intr_cnt; i++) {
+			(void) ddi_intr_enable(statep->htable[i]);
+		}
+	}
 
 	/*
 	 * Register audio controls.
@@ -449,14 +642,12 @@ audiohd_free_path(audiohd_state_t *statep)
 static void
 audiohd_destroy(audiohd_state_t *statep)
 {
-	dev_info_t		*dip = statep->hda_dip;
-
 	mutex_enter(&statep->hda_mutex);
 	audiohd_stop_dma(statep);
 	audiohd_disable_intr(statep);
 	mutex_exit(&statep->hda_mutex);
 	if (statep->intr_added) {
-		ddi_remove_intr(dip, 0, statep->hda_intr_cookie);
+		audiohd_rem_intrs(statep);
 	}
 	if (statep->hda_ksp)
 		kstat_delete(statep->hda_ksp);
@@ -2143,19 +2334,12 @@ audiohd_init_state(audiohd_state_t *statep, dev_info_t *dip)
 	}
 	statep->adev = adev;
 	statep->intr_added = B_FALSE;
+	statep->msi_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "msi_enable", B_TRUE);
 
 	/* set device information */
 	audio_dev_set_description(adev, AUDIOHD_DEV_CONFIG);
 	audio_dev_set_version(adev, AUDIOHD_DEV_VERSION);
-
-	if (ddi_get_iblock_cookie(dip, (uint_t)0, &statep->hda_intr_cookie) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(statep->adev,
-		    "cannot get iblock cookie");
-		return (DDI_FAILURE);
-	}
-	mutex_init(&statep->hda_mutex, NULL,
-	    MUTEX_DRIVER, statep->hda_intr_cookie);
 
 	statep->hda_rirb_rp = 0;
 
@@ -3531,12 +3715,14 @@ audiohd_build_output_path(hda_codec_t *codec)
 	uint8_t			mixer_allow = 1;
 
 	/*
-	 * work around for laptops which have IDT audio chipset, such as
-	 * HP mini 1000 laptop, Dell Lattitude 6400. We don't allow mixer
-	 * widget on such path, which leads to speaker loud hiss noise.
+	 * Work around for laptops which have IDT or AD audio chipset, such as
+	 * HP mini 1000 laptop, Dell Lattitude 6400, Lenovo T60. We don't
+	 * allow mixer widget on such path, which leads to speaker
+	 * loud hiss noise.
 	 */
 	if (codec->vid == AUDIOHD_CODEC_IDT7608 ||
-	    codec->vid == AUDIOHD_CODEC_IDT76B2)
+	    codec->vid == AUDIOHD_CODEC_IDT76B2 ||
+	    codec->vid == AUDIOHD_CODEC_AD1981)
 		mixer_allow = 0;
 	/* search an exclusive mixer widget path. This is preferred */
 	audiohd_do_build_output_path(codec, mixer_allow, &mnum, 1, 0);
@@ -5766,14 +5952,16 @@ audiohd_pin_sense(audiohd_state_t *statep, uint32_t resp, uint32_t respex)
  *	DDI_INTR_UNCLAIMED  Interrupt not claimed, and thus ignored
  */
 static uint_t
-audiohd_intr(caddr_t arg)
+audiohd_intr(caddr_t arg1, caddr_t arg2)
 {
-	audiohd_state_t	*statep = (audiohd_state_t *)arg;
+	audiohd_state_t	*statep = (void *)arg1;
 	uint32_t	status;
 	uint32_t	regbase;
 	uint32_t	resp, respex;
 	uint8_t		sdstatus, rirbsts;
 	int		i, ret;
+
+	_NOTE(ARGUNUSED(arg2))
 	audio_engine_t	*do_adc = NULL;
 	audio_engine_t	*do_dac = NULL;
 
