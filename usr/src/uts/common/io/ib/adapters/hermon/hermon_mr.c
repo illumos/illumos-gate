@@ -290,7 +290,7 @@ hermon_mr_register_shared(hermon_state_t *state, hermon_mrhdl_t mrhdl,
 		umem_flags = (DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ |
 		    DDI_UMEMLOCK_LONGTERM);
 		status = umem_lockmemory(umem_addr, umem_len, umem_flags,
-		    &umem_cookie, &hermon_umem_cbops, curproc);
+		    &umem_cookie, &hermon_umem_cbops, NULL);
 		if (status != 0) {
 			mutex_exit(&mrhdl->mr_lock);
 			status = IBT_INSUFF_RESOURCE;
@@ -1616,7 +1616,7 @@ hermon_mr_common_reg(hermon_state_t *state, hermon_pdhdl_t pd,
 		umem_flags = (DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ |
 		    DDI_UMEMLOCK_LONGTERM);
 		status = umem_lockmemory(umem_addr, umem_len, umem_flags,
-		    &umem_cookie, &hermon_umem_cbops, curproc);
+		    &umem_cookie, &hermon_umem_cbops, NULL);
 		if (status != 0) {
 			status = IBT_INSUFF_RESOURCE;
 			goto mrcommon_fail3;

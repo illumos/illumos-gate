@@ -310,7 +310,7 @@ tavor_mr_register_shared(tavor_state_t *state, tavor_mrhdl_t mrhdl,
 		umem_flags = (DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ |
 		    DDI_UMEMLOCK_LONGTERM);
 		status = umem_lockmemory(umem_addr, umem_len, umem_flags,
-		    &umem_cookie, &tavor_umem_cbops, curproc);
+		    &umem_cookie, &tavor_umem_cbops, NULL);
 		if (status != 0) {
 			mutex_exit(&mrhdl->mr_lock);
 			/* Set "status" and "errormsg" and goto failure */
@@ -1727,7 +1727,7 @@ tavor_mr_common_reg(tavor_state_t *state, tavor_pdhdl_t pd,
 		umem_flags = (DDI_UMEMLOCK_WRITE | DDI_UMEMLOCK_READ |
 		    DDI_UMEMLOCK_LONGTERM);
 		status = umem_lockmemory(umem_addr, umem_len, umem_flags,
-		    &umem_cookie, &tavor_umem_cbops, curproc);
+		    &umem_cookie, &tavor_umem_cbops, NULL);
 		if (status != 0) {
 			/* Set "status" and "errormsg" and goto failure */
 			TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed umem pin");

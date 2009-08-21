@@ -8258,10 +8258,14 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 	int	error;
 	struct ddi_umem_cookie *p;
 	void	(*driver_callback)() = NULL;
-	struct as *as = procp->p_as;
+	struct as *as;
 	struct seg		*seg;
 	vnode_t			*vp;
 
+	/* Allow device drivers to not have to reference "curproc" */
+	if (procp == NULL)
+		procp = curproc;
+	as = procp->p_as;
 	*cookie = NULL;		/* in case of any error return */
 
 	/* These are the only three valid flags */
@@ -8354,13 +8358,20 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 	 * Doing this after as_pagelock guarantees persistence of the as; if
 	 * an unacceptable segment is found, the cleanup includes calling
 	 * as_pageunlock before returning EFAULT.
+	 *
+	 * segdev is allowed here as it is already locked.  This allows
+	 * for memory exported by drivers through mmap() (which is already
+	 * locked) to be allowed for LONGTERM.
 	 */
 	if (flags & DDI_UMEMLOCK_LONGTERM) {
 		extern  struct seg_ops segspt_shmops;
+		extern	struct seg_ops segdev_ops;
 		AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 		for (seg = as_segat(as, addr); ; seg = AS_SEGNEXT(as, seg)) {
 			if (seg == NULL || seg->s_base > addr + len)
 				break;
+			if (seg->s_ops == &segdev_ops)
+				continue;
 			if (((seg->s_ops != &segvn_ops) &&
 			    (seg->s_ops != &segspt_shmops)) ||
 			    ((SEGOP_GETVP(seg, addr, &vp) == 0 &&
