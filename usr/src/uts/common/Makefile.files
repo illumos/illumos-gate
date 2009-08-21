@@ -465,7 +465,7 @@ LX_PTM_OBJS +=	lx_ptm.o
 LX_AUDIO_OBJS += lx_audio.o
 
 MII_OBJS +=	mii.o mii_cicada.o mii_natsemi.o mii_intel.o mii_qualsemi.o \
-		mii_other.o
+		mii_marvell.o mii_other.o
 
 PTS_OBJS +=	pts.o
 

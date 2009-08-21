@@ -58,6 +58,7 @@ enum {
 	MII_ESTART,
 	MII_ENOPHY,
 	MII_ECHECK,
+	MII_ELOOP,
 };
 
 static const char *mii_errors[] = {
@@ -65,7 +66,8 @@ static const char *mii_errors[] = {
 	"Failure resetting PHY.",
 	"Failure starting PHY.",
 	"No Ethernet PHY found.",
-	"Failure reading PHY (removed?)"
+	"Failure reading PHY (removed?)",
+	"Failure setting loopback."
 };
 
 /* Indexed by XCVR_ type */
@@ -80,20 +82,13 @@ static const const char *mii_xcvr_types[] = {
 	"1000BASE-T"
 };
 
-static lb_property_t mii_loopmodes[] = {
-	{ normal,	"normal",	PHY_LB_NONE },
-	{ internal,	"PHY",		PHY_LB_INT_PHY },
-	{ external,	"10Mbps",	PHY_LB_EXT_10 },
-	{ external,	"100Mbps",	PHY_LB_EXT_100 },
-	{ external,	"1000Mbps",	PHY_LB_EXT_1000 },
-};
-
 /* state machine */
 typedef enum {
 	MII_STATE_PROBE = 0,
 	MII_STATE_RESET,
 	MII_STATE_START,
 	MII_STATE_RUN,
+	MII_STATE_LOOPBACK,
 } mii_tstate_t;
 
 struct mii_handle {
@@ -110,7 +105,6 @@ struct mii_handle {
 	boolean_t	m_started;
 	boolean_t	m_suspending;
 	boolean_t	m_suspended;
-	boolean_t	m_notify;
 	int		m_error;
 	mii_tstate_t	m_tstate;
 
@@ -150,7 +144,13 @@ struct mii_handle {
 
 
 static void _mii_task(void *);
-static void _mii_probe_task(mii_handle_t);
+static void _mii_probe_phy(phy_handle_t *);
+static void _mii_probe(mii_handle_t);
+static int _mii_reset(mii_handle_t);
+static int _mii_loopback(mii_handle_t);
+static void _mii_notify(mii_handle_t);
+static int _mii_check(mii_handle_t);
+static int _mii_start(mii_handle_t);
 
 /*
  * Loadable module structures/entrypoints
@@ -207,6 +207,7 @@ phy_probe_t _phy_probes[] = {
 	phy_intel_probe,
 	phy_qualsemi_probe,
 	phy_cicada_probe,
+	phy_marvell_probe,
 	phy_other_probe,
 	NULL
 };
@@ -239,9 +240,9 @@ mii_alloc_instance(void *private, dev_info_t *dip, int inst, mii_ops_t *ops)
 	mh->m_private = private;
 	mh->m_suspended = B_FALSE;
 	mh->m_started = B_FALSE;
-	mh->m_notify = B_FALSE;
 	mh->m_tstate = MII_STATE_PROBE;
 	mh->m_error = MII_EOK;
+	mh->m_addr = -1;
 	mutex_init(&mh->m_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&mh->m_cv, NULL, CV_DRIVER, NULL);
 
@@ -353,10 +354,23 @@ void
 mii_resume(mii_handle_t mh)
 {
 	mutex_enter(&mh->m_lock);
-	/* resume implicity causes a PHY reset */
-	if (mh->m_tstate > MII_STATE_RESET) {
+
+	switch (mh->m_tstate) {
+	case MII_STATE_PROBE:
+		break;
+	case MII_STATE_RESET:
+	case MII_STATE_START:
+	case MII_STATE_RUN:
+		/* let monitor thread deal with this */
 		mh->m_tstate = MII_STATE_RESET;
+		break;
+
+	case MII_STATE_LOOPBACK:
+		/* loopback is handled synchronously */
+		(void) _mii_loopback(mh);
+		break;
 	}
+
 	mh->m_suspended = B_FALSE;
 	cv_broadcast(&mh->m_cv);
 	mutex_exit(&mh->m_lock);
@@ -367,6 +381,7 @@ mii_start(mii_handle_t mh)
 {
 	mutex_enter(&mh->m_lock);
 	if (!mh->m_started) {
+		mh->m_tstate = MII_STATE_PROBE;
 		mh->m_started = B_TRUE;
 		if (ddi_taskq_dispatch(mh->m_tq, _mii_task, mh, DDI_NOSLEEP) !=
 		    DDI_SUCCESS) {
@@ -393,7 +408,7 @@ void
 mii_probe(mii_handle_t mh)
 {
 	mutex_enter(&mh->m_lock);
-	_mii_probe_task(mh);
+	_mii_probe(mh);
 	mutex_exit(&mh->m_lock);
 }
 
@@ -441,56 +456,49 @@ int
 mii_get_loopmodes(mii_handle_t mh, lb_property_t *modes)
 {
 	phy_handle_t	*ph = mh->m_phy;
-	int		cnt;
+	int		cnt = 0;
+	lb_property_t	lmodes[MII_LOOPBACK_MAX];
 
-	/*
-	 * There's a pretty big assumption in here.  The assumption is
-	 * that for 1000BASE-T and 100BASE-TX modes that we can
-	 * support all of the lower speeds and full duplex uniformly.
-	 */
-	switch (ph->phy_type) {
-	case XCVR_1000T:
-		cnt = 5;	/* 1000 BASE-T should support all modes */
-		break;
-	case XCVR_100X:
-		/*
-		 * This might be 100BASE-FX.  If so, it won't support the
-		 * 10Mbps modes.
-		 */
-		if (ph->phy_cap_10_fdx) {
-			cnt = 4;	/* 100BASE-TX probably */
-		} else {
-			cnt = 2;	/* 100BASE-FX? */
-		}
-		break;
-	case XCVR_10:
-		/* Some 10Mbs PHYs don't do full duplex */
-		if (ph->phy_cap_10_fdx) {
-			cnt = 3;
-		} else {
-			cnt = 2;
-		}
-		break;
-	case XCVR_NONE:
-		cnt = 1;	/* No XCVR, all we can do is leave it off */
-		break;
-	case XCVR_1000X:
-	case XCVR_100T4:
-	case XCVR_100T2:
-	default:
-		/*
-		 * Anything else we just allow for internal PHY loopback.
-		 * Note that many of these will probably be capable of
-		 * supporting additional external loopback modes, but we
-		 * can't be sure of it, so we just leave it alone.
-		 */
-		cnt = 2;
-		break;
+	lmodes[cnt].lb_type = normal;
+	strlcpy(lmodes[cnt].key, "normal", sizeof (lmodes[cnt].key));
+	lmodes[cnt].value = PHY_LB_NONE;
+	cnt++;
+
+	if (ph->phy_cap_1000_fdx ||
+	    ph->phy_cap_100_fdx ||
+	    ph->phy_cap_10_fdx) {
+		/* we only support full duplex internal phy testing */
+		lmodes[cnt].lb_type = internal;
+		strlcpy(lmodes[cnt].key, "PHY", sizeof (lmodes[cnt].key));
+		lmodes[cnt].value = PHY_LB_INT_PHY;
+		cnt++;
+	}
+
+	if (ph->phy_cap_1000_fdx) {
+		lmodes[cnt].lb_type = external;
+		strlcpy(lmodes[cnt].key, "1000Mbps", sizeof (lmodes[cnt].key));
+		lmodes[cnt].value = PHY_LB_EXT_1000;
+		cnt++;
+	}
+
+	if (ph->phy_cap_100_fdx) {
+		lmodes[cnt].lb_type = external;
+		strlcpy(lmodes[cnt].key, "100Mbps", sizeof (lmodes[cnt].key));
+		lmodes[cnt].value = PHY_LB_EXT_100;
+		cnt++;
+	}
+
+	if (ph->phy_cap_10_fdx) {
+		lmodes[cnt].lb_type = external;
+		strlcpy(lmodes[cnt].key, "10Mbps", sizeof (lmodes[cnt].key));
+		lmodes[cnt].value = PHY_LB_EXT_10;
+		cnt++;
 	}
 
 	if (modes) {
-		bcopy(mii_loopmodes, modes, sizeof (lb_property_t) * cnt);
+		bcopy(lmodes, modes, sizeof (lb_property_t) * cnt);
 	}
+
 	return (cnt);
 }
 
@@ -506,6 +514,7 @@ int
 mii_set_loopback(mii_handle_t mh, uint32_t loop)
 {
 	phy_handle_t	*ph;
+	int		rv;
 
 	mutex_enter(&mh->m_lock);
 	ph = mh->m_phy;
@@ -516,11 +525,14 @@ mii_set_loopback(mii_handle_t mh, uint32_t loop)
 	}
 
 	ph->phy_loopback = loop;
-	mh->m_tstate = MII_STATE_RESET;
+	rv = _mii_loopback(mh);
+	if (rv == DDI_SUCCESS) {
+		mh->m_tstate = MII_STATE_LOOPBACK;
+	}
 	cv_broadcast(&mh->m_cv);
 	mutex_exit(&mh->m_lock);
 
-	return (0);
+	return (rv == DDI_SUCCESS ? 0 : EIO);
 }
 
 uint32_t
@@ -1033,11 +1045,10 @@ phy_reset(phy_handle_t *ph)
 	ASSERT(mutex_owned(&ph->phy_mii->m_lock));
 
 	/*
-	 * For our device, make sure its powered up, unisolated, and
-	 * not in loopback.
+	 * For our device, make sure its powered up and unisolated.
 	 */
 	PHY_CLR(ph, MII_CONTROL,
-	    MII_CONTROL_PWRDN | MII_CONTROL_LOOPBACK | MII_CONTROL_ISOLATE);
+	    MII_CONTROL_PWRDN | MII_CONTROL_ISOLATE);
 
 	/*
 	 * Finally reset it.
@@ -1080,9 +1091,10 @@ phy_stop(phy_handle_t *ph)
 }
 
 int
-phy_start(phy_handle_t *ph)
+phy_loop(phy_handle_t *ph)
 {
-	uint16_t	bmcr, anar, gtcr;
+	uint16_t	bmcr, gtcr;
+
 	ASSERT(mutex_owned(&ph->phy_mii->m_lock));
 
 	/*
@@ -1099,46 +1111,87 @@ phy_start(phy_handle_t *ph)
 	ph->phy_adv_pause = B_FALSE;
 	ph->phy_adv_asmpause = B_FALSE;
 
+	bmcr = 0;
+	gtcr = MII_MSCONTROL_MANUAL | MII_MSCONTROL_MASTER;
+
 	switch (ph->phy_loopback) {
 	case PHY_LB_NONE:
-		/*
-		 * No loopback overrides, so try to advertise everything
-		 * that is administratively enabled.
-		 */
-		ph->phy_adv_aneg = ph->phy_en_aneg;
-		ph->phy_adv_1000_fdx = ph->phy_en_1000_fdx;
-		ph->phy_adv_1000_hdx = ph->phy_en_1000_hdx;
-		ph->phy_adv_100_fdx = ph->phy_en_100_fdx;
-		ph->phy_adv_100_t4 = ph->phy_en_100_t4;
-		ph->phy_adv_100_hdx = ph->phy_en_100_hdx;
-		ph->phy_adv_10_fdx = ph->phy_en_10_fdx;
-		ph->phy_adv_10_hdx = ph->phy_en_10_hdx;
-		ph->phy_adv_pause = ph->phy_en_pause;
-		ph->phy_adv_asmpause = ph->phy_en_asmpause;
+		/* We shouldn't be here */
+		ASSERT(0);
 		break;
 
 	case PHY_LB_INT_PHY:
+		bmcr |= MII_CONTROL_LOOPBACK;
+		ph->phy_duplex = LINK_DUPLEX_FULL;
 		if (ph->phy_cap_1000_fdx) {
-			ph->phy_adv_1000_fdx = B_TRUE;
+			bmcr |= MII_CONTROL_1GB | MII_CONTROL_FDUPLEX;
+			ph->phy_speed = 1000;
 		} else if (ph->phy_cap_100_fdx) {
-			ph->phy_adv_100_fdx = B_TRUE;
+			bmcr |= MII_CONTROL_100MB | MII_CONTROL_FDUPLEX;
+			ph->phy_speed = 100;
 		} else if (ph->phy_cap_10_fdx) {
-			ph->phy_adv_10_fdx = B_TRUE;
+			bmcr |= MII_CONTROL_FDUPLEX;
+			ph->phy_speed = 10;
 		}
 		break;
 
 	case PHY_LB_EXT_10:
-		ph->phy_adv_10_fdx = B_TRUE;
+		bmcr = MII_CONTROL_FDUPLEX;
+		ph->phy_speed = 10;
+		ph->phy_duplex = LINK_DUPLEX_FULL;
 		break;
 
 	case PHY_LB_EXT_100:
-		ph->phy_adv_100_fdx = B_TRUE;
+		bmcr = MII_CONTROL_100MB | MII_CONTROL_FDUPLEX;
+		ph->phy_speed = 100;
+		ph->phy_duplex = LINK_DUPLEX_FULL;
 		break;
 
 	case PHY_LB_EXT_1000:
-		ph->phy_adv_1000_fdx = B_TRUE;
+		bmcr = MII_CONTROL_1GB | MII_CONTROL_FDUPLEX;
+		ph->phy_speed = 1000;
+		ph->phy_duplex = LINK_DUPLEX_FULL;
 		break;
 	}
+
+	ph->phy_link = LINK_STATE_UP;	/* force up for loopback */
+	ph->phy_flowctrl = LINK_FLOWCTRL_NONE;
+
+	switch (ph->phy_type) {
+	case XCVR_1000T:
+	case XCVR_1000X:
+	case XCVR_100T2:
+		phy_write(ph, MII_MSCONTROL, gtcr);
+		break;
+	}
+
+	phy_write(ph, MII_CONTROL, bmcr);
+
+	return (DDI_SUCCESS);
+}
+
+int
+phy_start(phy_handle_t *ph)
+{
+	uint16_t	bmcr, anar, gtcr;
+	ASSERT(mutex_owned(&ph->phy_mii->m_lock));
+
+	ASSERT(ph->phy_loopback == PHY_LB_NONE);
+
+	/*
+	 * No loopback overrides, so try to advertise everything
+	 * that is administratively enabled.
+	 */
+	ph->phy_adv_aneg = ph->phy_en_aneg;
+	ph->phy_adv_1000_fdx = ph->phy_en_1000_fdx;
+	ph->phy_adv_1000_hdx = ph->phy_en_1000_hdx;
+	ph->phy_adv_100_fdx = ph->phy_en_100_fdx;
+	ph->phy_adv_100_t4 = ph->phy_en_100_t4;
+	ph->phy_adv_100_hdx = ph->phy_en_100_hdx;
+	ph->phy_adv_10_fdx = ph->phy_en_10_fdx;
+	ph->phy_adv_10_hdx = ph->phy_en_10_hdx;
+	ph->phy_adv_pause = ph->phy_en_pause;
+	ph->phy_adv_asmpause = ph->phy_en_asmpause;
 
 	/*
 	 * Limit properties to what the hardware can actually support.
@@ -1180,23 +1233,8 @@ phy_start(phy_handle_t *ph)
 		return (DDI_SUCCESS);
 	}
 
-	switch (ph->phy_loopback) {
-	case PHY_LB_INT_PHY:
-		bmcr = MII_CONTROL_LOOPBACK;
-		gtcr = 0;
-		break;
-	case PHY_LB_EXT_10:
-	case PHY_LB_EXT_100:
-	case PHY_LB_EXT_1000:
-		bmcr = 0;
-		gtcr = MII_MSCONTROL_MANUAL | MII_MSCONTROL_MASTER;
-		break;
-	case PHY_LB_NONE:
-	default:
-		bmcr = 0;
-		gtcr = 0;
-		break;
-	}
+	bmcr = 0;
+	gtcr = 0;
 
 	if (ph->phy_adv_aneg) {
 		bmcr |= MII_CONTROL_ANE | MII_CONTROL_RSAN;
@@ -1562,6 +1600,14 @@ phy_warn(phy_handle_t *ph, const char *fmt, ...)
  */
 
 void
+_mii_notify(mii_handle_t mh)
+{
+	if (mh->m_ops.mii_notify != NULL) {
+		mh->m_ops.mii_notify(mh->m_private, mh->m_link);
+	}
+}
+
+void
 _mii_probe_phy(phy_handle_t *ph)
 {
 	uint16_t	bmsr;
@@ -1605,6 +1651,7 @@ _mii_probe_phy(phy_handle_t *ph)
 	ph->phy_start = phy_start;
 	ph->phy_stop = phy_stop;
 	ph->phy_check = phy_check;
+	ph->phy_loop = phy_loop;
 
 	/*
 	 * We ignore the non-existent 100baseT2 stuff -- no
@@ -1707,7 +1754,7 @@ _mii_probe_phy(phy_handle_t *ph)
 }
 
 void
-_mii_probe_task(mii_handle_t mh)
+_mii_probe(mii_handle_t mh)
 {
 	uint8_t		new_addr;
 	uint8_t		old_addr;
@@ -1794,16 +1841,21 @@ _mii_probe_task(mii_handle_t mh)
 		mh->m_addr = new_addr;
 		mh->m_phy = &mh->m_phys[new_addr];
 		mh->m_tstate = MII_STATE_RESET;
-		cmn_err(CE_CONT, "?%s: Using %s Ethernet PHY at %d: %s %s\n",
-		    mh->m_name, mii_xcvr_types[mh->m_phy->phy_type],
-		    mh->m_addr, mh->m_phy->phy_vendor, mh->m_phy->phy_model);
+		if (new_addr != old_addr) {
+			cmn_err(CE_CONT,
+			    "?%s: Using %s Ethernet PHY at %d: %s %s\n",
+			    mh->m_name, mii_xcvr_types[mh->m_phy->phy_type],
+			    mh->m_addr, mh->m_phy->phy_vendor,
+			    mh->m_phy->phy_model);
+		}
 	}
 }
 
-static int
-_mii_reset_task(mii_handle_t mh)
+int
+_mii_reset(mii_handle_t mh)
 {
 	phy_handle_t	*ph;
+	boolean_t	notify;
 
 	ASSERT(mutex_owned(&mh->m_lock));
 
@@ -1817,7 +1869,7 @@ _mii_reset_task(mii_handle_t mh)
 		if (!ph->phy_present)
 			continue;
 
-		/* don't touch our own phy, yet */
+		/* Don't touch our own phy, yet. */
 		if (ph == mh->m_phy)
 			continue;
 
@@ -1828,20 +1880,60 @@ _mii_reset_task(mii_handle_t mh)
 
 	ASSERT(ph->phy_present);
 
-	/* If we're resetting the PHY, then for sure we want to notify */
-	mh->m_notify = B_TRUE;
+	/* If we're resetting the PHY, then we want to notify loss of link */
+	notify = (mh->m_link == LINK_STATE_UP);
+	mh->m_link = LINK_STATE_DOWN;
+	ph->phy_link = LINK_STATE_DOWN;
+	ph->phy_speed = 0;
+	ph->phy_duplex = LINK_DUPLEX_UNKNOWN;
 
 	if (ph->phy_reset(ph) != DDI_SUCCESS) {
 		_mii_error(mh, MII_ERESET);
 		return (DDI_FAILURE);
 	}
 
-	mh->m_tstate = MII_STATE_START;
+	/* Perform optional mac layer reset. */
+	if (mh->m_ops.mii_reset != NULL) {
+		mh->m_ops.mii_reset(mh->m_private);
+	}
+
+	/* Perform optional mac layer notification. */
+	if (notify) {
+		_mii_notify(mh);
+	}
 	return (DDI_SUCCESS);
 }
 
-static void
-_mii_start_task(mii_handle_t mh)
+int
+_mii_loopback(mii_handle_t mh)
+{
+	phy_handle_t	*ph;
+
+	ASSERT(mutex_owned(&mh->m_lock));
+
+	ph = mh->m_phy;
+
+	if (_mii_reset(mh) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+	if (ph->phy_loopback == PHY_LB_NONE) {
+		mh->m_tstate = MII_STATE_START;
+		return (DDI_SUCCESS);
+	}
+	if (ph->phy_loop(ph) != DDI_SUCCESS) {
+		_mii_error(mh, MII_ELOOP);
+		return (DDI_FAILURE);
+	}
+
+	/* Just force loopback to link up. */
+	mh->m_link = ph->phy_link = LINK_STATE_UP;
+	_mii_notify(mh);
+
+	return (DDI_SUCCESS);
+}
+
+int
+_mii_start(mii_handle_t mh)
 {
 	phy_handle_t		*ph;
 
@@ -1849,19 +1941,19 @@ _mii_start_task(mii_handle_t mh)
 
 	ASSERT(mutex_owned(&mh->m_lock));
 	ASSERT(ph->phy_present);
+	ASSERT(ph->phy_loopback == PHY_LB_NONE);
 
-	if (phy_start(ph) != DDI_SUCCESS) {
+	if (ph->phy_start(ph) != DDI_SUCCESS) {
 		_mii_error(mh, MII_ESTART);
-		mh->m_tstate = MII_STATE_RESET;
-		return;
+		return (DDI_FAILURE);
 	}
 	/* clear the error state since we got a good startup! */
 	mh->m_error = MII_EOK;
-	mh->m_tstate = MII_STATE_RUN;
+	return (DDI_SUCCESS);
 }
 
-static int
-_mii_check_task(mii_handle_t mh)
+int
+_mii_check(mii_handle_t mh)
 {
 	link_state_t	olink;
 	int		ospeed;
@@ -1881,8 +1973,7 @@ _mii_check_task(mii_handle_t mh)
 	if (ph->phy_check(ph) == DDI_FAILURE) {
 		_mii_error(mh, MII_ECHECK);
 		mh->m_link = LINK_STATE_UNKNOWN;
-		mh->m_tstate = MII_STATE_PROBE;
-		mh->m_notify = B_TRUE;
+		_mii_notify(mh);
 		return (DDI_FAILURE);
 	}
 
@@ -1893,13 +1984,13 @@ _mii_check_task(mii_handle_t mh)
 	    (ph->phy_speed != ospeed) ||
 	    (ph->phy_duplex != oduplex) ||
 	    (ph->phy_flowctrl != ofctrl)) {
-		mh->m_notify = B_TRUE;
+		_mii_notify(mh);
 	}
 
 	return (DDI_SUCCESS);
 }
 
-static void
+void
 _mii_task(void *_mh)
 {
 	mii_handle_t	mh = _mh;
@@ -1940,7 +2031,7 @@ _mii_task(void *_mh)
 
 		switch (mh->m_tstate) {
 		case MII_STATE_PROBE:
-			_mii_probe_task(mh);
+			_mii_probe(mh);
 			ph = mh->m_phy;
 			if (!ph->phy_present) {
 				/*
@@ -1955,21 +2046,8 @@ _mii_task(void *_mh)
 			break;
 
 		case MII_STATE_RESET:
-			if (_mii_reset_task(mh) == DDI_SUCCESS) {
-				ASSERT(mh->m_tstate == MII_STATE_START);
-
-				/*
-				 * We have to go back to the top of
-				 * the routine to check for changed
-				 * conditions while we drop the lock
-				 * to call into the mac layer.
-				 */
-				if (mh->m_ops.mii_reset != NULL) {
-					mutex_exit(&mh->m_lock);
-					mh->m_ops.mii_reset(mh->m_private);
-					mutex_enter(&mh->m_lock);
-					continue;
-				}
+			if (_mii_reset(mh) == DDI_SUCCESS) {
+				mh->m_tstate = MII_STATE_START;
 				wait = 0;
 			} else {
 				/*
@@ -1989,21 +2067,34 @@ _mii_task(void *_mh)
 			 * settle, or to give other code a chance to run
 			 * while we reset.
 			 */
-			_mii_start_task(mh);
-			/* reset watchdog to latest */
-			downtime = ddi_get_lbolt();
-			wait = MII_SECOND;
+			if (_mii_start(mh) == DDI_SUCCESS) {
+				/* reset watchdog to latest */
+				downtime = ddi_get_lbolt();
+				mh->m_tstate = MII_STATE_RUN;
+			} else {
+				mh->m_tstate = MII_STATE_PROBE;
+			}
+			wait = 0;
+			break;
+
+		case MII_STATE_LOOPBACK:
+			/*
+			 * In loopback mode we don't check anything,
+			 * and just wait for some condition to change.
+			 */
+			wait = (clock_t)-1;
 			break;
 
 		case MII_STATE_RUN:
 		default:
-			if (_mii_check_task(mh) == DDI_FAILURE) {
+			if (_mii_check(mh) == DDI_FAILURE) {
 				/*
 				 * On error (PHY removed?), wait a
 				 * short bit before reprobing or
 				 * resetting.
 				 */
 				wait = MII_SECOND;
+				mh->m_tstate = MII_STATE_PROBE;
 
 			} else if (mh->m_link == LINK_STATE_UP) {
 				/* got goood link, so reset the watchdog */
@@ -2033,21 +2124,19 @@ _mii_task(void *_mh)
 			break;
 		}
 
-		if (mh->m_notify) {
-			mh->m_notify = B_FALSE;
+		switch (wait) {
+		case 0:
+			break;
 
-			if (mh->m_ops.mii_notify != NULL) {
-				link_state_t state = mh->m_link;
-				mutex_exit(&mh->m_lock);
-				mh->m_ops.mii_notify(mh->m_private, state);
-				mutex_enter(&mh->m_lock);
-				continue;
-			}
-		}
+		case (clock_t)-1:
+			cv_wait(&mh->m_cv, &mh->m_lock);
+			break;
 
-		if (wait)
+		default:
 			(void) cv_timedwait(&mh->m_cv, &mh->m_lock,
 			    ddi_get_lbolt() + drv_usectohz(wait));
+			break;
+		}
 	}
 
 	mutex_exit(&mh->m_lock);

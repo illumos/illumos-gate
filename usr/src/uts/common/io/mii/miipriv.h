@@ -71,6 +71,7 @@ struct phy_handle {
 	int		(*phy_start)(phy_handle_t *);
 	int		(*phy_stop)(phy_handle_t *);
 	int		(*phy_check)(phy_handle_t *);
+	int		(*phy_loop)(phy_handle_t *);
 
 	/*
 	 * Physical capabilities.  PHY implementations may override
@@ -199,13 +200,20 @@ int phy_stop(phy_handle_t *);
 int phy_check(phy_handle_t *);
 
 /*
- * THe following probes are PHY specific, and located here so that
+ * phy_ isoop called to establish loopback mode.  The PHY must
+ * examine the value of phy_loopback.
+ */
+int phy_loop(phy_handle_t *);
+
+/*
+ * The following probes are PHY specific, and located here so that
  * the common PHY layer can find them.
  */
 boolean_t phy_intel_probe(phy_handle_t *);
 boolean_t phy_natsemi_probe(phy_handle_t *);
 boolean_t phy_qualsemi_probe(phy_handle_t *);
 boolean_t phy_cicada_probe(phy_handle_t *);
+boolean_t phy_marvell_probe(phy_handle_t *);
 boolean_t phy_other_probe(phy_handle_t *);
 
 #endif /* _MIIPRIV_H */
