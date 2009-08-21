@@ -490,7 +490,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.16"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.17"
 #define	CDATE "MPTSAS was compiled on "__DATE__
 /* LINTED E_STATIC_UNUSED */
 static char *MPTWASCOMPILEDON = CDATE;
@@ -9940,8 +9940,10 @@ mptsas_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 				break;
 			}
 			mutex_enter(&mpt->m_mutex);
-			if (mpt->m_passthru_in_progress)
+			if (mpt->m_passthru_in_progress) {
+				mutex_exit(&mpt->m_mutex);
 				return (EBUSY);
+			}
 			mpt->m_passthru_in_progress = 1;
 			status = mptsas_pass_thru(mpt, &passthru_data, mode);
 			mpt->m_passthru_in_progress = 0;
