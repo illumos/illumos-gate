@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_SYS_SCSI_ADAPTERS_SCSI_VHCI_TPGS_H
 #define	_SYS_SCSI_ADAPTERS_SCSI_VHCI_TPGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * max number of retries for std failover to complete where the ping
@@ -50,6 +48,7 @@
 #define	STD_SCSI_ASC_INVAL_PARAM_LIST	0x26
 #define	STD_SCSI_ASC_INVAL_CMD_OPCODE	0x20
 #define	STD_LOGICAL_UNIT_NOT_ACCESSIBLE	0x04
+#define	STD_TGT_PORT_STANDBY		0x0B
 #define	STD_TGT_PORT_UNAVAILABLE	0x0C
 
 extern int vhci_tpgs_get_target_fo_mode(struct scsi_device *sd, int *mode,
