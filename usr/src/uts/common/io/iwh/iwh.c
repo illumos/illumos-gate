@@ -519,13 +519,10 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    instance);
 		ASSERT(sc != NULL);
 
-		mutex_enter(&sc->sc_suspend_lock);
 		sc->sc_flags &= ~IWH_F_SUSPEND;
-
 		if (sc->sc_flags & IWH_F_RUNNING) {
 			(void) iwh_init(sc);
 		}
-		mutex_exit(&sc->sc_suspend_lock);
 
 		IWH_DBG((IWH_DEBUG_RESUME, "iwh_attach(): "
 		    "resume\n"));
@@ -989,17 +986,11 @@ iwh_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		break;
 
 	case DDI_SUSPEND:
-		mutex_enter(&sc->sc_suspend_lock);
-		sc->sc_flags |= IWH_F_SUSPEND;
-
 		if (sc->sc_flags & IWH_F_RUNNING) {
-			iwh_stop(sc);
 			ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-
-			sc->sc_flags &= ~IWH_F_HW_ERR_RECOVER;
-			sc->sc_flags &= ~IWH_F_RATE_AUTO_CTL;
+			iwh_stop(sc);
 		}
-		mutex_exit(&sc->sc_suspend_lock);
+		sc->sc_flags |= IWH_F_SUSPEND;
 
 		IWH_DBG((IWH_DEBUG_RESUME, "iwh_detach(): "
 		    "suspend\n"));
