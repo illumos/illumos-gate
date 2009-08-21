@@ -1394,7 +1394,8 @@ xnf_send(void *arg, mblk_t *mp)
 			ec_notify_via_evtchn(xnfp->xnf_evtchn);
 	}
 
-	xnfp->xnf_need_sched = !sent_something;
+	if (mp != NULL)
+		xnfp->xnf_need_sched = B_TRUE;
 
 	mutex_exit(&xnfp->xnf_txlock);
 
