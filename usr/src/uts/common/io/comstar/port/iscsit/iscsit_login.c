@@ -1005,10 +1005,6 @@ login_sm_process_request(iscsit_conn_t *ict)
 			(void) iscsit_reply_numerical(ict,
 			    "TargetPortalGroupTag",
 			    (uint64_t)lsm->icl_tpgt_tag);
-			if (iscsit_add_declarative_keys(ict) !=
-			    IDM_STATUS_SUCCESS) {
-				goto request_fail;
-			}
 		}
 
 		ict->ict_op.op_initial_params_set = B_TRUE;
@@ -1861,6 +1857,16 @@ login_sm_process_nvlist(iscsit_conn_t *ict)
 	/* Ensure we clear transit bit if the transport layer has countered */
 	if (kvrc == KV_HANDLED_NO_TRANSIT) {
 		lsm->icl_login_transit = B_FALSE;
+	}
+
+	/* Prepend the declarative params */
+	if (!ict->ict_op.op_declarative_params_set &&
+	    lsm->icl_login_csg == ISCSI_OP_PARMS_NEGOTIATION_STAGE) {
+		if (iscsit_add_declarative_keys(ict) != IDM_STATUS_SUCCESS) {
+			idm_status = IDM_STATUS_FAIL;
+			return (idm_status);
+		}
+		ict->ict_op.op_declarative_params_set = B_TRUE;
 	}
 
 	/* Now, move on and process the rest of the pairs */

@@ -429,7 +429,8 @@ typedef struct {
 				op_initial_r2t:1,
 				op_immed_data:1,
 				op_data_pdu_in_order:1,
-				op_data_sequence_in_order:1;
+				op_data_sequence_in_order:1,
+				op_declarative_params_set:1;
 	uint64_t		op_max_connections;
 	uint64_t		op_max_recv_data_segment_length;
 	uint64_t		op_max_burst_length;
