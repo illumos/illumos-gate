@@ -249,6 +249,9 @@ typedef struct arc_stats {
 	kstat_named_t arcstat_recycle_miss;
 	kstat_named_t arcstat_mutex_miss;
 	kstat_named_t arcstat_evict_skip;
+	kstat_named_t arcstat_evict_l2_cached;
+	kstat_named_t arcstat_evict_l2_eligible;
+	kstat_named_t arcstat_evict_l2_ineligible;
 	kstat_named_t arcstat_hash_elements;
 	kstat_named_t arcstat_hash_elements_max;
 	kstat_named_t arcstat_hash_collisions;
@@ -302,6 +305,9 @@ static arc_stats_t arc_stats = {
 	{ "recycle_miss",		KSTAT_DATA_UINT64 },
 	{ "mutex_miss",			KSTAT_DATA_UINT64 },
 	{ "evict_skip",			KSTAT_DATA_UINT64 },
+	{ "evict_l2_cached",		KSTAT_DATA_UINT64 },
+	{ "evict_l2_eligible",		KSTAT_DATA_UINT64 },
+	{ "evict_l2_ineligible",	KSTAT_DATA_UINT64 },
 	{ "hash_elements",		KSTAT_DATA_UINT64 },
 	{ "hash_elements_max",		KSTAT_DATA_UINT64 },
 	{ "hash_collisions",		KSTAT_DATA_UINT64 },
@@ -467,6 +473,8 @@ static void arc_get_data_buf(arc_buf_t *buf);
 static void arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 static int arc_evict_needed(arc_buf_contents_t type);
 static void arc_evict_ghost(arc_state_t *state, uint64_t spa, int64_t bytes);
+
+static boolean_t l2arc_write_eligible(uint64_t spa_guid, arc_buf_hdr_t *ab);
 
 #define	GHOST_STATE(state)	\
 	((state) == arc_mru_ghost || (state) == arc_mfu_ghost ||	\
@@ -1605,6 +1613,21 @@ arc_evict(arc_state_t *state, uint64_t spa, int64_t bytes, boolean_t recycle,
 					    buf->b_data == stolen, TRUE);
 				}
 			}
+
+			if (ab->b_l2hdr) {
+				ARCSTAT_INCR(arcstat_evict_l2_cached,
+				    ab->b_size);
+			} else {
+				if (l2arc_write_eligible(ab->b_spa, ab)) {
+					ARCSTAT_INCR(arcstat_evict_l2_eligible,
+					    ab->b_size);
+				} else {
+					ARCSTAT_INCR(
+					    arcstat_evict_l2_ineligible,
+					    ab->b_size);
+				}
+			}
+
 			if (ab->b_datacnt == 0) {
 				arc_change_state(evicted_state, ab, hash_lock);
 				ASSERT(HDR_IN_HASH_TABLE(ab));
@@ -3789,12 +3812,11 @@ l2arc_write_eligible(uint64_t spa_guid, arc_buf_hdr_t *ab)
 	/*
 	 * A buffer is *not* eligible for the L2ARC if it:
 	 * 1. belongs to a different spa.
-	 * 2. has no attached buffer.
-	 * 3. is already cached on the L2ARC.
-	 * 4. has an I/O in progress (it may be an incomplete read).
-	 * 5. is flagged not eligible (zfs property).
+	 * 2. is already cached on the L2ARC.
+	 * 3. has an I/O in progress (it may be an incomplete read).
+	 * 4. is flagged not eligible (zfs property).
 	 */
-	if (ab->b_spa != spa_guid || ab->b_buf == NULL || ab->b_l2hdr != NULL ||
+	if (ab->b_spa != spa_guid || ab->b_l2hdr != NULL ||
 	    HDR_IO_IN_PROGRESS(ab) || !HDR_L2CACHE(ab))
 		return (B_FALSE);
 
