@@ -27,7 +27,9 @@
 
 # Driver info
 DRV=urtw
-DRVALIAS='"usb846,6a00"'
+DRVALIAS='"usb846,6a00"	"usb1371,9401" "usb789,10c" "usb114b,150"
+	"usbbda,8187" "usb769,11f2" "usb50d,705e" "usb846,4260"
+	"usbbda,8189" "usbbda,8197" "usbbda,8198" "usbdf6,28"'
 
 BASEDIR=${BASEDIR:-/}
 

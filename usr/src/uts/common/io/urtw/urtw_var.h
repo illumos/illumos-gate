@@ -38,7 +38,7 @@
 extern "C" {
 #endif
 
-#define	URTW_RX_DATA_LIST_COUNT	(1)
+#define	URTW_RX_DATA_LIST_COUNT	(2)
 #define	URTW_TX_DATA_LIST_COUNT	(16)
 #define	URTW_RX_MAXSIZE	(0x9c4)
 #define	URTW_TX_MAXSIZE	URTW_RX_MAXSIZE
@@ -59,6 +59,18 @@ typedef int usbd_status;
 #define	NORMAL_PRIORITY_PIPE (1)
 #define	URTW_LED_LINKOFF_BLINK	(1000*1000)
 #define	URTW_LED_LINKON_BLINK	(300*1000)
+
+struct urtw_rf {
+	/* RF methods */
+	usbd_status			(*init)(struct urtw_rf *);
+	usbd_status			(*set_chan)(struct urtw_rf *, int);
+	usbd_status			(*set_sens)(struct urtw_rf *);
+
+	/* RF attributes */
+	struct urtw_softc		*rf_sc;
+	uint32_t			max_sens;
+	int32_t				sens;
+};
 
 struct urtw_softc {
 	struct ieee80211com	sc_ic;
@@ -93,15 +105,8 @@ struct urtw_softc {
 	uint8_t				sc_crcmon;
 	uint8_t				sc_bssid[IEEE80211_ADDR_LEN];
 
-	/* for RF  */
-	usbd_status			(*sc_rf_init)(struct urtw_softc *);
-	usbd_status			(*sc_rf_set_chan)(struct urtw_softc *,
-					    int);
-	usbd_status			(*sc_rf_set_sens)(struct urtw_softc *,
-					    int);
-	uint8_t				sc_rfchip;
-	uint32_t			sc_max_sens;
-	uint32_t			sc_sens;
+	struct urtw_rf			sc_rf;
+
 	/* for LED  */
 	kmutex_t			sc_ledlock;
 	timeout_id_t			sc_led_ch;
@@ -124,10 +129,14 @@ struct urtw_softc {
 	uint8_t				sc_txpwr_cck_base;
 	uint8_t				sc_txpwr_ofdm[URTW_MAX_CHANNELS];
 	uint8_t				sc_txpwr_ofdm_base;
+
+	uint8_t				sc_hwrev;
+	int				(*urtw_init)(void *);
 };
 #define	URTW_FLAG_RUNNING	(1 << 0)
 #define	URTW_FLAG_SUSPEND	(1 << 1)
-#define	URTW_FLAG_PLUGIN_ONLINE		(1 << 2)
+#define	URTW_FLAG_PLUGIN_ONLINE	(1 << 2)
+#define	URTW_FLAG_HP		(1 << 3)
 
 #define	URTW_IS_PLUGIN_ONLINE(_sc) \
 	((_sc)->sc_flags & URTW_FLAG_PLUGIN_ONLINE)
