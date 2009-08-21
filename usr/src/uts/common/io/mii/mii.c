@@ -460,7 +460,7 @@ mii_get_loopmodes(mii_handle_t mh, lb_property_t *modes)
 	lb_property_t	lmodes[MII_LOOPBACK_MAX];
 
 	lmodes[cnt].lb_type = normal;
-	strlcpy(lmodes[cnt].key, "normal", sizeof (lmodes[cnt].key));
+	(void) strlcpy(lmodes[cnt].key, "normal", sizeof (lmodes[cnt].key));
 	lmodes[cnt].value = PHY_LB_NONE;
 	cnt++;
 
@@ -469,28 +469,32 @@ mii_get_loopmodes(mii_handle_t mh, lb_property_t *modes)
 	    ph->phy_cap_10_fdx) {
 		/* we only support full duplex internal phy testing */
 		lmodes[cnt].lb_type = internal;
-		strlcpy(lmodes[cnt].key, "PHY", sizeof (lmodes[cnt].key));
+		(void) strlcpy(lmodes[cnt].key, "PHY",
+		    sizeof (lmodes[cnt].key));
 		lmodes[cnt].value = PHY_LB_INT_PHY;
 		cnt++;
 	}
 
 	if (ph->phy_cap_1000_fdx) {
 		lmodes[cnt].lb_type = external;
-		strlcpy(lmodes[cnt].key, "1000Mbps", sizeof (lmodes[cnt].key));
+		(void) strlcpy(lmodes[cnt].key, "1000Mbps",
+		    sizeof (lmodes[cnt].key));
 		lmodes[cnt].value = PHY_LB_EXT_1000;
 		cnt++;
 	}
 
 	if (ph->phy_cap_100_fdx) {
 		lmodes[cnt].lb_type = external;
-		strlcpy(lmodes[cnt].key, "100Mbps", sizeof (lmodes[cnt].key));
+		(void) strlcpy(lmodes[cnt].key, "100Mbps",
+		    sizeof (lmodes[cnt].key));
 		lmodes[cnt].value = PHY_LB_EXT_100;
 		cnt++;
 	}
 
 	if (ph->phy_cap_10_fdx) {
 		lmodes[cnt].lb_type = external;
-		strlcpy(lmodes[cnt].key, "10Mbps", sizeof (lmodes[cnt].key));
+		(void) strlcpy(lmodes[cnt].key, "10Mbps",
+		    sizeof (lmodes[cnt].key));
 		lmodes[cnt].value = PHY_LB_EXT_10;
 		cnt++;
 	}
