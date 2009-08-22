@@ -64,6 +64,7 @@ static const char smbiod_path[] = "/usr/lib/smbfs/smbiod";
  * and initialized at startup, so no locks.
  */
 static char door_path[40];
+static int iod_start_timeout = 10;	/* seconds */
 
 char *
 smb_iod_door_path(void)
@@ -125,13 +126,19 @@ smb_iod_open_door(int *fdp)
 }
 
 /*
- * Start the IOD and wait until we can
- * open its client-side door.
+ * Start the IOD (if not already running) and
+ * wait until its door service is ready.
+ * On success, sets ctx->ct_door_fd
  */
-static int
-start_iod(int *fdp)
+int
+smb_iod_start(smb_ctx_t *ctx)
 {
-	int err, pid, t;
+	int err, pid, tmo;
+	int fd = -1;
+
+	err = smb_iod_open_door(&fd);
+	if (err == 0)
+		goto OK;
 
 	pid = vfork();
 	if (pid < 0)
@@ -145,39 +152,44 @@ start_iod(int *fdp)
 		argv[0] = "smbiod";
 		argv[1] = NULL;
 		execv(smbiod_path, argv);
-		return (errno);
+		_exit(1);
 	}
 
 	/*
 	 * parent: wait for smbiod to start
 	 */
-	for (t = 0; t < 10; t++) {
+	tmo = iod_start_timeout;
+	while (--tmo >= 0) {
 		sleep(1);
-		err = smb_iod_open_door(fdp);
+		err = smb_iod_open_door(&fd);
 		if (err == 0)
-			break;
+			goto OK;
 	}
-
 	return (err);
+
+OK:
+	/* Save the door fd. */
+	if (ctx->ct_door_fd != -1)
+		close(ctx->ct_door_fd);
+	ctx->ct_door_fd = fd;
+
+	return (0);
 }
 
 
 /*
- * Start smbiod if necessary, and then
- * ask it to connect using the info in ctx.
+ * Ask the IOD to connect using the info in ctx.
+ * Called by newvc.
  */
 int
 smb_iod_cl_newvc(smb_ctx_t *ctx)
 {
 	door_arg_t da;
-	int fd, err = 0;
+	int err = 0;
 
-	err = smb_iod_open_door(&fd);
-	if (err != 0) {
-		err = start_iod(&fd);
-		if (err)
-			return (err);
-	}
+	/* Should already have the IOD door. */
+	if (ctx->ct_door_fd < 0)
+		return (EINVAL);
 
 	da.data_ptr = (void *) &ctx->ct_iod_ssn;
 	da.data_size = sizeof (ctx->ct_iod_ssn);
@@ -185,11 +197,10 @@ smb_iod_cl_newvc(smb_ctx_t *ctx)
 	da.desc_num = 0;
 	da.rbuf = (void *) &err;
 	da.rsize = sizeof (err);
-	if (door_call(fd, &da) < 0) {
+	if (door_call(ctx->ct_door_fd, &da) < 0) {
 		err = errno;
 		DPRINT("door_call, err=%d", err);
 	}
-	close(fd);
 
 	return (err);
 }

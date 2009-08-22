@@ -143,6 +143,8 @@ int  smb_fh_write(struct smb_ctx *, int, off_t, size_t, const char *);
 int  smb_fh_xactnp(struct smb_ctx *, int, int, const char *,
 	int *, char *, int *);
 
+int  smb_iod_start(struct smb_ctx *);
+
 int  smb_t2_request(struct smb_ctx *, int, uint16_t *, const char *,
 	int, void *, int, void *, int *, void *, int *, void *, int *);
 

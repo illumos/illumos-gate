@@ -241,6 +241,7 @@ smb_ctx_init(struct smb_ctx *ctx)
 		return (error);
 
 	ctx->ct_dev_fd = -1;
+	ctx->ct_door_fd = -1;
 	ctx->ct_tran_fd = -1;
 	ctx->ct_parsedlevel = SMBL_NONE;
 	ctx->ct_minlevel = SMBL_NONE;
@@ -396,6 +397,10 @@ smb_ctx_done(struct smb_ctx *ctx)
 	if (ctx->ct_dev_fd != -1) {
 		close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
+	}
+	if (ctx->ct_door_fd != -1) {
+		close(ctx->ct_door_fd);
+		ctx->ct_door_fd = -1;
 	}
 	if (ctx->ct_tran_fd != -1) {
 		close(ctx->ct_tran_fd);
@@ -1013,14 +1018,18 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 #endif	/* KICONV_SUPPORT */
 
 	/*
-	 * Lookup the IP address.
-	 * Puts a list in ct_addrinfo
+	 * Lookup the IP address and fill in ct_addrinfo.
+	 *
+	 * Note: smb_ctx_getaddr() returns a EAI_xxx
+	 * error value like getaddrinfo(3), but this
+	 * function needs to return an errno value.
 	 */
 	error = smb_ctx_getaddr(ctx);
 	if (error) {
+		const char *ais = gai_strerror(error);
 		smb_error(dgettext(TEXT_DOMAIN,
-		    "can't get server address"), error);
-		return (error);
+		    "can't get server address, %s"), 0, ais);
+		return (ENODATA);
 	}
 	assert(ctx->ct_addrinfo != NULL);
 

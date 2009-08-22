@@ -87,12 +87,24 @@ int
 smb_ctx_newvc(struct smb_ctx *ctx)
 {
 	struct addrinfo *ai;
-	int err = ENOENT;
+	int err;
 
 	/* Should already have the address list. */
 	if ((ctx->ct_flags & SMBCF_RESOLVED) == 0)
 		return (EINVAL);
 
+	/*
+	 * Get a door handle to the smbiod if we
+	 * don't have one already.  This also
+	 * starts the smbiod if necessary.
+	 */
+	if (ctx->ct_door_fd < 0) {
+		err = smb_iod_start(ctx);
+		if (err != 0)
+			return (err);
+	}
+
+	err = EPROTONOSUPPORT;  /* in case no AF match */
 	for (ai = ctx->ct_addrinfo; ai; ai = ai->ai_next) {
 
 		switch (ai->ai_family) {
@@ -101,18 +113,26 @@ smb_ctx_newvc(struct smb_ctx *ctx)
 		case AF_INET6:
 		case AF_NETBIOS:
 			err = newvc(ctx, ai);
+			if (err == 0)
+				goto OK;
 			break;
 
 		default:
 			DPRINT("skipped family %d", ai->ai_family);
 			break;
 		}
-
-		if (err == 0) {
-			ctx->ct_flags |= SMBCF_SSNACTIVE;
-			return (0);
-		}
 	}
 
+	/*
+	 * In the error case, the caller may try again
+	 * with new auth. info, so keep the door open.
+	 * Error return will close in smb_ctx_done.
+	 */
 	return (err);
+
+OK:
+	/* Done with the door handle. */
+	close(ctx->ct_door_fd);
+	ctx->ct_door_fd = -1;
+	return (0);
 }

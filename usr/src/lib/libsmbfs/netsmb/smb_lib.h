@@ -94,6 +94,7 @@ typedef struct smb_iod_ssn smb_iod_ssn_t;
 struct smb_ctx {
 	int		ct_flags;	/* SMBCF_ */
 	int		ct_dev_fd;	/* device handle */
+	int		ct_door_fd;	/* to smbiod */
 	int		ct_parsedlevel;
 	int		ct_minlevel;
 	int		ct_maxlevel;

@@ -104,6 +104,7 @@ SUNWprivate {
 	smb_iod_connect;
 	smb_iod_door_path;
 	smb_iod_open_door;
+	smb_iod_start;
 	smb_iod_work;
 	smb_lib_init;
 	smb_netshareenum;	# will move to libnetapi
