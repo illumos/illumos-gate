@@ -3913,7 +3913,10 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 		}
 
 		mutex_enter(&zp->z_lock);
-		vp->v_count = 0; /* count arrives as 1 */
+		mutex_enter(&vp->v_lock);
+		ASSERT(vp->v_count == 1);
+		vp->v_count = 0;
+		mutex_exit(&vp->v_lock);
 		mutex_exit(&zp->z_lock);
 		rw_exit(&zfsvfs->z_teardown_inactive_lock);
 		zfs_znode_free(zp);
