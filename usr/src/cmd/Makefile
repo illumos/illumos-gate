@@ -350,7 +350,6 @@ COMMON_SUBDIRS=		\
 	rpcgen		\
 	rpcinfo		\
 	rpcsvc		\
-	rpld		\
 	runat		\
 	sa		\
 	saf		\

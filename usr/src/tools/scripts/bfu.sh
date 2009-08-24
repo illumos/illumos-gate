@@ -1290,6 +1290,7 @@ smf_obsolete_rc_files="
 	etc/init.d/acctadm
 	etc/init.d/audit
 	etc/init.d/autofs
+	etc/init.d/boot.server
 	etc/init.d/coreadm
 	etc/init.d/cron
 	etc/init.d/cryptosvc
@@ -1341,6 +1342,7 @@ smf_obsolete_rc_files="
 	etc/rc0.d/K07snmpdx
 	etc/rc0.d/K10rcapd
 	etc/rc0.d/K21dhcp
+	etc/rc0.d/K27boot.server
 	etc/rc0.d/K28kdc
 	etc/rc0.d/K28kdc.master
 	etc/rc0.d/K28nfs.server
@@ -1374,6 +1376,7 @@ smf_obsolete_rc_files="
 	etc/rc1.d/K07snmpdx
 	etc/rc1.d/K10rcapd
 	etc/rc1.d/K21dhcp
+	etc/rc1.d/K27boot.server
 	etc/rc1.d/K28kdc
 	etc/rc1.d/K28kdc.master
 	etc/rc1.d/K28nfs.server
@@ -1402,6 +1405,7 @@ smf_obsolete_rc_files="
 	etc/rc2.d/K05volmgt
 	etc/rc2.d/K07snmpdx
 	etc/rc2.d/K21dhcp
+	etc/rc2.d/K27boot.server
 	etc/rc2.d/K28kdc
 	etc/rc2.d/K28kdc.master
 	etc/rc2.d/K28nfs.server
@@ -1438,6 +1442,7 @@ smf_obsolete_rc_files="
 	etc/rc3.d/S13kdc.master
 	etc/rc3.d/S14kdc
 	etc/rc3.d/S15nfs.server
+	etc/rc3.d/S16boot.server
 	etc/rc3.d/S34dhcp
 	etc/rc3.d/S76snmpdx
 	etc/rc3.d/S81volmgt
@@ -1449,6 +1454,7 @@ smf_obsolete_rc_files="
 	etc/rcS.d/K07snmpdx
 	etc/rcS.d/K10rcapd
 	etc/rcS.d/K21dhcp
+	etc/rcS.d/K27boot.server
 	etc/rcS.d/K28kdc
 	etc/rcS.d/K28kdc.master
 	etc/rcS.d/K28nfs.server

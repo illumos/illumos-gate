@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,10 +20,21 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+
+# For modifying the behavior of rmtmpfiles, do not edit this script.
+# Instead use svccfg(1m) to modify the SMF repository.  To achieve
+# traditional System V treatment of /var/tmp, invoke the following
+# commands.:
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# # svccfg
+# svc:> select system/rmtmpfiles
+# svc:/system/rmtmpfiles> setprop options/clean_vartmp="true"
+# svc:/system/rmtmpfiles> select default
+# svc:/system/rmtmpfiles:default> refresh
+# svc:/system/rmtmpfiles:default> exit
+#
 
 # Traditional SunOS 4.x behavior has been to not remove directories in
 # the /tmp directory; only simple files were removed. This lead to an
@@ -52,26 +62,26 @@ done
 
 # Traditional SunOS 4.x behavior has been to not alter the contents of
 # /var/tmp (/usr/tmp) at boot time. This behavior is maintained as the
-# current default behavior. It the traditional System V behavior of
-# removing everything in /var/tmp is desired, remove the following 'exit'.
+# current default behavior. If the traditional System V behavior of
+# removing everything in /var/tmp is desired then clean up /var/tmp,
+# unless /var/tmp or any of its subdirectories are mount points for
+# another filesystem.
 
-exit 0
-
-# Clean up /var/tmp, unless /var/tmp or any of its subdirectories are
-# mount points for another filesystem.
-
-/sbin/mount | /usr/bin/egrep '^/var/tmp(/| )' >/dev/null 2>&1 || {
+CLEAN_VARTMP=`svcprop -c -p options/clean_vartmp $SMF_FMRI`
+if [ "$CLEAN_VARTMP" = "true" ]; then
+    /sbin/mount | /usr/bin/egrep '^/var/tmp(/| )' >/dev/null 2>&1 || {
 	cd /var/tmp || exit 0
 
 	# We carefully remove all files except the Ex* files (editor
 	# temporary files), which expreserve will process later (in
-	# S80PRESERVE).  Of course, it would be simpler to just run
+	# S89PRESERVE).  Of course, it would be simpler to just run
 	# expreserve before this script, but that doesn't work --
 	# expreserve requires the name service, which is not available
 	# until much later.
 
 	/usr/bin/ls -a | /usr/bin/egrep -v '^(Ex.*|\.|\.\.)$' |
 	    /usr/bin/xargs /usr/bin/rm -rf -- 2>/dev/null
-}
+    }
+fi
 
 exit 0

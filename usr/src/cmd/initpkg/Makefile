@@ -26,16 +26,13 @@
 SHFILES=	dfstab vfstab
 CPFILES=	rcS rc0 rc1 rc2 rc3 mountall shutdown swapadd umountall
 ALL=		$(SHFILES) $(CPFILES)
-TXTS=		rcS.d/mk.rcS.d.sh rc0.d/mk.rc0.d.sh \
-		rc1.d/mk.rc1.d.sh rc2.d/mk.rc2.d.sh rc3.d/mk.rc3.d.sh
+TXTS=		rc2.d/mk.rc2.d.sh
 CLOBBERFILES=	$(ALL)
-SUBDIRS=	rcS.d rc0.d rc1.d rc2.d rc3.d
+RCDIRS=		rc2.d
 
 include ../Makefile.cmd
 
-ETCINITD=	$(ROOTETC)/init.d
 ETCDFSD=	$(ROOTETC)/dfs
-DIRS=		$(ETCINITD) $(ETCDFSD) $(ROOTETC)/security
 
 SBINF=		rcS mountall rc0 rc1 rc2 rc3 swapadd umountall
 SBINL=		rc5 rc6
@@ -96,7 +93,7 @@ ins_init.d: FRC
 $(SHFILES):
 	sh $@.sh $(ROOT)
 
-install: $(ALL) ins_all ins_init.d $(SUBDIRS)
+install: $(ALL) ins_all ins_init.d $(RCDIRS)
 
 ins_all : $(ROOTSBINF) $(ROOTSBINL) $(ROOTUSRSBINF) $(ROOTETCTABS) \
 	$(ROOTDFSTAB)  $(SYMSBINF) $(SYMUSRSBINF)
@@ -105,7 +102,7 @@ ins_all : $(ROOTSBINF) $(ROOTSBINL) $(ROOTUSRSBINF) $(ROOTETCTABS) \
 #$(DIRS):
 #	$(INS.dir)
 
-$(SUBDIRS):	FRC
+$(RCDIRS):	FRC
 	@cd $@; pwd; ROOT=$(ROOT) sh mk.$@.sh
 
 FRC:

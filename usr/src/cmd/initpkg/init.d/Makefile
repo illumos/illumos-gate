@@ -31,7 +31,6 @@ i386_PROG=
 
 PROG=		\
 	README		\
-	boot.server	\
 	cachefs.daemon	\
 	deallocate	\
 	devlinks	\

@@ -33,20 +33,13 @@ COMMON_STARTLST="\
 82mkdtab \
 98deallocate"
 
-STOPLST="27boot.server"
-
 INSDIR=${ROOT}/etc/rc2.d
 
 if [ ! -d ${INSDIR} ]
 then
 	mkdir ${INSDIR}
 fi
-for f in ${STOPLST}
-do
-	name=`echo $f | sed -e 's/^..//'`
-	rm -f ${INSDIR}/K$f
-	ln ${ROOT}/etc/init.d/${name} ${INSDIR}/K$f
-done
+
 for f in ${COMMON_STARTLST}
 do 
 	name=`echo $f | sed -e 's/^..//'`
