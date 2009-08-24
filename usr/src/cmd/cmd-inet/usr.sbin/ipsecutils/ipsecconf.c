@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -4151,7 +4149,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 	int tok_count = 0;
 	struct protoent *pent;
 	boolean_t saddr, daddr, ipsec_aalg, ipsec_ealg, ipsec_eaalg, dir;
-	boolean_t old_style, new_style;
+	boolean_t old_style, new_style, auth_covered, is_no_alg;
 	struct in_addr mask;
 	int line_no;
 	int ret;
@@ -4179,7 +4177,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 
 	(void) memset(cptr, 0, sizeof (ips_conf_t));
 	saddr = daddr = ipsec_aalg = ipsec_ealg = ipsec_eaalg = dir = B_FALSE;
-	old_style = new_style = B_FALSE;
+	old_style = new_style = is_no_alg = B_FALSE;
 	/*
 	 * Get the Pattern. NULL pattern is valid.
 	 */
@@ -4735,7 +4733,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 			new_style = B_TRUE;
 		}
 
-		ipsec_aalg = ipsec_ealg = ipsec_eaalg = B_FALSE;
+		ipsec_aalg = ipsec_ealg = ipsec_eaalg = auth_covered = B_FALSE;
 		tok_count = 0;
 
 		for (k = 0; action_table[k].string; k++) {
@@ -4792,7 +4790,8 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 				    |SPD_RULE_FLAG_OUTBOUND;
 			break;
 		case TOK_bypass:
-			/* do something? */
+		case TOK_drop:
+			is_no_alg = B_TRUE;
 			break;
 		}
 
@@ -4846,6 +4845,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					return (-1);
 				}
 				ipsec_aalg = B_TRUE;
+				auth_covered = B_TRUE;
 				break;
 			case SPD_ATTR_ESP_ENCR:
 				/*
@@ -4877,6 +4877,11 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					    IPSEC_CONF_IPSEC_EALGS, line_no);
 					return (-1);
 				}
+				/*
+				 * XXX FUTURE TODO -- set auth_covered here
+				 * if the encryption algorithm is self-
+				 * authenticating, e.g. AES-CCM/GCM.
+				 */
 				ipsec_ealg = B_TRUE;
 				break;
 			case SPD_ATTR_ESP_AUTH:
@@ -4892,6 +4897,11 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					    IPSEC_CONF_IPSEC_EAALGS, line_no);
 					return (-1);
 				}
+				/*
+				 * XXX FUTURE QUESTION -- error if
+				 * auth_covered and ipsec_aalg false
+				 * (e.g. AES-CCM/GCM)?
+				 */
 				i++, line_no++;
 				if (act_props->ap[ap_num].prop[i] == NULL) {
 					error_message(BAD_ERROR,
@@ -4911,6 +4921,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					return (-1);
 				}
 				ipsec_eaalg = B_TRUE;
+				auth_covered = B_TRUE;
 				break;
 			case IPS_SA:
 				i++, line_no++;
@@ -4977,6 +4988,14 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 
 				break;
 			}
+		}
+
+		/* Warn here about no authentication! */
+		if (!auth_covered && !is_no_alg) {
+			warnx(gettext("DANGER:  Rule on line %d "
+			    "has encryption with no authentication."),
+			    arg_indices[line_no] == 0 ? 1 :
+			    arg_indices[line_no]);
 		}
 
 		if (!ipsec_ealg && ipsec_eaalg) {
