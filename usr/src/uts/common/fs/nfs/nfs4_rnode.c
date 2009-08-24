@@ -59,6 +59,7 @@
 #include <sys/dirent.h>
 #include <sys/flock.h>
 #include <sys/callb.h>
+#include <sys/sdt.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -1090,7 +1091,7 @@ r4find_unlocked(nfs4_sharedfh_t *fh, struct vfs *vfsp)
 }
 
 /*
- * Return 1 if there is a active vnode belonging to this vfs in the
+ * Return >0 if there is a active vnode belonging to this vfs in the
  * rtable4 cache.
  *
  * Several of these checks are done without holding the usual
@@ -1103,7 +1104,7 @@ check_rtable4(struct vfs *vfsp)
 {
 	rnode4_t *rp;
 	vnode_t *vp;
-	char *busy = NULL;
+	int busy = NFSV4_RTABLE4_OK;
 	int index;
 
 	for (index = 0; index < rtable4size; index++) {
@@ -1116,32 +1117,32 @@ check_rtable4(struct vfs *vfsp)
 			vp = RTOV4(rp);
 			if (vp->v_vfsp == vfsp) {
 				if (rp->r_freef == NULL) {
-					busy = "not on free list";
+					busy = NFSV4_RTABLE4_NOT_FREE_LIST;
 				} else if (nfs4_has_pages(vp) &&
 				    (rp->r_flags & R4DIRTY)) {
-					busy = "dirty pages";
+					busy = NFSV4_RTABLE4_DIRTY_PAGES;
 				} else if (rp->r_count > 0) {
-					busy = "r_count > 0";
+					busy = NFSV4_RTABLE4_POS_R_COUNT;
 				}
 
-				if (busy != NULL) {
+				if (busy != NFSV4_RTABLE4_OK) {
 #ifdef DEBUG
 					char *path;
 
 					path = fn_path(rp->r_svnode.sv_name);
-					NFS4_DEBUG(nfs4_rnode_debug,
-					    (CE_NOTE, "check_rtable4: " "%s %s",
-					    path, busy));
+					DTRACE_NFSV4_3(rnode__e__debug,
+					    int, busy, char *, path,
+					    rnode4_t *, rp);
 					kmem_free(path, strlen(path)+1);
 #endif
 					rw_exit(&rtable4[index].r_lock);
-					return (1);
+					return (busy);
 				}
 			}
 		}
 		rw_exit(&rtable4[index].r_lock);
 	}
-	return (0);
+	return (busy);
 }
 
 /*

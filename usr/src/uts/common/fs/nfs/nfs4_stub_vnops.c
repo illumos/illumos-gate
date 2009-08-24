@@ -201,7 +201,7 @@ extern int	nfs4_realvp(vnode_t *, vnode_t **, caller_context_t *);
 
 static int	nfs4_trigger_mount(vnode_t *, cred_t *, vnode_t **);
 static int	nfs4_trigger_domount(vnode_t *, domount_args_t *, vfs_t **,
-    cred_t *);
+    cred_t *, vnode_t **);
 static domount_args_t  *nfs4_trigger_domount_args_create(vnode_t *);
 static void	nfs4_trigger_domount_args_destroy(domount_args_t *dma,
     vnode_t *vp);
@@ -636,6 +636,42 @@ nfs4_trigger_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr,
 /* end of trigger vnode ops */
 
 /*
+ * See if the mount has already been done by another caller.
+ */
+static int
+nfs4_trigger_mounted_already(vnode_t *vp, vnode_t **newvpp,
+    bool_t *was_mounted, vfs_t **vfsp)
+{
+	int		error;
+	mntinfo4_t	*mi = VTOMI4(vp);
+
+	*was_mounted = FALSE;
+
+	error = vn_vfsrlock_wait(vp);
+	if (error)
+		return (error);
+
+	*vfsp = vn_mountedvfs(vp);
+	if (*vfsp != NULL) {
+		/* the mount has already occurred */
+		error = VFS_ROOT(*vfsp, newvpp);
+		if (!error) {
+			/* need to update the reference time  */
+			mutex_enter(&mi->mi_lock);
+			if (mi->mi_ephemeral)
+				mi->mi_ephemeral->ne_ref_time =
+				    gethrestime_sec();
+			mutex_exit(&mi->mi_lock);
+
+			*was_mounted = TRUE;
+		}
+	}
+
+	vn_vfsunlock(vp);
+	return (0);
+}
+
+/*
  * Mount upon a trigger vnode; for mirror-mounts, etc.
  *
  * The mount may have already occurred, via another thread. If not,
@@ -660,6 +696,7 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 
 	bool_t			must_unlock = FALSE;
 	bool_t			is_building = FALSE;
+	bool_t			was_mounted = FALSE;
 
 	cred_t			*mcred = NULL;
 
@@ -677,26 +714,10 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 	/*
 	 * Has the mount already occurred?
 	 */
-	error = vn_vfsrlock_wait(vp);
-	if (error)
+	error = nfs4_trigger_mounted_already(vp, newvpp,
+	    &was_mounted, &vfsp);
+	if (error || was_mounted)
 		goto done;
-	vfsp = vn_mountedvfs(vp);
-	if (vfsp != NULL) {
-		/* the mount has already occurred */
-		error = VFS_ROOT(vfsp, newvpp);
-		if (!error) {
-			/* need to update the reference time  */
-			mutex_enter(&mi->mi_lock);
-			if (mi->mi_ephemeral)
-				mi->mi_ephemeral->ne_ref_time =
-				    gethrestime_sec();
-			mutex_exit(&mi->mi_lock);
-		}
-
-		vn_vfsunlock(vp);
-		goto done;
-	}
-	vn_vfsunlock(vp);
 
 	ntg = zone_getspecific(nfs4_ephemeral_key, zone);
 	ASSERT(ntg != NULL);
@@ -781,14 +802,13 @@ nfs4_trigger_mount(vnode_t *vp, cred_t *cr, vnode_t **newvpp)
 
 	crset_zone_privall(mcred);
 
-	error = nfs4_trigger_domount(vp, dma, &vfsp, mcred);
+	error = nfs4_trigger_domount(vp, dma, &vfsp, mcred, newvpp);
 	nfs4_trigger_domount_args_destroy(dma, vp);
 
 	crfree(mcred);
 
-	if (!error)
-		error = VFS_ROOT(vfsp, newvpp);
 done:
+
 	if (must_unlock) {
 		mutex_enter(&net->net_cnt_lock);
 		net->net_status &= ~NFS4_EPHEMERAL_TREE_MOUNTING;
@@ -1149,7 +1169,7 @@ nfs4_trigger_esi_create_mirrormount(vnode_t *vp, servinfo4_t *svp)
  */
 static int
 nfs4_trigger_domount(vnode_t *stubvp, domount_args_t *dma, vfs_t **vfsp,
-    cred_t *cr)
+    cred_t *cr, vnode_t **newvpp)
 {
 	struct mounta	*uap;
 	char		*mntpt, *orig_path, *path;
@@ -1159,6 +1179,7 @@ nfs4_trigger_domount(vnode_t *stubvp, domount_args_t *dma, vfs_t **vfsp,
 	int		spec_len;
 	zone_t		*zone = curproc->p_zone;
 	bool_t		has_leading_slash;
+	int		i;
 
 	vfs_t			*stubvfsp = stubvp->v_vfsp;
 	ephemeral_servinfo_t	*esi = dma->dma_esi;
@@ -1236,9 +1257,35 @@ nfs4_trigger_domount(vnode_t *stubvp, domount_args_t *dma, vfs_t **vfsp,
 	/* domount() expects us to count the trailing NUL */
 	uap->optlen = strlen(uap->optptr) + 1;
 
-	retval = domount(NULL, uap, stubvp, cr, vfsp);
-	if (retval == 0)
-		VFS_RELE(*vfsp);
+	/*
+	 * If we get EBUSY, we try again once to see if we can perform
+	 * the mount. We do this because of a spurious race condition.
+	 */
+	for (i = 0; i < 2; i++) {
+		int	error;
+		bool_t	was_mounted;
+
+		retval = domount(NULL, uap, stubvp, cr, vfsp);
+		if (retval == 0) {
+			retval = VFS_ROOT(*vfsp, newvpp);
+			VFS_RELE(*vfsp);
+			break;
+		} else if (retval != EBUSY) {
+			break;
+		}
+
+		/*
+		 * We might find it mounted by the other racer...
+		 */
+		error = nfs4_trigger_mounted_already(stubvp,
+		    newvpp, &was_mounted, vfsp);
+		if (error) {
+			goto done;
+		} else if (was_mounted) {
+			retval = 0;
+			break;
+		}
+	}
 
 done:
 	if (uap->optptr)
