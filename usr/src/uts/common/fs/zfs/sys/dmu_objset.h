@@ -131,6 +131,7 @@ int dmu_objset_find_spa(spa_t *spa, const char *name,
 int dmu_objset_prefetch(char *name, void *arg);
 void dmu_objset_byteswap(void *buf, size_t size);
 int dmu_objset_evict_dbufs(objset_t *os);
+timestruc_t dmu_objset_snap_cmtime(objset_t *os);
 
 /* called from dsl */
 void dmu_objset_sync(objset_t *os, zio_t *zio, dmu_tx_t *tx);

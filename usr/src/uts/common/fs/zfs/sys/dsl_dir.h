@@ -89,6 +89,7 @@ struct dsl_dir {
 	/* Protected by dd_lock */
 	kmutex_t dd_lock;
 	list_t dd_prop_cbs; /* list of dsl_prop_cb_record_t's */
+	timestruc_t dd_snap_cmtime; /* last time snapshot namespace changed */
 
 	/* gross estimate of space used by in-flight tx's */
 	uint64_t dd_tempreserved[TXG_SIZE];
@@ -133,6 +134,8 @@ int dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx);
 boolean_t dsl_dir_is_clone(dsl_dir_t *dd);
 void dsl_dir_new_refreservation(dsl_dir_t *dd, struct dsl_dataset *ds,
     uint64_t reservation, cred_t *cr, dmu_tx_t *tx);
+void dsl_dir_snap_cmtime_update(dsl_dir_t *dd);
+timestruc_t dsl_dir_snap_cmtime(dsl_dir_t *dd);
 
 /* internal reserved dir name */
 #define	MOS_DIR_NAME "$MOS"

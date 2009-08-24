@@ -499,6 +499,12 @@ dmu_objset_evict(objset_t *os)
 	kmem_free(os, sizeof (objset_t));
 }
 
+timestruc_t
+dmu_objset_snap_cmtime(objset_t *os)
+{
+	return (dsl_dir_snap_cmtime(os->os_dsl_dataset->ds_dir));
+}
+
 /* called from dsl for meta-objset */
 objset_t *
 dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,

@@ -440,6 +440,11 @@ extern vnode_t *rootdir;
 extern void delay(clock_t ticks);
 
 #define	gethrestime_sec() time(NULL)
+#define	gethrestime(t) \
+	do {\
+		(t)->tv_sec = gethrestime_sec();\
+		(t)->tv_nsec = 0;\
+	} while (0);
 
 #define	max_ncpus	64
 

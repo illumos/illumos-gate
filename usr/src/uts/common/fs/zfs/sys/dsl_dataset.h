@@ -236,9 +236,6 @@ int dsl_dataset_set_quota(const char *dsname, uint64_t quota);
 void dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr,
     dmu_tx_t *tx);
 int dsl_dataset_set_reservation(const char *dsname, uint64_t reservation);
-void dsl_dataset_set_flags(dsl_dataset_t *ds, uint64_t flags);
-int64_t dsl_dataset_new_refreservation(dsl_dataset_t *ds, uint64_t reservation,
-    dmu_tx_t *tx);
 
 int dsl_destroy_inconsistent(char *dsname, void *arg);
 

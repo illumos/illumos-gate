@@ -107,6 +107,8 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 		list_create(&dd->dd_prop_cbs, sizeof (dsl_prop_cb_record_t),
 		    offsetof(dsl_prop_cb_record_t, cbr_node));
 
+		dsl_dir_snap_cmtime_update(dd);
+
 		if (dd->dd_phys->dd_parent_obj) {
 			err = dsl_dir_open_obj(dp, dd->dd_phys->dd_parent_obj,
 			    NULL, dd, &dd->dd_parent);
@@ -1314,4 +1316,27 @@ dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space)
 		return (ENOSPC);
 
 	return (0);
+}
+
+timestruc_t
+dsl_dir_snap_cmtime(dsl_dir_t *dd)
+{
+	timestruc_t t;
+
+	mutex_enter(&dd->dd_lock);
+	t = dd->dd_snap_cmtime;
+	mutex_exit(&dd->dd_lock);
+
+	return (t);
+}
+
+void
+dsl_dir_snap_cmtime_update(dsl_dir_t *dd)
+{
+	timestruc_t t;
+
+	gethrestime(&t);
+	mutex_enter(&dd->dd_lock);
+	dd->dd_snap_cmtime = t;
+	mutex_exit(&dd->dd_lock);
 }

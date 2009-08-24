@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/cred.h>
+#include <sys/time.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -557,6 +558,11 @@ void dmu_objset_space(objset_t *os, uint64_t *refdbytesp, uint64_t *availbytesp,
  * change, so there is a small probability that it will collide.)
  */
 uint64_t dmu_objset_fsid_guid(objset_t *os);
+
+/*
+ * Get the [cm]time for an objset's snapshot dir
+ */
+timestruc_t dmu_objset_snap_cmtime(objset_t *os);
 
 int dmu_objset_is_snapshot(objset_t *os);
 
