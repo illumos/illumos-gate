@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,9 +225,12 @@ flt_handler(int sig)
 			(void) se_signal_unblockall();
 			syseventd_exit(1);
 			/*NOTREACHED*/
+		case SIGCLD:
+			/* No need to abort on a SIGCLD */
+			break;
 		default:
 			syseventd_err_print(FATAL_ERROR);
-			(void) fflush(0);
+			abort();
 
 	}
 }
@@ -309,7 +312,7 @@ main(int argc, char **argv)
 		prog++;
 	}
 
-	if ((c = getopt(argc, argv, "d:r:")) != EOF) {
+	while ((c = getopt(argc, argv, "d:r:")) != EOF) {
 		switch (c) {
 		case 'd':
 			debug_level = atoi(optarg);
@@ -691,6 +694,9 @@ client_deliver_event_thr(void *arg)
 		while (eventq != NULL) {
 			d_pkg = eventq->d_pkg;
 			d_pkg->completion_state = SE_OUTSTANDING;
+			scp->eventq = eventq->next;
+			free(eventq);
+			eventq = scp->eventq;
 			(void) mutex_unlock(&scp->client_lock);
 
 
@@ -767,17 +773,6 @@ client_deliver_event_thr(void *arg)
 			d_pkg->completion_status = error;
 			d_pkg->completion_state = SE_COMPLETE;
 			(void) sema_post(d_pkg->completion_sema);
-
-			/* Update eventq pointer */
-			if (scp->eventq != NULL) {
-				scp->eventq = eventq->next;
-				free(eventq);
-				eventq = scp->eventq;
-			} else {
-				free(eventq);
-				break;
-			}
-
 			syseventd_print(3, "Completed delivery with "
 			    "error %d\n", error);
 		}

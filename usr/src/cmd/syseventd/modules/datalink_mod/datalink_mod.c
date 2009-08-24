@@ -36,6 +36,7 @@
 #include <libnvpair.h>
 #include <librcm.h>
 #include <libsysevent.h>
+#include "sysevent_signal.h"
 
 extern void syseventd_err_print(char *, ...);
 
@@ -71,15 +72,26 @@ datalink_notify_thread(void *arg)
 		(void) mutex_unlock(&dl_mx);
 
 		while (tmp_events != NULL) {
+			struct sigaction cbuf, dfl;
+
+			/*
+			 * Ignore SIGCLD for the
+			 * duration of the rcm_notify_event call.
+			 */
+			(void) memset(&dfl, 0, sizeof (dfl));
+			dfl.sa_handler = SIG_IGN;
+			(void) sigaction(SIGCHLD, &dfl, &cbuf);
+
 			/*
 			 * Send the PHYSLINK_NEW event to network_rcm to update
 			 * the network devices cache accordingly.
 			 */
 			if (rcm_notify_event(rcm_hdl, RCM_RESOURCE_PHYSLINK_NEW,
 			    0, tmp_events->ev, NULL) != RCM_SUCCESS)
-				syseventd_err_print("datalink_mod: Can not"
+				syseventd_err_print("datalink_mod: Can not "
 				    "notify event: %s\n", strerror(errno));
 
+			(void) sigaction(SIGCHLD, &cbuf, NULL);
 			ep = tmp_events;
 			tmp_events = tmp_events->next;
 			nvlist_free(ep->ev);
