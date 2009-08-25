@@ -863,6 +863,7 @@ phyint_inst_v6_sockinit(struct phyint_instance *pii)
 	int off = 0;
 	int on = 1;
 	struct	sockaddr_in6	testaddr;
+	int flags;
 
 	/*
 	 * Open a raw socket with ICMPv6 protocol.
@@ -878,6 +879,21 @@ phyint_inst_v6_sockinit(struct phyint_instance *pii)
 	pii->pii_probe_sock = socket(pii->pii_af, SOCK_RAW, IPPROTO_ICMPV6);
 	if (pii->pii_probe_sock < 0) {
 		logperror_pii(pii, "phyint_inst_v6_sockinit: socket");
+		return (_B_FALSE);
+	}
+
+	/*
+	 * Probes must not block in case of lower layer issues.
+	 */
+	if ((flags = fcntl(pii->pii_probe_sock, F_GETFL, 0)) == -1) {
+		logperror_pii(pii, "phyint_inst_v6_sockinit: fcntl"
+		    " F_GETFL");
+		return (_B_FALSE);
+	}
+	if (fcntl(pii->pii_probe_sock, F_SETFL,
+	    flags | O_NONBLOCK) == -1) {
+		logperror_pii(pii, "phyint_inst_v6_sockinit: fcntl"
+		    " F_SETFL O_NONBLOCK");
 		return (_B_FALSE);
 	}
 
@@ -971,6 +987,7 @@ phyint_inst_v4_sockinit(struct phyint_instance *pii)
 	int	ttl = 1;
 	char	char_ttl = 1;
 	int	on = 1;
+	int	flags;
 
 	/*
 	 * Open a raw socket with ICMPv4 protocol.
@@ -985,6 +1002,21 @@ phyint_inst_v4_sockinit(struct phyint_instance *pii)
 	pii->pii_probe_sock = socket(pii->pii_af, SOCK_RAW, IPPROTO_ICMP);
 	if (pii->pii_probe_sock < 0) {
 		logperror_pii(pii, "phyint_inst_v4_sockinit: socket");
+		return (_B_FALSE);
+	}
+
+	/*
+	 * Probes must not block in case of lower layer issues.
+	 */
+	if ((flags = fcntl(pii->pii_probe_sock, F_GETFL, 0)) == -1) {
+		logperror_pii(pii, "phyint_inst_v4_sockinit: fcntl"
+		    " F_GETFL");
+		return (_B_FALSE);
+	}
+	if (fcntl(pii->pii_probe_sock, F_SETFL,
+	    flags | O_NONBLOCK) == -1) {
+		logperror_pii(pii, "phyint_inst_v4_sockinit: fcntl"
+		    " F_SETFL O_NONBLOCK");
 		return (_B_FALSE);
 	}
 

@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -221,7 +220,8 @@ probe(struct phyint_instance *pii, uint_t probe_type, hrtime_t start_hrtime)
 	struct sockaddr_storage targ;	/* target address */
 	uint_t	targaddrlen;		/* targed address length */
 	int	pr_ndx;			/* probe index in pii->pii_probes[] */
-	boolean_t sent = _B_TRUE;
+	boolean_t sent = _B_FALSE;
+	int	rval;
 
 	if (debug & D_TARGET) {
 		logdebug("probe(%s %s %d %lld)\n", AF_STR(pii->pii_af),
@@ -297,10 +297,19 @@ probe(struct phyint_instance *pii, uint_t probe_type, hrtime_t start_hrtime)
 	 */
 	sent_hrtime = gethrtime();
 	(void) gettimeofday(&sent_tv, NULL);
-	if (sendto(pii->pii_probe_sock, &probe_pkt, sizeof (probe_pkt), 0,
-	    (struct sockaddr *)&targ, targaddrlen) != sizeof (probe_pkt)) {
+	rval = sendto(pii->pii_probe_sock, &probe_pkt, sizeof (probe_pkt), 0,
+	    (struct sockaddr *)&targ, targaddrlen);
+	/*
+	 * If the send would block, this may either be transient or a hang in a
+	 * lower layer. We pretend the probe was actually sent, the daemon will
+	 * not see a reply to the probe and will fail the interface if normal
+	 * failure detection criteria are met.
+	 */
+	if (rval == sizeof (probe_pkt) ||
+	    (rval == -1 && errno == EWOULDBLOCK)) {
+		sent = _B_TRUE;
+	} else {
 		logperror_pii(pii, "probe: probe sendto");
-		sent = _B_FALSE;
 	}
 
 	/*
