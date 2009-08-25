@@ -812,8 +812,6 @@ fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
 	    (mp = Paddr2mptr(P, symtab->sh_addr)) == NULL ||
 	    (fp = mp->map_file) == NULL) {
 		dprintf("fake_up_symtab: invalid section\n");
-		dprintf("fp->file_symtab.sym_data_pri == %lx\n",
-		    (long)fp->file_symtab.sym_data_pri);
 		return;
 	}
 
