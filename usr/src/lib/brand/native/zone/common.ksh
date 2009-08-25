@@ -402,6 +402,111 @@ install_flar()
 }
 
 #
+# Get the archive base.
+#
+# We must unpack the archive in the right place within the zonepath so
+# that files are installed into the various mounted filesystems that are set
+# up in the zone's configuration.  These are already mounted for us by the
+# mntfs function.
+#
+# Archives can be made of either a physical host's root file system or a
+# zone's zonepath.  For a physical system, if the archive is made using an
+# absolute path (/...) we can't use it.  For a zone the admin can make the
+# archive from a variety of locations;
+#
+#   a) zonepath itself: This will be a single dir, probably named with the
+#      zone name, it will contain a root dir and under the root we'll see all
+#      the top level dirs; etc, var, usr...  We must be above the ZONEPATH
+#      when we unpack the archive but this will only work if the the archive's
+#      top-level dir name matches the ZONEPATH base-level dir name.  If not,
+#      this is an error.
+#
+#   b) inside the zonepath: We'll see root and it will contain all the top
+#      level dirs; etc, var, usr....  We must be in the ZONEPATH when we unpack
+#      the archive.
+#
+#   c) inside the zonepath root: We'll see all the top level dirs, ./etc,
+#      ./var, ./usr....  This is also the case we see when we get an archive
+#      of a physical sytem.  We must be in ZONEROOT when we unpack the archive.
+#
+# Note that there can be a directory named "root" under the ZONEPATH/root
+# directory.
+#
+# This function handles the above possibilities so that we reject absolute
+# path archives and figure out where in the file system we need to be to
+# properly unpack the archive into the zone.  It sets the ARCHIVE_BASE
+# variable to the location where the achive should be unpacked.
+#
+get_archive_base()
+{
+	stage1=$1
+	archive=$2
+	stage2=$3
+
+	vlog "$m_analyse_archive"
+
+	base=`$stage1 $archive | $stage2 2>/dev/null | nawk -F/ '{
+		# Check for an absolute path archive
+		if (substr($0, 1, 1) == "/")
+			exit 1
+
+		if ($1 != ".")
+			dirs[$1] = 1
+		else
+			dirs[$2] = 1
+	}
+	END {
+		for (d in dirs) {
+			cnt++
+			if (d == "bin")  sawbin = 1
+			if (d == "etc")  sawetc = 1
+			if (d == "root") sawroot = 1
+			if (d == "var")  sawvar = 1
+                }
+
+		if (cnt == 1) {
+			# If only one top-level dir named root, we are in the
+			# zonepath, otherwise this must be an archive *of*
+			# the zonepath so print the top-level dir name.
+			if (sawroot)
+				print "*zonepath*"
+			else
+				for (d in dirs) print d
+		} else {
+			# We are either in the zonepath or in the zonepath/root
+			# (or at the top level of a full system archive which
+			# looks like the zonepath/root case).  Figure out which
+			# one.
+			if (sawroot && !sawbin && !sawetc && !sawvar)
+				print "*zonepath*"
+			else
+				print "*zoneroot*"
+		}
+	}'`
+
+	if (( $? != 0 )); then
+		umnt_fs
+		fatal "$e_absolute_archive"
+	fi
+
+	if [[ "$base" == "*zoneroot*" ]]; then
+		ARCHIVE_BASE=$ZONEROOT
+	elif [[ "$base" == "*zonepath*" ]]; then
+		ARCHIVE_BASE=$ZONEPATH
+	else
+		# We need to be in the dir above the ZONEPATH but we need to
+		# validate that $base matches the final component of ZONEPATH.
+		bname=`basename $ZONEPATH`
+
+		if [[ "$bname" != "$base" ]]; then
+			umnt_fs
+			fatal "$e_mismatch_archive" "$base" "$bname"
+		fi
+		ARCHIVE_BASE=`dirname $ZONEPATH`
+	fi
+}
+
+#
 # Unpack cpio archive into zoneroot.
 #
 install_cpio()
@@ -409,20 +514,13 @@ install_cpio()
 	stage1=$1
 	archive=$2
 
-	# Check the first few members of the archive for an absolute path.
-	for i in `$stage1 "$archive" | cpio -it | head | cut -b1`
-	do
-		if [[ "$i" == "/" ]]; then
-			umnt_fs
-			fatal "$e_absolute_archive"
-		fi
-	done
+	get_archive_base "$stage1" "$archive" "cpio -it"
 
 	cpioopts="-idmfE $ipdcpiofile"
 
-	vlog "cd \"$ZONEROOT\" && $stage1 \"$archive\" | cpio $cpioopts"
+	vlog "cd \"$ARCHIVE_BASE\" && $stage1 \"$archive\" | cpio $cpioopts"
 
-	( cd "$ZONEROOT" && $stage1 "$archive" | cpio $cpioopts )
+	( cd "$ARCHIVE_BASE" && $stage1 "$archive" | cpio $cpioopts )
 	result=$?
 
 	post_unpack
@@ -437,22 +535,15 @@ install_pax()
 {
 	archive=$1
 
-	# Check the first few members of the archive for an absolute path.
-	for i in `pax -f "$archive" | head | cut -b1`
-	do
-		if [[ "$i" == "/" ]]; then
-			umnt_fs
-			fatal "$e_absolute_archive"
-		fi
-	done
+	get_archive_base "cat" "$archive" "pax"
 
 	if [[ -s $ipdpaxfile ]]; then
 		filtopt="-c $(/usr/bin/cat $ipdpaxfile)"
 	fi
 
-	vlog "cd \"$ZONEROOT\" && pax -r -f \"$archive\" $filtopt"
+	vlog "cd \"$ARCHIVE_BASE\" && pax -r -f \"$archive\" $filtopt"
 
-	( cd "$ZONEROOT" && pax -r -f "$archive" $filtopt )
+	( cd "$ARCHIVE_BASE" && pax -r -f "$archive" $filtopt )
 	result=$?
 
 	post_unpack
@@ -778,47 +869,6 @@ install_image()
 	umnt_fs
 	rm -f $fstmpfile $ipdcpiofile $ipdpaxfile
 
-	#
-	# If the archive was of a zone then the archive might have been made
-	# of the zonepath (single dir), inside the zonepath (dev, root, etc.,
-	# or just even just root) or inside the zonepath root (all the top
-	# level dirs).  Try to normalize these possibilities.
-	#
-	dirsize=$(ls $ZONEROOT | wc -l)
-	if [[ -d $ZONEROOT/root && -d $ZONEROOT/root/etc && \
-	    -d $ZONEROOT/root/var ]]; then
-		# The archive was made of the zoneroot.
-		mkdir -m 0755 $ZONEPATH/.attach_root
-		mv $ZONEROOT/root/* $ZONEPATH/.attach_root
-		mv $ZONEROOT/root/.[a-zA-Z]* $ZONEPATH/.attach_root \
-		    >/dev/null 2>&1
-		rm -rf $ZONEROOT
-		mv $ZONEPATH/.attach_root $ZONEROOT
-
-	elif (( $dirsize == 1 )); then
-		# The archive was made of the the zonepath.
-
-		dir=$(ls $ZONEROOT)
-
-		if [[ -d $ZONEROOT/$dir/root ]]; then
-			mkdir -m 0755 $ZONEPATH/.attach_root
-			mv $ZONEROOT/$dir/root/* $ZONEPATH/.attach_root
-			mv $ZONEROOT/$dir/root/.[a-zA-Z]* \
-			    $ZONEPATH/.attach_root >/dev/null 2>&1
-			rm -rf $ZONEROOT
-			mv $ZONEPATH/.attach_root $ZONEROOT
-		else
-			# We don't know where this archive was made.
-			fatal "$e_bad_zone_layout"
-		fi
-
-	elif [[ ! -d $ZONEROOT/etc ]]; then
-		# We were expecting that the archive was made inside the
-		# zoneroot but there's no etc dir, so we don't know where
-		# this archive was made.
-		fatal "$e_bad_zone_layout"
-	fi
-
 	chmod 700 $zonepath
 
 	# Verify this is a valid image.
@@ -833,7 +883,6 @@ export TEXTDOMAIN
 
 e_baddir=$(gettext "Invalid '%s' directory within the zone")
 e_badfile=$(gettext "Invalid '%s' file within the zone")
-e_bad_zone_layout=$(gettext "Unexpected zone layout.")
 e_path_abs=$(gettext "Pathname specified to -a '%s' must be absolute.")
 e_not_found=$(gettext "%s: error: file or directory not found.")
 e_install_abort=$(gettext "Installation aborted.")
@@ -841,9 +890,12 @@ e_not_readable=$(gettext "Cannot read directory '%s'")
 e_not_dir=$(gettext "Error: must be a directory")
 e_unknown_archive=$(gettext "Error: Unknown archive format. Must be a flash archive, a cpio archive (can also be gzipped or bzipped), a pax XUSTAR archive, or a level 0 ufsdump archive.")
 e_absolute_archive=$(gettext "Error: archive contains absolute paths instead of relative paths.")
+e_mismatch_archive=$(gettext "Error: the archive top-level directory (%s) does not match the zonepath (%s).")
 e_tmpfile=$(gettext "Unable to create temporary file")
 e_root_full=$(gettext "Zonepath root %s exists and contains data; remove or move aside prior to install.")
 
+
+m_analyse_archive=$(gettext "Analysing the archive")
 
 not_readable=$(gettext "Cannot read file '%s'")
 not_flar=$(gettext "Input is not a flash archive")
