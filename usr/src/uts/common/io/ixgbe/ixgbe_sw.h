@@ -95,6 +95,8 @@ extern "C" {
 
 #define	IXGBE_ADAPTER_REGSET		1	/* map adapter registers */
 
+#define	IXGBE_RX_STOPPED		0x1
+
 /*
  * MAX_xx_QUEUE_NUM and MAX_INTR_VECTOR values need to be the maximum of all
  * supported silicon types.
@@ -112,8 +114,6 @@ extern "C" {
 
 #define	MAX_MTU				16366
 #define	MAX_RX_LIMIT_PER_INTR		4096
-#define	MAX_INTR_THROTTLING_82598	0xFFFF
-#define	MAX_INTR_THROTTLING_82599	0xFF8
 
 #define	MAX_RX_COPY_THRESHOLD		9216
 #define	MAX_TX_COPY_THRESHOLD		9216
@@ -130,7 +130,6 @@ extern "C" {
 
 #define	MIN_MTU				ETHERMIN
 #define	MIN_RX_LIMIT_PER_INTR		16
-#define	MIN_INTR_THROTTLING		0
 #define	MIN_TX_COPY_THRESHOLD		0
 #define	MIN_RX_COPY_THRESHOLD		0
 #define	MIN_TX_RECYCLE_THRESHOLD	MIN_NUM_TX_DESC
@@ -146,8 +145,6 @@ extern "C" {
 
 #define	DEFAULT_MTU			ETHERMTU
 #define	DEFAULT_RX_LIMIT_PER_INTR	256
-#define	DEFAULT_INTR_THROTTLING_82598	200	/* In unit of 256 nsec */
-#define	DEFAULT_INTR_THROTTLING_82599	200	/* In unit of 256 nsec */
 #define	DEFAULT_RX_COPY_THRESHOLD	128
 #define	DEFAULT_TX_COPY_THRESHOLD	512
 #define	DEFAULT_TX_RECYCLE_THRESHOLD	(MAX_COOKIE + 1)
@@ -194,9 +191,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_ADD_INTR	0x0020	/* Intr handlers added */
 #define	ATTACH_PROGRESS_LOCKS		0x0040	/* Locks initialized */
 #define	ATTACH_PROGRESS_INIT		0x0080	/* Device initialized */
-#define	ATTACH_PROGRESS_INIT_RINGS	0x0100	/* Rings initialized */
 #define	ATTACH_PROGRESS_STATS		0x0200	/* Kstats created */
-#define	ATTACH_PROGRESS_NDD		0x0400	/* NDD initialized */
 #define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
 #define	ATTACH_PROGRESS_FM_INIT		0x2000	/* FMA initialized */
@@ -254,6 +249,14 @@ typedef struct adapter_info {
 	uint32_t	max_tx_que_num;	/* maximum number of tx queues */
 	uint32_t	min_tx_que_num;	/* minimum number of tx queues */
 	uint32_t	def_tx_que_num;	/* default number of tx queues */
+
+	/*
+	 * Interrupt throttling is in unit of 256 nsec
+	 */
+	uint32_t	max_intr_throttle; /* maximum interrupt throttle */
+	uint32_t	min_intr_throttle; /* minimum interrupt throttle */
+	uint32_t	def_intr_throttle; /* default interrupt throttle */
+
 	uint32_t	max_msix_vect;	/* maximum total msix vectors */
 	uint32_t	max_ring_vect;	/* maximum number of ring vectors */
 	uint32_t	max_other_vect;	/* maximum number of other vectors */
@@ -264,33 +267,6 @@ typedef struct adapter_info {
 /* bits representing all interrupt types other than tx & rx */
 #define	IXGBE_OTHER_INTR	0x3ff00000
 #define	IXGBE_82599_OTHER_INTR	0x86100000
-
-/*
- * Shorthand for the NDD parameters
- */
-#define	param_autoneg_cap	nd_params[PARAM_AUTONEG_CAP].val
-#define	param_pause_cap		nd_params[PARAM_PAUSE_CAP].val
-#define	param_asym_pause_cap	nd_params[PARAM_ASYM_PAUSE_CAP].val
-#define	param_10000fdx_cap	nd_params[PARAM_10000FDX_CAP].val
-#define	param_1000fdx_cap	nd_params[PARAM_1000FDX_CAP].val
-#define	param_100fdx_cap	nd_params[PARAM_1000FDX_CAP].val
-#define	param_rem_fault		nd_params[PARAM_REM_FAULT].val
-
-#define	param_adv_autoneg_cap	nd_params[PARAM_ADV_AUTONEG_CAP].val
-#define	param_adv_pause_cap	nd_params[PARAM_ADV_PAUSE_CAP].val
-#define	param_adv_asym_pause_cap nd_params[PARAM_ADV_ASYM_PAUSE_CAP].val
-#define	param_adv_10000fdx_cap	nd_params[PARAM_ADV_10000FDX_CAP].val
-#define	param_adv_1000fdx_cap	nd_params[PARAM_ADV_1000FDX_CAP].val
-#define	param_adv_100fdx_cap	nd_params[PARAM_ADV_1000FDX_CAP].val
-#define	param_adv_rem_fault	nd_params[PARAM_ADV_REM_FAULT].val
-
-#define	param_lp_autoneg_cap	nd_params[PARAM_LP_AUTONEG_CAP].val
-#define	param_lp_pause_cap	nd_params[PARAM_LP_PAUSE_CAP].val
-#define	param_lp_asym_pause_cap	nd_params[PARAM_LP_ASYM_PAUSE_CAP].val
-#define	param_lp_10000fdx_cap	nd_params[PARAM_LP_10000FDX_CAP].val
-#define	param_lp_1000fdx_cap	nd_params[PARAM_LP_1000FDX_CAP].val
-#define	param_lp_100fdx_cap	nd_params[PARAM_LP_1000FDX_CAP].val
-#define	param_lp_rem_fault	nd_params[PARAM_LP_REM_FAULT].val
 
 enum ioc_reply {
 	IOC_INVAL = -1,	/* bad, NAK with EINVAL */
@@ -377,49 +353,6 @@ typedef struct {
 	char *name;
 } nd_param_t;
 
-/*
- * NDD parameter indexes, divided into:
- *
- *	read-only parameters describing the hardware's capabilities
- *	read-write parameters controlling the advertised capabilities
- *	read-only parameters describing the partner's capabilities
- *	read-write parameters controlling the force speed and duplex
- *	read-only parameters describing the link state
- *	read-only parameters describing the driver properties
- *	read-write parameters controlling the driver properties
- */
-enum {
-	PARAM_AUTONEG_CAP,
-	PARAM_PAUSE_CAP,
-	PARAM_ASYM_PAUSE_CAP,
-	PARAM_10000FDX_CAP,
-	PARAM_1000FDX_CAP,
-	PARAM_100FDX_CAP,
-	PARAM_REM_FAULT,
-
-	PARAM_ADV_AUTONEG_CAP,
-	PARAM_ADV_PAUSE_CAP,
-	PARAM_ADV_ASYM_PAUSE_CAP,
-	PARAM_ADV_10000FDX_CAP,
-	PARAM_ADV_1000FDX_CAP,
-	PARAM_ADV_100FDX_CAP,
-	PARAM_ADV_REM_FAULT,
-
-	PARAM_LP_AUTONEG_CAP,
-	PARAM_LP_PAUSE_CAP,
-	PARAM_LP_ASYM_PAUSE_CAP,
-	PARAM_LP_10000FDX_CAP,
-	PARAM_LP_1000FDX_CAP,
-	PARAM_LP_100FDX_CAP,
-	PARAM_LP_REM_FAULT,
-
-	PARAM_LINK_STATUS,
-	PARAM_LINK_SPEED,
-	PARAM_LINK_DUPLEX,
-
-	PARAM_COUNT
-};
-
 typedef union ixgbe_ether_addr {
 	struct {
 		uint32_t	high;
@@ -437,11 +370,6 @@ typedef enum {
 	USE_COPY,
 	USE_DMA
 } tx_type_t;
-
-typedef enum {
-	RCB_FREE,
-	RCB_SENDUP
-} rcb_state_t;
 
 typedef struct ixgbe_tx_context {
 	uint32_t		hcksum_flags;
@@ -493,10 +421,10 @@ typedef struct tx_control_block {
  */
 typedef struct rx_control_block {
 	mblk_t			*mp;
-	rcb_state_t		state;
+	uint32_t		ref_cnt;
 	dma_buffer_t		rx_buf;
 	frtn_t			free_rtn;
-	struct ixgbe_rx_ring	*rx_ring;
+	struct ixgbe_rx_data	*rx_data;
 } rx_control_block_t;
 
 /*
@@ -548,10 +476,6 @@ typedef struct ixgbe_tx_ring {
 	 */
 	uint32_t		ring_size; /* Tx descriptor ring size */
 	uint32_t		free_list_size;	/* Tx free list size */
-	uint32_t		copy_thresh;
-	uint32_t		recycle_thresh;
-	uint32_t		overload_thresh;
-	uint32_t		resched_thresh;
 
 	boolean_t		reschedule;
 	uint32_t		recycle_fail;
@@ -581,15 +505,7 @@ typedef struct ixgbe_tx_ring {
 /*
  * Software Receive Ring
  */
-typedef struct ixgbe_rx_ring {
-	uint32_t		index;		/* Ring index */
-	uint32_t		intr_vector;	/* Interrupt vector index */
-	uint32_t		vect_bit;	/* vector's bit in register */
-
-	/*
-	 * Mutexes
-	 */
-	kmutex_t		rx_lock;	/* Rx access lock */
+typedef struct ixgbe_rx_data {
 	kmutex_t		recycle_lock;	/* Recycle lock, for rcb_tail */
 
 	/*
@@ -610,12 +526,28 @@ typedef struct ixgbe_rx_ring {
 	uint32_t		rcb_free;	/* Number of free rcbs */
 
 	/*
-	 * Rx ring settings and status
+	 * Rx sw ring settings and status
 	 */
 	uint32_t		ring_size;	/* Rx descriptor ring size */
 	uint32_t		free_list_size;	/* Rx free list size */
-	uint32_t		limit_per_intr;	/* Max packets per interrupt */
-	uint32_t		copy_thresh;
+
+	uint32_t		rcb_pending;
+	uint32_t		flag;
+
+	struct ixgbe_rx_ring	*rx_ring;	/* Pointer to rx ring */
+} ixgbe_rx_data_t;
+
+/*
+ * Software Data Structure for Rx Ring
+ */
+typedef struct ixgbe_rx_ring {
+	uint32_t		index;		/* Ring index */
+	uint32_t		intr_vector;	/* Interrupt vector index */
+	uint32_t		vect_bit;	/* vector's bit in register */
+
+	ixgbe_rx_data_t		*rx_data;	/* Rx software ring */
+
+	kmutex_t		rx_lock;	/* Rx access lock */
 
 #ifdef IXGBE_DEBUG
 	/*
@@ -631,7 +563,6 @@ typedef struct ixgbe_rx_ring {
 
 	struct ixgbe		*ixgbe;		/* Pointer to ixgbe struct */
 } ixgbe_rx_ring_t;
-
 /*
  * Software Receive Ring Group
  */
@@ -682,6 +613,8 @@ typedef struct ixgbe {
 	uint32_t		default_mtu;
 	uint32_t		max_frame_size;
 
+	uint32_t		rcb_pending;
+
 	/*
 	 * Each msi-x vector: map vector to interrupt cleanup
 	 */
@@ -709,6 +642,7 @@ typedef struct ixgbe {
 	uint32_t		tx_ring_size;	/* Tx descriptor ring size */
 	uint32_t		tx_buf_size;	/* Tx buffer size */
 
+	boolean_t		tx_ring_init;
 	boolean_t		tx_head_wb_enable; /* Tx head wrtie-back */
 	boolean_t		tx_hcksum_enable; /* Tx h/w cksum offload */
 	boolean_t 		lso_enable; 	/* Large Segment Offload */
@@ -734,6 +668,7 @@ typedef struct ixgbe {
 
 	kmutex_t		gen_lock; /* General lock for device access */
 	kmutex_t		watchdog_lock;
+	kmutex_t		rx_pending_lock;
 
 	boolean_t		watchdog_enable;
 	boolean_t		watchdog_start;
@@ -753,11 +688,27 @@ typedef struct ixgbe {
 	 */
 	kstat_t			*ixgbe_ks;
 
-	/*
-	 * NDD definitions
-	 */
-	caddr_t			nd_data;
-	nd_param_t		nd_params[PARAM_COUNT];
+	uint32_t		param_en_10000fdx_cap:1,
+				param_en_1000fdx_cap:1,
+				param_en_100fdx_cap:1,
+				param_adv_10000fdx_cap:1,
+				param_adv_1000fdx_cap:1,
+				param_adv_100fdx_cap:1,
+				param_pause_cap:1,
+				param_asym_pause_cap:1,
+				param_rem_fault:1,
+				param_adv_autoneg_cap:1,
+				param_adv_pause_cap:1,
+				param_adv_asym_pause_cap:1,
+				param_adv_rem_fault:1,
+				param_lp_10000fdx_cap:1,
+				param_lp_1000fdx_cap:1,
+				param_lp_100fdx_cap:1,
+				param_lp_autoneg_cap:1,
+				param_lp_pause_cap:1,
+				param_lp_asym_pause_cap:1,
+				param_lp_rem_fault,
+				param_pad_to_32:12;
 } ixgbe_t;
 
 typedef struct ixgbe_stat {
@@ -829,12 +780,15 @@ typedef struct ixgbe_stat {
 int ixgbe_alloc_dma(ixgbe_t *);
 void ixgbe_free_dma(ixgbe_t *);
 void ixgbe_set_fma_flags(int, int);
+void ixgbe_free_dma_buffer(dma_buffer_t *);
+int ixgbe_alloc_rx_ring_data(ixgbe_rx_ring_t *rx_ring);
+void ixgbe_free_rx_ring_data(ixgbe_rx_data_t *rx_data);
 
 /*
  * Function prototypes in ixgbe_main.c
  */
-int ixgbe_start(ixgbe_t *);
-void ixgbe_stop(ixgbe_t *);
+int ixgbe_start(ixgbe_t *, boolean_t);
+void ixgbe_stop(ixgbe_t *, boolean_t);
 int ixgbe_driver_setup_link(ixgbe_t *, boolean_t);
 int ixgbe_multicst_add(ixgbe_t *, const uint8_t *);
 int ixgbe_multicst_remove(ixgbe_t *, const uint8_t *);
@@ -866,6 +820,13 @@ int ixgbe_m_stat(void *, uint_t, uint64_t *);
 void ixgbe_m_resources(void *);
 void ixgbe_m_ioctl(void *, queue_t *, mblk_t *);
 boolean_t ixgbe_m_getcapab(void *, mac_capab_t, void *);
+int ixgbe_m_setprop(void *, const char *, mac_prop_id_t, uint_t, const void *);
+int ixgbe_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *, uint_t *);
+int ixgbe_set_priv_prop(ixgbe_t *, const char *, uint_t, const void *);
+int ixgbe_get_priv_prop(ixgbe_t *, const char *,
+    uint_t, uint_t, void *, uint_t *);
+boolean_t ixgbe_param_locked(mac_prop_id_t);
 
 /*
  * Function prototypes in ixgbe_rx.c
@@ -889,13 +850,6 @@ uint32_t ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *);
 void ixgbe_notice(void *, const char *, ...);
 void ixgbe_log(void *, const char *, ...);
 void ixgbe_error(void *, const char *, ...);
-
-/*
- * Function prototypes in ixgbe_ndd.c
- */
-int ixgbe_nd_init(ixgbe_t *);
-void ixgbe_nd_cleanup(ixgbe_t *);
-enum ioc_reply ixgbe_nd_ioctl(ixgbe_t *, queue_t *, mblk_t *, struct iocblk *);
 
 /*
  * Function prototypes in ixgbe_stat.c

@@ -98,7 +98,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 
 	ASSERT(mp->b_next == NULL);
 
-	copy_thresh = tx_ring->copy_thresh;
+	copy_thresh = ixgbe->tx_copy_thresh;
 
 	/* Get the mblk size */
 	mbsize = 0;
@@ -138,7 +138,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	 * Check and recycle tx descriptors.
 	 * The recycle threshold here should be selected carefully
 	 */
-	if (tx_ring->tbd_free < tx_ring->recycle_thresh) {
+	if (tx_ring->tbd_free < ixgbe->tx_recycle_thresh) {
 		tx_ring->tx_recycle(tx_ring);
 	}
 
@@ -147,7 +147,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	 * overload_threshold, assert overload, return mp;
 	 * and we need to re-schedule the tx again.
 	 */
-	if (tx_ring->tbd_free < tx_ring->overload_thresh) {
+	if (tx_ring->tbd_free < ixgbe->tx_overload_thresh) {
 		tx_ring->reschedule = B_TRUE;
 		IXGBE_DEBUG_STAT(tx_ring->stat_overload);
 		return (mp);
@@ -460,7 +460,6 @@ adjust_threshold:
 	}
 
 	mutex_enter(&tx_ring->tx_lock);
-
 	/*
 	 * If the number of free tx descriptors is not enough for transmit
 	 * then return mp.
@@ -1161,6 +1160,7 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 	boolean_t desc_done;
 	tx_control_block_t *tcb;
 	link_list_t pending_list;
+	ixgbe_t *ixgbe = tx_ring->ixgbe;
 
 	mutex_enter(&tx_ring->recycle_lock);
 
@@ -1171,7 +1171,7 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 		tx_ring->stall_watchdog = 0;
 		if (tx_ring->reschedule) {
 			tx_ring->reschedule = B_FALSE;
-			mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+			mac_tx_ring_update(ixgbe->mac_hdl,
 			    tx_ring->ring_handle);
 		}
 		mutex_exit(&tx_ring->recycle_lock);
@@ -1184,8 +1184,7 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 	DMA_SYNC(&tx_ring->tbd_area, DDI_DMA_SYNC_FORKERNEL);
 
 	if (ixgbe_check_dma_handle(tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(tx_ring->ixgbe->dip,
-		    DDI_SERVICE_DEGRADED);
+		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
 	}
 
 	LINK_LIST_INIT(&pending_list);
@@ -1275,10 +1274,10 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 	 */
 	atomic_add_32(&tx_ring->tbd_free, desc_num);
 
-	if ((tx_ring->tbd_free >= tx_ring->resched_thresh) &&
+	if ((tx_ring->tbd_free >= ixgbe->tx_resched_thresh) &&
 	    (tx_ring->reschedule)) {
 		tx_ring->reschedule = B_FALSE;
-		mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+		mac_tx_ring_update(ixgbe->mac_hdl,
 		    tx_ring->ring_handle);
 	}
 	mutex_exit(&tx_ring->recycle_lock);
@@ -1320,11 +1319,8 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	int desc_num;
 	tx_control_block_t *tcb;
 	link_list_t pending_list;
+	ixgbe_t *ixgbe = tx_ring->ixgbe;
 
-	/*
-	 * The mutex_tryenter() is used to avoid unnecessary
-	 * lock contention.
-	 */
 	mutex_enter(&tx_ring->recycle_lock);
 
 	ASSERT(tx_ring->tbd_free <= tx_ring->ring_size);
@@ -1334,7 +1330,7 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 		tx_ring->stall_watchdog = 0;
 		if (tx_ring->reschedule) {
 			tx_ring->reschedule = B_FALSE;
-			mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+			mac_tx_ring_update(ixgbe->mac_hdl,
 			    tx_ring->ring_handle);
 		}
 		mutex_exit(&tx_ring->recycle_lock);
@@ -1357,7 +1353,7 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	    DDI_DMA_SYNC_FORKERNEL);
 
 	if (ixgbe_check_dma_handle(tx_ring->tbd_area.dma_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(tx_ring->ixgbe->dip,
+		ddi_fm_service_impact(ixgbe->dip,
 		    DDI_SERVICE_DEGRADED);
 	}
 
@@ -1422,10 +1418,10 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	 */
 	atomic_add_32(&tx_ring->tbd_free, desc_num);
 
-	if ((tx_ring->tbd_free >= tx_ring->resched_thresh) &&
+	if ((tx_ring->tbd_free >= ixgbe->tx_resched_thresh) &&
 	    (tx_ring->reschedule)) {
 		tx_ring->reschedule = B_FALSE;
-		mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+		mac_tx_ring_update(ixgbe->mac_hdl,
 		    tx_ring->ring_handle);
 	}
 	mutex_exit(&tx_ring->recycle_lock);
