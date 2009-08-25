@@ -13084,8 +13084,6 @@ st_create_errstats(struct scsi_tape *un, int instance)
 				    ST_INQUIRY->inq_pid, 16);
 				(void) strncpy(&stp->st_revision.value.c[0],
 				    ST_INQUIRY->inq_revision, 4);
-				(void) strncpy(&stp->st_serial.value.c[0],
-				    ST_INQUIRY->inq_serial, 12);
 			}
 		}
 	}
