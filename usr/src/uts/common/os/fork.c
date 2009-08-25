@@ -799,6 +799,14 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct)
 		if (getproc(&p, 1) < 0)
 			return (EAGAIN);
 
+		/*
+		 * Release the hold on the p_exec and p_execdir, these
+		 * were acquired in getproc()
+		 */
+		if (p->p_execdir != NULL)
+			VN_RELE(p->p_execdir);
+		if (p->p_exec != NULL)
+			VN_RELE(p->p_exec);
 		p->p_flag |= SNOWAIT;
 		p->p_exec = NULL;
 		p->p_execdir = NULL;
