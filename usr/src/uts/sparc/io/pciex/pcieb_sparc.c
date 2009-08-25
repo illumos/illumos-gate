@@ -201,6 +201,7 @@ pcieb_attach_plx_workarounds(pcieb_devstate_t *pcieb)
 	uint_t		bus_num, primary, secondary;
 	uint8_t		dev_type = bus_p->bus_dev_type;
 	uint16_t	vendor_id = bus_p->bus_dev_ven_id & 0xFFFF;
+	int 		ce_mask = 0;
 
 	if (!IS_PLX_VENDORID(vendor_id))
 		return;
@@ -209,10 +210,13 @@ pcieb_attach_plx_workarounds(pcieb_devstate_t *pcieb)
 	 * Due to a PLX HW bug we need to disable the receiver error CE on all
 	 * ports. To this end we create a property "pcie_ce_mask" with value
 	 * set to PCIE_AER_CE_RECEIVER_ERR. The pcie module will check for this
-	 * property before setting the AER CE mask.
+	 * property before setting the AER CE mask. Be sure to honor all other
+	 * pcie_ce_mask settings.
 	 */
+	ce_mask = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "pcie_ce_mask", 0);
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE, dip,
-	    "pcie_ce_mask", PCIE_AER_CE_RECEIVER_ERR);
+	    "pcie_ce_mask", (PCIE_AER_CE_RECEIVER_ERR|ce_mask));
 
 	/*
 	 * There is a bug in the PLX 8114 bridge, such that an 8-bit
