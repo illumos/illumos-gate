@@ -19959,12 +19959,15 @@ sd_send_scsi_READ_CAPACITY(sd_ssc_t *ssc, uint64_t *capp, uint32_t *lbap,
 	 * returned from the device is the LBA of the last logical block
 	 * on the logical unit.  The actual logical block count will be
 	 * this value plus one.
-	 *
+	 */
+	capacity += 1;
+
+	/*
 	 * Currently, for removable media, the capacity is saved in terms
 	 * of un->un_sys_blocksize, so scale the capacity value to reflect this.
 	 */
 	if (un->un_f_has_removable_media)
-		capacity = (capacity + 1) * (lbasize / un->un_sys_blocksize);
+		capacity *= (lbasize / un->un_sys_blocksize);
 
 	/*
 	 * Copy the values from the READ CAPACITY command into the space
