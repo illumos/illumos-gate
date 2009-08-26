@@ -1036,12 +1036,14 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 			dmu_objset_evict(ds->ds_objset);
 			ds->ds_objset = NULL;
 		}
-		/* NOTE: defer is always B_FALSE for non-snapshots */
 		dsda.defer = defer;
 		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 		    dsl_dataset_destroy_check, dsl_dataset_destroy_sync,
 		    &dsda, tag, 0);
 		ASSERT3P(dsda.rm_origin, ==, NULL);
+		goto out;
+	} else if (defer) {
+		err = EINVAL;
 		goto out;
 	}
 

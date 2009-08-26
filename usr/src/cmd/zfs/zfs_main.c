@@ -197,9 +197,8 @@ get_usage(zfs_help_t idx)
 		    "\tcreate [-ps] [-b blocksize] [-o property=value] ... "
 		    "-V <size> <volume>\n"));
 	case HELP_DESTROY:
-		return (gettext("\tdestroy [-rRf] "
-		    "<filesystem|volume|snapshot>\n"
-		    "\tdestroy -d [-r] <filesystem|volume|snapshot>\n"));
+		return (gettext("\tdestroy [-rRf] <filesystem|volume>\n"
+		    "\tdestroy [-rRd] <snapshot>\n"));
 	case HELP_GET:
 		return (gettext("\tget [-rHp] [-d max] "
 		    "[-o field[,...]] [-s source[,...]]\n"
@@ -785,8 +784,8 @@ badusage:
 }
 
 /*
- * zfs destroy [-rRf] <fs, snap, vol>
- * zfs destroy -d [-r] <fs, snap, vol>
+ * zfs destroy [-rRf] <fs, vol>
+ * zfs destroy [-rRd] <snap>
  *
  * 	-r	Recursively destroy all children
  * 	-R	Recursively destroy all dependents, including clones
@@ -940,12 +939,14 @@ zfs_do_destroy(int argc, char **argv)
 	int c;
 	zfs_handle_t *zhp;
 	char *cp;
+	zfs_type_t type = ZFS_TYPE_DATASET;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "dfrR")) != -1) {
 		switch (c) {
 		case 'd':
 			cb.cb_defer_destroy = B_TRUE;
+			type = ZFS_TYPE_SNAPSHOT;
 			break;
 		case 'f':
 			cb.cb_force = 1;
@@ -978,9 +979,6 @@ zfs_do_destroy(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	if (cb.cb_defer_destroy && cb.cb_doclones)
-		usage(B_FALSE);
-
 	/*
 	 * If we are doing recursive destroy of a snapshot, then the
 	 * named snapshot may not exist.  Go straight to libzfs.
@@ -995,11 +993,19 @@ zfs_do_destroy(int argc, char **argv)
 		cp++;
 
 		if (cb.cb_doclones) {
+			boolean_t defer = cb.cb_defer_destroy;
+
+			/*
+			 * Temporarily ignore the defer_destroy setting since
+			 * it's not supported for clones.
+			 */
+			cb.cb_defer_destroy = B_FALSE;
 			cb.cb_snapname = cp;
 			if (destroy_snap_clones(zhp, &cb) != 0) {
 				zfs_close(zhp);
 				return (1);
 			}
+			cb.cb_defer_destroy = defer;
 		}
 
 		ret = zfs_destroy_snaps(zhp, cp, cb.cb_defer_destroy);
@@ -1012,7 +1018,7 @@ zfs_do_destroy(int argc, char **argv)
 	}
 
 	/* Open the given dataset */
-	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_DATASET)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], type)) == NULL)
 		return (1);
 
 	cb.cb_target = zhp;
