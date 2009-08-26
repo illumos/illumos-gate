@@ -30,6 +30,8 @@
 #ifndef _SYS_MODE_H
 #define	_SYS_MODE_H
 
+#ifdef _KERNEL
+
 #include <sys/stat.h>
 #include <sys/vnode.h>
 
@@ -50,5 +52,7 @@ extern ushort_t		vttoif_tab[];
 #ifdef	__cplusplus
 }
 #endif
+
+#endif  /* _KERNEL */
 
 #endif	/* _SYS_MODE_H */
