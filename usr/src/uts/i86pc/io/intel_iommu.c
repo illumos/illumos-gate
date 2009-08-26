@@ -23,12 +23,12 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2008, Intel Corporation.
+ * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  */
 
 /*
- * Intel IOMMU implementaion
+ * Intel IOMMU implementation
  */
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -57,6 +57,18 @@
 #include <sys/atomic.h>
 #include <sys/iommulib.h>
 #include <sys/memlist.h>
+#include <sys/pcie.h>
+#include <sys/pci_cfgspace.h>
+
+/*
+ * Macros based on PCI spec
+ */
+#define	GET_DEV(devfn)	(devfn >> 3)		/* get device from devicefunc */
+#define	GET_FUNC(devfn)	(devfn & 7)		/* get func from devicefunc */
+#define	GET_DEVFUNC(d, f)	(((d) << 3) | (f)) /* create devicefunc */
+#define	REV2CLASS(r)	((r) >> 8)		/* Get classcode from revid */
+#define	CLASS2BASE(c)	((c) >> 16)		/* baseclass from classcode */
+#define	CLASS2SUB(c)	(((c) >> 8) & 0xff);	/* subclass from classcode */
 
 static boolean_t drhd_only_for_gfx(intel_iommu_state_t *iommu);
 static void iommu_bringup_unit(intel_iommu_state_t *iommu);
@@ -64,7 +76,6 @@ static void iommu_bringup_unit(intel_iommu_state_t *iommu);
 /*
  * Are we on a Mobile 4 Series Chipset
  */
-
 static int mobile4_cs = 0;
 
 /*
@@ -75,7 +86,6 @@ static int mobile4_cs = 0;
  * enabled for translation.
  * This happens only when enabling legacy emulation mode.
  */
-
 static int usb_page0_quirk = 1;
 static int usb_fullpa_quirk = 0;
 static int usb_rmrr_quirk = 1;
@@ -91,9 +101,29 @@ static uint_t page_num;
 /*
  * record some frequently used dips
  */
-static dev_info_t *pci_top_devinfo = NULL;
-static dev_info_t *isa_top_devinfo = NULL;
+static dev_info_t *root_devinfo = NULL;
 static dev_info_t *lpc_devinfo = NULL;
+
+/*
+ * A single element in the BDF based cache of private structs
+ */
+typedef struct bdf_private_entry {
+	int			bpe_seg;
+	int			bpe_bus;
+	int			bpe_devfcn;
+	iommu_private_t		*bpe_private;
+	struct bdf_private_entry	*bpe_next;
+} bdf_private_entry_t;
+
+/*
+ * Head of the BDF based cache of private structs
+ */
+typedef struct bdf_private_cache {
+	kmutex_t		bpc_lock;
+	bdf_private_entry_t	*bpc_cache;
+} bdf_private_cache_t;
+
+static bdf_private_cache_t bdf_private_cache;
 
 /*
  * dvma cache related variables
@@ -146,6 +176,9 @@ static char *dmar_fault_reason[] = {
 
 #define	IOMMU_IOVPTE_TABLE_SIZE	(IOMMU_LEVEL_SIZE * sizeof (struct iovpte))
 
+/*
+ * Check if the device has mobile 4 chipset quirk
+ */
 static int
 check_hwquirk_walk(dev_info_t *dip, void *arg)
 {
@@ -160,22 +193,22 @@ check_hwquirk_walk(dev_info_t *dip, void *arg)
 	if (vendor_id == 0x8086 && device_id == 0x2a40) {
 		mobile4_cs = 1;
 		return (DDI_WALK_TERMINATE);
-	} else
+	} else {
 		return (DDI_WALK_CONTINUE);
+	}
 }
 
-static void check_hwquirk(dev_info_t *pdip)
+static void
+check_hwquirk(void)
 {
 	int count;
-	ASSERT(pdip);
 
 	/*
-	 * walk through the device tree under pdip
-	 * normally, pdip should be the pci root nexus
+	 * walk through the entire device tree
 	 */
-	ndi_devi_enter(pdip, &count);
-	ddi_walk_devs(ddi_get_child(pdip), check_hwquirk_walk, NULL);
-	ndi_devi_exit(pdip, count);
+	ndi_devi_enter(root_devinfo, &count);
+	ddi_walk_devs(ddi_get_child(root_devinfo), check_hwquirk_walk, NULL);
+	ndi_devi_exit(root_devinfo, count);
 }
 
 #define	IOMMU_ALLOC_RESOURCE_DELAY	drv_usectohz(5000)
@@ -692,6 +725,193 @@ no_primary_faults:
 
 	return (any_fault ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }
+
+/*
+ * Function to identify a display device from the PCI class code
+ */
+static int
+device_is_display(uint_t classcode)
+{
+	static uint_t disp_classes[] = {
+		0x000100,
+		0x030000,
+		0x030001
+	};
+	int i, nclasses = sizeof (disp_classes) / sizeof (uint_t);
+
+	for (i = 0; i < nclasses; i++) {
+		if (classcode == disp_classes[i])
+			return (1);
+	}
+	return (0);
+}
+
+/*
+ * Function that determines if device is PCIEX and/or PCIEX bridge
+ */
+static int
+device_is_pciex(uchar_t bus, uchar_t dev, uchar_t func, int *is_pci_bridge)
+{
+	ushort_t cap;
+	ushort_t capsp;
+	ushort_t cap_count = PCI_CAP_MAX_PTR;
+	ushort_t status;
+	int is_pciex = 0;
+
+	*is_pci_bridge = 0;
+
+	status = pci_getw_func(bus, dev, func, PCI_CONF_STAT);
+	if (!(status & PCI_STAT_CAP))
+		return (0);
+
+	capsp = pci_getb_func(bus, dev, func, PCI_CONF_CAP_PTR);
+	while (cap_count-- && capsp >= PCI_CAP_PTR_OFF) {
+		capsp &= PCI_CAP_PTR_MASK;
+		cap = pci_getb_func(bus, dev, func, capsp);
+
+		if (cap == PCI_CAP_ID_PCI_E) {
+			status = pci_getw_func(bus, dev, func, capsp + 2);
+			/*
+			 * See section 7.8.2 of PCI-Express Base Spec v1.0a
+			 * for Device/Port Type.
+			 * PCIE_PCIECAP_DEV_TYPE_PCIE2PCI implies that the
+			 * device is a PCIe2PCI bridge
+			 */
+			*is_pci_bridge =
+			    ((status & PCIE_PCIECAP_DEV_TYPE_MASK) ==
+			    PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) ? 1 : 0;
+
+			is_pciex = 1;
+		}
+
+		capsp = (*pci_getb_func)(bus, dev, func,
+		    capsp + PCI_CAP_NEXT_PTR);
+	}
+
+	return (is_pciex);
+}
+
+/*
+ * Allocate a private structure and initialize it
+ */
+static iommu_private_t *
+iommu_create_private(int bus, int dev, int func)
+{
+	uchar_t basecl, subcl;
+	uint_t classcode, revclass;
+	iommu_private_t *private;
+	int pciex = 0;
+	int is_pci_bridge = 0;
+
+	/* No cached private struct. Create one */
+	private = kmem_zalloc(sizeof (iommu_private_t), KM_SLEEP);
+	private->idp_seg = 0; /* Currently seg can only be 0 */
+	private->idp_bus = bus;
+	private->idp_devfn = GET_DEVFUNC(dev, func);
+	private->idp_sec = 0;
+	private->idp_sub = 0;
+	private->idp_bbp_type = IOMMU_PPB_NONE;
+
+	/* record the bridge */
+	revclass = pci_getl_func(bus, dev, func, PCI_CONF_REVID);
+
+	classcode = REV2CLASS(revclass);
+	basecl = CLASS2BASE(classcode);
+	subcl = CLASS2SUB(classcode);
+
+	private->idp_is_bridge = ((basecl == PCI_CLASS_BRIDGE) &&
+	    (subcl == PCI_BRIDGE_PCI));
+
+	if (private->idp_is_bridge) {
+		private->idp_sec = pci_getb_func(bus, dev, func,
+		    PCI_BCNF_SECBUS);
+		private->idp_sub = pci_getb_func(bus, dev, func,
+		    PCI_BCNF_SUBBUS);
+
+		pciex = device_is_pciex(bus, dev, func, &is_pci_bridge);
+		if (pciex && is_pci_bridge)
+			private->idp_bbp_type = IOMMU_PPB_PCIE_PCI;
+		else if (pciex)
+			private->idp_bbp_type = IOMMU_PPB_PCIE_PCIE;
+		else
+			private->idp_bbp_type = IOMMU_PPB_PCI_PCI;
+	}
+
+	/* record the special devices */
+	private->idp_is_display =
+	    (device_is_display(classcode) ? B_TRUE : B_FALSE);
+
+	private->idp_is_lpc = ((basecl == PCI_CLASS_BRIDGE) &&
+	    (subcl == PCI_BRIDGE_ISA));
+	private->idp_intel_domain = NULL;
+
+	return (private);
+}
+
+/*
+ * Set the private struct in the private field of a devinfo node
+ */
+static int
+iommu_set_private(dev_info_t *dip)
+{
+	bdf_private_entry_t *bpe, *new;
+	int bus, device, func, seg;
+	iommu_private_t *pvt;
+	dmar_domain_state_t *domain;
+
+	seg = 0; /* NOTE: Currently seg always = 0 */
+	bus = device = func = -1;
+
+	if (acpica_get_bdf(dip, &bus, &device, &func) != DDI_SUCCESS) {
+		/* probably not PCI device */
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * We always need a private structure, whether it was cached
+	 * or not previously, since a hotplug may change the type of
+	 * device - for example we may have had a bridge here before,
+	 * and now we could have a leaf device
+	 */
+	pvt = iommu_create_private(bus, device, func);
+	ASSERT(pvt);
+
+	/* assume new cache entry needed */
+	new = kmem_zalloc(sizeof (*new), KM_SLEEP);
+
+	mutex_enter(&bdf_private_cache.bpc_lock);
+
+	for (bpe = bdf_private_cache.bpc_cache; bpe; bpe = bpe->bpe_next) {
+		if (bpe->bpe_seg == seg &&
+		    bpe->bpe_bus == bus &&
+		    bpe->bpe_devfcn == GET_DEVFUNC(device, func)) {
+			break;
+		}
+	}
+
+	if (bpe) {
+		/* extry exists, new not needed */
+		kmem_free(new, sizeof (*new));
+		ASSERT(bpe->bpe_private);
+		domain = bpe->bpe_private->idp_intel_domain;
+		/* domain may be NULL */
+		kmem_free(bpe->bpe_private, sizeof (iommu_private_t));
+		bpe->bpe_private = pvt;
+		pvt->idp_intel_domain = domain;
+	} else {
+		new->bpe_seg = pvt->idp_seg;
+		new->bpe_bus = pvt->idp_bus;
+		new->bpe_devfcn = pvt->idp_devfn;
+		new->bpe_private = pvt;
+		new->bpe_next =  bdf_private_cache.bpc_cache;
+		bdf_private_cache.bpc_cache = new;
+	}
+	DEVI(dip)->devi_iommu_private = pvt;
+
+	mutex_exit(&bdf_private_cache.bpc_lock);
+	return (DDI_SUCCESS);
+}
+
 
 /*
  * intel_iommu_init()
@@ -1623,11 +1843,19 @@ create_iommu_state(drhd_info_t *drhd)
 static int
 match_dip_sbdf(dev_info_t *dip, void *arg)
 {
-	iommu_private_t *private = DEVI(dip)->devi_iommu_private;
+	iommu_private_t *private;
 	pci_dev_info_t *info = arg;
 
-	if (private &&
-	    (info->pdi_seg == private->idp_seg) &&
+	if (DEVI(dip)->devi_iommu_private == NULL &&
+	    iommu_set_private(dip) != DDI_SUCCESS) {
+		return (DDI_WALK_CONTINUE);
+	}
+
+	private = DEVI(dip)->devi_iommu_private;
+
+	ASSERT(private);
+
+	if ((info->pdi_seg == private->idp_seg) &&
 	    (info->pdi_bus == private->idp_bus) &&
 	    (info->pdi_devfn == private->idp_devfn)) {
 		info->pdi_dip = dip;
@@ -1646,10 +1874,10 @@ get_dip_from_info(pci_dev_info_t *info)
 	int count;
 	info->pdi_dip = NULL;
 
-	ndi_devi_enter(pci_top_devinfo, &count);
-	ddi_walk_devs(ddi_get_child(pci_top_devinfo),
+	ndi_devi_enter(root_devinfo, &count);
+	ddi_walk_devs(ddi_get_child(root_devinfo),
 	    match_dip_sbdf, info);
-	ndi_devi_exit(pci_top_devinfo, count);
+	ndi_devi_exit(root_devinfo, count);
 
 	if (info->pdi_dip)
 		return (DDI_SUCCESS);
@@ -1658,23 +1886,28 @@ get_dip_from_info(pci_dev_info_t *info)
 }
 
 /*
- * get_pci_top_bridge()
+ * iommu_get_pci_top_bridge()
  *   get the top level bridge for a pci device
  */
 static dev_info_t *
-get_pci_top_bridge(dev_info_t *dip)
+iommu_get_pci_top_bridge(dev_info_t *dip)
 {
 	iommu_private_t *private;
 	dev_info_t *tmp, *pdip;
 
 	tmp = NULL;
 	pdip = ddi_get_parent(dip);
-	while (pdip != pci_top_devinfo) {
+	for (; pdip && pdip != root_devinfo; pdip = ddi_get_parent(pdip)) {
+		if (DEVI(pdip)->devi_iommu_private == NULL &&
+		    iommu_set_private(pdip) != DDI_SUCCESS)
+			continue;
+
 		private = DEVI(pdip)->devi_iommu_private;
+		ASSERT(private);
+
 		if ((private->idp_bbp_type == IOMMU_PPB_PCIE_PCI) ||
 		    (private->idp_bbp_type == IOMMU_PPB_PCI_PCI))
 			tmp = pdip;
-		pdip = ddi_get_parent(pdip);
 	}
 
 	return (tmp);
@@ -1695,7 +1928,6 @@ domain_vmem_init(dmar_domain_state_t *domain)
 
 	(void) snprintf(vmem_name, sizeof (vmem_name),
 	    "domain_vmem_%d", vmem_instance++);
-
 
 	memlist_read_lock();
 	mp = phys_install;
@@ -1781,6 +2013,7 @@ iommu_domain_init(dmar_domain_state_t *domain)
 	    KM_SLEEP);
 
 	mutex_init(&(domain->dm_pgtable_lock), NULL, MUTEX_DRIVER, NULL);
+
 	/*
 	 * init the CPU available page tables
 	 */
@@ -1813,25 +2046,50 @@ iommu_domain_init(dmar_domain_state_t *domain)
 }
 
 /*
+ *  Get first ancestor with a non-NULL private struct
+ */
+static dev_info_t *
+iommu_get_ancestor_private(dev_info_t *dip)
+{
+	dev_info_t *pdip;
+
+	pdip = ddi_get_parent(dip);
+	for (; pdip && pdip != root_devinfo; pdip = ddi_get_parent(pdip)) {
+		if (DEVI(pdip)->devi_iommu_private == NULL &&
+		    iommu_set_private(pdip) != DDI_SUCCESS)
+			continue;
+		ASSERT(DEVI(pdip)->devi_iommu_private);
+		return (pdip);
+	}
+
+	return (NULL);
+}
+
+/*
  * dmar_check_sub()
  *   check to see if the device is under scope of a p2p bridge
  */
 static boolean_t
-dmar_check_sub(dev_info_t *dip, pci_dev_scope_t *devs)
+dmar_check_sub(dev_info_t *dip, int seg, pci_dev_scope_t *devs)
 {
-	dev_info_t *pdip, *pci_root;
+	dev_info_t *pdip;
 	iommu_private_t *private;
 	int bus = devs->pds_bus;
 	int devfn = ((devs->pds_dev << 3) | devs->pds_func);
 
+	ASSERT(dip != root_devinfo);
+
 	pdip = ddi_get_parent(dip);
-	pci_root = pci_top_devinfo;
-	while (pdip != pci_root) {
+	for (; pdip && pdip != root_devinfo; pdip = ddi_get_parent(pdip)) {
+		if (DEVI(pdip)->devi_iommu_private == NULL &&
+		    iommu_set_private(pdip) != DDI_SUCCESS)
+			continue;
 		private = DEVI(pdip)->devi_iommu_private;
-		if (private && (private->idp_bus == bus) &&
+		ASSERT(private);
+		if ((private->idp_seg == seg) &&
+		    (private->idp_bus == bus) &&
 		    (private->idp_devfn == devfn))
 			return (B_TRUE);
-		pdip = ddi_get_parent(pdip);
 	}
 
 	return (B_FALSE);
@@ -1844,14 +2102,23 @@ dmar_check_sub(dev_info_t *dip, pci_dev_scope_t *devs)
 static intel_iommu_state_t *
 iommu_get_dmar(dev_info_t *dip)
 {
-	iommu_private_t *private =
-	    DEVI(dip)->devi_iommu_private;
-	int seg = private->idp_seg;
-	int bus = private->idp_bus;
-	int dev = private->idp_devfn >> 3;
-	int func = private->idp_devfn & 7;
+	iommu_private_t *private = NULL;
+	int seg, bus, dev, func;
 	pci_dev_scope_t *devs;
 	drhd_info_t *drhd;
+
+	bus = dev = func = -1;
+
+	seg = 0;
+	if (DEVI(dip)->devi_iommu_private ||
+	    iommu_set_private(dip) == DDI_SUCCESS) {
+		private = DEVI(dip)->devi_iommu_private;
+		ASSERT(private);
+		seg = private->idp_seg;
+		bus = private->idp_bus;
+		dev = GET_DEV(private->idp_devfn);
+		func = GET_FUNC(private->idp_devfn);
+	}
 
 	/*
 	 * walk the drhd list for a match
@@ -1873,7 +2140,8 @@ iommu_get_dmar(dev_info_t *dip)
 			/*
 			 * get a perfect match
 			 */
-			if (devs->pds_bus == bus &&
+			if (private &&
+			    devs->pds_bus == bus &&
 			    devs->pds_dev == dev &&
 			    devs->pds_func == func) {
 				return ((intel_iommu_state_t *)
@@ -1884,16 +2152,18 @@ iommu_get_dmar(dev_info_t *dip)
 			 * maybe under a scope of a p2p
 			 */
 			if (devs->pds_type == 0x2 &&
-			    dmar_check_sub(dip, devs))
+			    dmar_check_sub(dip, seg, devs))
 				return ((intel_iommu_state_t *)
 				    (drhd->di_iommu));
 		}
 	}
 
 	/*
-	 * shouldn't get here
+	 * This may happen with buggy versions of BIOSes. Just warn instead
+	 * of panic as we don't want whole system to go down because of one
+	 * device.
 	 */
-	cmn_err(CE_PANIC, "can't match iommu for %s\n",
+	cmn_err(CE_WARN, "can't match iommu for %s\n",
 	    ddi_node_name(dip));
 
 	return (NULL);
@@ -1949,9 +2219,10 @@ domain_set_root_context(dmar_domain_state_t *domain,
 		iommu->iu_dmar_ops->do_clflush((caddr_t)rce, sizeof (*rce));
 	} else if (CONT_ENTRY_GET_ASR(rce) !=
 	    domain->dm_page_table_paddr) {
-		cmn_err(CE_WARN, "root context entries for"
+		cmn_err(CE_PANIC, "root context entries for"
 		    " %d, %d, %d has been set", bus,
 		    devfn >>3, devfn & 0x7);
+		/*NOTREACHED*/
 	}
 
 	mutex_exit(&(iommu->iu_root_context_lock));
@@ -1996,10 +2267,16 @@ setup_context_walk(dev_info_t *dip, void *arg)
 	iommu_private_t *private;
 
 	private = DEVI(dip)->devi_iommu_private;
+	if (private == NULL && iommu_set_private(dip) != DDI_SUCCESS) {
+		cmn_err(CE_PANIC, "setup_context_walk: cannot find private");
+		/*NOTREACHED*/
+	}
+	private = DEVI(dip)->devi_iommu_private;
 	ASSERT(private);
 
 	setup_single_context(domain, private->idp_seg,
 	    private->idp_bus, private->idp_devfn);
+
 	return (DDI_WALK_PRUNECHILD);
 }
 
@@ -2013,6 +2290,8 @@ setup_possible_contexts(dmar_domain_state_t *domain, dev_info_t *dip)
 	int count;
 	iommu_private_t *private;
 	private = DEVI(dip)->devi_iommu_private;
+
+	ASSERT(private);
 
 	/* for pci-pci bridge */
 	if (private->idp_bbp_type == IOMMU_PPB_PCI_PCI) {
@@ -2070,7 +2349,8 @@ iommu_alloc_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 	 *    strutures have been synchronized.
 	 */
 	ndi_hold_devi(dip);
-	bdip = get_pci_top_bridge(dip);
+	bdip = iommu_get_pci_top_bridge(dip);
+	ASSERT(bdip == NULL || DEVI(bdip)->devi_iommu_private);
 	ldip = (bdip != NULL) ? bdip : dip;
 	ndi_devi_enter(ldip, &count);
 
@@ -2089,6 +2369,7 @@ iommu_alloc_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 	 */
 	if (bdip != NULL) {
 		b_private = DEVI(bdip)->devi_iommu_private;
+		ASSERT(b_private);
 		if (b_private->idp_intel_domain) {
 			new = INTEL_IOMMU_PRIVATE(b_private->idp_intel_domain);
 			goto get_domain_finish;
@@ -2102,7 +2383,7 @@ iommu_alloc_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 	 */
 	new = kmem_alloc(sizeof (dmar_domain_state_t), KM_SLEEP);
 	new->dm_iommu = iommu_get_dmar(dip);
-	if (iommu_domain_init(new) != DDI_SUCCESS) {
+	if (new->dm_iommu == NULL || iommu_domain_init(new) != DDI_SUCCESS) {
 		ndi_devi_exit(ldip, count);
 		ndi_rele_devi(dip);
 		kmem_free(new, sizeof (dmar_domain_state_t));
@@ -2141,16 +2422,16 @@ get_domain_finish:
 static int
 iommu_get_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 {
-	iommu_private_t *private;
+	iommu_private_t *private = DEVI(dip)->devi_iommu_private;
 	dev_info_t *pdip;
-	private = DEVI(dip)->devi_iommu_private;
 
 	ASSERT(domain);
 
 	/*
 	 * for isa devices attached under lpc
 	 */
-	if (ddi_get_parent(dip) == isa_top_devinfo) {
+	pdip = ddi_get_parent(dip);
+	if (strcmp(ddi_node_name(pdip), "isa") == 0) {
 		if (lpc_devinfo) {
 			return (iommu_alloc_domain(lpc_devinfo, domain));
 		} else {
@@ -2172,17 +2453,28 @@ iommu_get_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 	}
 
 	/*
-	 * if iommu private is NULL, we share
-	 * the domain with the parent
+	 * if iommu private is NULL:
+	 *	1. try to find a cached private
+	 *	2. if that fails try to create a new one
+	 *	3. if this fails as well, device is probably not
+	 *	   PCI and shares domain with an ancestor.
 	 */
-	if (private == NULL) {
-		pdip = ddi_get_parent(dip);
-		return (iommu_alloc_domain(pdip, domain));
+	if (private == NULL && iommu_set_private(dip) != DDI_SUCCESS) {
+		if (pdip = iommu_get_ancestor_private(dip)) {
+			return (iommu_alloc_domain(pdip, domain));
+		}
+		cmn_err(CE_WARN, "Cannot find ancestor private for "
+		    "devinfo %s%d", ddi_node_name(dip),
+		    ddi_get_instance(dip));
+		*domain = NULL;
+		return (DDI_FAILURE);
 	}
 
 	/*
 	 * check if the domain has already allocated
 	 */
+	private = DEVI(dip)->devi_iommu_private;
+	ASSERT(private);
 	if (private->idp_intel_domain) {
 		*domain = INTEL_IOMMU_PRIVATE(private->idp_intel_domain);
 		return (DDI_SUCCESS);
@@ -2197,14 +2489,14 @@ iommu_get_domain(dev_info_t *dip, dmar_domain_state_t **domain)
 /*
  * helper functions to manipulate iommu pte
  */
-static inline void
+static void
 set_pte(iopte_t pte, uint_t rw, paddr_t addr)
 {
 	*pte |= (rw & 0x3);
 	*pte |= (addr & IOMMU_PAGE_MASK);
 }
 
-static inline paddr_t
+static paddr_t
 pte_get_paddr(iopte_t pte)
 {
 	return (*pte & IOMMU_PAGE_MASK);
@@ -2214,7 +2506,7 @@ pte_get_paddr(iopte_t pte)
  * dvma_level_offset()
  *   get the page table offset by specifying a dvma and level
  */
-static inline uint_t
+static uint_t
 dvma_level_offset(uint64_t dvma_pn, uint_t level)
 {
 	uint_t start_bit, offset;
@@ -2262,7 +2554,6 @@ iommu_setup_level_table(dmar_domain_state_t *domain,
 		iommu_free_page(domain->dm_iommu, child);
 		return (vpte);
 	}
-
 	set_pte(pte, IOMMU_PAGE_PROP_RW, child);
 	domain->dm_iommu->iu_dmar_ops->do_clflush((caddr_t)pte, sizeof (*pte));
 	vpte->vp = vp;
@@ -2414,8 +2705,10 @@ build_single_rmrr_identity_map(rmrr_info_t *rmrr)
 		    devs->pds_func;
 
 		if (get_dip_from_info(&info) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "rmrr: get dip for %d,%d failed",
-			    info.pdi_bus, info.pdi_devfn);
+			cmn_err(CE_NOTE, "RMRR: device [%x,%x,%x] listed in "
+			    "ACPI DMAR table does not exist, ignoring",
+			    info.pdi_bus, GET_DEV(info.pdi_devfn),
+			    GET_FUNC(info.pdi_devfn));
 			continue;
 		}
 
@@ -2431,7 +2724,9 @@ build_single_rmrr_identity_map(rmrr_info_t *rmrr)
 
 		if (!address_in_memlist(bios_rsvd, start, size)) {
 			cmn_err(CE_WARN, "bios issue: "
-			    "rmrr is not in reserved memory range\n");
+			    "rmrr [0x%" PRIx64 " - 0x%" PRIx64 "]\n"
+			    "is not in reserved memory range\n",
+			    start, end);
 		}
 
 		(void) iommu_map_page_range(domain,
@@ -2503,6 +2798,7 @@ drhd_only_for_gfx(intel_iommu_state_t *iommu)
 		}
 
 		private = DEVI(info.pdi_dip)->devi_iommu_private;
+		ASSERT(private);
 		if (private->idp_is_display)
 			return (B_TRUE);
 	}
@@ -2591,11 +2887,15 @@ build_isa_gfx_identity_walk(dev_info_t *dip, void *arg)
 
 	iommu_private_t *private;
 
+	if (DEVI(dip)->devi_iommu_private == NULL &&
+	    iommu_set_private(dip) != DDI_SUCCESS) {
+		/* ignore devices which cannot have private struct */
+		return (DDI_WALK_CONTINUE);
+	}
+
 	private = DEVI(dip)->devi_iommu_private;
 
-	/* ignore the NULL private device */
-	if (!private)
-		return (DDI_WALK_CONTINUE);
+	ASSERT(private);
 
 	/* fix the gfx and fd */
 	if (private->idp_is_display) {
@@ -2664,13 +2964,12 @@ build_isa_gfx_identity_map(void)
 	int count;
 
 	/*
-	 * walk through the device tree from pdip
-	 * normally, pdip should be the pci root
+	 * walk through the entire device tree
 	 */
-	ndi_devi_enter(pci_top_devinfo, &count);
-	ddi_walk_devs(ddi_get_child(pci_top_devinfo),
+	ndi_devi_enter(root_devinfo, &count);
+	ddi_walk_devs(ddi_get_child(root_devinfo),
 	    build_isa_gfx_identity_walk, NULL);
-	ndi_devi_exit(pci_top_devinfo, count);
+	ndi_devi_exit(root_devinfo, count);
 }
 
 /*
@@ -2732,20 +3031,10 @@ intel_iommu_attach_dmar_nodes(void)
 	list_create(&iommu_states, sizeof (intel_iommu_state_t),
 	    offsetof(intel_iommu_state_t, node));
 
-	pci_top_devinfo = ddi_find_devinfo("pci", -1, 0);
-	isa_top_devinfo = ddi_find_devinfo("isa", -1, 0);
-	if (pci_top_devinfo == NULL) {
-		cmn_err(CE_WARN, "can't get pci top devinfo");
-		return (DDI_FAILURE);
-	} else {
-		ndi_rele_devi(pci_top_devinfo);
-	}
+	root_devinfo = ddi_root_node();
+	ASSERT(root_devinfo);
 
-	if (isa_top_devinfo != NULL) {
-		ndi_rele_devi(isa_top_devinfo);
-	}
-
-	check_hwquirk(pci_top_devinfo);
+	check_hwquirk();
 
 	iommu_page_init();
 
@@ -3484,7 +3773,7 @@ qinv_submit_inv_dsc(intel_iommu_state_t *iommu, inv_dsc_t *dsc)
 	while (iq_table->head == iq_table->tail) {
 		/*
 		 * inv queue table exhausted, wait hardware to fetch
-		 * next decscritor
+		 * next descriptor
 		 */
 		iq_table->head = QINV_IQA_HEAD(
 		    iommu_get_reg64(iommu, IOMMU_REG_INVAL_QH));
@@ -4443,7 +4732,7 @@ intr_remap_get_sid(apic_irq_t *irq_ptr)
 		/* MSI/MSI-X interrupt */
 		dip = irq_ptr->airq_dip;
 		ASSERT(dip);
-		pdip = get_pci_top_bridge(dip);
+		pdip = iommu_get_pci_top_bridge(dip);
 		if (pdip == NULL) {
 			/* pcie device */
 			private = DEVI(dip)->devi_iommu_private;

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation.
+ * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  */
 
@@ -71,13 +71,13 @@ boolean_t intel_iommu_support;
 intel_dmar_info_t *dmar_info;
 
 /*
- * global varables to save source id and drhd info for ioapic
+ * global variables to save source id and drhd info for ioapic
  * to support interrupt remapping
  */
 list_t	ioapic_drhd_infos;
 
 /*
- * internal varables
+ * internal variables
  */
 static void *dmart;
 
@@ -562,7 +562,7 @@ parse_dmar(void)
 				return (PARSE_DMAR_FAIL);
 			break;
 		default:
-			cmn_err(CE_WARN,
+			cmn_err(CE_CONT, "!DMAR ACPI table: "
 			    "unit type %d ignored\n", unit_head->uh_type);
 		}
 		unit_head = (dmar_acpi_unit_head_t *)

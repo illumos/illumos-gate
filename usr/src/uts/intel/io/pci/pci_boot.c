@@ -1519,7 +1519,6 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	int pciex = 0;
 	ushort_t is_pci_bridge = 0;
 	struct pci_devfunc *devlist = NULL, *entry = NULL;
-	iommu_private_t *private;
 	gfx_entry_t *gfxp;
 
 	ushort_t deviceid = pci_getw(bus, dev, func, PCI_CONF_DEVID);
@@ -1746,36 +1745,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		reprogram = 0;	/* don't reprogram pci-ide bridge */
 	}
 
-	/* allocate and set up iommu private */
-	private = kmem_alloc(sizeof (iommu_private_t), KM_SLEEP);
-	private->idp_seg = 0;
-	private->idp_bus = bus;
-	private->idp_devfn = (dev << 3) | func;
-	private->idp_sec = 0;
-	private->idp_sub = 0;
-	private->idp_bbp_type = IOMMU_PPB_NONE;
-	/* record the bridge */
-	private->idp_is_bridge = ((basecl == PCI_CLASS_BRIDGE) &&
-	    (subcl == PCI_BRIDGE_PCI));
-	if (private->idp_is_bridge) {
-		private->idp_sec = pci_getb(bus, dev, func, PCI_BCNF_SECBUS);
-		private->idp_sub = pci_getb(bus, dev, func, PCI_BCNF_SUBBUS);
-		if (pciex && is_pci_bridge)
-			private->idp_bbp_type = IOMMU_PPB_PCIE_PCI;
-		else if (pciex)
-			private->idp_bbp_type = IOMMU_PPB_PCIE_PCIE;
-		else
-			private->idp_bbp_type = IOMMU_PPB_PCI_PCI;
-	}
-	/* record the special devices */
-	private->idp_is_display = (is_display(classcode) ? B_TRUE : B_FALSE);
-	private->idp_is_lpc = ((basecl == PCI_CLASS_BRIDGE) &&
-	    (subcl == PCI_BRIDGE_ISA));
-	private->idp_intel_domain = NULL;
-	/* hook the private to dip */
-	DEVI(dip)->devi_iommu_private = private;
-
-	if (private->idp_is_display == B_TRUE) {
+	if (is_display(classcode)) {
 		gfxp = kmem_zalloc(sizeof (*gfxp), KM_SLEEP);
 		gfxp->g_dip = dip;
 		gfxp->g_prev = NULL;
@@ -1794,6 +1764,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 	if (reprogram && (entry != NULL))
 		entry->reprogram = B_TRUE;
+
 }
 
 /*

@@ -154,7 +154,7 @@ typedef paddr_t rootnex_addr_t;
 #endif
 
 #if !defined(__xpv)
-char _depends_on[] = "mach/pcplusmp misc/iommulib";
+char _depends_on[] = "mach/pcplusmp misc/iommulib misc/acpica";
 #endif
 
 static struct cb_ops rootnex_cb_ops = {
