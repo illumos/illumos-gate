@@ -38,6 +38,7 @@
 #include <synch.h>
 #include <sys/param.h>
 #include <sys/mman.h>
+#include <errno.h>
 
 extern int _getgroupsbymember(const char *, gid_t[], int, int);
 int str2group(const char *, int, void *, char *, int);
@@ -378,12 +379,14 @@ str2group(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 			return (NSS_STR_PARSE_PARSE);
 	}
 	if (!black_magic) {
+		errno = 0;
 		tmp = strtoul(p, &next, 10);
-		if (next == p) {
+		if (next == p || errno != 0) {
 			/* gid field should be nonempty */
+			/* also check errno from strtoul */
 			return (NSS_STR_PARSE_PARSE);
 		}
-		if (group->gr_gid >= UINT32_MAX)
+		if (tmp >= UINT32_MAX)
 			group->gr_gid = GID_NOBODY;
 		else
 			group->gr_gid = (gid_t)tmp;

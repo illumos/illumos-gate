@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <errno.h>
 
 int str2passwd(const char *, int, void *,
 	char *, int);
@@ -316,9 +317,11 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 		 * which is 4 bytes or else we will end up
 		 * truncating the value.
 		 */
+		errno = 0;
 		tmp = strtoul(p, &next, 10);
-		if (next == p) {
+		if (next == p || errno != 0) {
 			/* uid field should be nonempty */
+			/* also check errno from strtoul */
 			return (NSS_STR_PARSE_PARSE);
 		}
 		/*
@@ -349,16 +352,18 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 			return (NSS_STR_PARSE_PARSE);
 	}
 	if (!black_magic) {
+		errno = 0;
 		tmp = strtoul(p, &next, 10);
-		if (next == p) {
+		if (next == p || errno != 0) {
 			/* gid field should be nonempty */
+			/* also check errno from strtoul */
 			return (NSS_STR_PARSE_PARSE);
 		}
 		/*
 		 * gid should not be -1; anything else
 		 * is administrative policy.
 		 */
-		if (passwd->pw_gid >= UINT32_MAX)
+		if (tmp >= UINT32_MAX)
 			passwd->pw_gid = GID_NOBODY;
 		else
 			passwd->pw_gid = (gid_t)tmp;
