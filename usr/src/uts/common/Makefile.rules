@@ -528,6 +528,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/afe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/atge/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:                $(UTSBASE)/common/io/arn/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1792,6 +1796,9 @@ $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/aac/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/afe/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/atge/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/arn/%.c

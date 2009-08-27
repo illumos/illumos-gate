@@ -114,6 +114,7 @@ i386_SUBDIRS= \
 	SUNWarn \
 	SUNWatheros \
 	SUNWatigfx \
+	SUNWatge \
 	SUNWatu \
 	SUNWaudiocmi \
 	SUNWaudiohd \

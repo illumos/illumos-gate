@@ -384,6 +384,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= acpi_toshiba
 #
 
 DRV_KMODS	+= afe
+DRV_KMODS	+= atge
 DRV_KMODS	+= bfe
 DRV_KMODS	+= dmfe
 DRV_KMODS	+= e1000g

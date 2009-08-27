@@ -42,6 +42,7 @@ static const struct {
 } other_vendors[] = {
 	OUI(AMD, "Advanced Micro Devices"),
 	OUI(AMD_2, "Advanced Micro Devices"),
+	OUI(ATTANSIC, "Atheros/Attansic"),
 	OUI(BROADCOM, "Broadcom Corporation"),
 	OUI(BROADCOM_2, "Broadcom Corporation"),
 	OUI(CICADA, "Cicada Semiconductor"),

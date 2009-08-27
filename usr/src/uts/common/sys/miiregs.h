@@ -150,6 +150,7 @@ extern "C" {
  */
 #define	MII_OUI_AMD			0x00001a
 #define	MII_OUI_AMD_2			0x000058
+#define	MII_OUI_ATTANSIC		0x001374
 #define	MII_OUI_BROADCOM		0x001018
 #define	MII_OUI_BROADCOM_2		0x000818
 #define	MII_OUI_CICADA			0x0003f1
