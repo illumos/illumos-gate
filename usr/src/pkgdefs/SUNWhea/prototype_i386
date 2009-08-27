@@ -120,6 +120,7 @@ d none usr/platform/i86pc 755 root sys
 d none usr/platform/i86pc/include 755 root bin
 d none usr/platform/i86pc/include/sys 755 root bin
 f none usr/platform/i86pc/include/sys/asm_misc.h 644 root bin
+f none usr/platform/i86pc/include/sys/acpidev.h 644 root bin
 f none usr/platform/i86pc/include/sys/clock.h 644 root bin
 f none usr/platform/i86pc/include/sys/cram.h 644 root bin
 f none usr/platform/i86pc/include/sys/debug_info.h 644 root bin

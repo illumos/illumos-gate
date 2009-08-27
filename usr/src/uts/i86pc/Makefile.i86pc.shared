@@ -254,6 +254,7 @@ DRV_KMODS	+= pci-ide
 DRV_KMODS	+= xsvc
 DRV_KMODS	+= tzmon
 DRV_KMODS	+= acpi_drv 
+DRV_KMODS	+= acpinex
 DRV_KMODS	+= ioat
 DRV_KMODS	+= fipe
 
@@ -301,6 +302,7 @@ SYS_KMODS	+=
 #	'Misc' Modules (/kernel/misc):
 #
 MISC_KMODS	+= gfx_private pcie
+MISC_KMODS	+= acpidev
 
 #
 #	'Dacf' modules (/kernel/dacf)

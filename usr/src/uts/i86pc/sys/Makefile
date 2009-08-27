@@ -37,6 +37,7 @@ include ../Makefile.i86pc
 FILEMODE = 644
 
 HDRS=  \
+	acpidev.h	\
 	asm_misc.h	\
 	clock.h		\
 	cram.h		\

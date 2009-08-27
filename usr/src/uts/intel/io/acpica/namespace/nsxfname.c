@@ -388,7 +388,7 @@ AcpiGetObjectInfo (
 
     /* If not a device, we are all done */
 
-    if (Info->Type == ACPI_TYPE_DEVICE)
+    if (Info->Type == ACPI_TYPE_DEVICE || Info->Type == ACPI_TYPE_PROCESSOR)
     {
         /*
          * Get extra info for ACPI Devices objects only:

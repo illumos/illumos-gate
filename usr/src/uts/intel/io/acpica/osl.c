@@ -43,6 +43,7 @@
 #include <sys/kobj.h>
 #include <sys/taskq.h>
 #include <sys/strlog.h>
+#include <sys/x86_archext.h>
 #include <sys/note.h>
 #include <sys/promif.h>
 
@@ -119,6 +120,13 @@ static struct cpu_map_item **cpu_map = NULL;
 static int cpu_map_count_max = 0;
 static int cpu_map_count = 0;
 static int cpu_map_built = 0;
+
+/*
+ * On systems with the uppc PSM only, acpica_map_cpu() won't be called at all.
+ * This flag is used to check for uppc-only systems by detecting whether
+ * acpica_map_cpu() has been called or not.
+ */
+static int cpu_map_called = 0;
 
 static int acpi_has_broken_bbn = -1;
 
@@ -1552,14 +1560,31 @@ acpica_get_handle_cpu(int cpu_id, ACPI_HANDLE *rh)
 			break;
 		}
 	}
-	if (i >= cpu_map_count || (cpu_map[i]->obj == NULL)) {
+	if (i < cpu_map_count && (cpu_map[i]->obj != NULL)) {
+		*rh = cpu_map[cpu_id]->obj;
 		mutex_exit(&cpu_map_lock);
-		return (AE_ERROR);
+		return (AE_OK);
 	}
-	*rh = cpu_map[cpu_id]->obj;
+
+	/* Handle special case for uppc-only systems. */
+	if (cpu_map_called == 0) {
+		uint32_t apicid = cpuid_get_apicid(CPU);
+		if (apicid != UINT32_MAX) {
+			for (i = 0; i < cpu_map_count; i++) {
+				if (cpu_map[i]->apic_id == apicid) {
+					break;
+				}
+			}
+			if (i < cpu_map_count && (cpu_map[i]->obj != NULL)) {
+				*rh = cpu_map[cpu_id]->obj;
+				mutex_exit(&cpu_map_lock);
+				return (AE_OK);
+			}
+		}
+	}
 	mutex_exit(&cpu_map_lock);
 
-	return (AE_OK);
+	return (AE_ERROR);
 }
 
 /*
@@ -1923,9 +1948,10 @@ acpica_grow_cpu_map(void)
  * 1) acpica_add_processor_to_map() builds mapping among APIC id, ACPI
  *    processor id and ACPI object handle.
  * 2) acpica_map_cpu() builds mapping among cpu id and ACPI processor id.
- * On system with ACPI device configuration for CPU enabled, acpica_map_cpu()
- * will be called before acpica_add_processor_to_map(), otherwise
- * acpica_map_cpu() will be called after acpica_add_processor_to_map().
+ * On systems with which have ACPI device configuration for CPUs enabled,
+ * acpica_map_cpu() will be called after acpica_add_processor_to_map(),
+ * otherwise acpica_map_cpu() will be called before
+ * acpica_add_processor_to_map().
  */
 ACPI_STATUS
 acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj, UINT32 apic_id)
@@ -1947,6 +1973,9 @@ acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj, UINT32 apic_id)
 	 * been disabled, there won't be a CPU map yet because uppc psm doesn't
 	 * call acpica_map_cpu(). So create one and use the passed-in processor
 	 * as CPU 0
+	 * Assumption: the first CPU returned by
+	 * AcpiGetDevices/AcpiWalkNamespace will be the BSP.
+	 * Unfortunately there appears to be no good way to ASSERT this.
 	 */
 	if (cpu_map == NULL &&
 	    !acpica_get_devcfg_feature(ACPI_DEVCFG_CPU)) {
@@ -2050,6 +2079,7 @@ acpica_map_cpu(processorid_t cpuid, UINT32 acpi_id)
 	}
 
 	mutex_enter(&cpu_map_lock);
+	cpu_map_called = 1;
 	for (i = 0; i < cpu_map_count; i++) {
 		if (cpu_map[i]->cpu_id == cpuid) {
 			rc = AE_ALREADY_EXISTS;

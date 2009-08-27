@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ppm driver subroutines
  */
@@ -399,6 +397,9 @@ ppm_lookup_dev(dev_info_t *dip)
 	char path[MAXNAMELEN];
 	ppm_domain_t *domp;
 	ppm_db_t *dbp;
+#ifdef	__x86
+	char *devtype = NULL;
+#endif	/* __x86 */
 
 	PPM_GET_PATHNAME(dip, path);
 	for (domp = ppm_domain_p; domp; domp = domp->next) {
@@ -411,6 +412,25 @@ ppm_lookup_dev(dev_info_t *dip)
 				if (dip == ddi_root_node() &&
 				    strcmp(dbp->name, "/") == 0)
 					return (domp);
+
+#ifdef	__x86
+				/*
+				 * Special rule to catch all CPU devices on x86.
+				 */
+				if (domp->model == PPMD_CPU &&
+				    strcmp(dbp->name, "/") == 0 &&
+				    ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+				    DDI_PROP_DONTPASS, "device_type",
+				    &devtype) == DDI_SUCCESS) {
+					if (strcmp(devtype, "cpu") == 0) {
+						ddi_prop_free(devtype);
+						return (domp);
+					} else {
+						ddi_prop_free(devtype);
+					}
+				}
+#endif	/* __x86 */
+
 				if (ppm_match_devs(path, dbp) == 0)
 					return (domp);
 			}

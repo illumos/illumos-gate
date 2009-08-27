@@ -67,12 +67,14 @@ d none platform/i86pc/kernel/drv/amd64 755 root sys
 f none platform/i86pc/kernel/drv/amd64/acpippm 755 root sys
 f none platform/i86pc/kernel/drv/acpippm 755 root sys
 f none platform/i86pc/kernel/drv/acpippm.conf 644 root sys
+f none platform/i86pc/kernel/drv/amd64/acpinex 755 root sys
 f none platform/i86pc/kernel/drv/amd64/ppm 755 root sys
 f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pit_beep 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
+f none platform/i86pc/kernel/drv/acpinex 755 root sys
 f none platform/i86pc/kernel/drv/cpudrv 755 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
 f none platform/i86pc/kernel/drv/npe 755 root sys
@@ -91,8 +93,10 @@ f none platform/i86pc/kernel/mach/amd64/uppc 755 root sys
 f none platform/i86pc/kernel/mach/uppc 755 root sys
 d none platform/i86pc/kernel/misc 755 root sys
 d none platform/i86pc/kernel/misc/amd64 755 root sys
+f none platform/i86pc/kernel/misc/amd64/acpidev 755 root sys
 f none platform/i86pc/kernel/misc/amd64/gfx_private 755 root sys
 f none platform/i86pc/kernel/misc/amd64/pcie 755 root sys
+f none platform/i86pc/kernel/misc/acpidev 755 root sys
 f none platform/i86pc/kernel/misc/gfx_private 755 root sys
 f none platform/i86pc/kernel/misc/pcie 755 root sys
 f none platform/i86pc/kernel/unix 755 root sys

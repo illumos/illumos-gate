@@ -185,6 +185,7 @@ PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o	\
 			mp_platform_common.o hpet_acpi.o
 
 ACPI_DRV_OBJS	+= acpi_drv.o acpi_video.o
+ACPINEX_OBJS	+= acpinex_drv.o
 
 CPUDRV_OBJS	+= \
 	cpudrv.o \
@@ -193,6 +194,13 @@ CPUDRV_OBJS	+= \
 PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
 
 ACPIPPM_OBJS	+= acpippm.o acpisleep.o
+ACPIDEV_OBJS += acpidev_drv.o \
+	acpidev_scope.o acpidev_device.o \
+	acpidev_container.o \
+	acpidev_cpu.o \
+	acpidev_memory.o \
+	acpidev_resource.o \
+	acpidev_util.o
 
 ROOTNEX_OBJS += rootnex.o iommu_rscs.o dmar_acpi.o intel_iommu.o
 TZMON_OBJS	+= tzmon.o
