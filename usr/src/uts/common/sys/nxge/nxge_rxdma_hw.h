@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_NXGE_NXGE_RXDMA_HW_H
 #define	_SYS_NXGE_NXGE_RXDMA_HW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -683,6 +681,7 @@ typedef union _rbr_hdl_t {
 #define	RCR_PKTBUFSZ_1			0x01
 #define	RCR_PKTBUFSZ_2			0x02
 #define	RCR_SINGLE_BLOCK		0x03
+#define	RCR_N_PKTBUF_SZ			0x04
 
 #define	RCR_NO_ERROR			0x0
 #define	RCR_L2_ERROR			0x1

@@ -1801,8 +1801,13 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 			ddi_prop_free(prop_val);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "==> nxge_use_default_dma_config_n2: "
-			    "get tx-dma-channels failed"));
-			return (NXGE_DDI_FAILED);
+			    "invalid tx-dma-channels property for the NIU, "
+			    "using defaults"));
+			/*
+			 * Just failover to defaults
+			 */
+			p_cfgp->tdc.start = (func * NXGE_TDMA_PER_NIU_PORT);
+			ndmas = NXGE_TDMA_PER_NIU_PORT;
 		} else {
 			p_cfgp->tdc.start = prop_val[0];
 			NXGE_DEBUG_MSG((nxgep, OBP_CTL,
@@ -1834,12 +1839,17 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
 	    "rx-dma-channels", (int **)&prop_val,
 	    &prop_len) == DDI_PROP_SUCCESS) {
-		if (prop_len != NXGE_NIU_TDMA_PROP_LEN) {
+		if (prop_len != NXGE_NIU_RDMA_PROP_LEN) {
 			ddi_prop_free(prop_val);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "==> nxge_use_default_dma_config_n2: "
-			    "get rx-dma-channels failed"));
-			return (NXGE_DDI_FAILED);
+			    "invalid rx-dma-channels property for the NIU, "
+			    "using defaults"));
+			/*
+			 * Just failover to defaults
+			 */
+			p_cfgp->start_rdc = (func * NXGE_RDMA_PER_NIU_PORT);
+			ndmas = NXGE_RDMA_PER_NIU_PORT;
 		} else {
 			p_cfgp->start_rdc = prop_val[0];
 			NXGE_DEBUG_MSG((nxgep, OBP_CTL,

@@ -257,10 +257,11 @@ typedef struct _rxbuf_index_info_t {
 	uint64_t kaddr;
 } rxbuf_index_info_t, *p_rxbuf_index_info_t;
 
-/* Buffer index information */
-
+/*
+ * Buffer index information
+ */
 typedef struct _rxring_info_t {
-	uint32_t hint[3];
+	uint32_t hint[RCR_N_PKTBUF_SZ];
 	uint32_t block_size_mask;
 	uint16_t max_iterations;
 	rxbuf_index_info_t buffer[NXGE_DMA_BLOCK];
