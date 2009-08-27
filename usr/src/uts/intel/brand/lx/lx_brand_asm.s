@@ -51,17 +51,20 @@ lx_brand_int80_callback(void)
 	/*
 	 * lx brand callback for the int $0x80 trap handler.
 	 *
-	 * We're running on the user's %gs.
+	 * We're running on the kernel's %gs.
 	 *
 	 * We return directly to userland, bypassing the _update_sregs logic, so
 	 * this	routine must NOT do anything that could cause a context switch.
 	 *
 	 * %rax - syscall number
 	 * 
-	 * When called, all general registers and %gs are as they were when
-	 * the user process made the system call. The stack looks like
-	 * this:
+	 * When called, all general registers are as they were when
+	 * the user process made the system call.  The %gs register has the
+	 * kernel value.  The stack looks like this:
+	 *
 	 *  	   --------------------------------------
+	 *      40 | user %gs				|
+	 *      32 | callback pointer			|
 	 *      24 | saved stack pointer		|
 	 *    | 16 | lwp pointer			|
 	 *    v  8 | user return address (*)		|
@@ -79,7 +82,10 @@ lx_brand_int80_callback(void)
 	xchgq	(%rsp), %rax			/* swap %rax and stack value */
 	movq	32(%rsp), %r15			/* re-load the lwp pointer */
 	movq	LWP_BRAND(%r15), %r15		/* grab the lwp brand data */
-	mov	%gs, BR_UGS(%r15)		/* save user %gs */
+	pushq   %rax				/* save %rax on stack */
+	movq	64(%rsp), %rax			/* get user %gs */
+	mov	%eax, BR_UGS(%r15)		/* save user %gs */
+	popq	%rax				/* restore %rax from stack */
 
 	/* grab the 'max syscall num' for this process from 'zone brand data' */
 	cmpq	(%rsp), %rax			/* is 0 <= syscall <= MAX? */
@@ -107,7 +113,7 @@ lx_brand_int80_callback(void)
 	addq	%r15, %rax
 	movq	40(%rsp), %rsp		/* restore user stack pointer */
 	xchgq	(%rsp), %rax		/* swap %rax and return addr */
-	jmp	nopop_sys_rtt_syscall32
+	jmp	sys_sysint_swapgs_iret
 
 .lx_brand_int80_trace:
 	/*
@@ -140,9 +146,9 @@ lx_brand_int80_callback(void)
 	/*
 	 * %eax - syscall number
 	 *
-	 * When called, all general registers and %gs are as they were when
-	 * the user process made the system call. The stack looks like
-	 * this:
+	 * When called, all general registers are as they were when
+	 * the user process made the system call.  The %gs register has the
+	 * kernel value.  The stack looks like this:
 	 *
 	 *	   --------------------------------------
 	 *    | 44 | user's %ss				|
@@ -150,7 +156,7 @@ lx_brand_int80_callback(void)
 	 *    | 36 | EFLAGS register			|
 	 *    | 32 | user's %cs				|
 	 *    | 28 | user's %eip			|
-	 *    | 24 | 'scatch space'			|
+	 *    | 24 | 'scratch space'			|
 	 *    | 20 | user's %ebx			|
 	 *    | 16 | user's %gs selector		|
 	 *    | 12 | kernel's %gs selector		|
@@ -167,6 +173,8 @@ lx_brand_int80_callback(void)
 	movl	P_ZONE(%ebx), %ebx		/* grab the zone pointer */
 	movl	ZONE_BRAND_DATA(%ebx), %ebx	/* grab the zone brand data */
 	pushl	LXZD_MAX_SYSCALL(%ebx)		/* push the max sysnum */
+	movl	28(%esp), %ebx			/* grab the the user %gs */
+	movw	%bx, %gs			/* restore the user %gs */
 	movl	20(%esp), %ebx			/* re-load the lwp pointer */
 	movl	LWP_BRAND(%ebx), %ebx		/* grab the lwp brand data */
 	movw	%gs, BR_UGS(%ebx)		/* save user %gs */

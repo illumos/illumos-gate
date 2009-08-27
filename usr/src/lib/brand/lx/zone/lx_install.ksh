@@ -351,11 +351,13 @@ fi
 procinfo=$(LC_ALL=C psrinfo -vp | grep family)
 
 #
-# All x86 processors in CPUID families 6 or 15 should be i686-compatible,
-# assuming third party processor vendors follow AMD and Intel's lead.
+# All x86 processors in CPUID families 6, 15, 16 or 17 should be
+# i686-compatible, assuming third party processor vendors follow AMD and
+# Intel's lead.
 #
 if [[ "$procinfo" != *" x86 "* ]] ||
-    [[ "$procinfo" != *" family 6 "* && "$procinfo" != *" family 15 "* ]] ; then
+    [[ "$procinfo" != *" family 6 "* && "$procinfo" != *" family 15 "* &&
+    "$procinfo" != *" family 16 "* && "$procinfo" != *" family 17 "* ]] ; then
 	screenlog "$unsupported_cpu" "i686"
 	exit $int_code
 fi

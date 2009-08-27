@@ -68,6 +68,8 @@ sn1_brand_int91_callback(void)
  * When our syscall interposition callback entry point gets invoked the
  * stack looks like this:
  *         --------------------------------------
+ *      40 | user %gs				|
+ *      32 | callback pointer			|
  *      24 | saved stack pointer		|
  *    | 16 | lwp pointer			|
  *    v  8 | user return address (*)		|
@@ -78,8 +80,8 @@ sn1_brand_int91_callback(void)
  *       so it's just garbage for that entry point.
  */
 
-#define	V_COUNT	4
-#define	V_END		(CLONGSIZE * 4)
+#define	V_COUNT	6
+#define	V_END		(CLONGSIZE * 6)
 #define	V_SSP		(CLONGSIZE * 3)
 #define	V_LWP		(CLONGSIZE * 2)
 #define	V_URET_ADDR	(CLONGSIZE * 1)
@@ -92,7 +94,7 @@ sn1_brand_int91_callback(void)
  * When our syscall interposition callback entry point gets invoked the
  * stack looks like this:
  *         --------------------------------------
- *    | 24 | 'scatch space'			|
+ *    | 24 | 'scratch space'			|
  *    | 20 | user's %ebx			|
  *    | 16 | user's %gs selector		|
  *    | 12 | kernel's %gs selector		|
@@ -104,6 +106,8 @@ sn1_brand_int91_callback(void)
 
 #define	V_COUNT	7
 #define	V_END		(CLONGSIZE * 7)
+#define	V_U_GS		(CLONGSIZE * 4)
+#define	V_K_GS		(CLONGSIZE * 3)
 #define	V_LWP		(CLONGSIZE * 2)
 #define	V_URET_ADDR	(CLONGSIZE * 1)
 #define	V_CB_ADDR	(CLONGSIZE * 0)
@@ -220,7 +224,7 @@ ENTRY(sn1_brand_syscall32_callback)
 	GET_P_BRAND_DATA(%r15, 1, %rcx);/* get p_brand_data ptr	*/
 	movq	SPD_HANDLER(%rcx), %rcx	/* get p_brand_data->spd_handler ptr */
 	movq	(%r15), %r15		/* Restore scratch register	*/
-	jmp	nopop_sys_syscall32_sysretl
+	jmp	nopop_sys_syscall32_swapgs_sysretl
 9:
 	popq	%r15
 	retq
@@ -247,7 +251,7 @@ ENTRY(sn1_brand_syscall_callback)
 	GET_P_BRAND_DATA(%r15, 1, %rcx);/* get p_brand_data ptr	*/
 	movq	SPD_HANDLER(%rcx), %rcx	/* get p_brand_data->spd_handler ptr */
 	movq	(%r15), %r15		/* Restore scratch register	*/
-	jmp	nopop_sys_syscall_sysretq
+	jmp	nopop_sys_syscall_swapgs_sysretq
 9:
 	popq	%r15
 	retq
@@ -268,7 +272,7 @@ ENTRY(sn1_brand_sysenter_callback)
 	GET_P_BRAND_DATA(%rsp, 1, %rdx)	/* get p_brand_data		*/
 	movq	SPD_HANDLER(%rdx), %rdx	/* get p_brand_data->spd_handler ptr */
 	popq	%r15			/* Restore scratch register	*/
-	sysexit
+	jmp	sys_sysenter_swapgs_sysexit
 9:
 	popq	%r15
 	ret
@@ -310,7 +314,7 @@ ENTRY(sn1_brand_int91_callback)
 	popq	%rax			/* Restore scratch register	*/
 	popq	%r15			/* Restore scratch register	*/
 	movq	V_SSP(%rsp), %rsp	/* Remove callback stuff from stack */
-	jmp	nopop_sys_rtt_syscall32
+	jmp	sys_sysint_swapgs_iret
 9:
 	popq	%r15
 	retq
@@ -359,6 +363,9 @@ ENTRY(sn1_brand_syscall_callback)
 	SET_V(%esp, 2, V_U_ESP, %eax)	  /* Updated user %esp		    */
 	movl	%ebx, (%eax)		  /* Put new ret addr on user stack */
 
+	GET_V(%esp, 2, V_U_GS, %ebx)	  /* grab the the user %gs	*/
+	movw	%bx, %gs		  /* restore the user %gs	*/
+
 	popl	%eax		/* Restore scratch register 		*/
 	popl	%ebx		/* Restore scratch register 		*/
 	addl	$V_END, %esp	/* Remove all callback stuff from stack	*/
@@ -381,6 +388,10 @@ ENTRY(sn1_brand_sysenter_callback)
 	movl	%edx, (%ecx)		/* Save current return addr	*/
 	GET_P_BRAND_DATA(%esp, 1, %edx)	/* get p_brand_data		*/
 	movl	SPD_HANDLER(%edx), %edx	/* get p_brand_data->spd_handler */
+
+	GET_V(%esp, 1, V_U_GS, %ebx)	  /* grab the the user %gs	*/
+	movw	%bx, %gs		  /* restore the user %gs	*/
+
 	popl	%ebx			/* Restore scratch register	*/
 	sysexit
 9:

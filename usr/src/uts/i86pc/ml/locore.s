@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1575,16 +1575,8 @@ _no_pending_updates:
 	 */
 	ALTENTRY(sys_rtt_syscall32)
 	USER32_POP
-
-	/*
-	 * There can be no instructions between this label and IRET or
-	 * we could end up breaking linux brand support. See label usage
-	 * in lx_brand_int80_callback for an example.
-	 */
-	ALTENTRY(nopop_sys_rtt_syscall32)
 	IRET
 	/*NOTREACHED*/
-	SET_SIZE(nopop_sys_rtt_syscall32)
 
 	ALTENTRY(sys_rtt_syscall)
 	/*

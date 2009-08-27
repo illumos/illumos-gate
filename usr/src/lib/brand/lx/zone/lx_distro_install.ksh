@@ -19,10 +19,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This script is called from /usr/lib/brand/lx/lx_install.
@@ -339,7 +338,9 @@ find_packages()
 		# Check for additional processor capabilities
 		#
 		if [[ "$procinfo" = *" family 6 "* ||
-		    "$procinfo" = *" family 15 "* ]]; then
+		    "$procinfo" = *" family 15 "* ||
+		    "$procinfo" = *" family 16 "* ||
+		    "$procinfo" = *" family 17 "* ]]; then
 			if [[ "$procinfo" = *AuthenticAMD* ]]; then
 				#
 				# Linux gives "athlon" packages precedence

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,7 +114,9 @@
 	ORL_SYSCALLTRACE(%edi)
 
 /*
- * When the brand's callback is invoked, the stack will look like this:
+ * Check if a brand_mach_ops callback is defined for the specified callback_id
+ * type.  If so invoke it with the kernel's %gs value loaded and the following
+ * data on the stack:
  *	   --------------------------------------
  *         | 'scratch space'			|
  *         | user's %ebx			|
@@ -146,8 +148,6 @@
 	cmpl	$0, %ebx						   ;\
 	je	1f							   ;\
 	movl	%ebx, 16(%esp)		/* save callback to scratch	*/ ;\
-	movl	8(%esp), %ebx		/* grab the the user %gs	*/ ;\
-	movw	%bx, %gs		/* restore the user %gs		*/ ;\
 	movl	12(%esp), %ebx		/* restore %ebx			*/ ;\
 	pushl	20(%esp)		/* push the return address	*/ ;\
 	call	*20(%esp)		/* call callback		*/ ;\
