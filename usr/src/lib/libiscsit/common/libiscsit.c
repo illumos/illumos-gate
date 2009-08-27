@@ -508,7 +508,6 @@ it_tgt_create(it_config_t *cfg, it_tgt_t **tgt, char *tgt_name)
 
 	if (!namep) {
 		/* generate a name */
-
 		ret = it_iqn_generate(buf, sizeof (buf), NULL);
 		if (ret != 0) {
 			return (ret);
@@ -521,12 +520,6 @@ it_tgt_create(it_config_t *cfg, it_tgt_t **tgt, char *tgt_name)
 		}
 	}
 
-	/* Too many targets? */
-	if (cfg->config_tgt_count >= MAX_TARGETS) {
-		return (E2BIG);
-	}
-
-
 	/* make sure this name isn't already on the list */
 	cfgtgt = cfg->config_tgt_list;
 	while (cfgtgt != NULL) {
@@ -534,6 +527,11 @@ it_tgt_create(it_config_t *cfg, it_tgt_t **tgt, char *tgt_name)
 			return (EEXIST);
 		}
 		cfgtgt = cfgtgt->tgt_next;
+	}
+
+	/* Too many targets? */
+	if (cfg->config_tgt_count >= MAX_TARGETS) {
+		return (E2BIG);
 	}
 
 	ptr = calloc(1, sizeof (it_tgt_t));
