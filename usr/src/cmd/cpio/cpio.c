@@ -319,10 +319,11 @@ typedef struct sl_info
 typedef struct data_in
 {
 	int		data_in_errno;
-	int		data_in_swapfile;
-	int		data_in_proc_mode;
-	int		data_in_partialflg;
-	int		data_in_compress_flag;
+	char		data_in_swapfile;
+	char		data_in_proc_mode;
+	char		data_in_rd_eof;
+	char		data_in_wr_part;
+	char		data_in_compress_flag;
 	long		data_in_cksumval;
 	FILE		*data_in_pipef;
 } data_in_t;
@@ -2266,7 +2267,8 @@ read_chunk(int ifd, char *buffer, size_t datasize, data_in_t *data_in_info)
  *		and copy to the buffer.
  * rdblocksz	- The size of the chunk of data to read.
  *
- * return 0 upon success.
+ * Return number of bytes failed to read.
+ * Return -1 when buffer is empty and read failed.
  */
 static int
 read_bytes(int ifd, char *buf, size_t bytes, size_t rdblocksz,
@@ -2281,17 +2283,21 @@ read_bytes(int ifd, char *buf, size_t bytes, size_t rdblocksz,
 		 * or the archive file.  read_chunk() will only return
 		 * <= 0 if data_copy() was called from data_pass().
 		 */
-		errno = 0;
 		if ((got = read_chunk(ifd, buf + bytesread,
 		    min(bytes - bytesread, rdblocksz),
 		    data_in_info)) <= 0) {
-			data_in_info->data_in_errno = errno;
 			/*
+			 * We come here only in the pass mode.
 			 * If data couldn't be read from the input file
-			 * descriptor, set corrupt to indicate the error
-			 * and return.
+			 * descriptor, return number of bytes in the buf.
+			 * If buffer is empty, return -1.
 			 */
-			return (-1);
+			if (bytesread == 0) {
+				if (got == 0) /* EOF */
+					data_in_info->data_in_rd_eof = 1;
+				return (-1);
+			}
+			return (bytes - bytesread);
 		}
 	}
 	return (0);
@@ -2311,6 +2317,7 @@ write_bytes(int ofd, char *buf, size_t maxwrite, data_in_t *data_in_info)
 {
 	ssize_t	cnt;
 
+	errno = 0;
 	if ((cnt = write(ofd, buf, maxwrite)) < (ssize_t)maxwrite) {
 		data_in_info->data_in_errno = errno;
 		/*
@@ -2319,9 +2326,8 @@ write_bytes(int ofd, char *buf, size_t maxwrite, data_in_t *data_in_info)
 		 * requested so that we know that the rest of the file's
 		 * data can be read but not written.
 		 */
-		if (cnt != -1 && data_in_info != NULL) {
-			data_in_info->data_in_partialflg = 1;
-		}
+		if (cnt != -1)
+			data_in_info->data_in_wr_part = 1;
 		return (1);
 	} else if (Args & OCp) {
 		Blocks += (u_longlong_t)((cnt + (Bufsize - 1)) / Bufsize);
@@ -2346,10 +2352,9 @@ static int
 rdwr_bytes(int ifd, int ofd, char *buf, off_t bytes,
     size_t wrblocksz, size_t rdblocksz, data_in_t *data_in_info)
 {
-	int rv;
+	int rv, sz;
 	int error = 0;
-	int write_it = (data_in_info == NULL ||
-	    data_in_info->data_in_proc_mode != P_SKIP);
+	int write_it = (data_in_info->data_in_proc_mode != P_SKIP);
 
 	while (bytes > 0) {
 		/*
@@ -2362,12 +2367,13 @@ rdwr_bytes(int ifd, int ofd, char *buf, off_t bytes,
 			wrblocksz = bytes;
 
 		/* Read input till satisfy output block size */
-		rv = read_bytes(ifd, buf, wrblocksz, rdblocksz, data_in_info);
-		if (rv != 0)
-			return (rv);
+		sz = read_bytes(ifd, buf, wrblocksz, rdblocksz, data_in_info);
+		if (sz < 0)
+			return (sz);
 
 		if (write_it) {
-			rv = write_bytes(ofd, buf, wrblocksz, data_in_info);
+			rv = write_bytes(ofd, buf,
+			    wrblocksz - sz, data_in_info);
 			if (rv != 0) {
 				/*
 				 * If we wrote partial, we return and quits.
@@ -2375,7 +2381,7 @@ rdwr_bytes(int ifd, int ofd, char *buf, off_t bytes,
 				 * to go to the next file.
 				 */
 				if ((Args & OCp) ||
-				    data_in_info->data_in_partialflg) {
+				    data_in_info->data_in_wr_part) {
 					return (rv);
 				} else {
 					write_it = 0;
@@ -2383,7 +2389,7 @@ rdwr_bytes(int ifd, int ofd, char *buf, off_t bytes,
 				error = 1;
 			}
 		}
-		bytes -= wrblocksz;
+		bytes -= (wrblocksz - sz);
 	}
 	return (error);
 }
@@ -2559,10 +2565,10 @@ errout:
 			/*
 			 * Return if we got a read error or in pass mode,
 			 * or failed with partial write. Otherwise, we'll
-			 * read through the input till next file.
+			 * read through the input stream till next file.
 			 */
 			if (rv < 0 || (Args & OCp) ||
-			    data_in_info->data_in_partialflg) {
+			    data_in_info->data_in_wr_part) {
 				free(buf);
 				return (rv);
 			}
@@ -2577,7 +2583,7 @@ errout:
 	 * We should read through the input data to go to the next
 	 * header when non-fatal error occured.
 	 */
-	if (error) {
+	if (error && !(Args & OCp)) {
 		data_in_info->data_in_proc_mode = P_SKIP;
 		while (hl != NULL) {
 			datasize = hl->hl_hole - hl->hl_data;
@@ -2694,12 +2700,8 @@ data_in(int proc_mode)
 	}
 
 	data_in_info = e_zalloc(E_EXIT, sizeof (data_in_t));
-	data_in_info->data_in_errno = 0;
 	data_in_info->data_in_swapfile = swapfile;
 	data_in_info->data_in_proc_mode = proc_mode;
-	data_in_info->data_in_partialflg = 0;
-	data_in_info->data_in_cksumval = 0L;
-	data_in_info->data_in_compress_flag = 0;
 
 	filesz = G_p->g_filesz;
 
@@ -2751,16 +2753,9 @@ data_in(int proc_mode)
 	if (rv != 0 || error) {
 		errno = data_in_info->data_in_errno;
 
-		if (data_in_info->data_in_partialflg) {
-			msg(EXTN, "Cannot write \"%s%s%s\"",
-			    (G_p->g_attrnam_p == NULL) ? "" :
-			    G_p->g_attrfnam_p,
-			    (G_p->g_attrnam_p == NULL) ? "" :
-			    G_p->g_rw_sysattr ?
-			    gettext(" System Attribute ") :
-			    gettext(" Attribute "), nam_p);
-		} else if (!error) {
-			msg(ERRN, "Cannot write \"%s%s%s\"",
+		if (!error) {
+			msg(data_in_info->data_in_wr_part ? EXTN : ERRN,
+			    "Cannot write \"%s%s%s\"",
 			    (G_p->g_attrnam_p == NULL) ? "" :
 			    G_p->g_attrfnam_p,
 			    (G_p->g_attrnam_p == NULL) ? "" :
@@ -2768,7 +2763,6 @@ data_in(int proc_mode)
 			    gettext(" System Attribute ") :
 			    gettext(" Attribute "), nam_p);
 		}
-
 		/*
 		 * We've failed to write to the file, and input data
 		 * has been skiped to the next file. We'll need to restore
@@ -3250,6 +3244,7 @@ data_pass(void)
 	int cstatus;
 	char *namep = Nam_p;
 	holes_info_t *holes = NULL;
+	data_in_t *data_in_info;
 
 	if (G_p->g_attrnam_p != NULL) {
 		namep = G_p->g_attrnam_p;
@@ -3279,23 +3274,43 @@ data_pass(void)
 		return;
 	}
 
+	data_in_info = e_zalloc(E_EXIT, sizeof (data_in_t));
+	data_in_info->data_in_proc_mode = P_PROC;
+
 	if (S_ISREG(G_p->g_mode))
 		holes = get_holes_info(Ifile, G_p->g_filesz, B_TRUE);
 
 	if (holes != NULL) {
 		rv = data_copy_with_holes(Ifile, Ofile,
 		    (G_p->g_attrnam_p == NULL) ? 0 : G_p->g_rw_sysattr,
-		    G_p->g_filesz, Bufsize, NULL, holes);
+		    G_p->g_filesz, Bufsize, data_in_info, holes);
 
 		free_holes_info(holes);
 	} else {
 		rv = data_copy(Ifile, Ofile,
 		    (G_p->g_attrnam_p == NULL) ? 0 : G_p->g_rw_sysattr,
-		    G_p->g_filesz, Bufsize, NULL);
+		    G_p->g_filesz, Bufsize, data_in_info);
 	}
-	if (rv != 0) {
-		/* read error */
-		if (rv < 0) {
+
+	if (rv < 0) {
+		/* read error or unexpected EOF */
+		if (data_in_info->data_in_rd_eof) {
+			/*
+			 * read has reached EOF unexpectedly, but this isn't
+			 * an error since it's the latest shape of the file.
+			 */
+			msg(EPOST, "File size of \"%s%s%s\" has decreased",
+			    (G_p->g_attrnam_p == NULL) ?
+			    Nam_p : G_p->g_attrfnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p);
+
+			/* It's not error. We'll use the new file */
+			rv = 0;
+		} else {
+			/* read error */
 			msg(ERRN, "Cannot read \"%s%s%s\"",
 			    (G_p->g_attrnam_p == NULL) ?
 			    Nam_p : G_p->g_attrfnam_p,
@@ -3303,27 +3318,26 @@ data_pass(void)
 			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
 			    gettext(" Attribute "),
 			    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p);
+		}
+	} else if (rv > 0) {
 		/* write error */
-		} else if (rv > 0) {
-			if (Do_rename) {
-				msg(ERRN, "Cannot write \"%s%s%s\"", Over_p,
-				    (G_p->g_attrnam_p == NULL) ? "" :
-				    G_p->g_rw_sysattr ?
-				    gettext(" System Attribute ") :
-				    gettext(" Attribute "),
-				    (G_p->g_attrnam_p == NULL) ? "" : Over_p);
-			} else {
-				msg(ERRN, "Cannot write \"%s%s%s\"",
-				    Fullnam_p,
-				    (G_p->g_attrnam_p == NULL) ? "" :
-				    G_p->g_rw_sysattr ?
-				    gettext(" System Attribute ") :
-				    gettext(" Attribute "),
-				    (G_p->g_attrnam_p == NULL) ?
-				    "" : G_p->g_attrnam_p);
-			}
+		if (Do_rename) {
+			msg(ERRN, "Cannot write \"%s%s%s\"", Over_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : Over_p);
+		} else {
+			msg(ERRN, "Cannot write \"%s%s%s\"",
+			    Fullnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p);
 		}
 	}
+
+	free(data_in_info);
 
 	if (rv == 0) {
 		rstfiles(U_OVER, G_p->g_passdirfd);
