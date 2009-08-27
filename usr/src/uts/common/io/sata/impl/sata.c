@@ -131,7 +131,7 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, int *, int);
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.44"};
+static char sata_rev_tag[] = {"1.45"};
 
 /*
  * SATA cb_ops functions
@@ -2069,8 +2069,17 @@ sata_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	sata_hba_inst = (sata_hba_inst_t *)(hba_tran->tran_hba_private);
 
 	/* Validate scsi device address */
+	/*
+	 * Note: tgt_free relates to the SCSA view of a device. If called, there
+	 * was a device at this address, so even if the sata framework internal
+	 * resources were alredy released because a device was detached,
+	 * this function should be executed as long as its actions do
+	 * not require the internal sata view of a device and the address
+	 * refers to a valid sata address.
+	 * Validating the address here means that we do not trust SCSA...
+	 */
 	if (sata_validate_scsi_address(sata_hba_inst, &sd->sd_address,
-	    &sata_device) != 0)
+	    &sata_device) == -1)
 		return;
 
 	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
@@ -3053,16 +3062,30 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason)
 
 	case -1:
 		/* Invalid address or invalid device type */
-		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
-		    "sata_scsi_start: reject command because "
-		    "dev type or address is invalid\n", NULL);
 		return (TRAN_BADPKT);
+	case 2:
+		/*
+		 * Valid address but device type is unknown - Chack if it is
+		 * in the reset state and therefore in an indeterminate state.
+		 */
+		sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
+		    &spx->txlt_sata_pkt->satapkt_device);
+		if (sdinfo != NULL && (sdinfo->satadrv_event_flags &
+		    (SATA_EVNT_DEVICE_RESET |
+		    SATA_EVNT_INPROC_DEVICE_RESET)) != 0) {
+			if (!ddi_in_panic()) {
+				spx->txlt_scsi_pkt->pkt_reason = CMD_INCOMPLETE;
+				*reason = CMD_INCOMPLETE;
+				SATADBG1(SATA_DBG_SCSI_IF,
+				    spx->txlt_sata_hba_inst,
+				    "sata_scsi_start: rejecting command "
+				    "because of device reset state\n", NULL);
+				return (TRAN_BUSY);
+			}
+		}
+		/* FALLTHROUGH */
 	case 1:
-		/* valid address but no device - it has disappeared ? */
-		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
-		    "sata_scsi_start: reject command because "
-		    "device is gone\n", NULL);
-
+		/* valid address but no valid device - it has disappeared */
 		spx->txlt_scsi_pkt->pkt_reason = CMD_DEV_GONE;
 		*reason = CMD_DEV_GONE;
 		/*
@@ -3743,8 +3766,8 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 
 /*
  * SATA translate command: Test Unit Ready
- * At the moment this is an emulated command (ATA version for SATA hard disks).
- * May be translated into Check Power Mode command in the future
+ * (ATA version for SATA hard disks).
+ * It is translated into the Check Power Mode command.
  *
  * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
  */
@@ -4145,8 +4168,8 @@ err_out:
 	}
 
 	/*
-	 * since it was synchronous commands,
-	 * a callback function will be called directely.
+	 * Since it was a synchronous command,
+	 * a callback function will be called directly.
 	 */
 	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
 	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
@@ -7891,7 +7914,7 @@ sata_build_lsense_page_30(
 
 /*
  * sata_build_lsense_page_0e() is used to create the
- * SCSI LOG SENSE page 0e (supported log pages)
+ * SCSI LOG SENSE page 0e (start-stop cycle counter page)
  *
  * Date of Manufacture (0x0001)
  *	YEAR = "0000"
@@ -10883,7 +10906,8 @@ invalid_address:
  * SCSI target address is translated into SATA cport/pmport and compared
  * with a controller port/device configuration. LUN has to be 0.
  * Returns 0 if a scsi target refers to an attached device,
- * returns 1 if address is valid but device is not attached,
+ * returns 1 if address is valid but no valid device is attached,
+ * returns 2 if address is valid but device type is unknown (not valid device),
  * returns -1 if bad address or device is of an unsupported type.
  * Upon return sata_device argument is set.
  *
@@ -10913,6 +10937,11 @@ sata_validate_scsi_address(sata_hba_inst_t *sata_hba_inst,
 		sata_pmult_info_t *pmultinfo;
 		sata_drive_info_t *sdinfo = NULL;
 
+		sata_device->satadev_addr.qual = qual;
+		sata_device->satadev_addr.cport = cport;
+		sata_device->satadev_addr.pmport = pmport;
+		sata_device->satadev_rev = SATA_DEVICE_REV_1;
+
 		rval = 1;	/* Valid sata address */
 
 		cportinfo = SATA_CPORT_INFO(sata_hba_inst, cport);
@@ -10921,12 +10950,18 @@ sata_validate_scsi_address(sata_hba_inst_t *sata_hba_inst,
 			    cportinfo->cport_dev_type == SATA_DTYPE_NONE)
 				goto out;
 
+			sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
+			if (cportinfo->cport_dev_type == SATA_DTYPE_UNKNOWN &&
+			    sdinfo != NULL) {
+				rval = 2;
+				goto out;
+			}
+
 			if ((cportinfo->cport_dev_type &
 			    SATA_VALID_DEV_TYPE) == 0) {
 				rval = -1;
 				goto out;
 			}
-			sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
 
 		} else if (qual == SATA_ADDR_DPMPORT) {
 			pmultinfo = SATA_CPORTINFO_PMULT_INFO(cportinfo);
@@ -10942,6 +10977,18 @@ sata_validate_scsi_address(sata_hba_inst_t *sata_hba_inst,
 
 			sdinfo = SATA_PMPORT_DRV_INFO(sata_hba_inst, cport,
 			    pmport);
+			if (SATA_PMPORT_DEV_TYPE(sata_hba_inst, cport,
+			    pmport) == SATA_DTYPE_UNKNOWN && sdinfo != NULL) {
+				rval = 2;
+				goto out;
+			}
+
+			if ((SATA_PMPORT_DEV_TYPE(sata_hba_inst, cport,
+			    pmport) && SATA_VALID_DEV_TYPE) == 0) {
+				rval = -1;
+				goto out;
+			}
+
 		} else {
 			rval = -1;
 			goto out;
@@ -10951,14 +10998,11 @@ sata_validate_scsi_address(sata_hba_inst_t *sata_hba_inst,
 			goto out;
 
 		sata_device->satadev_type = sdinfo->satadrv_type;
-		sata_device->satadev_addr.qual = qual;
-		sata_device->satadev_addr.cport = cport;
-		sata_device->satadev_addr.pmport = pmport;
-		sata_device->satadev_rev = SATA_DEVICE_REV_1;
+
 		return (0);
 	}
 out:
-	if (rval == 1) {
+	if (rval > 0) {
 		SATADBG2(SATA_DBG_SCSI_IF, sata_hba_inst,
 		    "sata_validate_scsi_address: no valid target %x lun %x",
 		    ap->a_target, ap->a_lun);
@@ -11158,6 +11202,7 @@ sata_probe_device(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	    sata_device->satadev_addr.cport)));
 	return (rval);
 }
+
 
 /*
  * Get pointer to sata_drive_info structure.
@@ -12259,6 +12304,7 @@ sata_free_dma_resources(sata_pkt_t *sata_pkt)
 
 	sata_common_free_dma_rsrcs(spx);
 }
+
 /*
  * Fetch Device Identify data.
  * Send DEVICE IDENTIFY or IDENTIFY PACKET DEVICE (depending on a device type)
@@ -12993,7 +13039,7 @@ sata_ioctl_disconnect(sata_hba_inst_t *sata_hba_inst,
 	sata_cport_info_t *cportinfo = NULL;
 	sata_pmport_info_t *pmportinfo = NULL;
 	sata_pmult_info_t *pmultinfo = NULL;
-	sata_device_t 		subsdevice;
+	sata_device_t subsdevice;
 	int cport, pmport, qual;
 	int rval = SATA_SUCCESS;
 	int npmport = 0;

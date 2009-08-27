@@ -172,8 +172,6 @@ struct nv_port {
 	timeout_id_t	nvp_timeout_id;
 
 	clock_t		nvp_reset_time;	/* time of last reset */
-	clock_t		nvp_probe_time;	/* time when probe began */
-	clock_t		nvp_link_lost_time; /* time link lost was noticed */
 
 	int		nvp_state; /* state of port. flags defined below */
 
@@ -183,6 +181,14 @@ struct nv_port {
 #ifdef SGPIO_SUPPORT
 	uint8_t		nvp_sgp_ioctl_mod; /* LEDs modified by ioctl */
 #endif
+	int		nvp_timeout_duration;
+
+	uint8_t		nvp_last_cmd;
+	uint8_t		nvp_previous_cmd;
+	int		nvp_reset_count;
+	clock_t		intr_duration;	/* max length of port intr (ticks) */
+	clock_t		intr_start_time;
+	int		intr_loop_cnt;
 };
 
 
@@ -272,7 +278,7 @@ struct nv_sgp_cbp2cmn {
 #define	NVDBG_ERRS	0x0800
 #define	NVDBG_COOKIES	0x1000
 #define	NVDBG_HOT	0x2000
-#define	NVDBG_PROBE	0x4000
+#define	NVDBG_RESET	0x4000
 #define	NVDBG_ATAPI	0x8000
 
 #ifdef DEBUG
@@ -318,7 +324,9 @@ struct nv_sgp_cbp2cmn {
 #define	ATDC_D3		0x08	/* mysterious bit */
 #define	ATDC_HOB	0x80	/* high order byte to read 48-bit values */
 
-
+/*
+ * MCP5x NCQ and INTR control registers
+ */
 #define	MCP5X_CTL		0x400 /* queuing control */
 #define	MCP5X_INT_STATUS	0x440 /* status bits for interrupt */
 #define	MCP5X_INT_CTL		0x444 /* enable bits for interrupt */
@@ -576,34 +584,51 @@ typedef struct prde {
 #define	NV_QUEUE_SLOTS	1
 #endif
 
-/*
- * wait 30 seconds for signature
- */
-#define	NV_SIG_TIMEOUT		45
-
 #define	NV_BM_64K_BOUNDARY	0x10000ull
 
-/*
- * every 1 second
- */
-#define	NV_ONE_SEC	1000000
-
+#define	NV_MAX_INTR_PER_DEV	20	/* Empirical value */
 
 /*
- * the amount of time link can be down during
- * reset without taking action.
+ * 1 second (in microseconds)
  */
-#define	NV_LINK_LOST_OK	2
+#define	NV_ONE_SEC		1000000
 
 /*
- * nv_reset() flags
+ * 1 millisecond (in microseconds)
  */
-#define	NV_RESET_SEND_EVENT	0x1 /* send reset event to sata module */
-#define	NV_RESET_WAIT		0x2 /* OK to block waiting for reset */
+#define	NV_ONE_MSEC		1000
 
+/*
+ * Length of port reset (microseconds) - SControl bit 0 set to 1
+ */
+#define	NV_RESET_LENGTH		1000
 
+#define	NV_RESET_ATTEMPTS	3
 
-#define	NV_RESET_ATTEMPTS 3
+/*
+ * The maximum amount of time (milliseconds) a link can be down during
+ * reset without assuming that there is no device attached.
+ */
+#define	NV_LINK_DOWN_TIMEOUT	10
+
+/*
+ * The maximum amount of time (milliseconds) the signature acquisition can
+ * drag on before it is terminated.
+ * Some disks have very long acquisition times after hotplug, related to
+ * to spinning-up and reading some data from a media.
+ * The value below is empirical (20s)
+ *
+ */
+#define	NV_SIG_ACQUISITION_TIME	20000
+
+/*
+ * Minimum amount of time (milliseconds) to delay reporting hotplug
+ * (device added) event.
+ * It is the time allowed for a drive to initialize and to send a D2H FIS with
+ * a device signature.
+ * It varies between drives from a few milliseconds up to 20s.
+ */
+#define	NV_HOTPLUG_DELAY	20000
 
 /*
  * nvp_state flags
@@ -614,8 +639,10 @@ typedef struct prde {
 #define	NV_PORT_INIT		0x008
 #define	NV_PORT_FAILED		0x010
 #define	NV_PORT_RESET		0x020
-#define	NV_PORT_RESET_PROBE	0x040
+#define	NV_PORT_RESET_RETRY	0x040
 #define	NV_PORT_RESTORE		0x080
+#define	NV_PORT_PROBE		0x100
+#define	NV_PORT_HOTPLUG_DELAY	0x200
 
 /*
  * nvc_state flags
