@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,13 +79,12 @@ static int issue_uscsi_cmd(int file, struct uscsi_cmd *command, int flag);
 static int
 wait_random_time(void)
 {
-time_t		timeval;
-struct tm	*tmbuf = NULL;
-struct timeval	tval;
-unsigned int	seed;
-int		random;
-pid_t		pid;
-
+	time_t		timeval;
+	struct tm	*tmbuf = NULL;
+	struct timeval	tval;
+	unsigned int	seed;
+	int		random;
+	pid_t		pid;
 
 	/*
 	 * Get the system time and use "system seconds"
@@ -141,26 +140,23 @@ string_dump(char *hdr, uchar_t *src, int nbytes, int format, char msg_string[])
 
 	p = hdr;
 	while (nbytes > 0) {
-		(void) sprintf(&msg_string[strlen(msg_string)],
-			"%s", p);
+		(void) sprintf(&msg_string[strlen(msg_string)], "%s", p);
 		p = s;
 		n = MIN(nbytes, BYTES_PER_LINE);
 		for (i = 0; i < n; i++) {
 			(void) sprintf(&msg_string[strlen(msg_string)],
-				"%02x ",
-				src[i] & 0xff);
+			    "%02x ", src[i] & 0xff);
 		}
 		if (format == HEX_ASCII) {
 			for (i = BYTES_PER_LINE-n; i > 0; i--) {
 				(void) sprintf(&msg_string[strlen(msg_string)],
-					"   ");
+				    "   ");
 			}
 			(void) sprintf(&msg_string[strlen(msg_string)],
-				"    ");
+			    "    ");
 			for (i = 0; i < n; i++) {
 				(void) sprintf(&msg_string[strlen(msg_string)],
-					"%c",
-					isprint(src[i]) ? src[i] : '.');
+				    "%c", isprint(src[i]) ? src[i] : '.');
 			}
 		}
 		(void) sprintf(&msg_string[strlen(msg_string)], "\n");
@@ -174,15 +170,15 @@ string_dump(char *hdr, uchar_t *src, int nbytes, int format, char msg_string[])
 static char *
 scsi_find_command_name(int cmd)
 {
-/*
- * Names of commands.  Must have SCMD_UNKNOWN at end of list.
- */
-struct scsi_command_name {
-	int command;
-	char	*name;
-} scsi_command_names[29];
+	/*
+	 * Names of commands.  Must have SCMD_UNKNOWN at end of list.
+	 */
+	struct scsi_command_name {
+		int command;
+		char	*name;
+	} scsi_command_names[29];
 
-register struct scsi_command_name *c;
+	register struct scsi_command_name *c;
 
 	scsi_command_names[0].command = SCMD_TEST_UNIT_READY;
 	scsi_command_names[0].name = MSGSTR(61, "Test Unit Ready");
@@ -299,10 +295,9 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq,
 		break;
 	case KEY_NOT_READY:
 		(void) sprintf(msg_string,
-			MSGSTR(10503,
-			"Device Not ready."
-			" Error: Random Retry Failed: %s\n."),
-			err_string);
+		    MSGSTR(10503,
+		    "Device Not ready. Error: Random Retry Failed: %s\n."),
+		    err_string);
 		break;
 	case KEY_MEDIUM_ERROR:
 		(void) sprintf(msg_string, MSGSTR(99, "Medium error"));
@@ -315,9 +310,9 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq,
 		break;
 	case KEY_UNIT_ATTENTION:
 		(void) sprintf(msg_string,
-			MSGSTR(10504,
-			"Unit attention."
-			"Error: Random Retry Failed.\n"));
+		    MSGSTR(10504,
+		    "Unit attention."
+		    "Error: Random Retry Failed.\n"));
 		break;
 	case KEY_WRITE_PROTECT:
 		(void) sprintf(msg_string, MSGSTR(52, "Write protect error"));
@@ -333,9 +328,8 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq,
 		break;
 	case KEY_ABORTED_COMMAND:
 		(void) sprintf(msg_string,
-			MSGSTR(10505,
-			"Aborted command."
-			" Error: Random Retry Failed.\n"));
+		    MSGSTR(10505,
+		    "Aborted command. Error: Random Retry Failed.\n"));
 		break;
 	case KEY_EQUAL:
 		(void) sprintf(msg_string, MSGSTR(117, "Equal error"));
@@ -348,7 +342,7 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq,
 		break;
 	case KEY_RESERVED:
 		(void) sprintf(msg_string, MSGSTR(10506,
-			"Reserved value found"));
+		    "Reserved value found"));
 		break;
 	default:
 		(void) sprintf(msg_string, MSGSTR(59, "Unknown error"));
@@ -356,37 +350,37 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq,
 	}
 
 	(void) sprintf(&msg_string[strlen(msg_string)],
-		MSGSTR(10507, " during: %s"),
-		scsi_find_command_name(ucmd->uscsi_cdb[0]));
+	    MSGSTR(10507, " during: %s"),
+	    scsi_find_command_name(ucmd->uscsi_cdb[0]));
 
 	if (rq->es_valid) {
 		blkno = (rq->es_info_1 << 24) | (rq->es_info_2 << 16) |
-			(rq->es_info_3 << 8) | rq->es_info_4;
+		    (rq->es_info_3 << 8) | rq->es_info_4;
 		(void) sprintf(&msg_string[strlen(msg_string)],
-			MSGSTR(49, ": block %d (0x%x)"), blkno, blkno);
+		    MSGSTR(49, ": block %d (0x%x)"), blkno, blkno);
 	}
 
 	(void) sprintf(&msg_string[strlen(msg_string)], "\n");
 
 	if (rq->es_add_len >= 6) {
 		(void) sprintf(&msg_string[strlen(msg_string)],
-		MSGSTR(132, "  Additional sense: 0x%x   ASC Qualifier: 0x%x\n"),
-			rq->es_add_code, rq->es_qual_code);
-			/*
-			 * rq->es_add_info[ADD_SENSE_CODE],
-			 * rq->es_add_info[ADD_SENSE_QUAL_CODE]);
-			 */
+		    MSGSTR(132, "  Additional sense: 0x%x   "
+		    "ASC Qualifier: 0x%x\n"),
+		    rq->es_add_code, rq->es_qual_code);
+		/*
+		 * rq->es_add_info[ADD_SENSE_CODE],
+		 * rq->es_add_info[ADD_SENSE_QUAL_CODE]);
+		 */
 	}
 	if (rq->es_key == KEY_ILLEGAL_REQUEST) {
 		string_dump(MSGSTR(47, " cmd:   "), (uchar_t *)ucmd,
-			sizeof (struct uscsi_cmd), HEX_ONLY, msg_string);
+		    sizeof (struct uscsi_cmd), HEX_ONLY, msg_string);
 		string_dump(MSGSTR(48, " cdb:   "),
-			(uchar_t *)ucmd->uscsi_cdb,
-			ucmd->uscsi_cdblen, HEX_ONLY, msg_string);
+		    (uchar_t *)ucmd->uscsi_cdb,
+		    ucmd->uscsi_cdblen, HEX_ONLY, msg_string);
 	}
 	string_dump(MSGSTR(43, " sense:  "),
-		(uchar_t *)rq, 8 + rq->es_add_len, HEX_ONLY,
-		msg_string);
+	    (uchar_t *)rq, 8 + rq->es_add_len, HEX_ONLY, msg_string);
 	rqlen = rqlen;	/* not used */
 }
 
@@ -397,9 +391,9 @@ scsi_printerr(struct uscsi_cmd *ucmd, struct scsi_extended_sense *rq,
 static int
 issue_uscsi_cmd(int file, struct uscsi_cmd *command, int flag)
 {
-struct scsi_extended_sense	*rqbuf;
-int				status, i, retry_cnt = 0, err;
-char				errorMsg[MAXLEN];
+	struct scsi_extended_sense	*rqbuf;
+	int				status, i, retry_cnt = 0, err;
+	char				errorMsg[MAXLEN];
 
 	/*
 	 * Set function flags for driver.
@@ -416,8 +410,8 @@ char				errorMsg[MAXLEN];
 	/* print command for debug */
 	if (getenv("_LUX_S_DEBUG") != NULL) {
 		if ((command->uscsi_cdb == NULL) ||
-			(flag & USCSI_RESET) ||
-			(flag & USCSI_RESET_ALL)) {
+		    (flag & USCSI_RESET) ||
+		    (flag & USCSI_RESET_ALL)) {
 			if (flag & USCSI_RESET) {
 				(void) printf("  Issuing a SCSI Reset.\n");
 			}
@@ -427,23 +421,23 @@ char				errorMsg[MAXLEN];
 
 		} else {
 			(void) printf("  Issuing the following "
-				"SCSI command: %s\n",
-			scsi_find_command_name(command->uscsi_cdb[0]));
+			    "SCSI command: %s\n",
+			    scsi_find_command_name(command->uscsi_cdb[0]));
 			(void) printf("	fd=0x%x cdb=", file);
 			for (i = 0; i < (int)command->uscsi_cdblen; i++) {
 				(void) printf("%x ", *(command->uscsi_cdb + i));
 			}
 			(void) printf("\n\tlen=0x%x bufaddr=0x%x buflen=0x%x"
-				" flags=0x%x\n",
-			command->uscsi_cdblen,
-			command->uscsi_bufaddr,
-			command->uscsi_buflen, command->uscsi_flags);
+			    " flags=0x%x\n",
+			    command->uscsi_cdblen,
+			    command->uscsi_bufaddr,
+			    command->uscsi_buflen, command->uscsi_flags);
 
 			if ((command->uscsi_buflen > 0) &&
-				((flag & USCSI_READ) == 0)) {
+			    ((flag & USCSI_READ) == 0)) {
 				(void) dump_hex_data("  Buffer data: ",
-				(uchar_t *)command->uscsi_bufaddr,
-				MIN(command->uscsi_buflen, 512), HEX_ASCII);
+				    (uchar_t *)command->uscsi_bufaddr,
+				    MIN(command->uscsi_buflen, 512), HEX_ASCII);
 			}
 		}
 		(void) fflush(stdout);
@@ -463,19 +457,19 @@ retry:
 	if (status == 0 && command->uscsi_status == 0) {
 		if (getenv("_LUX_S_DEBUG") != NULL) {
 			if ((command->uscsi_buflen > 0) &&
-				(flag & USCSI_READ)) {
+			    (flag & USCSI_READ)) {
 				(void) dump_hex_data("\tData read:",
-				(uchar_t *)command->uscsi_bufaddr,
-				MIN(command->uscsi_buflen, 512), HEX_ASCII);
+				    (uchar_t *)command->uscsi_bufaddr,
+				    MIN(command->uscsi_buflen, 512), HEX_ASCII);
 			}
 		}
 		return (status);
 	}
 	if ((status != 0) && (command->uscsi_status == 0)) {
 		if ((getenv("_LUX_S_DEBUG") != NULL) ||
-			(getenv("_LUX_ER_DEBUG") != NULL)) {
+		    (getenv("_LUX_ER_DEBUG") != NULL)) {
 			(void) printf("Unexpected USCSICMD ioctl error: %s\n",
-				strerror(errno));
+			    strerror(errno));
 		}
 		return (status);
 	}
@@ -494,7 +488,7 @@ retry:
 		case KEY_NOT_READY:
 			if (retry_cnt++ < 1) {
 				ER_DPRINTF("Note: Device Not Ready."
-						" Retrying...\n");
+				    " Retrying...\n");
 
 				if ((err = wait_random_time()) == 0) {
 					goto retry;
@@ -523,11 +517,11 @@ retry:
 			break;
 		}
 		if ((getenv("_LUX_S_DEBUG") != NULL) ||
-			(getenv("_LUX_ER_DEBUG") != NULL)) {
+		    (getenv("_LUX_ER_DEBUG") != NULL)) {
 			scsi_printerr(command,
-			(struct scsi_extended_sense *)command->uscsi_rqbuf,
-			(command->uscsi_rqlen - command->uscsi_rqresid),
-				errorMsg, strerror(errno));
+			    (struct scsi_extended_sense *)command->uscsi_rqbuf,
+			    (command->uscsi_rqlen - command->uscsi_rqresid),
+			    errorMsg, strerror(errno));
 		}
 
 	} else {
@@ -547,8 +541,8 @@ retry:
 			if (retry_cnt++ < 5) {
 				if ((err = wait_random_time()) == 0) {
 					R_DPRINTF("  cmd(): No. of retries %d."
-					" STATUS_BUSY: Retrying...\n",
-					retry_cnt);
+					    " STATUS_BUSY: Retrying...\n",
+					    retry_cnt);
 					goto retry;
 
 				} else {
@@ -574,7 +568,7 @@ retry:
 		case STATUS_TERMINATED:
 			if (retry_cnt++ < 1) {
 				R_DPRINTF("Note: Command Terminated."
-					" Retrying...\n");
+				    " Retrying...\n");
 
 				if ((err = wait_random_time()) == 0) {
 					goto retry;
@@ -600,8 +594,8 @@ retry:
 
 	}
 	if (((getenv("_LUX_S_DEBUG") != NULL) ||
-		(getenv("_LUX_ER_DEBUG") != NULL)) &&
-		(errorMsg[0] != '\0')) {
+	    (getenv("_LUX_ER_DEBUG") != NULL)) &&
+	    (errorMsg[0] != '\0')) {
 		(void) fprintf(stdout, "  %s\n", errorMsg);
 	}
 	return (L_SCSI_ERROR | command->uscsi_status);
@@ -621,12 +615,12 @@ scsi_mode_sense_cmd(int fd,
 	uchar_t pc,
 	uchar_t page_code)
 {
-struct uscsi_cmd	ucmd;
-/* 10 byte Mode Select cmd */
-union scsi_cdb	cdb =  {SCMD_MODE_SENSE_G1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-struct	scsi_extended_sense	sense;
-int		status;
-static	int	uscsi_count;
+	struct uscsi_cmd	ucmd;
+	/* 10 byte Mode Select cmd */
+	union scsi_cdb	cdb =  {SCMD_MODE_SENSE_G1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	struct	scsi_extended_sense	sense;
+	int		status;
+	static	int	uscsi_count;
 
 	if ((fd < 0) || (buf_ptr == NULL) || (buf_len < 0)) {
 		return (-1); /* L_INVALID_ARG */
@@ -636,7 +630,7 @@ static	int	uscsi_count;
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
 	/* Just for me  - a sanity check */
 	if ((page_code > MODEPAGE_ALLPAGES) || (pc > 3) ||
-		(buf_len > MAX_MODE_SENSE_LEN)) {
+	    (buf_len > MAX_MODE_SENSE_LEN)) {
 		return (-1); /* L_ILLEGAL_MODE_SENSE_PAGE */
 	}
 	cdb.g1_addr3 = (pc << 6) + page_code;
@@ -657,8 +651,8 @@ static	int	uscsi_count;
 		S_DPRINTF("  Number of bytes read on "
 		"Mode Sense 0x%x\n", uscsi_count);
 		if (getenv("_LUX_D_DEBUG") != NULL) {
-		    (void) dump_hex_data("  Mode Sense data: ", buf_ptr,
-		    uscsi_count, HEX_ASCII);
+			(void) dump_hex_data("  Mode Sense data: ", buf_ptr,
+			    uscsi_count, HEX_ASCII);
 		}
 	}
 	return (status);
@@ -667,14 +661,14 @@ static	int	uscsi_count;
 int
 scsi_release(char *path)
 {
-struct uscsi_cmd	ucmd;
-union scsi_cdb		cdb = {SCMD_RELEASE, 0, 0, 0, 0, 0};
-struct	scsi_extended_sense	sense;
-int	fd, status;
+	struct uscsi_cmd	ucmd;
+	union scsi_cdb		cdb = {SCMD_RELEASE, 0, 0, 0, 0, 0};
+	struct	scsi_extended_sense	sense;
+	int	fd, status;
 
 	P_DPRINTF("  scsi_release: Release: Path %s\n", path);
 	if ((fd = open(path, O_NDELAY | O_RDONLY)) == -1)
-	    return (1);
+		return (1);
 
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
 
@@ -694,14 +688,14 @@ int	fd, status;
 int
 scsi_reserve(char *path)
 {
-struct uscsi_cmd	ucmd;
-union scsi_cdb	cdb = {SCMD_RESERVE, 0, 0, 0, 0, 0};
-struct	scsi_extended_sense	sense;
-int	fd, status;
+	struct uscsi_cmd	ucmd;
+	union scsi_cdb	cdb = {SCMD_RESERVE, 0, 0, 0, 0, 0};
+	struct	scsi_extended_sense	sense;
+	int	fd, status;
 
 	P_DPRINTF("  scsi_reserve: Reserve: Path %s\n", path);
 	if ((fd = open(path, O_NDELAY | O_RDONLY)) == -1)
-	    return (1);
+		return (1);
 
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
 
@@ -727,21 +721,23 @@ print_fabric_dtype_prop(uchar_t *hba_port_wwn, uchar_t *port_wwn,
 {
 	if ((dtype_prop & DTYPE_MASK) < 0x10) {
 		(void) fprintf(stdout, " 0x%-2x (%s)\n",
-		(dtype_prop & DTYPE_MASK), dtype[(dtype_prop & DTYPE_MASK)]);
+		    (dtype_prop & DTYPE_MASK),
+		    dtype[(dtype_prop & DTYPE_MASK)]);
 	} else if ((dtype_prop & DTYPE_MASK) < 0x1f) {
 		(void) fprintf(stdout,
-		MSGSTR(2096, " 0x%-2x (Reserved)\n"),
-		(dtype_prop & DTYPE_MASK));
+		    MSGSTR(2096, " 0x%-2x (Reserved)\n"),
+		    (dtype_prop & DTYPE_MASK));
 	} else {
 		/* Check to see if this is the HBA */
 		if (wwnConversion(hba_port_wwn) != wwnConversion(port_wwn)) {
 			(void) fprintf(stdout, MSGSTR(2097,
-			" 0x%-2x (Unknown Type)\n"), (dtype_prop & DTYPE_MASK));
+			    " 0x%-2x (Unknown Type)\n"),
+			    (dtype_prop & DTYPE_MASK));
 		} else {
 			/* MATCH */
 			(void) fprintf(stdout, MSGSTR(2241,
-			" 0x%-2x (Unknown Type,Host Bus Adapter)\n"),
-			(dtype_prop & DTYPE_MASK));
+			    " 0x%-2x (Unknown Type,Host Bus Adapter)\n"),
+			    (dtype_prop & DTYPE_MASK));
 		}
 	}
 }
@@ -751,13 +747,14 @@ void
 print_inq_data(char *arg_path, char *path, L_inquiry inq, uchar_t *serial,
     size_t serial_len)
 {
-char	**p;
-uchar_t	*v_parm;
-int	scsi_3, length;
-char	byte_number[MAXNAMELEN];
-static	char *scsi_inquiry_labels_2[21];
-static	char *scsi_inquiry_labels_3[22];
-static	char	*ansi_version[4];
+	char	**p;
+	uchar_t	*v_parm;
+	int	scsi_3, length;
+	char	byte_number[MAXNAMELEN];
+	static	char *scsi_inquiry_labels_2[21];
+	static	char *scsi_inquiry_labels_3[22];
+#define	MAX_ANSI_VERSION	6
+	static	char	*ansi_version[MAX_ANSI_VERSION];
 	/*
 	 * Intialize scsi_inquiry_labels_2 with i18n strings
 	 */
@@ -772,22 +769,22 @@ static	char	*ansi_version[4];
 	scsi_inquiry_labels_2[8] = MSGSTR(147, "ECMA version:               ");
 	scsi_inquiry_labels_2[9] = MSGSTR(148, "ANSI version:               ");
 	scsi_inquiry_labels_2[10] =
-		MSGSTR(2168, "Async event notification:   ");
+	    MSGSTR(2168, "Async event notification:   ");
 	scsi_inquiry_labels_2[11] =
-		MSGSTR(2169, "Terminate i/o process msg:  ");
+	    MSGSTR(2169, "Terminate i/o process msg:  ");
 	scsi_inquiry_labels_2[12] = MSGSTR(150, "Response data format:       ");
 	scsi_inquiry_labels_2[13] = MSGSTR(151, "Additional length:          ");
 	scsi_inquiry_labels_2[14] = MSGSTR(152, "Relative addressing:        ");
 	scsi_inquiry_labels_2[15] =
-		MSGSTR(2170, "32 bit transfers:           ");
+	    MSGSTR(2170, "32 bit transfers:           ");
 	scsi_inquiry_labels_2[16] =
-		MSGSTR(2171, "16 bit transfers:           ");
+	    MSGSTR(2171, "16 bit transfers:           ");
 	scsi_inquiry_labels_2[17] =
-		MSGSTR(2172, "Synchronous transfers:      ");
+	    MSGSTR(2172, "Synchronous transfers:      ");
 	scsi_inquiry_labels_2[18] = MSGSTR(153, "Linked commands:            ");
 	scsi_inquiry_labels_2[19] = MSGSTR(154, "Command queueing:           ");
 	scsi_inquiry_labels_2[20] =
-		MSGSTR(2173, "Soft reset option:          ");
+	    MSGSTR(2173, "Soft reset option:          ");
 
 	/*
 	 * Intialize scsi_inquiry_labels_3 with i18n strings
@@ -804,82 +801,86 @@ static	char	*ansi_version[4];
 	scsi_inquiry_labels_3[9] = MSGSTR(147, "ECMA version:               ");
 	scsi_inquiry_labels_3[10] = MSGSTR(148, "ANSI version:               ");
 	scsi_inquiry_labels_3[11] =
-		MSGSTR(2175, "Async event reporting:      ");
+	    MSGSTR(2175, "Async event reporting:      ");
 	scsi_inquiry_labels_3[12] =
-		MSGSTR(2176, "Terminate task:             ");
+	    MSGSTR(2176, "Terminate task:             ");
 	scsi_inquiry_labels_3[13] =
-		MSGSTR(2177, "Normal ACA Supported:       ");
+	    MSGSTR(2177, "Normal ACA Supported:       ");
 	scsi_inquiry_labels_3[14] = MSGSTR(150, "Response data format:       ");
 	scsi_inquiry_labels_3[15] = MSGSTR(151, "Additional length:          ");
 	scsi_inquiry_labels_3[16] =
-		MSGSTR(2178, "Cmd received on port:       ");
+	    MSGSTR(2178, "Cmd received on port:       ");
 	scsi_inquiry_labels_3[17] =
-		MSGSTR(2179, "SIP Bits:                   ");
+	    MSGSTR(2179, "SIP Bits:                   ");
 	scsi_inquiry_labels_3[18] = MSGSTR(152, "Relative addressing:        ");
 	scsi_inquiry_labels_3[19] = MSGSTR(153, "Linked commands:            ");
 	scsi_inquiry_labels_3[20] =
-		MSGSTR(2180, "Transfer Disable:           ");
+	    MSGSTR(2180, "Transfer Disable:           ");
 	scsi_inquiry_labels_3[21] = MSGSTR(154, "Command queueing:           ");
 
 	/*
 	 * Intialize scsi_inquiry_labels_3 with i18n strings
 	 */
 	ansi_version[0] = MSGSTR(2181,
-		" (Device might or might not comply to an ANSI version)");
+	    " (Device might or might not comply to an ANSI version)");
 	ansi_version[1] = MSGSTR(2182,
-		" (This code is reserved for historical uses)");
+	    " (This code is reserved for historical uses)");
 	ansi_version[2] = MSGSTR(2183,
-		" (Device complies to ANSI X3.131-1994 (SCSI-2))");
+	    " (Device complies to ANSI X3.131-1994 (SCSI-2))");
 	ansi_version[3] = MSGSTR(2184,
-		" (Device complies to SCSI-3)");
+	    " (Device complies to ANSI INCITS 301-1997 (SPC))");
+	ansi_version[4] = MSGSTR(2226,
+	    " (Device complies to ANSI INCITS 351-2001 (SPC-2))");
+	ansi_version[5] = MSGSTR(2227,
+	    " (Device complies to ANSI INCITS 408-2005 (SPC-3))");
 
-	    /* print inquiry information */
+	/* print inquiry information */
 
-	    (void) fprintf(stdout, MSGSTR(2185, "\nINQUIRY:\n"));
+	(void) fprintf(stdout, MSGSTR(2185, "\nINQUIRY:\n"));
 		/*
 		 * arg_path is the path sent to luxadm by the user.  if arg_path
 		 * is a /devices path, then we do not need to print out physical
 		 * path info
 		 */
-	    if (strcmp(arg_path, path) != 0 &&
-		strstr(arg_path, "/devices/") == NULL) {
+	if (strcmp(arg_path, path) != 0 &&
+	    strstr(arg_path, "/devices/") == NULL) {
 		(void) fprintf(stdout, "  ");
 		(void) fprintf(stdout,
-		MSGSTR(5, "Physical Path:"));
+		    MSGSTR(5, "Physical Path:"));
 		(void) fprintf(stdout, "\n  %s\n", path);
-	    }
-	    if (inq.inq_ansi < 3) {
+	}
+	if (inq.inq_ansi < 3) {
 		p = scsi_inquiry_labels_2;
 		scsi_3 = 0;
-	    } else {
+	} else {
 		p = scsi_inquiry_labels_3;
 		scsi_3 = 1;
-	    }
-	    if (inq.inq_len < 11) {
+	}
+	if (inq.inq_len < 11) {
 		p += 1;
-	    } else {
+	} else {
 		/* */
 		(void) fprintf(stdout, "%s", *p++);
 		print_chars(inq.inq_vid, sizeof (inq.inq_vid), 0);
 		(void) fprintf(stdout, "\n");
-	    }
-	    if (inq.inq_len < 27) {
+	}
+	if (inq.inq_len < 27) {
 		p += 1;
-	    } else {
+	} else {
 		(void) fprintf(stdout, "%s", *p++);
 		print_chars(inq.inq_pid, sizeof (inq.inq_pid), 0);
 		(void) fprintf(stdout, "\n");
-	    }
-	    if (inq.inq_len < 31) {
+	}
+	if (inq.inq_len < 31) {
 		p += 1;
-	    } else {
+	} else {
 		(void) fprintf(stdout, "%s", *p++);
 		print_chars(inq.inq_revision, sizeof (inq.inq_revision), 0);
 		(void) fprintf(stdout, "\n");
-	    }
-	    if (inq.inq_len < 39) {
+	}
+	if (inq.inq_len < 39) {
 		p += 2;
-	    } else {
+	} else {
 		/*
 		 * If Pluto then print
 		 * firmware rev & serial #.
@@ -887,7 +888,7 @@ static	char	*ansi_version[4];
 		if (strstr((char *)inq.inq_pid, "SSA") != 0) {
 			(void) fprintf(stdout, "%s", *p++);
 			print_chars(inq.inq_firmware_rev,
-				sizeof (inq.inq_firmware_rev), 0);
+			    sizeof (inq.inq_firmware_rev), 0);
 			(void) fprintf(stdout, "\n");
 			(void) fprintf(stdout, "%s", *p++);
 			print_chars(serial, serial_len, 0);
@@ -901,28 +902,27 @@ static	char	*ansi_version[4];
 			/* if we miss both the above if's */
 			p += 2;
 		}
-	    }
+	}
 
-	    (void) fprintf(stdout, "%s0x%x (",
-			*p++, (inq.inq_dtype & DTYPE_MASK));
-	    if ((inq.inq_dtype & DTYPE_MASK) < 0x10) {
+	(void) fprintf(stdout, "%s0x%x (", *p++, (inq.inq_dtype & DTYPE_MASK));
+	if ((inq.inq_dtype & DTYPE_MASK) < 0x10) {
 		(void) fprintf(stdout, "%s", dtype[inq.inq_dtype & DTYPE_MASK]);
-	    } else if ((inq.inq_dtype & DTYPE_MASK) < 0x1f) {
+	} else if ((inq.inq_dtype & DTYPE_MASK) < 0x1f) {
 		(void) fprintf(stdout, MSGSTR(71, "Reserved"));
-	    } else {
+	} else {
 		(void) fprintf(stdout, MSGSTR(2186, "Unknown device"));
-	    }
-	    (void) fprintf(stdout, ")\n");
+	}
+	(void) fprintf(stdout, ")\n");
 
-	    (void) fprintf(stdout, "%s", *p++);
-	    if (inq.inq_rmb != NULL) {
+	(void) fprintf(stdout, "%s", *p++);
+	if (inq.inq_rmb != NULL) {
 		(void) fprintf(stdout, MSGSTR(40, "yes"));
-	    } else {
+	} else {
 		(void) fprintf(stdout, MSGSTR(45, "no"));
-	    }
-	    (void) fprintf(stdout, "\n");
+	}
+	(void) fprintf(stdout, "\n");
 
-	    if (scsi_3) {
+	if (scsi_3) {
 		(void) fprintf(stdout, "%s", *p++);
 		if (inq.inq_mchngr != NULL) {
 			(void) fprintf(stdout, MSGSTR(40, "yes"));
@@ -930,25 +930,26 @@ static	char	*ansi_version[4];
 			(void) fprintf(stdout, MSGSTR(45, "no"));
 		}
 		(void) fprintf(stdout, "\n");
-	    }
-	    (void) fprintf(stdout, "%s%d\n", *p++, inq.inq_iso);
-	    (void) fprintf(stdout, "%s%d\n", *p++, inq.inq_ecma);
+	}
+	(void) fprintf(stdout, "%s%d\n", *p++, inq.inq_iso);
+	(void) fprintf(stdout, "%s%d\n", *p++, inq.inq_ecma);
 
-	    (void) fprintf(stdout, "%s%d", *p++, inq.inq_ansi);
-	    if (inq.inq_ansi < 0x4) {
+	(void) fprintf(stdout, "%s%d", *p++, inq.inq_ansi);
+	if (inq.inq_ansi < MAX_ANSI_VERSION) {
 		(void) fprintf(stdout, "%s", ansi_version[inq.inq_ansi]);
-	    } else
-		(void) fprintf(stdout, MSGSTR(71, "Reserved"));
-	    (void) fprintf(stdout, "\n");
+	} else
+		(void) fprintf(stdout, MSGSTR(71, " (Reserved)"));
 
-	    if (inq.inq_aenc) {
+	(void) fprintf(stdout, "\n");
+
+	if (inq.inq_aenc) {
 		(void) fprintf(stdout, "%s", *p++);
 		(void) fprintf(stdout, MSGSTR(40, "yes"));
 		(void) fprintf(stdout, "\n");
-	    } else {
+	} else {
 		p++;
-	    }
-	    if (scsi_3) {
+	}
+	if (scsi_3) {
 		(void) fprintf(stdout, "%s", *p++);
 		if (inq.inq_normaca != NULL) {
 			(void) fprintf(stdout, MSGSTR(40, "yes"));
@@ -956,79 +957,78 @@ static	char	*ansi_version[4];
 			(void) fprintf(stdout, MSGSTR(45, "no"));
 		}
 		(void) fprintf(stdout, "\n");
-	    }
-	    if (inq.inq_trmiop) {
+	}
+	if (inq.inq_trmiop) {
 		(void) fprintf(stdout, "%s", *p++);
 		(void) fprintf(stdout, MSGSTR(40, "yes"));
 		(void) fprintf(stdout, "\n");
-	    } else {
+	} else {
 		p++;
-	    }
-	    (void) fprintf(stdout, "%s%d\n", *p++, inq.inq_rdf);
-	    (void) fprintf(stdout, "%s0x%x\n", *p++, inq.inq_len);
-	    if (scsi_3) {
+	}
+	(void) fprintf(stdout, "%s%d\n", *p++, inq.inq_rdf);
+	(void) fprintf(stdout, "%s0x%x\n", *p++, inq.inq_len);
+	if (scsi_3) {
 		if (inq.inq_dual_p) {
 			if (inq.inq_port != NULL) {
 				(void) fprintf(stdout, MSGSTR(2187,
-					"%sa\n"), *p++);
+				    "%sa\n"), *p++);
 			} else {
 				(void) fprintf(stdout, MSGSTR(2188,
-					"%sb\n"), *p++);
+				    "%sb\n"), *p++);
 			}
 		} else {
-		    p++;
+			p++;
 		}
-	    }
-	    if (scsi_3) {
+	}
+	if (scsi_3) {
 		if (inq.inq_SIP_1 || inq.ui.inq_3.inq_SIP_2 ||
-			inq.ui.inq_3.inq_SIP_3) {
-		    (void) fprintf(stdout, "%s%d, %d, %d\n", *p,
-			inq.inq_SIP_1, inq.ui.inq_3.inq_SIP_2,
-			inq.ui.inq_3.inq_SIP_3);
+		    inq.ui.inq_3.inq_SIP_3) {
+			(void) fprintf(stdout, "%s%d, %d, %d\n", *p,
+			    inq.inq_SIP_1, inq.ui.inq_3.inq_SIP_2,
+			    inq.ui.inq_3.inq_SIP_3);
 		}
 		p++;
 
-	    }
+	}
 
-	    if (inq.ui.inq_2.inq_2_reladdr) {
+	if (inq.ui.inq_2.inq_2_reladdr) {
 		(void) fprintf(stdout, "%s", *p);
 		(void) fprintf(stdout, MSGSTR(40, "yes"));
 		(void) fprintf(stdout, "\n");
-	    }
-	    p++;
+	}
+	p++;
 
-	    if (!scsi_3) {
-
-		    if (inq.ui.inq_2.inq_wbus32) {
+	if (!scsi_3) {
+		if (inq.ui.inq_2.inq_wbus32) {
 			(void) fprintf(stdout, "%s", *p);
 			(void) fprintf(stdout, MSGSTR(40, "yes"));
 			(void) fprintf(stdout, "\n");
-		    }
-		    p++;
+		}
+		p++;
 
-		    if (inq.ui.inq_2.inq_wbus16) {
+		if (inq.ui.inq_2.inq_wbus16) {
 			(void) fprintf(stdout, "%s", *p);
 			(void) fprintf(stdout, MSGSTR(40, "yes"));
 			(void) fprintf(stdout, "\n");
-		    }
-		    p++;
+		}
+		p++;
 
-		    if (inq.ui.inq_2.inq_sync) {
+		if (inq.ui.inq_2.inq_sync) {
 			(void) fprintf(stdout, "%s", *p);
 			(void) fprintf(stdout, MSGSTR(40, "yes"));
 			(void) fprintf(stdout, "\n");
-		    }
-		    p++;
+		}
+		p++;
 
-	    }
-	    if (inq.ui.inq_2.inq_linked) {
+	}
+	if (inq.ui.inq_2.inq_linked) {
 		(void) fprintf(stdout, "%s", *p);
 		(void) fprintf(stdout, MSGSTR(40, "yes"));
 		(void) fprintf(stdout, "\n");
-	    }
-	    p++;
+	}
+	p++;
 
-	    if (scsi_3) {
+	if (scsi_3) {
 		(void) fprintf(stdout, "%s", *p++);
 		if (inq.ui.inq_3.inq_trandis != NULL) {
 			(void) fprintf(stdout, MSGSTR(40, "yes"));
@@ -1036,40 +1036,40 @@ static	char	*ansi_version[4];
 			(void) fprintf(stdout, MSGSTR(45, "no"));
 		}
 		(void) fprintf(stdout, "\n");
-	    }
+	}
 
-	    if (inq.ui.inq_2.inq_cmdque) {
+	if (inq.ui.inq_2.inq_cmdque) {
 		(void) fprintf(stdout, "%s", *p);
 		(void) fprintf(stdout, MSGSTR(40, "yes"));
 		(void) fprintf(stdout, "\n");
-	    }
-	    p++;
+	}
+	p++;
 
-	    if (!scsi_3) {
-		    if (inq.ui.inq_2.inq_sftre) {
+	if (!scsi_3) {
+		if (inq.ui.inq_2.inq_sftre) {
 			(void) fprintf(stdout, "%s", *p);
 			(void) fprintf(stdout, MSGSTR(40, "yes"));
 			(void) fprintf(stdout, "\n");
-		    }
-		    p++;
+		}
+		p++;
 
-	    }
+	}
 
-		/*
-		 * Now print the vendor-specific data.
-		 */
-	    v_parm = inq.inq_ven_specific_1;
-	    if (inq.inq_len >= 32) {
+	/*
+	 * Now print the vendor-specific data.
+	 */
+	v_parm = inq.inq_ven_specific_1;
+	if (inq.inq_len >= 32) {
 		length = inq.inq_len - 31;
 		if (strstr((char *)inq.inq_pid, "SSA") != 0) {
-		(void) fprintf(stdout, MSGSTR(2189,
-					"Number of Ports, Targets:   %d,%d\n"),
-			inq.inq_ssa_ports, inq.inq_ssa_tgts);
+			(void) fprintf(stdout, MSGSTR(2189,
+			    "Number of Ports, Targets:   %d,%d\n"),
+			    inq.inq_ssa_ports, inq.inq_ssa_tgts);
 			v_parm += 20;
 			length -= 20;
 		} else if ((strstr((char *)inq.inq_pid, "SUN") != 0) ||
-			(strncmp((char *)inq.inq_vid, "SUN     ",
-			sizeof (inq.inq_vid)) == 0)) {
+		    (strncmp((char *)inq.inq_vid, "SUN     ",
+		    sizeof (inq.inq_vid)) == 0)) {
 			v_parm += 16;
 			length -= 16;
 		}
@@ -1078,16 +1078,16 @@ static	char	*ansi_version[4];
 		 */
 		if (length > 0) {
 			(void) fprintf(stdout,
-				MSGSTR(2190,
+			    MSGSTR(2190,
 			"              VENDOR-SPECIFIC PARAMETERS\n"));
 			(void) fprintf(stdout,
-				MSGSTR(2191,
-				"Byte#                  Hex Value            "
-				"                 ASCII\n"));
+			    MSGSTR(2191,
+			    "Byte#                  Hex Value            "
+			    "                 ASCII\n"));
 			(void) sprintf(byte_number,
-			"%d    ", inq.inq_len - length + 5);
+			    "%d    ", inq.inq_len - length + 5);
 			dump_hex_data(byte_number, v_parm,
-				MIN(length, inq.inq_res3 - v_parm), HEX_ASCII);
+			    MIN(length, inq.inq_res3 - v_parm), HEX_ASCII);
 		}
 		/*
 		 * Skip reserved bytes 56-95.
@@ -1095,17 +1095,17 @@ static	char	*ansi_version[4];
 		length -= (inq.inq_box_name - v_parm);
 		if (length > 0) {
 			(void) sprintf(byte_number, "%d    ",
-				inq.inq_len - length + 5);
+			    inq.inq_len - length + 5);
 			dump_hex_data(byte_number, inq.inq_box_name,
-				MIN(length, sizeof (inq.inq_box_name) +
-				sizeof (inq.inq_avu)), HEX_ASCII);
+			    MIN(length, sizeof (inq.inq_box_name) +
+			    sizeof (inq.inq_avu)), HEX_ASCII);
 		}
-	    }
-	    if (getenv("_LUX_D_DEBUG") != NULL) {
+	}
+	if (getenv("_LUX_D_DEBUG") != NULL) {
 		dump_hex_data("\nComplete Inquiry: ",
-			(uchar_t *)&inq,
-			MIN(inq.inq_len + 5, sizeof (inq)), HEX_ASCII);
-	    }
+		    (uchar_t *)&inq,
+		    MIN(inq.inq_len + 5, sizeof (inq)), HEX_ASCII);
+	}
 }
 
 /*
@@ -1222,7 +1222,8 @@ get_slash_devices_from_osDevName(char *osDevName, int flag)
 		/*
 		 * Clean up any "../"s that are in the path
 		 */
-		while (cleanup_dotdot_path(source));
+		while (cleanup_dotdot_path(source))
+			;
 
 		/*
 		 * source is now an absolute path to the link we're
@@ -1237,57 +1238,61 @@ get_slash_devices_from_osDevName(char *osDevName, int flag)
 			 * a dangling /dev link doesn't pass lstat so
 			 * NULL is returned.
 			 */
-		    if (stat(source, &stbuf) == -1) {
-			if (!is_lstat_failed &&
-			    strstr(source, "/devices")) {
-				/*
-				 * lstat succeeded previously and source
-				 * contains "/devices" then it is dangling node.
-				 */
-			    phys_path = (char *)calloc(1, strlen(source) + 1);
-			    if (phys_path != NULL) {
-				(void) strncpy(phys_path, source,
-				strlen(source) + 1);
-			    }
-			    return (phys_path);
-			} else if (is_lstat_failed) {
-			    /* check lstat result. */
-			    if (lstat(source, &stbuf) == -1) {
-				return (NULL);
-			    } else {
-				is_lstat_failed = B_FALSE; /* and coninue */
-			    }
+			if (stat(source, &stbuf) == -1) {
+				if (!is_lstat_failed &&
+				    strstr(source, "/devices")) {
+					/*
+					 * lstat succeeded previously and source
+					 * contains "/devices" then it is
+					 * dangling node.
+					 */
+					phys_path = (char *)calloc(1,
+					    strlen(source) + 1);
+					if (phys_path != NULL) {
+						(void) strncpy(phys_path,
+						    source, strlen(source) + 1);
+					}
+					return (phys_path);
+				} else if (is_lstat_failed) {
+					/* check lstat result. */
+					if (lstat(source, &stbuf) == -1) {
+						return (NULL);
+					} else {
+						/* and continue */
+						is_lstat_failed = B_FALSE;
+					}
+				} else {
+					/*
+					 * With algorithm that resolves a link
+					 * and then issues readlink(), should
+					 * not be reached here.
+					 */
+					return (NULL);
+				}
 			} else {
-				/*
-				 * With algorithm that resolves a link and
-				 * then issues readlink(), should not be
-				 * reached here.
-				 */
-			    return (NULL);
+				if (lstat(source, &stbuf) == -1) {
+					/*
+					 * when stat succeeds it is not
+					 * a dangling node so it is not
+					 * a special case.
+					 */
+					return (NULL);
+				}
 			}
-		    } else {
-			if (lstat(source, &stbuf) == -1) {
-			/*
-			 * when stat succeeds it is not a dangling node
-			 * so it is not a special case.
-			 */
-			    return (NULL);
-			}
-		    }
 		} else if (flag == STANDARD_DEVNAME_HANDLING) {
 			/*
 			 * See if there's a real file out there.  If not,
 			 * we have a dangling link and we ignore it.
 			 */
-		    if (stat(source, &stbuf) == -1) {
-			return (NULL);
-		    }
-		    if (lstat(source, &stbuf) == -1) {
-			return (NULL);
-		    }
+			if (stat(source, &stbuf) == -1) {
+				return (NULL);
+			}
+			if (lstat(source, &stbuf) == -1) {
+				return (NULL);
+			}
 		} else {
-		    /* invalid flag */
-		    return (NULL);
+			/* invalid flag */
+			return (NULL);
 		}
 
 		/*
@@ -1302,8 +1307,8 @@ get_slash_devices_from_osDevName(char *osDevName, int flag)
 		if (!S_ISLNK(stbuf.st_mode)) {
 			phys_path = (char *)calloc(1, strlen(source) + 1);
 			if (phys_path != NULL) {
-			    (void) strncpy(phys_path, source,
-			    strlen(source) + 1);
+				(void) strncpy(phys_path, source,
+				    strlen(source) + 1);
 			}
 			return (phys_path);
 		}
@@ -1364,14 +1369,13 @@ get_scsi_vhci_pathinfo(char *dev_path, sv_iocdata_t *ioc, int *path_count)
 	int 	prop_buf_size;
 	int	pathlist_retry_count = 0;
 
-	if (strncmp(dev_path, SCSI_VHCI,
-			strlen(SCSI_VHCI)) != NULL) {
+	if (strncmp(dev_path, SCSI_VHCI, strlen(SCSI_VHCI)) != NULL) {
 		if ((physical_path = get_slash_devices_from_osDevName(
-			dev_path, STANDARD_DEVNAME_HANDLING)) == NULL) {
+		    dev_path, STANDARD_DEVNAME_HANDLING)) == NULL) {
 			return (L_INVALID_PATH);
 		}
 		if (strncmp(physical_path, SCSI_VHCI,
-				strlen(SCSI_VHCI)) != NULL) {
+		    strlen(SCSI_VHCI)) != NULL) {
 			free(physical_path);
 			return (L_INVALID_PATH);
 		}
@@ -1419,7 +1423,7 @@ get_scsi_vhci_pathinfo(char *dev_path, sv_iocdata_t *ioc, int *path_count)
 	retval = ioctl(fd, SCSI_VHCI_GET_CLIENT_MULTIPATH_INFO, ioc);
 	if (retval != 0) {
 		close(fd);
-	    return (L_SCSI_VHCI_ERROR);
+		return (L_SCSI_VHCI_ERROR);
 	}
 	prop_buf_size = SV_PROP_MAX_BUF_SIZE;
 
@@ -1434,8 +1438,7 @@ get_scsi_vhci_pathinfo(char *dev_path, sv_iocdata_t *ioc, int *path_count)
 		 * Allocate enough space for # paths from get_pathcount
 		 */
 		ioc->ret_buf = (sv_path_info_t *)
-				calloc(initial_path_count,
-					sizeof (sv_path_info_t));
+		    calloc(initial_path_count, sizeof (sv_path_info_t));
 		if (ioc->ret_buf == NULL) {
 			close(fd);
 			return (L_MALLOC_FAILED);
@@ -1453,7 +1456,7 @@ get_scsi_vhci_pathinfo(char *dev_path, sv_iocdata_t *ioc, int *path_count)
 				break;
 			}
 			if ((ioc->ret_buf[i].ret_prop.ret_buf_size =
-				(uint_t *)malloc(sizeof (uint_t))) == NULL) {
+			    (uint_t *)malloc(sizeof (uint_t))) == NULL) {
 				malloc_error = 1;
 				break;
 			}
@@ -1509,8 +1512,8 @@ get_scsi_vhci_pathinfo(char *dev_path, sv_iocdata_t *ioc, int *path_count)
 int
 get_mode_page(char *path, uchar_t **pg_buf)
 {
-struct mode_header_g1	*mode_header_ptr;
-int		status, size, fd;
+	struct mode_header_g1	*mode_header_ptr;
+	int		status, size, fd;
 
 	/* open controller */
 	if ((fd = open(path, O_NDELAY | O_RDWR)) == -1)
@@ -1521,31 +1524,31 @@ int		status, size, fd;
 	 */
 	size = 20;
 	if ((*pg_buf = (uchar_t *)calloc(1, size)) == NULL) {
-	    (void) close(fd);
-	    return (L_MALLOC_FAILED);
+		(void) close(fd);
+		return (L_MALLOC_FAILED);
 	}
 	/* read page */
 	if (status = scsi_mode_sense_cmd(fd, *pg_buf, size,
 	    0, MODEPAGE_ALLPAGES)) {
-	    (void) close(fd);
-	    (void) free(*pg_buf);
-	    return (status);
+		(void) close(fd);
+		(void) free(*pg_buf);
+		return (status);
 	}
 	/* Now get the size for all pages */
 	mode_header_ptr = (struct mode_header_g1 *)(void *)*pg_buf;
 	size = ntohs(mode_header_ptr->length) +
-		sizeof (mode_header_ptr->length);
+	    sizeof (mode_header_ptr->length);
 	(void) free(*pg_buf);
 	if ((*pg_buf = (uchar_t *)calloc(1, size)) == NULL) {
-	    (void) close(fd);
-	    return (L_MALLOC_FAILED);
+		(void) close(fd);
+		return (L_MALLOC_FAILED);
 	}
 	/* read all pages */
 	if (status = scsi_mode_sense_cmd(fd, *pg_buf, size,
-					0, MODEPAGE_ALLPAGES)) {
-	    (void) close(fd);
-	    (void) free(*pg_buf);
-	    return (status);
+	    0, MODEPAGE_ALLPAGES)) {
+		(void) close(fd);
+		(void) free(*pg_buf);
+		return (status);
 	}
 	(void) close(fd);
 	return (0);
@@ -1584,7 +1587,7 @@ dump_hex_data(char *hdr, uchar_t *src, int nbytes, int format)
 			(void) fprintf(stdout, "    ");
 			for (i = 0; i < n; i++) {
 				(void) fprintf(stdout, "%c",
-					isprint(src[i]) ? src[i] : '.');
+				    isprint(src[i]) ? src[i] : '.');
 			}
 		}
 		(void) fprintf(stdout, "\n");
