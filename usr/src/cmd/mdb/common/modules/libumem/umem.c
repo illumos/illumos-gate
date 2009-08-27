@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "umem.h"
 
@@ -1852,20 +1850,46 @@ typedef struct whatis {
 	const umem_cache_t *w_cache;
 	const vmem_t *w_vmem;
 	int w_found;
-	uint_t w_verbose;
-	uint_t w_freemem;
 	uint_t w_all;
 	uint_t w_bufctl;
+	uint_t w_freemem;
+	uint_t w_quiet;
+	uint_t w_verbose;
 } whatis_t;
+
+/* nicely report pointers as offsets from a base */
+static void
+whatis_report_pointer(uintptr_t addr, uintptr_t base, const char *description)
+{
+	if (addr == base)
+		mdb_printf("%p is %s",
+		    addr, description);
+	else
+		mdb_printf("%p is %p+%p, %s",
+		    addr, base, addr - base, description);
+}
+
+/* call one of our dcmd functions with "-v" and the provided address */
+static void
+whatis_call_printer(mdb_dcmd_f *dcmd, uintptr_t addr)
+{
+	mdb_arg_t a;
+	a.a_type = MDB_TYPE_STRING;
+	a.a_un.a_str = "-v";
+
+	(void) (*dcmd)(addr, DCMD_ADDRSPEC, 1, &a);
+}
 
 static void
 whatis_print_umem(uintptr_t addr, uintptr_t baddr, whatis_t *w)
 {
+	const umem_cache_t *cp = w->w_cache;
 	/* LINTED pointer cast may result in improper alignment */
-	uintptr_t btaddr = (uintptr_t)UMEM_BUFTAG(w->w_cache, addr);
+	uintptr_t btaddr = (uintptr_t)UMEM_BUFTAG(cp, addr);
 	intptr_t stat;
+	int call_printer;
 
-	if (w->w_cache->cache_flags & UMF_REDZONE) {
+	if (cp->cache_flags & UMF_REDZONE) {
 		umem_buftag_t bt;
 
 		if (mdb_vread(&bt, sizeof (bt), btaddr) == -1)
@@ -1879,21 +1903,25 @@ whatis_print_umem(uintptr_t addr, uintptr_t baddr, whatis_t *w)
 		/*
 		 * provide the bufctl ptr if it has useful information
 		 */
-		if (baddr == 0 && (w->w_cache->cache_flags & UMF_AUDIT))
+		if (baddr == 0 && (cp->cache_flags & UMF_AUDIT))
 			baddr = (uintptr_t)bt.bt_bufctl;
 	}
 
 done:
-	if (baddr == 0)
-		mdb_printf("%p is %p+%p, %s from %s\n",
-		    w->w_addr, addr, w->w_addr - addr,
-		    w->w_freemem == FALSE ? "allocated" : "freed",
-		    w->w_cache->cache_name);
-	else
-		mdb_printf("%p is %p+%p, bufctl %p %s from %s\n",
-		    w->w_addr, addr, w->w_addr - addr, baddr,
-		    w->w_freemem == FALSE ? "allocated" : "freed",
-		    w->w_cache->cache_name);
+	call_printer =
+	    (!w->w_quiet && baddr != 0 && (cp->cache_flags & UMF_AUDIT));
+
+	whatis_report_pointer(w->w_addr, addr, "");
+
+	if (baddr != 0 && !call_printer)
+		mdb_printf("bufctl %p ", baddr);
+
+	mdb_printf("%s from %s%s\n",
+	    (w->w_freemem == FALSE) ? "allocated" : "freed", cp->cache_name,
+	    call_printer ? ":" : "");
+
+	if (call_printer)
+		whatis_call_printer(bufctl, baddr);
 }
 
 /*ARGSUSED*/
@@ -1914,19 +1942,23 @@ whatis_walk_seg(uintptr_t addr, const vmem_seg_t *vs, whatis_t *w)
 	if (w->w_addr < vs->vs_start || w->w_addr >= vs->vs_end)
 		return (WALK_NEXT);
 
-	mdb_printf("%p is %p+%p ", w->w_addr,
-	    vs->vs_start, w->w_addr - vs->vs_start);
+	whatis_report_pointer(w->w_addr, vs->vs_start, "");
 
 	/*
-	 * Always provide the vmem_seg pointer if it has a stack trace.
+	 * If we're not going to print it anyway, provide the vmem_seg pointer
+	 * if it has a stack trace.
 	 */
-	if (w->w_bufctl == TRUE ||
-	    (vs->vs_type == VMEM_ALLOC && vs->vs_depth != 0)) {
-		mdb_printf("(vmem_seg %p) ", addr);
+	if (w->w_quiet && (w->w_bufctl ||
+	    (vs->vs_type == VMEM_ALLOC && vs->vs_depth != 0))) {
+		mdb_printf("vmem_seg %p ", addr);
 	}
 
-	mdb_printf("%sfrom %s vmem arena\n", w->w_freemem == TRUE ?
-	    "freed " : "", w->w_vmem->vm_name);
+	mdb_printf("%s from %s vmem arena%s\n",
+	    (w->w_freemem == FALSE) ? "allocated" : "freed",
+	    w->w_vmem->vm_name, !w->w_quiet ? ":" : "");
+
+	if (!w->w_quiet)
+		whatis_call_printer(vmem_seg, addr);
 
 	w->w_found++;
 	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
@@ -1990,14 +2022,15 @@ whatis_walk_cache(uintptr_t addr, const umem_cache_t *c, whatis_t *w)
 	char *walk, *freewalk;
 	mdb_walk_cb_t func;
 
-	if (w->w_bufctl == FALSE) {
-		walk = "umem";
-		freewalk = "freemem";
-		func = (mdb_walk_cb_t)whatis_walk_umem;
-	} else {
+	/* For caches with auditing info, we always walk the bufctls */
+	if (w->w_bufctl || (c->cache_flags & UMF_AUDIT)) {
 		walk = "bufctl";
 		freewalk = "freectl";
 		func = (mdb_walk_cb_t)whatis_walk_bufctl;
+	} else {
+		walk = "umem";
+		freewalk = "freemem";
+		func = (mdb_walk_cb_t)whatis_walk_umem;
 	}
 
 	if (w->w_verbose)
@@ -2056,14 +2089,17 @@ whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	w.w_verbose = FALSE;
-	w.w_bufctl = FALSE;
 	w.w_all = FALSE;
+	w.w_bufctl = FALSE;
+	w.w_quiet = FALSE;
+	w.w_verbose = FALSE;
 
 	if (mdb_getopts(argc, argv,
-	    'v', MDB_OPT_SETBITS, TRUE, &w.w_verbose,
 	    'a', MDB_OPT_SETBITS, TRUE, &w.w_all,
-	    'b', MDB_OPT_SETBITS, TRUE, &w.w_bufctl, NULL) != argc)
+	    'b', MDB_OPT_SETBITS, TRUE, &w.w_bufctl,
+	    'q', MDB_OPT_SETBITS, TRUE, &w.w_quiet,
+	    'v', MDB_OPT_SETBITS, TRUE, &w.w_verbose,
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	w.w_addr = addr;

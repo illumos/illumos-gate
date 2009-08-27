@@ -2097,24 +2097,50 @@ typedef struct whatis {
 	int w_slab_found;
 	int w_found;
 	int w_kmem_lite_count;
-	uint_t w_verbose;
-	uint_t w_freemem;
 	uint_t w_all;
 	uint_t w_bufctl;
+	uint_t w_freemem;
 	uint_t w_idspace;
+	uint_t w_quiet;
+	uint_t w_verbose;
 } whatis_t;
+
+/* nicely report pointers as offsets from a base */
+static void
+whatis_report_pointer(uintptr_t addr, uintptr_t base, const char *description)
+{
+	if (addr == base)
+		mdb_printf("%p is %s",
+		    addr, description);
+	else
+		mdb_printf("%p is %p+%p, %s",
+		    addr, base, addr - base, description);
+}
+
+/* call one of our dcmd functions with "-v" and the provided address */
+static void
+whatis_call_printer(mdb_dcmd_f *dcmd, uintptr_t addr)
+{
+	mdb_arg_t a;
+	a.a_type = MDB_TYPE_STRING;
+	a.a_un.a_str = "-v";
+
+	(void) (*dcmd)(addr, DCMD_ADDRSPEC, 1, &a);
+}
 
 static void
 whatis_print_kmem(uintptr_t addr, uintptr_t baddr, whatis_t *w)
 {
+	const kmem_cache_t *cp = w->w_cache;
 	/* LINTED pointer cast may result in improper alignment */
-	uintptr_t btaddr = (uintptr_t)KMEM_BUFTAG(w->w_cache, addr);
+	uintptr_t btaddr = (uintptr_t)KMEM_BUFTAG(cp, addr);
 	intptr_t stat;
+	int call_printer;
 	int count = 0;
 	int i;
 	pc_t callers[16];
 
-	if (w->w_cache->cache_flags & KMF_REDZONE) {
+	if (cp->cache_flags & KMF_REDZONE) {
 		kmem_buftag_t bt;
 
 		if (mdb_vread(&bt, sizeof (bt), btaddr) == -1)
@@ -2128,10 +2154,10 @@ whatis_print_kmem(uintptr_t addr, uintptr_t baddr, whatis_t *w)
 		/*
 		 * provide the bufctl ptr if it has useful information
 		 */
-		if (baddr == 0 && (w->w_cache->cache_flags & KMF_AUDIT))
+		if (baddr == 0 && (cp->cache_flags & KMF_AUDIT))
 			baddr = (uintptr_t)bt.bt_bufctl;
 
-		if (w->w_cache->cache_flags & KMF_LITE) {
+		if (cp->cache_flags & KMF_LITE) {
 			count = w->w_kmem_lite_count;
 
 			if (count * sizeof (pc_t) > sizeof (callers))
@@ -2153,18 +2179,22 @@ whatis_print_kmem(uintptr_t addr, uintptr_t baddr, whatis_t *w)
 	}
 
 done:
-	if (baddr == 0)
-		mdb_printf("%p is %p+%p, %s from %s\n",
-		    w->w_addr, addr, w->w_addr - addr,
-		    w->w_freemem == FALSE ? "allocated" : "freed",
-		    w->w_cache->cache_name);
-	else
-		mdb_printf("%p is %p+%p, bufctl %p %s from %s\n",
-		    w->w_addr, addr, w->w_addr - addr, baddr,
-		    w->w_freemem == FALSE ? "allocated" : "freed",
-		    w->w_cache->cache_name);
+	call_printer =
+	    (!w->w_quiet && baddr != 0 && (cp->cache_flags & KMF_AUDIT));
 
-	if (count > 0) {
+	whatis_report_pointer(w->w_addr, addr, "");
+
+	if (baddr != 0 && !call_printer)
+		mdb_printf("bufctl %p ", baddr);
+
+	mdb_printf("%s from %s%s\n",
+	    (w->w_freemem == FALSE) ? "allocated" : "freed", cp->cache_name,
+	    (call_printer || (!w->w_quiet && count > 0)) ? ":" : "");
+
+	if (call_printer)
+		whatis_call_printer(bufctl, baddr);
+
+	if (!w->w_quiet && count > 0) {
 		mdb_inc_indent(8);
 		mdb_printf("recent caller%s: %a%s", (count != 1)? "s":"",
 		    callers[0], (count != 1)? ", ":"\n");
@@ -2193,19 +2223,23 @@ whatis_walk_seg(uintptr_t addr, const vmem_seg_t *vs, whatis_t *w)
 	if (w->w_addr < vs->vs_start || w->w_addr >= vs->vs_end)
 		return (WALK_NEXT);
 
-	mdb_printf("%p is %p+%p ", w->w_addr,
-	    vs->vs_start, w->w_addr - vs->vs_start);
+	whatis_report_pointer(w->w_addr, vs->vs_start, "");
 
 	/*
-	 * Always provide the vmem_seg pointer if it has a stack trace.
+	 * If we're not printing it seperately, provide the vmem_seg
+	 * pointer if it has a stack trace.
 	 */
-	if (w->w_bufctl == TRUE ||
-	    (vs->vs_type == VMEM_ALLOC && vs->vs_depth != 0)) {
-		mdb_printf("(vmem_seg %p) ", addr);
+	if (w->w_quiet && (w->w_bufctl == TRUE ||
+	    (vs->vs_type == VMEM_ALLOC && vs->vs_depth != 0))) {
+		mdb_printf("vmem_seg %p ", addr);
 	}
 
-	mdb_printf("%sfrom %s vmem arena\n", w->w_freemem == TRUE ?
-	    "freed " : "", w->w_vmem->vm_name);
+	mdb_printf("%s from %s vmem arena%s\n",
+	    (w->w_freemem == FALSE) ? "allocated" : "freed", w->w_vmem->vm_name,
+	    !w->w_quiet ? ":" : "");
+
+	if (!w->w_quiet)
+		whatis_call_printer(vmem_seg, addr);
 
 	w->w_found++;
 	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
@@ -2286,17 +2320,18 @@ whatis_walk_cache(uintptr_t addr, const kmem_cache_t *c, whatis_t *w)
 	mdb_walk_cb_t func;
 	vmem_t *vmp = c->cache_arena;
 
-	if (((c->cache_flags & VMC_IDENTIFIER) != 0) ^ w->w_idspace)
+	if (((c->cache_flags & KMC_IDENTIFIER) != 0) ^ w->w_idspace)
 		return (WALK_NEXT);
 
-	if (w->w_bufctl == FALSE) {
-		walk = "kmem";
-		freewalk = "freemem";
-		func = (mdb_walk_cb_t)whatis_walk_kmem;
-	} else {
+	/* For caches with auditing info, we always walk the bufctls */
+	if (w->w_bufctl || (c->cache_flags & KMF_AUDIT)) {
 		walk = "bufctl";
 		freewalk = "freectl";
 		func = (mdb_walk_cb_t)whatis_walk_bufctl;
+	} else {
+		walk = "kmem";
+		freewalk = "freemem";
+		func = (mdb_walk_cb_t)whatis_walk_kmem;
 	}
 
 	w->w_cache = c;
@@ -2396,8 +2431,8 @@ whatis_walk_thread(uintptr_t addr, const kthread_t *t, whatis_t *w)
 	 * We use this opportunity to short circuit this case...
 	 */
 	if (w->w_addr >= addr && w->w_addr < addr + sizeof (kthread_t)) {
-		mdb_printf("%p is %p+%p, allocated as a thread structure\n",
-		    w->w_addr, addr, w->w_addr - addr);
+		whatis_report_pointer(w->w_addr, addr,
+		    "allocated as a thread structure\n");
 		w->w_found++;
 		return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
 	}
@@ -2421,7 +2456,6 @@ whatis_walk_modctl(uintptr_t addr, const struct modctl *m, whatis_t *w)
 {
 	struct module mod;
 	char name[MODMAXNAMELEN], *where;
-	char c[MDB_SYM_NAMLEN];
 	Shdr shdr;
 	GElf_Sym sym;
 
@@ -2480,10 +2514,9 @@ found:
 	 * If we found this address in a module, then there's a chance that
 	 * it's actually a named symbol.  Try the symbol lookup.
 	 */
-	if (mdb_lookup_by_addr(w->w_addr, MDB_SYM_FUZZY, c, sizeof (c),
-	    &sym) != -1 && w->w_addr >= (uintptr_t)sym.st_value &&
-	    w->w_addr < (uintptr_t)sym.st_value + sym.st_size) {
-		mdb_printf("%s+%lx ", c, w->w_addr - (uintptr_t)sym.st_value);
+	if (mdb_lookup_by_addr(w->w_addr, MDB_SYM_FUZZY, NULL, 0, &sym) != -1 &&
+	    (w->w_addr - (uintptr_t)sym.st_value) < sym.st_size) {
+		mdb_printf("%a, ", w->w_addr);
 	}
 
 	mdb_printf("in %s's %s\n", name, where);
@@ -2511,8 +2544,8 @@ whatis_walk_page(uintptr_t addr, const void *ignored, whatis_t *w)
 	if (w->w_addr < addr || w->w_addr >= addr + machsize)
 		return (WALK_NEXT);
 
-	mdb_printf("%p is %p+%p, allocated as a page structure\n",
-	    w->w_addr, addr, w->w_addr - addr);
+	whatis_report_pointer(w->w_addr, addr,
+	    "allocated as a page structure\n");
 
 	w->w_found++;
 	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
@@ -2526,16 +2559,19 @@ whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	w.w_verbose = FALSE;
-	w.w_bufctl = FALSE;
 	w.w_all = FALSE;
+	w.w_bufctl = FALSE;
 	w.w_idspace = FALSE;
+	w.w_quiet = FALSE;
+	w.w_verbose = FALSE;
 
 	if (mdb_getopts(argc, argv,
-	    'v', MDB_OPT_SETBITS, TRUE, &w.w_verbose,
 	    'a', MDB_OPT_SETBITS, TRUE, &w.w_all,
+	    'b', MDB_OPT_SETBITS, TRUE, &w.w_bufctl,
 	    'i', MDB_OPT_SETBITS, TRUE, &w.w_idspace,
-	    'b', MDB_OPT_SETBITS, TRUE, &w.w_bufctl, NULL) != argc)
+	    'q', MDB_OPT_SETBITS, TRUE, &w.w_quiet,
+	    'v', MDB_OPT_SETBITS, TRUE, &w.w_verbose,
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	w.w_addr = addr;
@@ -2622,15 +2658,16 @@ whatis_help(void)
 	    "Given a virtual address, attempt to determine where it came\n"
 	    "from.\n"
 	    "\n"
-	    "\t-v\tVerbose output; display caches/arenas/etc as they are\n"
-	    "\t\tsearched\n"
 	    "\t-a\tFind all possible sources.  Default behavior is to stop at\n"
 	    "\t\tthe first (most specific) source.\n"
-	    "\t-i\tSearch only identifier arenas and caches.  By default\n"
-	    "\t\tthese are ignored.\n"
 	    "\t-b\tReport bufctls and vmem_segs for matches in kmem and vmem,\n"
 	    "\t\trespectively.  Warning: if the buffer exists, but does not\n"
-	    "\t\thave a bufctl, it will not be reported.\n");
+	    "\t\thave a bufctl, it will not be reported.\n"
+	    "\t-i\tSearch only identifier arenas and caches.  By default\n"
+	    "\t\tthese are ignored.\n"
+	    "\t-q\tDon't print multi-line reports (stack traces, etc.)\n"
+	    "\t-v\tVerbose output; display caches/arenas/etc as they are\n"
+	    "\t\tsearched\n");
 }
 
 typedef struct kmem_log_cpu {

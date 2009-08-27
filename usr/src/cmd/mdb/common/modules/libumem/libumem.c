@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "umem.h"
 #include <libproc.h>
@@ -354,7 +352,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "vmem_seg", ":[-sv] [-c caller] [-e earliest] [-l latest] "
 		"[-m minsize] [-M maxsize] [-t thread] [-T type]",
 		"print or filter a vmem_seg", vmem_seg, vmem_seg_help },
-	{ "whatis", ":[-abv]", "given an address, return information", whatis },
+	{ "whatis", ":[-abqv]", "given an address, return information",
+		whatis },
 
 #ifndef _KMDB
 	/* from ../genunix/kgrep.c + libumem.c */
