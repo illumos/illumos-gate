@@ -652,6 +652,7 @@ free_resources(picl_nodehdl_t subtree_root)
 
 	if (vol_props) {
 		free(vol_props);
+		vol_props = NULL;
 		n_vol_props = 0;
 		volprop_ndx = 0;
 	}
