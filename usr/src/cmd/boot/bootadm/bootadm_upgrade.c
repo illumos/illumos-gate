@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,6 @@ get_findroot_cap(const char *osroot)
 	char		buf[BAM_MAXLINE];
 	struct stat	sb;
 	int		dboot;
-	int		xVM;
 	int		error;
 	int		ret;
 	const char	*fcn = "get_findroot_cap()";
@@ -77,7 +76,7 @@ get_findroot_cap(const char *osroot)
 		return;
 	}
 
-	dboot = xVM = 0;
+	dboot = 0;
 	while (s_fgets(buf, sizeof (buf), fp) != NULL) {
 		if (strcmp(buf, "findroot") == 0) {
 			BAM_DPRINTF((D_FINDROOT_PRESENT, fcn));
@@ -87,14 +86,9 @@ get_findroot_cap(const char *osroot)
 			BAM_DPRINTF((D_DBOOT_PRESENT, fcn));
 			dboot = 1;
 		}
-		if (strcmp(buf, "xVM") == 0) {
-			BAM_DPRINTF((D_XVM_PRESENT, fcn));
-			xVM = 1;
-		}
 	}
 
 	assert(dboot);
-	assert(xVM);
 
 	if (bam_is_findroot == BAM_FINDROOT_UNKNOWN) {
 		bam_is_findroot = BAM_FINDROOT_ABSENT;
@@ -196,12 +190,9 @@ get_boot_cap(const char *osroot)
 
 	INJECT_ERROR1("GET_CAP_MULTIBOOT", bam_direct = BAM_DIRECT_MULTIBOOT);
 	if (bam_direct == BAM_DIRECT_DBOOT) {
-		(void) snprintf(fname, PATH_MAX, "%s/%s", osroot, XEN_32);
-		if (stat(fname, &sb) == 0) {
-			bam_is_hv = BAM_HV_PRESENT;
+		if (bam_is_hv == BAM_HV_PRESENT) {
 			BAM_DPRINTF((D_IS_XVM, fcn));
 		} else {
-			bam_is_hv = BAM_HV_NO;
 			BAM_DPRINTF((D_IS_NOT_XVM, fcn));
 		}
 	} else {
@@ -936,11 +927,14 @@ upgrade_menu(menu_t *mp, char *osroot, char *menu_root)
 	if (ret1 == BAM_ERROR)
 		goto abort;
 
-	ret2 = bam_add_hv(mp, grubsign, grubroot,
-	    root_optional(osroot, menu_root));
-	INJECT_ERROR1("UPGRADE_ADD_HV", ret2 = BAM_ERROR);
-	if (ret2 == BAM_ERROR)
-		goto abort;
+	if (bam_is_hv == BAM_HV_PRESENT) {
+		ret2 = bam_add_hv(mp, grubsign, grubroot,
+		    root_optional(osroot, menu_root));
+		INJECT_ERROR1("UPGRADE_ADD_HV", ret2 = BAM_ERROR);
+		if (ret2 == BAM_ERROR)
+			goto abort;
+	} else
+		ret2 = BAM_SUCCESS;
 
 	ret3 = bam_add_dboot(mp, osroot, grubsign,
 	    grubroot, root_optional(osroot, menu_root));

@@ -246,7 +246,6 @@ extern int is_sparc(void);
 #define	UPDATEDIR_64		"/platform/i86pc/amd64/updates"
 
 /* Hypervisors */
-#define	XEN_32			"/boot/xen.gz"
 #define	XEN_64			"/boot/amd64/xen.gz"
 #define	XEN_MENU		"/boot/$ISADIR/xen.gz"
 #define	HYPERVISOR_KERNEL	"/platform/i86xpv/kernel/$ISADIR/unix"

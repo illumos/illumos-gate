@@ -615,7 +615,7 @@ parse_args_internal(int argc, char *argv[])
 	opterr = 0;
 
 	error = 0;
-	while ((c = getopt(argc, argv, "a:d:fm:no:veFCR:p:Z")) != -1) {
+	while ((c = getopt(argc, argv, "a:d:fm:no:veFCR:p:XZ")) != -1) {
 		switch (c) {
 		case 'a':
 			if (bam_cmd) {
@@ -697,6 +697,9 @@ parse_args_internal(int argc, char *argv[])
 				error = 1;
 				bam_error(INVALID_PLAT, bam_platform);
 			}
+			break;
+		case 'X':
+			bam_is_hv = BAM_HV_PRESENT;
 			break;
 		case 'Z':
 			bam_zfs = 1;
