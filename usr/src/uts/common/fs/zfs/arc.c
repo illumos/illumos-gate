@@ -2842,41 +2842,6 @@ top:
 	return (0);
 }
 
-/*
- * arc_read() variant to support pool traversal.  If the block is already
- * in the ARC, make a copy of it; otherwise, the caller will do the I/O.
- * The idea is that we don't want pool traversal filling up memory, but
- * if the ARC already has the data anyway, we shouldn't pay for the I/O.
- */
-int
-arc_tryread(spa_t *spa, blkptr_t *bp, void *data)
-{
-	arc_buf_hdr_t *hdr;
-	kmutex_t *hash_mtx;
-	uint64_t guid = spa_guid(spa);
-	int rc = 0;
-
-	hdr = buf_hash_find(guid, BP_IDENTITY(bp), bp->blk_birth, &hash_mtx);
-
-	if (hdr && hdr->b_datacnt > 0 && !HDR_IO_IN_PROGRESS(hdr)) {
-		arc_buf_t *buf = hdr->b_buf;
-
-		ASSERT(buf);
-		while (buf->b_data == NULL) {
-			buf = buf->b_next;
-			ASSERT(buf);
-		}
-		bcopy(buf->b_data, data, hdr->b_size);
-	} else {
-		rc = ENOENT;
-	}
-
-	if (hash_mtx)
-		mutex_exit(hash_mtx);
-
-	return (rc);
-}
-
 void
 arc_set_callback(arc_buf_t *buf, arc_evict_func_t *func, void *private)
 {

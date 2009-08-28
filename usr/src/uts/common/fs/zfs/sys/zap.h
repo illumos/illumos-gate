@@ -255,6 +255,8 @@ int zap_join(objset_t *os, uint64_t fromobj, uint64_t intoobj, dmu_tx_t *tx);
 int zap_add_int(objset_t *os, uint64_t obj, uint64_t value, dmu_tx_t *tx);
 int zap_remove_int(objset_t *os, uint64_t obj, uint64_t value, dmu_tx_t *tx);
 int zap_lookup_int(objset_t *os, uint64_t obj, uint64_t value);
+int zap_increment_int(objset_t *os, uint64_t obj, uint64_t key, int64_t delta,
+    dmu_tx_t *tx);
 
 struct zap;
 struct zap_leaf;

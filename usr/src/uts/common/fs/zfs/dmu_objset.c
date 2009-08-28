@@ -1017,18 +1017,39 @@ dmu_objset_userused_enabled(objset_t *os)
 	    os->os_userused_dnode);
 }
 
+static void
+do_userquota_callback(objset_t *os, dnode_phys_t *dnp,
+    boolean_t subtract, dmu_tx_t *tx)
+{
+	static const char zerobuf[DN_MAX_BONUSLEN] = {0};
+	uint64_t user, group;
+
+	ASSERT(dnp->dn_type != 0 ||
+	    (bcmp(DN_BONUS(dnp), zerobuf, DN_MAX_BONUSLEN) == 0 &&
+	    DN_USED_BYTES(dnp) == 0));
+
+	if ((dnp->dn_flags & DNODE_FLAG_USERUSED_ACCOUNTED) &&
+	    0 == used_cbs[os->os_phys->os_type](dnp->dn_bonustype,
+	    DN_BONUS(dnp), &user, &group)) {
+		int64_t delta = DNODE_SIZE + DN_USED_BYTES(dnp);
+		if (subtract)
+			delta = -delta;
+		VERIFY(0 == zap_increment_int(os, DMU_USERUSED_OBJECT,
+		    user, delta, tx));
+		VERIFY(0 == zap_increment_int(os, DMU_GROUPUSED_OBJECT,
+		    group, delta, tx));
+	}
+}
+
 void
 dmu_objset_do_userquota_callbacks(objset_t *os, dmu_tx_t *tx)
 {
 	dnode_t *dn;
 	list_t *list = &os->os_synced_dnodes;
-	static const char zerobuf[DN_MAX_BONUSLEN] = {0};
 
 	ASSERT(list_head(list) == NULL || dmu_objset_userused_enabled(os));
 
 	while (dn = list_head(list)) {
-		dmu_object_type_t bonustype;
-
 		ASSERT(!DMU_OBJECT_IS_SPECIAL(dn->dn_object));
 		ASSERT(dn->dn_oldphys);
 		ASSERT(dn->dn_phys->dn_type == DMU_OT_NONE ||
@@ -1046,31 +1067,14 @@ dmu_objset_do_userquota_callbacks(objset_t *os, dmu_tx_t *tx)
 		}
 
 		/*
-		 * If the object was not previously
-		 * accounted, pretend that it was free.
+		 * We intentionally modify the zap object even if the
+		 * net delta (due to phys-oldphys) is zero.  Otherwise
+		 * the block of the zap obj could be shared between
+		 * datasets but need to be different between them after
+		 * a bprewrite.
 		 */
-		if (!(dn->dn_oldphys->dn_flags &
-		    DNODE_FLAG_USERUSED_ACCOUNTED)) {
-			bzero(dn->dn_oldphys, sizeof (dnode_phys_t));
-		}
-
-		/*
-		 * If the object was freed, use the previous bonustype.
-		 */
-		bonustype = dn->dn_phys->dn_bonustype ?
-		    dn->dn_phys->dn_bonustype : dn->dn_oldphys->dn_bonustype;
-		ASSERT(dn->dn_phys->dn_type != 0 ||
-		    (bcmp(DN_BONUS(dn->dn_phys), zerobuf,
-		    DN_MAX_BONUSLEN) == 0 &&
-		    DN_USED_BYTES(dn->dn_phys) == 0));
-		ASSERT(dn->dn_oldphys->dn_type != 0 ||
-		    (bcmp(DN_BONUS(dn->dn_oldphys), zerobuf,
-		    DN_MAX_BONUSLEN) == 0 &&
-		    DN_USED_BYTES(dn->dn_oldphys) == 0));
-		used_cbs[os->os_phys->os_type](os, bonustype,
-		    DN_BONUS(dn->dn_oldphys), DN_BONUS(dn->dn_phys),
-		    DN_USED_BYTES(dn->dn_oldphys),
-		    DN_USED_BYTES(dn->dn_phys), tx);
+		do_userquota_callback(os, dn->dn_oldphys, B_TRUE, tx);
+		do_userquota_callback(os, dn->dn_phys, B_FALSE, tx);
 
 		/*
 		 * The mutex is needed here for interlock with dnode_allocate.

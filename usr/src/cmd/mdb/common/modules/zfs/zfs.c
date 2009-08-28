@@ -36,6 +36,7 @@
 #include <sys/spa_impl.h>
 #include <sys/vdev_impl.h>
 #include <sys/zio_compress.h>
+#include <ctype.h>
 
 #ifndef _KERNEL
 #include "../genunix/list.h"
@@ -450,7 +451,7 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    DVA_GET_VDEV(dva), DVA_GET_OFFSET(dva));
 		mdb_printf("DVA[%d]:       GANG: %-5s  GRID:  %04x\t"
 		    "ASIZE: %llx\n", i, DVA_GET_GANG(dva) ? "TRUE" : "FALSE",
-		    DVA_GET_GRID(dva), DVA_GET_ASIZE(dva));
+		    (int)DVA_GET_GRID(dva), DVA_GET_ASIZE(dva));
 		mdb_printf("DVA[%d]: :%llu:%llx:%llx:%s%s%s%s\n", i,
 		    DVA_GET_VDEV(dva), DVA_GET_OFFSET(dva), BP_GET_PSIZE(&bp),
 		    BP_SHOULD_BYTESWAP(&bp) ? "e" : "",
@@ -464,7 +465,7 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    BP_GET_BYTEORDER(&bp) ? "LITTLE" : "BIG",
 	    doti[BP_GET_TYPE(&bp)].ot_name);
 	mdb_printf("BIRTH:  %-16llx   LEVEL: %-2d\tFILL:  %llx\n",
-	    bp.blk_birth, BP_GET_LEVEL(&bp), bp.blk_fill);
+	    bp.blk_birth, (int)BP_GET_LEVEL(&bp), bp.blk_fill);
 	mdb_printf("CKFUNC: %-16s\t\tCOMP:  %s\n",
 	    zci[BP_GET_CHECKSUM(&bp)].ci_name,
 	    zct[BP_GET_COMPRESS(&bp)].ci_name);
@@ -2145,6 +2146,114 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/* ARGSUSED */
+static int
+reference_cb(uintptr_t addr, const void *ignored, void *arg)
+{
+	static int gotid;
+	static mdb_ctf_id_t ref_id;
+	uintptr_t ref_holder;
+	uintptr_t ref_removed;
+	uint64_t ref_number;
+	boolean_t holder_is_str;
+	char holder_str[128];
+	boolean_t removed = (boolean_t)arg;
+
+	if (!gotid) {
+		if (mdb_ctf_lookup_by_name("struct reference", &ref_id) == -1) {
+			mdb_warn("couldn't find struct reference");
+			return (WALK_ERR);
+		}
+		gotid = TRUE;
+	}
+
+	if (GETMEMBID(addr, &ref_id, ref_holder, ref_holder) ||
+	    GETMEMBID(addr, &ref_id, ref_removed, ref_removed) ||
+	    GETMEMBID(addr, &ref_id, ref_number, ref_number))
+		return (WALK_ERR);
+
+	if (mdb_readstr(holder_str, sizeof (holder_str), ref_holder) != -1) {
+		char *cp;
+		holder_is_str = B_TRUE;
+		for (cp = holder_str; *cp; cp++) {
+			if (!isprint(*cp)) {
+				holder_is_str = B_FALSE;
+				break;
+			}
+		}
+	} else {
+		holder_is_str = B_FALSE;
+	}
+
+	if (removed)
+		mdb_printf("removed ");
+	mdb_printf("reference ");
+	if (ref_number != 1)
+		mdb_printf("with count=%llu ", ref_number);
+	mdb_printf("with tag %p", (void*)ref_holder);
+	if (holder_is_str)
+		mdb_printf(" \"%s\"", holder_str);
+	mdb_printf(", held at:\n");
+
+	(void) mdb_call_dcmd("whatis", addr, DCMD_ADDRSPEC, 0, NULL);
+
+	if (removed) {
+		mdb_printf("removed at:\n");
+		(void) mdb_call_dcmd("whatis", ref_removed,
+		    DCMD_ADDRSPEC, 0, NULL);
+	}
+
+	mdb_printf("\n");
+
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint64_t rc_count, rc_removed_count;
+	uintptr_t rc_list, rc_removed;
+	static int gotid;
+	static mdb_ctf_id_t rc_id;
+	ulong_t off;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (!gotid) {
+		if (mdb_ctf_lookup_by_name("struct refcount", &rc_id) == -1) {
+			mdb_warn("couldn't find struct refcount");
+			return (DCMD_ERR);
+		}
+		gotid = TRUE;
+	}
+
+	if (GETMEMBID(addr, &rc_id, rc_count, rc_count) ||
+	    GETMEMBID(addr, &rc_id, rc_removed_count, rc_removed_count))
+		return (DCMD_ERR);
+
+	mdb_printf("refcount_t at %p has %llu current holds, "
+	    "%llu recently released holds\n",
+	    addr, (longlong_t)rc_count, (longlong_t)rc_removed_count);
+
+	if (rc_count > 0)
+		mdb_printf("current holds:\n");
+	if (mdb_ctf_offsetof(rc_id, "rc_list", &off) == -1)
+		return (DCMD_ERR);
+	rc_list = addr + off/NBBY;
+	mdb_pwalk("list", reference_cb, (void*)B_FALSE, rc_list);
+
+	if (rc_removed_count > 0)
+		mdb_printf("released holds:\n");
+	if (mdb_ctf_offsetof(rc_id, "rc_removed", &off) == -1)
+		return (DCMD_ERR);
+	rc_removed = addr + off/NBBY;
+	mdb_pwalk("list", reference_cb, (void*)B_TRUE, rc_removed);
+
+	return (DCMD_OK);
+}
+
 /*
  * MDB module linkage information:
  *
@@ -2186,6 +2295,7 @@ static const mdb_dcmd_t dcmds[] = {
 	    "given a spa_t, print block type stats from last scrub",
 	    zfs_blkstats },
 	{ "zfs_params", "", "print zfs tunable parameters", zfs_params },
+	{ "refcount", "", "print refcount_t holders", refcount },
 	{ NULL }
 };
 

@@ -594,36 +594,18 @@ uidacct(objset_t *os, boolean_t isgroup, uint64_t fuid,
 	ASSERT(err == 0);
 }
 
-static void
-zfs_space_delta_cb(objset_t *os, dmu_object_type_t bonustype,
-    void *oldbonus, void *newbonus,
-    uint64_t oldused, uint64_t newused, dmu_tx_t *tx)
+static int
+zfs_space_delta_cb(dmu_object_type_t bonustype, void *bonus,
+    uint64_t *userp, uint64_t *groupp)
 {
-	znode_phys_t *oldznp = oldbonus;
-	znode_phys_t *newznp = newbonus;
+	znode_phys_t *znp = bonus;
 
 	if (bonustype != DMU_OT_ZNODE)
-		return;
+		return (ENOENT);
 
-	/* We charge 512 for the dnode (if it's allocated). */
-	if (oldznp->zp_gen != 0)
-		oldused += DNODE_SIZE;
-	if (newznp->zp_gen != 0)
-		newused += DNODE_SIZE;
-
-	if (oldznp->zp_uid == newznp->zp_uid) {
-		uidacct(os, B_FALSE, oldznp->zp_uid, newused-oldused, tx);
-	} else {
-		uidacct(os, B_FALSE, oldznp->zp_uid, -oldused, tx);
-		uidacct(os, B_FALSE, newznp->zp_uid, newused, tx);
-	}
-
-	if (oldznp->zp_gid == newznp->zp_gid) {
-		uidacct(os, B_TRUE, oldznp->zp_gid, newused-oldused, tx);
-	} else {
-		uidacct(os, B_TRUE, oldznp->zp_gid, -oldused, tx);
-		uidacct(os, B_TRUE, newznp->zp_gid, newused, tx);
-	}
+	*userp = znp->zp_uid;
+	*groupp = znp->zp_gid;
+	return (0);
 }
 
 static void

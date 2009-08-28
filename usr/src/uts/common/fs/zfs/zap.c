@@ -978,6 +978,30 @@ zap_lookup_int(objset_t *os, uint64_t obj, uint64_t value)
 	return (zap_lookup(os, obj, name, 8, 1, &value));
 }
 
+int
+zap_increment_int(objset_t *os, uint64_t obj, uint64_t key, int64_t delta,
+    dmu_tx_t *tx)
+{
+	char name[20];
+	uint64_t value = 0;
+	int err;
+
+	if (delta == 0)
+		return (0);
+
+	(void) snprintf(name, sizeof (name), "%llx", (longlong_t)key);
+	err = zap_lookup(os, obj, name, 8, 1, &value);
+	if (err != 0 && err != ENOENT)
+		return (err);
+	value += delta;
+	if (value == 0)
+		err = zap_remove(os, obj, name, tx);
+	else
+		err = zap_update(os, obj, name, 8, 1, &value, tx);
+	return (err);
+}
+
+
 /*
  * Routines for iterating over the attributes.
  */

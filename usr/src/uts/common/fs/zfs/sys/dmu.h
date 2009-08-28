@@ -581,9 +581,8 @@ extern int dmu_snapshot_realname(objset_t *os, char *name, char *real,
 extern int dmu_dir_list_next(objset_t *os, int namelen, char *name,
     uint64_t *idp, uint64_t *offp);
 
-typedef void objset_used_cb_t(objset_t *os, dmu_object_type_t bonustype,
-    void *oldbonus, void *newbonus, uint64_t oldused, uint64_t newused,
-    dmu_tx_t *tx);
+typedef int objset_used_cb_t(dmu_object_type_t bonustype,
+    void *bonus, uint64_t *userp, uint64_t *groupp);
 extern void dmu_objset_register_type(dmu_objset_type_t ost,
     objset_used_cb_t *cb);
 extern void dmu_objset_set_user(objset_t *os, void *user_ptr);
