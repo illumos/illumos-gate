@@ -46,17 +46,13 @@ ROOTDIRS =	$(ROOT)/usr/sadm/admin \
 
 ROOTBIN =	$(ROOT)/usr/sadm/admin/printmgr/classes
 ROOTBINPROG =   $(PROG:%=$(ROOTBIN)/%)
-ROOTAPPDIR =	$(ROOT)/usr/share/applications
-ROOTAPPFILE =	$(ROOTAPPDIR)/solaris-print-manager.desktop
-
-$(ROOTAPPFILE):= FILEMODE	= 444
 
 $(ROOTBINPROG):= FILEMODE	= 644
 
 .KEEP_STATE:
 
 all:		$(SUBDIRS)
-install:	$(SUBDIRS) $(ROOTDIRS) $(ROOTBINPROG) $(ROOTAPPFILE) .WAIT links
+install:	$(SUBDIRS) $(ROOTDIRS) $(ROOTBINPROG) .WAIT links
 
 links:
 		$(RM) $(ROOTUSRSBIN)/printmgr
@@ -78,9 +74,6 @@ $(PROG): FRC
 	else $(JAR) cf $@ \
 		com/sun/admin/pm/server/*class 2>/dev/null; \
 	fi
-
-$(ROOTAPPDIR)/%:	%
-	$(INS.file)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

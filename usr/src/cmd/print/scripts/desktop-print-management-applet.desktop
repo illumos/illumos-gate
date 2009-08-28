@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -28,7 +28,7 @@
 Encoding=UTF-8
 Name=Desktop Printing Monitoring applet
 Comment=Show balloon dialog for printers 
-Icon=print-manager.png
+Icon=print-manager
 Exec=env DESKTOP_LAUNCHED=true /usr/bin/desktop-print-management-applet
 Terminal=false
 Type=Application
