@@ -21,11 +21,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ndrgen.h"
 
@@ -48,7 +46,7 @@ typedef struct node *node_ptr;
 
 /* symbols and punctuation */
 %token IDENTIFIER INTEGER STRING
-%token LC RC SEMI STAR LB RB LP RP
+%token LC RC SEMI STAR DIV MOD PLUS MINUS AND OR XOR LB RB LP RP
 
 
 %token L_MEMBER
@@ -113,12 +111,23 @@ adv_attr:	IN_KW			={ $$ = n_cons (IN_KW); }
 	|	OUT_KW			={ $$ = n_cons (OUT_KW); }
 	|	OPERATION_KW LP arg RP	={ $$ = n_cons (OPERATION_KW, $3); }
 	|	ALIGN_KW LP arg RP	={ $$ = n_cons (ALIGN_KW, $3); }
-
 	|	STRING_KW		={ $$ = n_cons (STRING_KW); }
-	|	SIZE_IS_KW LP arg RP	={ $$ = n_cons (SIZE_IS_KW, $3); }
-	|	LENGTH_IS_KW LP arg RP	={ $$ = n_cons (LENGTH_IS_KW, $3); }
 
-	|	SWITCH_IS_KW LP arg RP	={ $$ = n_cons (SWITCH_IS_KW, $3); }
+	|	SIZE_IS_KW LP arg RP
+				={ $$ = n_cons (SIZE_IS_KW, $3, $3, $3); }
+	|	SIZE_IS_KW LP arg operator INTEGER RP
+				={ $$ = n_cons (SIZE_IS_KW, $3, $4, $5); }
+
+	|	LENGTH_IS_KW LP arg RP
+				={ $$ = n_cons (LENGTH_IS_KW, $3, $3, $3); }
+	|	LENGTH_IS_KW LP arg operator INTEGER RP
+				={ $$ = n_cons (LENGTH_IS_KW, $3, $4, $5); }
+
+	|	SWITCH_IS_KW LP arg RP
+				={ $$ = n_cons (SWITCH_IS_KW, $3, $3, $3); }
+	|	SWITCH_IS_KW LP arg operator INTEGER RP
+				={ $$ = n_cons (SWITCH_IS_KW, $3, $4, $5); }
+
 	|	CASE_KW LP arg RP	={ $$ = n_cons (CASE_KW, $3); }
 	|	DEFAULT_KW		={ $$ = n_cons (DEFAULT_KW); }
 
@@ -146,6 +155,16 @@ type	:	BASIC_TYPE
 
 typename:	TYPENAME
 	|	IDENTIFIER
+	;
+
+operator:	STAR
+	|	DIV
+	|	MOD
+	|	PLUS
+	|	MINUS
+	|	AND
+	|	OR
+	|	XOR
 	;
 
 declarator:	decl1

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include "ndrgen.h"
@@ -219,18 +217,30 @@ generate_union(ndr_typeinfo_t *ti)
 static void
 generate_arg(ndr_node_t *np)
 {
-	if (np) {
-		if (np->label != IDENTIFIER && np->label != INTEGER)
-			np = np->n_a_arg;
-	} else {
-		/* this is bogus */
-		np = n_cons(IDENTIFIER, sym_enter("?WHAT?"));
+	ndr_node_t	*arg = np;
+
+	if (np == NULL) {
+		compile_error("invalid node pointer <null>");
+		return;
 	}
 
-	if (np->label == IDENTIFIER)
-		(void) printf("val->%s", np->n_sym->name);
-	else
-		print_node(np);
+	if (np->label != IDENTIFIER && np->label != INTEGER)
+		arg = np->n_a_arg;
+
+	switch (np->label) {
+	case SIZE_IS_KW:
+	case LENGTH_IS_KW:
+	case SWITCH_IS_KW:
+		(void) printf("val->");
+		print_field_attr(np);
+		break;
+	default:
+		if (arg->label == IDENTIFIER)
+			(void) printf("val->%s", arg->n_sym->name);
+		else
+			print_node(arg);
+		break;
+	}
 }
 
 static void

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -138,12 +136,20 @@ static ndr_keyword_t optable[] = {
 	{ "[",		LB,		0 },
 	{ "]",		RB,		0 },
 	{ "*",		STAR,		0 },
+	{ "/",		DIV,		0 },
+	{ "%",		MOD,		0 },
+	{ "-",		MINUS,		0 },
+	{ "+",		PLUS,		0 },
+	{ "&",		AND,		0 },
+	{ "|",		OR,		0 },
+	{ "^",		XOR,		0 },
 	{ ";",		SEMI,		0 },
 	{0}
 };
 
 static int getch(FILE *fp);
 static ndr_integer_t *int_enter(long);
+static ndr_symbol_t *sym_enter(char *);
 static ndr_symbol_t *sym_find(char *);
 static int str_to_sv(char *, char *sv[]);
 
@@ -368,7 +374,10 @@ convert_icon:
 		return (sym->kw->token);
 	}
 
-	compile_error("unrecognized character 0x%02x", c);
+	if (is_between(c, ' ', '~'))
+		compile_error("unrecognized character: 0x%02x (%c)", c, c);
+	else
+		compile_error("unrecognized character: 0x%02x", c);
 	goto top;
 }
 
@@ -386,7 +395,7 @@ sym_find(char *name)
 	return (0);
 }
 
-ndr_symbol_t *
+static ndr_symbol_t *
 sym_enter(char *name)
 {
 	ndr_symbol_t		**pp;

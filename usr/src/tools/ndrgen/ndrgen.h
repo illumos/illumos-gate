@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _NDRGEN_H
 #define	_NDRGEN_H
@@ -69,6 +67,8 @@ typedef struct node {
 #define	n_m_name	n_node[3]
 
 #define	n_a_arg		n_node[0]
+#define	n_a_arg1	n_node[1]
+#define	n_a_arg2	n_node[2]
 
 #define	n_d_descend	n_node[0]
 #define	n_d_dim		n_node[1]
@@ -193,7 +193,6 @@ extern int		n_compile_error;
 extern struct node	*yylval;
 extern void		set_lex_input(FILE *, char *);
 extern int		yylex(void);
-extern ndr_symbol_t	*sym_enter(char *);
 extern void *		ndr_alloc(size_t nelem, size_t elsize);
 extern void		compile_error(const char *, ...);
 extern void		fatal_error(const char *, ...);
@@ -203,6 +202,7 @@ extern void		n_splice(struct node *, struct node *);
 /* ndr_print.c */
 extern void	tdata_dump(void);
 extern void	print_node(ndr_node_t *);
+extern void	print_field_attr(ndr_node_t *);
 
 /* ndr_parse.y */
 extern int	yyparse(void);

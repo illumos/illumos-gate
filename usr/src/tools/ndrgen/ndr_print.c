@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ndrgen.h"
 #include "y.tab.h"
@@ -120,9 +118,14 @@ print_node(ndr_node_t *np)
 		(void) printf(")");
 		break;
 
-	case INTERFACE_KW:
 	case SIZE_IS_KW:
 	case LENGTH_IS_KW:
+		(void) printf("%s(", nm);
+		print_field_attr(np);
+		(void) printf(")");
+		break;
+
+	case INTERFACE_KW:
 	case TRANSMIT_AS_KW:
 	case ARG_IS_KW:
 	case CASE_KW:
@@ -180,6 +183,62 @@ print_node(ndr_node_t *np)
 	default:
 		return;
 	}
+}
+
+/*
+ * Field attributes are used to specify the size of an array, or the portion
+ * of the array, that contains valid data, which is done by associating
+ * another parameter with the array that contains the sizing information.
+ *
+ * Supports formats such as size_is(x) or size_is(x / 2).  The supported
+ * operators are:
+ *
+ * 	* / % + - & | ^
+ */
+void
+print_field_attr(ndr_node_t *np)
+{
+	static char	*valid = "*/%+-&|^";
+	ndr_node_t	*arg;
+	char		*name;
+	char		*operator;
+	long		value;
+
+	arg = np->n_a_arg;
+	if (arg->label != IDENTIFIER)
+		fatal_error("invalid label %d", arg->label);
+	if ((name = arg->n_sym->name) == NULL)
+		fatal_error("missing symbol name");
+
+	arg = np->n_a_arg1;
+	operator = NULL;
+	if (arg->label == IDENTIFIER) {
+		operator = arg->n_sym->name;
+
+		if (operator != NULL) {
+			/*
+			 * The lexer sets the name and operator to
+			 * the same value if there is no operator.
+			 */
+			if (strcmp(name, operator) == 0)
+				operator = NULL;
+			else if (strchr(valid, *operator) == NULL)
+				compile_error("invalid operator: %s", operator);
+		}
+	}
+
+	arg = np->n_a_arg2;
+	if (arg->label == INTEGER) {
+		value = arg->n_int;
+
+		if ((value == 0) && strcmp(operator, "/") == 0)
+			compile_error("divide by zero");
+	}
+
+	if (operator)
+		(void) printf("%s %s %ldUL", name, operator, value);
+	else
+		(void) printf("%s", name);
 }
 
 static void
