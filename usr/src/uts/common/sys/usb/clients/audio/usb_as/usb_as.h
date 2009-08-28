@@ -86,6 +86,9 @@ typedef struct usb_as_state {
 	uint_t			usb_as_dev_state;
 	uint_t			usb_as_ifno;
 	kmutex_t		usb_as_mutex;
+	kcondvar_t		usb_as_pipe_cv;
+
+
 	uint_t			usb_as_flag;		/* status */
 
 	/* mblk containing the current control command */
@@ -111,7 +114,7 @@ typedef struct usb_as_state {
 	/* Isoc pipe stuff */
 	usb_pipe_handle_t	usb_as_isoc_ph;
 	usb_pipe_policy_t	usb_as_isoc_pp;
-	audiohdl_t		usb_as_ahdl;
+	void *		usb_as_ahdl;
 
 	uint_t			usb_as_request_count;
 	uint_t			usb_as_request_samples;

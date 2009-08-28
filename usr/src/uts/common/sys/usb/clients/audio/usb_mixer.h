@@ -49,12 +49,11 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared", usb_audio_formats))
 
 typedef struct usb_audio_play_req {
 	int 		up_samples;
-	audiohdl_t 	up_handle;
+	void		*up_handle;
 } usb_audio_play_req_t;
 
 #define	USB_AS_N_SRS		20
 #define	USB_AS_N_FORMATS	20
-#define	USB_AS_N_COMBINATIONS	USB_AS_N_FORMATS
 #define	USB_AS_N_CHANNELS	3
 
 typedef struct usb_as_registration {
@@ -65,7 +64,6 @@ typedef struct usb_as_registration {
 	uint_t			reg_srs[USB_AS_N_SRS];
 	usb_audio_formats_t	reg_formats[USB_AS_N_FORMATS];
 	uint_t			reg_channels[USB_AS_N_CHANNELS];
-	am_ad_cap_comb_t	reg_combinations[USB_AS_N_COMBINATIONS];
 } usb_as_registration_t;
 
 /* MCTLs between usb_ac and usb_as */

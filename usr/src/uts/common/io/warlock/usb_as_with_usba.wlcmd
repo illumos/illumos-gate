@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,7 +21,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one ohci_state
 one ehci_state
@@ -45,6 +44,7 @@ root	usb_get_if_number
 root	usb_parse_CV_cfg_descr
 root	usb_parse_CV_ep_descr
 root	usb_parse_CV_if_descr
+root	usb_parse_comp_ep_descr
 root	usb_pipe_get_private
 root	usb_get_current_frame_number
 root	usb_get_max_isoc_pkts
@@ -90,6 +90,12 @@ root	usb_register_hotplug_cbs
 root	usb_get_current_cfgidx
 root    usb_register_client
 root	usb_reset_device
+root    usb_register_dev_driver
+root    usb_unregister_dev_driver
+
+root    ohci_quiesce
+root    uhci_quiesce
+root    ehci_quiesce
 
 root    usb_ugen_attach
 root    usb_ugen_close
@@ -106,12 +112,10 @@ root    usb_ugen_write
 ### specify the usb_as root functions
 root	usb_as_open
 root	usb_as_close
-root	usb_as_wsrv
 root	usb_as_disconnect_event_cb
 root	usb_as_reconnect_event_cb
 root	usb_as_power
 
-root	usb_as_isoc_close_cb
 root	usb_as_play_cb
 root	usb_as_play_exc_cb
 root	usb_as_record_cb
@@ -152,6 +156,7 @@ root	hubd_reset_thread
 root	hubd_cpr_post_user_callb
 root	hubd_bus_power
 
+add hubd::h_cleanup_child targets warlock_dummy
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_close
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_reset
 

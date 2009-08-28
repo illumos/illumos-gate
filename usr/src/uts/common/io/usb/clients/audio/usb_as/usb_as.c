@@ -25,10 +25,6 @@
 
 /*
  * Audio Streams Interface Driver:
- * This driver is derived from the legacy SADA streams-based usb_as driver
- * and serves as an intermediate measure before the full conversion to the
- * to the Boomer framework in a follow-on phase of the Boomer project, which
- * will utilize more comprehensive USB audio features as well.
  *
  * usb_as is responsible for (1) Processing audio data messages during
  * play and record and management of isoc pipe, (2) Selecting correct
@@ -58,16 +54,13 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#include <sys/audio.h>
-#include <sys/audio/audio_support.h>
-#include <sys/mixer.h>
-#include <sys/audio/audio_mixer.h>
+#include <sys/audio/audio_driver.h>
 
 #include <sys/usb/clients/audio/usb_audio.h>
 #include <sys/usb/clients/audio/usb_mixer.h>
 #include <sys/usb/clients/audio/usb_as/usb_as.h>
+#include <sys/usb/clients/audio/usb_ac/usb_ac.h>
 
-#include "../usb_ac/audio_shim.h"
 
 /* debug support */
 uint_t	usb_as_errlevel	= USB_LOG_L4;
@@ -94,7 +87,6 @@ static void	usb_as_prepare_registration_data(usb_as_state_t *);
 static int	usb_as_valid_format(usb_as_state_t *, uint_t,
 				uint_t *, uint_t);
 static void	usb_as_free_alts(usb_as_state_t *);
-static int	usb_audio_fmt_convert(int);
 
 static void	usb_as_create_pm_components(dev_info_t *, usb_as_state_t *);
 static int	usb_as_disconnect_event_cb(dev_info_t *);
@@ -123,7 +115,7 @@ static int	usb_as_set_sample_freq(usb_as_state_t *, int);
 static int	usb_as_send_ctrl_cmd(usb_as_state_t *, uchar_t, uchar_t,
 			ushort_t, ushort_t, ushort_t, mblk_t *, boolean_t);
 
-static int	usb_as_start_record(usb_as_state_t *, audiohdl_t);
+static int	usb_as_start_record(usb_as_state_t *, void *);
 static int	usb_as_stop_record(usb_as_state_t *);
 static void	usb_as_play_cb(usb_pipe_handle_t, usb_isoc_req_t *);
 static void	usb_as_record_cb(usb_pipe_handle_t, usb_isoc_req_t *);
@@ -213,6 +205,9 @@ static uint_t usb_as_default_srs[] = {
 	32000,	33075, 37800, 44100, 48000, 0
 };
 
+_NOTE(SCHEME_PROTECTS_DATA("unique per call", mblk_t))
+_NOTE(SCHEME_PROTECTS_DATA("unique per call", usb_isoc_req_t))
+_NOTE(SCHEME_PROTECTS_DATA("unique per call", usb_isoc_pkt_descr))
 
 int
 _init(void)
@@ -360,6 +355,9 @@ usb_as_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* initialize mutex */
 	mutex_init(&uasp->usb_as_mutex, NULL, MUTEX_DRIVER,
 	    uasp->usb_as_dev_data->dev_iblock_cookie);
+
+	cv_init(&uasp->usb_as_pipe_cv, NULL, CV_DRIVER, NULL);
+
 	uasp->usb_as_ser_acc = usb_init_serialization(dip,
 	    USB_INIT_SER_CHECK_SAME_THREAD);
 
@@ -676,7 +674,7 @@ usb_as_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		usb_as_pause_play(uasp);
 		break;
 	case USB_AUDIO_START_RECORD:
-		rv = usb_as_start_record(uasp, *(audiohdl_t *)arg);
+		rv = usb_as_start_record(uasp, (void *)arg);
 		break;
 	case USB_AUDIO_STOP_RECORD:
 		rv = usb_as_stop_record(uasp);
@@ -776,8 +774,6 @@ usb_as_set_format(usb_as_state_t *uasp, usb_audio_formats_t *format)
 		return (USB_FAILURE);
 	}
 
-	ASSERT(uasp->usb_as_isoc_ph == NULL);
-
 	reg = &uasp->usb_as_reg;
 	interface = uasp->usb_as_ifno;
 
@@ -808,7 +804,6 @@ usb_as_set_format(usb_as_state_t *uasp, usb_audio_formats_t *format)
 		return (USB_FAILURE);
 	}
 
-	ASSERT(uasp->usb_as_isoc_ph == NULL);
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_set_format: interface=%d alternate=%d",
@@ -850,21 +845,37 @@ usb_as_setup(usb_as_state_t *uasp)
 	usb_ep_descr_t *ep = (usb_ep_descr_t *)uasp->usb_as_alts[alt].alt_ep;
 	int rval;
 
+
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_setup: Begin usb_as_setup, inst=%d",
 	    ddi_get_instance(uasp->usb_as_dip));
 
-	ASSERT(uasp->usb_as_request_count == 0);
 
 	/* Set record packet size to max packet size */
-	if (uasp->usb_as_alts[alt].alt_mode == AUDIO_RECORD) {
+	if (uasp->usb_as_alts[alt].alt_mode == USB_AUDIO_RECORD) {
 		uasp->usb_as_record_pkt_size = ep->wMaxPacketSize;
 	} else {
 		uasp->usb_as_record_pkt_size = 0;
 	}
 
+	if (uasp->usb_as_isoc_ph != NULL) {
+		while (uasp->usb_as_request_count) {
+			cv_wait(&uasp->usb_as_pipe_cv,
+			    &uasp->usb_as_mutex);
+		}
+
+		/* close the isoc pipe which is opened before */
+		mutex_exit(&uasp->usb_as_mutex);
+		usb_pipe_close(uasp->usb_as_dip, uasp->usb_as_isoc_ph,
+		    USB_FLAGS_SLEEP, NULL, (usb_opaque_t)NULL);
+
+		mutex_enter(&uasp->usb_as_mutex);
+		uasp->usb_as_isoc_ph = NULL;
+	}
+
+	ASSERT(uasp->usb_as_request_count == 0);
 	mutex_exit(&uasp->usb_as_mutex);
 
 	/* open isoc pipe, may fail if there is no bandwidth  */
@@ -922,27 +933,10 @@ usb_as_teardown(usb_as_state_t *uasp)
 
 	uasp->usb_as_audio_state = USB_AS_IDLE;
 
-	if (uasp->usb_as_isoc_ph) {
-		USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-		    "usb_as_teardown: closing isoc pipe, ph=0x%p",
-		    (void *)uasp->usb_as_isoc_ph);
+	ASSERT(uasp->usb_as_isoc_ph);
+	/* reset setup flag */
+	uasp->usb_as_setup_cnt--;
 
-		mutex_exit(&uasp->usb_as_mutex);
-
-		/* reply mp will be sent up in isoc close callback */
-		usb_pipe_close(uasp->usb_as_dip, uasp->usb_as_isoc_ph,
-		    USB_FLAGS_SLEEP, NULL, (usb_opaque_t)NULL);
-
-		mutex_enter(&uasp->usb_as_mutex);
-		uasp->usb_as_isoc_ph = NULL;
-
-		/* reset setup flag */
-		uasp->usb_as_setup_cnt--;
-
-	} else {
-		USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
-		    "usb_as_teardown: Pipe already closed");
-	}
 
 	ASSERT(uasp->usb_as_setup_cnt == 0);
 
@@ -1050,7 +1044,7 @@ usb_as_continue_play(usb_as_state_t *uasp)
 static void
 usb_as_handle_shutdown(usb_as_state_t *uasp)
 {
-	audiohdl_t	ahdl;
+	void	*ahdl;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_handle_shutdown, inst=%d",
@@ -1064,7 +1058,7 @@ usb_as_handle_shutdown(usb_as_state_t *uasp)
 	ahdl = uasp->usb_as_ahdl;
 
 	mutex_exit(&uasp->usb_as_mutex);
-	am_play_shutdown(ahdl);
+	usb_ac_stop_play(ahdl, NULL);
 	mutex_enter(&uasp->usb_as_mutex);
 }
 
@@ -1077,7 +1071,7 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 	usb_isoc_req_t *isoc_req = NULL;
 	usb_audio_formats_t *format = &uasp->usb_as_curr_format;
 	mblk_t		*data = NULL;
-	audiohdl_t	ahdl = uasp->usb_as_ahdl;
+	void *	ahdl = uasp->usb_as_ahdl;
 	int		precision;
 	int		pkt, frame, n, n_pkts, count;
 	size_t		bufsize;
@@ -1086,15 +1080,15 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 	ASSERT(mutex_owned(&uasp->usb_as_mutex));
 
 	/* we only support two precisions */
-	if ((format->fmt_precision != AUDIO_PRECISION_8) &&
-	    (format->fmt_precision != AUDIO_PRECISION_16)) {
+	if ((format->fmt_precision != USB_AUDIO_PRECISION_8) &&
+	    (format->fmt_precision != USB_AUDIO_PRECISION_16)) {
 
 		rval = USB_FAILURE;
 
 		goto done;
 	}
 
-	precision = (format->fmt_precision == AUDIO_PRECISION_8) ? 1 : 2;
+	precision = (format->fmt_precision == USB_AUDIO_PRECISION_8) ? 1 : 2;
 
 	frame = uasp->usb_as_pkt_count;
 
@@ -1122,14 +1116,14 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 	}
 
 	/*
-	 * restriction of Boomer: cannot call am_get_audio() in the context
+	 * restriction of Boomer: cannot call usb_ac_get_audio() in the context
 	 * of start so we play a fragment of silence at first
 	 */
 	if (play_req != NULL) {
 		bzero(data->b_wptr, bufsize);
 		count = bufsize / precision;
 
-	} else if ((count = am_get_audio(ahdl, (void *)data->b_wptr,
+	} else if ((count = usb_ac_get_audio(ahdl, (void *)data->b_wptr,
 	    bufsize / precision)) == 0) {
 		mutex_enter(&uasp->usb_as_mutex);
 		if (uasp->usb_as_request_count == 0) {
@@ -1183,20 +1177,6 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 	}
 
 
-#if defined(_BIG_ENDIAN)
-	/* byte swap if necessary */
-	if (format->fmt_precision == AUDIO_PRECISION_16) {
-		int i;
-		uchar_t tmp;
-		uchar_t *p = data->b_rptr;
-
-		for (i = 0; i < bufsize; i += 2, p += 2) {
-			tmp = *p;
-			*p = *(p + 1);
-			*(p + 1) = tmp;
-		}
-	}
-#endif
 
 	/* initialize the packet descriptor */
 	for (pkt = 0; pkt < n_pkts; pkt++) {
@@ -1231,6 +1211,7 @@ usb_as_play_isoc_data(usb_as_state_t *uasp, usb_audio_play_req_t *play_req)
 
 		mutex_enter(&uasp->usb_as_mutex);
 		uasp->usb_as_request_count--;
+		cv_signal(&uasp->usb_as_pipe_cv);
 		uasp->usb_as_send_debug_count--;
 		uasp->usb_as_pkt_count -= n_pkts;
 
@@ -1307,6 +1288,7 @@ usb_as_play_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 
 	usb_free_isoc_req(isoc_req);
 	uasp->usb_as_request_count--;
+	cv_signal(&uasp->usb_as_pipe_cv);
 	uasp->usb_as_rcv_debug_count++;
 	usb_as_continue_play(uasp);
 
@@ -1355,6 +1337,7 @@ usb_as_play_exc_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 	mutex_enter(&uasp->usb_as_mutex);
 	uasp->usb_as_rcv_debug_count++;
 	uasp->usb_as_request_count--;
+	cv_signal(&uasp->usb_as_pipe_cv);
 	usb_as_handle_shutdown(uasp);
 
 	USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
@@ -1373,7 +1356,7 @@ usb_as_play_exc_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
  * usb_as_start_record
  */
 static int
-usb_as_start_record(usb_as_state_t *uasp, audiohdl_t ahdl)
+usb_as_start_record(usb_as_state_t *uasp, void * ahdl)
 {
 	int		rval = USB_FAILURE;
 	usb_isoc_req_t *isoc_req;
@@ -1552,7 +1535,7 @@ usb_as_record_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 {
 	usb_as_state_t *uasp = (usb_as_state_t *)isoc_req->isoc_client_private;
 	int		i, offset, sz;
-	audiohdl_t	ahdl;
+	void *	ahdl;
 	usb_audio_formats_t *format = &uasp->usb_as_curr_format;
 	int		precision;
 
@@ -1572,26 +1555,10 @@ usb_as_record_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 	mutex_enter(&uasp->usb_as_mutex);
 	ahdl = uasp->usb_as_ahdl;
 	sz = uasp->usb_as_record_pkt_size;
-	precision = (format->fmt_precision == AUDIO_PRECISION_8) ? 1 : 2;
+	precision = (format->fmt_precision == USB_AUDIO_PRECISION_8) ? 1 : 2;
 
 	if (uasp->usb_as_audio_state != USB_AS_IDLE) {
-#if defined(_BIG_ENDIAN)
-		unsigned char	*ptr = isoc_req->isoc_data->b_rptr;
-#endif
 		for (offset = i = 0; i < isoc_req->isoc_pkts_count; i++) {
-#if defined(_BIG_ENDIAN)
-			int len = isoc_req->isoc_pkt_descr[i].
-			    isoc_pkt_actual_length;
-			/* do byte swap for precision 16 */
-			if (format->fmt_precision == AUDIO_PRECISION_16) {
-				int  j;
-				for (j = 0; j < len; j += 2, ptr += 2) {
-					char t = *ptr;
-					*ptr = *(ptr + 1);
-					*(ptr + 1) = t;
-				}
-			}
-#endif
 			USB_DPRINTF_L3(PRINT_MASK_CB, uasp->usb_as_log_handle,
 			    "\tpkt%d: "
 			    "offset=%d pktsize=%d len=%d status=%d resid=%d",
@@ -1610,7 +1577,7 @@ usb_as_record_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 			}
 			mutex_exit(&uasp->usb_as_mutex);
 
-			am_send_audio(ahdl,
+			usb_ac_send_audio(ahdl,
 			    isoc_req->isoc_data->b_rptr + offset,
 			    isoc_req->isoc_pkt_descr[i].isoc_pkt_actual_length /
 			    precision);
@@ -1693,7 +1660,7 @@ usb_as_get_pktsize(usb_as_state_t *uasp, usb_audio_formats_t *format,
 			pkt_size = (((frameno + 1) % cycle) ?
 			    pkt : (pkt + extra));
 			pkt_size *= ((format->fmt_precision ==
-			    AUDIO_PRECISION_16) ? 2 : 1)
+			    USB_AUDIO_PRECISION_16) ? 2 : 1)
 			    * format->fmt_chns;
 			break;
 		}
@@ -2167,7 +2134,7 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 
 		uasp->usb_as_alts[alternate].alt_mode  =
 		    (ep->bEndpointAddress & USB_EP_DIR_IN) ?
-		    AUDIO_RECORD : AUDIO_PLAY;
+		    USB_AUDIO_RECORD : USB_AUDIO_PLAY;
 
 		if (ep_data->ep_n_cvs == 0) {
 			USB_DPRINTF_L2(PRINT_MASK_ATTA,
@@ -2273,7 +2240,7 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 	usb_audio_type1_format_descr_t	*format;
 	uchar_t n_alternates = uasp->usb_as_n_alternates;
 	uchar_t channels[3];
-	int alt, n, i, t;
+	int alt, n;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
 	    "usb_as_prepare_registration_data:");
@@ -2334,7 +2301,7 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 			reg->reg_formats[n].fmt_precision =
 			    format->bBitResolution;
 			reg->reg_formats[n++].fmt_encoding =
-			    usb_audio_fmt_convert(format->bFormatType);
+			    format->bFormatType;
 			/* count how many mono and stereo we have */
 			channels[format->bNrChannels]++;
 		}
@@ -2353,7 +2320,9 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 	/* dump what we have so far */
 	for (n = 0; n < reg->reg_n_formats; n++) {
 		USB_DPRINTF_L3(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
-		    "format%d: alt=%d chns=%d prec=%d enc=%d", n,
+		    "regformats[%d]: termlink = %d, alt=%d chns=%d"
+		    " prec=%d enc=%d", n,
+		    reg->reg_formats[n].fmt_termlink,
 		    reg->reg_formats[n].fmt_alt,
 		    reg->reg_formats[n].fmt_chns,
 		    reg->reg_formats[n].fmt_precision,
@@ -2367,44 +2336,16 @@ usb_as_prepare_registration_data(usb_as_state_t   *uasp)
 	 */
 	n = 0;
 	if (channels[1]) {
-		reg->reg_channels[n++] = AUDIO_CHANNELS_MONO;
+		reg->reg_channels[n++] = 1;
 	}
 	if (channels[2]) {
-		reg->reg_channels[n] = AUDIO_CHANNELS_STEREO;
+		reg->reg_channels[n] = 2;
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
 	    "channels %d %d", reg->reg_channels[0], reg->reg_channels[1]);
 
 
-	/* fill out combinations */
-	for (i = n = 0; n < reg->reg_n_formats; n++) {
-		uchar_t prec = reg->reg_formats[n].fmt_precision;
-		uchar_t enc = reg->reg_formats[n].fmt_encoding;
-
-		/* check if already there */
-		for (t = 0; t < n; t++) {
-			uchar_t ad_prec = reg->reg_combinations[t].ad_prec;
-			uchar_t ad_enc = reg->reg_combinations[t].ad_enc;
-			if ((prec == ad_prec) && (enc == ad_enc)) {
-				break;
-			}
-		}
-
-		/* if not, add this combination */
-		if (t == n) {
-			reg->reg_combinations[i].ad_prec = prec;
-			reg->reg_combinations[i++].ad_enc = enc;
-		}
-	}
-
-
-	USB_DPRINTF_L3(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
-	    "combinations: %d %d %d %d %d %d %d %d",
-	    reg->reg_combinations[0].ad_prec, reg->reg_combinations[0].ad_enc,
-	    reg->reg_combinations[1].ad_prec, reg->reg_combinations[1].ad_enc,
-	    reg->reg_combinations[2].ad_prec, reg->reg_combinations[2].ad_enc,
-	    reg->reg_combinations[3].ad_prec, reg->reg_combinations[3].ad_enc);
 
 	reg->reg_valid++;
 }
@@ -2489,7 +2430,7 @@ usb_as_valid_format(usb_as_state_t *uasp, uint_t alternate,
 				break;
 			}
 
-			USB_DPRINTF_L4(PRINT_MASK_PM, uasp->usb_as_log_handle,
+			USB_DPRINTF_L3(PRINT_MASK_PM, uasp->usb_as_log_handle,
 			    "checking sr=%d", sr);
 			for (i = 0; i < alt_descr->alt_n_sample_rates; i++) {
 				if (sr == alt_descr->alt_sample_rates[i]) {
@@ -2544,30 +2485,6 @@ usb_as_valid_format(usb_as_state_t *uasp, uint_t alternate,
 }
 
 
-/*
- * convert  usb audio format type to SADA type
- */
-static int
-usb_audio_fmt_convert(int type)
-{
-	switch (type) {
-	case USB_AUDIO_FORMAT_TYPE1_PCM:
-		return (AUDIO_ENCODING_LINEAR);
-
-	case USB_AUDIO_FORMAT_TYPE1_PCM8:
-		return (AUDIO_ENCODING_LINEAR8);
-
-	case USB_AUDIO_FORMAT_TYPE1_ALAW:
-		return (AUDIO_ENCODING_ALAW);
-
-	case USB_AUDIO_FORMAT_TYPE1_MULAW:
-		return (AUDIO_ENCODING_ULAW);
-
-	case USB_AUDIO_FORMAT_TYPE1_IEEE_FLOAT:
-	default:
-		return (0);
-	}
-}
 
 
 /*

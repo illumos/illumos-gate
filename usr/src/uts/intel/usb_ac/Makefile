@@ -120,16 +120,9 @@ EHCI_FILES	= $(EHCI_OBJS:%.o=../ehci/%.ll)
 warlock: $(WARLOCK_OK)
 
 $(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
-	warlock_audiosup.files warlock_mixer.files \
-	warlock_standalone warlock_with_usba  warlock_with_sada
+	warlock_standalone warlock_usba.files warlock_with_usba
 	$(TOUCH) $(WARLOCK_OK)
-
-warlock_with_sada: $(WLCMD_DIR)/usb_ac_with_sada.wlcmd \
-	$(WARLOCK_OUT) \
-	warlock_audiosup.files  warlock_mixer.files warlock_amsrc2.files 
-	$(WARLOCK) -c $(WLCMD_DIR)/usb_ac_with_sada.wlcmd $(WARLOCK_OUT) \
-	-l ../warlock/ddi_dki_impl.ll
-
+	
 
 warlock_with_usba: $(WLCMD_DIR)/usb_ac_with_usba.wlcmd  $(WARLOCK_OUT) \
 	warlock_ddi.files warlock_usba.files warlock_ohci.files \
@@ -159,12 +152,3 @@ warlock_ehci.files:
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock
-
-warlock_audiosup.files:
-	@cd ../audiosup; pwd; $(MAKE) warlock
-
-warlock_mixer.files:
-	@cd ../mixer; pwd; $(MAKE) warlock
-
-warlock_amsrc2.files:
-	@cd ../amsrc2; pwd; $(MAKE) warlock

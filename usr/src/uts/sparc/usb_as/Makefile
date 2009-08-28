@@ -108,7 +108,7 @@ TEST		= test
 #
 #	lock_lint rules
 #
-USBA_FILES	= $(USBA_OBJS:%.o=../usba/%.ll)
+USBA_FILES	= $(USBA_WITHOUT_WUSB_OBJS:%.o=../usba/%.ll)
 UHCI_FILES	= $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES	= $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES	= $(EHCI_OBJS:%.o=../ehci/%.ll)
@@ -119,14 +119,10 @@ EHCI_FILES	= $(EHCI_OBJS:%.o=../ehci/%.ll)
 #
 warlock: $(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files warlock_audiosup.files \
-	warlock_standalone warlock_with_usba  warlock_with_sada
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
+	warlock_standalone warlock_usba.files warlock_with_usba
 	$(TOUCH) $(WARLOCK_OK)
 
-warlock_with_sada: $(WLCMD_DIR)/usb_as_with_sada.wlcmd \
-	$(WARLOCK_OUT) warlock_audiosup.files 
-	$(WARLOCK) -c $(WLCMD_DIR)/usb_as_with_sada.wlcmd $(WARLOCK_OUT) \
-	-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_usba: $(WLCMD_DIR)/usb_as_with_usba.wlcmd $(WARLOCK_OUT) \
 	warlock_ddi.files warlock_ohci.files warlock_usba.files \
@@ -157,6 +153,3 @@ warlock_ehci.files:
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock
-
-warlock_audiosup.files:
-	@cd ../audiosup; pwd; $(MAKE) warlock

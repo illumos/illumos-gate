@@ -708,7 +708,7 @@ USBVC_OBJS += usbvc.o usbvc_v4l2.o
 
 HIDPARSER_OBJS += hidparser.o
 
-USB_AC_OBJS += usb_ac.o audio_shim.o
+USB_AC_OBJS += usb_ac.o
 
 USB_AS_OBJS += usb_as.o
 

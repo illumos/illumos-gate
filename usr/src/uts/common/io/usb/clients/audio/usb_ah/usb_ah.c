@@ -48,10 +48,6 @@
 #include <sys/stropts.h>
 #include <sys/strsun.h>
 
-#include <sys/audio.h>
-#include <sys/audio/audio_support.h>
-#include <sys/mixer.h>
-#include <sys/audio/audio_mixer.h>
 
 #include <sys/usb/clients/audio/usb_audio.h>
 #include <sys/usb/clients/audio/usb_mixer.h>

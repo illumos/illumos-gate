@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -22,23 +22,18 @@
 # CDDL HEADER END
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 one usb_as_state
 
 ### specify the root functions
-root usb_as_default_xfer_cb
-root usb_as_default_xfer_exc_cb
 root usb_as_disconnect_event_cb
 root usb_as_reconnect_event_cb
 
 root usb_as_open
 root usb_as_close
-root usb_as_wsrv
 
 root usb_as_power
 
-root usb_as_isoc_close_cb
 root usb_as_play_cb
 root usb_as_play_exc_cb
 root usb_as_record_cb

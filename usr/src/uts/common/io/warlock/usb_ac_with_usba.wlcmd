@@ -90,6 +90,9 @@ root	usb_register_hotplug_cbs
 root	usb_get_current_cfgidx
 root    usb_register_client
 root	usb_reset_device
+root    usb_register_dev_driver
+root    usb_unregister_dev_driver
+
 
 root	hcdi_autoclearing
 root	hcdi_cb_thread
@@ -156,11 +159,6 @@ root usb_ac_close
 root usb_ac_disconnect_event_cb
 root usb_ac_reconnect_event_cb
 root usb_ac_power
-root usb_ac_lrput
-root usb_ac_uwput
-root usb_ac_power
-root usb_ac_pause_play
-root usb_ac_set_config
 root usb_ac_set_format
 root usb_ac_setup
 root usb_ac_start_play
@@ -168,6 +166,36 @@ root usb_ac_start_record
 root usb_ac_stop_play
 root usb_ac_stop_record
 root usb_ac_teardown
+
+root usb_ac_get_audio
+root usb_ac_send_audio
+root usb_ac_ctrl_restore
+root usb_audio_set_mute 
+
+root usb_engine_start 
+root usb_engine_stop 
+root usb_engine_sync 
+root usb_engine_rate 
+root usb_engine_format 
+root usb_engine_count 
+root usb_engine_close 
+root usb_engine_channels 
+root usb_engine_open 
+root usb_engine_qlen 
+
+root usb_ac_mux_plumbing_tq
+root usb_ac_mux_unplumbing_tq
+root usb_ac_reader
+
+root usb_audio_write_monitor_gain
+root usb_audio_write_mono_rec
+root usb_audio_write_mono_vol
+root usb_audio_write_ster_vol
+root usb_audio_write_stero_rec 
+root usb_audio_write_rec_src
+root usb_audio_write_mic_boost 
+root usb_audio_ctrl_read
+
 
 add hubd::h_cleanup_child targets warlock_dummy
 add usba_pipe_async_req::sync_func targets usba_pipe_sync_close
@@ -190,9 +218,4 @@ add ohci_trans_wrapper::tw_handle_td targets ohci_handle_isoc_td
 add ehci_trans_wrapper::tw_handle_qtd targets ehci_handle_ctrl_qtd
 add ehci_trans_wrapper::tw_handle_qtd targets ehci_handle_bulk_qtd
 add ehci_trans_wrapper::tw_handle_qtd targets ehci_handle_intr_qtd
-
-add usb_ac_state_space::restore_func targets usb_ac_restore_audio_state
-add usb_ac_state_space::get_featureID_func targets usb_ac_get_featureID
-add usb_ac_state_space::pm_busy_component targets usb_ac_pm_busy_component
-add usb_ac_state_space::pm_idle_component targets usb_ac_pm_idle_component
 
