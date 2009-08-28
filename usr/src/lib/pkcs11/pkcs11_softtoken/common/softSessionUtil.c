@@ -720,10 +720,8 @@ soft_logout(void)
 }
 
 void
-soft_acquire_all_session_mutexes()
+soft_acquire_all_session_mutexes(soft_session_t *session_p)
 {
-	soft_session_t *session_p = soft_session_list;
-
 	/* Iterate through sessions acquiring all mutexes */
 	while (session_p) {
 		soft_object_t *object_p;
@@ -741,10 +739,8 @@ soft_acquire_all_session_mutexes()
 }
 
 void
-soft_release_all_session_mutexes()
+soft_release_all_session_mutexes(soft_session_t *session_p)
 {
-	soft_session_t *session_p = soft_session_list;
-
 	/* Iterate through sessions releasing all mutexes */
 	while (session_p) {
 		/*

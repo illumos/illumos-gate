@@ -35,7 +35,10 @@
 #include "softKeystore.h"
 #include "softKeystoreUtil.h"
 
+#pragma init(softtoken_init)
 #pragma fini(softtoken_fini)
+
+extern soft_session_t token_session; /* for fork handler */
 
 static struct CK_FUNCTION_LIST functionList = {
 	{ 2, 20 },	/* version */
@@ -110,7 +113,6 @@ static struct CK_FUNCTION_LIST functionList = {
 };
 
 boolean_t softtoken_initialized = B_FALSE;
-static boolean_t softtoken_atfork_initialized = B_FALSE;
 
 static pid_t softtoken_pid = 0;
 
@@ -128,10 +130,10 @@ ses_to_be_freed_list_t ses_delay_freed;
 pthread_mutex_t soft_giant_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static CK_RV finalize_common(boolean_t force, CK_VOID_PTR pReserved);
+static void softtoken_init();
 static void softtoken_fini();
 static void softtoken_fork_prepare();
-static void softtoken_fork_parent();
-static void softtoken_fork_child();
+static void softtoken_fork_after();
 
 CK_RV
 C_Initialize(CK_VOID_PTR pInitArgs)
@@ -213,9 +215,6 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 		return (CKR_CANT_LOCK);
 	}
 
-	softtoken_initialized = B_TRUE;
-	softtoken_pid = initialize_pid;
-
 	/*
 	 * token object related initialization
 	 */
@@ -225,12 +224,14 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 	soft_slot.keystore_load_status = KEYSTORE_UNINITIALIZED;
 
 	if ((rv = soft_init_token_session()) != CKR_OK) {
+		(void) pthread_mutex_destroy(&soft_sessionlist_mutex);
 		(void) pthread_mutex_unlock(&soft_giant_mutex);
 		return (rv);
 	}
 
 	/* Initialize the slot lock */
 	if (pthread_mutex_init(&soft_slot.slot_mutex, NULL) != 0) {
+		(void) pthread_mutex_destroy(&soft_sessionlist_mutex);
 		(void) soft_destroy_token_session();
 		(void) pthread_mutex_unlock(&soft_giant_mutex);
 		return (CKR_CANT_LOCK);
@@ -238,31 +239,47 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 
 	/* Initialize the keystore lock */
 	if (pthread_mutex_init(&soft_slot.keystore_mutex, NULL) != 0) {
+		(void) pthread_mutex_destroy(&soft_slot.slot_mutex);
+		(void) pthread_mutex_destroy(&soft_sessionlist_mutex);
+		(void) soft_destroy_token_session();
 		(void) pthread_mutex_unlock(&soft_giant_mutex);
 		return (CKR_CANT_LOCK);
 	}
 
-	/* Children inherit parent's atfork handlers */
-	if (!softtoken_atfork_initialized) {
-		(void) pthread_atfork(softtoken_fork_prepare,
-		    softtoken_fork_parent, softtoken_fork_child);
-		softtoken_atfork_initialized = B_TRUE;
-	}
-
-	(void) pthread_mutex_unlock(&soft_giant_mutex);
-
 	/* Initialize the object_to_be_freed list */
-	(void) pthread_mutex_init(&obj_delay_freed.obj_to_be_free_mutex, NULL);
+	if (pthread_mutex_init(&obj_delay_freed.obj_to_be_free_mutex, NULL)
+	    != 0) {
+		(void) pthread_mutex_destroy(&soft_slot.keystore_mutex);
+		(void) pthread_mutex_destroy(&soft_slot.slot_mutex);
+		(void) pthread_mutex_destroy(&soft_sessionlist_mutex);
+		(void) soft_destroy_token_session();
+		(void) pthread_mutex_unlock(&soft_giant_mutex);
+		return (CKR_CANT_LOCK);
+	}
 	obj_delay_freed.count = 0;
 	obj_delay_freed.first = NULL;
 	obj_delay_freed.last = NULL;
 
-	(void) pthread_mutex_init(&ses_delay_freed.ses_to_be_free_mutex, NULL);
+	if (pthread_mutex_init(&ses_delay_freed.ses_to_be_free_mutex, NULL)
+	    != 0) {
+		(void) pthread_mutex_destroy(
+		    &obj_delay_freed.obj_to_be_free_mutex);
+		(void) pthread_mutex_destroy(&soft_slot.keystore_mutex);
+		(void) pthread_mutex_destroy(&soft_slot.slot_mutex);
+		(void) pthread_mutex_destroy(&soft_sessionlist_mutex);
+		(void) soft_destroy_token_session();
+		(void) pthread_mutex_unlock(&soft_giant_mutex);
+		return (CKR_CANT_LOCK);
+	}
 	ses_delay_freed.count = 0;
 	ses_delay_freed.first = NULL;
 	ses_delay_freed.last = NULL;
-	return (CKR_OK);
 
+	softtoken_pid = initialize_pid;
+	softtoken_initialized = B_TRUE;
+	(void) pthread_mutex_unlock(&soft_giant_mutex);
+
+	return (CKR_OK);
 }
 
 /*
@@ -366,6 +383,14 @@ finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 	return (rv);
 }
 
+static void
+softtoken_init()
+{
+	/* Children inherit parent's atfork handlers */
+	(void) pthread_atfork(softtoken_fork_prepare,
+	    softtoken_fork_after, softtoken_fork_after);
+}
+
 /*
  * softtoken_fini() function required to make sure complete cleanup
  * is done if softtoken is ever unloaded without a C_Finalize() call.
@@ -446,59 +471,51 @@ C_CancelFunction(CK_SESSION_HANDLE hSession)
 
 /*
  * Take out all mutexes before fork.
+ *
  * Order:
  * 1. soft_giant_mutex
  * 2. soft_sessionlist_mutex
  * 3. soft_slot.slot_mutex
  * 4. soft_slot.keystore_mutex
- * 5. all soft_session_list mutexs via soft_acquire_all_session_mutexes()
- * 6. obj_delay_freed.obj_to_be_free_mutex;
- * 7. ses_delay_freed.ses_to_be_free_mutex
+ * 5. token_session mutexes via soft_acquire_all_session_mutexes()
+ * 6. all soft_session_list mutexes via soft_acquire_all_session_mutexes()
+ * 7. obj_delay_freed.obj_to_be_free_mutex;
+ * 8. ses_delay_freed.ses_to_be_free_mutex
  */
 void
 softtoken_fork_prepare()
 {
 	(void) pthread_mutex_lock(&soft_giant_mutex);
-	(void) pthread_mutex_lock(&soft_sessionlist_mutex);
-	(void) pthread_mutex_lock(&soft_slot.slot_mutex);
-	(void) pthread_mutex_lock(&soft_slot.keystore_mutex);
-	soft_acquire_all_session_mutexes();
-	(void) pthread_mutex_lock(&obj_delay_freed.obj_to_be_free_mutex);
-	(void) pthread_mutex_lock(&ses_delay_freed.ses_to_be_free_mutex);
-}
-
-/* Release in opposite order to softtoken_fork_prepare(). */
-void
-softtoken_fork_parent()
-{
-	(void) pthread_mutex_unlock(&ses_delay_freed.ses_to_be_free_mutex);
-	(void) pthread_mutex_unlock(&obj_delay_freed.obj_to_be_free_mutex);
-	soft_release_all_session_mutexes();
-	(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
-	(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
-	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
-	(void) pthread_mutex_unlock(&soft_giant_mutex);
+	if (softtoken_initialized) {
+		(void) pthread_mutex_lock(&soft_sessionlist_mutex);
+		(void) pthread_mutex_lock(&soft_slot.slot_mutex);
+		(void) pthread_mutex_lock(&soft_slot.keystore_mutex);
+		soft_acquire_all_session_mutexes(&token_session);
+		soft_acquire_all_session_mutexes(soft_session_list);
+		(void) pthread_mutex_lock(
+		    &obj_delay_freed.obj_to_be_free_mutex);
+		(void) pthread_mutex_lock(
+		    &ses_delay_freed.ses_to_be_free_mutex);
+	}
 }
 
 /*
  * Release in opposite order to softtoken_fork_prepare().
- *
- * Note: This never happens when softtoken is loaded by libpkcs11.so.1 because
- *       the libpkcs11 afterfork child handler is run first and it calls dlclose
- *       which removes the softtoken afterfork handler.  dlclose also causes
- *       softtoken_fini to be called at a time when all of the mutexes are
- *       already locked. Fortunately, the softtoken_fini is called from the same
- *       thread that locked them in the first place so the mutex_lock calls just
- *       return EDEADLK instead of blocking forever.
+ * Function is used for parent and child.
  */
 void
-softtoken_fork_child()
+softtoken_fork_after()
 {
-	(void) pthread_mutex_unlock(&ses_delay_freed.ses_to_be_free_mutex);
-	(void) pthread_mutex_unlock(&obj_delay_freed.obj_to_be_free_mutex);
-	soft_release_all_session_mutexes();
-	(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
-	(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
-	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
+	if (softtoken_initialized) {
+		(void) pthread_mutex_unlock(
+		    &ses_delay_freed.ses_to_be_free_mutex);
+		(void) pthread_mutex_unlock(
+		    &obj_delay_freed.obj_to_be_free_mutex);
+		soft_release_all_session_mutexes(soft_session_list);
+		soft_release_all_session_mutexes(&token_session);
+		(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
+		(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
+		(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
+	}
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
 }

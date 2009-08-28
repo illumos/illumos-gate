@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)pkcs11General.c	1.10	08/08/12 SMI"
 
 #include <unistd.h>
 #include <string.h>
@@ -37,6 +35,7 @@
 #include "pkcs11Session.h"
 #include "metaGlobal.h"
 
+#pragma init(pkcs11_init)
 #pragma fini(pkcs11_fini)
 
 static struct CK_FUNCTION_LIST functionList = {
@@ -121,28 +120,38 @@ static pid_t pkcs11_pid = 0;
 static pthread_mutex_t globalmutex = PTHREAD_MUTEX_INITIALIZER;
 
 static CK_RV finalize_common(CK_VOID_PTR pReserved);
+static void pkcs11_init();
 static void pkcs11_fini();
 
 /*
  * Ensure that before a fork, all mutexes are taken.
+ * We cannot acquire globalmutex, because it can cause deadlock when
+ * atfork() and fork() are called in parallel. It can happen when
+ * C_Ininitialize() tries to dlopen() a provider. The dlopen() operation
+ * is protected by globalmutex and when another thread calls fork()
+ * pkcs11_fork_prepare cannot acquire the mutex again and thus it must wait.
+ * When a provider tries to register its atfork handler, atfork() must
+ * wait on fork(). See the comment in fork() libc function for more details.
+ *
  * Order:
- * 1. globalmutex
- * 2. slottable->st_mutex
- * 3. all slottable->st_slots' mutexes
+ * 1. slottable->st_mutex
+ * 2. all slottable->st_slots' mutexes
  */
 static void
 pkcs11_fork_prepare(void)
 {
 	int i;
-	(void) pthread_mutex_lock(&globalmutex);
-	if (slottable != NULL) {
-		(void) pthread_mutex_lock(&slottable->st_mutex);
+	if (pkcs11_initialized) {
+		if (slottable != NULL) {
+			(void) pthread_mutex_lock(&slottable->st_mutex);
 
-		/* Take the sl_mutex of all slots */
-		for (i = slottable->st_first; i <= slottable->st_last; i++) {
-			if (slottable->st_slots[i] != NULL) {
-				(void) pthread_mutex_lock(
-				    &slottable->st_slots[i]->sl_mutex);
+			/* Take the sl_mutex of all slots */
+			for (i = slottable->st_first;
+			    i <= slottable->st_last; i++) {
+				if (slottable->st_slots[i] != NULL) {
+					(void) pthread_mutex_lock(
+					    &slottable->st_slots[i]->sl_mutex);
+				}
 			}
 		}
 	}
@@ -157,39 +166,58 @@ static void
 pkcs11_fork_parent(void)
 {
 	int i;
-	if (slottable != NULL) {
-		/* Release the sl_mutex of all slots */
-		for (i = slottable->st_first; i <= slottable->st_last; i++) {
-			if (slottable->st_slots[i] != NULL) {
-				(void) pthread_mutex_unlock(
-				    &slottable->st_slots[i]->sl_mutex);
+	if (pkcs11_initialized) {
+		if (slottable != NULL) {
+			/* Release the sl_mutex of all slots */
+			for (i = slottable->st_first;
+			    i <= slottable->st_last; i++) {
+				if (slottable->st_slots[i] != NULL) {
+					(void) pthread_mutex_unlock(
+					    &slottable->st_slots[i]->sl_mutex);
+				}
 			}
 		}
 		(void) pthread_mutex_unlock(&slottable->st_mutex);
 	}
-	(void) pthread_mutex_unlock(&globalmutex);
 }
 
 
 /*
  * Ensure that after a fork, in the child, all mutexes are released in opposite
  * order to pkcs11_fork_prepare() and cleanup is done.
+ * Because we need to handle fork correctly before library is initialized two
+ * handlers are necessary.
+ *
+ * 1) pkcs11_fork_child() - unlock mutexes
+ * 2) pkcs11_fork_child_fini() - cleanup library after fork, it is registered in
+ *                               C_Initialize() after providers initialization.
  */
 static void
 pkcs11_fork_child(void)
 {
 	int i;
-	if (slottable != NULL) {
-		/* Release the sl_mutex of all slots */
-		for (i = slottable->st_first; i <= slottable->st_last; i++) {
-			if (slottable->st_slots[i] != NULL) {
-				(void) pthread_mutex_unlock(
-				    &slottable->st_slots[i]->sl_mutex);
+	if (pkcs11_initialized) {
+		if (slottable != NULL) {
+			/* Release the sl_mutex of all slots */
+			for (i = slottable->st_first;
+			    i <= slottable->st_last; i++) {
+				if (slottable->st_slots[i] != NULL) {
+					(void) pthread_mutex_unlock(
+					    &slottable->st_slots[i]->sl_mutex);
+				}
 			}
 		}
 		(void) pthread_mutex_unlock(&slottable->st_mutex);
 	}
-	(void) pthread_mutex_unlock(&globalmutex);
+
+	(void) pthread_mutex_destroy(&globalmutex);
+	(void) pthread_mutex_init(&globalmutex, NULL);
+}
+
+/* Library cleanup have to be last afterfork child handler. */
+static void
+pkcs11_fork_child_fini(void)
+{
 	pkcs11_fini();
 }
 
@@ -298,10 +326,10 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 	pkcs11_pid = initialize_pid;
 	/* Children inherit parent's atfork handlers */
 	if (!pkcs11_atfork_initialized) {
-		(void) pthread_atfork(pkcs11_fork_prepare,
-		    pkcs11_fork_parent, pkcs11_fork_child);
+		(void) pthread_atfork(NULL, NULL, pkcs11_fork_child_fini);
 		pkcs11_atfork_initialized = B_TRUE;
 	}
+
 	(void) pthread_mutex_unlock(&globalmutex);
 
 	/* Cleanup data structures no longer needed */
@@ -402,6 +430,13 @@ finalize_common(CK_VOID_PTR pReserved)
 	rv = pkcs11_slottable_delete();
 
 	return (rv);
+}
+
+static void
+pkcs11_init()
+{
+	(void) pthread_atfork(pkcs11_fork_prepare,
+	    pkcs11_fork_parent, pkcs11_fork_child);
 }
 
 /*

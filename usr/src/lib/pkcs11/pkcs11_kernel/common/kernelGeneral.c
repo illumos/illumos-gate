@@ -33,6 +33,7 @@
 #include "kernelSession.h"
 #include "kernelSlot.h"
 
+#pragma init(kernel_init)
 #pragma fini(kernel_fini)
 
 static struct CK_FUNCTION_LIST functionList = {
@@ -108,7 +109,6 @@ static struct CK_FUNCTION_LIST functionList = {
 };
 
 boolean_t kernel_initialized = B_FALSE;
-static boolean_t kernel_atfork_initialized = B_FALSE;
 static pid_t kernel_pid = 0;
 
 extern pthread_mutex_t mechhash_mutex;
@@ -125,10 +125,10 @@ kmh_elem_t **kernel_mechhash;	/* Hash table for kCF mech numbers */
 
 static void finalize_common();
 static void cleanup_library();
+static void kernel_init();
 static void kernel_fini();
 static void kernel_fork_prepare();
-static void kernel_fork_parent();
-static void kernel_fork_child();
+static void kernel_fork_after();
 
 CK_RV
 C_Initialize(CK_VOID_PTR pInitArgs)
@@ -245,13 +245,6 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 
 	kernel_initialized = B_TRUE;
 	kernel_pid = initialize_pid;
-
-	/* Children inherit parent's atfork handlers */
-	if (!kernel_atfork_initialized) {
-		(void) pthread_atfork(kernel_fork_prepare, kernel_fork_parent,
-		    kernel_fork_child);
-		kernel_atfork_initialized = B_TRUE;
-	}
 
 	(void) pthread_mutex_unlock(&globalmutex);
 
@@ -386,6 +379,13 @@ cleanup_library()
 	finalize_common();
 }
 
+static void
+kernel_init()
+{
+	(void) pthread_atfork(kernel_fork_prepare, kernel_fork_after,
+	    kernel_fork_after);
+}
+
 /*
  * kernel_fini() function required to make sure complete cleanup
  * is done if pkcs11_kernel is ever unloaded without
@@ -469,37 +469,31 @@ void
 kernel_fork_prepare()
 {
 	(void) pthread_mutex_lock(&globalmutex);
-	kernel_acquire_all_slots_mutexes();
-	(void) pthread_mutex_lock(
-	    &obj_delay_freed.obj_to_be_free_mutex);
-	(void) pthread_mutex_lock(
-	    &ses_delay_freed.ses_to_be_free_mutex);
-	(void) pthread_mutex_lock(&mechhash_mutex);
+	if (kernel_initialized) {
+		kernel_acquire_all_slots_mutexes();
+		(void) pthread_mutex_lock(
+		    &obj_delay_freed.obj_to_be_free_mutex);
+		(void) pthread_mutex_lock(
+		    &ses_delay_freed.ses_to_be_free_mutex);
+		(void) pthread_mutex_lock(&mechhash_mutex);
+	}
 }
 
-/* Release in opposite order to kernel_fork_prepare(). */
+/*
+ * Release in opposite order to kernel_fork_prepare().
+ * Function is used for parent and child.
+ */
 void
-kernel_fork_parent()
+kernel_fork_after()
 {
-	(void) pthread_mutex_unlock(&mechhash_mutex);
-	(void) pthread_mutex_unlock(
-	    &ses_delay_freed.ses_to_be_free_mutex);
-	(void) pthread_mutex_unlock(
-	    &obj_delay_freed.obj_to_be_free_mutex);
-	kernel_release_all_slots_mutexes();
-	(void) pthread_mutex_unlock(&globalmutex);
-}
-
-/* Release in opposite order to kernel_fork_prepare(). */
-void
-kernel_fork_child()
-{
-	(void) pthread_mutex_unlock(&mechhash_mutex);
-	(void) pthread_mutex_unlock(
-	    &ses_delay_freed.ses_to_be_free_mutex);
-	(void) pthread_mutex_unlock(
-	    &obj_delay_freed.obj_to_be_free_mutex);
-	kernel_release_all_slots_mutexes();
+	if (kernel_initialized) {
+		(void) pthread_mutex_unlock(&mechhash_mutex);
+		(void) pthread_mutex_unlock(
+		    &ses_delay_freed.ses_to_be_free_mutex);
+		(void) pthread_mutex_unlock(
+		    &obj_delay_freed.obj_to_be_free_mutex);
+		kernel_release_all_slots_mutexes();
+	}
 	(void) pthread_mutex_unlock(&globalmutex);
 }
 

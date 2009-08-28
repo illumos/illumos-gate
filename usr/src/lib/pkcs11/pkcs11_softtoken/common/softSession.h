@@ -199,8 +199,8 @@ CK_RV soft_login(CK_UTF8CHAR_PTR pPin, CK_ULONG ulPinLen);
 
 void soft_logout(void);
 
-void soft_acquire_all_session_mutexes();
-void soft_release_all_session_mutexes();
+void soft_acquire_all_session_mutexes(soft_session_t *session_p);
+void soft_release_all_session_mutexes(soft_session_t *session_p);
 
 #ifdef	__cplusplus
 }

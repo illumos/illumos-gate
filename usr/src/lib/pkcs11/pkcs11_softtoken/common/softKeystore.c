@@ -2172,6 +2172,8 @@ soft_init_token_session(void)
 	token_session.object_list = NULL;
 	token_session.ses_refcnt = 0;
 	token_session.ses_close_sync = 0;
+	token_session.next = NULL;
+	token_session.prev = NULL;
 
 	/* Initialize the lock for the token session */
 	if (pthread_mutex_init(&token_session.session_mutex, NULL) != 0) {
