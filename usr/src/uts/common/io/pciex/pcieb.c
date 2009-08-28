@@ -437,6 +437,8 @@ pcieb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			(void) pciehpc_uninit(devi);
 		else if (pcieb->pcieb_hpc_type == HPC_SHPC)
 			(void) pcishpc_uninit(devi);
+
+		(void) ndi_prop_remove(DDI_DEV_T_NONE, devi, "hotplug-capable");
 	} else {
 		ddi_remove_minor_node(devi, "devctl");
 	}
@@ -882,6 +884,7 @@ FAIL:
  * by the device.  If features are not enabled first, the
  * device might not ask for any interrupts.
  */
+
 static int
 pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 {
@@ -1106,10 +1109,10 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 	}
 
 	mutex_exit(&pcieb->pcieb_intr_mutex);
-
 	return (DDI_SUCCESS);
 
 FAIL:
+	pcieb_intr_fini(pcieb);
 	return (DDI_FAILURE);
 }
 
@@ -1164,7 +1167,7 @@ pcieb_msi_supported(dev_info_t *dip)
 }
 
 /*ARGSUSED*/
-int
+static int
 pcieb_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
     ddi_iblock_cookie_t *ibc)
 {
