@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of all implementation architecture
 #	dependent modules for the sun4u architecture.
@@ -50,20 +48,6 @@ LINT_LIBS	 = $(LINT_LIB) \
 		   $(LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(SPARC_LINTS:%=$(SPARC_LIB_DIR)/llib-l%.ln)
-
-# EXPORT DELETE START
-#
-# CRYPTO_EK_KMODS modules go in the encryption pack (SUNWcry*)
-# They need to be listed separately since they duplicate global symbols
-# causing the 2nd pass of lint on the kernel to complain. CRYPTO_EK_KMODS
-# should not be listed in the lint target.
-#
-# Don't build these for OpenSolaris, since they will be replaced by
-# binaries that are signed by Sun RE.
-#
-$(CLOSED_BUILD)CRYPTO_EK_KMODS	+= aes256
-$(CLOSED_BUILD)CRYPTO_EK_KMODS	+= arcfour2048
-# EXPORT DELETE END
 
 
 def		:=	TARGET= def
