@@ -57,8 +57,11 @@ All files in a given backup generation, with the exception of
 dirstate, are optional.
 '''
 
-import os, pwd, shutil, traceback, tarfile, time
-from mercurial import changegroup, patch, node, util, revlog
+import os, pwd, shutil, tarfile, time, traceback
+from mercurial import changegroup, node, patch, util
+
+from onbld.Scm.WorkSpace import HgLookupError
+import onbld.Scm.Version as Version
 
 
 class CdmNodeMissing(util.Abort):
@@ -155,7 +158,7 @@ class CdmCommittedBackup(object):
                 except EnvironmentError, e:
                     raise util.Abort("couldn't restore committed changes: %s\n"
                                      "   %s" % (bfile, e))
-                except revlog.LookupError, e:
+                except HgLookupError, e:
                     raise CdmNodeMissing("couldn't restore committed changes",
                                                      e.name)
             finally:
@@ -287,7 +290,7 @@ class CdmUncommittedBackup(object):
         try:
             n = node.bin(dirstate)
             self.ws.repo.changelog.lookup(n)
-        except revlog.LookupError, e:
+        except HgLookupError, e:
             raise CdmNodeMissing("couldn't restore uncommitted changes",
                                  e.name)
 
@@ -668,7 +671,10 @@ class CdmBackup(object):
         return False
 
     def backup(self):
-        '''Take a backup of the current workspace'''
+        '''Take a backup of the current workspace
+
+        Calling code is expected to hold both the working copy lock
+        and repository lock.'''
 
         if not os.path.exists(self.backupdir):
             try:
@@ -680,15 +686,6 @@ class CdmBackup(object):
         self.generation += 1
         self.create_gen(self.generation)
 
-        #
-        # Lock the repo, so the backup can be consistent.  We need the
-        # wlock too to make sure the dirstate parent doesn't change
-        # underneath us.
-        #
-
-        lock = self.ws.repo.lock()
-        wlock = self.ws.repo.lock()
-
         try:
             for x in self.modules:
                 x.backup()
@@ -697,6 +694,11 @@ class CdmBackup(object):
                 self.ws.ui.warn("Interrupted\n")
             else:
                 self.ws.ui.warn("Error: %s\n" % e)
+                if Version.at_least("1.3.0"):
+                    show_traceback = self.ws.ui.configbool('ui', 'traceback',
+                                                   False)
+                else:
+                    show_traceback = self.ws.ui.traceback
 
                 #
                 # If it's not a 'normal' error, we want to print a stack
@@ -704,7 +706,7 @@ class CdmBackup(object):
                 # backup also fails, and raises a second exception.
                 #
                 if (not isinstance(e, (EnvironmentError, util.Abort))
-                    or self.ws.ui.traceback):
+                    or show_traceback):
                     traceback.print_exc()
 
             for x in self.modules:
@@ -724,10 +726,10 @@ class CdmBackup(object):
         '''Restore workspace from backup
 
         Restores from backup generation GEN (defaulting to the latest)
-        into workspace WS.'''
+        into workspace WS.
 
-        wlock = self.ws.repo.wlock()
-        lock = self.ws.repo.lock()
+        Calling code is expected to hold both the working copy lock
+        and repository lock of the destination workspace.'''
 
         if not os.path.exists(self.backupdir):
             raise util.Abort('Backup directory does not exist: %s' %

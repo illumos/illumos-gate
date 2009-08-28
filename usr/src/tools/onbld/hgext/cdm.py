@@ -18,7 +18,7 @@
 # Use is subject to license terms.
 #
 
-'''workspace extensions for mercurial
+'''OpenSolaris workspace extensions for mercurial
 
 This extension contains a number of commands to help you work within
 the OpenSolaris consolidations.
@@ -37,7 +37,8 @@ Collapse all your changes into a single changeset	- recommit'''
 #
 #     If you change that, change this
 #
-import sys, os, stat, termios, atexit
+import atexit, os, stat, sys, termios
+
 sys.path.insert(1, "%s/../../" % os.path.dirname(__file__))
 
 from onbld.Scm import Version
@@ -49,9 +50,9 @@ except Version.VersionMismatch, badversion:
     raise util.Abort("Version Mismatch:\n %s\n" % badversion)
 
 import ConfigParser
-from mercurial import cmdutil, node, ignore
+from mercurial import cmdutil, ignore, node
 
-from onbld.Scm.WorkSpace import WorkSpace, ActiveEntry
+from onbld.Scm.WorkSpace import ActiveEntry, WorkSpace
 from onbld.Scm.Backup import CdmBackup
 from onbld.Checks import Cddl, Comments, Copyright, CStyle, HdrChk
 from onbld.Checks import JStyle, Keywords, Mapfile, Rti, onSWAN
@@ -65,14 +66,13 @@ def yes_no(ui, msg, default):
         prompt = ' [y/N]:'
         defanswer = 'n'
 
-    resp = ui.prompt(msg + prompt, r'([Yy(es)?|[Nn]o?)?',
-                     default=defanswer)
-    if not resp:
-        return default
-    elif resp[0] in ['Y', 'y']:
-        return True
+    if Version.at_least("1.3.0"):
+        resp = ui.prompt(msg + prompt, ['&yes', '&no'], default=defanswer)
     else:
-        return False
+        resp = ui.prompt(msg + prompt, r'([Yy(es)?|[Nn]o?)?',
+                         default=defanswer)
+
+    return resp[0] in ('Y', 'y')
 
 
 def buildfilelist(ws, parent, files):
@@ -123,6 +123,20 @@ def not_check(repo, cmd):
         return util.never
 
 
+def abort_if_dirty(ws):
+    '''Abort if the workspace has uncommitted changes, merges,
+    branches, or has Mq patches applied'''
+
+    if ws.modified():
+        raise util.Abort('workspace has uncommitted changes')
+    if ws.merged():
+        raise util.Abort('workspace contains uncommitted merge')
+    if ws.branched():
+        raise util.Abort('workspace contains uncommitted branch')
+    if ws.mq_applied():
+        raise util.Abort('workspace has Mq patches applied')
+
+
 #
 # Adding a reference to WorkSpace from a repo causes a circular reference
 # repo <-> WorkSpace.
@@ -142,7 +156,12 @@ def reposetup(ui, repo):
     if repo.local() and repo not in wslist:
         wslist[repo] = WorkSpace(repo)
 
-        if ui.interactive and sys.stdin.isatty():
+        if Version.at_least("1.3"):
+            interactive = ui.interactive()
+        else:
+            interactive = ui.interactive
+
+        if interactive and sys.stdin.isatty():
             ui.setconfig('hooks', 'preoutgoing.cdm_pbconfirm',
                          'python:hgext_cdm.pbconfirm')
 
@@ -702,25 +721,12 @@ def cdm_pbchk(ui, repo, **opts):
 
 
 def cdm_recommit(ui, repo, **opts):
-    '''compact outgoing deltas into a single, conglomerate delta'''
+    '''compact outgoing deltas into a single, conglomerate, delta'''
 
     if not os.getcwd().startswith(repo.root):
         raise util.Abort('recommit is not safe to run with -R')
 
-    if wslist[repo].modified():
-        raise util.Abort('workspace has uncommitted changes')
-
-    if wslist[repo].merged():
-        raise util.Abort('workspace contains uncommitted merge')
-
-    if wslist[repo].branched():
-        raise util.Abort('workspace contains uncommitted branch')
-
-    if wslist[repo].mq_applied():
-        raise util.Abort("workspace has Mq patches applied")
-
-    wlock = repo.wlock()
-    lock = repo.lock()
+    abort_if_dirty(wslist[repo])
 
     heads = repo.heads()
     if len(heads) > 1:
@@ -729,52 +735,61 @@ def cdm_recommit(ui, repo, **opts):
             ui.warn('\t%d\n' % repo.changelog.rev(head))
         raise util.Abort('you must merge before recommitting')
 
-    active = wslist[repo].active(opts['parent'])
+    wlock = repo.wlock()
+    lock = repo.lock()
 
-    if len(active.revs) <= 0:
-        raise util.Abort("no changes to recommit")
+    try:
+        active = wslist[repo].active(opts['parent'])
 
-    if len(active.files()) <= 0:
-        ui.warn("Recommitting %d active changesets, but no active files\n" %
-                len(active.revs))
+        if len(active.revs) <= 0:
+            raise util.Abort("no changes to recommit")
 
-    #
-    # During the course of a recommit, any file bearing a name matching the
-    # source name of any renamed file will be clobbered by the operation.
-    #
-    # As such, we ask the user before proceeding.
-    #
-    bogosity = [f.parentname for f in active if f.is_renamed() and
-                os.path.exists(repo.wjoin(f.parentname))]
+        if len(active.files()) <= 0:
+            ui.warn("Recommitting %d active changesets, but no active files\n" %
+                    len(active.revs))
 
-    if bogosity:
-        ui.warn("The following file names are the original name of a rename "
-                "and also present\n"
-                "in the working directory:\n")
-        for fname in bogosity:
-            ui.warn("  %s\n" % fname)
-        if not yes_no(ui, "These files will be removed by recommit.  Continue?",
-                      False):
-            raise util.Abort("recommit would clobber files")
+        #
+        # During the course of a recommit, any file bearing a name
+        # matching the source name of any renamed file will be
+        # clobbered by the operation.
+        #
+        # As such, we ask the user before proceeding.
+        #
+        bogosity = [f.parentname for f in active if f.is_renamed() and
+                    os.path.exists(repo.wjoin(f.parentname))]
+        if bogosity:
+            ui.warn("The following file names are the original name of a "
+                    "rename and also present\n"
+                    "in the working directory:\n")
 
-    user = opts['user'] or ui.username()
+            for fname in bogosity:
+                ui.warn("  %s\n" % fname)
 
-    message = cmdutil.logmessage(opts) or ui.edit('\n'.join(active.comments()),
-                                                  user)
-    if not message:
-        raise util.Abort('empty commit message')
+            if not yes_no(ui, "These files will be removed by recommit."
+                          "  Continue?",
+                          False):
+                raise util.Abort("recommit would clobber files")
 
-    name = backup_name(repo.root)
-    bk = CdmBackup(ui, wslist[repo], name)
-    if bk.need_backup():
-        if yes_no(ui, 'Do you want to backup files first?', True):
-            bk.backup()
+        user = opts['user'] or ui.username()
+        comments = '\n'.join(active.comments())
 
-    oldtags = repo.tags()
-    clearedtags = [(name, nd, repo.changelog.rev(nd), local)
-            for name, nd, local in active.tags()]
+        message = cmdutil.logmessage(opts) or ui.edit(comments, user)
+        if not message:
+            raise util.Abort('empty commit message')
 
-    wslist[repo].squishdeltas(active, message, user=user)
+        bk = CdmBackup(ui, wslist[repo], backup_name(repo.root))
+        if bk.need_backup():
+            if yes_no(ui, 'Do you want to backup files first?', True):
+                bk.backup()
+
+        oldtags = repo.tags()
+        clearedtags = [(name, nd, repo.changelog.rev(nd), local)
+                for name, nd, local in active.tags()]
+
+        wslist[repo].squishdeltas(active, message, user=user)
+    finally:
+        lock.release()
+        wlock.release()
 
     if clearedtags:
         ui.write("Removed tags:\n")
@@ -846,7 +861,7 @@ def cdm_apply(ui, repo, *command, **opts):
     do_eval(cmd, files, repo.root, not opts['remain'])
 
 
-def cdm_reparent(ui, repo, parent):
+def cdm_reparent_11(ui, repo, parent):
     '''reparent your workspace
 
     Updates the 'default' path.'''
@@ -854,10 +869,8 @@ def cdm_reparent(ui, repo, parent):
     filename = repo.join('hgrc')
 
     p = ui.expandpath(parent)
-    if not p:
-        raise util.Abort("could not find parent: %s" % parent)
-
     cp = util.configparser()
+
     try:
         cp.read(filename)
     except ConfigParser.ParsingError, inst:
@@ -873,6 +886,86 @@ def cdm_reparent(ui, repo, parent):
     cp.set('paths', 'default', p)
     cp.write(fh)
     fh.close()
+
+
+def cdm_reparent_13(ui, repo, parent):
+    '''reparent your workspace
+
+    Updates the 'default' path in this repository's .hg/hgrc.'''
+
+    def append_new_parent(parent):
+        fp = None
+        try:
+            fp = repo.opener('hgrc', 'a', atomictemp=True)
+            if fp.tell() != 0:
+                fp.write('\n')
+            fp.write('[paths]\n'
+                     'default = %s\n\n' % parent)
+            fp.rename()
+        finally:
+            if fp and not fp.closed:
+                fp.close()
+
+    def update_parent(path, line, parent):
+        line = line - 1 # The line number we're passed will be 1-based
+        fp = None
+
+        try:
+            fp = open(path)
+            data = fp.readlines()
+        finally:
+            if fp and not fp.closed:
+                fp.close()
+
+        #
+        # line will be the last line of any continued block, go back
+        # to the first removing the continuation as we go.
+        #
+        while data[line][0].isspace():
+            data.pop(line)
+            line -= 1
+
+        assert data[line].startswith('default')
+
+        data[line] = "default = %s\n" % parent
+        if data[-1] != '\n':
+            data.append('\n')
+
+        try:
+            fp = util.atomictempfile(path, 'w', 0644)
+            fp.writelines(data)
+            fp.rename()
+        finally:
+            if fp and not fp.closed:
+                fp.close()
+
+    from mercurial import config
+    parent = ui.expandpath(parent)
+
+    if not os.path.exists(repo.join('hgrc')):
+        append_new_parent(parent)
+        return
+
+    cfg = config.config()
+    cfg.read(repo.join('hgrc'))
+    source = cfg.source('paths', 'default')
+
+    if not source:
+        append_new_parent(parent)
+        return
+    else:
+        path, target = source.rsplit(':', 1)
+
+        if path != repo.join('hgrc'):
+            raise util.Abort("Cannot edit path specification not in repo hgrc\n"
+                             "default path is from: %s" % source)
+
+        update_parent(path, int(target), parent)
+
+if Version.at_least("1.3"):
+    cdm_reparent = cdm_reparent_13
+else:
+    cdm_reparent = cdm_reparent_11
 
 
 def backup_name(fullpath):
@@ -912,10 +1005,17 @@ def cdm_backup(ui, repo, if_newer=False):
     name = backup_name(repo.root)
     bk = CdmBackup(ui, wslist[repo], name)
 
-    if if_newer and not bk.need_backup():
-        ui.status('backup is up-to-date\n')
-    else:
-        bk.backup()
+    wlock = repo.wlock()
+    lock = repo.lock()
+
+    try:
+        if if_newer and not bk.need_backup():
+            ui.status('backup is up-to-date\n')
+        else:
+            bk.backup()
+    finally:
+        lock.release()
+        wlock.release()
 
 
 def cdm_restore(ui, repo, backup, **opts):
@@ -926,12 +1026,8 @@ def cdm_restore(ui, repo, backup, **opts):
 
     if not os.getcwd().startswith(repo.root):
         raise util.Abort('restore is not safe to run with -R')
-    if wslist[repo].modified():
-        raise util.Abort('Workspace has uncommitted changes')
-    if wslist[repo].merged():
-        raise util.Abort('Workspace has an uncommitted merge')
-    if wslist[repo].branched():
-        raise util.Abort('Workspace has an uncommitted branch')
+
+    abort_if_dirty(wslist[repo])
 
     if opts['generation']:
         gen = int(opts['generation'])
@@ -941,8 +1037,15 @@ def cdm_restore(ui, repo, backup, **opts):
     if os.path.exists(backup):
         backup = os.path.abspath(backup)
 
-    bk = CdmBackup(ui, wslist[repo], backup)
-    bk.restore(gen)
+    wlock = repo.wlock()
+    lock = repo.lock()
+
+    try:
+        bk = CdmBackup(ui, wslist[repo], backup)
+        bk.restore(gen)
+    finally:
+        lock.release()
+        wlock.release()
 
 
 def cdm_webrev(ui, repo, **opts):

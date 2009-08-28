@@ -30,7 +30,19 @@ sake of adapting to Mercurial API changes.
 # It is important that this module rely on as little of Mercurial as
 # is possible.
 #
-from mercurial import version
+
+#
+# Mercurial >= 1.2 has util.version(), prior versions
+# version.get_version() We discover which to use this way, rather than
+# via ImportError to account for mercurial.demandimport delaying the
+# ImportError exception.
+#
+from mercurial import util
+if hasattr(util, 'version'):
+    hg_version = util.version
+else:
+    from mercurial import version
+    hg_version = version.get_version
 
 
 class VersionMismatch(Exception):
@@ -40,7 +52,7 @@ class VersionMismatch(Exception):
 #
 # List of versions that are explicitly acceptable to us
 #
-GOOD_VERSIONS = ['1.0.2', '1.1.2']
+GOOD_VERSIONS = ['1.1.2', '1.3.1']
 
 
 def check_version():
@@ -53,11 +65,11 @@ def check_version():
         else:
             return versions[0]
 
-    if version.get_version() not in GOOD_VERSIONS:
+    if hg_version() not in GOOD_VERSIONS:
         raise VersionMismatch("Scm expects Mercurial version %s, "
                               "actual version is %s." %
                               (versionstring(GOOD_VERSIONS),
-                               version.get_version()))
+                               hg_version()))
 
 
 def _split_version(ver):
@@ -79,7 +91,7 @@ def at_least(desired):
     '''Return boolean indicating if the running version is greater
     than or equal to, the version specified by major, minor, micro'''
 
-    hgver = _split_version(version.get_version())
+    hgver = _split_version(hg_version())
     desired = map(int, desired.split('.'))
 
     #

@@ -15,7 +15,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,18 +35,21 @@ from onbld.Scm import Version
 
 try:
     Version.check_version()
-except Version.VersionMismatch, e:
-    sys.stderr.write("Error: %s\n" % e)
+except Version.VersionMismatch, versionerror:
+    sys.stderr.write("Error: %s\n" % versionerror)
     sys.exit(1)
 
+
 import getopt, binascii
-from mercurial import hg, repo, util
-from onbld.Scm.WorkSpace import WorkSpace
+from mercurial import hg, ui, util
+from onbld.Scm.WorkSpace import WorkSpace, HgRepoError
+
 
 def usage():
     sys.stderr.write("usage: %s [-p parent] -w workspace\n" %
                      os.path.basename(__file__))
     sys.exit(2)
+
 
 def main(argv):
     try:
@@ -71,11 +74,11 @@ def main(argv):
         usage()
 
     try:
-        repository = hg.repository(None, wspath)
-    except repo.RepoError, e:
+        repository = hg.repository(ui.ui(), wspath)
+    except HgRepoError, e:
         sys.stderr.write("failed to open repository: %s\n" % e)
         sys.exit(1)
-    
+
     ws = WorkSpace(repository)
     act = ws.active(parentpath)
 

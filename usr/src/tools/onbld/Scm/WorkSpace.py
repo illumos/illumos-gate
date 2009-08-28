@@ -45,11 +45,23 @@
 
 import cStringIO
 import os
-from mercurial import hg, patch, cmdutil, util, node, repo
-from mercurial import revlog, repair
+from mercurial import cmdutil, context, hg, node, patch, repair, util
 from hgext import mq
 
 from onbld.Scm import Version
+
+#
+# Mercurial >= 1.2 has its exception types in a mercurial.error
+# module, prior versions had them in their associated modules.
+#
+if Version.at_least("1.2"):
+    from mercurial import error
+    HgRepoError = error.RepoError
+    HgLookupError = error.LookupError
+else:
+    from mercurial import repo, revlog
+    HgRepoError = repo.RepoError
+    HgLookupError = revlog.LookupError
 
 
 class ActiveEntry(object):
@@ -189,7 +201,7 @@ class ActiveList(object):
 
                 try:
                     fctx = ctx.filectx(fname)
-                except revlog.LookupError:
+                except HgLookupError:
                     continue
 
                 #
@@ -291,15 +303,17 @@ class ActiveList(object):
         if fname not in self:
             self[fname] = ActiveEntry(fname)
 
-    #
-    # Return list of files represented in this AL,
-    # including the parent file of a rename
-    #
     def files(self):
-        ret = self._active.keys()
+        '''Return the list of pathnames of all files touched by this
+        ActiveList
 
+        Where files have been renamed, this will include both their
+        current name and the name which they had in the parent tip.
+        '''
+
+        ret = self._active.keys()
         ret.extend([x.parentname for x in self
-                    if x.parentname and x.parentname not in ret])
+                    if x.is_renamed() and x.parentname not in ret])
         return ret
 
     def comments(self):
@@ -377,36 +391,38 @@ class ActiveList(object):
 
     def tags(self):
         '''Find tags that refer to a changeset in the ActiveList,
-           returning a list of 3-tuples (tag, node, is_local) for each.
+        returning a list of 3-tuples (tag, node, is_local) for each.
 
-           We return all instances of a tag that refer to such a node,
-           not just that which takes precedence.'''
+        We return all instances of a tag that refer to such a node,
+        not just that which takes precedence.'''
+
+        def colliding_tags(iterable, nodes, local):
+            for nd, name in [line.rstrip().split(' ', 1) for line in iterable]:
+                if nd in nodes:
+                    yield (name, self.ws.repo.lookup(nd), local)
+
+        tags = []
+        nodes = set(node.hex(ctx.node()) for ctx in self.revs)
 
         if os.path.exists(self.ws.repo.join('localtags')):
-            l = self.ws.repo.opener('localtags').readlines()
-            ltags = [x.rstrip().split(' ', 1) for x in l]
-        else:
-            ltags = []
+            fh = self.ws.repo.opener('localtags')
+            tags.extend(colliding_tags(fh, nodes, True))
+            fh.close()
 
         # We want to use the tags file from the localtip
-        if '.hgtags' in self.localtip.manifest():
-            f = self.localtip.filectx('.hgtags')
-            rtags = [x.rstrip().split(' ', 1) for x in f.data().splitlines()]
-        else:
-            rtags = []
-
-        nodes = [node.hex(n.node()) for n in self.revs]
-        tags = []
-
-        for nd, name in rtags:
-            if nd in nodes:
-                tags.append((name, self.ws.repo.lookup(nd), False))
-
-        for nd, name in ltags:
-            if nd in nodes:
-                tags.append((name, self.ws.repo.lookup(nd), True))
+        if '.hgtags' in self.localtip:
+            data = self.localtip.filectx('.hgtags').data().splitlines()
+            tags.extend(colliding_tags(data, nodes, False))
 
         return tags
+
+    def prune_tags(self, data):
+        '''Return a copy of data, which should correspond to the
+        contents of a Mercurial tags file, with any tags that refer to
+        changesets which are components of the ActiveList removed.'''
+
+        nodes = set(node.hex(ctx.node()) for ctx in self.revs)
+        return [t for t in data if t.split(' ', 1)[0] not in nodes]
 
     def filecmp(self, entry):
         '''Compare two revisions of two files
@@ -426,11 +442,65 @@ class ActiveList(object):
         if parentfile.size() != localfile.size():
             return True
 
-        if self.ws.flags(parentfile) != self.ws.flags(localfile):
+        if parentfile.flags() != localfile.flags():
             return True
 
         if parentfile.cmp(localfile.data()):
             return True
+
+    def context(self, message, user):
+        '''Return a Mercurial context object representing the entire
+        ActiveList as one change.'''
+        return activectx(self, message, user)
+
+
+class activectx(context.memctx):
+    '''Represent an ActiveList as a Mercurial context object.
+
+    Part of the  WorkSpace.squishdeltas implementation.'''
+
+    def __init__(self, active, message, user):
+        '''Build an activectx object.
+
+          active  - The ActiveList object used as the source for all data.
+          message - Changeset description
+          user    - Committing user'''
+
+        def filectxfn(repository, ctx, fname):
+            fctx = active.localtip.filectx(fname)
+            data = fctx.data()
+
+            #
+            # .hgtags is a special case, tags referring to active list
+            # component changesets should be elided.
+            #
+            if fname == '.hgtags':
+                data = '\n'.join(active.prune_tags(data.splitlines()))
+
+            return context.memfilectx(fname, data, 'l' in fctx.flags(),
+                                      'x' in fctx.flags(),
+                                      active[fname].parentname)
+
+        self.__active = active
+        parents = (active.parenttip.node(), node.nullid)
+        extra = {'branch': active.localtip.branch()}
+        context.memctx.__init__(self, active.ws.repo, parents, message,
+                                active.files(), filectxfn, user=user,
+                                extra=extra)
+
+    def modified(self):
+        return [entry.name for entry in self.__active if entry.is_modified()]
+
+    def added(self):
+        return [entry.name for entry in self.__active if entry.is_added()]
+
+    def removed(self):
+        ret = [entry.name for entry in self.__active if entry.is_removed()]
+        ret.extend([x.parentname for x in self.__active if x.is_renamed()])
+        return ret
+
+    def files(self):
+        return self.__active.files()
 
 
 class WorkSpace(object):
@@ -441,7 +511,6 @@ class WorkSpace(object):
         self.name = self.repo.root
 
         self.activecache = {}
-        self.outgoingcache = {}
 
     def parent(self, spec=None):
         '''Return the canonical workspace parent, either SPEC (which
@@ -537,39 +606,39 @@ class WorkSpace(object):
         ptips = map(lambda x: tipmost_shared(x, nodes), heads)
         return self.repo.changectx(sorted(ptips)[-1])
 
-    def status(self, base=None, head=None):
+    def status(self, base='.', head=None):
         '''Translate from the hg 6-tuple status format to a hash keyed
         on change-type'''
+
         states = ['modified', 'added', 'removed', 'deleted', 'unknown',
               'ignored']
-
-        if base is None and Version.at_least("1.1"):
-            base = '.'
 
         chngs = self.repo.status(base, head)
         return dict(zip(states, chngs))
 
-    #
-    # Cache findoutgoing results
-    #
     def findoutgoing(self, parent):
-        ret = []
-        if parent in self.outgoingcache:
-            ret = self.outgoingcache[parent]
-        else:
-            self.ui.pushbuffer()
+        '''Return the base set of outgoing nodes.
+
+        A caching wrapper around mercurial.localrepo.findoutgoing().
+        Complains (to the user), if the parent workspace is
+        non-existent or inaccessible'''
+
+        self.ui.pushbuffer()
+        try:
             try:
-                pws = hg.repository(self.ui, parent)
-                ret = self.repo.findoutgoing(pws)
-            except repo.RepoError:
-                self.ui.warn(
-                    "Warning: Parent workspace %s is not accessible\n" % parent)
-                self.ui.warn("active list will be incomplete\n\n")
-
-            self.outgoingcache[parent] = ret
+                ui = self.ui
+                if hasattr(cmdutil, 'remoteui'):
+                    ui = cmdutil.remoteui(ui, {})
+                pws = hg.repository(ui, parent)
+                return self.repo.findoutgoing(pws)
+            except HgRepoError:
+                self.ui.warn("Warning: Parent workspace '%s' is not "
+                             "accessible\n"
+                             "active list will be incomplete\n\n" % parent)
+                return []
+        finally:
             self.ui.popbuffer()
-
-        return ret
+    findoutgoing = util.cachefunc(findoutgoing)
 
     def modified(self):
         '''Return a list of files modified in the workspace'''
@@ -638,130 +707,110 @@ class WorkSpace(object):
         if not act.revs:
             return
 
-        matchfunc = self.matcher(pats, opts)
+        matchfunc = cmdutil.match(self.repo, pats, opts)
         opts = patch.diffopts(self.ui, opts)
 
         return self.diff(act.parenttip.node(), act.localtip.node(),
                          match=matchfunc, opts=opts)
 
-    #
-    # Theory:
-    #
-    # We wish to go from a single series of consecutive changesets
-    # (possibly including merges with the parent) to a single
-    # changeset faithfully representing contents and copy history.
-    #
-    # We achieve this in a somewhat confusing fashion.
-    #
-    # - Sanity check the workspace
-    # - Update the workspace to tip
-    # - Enter into the dirstate the sum total of file contents in the
-    #   to-be-squished changesets
-    # - Commit this in-progress change (which has no changes at all,
-    #   in reality) On top of the effective parent tip.
-    # - Strip the child-local branch(es) (see ActiveList.bases())
-    #
     def squishdeltas(self, active, message, user=None):
-        '''Create a single conglomerate changeset, with log message MESSAGE
-        containing the changes from ACTIVE.  USER, if set, is used
-        as the author name.
+        '''Create a single conglomerate changeset based on a given
+        active list.  Removes the original changesets comprising the
+        given active list, and any tags pointing to them.
 
-        The old changes are removed.'''
+        Operation:
 
-        def strip_tags(nodes):
-            '''Remove any tags referring to the specified nodes.'''
+          - Commit an activectx object representing the specified
+            active list,
+
+          - Remove any local tags pointing to changesets in the
+            specified active list.
+
+          - Remove the changesets comprising the specified active
+            list.
+
+          - Remove any metadata that may refer to changesets that were
+            removed.
+
+        Calling code is expected to hold both the working copy lock
+        and repository lock of the destination workspace
+        '''
+
+        def strip_local_tags(active):
+            '''Remove any local tags referring to the specified nodes.'''
 
             if os.path.exists(self.repo.join('localtags')):
-                fh = self.repo.opener('localtags').readlines()
-                tags = [t for t in fh if t.split(' ')[0] not in nodes]
-                fh = self.repo.opener('localtags', 'w', atomictemp=True)
-                fh.writelines(tags)
-                fh.rename()
+                fh = None
+                try:
+                    fh = self.repo.opener('localtags')
+                    tags = active.prune_tags(fh)
+                    fh.close()
 
-            if os.path.exists(self.repo.wjoin('.hgtags')):
-                fh = self.repo.wopener('.hgtags', 'rb').readlines()
-                tags = [t for t in fh if t.split(' ')[0] not in nodes]
-                fh = self.repo.wopener('.hgtags', 'wb', atomictemp=True)
-                fh.writelines(tags)
-                fh.rename()
-
-        wlock = self.repo.wlock()
-        lock = self.repo.lock()
-
-        #
-        # The files involved need to be present in the workspace and
-        # not otherwise molested, rather than the workspace not being
-        # modified we also need to prevent files being deleted (but
-        # left versioned) too.
-        #
-        # The easiest way to achieve this is to update the working
-        # copy to tip.
-        #
-        self.clean()
-
-        try:
-            strip_tags([node.hex(ctx.node()) for ctx in active.revs])
-        except EnvironmentError, e:
-            raise util.Abort('Could not recommit tags: %s\n' % e)
-
-        #
-        # For copied files, we need to enter the copy into the
-        # dirstate before we force the commit such that the
-        # file logs of both branches (old and new) contain
-        # representation of the copy.
-        #
-        parentman = active.parenttip.manifest()
-        for entry in active:
-            if not entry.is_renamed() and not entry.is_copied():
-                continue
-
-            assert entry.parentname in parentman, \
-                ("parentname '%s' (of '%s') not in parent" %
-                 (entry.parentname, entry.name))
-
-            #
-            # If the source file exists, and used to be versioned
-            # this will cause this to become a true copy
-            # (re-introducing the source file)
-            #
-            # We bandaid this, by removing the source file in this
-            # case.  If we're here, the user has already agreed to this
-            # from above.
-            #
-            if (entry.is_renamed() and
-                os.path.exists(self.repo.wjoin(entry.parentname))):
-                os.unlink(self.repo.wjoin(entry.parentname))
-
-            self.repo.copy(entry.parentname, entry.name)
+                    fh = self.repo.opener('localtags', 'w', atomictemp=True)
+                    fh.writelines(tags)
+                    fh.rename()
+                finally:
+                    if fh and not fh.closed:
+                        fh.close()
 
         if active.files():
-            extra = {'branch': active.localtip.branch()}
-            self.repo.commit(files=active.files(), text=message,
-                             user=user, p1=active.parenttip.node(), p2=None,
-                             extra=extra)
-            wsstate = "recommitted changeset"
-            self.clean()
+            for entry in active:
+                #
+                # Work around Mercurial issue #1666, if the source
+                # file of a rename exists in the working copy
+                # Mercurial will complain, and remove the file.
+                #
+                # We preemptively remove the file to avoid the
+                # complaint (the user was asked about this in
+                # cdm_recommit)
+                #
+                if entry.is_renamed():
+                    path = self.repo.wjoin(entry.parentname)
+                    if os.path.exists(path):
+                        os.unlink(path)
+
+            self.repo.commitctx(active.context(message, user))
+            wsstate = "recommitted"
+            destination = self.repo.changelog.tip()
         else:
             #
             # If all we're doing is stripping the old nodes, we want to
             # update the working copy such that we're not at a revision
             # that's about to go away.
             #
-            wsstate = "tip changeset"
-            self.clean(rev=active.parenttip.node())
+            wsstate = "tip"
+            destination = active.parenttip.node()
+
+        self.clean(destination)
+
+        #
+        # Tags were elided by the activectx object.  Local tags,
+        # however, must be removed manually.
+        #
+        try:
+            strip_local_tags(active)
+        except EnvironmentError, e:
+            raise util.Abort('Could not recommit tags: %s\n' % e)
 
         # Silence all the strip and update fun
         self.ui.pushbuffer()
 
         #
-        # We must strip away the old representation of the child
-        # branch(es).  This may involve stripping a theoretically
-        # large number of branches in certain cases
+        # Remove the active lists component changesets by stripping
+        # the base of any active branch (of which there may be
+        # several)
         #
         bases = active.bases()
         try:
             try:
                 for basenode in bases:
+                    #
+                    # Any cached information about the repository is
+                    # likely to be invalid during the strip.  The
+                    # caching of branch tags is especially
+                    # problematic.
+                    #
+                    self.repo.invalidate()
                     repair.strip(self.ui, self.repo, basenode, backup=False)
             except:
                 #
@@ -776,19 +825,18 @@ class WorkSpace(object):
                 self.ui.warn("stripping failed, your workspace will have "
                              "superfluous heads.\n"
                              "your workspace has been updated to the "
-                             "%s.\n" % wsstate)
+                             "%s changeset.\n" % wsstate)
                 raise               # Re-raise the exception
         finally:
+            self.clean()
+            self.repo.dirstate.write() # Flush the dirstate
+            self.repo.invalidate()     # Invalidate caches
+
             #
             # We need to remove Hg's undo information (used for rollback),
             # since it refers to data that will probably not exist after
             # the strip.
             #
-
-            self.clean()
-            self.repo.dirstate.write() # Flush the dirstate
-            self.repo.invalidate()     # Invalidate caches
-
             if os.path.exists(self.repo.sjoin('undo')):
                 try:
                     os.unlink(self.repo.sjoin('undo'))
@@ -810,7 +858,6 @@ class WorkSpace(object):
         else:
             rev = self.repo.changelog.tip()
 
-        wlock = self.repo.wlock()
         hg.clean(self.repo, rev, show_stats=False)
 
     def mq_applied(self):
@@ -818,39 +865,18 @@ class WorkSpace(object):
         q = mq.queue(self.ui, self.repo.join(''))
         return q.applied
 
-    if Version.at_least("1.1"):
-        def workingctx(self):
-            return self.repo.changectx(None)
+    def workingctx(self):
+        return self.repo.changectx(None)
 
-        def flags(self, ctx):
-            return ctx.flags()
-
-        def matcher(self, pats, opts):
-            return cmdutil.match(self.repo, pats, opts)
-
-        def diff(self, node1=None, node2=None, match=None, opts=None):
-            ret = cStringIO.StringIO()
-
+    def diff(self, node1=None, node2=None, match=None, opts=None):
+        ret = cStringIO.StringIO()
+        try:
             for chunk in patch.diff(self.repo, node1, node2, match=match,
                                     opts=opts):
                 ret.write(chunk)
+        finally:
+            # Workaround Hg bug 1651
+            if not Version.at_least("1.3"):
+                self.repo.dirstate.invalidate()
 
-            return ret.getvalue()
-    else:
-        def workingctx(self):
-            return self.repo.workingctx()
-
-        def flags(self, ctx):
-            return ctx.fileflags()
-
-        def matcher(self, pats, opts):
-            return cmdutil.matchpats(self.repo, pats, opts)[1]
-
-        def diff(self, node1=None, node2=None, match=None, opts=None):
-            ret = cStringIO.StringIO()
-
-            imatch = match or util.always
-            patch.diff(self.repo, node1, node2, fp=ret, match=imatch,
-                       opts=opts)
-
-            return ret.getvalue()
+        return ret.getvalue()
