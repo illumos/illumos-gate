@@ -35,7 +35,7 @@ include ../Makefile.tools
 
 CFLAGS += $(CCVERBOSE)
 
-CLEANFILES += $(OBJS) y.tab.h
+CLEANFILES += $(OBJS) y.tab.c y.tab.h
 
 $(ROOTONBLDMAN1FILES) := FILEMODE=      644
 
@@ -54,8 +54,12 @@ clean:
 
 $(OBJS): y.tab.h
 
-y.tab.h:
+y.tab.c y.tab.h: ndr_parse.y
 	$(YACC.y) -d ndr_parse.y
+
+ndr_parse.o : y.tab.c
+	$(COMPILE.c) -o $@ y.tab.c
+	$(POST_PROCESS_O)
 
 ndrgen1: $(OBJS)
 	$(LINK.c) -o $@ $(OBJS)
