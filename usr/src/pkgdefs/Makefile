@@ -174,6 +174,7 @@ i386_SUBDIRS= \
 
 i386_XMODS= \
 	BRCMbnx \
+	BRCMbnxe \
 	SUNWadpu320 \
 	SUNWlsimega
 

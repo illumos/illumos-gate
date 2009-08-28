@@ -21,6 +21,8 @@
 ../closed/uts/sun/io/wsdrv.conf
 ../closed/uts/common/io/bnx
 ../closed/uts/intel/bnx
+../closed/uts/common/io/bnxe
+../closed/uts/intel/bnxe
 ../closed/uts/intel/io/adpu320
 ../closed/uts/intel/adpu320
 ../closed/uts/intel/io/lsimega
