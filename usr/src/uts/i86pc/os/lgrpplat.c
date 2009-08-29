@@ -1178,6 +1178,7 @@ lgrp_plat_probe(void)
 	int				from;
 	int				i;
 	lgrp_plat_latency_stats_t	*lat_stats;
+	boolean_t			probed;
 	hrtime_t			probe_time;
 	int				to;
 
@@ -1206,16 +1207,20 @@ lgrp_plat_probe(void)
 	 * so we can build latency topology of machine later.
 	 * This should approximate the memory latency between each node.
 	 */
+	probed = B_FALSE;
 	for (i = 0; i < lgrp_plat_probe_nrounds; i++) {
 		for (to = 0; to < lgrp_plat_node_cnt; to++) {
 			/*
-			 * Get probe time and bail out if can't get it yet
+			 * Get probe time and skip over any nodes that can't be
+			 * probed yet or don't have memory
 			 */
 			probe_time = lgrp_plat_probe_time(to,
 			    lgrp_plat_cpu_node, &lgrp_plat_probe_mem_config,
 			    &lgrp_plat_lat_stats, &lgrp_plat_probe_stats);
 			if (probe_time == 0)
-				return;
+				continue;
+
+			probed = B_TRUE;
 
 			/*
 			 * Keep lowest probe time as latency between nodes
@@ -1235,6 +1240,12 @@ lgrp_plat_probe(void)
 				lat_stats->latency_max = probe_time;
 		}
 	}
+
+	/*
+	 * Bail out if weren't able to probe any nodes from current CPU
+	 */
+	if (probed == B_FALSE)
+		return;
 
 	/*
 	 * - Fix up latencies such that local latencies are same,
@@ -1491,8 +1502,6 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 	 * if they are close enough together
 	 */
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
-		if (!node_memory[i].exists)
-			continue;
 		for (j = 0; j < lgrp_plat_node_cnt; j++) {
 			if (!node_memory[j].exists)
 				continue;
@@ -1510,8 +1519,6 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 				continue;
 
 			for (k = 0; k < lgrp_plat_node_cnt; k++) {
-				if (!node_memory[k].exists)
-					continue;
 				for (l = 0; l < lgrp_plat_node_cnt; l++) {
 					if (!node_memory[l].exists)
 						continue;
@@ -1633,8 +1640,6 @@ lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 	 */
 	lat_stats->latency_max = 0;
 	for (i = 0; i < lgrp_plat_node_cnt; i++) {
-		if (!node_memory[i].exists)
-			continue;
 		for (j = 0; j < lgrp_plat_node_cnt; j++) {
 			if (!node_memory[j].exists)
 				continue;
@@ -1726,8 +1731,6 @@ lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
 	 */
 	if (t1) {
 		for (i = 0; i < lgrp_plat_node_cnt; i++) {
-			if (!node_memory[i].exists)
-				continue;
 			for (j = 0; j < lgrp_plat_node_cnt; j++) {
 				if (!node_memory[j].exists)
 					continue;
