@@ -2755,8 +2755,8 @@ top:
 		mutex_exit(hash_lock);
 
 		ASSERT3U(hdr->b_size, ==, size);
-		DTRACE_PROBE3(arc__miss, blkptr_t *, bp, uint64_t, size,
-		    zbookmark_t *, zb);
+		DTRACE_PROBE4(arc__miss, arc_buf_hdr_t *, hdr, blkptr_t *, bp,
+		    uint64_t, size, zbookmark_t *, zb);
 		ARCSTAT_BUMP(arcstat_misses);
 		ARCSTAT_CONDSTAT(!(hdr->b_flags & ARC_PREFETCH),
 		    demand, prefetch, hdr->b_type != ARC_BUFC_METADATA,
