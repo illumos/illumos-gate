@@ -2574,7 +2574,7 @@ ibd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 attach_fail:
-	ibd_unattach(state, dip);
+	(void) ibd_unattach(state, dip);
 	return (DDI_FAILURE);
 }
 
