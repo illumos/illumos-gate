@@ -136,35 +136,35 @@ ads_set_micboost(ac97_ctrl_t *actrl, uint64_t value)
 	ac97_t	*ac = actrl->actrl_ac97;
 	uint16_t	v;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	switch (value) {
 	case 0x1:
 		/* 0db */
-		ac97_clr(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+		ac_clr(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
 		break;
 	case 0x2:
 		/* 10dB */
-		ac97_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
-		v = ac97_rd(ac, ADS_MISC_CFG_REGISTER);
+		ac_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+		v = ac_rd(ac, ADS_MISC_CFG_REGISTER);
 		v &= ~AMCR_MBG_MASK;
 		v |= AMCR_MBG_10dB;
-		ac97_wr(ac, ADS_MISC_CFG_REGISTER, v);
+		ac_wr(ac, ADS_MISC_CFG_REGISTER, v);
 		break;
 	case 0x4:
 		/* 20dB */
-		ac97_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
-		v = ac97_rd(ac, ADS_MISC_CFG_REGISTER);
+		ac_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+		v = ac_rd(ac, ADS_MISC_CFG_REGISTER);
 		v &= ~AMCR_MBG_MASK;
 		v |= AMCR_MBG_20dB;
-		ac97_wr(ac, ADS_MISC_CFG_REGISTER, v);
+		ac_wr(ac, ADS_MISC_CFG_REGISTER, v);
 		break;
 	case 0x8:
 		/* 30dB */
-		ac97_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
-		v = ac97_rd(ac, ADS_MISC_CFG_REGISTER);
+		ac_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+		v = ac_rd(ac, ADS_MISC_CFG_REGISTER);
 		v &= ~AMCR_MBG_MASK;
 		v |= AMCR_MBG_30dB;
-		ac97_wr(ac, ADS_MISC_CFG_REGISTER, v);
+		ac_wr(ac, ADS_MISC_CFG_REGISTER, v);
 		break;
 	}
 }
@@ -174,19 +174,19 @@ ads_set_micsrc(ac97_ctrl_t *actrl, uint64_t value)
 {
 	ac97_t	*ac = actrl->actrl_ac97;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	switch (value) {
 	case 0x1:	/* mic1 */
-		ac97_clr(ac, ADS_MISC_CFG_REGISTER, AMCR_2CMIC);
-		ac97_clr(ac, AC97_GENERAL_PURPOSE_REGISTER, GPR_MS_MIC2);
+		ac_clr(ac, ADS_MISC_CFG_REGISTER, AMCR_2CMIC);
+		ac_clr(ac, AC97_GENERAL_PURPOSE_REGISTER, GPR_MS_MIC2);
 		break;
 	case 0x2:	/* mic2 */
-		ac97_clr(ac, ADS_MISC_CFG_REGISTER, AMCR_2CMIC);
-		ac97_set(ac, AC97_GENERAL_PURPOSE_REGISTER, GPR_MS_MIC2);
+		ac_clr(ac, ADS_MISC_CFG_REGISTER, AMCR_2CMIC);
+		ac_set(ac, AC97_GENERAL_PURPOSE_REGISTER, GPR_MS_MIC2);
 		break;
 	case 0x4:	/* stereo - ms bit clear to allow MIC1 to be mixed */
-		ac97_set(ac, ADS_MISC_CFG_REGISTER, AMCR_2CMIC);
-		ac97_clr(ac, AC97_GENERAL_PURPOSE_REGISTER, GPR_MS_MIC2);
+		ac_set(ac, ADS_MISC_CFG_REGISTER, AMCR_2CMIC);
+		ac_clr(ac, AC97_GENERAL_PURPOSE_REGISTER, GPR_MS_MIC2);
 		break;
 	}
 }
@@ -194,7 +194,6 @@ ads_set_micsrc(ac97_ctrl_t *actrl, uint64_t value)
 static void
 ads_setup_micsrc(ac97_t *ac)
 {
-	ac97_ctrl_t		*ctrl;
 	static const char	*values[] = {
 		AUDIO_PORT_MIC1,
 		AUDIO_PORT_MIC2,
@@ -206,12 +205,7 @@ ads_setup_micsrc(ac97_t *ac)
 		AC97_FLAGS | AUDIO_CTRL_FLAG_REC, 0, ads_set_micsrc,
 		NULL, 0, values };
 
-	ctrl = ac97_control_find(ac, AUDIO_CTRL_ID_MICSRC);
-	if (ctrl) {
-		ac97_free_control(ctrl);
-	}
-
-	ac97_alloc_control(ac, &cpt);
+	ac_add_control(ac, &cpt);
 }
 
 static void
@@ -237,10 +231,9 @@ ads_setup_micboost(ac97_t *ac)
 			/* 20dB by default */
 			cpt.cp_initval = 2;
 		}
-		ac97_free_control(ctrl);
 	}
 
-	ac97_alloc_control(ac, &cpt);
+	ac_add_control(ac, &cpt);
 }
 
 void

@@ -78,11 +78,11 @@ alc650_set_linein_func(ac97_ctrl_t *actrl, uint64_t value)
 {
 	ac97_t		*ac = actrl->actrl_ac97;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	if (value & 2) {
-		ac97_set(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_SURROUND);
+		ac_set(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_SURROUND);
 	} else {
-		ac97_clr(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_SURROUND);
+		ac_clr(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_SURROUND);
 	}
 }
 
@@ -91,13 +91,13 @@ alc650_set_mic_func(ac97_ctrl_t *actrl, uint64_t value)
 {
 	ac97_t		*ac = actrl->actrl_ac97;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	if (value & 2) {
-		ac97_set(ac, ALC_MISC_CTRL_REGISTER, AMC_VREFOUT_DIS);
-		ac97_set(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_CENTER_LFE);
+		ac_set(ac, ALC_MISC_CTRL_REGISTER, AMC_VREFOUT_DIS);
+		ac_set(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_CENTER_LFE);
 	} else {
-		ac97_clr(ac, ALC_MISC_CTRL_REGISTER, AMC_VREFOUT_DIS);
-		ac97_clr(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_CENTER_LFE);
+		ac_clr(ac, ALC_MISC_CTRL_REGISTER, AMC_VREFOUT_DIS);
+		ac_clr(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_CENTER_LFE);
 	}
 }
 
@@ -107,11 +107,11 @@ alc850_set_auxin_func(ac97_ctrl_t *actrl, uint64_t value)
 {
 	ac97_t		*ac = actrl->actrl_ac97;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	if (value & 2) {
-		ac97_set(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_BACK_SURROUND);
+		ac_set(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_BACK_SURROUND);
 	} else {
-		ac97_clr(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_BACK_SURROUND);
+		ac_clr(ac, ALC_DATA_FLOW_CTRL_REGISTER, ADFC_BACK_SURROUND);
 	}
 }
 #endif
@@ -129,14 +129,14 @@ alc650_set_pcm(ac97_ctrl_t *actrl, uint64_t value)
 
 	/* If this control is mute-able than set as muted if needed */
 	mute = vol ? 0 : ASD_SURROUND_MUTE;
-	adj_value = ac97_val_scale(vol, vol, 5) | mute;
+	adj_value = ac_val_scale(vol, vol, 5) | mute;
 
 	/* select page 0 */
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);
 	/* adjust all three PCM volumes */
-	ac97_wr(ac, AC97_PCM_OUT_VOLUME_REGISTER, adj_value);
-	ac97_wr(ac, ALC_SURROUND_DAC_REGISTER, adj_value);
-	ac97_wr(ac, ALC_CEN_LFE_DAC_REGISTER, adj_value);
+	ac_wr(ac, AC97_PCM_OUT_VOLUME_REGISTER, adj_value);
+	ac_wr(ac, ALC_SURROUND_DAC_REGISTER, adj_value);
+	ac_wr(ac, ALC_CEN_LFE_DAC_REGISTER, adj_value);
 }
 
 static const char *alc_linein_funcs[] = {
@@ -179,18 +179,18 @@ alc650_init(ac97_t *ac)
 	int			ival;
 
 	bcopy(&alc650_linein_func_cpt, &cp, sizeof (cp));
-	ival = ac97_get_prop(ac, AC97_PROP_LINEIN_FUNC, 0);
+	ival = ac_get_prop(ac, AC97_PROP_LINEIN_FUNC, 0);
 	if ((ival >= 1) && (ival <= 2)) {
 		cp.cp_initval = ival;
 	}
-	ac97_alloc_control(ac, &cp);
+	ac_add_control(ac, &cp);
 
 	bcopy(&alc650_mic_func_cpt, &cp, sizeof (cp));
-	ival = ac97_get_prop(ac, AC97_PROP_MIC_FUNC, 0);
+	ival = ac_get_prop(ac, AC97_PROP_MIC_FUNC, 0);
 	if ((ival >= 1) && (ival <= 2)) {
 		cp.cp_initval = ival;
 	}
-	ac97_alloc_control(ac, &cp);
+	ac_add_control(ac, &cp);
 
 	alc_pcm_override(ac);
 }

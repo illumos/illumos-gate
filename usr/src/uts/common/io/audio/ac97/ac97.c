@@ -76,7 +76,7 @@
 #define	INPUT_MONOMIX		6
 #define	INPUT_PHONE		7
 
-static const char *ac97_insrcs[] = {
+static const char *ac_insrcs[] = {
 	AUDIO_PORT_MIC,
 	AUDIO_PORT_CD,
 	AUDIO_PORT_VIDEO,
@@ -221,7 +221,7 @@ static const char ac97_val_cvt[101] = {
  *      ( each channel is "bits" wide )
  */
 uint16_t
-ac97_val_scale(int left, int right, int bits)
+ac_val_scale(int left, int right, int bits)
 {
 	ASSERT(left <= 100);
 	ASSERT(right <= 100);
@@ -257,7 +257,7 @@ ac97_val_scale(int left, int right, int bits)
 }
 
 uint16_t
-ac97_mono_scale(int val, int bits)
+ac_mono_scale(int val, int bits)
 {
 	ASSERT(val <= 100);
 
@@ -269,15 +269,14 @@ ac97_mono_scale(int val, int bits)
 	return (val * ((1 << bits) - 1) / 100);
 }
 
-
 audio_dev_t *
-ac97_get_dev(ac97_t *ac)
+ac_get_dev(ac97_t *ac)
 {
 	return (ac->d);
 }
 
 int
-ac97_get_prop(ac97_t *ac, char *prop, int defval)
+ac_get_prop(ac97_t *ac, char *prop, int defval)
 {
 	int	rv;
 
@@ -313,7 +312,7 @@ ac97_get_prop(ac97_t *ac, char *prop, int defval)
  * detection.)
  */
 static int
-ac97_probe_reg(ac97_t *ac, uint8_t reg)
+ac_probe_reg(ac97_t *ac, uint8_t reg)
 {
 	uint16_t	val;
 	int		rv = 0;
@@ -333,7 +332,7 @@ ac97_probe_reg(ac97_t *ac, uint8_t reg)
  * Does this device have bass/treble controls?
  */
 static int
-ac97_probe_tone(ac97_t *ac)
+ac_probe_tone(ac97_t *ac)
 {
 	/* Bass/Treble contols  present */
 	if (ac->caps & RR_BASS_TREBLE)
@@ -346,7 +345,7 @@ ac97_probe_tone(ac97_t *ac)
  * If there is a loudness switch?
  */
 static int
-ac97_probe_loud(ac97_t *ac)
+ac_probe_loud(ac97_t *ac)
 {
 	/* loudness contol present */
 	if (ac->caps & RR_LOUDNESS_SUPPORT)
@@ -359,7 +358,7 @@ ac97_probe_loud(ac97_t *ac)
  * Does this device have a mono-mic input volume control?
  */
 static int
-ac97_probe_mmic(ac97_t *ac)
+ac_probe_mmic(ac97_t *ac)
 {
 	/* mono mic present */
 	if (ac->caps & RR_DEDICATED_MIC)
@@ -372,7 +371,7 @@ ac97_probe_mmic(ac97_t *ac)
  * Does this device have a simulated stereo switch?
  */
 static int
-ac97_probe_stsim(ac97_t *ac)
+ac_probe_stsim(ac97_t *ac)
 {
 	/* simulated stereocontol present */
 	if (ac->caps & RR_PSEUDO_STEREO)
@@ -385,16 +384,16 @@ ac97_probe_stsim(ac97_t *ac)
  * Does this device have a PC beeper input volume control?
  */
 static int
-ac97_probe_pcbeep(ac97_t *ac)
+ac_probe_pcbeep(ac97_t *ac)
 {
-	return (ac97_probe_reg(ac, AC97_PC_BEEP_REGISTER));
+	return (ac_probe_reg(ac, AC97_PC_BEEP_REGISTER));
 }
 
 /*
  * Does this device have AUX output port volume control?
  */
 static int
-ac97_probe_rear(ac97_t *ac)
+ac_probe_rear(ac97_t *ac)
 {
 	if (ac->flags & AC97_FLAG_AUX_4CH)
 		return (1);
@@ -407,10 +406,10 @@ ac97_probe_rear(ac97_t *ac)
  * Does this device have a mic?
  */
 static int
-ac97_probe_mic(ac97_t *ac)
+ac_probe_mic(ac97_t *ac)
 {
 	if ((!(ac->flags & AC97_FLAG_NO_MIC)) &&
-	    (ac97_probe_reg(ac, AC97_MIC_VOLUME_REGISTER))) {
+	    (ac_probe_reg(ac, AC97_MIC_VOLUME_REGISTER))) {
 		ac->inputs |= (1U << INPUT_MIC);
 		return (1);
 	}
@@ -421,7 +420,7 @@ ac97_probe_mic(ac97_t *ac)
  * If this device has an AUX output port is it used for headphones?
  */
 static int
-ac97_probe_headphone(ac97_t *ac)
+ac_probe_headphone(ac97_t *ac)
 {
 	/* headphone control present */
 	if ((ac->flags & AC97_FLAG_AUX_HP) &&
@@ -435,7 +434,7 @@ ac97_probe_headphone(ac97_t *ac)
  * Does this device have AUX output port volume control?
  */
 static int
-ac97_probe_auxout(ac97_t *ac)
+ac_probe_auxout(ac97_t *ac)
 {
 	/* ALT PCM control present */
 	if ((ac->flags & AC97_FLAG_AUX_LVL) &&
@@ -449,10 +448,10 @@ ac97_probe_auxout(ac97_t *ac)
  * Does this device have an AUX input port volume control?
  */
 static int
-ac97_probe_auxin(ac97_t *ac)
+ac_probe_auxin(ac97_t *ac)
 {
 	if ((!(ac->flags & AC97_FLAG_NO_AUXIN)) &&
-	    (ac97_probe_reg(ac, AC97_AUX_VOLUME_REGISTER))) {
+	    (ac_probe_reg(ac, AC97_AUX_VOLUME_REGISTER))) {
 		ac->inputs |= (1U << INPUT_AUXIN);
 		return (1);
 	}
@@ -463,10 +462,10 @@ ac97_probe_auxin(ac97_t *ac)
  * Does this device have a phone input port with a volume control?
  */
 static int
-ac97_probe_phone(ac97_t *ac)
+ac_probe_phone(ac97_t *ac)
 {
 	if ((!(ac->flags & AC97_FLAG_NO_PHONE)) &&
-	    (ac97_probe_reg(ac, AC97_PHONE_VOLUME_REGISTER))) {
+	    (ac_probe_reg(ac, AC97_PHONE_VOLUME_REGISTER))) {
 		ac->inputs |= (1U << INPUT_PHONE);
 		return (1);
 	}
@@ -477,12 +476,12 @@ ac97_probe_phone(ac97_t *ac)
  * Does this device have a mono output port with volume control?
  */
 static int
-ac97_probe_mono(ac97_t *ac)
+ac_probe_mono(ac97_t *ac)
 {
 	if (!(ac->flags & AC97_FLAG_SPEAKER_OK)) {
 		return (0);
 	}
-	if (ac97_probe_reg(ac, AC97_MONO_MASTER_VOLUME_REGISTER)) {
+	if (ac_probe_reg(ac, AC97_MONO_MASTER_VOLUME_REGISTER)) {
 		return (1);
 	}
 	return (0);
@@ -492,10 +491,10 @@ ac97_probe_mono(ac97_t *ac)
  * Does this device have a line input port with volume control?
  */
 static int
-ac97_probe_linein(ac97_t *ac)
+ac_probe_linein(ac97_t *ac)
 {
 	if ((!(ac->flags & AC97_FLAG_NO_LINEIN)) &&
-	    (ac97_probe_reg(ac, AC97_LINE_IN_VOLUME_REGISTER))) {
+	    (ac_probe_reg(ac, AC97_LINE_IN_VOLUME_REGISTER))) {
 		ac->inputs |= (1U << INPUT_LINEIN);
 		return (1);
 	}
@@ -506,10 +505,10 @@ ac97_probe_linein(ac97_t *ac)
  * Does this device have a cdrom input port with volume control?
  */
 static int
-ac97_probe_cdrom(ac97_t *ac)
+ac_probe_cdrom(ac97_t *ac)
 {
 	if ((!(ac->flags & AC97_FLAG_NO_CDROM)) &&
-	    (ac97_probe_reg(ac, AC97_CD_VOLUME_REGISTER))) {
+	    (ac_probe_reg(ac, AC97_CD_VOLUME_REGISTER))) {
 		ac->inputs |= (1U << INPUT_CD);
 		return (1);
 	}
@@ -520,10 +519,10 @@ ac97_probe_cdrom(ac97_t *ac)
  * Does this device have a video input port with volume control?
  */
 static int
-ac97_probe_video(ac97_t *ac)
+ac_probe_video(ac97_t *ac)
 {
 	if ((!(ac->flags & AC97_FLAG_NO_VIDEO)) &&
-	    (ac97_probe_reg(ac, AC97_VIDEO_VOLUME_REGISTER))) {
+	    (ac_probe_reg(ac, AC97_VIDEO_VOLUME_REGISTER))) {
 		ac->inputs |= (1U << INPUT_VIDEO);
 		return (1);
 	}
@@ -534,7 +533,7 @@ ac97_probe_video(ac97_t *ac)
  * Does this device have a 3D sound enhancement?
  */
 static int
-ac97_probe_3d(ac97_t *ac)
+ac_probe_3d(ac97_t *ac)
 {
 	/* 3D control present */
 	if (ac->caps & RR_3D_STEREO_ENHANCE_MASK)
@@ -544,7 +543,7 @@ ac97_probe_3d(ac97_t *ac)
 }
 
 static int
-ac97_probe_3d_impl(ac97_t *ac, uint16_t mask)
+ac_probe_3d_impl(ac97_t *ac, uint16_t mask)
 {
 	int	rv = 0;
 	uint16_t val;
@@ -564,22 +563,22 @@ ac97_probe_3d_impl(ac97_t *ac, uint16_t mask)
 }
 
 static int
-ac97_probe_3d_depth(ac97_t *ac)
+ac_probe_3d_depth(ac97_t *ac)
 {
-	return (ac97_probe_3d_impl(ac, TDCR_DEPTH_MASK));
+	return (ac_probe_3d_impl(ac, TDCR_DEPTH_MASK));
 }
 
 static int
-ac97_probe_3d_center(ac97_t *ac)
+ac_probe_3d_center(ac97_t *ac)
 {
-	return (ac97_probe_3d_impl(ac, TDCR_CENTER_MASK));
+	return (ac_probe_3d_impl(ac, TDCR_CENTER_MASK));
 }
 
 /*
  * Does this device have a center output port with volume control?
  */
 static int
-ac97_probe_center(ac97_t *ac)
+ac_probe_center(ac97_t *ac)
 {
 	uint16_t val;
 
@@ -597,7 +596,7 @@ ac97_probe_center(ac97_t *ac)
  * a volume control?
  */
 static int
-ac97_probe_lfe(ac97_t *ac)
+ac_probe_lfe(ac97_t *ac)
 {
 	uint16_t val;
 
@@ -615,7 +614,7 @@ ac97_probe_lfe(ac97_t *ac)
  * Are we a multichannel codec?
  */
 static int
-ac97_probe_front(ac97_t *ac)
+ac_probe_front(ac97_t *ac)
 {
 	uint16_t val;
 
@@ -629,19 +628,19 @@ ac97_probe_front(ac97_t *ac)
 }
 
 static int
-ac97_probe_lineout(ac97_t *ac)
+ac_probe_lineout(ac97_t *ac)
 {
 	/* if not multichannel, then use "lineout" instead of "front" label */
-	return (!ac97_probe_front(ac));
+	return (!ac_probe_front(ac));
 }
 
-static const char *ac97_mics[] = {
+static const char *ac_mics[] = {
 	AUDIO_PORT_MIC1,
 	AUDIO_PORT_MIC2,
 	NULL,
 };
 
-static const char *ac97_monos[] = {
+static const char *ac_monos[] = {
 	AUDIO_PORT_MONOMIX,
 	AUDIO_PORT_MIC,
 	NULL
@@ -652,7 +651,7 @@ static const char *ac97_monos[] = {
  * to write to a device register.
  */
 void
-ac97_wr(ac97_t *ac, uint8_t reg, uint16_t val)
+ac_wr(ac97_t *ac, uint8_t reg, uint16_t val)
 {
 	if ((reg < LAST_SHADOW_REG) && (reg > 0)) {
 		SHADOW(ac, reg) = val;
@@ -674,7 +673,7 @@ ac97_wr(ac97_t *ac, uint8_t reg, uint16_t val)
  * To read a hardware register, use the RD() macro above.
  */
 uint16_t
-ac97_rd(ac97_t *ac, uint8_t reg)
+ac_rd(ac97_t *ac, uint8_t reg)
 {
 	if ((reg < LAST_SHADOW_REG) && (reg > 0)) {
 		return (SHADOW(ac, reg));
@@ -690,9 +689,9 @@ ac97_rd(ac97_t *ac, uint8_t reg)
  * to set bits in a device register.
  */
 void
-ac97_set(ac97_t *ac, uint8_t reg, uint16_t val)
+ac_set(ac97_t *ac, uint8_t reg, uint16_t val)
 {
-	ac97_wr(ac, reg, ac->rd(ac->private, reg) | val);
+	ac_wr(ac, reg, ac->rd(ac->private, reg) | val);
 }
 
 /*
@@ -700,9 +699,9 @@ ac97_set(ac97_t *ac, uint8_t reg, uint16_t val)
  * to clear bits in a device register.
  */
 void
-ac97_clr(ac97_t *ac, uint8_t reg, uint16_t val)
+ac_clr(ac97_t *ac, uint8_t reg, uint16_t val)
 {
-	ac97_wr(ac, reg, ac->rd(ac->private, reg) & ~val);
+	ac_wr(ac, reg, ac->rd(ac->private, reg) & ~val);
 }
 
 /*
@@ -719,14 +718,11 @@ ac97_control_find(ac97_t *ac, const char *name)
 	list_t *l = &ac->ctrls;
 
 	/* Validate that ctrlnum is real and usable */
-	mutex_enter(&ac->ac_lock);
 	for (ctrl = list_head(l); ctrl; ctrl = list_next(l, ctrl)) {
 		if (strcmp(ctrl->actrl_name, name) == 0) {
-			mutex_exit(&ac->ac_lock);
 			return (ctrl);
 		}
 	}
-	mutex_exit(&ac->ac_lock);
 	return (NULL);
 }
 
@@ -734,7 +730,7 @@ ac97_control_find(ac97_t *ac, const char *name)
  * This will update all the codec registers from the shadow table.
  */
 static void
-ac97_restore(ac97_t *ac)
+ac_restore(ac97_t *ac)
 {
 	/*
 	 * If we are restoring previous settings, just reload from the
@@ -760,7 +756,7 @@ ac97_restore(ac97_t *ac)
  * start of day.
  */
 static void
-ac97_init_values(ac97_t *ac)
+ac_init_values(ac97_t *ac)
 {
 	ac97_ctrl_t	*ctrl;
 
@@ -778,7 +774,7 @@ ac97_init_values(ac97_t *ac)
  * for the control AUDIO_CONTROL_INPUTS.
  */
 static void
-ac97_insrc_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_insrc_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
 	ac97_t		*ac = ctrl->actrl_ac97;
 	uint16_t	set_val;
@@ -786,13 +782,13 @@ ac97_insrc_set(ac97_ctrl_t *ctrl, uint64_t value)
 	set_val = ddi_ffs(value & 0xffff);
 	if ((set_val > 0) && (set_val <= 8)) {
 		set_val--;
-		ac97_wr(ac, AC97_RECORD_SELECT_CTRL_REGISTER,
+		ac_wr(ac, AC97_RECORD_SELECT_CTRL_REGISTER,
 		    set_val | (set_val << 8));
 	}
 }
 
 static void
-ac97_gpr_toggle(ac97_ctrl_t *ctrl, int bit, uint64_t onoff)
+ac_gpr_toggle(ac97_ctrl_t *ctrl, int bit, uint64_t onoff)
 {
 	ac97_t			*ac = ctrl->actrl_ac97;
 	uint16_t		v;
@@ -803,56 +799,56 @@ ac97_gpr_toggle(ac97_ctrl_t *ctrl, int bit, uint64_t onoff)
 	} else {
 		v &= ~bit;
 	}
-	ac97_wr(ac, AC97_GENERAL_PURPOSE_REGISTER, v);
+	ac_wr(ac, AC97_GENERAL_PURPOSE_REGISTER, v);
 }
 
 static void
-ac97_3donoff_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_3donoff_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_gpr_toggle(ctrl, GPR_3D_STEREO_ENHANCE, value);
+	ac_gpr_toggle(ctrl, GPR_3D_STEREO_ENHANCE, value);
 }
 
 static void
-ac97_loudness_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_loudness_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_gpr_toggle(ctrl, GPR_BASS_BOOST, value);
+	ac_gpr_toggle(ctrl, GPR_BASS_BOOST, value);
 }
 
 static void
-ac97_loopback_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_loopback_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_gpr_toggle(ctrl, GPR_LPBK, value);
+	ac_gpr_toggle(ctrl, GPR_LPBK, value);
 }
 
 /*
  * This will set simulated stereo control to on or off.
  */
 static void
-ac97_stsim_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_stsim_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_gpr_toggle(ctrl, GPR_ST, value);
+	ac_gpr_toggle(ctrl, GPR_ST, value);
 }
 
 /*
  * This will set mic select control to mic1=0 or mic2=1.
  */
 static void
-ac97_selmic_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_selmic_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_gpr_toggle(ctrl, GPR_MS_MIC2, value & 2);
+	ac_gpr_toggle(ctrl, GPR_MS_MIC2, value & 2);
 }
 
 /*
  * This will set mono source select control to mix=0 or mic=1.
  */
 static void
-ac97_monosrc_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_monosrc_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_gpr_toggle(ctrl, GPR_MONO_MIC_IN, value & 2);
+	ac_gpr_toggle(ctrl, GPR_MONO_MIC_IN, value & 2);
 }
 
 static void
-ac97_stereo_set(ac97_ctrl_t *ctrl, uint64_t value, uint8_t reg)
+ac_stereo_set(ac97_ctrl_t *ctrl, uint64_t value, uint8_t reg)
 {
 	ac97_t			*ac = ctrl->actrl_ac97;
 	uint8_t			left, right;
@@ -862,11 +858,11 @@ ac97_stereo_set(ac97_ctrl_t *ctrl, uint64_t value, uint8_t reg)
 	right = value & 0xff;
 	mute = value ? 0 : ctrl->actrl_muteable;
 
-	ac97_wr(ac, reg, ac97_val_scale(left, right, ctrl->actrl_bits) | mute);
+	ac_wr(ac, reg, ac_val_scale(left, right, ctrl->actrl_bits) | mute);
 }
 
 static void
-ac97_mono_set(ac97_ctrl_t *ctrl, uint64_t value, uint8_t reg, int shift)
+ac_mono_set(ac97_ctrl_t *ctrl, uint64_t value, uint8_t reg, int shift)
 {
 	ac97_t			*ac = ctrl->actrl_ac97;
 	uint8_t			val;
@@ -884,131 +880,131 @@ ac97_mono_set(ac97_ctrl_t *ctrl, uint64_t value, uint8_t reg, int shift)
 
 	/* now set the mute bit, and volume bits */
 	v |= mute;
-	v |= (ac97_mono_scale(val, ctrl->actrl_bits) << shift);
+	v |= (ac_mono_scale(val, ctrl->actrl_bits) << shift);
 
-	ac97_wr(ac, reg, v);
+	ac_wr(ac, reg, v);
 }
 
 static void
 ac97_master_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
 	value = value | (value << 8);
-	ac97_stereo_set(ctrl, value, AC97_PCM_OUT_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_PCM_OUT_VOLUME_REGISTER);
 }
 
 static void
 ac97_lineout_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_MASTER_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_MASTER_VOLUME_REGISTER);
 }
 
 static void
 ac97_surround_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_EXTENDED_LRS_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_EXTENDED_LRS_VOLUME_REGISTER);
 }
 
 static void
 ac97_aux1out_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_HEADPHONE_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_HEADPHONE_VOLUME_REGISTER);
 }
 
 static void
 ac97_headphone_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_HEADPHONE_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_HEADPHONE_VOLUME_REGISTER);
 }
 
 static void
-ac97_cd_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_cd_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_CD_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_CD_VOLUME_REGISTER);
 }
 
 static void
-ac97_video_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_video_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_VIDEO_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_VIDEO_VOLUME_REGISTER);
 }
 
 static void
-ac97_auxin_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_auxin_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_AUX_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_AUX_VOLUME_REGISTER);
 }
 
 static void
-ac97_linein_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_linein_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_LINE_IN_VOLUME_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_LINE_IN_VOLUME_REGISTER);
 }
 
 /*
  * This will set mono mic gain control.
  */
 static void
-ac97_monomic_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_monomic_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_RECORD_GAIN_MIC_REGISTER, 0);
+	ac_mono_set(ctrl, value, AC97_RECORD_GAIN_MIC_REGISTER, 0);
 }
 
 static void
-ac97_phone_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_phone_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_PHONE_VOLUME_REGISTER, 0);
+	ac_mono_set(ctrl, value, AC97_PHONE_VOLUME_REGISTER, 0);
 }
 
 static void
-ac97_mic_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_mic_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_MIC_VOLUME_REGISTER, 0);
+	ac_mono_set(ctrl, value, AC97_MIC_VOLUME_REGISTER, 0);
 }
 
 static void
-ac97_speaker_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_speaker_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_MONO_MASTER_VOLUME_REGISTER, 0);
+	ac_mono_set(ctrl, value, AC97_MONO_MASTER_VOLUME_REGISTER, 0);
 }
 
 static void
-ac97_pcbeep_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_pcbeep_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_PC_BEEP_REGISTER, 1);
+	ac_mono_set(ctrl, value, AC97_PC_BEEP_REGISTER, 1);
 }
 
 static void
-ac97_recgain_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_recgain_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_stereo_set(ctrl, value, AC97_RECORD_GAIN_REGISTER);
+	ac_stereo_set(ctrl, value, AC97_RECORD_GAIN_REGISTER);
 }
 
 static void
-ac97_center_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_center_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_EXTENDED_C_LFE_VOLUME_REGISTER, 0);
+	ac_mono_set(ctrl, value, AC97_EXTENDED_C_LFE_VOLUME_REGISTER, 0);
 }
 
 static void
-ac97_lfe_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_lfe_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_EXTENDED_C_LFE_VOLUME_REGISTER, 8);
+	ac_mono_set(ctrl, value, AC97_EXTENDED_C_LFE_VOLUME_REGISTER, 8);
 }
 
 static void
-ac97_bass_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_bass_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_MASTER_TONE_CONTROL_REGISTER, 8);
+	ac_mono_set(ctrl, value, AC97_MASTER_TONE_CONTROL_REGISTER, 8);
 }
 
 static void
-ac97_treble_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_treble_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_mono_set(ctrl, value, AC97_MASTER_TONE_CONTROL_REGISTER, 0);
+	ac_mono_set(ctrl, value, AC97_MASTER_TONE_CONTROL_REGISTER, 0);
 }
 
 static void
-ac97_3ddepth_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_3ddepth_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
 	/*
 	 * XXX: This is all wrong... 3D depth/center cannot necessarily
@@ -1016,11 +1012,11 @@ ac97_3ddepth_set(ac97_ctrl_t *ctrl, uint64_t value)
 	 * need more information about each of the options available
 	 * to do the right thing.
 	 */
-	ac97_mono_set(ctrl, value, AC97_THREE_D_CONTROL_REGISTER, 0);
+	ac_mono_set(ctrl, value, AC97_THREE_D_CONTROL_REGISTER, 0);
 }
 
 static void
-ac97_3dcent_set(ac97_ctrl_t *ctrl, uint64_t value)
+ac_3dcent_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
 	/*
 	 * XXX: This is all wrong... 3D depth/center cannot necessarily
@@ -1028,7 +1024,7 @@ ac97_3dcent_set(ac97_ctrl_t *ctrl, uint64_t value)
 	 * need more information about each of the options available
 	 * to do the right thing.
 	 */
-	ac97_mono_set(ctrl, value, AC97_THREE_D_CONTROL_REGISTER, 8);
+	ac_mono_set(ctrl, value, AC97_THREE_D_CONTROL_REGISTER, 8);
 }
 
 static void
@@ -1043,7 +1039,7 @@ ac97_micboost_set(ac97_ctrl_t *ctrl, uint64_t value)
 	} else {
 		v &= ~MICVR_20dB_BOOST;
 	}
-	ac97_wr(ac, AC97_MIC_VOLUME_REGISTER, v);
+	ac_wr(ac, AC97_MIC_VOLUME_REGISTER, v);
 }
 
 /*
@@ -1058,10 +1054,9 @@ ac97_micboost_set(ac97_ctrl_t *ctrl, uint64_t value)
  *
  * On success zero is returned.
  */
-static int
-ac97_control_get(void *arg, uint64_t *value)
+int
+ac97_control_get(ac97_ctrl_t *ctrl, uint64_t *value)
 {
-	ac97_ctrl_t	*ctrl = arg;
 	ac97_t		*ac = ctrl->actrl_ac97;
 
 	mutex_enter(&ac->ac_lock);
@@ -1071,10 +1066,9 @@ ac97_control_get(void *arg, uint64_t *value)
 	return (0);
 }
 
-static int
-ac97_control_set(void *arg, uint64_t value)
+int
+ac97_control_set(ac97_ctrl_t *ctrl, uint64_t value)
 {
-	ac97_ctrl_t		*ctrl = arg;
 	ac97_t			*ac = ctrl->actrl_ac97;
 	uint8_t			v1, v2;
 
@@ -1114,6 +1108,18 @@ ac97_control_set(void *arg, uint64_t value)
 	return (0);
 }
 
+static int
+ac_get_value(void *arg, uint64_t *value)
+{
+	return (ac97_control_get(arg, value));
+}
+
+static int
+ac_set_value(void *arg, uint64_t value)
+{
+	return (ac97_control_set(arg, value));
+}
+
 /*
  * This simply sets a flag to block calls to the underlying
  * hardware driver to get or set hardware controls. This is usually
@@ -1143,7 +1149,7 @@ ac97_suspend(ac97_t *ac)
  * Wait a resonable amount of time for hardware to become ready.
  */
 static void
-ac97_analog_reset(ac97_t *ac)
+ac_analog_reset(ac97_t *ac)
 {
 	uint16_t	tmp;
 	int		wait = 1000; /* delay for up to 1s */
@@ -1171,7 +1177,7 @@ ac97_analog_reset(ac97_t *ac)
 		}
 	}
 
-	audio_dev_warn(ac->d, "AC'97 analog powerup timed out");
+	audio_dev_warn(ac->d, "AC'97 analog power up timed out");
 }
 
 /*
@@ -1187,33 +1193,33 @@ ac97_analog_reset(ac97_t *ac)
  * last updated versions.
  */
 static void
-ac97_hw_reset(ac97_t *ac)
+ac_hw_reset(ac97_t *ac)
 {
 	/*
 	 * Fully Power up the device
 	 */
 	if (ac->flags & AC97_FLAG_AMPLIFIER) {
 		/* power up - external amp powerd up */
-		ac97_wr(ac, AC97_POWERDOWN_CTRL_STAT_REGISTER, 0);
+		ac_wr(ac, AC97_POWERDOWN_CTRL_STAT_REGISTER, 0);
 	} else {
 		/* power up - external amp powered down */
-		ac97_wr(ac, AC97_POWERDOWN_CTRL_STAT_REGISTER, PCSR_EAPD);
+		ac_wr(ac, AC97_POWERDOWN_CTRL_STAT_REGISTER, PCSR_EAPD);
 	}
 
-	ac97_wr(ac, AC97_GENERAL_PURPOSE_REGISTER, 0);
+	ac_wr(ac, AC97_GENERAL_PURPOSE_REGISTER, 0);
 
 	switch (ac->vid) {
 	case AC97_CODEC_STAC9708:
 #if 0
 		/* non-inverted phase */
-		/* ac97_rd(ac, AC97_VENDOR_REGISTER_11) & ~0x8); */
+		/* ac_rd(ac, AC97_VENDOR_REGISTER_11) & ~0x8); */
 #endif
 		WR(AC97_VENDOR_REGISTER_11, 8);
 		break;
 
 	case AC97_CODEC_EM28028:
-		ac97_wr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER,
-		    (ac97_rd(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER) &
+		ac_wr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER,
+		    (ac_rd(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER) &
 		    ~3800) | 0xE0);
 		break;
 
@@ -1228,7 +1234,7 @@ ac97_hw_reset(ac97_t *ac)
 #if 0
 		/* GED: This looks fishy to me, so I'm nuking it for now */
 		/* headphone/aux volume (?) */
-		ac97_wr(ac, AC97_HEADPHONE_VOLUME_REGISTER,  0x0808);
+		ac_wr(ac, AC97_HEADPHONE_VOLUME_REGISTER,  0x0808);
 #endif
 		break;
 
@@ -1254,7 +1260,7 @@ ac97_hw_reset(ac97_t *ac)
 	case AC97_CODEC_VT1617A:
 	case AC97_CODEC_VT1616:
 		/* Turn off Center, Surround, and LFE DACs */
-		ac97_clr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER,
+		ac_clr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER,
 		    EASCR_PRI | EASCR_PRJ | EASCR_PRK);
 		WR(AC97_VENDOR_REGISTER_01, 0x0230);
 		break;
@@ -1274,7 +1280,7 @@ ac97_hw_reset(ac97_t *ac)
 	}
 
 	/* Turn off variable sampling rate support */
-	ac97_clr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER, EASCR_VRA);
+	ac_clr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER, EASCR_VRA);
 }
 
 /*
@@ -1298,9 +1304,9 @@ ac97_reset(ac97_t *ac)
 		mutex_exit(&ac->ac_lock);
 		return;
 	}
-	ac97_analog_reset(ac);
-	ac97_hw_reset(ac);
-	ac97_restore(ac);
+	ac_analog_reset(ac);
+	ac_hw_reset(ac);
+	ac_restore(ac);
 
 	mutex_exit(&ac->ac_lock);
 }
@@ -1324,9 +1330,9 @@ ac97_resume(ac97_t *ac)
 	ac->resumer = ddi_get_kt_did();
 
 	/* We simply call reset since the operation is the same */
-	ac97_analog_reset(ac);
-	ac97_hw_reset(ac);
-	ac97_restore(ac);
+	ac_analog_reset(ac);
+	ac_hw_reset(ac);
+	ac_restore(ac);
 
 	ac->resumer = 0;
 	ac->suspended = B_FALSE;
@@ -1345,82 +1351,134 @@ ac97_num_channels(ac97_t *ac)
 /*
  * Register a control -- if it fails, it will generate a message to
  * syslog, but the driver muddles on.  (Failure to register a control
- * should never occur, and is generally benign if it happens.)
+ * should never occur, but is generally benign if it happens.)
  */
 void
-ac97_alloc_control(ac97_t *ac, ac97_ctrl_probe_t *cpt)
+ac97_control_register(ac97_ctrl_t *ctrl)
+{
+	ac97_t	*ac = ctrl->actrl_ac97;
+	ASSERT(ac->d != NULL);
+
+	ctrl->actrl_suppress = B_FALSE;
+
+	/* Register control with framework */
+	ctrl->actrl_ctrl = audio_dev_add_control(ac->d, &ctrl->actrl_desc,
+	    ac_get_value, ac_set_value, ctrl);
+	if (ctrl->actrl_ctrl == NULL) {
+		audio_dev_warn(ac->d, "AC97 %s alloc failed",
+		    ctrl->actrl_name);
+	}
+}
+
+void
+ac97_control_unregister(ac97_ctrl_t *ctrl)
+{
+	ctrl->actrl_suppress = B_TRUE;
+
+	if (ctrl->actrl_ctrl != NULL) {
+		audio_dev_del_control(ctrl->actrl_ctrl);
+		ctrl->actrl_ctrl = NULL;
+	}
+}
+
+const char *
+ac97_control_name(ac97_ctrl_t *ctrl)
+{
+	return (ctrl->actrl_name);
+}
+
+const audio_ctrl_desc_t *
+ac97_control_desc(ac97_ctrl_t *ctrl)
+{
+	return (&ctrl->actrl_desc);
+}
+
+void
+ac97_register_controls(ac97_t *ac)
+{
+	ac97_ctrl_t	*ctrl;
+
+	for (ctrl = list_head(&ac->ctrls); ctrl;
+	    ctrl = list_next(&ac->ctrls, ctrl)) {
+		if (ctrl->actrl_suppress)
+			continue;
+		ac97_control_register(ctrl);
+	}
+}
+
+void
+ac97_walk_controls(ac97_t *ac, ac97_ctrl_walk_t walker, void *arg)
+{
+	ac97_ctrl_t	*ctrl;
+
+	for (ctrl = list_head(&ac->ctrls); ctrl;
+	    ctrl = list_next(&ac->ctrls, ctrl)) {
+		if (!(*walker)(ctrl, arg)) {
+			break;
+		}
+	}
+}
+
+void
+ac_add_control(ac97_t *ac, ac97_ctrl_probe_t *cpt)
 {
 	ac97_ctrl_t		*ctrl;
-	audio_ctrl_desc_t	ctrl_des;
+	boolean_t		is_new;
 
 	ASSERT(ac);
 	ASSERT(ac->d);
 
-	ctrl = kmem_zalloc(sizeof (ac97_ctrl_t), KM_SLEEP);
-
-	bzero(&ctrl_des, sizeof (ctrl_des));
-	ctrl_des.acd_name = cpt->cp_name;
-	ctrl_des.acd_minvalue = cpt->cp_minval;
-	ctrl_des.acd_maxvalue = cpt->cp_maxval;
-	ctrl_des.acd_type = cpt->cp_type;
-	ctrl_des.acd_flags = cpt->cp_flags;
+	ctrl = ac97_control_find(ac, cpt->cp_name);
+	if (ctrl != NULL) {
+		is_new = B_FALSE;
+	} else {
+		ctrl = kmem_zalloc(sizeof (ac97_ctrl_t), KM_SLEEP);
+		is_new = B_TRUE;
+	}
+	ctrl->actrl_ac97 = ac;
+	ctrl->actrl_minval = cpt->cp_minval;
+	ctrl->actrl_maxval = cpt->cp_maxval;
+	ctrl->actrl_type = cpt->cp_type;
+	ctrl->actrl_name = cpt->cp_name;
+	ctrl->actrl_flags = cpt->cp_flags;
 	if (cpt->cp_enum) {
 		for (int e = 0; e < 64; e++) {
 			if (cpt->cp_enum[e] == NULL)
 				break;
-			ctrl_des.acd_enum[e] = cpt->cp_enum[e];
+			ctrl->actrl_enum[e] = cpt->cp_enum[e];
 		}
 	}
 
-	ctrl->actrl_ac97 = ac;
 	/*
 	 * Warning for extended controls this field gets changed
 	 * by audio_dev_add_control() to be a unique value.
 	 */
-	ctrl->actrl_minval = cpt->cp_minval;
-	ctrl->actrl_maxval = cpt->cp_maxval;
 	ctrl->actrl_initval = cpt->cp_initval;
 	ctrl->actrl_muteable = cpt->cp_muteable;
 	ctrl->actrl_write_fn = cpt->cp_write_fn;
 	ctrl->actrl_bits = cpt->cp_bits;
-	ctrl->actrl_type = cpt->cp_type;
-	ctrl->actrl_name = cpt->cp_name;
-
-	/* Register control with framework */
-	ctrl->actrl_ctrl = audio_dev_add_control(ac->d, &ctrl_des,
-	    ac97_control_get, ac97_control_set, ctrl);
-	if (!ctrl->actrl_ctrl) {
-		audio_dev_warn(ac->d, "AC97 %s alloc failed", cpt->cp_name);
-		kmem_free(ctrl, sizeof (ac97_ctrl_t));
-		return;
-	}
 
 	/*
-	 * Not that it can not be referenced until in is in the
+	 * Not that it can not be referenced until it is in the
 	 * list. So again by adding to the list last we avoid the need
-	 * for control locks.
+	 * for locks.
 	 */
-	mutex_enter(&ac->ac_lock);
-	list_insert_tail(&ac->ctrls, ctrl);
-	mutex_exit(&ac->ac_lock);
+	if (is_new)
+		list_insert_tail(&ac->ctrls, ctrl);
 }
 
 /*
  * De-Register and free up a control
- *
- * Note ctrl_lock read write must be held for writing when calling
- * this function
  */
 void
-ac97_free_control(ac97_ctrl_t *ctrl)
+ac97_control_remove(ac97_ctrl_t *ctrl)
 {
 	ac97_t	*ac = ctrl->actrl_ac97;
 
-	mutex_enter(&ac->ac_lock);
 	list_remove(&ac->ctrls, ctrl);
-	mutex_exit(&ac->ac_lock);
 
-	audio_dev_del_control(ctrl->actrl_ctrl);
+	if (ctrl->actrl_ctrl != NULL)
+		audio_dev_del_control(ctrl->actrl_ctrl);
 	kmem_free(ctrl, sizeof (ac97_ctrl_t));
 }
 
@@ -1452,99 +1510,99 @@ ac97_ctrl_probe_t	ctrl_probe_tbl[] = {
 
 	/* LINE out volume */
 	{AUDIO_CTRL_ID_LINEOUT, INIT_VAL_ST, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MAINVOL, 0x8080, ac97_lineout_set, ac97_probe_lineout, 6},
+	MAINVOL, 0x8080, ac97_lineout_set, ac_probe_lineout, 6},
 
 	/* Front volume */
 	{AUDIO_CTRL_ID_FRONT, INIT_VAL_ST, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MAINVOL, 0x8080, ac97_lineout_set, ac97_probe_front, 6},
+	MAINVOL, 0x8080, ac97_lineout_set, ac_probe_front, 6},
 
 	/* 4CH out volume (has one of three possible uses, first use) */
 	{AUDIO_CTRL_ID_SURROUND, INIT_VAL_ST, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MAINVOL, 0x8080, ac97_surround_set, ac97_probe_rear, 6},
+	MAINVOL, 0x8080, ac97_surround_set, ac_probe_rear, 6},
 
 	/* ALT out volume (has one of three possible uses, second use) */
 	{AUDIO_CTRL_ID_HEADPHONE, INIT_VAL_ST, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MAINVOL, 0x8080, ac97_headphone_set, ac97_probe_headphone, 6},
+	MAINVOL, 0x8080, ac97_headphone_set, ac_probe_headphone, 6},
 
 	/* ALT out volume (has one of three possible uses, third use) */
 	{AUDIO_CTRL_ID_AUX1OUT, INIT_VAL_ST, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MAINVOL, 0x8080, ac97_aux1out_set, ac97_probe_auxout, 6},
+	MAINVOL, 0x8080, ac97_aux1out_set, ac_probe_auxout, 6},
 
 	/* center out volume */
 	{AUDIO_CTRL_ID_CENTER, INIT_VAL_MN, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	MAINVOL, EXLFEVR_CENTER_MUTE, ac97_center_set, ac97_probe_center, 6},
+	MAINVOL, EXLFEVR_CENTER_MUTE, ac_center_set, ac_probe_center, 6},
 
 	/* LFE out volume (sub-woofer) */
 	{AUDIO_CTRL_ID_LFE, INIT_VAL_MN, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	MAINVOL, EXLFEVR_LFE_MUTE, ac97_lfe_set, ac97_probe_lfe, 6},
+	MAINVOL, EXLFEVR_LFE_MUTE, ac_lfe_set, ac_probe_lfe, 6},
 
 	/* MONO out volume */
 	{AUDIO_CTRL_ID_SPEAKER, INIT_VAL_MN, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	MAINVOL, MMVR_MUTE, ac97_speaker_set, ac97_probe_mono, 6},
+	MAINVOL, MMVR_MUTE, ac_speaker_set, ac_probe_mono, 6},
 
 	/* Record in GAIN */
 	{AUDIO_CTRL_ID_RECGAIN, INIT_IGAIN_ST, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	RECVOL, RGR_MUTE, ac97_recgain_set, NULL, -4},
+	RECVOL, RGR_MUTE, ac_recgain_set, NULL, -4},
 
 	/* MIC in volume */
 	{AUDIO_CTRL_ID_MIC, 0, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MONVOL, MICVR_MUTE, ac97_mic_set, ac97_probe_mic, 5},
+	MONVOL, MICVR_MUTE, ac_mic_set, ac_probe_mic, 5},
 
 	/* LINE in volume */
 	{AUDIO_CTRL_ID_LINEIN, 0, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MONVOL, LIVR_MUTE, ac97_linein_set, ac97_probe_linein, 5},
+	MONVOL, LIVR_MUTE, ac_linein_set, ac_probe_linein, 5},
 
 	/* CD in volume */
 	{AUDIO_CTRL_ID_CD, 0, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MONVOL, CDVR_MUTE, ac97_cd_set, ac97_probe_cdrom, 5},
+	MONVOL, CDVR_MUTE, ac_cd_set, ac_probe_cdrom, 5},
 
 	/* VIDEO in volume */
 	{AUDIO_CTRL_ID_VIDEO, 0, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MONVOL, VIDVR_MUTE, ac97_video_set, ac97_probe_video, 5},
+	MONVOL, VIDVR_MUTE, ac_video_set, ac_probe_video, 5},
 
 	/* AUX in volume */
 	{AUDIO_CTRL_ID_AUX1IN, 0, 0, 100, AUDIO_CTRL_TYPE_STEREO,
-	MONVOL, AUXVR_MUTE, ac97_auxin_set, ac97_probe_auxin, 5},
+	MONVOL, AUXVR_MUTE, ac_auxin_set, ac_probe_auxin, 5},
 
 	/* PHONE in volume */
 	{AUDIO_CTRL_ID_PHONE, 0, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	MONVOL, PVR_MUTE, ac97_phone_set, ac97_probe_phone, 5},
+	MONVOL, PVR_MUTE, ac_phone_set, ac_probe_phone, 5},
 
 	/* PC BEEPER in volume (motherboard speaker pins) */
 	{AUDIO_CTRL_ID_BEEP, INIT_VAL_MN, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	AC97_RW, PCBR_MUTE, ac97_pcbeep_set, ac97_probe_pcbeep, 4},
+	AC97_RW, PCBR_MUTE, ac_pcbeep_set, ac_probe_pcbeep, 4},
 
 	/* BASS out level (note, zero is hardware bypass) */
 	{AUDIO_CTRL_ID_BASS, 0, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	TONECTL, 0, ac97_bass_set, ac97_probe_tone, 4},
+	TONECTL, 0, ac_bass_set, ac_probe_tone, 4},
 
 	/* TREBLE out level (note, zero is hardware bypass) */
 	{AUDIO_CTRL_ID_TREBLE, 0, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	TONECTL, 0, ac97_treble_set, ac97_probe_tone, 4},
+	TONECTL, 0, ac_treble_set, ac_probe_tone, 4},
 
 	/* Loudness on/off switch */
 	{AUDIO_CTRL_ID_LOUDNESS, 0, 0, 1, AUDIO_CTRL_TYPE_BOOLEAN,
-	TONECTL, 0, ac97_loudness_set, ac97_probe_loud, 0},
+	TONECTL, 0, ac_loudness_set, ac_probe_loud, 0},
 
 	/* 3D depth out level */
 	{AUDIO_CTRL_ID_3DDEPTH, 0, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	T3DCTL, 0, ac97_3ddepth_set, ac97_probe_3d_depth, 4},
+	T3DCTL, 0, ac_3ddepth_set, ac_probe_3d_depth, 4},
 
 	/* 3D center out level */
 	{AUDIO_CTRL_ID_3DCENT, 0, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	T3DCTL, 0, ac97_3dcent_set, ac97_probe_3d_center, 4},
+	T3DCTL, 0, ac_3dcent_set, ac_probe_3d_center, 4},
 
 	/* 3D enhance on/off switch */
 	{AUDIO_CTRL_ID_3DENHANCE, 0, 0, 1, AUDIO_CTRL_TYPE_BOOLEAN,
-	T3DCTL, 0, ac97_3donoff_set, ac97_probe_3d, 0},
+	T3DCTL, 0, ac_3donoff_set, ac_probe_3d, 0},
 
 	/* MIC BOOST switch */
 	{AUDIO_CTRL_ID_MICBOOST, 0, 0, 1, AUDIO_CTRL_TYPE_BOOLEAN,
-	RECCTL, 0, ac97_micboost_set, ac97_probe_mic, 0},
+	RECCTL, 0, ac97_micboost_set, ac_probe_mic, 0},
 
 	/* Loopback on/off switch */
 	{AUDIO_CTRL_ID_LOOPBACK, 0, 0, 1, AUDIO_CTRL_TYPE_BOOLEAN,
-	AC97_RW, 0, ac97_loopback_set, NULL, 0},
+	AC97_RW, 0, ac_loopback_set, NULL, 0},
 
 	/*
 	 * The following selectors *must* come after the others, as they rely
@@ -1552,25 +1610,25 @@ ac97_ctrl_probe_t	ctrl_probe_tbl[] = {
 	 */
 	/* record src select  (only one port at a time) */
 	{AUDIO_CTRL_ID_RECSRC, (1U << INPUT_MIC), 0, 0, AUDIO_CTRL_TYPE_ENUM,
-	RECCTL, 0, ac97_insrc_set, NULL, 0, ac97_insrcs},
+	RECCTL, 0, ac_insrc_set, NULL, 0, ac_insrcs},
 
 	/* Start of non-standard private controls */
 
 	/* Simulated stereo on/off switch */
 	{AUDIO_CTRL_ID_STEREOSIM, 0, 0, 1, AUDIO_CTRL_TYPE_BOOLEAN,
-	AC97_RW, 0, ac97_stsim_set, ac97_probe_stsim, 0},
+	AC97_RW, 0, ac_stsim_set, ac_probe_stsim, 0},
 
 	/* mono MIC GAIN */
 	{AUDIO_CTRL_ID_MICGAIN, INIT_IGAIN_MN, 0, 100, AUDIO_CTRL_TYPE_MONO,
-	RECCTL, RGMR_MUTE, ac97_monomic_set, ac97_probe_mmic, -4},
+	RECCTL, RGMR_MUTE, ac_monomic_set, ac_probe_mmic, -4},
 
 	/* MIC select switch 0=mic1 1=mic2 */
 	{AUDIO_CTRL_ID_MICSRC, 1, 3, 3, AUDIO_CTRL_TYPE_ENUM,
-	RECCTL, 0, ac97_selmic_set, ac97_probe_mic, 0, ac97_mics},
+	RECCTL, 0, ac_selmic_set, ac_probe_mic, 0, ac_mics},
 
 	/* MONO out src select 0=mix 1=mic */
 	{AUDIO_CTRL_ID_SPKSRC, 1, 3, 3, AUDIO_CTRL_TYPE_ENUM,
-	AC97_RW, 0, ac97_monosrc_set, ac97_probe_mono, 0, ac97_monos},
+	AC97_RW, 0, ac_monosrc_set, ac_probe_mono, 0, ac_monos},
 
 	{NULL}
 };
@@ -1581,8 +1639,8 @@ ac97_ctrl_probe_t	ctrl_probe_tbl[] = {
  *
  * Returns zero on success
  */
-static int
-ac97_probeinit_ctrls(ac97_t *ac, int vol_bits, int enh_bits)
+static void
+ac_probeinit_ctrls(ac97_t *ac, int vol_bits, int enh_bits)
 {
 	ac97_ctrl_probe_t	*cpt;
 	ac97_ctrl_probe_t	my_cpt;
@@ -1619,15 +1677,13 @@ ac97_probeinit_ctrls(ac97_t *ac, int vol_bits, int enh_bits)
 		}
 
 		if (!my_cpt.cp_probe || my_cpt.cp_probe(ac)) {
-			ac97_alloc_control(ac, &my_cpt);
+			ac_add_control(ac, &my_cpt);
 		}
 	}
 
 	if (ac->codec_init != NULL) {
 		ac->codec_init(ac);
 	}
-
-	return (0);
 }
 
 /*
@@ -1726,6 +1782,23 @@ ac97_alloc(dev_info_t *dip, ac97_rd_t rd, ac97_wr_t wr, void *priv)
 
 	return (ac);
 }
+/*
+ * Allocate an AC97 instance for use by a hardware driver.
+ *
+ * returns an allocated and initialize ac97 structure.
+ */
+ac97_t *
+ac97_allocate(audio_dev_t *adev, dev_info_t *dip, ac97_rd_t rd, ac97_wr_t wr,
+    void *priv)
+{
+	ac97_t *ac;
+
+	ac = ac97_alloc(dip, rd, wr, priv);
+	if (ac != NULL) {
+		ac->d = adev;
+	}
+	return (ac);
+}
 
 /*
  * Free an AC97 instance.
@@ -1737,7 +1810,7 @@ ac97_free(ac97_t *ac)
 
 	/* Clear out any controls that are still attached */
 	while ((ctrl = list_head(&ac->ctrls)) != NULL) {
-		ac97_free_control(ctrl);
+		ac97_control_remove(ctrl);
 	}
 
 	list_destroy(&ac->ctrls);
@@ -1846,14 +1919,8 @@ static struct codec {
 	{ 0, NULL }
 };
 
-/*
- * Init the actual hardware related to a previously
- * allocated instance of an AC97 device.
- *
- * Return zero on success.
- */
-int
-ac97_init(ac97_t *ac, struct audio_dev *d)
+void
+ac97_probe_controls(ac97_t *ac)
 {
 	uint32_t		vid1, vid2;
 	uint16_t		ear;
@@ -1865,17 +1932,17 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 	char			nmbuf[128];
 	char			buf[128];
 
-	/* Save audio framework instance structure */
-	ac->d = d;
+	/* This is only valid when used with new style ac97_allocate(). */
+	ASSERT(ac->d);
 
-	ac97_analog_reset(ac);
+	ac_analog_reset(ac);
 
 	vid1 = RD(AC97_VENDOR_ID1_REGISTER);
 	vid2 = RD(AC97_VENDOR_ID2_REGISTER);
 
 	if (vid1 == 0xffff) {
-		audio_dev_warn(d, "AC'97 codec unresponsive");
-		return (-1);
+		audio_dev_warn(ac->d, "AC'97 codec unresponsive");
+		return;
 	}
 
 	ac->vid = (vid1 << 16) | vid2;
@@ -1933,7 +2000,7 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 	 */
 	if (ac->caps & RR_HEADPHONE_SUPPORT) {
 		/* it looks like it is probably headphones */
-		if (ac97_probe_reg(ac, AC97_HEADPHONE_VOLUME_REGISTER)) {
+		if (ac_probe_reg(ac, AC97_HEADPHONE_VOLUME_REGISTER)) {
 			/* it is implemented */
 			ac->flags |= AC97_FLAG_AUX_HP;
 		}
@@ -1946,7 +2013,7 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 	 * If not a headphone, is it 4CH_OUT (surround?)
 	 */
 	if ((!(ac->flags & AC97_FLAG_AUX_HP)) && (ear & EAR_SDAC)) {
-		if (ac97_probe_reg(ac, AC97_EXTENDED_LRS_VOLUME_REGISTER)) {
+		if (ac_probe_reg(ac, AC97_EXTENDED_LRS_VOLUME_REGISTER)) {
 			ac->flags |= AC97_FLAG_AUX_4CH;
 		}
 	}
@@ -1955,7 +2022,7 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 	 * If neither, then maybe its an auxiliary line level output?
 	 */
 	if (!(ac->flags & (AC97_FLAG_AUX_HP | AC97_FLAG_AUX_4CH))) {
-		if (ac97_probe_reg(ac, AC97_HEADPHONE_VOLUME_REGISTER)) {
+		if (ac_probe_reg(ac, AC97_HEADPHONE_VOLUME_REGISTER)) {
 			ac->flags |= AC97_FLAG_AUX_LVL;
 		}
 	}
@@ -1975,11 +2042,10 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 	}
 
 	ac->flags |= flags;
-	(void) snprintf(ac->name, sizeof (ac->name), "%s %s (%d channels)",
-	    vendor, name, ac->nchan);
+	(void) snprintf(ac->name, sizeof (ac->name), "%s %s", vendor, name);
 
 	(void) snprintf(buf, sizeof (buf), "AC'97 codec: %s", ac->name);
-	audio_dev_add_info(d, buf);
+	audio_dev_add_info(ac->d, buf);
 
 	cmn_err(CE_CONT,
 	    "?%s#%d: AC'97 codec id %s (%x, %d channels, caps %x)\n",
@@ -1989,15 +2055,30 @@ ac97_init(ac97_t *ac, struct audio_dev *d)
 	/*
 	 * Probe and register all known controls with framework
 	 */
-	if (ac97_probeinit_ctrls(ac, vol_bits, enh_bits)) {
-		audio_dev_warn(d, "AC97 controls init failed");
+	ac_probeinit_ctrls(ac, vol_bits, enh_bits);
 
-		/* XXX - need to free all controls registered? */
-		return (-1);
-	}
+	ac_hw_reset(ac);
+	ac_init_values(ac);
+}
 
-	ac97_hw_reset(ac);
-	ac97_init_values(ac);
+/*
+ * Init the actual hardware related to a previously allocated instance
+ * of an AC97 device.  This is a legacy function and should not be
+ * used in new code.
+ *
+ * Return zero on success.
+ */
+int
+ac97_init(ac97_t *ac, struct audio_dev *d)
+{
+	/* Make sure we aren't using this with new style ac97_allocate(). */
+	ASSERT(ac->d == NULL);
+
+	/* Save audio framework instance structure */
+	ac->d = d;
+
+	ac97_probe_controls(ac);
+	ac97_register_controls(ac);
 
 	return (0);
 }

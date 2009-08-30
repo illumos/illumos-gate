@@ -71,22 +71,22 @@ cmi_set_micboost(ac97_ctrl_t *actrl, uint64_t value)
 {
 	ac97_t	*ac = actrl->actrl_ac97;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	switch (value) {
 	case 0x1:
 		/* 0db */
-		ac97_clr(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
-		ac97_clr(ac, CMI_MULTICH_REGISTER, CMR_BSTSEL);
+		ac_clr(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+		ac_clr(ac, CMI_MULTICH_REGISTER, CMR_BSTSEL);
 		break;
 	case 0x2:
 		/* 20dB */
-		ac97_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
-		ac97_clr(ac, CMI_MULTICH_REGISTER, CMR_BSTSEL);
+		ac_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+		ac_clr(ac, CMI_MULTICH_REGISTER, CMR_BSTSEL);
 		break;
 	case 0x4:
 		/* 30dB */
-		ac97_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
-		ac97_set(ac, CMI_MULTICH_REGISTER, CMR_BSTSEL);
+		ac_set(ac, AC97_MIC_VOLUME_REGISTER, MICVR_20dB_BOOST);
+		ac_set(ac, CMI_MULTICH_REGISTER, CMR_BSTSEL);
 		break;
 	}
 }
@@ -96,11 +96,11 @@ cmi_set_linein_func(ac97_ctrl_t *actrl, uint64_t value)
 {
 	ac97_t		*ac = actrl->actrl_ac97;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	if (value & 2) {
-		ac97_set(ac, CMI_MULTICH_REGISTER, CMR_S2LNI);
+		ac_set(ac, CMI_MULTICH_REGISTER, CMR_S2LNI);
 	} else {
-		ac97_clr(ac, CMI_MULTICH_REGISTER, CMR_S2LNI);
+		ac_clr(ac, CMI_MULTICH_REGISTER, CMR_S2LNI);
 	}
 }
 
@@ -109,11 +109,11 @@ cmi_set_mic_func(ac97_ctrl_t *actrl, uint64_t value)
 {
 	ac97_t		*ac = actrl->actrl_ac97;
 
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
 	if (value & 2) {
-		ac97_set(ac, CMI_MULTICH_REGISTER, CMR_CLCTL);
+		ac_set(ac, CMI_MULTICH_REGISTER, CMR_CLCTL);
 	} else {
-		ac97_clr(ac, CMI_MULTICH_REGISTER, CMR_CLCTL);
+		ac_clr(ac, CMI_MULTICH_REGISTER, CMR_CLCTL);
 	}
 }
 
@@ -139,10 +139,9 @@ cmi_setup_micboost(ac97_t *ac)
 			/* 20dB by default */
 			cpt.cp_initval = 1;
 		}
-		ac97_free_control(ctrl);
 	}
 
-	ac97_alloc_control(ac, &cpt);
+	ac_add_control(ac, &cpt);
 }
 
 static const char *cmi_linein_funcs[] = {
@@ -173,18 +172,18 @@ cmi_setup_jack_funcs(ac97_t *ac)
 	};
 
 	bcopy(&linein_cpt, &cp, sizeof (cp));
-	ival = ac97_get_prop(ac, AC97_PROP_LINEIN_FUNC, 0);
+	ival = ac_get_prop(ac, AC97_PROP_LINEIN_FUNC, 0);
 	if ((ival >= 1) && (ival <= 2)) {
 		cp.cp_initval = ival;
 	}
-	ac97_alloc_control(ac, &cp);
+	ac_add_control(ac, &cp);
 
 	bcopy(&mic_cpt, &cp, sizeof (cp));
-	ival = ac97_get_prop(ac, AC97_PROP_MIC_FUNC, 0);
+	ival = ac_get_prop(ac, AC97_PROP_MIC_FUNC, 0);
 	if ((ival >= 1) && (ival <= 2)) {
 		cp.cp_initval = ival;
 	}
-	ac97_alloc_control(ac, &cp);
+	ac_add_control(ac, &cp);
 }
 
 static void
@@ -193,9 +192,9 @@ cmi_set_linein_func_9738(ac97_ctrl_t *actrl, uint64_t value)
 	ac97_t		*ac = actrl->actrl_ac97;
 
 	if (value & 2) {
-		ac97_set(ac, CMI_TASK_REGISTER, CTR_S2LNI);
+		ac_set(ac, CMI_TASK_REGISTER, CTR_S2LNI);
 	} else {
-		ac97_clr(ac, CMI_TASK_REGISTER, CTR_S2LNI);
+		ac_clr(ac, CMI_TASK_REGISTER, CTR_S2LNI);
 	}
 }
 
@@ -205,9 +204,9 @@ cmi_set_spread_9738(ac97_ctrl_t *actrl, uint64_t value)
 	ac97_t		*ac = actrl->actrl_ac97;
 
 	if (value) {
-		ac97_set(ac, CMI_TASK_REGISTER, CTR_F2R);
+		ac_set(ac, CMI_TASK_REGISTER, CTR_F2R);
 	} else {
-		ac97_clr(ac, CMI_TASK_REGISTER, CTR_F2R);
+		ac_clr(ac, CMI_TASK_REGISTER, CTR_F2R);
 	}
 }
 
@@ -227,18 +226,18 @@ cmi_setup_jack_func_9738(ac97_t *ac)
 	};
 
 	bcopy(&linein_cpt, &cp, sizeof (cp));
-	ival = ac97_get_prop(ac, AC97_PROP_LINEIN_FUNC, 0);
+	ival = ac_get_prop(ac, AC97_PROP_LINEIN_FUNC, 0);
 	if ((ival >= 1) && (ival <= 2)) {
 		cp.cp_initval = ival;
 	}
-	ac97_alloc_control(ac, &cp);
+	ac_add_control(ac, &cp);
 
 	bcopy(&spread_cpt, &cp, sizeof (cp));
-	ival = ac97_get_prop(ac, AC97_PROP_SPREAD, -1);
+	ival = ac_get_prop(ac, AC97_PROP_SPREAD, -1);
 	if ((ival >= 0) && (ival <= 1)) {
 		cp.cp_initval = ival;
 	}
-	ac97_alloc_control(ac, &cp);
+	ac_add_control(ac, &cp);
 }
 
 
@@ -258,33 +257,40 @@ cmi_setup_volume(ac97_t *ac)
 	 */
 	ctrl = ac97_control_find(ac, AUDIO_CTRL_ID_VOLUME);
 	if (ctrl) {
-		ac97_free_control(ctrl);
+		ac97_control_remove(ctrl);
 	}
 	ctrl = ac97_control_find(ac, AUDIO_CTRL_ID_FRONT);
 	if (ctrl) {
-		ac97_free_control(ctrl);
+		ac97_control_remove(ctrl);
 	}
 	ctrl = ac97_control_find(ac, AUDIO_CTRL_ID_SURROUND);
 	if (ctrl) {
-		ac97_free_control(ctrl);
+		ac97_control_remove(ctrl);
 	}
 	ctrl = ac97_control_find(ac, AUDIO_CTRL_ID_CENTER);
 	if (ctrl) {
-		ac97_free_control(ctrl);
+		ac97_control_remove(ctrl);
 	}
 	ctrl = ac97_control_find(ac, AUDIO_CTRL_ID_LFE);
 	if (ctrl) {
-		ac97_free_control(ctrl);
+		ac97_control_remove(ctrl);
 	}
 
 	/* make sure we have disabled mute and attenuation on physical ctrls */
-	ac97_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
-	ac97_wr(ac, AC97_PCM_OUT_VOLUME_REGISTER, 0);
-	ac97_wr(ac, AC97_MASTER_VOLUME_REGISTER, 0);
-	ac97_wr(ac, AC97_EXTENDED_C_LFE_VOLUME_REGISTER, 0);
-	ac97_wr(ac, AC97_EXTENDED_LRS_VOLUME_REGISTER, 0);
+	ac_wr(ac, AC97_INTERRUPT_PAGING_REGISTER, 0);	/* select page 0 */
+	ac_wr(ac, AC97_PCM_OUT_VOLUME_REGISTER, 0);
+	ac_wr(ac, AC97_MASTER_VOLUME_REGISTER, 0);
+	ac_wr(ac, AC97_EXTENDED_C_LFE_VOLUME_REGISTER, 0);
+	ac_wr(ac, AC97_EXTENDED_LRS_VOLUME_REGISTER, 0);
 
-	(void) audio_dev_add_soft_volume(ac97_get_dev(ac));
+	/*
+	 * NB: This is probably not the best way to do this, because
+	 * it will make overriding this hard for drivers that desire
+	 * to.  Fortunately, we don't think any drivers that want to
+	 * override or fine tune AC'97 controls (i.e. creative cards)
+	 * use these C-Media codecs.
+	 */
+	(void) audio_dev_add_soft_volume(ac_get_dev(ac));
 }
 
 void

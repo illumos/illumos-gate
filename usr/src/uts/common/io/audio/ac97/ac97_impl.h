@@ -27,25 +27,28 @@
 #ifndef	_SYS_AC97_IMPL_H
 #define	_SYS_AC97_IMPL_H
 
-typedef struct ac97_ctrl ac97_ctrl_t;
 typedef void (*ac97_set_t)(ac97_ctrl_t *, uint64_t);
 
 /*
  * Per control state
  */
 struct ac97_ctrl {
-	list_node_t	actrl_linkage;  /* For private cntrls list */
-	struct ac97	*actrl_ac97;
-	int		actrl_bits;	/* Port width */
-	uint32_t	actrl_type;	/* control type */
-	const char	*actrl_name;	/* control's name */
-	audio_ctrl_t	*actrl_ctrl;    /* control framework handle */
-	ac97_set_t	actrl_write_fn; /* control write function */
-	uint64_t	actrl_minval;   /* MIN value for control */
-	uint64_t	actrl_maxval;   /* MAX value for control */
-	uint64_t	actrl_value;    /* current value in port */
-	uint64_t	actrl_initval;  /* initial value in port */
-	uint16_t	actrl_muteable; /* if muteable, bits to do it */
+	list_node_t		actrl_linkage;  /* For private cntrls list */
+	struct ac97		*actrl_ac97;
+	int			actrl_bits;	/* Port width */
+	audio_ctrl_t		*actrl_ctrl;    /* control framework handle */
+	ac97_set_t		actrl_write_fn; /* control write function */
+	uint64_t		actrl_value;    /* current value in port */
+	uint64_t		actrl_initval;  /* initial value in port */
+	uint16_t		actrl_muteable; /* if muteable, bits for it */
+	boolean_t		actrl_suppress;	/* if true, do not register */
+	audio_ctrl_desc_t	actrl_desc;	/* ctrl desc structure */
+#define	actrl_name		actrl_desc.acd_name
+#define	actrl_minval		actrl_desc.acd_minvalue
+#define	actrl_maxval		actrl_desc.acd_maxvalue
+#define	actrl_type		actrl_desc.acd_type
+#define	actrl_flags		actrl_desc.acd_flags
+#define	actrl_enum		actrl_desc.acd_enum
 };
 
 /*
@@ -74,29 +77,21 @@ typedef struct ac97_ctrl_probe {
 	const char	**cp_enum;	/* Enumeration value */
 } ac97_ctrl_probe_t;
 
-typedef struct ac97_hooks {
-	void		(*h_detach)(ac97_t *);
-	void		(*h_reset)(ac97_t *);
-	void		(*h_restore)(ac97_t *);
-} ac97_hooks_t;
-
 /*
  * These are the flags for most of our controls
  */
 #define	AC97_RW		(AUDIO_CTRL_FLAG_READABLE | AUDIO_CTRL_FLAG_WRITEABLE)
 #define	AC97_FLAGS	(AC97_RW | AUDIO_CTRL_FLAG_POLL)
 
-void ac97_wr(ac97_t *, uint8_t, uint16_t);
-uint16_t ac97_rd(ac97_t *, uint8_t);
-void ac97_clr(ac97_t *, uint8_t, uint16_t);
-void ac97_set(ac97_t *, uint8_t, uint16_t);
-void ac97_alloc_control(ac97_t *, ac97_ctrl_probe_t *);
-void ac97_free_control(ac97_ctrl_t *);
-ac97_ctrl_t *ac97_control_find(ac97_t *, const char *);
-uint16_t ac97_val_scale(int left, int right, int bits);
-uint16_t ac97_mono_scale(int val, int bits);
-audio_dev_t *ac97_get_dev(ac97_t *);
-int ac97_get_prop(ac97_t *, char *, int);
+void ac_wr(ac97_t *, uint8_t, uint16_t);
+uint16_t ac_rd(ac97_t *, uint8_t);
+void ac_clr(ac97_t *, uint8_t, uint16_t);
+void ac_set(ac97_t *, uint8_t, uint16_t);
+void ac_add_control(ac97_t *, ac97_ctrl_probe_t *);
+uint16_t ac_val_scale(int left, int right, int bits);
+uint16_t ac_mono_scale(int val, int bits);
+audio_dev_t *ac_get_dev(ac97_t *);
+int ac_get_prop(ac97_t *, char *, int);
 
 /* Codec specific initializations */
 

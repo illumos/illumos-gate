@@ -601,10 +601,51 @@ extern "C" {
 typedef struct ac97 ac97_t;
 typedef void (*ac97_wr_t)(void *, uint8_t, uint16_t);
 typedef uint16_t (*ac97_rd_t)(void *, uint8_t);
+typedef struct ac97_ctrl ac97_ctrl_t;
+typedef boolean_t (*ac97_ctrl_walk_t)(ac97_ctrl_t *, void *);
 
+/*
+ * Old style initialization.  The driver simply calls ac97_alloc()
+ * followed by ac97_init().  These interfaces should not be used in
+ * new drivers.
+ */
 ac97_t *ac97_alloc(dev_info_t *, ac97_rd_t, ac97_wr_t, void *);
-void ac97_free(ac97_t *);
 int ac97_init(ac97_t *, audio_dev_t *);
+
+/*
+ * New style initialization.  The driver will call ac97_allocate(),
+ * then it can call ac97_register_controls() to register controls.
+ * Or, if it doesn't want all controls registered, it can find
+ * controls with ac97_find_control(), and register them individually
+ * with ac97_register_control().  ac97_alloc()
+ *
+ * Note that adjusting the set of controls should only be performed
+ * while the driver is single threaded, during attach or detach
+ * processing.  The AC'97 framework does not provide any locks
+ * surrounding its internal list of controls.  Note however that
+ * changes to the controls made from within the framework (e.g. by
+ * someone accessing the control via the audio framework) are safe.
+ */
+ac97_t *ac97_allocate(audio_dev_t *, dev_info_t *, ac97_rd_t, ac97_wr_t,
+    void *);
+void ac97_probe_controls(ac97_t *);
+void ac97_register_controls(ac97_t *);
+void ac97_unregister_controls(ac97_t *);
+
+void ac97_walk_controls(ac97_t *, ac97_ctrl_walk_t, void *);
+ac97_ctrl_t *ac97_control_find(ac97_t *, const char *);
+void ac97_control_register(ac97_ctrl_t *);
+void ac97_control_unregister(ac97_ctrl_t *);
+void ac97_control_remove(ac97_ctrl_t *);
+const char *ac97_control_name(ac97_ctrl_t *);
+const audio_ctrl_desc_t *ac97_control_desc(ac97_ctrl_t *);
+int ac97_control_get(ac97_ctrl_t *, uint64_t *);
+int ac97_control_set(ac97_ctrl_t *, uint64_t);
+
+/*
+ * Bits common to both new style and old style initialization.
+ */
+void ac97_free(ac97_t *);
 void ac97_suspend(ac97_t *);
 void ac97_resume(ac97_t *);
 void ac97_reset(ac97_t *);
