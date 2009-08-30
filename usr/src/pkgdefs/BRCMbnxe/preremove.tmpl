@@ -19,19 +19,10 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-BD=${BASEDIR:-/}
-if grep -w bnx $BD/etc/name_to_major > /dev/null 2>&1
-then
-	rem_drv -b ${BD} bnx
-	if [ $? -ne 0 ]
-	then
-		exit 1 	
-	fi
-fi
-exit 0
+include drv_utils
+
+pkg_drvrem bnxe || exit 1

@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -18,23 +19,17 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../Makefile.com
+include drv_utils
 
-TMPLFILES += postinstall preremove
-DATAFILES += depend i.renameold
-LICENSEFILES += $(OSBL)
-CDDL=
-
-.KEEP_STATE:
-
-all: $(FILES)
-install: all pkg
-
-include ../Makefile.targ
-include ../Makefile.prtarg
+pkg_drvadd -i \
+	'"pci14e4,164e"
+	"pci14e4,164f"
+	"pci14e4,1650"
+	"pciex14e4,164e"
+	"pciex14e4,164f"
+	"pciex14e4,1650"' \
+	-m '* 0666 root sys' bnxe || exit 1
