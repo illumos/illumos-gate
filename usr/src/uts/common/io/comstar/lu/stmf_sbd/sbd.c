@@ -1818,30 +1818,6 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 		goto sim_err_out;
 	}
 
-	if (sl->sl_flags & SL_ZFS_META) {
-		/* Verify that its the right zfs node and not some clone */
-		int same_zvol;
-		char *zvol_name = sbd_get_zvol_name(sl);
-
-		if ((sli->sli_flags & (SLI_ZFS_META |
-		    SLI_META_FNAME_VALID)) == 0) {
-			*err_ret = SBD_RET_NO_META;
-			ret = EIO;
-			kmem_free(zvol_name, strlen(zvol_name) + 1);
-			goto sim_err_out;
-		}
-		if (strcmp(zvol_name, (char *)sli_buf_copy +
-		    sli->sli_meta_fname_offset) != 0)
-			same_zvol = 0;
-		else
-			same_zvol = 1;
-		kmem_free(zvol_name, strlen(zvol_name) + 1);
-		if (!same_zvol) {
-			*err_ret = SBD_ZVOL_META_NAME_MISMATCH;
-			ret = EINVAL;
-			goto sim_err_out;
-		}
-	}
 	sl->sl_lu_size = sli->sli_lu_size;
 	sl->sl_data_blocksize_shift = sli->sli_data_blocksize_shift;
 	bcopy(sli->sli_device_id, sl->sl_device_id, 20);

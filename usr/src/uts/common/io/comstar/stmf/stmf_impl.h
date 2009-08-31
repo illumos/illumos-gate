@@ -218,6 +218,7 @@ typedef struct stmf_i_scsi_task {
 #define	ITASK_DEFAULT_HANDLING		0x0200
 #define	ITASK_CAUSING_LU_RESET		0x0400
 #define	ITASK_CAUSING_TARGET_RESET	0x0800
+#define	ITASK_KSTAT_IN_RUNQ		0x1000
 
 /*
  * itask cmds.

@@ -2333,6 +2333,8 @@ stmf_deregister_lu(stmf_lu_t *lu)
 		return (STMF_BUSY);
 	}
 	if (ilu->ilu_kstat_info) {
+		kmem_free(ilu->ilu_kstat_info->ks_data,
+		    ilu->ilu_kstat_info->ks_data_size);
 		kstat_delete(ilu->ilu_kstat_info);
 	}
 	if (ilu->ilu_kstat_io) {
@@ -2426,6 +2428,8 @@ stmf_deregister_local_port(stmf_local_port_t *lport)
 		return (STMF_BUSY);
 	}
 	if (ilport->ilport_kstat_info) {
+		kmem_free(ilport->ilport_kstat_info->ks_data,
+		    ilport->ilport_kstat_info->ks_data_size);
 		kstat_delete(ilport->ilport_kstat_info);
 	}
 	if (ilport->ilport_kstat_io) {
@@ -3433,7 +3437,7 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_worker_t *w = itask->itask_worker;
 	uint32_t new, old;
-	uint8_t update_queue_flags, free_it, queue_it;
+	uint8_t update_queue_flags, free_it, queue_it, kstat_it;
 
 	mutex_enter(&w->worker_lock);
 	do {
@@ -3443,10 +3447,12 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 			return;
 		}
 		free_it = 0;
+		kstat_it = 0;
 		if (iof & STMF_IOF_LPORT_DONE) {
 			new &= ~ITASK_KNOWN_TO_TGT_PORT;
 			task->task_completion_status = dbuf->db_xfer_status;
 			free_it = 1;
+			kstat_it = 1;
 		}
 		/*
 		 * If the task is known to LU then queue it. But if
@@ -3471,6 +3477,10 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		}
 	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 
+	if (kstat_it) {
+		stmf_update_kstat_lu_q(task, kstat_runq_exit);
+		stmf_update_kstat_lport_q(task, kstat_runq_exit);
+	}
 	if (update_queue_flags) {
 		uint8_t cmd = (dbuf->db_handle << 5) | ITASK_CMD_DATA_XFER_DONE;
 
@@ -3498,8 +3508,6 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		if ((itask->itask_flags & (ITASK_KNOWN_TO_LU |
 		    ITASK_KNOWN_TO_TGT_PORT | ITASK_IN_WORKER_QUEUE |
 		    ITASK_BEING_ABORTED)) == 0) {
-			stmf_update_kstat_lu_q(task, kstat_runq_exit);
-			stmf_update_kstat_lport_q(task, kstat_runq_exit);
 			stmf_task_free(task);
 		}
 	}
@@ -3556,7 +3564,7 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_worker_t *w = itask->itask_worker;
 	uint32_t new, old;
-	uint8_t free_it, queue_it;
+	uint8_t free_it, queue_it, kstat_it;
 
 	mutex_enter(&w->worker_lock);
 	do {
@@ -3566,9 +3574,11 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 			return;
 		}
 		free_it = 0;
+		kstat_it = 0;
 		if (iof & STMF_IOF_LPORT_DONE) {
 			new &= ~ITASK_KNOWN_TO_TGT_PORT;
 			free_it = 1;
+			kstat_it = 1;
 		}
 		/*
 		 * If the task is known to LU then queue it. But if
@@ -3593,8 +3603,10 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 	task->task_completion_status = s;
 
-	stmf_update_kstat_lu_q(task, kstat_runq_exit);
-	stmf_update_kstat_lport_q(task, kstat_runq_exit);
+	if (kstat_it) {
+		stmf_update_kstat_lu_q(task, kstat_runq_exit);
+		stmf_update_kstat_lport_q(task, kstat_runq_exit);
+	}
 
 	if (queue_it) {
 		ASSERT(itask->itask_ncmds < ITASK_MAX_NCMDS);
@@ -3777,9 +3789,10 @@ stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 void
 stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 {
-	char			 info[STMF_CHANGE_INFO_LEN];
+	char			info[STMF_CHANGE_INFO_LEN];
 	stmf_i_scsi_task_t	*itask = TASK_TO_ITASK(task);
 	unsigned long long	st;
+	uint32_t		old, new;
 
 	st = s;
 	if ((s != STMF_ABORT_SUCCESS) && (s != STMF_NOT_FOUND)) {
@@ -3792,9 +3805,22 @@ stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 		    "task=%p, s=%llx, iof=%x", (void *)task, st, iof);
 	} else {
 		/*
-		 * LU abort successfully
+		 * LPORT abort successfully
 		 */
-		atomic_and_32(&itask->itask_flags, ~ITASK_KNOWN_TO_TGT_PORT);
+		do {
+			old = new = itask->itask_flags;
+			if (!(old & ITASK_KNOWN_TO_TGT_PORT))
+				return;
+			new &= ~ITASK_KNOWN_TO_TGT_PORT;
+		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+
+		if (!(itask->itask_flags & ITASK_KSTAT_IN_RUNQ)) {
+			stmf_update_kstat_lu_q(task, kstat_waitq_exit);
+			stmf_update_kstat_lport_q(task, kstat_waitq_exit);
+		} else {
+			stmf_update_kstat_lu_q(task, kstat_runq_exit);
+			stmf_update_kstat_lport_q(task, kstat_runq_exit);
+		}
 		return;
 	}
 
@@ -4890,7 +4916,12 @@ stmf_worker_loop:;
 				goto out_itask_flag_loop;
 			} else if ((curcmd & ITASK_CMD_MASK) ==
 			    ITASK_CMD_NEW_TASK) {
-				new = old | ITASK_KNOWN_TO_LU;
+				/*
+				 * set ITASK_KSTAT_IN_RUNQ, this flag
+				 * will not reset until task completed
+				 */
+				new = old | ITASK_KNOWN_TO_LU |
+				    ITASK_KSTAT_IN_RUNQ;
 			} else {
 				goto out_itask_flag_loop;
 			}
@@ -6065,9 +6096,9 @@ stmf_trace_clear()
 static void
 stmf_abort_task_offline(scsi_task_t *task, int offline_lu, char *info)
 {
-	stmf_state_change_info_t	 change_info;
+	stmf_state_change_info_t	change_info;
 	void				*ctl_private;
-	uint32_t			 ctl_cmd;
+	uint32_t			ctl_cmd;
 	int				msg = 0;
 
 	stmf_trace("FROM STMF", "abort_task_offline called for %s: %s",
