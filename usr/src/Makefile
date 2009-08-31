@@ -93,7 +93,7 @@ _msg :=			TARGET= _msg
 #
 all: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg_all
 install: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg_all .WAIT _msg
-	@cd pkgdefs/SUNW0on; pwd; $(MAKE) _msg
+	@cd msg; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
 
 mapfiles: bldtools
