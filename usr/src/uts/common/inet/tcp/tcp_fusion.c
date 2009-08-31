@@ -951,11 +951,6 @@ tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
 	/* Ensure that value is within the maximum upper bound */
 	if (rwnd > tcps->tcps_max_buf)
 		rwnd = tcps->tcps_max_buf;
-
-	/* Obey the absolute minimum tcp receive high water mark */
-	if (rwnd < tcps->tcps_sth_rcv_hiwat)
-		rwnd = tcps->tcps_sth_rcv_hiwat;
-
 	/*
 	 * Round up to system page size in case SO_RCVBUF is modified
 	 * after SO_SNDBUF; the latter is also similarly rounded up.
@@ -967,6 +962,7 @@ tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
 	 * purposes in tcp_fuse_output().
 	 */
 	tcp->tcp_recv_hiwater = rwnd;
+	tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
 	return (rwnd);
 }
 

@@ -5595,7 +5595,6 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 *
 	 */
 	/* Set the TCP options */
-	eager->tcp_recv_hiwater = tcp->tcp_recv_hiwater;
 	eager->tcp_recv_lowater = tcp->tcp_recv_lowater;
 	eager->tcp_xmit_hiwater = tcp->tcp_xmit_hiwater;
 	eager->tcp_dgram_errind = tcp->tcp_dgram_errind;
@@ -5609,6 +5608,9 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	eager->tcp_lingertime = tcp->tcp_lingertime;
 	if (tcp->tcp_ka_enabled)
 		eager->tcp_ka_enabled = 1;
+
+	ASSERT(eager->tcp_recv_hiwater != 0 &&
+	    eager->tcp_recv_hiwater == eager->tcp_rwnd);
 
 	/* Set the IP options */
 	econnp->conn_broadcast = connp->conn_broadcast;
@@ -7876,7 +7878,6 @@ tcp_reinit_values(tcp)
 	tcp->tcp_unfusable = B_FALSE;
 	tcp->tcp_fused_sigurg = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
-	tcp->tcp_recv_hiwater = 0;
 
 	tcp->tcp_lso = B_FALSE;
 
@@ -7980,7 +7981,6 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_unfusable = B_FALSE;
 	tcp->tcp_fused_sigurg = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
-	tcp->tcp_recv_hiwater = 0;
 
 	/* Initialize the header template */
 	if (tcp->tcp_ipversion == IPV4_VERSION) {
@@ -7998,6 +7998,9 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_rcv_ws = TCP_MAX_WINSHIFT;
 	tcp->tcp_xmit_lowater = tcps->tcps_xmit_lowat;
 	tcp->tcp_xmit_hiwater = tcps->tcps_xmit_hiwat;
+	tcp->tcp_recv_hiwater = tcps->tcps_recv_hiwat;
+	tcp->tcp_rwnd = tcps->tcps_recv_hiwat;
+	tcp->tcp_recv_lowater = tcp_rinfo.mi_lowat;
 
 	tcp->tcp_cork = B_FALSE;
 	/*
@@ -9319,10 +9322,6 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 		connp->conn_flags |= IPCL_SOCKET;
 		tcp->tcp_issocket = 1;
 	}
-
-	tcp->tcp_recv_hiwater = tcps->tcps_recv_hiwat;
-	tcp->tcp_rwnd = tcps->tcps_recv_hiwat;
-	tcp->tcp_recv_lowater = tcp_rinfo.mi_lowat;
 
 	/* Non-zero default values */
 	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
@@ -15751,6 +15750,14 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	boolean_t	tcp_detached = TCP_IS_DETACHED(tcp);
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
+	/*
+	 * Insist on a receive window that is at least
+	 * tcp_recv_hiwat_minmss * MSS (default 4 * MSS) to avoid
+	 * funny TCP interactions of Nagle algorithm, SWS avoidance
+	 * and delayed acknowledgement.
+	 */
+	rwnd = MAX(rwnd, tcps->tcps_recv_hiwat_minmss * mss);
+
 	if (tcp->tcp_fused) {
 		size_t sth_hiwat;
 		tcp_t *peer_tcp = tcp->tcp_loopback_peer;
@@ -15779,13 +15786,6 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 		old_max_rwnd = tcp->tcp_recv_hiwater;
 	}
 
-	/*
-	 * Insist on a receive window that is at least
-	 * tcp_recv_hiwat_minmss * MSS (default 4 * MSS) to avoid
-	 * funny TCP interactions of Nagle algorithm, SWS avoidance
-	 * and delayed acknowledgement.
-	 */
-	rwnd = MAX(rwnd, tcps->tcps_recv_hiwat_minmss * mss);
 
 	/*
 	 * If window size info has already been exchanged, TCP should not
@@ -15837,6 +15837,8 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	 * connection.)
 	 */
 	tcp->tcp_rwnd += rwnd - old_max_rwnd;
+	tcp->tcp_recv_hiwater = rwnd;
+
 	U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws, tcp->tcp_tcph->th_win);
 	if ((tcp->tcp_rcv_ws > 0) && rwnd > tcp->tcp_cwnd_max)
 		tcp->tcp_cwnd_max = rwnd;
@@ -15846,16 +15848,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 
 	tcp_set_recv_threshold(tcp, rwnd >> 3);
 
-	tcp->tcp_recv_hiwater = rwnd;
-
-	/*
-	 * Set the STREAM head high water mark. This doesn't have to be
-	 * here, since we are simply using default values, but we would
-	 * prefer to choose these values algorithmically, with a likely
-	 * relationship to rwnd.
-	 */
-	(void) proto_set_rx_hiwat(tcp->tcp_rq, tcp->tcp_connp,
-	    MAX(rwnd, tcps->tcps_sth_rcv_hiwat));
+	(void) proto_set_rx_hiwat(tcp->tcp_rq, tcp->tcp_connp, rwnd);
 	return (rwnd);
 }
 
@@ -17292,7 +17285,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 
 	sopp_rxhiwat = tcp->tcp_fused ?
 	    tcp_fuse_set_rcv_hiwat(tcp, tcp->tcp_recv_hiwater) :
-	    MAX(tcp->tcp_recv_hiwater, tcps->tcps_sth_rcv_hiwat);
+	    tcp->tcp_recv_hiwater;
 
 	/*
 	 * Determine what write offset value to use depending on SACK and
@@ -26540,6 +26533,8 @@ tcp_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
 	connp->conn_upcalls = sock_upcalls;
 	connp->conn_upper_handle = sock_handle;
 
+	ASSERT(connp->conn_tcp->tcp_recv_hiwater != 0 &&
+	    connp->conn_tcp->tcp_recv_hiwater == connp->conn_tcp->tcp_rwnd);
 	(*sock_upcalls->su_set_proto_props)(sock_handle, &sopp);
 }
 

@@ -168,8 +168,8 @@ typedef struct tcpparam_s {
 #define	tcps_rexmit_interval_min	tcps_params[22].tcp_param_val
 #define	tcps_deferred_ack_interval	tcps_params[23].tcp_param_val
 #define	tcps_snd_lowat_fraction		tcps_params[24].tcp_param_val
-#define	tcps_sth_rcv_hiwat		tcps_params[25].tcp_param_val
-#define	__tcps_not_used1		tcps_params[26].tcp_param_val
+#define	__tcps_not_used1		tcps_params[25].tcp_param_val
+#define	__tcps_not_used2		tcps_params[26].tcp_param_val
 #define	tcps_dupack_fast_retransmit	tcps_params[27].tcp_param_val
 #define	tcps_ignore_path_mtu		tcps_params[28].tcp_param_val
 #define	tcps_smallest_anon_port		tcps_params[29].tcp_param_val
@@ -190,7 +190,7 @@ typedef struct tcpparam_s {
 #define	tcps_slow_start_after_idle	tcps_params[44].tcp_param_val
 #define	tcps_slow_start_initial		tcps_params[45].tcp_param_val
 #define	tcps_sack_permitted		tcps_params[46].tcp_param_val
-#define	__tcps_not_used2		tcps_params[47].tcp_param_val
+#define	__tcps_not_used3		tcps_params[47].tcp_param_val
 #define	tcps_ipv6_hoplimit		tcps_params[48].tcp_param_val
 #define	tcps_mss_def_ipv6		tcps_params[49].tcp_param_val
 #define	tcps_mss_max_ipv6		tcps_params[50].tcp_param_val
