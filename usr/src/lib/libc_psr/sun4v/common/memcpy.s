@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -555,7 +555,6 @@ fqtr:
 	prefetch [%l0+0x80], #one_read
 7:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_56_63
@@ -575,7 +574,6 @@ off7:
 	prefetch [%l0+0x80], #one_read
 0:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_1_7
@@ -608,7 +606,6 @@ off15:
 	prefetch [%l0+0x80], #one_read
 1:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_8_15
@@ -639,7 +636,6 @@ off23:
 	prefetch [%l0+0x80], #one_read
 2:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_16_23
@@ -668,7 +664,6 @@ off31:
 	prefetch [%l0+0x80], #one_read
 3:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_24_31
@@ -695,7 +690,6 @@ off39:
 	prefetch [%l0+0x80], #one_read
 4:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_32_39
@@ -720,7 +714,6 @@ off47:
 	prefetch [%l0+0x80], #one_read
 5:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_40_47
@@ -743,7 +736,6 @@ off55:
 	prefetch [%l0+0x80], #one_read
 6:
 	add	%l0, 0x40, %l0
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 
 	ldda	[%l0]ASI_BLK_P, %d16
 	ALIGN_OFF_48_55
@@ -762,7 +754,6 @@ off55:
 	prefetch [%i1+0x40], #one_read
 	prefetch [%i1+0x80], #one_read
 8:
-	stxa	%g0, [%i0]%asi		! initialize the cache line
 	ldda	[%i1]ASI_BLK_P, %d0
 	stda	%d0, [%i0]ASI_BLK_P
 
