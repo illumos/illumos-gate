@@ -852,6 +852,22 @@ smb_ctx_setsrvaddr(struct smb_ctx *ctx, const char *addr)
 	return (0);
 }
 
+/*
+ * API for library caller to set signing enabled, required
+ * Note: if not enable, ignore require
+ */
+int
+smb_ctx_setsigning(struct smb_ctx *ctx, int enable, int require)
+{
+	ctx->ct_vopt &= ~SMBVOPT_SIGNING_MASK;
+	if (enable) {
+		ctx->ct_vopt |=	SMBVOPT_SIGNING_ENABLED;
+		if (require)
+			ctx->ct_vopt |=	SMBVOPT_SIGNING_REQUIRED;
+	}
+	return (0);
+}
+
 static int
 smb_parse_owner(char *pair, uid_t *uid, gid_t *gid)
 {
@@ -1373,17 +1389,12 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 			 * "signing" was set in this section; override
 			 * the current signing settings.
 			 */
-			ctx->ct_vopt &= ~SMBVOPT_SIGNING_MASK;
 			if (strcmp(p, "disabled") == 0) {
-				/* leave flags zero (expr for lint) */
-				(void) ctx->ct_vopt;
+				smb_ctx_setsigning(ctx, FALSE, FALSE);
 			} else if (strcmp(p, "enabled") == 0) {
-				ctx->ct_vopt |=
-				    SMBVOPT_SIGNING_ENABLED;
+				smb_ctx_setsigning(ctx, TRUE, FALSE);
 			} else if (strcmp(p, "required") == 0) {
-				ctx->ct_vopt |=
-				    SMBVOPT_SIGNING_ENABLED |
-				    SMBVOPT_SIGNING_REQUIRED;
+				smb_ctx_setsigning(ctx, TRUE, TRUE);
 			} else {
 				/*
 				 * Unknown "signing" value.

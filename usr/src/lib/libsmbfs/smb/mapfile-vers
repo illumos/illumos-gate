@@ -80,11 +80,13 @@ SUNWprivate {
 	smb_ctx_setauthflags;
 	smb_ctx_setdomain;
 	smb_ctx_setfullserver;
+	smb_ctx_setnbflags;
 	smb_ctx_setpassword;
 	smb_ctx_setpwhash;
 	smb_ctx_setscope;
 	smb_ctx_setserver;
 	smb_ctx_setshare;
+	smb_ctx_setsigning;
 	smb_ctx_setsrvaddr;
 	smb_ctx_setuser;
 	smb_ctx_setwins;

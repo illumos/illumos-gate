@@ -57,8 +57,25 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/nb_lib.h>
 
+void nb_ctx_setnbflags(struct nb_ctx *, int ns_ena, int bc_ena);
 int nb_ctx_setwins(struct nb_ctx *, const char *, const char *);
 
+/*
+ * API for seting NetBIOS name lookup flags:
+ * NetBIOS name lookup enable,
+ * NetBIOS broadcast enable.
+ */
+int
+smb_ctx_setnbflags(struct smb_ctx *ctx, int ns_ena, int bc_ena)
+{
+	struct nb_ctx *nb = ctx->ct_nb;
+
+	if (nb == NULL)
+		return (EINVAL);
+
+	nb_ctx_setnbflags(nb, ns_ena, bc_ena);
+	return (0);
+}
 
 /*
  * API for library consumer to set wins1, wins2
@@ -111,6 +128,17 @@ nb_ctx_done(struct nb_ctx *ctx)
 		free(ctx->nb_scope);
 	if (ctx)
 		free(ctx);
+}
+
+void
+nb_ctx_setnbflags(struct nb_ctx *nb, int ns_ena, int bc_ena)
+{
+	nb->nb_flags &= ~(NBCF_NS_ENABLE | NBCF_BC_ENABLE);
+	if (ns_ena) {
+		nb->nb_flags = NBCF_NS_ENABLE;
+		if (bc_ena)
+			nb->nb_flags = NBCF_BC_ENABLE;
+	}
 }
 
 int
@@ -250,12 +278,22 @@ nb_ctx_readrcsection(struct rcfile *rcfile, struct nb_ctx *ctx,
 			return (error);
 		}
 	}
-	error = rc_getbool(rcfile, sname, "nbns_enable", &nbns_enable);
-	if (error == 0 && nbns_enable == 0)
-		ctx->nb_flags &= ~NBCF_NS_ENABLE;
-	error = rc_getbool(rcfile, sname, "nbns_broadcast", &nbns_broadcast);
-	if (error == 0 && nbns_broadcast == 0)
-		ctx->nb_flags &= ~NBCF_BC_ENABLE;
+
+	/*
+	 * Want to use nb_ctx_setnbflags here, but
+	 * have to get both boolean values first,
+	 * either from settings or defaults.
+	 */
+	nbns_enable = nbns_broadcast = -1; /* not set */
+	rc_getbool(rcfile, sname, "nbns_enable", &nbns_enable);
+	rc_getbool(rcfile, sname, "nbns_broadcast", &nbns_broadcast);
+	if (nbns_enable >= 0 || nbns_broadcast >= 0) {
+		if (nbns_enable < 0)
+			nbns_enable = 1; /* default */
+		if (nbns_broadcast < 0)
+			nbns_broadcast = 1; /* default */
+		nb_ctx_setnbflags(ctx, nbns_enable, nbns_broadcast);
+	}
 	return (0);
 }
 

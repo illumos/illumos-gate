@@ -120,8 +120,10 @@ int  smb_ctx_get_tree(struct smb_ctx *);
 
 int  smb_ctx_setauthflags(struct smb_ctx *, int);
 int  smb_ctx_setcharset(struct smb_ctx *, const char *);
-int  smb_ctx_setflags(struct smb_ctx *, int, int, int);
 int  smb_ctx_setfullserver(struct smb_ctx *, const char *);
+int  smb_ctx_setsigning(struct smb_ctx *, int ena, int req);
+
+int  smb_ctx_setnbflags(struct smb_ctx *, int ena, int bcast);
 int  smb_ctx_setscope(struct smb_ctx *, const char *);
 int  smb_ctx_setwins(struct smb_ctx *, const char *, const char *);
 
