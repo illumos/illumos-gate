@@ -114,7 +114,7 @@ archive_Gnome()
 		# usr/share gnome stuff
 		cd "$MINIROOT"
 		find usr/share/GConf usr/share/application-registry \
-		    usr/share/autostart usr/share/dbus-1 usr/share/dtds \
+		    usr/share/autostart usr/share/dtds \
 		    usr/share/emacs usr/share/gnome usr/share/gnome-2.0 \
 		    usr/share/gnome-background-properties \
 		    usr/share/gtk-engines usr/share/gui-install \
@@ -140,7 +140,7 @@ archive_Gnome()
 		    usr/lib/libgobject*\.so\.* usr/lib/libgthread*\.so\.* \
 		    usr/lib/libpopt*\.so\.* usr/lib/libstartup*\.so\.* \
 		    usr/lib/libexif*\.so\.* usr/lib/libtiff*\.so\.* \
-		    usr/lib/libdbus*\.so\.* usr/lib/libstartup*\.so\.* \
+		    usr/lib/libstartup*\.so\.* \
 		    usr/lib/libexif*\.so\.* usr/lib/libORBit*\.so\.* \
 	 	    usr/lib/libmlib*\.so\.* usr/lib/libxsl*\.so\.* \
 		    usr/lib/libpango*\.so\.* usr/lib/libpng*\.so\.* \
