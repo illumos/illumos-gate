@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -726,13 +726,8 @@ amd_iommu_lookup_pgtable(amd_iommu_t *iommu, amd_iommu_page_table_t *ppt,
 		pdtep = &(ppt->pt_pgtblva[index]);
 		if (AMD_IOMMU_REG_GET64(pdtep, AMD_IOMMU_PTDE_PR) == 0) {
 			if (amd_iommu_debug & AMD_IOMMU_DEBUG_PAGE_TABLES) {
-#ifdef _LP64
-				cmn_err(CE_NOTE, "Skipping PR=0 pdte: %p",
-				    (void *)(*pdtep));
-#else
-				cmn_err(CE_NOTE, "Skipping PR=0 pdte: %llx",
-				    *pdtep);
-#endif
+				cmn_err(CE_NOTE, "Skipping PR=0 pdte: 0x%"
+				    PRIx64, *pdtep);
 			}
 			return (NULL);
 		}

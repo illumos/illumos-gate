@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,7 @@ amd_iommu_setup_passthru(amd_iommu_t *iommu)
 
 	for (gfxp = gfx_devinfo_list; gfxp; gfxp = gfxp->g_next) {
 		gfxp->g_ref++;
-		dip = gfxp->g_dip
+		dip = gfxp->g_dip;
 		if (dip) {
 			amd_iommu_set_passthru(iommu, dip);
 		}
