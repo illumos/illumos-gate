@@ -4120,11 +4120,6 @@ rootnex_coredma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		return (DDI_SUCCESS);
 	}
 
-	if (strcmp(ddi_driver_name(rdip), "bnx") == 0 ||
-	    strcmp(ddi_driver_name(rdip), "ohci") == 0)
-		cmn_err(CE_WARN, "%s: syncing DMA ...",
-		    ddi_driver_name(rdip));
-
 	/* handle off and len special cases */
 	if ((off == 0) || (rootnex_sync_ignore_params)) {
 		offset = win->wd_offset;
