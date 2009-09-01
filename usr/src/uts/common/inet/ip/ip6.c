@@ -6943,6 +6943,13 @@ ip_check_v6_mblk(mblk_t *mp, ill_t *ill)
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return (IP6_MBLK_LEN_ERR);
 		}
+
+		/*
+		 * adjmsg may have freed an mblk from the chain, hence
+		 * invalidate any hw checksum here. This will force IP to
+		 * calculate the checksum in sw, but only for this packet.
+		 */
+		DB_CKSUMFLAGS(mp) = 0;
 	}
 	return (IP6_MBLK_OK);
 }
