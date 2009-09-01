@@ -510,8 +510,8 @@ setup(void)
 	if ((kc = kstat_open()) == NULL)
 		fail(1, "kstat_open(): can't open /dev/kstat");
 
-	/* malloc space for our temporary kstat */
-	ksum_kstat = malloc(sizeof (kstat_t));
+	/* alloc space for our temporary kstat */
+	safe_zalloc((void **)&ksum_kstat, sizeof (kstat_t), 0);
 	rpc_clts_client_kstat = kstat_lookup(kc, "unix", 0, "rpc_clts_client");
 	rpc_clts_server_kstat = kstat_lookup(kc, "unix", 0, "rpc_clts_server");
 	rpc_cots_client_kstat = kstat_lookup(kc, "unix", 0, "rpc_cots_client");
@@ -1424,14 +1424,13 @@ nfsstat_kstat_copy(kstat_t *src, kstat_t *dst, int fr)
 }
 
 /*
- * "Safe" allocators - if we return we're guaranteed
- * to have the desired space. We exit via fail
- * if we can't get the space.
+ * "Safe" allocators - if we return we're guaranteed to have the desired space
+ * allocated and zero-filled. We exit via fail if we can't get the space.
  */
 void
 safe_zalloc(void **ptr, uint_t size, int free_first)
 {
-	if (*ptr == NULL)
+	if (ptr == NULL)
 		fail(1, "invalid pointer");
 	if (free_first && *ptr != NULL)
 		free(*ptr);
