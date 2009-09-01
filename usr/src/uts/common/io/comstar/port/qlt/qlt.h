@@ -18,17 +18,10 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2009 QLogic Corporation.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-/*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef	_QLT_H
 #define	_QLT_H
 
@@ -99,13 +92,6 @@ extern uint32_t fw2500_code02[];
 extern uint32_t fw2500_length02;
 extern uint32_t fw2500_addr02;
 
-extern uint32_t fw8100_code01[];
-extern uint32_t fw8100_length01;
-extern uint32_t fw8100_addr01;
-extern uint32_t fw8100_code02[];
-extern uint32_t fw8100_length02;
-extern uint32_t fw8100_addr02;
-
 typedef enum {
 	MBOX_STATE_UNKNOWN = 0,
 	MBOX_STATE_READY,
@@ -143,13 +129,6 @@ struct qlt_dmem_bucket;
 #define	QLT_INTR_MSI	0x2
 #define	QLT_INTR_MSIX	0x4
 
-typedef struct qlt_el_trace_desc {
-	kmutex_t	mutex;
-	uint16_t	next;
-	uint32_t	trace_buffer_size;
-	char		*trace_buffer;
-} qlt_el_trace_desc_t;
-
 typedef struct qlt_state {
 	dev_info_t		*dip;
 	char			qlt_minor_name[16];
@@ -164,8 +143,7 @@ typedef struct qlt_state {
 				qlt_25xx_chip:1,
 				qlt_stay_offline:1,
 				qlt_link_up,
-				qlt_81xx_chip:1,
-				qlt_rsvd1:3;
+				qlt_rsvd1:4;
 	uint8_t			cur_topology;
 
 	/* Registers */
@@ -240,8 +218,6 @@ typedef struct qlt_state {
 	kmutex_t	qlt_ioctl_lock;
 	caddr_t		qlt_fwdump_buf;	/* FWDUMP will use ioctl flags/lock */
 	uint32_t	qlt_change_state_flags;	/* Cached for ACK handling */
-
-	qlt_el_trace_desc_t	*el_trace_desc;
 } qlt_state_t;
 
 /*
@@ -332,7 +308,7 @@ typedef struct {
 	ddi_put16(qlt->queue_mem_acc_handle, (uint16_t *)(addr), \
 	(uint16_t)(data))
 #define	DMEM_WR16(qlt, addr, data) (*((uint16_t *)(addr)) = \
-	(uint16_t)LE_16((uint16_t)(data)))
+						LE_16((uint16_t)(data)))
 #define	QMEM_WR32(qlt, addr, data) \
 	ddi_put32(qlt->queue_mem_acc_handle, (uint32_t *)(addr), \
 	(uint32_t)(data))
@@ -351,13 +327,6 @@ typedef struct {
 	DMEM_WR32(qlt, addr, (data & 0xffffffff)), \
 	DMEM_WR32(qlt, (addr)+4, ((uint64_t)data) >> 32)
 
-void qlt_el_msg(qlt_state_t *qlt, const char *fn, int ce, ...);
-void qlt_dump_el_trace_buffer(qlt_state_t *qlt);
-#define	EL(qlt, ...) 	qlt_el_msg(qlt, __func__, CE_CONT, __VA_ARGS__);
-#define	EL_TRACE_BUF_SIZE	8192
-#define	EL_BUFFER_RESERVE	256
-#define	DEBUG_STK_DEPTH		24
-#define	EL_TRACE_BUF_SIZE	8192
 
 #ifdef	__cplusplus
 }

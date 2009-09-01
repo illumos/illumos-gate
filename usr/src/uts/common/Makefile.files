@@ -465,7 +465,7 @@ LX_PTM_OBJS +=	lx_ptm.o
 LX_AUDIO_OBJS += lx_audio.o
 
 MII_OBJS +=	mii.o mii_cicada.o mii_natsemi.o mii_intel.o mii_qualsemi.o \
-		mii_other.o
+		mii_marvell.o mii_other.o
 
 PTS_OBJS +=	pts.o
 
@@ -708,7 +708,7 @@ USBVC_OBJS += usbvc.o usbvc_v4l2.o
 
 HIDPARSER_OBJS += hidparser.o
 
-USB_AC_OBJS += usb_ac.o audio_shim.o
+USB_AC_OBJS += usb_ac.o
 
 USB_AS_OBJS += usb_as.o
 
@@ -887,7 +887,7 @@ EMLXS_FW_OBJS +=	emlxs_fw.o
 
 FCT_OBJS += discovery.o fct.o
 
-QLT_OBJS += 2400.o 2500.o 8100.o qlt.o qlt_dma.o
+QLT_OBJS += 2400.o 2500.o qlt.o qlt_dma.o
 
 SRPT_OBJS += srpt_mod.o srpt_ch.o srpt_cm.o srpt_ioc.o srpt_stp.o
 
@@ -1757,6 +1757,8 @@ IDM_OBJS +=	$(IDM_SHARED_OBJS) \
 
 VR_OBJS += vr.o
 
+ATGE_OBJS += atge_main.o atge_l1e.o atge_mii.o
+
 #
 #	Build up defines and paths.
 #
@@ -1823,7 +1825,7 @@ IGB_OBJS =	igb_82575.o igb_api.o igb_mac.o igb_manage.o \
 IXGBE_OBJS =    ixgbe_82598.o ixgbe_82599.o ixgbe_api.o		\
                 ixgbe_common.o ixgbe_phy.o			\
                 ixgbe_buf.o ixgbe_debug.o ixgbe_gld.o           \
-                ixgbe_log.o ixgbe_main.o ixgbe_ndd.o            \
+                ixgbe_log.o ixgbe_main.o 	                \
                 ixgbe_osdep.o ixgbe_rx.o ixgbe_stat.o           \
                 ixgbe_tx.o
 
@@ -1927,4 +1929,4 @@ MYRI10GE_OBJS =	myri10ge.o myri10ge_lro.o
 #
 NULLDRIVER_OBJS =	nulldriver.o
 
-TPM_OBJS =	tpm.o
+TPM_OBJS =	tpm.o tpm_hcall.o

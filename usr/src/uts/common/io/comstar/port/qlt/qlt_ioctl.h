@@ -18,17 +18,10 @@
  *
  * CDDL HEADER END
  */
-
-/*
- * Copyright 2009 QLogic Corporation.  All rights reserved.
- * Use is subject to license terms.
- */
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #ifndef	_QLT_IOCTL_H
 #define	_QLT_IOCTL_H
 
@@ -106,7 +99,6 @@ typedef struct qlt_ioctl_mbox {
 #define	QLT_IOCTL_GET_FW_INFO		0x9005
 #define	QLT_IOCTL_STAY_OFFLINE		0x9006
 #define	QLT_IOCTL_MBOX			0x9007
-#define	QLT_IOCTL_ELOG			0x9008
 
 #ifdef	__cplusplus
 }
