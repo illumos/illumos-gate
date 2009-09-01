@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,7 +120,7 @@ _init(void)
 {
 	int error = ENOTSUP;
 
-#if defined(_LP64) && !defined(__xpv)
+#if defined(__amd64) && !defined(__xpv)
 
 	error = ddi_soft_state_init(&amd_iommu_statep,
 	    sizeof (struct amd_iommu_state), 1);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -241,7 +241,7 @@ typedef enum {
 /* Invalidate Interrupt Table bits */
 #define	AMD_IOMMU_CMD_INVAL_INTR_DEVICEID		(15 << 16 | 0)
 
-#ifdef _LP64
+#if defined(__amd64)
 #define	dmac_cookie_addr	dmac_laddress
 #else
 #define	dmac_cookie_addr	dmac_address
