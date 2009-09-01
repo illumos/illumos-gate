@@ -382,12 +382,26 @@ i_ddi_free_node(dev_info_t *dip)
 {
 	struct dev_info *devi = DEVI(dip);
 	struct devi_nodeid *elem;
+#if defined(__x86) && !defined(__xpv)
+	gfx_entry_t *gfxp;
+	extern void *gfx_devinfo_list;
+#endif
 
 	ASSERT(devi->devi_ref == 0);
 	ASSERT(devi->devi_addr == NULL);
 	ASSERT(devi->devi_node_state == DS_PROTO);
 	ASSERT(devi->devi_child == NULL);
 
+#if defined(__x86) && !defined(__xpv)
+	for (gfxp = gfx_devinfo_list; gfxp; gfxp = gfxp->g_next) {
+		if (gfxp->g_dip == dip) {
+			gfxp->g_dip = NULL;
+			while (gfxp->g_ref)
+				;
+		}
+	}
+	membar_producer();
+#endif
 	/* free devi_addr_buf allocated by ddi_set_name_addr() */
 	if (devi->devi_addr_buf)
 		kmem_free(devi->devi_addr_buf, 2 * MAXNAMELEN);

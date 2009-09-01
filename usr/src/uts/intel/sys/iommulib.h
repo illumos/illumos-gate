@@ -186,6 +186,7 @@ typedef struct iommu_private {
 #define	INTEL_IOMMU_PRIVATE(i)	(dmar_domain_state_t *)(i)
 
 typedef struct gfx_entry {
+	int g_ref;
 	dev_info_t *g_dip;
 	struct gfx_entry *g_prev;
 	struct gfx_entry *g_next;
