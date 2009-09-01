@@ -2301,6 +2301,7 @@ vnet_rx_ring_stop(mac_ring_driver_t arg)
 	if ((rx_ringp->state &
 	    (VNET_RXRING_LDC_SERVICE|VNET_RXRING_LDC_GUEST)) != 0) {
 		rx_ringp->state &= ~VNET_RXRING_STARTED;
+		return;
 	}
 
 	ASSERT((rx_ringp->state & VNET_RXRING_HYBRID) != 0);
