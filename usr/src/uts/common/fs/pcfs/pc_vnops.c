@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1980,6 +1981,17 @@ pcfs_pathconf(
 		 * which is ~509MB.
 		 */
 		*valp = IS_FAT12(fsp) ? 30 : 33;
+		return (0);
+
+	case _PC_TIMESTAMP_RESOLUTION:
+		/*
+		 * PCFS keeps track of modification times, it its own
+		 * internal format, to a resolution of 2 seconds.
+		 * Since 2000 million is representable in an int32_t
+		 * without overflow (or becoming negative), we allow
+		 * this value to be returned.
+		 */
+		*valp = 2000000000L;
 		return (0);
 
 	default:

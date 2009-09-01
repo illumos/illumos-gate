@@ -25,14 +25,12 @@
  */
 
 #pragma weak _fchownat = fchownat
-#pragma weak _futimesat = futimesat
 #pragma weak _unlinkat = unlinkat
 
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 
 int
 fchownat(int fd, const char *name, uid_t uid, gid_t gid, int flags)
@@ -44,12 +42,6 @@ int
 unlinkat(int fd, const char *name, int flags)
 {
 	return (syscall(SYS_fsat, 5, fd, name, flags));
-}
-
-int
-futimesat(int fd, const char *name, const struct timeval *tv)
-{
-	return (syscall(SYS_fsat, 6, fd, name, tv));
 }
 
 int

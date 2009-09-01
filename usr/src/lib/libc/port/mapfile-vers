@@ -107,6 +107,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	forkallx;
 	forkx;
 	fsetattr;
+	futimens;
 	getattrat;
 	htonl;
 	htonll;
@@ -184,6 +185,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	uconv_u32tou8;
 	uconv_u8tou16;
 	uconv_u8tou32;
+	utimensat;
 	vasprintf;
 	verr;
 	verrx;

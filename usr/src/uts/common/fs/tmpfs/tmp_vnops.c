@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2389,6 +2390,11 @@ tmp_pathconf(
 	case _PC_SATTR_EXISTS:
 		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_SYSATTR_VIEWS) &&
 		    (vp->v_type == VREG || vp->v_type == VDIR);
+		error = 0;
+		break;
+	case _PC_TIMESTAMP_RESOLUTION:
+		/* nanosecond timestamp resolution */
+		*valp = 1L;
 		error = 0;
 		break;
 	default:

@@ -134,7 +134,8 @@ extern "C" {
 #define	SPF	94		/* print rctlsys_projset flags */
 #define	UN1	95		/* unsigned except for -1 */
 #define	MOB	96		/* print mmapobj() flags */
-#define	HID	97		/* hidden argument, don't print */
+#define	UTF	97		/* print utimensat() flag */
+#define	HID	98		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

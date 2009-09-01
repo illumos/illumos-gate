@@ -312,6 +312,8 @@ extern "C" {
 #define	_PC_SATTR_ENABLED	23
 #define	_PC_SATTR_EXISTS	24
 #define	_PC_ACCESS_FILTERING	25
+/* UNIX 08 names */
+#define	_PC_TIMESTAMP_RESOLUTION 26
 
 /*
  * Large File Summit names

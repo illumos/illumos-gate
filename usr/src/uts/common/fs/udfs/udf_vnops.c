@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2149,6 +2150,9 @@ udf_l_pathconf(
 		 * into account we can stay just as where ufs is
 		 */
 		*valp = 41;
+	} else if (cmd == _PC_TIMESTAMP_RESOLUTION) {
+		/* nanosecond timestamp resolution */
+		*valp = 1L;
 	} else {
 		error = fs_pathconf(vp, cmd, valp, cr, ct);
 	}

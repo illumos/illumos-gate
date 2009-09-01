@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  * Copyright 1985, 1993 by Mortice Kern Systems Inc.  All rights reserved.
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * getconf -- POSIX.2 compatible utility to query configuration specific
@@ -235,6 +233,11 @@ static struct sctab {
 
 	_PC_2_SYMLINKS,		"POSIX2_SYMLINKS",	PATHCONF,  NOFLAGS,
 	_PC_SYMLINK_MAX,	"SYMLINK_MAX",		PATHCONF,  NOFLAGS,
+
+	/* UNIX 08 additions */
+
+	_PC_TIMESTAMP_RESOLUTION, "_POSIX_TIMESTAMP_RESOLUTION",
+	    PATHCONF,	NOFLAGS,
 
 	/* confstr() variables */
 

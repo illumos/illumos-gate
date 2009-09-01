@@ -36,6 +36,7 @@
 #include <termio.h>
 #include <stddef.h>
 #include <limits.h>
+#include <fcntl.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -2626,6 +2627,20 @@ prt_fxf(private_t *pri, int raw, long val)
 }
 
 /*
+ * Print utimensat() flag
+ */
+void
+prt_utf(private_t *pri, int raw, long val)
+{
+	if (val == 0)
+		outstring(pri, "0");
+	else if (!raw && val == AT_SYMLINK_NOFOLLOW)
+		outstring(pri, "AT_SYMLINK_NOFOLLOW");
+	else
+		prt_hex(pri, 0, val);
+}
+
+/*
  * Array of pointers to print functions, one for each format.
  */
 void (* const Print[])() = {
@@ -2726,5 +2741,6 @@ void (* const Print[])() = {
 	prt_spf,	/* SPF -- print rctlsys_projset() flags */
 	prt_un1,	/* UN1 -- as prt_uns except for -1 */
 	prt_mob,	/* MOB -- print mmapobj() flags */
+	prt_utf,	/* UTF -- print utimensat() flag */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

@@ -132,6 +132,7 @@ int	umount();
 int	umount2();
 int	unlink();
 int	utime();
+int	utimesys();
 int64_t	utssys32();
 int64_t	utssys64();
 int	uucopy();
@@ -565,7 +566,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 109 */ IF_x86(
 			SYSENT_AP("hrtsys",	hrtsys,		5),
 			SYSENT_LOADABLE()),
-	/* 110 */ SYSENT_LOADABLE(),
+	/* 110 */ SYSENT_CI("utimesys",		utimesys,	5),
 	/* 111 */ SYSENT_CI("sigresend",	sigresend,	3),
 	/* 112 */ SYSENT_CL("priocntlsys",	priocntlsys,	5),
 	/* 113 */ SYSENT_CL("pathconf",		pathconf,	2),
@@ -962,7 +963,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 109 */ IF_x86(
 			SYSENT_AP("hrtsys",	hrtsys,		5),
 			SYSENT_LOADABLE32()),
-	/* 110 */ SYSENT_LOADABLE32(),
+	/* 110 */ SYSENT_CI("utimesys",		utimesys,	5),
 	/* 111 */ SYSENT_CI("sigresend",	sigresend,	3),
 	/* 112 */ SYSENT_CI("priocntlsys",	priocntlsys,	5),
 	/* 113 */ SYSENT_CI("pathconf",		pathconf,	2),

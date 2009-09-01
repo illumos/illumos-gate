@@ -330,7 +330,7 @@ const struct systable systable[] = {
 {"waitid",	4, DEC, NOV, IDT, DEC, HEX, WOP},		/* 107 */
 {"sigsendsys",	2, DEC, NOV, HEX, SIG},				/* 108 */
 {"hrtsys",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 109 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"utimesys",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 110 */
 {"sigresend",	3, DEC, NOV, SIG, HEX, HEX},			/* 111 */
 {"priocntlsys",	5, DEC, NOV, DEC, HEX, DEC, PC4, PC5},		/* 112 */
 {"pathconf",	2, DEC, NOV, STG, PTC},				/* 113 */
@@ -837,6 +837,12 @@ const	struct systable sidsystable[] = {
 };
 #define	NSIDSYSCODE	(sizeof (sidsystable) / sizeof (struct systable))
 
+const	struct systable utimesystable[] = {
+{"futimens",	3, DEC, NOV, HID, DEC, HEX},			/* 0 */
+{"utimensat",	5, DEC, NOV, HID, ATC, STG, HEX, UTF},		/* 1 */
+};
+#define	NUTIMESYSCODE	(sizeof (utimesystable) / sizeof (struct systable))
+
 const	struct sysalias sysalias[] = {
 	{ "exit",	SYS_exit	},
 	{ "fork",	SYS_forksys	},
@@ -994,6 +1000,8 @@ const	struct sysalias sysalias[] = {
 	{ "rctlsys_lst",	SYS_rctlsys	},
 	{ "rctlsys_ctl",	SYS_rctlsys	},
 	{ "allocids",		SYS_sidsys	},
+	{ "futimens",		SYS_utimesys	},
+	{ "utimensat",		SYS_utimesys	},
 	{  NULL,	0	}	/* end-of-list */
 };
 
@@ -1142,6 +1150,10 @@ subsys(int syscall, int subcode)
 		case SYS_sidsys:	/* SID family */
 			if ((unsigned)subcode < NSIDSYSCODE)
 				stp = &sidsystable[subcode];
+			break;
+		case SYS_utimesys:	/* utime family */
+			if ((unsigned)subcode < NUTIMESYSCODE)
+				stp = &utimesystable[subcode];
 			break;
 		}
 	}
@@ -1303,6 +1315,7 @@ getsubcode(private_t *pri)
 		case SYS_labelsys:	/* labelsys */
 		case SYS_rctlsys:	/* rctlsys */
 		case SYS_sidsys:	/* sidsys */
+		case SYS_utimesys:	/* utimesys */
 			subcode = arg0;
 			break;
 		case SYS_fcntl:		/* fcntl() */
@@ -1366,7 +1379,8 @@ maxsyscalls()
 	    + NLABELCODE - 1
 	    + NRCTLCODE - 1
 	    + NFORKCODE - 1
-	    + NSIDSYSCODE - 1);
+	    + NSIDSYSCODE - 1
+	    + NUTIMESYSCODE - 1);
 }
 
 /*
@@ -1444,6 +1458,8 @@ nsubcodes(int syscall)
 		return (NFORKCODE);
 	case SYS_sidsys:
 		return (NSIDSYSCODE);
+	case SYS_utimesys:
+		return (NUTIMESYSCODE);
 	default:
 		return (1);
 	}

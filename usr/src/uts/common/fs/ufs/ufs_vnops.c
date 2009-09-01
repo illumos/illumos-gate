@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5892,8 +5892,17 @@ ufs_l_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr,
 		    (vp->v_type == VREG || vp->v_type == VDIR);
 		break;
 
+	case _PC_TIMESTAMP_RESOLUTION:
+		/*
+		 * UFS keeps only microsecond timestamp resolution.
+		 * This is historical and will probably never change.
+		 */
+		*valp = 1000L;
+		break;
+
 	default:
 		error = fs_pathconf(vp, cmd, valp, cr, ct);
+		break;
 	}
 
 	if (ulp != NULL) {

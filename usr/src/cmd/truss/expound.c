@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_SYSCALL32
 
@@ -101,27 +99,55 @@
 void	show_sigset(private_t *, long, const char *);
 void	show_ioctl(private_t *, int, long);
 
+static void
+mk_ctime(char *str, size_t maxsize, time_t value)
+{
+	(void) strftime(str, maxsize, "%b %e %H:%M:%S %Z %Y",
+	    localtime(&value));
+}
+
 void
 prtime(private_t *pri, const char *name, time_t value)
 {
 	char str[80];
 
-	(void) strftime(str, sizeof (str), "%b %e %H:%M:%S %Z %Y",
-	    localtime(&value));
-	(void) printf("%s\t%s%s  [ %llu ]\n",
+	mk_ctime(str, sizeof (str), value);
+	(void) printf("%s\t%s%s  [ %lu ]\n",
 	    pri->pname,
 	    name,
 	    str,
-	    (longlong_t)value);
+	    value);
+}
+
+void
+prtimeval(private_t *pri, const char *name, struct timeval *value)
+{
+	char str[80];
+
+	mk_ctime(str, sizeof (str), value->tv_sec);
+	(void) printf("%s\t%s%s  [ %lu.%6.6lu ]\n",
+	    pri->pname,
+	    name,
+	    str,
+	    value->tv_sec,
+	    value->tv_usec);
 }
 
 void
 prtimestruc(private_t *pri, const char *name, timestruc_t *value)
 {
-	prtime(pri, name, value->tv_sec);
+	char str[80];
+
+	mk_ctime(str, sizeof (str), value->tv_sec);
+	(void) printf("%s\t%s%s  [ %lu.%9.9lu ]\n",
+	    pri->pname,
+	    name,
+	    str,
+	    value->tv_sec,
+	    value->tv_nsec);
 }
 
-void
+static void
 show_utime(private_t *pri)
 {
 	long offset;
@@ -146,20 +172,19 @@ show_utime(private_t *pri)
 	}
 
 	/* print access and modification times */
-	prtime(pri, "atime: ", utimbuf.actime);
-	prtime(pri, "mtime: ", utimbuf.modtime);
+	prtime(pri, "at = ", utimbuf.actime);
+	prtime(pri, "mt = ", utimbuf.modtime);
 }
 
-void
-show_utimes(private_t *pri)
+static void
+show_utimes(private_t *pri, long offset)
 {
-	long offset;
 	struct {
 		struct timeval	atime;
 		struct timeval	mtime;
 	} utimbuf;
 
-	if (pri->sys_nargs < 2 || (offset = pri->sys_args[1]) == NULL)
+	if (offset == 0)
 		return;
 
 	if (data_model == PR_MODEL_NATIVE) {
@@ -181,8 +206,52 @@ show_utimes(private_t *pri)
 	}
 
 	/* print access and modification times */
-	prtime(pri, "atime: ", utimbuf.atime.tv_sec);
-	prtime(pri, "mtime: ", utimbuf.mtime.tv_sec);
+	prtimeval(pri, "at = ", &utimbuf.atime);
+	prtimeval(pri, "mt = ", &utimbuf.mtime);
+}
+
+static void
+show_utimens(private_t *pri, long offset)
+{
+	struct {
+		timespec_t atime;
+		timespec_t mtime;
+	} utimbuf;
+
+	if (offset == 0)
+		return;
+
+	if (data_model == PR_MODEL_NATIVE) {
+		if (Pread(Proc, &utimbuf, sizeof (utimbuf), offset)
+		    != sizeof (utimbuf))
+			return;
+	} else {
+		struct {
+			timespec32_t atime;
+			timespec32_t mtime;
+		} utimbuf32;
+
+		if (Pread(Proc, &utimbuf32, sizeof (utimbuf32), offset)
+		    != sizeof (utimbuf32))
+			return;
+
+		TIMESPEC32_TO_TIMESPEC(&utimbuf.atime, &utimbuf32.atime);
+		TIMESPEC32_TO_TIMESPEC(&utimbuf.mtime, &utimbuf32.mtime);
+	}
+
+	/* print access and modification times */
+	if (utimbuf.atime.tv_nsec == UTIME_OMIT)
+		(void) printf("%s\tat = UTIME_OMIT\n", pri->pname);
+	else if (utimbuf.atime.tv_nsec == UTIME_NOW)
+		(void) printf("%s\tat = UTIME_NOW\n", pri->pname);
+	else
+		prtimestruc(pri, "at = ", &utimbuf.atime);
+	if (utimbuf.mtime.tv_nsec == UTIME_OMIT)
+		(void) printf("%s\tmt = UTIME_OMIT\n", pri->pname);
+	else if (utimbuf.mtime.tv_nsec == UTIME_NOW)
+		(void) printf("%s\tmt = UTIME_NOW\n", pri->pname);
+	else
+		prtimestruc(pri, "mt = ", &utimbuf.atime);
 }
 
 void
@@ -208,7 +277,7 @@ show_timeofday(private_t *pri)
 		TIMEVAL32_TO_TIMEVAL(&tod, &tod32);
 	}
 
-	prtime(pri, "time: ", tod.tv_sec);
+	prtimeval(pri, "time: ", &tod);
 }
 
 void
@@ -216,7 +285,7 @@ show_itimerval(private_t *pri, long offset, const char *name)
 {
 	struct itimerval itimerval;
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	if (data_model == PR_MODEL_NATIVE) {
@@ -248,7 +317,7 @@ show_timeval(private_t *pri, long offset, const char *name)
 {
 	struct timeval timeval;
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	if (data_model == PR_MODEL_NATIVE) {
@@ -278,7 +347,7 @@ show_timestruc(private_t *pri, long offset, const char *name)
 {
 	timestruc_t timestruc;
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	if (data_model == PR_MODEL_NATIVE) {
@@ -425,7 +494,7 @@ show_fusers(private_t *pri, long offset, long nproc)
 	f_user_t fubuf;
 	int serial = (nproc > 4);
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	/* enter region of lengthy output */
@@ -1308,7 +1377,7 @@ show_ioctl(private_t *pri, int code, long offset)
 	if (lp64)
 		return;
 #endif
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	switch (code) {
@@ -2461,7 +2530,7 @@ show_semop(private_t *pri, long offset, long nsops, long timeout)
 	struct sembuf sembuf;
 	const char *str;
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	if (nsops > 40)		/* let's not be ridiculous */
@@ -3272,7 +3341,7 @@ show_dents32(private_t *pri, long offset, long count)
 	struct dirent32 *dp;
 	int serial = (count > 100);
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	/* enter region of lengthy output */
@@ -3330,7 +3399,7 @@ show_dents64(private_t *pri, long offset, long count)
 	struct dirent64 *dp;
 	int serial = (count > 100);
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	/* enter region of lengthy output */
@@ -4148,7 +4217,7 @@ show_ids(private_t *pri, long offset, int count)
 	id_t *idp;
 	int serial = (count > MYBUFSIZ / 48);
 
-	if (offset == NULL)
+	if (offset == 0)
 		return;
 
 	/* enter region of lengthy output */
@@ -4723,6 +4792,23 @@ show_rctls(private_t *pri)
 	}
 }
 
+void
+show_utimesys(private_t *pri)
+{
+	switch (pri->sys_args[0]) {
+	case 0:			/* futimens() */
+		if (pri->sys_nargs > 2)
+			show_utimens(pri, (long)pri->sys_args[2]);
+		break;
+	case 1:			/* utimensat */
+		if (pri->sys_nargs > 3)
+			show_utimens(pri, (long)pri->sys_args[3]);
+		break;
+	default:		/* unexpected subcode */
+		break;
+	}
+}
+
 /* expound verbosely upon syscall arguments */
 /*ARGSUSED*/
 void
@@ -4747,7 +4833,7 @@ expound(private_t *pri, long r0, int raw)
 		show_utime(pri);
 		break;
 	case SYS_utimes:
-		show_utimes(pri);
+		show_utimes(pri, (long)pri->sys_args[1]);
 		break;
 	case SYS_gettimeofday:
 		if (!err)
@@ -4804,13 +4890,15 @@ expound(private_t *pri, long r0, int raw)
 		break;
 	case SYS_fsat:
 		/*
-		 * subcodes for fstatat() and fstatat64().
+		 * subcodes for fstatat(), fstatat64(), futimesat().
 		 */
 		if (!err && pri->sys_nargs >= 4) {
 			if (pri->sys_args[0] == 3)
 				show_statat(pri, (long)pri->sys_args[3]);
 			else if (pri->sys_args[0] == 2)
 				show_stat64_32(pri, (long)pri->sys_args[3]);
+			else if (pri->sys_args[0] == 6)
+				show_utimes(pri, (long)pri->sys_args[3]);
 		}
 		break;
 	case SYS_xstat:
@@ -5213,13 +5301,14 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_port:
 		show_ports(pri);
 		break;
-
 	case SYS_zone:
 		show_zones(pri);
 		break;
-
 	case SYS_rctlsys:
 		show_rctls(pri);
+		break;
+	case SYS_utimesys:
+		show_utimesys(pri);
 		break;
 	}
 }

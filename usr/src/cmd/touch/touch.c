@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +54,9 @@ static int isnumber(char *);
 static int atoi_for2(char *);
 static void usage(const int);
 static void touchabort(const char *);
-static void parse_time(char *, timestruc_t *);
-static void parse_datetime(char *, timestruc_t *);
-static void timestruc_to_timeval(timestruc_t *, struct timeval *);
+static void parse_datetime(char *, timespec_t *);
+static void parse_time(char *, timespec_t *);
+static void parse_timespec(char *, timespec_t *);
 
 int
 main(int argc, char *argv[])
@@ -72,10 +73,13 @@ main(int argc, char *argv[])
 	int		usecurrenttime = 1;
 	int		timespecified;
 	int		optc;
-	int		fd;
+	int		fd = -1;
+	mode_t		cmode =
+	    (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
 	struct stat	stbuf;
 	struct stat	prstbuf;
-	struct timeval	times[2];
+	timespec_t	times[2];
+	timespec_t	*tsp;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -84,10 +88,10 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	myname = basename(argv[0]);
-	if (strcmp(myname, "settime") == NULL) {
+	if (strcmp(myname, "settime") == 0) {
 		cflag++;
 		stflag++;
-		while ((optc = getopt(argc, argv, "f:")) != EOF)
+		while ((optc = getopt(argc, argv, "f:")) != EOF) {
 			switch (optc) {
 			case 'f':
 				rflag++;
@@ -101,13 +105,13 @@ main(int argc, char *argv[])
 			case '?':
 				usage(stflag);
 				break;
-			};
-	} else
-		while ((optc = getopt(argc, argv, "acfmr:t:")) != EOF)
+			}
+		}
+	} else {
+		while ((optc = getopt(argc, argv, "acfmr:d:t:")) != EOF) {
 			switch (optc) {
 			case 'a':
 				aflag++;
-				usecurrenttime = 0;
 				break;
 			case 'c':
 				cflag++;
@@ -116,7 +120,6 @@ main(int argc, char *argv[])
 				break;
 			case 'm':
 				mflag++;
-				usecurrenttime = 0;
 				break;
 			case 'r':	/* same as settime's -f option */
 				rflag++;
@@ -126,6 +129,12 @@ main(int argc, char *argv[])
 					perror(optarg);
 					return (2);
 				}
+				break;
+			case 'd':
+				tflag++;
+				usecurrenttime = 0;
+				parse_datetime(optarg, &prstbuf.st_mtim);
+				prstbuf.st_atim = prstbuf.st_mtim;
 				break;
 			case 't':
 				tflag++;
@@ -137,6 +146,8 @@ main(int argc, char *argv[])
 				usage(stflag);
 				break;
 			}
+		}
+	}
 
 	argc -= optind;
 	argv += optind;
@@ -148,34 +159,27 @@ main(int argc, char *argv[])
 		aflag = 1;
 		mflag = 1;
 	}
+	if ((aflag && !mflag) || (mflag && !aflag))
+		usecurrenttime = 0;
 
 	/*
-	 * If either -r or -t has been specified,
+	 * If -r, -t or -d has been specified,
 	 * use the specified time.
 	 */
-	timespecified = rflag || tflag;
+	timespecified = (rflag | tflag);
 
-	if (timespecified == 0) {
-		if (argc >= 2 && isnumber(*argv) && (strlen(*argv) == 8 ||
-		    strlen(*argv) == 10)) {
-			/*
-			 * time is specified as an operand.
-			 * use it.
-			 */
-			parse_datetime(*argv++, &prstbuf.st_mtim);
-			prstbuf.st_atim = prstbuf.st_mtim;
-			usecurrenttime = 0;
-			timespecified = 1;
-			argc--;
-		} else {
-			/*
-			 * no time information is specified.
-			 * use the current time.
-			 */
-			(void) gettimeofday(times, NULL);
-			times[1] = times[0];
-		}
+	if (timespecified == 0 && argc >= 2 && isnumber(*argv) &&
+	    (strlen(*argv) == 8 || strlen(*argv) == 10)) {
+		/*
+		 * time is specified as an operand; use it.
+		 */
+		parse_timespec(*argv++, &prstbuf.st_mtim);
+		prstbuf.st_atim = prstbuf.st_mtim;
+		usecurrenttime = 0;
+		timespecified = 1;
+		argc--;
 	}
+
 	for (c = 0; c < argc; c++) {
 		if (stat(argv[c], &stbuf)) {
 			/*
@@ -184,25 +188,11 @@ main(int argc, char *argv[])
 			 * can clobber the contents of an existing file.
 			 */
 			if (errno == EOVERFLOW) {
-				if (aflag == 0 || mflag == 0) {
-					(void) fprintf(stderr,
-					    gettext("%s: %s: current timestamps"
-					    " unavailable:\n%s"),
-					    myname, argv[c], aflag > 0 ?
-					    gettext("consider trying again"
-					    " without -a option\n") :
-					    gettext("consider trying again"
-					    " without -m option\n"));
-					status++;
-					continue;
-				}
 				/*
-				 * Since we have EOVERFLOW, we know the file
-				 * exists. Since both atime and mtime are being
-				 * changed to known values, we don't care that
-				 * st_atime and st_mtime from the file aren't
-				 * available.
+				 * Since we have EOVERFLOW,
+				 * we know the file exists.
 				 */
+				/* EMPTY */;
 			} else if (errno != ENOENT) {
 				(void) fprintf(stderr,
 				    gettext("%s: cannot stat %s: %s\n"),
@@ -211,55 +201,53 @@ main(int argc, char *argv[])
 				continue;
 			} else if (cflag) {
 				continue;
-			} else if ((fd = creat(argv[c],
-			    (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)))
-			    < 0) {
+			} else if ((fd = creat(argv[c], cmode)) < 0) {
 				(void) fprintf(stderr,
 				    gettext("%s: cannot create %s: %s\n"),
 				    myname, argv[c], strerror(errno));
 				status++;
 				continue;
+			}
+		}
+
+		if (usecurrenttime) {
+			tsp = NULL;
+		} else {
+			if (mflag == 0) {
+				/* Keep the mtime of the file */
+				times[1].tv_nsec = UTIME_OMIT;
+			} else if (timespecified) {
+				/* Set the specified time */
+				times[1] = prstbuf.st_mtim;
 			} else {
-				(void) close(fd);
-				if (stat(argv[c], &stbuf)) {
-					(void) fprintf(stderr,
-					    gettext("%s: cannot stat %s: %s\n"),
-					    myname, argv[c], strerror(errno));
-					status++;
-					continue;
-				}
+				/* Otherwise, use the current time */
+				times[1].tv_nsec = UTIME_NOW;
 			}
-		}
 
-		if (mflag == 0) {
-			/* Keep the mtime of the file */
-			timestruc_to_timeval(&stbuf.st_mtim, times + 1);
-		} else {
-			if (timespecified) {
+			if (aflag == 0) {
+				/* Keep the atime of the file */
+				times[0].tv_nsec = UTIME_OMIT;
+			} else if (timespecified) {
 				/* Set the specified time */
-				timestruc_to_timeval(&prstbuf.st_mtim,
-				    times + 1);
+				times[0] = prstbuf.st_atim;
+			} else {
+				/* Otherwise, use the current time */
+				times[0].tv_nsec = UTIME_NOW;
 			}
-			/* Otherwise, use the current time by gettimeofday */
+
+			tsp = times;
 		}
 
-		if (aflag == 0) {
-			/* Keep the atime of the file */
-			timestruc_to_timeval(&stbuf.st_atim, times);
-		} else {
-			if (timespecified) {
-				/* Set the specified time */
-				timestruc_to_timeval(&prstbuf.st_atim, times);
-			}
-			/* Otherwise, use the current time by gettimeofday */
-		}
-
-		if (utimes(argv[c], (usecurrenttime) ? NULL : times)) {
+		if ((fd >= 0 && futimens(fd, tsp) != 0) ||
+		    utimensat(AT_FDCWD, argv[c], tsp, 0) != 0) {
 			(void) fprintf(stderr,
 			    gettext("%s: cannot change times on %s: %s\n"),
 			    myname, argv[c], strerror(errno));
 			status++;
-			continue;
+		}
+		if (fd >= 0) {
+			(void) close(fd);
+			fd = -1;
 		}
 	}
 	return (status);
@@ -276,9 +264,128 @@ isnumber(char *s)
 	return (1);
 }
 
+static void
+parse_datetime(char *t, timespec_t *ts)
+{
+	char		date[64];
+	char		*year;
+	char		*month;
+	char		*day;
+	char		*hour;
+	char		*minute;
+	char		*second;
+	char		*fraction;
+	int		utc = 0;
+	char		*p;
+	time_t		when;
+	int		nanoseconds;
+	struct tm	tm;
+
+	/*
+	 * The date string has the format (defined by the touch(1) spec):
+	 *	YYYY-MM-DDThh:mm:SS[.frac][tz]
+	 *	YYYY-MM-DDThh:mm:SS[,frac][tz]
+	 * T is either the literal 'T' or is a space character.
+	 * tz is either empty (local time) or the literal 'Z' (UTC).
+	 * All other fields are strings of digits.
+	 */
+
+	/*
+	 * Make a copy of the date string so it can be tokenized.
+	 */
+	if (strlcpy(date, t, sizeof (date)) >= sizeof (date))
+		touchabort(BADTIME);
+
+	/* deal with the optional trailing 'Z' first */
+	p = date + strlen(date) - 1;
+	if (*p == 'Z') {
+		utc = 1;
+		*p = '\0';
+	}
+
+	/* break out the component tokens */
+	p = date;
+	year = strsep(&p, "-");
+	month = strsep(&p, "-");
+	day = strsep(&p, "T ");
+	hour = strsep(&p, ":");
+	minute = strsep(&p, ":");
+	second = strsep(&p, ".,");
+	fraction = p;
+
+	/* verify the component tokens */
+	if (year == NULL || strlen(year) < 4 || !isnumber(year) ||
+	    month == NULL || strlen(month) != 2 || !isnumber(month) ||
+	    day == NULL || strlen(day) != 2 || !isnumber(day) ||
+	    hour == NULL || strlen(hour) != 2 || !isnumber(hour) ||
+	    minute == NULL || strlen(minute) != 2 || !isnumber(minute) ||
+	    second == NULL || strlen(second) != 2 || !isnumber(second) ||
+	    (fraction != NULL && (*fraction == '\0' || !isnumber(fraction))))
+		touchabort(BADTIME);
+
+	(void) memset(&tm, 0, sizeof (struct tm));
+
+	tm.tm_year = atoi(year) - 1900;
+	tm.tm_mon = atoi(month) - 1;
+	tm.tm_mday = atoi(day);
+	tm.tm_hour = atoi(hour);
+	tm.tm_min = atoi(minute);
+	tm.tm_sec = atoi(second);
+	if (utc) {
+		(void) setenv("TZ", "GMT0", 1);
+		tzset();
+	}
+
+	errno = 0;
+	if ((when = mktime(&tm)) == -1 && errno != 0)
+		touchabort(BADTIME);
+	if (tm.tm_isdst)
+		when -= (timezone - altzone);
+
+	if (fraction == NULL) {
+		nanoseconds = 0;
+	} else {
+		/* truncate beyond 9 digits (nanoseconds) */
+		if (strlen(fraction) > 9)
+			fraction[9] = '\0';
+		nanoseconds = atoi(fraction);
+
+		switch (strlen(fraction)) {
+		case 1:
+			nanoseconds *= 100000000;
+			break;
+		case 2:
+			nanoseconds *= 10000000;
+			break;
+		case 3:
+			nanoseconds *= 1000000;
+			break;
+		case 4:
+			nanoseconds *= 100000;
+			break;
+		case 5:
+			nanoseconds *= 10000;
+			break;
+		case 6:
+			nanoseconds *= 1000;
+			break;
+		case 7:
+			nanoseconds *= 100;
+			break;
+		case 8:
+			nanoseconds *= 10;
+			break;
+		case 9:
+			break;
+		}
+	}
+
+	ts->tv_sec = when;
+	ts->tv_nsec = nanoseconds;
+}
 
 static void
-parse_time(char *t, timestruc_t *ts)
+parse_time(char *t, timespec_t *ts)
 {
 	int		century = 0;
 	int		seconds = 0;
@@ -339,7 +446,7 @@ parse_time(char *t, timestruc_t *ts)
 }
 
 static void
-parse_datetime(char *t, timestruc_t *ts)
+parse_timespec(char *t, timespec_t *ts)
 {
 	time_t		when;
 	struct tm	tm;
@@ -402,24 +509,17 @@ touchabort(const char *message)
 static void
 usage(const int settime)
 {
-	if (settime)
+	if (settime) {
 		(void) fprintf(stderr, gettext(
 		    "usage: %s [-f file] [mmddhhmm[yy]] file...\n"), myname);
-	else
-		(void) fprintf(stderr, gettext(
-		    "usage: %s [-acm] [-r ref_file] file...\n"
-		    "       %s [-acm] [MMDDhhmm[yy]] file...\n"
-		    "       %s [-acm] [-t [[CC]YY]MMDDhhmm[.SS]] file...\n"),
-		    myname, myname, myname);
+		exit(2);
+	}
+	(void) fprintf(stderr, gettext(
+	    "usage: %s [-acm] [-r ref_file] file...\n"
+	    "       %s [-acm] [-t [[CC]YY]MMDDhhmm[.SS]] file...\n"
+	    "       %s [-acm] [-d YYYY-MM-DDThh:mm:SS[.frac][Z]] file...\n"
+	    "       %s [-acm] [-d YYYY-MM-DDThh:mm:SS[,frac][Z]] file...\n"
+	    "       %s [-acm] [MMDDhhmm[yy]] file...\n"),
+	    myname, myname, myname, myname, myname);
 	exit(2);
-}
-
-/*
- * nanoseconds are rounded off to microseconds by flooring.
- */
-static void
-timestruc_to_timeval(timestruc_t *ts, struct timeval *tv)
-{
-	tv->tv_sec = ts->tv_sec;
-	tv->tv_usec = ts->tv_nsec / 1000;
 }

@@ -96,6 +96,7 @@ getloadavg		105
 nfs			106
 waitsys			107
 sigsendsys		108
+utimesys		110
 sigresend		111
 priocntlsys		112
 pathconf		113

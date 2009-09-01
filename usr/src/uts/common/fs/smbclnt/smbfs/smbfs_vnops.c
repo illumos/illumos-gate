@@ -3018,6 +3018,11 @@ smbfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 		}
 		return (EINVAL);
 
+	case _PC_TIMESTAMP_RESOLUTION:
+		/* nanosecond timestamp resolution */
+		*valp = 1L;
+		break;
+
 	default:
 		return (fs_pathconf(vp, cmd, valp, cr, ct));
 	}

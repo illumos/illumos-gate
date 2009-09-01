@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
 
 #ifndef _SYS_STAT_H
 #define	_SYS_STAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
@@ -473,6 +471,14 @@ struct stat64_32 {
 
 #endif	/* __i386 || (__i386_COMPAT && _KERNEL) */
 
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+	/* || defined(_XPG7) */
+/* for use with futimens() and utimensat() */
+#define	UTIME_NOW	-1L
+#define	UTIME_OMIT	-2L
+#endif	/* defined(__EXTENSIONS__) ... */
+
 #if !defined(_KERNEL) || defined(_BOOT)
 
 #if defined(__STDC__)
@@ -499,6 +505,13 @@ extern int fstatat64(int, const char *, struct stat64 *, int);
 #endif /* defined (_ATFILE_SOURCE) */
 #endif
 
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+	/* || defined(_XPG7) */
+extern int futimens(int, const struct timespec[2]);
+extern int utimensat(int, const char *, const struct timespec[2], int);
+#endif	/* defined(__EXTENSIONS__) ... */
+
 #else /* !__STDC__ */
 
 #if !defined(__XOPEN_OR_POSIX) || (_POSIX_C_SOURCE > 2) || \
@@ -522,6 +535,13 @@ extern int lstat64();
 extern int fstatat64();
 #endif /* defined (_ATFILE_SOURCE) */
 #endif
+
+#if defined(__EXTENSIONS__) || \
+	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
+	/* || defined(_XPG7) */
+extern int futimens();
+extern int utimensat();
+#endif	/* defined(__EXTENSIONS__) ... */
 
 #endif /* defined(__STDC__) */
 

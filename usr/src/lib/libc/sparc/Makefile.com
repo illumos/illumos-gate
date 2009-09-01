@@ -314,8 +314,6 @@ COMSYSOBJS=			\
 	umask.o			\
 	umount2.o		\
 	unlink.o		\
-	utime.o			\
-	utimes.o		\
 	utssys.o		\
 	uucopy.o		\
 	vhangup.o		\
@@ -894,6 +892,7 @@ PORTSYS=			\
 	time_util.o		\
 	ucontext.o		\
 	ustat.o			\
+	utimesys.o		\
 	zone.o
 
 PORTREGEX=			\

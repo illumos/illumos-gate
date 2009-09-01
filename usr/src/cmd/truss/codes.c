@@ -250,7 +250,7 @@ const char *const PATHCONFname[] = {
 	"_PC_SATTR_ENABLED",		/* 23 */
 	"_PC_SATTR_EXISTS",		/* 24 */
 	"_PC_ACCESS_FILTERING",		/* 25 */
-	NULL,				/* 26 */
+	"_PC_TIMESTAMP_RESOLUTION",	/* 26 */
 	NULL,				/* 27 */
 	NULL,				/* 28 */
 	NULL,				/* 29 */

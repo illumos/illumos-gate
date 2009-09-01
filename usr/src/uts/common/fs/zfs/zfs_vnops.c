@@ -4491,6 +4491,11 @@ zfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 		*valp = (ulong_t)SPA_MINBLOCKSIZE;
 		return (0);
 
+	case _PC_TIMESTAMP_RESOLUTION:
+		/* nanosecond timestamp resolution */
+		*valp = 1L;
+		return (0);
+
 	default:
 		return (fs_pathconf(vp, cmd, valp, cr, ct));
 	}

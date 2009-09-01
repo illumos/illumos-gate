@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Vnode operations for the High Sierra filesystem
@@ -2417,8 +2416,16 @@ hsfs_pathconf(struct vnode *vp,
 		*valp = 33;	/* Without multi extent support: 4 GB - 2k */
 		break;
 
+	case _PC_TIMESTAMP_RESOLUTION:
+		/*
+		 * HSFS keeps, at best, 1/100 second timestamp resolution.
+		 */
+		*valp = 10000000L;
+		break;
+
 	default:
 		error = fs_pathconf(vp, cmd, valp, cr, ct);
+		break;
 	}
 
 	return (error);

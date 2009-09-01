@@ -214,24 +214,25 @@ extern "C" {
 #define	SYS_fsat	76
 	/*
 	 * subcodes:
-	 *	openat(...)	:: fsat(0, ...)
-	 *	openat64(...)	:: fsat(1, ...)
-	 *	fstatat64(...)	:: fsat(2, ...)
-	 *	fstatat(...)	:: fsat(3, ...)
-	 *	renameat(...)	:: fsat(4, ...)
-	 *	fchownat(...)	:: fsat(5, ...)
-	 *	unlinkat(...)	:: fsat(6, ...)
-	 *	futimesat(...)	:: fsat(7, ...)
-	 *	faccessat(...)	:: fsat(8, ...)
+	 *	openat(...)		:: fsat(0, ...)
+	 *	openat64(...)		:: fsat(1, ...)
+	 *	fstatat64(...)		:: fsat(2, ...)
+	 *	fstatat(...)		:: fsat(3, ...)
+	 *	fchownat(...)		:: fsat(4, ...)
+	 *	unlinkat(...)		:: fsat(5, ...)
+	 *	futimesat(...)		:: fsat(6, ...)
+	 *	renameat(...)		:: fsat(7, ...)
+	 *	faccessat(...)		:: fsat(8, ...)
+	 *	openattrdirat(...)	:: fsat(9, ...)
 	 */
 #define	SYS_lwp_park	77
 	/*
 	 * subcodes:
-	 * 	_lwp_park(timespec_t *, lwpid_t) :: syslwp_park(0, ...)
-	 * 	_lwp_unpark(lwpid_t, int)	 :: syslwp_park(1, ...)
-	 * 	_lwp_unpark_all(lwpid_t *, int)  :: syslwp_park(2, ...)
-	 *	_lwp_unpark_cancel(lwpid_t *, int)  :: syslwp_park(3, ...)
-	 *	_lwp_set_park(lwpid_t *, int)   :: syslwp_park(4, ...)
+	 *	_lwp_park(timespec_t *, lwpid_t)	:: syslwp_park(0, ...)
+	 *	_lwp_unpark(lwpid_t, int)		:: syslwp_park(1, ...)
+	 *	_lwp_unpark_all(lwpid_t *, int)		:: syslwp_park(2, ...)
+	 *	_lwp_unpark_cancel(lwpid_t *, int)	:: syslwp_park(3, ...)
+	 *	_lwp_set_park(lwpid_t *, int)		:: syslwp_park(4, ...)
 	 */
 #define	SYS_sendfilev	78
 	/*
@@ -302,6 +303,12 @@ extern "C" {
 #define	SYS_waitsys	SYS_waitid	/* historical */
 #define	SYS_sigsendsys	108
 #define	SYS_hrtsys	109
+#define	SYS_utimesys	110
+	/*
+	 * subcodes:
+	 *	futimens(...)	:: syscall(110, 0, ...)
+	 *	utimensat(...)	:: syscall(110, 1, ...)
+	 */
 #define	SYS_sigresend	111
 #define	SYS_priocntlsys	112
 #define	SYS_pathconf	113
