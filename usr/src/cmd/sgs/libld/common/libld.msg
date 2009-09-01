@@ -820,6 +820,7 @@
 			 object (-dn, -r, --relocatable)"
 @ MSG_MARG_ST_INCOMP	"%s is incompatible with building a static \
 			 object (-dn, -r, --relocatable)"
+@ MSG_MARG_ST_ONLYAVL	"%s is only available when building a shared object"
 @ MSG_ARG_INCOMP	"option %s and %s are incompatible"
 @ MSG_MARG_INCOMP	"%s and %s are incompatible"
 @ MSG_ARG_MTONCE	"option %s appears more than once, first setting taken"
@@ -1011,6 +1012,8 @@
 			 when building a dynamic executable"
 @ MSG_MAP_NOEXVLSZ	"%s: %lld: value and size attributes are incompatible \
 			 with extern or parent symbols"
+@ MSG_MAP_FLTR_ONLYAVL	"%s: %lld: symbol filtering is only available when \
+			 building a shared object"
 
 @ MSG_MAP_SEGSAME	"segments `%s' and `%s' have the same assigned \
 			 virtual address"

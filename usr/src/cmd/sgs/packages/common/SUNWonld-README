@@ -209,6 +209,7 @@ xxxxxxx ia64 common code putback
 4287364 ld.so.1 runtime configuration cleanup
 4289573 disable linking of ia64 binaries for Solaris8
 4293966 crle(1)'s default directories should be supplied
+--------------------------------------------------------------------------------
 
 ------------------------------------
 Solaris 8 600 (1st Q-update - s28u1)
@@ -406,7 +407,6 @@ All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.8_sparc		patch 109147-12
 	Solaris/SunOS 5.8_x86		patch 109148-12
 --------------------------------------------------------------------------------
-
 
 ---------
 Solaris 9
@@ -1279,9 +1279,9 @@ All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.10_x86		patch TXXXXXX-XX
 --------------------------------------------------------------------------------
 
---------------
-Solaris Nevada
---------------
+--------------------------------------------
+Solaris Nevada (OpenSolaris 2008.05, snv_86)
+--------------------------------------------
 Bugid   Risk Synopsis
 ================================================================================
 6409350 BrandZ project integration into Solaris (link-editor components only)
@@ -1396,6 +1396,13 @@ Bugid   Risk Synopsis
 6357282 ldd should recognize PARENT and EXTERN symbols (D)
 	PSARC/2008/148 new ldd(1) -p option
 6672394 ldd(1) unused dependency processing is tricked by relocations errors
+--------------------------------------------------------------------------------
+
+---------------------------------------------
+Solaris Nevada (OpenSolaris 2008.11, snv_101)
+---------------------------------------------
+Bugid   Risk Synopsis
+================================================================================
 6671255 link-editor should support cross linking (D)
 	PSARC/2008/179 cross link-editor
 6674666 elfedit dyn:posflag1 needs option to locate element via NEEDED item
@@ -1440,6 +1447,14 @@ Bugid   Risk Synopsis
 	PSARC/2008/603 ELF objects to adopt GNU-style Versym indexes
 6752728 link-editor can enter UNDEF symbols in symbol sort sections
 6756472 AOUT search path pruning (D)
+--------------------------------------------------------------------------------
+
+---------------------------------------------
+Solaris Nevada (OpenSolaris 2009.06, snv_111)
+---------------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+
 6754965 introduce the SF1_SUNW_ADDR32 bit in software capabilities (D)
 	(link-editor components only)
 	PSARC/2008/622 32-bit Address Restriction Software Capabilities Flag
@@ -1473,6 +1488,13 @@ Bugid   Risk Synopsis
 	pfinstall does it again.
 6807050 GNU linkonce sections can create duplicate and incompatible
 	eh_frame FDE entries
+--------------------------------------------------------------------------------
+
+--------------
+Solaris Nevada
+--------------
+Bugid   Risk Synopsis
+================================================================================
 6813909 generalize eh_frame support to non-amd64 platforms
 6801536 ld: mapfile processing oddities unveiled through mmapobj(2) observations
 6802452 libelf shouldn't use MS_SYNC
@@ -1507,3 +1529,4 @@ Bugid   Risk Synopsis
 6856173 streams core dumps when compiled in 64bit with a very large static
 	array size
 6834197 ld pukes when given an empty plate
+6516644 per-symbol filtering shouldn't be allowed in executables

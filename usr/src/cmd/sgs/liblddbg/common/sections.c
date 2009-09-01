@@ -378,13 +378,15 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 			const char		*msg;
 
 			/*
-			 * An output section with sorted input sections
-			 * can also have a large number of unsorted sections.
-			 * Skip these without comment.
+			 * An output segment that requires ordering might have
+			 * as little as two sorted input sections.  For example,
+			 * the crt's can provide a SHN_BEGIN and SHN_AFTER, and
+			 * only these two sections must be processed.  Thus, if
+			 * a input section is unordered, move on.  Diagnosing
+			 * any unsorted section can produce way too much noise.
 			 */
-			if ((isp1->is_flags & FLG_IS_ORDERED) == 0) {
+			if ((isp1->is_flags & FLG_IS_ORDERED) == 0)
 				continue;
-			}
 
 			if (isp1->is_shdr->sh_flags & SHF_ORDERED) {
 				link = isp1->is_shdr->sh_info;

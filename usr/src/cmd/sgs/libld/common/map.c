@@ -1466,6 +1466,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				    MSG_INTL(MSG_MAP_UNKSYMSCO), mapfile,
 				    EC_XWORD(Line_num), _name);
 				errcnt++;
+				break;
 			}
 			continue;
 
@@ -1604,26 +1605,47 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    (FLG_OF1_NDIRECT | FLG_OF1_NGLBDIR);
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_FILTER)) == 0) {
+					/* BEGIN CSTYLED */
+					if (!(ofl->ofl_flags &
+					    FLG_OF_SHAROBJ)) {
+					    eprintf(ofl->ofl_lml, ERR_FATAL,
+						MSG_INTL(MSG_MAP_FLTR_ONLYAVL),
+						mapfile, EC_XWORD(Line_num));
+					    errcnt++;
+					    break;
+					}
+					/* END CSTYLED */
 					dftflag = filter = FLG_SY_STDFLTR;
 					sym_flags |= FLG_SY_STDFLTR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					continue;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_AUXILIARY)) == 0) {
+					/* BEGIN CSTYLED */
+					if (!(ofl->ofl_flags &
+					    FLG_OF_SHAROBJ)) {
+					    eprintf(ofl->ofl_lml, ERR_FATAL,
+						MSG_INTL(MSG_MAP_FLTR_ONLYAVL),
+						mapfile, EC_XWORD(Line_num));
+					    errcnt++;
+					    break;
+					}
+					/* END CSTYLED */
 					dftflag = filter = FLG_SY_AUXFLTR;
 					sym_flags |= FLG_SY_AUXFLTR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					continue;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_INTERPOSE)) == 0) {
+					/* BEGIN CSTYLED */
 					if (!(ofl->ofl_flags & FLG_OF_EXEC)) {
-						eprintf(ofl->ofl_lml, ERR_FATAL,
-						    MSG_INTL(MSG_MAP_NOINTPOSE),
-						    mapfile,
-						    EC_XWORD(Line_num));
-						errcnt++;
-						continue;
+					    eprintf(ofl->ofl_lml, ERR_FATAL,
+						MSG_INTL(MSG_MAP_NOINTPOSE),
+						mapfile, EC_XWORD(Line_num));
+					    errcnt++;
+					    break;
 					}
+					/* END CSTYLED */
 					sym_flags |= FLG_SY_INTPOSE;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					ofl->ofl_dtflags_1 |= DF_1_SYMINTPOSE;

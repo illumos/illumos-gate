@@ -335,6 +335,19 @@ check_flags(Ofl_desc * ofl, int argc)
 		ofl->ofl_flags |= FLG_OF_FATAL;
 	}
 
+	if (ofl->ofl_filtees && !Gflag) {
+		if (ofl->ofl_flags & FLG_OF_AUX) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MARG_ST_ONLYAVL),
+			    MSG_INTL(MSG_MARG_FILTER_AUX));
+		} else {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_MARG_ST_ONLYAVL),
+			    MSG_INTL(MSG_MARG_FILTER));
+		}
+		ofl->ofl_flags |= FLG_OF_FATAL;
+	}
+
 	if (dflag != SET_FALSE) {
 		/*
 		 * Set -Bdynamic on by default, setting is rechecked as input
@@ -453,19 +466,6 @@ check_flags(Ofl_desc * ofl, int argc)
 				    MSG_ORIG(MSG_ARG_BTRANS));
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
-			if (ofl->ofl_filtees) {
-				if (ofl->ofl_flags & FLG_OF_AUX) {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MARG_DY_INCOMP),
-					    MSG_INTL(MSG_MARG_FILTER_AUX));
-				} else {
-					eprintf(ofl->ofl_lml, ERR_FATAL,
-					    MSG_INTL(MSG_MARG_DY_INCOMP),
-					    MSG_INTL(MSG_MARG_FILTER));
-				}
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
-
 		} else if (!rflag) {
 			/*
 			 * Shared library.
@@ -542,18 +542,6 @@ check_flags(Ofl_desc * ofl, int argc)
 		if (ofl->ofl_config) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_ARG_ST_INCOMP), MSG_ORIG(MSG_ARG_C));
-			ofl->ofl_flags |= FLG_OF_FATAL;
-		}
-		if (ofl->ofl_filtees) {
-			if (ofl->ofl_flags & FLG_OF_AUX) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MARG_ST_INCOMP),
-				    MSG_INTL(MSG_MARG_FILTER_AUX));
-			} else {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MARG_ST_INCOMP),
-				    MSG_INTL(MSG_MARG_FILTER));
-			}
 			ofl->ofl_flags |= FLG_OF_FATAL;
 		}
 		if (ztflag) {
