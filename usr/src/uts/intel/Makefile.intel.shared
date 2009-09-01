@@ -203,6 +203,7 @@ DRV_KMODS	+= audiocmi
 DRV_KMODS	+= audioens
 DRV_KMODS	+= audiohd
 DRV_KMODS	+= audioixp
+DRV_KMODS	+= audiols
 DRV_KMODS	+= audiopci
 DRV_KMODS	+= audiots
 DRV_KMODS	+= audiovia823x

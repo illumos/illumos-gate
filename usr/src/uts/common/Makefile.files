@@ -440,6 +440,8 @@ AUDIOHD_OBJS +=	audiohd.o
 
 AUDIOIXP_OBJS += audioixp.o
 
+AUDIOLS_OBJS += audiols.o
+
 AUDIOPCI_OBJS += audiopci.o
 
 AUDIOTS_OBJS +=	audiots.o

@@ -190,6 +190,7 @@ COMMON_SUBDIRS= \
 	SUNWaudd  \
 	SUNWaudf  \
 	SUNWaudh  \
+	SUNWaudiols \
 	SUNWaudit \
 	SUNWatfsr  \
 	SUNWatfsu  \
