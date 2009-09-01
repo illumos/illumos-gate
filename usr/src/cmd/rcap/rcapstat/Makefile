@@ -49,9 +49,9 @@ LDFLAGS				+= $(MAPFILE.NGB:%=-M%)
 LINTFLAGS			+= $(LDLIBS) -mnu
 
 PROG =				rcapstat
-OBJS =				$(SRCS:%.c=%.o) rcapd_conf.o $(STAT_COMMON_OBJS)
+OBJS =				$(SRCS:%.c=%.o) rcapd_conf.o
 
-POFILES =			$(OBJS:%.o=%.po) $(STAT_COMMON_OBJS:%.o=%.po)
+POFILES =			$(OBJS:%.o=%.po)
 POFILE =			p$(PROG).po
 
 CLOBBERFILES += 		rcapd_conf.c $(POFILES) $(POFILE)
@@ -63,8 +63,8 @@ all: $(PROG) $(MAPFILE.NGB)
 
 include ../Makefile.com
 
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+$(PROG): $(OBJS) $(STAT_COMMON_OBJS)
+	$(LINK.c) $(OBJS) $(STAT_COMMON_OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 %.o : $(STATCOMMONDIR)/%.c
@@ -75,12 +75,8 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-%.po: $(STATCOMMONDIR)/%.c
-	$(COMPILE.cpp) $< > $<.i
-	$(BUILD.po)
-
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
 
 lint:
 	$(LINT.c) $(LINTSRCS)

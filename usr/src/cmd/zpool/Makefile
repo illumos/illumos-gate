@@ -35,9 +35,7 @@ STATCOMMONDIR = $(SRC)/cmd/stat/common
 
 STAT_COMMON_OBJS = timestamp.o
 STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
-STAT_COMMON_POFILES = $(STAT_COMMON_OBJS:%.o=%.po)
 SRCS += $(STAT_COMMON_SRCS)
-POFILES += $(STAT_COMMON_POFILES)
 
 LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem
 
@@ -70,12 +68,8 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-%.po: $(STATCOMMONDIR)/%.c
-	$(COMPILE.cpp) $< > $<.i
-	$(BUILD.po)
-
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
 
 lint:	lint_SRCS
 
