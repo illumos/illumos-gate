@@ -2959,7 +2959,7 @@ ztest_fzap(ztest_args_t *za)
 	int i, error;
 	char osname[MAXNAMELEN];
 	char *name = "aaa";
-	char entname[20];
+	char entname[MAXNAMELEN];
 
 	dmu_objset_name(os, osname);
 
@@ -2998,7 +2998,7 @@ ztest_fzap(ztest_args_t *za)
 	 * split.
 	 */
 	for (i = 0; i < 2050; i++) {
-		(void) sprintf(entname, "%s-%d", name, i);
+		(void) snprintf(entname, sizeof (entname), "%s-%d", name, i);
 		value = i;
 
 		tx = dmu_tx_create(os);
