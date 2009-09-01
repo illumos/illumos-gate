@@ -1053,10 +1053,13 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	if (desc_count == 0) {
 		E1000G_DEBUG_STAT(tx_ring->stat_recycle_none);
 		/*
-		 * If the packet hasn't been sent out for seconds,
+		 * If the packet hasn't been sent out for seconds and
+		 * the transmitter is not under paused flowctrl condition,
 		 * the transmitter is considered to be stalled.
 		 */
-		if (delta > Adapter->stall_threshold) {
+		if ((delta > Adapter->stall_threshold) &&
+		    !(E1000_READ_REG(&Adapter->shared,
+		    E1000_STATUS) & E1000_STATUS_TXOFF)) {
 			Adapter->stall_flag = B_TRUE;
 		}
 		return (0);

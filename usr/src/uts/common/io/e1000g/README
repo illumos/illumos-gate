@@ -682,3 +682,9 @@ Notes on packaging:
 ====
   This version has the following fix:
    6848586 rw_enter()/rw_exit() could be called on uninitialized rw lock
+
+5.3.12
+====
+   This version has the following fix:
+    6846262 T2000 fma shows fault.io.pciex.device-interr in snv_115
+    6870404 e1000g_reset can call e1000g_start after releasing dma resources

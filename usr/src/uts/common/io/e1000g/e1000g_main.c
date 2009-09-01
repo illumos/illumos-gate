@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.11";
+static char e1000g_version[] = "Driver Ver. 5.3.12";
 
 /*
  * Proto types for DDI entry points
@@ -1964,6 +1964,11 @@ e1000g_reset_adapter(struct e1000g *Adapter)
 	stop_82547_timer(Adapter->tx_ring);
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
+
+	if (!(Adapter->e1000g_state & E1000G_STARTED)) {
+		rw_exit(&Adapter->chip_lock);
+		return (B_TRUE);
+	}
 
 	e1000g_stop(Adapter, B_FALSE);
 
