@@ -39,6 +39,7 @@
 typedef struct sensor_fault {
 	struct sensor_fault	*sf_next;
 	char			*sf_fru;
+	uint32_t		sf_num_fails;
 	boolean_t		sf_last_faulted;
 	boolean_t		sf_faulted;
 	boolean_t		sf_unknown;
@@ -51,6 +52,11 @@ typedef struct sensor_transport {
 	id_t		st_timer;
 	sensor_fault_t	*st_faults;
 	boolean_t	st_first;
+	/*
+	 * The number of consecutive sensor readings indicating failure that
+	 * we'll tolerate before sending an ereport.
+	 */
+	uint32_t	st_tolerance;
 } sensor_transport_t;
 
 typedef struct st_stats {
@@ -73,7 +79,7 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 	const char *name = topo_node_name(node);
 	nvlist_t *nvl, *props, *rsrc, *fru;
 	char *fmri;
-	int err;
+	int err, ret;
 	int32_t last_source, source = -1;
 	boolean_t nonrecov, faulted, predictive, source_diff;
 	nvpair_t *nvp;
@@ -84,21 +90,40 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 	if (strcmp(name, FAN) != 0 && strcmp(name, PSU) != 0)
 		return (0);
 
+	if (topo_node_resource(node, &rsrc, NULL) != 0) {
+		st_stats.st_bad_fmri.fmds_value.ui64++;
+		return (0);
+	}
+
+	/*
+	 * If the resource isn't present, don't bother invoking the sensor
+	 * failure method.  It may be that the sensors aren't part of the same
+	 * physical FRU and will report failure if the FRU is no longer there.
+	 */
+	if ((ret = topo_fmri_present(thp, rsrc, &err)) < 0) {
+		fmd_hdl_debug(hdl, "topo_fmri_present() failed for %s=%d",
+		    name, topo_node_instance(node));
+		nvlist_free(rsrc);
+		return (0);
+	}
+
+	if (!ret) {
+		fmd_hdl_debug(hdl, "%s=%d is not present, ignoring",
+		    name, topo_node_instance(node));
+		nvlist_free(rsrc);
+		return (0);
+	}
+
 	if (topo_method_invoke(node, TOPO_METH_SENSOR_FAILURE,
 	    TOPO_METH_SENSOR_FAILURE_VERSION, NULL, &nvl, &err) != 0) {
 		if (err == ETOPO_METHOD_NOTSUP) {
 			fmd_hdl_debug(hdl, "Method %s not supported on %s=%d",
 			    TOPO_METH_SENSOR_FAILURE, name,
 			    topo_node_instance(node));
+			nvlist_free(rsrc);
 			return (0);
 		}
 		nvl = NULL;
-	}
-
-	if (topo_node_resource(node, &rsrc, NULL) != 0) {
-		st_stats.st_bad_fmri.fmds_value.ui64++;
-		nvlist_free(nvl);
-		return (0);
 	}
 
 	if (topo_node_fru(node, &fru, NULL, NULL) != 0) {
@@ -196,6 +221,9 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 		}
 	}
 
+	if (faulted)
+		sfp->sf_num_fails++;
+
 	if (nvl == NULL)
 		sfp->sf_unknown = B_TRUE;
 
@@ -207,7 +235,8 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 		 * to uniquely identify faulty resources instead and post one
 		 * per resource, even if they share the same FRU.
 		 */
-		if (!sfp->sf_last_faulted) {
+		if (!sfp->sf_last_faulted &&
+		    (sfp->sf_num_fails > stp->st_tolerance)) {
 			ena = fmd_event_ena_create(hdl);
 			event = fmd_nvl_alloc(hdl, FMD_SLEEP);
 
@@ -274,7 +303,8 @@ st_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 	 */
 	for (sfp = stp->st_faults; sfp != NULL; sfp = sfp->sf_next) {
 		sfp->sf_unknown = B_FALSE;
-		sfp->sf_last_faulted = sfp->sf_faulted;
+		if (sfp->sf_num_fails > stp->st_tolerance)
+			sfp->sf_last_faulted = sfp->sf_faulted;
 		sfp->sf_faulted = B_FALSE;
 	}
 
@@ -312,6 +342,7 @@ st_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 
 static const fmd_prop_t fmd_props[] = {
 	{ "interval", FMD_TYPE_TIME, "1min" },
+	{ "tolerance", FMD_TYPE_UINT32, "1" },
 	{ NULL, 0, NULL }
 };
 
@@ -326,7 +357,7 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"Sensor Transport Agent", "1.0", &fmd_ops, fmd_props
+	"Sensor Transport Agent", "1.1", &fmd_ops, fmd_props
 };
 
 void
@@ -354,6 +385,7 @@ _fmd_init(fmd_hdl_t *hdl)
 
 	stp = fmd_hdl_zalloc(hdl, sizeof (sensor_transport_t), FMD_SLEEP);
 	stp->st_interval = fmd_prop_get_int64(hdl, "interval");
+	stp->st_tolerance = fmd_prop_get_int32(hdl, "tolerance");
 
 	fmd_hdl_setspecific(hdl, stp);
 

@@ -690,7 +690,6 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
 			    topo_node_name(node), topo_node_instance(node),
 			    topo_strerror(*errp));
 			topo_node_rele(tmp);
-			topo_node_unlock(node);
 			return (-1);
 		}
 		if ((nvlist_lookup_nvlist(rsrc, "facility", &fac) != 0) ||
@@ -699,7 +698,6 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
 
 			nvlist_free(rsrc);
 			topo_node_rele(tmp);
-			topo_node_unlock(node);
 			return (-1);
 		}
 
@@ -717,9 +715,7 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
 		 */
 		if (topo_prop_get_uint32(tmp, TOPO_PGROUP_FACILITY,
 		    TOPO_FACILITY_TYPE, &tmp_facsubtype, errp) != 0) {
-
 			topo_node_rele(tmp);
-			topo_node_unlock(node);
 			return (-1);
 		}
 		if (fac_subtype == tmp_facsubtype ||
@@ -728,7 +724,6 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
 			    sizeof (topo_faclist_t))) == NULL) {
 				*errp = ETOPO_NOMEM;
 				topo_node_rele(tmp);
-				topo_node_unlock(node);
 				return (-1);
 			}
 			fac_ele->tf_node = tmp;
@@ -737,7 +732,6 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
 		}
 		topo_node_rele(tmp);
 	}
-	topo_node_unlock(node);
 
 	if (list_empty) {
 		*errp = ETOPO_FAC_NOENT;
