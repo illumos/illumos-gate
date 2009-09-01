@@ -3674,7 +3674,7 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 	    &spx->txlt_sata_pkt->satapkt_device);
 	ASSERT(sdinfo != NULL);
 
-	spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH;
+	spx->txlt_sata_pkt->satapkt_op_mode |= SATA_OPMODE_SYNCH;
 
 	sata_build_generic_cmd(scmd, SATAC_CHECK_POWER_MODE);
 	scmd->satacmd_flags.sata_copy_out_sec_count_lsb = B_TRUE;
@@ -3793,7 +3793,7 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 	    &spx->txlt_sata_pkt->satapkt_device);
 	ASSERT(sdinfo != NULL);
 
-	spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH;
+	spx->txlt_sata_pkt->satapkt_op_mode |= SATA_OPMODE_SYNCH;
 
 	/* send CHECK POWER MODE command */
 	sata_build_generic_cmd(scmd, SATAC_CHECK_POWER_MODE);
@@ -3901,7 +3901,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 		    SD_SCSI_ASC_INVALID_FIELD_IN_CDB));
 	}
 
-	spx->txlt_sata_pkt->satapkt_op_mode = SATA_OPMODE_SYNCH;
+	spx->txlt_sata_pkt->satapkt_op_mode |= SATA_OPMODE_SYNCH;
 	spx->txlt_sata_pkt->satapkt_comp = NULL;
 
 	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
@@ -7322,6 +7322,7 @@ sata_mode_select_page_1a(sata_pkt_txlate_t *spx, struct
 	scmd->satacmd_device_reg = 0;
 	scmd->satacmd_status_reg = 0;
 	scmd->satacmd_cmd_reg = SATAC_STANDBY;
+	scmd->satacmd_flags.sata_special_regs = B_TRUE;
 	scmd->satacmd_flags.sata_copy_out_error_reg = B_TRUE;
 
 	/* Transfer command to HBA */
@@ -8014,6 +8015,7 @@ sata_build_read_verify_cmd(sata_cmd_t *scmd, uint16_t sec, uint64_t lba)
 {
 	scmd->satacmd_cmd_reg = SATAC_RDVER;
 	scmd->satacmd_addr_type = ATA_ADDR_LBA28;
+	scmd->satacmd_flags.sata_special_regs = B_TRUE;
 
 	scmd->satacmd_sec_count_lsb = sec & 0xff;
 	scmd->satacmd_lba_low_lsb = lba & 0xff;
@@ -8043,6 +8045,7 @@ sata_build_generic_cmd(sata_cmd_t *scmd, uint8_t cmd)
 	scmd->satacmd_features_reg = 0;
 	scmd->satacmd_status_reg = 0;
 	scmd->satacmd_error_reg = 0;
+	scmd->satacmd_flags.sata_special_regs = B_TRUE;
 }
 
 /*
@@ -10796,6 +10799,8 @@ sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
 	if ((sdinfo->satadrv_id.ai_cmdset83 & 0x20) &&
 	    (sdinfo->satadrv_id.ai_features86 & 0x20))
 		sdinfo->satadrv_power_level = SATA_POWER_STANDBY;
+	else
+		sdinfo->satadrv_power_level = SATA_POWER_ACTIVE;
 
 	return (rval);
 }
