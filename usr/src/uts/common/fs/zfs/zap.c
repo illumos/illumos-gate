@@ -1169,9 +1169,9 @@ fzap_count_write(zap_name_t *zn, int add, uint64_t *towrite,
 	 * Account for the header block of the fatzap.
 	 */
 	if (!add && dmu_buf_freeable(zap->zap_dbuf)) {
-		tooverwrite += zap->zap_dbuf->db_size;
+		*tooverwrite += zap->zap_dbuf->db_size;
 	} else {
-		towrite += zap->zap_dbuf->db_size;
+		*towrite += zap->zap_dbuf->db_size;
 	}
 
 	/*
@@ -1184,9 +1184,9 @@ fzap_count_write(zap_name_t *zn, int add, uint64_t *towrite,
 	 */
 	if (add) {
 		if (zap->zap_f.zap_phys->zap_ptrtbl.zt_blk == 0)
-			towrite += zap->zap_dbuf->db_size;
+			*towrite += zap->zap_dbuf->db_size;
 		else
-			towrite += (zap->zap_dbuf->db_size * 3);
+			*towrite += (zap->zap_dbuf->db_size * 3);
 	}
 
 	/*
@@ -1199,13 +1199,13 @@ fzap_count_write(zap_name_t *zn, int add, uint64_t *towrite,
 	}
 
 	if (!add && dmu_buf_freeable(l->l_dbuf)) {
-		tooverwrite += l->l_dbuf->db_size;
+		*tooverwrite += l->l_dbuf->db_size;
 	} else {
 		/*
 		 * If this an add operation, the leaf block could split.
 		 * Hence, we need to account for an additional leaf block.
 		 */
-		towrite += (add ? 2 : 1) * l->l_dbuf->db_size;
+		*towrite += (add ? 2 : 1) * l->l_dbuf->db_size;
 	}
 
 	zap_put_leaf(l);

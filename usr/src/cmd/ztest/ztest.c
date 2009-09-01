@@ -168,6 +168,7 @@ ztest_func_t ztest_dmu_read_write_zcopy;
 ztest_func_t ztest_dmu_write_parallel;
 ztest_func_t ztest_dmu_object_alloc_free;
 ztest_func_t ztest_zap;
+ztest_func_t ztest_fzap;
 ztest_func_t ztest_zap_parallel;
 ztest_func_t ztest_traverse;
 ztest_func_t ztest_dsl_prop_get_set;
@@ -204,6 +205,7 @@ ztest_info_t ztest_info[] = {
 	{ ztest_dmu_write_parallel,		30,	&zopt_always	},
 	{ ztest_dmu_object_alloc_free,		1,	&zopt_always	},
 	{ ztest_zap,				30,	&zopt_always	},
+	{ ztest_fzap,				30,	&zopt_always	},
 	{ ztest_zap_parallel,			100,	&zopt_always	},
 	{ ztest_dsl_prop_get_set,		1,	&zopt_sometimes	},
 	{ ztest_dmu_objset_create_destroy,	1,	&zopt_sometimes },
@@ -2918,6 +2920,102 @@ ztest_zap(ztest_args_t *za)
 		    osname, object, propname, error);
 
 	dmu_tx_commit(tx);
+
+	/*
+	 * Once in a while, destroy the object.
+	 */
+	if (ztest_random(1000) != 0)
+		return;
+
+	tx = dmu_tx_create(os);
+	dmu_tx_hold_write(tx, ZTEST_DIROBJ, za->za_diroff, sizeof (uint64_t));
+	dmu_tx_hold_free(tx, object, 0, DMU_OBJECT_END);
+	error = dmu_tx_assign(tx, TXG_WAIT);
+	if (error) {
+		ztest_record_enospc("destroy zap object");
+		dmu_tx_abort(tx);
+		return;
+	}
+	error = zap_destroy(os, object, tx);
+	if (error)
+		fatal(0, "zap_destroy('%s', %llu) = %d",
+		    osname, object, error);
+	object = 0;
+	dmu_write(os, ZTEST_DIROBJ, za->za_diroff, sizeof (uint64_t),
+	    &object, tx);
+	dmu_tx_commit(tx);
+}
+
+/*
+ * Testcase to test the upgrading of a microzap to fatzap.
+ */
+void
+ztest_fzap(ztest_args_t *za)
+{
+	objset_t *os = za->za_os;
+	uint64_t object;
+	uint64_t value;
+	dmu_tx_t *tx;
+	int i, error;
+	char osname[MAXNAMELEN];
+	char *name = "aaa";
+	char entname[20];
+
+	dmu_objset_name(os, osname);
+
+	/*
+	 * Create a new object if necessary, and record it in the directory.
+	 */
+	VERIFY(0 == dmu_read(os, ZTEST_DIROBJ, za->za_diroff,
+	    sizeof (uint64_t), &object, DMU_READ_PREFETCH));
+
+	if (object == 0) {
+		tx = dmu_tx_create(os);
+		dmu_tx_hold_write(tx, ZTEST_DIROBJ, za->za_diroff,
+		    sizeof (uint64_t));
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, TRUE, NULL);
+		error = dmu_tx_assign(tx, TXG_WAIT);
+		if (error) {
+			ztest_record_enospc("create zap test obj");
+			dmu_tx_abort(tx);
+			return;
+		}
+		object = zap_create(os, DMU_OT_ZAP_OTHER, DMU_OT_NONE, 0, tx);
+		if (error) {
+			fatal(0, "zap_create('%s', %llu) = %d",
+			    osname, object, error);
+		}
+		ASSERT(object != 0);
+		dmu_write(os, ZTEST_DIROBJ, za->za_diroff,
+		    sizeof (uint64_t), &object, tx);
+		dmu_tx_commit(tx);
+	}
+
+	/*
+	 * Add entries to this ZAP amd make sure it spills over
+	 * and gets upgraded to a fatzap. Also, since we are adding
+	 * 2050 entries we should see ptrtbl growth and leaf-block
+	 * split.
+	 */
+	for (i = 0; i < 2050; i++) {
+		(void) sprintf(entname, "%s-%d", name, i);
+		value = i;
+
+		tx = dmu_tx_create(os);
+		dmu_tx_hold_zap(tx, object, TRUE, entname);
+		error = dmu_tx_assign(tx, TXG_WAIT);
+
+		if (error) {
+			ztest_record_enospc("create zap entry");
+			dmu_tx_abort(tx);
+			return;
+		}
+		error = zap_add(os, object, entname, sizeof (uint64_t),
+		    1, &value, tx);
+
+		ASSERT(error == 0 || error == EEXIST);
+		dmu_tx_commit(tx);
+	}
 
 	/*
 	 * Once in a while, destroy the object.
