@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -107,8 +105,8 @@ crypto_digest_prov(crypto_provider_t provider, crypto_session_id_t sid,
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
-		rv = kcf_get_hardware_provider(mech->cm_type,
-		    CRYPTO_MECH_INVALID, CHECK_RESTRICT(crq),
+		rv = kcf_get_hardware_provider(mech->cm_type, NULL,
+		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq),
 		    pd, &real_provider, CRYPTO_FG_DIGEST_ATOMIC);
 
 		if (rv != CRYPTO_SUCCESS)
@@ -140,8 +138,8 @@ crypto_digest(crypto_mechanism_t *mech, crypto_data_t *data,
 
 retry:
 	/* The pd is returned held */
-	if ((pd = kcf_get_mech_provider(mech->cm_type, NULL, &error, list,
-	    CRYPTO_FG_DIGEST_ATOMIC, CHECK_RESTRICT(crq),
+	if ((pd = kcf_get_mech_provider(mech->cm_type, NULL, NULL, &error,
+	    list, CRYPTO_FG_DIGEST_ATOMIC, CHECK_RESTRICT(crq),
 	    data->cd_length)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);
@@ -222,8 +220,8 @@ crypto_digest_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
-		error = kcf_get_hardware_provider(mech->cm_type,
-		    CRYPTO_MECH_INVALID, CHECK_RESTRICT(crq), pd,
+		error = kcf_get_hardware_provider(mech->cm_type, NULL,
+		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq), pd,
 		    &real_provider, CRYPTO_FG_DIGEST);
 
 		if (error != CRYPTO_SUCCESS)
@@ -282,7 +280,7 @@ crypto_digest_init(crypto_mechanism_t *mech, crypto_context_t *ctxp,
 
 retry:
 	/* The pd is returned held */
-	if ((pd = kcf_get_mech_provider(mech->cm_type, NULL, &error,
+	if ((pd = kcf_get_mech_provider(mech->cm_type, NULL, NULL, &error,
 	    list, CRYPTO_FG_DIGEST, CHECK_RESTRICT(crq), 0)) == NULL) {
 		if (list != NULL)
 			kcf_free_triedlist(list);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -721,26 +721,33 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 }
 
 static boolean_t
-des3_keycheck(uint8_t *key, uint8_t *corrected_key)
+des23_keycheck(uint8_t *key, uint8_t *corrected_key, boolean_t des3)
 {
 /* EXPORT DELETE START */
 	uint64_t aligned_key[DES3_KEYSIZE / sizeof (uint64_t)];
 	uint64_t key_so_far, scratch, *currentkey;
 	uint_t j, num_weakkeys = 0;
+	uint8_t keysize = DES3_KEYSIZE;
+	uint8_t checks = 3;
 
 	if (key == NULL) {
 		return (B_FALSE);
 	}
 
+	if (des3 == B_FALSE) {
+		keysize = DES2_KEYSIZE;
+		checks = 2;
+	}
+
 	if (!IS_P2ALIGNED(key, sizeof (uint64_t))) {
-		bcopy(key, aligned_key, DES3_KEYSIZE);
+		bcopy(key, aligned_key, keysize);
 		currentkey = (uint64_t *)aligned_key;
 	} else {
 		/* LINTED */
 		currentkey = (uint64_t *)key;
 	}
 
-	for (j = 0; j < 3; j++) {
+	for (j = 0; j < checks; j++) {
 		key_so_far = currentkey[j];
 
 		if (!keycheck((uint8_t *)&key_so_far, (uint8_t *)&scratch)) {
@@ -771,7 +778,7 @@ des3_keycheck(uint8_t *key, uint8_t *corrected_key)
 		return (B_FALSE);
 
 	if (corrected_key != NULL) {
-		bcopy(currentkey, corrected_key, DES3_KEYSIZE);
+		bcopy(currentkey, corrected_key, keysize);
 	}
 
 /* EXPORT DELETE END */
@@ -783,8 +790,10 @@ des_keycheck(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 {
 	if (strength == DES) {
 		return (keycheck(key, corrected_key));
+	} else if (strength == DES2) {
+		return (des23_keycheck(key, corrected_key, B_FALSE));
 	} else if (strength == DES3) {
-		return (des3_keycheck(key, corrected_key));
+		return (des23_keycheck(key, corrected_key, B_TRUE));
 	} else {
 		return (B_FALSE);
 	}

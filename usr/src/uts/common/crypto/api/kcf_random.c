@@ -161,7 +161,7 @@ kcf_rngprov_check(void)
 	int rv;
 	kcf_provider_desc_t *pd;
 
-	if ((pd = kcf_get_mech_provider(rngmech_type, NULL, &rv,
+	if ((pd = kcf_get_mech_provider(rngmech_type, NULL, NULL, &rv,
 	    NULL, CRYPTO_FG_RANDOM, B_FALSE, 0)) != NULL) {
 		KCF_PROV_REFRELE(pd);
 		/*
@@ -219,7 +219,7 @@ rngprov_getbytes(uint8_t *ptr, size_t need, boolean_t is_taskq_thr)
 	kcf_req_params_t params;
 	kcf_prov_tried_t *list = NULL;
 
-	while ((pd = kcf_get_mech_provider(rngmech_type, NULL, &rv,
+	while ((pd = kcf_get_mech_provider(rngmech_type, NULL, NULL, &rv,
 	    list, CRYPTO_FG_RANDOM, B_FALSE, 0)) != NULL) {
 
 		prov_cnt++;
@@ -300,7 +300,7 @@ rngprov_getbytes_nblk(uint8_t *ptr, size_t len)
 	req.cr_flag = CRYPTO_SKIP_REQID;
 	req.cr_callback_func = notify_done;
 
-	while ((pd = kcf_get_mech_provider(rngmech_type, NULL, &rv,
+	while ((pd = kcf_get_mech_provider(rngmech_type, NULL, NULL, &rv,
 	    list, CRYPTO_FG_RANDOM, CHECK_RESTRICT(&req), 0)) != NULL) {
 
 		prov_cnt ++;

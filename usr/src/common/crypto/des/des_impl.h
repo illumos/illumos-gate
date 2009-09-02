@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DES_IMPL_H
 #define	_DES_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Common definitions used by DES
@@ -76,9 +74,11 @@ typedef enum des_strength {
 #define	DES2_KEYSIZE	(2 * DES_KEYSIZE)
 #define	DES2_MINBITS	(2 * DES_MINBITS)
 #define	DES2_MAXBITS	(2 * DES_MAXBITS)
+#define	DES2_MINBYTES	(DES2_MINBITS / 8)
+#define	DES2_MAXBYTES	(DES2_MAXBITS / 8)
 
 #define	DES3_KEYSIZE	(3 * DES_KEYSIZE)
-#define	DES3_MINBITS	(3 * DES_MINBITS)
+#define	DES3_MINBITS	(2 * DES_MINBITS)	/* DES3 handles CKK_DES2 keys */
 #define	DES3_MAXBITS	(3 * DES_MAXBITS)
 #define	DES3_MINBYTES	(DES3_MINBITS / 8)
 #define	DES3_MAXBYTES	(DES3_MAXBITS / 8)

@@ -18,7 +18,9 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ */
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * des_crypt.c, DES encryption library routines
@@ -112,7 +112,7 @@ typedef enum des_mech_type {
 
 #define	DES_MIN_KEY_LEN		DES_MINBYTES
 #define	DES_MAX_KEY_LEN		DES_MAXBYTES
-#define	DES3_MIN_KEY_LEN	DES3_MINBYTES
+#define	DES3_MIN_KEY_LEN	DES3_MAXBYTES	/* no CKK_DES2 support */
 #define	DES3_MAX_KEY_LEN	DES3_MAXBYTES
 
 /* EXPORT DELETE END */
@@ -417,9 +417,9 @@ init_keysched(crypto_key_t *key, void *newbie, des_strength_t strength)
 	 */
 	switch (key->ck_format) {
 	case CRYPTO_KEY_RAW:
-		if (strength == DES && key->ck_length != DES_MINBITS)
+		if (strength == DES && key->ck_length != DES_MAXBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
-		if (strength == DES3 && key->ck_length != DES3_MINBITS)
+		if (strength == DES3 && key->ck_length != DES3_MAXBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
 		break;
 	default:
@@ -483,7 +483,7 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		if (mechanism->cm_param != NULL &&
 		    mechanism->cm_param_len != DES_BLOCK_LEN)
 			return (CRYPTO_MECHANISM_PARAM_INVALID);
-		if (key->ck_length != DES_MINBITS)
+		if (key->ck_length != DES_MAXBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
 		strength = DES;
 		if (des_ctx == NULL)
@@ -496,7 +496,7 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		if (mechanism->cm_param != NULL &&
 		    mechanism->cm_param_len != DES_BLOCK_LEN)
 			return (CRYPTO_MECHANISM_PARAM_INVALID);
-		if (key->ck_length != DES3_MINBITS)
+		if (key->ck_length != DES3_MAXBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
 		strength = DES3;
 		if (des_ctx == NULL)
@@ -880,7 +880,7 @@ des_encrypt_atomic(crypto_provider_handle_t provider,
 		if (mechanism->cm_param_len > 0 &&
 		    mechanism->cm_param_len != DES_BLOCK_LEN)
 			return (CRYPTO_MECHANISM_PARAM_INVALID);
-		if (key->ck_length != DES3_MINBITS)
+		if (key->ck_length != DES3_MAXBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
 		strength = DES3;
 		break;
@@ -987,7 +987,7 @@ des_decrypt_atomic(crypto_provider_handle_t provider,
 		if (mechanism->cm_param_len > 0 &&
 		    mechanism->cm_param_len != DES_BLOCK_LEN)
 			return (CRYPTO_MECHANISM_PARAM_INVALID);
-		if (key->ck_length != DES3_MINBITS)
+		if (key->ck_length != DES3_MAXBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
 		strength = DES3;
 		break;
@@ -1155,7 +1155,7 @@ des_key_check(crypto_provider_handle_t pd, crypto_mechanism_t *mech,
 		break;
 	case DES3_ECB_MECH_INFO_TYPE:
 	case DES3_CBC_MECH_INFO_TYPE:
-		expectedkeylen = DES3_MINBITS;
+		expectedkeylen = DES3_MAXBITS;
 		strength = DES3;
 		break;
 	default:

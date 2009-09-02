@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -53,8 +50,8 @@ crypto_key_generate(crypto_provider_t provider, crypto_session_id_t sid,
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
-		rv = kcf_get_hardware_provider(mech->cm_type,
-		    CRYPTO_MECH_INVALID, CHECK_RESTRICT(crq),
+		rv = kcf_get_hardware_provider(mech->cm_type, NULL,
+		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq),
 		    pd, &real_provider, CRYPTO_FG_GENERATE);
 
 		if (rv != CRYPTO_SUCCESS)
@@ -92,8 +89,8 @@ crypto_key_generate_pair(crypto_provider_t provider, crypto_session_id_t sid,
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
-		rv = kcf_get_hardware_provider(mech->cm_type,
-		    CRYPTO_MECH_INVALID, CHECK_RESTRICT(crq),
+		rv = kcf_get_hardware_provider(mech->cm_type, NULL,
+		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq),
 		    pd, &real_provider, CRYPTO_FG_GENERATE_KEY_PAIR);
 
 		if (rv != CRYPTO_SUCCESS)
@@ -132,8 +129,8 @@ crypto_key_wrap(crypto_provider_t provider, crypto_session_id_t sid,
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
-		rv = kcf_get_hardware_provider(mech->cm_type,
-		    CRYPTO_MECH_INVALID, CHECK_RESTRICT(crq),
+		rv = kcf_get_hardware_provider(mech->cm_type, wrapping_key,
+		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq),
 		    pd, &real_provider, CRYPTO_FG_WRAP);
 
 		if (rv != CRYPTO_SUCCESS)
@@ -172,8 +169,8 @@ crypto_key_unwrap(crypto_provider_t provider, crypto_session_id_t sid,
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
-		rv = kcf_get_hardware_provider(mech->cm_type,
-		    CRYPTO_MECH_INVALID, CHECK_RESTRICT(crq),
+		rv = kcf_get_hardware_provider(mech->cm_type, unwrapping_key,
+		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq),
 		    pd, &real_provider, CRYPTO_FG_UNWRAP);
 
 		if (rv != CRYPTO_SUCCESS)
@@ -212,8 +209,8 @@ crypto_key_derive(crypto_provider_t provider, crypto_session_id_t sid,
 	ASSERT(KCF_PROV_REFHELD(pd));
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
-		rv = kcf_get_hardware_provider(mech->cm_type,
-		    CRYPTO_MECH_INVALID, CHECK_RESTRICT(crq),
+		rv = kcf_get_hardware_provider(mech->cm_type, base_key,
+		    CRYPTO_MECH_INVALID, NULL, CHECK_RESTRICT(crq),
 		    pd, &real_provider, CRYPTO_FG_DERIVE);
 
 		if (rv != CRYPTO_SUCCESS)

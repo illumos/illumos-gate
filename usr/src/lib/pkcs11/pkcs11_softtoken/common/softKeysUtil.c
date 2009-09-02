@@ -169,6 +169,10 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		key_type = CKK_DES;
 		break;
 
+	case CKM_DES2_KEY_GEN:
+		key_type = CKK_DES2;
+		break;
+
 	case CKM_DES3_KEY_GEN:
 		key_type = CKK_DES3;
 		break;
@@ -271,6 +275,15 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		 */
 		keylen = OBJ_SEC_VALUE_LEN(secret_key) = DES_KEYSIZE;
 		des_strength = DES;
+		break;
+
+	case CKM_DES2_KEY_GEN:
+		/*
+		 * Set up key value len since it is not a required
+		 * attribute for C_GenerateKey.
+		 */
+		keylen = OBJ_SEC_VALUE_LEN(secret_key) = DES2_KEYSIZE;
+		des_strength = DES2;
 		break;
 
 	case CKM_DES3_KEY_GEN:

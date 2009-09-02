@@ -536,13 +536,14 @@ kcf_resubmit_request(kcf_areq_node_t *areq)
 		return (error);
 
 	if (mech1 && !mech2) {
-		new_pd = kcf_get_mech_provider(mech1->cm_type, NULL, &error,
-		    areq->an_tried_plist, fg,
+		new_pd = kcf_get_mech_provider(mech1->cm_type, NULL, NULL,
+		    &error, areq->an_tried_plist, fg,
 		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), 0);
 	} else {
 		ASSERT(mech1 != NULL && mech2 != NULL);
 
-		new_pd = kcf_get_dual_provider(mech1, mech2, NULL, &prov_mt1,
+		new_pd = kcf_get_dual_provider(mech1, NULL, mech2, NULL,
+		    NULL, &prov_mt1,
 		    &prov_mt2, &error, areq->an_tried_plist, fg, fg,
 		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), 0);
 	}
@@ -1940,7 +1941,7 @@ out:
 		mac_tmpl = (crypto_ctx_template_t)mops->mo_templ;
 
 		/* No expected recoverable failures, so no retry list */
-		pd = kcf_get_mech_provider(mops->mo_framework_mechtype,
+		pd = kcf_get_mech_provider(mops->mo_framework_mechtype, NULL,
 		    &me, &error, NULL, CRYPTO_FG_MAC_ATOMIC,
 		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), ct->dd_len2);
 
@@ -1972,7 +1973,7 @@ out:
 		ct = (crypto_dual_data_t *)dcrops->dop_ciphertext;
 		/* No expected recoverable failures, so no retry list */
 		pd = kcf_get_mech_provider(dcrops->dop_framework_mechtype,
-		    NULL, &error, NULL, CRYPTO_FG_DECRYPT_ATOMIC,
+		    NULL, NULL, &error, NULL, CRYPTO_FG_DECRYPT_ATOMIC,
 		    (areq->an_reqarg.cr_flag & CRYPTO_RESTRICTED), ct->dd_len1);
 
 		if (pd == NULL) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,7 @@ static crypto_mech_info_t dca_mech_info_tab1[] = {
 	{SUN_CKM_DES3_CBC, DES3_CBC_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_DECRYPT |
 	    CRYPTO_FG_ENCRYPT_ATOMIC | CRYPTO_FG_DECRYPT_ATOMIC,
-	    DES3_KEY_LEN, DES3_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES}
+	    DES3_MIN_KEY_LEN, DES3_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES}
 };
 
 /* Mechanisms for the asymmetric cipher provider */

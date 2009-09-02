@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CRYPTO_DCA_H
 #define	_SYS_CRYPTO_DCA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -95,7 +93,8 @@ extern "C" {
 #define	SHA1_HMAC_MAX_KEY_LEN	64	/* SHA1-HMAC max key length in bytes */
 
 #define	DES_KEY_LEN		8	/* DES key length in bytes */
-#define	DES3_KEY_LEN		24	/* 3DES key length in bytes */
+#define	DES3_MIN_KEY_LEN	16	/* 3DES min key length in bytes */
+#define	DES3_MAX_KEY_LEN	24	/* 3DES max key length in bytes */
 
 #define	DSA_MIN_KEY_LEN		64	/* DSA min key length in bytes */
 #define	DSA_MAX_KEY_LEN		128	/* DSA max key length in bytes */

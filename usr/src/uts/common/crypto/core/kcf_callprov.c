@@ -37,6 +37,8 @@
 #include <sys/crypto/impl.h>
 #include <sys/crypto/sched_impl.h>
 
+#include <sys/sdt.h>
+
 /*
  * Return B_TRUE if the specified entry point is NULL. We rely on the
  * caller to provide, with offset_1 and offset_2, information to calculate
@@ -101,6 +103,85 @@ is_in_triedlist(kcf_provider_desc_t *pd, kcf_prov_tried_t *triedl)
 }
 
 /*
+ * Check if the key/attribute length is within the limits of given provider
+ * and mechanism. Return 0 if the key length is off the limits, 1 otherwise.
+ * In the latter case, this either means the key length is within the limits
+ * or we are not able to perform check for a key type.
+ */
+static int
+kcf_check_prov_mech_keylen(kcf_provider_desc_t *provider,
+	crypto_mech_type_t mech_type,
+	crypto_key_t *key)
+{
+	crypto_mech_info_t *mech_info = NULL;
+	uint_t keylen = 0;
+	ssize_t attr_len;
+	uchar_t *attr;
+
+	mech_info = &(KCF_TO_PROV_MECHINFO(provider, mech_type));
+	switch (key->ck_format) {
+		case CRYPTO_KEY_RAW:
+			/* ck_length is always in bits */
+			if (mech_info->cm_mech_flags &
+			    CRYPTO_KEYSIZE_UNIT_IN_BYTES)
+				keylen = CRYPTO_BITS2BYTES(key->ck_length);
+			else
+				keylen = key->ck_length;
+			break;
+
+		case CRYPTO_KEY_ATTR_LIST:
+			/* Check modulus for RSA operations. */
+			if ((crypto_get_key_attr(key, SUN_CKA_MODULUS,
+			    &attr, &attr_len)) == CRYPTO_SUCCESS) {
+				/* modulus length is returned in bytes */
+				if (mech_info->cm_mech_flags &
+				    CRYPTO_KEYSIZE_UNIT_IN_BITS)
+					keylen = attr_len * 8;
+				else
+					keylen = attr_len;
+			/* Check prime for DH/DSA operations. */
+			} else if ((crypto_get_key_attr(key, SUN_CKA_PRIME,
+			    &attr, &attr_len)) == CRYPTO_SUCCESS) {
+				/* prime length is returned in bytes */
+				if (mech_info->cm_mech_flags &
+				    CRYPTO_KEYSIZE_UNIT_IN_BITS)
+					keylen = attr_len * 8;
+				else
+					keylen = attr_len;
+			}
+
+			/*
+			 * If the attribute is not found we cannot do
+			 * the check so return with success and let
+			 * the actual provider do the check.
+			 */
+			if (keylen == 0)
+				return (1);
+			break;
+
+		default:
+			/*
+			 * We are not able to check CRYPTO_KEY_REFERENCE
+			 * or other key types here.
+			 */
+			return (1);
+	}
+
+	DTRACE_PROBE4(keylen__check,
+	    crypto_mech_type_t, mech_type,
+	    uint_t, keylen,
+	    ssize_t, mech_info->cm_min_key_length,
+	    ssize_t, mech_info->cm_max_key_length);
+	/* Do the actual check. */
+	if ((keylen > mech_info->cm_max_key_length) ||
+	    (keylen < mech_info->cm_min_key_length)) {
+		return (0);
+	}
+
+	return (1);
+}
+
+/*
  * Search a mech entry's hardware provider list for the specified
  * provider. Return true if found.
  */
@@ -132,11 +213,16 @@ is_valid_provider_for_mech(kcf_provider_desc_t *pd, kcf_mech_entry_t *me,
  * non-nullness. This is accomplished by having the caller pass, as
  * arguments, the offset of the function group (offset_1), and the
  * offset of the function within the function group (offset_2).
+ *
+ * If a non-NULL key structure is supplied, the provider will be checked
+ * to see if the key length falls into the limits of given mechanism
+ * for that provider. This is done for both key structures and mechanisms.
+ *
  * Returns NULL if no provider can be found.
  */
 int
-kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
-    crypto_mech_type_t mech_type_2, boolean_t call_restrict,
+kcf_get_hardware_provider(crypto_mech_type_t mech_type_1, crypto_key_t *key1,
+    crypto_mech_type_t mech_type_2, crypto_key_t *key2, boolean_t call_restrict,
     kcf_provider_desc_t *old, kcf_provider_desc_t **new, crypto_func_group_t fg)
 {
 	kcf_provider_desc_t *provider, *real_pd = old;
@@ -200,6 +286,14 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 				continue;
 			}
 
+			if ((key1 != NULL) &&
+			    !kcf_check_prov_mech_keylen(provider, mech_type_1,
+			    key1)) {
+				p = p->pl_next;
+				rv = CRYPTO_KEY_SIZE_RANGE;
+				continue;
+			}
+
 			/* provider does second mech */
 			if (mech_type_2 != CRYPTO_MECH_INVALID) {
 				int i;
@@ -208,6 +302,14 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 				    mech_type_2);
 				if (i == KCF_INVALID_INDX) {
 					p = p->pl_next;
+					continue;
+				}
+
+				if ((key2 != NULL) &&
+				    !kcf_check_prov_mech_keylen(provider,
+				    mech_type_2, key2)) {
+					p = p->pl_next;
+					rv = CRYPTO_KEY_SIZE_RANGE;
 					continue;
 				}
 			}
@@ -234,14 +336,17 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 
 		if (gpd != NULL) {
 			real_pd = gpd;
+			rv = CRYPTO_SUCCESS;
 			KCF_PROV_REFHOLD(real_pd);
 		} else if (bpd != NULL) {
 			real_pd = bpd;
+			rv = CRYPTO_SUCCESS;
 			KCF_PROV_REFHOLD(real_pd);
 		} else {
 			/* can't find provider */
 			real_pd = NULL;
-			rv = CRYPTO_MECHANISM_INVALID;
+			if (rv == CRYPTO_SUCCESS)
+				rv = CRYPTO_MECHANISM_INVALID;
 		}
 		mutex_exit(&old->pd_lock);
 
@@ -256,6 +361,13 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 		if (!is_valid_provider_for_mech(old, me, fg)) {
 			real_pd = NULL;
 			rv = CRYPTO_MECHANISM_INVALID;
+			goto out;
+		}
+
+		if ((key1 != NULL) &&
+		    !kcf_check_prov_mech_keylen(old, mech_type_1, key1)) {
+			real_pd = NULL;
+			rv = CRYPTO_KEY_SIZE_RANGE;
 			goto out;
 		}
 
@@ -418,7 +530,9 @@ found:
  * Return the best provider for the specified mechanism. The provider
  * is held and it is the caller's responsibility to release it when done.
  * The fg input argument is used as a search criterion to pick a provider.
- * A provider has to support this function group to be picked.
+ * A provider has to support this function group to be picked. If a non-NULL
+ * key structure is supplied, the provider will be checked to see if the key
+ * length falls into the limits of given mechanism for that provider.
  *
  * Find the least loaded provider in the list of providers. We do a linear
  * search to find one. This is fine as we assume there are only a few
@@ -429,9 +543,9 @@ found:
  * use restricted providers.
  */
 kcf_provider_desc_t *
-kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
-    int *error, kcf_prov_tried_t *triedl, crypto_func_group_t fg,
-    boolean_t call_restrict, size_t data_size)
+kcf_get_mech_provider(crypto_mech_type_t mech_type, crypto_key_t *key,
+    kcf_mech_entry_t **mepp, int *error, kcf_prov_tried_t *triedl,
+    crypto_func_group_t fg, boolean_t call_restrict, size_t data_size)
 {
 	kcf_provider_desc_t *pd = NULL, *gpd = NULL;
 	kcf_prov_mech_desc_t *prov_chain, *mdesc;
@@ -441,6 +555,7 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 	kcf_mech_entry_t *me;
 	kcf_mech_entry_tab_t *me_tab;
 	kcf_lock_withpad_t *mp;
+	int error_val = CRYPTO_MECH_NOT_SUPPORTED; /* default error value */
 
 	class = KCF_MECH2CLASS(mech_type);
 	if ((class < KCF_FIRST_OPSCLASS) || (class > KCF_LAST_OPSCLASS)) {
@@ -494,6 +609,13 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 				continue;
 			}
 
+			if ((key != NULL) && !kcf_check_prov_mech_keylen(pd,
+			    mech_type, key)) {
+				prov_chain = prov_chain->pm_next;
+				error_val = CRYPTO_KEY_SIZE_RANGE;
+				continue;
+			}
+
 			/* Do load calculation only if needed */
 			if ((prov_chain = prov_chain->pm_next) == NULL &&
 			    gpd == NULL) {
@@ -520,6 +642,7 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 			pd = NULL;
 	}
 
+	/* No provider found */
 	if (pd == NULL) {
 		/*
 		 * We do not want to report CRYPTO_MECH_NOT_SUPPORTED, when
@@ -528,7 +651,7 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 		 * error code.
 		 */
 		if (triedl == NULL)
-			*error = CRYPTO_MECH_NOT_SUPPORTED;
+			*error = error_val;
 	} else {
 		KCF_PROV_REFHOLD(pd);
 	}
@@ -540,6 +663,11 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 /*
  * Very similar to kcf_get_mech_provider(). Finds the best provider capable of
  * a dual operation with both me1 and me2.
+ *
+ * If a non-NULL key structure is supplied, the provider will be checked
+ * to see if the key length falls into the limits of given mechanism
+ * for that provider. This is done for both key structures and mechanisms.
+ *
  * When no dual-ops capable providers are available, return the best provider
  * for me1 only, and sets *prov_mt2 to CRYPTO_INVALID_MECHID;
  * We assume/expect that a slower HW capable of the dual is still
@@ -547,7 +675,8 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
  * separately.
  */
 kcf_provider_desc_t *
-kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
+kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_key_t *key1,
+    crypto_mechanism_t *mech2, crypto_key_t *key2,
     kcf_mech_entry_t **mepp, crypto_mech_type_t *prov_mt1,
     crypto_mech_type_t *prov_mt2, int *error, kcf_prov_tried_t *triedl,
     crypto_func_group_t fg1, crypto_func_group_t fg2, boolean_t call_restrict,
@@ -560,6 +689,7 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 	crypto_mech_type_t m2id =  mech2->cm_type;
 	kcf_mech_entry_t *me;
 	kcf_lock_withpad_t *mp;
+	int error_val = CRYPTO_MECH_NOT_SUPPORTED; /* default error value */
 
 	/* when mech is a valid mechanism, me will be its mech_entry */
 	if (kcf_get_mech_entry(mech1->cm_type, &me) != KCF_SUCCESS) {
@@ -607,6 +737,13 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 				continue;
 			}
 
+			if ((key1 != NULL) && !kcf_check_prov_mech_keylen(pd,
+			    mech1->cm_type, key1)) {
+				prov_chain = prov_chain->pm_next;
+				error_val = CRYPTO_KEY_SIZE_RANGE;
+				continue;
+			}
+
 #define	PMD_MECH_NUM(pmdp)	(pmdp)->pm_mech_info.cm_mech_number
 
 			/* Do load calculation only if needed */
@@ -630,6 +767,13 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 				if ((mil->ml_mech_info.cm_func_group_mask &
 				    fg2) == 0)
 					continue;
+
+				if ((key2 != NULL) &&
+				    !kcf_check_prov_mech_keylen(pd,
+				    mech2->cm_type, key2)) {
+					error_val = CRYPTO_KEY_SIZE_RANGE;
+					continue;
+				}
 
 #define	MIL_MECH_NUM(mil)	(mil)->ml_mech_info.cm_mech_number
 
@@ -685,9 +829,17 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 		}
 	}
 
-	if (pd == NULL)
-		*error = CRYPTO_MECH_NOT_SUPPORTED;
-	else
+	/* No provider found */
+	if (pd == NULL) {
+		/*
+		 * We do not want to report CRYPTO_MECH_NOT_SUPPORTED, when
+		 * we are in the "fallback to the next provider" case. Rather
+		 * we preserve the error, so that the client gets the right
+		 * error code.
+		 */
+		if (triedl == NULL)
+			*error = error_val;
+	} else
 		KCF_PROV_REFHOLD(pd);
 
 	mutex_exit(&mp->kl_lock);
