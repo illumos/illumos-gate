@@ -498,7 +498,7 @@ static ofmt_field_t link_fields[] = {
 /* name,	field width,	index,	callback */
 { "LINK",	12,
 	offsetof(link_fields_buf_t, link_name), print_default_cb},
-{ "CLASS",	9,
+{ "CLASS",	10,
 	offsetof(link_fields_buf_t, link_class), print_default_cb},
 { "MTU",	7,
 	offsetof(link_fields_buf_t, link_mtu), print_default_cb},

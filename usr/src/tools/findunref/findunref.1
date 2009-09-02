@@ -52,7 +52,7 @@ Depending on how findunref is invoked, it can either check all files, or
 limit its checks to files under control of a specific source code
 management (SCM) system.  To limit checks to files managed by Mercurial,
 the \fBhg\fP(1) utility must be present in \fB/usr/bin\fP and any relevant
-repositories must be located at or under \fBsrcroot\fP.  Nested Mercurial
+repositories must be located at or under \fIsrcroot\fP.  Nested Mercurial
 repositories are supported.
 .SH OPTIONS
 .TP 10
@@ -75,7 +75,7 @@ interaction with \fBwhich_scm\fP(1), the SCM names "mercurial" and
 \fBwhich_scm\fP(1)
 .SH NOTES
 Since many files are only used when building for a particular ISA (e.g.,
-Makefiles that are specified to i386 or sparc), builds must be done on all
+Makefiles that are specific to x86 or SPARC), builds must be done on all
 applicable ISAs and the results merged.  For instance, if nightly builds
 (with \fB-f\fP) are done on both SPARC and x86, \fBusr/src\fP will be
 populated with a corresponding \fBunref-\fIisa\fB.out\fR file, which can
