@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -373,6 +371,8 @@ swap_mem_config_pre_del(
 		 * Tidy-up is done by the call to post_del which
 		 * is always made.
 		 */
+		cmn_err(CE_NOTE, "Memory operation refused to ensure system "
+		    "doesn't deadlock due to excessive consumption by swapfs.");
 		return (EBUSY);
 	}
 	return (0);
