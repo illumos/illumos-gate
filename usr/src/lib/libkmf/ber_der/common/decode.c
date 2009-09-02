@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -34,8 +34,6 @@
  */
 
 /* decode.c - ber input decoding routines */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -185,7 +183,7 @@ ber_getnint(BerElement *ber, ber_int_t *num, ber_slen_t len)
 	 * extend after we read it in.
 	 */
 
-	if (len > sizeof (ber_slen_t))
+	if (len > sizeof (buffer))
 		return (-1);
 
 	/* read into the low-order bytes of netnum */

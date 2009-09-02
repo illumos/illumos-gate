@@ -869,10 +869,16 @@ pk_export(int argc, char *argv[])
 		serial.len = bytelen;
 	}
 
+	/*
+	 * We need a password in the following situations:
+	 * 1.  When accessing PKCS11 token
+	 * 2.  If NSS keystore, when making a PKCS12 file or when
+	 * accessing any private object or key.
+	 */
 	if (kstype == KMF_KEYSTORE_PK11TOKEN ||
 	    ((kstype == KMF_KEYSTORE_NSS) &&
-	    (oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ))) ||
-	    kfmt == KMF_FORMAT_PKCS12) {
+	    ((oclass & (PK_KEY_OBJ | PK_PRIVATE_OBJ)) ||
+	    (kfmt == KMF_FORMAT_PKCS12)))) {
 			(void) get_token_password(kstype, token_spec,
 			    &tokencred);
 	}

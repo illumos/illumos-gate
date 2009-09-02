@@ -21,11 +21,9 @@
 /*
  * NSS keystore wrapper
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1953,7 +1951,8 @@ NSS_CreateSymKey(KMF_HANDLE_T handle,
 		return (rv);
 	}
 
-	nsskey = PK11_TokenKeyGen(nss_slot, keyType, NULL, keySize,  NULL,
+	/* convert key length to bytes */
+	nsskey = PK11_TokenKeyGen(nss_slot, keyType, NULL, keySize / 8,  NULL,
 	    PR_TRUE, (void *)cred.cred);
 	if (nsskey == NULL) {
 		SET_ERROR(kmfh, PORT_GetError());
