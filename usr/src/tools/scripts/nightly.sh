@@ -3043,7 +3043,12 @@ if [[ ($build_ok = y) && ( ($A_FLAG = y) || ($r_FLAG = y) ) ]]; then
 		fi
 		check_rtime -i -m -v $rtime_sflag -o -w $elf_ddir \
 			-D object_list  -f object_list -E runtime.err \
-			-I runtime.attr
+			-I runtime.attr.raw
+
+		# check_rtime -I output needs to be sorted in order to 
+		# compare it to that from previous builds.
+		sort $elf_ddir/runtime.attr.raw > $elf_ddir/runtime.attr
+		rm $elf_ddir/runtime.attr.raw
 
 		# Report errors
 		if [[ -s $elf_ddir/runtime.err ]]; then
