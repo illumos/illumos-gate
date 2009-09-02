@@ -543,22 +543,6 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 }
 
 /*
- * indicate when bus masters are active
- */
-static uint32_t
-cpu_acpi_bm_sts(void)
-{
-	uint32_t bm_sts = 0;
-
-	cpu_acpi_get_register(ACPI_BITREG_BUS_MASTER_STATUS, &bm_sts);
-
-	if (bm_sts)
-		cpu_acpi_set_register(ACPI_BITREG_BUS_MASTER_STATUS, 1);
-
-	return (bm_sts);
-}
-
-/*
  * Idle the present CPU, deep c-state is supported
  */
 void
@@ -593,31 +577,7 @@ cpu_acpi_idle(void)
 
 	cs_indx = cpupm_next_cstate(cs_data, cstates, cpu_max_cstates, start);
 
-	/*
-	 * OSPM uses the BM_STS bit to determine the power state to enter
-	 * when considering a transition to or from the C2/C3 power state.
-	 * if C3 is determined, bus master activity demotes the power state
-	 * to C2.
-	 */
-	if ((cstates[cs_indx].cs_type >= CPU_ACPI_C3) && cpu_acpi_bm_sts())
-		--cs_indx;
 	cs_type = cstates[cs_indx].cs_type;
-
-	/*
-	 * BM_RLD determines if the Cx power state was exited as a result of
-	 * bus master requests. Set this bit when using a C3 power state, and
-	 * clear it when using a C1 or C2 power state.
-	 */
-	if ((CPU_ACPI_BM_INFO(handle) & BM_RLD) && (cs_type < CPU_ACPI_C3)) {
-		cpu_acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
-		CPU_ACPI_BM_INFO(handle) &= ~BM_RLD;
-	}
-
-	if ((!(CPU_ACPI_BM_INFO(handle) & BM_RLD)) &&
-	    (cs_type >= CPU_ACPI_C3)) {
-		cpu_acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
-		CPU_ACPI_BM_INFO(handle) |= BM_RLD;
-	}
 
 	switch (cs_type) {
 	default:
@@ -632,24 +592,16 @@ cpu_acpi_idle(void)
 
 	case CPU_ACPI_C3:
 		/*
-		 * recommended in ACPI spec, providing hardware mechanisms
-		 * to prevent master from writing to memory (UP-only)
+		 * All supported Intel processors maintain cache coherency
+		 * during C3.  Currently when entering C3 processors flush
+		 * core caches to higher level shared cache. The shared cache
+		 * maintains state and supports probes during C3.
+		 * Consequently there is no need to handle cache coherency
+		 * and Bus Master activity here with the cache flush, BM_RLD
+		 * bit, BM_STS bit, nor PM2_CNT.ARB_DIS mechanisms described
+		 * in section 8.1.4 of the ACPI Specification 4.0.
 		 */
-		if ((ncpus_online == 1) &&
-		    (CPU_ACPI_BM_INFO(handle) & BM_CTL)) {
-			cpu_acpi_set_register(ACPI_BITREG_ARB_DISABLE, 1);
-			CPU_ACPI_BM_INFO(handle) |= BM_ARB_DIS;
-		/*
-		 * Today all Intel's processor support C3 share cache.
-		 */
-		} else if (x86_vendor != X86_VENDOR_Intel) {
-			__acpi_wbinvd();
-		}
 		acpi_cpu_cstate(&cstates[cs_indx]);
-		if (CPU_ACPI_BM_INFO(handle) & BM_ARB_DIS) {
-			cpu_acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
-			CPU_ACPI_BM_INFO(handle) &= ~BM_ARB_DIS;
-		}
 		break;
 	}
 
@@ -699,7 +651,6 @@ cpu_idle_init(cpu_t *cp)
 	cpu_acpi_cstate_t *cstate;
 	char name[KSTAT_STRLEN];
 	int cpu_max_cstates, i;
-	ACPI_TABLE_FADT *gbl_FADT;
 	int ret;
 
 	/*
@@ -714,13 +665,6 @@ cpu_idle_init(cpu_t *cp)
 		cpu_idle_fini(cp);
 		return (-1);
 	}
-
-	/*
-	 * Check the bus master arbitration control ability.
-	 */
-	acpica_get_global_FADT(&gbl_FADT);
-	if (gbl_FADT->Pm2ControlBlock && gbl_FADT->Pm2ControlLength)
-		CPU_ACPI_BM_INFO(handle) |= BM_CTL;
 
 	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
 
@@ -754,6 +698,8 @@ cpu_idle_init(cpu_t *cp)
 	cpupm_alloc_ms_cstate(cp);
 
 	if (cpu_deep_cstates_supported()) {
+		uint32_t value;
+
 		mutex_enter(&cpu_idle_callb_mutex);
 		if (cpu_deep_idle_callb_id == (callb_id_t)0)
 			cpu_deep_idle_callb_id = callb_add(&cpu_deep_idle_callb,
@@ -762,6 +708,17 @@ cpu_idle_init(cpu_t *cp)
 			cpu_idle_cpr_callb_id = callb_add(&cpu_idle_cpr_callb,
 			    (void *)NULL, CB_CL_CPR_PM, "cpu_idle_cpr");
 		mutex_exit(&cpu_idle_callb_mutex);
+
+
+		/*
+		 * All supported CPUs (Nehalem and later) will remain in C3
+		 * during Bus Master activity.
+		 * All CPUs set ACPI_BITREG_BUS_MASTER_RLD to 0 here if it
+		 * is not already 0 before enabling Deeper C-states.
+		 */
+		cpu_acpi_get_register(ACPI_BITREG_BUS_MASTER_RLD, &value);
+		if (value & 1)
+			cpu_acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
 	}
 
 	return (0);

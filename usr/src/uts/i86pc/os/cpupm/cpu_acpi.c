@@ -734,7 +734,6 @@ cpu_acpi_cache_cst(cpu_acpi_handle_t handle)
 	CPU_ACPI_CSTATES_COUNT(handle) = (uint32_t)cnt;
 	alloc_size = CPU_ACPI_CSTATES_SIZE(cnt);
 	CPU_ACPI_CSTATES(handle) = kmem_zalloc(alloc_size, KM_SLEEP);
-	CPU_ACPI_BM_INFO(handle) = 0;
 	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
 	p = cstate;
 

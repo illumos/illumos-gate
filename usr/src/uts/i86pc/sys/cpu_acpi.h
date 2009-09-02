@@ -71,7 +71,6 @@ extern "C" {
  * C-state realted macros
  */
 #define	CPU_ACPI_CSD(sp)		sp->cs_csd
-#define	CPU_ACPI_BM_INFO(sp)		sp->bm_info
 #define	CPU_ACPI_CSTATES(sp)		sp->cs_cstates.ss_states
 #define	CPU_ACPI_CSTATES_COUNT(sp)	sp->cs_cstates.ss_count
 
@@ -205,7 +204,6 @@ typedef struct cpu_acpi_state {
 	cpu_acpi_tpc_t cs_tpc;
 	cpu_acpi_cstates_t cs_cstates;
 	cpu_acpi_csd_t cs_csd;
-	uint_t bm_info;
 } cpu_acpi_state_t;
 
 typedef cpu_acpi_state_t *cpu_acpi_handle_t;
