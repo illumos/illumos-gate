@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,43 +33,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-
-#include <sys/param.h>
-#include <sys/types.h>
-#include <sys/signal.h>
-#include <sys/stream.h>
-#include <sys/termio.h>
-#include <sys/errno.h>
-#include <sys/file.h>
-#include <sys/cmn_err.h>
-#include <sys/stropts.h>
-#include <sys/strtty.h>
-#include <sys/kbio.h>
-#include <sys/cred.h>
-#include <sys/stat.h>
-#include <sys/consdev.h>
-#include <sys/kmem.h>
-#include <sys/modctl.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
+#include <sys/sysmacros.h>
 #include <sys/pci.h>
-#include <sys/errno.h>
-#include <sys/mac_provider.h>
-#include <sys/dlpi.h>
-#include <sys/ethernet.h>
-#include <sys/list.h>
-#include <sys/byteorder.h>
-#include <sys/strsun.h>
+#include <sys/stat.h>
 #include <sys/strsubr.h>
-#include <sys/policy.h>
-#include <inet/common.h>
-#include <inet/nd.h>
-#include <inet/mi.h>
-#include <inet/wifi_ioctl.h>
+#include <sys/strsun.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
-#include <sys/crypto/common.h>
-#include <sys/crypto/api.h>
-
+#include <sys/net80211.h>
 #include "rtwreg.h"
 #include "rtwvar.h"
 #include "smc93cx6var.h"
@@ -153,9 +124,10 @@ static ddi_dma_attr_t dma_attr_txbuf = {
 
 static void *rtw_soft_state_p = NULL;
 
-static int rtw_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd);
-static int rtw_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd);
-static int	rtw_quiesce(dev_info_t *dip);
+static void	rtw_stop(void *);
+static int	rtw_attach(dev_info_t *, ddi_attach_cmd_t);
+static int	rtw_detach(dev_info_t *, ddi_detach_cmd_t);
+static int	rtw_quiesce(dev_info_t *);
 static int	rtw_m_stat(void *,  uint_t, uint64_t *);
 static int	rtw_m_start(void *);
 static void	rtw_m_stop(void *);
@@ -191,7 +163,7 @@ DDI_DEFINE_STREAM_OPS(rtw_dev_ops, nulldev, nulldev, rtw_attach, rtw_detach,
 
 static struct modldrv rtw_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"realtek 802.11b driver",	/* short description */
+	"realtek 8180L driver 1.7",	/* short description */
 	&rtw_dev_ops		/* driver specific ops */
 };
 
@@ -1828,12 +1800,15 @@ rtw_init(rtw_softc_t *rsc)
 	struct ieee80211com *ic = &rsc->sc_ic;
 	int rc = 0;
 
+	rtw_stop(rsc);
+	mutex_enter(&rsc->sc_genlock);
 	if ((rc = rtw_enable(rsc)) != 0)
 		goto out;
 	rc = rtw_refine_setting(rsc);
-	if (rc != 0)
+	if (rc != 0) {
+		mutex_exit(&rsc->sc_genlock);
 		return (rc);
-
+	}
 	rtw_swring_setup(rsc, 1);
 	rtw_hwring_setup(rsc);
 	RTW_WRITE16(&rsc->sc_regs, RTW_BSSID16, 0x0);
@@ -1845,7 +1820,9 @@ rtw_init(rtw_softc_t *rsc)
 	RTW_DPRINTF(RTW_DEBUG_TUNE, "%s: channel %d freq %d flags 0x%04x\n",
 	    __func__, ieee80211_chan2ieee(ic, ic->ic_curchan),
 	    ic->ic_curchan->ich_freq, ic->ic_curchan->ich_flags);
+	rsc->sc_invalid = 0;
 out:
+	mutex_exit(&rsc->sc_genlock);
 	return (rc);
 }
 
@@ -2451,25 +2428,7 @@ rtw_rate_ctl_reset(rtw_softc_t *rsc, enum ieee80211_state state)
 			in->in_txrate = 0;
 		}
 	}
-#if 0
-	else {
-		/*
-		 * When operating as a station the node table holds
-		 * the AP's that were discovered during scanning.
-		 * For any other operating mode we want to reset the
-		 * tx rate state of each node.
-		 */
-		in = list_head(&ic->ic_in_list);
-		while (in != NULL) {
-			in->in_txrate = 0;
-			in = list_next(&ic->ic_in_list, in);
-		}
-		in->in_txrate = 0;
-	}
-#endif
 }
-
-static int startctl = 0;
 
 /*
  * Examine and potentially adjust the transmit rate.
@@ -2481,56 +2440,32 @@ rtw_rate_ctl(void *arg)
 	rtw_softc_t *rsc = (rtw_softc_t *)ic;
 	struct ieee80211_node *in = ic->ic_bss;
 	struct ieee80211_rateset *rs = &in->in_rates;
-	int32_t mod = 0, nrate, enough;
+	int32_t mod = 1, nrate, enough;
 
 	mutex_enter(&rsc->sc_genlock);
+	enough = (rsc->sc_tx_ok + rsc->sc_tx_err) >= 600? 1 : 0;
 
-	enough = (rsc->sc_tx_ok + rsc->sc_tx_err >= 10);
-
-	/* no packet reached -> down */
-	if (rsc->sc_tx_err > 0 && rsc->sc_tx_ok == 0)
-		mod = -1;
-
-	/* all packets needs retry in average -> down */
+	/* err ratio is high -> down */
 	if (enough && rsc->sc_tx_ok < rsc->sc_tx_err)
 		mod = -1;
 
-	/* no error and less than 10% of packets needs retry -> up */
-	if (enough &&
-	    rsc->sc_tx_ok > rsc->sc_tx_err * 5)
-		mod = 1;
-
 	nrate = in->in_txrate;
 	switch (mod) {
-	case 0:
-		if (enough && rsc->sc_tx_upper > 0)
-			rsc->sc_tx_upper--;
-		break;
 	case -1:
 		if (nrate > 0) {
 			nrate--;
 		}
-		rsc->sc_tx_upper = 0;
 		break;
 	case 1:
-		if (++rsc->sc_tx_upper < 10)
-			break;
-		rsc->sc_tx_upper = 0;
 		if (nrate + 1 < rs->ir_nrates) {
 			nrate++;
 		}
 		break;
 	}
 
-	if (nrate != in->in_txrate) {
+	if (nrate != in->in_txrate)
 		in->in_txrate = nrate;
-	} else if (enough)
-		rsc->sc_tx_ok = rsc->sc_tx_err = rsc->sc_tx_retr = 0;
-	if (!startctl) {
-		rsc->sc_tx_ok = rsc->sc_tx_err = rsc->sc_tx_retr = 0;
-		startctl = 1;
-	}
-
+	rsc->sc_tx_ok = rsc->sc_tx_err = rsc->sc_tx_retr = 0;
 	mutex_exit(&rsc->sc_genlock);
 	if (ic->ic_state == IEEE80211_S_RUN)
 		rsc->sc_ratectl_id = timeout(rtw_rate_ctl, ic,
@@ -2563,14 +2498,15 @@ rtw_new_state(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	rtw_rate_ctl_reset(rsc, nstate);
 	if (ostate == IEEE80211_S_INIT && nstate != IEEE80211_S_INIT)
 		(void) rtw_pwrstate(rsc, RTW_ON);
-	if ((error = rtw_tune(rsc)) != 0) {
-		mutex_exit(&rsc->sc_genlock);
-		return (error);
+	if (nstate != IEEE80211_S_INIT) {
+		if ((error = rtw_tune(rsc)) != 0) {
+			mutex_exit(&rsc->sc_genlock);
+			return (error);
+		}
 	}
 	switch (nstate) {
 	case IEEE80211_S_INIT:
 		RTW_DPRINTF(RTW_DEBUG_ATTACH, "rtw_new_state: S_INIT\n");
-		startctl = 0;
 		break;
 	case IEEE80211_S_SCAN:
 		RTW_DPRINTF(RTW_DEBUG_ATTACH, "rtw_new_state: S_SCAN\n");
@@ -2903,24 +2839,26 @@ rtw_intr(caddr_t arg)
 }
 
 static void
-rtw_m_stop(void *arg)
+rtw_stop(void *arg)
 {
 	rtw_softc_t *rsc = (rtw_softc_t *)arg;
 	struct rtw_regs *regs = &rsc->sc_regs;
 
-	(void) ieee80211_new_state(&rsc->sc_ic, IEEE80211_S_INIT, -1);
-	/*
-	 * Stop the transmit and receive processes. First stop DMA,
-	 * then disable receiver and transmitter.
-	 */
 	mutex_enter(&rsc->sc_genlock);
 	rtw_disable_interrupts(regs);
 	rtw_io_enable(rsc, RTW_CR_RE | RTW_CR_TE, 0);
 	RTW_WRITE8(regs, RTW_TPPOLL, RTW_TPPOLL_SALL);
-	mutex_exit(&rsc->sc_genlock);
-	delay(1);
-
 	rsc->sc_invalid = 1;
+	mutex_exit(&rsc->sc_genlock);
+}
+
+static void
+rtw_m_stop(void *arg)
+{
+	rtw_softc_t *rsc = (rtw_softc_t *)arg;
+
+	(void) ieee80211_new_state(&rsc->sc_ic, IEEE80211_S_INIT, -1);
+	rtw_stop(rsc);
 }
 
 /*
@@ -2958,25 +2896,19 @@ static int
 rtw_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
     uint_t wldp_length, const void *wldp_buf)
 {
-	rtw_softc_t *rsc = arg;
+	rtw_softc_t *rsc = (rtw_softc_t *)arg;
+	struct ieee80211com *ic = &rsc->sc_ic;
 	int err;
 
-	err = ieee80211_setprop(&rsc->sc_ic, pr_name, wldp_pr_num,
+	err = ieee80211_setprop(ic, pr_name, wldp_pr_num,
 	    wldp_length, wldp_buf);
-
-	mutex_enter(&rsc->sc_genlock);
 	if (err == ENETRESET) {
-		if (rsc->sc_invalid == 0) {
-			mutex_exit(&rsc->sc_genlock);
-			rtw_m_stop(rsc);
-			(void) rtw_m_start(rsc);
-			(void) ieee80211_new_state(&rsc->sc_ic,
-			    IEEE80211_S_SCAN, -1);
-			mutex_enter(&rsc->sc_genlock);
+		if (ic->ic_des_esslen && (rsc->sc_invalid == 0)) {
+			(void) rtw_init(rsc);
+			(void) ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 		}
 		err = 0;
 	}
-	mutex_exit(&rsc->sc_genlock);
 	return (err);
 }
 
@@ -3003,23 +2935,13 @@ rtw_m_start(void *arg)
 #ifdef DEBUG
 	rtw_print_regs(&rsc->sc_regs, "rtw", "rtw_start");
 #endif
-	mutex_enter(&rsc->sc_genlock);
+
 	ret = rtw_init(rsc);
 	if (ret) {
 		cmn_err(CE_WARN, "rtw: failed to do rtw_init\n");
-		mutex_exit(&rsc->sc_genlock);
-		return (-1);
+		return (EIO);
 	}
-	ic->ic_state = IEEE80211_S_INIT;
-	mutex_exit(&rsc->sc_genlock);
-
-	/*
-	 * fix KCF bug. - workaround, need to fix it in net80211
-	 */
-	(void) crypto_mech2id(SUN_CKM_RC4);
-
 	(void) ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-	rsc->sc_invalid = 0;
 	return (0);
 }
 
@@ -3091,17 +3013,17 @@ rtw_m_multicst(void *arg, boolean_t add, const uint8_t *macaddr)
 }
 
 static void
-rtw_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
+rtw_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 {
 	rtw_softc_t *rsc = arg;
-	int32_t err;
+	struct ieee80211com *ic = &rsc->sc_ic;
+	int err;
 
-	err = ieee80211_ioctl(&rsc->sc_ic, wq, mp);
+	err = ieee80211_ioctl(ic, wq, mp);
 	if (err == ENETRESET) {
-		if (rsc->sc_invalid == 0) {
-			rtw_m_stop(rsc);
-			(void) rtw_m_start(rsc);
-			(void) ieee80211_new_state(&rsc->sc_ic,
+		if (ic->ic_des_esslen && (rsc->sc_invalid == 0)) {
+			(void) rtw_init(rsc);
+			(void) ieee80211_new_state(ic,
 			    IEEE80211_S_SCAN, -1);
 		}
 	}
@@ -3111,15 +3033,18 @@ static int
 rtw_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	rtw_softc_t *rsc = (rtw_softc_t *)arg;
-	ieee80211com_t *ic = (ieee80211com_t *)rsc;
-	struct ieee80211_node *in = ic->ic_bss;
-	struct ieee80211_rateset *rs = &in->in_rates;
+	ieee80211com_t *ic = &rsc->sc_ic;
+	struct ieee80211_node *in = 0;
+	struct ieee80211_rateset *rs = 0;
 
 	mutex_enter(&rsc->sc_genlock);
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
-		*val = ((rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL))
-		    * 500000;
+		in = ic->ic_bss;
+		rs = &in->in_rates;
+		*val = ((ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
+		    (rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL)
+		    : ic->ic_fixed_rate) / 2 * 1000000;
 		break;
 	case MAC_STAT_NOXMTBUF:
 		*val = rsc->sc_noxmtbuf;
@@ -3192,6 +3117,22 @@ rtw_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_ATTACH:
 		break;
+	case DDI_RESUME:
+		rsc = ddi_get_soft_state(rtw_soft_state_p,
+		    ddi_get_instance(devinfo));
+		ASSERT(rsc != NULL);
+		mutex_enter(&rsc->sc_genlock);
+		rsc->sc_flags &= ~RTW_F_SUSPEND;
+		mutex_exit(&rsc->sc_genlock);
+		if ((rsc->sc_flags & RTW_F_PLUMBED)) {
+			err = rtw_init(rsc);
+			if (err == 0) {
+				mutex_enter(&rsc->sc_genlock);
+				rsc->sc_flags &= ~RTW_F_PLUMBED;
+				mutex_exit(&rsc->sc_genlock);
+			}
+		}
+		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);
 	}
@@ -3398,6 +3339,7 @@ rtw_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	rsc->sc_invalid = 1;
 	return (DDI_SUCCESS);
 attach_fail9:
+	(void) mac_disable(ic->ic_mach);
 	(void) mac_unregister(ic->ic_mach);
 attach_fail8:
 	ddi_remove_intr(devinfo, 0, rsc->sc_iblock);
@@ -3430,6 +3372,18 @@ rtw_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		break;
+	case DDI_SUSPEND:
+		ieee80211_new_state(&rsc->sc_ic, IEEE80211_S_INIT, -1);
+		mutex_enter(&rsc->sc_genlock);
+		rsc->sc_flags |= RTW_F_SUSPEND;
+		mutex_exit(&rsc->sc_genlock);
+		if (rsc->sc_invalid == 0) {
+			rtw_stop(rsc);
+			mutex_enter(&rsc->sc_genlock);
+			rsc->sc_flags |= RTW_F_PLUMBED;
+			mutex_exit(&rsc->sc_genlock);
+		}
+		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);
 	}

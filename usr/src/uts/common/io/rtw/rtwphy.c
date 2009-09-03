@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -36,38 +36,8 @@
  * Control the Philips SA2400 RF front-end and the baseband processor
  * built into the Realtek RTL8180.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/param.h>
 #include <sys/types.h>
-#include <sys/signal.h>
-#include <sys/stream.h>
-#include <sys/termio.h>
-#include <sys/errno.h>
-#include <sys/file.h>
-#include <sys/cmn_err.h>
-#include <sys/stropts.h>
-#include <sys/strtty.h>
-#include <sys/kbio.h>
-#include <sys/cred.h>
-#include <sys/stat.h>
-#include <sys/consdev.h>
-#include <sys/kmem.h>
-#include <sys/modctl.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-#include <sys/pci.h>
-#include <sys/errno.h>
-#include <sys/gld.h>
-#include <sys/dlpi.h>
-#include <sys/ethernet.h>
-#include <sys/list.h>
-#include <sys/byteorder.h>
-#include <sys/strsun.h>
-#include <inet/common.h>
-#include <inet/nd.h>
-#include <inet/mi.h>
-
+#include <sys/sysmacros.h>
 #include "rtwreg.h"
 #include "rtwvar.h"
 #include "max2820reg.h"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -33,14 +33,19 @@
  * OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _RTWPHYIO_H
 #define	_RTWPHYIO_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int rtw_rf_hostwrite(struct rtw_regs *, enum rtw_rfchipid, uint_t, uint32_t);
 int rtw_rf_macwrite(struct rtw_regs *, enum rtw_rfchipid, uint_t, uint32_t);
 uint8_t rtw_bbp_read(struct rtw_regs *, uint_t);
 int rtw_bbp_write(struct rtw_regs *, uint_t, uint_t);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _RTWPHYIO_H */

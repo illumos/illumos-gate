@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,11 +33,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SI4136REG_H_
 #define	_SI4136REG_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Serial bus format for Silicon Laboratories Si4126/Si4136 RF synthesizer.
@@ -91,5 +92,8 @@
 #define	SI4126_RF1R	6		/* RF1 R divider */
 #define	SI4126_RF2R	7		/* RF2 R divider */
 #define	SI4126_IFR	8		/* IF R divider */
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SI4136REG_H_ */

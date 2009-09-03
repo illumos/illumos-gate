@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,11 +33,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _MAX2820REG_H_
 #define	_MAX2820REG_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Serial bus format for Maxim MAX2820/MAX2820A/MAX2821/MAX2821A
@@ -210,5 +211,9 @@
  */
 #define	MAX2820_TRANSMIT_PA_MASK	BITS(3, 0)
 #define	MAX2820_TRANSMIT_PA_DEFAULT	LSHIFT(0, MAX2820_TRANSMIT_PA_MASK)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _MAX2820REG_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,30 +59,8 @@
  *   bit to be sent from the chip.
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/param.h>
-#include <sys/types.h>
-#include <sys/signal.h>
-#include <sys/stream.h>
-#include <sys/termio.h>
-#include <sys/errno.h>
-#include <sys/file.h>
-#include <sys/cmn_err.h>
-#include <sys/stropts.h>
-#include <sys/strtty.h>
-#include <sys/kbio.h>
-#include <sys/cred.h>
-#include <sys/stat.h>
-#include <sys/consdev.h>
-#include <sys/kmem.h>
-#include <sys/modctl.h>
-#include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/systm.h>
 #include "smc93cx6var.h"
-
 /*
  * Right now, we only have to read the SEEPROM.  But we make it easier to
  * add other 93Cx6 functions.

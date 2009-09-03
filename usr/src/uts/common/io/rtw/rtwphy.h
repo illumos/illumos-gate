@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -32,16 +32,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _RTWPHY_H
 #define	_RTWPHY_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct rtw_rf *rtw_sa2400_create(struct rtw_regs *, rtw_rf_write_t, int);
 struct rtw_rf *rtw_max2820_create(struct rtw_regs *, rtw_rf_write_t, int);
 
 int rtw_phy_init(struct rtw_regs *, struct rtw_rf *, uint8_t, uint8_t, uint_t,
     int, int, enum rtw_pwrstate);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _RTWPHY_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -32,11 +32,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _RTWVAR_H_
 #define	_RTWVAR_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <sys/list.h>
 #include <sys/net80211.h>
@@ -106,6 +107,8 @@ enum rtw_rfchipid {
 #define	RTW_F_9356SROM		0x00000020	/* 93c56 SROM */
 #define	RTW_F_SLEEP		0x00000040	/* chip is asleep */
 #define	RTW_F_INVALID		0x00000080	/* chip is absent */
+#define	RTW_F_SUSPEND		0x00000100	/* driver is suspended */
+#define	RTW_F_PLUMBED		0x00000200	/* driver is plumbed */
 #define	RTW_F_ATTACHED		0x01000000	/* driver is attached */
 /*
  * all PHY flags
@@ -482,7 +485,6 @@ typedef struct rtw_softc {
 	uint32_t		sc_tx_ok;
 	uint32_t		sc_tx_err;
 	uint32_t		sc_tx_retr;
-	uint32_t		sc_tx_upper;
 	uint32_t		sc_xmtretry;
 	uint32_t		sc_noxmtbuf;
 	uint32_t		sc_norcvbuf;
@@ -497,5 +499,8 @@ typedef struct rtw_softc {
 } rtw_softc_t;
 
 #define	RTW_SC(ic) ((rtw_softc_t *)ic)
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _RTWVAR_H_ */

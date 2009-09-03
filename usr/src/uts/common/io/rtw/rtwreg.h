@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -33,12 +33,13 @@
  * OF SUCH DAMAGE.
  */
 /* Macros for bit twiddling. */
-/* TBD factor w/ dev/ic/atwreg.h. */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _RTW_REG_H_
 #define	_RTW_REG_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef _BIT_TWIDDLE
 #define	_BIT_TWIDDLE
@@ -1389,5 +1390,8 @@ struct rtw_rxdesc {
 
 #define	RTW_CMD_RST_SHIFT (4)
 #define	RTW_TX_DMA_STOP_BEACON_SHIFT 3
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _RTW_REG_H_ */

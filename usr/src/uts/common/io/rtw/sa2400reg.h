@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -32,11 +32,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SA2400REG_H_
 #define	_SA2400REG_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Serial bus format for Philips SA2400 Single-chip Transceiver.
@@ -316,4 +317,8 @@
  *        frequencies
  */
 #define	SA2400_VCO_VCOBAND_MASK	BITS(3, 0)
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _SA2400REG_H_ */

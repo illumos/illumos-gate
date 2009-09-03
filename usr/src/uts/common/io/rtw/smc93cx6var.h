@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,11 +38,12 @@
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.40 2000/01/07 23:08:17gibbs Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _SMC93CX6VAR_H_
 #define	_SMC93CX6VAR_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -121,4 +122,8 @@ struct seeprom_descriptor {
 
 int read_seeprom(struct seeprom_descriptor *sd, uint16_t *buf,
     size_t start_addr, size_t count);
+#ifdef __cplusplus
+}
+#endif
+
 #endif	/* _SMC93CX6VAR_H_ */
