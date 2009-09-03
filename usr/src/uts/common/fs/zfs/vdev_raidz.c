@@ -116,7 +116,8 @@ typedef struct raidz_map {
 	uint64_t rm_missingdata;	/* Count of missing data devices */
 	uint64_t rm_missingparity;	/* Count of missing parity devices */
 	uint64_t rm_firstdatacol;	/* First data column/parity count */
-	uint64_t rm_skipped;		/* Skipped sectors for padding */
+	uint64_t rm_nskip;		/* Skipped sectors for padding */
+	uint64_t rm_skipstart;	/* Column index of padding start */
 	raidz_col_t rm_col[1];		/* Flexible array of I/O columns */
 } raidz_map_t;
 
@@ -288,6 +289,7 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	rm->rm_cols = acols;
 	rm->rm_scols = scols;
 	rm->rm_bigcols = bc;
+	rm->rm_skipstart = bc;
 	rm->rm_missingdata = 0;
 	rm->rm_missingparity = 0;
 	rm->rm_firstdatacol = nparity;
@@ -320,9 +322,9 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 
 	ASSERT3U(asize, ==, tot << unit_shift);
 	rm->rm_asize = roundup(asize, (nparity + 1) << unit_shift);
-	rm->rm_skipped = roundup(tot, nparity + 1) - tot;
-	ASSERT3U(rm->rm_asize - asize, ==, rm->rm_skipped << unit_shift);
-	ASSERT3U(rm->rm_skipped, <=, nparity);
+	rm->rm_nskip = roundup(tot, nparity + 1) - tot;
+	ASSERT3U(rm->rm_asize - asize, ==, rm->rm_nskip << unit_shift);
+	ASSERT3U(rm->rm_nskip, <=, nparity);
 
 	for (c = 0; c < rm->rm_firstdatacol; c++)
 		rm->rm_col[c].rc_data = zio_buf_alloc(rm->rm_col[c].rc_size);
@@ -347,6 +349,11 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	 * Unfortunately, this decision created an implicit on-disk format
 	 * requirement that we need to support for all eternity, but only
 	 * for single-parity RAID-Z.
+	 *
+	 * If we intend to skip a sector in the zeroth column for padding
+	 * we must make sure to note this swap. We will never intend to
+	 * skip the first column since at least one data and one parity
+	 * column must appear in each row.
 	 */
 	ASSERT(rm->rm_cols >= 2);
 	ASSERT(rm->rm_col[0].rc_size == rm->rm_col[1].rc_size);
@@ -358,6 +365,9 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 		rm->rm_col[0].rc_offset = rm->rm_col[1].rc_offset;
 		rm->rm_col[1].rc_devidx = devidx;
 		rm->rm_col[1].rc_offset = o;
+
+		if (rm->rm_skipstart == 0)
+			rm->rm_skipstart = 1;
 	}
 
 	zio->io_vsd = rm;
@@ -1361,7 +1371,7 @@ vdev_raidz_io_start(zio_t *zio)
 		 * Generate optional I/Os for any skipped sectors to improve
 		 * aggregation contiguity.
 		 */
-		for (c = rm->rm_bigcols, i = 0; i < rm->rm_skipped; c++, i++) {
+		for (c = rm->rm_skipstart, i = 0; i < rm->rm_nskip; c++, i++) {
 			ASSERT(c <= rm->rm_scols);
 			if (c == rm->rm_scols)
 				c = 0;
@@ -1586,8 +1596,12 @@ vdev_raidz_combrec(zio_t *zio, int total_errors, int data_errors)
 					c = tgts[i];
 					rc = &rm->rm_col[c];
 					ASSERT(rc->rc_error == 0);
-					if (rc->rc_tried)
+					if (rc->rc_tried) {
+						if (bcmp(orig[i], rc->rc_data,
+						    rc->rc_size) == 0)
+							continue;
 						raidz_checksum_error(zio, rc);
+					}
 					rc->rc_error = ECKSUM;
 				}
 
