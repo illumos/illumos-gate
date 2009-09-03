@@ -777,13 +777,13 @@ outvol(struct cfent **eptlist, unsigned int eptnum, int part, int nparts)
 		 * the pkgmap, we fix the attributes here.
 		 */
 		if (*(eptlist[i]->ainfo.owner) != '$' &&
-		    *(eptlist[i]->ainfo.group) != '$' && getuid() == 0) {
+		    *(eptlist[i]->ainfo.group) != '$') {
 			/* Clear dangerous bits. */
 			eptlist[i]->ainfo.mode=
 			    (eptlist[i]->ainfo.mode & S_IAMB);
 			/*
 			 * Make sure it can be read by the world and written
-			 * by root.
+			 * by the owner.
 			 */
 			eptlist[i]->ainfo.mode |= 0644;
 			if (!strchr("in", eptlist[i]->ftype)) {
