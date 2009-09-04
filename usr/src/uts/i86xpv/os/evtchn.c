@@ -1443,8 +1443,15 @@ restart:
 		sip = (uint16_t)cpu->cpu_softinfo.st_pending;
 		if (sip != 0) {
 			sipri = bsrw_insn(sip);
-			if (sipri > pri && sipri > cpu->cpu_pri)
+			if (sipri > pri && sipri > cpu->cpu_pri) {
 				dosoftint(rp);
+				/*
+				 * Check for cpu priority change
+				 * Can happen if softint thread blocks
+				 */
+				if (cpu->cpu_pri != curpri)
+					goto restart;
+			}
 		}
 	}
 	/*

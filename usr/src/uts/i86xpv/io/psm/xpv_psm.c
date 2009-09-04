@@ -556,8 +556,12 @@ xen_psm_intr_enter(int ipl, int *vector)
 		 * we need to service this int.  We can't return a lower
 		 * priority than current cpu priority.  Just synthesize a
 		 * priority to return that should be acceptable.
+		 * It should never happen that we synthesize a priority that
+		 * moves us from low-priority to high-priority that would make
+		 * a us incorrectly run on the high priority stack.
 		 */
 		newipl = cpu->cpu_pri + 1;	/* synthetic priority */
+		ASSERT(newipl != LOCK_LEVEL + 1);
 	}
 	return (newipl);
 }
