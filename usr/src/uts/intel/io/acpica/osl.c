@@ -786,7 +786,7 @@ static struct io_perm  {
 	ACPI_IO_ADDRESS	high;
 	uint8_t		perm;
 } osl_io_perm[] = {
-	{ 0xcf8, 0xd00, OSL_IO_NONE | OSL_IO_TERM }
+	{ 0xcf8, 0xd00, OSL_IO_TERM | OSL_IO_RW}
 };
 
 

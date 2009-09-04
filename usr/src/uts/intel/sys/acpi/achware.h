@@ -141,6 +141,12 @@ AcpiHwGetMode (
 /*
  * hwregs - ACPI Register I/O
  */
+ACPI_STATUS
+AcpiHwValidateRegister (
+    ACPI_GENERIC_ADDRESS    *Reg,
+    UINT8                   MaxBitWidth,
+    UINT64                  *Address);
+
 ACPI_BIT_REGISTER_INFO *
 AcpiHwGetBitRegisterInfo (
     UINT32                  RegisterId);
@@ -163,6 +169,11 @@ AcpiHwRegisterWrite (
 ACPI_STATUS
 AcpiHwClearAcpiStatus (
     void);
+
+ACPI_STATUS
+AcpiHwWrite (
+    UINT32                  Value,
+    ACPI_GENERIC_ADDRESS    *Reg);
 
 
 /*

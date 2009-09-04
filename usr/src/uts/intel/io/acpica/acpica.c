@@ -44,6 +44,7 @@
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
+#include <sys/archsystm.h>
 
 /*
  *
@@ -717,4 +718,22 @@ acpica_ddi_restore_resources(dev_info_t *dip)
 	(void) AcpiSetCurrentResources(devobj, &resbuf);
 	ddi_prop_free(propdata);
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "acpi-crs");
+}
+
+void
+acpi_reset_system(void)
+{
+	ACPI_STATUS status;
+	int ten;
+
+	status = AcpiReset();
+	if (status == AE_OK) {
+		/*
+		 * Wait up to 500 milliseconds for AcpiReset() to make its
+		 * way.
+		 */
+		ten = 50000;
+		while (ten-- > 0)
+			tenmicrosec();
+	}
 }

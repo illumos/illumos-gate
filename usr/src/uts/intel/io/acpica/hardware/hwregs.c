@@ -140,6 +140,141 @@ AcpiHwWriteMultiple (
     ACPI_GENERIC_ADDRESS    *RegisterB);
 
 
+
+/******************************************************************************
+ *
+ * FUNCTION:    AcpiHwValidateRegister
+ *
+ * PARAMETERS:  Reg                 - GAS register structure
+ *              MaxBitWidth         - Max BitWidth supported (32 or 64)
+ *              Address             - Pointer to where the gas->address
+ *                                    is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Validate the contents of a GAS register. Checks the GAS
+ *              pointer, Address, SpaceId, BitWidth, and BitOffset.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiHwValidateRegister (
+    ACPI_GENERIC_ADDRESS    *Reg,
+    UINT8                   MaxBitWidth,
+    UINT64                  *Address)
+{
+
+    /* Must have a valid pointer to a GAS structure */
+
+    if (!Reg)
+    {
+    	return (AE_BAD_PARAMETER);
+    }
+
+    /*
+     * Copy the target address. This handles possible alignment issues.
+     * Address must not be null. A null address also indicates an optional
+     * ACPI register that is not supported, so no error message.
+     */
+    ACPI_MOVE_64_TO_64 (Address, &Reg->Address);
+    if (!(*Address))
+    {
+    	return (AE_BAD_ADDRESS);
+    }
+
+    /* Validate the SpaceID */
+
+    if ((Reg->SpaceId != ACPI_ADR_SPACE_SYSTEM_MEMORY) &&
+    	(Reg->SpaceId != ACPI_ADR_SPACE_SYSTEM_IO))
+    {
+    	ACPI_ERROR ((AE_INFO,
+            "Unsupported address space: 0x%X", Reg->SpaceId));
+    	return (AE_SUPPORT);
+    }
+
+    /* Validate the BitWidth */
+
+    if ((Reg->BitWidth != 8) &&
+    	(Reg->BitWidth != 16) &&
+    	(Reg->BitWidth != 32) &&
+    	(Reg->BitWidth != MaxBitWidth))
+    {
+    	ACPI_ERROR ((AE_INFO,
+            "Unsupported register bit width: 0x%X", Reg->BitWidth));
+    	return (AE_SUPPORT);
+    }
+
+    /* Validate the BitOffset. Just a warning for now. */
+
+    if (Reg->BitOffset != 0)
+    {
+    	ACPI_WARNING ((AE_INFO,
+            "Unsupported register bit offset: 0x%X", Reg->BitOffset));
+    }
+
+    return (AE_OK);
+}
+
+
+/******************************************************************************
+ *
+ * FUNCTION:    AcpiHwWrite
+ *
+ * PARAMETERS:  Value               - Value to be written
+ *              Reg                 - GAS register structure
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Write to either memory or IO space. This is a 32-bit max
+ *              version of AcpiWrite, used internally since the overhead of
+ *              64-bit values is not needed.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiHwWrite (
+    UINT32                  Value,
+    ACPI_GENERIC_ADDRESS    *Reg)
+{
+    UINT64                  Address;
+    ACPI_STATUS             Status;
+
+
+    ACPI_FUNCTION_NAME (HwWrite);
+
+
+    /* Validate contents of the GAS register */
+
+    Status = AcpiHwValidateRegister (Reg, 32, &Address);
+    if (ACPI_FAILURE (Status))
+    {
+        return (Status);
+    }
+
+    /*
+     * Two address spaces supported: Memory or IO. PCI_Config is
+     * not supported here because the GAS structure is insufficient
+     */
+    if (Reg->SpaceId == ACPI_ADR_SPACE_SYSTEM_MEMORY)
+    {
+        Status = AcpiOsWriteMemory ((ACPI_PHYSICAL_ADDRESS)
+                    Address, Value, Reg->BitWidth);
+    }
+    else /* ACPI_ADR_SPACE_SYSTEM_IO, validated earlier */
+    {
+    	Status = AcpiHwWritePort ((ACPI_IO_ADDRESS)
+                    Address, Value, Reg->BitWidth);
+    }
+
+    ACPI_DEBUG_PRINT ((ACPI_DB_IO,
+    	"Wrote: %8.8X width %2d	  to %8.8X%8.8X (%s)\n",
+    	Value, Reg->BitWidth, ACPI_FORMAT_UINT64 (Address),
+    	AcpiUtGetRegionName (Reg->SpaceId)));
+
+    return (Status);
+}
+
+
 /*******************************************************************************
  *
  * FUNCTION:    AcpiHwClearAcpiStatus

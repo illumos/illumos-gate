@@ -420,25 +420,48 @@ debug_enter(
 void
 reset(void)
 {
+	extern	void acpi_reset_system();
 #if !defined(__xpv)
 	ushort_t *bios_memchk;
 
 	/*
-	 * Can't use psm_map_phys before the hat is initialized.
+	 * Can't use psm_map_phys or acpi_reset_system before the hat is
+	 * initialized.
 	 */
 	if (khat_running) {
 		bios_memchk = (ushort_t *)psm_map_phys(0x472,
 		    sizeof (ushort_t), PROT_READ | PROT_WRITE);
 		if (bios_memchk)
 			*bios_memchk = 0x1234;	/* bios memory check disable */
+
+		if (options_dip != NULL &&
+		    ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), 0,
+		    "efi-systab")) {
+			efi_reset();
+		}
+
+		/*
+		 * The problem with using stubs is that we can call
+		 * acpi_reset_system only after the kernel is up and running.
+		 *
+		 * We should create a global state to keep track of how far
+		 * up the kernel is but for the time being we will depend on
+		 * bootops. bootops cleared in startup_end().
+		 */
+		if (bootops == NULL)
+			acpi_reset_system();
 	}
 
-	if (ddi_prop_exists(DDI_DEV_T_ANY, ddi_root_node(), 0, "efi-systab"))
-		efi_reset();
 	pc_reset();
 #else
-	if (IN_XPV_PANIC())
+	if (IN_XPV_PANIC()) {
+		if (khat_running && bootops == NULL) {
+			acpi_reset_system();
+		}
+
 		pc_reset();
+	}
+
 	(void) HYPERVISOR_shutdown(SHUTDOWN_reboot);
 	panic("HYPERVISOR_shutdown() failed");
 #endif

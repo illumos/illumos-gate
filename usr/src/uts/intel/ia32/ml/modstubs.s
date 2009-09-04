@@ -1342,6 +1342,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(acpica, acpica_write_cpupm_capabilities,
 	    nomod_minus_one)		       ;
 	NO_UNLOAD_STUB(acpica, __acpi_wbinvd, nomod_minus_one) ;
+	NO_UNLOAD_STUB(acpica, acpi_reset_system, nomod_minus_one) ;
 	END_MODULE(acpica);
 #endif
 
