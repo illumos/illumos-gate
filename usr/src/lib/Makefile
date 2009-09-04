@@ -407,6 +407,7 @@ HDRSUBDIRS=		\
 	libinetcfg	\
 	libinetsvc	\
 	libinetutil	\
+	libinstzones	\
 	libipmi		\
 	libipmp		\
 	libipp		\

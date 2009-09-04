@@ -28,4 +28,4 @@
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
-#include "instzones_api.h"
+#include <instzones_api.h>

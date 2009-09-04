@@ -41,5 +41,7 @@ i depend
 # SUNWinstallint
 #
 d none usr 755 root sys
+d none usr/include 755 root bin
+f none usr/include/instzones_api.h 644 root bin
 d none usr/lib 755 root bin
 s none usr/lib/libinstzones.so=./libinstzones.so.1

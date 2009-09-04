@@ -23,6 +23,14 @@
 # Use is subject to license terms.
 #
 
+
+# include library definitions
+include $(SRC)/lib/Makefile.lib
+
+HDRS =		instzones_api.h
+HDRDIR =        hdrs
+
+
 SUBDIRS	=	$(MACH) 
 
 all :=		TARGET = all
@@ -40,4 +48,13 @@ all clean clobber install _msg lint: $(SUBDIRS)
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
+
+install_h:      $(ROOTHDRS)
+
+check:          $(CHECKHDRS)
+
+
 FRC:
+
+# include library targets
+include $(SRC)/lib/Makefile.targ
