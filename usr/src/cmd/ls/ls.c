@@ -453,12 +453,13 @@ main(int argc, char *argv[])
 					continue;
 				}
 
-				if ((strcmp(optarg, "auto") == 0 ||
+				if (strcmp(optarg, "auto") == 0 ||
 				    strcmp(optarg, "tty") == 0 ||
-				    strcmp(optarg, "if-tty") == 0) &&
-				    isatty(1) == 1) {
-					colorflg++;
-					statreq++;
+				    strcmp(optarg, "if-tty") == 0) {
+					if (isatty(1) == 1) {
+						colorflg++;
+						statreq++;
+					}
 					continue;
 				}
 
