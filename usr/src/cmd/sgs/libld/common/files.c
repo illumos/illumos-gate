@@ -555,6 +555,38 @@ invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 }
 
 /*
+ * Compare an input section name to a given string, taking the ELF '%'
+ * section naming convention into account. If an input section name
+ * contains a '%' character, the '%' and all following characters are
+ * ignored in the comparison.
+ *
+ * entry:
+ *	is_name - Name of input section
+ *	match_name - Name to compare to
+ *	match_len - strlen(match_name)
+ *
+ * exit:
+ *	Returns True (1) if the names match, and False (0) otherwise.
+ */
+inline static int
+is_name_cmp(const char *is_name, const char *match_name, size_t match_len)
+{
+	/*
+	 * If the start of is_name is not a match for name,
+	 * the match fails.
+	 */
+	if (strncmp(is_name, match_name, match_len) != 0)
+		return (0);
+
+	/*
+	 * The prefix matched. The next character must be either '%', or
+	 * NULL, in order for a match to be true.
+	 */
+	is_name += match_len;
+	return ((*is_name == '\0') || (*is_name == '%'));
+}
+
+/*
  * Process a progbits section.
  */
 static uintptr_t
@@ -614,33 +646,36 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 				case 'e':
 					if ((ld_targ.t_m.m_sht_unwind ==
 					    SHT_PROGBITS) &&
-					    (strcmp(name,
-					    MSG_ORIG(MSG_SCN_EHFRAME)) == 0)) {
+					    is_name_cmp(name,
+					    MSG_ORIG(MSG_SCN_EHFRAME),
+					    MSG_SCN_EHFRAME_SIZE)) {
 						ident = ld_targ.t_id.id_unwind;
 						is_flags = FLG_IS_EHFRAME;
 						done = 1;
 					}
 					break;
 				case 'g':
-					if (strcmp(name,
-					    MSG_ORIG(MSG_SCN_GOT)) == 0) {
+					if (is_name_cmp(name,
+					    MSG_ORIG(MSG_SCN_GOT),
+					    MSG_SCN_GOT_SIZE)) {
 						ident = ld_targ.t_id.id_null;
 						done = 1;
 						break;
 					}
 					if ((ld_targ.t_m.m_sht_unwind ==
-					    SHT_PROGBITS)&&
-					    (strcmp(name,
-					    MSG_ORIG(MSG_SCN_GCC_X_TBL)) ==
-					    0)) {
+					    SHT_PROGBITS) &&
+					    is_name_cmp(name,
+					    MSG_ORIG(MSG_SCN_GCC_X_TBL),
+					    MSG_SCN_GCC_X_TBL_SIZE)) {
 						ident = ld_targ.t_id.id_unwind;
 						done = 1;
 						break;
 					}
 					break;
 				case 'p':
-					if (strcmp(name,
-					    MSG_ORIG(MSG_SCN_PLT)) == 0) {
+					if (is_name_cmp(name,
+					    MSG_ORIG(MSG_SCN_PLT),
+					    MSG_SCN_PLT_SIZE)) {
 						ident = ld_targ.t_id.id_null;
 						done = 1;
 					}

@@ -1530,3 +1530,4 @@ Bugid   Risk Synopsis
 	array size
 6834197 ld pukes when given an empty plate
 6516644 per-symbol filtering shouldn't be allowed in executables
+6878605 ld should accept '%' syntax when matching input SHT_PROGBITS sections
