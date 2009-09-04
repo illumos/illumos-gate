@@ -1352,9 +1352,11 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			}
 			tpm->dip = dip;
 		} else {
+#ifdef DEBUG
 			cmn_err(CE_WARN,
 			    "%s: cannot allocate state information.",
 			    myname);
+#endif
 			return (DDI_FAILURE);
 		}
 		break;
@@ -1410,8 +1412,10 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (regsize == 0x5000)
 			break;
 	}
-	if (idx == nregs)
-		return (DDI_FAILURE);
+	if (idx == nregs) {
+		ret = DDI_FAILURE;
+		goto FAIL;
+	}
 
 	ret = ddi_regs_map_setup(tpm->dip, idx, (caddr_t *)&tpm->addr,
 	    (offset_t)0, (offset_t)0x5000,
@@ -1481,7 +1485,6 @@ tpm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 FAIL:
-	cmn_err(CE_WARN, "%s: tpm failed to attach", myname);
 	if (tpm != NULL) {
 		tpm_cleanup(dip, tpm);
 		ddi_soft_state_free(statep, instance);
@@ -1513,6 +1516,8 @@ tpm_cleanup(dev_info_t *dip, tpm_state_t *tpm)
 #endif
 	if (tpm->flags & TPM_DID_MUTEX) {
 		mutex_destroy(&tpm->dev_lock);
+		mutex_destroy(&tpm->pm_mutex);
+		cv_destroy(&tpm->suspend_cv);
 		tpm->flags &= ~(TPM_DID_MUTEX);
 	}
 	if (tpm->flags & TPM_DID_IO_ALLOC) {

@@ -34,7 +34,6 @@ MODULE		= tpm
 OBJECTS		= $(TPM_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(TPM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/io/tpm
 
 #
 #	Include common rules.
@@ -47,9 +46,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Dependency
