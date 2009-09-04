@@ -1206,10 +1206,20 @@ atapi_init_arq(
 }
 
 void
-atapi_reset_dma_mode(ata_drv_t *ata_drvp)
+atapi_reset_dma_mode(ata_drv_t *ata_drvp, int need_wait)
 {
 	ata_ctl_t *ata_ctlp = ata_drvp->ad_ctlp;
 
+	/*
+	 * Some very old CD-ROM need to wait 500mS to
+	 * reset the DMA mode, so after reset the DMA
+	 * mode when resuming, check whether it was
+	 * enabled on the device, if not, delay 500mS
+	 * and reset it again.  Then for normal DVD/CD-ROM,
+	 * no delay will be on resume.
+	 */
+	if (need_wait == TRUE)
+		drv_usecwait(5 * 100000);
 	ata_reset_dma_mode(ata_drvp);
 	(void) atapi_id_update(ata_ctlp, ata_drvp, NULL);
 }

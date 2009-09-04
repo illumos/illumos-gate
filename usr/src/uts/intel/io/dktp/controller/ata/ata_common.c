@@ -104,6 +104,7 @@ static int	ata_power(dev_info_t *, int, int);
 static int	ata_change_power(dev_info_t *, uint8_t);
 static int	ata_is_pci(dev_info_t *);
 static void	ata_disable_DMA(ata_drv_t *ata_drvp);
+static int	ata_check_dma_mode(ata_drv_t *ata_drvp);
 
 /*
  * Local static data
@@ -3556,7 +3557,17 @@ ata_resume_drive(ata_drv_t *ata_drvp)
 			return;
 	} else {
 		(void) atapi_init_drive(ata_drvp);
-		atapi_reset_dma_mode(ata_drvp);
+		if (ata_drvp->ad_dma_mode != 0) {
+			(void) atapi_reset_dma_mode(ata_drvp, FALSE);
+			if (!ata_check_dma_mode(ata_drvp))
+				atapi_reset_dma_mode(ata_drvp, TRUE);
+			if (ata_drvp->ad_id.ai_ultradma !=
+			    ata_drvp->ad_dma_mode) {
+				ata_drvp->ad_pciide_dma = ATA_DMA_OFF;
+			} else {
+				ata_drvp->ad_pciide_dma = ATA_DMA_ON;
+			}
+		}
 	}
 	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
 
@@ -3677,10 +3688,10 @@ static int
 ata_change_power(dev_info_t *dip, uint8_t cmd)
 {
 	int		instance;
-	ata_ctl_t 	*ata_ctlp;
+	ata_ctl_t	*ata_ctlp;
 	ata_drv_t	*ata_drvp;
 	uchar_t		targ;
-	struct ata_id 	id;
+	struct ata_id	id;
 	uchar_t		lun;
 	uchar_t		lastlun;
 	struct ata_id	*aidp;
@@ -3698,14 +3709,22 @@ ata_change_power(dev_info_t *dip, uint8_t cmd)
 			ata_drvp = CTL2DRV(ata_ctlp, targ, 0);
 			if (ata_drvp == NULL)
 				continue;
-			aidp = &ata_drvp->ad_id;
-			if ((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
-			    (aidp->ai_ultradma & ATAC_UDMA_SEL_MASK)) {
-				ata_drvp->ad_dma_cap = ATA_DMA_ULTRAMODE;
-				ata_drvp->ad_dma_mode = aidp->ai_ultradma;
-			} else if (aidp->ai_dworddma & ATAC_MDMA_SEL_MASK) {
-				ata_drvp->ad_dma_cap = ATA_DMA_MWORDMODE;
-				ata_drvp->ad_dma_mode = aidp->ai_dworddma;
+			if (ata_drvp->ad_dma_cap == 0 &&
+			    ata_drvp->ad_pciide_dma == ATA_DMA_ON) {
+				aidp = &ata_drvp->ad_id;
+				if ((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
+				    (aidp->ai_ultradma & ATAC_UDMA_SEL_MASK)) {
+					ata_drvp->ad_dma_cap =
+					    ATA_DMA_ULTRAMODE;
+					ata_drvp->ad_dma_mode =
+					    aidp->ai_ultradma;
+				} else if (aidp->ai_dworddma &
+				    ATAC_MDMA_SEL_MASK) {
+					ata_drvp->ad_dma_cap =
+					    ATA_DMA_MWORDMODE;
+					ata_drvp->ad_dma_mode =
+					    aidp->ai_dworddma;
+				}
 			}
 			if (ata_drive_type(ata_drvp->ad_drive_bits,
 			    ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
@@ -3890,4 +3909,35 @@ ata_reset_dma_mode(ata_drv_t *ata_drvp)
 
 	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_SET_XFRMOD,
 	    (subcmd | mode));
+}
+
+/*
+ * Check DMA mode is the same with saved info
+ * return value: 0 - not same
+ *		 1 - same
+ */
+static int
+ata_check_dma_mode(ata_drv_t *ata_drvp)
+{
+	struct ata_id	*aidp;
+
+	aidp = &ata_drvp->ad_id;
+	switch (ata_drvp->ad_dma_cap) {
+	case ATA_DMA_ULTRAMODE:
+		if ((aidp->ai_validinfo & ATAC_VALIDINFO_83) &&
+		    (aidp->ai_ultradma & ATAC_UDMA_SEL_MASK) &&
+		    (aidp->ai_ultradma == ata_drvp->ad_dma_mode))
+			break;
+		else
+			return (0);
+	case ATA_DMA_MWORDMODE:
+		if ((aidp->ai_dworddma & ATAC_MDMA_SEL_MASK) &&
+		    (aidp->ai_dworddma == ata_drvp->ad_dma_mode))
+			break;
+		else
+			return (0);
+	default:
+		return (0);
+	}
+	return (1);
 }

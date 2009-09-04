@@ -689,7 +689,7 @@ int	ata_test_lba_support(struct ata_id *aidp);
 void	ata_nsecwait(clock_t count);
 int	ata_set_dma_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp);
 void	ata_reset_dma_mode(ata_drv_t *ata_drvp);
-void	atapi_reset_dma_mode(ata_drv_t *ata_drvp);
+void	atapi_reset_dma_mode(ata_drv_t *ata_drvp, int need_wait);
 
 
 /*
