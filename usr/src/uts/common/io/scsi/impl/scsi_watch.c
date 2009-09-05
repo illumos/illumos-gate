@@ -122,6 +122,7 @@ struct scsi_watch_request {
 	struct scsi_pkt		*swr_pkt;	/* TUR pkt itself	*/
 	struct scsi_pkt		*swr_rqpkt;	/* request sense pkt	*/
 	struct buf		*swr_rqbp;	/* bp for request sense data */
+	struct buf		*swr_mmcbp;	/* bp for MMC command data */
 	int			(*swr_callback)(); /* callback to driver */
 	caddr_t			swr_callback_arg;
 	kcondvar_t		swr_terminate_cv; /* cv to wait on to cleanup */
@@ -147,6 +148,9 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_watch_request))
 #define	SWR_SUSPEND_REQUESTED	2	/* req. pending suspend */
 #define	SWR_SUSPENDED		3	/* req. is suspended */
 
+static opaque_t scsi_watch_request_submit_impl(struct scsi_device *devp,
+    int interval, int sense_length, int (*callback)(), caddr_t cb_arg,
+    boolean_t mmc);
 static void scsi_watch_request_destroy(struct scsi_watch_request *swr);
 static void scsi_watch_thread(void);
 static void scsi_watch_request_intr(struct scsi_pkt *pkt);
@@ -195,9 +199,35 @@ scsi_watch_request_submit(
 	int			(*callback)(),	/* callback function */
 	caddr_t			cb_arg)		/* device number */
 {
+	return (scsi_watch_request_submit_impl(devp, interval, sense_length,
+	    callback, cb_arg, B_FALSE));
+}
+
+opaque_t
+scsi_mmc_watch_request_submit(
+	struct scsi_device	*devp,
+	int			interval,
+	int			sense_length,
+	int			(*callback)(),	/* callback function */
+	caddr_t			cb_arg)		/* device number */
+{
+	return (scsi_watch_request_submit_impl(devp, interval, sense_length,
+	    callback, cb_arg, B_TRUE));
+}
+
+static opaque_t
+scsi_watch_request_submit_impl(
+	struct scsi_device	*devp,
+	int			interval,
+	int			sense_length,
+	int			(*callback)(),	/* callback function */
+	caddr_t			cb_arg,		/* device number */
+	boolean_t		mmc)
+{
 	register struct scsi_watch_request	*swr = NULL;
 	register struct scsi_watch_request	*sswr, *p;
 	struct buf				*bp = NULL;
+	struct buf				*mmcbp = NULL;
 	struct scsi_pkt				*rqpkt = NULL;
 	struct scsi_pkt				*pkt = NULL;
 	uchar_t					dtype;
@@ -259,15 +289,27 @@ scsi_watch_request_submit(
 	rqpkt->pkt_flags |= FLAG_HEAD;
 
 	/*
-	 * Create TUR pkt or a zero byte WRITE(10) based on the
-	 * disk-type for reservation state.
+	 * Create TUR pkt or GET STATUS EVENT NOTIFICATION for MMC requests or
+	 * a zero byte WRITE(10) based on the disk-type for reservation state.
 	 * For inq_dtype of SBC (DIRECT, dtype == 0)
 	 * OR for RBC devices (dtype is 0xE) AND for
 	 * ANSI version of SPC/SPC-2/SPC-3 (inq_ansi == 3-5).
 	 */
 
 	dtype = devp->sd_inq->inq_dtype & DTYPE_MASK;
-	if (((dtype == 0) || (dtype == 0xE)) &&
+	if (mmc) {
+		mmcbp = scsi_alloc_consistent_buf(ROUTE, NULL,
+		    8, B_READ, SLEEP_FUNC, NULL);
+
+		pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL, mmcbp,
+		    CDB_GROUP1, sizeof (struct scsi_arq_status),
+		    0, 0, SLEEP_FUNC, NULL);
+
+		(void) scsi_setup_cdb((union scsi_cdb *)pkt->pkt_cdbp,
+		    SCMD_GET_EVENT_STATUS_NOTIFICATION, 0, 8, 0);
+		pkt->pkt_cdbp[1] = 1; /* polled */
+		pkt->pkt_cdbp[4] = 1 << SD_GESN_MEDIA_CLASS;
+	} else if (((dtype == 0) || (dtype == 0xE)) &&
 	    (devp->sd_inq->inq_ansi > 2)) {
 		pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL, NULL,
 		    CDB_GROUP1, sizeof (struct scsi_arq_status),
@@ -297,6 +339,7 @@ scsi_watch_request_submit(
 	 */
 	swr->swr_rqbp = bp;
 	swr->swr_rqpkt = rqpkt;
+	swr->swr_mmcbp = mmcbp;
 	swr->swr_pkt = pkt;
 	swr->swr_timeout = swr->swr_interval = drv_usectohz(interval);
 	swr->swr_callback = callback;
@@ -465,6 +508,9 @@ scsi_watch_request_destroy(struct scsi_watch_request *swr)
 
 	scsi_destroy_pkt(swr->swr_rqpkt);
 	scsi_free_consistent_buf(swr->swr_rqbp);
+	if (swr->swr_mmcbp != NULL) {
+		scsi_free_consistent_buf(swr->swr_mmcbp);
+	}
 	scsi_destroy_pkt(swr->swr_pkt);
 	cv_signal(&swr->swr_terminate_cv);
 }
@@ -945,6 +991,9 @@ scsi_watch_request_intr(struct scsi_pkt *pkt)
 	result.sensep = rqsensep;
 	result.actual_sense_length = (uchar_t)amt;
 	result.pkt = swr->swr_pkt;
+	if (swr->swr_mmcbp != NULL) {
+		bcopy(swr->swr_mmcbp->b_un.b_addr, result.mmc_data, 8);
+	}
 
 	if ((*swr->swr_callback)(swr->swr_callback_arg, &result)) {
 		swr->swr_what = SWR_STOP;

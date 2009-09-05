@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_COMMON_H
 #define	_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -68,7 +66,8 @@ enum {
 extern char *progname;
 
 LibHalContext	*rmm_hal_init(LibHalDeviceAdded, LibHalDeviceRemoved,
-		LibHalDevicePropertyModified, DBusError *, rmm_error_t *);
+		LibHalDevicePropertyModified, LibHalDeviceCondition,
+		DBusError *, rmm_error_t *);
 void		rmm_hal_fini(LibHalContext *hal_ctx);
 
 LibHalDrive	*rmm_hal_volume_find(LibHalContext *, const char *,

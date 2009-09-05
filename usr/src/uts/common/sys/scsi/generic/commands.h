@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_GENERIC_COMMANDS_H
 #define	_SYS_SCSI_GENERIC_COMMANDS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -287,6 +285,36 @@ extern "C" {
 /*	SCMD_SEARCH_EQUAL	0x31	*/
 /*	SCMD_SEARCH_LOW		0x32	*/
 /*	SCMD_SET_LIMITS		0x33	*/
+
+/*
+ * Group 1 Commands, MMC Devices
+ */
+
+/* GET EVENT STATUS NOTIFICATION, MMC-3 5.6 */
+#define	SCMD_GET_EVENT_STATUS_NOTIFICATION	0x4a
+
+/* event header */
+#define	SD_GESN_HEADER_LEN			4
+#define	SD_GESN_HEADER_NEA			0x80	/* byte 2 */
+#define	SD_GESN_HEADER_CLASS			0x07	/* byte 2 */
+
+/* media class event class and event data that follows the header */
+#define	SD_GESN_MEDIA_CLASS			4
+
+#define	SD_GESN_MEDIA_DATA_LEN			4
+#define	SD_GESN_MEDIA_EVENT_CODE		0x0f	/* byte 0 */
+#define	SD_GESN_MEDIA_EVENT_STATUS_PRESENT	0x02	/* byte 1 */
+#define	SD_GESN_MEDIA_EVENT_STATUS_TRAY_OPEN	0x01	/* byte 1 */
+
+/* media event code */
+#define	SD_GESN_MEDIA_EVENT_NOCHG		0
+#define	SD_GESN_MEDIA_EVENT_EJECTREQUEST	1
+#define	SD_GESN_MEDIA_EVENT_NEWMEDIA		2
+#define	SD_GESN_MEDIA_EVENT_MEDIAREMOVAL	3
+#define	SD_GESN_MEDIA_EVENT_MEDIACHANGED	4
+#define	SD_GESN_MEDIA_EVENT_BGFORMATCOMPLETED	5
+#define	SD_GESN_MEDIA_EVENT_BGFORMATRESTARTED	6
+
 
 /*
  * Group 3 Commands

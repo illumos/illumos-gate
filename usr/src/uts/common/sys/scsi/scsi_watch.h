@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@ struct scsi_watch_result {
 	struct scsi_status		*statusp;
 	struct scsi_extended_sense	*sensep;
 	uchar_t				actual_sense_length;
+	uchar_t				mmc_data[8];
 	struct scsi_pkt			*pkt;
 };
 
@@ -55,6 +56,9 @@ struct scsi_watch_result {
 void	scsi_watch_init();
 void	scsi_watch_fini();
 opaque_t scsi_watch_request_submit(struct scsi_device *devp,
+	    int interval, int sense_length,
+	    int (*callback)(), caddr_t cb_arg);
+opaque_t scsi_mmc_watch_request_submit(struct scsi_device *devp,
 	    int interval, int sense_length,
 	    int (*callback)(), caddr_t cb_arg);
 int	scsi_watch_request_terminate(opaque_t token, int flags);

@@ -2,14 +2,12 @@
  *
  * addon-storage.c : watch removable media state changes
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
@@ -30,6 +28,8 @@
 #include <sys/mnttab.h>
 #include <sys/dkio.h>
 #include <priv.h>
+#include <libsysevent.h>
+#include <sys/sysevent/dev.h>
 
 #include <libhal.h>
 
@@ -37,12 +37,98 @@
 
 #define	SLEEP_PERIOD	5
 
+static char			*udi;
+static char			*devfs_path;
+LibHalContext			*ctx = NULL;
+static sysevent_handle_t	*shp = NULL;
+
+static void	sysevent_dev_handler(sysevent_t *);
+
 static void
 my_dbus_error_free(DBusError *error)
 {
 	if (dbus_error_is_set(error)) {
 		dbus_error_free(error);
 	}
+}
+
+static void
+sysevent_init ()
+{
+	const char	*subcl[1];
+
+	shp = sysevent_bind_handle (sysevent_dev_handler);
+	if (shp == NULL) {
+		HAL_DEBUG (("sysevent_bind_handle failed %d", errno));
+		return;
+	}
+
+	subcl[0] = ESC_DEV_EJECT_REQUEST;
+	if (sysevent_subscribe_event (shp, EC_DEV_STATUS, subcl, 1) != 0) {
+		HAL_INFO (("subscribe(dev_status) failed %d", errno));
+		sysevent_unbind_handle (shp);
+		return;
+	}
+}
+
+static void
+sysevent_fini ()
+{
+	if (shp != NULL) {
+		sysevent_unbind_handle (shp);
+		shp = NULL;
+	}
+}
+
+static void
+sysevent_dev_handler (sysevent_t *ev)
+{
+	char		*class;
+	char		*subclass;
+	nvlist_t	*attr_list;
+	char		*phys_path, *path;
+	char		*p;
+	int		len;
+	DBusError	error;
+
+	if ((class = sysevent_get_class_name (ev)) == NULL)
+		return;
+
+	if ((subclass = sysevent_get_subclass_name (ev)) == NULL)
+		return;
+
+	if ((strcmp (class, EC_DEV_STATUS) != 0) ||
+	    (strcmp (subclass, ESC_DEV_EJECT_REQUEST) != 0))
+		return;
+
+	if (sysevent_get_attr_list (ev, &attr_list) != 0)
+		return;
+
+	if (nvlist_lookup_string (attr_list, DEV_PHYS_PATH, &phys_path) != 0) {
+		goto out;
+	}
+
+	/* see if event belongs to our LUN (ignore slice and "/devices" ) */
+	if (strncmp (phys_path, "/devices", sizeof ("/devices") - 1) == 0)
+		path = phys_path + sizeof ("/devices") - 1;
+	else
+		path = phys_path;
+
+	if ((p = strrchr (path, ':')) == NULL)
+		goto out;
+	len = (uintptr_t)p - (uintptr_t)path;
+	if (strncmp (path, devfs_path, len) != 0)
+		goto out;
+
+	HAL_DEBUG (("sysevent_dev_handler %s %s", subclass, phys_path));
+
+	/* we got it, tell the world */
+	dbus_error_init (&error);
+	libhal_device_emit_condition (ctx, udi, "EjectPressed", "", &error);
+	dbus_error_free (&error);
+
+out:
+	nvlist_free(attr_list);
 }
 
 static void
@@ -202,6 +288,9 @@ drop_privileges ()
 	/* to open logindevperm'd devices */
 	(void) priv_addset(pPrivSet, PRIV_FILE_DAC_READ);
 
+	/* to receive sysevents */
+	(void) priv_addset(pPrivSet, PRIV_SYS_CONFIG);
+
 	/* Set the permitted privilege set. */
 	if (setppriv(PRIV_SET, PRIV_PERMITTED, pPrivSet) != 0) {
 		return;
@@ -224,9 +313,7 @@ drop_privileges ()
 int 
 main (int argc, char *argv[])
 {
-	char *udi;
 	char *device_file, *raw_device_file;
-	LibHalContext *ctx = NULL;
 	DBusError error;
 	char *bus;
 	char *drive_type;
@@ -245,10 +332,14 @@ main (int argc, char *argv[])
 		goto out;
 	if ((drive_type = getenv ("HAL_PROP_STORAGE_DRIVE_TYPE")) == NULL)
 		goto out;
+	if ((devfs_path = getenv ("HAL_PROP_SOLARIS_DEVFS_PATH")) == NULL)
+		goto out;
 
 	drop_privileges ();
 
 	setup_logger ();
+
+	sysevent_init ();
 
 	support_media_changed_str = getenv ("HAL_PROP_STORAGE_CDROM_SUPPORT_MEDIA_CHANGED");
 	if (support_media_changed_str != NULL && strcmp (support_media_changed_str, "true") == 0)
@@ -347,6 +438,7 @@ main (int argc, char *argv[])
 	}
 
 out:
+	sysevent_fini ();
 	if (ctx != NULL) {
 		my_dbus_error_free (&error);
 		libhal_ctx_shutdown (ctx, &error);

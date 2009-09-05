@@ -202,8 +202,15 @@ extern "C" {
 /* device tree branch removed */
 #define	ESC_DEV_BRANCH_REMOVE	"ESC_dev_branch_remove"
 
-/* device capacity dynamically changed */
+/*
+ * EC_DEV_STATUS subclass definitions
+ *
+ * device capacity dynamically changed
+ */
 #define	ESC_DEV_DLE		"ESC_dev_dle"
+
+/* LUN has received an eject request from the user */
+#define	ESC_DEV_EJECT_REQUEST	"ESC_dev_eject_request"
 
 /* FMA Fault and Error event protocol subclass */
 #define	ESC_FM_ERROR		"ESC_FM_error"

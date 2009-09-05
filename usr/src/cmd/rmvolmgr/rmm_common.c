@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <errno.h>
@@ -64,7 +62,7 @@ static const char *action_strings[] = {
 
 LibHalContext *
 rmm_hal_init(LibHalDeviceAdded devadd_cb, LibHalDeviceRemoved devrem_cb,
-    LibHalDevicePropertyModified propmod_cb,
+    LibHalDevicePropertyModified propmod_cb, LibHalDeviceCondition cond_cb,
     DBusError *error, rmm_error_t *rmm_error)
 {
 	DBusConnection	*dbus_conn;
@@ -113,6 +111,9 @@ rmm_hal_init(LibHalDeviceAdded devadd_cb, LibHalDeviceRemoved devrem_cb,
 			*rmm_error = RMM_EHAL_CONNECT;
 			return (NULL);
 		}
+	}
+	if (cond_cb != NULL) {
+		libhal_ctx_set_device_condition(ctx, cond_cb);
 	}
 
 	if (!libhal_ctx_init(ctx, error)) {

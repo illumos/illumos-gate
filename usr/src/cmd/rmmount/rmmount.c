@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -134,7 +132,7 @@ rmmount(int argc, char **argv)
 		action = INSERT;
 	}
 
-	if ((hal_ctx = rmm_hal_init(0, 0, 0, &error, &rmm_error)) == NULL) {
+	if ((hal_ctx = rmm_hal_init(0, 0, 0, 0, &error, &rmm_error)) == NULL) {
 		(void) fprintf(stderr, gettext("warning: %s\n"),
 		    rmm_strerror(&error, rmm_error));
 		rmm_dbus_error_free(&error);

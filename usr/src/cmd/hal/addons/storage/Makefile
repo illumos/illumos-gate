@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		hald-addon-storage
@@ -34,7 +32,7 @@ include ../../Makefile.hal
 
 ROOTCMDDIR =	$(ROOTLIB_HAL)
 
-LDLIBS +=	-lc -ldbus-1 -lhal
+LDLIBS +=	-lc -ldbus-1 -lhal -lnvpair -lsysevent
 
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../hald

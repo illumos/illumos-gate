@@ -1018,7 +1018,9 @@ static int sd_pm_idletime = 1;
 #define	sd_taskq_create			ssd_taskq_create
 #define	sd_taskq_delete			ssd_taskq_delete
 #define	sd_target_change_task		ssd_target_change_task
+#define	sd_log_dev_status_event		ssd_log_dev_status_event
 #define	sd_log_lun_expansion_event	ssd_log_lun_expansion_event
+#define	sd_log_eject_request_event	ssd_log_eject_request_event
 #define	sd_media_change_task		ssd_media_change_task
 #define	sd_handle_mchange		ssd_handle_mchange
 #define	sd_send_scsi_DOORLOCK		ssd_send_scsi_DOORLOCK
@@ -1041,6 +1043,9 @@ static int sd_pm_idletime = 1;
 #define	sd_send_scsi_MODE_SELECT	ssd_send_scsi_MODE_SELECT
 #define	sd_send_scsi_RDWR		ssd_send_scsi_RDWR
 #define	sd_send_scsi_LOG_SENSE		ssd_send_scsi_LOG_SENSE
+#define	sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION	\
+				ssd_send_scsi_GET_EVENT_STATUS_NOTIFICATION
+#define	sd_gesn_media_data_valid	ssd_gesn_media_data_valid
 #define	sd_alloc_rqs			ssd_alloc_rqs
 #define	sd_free_rqs			ssd_free_rqs
 #define	sd_dump_memory			ssd_dump_memory
@@ -1092,6 +1097,7 @@ static int sd_pm_idletime = 1;
 #define	sr_eject			ssr_eject
 #define	sr_ejected			ssr_ejected
 #define	sr_check_wp			ssr_check_wp
+#define	sd_watch_request_submit		ssd_watch_request_submit
 #define	sd_check_media			ssd_check_media
 #define	sd_media_watch_cb		ssd_media_watch_cb
 #define	sd_delayed_cv_broadcast		ssd_delayed_cv_broadcast
@@ -1485,7 +1491,9 @@ static void sd_start_stop_unit_task(void *arg);
 static void sd_taskq_create(void);
 static void sd_taskq_delete(void);
 static void sd_target_change_task(void *arg);
+static void sd_log_dev_status_event(struct sd_lun *un, char *esc, int km_flag);
 static void sd_log_lun_expansion_event(struct sd_lun *un, int km_flag);
+static void sd_log_eject_request_event(struct sd_lun *un, int km_flag);
 static void sd_media_change_task(void *arg);
 
 static int sd_handle_mchange(struct sd_lun *un);
@@ -1528,6 +1536,9 @@ static int sd_send_scsi_RDWR(sd_ssc_t *ssc, uchar_t cmd, void *bufaddr,
 static int sd_send_scsi_LOG_SENSE(sd_ssc_t *ssc, uchar_t *bufaddr,
 	uint16_t buflen, uchar_t page_code, uchar_t page_control,
 	uint16_t param_ptr, int path_flag);
+static int sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION(sd_ssc_t *ssc,
+	uchar_t *bufaddr, size_t buflen, uchar_t class_req);
+static boolean_t sd_gesn_media_data_valid(uchar_t *data);
 
 static int  sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un);
 static void sd_free_rqs(struct sd_lun *un);
@@ -1590,6 +1601,7 @@ static int sr_sector_mode(dev_t dev, uint32_t blksize);
 static int sr_eject(dev_t dev);
 static void sr_ejected(register struct sd_lun *un);
 static int sr_check_wp(dev_t dev);
+static opaque_t sd_watch_request_submit(struct sd_lun *un);
 static int sd_check_media(dev_t dev, enum dkio_state state);
 static int sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp);
 static void sd_delayed_cv_broadcast(void *arg);
@@ -3405,6 +3417,8 @@ sd_set_mmc_caps(sd_ssc_t *ssc)
 	int				rtn;
 	uchar_t				*out_data_rw, *out_data_hd;
 	uchar_t				*rqbuf_rw, *rqbuf_hd;
+	uchar_t				*out_data_gesn;
+	int				gesn_len;
 	struct sd_lun			*un;
 
 	ASSERT(ssc != NULL);
@@ -3436,6 +3450,28 @@ sd_set_mmc_caps(sd_ssc_t *ssc)
 	 * page (0x2A) succeeds the device is assumed to be MMC.
 	 */
 	un->un_f_mmc_cap = TRUE;
+
+	/* See if GET STATUS EVENT NOTIFICATION is supported */
+	if (un->un_f_mmc_gesn_polling) {
+		gesn_len = SD_GESN_HEADER_LEN + SD_GESN_MEDIA_DATA_LEN;
+		out_data_gesn = kmem_zalloc(gesn_len, KM_SLEEP);
+
+		rtn = sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION(ssc,
+		    out_data_gesn, gesn_len, 1 << SD_GESN_MEDIA_CLASS);
+
+		sd_ssc_assessment(ssc, SD_FMT_IGNORE);
+
+		if ((rtn != 0) || !sd_gesn_media_data_valid(out_data_gesn)) {
+			un->un_f_mmc_gesn_polling = FALSE;
+			SD_INFO(SD_LOG_ATTACH_DETACH, un,
+			    "sd_set_mmc_caps: gesn not supported "
+			    "%d %x %x %x %x\n", rtn,
+			    out_data_gesn[0], out_data_gesn[1],
+			    out_data_gesn[2], out_data_gesn[3]);
+		}
+
+		kmem_free(out_data_gesn, gesn_len);
+	}
 
 	/* Get to the page data */
 	sense_mhp = (struct mode_header_grp2 *)buf;
@@ -4177,6 +4213,20 @@ sd_set_properties(struct sd_lun *un, char *name, char *value)
 		un->un_saved_throttle = un->un_throttle = sd_max_throttle;
 		un->un_min_throttle = sd_min_throttle;
 	}
+
+	if (strcasecmp(name, "mmc-gesn-polling") == 0) {
+		if (strcasecmp(value, "true") == 0) {
+			un->un_f_mmc_gesn_polling = TRUE;
+		} else if (strcasecmp(value, "false") == 0) {
+			un->un_f_mmc_gesn_polling = FALSE;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "mmc-gesn-polling set to %d\n",
+		    un->un_f_mmc_gesn_polling);
+	}
+
 	return;
 
 value_invalid:
@@ -6529,7 +6579,6 @@ sdpower(dev_info_t *devi, int component, int level)
 	int		log_sense_page;
 	int		medium_present;
 	time_t		intvlp;
-	dev_t		dev;
 	struct pm_trans_data	sd_pm_tran_data;
 	uchar_t		save_state;
 	int		sval;
@@ -6545,7 +6594,6 @@ sdpower(dev_info_t *devi, int component, int level)
 		return (DDI_FAILURE);
 	}
 
-	dev = sd_make_device(SD_DEVINFO(un));
 	ssc = sd_ssc_init(un);
 
 	SD_TRACE(SD_LOG_IO_PM, un, "sdpower: entry, level = %d\n", level);
@@ -6959,11 +7007,8 @@ sdpower(dev_info_t *devi, int component, int level)
 
 					un->un_f_watcht_stopped = FALSE;
 					mutex_exit(SD_MUTEX(un));
-					temp_token = scsi_watch_request_submit(
-					    SD_SCSI_DEVP(un),
-					    sd_check_media_time,
-					    SENSE_LENGTH, sd_media_watch_cb,
-					    (caddr_t)dev);
+					temp_token =
+					    sd_watch_request_submit(un);
 					mutex_enter(SD_MUTEX(un));
 					un->un_swr_token = temp_token;
 				}
@@ -7539,6 +7584,12 @@ sd_unit_attach(dev_info_t *devi)
 	un->un_f_rmw_type = SD_RMW_TYPE_DEFAULT;
 
 	/*
+	 * GET EVENT STATUS NOTIFICATION media polling enabled by default, but
+	 * can be overridden via [s]sd-config-list "mmc-gesn-polling" property.
+	 */
+	un->un_f_mmc_gesn_polling = TRUE;
+
+	/*
 	 * Retrieve the properties from the static driver table or the driver
 	 * configuration file (.conf) for this unit and update the soft state
 	 * for the device as needed for the indicated properties.
@@ -8015,7 +8066,6 @@ sd_unit_attach(dev_info_t *devi)
 	if (ISCD(un)) {
 		sd_set_mmc_caps(ssc);
 	}
-
 
 	/*
 	 * Add a zero-length attribute to tell the world we support
@@ -19475,33 +19525,34 @@ task_exit:
 	sd_ssc_fini(ssc);
 }
 
+
 /*
- *    Function: sd_log_lun_expansion_event
+ *    Function: sd_log_dev_status_event
  *
- * Description: Log lun expansion sys event
+ * Description: Log EC_dev_status sysevent
  *
  *     Context: Never called from interrupt context
  */
 static void
-sd_log_lun_expansion_event(struct sd_lun *un, int km_flag)
+sd_log_dev_status_event(struct sd_lun *un, char *esc, int km_flag)
 {
 	int err;
 	char			*path;
-	nvlist_t		*dle_attr_list;
+	nvlist_t		*attr_list;
 
 	/* Allocate and build sysevent attribute list */
-	err = nvlist_alloc(&dle_attr_list, NV_UNIQUE_NAME_TYPE, km_flag);
+	err = nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, km_flag);
 	if (err != 0) {
 		SD_ERROR(SD_LOG_ERROR, un,
-		    "sd_log_lun_expansion_event: fail to allocate space\n");
+		    "sd_log_dev_status_event: fail to allocate space\n");
 		return;
 	}
 
 	path = kmem_alloc(MAXPATHLEN, km_flag);
 	if (path == NULL) {
-		nvlist_free(dle_attr_list);
+		nvlist_free(attr_list);
 		SD_ERROR(SD_LOG_ERROR, un,
-		    "sd_log_lun_expansion_event: fail to allocate space\n");
+		    "sd_log_dev_status_event: fail to allocate space\n");
 		return;
 	}
 	/*
@@ -19513,26 +19564,55 @@ sd_log_lun_expansion_event(struct sd_lun *un, int km_flag)
 	(void) snprintf(path + strlen(path), MAXPATHLEN - strlen(path),
 	    ":a");
 
-	err = nvlist_add_string(dle_attr_list, DEV_PHYS_PATH, path);
+	err = nvlist_add_string(attr_list, DEV_PHYS_PATH, path);
 	if (err != 0) {
-		nvlist_free(dle_attr_list);
+		nvlist_free(attr_list);
 		kmem_free(path, MAXPATHLEN);
 		SD_ERROR(SD_LOG_ERROR, un,
-		    "sd_log_lun_expansion_event: fail to add attribute\n");
+		    "sd_log_dev_status_event: fail to add attribute\n");
 		return;
 	}
 
 	/* Log dynamic lun expansion sysevent */
 	err = ddi_log_sysevent(SD_DEVINFO(un), SUNW_VENDOR, EC_DEV_STATUS,
-	    ESC_DEV_DLE, dle_attr_list, NULL, km_flag);
+	    esc, attr_list, NULL, km_flag);
 	if (err != DDI_SUCCESS) {
 		SD_ERROR(SD_LOG_ERROR, un,
-		    "sd_log_lun_expansion_event: fail to log sysevent\n");
+		    "sd_log_dev_status_event: fail to log sysevent\n");
 	}
 
-	nvlist_free(dle_attr_list);
+	nvlist_free(attr_list);
 	kmem_free(path, MAXPATHLEN);
 }
+
+
+/*
+ *    Function: sd_log_lun_expansion_event
+ *
+ * Description: Log lun expansion sys event
+ *
+ *     Context: Never called from interrupt context
+ */
+static void
+sd_log_lun_expansion_event(struct sd_lun *un, int km_flag)
+{
+	sd_log_dev_status_event(un, ESC_DEV_DLE, km_flag);
+}
+
+
+/*
+ *    Function: sd_log_eject_request_event
+ *
+ * Description: Log eject request sysevent
+ *
+ *     Context: Never called from interrupt context
+ */
+static void
+sd_log_eject_request_event(struct sd_lun *un, int km_flag)
+{
+	sd_log_dev_status_event(un, ESC_DEV_EJECT_REQUEST, km_flag);
+}
+
 
 /*
  *    Function: sd_media_change_task
@@ -21822,6 +21902,94 @@ sd_send_scsi_LOG_SENSE(sd_ssc_t *ssc, uchar_t *bufaddr, uint16_t buflen,
 
 
 /*
+ *    Function: sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION
+ *
+ * Description: Issue the scsi GET EVENT STATUS NOTIFICATION command.
+ *
+ *   Arguments: ssc   - ssc contains pointer to driver soft state (unit)
+ *                      structure for this target.
+ *		bufaddr
+ *		buflen
+ *		class_req
+ *
+ * Return Code: 0   - Success
+ *		errno return code from sd_ssc_send()
+ *
+ *     Context: Can sleep. Does not return until command is completed.
+ */
+
+static int
+sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION(sd_ssc_t *ssc, uchar_t *bufaddr,
+	size_t buflen, uchar_t class_req)
+{
+	union scsi_cdb		cdb;
+	struct uscsi_cmd	ucmd_buf;
+	int			status;
+	struct sd_lun		*un;
+
+	ASSERT(ssc != NULL);
+	un = ssc->ssc_un;
+	ASSERT(un != NULL);
+	ASSERT(!mutex_owned(SD_MUTEX(un)));
+	ASSERT(bufaddr != NULL);
+
+	SD_TRACE(SD_LOG_IO, un,
+	    "sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION: entry: un:0x%p\n", un);
+
+	bzero(&cdb, sizeof (cdb));
+	bzero(&ucmd_buf, sizeof (ucmd_buf));
+	bzero(bufaddr, buflen);
+
+	cdb.scc_cmd = SCMD_GET_EVENT_STATUS_NOTIFICATION;
+	cdb.cdb_opaque[1] = 1; /* polled */
+	cdb.cdb_opaque[4] = class_req;
+	FORMG1COUNT(&cdb, buflen);
+
+	ucmd_buf.uscsi_cdb	= (char *)&cdb;
+	ucmd_buf.uscsi_cdblen	= CDB_GROUP1;
+	ucmd_buf.uscsi_bufaddr	= (caddr_t)bufaddr;
+	ucmd_buf.uscsi_buflen	= buflen;
+	ucmd_buf.uscsi_rqbuf	= NULL;
+	ucmd_buf.uscsi_rqlen	= 0;
+	ucmd_buf.uscsi_flags	= USCSI_READ | USCSI_SILENT;
+	ucmd_buf.uscsi_timeout	= 60;
+
+	status = sd_ssc_send(ssc, &ucmd_buf, FKIOCTL,
+	    UIO_SYSSPACE, SD_PATH_DIRECT);
+
+	/*
+	 * Only handle status == 0, the upper-level caller
+	 * will put different assessment based on the context.
+	 */
+	if (status == 0) {
+		sd_ssc_assessment(ssc, SD_FMT_STANDARD);
+
+		if (ucmd_buf.uscsi_resid != 0) {
+			status = EIO;
+		}
+	}
+
+	SD_TRACE(SD_LOG_IO, un,
+	    "sd_send_scsi_GET_EVENT_STATUS_NOTIFICATION: exit\n");
+
+	return (status);
+}
+
+
+static boolean_t
+sd_gesn_media_data_valid(uchar_t *data)
+{
+	uint16_t			len;
+
+	len = (data[1] << 8) | data[0];
+	return ((len >= 6) &&
+	    ((data[2] & SD_GESN_HEADER_NEA) == 0) &&
+	    ((data[2] & SD_GESN_HEADER_CLASS) == SD_GESN_MEDIA_CLASS) &&
+	    ((data[3] & (1 << SD_GESN_MEDIA_CLASS)) != 0));
+}
+
+
+/*
  *    Function: sdioctl
  *
  * Description: Driver's ioctl(9e) entry point function.
@@ -23350,6 +23518,32 @@ no_assessment:
 }
 
 /*
+ *    Function: sd_watch_request_submit
+ *
+ * Description: Call scsi_watch_request_submit or scsi_mmc_watch_request_submit
+ *		depending on which is supported by device.
+ */
+static opaque_t
+sd_watch_request_submit(struct sd_lun *un)
+{
+	dev_t			dev;
+
+	/* All submissions are unified to use same device number */
+	dev = sd_make_device(SD_DEVINFO(un));
+
+	if (un->un_f_mmc_cap && un->un_f_mmc_gesn_polling) {
+		return (scsi_mmc_watch_request_submit(SD_SCSI_DEVP(un),
+		    sd_check_media_time, SENSE_LENGTH, sd_media_watch_cb,
+		    (caddr_t)dev));
+	} else {
+		return (scsi_watch_request_submit(SD_SCSI_DEVP(un),
+		    sd_check_media_time, SENSE_LENGTH, sd_media_watch_cb,
+		    (caddr_t)dev));
+	}
+}
+
+
+/*
  *    Function: sd_check_media
  *
  * Description: This utility routine implements the functionality for the
@@ -23380,17 +23574,10 @@ sd_check_media(dev_t dev, enum dkio_state state)
 	opaque_t		token = NULL;
 	int			rval = 0;
 	sd_ssc_t		*ssc;
-	dev_t			sub_dev;
 
 	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
 		return (ENXIO);
 	}
-
-	/*
-	 * sub_dev is used when submitting request to scsi watch.
-	 * All submissions are unified to use same device number.
-	 */
-	sub_dev = sd_make_device(SD_DEVINFO(un));
 
 	SD_TRACE(SD_LOG_COMMON, un, "sd_check_media: entry\n");
 
@@ -23423,9 +23610,7 @@ sd_check_media(dev_t dev, enum dkio_state state)
 			goto done;
 		}
 
-		token = scsi_watch_request_submit(SD_SCSI_DEVP(un),
-		    sd_check_media_time, SENSE_LENGTH, sd_media_watch_cb,
-		    (caddr_t)sub_dev);
+		token = sd_watch_request_submit(un);
 
 		sd_pm_exit(un);
 
@@ -23663,12 +23848,25 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 		return (0);
 	}
 
-	/*
-	 * If there was a check condition then sensep points to valid sense data
-	 * If status was not a check condition but a reservation or busy status
-	 * then the new state is DKIO_NONE
-	 */
-	if (sensep != NULL) {
+	if (un->un_f_mmc_cap && un->un_f_mmc_gesn_polling) {
+		if (sd_gesn_media_data_valid(resultp->mmc_data)) {
+			if ((resultp->mmc_data[5] &
+			    SD_GESN_MEDIA_EVENT_STATUS_PRESENT) != 0) {
+				state = DKIO_INSERTED;
+			} else {
+				state = DKIO_EJECTED;
+			}
+			if ((resultp->mmc_data[4] & SD_GESN_MEDIA_EVENT_CODE) ==
+			    SD_GESN_MEDIA_EVENT_EJECTREQUEST) {
+				sd_log_eject_request_event(un, KM_NOSLEEP);
+			}
+		}
+	} else if (sensep != NULL) {
+		/*
+		 * If there was a check condition then sensep points to valid
+		 * sense data. If status was not a check condition but a
+		 * reservation or busy status then the new state is DKIO_NONE.
+		 */
 		skey = scsi_sense_key(sensep);
 		asc = scsi_sense_asc(sensep);
 		ascq = scsi_sense_ascq(sensep);

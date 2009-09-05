@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Vold compatibility for rmvolmgr: emulate old commands as well as
@@ -277,7 +275,7 @@ vold_rmmount(int argc, char **argv)
 		rmm_vold_actions_enabled = B_TRUE;
 	}
 
-	if ((hal_ctx = rmm_hal_init(0, 0, 0, &error, &rmm_error)) == NULL) {
+	if ((hal_ctx = rmm_hal_init(0, 0, 0, 0, &error, &rmm_error)) == NULL) {
 		rmm_dbus_error_free(&error);
 
 		/* if HAL's not running, must be root */
@@ -534,8 +532,7 @@ vold_action(struct action_arg *aap)
 				    prog_name, prog_pid, errno);
 				return (1);
 			}
-		    }
-
+		}
 	}
 
 	/* only support one action at a time XXX */
@@ -585,7 +582,7 @@ vold_action(struct action_arg *aap)
 		}
 	} else {
 		dprintf("%s[%d]: action(): invalid action: %s\n",
-			__FILE__, __LINE__, action);
+		    __FILE__, __LINE__, action);
 		result = FALSE;
 	}
 
@@ -594,7 +591,7 @@ vold_action(struct action_arg *aap)
 	}
 
 	dprintf("%s[%d]: leaving action(), result = %s\n",
-		__FILE__, __LINE__, result_strings[result]);
+	    __FILE__, __LINE__, result_strings[result]);
 
 	if (mnt_zoneid > GLOBAL_ZONEID) {
 		/* exit forked local zone process */
@@ -666,7 +663,7 @@ create_notify_files(struct action_arg **aa)
 				 * file name conflicts.
 				 */
 				sprintf(notify_file, "%s-%s", symdev,
-						aa[ai]->aa_partname);
+				    aa[ai]->aa_partname);
 			} else {
 				sprintf(notify_file, "%s-0", symdev);
 			}
@@ -699,13 +696,13 @@ create_notify_files(struct action_arg **aa)
 					 * file name conflicts.
 					 */
 					sprintf(notify_file, "%s-%s", symdev,
-							aa[0]->aa_partname);
+					    aa[0]->aa_partname);
 				} else {
 					sprintf(notify_file, "%s-0", symdev);
 				}
 				if ((aa[0]->aa_type != NULL) &&
-					(strcmp(aa[0]->aa_type, "backup_slice")
-						== 0)) {
+				    (strcmp(aa[0]->aa_type, "backup_slice")
+				    == 0)) {
 					reason = "backup_slice";
 				} else {
 					reason = "unformatted_media";
@@ -723,15 +720,15 @@ create_notify_files(struct action_arg **aa)
 		}
 		raw_partitionp = aa[0]->aa_rawpath;
 		result = create_one_notify_file(fstype,
-				mount_point,
-				notify_file,
-				raw_partitionp,
-				reason,
-				symdev);
+		    mount_point,
+		    notify_file,
+		    raw_partitionp,
+		    reason,
+		    symdev);
 		ai++;
 	}
 	dprintf("%s[%d]: leaving create_notify_files(), result = %s\n",
-		__FILE__, __LINE__, result_strings[result]);
+	    __FILE__, __LINE__, result_strings[result]);
 	return (result);
 }
 
@@ -765,12 +762,12 @@ create_one_notify_file(char *fstype,
 	int	result;
 
 	dprintf("%s[%d]:Entering create_one_notify_file()\n",
-		__FILE__, __LINE__);
+	    __FILE__, __LINE__);
 	dprintf("\tcreate_one_notify_file(): fstype = %s\n", fstype);
 	dprintf("\tcreate_one_notify_file(): mount_point = %s\n", mount_point);
 	dprintf("\tcreate_one_notify_file(): notify_file = %s\n", notify_file);
 	dprintf("\tcreate_one_notify_file(): raw_partitionp = %s\n",
-		raw_partitionp);
+	    raw_partitionp);
 	if (reason != NULL) {
 		dprintf("\tcreate_one_notify_file(): reason = %s\n", reason);
 	} else {
@@ -819,42 +816,42 @@ create_one_notify_file(char *fstype,
 		 */
 		(void) remove(notify_file);
 		file_descriptor =
-			open(notify_file, O_CREAT|O_EXCL|O_WRONLY, 0644);
+		    open(notify_file, O_CREAT|O_EXCL|O_WRONLY, 0644);
 		if (file_descriptor < 0) {
 			dprintf("%s[%d]: can't create %s/%s; %m\n",
-				__FILE__, __LINE__, NOTIFY_DIR, notify_file);
+			    __FILE__, __LINE__, NOTIFY_DIR, notify_file);
 			result = FALSE;
 		} else {
 			filep = fdopen(file_descriptor, "w");
 			if (filep != NULL) {
 				if (reason == NULL) {
 					(void) fprintf(filep, "%s %s %s",
-						mount_point,
-						raw_partitionp,
-						fstype);
+					    mount_point,
+					    raw_partitionp,
+					    fstype);
 					(void) fclose(filep);
 				dprintf("%s[%d]: Just wrote %s %s %s to %s\n",
-						__FILE__,
-						__LINE__,
-						mount_point,
-						raw_partitionp,
-						fstype,
-						notify_file);
+				    __FILE__,
+				    __LINE__,
+				    mount_point,
+				    raw_partitionp,
+				    fstype,
+				    notify_file);
 				} else {
 					(void) fprintf(filep, "%s %s",
-						reason, raw_partitionp);
+					    reason, raw_partitionp);
 					(void) fclose(filep);
 				dprintf("%s[%d]: Just wrote %s %s to %s\n",
-						__FILE__,
-						__LINE__,
-						reason,
-						raw_partitionp,
-						notify_file);
+				    __FILE__,
+				    __LINE__,
+				    reason,
+				    raw_partitionp,
+				    notify_file);
 				}
 			} else {
 				dprintf("%s[%d]: can't write %s/%s; %m\n",
-					__FILE__, __LINE__,
-					NOTIFY_DIR, notify_file);
+				    __FILE__, __LINE__,
+				    NOTIFY_DIR, notify_file);
 				(void) close(file_descriptor);
 				result = FALSE;
 			}
@@ -862,7 +859,7 @@ create_one_notify_file(char *fstype,
 		popdir(current_working_dir_fd);
 	}
 	dprintf("%s[%d]: leaving create_one_notify_file, result = %s\n",
-		__FILE__, __LINE__, result_strings[result]);
+	    __FILE__, __LINE__, result_strings[result]);
 	return (result);
 }
 
@@ -910,7 +907,7 @@ notify_clients(action_t action, int do_notify)
 		dirp = opendir(".");
 		if (dirp == NULL) {
 			dprintf("%s[%d]:opendir failed on '.'; %m\n",
-				__FILE__, __LINE__);
+			    __FILE__, __LINE__);
 			popdir(current_working_dir_fd);
 			result = FALSE;
 		}
@@ -933,7 +930,7 @@ notify_clients(action_t action, int do_notify)
 				continue;
 			}
 			(void) sprintf(namebuf, "%s/%s",
-				NOTIFY_DIR, dir_entryp->d_name);
+			    NOTIFY_DIR, dir_entryp->d_name);
 			if ((fd = open(namebuf, O_WRONLY|O_NDELAY)) < 0) {
 				dprintf("%s[%d]: open failed for %s; %m\n",
 				    __FILE__, __LINE__, namebuf);
@@ -946,7 +943,7 @@ notify_clients(action_t action, int do_notify)
 			 */
 			if ((fstat(fd, &sb) < 0) || (!S_ISFIFO(sb.st_mode))) {
 				dprintf("%s[%d]: %s isn't a named pipe\n",
-					__FILE__, __LINE__, namebuf);
+				    __FILE__, __LINE__, namebuf);
 
 				(void) close(fd);
 				continue;
@@ -965,7 +962,7 @@ notify_clients(action_t action, int do_notify)
 		popdir(current_working_dir_fd);
 	}
 	dprintf("%s[%d]: leaving notify_clients(), result = %s\n",
-		__FILE__, __LINE__, result_strings[result]);
+	    __FILE__, __LINE__, result_strings[result]);
 	return (result);
 }
 
@@ -1010,25 +1007,25 @@ pushdir(const char *dir)
 
 	if (lstat(dir, &stat_buf) < 0) {
 		dprintf("%s[%d]: push_dir_and_check(): %s does not exist\n",
-			__FILE__, __LINE__, dir);
+		    __FILE__, __LINE__, dir);
 		return (-1);
 	}
 
 	if (!(S_ISDIR(stat_buf.st_mode))) {
 		dprintf("%s[%d]: push_dir_and_check(): %s not a directory.\n",
-			__FILE__, __LINE__, dir);
+		    __FILE__, __LINE__, dir);
 		(void) remove(dir);
 		return (-1);
 	}
 	if ((current_working_dir_fd = open(".", O_RDONLY)) < 0) {
 		dprintf("%s[%d]: push_dir_and_check(): can't open %s.\n",
-			__FILE__, __LINE__, dir);
+		    __FILE__, __LINE__, dir);
 		return (-1);
 	}
 	if (chdir(dir) < 0) {
 		(void) close(current_working_dir_fd);
 		dprintf("%s[%d]: push_dir_and_check(): can't chdir() to %s.\n",
-			__FILE__, __LINE__, dir);
+		    __FILE__, __LINE__, dir);
 		return (-1);
 	}
 	return (current_working_dir_fd);
@@ -1049,8 +1046,8 @@ remove_notify_files(struct action_arg **aa)
 	result = TRUE;
 	symdev = aa[ai]->aa_symdev;
 	while ((result == TRUE) &&
-		(aa[ai] != NULL) &&
-		(aa[ai]->aa_path != NULL)) {
+	    (aa[ai] != NULL) &&
+	    (aa[ai]->aa_path != NULL)) {
 
 		if (not_mountable(aa[ai])) {
 			sprintf(notify_file, "%s-0", symdev);
@@ -1063,7 +1060,7 @@ remove_notify_files(struct action_arg **aa)
 			 * file name conflicts.
 			 */
 			sprintf(notify_file, "%s-%s",
-				symdev, aa[0]->aa_partname);
+			    symdev, aa[0]->aa_partname);
 		} else {
 			sprintf(notify_file, "%s-0", symdev);
 		}
@@ -1074,7 +1071,7 @@ remove_notify_files(struct action_arg **aa)
 		}
 		if ((result == TRUE) && (remove(notify_file) < 0)) {
 			dprintf("%s[%d]: remove %s/%s; %m\n",
-				__FILE__, __LINE__, NOTIFY_DIR, notify_file);
+			    __FILE__, __LINE__, NOTIFY_DIR, notify_file);
 			result = FALSE;
 		}
 		if (current_working_dir_fd != -1) {
@@ -1083,7 +1080,7 @@ remove_notify_files(struct action_arg **aa)
 		ai++;
 	}
 	dprintf("%s[%d]: leaving remove_notify_files(), result = %s\n",
-		__FILE__, __LINE__, result_strings[result]);
+	    __FILE__, __LINE__, result_strings[result]);
 
 	return (result);
 }
