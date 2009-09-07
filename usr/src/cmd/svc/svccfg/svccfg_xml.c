@@ -50,6 +50,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <sys/param.h>
+#include "manifest_hash.h"
+
 #include "svccfg.h"
 
 /*
@@ -2948,6 +2951,8 @@ lxml_get_single_instance(entity_t *entity, xmlNodePtr si)
 static int
 lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 {
+	pgroup_t *pg;
+	property_t *p;
 	entity_t *s;
 	xmlNodePtr cursor;
 	xmlChar *type;
@@ -2967,6 +2972,36 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 	type = xmlGetProp(svc, (xmlChar *)type_attr);
 	s->sc_u.sc_service.sc_service_type = lxml_xlate_service_type(type);
 	xmlFree(type);
+
+	/*
+	 * Now that the service is created create the manifest
+	 * property group and add the property value of the service.
+	 */
+	if (svc->doc->name != NULL &&
+	    bundle->sc_bundle_type == SVCCFG_MANIFEST) {
+		char *buf, *base, *fname;
+
+		pg = internal_pgroup_create_strict(s, SCF_PG_MANIFESTFILES,
+		    SCF_GROUP_FRAMEWORK);
+
+		if (pg == NULL) {
+			uu_die(gettext("Property group for prop_pattern, "
+			    "\"%s\", already exists in %s\n"),
+			    SCF_PG_MANIFESTFILES, s->sc_name);
+		}
+		buf = mhash_filename_to_propname(svc->doc->name, B_FALSE);
+		/*
+		 * Must remove the PKG_INSTALL_ROOT, point to the correct
+		 * directory after install
+		 */
+		base = getenv("PKG_INSTALL_ROOT");
+		fname = safe_strdup(svc->doc->name +
+		    ((base != NULL) ? strlen(base) : 0));
+
+		p = internal_property_create(buf, SCF_TYPE_ASTRING, 1, fname);
+
+		(void) internal_attach_property(pg, p);
+	}
 
 	/*
 	 * Walk its child elements, as appropriate.
@@ -3165,6 +3200,8 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, svccfg_op_t op)
 		semerr(gettext("couldn't parse document\n"));
 		return (-1);
 	}
+
+	document->name = strdup(filename);
 
 	/*
 	 * Verify that this is a document type we understand.

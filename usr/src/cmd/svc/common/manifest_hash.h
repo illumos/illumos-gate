@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@ extern "C" {
 #define	MHASH_PG_TYPE	"framework"
 #define	MHASH_PG_FLAGS	0
 #define	MHASH_PROP	"md5sum"
+#define	MFILE_PROP	"manifestfile"
 
 #define	MHASH_FORMAT_V1	"%llx%x%llx%lx"
 #define	MHASH_FORMAT_V2	"%x%x%llx%lx"
@@ -51,7 +52,8 @@ extern "C" {
 
 char *mhash_filename_to_propname(const char *, boolean_t);
 int mhash_retrieve_entry(scf_handle_t *, const char *, uchar_t *);
-int mhash_store_entry(scf_handle_t *, const char *, uchar_t *, char **);
+int mhash_store_entry(scf_handle_t *, const char *, const char *, uchar_t *,
+    char **);
 int mhash_test_file(scf_handle_t *, const char *, uint_t, char **, uchar_t *);
 
 #ifdef	__cplusplus

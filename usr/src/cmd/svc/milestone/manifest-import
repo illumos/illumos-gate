@@ -1,4 +1,4 @@
-#!/sbin/sh
+#!/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,6 +29,7 @@
 [ -f /lib/svc/share/smf_include.sh ] || exit 1
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/manifest_cleanup.ksh
 
 activity=false
 
@@ -41,14 +42,14 @@ while getopts n opt; do
 	esac
 done
 
-svccfg_apply () {
+function svccfg_apply {
 	$X /usr/sbin/svccfg apply $1
 	if [ $? -ne 0 ]; then
 		echo "WARNING: svccfg apply $1 failed" | tee /dev/msglog
 	fi
 }
 
-svccfg_import () {
+function svccfg_import {
 	$X /usr/sbin/svccfg import $1 2>>/tmp/manifest_import.$$
 	if [ $? -ne 0 ]; then
 		echo > /dev/msglog
@@ -56,7 +57,7 @@ svccfg_import () {
 	fi
 }
 
-prophist_upgrade () {
+function prophist_upgrade {
 	#
 	# A property has changed in the manifest that we wish to propagate into
 	# the repository during manifest import.  We don't want to pollute
@@ -73,7 +74,7 @@ prophist_upgrade () {
 	[ $? = 0 ] && instance_refresh $fmri
 }
 
-prophist_override () {
+function prophist_override {
 	#
 	# A property has changed in the manifest that we wish to propagate
 	# into the repository during manifest import.
@@ -87,7 +88,7 @@ prophist_override () {
 	[ $? = 0 ] && instance_refresh $fmri
 }
 
-prophist_delete_svc_pg () {
+function prophist_delete_svc_pg {
 	#
 	# Certain property groups have migrated from the service level to the
 	# instance level.  We don't care if they are at both, as the instance
@@ -108,7 +109,7 @@ prophist_delete_svc_pg () {
 	fi
 }
 
-prophist_delete_dependency () {
+function prophist_delete_dependency {
 	#
 	# Some services have stale dependencies that need to be removed.
 	# This is done by removing the dependency property group.
@@ -125,7 +126,7 @@ prophist_delete_dependency () {
 	fi
 }
 
-prophist_delete_pg () {
+function prophist_delete_pg {
 	# Delete obsolete property groups from old manifests.  Instances
 	# should be refreshed for changes to take effect.
 	fmri=$1
@@ -135,7 +136,7 @@ prophist_delete_pg () {
 	    /lib/svc/bin/prophist delete -e $fmri -g $pg
 }
 
-prophist_addprop () {
+function prophist_addprop {
 	#
 	# If a property doesn't exist, create it.  Instances should be
 	# refreshed for changes to take effect.
@@ -161,7 +162,7 @@ prophist_addprop () {
 	/usr/sbin/svccfg -s $fmri setprop $pg/$prop = $*
 }
 
-prophist_addmeth () {
+function prophist_addmeth {
 	#
 	# If a method doesn't exist, create it.  Instances should be refreshed
 	# for changes to take effect.
@@ -188,7 +189,7 @@ prophist_addmeth () {
 END
 }
 
-prophist_adddep () {
+function prophist_adddep {
 	#
 	# If a dependency doesn't exist, create it.  Instances should be
 	# refreshed for changes to take effect.
@@ -218,7 +219,7 @@ prophist_adddep () {
 END
 }
 
-prophist_adddpt () {
+function prophist_adddpt {
 	#
 	# If a dependent doesn't exist, create it.  Instances should be
 	# refresh for changes to take effect.
@@ -242,26 +243,26 @@ prophist_adddpt () {
 	prophist_adddep $target $name service $group $ro $fmri
 }
 
-instance_refresh () {
+function instance_refresh {
 	echo $1 >> /etc/svc/volatile/refreshes
 }
 
-refresh_instances () {
+function refresh_instances {
 	[ -r /etc/svc/volatile/refreshes ] && {
 		sort -u /etc/svc/volatile/refreshes | xargs -l svcadm refresh
 	}
 }
 
-instance_clear () {
+function instance_clear {
 	echo $1 >> /etc/svc/volatile/clears
 }
 
-clear_conditionally () {
+function clear_conditionally {
 	[ "`/usr/bin/svcprop -p restarter/state $1`" = "maintenance" ] && \
 	    /usr/sbin/svcadm clear $1
 }
 
-clear_instances () {
+function clear_instances {
 	[ -r /etc/svc/volatile/clears ] && {
 		for inst in `/usr/bin/sort -u /etc/svc/volatile/clears`; do
 			clear_conditionally $inst
@@ -269,7 +270,7 @@ clear_instances () {
 	}
 }
 
-prepare_last_import () {
+function prepare_last_import {
 	# Preserve the five hashes for the profiles: generic (two
 	# cases), platform (uname -i, uname -m outputs), and site.
 
@@ -458,6 +459,7 @@ if [ -n "$nonsite_manifests" -o -n "$site_manifests" ]; then
 	rm -f /tmp/manifest_import.$$
 
 	set -- $manifests
+	cleanup=""
 	backup=`echo "$#/$#" | sed 's/.//g'`
 	fwidth=`echo "$#\c" | wc -c`
 
@@ -471,13 +473,19 @@ if [ -n "$nonsite_manifests" -o -n "$site_manifests" ]; then
 	doswitch=$?
 
 	i=1; n=$#
+	svcprop smf/manifest > /etc/svc/volatile/smf_manifest_svcprop 2>&1
 	while [ $# -gt 0 ]; do
 		printf "%${fwidth}s/%${fwidth}s" $i $n > /dev/msglog
+		grep $1 /etc/svc/volatile/smf_manifest_svcprop > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			cleanup="$cleanup $1"
+		fi	
 		svccfg_import $1
 		i=`expr $i + 1`
 		shift
 		echo "$backup\c" > /dev/msglog
 	done
+	rm -f /etc/svc/volatile/smf_manifest_svcprop
 
 	#
 	# If switch back fails, exit with the fatal error code.
@@ -577,5 +585,7 @@ clear_instances
 if $activity; then
 	svcadm _smf_backup "manifest_import" || true
 fi
+
+manifest_cleanup $activity $cleanup
 
 exit 0

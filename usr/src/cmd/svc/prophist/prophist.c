@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * prophist - property history utility
@@ -193,15 +191,15 @@ hash(char *arg)
 		uu_die(gettext("mhash_test_file() failed"));
 	default:
 		uu_die(gettext("unknown return value (%d) from "
-			"mhash_test_file()"), ret);
+		    "mhash_test_file()"), ret);
 	}
 
-	if (mhash_store_entry(hndl, pname, hash, &errstr)) {
+	if (mhash_store_entry(hndl, pname, arg, hash, &errstr)) {
 		if (errstr)
 			uu_die(errstr);
 		else
 			uu_die(gettext("Unknown error from "
-				"mhash_store_entry()\n"));
+			    "mhash_store_entry()\n"));
 	}
 
 	return (3);

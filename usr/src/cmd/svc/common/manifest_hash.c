@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,16 +189,18 @@ out:
 }
 
 int
-mhash_store_entry(scf_handle_t *hndl, const char *name, uchar_t *hash,
-    char **errstr)
+mhash_store_entry(scf_handle_t *hndl, const char *name, const char *fname,
+    uchar_t *hash, char **errstr)
 {
 	scf_scope_t *scope = NULL;
 	scf_service_t *svc = NULL;
 	scf_propertygroup_t *pg = NULL;
 	scf_property_t *prop = NULL;
 	scf_value_t *val = NULL;
+	scf_value_t *fval = NULL;
 	scf_transaction_t *tx = NULL;
 	scf_transaction_entry_t *e = NULL;
+	scf_transaction_entry_t *fe = NULL;
 	int ret, result = 0;
 
 	int i;
@@ -312,7 +314,9 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, uchar_t *hash,
 	}
 
 	if ((e = scf_entry_create(hndl)) == NULL ||
-	    (val = scf_value_create(hndl)) == NULL) {
+	    (val = scf_value_create(hndl)) == NULL ||
+	    (fe = scf_entry_create(hndl)) == NULL ||
+	    (fval = scf_value_create(hndl)) == NULL) {
 		if (errstr != NULL)
 			*errstr = gettext("Could not store file hash: "
 			    "permission denied.\n");
@@ -321,6 +325,8 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, uchar_t *hash,
 	}
 
 	ret = scf_value_set_opaque(val, hash, MHASH_SIZE);
+	assert(ret == SCF_SUCCESS);
+	ret = scf_value_set_astring(fval, fname);
 	assert(ret == SCF_SUCCESS);
 
 	tx = scf_transaction_create(hndl);
@@ -372,6 +378,20 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, uchar_t *hash,
 		ret = scf_entry_add_value(e, val);
 		assert(ret == SCF_SUCCESS);
 
+		if (scf_transaction_property_new(tx, fe, MFILE_PROP,
+		    SCF_TYPE_ASTRING) != SCF_SUCCESS &&
+		    scf_transaction_property_change_type(tx, fe, MFILE_PROP,
+		    SCF_TYPE_ASTRING) != SCF_SUCCESS) {
+			if (errstr != NULL)
+				*errstr = gettext("Could not modify file "
+				    "entry");
+			result = -1;
+			goto out;
+		}
+
+		ret = scf_entry_add_value(fe, fval);
+		assert(ret == SCF_SUCCESS);
+
 		ret = scf_transaction_commit(tx);
 
 		if (ret == 0)
@@ -394,9 +414,11 @@ mhash_store_entry(scf_handle_t *hndl, const char *name, uchar_t *hash,
 
 	scf_transaction_destroy(tx);
 	(void) scf_entry_destroy(e);
+	(void) scf_entry_destroy(fe);
 
 out:
 	(void) scf_value_destroy(val);
+	(void) scf_value_destroy(fval);
 	scf_property_destroy(prop);
 	scf_pg_destroy(pg);
 	scf_service_destroy(svc);
@@ -609,7 +631,7 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 			 * we then update the database with the complete
 			 * new hash so we can be a bit quicker next time.
 			 */
-			(void) mhash_store_entry(hndl, pname, hash, NULL);
+			(void) mhash_store_entry(hndl, pname, file, hash, NULL);
 			uu_free(pname);
 			return (MHASH_RECONCILED);
 		}
@@ -633,7 +655,7 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 			 * Update the new entry so we don't have to go through
 			 * all this trouble next time.
 			 */
-			(void) mhash_store_entry(hndl, pname, hash, NULL);
+			(void) mhash_store_entry(hndl, pname, file, hash, NULL);
 			uu_free(pname);
 			return (MHASH_RECONCILED);
 		}

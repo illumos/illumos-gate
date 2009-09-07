@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -117,70 +117,16 @@ fi
 
 while read mfst; do
 	if [ "$smf_alive" = "yes" ]; then
-		ENTITIES=`$SVCCFG inventory $mfst`
+		$RM -f $mfst
 
-		for fmri in $ENTITIES; do
-
-			# Determine whether fmri refers to an instance or a service.
-			$SVCPROP -p restarter/state $fmri >/dev/null 2>&1
-			if [ $? -eq 1 ]; then
-				# this is a service fmri, all instances have been deleted
-				$SVCCFG delete $fmri 2>/dev/null
-				# process next instance
-				continue
-			fi
-
-			#
-			# Try to disable the instance within a reasonable amount of time
-			# (eg. 60 secs). If it fails, forcibly delete the instance.
-			#
-			echo "Waiting up to $STOP_DELAY seconds for $fmri to stop..."
-			$SVCADM disable $fmri 2>/dev/null 
-			if [ $? -eq 0 ]; then
-				wait_disable $fmri $STOP_DELAY
-				if [ $? -eq 0 ]; then
-					# the instance is disabled and can be safely deleted
-					$SVCCFG delete $fmri 2>/dev/null
-					# process next instance
-					continue
-				fi
-				echo "Failed to disable $fmri after $STOP_DELAY seconds"
-			else
-				echo "Failed to disable $fmri"
-			fi
-
-			echo "Force deleting $fmri"
-
-			ctid=`$SVCPROP -p restarter/contract $fmri 2>/dev/null`
-			tctid=`$SVCPROP -p restarter/transient_contract $fmri 2>/dev/null`
-
-			$SVCCFG delete -f $fmri
-
-			#
-			# Kill any remaining processes.
-			# pkill must occur after the delete to prevent startd
-			# from retrying the STOP method.
-			#
-			if [ -n "${tctid}" -a "${tctid}" -gt 1 ]; then
-				# kill the STOP method processes
-				/usr/bin/pkill -9 -c $tctid
-			fi
-			if [ -n "${ctid}" -a "${ctid}" -gt 1 ]; then
-				# kill any remaining running processes for the instance
-				/usr/bin/pkill -9 -c $ctid
-			fi
-		done
-
-		#
-		# Delete the manifest hash value.
-		#
-		svc_delhash $mfst
+		$SVCADM restart svc:/system/manifest-import:default
 	else
 		# deathrow handling
 		svc_deathrow $mfst $PKGINST
+
+		$RM -f $mfst
 	fi
 
-	$RM -f $mfst
 done
 
 exit 0

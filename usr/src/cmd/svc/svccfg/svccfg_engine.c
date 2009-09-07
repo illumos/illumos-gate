@@ -622,7 +622,7 @@ engine_import(uu_list_t *args)
 	if (pname) {
 		char *errstr;
 
-		if (mhash_store_entry(g_hndl, pname, hash, &errstr)) {
+		if (mhash_store_entry(g_hndl, pname, file, hash, &errstr)) {
 			if (errstr)
 				semerr(errstr);
 			else
@@ -671,7 +671,7 @@ engine_apply(const char *file, int apply_changes)
 
 	if (pname) {
 		char *errstr;
-		if (mhash_store_entry(g_hndl, pname, hash, &errstr))
+		if (mhash_store_entry(g_hndl, pname, file, hash, &errstr))
 			semerr(errstr);
 
 		free(pname);

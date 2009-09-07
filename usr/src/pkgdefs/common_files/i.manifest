@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # i.manifest - smf(5) service manifest install class action script
@@ -30,6 +30,7 @@ repfile=$PKG_INSTALL_ROOT/etc/svc/repository.db
 export repfile
 
 SVCCFG=/usr/sbin/svccfg
+SVCADM=/usr/sbin/svcadm
 AWK=/usr/bin/awk
 RM=/usr/bin/rm
 CP=/usr/bin/cp
@@ -109,7 +110,7 @@ else
 		$CP -p $src $dst
 
 		[ "$PKG_INSTALL_ROOT" = "" -o "$PKG_INSTALL_ROOT" = "/" ] && \
-		    SVCCFG_CHECKHASH=1 $SVCCFG import $dst
+		    $SVCADM restart svc:/system/manifest-import:default
 	done
 fi
 

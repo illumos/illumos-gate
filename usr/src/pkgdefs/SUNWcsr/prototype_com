@@ -393,6 +393,7 @@ f none lib/svc/share/ipf_include.sh 0444 root bin
 f none lib/svc/share/net_include.sh 0444 root bin
 f none lib/svc/share/routing_include.sh 0444 root bin
 f none lib/svc/share/smf_include.sh 0444 root bin
+f none lib/svc/share/manifest_cleanup.ksh 0444 root bin
 d none mnt 755 root sys
 d none opt 755 root sys
 d none proc 555 root root

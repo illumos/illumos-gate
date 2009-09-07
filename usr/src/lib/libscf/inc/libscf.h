@@ -266,6 +266,7 @@ typedef struct scf_tmpl_error scf_tmpl_error_t;
 #define	SCF_PG_STARTD			((const char *)"startd")
 #define	SCF_PG_STARTD_PRIVATE		((const char *)"svc-startd-private")
 #define	SCF_PG_DEATHROW			((const char *)"deathrow")
+#define	SCF_PG_MANIFESTFILES		((const char *)"manifestfiles")
 
 /*
  * Template property group names and prefixes
