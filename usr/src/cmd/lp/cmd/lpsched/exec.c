@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pwd.h>
 #include <zone.h>
@@ -315,6 +313,8 @@ exec(int type, ...)
 	int ac = 0;
 	char	*mail_zonename = NULL;
 	char	*slabel = NULL;
+	int	setid = 1;
+	char	*ridno = NULL;
 
 	syslog(LOG_DEBUG, "exec(%s)", _exec_name(type));
 
@@ -753,7 +753,123 @@ exec(int type, ...)
 
 		av[ac++] = arg_string(TRUSTED, "%s/%s", Lp_A_Interfaces,
 					printer->printer->name);
-		av[ac++] = arg_string(TRUSTED, "%s", request->secure->req_id);
+		/*
+		 * Read the options field of the request
+		 * In case of remote lpd request
+		 * the options field will have
+		 * job-id-requested. This is the
+		 * id sent by the client
+		 */
+		if (request->request->options != NULL) {
+			char *options = NULL, *temp = NULL;
+			options = temp = strdup(request->request->options);
+
+			/*
+			 * Search for job-id-requested in
+			 * options string
+			 */
+			options = strstr(options, "job-id-requested");
+			if (options != NULL) {
+				/*
+				 * Extract the ridno from the string
+				 * job-id-requested=xxx
+				 * In this case ridno = xxx
+				 */
+				if (STRNEQU(options, "job-id-requested=", 17)) {
+					ridno = strdup(options + 17);
+					if (ridno != NULL)
+						/*
+						 * Read job-id-requested
+						 * successfully
+						 */
+						setid = 0;
+					else
+						/*
+						 * could not read
+						 * ridno from the string
+						 * job-id-requested=xxx
+						 */
+						setid = 1;
+				} else
+					/*
+					 * could not read
+					 * ridno from the string
+					 * job-id-requested=xxx
+					 */
+					setid = 1;
+			} else
+				/*
+				 * No job-id-requested in
+				 * request options
+				 */
+				setid = 1;
+
+			if (temp != NULL)
+				free(temp);
+
+		} else
+			/*
+			 * options field in request structure
+			 * not set
+			 */
+			setid = 1;
+
+
+		/*
+		 * setid = 1 means the job-id-requested attribute
+		 * is not set so read the request->secure->req_id
+		 */
+		if (setid)
+			av[ac++] = arg_string(TRUSTED, "%s",
+			    request->secure->req_id);
+		else {
+			/*
+			 * From request->secure->req_id extract the
+			 * printer-name.
+			 * request->secure->req_id = <printer-name>-<req_id>
+			 * The final req-id will be
+			 * <printer-name>-<ridno>
+			 */
+			char *r1 = NULL, *r2 = NULL, *tmp = NULL;
+			r1 = r2 = tmp = strdup(request->secure->req_id);
+			r2 = strrchr(r1, '-');
+			if (r2 != NULL) {
+				char *r3 = NULL;
+				int lr1 = strlen(r1);
+				int lr2 = strlen(r2);
+				r1[lr1 - lr2 + 1] = '\0';
+
+				/*
+				 * Now r1 = <printer-name>-
+				 */
+				lr1 = strlen(r1);
+				lr2 = strlen(ridno);
+
+				r3 = (char *)malloc(lr1+lr2+1);
+				if (r3 != NULL) {
+					strcpy(r3, r1);
+					strcat(r3, ridno);
+					/*
+					 * Here r3 = <printer-name>-<ridno>
+					 */
+					av[ac++] = arg_string(TRUSTED,
+					    "%s", r3);
+					free(r3);
+				} else
+					av[ac++] = arg_string(TRUSTED, "%s",
+					    request->secure->req_id);
+
+			} else
+				av[ac++] = arg_string(TRUSTED, "%s",
+				    request->secure->req_id);
+
+			if (tmp != NULL)
+				free(tmp);
+
+			if (ridno != NULL)
+				free(ridno);
+		}
+
 		av[ac++] = arg_string(UNTRUSTED, "%s", request->request->user);
 		av[ac++] = arg_string(TRUSTED, "%s", clean_title);
 		av[ac++] = arg_string(TRUSTED, "%d", request->copies);
