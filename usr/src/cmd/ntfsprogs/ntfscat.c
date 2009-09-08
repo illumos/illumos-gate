@@ -39,6 +39,7 @@
 #include <string.h>
 #endif
 
+#include "compat.h"
 #include "types.h"
 #include "attrib.h"
 #include "utils.h"

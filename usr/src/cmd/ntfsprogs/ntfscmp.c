@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <getopt.h>
 
+#include "compat.h"
 #include "utils.h"
 #include "mst.h"
 #include "version.h"

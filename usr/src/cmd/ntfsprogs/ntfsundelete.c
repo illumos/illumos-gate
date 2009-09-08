@@ -74,6 +74,7 @@
 #define REG_NOERROR 0
 #endif
 
+#include "compat.h"
 #include "ntfsundelete.h"
 #include "bootsect.h"
 #include "mft.h"

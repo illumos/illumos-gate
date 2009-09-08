@@ -44,6 +44,7 @@
 #include <getopt.h>
 #endif
 
+#include "compat.h"
 #include "debug.h"
 #include "mft.h"
 #include "utils.h"

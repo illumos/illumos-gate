@@ -41,6 +41,7 @@
 #include <limits.h>
 #endif
 
+#include "compat.h"
 #include "ntfscluster.h"
 #include "types.h"
 #include "attrib.h"

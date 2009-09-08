@@ -1,3 +1,4 @@
+#include "compat.h"
 #include "types.h"
 #include "layout.h"
 #include "sd.h"

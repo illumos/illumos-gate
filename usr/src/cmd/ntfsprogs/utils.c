@@ -65,6 +65,7 @@
 #include <ctype.h>
 #endif
 
+#include "compat.h"
 #include "utils.h"
 #include "types.h"
 #include "volume.h"

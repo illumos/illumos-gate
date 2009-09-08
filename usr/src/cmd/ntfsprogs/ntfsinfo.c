@@ -66,6 +66,7 @@
 #include <errno.h>
 #endif
 
+#include "compat.h"
 #include "types.h"
 #include "mft.h"
 #include "attrib.h"

@@ -52,6 +52,7 @@
 #include <getopt.h>
 #endif
 
+#include "compat.h"
 #include "debug.h"
 #include "types.h"
 #include "support.h"

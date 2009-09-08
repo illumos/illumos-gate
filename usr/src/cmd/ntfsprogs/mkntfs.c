@@ -118,6 +118,7 @@
 #	endif
 #endif
 
+#include "compat.h"
 #include "security.h"
 #include "types.h"
 #include "attrib.h"
