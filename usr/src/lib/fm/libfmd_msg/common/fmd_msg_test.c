@@ -70,6 +70,7 @@ main(int argc, char *argv[])
 
 	err |= nvlist_add_uint8(auth, FM_VERSION, FM_FMRI_AUTH_VERSION);
 	err |= nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT, "product");
+	err |= nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT_SN, "product_sn");
 	err |= nvlist_add_string(auth, FM_FMRI_AUTH_CHASSIS, "chassis");
 	err |= nvlist_add_string(auth, FM_FMRI_AUTH_DOMAIN, "domain");
 	err |= nvlist_add_string(auth, FM_FMRI_AUTH_SERVER, "server");

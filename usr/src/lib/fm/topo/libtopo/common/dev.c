@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <limits.h>
 #include <strings.h>
@@ -131,16 +129,12 @@ static ssize_t
 fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	nvlist_t *anvl = NULL;
+	nvpair_t *apair;
 	uint8_t version;
 	ssize_t size = 0;
 	char *devid = NULL;
 	char *devpath = NULL;
-	char *achas = NULL;
-	char *adom = NULL;
-	char *aprod = NULL;
-	char *asrvr = NULL;
-	char *ahost = NULL;
-	int more_auth = 0;
+	char *aname, *aval;
 	int err;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
@@ -162,54 +156,24 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	if (err != 0 || devpath == NULL)
 		return (-1);
 
-	if (anvl != NULL) {
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_PRODUCT, &aprod);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_CHASSIS, &achas);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_DOMAIN, &adom);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_SERVER, &asrvr);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_HOST, &ahost);
-		if (aprod != NULL)
-			more_auth++;
-		if (achas != NULL)
-			more_auth++;
-		if (adom != NULL)
-			more_auth++;
-		if (asrvr != NULL)
-			more_auth++;
-		if (ahost != NULL)
-			more_auth++;
-	}
 
 	/* dev:// */
 	topo_fmristr_build(&size,
 	    buf, buflen, FM_FMRI_SCHEME_DEV, NULL, "://");
 
 	/* authority, if any */
-	if (aprod != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, aprod, FM_FMRI_AUTH_PRODUCT "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (achas != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, achas, FM_FMRI_AUTH_CHASSIS "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (adom != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, adom, FM_FMRI_AUTH_DOMAIN "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (asrvr != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, asrvr, FM_FMRI_AUTH_SERVER "=",
-		    --more_auth > 0 ? "," : NULL);
-	if (ahost != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, ahost, FM_FMRI_AUTH_HOST "=",
-		    NULL);
+	if (anvl != NULL) {
+		for (apair = nvlist_next_nvpair(anvl, NULL);
+		    apair != NULL; apair = nvlist_next_nvpair(anvl, apair)) {
+			if (nvpair_type(apair) != DATA_TYPE_STRING ||
+			    nvpair_value_string(apair, &aval) != 0)
+				continue;
+			aname = nvpair_name(apair);
+			topo_fmristr_build(&size, buf, buflen, ":", NULL, NULL);
+			topo_fmristr_build(&size, buf, buflen, "=",
+			    aname, aval);
+		}
+	}
 
 	/* device-id part, topo_fmristr_build does nothing if devid is NULL */
 	topo_fmristr_build(&size,

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,8 @@ mb_topo_free(void *data, size_t size)
 }
 
 static int
-mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
+mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp,
+    char **psnp)
 {
 	char isa[MAXNAMELEN];
 	md_t *mdp;
@@ -126,7 +127,7 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 	ssize_t bufsize = 0;
 	int  nfrus, num_nodes, i;
 	char *pstr = NULL;
-	char *sn, *pn, *dn, *csn;
+	char *sn, *pn, *dn, *csn, *psn;
 	uint32_t type = 0;
 	ldom_hdl_t *lhp;
 
@@ -188,6 +189,9 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 		return (-1);
 	}
 	topo_mod_dprintf(mod, "nfrus=%d\n", nfrus);
+
+	sn = pn = dn = psn = csn = NULL;
+
 	for (i = 0; i < nfrus; i++) {
 		if (md_get_prop_str(mdp, listp[i], "type", &pstr) == 0) {
 			/* systemboard/motherboard component */
@@ -201,6 +205,10 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 				if (md_get_prop_str(mdp, listp[i],
 				    "dash_number", &dn) < 0)
 					dn = NULL;
+			} else if (strcmp("product", pstr) == 0) {
+				if (md_get_prop_str(mdp, listp[i],
+				    "serial_number", &psn) < 0)
+					psn = NULL;
 			}
 		}
 		/* redefined access method for chassis serial number */
@@ -222,6 +230,7 @@ mb_get_pri_info(topo_mod_t *mod, char **serialp, char **partp, char **csnp)
 	mb_topo_free(pstr, i);
 
 	*csnp = topo_mod_strdup(mod, csn);
+	*psnp = topo_mod_strdup(mod, psn);
 
 	mb_topo_free(listp, sizeof (mde_cookie_t) * num_nodes);
 	mb_topo_free(bufp, (size_t)bufsize);
@@ -237,7 +246,7 @@ mb_prop_set(tnode_t *node, nvlist_t *auth)
 	int err;
 	char isa[MAXNAMELEN];
 	struct utsname uts;
-	char *prod, *csn, *server;
+	char *prod, *psn, *csn, *server;
 
 	if ((topo_pgroup_create(node, &mb_auth_pgroup, &err) != 0) &&
 	    (err != ETOPO_PROP_DEFD))
@@ -246,6 +255,9 @@ mb_prop_set(tnode_t *node, nvlist_t *auth)
 	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT, &prod) == 0)
 		(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_PRODUCT, TOPO_PROP_IMMUTABLE, prod, &err);
+	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN, &psn) == 0)
+		(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_PRODUCT_SN, TOPO_PROP_IMMUTABLE, psn, &err);
 	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &csn) == 0)
 		(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_CHASSIS, TOPO_PROP_IMMUTABLE, csn, &err);
@@ -272,11 +284,14 @@ mb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	nvlist_t *fmri;
 	tnode_t *ntn;
 	char *serial = NULL, *part = NULL;
-	char *csn = NULL, *pstr = NULL;
+	char *psn = NULL, *csn = NULL, *pstr = NULL;
 	nvlist_t *auth = topo_mod_auth(mod, parent);
 
-	/* Get Chassis ID, MB Serial Number and Part Number from PRI */
-	(void) mb_get_pri_info(mod, &serial, &part, &csn);
+	/*
+	 * Get Product Serial Number, Chassis ID, MB Serial Number and
+	 * Part Number from PRI.
+	 */
+	(void) mb_get_pri_info(mod, &serial, &part, &csn, &psn);
 
 	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &pstr) != 0 &&
 	    csn != NULL) {
@@ -288,12 +303,24 @@ mb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 		}
 	}
 
+	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN, &pstr) != 0 &&
+	    psn != NULL) {
+		if (nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT_SN, psn)
+		    != 0) {
+			topo_mod_dprintf(mod,
+			    "failed to add product-sn to auth");
+			nvlist_free(auth);
+			return (NULL);
+		}
+	}
+
 	fmri = topo_mod_hcfmri(mod, NULL, FM_HC_SCHEME_VERSION, name, i,
 	    NULL, auth, part, NULL, serial);
 
 	topo_mod_strfree(mod, serial);
 	topo_mod_strfree(mod, part);
 	topo_mod_strfree(mod, csn);
+	topo_mod_strfree(mod, psn);
 
 	if (fmri == NULL) {
 		topo_mod_dprintf(mod,

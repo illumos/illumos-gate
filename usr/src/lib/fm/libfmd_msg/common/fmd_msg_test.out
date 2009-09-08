@@ -46,7 +46,7 @@ code TEST-8000-08 item 4 = <<This entry tests variable expansion for event paylo
 code TEST-8000-08 item 5 = <<Variable expansion for arrays: index = 1>>
 code TEST-8000-08 item 6 = <<http://sun.com/msg/TEST-8000-08>>
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
-PLATFORM: product, CSN: chassis, HOSTNAME: server
+PLATFORM: product, CSN: product_sn, HOSTNAME: server
 SOURCE: fmd_msg_test, REV: 1.0
 EVENT-ID: 12345678
 DESC: This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08
@@ -55,7 +55,7 @@ IMPACT: This entry tests variable expansion for event payload members: uuid = 12
 REC-ACTION: Variable expansion for arrays: index = 1
 
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
-PLATFORM: product, CSN: chassis, HOSTNAME: server
+PLATFORM: product, CSN: product_sn, HOSTNAME: server
 SOURCE: fmd_msg_test, REV: 1.0
 EVENT-ID: 12345678
 DESC: This entry tests URL variable expansion - url = http://foo.bar.com/TEST-8000-08
@@ -87,7 +87,7 @@ code TEST-8000-08 item 4 = <<This entry tests variable expansion for event paylo
 code TEST-8000-08 item 5 = <<Variable expansion for arrays: index = 1>>
 code TEST-8000-08 item 6 = <<http://sun.com/msg/TEST-8000-08>>
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
-PLATFORM: product, CSN: chassis, HOSTNAME: server
+PLATFORM: product, CSN: product_sn, HOSTNAME: server
 SOURCE: fmd_msg_test, REV: 1.0
 EVENT-ID: 12345678
 DESC: This entry tests URL variable expansion - url = http://sun.com/msg/TEST-8000-08
@@ -96,7 +96,7 @@ IMPACT: This entry tests variable expansion for event payload members: uuid = 12
 REC-ACTION: Variable expansion for arrays: index = 1
 
 SUNW-MSG-ID: TEST-8000-08, TYPE: Defect, VER: 1, SEVERITY: Minor
-PLATFORM: product, CSN: chassis, HOSTNAME: server
+PLATFORM: product, CSN: product_sn, HOSTNAME: server
 SOURCE: fmd_msg_test, REV: 1.0
 EVENT-ID: 12345678
 DESC: This entry tests URL variable expansion - url = http://foo.bar.com/TEST-8000-08

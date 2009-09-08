@@ -66,6 +66,7 @@ SUNWprivate_1.1 {
 	smbios_chassis_type_desc;
 	smbios_checksum;
 	smbios_close;
+	smbios_csn;
 	smbios_errmsg;
 	smbios_errno;
 	smbios_evlog_flag_desc;
@@ -114,6 +115,7 @@ SUNWprivate_1.1 {
 	smbios_processor_status_desc;
 	smbios_processor_type_desc;
 	smbios_processor_upgrade_desc;
+	smbios_psn;
 	smbios_slot_ch1_desc;
 	smbios_slot_ch1_name;
 	smbios_slot_ch2_desc;

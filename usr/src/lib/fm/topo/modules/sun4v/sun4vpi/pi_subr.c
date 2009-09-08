@@ -143,6 +143,87 @@ pi_skip_node(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 	return (0);
 }
 
+/*
+ * Get the product serial number (the ID as far as the topo authority is
+ * concerned) either from the current node, if it is of type 'product', or
+ * search for a product node in the PRI.
+ *
+ * The string must be freed with topo_mod_strfree()
+ */
+char *
+pi_get_productsn(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
+{
+	int		result;
+	int		idx;
+	int		num_nodes;
+	char		*id = NULL;
+	char		*type;
+	size_t		size;
+	mde_cookie_t	*nodes = NULL;
+
+	topo_mod_dprintf(mod, "pi_get_productsn: enter\n");
+
+	result = md_get_prop_str(mdp, mde_node, MD_STR_TYPE, &type);
+	if (result == 0 && strcmp(type, MD_STR_PRODUCT) == 0) {
+		/*
+		 * This is a product node.  We need only search for the serial
+		 * number property on this node to return the ID.
+		 */
+		result = md_get_prop_str(mdp, mde_node, MD_STR_SERIAL_NUMBER,
+		    &id);
+		if (result != 0 || id == NULL || strlen(id) == 0)
+			return (NULL);
+
+		topo_mod_dprintf(mod, "pi_get_productsn: product-sn = %s\n",
+		    id);
+		return (topo_mod_strdup(mod, id));
+	}
+
+	/*
+	 * Search the PRI for nodes of type MD_STR_COMPONENT and find the
+	 * first element with type of MD_STR_PRODUCT.  This node
+	 * will contain the MD_STR_SERIAL_NUMBER property to use as the
+	 * product-sn.
+	 */
+	num_nodes = pi_find_mdenodes(mod, mdp, MDE_INVAL_ELEM_COOKIE,
+	    MD_STR_COMPONENT, MD_STR_FWD, &nodes, &size);
+	if (num_nodes <= 0 || nodes == NULL) {
+		/* We did not find any component nodes */
+		return (NULL);
+	}
+	topo_mod_dprintf(mod, "pi_get_productsn: found %d %s nodes\n",
+	    num_nodes, MD_STR_COMPONENT);
+
+	idx = 0;
+	while (id == NULL && idx < num_nodes) {
+		result = md_get_prop_str(mdp, nodes[idx], MD_STR_TYPE, &type);
+		if (result == 0 && strcmp(type, MD_STR_PRODUCT) == 0) {
+			/*
+			 * This is a product node.  Get the serial number
+			 * property from the node.
+			 */
+			result = md_get_prop_str(mdp, nodes[idx],
+			    MD_STR_SERIAL_NUMBER, &id);
+			if (result != 0)
+				topo_mod_dprintf(mod, "pi_get_productsn: "
+				    "failed to read %s from node_0x%llx\n",
+				    MD_STR_SERIAL_NUMBER,
+				    (uint64_t)nodes[idx]);
+		}
+		/* Search the next node, if necessary */
+		idx++;
+	}
+	topo_mod_free(mod, nodes, size);
+
+	/* Everything is freed up and it's time to return the product-sn */
+	if (result != 0 || id == NULL || strlen(id) == 0) {
+		return (NULL);
+	}
+	topo_mod_dprintf(mod, "pi_get_productsn: product-sn %s\n", id);
+
+	return (topo_mod_strdup(mod, id));
+}
+
 
 /*
  * Get the chassis serial number (the ID as far as the topo authority is
@@ -629,6 +710,7 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	nvlist_t	*auth;
 	char		*val = NULL;
 	char		*prod = NULL;
+	char		*psn = NULL;
 	char		*csn = NULL;
 	char		*server = NULL;
 
@@ -653,6 +735,8 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	 * Set the authority data, inheriting it if possible, but creating it
 	 * if necessary.
 	 */
+
+	/* product-id */
 	result = topo_prop_inherit(t_node, FM_FMRI_AUTHORITY,
 	    FM_FMRI_AUTH_PRODUCT, &err);
 	if (result != 0 && err != ETOPO_PROP_DEFD) {
@@ -699,6 +783,54 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		}
 	}
 
+	/* product-sn */
+	result = topo_prop_inherit(t_node, FM_FMRI_AUTHORITY,
+	    FM_FMRI_AUTH_PRODUCT_SN, &err);
+	if (result != 0 && err != ETOPO_PROP_DEFD) {
+		val = NULL;
+		result = nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN,
+		    &val);
+		if (result != 0 || val == NULL) {
+			/*
+			 * No product-sn information in the parent node or auth
+			 * list.  Find the product-sn information in the PRI.
+			 */
+			psn = pi_get_productsn(mod, mdp, mde_node);
+			if (psn == NULL) {
+				topo_mod_dprintf(mod, "pi_set_auth: psn "
+				    "name not found for node_0x%llx\n",
+				    (uint64_t)mde_node);
+			}
+		} else {
+			/*
+			 * Dup the string.  If we cannot find it in the auth
+			 * nvlist we will need to free it, so this lets us
+			 * have a single code path.
+			 */
+			psn = topo_mod_strdup(mod, val);
+		}
+
+		/*
+		 * We continue even if the product information is not available
+		 * to enumerate as much as possible.
+		 */
+		if (psn != NULL) {
+			result = topo_prop_set_string(t_node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_PRODUCT_SN, TOPO_PROP_IMMUTABLE, psn,
+			    &err);
+			if (result != 0) {
+				/* Preserve the error and continue */
+				topo_mod_seterrno(mod, err);
+				topo_mod_dprintf(mod, "pi_set_auth: failed to "
+				    "set property %s (%d) : %s\n",
+				    FM_FMRI_AUTH_PRODUCT_SN, err,
+				    topo_strerror(err));
+			}
+			topo_mod_strfree(mod, psn);
+		}
+	}
+
+	/* chassis-id */
 	result = topo_prop_inherit(t_node, FM_FMRI_AUTHORITY,
 	    FM_FMRI_AUTH_CHASSIS, &err);
 	if (result != 0 && err != ETOPO_PROP_DEFD) {
@@ -745,6 +877,7 @@ pi_set_auth(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		}
 	}
 
+	/* server-id */
 	result = topo_prop_inherit(t_node, FM_FMRI_AUTHORITY,
 	    FM_FMRI_AUTH_SERVER, &err);
 	if (result != 0 && err != ETOPO_PROP_DEFD) {

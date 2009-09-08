@@ -125,8 +125,6 @@ struct topo_hdl {
 };
 
 #define	TOPO_UUID_SIZE	37	/* libuuid limit + 1 */
-#define	SMB_DEFAULT1	"To Be Filled By O.E.M."
-#define	SMB_DEFAULT2	"Not Available At This Time"
 
 extern ttree_t *topo_tree_create(topo_hdl_t *, topo_mod_t *, const char *);
 extern void topo_tree_destroy(ttree_t *);

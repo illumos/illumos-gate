@@ -516,6 +516,8 @@ topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_PRODUCT, &err);
 		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_PRODUCT_SN, &err);
+		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_CHASSIS, &err);
 		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_SERVER, &err);
@@ -647,6 +649,8 @@ topo_node_facbind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	if (topo_pgroup_create(node, &auth_pgroup, &err) == 0) {
 		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_PRODUCT, &err);
+		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_PRODUCT_SN, &err);
 		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_CHASSIS, &err);
 		(void) topo_prop_inherit(node, FM_FMRI_AUTHORITY,

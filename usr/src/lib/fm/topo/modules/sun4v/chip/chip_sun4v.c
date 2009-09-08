@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,7 @@ chip_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	int err;
 	nvlist_t *fmri;
 	tnode_t *ntn;
-	char *prod = NULL, *csn = NULL, *server = NULL;
+	char *prod = NULL, *psn = NULL, *csn = NULL, *server = NULL;
 	nvlist_t *auth = NULL;
 
 	if (topo_mod_nvalloc(mod, &auth, NV_UNIQUE_NAME) == 0) {
@@ -135,6 +135,12 @@ chip_tnode_create(topo_mod_t *mod, tnode_t *parent,
 			(void) nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT,
 			    prod);
 			topo_mod_strfree(mod, prod);
+		}
+		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_PRODUCT_SN, &psn, &err) == 0) {
+			(void) nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT_SN,
+			    psn);
+			topo_mod_strfree(mod, psn);
 		}
 		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_SERVER, &server, &err) == 0) {
@@ -177,6 +183,8 @@ chip_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	if (topo_pgroup_create(ntn, &chip_auth_pgroup, &err) == 0) {
 		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_PRODUCT, &err);
+		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_PRODUCT_SN, &err);
 		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_CHASSIS, &err);
 		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,

@@ -60,6 +60,9 @@ fmd_protocol_authority(void)
 	if (str != NULL)
 		err |= nvlist_add_string(nvl, FM_FMRI_AUTH_PRODUCT, str);
 
+	if ((str = fmd_conf_getnzstr(fmd.d_conf, "product_sn")) != NULL)
+		err |= nvlist_add_string(nvl, FM_FMRI_AUTH_PRODUCT_SN, str);
+
 	if ((str = fmd_conf_getnzstr(fmd.d_conf, "chassis")) != NULL)
 		err |= nvlist_add_string(nvl, FM_FMRI_AUTH_CHASSIS, str);
 

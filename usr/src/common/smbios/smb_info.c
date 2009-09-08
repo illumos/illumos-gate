@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,9 +48,12 @@
 
 #include <sys/smbios_impl.h>
 
-#ifndef _KERNEL
+#ifdef _KERNEL
+#include <sys/sunddi.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 #endif
 
 /*
@@ -811,4 +814,101 @@ smbios_info_ipmi(smbios_hdl_t *shp, smbios_ipmi_t *ip)
 		ip->smbip_flags |= SMB_IPMI_F_INTREDGE;
 
 	return (stp->smbst_hdr->smbh_hdl);
+}
+
+static boolean_t
+smbios_has_oemstr(smbios_hdl_t *shp, const char *oemstr)
+{
+	const smb_struct_t *stp = shp->sh_structs;
+	smb_strtab_t s;
+	int i, j;
+
+	for (i = 0; i < shp->sh_nstructs; i++, stp++) {
+		if (stp->smbst_hdr->smbh_type != SMB_TYPE_OEMSTR)
+			continue;
+
+		smb_info_bcopy(stp->smbst_hdr, &s, sizeof (s));
+		for (j = 0; j < s.smbtb_count; j++)
+			if (strcmp(smb_strptr(stp, j + 1), oemstr) == 0)
+				return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+static const char *
+smb_serial_valid(const char *serial)
+{
+	char buf[MAXNAMELEN];
+	int i = 0;
+
+	if (serial == NULL)
+		return (NULL);
+
+	(void) strlcpy(buf, serial, sizeof (buf));
+
+	while (buf[i] != '\0' && buf[i] == ' ')
+		i++;
+
+	if (buf[i] == '\0' || strstr(buf, SMB_DEFAULT1) != NULL ||
+	    strstr(buf, SMB_DEFAULT2) != NULL)
+		return (NULL);
+
+	return (serial);
+}
+
+/*
+ * Get chassis SN or product SN
+ */
+static int
+smb_get_sn(smbios_hdl_t *shp, const char **psnp, const char **csnp)
+{
+	const smb_struct_t *stp;
+	smbios_info_t s1, s3;
+
+	if (psnp == NULL || csnp == NULL)
+		return (smb_set_errno(shp, ESMB_INVAL));
+
+	*psnp = *csnp = NULL;
+
+	/*
+	 * If SMBIOS meets Sun's PRMS requirements, retrieve product SN
+	 * from type 1 structure, and chassis SN from type 3 structure.
+	 * Otherwise return SN in type 1 structure as chassis SN.
+	 */
+
+	/* Get type 1 SN */
+	if ((stp = smb_lookup_type(shp, SMB_TYPE_SYSTEM)) == NULL ||
+	    smbios_info_common(shp, stp->smbst_hdr->smbh_hdl, &s1) == SMB_ERR)
+		s1.smbi_serial = NULL;
+
+	/* Get type 3 SN */
+	if ((stp = smb_lookup_type(shp, SMB_TYPE_CHASSIS)) == NULL ||
+	    smbios_info_common(shp, stp->smbst_hdr->smbh_hdl, &s3) == SMB_ERR)
+		s3.smbi_serial = NULL;
+
+	if (smbios_has_oemstr(shp, SMB_PRMS1)) {
+		*psnp = smb_serial_valid(s1.smbi_serial);
+		*csnp = smb_serial_valid(s3.smbi_serial);
+	} else {
+		*csnp = smb_serial_valid(s1.smbi_serial);
+	}
+
+	return (0);
+}
+
+const char *
+smbios_psn(smbios_hdl_t *shp)
+{
+	const char *psn, *csn;
+
+	return (smb_get_sn(shp, &psn, &csn) == SMB_ERR ? NULL : psn);
+}
+
+const char *
+smbios_csn(smbios_hdl_t *shp)
+{
+	const char *psn, *csn;
+
+	return (smb_get_sn(shp, &psn, &csn) == SMB_ERR ? NULL : csn);
 }

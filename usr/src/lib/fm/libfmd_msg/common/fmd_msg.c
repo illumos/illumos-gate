@@ -1150,7 +1150,7 @@ fmd_msg_gettext_locked(fmd_msg_hdl_t *h,
 	char date[64];
 
 	char *uuid, *src_name, *src_vers;
-	char *platform, *server, *chassis;
+	char *platform, *server, *csn;
 
 	assert(fmd_msg_lock_held(h));
 	bzero(items, sizeof (items));
@@ -1200,8 +1200,9 @@ fmd_msg_gettext_locked(fmd_msg_hdl_t *h,
 	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_SERVER, &server) != 0)
 		server = (char *)FMD_MSG_MISSING;
 
-	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &chassis) != 0)
-		chassis = (char *)FMD_MSG_MISSING;
+	if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN, &csn) != 0 &&
+	    nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &csn) != 0)
+		csn = (char *)FMD_MSG_MISSING;
 
 	/*
 	 * Format the message once to get its length, allocate a buffer, and
@@ -1209,7 +1210,7 @@ fmd_msg_gettext_locked(fmd_msg_hdl_t *h,
 	 */
 	len = snprintf(NULL, 0, format, code,
 	    items[FMD_MSG_ITEM_TYPE], items[FMD_MSG_ITEM_SEVERITY],
-	    date, platform, chassis, server, src_name, src_vers, uuid,
+	    date, platform, csn, server, src_name, src_vers, uuid,
 	    items[FMD_MSG_ITEM_DESC], items[FMD_MSG_ITEM_RESPONSE],
 	    items[FMD_MSG_ITEM_IMPACT], items[FMD_MSG_ITEM_ACTION]);
 
@@ -1220,7 +1221,7 @@ fmd_msg_gettext_locked(fmd_msg_hdl_t *h,
 
 	(void) snprintf(buf, len + 1, format, code,
 	    items[FMD_MSG_ITEM_TYPE], items[FMD_MSG_ITEM_SEVERITY],
-	    date, platform, chassis, server, src_name, src_vers, uuid,
+	    date, platform, csn, server, src_name, src_vers, uuid,
 	    items[FMD_MSG_ITEM_DESC], items[FMD_MSG_ITEM_RESPONSE],
 	    items[FMD_MSG_ITEM_IMPACT], items[FMD_MSG_ITEM_ACTION]);
 out:

@@ -170,6 +170,7 @@ extern "C" {
 
 /* FMRI authority-type member names */
 #define	FM_FMRI_AUTH_CHASSIS		"chassis-id"
+#define	FM_FMRI_AUTH_PRODUCT_SN		"product-sn"
 #define	FM_FMRI_AUTH_PRODUCT		"product-id"
 #define	FM_FMRI_AUTH_DOMAIN		"domain-id"
 #define	FM_FMRI_AUTH_SERVER		"server-id"

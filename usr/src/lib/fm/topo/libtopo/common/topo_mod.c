@@ -90,6 +90,7 @@
 #include <alloca.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <ctype.h>
 #include <sys/param.h>
 #include <sys/utsname.h>
 #include <sys/smbios.h>
@@ -704,27 +705,33 @@ topo_mod_server(topo_mod_t *mod)
 }
 
 static char *
+topo_mod_psn(topo_mod_t *mod)
+{
+	smbios_hdl_t *shp;
+	const char *psn;
+
+	if ((shp = topo_mod_smbios(mod)) == NULL ||
+	    (psn = smbios_psn(shp)) == NULL)
+		return (NULL);
+
+	return (topo_cleanup_auth_str(mod->tm_hdl, psn));
+}
+
+static char *
 topo_mod_csn(topo_mod_t *mod)
 {
 	char csn[MAXNAMELEN];
+	smbios_hdl_t *shp;
 	di_prom_handle_t promh = DI_PROM_HANDLE_NIL;
 	di_node_t rooth = DI_NODE_NIL;
-	char *bufp;
-	smbios_hdl_t *shp;
-	smbios_system_t s1;
-	smbios_info_t s2;
-	id_t id;
+	const char *bufp;
 
 	if ((shp = topo_mod_smbios(mod)) != NULL) {
-		if ((id = smbios_info_system(shp, &s1)) != SMB_ERR &&
-		    smbios_info_common(shp, id, &s2) != SMB_ERR) {
-			(void) strlcpy(csn, s2.smbi_serial, MAXNAMELEN);
-		}
-
-		if (strcmp(csn, SMB_DEFAULT1) == 0 ||
-		    strcmp(csn, SMB_DEFAULT2) == 0)
+		bufp = smbios_csn(shp);
+		if (bufp != NULL)
+			(void) strlcpy(csn, bufp, MAXNAMELEN);
+		else
 			return (NULL);
-
 	} else if ((rooth = topo_mod_devinfo(mod)) != DI_NODE_NIL &&
 	    (promh = topo_mod_prominfo(mod)) != DI_PROM_HANDLE_NIL) {
 		if (di_prom_prop_lookup_bytes(promh, rooth, "chassis-sn",
@@ -737,7 +744,6 @@ topo_mod_csn(topo_mod_t *mod)
 		return (NULL);
 	}
 
-
 	return (topo_cleanup_auth_str(mod->tm_hdl, csn));
 }
 
@@ -747,6 +753,7 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 	int err;
 	char *prod = NULL;
 	char *csn = NULL;
+	char *psn = NULL;
 	char *server = NULL;
 	nvlist_t *auth;
 
@@ -757,6 +764,8 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 
 	(void) topo_prop_get_string(pnode, FM_FMRI_AUTHORITY,
 	    FM_FMRI_AUTH_PRODUCT, &prod, &err);
+	(void) topo_prop_get_string(pnode, FM_FMRI_AUTHORITY,
+	    FM_FMRI_AUTH_PRODUCT_SN, &psn, &err);
 	(void) topo_prop_get_string(pnode, FM_FMRI_AUTHORITY,
 	    FM_FMRI_AUTH_CHASSIS, &csn, &err);
 	(void) topo_prop_get_string(pnode, FM_FMRI_AUTHORITY,
@@ -769,6 +778,8 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 		prod = topo_mod_product(mod);
 	if (csn == NULL)
 		csn = topo_mod_csn(mod);
+	if (psn == NULL)
+		psn = topo_mod_psn(mod);
 	if (server == NULL) {
 		server = topo_mod_server(mod);
 	}
@@ -776,7 +787,7 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 	/*
 	 * No luck, return NULL
 	 */
-	if (!prod && !server && !csn) {
+	if (!prod && !server && !csn && !psn) {
 		nvlist_free(auth);
 		return (NULL);
 	}
@@ -785,6 +796,10 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 	if (prod != NULL) {
 		err |= nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT, prod);
 		topo_mod_strfree(mod, prod);
+	}
+	if (psn != NULL) {
+		err |= nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT_SN, psn);
+		topo_mod_strfree(mod, psn);
 	}
 	if (server != NULL) {
 		err |= nvlist_add_string(auth, FM_FMRI_AUTH_SERVER, server);

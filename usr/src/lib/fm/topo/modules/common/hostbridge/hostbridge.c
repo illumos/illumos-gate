@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <fm/topo_mod.h>
@@ -221,6 +219,8 @@ hb_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	if (topo_pgroup_create(ntn, &hb_auth_pgroup, &err) == 0) {
 		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_PRODUCT, &err);
+		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
+		    FM_FMRI_AUTH_PRODUCT_SN, &err);
 		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
 		    FM_FMRI_AUTH_CHASSIS, &err);
 		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,

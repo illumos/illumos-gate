@@ -240,7 +240,7 @@ hc_prop_set(tnode_t *node, nvlist_t *auth)
 	int err;
 	char isa[MAXNAMELEN];
 	struct utsname uts;
-	char *prod, *csn, *server;
+	char *prod, *psn, *csn, *server;
 
 	if (auth == NULL)
 		return;
@@ -259,6 +259,14 @@ hc_prop_set(tnode_t *node, nvlist_t *auth)
 		    == 0)
 			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
 			    FM_FMRI_AUTH_PRODUCT, TOPO_PROP_IMMUTABLE, prod,
+			    &err);
+	}
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT_SN,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN, &psn)
+		    == 0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_PRODUCT_SN, TOPO_PROP_IMMUTABLE, psn,
 			    &err);
 	}
 	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_CHASSIS,
@@ -456,21 +464,17 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	nvlist_t **hcprs = NULL;
 	nvlist_t *hcsp = NULL;
 	nvlist_t *anvl = NULL;
+	nvpair_t *apair;
 	nvlist_t *fnvl;
 	uint8_t version;
 	ssize_t size = 0;
 	uint_t hcnprs;
-	char *achas = NULL;
-	char *adom = NULL;
-	char *aprod = NULL;
-	char *asrvr = NULL;
-	char *ahost = NULL;
 	char *serial = NULL;
 	char *part = NULL;
 	char *root = NULL;
 	char *rev = NULL;
+	char *aname, *aval;
 	char *fname = NULL, *ftype = NULL;
-	int more_auth = 0;
 	int err, i;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
@@ -489,29 +493,6 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	if (err != 0 || hcprs == NULL)
 		return (-1);
 
-	if (anvl != NULL) {
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_PRODUCT, &aprod);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_CHASSIS, &achas);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_DOMAIN, &adom);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_SERVER, &asrvr);
-		(void) nvlist_lookup_string(anvl,
-		    FM_FMRI_AUTH_HOST, &ahost);
-		if (aprod != NULL)
-			more_auth++;
-		if (achas != NULL)
-			more_auth++;
-		if (adom != NULL)
-			more_auth++;
-		if (asrvr != NULL)
-			more_auth++;
-		if (ahost != NULL)
-			more_auth++;
-	}
-
 	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_SERIAL_ID, &serial);
 	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_PART, &part);
 	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_REVISION, &rev);
@@ -520,21 +501,18 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_HC, NULL, "://");
 
 	/* authority, if any */
-	if (aprod != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, aprod, ":" FM_FMRI_AUTH_PRODUCT "=", NULL);
-	if (achas != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, achas, ":" FM_FMRI_AUTH_CHASSIS "=", NULL);
-	if (adom != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, adom, ":" FM_FMRI_AUTH_DOMAIN "=", NULL);
-	if (asrvr != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, asrvr, ":" FM_FMRI_AUTH_SERVER "=", NULL);
-	if (ahost != NULL)
-		topo_fmristr_build(&size,
-		    buf, buflen, ahost, ":" FM_FMRI_AUTH_HOST "=", NULL);
+	if (anvl != NULL) {
+		for (apair = nvlist_next_nvpair(anvl, NULL);
+		    apair != NULL; apair = nvlist_next_nvpair(anvl, apair)) {
+			if (nvpair_type(apair) != DATA_TYPE_STRING ||
+			    nvpair_value_string(apair, &aval) != 0)
+				continue;
+			aname = nvpair_name(apair);
+			topo_fmristr_build(&size, buf, buflen, ":", NULL, NULL);
+			topo_fmristr_build(&size, buf, buflen, "=",
+			    aname, aval);
+		}
+	}
 
 	/* hardware-id part */
 	topo_fmristr_build(&size,

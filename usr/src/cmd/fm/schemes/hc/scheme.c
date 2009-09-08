@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,6 +141,7 @@ auth_compare(nvlist_t *nvl1, nvlist_t *nvl2)
 {
 	const char *names[] = {
 		FM_FMRI_AUTH_PRODUCT,
+		FM_FMRI_AUTH_PRODUCT_SN,
 		FM_FMRI_AUTH_CHASSIS,
 		FM_FMRI_AUTH_SERVER,
 		FM_FMRI_AUTH_DOMAIN,

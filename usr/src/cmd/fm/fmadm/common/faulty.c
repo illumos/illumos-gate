@@ -195,6 +195,7 @@ typedef struct host_id {
 	char *server;
 	char *platform;
 	char *domain;
+	char *product_sn;
 } hostid_t;
 
 typedef struct host_id_list {
@@ -265,7 +266,8 @@ format_date(char *buf, size_t len, uint64_t sec)
 }
 
 static hostid_t *
-find_hostid_in_list(char *platform, char *chassis, char *server, char *domain)
+find_hostid_in_list(char *platform, char *chassis, char *server, char *domain,
+    char *product_sn)
 {
 	hostid_t *rt = NULL;
 	host_id_list_t *hostp;
@@ -282,6 +284,8 @@ find_hostid_in_list(char *platform, char *chassis, char *server, char *domain)
 		    strcmp(hostp->hostid.server, server) == 0 &&
 		    (chassis == NULL || hostp->hostid.chassis == NULL ||
 		    strcmp(chassis, hostp->hostid.chassis) == 0) &&
+		    (product_sn == NULL || hostp->hostid.product_sn == NULL ||
+		    strcmp(product_sn, hostp->hostid.product_sn) == 0) &&
 		    (domain == NULL || hostp->hostid.domain == NULL ||
 		    strcmp(domain, hostp->hostid.domain) == 0)) {
 			rt = &hostp->hostid;
@@ -292,6 +296,8 @@ find_hostid_in_list(char *platform, char *chassis, char *server, char *domain)
 	if (rt == NULL) {
 		hostp = malloc(sizeof (host_id_list_t));
 		hostp->hostid.platform = strdup(platform);
+		hostp->hostid.product_sn =
+		    product_sn ? strdup(product_sn) : NULL;
 		hostp->hostid.server = strdup(server);
 		hostp->hostid.chassis = chassis ? strdup(chassis) : NULL;
 		hostp->hostid.domain = domain ? strdup(domain) : NULL;
@@ -307,6 +313,7 @@ static hostid_t *
 find_hostid(nvlist_t *nvl)
 {
 	char *platform = NULL, *chassis = NULL, *server = NULL, *domain = NULL;
+	char *product_sn = NULL;
 	nvlist_t *auth, *fmri;
 	hostid_t *rt = NULL;
 
@@ -314,11 +321,14 @@ find_hostid(nvlist_t *nvl)
 	    nvlist_lookup_nvlist(fmri, FM_FMRI_AUTHORITY, &auth) == 0) {
 		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT,
 		    &platform);
+		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN,
+		    &product_sn);
 		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_SERVER, &server);
 		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS,
 		    &chassis);
 		(void) nvlist_lookup_string(auth, FM_FMRI_AUTH_DOMAIN, &domain);
-		rt = find_hostid_in_list(platform, chassis, server, domain);
+		rt = find_hostid_in_list(platform, chassis, server,
+		    domain, product_sn);
 	}
 	return (rt);
 }
@@ -1441,8 +1451,10 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 		    srp->host->domain);
 	(void) printf("\n%s %s", dgettext("FMD", "Platform    :"),
 	    srp->host->platform);
-	(void) printf("\t%s %s\n\n", dgettext("FMD", "Chassis_id  :"),
+	(void) printf("\t%s %s", dgettext("FMD", "Chassis_id  :"),
 	    srp->host->chassis ? srp->host->chassis : "");
+	(void) printf("\n%s %s\n\n", dgettext("FMD", "Product_sn  :"),
+	    srp->host->product_sn? srp->host->product_sn : "");
 	if (srp->class)
 		print_name_list(srp->class,
 		    dgettext("FMD", "Fault class :"), NULL, 0, srp->class->pct,

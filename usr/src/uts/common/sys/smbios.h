@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,6 @@
 
 #ifndef	_SYS_SMBIOS_H
 #define	_SYS_SMBIOS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -129,6 +127,18 @@ typedef struct smbios_entry {
 
 #define	SMB_TYPE_OEM_LO		128	/* start of OEM-specific type range */
 #define	SMB_TYPE_OEM_HI		256	/* end of OEM-specific type range */
+
+/*
+ * OEM string indicating "Platform Resource Management Specification"
+ * compliance.
+ */
+#define	SMB_PRMS1	"SUNW-PRMS-1"
+
+/*
+ * Some default values set by BIOS vendor
+ */
+#define	SMB_DEFAULT1	"To Be Filled By O.E.M."
+#define	SMB_DEFAULT2	"Not Available"
 
 /*
  * SMBIOS Common Information.  These structures do not correspond to anything
@@ -1136,6 +1146,9 @@ extern int smbios_info_memdevmap(smbios_hdl_t *, id_t, smbios_memdevmap_t *);
 extern id_t smbios_info_hwsec(smbios_hdl_t *, smbios_hwsec_t *);
 extern id_t smbios_info_boot(smbios_hdl_t *, smbios_boot_t *);
 extern id_t smbios_info_ipmi(smbios_hdl_t *, smbios_ipmi_t *);
+
+extern const char *smbios_psn(smbios_hdl_t *);
+extern const char *smbios_csn(smbios_hdl_t *);
 
 #ifndef _KERNEL
 /*

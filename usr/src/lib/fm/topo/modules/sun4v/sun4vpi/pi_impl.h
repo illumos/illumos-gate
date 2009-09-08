@@ -67,6 +67,7 @@ extern "C" {
 #define	MD_STR_PART_NUMBER	"part_number"		/* FWARC/2008/300 */
 #define	MD_STR_PATH		"path"
 #define	MD_STR_PLATFORM		"platform"
+#define	MD_STR_PRODUCT		"product"		/* FWARC/2009/390 */
 #define	MD_STR_REVISION_NUMBER	"rev_number"		/* FWARC/2008/300 */
 #define	MD_STR_SERIAL_NUMBER	"serial_number"		/* FWARC/2008/300 */
 #define	MD_STR_TOPO_HC_NAME	"topo-hc-name"		/* FWARC/2008/300 */
@@ -144,6 +145,7 @@ void pi_walker_fini(topo_mod_t *);
 int	pi_find_mdenodes(topo_mod_t *, md_t *, mde_cookie_t, char *, char *,
     mde_cookie_t **, size_t *);
 int	pi_skip_node(topo_mod_t *, md_t *, mde_cookie_t);
+char   *pi_get_productsn(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_chassisid(topo_mod_t *, md_t *, mde_cookie_t);
 char   *pi_get_topo_hc_name(topo_mod_t *, md_t *, mde_cookie_t);
 int	pi_get_instance(topo_mod_t *, md_t *, mde_cookie_t, topo_instance_t *);
