@@ -584,6 +584,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/drv/audiopci/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/drv/audiop16x/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/drv/audiots/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1842,6 +1846,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/drv/audiols/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/drv/audiopci/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/drv/audiop16x/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/drv/audiots/%.c

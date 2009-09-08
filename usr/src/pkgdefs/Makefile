@@ -191,6 +191,7 @@ COMMON_SUBDIRS= \
 	SUNWaudf  \
 	SUNWaudh  \
 	SUNWaudiols \
+	SUNWaudiop16x \
 	SUNWaudit \
 	SUNWatfsr  \
 	SUNWatfsu  \

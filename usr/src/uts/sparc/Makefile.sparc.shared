@@ -201,7 +201,7 @@ ALL_DEFS	 = $(MACHINE_DEFS) $(DEBUG_DEFS) $(OPTION_DEFS)
 #
 #	Common Drivers (usually pseudo drivers) (/kernel/drv):
 #
-DRV_KMODS	+= aggr arp bl bofi clone cn conskbd consms cpuid
+DRV_KMODS	+= aggr arp audio bl bofi clone cn conskbd consms cpuid
 DRV_KMODS	+= crypto cryptoadm devinfo dump
 DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace dcpc
 DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipnet ipsecah
@@ -245,6 +245,12 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= se
 #
 
 DRV_KMODS	+= afe
+DRV_KMODS	+= audio1575
+DRV_KMODS	+= audioens
+DRV_KMODS	+= audiols
+DRV_KMODS	+= audiop16x
+DRV_KMODS	+= audiopci
+DRV_KMODS	+= audiots
 DRV_KMODS	+= e1000g
 DRV_KMODS	+= hxge
 DRV_KMODS	+= mxfe
@@ -263,7 +269,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 #
 #	Machine Specific Driver Modules (/kernel/drv):
 #
-DRV_KMODS	+= audio audio1575 audioens audiocs audiols audiots audiopci
+DRV_KMODS	+= audiocs
 DRV_KMODS	+= bge bpp dmfe eri esp fas hme qfe
 DRV_KMODS	+= openeepr options sd ses st
 DRV_KMODS	+= ssd
