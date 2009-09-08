@@ -2355,8 +2355,7 @@ bge_chip_id_init(bge_t *bgep)
 	 * feature is enabled.
 	 */
 	if (!(cidp->flags & CHIP_FLAG_NO_JUMBO) &&
-	    (cidp->default_mtu > BGE_DEFAULT_MTU) &&
-	    (cidp->default_mtu <= BGE_MAXIMUM_MTU)) {
+	    (cidp->default_mtu > BGE_DEFAULT_MTU)) {
 		if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 			cidp->mbuf_lo_water_rdma =
 			    RDMA_MBUF_LOWAT_5714_JUMBO;

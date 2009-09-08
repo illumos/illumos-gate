@@ -591,7 +591,8 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 		break;
 	}
 
-	if (bgep->chipid.default_mtu > BGE_DEFAULT_MTU) {
+	if (!(bgep->chipid.flags & CHIP_FLAG_NO_JUMBO) &&
+	    (bgep->chipid.default_mtu > BGE_DEFAULT_MTU)) {
 		/* Set the GMII Fifo Elasticity to high latency */
 		extctrl = bge_mii_get16(bgep, 0x10);
 		bge_mii_put16(bgep, 0x10, extctrl | 0x1);

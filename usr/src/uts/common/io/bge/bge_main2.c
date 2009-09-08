@@ -37,7 +37,7 @@ static char bge_ident[] = "Broadcom Gb Ethernet";
 /*
  * Make sure you keep the version ID up to date!
  */
-static char bge_version[] = "Broadcom Gb Ethernet v1.09";
+static char bge_version[] = "Broadcom Gb Ethernet v1.10";
 
 /*
  * Property names
@@ -3293,6 +3293,13 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	cidp->tx_rings = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
 	    DDI_PROP_DONTPASS, txrings_propname, cidp->tx_rings);
 
+	cidp->default_mtu = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
+	    DDI_PROP_DONTPASS, default_mtu, BGE_DEFAULT_MTU);
+	if ((cidp->default_mtu < BGE_DEFAULT_MTU) ||
+	    (cidp->default_mtu > BGE_MAXIMUM_MTU)) {
+		cidp->default_mtu = BGE_DEFAULT_MTU;
+	}
+
 	/*
 	 * Map operating registers
 	 */
@@ -3312,14 +3319,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (bge_chip_id_init(bgep) == EIO) {
 		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
 		goto attach_fail;
-	}
-
-	cidp->default_mtu = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-	    DDI_PROP_DONTPASS, default_mtu, BGE_DEFAULT_MTU);
-	if ((cidp->flags & CHIP_FLAG_NO_JUMBO) ||
-	    (cidp->default_mtu < BGE_DEFAULT_MTU) ||
-	    (cidp->default_mtu > BGE_MAXIMUM_MTU)) {
-		cidp->default_mtu = BGE_DEFAULT_MTU;
 	}
 
 	err = bge_alloc_bufs(bgep);
