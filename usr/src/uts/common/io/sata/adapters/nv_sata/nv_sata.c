@@ -2181,7 +2181,7 @@ nv_setup_timeout(nv_port_t *nvp, int time)
 		 */
 		if (old_duration > time) {
 			mutex_exit(&nvp->nvp_mutex);
-			untimeout(nvp->nvp_timeout_id);
+			(void) untimeout(nvp->nvp_timeout_id);
 			mutex_enter(&nvp->nvp_mutex);
 			nvp->nvp_timeout_id = timeout(nv_timeout, (void *)nvp,
 			    drv_usectohz(time));
@@ -5658,7 +5658,7 @@ nv_timeout(void *arg)
 					    "interrupt ready - calling "
 					    "int directly"));
 					mutex_exit(&nvp->nvp_mutex);
-					mcp5x_intr_port(nvp);
+					(void) mcp5x_intr_port(nvp);
 					mutex_enter(&nvp->nvp_mutex);
 				} else {
 					/*
