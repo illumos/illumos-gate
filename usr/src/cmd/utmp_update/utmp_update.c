@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * utmp_update		- Update the /var/adm/utmpx file
@@ -75,6 +72,7 @@
 #define	ALREADY_DEAD		5
 #define	ENTRY_NOTFOUND		6
 #define	ILLEGAL_ARGUMENT	7
+#define	DEVICE_ERROR		8
 
 /*
  * Sizes
@@ -116,8 +114,10 @@ static void check_id(char *, char *);
 int
 main(int argc, char *argv[])
 {
+	int devfd, err;
 	struct utmpx *rutmpx;
 	struct utmpx entryx;
+	struct stat stat_arg, stat_db;
 #ifdef	DEBUG
 	int	debugger = 1;
 	printf("%d\n", getpid());
@@ -155,28 +155,44 @@ main(int argc, char *argv[])
 	 * records. Also check that the entry is for either a dead
 	 * process or a current process that is valid (see
 	 * invalid_utmpx() for details of validation criteria).
+	 *
+	 * Match entries using the inode number of the device file.
 	 */
 	load_utmpx_struct(&entryx, argv);
 	check_utmpx(&entryx);
+	if ((devfd = open("/dev", O_RDONLY)) < 0) {
+		usage();
+		return (DEVICE_ERROR);
+	}
+
+	if (fstatat(devfd, entryx.ut_line, &stat_arg, 0) < 0) {
+		(void) close(devfd);
+		usage();
+		return (DEVICE_ERROR);
+	}
+
+	err = 0;
 	for (rutmpx = getutxent(); rutmpx != (struct utmpx *)NULL;
 	    rutmpx = getutxent()) {
 
-		if (strncmp(entryx.ut_line, rutmpx->ut_line,
-		    sizeof (entryx.ut_line)) == 0) {
+		if ((rutmpx->ut_type != USER_PROCESS) &&
+		    (rutmpx->ut_type != DEAD_PROCESS))
+			continue;
 
-			if (rutmpx->ut_type == DEAD_PROCESS) {
-				break;
-			}
+		if (fstatat(devfd, rutmpx->ut_line, &stat_db, 0) < 0)
+			continue;
 
-			if (rutmpx->ut_type == USER_PROCESS) {
-				if (invalid_utmpx(&entryx, rutmpx)) {
-					usage();
-					return (ILLEGAL_ARGUMENT);
-				} else {
-					break;
-				}
-			}
+		if (stat_arg.st_ino == stat_db.st_ino &&
+		    stat_arg.st_dev == stat_db.st_dev) {
+			if (rutmpx->ut_type == USER_PROCESS)
+				err = invalid_utmpx(&entryx, rutmpx);
+			break;
 		}
+	}
+	(void) close(devfd);
+	if (err) {
+		usage();
+		return (ILLEGAL_ARGUMENT);
 	}
 
 	if (pututxline(&entryx) == (struct utmpx *)NULL) {
@@ -457,15 +473,6 @@ bad_line(char *line)
 	 */
 	if (seteuid(getuid()) != 0)
 		return (1);
-
-	/*
-	 * Check that the line refers to a character
-	 * special device.
-	 */
-	if ((stat(line, &statbuf) < 0) || !S_ISCHR(statbuf.st_mode)) {
-		dprintf("Bad line (stat failed) (Not S_IFCHR) = %s\n", line);
-		return (1);
-	}
 
 	/*
 	 * We need to open the line without blocking so that it does not hang

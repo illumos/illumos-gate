@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the new w command which takes advantage of
@@ -243,14 +240,14 @@ main(int argc, char *argv[])
 	 */
 	if (stat(UTMPX_FILE, &sbuf) == ERR) {
 		(void) fprintf(stderr, gettext("%s: stat error of %s: %s\n"),
-			prog, UTMPX_FILE, strerror(errno));
+		    prog, UTMPX_FILE, strerror(errno));
 		exit(1);
 	}
 	entries = sbuf.st_size / sizeof (struct futmpx);
 	size = sizeof (struct utmpx) * entries;
 	if ((ut = malloc(size)) == NULL) {
 		(void) fprintf(stderr, gettext("%s: malloc error of %s: %s\n"),
-			prog, UTMPX_FILE, strerror(errno));
+		    prog, UTMPX_FILE, strerror(errno));
 		exit(1);
 	}
 
@@ -260,7 +257,7 @@ main(int argc, char *argv[])
 	utmpend = (struct utmpx *)((char *)utmpbegin + size);
 
 	setutxent();
-	while ((utp = getutxent()) != NULL)
+	while ((ut < utmpend) && ((utp = getutxent()) != NULL))
 		(void) memcpy(ut++, utp, sizeof (*ut));
 	endutxent();
 
@@ -332,7 +329,7 @@ main(int argc, char *argv[])
 	 */
 	if (!(dirp = opendir(PROCDIR))) {
 		(void) fprintf(stderr, gettext("%s: could not open %s: %s\n"),
-			prog, PROCDIR, strerror(errno));
+		    prog, PROCDIR, strerror(errno));
 		exit(1);
 	}
 
@@ -429,8 +426,8 @@ retry:
 			(void) close(procfd);
 
 			up->p_igintr =
-				actinfo[SIGINT-1].sa_handler == SIG_IGN &&
-				actinfo[SIGQUIT-1].sa_handler == SIG_IGN;
+			    actinfo[SIGINT-1].sa_handler == SIG_IGN &&
+			    actinfo[SIGQUIT-1].sa_handler == SIG_IGN;
 
 			/*
 			 * Process args.
@@ -633,7 +630,7 @@ findhash(pid_t pid)
 	tp = malloc(sizeof (*tp));		/* add new node */
 	if (!tp) {
 		(void) fprintf(stderr, gettext("%s: out of memory!: %s\n"),
-			prog, strerror(errno));
+		    prog, strerror(errno));
 		exit(1);
 	}
 	(void) memset(tp, 0, sizeof (*tp));
