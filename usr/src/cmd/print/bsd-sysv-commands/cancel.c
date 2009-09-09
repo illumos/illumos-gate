@@ -112,7 +112,7 @@ main(int ac, char *av[])
 	char *user = NULL;
 	papi_encryption_t encryption = PAPI_ENCRYPT_NEVER;
 	int c;
-	int32_t rid = 0;
+	int32_t rid = -1;
 	int first_dest = 0;
 
 
@@ -172,7 +172,7 @@ main(int ac, char *av[])
 			 * corresponding job-id and send it to cancel
 			 */
 			rid = job_to_be_queried(svc, printer, id);
-			if (rid > 0)
+			if (rid >= 0)
 				status = papiJobCancel(svc, printer, rid);
 			else
 				status = papiJobCancel(svc, printer, id);
@@ -221,7 +221,7 @@ main(int ac, char *av[])
 					 * job-id then that should be displayed
 					 */
 					rid = get_job_id_requested(*jobs);
-					if (rid > 0)
+					if (rid >= 0)
 						fprintf(OUT, "%s-%d: %s\n",
 						    printer, rid, mesg);
 					else

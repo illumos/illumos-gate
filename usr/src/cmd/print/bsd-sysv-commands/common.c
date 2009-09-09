@@ -238,7 +238,7 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 	papi_status_t status;
 	papi_attribute_t **list = papiJobGetAttributeList(job);
 	int id = 0;
-	int rid = 0;
+	int rid = -1;
 	char *user = "";
 	char *mesg = gettext("cancelled");
 
@@ -258,7 +258,7 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 	if (status != PAPI_OK)
 		mesg = papiStatusString(status);
 
-	if (rid != 0)
+	if (rid != -1)
 		fprintf(fp, "%s-%d: %s\n", printer, rid, mesg);
 	else
 		fprintf(fp, "%s-%d: %s\n", printer, id, mesg);

@@ -80,10 +80,10 @@ remote_host_name(FILE *fp)
 
 	/* get their name or return a string containing their address */
 	if ((hp = getipnodebyaddr((const char *)&peer.sin6_addr,
-				sizeof (struct in6_addr), AF_INET6,
-				&error_num)) == NULL) {
+	    sizeof (struct in6_addr), AF_INET6,
+	    &error_num)) == NULL) {
 		return (strdup(inet_ntop(peer.sin6_family,
-			&peer.sin6_addr, tmp_buf, sizeof (tmp_buf))));
+		    &peer.sin6_addr, tmp_buf, sizeof (tmp_buf))));
 	}
 
 	hostname = strdup(hp->h_name);
@@ -130,10 +130,10 @@ static papi_attribute_t **
 parse_cf(papi_service_t svc, char *cf, char **files)
 {
 	papi_attribute_t **list = NULL;
-	char	previous = NULL,
-		*entry;
-	int	copies_set = 0,
-		copies = 0;
+	char	previous = NULL;
+	char	*entry;
+	int	copies_set = 0;
+	int	copies = 0;
 
 	for (entry = strtok(cf, "\n"); entry != NULL;
 	    entry = strtok(NULL, "\n")) {
@@ -152,19 +152,19 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 		/* RFC-1179 options */
 		case 'J':	/* RFC-1179 Banner Job Name */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"job-name", ++entry);
+			    "job-name", ++entry);
 			break;
 		case 'C':	/* RFC-1179 Banner Class Name */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"rfc-1179-class", ++entry);
+			    "rfc-1179-class", ++entry);
 			break;
 		case 'L':	/* RFC-1179 Banner toggle  */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"job-sheets", "standard");
+			    "job-sheets", "standard");
 			break;
 		case 'T':	/* RFC-1179 Title (pr)  */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"pr-title", ++entry);
+			    "pr-title", ++entry);
 			break;
 		case 'H':	/* RFC-1179 Host */
 			/*
@@ -182,45 +182,45 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 			break;
 		case 'M':	/* RFC-1179 Mail to User */
 			papiAttributeListAddBoolean(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-mail", 1);
+			    "rfc-1179-mail", 1);
 			break;
 		case 'W':	/* RFC-1179 Width (pr) */
 			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
-					"pr-width", atoi(++entry));
+			    "pr-width", atoi(++entry));
 			break;
 		case 'I':	/* RFC-1179 Indent (pr) */
 			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
-					"pr-indent", atoi(++entry));
+			    "pr-indent", atoi(++entry));
 			break;
 		case 'N':	/* RFC-1179 Filename */
 			/* could have HPUX extension embedded */
 			if (entry[1] != ' ') {	/* real pathname */
 #ifdef DEBUG
 				papiAttributeListAddString(&list,
-						PAPI_ATTR_EXCL,
-						"flist", ++entry);
+				    PAPI_ATTR_EXCL,
+				    "flist", ++entry);
 #endif
 			} else if (entry[2] == 'O') /* HPUX lp -o options */
 				papiAttributeListFromString(&list,
-						PAPI_ATTR_APPEND, ++entry);
+				    PAPI_ATTR_APPEND, ++entry);
 			break;
 		case 'U':	/* RFC-1179 Unlink */
 			break;	/* ignored */
 		case '1':	/* RFC-1179 TROFF Font R */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-font-r", ++entry);
+			    "rfc-1179-font-r", ++entry);
 			break;
 		case '2':	/* RFC-1179 TROFF Font I */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-font-i", ++entry);
+			    "rfc-1179-font-i", ++entry);
 			break;
 		case '3':	/* RFC-1179 TROFF Font B */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-font-b", ++entry);
+			    "rfc-1179-font-b", ++entry);
 			break;
 		case '4':	/* RFC-1179 TROFF Font S */
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-				"rfc-1179-font-s", ++entry);
+			    "rfc-1179-font-s", ++entry);
 			break;
 		case 'f':	/* RFC-1179 ASCII file (print) */
 			format = "text/plain";
@@ -238,7 +238,7 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 		case 'p':	/* RFC-1179 PR file (print) */
 			format = "application/x-pr";
 			papiAttributeListAddBoolean(&list, PAPI_ATTR_EXCL,
-					"pr-filter", 1);
+			    "pr-filter", 1);
 			break;
 		case 't':	/* RFC-1179 TROFF file (print) */
 			format = "application/x-troff";
@@ -285,35 +285,35 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 			switch (entry[0]) {
 			case 'f':	/* Solaris form */
 				papiAttributeListAddString(&list,
-						PAPI_ATTR_EXCL,
-						"form", ++entry);
+				    PAPI_ATTR_EXCL,
+				    "form", ++entry);
 				break;
 			case 'H':	/* Solaris handling */
 				++entry;
 				if (strcasecmp(entry, "hold") == 0)
 					papiAttributeListAddString(&list,
-						PAPI_ATTR_EXCL,
-						"job-hold-until", "indefinite");
+					    PAPI_ATTR_EXCL,
+					    "job-hold-until", "indefinite");
 				else if (strcasecmp(entry, "immediate") == 0)
 					papiAttributeListAddString(&list,
-						PAPI_ATTR_EXCL,
-						"job-hold-until", "no-hold");
+					    PAPI_ATTR_EXCL,
+					    "job-hold-until", "no-hold");
 				else
 					papiAttributeListAddString(&list,
-						PAPI_ATTR_EXCL,
-						"job-hold-until", entry);
+					    PAPI_ATTR_EXCL,
+					    "job-hold-until", entry);
 				break;
 			case 'p':	/* Solaris notification */
 				papiAttributeListAddBoolean(&list,
-					PAPI_ATTR_EXCL, "rfc-1179-mail", 1);
+				    PAPI_ATTR_EXCL, "rfc-1179-mail", 1);
 				break;
 			case 'P': {	/* Solaris page list */
 				char buf[BUFSIZ];
 
 				snprintf(buf, sizeof (buf), "page-ranges=%s",
-						++entry);
+				    ++entry);
 				papiAttributeListFromString(&list,
-						PAPI_ATTR_EXCL, buf);
+				    PAPI_ATTR_EXCL, buf);
 				}
 				break;
 			case 'q': {	/* Solaris priority */
@@ -323,25 +323,25 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 				if ((i < 1) || (i > 100))
 					i = 50;
 				papiAttributeListAddInteger(&list,
-					PAPI_ATTR_EXCL, "job-priority", i);
+				    PAPI_ATTR_EXCL, "job-priority", i);
 				}
 				break;
 			case 'S':	/* Solaris character set */
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_EXCL, "lp-charset",
-					++entry);
+				    PAPI_ATTR_EXCL, "lp-charset",
+				    ++entry);
 				break;
 			case 'T':	/* Solaris type */
 				format = lp_type_to_mime_type(++entry);
 				break;
 			case 'y':	/* Solaris mode */
 				papiAttributeListAddString(&list,
-					PAPI_ATTR_APPEND, "lp-modes", ++entry);
+				    PAPI_ATTR_APPEND, "lp-modes", ++entry);
 				break;
 			default:
 				syslog(LOG_INFO|LOG_DEBUG,
-					"Warning: cf message (%s) ignored",
-					entry);
+				    "Warning: cf message (%s) ignored",
+				    entry);
 				break;
 			}
 			break;
@@ -349,19 +349,19 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 
 		default:
 			syslog(LOG_INFO|LOG_DEBUG,
-				"Warning: cf message (%s) ignored", entry);
+			    "Warning: cf message (%s) ignored", entry);
 			break;
 		}
 
 		if (format != NULL)
 			papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-				"document-format", format);
+			    "document-format", format);
 	}
 
 	papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
-					"copies", ++copies);
+	    "copies", ++copies);
 	papiAttributeListAddString(&list, PAPI_ATTR_EXCL,
-					"job-sheets", "none");
+	    "job-sheets", "none");
 
 	return (list);
 }
@@ -381,12 +381,12 @@ submit_job(papi_service_t svc, FILE *ifp, char *printer, int rid, char *cf,
 
 		if (host != NULL) {
 			papiAttributeListAddString(&list, PAPI_ATTR_REPLACE,
-					"job-originating-host-name", host);
+			    "job-originating-host-name", host);
 			free(host);
 		}
-		if (rid > 0) {
+		if (rid >= 0) {
 			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
-					"job-id-requested", rid);
+			    "job-id-requested", rid);
 		}
 	}
 
@@ -519,7 +519,7 @@ berkeley_receive_files(papi_service_t svc, FILE *ifp, FILE *ofp, char *printer)
 				return (PAPI_BAD_REQUEST);
 			} else if (files != NULL) {
 				status = submit_job(svc, ifp, printer, rid, cf,
-							files);
+				    files);
 				cleanup(&files, &cf);
 			}
 			}
@@ -562,7 +562,7 @@ berkeley_transfer_files(papi_service_t svc, FILE *ifp, FILE *ofp,
 		char accepting = PAPI_FALSE;
 
 		papiAttributeListGetBoolean(attrs, NULL,
-				"printer-is-accepting-jobs", &accepting);
+		    "printer-is-accepting-jobs", &accepting);
 
 		if (accepting == PAPI_TRUE) {
 			ACK(ofp);
@@ -632,14 +632,14 @@ main(int ac, char *av[])
 	papi_status_t status;
 	papi_service_t svc = NULL;
 	papi_encryption_t encryption = PAPI_ENCRYPT_NEVER;
-	FILE	*ifp = stdin,
-		*ofp = stdout;
+	FILE	*ifp = stdin;
+	FILE	*ofp = stdout;
 	int	c;
-	char	buf[BUFSIZ],
-		**args,
-		*printer,
-		*run_dir = "/var/run/in.lpd",
-		*run_user = NULL;
+	char	buf[BUFSIZ];
+	char	**args;
+	char	*printer;
+	char	*run_dir = "/var/run/in.lpd";
+	char	*run_user = NULL;
 	struct passwd *pw = NULL;
 
 	(void) chdir("/tmp");		/* run in /tmp by default */
@@ -671,7 +671,7 @@ main(int ac, char *av[])
 
 	if (pw != NULL) {	/* run as the requested user */
 		syslog(LOG_DEBUG, "name: %s, uid: %d, gid: %d",
-				pw->pw_name, pw->pw_uid, pw->pw_gid);
+		    pw->pw_name, pw->pw_uid, pw->pw_gid);
 		initgroups(pw->pw_name, pw->pw_gid);
 		setgid(pw->pw_gid);
 		setuid(pw->pw_uid);
@@ -688,7 +688,7 @@ main(int ac, char *av[])
 	if (fgets(buf, sizeof (buf), ifp) == NULL) {
 		if (feof(ifp) == 0)
 			syslog(LOG_ERR, "Error reading from connection: %s",
-				strerror(errno));
+			    strerror(errno));
 		exit(1);
 	}
 
@@ -701,7 +701,7 @@ main(int ac, char *av[])
 
 	if ((buf[0] < 1) || (buf[0] > 5)) {
 		fatal(ofp, "Invalid protocol request (%d): %c%s\n",
-			buf[0], buf[0], buf);
+		    buf[0], buf[0], buf);
 		exit(1);
 	}
 
@@ -719,10 +719,10 @@ main(int ac, char *av[])
 	}
 
 	status = papiServiceCreate(&svc, printer, NULL, NULL, NULL,
-					encryption, NULL);
+	    encryption, NULL);
 	if (status != PAPI_OK) {
 		fatal(ofp, "Failed to contact service for %s: %s\n", printer,
-			verbose_papi_message(svc, status));
+		    verbose_papi_message(svc, status));
 		exit(1);
 	}
 
@@ -744,7 +744,7 @@ main(int ac, char *av[])
 	case '\4': {	/* show queue (long) */
 		int count;
 
-		for (count = 0; args[count] != 0; count++);
+		for (count = 0; args[count] != 0; count++) {}
 
 		berkeley_queue_report(svc, ofp, printer, buf[0], count, args);
 		}
@@ -762,23 +762,23 @@ main(int ac, char *av[])
 		} else
 			status = papiServiceSetUserName(svc, user);
 
-		for (count = 0; args[count] != 0; count++);
+		for (count = 0; args[count] != 0; count++) {}
 
 		berkeley_cancel_request(svc, ofp, printer, count, args);
 		}
 		break;
 	default:
 		fatal(ofp, "unsupported protocol request (%c), %s",
-			buf[0], &buf[1]);
+		    buf[0], &buf[1]);
 	}
 
 	(void) fflush(ofp);
 
 	syslog(LOG_DEBUG, "protocol request(%d) for %s completed: %s",
-		buf[0], printer, papiStatusString(status));
+	    buf[0], printer, papiStatusString(status));
 	if (status != PAPI_OK)
 		syslog(LOG_DEBUG, "detail: %s",
-				verbose_papi_message(svc, status));
+		    verbose_papi_message(svc, status));
 
 	papiServiceDestroy(svc);
 
