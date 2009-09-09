@@ -251,7 +251,7 @@ select_digital_enable(audigyls_dev_t *dev, int mode)
 }
 
 /* only for SBLive 7.1 */
-int
+void
 audigyls_i2c_write(audigyls_dev_t *dev, int reg, int data)
 {
 	int i, timeout, tmp;
@@ -279,9 +279,8 @@ audigyls_i2c_write(audigyls_dev_t *dev, int reg, int data)
 
 		/* transaction aborted */
 		if (tmp & 0x200)
-			return (0);
+			break;
 	}
-	return (1);
 }
 
 int
@@ -993,7 +992,7 @@ audigyls_configure_mixer(audigyls_dev_t *dev)
 		 * For AC'97, we use the AC'97 record gain, unless we are
 		 * in loopback.
 		 */
-		ac97_control_set(dev->ac97_recgain, v1);
+		(void) ac97_control_set(dev->ac97_recgain, v1);
 		write_reg(dev, P17RECVOLL, 0x30303030);
 		write_reg(dev, P17RECVOLH, 0x30303030);
 	} else {
@@ -1024,7 +1023,7 @@ audigyls_configure_mixer(audigyls_dev_t *dev)
 
 	/* record source */
 	if (dev->ac97_recsrc != NULL) {
-		ac97_control_set(dev->ac97_recsrc,
+		(void) ac97_control_set(dev->ac97_recsrc,
 		    dev->controls[CTL_RECSRC].val);
 		v1 = RECSEL_AC97;	/* Audigy LS */
 	} else {
@@ -1260,7 +1259,7 @@ audigyls_alloc_ctrl(audigyls_dev_t *dev, uint32_t num, uint64_t val)
 	    audigyls_get_control, audigyls_set_control, pc);
 }
 
-static int
+static void
 audigyls_add_controls(audigyls_dev_t *dev)
 {
 	(void) audio_dev_add_soft_volume(dev->adev);
@@ -1276,8 +1275,6 @@ audigyls_add_controls(audigyls_dev_t *dev)
 	if (!dev->ac97) {
 		audigyls_alloc_ctrl(dev, CTL_MONGAIN, 0);
 	}
-
-	return (DDI_SUCCESS);
 }
 
 int
