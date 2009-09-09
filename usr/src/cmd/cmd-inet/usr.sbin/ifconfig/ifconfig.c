@@ -4115,14 +4115,22 @@ inetunplumb(char *arg, int64_t param)
 		Perror0_exit("unplumb: SIOCGLIFFLAGS");
 	}
 	flags = lifr.lifr_flags;
-
+again:
 	if (flags & IFF_IPMP) {
 		lifgroupinfo_t lifgr;
 		ifaddrlistx_t *ifaddrs, *ifaddrp;
 
 		/*
-		 * The kernel will fail the I_PUNLINK if the group still has
-		 * members, but check now to provide a better error message.
+		 * There are two reasons the I_PUNLINK can fail with EBUSY:
+		 * (1) if IP interfaces are in the group, or (2) if IPMP data
+		 * addresses are administratively up.  For case (1), we fail
+		 * here with a specific error message.  For case (2), we bring
+		 * down the addresses prior to doing the I_PUNLINK.  If the
+		 * I_PUNLINK still fails with EBUSY then the configuration
+		 * must have changed after our checks, in which case we branch
+		 * back up to `again' and rerun this logic.  The net effect is
+		 * that unplumbing an IPMP interface will only fail with EBUSY
+		 * if IP interfaces are in the group.
 		 */
 		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) == -1)
 			Perror0_exit("unplumb: SIOCGLIFGROUPNAME");
@@ -4173,6 +4181,12 @@ inetunplumb(char *arg, int64_t param)
 		if (debug)
 			(void) printf("arp_muxid %d\n", arp_muxid);
 		if (ioctl(mux_fd, I_PUNLINK, arp_muxid) < 0) {
+			/*
+			 * See the comment before the SIOCGLIFGROUPNAME call.
+			 */
+			if (errno == EBUSY && (flags & IFF_IPMP))
+				goto again;
+
 			if ((errno == EINVAL) &&
 			    (flags & (IFF_NOARP | IFF_IPV6))) {
 				/*
@@ -4208,6 +4222,13 @@ inetunplumb(char *arg, int64_t param)
 			(void) ioctl(muxid_fd, SIOCSLIFMUXID, (caddr_t)&lifr);
 			errno = save_errno;
 		}
+
+		/*
+		 * See the comment before the SIOCGLIFGROUPNAME call.
+		 */
+		if (errno == EBUSY && (flags & IFF_IPMP))
+			goto again;
+
 		Perror0_exit("I_PUNLINK for ip");
 	}
 	(void) close(mux_fd);
