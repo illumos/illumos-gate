@@ -165,6 +165,7 @@ unsigned auclnt_get_dev_capab(audio_dev_t *);
 #define	AUDIO_CLIENT_CAP_RECORD		(1U << 1)
 #define	AUDIO_CLIENT_CAP_DUPLEX		(1U << 2)
 #define	AUDIO_CLIENT_CAP_SNDSTAT	(1U << 3)
+#define	AUDIO_CLIENT_CAP_OPAQUE		(1U << 4)
 
 /*
  * Walk all the open client structures for a named audio device.

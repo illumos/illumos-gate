@@ -517,6 +517,7 @@ typedef unsigned short oss_peaks_t[MAX_PEAK_CHANNELS];
 
 #define	SNDCTL_DSP_GETOSPACE	__OSSIOR('P', 12, audio_buf_info)
 #define	SNDCTL_DSP_GETISPACE	__OSSIOR('P', 13, audio_buf_info)
+#define	SNDCTL_DSP_NONBLOCK	__OSSIO('P', 14)	/* Obsolete */
 #define	SNDCTL_DSP_GETCAPS	__OSSIOR('P', 15, int)
 
 #define	SNDCTL_DSP_GETTRIGGER	__OSSIOR('P', 16, int)

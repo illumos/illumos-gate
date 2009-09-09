@@ -604,7 +604,6 @@ oss_cnt_devs(void)
 static int
 sndctl_dsp_speed(audio_client_t *c, int *ratep)
 {
-	int		rv;
 	int		rate;
 	int		oflag;
 
@@ -612,13 +611,13 @@ sndctl_dsp_speed(audio_client_t *c, int *ratep)
 
 	oflag = auclnt_get_oflag(c);
 	if (oflag & FREAD) {
-		if ((rv = auclnt_set_rate(auclnt_input_stream(c), rate)) != 0)
-			return (rv);
+		(void) auclnt_set_rate(auclnt_input_stream(c), rate);
+		*ratep = auclnt_get_rate(auclnt_input_stream(c));
 	}
 
 	if (oflag & FWRITE) {
-		if ((rv = auclnt_set_rate(auclnt_output_stream(c), rate)) != 0)
-			return (rv);
+		(void) auclnt_set_rate(auclnt_output_stream(c), rate);
+		*ratep = auclnt_get_rate(auclnt_output_stream(c));
 	}
 
 	return (0);
@@ -627,7 +626,6 @@ sndctl_dsp_speed(audio_client_t *c, int *ratep)
 static int
 sndctl_dsp_setfmt(audio_client_t *c, int *fmtp)
 {
-	int		rv;
 	int		fmt;
 	int		i;
 	int		oflag;
@@ -643,23 +641,20 @@ sndctl_dsp_setfmt(audio_client_t *c, int *fmtp)
 			}
 		}
 		if (fmt == AUDIO_FORMAT_NONE) {
-			/* if format not known, return ENOTSUP */
-			return (ENOTSUP);
+			/* if format not known, return */
+			goto done;
 		}
 
 		if (oflag & FWRITE) {
-			rv = auclnt_set_format(auclnt_output_stream(c), fmt);
-			if (rv != 0)
-				return (rv);
+			(void) auclnt_set_format(auclnt_output_stream(c), fmt);
 		}
 
 		if (oflag & FREAD) {
-			rv = auclnt_set_format(auclnt_input_stream(c), fmt);
-			if (rv != 0)
-				return (rv);
+			(void) auclnt_set_format(auclnt_input_stream(c), fmt);
 		}
 	}
 
+done:
 	if (oflag & FWRITE) {
 		fmt = auclnt_get_format(auclnt_output_stream(c));
 	} else if (oflag & FREAD) {
@@ -699,7 +694,6 @@ sndctl_dsp_getfmts(audio_client_t *c, int *fmtsp)
 static int
 sndctl_dsp_channels(audio_client_t *c, int *chanp)
 {
-	int		rv;
 	int		nchan;
 	int		oflag;
 
@@ -708,16 +702,13 @@ sndctl_dsp_channels(audio_client_t *c, int *chanp)
 	nchan = *chanp;
 	if (nchan != 0) {
 		if (oflag & FWRITE) {
-			rv = auclnt_set_channels(auclnt_output_stream(c),
+			(void) auclnt_set_channels(auclnt_output_stream(c),
 			    nchan);
-			if (rv != 0)
-				return (rv);
 		}
 
 		if (oflag & FREAD) {
-			rv = auclnt_set_channels(auclnt_input_stream(c), nchan);
-			if (rv != 0)
-				return (rv);
+			(void) auclnt_set_channels(auclnt_input_stream(c),
+			    nchan);
 		}
 	}
 
@@ -774,6 +765,16 @@ sndctl_dsp_getcaps(audio_client_t *c, int *capsp)
 		osscaps |= PCM_CAP_INPUT;
 	if (ncaps & AUDIO_CLIENT_CAP_DUPLEX)
 		osscaps |= PCM_CAP_DUPLEX;
+
+	if (osscaps != 0) {
+		osscaps |= PCM_CAP_TRIGGER | PCM_CAP_BATCH;
+		if (!(ncaps & AUDIO_CLIENT_CAP_OPAQUE)) {
+			osscaps |= PCM_CAP_FREERATE | PCM_CAP_MULTI;
+		}
+	} else {
+		/* This is the sndstat device! */
+		osscaps = PCM_CAP_VIRTUAL;
+	}
 
 	*capsp = osscaps;
 	return (0);
@@ -1306,18 +1307,16 @@ sndctl_audioinfo(audio_client_t *c, oss_audioinfo *si)
 	}
 
 	if (si->caps != 0) {
-		/* AC3: PCM_CAP_MULTI would be wrong for an AC3 only device */
-		si->caps |= PCM_CAP_BATCH | PCM_CAP_TRIGGER | PCM_CAP_MULTI;
 		/* MMAP: we add PCM_CAP_MMAP when we we support it */
+		si->caps |= PCM_CAP_TRIGGER | PCM_CAP_BATCH;
 		si->enabled = 1;
 		si->rate_source = si->dev;
 
-		/* we can convert PCM formats */
-		if ((si->iformats | si->oformats) &
-		    AUDIO_FORMAT_PCM) {
+		/* we can convert and mix PCM formats */
+		if (!(cap & AUDIO_CLIENT_CAP_OPAQUE)) {
 			si->min_channels = min(2, si->max_channels);
 			si->min_rate = min(5000, si->max_rate);
-			si->caps |= PCM_CAP_FREERATE;
+			si->caps |= PCM_CAP_FREERATE | PCM_CAP_MULTI;
 		}
 		(void) snprintf(si->devnode, sizeof (si->devnode),
 		    "/dev/sound/%s:%ddsp",
@@ -1893,6 +1892,7 @@ oss_ioctl(audio_client_t *c, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case SNDCTL_DSP_GETCHANNELMASK:
 	case SNDCTL_DSP_BIND_CHANNEL:
 	case SNDCTL_DSP_SETSYNCRO:
+	case SNDCTL_DSP_NONBLOCK:
 	default:
 		rv = EINVAL;
 		break;

@@ -329,6 +329,7 @@ struct audio_dev {
 #define	DEV_INPUT_CAP		(1U << 1)
 #define	DEV_DUPLEX_CAP		(1U << 2)
 #define	DEV_SNDSTAT_CAP		(1U << 3)
+#define	DEV_OPAQUE_CAP		(1U << 4)	/* AC3 are not mixable */
 
 	char			d_name[128];	/* generic description */
 	char			d_desc[128];	/* detailed config descr */
