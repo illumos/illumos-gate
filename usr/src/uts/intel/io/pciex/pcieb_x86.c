@@ -572,7 +572,9 @@ pcieb_intel_mps_workaround(dev_info_t *dip)
 	vid = bus_p->bus_dev_ven_id & 0xFFFF;
 	did = bus_p->bus_dev_ven_id >> 16;
 
-	if ((vid == INTEL_VENDOR_ID) && INTEL_NB5000_PCIE_DEV_ID(did)) {
+	if ((vid == INTEL_VENDOR_ID) && (INTEL_NB5000_PCIE_DEV_ID(did) ||
+	    INTEL_NB5100_PCIE_DEV_ID(did))) {
+
 		pexctrl = pci_config_get32(bus_p->bus_cfg_hdl,
 		    INTEL_NB5000_PEXCTRL_OFFSET);
 		/*
