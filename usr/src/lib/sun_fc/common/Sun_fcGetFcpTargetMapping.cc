@@ -71,7 +71,7 @@ Sun_fcGetFcpTargetMapping(HBA_HANDLE handle, PHBA_FCPTARGETMAPPING mapping) {
 	int			    count;
 	PHBA_FCPTARGETMAPPINGV2	    mappingV2;
 	HBA_ADAPTERATTRIBUTES       attributes;
-	HBA_UINT32                  entries = mapping->NumberOfEntries;
+	HBA_UINT32                  entries = 0;
 	HBA_UINT32                  current = 0;
 	HBA_UINT32                  port;
 	HBA_UINT32                  limit;
@@ -82,6 +82,8 @@ Sun_fcGetFcpTargetMapping(HBA_HANDLE handle, PHBA_FCPTARGETMAPPING mapping) {
 	    log.userError("NULL mapping argument.");
 	    return (HBA_STATUS_ERROR_ARG);
 	}
+
+	entries = mapping->NumberOfEntries;
 
 	/* get adapter attributes for number of ports */
 	status = Sun_fcGetAdapterAttributes(handle,&attributes);
