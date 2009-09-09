@@ -145,6 +145,7 @@ usb_log_handle_t	hubdi_log_handle;
 uint_t			hubdi_errlevel = USB_LOG_L4;
 uint_t			hubdi_errmask = (uint_t)-1;
 uint8_t			hubdi_min_pm_threshold = 5; /* seconds */
+uint8_t			hubdi_reset_delay = 20; /* seconds */
 extern int modrootloaded;
 
 
@@ -8616,6 +8617,8 @@ hubd_reset_thread(void *arg)
 	boolean_t	online_child = B_FALSE;
 	int		prh_circ, rh_circ, circ, devinst;
 	char		*devname;
+	int		i = 0;
+	int		rval = USB_FAILURE;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_reset_thread:  started, hubd_reset_port = 0x%x", reset_port);
@@ -8694,11 +8697,46 @@ hubd_reset_thread(void *arg)
 		mutex_exit(HUBD_MUTEX(hubd));
 		/* First disconnect the device */
 		hubd_post_event(hubd, reset_port, USBA_EVENT_TAG_HOT_REMOVAL);
+
+		/* delete cached dv_node's but drop locks first */
+		ndi_devi_exit(hdip, circ);
+		ndi_devi_exit(rh_dip, rh_circ);
+		ndi_devi_exit(ddi_get_parent(rh_dip), prh_circ);
+
+		(void) devfs_clean(rh_dip, NULL, DV_CLEAN_FORCE);
+
+		/*
+		 * workaround only for storage device. When it's able to force
+		 * detach a driver, this code can be removed safely.
+		 *
+		 * If we're to reset storage device and the device is used, we
+		 * will wait at most extra 20s for applications to exit and
+		 * close the device. This is especially useful for HAL-based
+		 * applications.
+		 */
+		if ((strcmp(devname, "scsa2usb") == 0) &&
+		    DEVI(child_dip)->devi_ref != 0) {
+			while (i++ < hubdi_reset_delay) {
+				mutex_enter(HUBD_MUTEX(hubd));
+				rval = hubd_delete_child(hubd, reset_port,
+				    NDI_DEVI_REMOVE, B_FALSE);
+				mutex_exit(HUBD_MUTEX(hubd));
+				if (rval == USB_SUCCESS)
+					break;
+
+				delay(drv_usectohz(1000000)); /* 1s */
+			}
+		}
+
+		ndi_devi_enter(ddi_get_parent(rh_dip), &prh_circ);
+		ndi_devi_enter(rh_dip, &rh_circ);
+		ndi_devi_enter(hdip, &circ);
+
 		mutex_enter(HUBD_MUTEX(hubd));
 
 		/* Then force detaching the device */
-		if (hubd_delete_child(hubd, reset_port, NDI_DEVI_REMOVE,
-		    B_FALSE) != USB_SUCCESS) {
+		if ((rval != USB_SUCCESS) && (hubd_delete_child(hubd,
+		    reset_port, NDI_DEVI_REMOVE, B_FALSE) != USB_SUCCESS)) {
 			USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 			    "%s%d cannot be reset due to other applications "
 			    "are using it, please first close these "
@@ -8813,27 +8851,37 @@ usba_hubdi_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)
 	int			rval = USB_FAILURE;
 
 	if ((!dip) || usba_is_root_hub(dip)) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
+		    "usba_hubdi_reset_device: NULL dip or root hub");
 
 		return (USB_INVALID_ARGS);
 	}
 
 	if (!usb_owns_device(dip)) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
+		    "usba_hubdi_reset_device: Not owns the device");
 
 		return (USB_INVALID_PERM);
 	}
 
 	if ((reset_level != USB_RESET_LVL_REATTACH) &&
 	    (reset_level != USB_RESET_LVL_DEFAULT)) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
+		    "usba_hubdi_reset_device: Unknown flags");
 
 		return (USB_INVALID_ARGS);
 	}
 
 	if ((hdip = ddi_get_parent(dip)) == NULL) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
+		    "usba_hubdi_reset_device: fail to get parent hub");
 
 		return (USB_INVALID_ARGS);
 	}
 
 	if ((hubd = hubd_get_soft_state(hdip)) == NULL) {
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
+		    "usba_hubdi_reset_device: fail to get hub softstate");
 
 		return (USB_INVALID_ARGS);
 	}
