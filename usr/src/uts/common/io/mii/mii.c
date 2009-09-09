@@ -241,6 +241,7 @@ mii_alloc_instance(void *private, dev_info_t *dip, int inst, mii_ops_t *ops)
 	mh->m_suspended = B_FALSE;
 	mh->m_started = B_FALSE;
 	mh->m_tstate = MII_STATE_PROBE;
+	mh->m_link = LINK_STATE_UNKNOWN;
 	mh->m_error = MII_EOK;
 	mh->m_addr = -1;
 	mutex_init(&mh->m_lock, NULL, MUTEX_DRIVER, NULL);
@@ -1851,6 +1852,7 @@ _mii_probe(mii_handle_t mh)
 			    mh->m_name, mii_xcvr_types[mh->m_phy->phy_type],
 			    mh->m_addr, mh->m_phy->phy_vendor,
 			    mh->m_phy->phy_model);
+			mh->m_link = LINK_STATE_UNKNOWN;
 		}
 	}
 }
@@ -1885,7 +1887,7 @@ _mii_reset(mii_handle_t mh)
 	ASSERT(ph->phy_present);
 
 	/* If we're resetting the PHY, then we want to notify loss of link */
-	notify = (mh->m_link == LINK_STATE_UP);
+	notify = (mh->m_link != LINK_STATE_DOWN);
 	mh->m_link = LINK_STATE_DOWN;
 	ph->phy_link = LINK_STATE_DOWN;
 	ph->phy_speed = 0;
