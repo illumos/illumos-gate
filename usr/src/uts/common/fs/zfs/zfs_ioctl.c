@@ -1571,14 +1571,14 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	objset_t *os;
 	int error;
 
+	if (zc->zc_cookie == 0)
+		(void) dmu_objset_find(zc->zc_name, dmu_objset_prefetch,
+		    NULL, DS_FIND_SNAPSHOTS);
+
 	error = dmu_objset_hold(zc->zc_name, FTAG, &os);
 	if (error)
 		return (error == ENOENT ? ESRCH : error);
 
-	if (zc->zc_cookie == 0) {
-		(void) dmu_objset_find(zc->zc_name, dmu_objset_prefetch,
-		    NULL, DS_FIND_SNAPSHOTS);
-	}
 	/*
 	 * A dataset name of maximum length cannot have any snapshots,
 	 * so exit immediately.
