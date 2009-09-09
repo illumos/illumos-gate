@@ -19,13 +19,13 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	All Rights Reserved */
-
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	All Rights Reserved */
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -493,9 +493,15 @@ set_active_fd(int fd)
 	int i;
 	int *old_fd;
 	int old_nfd;
+	int *new_fd;
+	int new_nfd;
 
-	if (afd->a_nfd == 0)	/* first time initialization */
+	if (afd->a_nfd == 0) {	/* first time initialization */
+		ASSERT(fd == -1);
+		mutex_enter(&afd->a_fdlock);
 		free_afd(afd);
+		mutex_exit(&afd->a_fdlock);
+	}
 
 	/* insert fd into vacant slot, if any */
 	for (i = 0; i < afd->a_nfd; i++) {
@@ -508,15 +514,21 @@ set_active_fd(int fd)
 	/*
 	 * Reallocate the a_fd[] array to add one more slot.
 	 */
-	old_fd = afd->a_fd;
+	ASSERT(fd == -1);
 	old_nfd = afd->a_nfd;
-	afd->a_nfd = old_nfd + 1;
-	MAXFD(afd->a_nfd);
+	old_fd = afd->a_fd;
+	new_nfd = old_nfd + 1;
+	new_fd = kmem_alloc(new_nfd * sizeof (afd->a_fd[0]), KM_SLEEP);
+	MAXFD(new_nfd);
 	COUNT(afd_alloc);
-	afd->a_fd = kmem_alloc(afd->a_nfd * sizeof (afd->a_fd[0]), KM_SLEEP);
+
+	mutex_enter(&afd->a_fdlock);
+	afd->a_fd = new_fd;
+	afd->a_nfd = new_nfd;
 	for (i = 0; i < old_nfd; i++)
 		afd->a_fd[i] = old_fd[i];
 	afd->a_fd[i] = fd;
+	mutex_exit(&afd->a_fdlock);
 
 	if (old_nfd > sizeof (afd->a_buf) / sizeof (afd->a_buf[0])) {
 		COUNT(afd_free);
@@ -548,11 +560,16 @@ is_active_fd(kthread_t *t, int fd)
 	afd_t *afd = &t->t_activefd;
 	int i;
 
+	ASSERT(t != curthread);
+	mutex_enter(&afd->a_fdlock);
 	/* uninitialized is ok here, a_nfd is then zero */
 	for (i = 0; i < afd->a_nfd; i++) {
-		if (afd->a_fd[i] == fd)
+		if (afd->a_fd[i] == fd) {
+			mutex_exit(&afd->a_fdlock);
 			return (1);
+		}
 	}
+	mutex_exit(&afd->a_fdlock);
 	return (0);
 }
 
@@ -572,7 +589,14 @@ getf(int fd)
 	if ((uint_t)fd >= fip->fi_nfiles)
 		return (NULL);
 
+	/*
+	 * Reserve a slot in the active fd array now so we can call
+	 * set_active_fd(fd) for real below, while still inside UF_ENTER().
+	 */
+	set_active_fd(-1);
+
 	UF_ENTER(ufp, fip, fd);
+
 	if ((fp = ufp->uf_file) == NULL) {
 		UF_EXIT(ufp);
 
@@ -588,9 +612,10 @@ getf(int fd)
 	 */
 	if (audit_active)
 		(void) audit_getf(fd);
-	UF_EXIT(ufp);
 
 	set_active_fd(fd);	/* record the active file descriptor */
+
+	UF_EXIT(ufp);
 
 	return (fp);
 }
@@ -674,39 +699,61 @@ closeandsetf(int fd, file_t *newfp)
 	 * some other lwp in the process is performing system call
 	 * activity on the file.  To avoid blocking here for a long
 	 * time (the other lwp might be in a long term sleep in its
-	 * system call), we stop all other lwps in the process and
-	 * scan them to find the ones with this fd as one of their
-	 * active fds and set their a_stale flag so they will emerge
-	 * from their system calls immediately.  post_syscall() will
+	 * system call), we scan all other lwps in the process to
+	 * find the ones with this fd as one of their active fds,
+	 * set their a_stale flag, and set them running if they
+	 * are in an interruptible sleep so they will emerge from
+	 * their system calls immediately.  post_syscall() will
 	 * test the a_stale flag and set errno to EBADF.
 	 */
 	ASSERT(ufp->uf_refcnt == 0 || p->p_lwpcnt > 1);
 	if (ufp->uf_refcnt > 0) {
+		kthread_t *t;
+
+		/*
+		 * We call sprlock_proc(p) to ensure that the thread
+		 * list will not change while we are scanning it.
+		 * To do this, we must drop ufp->uf_lock and then
+		 * reacquire it (so we are not holding both p->p_lock
+		 * and ufp->uf_lock at the same time).  ufp->uf_lock
+		 * must be held for is_active_fd() to be correct
+		 * (set_active_fd() is called while holding ufp->uf_lock).
+		 *
+		 * This is a convoluted dance, but it is better than
+		 * the old brute-force method of stopping every thread
+		 * in the process by calling holdlwps(SHOLDFORK1).
+		 */
+
 		UF_EXIT(ufp);
 		COUNT(afd_wait);
 
-		/*
-		 * Make all other lwps hold in place, as if doing fork1().
-		 * holdlwps(SHOLDFORK1) fails only if another lwp wants to
-		 * perform a forkall() or the process is exiting.  In either
-		 * case, all other lwps are either returning from their
-		 * system calls (because of SHOLDFORK) or calling lwp_exit()
-		 * (because of SEXITLWPS) so we don't need to scan them.
-		 */
-		if (holdlwps(SHOLDFORK1)) {
-			kthread_t *t;
+		mutex_enter(&p->p_lock);
+		sprlock_proc(p);
+		mutex_exit(&p->p_lock);
 
-			mutex_enter(&p->p_lock);
-			for (t = curthread->t_forw; t != curthread;
+		UF_ENTER(ufp, fip, fd);
+		ASSERT(ufp->uf_file == NULL);
+
+		if (ufp->uf_refcnt > 0) {
+			for (t = curthread->t_forw;
+			    t != curthread;
 			    t = t->t_forw) {
 				if (is_active_fd(t, fd)) {
+					thread_lock(t);
 					t->t_activefd.a_stale = 1;
 					t->t_post_sys = 1;
+					if (ISWAKEABLE(t))
+						setrun_locked(t);
+					thread_unlock(t);
 				}
 			}
-			continuelwps(p);
-			mutex_exit(&p->p_lock);
 		}
+
+		UF_EXIT(ufp);
+
+		mutex_enter(&p->p_lock);
+		sprunlock(p);
+
 		UF_ENTER(ufp, fip, fd);
 		ASSERT(ufp->uf_file == NULL);
 	}
@@ -774,10 +821,9 @@ releasef(int fd)
 	uf_info_t *fip = P_FINFO(curproc);
 	uf_entry_t *ufp;
 
-	clear_active_fd(fd);	/* clear the active file descriptor */
-
 	UF_ENTER(ufp, fip, fd);
 	ASSERT(ufp->uf_refcnt > 0);
+	clear_active_fd(fd);	/* clear the active file descriptor */
 	if (--ufp->uf_refcnt == 0)
 		cv_broadcast(&ufp->uf_closing_cv);
 	UF_EXIT(ufp);

@@ -75,11 +75,12 @@ typedef struct ctxop {
  * Each member of a_fd[] not equalling -1 represents an active fd.
  * The structure is initialized on first use; all zeros means uninitialized.
  */
-typedef struct _afd {
+typedef struct {
+	kmutex_t a_fdlock;	/* protects a_fd and a_nfd */
 	int	*a_fd;		/* pointer to list of fds */
-	short	a_nfd;		/* number of entries in *a_fd */
-	short	a_stale;	/* one of the active fds is being closed */
-	int	a_buf[1];	/* buffer to which a_fd initially refers */
+	int	a_nfd;		/* number of entries in *a_fd */
+	int	a_stale;	/* one of the active fds is being closed */
+	int	a_buf[2];	/* buffer to which a_fd initially refers */
 } afd_t;
 
 /*
@@ -282,7 +283,7 @@ typedef struct _kthread {
 	caddr_t		t_stkbase;	/* base of the the stack */
 	struct page	*t_red_pp;	/* if non-NULL, redzone is mapped */
 
-	struct _afd	t_activefd;	/* active file descriptor table */
+	afd_t		t_activefd;	/* active file descriptor table */
 
 	struct _kthread	*t_priforw;	/* sleepq per-priority sublist */
 	struct _kthread	*t_priback;
