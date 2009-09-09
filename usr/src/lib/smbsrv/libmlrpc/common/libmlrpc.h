@@ -491,6 +491,7 @@ typedef struct ndr_buf {
 void nds_initialize(ndr_stream_t *, unsigned, int, ndr_heap_t *);
 void nds_finalize(ndr_stream_t *, ndr_fraglist_t *);
 void nds_destruct(ndr_stream_t *);
+void nds_show_state(ndr_stream_t *);
 
 /* ndr_client.c */
 int ndr_clnt_bind(ndr_client_t *, const char *, ndr_binding_t **);
@@ -508,6 +509,7 @@ int ndr_decode_return(ndr_xa_t *, void *);
 int ndr_decode_pdu_hdr(ndr_xa_t *);
 int ndr_encode_pdu_hdr(ndr_xa_t *);
 void ndr_decode_frag_hdr(ndr_stream_t *, ndr_common_header_t *);
+void ndr_show_hdr(ndr_common_header_t *);
 unsigned ndr_bind_ack_hdr_size(ndr_xa_t *);
 unsigned ndr_alter_context_rsp_hdr_size(void);
 

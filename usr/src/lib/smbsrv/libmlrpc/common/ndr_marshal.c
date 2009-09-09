@@ -138,7 +138,6 @@ ndr_buf_decode(ndr_buf_t *nbuf, unsigned opnum, const char *data,
 	else
 		pdu_size_hint = datalen;
 
-	nds_destruct(&nbuf->nb_nds);
 	nds_initialize(&nbuf->nb_nds, pdu_size_hint, NDR_MODE_BUF_DECODE,
 	    nbuf->nb_heap);
 	bcopy(data, nbuf->nb_nds.pdu_base_addr, datalen);
@@ -330,6 +329,31 @@ ndr_decode_frag_hdr(ndr_stream_t *nds, ndr_common_header_t *hdr)
 		    sizeof (WORD));
 		nds_bswap(&tmp->call_id, &hdr->call_id, sizeof (DWORD));
 	}
+}
+
+void
+ndr_show_hdr(ndr_common_header_t *hdr)
+{
+	char	*fragtype;
+
+	if (hdr == NULL) {
+		ndo_printf(NULL, NULL, "ndr hdr: <null>");
+		return;
+	}
+
+	if (NDR_IS_SINGLE_FRAG(hdr->pfc_flags))
+		fragtype = "single";
+	else if (NDR_IS_FIRST_FRAG(hdr->pfc_flags))
+		fragtype = "first";
+	else if (NDR_IS_LAST_FRAG(hdr->pfc_flags))
+		fragtype = "last";
+	else
+		fragtype = "intermediate";
+
+	ndo_printf(NULL, NULL,
+	    "ndr hdr: %d.%d ptype=%d, %s frag (flags=0x%08x) len=%d",
+	    hdr->rpc_vers, hdr->rpc_vers_minor, hdr->ptype,
+	    fragtype, hdr->pfc_flags, hdr->frag_length);
 }
 
 int

@@ -31,10 +31,12 @@
 #include <smbsrv/libmlrpc.h>
 
 #define	NDR_DEFAULT_FRAGSZ	8192
+#define	NDR_MULTI_FRAGSZ	(60 * 1024)
 
 static void ndr_clnt_init_hdr(ndr_client_t *, ndr_xa_t *);
+static void ndr_clnt_remove_hdr(ndr_stream_t *);
 static int ndr_clnt_get_frags(ndr_client_t *, ndr_xa_t *);
-static void ndr_clnt_remove_hdr(ndr_stream_t *, int *);
+static int ndr_clnt_get_frag(ndr_client_t *, ndr_xa_t *, ndr_common_header_t *);
 
 int
 ndr_clnt_bind(ndr_client_t *clnt, const char *service_name,
@@ -209,7 +211,11 @@ ndr_clnt_call(ndr_binding_t *mbind, int opnum, void *params)
 		 * as if we had received the entire response as
 		 * a single PDU.
 		 */
+		(void) NDS_GROW_PDU(&mxa.recv_nds, NDR_MULTI_FRAGSZ, NULL);
+
 		recv_pdu_scan_offset = mxa.recv_nds.pdu_scan_offset;
+		mxa.recv_nds.pdu_scan_offset = rsphdr->frag_length;
+		mxa.recv_nds.pdu_size = rsphdr->frag_length;
 
 		if (ndr_clnt_get_frags(clnt, &mxa) < 0) {
 			rc = NDR_DRC_FAULT_RECEIVED_MALFORMED;
@@ -274,7 +280,7 @@ ndr_clnt_init_hdr(ndr_client_t *clnt, ndr_xa_t *mxa)
  * base_offset                          hdr   data
  *
  * |-------------------------------------|-----------------|
- *              offset                           len
+ *            scan_offset                         len
  *
  * RPC receive buffer (after this call):
  * +==================+=============+----+===========+
@@ -285,16 +291,17 @@ ndr_clnt_init_hdr(ndr_client_t *clnt, ndr_xa_t *mxa)
  * +=====+============+=============+----+===========+
  */
 static void
-ndr_clnt_remove_hdr(ndr_stream_t *nds, int *nbytes)
+ndr_clnt_remove_hdr(ndr_stream_t *nds)
 {
 	char *hdr;
 	char *data;
+	int nbytes;
 
 	hdr = (char *)nds->pdu_base_offset + nds->pdu_scan_offset;
 	data = hdr + NDR_RSP_HDR_SIZE;
-	*nbytes -= NDR_RSP_HDR_SIZE;
+	nbytes = nds->pdu_size - nds->pdu_scan_offset - NDR_RSP_HDR_SIZE;
 
-	bcopy(data, hdr, *nbytes);
+	bcopy(data, hdr, nbytes);
 	nds->pdu_size -= NDR_RSP_HDR_SIZE;
 }
 
@@ -307,51 +314,65 @@ ndr_clnt_remove_hdr(ndr_stream_t *nds, int *nbytes)
  *
  * Collect RPC fragments and append them to the receive stream buffer.
  * Each received fragment has a header, which we need to remove as we
- * build the full RPC PDU.
- *
- * The xa_read() calls will translate to SmbReadX requests.  Note that
- * there is no correspondence between SmbReadX buffering and DCE RPC
- * fragment alignment.
- *
- * Return -1 on error. Otherwise, return the total data count of the
- * complete RPC response upon success.
+ * build the full RPC PDU.  The scan offset is used to track frag headers.
  */
 static int
 ndr_clnt_get_frags(ndr_client_t *clnt, ndr_xa_t *mxa)
 {
 	ndr_stream_t *nds = &mxa->recv_nds;
 	ndr_common_header_t hdr;
-	int frag_rcvd;
 	int frag_size;
 	int last_frag;
-	int nbytes;
-
-	/*
-	 * The scan offest will be used to locate the frag header.
-	 */
-	nds->pdu_scan_offset = nds->pdu_base_offset + nds->pdu_size;
 
 	do {
-		frag_rcvd = 0;
+		if (ndr_clnt_get_frag(clnt, mxa, &hdr) < 0) {
+			nds_show_state(nds);
+			return (-1);
+		}
 
-		do {
-			if ((nbytes = (*clnt->xa_read)(clnt, mxa)) < 0)
-				return (-1);
+		last_frag = NDR_IS_LAST_FRAG(hdr.pfc_flags);
+		frag_size = hdr.frag_length;
 
-			if (frag_rcvd == 0) {
-				ndr_decode_frag_hdr(nds, &hdr);
+		if (frag_size > (nds->pdu_size - nds->pdu_scan_offset)) {
+			nds_show_state(nds);
+			return (-1);
+		}
 
-				last_frag = NDR_IS_LAST_FRAG(hdr.pfc_flags);
-				frag_size = hdr.frag_length - NDR_RSP_HDR_SIZE;
-
-				ndr_clnt_remove_hdr(nds, &nbytes);
-				nds->pdu_scan_offset += frag_size;
-			}
-
-			frag_rcvd += nbytes;
-
-		} while (frag_rcvd < frag_size);
+		ndr_clnt_remove_hdr(nds);
+		nds->pdu_scan_offset += frag_size - NDR_RSP_HDR_SIZE;
 	} while (!last_frag);
 
 	return (0);
+}
+
+/*
+ * Read the next RPC fragment.  The xa_read() calls correspond to SmbReadX
+ * requests.  Note that there is no correspondence between SmbReadX buffering
+ * and DCE RPC fragment alignment.
+ */
+static int
+ndr_clnt_get_frag(ndr_client_t *clnt, ndr_xa_t *mxa, ndr_common_header_t *hdr)
+{
+	ndr_stream_t		*nds = &mxa->recv_nds;
+	unsigned long		available;
+	int			nbytes = 0;
+
+	available = nds->pdu_size - nds->pdu_scan_offset;
+
+	while (available < NDR_RSP_HDR_SIZE) {
+		if ((nbytes += (*clnt->xa_read)(clnt, mxa)) <= 0)
+			return (-1);
+		available += nbytes;
+	}
+
+	ndr_decode_frag_hdr(nds, hdr);
+	ndr_show_hdr(hdr);
+
+	while (available < hdr->frag_length) {
+		if ((nbytes = (*clnt->xa_read)(clnt, mxa)) <= 0)
+			return (-1);
+		available += nbytes;
+	}
+
+	return (nbytes);
 }

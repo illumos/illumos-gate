@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,7 +145,6 @@ smb_tree_connect:entry
 
 smb_com_logoff_andx:return
 {
-	exit(0);
 }
 
 /*
@@ -228,9 +227,13 @@ pid$target::lsarpc_s_LookupNames2:return
 /*
  * NetLogon
  */
-pid$target::netr_s_*:entry,
-pid$target::netr_s_*:return
+pid$target::netr_*:entry
 {
+}
+
+pid$target::netr_*:return
+{
+	printf("0x%08x", arg1);
 }
 
 /*
@@ -366,11 +369,6 @@ pid$target::wkssvc_s_*:return
 /*
  * SMBRDR
  */
-pid$target::smbrdr_*:entry,
-pid$target::smbrdr_*:return
-{
-}
-
 pid$target::smbrdr_tree_connect:entry
 {
 	printf("%s %s %s",
@@ -388,13 +386,32 @@ pid$target::smbrdr_open_pipe:entry
 	    copyinstr(arg3));
 }
 
-pid$target::smbrdr_close_pipe:entry
+pid$target::smbrdr_tree_disconnect:entry,
+pid$target::smbrdr_close_pipe:entry,
+pid$target::smbrdr_ntcreatex:entry,
+pid$target::smbrdr_transact:entry,
+pid$target::smbrdr_readx*:entry
 {
 }
 
 pid$target::smbrdr_tree_connect:return,
+pid$target::smbrdr_tree_disconnect:return,
 pid$target::smbrdr_open_pipe:return,
-pid$target::smbrdr_close_pipe:return
+pid$target::smbrdr_close_pipe:return,
+pid$target::smbrdr_ntcreatex:return,
+pid$target::smbrdr_transact:return,
+pid$target::smbrdr_readx*:return
+{
+	printf("%d", arg1);
+}
+
+pid$target::ndr_clnt_get_frags:entry,
+pid$target::ndr_clnt_get_frag:entry
+{
+}
+
+pid$target::ndr_clnt_get_frags:return,
+pid$target::ndr_clnt_get_frag:return
 {
 	printf("%d", arg1);
 }

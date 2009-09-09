@@ -199,7 +199,26 @@ nds_finalize(ndr_stream_t *nds, ndr_fraglist_t *frags)
 void
 nds_destruct(ndr_stream_t *nds)
 {
+	if ((nds == NULL) || (nds->ndo == NULL))
+		return;
+
 	NDS_DESTRUCT(nds);
+}
+
+/*
+ * Print NDR stream state.
+ */
+void
+nds_show_state(ndr_stream_t *nds)
+{
+	if (nds == NULL) {
+		ndo_printf(NULL, NULL, "nds: <null");
+		return;
+	}
+
+	ndo_printf(NULL, NULL, "nds: base=0x%x, size=%d, max=%d, scan=%d",
+	    nds->pdu_base_offset, nds->pdu_size, nds->pdu_max_size,
+	    nds->pdu_scan_offset);
 }
 
 /*
