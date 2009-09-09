@@ -49,6 +49,7 @@ MANIFEST_TOPDIRS=			\
 	kbd				\
 	keyserv				\
 	ldapcachemgr			\
+	ldmad				\
 	lms				\
 	mms				\
 	dlmgmtd				\

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -51,6 +51,7 @@ d none usr 755 root sys
 d none usr/lib 755 root bin
 d none usr/lib/ldoms 755 root bin
 f none usr/lib/ldoms/drd 555 root bin
+f none usr/lib/ldoms/ldmad 555 root bin
 f none usr/lib/ldoms/vntsd 555 root bin
 f none usr/lib/libpri.so.1 755 root bin
 f none usr/lib/libds.so.1 755 root bin

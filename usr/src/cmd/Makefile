@@ -498,6 +498,7 @@ sparc_SUBDIRS=		\
 	drd		\
 	fps		\
 	fruadm		\
+	ldmad		\
 	oplhpd		\
 	prtdscp		\
 	prtfru		\

@@ -50,6 +50,7 @@
 d none lib 755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
+f none lib/svc/method/ldoms-agents 0555 root bin
 f none lib/svc/method/svc-drd 0555 root bin
 f none lib/svc/method/svc-vntsd 0555 root bin
 d none platform 755 root sys
@@ -86,4 +87,5 @@ d none var/svc/manifest 755 root sys
 d none var/svc/manifest/platform 755 root sys
 d none var/svc/manifest/platform/sun4v 755 root sys
 f manifest var/svc/manifest/platform/sun4v/drd.xml 0444 root sys
+f manifest var/svc/manifest/platform/sun4v/ldoms-agents.xml 0444 root sys
 f manifest var/svc/manifest/platform/sun4v/vntsd.xml 0444 root sys

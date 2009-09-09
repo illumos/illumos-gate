@@ -306,6 +306,7 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/devices-audio
 	lib/svc/method/fc-fabric
 	lib/svc/method/iscsi-initiator
+	lib/svc/method/ldoms-agents
 	lib/svc/method/npivconfig
 	lib/svc/method/sf880dr
 	lib/svc/method/svc-cvcd
@@ -1612,6 +1613,10 @@ smf_handle_new_services () {
 	    ! -f $rootprefix/var/svc/manifest/system/pools.xml &&
 	    -f $rootprefix/etc/pooladm.conf ]]; then
 		smf_enable svc:/system/pools:default
+	fi
+	if [[ $zone = global && $karch = sun4v &&
+	    ! -f $rootprefix/var/svc/manifest/platforms/sun4v/ldoms-agents.xml ]]; then
+		smf_enable svc:/ldoms/agents:default
 	fi
 }
 

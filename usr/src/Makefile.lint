@@ -484,6 +484,7 @@ sparc_SUBDIRS= \
 	cmd/drd \
 	cmd/fps \
 	cmd/fruadm \
+	cmd/ldmad \
 	cmd/prtdscp \
 	cmd/prtfru \
 	cmd/sckmd \
