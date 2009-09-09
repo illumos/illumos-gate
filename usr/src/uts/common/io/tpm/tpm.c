@@ -1593,11 +1593,7 @@ tpm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	/* Since we are freeing tpm structure, we need to gain the lock */
-
 	tpm_cleanup(dip, tpm);
-
-	mutex_destroy(&tpm->pm_mutex);
-	cv_destroy(&tpm->suspend_cv);
 
 	/* Free the soft state */
 	ddi_soft_state_free(statep, instance);

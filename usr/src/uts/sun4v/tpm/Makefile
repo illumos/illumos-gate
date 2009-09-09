@@ -67,6 +67,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS += $(CCVERBOSE)
 CFLAGS += -xCC
 
+# This is for everything except /usr/include/tss
+CPPFLAGS	+= -I$(ROOT)/usr/include
+
 # This is for /usr/include/tss/, which is not built in the ON consolidation
 CPPFLAGS        += -I/usr/include
 
