@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,9 +34,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/mac.h>
+#include <sys/dld.h>
 #include <libdladm.h>
-#include <libdladm_impl.h>
-#include <sys/mac_flow.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -128,6 +128,9 @@ extern dladm_status_t	dladm_set_linkprop(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t, uint_t);
 extern dladm_status_t	dladm_get_linkprop(dladm_handle_t, datalink_id_t,
 			    dladm_prop_type_t, const char *, char **, uint_t *);
+extern dladm_status_t	dladm_get_linkprop_values(dladm_handle_t, datalink_id_t,
+			    dladm_prop_type_t, const char *, uint_t *,
+			    uint_t *);
 extern dladm_status_t	dladm_walk_linkprop(dladm_handle_t, datalink_id_t,
 			    void *, int (*)(dladm_handle_t, datalink_id_t,
 			    const char *, void *));

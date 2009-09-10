@@ -66,6 +66,9 @@ extern "C" {
  *
  *  - DLADM_OPT_HWRINGS:
  *    Requires a hardware group of rings when creating a vnic.
+ *
+ *  - DLADM_OPT_NOREFRESH:
+ *    Do not refresh the daemon after setting parameter (used by STP mcheck).
  */
 #define	DLADM_OPT_ACTIVE	0x00000001
 #define	DLADM_OPT_PERSIST	0x00000002
@@ -75,6 +78,7 @@ extern "C" {
 #define	DLADM_OPT_ANCHOR	0x00000020
 #define	DLADM_OPT_VLAN		0x00000040
 #define	DLADM_OPT_HWRINGS	0x00000080
+#define	DLADM_OPT_NOREFRESH	0x00000100
 
 #define	DLADM_WALK_TERMINATE	0
 #define	DLADM_WALK_CONTINUE	-1
@@ -148,7 +152,9 @@ typedef enum {
 	DLADM_STATUS_NOTDEFINED,
 	DLADM_STATUS_BADPROP,
 	DLADM_STATUS_MINMAXBW,
-	DLADM_STATUS_NO_HWRINGS
+	DLADM_STATUS_NO_HWRINGS,
+	DLADM_STATUS_PERMONLY,
+	DLADM_STATUS_OPTMISSING
 } dladm_status_t;
 
 typedef enum {

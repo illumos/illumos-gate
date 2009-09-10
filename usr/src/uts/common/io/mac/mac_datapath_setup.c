@@ -1358,6 +1358,10 @@ mac_client_update_classifier(mac_client_impl_t *mcip, boolean_t enable)
 	rx_func = enable_classifier ? mac_rx_srs_subflow_process :
 	    mac_rx_srs_process;
 
+	/* Tell mac_srs_poll_state_change to disable polling if necessary */
+	if (mip->mi_state_flags & MIS_POLL_DISABLE)
+		enable_classifier = B_TRUE;
+
 	/*
 	 * If receive function has already been configured correctly for
 	 * current subflow configuration, do nothing.
@@ -1979,7 +1983,8 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
 		ring->mr_classify_type = MAC_HW_CLASSIFIER;
 		ring->mr_flag |= MR_INCIPIENT;
 
-		if (FLOW_TAB_EMPTY(mcip->mci_subflow_tab) && mac_poll_enable)
+		if (!(mcip->mci_mip->mi_state_flags & MIS_POLL_DISABLE) &&
+		    FLOW_TAB_EMPTY(mcip->mci_subflow_tab) && mac_poll_enable)
 			mac_srs->srs_state |= SRS_POLLING_CAPAB;
 
 		mac_srs->srs_poll_thr = thread_create(NULL, 0,
@@ -3386,5 +3391,27 @@ mac_fanout_recompute(mac_impl_t *mip)
 			continue;
 		mac_fanout_recompute_client(mcip);
 	}
+	i_mac_perim_exit(mip);
+}
+
+/*
+ * Given a MAC, change the polling state for all its MAC clients.  'enable' is
+ * B_TRUE to enable polling or B_FALSE to disable.  Polling is enabled by
+ * default.
+ */
+void
+mac_poll_state_change(mac_handle_t mh, boolean_t enable)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	mac_client_impl_t *mcip;
+
+	i_mac_perim_enter(mip);
+	if (enable)
+		mip->mi_state_flags &= ~MIS_POLL_DISABLE;
+	else
+		mip->mi_state_flags |= MIS_POLL_DISABLE;
+	for (mcip = mip->mi_clients_list; mcip != NULL;
+	    mcip = mcip->mci_client_next)
+		mac_client_update_classifier(mcip, B_TRUE);
 	i_mac_perim_exit(mip);
 }

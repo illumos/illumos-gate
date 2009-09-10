@@ -236,14 +236,12 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 		 * so we need to send a copy of the packet to the
 		 * underlying NIC so that it can be sent on the wire.
 		 */
-		mblk_t *rest;
-
 		src_mcip->mci_stat_multixmt++;
 		src_mcip->mci_stat_brdcstxmt++;
 
-		rest = MAC_RING_TX_DEFAULT(mip, mp_chain);
-		if (rest != NULL)
-			freemsgchain(rest);
+		MAC_TX(mip, mip->mi_default_tx_ring, mp_chain, B_FALSE);
+		if (mp_chain != NULL)
+			freemsgchain(mp_chain);
 	} else {
 		freemsgchain(mp_chain);
 	}

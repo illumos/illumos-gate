@@ -569,6 +569,9 @@ mac_client_stat_get(mac_client_handle_t mch, uint_t stat)
 	case MAC_STAT_PROMISC:
 		val = mac_stat_get((mac_handle_t)mip, MAC_STAT_PROMISC);
 		break;
+	case MAC_STAT_LOWLINK_STATE:
+		val = mac_stat_get((mac_handle_t)mip, MAC_STAT_LOWLINK_STATE);
+		break;
 	case MAC_STAT_IFSPEED:
 		val = mac_client_ifspeed(mcip);
 		break;
@@ -645,6 +648,8 @@ mac_stat_get(mac_handle_t mh, uint_t stat)
 			return (mip->mi_linkstate == LINK_STATE_UP);
 		case MAC_STAT_PROMISC:
 			return (mip->mi_devpromisc != 0);
+		case MAC_STAT_LOWLINK_STATE:
+			return (mip->mi_lowlinkstate);
 		default:
 			ASSERT(B_FALSE);
 		}
@@ -1828,6 +1833,8 @@ mac_get_passive_primary_client(mac_impl_t *mip)
  * Note also the tuple (MAC address, VID) must be unique
  * for the MAC clients defined on top of the same underlying MAC
  * instance, unless the MAC_UNICAST_NODUPCHECK is specified.
+ *
+ * In no case can a client use the PVID for the MAC, if the MAC has one set.
  */
 int
 i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
@@ -1849,6 +1856,13 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 
 	/* when VID is non-zero, the underlying MAC can not be VNIC */
 	ASSERT(!((mip->mi_state_flags & MIS_IS_VNIC) && (vid != 0)));
+
+	/*
+	 * Check for an attempted use of the current Port VLAN ID, if enabled.
+	 * No client may use it.
+	 */
+	if (mip->mi_pvid != 0 && vid == mip->mi_pvid)
+		return (EBUSY);
 
 	/*
 	 * Check whether it's the primary client and flag it.
@@ -1945,8 +1959,9 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	 *  - this is an exclusive active mac client but
 	 *	a. there is already active mac clients exist, or
 	 *	b. fastpath streams are already plumbed on this legacy device
+	 *  - the mac creator has disallowed active mac clients.
 	 */
-	if (mip->mi_state_flags & MIS_EXCLUSIVE) {
+	if (mip->mi_state_flags & (MIS_EXCLUSIVE|MIS_NO_ACTIVE)) {
 		if (fastpath_disabled)
 			mac_fastpath_enable((mac_handle_t)mip);
 		return (EBUSY);
@@ -2832,7 +2847,8 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 		obytes = (mp_chain->b_cont == NULL ? MBLKL(mp_chain) :
 		    msgdsize(mp_chain));
 
-		MAC_TX(mip, srs_tx->st_arg2, mp_chain, mcip);
+		MAC_TX(mip, srs_tx->st_arg2, mp_chain,
+		    ((mcip->mci_state_flags & MCIS_SHARE_BOUND) != 0));
 
 		if (mp_chain == NULL) {
 			cookie = NULL;
@@ -3299,6 +3315,10 @@ mac_promisc_dispatch(mac_impl_t *mip, mblk_t *mp_chain,
 				 */
 				continue;
 
+			/* this client doesn't need any packets (bridge) */
+			if (mpip->mpi_fn == NULL)
+				continue;
+
 			/*
 			 * For an ethernet MAC, don't displatch a multicast
 			 * packet to a non-PROMISC_ALL callbacks unless the VID
@@ -3412,14 +3432,18 @@ mac_info_get(const char *name, mac_info_t *minfop)
 
 /*
  * To get the capabilities that MAC layer cares about, such as rings, factory
- * mac address, vnic or not, it should directly invoke this function
+ * mac address, vnic or not, it should directly invoke this function.  If the
+ * link is part of a bridge, then the only "capability" it has is the inability
+ * to do zero copy.
  */
 boolean_t
 i_mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
-	if (mip->mi_callbacks->mc_callbacks & MC_GETCAPAB)
+	if (mip->mi_bridge_link != NULL)
+		return (cap == MAC_CAPAB_NO_ZCOPY);
+	else if (mip->mi_callbacks->mc_callbacks & MC_GETCAPAB)
 		return (mip->mi_getcapab(mip->mi_driver, cap, cap_data));
 	else
 		return (B_FALSE);
@@ -3672,6 +3696,55 @@ mac_get_resources(mac_handle_t mh, mac_resource_props_t *mrp)
 		}
 	}
 	bcopy(&mip->mi_resource_props, mrp, sizeof (mac_resource_props_t));
+}
+
+int
+mac_set_pvid(mac_handle_t mh, uint16_t pvid)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	mac_client_impl_t *mcip;
+	mac_unicast_impl_t *muip;
+
+	i_mac_perim_enter(mip);
+	if (pvid != 0) {
+		for (mcip = mip->mi_clients_list; mcip != NULL;
+		    mcip = mcip->mci_client_next) {
+			for (muip = mcip->mci_unicast_list; muip != NULL;
+			    muip = muip->mui_next) {
+				if (muip->mui_vid == pvid) {
+					i_mac_perim_exit(mip);
+					return (EBUSY);
+				}
+			}
+		}
+	}
+	mip->mi_pvid = pvid;
+	i_mac_perim_exit(mip);
+	return (0);
+}
+
+uint16_t
+mac_get_pvid(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	return (mip->mi_pvid);
+}
+
+uint32_t
+mac_get_llimit(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	return (mip->mi_llimit);
+}
+
+uint32_t
+mac_get_ldecay(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	return (mip->mi_ldecay);
 }
 
 /*

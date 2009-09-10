@@ -27,7 +27,7 @@
 #define	_DLS_MGMT_H
 
 #include <sys/types.h>
-#include <sys/dld.h>
+#include <sys/param.h>
 
 /*
  * Data-Link Services Module
@@ -43,12 +43,14 @@ typedef enum {
 	DATALINK_CLASS_AGGR		= 0x04,
 	DATALINK_CLASS_VNIC		= 0x08,
 	DATALINK_CLASS_ETHERSTUB	= 0x10,
-	DATALINK_CLASS_SIMNET		= 0x20
+	DATALINK_CLASS_SIMNET		= 0x20,
+	DATALINK_CLASS_BRIDGE		= 0x40
 } datalink_class_t;
 
 #define	DATALINK_CLASS_ALL	(DATALINK_CLASS_PHYS |	\
 	DATALINK_CLASS_VLAN | DATALINK_CLASS_AGGR | DATALINK_CLASS_VNIC | \
-	DATALINK_CLASS_ETHERSTUB | DATALINK_CLASS_SIMNET)
+	DATALINK_CLASS_ETHERSTUB | DATALINK_CLASS_SIMNET | \
+	DATALINK_CLASS_BRIDGE)
 
 /*
  * A combination of flags and media.

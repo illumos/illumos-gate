@@ -71,6 +71,7 @@ f none kernel/drv/sparcv9/aggr 755 root sys
 f none kernel/drv/sparcv9/arp 755 root sys
 f none kernel/drv/sparcv9/bl 755 root sys
 f none kernel/drv/sparcv9/bpp 755 root sys
+f none kernel/drv/sparcv9/bridge 755 root sys
 f none kernel/drv/sparcv9/clone 755 root sys
 f none kernel/drv/sparcv9/cn 755 root sys
 f none kernel/drv/sparcv9/conskbd 755 root sys
@@ -272,3 +273,4 @@ l none kernel/socketmod/sparcv9/rts=../../../kernel/drv/sparcv9/rts
 l none kernel/socketmod/sparcv9/tcp=../../../kernel/drv/sparcv9/tcp
 l none kernel/socketmod/sparcv9/udp=../../../kernel/drv/sparcv9/udp
 f none kernel/socketmod/sparcv9/socksctp 755 root sys
+f none kernel/socketmod/sparcv9/trill 755 root sys

@@ -259,6 +259,7 @@ SUBDIRS += \
 	libima		\
 	libsun_ima	\
 	mpapi		\
+	librstp		\
 	$($(MACH)_SUBDIRS)
 
 i386_SUBDIRS=		\
@@ -441,6 +442,7 @@ HDRSUBDIRS=		\
 	librestart	\
 	librpcsvc	\
 	librsm		\
+	librstp		\
 	libsasl		\
 	libsec		\
 	libshell	\

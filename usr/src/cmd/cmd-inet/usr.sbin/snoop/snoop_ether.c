@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include <limits.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
+#include <net/trill.h>
 
 #include "at.h"
 #include "snoop.h"
@@ -106,6 +107,7 @@ char *print_smtclass();
 struct ether_addr ether_broadcast = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 static char *data;			/* current data buffer */
 static int datalen;			/* current data buffer length */
+static const struct ether_addr all_isis_rbridges = ALL_ISIS_RBRIDGES;
 
 uint_t
 interpret_ether(flags, e, elen, origlen)
@@ -113,14 +115,15 @@ interpret_ether(flags, e, elen, origlen)
 	struct ether_header *e;
 	int elen, origlen;
 {
-	char *off;
+	uchar_t *off, *ieeestart;
 	int len;
 	int ieee8023 = 0;
 	extern char *dst_name;
 	int ethertype;
-	boolean_t data_copied = B_FALSE;
 	struct ether_vlan_extinfo *evx = NULL;
 	int blen = MAX(origlen, ETHERMTU);
+	boolean_t trillpkt = B_FALSE;
+	uint16_t tci = 0;
 
 	if (data != NULL && datalen != 0 && datalen < blen) {
 		free(data);
@@ -133,6 +136,7 @@ interpret_ether(flags, e, elen, origlen)
 			pr_err("Warning: malloc failure");
 		datalen = blen;
 	}
+inner_pkt:
 	if (origlen < 14) {
 		if (flags & F_SUM)
 			(void) sprintf(get_sum_line(),
@@ -160,19 +164,7 @@ interpret_ether(flags, e, elen, origlen)
 	 * the rest of the packet in order to align it.
 	 */
 	len = elen - sizeof (struct ether_header);
-	off = (char *)(e + 1);
-	if (ethertype <= 1514) {
-		/*
-		 * Fake out the IEEE 802.3 packets.
-		 * Should be DSAP=0xAA, SSAP=0xAA, control=0x03
-		 * then three padding bytes of zero,
-		 * followed by a normal ethernet-type packet.
-		 */
-		ieee8023 = ntohs(e->ether_type);
-		ethertype = ntohs(*(ushort_t *)(off + 6));
-		off += 8;
-		len -= 8;
-	}
+	off = (uchar_t *)(e + 1);
 
 	if (ethertype == ETHERTYPE_VLAN) {
 		if (origlen < sizeof (struct ether_vlan_header)) {
@@ -195,16 +187,27 @@ interpret_ether(flags, e, elen, origlen)
 		len -= sizeof (struct ether_vlan_extinfo);
 
 		ethertype = ntohs(evx->ether_type);
+		tci = ntohs(evx->ether_tci);
 	}
 
-	/*
-	 * We cannot trust the length field in the header to be correct.
-	 * But we should continue to process the packet.  Then user can
-	 * notice something funny in the header.
-	 */
-	if (len > 0 && (off + len <= (char *)e + elen)) {
-		(void) memcpy(data, off, len);
-		data_copied = B_TRUE;
+	if (ethertype <= 1514) {
+		/*
+		 * Fake out the IEEE 802.3 packets.
+		 * Should be DSAP=0xAA, SSAP=0xAA, control=0x03
+		 * then three padding bytes of zero (OUI),
+		 * followed by a normal ethernet-type packet.
+		 */
+		ieee8023 = ethertype;
+		ieeestart = off;
+		if (off[0] == 0xAA && off[1] == 0xAA) {
+			ethertype = ntohs(*(ushort_t *)(off + 6));
+			off += 8;
+			len -= 8;
+		} else {
+			ethertype = 0;
+			off += 3;
+			len -= 3;
+		}
 	}
 
 	if (flags & F_SUM) {
@@ -216,58 +219,105 @@ interpret_ether(flags, e, elen, origlen)
 		 */
 		set_vlan_id(0);
 		if (evx == NULL) {
-			(void) sprintf(get_sum_line(),
-			    "ETHER Type=%04X (%s), size=%d bytes",
-			    ethertype, print_ethertype(ethertype),
-			    origlen);
+			if (ethertype == 0 && ieee8023 > 0) {
+				(void) sprintf(get_sum_line(),
+				    "ETHER 802.3 SSAP %02X DSAP %02X, "
+				    "size=%d bytes", ieeestart[0], ieeestart[1],
+				    origlen);
+			} else {
+				(void) sprintf(get_sum_line(),
+				    "ETHER Type=%04X (%s), size=%d bytes",
+				    ethertype, print_ethertype(ethertype),
+				    origlen);
+			}
 		} else {
-			(void) sprintf(get_sum_line(),
-			    "ETHER Type=%04X (%s), VLAN ID=%hu, size=%d "
-			    "bytes", ethertype, print_ethertype(ethertype),
-			    VLAN_ID(ntohs(evx->ether_tci)), origlen);
+			if (ethertype == 0 && ieee8023 > 0) {
+				(void) sprintf(get_sum_line(),
+				    "ETHER 802.3 SSAP %02X DSAP %02X, "
+				    "VLAN ID=%hu, size=%d bytes", ieeestart[0],
+				    ieeestart[1], VLAN_ID(tci), origlen);
+			} else {
+				(void) sprintf(get_sum_line(),
+				    "ETHER Type=%04X (%s), VLAN ID=%hu, "
+				    "size=%d bytes", ethertype,
+				    print_ethertype(ethertype), VLAN_ID(tci),
+				    origlen);
+			}
 
 			if (!(flags & F_ALLSUM))
-				set_vlan_id(VLAN_ID(ntohs(evx->ether_tci)));
+				set_vlan_id(VLAN_ID(tci));
 		}
 	}
 
 	if (flags & F_DTAIL) {
-	show_header("ETHER:  ", "Ether Header", elen);
-	show_space();
-	(void) sprintf(get_line(0, 0),
-		"Packet %d arrived at %d:%02d:%d.%05d",
-		pi_frame,
-		pi_time_hour, pi_time_min, pi_time_sec,
-		pi_time_usec / 10);
-	(void) sprintf(get_line(0, 0),
-		"Packet size = %d bytes",
-		elen, elen);
-	(void) sprintf(get_line(0, 6),
-		"Destination = %s, %s",
-		printether(&e->ether_dhost),
-		print_etherinfo(&e->ether_dhost));
-	(void) sprintf(get_line(6, 6),
-		"Source      = %s, %s",
-		printether(&e->ether_shost),
-		print_etherinfo(&e->ether_shost));
-	if (ieee8023 > 0) {
-		(void) sprintf(get_line(12, 2),
-		    "IEEE 802.3 length = %d bytes", ieee8023);
-	}
-	if (evx != NULL) {
-		(void) sprintf(get_line(0, 0),
-		    "VLAN ID     = %hu", VLAN_ID(ntohs(evx->ether_tci)));
-		(void) sprintf(get_line(0, 0),
-		    "VLAN Priority = %hu", VLAN_PRI(ntohs(evx->ether_tci)));
-	}
-	(void) sprintf(get_line(12, 2),
-		"Ethertype = %04X (%s)",
-		ethertype, print_ethertype(ethertype));
-	show_space();
+		show_header("ETHER:  ", "Ether Header", elen);
+		show_space();
+		if (!trillpkt) {
+			(void) sprintf(get_line(0, 0),
+			    "Packet %d arrived at %d:%02d:%d.%05d",
+			    pi_frame,
+			    pi_time_hour, pi_time_min, pi_time_sec,
+			    pi_time_usec / 10);
+			(void) sprintf(get_line(0, 0),
+			    "Packet size = %d bytes",
+			    elen, elen);
+		}
+		(void) sprintf(get_line(0, 6),
+		    "Destination = %s, %s",
+		    printether(&e->ether_dhost),
+		    print_etherinfo(&e->ether_dhost));
+		(void) sprintf(get_line(6, 6),
+		    "Source      = %s, %s",
+		    printether(&e->ether_shost),
+		    print_etherinfo(&e->ether_shost));
+		if (evx != NULL) {
+			(void) sprintf(get_line(0, 0),
+			    "VLAN ID     = %hu", VLAN_ID(tci));
+			(void) sprintf(get_line(0, 0),
+			    "VLAN Priority = %hu", VLAN_PRI(tci));
+		}
+		if (ieee8023 > 0) {
+			(void) sprintf(get_line(12, 2),
+			    "IEEE 802.3 length = %d bytes", ieee8023);
+			/* Print LLC only for non-TCP/IP packets */
+			if (ethertype == 0) {
+				(void) snprintf(get_line(0, 0),
+				    get_line_remain(),
+				    "SSAP = %02X, DSAP = %02X, CTRL = %02X",
+				    ieeestart[0], ieeestart[1], ieeestart[2]);
+			}
+		}
+		if (ethertype != 0 || ieee8023 == 0)
+			(void) sprintf(get_line(12, 2),
+			    "Ethertype = %04X (%s)",
+			    ethertype, print_ethertype(ethertype));
+		show_space();
 	}
 
-	/* Go to the next protocol layer only if data have been copied. */
-	if (data_copied) {
+	/*
+	 * We cannot trust the length field in the header to be correct.
+	 * But we should continue to process the packet.  Then user can
+	 * notice something funny in the header.
+	 * Go to the next protocol layer only if data have been
+	 * copied.
+	 */
+	if (len > 0 && (off + len <= (uchar_t *)e + elen)) {
+		(void) memmove(data, off, len);
+
+		if (!trillpkt && ethertype == ETHERTYPE_TRILL) {
+			ethertype = interpret_trill(flags, &e, data, &len);
+			/* Decode inner Ethernet frame */
+			if (ethertype != 0) {
+				evx = NULL;
+				trillpkt = B_TRUE;
+				(void) memmove(data, e, len);
+				e = (struct ether_header *)data;
+				origlen = len;
+				elen = len;
+				goto inner_pkt;
+			}
+		}
+
 		switch (ethertype) {
 		case ETHERTYPE_IP:
 			(void) interpret_ip(flags, (struct ip *)data, len);
@@ -290,7 +340,19 @@ interpret_ether(flags, e, elen, origlen)
 		case ETHERTYPE_AT:
 			interpret_at(flags, (struct ddp_hdr *)data, len);
 			break;
-		default:
+		case 0:
+			if (ieee8023 == 0)
+				break;
+			switch (ieeestart[0]) {
+			case 0xFE:
+				interpret_isis(flags, data, len,
+				    memcmp(&e->ether_dhost, &all_isis_rbridges,
+				    sizeof (struct ether_addr)) == 0);
+				break;
+			case 0x42:
+				interpret_bpdu(flags, data, len);
+				break;
+			}
 			break;
 		}
 	}
@@ -343,6 +405,7 @@ ETHERTYPE_REVARP, "RARP",
 ETHERTYPE_IPV6, "IPv6",
 ETHERTYPE_PPPOED, "PPPoE Discovery",
 ETHERTYPE_PPPOES, "PPPoE Session",
+ETHERTYPE_TRILL, "TRILL",
 /* end of popular entries */
 ETHERTYPE_PUP,	"Xerox PUP",
 0x0201, "Xerox PUP",
@@ -1260,6 +1323,7 @@ struct block_type {
 0x0000A7,	"Network Computing Devices (NCD	X-terminal)",
 0x08005A,	"IBM",
 0x0000AC,	"Apollo",
+0x0180C2,	"Standard MAC Group Address",
 /* end of popular entries */
 0x000002,	"BBN",
 0x000010,	"Sytek",
@@ -1437,16 +1501,13 @@ print_etherinfo(eaddr)
 	if (memcmp(eaddr, &ether_broadcast, sizeof (struct ether_addr)) == 0)
 		return ("(broadcast)");
 
-	if (eaddr->ether_addr_octet[0] & 1)
-		return ("(multicast)");
-
 	addr = ntohl(addr);	/* make it right for little-endians */
 	ename = ether_ouiname(addr);
 
 	if (ename != NULL)
 		return (ename);
 	else
-		return ("");
+		return ((eaddr->ether_addr_octet[0] & 1) ? "(multicast)" : "");
 }
 
 static uchar_t	endianswap[] = {

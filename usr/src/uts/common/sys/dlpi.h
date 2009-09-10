@@ -49,6 +49,7 @@ extern "C" {
 #define	DLIOCNATIVE	(DLIOC|2)	/* Native traffic mode */
 #define	DLIOCMARGININFO	(DLIOC|3)	/* margin size info */
 #define	DLIOCIPNETINFO	(DLIOC|4)	/* ipnet header */
+#define	DLIOCLOWLINK	(DLIOC|5)	/* low-level link up/down */
 #define	DLIOCHDRINFO	(DLIOC|10)	/* IP fast-path */
 #define	DL_IOC_HDR_INFO	DLIOCHDRINFO
 

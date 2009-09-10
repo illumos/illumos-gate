@@ -88,16 +88,12 @@ usr/lib/libdhcpsvc.so			i386
 #
 usr/include/sys/aggr.h			i386
 usr/include/sys/aggr_impl.h		i386
-usr/include/sys/dld.h			i386
 usr/include/sys/dld_impl.h		i386
 usr/include/sys/dld_ioc.h		i386
 usr/include/sys/dls.h			i386
-usr/include/sys/dls_mgmt.h		i386
 usr/include/sys/dls_impl.h		i386
-usr/include/sys/mac.h			i386
 usr/include/sys/mac_client.h		i386
 usr/include/sys/mac_client_impl.h	i386
-usr/include/sys/mac_flow.h		i386
 usr/include/sys/mac_flow_impl.h		i386
 usr/include/sys/mac_impl.h		i386
 usr/include/sys/mac_provider.h		i386
@@ -105,27 +101,17 @@ usr/include/sys/mac_soft_ring.h		i386
 #
 # Private GLDv3 userland libraries and headers
 #
-usr/include/sys/vnic.h		i386
-usr/include/sys/vnic_impl.h	i386
-usr/include/libdladm.h		i386
-usr/include/libdlether.h	i386
 usr/include/libdladm_impl.h	i386
-usr/include/libdllink.h		i386
 usr/include/libdlaggr.h		i386
-usr/include/libdlwlan.h		i386
-usr/include/libdlwlan_impl.h	i386
-usr/include/libdlvnic.h		i386
+usr/include/libdlether.h	i386
 usr/include/libdlflow.h		i386
 usr/include/libdlflow_impl.h	i386
-usr/include/libdlvlan.h		i386
 usr/include/libdlmgmt.h		i386
-usr/include/libdlstat.h		i386
 usr/include/libdlsim.h		i386
-lib/libdladm.so			i386
-lib/llib-ldladm.ln		i386
-lib/amd64/libdladm.so		i386
-lib/amd64/llib-ldladm.ln	i386
-lib/llib-ldladm			i386
+usr/include/libdlstat.h		i386
+usr/include/libdlvnic.h		i386
+usr/include/libdlwlan.h		i386
+usr/include/libdlwlan_impl.h	i386
 #
 # Virtual Network Interface Card (VNIC)
 #
@@ -668,18 +654,23 @@ usr/lib/devfsadm/linkmod/SUNW_ieee1394_link.so	i386
 usr/include/sys/1394/ieee1212.h		i386
 usr/include/sys/1394/t1394.h		i386
 usr/include/sys/1394/id1394.h		i386
+#
 # Private net80211 headers
 usr/include/sys/net80211.h		i386
 usr/include/sys/net80211_crypto.h	i386
 usr/include/sys/net80211_ht.h		i386
 usr/include/sys/net80211_proto.h	i386
+usr/include/net/wpa.h			i386
 #
 # PPPoE files not delivered to customers.
 usr/include/net/pppoe.h			i386
 usr/include/net/sppptun.h		i386
 #
+# Simnet
 usr/include/net/simnet.h		i386
-usr/include/net/wpa.h			i386
+#
+# Bridging internal data structures
+usr/include/net/bridge_impl.h		i386
 #
 # The ses driver is not currently delivered on Intel
 #
@@ -1263,3 +1254,12 @@ usr/include/rpcsvc/idmap_prot.x		i386
 
 # Private idmap directory API
 usr/include/directory.h			i386
+# librstp is private for bridging
+#
+usr/include/stp_bpdu.h		i386
+usr/include/stp_in.h		i386
+usr/include/stp_vectors.h	i386
+usr/lib/librstp.so		i386
+usr/lib/llib-lrstp		i386
+usr/lib/llib-lrstp.ln		i386
+

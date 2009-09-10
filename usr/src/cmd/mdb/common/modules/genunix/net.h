@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_NET_H
 #define	_NET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -56,6 +54,8 @@ extern int udp_stacks_walk_step(mdb_walk_state_t *);
 extern int sonode(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int mi(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int netstat(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int dladm(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern void dladm_help(void);
 
 #ifdef	__cplusplus
 }

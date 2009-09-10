@@ -217,6 +217,8 @@ struct dld_str_s {					/* Protected by */
 	 * driver private data set by the driver when calling dld_str_open().
 	 */
 	void			*ds_private;
+
+	boolean_t		ds_lowlink;		/* SL */
 };
 
 

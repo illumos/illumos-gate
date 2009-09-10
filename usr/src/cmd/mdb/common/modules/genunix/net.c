@@ -49,6 +49,9 @@
 #include <inet/rawip_impl.h>
 #include <inet/mi.h>
 #include <fs/sockfs/socktpi_impl.h>
+#include <net/bridge_impl.h>
+#include <io/trill_impl.h>
+#include <sys/mac_impl.h>
 
 #define	ADDR_V6_WIDTH	23
 #define	ADDR_V4_WIDTH	15
@@ -1253,4 +1256,425 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 out:
 	mdb_free(cbdata, sizeof (netstat_cb_data_t));
 	return (status);
+}
+
+/*
+ * "::dladm show-bridge" support
+ */
+typedef struct {
+	uint_t opt_l;
+	uint_t opt_f;
+	uint_t opt_t;
+	const char *name;
+	clock_t lbolt;
+	boolean_t found;
+	uint_t nlinks;
+	uint_t nfwd;
+
+	/*
+	 * These structures are kept inside the 'args' for allocation reasons.
+	 * They're all large data structures (over 1K), and may cause the stack
+	 * to explode.  mdb and kmdb will fail in these cases, and thus we
+	 * allocate them from the heap.
+	 */
+	trill_inst_t ti;
+	bridge_link_t bl;
+	mac_impl_t mi;
+} show_bridge_args_t;
+
+static void
+show_vlans(const uint8_t *vlans)
+{
+	int i, bit;
+	uint8_t val;
+	int rstart = -1, rnext = -1;
+
+	for (i = 0; i < BRIDGE_VLAN_ARR_SIZE; i++) {
+		val = vlans[i];
+		if (i == 0)
+			val &= ~1;
+		while ((bit = mdb_ffs(val)) != 0) {
+			bit--;
+			val &= ~(1 << bit);
+			bit += i * sizeof (*vlans) * NBBY;
+			if (bit != rnext) {
+				if (rnext != -1 && rstart + 1 != rnext)
+					mdb_printf("-%d", rnext - 1);
+				if (rstart != -1)
+					mdb_printf(",");
+				mdb_printf("%d", bit);
+				rstart = bit;
+			}
+			rnext = bit + 1;
+		}
+	}
+	if (rnext != -1 && rstart + 1 != rnext)
+		mdb_printf("-%d", rnext - 1);
+	mdb_printf("\n");
+}
+
+/*
+ * This callback is invoked by a walk of the links attached to a bridge.  If
+ * we're showing link details, then they're printed here.  If not, then we just
+ * count up the links for the bridge summary.
+ */
+static int
+do_bridge_links(uintptr_t addr, const void *data, void *ptr)
+{
+	show_bridge_args_t *args = ptr;
+	const bridge_link_t *blp = data;
+	char macaddr[ETHERADDRL * 3];
+	const char *name;
+
+	args->nlinks++;
+
+	if (!args->opt_l)
+		return (WALK_NEXT);
+
+	if (mdb_vread(&args->mi, sizeof (args->mi),
+	    (uintptr_t)blp->bl_mh) == -1) {
+		mdb_warn("cannot read mac data at %p", blp->bl_mh);
+		name = "?";
+	} else  {
+		name = args->mi.mi_name;
+	}
+
+	mdb_mac_addr(blp->bl_local_mac, ETHERADDRL, macaddr,
+	    sizeof (macaddr));
+
+	mdb_printf("%-?p %-16s %-17s %03X %-4d ", addr, name, macaddr,
+	    blp->bl_flags, blp->bl_pvid);
+
+	if (blp->bl_trilldata == NULL) {
+		switch (blp->bl_state) {
+		case BLS_BLOCKLISTEN:
+			name = "BLOCK";
+			break;
+		case BLS_LEARNING:
+			name = "LEARN";
+			break;
+		case BLS_FORWARDING:
+			name = "FWD";
+			break;
+		default:
+			name = "?";
+		}
+		mdb_printf("%-5s ", name);
+		show_vlans(blp->bl_vlans);
+	} else {
+		show_vlans(blp->bl_afs);
+	}
+
+	return (WALK_NEXT);
+}
+
+/*
+ * It seems a shame to duplicate this code, but merging it with the link
+ * printing code above is more trouble than it would be worth.
+ */
+static void
+print_link_name(show_bridge_args_t *args, uintptr_t addr, char sep)
+{
+	const char *name;
+
+	if (mdb_vread(&args->bl, sizeof (args->bl), addr) == -1) {
+		mdb_warn("cannot read bridge link at %p", addr);
+		return;
+	}
+
+	if (mdb_vread(&args->mi, sizeof (args->mi),
+	    (uintptr_t)args->bl.bl_mh) == -1) {
+		name = "?";
+	} else  {
+		name = args->mi.mi_name;
+	}
+
+	mdb_printf("%s%c", name, sep);
+}
+
+static int
+do_bridge_fwd(uintptr_t addr, const void *data, void *ptr)
+{
+	show_bridge_args_t *args = ptr;
+	const bridge_fwd_t *bfp = data;
+	char macaddr[ETHERADDRL * 3];
+	int i;
+#define	MAX_FWD_LINKS	16
+	bridge_link_t *links[MAX_FWD_LINKS];
+	uint_t nlinks;
+
+	args->nfwd++;
+
+	if (!args->opt_f)
+		return (WALK_NEXT);
+
+	if ((nlinks = bfp->bf_nlinks) > MAX_FWD_LINKS)
+		nlinks = MAX_FWD_LINKS;
+
+	if (mdb_vread(links, sizeof (links[0]) * nlinks,
+	    (uintptr_t)bfp->bf_links) == -1) {
+		mdb_warn("cannot read bridge forwarding links at %p",
+		    bfp->bf_links);
+		return (WALK_ERR);
+	}
+
+	mdb_mac_addr(bfp->bf_dest, ETHERADDRL, macaddr, sizeof (macaddr));
+
+	mdb_printf("%-?p %-17s ", addr, macaddr);
+	if (bfp->bf_flags & BFF_LOCALADDR)
+		mdb_printf("%-7s", "[self]");
+	else
+		mdb_printf("t-%-5d", args->lbolt - bfp->bf_lastheard);
+	mdb_printf(" %-7u ", bfp->bf_refs);
+
+	if (bfp->bf_trill_nick != 0) {
+		mdb_printf("%d\n", bfp->bf_trill_nick);
+	} else {
+		for (i = 0; i < bfp->bf_nlinks; i++) {
+			print_link_name(args, (uintptr_t)links[i],
+			    i == bfp->bf_nlinks - 1 ? '\n' : ' ');
+		}
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+do_show_bridge(uintptr_t addr, const void *data, void *ptr)
+{
+	show_bridge_args_t *args = ptr;
+	bridge_inst_t bi;
+	const bridge_inst_t *bip;
+	trill_node_t tn;
+	trill_sock_t tsp;
+	trill_nickinfo_t tni;
+	char bname[MAXLINKNAMELEN];
+	char macaddr[ETHERADDRL * 3];
+	char *cp;
+	uint_t nnicks;
+	int i;
+
+	if (data != NULL) {
+		bip = data;
+	} else {
+		if (mdb_vread(&bi, sizeof (bi), addr) == -1) {
+			mdb_warn("cannot read bridge instance at %p", addr);
+			return (WALK_ERR);
+		}
+		bip = &bi;
+	}
+
+	(void) strncpy(bname, bip->bi_name, sizeof (bname) - 1);
+	bname[MAXLINKNAMELEN - 1] = '\0';
+	cp = bname + strlen(bname);
+	if (cp > bname && cp[-1] == '0')
+		cp[-1] = '\0';
+
+	if (args->name != NULL && strcmp(args->name, bname) != 0)
+		return (WALK_NEXT);
+
+	args->found = B_TRUE;
+	args->nlinks = args->nfwd = 0;
+
+	if (args->opt_l) {
+		mdb_printf("%-?s %-16s %-17s %3s %-4s ", "ADDR", "LINK",
+		    "MAC-ADDR", "FLG", "PVID");
+		if (bip->bi_trilldata == NULL)
+			mdb_printf("%-5s %s\n", "STATE", "VLANS");
+		else
+			mdb_printf("%s\n", "FWD-VLANS");
+	}
+
+	if (!args->opt_f && !args->opt_t &&
+	    mdb_pwalk("list", do_bridge_links, args,
+	    addr + offsetof(bridge_inst_t, bi_links)) != DCMD_OK)
+		return (WALK_ERR);
+
+	if (args->opt_f)
+		mdb_printf("%-?s %-17s %-7s %-7s %s\n", "ADDR", "DEST", "TIME",
+		    "REFS", "OUTPUT");
+
+	if (!args->opt_l && !args->opt_t &&
+	    mdb_pwalk("avl", do_bridge_fwd, args,
+	    addr + offsetof(bridge_inst_t, bi_fwd)) != DCMD_OK)
+		return (WALK_ERR);
+
+	nnicks = 0;
+	if (bip->bi_trilldata != NULL && !args->opt_l && !args->opt_f) {
+		if (mdb_vread(&args->ti, sizeof (args->ti),
+		    (uintptr_t)bip->bi_trilldata) == -1) {
+			mdb_warn("cannot read trill instance at %p",
+			    bip->bi_trilldata);
+			return (WALK_ERR);
+		}
+		if (args->opt_t)
+			mdb_printf("%-?s %-5s %-17s %s\n", "ADDR",
+			    "NICK", "NEXT-HOP", "LINK");
+		for (i = 0; i < RBRIDGE_NICKNAME_MAX; i++) {
+			if (args->ti.ti_nodes[i] == NULL)
+				continue;
+			if (args->opt_t) {
+				if (mdb_vread(&tn, sizeof (tn),
+				    (uintptr_t)args->ti.ti_nodes[i]) == -1) {
+					mdb_warn("cannot read trill node %d at "
+					    "%p", i, args->ti.ti_nodes[i]);
+					return (WALK_ERR);
+				}
+				if (mdb_vread(&tni, sizeof (tni),
+				    (uintptr_t)tn.tn_ni) == -1) {
+					mdb_warn("cannot read trill node info "
+					    "%d at %p", i, tn.tn_ni);
+					return (WALK_ERR);
+				}
+				mdb_mac_addr(tni.tni_adjsnpa, ETHERADDRL,
+				    macaddr, sizeof (macaddr));
+				if (tni.tni_nick == args->ti.ti_nick) {
+					(void) strcpy(macaddr, "[self]");
+				}
+				mdb_printf("%-?p %-5u %-17s ",
+				    args->ti.ti_nodes[i], tni.tni_nick,
+				    macaddr);
+				if (tn.tn_tsp != NULL) {
+					if (mdb_vread(&tsp, sizeof (tsp),
+					    (uintptr_t)tn.tn_tsp) == -1) {
+						mdb_warn("cannot read trill "
+						    "socket info at %p",
+						    tn.tn_tsp);
+						return (WALK_ERR);
+					}
+					if (tsp.ts_link != NULL) {
+						print_link_name(args,
+						    (uintptr_t)tsp.ts_link,
+						    '\n');
+						continue;
+					}
+				}
+				mdb_printf("--\n");
+			} else {
+				nnicks++;
+			}
+		}
+	} else {
+		if (args->opt_t)
+			mdb_printf("bridge is not running TRILL\n");
+	}
+
+	if (!args->opt_l && !args->opt_f && !args->opt_t) {
+		mdb_printf("%-?p %-7s %-16s %-7u %-7u", addr,
+		    bip->bi_trilldata == NULL ? "stp" : "trill", bname,
+		    args->nlinks, args->nfwd);
+		if (bip->bi_trilldata != NULL)
+			mdb_printf(" %-7u %u\n", nnicks, args->ti.ti_nick);
+		else
+			mdb_printf(" %-7s %s\n", "--", "--");
+	}
+	return (WALK_NEXT);
+}
+
+static int
+dladm_show_bridge(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	show_bridge_args_t *args;
+	GElf_Sym sym;
+	int i;
+
+	args = mdb_zalloc(sizeof (*args), UM_SLEEP);
+
+	i = mdb_getopts(argc, argv,
+	    'l', MDB_OPT_SETBITS, 1, &args->opt_l,
+	    'f', MDB_OPT_SETBITS, 1, &args->opt_f,
+	    't', MDB_OPT_SETBITS, 1, &args->opt_t,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	if (argc > 1 || (argc == 1 && argv[0].a_type != MDB_TYPE_STRING)) {
+		mdb_free(args, sizeof (*args));
+		return (DCMD_USAGE);
+	}
+	if (argc == 1)
+		args->name = argv[0].a_un.a_str;
+
+	if (mdb_readvar(&args->lbolt,
+	    mdb_prop_postmortem ? "panic_lbolt" : "lbolt") == -1) {
+		mdb_warn("failed to read lbolt");
+		goto err;
+	}
+
+	if (flags & DCMD_ADDRSPEC) {
+		if (args->name != NULL) {
+			mdb_printf("bridge name and address are mutually "
+			    "exclusive\n");
+			goto err;
+		}
+		if (!args->opt_l && !args->opt_f && !args->opt_t)
+			mdb_printf("%-?s %-7s %-16s %-7s %-7s\n", "ADDR",
+			    "PROTECT", "NAME", "NLINKS", "NFWD");
+		if (do_show_bridge(addr, NULL, args) != WALK_NEXT)
+			goto err;
+		mdb_free(args, sizeof (*args));
+		return (DCMD_OK);
+	} else {
+		if ((args->opt_l || args->opt_f || args->opt_t) &&
+		    args->name == NULL) {
+			mdb_printf("need bridge name or address with -[lft]\n");
+			goto err;
+		}
+		if (mdb_lookup_by_obj("bridge", "inst_list", &sym) == -1) {
+			mdb_warn("failed to find 'bridge`inst_list'");
+			goto err;
+		}
+		if (!args->opt_l && !args->opt_f && !args->opt_t)
+			mdb_printf("%-?s %-7s %-16s %-7s %-7s %-7s %s\n",
+			    "ADDR", "PROTECT", "NAME", "NLINKS", "NFWD",
+			    "NNICKS", "NICK");
+		if (mdb_pwalk("list", do_show_bridge, args,
+		    (uintptr_t)sym.st_value) != DCMD_OK)
+			goto err;
+		if (!args->found && args->name != NULL) {
+			mdb_printf("bridge instance %s not found\n",
+			    args->name);
+			goto err;
+		}
+		mdb_free(args, sizeof (*args));
+		return (DCMD_OK);
+	}
+
+err:
+	mdb_free(args, sizeof (*args));
+	return (DCMD_ERR);
+}
+
+/*
+ * Support for the "::dladm" dcmd
+ */
+int
+dladm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	if (argc < 1 || argv[0].a_type != MDB_TYPE_STRING)
+		return (DCMD_USAGE);
+
+	/*
+	 * This could be a bit more elaborate, once we support more of the
+	 * dladm show-* subcommands.
+	 */
+	argc--;
+	argv++;
+	if (strcmp(argv[-1].a_un.a_str, "show-bridge") == 0)
+		return (dladm_show_bridge(addr, flags, argc, argv));
+
+	return (DCMD_USAGE);
+}
+
+void
+dladm_help(void)
+{
+	mdb_printf("Subcommands:\n"
+	    "  show-bridge [-flt] [<name>]\n"
+	    "\t     Show bridge information; -l for links and -f for "
+	    "forwarding\n"
+	    "\t     entries, and -t for TRILL nicknames.  Address is required "
+	    "if name\n"
+	    "\t     is not specified.\n");
 }

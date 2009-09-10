@@ -355,6 +355,7 @@ f none usr/include/ndbm.h 644 root bin
 f none usr/include/ndpd.h 644 root bin
 d none usr/include/net 755 root bin
 f none usr/include/net/af.h 644 root bin
+f none usr/include/net/bridge.h 644 root bin
 f none usr/include/net/if.h 644 root bin
 f none usr/include/net/if_arp.h 644 root bin
 f none usr/include/net/if_dl.h 644 root bin
@@ -367,6 +368,7 @@ f none usr/include/net/pppio.h 644 root bin
 f none usr/include/net/vjcompress.h 644 root bin
 f none usr/include/net/route.h 644 root bin
 f none usr/include/net/radix.h 644 root bin
+f none usr/include/net/trill.h 644 root bin
 f none usr/include/netconfig.h 644 root bin
 f none usr/include/netdb.h 644 root bin
 f none usr/include/netdir.h 644 root bin

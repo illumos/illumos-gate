@@ -350,6 +350,7 @@ vscan:*
 nsmb:*
 bmc:bmc
 fm:*
+clone:bridge
 EOF
 }
 

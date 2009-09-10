@@ -77,16 +77,12 @@ usr/lib/libdhcpsvc.so			sparc
 #
 usr/include/sys/aggr.h			sparc
 usr/include/sys/aggr_impl.h		sparc
-usr/include/sys/dld.h			sparc
 usr/include/sys/dld_impl.h		sparc
 usr/include/sys/dld_ioc.h		sparc
 usr/include/sys/dls.h			sparc
-usr/include/sys/dls_mgmt.h		sparc
 usr/include/sys/dls_impl.h		sparc
-usr/include/sys/mac.h			sparc
 usr/include/sys/mac_client.h		sparc
 usr/include/sys/mac_client_impl.h	sparc
-usr/include/sys/mac_flow.h		sparc
 usr/include/sys/mac_flow_impl.h		sparc
 usr/include/sys/mac_impl.h		sparc
 usr/include/sys/mac_provider.h		sparc
@@ -94,27 +90,17 @@ usr/include/sys/mac_soft_ring.h		sparc
 #
 # Private GLDv3 userland libraries and headers
 #
-usr/include/sys/vnic.h		sparc
-usr/include/sys/vnic_impl.h	sparc
-usr/include/libdladm.h		sparc
-usr/include/libdlether.h	sparc
 usr/include/libdladm_impl.h	sparc
-usr/include/libdllink.h		sparc
 usr/include/libdlaggr.h		sparc
+usr/include/libdlether.h	sparc
 usr/include/libdlflow.h		sparc
 usr/include/libdlflow_impl.h	sparc
+usr/include/libdlmgmt.h		sparc
+usr/include/libdlsim.h		sparc
+usr/include/libdlstat.h		sparc
+usr/include/libdlvnic.h		sparc
 usr/include/libdlwlan.h		sparc
 usr/include/libdlwlan_impl.h	sparc
-usr/include/libdlvnic.h		sparc
-usr/include/libdlvlan.h		sparc
-usr/include/libdlmgmt.h		sparc
-usr/include/libdlstat.h		sparc
-usr/include/libdlsim.h		sparc
-lib/libdladm.so			sparc
-lib/llib-ldladm.ln		sparc
-lib/sparcv9/libdladm.so		sparc
-lib/sparcv9/llib-ldladm.ln	sparc
-lib/llib-ldladm			sparc
 #
 # Virtual Network Interface Card (VNIC)
 #
@@ -668,18 +654,24 @@ var/svc/manifest/network/ssh.xml	sparc
 usr/platform/sun4u/include/sys/fc_plat.h	sparc
 usr/platform/sun4u/include/sys/fcode.h		sparc
 #
-# PPPoE files not delivered to customers.
-#
-usr/include/net/pppoe.h			sparc
-usr/include/net/sppptun.h		sparc
-#
-usr/include/net/simnet.h		sparc
-usr/include/net/wpa.h			sparc
 # Private net80211 headers
 usr/include/sys/net80211.h		sparc
 usr/include/sys/net80211_crypto.h	sparc
 usr/include/sys/net80211_ht.h		sparc
 usr/include/sys/net80211_proto.h	sparc
+#
+usr/include/net/wpa.h			sparc
+#
+# PPPoE files not delivered to customers.
+#
+usr/include/net/pppoe.h			sparc
+usr/include/net/sppptun.h		sparc
+#
+# Simnet
+usr/include/net/simnet.h		sparc
+#
+# Bridging internal data structures
+usr/include/net/bridge_impl.h		sparc
 #
 # User<->kernel interface used by cfgadm/USB only
 #
@@ -1362,3 +1354,11 @@ usr/include/rpcsvc/idmap_prot.x		sparc
 
 # Private idmap directory API
 usr/include/directory.h			sparc
+# librstp is private for bridging
+#
+usr/include/stp_bpdu.h		sparc
+usr/include/stp_in.h		sparc
+usr/include/stp_vectors.h	sparc
+usr/lib/librstp.so		sparc
+usr/lib/llib-lrstp		sparc
+usr/lib/llib-lrstp.ln		sparc

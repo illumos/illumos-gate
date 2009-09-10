@@ -29,7 +29,7 @@ include $(SRC)/lib/Makefile.lib
 HDRS =		libdladm.h libdladm_impl.h libdllink.h libdlaggr.h	\
 		libdlwlan.h libdlwlan_impl.h libdlvnic.h libdlvlan.h	\
 		libdlmgmt.h libdlflow.h libdlflow_impl.h libdlstat.h	\
-		libdlether.h libdlsim.h
+		libdlether.h libdlsim.h libdlbridge.h
 
 HDRDIR =	common
 
@@ -42,9 +42,10 @@ MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c	\
 		common/libdlwlan.c common/libdlvnic.c	\
 		common/libdlvlan.c common/libdlmgmt.c	\
 		common/flowattr.c common/flowprop.c	\
-		common/propfuncs.c common/libdlflow.c \
+		common/propfuncs.c common/libdlflow.c	\
 		common/libdlstat.c common/flowattr.c	\
-		common/libdlether.c common/libdlsim.c
+		common/libdlether.c common/libdlsim.c	\
+		common/libdlbridge.c
 
 XGETFLAGS =     -a -x libdladm.xcl
 

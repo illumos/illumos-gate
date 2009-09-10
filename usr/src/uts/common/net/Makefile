@@ -28,7 +28,7 @@ include ../../../Makefile.master
 
 HDRS=	af.h if.h if_arp.h if_dl.h if_types.h route.h pfkeyv2.h pfpolicy.h \
 	ppp-comp.h ppp_defs.h pppio.h vjcompress.h sppptun.h pppoe.h radix.h \
-	wpa.h simnet.h
+	wpa.h simnet.h bridge.h bridge_impl.h trill.h
 
 ROOTDIRS= $(ROOT)/usr/include/net
 

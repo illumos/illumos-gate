@@ -458,6 +458,7 @@ extern void 			mac_rx(mac_handle_t, mac_resource_handle_t,
 extern void 			mac_rx_ring(mac_handle_t, mac_ring_handle_t,
 				    mblk_t *, uint64_t);
 extern void 			mac_link_update(mac_handle_t, link_state_t);
+extern void 			mac_link_redo(mac_handle_t, link_state_t);
 extern void 			mac_unicst_update(mac_handle_t,
 				    const uint8_t *);
 extern void			mac_tx_update(mac_handle_t);

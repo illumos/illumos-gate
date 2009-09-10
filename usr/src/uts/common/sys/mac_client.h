@@ -167,6 +167,12 @@ extern int mac_client_set_resources(mac_client_handle_t,
 extern void mac_client_get_resources(mac_client_handle_t,
     mac_resource_props_t *);
 
+/* bridging-related interfaces */
+extern int mac_set_pvid(mac_handle_t, uint16_t);
+extern uint16_t mac_get_pvid(mac_handle_t);
+extern uint32_t mac_get_llimit(mac_handle_t);
+extern uint32_t mac_get_ldecay(mac_handle_t);
+
 extern int mac_share_capable(mac_handle_t);
 extern int mac_share_bind(mac_client_handle_t, uint64_t, uint64_t *);
 extern void mac_share_unbind(mac_client_handle_t);

@@ -29,6 +29,7 @@
 #include <strings.h>
 #include <exacct.h>
 #include <net/if.h>
+#include <sys/ethernet.h>
 #include <libdladm.h>
 
 #define	TIMEBUFLEN	20

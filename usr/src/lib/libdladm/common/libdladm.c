@@ -345,6 +345,12 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_NO_HWRINGS:
 		s = "request hw rings failed";
 		break;
+	case DLADM_STATUS_PERMONLY:
+		s = "change must be persistent";
+		break;
+	case DLADM_STATUS_OPTMISSING:
+		s = "optional software not installed";
+		break;
 	default:
 		s = "<unknown error>";
 		break;
@@ -569,6 +575,9 @@ dladm_class2str(datalink_class_t class, char *buf)
 		break;
 	case DATALINK_CLASS_SIMNET:
 		s = "simnet";
+		break;
+	case DATALINK_CLASS_BRIDGE:
+		s = "bridge";
 		break;
 	default:
 		s = "unknown";

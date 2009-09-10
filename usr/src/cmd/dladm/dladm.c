@@ -25,6 +25,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#include <dlfcn.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -55,6 +56,7 @@
 #include <libdlvnic.h>
 #include <libdlether.h>
 #include <libdlsim.h>
+#include <libdlbridge.h>
 #include <libinetutil.h>
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
@@ -66,6 +68,7 @@
 #include <arpa/inet.h>
 #include <net/if_types.h>
 #include <stddef.h>
+#include <stp_in.h>
 #include <ofmt.h>
 
 #define	MAXPORT			256
@@ -83,6 +86,27 @@
 #define	WIFI_CMD_SCAN		0x00000001
 #define	WIFI_CMD_SHOW		0x00000002
 #define	WIFI_CMD_ALL		(WIFI_CMD_SCAN | WIFI_CMD_SHOW)
+
+/* No larger than pktsum_t */
+typedef struct brsum_s {
+	uint64_t	drops;
+	uint64_t	forward_dir;
+	uint64_t	forward_mb;
+	uint64_t	forward_unk;
+	uint64_t	recv;
+	uint64_t	sent;
+} brsum_t;
+
+/* No larger than pktsum_t */
+typedef struct brlsum_s {
+	uint32_t	cfgbpdu;
+	uint32_t	tcnbpdu;
+	uint32_t	rstpbpdu;
+	uint32_t	txbpdu;
+	uint64_t	drops;
+	uint64_t	recv;
+	uint64_t	xmit;
+} brlsum_t;
 
 typedef struct show_state {
 	boolean_t	ls_firstonly;
@@ -166,6 +190,8 @@ static cmdfunc_t do_create_etherstub, do_delete_etherstub, do_show_etherstub;
 static cmdfunc_t do_create_simnet, do_modify_simnet;
 static cmdfunc_t do_delete_simnet, do_show_simnet, do_up_simnet;
 static cmdfunc_t do_show_usage;
+static cmdfunc_t do_create_bridge, do_modify_bridge, do_delete_bridge;
+static cmdfunc_t do_add_bridge, do_remove_bridge, do_show_bridge;
 
 static void 	do_up_vnic_common(int, char **, const char *, boolean_t);
 
@@ -290,6 +316,33 @@ static cmd_t	cmds[] = {
 	{ "delete-simnet",	do_delete_simnet,	NULL		},
 	{ "show-simnet",	do_show_simnet,		NULL		},
 	{ "up-simnet",		do_up_simnet,		NULL		},
+	{ "create-bridge",	do_create_bridge,
+	    "    create-bridge    [-R <root-dir>] [-P <protect>] "
+	    "[-p <priority>]\n"
+	    "\t\t     [-m <max-age>] [-h <hello-time>] [-d <forward-delay>]\n"
+	    "\t\t     [-f <force-protocol>] [-l <link>]... <bridge>"	},
+	{ "modify-bridge",	do_modify_bridge,
+	    "    modify-bridge    [-R <root-dir>] [-P <protect>] "
+	    "[-p <priority>]\n"
+	    "\t\t     [-m <max-age>] [-h <hello-time>] [-d <forward-delay>]\n"
+	    "\t\t     [-f <force-protocol>] <bridge>"			},
+	{ "delete-bridge",	do_delete_bridge,
+	    "    delete-bridge    [-R <root-dir>] <bridge>"		},
+	{ "add-bridge",		do_add_bridge,
+	    "    add-bridge       [-R <root-dir>] -l <link> [-l <link>]... "
+	    "<bridge>"							},
+	{ "remove-bridge",	do_remove_bridge,
+	    "    remove-bridge    [-R <root-dir>] -l <link> [-l <link>]... "
+	    "<bridge>"							},
+	{ "show-bridge",	do_show_bridge,
+	    "    show-bridge      [-p] [-o <field>,...] [-s [-i <interval>]] "
+	    "[<bridge>]\n"
+	    "    show-bridge      -l [-p] [-o <field>,...] [-s [-i <interval>]]"
+	    " <bridge>\n"
+	    "    show-bridge      -f [-p] [-o <field>,...] [-s [-i <interval>]]"
+	    " <bridge>\n"
+	    "    show-bridge      -t [-p] [-o <field>,...] [-s [-i <interval>]]"
+	    " <bridge>\n"						},
 	{ "show-usage",		do_show_usage,
 	    "    show-usage       [-a] [-d | -F <format>] "
 	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
@@ -399,6 +452,30 @@ static const struct option simnet_lopts[] = {
 	{ 0, 0, 0, 0 }
 };
 
+static const struct option bridge_lopts[] = {
+	{ "protect",		required_argument,	0, 'P' },
+	{ "root-dir",		required_argument,	0, 'R'	},
+	{ "forward-delay",	required_argument,	0, 'd'	},
+	{ "force-protocol",	required_argument,	0, 'f'	},
+	{ "hello-time",		required_argument,	0, 'h'	},
+	{ "link",		required_argument,	0, 'l'	},
+	{ "max-age",		required_argument,	0, 'm'	},
+	{ "priority",		required_argument,	0, 'p'	},
+	{ NULL, NULL, 0, 0 }
+};
+
+static const struct option bridge_show_lopts[] = {
+	{ "forwarding", no_argument,		0, 'f' },
+	{ "interval",	required_argument,	0, 'i' },
+	{ "link",	no_argument,		0, 'l' },
+	{ "output",	required_argument,	0, 'o' },
+	{ "parsable",	no_argument,		0, 'p' },
+	{ "parseable",	no_argument,		0, 'p' },
+	{ "statistics",	no_argument,		0, 's' },
+	{ "trill",	no_argument,		0, 't' },
+	{ 0, 0, 0, 0 }
+};
+
 /*
  * structures for 'dladm show-ether'
  */
@@ -481,6 +558,7 @@ typedef struct link_fields_buf_s {
 	char link_class[DLADM_STRSIZE];
 	char link_mtu[11];
 	char link_state[DLADM_STRSIZE];
+	char link_bridge[MAXLINKNAMELEN];
 	char link_over[MAXLINKNAMELEN];
 	char link_phys_state[DLADM_STRSIZE];
 	char link_phys_media[DLADM_STRSIZE];
@@ -504,6 +582,8 @@ static ofmt_field_t link_fields[] = {
 	offsetof(link_fields_buf_t, link_mtu), print_default_cb},
 { "STATE",	9,
 	offsetof(link_fields_buf_t, link_state), print_default_cb},
+{ "BRIDGE",	11,
+    offsetof(link_fields_buf_t, link_bridge), print_default_cb},
 { "OVER",	DLPI_LINKNAME_MAX,
 	offsetof(link_fields_buf_t, link_over), print_default_cb},
 { NULL,		0, 0, NULL}}
@@ -926,6 +1006,235 @@ static ofmt_field_t usage_l_fields[] = {
 	offsetof(usage_l_fields_buf_t, usage_l_bandwidth), print_default_cb},
 { NULL,		0, 0, NULL}}
 ;
+
+/*
+ * structures for 'dladm show-bridge'.  These are based on sections 14.8.1.1.3
+ * and 14.8.1.2.2 of IEEE 802.1D-2004.
+ */
+typedef struct bridge_fields_buf_s {
+	char bridge_name[MAXLINKNAMELEN]; /* 14.4.1.2.3(b) */
+	char bridge_protect[7];		/* stp or trill */
+	char bridge_address[24];	/* 17.18.3, 7.12.5, 14.4.1.2.3(a) */
+	char bridge_priority[7];	/* 17.18.3 9.2.5 - only upper 4 bits */
+	char bridge_bmaxage[7];		/* 17.18.4 configured */
+	char bridge_bhellotime[7];	/* 17.18.4 configured */
+	char bridge_bfwddelay[7];	/* 17.18.4 configured */
+	char bridge_forceproto[3];	/* 17.13.4 configured */
+	char bridge_tctime[12];		/* 14.8.1.1.3(b) */
+	char bridge_tccount[12];	/* 17.17.8 */
+	char bridge_tchange[12];	/* 17.17.8 */
+	char bridge_desroot[24];	/* 17.18.6 priority "/" MAC */
+	char bridge_rootcost[12];	/* 17.18.6 */
+	char bridge_rootport[12];	/* 17.18.6 */
+	char bridge_maxage[7];		/* 17.18.7 for root */
+	char bridge_hellotime[7];	/* 17.13.6 for root */
+	char bridge_fwddelay[7];	/* 17.13.5 for root */
+	char bridge_holdtime[12];	/* 17.13.12 for root */
+} bridge_fields_buf_t;
+
+static ofmt_field_t bridge_fields[] = {
+/* name,	field width,	offset,	callback	*/
+{ "BRIDGE",	12,
+    offsetof(bridge_fields_buf_t, bridge_name), print_default_cb },
+{ "PROTECT",	8,
+    offsetof(bridge_fields_buf_t, bridge_protect), print_default_cb },
+{ "ADDRESS",	19,
+    offsetof(bridge_fields_buf_t, bridge_address), print_default_cb },
+{ "PRIORITY",	9,
+    offsetof(bridge_fields_buf_t, bridge_priority), print_default_cb },
+{ "BMAXAGE",	8,
+    offsetof(bridge_fields_buf_t, bridge_bmaxage), print_default_cb },
+{ "BHELLOTIME",	11,
+    offsetof(bridge_fields_buf_t, bridge_bhellotime), print_default_cb },
+{ "BFWDDELAY",	10,
+    offsetof(bridge_fields_buf_t, bridge_bfwddelay), print_default_cb },
+{ "FORCEPROTO",	11,
+    offsetof(bridge_fields_buf_t, bridge_forceproto), print_default_cb },
+{ "TCTIME",	10,
+    offsetof(bridge_fields_buf_t, bridge_tctime), print_default_cb },
+{ "TCCOUNT",	10,
+    offsetof(bridge_fields_buf_t, bridge_tccount), print_default_cb },
+{ "TCHANGE",	10,
+    offsetof(bridge_fields_buf_t, bridge_tchange), print_default_cb },
+{ "DESROOT",	23,
+    offsetof(bridge_fields_buf_t, bridge_desroot), print_default_cb },
+{ "ROOTCOST",	11,
+    offsetof(bridge_fields_buf_t, bridge_rootcost), print_default_cb },
+{ "ROOTPORT",	11,
+    offsetof(bridge_fields_buf_t, bridge_rootport), print_default_cb },
+{ "MAXAGE",	8,
+    offsetof(bridge_fields_buf_t, bridge_maxage), print_default_cb },
+{ "HELLOTIME",	10,
+    offsetof(bridge_fields_buf_t, bridge_hellotime), print_default_cb },
+{ "FWDDELAY",	9,
+    offsetof(bridge_fields_buf_t, bridge_fwddelay), print_default_cb },
+{ "HOLDTIME",	9,
+    offsetof(bridge_fields_buf_t, bridge_holdtime), print_default_cb },
+{ NULL,		0, 0, NULL}};
+
+/*
+ * structures for 'dladm show-bridge -l'.  These are based on 14.4.1.2.3 and
+ * 14.8.2.1.3 of IEEE 802.1D-2004.
+ */
+typedef struct bridge_link_fields_buf_s {
+	char bridgel_link[MAXLINKNAMELEN];
+	char bridgel_index[7];			/* 14.4.1.2.3(d1) */
+	char bridgel_state[11];			/* 14.8.2.1.3(b) */
+	char bridgel_uptime[7];			/* 14.8.2.1.3(a) */
+	char bridgel_opercost[7]		/* 14.8.2.1.3(d) */;
+	char bridgel_operp2p[4];		/* 14.8.2.1.3(p) */
+	char bridgel_operedge[4];		/* 14.8.2.1.3(k) */
+	char bridgel_desroot[23];		/* 14.8.2.1.3(e) */
+	char bridgel_descost[12];		/* 14.8.2.1.3(f) */
+	char bridgel_desbridge[23];		/* 14.8.2.1.3(g) */
+	char bridgel_desport[7];		/* 14.8.2.1.3(h) */
+	char bridgel_tcack[4];			/* 14.8.2.1.3(i) */
+} bridge_link_fields_buf_t;
+
+static ofmt_field_t bridge_link_fields[] = {
+/* name,	field width,	offset,	callback	*/
+{ "LINK",		12,
+    offsetof(bridge_link_fields_buf_t, bridgel_link), print_default_cb },
+{ "INDEX",	8,
+    offsetof(bridge_link_fields_buf_t, bridgel_index), print_default_cb },
+{ "STATE",	12,
+    offsetof(bridge_link_fields_buf_t, bridgel_state), print_default_cb },
+{ "UPTIME",	8,
+    offsetof(bridge_link_fields_buf_t, bridgel_uptime), print_default_cb },
+{ "OPERCOST",	9,
+    offsetof(bridge_link_fields_buf_t, bridgel_opercost), print_default_cb },
+{ "OPERP2P",	8,
+    offsetof(bridge_link_fields_buf_t, bridgel_operp2p), print_default_cb },
+{ "OPEREDGE",	9,
+    offsetof(bridge_link_fields_buf_t, bridgel_operedge), print_default_cb },
+{ "DESROOT",	22,
+    offsetof(bridge_link_fields_buf_t, bridgel_desroot), print_default_cb },
+{ "DESCOST",	11,
+    offsetof(bridge_link_fields_buf_t, bridgel_descost), print_default_cb },
+{ "DESBRIDGE",	22,
+    offsetof(bridge_link_fields_buf_t, bridgel_desbridge), print_default_cb },
+{ "DESPORT",	8,
+    offsetof(bridge_link_fields_buf_t, bridgel_desport), print_default_cb },
+{ "TCACK",	6,
+    offsetof(bridge_link_fields_buf_t, bridgel_tcack), print_default_cb },
+{ NULL,		0, 0, NULL}};
+
+/*
+ * structures for 'dladm show-bridge -s'.  These are not based on IEEE
+ * 802.1D-2004.
+ */
+#define	ULONG_DIG	(((sizeof (ulong_t) * NBBY) * 3 / 10) + 1)
+#define	UINT64_DIG	(((sizeof (uint64_t) * NBBY) * 3 / 10) + 1)
+typedef struct bridge_statfields_buf_s {
+	char bridges_name[MAXLINKNAMELEN];
+	char bridges_drops[UINT64_DIG];
+	char bridges_forwards[UINT64_DIG];
+	char bridges_mbcast[UINT64_DIG];
+	char bridges_unknown[UINT64_DIG];
+	char bridges_recv[UINT64_DIG];
+	char bridges_sent[UINT64_DIG];
+} bridge_statfields_buf_t;
+
+static ofmt_field_t bridge_statfields[] = {
+/* name,	field width,	offset,	callback	*/
+{ "BRIDGE",	12,
+    offsetof(bridge_statfields_buf_t, bridges_name), print_default_cb },
+{ "DROPS",	12,
+    offsetof(bridge_statfields_buf_t, bridges_drops), print_default_cb },
+{ "FORWARDS",	12,
+    offsetof(bridge_statfields_buf_t, bridges_forwards), print_default_cb },
+{ "MBCAST",	12,
+    offsetof(bridge_statfields_buf_t, bridges_mbcast), print_default_cb },
+{ "UNKNOWN",	12,
+    offsetof(bridge_statfields_buf_t, bridges_unknown), print_default_cb },
+{ "RECV",	12,
+    offsetof(bridge_statfields_buf_t, bridges_recv), print_default_cb },
+{ "SENT",	12,
+    offsetof(bridge_statfields_buf_t, bridges_sent), print_default_cb },
+{ NULL,		0, 0, NULL}};
+
+/*
+ * structures for 'dladm show-bridge -s -l'.  These are based in part on
+ * section 14.6.1.1.3 of IEEE 802.1D-2004.
+ */
+typedef struct bridge_link_statfields_buf_s {
+	char bridgels_link[MAXLINKNAMELEN];
+	char bridgels_cfgbpdu[ULONG_DIG];
+	char bridgels_tcnbpdu[ULONG_DIG];
+	char bridgels_rstpbpdu[ULONG_DIG];
+	char bridgels_txbpdu[ULONG_DIG];
+	char bridgels_drops[UINT64_DIG];	/* 14.6.1.1.3(d) */
+	char bridgels_recv[UINT64_DIG];		/* 14.6.1.1.3(a) */
+	char bridgels_xmit[UINT64_DIG];		/* 14.6.1.1.3(c) */
+} bridge_link_statfields_buf_t;
+
+static ofmt_field_t bridge_link_statfields[] = {
+/* name,	field width,	offset,	callback	*/
+{ "LINK",	12,
+    offsetof(bridge_link_statfields_buf_t, bridgels_link), print_default_cb },
+{ "CFGBPDU",	9,
+    offsetof(bridge_link_statfields_buf_t, bridgels_cfgbpdu),
+    print_default_cb },
+{ "TCNBPDU",	9,
+    offsetof(bridge_link_statfields_buf_t, bridgels_tcnbpdu),
+    print_default_cb },
+{ "RSTPBPDU",	9,
+    offsetof(bridge_link_statfields_buf_t, bridgels_rstpbpdu),
+    print_default_cb },
+{ "TXBPDU",	9,
+    offsetof(bridge_link_statfields_buf_t, bridgels_txbpdu), print_default_cb },
+{ "DROPS",	9,
+    offsetof(bridge_link_statfields_buf_t, bridgels_drops), print_default_cb },
+{ "RECV",	9,
+    offsetof(bridge_link_statfields_buf_t, bridgels_recv), print_default_cb },
+{ "XMIT",	9,
+    offsetof(bridge_link_statfields_buf_t, bridgels_xmit), print_default_cb },
+{ NULL,		0, 0, NULL}};
+
+/*
+ * structures for 'dladm show-bridge -f'.  These are based in part on
+ * section  14.7.6.3.3 of IEEE 802.1D-2004.
+ */
+typedef struct bridge_fwd_fields_buf_s {
+	char bridgef_dest[18];			/* 14.7.6.3.3(a) */
+	char bridgef_age[8];
+	char bridgef_flags[6];
+	char bridgef_output[MAXLINKNAMELEN];	/* 14.7.6.3.3(c) */
+} bridge_fwd_fields_buf_t;
+
+static ofmt_field_t bridge_fwd_fields[] = {
+/* name,	field width,	offset,	callback	*/
+{ "DEST",	17,
+    offsetof(bridge_fwd_fields_buf_t, bridgef_dest), print_default_cb },
+{ "AGE",	7,
+    offsetof(bridge_fwd_fields_buf_t, bridgef_age), print_default_cb },
+{ "FLAGS",	6,
+    offsetof(bridge_fwd_fields_buf_t, bridgef_flags), print_default_cb },
+{ "OUTPUT",	12,
+    offsetof(bridge_fwd_fields_buf_t, bridgef_output), print_default_cb },
+{ NULL,		0, 0, NULL}};
+
+/*
+ * structures for 'dladm show-bridge -t'.
+ */
+typedef struct bridge_trill_fields_buf_s {
+	char bridget_nick[6];
+	char bridget_flags[6];
+	char bridget_link[MAXLINKNAMELEN];
+	char bridget_nexthop[18];
+} bridge_trill_fields_buf_t;
+
+static ofmt_field_t bridge_trill_fields[] = {
+/* name,	field width,	offset,	callback	*/
+{ "NICK",	5,
+    offsetof(bridge_trill_fields_buf_t, bridget_nick), print_default_cb },
+{ "FLAGS",	6,
+    offsetof(bridge_trill_fields_buf_t, bridget_flags), print_default_cb },
+{ "LINK",	12,
+    offsetof(bridge_trill_fields_buf_t, bridget_link), print_default_cb },
+{ "NEXTHOP",	17,
+    offsetof(bridge_trill_fields_buf_t, bridget_nexthop), print_default_cb },
+{ NULL,		0, 0, NULL}};
 
 static char *progname;
 static sig_atomic_t signalled;
@@ -1460,8 +1769,8 @@ done:
 	dladm_free_props(proplist);
 	if (status != DLADM_STATUS_OK) {
 		if (status == DLADM_STATUS_NONOTIF) {
-			die_dlerr(status, "not all links have link up/down "
-			    "detection; must use -f (see dladm(1M))\n");
+			die("not all links have link up/down detection; must "
+			    "use -f (see dladm(1M))");
 		} else {
 			die_dlerr(status, "create operation failed");
 		}
@@ -1630,8 +1939,8 @@ done:
 			dladm_close(handle);
 			exit(ENOTSUP);
 		} else if (status == DLADM_STATUS_NONOTIF) {
-			die_dlerr(status, "not all links have link up/down "
-			    "detection; must use -f (see dladm(1M))\n");
+			die("not all links have link up/down detection; must "
+			    "use -f (see dladm(1M))");
 		} else {
 			die_dlerr(status, "add operation failed");
 		}
@@ -1925,9 +2234,23 @@ do_create_vlan(int argc, char *argv[], const char *use)
 	    != DLADM_STATUS_OK)
 		die("invalid vlan property");
 
-	if ((status = dladm_vlan_create(handle, vlan, dev_linkid, vid, proplist,
-	    flags, &linkid)) != DLADM_STATUS_OK) {
-		die_dlerr(status, "create operation over %s failed", link);
+	status = dladm_vlan_create(handle, vlan, dev_linkid, vid, proplist,
+	    flags, &linkid);
+	switch (status) {
+	case DLADM_STATUS_OK:
+		break;
+
+	case DLADM_STATUS_NOTSUP:
+		die("VLAN over '%s' may require lowered MTU; must use -f (see "
+		    "dladm(1M))", link);
+		break;
+
+	case DLADM_STATUS_LINKBUSY:
+		die("VLAN over '%s' may not use default_tag ID", link);
+		break;
+
+	default:
+		die_dlerr(status, "create operation failed");
 	}
 }
 
@@ -2125,11 +2448,26 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
     datalink_class_t class, link_fields_buf_t *lbuf)
 {
 	uint32_t	flags = state->ls_flags;
-	dladm_status_t	status = DLADM_STATUS_OK;
+	dladm_status_t	status;
 	char		tmpbuf[MAXLINKNAMELEN];
 
 	lbuf->link_over[0] = '\0';
+	lbuf->link_bridge[0] = '\0';
 
+	switch (class) {
+	case DATALINK_CLASS_AGGR:
+	case DATALINK_CLASS_PHYS:
+	case DATALINK_CLASS_ETHERSTUB:
+		status = dladm_bridge_getlink(handle, linkid, lbuf->link_bridge,
+		    sizeof (lbuf->link_bridge));
+		if (status == DLADM_STATUS_OK)
+			break;
+		if (status != DLADM_STATUS_NOTFOUND)
+			return (status);
+		break;
+	}
+
+	status = DLADM_STATUS_OK;
 	switch (class) {
 	case DATALINK_CLASS_VLAN: {
 		dladm_vlan_attr_t	vinfo;
@@ -2146,6 +2484,8 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 		dladm_aggr_grp_attr_t	ginfo;
 		int			i;
 
+		lbuf->link_over[0] = '\0';
+
 		status = dladm_aggr_info(handle, linkid, &ginfo, flags);
 		if (status != DLADM_STATUS_OK)
 			break;
@@ -2158,10 +2498,8 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 			status = dladm_datalink_id2info(handle,
 			    ginfo.lg_ports[i].lp_linkid, NULL, NULL, NULL,
 			    tmpbuf, sizeof (tmpbuf));
-			if (status != DLADM_STATUS_OK) {
-				free(ginfo.lg_ports);
+			if (status != DLADM_STATUS_OK)
 				break;
-			}
 			(void) strlcat(lbuf->link_over, tmpbuf,
 			    sizeof (lbuf->link_over));
 			if (i != (ginfo.lg_nports - 1)) {
@@ -2181,6 +2519,38 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 			status = dladm_datalink_id2info(handle,
 			    vinfo.va_link_id, NULL, NULL, NULL, lbuf->link_over,
 			    sizeof (lbuf->link_over));
+		break;
+	}
+
+	case DATALINK_CLASS_BRIDGE: {
+		datalink_id_t *dlp;
+		uint_t i, nports;
+
+		status = dladm_datalink_id2info(handle, linkid, NULL, NULL,
+		    NULL, tmpbuf, sizeof (tmpbuf));
+		if (status != DLADM_STATUS_OK)
+			break;
+		if (tmpbuf[0] != '\0')
+			tmpbuf[strlen(tmpbuf) - 1] = '\0';
+		dlp = dladm_bridge_get_portlist(tmpbuf, &nports);
+		if (dlp == NULL) {
+			status = DLADM_STATUS_BADVAL;
+			break;
+		}
+		lbuf->link_over[0] = '\0';
+		for (i = 0; i < nports; i++) {
+			status = dladm_datalink_id2info(handle, dlp[i], NULL,
+			    NULL, NULL, tmpbuf, sizeof (tmpbuf));
+			if (status != DLADM_STATUS_OK)
+				break;
+			(void) strlcat(lbuf->link_over, tmpbuf,
+			    sizeof (lbuf->link_over));
+			if (i != nports - 1) {
+				(void) strlcat(lbuf->link_over, " ",
+				    sizeof (lbuf->link_over));
+			}
+		}
+		dladm_bridge_free_portlist(dlp);
 		break;
 	}
 
@@ -2867,8 +3237,8 @@ do_show_link(int argc, char *argv[], const char *use)
 	dladm_status_t	status;
 	boolean_t	o_arg = B_FALSE;
 	char		*fields_str = NULL;
-	char		*all_active_fields = "link,class,mtu,state,over";
-	char		*all_inactive_fields = "link,class,over";
+	char		*all_active_fields = "link,class,mtu,state,bridge,over";
+	char		*all_inactive_fields = "link,class,bridge,over";
 	char		*allstat_fields =
 	    "link,ipackets,rbytes,ierrors,opackets,obytes,oerrors";
 	ofmt_handle_t	ofmt;
@@ -5849,22 +6219,6 @@ show_linkprop_onelink(dladm_handle_t hdl, datalink_id_t linkid, void *arg)
 	return (DLADM_WALK_CONTINUE);
 }
 
-static dladm_status_t
-set_linkprop_persist(datalink_id_t linkid, const char *prop_name,
-    char **prop_val, uint_t val_cnt, boolean_t reset)
-{
-	dladm_status_t	status;
-
-	status = dladm_set_linkprop(handle, linkid, prop_name, prop_val,
-	    val_cnt, DLADM_OPT_PERSIST);
-
-	if (status != DLADM_STATUS_OK) {
-		warn_dlerr(status, "cannot persistently %s link property '%s'",
-		    reset ? "reset" : "set", prop_name);
-	}
-	return (status);
-}
-
 static int
 reset_one_linkprop(dladm_handle_t dh, datalink_id_t linkid,
     const char *propname, void *arg)
@@ -5873,23 +6227,14 @@ reset_one_linkprop(dladm_handle_t dh, datalink_id_t linkid,
 	dladm_status_t		status;
 
 	status = dladm_set_linkprop(dh, linkid, propname, NULL, 0,
-	    DLADM_OPT_ACTIVE);
+	    DLADM_OPT_ACTIVE | (statep->ls_temp ? 0 : DLADM_OPT_PERSIST));
 	if (status != DLADM_STATUS_OK &&
 	    status != DLADM_STATUS_PROPRDONLY &&
 	    status != DLADM_STATUS_NOTSUP) {
 		warn_dlerr(status, "cannot reset link property '%s' on '%s'",
 		    propname, statep->ls_name);
-	}
-	if (!statep->ls_temp) {
-		dladm_status_t	s;
-
-		s = set_linkprop_persist(linkid, propname, NULL, 0,
-		    statep->ls_reset);
-		if (s != DLADM_STATUS_OK)
-			status = s;
-	}
-	if (status != DLADM_STATUS_OK)
 		statep->ls_status = status;
+	}
 
 	return (DLADM_WALK_CONTINUE);
 }
@@ -5970,7 +6315,6 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 		dladm_arg_info_t	*aip = &proplist->al_info[i];
 		char		**val;
 		uint_t		count;
-		dladm_status_t	s;
 
 		if (reset) {
 			val = NULL;
@@ -5985,19 +6329,11 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 				continue;
 			}
 		}
-		s = dladm_set_linkprop(handle, linkid, aip->ai_name, val, count,
-		    DLADM_OPT_ACTIVE);
-		if (s == DLADM_STATUS_OK) {
-			if (!temp) {
-				s = set_linkprop_persist(linkid,
-				    aip->ai_name, val, count, reset);
-				if (s != DLADM_STATUS_OK)
-					status = s;
-			}
-			continue;
-		}
-		status = s;
-		switch (s) {
+		status = dladm_set_linkprop(handle, linkid, aip->ai_name, val,
+		    count, DLADM_OPT_ACTIVE | (temp ? 0 : DLADM_OPT_PERSIST));
+		switch (status) {
+		case DLADM_STATUS_OK:
+			break;
 		case DLADM_STATUS_NOTFOUND:
 			warn("invalid link property '%s'", aip->ai_name);
 			break;
@@ -6006,6 +6342,7 @@ set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 			char		*ptr, *lim;
 			char		**propvals = NULL;
 			uint_t		valcnt = DLADM_MAX_PROP_VALCNT;
+			dladm_status_t	s;
 
 			ptr = malloc((sizeof (char *) +
 			    DLADM_PROP_VAL_MAX) * DLADM_MAX_PROP_VALCNT +
@@ -6768,6 +7105,1106 @@ do_init_secobj(int argc, char **argv, const char *use)
 	status = dladm_init_secobj(handle);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "secure object initialization failed");
+}
+
+enum bridge_func {
+	brCreate, brAdd, brModify
+};
+
+static void
+create_modify_add_bridge(int argc, char **argv, const char *use,
+    enum bridge_func func)
+{
+	int			option;
+	uint_t			n, i, nlink;
+	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	char			*altroot = NULL;
+	char			*links[MAXPORT];
+	datalink_id_t		linkids[MAXPORT];
+	dladm_status_t		status;
+	const char		*bridge;
+	UID_STP_CFG_T		cfg, cfg_old;
+	dladm_bridge_prot_t	brprot = DLADM_BRIDGE_PROT_UNKNOWN;
+	dladm_bridge_prot_t	brprot_old;
+
+	/* Set up the default configuration values */
+	cfg.field_mask = 0;
+	cfg.bridge_priority = DEF_BR_PRIO;
+	cfg.max_age = DEF_BR_MAXAGE;
+	cfg.hello_time = DEF_BR_HELLOT;
+	cfg.forward_delay = DEF_BR_FWDELAY;
+	cfg.force_version = DEF_FORCE_VERS;
+
+	nlink = opterr = 0;
+	while ((option = getopt_long(argc, argv, ":P:R:d:f:h:l:m:p:",
+	    bridge_lopts, NULL)) != -1) {
+		switch (option) {
+		case 'P':
+			if (func == brAdd)
+				die_opterr(optopt, option, use);
+			status = dladm_bridge_str2prot(optarg, &brprot);
+			if (status != DLADM_STATUS_OK)
+				die_dlerr(status, "protection %s", optarg);
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		case 'd':
+			if (func == brAdd)
+				die_opterr(optopt, option, use);
+			if (cfg.field_mask & BR_CFG_DELAY)
+				die("forwarding delay set more than once");
+			if (!str2int(optarg, &cfg.forward_delay) ||
+			    cfg.forward_delay < MIN_BR_FWDELAY ||
+			    cfg.forward_delay > MAX_BR_FWDELAY)
+				die("incorrect forwarding delay");
+			cfg.field_mask |= BR_CFG_DELAY;
+			break;
+		case 'f':
+			if (func == brAdd)
+				die_opterr(optopt, option, use);
+			if (cfg.field_mask & BR_CFG_FORCE_VER)
+				die("force protocol set more than once");
+			if (!str2int(optarg, &cfg.force_version) ||
+			    cfg.force_version < 0)
+				die("incorrect force protocol");
+			cfg.field_mask |= BR_CFG_FORCE_VER;
+			break;
+		case 'h':
+			if (func == brAdd)
+				die_opterr(optopt, option, use);
+			if (cfg.field_mask & BR_CFG_HELLO)
+				die("hello time set more than once");
+			if (!str2int(optarg, &cfg.hello_time) ||
+			    cfg.hello_time < MIN_BR_HELLOT ||
+			    cfg.hello_time > MAX_BR_HELLOT)
+				die("incorrect hello time");
+			cfg.field_mask |= BR_CFG_HELLO;
+			break;
+		case 'l':
+			if (func == brModify)
+				die_opterr(optopt, option, use);
+			if (nlink >= MAXPORT)
+				die("too many links specified");
+			links[nlink++] = optarg;
+			break;
+		case 'm':
+			if (func == brAdd)
+				die_opterr(optopt, option, use);
+			if (cfg.field_mask & BR_CFG_AGE)
+				die("max age set more than once");
+			if (!str2int(optarg, &cfg.max_age) ||
+			    cfg.max_age < MIN_BR_MAXAGE ||
+			    cfg.max_age > MAX_BR_MAXAGE)
+				die("incorrect max age");
+			cfg.field_mask |= BR_CFG_AGE;
+			break;
+		case 'p':
+			if (func == brAdd)
+				die_opterr(optopt, option, use);
+			if (cfg.field_mask & BR_CFG_PRIO)
+				die("priority set more than once");
+			if (!str2int(optarg, &cfg.bridge_priority) ||
+			    cfg.bridge_priority < MIN_BR_PRIO ||
+			    cfg.bridge_priority > MAX_BR_PRIO)
+				die("incorrect priority");
+			cfg.bridge_priority &= 0xF000;
+			cfg.field_mask |= BR_CFG_PRIO;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	/* get the bridge name (required last argument) */
+	if (optind != (argc-1))
+		usage();
+
+	bridge = argv[optind];
+	if (!dladm_valid_bridgename(bridge))
+		die("invalid bridge name '%s'", bridge);
+
+	/*
+	 * Get the current properties, if any, and merge in with changes.  This
+	 * is necessary (even with the field_mask feature) so that the
+	 * value-checking macros will produce the right results with proposed
+	 * changes to existing configuration.  We only need it for those
+	 * parameters, though.
+	 */
+	(void) dladm_bridge_get_properties(bridge, &cfg_old, &brprot_old);
+	if (brprot == DLADM_BRIDGE_PROT_UNKNOWN)
+		brprot = brprot_old;
+	if (!(cfg.field_mask & BR_CFG_AGE))
+		cfg.max_age = cfg_old.max_age;
+	if (!(cfg.field_mask & BR_CFG_HELLO))
+		cfg.hello_time = cfg_old.hello_time;
+	if (!(cfg.field_mask & BR_CFG_DELAY))
+		cfg.forward_delay = cfg_old.forward_delay;
+
+	if (!CHECK_BRIDGE_CONFIG(cfg)) {
+		warn("illegal forward delay / max age / hello time "
+		    "combination");
+		if (NO_MAXAGE(cfg)) {
+			die("no max age possible: need forward delay >= %d or "
+			    "hello time <= %d", MIN_FWDELAY_NOM(cfg),
+			    MAX_HELLOTIME_NOM(cfg));
+		} else if (SMALL_MAXAGE(cfg)) {
+			if (CAPPED_MAXAGE(cfg))
+				die("max age too small: need age >= %d and "
+				    "<= %d or hello time <= %d",
+				    MIN_MAXAGE(cfg), MAX_MAXAGE(cfg),
+				    MAX_HELLOTIME(cfg));
+			else
+				die("max age too small: need age >= %d or "
+				    "hello time <= %d",
+				    MIN_MAXAGE(cfg), MAX_HELLOTIME(cfg));
+		} else if (FLOORED_MAXAGE(cfg)) {
+			die("max age too large: need age >= %d and <= %d or "
+			    "forward delay >= %d",
+			    MIN_MAXAGE(cfg), MAX_MAXAGE(cfg),
+			    MIN_FWDELAY(cfg));
+		} else {
+			die("max age too large: need age <= %d or forward "
+			    "delay >= %d",
+			    MAX_MAXAGE(cfg), MIN_FWDELAY(cfg));
+		}
+	}
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	for (n = 0; n < nlink; n++) {
+		datalink_class_t class;
+		uint32_t media;
+		char pointless[DLADM_STRSIZE];
+
+		if (dladm_name2info(handle, links[n], &linkids[n], NULL, &class,
+		    &media) != DLADM_STATUS_OK)
+			die("invalid link name '%s'", links[n]);
+		if (class & ~(DATALINK_CLASS_PHYS | DATALINK_CLASS_AGGR |
+		    DATALINK_CLASS_ETHERSTUB | DATALINK_CLASS_SIMNET))
+			die("%s %s cannot be bridged",
+			    dladm_class2str(class, pointless), links[n]);
+		if (media != DL_ETHER && media != DL_100VG &&
+		    media != DL_ETH_CSMA && media != DL_100BT)
+			die("%s interface %s cannot be bridged",
+			    dladm_media2str(media, pointless), links[n]);
+	}
+
+	if (func == brCreate)
+		flags |= DLADM_OPT_CREATE;
+
+	if (func != brAdd) {
+		status = dladm_bridge_configure(handle, bridge, &cfg, brprot,
+		    flags);
+		if (status != DLADM_STATUS_OK)
+			die_dlerr(status, "create operation failed");
+	}
+
+	status = DLADM_STATUS_OK;
+	for (n = 0; n < nlink; n++) {
+		status = dladm_bridge_setlink(handle, linkids[n], bridge);
+		if (status != DLADM_STATUS_OK)
+			break;
+	}
+
+	if (n >= nlink) {
+		/*
+		 * We were successful.  If we're creating a new bridge, then
+		 * there's just one more step: enabling.  If we're modifying or
+		 * just adding links, then we're done.
+		 */
+		if (func != brCreate ||
+		    (status = dladm_bridge_enable(bridge)) == DLADM_STATUS_OK)
+			return;
+	}
+
+	/* clean up the partial configuration */
+	for (i = 0; i < n; i++)
+		(void) dladm_bridge_setlink(handle, linkids[i], "");
+
+	/* if failure for brCreate, then delete the bridge */
+	if (func == brCreate)
+		(void) dladm_bridge_delete(handle, bridge, flags);
+
+	if (n < nlink)
+		die_dlerr(status, "unable to add link %s to bridge %s",
+		    links[n], bridge);
+	else
+		die_dlerr(status, "unable to enable bridge %s", bridge);
+}
+
+static void
+do_create_bridge(int argc, char **argv, const char *use)
+{
+	create_modify_add_bridge(argc, argv, use, brCreate);
+}
+
+static void
+do_modify_bridge(int argc, char **argv, const char *use)
+{
+	create_modify_add_bridge(argc, argv, use, brModify);
+}
+
+static void
+do_add_bridge(int argc, char **argv, const char *use)
+{
+	create_modify_add_bridge(argc, argv, use, brAdd);
+}
+
+static void
+do_delete_bridge(int argc, char **argv, const char *use)
+{
+	char			option;
+	char			*altroot = NULL;
+	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	dladm_status_t		status;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":R:", bridge_lopts, NULL)) !=
+	    -1) {
+		switch (option) {
+		case 'R':
+			altroot = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	/* get the bridge name (required last argument) */
+	if (optind != (argc-1))
+		usage();
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	status = dladm_bridge_delete(handle, argv[optind], flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "delete operation failed");
+}
+
+static void
+do_remove_bridge(int argc, char **argv, const char *use)
+{
+	char		option;
+	uint_t		n, nlink;
+	char		*links[MAXPORT];
+	datalink_id_t	linkids[MAXPORT];
+	char		*altroot = NULL;
+	dladm_status_t	status;
+	boolean_t	removed_one;
+
+	nlink = opterr = 0;
+	while ((option = getopt_long(argc, argv, ":R:l:", bridge_lopts,
+	    NULL)) != -1) {
+		switch (option) {
+		case 'R':
+			altroot = optarg;
+			break;
+		case 'l':
+			if (nlink >= MAXPORT)
+				die("too many links specified");
+			links[nlink++] = optarg;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	if (nlink == 0)
+		usage();
+
+	/* get the bridge name (required last argument) */
+	if (optind != (argc-1))
+		usage();
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	for (n = 0; n < nlink; n++) {
+		char bridge[MAXLINKNAMELEN];
+
+		if (dladm_name2info(handle, links[n], &linkids[n], NULL, NULL,
+		    NULL) != DLADM_STATUS_OK)
+			die("invalid link name '%s'", links[n]);
+		status = dladm_bridge_getlink(handle, linkids[n], bridge,
+		    sizeof (bridge));
+		if (status != DLADM_STATUS_OK &&
+		    status != DLADM_STATUS_NOTFOUND) {
+			die_dlerr(status, "cannot get bridge status on %s",
+			    links[n]);
+		}
+		if (status == DLADM_STATUS_NOTFOUND ||
+		    strcmp(bridge, argv[optind]) != 0)
+			die("link %s is not on bridge %s", links[n],
+			    argv[optind]);
+	}
+
+	removed_one = B_FALSE;
+	for (n = 0; n < nlink; n++) {
+		status = dladm_bridge_setlink(handle, linkids[n], "");
+		if (status == DLADM_STATUS_OK) {
+			removed_one = B_TRUE;
+		} else {
+			warn_dlerr(status,
+			    "cannot remove link %s from bridge %s",
+			    links[n], argv[optind]);
+		}
+	}
+	if (!removed_one)
+		die("unable to remove any links from bridge %s", argv[optind]);
+}
+
+static void
+fmt_int(char *buf, size_t buflen, int value, int runvalue,
+    boolean_t printstar)
+{
+	(void) snprintf(buf, buflen, "%d", value);
+	if (value != runvalue && printstar)
+		(void) strlcat(buf, "*", buflen);
+}
+
+static void
+fmt_bridge_id(char *buf, size_t buflen, UID_BRIDGE_ID_T *bid)
+{
+	(void) snprintf(buf, buflen, "%u/%x:%x:%x:%x:%x:%x", bid->prio,
+	    bid->addr[0], bid->addr[1], bid->addr[2], bid->addr[3],
+	    bid->addr[4], bid->addr[5]);
+}
+
+static dladm_status_t
+print_bridge(show_state_t *state, datalink_id_t linkid,
+    bridge_fields_buf_t *bbuf)
+{
+	char			link[MAXLINKNAMELEN];
+	datalink_class_t	class;
+	uint32_t		flags;
+	dladm_status_t		status;
+	UID_STP_CFG_T		smfcfg, runcfg;
+	UID_STP_STATE_T		stpstate;
+	dladm_bridge_prot_t	smfprot, runprot;
+
+	if ((status = dladm_datalink_id2info(handle, linkid, &flags, &class,
+	    NULL, link, sizeof (link))) != DLADM_STATUS_OK)
+		return (status);
+
+	if (!(state->ls_flags & flags))
+		return (DLADM_STATUS_NOTFOUND);
+
+	/* Convert observability node name back to bridge name */
+	if (!dladm_observe_to_bridge(link))
+		return (DLADM_STATUS_NOTFOUND);
+	(void) strlcpy(bbuf->bridge_name, link, sizeof (bbuf->bridge_name));
+
+	/*
+	 * If the running value differs from the one in SMF, and parsable
+	 * output is not requested, then we show the running value with an
+	 * asterisk.
+	 */
+	(void) dladm_bridge_get_properties(bbuf->bridge_name, &smfcfg,
+	    &smfprot);
+	(void) dladm_bridge_run_properties(bbuf->bridge_name, &runcfg,
+	    &runprot);
+	(void) snprintf(bbuf->bridge_protect, sizeof (bbuf->bridge_protect),
+	    "%s%s", state->ls_parsable || smfprot == runprot ? "" : "*",
+	    dladm_bridge_prot2str(runprot));
+	fmt_int(bbuf->bridge_priority, sizeof (bbuf->bridge_priority),
+	    smfcfg.bridge_priority, runcfg.bridge_priority,
+	    !state->ls_parsable && (runcfg.field_mask & BR_CFG_AGE));
+	fmt_int(bbuf->bridge_bmaxage, sizeof (bbuf->bridge_bmaxage),
+	    smfcfg.max_age, runcfg.max_age,
+	    !state->ls_parsable && (runcfg.field_mask & BR_CFG_AGE));
+	fmt_int(bbuf->bridge_bhellotime,
+	    sizeof (bbuf->bridge_bhellotime), smfcfg.hello_time,
+	    runcfg.hello_time,
+	    !state->ls_parsable && (runcfg.field_mask & BR_CFG_HELLO));
+	fmt_int(bbuf->bridge_bfwddelay, sizeof (bbuf->bridge_bfwddelay),
+	    smfcfg.forward_delay, runcfg.forward_delay,
+	    !state->ls_parsable && (runcfg.field_mask & BR_CFG_DELAY));
+	fmt_int(bbuf->bridge_forceproto, sizeof (bbuf->bridge_forceproto),
+	    smfcfg.force_version, runcfg.force_version,
+	    !state->ls_parsable && (runcfg.field_mask & BR_CFG_FORCE_VER));
+	fmt_int(bbuf->bridge_holdtime, sizeof (bbuf->bridge_holdtime),
+	    smfcfg.hold_time, runcfg.hold_time,
+	    !state->ls_parsable && (runcfg.field_mask & BR_CFG_HOLD_TIME));
+
+	if (dladm_bridge_state(bbuf->bridge_name, &stpstate) ==
+	    DLADM_STATUS_OK) {
+		fmt_bridge_id(bbuf->bridge_address,
+		    sizeof (bbuf->bridge_address), &stpstate.bridge_id);
+		(void) snprintf(bbuf->bridge_tctime,
+		    sizeof (bbuf->bridge_tctime), "%lu",
+		    stpstate.timeSince_Topo_Change);
+		(void) snprintf(bbuf->bridge_tccount,
+		    sizeof (bbuf->bridge_tccount), "%lu",
+		    stpstate.Topo_Change_Count);
+		(void) snprintf(bbuf->bridge_tchange,
+		    sizeof (bbuf->bridge_tchange), "%u", stpstate.Topo_Change);
+		fmt_bridge_id(bbuf->bridge_desroot,
+		    sizeof (bbuf->bridge_desroot), &stpstate.designated_root);
+		(void) snprintf(bbuf->bridge_rootcost,
+		    sizeof (bbuf->bridge_rootcost), "%lu",
+		    stpstate.root_path_cost);
+		(void) snprintf(bbuf->bridge_rootport,
+		    sizeof (bbuf->bridge_rootport), "%u", stpstate.root_port);
+		(void) snprintf(bbuf->bridge_maxage,
+		    sizeof (bbuf->bridge_maxage), "%d", stpstate.max_age);
+		(void) snprintf(bbuf->bridge_hellotime,
+		    sizeof (bbuf->bridge_hellotime), "%d", stpstate.hello_time);
+		(void) snprintf(bbuf->bridge_fwddelay,
+		    sizeof (bbuf->bridge_fwddelay), "%d",
+		    stpstate.forward_delay);
+	}
+	return (DLADM_STATUS_OK);
+}
+
+static dladm_status_t
+print_bridge_stats(show_state_t *state, datalink_id_t linkid,
+    bridge_statfields_buf_t *bbuf)
+{
+	char			link[MAXLINKNAMELEN];
+	datalink_class_t	class;
+	uint32_t		flags;
+	dladm_status_t		status;
+	kstat_ctl_t		*kcp;
+	kstat_t			*ksp;
+	brsum_t			*brsum = (brsum_t *)&state->ls_prevstats;
+	brsum_t			newval;
+
+#ifndef lint
+	/* This is a compile-time assertion; optimizer normally fixes this */
+	extern void brsum_t_is_too_large(void);
+
+	if (sizeof (*brsum) > sizeof (state->ls_prevstats))
+		brsum_t_is_too_large();
+#endif
+
+	if (state->ls_firstonly) {
+		if (state->ls_donefirst)
+			return (DLADM_WALK_CONTINUE);
+		state->ls_donefirst = B_TRUE;
+	} else {
+		bzero(brsum, sizeof (*brsum));
+	}
+	bzero(&newval, sizeof (newval));
+
+	if ((status = dladm_datalink_id2info(handle, linkid, &flags, &class,
+	    NULL, link, sizeof (link))) != DLADM_STATUS_OK)
+		return (status);
+
+	if (!(state->ls_flags & flags))
+		return (DLADM_STATUS_NOTFOUND);
+
+	if ((kcp = kstat_open()) == NULL) {
+		warn("kstat open operation failed");
+		return (DLADM_STATUS_OK);
+	}
+	if ((ksp = kstat_lookup(kcp, "bridge", 0, link)) != NULL &&
+	    kstat_read(kcp, ksp, NULL) != -1) {
+		if (dladm_kstat_value(ksp, "drops", KSTAT_DATA_UINT64,
+		    &newval.drops) == DLADM_STATUS_OK) {
+			(void) snprintf(bbuf->bridges_drops,
+			    sizeof (bbuf->bridges_drops), "%llu",
+			    newval.drops - brsum->drops);
+		}
+		if (dladm_kstat_value(ksp, "forward_direct", KSTAT_DATA_UINT64,
+		    &newval.forward_dir) == DLADM_STATUS_OK) {
+			(void) snprintf(bbuf->bridges_forwards,
+			    sizeof (bbuf->bridges_forwards), "%llu",
+			    newval.forward_dir - brsum->forward_dir);
+		}
+		if (dladm_kstat_value(ksp, "forward_mbcast", KSTAT_DATA_UINT64,
+		    &newval.forward_mb) == DLADM_STATUS_OK) {
+			(void) snprintf(bbuf->bridges_mbcast,
+			    sizeof (bbuf->bridges_mbcast), "%llu",
+			    newval.forward_mb - brsum->forward_mb);
+		}
+		if (dladm_kstat_value(ksp, "forward_unknown", KSTAT_DATA_UINT64,
+		    &newval.forward_unk) == DLADM_STATUS_OK) {
+			(void) snprintf(bbuf->bridges_unknown,
+			    sizeof (bbuf->bridges_unknown), "%llu",
+			    newval.forward_unk - brsum->forward_unk);
+		}
+		if (dladm_kstat_value(ksp, "recv", KSTAT_DATA_UINT64,
+		    &newval.recv) == DLADM_STATUS_OK) {
+			(void) snprintf(bbuf->bridges_recv,
+			    sizeof (bbuf->bridges_recv), "%llu",
+			    newval.recv - brsum->recv);
+		}
+		if (dladm_kstat_value(ksp, "sent", KSTAT_DATA_UINT64,
+		    &newval.sent) == DLADM_STATUS_OK) {
+			(void) snprintf(bbuf->bridges_sent,
+			    sizeof (bbuf->bridges_sent), "%llu",
+			    newval.sent - brsum->sent);
+		}
+	}
+	(void) kstat_close(kcp);
+
+	/* Convert observability node name back to bridge name */
+	if (!dladm_observe_to_bridge(link))
+		return (DLADM_STATUS_NOTFOUND);
+	(void) strlcpy(bbuf->bridges_name, link, sizeof (bbuf->bridges_name));
+
+	*brsum = newval;
+
+	return (DLADM_STATUS_OK);
+}
+
+/*
+ * This structure carries around extra state information for the show-bridge
+ * command and allows us to use common support functions.
+ */
+typedef struct {
+	show_state_t	state;
+	boolean_t	show_stats;
+	const char	*bridge;
+} show_brstate_t;
+
+/* ARGSUSED */
+static int
+show_bridge(dladm_handle_t handle, datalink_id_t linkid, void *arg)
+{
+	show_brstate_t	*brstate = arg;
+	void *buf;
+
+	if (brstate->show_stats) {
+		bridge_statfields_buf_t bbuf;
+
+		bzero(&bbuf, sizeof (bbuf));
+		brstate->state.ls_status = print_bridge_stats(&brstate->state,
+		    linkid, &bbuf);
+		buf = &bbuf;
+	} else {
+		bridge_fields_buf_t bbuf;
+
+		bzero(&bbuf, sizeof (bbuf));
+		brstate->state.ls_status = print_bridge(&brstate->state, linkid,
+		    &bbuf);
+		buf = &bbuf;
+	}
+	if (brstate->state.ls_status == DLADM_STATUS_OK)
+		ofmt_print(brstate->state.ls_ofmt, buf);
+	return (DLADM_WALK_CONTINUE);
+}
+
+static void
+fmt_bool(char *buf, size_t buflen, int val)
+{
+	(void) strlcpy(buf, val ? "yes" : "no", buflen);
+}
+
+static dladm_status_t
+print_bridge_link(show_state_t *state, datalink_id_t linkid,
+    bridge_link_fields_buf_t *bbuf)
+{
+	datalink_class_t	class;
+	uint32_t		flags;
+	dladm_status_t		status;
+	UID_STP_PORT_STATE_T	stpstate;
+
+	status = dladm_datalink_id2info(handle, linkid, &flags, &class, NULL,
+	    bbuf->bridgel_link, sizeof (bbuf->bridgel_link));
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	if (!(state->ls_flags & flags))
+		return (DLADM_STATUS_NOTFOUND);
+
+	if (dladm_bridge_link_state(handle, linkid, &stpstate) ==
+	    DLADM_STATUS_OK) {
+		(void) snprintf(bbuf->bridgel_index,
+		    sizeof (bbuf->bridgel_index), "%u", stpstate.port_no);
+		if (dlsym(RTLD_PROBE, "STP_IN_state2str")) {
+			(void) strlcpy(bbuf->bridgel_state,
+			    STP_IN_state2str(stpstate.state),
+			    sizeof (bbuf->bridgel_state));
+		} else {
+			(void) snprintf(bbuf->bridgel_state,
+			    sizeof (bbuf->bridgel_state), "%u",
+			    stpstate.state);
+		}
+		(void) snprintf(bbuf->bridgel_uptime,
+		    sizeof (bbuf->bridgel_uptime), "%lu", stpstate.uptime);
+		(void) snprintf(bbuf->bridgel_opercost,
+		    sizeof (bbuf->bridgel_opercost), "%lu",
+		    stpstate.oper_port_path_cost);
+		fmt_bool(bbuf->bridgel_operp2p, sizeof (bbuf->bridgel_operp2p),
+		    stpstate.oper_point2point);
+		fmt_bool(bbuf->bridgel_operedge,
+		    sizeof (bbuf->bridgel_operedge), stpstate.oper_edge);
+		fmt_bridge_id(bbuf->bridgel_desroot,
+		    sizeof (bbuf->bridgel_desroot), &stpstate.designated_root);
+		(void) snprintf(bbuf->bridgel_descost,
+		    sizeof (bbuf->bridgel_descost), "%lu",
+		    stpstate.designated_cost);
+		fmt_bridge_id(bbuf->bridgel_desbridge,
+		    sizeof (bbuf->bridgel_desbridge),
+		    &stpstate.designated_bridge);
+		(void) snprintf(bbuf->bridgel_desport,
+		    sizeof (bbuf->bridgel_desport), "%u",
+		    stpstate.designated_port);
+		fmt_bool(bbuf->bridgel_tcack, sizeof (bbuf->bridgel_tcack),
+		    stpstate.top_change_ack);
+	}
+	return (DLADM_STATUS_OK);
+}
+
+static dladm_status_t
+print_bridge_link_stats(show_state_t *state, datalink_id_t linkid,
+    bridge_link_statfields_buf_t *bbuf)
+{
+	datalink_class_t	class;
+	uint32_t		flags;
+	dladm_status_t		status;
+	UID_STP_PORT_STATE_T	stpstate;
+	kstat_ctl_t		*kcp;
+	kstat_t			*ksp;
+	char			bridge[MAXLINKNAMELEN];
+	char			kstatname[MAXLINKNAMELEN*2 + 1];
+	brlsum_t		*brlsum = (brlsum_t *)&state->ls_prevstats;
+	brlsum_t		newval;
+
+#ifndef lint
+	/* This is a compile-time assertion; optimizer normally fixes this */
+	extern void brlsum_t_is_too_large(void);
+
+	if (sizeof (*brlsum) > sizeof (state->ls_prevstats))
+		brlsum_t_is_too_large();
+#endif
+
+	if (state->ls_firstonly) {
+		if (state->ls_donefirst)
+			return (DLADM_WALK_CONTINUE);
+		state->ls_donefirst = B_TRUE;
+	} else {
+		bzero(brlsum, sizeof (*brlsum));
+	}
+	bzero(&newval, sizeof (newval));
+
+	status = dladm_datalink_id2info(handle, linkid, &flags, &class, NULL,
+	    bbuf->bridgels_link, sizeof (bbuf->bridgels_link));
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	if (!(state->ls_flags & flags))
+		return (DLADM_STATUS_NOTFOUND);
+
+	if (dladm_bridge_link_state(handle, linkid, &stpstate) ==
+	    DLADM_STATUS_OK) {
+		newval.cfgbpdu = stpstate.rx_cfg_bpdu_cnt;
+		newval.tcnbpdu = stpstate.rx_tcn_bpdu_cnt;
+		newval.rstpbpdu = stpstate.rx_rstp_bpdu_cnt;
+		newval.txbpdu = stpstate.txCount;
+
+		(void) snprintf(bbuf->bridgels_cfgbpdu,
+		    sizeof (bbuf->bridgels_cfgbpdu), "%lu",
+		    newval.cfgbpdu - brlsum->cfgbpdu);
+		(void) snprintf(bbuf->bridgels_tcnbpdu,
+		    sizeof (bbuf->bridgels_tcnbpdu), "%lu",
+		    newval.tcnbpdu - brlsum->tcnbpdu);
+		(void) snprintf(bbuf->bridgels_rstpbpdu,
+		    sizeof (bbuf->bridgels_rstpbpdu), "%lu",
+		    newval.rstpbpdu - brlsum->rstpbpdu);
+		(void) snprintf(bbuf->bridgels_txbpdu,
+		    sizeof (bbuf->bridgels_txbpdu), "%lu",
+		    newval.txbpdu - brlsum->txbpdu);
+	}
+
+	if ((status = dladm_bridge_getlink(handle, linkid, bridge,
+	    sizeof (bridge))) != DLADM_STATUS_OK)
+		goto bls_out;
+	(void) snprintf(kstatname, sizeof (kstatname), "%s0-%s", bridge,
+	    bbuf->bridgels_link);
+	if ((kcp = kstat_open()) == NULL) {
+		warn("kstat open operation failed");
+		goto bls_out;
+	}
+	if ((ksp = kstat_lookup(kcp, "bridge", 0, kstatname)) != NULL &&
+	    kstat_read(kcp, ksp, NULL) != -1) {
+		if (dladm_kstat_value(ksp, "drops", KSTAT_DATA_UINT64,
+		    &newval.drops) != -1) {
+			(void) snprintf(bbuf->bridgels_drops,
+			    sizeof (bbuf->bridgels_drops), "%llu",
+			    newval.drops - brlsum->drops);
+		}
+		if (dladm_kstat_value(ksp, "recv", KSTAT_DATA_UINT64,
+		    &newval.recv) != -1) {
+			(void) snprintf(bbuf->bridgels_recv,
+			    sizeof (bbuf->bridgels_recv), "%llu",
+			    newval.recv - brlsum->recv);
+		}
+		if (dladm_kstat_value(ksp, "xmit", KSTAT_DATA_UINT64,
+		    &newval.xmit) != -1) {
+			(void) snprintf(bbuf->bridgels_xmit,
+			    sizeof (bbuf->bridgels_xmit), "%llu",
+			    newval.xmit - brlsum->xmit);
+		}
+	}
+	(void) kstat_close(kcp);
+bls_out:
+	*brlsum = newval;
+
+	return (status);
+}
+
+static void
+show_bridge_link(datalink_id_t linkid, show_brstate_t *brstate)
+{
+	void *buf;
+
+	if (brstate->show_stats) {
+		bridge_link_statfields_buf_t bbuf;
+
+		bzero(&bbuf, sizeof (bbuf));
+		brstate->state.ls_status = print_bridge_link_stats(
+		    &brstate->state, linkid, &bbuf);
+		buf = &bbuf;
+	} else {
+		bridge_link_fields_buf_t bbuf;
+
+		bzero(&bbuf, sizeof (bbuf));
+		brstate->state.ls_status = print_bridge_link(&brstate->state,
+		    linkid, &bbuf);
+		buf = &bbuf;
+	}
+	if (brstate->state.ls_status == DLADM_STATUS_OK)
+		ofmt_print(brstate->state.ls_ofmt, buf);
+}
+
+/* ARGSUSED */
+static int
+show_bridge_link_walk(dladm_handle_t handle, datalink_id_t linkid, void *arg)
+{
+	show_brstate_t	*brstate = arg;
+	char bridge[MAXLINKNAMELEN];
+
+	if (dladm_bridge_getlink(handle, linkid, bridge, sizeof (bridge)) ==
+	    DLADM_STATUS_OK && strcmp(bridge, brstate->bridge) == 0) {
+		show_bridge_link(linkid, brstate);
+	}
+	return (DLADM_WALK_CONTINUE);
+}
+
+static void
+show_bridge_fwd(dladm_handle_t handle, bridge_listfwd_t *blf,
+    show_state_t *state)
+{
+	bridge_fwd_fields_buf_t bbuf;
+
+	bzero(&bbuf, sizeof (bbuf));
+	(void) snprintf(bbuf.bridgef_dest, sizeof (bbuf.bridgef_dest),
+	    "%s", ether_ntoa((struct ether_addr *)blf->blf_dest));
+	if (blf->blf_is_local) {
+		(void) strlcpy(bbuf.bridgef_flags, "L",
+		    sizeof (bbuf.bridgef_flags));
+	} else {
+		(void) snprintf(bbuf.bridgef_age, sizeof (bbuf.bridgef_age),
+		    "%2d.%03d", blf->blf_ms_age / 1000, blf->blf_ms_age % 1000);
+		if (blf->blf_trill_nick != 0) {
+			(void) snprintf(bbuf.bridgef_output,
+			    sizeof (bbuf.bridgef_output), "%u",
+			    blf->blf_trill_nick);
+		}
+	}
+	if (blf->blf_linkid != DATALINK_INVALID_LINKID &&
+	    blf->blf_trill_nick == 0) {
+		state->ls_status = dladm_datalink_id2info(handle,
+		    blf->blf_linkid, NULL, NULL, NULL, bbuf.bridgef_output,
+		    sizeof (bbuf.bridgef_output));
+	}
+	if (state->ls_status == DLADM_STATUS_OK)
+		ofmt_print(state->ls_ofmt, &bbuf);
+}
+
+static void
+show_bridge_trillnick(trill_listnick_t *tln, show_state_t *state)
+{
+	bridge_trill_fields_buf_t bbuf;
+
+	bzero(&bbuf, sizeof (bbuf));
+	(void) snprintf(bbuf.bridget_nick, sizeof (bbuf.bridget_nick),
+	    "%u", tln->tln_nick);
+	if (tln->tln_ours) {
+		(void) strlcpy(bbuf.bridget_flags, "L",
+		    sizeof (bbuf.bridget_flags));
+	} else {
+		state->ls_status = dladm_datalink_id2info(handle,
+		    tln->tln_linkid, NULL, NULL, NULL, bbuf.bridget_link,
+		    sizeof (bbuf.bridget_link));
+		(void) snprintf(bbuf.bridget_nexthop,
+		    sizeof (bbuf.bridget_nexthop), "%s",
+		    ether_ntoa((struct ether_addr *)tln->tln_nexthop));
+	}
+	if (state->ls_status == DLADM_STATUS_OK)
+		ofmt_print(state->ls_ofmt, &bbuf);
+}
+
+static void
+do_show_bridge(int argc, char **argv, const char *use)
+{
+	int		option;
+	enum {
+		bridgeMode, linkMode, fwdMode, trillMode
+	}		op_mode = bridgeMode;
+	uint32_t	flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	boolean_t	parsable = B_FALSE;
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	int		interval = 0;
+	show_brstate_t	brstate;
+	dladm_status_t	status;
+	char		*fields_str = NULL;
+	/* default: bridge-related data */
+	char		*all_fields = "bridge,protect,address,priority,bmaxage,"
+	    "bhellotime,bfwddelay,forceproto,tctime,tccount,tchange,"
+	    "desroot,rootcost,rootport,maxage,hellotime,fwddelay,holdtime";
+	char		*default_fields = "bridge,protect,address,priority,"
+	    "desroot";
+	char		*all_statfields = "bridge,drops,forwards,mbcast,"
+	    "unknown,recv,sent";
+	char		*default_statfields = "bridge,drops,forwards,mbcast,"
+	    "unknown";
+	/* -l: link-related data */
+	char		*all_link_fields = "link,index,state,uptime,opercost,"
+	    "operp2p,operedge,desroot,descost,desbridge,desport,tcack";
+	char		*default_link_fields = "link,state,uptime,desroot";
+	char		*all_link_statfields = "link,cfgbpdu,tcnbpdu,rstpbpdu,"
+	    "txbpdu,drops,recv,xmit";
+	char		*default_link_statfields = "link,drops,recv,xmit";
+	/* -f: bridge forwarding table related data */
+	char		*default_fwd_fields = "dest,age,flags,output";
+	/* -t: TRILL nickname table related data */
+	char		*default_trill_fields = "nick,flags,link,nexthop";
+	char		*default_str;
+	char		*all_str;
+	ofmt_field_t	*field_arr;
+	ofmt_handle_t	ofmt;
+	ofmt_status_t	oferr;
+	uint_t		ofmtflags = 0;
+
+	bzero(&brstate, sizeof (brstate));
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":fi:lo:pst",
+	    bridge_show_lopts, NULL)) != -1) {
+		switch (option) {
+		case 'f':
+			if (op_mode != bridgeMode && op_mode != fwdMode)
+				die("-f is incompatible with -l or -t");
+			op_mode = fwdMode;
+			break;
+		case 'i':
+			if (interval != 0)
+				die_optdup(option);
+			if (!str2int(optarg, &interval) || interval == 0)
+				die("invalid interval value '%s'", optarg);
+			break;
+		case 'l':
+			if (op_mode != bridgeMode && op_mode != linkMode)
+				die("-l is incompatible with -f or -t");
+			op_mode = linkMode;
+			break;
+		case 'o':
+			fields_str = optarg;
+			break;
+		case 'p':
+			if (parsable)
+				die_optdup(option);
+			parsable = B_TRUE;
+			break;
+		case 's':
+			if (brstate.show_stats)
+				die_optdup(option);
+			brstate.show_stats = B_TRUE;
+			break;
+		case 't':
+			if (op_mode != bridgeMode && op_mode != trillMode)
+				die("-t is incompatible with -f or -l");
+			op_mode = trillMode;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	if (interval != 0 && !brstate.show_stats)
+		die("the -i option can be used only with -s");
+
+	if ((op_mode == fwdMode || op_mode == trillMode) && brstate.show_stats)
+		die("the -f/-t and -s options cannot be used together");
+
+	/* get the bridge name (optional last argument) */
+	if (optind == (argc-1)) {
+		char lname[MAXLINKNAMELEN];
+		uint32_t lnkflg;
+		datalink_class_t class;
+
+		brstate.bridge = argv[optind];
+		(void) snprintf(lname, sizeof (lname), "%s0", brstate.bridge);
+		if ((status = dladm_name2info(handle, lname, &linkid, &lnkflg,
+		    &class, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "bridge %s is not valid",
+			    brstate.bridge);
+		}
+
+		if (class != DATALINK_CLASS_BRIDGE)
+			die("%s is not a bridge", brstate.bridge);
+
+		if (!(lnkflg & flags)) {
+			die_dlerr(DLADM_STATUS_BADARG,
+			    "bridge %s is temporarily removed", brstate.bridge);
+		}
+	} else if (optind != argc) {
+		usage();
+	} else if (op_mode != bridgeMode) {
+		die("bridge name required for -l, -f, or -t");
+		return;
+	}
+
+	brstate.state.ls_parsable = parsable;
+	brstate.state.ls_flags = flags;
+	brstate.state.ls_firstonly = (interval != 0);
+
+	switch (op_mode) {
+	case bridgeMode:
+		if (brstate.show_stats) {
+			default_str = default_statfields;
+			all_str = all_statfields;
+			field_arr = bridge_statfields;
+		} else {
+			default_str = default_fields;
+			all_str = all_fields;
+			field_arr = bridge_fields;
+		}
+		break;
+
+	case linkMode:
+		if (brstate.show_stats) {
+			default_str = default_link_statfields;
+			all_str = all_link_statfields;
+			field_arr = bridge_link_statfields;
+		} else {
+			default_str = default_link_fields;
+			all_str = all_link_fields;
+			field_arr = bridge_link_fields;
+		}
+		break;
+
+	case fwdMode:
+		default_str = all_str = default_fwd_fields;
+		field_arr = bridge_fwd_fields;
+		break;
+
+	case trillMode:
+		default_str = all_str = default_trill_fields;
+		field_arr = bridge_trill_fields;
+		break;
+	}
+
+	if (fields_str == NULL)
+		fields_str = default_str;
+	else if (strcasecmp(fields_str, "all") == 0)
+		fields_str = all_str;
+
+	if (parsable)
+		ofmtflags |= OFMT_PARSABLE;
+	oferr = ofmt_open(fields_str, field_arr, ofmtflags, 0, &ofmt);
+	dladm_ofmt_check(oferr, brstate.state.ls_parsable, ofmt);
+	brstate.state.ls_ofmt = ofmt;
+
+	for (;;) {
+		brstate.state.ls_donefirst = B_FALSE;
+		switch (op_mode) {
+		case bridgeMode:
+			if (linkid == DATALINK_ALL_LINKID) {
+				(void) dladm_walk_datalink_id(show_bridge,
+				    handle, &brstate, DATALINK_CLASS_BRIDGE,
+				    DATALINK_ANY_MEDIATYPE, flags);
+			} else {
+				(void) show_bridge(handle, linkid, &brstate);
+				if (brstate.state.ls_status !=
+				    DLADM_STATUS_OK) {
+					die_dlerr(brstate.state.ls_status,
+					    "failed to show bridge %s",
+					    brstate.bridge);
+				}
+			}
+			break;
+
+		case linkMode: {
+			datalink_id_t *dlp;
+			uint_t i, nlinks;
+
+			dlp = dladm_bridge_get_portlist(brstate.bridge,
+			    &nlinks);
+			if (dlp != NULL) {
+				for (i = 0; i < nlinks; i++)
+					show_bridge_link(dlp[i], &brstate);
+				dladm_bridge_free_portlist(dlp);
+			} else if (errno == ENOENT) {
+				/* bridge not running; iterate on libdladm */
+				(void) dladm_walk_datalink_id(
+				    show_bridge_link_walk, handle,
+				    &brstate, DATALINK_CLASS_PHYS |
+				    DATALINK_CLASS_AGGR |
+				    DATALINK_CLASS_ETHERSTUB,
+				    DATALINK_ANY_MEDIATYPE, flags);
+			} else {
+				die("unable to get port list for bridge %s: %s",
+				    brstate.bridge, strerror(errno));
+			}
+			break;
+		}
+
+		case fwdMode: {
+			bridge_listfwd_t *blf;
+			uint_t i, nfwd;
+
+			blf = dladm_bridge_get_fwdtable(handle, brstate.bridge,
+			    &nfwd);
+			if (blf == NULL) {
+				die("unable to get forwarding entries for "
+				    "bridge %s", brstate.bridge);
+			} else {
+				for (i = 0; i < nfwd; i++)
+					show_bridge_fwd(handle, blf + i,
+					    &brstate.state);
+				dladm_bridge_free_fwdtable(blf);
+			}
+			break;
+		}
+
+		case trillMode: {
+			trill_listnick_t *tln;
+			uint_t i, nnick;
+
+			tln = dladm_bridge_get_trillnick(brstate.bridge,
+			    &nnick);
+			if (tln == NULL) {
+				if (errno == ENOENT)
+					die("bridge %s is not running TRILL",
+					    brstate.bridge);
+				else
+					die("unable to get TRILL nickname "
+					    "entries for bridge %s",
+					    brstate.bridge);
+			} else {
+				for (i = 0; i < nnick; i++)
+					show_bridge_trillnick(tln + i,
+					    &brstate.state);
+				dladm_bridge_free_trillnick(tln);
+			}
+			break;
+		}
+		}
+		if (interval == 0)
+			break;
+		(void) sleep(interval);
+	}
 }
 
 /*

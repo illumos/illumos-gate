@@ -73,6 +73,7 @@ f none kernel/drv/amd_iommu.conf 644 root sys
 f none kernel/drv/bl 755 root sys
 f none kernel/drv/bmc 755 root sys
 f none kernel/drv/bmc.conf 644 root sys
+f none kernel/drv/bridge 755 root sys
 f none kernel/drv/bscbus 755 root sys
 f none kernel/drv/bscbus.conf 644 root sys
 f none kernel/drv/bscv 755 root sys
@@ -298,6 +299,7 @@ f none kernel/drv/amd64/acpi_toshiba 755 root sys
 f none kernel/drv/amd64/amd_iommu 755 root sys
 f none kernel/drv/amd64/bl 755 root sys
 f none kernel/drv/amd64/bmc 755 root sys
+f none kernel/drv/amd64/bridge 755 root sys
 f none kernel/drv/amd64/bscbus 755 root sys
 f none kernel/drv/amd64/bscv 755 root sys
 f none kernel/drv/amd64/clone 755 root sys
@@ -511,9 +513,11 @@ l none kernel/socketmod/rts=../../kernel/drv/rts
 l none kernel/socketmod/tcp=../../kernel/drv/tcp
 l none kernel/socketmod/udp=../../kernel/drv/udp
 f none kernel/socketmod/socksctp 755 root sys
+f none kernel/socketmod/trill 755 root sys
 d none kernel/socketmod/amd64 755 root sys
 l none kernel/socketmod/amd64/icmp=../../../kernel/drv/amd64/icmp
 l none kernel/socketmod/amd64/rts=../../../kernel/drv/amd64/rts
 l none kernel/socketmod/amd64/tcp=../../../kernel/drv/amd64/tcp
 l none kernel/socketmod/amd64/udp=../../../kernel/drv/amd64/udp
 f none kernel/socketmod/amd64/socksctp 755 root sys
+f none kernel/socketmod/amd64/trill 755 root sys

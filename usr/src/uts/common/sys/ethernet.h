@@ -92,6 +92,7 @@ struct ether_vlan_extinfo {
 #define	ETHERTYPE_PPPOES	(0x8864)	/* PPPoE Session Stage */
 #define	ETHERTYPE_EAPOL		(0x888e)	/* EAPOL protocol */
 #define	ETHERTYPE_RSN_PREAUTH	(0x88c7)	/* RSN PRE-Authentication */
+#define	ETHERTYPE_TRILL		(0x88c8)	/* TBD. TRILL frame */
 #define	ETHERTYPE_FCOE		(0x8906)	/* FCoE */
 #define	ETHERTYPE_MAX		(0xffff)	/* Max valid ethernet type */
 

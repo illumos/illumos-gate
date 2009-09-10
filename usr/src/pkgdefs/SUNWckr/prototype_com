@@ -72,6 +72,7 @@ d none kernel/drv 755 root sys
 f none kernel/drv/aggr.conf 644 root sys
 f none kernel/drv/arp.conf 644 root sys
 f none kernel/drv/bl.conf 644 root sys
+f none kernel/drv/bridge.conf 644 root sys
 f none kernel/drv/clone.conf 644 root sys
 f none kernel/drv/cn.conf 644 root sys
 f none kernel/drv/conskbd.conf 644 root sys

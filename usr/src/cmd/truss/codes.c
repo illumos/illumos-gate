@@ -414,6 +414,7 @@ const struct ioc {
 	{ (uint_t)DLIOCRAW,	"DLIOCRAW",	NULL },
 	{ (uint_t)DLIOCNATIVE,	"DLIOCNATIVE",	NULL },
 	{ (uint_t)DLIOCIPNETINFO, "DLIOCIPNETINFO", NULL},
+	{ (uint_t)DLIOCLOWLINK,	"DLIOCLOWLINK",	NULL },
 
 	{ (uint_t)LDOPEN,	"LDOPEN",	NULL },
 	{ (uint_t)LDCLOSE,	"LDCLOSE",	NULL },

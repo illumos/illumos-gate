@@ -36,3 +36,4 @@
 #include <libdlstat.h>
 #include <libdlether.h>
 #include <libdlsim.h>
+#include <libdlbridge.h>

@@ -3279,7 +3279,9 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			    msgdsize(mp));
 
 			CHECK_VID_AND_ADD_TAG(mp);
-			MAC_TX(mip, ring, mp, src_mcip);
+			MAC_TX(mip, ring, mp,
+			    ((src_mcip->mci_state_flags & MCIS_SHARE_BOUND) !=
+			    0));
 
 			/*
 			 * If the driver is out of descriptors and does a
@@ -3406,7 +3408,9 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			 * Unknown destination, send via the underlying
 			 * NIC.
 			 */
-			MAC_TX(mip, ring, mp, src_mcip);
+			MAC_TX(mip, ring, mp,
+			    ((src_mcip->mci_state_flags & MCIS_SHARE_BOUND) !=
+			    0));
 			if (mp != NULL) {
 				/*
 				 * Adjust for the last packet that

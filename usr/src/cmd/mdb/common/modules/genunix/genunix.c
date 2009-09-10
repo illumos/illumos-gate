@@ -4488,6 +4488,8 @@ static const mdb_dcmd_t dcmds[] = {
 		modent_help },
 
 	/* from net.c */
+	{ "dladm", "?<sub-command> [flags]", "show data link information",
+		dladm, dladm_help },
 	{ "mi", ":[-p] [-d | -m]", "filter and display MI object or payload",
 		mi },
 	{ "netstat", "[-arv] [-f inet | inet6 | unix] [-P tcp | udp | icmp]",

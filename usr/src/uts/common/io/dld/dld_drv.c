@@ -1190,7 +1190,8 @@ static dld_ioc_modentry_t dld_ioc_modtable[] = {
 	{DLD_IOC,	"dld",	drv_ioc_list, DLDIOCCNT(drv_ioc_list)},
 	{AGGR_IOC,	"aggr",	NULL, 0},
 	{VNIC_IOC,	"vnic",	NULL, 0},
-	{SIMNET_IOC,	"simnet", NULL, 0}
+	{SIMNET_IOC,	"simnet", NULL, 0},
+	{BRIDGE_IOC,	"bridge", NULL, 0}
 };
 #define	DLDIOC_CNT	\
 	(sizeof (dld_ioc_modtable) / sizeof (dld_ioc_modentry_t))

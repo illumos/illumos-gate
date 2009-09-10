@@ -390,12 +390,13 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 			/*
 			 * Don't pass the packets up if they are tagged
 			 * packets and:
-			 *  - their VID and priority are both zero (invalid
+			 *  - their VID and priority are both zero and the
+			 *    original packet isn't using the PVID (invalid
 			 *    packets).
 			 *  - their sap is ETHERTYPE_VLAN and their VID is
 			 *    zero as they have already been sent upstreams.
 			 */
-			if ((vid == VLAN_ID_NONE &&
+			if ((vid == VLAN_ID_NONE && !mhi.mhi_ispvid &&
 			    VLAN_PRI(mhi.mhi_tci) == 0) ||
 			    (mhi.mhi_bindsap == ETHERTYPE_VLAN &&
 			    vid == VLAN_ID_NONE)) {
@@ -1016,6 +1017,7 @@ int
 dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip)
 {
 	boolean_t	is_ethernet = (dlp->dl_mip->mi_media == DL_ETHER);
+	uint16_t	pvid = mac_get_pvid(dlp->dl_mh);
 	int		err = 0;
 
 	/*
@@ -1031,6 +1033,7 @@ dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip)
 	 * mac_header_info_t as returned by mac_header_info() is
 	 * ETHERTYPE_VLAN. We need to grab the ethertype from the VLAN header.
 	 */
+	mhip->mhi_ispvid = B_FALSE;
 	if (is_ethernet && (mhip->mhi_bindsap == ETHERTYPE_VLAN)) {
 		struct ether_vlan_header *evhp;
 		uint16_t sap;
@@ -1056,6 +1059,16 @@ dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip)
 		mhip->mhi_tci = ntohs(evhp->ether_tci);
 		mhip->mhi_istagged = B_TRUE;
 		freemsg(tmp);
+
+		/*
+		 * If this port has a non-zero PVID, then we have to lie to the
+		 * caller about the VLAN ID.  It's always zero on receive for
+		 * that VLAN.
+		 */
+		if (pvid != VLAN_ID_NONE && VLAN_ID(mhip->mhi_tci) == pvid) {
+			mhip->mhi_tci &= ~(VLAN_ID_MASK << VLAN_ID_SHIFT);
+			mhip->mhi_ispvid = B_TRUE;
+		}
 
 		if (VLAN_CFI(mhip->mhi_tci) != ETHER_CFI)
 			return (EINVAL);

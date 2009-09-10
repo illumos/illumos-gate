@@ -1679,6 +1679,8 @@ DLPISTUB_OBJS += dlpistub.o
 
 SDP_OBJS +=	sdpddi.o
 
+TRILL_OBJS +=   trill.o
+
 CTF_OBJS += ctf_create.o ctf_decl.o ctf_error.o ctf_hash.o ctf_labels.o \
 	ctf_lookup.o ctf_open.o ctf_types.o ctf_util.o ctf_subr.o ctf_mod.o
 
@@ -1749,6 +1751,8 @@ MPTSAS_OBJS += mptsas.o mptsas_impl.o mptsas_init.o mptsas_raid.o
 SFE_OBJS += sfe.o sfe_util.o
 
 BFE_OBJS += bfe.o
+
+BRIDGE_OBJS += bridge.o
 
 DDA_OBJS += dda.o
 

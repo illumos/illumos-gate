@@ -49,6 +49,7 @@ keysock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 ipsecah		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 ipsecesp	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
 spdsock		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+bridge		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 
 #
 # IP observability device access permission

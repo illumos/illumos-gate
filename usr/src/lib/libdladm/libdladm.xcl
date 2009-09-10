@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 msgid  " \n\t"
 msgid  ""
@@ -32,13 +30,30 @@ msgid  "%s%c"
 msgid  "%s%d"
 msgid  "%s/%s"
 msgid  "%s/%s.new"
+msgid  "%s0"
 msgid  "%s="
 msgid  "%s\n"
 msgid  "%s\t"
 msgid  "/"
+msgid  "/dev/net/%s0"
 msgid  "/tmp/%s.lock"
+msgid  "/usr/lib/bridged"
+msgid  "/usr/sbin/trilld"
 msgid  "0x"
+msgid  "bridging"
+msgid  "config"
+msgid  "debug"
+msgid  "force-protocol"
+msgid  "forward-delay"
+msgid  "hello-time"
+msgid  "max-age"
+msgid  "nickname"
 msgid  "r"
 msgid  "r+"
+msgid  "running"
+msgid  "service"
+msgid  "stp"
+msgid  "table-maximum"
+msgid  "trill"
 msgid  "w"
 msgid  "wep"

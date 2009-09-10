@@ -248,8 +248,9 @@ struct	linger {
 #define	AF_NCA		28		/* NCA socket */
 #define	AF_POLICY	29		/* Security Policy DB socket */
 #define	AF_INET_OFFLOAD	30		/* Sun private; do not use */
+#define	AF_TRILL	31		/* TRILL interface */
 
-#define	AF_MAX		30
+#define	AF_MAX		31
 
 /*
  * Protocol families, same as address families for now.
@@ -287,6 +288,7 @@ struct	linger {
 #define	PF_NCA		AF_NCA
 #define	PF_POLICY	AF_POLICY
 #define	PF_INET_OFFLOAD	AF_INET_OFFLOAD	/* Sun private; do not use */
+#define	PF_TRILL	AF_TRILL
 
 #define	PF_MAX		AF_MAX
 

@@ -76,6 +76,11 @@ do
 			echo >> $dest
 			grep '/dev/spdsock' $src >> $dest
 		fi
+		grep 'trill' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo >> $dest
+			grep 'trill' $src >> $dest
+		fi
 		grep "^#" $dest | awk '{
 			if ($5=="Path") {print $0 "|Module"}
 			else {print $0}}' > /tmp/i.$$

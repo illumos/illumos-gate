@@ -715,3 +715,58 @@ net_reconfigure ()
 	/sbin/dladm init-phys
 	return 0
 }
+
+#
+# Check for use of the default "Port VLAN Identifier" (PVID) -- VLAN 1.
+# If there is one for a given interface, then warn the user and force the
+# PVID to zero (if it's not already set).  We do this by generating a list
+# of interfaces with VLAN 1 in use first, and then parsing out the
+# corresponding base datalink entries to check for ones without a
+# "default_tag" property.
+#
+update_pvid()
+{
+	datalink=/etc/dladm/datalink.conf
+
+	(
+		# Find datalinks using VLAN 1 explicitly
+		# configured by dladm
+		/usr/bin/nawk '
+			/^#/ || NF < 2 { next }
+			{ linkdata[$1]=$2; }
+			/;vid=int,1;/ {
+				sub(/.*;linkover=int,/, "", $2);
+				sub(/;.*/, "", $2);
+				link=linkdata[$2];
+				sub(/name=string,/, "", link);
+				sub(/;.*/, "", link);
+				print link;
+			}' $datalink
+	) | ( /usr/bin/sort -u; echo END; cat $datalink ) | /usr/bin/nawk '
+	    /^END$/ { state=1; }
+	    state == 0 { usingpvid[++nusingpvid]=$1; next; }
+	    /^#/ || NF < 2 { next; }
+	    {
+		# If it is already present and has a tag set,
+		# then believe it.
+		if (!match($2, /;default_tag=/))
+			next;
+		sub(/name=string,/, "", $2);
+		sub(/;.*/, "", $2);
+		for (i = 1; i <= nusingpvid; i++) {
+			if (usingpvid[i] == $2)
+				usingpvid[i]="";
+		}
+	    }
+	    END {
+		for (i = 1; i <= nusingpvid; i++) {
+			if (usingpvid[i] != "") {
+				printf("Warning: default VLAN tag set to 0" \
+				    " on %s\n", usingpvid[i]);
+				cmd=sprintf("dladm set-linkprop -p " \
+				    "default_tag=0 %s\n", usingpvid[i]);
+				system(cmd);
+			}
+		}
+	    }'
+}

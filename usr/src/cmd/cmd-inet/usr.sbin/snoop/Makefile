@@ -20,27 +20,26 @@
 
 
 #
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=	snoop
 OBJS=	nfs4_xdr.o snoop.o snoop_aarp.o snoop_adsp.o snoop_aecho.o \
 	snoop_apple.o snoop_arp.o snoop_atp.o snoop_bparam.o \
+	snoop_bpdu.o \
 	snoop_capture.o snoop_dhcp.o snoop_dhcpv6.o snoop_display.o \
 	snoop_dns.o snoop_ether.o \
 	snoop_filter.o snoop_http.o snoop_icmp.o snoop_igmp.o snoop_ip.o \
-	snoop_ipaddr.o snoop_ipsec.o snoop_ldap.o snoop_mip.o snoop_mount.o \
+	snoop_ipaddr.o snoop_ipsec.o snoop_isis.o \
+	snoop_ldap.o snoop_mip.o snoop_mount.o \
 	snoop_nbp.o snoop_netbios.o snoop_nfs.o snoop_nfs3.o snoop_nfs4.o \
 	snoop_nfs_acl.o snoop_nis.o snoop_nisplus.o snoop_nlm.o snoop_ntp.o \
 	snoop_pf.o snoop_ospf.o snoop_ospf6.o snoop_pmap.o snoop_ppp.o \
 	snoop_pppoe.o snoop_rip.o snoop_rip6.o snoop_rpc.o snoop_rpcprint.o \
 	snoop_rpcsec.o snoop_rport.o snoop_rquota.o snoop_rstat.o snoop_rtmp.o \
 	snoop_sctp.o snoop_slp.o snoop_smb.o snoop_socks.o snoop_solarnet.o \
-	snoop_tcp.o snoop_tftp.o snoop_udp.o snoop_zip.o
+	snoop_tcp.o snoop_tftp.o snoop_trill.o snoop_udp.o snoop_zip.o
 
 SRCS=	$(OBJS:.o=.c)
 HDRS=	snoop.h snoop_mip.h at.h snoop_ospf.h snoop_ospf6.h

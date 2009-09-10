@@ -63,21 +63,16 @@ static void i_mac_notify_thread(void *);
 
 typedef void (*mac_notify_default_cb_fn_t)(mac_impl_t *);
 
-typedef struct mac_notify_default_cb_s {
-	mac_notify_type_t		mac_notify_type;
-	mac_notify_default_cb_fn_t	mac_notify_cb_fn;
-}mac_notify_default_cb_t;
-
-mac_notify_default_cb_t mac_notify_cb_list[] = {
-	{ MAC_NOTE_LINK,		mac_fanout_recompute},
-	{ MAC_NOTE_UNICST,		NULL},
-	{ MAC_NOTE_TX,			NULL},
-	{ MAC_NOTE_DEVPROMISC,		NULL},
-	{ MAC_NOTE_FASTPATH_FLUSH,	NULL},
-	{ MAC_NOTE_SDU_SIZE,		NULL},
-	{ MAC_NOTE_MARGIN,		NULL},
-	{ MAC_NOTE_CAPAB_CHG,		NULL},
-	{ MAC_NNOTE,			NULL},
+static const mac_notify_default_cb_fn_t mac_notify_cb_list[MAC_NNOTE] = {
+	mac_fanout_recompute,	/* MAC_NOTE_LINK */
+	NULL,		/* MAC_NOTE_UNICST */
+	NULL,		/* MAC_NOTE_TX */
+	NULL,		/* MAC_NOTE_DEVPROMISC */
+	NULL,		/* MAC_NOTE_FASTPATH_FLUSH */
+	NULL,		/* MAC_NOTE_SDU_SIZE */
+	NULL,		/* MAC_NOTE_MARGIN */
+	NULL,		/* MAC_NOTE_CAPAB_CHG */
+	NULL		/* MAC_NOTE_LOWLINK */
 };
 
 /*
@@ -188,6 +183,13 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	mip->mi_dip = mregp->m_dip;
 	mip->mi_clients_list = NULL;
 	mip->mi_nclients = 0;
+
+	/* Set the default IEEE Port VLAN Identifier */
+	mip->mi_pvid = 1;
+
+	/* Default bridge link learning protection values */
+	mip->mi_llimit = 1000;
+	mip->mi_ldecay = 200;
 
 	driver = (char *)ddi_driver_name(mip->mi_dip);
 
@@ -537,7 +539,7 @@ mac_unregister(mac_handle_t mh)
 	}
 	mip->mi_mmrp = NULL;
 
-	mip->mi_linkstate = LINK_STATE_UNKNOWN;
+	mip->mi_linkstate = mip->mi_lowlinkstate = LINK_STATE_UNKNOWN;
 	kmem_free(mip->mi_info.mi_unicst_addr, mip->mi_type->mt_addr_length);
 	mip->mi_info.mi_unicst_addr = NULL;
 
@@ -577,6 +579,8 @@ mac_unregister(mac_handle_t mh)
 	mip->mi_state_flags = 0;
 
 	mac_unregister_priv_prop(mip);
+
+	ASSERT(mip->mi_bridge_link == NULL);
 	kmem_cache_free(i_mac_impl_cachep, mip);
 
 	return (0);
@@ -607,11 +611,58 @@ mac_rx_ring(mac_handle_t mh, mac_ring_handle_t mrh, mblk_t *mp_chain,
 }
 
 /*
- * This function is invoked for each packet received by the underlying
- * driver.
+ * This function is invoked for each packet received by the underlying driver.
  */
 void
 mac_rx(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	/*
+	 * Check if the link is part of a bridge.  If not, then we don't need
+	 * to take the lock to remain consistent.  Make this common case
+	 * lock-free and tail-call optimized.
+	 */
+	if (mip->mi_bridge_link == NULL) {
+		mac_rx_common(mh, mrh, mp_chain);
+	} else {
+		/*
+		 * Once we take a reference on the bridge link, the bridge
+		 * module itself can't unload, so the callback pointers are
+		 * stable.
+		 */
+		mutex_enter(&mip->mi_bridge_lock);
+		if ((mh = mip->mi_bridge_link) != NULL)
+			mac_bridge_ref_cb(mh, B_TRUE);
+		mutex_exit(&mip->mi_bridge_lock);
+		if (mh == NULL) {
+			mac_rx_common((mac_handle_t)mip, mrh, mp_chain);
+		} else {
+			mac_bridge_rx_cb(mh, mrh, mp_chain);
+			mac_bridge_ref_cb(mh, B_FALSE);
+		}
+	}
+}
+
+/*
+ * Special case function: this allows snooping of packets transmitted and
+ * received by TRILL. By design, they go directly into the TRILL module.
+ */
+void
+mac_trill_snoop(mac_handle_t mh, mblk_t *mp)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	if (mip->mi_promisc_list != NULL)
+		mac_promisc_dispatch(mip, mp, NULL);
+}
+
+/*
+ * This is the upward reentry point for packets arriving from the bridging
+ * module and from mac_rx for links not part of a bridge.
+ */
+void
+mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 {
 	mac_impl_t		*mip = (mac_impl_t *)mh;
 	mac_ring_t		*mr = (mac_ring_t *)mrh;
@@ -733,10 +784,31 @@ mac_link_update(mac_handle_t mh, link_state_t link)
 	/*
 	 * Save the link state.
 	 */
+	mip->mi_lowlinkstate = link;
+
+	/*
+	 * Send a MAC_NOTE_LOWLINK notification.  This tells the notification
+	 * thread to deliver both lower and upper notifications.
+	 */
+	i_mac_notify(mip, MAC_NOTE_LOWLINK);
+}
+
+/*
+ * Notify the MAC layer about a link state change due to bridging.
+ */
+void
+mac_link_redo(mac_handle_t mh, link_state_t link)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	/*
+	 * Save the link state.
+	 */
 	mip->mi_linkstate = link;
 
 	/*
-	 * Send a MAC_NOTE_LINK notification.
+	 * Send a MAC_NOTE_LINK notification.  Only upper notifications are
+	 * made.
 	 */
 	i_mac_notify(mip, MAC_NOTE_LINK);
 }
@@ -846,10 +918,10 @@ i_mac_log_link_state(mac_impl_t *mip)
 	/*
 	 * If no change, then it is not interesting.
 	 */
-	if (mip->mi_lastlinkstate == mip->mi_linkstate)
+	if (mip->mi_lastlowlinkstate == mip->mi_lowlinkstate)
 		return;
 
-	switch (mip->mi_linkstate) {
+	switch (mip->mi_lowlinkstate) {
 	case LINK_STATE_UP:
 		if (mip->mi_type->mt_ops.mtops_ops & MTOPS_LINK_DETAILS) {
 			char det[200];
@@ -867,7 +939,7 @@ i_mac_log_link_state(mac_impl_t *mip)
 		/*
 		 * Only transitions from UP to DOWN are interesting
 		 */
-		if (mip->mi_lastlinkstate != LINK_STATE_UNKNOWN)
+		if (mip->mi_lastlowlinkstate != LINK_STATE_UNKNOWN)
 			cmn_err(CE_NOTE, "!%s link down", mip->mi_name);
 		break;
 
@@ -877,7 +949,7 @@ i_mac_log_link_state(mac_impl_t *mip)
 		 */
 		break;
 	}
-	mip->mi_lastlinkstate = mip->mi_linkstate;
+	mip->mi_lastlowlinkstate = mip->mi_lowlinkstate;
 }
 
 /*
@@ -919,10 +991,28 @@ i_mac_notify_thread(void *arg)
 		mutex_exit(mcbi->mcbi_lockp);
 
 		/*
-		 * Log link changes.
+		 * Log link changes on the actual link, but then do reports on
+		 * synthetic state (if part of a bridge).
 		 */
-		if ((bits & (1 << MAC_NOTE_LINK)) != 0)
+		if ((bits & (1 << MAC_NOTE_LOWLINK)) != 0) {
+			link_state_t newstate;
+			mac_handle_t mh;
+
 			i_mac_log_link_state(mip);
+			newstate = mip->mi_lowlinkstate;
+			if (mip->mi_bridge_link != NULL) {
+				mutex_enter(&mip->mi_bridge_lock);
+				if ((mh = mip->mi_bridge_link) != NULL) {
+					newstate = mac_bridge_ls_cb(mh,
+					    newstate);
+				}
+				mutex_exit(&mip->mi_bridge_lock);
+			}
+			if (newstate != mip->mi_linkstate) {
+				mip->mi_linkstate = newstate;
+				bits |= 1 << MAC_NOTE_LINK;
+			}
+		}
 
 		/*
 		 * Do notification callbacks for each notification type.
@@ -932,8 +1022,8 @@ i_mac_notify_thread(void *arg)
 				continue;
 			}
 
-			if (mac_notify_cb_list[type].mac_notify_cb_fn)
-				mac_notify_cb_list[type].mac_notify_cb_fn(mip);
+			if (mac_notify_cb_list[type] != NULL)
+				(*mac_notify_cb_list[type])(mip);
 
 			/*
 			 * Walk the list of notifications.

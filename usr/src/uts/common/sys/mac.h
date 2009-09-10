@@ -208,6 +208,9 @@ typedef enum {
 	MAC_PROP_TAGMODE,
 	MAC_PROP_ADV_10GFDX_CAP,
 	MAC_PROP_EN_10GFDX_CAP,
+	MAC_PROP_PVID,
+	MAC_PROP_LLIMIT,
+	MAC_PROP_LDECAY,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 
@@ -243,7 +246,8 @@ typedef enum {
 enum mac_mod_stat {
 	MAC_STAT_LINK_STATE,
 	MAC_STAT_LINK_UP,
-	MAC_STAT_PROMISC
+	MAC_STAT_PROMISC,
+	MAC_STAT_LOWLINK_STATE
 };
 
 /*
@@ -328,6 +332,13 @@ typedef struct mac_capab_aggr_s {
 	int (*mca_unicst)(void *, const uint8_t *);
 } mac_capab_aggr_t;
 
+/* Bridge transmit and receive function signatures */
+typedef mblk_t *(*mac_bridge_tx_t)(mac_handle_t, mac_ring_handle_t, mblk_t *);
+typedef void (*mac_bridge_rx_t)(mac_handle_t, mac_resource_handle_t, mblk_t *);
+typedef void (*mac_bridge_ref_t)(mac_handle_t, boolean_t);
+typedef link_state_t (*mac_bridge_ls_t)(mac_handle_t, link_state_t);
+
+/* must change mac_notify_cb_list[] in mac_provider.c if this is changed */
 typedef enum {
 	MAC_NOTE_LINK,
 	MAC_NOTE_UNICST,
@@ -337,6 +348,7 @@ typedef enum {
 	MAC_NOTE_SDU_SIZE,
 	MAC_NOTE_MARGIN,
 	MAC_NOTE_CAPAB_CHG,
+	MAC_NOTE_LOWLINK,
 	MAC_NNOTE	/* must be the last entry */
 } mac_notify_type_t;
 
@@ -400,6 +412,7 @@ typedef struct mac_header_info_s {
 	mac_addrtype_t	mhi_dsttype;
 	uint16_t	mhi_tci;
 	boolean_t	mhi_istagged;
+	boolean_t	mhi_ispvid;
 } mac_header_info_t;
 
 /*
@@ -588,6 +601,7 @@ extern int			mac_margin_add(mac_handle_t, uint32_t *,
 				    boolean_t);
 extern int			mac_fastpath_disable(mac_handle_t);
 extern void			mac_fastpath_enable(mac_handle_t);
+extern void			mac_no_active(mac_handle_t);
 
 extern mactype_register_t	*mactype_alloc(uint_t);
 extern void			mactype_free(mactype_register_t *);
@@ -609,6 +623,20 @@ extern mac_handle_t		mac_get_lower_mac_handle(mac_handle_t);
 
 extern uint64_t			mac_pkt_hash(uint_t, mblk_t *, uint8_t,
 				    boolean_t);
+
+/*
+ * Bridging linkage
+ */
+extern void			mac_rx_common(mac_handle_t,
+				    mac_resource_handle_t, mblk_t *);
+extern int			mac_bridge_set(mac_handle_t, mac_handle_t);
+extern void			mac_bridge_clear(mac_handle_t, mac_handle_t);
+extern void			mac_bridge_vectors(mac_bridge_tx_t,
+				    mac_bridge_rx_t, mac_bridge_ref_t,
+				    mac_bridge_ls_t);
+
+/* special case function for TRILL observability */
+extern void			mac_trill_snoop(mac_handle_t, mblk_t *);
 
 #endif	/* _KERNEL */
 

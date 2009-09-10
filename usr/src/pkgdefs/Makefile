@@ -206,6 +206,8 @@ COMMON_SUBDIRS= \
 	SUNWbipr \
 	SUNWbnur  \
 	SUNWbnuu  \
+	SUNWbridger \
+	SUNWbridgeu \
 	SUNWbsr \
 	SUNWbsu \
 	SUNWbtool  \
@@ -232,6 +234,7 @@ COMMON_SUBDIRS= \
 	SUNWdhcsb  \
 	SUNWdhcsr  \
 	SUNWdhcsu  \
+	SUNWdladmint \
 	SUNWdmfe \
 	SUNWdmgtr \
 	SUNWdmgtu \

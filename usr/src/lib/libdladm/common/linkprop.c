@@ -56,6 +56,9 @@
 #include <sys/ethernet.h>
 #include <net/wpa.h>
 #include <sys/sysmacros.h>
+#include <sys/vlan.h>
+#include <libdlbridge.h>
+#include <stp_in.h>
 
 /*
  * The linkprop get() callback.
@@ -133,15 +136,18 @@ static pd_getf_t	do_get_zone, do_get_autopush, do_get_rate_mod,
 			i_dladm_binary_get, i_dladm_uint32_get,
 			i_dladm_flowctl_get, i_dladm_maxbw_get,
 			i_dladm_cpus_get, i_dladm_priority_get,
-			i_dladm_tagmode_get, i_dladm_range_get;
+			i_dladm_tagmode_get, i_dladm_range_get,
+			get_stp_prop, get_bridge_forward,
+			get_bridge_pvid;
 
 static pd_setf_t	do_set_zone, do_set_rate_prop,
 			do_set_powermode_prop, do_set_radio_prop,
-			i_dladm_set_public_prop, do_set_res, do_set_cpus;
+			i_dladm_set_public_prop, do_set_res, do_set_cpus,
+			set_stp_prop, set_bridge_forward, set_bridge_pvid;
 
 static pd_checkf_t	do_check_zone, do_check_autopush, do_check_rate,
-			i_dladm_defmtu_check, do_check_maxbw, do_check_cpus,
-			do_check_priority;
+			i_dladm_uint32_check, do_check_maxbw, do_check_cpus,
+			do_check_priority, check_stp_prop, check_bridge_pvid;
 
 static dladm_status_t	i_dladm_speed_get(dladm_handle_t, prop_desc_t *,
 			    datalink_id_t, char **, uint_t *, uint_t, uint_t *);
@@ -173,8 +179,9 @@ struct prop_desc {
 	uint_t			pd_noptval;
 
 	/*
-	 * callback to set link property;
-	 * set to NULL if this property is read-only
+	 * callback to set link property; set to NULL if this property is
+	 * read-only and may be called before or after permanent update; see
+	 * flags.
 	 */
 	pd_setf_t		*pd_set;
 
@@ -199,6 +206,7 @@ struct prop_desc {
 	uint_t			pd_flags;
 #define	PD_TEMPONLY	0x1	/* property is temporary only */
 #define	PD_CHECK_ALLOC	0x2	/* alloc vd_val as part of pd_check */
+#define	PD_AFTER_PERM	0x4	/* pd_set after db update; no temporary */
 	/*
 	 * indicate link classes this property applies to.
 	 */
@@ -321,8 +329,29 @@ static link_attr_t link_attr[] = {
 
 	{ MAC_PROP_TAGMODE,	sizeof (link_tagmode_t),	"tagmode"},
 
+	{ MAC_PROP_PVID,	sizeof (uint16_t),	"default_tag"},
+
+	{ MAC_PROP_LLIMIT,	sizeof (uint32_t),	"learn_limit"},
+
+	{ MAC_PROP_LDECAY,	sizeof (uint32_t),	"learn_decay"},
+
 	{ MAC_PROP_PRIVATE,	0,			"driver-private"}
 
+};
+
+typedef struct bridge_public_prop_s {
+	const char	*bpp_name;
+	int		bpp_code;
+} bridge_public_prop_t;
+
+static const bridge_public_prop_t bridge_prop[] = {
+	{ "stp", PT_CFG_NON_STP },
+	{ "stp_priority", PT_CFG_PRIO },
+	{ "stp_cost", PT_CFG_COST },
+	{ "stp_edge", PT_CFG_EDGE },
+	{ "stp_p2p", PT_CFG_P2P },
+	{ "stp_mcheck", PT_CFG_MCHECK },
+	{ NULL, 0 }
 };
 
 static  val_desc_t	link_duplex_vals[] = {
@@ -363,6 +392,12 @@ static val_desc_t	dladm_wlan_powermode_vals[] = {
 	{ "off",	DLADM_WLAN_PM_OFF	},
 	{ "fast",	DLADM_WLAN_PM_FAST	},
 	{ "max",	DLADM_WLAN_PM_MAX	}
+};
+
+static  val_desc_t	stp_p2p_vals[] = {
+	{ "true",	P2P_FORCE_TRUE		},
+	{ "false",	P2P_FORCE_FALSE		},
+	{ "auto",	P2P_AUTO		}
 };
 
 #define	VALCNT(vals)    (sizeof ((vals)) / sizeof (val_desc_t))
@@ -418,7 +453,7 @@ static prop_desc_t	prop_table[] = {
 
 	{ "mtu", { "", 0 }, NULL, 0,
 	    i_dladm_set_public_prop, i_dladm_range_get,
-	    i_dladm_uint32_get, i_dladm_defmtu_check, 0, DATALINK_CLASS_ALL,
+	    i_dladm_uint32_get, i_dladm_uint32_check, 0, DATALINK_CLASS_ALL,
 	    DATALINK_ANY_MEDIATYPE },
 
 	{ "flowctrl", { "", 0 },
@@ -516,7 +551,63 @@ static prop_desc_t	prop_table[] = {
 	    i_dladm_set_public_prop, NULL, i_dladm_tagmode_get,
 	    NULL, 0,
 	    DATALINK_CLASS_PHYS | DATALINK_CLASS_AGGR | DATALINK_CLASS_VNIC,
-	    DL_ETHER }
+	    DL_ETHER },
+
+	{ "forward", { "1", 1 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_bridge_forward, NULL, get_bridge_forward, NULL, PD_AFTER_PERM,
+	    DATALINK_CLASS_ALL & ~DATALINK_CLASS_VNIC, DL_ETHER },
+
+	{ "default_tag", { "1", 1 }, NULL, 0,
+	    set_bridge_pvid, NULL, get_bridge_pvid, check_bridge_pvid,
+	    0, DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "learn_limit", { "1000", 1000 }, NULL, 0,
+	    i_dladm_set_public_prop, NULL, i_dladm_uint32_get,
+	    i_dladm_uint32_check, 0,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "learn_decay", { "200", 200 }, NULL, 0,
+	    i_dladm_set_public_prop, NULL, i_dladm_uint32_get,
+	    i_dladm_uint32_check, 0,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "stp", { "1", 1 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_stp_prop, NULL, get_stp_prop, NULL, PD_AFTER_PERM,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "stp_priority", { "128", 128 }, NULL, 0,
+	    set_stp_prop, NULL, get_stp_prop, check_stp_prop, PD_AFTER_PERM,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "stp_cost", { "auto", 0 }, NULL, 0,
+	    set_stp_prop, NULL, get_stp_prop, check_stp_prop, PD_AFTER_PERM,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "stp_edge", { "1", 1 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_stp_prop, NULL, get_stp_prop, NULL, PD_AFTER_PERM,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "stp_p2p", { "auto", P2P_AUTO },
+	    stp_p2p_vals, VALCNT(stp_p2p_vals),
+	    set_stp_prop, NULL, get_stp_prop, NULL, PD_AFTER_PERM,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
+
+	{ "stp_mcheck", { "0", 0 },
+	    link_01_vals, VALCNT(link_01_vals),
+	    set_stp_prop, NULL, get_stp_prop, check_stp_prop, PD_AFTER_PERM,
+	    DATALINK_CLASS_PHYS|DATALINK_CLASS_AGGR|
+	    DATALINK_CLASS_ETHERSTUB|DATALINK_CLASS_SIMNET, DL_ETHER },
 };
 
 #define	DLADM_MAX_PROPS	(sizeof (prop_table) / sizeof (prop_desc_t))
@@ -658,7 +749,12 @@ i_dladm_set_single_prop(dladm_handle_t handle, datalink_id_t linkid,
 			return (status);
 		}
 	}
-	status = pdp->pd_set(handle, pdp, linkid, vdp, cnt, flags, media);
+	if (pdp->pd_flags & PD_AFTER_PERM)
+		status = (flags & DLADM_OPT_PERSIST) ? DLADM_STATUS_OK :
+		    DLADM_STATUS_PERMONLY;
+	else
+		status = pdp->pd_set(handle, pdp, linkid, vdp, cnt, flags,
+		    media);
 	if (needfree) {
 		for (i = 0; i < cnt; i++)
 			free((void *)((val_desc_t *)vdp + i)->vd_val);
@@ -744,6 +840,21 @@ dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 	if (flags & DLADM_OPT_PERSIST) {
 		status = i_dladm_set_linkprop_db(handle, linkid, prop_name,
 		    prop_val, val_cnt);
+
+		if (status == DLADM_STATUS_OK && (flags & DLADM_OPT_ACTIVE)) {
+			prop_desc_t *pdp = prop_table;
+			int i;
+
+			for (i = 0; i < DLADM_MAX_PROPS; i++, pdp++) {
+				if (!(pdp->pd_flags & PD_AFTER_PERM))
+					continue;
+				if (prop_name != NULL &&
+				    strcasecmp(prop_name, pdp->pd_name) != 0)
+					continue;
+				status = pdp->pd_set(handle, pdp, linkid, NULL,
+				    0, flags, 0);
+			}
+		}
 	}
 	return (status);
 }
@@ -923,6 +1034,140 @@ dladm_get_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 		status = DLADM_STATUS_BADARG;
 		break;
 	}
+
+	return (status);
+}
+
+/*
+ * Get linkprop of the given specific link and run any possible conversion
+ * of the values using the check function for the property. Fails if the
+ * check function doesn't succeed for the property value.
+ */
+dladm_status_t
+dladm_get_linkprop_values(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_prop_type_t type, const char *prop_name, uint_t *ret_val,
+    uint_t *val_cntp)
+{
+	dladm_status_t		status;
+	datalink_class_t	class;
+	uint_t			media;
+	prop_desc_t		*pdp;
+	uint_t			dld_flags;
+	int			valc, i;
+	char			**prop_val;
+	uint_t			perm_flags;
+
+	if (linkid == DATALINK_INVALID_LINKID || prop_name == NULL ||
+	    ret_val == NULL || val_cntp == NULL || *val_cntp == 0)
+		return (DLADM_STATUS_BADARG);
+
+	for (pdp = prop_table; pdp < prop_table + DLADM_MAX_PROPS; pdp++)
+		if (strcasecmp(prop_name, pdp->pd_name) == 0)
+			break;
+
+	if (pdp == prop_table + DLADM_MAX_PROPS)
+		return (DLADM_STATUS_NOTFOUND);
+
+	if (pdp->pd_flags & PD_CHECK_ALLOC)
+		return (DLADM_STATUS_BADARG);
+
+	status = dladm_datalink_id2info(handle, linkid, NULL, &class, &media,
+	    NULL, 0);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	if (!(pdp->pd_class & class))
+		return (DLADM_STATUS_BADARG);
+
+	if (!DATALINK_MEDIA_ACCEPTED(pdp->pd_dmedia, media))
+		return (DLADM_STATUS_BADARG);
+
+	prop_val = malloc(*val_cntp * sizeof (*prop_val) +
+	    *val_cntp * DLADM_PROP_VAL_MAX);
+	if (prop_val == NULL)
+		return (DLADM_STATUS_NOMEM);
+	for (valc = 0; valc < *val_cntp; valc++)
+		prop_val[valc] = (char *)(prop_val + *val_cntp) +
+		    valc * DLADM_PROP_VAL_MAX;
+
+	dld_flags = (type == DLADM_PROP_VAL_DEFAULT) ? MAC_PROP_DEFAULT : 0;
+
+	switch (type) {
+	case DLADM_PROP_VAL_CURRENT:
+		status = pdp->pd_get(handle, pdp, linkid, prop_val, val_cntp,
+		    media, dld_flags, &perm_flags);
+		break;
+
+	case DLADM_PROP_VAL_DEFAULT:
+		/*
+		 * If defaults are not defined for the property,
+		 * pd_defval.vd_name should be null. If the driver
+		 * has to be contacted for the value, vd_name should
+		 * be the empty string (""). Otherwise, dladm will
+		 * just print whatever is in the table.
+		 */
+		if (pdp->pd_defval.vd_name == NULL) {
+			status = DLADM_STATUS_NOTSUP;
+			break;
+		}
+
+		if (pdp->pd_defval.vd_name[0] != '\0') {
+			*val_cntp = 1;
+			*ret_val = pdp->pd_defval.vd_val;
+			free(prop_val);
+			return (DLADM_STATUS_OK);
+		}
+		status = pdp->pd_get(handle, pdp, linkid, prop_val, val_cntp,
+		    media, dld_flags, &perm_flags);
+		break;
+
+	case DLADM_PROP_VAL_PERSISTENT:
+		if (pdp->pd_flags & PD_TEMPONLY)
+			status = DLADM_STATUS_TEMPONLY;
+		else
+			status = i_dladm_get_linkprop_db(handle, linkid,
+			    prop_name, prop_val, val_cntp);
+		break;
+
+	default:
+		status = DLADM_STATUS_BADARG;
+		break;
+	}
+
+	if (status == DLADM_STATUS_OK) {
+		if (pdp->pd_check != NULL) {
+			val_desc_t *vdp;
+
+			vdp = malloc(sizeof (val_desc_t) * *val_cntp);
+			if (vdp == NULL)
+				status = DLADM_STATUS_NOMEM;
+			else
+				status = pdp->pd_check(handle, pdp, linkid,
+				    prop_val, *val_cntp, vdp, media);
+			if (status == DLADM_STATUS_OK) {
+				for (valc = 0; valc < *val_cntp; valc++)
+					ret_val[valc] = vdp[valc].vd_val;
+			}
+			free(vdp);
+		} else {
+			for (valc = 0; valc < *val_cntp; valc++) {
+				for (i = 0; i < pdp->pd_noptval; i++) {
+					if (strcmp(pdp->pd_optval[i].vd_name,
+					    prop_val[valc]) == 0) {
+						ret_val[valc] =
+						    pdp->pd_optval[i].vd_val;
+						break;
+					}
+				}
+				if (i == pdp->pd_noptval) {
+					status = DLADM_STATUS_FAILED;
+					break;
+				}
+			}
+		}
+	}
+
+	free(prop_val);
 
 	return (status);
 }
@@ -2390,13 +2635,13 @@ i_dladm_get_public_prop(dladm_handle_t handle, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-i_dladm_defmtu_check(dladm_handle_t handle, prop_desc_t *pdp,
+i_dladm_uint32_check(dladm_handle_t handle, prop_desc_t *pdp,
     datalink_id_t linkid, char **prop_val, uint_t val_cnt, val_desc_t *v,
     datalink_media_t media)
 {
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVAL);
-	v->vd_val = atoi(prop_val[0]);
+	v->vd_val = strtoul(prop_val[0], NULL, 0);
 	return (DLADM_STATUS_OK);
 }
 
@@ -2850,6 +3095,247 @@ i_dladm_getset_defval(dladm_handle_t handle, prop_desc_t *pdp,
 	}
 	free(buf);
 	return (status);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+get_stp_prop(dladm_handle_t handle, struct prop_desc *pd, datalink_id_t linkid,
+    char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags,
+    uint_t *perm_flags)
+{
+	const bridge_public_prop_t *bpp;
+	dladm_status_t retv;
+	int val, i;
+
+	if (flags != 0)
+		return (DLADM_STATUS_NOTSUP);
+	*perm_flags = MAC_PROP_PERM_RW;
+	*val_cnt = 1;
+	for (bpp = bridge_prop; bpp->bpp_name != NULL; bpp++)
+		if (strcmp(bpp->bpp_name, pd->pd_name) == 0)
+			break;
+	retv = dladm_bridge_get_port_cfg(handle, linkid, bpp->bpp_code, &val);
+	/* If the daemon isn't running, then return the persistent value */
+	if (retv == DLADM_STATUS_NOTFOUND) {
+		if (i_dladm_get_linkprop_db(handle, linkid, pd->pd_name,
+		    prop_val, val_cnt) != DLADM_STATUS_OK)
+			(void) strlcpy(*prop_val, pd->pd_defval.vd_name,
+			    DLADM_PROP_VAL_MAX);
+		return (DLADM_STATUS_OK);
+	}
+	if (retv != DLADM_STATUS_OK) {
+		(void) strlcpy(*prop_val, "?", DLADM_PROP_VAL_MAX);
+		return (retv);
+	}
+	if (val == pd->pd_defval.vd_val && pd->pd_defval.vd_name[0] != '\0') {
+		(void) strlcpy(*prop_val, pd->pd_defval.vd_name,
+		    DLADM_PROP_VAL_MAX);
+		return (DLADM_STATUS_OK);
+	}
+	for (i = 0; i < pd->pd_noptval; i++) {
+		if (val == pd->pd_optval[i].vd_val) {
+			(void) strlcpy(*prop_val, pd->pd_optval[i].vd_name,
+			    DLADM_PROP_VAL_MAX);
+			return (DLADM_STATUS_OK);
+		}
+	}
+	(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%u", (unsigned)val);
+	return (DLADM_STATUS_OK);
+}
+
+/* ARGSUSED1 */
+static dladm_status_t
+set_stp_prop(dladm_handle_t handle, prop_desc_t *pd, datalink_id_t linkid,
+    val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
+{
+	/*
+	 * Special case for mcheck: the daemon resets the value to zero, and we
+	 * don't want the daemon to refresh itself; it leads to deadlock.
+	 */
+	if (flags & DLADM_OPT_NOREFRESH)
+		return (DLADM_STATUS_OK);
+
+	/* Tell the running daemon, if any */
+	return (dladm_bridge_refresh(handle, linkid));
+}
+
+/*
+ * This is used only for stp_priority, stp_cost, and stp_mcheck.
+ */
+/* ARGSUSED */
+static dladm_status_t
+check_stp_prop(dladm_handle_t handle, struct prop_desc *pd,
+    datalink_id_t linkid, char **prop_val, uint_t val_cnt, val_desc_t *vdp,
+    datalink_media_t media)
+{
+	char *cp;
+	boolean_t iscost;
+
+	if (val_cnt != 1)
+		return (DLADM_STATUS_BADVALCNT);
+
+	if (prop_val == NULL) {
+		vdp->vd_val = 0;
+	} else {
+		/* Only stp_priority and stp_cost use this function */
+		iscost = strcmp(pd->pd_name, "stp_cost") == 0;
+
+		if (iscost && strcmp(prop_val[0], "auto") == 0) {
+			/* Illegal value 0 is allowed to mean "automatic" */
+			vdp->vd_val = 0;
+		} else {
+			errno = 0;
+			vdp->vd_val = strtoul(prop_val[0], &cp, 0);
+			if (errno != 0 || *cp != '\0')
+				return (DLADM_STATUS_BADVAL);
+		}
+	}
+
+	if (iscost) {
+		return (vdp->vd_val > 65535 ? DLADM_STATUS_BADVAL :
+		    DLADM_STATUS_OK);
+	} else {
+		if (vdp->vd_val > 255)
+			return (DLADM_STATUS_BADVAL);
+		/*
+		 * If the user is setting stp_mcheck non-zero, then (per the
+		 * IEEE management standards and UNH testing) we need to check
+		 * whether this link is part of a bridge that is running RSTP.
+		 * If it's not, then setting the flag is an error.  Note that
+		 * errors are intentionally discarded here; it's the value
+		 * that's the problem -- it's not a bad value, merely one that
+		 * can't be used now.
+		 */
+		if (strcmp(pd->pd_name, "stp_mcheck") == 0 &&
+		    vdp->vd_val != 0) {
+			char bridge[MAXLINKNAMELEN];
+			UID_STP_CFG_T cfg;
+			dladm_bridge_prot_t brprot;
+
+			if (dladm_bridge_getlink(handle, linkid, bridge,
+			    sizeof (bridge)) != DLADM_STATUS_OK ||
+			    dladm_bridge_get_properties(bridge, &cfg,
+			    &brprot) != DLADM_STATUS_OK)
+				return (DLADM_STATUS_FAILED);
+			if (cfg.force_version <= 1)
+				return (DLADM_STATUS_FAILED);
+		}
+		return (DLADM_STATUS_OK);
+	}
+}
+
+/* ARGSUSED */
+static dladm_status_t
+get_bridge_forward(dladm_handle_t handle, struct prop_desc *pd,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
+    datalink_media_t media, uint_t flags, uint_t *perm_flags)
+{
+	dladm_status_t retv;
+	uint_t val;
+
+	if (flags != 0)
+		return (DLADM_STATUS_NOTSUP);
+	*perm_flags = MAC_PROP_PERM_RW;
+	*val_cnt = 1;
+	retv = dladm_bridge_get_forwarding(handle, linkid, &val);
+	if (retv == DLADM_STATUS_NOTFOUND) {
+		if (i_dladm_get_linkprop_db(handle, linkid, pd->pd_name,
+		    prop_val, val_cnt) != DLADM_STATUS_OK)
+			(void) strlcpy(*prop_val, pd->pd_defval.vd_name,
+			    DLADM_PROP_VAL_MAX);
+		return (DLADM_STATUS_OK);
+	}
+	if (retv == DLADM_STATUS_OK)
+		(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%u", val);
+	else
+		(void) strlcpy(*prop_val, "?", DLADM_PROP_VAL_MAX);
+	return (retv);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+set_bridge_forward(dladm_handle_t handle, prop_desc_t *pd, datalink_id_t linkid,
+    val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
+{
+	/* Tell the running daemon, if any */
+	return (dladm_bridge_refresh(handle, linkid));
+}
+
+/* ARGSUSED */
+static dladm_status_t
+get_bridge_pvid(dladm_handle_t handle, struct prop_desc *pd,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
+    datalink_media_t media, uint_t flags, uint_t *perm_flags)
+{
+	dladm_status_t status;
+	dld_ioc_macprop_t *dip;
+	uint16_t pvid;
+
+	if (flags != 0)
+		return (DLADM_STATUS_NOTSUP);
+	*perm_flags = MAC_PROP_PERM_RW;
+	*val_cnt = 1;
+	dip = i_dladm_buf_alloc_by_id(sizeof (uint16_t), linkid, MAC_PROP_PVID,
+	    0, &status);
+	if (dip == NULL)
+		return (status);
+	status = i_dladm_macprop(handle, dip, B_FALSE);
+	if (status == DLADM_STATUS_OK) {
+		(void) memcpy(&pvid, dip->pr_val, sizeof (pvid));
+		(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%u", pvid);
+	} else {
+		(void) strlcpy(*prop_val, "?", DLADM_PROP_VAL_MAX);
+	}
+	free(dip);
+	return (status);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+set_bridge_pvid(dladm_handle_t handle, prop_desc_t *pd, datalink_id_t linkid,
+    val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
+{
+	dladm_status_t status;
+	dld_ioc_macprop_t *dip;
+	uint16_t pvid;
+
+	dip = i_dladm_buf_alloc_by_id(sizeof (uint16_t), linkid, MAC_PROP_PVID,
+	    0, &status);
+	if (dip == NULL)
+		return (status);
+	pvid = vdp->vd_val;
+	(void) memcpy(dip->pr_val, &pvid, sizeof (pvid));
+	status = i_dladm_macprop(handle, dip, B_TRUE);
+	free(dip);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	/* Tell the running daemon, if any */
+	return (dladm_bridge_refresh(handle, linkid));
+}
+
+/* ARGSUSED */
+static dladm_status_t
+check_bridge_pvid(dladm_handle_t handle, struct prop_desc *pd,
+    datalink_id_t linkid, char **prop_val, uint_t val_cnt, val_desc_t *vdp,
+    datalink_media_t media)
+{
+	char *cp;
+
+	if (val_cnt != 1)
+		return (DLADM_STATUS_BADVALCNT);
+
+	if (prop_val == NULL) {
+		vdp->vd_val = 1;
+	} else {
+		errno = 0;
+		vdp->vd_val = strtoul(prop_val[0], &cp, 0);
+		if (errno != 0 || *cp != '\0')
+			return (DLADM_STATUS_BADVAL);
+	}
+
+	return (vdp->vd_val > VLAN_ID_MAX ? DLADM_STATUS_BADVAL :
+	    DLADM_STATUS_OK);
 }
 
 dladm_status_t

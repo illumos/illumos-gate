@@ -46,6 +46,9 @@ smf_netstrategy
 if smf_is_globalzone; then
 	net_reconfigure || exit $SMF_EXIT_ERR_CONFIG
 
+	# Update PVID on interfaces configured with VLAN 1
+	update_pvid
+
 	# 
 	# Upgrade handling. The upgrade file consists of a series of dladm(1M)
 	# commands. Note that after we are done, we cannot rename the upgrade

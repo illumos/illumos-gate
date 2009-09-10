@@ -54,6 +54,7 @@ SUNWprivate_1.1 {
 	dladm_mac_walk;
 	dladm_init_linkprop;
 	dladm_get_linkprop;
+	dladm_get_linkprop_values;
 	dladm_set_linkprop;
 	dladm_walk_linkprop;
 	dladm_attr_is_linkprop;
@@ -194,7 +195,6 @@ SUNWprivate_1.1 {
 	dladm_get_single_mac_stat;
 	dladm_stats_total;
 	dladm_stats_diff;
-
 	dladm_ether_info;
 	dladm_ether_autoneg2str;
 	dladm_ether_pause2str;
@@ -206,6 +206,28 @@ SUNWprivate_1.1 {
 	dladm_simnet_delete;
 	dladm_simnet_info;
 	dladm_simnet_up;
+	dladm_bridge_str2prot;
+	dladm_bridge_prot2str;
+	dladm_bridge_get_properties;
+	dladm_bridge_run_properties;
+	dladm_bridge_configure;
+	dladm_bridge_enable;
+	dladm_bridge_delete;
+	dladm_bridge_state;
+	dladm_bridge_get_portlist;
+	dladm_bridge_free_portlist;
+	dladm_bridge_setlink;
+	dladm_bridge_getlink;
+	dladm_bridge_link_state;
+	dladm_valid_bridgename;
+	dladm_observe_to_bridge;
+	dladm_bridge_get_fwdtable;
+	dladm_bridge_free_fwdtable;
+	dladm_bridge_get_trillnick;
+	dladm_bridge_free_trillnick;
+	dladm_bridge_get_nick;
+	dladm_bridge_set_nick;
+	dladm_bridge_get_privprop;
     local:
 	*;
 };

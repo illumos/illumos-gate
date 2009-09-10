@@ -389,6 +389,7 @@ xenbus:*
 fm:*
 amd_iommu:*
 xpvtap:*
+clone:bridge
 EOF
 }
 

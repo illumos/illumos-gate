@@ -57,12 +57,14 @@ extern "C" {
 #define	AGGR_IOC	0x0A66
 #define	VNIC_IOC	0x0171
 #define	SIMNET_IOC	0x5132
+#define	BRIDGE_IOC	0xB81D
 
 /* GLDv3 modules use these macros to generate unique ioctl commands */
 #define	DLDIOC(cmdid)		DLD_IOC_CMD(DLD_IOC, (cmdid))
 #define	AGGRIOC(cmdid)		DLD_IOC_CMD(AGGR_IOC, (cmdid))
 #define	VNICIOC(cmdid)		DLD_IOC_CMD(VNIC_IOC, (cmdid))
 #define	SIMNETIOC(cmdid)	DLD_IOC_CMD(SIMNET_IOC, (cmdid))
+#define	BRIDGEIOC(cmdid)	DLD_IOC_CMD(BRIDGE_IOC, (cmdid))
 
 #ifdef _KERNEL
 

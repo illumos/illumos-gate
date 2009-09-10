@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <sys/dld.h>
 #include <libdladm_impl.h>
 #include <libdllink.h>
+#include <libdlbridge.h>
 #include <libdlvnic.h>
 
 /*
@@ -340,8 +341,6 @@ dladm_vnic_str2macaddrtype(const char *str, vnic_mac_addr_type_t *val)
 	return (DLADM_STATUS_BADARG);
 }
 
-
-
 /*
  * Create a new VNIC / VLAN. Update the configuration file and bring it up.
  */
@@ -361,6 +360,8 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 	boolean_t is_vlan;
 	boolean_t is_etherstub;
 	int i;
+	boolean_t vnic_created = B_FALSE;
+	boolean_t conf_set = B_FALSE;
 
 	/*
 	 * Sanity test arguments.
@@ -453,16 +454,16 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 	status = i_dladm_vnic_create_sys(handle, &attr);
 	if (status != DLADM_STATUS_OK)
 		goto done;
+	vnic_created = B_TRUE;
 
 	/* Save vnic configuration and its properties */
 	if (!(flags & DLADM_OPT_PERSIST))
 		goto done;
 
 	status = dladm_vnic_persist_conf(handle, name, &attr, class);
-	if (status != DLADM_STATUS_OK) {
-		(void) i_dladm_vnic_delete_sys(handle, vnic_id);
+	if (status != DLADM_STATUS_OK)
 		goto done;
-	}
+	conf_set = B_TRUE;
 
 	if (proplist != NULL) {
 		for (i = 0; i < proplist->al_count; i++) {
@@ -474,21 +475,28 @@ dladm_vnic_create(dladm_handle_t handle, const char *vnic, datalink_id_t linkid,
 			if (status != DLADM_STATUS_OK)
 				break;
 		}
-
-		if (status != DLADM_STATUS_OK) {
-			(void) dladm_remove_conf(handle, vnic_id);
-			(void) i_dladm_vnic_delete_sys(handle, vnic_id);
-		}
 	}
 
 done:
 	if (status != DLADM_STATUS_OK) {
+		if (conf_set)
+			(void) dladm_remove_conf(handle, vnic_id);
+		if (vnic_created)
+			(void) i_dladm_vnic_delete_sys(handle, vnic_id);
 		(void) dladm_destroy_datalink_id(handle, vnic_id, flags);
 	} else {
 		if (vnic_id_out != NULL)
 			*vnic_id_out = vnic_id;
 		if (mac_slot != NULL)
 			*mac_slot = attr.va_mac_slot;
+	}
+
+	if (is_vlan) {
+		dladm_status_t stat2;
+
+		stat2 = dladm_bridge_refresh(handle, linkid);
+		if (status == DLADM_STATUS_OK && stat2 != DLADM_STATUS_OK)
+			status = stat2;
 	}
 	return (status);
 }
@@ -501,6 +509,7 @@ dladm_vnic_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 {
 	dladm_status_t status;
 	datalink_class_t class;
+	dladm_vnic_attr_t attr;
 
 	if (flags == 0)
 		return (DLADM_STATUS_BADARG);
@@ -519,6 +528,10 @@ dladm_vnic_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 	}
 
 	if ((flags & DLADM_OPT_ACTIVE) != 0) {
+		status = dladm_vnic_info(handle, linkid, &attr,
+		    DLADM_OPT_ACTIVE);
+		if (status != DLADM_STATUS_OK)
+			return (status);
 		status = i_dladm_vnic_delete_sys(handle, linkid);
 		if (status == DLADM_STATUS_OK) {
 			(void) dladm_set_linkprop(handle, linkid, NULL, NULL, 0,
@@ -535,7 +548,7 @@ dladm_vnic_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 		    DLADM_OPT_PERSIST);
 		(void) dladm_remove_conf(handle, linkid);
 	}
-	return (DLADM_STATUS_OK);
+	return (dladm_bridge_refresh(handle, linkid));
 }
 
 static const char *
@@ -699,14 +712,12 @@ i_dladm_vnic_up(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	}
 
 	status = i_dladm_vnic_create_sys(handle, &attr);
-	if (status != DLADM_STATUS_OK)
-		goto done;
-
-	if ((status = dladm_up_datalink_id(handle, linkid)) !=
-	    DLADM_STATUS_OK) {
-		(void) i_dladm_vnic_delete_sys(handle, linkid);
-		goto done;
+	if (status == DLADM_STATUS_OK) {
+		status = dladm_up_datalink_id(handle, linkid);
+		if (status != DLADM_STATUS_OK)
+			(void) i_dladm_vnic_delete_sys(handle, linkid);
 	}
+
 done:
 	*statusp = status;
 	return (DLADM_WALK_CONTINUE);

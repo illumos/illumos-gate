@@ -26,6 +26,8 @@
 #ifndef _LIBDLADM_IMPL_H
 #define	_LIBDLADM_IMPL_H
 
+#include <sys/mac.h>
+#include <sys/mac_flow.h>
 #include <libdladm.h>
 #include <stdio.h>
 
@@ -153,6 +155,11 @@ typedef struct resource_prop_s {
 	 */
 	rp_extractf_t	*rp_extract;
 } resource_prop_t;
+
+/*
+ * Set for bridged links only
+ */
+#define	FBRIDGE		"bridge"	/* string */
 
 #ifdef	__cplusplus
 }

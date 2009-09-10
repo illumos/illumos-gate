@@ -54,6 +54,7 @@ static void	ioc_native(dld_str_t *,  mblk_t *);
 static void	ioc_margin(dld_str_t *, mblk_t *);
 static void	ioc_raw(dld_str_t *, mblk_t *);
 static void	ioc_fast(dld_str_t *,  mblk_t *);
+static void	ioc_lowlink(dld_str_t *,  mblk_t *);
 static void	ioc(dld_str_t *, mblk_t *);
 static void	dld_ioc(dld_str_t *, mblk_t *);
 static void	dld_wput_nondata(dld_str_t *, mblk_t *);
@@ -913,7 +914,8 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 		 * but both pri and VID are 0.
 		 */
 		pri = VLAN_PRI(mhi.mhi_tci);
-		if (mhi.mhi_istagged && (pri == 0) && (vid == VLAN_ID_NONE))
+		if (mhi.mhi_istagged && !mhi.mhi_ispvid && pri == 0 &&
+		    vid == VLAN_ID_NONE)
 			goto discard;
 
 		/*
@@ -1708,12 +1710,38 @@ str_notify(void *arg, mac_notify_type_t type)
 		str_notify_phys_addr(dsp, addr);
 		break;
 
+	case MAC_NOTE_LOWLINK:
 	case MAC_NOTE_LINK:
+		/*
+		 * LOWLINK refers to the actual link status. For links that
+		 * are not part of a bridge instance LOWLINK and LINK state
+		 * are the same. But for a link part of a bridge instance
+		 * LINK state refers to the aggregate link status: "up" when
+		 * at least one link part of the bridge is up and is "down"
+		 * when all links part of the bridge are down.
+		 *
+		 * Clients can request to be notified of the LOWLINK state
+		 * using the DLIOCLOWLINK ioctl. Clients such as the bridge
+		 * daemon request lowlink state changes and upper layer clients
+		 * receive notifications of the aggregate link state changes
+		 * which is the default when requesting LINK UP/DOWN state
+		 * notifications.
+		 */
+
+		/*
+		 * Check that the notification type matches the one that we
+		 * want.  If we want lower-level link notifications, and this
+		 * is upper, or if we want upper and this is lower, then
+		 * ignore.
+		 */
+		if ((type == MAC_NOTE_LOWLINK) != dsp->ds_lowlink)
+			break;
 		/*
 		 * This notification is sent every time the MAC driver
 		 * updates the link state.
 		 */
-		switch (mac_client_stat_get(mch, MAC_STAT_LINK_STATE)) {
+		switch (mac_client_stat_get(mch, dsp->ds_lowlink ?
+		    MAC_STAT_LOWLINK_STATE : MAC_STAT_LINK_STATE)) {
 		case LINK_STATE_UP: {
 			uint64_t speed;
 			/*
@@ -1759,6 +1787,7 @@ str_notify(void *arg, mac_notify_type_t type)
 		str_notify_fastpath_flush(dsp);
 		break;
 
+	/* Unused notifications */
 	case MAC_NOTE_MARGIN:
 		break;
 
@@ -1926,6 +1955,9 @@ dld_ioc(dld_str_t *dsp, mblk_t *mp)
 		break;
 	case DLIOCHDRINFO:
 		ioc_fast(dsp, mp);
+		break;
+	case DLIOCLOWLINK:
+		ioc_lowlink(dsp, mp);
 		break;
 	default:
 		ioc(dsp, mp);
@@ -2113,6 +2145,27 @@ ioc_fast(dld_str_t *dsp, mblk_t *mp)
 	return;
 failed:
 	miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLIOCLOWLINK: request actual link state changes. When the
+ * link is part of a bridge instance the client receives actual
+ * link state changes and not the aggregate link status. Used by
+ * the bridging daemon (bridged) for proper RSTP operation.
+ */
+static void
+ioc_lowlink(dld_str_t *dsp, mblk_t *mp)
+{
+	queue_t *q = dsp->ds_wq;
+	int err;
+
+	if ((err = miocpullup(mp, sizeof (int))) != 0) {
+		miocnak(q, mp, 0, err);
+	} else {
+		/* LINTED: alignment */
+		dsp->ds_lowlink = *(boolean_t *)mp->b_cont->b_rptr;
+		miocack(q, mp, 0, 0);
+	}
 }
 
 /*

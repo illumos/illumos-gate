@@ -165,6 +165,14 @@ do
 		if [ "$vid" != "0" ]; then
 			echo dladm create-vlan -l $phys$inst -v $vid \
 			    $ifname >> ${PKG_INSTALL_ROOT}/$UPGRADE_SCRIPT
+			if [ "$vid" != "1" ]; then
+				continue
+			fi
+			# If default PVID VLAN 1 is in use then warn
+			# the user and force PVID to zero.
+			echo "Warning: default VLAN tag set to 0 on $ifname"
+			echo dladm set-linkprop -p default_tag=0 \
+			    $ifname >> ${PKG_INSTALL_ROOT}/$UPGRADE_SCRIPT
 		fi
 	fi
 done

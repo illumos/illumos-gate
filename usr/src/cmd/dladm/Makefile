@@ -22,7 +22,6 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 
 PROG= dladm
 CFGFILES= secobj.conf
@@ -36,8 +35,15 @@ include ../Makefile.cmd
 XGETFLAGS += -a -x $(PROG).xcl
 LDLIBS += -L$(ROOT)/lib -lsocket
 LDLIBS += -ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil -ldevinfo
+LDLIBS += $(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
+
+# For headers from librstp.
+LINTFLAGS +=	-erroff=E_TRAILING_COMMA_IN_ENUM
 
 $(ROOTCFGDIR)/secobj.conf := FILEMODE= 600
+
+lint :=	ZLAZYLOAD=
+lint :=	ZNOLAZYLOAD=
 
 .KEEP_STATE:
 

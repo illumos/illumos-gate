@@ -19,13 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SUBDIRS=	dhcp dsvclockd in.chargend in.daytimed \
+SUBDIRS=	bridged dhcp dsvclockd in.chargend in.daytimed \
 		in.discardd in.echod in.dhcpd in.mpathd in.ndpd \
 		in.ripngd in.timed inetd mdnsd ncaconfd pppoe \
 		slpd wanboot wpad
