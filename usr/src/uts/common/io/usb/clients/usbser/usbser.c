@@ -2786,12 +2786,15 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 			break;
 
 		*(struct cons_polledio **)mp->b_cont->b_rptr = &usbser_polledio;
-		mioc2ack(mp, NULL, 0, 0);
+
+		mp->b_datap->db_type = M_IOCACK;
 		break;
 
 	case CONSCLOSEPOLLEDIO:
 		usbser_polledio_fini(pp);
-		mioc2ack(mp, NULL, 0, 0);
+		mp->b_datap->db_type = M_IOCACK;
+		iocp->ioc_error = 0;
+		iocp->ioc_rval = 0;
 		break;
 
 	case CONSSETABORTENABLE:
@@ -2816,7 +2819,10 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 			usbser_console_abort = 1;
 		else
 			usbser_console_abort = 0;
-		mioc2ack(mp, NULL, 0, 0);
+
+		mp->b_datap->db_type = M_IOCACK;
+		iocp->ioc_error = 0;
+		iocp->ioc_rval = 0;
 		break;
 
 	case CONSGETABORTENABLE:
@@ -2828,7 +2834,6 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 		 */
 		mcopyout(mp, NULL, sizeof (boolean_t), NULL, NULL);
 		*(boolean_t *)mp->b_cont->b_rptr = (usbser_console_abort != 0);
-		mioc2ack(mp, NULL, 0, 0);
 		break;
 
 	default:
