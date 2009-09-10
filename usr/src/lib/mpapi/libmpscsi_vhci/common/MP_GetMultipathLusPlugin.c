@@ -59,13 +59,13 @@ static int getOidList(di_node_t root_node, MP_OID_LIST *pOidList)
 
 	while (DI_NODE_NIL != sv_child_node) {
 
-		if (haveList && (numNodes < pOidList->oidCount)) {
+		/* Skip the node which is not online. */
+		if (di_state(sv_child_node) != 0) {
+			sv_child_node = di_sibling_node(sv_child_node);
+			continue;
+		}
 
-			/* skip the node which is not online */
-			if (di_state(sv_child_node) != 0) {
-				sv_child_node = di_sibling_node(sv_child_node);
-				continue;
-			}
+		if (haveList && (numNodes < pOidList->oidCount)) {
 
 			instNum =
 			    (MP_UINT64)di_instance(sv_child_node);
