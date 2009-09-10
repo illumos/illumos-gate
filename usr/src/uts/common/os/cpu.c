@@ -2211,6 +2211,11 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
+#if defined(__x86)
+	/* Is the cpu still initialising itself? */
+	if (cpuid_checkpass(cp, 1) == 0)
+		return (ENXIO);
+#endif
 	switch (cp->cpu_type_info.pi_state) {
 	case P_ONLINE:
 		pi_state = PS_ONLINE;
@@ -2289,7 +2294,7 @@ cpu_info_kstat_create(cpu_t *cp)
 	if ((cp->cpu_info_kstat = kstat_create_zone("cpu_info", cp->cpu_id,
 	    NULL, "misc", KSTAT_TYPE_NAMED,
 	    sizeof (cpu_info_template) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL, zoneid)) != NULL) {
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE, zoneid)) != NULL) {
 		cp->cpu_info_kstat->ks_data_size += 2 * CPU_IDSTRLEN;
 #if defined(__sparcv9)
 		cp->cpu_info_kstat->ks_data_size +=
