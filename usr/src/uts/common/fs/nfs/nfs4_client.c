@@ -3010,6 +3010,14 @@ nfs_free_mi4(mntinfo4_t *mi)
 	int i;
 	servinfo4_t 		*svp;
 
+	/*
+	 * Code introduced here should be carefully evaluated to make
+	 * sure none of the freed resources are accessed either directly
+	 * or indirectly after freeing them. For eg: Introducing calls to
+	 * NFS4_DEBUG that use mntinfo4_t structure member after freeing
+	 * the structure members or other routines calling back into NFS
+	 * accessing freed mntinfo4_t structure member.
+	 */
 	mutex_enter(&mi->mi_lock);
 	ASSERT(mi->mi_recovthread == NULL);
 	ASSERT(mi->mi_flags & MI4_ASYNC_MGR_STOP);
@@ -3018,8 +3026,6 @@ nfs_free_mi4(mntinfo4_t *mi)
 	ASSERT(mi->mi_threads == 0);
 	ASSERT(mi->mi_manager_thread == NULL);
 	mutex_exit(&mi->mi_async_lock);
-	svp = mi->mi_servers;
-	sv4_free(svp);
 	if (mi->mi_io_kstats) {
 		kstat_delete(mi->mi_io_kstats);
 		mi->mi_io_kstats = NULL;
@@ -3045,6 +3051,8 @@ nfs_free_mi4(mntinfo4_t *mi)
 		sfh4_rele(&mi->mi_rootfh);
 	if (mi->mi_srvparentfh != NULL)
 		sfh4_rele(&mi->mi_srvparentfh);
+	svp = mi->mi_servers;
+	sv4_free(svp);
 	mutex_destroy(&mi->mi_lock);
 	mutex_destroy(&mi->mi_async_lock);
 	mutex_destroy(&mi->mi_msg_list_lock);
