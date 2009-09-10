@@ -340,6 +340,7 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 		ASSERT(of->f_refcnt);
 		ASSERT(of->f_state == SMB_OFILE_STATE_CLOSING);
 		of->f_state = SMB_OFILE_STATE_CLOSED;
+		mutex_exit(&of->f_mutex);
 		if (of->f_node != NULL) {
 			smb_node_dec_open_ofiles(of->f_node);
 			if (of->f_oplock_granted) {
@@ -347,7 +348,6 @@ smb_ofile_close(smb_ofile_t *of, uint32_t last_wtime)
 				of->f_oplock_granted = B_FALSE;
 			}
 		}
-		mutex_exit(&of->f_mutex);
 		return;
 	}
 	case SMB_OFILE_STATE_CLOSED:
@@ -483,16 +483,21 @@ smb_ofile_hold(smb_ofile_t *of)
  *
  */
 void
-smb_ofile_release(
-    smb_ofile_t		*of)
+smb_ofile_release(smb_ofile_t	*of)
 {
+	boolean_t	rb;
+
 	ASSERT(of);
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 
 	mutex_enter(&of->f_mutex);
-	if (of->f_oplock_exit)
-		if (smb_oplock_broadcast(of->f_node))
+	if (of->f_oplock_exit) {
+		mutex_exit(&of->f_mutex);
+		rb = smb_oplock_broadcast(of->f_node);
+		mutex_enter(&of->f_mutex);
+		if (rb)
 			of->f_oplock_exit = B_FALSE;
+	}
 	ASSERT(of->f_refcnt);
 	of->f_refcnt--;
 	switch (of->f_state) {
