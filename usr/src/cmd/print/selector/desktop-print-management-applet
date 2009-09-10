@@ -23,9 +23,11 @@
 # Use is subject to license terms.
 #
 #
+use Errno qw(EINTR :POSIX);
 
 my $SVC_CUPS_SCHEDULER = 'cups/scheduler';
 my $SVCPROP = '/usr/bin/svcprop';
+my $reexec = 0;
 
 sub svcprop {
         local ($fmri, $property) = @_;
@@ -48,34 +50,41 @@ sub print_service {
 }
 
 sub kill_running_applets {
+	$reexec = 1;
         # cups applet daemon
         system("pkill -f '/system-config-printer/applet.py'");
         # lp applet daemon
         system("pkill ospm-applet");
 }
 
-my $pid;
-
 sub handle_signal {
         kill_running_applets ();
 }
+
 $SIG{USR1} = \&handle_signal;
 
-
-$SIG{CHLD} = 'IGNORE';
-my $service;
-$service =  print_service();
-$pid = fork();
-if ($pid) {
-        waitpid($pid, 0);
-        exec('/usr/bin/desktop-print-management-applet');
+my $pid = fork();
+if (! defined($pid)) {
+	die "Error: fork() failed\n";
 }
-else {
+elsif ($pid == 0) {
+	my $service =  print_service();
         if ($service eq 'lp') {
                 exec('/usr/lib/lp/bin/desktop-print-management-applet');
         }
         else {
                 exec('/usr/lib/cups/bin/desktop-print-management-applet');
         }
+
+}
+else {
+	my $retid;
+	while ((($retid = waitpid($pid, 0)) < 0) && $!{EINTR}) {
+	} 
+
+	if ($retid == $pid && $reexec) {
+        	exec('/usr/bin/desktop-print-management-applet');
+	}
 }
 
+exit(0);
