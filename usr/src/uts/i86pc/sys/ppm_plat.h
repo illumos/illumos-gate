@@ -19,14 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009,  Intel Corporation.
+ * All Rights Reserved.
  */
 
 #ifndef _SYS_PPM_PLAT_H
 #define	_SYS_PPM_PLAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpupm.h>
 
@@ -44,9 +46,9 @@ extern "C" {
 		delay = dc->m_un.kio.post_delay; \
 }
 
-extern void	ppm_rebuild_cpu_domains(void);
+extern void	ppm_alloc_pstate_domains(cpu_t *);
+extern void	ppm_free_pstate_domains(cpu_t *);
 extern void	ppm_set_topspeed(ppm_dev_t *, int);
-extern void	ppm_init_topspeed(void);
 extern void	ppm_redefine_topspeed(void *);
 
 #ifdef  __cplusplus

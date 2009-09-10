@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009,  Intel Corporation.
+ * All Rights Reserved.
+ */
 
 #include <sys/x86_archext.h>
 #include <sys/machsystm.h>
@@ -55,6 +59,7 @@ typedef struct turbo_kstat_s {
 static int speedstep_init(cpu_t *);
 static void speedstep_fini(cpu_t *);
 static void speedstep_power(cpuset_t, uint32_t);
+static void speedstep_stop(cpu_t *);
 static boolean_t turbo_supported(void);
 static int turbo_kstat_update(kstat_t *, int);
 static void get_turbo_info(cpupm_turbo_info_t *);
@@ -69,7 +74,8 @@ cpupm_state_ops_t speedstep_ops = {
 	"Enhanced SpeedStep Technology",
 	speedstep_init,
 	speedstep_fini,
-	speedstep_power
+	speedstep_power,
+	speedstep_stop
 };
 
 /*
@@ -404,6 +410,25 @@ speedstep_fini(cpu_t *cp)
 	    (cpupm_turbo_info_t *)(mach_state->ms_vendor);
 
 	cpupm_free_domains(&cpupm_pstate_domains);
+	cpu_acpi_free_pstate_data(handle);
+
+	if (turbo_info) {
+		if (turbo_info->turbo_ksp != NULL)
+			kstat_delete(turbo_info->turbo_ksp);
+		kmem_free(turbo_info, sizeof (cpupm_turbo_info_t));
+	}
+}
+
+static void
+speedstep_stop(cpu_t *cp)
+{
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
+	cpupm_turbo_info_t *turbo_info =
+	    (cpupm_turbo_info_t *)(mach_state->ms_vendor);
+
+	cpupm_remove_domains(cp, CPUPM_P_STATES, &cpupm_pstate_domains);
 	cpu_acpi_free_pstate_data(handle);
 
 	if (turbo_info) {

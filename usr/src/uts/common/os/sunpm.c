@@ -2337,8 +2337,9 @@ pm_rem_info(dev_info_t *dip)
 	 * not being power-managed anymore.
 	 */
 	for (i = 0; i < PM_NUMCMPTS(dip); i++) {
-		if (PM_CURPOWER(dip, i) != 0)
-			PM_DECR_NOTLOWEST(dip);
+		pm_component_t *cp = PM_CP(dip, i);
+		if (cp->pmc_cur_pwr != 0)
+			PM_DECR_NOTLOWEST(dip)
 	}
 	/*
 	 * Once we clear the info pointer, it looks like it is not power

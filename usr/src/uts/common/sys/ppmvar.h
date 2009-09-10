@@ -19,14 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+/*
+ * Copyright (c) 2009,  Intel Corporation.
+ * All Rights Reserved.
  */
 
 #ifndef _SYS_PPMVAR_H
 #define	_SYS_PPMVAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/epm.h>
 #include <sys/sunldi.h>
@@ -239,6 +241,7 @@ struct ppm_domain {
 	int		refcnt;		/* domain lock ref count */
 	int		model;		/* pm model, CPU, FET or LED	*/
 	int		status;		/* domain specific status */
+	int		sub_domain;	/* sub-domain */
 	ppm_dc_t	*dc;		/* domain control method */
 	ppm_owned_t	*owned;		/* list of ever owned devices */
 	struct ppm_domain	*next;	/* a linked list */

@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009,  Intel Corporation.
+ * All Rights Reserved.
+ */
 
 #ifndef _SYS_CPUDRV_H
 #define	_SYS_CPUDRV_H
@@ -78,7 +82,7 @@ typedef struct cpudrv_pm {
 	hrtime_t	lastquan_mstate[NCMSTATES]; /* last quantum's mstate */
 	clock_t		lastquan_ticks;	/* last quantum's clock tick */
 	int		pm_busycnt;	/* pm_busy_component() count  */
-	taskq_t		*tq;		/* taskq handler for CPU monitor */
+	ddi_taskq_t	*tq;		/* taskq handler for CPU monitor */
 	timeout_id_t	timeout_id;	/* cpudrv_monitor()'s timeout_id */
 	int		timeout_count;	/* count dispatched timeouts */
 	kmutex_t	timeout_lock;	/* protect timeout_count */
@@ -196,7 +200,8 @@ extern int cpudrv_change_speed(cpudrv_devstate_t *, cpudrv_pm_spd_t *);
 extern boolean_t cpudrv_get_cpu_id(dev_info_t *, processorid_t *);
 extern boolean_t cpudrv_is_governor_thread(cpudrv_pm_t *);
 extern boolean_t cpudrv_mach_init(cpudrv_devstate_t *);
-extern boolean_t cpudrv_power_ready(void);
+extern boolean_t cpudrv_mach_fini(cpudrv_devstate_t *);
+extern boolean_t cpudrv_power_ready(cpu_t *);
 extern boolean_t cpudrv_is_enabled(cpudrv_devstate_t *);
 extern void cpudrv_set_supp_freqs(cpudrv_devstate_t *);
 

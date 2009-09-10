@@ -373,7 +373,6 @@ main(void)
 	extern void	lgrp_main_init(void);
 	extern void	lgrp_main_mp_init(void);
 #if defined(__x86)
-	extern void	cpupm_post_startup(void);
 	extern void	fastboot_post_startup(void);
 #endif
 	/*
@@ -573,7 +572,6 @@ main(void)
 	 */
 	pm_cfb_setup_intr();
 #if defined(__x86)
-	cpupm_post_startup();
 	fastboot_post_startup();
 #endif
 

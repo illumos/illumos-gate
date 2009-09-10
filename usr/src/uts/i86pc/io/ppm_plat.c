@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
 
 /*
  * Platform Power Management master pseudo driver platform support.
@@ -32,150 +36,7 @@
 #include <sys/ppmvar.h>
 #include <sys/cpupm.h>
 
-static struct ppm_domit *
-ppm_get_domit_by_model(int model)
-{
-	struct ppm_domit *domit_p;
-	for (domit_p = ppm_domit_data; (domit_p->name &&
-	    (domit_p->model != model));	domit_p++)
-		;
-	ASSERT(domit_p);
-	return (domit_p);
-}
-
-void
-ppm_rebuild_cpu_domains(void)
-{
-	char *str = "ppm_rebuild_cpu_domains";
-	cpupm_state_domains_t *dep;
-	cpupm_state_domains_t *dep_next;
-	struct ppm_domit *domit_p;
-	ppm_domain_t *domp_old;
-	ppm_domain_t *domp;
-	ppm_dev_t *devp;
-	ppm_db_t *dbp;
-	uint_t cpu_id;
-	cpuset_t dom_cpu_set;
-	int result;
-	dev_info_t *cpu_dip;
-
-	/*
-	 * Get the CPU domain data
-	 */
-	domit_p = ppm_get_domit_by_model(PPMD_CPU);
-
-	/*
-	 * Find the CPU domain created from ppm.conf. It's only a
-	 * temporary domain used to make sure that all CPUs are
-	 * claimed. There should only be one such domain defined.
-	 */
-	for (domp = ppm_domain_p; (domp && (domp->model != PPMD_CPU));
-	    domp = domp->next)
-		;
-	if (domp == NULL) {
-		cmn_err(CE_WARN, "%s: ppm.conf does not define a CPU domain!",
-		    str);
-		return;
-	}
-	domp_old = domp;
-	for (domp = domp->next; domp; domp = domp->next) {
-		if (domp->model == PPMD_CPU) {
-			cmn_err(CE_WARN, "%s: Multiple CPU domains defined "
-			    "in ppm.conf!", str);
-			return;
-		}
-	}
-
-	/*
-	 * It is quite possible that the platform does not contain any
-	 * power manageable CPUs. If so, devlist will be NULL.
-	 */
-	if (domp_old->devlist == NULL) {
-		PPMD(D_CPU, ("%s: No CPUs claimed by ppm!\n", str));
-		return;
-	}
-
-	/*
-	 * Get the CPU dependencies as determined by the CPU driver. If
-	 * the CPU driver didn't create a valid set of dependencies, then
-	 * leave the domain as it is (which is unmanageable since
-	 * PPM_CPU_READY is off).
-	 */
-	dep = cpupm_pstate_domains;
-	if (dep == NULL) {
-		PPMD(D_CPU, ("%s: No CPU dependency info!\n", str));
-		return;
-	}
-
-	/*
-	 * Build real CPU domains. OFFLINE the old one as we don't
-	 * want it to be used when we're done.
-	 */
-	mutex_enter(&domp_old->lock);
-	domp_old->dflags |= PPMD_OFFLINE;
-	for (dep_next = dep; dep_next; dep_next = dep_next->pm_next) {
-		domp = kmem_zalloc(sizeof (*domp), KM_SLEEP);
-		domp->name =  kmem_zalloc(MAXNAMELEN, KM_SLEEP);
-		(void) snprintf(domp->name, MAXNAMELEN, "acpi_cpu_domain_%d",
-		    dep_next->pm_domain);
-		mutex_init(&domp->lock, NULL, MUTEX_DRIVER, NULL);
-		mutex_enter(&domp->lock);
-		domp->dflags = domit_p->dflags | PPMD_CPU_READY;
-		domp->pwr_cnt = 0;
-		domp->propname = domp_old->propname;
-		domp->model = domit_p->model;
-		domp->status = domit_p->status;
-
-		/*
-		 * Add devices to new domain. As a precaution,
-		 * make sure that the device is currently owned by the
-		 * ppm.conf defined CPU domain. Adding the device to the
-		 * domain will result in the domain's "devlist" and "owned"
-		 * lists being properly formed. It will also update the
-		 * dip pointer to the device structure. We have to manually
-		 * build the "conflist" for the domain. But conveniently, the
-		 * "conflist" data is easily obtainable from the "devlist".
-		 */
-		dom_cpu_set = dep_next->pm_cpus;
-		do {
-			CPUSET_FIND(dom_cpu_set, cpu_id);
-			if (cpu_id == CPUSET_NOTINSET)
-				break;
-
-			ASSERT(cpu_id < NCPU);
-			cpu_dip = ((cpupm_mach_state_t *)
-			    (cpu[cpu_id]->cpu_m.mcpu_pm_mach_state))->ms_dip;
-			devp = PPM_GET_PRIVATE(cpu_dip);
-			ASSERT(devp && devp->domp == domp_old);
-			devp = ppm_add_dev(cpu_dip, domp);
-			dbp = kmem_zalloc(sizeof (struct ppm_db), KM_SLEEP);
-			dbp->name = kmem_zalloc((strlen(devp->path) + 1),
-			    KM_SLEEP);
-			(void) strcpy(dbp->name, devp->path);
-			dbp->next = domp->conflist;
-			domp->conflist = dbp;
-
-			CPUSET_ATOMIC_XDEL(dom_cpu_set, cpu_id, result);
-		} while (result == 0);
-
-		/*
-		 * Note that we do not bother creating a "dc" list as there
-		 * isn't one for x86 CPU power management. If this changes
-		 * in the future some more work will need to be done to
-		 * support it.
-		 */
-		ASSERT(domp_old->dc == NULL);
-
-		/*
-		 * Add the domain to the live list.
-		 */
-		domp->next = ppm_domain_p;
-		ppm_domain_p = domp;
-
-		mutex_exit(&domp->lock);
-	}
-	mutex_exit(&domp_old->lock);
-}
+#define	PPM_CPU_PSTATE_DOMAIN_FLG	0x100
 
 /*
  * Used by ppm_redefine_topspeed() to set the highest power level of all CPUs
@@ -231,26 +92,6 @@ ppm_redefine_topspeed(void *ctx)
 	}
 
 	ppm_set_topspeed(cpup, newspeed);
-}
-
-/*
- * Traverses all domains looking for CPU domains and for each CPU domain
- * redefines the topspeed for that domain. The reason that this is necessary
- * is that on x86 platforms ACPI allows the highest power level to be
- * redefined dynamically. Once all CPU devices have been started it we
- * need to go back and reinitialize the topspeeds (just in case it's changed).
- */
-void
-ppm_init_topspeed(void)
-{
-	ppm_domain_t *domp;
-	for (domp = ppm_domain_p; domp;	domp = domp->next) {
-		if (domp->model != PPMD_CPU || !PPM_DOMAIN_UP(domp))
-			continue;
-		if (domp->devlist == NULL)
-			continue;
-		ppm_redefine_topspeed(domp->devlist->dip);
-	}
 }
 
 /*
@@ -324,4 +165,132 @@ ppm_change_cpu_power(ppm_dev_t *ppmd, int newlevel)
 	}
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * allocate ppm CPU pstate domain if non-existence,
+ * otherwise, add the CPU to the corresponding ppm
+ * CPU pstate domain.
+ */
+void
+ppm_alloc_pstate_domains(cpu_t *cp)
+{
+	cpupm_mach_state_t	*mach_state;
+	uint32_t		pm_domain;
+	int			sub_domain;
+	ppm_domain_t		*domp;
+	dev_info_t		*cpu_dip;
+	ppm_db_t		*dbp;
+	char			path[MAXNAMELEN];
+
+	mach_state = (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	ASSERT(mach_state);
+	pm_domain = mach_state->ms_pstate.cma_domain->pm_domain;
+
+	/*
+	 * There are two purposes of sub_domain:
+	 * 1. skip the orignal ppm CPU domain generated by ppm.conf
+	 * 2. A CPU ppm domain could have several pstate domains indeed.
+	 */
+	sub_domain = pm_domain | PPM_CPU_PSTATE_DOMAIN_FLG;
+
+	/*
+	 * Find ppm CPU pstate domain
+	 */
+	for (domp = ppm_domain_p; domp; domp = domp->next) {
+		if ((domp->model == PPMD_CPU) &&
+		    (domp->sub_domain == sub_domain)) {
+			break;
+		}
+	}
+
+	/*
+	 * Create one ppm CPU pstate domain if no found
+	 */
+	if (domp == NULL) {
+		domp = kmem_zalloc(sizeof (*domp), KM_SLEEP);
+		mutex_init(&domp->lock, NULL, MUTEX_DRIVER, NULL);
+		mutex_enter(&domp->lock);
+		domp->name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+		(void) snprintf(domp->name, MAXNAMELEN, "cpu_pstate_domain_%d",
+		    pm_domain);
+		domp->sub_domain = sub_domain;
+		domp->dflags = PPMD_LOCK_ALL | PPMD_CPU_READY;
+		domp->pwr_cnt = 0;
+		domp->pwr_cnt++;
+		domp->propname = NULL;
+		domp->model = PPMD_CPU;
+		domp->status = PPMD_ON;
+		cpu_dip = mach_state->ms_dip;
+		(void) ddi_pathname(cpu_dip, path);
+		dbp = kmem_zalloc(sizeof (struct ppm_db), KM_SLEEP);
+		dbp->name = kmem_zalloc((strlen(path) + 1),
+		    KM_SLEEP);
+		(void) strcpy(dbp->name, path);
+		dbp->next = domp->conflist;
+		domp->conflist = dbp;
+		domp->next = ppm_domain_p;
+		ppm_domain_p = domp;
+		mutex_exit(&domp->lock);
+	}
+	/*
+	 * We found one matched ppm CPU pstate domain,
+	 * add cpu to this domain
+	 */
+	else {
+		mutex_enter(&domp->lock);
+		cpu_dip = mach_state->ms_dip;
+		(void) ddi_pathname(cpu_dip, path);
+		dbp = kmem_zalloc(sizeof (struct ppm_db), KM_SLEEP);
+		dbp->name = kmem_zalloc((strlen(path) + 1),
+		    KM_SLEEP);
+		(void) strcpy(dbp->name, path);
+		dbp->next = domp->conflist;
+		domp->conflist = dbp;
+		domp->pwr_cnt++;
+		mutex_exit(&domp->lock);
+	}
+}
+
+/*
+ * remove CPU from the corresponding ppm CPU pstate
+ * domain. We only remove CPU from conflist here.
+ */
+void
+ppm_free_pstate_domains(cpu_t *cp)
+{
+	cpupm_mach_state_t	*mach_state;
+	ppm_domain_t		*domp;
+	ppm_dev_t		*devp;
+	dev_info_t		*cpu_dip;
+	ppm_db_t		**dbpp, *pconf;
+	char			path[MAXNAMELEN];
+
+	mach_state = (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	ASSERT(mach_state);
+	cpu_dip = mach_state->ms_dip;
+	(void) ddi_pathname(cpu_dip, path);
+
+	/*
+	 * get ppm CPU pstate domain
+	 */
+	devp = PPM_GET_PRIVATE(cpu_dip);
+	ASSERT(devp);
+	domp = devp->domp;
+	ASSERT(domp);
+
+	/*
+	 * remove CPU from conflist
+	 */
+	mutex_enter(&domp->lock);
+	for (dbpp = &domp->conflist; (pconf = *dbpp) != NULL; ) {
+		if (strcmp(pconf->name, path) != 0) {
+			dbpp = &pconf->next;
+			continue;
+		}
+		*dbpp = pconf->next;
+		kmem_free(pconf->name, strlen(pconf->name) + 1);
+		kmem_free(pconf, sizeof (*pconf));
+	}
+	mutex_exit(&domp->lock);
 }

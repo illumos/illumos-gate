@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009,  Intel Corporation.
+ * All Rights Reserved.
+ */
 
 #ifndef	_CPUPM_MACH_H
 #define	_CPUPM_MACH_H
@@ -70,6 +74,7 @@ typedef struct cpupm_state_ops {
 	int	(*cpus_init)(cpu_t *);
 	void	(*cpus_fini)(cpu_t *);
 	void	(*cpus_change)(cpuset_t, uint32_t);
+	void	(*cpus_stop)(cpu_t *);
 } cpupm_state_ops_t;
 
 /*
@@ -154,20 +159,22 @@ typedef struct cpupm_notification {
 /*
  * Callbacks used for CPU power management.
  */
-extern void (*cpupm_rebuild_cpu_domains)(void);
-extern void (*cpupm_init_topspeed)(void);
+extern void (*cpupm_ppm_alloc_pstate_domains)(cpu_t *);
+extern void (*cpupm_ppm_free_pstate_domains)(cpu_t *);
 extern void (*cpupm_redefine_topspeed)(void *);
 extern int (*cpupm_get_topspeed_callb)(void *);
 extern void (*cpupm_set_topspeed_callb)(void *, int);
 
 extern void cpupm_init(cpu_t *);
-extern void cpupm_free(cpu_t *);
-extern boolean_t cpupm_is_ready();
+extern void cpupm_fini(cpu_t *);
+extern void cpupm_start(cpu_t *);
+extern void cpupm_stop(cpu_t *);
+extern boolean_t cpupm_is_ready(cpu_t *);
 extern boolean_t cpupm_is_enabled(uint32_t);
 extern void cpupm_disable(uint32_t);
-extern void cpupm_post_startup();
 extern void cpupm_alloc_domains(cpu_t *, int);
 extern void cpupm_free_domains(cpupm_state_domains_t **);
+extern void cpupm_remove_domains(cpu_t *, int, cpupm_state_domains_t **);
 extern void cpupm_alloc_ms_cstate(cpu_t *cp);
 extern void cpupm_free_ms_cstate(cpu_t *cp);
 extern void cpupm_state_change(cpu_t *, int, int);
@@ -177,9 +184,9 @@ extern uint_t cpupm_plat_state_enumerate(cpu_t *, cpupm_dtype_t,
 extern int cpupm_plat_change_state(cpu_t *, cpupm_state_t *);
 extern uint_t cpupm_get_speeds(cpu_t *, int **);
 extern void cpupm_free_speeds(int *, uint_t);
-extern boolean_t cpupm_power_ready(void);
-extern boolean_t cpupm_throttle_ready(void);
-extern boolean_t cpupm_cstate_ready(void);
+extern boolean_t cpupm_power_ready(cpu_t *);
+extern boolean_t cpupm_throttle_ready(cpu_t *);
+extern boolean_t cpupm_cstate_ready(cpu_t *);
 extern void cpupm_add_notify_handler(cpu_t *, CPUPM_NOTIFY_HANDLER, void *);
 extern int cpupm_get_top_speed(cpu_t *);
 extern void cpupm_idle_cstate_data(cma_c_state_t *, int);

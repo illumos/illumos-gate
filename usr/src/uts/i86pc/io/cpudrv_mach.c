@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009,  Intel Corporation.
+ * All Rights Reserved.
+ */
 
 /*
  * CPU power management driver support for i86pc.
@@ -239,6 +243,33 @@ cpudrv_install_notify_handler(cpudrv_devstate_t *cpudsp)
 }
 
 void
+cpudrv_uninstall_notify_handler(cpudrv_devstate_t *cpudsp)
+{
+	cpu_t *cp = cpudsp->cp;
+	cpupm_notification_t *entry, **next;
+
+	ASSERT(cp != NULL);
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+
+	mutex_enter(&mach_state->ms_lock);
+	if (mach_state->ms_handlers == NULL) {
+		mutex_exit(&mach_state->ms_lock);
+		return;
+	}
+
+	for (next = &mach_state->ms_handlers; (entry = *next) != NULL; ) {
+		if (entry->nq_handler != cpudrv_notify_handler) {
+			next = &entry->nq_next;
+			continue;
+		}
+		*next = entry->nq_next;
+		kmem_free(entry, sizeof (cpupm_notification_t));
+	}
+	mutex_exit(&mach_state->ms_lock);
+}
+
+void
 cpudrv_redefine_topspeed(void *ctx)
 {
 	/*
@@ -262,19 +293,42 @@ boolean_t
 cpudrv_mach_init(cpudrv_devstate_t *cpudsp)
 {
 	cpupm_mach_state_t *mach_state;
+	int topspeed;
 
-	mutex_enter(&cpu_lock);
-	cpudsp->cp = cpu_get(cpudsp->cpu_id);
-	mutex_exit(&cpu_lock);
-	if (cpudsp->cp == NULL) {
-		cmn_err(CE_WARN, "cpudrv_mach_pm_init: instance %d: "
-		    "can't get cpu_t", ddi_get_instance(cpudsp->dip));
-		return (B_FALSE);
-	}
+	ASSERT(cpudsp->cp);
 
 	mach_state = (cpupm_mach_state_t *)
 	    (cpudsp->cp->cpu_m.mcpu_pm_mach_state);
 	mach_state->ms_dip = cpudsp->dip;
+	/*
+	 * allocate ppm CPU domain and initialize the topspeed
+	 * only if P-states are enabled.
+	 */
+	if (cpudrv_power_ready(cpudsp->cp)) {
+		(*cpupm_ppm_alloc_pstate_domains)(cpudsp->cp);
+		topspeed = cpudrv_get_topspeed(cpudsp->dip);
+		cpudrv_set_topspeed(cpudsp->dip, topspeed);
+	}
+
+	return (B_TRUE);
+}
+
+boolean_t
+cpudrv_mach_fini(cpudrv_devstate_t *cpudsp)
+{
+	/*
+	 * return TRUE if cpu pointer is NULL
+	 */
+	if (cpudsp->cp == NULL)
+		return (B_TRUE);
+	/*
+	 * free ppm cpu pstate domains only if
+	 * P-states are enabled
+	 */
+	if (cpudrv_power_ready(cpudsp->cp)) {
+		(*cpupm_ppm_free_pstate_domains)(cpudsp->cp);
+	}
+
 	return (B_TRUE);
 }
 
@@ -291,9 +345,9 @@ cpudrv_free_speeds(int *speeds, uint_t nspeeds)
 }
 
 boolean_t
-cpudrv_power_ready(void)
+cpudrv_power_ready(cpu_t *cp)
 {
-	return (cpupm_power_ready());
+	return (cpupm_power_ready(cp));
 }
 
 /* ARGSUSED */

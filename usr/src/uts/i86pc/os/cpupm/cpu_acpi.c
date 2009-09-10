@@ -1094,13 +1094,13 @@ cpu_acpi_get_max_cstates(cpu_acpi_handle_t handle)
 void
 cpu_acpi_set_register(uint32_t bitreg, uint32_t value)
 {
-	AcpiWriteBitRegister(bitreg, value);
+	(void) AcpiWriteBitRegister(bitreg, value);
 }
 
 void
 cpu_acpi_get_register(uint32_t bitreg, uint32_t *value)
 {
-	AcpiReadBitRegister(bitreg, value);
+	(void) AcpiReadBitRegister(bitreg, value);
 }
 
 /*

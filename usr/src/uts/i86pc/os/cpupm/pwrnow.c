@@ -37,6 +37,7 @@
 static int pwrnow_init(cpu_t *);
 static void pwrnow_fini(cpu_t *);
 static void pwrnow_power(cpuset_t, uint32_t);
+static void pwrnow_stop(cpu_t *);
 
 /*
  * Interfaces for modules implementing AMD's PowerNow!.
@@ -45,7 +46,8 @@ cpupm_state_ops_t pwrnow_ops = {
 	"PowerNow! Technology",
 	pwrnow_init,
 	pwrnow_fini,
-	pwrnow_power
+	pwrnow_power,
+	pwrnow_stop
 };
 
 /*
@@ -246,4 +248,15 @@ pwrnow_supported()
 		return (B_FALSE);
 	}
 	return (B_TRUE);
+}
+
+static void
+pwrnow_stop(cpu_t *cp)
+{
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
+
+	cpupm_remove_domains(cp, CPUPM_P_STATES, &cpupm_pstate_domains);
+	cpu_acpi_free_pstate_data(handle);
 }

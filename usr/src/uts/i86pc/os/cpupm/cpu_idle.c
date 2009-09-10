@@ -53,6 +53,7 @@ extern uint32_t cpupm_next_cstate(cma_c_state_t *cs_data,
 
 static int cpu_idle_init(cpu_t *);
 static void cpu_idle_fini(cpu_t *);
+static void cpu_idle_stop(cpu_t *);
 static boolean_t cpu_deep_idle_callb(void *arg, int code);
 static boolean_t cpu_idle_cpr_callb(void *arg, int code);
 static void acpi_cpu_cstate(cpu_acpi_cstate_t *cstate);
@@ -73,7 +74,8 @@ cpupm_state_ops_t cpu_idle_ops = {
 	"Generic ACPI C-state Support",
 	cpu_idle_init,
 	cpu_idle_fini,
-	NULL
+	NULL,
+	cpu_idle_stop
 };
 
 static kmutex_t		cpu_idle_callb_mutex;
@@ -769,6 +771,30 @@ cpu_idle_fini(cpu_t *cp)
 	mutex_exit(&cpu_idle_callb_mutex);
 }
 
+static void
+cpu_idle_stop(cpu_t *cp)
+{
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
+	cpu_acpi_cstate_t *cstate;
+	uint_t cpu_max_cstates, i;
+
+	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
+	if (cstate) {
+		cpu_max_cstates = cpu_acpi_get_max_cstates(handle);
+
+		for (i = CPU_ACPI_C1; i <= cpu_max_cstates; i++) {
+			if (cstate->cs_ksp != NULL)
+				kstat_delete(cstate->cs_ksp);
+			cstate++;
+		}
+	}
+	cpupm_free_ms_cstate(cp);
+	cpupm_remove_domains(cp, CPUPM_C_STATES, &cpupm_cstate_domains);
+	cpu_acpi_free_cstate_data(handle);
+}
+
 /*ARGSUSED*/
 static boolean_t
 cpu_deep_idle_callb(void *arg, int code)
@@ -919,8 +945,8 @@ cpuidle_cstate_instance(cpu_t *cp)
 		mutex_exit(&cpu_lock);
 
 		CPUSET_ATOMIC_XDEL(dom_cpu_set, cpu_id, result);
-		mutex_exit(pm_lock);
 	} while (result < 0);
+	mutex_exit(pm_lock);
 #endif
 }
 
@@ -944,12 +970,10 @@ cpuidle_manage_cstates(void *ctx)
 	 * take cross calls (cross calls fail silently if CPU is not ready
 	 * for it).
 	 *
-	 * Additionally, for x86 platforms we cannot power manage
-	 * any one instance, until all instances have been initialized.
-	 * That's because we don't know what the CPU domains look like
-	 * until all instances have been initialized.
+	 * Additionally, for x86 platforms we cannot power manage an instance,
+	 * until it has been initialized.
 	 */
-	is_ready = (cp->cpu_flags & CPU_READY) && cpupm_cstate_ready();
+	is_ready = (cp->cpu_flags & CPU_READY) && cpupm_cstate_ready(cp);
 	if (!is_ready)
 		return;
 

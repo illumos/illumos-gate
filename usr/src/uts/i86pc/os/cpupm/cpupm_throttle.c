@@ -34,12 +34,14 @@
 static int cpupm_throttle_init(cpu_t *);
 static void cpupm_throttle_fini(cpu_t *);
 static void cpupm_throttle(cpuset_t,  uint32_t);
+static void cpupm_throttle_stop(cpu_t *);
 
 cpupm_state_ops_t cpupm_throttle_ops = {
 	"Generic ACPI T-state Support",
 	cpupm_throttle_init,
 	cpupm_throttle_fini,
-	cpupm_throttle
+	cpupm_throttle,
+	cpupm_throttle_stop
 };
 
 /*
@@ -269,6 +271,17 @@ cpupm_throttle_fini(cpu_t *cp)
 	cpu_acpi_free_tstate_data(handle);
 }
 
+static void
+cpupm_throttle_stop(cpu_t *cp)
+{
+	cpupm_mach_state_t *mach_state =
+	    (cpupm_mach_state_t *)cp->cpu_m.mcpu_pm_mach_state;
+	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
+
+	cpupm_remove_domains(cp, CPUPM_T_STATES, &cpupm_tstate_domains);
+	cpu_acpi_free_tstate_data(handle);
+}
+
 /*
  * This routine reads the ACPI _TPC object. It's accessed as a callback
  * by the cpu driver whenever a _TPC change notification is received.
@@ -328,12 +341,10 @@ cpupm_throttle_manage_notification(void *ctx)
 	 * take cross calls (cross calls fail silently if CPU is not ready
 	 * for it).
 	 *
-	 * Additionally, for x86 platforms we cannot power-manage
-	 * any one instance, until all instances have been initialized.
-	 * That's because we don't know what the CPU domains look like
-	 * until all instances have been initialized.
+	 * Additionally, for x86 platforms we cannot power-manage an instance,
+	 * until it has been initialized.
 	 */
-	is_ready = (cp->cpu_flags & CPU_READY) && cpupm_throttle_ready();
+	is_ready = (cp->cpu_flags & CPU_READY) && cpupm_throttle_ready(cp);
 	if (!is_ready)
 		return;
 

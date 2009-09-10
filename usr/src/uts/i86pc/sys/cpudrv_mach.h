@@ -64,6 +64,12 @@ extern cpuset_t cpu_ready_set;
 	cpudrv_install_notify_handler(cpudsp);
 
 /*
+ * Uninstall _PPC/_TPC change notification handler.
+ */
+#define	CPUDRV_UNINSTALL_MAX_CHANGE_HANDLER(cpudsp) \
+	cpudrv_uninstall_notify_handler(cpudsp);
+
+/*
  * Redefine the topspeed.
  */
 #define	CPUDRV_REDEFINE_TOPSPEED(dip) cpudrv_redefine_topspeed(dip)
@@ -126,6 +132,7 @@ extern int cpudrv_get_topspeed(void *);
 extern int cpudrv_get_topthrottle(cpu_t *);
 extern void cpudrv_manage_throttling(void *);
 extern void cpudrv_install_notify_handler(cpudrv_devstate_t *);
+extern void cpudrv_uninstall_notify_handler(cpudrv_devstate_t *);
 extern void cpudrv_redefine_topspeed(void *);
 extern uint_t cpudrv_get_speeds(cpudrv_devstate_t *, int **);
 extern void cpudrv_free_speeds(int *, uint_t);

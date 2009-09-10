@@ -22,6 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2009,  Intel Corporation.
+ * All Rights Reserved.
+ */
 
 
 /*
@@ -352,16 +356,11 @@ ppm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #if defined(__x86)
 	/*
 	 * Register callback so that once CPUs have been added to
-	 * the device tree, ppm can rebuild CPU domains using ACPI
+	 * the device tree, ppm CPU domains can be allocated using ACPI
 	 * data.
 	 */
-	cpupm_rebuild_cpu_domains = ppm_rebuild_cpu_domains;
-
-	/*
-	 * Register callback so that the ppm can initialize the
-	 * topspeed for all CPUs in all domains.
-	 */
-	cpupm_init_topspeed = ppm_init_topspeed;
+	cpupm_ppm_alloc_pstate_domains = ppm_alloc_pstate_domains;
+	cpupm_ppm_free_pstate_domains = ppm_free_pstate_domains;
 
 	/*
 	 * Register callback so that whenever max speed throttle requests
