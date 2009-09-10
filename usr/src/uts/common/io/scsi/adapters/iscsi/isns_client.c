@@ -86,12 +86,10 @@ void (*scn_callback_p)(void *);
  */
 static boolean_t esi_scn_thr_to_shutdown = B_FALSE;
 static iscsi_thread_t *esi_scn_thr_id = NULL;
-static iscsi_addr_t *local_addr = NULL;
 static void *instance_listening_so = NULL;
 /*
  * This mutex protects all the per LHBA instance variables, i.e.,
- * esi_scn_thr_to_shutdown, esi_scn_thr_id, local_addr, and
- * instance_listening_so.
+ * esi_scn_thr_to_shutdown, esi_scn_thr_id, and instance_listening_so.
  */
 static kmutex_t esi_scn_thr_mutex;
 
@@ -150,6 +148,8 @@ static void (*scn_callback_lookup(uint8_t *lhba_handle))(void *);
 static void *isns_open(iscsi_addr_t *isns_server_addr);
 static ssize_t isns_send_pdu(void *socket, isns_pdu_t *pdu);
 static size_t isns_rcv_pdu(void *so, isns_pdu_t **pdu, size_t *pdu_size);
+static boolean_t find_listening_addr(iscsi_addr_t *local_addr,
+    void *listening_so);
 static boolean_t find_local_portal(iscsi_addr_t *isns_server_addr,
     iscsi_addr_t **local_addr, void **listening_so);
 
@@ -216,7 +216,6 @@ isns_client_init()
 	/* MISC initializations. */
 	scn_callback_p = NULL;
 	esi_scn_thr_id = NULL;
-	local_addr = NULL;
 	instance_listening_so = NULL;
 	esi_scn_thr_to_shutdown = B_FALSE;
 	xid = 0;
@@ -609,29 +608,11 @@ static
 int
 create_esi_scn_thr(uint8_t *lhba_handle, iscsi_addr_t *isns_server_address)
 {
-	iscsi_addr_t *tmp_local_addr;
-	void *listening_so = NULL;
+	void *listening_so  = NULL;
+	boolean_t found	    = B_FALSE;
 
 	ASSERT(lhba_handle != NULL);
 	ASSERT(isns_server_address != NULL);
-
-	/* Determine local port and address. */
-	mutex_enter(&esi_scn_thr_mutex);
-	if (local_addr == NULL) {
-		boolean_t rval;
-		rval = find_local_portal(isns_server_address,
-		    &tmp_local_addr, &listening_so);
-		if (rval == B_FALSE) {
-			local_addr = NULL;
-			mutex_exit(&esi_scn_thr_mutex);
-			if (listening_so != NULL) {
-				iscsi_net->close(listening_so);
-			}
-			return (ISNS_CANNOT_FIND_LOCAL_ADDR);
-		}
-		local_addr = tmp_local_addr;
-	}
-	mutex_exit(&esi_scn_thr_mutex);
 
 	/*
 	 * Bringing up of the thread should happen regardless of the
@@ -640,6 +621,18 @@ create_esi_scn_thr(uint8_t *lhba_handle, iscsi_addr_t *isns_server_address)
 	 */
 	/* Check and create ESI/SCN thread. */
 	mutex_enter(&esi_scn_thr_mutex);
+
+	/* Determine local port and address. */
+	found = find_local_portal(isns_server_address,
+	    NULL, &listening_so);
+	if (found == B_FALSE) {
+		if (listening_so != NULL) {
+			iscsi_net->close(listening_so);
+		}
+		mutex_exit(&esi_scn_thr_mutex);
+		return (ISNS_CANNOT_FIND_LOCAL_ADDR);
+	}
+
 	if (esi_scn_thr_id == NULL) {
 		char thr_name[ISCSI_TH_MAX_NAME_LEN];
 		int rval;
@@ -654,10 +647,6 @@ create_esi_scn_thr(uint8_t *lhba_handle, iscsi_addr_t *isns_server_address)
 		    lhba_handle[3]) >=
 		    sizeof (thr_name)) {
 			esi_scn_thr_id = NULL;
-			if (local_addr != NULL) {
-				kmem_free(local_addr, sizeof (iscsi_addr_t));
-				local_addr = NULL;
-			}
 			if (listening_so != NULL) {
 				iscsi_net->close(listening_so);
 				listening_so = NULL;
@@ -674,10 +663,6 @@ create_esi_scn_thr(uint8_t *lhba_handle, iscsi_addr_t *isns_server_address)
 		esi_scn_thr_id = iscsi_thread_create(NULL,
 		    thr_name, isns_service_esi_scn, (void *)larg);
 		if (esi_scn_thr_id == NULL) {
-			if (local_addr != NULL) {
-				kmem_free(local_addr, sizeof (iscsi_addr_t));
-				local_addr = NULL;
-			}
 			if (listening_so != NULL) {
 				iscsi_net->close(listening_so);
 				listening_so = NULL;
@@ -691,10 +676,6 @@ create_esi_scn_thr(uint8_t *lhba_handle, iscsi_addr_t *isns_server_address)
 		if (rval == B_FALSE) {
 			iscsi_thread_destroy(esi_scn_thr_id);
 			esi_scn_thr_id = NULL;
-			if (local_addr != NULL) {
-				kmem_free(local_addr, sizeof (iscsi_addr_t));
-				local_addr = NULL;
-			}
 			if (listening_so != NULL) {
 				iscsi_net->close(listening_so);
 				listening_so = NULL;
@@ -1740,10 +1721,11 @@ isns_create_dev_attr_reg_pdu(
 	isns_pdu_t *pdu;
 	size_t pdu_size, node_name_len, node_alias_len;
 	uint16_t flags;
+	boolean_t	rval	    = B_FALSE;
+	iscsi_addr_t	local_addr;
 
 	ASSERT(node_name != NULL);
 	ASSERT(node_alias != NULL);
-	ASSERT(local_addr != NULL);
 
 	/* RFC 4171 section 6.1 - NULLs included in the length. */
 	node_name_len = strlen((char *)node_name) + 1;
@@ -1839,14 +1821,25 @@ isns_create_dev_attr_reg_pdu(
 	}
 
 	mutex_enter(&esi_scn_thr_mutex);
-	local_port = local_addr->a_port;
-	mutex_exit(&esi_scn_thr_mutex);
-
-	mutex_enter(&esi_scn_thr_mutex);
+	if (instance_listening_so != NULL) {
+		rval = find_listening_addr(&local_addr, instance_listening_so);
+		if (rval == B_FALSE) {
+			kmem_free(pdu, pdu_size);
+			*out_pdu = NULL;
+			mutex_exit(&esi_scn_thr_mutex);
+			return (0);
+		}
+	} else {
+		kmem_free(pdu, pdu_size);
+		*out_pdu = NULL;
+		mutex_exit(&esi_scn_thr_mutex);
+		return (0);
+	}
+	local_port = local_addr.a_port;
 	/* Portal IP Address - Section 6.5.2 */
 	if (isns_add_attr(pdu, pdu_size, ISNS_PORTAL_IP_ADDR_ATTR_ID, 16,
-	    &(local_addr->a_addr.i_addr.in4),
-	    local_addr->a_addr.i_insize) != 0) {
+	    &(local_addr.a_addr.i_addr.in4),
+	    local_addr.a_addr.i_insize) != 0) {
 		kmem_free(pdu, pdu_size);
 		*out_pdu = NULL;
 		mutex_exit(&esi_scn_thr_mutex);
@@ -3085,10 +3078,50 @@ isns_service_esi_scn(iscsi_thread_t *thread, void *arg)
 
 static
 boolean_t
+find_listening_addr(iscsi_addr_t *local_addr, void *listening_so)
+{
+	union {
+		struct sockaddr_in	soa4;
+		struct sockaddr_in6	soa6;
+	} local_conn_prop = { 0 };
+
+	struct sockaddr_in6	t_addr;
+	socklen_t		t_addrlen;
+
+	if (local_addr == NULL || listening_so == NULL) {
+		return (B_FALSE);
+	}
+
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in6);
+
+	(void) iscsi_net->getsockname(listening_so, (struct sockaddr *)&t_addr,
+	    &t_addrlen);
+	if (t_addrlen > sizeof (local_conn_prop)) {
+		return (B_FALSE);
+	}
+	bcopy(&t_addr, &local_conn_prop, t_addrlen);
+	if (local_conn_prop.soa4.sin_family == AF_INET) {
+		local_addr->a_addr.i_addr.in4.s_addr =
+		    local_conn_prop.soa4.sin_addr.s_addr;
+		local_addr->a_addr.i_insize = sizeof (in_addr_t);
+	} else if (local_conn_prop.soa4.sin_family == AF_INET6) {
+		/* Currently, IPv6 is not supported */
+		return (B_FALSE);
+	} else {
+		return (B_FALSE);
+	}
+
+	local_addr->a_port = ntohs(local_conn_prop.soa4.sin_port);
+
+	return (B_TRUE);
+}
+
+static
+boolean_t
 find_local_portal(iscsi_addr_t *isns_server_addr,
     iscsi_addr_t **local_addr, void **listening_so)
 {
-	char local_addr_str[256];
 	union {
 		struct sockaddr_in	soa4;
 		struct sockaddr_in6	soa6;
@@ -3102,42 +3135,53 @@ find_local_portal(iscsi_addr_t *isns_server_addr,
 	struct sockaddr_in6	t_addr;
 	socklen_t		t_addrlen;
 
-	*local_addr = NULL;
-	*listening_so = NULL;
+	if (listening_so == NULL) {
+		return (B_FALSE);
+	}
 
+	if (local_addr != NULL) {
+		*local_addr = NULL;
+	}
+
+	*listening_so = NULL;
 	bzero(&t_addr, sizeof (struct sockaddr_in6));
 	t_addrlen = sizeof (struct sockaddr_in6);
+
 	/*
 	 * Determine the local IP address.
 	 */
-	so = isns_open(isns_server_addr);
-	if (so == NULL) {
-		return (B_FALSE);
-	}
+	if (local_addr != NULL) {
+		so = isns_open(isns_server_addr);
+		if (so == NULL) {
+			return (B_FALSE);
+		}
 
-	iscsi_net->getsockname(so, (struct sockaddr *)&t_addr, &t_addrlen);
-	if (t_addrlen > sizeof (local_conn_prop)) {
+		iscsi_net->getsockname(so,
+		    (struct sockaddr *)&t_addr, &t_addrlen);
+		if (t_addrlen > sizeof (local_conn_prop)) {
+			iscsi_net->close(so);
+			return (B_FALSE);
+		}
+
+		bcopy(&t_addr, &local_conn_prop, t_addrlen);
+		t_addrlen = sizeof (struct sockaddr_in6);
+		if (local_conn_prop.soa4.sin_family == AF_INET) {
+			*local_addr =
+			    (iscsi_addr_t *)kmem_zalloc(sizeof (iscsi_addr_t),
+			    KM_SLEEP);
+			(*local_addr)->a_addr.i_addr.in4.s_addr =
+			    local_conn_prop.soa4.sin_addr.s_addr;
+			(*local_addr)->a_addr.i_insize = sizeof (in_addr_t);
+		} else if (local_conn_prop.soa4.sin_family == AF_INET6) {
+			/* Currently, IPv6 is not supported */
+			return (B_FALSE);
+		} else {
+			iscsi_net->close(so);
+			return (B_FALSE);
+		}
+
 		iscsi_net->close(so);
-		return (B_FALSE);
 	}
-
-	bcopy(&t_addr, &local_conn_prop, t_addrlen);
-	t_addrlen = sizeof (struct sockaddr_in6);
-	if (local_conn_prop.soa4.sin_family == AF_INET) {
-		*local_addr = (iscsi_addr_t *)kmem_zalloc(sizeof (iscsi_addr_t),
-		    KM_SLEEP);
-		(*local_addr)->a_addr.i_addr.in4.s_addr =
-		    local_conn_prop.soa4.sin_addr.s_addr;
-		(*local_addr)->a_addr.i_insize = sizeof (in_addr_t);
-	} else if (local_conn_prop.soa4.sin_family == AF_INET6) {
-		/* EMPTY */
-	} else {
-		iscsi_net->close(so);
-		return (B_FALSE);
-	}
-
-	iscsi_net->close(so);
-
 	/*
 	 * Determine the local IP address. (End)
 	 */
@@ -3156,32 +3200,36 @@ find_local_portal(iscsi_addr_t *isns_server_addr,
 
 	so = iscsi_net->socket(AF_INET, SOCK_STREAM, 0);
 	if (so == NULL) {
-		kmem_free((*local_addr), sizeof (iscsi_addr_t));
-		*local_addr = NULL;
+		if (local_addr != NULL && (*local_addr != NULL)) {
+			kmem_free((*local_addr), sizeof (iscsi_addr_t));
+			*local_addr = NULL;
+		}
 		return (B_FALSE);
 	}
 
 	if (iscsi_net->bind(so, &serv_addr.sin,
 		sizeof (struct sockaddr), 0, 0) < 0) {
-		kmem_free((*local_addr), sizeof (iscsi_addr_t));
-		*local_addr = NULL;
+		if (local_addr != NULL && (*local_addr != NULL)) {
+			kmem_free((*local_addr), sizeof (iscsi_addr_t));
+			*local_addr = NULL;
+		}
 		iscsi_net->close(so);
 		return (B_FALSE);
 	}
 
-	(void) iscsi_net->getsockname(so, (struct sockaddr *)&t_addr,
-	    &t_addrlen);
-	if (t_addrlen <= sizeof (local_conn_prop)) {
-		bcopy(&t_addr, &local_conn_prop, t_addrlen);
-		(*local_addr)->a_port = ntohs(local_conn_prop.soa4.sin_port);
-	} else {
-		(*local_addr)->a_port = ISNS_DEFAULT_ESI_SCN_PORT;
+	if (local_addr != NULL && (*local_addr != NULL)) {
+		(void) iscsi_net->getsockname(so, (struct sockaddr *)&t_addr,
+		    &t_addrlen);
+		if (t_addrlen <= sizeof (local_conn_prop)) {
+			bcopy(&t_addr, &local_conn_prop, t_addrlen);
+			(*local_addr)->a_port =
+			    ntohs(local_conn_prop.soa4.sin_port);
+		} else {
+			(*local_addr)->a_port = ISNS_DEFAULT_ESI_SCN_PORT;
+		}
 	}
 
 	*listening_so = so;
-
-	(void) inet_ntop(AF_INET, (void *)&((*local_addr)->a_addr.i_addr.in4),
-	    local_addr_str, 256);
 
 	return (B_TRUE);
 }
@@ -3210,22 +3258,17 @@ static
 void
 esi_scn_thr_cleanup()
 {
-	boolean_t clear_esi_scn_thr_id_b = B_FALSE;
-	boolean_t clear_instance_listening_so_b = B_FALSE;
-	boolean_t clear_local_addr_b = B_FALSE;
-	iscsi_thread_t *tmp_esi_scn_thr_id = NULL;
+	boolean_t	unblock_esi_scn_thr_b		= B_FALSE;
+	iscsi_addr_t	local_addr;
 
 	mutex_enter(&esi_scn_thr_mutex);
-	tmp_esi_scn_thr_id = esi_scn_thr_id;
-	mutex_exit(&esi_scn_thr_mutex);
-	if (tmp_esi_scn_thr_id != NULL) {
-		boolean_t unblock_esi_scn_thr_b = B_TRUE;
+	if (esi_scn_thr_to_shutdown == B_FALSE) {
 
 		/* Instruct the ESI/SCN to shut itself down. */
-		mutex_enter(&esi_scn_thr_mutex);
 		esi_scn_thr_to_shutdown = B_TRUE;
 		if (instance_listening_so != NULL &&
-		    local_addr != NULL) {
+		    (find_listening_addr(&local_addr,
+		    instance_listening_so) == B_TRUE)) {
 			isns_pdu_t *out_pdu;
 			size_t out_pdu_size;
 			void *connecting_so;
@@ -3236,10 +3279,10 @@ esi_scn_thr_cleanup()
 			 * the ESI/SCN thread has a chance to terminate
 			 * itself.
 			 */
-			connecting_so = isns_open(local_addr);
+			connecting_so = isns_open(&local_addr);
 			if (connecting_so == NULL) {
 				unblock_esi_scn_thr_b = B_FALSE;
-				mutex_exit(&esi_scn_thr_mutex);
+				esi_scn_thr_to_shutdown = B_FALSE;
 			} else {
 				out_pdu_size = isns_create_pdu_header(0,
 				    ISNS_FLAG_FIRST_PDU |
@@ -3248,45 +3291,30 @@ esi_scn_thr_cleanup()
 				if (isns_send_pdu(connecting_so,
 				    out_pdu) != 0) {
 					unblock_esi_scn_thr_b = B_FALSE;
+					esi_scn_thr_to_shutdown = B_FALSE;
 				} else {
 					unblock_esi_scn_thr_b = B_TRUE;
 				}
 				iscsi_net->close(connecting_so);
 				kmem_free(out_pdu, out_pdu_size);
 				out_pdu = NULL;
-				mutex_exit(&esi_scn_thr_mutex);
 			}
-		} else {
-			mutex_exit(&esi_scn_thr_mutex);
 		}
 
 		if (unblock_esi_scn_thr_b == B_TRUE) {
-			clear_instance_listening_so_b = B_TRUE;
-			clear_esi_scn_thr_id_b = B_TRUE;
-			clear_local_addr_b = B_TRUE;
+			mutex_exit(&esi_scn_thr_mutex);
+			(void) iscsi_thread_stop(esi_scn_thr_id);
+			iscsi_thread_destroy(esi_scn_thr_id);
+			mutex_enter(&esi_scn_thr_mutex);
+			esi_scn_thr_id = NULL;
+
+			/*
+			 * Shutdown and close the listening socket.
+			 */
+			iscsi_net->shutdown(instance_listening_so, 2);
+			iscsi_net->close(instance_listening_so);
+			instance_listening_so = NULL;
 		}
 	}
-
-	if (clear_instance_listening_so_b &&
-	    clear_esi_scn_thr_id_b &&
-	    clear_local_addr_b) {
-		(void) iscsi_thread_stop(esi_scn_thr_id);
-		iscsi_thread_destroy(esi_scn_thr_id);
-
-		mutex_enter(&esi_scn_thr_mutex);
-		esi_scn_thr_id = NULL;
-
-		/*
-		 * Shutdown and close the listening socket.
-		 */
-		iscsi_net->shutdown(instance_listening_so, 2);
-		iscsi_net->close(instance_listening_so);
-		instance_listening_so = NULL;
-
-		if (local_addr != NULL) {
-			kmem_free(local_addr, sizeof (iscsi_addr_t));
-			local_addr = NULL;
-		}
-		mutex_exit(&esi_scn_thr_mutex);
-	}
+	mutex_exit(&esi_scn_thr_mutex);
 }

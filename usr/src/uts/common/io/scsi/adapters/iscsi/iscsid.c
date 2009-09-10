@@ -705,13 +705,26 @@ iscsid_do_isns_query(iscsi_hba_t *ihp)
 	    ihp->hba_alias,
 	    ISNS_INITIATOR_NODE_TYPE,
 	    &pg_list);
-	if ((query_status != isns_ok &&
-	    query_status != isns_op_partially_failed) ||
-	    pg_list == NULL) {
+
+	if (pg_list == NULL) {
 		DTRACE_PROBE1(iscsid_do_isns_query_status,
 		    int, query_status);
 		return;
 	}
+
+	if ((query_status != isns_ok &&
+	    query_status != isns_op_partially_failed)) {
+		DTRACE_PROBE1(iscsid_do_isns_query_status,
+		    int, query_status);
+		pg_sz = sizeof (isns_portal_group_list_t);
+		if (pg_list->pg_out_cnt > 0) {
+			pg_sz += (pg_list->pg_out_cnt - 1) *
+			    sizeof (isns_portal_group_t);
+		}
+		kmem_free(pg_list, pg_sz);
+		return;
+	}
+
 	iscsid_add_pg_list_to_cache(ihp, pg_list);
 
 	pg_sz = sizeof (isns_portal_group_list_t);
