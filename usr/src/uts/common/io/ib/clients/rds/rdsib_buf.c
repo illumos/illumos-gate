@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -93,6 +93,8 @@
 	RDS_DPRINTF3(LABEL, "DataRecvBufferLWM = %d", DataRecvBufferLWM); \
 	RDS_DPRINTF3(LABEL, "PendingRxPktsHWM = %d", PendingRxPktsHWM); \
 	RDS_DPRINTF3(LABEL, "MinRnrRetry = %d", MinRnrRetry)
+
+uint_t	rds_nbuffers_to_putback;
 
 static void
 rds_free_mblk(char *arg)
@@ -201,9 +203,11 @@ rds_init_recv_caches(rds_state_t *statep)
 	 */
 	rds_rx_pkts_pending_hwm = (PendingRxPktsHWM * NDataRX)/100;
 
+	rds_nbuffers_to_putback = min(MaxCtrlRecvBuffers, MaxDataRecvBuffers);
+
 	/* nsessions can never be less than 1 */
 	nsessions = MaxNodes - 1;
-	nctrlrx = (nsessions + 1) * MaxCtrlRecvBuffers;
+	nctrlrx = (nsessions + 1) * MaxCtrlRecvBuffers * 2;
 
 	RDS_DPRINTF3(LABEL, "Number of Possible Sessions: %d", nsessions);
 
@@ -821,18 +825,17 @@ rds_is_recvq_empty(rds_ep_t *ep, boolean_t wait)
 
 	rpool = &ep->ep_rcvpool;
 	mutex_enter(&rpool->pool_lock);
-	RDS_DPRINTF2("rds_is_recvq_empty", "EP(%p): "
-	    "There are %d pending buffers on sockqs", ep, rpool->pool_nbusy);
-	if (wait) {
-		/* Wait for all buffers to be freed by sockfs */
-		while (rpool->pool_nbusy != 0) {
-			/* wait one second and try again */
-			mutex_exit(&rpool->pool_lock);
-			delay(drv_usectohz(1000000));
-			mutex_enter(&rpool->pool_lock);
-		}
-	} else if (rpool->pool_nbusy != 0) {
-			ret = B_FALSE;
+
+	/*
+	 * During failovers/reconnects, the app may still have some buffers
+	 * on thier socket queues. Waiting here for those buffers may
+	 * cause a hang. It seems ok for those buffers to get freed later.
+	 */
+	if (rpool->pool_nbusy != 0) {
+		RDS_DPRINTF2("rds_is_recvq_empty", "EP(%p): "
+		    "There are %d pending buffers on sockqs", ep,
+		    rpool->pool_nbusy);
+		ret = B_FALSE;
 	}
 	mutex_exit(&rpool->pool_lock);
 
@@ -1083,7 +1086,6 @@ rds_free_send_buf(rds_ep_t *ep, rds_buf_t *headp, rds_buf_t *tailp, uint_t nbuf,
 	RDS_DPRINTF4("rds_free_send_buf", "Return");
 }
 
-#define	RDS_NBUFFERS_TO_PUTBACK	100
 void
 rds_free_recv_buf(rds_buf_t *bp, uint_t nbuf)
 {
@@ -1140,7 +1142,7 @@ rds_free_recv_buf(rds_buf_t *bp, uint_t nbuf)
 		rpool->pool_nfree += nbuf;
 	}
 
-	if (rpool->pool_nfree >= RDS_NBUFFERS_TO_PUTBACK) {
+	if (rpool->pool_nfree >= rds_nbuffers_to_putback) {
 		bp = rpool->pool_headp;
 		nbuf = rpool->pool_nfree;
 		rpool->pool_headp = NULL;

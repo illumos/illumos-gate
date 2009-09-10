@@ -192,6 +192,7 @@ rds_lkup_hca(ib_guid_t hca_guid)
 	return (hcap);
 }
 
+void rds_randomize_qps(rds_hca_t *hcap);
 
 static rds_hca_t *
 rdsib_init_hca(ib_guid_t hca_guid)
@@ -290,6 +291,9 @@ rdsib_init_hca(ib_guid_t hca_guid)
 	}
 
 	rdsib_validate_chan_sizes(&hcap->hca_attr);
+
+	/* To minimize stale connections after ungraceful reboots */
+	rds_randomize_qps(hcap);
 
 	rw_enter(&rdsib_statep->rds_hca_lock, RW_WRITER);
 	hcap->hca_state = RDS_HCA_STATE_OPEN;
@@ -1581,7 +1585,7 @@ rdsib_del_hca(rds_state_t *statep, ib_guid_t hca_guid)
 		 * close this session. This enables for graceful shutdown of
 		 * the session
 		 */
-		rds_is_sendq_empty(&sp->session_dataep, 2);
+		(void) rds_is_sendq_empty(&sp->session_dataep, 2);
 		(void) rds_post_control_message(sp,
 		    RDS_CTRL_CODE_CLOSE_SESSION, 0);
 
@@ -1717,4 +1721,73 @@ rds_async_handler(void *clntp, ibt_hca_hdl_t hdl, ibt_async_code_t code,
 	}
 
 	RDS_DPRINTF2("rds_async_handler", "Return: code: %d", code);
+}
+
+/*
+ * This routine exists to minimize stale connections across ungraceful
+ * reboots of nodes in a cluster.
+ */
+void
+rds_randomize_qps(rds_hca_t *hcap)
+{
+	ibt_cq_attr_t			cqattr;
+	ibt_rc_chan_alloc_args_t	chanargs;
+	ibt_channel_hdl_t		qp1, qp2;
+	ibt_cq_hdl_t			cq_hdl;
+	hrtime_t			nsec;
+	uint8_t				i, j, rand1, rand2;
+	int				ret;
+
+	bzero(&cqattr, sizeof (ibt_cq_attr_t));
+	cqattr.cq_size = 1;
+	cqattr.cq_sched = NULL;
+	cqattr.cq_flags = IBT_CQ_NO_FLAGS;
+	ret = ibt_alloc_cq(hcap->hca_hdl, &cqattr, &cq_hdl, NULL);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2("rds_randomize_qps",
+		    "ibt_alloc_cq failed: %d", ret);
+		return;
+	}
+
+	bzero(&chanargs, sizeof (ibt_rc_chan_alloc_args_t));
+	chanargs.rc_flags = IBT_ALL_SIGNALED;
+	chanargs.rc_control = IBT_CEP_RDMA_RD | IBT_CEP_RDMA_WR |
+	    IBT_CEP_ATOMIC;
+	chanargs.rc_hca_port_num = 1;
+	chanargs.rc_scq = cq_hdl;
+	chanargs.rc_rcq = cq_hdl;
+	chanargs.rc_pd = hcap->hca_pdhdl;
+	chanargs.rc_srq = NULL;
+
+	nsec = gethrtime();
+	rand1 = (nsec & 0xF);
+	rand2 = (nsec >> 4) & 0xF;
+	RDS_DPRINTF2("rds_randomize_qps", "rand1: %d rand2: %d",
+	    rand1, rand2);
+
+	for (i = 0; i < rand1 + 3; i++) {
+		if (ibt_alloc_rc_channel(hcap->hca_hdl,
+		    IBT_ACHAN_NO_FLAGS, &chanargs, &qp1, NULL) !=
+		    IBT_SUCCESS) {
+			RDS_DPRINTF2("rds_randomize_qps",
+			    "Bailing at i: %d", i);
+			(void) ibt_free_cq(cq_hdl);
+			return;
+		}
+		for (j = 0; j < rand2 + 3; j++) {
+			if (ibt_alloc_rc_channel(hcap->hca_hdl,
+			    IBT_ACHAN_NO_FLAGS, &chanargs, &qp2,
+			    NULL) != IBT_SUCCESS) {
+				RDS_DPRINTF2("rds_randomize_qps",
+				    "Bailing at i: %d j: %d", i, j);
+				(void) ibt_free_channel(qp1);
+				(void) ibt_free_cq(cq_hdl);
+				return;
+			}
+			(void) ibt_free_channel(qp2);
+		}
+		(void) ibt_free_channel(qp1);
+	}
+
+	(void) ibt_free_cq(cq_hdl);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -105,6 +105,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	rds_ep_t		*ep;
 	ibt_channel_hdl_t	chanhdl;
 	ibt_ip_cm_info_t	ipcm_info;
+	uint8_t			save_state, save_type;
 	int			ret;
 
 	RDS_DPRINTF2("rds_handle_cm_req", "Enter");
@@ -234,6 +235,8 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	}
 
 	RDS_DPRINTF2(LABEL, "SP(%p) state: %d", sp, sp->session_state);
+	save_state = sp->session_state;
+	save_type = sp->session_type;
 
 	switch (sp->session_state) {
 	case RDS_SESSION_STATE_CONNECTED:
@@ -245,6 +248,10 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		/* FALLTHRU */
 	case RDS_SESSION_STATE_ERROR:
 	case RDS_SESSION_STATE_PASSIVE_CLOSING:
+		/*
+		 * Some other thread must be processing this session,
+		 * this thread must wait until the other thread finishes.
+		 */
 		sp->session_type = RDS_SESSION_PASSIVE;
 		rw_exit(&sp->session_lock);
 
@@ -259,31 +266,60 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		 */
 		rds_session_close(sp, IBT_NOCALLBACKS, 0);
 
-		/* move the session to init state */
 		rw_enter(&sp->session_lock, RW_WRITER);
-		ret = rds_session_reinit(sp, lgid);
-		sp->session_myip = ipcm_info.DSTIP;
-		sp->session_lgid = lgid;
-		sp->session_rgid = rgid;
-		if (ret != 0) {
-			rds_session_fini(sp);
-			sp->session_state = RDS_SESSION_STATE_FAILED;
-			RDS_DPRINTF3("rds_handle_cm_req", "SP(%p) State "
-			    "RDS_SESSION_STATE_FAILED", sp);
-			rw_exit(&sp->session_lock);
-			return (IBT_CM_REJECT);
-		} else {
-			sp->session_state = RDS_SESSION_STATE_INIT;
-			RDS_DPRINTF3("rds_handle_cm_req", "SP(%p) State "
-			    "RDS_SESSION_STATE_INIT", sp);
+
+		/*
+		 * If the session was in ERROR, then either a failover thread
+		 * or event_failure thread would be processing this session.
+		 * This thread should wait for event_failure thread to
+		 * complete. This need not wait for failover thread.
+		 */
+		if ((save_state != RDS_SESSION_STATE_CONNECTED) &&
+		    (save_type == RDS_SESSION_PASSIVE)) {
+				/*
+				 * The other thread is event_failure thread,
+				 * wait until it finishes.
+				 */
+				while (!((sp->session_state ==
+				    RDS_SESSION_STATE_FAILED) ||
+				    (sp->session_state ==
+				    RDS_SESSION_STATE_FINI))) {
+					rw_exit(&sp->session_lock);
+					delay(drv_usectohz(1000000));
+					rw_enter(&sp->session_lock, RW_WRITER);
+				}
 		}
 
-		if (cmp.cmp_eptype == RDS_EP_TYPE_CTRL) {
-			ep = &sp->session_ctrlep;
-		} else {
-			ep = &sp->session_dataep;
+		/* move the session to init state */
+		if ((sp->session_state == RDS_SESSION_STATE_ERROR) ||
+		    (sp->session_state == RDS_SESSION_STATE_PASSIVE_CLOSING)) {
+			ret = rds_session_reinit(sp, lgid);
+			sp->session_myip = ipcm_info.DSTIP;
+			sp->session_lgid = lgid;
+			sp->session_rgid = rgid;
+			if (ret != 0) {
+				rds_session_fini(sp);
+				sp->session_state = RDS_SESSION_STATE_FAILED;
+				RDS_DPRINTF3("rds_handle_cm_req",
+				    "SP(%p) State RDS_SESSION_STATE_FAILED",
+				    sp);
+				rw_exit(&sp->session_lock);
+				return (IBT_CM_REJECT);
+			} else {
+				sp->session_state = RDS_SESSION_STATE_INIT;
+				RDS_DPRINTF3("rds_handle_cm_req",
+				    "SP(%p) State RDS_SESSION_STATE_INIT", sp);
+			}
+
+			if (cmp.cmp_eptype == RDS_EP_TYPE_CTRL) {
+				ep = &sp->session_ctrlep;
+			} else {
+				ep = &sp->session_dataep;
+			}
+			break;
 		}
-		break;
+
+		/* FALLTHRU */
 	case RDS_SESSION_STATE_CREATED:
 	case RDS_SESSION_STATE_FAILED:
 	case RDS_SESSION_STATE_FINI:

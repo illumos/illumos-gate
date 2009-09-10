@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -522,13 +522,22 @@ rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
 	rds_hca_t	*hcap, *hcap1;
 	int		ret;
 
-	RDS_DPRINTF2("rds_session_reinit", "Enter: SP(0x%p)", sp);
+	RDS_DPRINTF2("rds_session_reinit", "Enter: SP(0x%p) - state: %d",
+	    sp, sp->session_state);
 
 	/* CALLED WITH SESSION WRITE LOCK */
 
 	/* Clear the portmaps */
 	rds_unmark_all_ports(sp, RDS_LOCAL);
 	rds_unmark_all_ports(sp, RDS_REMOTE);
+
+	/* This should not happen but just a safe guard */
+	if (sp->session_dataep.ep_ack_addr == NULL) {
+		RDS_DPRINTF2("rds_session_reinit",
+		    "ERROR: Unexpected: SP(0x%p) - state: %d",
+		    sp, sp->session_state);
+		return (-1);
+	}
 
 	/* make the last buffer as the acknowledged */
 	*(uintptr_t *)sp->session_dataep.ep_ack_addr =
