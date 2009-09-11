@@ -1238,17 +1238,18 @@ iscsit_dbuf_alloc(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
 	uint32_t	bsize;
 
 	/*
-	 * If iscsit is requested to allocate a buffer larger than
-	 * MaxBurstLength, then the allocation fails (dbuf = NULL)
-	 * and pminsize is modified to be equal to MaxBurstLength.
-	 * stmf/sbd then should re-invoke this function with the
-	 * corrected values for transfer. iscsit allocates a buffer
-	 * whose size is a minimum of the requested size and the
-	 * configured MaxBurstLength.
+	 * If the requested size is larger than MaxBurstLength and the
+	 * given pminsize is also larger than MaxBurstLength, then the
+	 * allocation fails (dbuf = NULL) and pminsize is modified to
+	 * be equal to MaxBurstLength. stmf/sbd then should re-invoke
+	 * this function with the corrected values for transfer.
 	 */
 	ASSERT(pminsize);
-	bsize = min(size, *pminsize);
-	if (bsize > itask->it_ict->ict_op.op_max_burst_length) {
+	if (size <= itask->it_ict->ict_op.op_max_burst_length) {
+		bsize = size;
+	} else if (*pminsize <= itask->it_ict->ict_op.op_max_burst_length) {
+		bsize = itask->it_ict->ict_op.op_max_burst_length;
+	} else {
 		*pminsize = itask->it_ict->ict_op.op_max_burst_length;
 		return (NULL);
 	}
