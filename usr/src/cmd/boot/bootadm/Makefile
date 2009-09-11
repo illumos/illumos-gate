@@ -27,7 +27,7 @@ PROG= bootadm
 
 SBINLINKS= $(PROG)
 
-OBJS= bootadm.o bootadm_upgrade.o
+OBJS= bootadm.o bootadm_upgrade.o bootadm_hyper.o
 SRCS = $(OBJS:.o=.c)
 
 include ../Makefile.com

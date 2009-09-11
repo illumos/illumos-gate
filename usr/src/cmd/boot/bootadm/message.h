@@ -88,7 +88,11 @@ extern "C" {
 
 #define	NO_MEM gettext("could not allocate memory: size = %u\n")
 
+#define	NO_SPARC gettext("%s operation unsupported on SPARC machines\n")
+
 #define	CANNOT_LOCATE_GRUB_MENU gettext("cannot find GRUB menu\n")
+
+#define	CANNOT_LOCATE_GRUB_MENU_FILE gettext("cannot find GRUB menu file: %s\n")
 
 #define	GRUB_MENU_PATH gettext("the location for the active GRUB menu is: %s\n")
 
@@ -285,11 +289,23 @@ extern "C" {
 #define	DEFAULT_NOT_BAM	gettext(	\
 "Default /boot/grub/menu.lst entry is not controlled by bootadm.  Exiting\n")
 
+#define	CANT_FIND_DEFAULT	\
+gettext("unable to find default boot entry (%d) in menu.lst file.\n")
+
 #define	UNKNOWN_KERNEL_LINE	\
 gettext("kernel command on line %d not recognized.\n")
 
 #define	UNKNOWN_MODULE_LINE	\
 gettext("module command on line %d not recognized.\n")
+
+#define	FINDROOT_NOT_FOUND	\
+gettext("findroot in default boot entry (%d) missing.\n")
+
+#define	KERNEL_NOT_FOUND	\
+gettext("kernel$ in default boot entry (%d) missing.\n")
+
+#define	MODULE_NOT_PARSEABLE	\
+gettext("module$ in default boot entry (%d) missing or not parseable.\n")
 
 #define	NOT_ELF_FILE gettext("%s is not an ELF file.\n")
 
@@ -418,6 +434,20 @@ For details on manually updating entries, see %s\n")
 #define	CVT_ABORT	\
 gettext("error upgrading GRUB menu entries on %s. Aborting.\n\
 For details on manually updating entries, see %s\n")
+
+#define	ALREADY_HYPER	\
+gettext("default entry already setup for use with the hypervisor!\n")
+
+#define	HYPER_ABORT	\
+gettext("error converting GRUB menu entry on %s for use with the hypervisor.\n\
+Aborting.\n")
+
+#define	ALREADY_METAL	\
+gettext("default entry already setup for use with a metal kernel!\n")
+
+#define	METAL_ABORT	\
+gettext("error converting GRUB menu entry on %s for use with a metal kernel.\n\
+Aborting.\n")
 
 #define	HAND_ADDED_ENTRIES	\
 gettext("bootadm(1M) will only upgrade GRUB menu entries added by \n\
@@ -662,6 +692,9 @@ gettext("failed to get special file for menu_root: %s\n")
 #define	NEED_DIRPATH	gettext("need to create directory path for %s\n")
 
 #define	UPDT_CACHE_FAIL	gettext("directory cache update failed for %s\n")
+
+#define	NEW_BOOT_ENTRY \
+    gettext("unable to modify default entry; creating new boot entry for %s\n")
 
 /*
  * NOTE: The following are debug messages and not I18Ned
@@ -966,6 +999,8 @@ gettext("failed to get special file for menu_root: %s\n")
 
 #define	D_CVT_CMD_KERN_DOLLAR "%s: converted kernel cmd to %s\n"
 
+#define	D_CVT_CMD_MOD_DOLLAR "%s: converted module cmd to %s\n"
+
 #define	D_FLAGS1_UNIX_FLAGS2_NULL "%s: NULL flags1, unix, flags2\n"
 
 #define	D_UNIX_PRESENT "%s: unix present\n"
@@ -1113,6 +1148,8 @@ gettext("failed to get special file for menu_root: %s\n")
 #define	D_CMDLINE  "%s: executing: %s\n"
 
 #define	D_IS_CHAINLOADER_CMD "%s: setting CHAINLOADER: %s\n"
+
+#define	D_NO_BOOTENVRC "could not open %s: %s\n"
 
 #define	D_ADD_FINDROOT_NUM "%s: findroot added: line#: %d: entry#: %d\n"
 

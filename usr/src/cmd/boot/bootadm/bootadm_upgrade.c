@@ -782,7 +782,7 @@ bam_add_hv(menu_t *mp, char *grubsign, char *grubroot, int root_opt)
 	}
 
 	(void) add_boot_entry(mp, NEW_HV_ENTRY, grubsign, XEN_MENU,
-	    XEN_KERNEL_MODULE_LINE, DIRECT_BOOT_ARCHIVE);
+	    XEN_KERNEL_MODULE_LINE, DIRECT_BOOT_ARCHIVE, NULL);
 
 	BAM_DPRINTF((D_ADDED_XVM_ENTRY, fcn));
 
