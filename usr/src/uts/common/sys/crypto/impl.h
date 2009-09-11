@@ -1396,6 +1396,7 @@ extern int kcf_policy_load_soft_disabled(char *, uint_t, crypto_mech_name_t *,
 extern int kcf_policy_load_dev_disabled(char *, uint_t, uint_t,
     crypto_mech_name_t *, uint_t *, crypto_mech_name_t **);
 extern boolean_t in_soft_config_list(char *);
+extern int kcf_get_fips140_mode(void);
 
 #endif	/* _KERNEL */
 

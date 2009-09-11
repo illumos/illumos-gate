@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <errno.h>
@@ -234,9 +233,9 @@ parse_policylist(char *buf, uentry_t *pent)
 	    sizeof (METASLOT_STATUS) - 1) == 0) {
 		if (value = strpbrk(buf, SEP_EQUAL)) {
 			value++; /* get rid of = */
-			if (strcmp(value, METASLOT_DISABLED) == 0) {
+			if (strcmp(value, DISABLED_KEYWORD) == 0) {
 				pent->flag_metaslot_enabled = B_FALSE;
-			} else if (strcmp(value, METASLOT_ENABLED) == 0) {
+			} else if (strcmp(value, ENABLED_KEYWORD) == 0) {
 				pent->flag_metaslot_enabled = B_TRUE;
 			} else {
 				cryptoerror(LOG_ERR, "failed to parse %s.\n",
@@ -253,9 +252,9 @@ parse_policylist(char *buf, uentry_t *pent)
 	    sizeof (METASLOT_AUTO_KEY_MIGRATE) - 1) == 0) {
 		if (value = strpbrk(buf, SEP_EQUAL)) {
 			value++; /* get rid of = */
-			if (strcmp(value, METASLOT_DISABLED) == 0) {
+			if (strcmp(value, DISABLED_KEYWORD) == 0) {
 				pent->flag_metaslot_auto_key_migrate = B_FALSE;
-			} else if (strcmp(value, METASLOT_ENABLED) == 0) {
+			} else if (strcmp(value, ENABLED_KEYWORD) == 0) {
 				pent->flag_metaslot_auto_key_migrate = B_TRUE;
 			} else {
 				cryptoerror(LOG_ERR, "failed to parse %s.\n",
@@ -545,5 +544,100 @@ out:
 		}
 	}
 
+	return (rc);
+}
+
+static CK_RV
+parse_fips_mode(char *buf, int *mode)
+{
+
+	char *value;
+
+	if (strncmp(buf, EF_FIPS_STATUS, sizeof (EF_FIPS_STATUS) - 1) == 0) {
+		if (value = strpbrk(buf, SEP_EQUAL)) {
+			value++; /* get rid of = */
+			if (strcmp(value, DISABLED_KEYWORD) == 0) {
+				*mode = CRYPTO_FIPS_MODE_DISABLED;
+			} else if (strcmp(value, ENABLED_KEYWORD) == 0) {
+				*mode = CRYPTO_FIPS_MODE_ENABLED;
+			} else {
+				cryptoerror(LOG_ERR,
+				    "failed to parse kcf.conf file.\n");
+				return (CKR_FUNCTION_FAILED);
+			}
+			return (CKR_OK);
+		} else {
+			return (CKR_FUNCTION_FAILED);
+		}
+	} else {
+		/* should not come here */
+		return (CKR_FUNCTION_FAILED);
+	}
+
+}
+
+static boolean_t
+is_fips(char *name)
+{
+	if (strcmp(name, FIPS_KEYWORD) == 0) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
+CK_RV
+get_fips_mode(int *mode)
+{
+	FILE	*pfile = NULL;
+	char	buffer[BUFSIZ];
+	int	len;
+	CK_RV	rc = CKR_OK;
+	int found = 0;
+	char *token1;
+
+	if ((pfile = fopen(_PATH_KCF_CONF, "r")) == NULL) {
+		cryptoerror(LOG_ERR,
+		    "failed to open the kcf.conf file for read only.");
+		return (CKR_FUNCTION_FAILED);
+	}
+
+	while (fgets(buffer, BUFSIZ, pfile) != NULL) {
+		if (buffer[0] == '#' || buffer[0] == ' ' ||
+		    buffer[0] == '\n'|| buffer[0] == '\t') {
+			continue;   /* ignore comment lines */
+		}
+
+		len = strlen(buffer);
+		if (buffer[len - 1] == '\n') { /* get rid of trailing '\n' */
+			len--;
+		}
+		buffer[len] = '\0';
+
+		/* Get provider name */
+		if ((token1 = strtok(buffer, SEP_COLON)) ==
+		    NULL) { /* buf is NULL */
+			return (CKR_FUNCTION_FAILED);
+		};
+
+		if (is_fips(token1)) {
+			if ((rc = parse_fips_mode(buffer + strlen(token1) + 1,
+			    mode)) != CKR_OK) {
+				goto out;
+			} else {
+				found++;
+				break;
+			}
+		} else {
+			continue;
+		}
+	}
+
+	if (!found) {
+		*mode = CRYPTO_FIPS_MODE_DISABLED;
+	}
+
+out:
+	(void) fclose(pfile);
 	return (rc);
 }

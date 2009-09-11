@@ -21,11 +21,10 @@
 #
 # uts/sparc/sha1/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the sha1 crypto kernel module.
 #
@@ -36,6 +35,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+COM_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -64,9 +64,15 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
+# Linkage dependencies
+#
+LDFLAGS += -dy -Nmisc/kcf
+
+#
 # lint pass one enforcement
 #
-CFLAGS += $(CCVERBOSE)
+CFLAGS += $(CCVERBOSE) -I$(COM_DIR)
+LINTFLAGS	+= -I$(COM_DIR)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

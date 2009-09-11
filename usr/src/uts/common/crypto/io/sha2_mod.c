@@ -33,6 +33,7 @@
 #include <sys/sysmacros.h>
 #define	_SHA2_IMPL
 #include <sys/sha2.h>
+#include <sha2/sha2_impl.h>
 
 /*
  * The sha2 module is created with two modlinkages:
@@ -56,28 +57,6 @@ static struct modlcrypto modlcrypto = {
 static struct modlinkage modlinkage = {
 	MODREV_1, &modlmisc, &modlcrypto, NULL
 };
-
-/*
- * CSPI information (entry points, provider info, etc.)
- */
-
-/*
- * Context for SHA2 mechanism.
- */
-typedef struct sha2_ctx {
-	sha2_mech_type_t	sc_mech_type;	/* type of context */
-	SHA2_CTX		sc_sha2_ctx;	/* SHA2 context */
-} sha2_ctx_t;
-
-/*
- * Context for SHA2 HMAC and HMAC GENERAL mechanisms.
- */
-typedef struct sha2_hmac_ctx {
-	sha2_mech_type_t	hc_mech_type;	/* type of context */
-	uint32_t		hc_digest_len;	/* digest len in bytes */
-	SHA2_CTX		hc_icontext;	/* inner SHA2 context */
-	SHA2_CTX		hc_ocontext;	/* outer SHA2 context */
-} sha2_hmac_ctx_t;
 
 /*
  * Macros to access the SHA2 or SHA2-HMAC contexts from a context passed
@@ -1630,4 +1609,15 @@ sha2_free_context(crypto_ctx_t *ctx)
 	ctx->cc_provider_private = NULL;
 
 	return (CRYPTO_SUCCESS);
+}
+
+/*
+ * SHA-2 Power-Up Self-Test
+ */
+void
+sha2_POST(int *rc)
+{
+
+	*rc = fips_sha2_post();
+
 }

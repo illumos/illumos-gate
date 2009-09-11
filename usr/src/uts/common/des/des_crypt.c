@@ -48,6 +48,7 @@
 #include <sys/strsun.h>
 #include <sys/note.h>
 #include <modes/modes.h>
+#define	_DES_FIPS_POST
 #include <des/des_impl.h>
 
 /* EXPORT DELETE START */
@@ -96,18 +97,6 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-/*
- * CSPI information (entry points, provider info, etc.)
- */
-typedef enum des_mech_type {
-	DES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_DES_ECB */
-	DES_CBC_MECH_INFO_TYPE,		/* SUN_CKM_DES_CBC */
-	DES_CFB_MECH_INFO_TYPE,		/* SUN_CKM_DES_CFB */
-	DES3_ECB_MECH_INFO_TYPE,	/* SUN_CKM_DES3_ECB */
-	DES3_CBC_MECH_INFO_TYPE,	/* SUN_CKM_DES3_CBC */
-	DES3_CFB_MECH_INFO_TYPE		/* SUN_CKM_DES3_CFB */
-} des_mech_type_t;
-
 /* EXPORT DELETE START */
 
 #define	DES_MIN_KEY_LEN		DES_MINBYTES
@@ -132,6 +121,7 @@ typedef enum des_mech_type {
 #ifndef DES3_MAX_KEY_LEN
 #define	DES3_MAX_KEY_LEN	0
 #endif
+
 
 /*
  * Mechanism info structure passed to KCF during registration.
@@ -1235,4 +1225,15 @@ des_common_init_ctx(des_ctx_t *des_ctx, crypto_spi_ctx_template_t *template,
 /* EXPORT DELETE END */
 
 	return (rv);
+}
+
+/*
+ * Triple DES Power-Up Self-Test
+ */
+void
+des_POST(int *rc)
+{
+
+	*rc = fips_des3_post();
+
 }

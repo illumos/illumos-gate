@@ -91,7 +91,6 @@ typedef struct {
 	BIGNUM	n_rr;		/* 2^(2*(32*n->len)) mod n */
 } RSAkey;
 
-
 BIG_ERR_CODE RSA_key_init(RSAkey *key, int psize, int qsize);
 void RSA_key_finish(RSAkey *key);
 
@@ -107,6 +106,61 @@ CK_RV soft_verify_rsa_pkcs_decode(uint8_t *data, int *mbit_l);
 int knzero_random_generator(uint8_t *ran_out, size_t ran_len);
 void kmemset(uint8_t *buf, char pattern, size_t len);
 #endif
+
+/*
+ * The following definitions and declarations are only used by RSA FIPS POST
+ */
+#ifdef _RSA_FIPS_POST
+
+/* RSA FIPS Declarations */
+#define	FIPS_RSA_PUBLIC_EXPONENT_LENGTH		  3 /*   24-bits */
+#define	FIPS_RSA_PRIVATE_VERSION_LENGTH		  1 /*    8-bits */
+#define	FIPS_RSA_MESSAGE_LENGTH			128 /* 1024-bits */
+#define	FIPS_RSA_COEFFICIENT_LENGTH		 64 /*  512-bits */
+#define	FIPS_RSA_PRIME0_LENGTH			 64 /*  512-bits */
+#define	FIPS_RSA_PRIME1_LENGTH			 64 /*  512-bits */
+#define	FIPS_RSA_EXPONENT0_LENGTH		 64 /*  512-bits */
+#define	FIPS_RSA_EXPONENT1_LENGTH		 64 /*  512-bits */
+#define	FIPS_RSA_PRIVATE_EXPONENT_LENGTH	128 /* 1024-bits */
+#define	FIPS_RSA_ENCRYPT_LENGTH			128 /* 1024-bits */
+#define	FIPS_RSA_DECRYPT_LENGTH			128 /* 1024-bits */
+#define	FIPS_RSA_SIGNATURE_LENGTH		128 /* 1024-bits */
+#define	FIPS_RSA_MODULUS_LENGTH			128 /* 1024-bits */
+#define	MAX_KEY_ATTR_BUFLEN			1024
+
+typedef struct RSAPrivateKey_s {
+	uint8_t		*version;
+	int		version_len;
+	uint8_t		*modulus;
+	int		modulus_len;
+	uint8_t		*public_expo;
+	int		public_expo_len;
+	uint8_t		*private_expo;
+	int		private_expo_len;
+	uint8_t		*prime1;
+	int		prime1_len;
+	uint8_t		*prime2;
+	int		prime2_len;
+	uint8_t		*exponent1;
+	int		exponent1_len;
+	uint8_t		*exponent2;
+	int		exponent2_len;
+	uint8_t		*coef;
+	int		coef_len;
+} RSAPrivateKey_t;
+
+/* RSA FIPS functions */
+extern int fips_rsa_post(void);
+extern int fips_rsa_encrypt(uint8_t *, int, uint8_t *,
+	int, uint8_t *, int, uint8_t *);
+extern int fips_rsa_decrypt(RSAPrivateKey_t *, uint8_t *,
+	int, uint8_t *);
+extern int fips_rsa_sign(RSAPrivateKey_t *, uint8_t *,
+	uint32_t, uint8_t *);
+extern int fips_rsa_verify(RSAPrivateKey_t *, uint8_t *, uint32_t,
+	uint8_t *);
+
+#endif /* _RSA_FIPS_POST */
 
 #ifdef	__cplusplus
 }

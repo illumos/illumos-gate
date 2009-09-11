@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the SHA1 kernel module.
 #
@@ -33,6 +32,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+COM_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -55,11 +55,17 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
+#
+# Linkage dependencies
+#
+LDFLAGS += -dy -Nmisc/kcf
+
 # 
 # lint pass one enforcement 
 # 
-CFLAGS += $(CCVERBOSE)
+CFLAGS += $(CCVERBOSE) -I$(COM_DIR)
 CFLAGS += -DVIS_SHA1
+LINTFLAGS	+= -I$(COM_DIR)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

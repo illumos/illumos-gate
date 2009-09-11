@@ -52,6 +52,9 @@
 
 #define	local_min(a, b)	((a) < (b) ? (a) : (b))
 
+extern CK_RV fips_pairwise_check(soft_session_t *,
+    soft_object_t *, soft_object_t *, CK_KEY_TYPE);
+
 static CK_RV
 soft_pkcs12_pbe(soft_session_t *, CK_MECHANISM_PTR, soft_object_t *);
 
@@ -513,6 +516,33 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 			soft_delete_object(session_p, private_key,
 			    B_FALSE, B_FALSE);
 		}
+		return (rv);
+	}
+
+	/*
+	 * FIPS 140-2 pairwise consistency check utilized to
+	 * validate key pair
+	 */
+	if ((key_type == CKK_RSA) || (key_type == CKK_DSA) ||
+	    (key_type == CKK_EC)) {
+		if (softtoken_fips_mode == CRYPTO_FIPS_MODE_ENABLED) {
+			rv = fips_pairwise_check(session_p, public_key,
+			    private_key, key_type);
+			if (rv != CKR_OK) {
+				if (IS_TOKEN_OBJECT(public_key)) {
+					soft_delete_token_object(public_key,
+					    B_FALSE, B_FALSE);
+					soft_delete_token_object(private_key,
+					    B_FALSE, B_FALSE);
+				} else {
+					soft_delete_object(session_p,
+					    public_key, B_FALSE, B_FALSE);
+					soft_delete_object(session_p,
+					    private_key, B_FALSE, B_FALSE);
+				}
+				return (rv);
+			}
+		}
 	}
 
 	if (IS_TOKEN_OBJECT(public_key)) {
@@ -524,6 +554,7 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		if (rv != CKR_OK) {
 			soft_delete_token_object(public_key, B_FALSE, B_FALSE);
 			soft_delete_token_object(private_key, B_FALSE, B_FALSE);
+			return (rv);
 		}
 	}
 

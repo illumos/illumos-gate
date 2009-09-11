@@ -148,7 +148,7 @@ MEM_CACHE_OBJS	+= mem_cache.o panther_asm.o
 
 BIGNUM_PSR_OBJS	+= mont_mulf_kernel_v9.o
 
-AES_OBJS	+= aes.o aes_impl.o aes_modes.o aes_crypt_asm.o
+AES_OBJS	+= aes.o aes_impl.o aes_modes.o aes_crypt_asm.o fips_aes_util.o
 
 DES_OBJS	+= des_crypt_asm.o
 

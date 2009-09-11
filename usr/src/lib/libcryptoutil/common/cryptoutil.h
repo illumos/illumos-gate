@@ -41,6 +41,7 @@ extern "C" {
 #define	MECH_ID_HEX_LEN	11	/* length of mechanism id in hex form */
 
 #define	_PATH_PKCS11_CONF	"/etc/crypto/pkcs11.conf"
+#define	_PATH_KCF_CONF		"/etc/crypto/kcf.conf"
 #define	_PATH_KCFD_LOCK		"/var/run/kcfd.lock"
 
 /* $ISA substitution for parsing pkcs11.conf data */
@@ -57,19 +58,23 @@ extern "C" {
 #define	SEP_EQUAL	"="
 #define	SEP_COMMA	","
 #define	METASLOT_KEYWORD	"metaslot"
+#define	FIPS_KEYWORD	"fips-140"
 #define	EF_DISABLED	"disabledlist="
 #define	EF_ENABLED	"enabledlist="
 #define	EF_NORANDOM	"NO_RANDOM"
 #define	METASLOT_TOKEN	"metaslot_token="
 #define	METASLOT_SLOT	"metaslot_slot="
 #define	METASLOT_STATUS	"metaslot_status="
+#define	EF_FIPS_STATUS	"fips_status="
 #define	METASLOT_AUTO_KEY_MIGRATE	"metaslot_auto_key_migrate="
-#define	METASLOT_ENABLED	"enabled"
-#define	METASLOT_DISABLED	"disabled"
+#define	ENABLED_KEYWORD		"enabled"
+#define	DISABLED_KEYWORD	"disabled"
 #define	SLOT_DESCRIPTION_SIZE	64
 #define	TOKEN_LABEL_SIZE	32
 #define	TOKEN_MANUFACTURER_SIZE	32
 #define	TOKEN_SERIAL_SIZE	16
+#define	CRYPTO_FIPS_MODE_DISABLED	0
+#define	CRYPTO_FIPS_MODE_ENABLED	1
 
 /*
  * Define the following softtoken values that are used by softtoken
@@ -156,6 +161,9 @@ extern int pkcs11_read_data(char *filename, void **dbuf, size_t *dlen);
 extern int open_nointr(const char *path, int oflag, ...);
 extern ssize_t readn_nointr(int fd, void *dbuf, size_t dlen);
 extern ssize_t writen_nointr(int fd, void *dbuf, size_t dlen);
+extern int update_conf(char *conf_file, char *entry);
+
+extern CK_RV get_fips_mode(int *);
 
 #ifdef __cplusplus
 }

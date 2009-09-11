@@ -667,10 +667,13 @@ punt:
 			if (tempout[i] != rmp->rm_mag.rm_previous[i])
 				break;
 		}
-		if (i == HASHSIZE/BYTES_IN_WORD)
+		if (i == HASHSIZE/BYTES_IN_WORD) {
 			cmn_err(CE_WARN, "kcf_random: The value of 160-bit "
 			    "block random bytes are same as the previous "
 			    "one.\n");
+			/* discard random bytes and return error */
+			return (EIO);
+		}
 
 		bcopy(tempout, rmp->rm_mag.rm_previous,
 		    HASHSIZE);

@@ -34,6 +34,7 @@
 #include <sys/sysmacros.h>
 
 #include <sys/sha1.h>
+#include <sha1/sha1_impl.h>
 
 /*
  * The sha1 module is created with two modlinkages:
@@ -58,39 +59,6 @@ static struct modlinkage modlinkage = {
 	MODREV_1, &modlmisc, &modlcrypto, NULL
 };
 
-/*
- * CSPI information (entry points, provider info, etc.)
- */
-
-typedef enum sha1_mech_type {
-	SHA1_MECH_INFO_TYPE,		/* SUN_CKM_SHA1 */
-	SHA1_HMAC_MECH_INFO_TYPE,	/* SUN_CKM_SHA1_HMAC */
-	SHA1_HMAC_GEN_MECH_INFO_TYPE	/* SUN_CKM_SHA1_HMAC_GENERAL */
-} sha1_mech_type_t;
-
-#define	SHA1_DIGEST_LENGTH	20	/* SHA1 digest length in bytes */
-#define	SHA1_HMAC_BLOCK_SIZE	64	/* SHA1-HMAC block size */
-#define	SHA1_HMAC_MIN_KEY_LEN	1	/* SHA1-HMAC min key length in bytes */
-#define	SHA1_HMAC_MAX_KEY_LEN	INT_MAX /* SHA1-HMAC max key length in bytes */
-#define	SHA1_HMAC_INTS_PER_BLOCK	(SHA1_HMAC_BLOCK_SIZE/sizeof (uint32_t))
-
-/*
- * Context for SHA1 mechanism.
- */
-typedef struct sha1_ctx {
-	sha1_mech_type_t	sc_mech_type;	/* type of context */
-	SHA1_CTX		sc_sha1_ctx;	/* SHA1 context */
-} sha1_ctx_t;
-
-/*
- * Context for SHA1-HMAC and SHA1-HMAC-GENERAL mechanisms.
- */
-typedef struct sha1_hmac_ctx {
-	sha1_mech_type_t	hc_mech_type;	/* type of context */
-	uint32_t		hc_digest_len;	/* digest len in bytes */
-	SHA1_CTX		hc_icontext;	/* inner SHA1 context */
-	SHA1_CTX		hc_ocontext;	/* outer SHA1 context */
-} sha1_hmac_ctx_t;
 
 /*
  * Macros to access the SHA1 or SHA1-HMAC contexts from a context passed
@@ -1472,4 +1440,15 @@ sha1_free_context(crypto_ctx_t *ctx)
 	ctx->cc_provider_private = NULL;
 
 	return (CRYPTO_SUCCESS);
+}
+
+/*
+ * SHA-1 Power-Up Self-Test
+ */
+void
+sha1_POST(int *rc)
+{
+
+	*rc = fips_sha1_post();
+
 }

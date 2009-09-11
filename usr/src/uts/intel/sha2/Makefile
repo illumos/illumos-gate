@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the sha2 crypto kernel module.
 #
@@ -33,7 +32,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COMDIR	= $(COMMONBASE)/crypto/sha2
+COMDIR	= $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -63,6 +62,14 @@ CLEANFILES += sha512-x86_64.s sha256-x86_64.s
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
+
+#
+# Linkage dependencies
+#
+LDFLAGS += -dy -Nmisc/kcf
+
+CFLAGS += -I$(COMDIR)
+LINTFLAGS	+= -I$(COMDIR)
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -110,8 +117,8 @@ $(OBJS_DIR)/%.o: %.s
 $(OBJS_DIR)/%.ln: %.s
 	@($(LHEAD) $(LINT.c) ${@F:.ln=.s} $(LTAIL))
 
-sha512-x86_64.s: $(COMDIR)/amd64/sha512-x86_64.pl
+sha512-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 	$(PERL) $? $@
 
-sha256-x86_64.s: $(COMDIR)/amd64/sha512-x86_64.pl
+sha256-x86_64.s: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 	$(PERL) $? $@

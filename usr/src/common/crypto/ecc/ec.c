@@ -37,13 +37,12 @@
  *
  * ***** END LICENSE BLOCK ***** */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Sun elects to use this software under the MPL license.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mplogic.h"
 #include "ec.h"
@@ -1066,3 +1065,48 @@ cleanup:
     return rv;
 }
 
+/* 
+ * Copy all of the fields from srcParams into dstParams
+ */
+SECStatus
+EC_CopyParams(PRArenaPool *arena, ECParams *dstParams,
+	      const ECParams *srcParams)
+{
+    SECStatus rv = SECFailure;
+
+    dstParams->arena = arena;
+    dstParams->type = srcParams->type;
+    dstParams->fieldID.size = srcParams->fieldID.size;
+    dstParams->fieldID.type = srcParams->fieldID.type;
+    if (srcParams->fieldID.type == ec_field_GFp) {
+	CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->fieldID.u.prime,
+	    &srcParams->fieldID.u.prime, 0));
+    } else {
+	CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->fieldID.u.poly,
+	    &srcParams->fieldID.u.poly, 0));
+    }
+    dstParams->fieldID.k1 = srcParams->fieldID.k1;
+    dstParams->fieldID.k2 = srcParams->fieldID.k2;
+    dstParams->fieldID.k3 = srcParams->fieldID.k3;
+    CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->curve.a,
+	&srcParams->curve.a, 0));
+    CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->curve.b,
+	&srcParams->curve.b, 0));
+    CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->curve.seed,
+	&srcParams->curve.seed, 0));
+    CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->base,
+	&srcParams->base, 0));
+    CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->order,
+	&srcParams->order, 0));
+    CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->DEREncoding,
+	&srcParams->DEREncoding, 0));
+	dstParams->name = srcParams->name;
+    CHECK_SEC_OK(SECITEM_CopyItem(arena, &dstParams->curveOID,
+ 	&srcParams->curveOID, 0));
+    dstParams->cofactor = srcParams->cofactor;
+
+    return SECSuccess;
+
+cleanup:
+    return SECFailure;
+}

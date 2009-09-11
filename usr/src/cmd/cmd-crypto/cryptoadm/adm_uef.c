@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -702,18 +702,9 @@ install_uef_lib(char *libname)
 {
 	uentry_t	*puent;
 	struct stat 	statbuf;
-	boolean_t	found;
-	FILE	*pfile;
-	FILE	*pfile_tmp;
-	char	tmpfile_name[MAXPATHLEN];
 	char	libpath[MAXPATHLEN];
 	char	libbuf[MAXPATHLEN];
 	char	*isa;
-	char 	buffer[BUFSIZ];
-	char 	*ptr;
-	int	found_count;
-	int	rc = SUCCESS;
-
 
 	if (libname == NULL) {
 		/* should not happen */
@@ -769,163 +760,8 @@ install_uef_lib(char *libname)
 		return (FAILURE);
 	}
 
-	if ((pfile = fopen(_PATH_PKCS11_CONF, "r+")) == NULL) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to update the configuration - %s"),
-		    strerror(err));
-		cryptodebug("failed to open %s for write.", _PATH_PKCS11_CONF);
-		return (FAILURE);
-	}
+	return (update_conf(_PATH_PKCS11_CONF, libname));
 
-	if (lockf(fileno(pfile), F_TLOCK, 0) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to lock the configuration - %s"),
-		    strerror(err));
-		(void) fclose(pfile);
-		return (FAILURE);
-	}
-
-	/*
-	 * Create a temporary file in the /etc/crypto directory.
-	 */
-	(void) strlcpy(tmpfile_name, TMPFILE_TEMPLATE, sizeof (tmpfile_name));
-	if (mkstemp(tmpfile_name) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to create a temporary file - %s"),
-		    strerror(err));
-		(void) fclose(pfile);
-		return (FAILURE);
-	}
-
-	if ((pfile_tmp = fopen(tmpfile_name, "w")) == NULL) {
-		err = errno;
-		cryptoerror(LOG_STDERR, gettext("failed to open %s - %s"),
-		    tmpfile_name, strerror(err));
-		(void) fclose(pfile);
-		return (FAILURE);
-	}
-
-	/*
-	 * Loop thru the config file. If the file was reserved within a
-	 * package bracket, just uncomment it.  Other wise, append it at
-	 * the end.  The resulting file will be saved in the temp file first.
-	 */
-	found_count = 0;
-	rc = SUCCESS;
-	while (fgets(buffer, BUFSIZ, pfile) != NULL) {
-		found = B_FALSE;
-		if (buffer[0] == '#') {
-			ptr = buffer;
-			ptr++;
-			if (strcmp(libname, ptr) == 0) {
-				found = B_TRUE;
-				found_count++;
-			}
-		}
-
-		if (found == B_FALSE) {
-			if (fputs(buffer, pfile_tmp) == EOF) {
-				rc = FAILURE;
-			}
-		} else {
-			if (found_count == 1) {
-				if (fputs(ptr, pfile_tmp) == EOF) {
-					rc = FAILURE;
-				}
-			} else {
-				/*
-				 * Found a second entry with #libname.
-				 * Should not happen. The pkcs11.conf file
-				 * is corrupted. Give a warning and skip
-				 * this entry.
-				 */
-				cryptoerror(LOG_STDERR, gettext(
-				    "(Warning) Found an additional reserved "
-				    "entry for %s."), libname);
-			}
-		}
-
-		if (rc == FAILURE) {
-			break;
-		}
-	}
-
-	if (rc == FAILURE) {
-		cryptoerror(LOG_STDERR, gettext("write error."));
-		(void) fclose(pfile);
-		(void) fclose(pfile_tmp);
-		if (unlink(tmpfile_name) != 0) {
-			err = errno;
-			cryptoerror(LOG_STDERR, gettext(
-			    "(Warning) failed to remove %s: %s"), tmpfile_name,
-			    strerror(err));
-		}
-		return (FAILURE);
-	}
-
-	if (found_count == 0) {
-		/*
-		 * This libname was not in package before, append it to the
-		 * end of the temp file.
-		 */
-		if (fputs(libname, pfile_tmp) == EOF) {
-			err = errno;
-			cryptoerror(LOG_STDERR, gettext(
-			    "failed to write to %s: %s"), tmpfile_name,
-			    strerror(err));
-			(void) fclose(pfile);
-			(void) fclose(pfile_tmp);
-			if (unlink(tmpfile_name) != 0) {
-				err = errno;
-				cryptoerror(LOG_STDERR, gettext(
-				    "(Warning) failed to remove %s: %s"),
-				    tmpfile_name, strerror(err));
-			}
-			return (FAILURE);
-		}
-	}
-
-	(void) fclose(pfile);
-	if (fclose(pfile_tmp) != 0) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to close %s: %s"), tmpfile_name,
-		    strerror(err));
-		return (FAILURE);
-	}
-
-	if (rename(tmpfile_name, _PATH_PKCS11_CONF) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to update the configuration - %s"),
-		    strerror(err));
-		cryptodebug("failed to rename %s to %s: %s", tmpfile_name,
-		    _PATH_PKCS11_CONF, strerror(err));
-		rc = FAILURE;
-	} else if (chmod(_PATH_PKCS11_CONF,
-	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
-		err = errno;
-		cryptoerror(LOG_STDERR,
-		    gettext("failed to update the configuration - %s"),
-		    strerror(err));
-		cryptodebug("failed to chmod to %s: %s", _PATH_PKCS11_CONF,
-		    strerror(err));
-		rc = FAILURE;
-	} else {
-		rc = SUCCESS;
-	}
-
-	if ((rc == FAILURE) && (unlink(tmpfile_name) != 0)) {
-		err = errno;
-		cryptoerror(LOG_STDERR, gettext(
-		    "(Warning) failed to remove %s: %s"), tmpfile_name,
-		    strerror(err));
-	}
-
-	return (rc);
 }
 
 
@@ -1565,12 +1401,12 @@ uent2str(uentry_t *puent)
 		}
 
 		if (puent->flag_metaslot_enabled) {
-			if (strlcat(buf, METASLOT_ENABLED, BUFSIZ) >= BUFSIZ) {
+			if (strlcat(buf, ENABLED_KEYWORD, BUFSIZ) >= BUFSIZ) {
 				free(buf);
 				return (NULL);
 			}
 		} else {
-			if (strlcat(buf, METASLOT_DISABLED, BUFSIZ)
+			if (strlcat(buf, DISABLED_KEYWORD, BUFSIZ)
 			    >= BUFSIZ) {
 				free(buf);
 				return (NULL);
@@ -1592,12 +1428,12 @@ uent2str(uentry_t *puent)
 		}
 
 		if (puent->flag_metaslot_auto_key_migrate) {
-			if (strlcat(buf, METASLOT_ENABLED, BUFSIZ) >= BUFSIZ) {
+			if (strlcat(buf, ENABLED_KEYWORD, BUFSIZ) >= BUFSIZ) {
 				free(buf);
 				return (NULL);
 			}
 		} else {
-			if (strlcat(buf, METASLOT_DISABLED, BUFSIZ) >= BUFSIZ) {
+			if (strlcat(buf, DISABLED_KEYWORD, BUFSIZ) >= BUFSIZ) {
 				free(buf);
 				return (NULL);
 			}

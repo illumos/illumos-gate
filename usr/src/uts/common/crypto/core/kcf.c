@@ -61,6 +61,7 @@ int kcf_frmwrk_debug = 0;
 kmutex_t kcf_dh_lock;
 door_handle_t kcf_dh = NULL;
 
+uint32_t global_fips140_mode;	/* FIPS140 enable/disable flag */
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "Kernel Crypto Framework"
@@ -114,6 +115,17 @@ int
 _fini(void)
 {
 	return (EBUSY);
+}
+
+/*
+ * Return the FIPS140 mode status:
+ * FIPS140_MODE_DISABLED (0)
+ * FIPS140_MODE_ENABLED (1)
+ */
+int
+kcf_get_fips140_mode(void)
+{
+	return (global_fips140_mode);
 }
 
 /*

@@ -23,33 +23,39 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_COMMON_CRYPTO_FIPS_RANDOM_H
-#define	_COMMON_CRYPTO_FIPS_RANDOM_H
+#ifndef	_FIPS_POST_H
+#define	_FIPS_POST_H
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <sys/types.h>
-
-#define	SHA1BLOCKBITS		512
-#define	SHA1BLOCKBYTES		(SHA1BLOCKBITS >> 3)
-#define	SHA1WORDS		5
-#define	BYTES_IN_WORD		4
-#define	SHA1BYTES		(BYTES_IN_WORD * SHA1WORDS)
+#define	FIPS_KNOWN_HMAC_MESSAGE_LENGTH	64	/* 512-bits */
 
 #ifdef _KERNEL
-#define	SHA1_HASH_SIZE		20
-#define	CK_RV			int
-#define	CKR_OK			CRYPTO_SUCCESS
-#define	CKR_DEVICE_ERROR	CRYPTO_DEVICE_ERROR
-#endif
 
-extern void fips_random_inner(uint32_t *, uint32_t *, uint32_t *);
-extern int fips_rng_post(void);
+#define	CK_BYTE				uchar_t
+#define	CK_ULONG			ulong_t
+#define	CK_RV				int
+#define	CKR_OK				CRYPTO_SUCCESS
+#define	CKR_HOST_MEMORY			CRYPTO_HOST_MEMORY
+#define	CKR_DEVICE_ERROR		CRYPTO_DEVICE_ERROR
+#define	CKR_DATA_LEN_RANGE		CRYPTO_DATA_LEN_RANGE
+#define	CKR_ENCRYPTED_DATA_LEN_RANGE	CRYPTO_ENCRYPTED_DATA_LEN_RANGE
+#define	CKR_ENCRYPTED_DATA_INVALID	CRYPTO_ENCRYPTED_DATA_INVALID
+#define	CKR_SIGNATURE_INVALID		CRYPTO_SIGNATURE_INVALID
+#define	CKR_ARGUMENTS_BAD		CRYPTO_ARGUMENTS_BAD
+
+#else
+
+#define	FIPS_RNG_XKEY_LENGTH		32	/* 256-bits */
+#define	PAIRWISE_DIGEST_LENGTH		20	/* 160-bits */
+#define	PAIRWISE_MESSAGE_LENGTH		20	/* 160-bits */
+
+#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _COMMON_CRYPTO_FIPS_RANDOM_H */
+#endif /* _FIPS_POST_H */

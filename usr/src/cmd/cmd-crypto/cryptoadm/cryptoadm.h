@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,6 @@
 extern "C" {
 #endif
 
-#define	_PATH_KCF_CONF		"/etc/crypto/kcf.conf"
 #define	_PATH_KCFD		"/lib/crypto/kcfd"
 #define	TMPFILE_TEMPLATE	"/etc/crypto/admXXXXXX"
 
@@ -56,6 +55,9 @@ extern "C" {
 #define	DELETE_MODE	2
 #define	MODIFY_MODE	3
 
+#define	REFRESH		1
+#define	NOT_REFRESH	0
+
 typedef char prov_name_t[MAXNAMELEN];
 typedef char mech_name_t[CRYPTO_MAX_MECH_NAME];
 
@@ -72,6 +74,7 @@ typedef struct entry {
 	mechlist_t	*dislist; /* disabled list */
 	uint_t		dis_count;
 	boolean_t	load; /* B_FALSE after cryptoadm unload */
+	boolean_t	flag_fips_enabled;
 } entry_t;
 
 
@@ -94,16 +97,20 @@ extern void free_mechlist(mechlist_t *);
 
 /* adm_kef_util */
 extern boolean_t is_device(char *);
+extern boolean_t is_fips(char *);
+extern int fips_update_kcfconf(int);
+extern void fips_status_kcfconf(int *);
 extern char *ent2str(entry_t *);
 extern entry_t *getent_kef(char *provname,
-		entrylist_t *pdevlist, entrylist_t *psoftlist);
+		entrylist_t *pdevlist, entrylist_t *psoftlist,
+		entrylist_t *pfipslist);
 extern int check_kernel_for_soft(char *provname,
 		crypto_get_soft_list_t *psoftlist, boolean_t *in_kernel);
 extern int check_kernel_for_hard(char *provname,
 		crypto_get_dev_list_t *pdevlist, boolean_t *in_kernel);
 extern int disable_mechs(entry_t **, mechlist_t *, boolean_t, mechlist_t *);
 extern int enable_mechs(entry_t **, boolean_t, mechlist_t *);
-extern int get_kcfconf_info(entrylist_t **, entrylist_t **);
+extern int get_kcfconf_info(entrylist_t **, entrylist_t **, entrylist_t **);
 extern int get_admindev_info(entrylist_t **, entrylist_t **);
 extern int get_mech_count(mechlist_t *);
 extern entry_t *create_entry(char *provname);
@@ -138,12 +145,15 @@ extern int update_policylist(uentry_t *, mechlist_t *, int);
 
 /* adm_kef */
 extern int list_mechlist_for_soft(char *provname,
-		entrylist_t *phardlist, entrylist_t *psoftlist);
+		entrylist_t *phardlist, entrylist_t *psoftlist,
+		entrylist_t *pfipslist);
 extern int list_mechlist_for_hard(char *);
 extern int list_policy_for_soft(char *provname,
-		entrylist_t *phardlist, entrylist_t *psoftlist);
+		entrylist_t *phardlist, entrylist_t *psoftlist,
+		entrylist_t *pfipslist);
 extern int list_policy_for_hard(char *provname,
 		entrylist_t *phardlist, entrylist_t *psoftlist,
+		entrylist_t *pfipslist,
 		crypto_get_dev_list_t *pdevlist);
 extern int disable_kef_software(char *, boolean_t, boolean_t, mechlist_t *);
 extern int disable_kef_hardware(char *, boolean_t, boolean_t, mechlist_t *);
@@ -163,8 +173,10 @@ extern crypto_unload_soft_module_t *setup_unload_soft(entry_t *);
 extern int get_dev_info(char *, int, int, mechlist_t **);
 extern int get_dev_list(crypto_get_dev_list_t **);
 extern int get_soft_info(char *provname, mechlist_t **ppmechlist,
-		entrylist_t *phardlist, entrylist_t *psoftlist);
+		entrylist_t *phardlist, entrylist_t *psoftlist,
+		entrylist_t *pfipslist);
 extern int get_soft_list(crypto_get_soft_list_t **);
+extern int do_fips_actions(int, int);
 
 /* adm_metaslot */
 extern int list_metaslot_info(boolean_t, boolean_t, mechlist_t *);

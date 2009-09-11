@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -402,7 +402,8 @@ get_dev_info(char *devname, int inst_num, int count, mechlist_t **ppmechlist)
  */
 int
 get_soft_info(char *provname, mechlist_t **ppmechlist,
-	entrylist_t *phardlist, entrylist_t *psoftlist)
+	entrylist_t *phardlist, entrylist_t *psoftlist,
+	entrylist_t *pfipslist)
 {
 	boolean_t		in_kernel = B_FALSE;
 	crypto_get_soft_info_t	*psoft_info;
@@ -421,8 +422,8 @@ get_soft_info(char *provname, mechlist_t **ppmechlist,
 
 	if (getzoneid() == GLOBAL_ZONEID) {
 		/* use kcf.conf for kernel software providers in global zone */
-		if ((pent = getent_kef(provname, phardlist, psoftlist)) ==
-		    NULL) {
+		if ((pent = getent_kef(provname, phardlist, psoftlist,
+		    pfipslist)) == NULL) {
 
 			/* No kcf.conf entry for this provider */
 			if (check_kernel_for_soft(provname, NULL, &in_kernel)
@@ -604,4 +605,132 @@ get_soft_list(crypto_get_soft_list_t **ppsoftlist)
 	*ppsoftlist = psoftlist;
 	(void) close(fd);
 	return (SUCCESS);
+}
+
+/*
+ * Perform the FIPS related actions
+ */
+int
+do_fips_actions(int action, int caller)
+{
+
+	crypto_fips140_t	fips_info;
+	int	fd;
+	int	rc = SUCCESS;
+	int	kcf_fips_mode = 0;
+
+	/* Get FIPS-140 status from kcf.conf */
+	fips_status_kcfconf(&kcf_fips_mode);
+
+	if (action == FIPS140_STATUS) {
+		if (kcf_fips_mode == CRYPTO_FIPS_MODE_ENABLED)
+			(void) printf(gettext(
+			    "\tFIPS-140 mode is enabled.\n"));
+		else
+			(void) printf(gettext(
+			    "\tFIPS-140 mode is disabled.\n"));
+		return (SUCCESS);
+	}
+
+	if (caller == NOT_REFRESH) {
+		/* Is it a duplicate operation? */
+		if ((action == FIPS140_ENABLE) &&
+		    (kcf_fips_mode == CRYPTO_FIPS_MODE_ENABLED)) {
+			cryptoerror(LOG_STDERR,
+			    gettext("FIPS-140 mode has already "
+			    "been enabled.\n"));
+			return (FAILURE);
+		}
+
+		if ((action == FIPS140_DISABLE) &&
+		    (kcf_fips_mode == CRYPTO_FIPS_MODE_DISABLED)) {
+			cryptoerror(LOG_STDERR,
+			    gettext("FIPS-140 mode has already "
+			    "been disabled.\n"));
+			return (FAILURE);
+		}
+
+		if ((action == FIPS140_ENABLE) || (action == FIPS140_DISABLE)) {
+			/* Update kcf.conf */
+			if ((rc = fips_update_kcfconf(action)) != SUCCESS)
+				return (rc);
+		}
+
+		/* No need to inform kernel */
+		if (action == FIPS140_ENABLE) {
+			(void) printf(gettext(
+			    "FIPS-140 mode was enabled successfully.\n"));
+			(void) printf(gettext(
+			    "Warning: In this release, the Cryptographic "
+			    "Framework has not been FIPS 140-2 "
+			    "certified.\n\n"));
+		} else {
+			(void) printf(gettext(
+			    "FIPS-140 mode was disabled successfully.\n"));
+		}
+
+		(void) printf(gettext(
+		    "The FIPS-140 mode has changed.\n"));
+		(void) printf(gettext(
+		    "The system will require a reboot.\n\n"));
+		return (SUCCESS);
+
+	}
+
+	/* This is refresh, need to inform kernel */
+	(void) memset(&fips_info, 0, sizeof (crypto_fips140_t));
+
+	if ((fd = open(ADMIN_IOCTL_DEVICE, O_RDONLY)) == -1) {
+		cryptoerror(LOG_STDERR, gettext("failed to open %s: %s"),
+		    ADMIN_IOCTL_DEVICE, strerror(errno));
+		return (FAILURE);
+	}
+
+	switch (action) {
+	case FIPS140_ENABLE:
+		/* make CRYPTO_FIPS_SET ioctl call */
+		fips_info.fips140_op = FIPS140_ENABLE;
+		if ((rc = ioctl(fd, CRYPTO_FIPS140_SET, &fips_info)) == -1) {
+			cryptodebug("CRYPTO_FIPS140_ENABLE ioctl failed: %s",
+			    strerror(errno));
+			rc = FAILURE;
+			goto out;
+		}
+
+		if (fips_info.fips140_return_value != CRYPTO_SUCCESS) {
+			cryptodebug("CRYPTO_FIPS140_ENABLE ioctl failed, "
+			    "return_value = %d",
+			    fips_info.fips140_return_value);
+			rc = FAILURE;
+		}
+
+		break;
+
+	case FIPS140_DISABLE:
+		/* make CRYPTO_FIPS140_SET ioctl call */
+		fips_info.fips140_op = FIPS140_DISABLE;
+		if ((rc = ioctl(fd, CRYPTO_FIPS140_SET, &fips_info)) == -1) {
+			cryptodebug("CRYPTO_FIPS140_DISABLE ioctl failed: %s",
+			    strerror(errno));
+			rc = FAILURE;
+			goto out;
+		}
+
+		if (fips_info.fips140_return_value != CRYPTO_SUCCESS) {
+			cryptodebug("CRYPTO_FIPS140_DISABLE ioctl failed, "
+			    "return_value = %d",
+			    fips_info.fips140_return_value);
+			rc = FAILURE;
+		}
+
+		break;
+
+	default:
+		rc = FAILURE;
+		break;
+	};
+
+out:
+	(void) close(fd);
+	return (rc);
 }

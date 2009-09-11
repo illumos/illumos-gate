@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,12 +43,15 @@ static int check_hardware_provider(char *, char *, int *, int *);
  * Display the mechanism list for a kernel software provider.
  * This implements part of the "cryptoadm list -m" command.
  *
- * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
- * If NULL, this function obtains it by calling get_kcfconf_info() internally.
+ * Parameters phardlist, psoftlist and pfipslist are supplied by
+ * get_soft_info().
+ * If NULL, this function obtains it by calling getent_kef() and
+ * then get_kcfconf_info() via get_soft_info() internally.
  */
 int
 list_mechlist_for_soft(char *provname,
-    entrylist_t *phardlist, entrylist_t *psoftlist)
+    entrylist_t *phardlist, entrylist_t *psoftlist,
+    entrylist_t *pfipslist)
 {
 	mechlist_t	*pmechlist = NULL;
 	int		rc;
@@ -57,7 +60,8 @@ list_mechlist_for_soft(char *provname,
 		return (FAILURE);
 	}
 
-	rc = get_soft_info(provname, &pmechlist, phardlist, psoftlist);
+	rc = get_soft_info(provname, &pmechlist, phardlist, psoftlist,
+	    pfipslist);
 	if (rc == SUCCESS) {
 		(void) filter_mechlist(&pmechlist, RANDOM);
 		print_mechlist(provname, pmechlist);
@@ -113,12 +117,15 @@ list_mechlist_for_hard(char *provname)
  * Display the policy information for a kernel software provider.
  * This implements part of the "cryptoadm list -p" command.
  *
- * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
- * If NULL, this function obtains it by calling get_kcfconf_info() internally.
+ * Parameters phardlist, psoftlist and pfipslist are supplied by
+ * getent_kef().
+ * If NULL, this function obtains it by calling get_kcfconf_info()
+ * via getent_kef() internally.
  */
 int
 list_policy_for_soft(char *provname,
-    entrylist_t *phardlist, entrylist_t *psoftlist)
+    entrylist_t *phardlist, entrylist_t *psoftlist,
+    entrylist_t *pfipslist)
 {
 	int		rc;
 	entry_t		*pent = NULL;
@@ -138,9 +145,11 @@ list_policy_for_soft(char *provname,
 		    provname);
 		return (FAILURE);
 	}
-	pent = getent_kef(provname, phardlist, psoftlist);
+	pent = getent_kef(provname, phardlist, psoftlist,
+	    pfipslist);
 
-	rc = get_soft_info(provname, &pmechlist, phardlist, psoftlist);
+	rc = get_soft_info(provname, &pmechlist, phardlist, psoftlist,
+	    pfipslist);
 	if (rc == SUCCESS) {
 		has_random = filter_mechlist(&pmechlist, RANDOM);
 		if (pmechlist != NULL) {
@@ -165,15 +174,17 @@ list_policy_for_soft(char *provname,
  * Display the policy information for a kernel hardware provider.
  * This implements part of the "cryptoadm list -p" command.
  *
- * Parameters phardlist and psoftlist are supplied by get_kcfconf_info().
- * If NULL, this function obtains it by calling get_kcfconf_info() internally.
- * Parameter pdevlist is supplied by get_dev_list().
- * If NULL, this function obtains it by calling get_dev_list() internally.
+ * Parameters phardlist, psoftlist and pfipslist are supplied by getent_kef().
+ * If NULL, this function obtains it by calling get_kcfconf_info() via
+ * getent_kef() internally.
+ * Parameter pdevlist is supplied by check_kernel_for_hard().
+ * If NULL, this function obtains it by calling get_dev_list() via
+ * check_kernel_for_hard() internally.
  */
 int
 list_policy_for_hard(char *provname,
 	entrylist_t *phardlist, entrylist_t *psoftlist,
-	crypto_get_dev_list_t *pdevlist)
+	entrylist_t *pfipslist, crypto_get_dev_list_t *pdevlist)
 {
 	entry_t		*pent = NULL;
 	boolean_t	in_kernel;
@@ -220,7 +231,8 @@ list_policy_for_hard(char *provname,
 	 * the disabled list from the config file entry.  Otherwise,
 	 * if it is active, then all the mechanisms for it are enabled.
 	 */
-	if ((pent = getent_kef(provname, phardlist, psoftlist)) != NULL) {
+	if ((pent = getent_kef(provname, phardlist, psoftlist,
+	    pfipslist)) != NULL) {
 		print_kef_policy(provname, pent, has_random, has_mechs);
 		free_entry(pent);
 		return (SUCCESS);
@@ -292,7 +304,7 @@ disable_kef_hardware(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * Get the entry of this hardware provider from the config file.
 	 * If there is no entry yet, create one for it.
 	 */
-	if ((pent = getent_kef(provname, NULL, NULL)) == NULL) {
+	if ((pent = getent_kef(provname, NULL, NULL, NULL)) == NULL) {
 		if ((pent = create_entry(provname)) == NULL) {
 			cryptoerror(LOG_STDERR, gettext("out of memory."));
 			free_mechlist(infolist);
@@ -387,6 +399,7 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 	entry_t				*pent = NULL;
 	entrylist_t			*phardlist = NULL;
 	entrylist_t			*psoftlist = NULL;
+	entrylist_t			*pfipslist = NULL;
 	boolean_t			in_kernel = B_FALSE;
 	int				fd = -1;
 	int				rc = SUCCESS;
@@ -400,7 +413,8 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * If it is unloaded, return FAILURE, because the disable subcommand
 	 * can not perform on inactive (unloaded) providers.
 	 */
-	if (check_kernel_for_soft(provname, NULL, &in_kernel) == FAILURE) {
+	if (check_kernel_for_soft(provname, NULL, &in_kernel) ==
+	    FAILURE) {
 		return (FAILURE);
 	} else if (in_kernel == B_FALSE) {
 		cryptoerror(LOG_STDERR,
@@ -409,7 +423,8 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 		return (FAILURE);
 	}
 
-	if (get_kcfconf_info(&phardlist, &psoftlist) == FAILURE) {
+	if (get_kcfconf_info(&phardlist, &psoftlist, &pfipslist) ==
+	    FAILURE) {
 		cryptoerror(LOG_ERR,
 		    "failed to retrieve the providers' "
 		    "information from the configuration file - %s.",
@@ -421,7 +436,7 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 	 * Get the entry of this provider from the kcf.conf file, if any.
 	 * Otherwise, create a new kcf.conf entry for writing back to the file.
 	 */
-	pent = getent_kef(provname, phardlist, psoftlist);
+	pent = getent_kef(provname, phardlist, psoftlist, pfipslist);
 	if (pent == NULL) { /* create a new entry */
 		pent = create_entry(provname);
 		if (pent == NULL) {
@@ -432,8 +447,8 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 	}
 
 	/* Get the mechanism list for the software provider from the kernel */
-	if (get_soft_info(provname, &infolist, phardlist, psoftlist) ==
-	    FAILURE) {
+	if (get_soft_info(provname, &infolist, phardlist, psoftlist,
+	    pfipslist) == FAILURE) {
 		rc = FAILURE;
 		goto out;
 	}
@@ -530,7 +545,7 @@ enable_kef(char *provname, boolean_t rndflag, boolean_t allflag,
 
 
 	/* Get the entry of this provider from the kcf.conf file, if any. */
-	pent = getent_kef(provname, NULL, NULL);
+	pent = getent_kef(provname, NULL, NULL, NULL);
 
 	if (is_device(provname)) {
 		if (pent == NULL) {
@@ -711,7 +726,7 @@ install_kef(char *provname, mechlist_t *mlist)
 	}
 
 	/* Check if the provider already exists */
-	if ((pent = getent_kef(provname, NULL, NULL)) != NULL) {
+	if ((pent = getent_kef(provname, NULL, NULL, NULL)) != NULL) {
 		cryptoerror(LOG_STDERR, gettext("%s exists already."),
 		    provname);
 		free_entry(pent);
@@ -982,7 +997,7 @@ uninstall_kef(char *provname)
 	 */
 
 	/* Setup ioctl() parameter */
-	pent = getent_kef(provname, NULL, NULL);
+	pent = getent_kef(provname, NULL, NULL, NULL);
 	if (pent != NULL) { /* in kcf.conf */
 		in_kcfconf = B_TRUE;
 		free_mechlist(pent->suplist);
@@ -1053,12 +1068,14 @@ refresh(void)
 	crypto_load_dev_disabled_t	*pload_dev_dis = NULL;
 	entrylist_t			*pdevlist = NULL;
 	entrylist_t			*psoftlist = NULL;
+	entrylist_t			*pfipslist = NULL;
 	entrylist_t			*ptr;
 	int				fd = -1;
 	int				rc = SUCCESS;
 	int				err;
 
-	if (get_kcfconf_info(&pdevlist, &psoftlist) == FAILURE) {
+	if (get_kcfconf_info(&pdevlist, &psoftlist, &pfipslist) ==
+	    FAILURE) {
 		cryptoerror(LOG_ERR, "failed to retrieve the providers' "
 		    "information from the configuration file - %s.",
 		    _PATH_KCF_CONF);
@@ -1189,6 +1206,18 @@ refresh(void)
 		}
 	}
 
+	/*
+	 * handle fips_status=enabled|disabled
+	 */
+	ptr = pfipslist;
+	if (ptr != NULL) {
+		if (ptr->pent->flag_fips_enabled) {
+			rc = do_fips_actions(FIPS140_ENABLE, REFRESH);
+		} else {
+			rc = do_fips_actions(FIPS140_DISABLE, REFRESH);
+		}
+	}
+
 	(void) close(fd);
 	return (rc);
 }
@@ -1217,7 +1246,7 @@ unload_kef_soft(char *provname)
 		return (FAILURE);
 	}
 
-	pent = getent_kef(provname, NULL, NULL);
+	pent = getent_kef(provname, NULL, NULL, NULL);
 	if (pent == NULL) { /* not in kcf.conf */
 		/* Construct an entry using the provname */
 		pent = create_entry(provname);
@@ -1359,4 +1388,44 @@ check_hardware_provider(char *provname, char *pname, int *pnum, int *pcount)
 
 	free(dev_list);
 	return (SUCCESS);
+}
+
+int
+fips_update_kcfconf(int action)
+{
+
+	char	*str;
+
+	if (action == FIPS140_ENABLE)
+		str = "fips-140:fips_status=enabled\n";
+	else
+		str = "fips-140:fips_status=disabled\n";
+
+	if (update_conf(_PATH_KCF_CONF, str) != SUCCESS)
+		return (FAILURE);
+
+	return (SUCCESS);
+}
+
+void
+fips_status_kcfconf(int *status)
+{
+
+	entry_t *pent = NULL;
+
+	if ((pent = getent_kef(FIPS_KEYWORD, NULL, NULL, NULL)) == NULL) {
+		/*
+		 * By default (no FIPS entry), we assume FIPS is disabled.
+		 */
+		*status = CRYPTO_FIPS_MODE_DISABLED;
+		return;
+	}
+
+	if (pent->flag_fips_enabled)
+		*status = CRYPTO_FIPS_MODE_ENABLED;
+	else
+		*status = CRYPTO_FIPS_MODE_DISABLED;
+
+	return;
+
 }

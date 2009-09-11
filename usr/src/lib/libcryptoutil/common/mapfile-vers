@@ -49,6 +49,7 @@ SUNWprivate {
 	free_uentrylist;
 	free_umechlist;
 	getent_uef;
+	get_fips_mode;
 	get_fullpath;
 	get_metaslot_info;
 	get_pkcs11conf_info;

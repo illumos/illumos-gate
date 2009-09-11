@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,25 @@ fips_add160(uint32_t *sum, uint32_t const *val1, uint32_t const *val2,
 	return (((non_zero != 0) * 2) | carry);
 }
 
+#ifdef _LITTLE_ENDIAN
+#define	SWAP16(value)  \
+	((((value) & 0xff) << 8) | ((value) >> 8))
+
+#define	SWAP32(value)	\
+	(((uint32_t)SWAP16((uint16_t)((value) & 0xffff)) << 16) | \
+	(uint32_t)SWAP16((uint16_t)((value) >> 16)))
+
+static void
+xvalconv(uint32_t *dest, uint32_t *src, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) {
+		dest [i] = SWAP32(src[i]);
+	}
+}
+#endif /* _LITTLE_ENDIAN */
+
 /*
  * Computes a new random value, which is stored in x_j; updates
  * XKEY.  XSEED_j is additional input.  In principle, we should
@@ -86,7 +105,6 @@ void
 fips_random_inner(uint32_t *key, uint32_t *x_j,
     uint32_t *XSEED_j)
 {
-	int		i;
 	SHA1_CTX	sha1_context;
 	/* Alias to preserve terminology from FIPS 186-2 */
 #define	XVAL XSEED_j
@@ -124,9 +142,18 @@ fips_random_inner(uint32_t *key, uint32_t *x_j,
 	 * sha1_context, which is of type SHA1_CTX, defined in sha1.h.
 	 */
 	/* copy out to x_j */
-	for (i = 0; i < 5; i++) {
-		x_j[i] = sha1_context.state[i];
+
+#ifdef _BIG_ENDIAN
+	{
+		int i;
+		for (i = 0; i < 5; i++) {
+			x_j[i] = sha1_context.state[i];
+		}
 	}
+#else
+	xvalconv(x_j, sha1_context.state, SHA1BYTES/4);
+#endif
+
 	/*
 	 * Step 3d: XKEY = (1 + XKEY + x_sub_j) mod 2^b.  b=160.  The
 	 * mod 2^160 is implicit in the 160 bit representation.  The

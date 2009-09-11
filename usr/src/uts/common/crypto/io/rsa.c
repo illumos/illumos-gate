@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * RSA provider for the Kernel Cryptographic Framework (KCF)
@@ -39,10 +37,14 @@
 #include <sys/strsun.h>
 #include <sys/md5.h>
 #include <sys/sha1.h>
+#define	_SHA2_IMPL
 #include <sys/sha2.h>
 #include <sys/random.h>
 #include <sys/crypto/impl.h>
-#include "rsa_impl.h"
+#include <sha1/sha1_impl.h>
+#include <sha2/sha2_impl.h>
+#define	_RSA_FIPS_POST
+#include <rsa/rsa_impl.h>
 
 extern struct mod_ops mod_cryptoops;
 
@@ -1707,4 +1709,15 @@ rsa_verify_recover_atomic(crypto_provider_handle_t provider,
 
 	return (rsa_verify_recover_common(mechanism->cm_type, key,
 	    signature, data, crypto_kmflag(req)));
+}
+
+/*
+ * RSA Power-Up Self-Test
+ */
+void
+rsa_POST(int *rc)
+{
+
+	*rc = fips_rsa_post();
+
 }

@@ -481,9 +481,9 @@ MD4_OBJS +=	md4.o md4_mod.o
 
 MD5_OBJS +=	md5.o md5_mod.o
 
-SHA1_OBJS +=	sha1.o sha1_mod.o
+SHA1_OBJS +=	sha1.o sha1_mod.o fips_sha1_util.o
 
-SHA2_OBJS +=	sha2.o sha2_mod.o
+SHA2_OBJS +=	sha2.o sha2_mod.o fips_sha2_util.o
 
 IPGPC_OBJS +=   classifierddi.o classifier.o filters.o trie.o table.o \
 		ba_table.o
@@ -1467,7 +1467,7 @@ DPROV_OBJS +=	dprov.o
 DCA_OBJS +=	dca.o dca_3des.o dca_debug.o dca_dsa.o dca_kstat.o dca_rng.o \
 		dca_rsa.o
 
-AESPROV_OBJS +=	aes.o aes_impl.o aes_modes.o
+AESPROV_OBJS +=	aes.o aes_impl.o aes_modes.o fips_aes_util.o
 
 ARCFOURPROV_OBJS += arcfour.o arcfour_crypt.o
 
@@ -1478,11 +1478,11 @@ ECCPROV_OBJS += ecc.o ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o \
 		ecp_jm.o ec2_233.o ecl_curve.o ecp_224.o ecp_aff.o \
 		ecp_mont.o ec2_aff.o ec_naf.o ecl_gf.o ecp_256.o mp_gf2m.o \
 		mpi.o mplogic.o mpmontg.o mpprime.o oid.o \
-		secitem.o ec2_test.o ecp_test.o
+		secitem.o ec2_test.o ecp_test.o fips_ecc_util.o
 
-RSAPROV_OBJS += rsa.o rsa_impl.o
+RSAPROV_OBJS += rsa.o rsa_impl.o fips_rsa_util.o
 
-SWRANDPROV_OBJS += swrand.o
+SWRANDPROV_OBJS += swrand.o fips_random_util.o
 
 #
 #			kernel SSL
@@ -1601,7 +1601,7 @@ KGSS_KRB5_OBJS += krb5mech.o \
 	$(CRYPTO_OLD) \
 	$(CRYPTO_RAW) $(K5_KRB) $(K5_OS)
 
-DES_OBJS +=	des_crypt.o des_impl.o des_ks.o des_soft.o
+DES_OBJS +=	des_crypt.o des_impl.o des_ks.o des_soft.o fips_des_util.o
 
 DLBOOT_OBJS +=	bootparam_xdr.o nfs_dlinet.o scan.o
 

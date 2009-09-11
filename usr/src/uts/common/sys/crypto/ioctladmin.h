@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CRYPTO_IOCTLADMIN_H
 #define	_SYS_CRYPTO_IOCTLADMIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -104,6 +101,12 @@ typedef struct crypto_load_door {
 	uint_t			ld_did;
 } crypto_load_door_t;
 
+typedef struct crypto_fips140 {
+	uint_t			fips140_return_value;
+	uint_t			fips140_op;
+	uint_t			fips140_status;
+} crypto_fips140_t;
+
 #ifdef	_KERNEL
 #ifdef	_SYSCALL32
 
@@ -116,6 +119,23 @@ typedef struct crypto_get_soft_list32 {
 
 #endif	/* _SYSCALL32 */
 #endif	/* _KERNEL */
+
+/*
+ * FIPS140 ioctl operations
+ */
+enum {
+	FIPS140_STATUS,		/* get current fips140 mode */
+	FIPS140_ENABLE,		/* enable fips140 mode */
+	FIPS140_DISABLE		/* disable fips140 mode */
+};
+
+/*
+ * FIPS140 Mode Status
+ */
+enum {
+	FIPS140_MODE_DISABLED,
+	FIPS140_MODE_ENABLED
+};
 
 #define	CRYPTO_GET_VERSION		CRYPTOADMIN(1)
 #define	CRYPTO_GET_DEV_LIST		CRYPTOADMIN(2)
@@ -130,6 +150,8 @@ typedef struct crypto_get_soft_list32 {
 #define	CRYPTO_POOL_WAIT		CRYPTOADMIN(13)
 #define	CRYPTO_POOL_RUN			CRYPTOADMIN(14)
 #define	CRYPTO_LOAD_DOOR		CRYPTOADMIN(15)
+#define	CRYPTO_FIPS140_STATUS		CRYPTOADMIN(16)
+#define	CRYPTO_FIPS140_SET		CRYPTOADMIN(17)
 
 #ifdef	__cplusplus
 }

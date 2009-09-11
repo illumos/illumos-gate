@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the ECC KEF provider.
 #
@@ -34,8 +33,7 @@
 #
 UTSBASE	= ../..
 COM1_DIR = $(COMMONBASE)/mpi
-COM2_DIR = $(COMMONBASE)/crypto/ecc
-COM3_DIR = $(COMMONBASE)/crypto/des
+COM2_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -68,9 +66,9 @@ LDFLAGS += -dy -Nmisc/kcf
 #
 # lint pass one enforcement
 #
-CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR) -I$(COM2_DIR) -I$(COM3_DIR)
+CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR) -I$(COM2_DIR)
 CFLAGS		+= -DMP_API_COMPATIBLE -DNSS_ECC_MORE_THAN_SUITE_B
-LINTFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR) -I$(COM3_DIR)
+LINTFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR)
 
 #
 #	Default build targets.

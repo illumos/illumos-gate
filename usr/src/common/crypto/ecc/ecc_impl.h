@@ -229,6 +229,12 @@ extern SECStatus ECDSA_VerifyDigest(ECPublicKey *, const SECItem *,
     const SECItem *, int);
 extern SECStatus ECDH_Derive(SECItem *, ECParams *, SECItem *, boolean_t,
     SECItem *, int);
+extern SECStatus EC_CopyParams(PRArenaPool *, ECParams *, const ECParams *);
+extern SECStatus EC_ValidatePublicKey(ECParams *, SECItem *, int);
+extern SECStatus ECDSA_SignDigestWithSeed(ECPrivateKey *, SECItem *,
+    const SECItem *, const unsigned char *, const int kblen, int);
+extern SECStatus ec_NewKey(ECParams *, ECPrivateKey **,
+    const unsigned char *, int, int);
 
 #ifdef	__cplusplus
 }

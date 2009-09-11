@@ -146,6 +146,81 @@ extern int aes_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
 extern int aes_decrypt_contiguous_blocks(void *ctx, char *data, size_t length,
     crypto_data_t *out);
 
+/*
+ * The following definitions and declarations are only used by AES FIPS POST
+ */
+#ifdef _AES_FIPS_POST
+
+#include <fips/fips_post.h>
+
+/*
+ * FIPS preprocessor directives for AES-ECB and AES-CBC.
+ */
+#define	FIPS_AES_BLOCK_SIZE		16  /* 128-bits */
+#define	FIPS_AES_ENCRYPT_LENGTH		16  /* 128-bits */
+#define	FIPS_AES_DECRYPT_LENGTH		16  /* 128-bits */
+#define	FIPS_AES_128_KEY_SIZE		16  /* 128-bits */
+#define	FIPS_AES_192_KEY_SIZE		24  /* 192-bits */
+#define	FIPS_AES_256_KEY_SIZE		32  /* 256-bits */
+
+
+#ifdef _KERNEL
+typedef enum aes_mech_type {
+	AES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_AES_ECB */
+	AES_CBC_MECH_INFO_TYPE,		/* SUN_CKM_AES_CBC */
+	AES_CBC_PAD_MECH_INFO_TYPE,	/* SUN_CKM_AES_CBC_PAD */
+	AES_CTR_MECH_INFO_TYPE,		/* SUN_CKM_AES_CTR */
+	AES_CCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_CCM */
+	AES_GCM_MECH_INFO_TYPE,		/* SUN_CKM_AES_GCM */
+	AES_GMAC_MECH_INFO_TYPE		/* SUN_CKM_AES_GMAC */
+} aes_mech_type_t;
+
+#undef	CKM_AES_ECB
+#undef	CKM_AES_CBC
+#undef	CKM_AES_CTR
+
+#define	CKM_AES_ECB			AES_ECB_MECH_INFO_TYPE
+#define	CKM_AES_CBC			AES_CBC_MECH_INFO_TYPE
+#define	CKM_AES_CTR			AES_CTR_MECH_INFO_TYPE
+
+typedef struct soft_aes_ctx {
+	void *key_sched;		/* pointer to key schedule */
+	size_t keysched_len;		/* Length of the key schedule */
+	uint8_t ivec[AES_BLOCK_LEN];	/* initialization vector */
+	uint8_t data[AES_BLOCK_LEN];	/* for use by update */
+	size_t remain_len;		/* for use by update */
+	void *aes_cbc;			/* to be used by CBC mode */
+} soft_aes_ctx_t;
+#endif
+
+/* AES FIPS functions */
+extern int fips_aes_post(int);
+
+#ifdef _AES_IMPL
+#ifndef _KERNEL
+struct soft_aes_ctx;
+extern void fips_aes_free_context(struct soft_aes_ctx *);
+extern struct soft_aes_ctx *fips_aes_build_context(uint8_t *, int,
+	uint8_t *, CK_MECHANISM_TYPE);
+extern CK_RV fips_aes_encrypt(struct soft_aes_ctx *, CK_BYTE_PTR,
+	CK_ULONG, CK_BYTE_PTR, CK_ULONG_PTR, CK_MECHANISM_TYPE);
+extern CK_RV fips_aes_decrypt(struct soft_aes_ctx *, CK_BYTE_PTR,
+	CK_ULONG, CK_BYTE_PTR, CK_ULONG_PTR, CK_MECHANISM_TYPE);
+
+#else
+extern void fips_aes_free_context(soft_aes_ctx_t *);
+extern void *aes_cbc_ctx_init(void *, size_t, uint8_t *);
+extern soft_aes_ctx_t *fips_aes_build_context(uint8_t *, int,
+	uint8_t *, aes_mech_type_t, boolean_t);
+extern int fips_aes_encrypt(soft_aes_ctx_t *, uchar_t *,
+	ulong_t, uchar_t *, ulong_t *, aes_mech_type_t);
+extern int fips_aes_decrypt(soft_aes_ctx_t *, uchar_t *,
+	ulong_t, uchar_t *, ulong_t *, aes_mech_type_t);
+
+#endif /* _KERNEL */
+#endif /* _AES_IMPL */
+#endif /* _AES_FIPS_POST */
+
 #ifdef	__cplusplus
 }
 #endif

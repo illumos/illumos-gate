@@ -335,7 +335,6 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 	}
 
 	while (len > 0) {
-
 		/* Check if there is enough entropy */
 		while (entropy_bits < MINEXTRACTBITS) {
 
@@ -402,9 +401,13 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 			if (tempout[i] != previous_bytes[i])
 				break;
 		}
-		if (i == HASHSIZE/BYTES_IN_WORD)
+
+		if (i == HASHSIZE/BYTES_IN_WORD) {
 			cmn_err(CE_WARN, "swrand: The value of 160-bit block "
 			    "random bytes are same as the previous one.\n");
+			/* discard random bytes and return error */
+			return (EIO);
+		}
 
 		bcopy(tempout, previous_bytes, HASHSIZE);
 
@@ -903,4 +906,15 @@ rnd_handler(void *arg)
 	swrand_schedule_timeout();
 
 	mutex_exit(&srndpool_lock);
+}
+
+/*
+ * Swrand Power-Up Self-Test
+ */
+void
+swrand_POST(int *rc)
+{
+
+	*rc = fips_rng_post();
+
 }

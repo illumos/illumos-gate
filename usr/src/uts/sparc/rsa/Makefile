@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the RSA KEF provider.
 #
@@ -34,7 +33,7 @@
 #
 UTSBASE	= ../..
 COM1_DIR = $(COMMONBASE)/bignum
-COM2_DIR = $(COMMONBASE)/crypto/rsa
+COM2_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,10 @@ static int cryptoadm_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
 extern void audit_cryptoadm(int, char *, crypto_mech_name_t *, uint_t,
     uint_t, uint32_t, int);
+
+kmutex_t fips140_mode_lock;
+extern uint32_t global_fips140_mode;
+
 /*
  * Module linkage.
  */
@@ -170,6 +174,7 @@ cryptoadm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	mutex_init(&fips140_mode_lock, NULL, MUTEX_DEFAULT, NULL);
 	cryptoadm_dip = dip;
 
 	return (DDI_SUCCESS);
@@ -802,6 +807,53 @@ out2:
 	return (error);
 }
 
+/*
+ * This function enables/disables FIPS140 mode or gets the  current
+ * FIPS140 mode status.
+ *
+ * Enable or disable FIPS140 ioctl operation name:
+ *	FIPS140_ENABLE or FIPS140_DISABLE
+ *
+ * Global fips140 mode status in kernel:
+ *	FIPS140_MODE_ENABLED or FIPS140_MODE_DISABLED
+ */
+/* ARGSUSED */
+static int
+fips140_actions(dev_t dev, caddr_t arg, int mode, int *rval, int cmd)
+{
+	crypto_fips140_t fips140_info;
+	uint32_t rv = CRYPTO_SUCCESS;
+	int error = 0;
+
+	if (copyin(arg, &fips140_info, sizeof (crypto_fips140_t)) != 0)
+		return (EFAULT);
+
+	switch (cmd) {
+	case CRYPTO_FIPS140_STATUS:
+		fips140_info.fips140_status = global_fips140_mode;
+		break;
+	case CRYPTO_FIPS140_SET:
+		mutex_enter(&fips140_mode_lock);
+		if (fips140_info.fips140_op == FIPS140_ENABLE)
+			global_fips140_mode = FIPS140_MODE_ENABLED;
+		else if (fips140_info.fips140_op == FIPS140_DISABLE)
+			global_fips140_mode = FIPS140_MODE_DISABLED;
+		else {
+			rv = CRYPTO_ARGUMENTS_BAD;
+			error = CRYPTO_FAILED;
+		}
+		mutex_exit(&fips140_mode_lock);
+		break;
+	}
+
+	fips140_info.fips140_return_value = rv;
+
+	if (copyout(&fips140_info, arg, sizeof (crypto_fips140_t)) != 0)
+		error = EFAULT;
+
+	return (error);
+}
+
 static int
 cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
     int *rval)
@@ -818,6 +870,7 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 	case CRYPTO_POOL_WAIT:
 	case CRYPTO_POOL_RUN:
 	case CRYPTO_LOAD_DOOR:
+	case CRYPTO_FIPS140_SET:
 		if ((error = drv_priv(c)) != 0)
 			return (error);
 	default:
@@ -886,6 +939,18 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 
 	case CRYPTO_LOAD_DOOR:
 		return (load_door(dev, ARG, mode, rval));
+	case CRYPTO_FIPS140_STATUS:
+		return (fips140_actions(dev, ARG, mode, rval, cmd));
+	case CRYPTO_FIPS140_SET: {
+		int err;
+
+		err = fips140_actions(dev, ARG, mode, rval, cmd);
+		if (audit_active)
+			audit_cryptoadm(CRYPTO_FIPS140_SET, NULL, NULL,
+			    0, 0, 0, err);
+		return (err);
 	}
+	}
+
 	return (EINVAL);
 }

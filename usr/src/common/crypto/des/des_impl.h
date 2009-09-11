@@ -104,6 +104,67 @@ extern int des3_encrypt_block(const void *, const uint8_t *, uint8_t *);
 extern int des_decrypt_block(const void *, const uint8_t *, uint8_t *);
 extern int des3_decrypt_block(const void *, const uint8_t *, uint8_t *);
 
+/*
+ * The following definitions and declarations are only used by DES FIPS POST
+ */
+#ifdef _DES_FIPS_POST
+
+#include <modes/modes.h>
+#include <fips/fips_post.h>
+
+/* DES FIPS Declarations */
+#define	FIPS_DES_ENCRYPT_LENGTH		8  /*  64-bits */
+#define	FIPS_DES_DECRYPT_LENGTH		8  /*  64-bits */
+#define	FIPS_DES3_ENCRYPT_LENGTH	8  /*  64-bits */
+#define	FIPS_DES3_DECRYPT_LENGTH	8  /*  64-bits */
+
+#ifdef _KERNEL
+typedef enum des_mech_type {
+	DES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_DES_ECB */
+	DES_CBC_MECH_INFO_TYPE,		/* SUN_CKM_DES_CBC */
+	DES_CFB_MECH_INFO_TYPE,		/* SUN_CKM_DES_CFB */
+	DES3_ECB_MECH_INFO_TYPE,	/* SUN_CKM_DES3_ECB */
+	DES3_CBC_MECH_INFO_TYPE,	/* SUN_CKM_DES3_CBC */
+	DES3_CFB_MECH_INFO_TYPE		/* SUN_CKM_DES3_CFB */
+} des_mech_type_t;
+
+
+#undef	CKM_DES_ECB
+#undef	CKM_DES3_ECB
+#undef	CKM_DES_CBC
+#undef	CKM_DES3_CBC
+
+#define	CKM_DES_ECB		DES_ECB_MECH_INFO_TYPE
+#define	CKM_DES3_ECB		DES3_ECB_MECH_INFO_TYPE
+#define	CKM_DES_CBC		DES_CBC_MECH_INFO_TYPE
+#define	CKM_DES3_CBC		DES3_CBC_MECH_INFO_TYPE
+#endif
+
+/* DES3 FIPS functions */
+extern int fips_des3_post(void);
+
+#ifndef _KERNEL
+#ifdef _DES_IMPL
+struct soft_des_ctx;
+extern struct soft_des_ctx *des_build_context(uint8_t *, uint8_t *,
+	CK_KEY_TYPE, CK_MECHANISM_TYPE);
+extern void fips_des_free_context(struct soft_des_ctx *);
+extern CK_RV fips_des_encrypt(struct soft_des_ctx *, CK_BYTE_PTR,
+	CK_ULONG, CK_BYTE_PTR, CK_ULONG_PTR, CK_MECHANISM_TYPE);
+extern CK_RV fips_des_decrypt(struct soft_des_ctx *, CK_BYTE_PTR,
+	CK_ULONG, CK_BYTE_PTR, CK_ULONG_PTR, CK_MECHANISM_TYPE);
+#endif /* _DES_IMPL */
+#else
+extern des_ctx_t *des_build_context(uint8_t *, uint8_t *,
+	des_mech_type_t);
+extern void fips_des_free_context(des_ctx_t *);
+extern int fips_des_encrypt(des_ctx_t *, uint8_t *,
+	ulong_t, uint8_t *, ulong_t *, des_mech_type_t);
+extern int fips_des_decrypt(des_ctx_t *, uint8_t *,
+	ulong_t, uint8_t *, ulong_t *, des_mech_type_t);
+#endif /* _KERNEL */
+#endif /* _DES_FIPS_POST */
+
 #ifdef	__cplusplus
 }
 #endif

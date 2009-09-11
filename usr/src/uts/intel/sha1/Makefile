@@ -21,10 +21,9 @@
 #
 # uts/intel/sha1/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the sha1 crypto kernel module.
 #
@@ -35,7 +34,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COMDIR = $(COMMONBASE)/crypto/sha1
+COMDIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -58,6 +57,14 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Override defaults
 #
 CLEANFILES += sha1-x86_64.s
+
+#
+# Linkage dependencies
+#
+LDFLAGS += -dy -Nmisc/kcf
+
+CFLAGS += -I$(COMDIR)
+LINTFLAGS	+= -I$(COMDIR)
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -111,5 +118,5 @@ $(OBJS_DIR)/sha1-x86_64.o: sha1-x86_64.s
 $(OBJS_DIR)/sha1-x86_64.ln: sha1-x86_64.s
 	@($(LHEAD) $(LINT.c) ${@F:.ln=.s} $(LTAIL))
 
-sha1-x86_64.s: $(COMDIR)/amd64/sha1-x86_64.pl
+sha1-x86_64.s: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
 	$(PERL) $? $@
