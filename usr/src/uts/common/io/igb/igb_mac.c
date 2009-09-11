@@ -472,7 +472,7 @@ e1000_update_mc_addr_list_generic(struct e1000_hw *hw,
 	DEBUGFUNC("e1000_update_mc_addr_list_generic");
 
 	/* clear mta_shadow */
-	memset(&hw->mac.mta_shadow, 0, sizeof (hw->mac.mta_shadow));
+	(void) memset(&hw->mac.mta_shadow, 0, sizeof (hw->mac.mta_shadow));
 
 	/* update mta_shadow from mc_addr_list */
 	for (i = 0; (u32) i < mc_addr_count; i++) {
