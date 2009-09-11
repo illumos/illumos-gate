@@ -1164,7 +1164,7 @@ link_shutdown(void *arg)
 		mac_bridge_clear(mh, (mac_handle_t)blp);
 
 	if (blp->bl_flags & BLF_MARGIN_ADDED) {
-		mac_notify_remove(blp->bl_mnh, B_TRUE);
+		(void) mac_notify_remove(blp->bl_mnh, B_TRUE);
 		(void) mac_margin_remove(mh, blp->bl_margin);
 	}
 
