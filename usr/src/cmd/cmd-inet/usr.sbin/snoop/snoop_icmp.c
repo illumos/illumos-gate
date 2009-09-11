@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -849,7 +847,7 @@ interpret_options(optc, ilen)
 			    "+++ ICMPv6 MTU option +++");
 			mopt = (struct nd_opt_mtu *)opt;
 			(void) sprintf(get_line(0, 0),
-			    "MTU = %u ", mopt->nd_opt_mtu_mtu);
+			    "MTU = %u ", ntohl(mopt->nd_opt_mtu_mtu));
 			show_space();
 			break;
 		}

@@ -709,6 +709,7 @@ ip_mrouter_done(mblk_t *mp, ip_stack_t *ipst)
 				}
 				mutex_enter(&vifp->v_lock);
 			}
+			ipif_refrele(vifp->v_ipif);
 			/*
 			 * decreases the refcnt added in add_vif.
 			 * and release v_lock.
@@ -1080,12 +1081,6 @@ del_vifp(struct vif *vifp)
 	ASSERT(vifp->v_marks & VIF_MARK_CONDEMNED);
 	ASSERT(t != NULL);
 
-	/*
-	 * release the ref we put in vif_del.
-	 */
-	ASSERT(vifp->v_ipif != NULL);
-	ipif_refrele(vifp->v_ipif);
-
 	if (ipst->ips_ip_mrtdebug > 1) {
 		(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 		    "del_vif: src 0x%x\n", vifp->v_lcl_addr.s_addr);
@@ -1144,7 +1139,6 @@ del_vif(vifi_t *vifip, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 	if (*vifip >= ipst->ips_numvifs)
 		return (EINVAL);
 
-
 	mutex_enter(&vifp->v_lock);
 	/*
 	 * Not initialized
@@ -1191,14 +1185,6 @@ del_vif(vifi_t *vifip, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 
 
 	ASSERT(IAM_WRITER_IPIF(vifp->v_ipif));
-
-
-	/*
-	 * add a refhold so that ipif does not go away while
-	 * there are still users, this will be released in del_vifp
-	 * when we free the vif.
-	 */
-	ipif_refhold(vifp->v_ipif);
 
 	/* Clear VIF_MARK_GOOD and set VIF_MARK_CONDEMNED. */
 	vifp->v_marks &= ~VIF_MARK_GOOD;
