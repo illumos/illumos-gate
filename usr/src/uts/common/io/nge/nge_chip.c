@@ -1458,6 +1458,7 @@ nge_sync_mac_modes(nge_t *ngep)
 	nge_bkoff_cntl bk_cntl;
 	nge_mac2phy m2p;
 	nge_rx_cntrl0 rx_cntl0;
+	nge_tx_cntl tx_cntl;
 	nge_dev_spec_param_t	*dev_param_p;
 
 	dev_param_p = &ngep->dev_spec_param;
@@ -1534,11 +1535,30 @@ nge_sync_mac_modes(nge_t *ngep)
 	nge_reg_put32(ngep, NGE_BKOFF_CNTL, bk_cntl.cntl_val);
 
 	rx_cntl0.cntl_val = nge_reg_get32(ngep, NGE_RX_CNTL0);
-	if (ngep->param_link_rx_pause && dev_param_p->rx_pause_frame)
-		rx_cntl0.cntl_bits.paen = NGE_SET;
-	else
-		rx_cntl0.cntl_bits.paen = NGE_CLEAR;
-	nge_reg_put32(ngep, NGE_RX_CNTL0, rx_cntl0.cntl_val);
+	if (ngep->param_link_rx_pause && dev_param_p->rx_pause_frame) {
+		if (rx_cntl0.cntl_bits.paen == NGE_CLEAR) {
+			rx_cntl0.cntl_bits.paen = NGE_SET;
+			nge_reg_put32(ngep, NGE_RX_CNTL0, rx_cntl0.cntl_val);
+	}
+	} else {
+		if (rx_cntl0.cntl_bits.paen == NGE_SET) {
+			rx_cntl0.cntl_bits.paen = NGE_CLEAR;
+			nge_reg_put32(ngep, NGE_RX_CNTL0, rx_cntl0.cntl_val);
+		}
+	}
+
+	tx_cntl.cntl_val = nge_reg_get32(ngep, NGE_TX_CNTL);
+	if (ngep->param_link_tx_pause && dev_param_p->tx_pause_frame) {
+		if (tx_cntl.cntl_bits.paen == NGE_CLEAR) {
+			tx_cntl.cntl_bits.paen = NGE_SET;
+			nge_reg_put32(ngep, NGE_TX_CNTL, tx_cntl.cntl_val);
+		}
+	} else {
+		if (tx_cntl.cntl_bits.paen == NGE_SET) {
+			tx_cntl.cntl_bits.paen = NGE_CLEAR;
+			nge_reg_put32(ngep, NGE_TX_CNTL, tx_cntl.cntl_val);
+		}
+	}
 }
 
 /*

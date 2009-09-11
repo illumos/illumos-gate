@@ -211,8 +211,6 @@ mac_priv_prop_t nge_priv_props[] = {
 	{"_poll_busy_time", MAC_PROP_PERM_RW},
 	{"_rx_intr_hwater", MAC_PROP_PERM_RW},
 	{"_rx_intr_lwater", MAC_PROP_PERM_RW},
-	{"_adv_pause_cap", MAC_PROP_PERM_RW},
-	{"_adv_asym_pause_cap", MAC_PROP_PERM_RW},
 	{"_tx_n_intr", MAC_PROP_PERM_RW}
 };
 
@@ -1003,6 +1001,15 @@ nge_get_props(nge_t *ngep)
 		    DDI_PROP_DONTPASS, default_mtu, ETHERMTU);
 	} else
 		ngep->default_mtu = ETHERMTU;
+	if (dev_param_p->tx_pause_frame)
+			ngep->param_link_tx_pause = B_TRUE;
+	else
+			ngep->param_link_tx_pause = B_FALSE;
+
+	if (dev_param_p->rx_pause_frame)
+			ngep->param_link_rx_pause = B_TRUE;
+	else
+			ngep->param_link_rx_pause = B_FALSE;
 
 	if (ngep->default_mtu > ETHERMTU &&
 	    ngep->default_mtu <= NGE_MTU_2500) {
@@ -2072,16 +2079,6 @@ nge_get_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_flags,
 	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
-	if (strcmp(pr_name, "_adv_pause_cap") == 0) {
-		value = (is_default ? 1 : ngep->param_adv_pause);
-		err = 0;
-		goto done;
-	}
-	if (strcmp(pr_name, "_adv_asym_pause_cap") == 0) {
-		value = (is_default ? 1 : ngep->param_adv_asym_pause);
-		err = 0;
-		goto done;
-	}
 	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
 		value = (is_default ? NGE_TX_COPY_SIZE :
 		    ngep->param_txbcopy_threshold);

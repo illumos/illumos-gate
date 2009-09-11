@@ -613,12 +613,6 @@ nge_check_copper(nge_t *ngep)
 		ngep->param_lp_asym_pause = B_TRUE;
 	if (lpan & MII_LP_PAUSE)
 		ngep->param_lp_pause = B_TRUE;
-	ngep->param_link_tx_pause = B_FALSE;
-
-	if (ngep->param_adv_autoneg)
-		ngep->param_link_rx_pause = B_FALSE;
-	else
-		ngep->param_link_rx_pause = ngep->param_adv_pause;
 	if (linkup) {
 		ngep->param_link_up = linkup;
 		ngep->param_link_speed = nge_copper_link_speed[speed];
