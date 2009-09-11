@@ -1899,7 +1899,8 @@ tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc,
  * address that the user is binding and the zone.  If the address is
  * unspecified, then we're looking at both private and shared.  If it's one
  * of the zone's private addresses, then it's private only.  If it's one
- * of the global addresses, then it's shared only.
+ * of the global addresses, then it's shared only. Multicast addresses are
+ * treated same as unspecified address.
  *
  * If we can't figure out what it is, then return mlptSingle.  That's actually
  * an error case.
@@ -1938,12 +1939,13 @@ tsol_mlp_addr_type(zoneid_t zoneid, uchar_t version, const void *addr,
 
 	if (version == IPV4_VERSION) {
 		in4 = *(const in_addr_t *)addr;
-		if (in4 == INADDR_ANY) {
+		if ((in4 == INADDR_ANY) || CLASSD(in4)) {
 			return (mlptBoth);
 		}
 		ire = ire_cache_lookup(in4, ip_zoneid, NULL, ipst);
 	} else {
-		if (IN6_IS_ADDR_UNSPECIFIED((const in6_addr_t *)addr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED((const in6_addr_t *)addr) ||
+		    IN6_IS_ADDR_MULTICAST((const in6_addr_t *)addr)) {
 			return (mlptBoth);
 		}
 		ire = ire_cache_lookup_v6(addr, ip_zoneid, NULL, ipst);
