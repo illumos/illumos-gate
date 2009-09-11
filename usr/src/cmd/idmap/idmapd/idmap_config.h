@@ -38,6 +38,18 @@ extern "C" {
 
 #define	MAX_POLICY_SIZE 1023
 
+#define	DIRECTORY_MAPPING_NONE	0
+#define	DIRECTORY_MAPPING_NAME	1
+#define	DIRECTORY_MAPPING_IDMU	2
+
+struct enum_lookup_map {
+	int value;
+	char *string;
+};
+
+extern struct enum_lookup_map directory_mapping_map[];
+extern const char *enum_lookup(int value, struct enum_lookup_map *map);
+
 /* SMF and auto-discovery context handles */
 typedef struct idmap_cfg_handles {
 	pthread_mutex_t		mutex;
@@ -63,19 +75,8 @@ typedef struct idmap_trustedforest {
 
 typedef struct idmap_pg_config {
 	uint64_t	list_size_limit;
-	/*
-	 * The idmap_cfg_update_thread() uses the ad_disc_t context in
-	 * the idmap_cfg_handles_t (see above) to track which values
-	 * came from SMF and which values didn't.  This works for all
-	 * items that are discoverable, but default_domain (the domain
-	 * that we qualify unqualified names passed to idmap show) is
-	 * not discoverable independently of domain_name.  So we need to
-	 * track its procedence separately.  The dflt_dom_set_in_smf
-	 * field does just that.
-	 */
 	char		*machine_sid;		/* machine sid */
 	char		*default_domain;	/* default domain name */
-	boolean_t	dflt_dom_set_in_smf;
 	char		*domain_name;		/* AD domain name */
 	boolean_t		domain_name_auto_disc;
 	idmap_ad_disc_ds_t
@@ -103,7 +104,7 @@ typedef struct idmap_pg_config {
 	char		*ad_unixuser_attr;
 	char		*ad_unixgroup_attr;
 	char		*nldap_winname_attr;
-	boolean_t	ds_name_mapping_enabled;
+	int		directory_based_mapping;	/* enum */
 	boolean_t	eph_map_unres_sids;
 } idmap_pg_config_t;
 
@@ -118,6 +119,7 @@ extern void 		idmap_cfg_unload(idmap_pg_config_t *);
 extern int		idmap_cfg_load(idmap_cfg_t *, int);
 extern idmap_cfg_t	*idmap_cfg_init(void);
 extern int		idmap_cfg_fini(idmap_cfg_t *);
+extern int		idmap_cfg_upgrade(idmap_cfg_t *);
 extern int		idmap_cfg_start_updates(void);
 extern void		idmap_cfg_poke_updates(void);
 extern void		idmap_cfg_hup_handler(int);

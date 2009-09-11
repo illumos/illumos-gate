@@ -340,6 +340,8 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
 		flags = SMB_IGNORE_CASE;
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
+	if (SMB_TREE_SUPPORTS_ABE(sr))
+		flags |= SMB_ABE;
 
 	if (smb_is_stream_name(name)) {
 		fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -358,7 +360,8 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
 
 	if (smb_maybe_mangled_name(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(dnode, name, longname,
+		    MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
 
 		if (rc == 0)
@@ -575,10 +578,13 @@ smb_fsop_mkdir(
 		return (EROFS);
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
+	if (SMB_TREE_SUPPORTS_ABE(sr))
+		flags |= SMB_ABE;
 
 	if (smb_maybe_mangled_name(name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(dnode, name, longname,
+		    MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
 
 		/*
@@ -733,8 +739,11 @@ smb_fsop_remove(
 			}
 			longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
+			if (SMB_TREE_SUPPORTS_ABE(sr))
+				flags |= SMB_ABE;
+
 			rc = smb_unmangle_name(dnode, name,
-			    longname, MAXNAMELEN);
+			    longname, MAXNAMELEN, flags);
 
 			if (rc == 0) {
 				/*
@@ -866,7 +875,11 @@ smb_fsop_rmdir(
 			return (rc);
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
+
+		if (SMB_TREE_SUPPORTS_ABE(sr))
+			flags |= SMB_ABE;
+		rc = smb_unmangle_name(dnode, name, longname,
+		    MAXNAMELEN, flags);
 
 		if (rc == 0) {
 			/*
@@ -989,10 +1002,13 @@ smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *to_dnode,
 		flags = SMB_IGNORE_CASE;
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
+	if (SMB_TREE_SUPPORTS_ABE(sr))
+		flags |= SMB_ABE;
 
 	if (smb_maybe_mangled_name(to_name)) {
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(to_dnode, to_name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(to_dnode, to_name,
+		    longname, MAXNAMELEN, flags);
 		kmem_free(longname, MAXNAMELEN);
 
 		if (rc == 0)
@@ -1116,7 +1132,8 @@ smb_fsop_rename(
  * Please document any direct call to explain the reason
  * for avoiding this wrapper.
  *
- * It is assumed that a reference exists on snode coming into this routine.
+ * It is assumed that a reference exists on snode coming into
+ * this function.
  * A null smb_request might be passed to this function.
  */
 int
@@ -1149,6 +1166,11 @@ smb_fsop_setattr(
 	    ACE_WRITE_ATTRIBUTES | ACE_WRITE_NAMED_ATTRS) == 0)
 		return (EACCES);
 
+	/*
+	 * The file system cannot detect pending READDONLY
+	 * (i.e. if the file has been opened readonly but
+	 * not yet closed) so we need to test READONLY here.
+	 */
 	if (sr && (set_attr->sa_mask & SMB_AT_SIZE)) {
 		if (sr->fid_ofile) {
 			if (SMB_OFILE_IS_READONLY(sr->fid_ofile))
@@ -1159,14 +1181,29 @@ smb_fsop_setattr(
 		}
 	}
 
-	/* sr could be NULL in some cases */
+	/*
+	 * SMB checks access on open and retains an access granted
+	 * mask for use while the file is open.  ACL changes should
+	 * not affect access to an open file.
+	 *
+	 * If the setattr is being performed on an ofile:
+	 * - Check the ofile's access granted mask to see if the
+	 *   setattr is permitted.
+	 *   UID, GID - require WRITE_OWNER
+	 *   SIZE, ALLOCSZ - require FILE_WRITE_DATA
+	 *   all other attributes require FILE_WRITE_ATTRIBUTES
+	 *
+	 * - If the file system does access checking, set the
+	 *   ATTR_NOACLCHECK flag to ensure that the file system
+	 *   does not check permissions on subsequent calls.
+	 */
 	if (sr && sr->fid_ofile) {
 		sa_mask = set_attr->sa_mask;
 		access = 0;
 
-		if (sa_mask & SMB_AT_SIZE) {
+		if (sa_mask & (SMB_AT_SIZE | SMB_AT_ALLOCSZ)) {
 			access |= FILE_WRITE_DATA;
-			sa_mask &= ~SMB_AT_SIZE;
+			sa_mask &= ~(SMB_AT_SIZE | SMB_AT_ALLOCSZ);
 		}
 
 		if (sa_mask & (SMB_AT_UID|SMB_AT_GID)) {
@@ -1645,6 +1682,8 @@ smb_fsop_lookup(
 		flags |= SMB_IGNORE_CASE;
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
+	if (SMB_TREE_SUPPORTS_ABE(sr))
+		flags |= SMB_ABE;
 
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
@@ -1658,7 +1697,8 @@ smb_fsop_lookup(
 		}
 
 		longname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-		rc = smb_unmangle_name(dnode, name, longname, MAXNAMELEN);
+		rc = smb_unmangle_name(dnode, name, longname,
+		    MAXNAMELEN, flags);
 		if (rc != 0) {
 			kmem_free(od_name, MAXNAMELEN);
 			kmem_free(longname, MAXNAMELEN);

@@ -62,7 +62,6 @@ typedef enum idmap_namemap_mode {
 /*
  * Global state of idmapd daemon.
  */
-#define	IDMAP_MAX_NAME_LEN	512
 typedef struct idmapd_state {
 	rwlock_t	rwlk_cfg;		/* config lock */
 	idmap_cfg_t	*cfg;			/* config */
@@ -74,9 +73,10 @@ typedef struct idmapd_state {
 	uid_t		limit_uid;
 	gid_t		limit_gid;
 	int		new_eph_db;	/* was the ephem ID db [re-]created? */
-	bool_t		eph_map_unres_sids;
-	int		num_ads;
-	adutils_ad_t	**ads;
+	int		num_gcs;
+	adutils_ad_t	**gcs;
+	int		num_dcs;
+	adutils_ad_t	**dcs;
 } idmapd_state_t;
 extern idmapd_state_t	_idmapdstate;
 
@@ -98,6 +98,7 @@ typedef struct lookup_state {
 	int			ad_nqueries;
 	int			nldap_nqueries;
 	bool_t			eph_map_unres_sids;
+	int			directory_based_mapping;	/* enum */
 	uint_t			curpos;
 	hashentry_t		*sid_history;
 	uint_t			sid_history_size;
@@ -158,7 +159,7 @@ typedef struct wksids_table {
 	const char	*domain;
 	const char	*winname;
 	int		is_wuser;
-	uid_t		pid;
+	posix_id_t	pid;
 	int		is_user;
 	int		direction;
 } wksids_table_t;
@@ -303,7 +304,7 @@ extern void 	idmap_log_stderr(int);
 extern void	idmap_log_syslog(boolean_t);
 extern void	idmap_log_degraded(boolean_t);
 
-extern const wksids_table_t *find_wksid_by_pid(uid_t pid, int is_user);
+extern const wksids_table_t *find_wksid_by_pid(posix_id_t pid, int is_user);
 extern const wksids_table_t *find_wksid_by_sid(const char *sid, int rid,
     int type);
 extern const wksids_table_t *find_wksid_by_name(const char *name,

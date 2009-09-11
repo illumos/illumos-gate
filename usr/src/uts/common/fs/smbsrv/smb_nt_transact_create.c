@@ -185,7 +185,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		}
 
 		op->fqi.fq_dnode = sr->fid_ofile->f_node;
-		smbsr_disconnect_file(sr);
+		smbsr_release_file(sr);
 	}
 
 	status = smb_common_open(sr);
@@ -231,7 +231,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		    &attr.sa_vattr.va_mtime,
 		    &attr.sa_vattr.va_ctime,
 		    op->dattr & FILE_ATTRIBUTE_MASK,
-		    attr.sa_vattr.va_size,
+		    attr.sa_allocsz,
 		    attr.sa_vattr.va_size,
 		    op->ftype,
 		    op->devstate,

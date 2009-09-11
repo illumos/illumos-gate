@@ -246,6 +246,7 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
+#include <smbsrv/smb_share.h>
 #include <sys/extdirent.h>
 
 /* static functions */
@@ -659,9 +660,8 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 {
 	int		rc;
 	smb_odirent_t	*odirent;
-	vnode_t		*vp;
+	smb_node_t	*fnode;
 	smb_attr_t	attr;
-	int		tmpflg;
 
 	ASSERT(sr);
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
@@ -702,15 +702,11 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 			continue;
 		}
 
-		/*
-		 * since we only care about the size attributes we don't need
-		 * to pass the vp of the unnamed stream file to smb_vop_getattr
-		 */
-		rc = smb_vop_lookup(od->d_dnode->vp, odirent->od_name, &vp,
-		    NULL, 0, &tmpflg, od->d_tree->t_snode->vp, od->d_cred);
+		rc = smb_fsop_lookup(sr, od->d_cred, 0, od->d_tree->t_snode,
+		    od->d_dnode, odirent->od_name, &fnode);
 		if (rc == 0) {
-			rc = smb_vop_getattr(vp, NULL, &attr, 0, od->d_cred);
-			VN_RELE(vp);
+			rc = smb_node_getattr(sr, fnode, &attr);
+			smb_node_release(fnode);
 		}
 
 		if (rc == 0) {
@@ -718,8 +714,7 @@ smb_odir_read_streaminfo(smb_request_t *sr, smb_odir_t *od,
 			    odirent->od_name + SMB_STREAM_PREFIX_LEN,
 			    sizeof (sinfo->si_name));
 			sinfo->si_size = attr.sa_vattr.va_size;
-			sinfo->si_alloc_size =
-			    attr.sa_vattr.va_nblocks * DEV_BSIZE;
+			sinfo->si_alloc_size = attr.sa_allocsz;
 			break;
 		}
 	}
@@ -872,6 +867,8 @@ smb_odir_create(smb_request_t *sr, smb_node_t *dnode,
 		od->d_flags |= SMB_ODIR_FLAG_IGNORE_CASE;
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		od->d_flags |= SMB_ODIR_FLAG_CATIA;
+	if (SMB_TREE_SUPPORTS_ABE(sr))
+		od->d_flags |= SMB_ODIR_FLAG_ABE;
 	od->d_eof = B_FALSE;
 
 	smb_llist_enter(&tree->t_odir_list, RW_WRITER);
@@ -939,6 +936,7 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 	dirent64_t	*dp;
 	edirent_t	*edp;
 	char		*np;
+	uint32_t	abe_flag = 0;
 
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 
@@ -965,8 +963,11 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 
 		od->d_bufsize = sizeof (od->d_buf);
 
+		if (od->d_flags & SMB_ODIR_FLAG_ABE)
+			abe_flag = SMB_ABE;
+
 		rc = smb_vop_readdir(od->d_dnode->vp, od->d_offset,
-		    od->d_buf, &od->d_bufsize, &eof, od->d_cred);
+		    od->d_buf, &od->d_bufsize, &eof, abe_flag, od->d_cred);
 
 		if ((rc == 0) && (od->d_bufsize == 0))
 			rc = ENOENT;
@@ -1109,7 +1110,7 @@ smb_odir_single_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	fileinfo->fi_dosattr = attr.sa_dosattr;
 	fileinfo->fi_nodeid = attr.sa_vattr.va_nodeid;
 	fileinfo->fi_size = attr.sa_vattr.va_size;
-	fileinfo->fi_alloc_size = attr.sa_vattr.va_nblocks * DEV_BSIZE;
+	fileinfo->fi_alloc_size = attr.sa_allocsz;
 	fileinfo->fi_atime = attr.sa_vattr.va_atime;
 	fileinfo->fi_mtime = attr.sa_vattr.va_mtime;
 	fileinfo->fi_ctime = attr.sa_vattr.va_ctime;
@@ -1200,7 +1201,7 @@ smb_odir_wildcard_fileinfo(smb_request_t *sr, smb_odir_t *od,
 	fileinfo->fi_dosattr = attr.sa_dosattr;
 	fileinfo->fi_nodeid = attr.sa_vattr.va_nodeid;
 	fileinfo->fi_size = attr.sa_vattr.va_size;
-	fileinfo->fi_alloc_size = attr.sa_vattr.va_nblocks * DEV_BSIZE;
+	fileinfo->fi_alloc_size = attr.sa_allocsz;
 	fileinfo->fi_atime = attr.sa_vattr.va_atime;
 	fileinfo->fi_mtime = attr.sa_vattr.va_mtime;
 	fileinfo->fi_ctime = attr.sa_vattr.va_ctime;

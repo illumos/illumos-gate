@@ -161,6 +161,7 @@ int ndr_rpc_call(mlsvc_handle_t *, int, void *);
 void ndr_rpc_server_setinfo(mlsvc_handle_t *, const srvsvc_server_info_t *);
 void ndr_rpc_server_getinfo(mlsvc_handle_t *, srvsvc_server_info_t *);
 int ndr_rpc_server_os(mlsvc_handle_t *);
+int ndr_rpc_get_ssnkey(mlsvc_handle_t *, unsigned char *, size_t);
 void *ndr_rpc_malloc(mlsvc_handle_t *, size_t);
 ndr_heap_t *ndr_rpc_get_heap(mlsvc_handle_t *);
 void ndr_rpc_release(mlsvc_handle_t *);

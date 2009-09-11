@@ -145,15 +145,27 @@ static void smb_node_free(smb_node_t *);
 static int smb_node_constructor(void *, void *, int);
 static void smb_node_destructor(void *, void *);
 static smb_llist_t *smb_node_get_hash(fsid_t *, smb_attr_t *, uint32_t *);
-static void smb_node_init_cached_timestamps(smb_node_t *);
+
+static void smb_node_init_cached_data(smb_node_t *);
+static void smb_node_clear_cached_data(smb_node_t *);
+
+static void smb_node_init_cached_timestamps(smb_node_t *, smb_attr_t *);
 static void smb_node_clear_cached_timestamps(smb_node_t *);
 static void smb_node_get_cached_timestamps(smb_node_t *, smb_attr_t *);
 static void smb_node_set_cached_timestamps(smb_node_t *, smb_attr_t *);
+
+static void smb_node_init_cached_allocsz(smb_node_t *, smb_attr_t *);
+static void smb_node_clear_cached_allocsz(smb_node_t *);
+static void smb_node_get_cached_allocsz(smb_node_t *, smb_attr_t *);
+static void smb_node_set_cached_allocsz(smb_node_t *, smb_attr_t *);
 
 #define	VALIDATE_DIR_NODE(_dir_, _node_) \
     ASSERT((_dir_)->n_magic == SMB_NODE_MAGIC); \
     ASSERT(((_dir_)->vp->v_xattrdir) || ((_dir_)->vp->v_type == VDIR)); \
     ASSERT((_dir_)->n_dnode != (_node_));
+
+/* round sz to DEV_BSIZE block */
+#define	SMB_ALLOCSZ(sz)	(((sz) + DEV_BSIZE-1) & ~(DEV_BSIZE-1))
 
 static kmem_cache_t	*smb_node_cache = NULL;
 static boolean_t	smb_node_initialized = B_FALSE;
@@ -898,7 +910,7 @@ smb_node_inc_open_ofiles(smb_node_t *node)
 	node->n_open_count++;
 	mutex_exit(&node->n_mutex);
 
-	smb_node_init_cached_timestamps(node);
+	smb_node_init_cached_data(node);
 }
 
 /*
@@ -913,7 +925,7 @@ smb_node_dec_open_ofiles(smb_node_t *node)
 	node->n_open_count--;
 	mutex_exit(&node->n_mutex);
 
-	smb_node_clear_cached_timestamps(node);
+	smb_node_clear_cached_data(node);
 }
 
 uint32_t
@@ -1135,6 +1147,7 @@ smb_node_file_is_readonly(smb_node_t *node)
  * The ofile may be NULL, for example when a client request
  * specifies the file by pathname.
  *
+ * Timestamps
  * When attributes are set on an ofile, any pending timestamps
  * from a write request on the ofile are implicitly set to "now".
  * For compatibility with windows the following timestamps are
@@ -1142,12 +1155,20 @@ smb_node_file_is_readonly(smb_node_t *node)
  * - if any attribute is being explicitly set, set ctime to now
  * - if file size is being explicitly set, set atime & ctime to now
  *
- * Any attribute that is being explicitly set, or has previously
+ * Any timestamp that is being explicitly set, or has previously
  * been explicitly set on the ofile, is excluded from implicit
  * (now) setting.
  *
  * Updates the node's cached timestamp values.
  * Updates the ofile's explicit times flag.
+ *
+ * File allocation size
+ * When the file allocation size is set it is first rounded up
+ * to block size. If the file size is smaller than the allocation
+ * size the file is truncated by setting the filesize to allocsz.
+ * If there are open ofiles, the allocsz is cached on the node.
+ *
+ * Updates the node's cached allocsz value.
  *
  * Returns: errno
  */
@@ -1156,56 +1177,77 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
     cred_t *cr, smb_ofile_t *of, smb_attr_t *attr)
 {
 	int rc;
-	uint32_t what;
-	uint32_t now_times = 0;
+	uint32_t pending_times = 0;
+	uint32_t explicit_times = 0;
 	timestruc_t now;
+	smb_attr_t tmp_attr;
 
 	ASSERT(attr);
 	SMB_NODE_VALID(node);
 
-	what = attr->sa_mask;
+	/* set attributes specified in attr */
+	if (attr->sa_mask != 0) {
+		/* if allocation size is < file size, truncate the file */
+		if (attr->sa_mask & SMB_AT_ALLOCSZ) {
+			attr->sa_allocsz = SMB_ALLOCSZ(attr->sa_allocsz);
 
-	/* determine which timestamps to implicitly set to "now" */
-	if (what)
-		now_times |= SMB_AT_CTIME;
-	if (what & SMB_AT_SIZE)
-		now_times |= (SMB_AT_MTIME | SMB_AT_CTIME);
+			bzero(&tmp_attr, sizeof (smb_attr_t));
+			tmp_attr.sa_mask = SMB_AT_SIZE;
+			(void) smb_fsop_getattr(NULL, kcred, node, &tmp_attr);
+
+			if (tmp_attr.sa_vattr.va_size > attr->sa_allocsz) {
+				attr->sa_vattr.va_size = attr->sa_allocsz;
+				attr->sa_mask |= SMB_AT_SIZE;
+			}
+		}
+
+		rc = smb_fsop_setattr(sr, cr, node, attr);
+		if (rc != 0)
+			return (rc);
+
+		smb_node_set_cached_allocsz(node, attr);
+		smb_node_set_cached_timestamps(node, attr);
+		if (of) {
+			smb_ofile_set_explicit_times(of,
+			    (attr->sa_mask & SMB_AT_TIMES));
+		}
+	}
+
+	/*
+	 * Determine which timestamps to implicitly set to "now".
+	 * Don't overwrite timestamps already explicitly set.
+	 */
+	bzero(&tmp_attr, sizeof (smb_attr_t));
+	gethrestime(&now);
+	tmp_attr.sa_vattr.va_atime = now;
+	tmp_attr.sa_vattr.va_mtime = now;
+	tmp_attr.sa_vattr.va_ctime = now;
+
+	/* pending write timestamps */
 	if (of) {
-		if (smb_ofile_write_time_pending(of))
-			now_times |=
+		if (smb_ofile_write_time_pending(of)) {
+			pending_times |=
 			    (SMB_AT_MTIME | SMB_AT_CTIME | SMB_AT_ATIME);
-		now_times &= ~(smb_ofile_explicit_times(of));
+		}
+		explicit_times |= (smb_ofile_explicit_times(of));
 	}
-	now_times &= ~what;
+	explicit_times |= (attr->sa_mask & SMB_AT_TIMES);
+	pending_times &= ~explicit_times;
 
-	if (now_times) {
-		gethrestime(&now);
-
-		if (now_times & SMB_AT_ATIME) {
-			attr->sa_vattr.va_atime = now;
-			attr->sa_mask |= SMB_AT_ATIME;
-		}
-		if (now_times & SMB_AT_MTIME) {
-			attr->sa_vattr.va_mtime = now;
-			attr->sa_mask |= SMB_AT_MTIME;
-		}
-		if (now_times & SMB_AT_CTIME) {
-			attr->sa_vattr.va_ctime = now;
-			attr->sa_mask |= SMB_AT_CTIME;
-		}
+	if (pending_times) {
+		tmp_attr.sa_mask = pending_times;
+		(void) smb_fsop_setattr(NULL, kcred, node, &tmp_attr);
 	}
 
-	if (attr->sa_mask == 0)
-		return (0);
+	/* additional timestamps to update in cache */
+	if (attr->sa_mask)
+		tmp_attr.sa_mask |= SMB_AT_CTIME;
+	if (attr->sa_mask & (SMB_AT_SIZE | SMB_AT_ALLOCSZ))
+		tmp_attr.sa_mask |= SMB_AT_MTIME;
+	tmp_attr.sa_mask &= ~explicit_times;
 
-	rc = smb_fsop_setattr(sr, cr, node, attr);
-	if (rc != 0)
-		return (rc);
-
-	smb_node_set_cached_timestamps(node, attr);
-
-	if (of)
-		smb_ofile_set_explicit_times(of, (what & SMB_AT_TIMES));
+	if (tmp_attr.sa_mask)
+		smb_node_set_cached_timestamps(node, &tmp_attr);
 
 	return (0);
 }
@@ -1238,19 +1280,134 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, smb_attr_t *attr)
 
 	mutex_enter(&node->n_mutex);
 
-	if (node->vp->v_type == VDIR)
+	if (node->vp->v_type == VDIR) {
 		attr->sa_vattr.va_size = 0;
+		attr->sa_allocsz = 0;
+	}
 
 	if (node->readonly_creator)
 		attr->sa_dosattr |= FILE_ATTRIBUTE_READONLY;
 	if (attr->sa_dosattr == 0)
 		attr->sa_dosattr = FILE_ATTRIBUTE_NORMAL;
 
+
 	mutex_exit(&node->n_mutex);
 
+	smb_node_get_cached_allocsz(node, attr);
 	smb_node_get_cached_timestamps(node, attr);
+
 	return (0);
 }
+
+/*
+ * smb_node_init_cached_data
+ */
+static void
+smb_node_init_cached_data(smb_node_t *node)
+{
+	smb_attr_t attr;
+
+	bzero(&attr, sizeof (smb_attr_t));
+	attr.sa_mask = SMB_AT_ALL;
+	(void) smb_fsop_getattr(NULL, kcred, node, &attr);
+
+	smb_node_init_cached_allocsz(node, &attr);
+	smb_node_init_cached_timestamps(node, &attr);
+}
+
+/*
+ * smb_node_clear_cached_data
+ */
+static void
+smb_node_clear_cached_data(smb_node_t *node)
+{
+	smb_node_clear_cached_allocsz(node);
+	smb_node_clear_cached_timestamps(node);
+}
+
+/*
+ * File allocation size (allocsz) caching
+ *
+ * When there are open ofiles on the node, the file allocsz is cached.
+ * The cached value (n_allocsz) is initialized when the first ofile is
+ * opened and cleared when the last is closed. Allocsz calculated from
+ * the filesize (rounded up to block size).
+ * When the allocation size is queried, if the cached allocsz is less
+ * than the filesize, it is recalculated from the filesize.
+ */
+
+/*
+ * smb_node_init_cached_allocsz
+ *
+ * If there are open ofiles, cache the allocsz in the node.
+ * Calculate the allocsz from the filesizes.
+ * block size).
+ */
+static void
+smb_node_init_cached_allocsz(smb_node_t *node, smb_attr_t *attr)
+{
+	mutex_enter(&node->n_mutex);
+	if (node->n_open_count == 1)
+		node->n_allocsz = SMB_ALLOCSZ(attr->sa_vattr.va_size);
+	mutex_exit(&node->n_mutex);
+}
+
+/*
+ * smb_node_clear_cached_allocsz
+ */
+static void
+smb_node_clear_cached_allocsz(smb_node_t *node)
+{
+	mutex_enter(&node->n_mutex);
+	if (node->n_open_count == 0)
+		node->n_allocsz = 0;
+	mutex_exit(&node->n_mutex);
+}
+
+/*
+ * smb_node_get_cached_allocsz
+ *
+ * If there is no cached allocsz (no open files), calculate
+ * allocsz from the filesize.
+ * If the allocsz is cached but is smaller than the filesize
+ * recalculate the cached allocsz from the filesize.
+ *
+ * Return allocs in attr->sa_allocsz.
+ */
+static void
+smb_node_get_cached_allocsz(smb_node_t *node, smb_attr_t *attr)
+{
+	if (node->vp->v_type == VDIR)
+		return;
+
+	mutex_enter(&node->n_mutex);
+	if (node->n_open_count == 0) {
+		attr->sa_allocsz = SMB_ALLOCSZ(attr->sa_vattr.va_size);
+	} else {
+		if (node->n_allocsz < attr->sa_vattr.va_size)
+			node->n_allocsz = SMB_ALLOCSZ(attr->sa_vattr.va_size);
+		attr->sa_allocsz = node->n_allocsz;
+	}
+	mutex_exit(&node->n_mutex);
+}
+
+/*
+ * smb_node_set_cached_allocsz
+ *
+ * attr->sa_allocsz has already been rounded to block size by
+ * the caller.
+ */
+static void
+smb_node_set_cached_allocsz(smb_node_t *node, smb_attr_t *attr)
+{
+	mutex_enter(&node->n_mutex);
+	if (attr->sa_mask & SMB_AT_ALLOCSZ) {
+		if (node->n_open_count > 0)
+			node->n_allocsz = attr->sa_allocsz;
+	}
+	mutex_exit(&node->n_mutex);
+}
+
 
 /*
  * Timestamp caching
@@ -1282,10 +1439,9 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, smb_attr_t *attr)
  * file system values.
  */
 static void
-smb_node_init_cached_timestamps(smb_node_t *node)
+smb_node_init_cached_timestamps(smb_node_t *node, smb_attr_t *attr)
 {
 	smb_node_t *unode;
-	smb_attr_t attr;
 
 	if ((unode = SMB_IS_STREAM(node)) != NULL)
 		node = unode;
@@ -1293,13 +1449,10 @@ smb_node_init_cached_timestamps(smb_node_t *node)
 	mutex_enter(&node->n_mutex);
 	++(node->n_timestamps.t_open_ofiles);
 	if (node->n_timestamps.t_open_ofiles == 1) {
-		bzero(&attr, sizeof (smb_attr_t));
-		attr.sa_mask = SMB_AT_TIMES;
-		(void) smb_fsop_getattr(NULL, kcred, node, &attr);
-		node->n_timestamps.t_mtime = attr.sa_vattr.va_mtime;
-		node->n_timestamps.t_atime = attr.sa_vattr.va_atime;
-		node->n_timestamps.t_ctime = attr.sa_vattr.va_ctime;
-		node->n_timestamps.t_crtime = attr.sa_crtime;
+		node->n_timestamps.t_mtime = attr->sa_vattr.va_mtime;
+		node->n_timestamps.t_atime = attr->sa_vattr.va_atime;
+		node->n_timestamps.t_ctime = attr->sa_vattr.va_ctime;
+		node->n_timestamps.t_crtime = attr->sa_crtime;
 		node->n_timestamps.t_cached = B_TRUE;
 	}
 	mutex_exit(&node->n_mutex);

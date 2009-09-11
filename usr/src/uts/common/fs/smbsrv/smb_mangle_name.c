@@ -664,7 +664,8 @@ int smb_mangle_name(
  */
 #define	SMB_UNMANGLE_BUFSIZE	(4 * 1024)
 int
-smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf, int buflen)
+smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf,
+    int buflen, uint32_t flags)
 {
 	int		err, eof, bufsize, reclen;
 	uint64_t	offset;
@@ -700,7 +701,7 @@ smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf, int buflen)
 	offset = 0;
 
 	while ((err = smb_vop_readdir(vp, offset, buf, &bufsize,
-	    &eof, kcred)) == 0) {
+	    &eof, flags, kcred)) == 0) {
 		if (bufsize == 0) {
 			err = ENOENT;
 			break;

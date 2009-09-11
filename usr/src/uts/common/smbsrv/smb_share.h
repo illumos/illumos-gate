@@ -51,6 +51,9 @@ extern "C" {
  * ad-container		Active directory container in which the share
  * 			will be published
  *
+ * abe			Determines whether Access Based Enumeration is applied
+ *			to a share
+ *
  * csc			Client-side caching (CSC) options applied to this share
  * 	disabled	The client MUST NOT cache any files
  * 	manual		The client should not automatically cache every file
@@ -70,6 +73,7 @@ extern "C" {
  * none			list of hosts that won't be allowed access
  */
 #define	SHOPT_AD_CONTAINER	"ad-container"
+#define	SHOPT_ABE		"abe"
 #define	SHOPT_NAME		"name"
 #define	SHOPT_CSC		"csc"
 #define	SHOPT_CATIA		"catia"
@@ -123,7 +127,7 @@ extern "C" {
  * SMB_SHRF_ADMIN	Admin share
  * SMB_SHRF_CATIA	CATIA character translation on/off
  * SMB_SHRF_GUEST_OK	Guest access on/off
- *
+ * SMB_SHRF_ABE		Access Based Enumeration on/off
  * SMB_SHRF_MAP		Map command is specified
  * SMB_SHRF_UNMAP	Unmap command is specified
  * SMB_SHRF_DISP_TERM	Disposition is set to terminate
@@ -154,6 +158,7 @@ extern "C" {
 #define	SMB_SHRF_ADMIN		0x1000
 #define	SMB_SHRF_CATIA		0x2000
 #define	SMB_SHRF_GUEST_OK	0x4000
+#define	SMB_SHRF_ABE		0x8000
 
 /* Exec Flags */
 #define	SMB_SHRF_MAP		0x10000
@@ -266,6 +271,7 @@ void smb_shr_sa_exit(void);
 void smb_shr_sa_csc_option(const char *, smb_share_t *);
 char *smb_shr_sa_csc_name(const smb_share_t *);
 void smb_shr_sa_catia_option(const char *, smb_share_t *);
+void smb_shr_sa_abe_option(const char *, smb_share_t *);
 
 /*
  * CIFS share management API exported for other processes

@@ -269,7 +269,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		}
 
 		op->fqi.fq_dnode = sr->fid_ofile->f_node;
-		smbsr_disconnect_file(sr);
+		smbsr_release_file(sr);
 	}
 
 	if (smb_common_open(sr) != NT_STATUS_SUCCESS)
@@ -315,7 +315,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    &attr.sa_vattr.va_mtime,
 		    &attr.sa_vattr.va_ctime,
 		    op->dattr & FILE_ATTRIBUTE_MASK,
-		    attr.sa_vattr.va_size,
+		    attr.sa_allocsz,
 		    attr.sa_vattr.va_size,
 		    op->ftype,
 		    op->devstate,

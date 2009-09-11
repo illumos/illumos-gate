@@ -524,8 +524,17 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames)
 		case IDMAP_MAP_TYPE_LOCAL_SID:
 			break;
 
+		case IDMAP_MAP_TYPE_IDMU:
+			how->idmap_how_u.idmu.dn =
+			    strdup(argv[12]);
+			how->idmap_how_u.idmu.attr =
+			    strdup(argv[13]);
+			how->idmap_how_u.idmu.value =
+			    strdup(argv[14]);
+			break;
+
 		default:
-			/* Unknow mapping type */
+			/* Unknown mapping type */
 			assert(FALSE);
 		}
 
@@ -1069,9 +1078,10 @@ idmap_get_prop_1_svc(idmap_prop_type request,
 		    pgcfg->nldap_winname_attr);
 		result->auto_discovered = FALSE;
 		break;
-	case PROP_DS_NAME_MAPPING_ENABLED:
-		result->value.idmap_prop_val_u.boolval =
-		    pgcfg->ds_name_mapping_enabled;
+	case PROP_DIRECTORY_BASED_MAPPING:
+		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
+		    enum_lookup(pgcfg->directory_based_mapping,
+		    directory_mapping_map));
 		result->auto_discovered = FALSE;
 		break;
 	default:

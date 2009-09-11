@@ -130,19 +130,36 @@ smb_com_rename(smb_request_t *sr)
 static int
 smb_do_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 {
-	smb_node_t *src_node;
+	smb_node_t *src_node, *tnode;
 	char *dstname;
 	DWORD status;
 	int rc;
 	int count;
+	char *path;
 
-	if ((rc = smbd_fs_query(sr, src_fqi, FQM_PATH_MUST_EXIST)) != 0)
+	tnode = sr->tid_tree->t_snode;
+
+	/* Lookup the source node. It MUST exist. */
+	path = src_fqi->fq_path.pn_path;
+	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
+	    &src_fqi->fq_dnode, src_fqi->fq_last_comp);
+	if (rc != 0)
 		return (rc);
 
-	src_node = src_fqi->fq_fnode;
+	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
+	    src_fqi->fq_dnode, src_fqi->fq_last_comp, &src_fqi->fq_fnode);
+	if (rc != 0) {
+		smb_node_release(src_fqi->fq_dnode);
+		return (rc);
+	}
 
-	if ((rc = smb_rename_check_attr(sr, src_node, src_fqi->fq_sattr)) != 0)
-		goto rename_cleanup_nodes;
+	src_node = src_fqi->fq_fnode;
+	rc = smb_rename_check_attr(sr, src_node, src_fqi->fq_sattr);
+	if (rc != 0) {
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (rc);
+	}
 
 	/*
 	 * Break the oplock before access checks. If a client
@@ -167,58 +184,78 @@ smb_do_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 
 	if (status == NT_STATUS_SHARING_VIOLATION) {
 		smb_node_end_crit(src_node);
-		rc = EPIPE;	/* = ERRbadshare */
-		goto rename_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (EPIPE); /* = ERRbadshare */
 	}
 
 	status = smb_range_check(sr, src_node, 0, UINT64_MAX, B_TRUE);
 
 	if (status != NT_STATUS_SUCCESS) {
 		smb_node_end_crit(src_node);
-		rc = EACCES;
-		goto rename_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (EACCES);
+	}
+
+	/* Lookup destination node. */
+	path = dst_fqi->fq_path.pn_path;
+	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
+	    &dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
+	if (rc != 0) {
+		smb_node_end_crit(src_node);
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (rc);
+	}
+
+	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
+	    dst_fqi->fq_dnode, dst_fqi->fq_last_comp, &dst_fqi->fq_fnode);
+	if ((rc != 0) && (rc != ENOENT)) {
+		smb_node_end_crit(src_node);
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (rc);
 	}
 
 	if (utf8_strcasecmp(src_fqi->fq_path.pn_path,
 	    dst_fqi->fq_path.pn_path) == 0) {
-		if ((rc = smbd_fs_query(sr, dst_fqi, 0)) != 0) {
-			smb_node_end_crit(src_node);
-			goto rename_cleanup_nodes;
-		}
 
-		/*
-		 * Because the fqm parameter to smbd_fs_query() was 0,
-		 * dst_fqi->fq_fnode may be NULL.
-		 */
 		if (dst_fqi->fq_fnode)
 			smb_node_release(dst_fqi->fq_fnode);
 
-		rc = strcmp(src_fqi->fq_od_name, dst_fqi->fq_last_comp);
+		rc = strcmp(src_fqi->fq_fnode->od_name, dst_fqi->fq_last_comp);
 		if (rc == 0) {
 			smb_node_end_crit(src_node);
-			goto rename_cleanup_nodes;
+			smb_node_release(src_fqi->fq_fnode);
+			smb_node_release(src_fqi->fq_dnode);
+			smb_node_release(dst_fqi->fq_dnode);
+			return (0);
 		}
 
 		rc = smb_fsop_rename(sr, sr->user_cr,
-		    src_fqi->fq_dnode, src_fqi->fq_od_name,
+		    src_fqi->fq_dnode, src_fqi->fq_fnode->od_name,
 		    dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
 
 		smb_node_end_crit(src_node);
 		if (rc == 0)
 			smb_node_notify_change(dst_fqi->fq_dnode);
-		goto rename_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (rc);
 	}
 
-	rc = smbd_fs_query(sr, dst_fqi, FQM_PATH_MUST_NOT_EXIST);
-	if (rc != 0) {
+	/* dst node must not exist */
+	if (dst_fqi->fq_fnode) {
 		smb_node_end_crit(src_node);
-		goto rename_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		smb_node_release(dst_fqi->fq_fnode);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (EEXIST);
 	}
-
-	/*
-	 * On success of FQM_PATH_MUST_NOT_EXIST only dst_fqi->fq_dnode
-	 * is valid (dst_fqi->fq_fnode is NULL).
-	 */
 
 	/*
 	 * If the source name is mangled but the source and destination
@@ -226,29 +263,21 @@ smb_do_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 	 */
 	if ((smb_maybe_mangled_name(src_fqi->fq_last_comp)) &&
 	    (strcmp(src_fqi->fq_last_comp, dst_fqi->fq_last_comp) == 0)) {
-		dstname = src_fqi->fq_od_name;
+		dstname = src_fqi->fq_fnode->od_name;
 	} else {
 		dstname = dst_fqi->fq_last_comp;
 	}
 
 	rc = smb_fsop_rename(sr, sr->user_cr,
-	    src_fqi->fq_dnode, src_fqi->fq_od_name,
+	    src_fqi->fq_dnode, src_fqi->fq_fnode->od_name,
 	    dst_fqi->fq_dnode, dstname);
 
 	smb_node_end_crit(src_node);
-
 	if (rc == 0)
 		smb_node_notify_change(dst_fqi->fq_dnode);
-
-rename_cleanup_nodes:
-	smb_node_release(src_node);
+	smb_node_release(src_fqi->fq_fnode);
 	smb_node_release(src_fqi->fq_dnode);
-
-	if (dst_fqi->fq_dnode)
-		smb_node_release(dst_fqi->fq_dnode);
-
-	SMB_NULL_FQI_NODES(*src_fqi);
-	SMB_NULL_FQI_NODES(*dst_fqi);
+	smb_node_release(dst_fqi->fq_dnode);
 	return (rc);
 }
 
@@ -377,18 +406,35 @@ smb_com_nt_rename(smb_request_t *sr)
 static int
 smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 {
-	smb_node_t *src_fnode;
+	smb_node_t *src_fnode, *tnode;
 	DWORD status;
 	int rc;
 	int count;
+	char *path;
 
-	if ((rc = smbd_fs_query(sr, src_fqi, FQM_PATH_MUST_EXIST)) != 0)
+	tnode = sr->tid_tree->t_snode;
+
+	/* Lookup the source node. It MUST exist. */
+	path = src_fqi->fq_path.pn_path;
+	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
+	    &src_fqi->fq_dnode, src_fqi->fq_last_comp);
+	if (rc != 0)
 		return (rc);
 
-	src_fnode = src_fqi->fq_fnode;
+	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
+	    src_fqi->fq_dnode, src_fqi->fq_last_comp, &src_fqi->fq_fnode);
+	if (rc != 0) {
+		smb_node_release(src_fqi->fq_dnode);
+		return (rc);
+	}
 
-	if ((rc = smb_rename_check_attr(sr, src_fnode, src_fqi->fq_sattr)) != 0)
-		goto link_cleanup_nodes;
+	src_fnode = src_fqi->fq_fnode;
+	rc = smb_rename_check_attr(sr, src_fnode, src_fqi->fq_sattr);
+	if (rc != 0) {
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (rc);
+	}
 
 	/*
 	 * Break the oplock before access checks. If a client
@@ -412,52 +458,61 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 
 	if (status == NT_STATUS_SHARING_VIOLATION) {
 		smb_node_end_crit(src_fnode);
-		rc = EPIPE;	/* = ERRbadshare */
-		goto link_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (EPIPE); /* = ERRbadshare */
 	}
 
 	status = smb_range_check(sr, src_fnode, 0, UINT64_MAX, B_TRUE);
-
 	if (status != NT_STATUS_SUCCESS) {
 		smb_node_end_crit(src_fnode);
-		rc = EACCES;
-		goto link_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (EACCES);
 	}
 
 	if (utf8_strcasecmp(src_fqi->fq_path.pn_path,
 	    dst_fqi->fq_path.pn_path) == 0) {
 		smb_node_end_crit(src_fnode);
-		rc = 0;
-		goto link_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (0);
 	}
 
-	rc = smbd_fs_query(sr, dst_fqi, FQM_PATH_MUST_NOT_EXIST);
+	/* Lookup the destination node. It MUST NOT exist. */
+	path = dst_fqi->fq_path.pn_path;
+	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
+	    &dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
 	if (rc != 0) {
 		smb_node_end_crit(src_fnode);
-		goto link_cleanup_nodes;
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (rc);
 	}
 
-	/*
-	 * On success of FQM_PATH_MUST_NOT_EXIST only dst_fqi->fq_dnode
-	 * is valid (dst_fqi->fq_fnode is NULL).
-	 */
+	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
+	    dst_fqi->fq_dnode, dst_fqi->fq_last_comp, &dst_fqi->fq_fnode);
+	if (rc == 0) {
+		smb_node_release(dst_fqi->fq_fnode);
+		rc = EEXIST;
+	}
+	if (rc != ENOENT) {
+		smb_node_end_crit(src_fnode);
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (rc);
+	}
+
 	rc = smb_fsop_link(sr, sr->user_cr, dst_fqi->fq_dnode, src_fnode,
 	    dst_fqi->fq_last_comp);
 
 	smb_node_end_crit(src_fnode);
-
 	if (rc == 0)
 		smb_node_notify_change(dst_fqi->fq_dnode);
-
-link_cleanup_nodes:
-	smb_node_release(src_fnode);
+	smb_node_release(src_fqi->fq_fnode);
 	smb_node_release(src_fqi->fq_dnode);
-
-	if (dst_fqi->fq_dnode)
-		smb_node_release(dst_fqi->fq_dnode);
-
-	SMB_NULL_FQI_NODES(*src_fqi);
-	SMB_NULL_FQI_NODES(*dst_fqi);
+	smb_node_release(dst_fqi->fq_dnode);
 	return (rc);
 }
 

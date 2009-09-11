@@ -76,6 +76,12 @@ load_config()
 		return (-1);
 	}
 
+	rc = idmap_cfg_upgrade(_idmapdstate.cfg);
+	if (rc != 0) {
+		degrade_svc(0, "fatal error while upgrading configuration");
+		return (rc);
+	}
+
 	rc = idmap_cfg_load(_idmapdstate.cfg, 0);
 	if (rc < -1) {
 		/* Total failure */
@@ -101,13 +107,13 @@ load_config()
 
 
 void
-reload_ad()
+reload_gcs()
 {
 	int		i, j;
-	adutils_ad_t	**new_ads = NULL;
-	adutils_ad_t	**old_ads;
-	int		new_num_ads;
-	int		old_num_ads;
+	adutils_ad_t	**new_gcs;
+	adutils_ad_t	**old_gcs;
+	int		new_num_gcs;
+	int		old_num_gcs;
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
 	idmap_trustedforest_t *trustfor = pgcfg->trusted_forests;
 	int		num_trustfor = pgcfg->num_trusted_forests;
@@ -126,31 +132,31 @@ reload_ad()
 		return;
 	}
 
-	old_ads = _idmapdstate.ads;
-	old_num_ads = _idmapdstate.num_ads;
+	old_gcs = _idmapdstate.gcs;
+	old_num_gcs = _idmapdstate.num_gcs;
 
-	new_num_ads = 1 + num_trustfor;
-	new_ads = calloc(new_num_ads, sizeof (adutils_ad_t *));
-	if (new_ads == NULL) {
+	new_num_gcs = 1 + num_trustfor;
+	new_gcs = calloc(new_num_gcs, sizeof (adutils_ad_t *));
+	if (new_gcs == NULL) {
 		degrade_svc(0, "could not allocate AD context array "
 		    "(out of memory)");
 		return;
 	}
 
-	if (adutils_ad_alloc(&new_ads[0], pgcfg->default_domain,
-	    ADUTILS_AD_GLOBAL_CATALOG) != ADUTILS_SUCCESS) {
-		free(new_ads);
+	if (adutils_ad_alloc(&new_gcs[0], NULL, ADUTILS_AD_GLOBAL_CATALOG) !=
+	    ADUTILS_SUCCESS) {
+		free(new_gcs);
 		degrade_svc(0, "could not initialize AD context "
 		    "(out of memory)");
 		return;
 	}
 
 	for (i = 0; pgcfg->global_catalog[i].host[0] != '\0'; i++) {
-		if (idmap_add_ds(new_ads[0],
+		if (idmap_add_ds(new_gcs[0],
 		    pgcfg->global_catalog[i].host,
 		    pgcfg->global_catalog[i].port) != 0) {
-			adutils_ad_free(&new_ads[0]);
-			free(new_ads);
+			adutils_ad_free(&new_gcs[0]);
+			free(new_gcs);
 			degrade_svc(0, "could not set AD hosts "
 			    "(out of memory)");
 			return;
@@ -160,11 +166,11 @@ reload_ad()
 	if (pgcfg->domains_in_forest != NULL) {
 		for (i = 0; pgcfg->domains_in_forest[i].domain[0] != '\0';
 		    i++) {
-			if (adutils_add_domain(new_ads[0],
+			if (adutils_add_domain(new_gcs[0],
 			    pgcfg->domains_in_forest[i].domain,
 			    pgcfg->domains_in_forest[i].sid) != 0) {
-				adutils_ad_free(&new_ads[0]);
-				free(new_ads);
+				adutils_ad_free(&new_gcs[0]);
+				free(new_gcs);
 				degrade_svc(0, "could not set AD domains "
 				    "(out of memory)");
 				return;
@@ -173,22 +179,22 @@ reload_ad()
 	}
 
 	for (i = 0; i < num_trustfor; i++) {
-		if (adutils_ad_alloc(&new_ads[i + 1], NULL,
+		if (adutils_ad_alloc(&new_gcs[i + 1], NULL,
 		    ADUTILS_AD_GLOBAL_CATALOG) != ADUTILS_SUCCESS) {
 			degrade_svc(0, "could not initialize trusted AD "
 			    "context (out of memory)");
-				new_num_ads = i + 1;
+				new_num_gcs = i + 1;
 				goto out;
 		}
 		for (j = 0; trustfor[i].global_catalog[j].host[0] != '\0';
 		    j++) {
-			if (idmap_add_ds(new_ads[i + 1],
+			if (idmap_add_ds(new_gcs[i + 1],
 			    trustfor[i].global_catalog[j].host,
 			    trustfor[i].global_catalog[j].port) != 0) {
-				adutils_ad_free(&new_ads[i + 1]);
+				adutils_ad_free(&new_gcs[i + 1]);
 				degrade_svc(0, "could not set trusted "
 				    "AD hosts (out of memory)");
-				new_num_ads = i + 1;
+				new_num_gcs = i + 1;
 				goto out;
 			}
 		}
@@ -197,13 +203,13 @@ reload_ad()
 			domain_in_forest = &trustfor[i].domains_in_forest[j];
 			/* Only add domains which are marked */
 			if (domain_in_forest->trusted) {
-				if (adutils_add_domain(new_ads[i + 1],
+				if (adutils_add_domain(new_gcs[i + 1],
 				    domain_in_forest->domain,
 				    domain_in_forest->sid) != 0) {
-					adutils_ad_free(&new_ads[i + 1]);
+					adutils_ad_free(&new_gcs[i + 1]);
 					degrade_svc(0, "could not set trusted "
 					    "AD domains (out of memory)");
-					new_num_ads = i + 1;
+					new_num_gcs = i + 1;
 					goto out;
 				}
 			}
@@ -211,17 +217,105 @@ reload_ad()
 	}
 
 out:
-	_idmapdstate.ads = new_ads;
-	_idmapdstate.num_ads = new_num_ads;
+	_idmapdstate.gcs = new_gcs;
+	_idmapdstate.num_gcs = new_num_gcs;
 
 
-	if (old_ads != NULL) {
-		for (i = 0; i < old_num_ads; i++)
-			adutils_ad_free(&old_ads[i]);
-		free(old_ads);
+	if (old_gcs != NULL) {
+		for (i = 0; i < old_num_gcs; i++)
+			adutils_ad_free(&old_gcs[i]);
+		free(old_gcs);
 	}
 }
 
+/*
+ * NEEDSWORK:  This should load entries for domain servers for all known
+ * domains - the joined domain, other domains in the forest, and trusted
+ * domains in other forests.  However, we don't yet discover any DCs other
+ * than the DCs for the joined domain.
+ */
+static
+void
+reload_dcs(void)
+{
+	int		i;
+	adutils_ad_t	**new_dcs;
+	adutils_ad_t	**old_dcs;
+	int		new_num_dcs;
+	int		old_num_dcs;
+	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
+
+	if (pgcfg->domain_controller == NULL ||
+	    pgcfg->domain_controller[0].host[0] == '\0') {
+		/*
+		 * No DCs.  Continue to use the previous AD config in case
+		 * that's still good but auto-discovery had a transient failure.
+		 * If that stops working we'll go into degraded mode anyways
+		 * when it does.
+		 */
+		degrade_svc(0,
+		    "Domain controller servers not configured/discoverable");
+		return;
+	}
+
+	old_dcs = _idmapdstate.dcs;
+	old_num_dcs = _idmapdstate.num_dcs;
+
+	new_num_dcs = 1;
+	new_dcs = calloc(new_num_dcs, sizeof (adutils_ad_t *));
+	if (new_dcs == NULL)
+		goto nomem;
+
+	if (adutils_ad_alloc(&new_dcs[0], pgcfg->domain_name,
+	    ADUTILS_AD_DATA) != ADUTILS_SUCCESS)
+		goto nomem;
+
+	for (i = 0; pgcfg->domain_controller[i].host[0] != '\0'; i++) {
+		if (idmap_add_ds(new_dcs[0],
+		    pgcfg->domain_controller[i].host,
+		    pgcfg->domain_controller[i].port) != 0)
+			goto nomem;
+	}
+
+	/* NEEDSWORK:  isn't there an easier way to find the domain SID? */
+	for (i = 0; pgcfg->domains_in_forest[i].domain[0] != '\0'; i++) {
+		if (domain_eq(pgcfg->domain_name,
+		    pgcfg->domains_in_forest[i].domain)) {
+			if (adutils_add_domain(new_dcs[0], pgcfg->domain_name,
+			    pgcfg->domains_in_forest[i].sid) != 0)
+				goto nomem;
+			break;
+		}
+	}
+
+	_idmapdstate.dcs = new_dcs;
+	_idmapdstate.num_dcs = new_num_dcs;
+
+	if (old_dcs != NULL) {
+		for (i = 0; i < old_num_dcs; i++)
+			adutils_ad_free(&old_dcs[i]);
+		free(old_dcs);
+	}
+
+	return;
+
+nomem:
+	degrade_svc(0, "out of memory");
+
+	if (new_dcs != NULL) {
+		if (new_dcs[0] != NULL)
+			adutils_ad_free(&new_dcs[0]);
+		free(new_dcs);
+	}
+}
+
+
+void
+reload_ad(void)
+{
+	reload_gcs();
+	reload_dcs();
+}
 
 void
 print_idmapdstate()
@@ -302,8 +396,8 @@ print_idmapdstate()
 		}
 	}
 
-	idmapdlog(LOG_DEBUG, "ds_name_mapping_enabled=%s",
-	    (pgcfg->ds_name_mapping_enabled) ? "true" : "false");
+	idmapdlog(LOG_DEBUG, "directory_based_mapping=%s",
+	    enum_lookup(pgcfg->directory_based_mapping, directory_mapping_map));
 	idmapdlog(LOG_DEBUG, "ad_unixuser_attr=%s",
 	    CHECK_NULL(pgcfg->ad_unixuser_attr));
 	idmapdlog(LOG_DEBUG, "ad_unixgroup_attr=%s",

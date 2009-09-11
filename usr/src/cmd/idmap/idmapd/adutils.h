@@ -65,9 +65,9 @@ extern "C" {
 #define	_IDMAP_T_USER		-1004
 #define	_IDMAP_T_GROUP		-1005
 #define	_IDMAP_T_DOMAIN		-1006
-#define	_IDMAP_T_COMPUTER	-1007
 
 typedef uint32_t rid_t;
+typedef uid_t posix_id_t;
 
 typedef struct idmap_query_state idmap_query_state_t;
 
@@ -95,7 +95,8 @@ int	idmap_add_ds(adutils_ad_t *ad, const char *host, int port);
 
 /* Start a batch of lookups */
 idmap_retcode idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
-		idmap_query_state_t **state);
+    int directory_based_mapping, const char *default_domain,
+    idmap_query_state_t **state);
 
 /* End a batch and release its idmap_query_state_t object */
 idmap_retcode idmap_lookup_batch_end(idmap_query_state_t **state);
@@ -120,7 +121,7 @@ idmap_retcode idmap_name2sid_batch_add1(idmap_query_state_t *state,
 		const char *name, const char *dname, int eunixtype,
 		char **dn, char **attr, char **value, char **canonname,
 		char **sid, rid_t *rid, int *sid_type, char **unixname,
-		idmap_retcode *rc);
+		posix_id_t *pid, idmap_retcode *rc);
 /*
  * Add a SID->name lookup
  *
@@ -139,13 +140,21 @@ idmap_retcode idmap_sid2name_batch_add1(idmap_query_state_t *state,
 		const char *sid, const rid_t *rid, int eunixtype,
 		char **dn, char **attr, char **value, char **name,
 		char **dname, int *sid_type, char **unixname,
-		idmap_retcode *rc);
+		posix_id_t *pid, idmap_retcode *rc);
 
 /*
  * Add a unixname->SID lookup
  */
 idmap_retcode idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 		const char *unixname, int is_user, int is_wuser,
+		char **dn, char **attr, char **value, char **sid, rid_t *rid,
+		char **name, char **dname, int *sid_type, idmap_retcode *rc);
+
+/*
+ * Add a PID->SID lookup
+ */
+idmap_retcode idmap_pid2sid_batch_add1(idmap_query_state_t *state,
+		posix_id_t pid, int is_user,
 		char **dn, char **attr, char **value, char **sid, rid_t *rid,
 		char **name, char **dname, int *sid_type, idmap_retcode *rc);
 

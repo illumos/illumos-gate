@@ -45,7 +45,7 @@
 #define	SAM_PASSWORD_516	516
 #define	SAM_KEYLEN		16
 
-extern DWORD samr_set_user_info(mlsvc_handle_t *, smb_auth_info_t *);
+extern DWORD samr_set_user_info(mlsvc_handle_t *);
 static struct samr_sid *sam_get_domain_sid(mlsvc_handle_t *, char *, char *);
 
 /*
@@ -59,7 +59,7 @@ static struct samr_sid *sam_get_domain_sid(mlsvc_handle_t *, char *, char *);
  * Returns NT status codes.
  */
 DWORD
-sam_create_trust_account(char *server, char *domain, smb_auth_info_t *auth)
+sam_create_trust_account(char *server, char *domain)
 {
 	char account_name[SMB_SAMACCT_MAXLEN];
 	DWORD status;
@@ -73,7 +73,7 @@ sam_create_trust_account(char *server, char *domain, smb_auth_info_t *auth)
 	 * information is set on this account.
 	 */
 	status = sam_create_account(server, domain, account_name,
-	    auth, SAMR_AF_WORKSTATION_TRUST_ACCOUNT);
+	    SAMR_AF_WORKSTATION_TRUST_ACCOUNT);
 
 	/*
 	 * Based on network traces, a Windows 2000 client will
@@ -104,7 +104,7 @@ sam_create_trust_account(char *server, char *domain, smb_auth_info_t *auth)
  */
 DWORD
 sam_create_account(char *server, char *domain_name, char *account_name,
-    smb_auth_info_t *auth, DWORD account_flags)
+    DWORD account_flags)
 {
 	mlsvc_handle_t samr_handle;
 	mlsvc_handle_t domain_handle;
@@ -140,7 +140,7 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 			    SAMR_QUERY_USER_UNKNOWN16, &sui);
 
 			(void) samr_get_user_pwinfo(&user_handle);
-			(void) samr_set_user_info(&user_handle, auth);
+			(void) samr_set_user_info(&user_handle);
 			(void) samr_close_handle(&user_handle);
 		} else if (status != NT_STATUS_USER_EXISTS) {
 			smb_tracef("SamCreateAccount[%s]: %s",

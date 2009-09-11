@@ -55,7 +55,11 @@
 #define	SAN		"sAMAccountName"
 #define	OBJSID		"objectSid"
 #define	OBJCLASS	"objectClass"
-#define	SANFILTER	"(sAMAccountName=%.*s)"
+#define	UIDNUMBER	"uidNumber"
+#define	GIDNUMBER	"gidNumber"
+#define	UIDNUMBERFILTER	"(&(objectclass=user)(uidNumber=%u))"
+#define	GIDNUMBERFILTER	"(&(objectclass=group)(gidNumber=%u))"
+#define	SANFILTER	"(sAMAccountName=%s)"
 #define	OBJSIDFILTER	"(objectSid=%s)"
 
 void	idmap_ldap_res_search_cb(LDAP *ld, LDAPMessage **res, int rc,
@@ -85,6 +89,7 @@ typedef struct idmap_q {
 	char			**dn;		/* DN of entry */
 	char			**attr;		/* Attr for name mapping */
 	char			**value;	/* value for name mapping */
+	posix_id_t		*pid;		/* Posix ID found via IDMU */
 	idmap_retcode		*rc;
 	adutils_rc		ad_rc;
 	adutils_result_t	*result;
@@ -103,6 +108,8 @@ struct idmap_query_state {
 	uint32_t		qcount;		/* Number of queued requests */
 	const char		*ad_unixuser_attr;
 	const char		*ad_unixgroup_attr;
+	int			directory_based_mapping;	/* enum */
+	char			*default_domain;
 	idmap_q_t		queries[1];	/* array of query results */
 };
 
@@ -185,6 +192,7 @@ map_adrc2idmaprc(adutils_rc adrc)
 
 idmap_retcode
 idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
+	int directory_based_mapping, const char *default_domain,
 	idmap_query_state_t **state)
 {
 	idmap_query_state_t	*new_state;
@@ -202,10 +210,17 @@ idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
 	if ((rc = adutils_lookup_batch_start(ad, nqueries,
 	    idmap_ldap_res_search_cb, new_state, &new_state->qs))
 	    != ADUTILS_SUCCESS) {
-		free(new_state);
+		idmap_lookup_release_batch(&new_state);
 		return (map_adrc2idmaprc(rc));
 	}
 
+	new_state->default_domain = strdup(default_domain);
+	if (new_state->default_domain == NULL) {
+		idmap_lookup_release_batch(&new_state);
+		return (IDMAP_ERR_MEMORY);
+	}
+
+	new_state->directory_based_mapping = directory_based_mapping;
 	new_state->qsize = nqueries;
 	*state = new_state;
 	return (IDMAP_SUCCESS);
@@ -227,12 +242,24 @@ idmap_lookup_batch_set_unixattr(idmap_query_state_t *state,
  * it is the result that was desired and, if so, set the result fields
  * of the given idmap_q_t.
  *
- * Frees the unused char * values.
+ * Except for dn and attr, all strings are consumed, either by transferring
+ * them over into the request results (where the caller will eventually free
+ * them) or by freeing them here.  Note that this aligns with the "const"
+ * declarations below.
  */
 static
 void
-idmap_setqresults(idmap_q_t *q, char *san, char *dn, const char *attr,
-	char *sid, rid_t rid, int sid_type, char *unixname)
+idmap_setqresults(
+    idmap_q_t *q,
+    char *san,
+    const char *dn,
+    const char *attr,
+    char *value,
+    char *sid,
+    rid_t rid,
+    int sid_type,
+    char *unixname,
+    posix_id_t pid)
 {
 	char *domain;
 	int err1;
@@ -263,8 +290,10 @@ idmap_setqresults(idmap_q_t *q, char *san, char *dn, const char *attr,
 	if (q->attr != NULL && attr != NULL)
 		*q->attr = strdup(attr);
 
-	if (q->value != NULL && unixname != NULL)
-		*q->value = strdup(unixname);
+	if (q->value != NULL && value != NULL) {
+		*q->value = value;
+		value = NULL;
+	}
 
 	/* Set results */
 	if (q->sid) {
@@ -294,6 +323,10 @@ idmap_setqresults(idmap_q_t *q, char *san, char *dn, const char *attr,
 		san = NULL;
 	}
 
+	if (q->pid != NULL && pid != SENTINEL_PID) {
+		*q->pid = pid;
+	}
+
 	q->ad_rc = ADUTILS_SUCCESS;
 
 out:
@@ -302,6 +335,7 @@ out:
 	free(sid);
 	free(domain);
 	free(unixname);
+	free(value);
 }
 
 #define	BVAL_CASEEQ(bv, str) \
@@ -323,19 +357,17 @@ idmap_bv_objclass2sidtype(BerValue **bvalues, int *sid_type)
 		return (0);
 
 	/*
-	 * We iterate over all the values because computer is a
-	 * sub-class of user.
+	 * We consider Computer to be a subclass of User, so we can just
+	 * ignore Computer entries and pay attention to the accompanying
+	 * User entries.
 	 */
 	for (cbval = bvalues; *cbval != NULL; cbval++) {
-		if (BVAL_CASEEQ(cbval, "Computer")) {
-			*sid_type = _IDMAP_T_COMPUTER;
-			break;
-		} else if (BVAL_CASEEQ(cbval, "Group")) {
+		if (BVAL_CASEEQ(cbval, "group")) {
 			*sid_type = _IDMAP_T_GROUP;
 			break;
-		} else if (BVAL_CASEEQ(cbval, "USER")) {
+		} else if (BVAL_CASEEQ(cbval, "user")) {
 			*sid_type = _IDMAP_T_USER;
-			/* Continue looping -- this may be a computer yet */
+			break;
 		}
 		/*
 		 * "else if (*sid_type = _IDMAP_T_USER)" then this is a
@@ -354,169 +386,121 @@ void
 idmap_extract_object(idmap_query_state_t *state, idmap_q_t *q,
 	LDAPMessage *res, LDAP *ld)
 {
-	BerElement		*ber = NULL;
 	BerValue		**bvalues;
-	char			*attr;
-	const char		*unixuser_attr = NULL;
-	const char		*unixgroup_attr = NULL;
-	char			*unixuser = NULL;
-	char			*unixgroup = NULL;
-	char			*dn = NULL;
+	const char		*attr = NULL;
+	char			*value = NULL;
+	char			*unix_name = NULL;
+	char			*dn;
 	char			*san = NULL;
 	char			*sid = NULL;
 	rid_t			rid = 0;
-	int			sid_type = _IDMAP_T_UNDEF;
-	int			has_class, has_san, has_sid;
-	int			has_unixuser, has_unixgroup;
+	int			sid_type;
+	int			ok;
+	posix_id_t		pid = SENTINEL_PID;
 
 	assert(q->rc != NULL);
+	assert(q->domain == NULL || *q->domain == NULL);
 
 	if ((dn = ldap_get_dn(ld, res)) == NULL)
 		return;
 
-	assert(q->domain == NULL || *q->domain == NULL);
-
-	/*
-	 * If the caller has requested unixname then determine the
-	 * AD attribute name that will have the unixname.
-	 */
-	if (q->unixname != NULL) {
-		if (q->eunixtype == _IDMAP_T_USER)
-			unixuser_attr = state->ad_unixuser_attr;
-		else if (q->eunixtype == _IDMAP_T_GROUP)
-			unixgroup_attr = state->ad_unixgroup_attr;
-		else if (q->eunixtype == _IDMAP_T_UNDEF) {
-			/*
-			 * This is the case where we don't know
-			 * before hand whether we need unixuser
-			 * or unixgroup. This will be determined
-			 * by the "sid_type" (i.e whether the given
-			 * winname is user or group). If sid_type
-			 * turns out to be user we will return
-			 * unixuser (if found) and if it is a group
-			 * we will return unixgroup (if found). We
-			 * lookup for both ad_unixuser_attr and
-			 * ad_unixgroup_attr and discard one of them
-			 * after we know the "sidtype". This
-			 * supports the following type of lookups.
-			 *
-			 * Example:
-			 *   $idmap show -c winname:foo
-			 * In the above example, idmap will
-			 * return uid if winname is winuser
-			 * and gid if winname is wingroup.
-			 */
-			unixuser_attr = state->ad_unixuser_attr;
-			unixgroup_attr = state->ad_unixgroup_attr;
-		}
-	}
-
-	has_class = has_san = has_sid = has_unixuser = has_unixgroup = 0;
-	for (attr = ldap_first_attribute(ld, res, &ber); attr != NULL;
-	    attr = ldap_next_attribute(ld, res, ber)) {
-		bvalues = NULL;	/* for memory management below */
-
-		/*
-		 * If this is an attribute we are looking for and
-		 * haven't seen it yet, parse it
-		 */
-		if (q->sid != NULL && !has_sid &&
-		    strcasecmp(attr, OBJSID) == 0) {
-			bvalues = ldap_get_values_len(ld, res, attr);
-			if (bvalues != NULL) {
-				sid = adutils_bv_objsid2sidstr(
-				    bvalues[0], &rid);
-				has_sid = (sid != NULL);
-			}
-		} else if (!has_san && strcasecmp(attr, SAN) == 0) {
-			bvalues = ldap_get_values_len(ld, res, attr);
-			if (bvalues != NULL) {
-				san = adutils_bv_name2str(bvalues[0]);
-				has_san = (san != NULL);
-			}
-		} else if (!has_class && strcasecmp(attr, OBJCLASS) == 0) {
-			bvalues = ldap_get_values_len(ld, res, attr);
-			has_class = idmap_bv_objclass2sidtype(bvalues,
-			    &sid_type);
-			if (has_class && q->unixname != NULL &&
-			    q->eunixtype == _IDMAP_T_UNDEF) {
-				/*
-				 * This is the case where we didn't
-				 * know whether we wanted unixuser or
-				 * unixgroup as described above.
-				 * Now since we know the "sid_type"
-				 * we discard the unwanted value
-				 * if it was retrieved before we
-				 * got here.
-				 */
-				if (sid_type == _IDMAP_T_USER) {
-					free(unixgroup);
-					unixgroup_attr = unixgroup = NULL;
-				} else if (sid_type == _IDMAP_T_GROUP) {
-					free(unixuser);
-					unixuser_attr = unixuser = NULL;
-				} else {
-					free(unixuser);
-					free(unixgroup);
-					unixuser_attr = unixuser = NULL;
-					unixgroup_attr = unixgroup = NULL;
-				}
-			}
-		} else if (!has_unixuser && unixuser_attr != NULL &&
-		    strcasecmp(attr, unixuser_attr) == 0) {
-			bvalues = ldap_get_values_len(ld, res, attr);
-			if (bvalues != NULL) {
-				unixuser = adutils_bv_name2str(bvalues[0]);
-				has_unixuser = (unixuser != NULL);
-			}
-
-		} else if (!has_unixgroup && unixgroup_attr != NULL &&
-		    strcasecmp(attr, unixgroup_attr) == 0) {
-			bvalues = ldap_get_values_len(ld, res, attr);
-			if (bvalues != NULL) {
-				unixgroup = adutils_bv_name2str(bvalues[0]);
-				has_unixgroup = (unixgroup != NULL);
-			}
-		}
-
-		if (bvalues != NULL)
-			ldap_value_free_len(bvalues);
-		ldap_memfree(attr);
-
-		if (has_class && has_san &&
-		    (q->sid == NULL || has_sid) &&
-		    (unixuser_attr == NULL || has_unixuser) &&
-		    (unixgroup_attr == NULL || has_unixgroup)) {
-			/* Got what we need */
-			break;
-		}
-	}
-
-	if (!has_class) {
+	bvalues = ldap_get_values_len(ld, res, OBJCLASS);
+	if (bvalues == NULL) {
 		/*
 		 * Didn't find objectclass. Something's wrong with our
 		 * AD data.
 		 */
-		free(san);
-		free(sid);
-		free(unixuser);
-		free(unixgroup);
-	} else {
+		idmapdlog(LOG_ERR, "%s has no %s", dn, OBJCLASS);
+		goto out;
+	}
+	ok = idmap_bv_objclass2sidtype(bvalues, &sid_type);
+	ldap_value_free_len(bvalues);
+	if (!ok) {
 		/*
-		 * Either we got what we needed and came out of the loop
-		 * early OR we completed the loop in which case we didn't
-		 * find some attributes that we were looking for. In either
-		 * case set the result with what we got.
+		 * Didn't understand objectclass. Something's wrong with our
+		 * AD data.
 		 */
-		idmap_setqresults(q, san, dn,
-		    (unixuser != NULL) ? unixuser_attr : unixgroup_attr,
-		    sid, rid, sid_type,
-		    (unixuser != NULL) ? unixuser : unixgroup);
+		idmapdlog(LOG_ERR, "%s has unexpected %s", dn, OBJCLASS);
+		goto out;
 	}
 
-	if (ber != NULL)
-		ber_free(ber, 0);
+	if (state->directory_based_mapping == DIRECTORY_MAPPING_IDMU &&
+	    q->pid != NULL) {
+		if (sid_type == _IDMAP_T_USER)
+			attr = UIDNUMBER;
+		else if (sid_type == _IDMAP_T_GROUP)
+			attr = GIDNUMBER;
+		if (attr != NULL) {
+			bvalues = ldap_get_values_len(ld, res, attr);
+			if (bvalues != NULL) {
+				value = adutils_bv_str(bvalues[0]);
+				if (!adutils_bv_uint(bvalues[0], &pid)) {
+					idmapdlog(LOG_ERR,
+					    "%s has Invalid %s value \"%s\"",
+					    dn, attr, value);
+				}
+				ldap_value_free_len(bvalues);
+			}
+		}
+	}
 
+	if (state->directory_based_mapping == DIRECTORY_MAPPING_NAME &&
+	    q->unixname != NULL) {
+		/*
+		 * If the caller has requested unixname then determine the
+		 * AD attribute name that will have the unixname, and retrieve
+		 * its value.
+		 */
+		int unix_type;
+		/*
+		 * Determine the target UNIX type.
+		 *
+		 * If the caller specified one, use that.  Otherwise, give the
+		 * same type that as we found for the Windows user.
+		 */
+		unix_type = q->eunixtype;
+		if (unix_type == _IDMAP_T_UNDEF) {
+			if (sid_type == _IDMAP_T_USER)
+				unix_type = _IDMAP_T_USER;
+			else if (sid_type == _IDMAP_T_GROUP)
+				unix_type = _IDMAP_T_GROUP;
+		}
+
+		if (unix_type == _IDMAP_T_USER)
+			attr = state->ad_unixuser_attr;
+		else if (unix_type == _IDMAP_T_GROUP)
+			attr = state->ad_unixgroup_attr;
+
+		if (attr != NULL) {
+			bvalues = ldap_get_values_len(ld, res, attr);
+			if (bvalues != NULL) {
+				unix_name = adutils_bv_str(bvalues[0]);
+				ldap_value_free_len(bvalues);
+				value = strdup(unix_name);
+			}
+		}
+	}
+
+	bvalues = ldap_get_values_len(ld, res, SAN);
+	if (bvalues != NULL) {
+		san = adutils_bv_str(bvalues[0]);
+		ldap_value_free_len(bvalues);
+	}
+
+	if (q->sid != NULL) {
+		bvalues = ldap_get_values_len(ld, res, OBJSID);
+		if (bvalues != NULL) {
+			sid = adutils_bv_objsid2sidstr(bvalues[0], &rid);
+			ldap_value_free_len(bvalues);
+		}
+	}
+
+	idmap_setqresults(q, san, dn,
+	    attr, value,
+	    sid, rid, sid_type,
+	    unix_name, pid);
+
+out:
 	ldap_memfree(dn);
 }
 
@@ -573,6 +557,7 @@ idmap_lookup_release_batch(idmap_query_state_t **state)
 		return;
 	adutils_lookup_batch_release(&(*state)->qs);
 	idmap_cleanup_batch(*state);
+	free((*state)->default_domain);
 	free(*state);
 	*state = NULL;
 }
@@ -610,19 +595,13 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 	char **dn, char **attr, char **value,
 	char **canonname, char **dname,
 	char **sid, rid_t *rid, int *sid_type, char **unixname,
+	posix_id_t *pid,
 	idmap_retcode *rc)
 {
 	adutils_rc	ad_rc;
 	int		qid, i;
 	idmap_q_t	*q;
-	static char	*attrs[] = {
-		SAN,
-		OBJSID,
-		OBJCLASS,
-		NULL,	/* placeholder for unixname attr */
-		NULL,	/* placeholder for unixname attr */
-		NULL
-	};
+	char	*attrs[20];	/* Plenty */
 
 	qid = atomic_inc_32_nv(&state->qcount) - 1;
 	q = &(state->queries[qid]);
@@ -648,17 +627,32 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 	q->dn = dn;
 	q->attr = attr;
 	q->value = value;
+	q->pid = pid;
 
-	/* Add unixuser/unixgroup attribute names to the attrs list */
+	/* Add attributes that are not always needed */
+	i = 0;
+	attrs[i++] = SAN;
+	attrs[i++] = OBJSID;
+	attrs[i++] = OBJCLASS;
+
 	if (unixname != NULL) {
-		i = 3;
+		/* Add unixuser/unixgroup attribute names to the attrs list */
 		if (eunixtype != _IDMAP_T_GROUP &&
 		    state->ad_unixuser_attr != NULL)
 			attrs[i++] = (char *)state->ad_unixuser_attr;
 		if (eunixtype != _IDMAP_T_USER &&
 		    state->ad_unixgroup_attr != NULL)
-			attrs[i] = (char *)state->ad_unixgroup_attr;
+			attrs[i++] = (char *)state->ad_unixgroup_attr;
 	}
+
+	if (pid != NULL) {
+		if (eunixtype != _IDMAP_T_GROUP)
+			attrs[i++] = UIDNUMBER;
+		if (eunixtype != _IDMAP_T_USER)
+			attrs[i++] = GIDNUMBER;
+	}
+
+	attrs[i] = NULL;
 
 	/*
 	 * Provide sane defaults for the results in case we never hear
@@ -707,11 +701,11 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	const char *name, const char *dname, int eunixtype,
 	char **dn, char **attr, char **value,
 	char **canonname, char **sid, rid_t *rid,
-	int *sid_type, char **unixname, idmap_retcode *rc)
+	int *sid_type, char **unixname,
+	posix_id_t *pid, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
-	int		len, samAcctNameLen;
-	char		*filter = NULL, *s_name;
+	char		*filter, *s_name;
 	char		*ecanonname, *edomain; /* expected canonname */
 
 	/*
@@ -725,37 +719,16 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	 * the user/group and whether it is a user or a group.
 	 */
 
-	/*
-	 * We need the name and the domain name separately and as
-	 * name@domain.  We also allow the domain to be provided
-	 * separately.
-	 */
-	samAcctNameLen = strlen(name);
-
 	if ((ecanonname = strdup(name)) == NULL)
 		return (IDMAP_ERR_MEMORY);
 
 	if (dname == NULL || *dname == '\0') {
-		if ((dname = strchr(name, '@')) != NULL) {
-			/* 'name' is qualified with a domain name */
-			if ((edomain = strdup(dname + 1)) == NULL) {
-				free(ecanonname);
-				return (IDMAP_ERR_MEMORY);
-			}
-			*strchr(ecanonname, '@') = '\0';
-		} else {
-			/* 'name' not qualified and dname not given */
-			dname = adutils_lookup_batch_getdefdomain(state->qs);
-			assert(dname != NULL);
-			if (*dname == '\0') {
-				free(ecanonname);
-				return (IDMAP_ERR_DOMAIN);
-			}
-			edomain = strdup(dname);
-			if (edomain == NULL) {
-				free(ecanonname);
-				return (IDMAP_ERR_MEMORY);
-			}
+		/* 'name' not qualified and dname not given */
+		dname = state->default_domain;
+		edomain = strdup(dname);
+		if (edomain == NULL) {
+			free(ecanonname);
+			return (IDMAP_ERR_MEMORY);
 		}
 	} else {
 		if ((edomain = strdup(dname)) == NULL) {
@@ -778,21 +751,18 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	}
 
 	/* Assemble filter */
-	len = snprintf(NULL, 0, SANFILTER, samAcctNameLen, s_name) + 1;
-	if ((filter = (char *)malloc(len)) == NULL) {
-		free(ecanonname);
-		free(edomain);
-		if (s_name != name)
-			free(s_name);
-		return (IDMAP_ERR_MEMORY);
-	}
-	(void) snprintf(filter, len, SANFILTER, samAcctNameLen, s_name);
+	(void) asprintf(&filter, SANFILTER, s_name);
 	if (s_name != name)
 		free(s_name);
+	if (filter == NULL) {
+		free(ecanonname);
+		free(edomain);
+		return (IDMAP_ERR_MEMORY);
+	}
 
 	retcode = idmap_batch_add1(state, filter, ecanonname, edomain,
 	    eunixtype, dn, attr, value, canonname, NULL, sid, rid, sid_type,
-	    unixname, rc);
+	    unixname, pid, rc);
 
 	free(filter);
 
@@ -804,11 +774,11 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 	const char *sid, const rid_t *rid, int eunixtype,
 	char **dn, char **attr, char **value,
 	char **name, char **dname, int *sid_type,
-	char **unixname, idmap_retcode *rc)
+	char **unixname, posix_id_t *pid, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
-	int		flen, ret;
-	char		*filter = NULL;
+	int		ret;
+	char		*filter;
 	char		cbinsid[ADUTILS_MAXHEXBINSID + 1];
 
 	/*
@@ -827,13 +797,13 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 		return (IDMAP_ERR_SID);
 
 	/* Assemble filter */
-	flen = snprintf(NULL, 0, OBJSIDFILTER, cbinsid) + 1;
-	if ((filter = (char *)malloc(flen)) == NULL)
+	(void) asprintf(&filter, OBJSIDFILTER, cbinsid);
+	if (filter == NULL)
 		return (IDMAP_ERR_MEMORY);
-	(void) snprintf(filter, flen, OBJSIDFILTER, cbinsid);
 
 	retcode = idmap_batch_add1(state, filter, NULL, NULL, eunixtype,
-	    dn, attr, value, name, dname, NULL, NULL, sid_type, unixname, rc);
+	    dn, attr, value, name, dname, NULL, NULL, sid_type, unixname,
+	    pid, rc);
 
 	free(filter);
 
@@ -848,9 +818,8 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 	char **dname, int *sid_type, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
-	int		len, ulen;
-	char		*filter = NULL, *s_unixname;
-	const char	*attrname = NULL;
+	char		*filter, *s_unixname;
+	const char	*attrname;
 
 	/* Get unixuser or unixgroup AD attribute name */
 	attrname = (is_user) ?
@@ -863,22 +832,17 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 		return (IDMAP_ERR_MEMORY);
 
 	/*  Assemble filter */
-	ulen = strlen(unixname);
-	len = snprintf(NULL, 0, "(&(objectclass=%s)(%s=%.*s))",
-	    is_wuser ? "user" : "group", attrname, ulen, s_unixname) + 1;
-	if ((filter = (char *)malloc(len)) == NULL) {
-		if (s_unixname != unixname)
-			free(s_unixname);
-		return (IDMAP_ERR_MEMORY);
-	}
-	(void) snprintf(filter, len, "(&(objectclass=%s)(%s=%.*s))",
-	    is_wuser ? "user" : "group", attrname, ulen, s_unixname);
+	(void) asprintf(&filter, "(&(objectclass=%s)(%s=%s))",
+	    is_wuser ? "user" : "group", attrname, s_unixname);
 	if (s_unixname != unixname)
 		free(s_unixname);
+	if (filter == NULL) {
+		return (IDMAP_ERR_MEMORY);
+	}
 
 	retcode = idmap_batch_add1(state, filter, NULL, NULL,
 	    _IDMAP_T_UNDEF, dn, NULL, NULL, name, dname, sid, rid, sid_type,
-	    NULL, rc);
+	    NULL, NULL, rc);
 
 	if (retcode == IDMAP_SUCCESS && attr != NULL) {
 		if ((*attr = strdup(attrname)) == NULL)
@@ -886,12 +850,50 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 	}
 
 	if (retcode == IDMAP_SUCCESS && value != NULL) {
-		if (ulen > 0) {
-			if ((*value = strdup(unixname)) == NULL)
-				retcode = IDMAP_ERR_MEMORY;
-		}
-		else
-			*value = NULL;
+		if ((*value = strdup(unixname)) == NULL)
+			retcode = IDMAP_ERR_MEMORY;
+	}
+
+	free(filter);
+
+	return (retcode);
+}
+
+idmap_retcode
+idmap_pid2sid_batch_add1(idmap_query_state_t *state,
+	posix_id_t pid, int is_user,
+	char **dn, char **attr, char **value,
+	char **sid, rid_t *rid, char **name,
+	char **dname, int *sid_type, idmap_retcode *rc)
+{
+	idmap_retcode	retcode;
+	char		*filter;
+	const char	*attrname;
+
+	/*  Assemble filter */
+	if (is_user) {
+		(void) asprintf(&filter, UIDNUMBERFILTER, pid);
+		attrname = UIDNUMBER;
+	} else {
+		(void) asprintf(&filter, GIDNUMBERFILTER, pid);
+		attrname = GIDNUMBER;
+	}
+	if (filter == NULL)
+		return (IDMAP_ERR_MEMORY);
+
+	retcode = idmap_batch_add1(state, filter, NULL, NULL,
+	    _IDMAP_T_UNDEF, dn, NULL, NULL, name, dname, sid, rid, sid_type,
+	    NULL, NULL, rc);
+
+	if (retcode == IDMAP_SUCCESS && attr != NULL) {
+		if ((*attr = strdup(attrname)) == NULL)
+			retcode = IDMAP_ERR_MEMORY;
+	}
+
+	if (retcode == IDMAP_SUCCESS && value != NULL) {
+		(void) asprintf(value, "%u", pid);
+		if (*value == NULL)
+			retcode = IDMAP_ERR_MEMORY;
 	}
 
 	free(filter);

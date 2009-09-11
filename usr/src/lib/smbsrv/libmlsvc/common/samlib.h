@@ -61,8 +61,8 @@ extern "C" {
 /*
  * samlib.c
  */
-DWORD sam_create_trust_account(char *, char *, smb_auth_info_t *);
-DWORD sam_create_account(char *, char *, char *, smb_auth_info_t *, DWORD);
+DWORD sam_create_trust_account(char *, char *);
+DWORD sam_create_account(char *, char *, char *, DWORD);
 DWORD sam_remove_trust_account(char *, char *);
 DWORD sam_delete_account(char *, char *, char *);
 DWORD sam_get_local_domains(char *, char *);

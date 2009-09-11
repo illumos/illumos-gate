@@ -452,6 +452,11 @@ smb_autohome_parse_options(smb_share_t *si)
 			continue;
 		}
 
+		if (strncasecmp(value, "abe=", 4) == 0) {
+			smb_shr_sa_abe_option((value + 4), si);
+			continue;
+		}
+
 		if (strncasecmp(value, "description=", 12) == 0) {
 			(void) strlcpy(si->shr_cmnt, (value + 12),
 			    SMB_SHARE_CMNT_MAX);

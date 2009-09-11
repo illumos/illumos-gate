@@ -2257,7 +2257,6 @@ idmap_how_ds_based_cpy(idmap_how_ds_based *to, idmap_how_ds_based *from)
 	return (retval);
 }
 
-
 idmap_stat
 idmap_info_cpy(idmap_info *to, idmap_info *from)
 {
@@ -2293,6 +2292,11 @@ idmap_info_cpy(idmap_info *to, idmap_info *from)
 		break;
 
 	case IDMAP_MAP_TYPE_KNOWN_SID:
+		break;
+
+	case IDMAP_MAP_TYPE_IDMU:
+		retval = idmap_how_ds_based_cpy(&to->how.idmap_how_u.idmu,
+		    &from->how.idmap_how_u.idmu);
 		break;
 	}
 	return (retval);
@@ -2365,6 +2369,15 @@ idmap_info_free(idmap_info *info)
 		break;
 
 	case IDMAP_MAP_TYPE_LOCAL_SID:
+		break;
+
+	case IDMAP_MAP_TYPE_IDMU:
+		free(how->idmap_how_u.idmu.dn);
+		how->idmap_how_u.idmu.dn = NULL;
+		free(how->idmap_how_u.idmu.attr);
+		how->idmap_how_u.idmu.attr = NULL;
+		free(how->idmap_how_u.idmu.value);
+		how->idmap_how_u.idmu.value = NULL;
 		break;
 	}
 	how->map_type = IDMAP_MAP_TYPE_UNKNOWN;

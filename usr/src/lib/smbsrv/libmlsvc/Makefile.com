@@ -84,7 +84,7 @@ INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lresolv -lnsl -lpkcs11 -lscf	\
-	-luutil -lzfs -lc
+	-lnvpair -luutil -lzfs -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 

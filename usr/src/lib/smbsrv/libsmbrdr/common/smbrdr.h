@@ -32,6 +32,7 @@
 #include <synch.h>
 #include <sys/types.h>
 
+#include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
 
 #include <smbsrv/cifs.h>
@@ -82,6 +83,7 @@ typedef struct sdb_logon {
 	unsigned int type;
 	unsigned short state;
 	smb_auth_info_t auth;
+	unsigned char ssn_key[SMBAUTH_SESSION_KEY_SZ];
 } sdb_logon_t;
 
 /*

@@ -236,6 +236,18 @@ struct svc_description {
 };
 typedef struct svc_description svc_description_t;
 
+/* Boolean flag to control delayed start of service. Set 1=true, 0=false */
+struct svc_delayed_auto_start {
+	DWORD dstart;
+};
+typedef struct svc_delayed_auto_start svc_delayed_auto_start_t;
+
+/* Boolean flag to control configured failure action. Set 1=true, 0=false */
+struct svc_config_failure_action {
+	DWORD cfa;
+};
+typedef struct svc_config_failure_action svc_config_failure_action_t;
+
 /*
  ***********************************************************************
  * Close

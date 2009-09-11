@@ -396,9 +396,41 @@ adutils_sid_ber2str(BerValue *bval)
 }
 
 
+/*
+ * Extract an int from the Ber value
+ * Return B_TRUE if a valid integer was found, B_FALSE if not.
+ */
+boolean_t
+adutils_bv_uint(BerValue *bval, unsigned int *result)
+{
+	char buf[40];	/* big enough for any int */
+	unsigned int tmp;
+	char *p;
+
+	*result = 0;	/* for error cases */
+
+	if (bval == NULL || bval->bv_val == NULL)
+		return (B_FALSE);
+	if (bval->bv_len >= sizeof (buf))
+		return (B_FALSE);
+
+	(void) memcpy(buf, bval->bv_val, bval->bv_len);
+	buf[bval->bv_len] = '\0';
+
+	tmp = strtoul(buf, &p, 10);
+
+	/* Junk after the number? */
+	if (*p != '\0')
+		return (B_FALSE);
+
+	*result = tmp;
+
+	return (B_TRUE);
+}
+
 /* Return a NUL-terminated string from the Ber value */
 char *
-adutils_bv_name2str(BerValue *bval)
+adutils_bv_str(BerValue *bval)
 {
 	char *s;
 
@@ -461,32 +493,38 @@ adutils_reap_idle_connections()
 
 
 adutils_rc
-adutils_ad_alloc(adutils_ad_t **new_ad, const char *default_domain,
+adutils_ad_alloc(adutils_ad_t **new_ad, const char *domain_name,
 	adutils_ad_partition_t part)
 {
 	adutils_ad_t *ad;
 
 	*new_ad = NULL;
 
-	if ((default_domain == NULL || *default_domain == '\0') &&
-	    part != ADUTILS_AD_GLOBAL_CATALOG)
-		return (ADUTILS_ERR_DOMAIN);
 	if ((ad = calloc(1, sizeof (*ad))) == NULL)
 		return (ADUTILS_ERR_MEMORY);
 	ad->ref = 1;
 	ad->partition = part;
-	if (default_domain == NULL)
-		default_domain = "";
-	if ((ad->dflt_w2k_dom = strdup(default_domain)) == NULL)
+
+	/* domain_name is required iff we are talking directly to a DC */
+	if (part == ADUTILS_AD_DATA) {
+		assert(domain_name != NULL);
+		assert(*domain_name != '\0');
+
+		ad->basedn = adutils_dns2dn(domain_name);
+	} else {
+		assert(domain_name == NULL);
+		ad->basedn = strdup("");
+	}
+	if (ad->basedn == NULL)
 		goto err;
+
 	if (pthread_mutex_init(&ad->lock, NULL) != 0)
 		goto err;
 	*new_ad = ad;
 	return (ADUTILS_SUCCESS);
 
 err:
-	if (ad->dflt_w2k_dom != NULL)
-		free(ad->dflt_w2k_dom);
+	free(ad->basedn);
 	free(ad);
 	return (ADUTILS_ERR_MEMORY);
 }
@@ -531,7 +569,7 @@ adutils_ad_free(adutils_ad_t **ad)
 
 	if ((*ad)->known_domains)
 		free((*ad)->known_domains);
-	free((*ad)->dflt_w2k_dom);
+	free((*ad)->basedn);
 	free(*ad);
 
 	*ad = NULL;
@@ -587,9 +625,10 @@ open_conn(adutils_host_t *adh, int timeoutsecs)
 		logger(LOG_INFO, "ldap_sasl_interactive_bind_s() to server "
 		    "%s port %d failed. (%s)", adh->host, adh->port,
 		    ldap_err2string(rc));
+		goto out;
 	}
 
-	logger(LOG_DEBUG, "Using global catalog server %s:%d",
+	logger(LOG_DEBUG, "Using server %s:%d",
 	    adh->host, adh->port);
 
 out:
@@ -921,26 +960,6 @@ adutils_lookup_batch_start(adutils_ad_t *ad, int nqueries,
 	    (nqueries - 1) * sizeof (adutils_q_t));
 	if (new_state == NULL)
 		return (ADUTILS_ERR_MEMORY);
-
-	/*
-	 * Save default domain from the ad object so that we don't
-	 * have to access the 'ad' object later.
-	 */
-	new_state->default_domain = strdup(adh->owner->dflt_w2k_dom);
-	if (new_state->default_domain == NULL) {
-		free(new_state);
-		return (ADUTILS_ERR_MEMORY);
-	}
-
-	if (ad->partition == ADUTILS_AD_DATA)
-		new_state->basedn = adutils_dns2dn(new_state->default_domain);
-	else
-		new_state->basedn = strdup("");
-	if (new_state->basedn == NULL) {
-		free(new_state->default_domain);
-		free(new_state);
-		return (ADUTILS_ERR_MEMORY);
-	}
 
 	new_state->ref_cnt = 1;
 	new_state->qadh = adh;
@@ -1485,8 +1504,6 @@ adutils_lookup_batch_release(adutils_query_state_t **state)
 			adutils_freeresult((*state)->queries[i].result);
 		}
 	}
-	free((*state)->default_domain);
-	free((*state)->basedn);
 	free(*state);
 	*state = NULL;
 }
@@ -1545,12 +1562,6 @@ adutils_lookup_batch_end(adutils_query_state_t **state)
 	return (ad_rc);
 }
 
-const char *
-adutils_lookup_batch_getdefdomain(adutils_query_state_t *state)
-{
-	return (state->default_domain);
-}
-
 /*
  * Send one prepared search, queue up msgid, process what results are
  * available
@@ -1605,7 +1616,9 @@ adutils_lookup_batch_add(adutils_query_state_t *state,
 
 	if (!state->qadh->dead) {
 		state->qadh->idletime = time(NULL);
-		lrc = ldap_search_ext(state->qadh->ld, state->basedn,
+
+		lrc = ldap_search_ext(state->qadh->ld,
+		    state->qadh->owner->basedn,
 		    LDAP_SCOPE_SUBTREE, filter, (char **)attrs,
 		    0, NULL, NULL, NULL, -1, &q->msgid);
 

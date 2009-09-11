@@ -98,24 +98,38 @@ smbrdr_anonymous_logon(char *domain_controller, char *domain_name)
 	return (0);
 }
 
+/*
+ * Get the user session key from an already open named pipe.
+ * The RPC library needs this.  See ndr_rpc_get_ssnkey()
+ *
+ * Returns zero (success) or an errno.
+ */
 int
-mlsvc_user_getauth(char *domain_controller, char *username,
-    smb_auth_info_t *auth)
+smbrdr_get_ssnkey(int fid, unsigned char *ssn_key, size_t key_len)
 {
+	struct sdb_logon *logon;
 	struct sdb_session *session;
+	struct sdb_netuse *netuse;
+	struct sdb_ofile *ofile;
 
-	if (auth) {
-		bzero(auth, sizeof (smb_auth_info_t));
-		session = smbrdr_session_lock(domain_controller, username,
-		    SDB_SLCK_READ);
-		if (session) {
-			*auth = session->logon.auth;
-			smbrdr_session_unlock(session);
-			return (0);
-		}
-	}
+	if (ssn_key == NULL || key_len < SMBAUTH_SESSION_KEY_SZ)
+		return (EINVAL);
 
-	return (-1);
+	ofile = smbrdr_ofile_get(fid);
+	if (ofile == NULL)
+		return (EBADF);
+
+	netuse = ofile->netuse;
+	session = netuse->session;
+	logon = &session->logon;
+
+	if (key_len > SMBAUTH_SESSION_KEY_SZ)
+		bzero(ssn_key, key_len);
+	bcopy(logon->ssn_key, ssn_key,
+	    SMBAUTH_SESSION_KEY_SZ);
+
+	smbrdr_ofile_put(ofile);
+	return (0);
 }
 
 /*
@@ -558,6 +572,12 @@ smbrdr_logon_init(struct sdb_session *session, char *username,
 		rc = smb_auth_set_info(username, 0, pwd,
 		    session->domain, session->challenge_key,
 		    session->challenge_len, smbrdr_lmcompl, &logon->auth);
+
+		/* Generate (and save) the session key. */
+		if (rc == 0) {
+			rc = smb_auth_gen_session_key(&logon->auth,
+			    logon->ssn_key);
+		}
 
 		if (rc != 0) {
 			free(logon);

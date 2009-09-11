@@ -60,79 +60,6 @@ smb_is_executable(char *path)
 }
 
 /*
- * smbd_fs_query
- *
- * Upon success, the caller will need to call smb_node_release() on
- * fqi.fq_fnode (if it isn't already set to NULL by this routine) and
- * and fqi.fq_dnode.  These pointers will not be used after the caller
- * is done with them and should be released immediately.  (The position
- * of smb_fqi in a union in the smb_request structure makes it difficult
- * to free these pointers at smb_request deallocation time.)
- *
- * If smbd_fs_query() returns error, no smb_nodes will need to be released
- * by callers as a result of references taken in this routine, and
- * fqi.fq_fnode and fqi.fq_dnode will be set to NULL.
- */
-
-int
-smbd_fs_query(smb_request_t *sr, smb_fqi_t *fqi, int fqm)
-{
-	int rc;
-
-	rc = smb_pathname_reduce(sr, sr->user_cr, fqi->fq_path.pn_path,
-	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &fqi->fq_dnode,
-	    fqi->fq_last_comp);
-
-	if (rc)
-		return (rc);
-
-	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, fqi->fq_dnode, fqi->fq_last_comp,
-	    &fqi->fq_fnode);
-
-	if (rc == 0) {
-		(void) strcpy(fqi->fq_od_name, fqi->fq_fnode->od_name);
-
-		/*
-		 * fqi->fq_fattr MUST be set even if returning EEXIST, as it
-		 * is used by some callers to determine how to handle EEXIST
-		 */
-		rc = smb_node_getattr(sr, fqi->fq_fnode, &fqi->fq_fattr);
-		if (rc != 0) {
-			smb_node_release(fqi->fq_dnode);
-			smb_node_release(fqi->fq_fnode);
-			SMB_NULL_FQI_NODES(*fqi);
-			return (rc);
-		}
-
-		if (fqm == FQM_PATH_MUST_NOT_EXIST) {
-			smb_node_release(fqi->fq_dnode);
-			smb_node_release(fqi->fq_fnode);
-			SMB_NULL_FQI_NODES(*fqi);
-			return (EEXIST);
-		}
-
-		return (0);
-	}
-
-	if (fqm == FQM_PATH_MUST_EXIST) {
-		smb_node_release(fqi->fq_dnode);
-		SMB_NULL_FQI_NODES(*fqi);
-		return (rc);
-	}
-
-	if (rc == ENOENT) {
-		fqi->fq_fnode = NULL;
-		return (0);
-	}
-
-	smb_node_release(fqi->fq_dnode);
-	SMB_NULL_FQI_NODES(*fqi);
-
-	return (rc);
-}
-
-/*
  * smb_pathname_reduce
  *
  * smb_pathname_reduce() takes a path and returns the smb_node for the
@@ -398,6 +325,7 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 	int		err = 0;
 	int		nlink = 0;
 	int		local_flags;
+	uint32_t	abe_flag = 0;
 	char		namebuf[MAXNAMELEN];
 
 	if (path == NULL)
@@ -418,6 +346,9 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 		(void) pn_free(&upn);
 		return (err);
 	}
+
+	if (SMB_TREE_SUPPORTS_ABE(sr))
+		abe_flag = SMB_ABE;
 
 	(void) pn_alloc(&pn);
 	(void) pn_alloc(&rpn);
@@ -458,7 +389,7 @@ smb_pathname(smb_request_t *sr, char *path, int flags,
 				break;
 
 			if ((err = smb_unmangle_name(dnode, component,
-			    real_name, MAXNAMELEN)) != 0)
+			    real_name, MAXNAMELEN, abe_flag)) != 0)
 				break;
 
 			if ((namep = smb_pathname_catia_v5tov4(sr, real_name,

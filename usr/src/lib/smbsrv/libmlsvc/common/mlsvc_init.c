@@ -52,6 +52,8 @@ mlsvc_init(void)
 	pthread_attr_t tattr;
 	int rc;
 
+	smb_proc_initsem();
+
 	if (smb_logon_init() != NT_STATUS_SUCCESS)
 		return (-1);
 

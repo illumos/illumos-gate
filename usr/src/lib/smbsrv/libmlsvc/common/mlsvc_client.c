@@ -208,6 +208,31 @@ ndr_rpc_server_os(mlsvc_handle_t *handle)
 	return (handle->remote_os);
 }
 
+/*
+ * Get the session key from a bound RPC client handle.
+ *
+ * The key returned is the 16-byte "user session key"
+ * established by the underlying authentication protocol
+ * (either Kerberos or NTLM).  This key is needed for
+ * SAM RPC calls such as SamrSetInformationUser, etc.
+ * See [MS-SAMR] sections: 2.2.3.3, 2.2.7.21, 2.2.7.25.
+ *
+ * Returns zero (success) or an errno.
+ */
+int
+ndr_rpc_get_ssnkey(mlsvc_handle_t *handle,
+	unsigned char *ssn_key, size_t len)
+{
+	ndr_client_t *clnt = handle->clnt;
+	int rc;
+
+	if (clnt == NULL)
+		return (EINVAL);
+
+	rc = smbrdr_get_ssnkey(clnt->fid, ssn_key, len);
+	return (rc);
+}
+
 void *
 ndr_rpc_malloc(mlsvc_handle_t *handle, size_t size)
 {

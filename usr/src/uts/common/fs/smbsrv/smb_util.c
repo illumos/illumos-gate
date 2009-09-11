@@ -1613,9 +1613,12 @@ smb_idmap_batch_getmappings(smb_idmap_batch_t *sib)
 }
 
 uint64_t
-unix_to_nt_time(timestruc_t *unix_time)
+smb_time_unix_to_nt(timestruc_t *unix_time)
 {
 	uint64_t nt_time;
+
+	if ((unix_time->tv_sec == 0) && (unix_time->tv_nsec == 0))
+		return (0);
 
 	nt_time = unix_time->tv_sec;
 	nt_time *= 10000000;  /* seconds to 100ns */
@@ -1623,22 +1626,51 @@ unix_to_nt_time(timestruc_t *unix_time)
 	return (nt_time + NT_TIME_BIAS);
 }
 
-uint32_t
-nt_to_unix_time(uint64_t nt_time, timestruc_t *unix_time)
+void
+smb_time_nt_to_unix(uint64_t nt_time, timestruc_t *unix_time)
 {
 	uint32_t seconds;
 
+	ASSERT(unix_time);
+
+	if ((nt_time == 0) || (nt_time == -1)) {
+		unix_time->tv_sec = 0;
+		unix_time->tv_nsec = 0;
+		return;
+	}
+
 	nt_time -= NT_TIME_BIAS;
 	seconds = nt_time / 10000000;
-	if (unix_time) {
-		unix_time->tv_sec = seconds;
-		unix_time->tv_nsec = (nt_time  % 10000000) * 100;
-	}
-	return (seconds);
+	unix_time->tv_sec = seconds;
+	unix_time->tv_nsec = (nt_time  % 10000000) * 100;
 }
 
 /*
- * smb_dos_to_ux_time
+ * smb_time_gmt_to_local, smb_time_local_to_gmt
+ *
+ * Apply the gmt offset to convert between local time and gmt
+ */
+int32_t
+smb_time_gmt_to_local(smb_request_t *sr, int32_t gmt)
+{
+	if ((gmt == 0) || (gmt == -1))
+		return (0);
+
+	return (gmt - sr->sr_gmtoff);
+}
+
+int32_t
+smb_time_local_to_gmt(smb_request_t *sr, int32_t local)
+{
+	if ((local == 0) || (local == -1))
+		return (0);
+
+	return (local + sr->sr_gmtoff);
+}
+
+
+/*
+ * smb_time_dos_to_unix
  *
  * Convert SMB_DATE & SMB_TIME values to a unix timestamp.
  *
@@ -1650,7 +1682,7 @@ nt_to_unix_time(uint64_t nt_time, timestruc_t *unix_time)
  * so that the caller can identify and handle this special case.
  */
 int32_t
-smb_dos_to_ux_time(int16_t date, int16_t time)
+smb_time_dos_to_unix(int16_t date, int16_t time)
 {
 	struct tm	atm;
 
@@ -1669,12 +1701,18 @@ smb_dos_to_ux_time(int16_t date, int16_t time)
 	return (smb_timegm(&atm));
 }
 
-int32_t
-smb_ux_to_dos_time(int32_t ux_time, int16_t *date_p, int16_t *time_p)
+void
+smb_time_unix_to_dos(int32_t ux_time, int16_t *date_p, int16_t *time_p)
 {
 	struct tm	atm;
 	int		i;
 	time_t		tmp_time;
+
+	if (ux_time == 0) {
+		*date_p = 0;
+		*time_p = 0;
+		return;
+	}
 
 	tmp_time = (time_t)ux_time;
 	(void) smb_gmtime_r(&tmp_time, &atm);
@@ -1699,7 +1737,6 @@ smb_ux_to_dos_time(int32_t ux_time, int16_t *date_p, int16_t *time_p)
 
 		*time_p = (short)i;
 	}
-	return (ux_time);
 }
 
 

@@ -45,7 +45,7 @@ static int samr_setup_user_info(WORD, struct samr_QueryUserInfo *,
     union samr_user_info *);
 static void samr_set_user_unknowns(struct samr_SetUserInfo23 *);
 static void samr_set_user_logon_hours(struct samr_SetUserInfo *);
-static int samr_set_user_password(smb_auth_info_t *, BYTE *);
+static int samr_set_user_password(unsigned char *, BYTE *);
 
 /*
  * samr_lookup_domain
@@ -389,13 +389,17 @@ samr_get_user_pwinfo(mlsvc_handle_t *user_handle)
  */
 /*ARGSUSED*/
 DWORD
-samr_set_user_info(mlsvc_handle_t *user_handle, smb_auth_info_t *auth)
+samr_set_user_info(mlsvc_handle_t *user_handle)
 {
+	unsigned char ssn_key[SMBAUTH_SESSION_KEY_SZ];
 	struct samr_SetUserInfo arg;
 	int opnum;
 	DWORD status = 0;
 
 	if (ndr_is_null_handle(user_handle))
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	if (ndr_rpc_get_ssnkey(user_handle, ssn_key, sizeof (ssn_key)))
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	opnum = SAMR_OPNUM_SetUserInfo;
@@ -409,7 +413,7 @@ samr_set_user_info(mlsvc_handle_t *user_handle, smb_auth_info_t *auth)
 	samr_set_user_unknowns(&arg.info.ru.info23);
 	samr_set_user_logon_hours(&arg);
 
-	if (samr_set_user_password(auth, arg.info.ru.info23.password) < 0)
+	if (samr_set_user_password(ssn_key, arg.info.ru.info23.password) < 0)
 		status = NT_STATUS_INTERNAL_ERROR;
 
 	if (ndr_rpc_call(user_handle, opnum, &arg) != 0) {
@@ -494,9 +498,8 @@ samr_set_user_logon_hours(struct samr_SetUserInfo *sui)
  * key.
  */
 static int
-samr_set_user_password(smb_auth_info_t *auth, BYTE *oem_password)
+samr_set_user_password(unsigned char *nt_key, BYTE *oem_password)
 {
-	unsigned char nt_key[SMBAUTH_SESSION_KEY_SZ];
 	char hostname[NETBIOS_NAME_SZ];
 
 	randomize((char *)oem_password, SAMR_SET_USER_DATA_SZ);
@@ -509,9 +512,6 @@ samr_set_user_password(smb_auth_info_t *auth, BYTE *oem_password)
 		return (-1);
 
 	(void) utf8_strlwr(hostname);
-
-	if (smb_auth_gen_session_key(auth, nt_key) != SMBAUTH_SUCCESS)
-		return (-1);
 
 	/*
 	 * Generate the OEM password from the hostname and the user session

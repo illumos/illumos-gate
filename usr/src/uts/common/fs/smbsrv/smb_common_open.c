@@ -441,14 +441,11 @@ smb_open_subr(smb_request_t *sr)
 
 	if (rc == 0) {
 		last_comp_found = B_TRUE;
-		(void) strcpy(op->fqi.fq_od_name,
-		    op->fqi.fq_fnode->od_name);
 		rc = smb_node_getattr(sr, op->fqi.fq_fnode,
 		    &op->fqi.fq_fattr);
 		if (rc != 0) {
 			smb_node_release(op->fqi.fq_fnode);
 			smb_node_release(op->fqi.fq_dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_INTERNAL_ERROR,
 			    ERRDOS, ERROR_INTERNAL_ERROR);
 			return (sr->smb_error.status);
@@ -459,7 +456,6 @@ smb_open_subr(smb_request_t *sr)
 		rc = 0;
 	} else {
 		smb_node_release(op->fqi.fq_dnode);
-		SMB_NULL_FQI_NODES(op->fqi);
 		smbsr_errno(sr, rc);
 		return (sr->smb_error.status);
 	}
@@ -481,7 +477,6 @@ smb_open_subr(smb_request_t *sr)
 
 			smb_node_release(op->fqi.fq_fnode);
 			smb_node_release(op->fqi.fq_dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 			    ERRnoaccess);
 			return (NT_STATUS_ACCESS_DENIED);
@@ -501,7 +496,6 @@ smb_open_subr(smb_request_t *sr)
 			if (op->create_options & FILE_NON_DIRECTORY_FILE) {
 				smb_node_release(node);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
 				    ERRDOS, ERROR_ACCESS_DENIED);
 				return (NT_STATUS_FILE_IS_A_DIRECTORY);
@@ -511,7 +505,6 @@ smb_open_subr(smb_request_t *sr)
 			    (op->nt_flags & NT_CREATE_FLAG_OPEN_TARGET_DIR)) {
 				smb_node_release(node);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
 				    ERRDOS, ERROR_DIRECTORY);
 				return (NT_STATUS_NOT_A_DIRECTORY);
@@ -525,7 +518,6 @@ smb_open_subr(smb_request_t *sr)
 		if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
 			smb_node_release(node);
 			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_DELETE_PENDING,
 			    ERRDOS, ERROR_ACCESS_DENIED);
 			return (NT_STATUS_DELETE_PENDING);
@@ -537,7 +529,6 @@ smb_open_subr(smb_request_t *sr)
 		if (op->create_disposition == FILE_CREATE) {
 			smb_node_release(node);
 			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
 			    ERRDOS, ERROR_FILE_EXISTS);
 			return (NT_STATUS_OBJECT_NAME_COLLISION);
@@ -557,7 +548,6 @@ smb_open_subr(smb_request_t *sr)
 				    FILE_APPEND_DATA)) {
 					smb_node_release(node);
 					smb_node_release(dnode);
-					SMB_NULL_FQI_NODES(op->fqi);
 					smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 					    ERRDOS, ERRnoaccess);
 					return (NT_STATUS_ACCESS_DENIED);
@@ -582,7 +572,6 @@ smb_open_subr(smb_request_t *sr)
 				smb_node_unlock(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 				    ERRDOS, ERRnoaccess);
 				return (NT_STATUS_ACCESS_DENIED);
@@ -596,7 +585,6 @@ smb_open_subr(smb_request_t *sr)
 			smb_node_unlock(node);
 			smb_node_release(node);
 			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 			return (status);
 		}
 
@@ -609,7 +597,6 @@ smb_open_subr(smb_request_t *sr)
 			smb_node_unlock(node);
 			smb_node_release(node);
 			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 
 			if (status == NT_STATUS_PRIVILEGE_NOT_HELD) {
 				smbsr_error(sr, status,
@@ -631,7 +618,6 @@ smb_open_subr(smb_request_t *sr)
 				smb_node_unlock(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 				    ERRDOS, ERROR_ACCESS_DENIED);
 				return (NT_STATUS_ACCESS_DENIED);
@@ -654,7 +640,6 @@ smb_open_subr(smb_request_t *sr)
 				smb_node_unlock(node);
 				smb_node_release(node);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_errno(sr, rc);
 				return (sr->smb_error.status);
 			}
@@ -671,7 +656,6 @@ smb_open_subr(smb_request_t *sr)
 					smb_node_unlock(node);
 					smb_node_release(node);
 					smb_node_release(dnode);
-					SMB_NULL_FQI_NODES(op->fqi);
 					return (sr->smb_error.status);
 				}
 			}
@@ -696,7 +680,6 @@ smb_open_subr(smb_request_t *sr)
 		if ((op->create_disposition == FILE_OPEN) ||
 		    (op->create_disposition == FILE_OVERWRITE)) {
 			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
 			    ERRDOS, ERROR_FILE_NOT_FOUND);
 			return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
@@ -705,7 +688,6 @@ smb_open_subr(smb_request_t *sr)
 		if ((is_dir == 0) && (!is_stream) &&
 		    smb_is_invalid_filename(op->fqi.fq_last_comp)) {
 			smb_node_release(dnode);
-			SMB_NULL_FQI_NODES(op->fqi);
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 			    ERRDOS, ERROR_INVALID_NAME);
 			return (NT_STATUS_OBJECT_NAME_INVALID);
@@ -752,7 +734,6 @@ smb_open_subr(smb_request_t *sr)
 			if (rc != 0) {
 				smb_node_unlock(dnode);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_errno(sr, rc);
 				return (sr->smb_error.status);
 			}
@@ -769,7 +750,6 @@ smb_open_subr(smb_request_t *sr)
 				smb_node_release(node);
 				smb_node_unlock(dnode);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				return (status);
 			}
 		} else {
@@ -785,7 +765,6 @@ smb_open_subr(smb_request_t *sr)
 			if (rc != 0) {
 				smb_node_unlock(dnode);
 				smb_node_release(dnode);
-				SMB_NULL_FQI_NODES(op->fqi);
 				smbsr_errno(sr, rc);
 				return (sr->smb_error.status);
 			}
@@ -796,7 +775,6 @@ smb_open_subr(smb_request_t *sr)
 
 		created = B_TRUE;
 		op->action_taken = SMB_OACT_CREATED;
-		node->flags |= NODE_FLAGS_CREATED;
 	}
 
 	if (max_requested) {
@@ -857,7 +835,6 @@ smb_open_subr(smb_request_t *sr)
 		if (created)
 			smb_node_unlock(dnode);
 		smb_node_release(dnode);
-		SMB_NULL_FQI_NODES(op->fqi);
 		return (status);
 	}
 
@@ -896,7 +873,6 @@ smb_open_subr(smb_request_t *sr)
 
 	smb_node_release(node);
 	smb_node_release(dnode);
-	SMB_NULL_FQI_NODES(op->fqi);
 
 	return (NT_STATUS_SUCCESS);
 }

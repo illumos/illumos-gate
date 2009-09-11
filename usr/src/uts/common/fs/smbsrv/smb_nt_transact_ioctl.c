@@ -27,29 +27,30 @@
 #include <smbsrv/winioctl.h>
 #include <smbsrv/ntstatus.h>
 
+
+static uint32_t smb_nt_trans_ioctl_noop(smb_request_t *, smb_xa_t *);
 static uint32_t smb_nt_trans_ioctl_invalid_parm(smb_request_t *,
     smb_xa_t *);
 
 /*
- * This table defines the list of IOCTL/FSCTL values for which we'll
- * call a funtion to return a specific processing.
+ * This table defines the list of FSCTL values for which we'll
+ * call a funtion to perform specific processing.
  */
 static struct {
 	uint32_t fcode;
 	uint32_t (*ioctl_func)(smb_request_t *sr, smb_xa_t *xa);
 } ioctl_ret_tbl[] = {
-	{ FSCTL_GET_OBJECT_ID,	smb_nt_trans_ioctl_invalid_parm },
-	{ FSCTL_QUERY_ALLOCATED_RANGES,	smb_nt_trans_ioctl_invalid_parm },
-	{ FSCTL_SRV_ENUMERATE_SNAPSHOTS, smb_vss_ioctl_enumerate_snaps }
+	{ FSCTL_GET_OBJECT_ID, smb_nt_trans_ioctl_invalid_parm },
+	{ FSCTL_QUERY_ALLOCATED_RANGES, smb_nt_trans_ioctl_invalid_parm },
+	{ FSCTL_SRV_ENUMERATE_SNAPSHOTS, smb_vss_ioctl_enumerate_snaps },
+	{ FSCTL_SET_SPARSE, smb_nt_trans_ioctl_noop }
 };
 
 /*
  * smb_nt_transact_ioctl
  *
  * This command allows device and file system control functions to be
- * transferred transparently from client to server. This is currently
- * a stub to work out whether or not we need to return an NT status
- * code.
+ * transferred transparently from client to server.
  *
  * Setup Words Encoding        Description
  * =========================== =========================================
@@ -78,7 +79,7 @@ static struct {
 smb_sdrc_t
 smb_nt_transact_ioctl(smb_request_t *sr, smb_xa_t *xa)
 {
-	uint32_t status = NT_STATUS_SUCCESS;
+	uint32_t status = NT_STATUS_NOT_SUPPORTED;
 	uint32_t fcode;
 	unsigned short fid;
 	unsigned char is_fsctl;
@@ -91,6 +92,10 @@ smb_nt_transact_ioctl(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
+	/*
+	 * Invoke handler if specified, otherwise the default
+	 * behavior is to return NT_STATUS_NOT_SUPPORTED
+	 */
 	for (i = 0; i < sizeof (ioctl_ret_tbl) / sizeof (ioctl_ret_tbl[0]);
 	    i++) {
 		if (ioctl_ret_tbl[i].fcode == fcode) {
@@ -106,6 +111,13 @@ smb_nt_transact_ioctl(smb_request_t *sr, smb_xa_t *xa)
 
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "l", 0);
 	return (SDRC_SUCCESS);
+}
+
+/* ARGSUSED */
+static uint32_t
+smb_nt_trans_ioctl_noop(smb_request_t *sr, smb_xa_t *xa)
+{
+	return (NT_STATUS_SUCCESS);
 }
 
 /* ARGSUSED */

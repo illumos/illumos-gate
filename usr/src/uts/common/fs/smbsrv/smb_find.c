@@ -340,7 +340,7 @@ smb_com_search(smb_request_t *sr)
 		    fileinfo.fi_name83, fileinfo.fi_name83+9,
 		    index, odid, client_key,
 		    fileinfo.fi_dosattr & 0xff,
-		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
+		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
 		    name);
 
@@ -476,7 +476,7 @@ smb_com_find(smb_request_t *sr)
 		    fileinfo.fi_name83, fileinfo.fi_name83+9,
 		    index, odid, client_key,
 		    fileinfo.fi_dosattr & 0xff,
-		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
+		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
 		    name);
 
@@ -654,7 +654,7 @@ smb_com_find_unique(struct smb_request *sr)
 		    fileinfo.fi_name83, fileinfo.fi_name83+9,
 		    index, odid, client_key,
 		    fileinfo.fi_dosattr & 0xff,
-		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
+		    smb_time_gmt_to_local(sr, fileinfo.fi_mtime.tv_sec),
 		    (int32_t)fileinfo.fi_size,
 		    name);
 

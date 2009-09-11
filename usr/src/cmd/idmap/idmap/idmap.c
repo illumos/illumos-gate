@@ -1440,6 +1440,15 @@ print_how(idmap_how *how)
 	case IDMAP_MAP_TYPE_KNOWN_SID:
 		(void) printf(gettext("Method:\tWell-Known mapping\n"));
 		break;
+
+	case IDMAP_MAP_TYPE_IDMU:
+		(void) printf(gettext("Method:\tIDMU\n"));
+		(void) printf(gettext("DN:\t%s\n"),
+		    CHECK_NULL(how->idmap_how_u.idmu.dn));
+		(void) printf(gettext("Attribute:\t%s=%s\n"),
+		    CHECK_NULL(how->idmap_how_u.idmu.attr),
+		    CHECK_NULL(how->idmap_how_u.idmu.value));
+		break;
 	}
 }
 
@@ -1541,6 +1550,16 @@ print_error_info(idmap_info *info)
 	case IDMAP_MAP_TYPE_KNOWN_SID:
 		(void) fprintf(stderr,
 		    gettext("Failed Method:\tWell-Known mapping\n"));
+		break;
+
+	case IDMAP_MAP_TYPE_IDMU:
+		(void) fprintf(stderr,
+		    gettext("Failed Method:\tIDMU\n"));
+		(void) fprintf(stderr, gettext("DN:\t%s\n"),
+		    CHECK_NULL(how->idmap_how_u.idmu.dn));
+		(void) fprintf(stderr, gettext("Attribute:\t%s=%s\n"),
+		    CHECK_NULL(how->idmap_how_u.idmu.attr),
+		    CHECK_NULL(how->idmap_how_u.idmu.value));
 		break;
 	}
 }

@@ -42,11 +42,11 @@ SUNWprivate {
 	mlsvc_disconnect;
 	mlsvc_echo;
 	mlsvc_logon;
-	mlsvc_user_getauth;
 	smbrdr_close_pipe;
 	smbrdr_dump_netuse;
 	smbrdr_dump_ofiles;
 	smbrdr_dump_sessions;
+	smbrdr_get_ssnkey;
 	smbrdr_init;
 	smbrdr_ipc_commit;
 	smbrdr_ipc_get_user;

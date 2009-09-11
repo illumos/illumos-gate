@@ -185,7 +185,7 @@ smb_common_create(smb_request_t *sr)
 	uint32_t status;
 
 	if ((op->mtime.tv_sec != 0) && (op->mtime.tv_sec != UINT_MAX))
-		op->mtime.tv_sec = smb_local2gmt(sr, op->mtime.tv_sec);
+		op->mtime.tv_sec = smb_time_local_to_gmt(sr, op->mtime.tv_sec);
 	op->mtime.tv_nsec = 0;
 	op->dsize = 0;
 	op->omode = SMB_DA_ACCESS_READ_WRITE | SMB_DA_SHARE_COMPATIBILITY;

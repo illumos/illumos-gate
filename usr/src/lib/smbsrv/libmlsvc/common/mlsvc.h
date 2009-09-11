@@ -64,6 +64,11 @@ uint32_t srvsvc_sd_set(smb_share_t *, uint8_t *);
 uint32_t smb_logon_init(void);
 void smb_logon_fini(void);
 
+/* Locking for process-wide settings (i.e. privileges) */
+void smb_proc_initsem(void);	/* init (or re-init in child) */
+int  smb_proc_takesem(void);	/* parent before */
+void smb_proc_givesem(void);	/* parent after */
+
 #ifdef __cplusplus
 }
 #endif

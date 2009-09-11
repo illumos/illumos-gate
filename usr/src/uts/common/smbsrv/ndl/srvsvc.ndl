@@ -640,14 +640,11 @@ struct mslm_NetShareInfo_2 {
 	LPTSTR shi2_passwd;
 };
 
-/*
- * shi501_reserved (AKA shi501_flags) must be zero.
- */ 
 struct mslm_NetShareInfo_501 {
 	LPTSTR shi501_netname;
 	DWORD shi501_type;
 	LPTSTR shi501_comment;
-	DWORD shi501_reserved;
+	DWORD shi501_flags;
 };
 
 struct mslm_NetShareInfo_502 {

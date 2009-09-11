@@ -764,6 +764,11 @@ smb_ofile_set_write_time_pending(smb_ofile_t *of)
 	mutex_exit(&of->f_mutex);
 }
 
+/*
+ * smb_ofile_write_time_pending
+ *
+ * Get and reset the write times pending flag.
+ */
 boolean_t
 smb_ofile_write_time_pending(smb_ofile_t *of)
 {
@@ -771,8 +776,10 @@ smb_ofile_write_time_pending(smb_ofile_t *of)
 
 	SMB_OFILE_VALID(of);
 	mutex_enter(&of->f_mutex);
-	if (of->f_flags & SMB_OFLAGS_TIMESTAMPS_PENDING)
+	if (of->f_flags & SMB_OFLAGS_TIMESTAMPS_PENDING) {
 		rc = B_TRUE;
+		of->f_flags &= ~SMB_OFLAGS_TIMESTAMPS_PENDING;
+	}
 	mutex_exit(&of->f_mutex);
 
 	return (rc);
@@ -782,16 +789,13 @@ smb_ofile_write_time_pending(smb_ofile_t *of)
  * smb_ofile_set_explicit_time_flag
  *
  * Note the timestamps specified in "what", as having been
- * explicity set for the ofile. Also clear the flag for pending
- * timestamps as the pending timestamps will have been applied
- * by the explicit set.
+ * explicity set for the ofile.
  */
 void
 smb_ofile_set_explicit_times(smb_ofile_t *of, uint32_t what)
 {
 	SMB_OFILE_VALID(of);
 	mutex_enter(&of->f_mutex);
-	of->f_flags &= ~SMB_OFLAGS_TIMESTAMPS_PENDING;
 	of->f_explicit_times |= (what & SMB_AT_TIMES);
 	mutex_exit(&of->f_mutex);
 }

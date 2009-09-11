@@ -161,6 +161,7 @@ struct sa_plugin_ops sa_plugin_ops = {
 
 struct option_defs optdefs[] = {
 	{ SHOPT_AD_CONTAINER,	OPT_TYPE_STRING },
+	{ SHOPT_ABE,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_NAME,		OPT_TYPE_NAME },
 	{ SHOPT_RO,		OPT_TYPE_ACCLIST },
 	{ SHOPT_RW,		OPT_TYPE_ACCLIST },
@@ -1541,6 +1542,9 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 	if ((opt = smb_csc_name(si)) != NULL)
 		(void) sa_set_resource_attr(resource, SHOPT_CSC, opt);
 
+	opt = (si->shr_flags & SMB_SHRF_ABE) ? "true" : "false";
+	(void) sa_set_resource_attr(resource, SHOPT_ABE, opt);
+
 	opt = (si->shr_flags & SMB_SHRF_GUEST_OK) ? "true" : "false";
 	(void) sa_set_resource_attr(resource, SHOPT_GUEST, opt);
 
@@ -2030,6 +2034,19 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 				si->shr_flags |= SMB_SHRF_CATIA;
 			} else {
 				si->shr_flags &= ~SMB_SHRF_CATIA;
+			}
+			free(val);
+		}
+	}
+
+	prop = sa_get_property(opts, SHOPT_ABE);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			if ((strcasecmp(val, "true") == 0) ||
+			    (strcmp(val, "1") == 0)) {
+				si->shr_flags |= SMB_SHRF_ABE;
+			} else {
+				si->shr_flags &= ~SMB_SHRF_ABE;
 			}
 			free(val);
 		}

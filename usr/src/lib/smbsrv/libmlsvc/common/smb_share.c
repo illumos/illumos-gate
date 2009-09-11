@@ -52,6 +52,7 @@
 #include <smbsrv/smb_share.h>
 #include <smbsrv/cifs.h>
 #include <smbsrv/nterror.h>
+#include <mlsvc.h>
 
 #define	SMB_SHR_ERROR_THRESHOLD		3
 
@@ -208,6 +209,13 @@ static int smb_shr_exec_flags;
 static char smb_shr_exec_map[MAXPATHLEN];
 static char smb_shr_exec_unmap[MAXPATHLEN];
 static mutex_t smb_shr_exec_mtx;
+
+/*
+ * Semaphore held during temporary, process-wide changes
+ * such as process privileges.  It is a seamaphore and
+ * not a mutex so a child of fork can reset it.
+ */
+static sema_t smb_proc_sem = DEFAULTSEMA;
 
 /*
  * Creates and initializes the cache and starts the publisher
@@ -574,6 +582,7 @@ smb_shr_get(char *sharename, smb_share_t *si)
  *   o comment
  *   o AD container
  *   o host access
+ *   o abe
  */
 uint32_t
 smb_shr_modify(smb_share_t *new_si)
@@ -581,9 +590,7 @@ smb_shr_modify(smb_share_t *new_si)
 	smb_share_t *si;
 	boolean_t adc_changed = B_FALSE;
 	char old_container[MAXPATHLEN];
-	uint32_t catia;
-	uint32_t cscflg;
-	uint32_t access;
+	uint32_t catia, cscflg, access, abe;
 
 	assert(new_si != NULL);
 
@@ -611,6 +618,10 @@ smb_shr_modify(smb_share_t *new_si)
 		(void) strlcpy(si->shr_container, new_si->shr_container,
 		    sizeof (si->shr_container));
 	}
+
+	abe = (new_si->shr_flags & SMB_SHRF_ABE);
+	si->shr_flags &= ~SMB_SHRF_ABE;
+	si->shr_flags |= abe;
 
 	catia = (new_si->shr_flags & SMB_SHRF_CATIA);
 	si->shr_flags &= ~SMB_SHRF_CATIA;
@@ -949,6 +960,9 @@ smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
 	if (*cmd == '\0')
 		return (0);
 
+	if (smb_proc_takesem() != 0)
+		return (-1);
+
 	pact.sa_handler = smb_shr_sig_child;
 	pact.sa_flags = 0;
 	(void) sigemptyset(&pact.sa_mask);
@@ -958,6 +972,7 @@ smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
 
 	if ((child_pid = fork()) == -1) {
 		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
+		smb_proc_givesem();
 		return (-1);
 	}
 
@@ -979,6 +994,8 @@ smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
 		if (smb_shr_enable_all_privs())
 			_exit(-1);
 
+		smb_proc_initsem();
+
 		(void) trim_whitespace(cmd);
 		(void) strcanon(cmd, " ");
 
@@ -999,6 +1016,9 @@ smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
 		_exit(-1);
 	}
 
+	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
+	smb_proc_givesem();
+
 	/* parent process */
 
 	while (waitpid(child_pid, &child_status, 0) < 0) {
@@ -1010,12 +1030,31 @@ smb_shr_exec(char *share, smb_execsub_info_t *subs, int exec_type)
 		continue;
 	}
 
-	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_PROC_FORK, NULL);
-
 	if (WIFEXITED(child_status))
 		return (WEXITSTATUS(child_status));
 
 	return (child_status);
+}
+
+/*
+ * Locking for process-wide settings (i.e. privileges)
+ */
+void
+smb_proc_initsem(void)
+{
+	(void) sema_init(&smb_proc_sem, 1, USYNC_THREAD, NULL);
+}
+
+int
+smb_proc_takesem(void)
+{
+	return (sema_wait(&smb_proc_sem));
+}
+
+void
+smb_proc_givesem(void)
+{
+	(void) sema_post(&smb_proc_sem);
 }
 
 /*
@@ -1527,6 +1566,14 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 		}
 	}
 
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_ABE);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_abe_option(val, si);
+			free(val);
+		}
+	}
+
 	prop = (sa_property_t)sa_get_property(opts, SHOPT_CSC);
 	if (prop != NULL) {
 		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
@@ -1641,6 +1688,19 @@ smb_shr_sa_catia_option(const char *value, smb_share_t *si)
 		si->shr_flags |= SMB_SHRF_CATIA;
 	} else {
 		si->shr_flags &= ~SMB_SHRF_CATIA;
+	}
+}
+
+/*
+ * set SMB_SHRF_ABE in accordance with abe property value
+ */
+void
+smb_shr_sa_abe_option(const char *value, smb_share_t *si)
+{
+	if ((strcasecmp(value, "true") == 0) || (strcmp(value, "1") == 0)) {
+		si->shr_flags |= SMB_SHRF_ABE;
+	} else {
+		si->shr_flags &= ~SMB_SHRF_ABE;
 	}
 }
 

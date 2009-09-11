@@ -708,11 +708,12 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 			return (NULL);
 		}
 	} else if (dname != NULL) {
-		len = res_nquerydomain(state, svc_name, dname, C_IN, T_SRV,
-		    msg.buf, sizeof (msg.buf));
 		logger(LOG_DEBUG,
 		    "Querying DNS for SRV RRs named '%s' for '%s' ",
 		    svc_name, dname);
+
+		len = res_nquerydomain(state, svc_name, dname, C_IN, T_SRV,
+		    msg.buf, sizeof (msg.buf));
 
 		if (len < 0) {
 			logger(LOG_DEBUG,

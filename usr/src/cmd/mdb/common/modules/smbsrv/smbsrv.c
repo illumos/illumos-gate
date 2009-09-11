@@ -1179,13 +1179,13 @@ smb_dcmd_odir(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		} else {
 			if (DCMD_HDRSPEC(flags))
 				mdb_printf(
-				    "%<u>%-?s "
+				    "%<b>%<u>%-?s "
 				    "%-5s "
 				    "%-?s "
-				    "%-16s%</u>\n",
+				    "%-16s%</u>%</b>\n",
 				    "ODIR", "SID", "VNODE", "PATTERN");
 
-			mdb_printf("%?p %-5u %-16s %s\n",
+			mdb_printf("%?p %-5u %-16p %s\n",
 			    addr, od->d_odid, od->d_dnode, od->d_pattern);
 		}
 	}

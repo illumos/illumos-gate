@@ -71,6 +71,7 @@ typedef struct smb_attr {
 	vattr_t		sa_vattr;	/* Legacy vattr */
 	uint32_t	sa_dosattr;	/* DOS attributes */
 	timestruc_t	sa_crtime;	/* Creation time */
+	u_offset_t	sa_allocsz;	/* File allocation size in bytes */
 } smb_attr_t;
 
 #define	SMB_AT_TYPE	0x00001
@@ -91,12 +92,15 @@ typedef struct smb_attr {
 
 #define	SMB_AT_DOSATTR	0x00100000
 #define	SMB_AT_CRTIME	0x00200000
-#define	SMB_AT_SMB	0x00300000
+#define	SMB_AT_ALLOCSZ	0x00400000
+
+#define	SMB_AT_SMB	(SMB_AT_DOSATTR|SMB_AT_CRTIME|SMB_AT_ALLOCSZ)
 
 #define	SMB_AT_ALL	(SMB_AT_TYPE|SMB_AT_MODE|SMB_AT_UID|SMB_AT_GID|\
 			SMB_AT_FSID|SMB_AT_NODEID|SMB_AT_NLINK|SMB_AT_SIZE|\
 			SMB_AT_ATIME|SMB_AT_MTIME|SMB_AT_CTIME|SMB_AT_RDEV|\
 			SMB_AT_BLKSIZE|SMB_AT_NBLOCKS|SMB_AT_SEQ|SMB_AT_SMB)
+
 #define	SMB_AT_TIMES	(SMB_AT_ATIME | SMB_AT_MTIME |\
 			SMB_AT_CTIME | SMB_AT_CRTIME)
 
@@ -123,7 +127,8 @@ int smb_vop_rename(vnode_t *, char *, vnode_t *, char *, int, cred_t *);
 int smb_vop_mkdir(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,
     vsecattr_t *);
 int smb_vop_rmdir(vnode_t *, char *, int, cred_t *);
-int smb_vop_readdir(vnode_t *, uint32_t, void *, int *, int *, cred_t *);
+int smb_vop_readdir(vnode_t *, uint32_t, void *, int *, int *,
+    uint32_t, cred_t *);
 int smb_vop_commit(vnode_t *, cred_t *);
 int smb_vop_statfs(vnode_t *, struct statvfs64 *, cred_t *);
 int smb_vop_stream_lookup(vnode_t *, char *, vnode_t **, char *, vnode_t **,

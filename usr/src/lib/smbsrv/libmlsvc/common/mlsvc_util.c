@@ -52,7 +52,6 @@ static boolean_t mlsvc_ntjoin_support = B_FALSE;
 extern int netr_open(char *, char *, mlsvc_handle_t *);
 extern int netr_close(mlsvc_handle_t *);
 extern DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
-extern int mlsvc_user_getauth(char *, char *, smb_auth_info_t *);
 
 /*
  * mlsvc_lookup_name
@@ -141,7 +140,6 @@ mlsvc_netlogon(char *server, char *domain)
 DWORD
 mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 {
-	smb_auth_info_t auth;
 	int erc;
 	DWORD status;
 	char machine_passwd[NETR_MACHINE_ACCT_PASSWD_MAX];
@@ -168,14 +166,9 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 				status = NT_STATUS_UNSUCCESSFUL;
 			}
 		} else {
-			if (mlsvc_user_getauth(dinfo->d_dc, user, &auth)
-			    != 0) {
-				status = NT_STATUS_INVALID_PARAMETER;
-				return (status);
-			}
 
 			status = sam_create_trust_account(dinfo->d_dc,
-			    domain->di_nbname, &auth);
+			    domain->di_nbname);
 			if (status == NT_STATUS_SUCCESS) {
 				(void) smb_getnetbiosname(machine_passwd,
 				    sizeof (machine_passwd));

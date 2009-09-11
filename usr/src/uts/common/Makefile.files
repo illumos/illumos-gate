@@ -1168,8 +1168,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_path_name_reduction.o		\
 		smb_print.o				\
 		smb_process_exit.o			\
-		smb_query_information.o			\
-		smb_query_information2.o		\
+		smb_query_fileinfo.o			\
 		smb_query_information_disk.o		\
 		smb_read.o				\
 		smb_rename.o				\
@@ -1178,19 +1177,13 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_server.o				\
 		smb_session.o				\
 		smb_session_setup_andx.o		\
-		smb_set_information.o			\
-		smb_set_information2.o			\
+		smb_set_fileinfo.o		\
 		smb_signing.o				\
                 smb_tree.o				\
 		smb_trans2_create_directory.o		\
 		smb_trans2_dfs.o			\
 		smb_trans2_find.o			\
-		smb_trans2_query_file_info.o		\
 		smb_trans2_query_fs_information.o	\
-		smb_trans2_query_path_info.o		\
-		smb_trans2_set_file_information.o	\
-		smb_trans2_set_information.o		\
-		smb_trans2_set_path_information.o	\
 		smb_tree_connect.o			\
 		smb_unlock_byte_range.o			\
 		smb_upcalls.o				\

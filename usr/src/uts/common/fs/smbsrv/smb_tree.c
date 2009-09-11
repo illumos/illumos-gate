@@ -581,6 +581,11 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 		break;
 	}
 
+	/* ABE support */
+	if (si->shr_flags & SMB_SHRF_ABE)
+		sr->arg.tcon.optional_support |=
+		    SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM;
+
 	access = si->shr_access_value & SMB_SHRF_ACC_ALL;
 
 	if (access == SMB_SHRF_ACC_RO) {
@@ -1021,6 +1026,9 @@ smb_tree_get_flags(const smb_share_t *si, vfs_t *vfsp, smb_tree_t *tree)
 
 	if (si->shr_flags & SMB_SHRF_CATIA)
 		flags |= SMB_TREE_CATIA;
+
+	if (si->shr_flags & SMB_SHRF_ABE)
+		flags |= SMB_TREE_ABE;
 
 	if (vfsp->vfs_flag & VFS_RDONLY)
 		flags |= SMB_TREE_READONLY;

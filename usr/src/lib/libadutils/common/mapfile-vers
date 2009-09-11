@@ -40,8 +40,9 @@
 SUNWprivate {
     global:
 	adutils_txtsid2hexbinsid;
-	adutils_bv_name2str;
+	adutils_bv_uint;
 	adutils_bv_objsid2sidstr;
+	adutils_bv_str;
 	adutils_getattr;
 	adutils_getfirstentry;
 	adutils_freeresult;
@@ -50,7 +51,6 @@ SUNWprivate {
 	adutils_lookup_batch_add;
 	adutils_lookup_batch_end;
 	adutils_lookup_batch_release;
-	adutils_lookup_batch_getdefdomain;
 	adutils_lookup_check_domain;
 	adutils_lookup_check_sid_prefix;
 	adutils_dn2dns;

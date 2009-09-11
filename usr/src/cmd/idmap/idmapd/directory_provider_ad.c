@@ -146,7 +146,7 @@ directory_provider_ad_get(
 	/*
 	 * If we don't have any AD servers handy, we can't find anything.
 	 */
-	if (_idmapdstate.num_ads < 1) {
+	if (_idmapdstate.num_gcs < 1) {
 		return (NULL);
 	}
 
@@ -295,7 +295,7 @@ directory_provider_ad_lookup(
 	 * NEEDSWORK:  Should eventually handle other forests.
 	 * NEEDSWORK:  Should eventually handle non-GC attributes.
 	 */
-	ad = _idmapdstate.ads[0];
+	ad = _idmapdstate.gcs[0];
 
 	/* Stash away information for the callback function. */
 	cbinfo.attrs = attrs;

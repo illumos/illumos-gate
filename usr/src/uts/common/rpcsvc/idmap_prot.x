@@ -49,7 +49,8 @@ enum idmap_map_type {
 	IDMAP_MAP_TYPE_RULE_BASED,
 	IDMAP_MAP_TYPE_EPHEMERAL,
 	IDMAP_MAP_TYPE_LOCAL_SID,
-	IDMAP_MAP_TYPE_KNOWN_SID
+	IDMAP_MAP_TYPE_KNOWN_SID,
+	IDMAP_MAP_TYPE_IDMU
 };
 
 
@@ -103,7 +104,7 @@ struct idmap_how_ds_based {
 	idmap_utf8str	attr;
 	idmap_utf8str	value;
 };
- 
+
 union idmap_how switch(idmap_map_type map_type) {
 	case IDMAP_MAP_TYPE_UNKNOWN: void;
 	case IDMAP_MAP_TYPE_DS_AD: idmap_how_ds_based ad;
@@ -112,6 +113,7 @@ union idmap_how switch(idmap_map_type map_type) {
 	case IDMAP_MAP_TYPE_EPHEMERAL: void;
 	case IDMAP_MAP_TYPE_LOCAL_SID: void;
 	case IDMAP_MAP_TYPE_KNOWN_SID: void;
+	case IDMAP_MAP_TYPE_IDMU: idmap_how_ds_based idmu;
 };
 
 struct idmap_info {
@@ -239,7 +241,7 @@ enum idmap_prop_type {
 	PROP_AD_UNIXUSER_ATTR = 9,
 	PROP_AD_UNIXGROUP_ATTR = 10,
 	PROP_NLDAP_WINNAME_ATTR = 11,
-	PROP_DS_NAME_MAPPING_ENABLED = 12
+	PROP_DIRECTORY_BASED_MAPPING = 12
 };
 
 union idmap_prop_val switch(idmap_prop_type prop) {
@@ -253,9 +255,8 @@ union idmap_prop_val switch(idmap_prop_type prop) {
 	case PROP_AD_UNIXUSER_ATTR:
 	case PROP_AD_UNIXGROUP_ATTR:
 	case PROP_NLDAP_WINNAME_ATTR:
+	case PROP_DIRECTORY_BASED_MAPPING:
 		idmap_utf8str utf8val;
-	case PROP_DS_NAME_MAPPING_ENABLED:
-		bool boolval;
 	case PROP_DOMAIN_CONTROLLER:
 	case PROP_GLOBAL_CATALOG:
 		idmap_ad_disc_ds_t dsval;

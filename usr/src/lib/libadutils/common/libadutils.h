@@ -133,7 +133,7 @@ typedef void (*adutils_logger)(int, const char *, ...);
 
 
 extern adutils_rc	adutils_ad_alloc(adutils_ad_t **new_ad,
-				const char *default_domain,
+				const char *domain_name,
 				adutils_ad_partition_t part);
 extern void		adutils_ad_free(adutils_ad_t **ad);
 extern adutils_rc	adutils_add_ds(adutils_ad_t *ad,
@@ -153,7 +153,8 @@ extern const adutils_entry_t	*adutils_getfirstentry(
 extern int		adutils_txtsid2hexbinsid(const char *txt,
 				const uint32_t *rid,
 				char *hexbinsid, int hexbinsidlen);
-extern char		*adutils_bv_name2str(BerValue *bval);
+extern char		*adutils_bv_str(BerValue *bval);
+extern boolean_t	adutils_bv_uint(BerValue *bval, unsigned int *result);
 extern char		*adutils_bv_objsid2sidstr(BerValue *bval,
 				uint32_t *rid);
 extern void		adutils_reap_idle_connections(void);
@@ -171,8 +172,6 @@ extern adutils_rc	adutils_lookup_batch_end(
 				adutils_query_state_t **state);
 extern void		adutils_lookup_batch_release(
 				adutils_query_state_t **state);
-extern const char	*adutils_lookup_batch_getdefdomain(
-				adutils_query_state_t *state);
 extern int		adutils_lookup_check_domain(
 				adutils_query_state_t *state,
 				const char *domain);

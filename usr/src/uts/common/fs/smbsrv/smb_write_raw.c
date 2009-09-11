@@ -349,11 +349,10 @@ smb_com_write_raw(struct smb_request *sr)
 
 	/*
 	 * smb_write_raw_helper will call smb_opipe_write or
-	 * smb_fsop_write as appropriate, handle the NODE_FLAGS_SET_SIZE
-	 * flag (if set) and update the other f_node fields.  It's possible
-	 * that data_length may be 0 for this transfer but we still want
-	 * process it since it will update the file state (seek position,
-	 * file size (possibly), etc).
+	 * smb_fsop_write as appropriate, and update the other f_node fields.
+	 * It's possible that data_length may be 0 for this transfer but
+	 * we still want to process it since it will update the file state
+	 * (seek position, file size (possibly), etc).
 	 */
 	rc = smb_write_raw_helper(sr, &uio, stability, &off, &lcount);
 
@@ -475,11 +474,11 @@ notify_write_raw_complete:
 /*
  * smb_write_raw_helper
  *
- * This function will call smb_opipe_write or smb_fsop_write as appropriate,
- * handle the NODE_FLAGS_SET_SIZE flag (if set) and update the other f_node
- * fields.  It's possible that data_length may be 0 for this transfer but
- * we still want process it since it will update the file state (seek
- * position, file size (possibly), etc).
+ * This function will call smb_opipe_write or smb_fsop_write
+ * as appropriate, and update the other f_node fields.
+ * It's possible that data_length may be 0 for this transfer but
+ * we still want process it since it will update the file state
+ * (seek position, file size (possibly), etc).
  *
  * Returns 0 for success, non-zero for failure
  */

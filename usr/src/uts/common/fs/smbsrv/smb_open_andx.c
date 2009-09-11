@@ -290,7 +290,7 @@ smb_com_open(smb_request_t *sr)
 	    7,
 	    sr->smb_fid,
 	    file_attr,
-	    smb_gmt2local(sr, attr.sa_vattr.va_mtime.tv_sec),
+	    smb_time_gmt_to_local(sr, attr.sa_vattr.va_mtime.tv_sec),
 	    (uint32_t)op->dsize,
 	    op->omode,
 	    (uint16_t)0);	/* bcc */
@@ -331,7 +331,8 @@ smb_pre_open_andx(smb_request_t *sr)
 			op->op_oplock_level = SMB_OPLOCK_NONE;
 
 		if ((creation_time != 0) && (creation_time != UINT_MAX))
-			op->crtime.tv_sec = smb_local2gmt(sr, creation_time);
+			op->crtime.tv_sec =
+			    smb_time_local_to_gmt(sr, creation_time);
 		op->crtime.tv_nsec = 0;
 
 		op->create_disposition = smb_ofun_to_crdisposition(op->ofun);
@@ -399,7 +400,7 @@ smb_com_open_andx(smb_request_t *sr)
 		    sr->andx_com, VAR_BCC,
 		    sr->smb_fid,
 		    file_attr,
-		    smb_gmt2local(sr, attr.sa_vattr.va_mtime.tv_sec),
+		    smb_time_gmt_to_local(sr, attr.sa_vattr.va_mtime.tv_sec),
 		    (uint32_t)op->dsize,
 		    op->omode, op->ftype,
 		    op->devstate,
@@ -442,7 +443,7 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 
 	if ((creation_time != 0) && (creation_time != UINT_MAX))
-		op->crtime.tv_sec = smb_local2gmt(sr, creation_time);
+		op->crtime.tv_sec = smb_time_local_to_gmt(sr, creation_time);
 	op->crtime.tv_nsec = 0;
 
 	op->dattr = file_attr;

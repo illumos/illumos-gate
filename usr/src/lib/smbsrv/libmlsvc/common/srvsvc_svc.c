@@ -45,6 +45,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <libshare.h>
+#include <libnvpair.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/lmerr.h>
@@ -139,11 +140,12 @@ static uint32_t srvsvc_modify_share(smb_share_t *,
 static uint32_t srvsvc_modify_transient_share(smb_share_t *,
     srvsvc_netshare_setinfo_t *);
 static uint32_t srvsvc_update_share_flags(smb_share_t *, uint32_t);
+static uint32_t srvsvc_get_share_flags(smb_share_t *);
 
 static uint32_t srvsvc_sa_add(char *, char *, char *);
 static uint32_t srvsvc_sa_delete(char *);
 static uint32_t srvsvc_sa_modify(smb_share_t *, srvsvc_netshare_setinfo_t *);
-static uint32_t srvsvc_sa_setattr(smb_share_t *);
+static uint32_t srvsvc_sa_setprop(smb_share_t *, nvlist_t *);
 
 static char empty_string[1];
 
@@ -881,7 +883,7 @@ srvsvc_s_NetShareGetInfo(void *arg, ndr_xa_t *mxa)
 		info501->shi501_netname = netname;
 		info501->shi501_comment = comment;
 		info501->shi501_type = si.shr_type;
-		info501->shi501_reserved = 0;
+		info501->shi501_flags = srvsvc_get_share_flags(&si);
 		param->result.ru.info501 = info501;
 		break;
 
@@ -942,26 +944,7 @@ srvsvc_s_NetShareGetInfo(void *arg, ndr_xa_t *mxa)
 
 	case 1005:
 		info1005 = &info->nsg_info1005;
-		info1005->shi1005_flags = 0;
-
-		switch (si.shr_flags & SMB_SHRF_CSC_MASK) {
-		case SMB_SHRF_CSC_DISABLED:
-			info1005->shi1005_flags |= CSC_CACHE_NONE;
-			break;
-		case SMB_SHRF_CSC_AUTO:
-			info1005->shi1005_flags |= CSC_CACHE_AUTO_REINT;
-			break;
-		case SMB_SHRF_CSC_VDO:
-			info1005->shi1005_flags |= CSC_CACHE_VDO;
-			break;
-		case SMB_SHRF_CSC_MANUAL:
-		default:
-			/*
-			 * Default to CSC_CACHE_MANUAL_REINT.
-			 */
-			break;
-		}
-
+		info1005->shi1005_flags = srvsvc_get_share_flags(&si);
 		param->result.ru.info1005 = info1005;
 		break;
 
@@ -1108,6 +1091,9 @@ srvsvc_s_NetShareSetInfo(void *arg, ndr_xa_t *mxa)
 		info.nss_comment = (char *)info501->shi501_comment;
 		info.nss_type = info501->shi501_type;
 		status = srvsvc_modify_share(&si, &info);
+		if (status == ERROR_SUCCESS)
+			status = srvsvc_update_share_flags(&si,
+			    info501->shi501_flags);
 		break;
 
 	case 502:
@@ -1230,41 +1216,101 @@ srvsvc_modify_transient_share(smb_share_t *si, srvsvc_netshare_setinfo_t *info)
 	return (NERR_Success);
 }
 
+/*
+ * srvsvc_update_share_flags
+ *
+ * This function updates flags for shares.
+ * Flags for Persistent shares are updated in both libshare and the local cache.
+ * Flags for Transient shares are updated only in the local cache.
+ */
 static uint32_t
 srvsvc_update_share_flags(smb_share_t *si, uint32_t shi_flags)
 {
-	uint32_t cscflg = 0;
 	uint32_t nerr = NERR_Success;
+	uint32_t flag = 0;
+	char *csc_value;
+	char *abe_value = "false";
+	nvlist_t *nvl;
+	int err = 0;
+
+	if (shi_flags & SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM) {
+		flag = SMB_SHRF_ABE;
+		abe_value = "true";
+	}
+
+	si->shr_flags &= ~SMB_SHRF_ABE;
+	si->shr_flags |= flag;
 
 	switch ((shi_flags & CSC_MASK)) {
 	case CSC_CACHE_AUTO_REINT:
-		cscflg = SMB_SHRF_CSC_AUTO;
+		flag = SMB_SHRF_CSC_AUTO;
 		break;
 	case CSC_CACHE_VDO:
-		cscflg = SMB_SHRF_CSC_VDO;
+		flag = SMB_SHRF_CSC_VDO;
 		break;
 	case CSC_CACHE_NONE:
-		cscflg = SMB_SHRF_CSC_DISABLED;
+		flag = SMB_SHRF_CSC_DISABLED;
 		break;
 	case CSC_CACHE_MANUAL_REINT:
-		cscflg = SMB_SHRF_CSC_MANUAL;
+		flag = SMB_SHRF_CSC_MANUAL;
 		break;
 	default:
-		return (NERR_Success);
+		return (NERR_InternalError);
 	}
 
-	if (cscflg == (si->shr_flags & SMB_SHRF_CSC_MASK))
-		return (NERR_Success);
-
 	si->shr_flags &= ~SMB_SHRF_CSC_MASK;
-	si->shr_flags |= cscflg;
+	si->shr_flags |= flag;
 
 	if ((si->shr_flags & SMB_SHRF_TRANS) == 0) {
-		if ((nerr = srvsvc_sa_setattr(si)) != NERR_Success)
+		csc_value = smb_shr_sa_csc_name(si);
+
+		if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+			return (NERR_InternalError);
+
+		err |= nvlist_add_string(nvl, SHOPT_CSC, csc_value);
+		err |= nvlist_add_string(nvl, SHOPT_ABE, abe_value);
+		if (err) {
+			nvlist_free(nvl);
+			return (NERR_InternalError);
+		}
+
+		nerr = srvsvc_sa_setprop(si, nvl);
+		nvlist_free(nvl);
+
+		if (nerr != NERR_Success)
 			return (nerr);
 	}
 
 	return (smb_shr_modify(si));
+}
+
+static uint32_t
+srvsvc_get_share_flags(smb_share_t *si)
+{
+	uint32_t flags = 0;
+
+	switch (si->shr_flags & SMB_SHRF_CSC_MASK) {
+	case SMB_SHRF_CSC_DISABLED:
+		flags |= CSC_CACHE_NONE;
+		break;
+	case SMB_SHRF_CSC_AUTO:
+		flags |= CSC_CACHE_AUTO_REINT;
+		break;
+	case SMB_SHRF_CSC_VDO:
+		flags |= CSC_CACHE_VDO;
+		break;
+	case SMB_SHRF_CSC_MANUAL:
+	default:
+		/*
+		 * Default to CSC_CACHE_MANUAL_REINT.
+		 */
+		break;
+	}
+
+	if (si->shr_flags & SMB_SHRF_ABE)
+		flags |= SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM;
+
+	return (flags);
 }
 
 /*
@@ -1977,7 +2023,7 @@ srvsvc_estimate_limit(smb_svcenum_t *se, uint32_t obj_size)
  * Level 0: share names.
  * Level 1: share name, share type and comment field.
  * Level 2: everything that we know about the shares.
- * Level 501: level 1 + flags (flags must be zero).
+ * Level 501: level 1 + flags.
  * Level 502: level 2 + security descriptor.
  */
 static int
@@ -2541,7 +2587,7 @@ mlsvc_NetShareEnumCommon(ndr_xa_t *mxa, smb_svcenum_t *se,
 		info501[i].shi501_netname = netname;
 		info501[i].shi501_comment = comment;
 		info501[i].shi501_type = si->shr_type;
-		info501[i].shi501_reserved = 0;
+		info501[i].shi501_flags = srvsvc_get_share_flags(si);
 		break;
 
 	case 502:
@@ -2889,15 +2935,25 @@ srvsvc_sa_modify(smb_share_t *si, srvsvc_netshare_setinfo_t *info)
 }
 
 /*
- * Update the share flags.
+ * Update the share properties.
+ *
+ * Updates the optionset properties of the share resource.
+ * The properties are given as a list of name-value pair.
+ * The name argument should be the optionset property name and the value
+ * should be a valid value for the specified property.
  */
 static uint32_t
-srvsvc_sa_setattr(smb_share_t *si)
+srvsvc_sa_setprop(smb_share_t *si, nvlist_t *nvl)
 {
 	sa_handle_t handle;
 	sa_share_t share;
 	sa_resource_t resource;
-	char *value;
+	sa_property_t prop;
+	sa_optionset_t opts;
+	uint32_t nerr = NERR_Success;
+	nvpair_t *cur;
+	int err = 0;
+	char *name, *val;
 
 	if ((handle = smb_shr_sa_enter()) == NULL)
 		return (NERR_InternalError);
@@ -2912,15 +2968,53 @@ srvsvc_sa_setattr(smb_share_t *si)
 		return (NERR_InternalError);
 	}
 
-	if ((value = smb_shr_sa_csc_name(si)) == NULL) {
-		smb_shr_sa_exit();
-		return (NERR_InternalError);
+	if ((opts = sa_get_optionset(resource, SMB_PROTOCOL_NAME)) == NULL) {
+		opts = sa_create_optionset(resource, SMB_PROTOCOL_NAME);
+		if (opts == NULL) {
+			smb_shr_sa_exit();
+			return (NERR_InternalError);
+		}
 	}
 
-	(void) sa_set_resource_attr(resource, SHOPT_CSC, value);
+	cur = nvlist_next_nvpair(nvl, NULL);
+	while (cur != NULL) {
+		name = nvpair_name(cur);
+		err = nvpair_value_string(cur, &val);
+		if ((err != 0) || (name == NULL) || (val == NULL)) {
+			nerr = NERR_InternalError;
+			break;
+		}
+
+		prop = NULL;
+		if ((prop = sa_get_property(opts, name)) == NULL) {
+			prop = sa_create_property(name, val);
+			if (prop != NULL) {
+				nerr = sa_valid_property(handle, opts,
+				    SMB_PROTOCOL_NAME, prop);
+				if (nerr != NERR_Success) {
+					(void) sa_remove_property(prop);
+					break;
+				}
+			}
+			nerr = sa_add_property(opts, prop);
+			if (nerr != NERR_Success)
+				break;
+		} else {
+			nerr = sa_update_property(prop, val);
+			if (nerr != NERR_Success)
+				break;
+		}
+
+		cur = nvlist_next_nvpair(nvl, cur);
+	}
+
+	if (nerr == NERR_Success)
+		nerr = sa_commit_properties(opts, 0);
+
 	smb_shr_sa_exit();
-	return (NERR_Success);
+	return (nerr);
 }
+
 
 static ndr_stub_table_t srvsvc_stub_table[] = {
 	{ srvsvc_s_NetConnectEnum,	SRVSVC_OPNUM_NetConnectEnum },

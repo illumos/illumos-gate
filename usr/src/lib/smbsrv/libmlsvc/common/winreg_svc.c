@@ -64,6 +64,8 @@ static char *winreg_keys[] = {
 	"HKU",
 	"HKLM\\SOFTWARE",
 	"HKLM\\SYSTEM",
+	"Application",
+	"Security",
 	"System",
 	"CurrentControlSet",
 	"System\\CurrentControlSet\\Services\\Eventlog",
@@ -830,6 +832,7 @@ winreg_lookup_value(const char *name)
 		char *name;
 		char *value;
 	} registry[] = {
+		{ "CurrentVersion", "4.0" },
 		{ "ProductType", "ServerNT" },
 		{ "Sources",	 NULL }	/* product name */
 	};

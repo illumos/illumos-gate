@@ -52,6 +52,14 @@
 	((S) & SERVICE_STOP)		||	\
 	((S) & SERVICE_ENUMERATE_DEPENDENTS)
 
+typedef union {
+	uint8_t				*svc_buf;
+	svc_description_t		*svc_desc;
+	svc_failure_actions_t		*svc_fac;
+	svc_delayed_auto_start_t	*svc_dstart;
+	svc_config_failure_action_t	*svc_cfa;
+} svc_config_rsp_t;
+
 static int svcctl_s_Close(void *, ndr_xa_t *);
 static int svcctl_s_ControlService(void *, ndr_xa_t *);
 static int svcctl_s_DeleteService(void *, ndr_xa_t *);
@@ -844,7 +852,7 @@ svcctl_s_QueryServiceConfig(void *arg, ndr_xa_t *mxa)
 	cfg = &param->service_cfg;
 	cfg->service_type = SERVICE_WIN32_SHARE_PROCESS;
 	cfg->start_type = SERVICE_AUTO_START;
-	cfg->error_control = SERVICE_AUTO_START;
+	cfg->error_control = SERVICE_ERROR_IGNORE;
 	cfg->binary_pathname = NDR_STRDUP(mxa, "");
 	cfg->loadorder_group = NDR_STRDUP(mxa, "");
 	cfg->tag_id = 0;
@@ -1184,8 +1192,7 @@ svcctl_s_QueryServiceConfig2W(void *arg, ndr_xa_t *mxa)
 	svcctl_manager_context_t *mgr_ctx;
 	svcctl_service_context_t *svc_ctx;
 	svcctl_svc_node_t *svc;
-	svc_description_t *svc_desc;
-	svc_failure_actions_t *fac;
+	svc_config_rsp_t svc_rsp;
 	int offset, input_bufsize, bytes_needed = 0;
 	mts_wchar_t *wide_desc;
 	char *desc;
@@ -1209,6 +1216,7 @@ svcctl_s_QueryServiceConfig2W(void *arg, ndr_xa_t *mxa)
 	}
 	bzero(param->buffer, input_bufsize);
 
+	svc_rsp.svc_buf = param->buffer;
 	status = ERROR_SUCCESS;
 	switch (param->info_level) {
 	case SERVICE_CONFIG_DESCRIPTION:
@@ -1235,25 +1243,41 @@ svcctl_s_QueryServiceConfig2W(void *arg, ndr_xa_t *mxa)
 		}
 
 		offset = sizeof (svc_description_t);
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		svc_desc = (svc_description_t *)param->buffer;
-		svc_desc->desc = offset;
+		svc_rsp.svc_desc->desc = offset;
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
 		wide_desc = (mts_wchar_t *)&param->buffer[offset];
 		(void) mts_mbstowcs(wide_desc, desc, (strlen(desc) + 1));
-		offset = SVCCTL_WNSTRLEN(desc);
+		offset += SVCCTL_WNSTRLEN(desc);
 
 		param->bytes_needed = offset;
 		break;
 
 	case SERVICE_CONFIG_FAILURE_ACTIONS:
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		fac = (svc_failure_actions_t *)param->buffer;
-		bzero(fac, sizeof (svc_failure_actions_t));
-
-		param->bytes_needed = input_bufsize;
+		bzero(svc_rsp.svc_fac, sizeof (svc_failure_actions_t));
+		bytes_needed = sizeof (svc_failure_actions_t);
+		if (input_bufsize <= bytes_needed) {
+			param->bytes_needed = bytes_needed;
+			param->status = ERROR_INSUFFICIENT_BUFFER;
+			return (NDR_DRC_OK);
+		}
+		param->bytes_needed = bytes_needed;
 		break;
 
+	case SERVICE_CONFIG_DELAYED_AUTO_START_INFO:
+		svc_rsp.svc_dstart->dstart = 0;
+		param->bytes_needed = sizeof (svc_delayed_auto_start_t);
+		break;
+
+	case SERVICE_CONFIG_FAILURE_ACTIONS_FLAG:
+		svc_rsp.svc_cfa->cfa = 0;
+		param->bytes_needed = sizeof (svc_config_failure_action_t);
+		break;
+
+	case SERVICE_CONFIG_SERVICE_SID_INFO:
+	case SERVICE_CONFIG_REQUIRED_PRIVILEGES_INFO:
+	case SERVICE_CONFIG_PRESHUTDOWN_INFO:
+	case SERVICE_CONFIG_TRIGGER_INFO:
+	case SERVICE_CONFIG_PREFERRED_NODE:
 	default:
 		status = ERROR_INVALID_LEVEL;
 		break;
@@ -1305,7 +1329,7 @@ svcctl_s_QueryServiceStatusEx(void *arg, ndr_xa_t *mxa)
 		goto query_service_status_ex_error;
 	}
 
-	bytes_needed = sizeof (struct svcctl_QueryServiceStatusEx);
+	bytes_needed = sizeof (svc_status_ex_t);
 
 	if ((input_bufsize = param->buf_size) < bytes_needed) {
 		bzero(param, sizeof (struct svcctl_QueryServiceStatusEx));
@@ -1338,8 +1362,8 @@ svcctl_s_QueryServiceStatusEx(void *arg, ndr_xa_t *mxa)
 	svc_status_ex->service_flags = 1;
 
 	param->buffer = (uint8_t *)svc_status_ex;
-	param->buf_size = bytes_needed;
-	param->bytes_needed = 0;
+	param->buf_size = input_bufsize;
+	param->bytes_needed = bytes_needed;
 	param->status = ERROR_SUCCESS;
 	return (NDR_DRC_OK);
 

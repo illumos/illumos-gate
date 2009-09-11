@@ -110,12 +110,14 @@ int smb_fsop_frlock(smb_node_t *, smb_lock_t *, boolean_t, cred_t *);
  *
  * SMB_FOLLOW_LINKS	Follow symbolic links.
  * SMB_IGNORE_CASE	Perform case-insensitive lookup.
- * SMB_CATIA		Perform CATIA character substitution
+ * SMB_CATIA		Perform CATIA character substitution.
+ * SMB_ABE		Perform Access based enumeration/lookup.
  */
 
 #define	SMB_FOLLOW_LINKS	0x00000001
 #define	SMB_IGNORE_CASE		0x00000002
 #define	SMB_CATIA		0x00000004
+#define	SMB_ABE			0x00000008
 
 #ifdef	__cplusplus
 }

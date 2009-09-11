@@ -60,13 +60,14 @@ struct known_domain {
 
 /* A set of DSs for a given AD partition */
 struct adutils_ad {
-	char			*dflt_w2k_dom;	/* used to qualify bare names */
 	int			num_known_domains;
 	struct known_domain	*known_domains;
 	pthread_mutex_t		lock;
 	uint32_t		ref;
 	struct adutils_host	*last_adh;
 	adutils_ad_partition_t	partition;	/* Data or global catalog? */
+	/* If this is a reference to DC, this is the base DN for that DC */
+	char			*basedn;
 };
 
 typedef struct adutils_attr {
@@ -141,8 +142,6 @@ struct adutils_query_state {
 	uint64_t		qadh_gen;	/* same as qadh->generation */
 	adutils_ldap_res_search_cb ldap_res_search_cb;
 	void			*ldap_res_search_argp;
-	char			*default_domain;
-	char			*basedn;
 	adutils_q_t		queries[1];	/* array of query results */
 };
 

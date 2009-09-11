@@ -31,7 +31,7 @@
 static int smb_delete_check_path(smb_request_t *, boolean_t *);
 static int smb_delete_single_file(smb_request_t *, smb_error_t *);
 static int smb_delete_multiple_files(smb_request_t *, smb_error_t *);
-static int smb_delete_find_fname(smb_request_t *, smb_odir_t *);
+static int smb_delete_find_fname(smb_request_t *, smb_odir_t *, char *, int);
 static int smb_delete_check_dosattr(smb_request_t *, smb_error_t *);
 static int smb_delete_remove_file(smb_request_t *, smb_error_t *);
 
@@ -276,6 +276,7 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 	smb_fqi_t *fqi;
 	uint16_t odid;
 	smb_odir_t *od;
+	char namebuf[MAXNAMELEN];
 
 	fqi = &sr->arg.dirop.fqi;
 
@@ -292,13 +293,13 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 		return (-1);
 
 	for (;;) {
-		rc = smb_delete_find_fname(sr, od);
+		rc = smb_delete_find_fname(sr, od, namebuf, MAXNAMELEN);
 		if (rc != 0)
 			break;
 
 		rc = smb_fsop_lookup_name(sr, sr->user_cr, 0,
 		    sr->tid_tree->t_snode, fqi->fq_dnode,
-		    fqi->fq_od_name, &fqi->fq_fnode);
+		    namebuf, &fqi->fq_fnode);
 		if (rc != 0)
 			break;
 
@@ -351,8 +352,8 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 /*
  * smb_delete_find_fname
  *
- * Find next filename that matches search pattern (fqi->fq_last_comp)
- * and save it in fqi->fq_od_name.
+ * Find next filename that matches search pattern and return it
+ * in namebuf.
  *
  * Case insensitivity note:
  * If the tree is case insensitive and there's a case conflict
@@ -365,7 +366,7 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
  *          errno
  */
 static int
-smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
+smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od, char *namebuf, int len)
 {
 	int		rc;
 	smb_odirent_t	*odirent;
@@ -373,9 +374,7 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
 	char		*name;
 	char		shortname[SMB_SHORTNAMELEN];
 	char		name83[SMB_SHORTNAMELEN];
-	smb_fqi_t	*fqi;
 
-	fqi = &sr->arg.dirop.fqi;
 	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
 
 	rc = smb_odir_read(sr, od, odirent, &eos);
@@ -397,7 +396,7 @@ smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
 	} else {
 		name = odirent->od_name;
 	}
-	(void) strlcpy(fqi->fq_od_name, name, sizeof (fqi->fq_od_name));
+	(void) strlcpy(namebuf, name, len);
 
 	kmem_free(odirent, sizeof (smb_odirent_t));
 	return (0);

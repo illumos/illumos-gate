@@ -573,7 +573,7 @@ svcctl_scm_enum_services(svcctl_manager_context_t *mgr_ctx, uint8_t *buf,
 		}
 	}
 
-	offset = base_offset;
+	offset = buflen;
 	node = uu_avl_first(mgr_ctx->mc_svcs);
 
 	for (ns = 0; ((ns < *resume_handle) && (node != NULL)); ++ns)
@@ -587,38 +587,36 @@ svcctl_scm_enum_services(svcctl_manager_context_t *mgr_ctx, uint8_t *buf,
 	for (ns = 0; ((ns < numsvcs) && (node != NULL)); ++ns) {
 		node_name = node->sn_name;
 		namelen = strlen(node_name) + 1;
-		svc[ns].svc_name = offset;
-
 		if (use_wchar) {
+			offset -= SVCCTL_WNSTRLEN(node_name);
 			/*LINTED E_BAD_PTR_CAST_ALIGN*/
 			w_name = (mts_wchar_t *)&buf[offset];
 			(void) mts_mbstowcs(w_name, node_name, namelen);
-			offset += SVCCTL_WNSTRLEN(node_name);
 		} else {
+			offset -= namelen;
 			a_name = (char *)&buf[offset];
 			(void) strlcpy(a_name, node_name, namelen);
-			offset += namelen;
 		}
+		svc[ns].svc_name = offset;
 
-		if (offset >= buflen)
+		if (offset <= base_offset)
 			break;
 
 		node_name = node->sn_fmri;
 		namelen = strlen(node_name) + 1;
-		svc[ns].display_name = offset;
-
 		if (use_wchar) {
+			offset -= SVCCTL_WNSTRLEN(node_name);
 			/*LINTED E_BAD_PTR_CAST_ALIGN*/
 			w_name = (mts_wchar_t *)&buf[offset];
 			(void) mts_mbstowcs(w_name, node_name, namelen);
-			offset += SVCCTL_WNSTRLEN(node_name);
 		} else {
+			offset -= namelen;
 			a_name = (char *)&buf[offset];
 			(void) strlcpy(a_name, node_name, namelen);
-			offset += namelen;
 		}
+		svc[ns].display_name = offset;
 
-		if (offset >= buflen)
+		if (offset <= base_offset)
 			break;
 
 		svc[ns].svc_status.cur_state =
