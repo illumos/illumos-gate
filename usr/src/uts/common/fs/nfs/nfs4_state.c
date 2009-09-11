@@ -1545,8 +1545,10 @@ rfs4_client_expiry(rfs4_entry_t u_entry)
 	rfs4_client_t *cp = (rfs4_client_t *)u_entry;
 	bool_t cp_expired;
 
-	if (rfs4_dbe_is_invalid(cp->rc_dbe))
+	if (rfs4_dbe_is_invalid(cp->rc_dbe)) {
+		cp->rc_ss_remove = 1;
 		return (TRUE);
+	}
 	/*
 	 * If the sysadmin has used clear_locks for this
 	 * entry then forced_expire will be set and we
@@ -1568,9 +1570,21 @@ rfs4_client_expiry(rfs4_entry_t u_entry)
 static void
 rfs4_dss_remove_cpleaf(rfs4_client_t *cp)
 {
+	rfs4_servinst_t *sip;
 	char *leaf = cp->rc_ss_pn->leaf;
 
-	rfs4_dss_remove_leaf(cp->rc_server_instance, NFS4_DSS_STATE_LEAF, leaf);
+	/*
+	 * since the state files are written to all DSS
+	 * paths we must remove this leaf file instance
+	 * from all server instances.
+	 */
+
+	mutex_enter(&rfs4_servinst_lock);
+	for (sip = rfs4_cur_servinst; sip != NULL; sip = sip->prev) {
+		/* remove the leaf file associated with this server instance */
+		rfs4_dss_remove_leaf(sip, NFS4_DSS_STATE_LEAF, leaf);
+	}
+	mutex_exit(&rfs4_servinst_lock);
 }
 
 static void
