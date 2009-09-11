@@ -891,7 +891,7 @@ EMLXS_FW_OBJS +=	emlxs_fw.o
 
 FCT_OBJS += discovery.o fct.o
 
-QLT_OBJS += 2400.o 2500.o qlt.o qlt_dma.o
+QLT_OBJS += 2400.o 2500.o 8100.o qlt.o qlt_dma.o
 
 SRPT_OBJS += srpt_mod.o srpt_ch.o srpt_cm.o srpt_ioc.o srpt_stp.o
 
