@@ -535,6 +535,7 @@ COMMON_SUBDIRS= \
 	SUNWxcu6  \
 	SUNWxwdv \
 	SUNWxge \
+	SUNWyge \
 	SUNWzfskr \
 	SUNWzfsr \
 	SUNWzfsu \

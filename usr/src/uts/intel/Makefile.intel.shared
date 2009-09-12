@@ -349,6 +349,7 @@ DRV_KMODS	+= wc
 DRV_KMODS	+= winlock
 DRV_KMODS	+= wpi
 DRV_KMODS	+= xge
+DRV_KMODS	+= yge
 DRV_KMODS	+= zcons
 DRV_KMODS	+= zyd
 DRV_KMODS	+= simnet

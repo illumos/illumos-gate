@@ -1295,6 +1295,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/vr/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/yge/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 #
 # krtld must refer to its own bzero/bcopy until the kernel is fully linked
 #
@@ -2475,4 +2479,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/tpm/%.s
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/vr/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/yge/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
