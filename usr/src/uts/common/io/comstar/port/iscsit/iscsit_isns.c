@@ -44,6 +44,74 @@
 #include <iscsit_isns.h>
 #include <sys/ksocket.h>
 
+/*
+ * iscsit_isns.c -- isns client that is part of the iscsit server
+ *
+ * The COMSTAR iSCSI target uses four pieces of iSNS functionality:
+ * - DevAttrReg to notify the iSNS server of our targets and portals.
+ * - DeregDev to notify when a target goes away or we shut down
+ * - DevAttrQry (self-query) to see if iSNS server still knows us.
+ * - Request ESI probes from iSNS server as a keepalive mechanism
+ *
+ * We send only two kinds of DevAttrReg messages.
+ *
+ * REPLACE-ALL the info the iSNS server knows about us:
+ *    Set Flag in PDU header to ISNS_FLAG_REPLACE_REG
+ *    Set "source" to same iSCSI target each time
+ *    EID (Entity Identifier) == our DNS name
+ *    "Delimiter"
+ *    Object operated on = EID
+ *    "Entity Portals" owned by this "network entity"
+ *    List of targets
+ *     (Targets with TPGT are followed by PGT and PG portal info)
+ *
+ *   UPDATE-EXISTING - used to register/change one target at a time
+ *    Flag for replace reg not set
+ *    Source and EID and Delimiter and Object Operated On as above
+ *    Single Target
+ *      (Targets with TPGT are followed by PGT and PG portal info)
+ *
+ * Interfaces to iscsit
+ *
+ * iscsit_isns_init -- called when iscsi/target service goes online
+ * iscsit_isns_fini -- called when iscsi/target service goes offline
+ * iscsit_isns_register -- a new target comes online
+ * iscsit_isns_deregister -- target goes offline
+ * iscsit_isns_target_update -- called when a target is modified
+ * iscsit_isns_portal_online -- called when defining a new portal
+ * iscsit_isns_portal_offline -- no longer using a portal
+ *
+ * Copying Data Structures
+ *
+ * The above routines copy all the data they need, so iscsit can
+ * proceed without interfering with us.  This is moving in the
+ * direction of having this isns_client be a standalone user-mode
+ * program. Specifically, we copy the target name, alias, and
+ * tpgt+portal information.
+ *
+ * The iscsit_isns_mutex protects the shadow copies of target and portal
+ * information.  The ISNS_GLOBAL_LOCK protects the iSNS run time structures
+ * that the monitor thread uses. The routine isnst_copy_global_status_changes
+ * has to acquire both locks and copy all the required information from the
+ * global structs to the per-server structs.  Once it completes, the monitor
+ * thread should run completely off the per-server copies.
+ *
+ * Global State vs Per-Server state
+ * There is a global list of targets and portals that is kept updated
+ * by iscsit.  Each svr keeps its own list of targets that have been
+ * announced to the iSNS server.
+ *
+ * Invariants
+ *
+ * 1) If svr->svr_registered, then there is some itarget with
+ *    itarget->target_registered.
+ * 2) If itarget->target_delete_needed, then also itarget->target_registered.
+ *    (Corollary: Any time you remove the last registered target, you have
+ *    to send an unregister-all message.)
+ * 3) If a target has a non-default portal, then the portal goes online
+ *    before the target goes online, and comes offline afterwards.
+ *    (This is enforced by the iscsit state machines.)
+ */
 /* local defines */
 #define	MAX_XID			(2^16)
 #define	ISNS_IDLE_TIME		60
@@ -54,12 +122,10 @@
 ((LEN) > 0 && (NAME)[0] != 0 && (NAME)[(LEN) - 1] == 0)
 
 
-boolean_t iscsit_isns_logging = 0;
-
 #define	ISNST_LOG if (iscsit_isns_logging) cmn_err
 
-static kmutex_t		isns_monitor_mutex;
-static kthread_t	*isns_monitor_thr_id;
+static kmutex_t	isns_monitor_mutex;
+volatile kthread_t	*isns_monitor_thr_id;
 static kt_did_t		isns_monitor_thr_did;
 static boolean_t	isns_monitor_thr_running;
 
@@ -70,6 +136,7 @@ static uint16_t		xid;
 
 static clock_t		monitor_idle_interval;
 
+/* The ISNS_GLOBAL_LOCK protects the per-server data structures */
 #define	ISNS_GLOBAL_LOCK() \
 	mutex_enter(&iscsit_global.global_isns_cfg.isns_mutex)
 
@@ -80,28 +147,96 @@ static clock_t		monitor_idle_interval;
 	mutex_exit(&iscsit_global.global_isns_cfg.isns_mutex)
 
 /*
+ * "Configurable" parameters (set in /etc/system for now).
+ */
+boolean_t iscsit_isns_logging = B_FALSE;
+
+
+/*
+ * If fail this many times to send an update to the server, then
+ * declare the server non-responsive and reregister everything with
+ * the server when we next connect.
+ */
+int	isns_max_retry = MAX_RETRY;
+
+/*
+ * The use of ESI probes to all active portals is not appropriate in
+ * all network environments, since the iSNS server may not have
+ * connectivity to all portals, so we turn it off by default.
+ */
+boolean_t	isns_use_esi = B_FALSE;
+
+/*
+ * Interval to request ESI probes at, in seconds.  The server is free
+ * to specify a different frequency in its response.
+ */
+int	isns_default_esi_interval = ISNS_DEFAULT_ESI_INTERVAL;
+
+
+/*
+ * Registration Period -- we guarantee to check in with iSNS server at
+ * least this often.  Used when ESI probes are turned off.
+ */
+int	isns_registration_period = ISNS_DEFAULT_REGISTRATION_PERIOD;
+
+/*
+ * Socket connect, PDU receive, and PDU send must complete
+ * within this number of microseconds.
+ */
+uint32_t	isns_timeout_usec = ISNS_RCV_TIMER_SECONDS * 1000000;
+
+
+/*
+ * iSNS Message size -- we start with the max that can fit into one PDU.
+ * If the message doesn't fit, we will expand at run time to a higher
+ * value. This parameter could be set in /etc/system if some particular
+ * installation knows it always goes over the standard limit.
+ */
+uint32_t	isns_message_buf_size = ISNSP_MAX_PDU_SIZE;
+
+/*
+ * Number of seconds to wait after isnst_monitor thread starts up
+ * before sending first DevAttrReg message.
+ */
+int	isns_initial_delay = ISNS_INITIAL_DELAY;
+
+/* If PDU sizes ever go over the following, we need to rearchitect */
+#define	ISNST_MAX_MSG_SIZE (16 * ISNSP_MAX_PDU_SIZE)
+
+/*
  * iSNS ESI thread state
  */
-
 static isns_esi_tinfo_t	esi;
 
 /*
- * List of portals.
+ * Our list of targets.  Kept in lock-step synch with iscsit.
+ * The iscsit_isns_mutex protects the global data structures that are
+ * kept in lock-step with iscsit.
+ * NOTE: Now that isnst runs independently of iscsit, we could remove the
+ * shadow copies of iscsit structures, such as isns_target_list and
+ * isns_tpg_portals, and have isnst_copy_global_status_changes reconcile
+ * isnst directly with the iscsit data structures.
  */
-static boolean_t	default_portal_online = B_FALSE;
-static boolean_t	default_portal_state_change = B_FALSE;
-static list_t		portal_list;
-static uint32_t		portal_list_count = 0;
+static kmutex_t		iscsit_isns_mutex;
+static avl_tree_t	isns_target_list;
+static boolean_t	isns_targets_changed;
 
 /*
- * Our entity identifier (fully-qualified hostname)
+ * List of portals from TPGs.  Protected by iscsit_isns_mutex.
+ */
+static boolean_t	isns_portals_changed;
+static avl_tree_t	isns_tpg_portals;
+static boolean_t	default_portal_online;
+
+/* List of all portals.  Protected by ISNS_GLOBAL_LOCK */
+static avl_tree_t	isns_all_portals;
+static int		num_default_portals;
+static int		num_tpg_portals;
+
+/*
+ * Our entity identifier (fully-qualified hostname). Passed in from libiscsit.
  */
 static char		*isns_eid = NULL;
-
-/*
- * Our list of targets
- */
-static avl_tree_t	isns_target_list;
 
 /*
  * in6addr_any is currently all zeroes, but use the macro in case this
@@ -118,11 +253,14 @@ isnst_stop();
 static void
 iscsit_set_isns(boolean_t state);
 
-static int
+static void
 iscsit_add_isns(it_portal_t *cfg_svr);
 
 static void
-iscsit_delete_isns(iscsit_isns_svr_t *svr);
+isnst_mark_delete_isns(iscsit_isns_svr_t *svr);
+
+static void
+isnst_finish_delete_isns(iscsit_isns_svr_t *svr);
 
 static iscsit_isns_svr_t *
 iscsit_isns_svr_lookup(struct sockaddr_storage *sa);
@@ -133,19 +271,37 @@ isnst_monitor(void *arg);
 static int
 isnst_monitor_one_server(iscsit_isns_svr_t *svr, boolean_t enabled);
 
-static int
-isnst_update_target(iscsit_tgt_t *target, isns_reg_type_t reg);
+static void
+isnst_monitor_awaken(void);
+
+static boolean_t
+isnst_update_server_timestamp(struct sockaddr_storage *sa);
+
+static void
+isnst_copy_global_status_changes(void);
+
+static void
+isnst_mark_deleted_targets(iscsit_isns_svr_t *svr);
 
 static  int
-isnst_update_one_server(iscsit_isns_svr_t *svr, iscsit_tgt_t *target,
+isnst_update_one_server(iscsit_isns_svr_t *svr, isns_target_t *target,
     isns_reg_type_t reg);
 
-static int isnst_register(iscsit_isns_svr_t *svr, iscsit_tgt_t *target,
+static boolean_t isnst_retry_registration(int rsp_status_code);
+
+static int isnst_register(iscsit_isns_svr_t *svr, isns_target_t *itarget,
     isns_reg_type_t regtype);
-static int isnst_deregister(iscsit_isns_svr_t *svr, char *node);
+static int isnst_deregister(iscsit_isns_svr_t *svr, isns_target_t *itarget);
 
 static size_t
-isnst_make_dereg_pdu(isns_pdu_t **pdu, char *node);
+isnst_make_dereg_pdu(iscsit_isns_svr_t *svr, isns_pdu_t **pdu,
+    isns_target_t *itarge);
+
+static int isnst_keepalive(iscsit_isns_svr_t *svr);
+static size_t
+isnst_make_keepalive_pdu(iscsit_isns_svr_t *svr, isns_pdu_t **pdu);
+
+static isns_target_t *isnst_get_registered_source(iscsit_isns_svr_t *srv);
 
 static int
 isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
@@ -155,20 +311,26 @@ static uint16_t
 isnst_pdu_get_op(isns_pdu_t *pdu, uint8_t **pp);
 
 static size_t
-isnst_make_reg_pdu(isns_pdu_t **pdu, iscsit_tgt_t *target,
-    boolean_t svr_registered, isns_reg_type_t regtype);
+isnst_make_reg_pdu(isns_pdu_t **pdu, isns_target_t *target,
+    iscsit_isns_svr_t *svr, isns_reg_type_t regtype);
 
 static int
-isnst_reg_pdu_add_entity_portals(isns_pdu_t *pdu, size_t pdu_size,
-    idm_addr_list_t *default_portal_list);
+isnst_reg_pdu_add_entity_portals(isns_pdu_t *pdu, size_t pdu_size);
 
 static int
-isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, iscsit_tgt_t *target,
-    idm_addr_list_t *default_portal_list);
+isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, isns_target_t *target);
+
+static int
+isnst_add_default_pg(isns_pdu_t *pdu, size_t pdu_size,
+    avl_tree_t *null_portal_list);
+
+static int
+isnst_add_tpg_pg(isns_pdu_t *pdu, size_t pdu_size,
+    isns_target_info_t *ti, avl_tree_t *null_portal_list);
 
 static int
 isnst_add_null_pg(isns_pdu_t *pdu, size_t pdu_size,
-    iscsit_tgt_t *tgt, idm_addr_list_t *default_portal_list);
+    avl_tree_t *null_portal_list);
 
 static int
 isnst_add_portal_attr(isns_pdu_t *pdu, size_t pdu_size,
@@ -206,21 +368,53 @@ isnst_handle_esi_req(ksocket_t so, isns_pdu_t *pdu, size_t pl_size);
 
 static void isnst_esi_start(void);
 static void isnst_esi_stop(void);
-static isns_target_t *isnst_add_to_target_list(iscsit_tgt_t *target);
-int isnst_tgt_avl_compare(const void *t1, const void *t2);
-static void isnst_get_target_list(void);
+static isns_target_t *isnst_latch_to_target_list(isns_target_t *target,
+    avl_tree_t *list);
+static void isnst_clear_target_list(iscsit_isns_svr_t *svr);
+static void isnst_clear_from_target_list(isns_target_t *target,
+    avl_tree_t *target_list);
+static int isnst_tgt_avl_compare(const void *t1, const void *t2);
 static void isnst_set_server_status(iscsit_isns_svr_t *svr,
     boolean_t registered);
 static void isnst_monitor_start(void);
 static void isnst_monitor_stop(void);
-static void isnst_add_portal(iscsit_portal_t *portal);
-static void isnst_remove_portal(iscsit_portal_t *portal);
-static isns_portal_list_t *isnst_lookup_portal(struct sockaddr_storage *p,
-	isns_portal_list_t *last_portal);
-static boolean_t isnst_portal_exists(struct sockaddr_storage *p);
-static boolean_t isnst_lookup_default_portal();
 
-static boolean_t isnst_retry_registration(int rsp_status_code);
+static void
+isnst_monitor_default_portal_list(void);
+
+static int
+isnst_find_default_portals(idm_addr_list_t *alist);
+
+static int
+isnst_add_default_portals(idm_addr_list_t *alist);
+
+static void
+isnst_clear_default_portals(void);
+
+
+static void
+isnst_clear_portal_list(avl_tree_t *portal_list);
+
+static void
+isnst_copy_portal_list(avl_tree_t *t1, avl_tree_t *t2);
+
+static isns_portal_t *
+isnst_lookup_portal(struct sockaddr_storage *sa);
+
+static isns_portal_t *
+isnst_add_to_portal_list(struct sockaddr_storage *sa, avl_tree_t *portal_list);
+
+static void
+isnst_remove_from_portal_list(struct sockaddr_storage *sa,
+    avl_tree_t *portal_list);
+
+static int
+isnst_portal_avl_compare(const void *t1, const void *t2);
+
+
+
+
+
 
 it_cfg_status_t
 isnst_config_merge(it_config_t *cfg)
@@ -229,14 +423,14 @@ isnst_config_merge(it_config_t *cfg)
 	iscsit_isns_svr_t	*isns_svr, *next_isns_svr;
 	it_portal_t		*cfg_isns_svr;
 
+	ISNS_GLOBAL_LOCK();
+
 	/*
 	 * Determine whether iSNS is enabled in the new config.
 	 * Isns property may not be set up yet.
 	 */
 	(void) nvlist_lookup_boolean_value(cfg->config_global_properties,
 	    PROP_ISNS_ENABLED, &new_isns_state);
-
-	ISNS_GLOBAL_LOCK();
 
 	/* Delete iSNS servers that are no longer part of the config */
 	for (isns_svr = list_head(&iscsit_global.global_isns_cfg.isns_svrs);
@@ -245,7 +439,7 @@ isnst_config_merge(it_config_t *cfg)
 		next_isns_svr = list_next(
 		    &iscsit_global.global_isns_cfg.isns_svrs, isns_svr);
 		if (it_sns_svr_lookup(cfg, &isns_svr->svr_sa) == NULL)
-			iscsit_delete_isns(isns_svr);
+			isnst_mark_delete_isns(isns_svr);
 	}
 
 	/* Add new iSNS servers */
@@ -254,25 +448,30 @@ isnst_config_merge(it_config_t *cfg)
 	    cfg_isns_svr = cfg_isns_svr->next) {
 		isns_svr = iscsit_isns_svr_lookup(&cfg_isns_svr->portal_addr);
 		if (isns_svr == NULL) {
-			if (iscsit_add_isns(cfg_isns_svr) != 0) {
-				/* Shouldn't happen */
-				ISNS_GLOBAL_UNLOCK();
-				return (ITCFG_MISC_ERR);
-			}
+			iscsit_add_isns(cfg_isns_svr);
+		} else if (isns_svr->svr_delete_needed) {
+			/*
+			 * If reactivating a server that was being
+			 * deleted, turn it into a reset.
+			 */
+			isns_svr->svr_delete_needed = B_FALSE;
+			isns_svr->svr_reset_needed = B_TRUE;
 		}
 	}
-
-	/* Start/Stop iSNS if necessary */
-	if (iscsit_global.global_isns_cfg.isns_state != new_isns_state) {
-		iscsit_set_isns(new_isns_state);
-	}
-
-	ISNS_GLOBAL_UNLOCK();
 
 	/*
 	 * There is no "modify case" since the user specifies a complete
 	 * server list each time.  A modify is the same as a remove+add.
 	 */
+
+	/* Start/Stop iSNS if necessary */
+	iscsit_set_isns(new_isns_state);
+
+	ISNS_GLOBAL_UNLOCK();
+
+
+	/* Wake up the monitor thread to complete the state change */
+	isnst_monitor_awaken();
 
 	return (0);
 }
@@ -284,26 +483,22 @@ iscsit_isns_init(iscsit_hostinfo_t *hostinfo)
 	    MUTEX_DEFAULT, NULL);
 
 	ISNS_GLOBAL_LOCK();
+	mutex_init(&iscsit_isns_mutex, NULL, MUTEX_DEFAULT, NULL);
+
 	iscsit_global.global_isns_cfg.isns_state = B_FALSE;
 	list_create(&iscsit_global.global_isns_cfg.isns_svrs,
 	    sizeof (iscsit_isns_svr_t), offsetof(iscsit_isns_svr_t, svr_ln));
-	list_create(&portal_list, sizeof (isns_portal_list_t),
-	    offsetof(isns_portal_list_t, portal_ln));
-	portal_list_count = 0;
-	isns_eid = kmem_alloc(hostinfo->length, KM_SLEEP);
+	avl_create(&isns_tpg_portals, isnst_portal_avl_compare,
+	    sizeof (isns_portal_t), offsetof(isns_portal_t, portal_node));
+	avl_create(&isns_all_portals, isnst_portal_avl_compare,
+	    sizeof (isns_portal_t), offsetof(isns_portal_t, portal_node));
+	num_default_portals = 0;
 	if (hostinfo->length > ISCSIT_MAX_HOSTNAME_LEN)
 		hostinfo->length = ISCSIT_MAX_HOSTNAME_LEN;
+	isns_eid = kmem_alloc(hostinfo->length, KM_SLEEP);
 	(void) strlcpy(isns_eid, hostinfo->fqhn, hostinfo->length);
 	avl_create(&isns_target_list, isnst_tgt_avl_compare,
 	    sizeof (isns_target_t), offsetof(isns_target_t, target_node));
-	/*
-	 * The iscsi global lock is not held here, but it is held when
-	 * isnst_start is called, so we need to acquire it only in this
-	 * case.
-	 */
-	ISCSIT_GLOBAL_LOCK(RW_READER);
-	isnst_get_target_list();
-	ISCSIT_GLOBAL_UNLOCK();
 
 	/* initialize isns client */
 	mutex_init(&isns_monitor_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -322,11 +517,20 @@ void
 iscsit_isns_fini()
 {
 	ISNS_GLOBAL_LOCK();
+
+	/*
+	 * The following call to iscsit_set_isns waits until all the
+	 * iSNS servers have been fully deactivated and the monitor and esi
+	 * threads have stopped.
+	 */
 	iscsit_set_isns(B_FALSE);
+
+	/* Clean up data structures */
 	mutex_destroy(&isns_monitor_mutex);
 	cv_destroy(&isns_idle_cv);
 	mutex_destroy(&esi.esi_mutex);
 	cv_destroy(&esi.esi_cv);
+	mutex_destroy(&iscsit_isns_mutex);
 
 	/*
 	 * Free our EID and target list.
@@ -340,8 +544,9 @@ iscsit_isns_fini()
 	iscsit_global.global_isns_cfg.isns_state = B_FALSE;
 	avl_destroy(&isns_target_list);
 	list_destroy(&iscsit_global.global_isns_cfg.isns_svrs);
-	list_destroy(&portal_list);
-	portal_list_count = 0;
+	avl_destroy(&isns_tpg_portals);
+	avl_destroy(&isns_all_portals);
+	num_default_portals = 0;
 	ISNS_GLOBAL_UNLOCK();
 
 	mutex_destroy(&iscsit_global.global_isns_cfg.isns_mutex);
@@ -376,7 +581,7 @@ iscsit_set_isns(boolean_t state)
 	}
 }
 
-int
+void
 iscsit_add_isns(it_portal_t *cfg_svr)
 {
 	iscsit_isns_svr_t *svr;
@@ -386,45 +591,38 @@ iscsit_add_isns(it_portal_t *cfg_svr)
 	svr = kmem_zalloc(sizeof (iscsit_isns_svr_t), KM_SLEEP);
 	bcopy(&cfg_svr->portal_addr, &svr->svr_sa,
 	    sizeof (struct sockaddr_storage));
+	avl_create(&svr->svr_target_list, isnst_tgt_avl_compare,
+	    sizeof (isns_target_t), offsetof(isns_target_t, target_node));
+	svr->svr_esi_interval = isns_default_esi_interval;
 
 	/* put it on the global isns server list */
 	list_insert_tail(&iscsit_global.global_isns_cfg.isns_svrs, svr);
-
-	/*
-	 * Register targets with this server if iSNS is enabled.
-	 */
-
-	if (iscsit_global.global_isns_cfg.isns_state &&
-	    (isnst_update_one_server(svr, NULL, ISNS_REGISTER_ALL) == 0)) {
-		isnst_set_server_status(svr, B_TRUE);
-	}
-
-	return (0);
 }
 
 void
-iscsit_delete_isns(iscsit_isns_svr_t *svr)
+isnst_mark_delete_isns(iscsit_isns_svr_t *svr)
 {
-	boolean_t	need_dereg;
-
 	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 
-	list_remove(&iscsit_global.global_isns_cfg.isns_svrs, svr);
-
-	/* talk to this server if isns monitor is running */
-	mutex_enter(&isns_monitor_mutex);
-	if (isns_monitor_thr_id != NULL) {
-		need_dereg = B_TRUE;
+	/* If monitor thread not running, finish delete here */
+	if (iscsit_global.global_isns_cfg.isns_state == B_FALSE) {
+		isnst_finish_delete_isns(svr);
 	} else {
-		need_dereg = B_FALSE;
-	}
-	mutex_exit(&isns_monitor_mutex);
-
-	if (need_dereg) {
-		(void) isnst_monitor_one_server(svr, B_FALSE);
+		svr->svr_delete_needed = B_TRUE;
 	}
 
+}
+
+void
+isnst_finish_delete_isns(iscsit_isns_svr_t *svr)
+{
+
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+	isnst_clear_target_list(svr);
+
+	list_remove(&iscsit_global.global_isns_cfg.isns_svrs, svr);
 	/* free the memory */
+	avl_destroy(&svr->svr_target_list);
 	kmem_free(svr, sizeof (*svr));
 }
 
@@ -448,84 +646,165 @@ iscsit_isns_svr_lookup(struct sockaddr_storage *sa)
 	return (NULL);
 }
 
+static isns_target_info_t *
+isnst_create_target_info(iscsit_tgt_t *target)
+{
+
+	isns_target_info_t	*ti;
+	isns_tpgt_t		*tig;
+	isns_tpgt_addr_t	*tip;
+	iscsit_tpgt_t		*tpgt;
+	iscsit_tpg_t		*tpg;
+	iscsit_portal_t		*tp;
+	char			*str;
+
+	ti = kmem_zalloc(sizeof (isns_target_info_t), KM_SLEEP);
+	list_create(&ti->ti_tpgt_list,
+	    sizeof (isns_tpgt_t), offsetof(isns_tpgt_t, ti_tpgt_ln));
+	idm_refcnt_init(&ti->ti_refcnt, ti);
+
+	mutex_enter(&target->target_mutex);
+	(void) strncpy(ti->ti_tgt_name, target->target_name,
+	    MAX_ISCSI_NODENAMELEN);
+
+
+	if (nvlist_lookup_string(target->target_props, PROP_ALIAS,
+	    &str) == 0) {
+		(void) strncpy(ti->ti_tgt_alias, str, MAX_ISCSI_NODENAMELEN);
+	}
+
+	tpgt = avl_first(&target->target_tpgt_list);
+	ASSERT(tpgt != NULL);
+	do {
+		tig = kmem_zalloc(sizeof (isns_tpgt_t), KM_SLEEP);
+		list_create(&tig->ti_portal_list, sizeof (isns_tpgt_addr_t),
+		    offsetof(isns_tpgt_addr_t, portal_ln));
+		tig->ti_tpgt_tag = tpgt->tpgt_tag;
+
+		/*
+		 * Only need portal list for non-default portal.
+		 */
+		if (tpgt->tpgt_tag != ISCSIT_DEFAULT_TPGT) {
+			tpg = tpgt->tpgt_tpg;
+
+			mutex_enter(&tpg->tpg_mutex);
+
+			tp = avl_first(&tpg->tpg_portal_list);
+			do {
+				tip = kmem_zalloc(sizeof (isns_tpgt_addr_t),
+				    KM_SLEEP);
+				bcopy(&tp->portal_addr, &tip->portal_addr,
+				    sizeof (tip->portal_addr));
+				list_insert_tail(&tig->ti_portal_list, tip);
+
+				tp = AVL_NEXT(&tpg->tpg_portal_list, tp);
+			} while (tp != NULL);
+			mutex_exit(&tpg->tpg_mutex);
+		}
+		list_insert_tail(&ti->ti_tpgt_list, tig);
+		tpgt = AVL_NEXT(&target->target_tpgt_list, tpgt);
+	} while (tpgt != NULL);
+	mutex_exit(&target->target_mutex);
+
+	return (ti);
+}
+
+static void
+isnst_clear_target_info_cb(void *arg)
+{
+	isns_target_info_t *ti = (isns_target_info_t *)arg;
+	isns_tpgt_t	*tig;
+	isns_tpgt_addr_t *tip;
+
+	while ((tig = list_remove_head(&ti->ti_tpgt_list)) != NULL) {
+		while ((tip = list_remove_head(&tig->ti_portal_list)) != NULL) {
+			kmem_free(tip, sizeof (isns_tpgt_addr_t));
+		}
+		list_destroy(&tig->ti_portal_list);
+		kmem_free(tig, sizeof (isns_tpgt_t));
+	}
+	list_destroy(&ti->ti_tpgt_list);
+	idm_refcnt_destroy(&ti->ti_refcnt);
+	kmem_free(ti, sizeof (isns_target_info_t));
+}
+
+
+/*
+ * iscsit_isns_register
+ * called by iscsit when a target goes online
+ */
 int
 iscsit_isns_register(iscsit_tgt_t *target)
 {
-	int rc = 0;
+	isns_target_t		*itarget, tmptgt;
+	avl_index_t		where;
 
-	ISNS_GLOBAL_LOCK();
-
-	(void) isnst_add_to_target_list(target);
-
-	if (iscsit_global.global_isns_cfg.isns_state == B_FALSE) {
-		ISNS_GLOBAL_UNLOCK();
-		return (rc);
-	}
-
-	rc = isnst_update_target(target, ISNS_REGISTER_TARGET);
-
-	ISNS_GLOBAL_UNLOCK();
-
-	return (rc);
-}
-
-int
-iscsit_isns_deregister(iscsit_tgt_t *target)
-{
-	void				*itarget;
-	isns_target_t			tmptgt;
-	iscsit_isns_svr_t		*svr;
-	list_t				*global;
-
-	ISNS_GLOBAL_LOCK();
-
-	if (iscsit_global.global_isns_cfg.isns_state == B_FALSE) {
-		tmptgt.target = target;
-
-		if ((itarget = avl_find(&isns_target_list, &tmptgt, NULL))
-		    != NULL) {
-			avl_remove(&isns_target_list, itarget);
-			kmem_free(itarget, sizeof (isns_target_t));
-		}
-
-		ISNS_GLOBAL_UNLOCK();
-		return (0);
-	}
-
-	/*
-	 * Don't worry about dereg failures.
-	 */
-	(void) isnst_update_target(target, ISNS_DEREGISTER_TARGET);
-
-	/*
-	 * Remove the target from the list regardless of the status.
-	 */
+	mutex_enter(&iscsit_isns_mutex);
 
 	tmptgt.target = target;
-	if ((itarget = avl_find(&isns_target_list, &tmptgt, NULL)) != NULL) {
-		avl_remove(&isns_target_list, itarget);
-		kmem_free(itarget, sizeof (isns_target_t));
+	if ((itarget = (isns_target_t *)avl_find(&isns_target_list,
+	    &tmptgt, &where)) == NULL) {
+		itarget = kmem_zalloc(sizeof (isns_target_t), KM_SLEEP);
+
+		itarget->target = target;
+		avl_insert(&isns_target_list, (void *)itarget, where);
+	} else {
+		ASSERT(0);
 	}
 
-	/*
-	 * If there are no more targets, mark the server as
-	 * unregistered.
-	 */
+	/* Copy the target info so it will last beyond deregister */
+	itarget->target_info = isnst_create_target_info(target);
+	idm_refcnt_hold(&itarget->target_info->ti_refcnt);
 
-	if (avl_numnodes(&isns_target_list) == 0) {
-		global = &iscsit_global.global_isns_cfg.isns_svrs;
-		for (svr = list_head(global); svr != NULL;
-		    svr = list_next(global, svr)) {
-			isnst_set_server_status(svr, B_FALSE);
-		}
-	}
+	isns_targets_changed = B_TRUE;
 
-	ISNS_GLOBAL_UNLOCK();
+	mutex_exit(&iscsit_isns_mutex);
 
+	isnst_monitor_awaken();
 	return (0);
 }
 
 /*
+ * iscsit_isns_deregister
+ * called by iscsit when a target goes offline
+ */
+int
+iscsit_isns_deregister(iscsit_tgt_t *target)
+{
+	isns_target_t		*itarget, tmptgt;
+	isns_target_info_t	*ti;
+
+	tmptgt.target = target;
+
+	mutex_enter(&iscsit_isns_mutex);
+
+	itarget = avl_find(&isns_target_list, &tmptgt, NULL);
+	ASSERT(itarget != NULL);
+	ti = itarget->target_info;
+
+	/*
+	 * The main thread is done with the target_info object.
+	 * Make sure the delete callback is called when
+	 * all the svrs are done with it.
+	 */
+	idm_refcnt_rele(&ti->ti_refcnt);
+	idm_refcnt_async_wait_ref(&ti->ti_refcnt,
+	    (idm_refcnt_cb_t *)&isnst_clear_target_info_cb);
+
+	itarget->target_info = NULL;
+	avl_remove(&isns_target_list, itarget);
+	kmem_free(itarget, sizeof (isns_target_t));
+
+	isns_targets_changed = B_TRUE;
+
+	mutex_exit(&iscsit_isns_mutex);
+
+	isnst_monitor_awaken();
+	return (0);
+}
+
+/*
+ * iscsit_isns_target_update
  * This function is called by iscsit when a target's configuration
  * has changed.
  */
@@ -533,16 +812,33 @@ iscsit_isns_deregister(iscsit_tgt_t *target)
 void
 iscsit_isns_target_update(iscsit_tgt_t *target)
 {
-	ISNS_GLOBAL_LOCK();
+	isns_target_t	*itarget, tmptgt;
 
-	if (iscsit_global.global_isns_cfg.isns_state == B_FALSE) {
-		ISNS_GLOBAL_UNLOCK();
+	mutex_enter(&iscsit_isns_mutex);
+
+	/*
+	 * If iscsit calls us to modify a target, that target should
+	 * already exist in the isns_svr_list
+	 */
+	tmptgt.target = target;
+	itarget = avl_find(&isns_target_list, &tmptgt, NULL);
+	if (itarget == NULL) {
+		/*
+		 * If target-update gets called while the target is still
+		 * offline, then there is nothing to do. The target will be
+		 * completely registered when it comes online.
+		 */
+		mutex_exit(&iscsit_isns_mutex);
 		return;
 	}
 
-	(void) isnst_update_target(target, ISNS_UPDATE_TARGET);
+	itarget->target_update_needed = B_TRUE;
 
-	ISNS_GLOBAL_UNLOCK();
+	isns_targets_changed = B_TRUE;
+
+	mutex_exit(&iscsit_isns_mutex);
+
+	isnst_monitor_awaken();
 }
 
 static void
@@ -551,11 +847,6 @@ isnst_start()
 	ISNST_LOG(CE_NOTE, "**** isnst_start");
 
 	ASSERT(ISNS_GLOBAL_LOCK_HELD());
-
-	/*
-	 * Get initial target list
-	 */
-	isnst_get_target_list();
 
 	/*
 	 * Start ESI thread(s)
@@ -571,18 +862,14 @@ isnst_start()
 static void
 isnst_stop()
 {
-	isns_target_t *itarget;
-
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 	ISNST_LOG(CE_NOTE, "**** isnst_stop");
+
 
 	ISNS_GLOBAL_UNLOCK();
 	isnst_esi_stop();
 	isnst_monitor_stop();
 	ISNS_GLOBAL_LOCK();
-	while ((itarget = avl_first(&isns_target_list)) != NULL) {
-		avl_remove(&isns_target_list, itarget);
-		kmem_free(itarget, sizeof (isns_target_t));
-	}
 }
 
 static void
@@ -590,7 +877,9 @@ isnst_monitor_start(void)
 {
 	ISNST_LOG(CE_NOTE, "isnst_monitor_start");
 
+
 	mutex_enter(&isns_monitor_mutex);
+	ASSERT(!isns_monitor_thr_running);
 	isns_monitor_thr_id = thread_create(NULL, 0,
 	    isnst_monitor, NULL, 0, &p0, TS_RUN, minclsyspri);
 	while (!isns_monitor_thr_running)
@@ -621,111 +910,166 @@ isnst_monitor_stop(void)
  * When we receive an ESI request, update the timestamp for the server.
  * If we don't receive one for the specified period of time, we'll attempt
  * to re-register.
+ *
  */
-
-static void
-isnst_update_server_timestamp(ksocket_t so)
+static boolean_t
+isnst_update_server_timestamp(struct sockaddr_storage *ss)
 {
 	iscsit_isns_svr_t	*svr;
-	struct in_addr		*sin = NULL, *svr_in;
-	struct in6_addr		*sin6 = NULL, *svr_in6;
-	struct sockaddr_in6	t_addr;
-	socklen_t		t_addrlen;
 
-	bzero(&t_addr, sizeof (struct sockaddr_in6));
-	t_addrlen = sizeof (struct sockaddr_in6);
-	(void) ksocket_getpeername(so, (struct sockaddr *)&t_addr, &t_addrlen,
-	    CRED());
-	if (((struct sockaddr *)(&t_addr))->sa_family == AF_INET) {
-		sin = &((struct sockaddr_in *)((void *)(&t_addr)))->sin_addr;
-	} else {
-		sin6 = &(&t_addr)->sin6_addr;
-	}
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 
 	/*
 	 * Find the server and update the timestamp
 	 */
-
-	ISNS_GLOBAL_LOCK();
 	for (svr = list_head(&iscsit_global.global_isns_cfg.isns_svrs);
 	    svr != NULL;
 	    svr = list_next(&iscsit_global.global_isns_cfg.isns_svrs, svr)) {
-		if (sin6 == NULL) {
-			if (svr->svr_sa.ss_family == AF_INET) {
-				svr_in = &((struct sockaddr_in *)&svr->svr_sa)->
-				    sin_addr;
-				if (bcmp(svr_in, sin, sizeof (in_addr_t))
-				    == 0) {
-					break;
-				}
-			}
-		} else {
-			if (svr->svr_sa.ss_family == AF_INET6) {
-				svr_in6 = &((struct sockaddr_in6 *)
-				    &svr->svr_sa)->sin6_addr;
-				if (bcmp(svr_in6, sin6,
-				    sizeof (in6_addr_t)) == 0) {
-					break;
-				}
-			}
+		/*
+		 * Note that the port number in incoming probe will be
+		 * different than the iSNS server's port number.
+		 */
+		if (idm_ss_compare(ss, &svr->svr_sa,
+		    B_TRUE /* v4_mapped_as_v4 */,
+		    B_FALSE /* don't compare_ports */) == 0) {
+			break;
 		}
 	}
 
 	if (svr != NULL) {
+		/* Update the timestamp we keep for this server */
 		svr->svr_last_msg = ddi_get_lbolt();
+		/*
+		 * If we receive ESI probe from a server we are not
+		 * registered to, then cause a re-reg attempt.
+		 */
+		if (!svr->svr_registered) {
+			isnst_monitor_awaken();
+		}
+		return (B_TRUE);
 	}
-	ISNS_GLOBAL_UNLOCK();
+
+	return (B_FALSE);
 }
 
+
 /*
- * isnst_monitor
- *
- * This function monitors registration status for each server.
+ * isnst_monitor_all_servers -- loop through all servers
  */
 
 
 static void
 isnst_monitor_all_servers()
 {
-	iscsit_isns_svr_t	*svr;
+	iscsit_isns_svr_t	*svr, *next_svr;
 	boolean_t		enabled;
 	list_t			*svr_list;
+	int			rc;
 
 	svr_list = &iscsit_global.global_isns_cfg.isns_svrs;
 
 	ISNS_GLOBAL_LOCK();
+
+	isnst_copy_global_status_changes();
+
 	enabled = iscsit_global.global_isns_cfg.isns_state;
-	for (svr = list_head(svr_list); svr != NULL;
-	    svr = list_next(svr_list, svr)) {
-		if (isnst_monitor_one_server(svr, enabled) != 0) {
+	for (svr = list_head(svr_list); svr != NULL; svr = next_svr) {
+		next_svr = list_next(svr_list, svr);
+
+		rc = isnst_monitor_one_server(svr, enabled);
+		if (rc != 0) {
 			svr->svr_retry_count++;
+			if (svr->svr_registered &&
+			    svr->svr_retry_count > isns_max_retry) {
+				char	server_buf[IDM_SA_NTOP_BUFSIZ];
+
+				if (! svr->svr_reset_needed) {
+					ISNST_LOG(CE_WARN,
+					    "isnst: iSNS server %s"
+					    " not responding (rc=%d).",
+					    idm_sa_ntop(&svr->svr_sa,
+					    server_buf, sizeof (server_buf)),
+					    rc);
+					svr->svr_reset_needed = B_TRUE;
+				}
+			}
 		} else {
 			svr->svr_retry_count = 0;
+		}
+		/*
+		 * If we have finished unregistering this server,
+		 * it is now OK to delete it.
+		 */
+		if (svr->svr_delete_needed == B_TRUE &&
+		    svr->svr_registered == B_FALSE) {
+			isnst_finish_delete_isns(svr);
 		}
 	}
 	ISNS_GLOBAL_UNLOCK();
 }
 
+static void
+isnst_monitor_awaken(void)
+{
+	mutex_enter(&isns_monitor_mutex);
+	if (isns_monitor_thr_running) {
+		DTRACE_PROBE(iscsit__isns__monitor__awaken);
+		cv_signal(&isns_idle_cv);
+	}
+	mutex_exit(&isns_monitor_mutex);
+}
+
+/*
+ * isnst_monitor -- the monitor thread for iSNS
+ */
 /*ARGSUSED*/
 static void
 isnst_monitor(void *arg)
 {
 	mutex_enter(&isns_monitor_mutex);
-	cv_signal(&isns_idle_cv);
 	isns_monitor_thr_did = curthread->t_did;
 	isns_monitor_thr_running = B_TRUE;
+	cv_signal(&isns_idle_cv);
+
+	/*
+	 * Start with a short pause (5 sec) to allow all targets
+	 * to be registered before we send register-all.  This is
+	 * purely an optimization to cut down on the number of
+	 * messages we send to the iSNS server.
+	 */
+	mutex_exit(&isns_monitor_mutex);
+	delay(drv_usectohz(isns_initial_delay * 1000000));
+	mutex_enter(&isns_monitor_mutex);
+
+	/* Force an initialization of isns_all_portals */
+	mutex_enter(&iscsit_isns_mutex);
+	isns_portals_changed = B_TRUE;
+	mutex_exit(&iscsit_isns_mutex);
 
 	while (isns_monitor_thr_running) {
-		mutex_exit(&isns_monitor_mutex);
 
 		/* Update servers */
+		mutex_exit(&isns_monitor_mutex);
 		isnst_monitor_all_servers();
+		mutex_enter(&isns_monitor_mutex);
+
+		/* If something needs attention, go right to the top */
+		mutex_enter(&iscsit_isns_mutex);
+		if (isns_targets_changed || isns_portals_changed) {
+			DTRACE_PROBE(iscsit__isns__monitor__reenter);
+			mutex_exit(&iscsit_isns_mutex);
+			/* isns_monitor_mutex still held */
+			continue;
+		}
+		mutex_exit(&iscsit_isns_mutex);
 
 		/*
 		 * Keep running until isns_monitor_thr_running is set to
 		 * B_FALSE.
 		 */
-		mutex_enter(&isns_monitor_mutex);
+		if (! isns_monitor_thr_running)
+			break;
+
 		DTRACE_PROBE(iscsit__isns__monitor__sleep);
 		(void) cv_timedwait(&isns_idle_cv, &isns_monitor_mutex,
 		    ddi_get_lbolt() + monitor_idle_interval);
@@ -738,6 +1082,11 @@ isnst_monitor(void *arg)
 	/* Update the servers one last time for deregistration */
 	isnst_monitor_all_servers();
 
+	/* Clean up the all-portals list */
+	ISNS_GLOBAL_LOCK();
+	isnst_clear_default_portals();
+	ISNS_GLOBAL_UNLOCK();
+
 	/* terminate the thread at the last */
 	thread_exit();
 }
@@ -746,118 +1095,400 @@ static int
 isnst_monitor_one_server(iscsit_isns_svr_t *svr, boolean_t enabled)
 {
 	int		rc = 0;
-	struct sonode	*so;
+	isns_target_t	*itarget;
 
 	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 
 	/*
 	 * First, take care of the case where iSNS is no longer enabled.
 	 *
-	 * If we're still registered, deregister.  Regardless, mark the
-	 * server as not registered.
 	 */
 
-	if (enabled == B_FALSE) {
-		if (svr->svr_registered == B_TRUE) {
-			/*
-			 * Doesn't matter if this fails.  We're disabled.
-			 */
-			so = isnst_open_so(&svr->svr_sa);
-			if (so != NULL) {
-				(void) isnst_update_one_server(svr, NULL,
-				    ISNS_DEREGISTER_ALL);
-				isnst_close_so(so);
-			}
-		}
-
+	if (enabled == B_FALSE || svr->svr_delete_needed) {
+		/*
+		 * Just try one time to deregister all from server.
+		 * Doesn't matter if this fails.  We're disabled.
+		 */
+		(void) isnst_update_one_server(svr, NULL, ISNS_DEREGISTER_ALL);
 		isnst_set_server_status(svr, B_FALSE);
 		return (0);
 	}
 
+retry_replace_all:
 	/*
-	 * If there are no targets, we're done.
+	 * If the server needs replace-all, check if it should
+	 * be a DevDereg (i.e. if the last target is gone.)
 	 */
 
-	if (avl_numnodes(&isns_target_list) == 0) {
-		return (0);
+	if (svr->svr_registered && svr->svr_reset_needed) {
+		/* Send DevDereg if last registered target */
+		isns_target_t	*jtarget;
+		for (jtarget = avl_first(&svr->svr_target_list);
+		    jtarget != NULL;
+		    jtarget = AVL_NEXT(&svr->svr_target_list, jtarget)) {
+			if (!jtarget->target_delete_needed) {
+				break;
+			}
+		}
+		/*
+		 * jtarget is null IFF all tgts need deletion,
+		 * and there are no new targets to register.
+		 */
+		if (jtarget == NULL) {
+			rc = isnst_update_one_server(svr, NULL,
+			    ISNS_DEREGISTER_ALL);
+			if (rc != 0) {
+				return (rc);
+			}
+			isnst_set_server_status(svr, B_FALSE);
+			return (0);
+		}
 	}
 
 	/*
-	 * At this point, we know iSNS is enabled.
-	 *
-	 * If we've received an ESI request from the server recently
-	 * (within MAX_ESI_INTERVALS * the max interval length),
-	 * no need to continue.
+	 * If the server is not yet registered, do the registration
 	 */
+	if (! svr->svr_registered || svr->svr_reset_needed) {
 
-	if (svr->svr_registered == B_TRUE) {
-		if (ddi_get_lbolt() < (svr->svr_last_msg +
+		if (avl_numnodes(&svr->svr_target_list) == 0) {
+			/* If no targets, nothing to register */
+			return (0);
+		}
+		if ((rc = isnst_update_one_server(svr, NULL,
+		    ISNS_REGISTER_ALL)) != 0) {
+			/* Registration failed */
+			return (rc);
+		}
+		isnst_set_server_status(svr, B_TRUE);
+
+	}
+
+	/* The following checks are expensive, so only do them if needed */
+	if (svr->svr_targets_changed) {
+		isns_target_t	*next_target;
+		/*
+		 * If there is a target to be deleted, send the
+		 * deletion request for one target at a time.
+		 */
+		for (itarget = avl_first(&svr->svr_target_list);
+		    itarget != NULL;
+		    itarget = next_target) {
+			next_target = AVL_NEXT(&svr->svr_target_list, itarget);
+			if (itarget->target_delete_needed) {
+				/* See if last non-deleted target */
+				isns_target_t	*jtarget;
+				ASSERT(itarget->target_registered);
+				for (jtarget = avl_first(&svr->svr_target_list);
+				    jtarget != NULL;
+				    jtarget = AVL_NEXT(&svr->svr_target_list,
+				    jtarget)) {
+					if (jtarget->target_registered &&
+					    !jtarget->target_delete_needed) {
+						break;
+					}
+				}
+				/* jtarget is null if last registered tgt */
+				if (jtarget == NULL) {
+					/*
+					 * Removing last tgt -- deregister all.
+					 * Doesn't matter if this fails.
+					 * We're disabled.
+					 */
+					rc = isnst_update_one_server(svr,
+					    NULL, ISNS_DEREGISTER_ALL);
+					if (rc != 0) {
+						return (rc);
+					}
+					isnst_set_server_status(svr, B_FALSE);
+					return (0);
+				}
+				rc = isnst_update_one_server(svr,
+				    itarget, ISNS_DEREGISTER_TARGET);
+				if (rc != 0 && isnst_retry_registration(rc)) {
+					/* Retryable code => try replace-all */
+					svr->svr_reset_needed = B_TRUE;
+					goto retry_replace_all;
+				}
+
+				if (rc != 0) {
+					return (rc);
+				}
+				isnst_clear_from_target_list(itarget,
+				    &svr->svr_target_list);
+			}
+		}
+
+		/* If any target needs a register or an update, do so */
+		itarget = avl_first(&svr->svr_target_list);
+		while (itarget) {
+			if (!itarget->target_registered ||
+			    itarget->target_update_needed) {
+
+				/* Try to update existing info for one tgt */
+				rc = isnst_update_one_server(svr,
+				    itarget,
+				    ISNS_MODIFY_TARGET);
+				if (rc != 0 && isnst_retry_registration(rc)) {
+					/* Retryable code => try replace-all */
+					svr->svr_reset_needed = B_TRUE;
+					goto retry_replace_all;
+				}
+				if (rc != 0) {
+					return (rc);
+				}
+				itarget->target_update_needed =
+				    B_FALSE;
+				itarget->target_registered = B_TRUE;
+			}
+			itarget = AVL_NEXT(&svr->svr_target_list,
+			    itarget);
+		}
+
+		/*
+		 * We have gone through all the cases -- this server
+		 * is now up to date.
+		 */
+		svr->svr_targets_changed = B_FALSE;
+	}
+
+
+	if (isns_use_esi) {
+		/*
+		 * If using ESI, and no ESI request is received within
+		 * MAX_ESI_INTERVALS (3) number of intervals, we'll
+		 * try to re-register with the server. The server will
+		 * delete our information if we fail to respond for 2
+		 * ESI intervals.
+		 */
+		if (ddi_get_lbolt() >= (svr->svr_last_msg +
 		    drv_usectohz(svr->svr_esi_interval * 1000000 *
 		    MAX_ESI_INTERVALS))) {
-			return (0);
+			/* re-register everything */
+			svr->svr_reset_needed = B_TRUE;
+			goto retry_replace_all;
 		}
 	} else {
 		/*
-		 * We're not registered... Try to register now.
+		 * If not using ESI, make sure to ping server during
+		 * each registration period.  Do this at half the
+		 * registration interval, so we won't get timed out.
 		 */
-		if ((rc = isnst_update_one_server(svr, NULL,
-		    ISNS_REGISTER_ALL)) == 0) {
-			isnst_set_server_status(svr, B_TRUE);
+		if (ddi_get_lbolt() >= (svr->svr_last_msg +
+		    drv_usectohz(isns_registration_period * (1000000/3)))) {
+			/* Send a self-query as a keepalive. */
+			rc = isnst_keepalive(svr);
+			if (rc != 0 && isnst_retry_registration(rc)) {
+				/* Retryable code => try replace-all */
+				svr->svr_reset_needed = B_TRUE;
+				goto retry_replace_all;
+			}
+			if (rc != 0) {
+				return (rc);
+			}
 		}
 	}
+	return (0);
 
-	return (rc);
 }
 
-static int
-isnst_update_target(iscsit_tgt_t *target, isns_reg_type_t reg)
+/*
+ * isnst_mark_deleted_target -- find tgt in svr list but not global list
+ */
+static void
+isnst_mark_deleted_targets(iscsit_isns_svr_t *svr)
 {
-	iscsit_isns_svr_t	*svr;
-	int			rc = 0, curr_rc;
+	isns_target_t *itarget, *nxt_target, tmptgt;
 
 	ASSERT(ISNS_GLOBAL_LOCK_HELD());
-	ASSERT(iscsit_global.global_isns_cfg.isns_state == B_TRUE);
+	ASSERT(mutex_owned(&iscsit_isns_mutex));
 
+	for (itarget = avl_first(&svr->svr_target_list);
+	    itarget != NULL;
+	    itarget = nxt_target) {
+		tmptgt.target = itarget->target;
+		nxt_target = AVL_NEXT(&svr->svr_target_list, itarget);
+		if (avl_find(&isns_target_list, &tmptgt, NULL) == NULL) {
+			if (itarget->target_registered) {
+				itarget->target_delete_needed = B_TRUE;
+			} else {
+				isnst_clear_from_target_list(itarget,
+				    &svr->svr_target_list);
+			}
+		}
+	}
+}
+
+static isns_target_t *
+isnst_latch_to_target_list(isns_target_t *jtarget, avl_tree_t *target_list)
+{
+	isns_target_t *itarget, tmptgt;
+	avl_index_t where;
+
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+	ASSERT(mutex_owned(&iscsit_isns_mutex));
+	/*
+	 * Make sure this target isn't already in our list.
+	 */
+
+	tmptgt.target = jtarget->target;
+	if ((itarget = (isns_target_t *)avl_find(target_list,
+	    &tmptgt, &where)) == NULL) {
+		itarget = kmem_zalloc(sizeof (isns_target_t), KM_SLEEP);
+
+		itarget->target = jtarget->target;
+		itarget->target_info = jtarget->target_info;
+		idm_refcnt_hold(&itarget->target_info->ti_refcnt);
+
+		avl_insert(target_list, (void *)itarget, where);
+	} else {
+		ASSERT(0);
+	}
+
+	return (itarget);
+}
+
+static void
+isnst_clear_target_list(iscsit_isns_svr_t *svr)
+{
+	isns_target_t	*itarget;
+
+	while ((itarget = avl_first(&svr->svr_target_list)) != NULL) {
+		isnst_clear_from_target_list(itarget,
+		    &svr->svr_target_list);
+	}
+}
+
+static void
+isnst_clear_from_target_list(isns_target_t *jtarget, avl_tree_t *target_list)
+{
+	isns_target_t		*itarget, tmptgt;
+
+	tmptgt.target = jtarget->target;
+
+	if ((itarget = avl_find(target_list, &tmptgt, NULL))
+	    != NULL) {
+
+		avl_remove(target_list, itarget);
+		idm_refcnt_rele(&itarget->target_info->ti_refcnt);
+		kmem_free(itarget, sizeof (isns_target_t));
+	} else {
+		ASSERT(0);
+	}
+}
+
+/*
+ * isnst_copy_global_status_changes -- update svrs to match iscsit
+ *
+ * At the end of this routine svr->svr_target_list has all the entries
+ * in the current isns_target_list plus any targets that are marked
+ * for deletion.
+ */
+static void
+isnst_copy_global_status_changes(void)
+{
+	isns_target_t		*ttarget, *itarget, tmptgt;
+	iscsit_isns_svr_t	*svr;
+
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+
+	/*
+	 * Copy info about recent transitions from global state to
+	 * per-server state.  We use the global state so that iscsit
+	 * functions can proceed without blocking on slow-to-release
+	 * iSNS locks.
+	 */
+	mutex_enter(&iscsit_isns_mutex);
+
+	/*
+	 * Periodically check for changed IP addresses.  This function
+	 * sets isns_all_portals to the current set, and sets
+	 * isns_portals_changed if a portal is added or removed.
+	 */
+	isnst_monitor_default_portal_list();
+
+	/* Initialize the per-server structs to some basic values */
 	for (svr = list_head(&iscsit_global.global_isns_cfg.isns_svrs);
 	    svr != NULL;
-	    svr = list_next(&iscsit_global.global_isns_cfg.isns_svrs, svr)) {
-		/*
-		 * Only return success if they all succeed.  Let the caller
-		 * deal with any failure.
-		 */
-
-		curr_rc = isnst_update_one_server(svr, target, reg);
-
-		if (curr_rc == 0) {
-			if (reg == ISNS_REGISTER_TARGET) {
-				isnst_set_server_status(svr, B_TRUE);
-			}
-		} else if (rc == 0) {
-			rc = curr_rc;
+	    svr = list_next(&iscsit_global.global_isns_cfg.isns_svrs,
+	    svr)) {
+		if (isns_portals_changed && svr->svr_registered) {
+			/*
+			 * Cause re-register, for now, when portals change.
+			 * Eventually, we should add new portals one by one
+			 */
+			svr->svr_reset_needed = B_TRUE;
+		}
+		if (!svr->svr_registered) {
+			/* To re-register, start with empty target list */
+			isnst_clear_target_list(svr);
+			/* And set flag to add all current targets, below */
+			isns_targets_changed = B_TRUE;
+		} else if (isns_targets_changed || svr->svr_reset_needed) {
+			/* Mark to look for target changes */
+			isnst_mark_deleted_targets(svr);
+			svr->svr_targets_changed = B_TRUE;
 		}
 	}
 
-	return (rc);
+	/*
+	 * If any target has been modified, tell all the svrs to
+	 * update that target.
+	 */
+	if (isns_targets_changed) {
+		ttarget = avl_first(&isns_target_list);
+		while (ttarget) {
+			for (svr = list_head(
+			    &iscsit_global.global_isns_cfg.isns_svrs);
+			    svr != NULL;
+			    svr = list_next(
+			    &iscsit_global.global_isns_cfg.isns_svrs,
+			    svr)) {
+				tmptgt.target = ttarget->target;
+				itarget = avl_find(
+				    &svr->svr_target_list,
+				    &tmptgt, NULL);
+				if (itarget == NULL) {
+					/* Add a new target */
+					(void) isnst_latch_to_target_list(
+					    ttarget, &svr->svr_target_list);
+				} else if (ttarget->target_update_needed) {
+					/* Modify existing target */
+					itarget->target_update_needed =
+					    B_TRUE;
+				}
+				ttarget->target_update_needed = B_FALSE;
+			}
+			ttarget = AVL_NEXT(&isns_target_list, ttarget);
+		}
+	}
+
+	/*
+	 * Now we have updated the per-server state for all servers.
+	 * Clear the global state flags
+	 */
+	isns_targets_changed = B_FALSE;
+	isns_portals_changed = B_FALSE;
+	mutex_exit(&iscsit_isns_mutex);
 }
 
 static int
-isnst_update_one_server(iscsit_isns_svr_t *svr, iscsit_tgt_t *target,
+isnst_update_one_server(iscsit_isns_svr_t *svr, isns_target_t *itarget,
     isns_reg_type_t reg)
 {
 	int rc = 0;
 
 	switch (reg) {
 	case ISNS_DEREGISTER_TARGET:
-		rc = isnst_deregister(svr, target->target_name);
+		rc = isnst_deregister(svr, itarget);
 		break;
 
 	case ISNS_DEREGISTER_ALL:
 		rc = isnst_deregister(svr, NULL);
 		break;
 
-	case ISNS_UPDATE_TARGET:
+	case ISNS_MODIFY_TARGET:
 	case ISNS_REGISTER_TARGET:
-		rc = isnst_register(svr, target, reg);
+		rc = isnst_register(svr, itarget, reg);
 		break;
 
 	case ISNS_REGISTER_ALL:
@@ -887,15 +1518,18 @@ isnst_retry_registration(int rsp_status_code)
 	boolean_t retry;
 
 	/*
-	 * Currently, we will attempt to retry for "Invalid Registration",
-	 * "Source Unauthorized", or "Busy" errors.  Any other errors should
-	 * be handled by the caller if necessary.
+	 * The following are the error codes that indicate isns-client
+	 * and isns-server are out of synch.  E.g. No-Such-Entry can
+	 * occur on a keepalive if the server has timed out our
+	 * connection.  If we get one of these messages, we replace-all
+	 * right away to get back in synch faster.
 	 */
-
 	switch (rsp_status_code) {
 	case ISNS_RSP_INVALID_REGIS:
 	case ISNS_RSP_SRC_UNAUTHORIZED:
 	case ISNS_RSP_BUSY:
+	case ISNS_RSP_INVALID_UPDATE:
+	case ISNS_RSP_NO_SUCH_ENTRY:
 		retry = B_TRUE;
 		break;
 	default:
@@ -906,303 +1540,134 @@ isnst_retry_registration(int rsp_status_code)
 	return (retry);
 }
 
+
+
 static int
-isnst_register(iscsit_isns_svr_t *svr, iscsit_tgt_t *target,
+isnst_register(iscsit_isns_svr_t *svr, isns_target_t *itarget,
     isns_reg_type_t regtype)
 {
 	struct sonode	*so;
 	int		rc = 0;
 	isns_pdu_t	*pdu, *rsp;
 	size_t		pdu_size, rsp_size;
-	isns_target_t	*itarget, tmptgt;
-	boolean_t	retry_reg = B_TRUE;
-
-	/*
-	 * Registration is a tricky thing.  In order to keep things simple,
-	 * we don't want to keep track of which targets are registered to
-	 * which server.  We rely on the target state machine to tell us
-	 * when a target is online or offline, which prompts us to either
-	 * register or deregister that target.
-	 *
-	 * When iscsit_isns_init is called, get a list of targets.  Those that
-	 * are online will need to be registered.  In this case, target
-	 * will be NULL.
-	 *
-	 * What this means is that if svr_registered == B_FALSE, that's
-	 * when we'll register the network entity as well.
-	 */
-
-	if ((avl_numnodes(&isns_target_list) == 0) && (target == NULL)) {
-		return (0);
-	}
-
-	/*
-	 * If the target is already registered and we're not doing an
-	 * update registration, just return.
-	 */
-
-	if (target != NULL) {
-		tmptgt.target = target;
-		itarget = avl_find(&isns_target_list, &tmptgt, NULL);
-		ASSERT(itarget);
-		if ((itarget->target_registered == B_TRUE) &&
-		    (regtype != ISNS_UPDATE_TARGET)) {
-			return (0);
-		}
-	}
 
 	/* create TCP connection to the isns server */
 	so = isnst_open_so(&svr->svr_sa);
-
 	if (so == NULL) {
-		isnst_set_server_status(svr, B_FALSE);
 		return (-1);
 	}
 
-	while (retry_reg) {
-		pdu_size = isnst_make_reg_pdu(&pdu, target, svr->svr_registered,
-		    regtype);
-		if (pdu_size == 0) {
-			isnst_close_so(so);
-			return (-1);
-		}
+	pdu_size = isnst_make_reg_pdu(&pdu, itarget, svr, regtype);
+	if (pdu_size == 0) {
+		isnst_close_so(so);
+		return (-1);
+	}
 
-		rc = isnst_send_pdu(so, pdu);
-		if (rc != 0) {
-			kmem_free(pdu, pdu_size);
-			isnst_close_so(so);
-			return (rc);
-		}
-
-		rsp_size = isnst_rcv_pdu(so, &rsp);
-		if (rsp_size == 0) {
-			kmem_free(pdu, pdu_size);
-			isnst_close_so(so);
-			return (-1);
-		}
-
-		rc = isnst_verify_rsp(svr, pdu, rsp, rsp_size);
-
-		/*
-		 * If we got a registration error, the server may be out of
-		 * sync.  In this case, we may re-try the registration as
-		 * a "target update", which causes us to re-register everything.
-		 */
-
-		if ((retry_reg = isnst_retry_registration(rc)) == B_TRUE) {
-			if (regtype == ISNS_UPDATE_TARGET) {
-				/*
-				 * If registration failed on an update, there
-				 * is something terribly wrong, possibly with
-				 * the server.
-				 */
-				rc = -1;
-				retry_reg = B_FALSE;
-				isnst_set_server_status(svr, B_FALSE);
-			} else {
-				regtype = ISNS_UPDATE_TARGET;
-			}
-		}
-
+	rc = isnst_send_pdu(so, pdu);
+	if (rc != 0) {
 		kmem_free(pdu, pdu_size);
-		kmem_free(rsp, rsp_size);
+		isnst_close_so(so);
+		return (rc);
 	}
 
+	rsp_size = isnst_rcv_pdu(so, &rsp);
+	if (rsp_size == 0) {
+		kmem_free(pdu, pdu_size);
+		isnst_close_so(so);
+		return (-1);
+	}
+
+	rc = isnst_verify_rsp(svr, pdu, rsp, rsp_size);
+
+	kmem_free(pdu, pdu_size);
+	kmem_free(rsp, rsp_size);
 	isnst_close_so(so);
-
-	/*
-	 * If it succeeded, mark all registered targets as such
-	 */
-	if (rc == 0) {
-		if ((target != NULL) && (regtype != ISNS_UPDATE_TARGET)) {
-			/* itarget initialized above */
-			itarget->target_registered = B_TRUE;
-		} else {
-			itarget = avl_first(&isns_target_list);
-			while (itarget) {
-				itarget->target_registered = B_TRUE;
-				itarget = AVL_NEXT(&isns_target_list, itarget);
-			}
-		}
-	}
 
 	return (rc);
 }
 
-static isns_portal_list_t *
-isnst_lookup_portal(struct sockaddr_storage *p, isns_portal_list_t *last_portal)
-{
-	isns_portal_list_t *portal;
-
-	ASSERT(ISNS_GLOBAL_LOCK_HELD());
-
-	portal = (last_portal == NULL) ?
-	    list_head(&portal_list) : list_next(&portal_list, last_portal);
-
-	while (portal != NULL) {
-		if (idm_ss_compare(p, &portal->portal_addr,
-		    B_TRUE /* v4_mapped_as_v4 */) == 0) {
-			return (portal);
-		}
-		portal = list_next(&portal_list, portal);
-	}
-
-	return (NULL);
-}
-
-static boolean_t
-isnst_portal_exists(struct sockaddr_storage *p)
-{
-	return ((isnst_lookup_portal(p, NULL) != NULL) ||
-	    (default_portal_online && isnst_lookup_default_portal(p)));
-}
-
-static void
-isnst_add_portal(iscsit_portal_t *portal)
-{
-	isns_portal_list_t	*new_portal;
-
-	ASSERT(ISNS_GLOBAL_LOCK_HELD());
-
-	new_portal = kmem_zalloc(sizeof (isns_portal_list_t), KM_SLEEP);
-	new_portal->portal_addr = portal->portal_addr;
-	new_portal->portal_iscsit = portal;
-	list_insert_tail(&portal_list, new_portal);
-	portal->portal_isns = new_portal;
-	portal_list_count++;
-
-}
-
-static void
-isnst_remove_portal(iscsit_portal_t *portal)
-{
-	ASSERT(portal->portal_isns != NULL);
-	ASSERT(ISNS_GLOBAL_LOCK_HELD());
-
-	list_remove(&portal_list, portal->portal_isns);
-	kmem_free(portal->portal_isns, sizeof (isns_portal_list_t));
-	portal_list_count--;
-}
-
-static isns_target_t *
-isnst_add_to_target_list(iscsit_tgt_t *target)
-{
-	isns_target_t *itarget, tmptgt;
-
-	ASSERT(ISNS_GLOBAL_LOCK_HELD());
-
-	/*
-	 * Make sure this target isn't already in our list.  If it is,
-	 * perhaps it has just moved from offline to online.
-	 */
-
-	tmptgt.target = target;
-	if ((itarget = (isns_target_t *)avl_find(&isns_target_list,
-	    &tmptgt, NULL)) == NULL) {
-		itarget = kmem_zalloc(sizeof (isns_target_t), KM_SLEEP);
-
-		itarget->target = target;
-		avl_add(&isns_target_list, itarget);
-	}
-
-	return (itarget);
-}
-
+/*
+ * isnst_make_reg_pdu:
+ * Cases:
+ *   initial registration of all targets (replace-all)
+ *   initial registration of a single target (update-existing)
+ *   modify an existing target (update-existing)
+ */
 static size_t
-isnst_make_reg_pdu(isns_pdu_t **pdu, iscsit_tgt_t *target,
-    boolean_t svr_registered, isns_reg_type_t regtype)
+isnst_make_reg_pdu(isns_pdu_t **pdu, isns_target_t *itarget,
+    iscsit_isns_svr_t *svr, isns_reg_type_t regtype)
 {
-	idm_addr_list_t		*default_portal_list = NULL;
-	uint32_t		default_portal_list_size;
 	size_t			pdu_size;
 	char			*str;
 	int			len;
-	isns_target_t		*itarget;
-	iscsit_tgt_t		*src;
+	isns_target_t		*src;
 	boolean_t		reg_all = B_FALSE;
 	uint16_t		flags = 0;
 
 	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 
 	/*
-	 * If any targets are using the default portal then get the global
-	 * list of portals.
-	 */
-	if (default_portal_online) {
-		default_portal_list_size = idm_get_ipaddr(&default_portal_list);
-
-		if (default_portal_list_size == 0) {
-			/*
-			 * If the default portal is online, then there should
-			 * be at least one default portal.
-			 */
-			return (0);
-		}
-	}
-
-	/*
 	 * Find a source attribute for this registration.
 	 *
-	 * If we're already registered, registering for the first time, or
-	 * updating a target, we'll use the target_name of the first target
-	 * in our list.
-	 *
-	 * The alternate case is that we're registering for the first time,
-	 * but target is non-NULL.  In that case, we have no targets in our
-	 * list yet, so we use the passed in target's name.
+	 * If updating a specific target for the first time, use that
+	 * target.
+	 * If already registered, use a registered target
+	 * Otherwise, use the first target we are going to register.
 	 */
-
-	if (svr_registered || (target == NULL) ||
-	    (regtype == ISNS_UPDATE_TARGET)) {
-		ASSERT(avl_numnodes(&isns_target_list) != 0);
-		itarget = (isns_target_t *)avl_first(&isns_target_list);
-		src = itarget->target;
+	ASSERT(avl_numnodes(&svr->svr_target_list) != 0);
+	if (itarget != NULL && ! svr->svr_registered) {
+		src = itarget;
+	} else if (svr->svr_registered) {
+		src = isnst_get_registered_source(svr);
 	} else {
-		src = target;
+		/*
+		 * When registering to a server, and we don't know which
+		 * of our targets the server might already know,
+		 * cycle through each of our targets as source.  The server
+		 * does source validation.  If the server knows any of our
+		 * targets, it will eventually accept one of our registrations.
+		 */
+		int		i;
+		isns_target_t	*jtarget;
+
+		if (svr->svr_last_target_index >=
+		    avl_numnodes(&svr->svr_target_list) - 1) {
+			svr->svr_last_target_index = 0;
+		} else {
+			svr->svr_last_target_index++;
+		}
+		for (i = 0, jtarget = avl_first(&svr->svr_target_list);
+		    i < svr->svr_last_target_index;
+		    i++, jtarget = AVL_NEXT(&svr->svr_target_list, jtarget)) {
+			ASSERT(jtarget != NULL);
+		}
+		src = jtarget;
+		ASSERT(src != NULL);
 	}
 
 	/*
-	 * No target means we're registering everything.  A regtype of
-	 * ISNS_UPDATE_TARGET means we're re-registering everything.
-	 * Whether we're registering or re-registering depends on if
-	 * we're already registered.
+	 * Null target means we're replacing everything.
 	 */
-
-	if ((target == NULL) || (regtype == ISNS_UPDATE_TARGET) ||
-	    ((regtype == ISNS_REGISTER_TARGET) &&
-	    default_portal_state_change)) {
+	if (itarget == NULL) {
 		reg_all = B_TRUE;
-		target = src;	/* This will be the 1st tgt in our list */
-		default_portal_state_change = B_FALSE;
-
-		/*
-		 * If we're already registered, this will be a replacement
-		 * registration.  In this case, we need to make sure our
-		 * source attribute is an already registered target.
-		 */
-		if (svr_registered) {
-			flags = ISNS_FLAG_REPLACE_REG;
-			while (itarget->target_registered == B_FALSE) {
-				itarget = AVL_NEXT(&isns_target_list,
-				    itarget);
-			}
-			src = itarget->target;
-			/* Reset itarget to the beginning of our list */
-			itarget = (isns_target_t *)avl_first(&isns_target_list);
-		}
+		flags = ISNS_FLAG_REPLACE_REG;
+		/* Reset itarget to the beginning of our list */
+		itarget = (isns_target_t *)avl_first(&svr->svr_target_list);
+	} else if (regtype == ISNS_REGISTER_TARGET) {
+		flags = ISNS_FLAG_REPLACE_REG;
+		ASSERT(!itarget->target_delete_needed);
 	}
 
 	pdu_size = isnst_create_pdu_header(ISNS_DEV_ATTR_REG, pdu, flags);
 	if (pdu_size == 0) {
-		if (default_portal_list)
-			kmem_free(default_portal_list,
-			    default_portal_list_size);
 		return (0);
 	}
 
-	len = strlen(src->target_name) + 1;
+	/* Source Attribute */
+
+	len = strlen(src->target_info->ti_tgt_name) + 1;
 	if (isnst_add_attr(*pdu, pdu_size, ISNS_ISCSI_NAME_ATTR_ID,
-	    len, src->target_name, 0) != 0) {
+	    len, src->target_info->ti_tgt_name, 0) != 0) {
 		goto pdu_error;
 	}
 
@@ -1230,32 +1695,52 @@ isnst_make_reg_pdu(isns_pdu_t **pdu, iscsit_tgt_t *target,
 		goto pdu_error;
 	}
 
+
 	/* ENTITY Protocol - Section 6.2.2 */
-	if (isnst_add_attr(*pdu, pdu_size, ISNS_ENTITY_PROTOCOL_ATTR_ID,
+	if (isnst_add_attr(*pdu, pdu_size,
+	    ISNS_ENTITY_PROTOCOL_ATTR_ID,
 	    4, 0, ISNS_ENTITY_PROTOCOL_ISCSI) != 0) {
 		goto pdu_error;
 	}
 
-	/*
-	 * Network entity portal information - only on the first registration.
-	 */
-	if (!svr_registered || (flags & ISNS_FLAG_REPLACE_REG)) {
-		if (isnst_reg_pdu_add_entity_portals(*pdu, pdu_size,
-		    default_portal_list) != 0) {
+	if (reg_all) {
+		/* Registration Period -- use if not using ESI */
+		if (!isns_use_esi &&
+		    isnst_add_attr(*pdu, pdu_size,
+		    ISNS_ENTITY_REG_PERIOD_ATTR_ID, 4,
+		    0, isns_registration_period) != 0) {
 			goto pdu_error;
+		}
+		/*
+		 * Network entity portal information - only when
+		 * replacing all.  Since targets are only registered
+		 * to iSNS when their portals are already registered
+		 * to iSNS, we can assume entity portals exist.
+		 */
+		if (isnst_reg_pdu_add_entity_portals(*pdu, pdu_size) != 0) {
+			goto pdu_error;
+		}
+
+		/*
+		 * Skip over delete-pending tgts. There must be at
+		 * least one non-deleted tgt, or it is an error.
+		 */
+		while (itarget->target_delete_needed) {
+			itarget = AVL_NEXT(&svr->svr_target_list,
+			    itarget);
+			ASSERT(itarget != NULL);
 		}
 	}
 
+
+	/* Add information about each target or one target */
 	do {
-		/* Hold the target mutex */
-		mutex_enter(&target->target_mutex);
 
 		/* iSCSI Name - Section 6.4.1 */
-		str = target->target_name;
+		str = itarget->target_info->ti_tgt_name;
 		len = strlen(str) + 1;
 		if (isnst_add_attr(*pdu, pdu_size, ISNS_ISCSI_NAME_ATTR_ID,
 		    len, str, 0) != 0) {
-			mutex_exit(&target->target_mutex);
 			goto pdu_error;
 		}
 
@@ -1263,300 +1748,248 @@ isnst_make_reg_pdu(isns_pdu_t **pdu, iscsit_tgt_t *target,
 		if (isnst_add_attr(*pdu, pdu_size,
 		    ISNS_ISCSI_NODE_TYPE_ATTR_ID, 4, 0,
 		    ISNS_TARGET_NODE_TYPE) != 0) {
-			mutex_exit(&target->target_mutex);
 			goto pdu_error;
 		}
 
 		/* iSCSI Alias */
-		if (nvlist_lookup_string(target->target_props, PROP_ALIAS,
-		    &str) == 0) {
+		str = itarget->target_info->ti_tgt_alias;
+		len = strnlen(str,
+		    sizeof (itarget->target_info->ti_tgt_alias));
+		if (len) {
 			/* Found alias in property list */
-			len = strlen(str) + 1;
 			if (isnst_add_attr(*pdu, pdu_size,
-			    ISNS_ISCSI_ALIAS_ATTR_ID, len, str, 0) != 0) {
-				mutex_exit(&target->target_mutex);
+			    ISNS_ISCSI_ALIAS_ATTR_ID, len+1, str, 0) != 0) {
 				goto pdu_error;
 			}
 		}
 
-		if (isnst_reg_pdu_add_pg(*pdu, pdu_size, target,
-		    default_portal_list) != 0) {
-			mutex_exit(&target->target_mutex);
+		if (isnst_reg_pdu_add_pg(*pdu, pdu_size, itarget) != 0) {
 			goto pdu_error;
 		}
 
-		mutex_exit(&target->target_mutex);
-
-		if (reg_all) {
-			itarget = AVL_NEXT(&isns_target_list, itarget);
-			if (itarget) {
-				target = itarget->target;
-			} else {
-				target = NULL;
-			}
+		/* If registering one target, then we are done. */
+		if (!reg_all) {
+			break;
 		}
-	} while ((reg_all == B_TRUE) && (target != NULL));
 
-	if (default_portal_list)
-		kmem_free(default_portal_list, default_portal_list_size);
+		/* Skip over delete-pending tgts */
+		do {
+			itarget = AVL_NEXT(&svr->svr_target_list, itarget);
+		} while (itarget != NULL && itarget->target_delete_needed);
+
+	} while (itarget != NULL);
 
 	return (pdu_size);
 
 pdu_error:
-	/* packet too large, no memory */
-	kmem_free(*pdu, pdu_size);
-	*pdu = NULL;
-	if (default_portal_list)
-		kmem_free(default_portal_list, default_portal_list_size);
-
-	return (0);
-}
-
-
-static int
-isnst_reg_pdu_add_entity_portals(isns_pdu_t *pdu, size_t pdu_size,
-    idm_addr_list_t *default_portal_list)
-{
-	isns_portal_list_t	*portal;
-	idm_addr_t		*dportal;
-	struct sockaddr_storage	ss;
-	struct sockaddr_in	*sin;
-	struct sockaddr_in6	*sin6;
-	int			idx;
-	int			dp_addr_size;
-
-	if (default_portal_list != NULL) {
-		for (idx = 0; idx < default_portal_list->al_out_cnt; idx++) {
-			dportal = &default_portal_list->al_addrs[idx];
-
-			/* Build sockaddr_storage for this portal */
-			bzero(&ss, sizeof (ss));
-			dp_addr_size = dportal->a_addr.i_insize;
-			if (dp_addr_size == sizeof (struct in_addr)) {
-				/* IPv4 */
-				ss.ss_family = AF_INET;
-				sin = (struct sockaddr_in *)&ss;
-				sin->sin_port = htons(ISCSI_LISTEN_PORT);
-				bcopy(&dportal->a_addr.i_addr.in4,
-				    &sin->sin_addr, sizeof (struct in_addr));
-			} else if (dp_addr_size == sizeof (struct in6_addr)) {
-				ss.ss_family = AF_INET6;
-				sin6 = (struct sockaddr_in6 *)&ss;
-				sin6->sin6_port = htons(ISCSI_LISTEN_PORT);
-				bcopy(&dportal->a_addr.i_addr.in6,
-				    &sin6->sin6_addr, sizeof (struct in6_addr));
-			} else {
-				continue;
-			}
-
-			if (isnst_add_portal_attr(pdu, pdu_size,
-			    ISNS_PORTAL_IP_ADDR_ATTR_ID,
-			    ISNS_PORTAL_PORT_ATTR_ID,
-			    &ss, B_TRUE /* ESI info */) != 0) {
-				return (-1);
-			}
-
-		}
-	} else {
-		portal = list_head(&portal_list);
-
-		while (portal != NULL) {
-			if (isnst_add_portal_attr(pdu, pdu_size,
-			    ISNS_PORTAL_IP_ADDR_ATTR_ID,
-			    ISNS_PORTAL_PORT_ATTR_ID,
-			    &portal->portal_addr, B_TRUE /* ESI info */) != 0) {
-				return (-1);
-			}
-
-			portal = list_next(&portal_list, portal);
+	/* packet too large, no memory (or other error) */
+	len = ntohs((*pdu)->payload_len);
+	if (len + 1000 > isns_message_buf_size) {
+		/* Increase the PDU size we will ask for next time */
+		if (isns_message_buf_size * 2 <= ISNST_MAX_MSG_SIZE) {
+			isns_message_buf_size *= 2;
+			ISNST_LOG(CE_NOTE,
+			    "Increasing isns_message_buf_size to %d",
+			    isns_message_buf_size);
+		} else {
+			cmn_err(CE_WARN, "iscsit: isns: no space"
+			    " to send required PDU");
 		}
 	}
 
+	kmem_free(*pdu, pdu_size);
+	*pdu = NULL;
+
 	return (0);
 }
 
+static int
+isnst_reg_pdu_add_entity_portals(isns_pdu_t *pdu, size_t pdu_size)
+{
+	int			rc = 0;
+	isns_portal_t		*iportal;
+
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+
+	iportal = (isns_portal_t *)avl_first(&isns_all_portals);
+	while (iportal != NULL) {
+		/* Do not include ESI port if not using ESI */
+		if (isnst_add_portal_attr(pdu, pdu_size,
+		    ISNS_PORTAL_IP_ADDR_ATTR_ID,
+		    ISNS_PORTAL_PORT_ATTR_ID,
+		    &iportal->portal_addr,
+		    isns_use_esi /* ESI info */) != 0) {
+			rc = -1;
+			break;
+		}
+		iportal = AVL_NEXT(&isns_all_portals, iportal);
+	}
+
+	return (rc);
+}
+
+
+/*
+ * isnst_reg_pdu_add_pg -- add the PG and PGT entries for one target.
+ */
+static int
+isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, isns_target_t *itarget)
+{
+	int			rval = 0;
+	avl_tree_t		null_portals;
+	isns_target_info_t	*ti;
+	isns_tpgt_t		*tig;
+
+
+	ti = itarget->target_info;
+
+	/*
+	 * If all registered targets only use the default TPGT, then
+	 * we can skip sending PG info to the iSNS server.
+	 */
+	if (num_tpg_portals == 0)
+		return (0);
+
+	/*
+	 * For each target, we start with the full portal list,
+	 * and then remove portals as we add them to TPGTs for this target.
+	 * At the end, all the remaining portals go into the "null pg".
+	 */
+	avl_create(&null_portals, isnst_portal_avl_compare,
+	    sizeof (isns_portal_t), offsetof(isns_portal_t, portal_node));
+	isnst_copy_portal_list(&isns_all_portals, &null_portals);
+
+	for (tig = list_head(&ti->ti_tpgt_list);
+	    tig != NULL;
+	    tig = list_next(&ti->ti_tpgt_list, tig)) {
+
+		if (tig->ti_tpgt_tag == ISCSIT_DEFAULT_TPGT) {
+			/* Add portal info from list of default portals */
+			if (isnst_add_default_pg(pdu, pdu_size,
+			    &null_portals) != 0) {
+				rval = 1;
+				break;
+			}
+		} else {
+			/* Add portal info from this target's TPGT entries */
+			if (isnst_add_tpg_pg(pdu, pdu_size, ti,
+			    &null_portals) != 0) {
+				rval = 1;
+				break;
+			}
+		}
+	}
+
+	/* Add the remaining portals (if any) to the null PG */
+	if (rval == 0 &&
+	    isnst_add_null_pg(pdu, pdu_size, &null_portals) != 0) {
+		rval = 1;
+	}
+	isnst_clear_portal_list(&null_portals);
+	avl_destroy(&null_portals);
+	return (rval);
+}
 
 static int
-isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, iscsit_tgt_t *target,
-    idm_addr_list_t *default_portal_list)
+isnst_add_tpg_pg(isns_pdu_t *pdu, size_t pdu_size,
+    isns_target_info_t *ti, avl_tree_t *null_portal_list)
 {
-	iscsit_tpgt_t		*tpgt;
-	iscsit_tpg_t		*tpg;
-	iscsit_portal_t		*tp;
+	isns_tpgt_t		*tig;
+	isns_tpgt_addr_t	*tip;
 	int			rval = 0;
-	boolean_t		use_default = B_FALSE;
 
+	tig = list_head(&ti->ti_tpgt_list);
+	ASSERT(tig->ti_tpgt_tag != ISCSIT_DEFAULT_TPGT);
 
-	tpgt = avl_first(&target->target_tpgt_list);
-	ASSERT(tpgt != NULL);
 	do {
-		/*
-		 * No need to explicitly register default PG.  Any target
-		 * should have either an explicit portal list or
-		 * one and only one portal representing the default portal.
-		 */
-		ASSERT((avl_numnodes(&target->target_tpgt_list) == 1) ||
-		    (tpgt->tpgt_tag != ISCSIT_DEFAULT_TPGT));
-		if (tpgt->tpgt_tag == ISCSIT_DEFAULT_TPGT) {
-			use_default = B_TRUE;
-			tpgt = AVL_NEXT(&target->target_tpgt_list, tpgt);
-			continue;
-		}
-
-		tpg = tpgt->tpgt_tpg;
-		mutex_enter(&tpg->tpg_mutex);
-
-		tp = avl_first(&tpg->tpg_portal_list);
+		/* Write one TPGT's info into the PDU */
 
 		/* Portal Group Tag */
 		if (isnst_add_attr(pdu, pdu_size,
-		    ISNS_PG_TAG_ATTR_ID, 4, 0, tpgt->tpgt_tag) != 0) {
-			mutex_exit(&tpg->tpg_mutex);
+		    ISNS_PG_TAG_ATTR_ID, 4, 0, tig->ti_tpgt_tag) != 0) {
 			rval = 1;
 			goto pg_done;
 		}
 
-		ASSERT(tp != NULL);
+		tip = list_head(&tig->ti_portal_list);
+		ASSERT(tip != NULL);
 		do {
+			/* PG Portal Addr and PG Portal Port */
 			if (isnst_add_portal_attr(pdu, pdu_size,
 			    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
 			    ISNS_PG_PORTAL_PORT_ATTR_ID,
-			    &tp->portal_addr, B_FALSE /* ESI */) != 0) {
-				mutex_exit(&tpg->tpg_mutex);
+			    &tip->portal_addr, B_FALSE /* ESI */) != 0) {
 				rval = 1;
 				goto pg_done;
 			}
+			isnst_remove_from_portal_list(&tip->portal_addr,
+			    null_portal_list);
 
-			tp = AVL_NEXT(&tpg->tpg_portal_list, tp);
-		} while (tp != NULL);
-
-		mutex_exit(&tpg->tpg_mutex);
-		tpgt = AVL_NEXT(&target->target_tpgt_list, tpgt);
-	} while (tpgt != NULL);
-
-	/*
-	 * If we are not using the default portal group we need to create
-	 * a NULL PG tag indicating some of the default portals should be
-	 * not be used to access this target.
-	 */
-	if (!use_default) {
-		if (isnst_add_null_pg(pdu, pdu_size, target,
-		    default_portal_list) != 0) {
-			rval = 1;
-			goto pg_done;
-		}
-	}
+			tip = list_next(&tig->ti_portal_list, tip);
+		} while (tip != NULL);
+		tig = list_next(&ti->ti_tpgt_list, tig);
+	} while (tig != NULL);
 
 pg_done:
 	return (rval);
 }
 
 static int
-isnst_add_null_pg(isns_pdu_t *pdu, size_t pdu_size,
-    iscsit_tgt_t *tgt, idm_addr_list_t *default_portal_list)
+isnst_add_default_pg(isns_pdu_t *pdu, size_t pdu_size,
+    avl_tree_t *null_portal_list)
 {
-	isns_portal_list_t	*portal;
-	idm_addr_t		*dportal;
-	iscsit_portal_t		*iscsit_portal;
-	iscsit_tpgt_t		*iscsit_tpgt;
-	struct sockaddr_storage	ss;
-	struct sockaddr_in	*sin;
-	struct sockaddr_in6	*sin6;
-	int			idx;
-	int			dp_addr_size;
-	boolean_t		null_pg_tag = B_FALSE;
+	isns_portal_t *iportal;
 
-	/*
-	 * Register all entity portals that aren't bound to this target in the
-	 * null pg.
-	 */
-	if (default_portal_list != NULL) {
-		for (idx = 0; idx < default_portal_list->al_out_cnt; idx++) {
-			dportal = &default_portal_list->al_addrs[idx];
+	/* Portal Group Tag */
+	if (isnst_add_attr(pdu, pdu_size,
+	    ISNS_PG_TAG_ATTR_ID, 4, 0, ISCSIT_DEFAULT_TPGT) != 0) {
+		return (1);
+	}
 
-			/* Build sockaddr_storage for this portal */
-			bzero(&ss, sizeof (ss));
-			dp_addr_size = dportal->a_addr.i_insize;
-			if (dp_addr_size == sizeof (struct in_addr)) {
-				/* IPv4 */
-				ss.ss_family = AF_INET;
-				sin = (struct sockaddr_in *)&ss;
-				sin->sin_port = htons(ISCSI_LISTEN_PORT);
-				bcopy(&dportal->a_addr.i_addr.in4,
-				    &sin->sin_addr, sizeof (struct in_addr));
-			} else if (dp_addr_size == sizeof (struct in6_addr)) {
-				ss.ss_family = AF_INET6;
-				sin6 = (struct sockaddr_in6 *)&ss;
-				sin6->sin6_port = htons(ISCSI_LISTEN_PORT);
-				bcopy(&dportal->a_addr.i_addr.in6,
-				    &sin6->sin6_addr, sizeof (struct in6_addr));
-			} else {
-				continue;
+	for (iportal = avl_first(&isns_all_portals);
+	    iportal != NULL;
+	    iportal = AVL_NEXT(&isns_all_portals, iportal)) {
+		if (iportal->portal_default) {
+			/* PG Portal Addr and PG Portal Port */
+			if (isnst_add_portal_attr(pdu, pdu_size,
+			    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
+			    ISNS_PG_PORTAL_PORT_ATTR_ID,
+			    &iportal->portal_addr, B_FALSE) != 0) {
+				return (1);
 			}
-
-			iscsit_portal = iscsit_tgt_lookup_portal(tgt,
-			    &ss, &iscsit_tpgt);
-			if (iscsit_portal == NULL) {
-				/*
-				 * If this is the first NULL PG portal, then
-				 * write the NULL PG tag first.
-				 */
-				if (!null_pg_tag) {
-					if (isnst_add_attr(pdu, pdu_size,
-					    ISNS_PG_TAG_ATTR_ID,
-					    0, 0, 0) != 0) {
-						return (-1);
-					}
-					null_pg_tag = B_TRUE;
-				}
-				if (isnst_add_portal_attr(pdu, pdu_size,
-				    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
-				    ISNS_PG_PORTAL_PORT_ATTR_ID,
-				    &ss, B_FALSE) != 0) {
-					return (-1);
-				}
-			} else {
-				iscsit_tpgt_rele(iscsit_tpgt);
-				iscsit_portal_rele(iscsit_portal);
-			}
-		}
-	} else {
-		portal = list_head(&portal_list);
-
-		while (portal != NULL) {
-			iscsit_portal = iscsit_tgt_lookup_portal(tgt,
-			    &portal->portal_addr, &iscsit_tpgt);
-			if (iscsit_portal == NULL) {
-				/*
-				 * If this is the first NULL PG portal, then
-				 * write the NULL PG tag first.
-				 */
-				if (!null_pg_tag) {
-					if (isnst_add_attr(pdu, pdu_size,
-					    ISNS_PG_TAG_ATTR_ID,
-					    0, 0, 0) != 0) {
-						return (-1);
-					}
-					null_pg_tag = B_TRUE;
-				}
-				if (isnst_add_portal_attr(pdu, pdu_size,
-				    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
-				    ISNS_PG_PORTAL_PORT_ATTR_ID,
-				    &portal->portal_addr, B_FALSE) != 0) {
-					return (-1);
-				}
-			} else {
-				iscsit_tpgt_rele(iscsit_tpgt);
-				iscsit_portal_rele(iscsit_portal);
-			}
-
-			portal = list_next(&portal_list, portal);
+			isnst_remove_from_portal_list(&iportal->portal_addr,
+			    null_portal_list);
 		}
 	}
 
 	return (0);
 }
 
+static int
+isnst_add_null_pg(isns_pdu_t *pdu, size_t pdu_size,
+    avl_tree_t *null_portal_list)
+{
+	isns_portal_t *iportal;
+
+	/* NULL Portal Group Tag means no access via these portals. */
+	if (isnst_add_attr(pdu, pdu_size,
+	    ISNS_PG_TAG_ATTR_ID, 0, 0, 0) != 0) {
+		return (1);
+	}
+
+	for (iportal = avl_first(null_portal_list);
+	    iportal != NULL;
+	    iportal = AVL_NEXT(null_portal_list, iportal)) {
+		if (isnst_add_portal_attr(pdu, pdu_size,
+		    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
+		    ISNS_PG_PORTAL_PORT_ATTR_ID,
+		    &iportal->portal_addr, B_FALSE) != 0) {
+			return (1);
+		}
+	}
+
+	return (0);
+}
 
 static int
 isnst_add_portal_attr(isns_pdu_t *pdu, size_t pdu_size,
@@ -1597,7 +2030,7 @@ isnst_add_portal_attr(isns_pdu_t *pdu, size_t pdu_size,
 	if (esi_info && esi.esi_valid) {
 		/* ESI interval and port */
 		if (isnst_add_attr(pdu, pdu_size, ISNS_ESI_INTERVAL_ATTR_ID, 4,
-		    NULL, 20) != 0) {
+		    NULL, isns_default_esi_interval) != 0) {
 			return (1);
 		}
 
@@ -1612,17 +2045,12 @@ isnst_add_portal_attr(isns_pdu_t *pdu, size_t pdu_size,
 }
 
 static int
-isnst_deregister(iscsit_isns_svr_t *svr, char *node)
+isnst_deregister(iscsit_isns_svr_t *svr, isns_target_t *itarget)
 {
 	int		rc;
 	isns_pdu_t	*pdu, *rsp;
 	size_t		pdu_size, rsp_size;
 	struct sonode	*so;
-
-	if ((svr->svr_registered == B_FALSE) ||
-	    (avl_numnodes(&isns_target_list) == 0)) {
-		return (0);
-	}
 
 	so = isnst_open_so(&svr->svr_sa);
 
@@ -1630,7 +2058,50 @@ isnst_deregister(iscsit_isns_svr_t *svr, char *node)
 		return (-1);
 	}
 
-	pdu_size = isnst_make_dereg_pdu(&pdu, node);
+	pdu_size = isnst_make_dereg_pdu(svr, &pdu, itarget);
+	if (pdu_size == 0) {
+		isnst_close_so(so);
+		return (-1);
+	}
+
+	rc = isnst_send_pdu(so, pdu);
+	if (rc != 0) {
+		isnst_close_so(so);
+		kmem_free(pdu, pdu_size);
+		return (rc);
+	}
+
+	rsp_size = isnst_rcv_pdu(so, &rsp);
+	if (rsp_size == 0) {
+		isnst_close_so(so);
+		kmem_free(pdu, pdu_size);
+		return (-1);
+	}
+
+	rc = isnst_verify_rsp(svr, pdu, rsp, rsp_size);
+
+	isnst_close_so(so);
+	kmem_free(pdu, pdu_size);
+	kmem_free(rsp, rsp_size);
+
+	return (rc);
+}
+
+static int
+isnst_keepalive(iscsit_isns_svr_t *svr)
+{
+	int		rc;
+	isns_pdu_t	*pdu, *rsp;
+	size_t		pdu_size, rsp_size;
+	struct sonode	*so;
+
+	so = isnst_open_so(&svr->svr_sa);
+
+	if (so == NULL) {
+		return (-1);
+	}
+
+	pdu_size = isnst_make_keepalive_pdu(svr, &pdu);
 	if (pdu_size == 0) {
 		isnst_close_so(so);
 		return (-1);
@@ -1660,13 +2131,12 @@ isnst_deregister(iscsit_isns_svr_t *svr, char *node)
 }
 
 static size_t
-isnst_make_dereg_pdu(isns_pdu_t **pdu, char *node)
+isnst_make_dereg_pdu(iscsit_isns_svr_t *svr, isns_pdu_t **pdu,
+    isns_target_t *itarget)
 {
 	size_t		pdu_size;
 	int		len;
-	isns_target_t	*itarget;
-	iscsit_tgt_t	*target;
-	int		num_targets;
+	isns_target_t	*src;
 
 	/*
 	 * create DevDereg Message with all of target nodes
@@ -1678,20 +2148,22 @@ isnst_make_dereg_pdu(isns_pdu_t **pdu, char *node)
 
 	/*
 	 * Source attribute - Must be a storage node in the same
-	 * network entity.  We'll just grab the first one in the list.
-	 * If it's the only online target, we turn this into a total
-	 * deregistration regardless of the value of "node".
+	 * network entity.
 	 */
-
-	num_targets = avl_numnodes(&isns_target_list);
-	itarget = avl_first(&isns_target_list);
-	target = itarget->target;
-
-	len = strlen(target->target_name) + 1;
-	if (isnst_add_attr(*pdu, pdu_size, ISNS_ISCSI_NAME_ATTR_ID,
-	    len, target->target_name, 0) != 0) {
+	if (svr->svr_registered) {
+		src = isnst_get_registered_source(svr);
+	} else if (itarget != NULL) {
+		src = itarget;
+	} else {
 		goto dereg_pdu_error;
 	}
+
+	len = strlen(src->target_info->ti_tgt_name) + 1;
+	if (isnst_add_attr(*pdu, pdu_size, ISNS_ISCSI_NAME_ATTR_ID,
+	    len, src->target_info->ti_tgt_name, 0) != 0) {
+		goto dereg_pdu_error;
+	}
+
 
 	/* Delimiter */
 	if (isnst_add_attr(*pdu, pdu_size, ISNS_DELIMITER_ATTR_ID,
@@ -1702,7 +2174,7 @@ isnst_make_dereg_pdu(isns_pdu_t **pdu, char *node)
 	/*
 	 * Operating attributes
 	 */
-	if ((node == NULL) || (num_targets == 1)) {
+	if (itarget == NULL) {
 		/* dereg everything */
 		len = strlen(isns_eid) + 1;
 		if (isnst_add_attr(*pdu, pdu_size, ISNS_EID_ATTR_ID,
@@ -1711,9 +2183,9 @@ isnst_make_dereg_pdu(isns_pdu_t **pdu, char *node)
 		}
 	} else {
 		/* dereg one target only */
-		len = strlen(node) + 1;
+		len = strlen(itarget->target_info->ti_tgt_name) + 1;
 		if (isnst_add_attr(*pdu, pdu_size, ISNS_ISCSI_NAME_ATTR_ID,
-		    len, node, 0) != 0) {
+		    len, itarget->target_info->ti_tgt_name, 0) != 0) {
 			goto dereg_pdu_error;
 		}
 	}
@@ -1725,6 +2197,85 @@ dereg_pdu_error:
 	*pdu = NULL;
 
 	return (0);
+}
+
+static size_t
+isnst_make_keepalive_pdu(iscsit_isns_svr_t *svr, isns_pdu_t **pdu)
+{
+	size_t		pdu_size;
+	int		len;
+	isns_target_t	*src;
+
+	ASSERT(svr->svr_registered);
+
+	/*
+	 * create DevAttrQuery Message
+	 */
+	pdu_size = isnst_create_pdu_header(ISNS_DEV_ATTR_QRY, pdu, 0);
+	if (pdu_size == 0) {
+		return (0);
+	}
+
+	/*
+	 * Source attribute - Must be a iscsi target in the same
+	 * network entity.
+	 */
+	src = isnst_get_registered_source(svr);
+
+	len = strlen(src->target_info->ti_tgt_name) + 1;
+	if (isnst_add_attr(*pdu, pdu_size, ISNS_ISCSI_NAME_ATTR_ID,
+	    len, src->target_info->ti_tgt_name, 0) != 0) {
+		goto keepalive_pdu_error;
+	}
+
+	/* EID */
+	len = strlen(isns_eid) + 1;
+	if (isnst_add_attr(*pdu, pdu_size, ISNS_EID_ATTR_ID,
+	    len, isns_eid, 0) != 0) {
+		goto keepalive_pdu_error;
+	}
+	/* Delimiter */
+	if (isnst_add_attr(*pdu, pdu_size, ISNS_DELIMITER_ATTR_ID,
+	    0, 0, 0) != 0) {
+		goto keepalive_pdu_error;
+	}
+
+	/* Values to Fetch -- EID */
+	if (isnst_add_attr(*pdu, pdu_size, ISNS_EID_ATTR_ID,
+	    0, 0, 0) != 0) {
+		goto keepalive_pdu_error;
+	}
+
+
+	return (pdu_size);
+
+keepalive_pdu_error:
+	kmem_free(*pdu, pdu_size);
+	*pdu = NULL;
+
+	return (0);
+}
+
+static isns_target_t *
+isnst_get_registered_source(iscsit_isns_svr_t *svr)
+{
+	isns_target_t	*itarget;
+
+	/*
+	 * If svr is registered, then there must be at least one
+	 * target that is registered to that svr.
+	 */
+	ASSERT(svr->svr_registered);
+	ASSERT((avl_numnodes(&svr->svr_target_list) != 0));
+
+	itarget = avl_first(&svr->svr_target_list);
+	do {
+		if (itarget->target_registered == B_TRUE)
+			break;
+		itarget = AVL_NEXT(&svr->svr_target_list, itarget);
+	} while (itarget != NULL);
+	ASSERT(itarget != NULL);
+	return (itarget);
 }
 
 static int
@@ -1810,6 +2361,13 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 			return (-1);
 		}
 		break;
+	case ISNS_DEV_ATTR_QRY:
+		if (func_id != ISNS_DEV_ATTR_QRY_RSP) {
+			return (-1);
+		}
+		break;
+
+
 	default:
 		ASSERT(0);
 		break;
@@ -1820,8 +2378,14 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 		return (-1);
 	}
 
+
 	/* check the error code */
 	resp = (isns_resp_t *)((void *)&rsp->payload[0]);
+
+	/* Update the last time we heard from this server */
+	if (resp->status == 0) {
+		svr->svr_last_msg = ddi_get_lbolt();
+	}
 
 	return (ntohl(resp->status));
 }
@@ -1877,7 +2441,7 @@ isnst_pdu_get_op(isns_pdu_t *pdu, uint8_t **pp)
 static size_t
 isnst_create_pdu_header(uint16_t func_id, isns_pdu_t **pdu, uint16_t flags)
 {
-	size_t	pdu_size = ISNSP_MAX_PDU_SIZE;
+	size_t	pdu_size = isns_message_buf_size;
 
 	*pdu = (isns_pdu_t *)kmem_zalloc(pdu_size, KM_NOSLEEP);
 	if (*pdu != NULL) {
@@ -2055,7 +2619,7 @@ isnst_send_pdu(void *so, isns_pdu_t *pdu)
 		/* send the pdu */
 		send_len = ISNSP_HEADER_SIZE + payload_len;
 		send_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000));
+		    drv_usectohz(isns_timeout_usec));
 		rc = idm_iov_sosend(so, &iov[0], 2, send_len);
 		(void) untimeout(send_timer);
 
@@ -2094,7 +2658,7 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 	do {
 		/* receive the pdu header */
 		rcv_timer = timeout(isnst_so_timeout, so,
-		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000));
+		    drv_usectohz(isns_timeout_usec));
 		if (idm_sorecv(so, &tmp_pdu_hdr, ISNSP_HEADER_SIZE) != 0 ||
 		    ntohs(tmp_pdu_hdr.seq) != seq) {
 			(void) untimeout(rcv_timer);
@@ -2104,7 +2668,13 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 
 		/* receive the payload */
 		payload_len = ntohs(tmp_pdu_hdr.payload_len);
-		payload = kmem_alloc(payload_len, KM_SLEEP);
+		if (payload_len > ISNST_MAX_MSG_SIZE) {
+			goto rcv_error;
+		}
+		payload = kmem_alloc(payload_len, KM_NOSLEEP);
+		if (payload == NULL) {
+			goto rcv_error;
+		}
 		rcv_timer = timeout(isnst_so_timeout, so,
 		    drv_usectohz(ISNS_RCV_TIMER_SECONDS * 1000000));
 		if (idm_sorecv(so, payload, payload_len) != 0) {
@@ -2117,6 +2687,9 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 		if (total_pdu_len > 0) {
 			combined_len = total_pdu_len + payload_len;
 			combined_pdu = kmem_alloc(combined_len, KM_SLEEP);
+			if (combined_pdu == NULL) {
+				goto rcv_error;
+			}
 			bcopy(*pdu, combined_pdu, total_pdu_len);
 			combined_payload =
 			    &combined_pdu->payload[total_payload_len];
@@ -2130,7 +2703,10 @@ isnst_rcv_pdu(void *so, isns_pdu_t **pdu)
 		} else {
 			total_payload_len = payload_len;
 			total_pdu_len = ISNSP_HEADER_SIZE + payload_len;
-			*pdu = kmem_alloc(total_pdu_len, KM_SLEEP);
+			*pdu = kmem_alloc(total_pdu_len, KM_NOSLEEP);
+			if (*pdu == NULL) {
+				goto rcv_error;
+			}
 			bcopy(&tmp_pdu_hdr, *pdu, ISNSP_HEADER_SIZE);
 			bcopy(payload, &(*pdu)->payload[0], payload_len);
 			kmem_free(payload, payload_len);
@@ -2182,8 +2758,8 @@ isnst_open_so(struct sockaddr_storage *sa)
 	}
 
 	if (so != NULL) {
-		if (ksocket_connect(so, (struct sockaddr *)sa, sa_sz, CRED())
-		    != 0) {
+		if (idm_so_timed_socket_connect(so, sa, sa_sz,
+		    isns_timeout_usec) != 0) {
 			/* not calling isnst_close_so() to */
 			/* make dtrace output look clear */
 			idm_soshutdown(so);
@@ -2193,22 +2769,12 @@ isnst_open_so(struct sockaddr_storage *sa)
 	}
 
 	if (so == NULL) {
-		struct sockaddr_in *sin;
-		struct sockaddr_in6 *sin6;
-		char s[INET6_ADDRSTRLEN];
-		void *ip;
-		uint16_t port;
-		sin = (struct sockaddr_in *)sa;
-		port = ntohs(sin->sin_port);
-		if (sa->ss_family == AF_INET) {
-			ip = (void *)&sin->sin_addr.s_addr;
-			(void) inet_ntop(AF_INET, ip, s, sizeof (s));
-		} else {
-			sin6 = (struct sockaddr_in6 *)sa;
-			ip = (void *)&sin6->sin6_addr.s6_addr;
-			(void) inet_ntop(AF_INET6, ip, s, sizeof (s));
-		}
-		ISNST_LOG(CE_WARN, "open iSNS Server %s:%u failed", s, port);
+		char	server_buf[IDM_SA_NTOP_BUFSIZ];
+		ISNST_LOG(CE_WARN, "open iSNS Server %s failed",
+		    idm_sa_ntop(sa, server_buf,
+		    sizeof (server_buf)));
+		DTRACE_PROBE1(isnst__connect__fail,
+		    struct sockaddr_storage *, sa);
 	}
 
 	return (so);
@@ -2221,7 +2787,6 @@ isnst_close_so(void *so)
 	idm_sodestroy(so);
 }
 
-
 /*
  * ESI handling
  */
@@ -2229,13 +2794,18 @@ isnst_close_so(void *so)
 static void
 isnst_esi_start(void)
 {
-	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+	if (isns_use_esi == B_FALSE) {
+		ISNST_LOG(CE_NOTE, "ESI disabled by isns_use_esi=FALSE");
+		return;
+	}
 
 	ISNST_LOG(CE_NOTE, "isnst_esi_start");
 
 	mutex_enter(&esi.esi_mutex);
+	ASSERT(esi.esi_enabled == B_FALSE);
+	ASSERT(esi.esi_thread_running == B_FALSE);
+
 	esi.esi_enabled = B_TRUE;
-	esi.esi_thread_running = B_FALSE;
 	esi.esi_valid = B_FALSE;
 	esi.esi_thread = thread_create(NULL, 0, isnst_esi_thread,
 	    (void *)&esi, 0, &p0, TS_RUN, minclsyspri);
@@ -2256,16 +2826,17 @@ isnst_esi_stop()
 
 	/* Shutdown ESI listening socket, wait for thread to terminate */
 	mutex_enter(&esi.esi_mutex);
-	esi.esi_enabled = B_FALSE;
-	if (esi.esi_valid) {
-		idm_soshutdown(esi.esi_so);
+	if (esi.esi_enabled) {
+		esi.esi_enabled = B_FALSE;
+		if (esi.esi_valid) {
+			idm_soshutdown(esi.esi_so);
+			idm_sodestroy(esi.esi_so);
+		}
 		mutex_exit(&esi.esi_mutex);
-		idm_sodestroy(esi.esi_so);
+		thread_join(esi.esi_thread_did);
 	} else {
 		mutex_exit(&esi.esi_mutex);
 	}
-	thread_join(esi.esi_thread_did);
-
 }
 
 /*
@@ -2304,8 +2875,6 @@ isnst_esi_thread(void *arg)
 		/*
 		 * Create a socket to listen for requests from the iSNS server.
 		 */
-		DTRACE_PROBE1(iscsit__isns__esi__socreate,
-		    boolean_t, esi.esi_enabled);
 		if ((esi.esi_so = idm_socreate(PF_INET6, SOCK_STREAM, 0)) ==
 		    NULL) {
 			ISNST_LOG(CE_WARN,
@@ -2360,8 +2929,10 @@ isnst_esi_thread(void *arg)
 		while (esi.esi_enabled) {
 			mutex_exit(&esi.esi_mutex);
 
-			DTRACE_PROBE1(iscsit__isns__esi__accept__wait,
-			    boolean_t, esi.esi_enabled);
+			DTRACE_PROBE3(iscsit__isns__esi__accept__wait,
+			    boolean_t, esi.esi_enabled,
+			    ksocket_t, esi.esi_so,
+			    struct sockaddr_in6, &sin6);
 			if ((rc = ksocket_accept(esi.esi_so, NULL, NULL,
 			    &newso, CRED())) != 0) {
 				mutex_enter(&esi.esi_mutex);
@@ -2399,13 +2970,6 @@ isnst_esi_thread(void *arg)
 
 			(void) ksocket_close(newso, CRED());
 
-			/*
-			 * Do not hold the esi mutex during server timestamp
-			 * update.  It requires the isns global lock, which may
-			 * be held during other functions that also require
-			 * the esi_mutex (potential deadlock).
-			 */
-			isnst_update_server_timestamp(newso);
 			mutex_enter(&esi.esi_mutex);
 		}
 
@@ -2436,18 +3000,20 @@ esi_thread_exit:
 static void
 isnst_handle_esi_req(ksocket_t ks, isns_pdu_t *pdu, size_t pdu_size)
 {
-	static char		log_addr_buf[INET6_ADDRSTRLEN];
 	isns_pdu_t		*rsp_pdu;
 	isns_resp_t		*rsp;
 	isns_tlv_t		*attr;
 	uint32_t		attr_len, attr_id;
 	size_t			req_pl_len, rsp_size, tlv_len;
-	struct sockaddr_storage	ss;
+	struct sockaddr_storage	portal_ss;
+	struct sockaddr_storage	server_ss;
 	struct sockaddr_in6	*portal_addr6;
 	boolean_t		portal_addr_valid = B_FALSE;
 	boolean_t		portal_port_valid = B_FALSE;
 	uint32_t		esi_response = ISNS_RSP_SUCCESSFUL;
-	isns_portal_list_t	*portal;
+	isns_portal_t		*iportal;
+	socklen_t		sa_len;
+
 
 	if (ntohs(pdu->func_id) != ISNS_ESI) {
 		ISNST_LOG(CE_WARN, "isnst_handle_esi_req: Unexpected func 0x%x",
@@ -2486,9 +3052,9 @@ isnst_handle_esi_req(ksocket_t ks, isns_pdu_t *pdu, size_t pdu_size)
 	 * ISNS_PORTAL_IP_ADDR_ATTR_ID,
 	 * ISNS_PORTAL_PORT_ATTR_ID
 	 */
-	bzero(&ss, sizeof (struct sockaddr_storage));
-	ss.ss_family = AF_INET6;
-	portal_addr6 = (struct sockaddr_in6 *)&ss;
+	bzero(&portal_ss, sizeof (struct sockaddr_storage));
+	portal_ss.ss_family = AF_INET6;
+	portal_addr6 = (struct sockaddr_in6 *)&portal_ss;
 	attr = (isns_tlv_t *)((void *)&pdu->payload);
 	attr_len = ntohl(attr->attr_len);
 	attr_id = ntohl(attr->attr_id);
@@ -2544,12 +3110,7 @@ isnst_handle_esi_req(ksocket_t ks, isns_pdu_t *pdu, size_t pdu_size)
 	if (!portal_port_valid)
 		portal_addr6->sin6_port = htons(ISCSI_LISTEN_PORT);
 
-	if (portal_addr_valid) {
-		ISNST_LOG(CE_NOTE, "ESI %s:%d",
-		    inet_ntop(AF_INET6, &portal_addr6->sin6_addr, log_addr_buf,
-		    INET6_ADDRSTRLEN),
-		    ntohs(portal_addr6->sin6_port));
-	} else {
+	if (!portal_addr_valid) {
 		esi_response = ISNS_RSP_MSG_FORMAT_ERROR;
 	}
 
@@ -2559,14 +3120,64 @@ isnst_handle_esi_req(ksocket_t ks, isns_pdu_t *pdu, size_t pdu_size)
 	 * timeout the portal and eliminate it from the list.
 	 */
 
+	if (esi_response != ISNS_RSP_SUCCESSFUL) {
+		kmem_free(pdu, pdu_size);
+		return;
+	}
+
+	/* Get the remote peer's IP address */
+	bzero(&server_ss, sizeof (server_ss));
+	sa_len = sizeof (server_ss);
+	if (ksocket_getpeername(ks, (struct sockaddr *)&server_ss, &sa_len,
+	    CRED())) {
+		return;
+	}
+
+	if (iscsit_isns_logging) {
+		char	server_buf[IDM_SA_NTOP_BUFSIZ];
+		char	portal_buf[IDM_SA_NTOP_BUFSIZ];
+		ISNST_LOG(CE_NOTE, "ESI: svr %s -> portal %s",
+		    idm_sa_ntop(&server_ss, server_buf,
+		    sizeof (server_buf)),
+		    idm_sa_ntop(&portal_ss, portal_buf,
+		    sizeof (portal_buf)));
+	}
+
+
 	ISNS_GLOBAL_LOCK();
-	if ((esi_response != ISNS_RSP_SUCCESSFUL) ||
-	    !isnst_portal_exists(&ss)) {
+	if (isnst_lookup_portal(&portal_ss) == NULL) {
+		ISNST_LOG(CE_WARN, "ESI req to non-active portal");
 		ISNS_GLOBAL_UNLOCK();
 		kmem_free(pdu, pdu_size);
 		return;
 	}
+
+	/*
+	 * Update the server timestamp of how recently we have
+	 * received an ESI request from this iSNS server.
+	 * We ignore requests from servers we don't know.
+	 */
+	if (! isnst_update_server_timestamp(&server_ss)) {
+		ISNST_LOG(CE_WARN, "ESI req from unknown server");
+		kmem_free(pdu, pdu_size);
+		ISNS_GLOBAL_UNLOCK();
+		return;
+	}
+
+	/*
+	 * Update ESI timestamps for all portals with same IP address.
+	 */
+	for (iportal = avl_first(&isns_all_portals);
+	    iportal != NULL;
+	    iportal = AVL_NEXT(&isns_all_portals, iportal)) {
+		if (idm_ss_compare(&iportal->portal_addr, &portal_ss,
+		    B_TRUE, B_FALSE)) {
+			gethrestime(&iportal->portal_esi_timestamp);
+		}
+	}
+
 	ISNS_GLOBAL_UNLOCK();
+
 
 	/*
 	 * Build response validating the portal
@@ -2598,22 +3209,9 @@ isnst_handle_esi_req(ksocket_t ks, isns_pdu_t *pdu, size_t pdu_size)
 	kmem_free(rsp_pdu, rsp_size);
 	kmem_free(pdu, pdu_size);
 
-	/*
-	 * Update ESI timestamps for all matching portals.  Iscsit may or
-	 * may not allow portals to belong to multiple portal groups depending
-	 * on the policy it implements.  The iSNS client  does not know or
-	 * care so we allow for multiple hits in the list.
-	 */
-	ISNS_GLOBAL_LOCK();
-	for (portal = isnst_lookup_portal(&ss, NULL);
-	    portal != NULL;
-	    portal = isnst_lookup_portal(&ss, portal)) {
-		gethrestime(&portal->portal_esi_timestamp);
-	}
-	ISNS_GLOBAL_UNLOCK();
 }
 
-int
+static int
 isnst_tgt_avl_compare(const void *t1, const void *t2)
 {
 	const isns_target_t	*tgt1 = t1;
@@ -2633,108 +3231,215 @@ isnst_tgt_avl_compare(const void *t1, const void *t2)
 }
 
 static void
-isnst_get_target_list(void)
+isnst_set_server_status(iscsit_isns_svr_t *svr, boolean_t registered)
 {
-	iscsit_tgt_t	*tgt, *next_tgt;
+	isns_target_t		*itarget;
 
-	/*
-	 * Initialize our list of targets with those from the global
-	 * list that are online.
-	 */
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 
-	for (tgt = avl_first(&iscsit_global.global_target_list); tgt != NULL;
-	    tgt = next_tgt) {
-		next_tgt = AVL_NEXT(&iscsit_global.global_target_list, tgt);
-		if (tgt->target_state == TS_STMF_ONLINE) {
-			(void) isnst_add_to_target_list(tgt);
+	svr->svr_reset_needed = B_FALSE;
+	if (registered == B_TRUE) {
+		svr->svr_registered = B_TRUE;
+		svr->svr_last_msg = ddi_get_lbolt();
+		itarget = avl_first(&svr->svr_target_list);
+		while (itarget) {
+			isns_target_t *next_target;
+			next_target = AVL_NEXT(&svr->svr_target_list, itarget);
+			if (itarget->target_delete_needed) {
+				/* All deleted tgts removed */
+				isnst_clear_from_target_list(itarget,
+				    &svr->svr_target_list);
+			} else {
+				/* Other tgts marked registered */
+				itarget->target_registered = B_TRUE;
+			}
+			itarget = next_target;
 		}
+		ASSERT(avl_numnodes(&svr->svr_target_list) > 0);
+	} else {
+		svr->svr_registered = B_FALSE;
+		isnst_clear_target_list(svr);
 	}
 }
 
 static void
-isnst_set_server_status(iscsit_isns_svr_t *svr, boolean_t registered)
+isnst_monitor_default_portal_list(void)
 {
-	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+	idm_addr_list_t		*new_portal_list = NULL;
+	uint32_t		new_portal_list_size = 0;
 
-	if (registered == B_TRUE) {
-		svr->svr_registered = B_TRUE;
-		svr->svr_last_msg = ddi_get_lbolt();
-	} else {
-		svr->svr_registered = B_FALSE;
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+	ASSERT(mutex_owned(&iscsit_isns_mutex));
+
+	if (default_portal_online) {
+		new_portal_list_size = idm_get_ipaddr(&new_portal_list);
+	}
+
+	/*
+	 * We compute a new list of portals if
+	 * a) Something in itadm has changed a portal
+	 * b) there are new default portals
+	 * c) the default portal has gone offline
+	 */
+	if (isns_portals_changed ||
+	    (default_portal_online &&
+	    (isnst_find_default_portals(new_portal_list) !=
+	    num_default_portals)) ||
+	    (! default_portal_online && num_default_portals > 0)) {
+
+		isnst_clear_default_portals();
+		isnst_copy_portal_list(&isns_tpg_portals,
+		    &isns_all_portals);
+		num_tpg_portals = avl_numnodes(&isns_all_portals);
+		if (default_portal_online) {
+			num_default_portals =
+			    isnst_add_default_portals(new_portal_list);
+		}
+	}
+
+	/* Catch any case where we miss an update to TPG portals */
+	ASSERT(num_tpg_portals == avl_numnodes(&isns_tpg_portals));
+
+	if (new_portal_list != NULL) {
+		kmem_free(new_portal_list, new_portal_list_size);
 	}
 }
 
-static boolean_t
-isnst_lookup_default_portal(struct sockaddr_storage *p)
+
+static int
+isnst_find_default_portals(idm_addr_list_t *alist)
 {
-	idm_addr_list_t		*default_portal_list;
-	uint32_t		default_portal_list_size;
 	idm_addr_t		*dportal;
-	struct sockaddr_storage	dportal_ss;
-	int			idx;
-	boolean_t		result = B_FALSE;
+	isns_portal_t		*iportal;
+	struct sockaddr_storage	sa;
+	int			aidx;
+	int			num_portals_found = 0;
 
-	/*
-	 * If the address we're looking up is not using the well known
-	 * port then it's inherently not a match for a default portal
-	 */
-	if (((struct sockaddr_in *)p)->sin_port != htons(ISCSI_LISTEN_PORT)) {
-		return (B_FALSE);
-	}
-
-	/*
-	 * Get the global list of default portals
-	 */
-	default_portal_list_size = idm_get_ipaddr(&default_portal_list);
-
-	if (default_portal_list_size == 0) {
-		ISNST_LOG(CE_WARN, "isnst_lookup_default_portal: "
-		    "No default portals");
-		return (B_FALSE);
-	}
-
-	/*
-	 * Scan the through the current default portal list (this should
-	 * be refreshed just before lookup since the contents can change)
-	 */
-	for (idx = 0; idx < default_portal_list->al_out_cnt; idx++) {
-		dportal = &default_portal_list->al_addrs[idx];
-
-		/*
-		 * Translate the address idm_get_ipaddr returned into
-		 * sockaddr_storage format
-		 */
-		bzero(&dportal_ss, sizeof (dportal_ss));
-		((struct sockaddr_in *)&dportal_ss)->sin_port =
-		    htons(ISCSI_LISTEN_PORT);
-		if (dportal->a_addr.i_insize == sizeof (struct in_addr)) {
-			dportal_ss.ss_family = AF_INET;
-			bcopy(&dportal->a_addr.i_addr.in4,
-			    &((struct sockaddr_in *)&dportal_ss)->sin_addr,
-			    sizeof (struct in_addr));
-		} else if (dportal->a_addr.i_insize ==
-		    sizeof (struct in6_addr)) {
-			dportal_ss.ss_family = AF_INET6;
-			bcopy(&dportal->a_addr.i_addr.in6,
-			    &((struct sockaddr_in6 *)&dportal_ss)->sin6_addr,
-			    sizeof (struct in6_addr));
-		} else {
-			continue;
+	for (aidx = 0; aidx < alist->al_out_cnt; aidx++) {
+		dportal = &alist->al_addrs[aidx];
+		dportal->a_port = ISCSI_LISTEN_PORT;
+		idm_addr_to_sa(dportal, &sa);
+		iportal = isnst_lookup_portal(&sa);
+		if (iportal == NULL) {
+			/* Found a non-matching default portal */
+			return (-1);
 		}
-
-		/*
-		 * Now we can compare to the address we were passed
-		 */
-		if (idm_ss_compare(p, &dportal_ss,
-		    B_TRUE /* v4_mapped_as_v4 */) == 0) {
-			result = B_TRUE;
-			goto lookup_default_portal_done;
+		if (iportal->portal_default) {
+			num_portals_found++;
 		}
 	}
+	return (num_portals_found);
+}
 
-lookup_default_portal_done:
-	kmem_free(default_portal_list, default_portal_list_size);
-	return (result);
+static void
+isnst_clear_default_portals(void)
+{
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+
+	isnst_clear_portal_list(&isns_all_portals);
+	num_tpg_portals = 0;
+	num_default_portals = 0;
+}
+
+static int
+isnst_add_default_portals(idm_addr_list_t *alist)
+{
+	idm_addr_t		*dportal;
+	isns_portal_t		*iportal;
+	struct sockaddr_storage	sa;
+	int			aidx;
+
+	for (aidx = 0; aidx < alist->al_out_cnt; aidx++) {
+		dportal = &alist->al_addrs[aidx];
+		dportal->a_port = ISCSI_LISTEN_PORT;
+		idm_addr_to_sa(dportal, &sa);
+		iportal = isnst_add_to_portal_list(&sa, &isns_all_portals);
+		iportal->portal_default = B_TRUE;
+	}
+	return (alist->al_out_cnt);
+}
+
+
+static int
+isnst_portal_avl_compare(const void *p1, const void *p2)
+{
+	const isns_portal_t	*portal1 = p1;
+	const isns_portal_t	*portal2 = p2;
+
+	return (idm_ss_compare(&portal1->portal_addr, &portal2->portal_addr,
+	    B_TRUE /* v4_mapped_as_v4 */, B_TRUE /* compare_ports */));
+}
+
+static void
+isnst_clear_portal_list(avl_tree_t *portal_list)
+{
+	isns_portal_t	*iportal;
+	void *cookie = NULL;
+
+	while ((iportal = avl_destroy_nodes(portal_list, &cookie)) != NULL) {
+		kmem_free(iportal, sizeof (isns_portal_t));
+	}
+}
+static void
+isnst_copy_portal_list(avl_tree_t *t1, avl_tree_t *t2)
+{
+	isns_portal_t		*iportal, *jportal;
+
+	iportal = (isns_portal_t *)avl_first(t1);
+	while (iportal) {
+		jportal = isnst_add_to_portal_list(&iportal->portal_addr, t2);
+		jportal->portal_iscsit = iportal->portal_iscsit;
+		iportal = AVL_NEXT(t1, iportal);
+	}
+}
+
+
+static isns_portal_t *
+isnst_lookup_portal(struct sockaddr_storage *sa)
+{
+	isns_portal_t *iportal, tmp_portal;
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+
+	bcopy(sa, &tmp_portal.portal_addr, sizeof (*sa));
+	iportal = avl_find(&isns_all_portals, &tmp_portal, NULL);
+	return (iportal);
+}
+
+static isns_portal_t *
+isnst_add_to_portal_list(struct sockaddr_storage *sa, avl_tree_t *portal_list)
+{
+	isns_portal_t		*iportal, tmp_portal;
+	avl_index_t		where;
+	/*
+	 * Make sure this portal isn't already in our list.
+	 */
+
+	bcopy(sa, &tmp_portal.portal_addr, sizeof (*sa));
+
+	if ((iportal = (isns_portal_t *)avl_find(portal_list,
+	    &tmp_portal, &where)) == NULL) {
+		iportal = kmem_zalloc(sizeof (isns_portal_t), KM_SLEEP);
+		bcopy(sa, &iportal->portal_addr, sizeof (*sa));
+		avl_insert(portal_list, (void *)iportal, where);
+	}
+
+	return (iportal);
+}
+
+
+static void
+isnst_remove_from_portal_list(struct sockaddr_storage *sa,
+    avl_tree_t *portal_list)
+{
+	isns_portal_t		*iportal, tmp_portal;
+
+	bcopy(sa, &tmp_portal.portal_addr, sizeof (*sa));
+
+	if ((iportal = avl_find(portal_list, &tmp_portal, NULL))
+	    != NULL) {
+		avl_remove(portal_list, iportal);
+		kmem_free(iportal, sizeof (isns_portal_t));
+	}
 }
 
 /*
@@ -2745,37 +3450,42 @@ lookup_default_portal_done:
 void
 iscsit_isns_portal_online(iscsit_portal_t *portal)
 {
-	ISNS_GLOBAL_LOCK();
+	isns_portal_t	*iportal;
+
+	mutex_enter(&iscsit_isns_mutex);
 
 	if (portal->portal_default) {
 		/* Portals should only be onlined once */
-		ASSERT(!default_portal_online);
+		ASSERT(default_portal_online == B_FALSE);
 		default_portal_online = B_TRUE;
-		default_portal_state_change = B_TRUE;
-		ISNS_GLOBAL_UNLOCK();
-		return;
+	} else {
+		iportal = isnst_add_to_portal_list(
+		    &portal->portal_addr, &isns_tpg_portals);
+		iportal->portal_iscsit = portal;
 	}
+	isns_portals_changed = B_TRUE;
 
-	isnst_add_portal(portal);
+	mutex_exit(&iscsit_isns_mutex);
 
-	ISNS_GLOBAL_UNLOCK();
+	isnst_monitor_awaken();
 }
 
 void
 iscsit_isns_portal_offline(iscsit_portal_t *portal)
 {
-	ISNS_GLOBAL_LOCK();
+	mutex_enter(&iscsit_isns_mutex);
 
 	if (portal->portal_default) {
 		/* Portals should only be offlined once */
-		ASSERT(default_portal_online);
+		ASSERT(default_portal_online == B_TRUE);
 		default_portal_online = B_FALSE;
-		default_portal_state_change = B_TRUE;
-		ISNS_GLOBAL_UNLOCK();
-		return;
+	} else {
+		isnst_remove_from_portal_list(&portal->portal_addr,
+		    &isns_tpg_portals);
 	}
+	isns_portals_changed = B_TRUE;
 
-	isnst_remove_portal(portal);
+	mutex_exit(&iscsit_isns_mutex);
 
-	ISNS_GLOBAL_UNLOCK();
+	isnst_monitor_awaken();
 }

@@ -220,7 +220,7 @@ iscsit_add_default_portals(iscsit_conn_t *ict, idm_addr_list_t *ipaddr_p,
 				 * do not match the incoming connection.
 				 */
 				if (idm_ss_compare(&ss, &ict->ict_ic->ic_laddr,
-				    B_TRUE) != 0)
+				    B_TRUE, B_TRUE) != 0)
 					continue;
 				break;
 			case 2:
@@ -229,7 +229,7 @@ iscsit_add_default_portals(iscsit_conn_t *ict, idm_addr_list_t *ipaddr_p,
 				 * remaining portals.
 				 */
 				if (idm_ss_compare(&ss, &ict->ict_ic->ic_laddr,
-				    B_TRUE) == 0)
+				    B_TRUE, B_TRUE) == 0)
 					continue;
 				break;
 			}
@@ -273,8 +273,8 @@ iscsit_add_portals(iscsit_conn_t *ict, iscsit_tpgt_t *tpg_list,
 				 * On the first pass, skip portals that
 				 * do not match the incoming connection.
 				 */
-				if (idm_ss_compare(ss,
-				    &ict->ict_ic->ic_laddr, B_TRUE) != 0)
+				if (idm_ss_compare(ss, &ict->ict_ic->ic_laddr,
+				    B_TRUE, B_TRUE) != 0)
 					continue;
 				break;
 			case 2:
@@ -282,8 +282,8 @@ iscsit_add_portals(iscsit_conn_t *ict, iscsit_tpgt_t *tpg_list,
 				 * On the second pass, process the
 				 * remaining portals.
 				 */
-				if (idm_ss_compare(ss,
-				    &ict->ict_ic->ic_laddr, B_TRUE) == 0)
+				if (idm_ss_compare(ss, &ict->ict_ic->ic_laddr,
+				    B_TRUE, B_TRUE) == 0)
 					continue;
 				break;
 			}

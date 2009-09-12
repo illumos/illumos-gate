@@ -77,6 +77,13 @@ typedef struct idm_so_conn_s {
 void idm_so_init(idm_transport_t *it);
 void idm_so_fini();
 
+/* used by idm_so_timed_socket_connect */
+typedef struct idm_so_timed_socket_s {
+	kcondvar_t	it_cv;
+	boolean_t	it_callback_called;
+	int		it_socket_error_code;
+} idm_so_timed_socket_t;
+
 /* Socket functions */
 
 ksocket_t
@@ -88,9 +95,18 @@ void idm_sodestroy(ksocket_t so);
 
 int idm_ss_compare(const struct sockaddr_storage *cmp_ss1,
     const struct sockaddr_storage *cmp_ss2,
-    boolean_t v4_mapped_as_v4);
+    boolean_t v4_mapped_as_v4,
+    boolean_t compare_ports);
 
 int idm_get_ipaddr(idm_addr_list_t **);
+
+void idm_addr_to_sa(idm_addr_t *dportal,
+    struct sockaddr_storage *sa);
+
+#define	IDM_SA_NTOP_BUFSIZ (INET6_ADDRSTRLEN + sizeof ("[].65535") + 1)
+
+const char *idm_sa_ntop(const struct sockaddr_storage *sa,
+    char *buf, size_t size);
 
 int idm_sorecv(ksocket_t so, void *msg, size_t len);
 
@@ -117,6 +133,8 @@ void idm_sorx_pdu_destructor(void *pdu_void, void *arg);
 
 void idm_so_svc_port_watcher(void *arg);
 
+int idm_so_timed_socket_connect(ksocket_t ks,
+    struct sockaddr_storage *sa, int sa_sz, int login_max_usec);
 
 #ifdef	__cplusplus
 }

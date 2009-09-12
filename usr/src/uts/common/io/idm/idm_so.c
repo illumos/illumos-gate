@@ -46,6 +46,7 @@
 #include <net/if.h>
 #include <sys/sockio.h>
 #include <sys/ksocket.h>
+#include <sys/filio.h>		/* FIONBIO */
 #include <sys/iscsi_protocol.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
@@ -159,6 +160,7 @@ idm_transport_ops_t idm_so_transport_ops = {
 	idm_so_declare_key_values	/* it_declare_key_values */
 };
 
+kmutex_t	idm_so_timed_socket_mutex;
 /*
  * idm_so_init()
  * Sockets transport initialization
@@ -182,6 +184,9 @@ idm_so_init(idm_transport_t *it)
 
 	/* Set the sockets transport ops */
 	it->it_ops = &idm_so_transport_ops;
+
+	mutex_init(&idm_so_timed_socket_mutex, NULL, MUTEX_DEFAULT, NULL);
+
 }
 
 /*
@@ -194,6 +199,7 @@ idm_so_fini(void)
 	kmem_cache_destroy(idm.idm_so_128k_buf_cache);
 	kmem_cache_destroy(idm.idm_sotx_pdu_cache);
 	kmem_cache_destroy(idm.idm_sorx_pdu_cache);
+	mutex_destroy(&idm_so_timed_socket_mutex);
 }
 
 ksocket_t
@@ -241,7 +247,8 @@ idm_sodestroy(ksocket_t ks)
 int
 idm_ss_compare(const struct sockaddr_storage *cmp_ss1,
     const struct sockaddr_storage *cmp_ss2,
-    boolean_t v4_mapped_as_v4)
+    boolean_t v4_mapped_as_v4,
+    boolean_t compare_ports)
 {
 	struct sockaddr_storage			mapped_v4_ss1, mapped_v4_ss2;
 	const struct sockaddr_storage		*ss1, *ss2;
@@ -284,8 +291,9 @@ idm_ss_compare(const struct sockaddr_storage *cmp_ss1,
 	/*
 	 * Compare ports, then address family, then ip address
 	 */
-	if (((struct sockaddr_in *)ss1)->sin_port !=
-	    ((struct sockaddr_in *)ss2)->sin_port) {
+	if (compare_ports &&
+	    (((struct sockaddr_in *)ss1)->sin_port !=
+	    ((struct sockaddr_in *)ss2)->sin_port)) {
 		if (((struct sockaddr_in *)ss1)->sin_port >
 		    ((struct sockaddr_in *)ss2)->sin_port)
 			return (1);
@@ -2888,4 +2896,214 @@ idm_so_socket_set_block(struct sonode *node)
 {
 	(void) VOP_SETFL(node->so_vnode, node->so_flag,
 	    (node->so_state & (~FNONBLOCK)), CRED(), NULL);
+}
+
+
+/*
+ * Called by kernel sockets when the connection has been accepted or
+ * rejected. In early volo, a "disconnect" callback was sent instead of
+ * "connectfailed", so we check for both.
+ */
+/* ARGSUSED */
+void
+idm_so_timed_socket_connect_cb(ksocket_t ks,
+    ksocket_callback_event_t ev, void *arg, uintptr_t info)
+{
+	idm_so_timed_socket_t	*itp = arg;
+	ASSERT(itp != NULL);
+	ASSERT(ev == KSOCKET_EV_CONNECTED ||
+	    ev == KSOCKET_EV_CONNECTFAILED ||
+	    ev == KSOCKET_EV_DISCONNECTED);
+
+	mutex_enter(&idm_so_timed_socket_mutex);
+	itp->it_callback_called = B_TRUE;
+	if (ev == KSOCKET_EV_CONNECTED) {
+		itp->it_socket_error_code = 0;
+	} else {
+		/* Make sure the error code is non-zero on error */
+		if (info == 0)
+			info = ECONNRESET;
+		itp->it_socket_error_code = (int)info;
+	}
+	cv_signal(&itp->it_cv);
+	mutex_exit(&idm_so_timed_socket_mutex);
+}
+
+int
+idm_so_timed_socket_connect(ksocket_t ks,
+    struct sockaddr_storage *sa, int sa_sz, int login_max_usec)
+{
+	clock_t			conn_login_max;
+	int			rc, nonblocking, rval;
+	idm_so_timed_socket_t	it;
+	ksocket_callbacks_t	ks_cb;
+
+	conn_login_max = ddi_get_lbolt() + drv_usectohz(login_max_usec);
+
+	/*
+	 * Set to non-block socket mode, with callback on connect
+	 * Early volo used "disconnected" instead of "connectfailed",
+	 * so set callback to look for both.
+	 */
+	bzero(&it, sizeof (it));
+	ks_cb.ksock_cb_flags = KSOCKET_CB_CONNECTED |
+	    KSOCKET_CB_CONNECTFAILED | KSOCKET_CB_DISCONNECTED;
+	ks_cb.ksock_cb_connected = idm_so_timed_socket_connect_cb;
+	ks_cb.ksock_cb_connectfailed = idm_so_timed_socket_connect_cb;
+	ks_cb.ksock_cb_disconnected = idm_so_timed_socket_connect_cb;
+	cv_init(&it.it_cv, NULL, CV_DEFAULT, NULL);
+	rc = ksocket_setcallbacks(ks, &ks_cb, &it, CRED());
+	if (rc != 0)
+		return (rc);
+
+	/* Set to non-blocking mode */
+	nonblocking = 1;
+	rc = ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
+	    CRED());
+	if (rc != 0)
+		goto cleanup;
+
+	bzero(&it, sizeof (it));
+	for (;;) {
+		/*
+		 * Warning -- in a loopback scenario, the call to
+		 * the connect_cb can occur inside the call to
+		 * ksocket_connect. Do not hold the mutex around the
+		 * call to ksocket_connect.
+		 */
+		rc = ksocket_connect(ks, (struct sockaddr *)sa, sa_sz, CRED());
+		if (rc == 0 || rc == EISCONN) {
+			/* socket success or already success */
+			rc = 0;
+			break;
+		}
+		if ((rc != EINPROGRESS) && (rc != EALREADY)) {
+			break;
+		}
+
+		/* TCP connect still in progress. See if out of time. */
+		if (ddi_get_lbolt() > conn_login_max) {
+			/*
+			 * Connection retry timeout,
+			 * failed connect to target.
+			 */
+			rc = ETIMEDOUT;
+			break;
+		}
+
+		/*
+		 * TCP connect still in progress.  Sleep until callback.
+		 * Do NOT go to sleep if the callback already occurred!
+		 */
+		mutex_enter(&idm_so_timed_socket_mutex);
+		if (!it.it_callback_called) {
+			(void) cv_timedwait(&it.it_cv,
+			    &idm_so_timed_socket_mutex, conn_login_max);
+		}
+		if (it.it_callback_called) {
+			rc = it.it_socket_error_code;
+			mutex_exit(&idm_so_timed_socket_mutex);
+			break;
+		}
+		/* If timer expires, go call ksocket_connect one last time. */
+		mutex_exit(&idm_so_timed_socket_mutex);
+	}
+
+	/* resume blocking mode */
+	nonblocking = 0;
+	(void)  ksocket_ioctl(ks, FIONBIO, (intptr_t)&nonblocking, &rval,
+	    CRED());
+cleanup:
+	ksocket_setcallbacks(ks, NULL, NULL, CRED());
+	cv_destroy(&it.it_cv);
+	if (rc != 0) {
+		idm_soshutdown(ks);
+	}
+	return (rc);
+}
+
+
+void
+idm_addr_to_sa(idm_addr_t *dportal, struct sockaddr_storage *sa)
+{
+	int			dp_addr_size;
+	struct sockaddr_in	*sin;
+	struct sockaddr_in6	*sin6;
+
+	/* Build sockaddr_storage for this portal (idm_addr_t) */
+	bzero(sa, sizeof (*sa));
+	dp_addr_size = dportal->a_addr.i_insize;
+	if (dp_addr_size == sizeof (struct in_addr)) {
+		/* IPv4 */
+		sa->ss_family = AF_INET;
+		sin = (struct sockaddr_in *)sa;
+		sin->sin_port = htons(dportal->a_port);
+		bcopy(&dportal->a_addr.i_addr.in4,
+		    &sin->sin_addr, sizeof (struct in_addr));
+	} else if (dp_addr_size == sizeof (struct in6_addr)) {
+		/* IPv6 */
+		sa->ss_family = AF_INET6;
+		sin6 = (struct sockaddr_in6 *)sa;
+		sin6->sin6_port = htons(dportal->a_port);
+		bcopy(&dportal->a_addr.i_addr.in6,
+		    &sin6->sin6_addr, sizeof (struct in6_addr));
+	} else {
+		ASSERT(0);
+	}
+}
+
+
+/*
+ * return a human-readable form of a sockaddr_storage, in the form
+ * [ip-address]:port.  This is used in calls to logging functions.
+ * If several calls to idm_sa_ntop are made within the same invocation
+ * of a logging function, then each one needs its own buf.
+ */
+const char *
+idm_sa_ntop(const struct sockaddr_storage *sa,
+    char *buf, size_t size)
+{
+	static const char bogus_ip[] = "[0].-1";
+	char tmp[INET6_ADDRSTRLEN];
+
+	switch (sa->ss_family) {
+	case AF_INET6:
+		{
+			const struct sockaddr_in6 *in6 =
+			    (const struct sockaddr_in6 *) sa;
+
+			if (inet_ntop(in6->sin6_family,
+			    &in6->sin6_addr, tmp, sizeof (tmp)) == NULL) {
+				goto err;
+			}
+			if (strlen(tmp) + sizeof ("[].65535") > size) {
+				goto err;
+			}
+			/* struct sockaddr_storage gets port info from v4 loc */
+			(void) snprintf(buf, size, "[%s].%u", tmp,
+			    ntohs(in6->sin6_port));
+			return (buf);
+		}
+	case AF_INET:
+		{
+			const struct sockaddr_in *in =
+			    (const struct sockaddr_in *) sa;
+
+			if (inet_ntop(in->sin_family, &in->sin_addr,
+			    tmp, sizeof (tmp)) == NULL) {
+				goto err;
+			}
+			if (strlen(tmp) + sizeof ("[].65535") > size) {
+				goto err;
+			}
+			(void) snprintf(buf, size,  "[%s].%u", tmp,
+			    ntohs(in->sin_port));
+			return (buf);
+		}
+	default:
+		break;
+	}
+err:
+	(void) snprintf(buf, size, "%s", bogus_ip);
+	return (buf);
 }

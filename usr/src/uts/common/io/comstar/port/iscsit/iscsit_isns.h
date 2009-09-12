@@ -36,8 +36,13 @@ typedef struct {
 	struct sockaddr_storage	svr_sa;
 	clock_t			svr_last_msg;
 	list_node_t		svr_ln;
-	boolean_t		svr_registered;
+	uint32_t		svr_registered:1,
+				svr_reset_needed:1,
+				svr_delete_needed:1,
+				svr_targets_changed:1;
+	uint32_t		svr_last_target_index;
 	uint32_t		svr_esi_interval;
+	avl_tree_t		svr_target_list;
 } iscsit_isns_svr_t;
 
 /*
@@ -48,16 +53,14 @@ typedef enum {
 	ISNS_DEREGISTER_ALL,
 	ISNS_REGISTER_TARGET,
 	ISNS_REGISTER_ALL,
-	ISNS_UPDATE_TARGET
+	ISNS_MODIFY_TARGET
 } isns_reg_type_t;
 
 /*
  * This structure is used to keep state with regard to the RX threads used
- * for ESI.  There must always be a 1:1 correspondence between the entries
- * in this list and the entries in the portal_list.
+ * for ESI.
  */
 
-struct isns_portal_list_s;
 
 typedef struct {
 	kthread_t			*esi_thread;
@@ -73,28 +76,67 @@ typedef struct {
 
 
 /*
- * Portal list - comprised of "default" portals (i.e. idm_get_ipaddr) and
- * portals that are part of target portal groups.
+ * Portal list - both default portals from idm_get_ipaddr and portals
+ * defined in target port groups.
  */
 
-typedef struct isns_portal_list_s {
+typedef struct isns_portal_s {
 	struct sockaddr_storage		portal_addr;
-	iscsit_portal_t			*portal_iscsit;
-	list_node_t			portal_ln;
+	avl_node_t			portal_node;
 	timespec_t			portal_esi_timestamp;
-} isns_portal_list_t;
+	iscsit_portal_t			*portal_iscsit;	/* if in TPG */
+	boolean_t			portal_default; /* if in default */
+} isns_portal_t;
 
+
+typedef struct isns_tpgt_addr_s {
+	list_node_t		portal_ln;
+	struct sockaddr_storage	portal_addr;
+} isns_tpgt_addr_t;
+
+typedef struct isns_tpgt_s {
+	list_node_t		ti_tpgt_ln;
+	uint16_t		ti_tpgt_tag;
+	list_t			ti_portal_list;
+} isns_tpgt_t;
+
+typedef struct isns_target_info_s {
+	idm_refcnt_t		ti_refcnt;
+	char			ti_tgt_name[MAX_ISCSI_NODENAMELEN];
+	char			ti_tgt_alias[MAX_ISCSI_NODENAMELEN];
+	list_t			ti_tpgt_list;
+} isns_target_info_t;
+
+/* Contents of isns_target_list and svr->svr_target_list */
 typedef struct isns_target_s {
 	iscsit_tgt_t		*target;
 	avl_node_t		target_node;
 	boolean_t		target_registered;
+	boolean_t		target_update_needed;
+	boolean_t		target_delete_needed;
+	isns_target_info_t	*target_info;
 } isns_target_t;
 
 /*
  * If no ESI request is received within this number of intervals, we'll
  * try to re-register with the server.
  */
-#define	MAX_ESI_INTERVALS	3
+#define	MAX_ESI_INTERVALS			3
+
+/*
+ * Interval to ask the server to send us ESI probes, in seconds.
+ */
+#define	ISNS_DEFAULT_ESI_INTERVAL		20
+
+/*
+ * Registration Period (when not using ESI), in seconds. (15 min)
+ */
+#define	ISNS_DEFAULT_REGISTRATION_PERIOD	900
+
+/*
+ * Initial delay before sending first DevAttrReg message.
+ */
+#define	ISNS_INITIAL_DELAY			5
 
 it_cfg_status_t
 isnst_config_merge(it_config_t *cfg);
