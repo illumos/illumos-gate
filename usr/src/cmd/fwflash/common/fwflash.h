@@ -41,7 +41,6 @@ extern "C" {
 #define	MSG_INFO	0
 #define	MSG_WARN	1
 #define	MSG_ERROR	2
-int fwflash_debug;
 
 #define	FWFLASH_SUCCESS		0
 #define	FWFLASH_FAILURE		1
@@ -341,12 +340,14 @@ struct vrfyplugin {
 /* global variables for fwflash */
 TAILQ_HEAD(PLUGINLIST, pluginlist);
 TAILQ_HEAD(DEVICELIST, devicelist);
-struct PLUGINLIST *fw_pluginlist;
-struct DEVICELIST *fw_devices;
 
-struct vrfyplugin *verifier;
-di_node_t rootnode;
-struct fw_plugin *self;
+/* exposed global args */
+extern di_node_t rootnode;
+extern struct PLUGINLIST *fw_pluginlist;
+extern struct DEVICELIST *fw_devices;
+extern struct vrfyplugin *verifier;
+extern struct fw_plugin *self;
+extern int fwflash_debug;
 
 /*
  * utility defines and macros, since the firmware image we get

@@ -22,34 +22,25 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fwflash/plugins
+
 #
-include $(SRC)/Makefile.master
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
 
-COMMON_SUBDIRS=	$(MACH)
-$(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED)/cmd/fwflash/plugins 
-
-SUBDIRS=	$(COMMON_SUBDIRS)
-
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-_msg :=		TARGET= _msg
-msg :=		TARGET= msg
-
-
-.KEEP_STATE:
-
-all clean clobber install lint msg _msg:		$(SUBDIRS)
-
-
-$(SUBDIRS): FRC
-	@if [ -f $@/Makefile ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
-	else \
-		true; \
-	fi
-
-FRC:
+SUNWprivate { 
+    global:
+	cnx_crc16;
+	cnx_is_magic_pattern_present;
+	cnx_parse_img_info;
+};
+  

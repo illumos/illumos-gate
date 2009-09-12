@@ -18,24 +18,37 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
-# cmd/fwflash/common/Makefile
+# MAPFILE HEADER START
 #
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
 #
 
-HDRS=	fwflash.h
-
-all:	install_h
-
-include $(SRC)/Makefile.master
-include ../Makefile.com
-
-$(ROOTUSRINCLUDEFWFLASH)/%.h :=	FILEMODE= 0644
-
-install_h: $(ROOTUSRINCLUDEFWFLASH) \
-	$(ROOTUSRINCLUDEFWFLASH)/$(HDRS)
-
+SUNWprivate { 
+    global:
+	fw_devices = PARENT;
+	fw_pluginlist = PARENT;
+	fwflash_debug = PARENT;
+	rootnode = PARENT;
+	self = PARENT;
+	verifier = PARENT;
+	logmsg = PARENT;
+	vendorvrfy;
+	vendor;
+    local:
+	*;
+};
+  

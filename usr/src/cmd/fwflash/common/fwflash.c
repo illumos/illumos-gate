@@ -73,6 +73,14 @@ static char *sla [] = { "Copyright 2007 Sun Microsystems, Inc., 4150 Network "
 int	fwflash_arg_list = 0;
 char	*filelist[10];
 
+/* exposed global args */
+di_node_t rootnode;
+struct PLUGINLIST *fw_pluginlist;
+struct DEVICELIST *fw_devices;
+struct vrfyplugin *verifier;
+struct fw_plugin *self;
+int fwflash_debug = 0;
+
 /* are we writing to flash? */
 static int fwflash_in_write = 0;
 

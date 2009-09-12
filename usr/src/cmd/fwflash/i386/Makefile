@@ -18,76 +18,11 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/fwflash/i386/Makefile
 #
-#
 
-
-PROG=		fwflash
-OBJS=		fwflash.o
-SRCS=		fwflash.c
-LINTFILE=	fwflash.ln
-
-
-all:	$(PROG)
-lint:	lint_SRCS
-
-include $(SRC)/Makefile.master
-include $(SRC)/cmd/Makefile.cmd
-include ../Makefile.com
-
-$(ROOTUSRSBIN)/$(PROG) :=	FILEMODE = 0555
-
-#
-# Message catalog
-#
-POFILES= $(SRCS:%.c=%.po)
-POFILE= fwflash_msg.po
-
-CFLAGS += -g -D_POSIX_PTHREAD_SEMANTICS
-MANUFACTURING_MODE=0
-CFLAGS += -DMANUFACTURING_MODE=$(MANUFACTURING_MODE)
-LDLIBS += -ldevinfo -lumem
-
-#
-# Message catalog
-#
-
-$(POFILES): ../common/$(SRCS)
-	$(RM) messages.po
-	$(XGETTEXT) $(XGETFLAGS) \
-	    `($(GREP) -l gettext ../common/fwflash.c || echo /dev/null)`
-	$(SED) "/^domain/d" messages.po > $@
-	$(RM) messages.po
-
-$(POFILE): $(POFILES)
-	$(RM) $@
-	cat $(POFILES) > $@
-
-
-clean:
-	$(RM) $(PROG) $(OBJS)
-
-clobber: clean
-	$(RM) $(POFILE) $(POFILES) $(LINTFILE)
-
-install_h:
-	@cd ../common ; $(MAKE) install_h
-
-$(PROG): install_h $(OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(COMMON_OBJS) $(LDFLAGS) $(LDLIBS)
-	$(POST_PROCESS)
-
-%.o: ../common/%.c
-	$(COMPILE.c) $(CFLAGS) -o $@ $<
-
-install: all $(ROOTUSRSBIN) $(ROOTUSRSBIN)/$(PROG)
-
-lint_SRCS: ../common/$(SRCS:%.c=%.ln)
-
-_msg msg:	$(POFILE)
+include ../Makefile.targ

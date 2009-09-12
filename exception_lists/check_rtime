@@ -204,23 +204,3 @@ NOSYMSORT	lib/sparcv9/libsun_fc\.so\.1 			# C++
 UNREF_OBJ	lib/(libdevinfo|libcfgadm)\.so\.1; .*\ of\ .*SUNW,Netra-CP2300/lib/libprtdiag_psr\.so\.1
 
 
-# Remove this once the following integrates:
-#	6858961 check_rtime issues with fwflash plugins (IB transports)
-#
-SKIP	^usr/lib/fwflash/identify/hermon\.so$
-SKIP	^usr/lib/fwflash/identify/tavor\.so$
-SKIP	^usr/lib/fwflash/verify/hermon-MELLANOX\.so$
-SKIP	^usr/lib/fwflash/verify/tavor-MELLANOX\.so$
-
-
-# Remove this once the following integrates:
-#	6858954 check_rtime issues with fwflash plugins (scsi transports)
-#
-SKIP	^usr/lib/fwflash/identify/sd\.so$
-SKIP	^usr/lib/fwflash/identify/ses\.so$
-SKIP	^usr/lib/fwflash/identify/sgen\.so$
-SKIP	^usr/lib/fwflash/verify/sd-GENERIC\.so$
-SKIP	^usr/lib/fwflash/verify/ses-LSILOGIC\.so$
-SKIP	^usr/lib/fwflash/verify/ses-SUN\.so$
-SKIP	^usr/lib/fwflash/verify/sgen-LSILOGIC\.so$
-SKIP	^usr/lib/fwflash/verify/sgen-SUN\.so$

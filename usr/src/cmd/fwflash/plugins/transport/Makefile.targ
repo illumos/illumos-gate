@@ -1,0 +1,91 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# cmd/fwflash/plugins/transport
+#
+include $(SRC)/lib/Makefile.lib
+
+SES_LIB=	ses.so
+TAVOR_LIB=	tavor.so
+HERMON_LIB=	hermon.so
+SD_LIB=		sd.so
+
+PLUGINS=	$(SES_LIB) $(TAVOR_LIB) $(HERMON_LIB) $(SD_LIB)
+
+OBJECTS= $(PLUGINS:%.so=%.o)
+DYNLIB=	$(PLUGINS:%=%)
+POFILES= $(PLUGINS:%.so=%.po)
+LINTFILE= $(PLUGINS:%.so=%.ln)
+
+SLINKS=		sgen.so
+POFILE=	fwflash_transport_identify_ses.po
+SRCDIR= ../common
+
+include $(SRC)/cmd/fwflash/Makefile.com
+
+CLEANFILES=	$(PLUGINS) $(POFILES) $(POFILE) $(LINTFILE) $(SLINKS) 
+
+LIBS= $(DYNLIB)
+CFLAGS += $(C_PICFLAGS) 
+ROOTLIBDIR= $(ROOTUSRLIBFWFLASHIDF)
+LDLIBS		+= -ldevinfo -lc
+MAPFILES= ../common/mapfile-vers
+FILEMODE= 0755
+
+$(SES_LIB):=	PICS= pics/$(SES_LIB:%.so=%.o)
+$(TAVOR_LIB):=	PICS= pics/$(TAVOR_LIB:%.so=%.o)
+$(HERMON_LIB):=	PICS= pics/$(HERMON_LIB:%.so=%.o)
+$(SD_LIB):=	PICS= pics/$(SD_LIB:%.so=%.o)
+
+$(SES_LIB):=    SONAME = $(SES_LIB)
+$(TAVOR_LIB):=  SONAME = $(TAVOR_LIB)
+$(HERMON_LIB):= SONAME = $(HERMON_LIB)
+$(SD_LIB):=     SONAME = $(SD_LIB)
+
+$(HERMON_LIB):=	MAPFILES += ../common/mapfile-vers-hermon
+$(SD_LIB):=	MAPFILES += ../common/mapfile-vers-plus
+
+$(SES_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lses -lnvpair
+$(SD_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lumem
+
+$(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi 
+$(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi 
+
+.KEEP STATE:
+
+$(ROOTUSRLIBFWFLASHIDF)/$(SLINKS) : $(ROOTUSRLIBFWFLASHIDF)/$(SES_LIB)
+	@$(RM) $@
+	$(SYMLINK) $(SES_LIB) $@
+
+all: $(LIBS)
+
+install: all  $(ROOTLIBS) \
+	$(ROOTUSRLIBFWFLASHIDF)/$(SLINKS)
+
+lint: $(LINTFILE)
+
+_msg msg: $(POFILE)
+
+include $(SRC)/lib/Makefile.targ
+
+

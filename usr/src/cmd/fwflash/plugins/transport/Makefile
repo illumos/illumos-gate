@@ -18,22 +18,16 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fwflash/plugins/transport
 #
-
-include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/Makefile.master
 
 COMMON_SUBDIRS=	$(MACH)
 
 SUBDIRS=	$(COMMON_SUBDIRS)
-
-MSGSUBDIRS=	$(COMMON_SUBDIRS)
 
 all :=          TARGET= all
 install :=      TARGET= install
@@ -43,20 +37,11 @@ lint :=         TARGET= lint
 _msg :=         TARGET= _msg
 msg :=		TARGET= msg
 
-include $(SRC)/cmd/fwflash/Makefile.com
-
 
 .KEEP_STATE:
 
-all:		$(SUBDIRS)
-lint:		$(SUBDIRS)
+all clean clobber install lint msg _msg:		$(SUBDIRS)
 
-msg _msg:	$(MSGSUBDIRS)
-
-
-install:	$(SUBDIRS)
-clean:		$(SUBDIRS)
-clobber:	$(SUBDIRS)
 
 
 $(SUBDIRS): FRC

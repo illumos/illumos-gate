@@ -1,0 +1,87 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# cmd/fwflash
+#
+#
+
+include $(SRC)/Makefile.master
+include $(SRC)/cmd/Makefile.cmd
+
+SRCS=		fwflash.c
+HDRS=		fwflash.h
+
+PROG=		$(SRCS:%.c=%)
+OBJS=		$(SRCS:%.c=%.o)
+LINTFILE=	$(SRCS:%.c=%.ln)
+POFILES=	$(SRCS:%.c=%.po)
+
+POFILE= 	fwflash_msg.po
+
+HDRDIR=../common
+SRCDIR=../common
+
+include ../Makefile.com
+
+ROOTHDRS= $(HDRS:%=$(ROOTUSRINCLDFWFLASH)/%)
+HDRSRCS= $(HDRS:%=$(HDRDIR)/%)
+CHECKHDRS= $(HDRSRCS:%.h=%.check)
+
+$(ROOTUSRSBIN)/$(PROG) :=	FILEMODE = 0555
+$(ROOTUSRINCLDFWFLASH)/%.h :=       FILEMODE = 0644
+
+
+CFLAGS += -D_POSIX_PTHREAD_SEMANTICS
+LDLIBS += -ldevinfo -lumem -lscf
+
+
+$(ROOTUSRINCLDFWFLASH)/%:  $(HDRDIR)/% 
+	$(INS.file)
+
+
+$(PROG): install_h $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(COMMON_OBJS) $(LDFLAGS) $(LDLIBS)
+	$(POST_PROCESS)
+
+%.o: $(SRCDIR)/%.c
+	$(COMPILE.c) $(CFLAGS) -o $@ $<
+
+
+all:	$(PROG)
+
+clean: 
+	$(RM) $(POFILE) $(POFILES) $(LINTFILE) $(PROG)
+
+clobber: clean
+	$(RM) $(OBJS)
+
+check: $(CHECKHDRS)
+
+install: all $(ROOTUSRSBIN) $(ROOTUSRSBIN)/$(PROG)
+
+install_h:$(ROOTUSRINCLDFWFLASH) $(ROOTHDRS)
+
+lint: $(LINTFILE)	
+
+_msg msg:	$(POFILE)

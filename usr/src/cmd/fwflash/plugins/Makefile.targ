@@ -1,0 +1,75 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# cmd/fwflash/plugins
+#
+include $(SRC)/lib/Makefile.lib
+
+HERMON-MELLANOX_LIB=	hermon-MELLANOX.so
+TAVOR-MELLANOX_LIB=	tavor-MELLANOX.so
+SD-GENERIC_LIB=		sd-GENERIC.so
+
+PLUGINS= $(HERMON-MELLANOX_LIB) $(TAVOR-MELLANOX_LIB) $(SD-GENERIC_LIB)
+
+OBJECTS= $(PLUGINS:%.so=%.o)
+DYNLIB=	$(PLUGINS:%=%)
+POFILES= $(PLUGINS:%.so=%.po)
+LINTFILE= $(PLUGINS:%.so=%.ln)
+
+POFILE=	fwflash_verify_msg.po
+SRCDIR=	../vendor
+
+include $(SRC)/cmd/fwflash/Makefile.com
+
+CLEANFILES= $(PLUGINS) $(POFILE) $(POFILES) $(LINTFILE)
+
+LIBS= $(DYNLIB)
+CFLAGS += $(C_PICFLAGS)
+ROOTLIBDIR= $(ROOTUSRLIBFWFLASHVRF)
+MAPFILES= ../vendor/mapfile-vers
+LDLIBS += -lc
+FILEMODE = 0755
+
+$(HERMON-MELLANOX_LIB):= PICS= pics/$(HERMON-MELLANOX_LIB:%.so=%.o)
+$(TAVOR-MELLANOX_LIB):=	PICS = pics/$(TAVOR-MELLANOX_LIB:%.so=%.o)
+$(SD-GENERIC_LIB):= PICS= pics/$(SD-GENERIC_LIB:%.so=%.o)
+
+$(HERMON-MELLANOX_LIB):= SONAME = $(HERMON-MELLANOX_LIB)
+$(TAVOR-MELLANOX_LIB):=	SONAME = $(TAVOR-MELLANOX_LIB)
+$(SD-GENERIC_LIB):= SONAME = $(SD-GENERIC_LIB)
+
+$(HERMON-MELLANOX_LIB):= DYNFLAGS += -R/usr/lib/fwflash/identify 
+$(HERMON-MELLANOX_LIB):= LDLIBS += -L. $(ROOT)/usr/lib/fwflash/identify/hermon.so
+
+
+.KEEP STATE:
+
+all: $(LIBS)
+
+install: all $(ROOTLIBS)
+
+lint: $(LINTFILE) 
+
+_msg msg: $(POFILE)
+
+include $(SRC)/lib/Makefile.targ

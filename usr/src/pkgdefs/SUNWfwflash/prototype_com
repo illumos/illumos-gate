@@ -45,18 +45,18 @@ d none usr/lib 0755 root bin
 d none usr/lib/fwflash 0755 root bin
 d none usr/lib/fwflash/identify 0755 root bin
 d none usr/lib/fwflash/verify 0755 root bin
-f none usr/lib/fwflash/verify/ses-SUN.so 0644 root bin
+f none usr/lib/fwflash/verify/ses-SUN.so 755 root bin
 s none usr/lib/fwflash/verify/ses-LSILOGIC.so=ses-SUN.so
 s none usr/lib/fwflash/verify/sgen-SUN.so=ses-SUN.so
 s none usr/lib/fwflash/verify/sgen-LSILOGIC.so=ses-SUN.so
-f none usr/lib/fwflash/verify/tavor-MELLANOX.so 644 root bin
-f none usr/lib/fwflash/verify/hermon-MELLANOX.so 644 root bin
-f none usr/lib/fwflash/verify/sd-GENERIC.so 644 root bin
-f none usr/lib/fwflash/identify/ses.so 0644 root bin
-s none usr/lib/fwflash/identify/sgen.so=ses.so 644 root bin
-f none usr/lib/fwflash/identify/tavor.so 0644 root bin
-f none usr/lib/fwflash/identify/hermon.so 0644 root bin
-f none usr/lib/fwflash/identify/sd.so 0644 root bin
+f none usr/lib/fwflash/verify/tavor-MELLANOX.so 755 root bin
+f none usr/lib/fwflash/verify/hermon-MELLANOX.so 755 root bin
+f none usr/lib/fwflash/verify/sd-GENERIC.so 755 root bin
+f none usr/lib/fwflash/identify/ses.so 755 root bin
+s none usr/lib/fwflash/identify/sgen.so=ses.so 755 root bin
+f none usr/lib/fwflash/identify/tavor.so 755 root bin
+f none usr/lib/fwflash/identify/hermon.so 755 root bin
+f none usr/lib/fwflash/identify/sd.so 755 root bin
 d none usr/include 0755 root bin
 d none usr/include/fwflash 0755 root bin
 f none usr/include/fwflash/fwflash.h 0644 root bin
