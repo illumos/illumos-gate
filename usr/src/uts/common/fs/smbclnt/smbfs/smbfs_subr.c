@@ -391,5 +391,5 @@ errout:
 	 * deal with errors here, so... (hack).
 	 * Don't expect to ever see this.
 	 */
-	strlcpy(ctx->f_name + 1, "?", ctx->f_namesz);
+	(void) strlcpy(ctx->f_name, "?", ctx->f_namesz);
 }

@@ -551,7 +551,7 @@ smbfs_smb_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *fsa,
 		md_get_mem(mdp, tmpbuf, nlen, MB_MSYSTEM);
 		tmplen = nlen / 2;	/* UCS-2 chars */
 		outlen = FSTYPSZ - 1;
-		uconv_u16tou8(tmpbuf, &tmplen,
+		(void) uconv_u16tou8(tmpbuf, &tmplen,
 		    (uchar_t *)fsa->fsa_tname, &outlen,
 		    UCONV_IN_LITTLE_ENDIAN);
 	} else {
