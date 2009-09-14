@@ -8547,20 +8547,34 @@ fcp_scan_offline_tgts(struct fcp_port *pptr)
 	while (elem) {
 		next = elem->next;
 		if (elem->time <= fcp_watchdog_time) {
-			int			changed = 1;
+			int		outdated = 1;
 			struct fcp_tgt	*ptgt = elem->ptgt;
 
+			mutex_enter(&ptgt->tgt_mutex);
+
 			if (ptgt->tgt_change_cnt == elem->tgt_cnt) {
-				changed = 0;
+				/* No change on tgt since elem was created. */
+				outdated = 0;
+			} else if (ptgt->tgt_change_cnt == elem->tgt_cnt + 1 &&
+			    pptr->port_link_cnt == elem->link_cnt + 1 &&
+			    ptgt->tgt_statec_cause == FCP_CAUSE_LINK_DOWN) {
+				/*
+				 * Exactly one thing happened to the target
+				 * inbetween: the local port went offline.
+				 * For fp the remote port is already gone so
+				 * it will not tell us again to offline the
+				 * target. We must offline it now.
+				 */
+				outdated = 0;
 			}
 
-			mutex_enter(&ptgt->tgt_mutex);
-			if (!changed && !(ptgt->tgt_state &
+			if (!outdated && !(ptgt->tgt_state &
 			    FCP_TGT_OFFLINE)) {
 				fcp_offline_target_now(pptr,
 				    ptgt, elem->link_cnt, elem->tgt_cnt,
 				    elem->flags);
 			}
+
 			mutex_exit(&ptgt->tgt_mutex);
 
 			kmem_free(elem, sizeof (*elem));
