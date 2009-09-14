@@ -2213,6 +2213,11 @@ Use is subject to license terms.
 	<msg id="AD_FTRACE_STOP">ftrace stop</msg>
     </msg_list>
 
+<!--
+      msg list for TPM errors that will be reported by tcsd(8).
+      This list must match the order of the TPM_E_* error codes defined
+      in /usr/include/tss/tpm_error.h (SUNWtss package)
+-->
     <msg_list id="tpm_e" header="0" start="4000" public="true">
 	<msg id="AUTHFAIL">Authentication failed</msg>
 	<msg id="BADINDEX">The index to a PCR, DIR or other register is incorrect</msg>
@@ -2317,6 +2322,7 @@ Use is subject to license terms.
 	<msg id="NEEDS_SELFTEST">SelfTestFull has not been run</msg>
 	<msg id="DOING_SELFTEST">The TPM is currently executing a full selftest</msg>
 	<msg id="DEFEND_LOCK_RUNNING">TPM is defending against dictionary attacks</msg>
+	<msg id="NO_MSG"></msg>
 	<!-- End TPM failure codes -->
     </msg_list>
 </specification>
