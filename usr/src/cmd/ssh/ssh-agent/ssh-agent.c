@@ -889,7 +889,17 @@ cleanup_handler(int sig)
 static void
 check_parent_exists(void)
 {
+#ifdef HAVE_SOLARIS_PRIVILEGE
+	/*
+	 * We can not simply use "kill(ppid, 0) < 0" to detect if the parent
+	 * has exited when the child process no longer has the
+	 * PRIV_PROC_SESSION privilege.
+	 */
+	if (parent_pid != -1 && getppid() != parent_pid) {
+#else
 	if (parent_pid != -1 && kill(parent_pid, 0) < 0) {
+
+#endif
 		/* printf("Parent has died - Authentication agent exiting.\n"); */
 		cleanup_socket();
 		_exit(2);
