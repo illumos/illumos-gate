@@ -189,7 +189,7 @@ static ddi_dma_attr_t fastboot_dma_attr = {
  */
 extern multiboot_info_t saved_mbi;
 extern mb_memory_map_t saved_mmap[FASTBOOT_SAVED_MMAP_COUNT];
-extern struct sol_netinfo saved_drives[FASTBOOT_SAVED_DRIVES_COUNT];
+extern uint8_t saved_drives[FASTBOOT_SAVED_DRIVES_SIZE];
 extern char saved_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 extern int saved_cmdline_len;
 extern size_t saved_file_size[];
@@ -557,6 +557,12 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 		bcopy((void *)saved_cmdline, (void *)(start_addr_va + offs),
 		    arglen);
 	}
+
+	/* clear fields and flags that are not copied */
+	bzero(&mbi->config_table,
+	    sizeof (*mbi) - offsetof(multiboot_info_t, config_table));
+	mbi->flags &= ~(MB_INFO_CONFIG_TABLE | MB_INFO_BOOT_LOADER_NAME |
+	    MB_INFO_APM_TABLE | MB_INFO_VIDEO_INFO);
 
 	return (0);
 }

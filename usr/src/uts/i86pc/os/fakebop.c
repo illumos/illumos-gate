@@ -139,7 +139,7 @@ int fastreboot_capable = 1;
  */
 multiboot_info_t saved_mbi;
 mb_memory_map_t saved_mmap[FASTBOOT_SAVED_MMAP_COUNT];
-struct sol_netinfo saved_drives[FASTBOOT_SAVED_DRIVES_COUNT];
+uint8_t saved_drives[FASTBOOT_SAVED_DRIVES_SIZE];
 char saved_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 int saved_cmdline_len = 0;
 size_t saved_file_size[FASTBOOT_MAX_FILES_MAP];
@@ -1102,14 +1102,19 @@ save_boot_info(multiboot_info_t *mbi, struct xboot_info *xbi)
 		    mbi->mmap_length);
 	}
 
-	if (mbi->drives_length > sizeof (saved_drives)) {
-		DBG(mbi->drives_length);
-		DBG_MSG("mbi->drives_length too big: clearing "
-		    "fastreboot_capable\n");
-		fastreboot_capable = 0;
+	if ((mbi->flags & MB_INFO_DRIVE_INFO) != 0) {
+		if (mbi->drives_length > sizeof (saved_drives)) {
+			DBG(mbi->drives_length);
+			DBG_MSG("mbi->drives_length too big: clearing "
+			    "fastreboot_capable\n");
+			fastreboot_capable = 0;
+		} else {
+			bcopy((void *)(uintptr_t)mbi->drives_addr,
+			    (void *)saved_drives, mbi->drives_length);
+		}
 	} else {
-		bcopy((void *)(uintptr_t)mbi->drives_addr, (void *)saved_drives,
-		    mbi->drives_length);
+		saved_mbi.drives_length = 0;
+		saved_mbi.drives_addr = NULL;
 	}
 
 	/*
@@ -1124,7 +1129,6 @@ save_boot_info(multiboot_info_t *mbi, struct xboot_info *xbi)
 	    i < xbi->bi_module_cnt; i++, modp++) {
 		saved_file_size[FASTBOOT_NAME_BOOTARCHIVE] += modp->bm_size;
 	}
-
 }
 #endif	/* __xpv */
 
@@ -1383,7 +1387,7 @@ build_boot_properties(void)
 	 */
 	save_boot_info(mbi, xbootp);
 
-	if (mbi != NULL && mbi->flags & 0x2) {
+	if (mbi != NULL && mbi->flags & MB_INFO_BOOTDEV) {
 		boot_device = mbi->boot_device >> 24;
 		if (boot_device == 0x20)
 			netboot++;

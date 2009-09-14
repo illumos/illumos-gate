@@ -98,30 +98,62 @@ typedef struct mb_memory_map {
 } mb_memory_map_t;
 
 
+/* Drive Info structure.  */
+typedef struct mb_drive_info {
+	uint32_t	size;		/* The size of this structure */
+	uint8_t		drive_number;	/* The BIOS drive number */
+	uint8_t		drive_mode;	/* The access mode (see below) */
+	uint16_t	drive_cylinders;	/* The BIOS geometry */
+	uint8_t		drive_heads;
+	uint8_t		drive_sectors;
+	/* The array of I/O ports used for the drive.  */
+	uint16_t	drive_ports[1];
+} mb_drive_info_t;
+
+/* Drive Mode.  */
+#define	MB_DI_CHS_MODE		0
+#define	MB_DI_LBA_MODE		1
+
+
 /*
  * The Multiboot information. This is supplied by the multiboot loader
  * for the OS.
  *
  * The flag bit fields defined what multiboot info the boot
  * loader (see struct multiboot_info below) supplied:
- *	flag[0]		mem_upper, mem_loader
- *	flag[1]		boot_device
- *	flag[2]		cmdline (for launching kernel)
- *	flag[3]		mods_count, mods_addr
- *	flag[4]		symbol table for a.out
- *	flag[5]		symbol table for elf
- *	flag[6]		mmap_length, mmap_addr
- *	flag[7]		drives_length, drivers_addr
- *	flag[8]		config_table
- *	flag[9]		boot_loader_name
- *	flag[10]	apm_table
- *	flag[11]	vbe_control_info
- *			vbe_mode_info
- *			vbe_mode
- *			vbe_interface_seg
- *			vbe_interface_off
- *			vbe_interface_len
  */
+/* flag[0]	mem_upper, mem_loader */
+#define	MB_INFO_MEMORY			0x00000001
+/* flag[1]	boot_device */
+#define	MB_INFO_BOOTDEV			0x00000002
+/* flag[2]	cmdline (for launching kernel) */
+#define	MB_INFO_CMDLINE			0x00000004
+/* flag[3]	mods_count, mods_addr */
+#define	MB_INFO_MODS			0x00000008
+/* flag[4]	symbol table for a.out */
+#define	MB_INFO_AOUT_SYMS		0x00000010
+/* flag[5]	symbol table for elf */
+#define	MB_INFO_ELF_SHDR		0x00000020
+/* flag[6]	mmap_length, mmap_addr */
+#define	MB_INFO_MEM_MAP			0x00000040
+/* flag[7]	drives_length, drivers_addr */
+#define	MB_INFO_DRIVE_INFO		0x00000080
+/* flag[8]	config_table */
+#define	MB_INFO_CONFIG_TABLE		0x00000100
+/* flag[9]	boot_loader_name */
+#define	MB_INFO_BOOT_LOADER_NAME	0x00000200
+/* flag[10]	apm_table */
+#define	MB_INFO_APM_TABLE		0x00000400
+/*
+ * flag[11]	vbe_control_info
+ *		vbe_mode_info
+ *		vbe_mode
+ *		vbe_interface_seg
+ *		vbe_interface_off
+ *		vbe_interface_len
+ */
+#define	MB_INFO_VIDEO_INFO		0x00000800
+
 typedef struct multiboot_info {
 	uint32_t	flags;
 	uint32_t	mem_lower;	/* # of pages below 1Meg */

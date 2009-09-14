@@ -64,7 +64,14 @@ extern "C" {
  * fast reboot.
  */
 #define	FASTBOOT_SAVED_MMAP_COUNT	32
-#define	FASTBOOT_SAVED_DRIVES_COUNT	9
+
+#define	FASTBOOT_SAVED_DRIVES_MAX	8
+#define	FASTBOOT_SAVED_DRIVES_PORT_MAX	128
+#define	FASTBOOT_SAVED_DRIVES_SIZE	\
+	((offsetof(struct mb_drive_info, drive_ports) +	\
+	FASTBOOT_SAVED_DRIVES_PORT_MAX * sizeof (uint16_t)) *	\
+	FASTBOOT_SAVED_DRIVES_MAX)
+
 #define	FASTBOOT_SAVED_CMDLINE_LEN	MMU_PAGESIZE
 
 
