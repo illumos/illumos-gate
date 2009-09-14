@@ -730,8 +730,9 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr)
 	}
 
 	while (fgets(inbuf, 1024, file) != NULL) {
-		if (retstr == NULL && zlogp != &logsys) {
-			zerror(zlogp, B_FALSE, "%s", inbuf);
+		if (retstr == NULL) {
+			if (zlogp != &logsys)
+				zerror(zlogp, B_FALSE, "%s", inbuf);
 		} else {
 			char *p;
 
