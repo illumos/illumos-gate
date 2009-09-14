@@ -60,6 +60,18 @@ atge_mii_read(void *arg, uint8_t phy, uint8_t reg)
 		return (0xffff);
 	}
 
+	/*
+	 * Some fast ethernet chips may not be able to auto-nego with
+	 * switches even though they have 1000T based PHY. Hence we mask
+	 * 1000T based capabilities.
+	 */
+	if (atgep->atge_flags & ATGE_FLAG_FASTETHER) {
+		if (reg == MII_STATUS)
+			v &= ~MII_STATUS_EXTSTAT;
+		else if (reg == MII_EXTSTATUS)
+			v = 0;
+	}
+
 	return ((v & MDIO_DATA_MASK) >> MDIO_DATA_SHIFT);
 }
 
@@ -108,6 +120,14 @@ atge_l1e_mii_reset(void *arg)
 	    GPHY_CTRL_EXT_RESET | GPHY_CTRL_HIB_EN | GPHY_CTRL_HIB_PULSE |
 	    GPHY_CTRL_SEL_ANA_RESET | GPHY_CTRL_PHY_PLL_ON);
 	drv_usecwait(1000);
+
+	/*
+	 * Some fast ethernet chips may not be able to auto-nego with
+	 * switches even though they have 1000T based PHY. Hence we need
+	 * to write 0 to MII_MSCONTROL control register.
+	 */
+	if (atgep->atge_flags & ATGE_FLAG_FASTETHER)
+		atge_mii_write(atgep, phyaddr, MII_MSCONTROL, 0x0);
 
 	/* Enable hibernation mode. */
 	atge_mii_write(atgep, phyaddr, ATPHY_DBG_ADDR, 0x0B);
