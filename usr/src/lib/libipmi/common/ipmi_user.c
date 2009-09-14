@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libipmi.h>
 #include <string.h>
@@ -146,7 +144,7 @@ ipmi_get_user_name(ipmi_handle_t *ihp, uint8_t uid)
 	ipmi_cmd_t cmd, *resp;
 
 	cmd.ic_netfn = IPMI_NETFN_APP;
-	cmd.ic_cmd = IPMI_CMD_GET_USER_ACCESS;
+	cmd.ic_cmd = IPMI_CMD_GET_USER_NAME;
 	cmd.ic_lun = 0;
 	cmd.ic_data = &uid;
 	cmd.ic_dlen = sizeof (uid);
@@ -182,24 +180,43 @@ ipmi_user_iter(ipmi_handle_t *ihp, int (*func)(ipmi_user_t *, void *),
     void *data)
 {
 	ipmi_get_user_access_t *resp;
-	uint8_t i;
+	uint8_t i, uid_max;
 	ipmi_user_impl_t *uip;
 	ipmi_user_t *up;
 	const char *name;
+	uint8_t channel;
+	ipmi_deviceid_t *devid;
 
 	ipmi_user_clear(ihp);
 
-	/*
-	 * First get the number of active users on the system by requesting the
-	 * reserved user ID (0).
-	 */
-	if ((resp = ipmi_get_user_access(ihp,
-	    IPMI_USER_CHANNEL_CURRENT, 0)) == NULL)
-		return (-1);
+	channel = IPMI_USER_CHANNEL_CURRENT;
 
-	for (i = 1; i <= resp->igua_max_uid; i++) {
-		if ((resp = ipmi_get_user_access(ihp,
-		    IPMI_USER_CHANNEL_CURRENT, i)) == NULL)
+	/*
+	 * Get the number of active users on the system by requesting the first
+	 * user ID (1).
+	 */
+	if ((resp = ipmi_get_user_access(ihp, channel, 1)) == NULL) {
+		/*
+		 * Some versions of the Sun ILOM have a bug which prevent the
+		 * GET USER ACCESS command from succeeding over the default
+		 * channel.  If this fails and we are on ILOM, then attempt to
+		 * use the standard channel (1) instead.
+		 */
+		if ((devid = ipmi_get_deviceid(ihp)) == NULL)
+			return (-1);
+
+		if (!ipmi_is_sun_ilom(devid))
+			return (-1);
+
+		channel = 1;
+		if ((resp = ipmi_get_user_access(ihp, channel, 1)) == NULL)
+			return (-1);
+	}
+
+	uid_max = resp->igua_max_uid;
+	for (i = 1; i <= uid_max; i++) {
+		if (i != 1 && (resp = ipmi_get_user_access(ihp,
+		    channel, i)) == NULL)
 			return (-1);
 
 		if ((uip = ipmi_zalloc(ihp, sizeof (ipmi_user_impl_t))) == NULL)
@@ -215,11 +232,23 @@ ipmi_user_iter(ipmi_handle_t *ihp, int (*func)(ipmi_user_t *, void *),
 
 		ipmi_list_append(&ihp->ih_users, uip);
 
-		if ((name = ipmi_get_user_name(ihp, i)) == NULL)
-			return (-1);
+		/*
+		 * If we are requesting a username that doesn't have a
+		 * supported username, we may get an INVALID REQUEST response.
+		 * If this is the case, then continue as if there is no known
+		 * username.
+		 */
+		if ((name = ipmi_get_user_name(ihp, i)) == NULL) {
+			if (ipmi_errno(ihp) == EIPMI_INVALID_REQUEST)
+				continue;
+			else
+				return (-1);
+		}
 
-		if (*name != '\0' &&
-		    (up->iu_name = ipmi_strdup(ihp, name)) == NULL)
+		if (*name == '\0')
+			continue;
+
+		if ((up->iu_name = ipmi_strdup(ihp, name)) == NULL)
 			return (-1);
 	}
 
