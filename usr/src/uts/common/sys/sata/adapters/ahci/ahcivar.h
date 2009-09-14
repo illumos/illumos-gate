@@ -459,6 +459,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_PMULT_CBSS		0x200
 /* Port Multiplier FIS-Based Switching Support (PMULT_FBSS) */
 #define	AHCI_CAP_PMULT_FBSS		0x400
+/* Software Reset FIS cannot set pmport with 0xf for direct access device */
+#define	AHCI_CAP_SRST_NO_HOSTPORT	0x800
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */

@@ -3738,36 +3738,77 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	}
 
 	/*
-	 * AMD/ATI SB600 (1002,4380) AHCI chipset doesn't support 64-bit DMA
-	 * addressing for both data buffer and communication memory descriptors
-	 * though S64A bit of CAP register declares the support.
+	 * AMD/ATI SB600 (0x1002,0x4380) AHCI chipset doesn't support 64-bit
+	 * DMA addressing for communication memory descriptors though S64A bit
+	 * of CAP register declares it supports. However, it does support
+	 * 64-bit DMA for data buffer. So only AHCI_CAP_COMMU_32BIT_DMA is
+	 * set for this controller.
 	 *
-	 * We found this chipset must do port reset during initialization,
-	 * otherwise, when retrieving device signature, software reset will
-	 * get time out.
+	 * Please note that AHCI_CAP_BUF_32BIT_DMA was ever set because we
+	 * found 64-bit DMA cannot work on ASUS M2A-VM with old BIOS version.
+	 * However, the issue can be resolved by upgrade of 1501+ BIOS, so
+	 * we decided to remove the flag.
+	 *
+	 * Due to certain hardware issue, the chipset must do port reset during
+	 * initialization, otherwise, when retrieving device signature,
+	 * software reset will get time out. So AHCI_CAP_INIT_PORT_RESET flag
+	 * need to set.
+	 *
+	 * For this chipset software reset will get failure if the pmport of
+	 * Register FIS was set with SATA_PMULT_HOSTPORT (0xf) and no port
+	 * multiplier is connected to the port. In order to fix the issue,
+	 * AHCI_CAP_SRST_NO_HOSTPORT flag need to be set, and once software
+	 * reset got failure, the driver will try to do another software reset
+	 * with pmport 0.
 	 */
 	if (venid == 0x1002 && devid == 0x4380) {
-		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
-		    "ATI SB600 cannot do 64-bit DMA for both data buffer "
-		    "and communication memory descriptors though CAP indicates "
-		    "support, so force it to use 32-bit DMA", NULL);
-		ahci_ctlp->ahcictl_cap |= AHCI_CAP_BUF_32BIT_DMA;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_INIT_PORT_RESET;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_SRST_NO_HOSTPORT;
+
+		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
+		    "ATI SB600 cannot do 64-bit DMA for communication "
+		    "memory descriptors though CAP indicates support, "
+		    "so force it to use 32-bit DMA", NULL);
+		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
+		    "ATI SB600 need to do a port reset during initialization",
+		    NULL);
+		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
+		    "ATI SB600 will get software reset failure if pmport "
+		    "is set 0xf and no port multiplier is attached", NULL);
 	}
 
 	/*
-	 * AMD/ATI SB700/750 (1002,4391) AHCI chipset doesn't support 64-bit
+	 * AMD/ATI SB700/710/750/800 and SP5100 AHCI chipset share the same
+	 * vendor ID and device ID (0x1002,0x4391).
+	 *
+	 * SB700/750 AHCI chipset on some boards doesn't support 64-bit
 	 * DMA addressing for communication memory descriptors though S64A bit
 	 * of CAP register declares the support. However, it does support
-	 * 64-bit DMA for data buffer.
+	 * 64-bit DMA for data buffer. So only AHCI_CAP_COMMU_32BIT_DMA is
+	 * set for this controller.
+	 *
+	 * SB710 has the same initialization issue as SB600, so it also need
+	 * a port reset. That is AHCI_CAP_INIT_PORT_RESET need to set for it.
+	 *
+	 * SB700 also has the same issue about software reset, and thus
+	 * AHCI_CAP_SRST_NO_HOSTPORT flag also is needed.
 	 */
 	if (venid == 0x1002 && devid == 0x4391) {
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_INIT_PORT_RESET;
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_SRST_NO_HOSTPORT;
+
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
 		    "ATI SB700/750 cannot do 64-bit DMA for communication "
 		    "memory descriptors though CAP indicates support, "
 		    "so force it to use 32-bit DMA", NULL);
-		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
+		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
+		    "ATI SB710 need to do a port reset during initialization",
+		    NULL);
+		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
+		    "ATI SB700 will get software reset failure if pmport "
+		    "is set 0xf and no port multiplier is attached", NULL);
 	}
 
 	/*
@@ -5416,6 +5457,7 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	uint8_t port = addrp->aa_port;
 	uint8_t pmport = addrp->aa_pmport;
 	ASSERT(AHCI_ADDR_IS_VALID(addrp));
+	int rval;
 
 	if (AHCI_ADDR_IS_PORT(addrp)) {
 		AHCIDBG(AHCIDBG_ENTRY, ahci_ctlp,
@@ -5439,13 +5481,31 @@ ahci_find_dev_signature(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	AHCIPORT_SET_DEV_TYPE(ahci_portp, addrp, SATA_DTYPE_UNKNOWN);
 
 	/* Issue a software reset to get the signature */
-	if (ahci_software_reset(ahci_ctlp, ahci_portp, &dev_addr)
-	    != AHCI_SUCCESS) {
-		AHCIDBG(AHCIDBG_ERRS, ahci_ctlp,
-		    "ahci_find_dev_signature: software reset failed "
-		    "at port %d:%d, cannot get signature.", port, pmport);
-		AHCIPORT_SET_STATE(ahci_portp, addrp, SATA_PSTATE_FAILED);
-		return;
+	rval = ahci_software_reset(ahci_ctlp, ahci_portp, &dev_addr);
+	if (rval != AHCI_SUCCESS) {
+
+		/*
+		 * Try to do software reset again with pmport set with 0 if
+		 * the controller is set with AHCI_CAP_SRST_NO_HOSTPORT and
+		 * the original pmport is set with SATA_PMULT_HOSTPORT (0xf)
+		 */
+		if ((ahci_ctlp->ahcictl_cap & AHCI_CAP_SRST_NO_HOSTPORT) &&
+		    (dev_addr.aa_pmport == SATA_PMULT_HOSTPORT)) {
+			dev_addr.aa_pmport = 0;
+			rval = ahci_software_reset(ahci_ctlp, ahci_portp,
+			    &dev_addr);
+		}
+
+		if (rval != AHCI_SUCCESS) {
+			AHCIDBG(AHCIDBG_ERRS, ahci_ctlp,
+			    "ahci_find_dev_signature: software reset failed "
+			    "at port %d:%d, cannot get signature.",
+			    port, pmport);
+
+			AHCIPORT_SET_STATE(ahci_portp, addrp,
+			    SATA_PSTATE_FAILED);
+			return;
+		}
 	}
 
 	/*
