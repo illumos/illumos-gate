@@ -1383,7 +1383,7 @@ stmf_worker(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		mdb_printf("%-19p %-10s %-10d %-5d%\n", addr,
 		    (worker.worker_flags == STMF_WORKER_STARTED) ? "STARTED" :
-		    (worker.worker_flags == STMF_WORKER_ACTIVE) ?
+		    (worker.worker_flags & STMF_WORKER_ACTIVE) ?
 		    "ACTIVE" : "TERMINATED",
 		    worker.worker_ref_count,
 		    worker.worker_queue_depth);
