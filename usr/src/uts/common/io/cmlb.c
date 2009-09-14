@@ -4403,6 +4403,15 @@ cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	cmlb_clear_efi(cl, tg_cookie);
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd");
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd,raw");
+	/*
+	 * cmlb_dkio_set_extvtoc creates duplicate minor nodes when
+	 * relabeling an SMI disk. To avoid that we remove them
+	 * before creating.
+	 * It should be OK to remove a non-existed minor node.
+	 */
+	ddi_remove_minor_node(CMLB_DEVINFO(cl), "h");
+	ddi_remove_minor_node(CMLB_DEVINFO(cl), "h,raw");
+
 	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h",
 	    S_IFBLK, (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
 	    cl->cl_node_type, NULL, internal);
