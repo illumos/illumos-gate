@@ -189,6 +189,7 @@ typedef struct sbd_lu {
 	char		*sl_name;		/* refers to meta or data */
 
 	/* Metadata */
+	kmutex_t	sl_metadata_lock;
 	char		*sl_alias;
 	char		*sl_meta_filename;	/* If applicable */
 	char		*sl_mgmt_url;
