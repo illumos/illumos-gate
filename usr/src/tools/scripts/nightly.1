@@ -1,4 +1,3 @@
-.\" ident	"%Z%%M%	%I%	%E% SMI"
 .\" " CDDL HEADER START
 .\" "
 .\" " The contents of this file are subject to the terms of the
@@ -18,9 +17,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2008 Sun Microsystems, Inc.  All rights reserved."
+.\" "Copyright 2009 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH nightly 1 "18 June 2008"
+.TH nightly 1 "08 Sep 2009"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -151,6 +150,12 @@ current source code
 Do an "old style" (pre-S10) build using root privileges to set OWNER
 and GROUP from the Makefiles.
 .TP
+.B \-0
+Create a globalization package.  Requires that G11N_PKGDIR be set
+in the build environment.  See 
+.B ENVIRONMENT VARIABLES
+below.
+.TP
 .B \-a
 Create BFU archives
 .TP
@@ -192,7 +197,8 @@ Check for cstyle/hdrchk errors
 .B \-f
 Check for unreferenced files.  Since the full workspace must be built
 in order to accurately identify unreferenced files, -f is ignored for
-incremental (-i) builds, or builds that do not include -l and -p.
+incremental (-i) builds, or builds that do not include -l, and -p.  In
+addition, -f implies -0.
 .TP
 .B \-r
 Check the ELF runtime attributes of all dynamic objects
@@ -217,7 +223,7 @@ proto area will be used for comparison (which might not be what you want).
 .B Groups of options
 .TP 10
 .B \-G
-Gate keeper default group of options (-au)
+Gate keeper default group of options (-0au)
 .TP
 .B \-I
 Integration engineer default group of options (-ampu)
@@ -331,6 +337,15 @@ for details).
 Root of OS-Net source code, referenced by the Makefiles.  It is
 the starting point of build activity.  It should be expressed
 in terms of $CODEMGR_WS.
+.RE
+.LP
+.B G11N_PKGDIR
+.RS 5
+The location of the globalization package directory.  It should be
+expressed in terms of $CODEMGR_WS.  If this is not set, then the -0
+option will be ignored, whether it was set explicitly in
+NIGHTLY_OPTIONS or implicitly via the -f option.  If this is set, but
+the diretory does not exist, the -0 option will have no effect.  
 .RE
 .LP
 .B ROOT

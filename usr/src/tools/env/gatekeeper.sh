@@ -33,6 +33,7 @@
 # area are put into the parent for everyone to use). It is based off
 # the onnv release. It sets NIGHTLY_OPTIONS to make nightly do:
 #	DEBUG and non-DEBUG builds (-D)
+#	creates a globalization package (-0)
 #	creates cpio archives for bfu (-a)
 #	creates packages for PIT/RE (-p)
 #	checks for new interfaces in libraries (-A)
@@ -44,7 +45,7 @@
 #	checks for changes in ELF runpaths (-r)
 #	checks for changes in unreferenced files (-f)
 #
-NIGHTLY_OPTIONS="-aADClmpuUrf";		export NIGHTLY_OPTIONS
+NIGHTLY_OPTIONS="-0aADClmpuUrf";		export NIGHTLY_OPTIONS
 
 # This is a variable for the rest of the script - GATE doesn't matter to
 # nightly itself
@@ -55,6 +56,9 @@ GATE=onnv-gate;					export GATE
 # (sparc and x86) are set up the same. But remember, this is a script, so
 # you _could_ look at $MACH or `uname -n` and set these variables differently.
 CODEMGR_WS="/builds/$GATE";			export CODEMGR_WS
+
+# G11N_PKGDIR - where does the globalization package live
+G11N_PKGDIR="$CODEMGR_WS/usr/src/pkgdefs/SUNW0on";	export G11N_PKGDIR
 
 # PARENT_WS is used to determine the parent of this workspace. This is
 # for the options that deal with the parent workspace (such as where the

@@ -103,6 +103,7 @@ normal_build() {
 
 	typeset orig_p_FLAG="$p_FLAG"
 	typeset orig_a_FLAG="$a_FLAG"
+	typeset orig_zero_FLAG="$zero_FLAG"
 
 	suffix=""
 	open_only=""
@@ -113,6 +114,7 @@ normal_build() {
 			open_only="open-only"
 			p_FLAG=n
 			a_FLAG=n
+			zero_FLAG=n
 			;;
 		esac
 	done
@@ -152,6 +154,7 @@ normal_build() {
 
 	p_FLAG="$orig_p_FLAG"
 	a_FLAG="$orig_a_FLAG"
+	zero_FLAG="$orig_zero_FLAG"
 }
 
 #
@@ -571,6 +574,22 @@ build() {
 	cd $SRC
 	/bin/time $MAKE -e install 2>&1 | \
 	    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
+
+	if [[ "$zero_FLAG" = "y" ]]; then
+		if [[ -d "${G11N_PKGDIR}" ]]; then
+			echo "\n==== Building globalization package" \
+			    "$(basename ${G11N_PKGDIR}) ($LABEL) ====\n" \
+			    >> $LOGFILE
+			cd $G11N_PKGDIR
+			/bin/time $MAKE -e install 2>&1 | \
+			    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
+			cd $SRC
+		else
+			echo "\n==== Skipping nonexistent globalization" \
+			    "package $(basename ${G11N_PKGDIR})" \
+			    "($LABEL) ====\n" >> $LOGFILE
+		fi
+	fi
 
 	if [[ "$SCM_TYPE" = teamware ]]; then
 		echo "\n==== SCCS Noise ($LABEL) ====\n" >> $mail_msg_file
@@ -1106,11 +1125,12 @@ Where:
 non-DEBUG is the default build type. Build options can be set in the
 NIGHTLY_OPTIONS variable in the <env_file> as follows:
 
+	-0	build the globalization package
 	-A	check for ABI differences in .so files
 	-C	check for cstyle/hdrchk errors
 	-D	do a build with DEBUG on
 	-F	do _not_ do a non-DEBUG build
-	-G	gate keeper default group of options (-au)
+	-G	gate keeper default group of options (-0au)
 	-I	integration engineer default group of options (-ampu)
 	-M	do not run pmodes (safe file permission checker)
 	-N	do not run protocmp
@@ -1149,6 +1169,7 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 #
 
 # default values for low-level FLAGS; G I R are group FLAGS
+zero_FLAG=n
 A_FLAG=n
 a_FLAG=n
 C_FLAG=n
@@ -1378,9 +1399,11 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
+while getopts 0AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
+	  0 )   zero_FLAG=y
+	  	;;
 	  A )	A_FLAG=y
 		;;
 	  a )	a_FLAG=y
@@ -1395,7 +1418,8 @@ do
 		;;
 	  f )	f_FLAG=y
 		;;
-	  G )	a_FLAG=y
+	  G )   zero_FLAG=y
+	  	a_FLAG=y
 		u_FLAG=y
 		;;
 	  I )	a_FLAG=y
@@ -1998,11 +2022,23 @@ if [ "$f_FLAG" = "y" ]; then
 		    "builds; ignoring -f\n" | tee -a $mail_msg_file >> $LOGFILE
 		f_FLAG=n
 	fi
-	if [ "$p_FLAG" != "y" -o "$l_FLAG" != "y" ]; then
-		echo "WARNING: the -f flag requires -l and -p; ignoring -f\n" | \
-		    tee -a $mail_msg_file >> $LOGFILE
+	if [ "${l_FLAG}${p_FLAG}" != "yy" ]; then
+		echo "WARNING: the -f flag requires -l, and -p;" \
+		    "ignoring -f\n" | tee -a $mail_msg_file >> $LOGFILE
 		f_FLAG=n
 	fi
+	if [ "${f_FLAG}${zero_FLAG}" = "yn" ]; then
+		echo "WARNING: the -f flag implies -0; enabling -0\n" \
+		    | tee -a $mail_msg_file >> $LOGFILE
+		zero_FLAG=y
+	fi
+fi
+
+if [ "$zero_FLAG" = "y" -a -z "$G11N_PKGDIR" ]; then
+	echo "WARNING: the -0 flag requires that G11N_PKGDIR be set" \
+	    "in the environment; ignoring -0\n" \
+	    | tee -a $mail_msg_file >> $LOGFILE
+	zero_FLAG=n
 fi
 
 if [ "$w_FLAG" = "y" -a ! -d $ROOT ]; then

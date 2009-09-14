@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -46,6 +46,9 @@ GATE=testws;			export GATE
 
 # CODEMGR_WS - where is your workspace at (or what should nightly name it)
 CODEMGR_WS="/export/$GATE";			export CODEMGR_WS
+
+# G11N_PKGDIR - where does the globalization package live
+G11N_PKGDIR="$CODEMGR_WS/usr/src/pkgdefs/SUNW0on";	export G11N_PKGDIR
 
 # Location of encumbered binaries.
 ON_CLOSED_BINS="$CODEMGR_WS/closed";		export ON_CLOSED_BINS

@@ -47,6 +47,9 @@ GATE=onnv-bugfixes;			export GATE
 # CODEMGR_WS - where is your workspace at (or what should nightly name it)
 CODEMGR_WS="/builds/$GATE";			export CODEMGR_WS
 
+# G11N_PKGDIR - where does the globalization package live
+G11N_PKGDIR="$CODEMGR_WS/usr/src/pkgdefs/SUNW0on";	export G11N_PKGDIR
+
 # PARENT_WS is used to determine the parent of this workspace. This is
 # for the options that deal with the parent workspace (such as where the
 # proto area will go).
