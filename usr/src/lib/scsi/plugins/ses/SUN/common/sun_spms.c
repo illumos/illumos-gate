@@ -69,11 +69,12 @@ static int
 sun_parse_node(ses_plugin_t *sp, ses_node_t *np)
 {
 	ses_sun_spms_vs_t *sfbp;
-	nvlist_t *encprops;
+	nvlist_t *encprops, *lid_nv;
 	uint8_t *vsp;
 	uint_t vsp_len;
 	uint_t cid_off, cid_len;
-	char *csn;
+	uint64_t wwn;
+	char lid[17];
 	int nverr;
 
 	if (ses_node_type(np) != SES_NODE_ENCLOSURE)
@@ -89,6 +90,20 @@ sun_parse_node(ses_plugin_t *sp, ses_node_t *np)
 
 	if (strncmp(sfbp->ssvs_spms_header, "SPMS", 4) != 0)
 		return (0);
+
+
+	/*
+	 * NOTE - The following is a temporary mechanism to identify
+	 *	subchassis until SPMS defines a formal method to do so.
+	 */
+	if (nvlist_lookup_nvlist(encprops, SES_EN_PROP_LID, &lid_nv) != 0 ||
+	    nvlist_lookup_uint64(lid_nv, SPC3_NAA_INT, &wwn) != 0)
+		return (0);
+
+	(void) snprintf(lid, sizeof (lid), "%llx", wwn);
+
+	SES_NV_ADD(fixed_string, nverr, encprops, LIBSES_EN_PROP_SUBCHASSIS_ID,
+	    lid, 16);
 
 	if (sfbp->ssvs_chassis_id_off < 96)
 		return (0);
@@ -109,12 +124,8 @@ sun_parse_node(ses_plugin_t *sp, ses_node_t *np)
 	if (cid_off + cid_len > vsp_len)
 		return (0);
 
-	csn = alloca((size_t)cid_len + 1);
-	csn[cid_len] = '\0';
-
-	bcopy((void *)(vsp + cid_off), csn, cid_len);
 	SES_NV_ADD(fixed_string, nverr, encprops, LIBSES_EN_PROP_CSN,
-	    csn, cid_len + 1);
+	    (char *)(vsp + cid_off), cid_len);
 
 	return (0);
 }

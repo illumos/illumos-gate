@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_FRAMEWORK_LIBSES_H
 #define	_FRAMEWORK_LIBSES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -71,6 +69,12 @@ extern "C" {
  * This is used on platforms with a disk backplane that exports a SES target.
  */
 #define	LIBSES_EN_PROP_INTERNAL		"libses-internal"
+
+/*
+ * This property identifies the subchassis id for those systems that
+ * support the concept of a subchassis.
+ */
+#define	LIBSES_EN_PROP_SUBCHASSIS_ID	"libses-subchassis-id"
 
 #ifdef	__cplusplus
 }

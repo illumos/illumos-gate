@@ -70,12 +70,15 @@ typedef struct ses_enum_node {
 
 typedef struct ses_enum_chassis {
 	topo_list_t		sec_link;
+	topo_list_t		sec_subchassis;
 	topo_list_t		sec_nodes;
 	topo_list_t		sec_targets;
 	const char		*sec_csn;
+	const char		*sec_lid;
 	ses_node_t		*sec_enclosure;
 	ses_enum_target_t	*sec_target;
 	topo_instance_t		sec_instance;
+	topo_instance_t		sec_scinstance;
 	boolean_t		sec_hasdev;
 	boolean_t		sec_internal;
 } ses_enum_chassis_t;
@@ -90,6 +93,13 @@ typedef struct ses_enum_data {
 	topo_mod_t		*sed_mod;
 	topo_instance_t		sed_instance;
 } ses_enum_data_t;
+
+typedef enum {
+	SES_NEW_CHASSIS		= 0x1,
+	SES_NEW_SUBCHASSIS	= 0x2,
+	SES_DUP_CHASSIS		= 0x4,
+	SES_DUP_SUBCHASSIS	= 0x8
+} ses_chassis_type_e;
 
 static int ses_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
@@ -133,16 +143,23 @@ ses_target_free(topo_mod_t *mod, ses_enum_target_t *stp)
 }
 
 static void
-ses_data_free(ses_enum_data_t *sdp)
+ses_data_free(ses_enum_data_t *sdp, ses_enum_chassis_t *pcp)
 {
 	topo_mod_t *mod = sdp->sed_mod;
 	ses_enum_chassis_t *cp;
 	ses_enum_node_t *np;
 	ses_enum_target_t *tp;
 	ses_alt_node_t *ap;
+	topo_list_t *cpl;
 
-	while ((cp = topo_list_next(&sdp->sed_chassis)) != NULL) {
-		topo_list_delete(&sdp->sed_chassis, cp);
+
+	if (pcp != NULL)
+		cpl = &pcp->sec_subchassis;
+	else
+		cpl = &sdp->sed_chassis;
+
+	while ((cp = topo_list_next(cpl)) != NULL) {
+		topo_list_delete(cpl, cp);
 
 		while ((np = topo_list_next(&cp->sec_nodes)) != NULL) {
 			while ((ap = topo_list_next(&np->sen_alt_nodes)) !=
@@ -162,8 +179,10 @@ ses_data_free(ses_enum_data_t *sdp)
 		topo_mod_free(mod, cp, sizeof (ses_enum_chassis_t));
 	}
 
-	disk_list_free(mod, &sdp->sed_disks);
-	topo_mod_free(mod, sdp, sizeof (ses_enum_data_t));
+	if (pcp == NULL) {
+		disk_list_free(mod, &sdp->sed_disks);
+		topo_mod_free(mod, sdp, sizeof (ses_enum_data_t));
+	}
 }
 
 /*
@@ -802,7 +821,7 @@ ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
 		return (0);
 
 	topo_mod_dprintf(mod, "%s: creating %llu %s nodes",
-	    cp->sec_csn, max, nodename);
+	    cp->sec_csn, max + 1, nodename);
 
 	if (dorange && topo_node_range_create(mod, pnode,
 	    nodename, 0, max) != 0) {
@@ -825,6 +844,130 @@ ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
 }
 
 /*
+ * Instantiate a new subchassis instance in the topology.
+ */
+static int
+ses_create_subchassis(ses_enum_data_t *sdp, tnode_t *pnode,
+    ses_enum_chassis_t *scp)
+{
+	topo_mod_t *mod = sdp->sed_mod;
+	tnode_t *tn;
+	nvlist_t *props;
+	nvlist_t *auth = NULL, *fmri = NULL;
+	char *part = NULL, *revision = NULL;
+	uint64_t instance = scp->sec_instance;
+	char *desc;
+	char label[128];
+	char **paths;
+	int i, err;
+	ses_enum_target_t *stp;
+	int ret = -1;
+
+	/*
+	 * Copy authority information from parent enclosure node
+	 */
+	if ((auth = topo_mod_auth(mod, pnode)) == NULL)
+		goto error;
+
+	/*
+	 * Record the subchassis serial number in the FMRI.
+	 * For now, we assume that logical id is the subchassis serial number.
+	 * If this assumption changes in future, then the following
+	 * piece of code will need to be updated via an RFE.
+	 */
+	if ((fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION,
+	    SUBCHASSIS, (topo_instance_t)instance, NULL, auth, part, revision,
+	    scp->sec_lid)) == NULL) {
+		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
+		    topo_mod_errmsg(mod));
+		goto error;
+	}
+
+	if ((tn = topo_node_bind(mod, pnode, SUBCHASSIS,
+	    instance, fmri)) == NULL) {
+		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",
+		    topo_mod_errmsg(mod));
+		goto error;
+	}
+
+	props = ses_node_props(scp->sec_enclosure);
+
+	/*
+	 * Look for the subchassis label in the following order:
+	 *	<ses-description>
+	 *	<ses-class-description> <instance>
+	 *	<default-type-label> <instance>
+	 *
+	 * For subchassis, the default label is "SUBCHASSIS"
+	 */
+	if (nvlist_lookup_string(props, SES_PROP_DESCRIPTION, &desc) != 0 ||
+	    desc[0] == '\0') {
+		if (nvlist_lookup_string(props, SES_PROP_CLASS_DESCRIPTION,
+		    &desc) == 0 && desc[0] != '\0')
+			(void) snprintf(label, sizeof (label), "%s %llu", desc,
+			    instance);
+		else
+			(void) snprintf(label, sizeof (label),
+			    "SUBCHASSIS %llu", instance);
+		desc = label;
+	}
+
+	if (topo_node_label_set(tn, desc, &err) != 0)
+		goto error;
+
+	if (ses_set_standard_props(mod, tn, NULL,
+	    ses_node_id(scp->sec_enclosure), scp->sec_target->set_devpath) != 0)
+		goto error;
+
+	/*
+	 * For enclosures, we want to include all possible targets (for upgrade
+	 * purposes).
+	 */
+	for (i = 0, stp = topo_list_next(&scp->sec_targets); stp != NULL;
+	    stp = topo_list_next(stp), i++)
+		;
+
+	verify(i != 0);
+	paths = alloca(i * sizeof (char *));
+
+	for (i = 0, stp = topo_list_next(&scp->sec_targets); stp != NULL;
+	    stp = topo_list_next(stp), i++)
+		paths[i] = stp->set_devpath;
+
+	if (topo_prop_set_string_array(tn, TOPO_PGROUP_SES,
+	    TOPO_PROP_PATHS, TOPO_PROP_IMMUTABLE, (const char **)paths,
+	    i, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to create property %s: %s\n",
+		    TOPO_PROP_PATHS, topo_strerror(err));
+		goto error;
+	}
+
+	if (topo_method_register(mod, tn, ses_enclosure_methods) != 0) {
+		topo_mod_dprintf(mod, "topo_method_register() failed: %s",
+		    topo_mod_errmsg(mod));
+		goto error;
+	}
+
+	/*
+	 * Create the nodes for controllers and bays.
+	 */
+	if (ses_create_children(sdp, tn, SES_ET_ESC_ELECTRONICS,
+	    CONTROLLER, "CONTROLLER", scp, B_TRUE) != 0 ||
+	    ses_create_children(sdp, tn, SES_ET_DEVICE,
+	    BAY, "BAY", scp, B_TRUE) != 0 ||
+	    ses_create_children(sdp, tn, SES_ET_ARRAY_DEVICE,
+	    BAY, "BAY", scp, B_TRUE) != 0)
+		goto error;
+
+	ret = 0;
+
+error:
+	nvlist_free(auth);
+	nvlist_free(fmri);
+	return (ret);
+}
+
+/*
  * Instantiate a new chassis instance in the topology.
  */
 static int
@@ -843,7 +986,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	int ret = -1;
 	ses_enum_node_t *snp;
 	ses_enum_target_t *stp;
+	ses_enum_chassis_t *scp;
 	int i, err;
+	uint64_t sc_count = 0;
 
 	/*
 	 * Ignore any internal enclosures.
@@ -985,6 +1130,30 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	    BAY, "BAY", cp, B_TRUE) != 0)
 		goto error;
 
+	if (cp->sec_scinstance > 0 &&
+	    topo_node_range_create(mod, tn, SUBCHASSIS, 0,
+	    cp->sec_scinstance - 1) != 0) {
+		topo_mod_dprintf(mod, "topo_node_create_range() failed: %s",
+		    topo_mod_errmsg(mod));
+		goto error;
+	}
+
+	for (scp = topo_list_next(&cp->sec_subchassis); scp != NULL;
+	    scp = topo_list_next(scp)) {
+
+		if (ses_create_subchassis(sdp, tn, scp) != 0)
+			goto error;
+
+		topo_mod_dprintf(mod, "created Subchassis node with "
+		    "LID (%s)\n  and target (%s) under Chassis with CSN (%s)",
+		    scp->sec_lid, scp->sec_target->set_devpath, cp->sec_csn);
+
+		sc_count++;
+	}
+
+	topo_mod_dprintf(mod, "%s: created %llu %s nodes",
+	    cp->sec_csn, sc_count, SUBCHASSIS);
+
 	cp->sec_target->set_refcount++;
 	topo_node_setspecific(tn, cp->sec_target);
 
@@ -1033,6 +1202,65 @@ ses_create_bays(ses_enum_data_t *sdp, tnode_t *pnode)
 
 	return (0);
 }
+
+/*
+ * Initialize chassis or subchassis.
+ */
+static int
+ses_init_chassis(topo_mod_t *mod, ses_enum_data_t *sdp, ses_enum_chassis_t *pcp,
+    ses_enum_chassis_t *cp, ses_node_t *np, nvlist_t *props,
+    char *lid, ses_chassis_type_e flags)
+{
+	boolean_t internal, ident;
+
+	assert((flags & (SES_NEW_CHASSIS | SES_NEW_SUBCHASSIS |
+	    SES_DUP_CHASSIS | SES_DUP_SUBCHASSIS)) != 0);
+
+	assert((cp != NULL) && (np != NULL) && (props != NULL) &&
+	    (lid != NULL));
+
+	if (flags & (SES_NEW_SUBCHASSIS | SES_DUP_SUBCHASSIS))
+		assert(pcp != NULL);
+
+	topo_mod_dprintf(mod, "ses_init_chassis: %s: lid(%s), flags (%d)",
+	    sdp->sed_name, lid, flags);
+
+	if (flags & (SES_NEW_CHASSIS | SES_NEW_SUBCHASSIS)) {
+
+		topo_mod_dprintf(mod, "new chassis/subchassis");
+		if (nvlist_lookup_boolean_value(props,
+		    LIBSES_EN_PROP_INTERNAL, &internal) == 0)
+			cp->sec_internal = internal;
+
+		cp->sec_lid = lid;
+		cp->sec_enclosure = np;
+		cp->sec_target = sdp->sed_target;
+
+		if (flags & SES_NEW_CHASSIS) {
+			cp->sec_instance = sdp->sed_instance++;
+			topo_list_append(&sdp->sed_chassis, cp);
+		} else {
+			cp->sec_instance = pcp->sec_scinstance++;
+			topo_list_append(&pcp->sec_subchassis, cp);
+		}
+
+	} else {
+		topo_mod_dprintf(mod, "dup chassis/subchassis");
+		if (nvlist_lookup_boolean_value(props,
+		    SES_PROP_IDENT, &ident) == 0) {
+			topo_mod_dprintf(mod,  "overriding enclosure node");
+
+			cp->sec_enclosure = np;
+			cp->sec_target = sdp->sed_target;
+		}
+	}
+
+	topo_list_append(&cp->sec_targets, sdp->sed_target);
+	sdp->sed_current = cp;
+
+	return (0);
+}
+
 /*
  * Gather nodes from the current SES target into our chassis list, merging the
  * results if necessary.
@@ -1043,13 +1271,15 @@ ses_enum_gather(ses_node_t *np, void *data)
 	nvlist_t *props = ses_node_props(np);
 	ses_enum_data_t *sdp = data;
 	topo_mod_t *mod = sdp->sed_mod;
-	ses_enum_chassis_t *cp;
+	ses_enum_chassis_t *cp, *scp;
 	ses_enum_node_t *snp;
 	ses_alt_node_t *sap;
 	char *csn;
 	uint64_t instance, type;
 	uint64_t prevstatus, status;
-	boolean_t report, internal, ident;
+	boolean_t report;
+	boolean_t have_subchassis = B_TRUE;
+	char *lid;
 
 	if (ses_node_type(np) == SES_NODE_ENCLOSURE) {
 		/*
@@ -1063,59 +1293,165 @@ ses_enum_gather(ses_node_t *np, void *data)
 		/*
 		 * Go through the list of chassis we have seen so far and see
 		 * if this serial number matches one of the known values.
+		 * If so, check whether this enclosure is a subchassis.
 		 */
 		if (nvlist_lookup_string(props, LIBSES_EN_PROP_CSN,
 		    &csn) != 0)
 			return (SES_WALK_ACTION_TERMINATE);
 
-		for (cp = topo_list_next(&sdp->sed_chassis); cp != NULL;
-		    cp = topo_list_next(cp)) {
-			if (strcmp(cp->sec_csn, csn) == 0) {
-				topo_mod_dprintf(mod, "%s: part of already "
-				    "known chassis %s", sdp->sed_name, csn);
-				break;
-			}
+		if (nvlist_lookup_string(props, LIBSES_EN_PROP_SUBCHASSIS_ID,
+		    &lid) != 0) {
+			have_subchassis = B_FALSE;
+			if ((lid = topo_mod_zalloc(mod, sizeof (char))) == NULL)
+				goto error;
 		}
 
+		topo_mod_dprintf(mod, "ses_enum_gather: Enclosure Node (%s) "
+		    "CSN (%s), LID (%s)", sdp->sed_name, csn, lid);
+
+		/*
+		 * We need to determine whether this enclosure node
+		 * represents a chassis or a subchassis. Since we may
+		 * receive the enclosure nodes in a non-deterministic
+		 * manner, we need to account for all possible combinations:
+		 *	1. Chassis for the current CSN has not yet been
+		 *	   allocated
+		 *		1.1 This is a new chassis:
+		 *			allocate and instantiate the chassis
+		 *		1.2 This is a new subchassis:
+		 *			allocate a placeholder chassis
+		 *			allocate and instantiate the subchassis
+		 *			link the subchassis to the chassis
+		 *	2. Chassis for the current CSN has been allocated
+		 *		2.1 This is a duplicate chassis enclosure
+		 *			check whether to override old chassis
+		 *			append to chassis' target list
+		 *		2.2 Only placeholder chassis exists
+		 *			fill in the chassis fields
+		 *		2.3 This is a new subchassis
+		 *			allocate and instantiate the subchassis
+		 *			link the subchassis to the chassis
+		 *		2.4 This is a duplicate subchassis enclosure
+		 *			 check whether to override old chassis
+		 *			 append to chassis' target list
+		 */
+
+		for (cp = topo_list_next(&sdp->sed_chassis); cp != NULL;
+		    cp = topo_list_next(cp))
+			if (strcmp(cp->sec_csn, csn) == 0)
+				break;
+
 		if (cp == NULL) {
-			topo_mod_dprintf(mod, "%s: creating chassis %s",
-			    sdp->sed_name, csn);
+			/* 1. Haven't seen a chassis with this CSN before */
 
 			if ((cp = topo_mod_zalloc(mod,
 			    sizeof (ses_enum_chassis_t))) == NULL)
 				goto error;
 
-			if (nvlist_lookup_boolean_value(props,
-			    LIBSES_EN_PROP_INTERNAL, &internal) == 0)
-				cp->sec_internal = internal;
-
 			cp->sec_csn = csn;
-			cp->sec_enclosure = np;
-			cp->sec_target = sdp->sed_target;
-			cp->sec_instance = sdp->sed_instance++;
-			topo_list_append(&sdp->sed_chassis, cp);
+
+			if (!have_subchassis || strcmp(csn, lid) == 0) {
+				/* 1.1 This is a new chassis */
+
+				topo_mod_dprintf(mod, "%s: Initialize new "
+				    "chassis with CSN (%s) and LID (%s)",
+				    sdp->sed_name, csn, lid);
+
+				if (ses_init_chassis(mod, sdp, NULL, cp,
+				    np, props, lid, SES_NEW_CHASSIS) < 0)
+					goto error;
+			} else {
+				/* 1.2 This is a new subchassis */
+
+				topo_mod_dprintf(mod, "%s: Initialize new "
+				    "subchassis with CSN (%s) and LID (%s)",
+				    sdp->sed_name, csn, lid);
+
+				if ((scp = topo_mod_zalloc(mod,
+				    sizeof (ses_enum_chassis_t))) == NULL)
+					goto error;
+
+				scp->sec_csn = csn;
+
+				if (ses_init_chassis(mod, sdp, cp, scp,
+				    np, props, lid, SES_NEW_SUBCHASSIS) < 0)
+					goto error;
+			}
 		} else {
-			/*
-			 * For the enclosure node, it is possible to have
-			 * multiple targets, only one of which support an
-			 * enclosure element descriptor.  We assume that this
-			 * is the one that is responsible for managing the
-			 * enclosure itself, so we prefer one with the
-			 * SES_PROP_IDENT property (which is only present for a
-			 * target that has an enclosure element descriptor).
-			 */
-			if (nvlist_lookup_boolean_value(props, SES_PROP_IDENT,
-			    &ident) == 0) {
-				topo_mod_dprintf(mod,
-				    "overriding enclosure node");
-				cp->sec_enclosure = np;
-				cp->sec_target = sdp->sed_target;
+			/* 2. We have a chassis with this CSN */
+
+			if (!have_subchassis || strcmp(csn, lid) == 0) {
+				/* This is a chassis */
+
+				if (!have_subchassis ||
+				    strlen(cp->sec_lid) > 0) {
+					/* 2.1 This is a duplicate chassis */
+
+					topo_mod_dprintf(mod, "%s: Append "
+					    "duplicate chassis with CSN (%s) "
+					    "and LID (%s)",
+					    sdp->sed_name, csn, lid);
+
+					if (ses_init_chassis(mod, sdp, NULL, cp,
+					    np, props, lid,
+					    SES_DUP_CHASSIS) < 0)
+						goto error;
+				} else {
+					/* 2.2 Init the placeholder chassis */
+
+					topo_mod_dprintf(mod, "%s: Initialize"
+					    "placeholder chassis with CSN (%s) "
+					    "and LID (%s)",
+					    sdp->sed_name, csn, lid);
+
+					if (ses_init_chassis(mod, sdp, NULL, cp,
+					    np, props, lid,
+					    SES_NEW_CHASSIS) < 0)
+						goto error;
+
+				}
+			} else {
+				/* This is a subchassis */
+
+				for (scp = topo_list_next(&cp->sec_subchassis);
+				    scp != NULL; scp = topo_list_next(scp))
+					if (strcmp(scp->sec_lid, lid) == 0)
+						break;
+
+				if (scp == NULL) {
+					/* 2.3 This is a new subchassis */
+
+					topo_mod_dprintf(mod, "%s: Initialize "
+					    "new subchassis with CSN (%s) "
+					    "and LID (%s)",
+					    sdp->sed_name, csn, lid);
+
+					if ((scp = topo_mod_zalloc(mod,
+					    sizeof (ses_enum_chassis_t)))
+					    == NULL)
+						goto error;
+
+					scp->sec_csn = csn;
+
+					if (ses_init_chassis(mod, sdp, cp, scp,
+					    np, props, lid,
+					    SES_NEW_SUBCHASSIS) < 0)
+						goto error;
+				} else {
+					/* 2.4 This is a duplicate subchassis */
+
+					topo_mod_dprintf(mod, "%s: Append "
+					    "duplicate subchassis with "
+					    "CSN (%s) and LID (%s)",
+					    sdp->sed_name, csn, lid);
+
+					if (ses_init_chassis(mod, sdp, cp, scp,
+					    np, props, lid,
+					    SES_DUP_SUBCHASSIS) < 0)
+						goto error;
+				}
 			}
 		}
-
-		topo_list_append(&cp->sec_targets, sdp->sed_target);
-		sdp->sed_current = cp;
-
 	} else if (ses_node_type(np) == SES_NODE_ELEMENT) {
 		/*
 		 * If we haven't yet seen an enclosure node and identified the
@@ -1390,13 +1726,19 @@ ses_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	 * for the 'ses-enclosure' node last.
 	 */
 	if (strcmp(name, SES_ENCLOSURE) == 0) {
-		ses_data_free(data);
+		for (cp = topo_list_next(&data->sed_chassis); cp != NULL;
+		    cp = topo_list_next(cp))
+			ses_data_free(data, cp);
+		ses_data_free(data, NULL);
 		topo_mod_setspecific(mod, NULL);
 	}
 	return (0);
 
 error:
-	ses_data_free(data);
+	for (cp = topo_list_next(&data->sed_chassis); cp != NULL;
+	    cp = topo_list_next(cp))
+		ses_data_free(data, cp);
+	ses_data_free(data, NULL);
 	topo_mod_setspecific(mod, NULL);
 	return (-1);
 }

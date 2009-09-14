@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ extern "C" {
 #define	RISER		"riser"
 #define	SHELF		"shelf"
 #define	SES_ENCLOSURE	"ses-enclosure"
+#define	SUBCHASSIS	"subchassis"
 #define	SYSTEMBOARD	"systemboard"
 #define	XAUI		"xaui"
 #define	XFP		"xfp"
