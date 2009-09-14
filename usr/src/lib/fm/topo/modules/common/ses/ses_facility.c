@@ -137,6 +137,7 @@ ses_indicator_mode(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	uint32_t mode;
 	boolean_t current, altcurrent;
 	nvlist_t *nvl;
+	ses_enum_target_t *tp = topo_node_getspecific(tn);
 
 	if (vers > TOPO_METH_SES_MODE_VERSION)
 		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
@@ -193,6 +194,7 @@ ses_indicator_mode(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 			goto error;
 		}
 
+		tp->set_snaptime = 0;
 		nvlist_free(nvl);
 	} else {
 		/* get operation */

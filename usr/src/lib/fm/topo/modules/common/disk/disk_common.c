@@ -787,13 +787,13 @@ disk_list_gather(topo_mod_t *mod, topo_list_t *listp)
 
 	if ((devtree = topo_mod_devinfo(mod)) == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "disk_list_gather: "
-		    "di_init failed");
+		    "topo_mod_devinfo() failed");
 		return (-1);
 	}
 
 	if ((devhdl = di_devlink_init(NULL, 0)) == DI_NODE_NIL) {
 		topo_mod_dprintf(mod, "disk_list_gather: "
-		    "di_devlink_init failed");
+		    "di_devlink_init() failed");
 		return (-1);
 	}
 

@@ -114,6 +114,9 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 				return (-1);
 			}
 
+			topo_mod_dprintf(mod,
+			    "ipmi_entity_present_sdr(%s) = %d\n", name,
+			    present);
 			topo_mod_strfree(mod, name);
 		} else {
 			if (topo_prop_get_string(tn, TOPO_PGROUP_IPMI,
@@ -151,6 +154,9 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
+
+		topo_mod_dprintf(mod,
+		    "ipmi_entity_present() = %d\n", present);
 	}
 
 	topo_mod_ipmi_rele(mod);

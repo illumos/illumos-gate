@@ -51,7 +51,7 @@ typedef struct ses_enum_target {
 	topo_list_t		set_link;
 	ses_target_t		*set_target;
 	ses_snap_t		*set_snap;
-	struct timeval		set_snaptime;
+	hrtime_t		set_snaptime;
 	char			*set_devpath;
 	int			set_refcount;
 	pthread_mutex_t		set_lock;

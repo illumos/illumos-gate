@@ -48,6 +48,7 @@
  */
 #define	MAX_ID_LEN	33
 
+#define	TOPO_METH_IPMI_PLATFORM_MESSAGE_VERSION	0
 #define	TOPO_METH_IPMI_READING_VERSION		0
 #define	TOPO_METH_IPMI_STATE_VERSION		0
 #define	TOPO_METH_IPMI_MODE_VERSION		0
@@ -72,6 +73,8 @@ static int dimm_ipmi_entity(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int cs_ipmi_entity(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
+static int ipmi_platform_message(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 static int ipmi_sensor_reading(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int ipmi_sensor_state(topo_mod_t *, tnode_t *, topo_version_t,
@@ -109,6 +112,9 @@ static const topo_method_t ipmi_node_methods[] = {
 };
 
 static const topo_method_t ipmi_fac_methods[] = {
+	{ "ipmi_platform_message", TOPO_PROP_METH_DESC,
+	    TOPO_METH_IPMI_PLATFORM_MESSAGE_VERSION,
+	    TOPO_STABILITY_INTERNAL, ipmi_platform_message },
 	{ "ipmi_sensor_reading", TOPO_PROP_METH_DESC,
 	    TOPO_METH_IPMI_READING_VERSION,
 	    TOPO_STABILITY_INTERNAL, ipmi_sensor_reading },
@@ -179,6 +185,147 @@ strarr_free(topo_mod_t *mod, char **arr, uint_t nelems)
 	for (int i = 0; i < nelems; i++)
 		topo_mod_strfree(mod, arr[i]);
 	topo_mod_free(mod, arr, (nelems * sizeof (char *)));
+}
+
+/*
+ * Some platforms (most notably G1/2N) use the 'platform event message' command
+ * to manipulate disk fault LEDs over IPMI, but uses the standard sensor
+ * reading to read the value.  This method implements this alternative
+ * interface for these platforms.
+ */
+/*ARGSUSED*/
+static int
+ipmi_platform_message(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *entity_ref;
+	ipmi_sdr_compact_sensor_t *csp;
+	ipmi_handle_t *hdl;
+	int err, ret;
+	uint32_t mode;
+	nvlist_t *pargs, *nvl;
+	ipmi_platform_event_message_t pem;
+	ipmi_sensor_reading_t *reading;
+
+	if (vers > TOPO_METH_IPMI_PLATFORM_MESSAGE_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	/*
+	 * Get an IPMI handle and then lookup the generic device locator sensor
+	 * data record referenced by the entity_ref prop val
+	 */
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
+		return (-1);
+	}
+
+	if (topo_prop_get_string(node, TOPO_PGROUP_FACILITY, "entity_ref",
+	    &entity_ref, &err) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup entity_ref property "
+		    "(%s)", topo_strerror(err));
+		topo_mod_ipmi_rele(mod);
+		return (-1);
+	}
+
+	if ((csp = ipmi_sdr_lookup_compact_sensor(hdl, entity_ref)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to lookup SDR for %s (%s)\n",
+		    entity_ref, ipmi_errmsg(hdl));
+		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
+		return (-1);
+	}
+
+	/*
+	 * Now look for a private argument list to figure out whether we're
+	 * doing a get or a set operation, and then do it.
+	 */
+	if ((nvlist_lookup_nvlist(in, TOPO_PROP_PARGS, &pargs) == 0) &&
+	    nvlist_exists(pargs, TOPO_PROP_VAL_VAL)) {
+		/*
+		 * Set the LED mode
+		 */
+		if ((ret = nvlist_lookup_uint32(pargs, TOPO_PROP_VAL_VAL,
+		    &mode)) != 0) {
+			topo_mod_dprintf(mod, "Failed to lookup %s nvpair "
+			    "(%s)\n", TOPO_PROP_VAL_VAL, strerror(ret));
+			topo_mod_strfree(mod, entity_ref);
+			(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+			topo_mod_ipmi_rele(mod);
+			return (-1);
+		}
+
+		if (mode != TOPO_LED_STATE_OFF &&
+		    mode != TOPO_LED_STATE_ON) {
+			topo_mod_dprintf(mod, "Invalid property value: %d\n",
+			    mode);
+			topo_mod_strfree(mod, entity_ref);
+			(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+			topo_mod_ipmi_rele(mod);
+			return (-1);
+		}
+
+		pem.ipem_sensor_type = csp->is_cs_type;
+		pem.ipem_sensor_num = csp->is_cs_number;
+		pem.ipem_event_type = csp->is_cs_reading_type;
+
+		/*
+		 * The spec states that any values between 0x20 and 0x29 are
+		 * legitimate for "system software".  However, some versions of
+		 * Sun's ILOM rejects messages over /dev/bmc with a generator
+		 * of 0x20, so we use 0x21 instead.
+		 */
+		pem.ipem_generator = 0x21;
+		pem.ipem_event_dir = 0;
+		pem.ipem_rev = 0x04;
+		if (mode == TOPO_LED_STATE_ON)
+			pem.ipem_event_data[0] = 1;
+		else
+			pem.ipem_event_data[0] = 0;
+		pem.ipem_event_data[1] = 0xff;
+		pem.ipem_event_data[2] = 0xff;
+
+		if (ipmi_event_platform_message(hdl, &pem) < 0) {
+			topo_mod_dprintf(mod, "Failed to set LED mode for %s "
+			    "(%s)\n", entity_ref, ipmi_errmsg(hdl));
+			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
+			return (-1);
+		}
+	} else {
+		/*
+		 * Get the LED mode
+		 */
+		if ((reading = ipmi_get_sensor_reading(hdl, csp->is_cs_number))
+		    == NULL) {
+			topo_mod_dprintf(mod, "Failed to get sensor reading "
+			    "for sensor %s: %s\n", entity_ref,
+			    ipmi_errmsg(hdl));
+			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
+			return (-1);
+		}
+
+		if (reading->isr_state &
+		    TOPO_SENSOR_STATE_GENERIC_STATE_ASSERTED)
+			mode = TOPO_LED_STATE_ON;
+		else
+			mode = TOPO_LED_STATE_OFF;
+	}
+	topo_mod_strfree(mod, entity_ref);
+
+	topo_mod_ipmi_rele(mod);
+
+	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
+	    nvlist_add_string(nvl, TOPO_PROP_VAL_NAME, TOPO_LED_MODE) != 0 ||
+	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, TOPO_TYPE_UINT32) != 0 ||
+	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL, mode) != 0) {
+		topo_mod_dprintf(mod, "Failed to allocate 'out' nvlist\n");
+		nvlist_free(nvl);
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
+	*out = nvl;
+
+	return (0);
 }
 
 /*ARGSUSED*/

@@ -41,7 +41,7 @@
 
 #define	SES_VERSION	1
 
-#define	SES_SNAP_FREQ		1000	/* in milliseconds */
+static int ses_snap_freq = 250;		/* in milliseconds */
 
 #define	SES_STATUS_UNAVAIL(s)	\
 	((s) == SES_ESC_UNSUPPORTED || (s) >= SES_ESC_NOT_INSTALLED)
@@ -298,9 +298,8 @@ ses_contains(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 ses_node_t *
 ses_node_lock(topo_mod_t *mod, tnode_t *tn)
 {
-	struct timeval tv;
 	ses_enum_target_t *tp = topo_node_getspecific(tn);
-	uint64_t prev, now;
+	hrtime_t now;
 	ses_snap_t *snap;
 	int err;
 	uint64_t nodeid;
@@ -316,16 +315,9 @@ ses_node_lock(topo_mod_t *mod, tnode_t *tn)
 	/*
 	 * Determine if we need to take a new snapshot.
 	 */
-	if (gettimeofday(&tv, NULL) != 0) {
-		tv.tv_sec = time(NULL);
-		tv.tv_usec = 0;
-	}
+	now = gethrtime();
 
-	now = tv.tv_sec * 1000 + tv.tv_usec / 1000;
-	prev = tp->set_snaptime.tv_sec * 1000 +
-	    tp->set_snaptime.tv_usec / 1000;
-
-	if (now - prev > SES_SNAP_FREQ &&
+	if (now - tp->set_snaptime > (ses_snap_freq * 1000 * 1000) &&
 	    (snap = ses_snap_new(tp->set_target)) != NULL) {
 		if (ses_snap_generation(snap) !=
 		    ses_snap_generation(tp->set_snap)) {
@@ -347,7 +339,7 @@ ses_node_lock(topo_mod_t *mod, tnode_t *tn)
 			ses_snap_rele(tp->set_snap);
 			tp->set_snap = snap;
 		}
-		tp->set_snaptime = tv;
+		tp->set_snaptime = gethrtime();
 	}
 
 	snap = tp->set_snap;
@@ -1629,8 +1621,7 @@ ses_process_dir(const char *dirpath, ses_enum_data_t *sdp)
 		stp->set_refcount = 1;
 		sdp->sed_target = stp;
 		stp->set_snap = ses_snap_hold(stp->set_target);
-		if (gettimeofday(&stp->set_snaptime, NULL) != 0)
-			stp->set_snaptime.tv_sec = time(NULL);
+		stp->set_snaptime = gethrtime();
 
 		/*
 		 * Enumerate over all SES elements and merge them into the
