@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _KSSLADM_H
 #define	_KSSLADM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Common routines and variables used by kssladm files.
@@ -69,7 +67,8 @@ extern int PKCS12_get_rsa_key_certs(KMF_HANDLE_T, const char *,
 
 extern int get_passphrase(const char *password_file, char *buf, int buf_size);
 extern int kssl_send_command(char *buf, int cmd);
-extern int parse_and_set_addr(char *arg1, char *arg2, struct sockaddr_in *addr);
+extern int parse_and_set_addr(char *arg1, char *arg2,
+    struct sockaddr_in6 *addr);
 
 #ifdef __cplusplus
 }

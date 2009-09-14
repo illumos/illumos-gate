@@ -19,17 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/types.h>
 #include <sys/stream.h>
-#include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/stropts.h>
-#include <sys/strlog.h>
-#include <sys/strsun.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/vtrace.h>
@@ -37,7 +34,6 @@
 #include <sys/zone.h>
 #include <sys/tihdr.h>
 
-#include <sys/errno.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
@@ -46,7 +42,6 @@
 #include <inet/ipclassifier.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
-#include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/tcp.h>
 #include <inet/ipsec_impl.h>
@@ -80,12 +75,12 @@ extern int tcp_squeue_flag;
  * A packet may carry multiple SSL records, so the function
  * calls kssl_input() in a loop, until all records are
  * handled.
- * As long as this conection is in handshake, that is until the first
+ * As long as this connection is in handshake, that is until the first
  * time kssl_input() returns a record to be delivered ustreams,
  * we maintain the tcp_kssl_inhandshake, and keep an extra reference on
  * the tcp/connp across the call to kssl_input(). The reason is, that
  * function may return KSSL_CMD_QUEUED after scheduling an asynchronous
- * request and cause tcp_kssl_callback() to be called on adifferent CPU,
+ * request and cause tcp_kssl_callback() to be called on a different CPU,
  * which could decrement the conn/tcp reference before we get to increment it.
  */
 void
@@ -99,13 +94,22 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 	struct		T_conn_ind *tci;
 	boolean_t	more = B_FALSE;
 	boolean_t	conn_held = B_FALSE;
+	boolean_t	is_v4;
+	void		*addr;
 
 	/* First time here, allocate the SSL context */
 	if (tcp->tcp_kssl_ctx == NULL) {
 		ASSERT(tcp->tcp_kssl_pending);
 
+		is_v4 = (tcp->tcp_ipversion == IPV4_VERSION);
+		if (is_v4) {
+			addr = &tcp->tcp_ipha->ipha_dst;
+		} else {
+			addr = &tcp->tcp_ip6h->ip6_dst;
+		}
+
 		if (kssl_init_context(tcp->tcp_kssl_ent,
-		    tcp->tcp_ipha->ipha_dst, tcp->tcp_mss,
+		    addr, is_v4, tcp->tcp_mss,
 		    &(tcp->tcp_kssl_ctx)) != KSSL_STS_OK) {
 			tcp->tcp_kssl_pending = B_FALSE;
 			kssl_release_ent(tcp->tcp_kssl_ent, NULL,
@@ -125,6 +129,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 		CONN_INC_REF(connp);
 		conn_held = B_TRUE;
 	}
+
 	do {
 		kssl_cmd = kssl_input(tcp->tcp_kssl_ctx, mp, &outmp,
 		    &more, tcp_kssl_input_callback, (void *)tcp);
@@ -308,6 +313,7 @@ no_can_do:
 		}
 		mp = NULL;
 	} while (more);
+
 	if (conn_held) {
 		CONN_DEC_REF(connp);
 	}
@@ -316,7 +322,7 @@ no_can_do:
 /*
  * Callback function for the cases kssl_input() had to submit an asynchronous
  * job and need to come back when done to carry on the input processing.
- * This routine follows the conentions of timeout and interrupt handlers.
+ * This routine follows the conventions of timeout and interrupt handlers.
  * (no blocking, ...)
  */
 static void

@@ -127,7 +127,7 @@ static int kssl_handle_finished(ssl_t *, mblk_t *, int);
 static void kssl_get_hello_random(uchar_t *);
 static uchar_t *kssl_rsa_unwrap(uchar_t *, size_t *);
 static void kssl_cache_sid(sslSessionID *, kssl_entry_t *);
-static void kssl_lookup_sid(sslSessionID *, uchar_t *, ipaddr_t,
+static void kssl_lookup_sid(sslSessionID *, uchar_t *, in6_addr_t *,
     kssl_entry_t *);
 static int kssl_generate_tls_ms(ssl_t *, uchar_t *, size_t);
 static void kssl_generate_ssl_ms(ssl_t *, uchar_t *, size_t);
@@ -499,7 +499,7 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 	if (sidlen != SSL3_SESSIONID_BYTES) {
 		mp->b_rptr += sidlen;
 	} else {
-		kssl_lookup_sid(&ssl->sid, mp->b_rptr, ssl->faddr,
+		kssl_lookup_sid(&ssl->sid, mp->b_rptr, &ssl->faddr,
 		    ssl->kssl_entry);
 		mp->b_rptr += SSL3_SESSIONID_BYTES;
 	}
@@ -536,7 +536,6 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 			goto suite_found;
 		}
 		kssl_uncache_sid(&ssl->sid, ssl->kssl_entry);
-		ssl->sid.cached = B_FALSE;
 	}
 
 	/* Check if this server is capable of the cipher suite */
@@ -656,52 +655,93 @@ falert:
 	return (EBADMSG);
 }
 
+#define	SET_HASH_INDEX(index, s, clnt_addr) {				\
+	int addr;							\
+									\
+	IN6_V4MAPPED_TO_IPADDR(clnt_addr, addr);			\
+	index = addr ^ (((int)(s)[0] << 24) | ((int)(s)[1] << 16) |	\
+	    ((int)(s)[2] << 8) | (int)(s)[SSL3_SESSIONID_BYTES - 1]);	\
+}
+
+/*
+ * Creates a cache entry. Sets the sid->cached flag
+ * and sid->time fields. So, the caller should not set them.
+ */
 static void
 kssl_cache_sid(sslSessionID *sid, kssl_entry_t *kssl_entry)
 {
 	uint_t index;
 	uchar_t *s = sid->session_id;
-	int l = SSL3_SESSIONID_BYTES - 1;
 	kmutex_t *lock;
 
-	ASSERT(sid->cached == B_TRUE);
+	ASSERT(sid->cached == B_FALSE);
 
-	index = (int)sid->client_addr ^ (((int)s[0] << 24) | ((int)s[1] << 16) |
-	    ((int)s[2] << 8) | (int)s[l]);
-
-	index %= kssl_entry->sid_cache_nentries;
-
+	/* set the values before creating the cache entry */
+	sid->cached = B_TRUE;
 	sid->time = lbolt;
+
+	SET_HASH_INDEX(index, s, &sid->client_addr);
+	index %= kssl_entry->sid_cache_nentries;
 
 	lock = &(kssl_entry->sid_cache[index].se_lock);
 	mutex_enter(lock);
 	kssl_entry->sid_cache[index].se_used++;
 	bcopy(sid, &(kssl_entry->sid_cache[index].se_sid), sizeof (*sid));
 	mutex_exit(lock);
+
+	KSSL_COUNTER(sid_cached, 1);
 }
 
-static void
-kssl_lookup_sid(sslSessionID *sid, uchar_t *s, ipaddr_t faddr,
-    kssl_entry_t *kssl_entry)
+/*
+ * Invalidates the cache entry, if any. Clears the sid->cached flag
+ * as a side effect.
+ */
+void
+kssl_uncache_sid(sslSessionID *sid, kssl_entry_t *kssl_entry)
 {
 	uint_t index;
-	int l = SSL3_SESSIONID_BYTES - 1;
-	kmutex_t *lock;
+	uchar_t *s = sid->session_id;
 	sslSessionID *csid;
+	kmutex_t *lock;
 
-	ASSERT(sid->cached == B_FALSE);
+	ASSERT(sid->cached == B_TRUE);
+	sid->cached = B_FALSE;
 
-	KSSL_COUNTER(sid_cache_lookups, 1);
-
-	index = (int)faddr ^ (((int)s[0] << 24) | ((int)s[1] << 16) |
-	    ((int)s[2] << 8) | (int)s[l]);
-
+	SET_HASH_INDEX(index, s, &sid->client_addr);
 	index %= kssl_entry->sid_cache_nentries;
 
 	lock = &(kssl_entry->sid_cache[index].se_lock);
 	mutex_enter(lock);
 	csid = &(kssl_entry->sid_cache[index].se_sid);
-	if (csid->cached == B_FALSE || csid->client_addr != faddr ||
+	if (!(IN6_ARE_ADDR_EQUAL(&csid->client_addr, &sid->client_addr)) ||
+	    bcmp(csid->session_id, s, SSL3_SESSIONID_BYTES)) {
+		mutex_exit(lock);
+		return;
+	}
+	csid->cached = B_FALSE;
+	mutex_exit(lock);
+
+	KSSL_COUNTER(sid_uncached, 1);
+}
+
+static void
+kssl_lookup_sid(sslSessionID *sid, uchar_t *s, in6_addr_t *faddr,
+    kssl_entry_t *kssl_entry)
+{
+	uint_t index;
+	kmutex_t *lock;
+	sslSessionID *csid;
+
+	KSSL_COUNTER(sid_cache_lookups, 1);
+
+	SET_HASH_INDEX(index, s, faddr);
+	index %= kssl_entry->sid_cache_nentries;
+
+	lock = &(kssl_entry->sid_cache[index].se_lock);
+	mutex_enter(lock);
+	csid = &(kssl_entry->sid_cache[index].se_sid);
+	if (csid->cached == B_FALSE ||
+	    !IN6_ARE_ADDR_EQUAL(&csid->client_addr, faddr) ||
 	    bcmp(csid->session_id, s, SSL3_SESSIONID_BYTES)) {
 		mutex_exit(lock);
 		return;
@@ -742,36 +782,6 @@ kssl_rsa_unwrap(uchar_t *buf, size_t *lenp)
 	}
 
 	return (buf + i);
-}
-
-void
-kssl_uncache_sid(sslSessionID *sid, kssl_entry_t *kssl_entry)
-{
-	uint_t index;
-	uchar_t *s = sid->session_id;
-	int l = SSL3_SESSIONID_BYTES - 1;
-	sslSessionID *csid;
-	kmutex_t *lock;
-
-	ASSERT(sid->cached == B_TRUE);
-
-	KSSL_COUNTER(sid_uncached, 1);
-
-	index = (int)sid->client_addr ^ (((int)s[0] << 24) | ((int)s[1] << 16) |
-	    ((int)s[2] << 8) | (int)s[l]);
-
-	index %= kssl_entry->sid_cache_nentries;
-
-	lock = &(kssl_entry->sid_cache[index].se_lock);
-	mutex_enter(lock);
-	csid = &(kssl_entry->sid_cache[index].se_sid);
-	if (csid->client_addr != sid->client_addr ||
-	    bcmp(csid->session_id, s, SSL3_SESSIONID_BYTES)) {
-		mutex_exit(lock);
-		return;
-	}
-	csid->cached = B_FALSE;
-	mutex_exit(lock);
 }
 
 
@@ -875,7 +885,7 @@ kssl_tls_P_hash(crypto_mechanism_t *mech, crypto_key_t *key,
 	mac.cd_offset = 0;
 
 	/*
-	 * A(i) = HMAC_hash(secred, seed + A(i-1));
+	 * A(i) = HMAC_hash(secret, seed + A(i-1));
 	 * A(0) = seed;
 	 *
 	 * Compute A(1):
@@ -943,7 +953,7 @@ kssl_tls_PRF(ssl_t *ssl,
 	 *
 	 */
 
-	int rv = 0, i;
+	int rv, i;
 	uchar_t psha1[MAX_KEYBLOCK_LENGTH];
 	crypto_key_t S1, S2;
 
@@ -1411,7 +1421,7 @@ kssl_send_finished(ssl_t *ssl, int update_hsh)
 	uchar_t *versionp;
 	SSL3Hashes ssl3hashes;
 	size_t finish_len;
-	int ret = 0;
+	int ret;
 
 	mp = ssl->handshake_sendbuf;
 	ASSERT(mp != NULL);
@@ -1562,7 +1572,6 @@ kssl_send_alert(ssl_t *ssl, SSL3AlertLevel level, SSL3AlertDescription desc)
 		    SSL3AlertLevel, level, SSL3AlertDescription, desc);
 		if (ssl->sid.cached == B_TRUE) {
 			kssl_uncache_sid(&ssl->sid, ssl->kssl_entry);
-			ssl->sid.cached = B_FALSE;
 		}
 		ssl->fatal_alert = B_TRUE;
 		KSSL_COUNTER(fatal_alerts, 1);
@@ -1812,8 +1821,6 @@ kssl_handle_finished(ssl_t *ssl, mblk_t *mp, int msglen)
 		return (err);
 	}
 
-	ASSERT(ssl->sid.cached == B_FALSE);
-	ssl->sid.cached = B_TRUE;
 	kssl_cache_sid(&ssl->sid, ssl->kssl_entry);
 	ssl->activeinput = B_FALSE;
 

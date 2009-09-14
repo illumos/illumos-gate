@@ -2258,12 +2258,13 @@ audit_kssl(int cmd, void *params, int error)
 	case KSSL_ADD_ENTRY: {
 		char buf[32];
 		kssl_params_t *kp = (kssl_params_t *)params;
-		struct sockaddr_in *saddr = &(kp->kssl_addr);
+		struct sockaddr_in6 *saddr = &kp->kssl_addr;
 
 		au_write((caddr_t *)&ad, au_to_text("op=KSSL_ADD_ENTRY"));
-		au_write((caddr_t *)&ad, au_to_in_addr(&(saddr->sin_addr)));
+		au_write((caddr_t *)&ad,
+		    au_to_in_addr_ex((int32_t *)&saddr->sin6_addr));
 		(void) snprintf(buf, sizeof (buf), "SSL port=%d",
-		    saddr->sin_port);
+		    saddr->sin6_port);
 		au_write((caddr_t *)&ad, au_to_text(buf));
 
 		(void) snprintf(buf, sizeof (buf), "proxy port=%d",
@@ -2274,12 +2275,13 @@ audit_kssl(int cmd, void *params, int error)
 
 	case KSSL_DELETE_ENTRY: {
 		char buf[32];
-		struct sockaddr_in *saddr = (struct sockaddr_in *)params;
+		struct sockaddr_in6 *saddr = (struct sockaddr_in6 *)params;
 
 		au_write((caddr_t *)&ad, au_to_text("op=KSSL_DELETE_ENTRY"));
-		au_write((caddr_t *)&ad, au_to_in_addr(&(saddr->sin_addr)));
+		au_write((caddr_t *)&ad,
+		    au_to_in_addr_ex((int32_t *)&saddr->sin6_addr));
 		(void) snprintf(buf, sizeof (buf), "SSL port=%d",
-		    saddr->sin_port);
+		    saddr->sin6_port);
 		au_write((caddr_t *)&ad, au_to_text(buf));
 		break;
 	}

@@ -19,11 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/cmd-inet/usr.sbin/kssl/kssladm/Makefile
 #
 
@@ -45,7 +43,7 @@ ROOTUSRLIBPROG = $(PROG:%=$(ROOTLIB)/%)
 
 CFLAGS +=	$(CCVERBOSE)
 
-LDLIBS += -lkmf -lpkcs11 -lcryptoutil -lnsl
+LDLIBS += -lkmf -lpkcs11 -lcryptoutil -lnsl -lsocket
 
 all: $(PROG)
 

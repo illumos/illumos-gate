@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <sys/sysmacros.h>
@@ -311,7 +309,6 @@ get_sensitive_key_data(KMF_HANDLE_T kmfh,
 	static CK_BYTE aes_param[16];
 	static CK_OBJECT_CLASS privkey_class = CKO_PRIVATE_KEY;
 	static CK_KEY_TYPE privkey_type = CKK_RSA;
-	static CK_BBOOL true = TRUE;
 	static CK_BBOOL false = FALSE;
 	boolean_t kmftrue = B_TRUE;
 	boolean_t kmffalse = B_FALSE;
@@ -485,7 +482,7 @@ get_sensitive_key_data(KMF_HANDLE_T kmfh,
 	 * Create a label for the wrapped session key so we can find
 	 * it easier later.
 	 */
-	snprintf(wrapkey_label, sizeof (wrapkey_label), "ksslprikey_%d",
+	(void) snprintf(wrapkey_label, sizeof (wrapkey_label), "ksslprikey_%d",
 	    getpid());
 
 	unwrap_tmpl[5].pValue = wrapkey_label;
@@ -564,10 +561,10 @@ out:
 		free(wrapped_privkey);
 
 	if (aes_key_obj != CK_INVALID_HANDLE)
-		C_DestroyObject(pk11session, aes_key_obj);
+		(void) C_DestroyObject(pk11session, aes_key_obj);
 
 	if (sess_privkey_obj != CK_INVALID_HANDLE)
-		C_DestroyObject(pk11session, sess_privkey_obj);
+		(void) C_DestroyObject(pk11session, sess_privkey_obj);
 
 	return (rv);
 }
@@ -930,35 +927,33 @@ load_from_pkcs12(KMF_HANDLE_T kmfh, const char *filename,
 
 int
 parse_and_set_addr(char *server_address, char *server_port,
-    struct sockaddr_in *addr)
+    struct sockaddr_in6 *addr)
 {
 	if (server_port == NULL) {
 		return (-1);
 	}
 
 	if (server_address == NULL) {
-		addr->sin_addr.s_addr = INADDR_ANY;
+		addr->sin6_addr = in6addr_any;
 	} else {
-		addr->sin_addr.s_addr = inet_addr(server_address);
-		if ((int)addr->sin_addr.s_addr == -1) {
-			struct hostent *hp;
+		struct hostent *hp;
+		int error_num;
 
-			if ((hp = gethostbyname(server_address)) == NULL) {
-				(void) fprintf(stderr,
-				    "Error: Unknown host: %s\n",
-				    server_address);
-				return (-1);
-			}
-
-			(void) memcpy(&addr->sin_addr.s_addr,
-			    hp->h_addr_list[0],
-			    sizeof (addr->sin_addr.s_addr));
+		if ((hp = (getipnodebyname(server_address, AF_INET6,
+		    AI_DEFAULT, &error_num))) == NULL) {
+			(void) fprintf(stderr, "Error: Unknown host: %s\n",
+			    server_address);
+			return (-1);
 		}
+
+		(void) memcpy((caddr_t)&addr->sin6_addr, hp->h_addr,
+		    hp->h_length);
+		freehostent(hp);
 	}
 
 	errno = 0;
-	addr->sin_port = strtol(server_port, NULL, 10);
-	if (addr->sin_port == 0 || errno != 0) {
+	addr->sin6_port = strtol(server_port, NULL, 10);
+	if (addr->sin6_port == 0 || errno != 0) {
 		(void) fprintf(stderr, "Error: Invalid Port value: %s\n",
 		    server_port);
 		return (-1);
@@ -1037,7 +1032,7 @@ do_create(int argc, char *argv[])
 	uint32_t scache_size = DEFAULT_SID_CACHE_NENTRIES;
 	uint16_t kssl_suites[CIPHER_SUITE_COUNT - 1];
 	int proxy_port = -1;
-	struct sockaddr_in server_addr;
+	struct sockaddr_in6 server_addr;
 	char *format = NULL;
 	char *port, *addr;
 	char c;
@@ -1113,8 +1108,12 @@ do_create(int argc, char *argv[])
 	}
 
 	if (verbose) {
-		(void) printf("addr=%s, port = %d\n",
-		    inet_ntoa(server_addr.sin_addr), server_addr.sin_port);
+		char buffer[128];
+
+		(void) inet_ntop(AF_INET6, &server_addr.sin6_addr, buffer,
+		    sizeof (buffer));
+		(void) printf("addr = %s, port = %d\n", buffer,
+		    server_addr.sin6_port);
 	}
 
 	if (format == NULL || proxy_port == -1) {

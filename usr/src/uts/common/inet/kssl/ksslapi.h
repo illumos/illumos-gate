@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_KSSL_KSSLAPI_H
 #define	_INET_KSSL_KSSLAPI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The kernel SSL proxy interface
@@ -64,10 +62,6 @@ typedef enum {
 	KSSL_CMD_QUEUED		/* Queued, a call back will finish it */
 } kssl_cmd_t;
 
-typedef enum {
-	KSSL_EVENT_CLOSE	/* close this context */
-} kssl_event_t;
-
 /* Un opaque context of an SSL connection */
 typedef void *kssl_ctx_t;
 
@@ -82,7 +76,8 @@ typedef	void *kssl_ent_t;
 
 kssl_endpt_type_t kssl_check_proxy(mblk_t *, void *, kssl_ent_t *);
 
-kssl_status_t kssl_init_context(kssl_ent_t, uint32_t, int, kssl_ctx_t *);
+kssl_status_t kssl_init_context(kssl_ent_t, void *, boolean_t,
+    int, kssl_ctx_t *);
 
 void kssl_hold_ent(kssl_ent_t);
 void kssl_release_ent(kssl_ent_t, void *, kssl_endpt_type_t);

@@ -33,7 +33,6 @@
 
 #include <inet/common.h>
 #include <inet/ip.h>
-#include <inet/ip6.h>
 
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -70,8 +69,7 @@ static kssl_status_t kssl_build_single_record(ssl_t *ssl, mblk_t *mp);
  *    lower modules' SSL hooks that handle the Handshake messages.
  *    The function returns KSSL_IS_PROXY.
  *
- * The function returns KSSL_NO_PROXY otherwise. We do not suppport
- * IPv6 addresses.
+ * The function returns KSSL_NO_PROXY otherwise.
  */
 
 kssl_endpt_type_t
@@ -83,38 +81,32 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 	sin_t *sin;
 	sin6_t *sin6;
 	struct T_bind_req *tbr;
-	ipaddr_t v4addr;
+	in6_addr_t mapped_v4addr;
+	in6_addr_t *v6addr;
 	in_port_t in_port;
 
-	if (kssl_enabled == 0) {
+	if (kssl_entry_tab_nentries == 0) {
 		return (KSSL_NO_PROXY);
 	}
 
-	tbr = (struct T_bind_req *)bindmp->b_rptr;
-
 	ret = KSSL_NO_PROXY;
 
+	tbr = (struct T_bind_req *)bindmp->b_rptr;
 	sin = (sin_t *)(bindmp->b_rptr + tbr->ADDR_offset);
 
 	switch (tbr->ADDR_length) {
 	case sizeof (sin_t):
 		in_port = ntohs(sin->sin_port);
-		v4addr = sin->sin_addr.s_addr;
+		IN6_IPADDR_TO_V4MAPPED(sin->sin_addr.s_addr, &mapped_v4addr);
+		v6addr = &mapped_v4addr;
 		break;
 
 	case sizeof (sin6_t):
-		/*
-		 * Handle any IPv4-mapped IPv6 address for now.
-		 * Support of IPv6 will be added later.
-		 */
 		sin6 = (sin6_t *)sin;
-		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-			in_port = ntohs(sin6->sin6_port);
-			IN6_V4MAPPED_TO_IPADDR(&sin6->sin6_addr, v4addr);
-			break;
-		}
+		in_port = ntohs(sin6->sin6_port);
+		v6addr = &sin6->sin6_addr;
+		break;
 
-		/* fallthrough for normal IPv6 address */
 	default:
 		return (ret);
 	}
@@ -125,7 +117,8 @@ kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
 		if ((ep = kssl_entry_tab[i]) == NULL)
 			continue;
 
-		if ((ep->ke_laddr == v4addr) || (ep->ke_laddr == INADDR_ANY)) {
+		if (IN6_ARE_ADDR_EQUAL(&ep->ke_laddr, v6addr) ||
+		    IN6_IS_ADDR_UNSPECIFIED(&ep->ke_laddr)) {
 
 			/* This is an SSL port to fallback to */
 			if (ep->ke_ssl_port == in_port) {
@@ -301,16 +294,18 @@ kssl_release_ent(kssl_ent_t ksslent, void *cookie, kssl_endpt_type_t endpt_type)
 	kssl_entry_t *kssl_entry = (kssl_entry_t *)ksslent;
 
 	if (cookie != NULL) {
-		if (endpt_type == KSSL_IS_PROXY)
+		if (endpt_type == KSSL_IS_PROXY) {
 			ASSERT(kssl_entry->ke_proxy_head != NULL);
 			kssl_dequeue(
 			    (kssl_chain_t **)&kssl_entry->ke_proxy_head,
 			    cookie);
-		if (endpt_type == KSSL_HAS_PROXY)
+		}
+		if (endpt_type == KSSL_HAS_PROXY) {
 			ASSERT(kssl_entry->ke_fallback_head != NULL);
 			kssl_dequeue(
 			    (kssl_chain_t **)&kssl_entry->ke_fallback_head,
 			    cookie);
+		}
 	}
 	KSSL_ENTRY_REFRELE(kssl_entry);
 }
@@ -574,7 +569,7 @@ kssl_handle_mblk(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
 	SSL3ContentType content_type;
 	ssl_t *ssl;
 	KSSLCipherSpec *spec;
-	int error = 0, ret;
+	int error, ret;
 	kssl_cmd_t kssl_cmd = KSSL_CMD_DELIVER_PROXY;
 	boolean_t deliverit = B_FALSE;
 	crypto_data_t cipher_data;
@@ -606,7 +601,7 @@ more:
 		if (DB_REF(mp) > 1) {
 			/*
 			 * Fortunately copyb() preserves the offset,
-			 * tail space and alignement so the copy is
+			 * tail space and alignment so the copy is
 			 * ready to be made an SSL record.
 			 */
 			if ((copybp = copyb(mp)) == NULL)
@@ -1098,7 +1093,6 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 				if (ssl->sid.cached == B_TRUE) {
 					kssl_uncache_sid(&ssl->sid,
 					    ssl->kssl_entry);
-					ssl->sid.cached = B_FALSE;
 				}
 				DTRACE_PROBE2(kssl_err__bad_content_alert,
 				    SSL3AlertLevel, level,
@@ -1187,12 +1181,11 @@ error:
 
 /*
  * Initialize the context of an SSL connection, coming to the specified
- * address.
- * the ssl structure returned is held.
+ * address. The ssl structure is returned held.
  */
 kssl_status_t
-kssl_init_context(kssl_ent_t kssl_ent, ipaddr_t faddr, int mss,
-    kssl_ctx_t *kssl_ctxp)
+kssl_init_context(kssl_ent_t kssl_ent, void *addr, boolean_t is_v4,
+    int mss, kssl_ctx_t *kssl_ctxp)
 {
 	ssl_t *ssl = kmem_cache_alloc(kssl_cache, KM_NOSLEEP);
 
@@ -1207,7 +1200,11 @@ kssl_init_context(kssl_ent_t kssl_ent, ipaddr_t faddr, int mss,
 	ssl->kssl_entry = (kssl_entry_t *)kssl_ent;
 	KSSL_ENTRY_REFHOLD(ssl->kssl_entry);
 
-	ssl->faddr = faddr;
+	if (is_v4) {
+		IN6_IPADDR_TO_V4MAPPED(*((ipaddr_t *)addr), &ssl->faddr);
+	} else {
+		ssl->faddr = *((in6_addr_t *)addr);	/* struct assignment */
+	}
 	ssl->tcp_mss = mss;
 	ssl->sendalert_level = alert_warning;
 	ssl->sendalert_desc = close_notify;
@@ -1220,7 +1217,7 @@ kssl_init_context(kssl_ent_t kssl_ent, ipaddr_t faddr, int mss,
 
 /*
  * Builds SSL records out of the chain of mblks, and returns it.
- * Taked a copy of the message before encypting it if it has another
+ * Takes a copy of the message before encrypting it if it has another
  * reference.
  * In case of failure, NULL is returned, and the message will be
  * freed by the caller.
@@ -1239,7 +1236,7 @@ kssl_build_record(kssl_ctx_t ctx, mblk_t *mp)
 		if (DB_REF(bp) > 1) {
 			/*
 			 * Fortunately copyb() preserves the offset,
-			 * tail space and alignement so the copy is
+			 * tail space and alignment so the copy is
 			 * ready to be made an SSL record.
 			 */
 			if ((copybp = copyb(bp)) == NULL)
@@ -1266,23 +1263,21 @@ kssl_build_record(kssl_ctx_t ctx, mblk_t *mp)
 }
 
 /*
- * Builds a single SSL record
+ * Builds a single SSL record.
  * In-line encryption of the record.
  */
 static kssl_status_t
 kssl_build_single_record(ssl_t *ssl, mblk_t *mp)
 {
 	int len;
-	int reclen = 0;
+	int reclen;
 	uchar_t *recstart, *versionp;
 	KSSLCipherSpec *spec;
 	int mac_sz;
-	int pad_sz = 0;
-
+	int pad_sz;
 
 	spec = &ssl->spec[KSSL_WRITE];
 	mac_sz = spec->mac_hashsz;
-
 
 	ASSERT(DB_REF(mp) == 1);
 	ASSERT((mp->b_rptr - mp->b_datap->db_base >= SSL3_HDR_LEN) &&

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_KSSL_KSSLIMPL_H
 #define	_INET_KSSL_KSSLIMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,7 +92,7 @@ typedef struct kssl_entry_s {
 	boolean_t		ke_no_freeall;
 	kmutex_t		ke_mutex;
 
-	ipaddr_t		ke_laddr;	/* Only IPv4 is supported */
+	in6_addr_t		ke_laddr;
 	in_port_t		ke_ssl_port;	/* SSL port */
 	in_port_t		ke_proxy_port;	/* SSL proxy port */
 
@@ -183,7 +181,6 @@ extern crypto_mechanism_t hmac_sha1_mech;
 extern crypto_call_flag_t kssl_call_flag;
 extern KSSLCipherDef cipher_defs[];
 
-extern int kssl_enabled;
 extern int kssl_cache_count;
 extern struct kmem_cache *kssl_cache;
 
@@ -196,6 +193,7 @@ extern kmutex_t kssl_tab_mutex;
 typedef struct kssl_stats {
 	kstat_named_t sid_cache_lookups;
 	kstat_named_t sid_cache_hits;
+	kstat_named_t sid_cached;
 	kstat_named_t sid_uncached;
 	kstat_named_t full_handshakes;
 	kstat_named_t resumed_sessions;

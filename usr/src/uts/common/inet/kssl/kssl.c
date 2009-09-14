@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,13 +36,11 @@
 #include <sys/sunddi.h>
 #include <sys/kmem.h>
 #include <sys/errno.h>
-#include <sys/ksynch.h>
 #include <sys/file.h>
 #include <sys/open.h>
 #include <sys/cred.h>
 #include <sys/proc.h>
 #include <sys/task.h>
-#include <sys/mkdev.h>
 #include <sys/model.h>
 #include <sys/sysmacros.h>
 #include <sys/policy.h>
@@ -146,7 +144,6 @@ KSSLCipherDef cipher_defs[] = { /* indexed by SSL3BulkCipher */
 	{type_block, 16, 32, CRYPTO_MECH_INVALID},
 };
 
-int kssl_enabled = 1;
 struct kmem_cache *kssl_cache;
 
 static void kssl_global_init();
@@ -327,7 +324,7 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		break;
 	}
 	case KSSL_DELETE_ENTRY: {
-		struct sockaddr_in server_addr;
+		struct sockaddr_in6 server_addr;
 
 		if (copyin(ARG, &server_addr, sizeof (server_addr)) != 0) {
 			return (EFAULT);
@@ -344,7 +341,7 @@ kssl_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 }
 
 #define	NUM_MECHS	7
-mech_to_cipher_t mech_to_cipher_tab[NUM_MECHS] = {
+static mech_to_cipher_t mech_to_cipher_tab[NUM_MECHS] = {
 	{CRYPTO_MECH_INVALID, SUN_CKM_RSA_X_509,
 	    {SSL_RSA_WITH_RC4_128_MD5, SSL_RSA_WITH_RC4_128_SHA,
 	    SSL_RSA_WITH_DES_CBC_SHA, SSL_RSA_WITH_3DES_EDE_CBC_SHA,
@@ -415,7 +412,7 @@ is_in_mechlist(char *name, crypto_mech_name_t *mechs, int count)
  * Callback function invoked by the crypto framework when a provider's
  * mechanism is available/unavailable. This callback updates entries in the
  * kssl_entry_tab[] to make changes to the cipher suites of an entry
- * which are affected by the mechansim.
+ * which are affected by the mechanism.
  */
 static void
 kssl_event_callback(uint32_t event, void *event_arg)
@@ -547,6 +544,8 @@ kssl_global_init()
 		    "kssl_sid_cache_lookups", KSTAT_DATA_UINT64);
 		kstat_named_init(&kssl_statp->sid_cache_hits,
 		    "kssl_sid_cache_hits", KSTAT_DATA_UINT64);
+		kstat_named_init(&kssl_statp->sid_cached,
+		    "kssl_sid_cached", KSTAT_DATA_UINT64);
 		kstat_named_init(&kssl_statp->sid_uncached,
 		    "kssl_sid_uncached", KSTAT_DATA_UINT64);
 

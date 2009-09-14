@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_KSSL_KSSLPROTO_H
 #define	_INET_KSSL_KSSLPROTO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -104,57 +102,49 @@ extern "C" {
 
 /* session state */
 typedef struct sslSessionIDStr {
-	uchar_t	session_id[SSL3_SESSIONID_BYTES];
-	uchar_t master_secret[SSL3_MASTER_SECRET_LEN];
-	clock_t time;
-	ipaddr_t client_addr;
-	boolean_t cached;
-	uint16_t cipher_suite;
+	uchar_t		session_id[SSL3_SESSIONID_BYTES];
+	uchar_t 	master_secret[SSL3_MASTER_SECRET_LEN];
+	clock_t 	time;
+	in6_addr_t 	client_addr;
+	boolean_t	cached;
+	uint16_t	cipher_suite;
 } sslSessionID;
 
 /* An element of the session cache */
 typedef struct kssl_sid_ent {
-	kmutex_t se_lock;
-	uint64_t se_used;	/* Counter to check hash distribution */
-	sslSessionID se_sid;
-	uchar_t  pad[2 * 64 - sizeof (kmutex_t) - sizeof (uint64_t) \
-	    - sizeof (sslSessionID)];
+	kmutex_t	se_lock;
+	uint64_t	se_used;	/* Counter to check hash distribution */
+	sslSessionID	se_sid;
 } kssl_sid_ent_t;
 
-typedef struct RC4ContextStr {
-	uchar_t i;
-	uchar_t j;
-	uchar_t S[256];
-} RC4Context;
-
 typedef enum {
-    content_change_cipher_spec	= 20,
-    content_alert		= 21,
-    content_handshake		= 22,
-    content_application_data	= 23,
-    content_handshake_v2	= 128
+	content_change_cipher_spec	= 20,
+	content_alert			= 21,
+	content_handshake		= 22,
+	content_application_data	= 23,
+	content_handshake_v2		= 128
 } SSL3ContentType;
 
 typedef enum {
-    hello_request	= 0,
-    client_hello	= 1,
-    server_hello	= 2,
-    certificate		= 11,
-    server_key_exchange	= 12,
-    certificate_request	= 13,
-    server_hello_done	= 14,
-    certificate_verify	= 15,
-    client_key_exchange	= 16,
-    finished		= 20
+	hello_request		= 0,
+	client_hello		= 1,
+	server_hello		= 2,
+	certificate		= 11,
+	server_key_exchange	= 12,
+	certificate_request	= 13,
+	server_hello_done	= 14,
+	certificate_verify	= 15,
+	client_key_exchange	= 16,
+	finished		= 20
 } SSL3HandshakeType;
 
 typedef struct SSL3HandshakeMsgStr {
-	int state;
-	SSL3HandshakeType type;
-	int msglen;
-	int msglen_bytes;
-	mblk_t *head;
-	mblk_t *tail;
+	int			state;
+	SSL3HandshakeType	type;
+	int			msglen;
+	int			msglen_bytes;
+	mblk_t			*head;
+	mblk_t			*tail;
 } SSL3HandshakeMsg;
 
 typedef struct KSSLJOBStr {
@@ -164,18 +154,6 @@ typedef struct KSSLJOBStr {
 	size_t		buflen;
 	int		status;
 } KSSLJOB;
-
-typedef struct KSSLMACJOBStr {
-	struct ssl_s *ssl;
-	buf_t *in;
-	buf_t *out;
-	uchar_t *rstart;
-	int rlen;
-	uint64_t seq;
-	SSL3ContentType ct;
-	uchar_t *digest;
-	int dir;
-} KSSLMACJOB;
 
 
 typedef struct {
@@ -224,23 +202,23 @@ typedef enum {
 } SSL3WaitState;
 
 typedef enum {
-    sender_client = 0x434c4e54,
-    sender_server = 0x53525652
+	sender_client = 0x434c4e54,
+	sender_server = 0x53525652
 } SSL3Sender;
 
 typedef enum {
-    mac_md5	= 0,
-    mac_sha	= 1
+	mac_md5	= 0,
+	mac_sha	= 1
 } SSL3MACAlgorithm;
 
 /* The SSL bulk cipher definition */
 typedef enum {
-    cipher_null = 0,
-    cipher_rc4 = 1,
-    cipher_des = 2,
-    cipher_3des = 3,
-    cipher_aes128 = 4,
-    cipher_aes256 = 5,
+	cipher_null = 0,
+	cipher_rc4 = 1,
+	cipher_des = 2,
+	cipher_3des = 3,
+	cipher_aes128 = 4,
+	cipher_aes256 = 5,
 } SSL3BulkCipher;
 
 typedef enum { type_stream = 0, type_block = 1 } CipherType;
@@ -306,7 +284,7 @@ typedef struct ssl_s {
 	mblk_t			*rec_ass_head;
 	mblk_t			*rec_ass_tail;
 	uint_t			kssl_refcnt;
-	ipaddr_t		faddr;
+	in6_addr_t		faddr;
 	uint32_t		tcp_mss;
 	SSL3WaitState		hs_waitstate;
 	boolean_t		resumed;
@@ -322,8 +300,6 @@ typedef struct ssl_s {
 	mblk_t			*alert_sendbuf;
 	kssl_callback_t		cke_callback_func;
 	void			*cke_callback_arg;
-	uint32_t		macjobs_todo;
-	uint32_t		macjobs_done;
 	uint16_t		pending_cipher_suite;
 	SSL3MACAlgorithm	pending_malg;
 	SSL3BulkCipher		pending_calg;

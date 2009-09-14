@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_KSSL_KSSL_H
 #define	_INET_KSSL_KSSL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -80,7 +78,7 @@ typedef struct kssl_tokinfo_s {
 typedef struct kssl_params_s {
 	uint64_t		kssl_params_size; /* total params buf len */
 	/* address and port number */
-	struct sockaddr_in	kssl_addr;
+	struct sockaddr_in6	kssl_addr;
 	uint16_t		kssl_proxy_port;
 
 	uint32_t		kssl_session_cache_timeout;	/* In seconds */
@@ -110,7 +108,7 @@ typedef struct kssl_params_s {
 #ifdef	_KERNEL
 
 extern int kssl_add_entry(kssl_params_t *);
-extern int kssl_delete_entry(struct sockaddr_in *);
+extern int kssl_delete_entry(struct sockaddr_in6 *);
 
 #endif	/* _KERNEL */
 

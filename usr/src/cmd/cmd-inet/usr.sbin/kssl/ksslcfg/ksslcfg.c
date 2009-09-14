@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <arpa/inet.h> /* inet_addr() */
 #include <ctype.h>
@@ -46,7 +44,11 @@
  * It makes use of kssladm(1M) which does the grunt work.
  */
 
-#define	KSSLCFG_VERSION "v%I%"
+/*
+ * This version number is rather meaningless. In any case,
+ * version 2.0 adds support for IPv6 addresses.
+ */
+#define	KSSLCFG_VERSION "Version 2.0"
 
 boolean_t verbose = B_FALSE;
 const char *SERVICE_NAME = "network/ssl/proxy";
@@ -96,12 +98,12 @@ create_instance_name(const char *arg, char **inaddr_any_name,
 	int len;
 	uint16_t port;
 	char *cname;
-	in_addr_t addr;
 	char *instance_name;
 	const char *prefix = "kssl-";
-	char *first_space = strchr(arg, ' ');
+	char *first_space;
 
-	if (first_space == NULL) {
+	first_space = strchr(arg, ' ');
+	if (first_space == NULL) {	/* No host name. Use INADDR_ANY. */
 		if (get_portnum(arg, &port) == 0) {
 			(void) fprintf(stderr,
 			    gettext("Error: Invalid port value -- %s\n"),
@@ -116,6 +118,9 @@ create_instance_name(const char *arg, char **inaddr_any_name,
 		char *ptr;
 		struct hostent *hp;
 		boolean_t do_warn;
+		int error_num;
+		in_addr_t v4addr;
+		in6_addr_t v6addr;
 
 		if (get_portnum(first_space + 1, &port) == 0) {
 			(void) fprintf(stderr,
@@ -129,30 +134,35 @@ create_instance_name(const char *arg, char **inaddr_any_name,
 			return (NULL);
 		*(strchr(temp_str, ' ')) = '\0';
 
-		if ((int)(addr = inet_addr(temp_str)) == -1) {
-			if ((hp = gethostbyname(temp_str)) == NULL) {
-				(void) fprintf(stderr,
-				    gettext("Error: Unknown host -- %s\n"),
-				    temp_str);
-				free(temp_str);
-				return (NULL);
-			}
+		if (inet_pton(AF_INET6, temp_str, &v6addr) == 1) {
+			/* Do a reverse lookup for the IPv6 address */
+			hp = getipnodebyaddr(&v6addr, sizeof (v6addr),
+			    AF_INET6, &error_num);
+		} else if (inet_pton(AF_INET, temp_str, &v4addr) == 1) {
+			/* Do a reverse lookup for the IPv4 address */
+			hp = getipnodebyaddr(&v4addr, sizeof (v4addr),
+			    AF_INET, &error_num);
 		} else {
-			/* This is an IP address. Do a reverse lookup. */
-			if ((hp = gethostbyaddr((char *)&addr, 4, AF_INET))
-			    == NULL) {
-				(void) fprintf(stderr,
-				    gettext("Error: Unknown host -- %s\n"),
-				    temp_str);
-				free(temp_str);
-				return (NULL);
-			}
+			/* Do a lookup for the host name */
+			hp = getipnodebyname(temp_str, AF_INET6, AI_DEFAULT,
+			    &error_num);
 		}
 
-		if ((ptr = cname = strdup(hp->h_name)) == NULL) {
+		if (hp == NULL) {
+			(void) fprintf(stderr,
+			    gettext("Error: Unknown host -- %s\n"), temp_str);
 			free(temp_str);
 			return (NULL);
 		}
+
+		if ((ptr = cname = strdup(hp->h_name)) == NULL) {
+			freehostent(hp);
+			free(temp_str);
+			return (NULL);
+		}
+
+		freehostent(hp);
+
 		do_warn = B_TRUE;
 		/* "s/./-/g" */
 		while ((ptr = strchr(ptr, '.')) != NULL) {

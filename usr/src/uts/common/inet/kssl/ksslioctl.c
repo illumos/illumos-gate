@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The kernel SSL module ioctls.
@@ -32,18 +30,14 @@
 #include <sys/types.h>
 #include <sys/modctl.h>
 #include <sys/conf.h>
-#include <sys/stat.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/kmem.h>
 #include <sys/errno.h>
-#include <sys/ksynch.h>
 #include <sys/file.h>
-#include <sys/open.h>
 #include <sys/cred.h>
 #include <sys/proc.h>
 #include <sys/task.h>
-#include <sys/mkdev.h>
 #include <sys/model.h>
 #include <sys/sysmacros.h>
 #include <sys/policy.h>
@@ -51,7 +45,6 @@
 #include <sys/crypto/api.h>
 #include <inet/common.h>
 #include <inet/ip.h>
-#include <inet/ip6.h>
 
 #include "ksslimpl.h"
 #include "kssl.h"
@@ -152,7 +145,7 @@ kssl_free_entry(kssl_entry_t *kssl_entry)
  * the address and port.  Returns -1 if no match is found.
  */
 static int
-kssl_find_entry(ipaddr_t laddr, in_port_t port, int type,
+kssl_find_entry(in6_addr_t laddr, in_port_t port, int type,
     boolean_t wild_card_match)
 {
 	int i;
@@ -169,8 +162,9 @@ kssl_find_entry(ipaddr_t laddr, in_port_t port, int type,
 		    (type == IS_PROXY_PORT && ep->ke_proxy_port == port)))
 			continue;
 
-		if ((ep->ke_laddr == laddr) || (wild_card_match &&
-		    ((laddr == INADDR_ANY) || (ep->ke_laddr == INADDR_ANY))))
+		if (IN6_ARE_ADDR_EQUAL(&laddr, &ep->ke_laddr) ||
+		    (wild_card_match && (IN6_IS_ADDR_UNSPECIFIED(&laddr) ||
+		    IN6_IS_ADDR_UNSPECIFIED(&ep->ke_laddr))))
 			break;
 	}
 
@@ -286,7 +280,7 @@ extract_private_key(kssl_params_t *kssl_params, crypto_key_t **privkey)
 	char *end_pos;
 	int i, j, rv;
 	size_t attrs_size;
-	crypto_object_attribute_t *newattrs = NULL;
+	crypto_object_attribute_t *newattrs;
 	char *mp_attrs;
 	kssl_object_attribute_t att;
 	char *attval;
@@ -415,8 +409,8 @@ create_kssl_entry(kssl_params_t *kssl_params, Certificate_t *cert,
 
 	kssl_entry = kmem_zalloc(sizeof (kssl_entry_t), KM_SLEEP);
 
-	kssl_entry->ke_laddr = kssl_params->kssl_addr.sin_addr.s_addr;
-	kssl_entry->ke_ssl_port = kssl_params->kssl_addr.sin_port;
+	kssl_entry->ke_laddr = kssl_params->kssl_addr.sin6_addr;
+	kssl_entry->ke_ssl_port = kssl_params->kssl_addr.sin6_port;
 	kssl_entry->ke_proxy_port = kssl_params->kssl_proxy_port;
 	if (kssl_params->kssl_session_cache_timeout == 0)
 		kssl_entry->sid_cache_timeout = DEFAULT_SID_TIMEOUT;
@@ -533,7 +527,7 @@ kssl_add_entry(kssl_params_t *kssl_params)
 	Certificate_t *cert;
 	crypto_key_t *privkey;
 	kssl_entry_t *kssl_entry;
-	ipaddr_t laddr;
+	in6_addr_t laddr;
 
 	if ((rv = extract_certificate(kssl_params, &cert)) != 0) {
 		return (rv);
@@ -551,8 +545,7 @@ kssl_add_entry(kssl_params_t *kssl_params)
 		return (EINVAL);
 	}
 
-	/* Revisit here for IPv6 support */
-	laddr = kssl_params->kssl_addr.sin_addr.s_addr;
+	laddr = kssl_params->kssl_addr.sin6_addr;
 
 retry:
 	mutex_enter(&kssl_tab_mutex);
@@ -578,7 +571,7 @@ retry:
 	} else {
 		/* Check if a matching entry exists already */
 		index = kssl_find_entry(laddr,
-		    kssl_params->kssl_addr.sin_port, IS_SSL_PORT, B_TRUE);
+		    kssl_params->kssl_addr.sin6_port, IS_SSL_PORT, B_TRUE);
 
 		if (index == -1) {
 			/* Check if an entry with the same proxy port exists */
@@ -624,16 +617,20 @@ retry:
 			}
 			index = i;
 		} else {
+			kssl_entry_t *ep;
+
 			/*
 			 * We do not want an entry with a specific address and
 			 * an entry with IN_ADDR_ANY to coexist. We could
 			 * replace the existing entry. But, most likely this
 			 * is misconfiguration. Better bail out with an error.
 			 */
-			if ((laddr == INADDR_ANY &&
-			    (kssl_entry_tab[index]->ke_laddr != INADDR_ANY)) ||
-			    (laddr != INADDR_ANY &&
-			    (kssl_entry_tab[index]->ke_laddr == INADDR_ANY))) {
+			ep = kssl_entry_tab[index];
+
+			if ((IN6_IS_ADDR_UNSPECIFIED(&laddr) &&
+			    !IN6_IS_ADDR_UNSPECIFIED(&ep->ke_laddr)) ||
+			    (!IN6_IS_ADDR_UNSPECIFIED(&laddr) &&
+			    IN6_IS_ADDR_UNSPECIFIED(&ep->ke_laddr))) {
 				mutex_exit(&kssl_tab_mutex);
 				kssl_free_entry(kssl_entry);
 				return (EEXIST);
@@ -654,16 +651,15 @@ retry:
 }
 
 int
-kssl_delete_entry(struct sockaddr_in *kssl_addr)
+kssl_delete_entry(struct sockaddr_in6 *kssl_addr)
 {
-	ipaddr_t laddr;
+	in6_addr_t laddr;
 	int index;
 
-	/* Revisit here for IPv6 support */
-	laddr = kssl_addr->sin_addr.s_addr;
+	laddr = kssl_addr->sin6_addr;
 
 	mutex_enter(&kssl_tab_mutex);
-	index = kssl_find_entry(laddr, kssl_addr->sin_port,
+	index = kssl_find_entry(laddr, kssl_addr->sin6_port,
 	    IS_SSL_PORT, B_FALSE);
 
 	if (index == -1) {
