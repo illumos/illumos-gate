@@ -904,6 +904,13 @@ iscsit_tgt_create(it_tgt_t *cfg_tgt)
 	result->target_stmf_lport = lport;
 
 	/*
+	 * We need a global hold until the STMF-ONLINE state machine
+	 * completes.  Acquire that hold now, in case we need to call
+	 * iscsit_tgt_destroy, which will also release the hold.
+	 */
+	iscsit_global_hold();
+
+	/*
 	 * Additional target modifications from config
 	 */
 	if (iscsit_tgt_modify(result, cfg_tgt) != IDM_STATUS_SUCCESS) {
@@ -921,8 +928,6 @@ iscsit_tgt_create(it_tgt_t *cfg_tgt)
 		return (NULL);
 	}
 	result->target_stmf_lport_registered = 1;
-
-	iscsit_global_hold();
 
 	return (result);
 }
@@ -1009,7 +1014,9 @@ iscsit_tgt_destroy(iscsit_tgt_t *tgt)
 {
 	iscsit_tpgt_t *tpgt, *next_tpgt;
 
-	ASSERT(tgt->target_state == TS_DELETING);
+	ASSERT(tgt->target_state == TS_DELETING ||
+	    (tgt->target_state == TS_CREATED &&
+	    tgt->target_stmf_lport_registered == 0));
 
 	/*
 	 * Destroy all target portal group tags
@@ -1912,7 +1919,7 @@ iscsit_portal_avl_compare(const void *void_portal1, const void *void_portal2)
 idm_status_t
 iscsit_portal_online(iscsit_portal_t *portal)
 {
-	idm_status_t rc;
+	idm_status_t rc = 0;
 	idm_svc_t	*svc;
 	idm_svc_req_t	sr;
 	uint16_t	port;

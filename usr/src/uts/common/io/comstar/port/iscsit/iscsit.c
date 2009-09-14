@@ -373,10 +373,9 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 {
 	iscsit_ioc_set_config_t		setcfg;
 	iscsit_ioc_set_config32_t	setcfg32;
-	/* iscsit_ioc_get_config_t	getcfg; */
-	char				*cfg_pnvlist;
-	nvlist_t			*cfg_nvlist;
-	it_config_t			*cfg;
+	char				*cfg_pnvlist = NULL;
+	nvlist_t			*cfg_nvlist = NULL;
+	it_config_t			*cfg = NULL;
 	idm_status_t			idmrc;
 	int				rc = 0;
 
@@ -429,11 +428,14 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 	/* Handle ioctl request (enable/disable have already been handled) */
 	switch (cmd) {
 	case ISCSIT_IOC_SET_CONFIG:
+		/* Any errors must set state back to ISE_ENABLED */
 		switch (ddi_model_convert_from(flag & FMODELS)) {
 		case DDI_MODEL_ILP32:
 			if (ddi_copyin((void *)argp, &setcfg32,
-			    sizeof (iscsit_ioc_set_config32_t), flag) != 0)
-				return (EFAULT);
+			    sizeof (iscsit_ioc_set_config32_t), flag) != 0) {
+				rc = EFAULT;
+				goto cleanup;
+			}
 
 			setcfg.set_cfg_pnvlist =
 			    (char *)((uintptr_t)setcfg32.set_cfg_pnvlist);
@@ -443,14 +445,17 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 			break;
 		case DDI_MODEL_NONE:
 			if (ddi_copyin((void *)argp, &setcfg,
-			    sizeof (iscsit_ioc_set_config_t), flag) != 0)
-				return (EFAULT);
+			    sizeof (iscsit_ioc_set_config_t), flag) != 0) {
+				rc = EFAULT;
+				goto cleanup;
+			}
 			break;
 		}
 
 		/* Check API version */
 		if (setcfg.set_cfg_vers != ISCSIT_API_VERS0) {
-			return (EINVAL);
+			rc = EINVAL;
+			goto cleanup;
 		}
 
 		/* Config is in packed nvlist format so unpack it */
@@ -460,34 +465,34 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 
 		if (ddi_copyin(setcfg.set_cfg_pnvlist, cfg_pnvlist,
 		    setcfg.set_cfg_pnvlist_len, flag) != 0) {
-			kmem_free(cfg_pnvlist, setcfg.set_cfg_pnvlist_len);
-			return (EFAULT);
+			rc = EFAULT;
+			goto cleanup;
 		}
 
-		if (nvlist_unpack(cfg_pnvlist, setcfg.set_cfg_pnvlist_len,
-		    &cfg_nvlist, KM_SLEEP) != 0) {
-			kmem_free(cfg_pnvlist, setcfg.set_cfg_pnvlist_len);
-			return (EINVAL);
+		rc = nvlist_unpack(cfg_pnvlist, setcfg.set_cfg_pnvlist_len,
+		    &cfg_nvlist, KM_SLEEP);
+		if (rc != 0) {
+			goto cleanup;
 		}
 
 		/* Translate nvlist */
-		if (it_nv_to_config(cfg_nvlist, &cfg) != 0) {
+		rc = it_nv_to_config(cfg_nvlist, &cfg);
+		if (rc != 0) {
 			cmn_err(CE_WARN, "Configuration is invalid");
-			kmem_free(cfg_pnvlist, setcfg.set_cfg_pnvlist_len);
-			nvlist_free(cfg_nvlist);
-			return (EINVAL);
+			goto cleanup;
 		}
 
 		/* Update config */
-		if (iscsit_config_merge(cfg) != 0) {
-			kmem_free(cfg_pnvlist, setcfg.set_cfg_pnvlist_len);
-			nvlist_free(cfg_nvlist);
-			return (EIO);
-		}
+		rc = iscsit_config_merge(cfg);
+		/* FALLTHROUGH */
 
-		it_config_free_cmn(cfg);
-		kmem_free(cfg_pnvlist, setcfg.set_cfg_pnvlist_len);
-		nvlist_free(cfg_nvlist);
+cleanup:
+		if (cfg)
+			it_config_free_cmn(cfg);
+		if (cfg_pnvlist)
+			kmem_free(cfg_pnvlist, setcfg.set_cfg_pnvlist_len);
+		if (cfg_nvlist)
+			nvlist_free(cfg_nvlist);
 
 		/*
 		 * Now that the reconfig is complete set our state back to
@@ -533,12 +538,13 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 		iscsit_global.global_svc_state = ISE_DISABLED;
 		ISCSIT_GLOBAL_UNLOCK();
 		break;
+
 	default:
 		rc = EINVAL;
+		ISCSIT_GLOBAL_LOCK(RW_WRITER);
+		iscsit_global.global_svc_state = ISE_ENABLED;
+		ISCSIT_GLOBAL_UNLOCK();
 	}
-
-	/* Don't forget to clear ISE_BUSY state */
-	ASSERT(iscsit_global.global_svc_state != ISE_BUSY);
 
 	return (rc);
 }
