@@ -1040,6 +1040,10 @@ void
 	return (buffer_get_string(&from_monitor, length_ptr));
 }
 
+/*
+ * Start and execute the code for the monitor which never returns from this
+ * function. The child will return and continue in the caller.
+ */
 void
 altprivsep_start_and_do_monitor(int use_engine, int inetd, int newsock,
 	int statup_pipe)
@@ -1072,12 +1076,6 @@ altprivsep_start_and_do_monitor(int use_engine, int inetd, int newsock,
 		 *  - PAM cleanup
 		 */
 
-		/*
-		 * Alarm signal handler is for our child only since that's the
-		 * one that does the authentication.
-		 */
-		(void) alarm(0);
-		(void) signal(SIGALRM, SIG_DFL);
 		/* this is for MaxStartups and the child takes care of that */
 		(void) close(statup_pipe);
 		(void) pkcs11_engine_load(use_engine);

@@ -933,8 +933,11 @@ packet_send(void)
  * Waits until a packet has been received, and returns its type.  Note that
  * no other data is processed until this returns, so this function should not
  * be used during the interactive session.
+ *
+ * The function is also used in the monitor to read the authentication context
+ * in aps_read_auth_context() via packet_read_seqnr(), before the monitor enters
+ * aps_monitor_loop() and starts using the process_input() function.
  */
-
 int
 packet_read_seqnr(u_int32_t *seqnr_p)
 {
@@ -980,11 +983,22 @@ packet_read_seqnr(u_int32_t *seqnr_p)
 		/* Read data from the socket. */
 		len = read(connection_in, buf, sizeof(buf));
 		if (len == 0) {
-			log("Connection closed by %.200s", get_remote_ipaddr());
+			if (packet_connection_is_on_socket())
+				log("Connection closed by %.200s",
+				    get_remote_ipaddr());
+			else
+				debug("child closed the communication pipe "
+				    "before user auth was finished");
 			fatal_cleanup();
 		}
-		if (len < 0)
-			fatal("Read from socket failed: %.100s", strerror(errno));
+		if (len < 0) {
+			if (packet_connection_is_on_socket())
+				fatal("Read from socket failed: %.100s",
+				    strerror(errno));
+			else
+				fatal("Read from communication pipe failed: "
+				    "%.100s", strerror(errno));
+		}
 		/* Append it to the buffer. */
 		packet_process_incoming(buf, len);
 	}

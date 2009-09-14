@@ -318,15 +318,15 @@ main_sigchld_handler(int sig)
 }
 
 /*
- * Signal handler for the alarm after the login grace period has expired.
+ * Signal handler for the alarm after the login grace period has expired. This
+ * is for the (soon-to-be) unprivileged child only. The monitor gets an event on
+ * the communication pipe and exits as well.
  */
 static void
 grace_alarm_handler(int sig)
 {
-	/* XXX no idea how fix this signal handler */
-
 	/* Log error and exit. */
-	fatal("Timeout before authentication for %s", get_remote_ipaddr());
+	fatal("Timeout before authentication for %.200s", get_remote_ipaddr());
 }
 
 #ifdef HAVE_SOLARIS_CONTRACTS
@@ -1512,18 +1512,6 @@ main(int ac, char **av)
 	/* Log the connection. */
 	verbose("Connection from %.500s port %d", remote_ip, remote_port);
 
-	/*
-	 * We don\'t want to listen forever unless the other side
-	 * successfully authenticates itself.  So we set up an alarm which is
-	 * cleared after successful authentication.  A limit of zero
-	 * indicates no limit. Note that we don\'t set the alarm in debugging
-	 * mode; it is just annoying to have the server exit just when you
-	 * are about to discover the bug.
-	 */
-	(void) signal(SIGALRM, grace_alarm_handler);
-	if (!debug_flag)
-		(void) alarm(options.login_grace_time);
-
 	sshd_exchange_identification(sock_in, sock_out);
 	/*
 	 * Check that the connection comes from a privileged port.
@@ -1561,9 +1549,23 @@ main(int ac, char **av)
 	 * PKCS#11 sessions. See the PKCS#11 standard for more information on
 	 * fork safety and packet.c for information about forking with the
 	 * engine.
+	 *
+	 * Note that the monitor stays in the function while the child is the
+	 * only one that returns.
 	 */
 	altprivsep_start_and_do_monitor(options.use_openssl_engine,
 	    inetd_flag, newsock, startup_pipe);
+
+	/*
+	 * We don't want to listen forever unless the other side successfully
+	 * authenticates itself. So we set up an alarm which is cleared after
+	 * successful authentication. A limit of zero indicates no limit. Note
+	 * that we don't set the alarm in debugging mode; it is just annoying to
+	 * have the server exit just when you are about to discover the bug.
+	 */
+	(void) signal(SIGALRM, grace_alarm_handler);
+	if (!debug_flag)
+		(void) alarm(options.login_grace_time);
 
 	/*
 	 * The child is about to start the first key exchange while the monitor
@@ -1581,7 +1583,6 @@ main(int ac, char **av)
 		authctxt = do_authentication();
 	}
 
-authenticated:
 	/* Authentication complete */
 	(void) alarm(0);
 	/* we no longer need an alarm handler */

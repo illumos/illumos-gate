@@ -111,6 +111,7 @@ compat_datafellows(const char *version)
 		{ "Sun_SSH_1.2*",	SSH_BUG_STRING_ENCODING},
 		{ "Sun_SSH_1.3*",	SSH_BUG_STRING_ENCODING},
 		{ "Sun_SSH_1.4*",	0 },
+		{ "Sun_SSH_1.5*",	0 },
 		{ "Sun_SSH_*",		0 },
 		{ "*MindTerm*",		0 },
 		{ "2.1.0*",		SSH_BUG_SIGBLOB|SSH_BUG_HMAC|
