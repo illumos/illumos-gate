@@ -1505,7 +1505,7 @@ mach_cpu_create_devinfo(cpu_t *cp, dev_info_t **dipp)
 	 * create a child node for cpu identified as 'cpu_id'
 	 */
 	ndi_devi_enter(cpu_nex_devi, &circ);
-	dip = ddi_add_child(cpu_nex_devi, "cpu", DEVI_SID_NODEID, cp->cpu_id);
+	dip = ddi_add_child(cpu_nex_devi, "cpu", DEVI_SID_NODEID, -1);
 	if (dip == NULL) {
 		cmn_err(CE_CONT,
 		    "?failed to create device node for cpu%d.\n", cp->cpu_id);
