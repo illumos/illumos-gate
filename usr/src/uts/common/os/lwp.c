@@ -58,6 +58,7 @@
 #include <sys/cmn_err.h>
 #include <sys/brand.h>
 #include <sys/cyclic.h>
+#include <sys/pool.h>
 
 /* hash function for the lwpid hash table, p->p_tidhash[] */
 #define	TIDHASH(tid, hash_sz)	((tid) & ((hash_sz) - 1))
@@ -394,8 +395,22 @@ grow:
 		 * We rely on stop() to call prbarrier(p) before returning.
 		 */
 		while ((curthread->t_proc_flag & TP_PRSTOP) &&
-		    !ttolwp(curthread)->lwp_nostop)
+		    !ttolwp(curthread)->lwp_nostop) {
+			/*
+			 * We called pool_barrier_enter() before calling
+			 * here to lwp_create(). We have to call
+			 * pool_barrier_exit() before stopping.
+			 */
+			pool_barrier_exit();
+			prbarrier(p);
 			stop(PR_REQUESTED, 0);
+			/*
+			 * And we have to repeat the call to
+			 * pool_barrier_enter after stopping.
+			 */
+			pool_barrier_enter();
+			prbarrier(p);
+		}
 
 		/*
 		 * If process is exiting, there could be a race between
