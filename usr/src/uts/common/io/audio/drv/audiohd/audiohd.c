@@ -1064,7 +1064,6 @@ audiohd_update_port(audiohd_port_t *port)
 	if (port->curpos >= port->samp_size * AUDIOHD_BDLE_NUMS)
 		port->curpos -= port->samp_size * AUDIOHD_BDLE_NUMS;
 
-	port->len = len;
 	port->count += len / (port->nchan * 2);
 
 
@@ -1104,8 +1103,8 @@ audiohd_engine_sync(void *arg, unsigned nframes)
 
 	_NOTE(ARGUNUSED(nframes));
 
-	(void) ddi_dma_sync(port->samp_dmah, port->curpos,
-	    port->len, port->sync_dir);
+	(void) ddi_dma_sync(port->samp_dmah, 0,
+	    0, port->sync_dir);
 
 }
 
@@ -5339,16 +5338,34 @@ audiohd_allocate_port(audiohd_state_t *statep)
 			    rc);
 			return (DDI_FAILURE);
 		}
-		/* allocate DMA buffer */
+		/*
+		 * Warning: please be noted that allocating the dma memory
+		 * with the flag IOMEM_DATA_UNCACHED is a hack due
+		 * to an incorrect cache synchronization on NVidia MCP79
+		 * chipset which causes the audio distortion problem,
+		 * and that it should be fixed later. There should be
+		 * no reason you have to allocate UNCACHED memory. In
+		 * complex architectures with nested IO caches,
+		 * reliance on this flag might lead to failure.
+		 */
 		rc = ddi_dma_mem_alloc(port->samp_dmah, port->samp_size *
 		    AUDIOHD_BDLE_NUMS,
 		    &hda_dev_accattr,
-		    DDI_DMA_CONSISTENT,
+		    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
 		    DDI_DMA_SLEEP, NULL, &port->samp_kaddr,
 		    &real_size, &port->samp_acch);
 		if (rc == DDI_FAILURE) {
-			audio_dev_warn(adev, "dma_mem_alloc failed");
-			return (DDI_FAILURE);
+			if (ddi_dma_mem_alloc(port->samp_dmah,
+			    port->samp_size * AUDIOHD_BDLE_NUMS,
+			    &hda_dev_accattr,
+			    DDI_DMA_CONSISTENT,
+			    DDI_DMA_SLEEP, NULL,
+			    &port->samp_kaddr, &real_size,
+			    &port->samp_acch) != DDI_SUCCESS) {
+				audio_dev_warn(adev,
+				    "ddi_dma_mem_alloc failed");
+				return (DDI_FAILURE);
+			}
 		}
 
 		/* bind DMA buffer */

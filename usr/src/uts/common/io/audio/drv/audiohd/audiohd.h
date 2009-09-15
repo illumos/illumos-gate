@@ -679,7 +679,6 @@ typedef struct audiohd_port
 	unsigned		nframes;
 	uint64_t		count;
 	int			curpos;
-	int			len;
 	int			intrs;
 
 	uint_t			format;
