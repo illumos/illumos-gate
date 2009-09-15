@@ -92,14 +92,10 @@ static int usb_rmrr_quirk = 1;
 
 /*
  * internal variables
- *   iommu_states	- the list of iommu
- *   domain_states	- the list of domain
- *   rmrr_states	- the list of rmrr
+ *   iommu_state	- the list of iommu structures
  *   page_num		- the count of pages for iommu page tables
  */
 static list_t iommu_states;
-static list_t domain_states;
-static list_t rmrr_states;
 static uint_t page_num;
 
 /*
@@ -2046,8 +2042,6 @@ iommu_domain_init(dmar_domain_state_t *domain)
 		    offsetof(dvma_cache_node_t, node));
 	}
 
-	list_insert_tail(&domain_states, domain);
-
 	return (DDI_SUCCESS);
 }
 
@@ -2765,7 +2759,6 @@ build_rmrr_identity_map(void)
 		if (list_is_empty(&(dmar_info->dmari_rmrr[i])))
 			break;
 		for_each_in_list(&(dmar_info->dmari_rmrr[i]), rmrr) {
-			list_insert_tail(&rmrr_states, rmrr);
 			build_single_rmrr_identity_map(rmrr);
 		}
 	}
@@ -3037,10 +3030,6 @@ intel_iommu_attach_dmar_nodes(void)
 	 */
 	list_create(&iommu_states, sizeof (intel_iommu_state_t),
 	    offsetof(intel_iommu_state_t, node));
-	list_create(&domain_states, sizeof (dmar_domain_state_t),
-	    offsetof(dmar_domain_state_t, node));
-	list_create(&rmrr_states, sizeof (rmrr_info_t),
-	    offsetof(rmrr_info_t, node4states));
 
 	root_devinfo = ddi_root_node();
 	ASSERT(root_devinfo);

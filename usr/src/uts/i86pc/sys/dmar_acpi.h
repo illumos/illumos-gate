@@ -160,7 +160,6 @@ typedef struct drhd_info {
  */
 typedef struct rmrr_info {
 	list_node_t	node;
-	list_node_t	node4states;
 	uint16_t	ri_segment;
 	uint64_t	ri_baseaddr;
 	uint64_t	ri_limiaddr;

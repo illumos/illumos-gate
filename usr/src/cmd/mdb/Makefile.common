@@ -96,8 +96,7 @@ COMMON_MODULES_KVM = \
 	sv \
 	ufs \
 	usba \
-	zfs \
-	rootnex
+	zfs
 
 CLOSED_COMMON_MODULES_KVM = \
 	mpt \
