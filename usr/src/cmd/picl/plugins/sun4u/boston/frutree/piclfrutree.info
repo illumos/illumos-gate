@@ -20,12 +20,11 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
  *
  * supported prop types: void, int, uint, float, string
  * supported prop access_modes: r, w, rw
@@ -59,15 +58,6 @@
  * This file describes the locations of all the system fru's and their
  * proms, if present.
  */
-
-/*
- * define a macro to force a #ident line into the output stream
- * otherwise cpp removes it. Use #ifndef because of #included definitions.
- */
-#ifndef id
-#define	id(s)	#ident s
-#endif
-id("%Z%%M%	%I%	%E% SMI")
 
 /*
  * There are a lot of nodes below the rmclomv node, define a shortname
@@ -118,8 +108,6 @@ NODE frutree picl
         NODE PDB location
             PROP SlotType string r 0 "power-distribution-board"
             PROP Label string r 0 "PDB"
-            NODE power-distribution-board fru
-            ENDNODE
         ENDNODE
 
 	/* on Boston we need only two of the four possible power supplies */
