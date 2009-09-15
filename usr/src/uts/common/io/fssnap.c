@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -952,8 +952,12 @@ snap_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 
 	minor = getminor(dev);
 
-	/* if this is the control device just check for .conf properties */
-	if (minor == SNAP_CTL_MINOR)
+	/*
+	 * If this is the control device just check for .conf properties,
+	 * if the wildcard DDI_DEV_T_ANY was passed in via the dev_t
+	 * just fall back to the defaults.
+	 */
+	if ((minor == SNAP_CTL_MINOR) || (dev == DDI_DEV_T_ANY))
 		return (ddi_prop_op(dev, dip, prop_op, flags, name,
 		    valuep, lengthp));
 
