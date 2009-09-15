@@ -322,7 +322,7 @@ def do_allow():
 		if sys.argv[2] == "-h":
 			# hack to make "zfs allow -h" work
 			usage()
-		ds = zfs.dataset.Dataset(sys.argv[2])
+		ds = zfs.dataset.Dataset(sys.argv[2], snaps=False)
 
 		p = dict()
 		for (fs, raw) in ds.get_fsacl().items():
