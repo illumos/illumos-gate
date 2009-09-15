@@ -23,6 +23,7 @@
 #
 #	This Makefile drives production of the amd_iommu driver kernel module.
 #
+#	intel implementation architecture dependent
 #
 
 #
@@ -36,13 +37,13 @@ UTSBASE	= ../..
 MODULE		= amd_iommu
 OBJECTS		= $(AMD_IOMMU_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AMD_IOMMU_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR     = $(UTSBASE)/i86pc/io/amd_iommu
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+CONF_SRCDIR     = $(UTSBASE)/intel/io/amd_iommu
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #	Define targets
@@ -80,4 +81,4 @@ install:	$(INSTALL_DEPS) $(CONF_INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ

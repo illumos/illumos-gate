@@ -7888,24 +7888,6 @@ mondo_loop() {
 	rm -f $root/dev/rsr[0-9]*
 
 	#
-	# Remove old amd_iommu driver
-	#
-
-	#
-	# old: need to remove going forwards:
-	#
-	rm -f $root/kernel/drv/amd_iommu
-	rm -f $root/kernel/drv/amd_iommu.conf
-	rm -f $root/kernel/drv/amd64/amd_iommu
-
-	#
-	# new: need to remove going backwards:
-	#
-	rm -f $root/platform/i86pc/kernel/drv/amd_iommu.conf
-	rm -f $root/platform/i86pc/kernel/drv/amd_iommu
-	rm -f $root/platform/i86pc/kernel/drv/amd64/amd_iommu
-
-	#
 	# The pkg* commands should not be used after this point and before
 	# archive extraction as libcrypto/libssl may not be available.
 	#

@@ -75,6 +75,7 @@ f none usr/include/ia32/sys/trap.h 644 root bin
 f none usr/include/ia32/sys/traptrace.h 644 root bin
 f none usr/include/sys/kdi_regs.h 644 root bin
 f none usr/include/stack_unwind.h 644 root bin
+f none usr/include/sys/amd_iommu.h 644 root bin
 f none usr/include/sys/bootregs.h 644 root bin
 f none usr/include/sys/bootsvcs.h 644 root bin
 f none usr/include/sys/controlregs.h 644 root bin
@@ -120,7 +121,6 @@ d none usr/platform/i86pc/include 755 root bin
 d none usr/platform/i86pc/include/sys 755 root bin
 f none usr/platform/i86pc/include/sys/asm_misc.h 644 root bin
 f none usr/platform/i86pc/include/sys/acpidev.h 644 root bin
-f none usr/platform/i86pc/include/sys/amd_iommu.h 644 root bin
 f none usr/platform/i86pc/include/sys/clock.h 644 root bin
 f none usr/platform/i86pc/include/sys/cram.h 644 root bin
 f none usr/platform/i86pc/include/sys/debug_info.h 644 root bin

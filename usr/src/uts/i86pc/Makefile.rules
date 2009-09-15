@@ -79,10 +79,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpi/acpinex/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/amd_iommu/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/ioat/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -297,9 +293,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/acpidev/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpi/acpinex/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:              $(UTSBASE)/i86pc/io/amd_iommu/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ioat/%.c

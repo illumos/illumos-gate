@@ -34,7 +34,6 @@
 #include <sys/conf.h>
 #include <sys/devops.h>
 #include <sys/ddi.h>
-#include <sys/x86_archext.h>
 
 #include <sys/amd_iommu.h>
 #include "amd_iommu_impl.h"
@@ -122,9 +121,6 @@ _init(void)
 	int error = ENOTSUP;
 
 #if defined(__amd64) && !defined(__xpv)
-
-	if (get_hwenv() != HW_NATIVE)
-		return (ENOTSUP);
 
 	error = ddi_soft_state_init(&amd_iommu_statep,
 	    sizeof (struct amd_iommu_state), 1);

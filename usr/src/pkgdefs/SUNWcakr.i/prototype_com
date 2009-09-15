@@ -68,7 +68,6 @@ f none platform/i86pc/kernel/drv/amd64/acpippm 755 root sys
 f none platform/i86pc/kernel/drv/acpippm 755 root sys
 f none platform/i86pc/kernel/drv/acpippm.conf 644 root sys
 f none platform/i86pc/kernel/drv/amd64/acpinex 755 root sys
-f none platform/i86pc/kernel/drv/amd64/amd_iommu 755 root sys
 f none platform/i86pc/kernel/drv/amd64/ppm 755 root sys
 f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
@@ -76,8 +75,6 @@ f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pit_beep 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
 f none platform/i86pc/kernel/drv/acpinex 755 root sys
-f none platform/i86pc/kernel/drv/amd_iommu 755 root sys
-f none platform/i86pc/kernel/drv/amd_iommu.conf 644 root sys
 f none platform/i86pc/kernel/drv/cpudrv 755 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
 f none platform/i86pc/kernel/drv/npe 755 root sys

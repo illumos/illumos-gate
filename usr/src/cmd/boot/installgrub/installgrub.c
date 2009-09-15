@@ -228,13 +228,11 @@ static unsigned int
 get_start_sector(int fd)
 {
 	static unsigned int start_sect = 0;
-	uint32_t secnum = 0, numsec = 0;
-	int i, pno, rval, log_part = 0;
+	uint32_t secnum, numsec;
+	int i, pno, rval, ext_sol_part_found = 0;
 	struct mboot *mboot;
 	struct ipart *part;
 	ext_part_t *epp;
-	struct part_info dkpi;
-	struct extpart_info edkpi;
 
 	if (start_sect)
 		return (start_sect);
@@ -243,84 +241,24 @@ get_start_sector(int fd)
 	for (i = 0; i < FD_NUMPART; i++) {
 		part = (struct ipart *)mboot->parts + i;
 		if (is_bootpar) {
-			if (part->systid == 0xbe) {
-				start_sect = part->relsect;
-				partition = i;
-				goto found_part;
-			}
+			if (part->systid == 0xbe)
+				break;
 		}
 	}
 
-	/*
-	 * We will not support x86 boot partition on extended partitions
-	 */
-	if (is_bootpar) {
-		(void) fprintf(stderr, NOBOOTPAR);
-		exit(-1);
-	}
-
-	/*
-	 * Not an x86 boot partition. Search for Solaris fdisk partition
-	 * Get the solaris partition information from the device
-	 * and compare the offset of S2 with offset of solaris partition
-	 * from fdisk partition table.
-	 */
-	if (ioctl(fd, DKIOCEXTPARTINFO, &edkpi) < 0) {
-		if (ioctl(fd, DKIOCPARTINFO, &dkpi) < 0) {
-			(void) fprintf(stderr, PART_FAIL);
-			exit(-1);
-		} else {
-			edkpi.p_start = dkpi.p_start;
-		}
-	}
-
-	for (i = 0; i < FD_NUMPART; i++) {
-		part = (struct ipart *)mboot->parts + i;
-
-		if (part->relsect == 0) {
-			(void) fprintf(stderr, BAD_PART, i);
-			exit(-1);
-		}
-
-		if (edkpi.p_start >= part->relsect &&
-		    edkpi.p_start < (part->relsect + part->numsect)) {
-			/* Found the partition */
-			break;
-		}
-	}
-
-	if (i == FD_NUMPART) {
-		/* No solaris fdisk partitions (primary or logical) */
-		(void) fprintf(stderr, NOSOLPAR);
-		exit(-1);
-	}
-
-	/*
-	 * We have found a Solaris fdisk partition (primary or extended)
-	 * Handle the simple case first: Solaris in a primary partition
-	 */
-	if (!fdisk_is_dos_extended(part->systid)) {
-		start_sect = part->relsect;
-		partition = i;
-		goto found_part;
-	}
-
-	/*
-	 * Solaris in a logical partition. Find that partition in the
-	 * extended part.
-	 */
+	/* Read extended partition to find a solaris partition */
 	if ((rval = libfdisk_init(&epp, device_p0, NULL, FDISK_READ_DISK))
 	    != FDISK_SUCCESS) {
 		switch (rval) {
 			/*
-			 * The first 2 cases are not an error per-se, just that
-			 * there is no Solaris logical partition
+			 * FDISK_EBADLOGDRIVE and FDISK_ENOLOGDRIVE can
+			 * be considered as soft errors and hence
+			 * we do not exit
 			 */
 			case FDISK_EBADLOGDRIVE:
+				break;
 			case FDISK_ENOLOGDRIVE:
-				(void) fprintf(stderr, NOSOLPAR);
-				exit(-1);
-				/*NOTREACHED*/
+				break;
 			case FDISK_ENOVGEOM:
 				(void) fprintf(stderr, NO_VIRT_GEOM);
 				exit(1);
@@ -341,18 +279,54 @@ get_start_sector(int fd)
 	}
 
 	rval = fdisk_get_solaris_part(epp, &pno, &secnum, &numsec);
-	if (rval != FDISK_SUCCESS) {
-		/* No solaris logical partition */
-		(void) fprintf(stderr, NOSOLPAR);
-		exit(-1);
+	if (rval == FDISK_SUCCESS) {
+		ext_sol_part_found = 1;
 	}
 	libfdisk_fini(&epp);
 
-	start_sect = secnum;
-	partition = pno - 1;
-	log_part = 1;
+	/*
+	 * If there is no boot partition, find the solaris partition
+	 */
 
-found_part:
+	if (i == FD_NUMPART) {
+		struct part_info dkpi;
+		struct extpart_info edkpi;
+
+		/*
+		 * Get the solaris partition information from the device
+		 * and compare the offset of S2 with offset of solaris partition
+		 * from fdisk partition table.
+		 */
+		if (ioctl(fd, DKIOCEXTPARTINFO, &edkpi) < 0) {
+			if (ioctl(fd, DKIOCPARTINFO, &dkpi) < 0) {
+				(void) fprintf(stderr, PART_FAIL);
+				exit(-1);
+			} else {
+				edkpi.p_start = dkpi.p_start;
+			}
+		}
+
+		for (i = 0; i < FD_NUMPART; i++) {
+			part = (struct ipart *)mboot->parts + i;
+
+			if (part->relsect == 0) {
+				(void) fprintf(stderr, BAD_PART, i);
+				exit(-1);
+			}
+
+			if (edkpi.p_start >= part->relsect &&
+			    edkpi.p_start < (part->relsect + part->numsect)) {
+				/* Found the partition */
+				break;
+			}
+		}
+	}
+
+	if ((i == FD_NUMPART) && (!ext_sol_part_found)) {
+		(void) fprintf(stderr, BOOTPAR);
+		exit(-1);
+	}
+
 	/* get confirmation for -m */
 	if (write_mboot && !force_mboot) {
 		(void) fprintf(stdout, MBOOT_PROMPT);
@@ -362,21 +336,16 @@ found_part:
 		}
 	}
 
-	/*
-	 * Currently if Solaris is in an extended partition we need to
-	 * write GRUB to the MBR. Check for this.
-	 */
-	if (log_part && !write_mboot) {
-		(void) fprintf(stderr, EXTSOLPAR);
-		exit(-1);
+	if (fdisk_is_dos_extended(part->systid)) {
+		start_sect = secnum;
+		partition = pno;
+	} else {
+		start_sect = part->relsect;
+		partition = i;
 	}
 
-	/*
-	 * warn, if Solaris in primary partition and GRUB not in MBR and
-	 * partition is not active
-	 */
-	if (!log_part && part->bootid != 128 && !write_mboot) {
-		(void) fprintf(stdout, SOLPAR_INACTIVE, partition + 1);
+	if (part->bootid != 128 && write_mboot == 0) {
+		(void) fprintf(stdout, BOOTPAR_INACTIVE, i + 1);
 	}
 
 	return (start_sect);

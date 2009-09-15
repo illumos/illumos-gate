@@ -34,19 +34,12 @@ extern "C" {
 
 #define	DRY_RUN	gettext("dry run--nothing will be written to disk\n")
 
-#define	NOSOLPAR	\
-	gettext("Solaris partition not found. Aborting operation.\n")
+#define	BOOTPAR	gettext("Solaris partition not found. Abort operation.\n")
 
-#define	NOBOOTPAR	\
-	gettext("Solaris x86 boot partition not found. Aborting operation.\n")
-
-#define	SOLPAR_INACTIVE	gettext("Solaris fdisk partition is inactive.\n")
+#define	BOOTPAR_INACTIVE	gettext("Solaris boot partition inactive.\n")
 
 #define	BOOTPAR_NOTFOUND	\
     gettext("Solaris boot partition not found on %s\n")
-
-#define	EXTSOLPAR	\
-	gettext("Solaris in extended partition. -m (MBR) option required\n")
 
 #define	NOT_RAW_DEVICE	gettext("device %s is not a char special device\n")
 
@@ -118,8 +111,6 @@ extern "C" {
 #define	NO_LABEL_GEOM	gettext("Could not get label geometry\n")
 
 #define	LIBFDISK_INIT_FAIL	gettext("Failed to initialize libfdisk.\n")
-
-
 
 #ifdef	__cplusplus
 }
