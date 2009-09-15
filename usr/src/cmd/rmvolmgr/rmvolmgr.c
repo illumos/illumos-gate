@@ -74,7 +74,6 @@ static boolean_t	opt_s;	/* system instance */
 static boolean_t	rmm_prop_eject_button = B_TRUE;
 
 static void	get_smf_properties();
-static int	daemon(int nochdir, int noclose);
 static void	rmm_device_added(LibHalContext *ctx, const char *udi);
 static void	rmm_device_removed(LibHalContext *ctx, const char *udi);
 static void	rmm_property_modified(LibHalContext *ctx, const char *udi,
@@ -592,50 +591,6 @@ rmm_unmount_all()
 		managed_volumes = g_slist_remove(managed_volumes, v);
 		rmm_managed_free(v);
 	}
-}
-
-static int
-daemon(int nochdir, int noclose)
-{
-	int fd;
-
-	switch (fork()) {
-	case -1:
-		return (-1);
-	case 0:
-		break;
-	default:
-		exit(0);
-	}
-
-	if (setsid() == -1)
-		return (-1);
-
-	if (!nochdir)
-		(void) chdir("/");
-
-	if (!noclose) {
-		struct stat64 st;
-
-		if (((fd = open("/dev/null", O_RDWR, 0)) != -1) &&
-		    (fstat64(fd, &st) == 0)) {
-			if (S_ISCHR(st.st_mode) != 0) {
-				(void) dup2(fd, STDIN_FILENO);
-				(void) dup2(fd, STDOUT_FILENO);
-				(void) dup2(fd, STDERR_FILENO);
-				if (fd > 2)
-					(void) close(fd);
-			} else {
-				(void) close(fd);
-				(void) __set_errno(ENODEV);
-				return (-1);
-			}
-		} else {
-			(void) close(fd);
-			return (-1);
-		}
-	}
-	return (0);
 }
 
 int

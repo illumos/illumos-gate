@@ -86,6 +86,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	clock_gettime;
 	clock_nanosleep;
 	clock_settime;
+	daemon;
 	dirfd;
 	door_bind;
 	door_call;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -37,8 +37,6 @@
  * char copyright[] = "@(#) Copyright (c) 1983, 1988, 1993\n"
  * " The Regents of the University of California.  All rights reserved.\n";
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include "pathnames.h"
@@ -103,35 +101,6 @@ static  int open_rip_sock();
 static void timevalsub(struct timeval *, struct timeval *, struct timeval *);
 static void	sigalrm(int);
 static void	sigterm(int);
-
-static int
-daemon(boolean_t nochdir, boolean_t noclose)
-{
-	int retv;
-
-	if ((retv = fork()) == -1)
-		return (-1);
-	if (retv != 0)
-		_exit(EXIT_SUCCESS);
-	if (setsid() == -1)
-		return (-1);
-	if ((retv = fork()) == -1)
-		return (-1);
-	if (retv != 0)
-		_exit(EXIT_SUCCESS);
-	if (!nochdir && chdir("/") == -1)
-		return (-1);
-	if (!noclose) {
-		(void) close(0);
-		(void) close(1);
-		(void) close(2);
-		if ((retv = open("/dev/null", O_RDWR)) != -1) {
-			(void) dup2(retv, 1);
-			(void) dup2(retv, 2);
-		}
-	}
-	return (0);
-}
 
 int
 main(int argc, char *argv[])
@@ -310,9 +279,9 @@ main(int argc, char *argv[])
 		goto usage;
 	if (argc != 0) {
 usage:
-		(void) fprintf(stderr,
-		    gettext("usage: in.routed [-AdghmnqsStVvz] "
-			"[-T <tracefile>]\n"));
+		(void) fprintf(stderr, gettext(
+		    "usage: in.routed [-AdghmnqsStVvz] "
+		    "[-T <tracefile>]\n"));
 		(void) fprintf(stderr,
 		    gettext("\t[-F <net>[/<mask>][,<metric>]] [-P <parms>]\n"));
 		logbad(_B_FALSE, gettext("excess arguments"));
@@ -358,7 +327,7 @@ usage:
 		msglog("signal: %s", rip_strerror(sigerr));
 
 	/* get into the background */
-	if (background && daemon(_B_FALSE, _B_FALSE) < 0)
+	if (background && daemon(0, 0) < 0)
 		BADERR(_B_FALSE, "daemon()");
 
 	/* Store our process id, blow away any existing file if it exists. */

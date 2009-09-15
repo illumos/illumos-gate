@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef _STDLIB_H
 #define	_STDLIB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.22	*/
 
 #include <iso/stdlib_iso.h>
 #include <iso/stdlib_c99.h>
@@ -215,6 +213,7 @@ extern int unsetenv(const char *);
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
 extern void closefrom(int);
+extern int daemon(int, int);
 extern int dup2(int, int);
 extern int fdwalk(int (*)(void *, int), void *);
 extern char *qecvt(long double, int, int *, int *);
@@ -317,6 +316,7 @@ extern int unsetenv();
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
 extern void closefrom();
+extern int daemon();
 extern int dup2();
 extern int fdwalk();
 extern char *qecvt();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -760,34 +760,6 @@ wpa_config_free(struct wpa_config *config)
 		free(ssid);
 	}
 	free(config);
-}
-
-static int
-daemon(boolean_t nochdir, boolean_t noclose)
-{
-	int retv;
-
-	if ((retv = fork()) == -1)
-		return (-1);
-	if (retv != 0)
-		_exit(EXIT_SUCCESS);
-	if (setsid() == -1)
-		return (-1);
-
-	if (!nochdir && chdir("/") == -1)
-		return (-1);
-
-	if (!noclose) {
-		(void) close(0);
-		(void) close(1);
-		(void) close(2);
-		if ((retv = open("/dev/null", O_RDWR)) != -1) {
-			(void) dup2(retv, 1);
-			(void) dup2(retv, 2);
-		}
-	}
-
-	return (0);
 }
 
 /*

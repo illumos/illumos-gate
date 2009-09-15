@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/ssh/libopenbsd-compat/Makefile.com
@@ -41,7 +41,6 @@ OBJECTS =	\
 		xmmap.o \
 		base64.o \
 		bindresvport.o \
-		daemon.o \
 		dirname.o \
 		getcwd.o \
 		getgrouplist.o \

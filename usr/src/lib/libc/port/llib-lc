@@ -345,6 +345,9 @@ int _toupper(int c);
 int _tolower(int c);
 int toascii(int c);
 
+/* daemon.c */
+int daemon(int nochdir, int noclose);
+
 /* directio.c */
 int directio(int filedes, int advice);
 

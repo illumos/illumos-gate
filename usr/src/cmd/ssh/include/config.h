@@ -279,9 +279,6 @@ extern "C" {
 /* Define if your libraries define login() */
 /* #undef HAVE_LOGIN */
 
-/* Define if your libraries define daemon() */
-/* #undef HAVE_DAEMON */
-
 /* Define if your libraries define getpagesize() */
 #define	HAVE_GETPAGESIZE 1
 
