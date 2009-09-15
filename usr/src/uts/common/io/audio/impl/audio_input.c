@@ -40,29 +40,25 @@
 void									\
 auimpl_import_##NAME(audio_engine_t *eng, audio_stream_t *sp)		\
 {									\
-	int	nch = eng->e_nchan;					\
-	int32_t *out;							\
-	TYPE	*in;							\
-	int	ch;							\
-	void	*data;							\
-	int	vol;							\
-									\
-	data = sp->s_cnv_src;						\
-	ch = 0;								\
-	in = (void *)(eng->e_data + (eng->e_tidx * eng->e_framesz));	\
-	out = data;							\
-	vol = sp->s_gain_eff;						\
+	int		fragfr = eng->e_fragfr;				\
+	int		nch = eng->e_nchan;				\
+	unsigned	tidx = eng->e_tidx;				\
+	int32_t 	*out = (void *)sp->s_cnv_src;			\
+	TYPE		*in = (void *)eng->e_data;			\
+	int		ch = 0;						\
+	int		vol = sp->s_gain_eff;				\
 									\
 	do {	/* for each channel */					\
-		TYPE *ip;						\
+		TYPE 	*ip;						\
 		int32_t *op;						\
-		int i;							\
+		int 	i;						\
+		int 	incr = eng->e_chincr[ch];			\
 									\
 		/* get value and adjust next channel offset */		\
 		op = out++;						\
-		ip = in++;						\
+		ip = in + eng->e_choffs[ch] + (tidx * incr);		\
 									\
-		i = eng->e_fragfr;					\
+		i = fragfr;						\
 									\
 		do {	/* for each frame */				\
 			int32_t	sample = (TYPE)SWAP(*ip);		\
@@ -72,7 +68,7 @@ auimpl_import_##NAME(audio_engine_t *eng, audio_stream_t *sp)		\
 			scaled /= AUDIO_VOL_SCALE;			\
 									\
 			*op = scaled;					\
-			ip += nch;					\
+			ip += incr;					\
 			op += nch;					\
 									\
 		} while (--i);						\
