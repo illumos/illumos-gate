@@ -255,10 +255,12 @@ DRV_KMODS	+= xsvc
 DRV_KMODS	+= tzmon
 DRV_KMODS	+= acpi_drv 
 DRV_KMODS	+= acpinex
+DRV_KMODS	+= amd_iommu
 DRV_KMODS	+= ioat
 DRV_KMODS	+= fipe
 
 DRV_KMODS	+= cpudrv
+
 
 #
 # Platform Power Modules
