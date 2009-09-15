@@ -743,6 +743,7 @@ vmu_insert_lookup_object_bounds(vmu_object_t *ro, pgcnt_t start, pgcnt_t
 			tmp = vmu_alloc_bound();
 			tmp->vmb_start = (*last)->vmb_end + 1;
 			tmp->vmb_end = end;
+			tmp->vmb_type = type;
 			ret += tmp->vmb_end - tmp->vmb_start + 1;
 			avl_insert_here(tree, tmp, *last, AVL_AFTER);
 			*last = tmp;
@@ -753,6 +754,7 @@ vmu_insert_lookup_object_bounds(vmu_object_t *ro, pgcnt_t start, pgcnt_t
 				tmp = vmu_alloc_bound();
 				tmp->vmb_start = (*last)->vmb_end + 1;
 				tmp->vmb_end = walker->vmb_start - 1;
+				tmp->vmb_type = type;
 				ret += tmp->vmb_end - tmp->vmb_start + 1;
 				avl_insert_here(tree, tmp, *last, AVL_AFTER);
 				*last = tmp;
@@ -849,8 +851,8 @@ vmu_update_bounds(avl_tree_t *tree, vmu_bound_t **first, vmu_bound_t **last,
 
 /*
  * Merges adjacent bounds with same type between first and last bound.
- * After merge, last pointer is no longer valid, as last bound may be
- * merged away.
+ * After merge, last pointer may point to a different bound, as (incoming)
+ * last bound may have been merged away.
  */
 static void
 vmu_merge_bounds(avl_tree_t *tree, vmu_bound_t **first, vmu_bound_t **last)
@@ -871,10 +873,11 @@ vmu_merge_bounds(avl_tree_t *tree, vmu_bound_t **first, vmu_bound_t **last)
 			avl_remove(tree, next);
 			vmu_free_bound(next);
 			if (next == *last) {
-				break;
+				*last = current;
 			}
+		} else {
+			current = AVL_NEXT(tree, current);
 		}
-		current = AVL_NEXT(tree, current);
 	}
 }
 
@@ -1087,7 +1090,6 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 	vmu_object_t *entity_object = NULL;
 	vmu_entity_t *entity;
 	vmusage_t *result;
-	avl_tree_t *tree;
 	vmu_bound_t *first = NULL;
 	vmu_bound_t *last = NULL;
 	vmu_bound_t *cur = NULL;
@@ -1344,6 +1346,8 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 
 	/* Compute resident pages backing shared amp or named vnode */
 	if (shared_object != NULL) {
+		avl_tree_t *tree = &(shared_object->vmo_bounds);
+
 		if (first == NULL) {
 			/*
 			 * No private amp, or private amp has no anon
@@ -1366,7 +1370,6 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 			    cur->vmb_start, cur->vmb_end, VMUSAGE_BOUND_UNKNOWN,
 			    &first, &last) > 0) {
 				/* new bounds, find incore/not-incore */
-				tree = &(shared_object->vmo_bounds);
 				if (shared_object->vmo_type ==
 				    VMUSAGE_TYPE_VNODE) {
 					vmu_vnode_update_incore_bounds(
