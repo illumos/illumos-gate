@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ extern void		mddb_setexit(mddb_set_t *s);
 extern void		*lookup_entry(struct nm_next_hdr *, set_t,
 				side_t, mdkey_t, md_dev64_t, int);
 extern struct nm_next_hdr	*get_first_record(set_t, int, int);
+extern dev_t		getrootdev(void);
 
 struct mdq_anchor	md_done_daemon; /* done request queue */
 struct mdq_anchor	md_mstr_daemon; /* mirror error, WOW requests */
@@ -3380,6 +3381,7 @@ md_probe_one(probe_req_t *reqp)
 	mdi_unit_t		*ui;
 	md_probedev_impl_t	*p;
 	int			err = 0;
+	set_t			setno;
 
 	p = (md_probedev_impl_t *)reqp->private_handle;
 	/*
@@ -3389,20 +3391,41 @@ md_probe_one(probe_req_t *reqp)
 	 * locks this will prevent a metaclear operation being performed
 	 * on the metadevice because metaclear takes the readerlock (via
 	 * openclose lock).
+	 * To avoid a potential deadlock with the probe_fcn() causing i/o to
+	 * be issued to the writerlock'd metadevice we only grab the writerlock
+	 * if the unit is not an SVM root device.
 	 */
 	while (md_ioctl_lock_enter() == EINTR)
 		;
+	setno = MD_MIN2SET(reqp->mnum);
 	ui = MDI_UNIT(reqp->mnum);
 	if (ui != NULL) {
-		(void) md_unit_writerlock_common(ui, 0);
+		int	writer_grabbed;
+		dev_t	svm_root;
+
+		if ((setno == MD_LOCAL_SET) && root_is_svm) {
+			svm_root = getrootdev();
+
+			if (getminor(svm_root) == reqp->mnum) {
+				writer_grabbed = 0;
+			} else {
+				writer_grabbed = 1;
+				(void) md_unit_writerlock_common(ui, 0);
+			}
+		} else {
+			writer_grabbed = 1;
+			(void) md_unit_writerlock_common(ui, 0);
+		}
 		(void) md_ioctl_lock_exit(0, 0, 0, FALSE);
 		err = (*reqp->probe_fcn)(ui, reqp->mnum);
-		md_unit_writerexit(ui);
+		if (writer_grabbed) {
+			md_unit_writerexit(ui);
+		}
 	} else {
 		(void) md_ioctl_lock_exit(0, 0, 0, FALSE);
 	}
 
-	/* update the info info in the probe structure */
+	/* update the info in the probe structure */
 
 	mutex_enter(PROBE_MX(p));
 	if (err != 0) {
