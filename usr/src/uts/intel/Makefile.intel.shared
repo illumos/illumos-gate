@@ -401,7 +401,6 @@ DRV_KMODS	+= rge
 DRV_KMODS	+= rtls
 DRV_KMODS	+= sfe
 DRV_KMODS	+= amd8111s
-DRV_KMODS	+= amd_iommu
 DRV_KMODS	+= igb
 DRV_KMODS	+= ixgbe
 DRV_KMODS	+= vr

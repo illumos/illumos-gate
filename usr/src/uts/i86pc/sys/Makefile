@@ -38,6 +38,7 @@ FILEMODE = 644
 
 HDRS=  \
 	acpidev.h	\
+	amd_iommu.h	\
 	asm_misc.h	\
 	clock.h		\
 	cram.h		\

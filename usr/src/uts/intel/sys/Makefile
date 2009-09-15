@@ -31,7 +31,6 @@ include ../../../Makefile.master
 #	from being built, so these headers are not exported (installed).
 
 HDRS	=			\
-	amd_iommu.h		\
 	archsystm.h		\
 	asm_linkage.h		\
 	bootconf.h		\
