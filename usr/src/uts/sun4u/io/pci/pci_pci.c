@@ -1471,16 +1471,23 @@ ppb_create_ranges_prop(dev_info_t *dip,
 	base = PPB_16bit_IOADDR(io_base_lo);
 	limit = PPB_16bit_IOADDR(io_limit_lo);
 
+	/*
+	 * Check for 32-bit I/O support as per PCI-to-PCI Bridge Arch Spec
+	 */
 	if ((io_base_lo & 0xf) == PPB_32BIT_IO) {
 		base = PPB_LADDR(base, io_base_hi);
-	}
-	if ((io_limit_lo & 0xf) == PPB_32BIT_IO) {
 		limit = PPB_LADDR(limit, io_limit_hi);
 	}
 
-	if ((io_base_lo & PPB_32BIT_IO) && (io_limit_hi > 0)) {
-		base = PPB_LADDR(base, io_base_hi);
-		limit = PPB_LADDR(limit, io_limit_hi);
+	/*
+	 * Check if the bridge implements an I/O address range as per
+	 * PCI-to-PCI Bridge Arch Spec
+	 */
+	if ((io_base_lo != 0 || io_limit_lo != 0) && limit >= base) {
+		ranges[i].parent_low = ranges[i].child_low =
+		    base;
+		ranges[i].size_low = limit - base + PPB_IOGRAIN;
+		i++;
 	}
 
 	/*
