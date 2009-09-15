@@ -21,20 +21,17 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
 
-include ../../Makefile.common
+# Copyright (c) 2009, Intel Corporation.
+# All rights reserved.
 
-MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_KVM) uhci rootnex
+MODULE = rootnex.so
+MDBTGT = kvm
 
-$(CLOSED_BUILD)MODULES += \
-	$(CLOSED_COMMON_MODULES_KVM:%=$(CLOSED)/cmd/mdb/intel/amd64/%)
+MODSRCS = intel_iommu.c
 
-SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
+include ../../../../Makefile.cmd
+include ../../Makefile.ia32
+include ../../../Makefile.module
 
-include ../../Makefile.subdirs
-
-.PARALLEL: $(SUBDIRS)
-
-# inter-module dependencies
-kmdb: libstand libstandctf mdb_ks
+CPPFLAGS += -I$(SRC)/uts/i86pc

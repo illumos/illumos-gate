@@ -145,20 +145,29 @@ extern void return_instr(void);
 #define	IOMMU_CAP_GET_DWD(x)		(((x) >> 54) & 1)
 #define	IOMMU_CAP_GET_DRD(x)		(((x) >> 55) & 1)
 #define	IOMMU_CAP_GET_PSI(x)		(((x) >> 39) & 1)
+#define	IOMMU_CAP_GET_SPS(x)		(((x) >> 34) & 0xf)
+#define	IOMMU_CAP_GET_ISOCH(x)		(((x) >> 23) & 1)
+#define	IOMMU_CAP_GET_ZLR(x)		(((x) >> 22) & 1)
 #define	IOMMU_CAP_GET_MAMV(x)		(((x) >> 48) & 0x3f)
 #define	IOMMU_CAP_GET_CM(x)		(((x) >> 7) & 1)
+#define	IOMMU_CAP_GET_PHMR(x)		(((x) >> 6) & 1)
+#define	IOMMU_CAP_GET_PLMR(x)		(((x) >> 5) & 1)
 #define	IOMMU_CAP_GET_RWBF(x)		(((x) >> 4) & 1)
+#define	IOMMU_CAP_GET_AFL(x)		(((x) >> 3) & 1)
 #define	IOMMU_CAP_GET_FRO(x)		((((x) >> 24) & 0x3ff) * 16)
 #define	IOMMU_CAP_MGAW(x)		(((((uint64_t)x) >> 16) & 0x3f) + 1)
 #define	IOMMU_CAP_SAGAW(x)		(((x) >> 8) & 0x1f)
 #define	IOMMU_CAP_ND(x)			(1 << (((x) & 0x7) *2 + 4)) -1
 #define	IOMMU_ECAP_GET_IRO(x)		((((x) >> 8) & 0x3ff) << 4)
-#define	IOMMU_ECAP_GET_C(x)		((x) & 0x1)
 #define	IOMMU_ECAP_GET_MHMV(x)		((x >> 20) & 0xf)
+#define	IOMMU_ECAP_GET_SC(x)		((x) & 0x80)
+#define	IOMMU_ECAP_GET_PT(x)		((x) & 0x40)
+#define	IOMMU_ECAP_GET_CH(x)		((x) & 0x20)
 #define	IOMMU_ECAP_GET_EIM(x)		((x) & 0x10)
 #define	IOMMU_ECAP_GET_IR(x)		((x) & 0x8)
 #define	IOMMU_ECAP_GET_DI(x)		((x) & 0x4)
 #define	IOMMU_ECAP_GET_QI(x)		((x) & 0x2)
+#define	IOMMU_ECAP_GET_C(x)		((x) & 0x1)
 
 
 /* iotlb invalidation */
@@ -343,7 +352,7 @@ typedef enum {
 
 typedef enum {
 	IEC_INV_GLOBAL = 0,
-	IEC_INV_INDEX,
+	IEC_INV_INDEX
 } iec_inv_g_t;
 
 /*
@@ -523,6 +532,7 @@ typedef struct dvma_cache_head {
  * dm_identity		- does this domain identity mapped
  */
 typedef struct dmar_domain_state {
+	list_node_t		node;
 	uint_t			dm_domain_id;
 	intel_iommu_state_t	*dm_iommu;
 	vmem_t			*dm_dvma_map;

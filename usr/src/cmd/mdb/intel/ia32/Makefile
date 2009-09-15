@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../../Makefile.common
 
 MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_PROC_32BIT) \
-    $(COMMON_MODULES_KVM) uhci
+    $(COMMON_MODULES_KVM) uhci rootnex
 
 $(CLOSED_BUILD)MODULES += \
 	$(CLOSED_COMMON_MODULES_KVM:%=$(CLOSED)/cmd/mdb/intel/ia32/%)
