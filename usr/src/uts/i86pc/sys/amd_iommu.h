@@ -43,8 +43,11 @@ typedef struct amd_iommu_state {
 	int aioms_nunits;			/* # of IOMMUs in function */
 } amd_iommu_state_t;
 
+#define	AMD_IOMMU_QUIESCE	(0)
+#define	AMD_IOMMU_TEARDOWN	(1)
+
 int amd_iommu_setup(dev_info_t *dip, amd_iommu_state_t *statep);
-int amd_iommu_teardown(dev_info_t *dip, amd_iommu_state_t *statep);
+int amd_iommu_teardown(dev_info_t *dip, amd_iommu_state_t *statep, int type);
 int amd_iommu_lookup_src_bdf(uint16_t bdf, uint16_t *src_bdfp);
 
 #endif	/* _KERNEL */

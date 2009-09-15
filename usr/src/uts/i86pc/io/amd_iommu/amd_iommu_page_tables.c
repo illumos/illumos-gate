@@ -510,14 +510,14 @@ amd_iommu_set_devtbl_entry(amd_iommu_t *iommu, dev_info_t *rdip,
 {
 	uint64_t *devtbl_entry;
 	amd_iommu_cmdargs_t cmdargs = {0};
-	int error;
+	int error, flags;
 	dev_info_t *idip = iommu->aiomt_dip;
 	const char *driver = ddi_driver_name(idip);
 	int instance = ddi_get_instance(idip);
 	const char *f = "amd_iommu_set_devtbl_entry";
 
 	if (amd_iommu_debug & AMD_IOMMU_DEBUG_DEVTBL) {
-		cmn_err(CE_WARN, "%s: attempting to set devtbl entry for %s",
+		cmn_err(CE_NOTE, "%s: attempting to set devtbl entry for %s",
 		    f, path);
 	}
 
@@ -536,10 +536,39 @@ amd_iommu_set_devtbl_entry(amd_iommu_t *iommu, dev_info_t *rdip,
 	    [deviceid * AMD_IOMMU_DEVTBL_ENTRY_SZ];
 
 	if (amd_iommu_debug & AMD_IOMMU_DEBUG_DEVTBL) {
-		cmn_err(CE_WARN, "%s: deviceid=%u devtbl entry (%p) for %s",
+		cmn_err(CE_NOTE, "%s: deviceid=%u devtbl entry (%p) for %s",
 		    f, deviceid, (void *)(uintptr_t)(*devtbl_entry), path);
 	}
 
+	/*
+	 * Flush internal caches, need to do this if we came up from
+	 * fast boot
+	 */
+	cmdargs.ca_deviceid = deviceid;
+	error = amd_iommu_cmd(iommu, AMD_IOMMU_CMD_INVAL_DEVTAB_ENTRY,
+	    &cmdargs, 0, 0);
+	if (error != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: idx=%d: deviceid=%d"
+		    "Failed to invalidate domain in IOMMU HW cache",
+		    f, iommu->aiomt_idx, deviceid);
+		return (error);
+	}
+
+	cmdargs.ca_domainid = (uint16_t)domainid;
+	cmdargs.ca_addr = (uintptr_t)0x7FFFFFFFFFFFF000;
+	flags = AMD_IOMMU_CMD_FLAGS_PAGE_PDE_INVAL |
+	    AMD_IOMMU_CMD_FLAGS_PAGE_INVAL_S;
+
+	error = amd_iommu_cmd(iommu, AMD_IOMMU_CMD_INVAL_IOMMU_PAGES,
+	    &cmdargs, flags, 0);
+	if (error != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: idx=%d: domainid=%d"
+		    "Failed to invalidate translations in IOMMU HW cache",
+		    f, iommu->aiomt_idx, cmdargs.ca_domainid);
+		return (error);
+	}
+
+	/* Initialize device table entry */
 	if (init_devtbl(iommu, devtbl_entry, domainid, dp)) {
 		cmdargs.ca_deviceid = deviceid;
 		error = amd_iommu_cmd(iommu, AMD_IOMMU_CMD_INVAL_DEVTAB_ENTRY,
@@ -582,7 +611,7 @@ amd_iommu_clear_devtbl_entry(amd_iommu_t *iommu, dev_info_t *rdip,
 	    [deviceid * AMD_IOMMU_DEVTBL_ENTRY_SZ];
 
 	if (amd_iommu_debug & AMD_IOMMU_DEBUG_DEVTBL) {
-		cmn_err(CE_WARN, "%s: deviceid=%u devtbl entry (%p) for %s",
+		cmn_err(CE_NOTE, "%s: deviceid=%u devtbl entry (%p) for %s",
 		    f, deviceid, (void *)(uintptr_t)(*devtbl_entry), path);
 	}
 
@@ -1548,7 +1577,7 @@ amd_iommu_map_pa2va(amd_iommu_t *iommu, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	for (pfn = pfn_start; pfn <= pfn_end; pfn++, pg++) {
 
 		if (amd_iommu_debug & AMD_IOMMU_DEBUG_PAGE_TABLES) {
-			cmn_err(CE_WARN, "%s: attempting to create page tables "
+			cmn_err(CE_NOTE, "%s: attempting to create page tables "
 			    "for pfn = %p, va = %p, path = %s",
 			    f, (void *)(uintptr_t)(pfn << MMU_PAGESHIFT),
 			    (void *)(uintptr_t)(pg << MMU_PAGESHIFT), path);
@@ -1568,7 +1597,7 @@ amd_iommu_map_pa2va(amd_iommu_t *iommu, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 		}
 
 		if (amd_iommu_debug & AMD_IOMMU_DEBUG_PAGE_TABLES) {
-			cmn_err(CE_WARN, "%s: successfuly created page tables "
+			cmn_err(CE_NOTE, "%s: successfuly created page tables "
 			    "for pfn = %p, vapg = %p, path = %s",
 			    f, (void *)(uintptr_t)pfn,
 			    (void *)(uintptr_t)pg, path);
