@@ -60,6 +60,7 @@
 #include <net/bridge.h>
 #include <net/bridge_impl.h>
 #include <net/trill.h>
+#include <sys/dld_ioc.h>
 
 /*
  * Locks and reference counts: object lifetime and design.

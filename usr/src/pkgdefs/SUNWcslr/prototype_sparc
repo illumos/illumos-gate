@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -82,6 +82,7 @@ s none lib/sparcv9/libdevinfo.so=libdevinfo.so.1
 f none lib/sparcv9/libdevinfo.so.1 755 root bin
 s none lib/sparcv9/libdl.so=libdl.so.1
 f none lib/sparcv9/libdl.so.1 755 root bin
+s none lib/sparcv9/libdladm.so=libdladm.so.1
 f none lib/sparcv9/libdladm.so.1 755 root bin
 s none lib/sparcv9/libdlpi.so=libdlpi.so.1
 f none lib/sparcv9/libdlpi.so.1 755 root bin

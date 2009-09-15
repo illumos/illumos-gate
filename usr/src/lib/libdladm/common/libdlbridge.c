@@ -43,6 +43,7 @@
 #include <net/bridge.h>
 #include <net/trill.h>
 #include <sys/socket.h>
+#include <sys/dld_ioc.h>
 
 /*
  * Bridge Administration Library.

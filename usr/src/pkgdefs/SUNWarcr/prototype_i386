@@ -62,6 +62,7 @@ f none lib/amd64/llib-ldevice.ln 644 root bin
 f none lib/amd64/llib-ldevid.ln 644 root bin
 f none lib/amd64/llib-ldevinfo.ln 644 root bin
 f none lib/amd64/llib-ldl.ln 644 root bin
+f none lib/amd64/llib-ldladm.ln 644 root bin
 f none lib/amd64/llib-ldlpi.ln 644 root bin
 f none lib/amd64/llib-ldoor.ln 644 root  bin
 f none lib/amd64/llib-lefi.ln 644 root bin

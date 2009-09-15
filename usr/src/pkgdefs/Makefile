@@ -234,7 +234,6 @@ COMMON_SUBDIRS= \
 	SUNWdhcsb  \
 	SUNWdhcsr  \
 	SUNWdhcsu  \
-	SUNWdladmint \
 	SUNWdmfe \
 	SUNWdmgtr \
 	SUNWdmgtu \

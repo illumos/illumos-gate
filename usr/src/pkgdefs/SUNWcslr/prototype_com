@@ -77,6 +77,7 @@ f none lib/libdhcpagent.so.1 755 root bin
 f none lib/libdhcputil.so.1 755 root bin
 s none lib/libdl.so=libdl.so.1
 f none lib/libdl.so.1 755 root bin
+s none lib/libdladm.so=libdladm.so.1
 f none lib/libdladm.so.1 755 root bin
 f none lib/libdlpi.so.1 755 root bin
 s none lib/libdlpi.so=libdlpi.so.1

@@ -68,6 +68,8 @@ f none lib/llib-ldevinfo 644 root bin
 f none lib/llib-ldevinfo.ln 644 root bin
 f none lib/llib-ldl 644 root bin
 f none lib/llib-ldl.ln 644 root bin
+f none lib/llib-ldladm 644 root bin
+f none lib/llib-ldladm.ln 644 root bin
 f none lib/llib-ldlpi 644 root bin
 f none lib/llib-ldlpi.ln 644 root bin
 f none lib/llib-ldoor 644 root bin

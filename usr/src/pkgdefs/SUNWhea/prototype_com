@@ -299,7 +299,11 @@ f none usr/include/libcontract.h 644 root bin
 f none usr/include/libctf.h 644 root bin
 f none usr/include/libdevinfo.h 644 root bin
 f none usr/include/libdevice.h 644 root bin
+f none usr/include/libdladm.h 644 root bin
+f none usr/include/libdlbridge.h 644 root bin
+f none usr/include/libdllink.h 644 root bin
 f none usr/include/libdlpi.h 644 root bin
+f none usr/include/libdlvlan.h 644 root bin
 f none usr/include/libelf.h 644 root bin
 f none usr/include/libfstyp.h 644 root bin
 f none usr/include/libfstyp_module.h 644 root bin
@@ -776,7 +780,9 @@ d none usr/include/sys/dktp 755 root bin
 f none usr/include/sys/dktp/dadkio.h 644 root bin
 f none usr/include/sys/dktp/fdisk.h 644 root bin
 f none usr/include/sys/dl.h 644 root bin
+f none usr/include/sys/dld.h 644 root bin
 f none usr/include/sys/dlpi.h 644 root bin
+f none usr/include/sys/dls_mgmt.h 644 root bin
 f none usr/include/sys/dma_i8237A.h 644 root bin
 f none usr/include/sys/door.h 644 root bin
 f none usr/include/sys/door_data.h 644 root bin
@@ -1031,6 +1037,8 @@ f none usr/include/sys/lvm/mdvar.h 644 root bin
 f none usr/include/sys/lwp.h 644 root bin
 f none usr/include/sys/lwp_timer_impl.h 644 root bin
 f none usr/include/sys/lwp_upimutex_impl.h 644 root bin
+f none usr/include/sys/mac.h 644 root bin
+f none usr/include/sys/mac_flow.h 644 root bin
 f none usr/include/sys/machelf.h 644 root bin
 f none usr/include/sys/machlock.h 644 root bin
 f none usr/include/sys/machsig.h 644 root bin
@@ -1415,6 +1423,7 @@ f none usr/include/tsol/label.h 644 root bin
 f none usr/include/tzfile.h 644 root bin
 f none usr/include/ucontext.h 644 root bin
 f none usr/include/ucred.h 644 root bin
+f none usr/include/uid_stp.h 644 root bin
 f none usr/include/user_attr.h 644 root bin
 f none usr/include/ulimit.h 644 root bin
 f none usr/include/umem.h 644 root bin

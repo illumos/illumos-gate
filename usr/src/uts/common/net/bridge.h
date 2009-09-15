@@ -34,7 +34,6 @@
 
 #include <sys/param.h>
 #include <sys/dld.h>
-#include <sys/dld_ioc.h>
 #include <sys/ethernet.h>
 
 #ifdef __cplusplus

@@ -74,6 +74,7 @@ s none lib/amd64/libdevinfo.so=libdevinfo.so.1
 f none lib/amd64/libdevinfo.so.1 755 root bin
 s none lib/amd64/libdl.so=libdl.so.1
 f none lib/amd64/libdl.so.1 755 root bin
+s none lib/amd64/libdladm.so=libdladm.so.1
 f none lib/amd64/libdladm.so.1 755 root bin
 s none lib/amd64/libdlpi.so=libdlpi.so.1
 f none lib/amd64/libdlpi.so.1 755 root bin
