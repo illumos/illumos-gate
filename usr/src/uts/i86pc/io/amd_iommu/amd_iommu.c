@@ -54,6 +54,7 @@ static int amd_iommu_open(dev_t *devp, int flag, int otyp, cred_t *credp);
 static int amd_iommu_close(dev_t dev, int flag, int otyp, cred_t *credp);
 static int amd_iommu_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
     cred_t *credp, int *rvalp);
+static int amd_iommu_quiesce(dev_info_t *dip);
 
 static struct cb_ops amd_iommu_cb_ops = {
 	amd_iommu_open,		/* cb_open */
@@ -87,7 +88,8 @@ static struct dev_ops amd_iommu_dev_ops = {
 	nodev,			/* devo_reset */
 	&amd_iommu_cb_ops,	/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	nulldev			/* devo_power */
+	nulldev,		/* devo_power */
+	amd_iommu_quiesce,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -441,4 +443,27 @@ amd_iommu_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	ASSERT(statep->aioms_instance == instance);
 
 	return (ENOTTY);
+}
+
+static int
+amd_iommu_quiesce(dev_info_t *dip)
+{
+	int instance = ddi_get_instance(dip);
+	struct amd_iommu_state *statep;
+	const char *f = "amd_iommu_quiesce";
+
+	statep = ddi_get_soft_state(amd_iommu_statep, instance);
+	if (statep == NULL) {
+		cmn_err(CE_WARN, "%s: cannot get soft state: instance %d",
+		    f, instance);
+		return (DDI_FAILURE);
+	}
+
+	if (amd_iommu_teardown(dip, statep, AMD_IOMMU_QUIESCE) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: Unable to quiesce AMD IOMMU "
+		    "%s%d", f, ddi_driver_name(dip), instance);
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
 }
