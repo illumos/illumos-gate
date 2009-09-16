@@ -279,6 +279,7 @@ pci_unitaddr_cache_init(void)
  * second is 1, and so on.
  */
 
+/*ARGSUSED*/
 static int
 pci_cache_unpack_nvlist(nvf_handle_t hdl, nvlist_t *nvl, char *name)
 {
@@ -332,7 +333,7 @@ pci_cache_pack_nvlist(nvf_handle_t hdl, nvlist_t **ret_nvl)
 	listp = nvf_list(hdl);
 	for (pua = list_head(listp); pua != NULL;
 	    pua = list_next(listp, pua)) {
-		snprintf(buf, sizeof (buf), "%d", pua->pua_index);
+		(void) snprintf(buf, sizeof (buf), "%d", pua->pua_index);
 		rval = nvlist_add_int32(sub_nvl, buf, pua->pua_addr);
 		if (rval != DDI_SUCCESS)
 			goto error;
