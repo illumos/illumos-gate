@@ -44,6 +44,7 @@
 #include <sys/acpica.h>
 #include <sys/intel_iommu.h>
 #include <sys/iommulib.h>
+#include <sys/devcache.h>
 
 #define	pci_getb	(*pci_getb_func)
 #define	pci_getw	(*pci_getw_func)
@@ -134,6 +135,15 @@ static void populate_bus_res(uchar_t bus);
 static void memlist_remove_list(struct memlist **list,
     struct memlist *remove_list);
 
+static void pci_scan_bbn(void);
+static int pci_unitaddr_cache_valid(void);
+static int pci_bus_unitaddr(int);
+static void pci_unitaddr_cache_create(void);
+
+static int pci_cache_unpack_nvlist(nvf_handle_t, nvlist_t *, char *);
+static int pci_cache_pack_nvlist(nvf_handle_t, nvlist_t **);
+static void pci_cache_free_list(nvf_handle_t);
+
 extern int pci_slot_names_prop(int, char *, int);
 
 /* set non-zero to force PCI peer-bus renumbering */
@@ -149,10 +159,284 @@ static struct {
 } isa_res;
 
 /*
+ * PCI unit-address cache management
+ */
+static nvf_ops_t pci_unitaddr_cache_ops = {
+	"/etc/devices/pci_unitaddr_persistent",	/* path to cache */
+	pci_cache_unpack_nvlist,		/* read in nvlist form */
+	pci_cache_pack_nvlist,			/* convert to nvlist form */
+	pci_cache_free_list,			/* free data list */
+	NULL					/* write complete callback */
+};
+
+typedef struct {
+	list_node_t	pua_nodes;
+	int		pua_index;
+	int		pua_addr;
+} pua_node_t;
+
+nvf_handle_t	puafd_handle;
+int		pua_cache_valid = 0;
+
+
+/*ARGSUSED*/
+static ACPI_STATUS
+pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
+{
+	ACPI_BUFFER	rb;
+	ACPI_OBJECT	ro;
+	ACPI_DEVICE_INFO *adi;
+
+	/*
+	 * Use AcpiGetObjectInfo() to find the device _HID
+	 * If not a PCI root-bus, ignore this device and continue
+	 * the walk
+	 */
+
+	rb.Length = ACPI_ALLOCATE_BUFFER;
+	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &rb)))
+		return (AE_OK);
+
+	adi = rb.Pointer;
+	if (!(adi->Valid & ACPI_VALID_HID)) {
+		AcpiOsFree(adi);
+		return (AE_OK);
+	}
+
+	if (strncmp(adi->HardwareId.Value, PCI_ROOT_HID_STRING,
+	    sizeof (PCI_ROOT_HID_STRING)) &&
+	    strncmp(adi->HardwareId.Value, PCI_EXPRESS_ROOT_HID_STRING,
+	    sizeof (PCI_EXPRESS_ROOT_HID_STRING))) {
+		AcpiOsFree(adi);
+		return (AE_OK);
+	}
+
+	AcpiOsFree(adi);
+
+	/*
+	 * XXX: ancient Big Bear broken _BBN will result in two
+	 * bus 0 _BBNs being found, so we need to handle duplicate
+	 * bus 0 gracefully.  However, broken _BBN does not
+	 * hide a childless root-bridge so no need to work-around it
+	 * here
+	 */
+	rb.Pointer = &ro;
+	rb.Length = sizeof (ro);
+	if (ACPI_SUCCESS(AcpiEvaluateObjectTyped(hdl, "_BBN",
+	    NULL, &rb, ACPI_TYPE_INTEGER))) {
+		/* PCI with _BBN, process it, go no deeper */
+		if (pci_bus_res[ro.Integer.Value].par_bus == (uchar_t)-1 &&
+		    pci_bus_res[ro.Integer.Value].dip == NULL)
+			create_root_bus_dip((uchar_t)ro.Integer.Value);
+		return (AE_CTRL_DEPTH);
+	}
+
+	/* PCI and no _BBN, continue walk */
+	return (AE_OK);
+}
+
+/*
+ * Scan the ACPI namespace for all top-level instances of _BBN
+ * in order to discover childless root-bridges (which enumeration
+ * may not find; root-bridges are inferred by the existence of
+ * children).  This scan should find all root-bridges that have
+ * been enumerated, and any childless root-bridges not enumerated.
+ * Root-bridge for bus 0 may not have a _BBN object.
+ */
+static void
+pci_scan_bbn()
+{
+	void *rv;
+
+	(void) AcpiGetDevices(NULL, pci_process_acpi_device, NULL, &rv);
+}
+
+static void
+pci_unitaddr_cache_init(void)
+{
+
+	puafd_handle = nvf_register_file(&pci_unitaddr_cache_ops);
+	ASSERT(puafd_handle);
+
+	list_create(nvf_list(puafd_handle), sizeof (pua_node_t),
+	    offsetof(pua_node_t, pua_nodes));
+
+	rw_enter(nvf_lock(puafd_handle), RW_WRITER);
+	(void) nvf_read_file(puafd_handle);
+	rw_exit(nvf_lock(puafd_handle));
+}
+
+/*
+ * Format of /etc/devices/pci_unitaddr_persistent:
+ *
+ * The persistent record of unit-address assignments contains
+ * a list of name/value pairs, where name is a string representation
+ * of the "index value" of the PCI root-bus and the value is
+ * the assigned unit-address.
+ *
+ * The "index value" is simply the zero-based index of the PCI
+ * root-buses ordered by physical bus number; first PCI bus is 0,
+ * second is 1, and so on.
+ */
+
+static int
+pci_cache_unpack_nvlist(nvf_handle_t hdl, nvlist_t *nvl, char *name)
+{
+	long		index;
+	int32_t		value;
+	nvpair_t	*np;
+	pua_node_t	*node;
+
+	np = NULL;
+	while ((np = nvlist_next_nvpair(nvl, np)) != NULL) {
+		/* name of nvpair is index value */
+		if (ddi_strtol(nvpair_name(np), NULL, 10, &index) != 0)
+			continue;
+
+		if (nvpair_value_int32(np, &value) != 0)
+			continue;
+
+		node = kmem_zalloc(sizeof (pua_node_t), KM_SLEEP);
+		node->pua_index = index;
+		node->pua_addr = value;
+		list_insert_tail(nvf_list(hdl), node);
+	}
+
+	pua_cache_valid = 1;
+	return (DDI_SUCCESS);
+}
+
+static int
+pci_cache_pack_nvlist(nvf_handle_t hdl, nvlist_t **ret_nvl)
+{
+	int		rval;
+	nvlist_t	*nvl, *sub_nvl;
+	list_t		*listp;
+	pua_node_t	*pua;
+	char		buf[13];
+
+	ASSERT(RW_WRITE_HELD(nvf_lock(hdl)));
+
+	rval = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	if (rval != DDI_SUCCESS) {
+		nvf_error("%s: nvlist alloc error %d\n",
+		    nvf_cache_name(hdl), rval);
+		return (DDI_FAILURE);
+	}
+
+	sub_nvl = NULL;
+	rval = nvlist_alloc(&sub_nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	if (rval != DDI_SUCCESS)
+		goto error;
+
+	listp = nvf_list(hdl);
+	for (pua = list_head(listp); pua != NULL;
+	    pua = list_next(listp, pua)) {
+		snprintf(buf, sizeof (buf), "%d", pua->pua_index);
+		rval = nvlist_add_int32(sub_nvl, buf, pua->pua_addr);
+		if (rval != DDI_SUCCESS)
+			goto error;
+	}
+
+	rval = nvlist_add_nvlist(nvl, "table", sub_nvl);
+	if (rval != DDI_SUCCESS)
+		goto error;
+	nvlist_free(sub_nvl);
+
+	*ret_nvl = nvl;
+	return (DDI_SUCCESS);
+
+error:
+	if (sub_nvl)
+		nvlist_free(sub_nvl);
+	ASSERT(nvl);
+	nvlist_free(nvl);
+	*ret_nvl = NULL;
+	return (DDI_FAILURE);
+}
+
+static void
+pci_cache_free_list(nvf_handle_t hdl)
+{
+	list_t		*listp;
+	pua_node_t	*pua;
+
+	ASSERT(RW_WRITE_HELD(nvf_lock(hdl)));
+
+	listp = nvf_list(hdl);
+	for (pua = list_head(listp); pua != NULL;
+	    pua = list_next(listp, pua)) {
+		list_remove(listp, pua);
+		kmem_free(pua, sizeof (pua_node_t));
+	}
+}
+
+
+static int
+pci_unitaddr_cache_valid(void)
+{
+
+	/* read only, no need for rw lock */
+	return (pua_cache_valid);
+}
+
+
+static int
+pci_bus_unitaddr(int index)
+{
+	pua_node_t	*pua;
+	list_t		*listp;
+	int		addr;
+
+	rw_enter(nvf_lock(puafd_handle), RW_READER);
+
+	addr = -1;	/* default return if no match */
+	listp = nvf_list(puafd_handle);
+	for (pua = list_head(listp); pua != NULL;
+	    pua = list_next(listp, pua)) {
+		if (pua->pua_index == index) {
+			addr = pua->pua_addr;
+			break;
+		}
+	}
+
+	rw_exit(nvf_lock(puafd_handle));
+	return (addr);
+}
+
+static void
+pci_unitaddr_cache_create(void)
+{
+	int		i, index;
+	pua_node_t	*node;
+	list_t		*listp;
+
+	rw_enter(nvf_lock(puafd_handle), RW_WRITER);
+
+	index = 0;
+	listp = nvf_list(puafd_handle);
+	for (i = 0; i <= pci_bios_nbus; i++) {
+		/* skip non-root (peer) PCI busses */
+		if ((pci_bus_res[i].par_bus != (uchar_t)-1) ||
+		    (pci_bus_res[i].dip == NULL))
+			continue;
+		node = kmem_zalloc(sizeof (pua_node_t), KM_SLEEP);
+		node->pua_index = index++;
+		node->pua_addr = pci_bus_res[i].root_addr;
+		list_insert_tail(listp, node);
+	}
+
+	(void) nvf_mark_dirty(puafd_handle);
+	rw_exit(nvf_lock(puafd_handle));
+	nvf_wake_daemon();
+}
+
+
+/*
  * Enumerate all PCI devices
  */
 void
-pci_setup_tree()
+pci_setup_tree(void)
 {
 	uint_t i, root_bus_addr = 0;
 
@@ -978,9 +1262,42 @@ pci_reprogram(void)
 	int bus;
 
 	/*
-	 * Excise phantom roots if possible
+	 * Scan ACPI namespace for _BBN objects, make sure that
+	 * childless root-bridges appear in devinfo tree
 	 */
-	pci_renumber_root_busses();
+	pci_scan_bbn();
+	pci_unitaddr_cache_init();
+
+	/*
+	 * Fix-up unit-address assignments if cache is available
+	 */
+	if (pci_unitaddr_cache_valid()) {
+		int pci_regs[] = {0, 0, 0};
+		int	new_addr;
+		int	index = 0;
+
+		for (bus = 0; bus <= pci_bios_nbus; bus++) {
+			/* skip non-root (peer) PCI busses */
+			if ((pci_bus_res[bus].par_bus != (uchar_t)-1) ||
+			    (pci_bus_res[bus].dip == NULL))
+				continue;
+
+			new_addr = pci_bus_unitaddr(index);
+			if (pci_bus_res[bus].root_addr != new_addr) {
+				/* update reg property for node */
+				pci_regs[0] = pci_bus_res[bus].root_addr =
+				    new_addr;
+				(void) ndi_prop_update_int_array(
+				    DDI_DEV_T_NONE, pci_bus_res[bus].dip,
+				    "reg", (int *)pci_regs, 3);
+			}
+			index++;
+		}
+	} else {
+		/* perform legacy processing */
+		pci_renumber_root_busses();
+		pci_unitaddr_cache_create();
+	}
 
 	/*
 	 * Do root-bus resource discovery
