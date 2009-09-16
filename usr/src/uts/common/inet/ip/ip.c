@@ -13947,8 +13947,8 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		 * ire_cache_lookup() can return ire of IRE_LOCAL in
 		 * transient cases. In such case, just drop the packet
 		 */
-		if (ire->ire_type != IRE_CACHE)
-			goto drop;
+		if (ire != NULL && ire->ire_type != IRE_CACHE)
+			goto indiscard;
 	}
 
 	/*
