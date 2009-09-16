@@ -307,11 +307,9 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		case AD_UPDATE_BOOT_CONFIG:
 #ifndef	__sparc
 		{
-			extern int fastreboot_capable;
 			extern void fastboot_update_config(const char *);
 
-			if (fastreboot_capable)
-				fastboot_update_config(mdep);
+			fastboot_update_config(mdep);
 		}
 #endif
 
@@ -379,22 +377,9 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 			panic_bootstr = mdep;
 
 #ifndef	__sparc
-		extern int fastreboot_onpanic;
-		if (fcn != AD_FASTREBOOT) {
-			extern void fastboot_update_config(const char *);
-			/*
-			 * If user has explicitly requested reboot to prom,
-			 * or uadmin(1M) was invoked with other functions,
-			 * don't try to fast reboot after dumping.
-			 */
-			fastreboot_onpanic = 0;
-			fastboot_update_config((char *)&fastreboot_onpanic);
-		}
+		extern void fastboot_update_and_load(int, char *);
 
-		if (fastreboot_onpanic) {
-			extern void fastboot_load_kernel(char *);
-			fastboot_load_kernel(mdep);
-		}
+		fastboot_update_and_load(fcn, mdep);
 #endif
 
 		panic("forced crash dump initiated at user request");

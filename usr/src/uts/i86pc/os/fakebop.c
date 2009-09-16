@@ -124,7 +124,7 @@ static void build_firmware_properties(void);
 static int early_allocation = 1;
 
 int force_fastreboot = 0;
-int fastreboot_onpanic = 0;
+volatile int fastreboot_onpanic = 0;
 int post_fastreboot = 0;
 #ifdef	__xpv
 int fastreboot_capable = 0;

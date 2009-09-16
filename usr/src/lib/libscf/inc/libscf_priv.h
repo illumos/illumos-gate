@@ -530,6 +530,7 @@ scf_instance_delete_prop(scf_instance_t *, const char *, const char *);
  * Functions to extract boot config information from FMRI_BOOT_CONFIG
  */
 void scf_get_boot_config(uint8_t *);
+void scf_get_boot_config_ovr(uint8_t *);
 int scf_is_fastboot_default(void);
 
 /*

@@ -67,10 +67,6 @@ main(int argc, char *argv[])
 	adt_event_data_t *event = NULL; /* event to be generated */
 	au_event_t event_id;
 	enum adt_uadmin_fcn fcn_id;
-#ifdef	__i386
-	uint8_t boot_config = 0;
-#endif /* __i386 */
-
 
 	if (argc < 3 || argc > 4) {
 		(void) fprintf(stderr, Usage, argv[0]);
@@ -208,10 +204,16 @@ main(int argc, char *argv[])
 		}
 #ifdef	__i386
 	} else if (cmd == A_CONFIG) {
+		uint8_t boot_config = 0;
+		uint8_t boot_config_ovr = 0;
+
 		switch (fcn) {
 		case AD_UPDATE_BOOT_CONFIG:
 			fcn_id = ADT_UADMIN_FCN_AD_UPDATE_BOOT_CONFIG;
 			scf_get_boot_config(&boot_config);
+			boot_config_ovr = boot_config;
+			scf_get_boot_config_ovr(&boot_config_ovr);
+			boot_config &= boot_config_ovr;
 			mdep = (uintptr_t)(&boot_config);
 			break;
 		}

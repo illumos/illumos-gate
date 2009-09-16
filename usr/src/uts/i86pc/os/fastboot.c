@@ -136,6 +136,11 @@ static uintptr_t fake_va = FASTBOOT_FAKE_VA;
 int reserve_mem_enabled = 1;
 
 /*
+ * Mutex to protect fastreboot_onpanic.
+ */
+kmutex_t fastreboot_config_mutex;
+
+/*
  * Amount of memory below PA 1G to reserve for constructing the multiboot
  * data structure and the page tables as we tend to run out of those
  * when more drivers are loaded.
@@ -868,7 +873,8 @@ fastboot_load_kernel(char *mdep)
 	int		is_retry = 0;
 	uint64_t	end_addr;
 
-	ASSERT(fastreboot_capable);
+	if (!fastreboot_capable)
+		return;
 
 	if (newkernel.fi_valid)
 		fastboot_free_newkernel(&newkernel);
@@ -1408,12 +1414,16 @@ fastboot_post_startup()
 	if (!fastreboot_capable)
 		return;
 
+	mutex_enter(&fastreboot_config_mutex);
+
 	fastboot_get_bootprop();
 
 	if (fastreboot_onpanic)
 		fastboot_load_kernel(fastreboot_onpanic_cmdline);
 	else if (reserve_mem_enabled)
 		fastboot_reserve_mem(&newkernel);
+
+	mutex_exit(&fastreboot_config_mutex);
 }
 
 /*
@@ -1427,15 +1437,69 @@ void
 fastboot_update_config(const char *mdep)
 {
 	uint8_t boot_config = (uint8_t)*mdep;
-	int cur_fastreboot_onpanic = fastreboot_onpanic;
+	int cur_fastreboot_onpanic;
 
 	if (!fastreboot_capable)
 		return;
 
+	mutex_enter(&fastreboot_config_mutex);
+
+	cur_fastreboot_onpanic = fastreboot_onpanic;
 	fastreboot_onpanic = boot_config & UA_FASTREBOOT_ONPANIC;
+
 	if (fastreboot_onpanic && (!cur_fastreboot_onpanic ||
 	    !newkernel.fi_valid))
 		fastboot_load_kernel(fastreboot_onpanic_cmdline);
 	if (cur_fastreboot_onpanic && !fastreboot_onpanic)
 		fastboot_free_newkernel(&newkernel);
+
+	mutex_exit(&fastreboot_config_mutex);
+}
+
+/*
+ * This is the interface to be called by other kernel components to
+ * disable fastreboot_onpanic.
+ */
+void
+fastreboot_disable()
+{
+	uint8_t boot_config = (uint8_t)(~UA_FASTREBOOT_ONPANIC);
+	fastboot_update_config((const char *)&boot_config);
+}
+
+/*
+ * This is the interface to be called by fm_panic() in case FMA has diagnosed
+ * a terminal machine check exception.  It does not free up memory allocated
+ * for the backup kernel.  General disabling fastreboot_onpanic in a
+ * non-panicking situation must go through fastboot_update_config().
+ */
+void
+fastreboot_disable_highpil()
+{
+	fastreboot_onpanic = 0;
+}
+
+
+/*
+ * A simplified interface for uadmin to call to update the configuration
+ * setting and load a new kernel if necessary.
+ */
+void
+fastboot_update_and_load(int fcn, char *mdep)
+{
+	if (fcn != AD_FASTREBOOT) {
+		/*
+		 * If user has explicitly requested reboot to prom,
+		 * or uadmin(1M) was invoked with other functions,
+		 * don't try to fast reboot after dumping.
+		 */
+		fastreboot_disable();
+	}
+
+	mutex_enter(&fastreboot_config_mutex);
+
+	if (fastreboot_onpanic)
+		fastboot_load_kernel(mdep);
+
+	mutex_exit(&fastreboot_config_mutex);
 }

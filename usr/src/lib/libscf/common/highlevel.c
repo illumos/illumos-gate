@@ -230,6 +230,8 @@ scf_getset_boot_config_ovr(int set, uint8_t *boot_config_ovr)
 		scf_propvec_t ua_boot_config_ovr[] = {
 			{ FASTREBOOT_DEFAULT, NULL, SCF_TYPE_BOOLEAN, NULL,
 			    UA_FASTREBOOT_DEFAULT },
+			{ FASTREBOOT_ONPANIC, NULL, SCF_TYPE_BOOLEAN, NULL,
+			    UA_FASTREBOOT_ONPANIC },
 			{ NULL }
 		};
 		scf_propvec_t	*prop;
@@ -274,6 +276,10 @@ scf_getset_boot_config_ovr(int set, uint8_t *boot_config_ovr)
 			}
 		}
 #endif	/* FASTREBOOT_DEBUG */
+
+		if (set)
+			(void) smf_refresh_instance(FMRI_BOOT_CONFIG);
+
 		return (rc);
 
 	}
@@ -283,7 +289,7 @@ scf_getset_boot_config_ovr(int set, uint8_t *boot_config_ovr)
 /*
  * Get values of properties in non-persistent "config_ovr" property group.
  */
-static void
+void
 scf_get_boot_config_ovr(uint8_t *boot_config_ovr)
 {
 	(void) scf_getset_boot_config_ovr(B_FALSE, boot_config_ovr);
@@ -295,7 +301,10 @@ scf_get_boot_config_ovr(uint8_t *boot_config_ovr)
 int
 scf_fastreboot_default_set_transient(boolean_t value)
 {
-	uint8_t	boot_config_ovr = (value & UA_FASTREBOOT_DEFAULT);
+	uint8_t	boot_config_ovr = 0;
+
+	if (value == B_TRUE)
+		boot_config_ovr = UA_FASTREBOOT_DEFAULT | UA_FASTREBOOT_ONPANIC;
 
 	return (scf_getset_boot_config_ovr(B_TRUE, &boot_config_ovr));
 }

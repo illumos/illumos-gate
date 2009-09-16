@@ -173,7 +173,7 @@ extern int fastreboot_capable;
 extern int force_fastreboot;
 
 /* If set, fast reboot after panic. */
-extern int fastreboot_onpanic;
+extern volatile int fastreboot_onpanic;
 extern char fastreboot_onpanic_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 
 #endif	/* _ASM */
