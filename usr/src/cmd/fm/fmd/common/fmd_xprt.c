@@ -1173,6 +1173,7 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 	uint8_t *proxy_asru = NULL;
 	int got_proxy_asru = 0;
 	int got_hc_rsrc = 0;
+	int got_hc_asru = 0;
 	int got_present_rsrc = 0;
 	uint8_t *diag_asru = NULL;
 	char *scheme;
@@ -1230,7 +1231,7 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 			    nvlist_lookup_string(asru, FM_FMRI_SCHEME,
 			    &scheme) == 0 &&
 			    strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
-				got_hc_rsrc = 1;
+				got_hc_asru = 1;
 				if (xip->xi_flags & FMD_XPRT_EXTERNAL)
 					continue;
 				if (topo_fmri_present(thp, asru, &err) != 0)
@@ -1266,7 +1267,8 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 	 * If we're set up only to report hc-scheme faults, and
 	 * there aren't any, then just drop the event.
 	 */
-	if (got_hc_rsrc == 0 && (xip->xi_flags & FMD_XPRT_HCONLY)) {
+	if (got_hc_rsrc == 0 && got_hc_asru == 0 &&
+	    (xip->xi_flags & FMD_XPRT_HCONLY)) {
 		if (nelem > 0) {
 			fmd_free(proxy_asru, sizeof (uint8_t) * nelem);
 			fmd_free(diag_asru, sizeof (uint8_t) * nelem);
@@ -1333,10 +1335,13 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 			(void) nvlist_add_nvlist(flt_copy, FM_FAULT_ASRU,
 			    asrua[i]);
 			nvlist_free(asrua[i]);
-		} else if (nvlist_lookup_nvlist(flt_copy, FM_FAULT_ASRU,
+		} else if (got_hc_asru == 0 &&
+		    nvlist_lookup_nvlist(flt_copy, FM_FAULT_ASRU,
 		    &asru) == 0 && asru != NULL) {
 			/*
-			 * keep asru from diag side, but but mark as no retire
+			 * If we have an asru from diag side, but it's not
+			 * in hc scheme, then we can't be sure what it
+			 * represents, so mark as no retire.
 			 */
 			(void) nvlist_add_boolean_value(flt_copy,
 			    FM_SUSPECT_RETIRE, B_FALSE);
