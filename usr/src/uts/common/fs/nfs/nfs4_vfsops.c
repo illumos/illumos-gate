@@ -549,7 +549,7 @@ nfs4_copyin(char *data, int datalen, struct nfs_args *nargs)
 		goto errout;
 	}
 
-	nargs->addr = kmem_alloc(sizeof (struct netbuf), KM_SLEEP);
+	nargs->addr = kmem_zalloc(sizeof (struct netbuf), KM_SLEEP);
 	userbufptr = STRUCT_FGETP(addr_tmp, buf);
 	addr.len = STRUCT_FGET(addr_tmp, len);
 	addr.buf = kmem_alloc(addr.len, KM_SLEEP);
