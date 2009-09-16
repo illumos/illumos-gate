@@ -1387,7 +1387,7 @@ stmf_set_stmf_state(stmf_state_desc_t *std)
 
 	stmf_state.stmf_inventory_locked = 1;
 	stmf_state.stmf_service_running = 0;
-	stmf_delete_all_ppds();
+
 	mutex_exit(&stmf_state.stmf_lock);
 	for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
 	    ilport = ilport->ilport_next) {

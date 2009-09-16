@@ -4735,15 +4735,15 @@ stmfLoadConfig(void)
 
 	if (iGetPersistMethod() == STMF_PERSIST_NONE) {
 		stmfStateSet.state = STMF_STATE_OFFLINE;
-		stmfStateSet.config_state = STMF_CONFIG_INIT;
+
 		if ((ret = openStmf(OPEN_EXCL_STMF, &fd))
 		    != STMF_STATUS_SUCCESS) {
 			return (ret);
 		}
-		ret = setStmfState(fd, &stmfStateSet, STMF_SERVICE_TYPE);
-		if (ret != STMF_STATUS_SUCCESS) {
-			goto done;
-		}
+		/*
+		 * Configuration not stored persistently; nothing to
+		 * initialize so do not set to STMF_CONFIG_INIT.
+		 */
 		stmfStateSet.config_state = STMF_CONFIG_INIT_DONE;
 		goto done;
 	}
