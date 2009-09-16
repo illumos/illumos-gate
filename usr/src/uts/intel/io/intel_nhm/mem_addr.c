@@ -749,9 +749,11 @@ choose_cpu(int *lastslot_p)
 	first = 0;
 	last = MAX_CPU_NODES;
 	id = CPU_ID_RD(0);
-	if (id == NHM_EP_CPU || id == NHM_WS_CPU) {
+	if (id == NHM_EP_CPU || id == NHM_WS_CPU || id == NHM_JF_CPU ||
+	    id == NHM_WM_CPU) {
 		id = CPU_ID_RD(1);
-		if (id != NHM_EP_CPU && id !=  NHM_WS_CPU) {
+		if (id != NHM_EP_CPU && id != NHM_WS_CPU && id != NHM_JF_CPU &&
+		    id != NHM_WM_CPU) {
 			last = 1;
 		}
 	} else {
@@ -829,10 +831,12 @@ mem_reg_init()
 	uint32_t rir_limit;
 	uint32_t rir_way;
 	uint32_t mc_control;
+	uint32_t id;
 	int nhm_slot;
 	int nhm_lastslot;
 	uint8_t	rank;
 	uint64_t base;
+	int ras_dev = 0;
 
 	nhm_slot = choose_cpu(&nhm_lastslot);
 
@@ -846,7 +850,10 @@ mem_reg_init()
 	}
 
 	for (i = nhm_slot; i < nhm_lastslot; i++) {
-		if (MC_CPU_RAS_RD(i) == NHM_CPU_RAS) {
+		id = MC_CPU_RAS_RD(i);
+		if (id == NHM_CPU_RAS || id == NHM_JF_CPU_RAS ||
+		    id == NHM_WM_CPU_RAS) {
+			ras_dev = 1;
 			mc_ras_enables = MC_RAS_ENABLES_RD(i);
 			if (RAS_LOCKSTEP_ENABLE(mc_ras_enables))
 				lockstep[i] = 1;
@@ -923,7 +930,7 @@ mem_reg_init()
 	}
 	mc_control = MC_CONTROL_RD(nhm_slot);
 	closed_page = MC_CONTROL_CLOSED_PAGE(mc_control);
-	if (MC_CPU_RAS_RD(nhm_slot) == NHM_CPU_RAS)
+	if (ras_dev)
 		ecc_enabled = MC_CONTROL_ECCEN(mc_control);
 	else if ((MC_STATUS_RD(nhm_slot) & WS_ECC_ENABLED) != 0)
 		ecc_enabled = 1;

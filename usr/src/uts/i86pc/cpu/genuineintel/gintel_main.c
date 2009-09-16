@@ -131,6 +131,23 @@ gintel_init(cmi_hdl_t hdl, void **datap)
 	case INTEL_QP_U2:
 	case INTEL_QP_U3:
 	case INTEL_QP_U4:
+	case INTEL_QP_JF:
+	case INTEL_QP_JF0:
+	case INTEL_QP_JF1:
+	case INTEL_QP_JF2:
+	case INTEL_QP_JF3:
+	case INTEL_QP_JF4:
+	case INTEL_QP_JF5:
+	case INTEL_QP_JF6:
+	case INTEL_QP_JF7:
+	case INTEL_QP_JF8:
+	case INTEL_QP_JF9:
+	case INTEL_QP_JFa:
+	case INTEL_QP_JFb:
+	case INTEL_QP_JFc:
+	case INTEL_QP_JFd:
+	case INTEL_QP_JFe:
+	case INTEL_QP_JFf:
 		quickpath = 1;
 		break;
 	default:

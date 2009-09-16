@@ -234,13 +234,15 @@ nhm_scrubber_enable()
 	uint32_t mc_dimm_clk_ratio_status;
 	uint64_t cycle_time;
 	uint32_t interval;
+	uint32_t id;
 	int i;
 	int hw_scrub = 0;
 
 	if (ecc_enabled && (nhm_patrol_scrub || nhm_demand_scrub)) {
 		for (i = 0; i < MAX_MEMORY_CONTROLLERS; i++) {
-			if (MC_CPU_RAS_RD(i) != NHM_CPU_RAS ||
-			    nhm_memory_on_ctl[i] == 0)
+			id = MC_CPU_RAS_RD(i);
+			if ((id != NHM_CPU_RAS && id != NHM_JF_CPU_RAS &&
+			    id != NHM_WM_CPU_RAS) || nhm_memory_on_ctl[i] == 0)
 				continue;
 			mc_ssrcontrol = MC_SSR_CONTROL_RD(i);
 			if (nhm_demand_scrub &&
@@ -286,7 +288,8 @@ init_dimms()
 	dimmpp = nhm_dimms;
 	for (i = 0; i < MAX_MEMORY_CONTROLLERS; i++) {
 		did = CPU_ID_RD(i);
-		if (did != NHM_EP_CPU && did != NHM_WS_CPU) {
+		if (did != NHM_EP_CPU && did != NHM_WS_CPU &&
+		    did != NHM_JF_CPU && did != NHM_WM_CPU) {
 			dimmpp += CHANNELS_PER_MEMORY_CONTROLLER *
 			    MAX_DIMMS_PER_CHANNEL;
 			continue;
@@ -324,10 +327,11 @@ nhm_init(void)
 		return (ENOTSUP);
 	for (slot = 0; slot < MAX_CPU_NODES; slot++) {
 		nhm_chipset = CPU_ID_RD(slot);
-		if (nhm_chipset == NHM_EP_CPU || nhm_chipset == NHM_WS_CPU)
+		if (nhm_chipset == NHM_EP_CPU || nhm_chipset == NHM_WS_CPU ||
+		    nhm_chipset == NHM_JF_CPU || nhm_chipset == NHM_WM_CPU)
 			break;
 	}
-	if (nhm_chipset != NHM_EP_CPU && nhm_chipset != NHM_WS_CPU) {
+	if (slot == MAX_CPU_NODES) {
 		return (ENOTSUP);
 	}
 	mem_reg_init();

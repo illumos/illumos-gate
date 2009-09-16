@@ -34,6 +34,10 @@ extern "C" {
 #define	NHM_EP_CPU	0x2c408086
 #define	NHM_WS_CPU	0x2c418086
 #define	NHM_CPU_RAS	0x2c1a8086
+#define	NHM_JF_CPU	0x2c588086
+#define	NHM_JF_CPU_RAS	0x2cda8086
+#define	NHM_WM_CPU	0x2c708086
+#define	NHM_WM_CPU_RAS	0x2d9a8086
 
 #define	NHM_INTERCONNECT	"Intel QuickPath"
 
