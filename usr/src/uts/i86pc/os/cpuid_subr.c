@@ -67,36 +67,48 @@
  * Second index by (model & 0x3) for family 0fh
  * or CPUID bits for later families
  */
-static uint32_t amd_skts[4][4] = {
+static uint32_t amd_skts[4][8] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
 #define	A_SKTS_0			0
 	{
-		X86_SOCKET_754,		/* 0b00 */
-		X86_SOCKET_940,		/* 0b01 */
-		X86_SOCKET_754,		/* 0b10 */
-		X86_SOCKET_939		/* 0b11 */
+		X86_SOCKET_754,		/* 0b000 */
+		X86_SOCKET_940,		/* 0b001 */
+		X86_SOCKET_754,		/* 0b010 */
+		X86_SOCKET_939,		/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
 	},
 	/*
 	 * Family 0xf revisions F and G
 	 */
 #define	A_SKTS_1			1
 	{
-		X86_SOCKET_S1g1,	/* 0b00 */
-		X86_SOCKET_F1207,	/* 0b01 */
-		X86_SOCKET_UNKNOWN,	/* 0b10 */
-		X86_SOCKET_AM2		/* 0b11 */
+		X86_SOCKET_S1g1,	/* 0b000 */
+		X86_SOCKET_F1207,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_AM2,		/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
 	},
 	/*
 	 * Family 0x10
 	 */
 #define	A_SKTS_2			2
 	{
-		X86_SOCKET_F1207,	/* 0b00 */
-		X86_SOCKET_AM,		/* 0b01 */
-		X86_SOCKET_S1g3,	/* 0b10 */
-		X86_SOCKET_G34,		/* 0b11 */
+		X86_SOCKET_F1207,	/* 0b000 */
+		X86_SOCKET_AM,		/* 0b001 */
+		X86_SOCKET_S1g3,	/* 0b010 */
+		X86_SOCKET_G34,		/* 0b011 */
+		X86_SOCKET_ASB2,	/* 0b100 */
+		X86_SOCKET_C32,		/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
 	},
 
 	/*
@@ -104,10 +116,14 @@ static uint32_t amd_skts[4][4] = {
 	 */
 #define	A_SKTS_3			3
 	{
-		X86_SOCKET_UNKNOWN,	/* 0b00 */
-		X86_SOCKET_UNKNOWN,	/* 0b01 */
-		X86_SOCKET_S1g2,	/* 0b10 */
-		X86_SOCKET_UNKNOWN,	/* 0b11 */
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_S1g2,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
 	}
 };
 
@@ -115,7 +131,7 @@ struct amd_sktmap_s {
 	uint32_t	skt_code;
 	char		sktstr[16];
 };
-static struct amd_sktmap_s amd_sktmap[13] = {
+static struct amd_sktmap_s amd_sktmap[15] = {
 	{ X86_SOCKET_754,	"754" },
 	{ X86_SOCKET_939,	"939" },
 	{ X86_SOCKET_940,	"940" },
@@ -128,6 +144,8 @@ static struct amd_sktmap_s amd_sktmap[13] = {
 	{ X86_SOCKET_AM2R2,	"AM2r2" },
 	{ X86_SOCKET_AM3,	"AM3" },
 	{ X86_SOCKET_G34,	"G34" },
+	{ X86_SOCKET_ASB2,	"ASB2" },
+	{ X86_SOCKET_C32,	"C32" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }
 };
 
@@ -277,7 +295,7 @@ synth_amd_info(uint_t family, uint_t model, uint_t step,
 			/* PkgType bits */
 			idx = BITX(cp.cp_ebx, 31, 28);
 
-			if (idx > 3) {
+			if (idx > 7) {
 				/* Reserved bits */
 				*skt_p = X86_SOCKET_UNKNOWN;
 			} else if (family == 0x10 &&
