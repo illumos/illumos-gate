@@ -147,9 +147,7 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 			 * not yet been asynchronously placed into the REMOVED
 			 * state.
 			 */
-			if (zio->io_vd == vd &&
-			    !vdev_accessible(vd, zio) &&
-			    strcmp(subclass, FM_EREPORT_ZFS_PROBE_FAILURE) != 0)
+			if (zio->io_vd == vd && !vdev_accessible(vd, zio))
 				return;
 
 			/*
@@ -163,6 +161,15 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 				return;
 		}
 	}
+
+	/*
+	 * For probe failure, we want to avoid posting ereports if we've
+	 * already removed the device in the meantime.
+	 */
+	if (vd != NULL &&
+	    strcmp(subclass, FM_EREPORT_ZFS_PROBE_FAILURE) == 0 &&
+	    (vd->vdev_remove_wanted || vd->vdev_state == VDEV_STATE_REMOVED))
+		return;
 
 	if ((ereport = fm_nvlist_create(NULL)) == NULL)
 		return;
@@ -337,6 +344,9 @@ zfs_post_common(spa_t *spa, vdev_t *vd, const char *name)
 #ifdef _KERNEL
 	nvlist_t *resource;
 	char class[64];
+
+	if (spa->spa_load_state == SPA_LOAD_TRYIMPORT)
+		return;
 
 	if ((resource = fm_nvlist_create(NULL)) == NULL)
 		return;

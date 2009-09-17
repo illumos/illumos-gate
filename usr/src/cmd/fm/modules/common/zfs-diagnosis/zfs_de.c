@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <stddef.h>
@@ -710,12 +708,11 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_prop_t fmd_props[] = {
-	{ "case_timeout", FMD_TYPE_TIME, "5sec" },
 	{ "checksum_N", FMD_TYPE_UINT32, "10" },
 	{ "checksum_T", FMD_TYPE_TIME, "10min" },
 	{ "io_N", FMD_TYPE_UINT32, "10" },
 	{ "io_T", FMD_TYPE_TIME, "10min" },
-	{ "remove_timeout", FMD_TYPE_TIME, "5sec" },
+	{ "remove_timeout", FMD_TYPE_TIME, "15sec" },
 	{ NULL, 0, NULL }
 };
 

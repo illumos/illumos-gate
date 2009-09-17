@@ -335,6 +335,10 @@ zfs_prop_init(void)
 	    ZFS_TYPE_DATASET, "GUID");
 	register_hidden(ZFS_PROP_USERACCOUNTING, "useraccounting",
 	    PROP_TYPE_NUMBER, PROP_READONLY, ZFS_TYPE_DATASET, NULL);
+	register_hidden(ZFS_PROP_UNIQUE, "unique", PROP_TYPE_NUMBER,
+	    PROP_READONLY, ZFS_TYPE_DATASET, NULL);
+	register_hidden(ZFS_PROP_OBJSETID, "objsetid", PROP_TYPE_NUMBER,
+	    PROP_READONLY, ZFS_TYPE_DATASET, "OBJSETID");
 
 	/* oddball properties */
 	register_impl(ZFS_PROP_CREATION, "creation", PROP_TYPE_NUMBER, 0, NULL,

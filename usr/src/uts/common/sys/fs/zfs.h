@@ -117,6 +117,8 @@ typedef enum {
 	ZFS_PROP_DEFER_DESTROY,
 	ZFS_PROP_USERREFS,
 	ZFS_PROP_LOGBIAS,
+	ZFS_PROP_UNIQUE,		/* not exposed to the user */
+	ZFS_PROP_OBJSETID,		/* not exposed to the user */
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 

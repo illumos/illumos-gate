@@ -430,12 +430,19 @@ vdev_disk_io_done(zio_t *zio)
 	 * asynchronous removal of the device. Otherwise, probe the device and
 	 * make sure it's still accessible.
 	 */
-	if (zio->io_error == EIO) {
+	if (zio->io_error == EIO && !vd->vdev_remove_wanted) {
 		vdev_disk_t *dvd = vd->vdev_tsd;
 		int state = DKIO_NONE;
 
 		if (ldi_ioctl(dvd->vd_lh, DKIOCSTATE, (intptr_t)&state,
 		    FKIOCTL, kcred, NULL) == 0 && state != DKIO_INSERTED) {
+			/*
+			 * We post the resource as soon as possible, instead of
+			 * when the async removal actually happens, because the
+			 * DE is using this information to discard previous I/O
+			 * errors.
+			 */
+			zfs_post_remove(zio->io_spa, vd);
 			vd->vdev_remove_wanted = B_TRUE;
 			spa_async_request(zio->io_spa, SPA_ASYNC_REMOVE);
 		}

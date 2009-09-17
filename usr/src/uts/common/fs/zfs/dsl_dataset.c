@@ -2017,6 +2017,10 @@ dsl_dataset_stats(dsl_dataset_t *ds, nvlist_t *nv)
 	    ds->ds_reserved);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_GUID,
 	    ds->ds_phys->ds_guid);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_UNIQUE,
+	    dsl_dataset_unique(ds));
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_OBJSETID,
+	    ds->ds_object);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_USERREFS, ds->ds_userrefs);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_DEFER_DESTROY,
 	    DS_IS_DEFER_DESTROY(ds) ? 1 : 0);

@@ -3683,7 +3683,17 @@ spa_async_remove(spa_t *spa, vdev_t *vd)
 	if (vd->vdev_remove_wanted) {
 		vd->vdev_remove_wanted = 0;
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_REMOVED, VDEV_AUX_NONE);
-		vdev_clear(spa, vd);
+
+		/*
+		 * We want to clear the stats, but we don't want to do a full
+		 * vdev_clear() as that will cause us to throw away
+		 * degraded/faulted state as well as attempt to reopen the
+		 * device, all of which is a waste.
+		 */
+		vd->vdev_stat.vs_read_errors = 0;
+		vd->vdev_stat.vs_write_errors = 0;
+		vd->vdev_stat.vs_checksum_errors = 0;
+
 		vdev_state_dirty(vd->vdev_top);
 	}
 
