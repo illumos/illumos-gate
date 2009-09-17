@@ -75,7 +75,6 @@ audio_dev_alloc(dev_info_t *dip, int instance)
 	mutex_init(&d->d_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&d->d_cv, NULL, CV_DRIVER, NULL);
 	rw_init(&d->d_ctrl_lock, NULL, RW_DRIVER, NULL);
-	rw_init(&d->d_clnt_lock, NULL, RW_DRIVER, NULL);
 	list_create(&d->d_clients, sizeof (struct audio_client),
 	    offsetof(struct audio_client, c_dev_linkage));
 	list_create(&d->d_engines, sizeof (struct audio_engine),
@@ -107,7 +106,6 @@ audio_dev_free(audio_dev_t *d)
 	rw_destroy(&d->d_ctrl_lock);
 	mutex_destroy(&d->d_lock);
 	cv_destroy(&d->d_cv);
-	rw_destroy(&d->d_clnt_lock);
 	kmem_free(d, sizeof (*d));
 }
 

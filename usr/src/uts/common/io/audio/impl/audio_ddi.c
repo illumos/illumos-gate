@@ -180,9 +180,8 @@ audio_open(dev_t *devp, int oflag, int otyp, cred_t *credp)
 	/* we do device cloning! */
 	*devp = makedevice(c->c_major, c->c_minor);
 
-	mutex_enter(&c->c_lock);
-	c->c_is_open = B_TRUE;
-	mutex_exit(&c->c_lock);
+	/* now we can receive upcalls */
+	auimpl_client_activate(c);
 
 	auclnt_notify_dev(c->c_dev);
 
@@ -240,13 +239,12 @@ audio_stropen(queue_t *rq, dev_t *devp, int oflag, int sflag, cred_t *credp)
 	/* we do device cloning! */
 	*devp = makedevice(c->c_major, c->c_minor);
 
-	mutex_enter(&c->c_lock);
-	c->c_is_open = B_TRUE;
-	mutex_exit(&c->c_lock);
+	qprocson(rq);
+
+	/* now we can receive upcalls */
+	auimpl_client_activate(c);
 
 	auclnt_notify_dev(c->c_dev);
-
-	qprocson(rq);
 
 	return (0);
 }
@@ -268,9 +266,8 @@ audio_strclose(queue_t *rq, int flag, cred_t *credp)
 		rv = auclnt_drain(c);
 	}
 
-	mutex_enter(&c->c_lock);
-	c->c_is_open = B_FALSE;
-	mutex_exit(&c->c_lock);
+	/* make sure we won't get any upcalls */
+	auimpl_client_deactivate(c);
 
 	/*
 	 * Pick up any data sitting around in input buffers.  This
@@ -316,9 +313,8 @@ audio_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		return (ENXIO);
 	}
 
-	mutex_enter(&c->c_lock);
-	c->c_is_open = B_FALSE;
-	mutex_exit(&c->c_lock);
+	/* we don't want any upcalls anymore */
+	auimpl_client_deactivate(c);
 
 	/*
 	 * Pick up any data sitting around in input buffers.  This

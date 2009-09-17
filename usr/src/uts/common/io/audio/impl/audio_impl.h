@@ -189,7 +189,7 @@ struct audio_client {
 	boolean_t		c_do_notify;
 	boolean_t		c_do_drain;
 	boolean_t		c_closing;
-	boolean_t		c_is_open;
+	boolean_t		c_is_active;
 
 	/*
 	 * Client wide settings... e.g. ops vector, etc.
@@ -442,9 +442,12 @@ void auimpl_client_init(void);
 void auimpl_client_fini(void);
 audio_client_t *auimpl_client_create(dev_t);
 void auimpl_client_destroy(audio_client_t *);
+void auimpl_client_activate(audio_client_t *);
+void auimpl_client_deactivate(audio_client_t *);
 int auimpl_create_minors(audio_dev_t *);
 void auimpl_remove_minors(audio_dev_t *);
-void auimpl_set_gain_master(audio_stream_t *, uint8_t);
+int auimpl_set_pcmvol(void *, uint64_t);
+int auimpl_get_pcmvol(void *, uint64_t *);
 
 /* audio_engine.c */
 void auimpl_dev_init(void);

@@ -58,7 +58,7 @@
  *
  */
 
-const uint16_t auimpl_db_table[AUDIO_DB_SIZE + 1] = {
+static const uint16_t auimpl_db_table[AUDIO_DB_SIZE + 1] = {
 	0,   0,   1,   1,   1,   1,   1,   1,   2,   2,
 	2,   2,   3,   3,   4,   4,   5,   5,   6,   7,
 	8,   9,   10,  11,  12,  14,  16,  18,  20,  22,
@@ -66,6 +66,10 @@ const uint16_t auimpl_db_table[AUDIO_DB_SIZE + 1] = {
 	80,  90,  101, 114, 128, 143, 161, 181, 203, 228,
 	256
 };
+
+static list_t			auimpl_clients;
+static krwlock_t		auimpl_client_lock;
+static audio_client_ops_t	*audio_client_ops[AUDIO_MN_TYPE_MASK + 1];
 
 void *
 auclnt_get_private(audio_client_t *c)
@@ -641,7 +645,8 @@ auclnt_get_channels(audio_stream_t *sp)
 	return (sp->s_user_parms->p_nchan);
 }
 
-void
+
+static void
 auimpl_set_gain_master(audio_stream_t *sp, uint8_t gain)
 {
 	uint32_t	scaled;
@@ -673,6 +678,38 @@ auimpl_set_gain_master(audio_stream_t *sp, uint8_t gain)
 	/*
 	 * No need to notify clients, since they can't see this update.
 	 */
+}
+
+int
+auimpl_set_pcmvol(void *arg, uint64_t val)
+{
+	audio_dev_t	*d = arg;
+	list_t		*l = &d->d_clients;
+	audio_client_t	*c;
+
+	if (val > 100) {
+		return (EINVAL);
+	}
+	rw_enter(&auimpl_client_lock, RW_WRITER);
+	d->d_pcmvol = val & 0xff;
+	rw_downgrade(&auimpl_client_lock);
+
+	for (c = list_head(l); c; c = list_next(l, c)) {
+		/* don't need to check is_active here, its safe */
+		auimpl_set_gain_master(&c->c_ostream, (uint8_t)val);
+	}
+	rw_exit(&auimpl_client_lock);
+
+	return (0);
+}
+
+int
+auimpl_get_pcmvol(void *arg, uint64_t *val)
+{
+	audio_dev_t	*d = arg;
+
+	*val = d->d_pcmvol;
+	return (0);
 }
 
 void
@@ -841,10 +878,6 @@ auclnt_get_oflag(audio_client_t *c)
  * These routines should not be accessed by client "personality"
  * implementations, but are for private framework use only.
  */
-
-static list_t			auimpl_clients;
-static krwlock_t		auimpl_client_lock;
-static audio_client_ops_t	*audio_client_ops[AUDIO_MN_TYPE_MASK + 1];
 
 void
 auimpl_client_init(void)
@@ -1157,6 +1190,22 @@ auimpl_client_destroy(audio_client_t *c)
 }
 
 void
+auimpl_client_activate(audio_client_t *c)
+{
+	rw_enter(&auimpl_client_lock, RW_WRITER);
+	c->c_is_active = B_TRUE;
+	rw_exit(&auimpl_client_lock);
+}
+
+void
+auimpl_client_deactivate(audio_client_t *c)
+{
+	rw_enter(&auimpl_client_lock, RW_WRITER);
+	c->c_is_active = B_FALSE;
+	rw_exit(&auimpl_client_lock);
+}
+
+void
 auclnt_close(audio_client_t *c)
 {
 	audio_dev_t	*d = c->c_dev;
@@ -1165,9 +1214,9 @@ auclnt_close(audio_client_t *c)
 	auclnt_stop(&c->c_istream);
 	auclnt_stop(&c->c_ostream);
 
-	rw_enter(&d->d_clnt_lock, RW_WRITER);
+	rw_enter(&auimpl_client_lock, RW_WRITER);
 	list_remove(&d->d_clients, c);
-	rw_exit(&d->d_clnt_lock);
+	rw_exit(&auimpl_client_lock);
 
 	mutex_enter(&c->c_lock);
 	/* if in transition need to wait for other thread to release */
@@ -1212,7 +1261,7 @@ auclnt_hold_by_devt(dev_t dev)
 	for (c = list_head(list); c != NULL; c = list_next(list, c)) {
 		if ((c->c_major == mj) && (c->c_minor == mn)) {
 			mutex_enter(&c->c_lock);
-			if (c->c_is_open) {
+			if (c->c_is_active) {
 				c->c_refcnt++;
 				mutex_exit(&c->c_lock);
 			} else {
@@ -1246,9 +1295,11 @@ auclnt_dev_walk_clients(audio_dev_t *d,
 	audio_client_t	*c;
 	int		rv;
 
-	rw_enter(&d->d_clnt_lock, RW_READER);
+	rw_enter(&auimpl_client_lock, RW_READER);
 restart:
 	for (c = list_head(l); c != NULL; c = list_next(l, c)) {
+		if (!c->c_is_active)
+			continue;
 		rv = (walker(c, arg));
 		if (rv == AUDIO_WALK_STOP) {
 			break;
@@ -1256,7 +1307,7 @@ restart:
 			goto restart;
 		}
 	}
-	rw_exit(&d->d_clnt_lock);
+	rw_exit(&auimpl_client_lock);
 }
 
 
@@ -1317,11 +1368,11 @@ done:
 		auimpl_engine_close(&c->c_ostream);
 		auimpl_engine_close(&c->c_istream);
 	} else {
-		rw_enter(&d->d_clnt_lock, RW_WRITER);
+		rw_enter(&auimpl_client_lock, RW_WRITER);
 		list_insert_tail(&d->d_clients, c);
 		c->c_ostream.s_gain_master = d->d_pcmvol;
 		c->c_istream.s_gain_master = 100;
-		rw_exit(&d->d_clnt_lock);
+		rw_exit(&auimpl_client_lock);
 		auclnt_set_gain(&c->c_ostream, 100);
 		auclnt_set_gain(&c->c_istream, 100);
 	}
@@ -1465,14 +1516,16 @@ auclnt_notify_dev(audio_dev_t *dev)
 	list_t *l = &dev->d_clients;
 	audio_client_t *c;
 
-	rw_enter(&dev->d_clnt_lock, RW_READER);
+	rw_enter(&auimpl_client_lock, RW_READER);
 	for (c = list_head(l); c != NULL; c = list_next(l, c)) {
+		if (!c->c_is_active)
+			continue;
 		mutex_enter(&c->c_lock);
 		c->c_do_notify = B_TRUE;
 		cv_broadcast(&c->c_cv);
 		mutex_exit(&c->c_lock);
 	}
-	rw_exit(&dev->d_clnt_lock);
+	rw_exit(&auimpl_client_lock);
 }
 
 uint64_t

@@ -239,34 +239,6 @@ audio_dev_del_control(audio_ctrl_t *ctrl)
 	kmem_free(ctrl, sizeof (*ctrl));
 }
 
-static int
-auimpl_set_pcmvol(void *arg, uint64_t val)
-{
-	audio_dev_t	*d = arg;
-	list_t		*l = &d->d_clients;
-	audio_client_t	*c;
-
-	if (val > 100) {
-		return (EINVAL);
-	}
-	rw_enter(&d->d_clnt_lock, RW_WRITER);
-	d->d_pcmvol = val & 0xff;
-	for (c = list_head(l); c; c = list_next(l, c)) {
-		auimpl_set_gain_master(&c->c_ostream, (uint8_t)val);
-	}
-	rw_exit(&d->d_clnt_lock);
-	return (0);
-}
-
-static int
-auimpl_get_pcmvol(void *arg, uint64_t *val)
-{
-	audio_dev_t	*d = arg;
-
-	*val = d->d_pcmvol;
-	return (0);
-}
-
 int
 audio_dev_add_soft_volume(audio_dev_t *d)
 {
