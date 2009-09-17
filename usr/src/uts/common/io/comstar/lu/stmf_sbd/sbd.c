@@ -2962,6 +2962,8 @@ sbd_zvolset(char *zvol_name, char *comstarprop)
 		cmn_err(CE_NOTE, "ioctl failed %d", rc);
 	}
 	kmem_free(zc, sizeof (zfs_cmd_t));
+	if (packed)
+		kmem_free(packed, len);
 out:
 	nvlist_free(nv);
 	(void) ldi_close(zfs_lh, FREAD|FWRITE, kcred);
