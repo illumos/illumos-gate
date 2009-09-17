@@ -1313,8 +1313,8 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		    (un->un_pos.blkno != 0)) ||	/* Or within first file */
 		    ((un->un_pos.pmode == logical) &&
 		    (un->un_pos.lgclblkno > 0))) &&
-		    ((un->un_state != ST_STATE_CLOSED) &&
-		    (un->un_laststate != ST_STATE_CLOSING)))) {
+		    ((un->un_state == ST_STATE_CLOSED) &&
+		    (un->un_laststate == ST_STATE_CLOSING)))) {
 
 			ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "cannot detach: pmode=%d fileno=0x%x, blkno=0x%x"
@@ -17014,6 +17014,12 @@ st_recov_cb(struct scsi_pkt *pkt)
 		break;
 	case CMD_TRAN_ERR:
 		action = QUE_COMMAND;
+		break;
+	case CMD_DEV_GONE:
+		if (un->un_multipath)
+			action = PATH_FAILED;
+		else
+			action = COMMAND_DONE_ERROR;
 		break;
 	default:
 		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
