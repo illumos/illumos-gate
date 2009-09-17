@@ -696,10 +696,17 @@ done:
 
 		consoledev = outputdev + v_len + 1;
 		v_len = do_bsys_getproplen(NULL, "console");
-		if (v_len > 0)
+		if (v_len > 0) {
 			(void) do_bsys_getprop(NULL, "console", consoledev);
-		else
+			if (post_fastreboot &&
+			    strcmp(consoledev, "graphics") == 0) {
+				bsetprops("console", "text");
+				v_len = strlen("text");
+				bcopy("text", consoledev, v_len);
+			}
+		} else {
 			v_len = 0;
+		}
 		consoledev[v_len] = 0;
 		bcons_init2(inputdev, outputdev, consoledev);
 	} else {
@@ -1696,8 +1703,6 @@ _start(struct xboot_info *xbp)
 	HYPERVISOR_shared_info = (void *)xbootp->bi_shared_info;
 	xen_info = xbootp->bi_xen_start_info;
 #endif
-	bcons_init((void *)xbootp->bi_cmdline);
-	have_console = 1;
 
 #ifndef __xpv
 	if (*((uint32_t *)(FASTBOOT_SWTCH_PA + FASTBOOT_STACK_OFFSET)) ==
@@ -1706,6 +1711,9 @@ _start(struct xboot_info *xbp)
 		*((uint32_t *)(FASTBOOT_SWTCH_PA + FASTBOOT_STACK_OFFSET)) = 0;
 	}
 #endif
+
+	bcons_init((void *)xbootp->bi_cmdline);
+	have_console = 1;
 
 	/*
 	 * enable debugging

@@ -58,6 +58,9 @@ menu_cmd("chainloader", GRBM_CHAINLOADER_CMD, GRUB_LINE_ENTRY, error_line)
 menu_cmd("args", GRBM_ARGS_CMD, GRUB_LINE_ENTRY, error_line)
 menu_cmd("findroot", GRBM_FINDROOT_CMD, GRUB_LINE_ENTRY, findroot)
 menu_cmd("bootfs", GRBM_BOOTFS_CMD, GRUB_LINE_ENTRY, bootfs)
+menu_cmd("splashimage", GRBM_SPLASHIMAGE_CMD, GRUB_LINE_ENTRY, skip_line)
+menu_cmd("background", GRBM_BACKGROUND_CMD, GRUB_LINE_ENTRY, skip_line)
+menu_cmd("foreground", GRBM_FOREGROUND_CMD, GRUB_LINE_ENTRY, skip_line)
 
 menu_cmd_end(GRBM_CMD_NUM) /* Should be the last one */
 

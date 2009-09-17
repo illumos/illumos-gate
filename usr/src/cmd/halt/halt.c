@@ -379,6 +379,42 @@ continue_delegates()
 		(void) sigsend(P_CTID, next->ctid, SIGCONT);
 }
 
+#define	FMRI_GDM "svc:/application/graphical-login/gdm:default"
+
+/*
+ * If gdm is running, try to stop gdm.
+ * Returns  0 on success, -1 on failure.
+ */
+static int
+stop_gdm()
+{
+	char *gdm_state = NULL;
+	int retry = 0;
+
+	/*
+	 * If gdm is running, try to stop gdm.
+	 */
+	while ((gdm_state = smf_get_state(FMRI_GDM)) != NULL &&
+	    strcmp(gdm_state, SCF_STATE_STRING_ONLINE) == 0 && retry++ < 5) {
+		if (smf_disable_instance(FMRI_GDM, SMF_TEMPORARY) != 0) {
+			(void) fprintf(stderr,
+			    gettext("%s: Failed to stop %s: %s.\n"),
+			    cmdname, FMRI_GDM, scf_strerror(scf_error()));
+			return (-1);
+		}
+		(void) sleep(1);
+	}
+
+	if (retry >= 5) {
+		(void) fprintf(stderr, gettext("%s: Failed to stop %s.\n"),
+		    cmdname, FMRI_GDM);
+		return (-1);
+	}
+
+	return (0);
+}
+
+
 static void
 stop_restarters()
 {
@@ -1480,7 +1516,29 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr,
 			    gettext("%s: could not create %s.\n"),
 			    cmdname, resetting);
+	}
 
+	/*
+	 * Make sure we don't get stopped by a jobcontrol shell
+	 * once we start killing everybody.
+	 */
+	(void) signal(SIGTSTP, SIG_IGN);
+	(void) signal(SIGTTIN, SIG_IGN);
+	(void) signal(SIGTTOU, SIG_IGN);
+	(void) signal(SIGPIPE, SIG_IGN);
+	(void) signal(SIGTERM, SIG_IGN);
+
+	/*
+	 * Try to stop gdm so X has a chance to return the screen and
+	 * keyboard to a sane state.
+	 */
+	if (fast_reboot && stop_gdm() != 0) {
+		(void) fprintf(stderr,
+		    gettext("%s: Falling back to regular reboot.\n"), cmdname);
+		fast_reboot = 0;
+	}
+
+	if (cmd != A_DUMP) {
 		/*
 		 * Stop all restarters so they do not try to restart services
 		 * that are terminated.
@@ -1498,16 +1556,6 @@ main(int argc, char *argv[])
 			    cmdname);
 		}
 	}
-
-	/*
-	 * Make sure we don't get stopped by a jobcontrol shell
-	 * once we start killing everybody.
-	 */
-	(void) signal(SIGTSTP, SIG_IGN);
-	(void) signal(SIGTTIN, SIG_IGN);
-	(void) signal(SIGTTOU, SIG_IGN);
-	(void) signal(SIGPIPE, SIG_IGN);
-	(void) signal(SIGTERM, SIG_IGN);
 
 	/*
 	 * If we're not forcing a crash dump, give everyone 5 seconds to

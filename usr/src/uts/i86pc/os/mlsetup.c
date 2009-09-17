@@ -49,10 +49,10 @@
 #include <sys/machsystm.h>
 #include <sys/ontrap.h>
 #include <sys/bootconf.h>
+#include <sys/boot_console.h>
 #include <sys/kdi_machimpl.h>
 #include <sys/archsystm.h>
 #include <sys/promif.h>
-#include <sys/bootconf.h>
 #include <sys/pci_cfgspace.h>
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -78,6 +78,21 @@ static unsigned char dummy_cpu_pri[MAXIPL + 1] = {
 	0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf
 };
 
+/*
+ * Set console mode
+ */
+static void
+set_console_mode(uint8_t val)
+{
+	struct bop_regs rp = {0};
+
+	rp.eax.byte.ah = 0x0;
+	rp.eax.byte.al = val;
+	rp.ebx.word.bx = 0x0;
+
+	BOP_DOINT(bootops, 0x10, &rp);
+}
+
 
 /*
  * Setup routine called right before main(). Interposing this function
@@ -90,6 +105,8 @@ mlsetup(struct regs *rp)
 	extern struct classfuncs sys_classfuncs;
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
+	extern int post_fastreboot;
+	extern int console;
 
 	ASSERT_STACK_ALIGNED();
 
@@ -302,6 +319,13 @@ mlsetup(struct regs *rp)
 	 */
 	if (boothowto & RB_DEBUG)
 		kdi_idt_sync();
+
+	/*
+	 * Explicitly set console to text mode (0x3) if this is a boot
+	 * post Fast Reboot, and the console is set to CONS_SCREEN_TEXT.
+	 */
+	if (post_fastreboot && console == CONS_SCREEN_TEXT)
+		set_console_mode(0x3);
 
 	/*
 	 * If requested (boot -d) drop into kmdb.

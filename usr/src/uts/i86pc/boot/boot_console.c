@@ -510,6 +510,10 @@ bcons_init(char *bootstr)
 	console_value_t *consolep;
 	size_t len, cons_len;
 	char *cons_str;
+#if !defined(_BOOT)
+	static char console_text[] = "text";
+	extern int post_fastreboot;
+#endif
 
 	boot_line = bootstr;
 	console = CONS_INVALID;
@@ -521,6 +525,11 @@ bcons_init(char *bootstr)
 	cons_str = find_boot_line_prop("console");
 	if (cons_str == NULL)
 		cons_str = find_boot_line_prop("output-device");
+
+#if !defined(_BOOT)
+	if (post_fastreboot && strcmp(cons_str, "graphics") == 0)
+		cons_str = console_text;
+#endif
 
 	/*
 	 * Go through the console_devices array trying to match the string
@@ -646,6 +655,10 @@ bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 	char *devnames[] = { consoledev, outputdev, inputdev, NULL };
 	console_value_t *consolep;
 	int i;
+	extern int post_fastreboot;
+
+	if (post_fastreboot && console == CONS_SCREEN_GRAPHICS)
+		console = CONS_SCREEN_TEXT;
 
 	if (console != CONS_USBSER && console != CONS_SCREEN_GRAPHICS) {
 		if (console_set) {
