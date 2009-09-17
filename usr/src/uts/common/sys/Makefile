@@ -1297,6 +1297,11 @@ usb/usbdevs.h: $(USBDEVS_AWK) $(USBDEVS_DATA)
 LVMDERIVED_H:
 	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE)
 
+clean:
+	$(RM) $(GENHDRS)
+
+clobber:	clean
+
 check:	$(CHECKHDRS)
 
 FRC:
