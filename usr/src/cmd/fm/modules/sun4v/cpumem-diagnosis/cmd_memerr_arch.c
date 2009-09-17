@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,8 +292,9 @@ cmd_evdisp_t
 cmd_ce(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
     cmd_errcl_t clcode)
 {
-	if (strcmp(class, "ereport.cpu.ultraSPARC-T2plus.dsc") == 0)
-		return (CMD_EVD_UNUSED); /* drop VF dsc's */
+	if ((strcmp(class, "ereport.cpu.ultraSPARC-T2plus.dsc") == 0) ||
+	    (strcmp(class, "ereport.cpu.ultraSPARC-T2.dsc") == 0))
+		return (CMD_EVD_UNUSED); /* drop T2/T2+ dsc's */
 	else
 		return (xe_common(hdl, ep, nvl, class, clcode, cmd_ce_common));
 }
