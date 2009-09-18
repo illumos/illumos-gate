@@ -597,9 +597,10 @@ get_fips_mode(int *mode)
 	char *token1;
 
 	if ((pfile = fopen(_PATH_KCF_CONF, "r")) == NULL) {
-		cryptoerror(LOG_ERR,
+		cryptoerror(LOG_DEBUG,
 		    "failed to open the kcf.conf file for read only.");
-		return (CKR_FUNCTION_FAILED);
+		*mode = CRYPTO_FIPS_MODE_DISABLED;
+		return (CKR_OK);
 	}
 
 	while (fgets(buffer, BUFSIZ, pfile) != NULL) {
