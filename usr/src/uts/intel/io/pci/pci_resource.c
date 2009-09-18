@@ -340,6 +340,12 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		break;
 
 	case ACPI_RESOURCE_TYPE_ADDRESS64:
+	/*
+	 * We comment out this block because we currently cannot deal with
+	 * PCI 64-bit addresses. Will revisit this when we add PCI 64-bit MMIO
+	 * support.
+	 */
+#if 0
 		if (rp->Data.Address64.AddressLength == 0)
 			break;
 		acpi_cb_cnt++;
@@ -347,9 +353,11 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		    rp->Data.Address64.Info.TypeSpecific, bus),
 		    rp->Data.Address64.Minimum,
 		    rp->Data.Address64.AddressLength);
+#endif
 		break;
 
 	case ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64:
+#if 0	/* Will revisit this when we add PCI 64-bit MMIO support */
 		if (rp->Data.ExtAddress64.AddressLength == 0)
 			break;
 		acpi_cb_cnt++;
@@ -357,6 +365,7 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		    rp->Data.ExtAddress64.Info.TypeSpecific, bus),
 		    rp->Data.ExtAddress64.Minimum,
 		    rp->Data.ExtAddress64.AddressLength);
+#endif
 		break;
 
 	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
