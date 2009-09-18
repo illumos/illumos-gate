@@ -953,6 +953,7 @@
 			 discarded file=%s"
 @ MSG_SYM_DISCARD_DUP	"symbol[%d]=%s;  discarded duplicate: originates from \
 			 file=%s"
+@ MSG_SYM_WRAP		"symbol[%d]=%s renamed to %s (-z wrap)"
 
 @ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"

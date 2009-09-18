@@ -404,9 +404,8 @@ ld_main(int argc, char **argv, Half mach)
 	 * our memory consumption and freeing are doing.  We should be able to
 	 * free all the memory that has been allocated as part of the link-edit
 	 * process.
-	 *
-	 * ofl_cleanup(ofl);
 	 */
+	/* ld_ofl_cleanup(ofl); */
 	return (0);
 }
 

@@ -616,6 +616,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_vers_promote		ld64_vers_promote
 #define	ld_vers_sym_process	ld64_vers_sym_process
 #define	ld_vers_verify		ld64_vers_verify
+#define	ld_wrap_enter		ld64_wrap_enter
 
 #else
 
@@ -703,6 +704,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_vers_promote		ld32_vers_promote
 #define	ld_vers_sym_process	ld32_vers_sym_process
 #define	ld_vers_verify		ld32_vers_verify
+#define	ld_wrap_enter		ld32_wrap_enter
 
 #endif
 
@@ -831,6 +833,7 @@ extern void		ld_vers_promote(Sym_desc *, Word, Ifl_desc *,
 			    Ofl_desc *);
 extern int		ld_vers_sym_process(Lm_list *, Is_desc *, Ifl_desc *);
 extern int		ld_vers_verify(Ofl_desc *);
+extern WrapSymNode	*ld_wrap_enter(Ofl_desc *, const char *);
 
 extern uintptr_t	add_regsym(Sym_desc *, Ofl_desc *);
 extern Word		hashbkts(Word);

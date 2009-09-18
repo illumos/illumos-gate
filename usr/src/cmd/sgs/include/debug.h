@@ -424,6 +424,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_spec_title	Dbg64_syms_spec_title
 #define	Dbg_syms_updated	Dbg64_syms_updated
 #define	Dbg_syms_up_title	Dbg64_syms_up_title
+#define	Dbg_syms_wrap		Dbg64_syms_wrap
 
 #define	Dbg_util_call_array	Dbg64_util_call_array
 #define	Dbg_util_call_fini	Dbg64_util_call_fini
@@ -632,6 +633,7 @@ extern	void		Dbg_help(void);
 #define	Dbg_syms_spec_title	Dbg32_syms_spec_title
 #define	Dbg_syms_updated	Dbg32_syms_updated
 #define	Dbg_syms_up_title	Dbg32_syms_up_title
+#define	Dbg_syms_wrap		Dbg32_syms_wrap
 
 #define	Dbg_util_call_array	Dbg32_util_call_array
 #define	Dbg_util_call_fini	Dbg32_util_call_fini
@@ -896,6 +898,7 @@ extern	void	Dbg_syms_sec_title(Lm_list *);
 extern	void	Dbg_syms_spec_title(Lm_list *);
 extern	void	Dbg_syms_updated(Ofl_desc *, Sym_desc *, const char *);
 extern	void	Dbg_syms_up_title(Lm_list *);
+extern	void	Dbg_syms_wrap(Lm_list *, Word, const char *, const char *);
 
 extern	void	Dbg_tls_modactivity(Lm_list *, void *, uint_t);
 extern	void	Dbg_tls_static_block(Lm_list *, void *, ulong_t, ulong_t);

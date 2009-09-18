@@ -284,6 +284,16 @@ Dbg_syms_global(Lm_list *lml, Word ndx, const char *name)
 }
 
 void
+Dbg_syms_wrap(Lm_list *lml, Word ndx, const char *orig_name, const char *name)
+{
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_SYM_WRAP), EC_WORD(ndx),
+	    Dbg_demangle_name(orig_name), Dbg_demangle_name(name));
+}
+
+void
 Dbg_syms_sec_title(Lm_list *lml)
 {
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))

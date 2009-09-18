@@ -41,7 +41,7 @@
 # MAPFILE HEADER END
 #
 
-SUNWprivate_4.73 {
+SUNWprivate_4.74 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -399,6 +399,8 @@ SUNWprivate_4.73 {
 		Dbg64_syms_updated;
 		Dbg32_syms_up_title;
 		Dbg64_syms_up_title;
+		Dbg32_syms_wrap;
+		Dbg64_syms_wrap;
 
 		Dbg_tls_modactivity;
 		Dbg_tls_static_block;

@@ -2312,6 +2312,48 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		}
 
 		/*
+		 * The '-z wrap=XXX' option emulates the GNU ld --wrap=XXX
+		 * option. When XXX is the symbol to be wrapped:
+		 *
+		 * -	An undefined reference to XXX is converted to __wrap_XXX
+		 * -	An undefined reference to __real_XXX is converted to XXX
+		 *
+		 * The idea is that the user can supply a wrapper function
+		 * __wrap_XXX that does some work, and then uses the name
+		 * __real_XXX to pass the call on to the real function. The
+		 * wrapper objects are linked with the original unmodified
+		 * objects to produce a wrapped version of the output object.
+		 */
+		if (ofl->ofl_wrap && name[0] && (shndx == SHN_UNDEF)) {
+			WrapSymNode wsn, *wsnp;
+
+			/*
+			 * If this is the __real_XXX form, advance the
+			 * pointer to reference the wrapped name.
+			 */
+			wsn.wsn_name = name;
+			if ((*name == '_') &&
+			    (strncmp(name, MSG_ORIG(MSG_STR_UU_REAL_U),
+			    MSG_STR_UU_REAL_U_SIZE) == 0))
+				wsn.wsn_name += MSG_STR_UU_REAL_U_SIZE;
+
+			/*
+			 * Is this symbol in the wrap AVL tree? If so, map
+			 * XXX to __wrap_XXX, and __real_XXX to XXX. Note that
+			 * wsn.wsn_name will equal the current value of name
+			 * if the __real_ prefix is not present.
+			 */
+			if ((wsnp = avl_find(ofl->ofl_wrap, &wsn, 0)) != NULL) {
+				const char *old_name = name;
+
+				name = (wsn.wsn_name == name) ?
+				    wsnp->wsn_wrapname : wsn.wsn_name;
+				DBG_CALL(Dbg_syms_wrap(ofl->ofl_lml, ndx,
+				    old_name, name));
+			}
+		}
+
+		/*
 		 * Determine and validate the symbols binding.
 		 */
 		bind = ELF_ST_BIND(sym->st_info);

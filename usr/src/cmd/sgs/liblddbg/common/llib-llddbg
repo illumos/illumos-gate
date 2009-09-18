@@ -404,6 +404,8 @@ void	Dbg32_syms_updated(Ofl_desc *, Sym_desc *, const char *);
 void	Dbg64_syms_updated(Ofl_desc *, Sym_desc *, const char *);
 void	Dbg32_syms_up_title(Lm_list *);
 void	Dbg64_syms_up_title(Lm_list *);
+void	Dbg32_syms_wrap(Lm_list *, Elf32_Word, const char *, const char *);
+void	Dbg64_syms_wrap(Lm_list *, Elf64_Word, const char *, const char *);
 
 void	Dbg32_util_broadcast(Rt_map *);
 void	Dbg64_util_broadcast(Rt_map *);

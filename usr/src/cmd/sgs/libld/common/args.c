@@ -55,6 +55,21 @@
  *    -z nosighandler		suppress the registration of the signal handler
  *				used to manage SIGBUS.
  */
+
+/*
+ * The following flags are committed, and will not be removed, but are
+ * not publically documented, either because they are obsolete, or because
+ * they exist to work around defects in other software and are not of
+ * sufficient interest otherwise.
+ *
+ *    OPTION			MEANING
+ *
+ *    -Wl,...			compiler drivers and configuration tools
+ *				have been known to pass this compiler option
+ *				to ld(1).  Strip off the "-Wl," prefix and
+ *			        process the remainder (...) as a normal option.
+ */
+
 #include	<sys/link.h>
 #include	<stdio.h>
 #include	<fcntl.h>
@@ -198,6 +213,7 @@ usage_mesg(Boolean detail)
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZT));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTO));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZTW));
+	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZWRAP));
 	(void) fprintf(stderr, MSG_INTL(MSG_ARG_DETAIL_ZV));
 }
 
@@ -1299,6 +1315,17 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 					/* Don't report cascading errors */
 					ofl->ofl_ars_gsandx = -1;
 				}
+
+			/*
+			 * If -z wrap is seen, enter the symbol to be wrapped
+			 * into the wrap AVL tree.
+			 */
+			} else if (strncmp(optarg, MSG_ORIG(MSG_ARG_WRAP),
+			    MSG_ARG_WRAP_SIZE) == 0) {
+				if (ld_wrap_enter(ofl,
+				    optarg + MSG_ARG_WRAP_SIZE) == NULL)
+					return (S_ERROR);
+
 			/*
 			 * The following options just need validation as they
 			 * are interpreted on the second pass through the

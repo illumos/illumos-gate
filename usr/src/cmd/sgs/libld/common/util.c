@@ -279,13 +279,48 @@ add_string(char *old, char *str)
 }
 
 /*
+ * The GNU ld '-wrap=XXX' and '--wrap=XXX' options correspond to our
+ * '-z wrap=XXX'. When str2chr() does this conversion, we end up with
+ * the return character set to 'z' and optarg set to 'XXX'. This callback
+ * changes optarg to include the missing wrap= prefix.
+ *
+ * exit:
+ *	Returns c on success, or '?' on error.
+ */
+static int
+str2chr_wrap_cb(int c)
+{
+	char    *str;
+	size_t  len = MSG_ARG_WRAP_SIZE + strlen(optarg) + 1;
+
+	if ((str = libld_malloc(len)) == NULL)
+		return ('?');
+	(void) snprintf(str, len, MSG_ORIG(MSG_FMT_STRCAT),
+	    MSG_ORIG(MSG_ARG_WRAP), optarg);
+	optarg = str;
+	return (c);
+}
+
+/*
  * Determine whether this string, possibly with an associated option, should be
  * translated to an option character.  If so, update the optind and optarg
  * as described for short options in getopt(3c).
+ *
+ * entry:
+ *	lml - Link map list for debug messages
+ *	ndx - Starting optind for current item
+ *	argc, argv - Command line arguments
+ *	arg - Option to be examined
+ *	c, opt - Option character (c) and corresponding long name (opt)
+ *	optsz - 0 if option does not accept a value. If option does
+ *		accept a value, strlen(opt), giving the offset to the
+ *		value if the option and value are combined in one string.
+ *	cbfunc - NULL, or pointer to function to call if a translation is
+ *		successful.
  */
 static int
 str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
-    const char *opt, size_t optsz)
+    const char *opt, size_t optsz, int cbfunc(int))
 {
 	if (optsz == 0) {
 		/*
@@ -331,6 +366,10 @@ str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
 					return ('?');
 			}
 		}
+
+		if (cbfunc != NULL)
+			c = (*cbfunc)(c);
+
 		return (c);
 	}
 	return (0);
@@ -362,20 +401,28 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 			/* Translate -rpath <optarg> to -R <optarg> */
 			if ((c = str2chr(lml, ndx, argc, argv, arg, 'R',
 			    MSG_ORIG(MSG_ARG_T_RPATH),
-			    MSG_ARG_T_RPATH_SIZE)) != 0) {
+			    MSG_ARG_T_RPATH_SIZE, NULL)) != 0) {
 				return (c);
 			}
 			break;
 		case 's':
 			/* Translate -shared to -G */
 			if ((c = str2chr(lml, ndx, argc, argv, arg, 'G',
-			    MSG_ORIG(MSG_ARG_T_SHARED), 0)) != 0) {
+			    MSG_ORIG(MSG_ARG_T_SHARED), 0, NULL)) != 0) {
 				return (c);
 
 			/* Translate -soname <optarg> to -h <optarg> */
 			} else if ((c = str2chr(lml, ndx, argc, argv, arg, 'h',
 			    MSG_ORIG(MSG_ARG_T_SONAME),
-			    MSG_ARG_T_SONAME_SIZE)) != 0) {
+			    MSG_ARG_T_SONAME_SIZE, NULL)) != 0) {
+				return (c);
+			}
+			break;
+		case 'w':
+			/* Translate -wrap to -z wrap= */
+			if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
+			    MSG_ORIG(MSG_ARG_T_WRAP) + 1,
+			    MSG_ARG_T_WRAP_SIZE - 1, str2chr_wrap_cb)) != 0) {
 				return (c);
 			}
 			break;
@@ -384,7 +431,8 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 			 * Translate -( to -z rescan-start
 			 */
 			if ((c = str2chr(lml, ndx, argc, argv,
-			    arg, 'z', MSG_ORIG(MSG_ARG_T_OPAR), 0)) != 0) {
+			    arg, 'z', MSG_ORIG(MSG_ARG_T_OPAR), 0, NULL)) !=
+			    0) {
 				optarg = (char *)MSG_ORIG(MSG_ARG_RESCAN_START);
 				return (c);
 			}
@@ -394,7 +442,8 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 			 * Translate -) to -z rescan-end
 			 */
 			if ((c = str2chr(lml, ndx, argc, argv,
-			    arg, 'z', MSG_ORIG(MSG_ARG_T_CPAR), 0)) != 0) {
+			    arg, 'z', MSG_ORIG(MSG_ARG_T_CPAR), 0, NULL)) !=
+			    0) {
 				optarg = (char *)MSG_ORIG(MSG_ARG_RESCAN_END);
 				return (c);
 			}
@@ -407,7 +456,8 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 * -zmuldefs
 				 */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
-				    MSG_ORIG(MSG_ARG_T_MULDEFS), 0)) != 0) {
+				    MSG_ORIG(MSG_ARG_T_MULDEFS), 0, NULL)) !=
+				    0) {
 					optarg =
 					    (char *)MSG_ORIG(MSG_ARG_MULDEFS);
 					return (c);
@@ -418,7 +468,7 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 */
 				} else if ((c = str2chr(lml, argc, ndx, argv,
 				    arg, 'f', MSG_ORIG(MSG_ARG_T_AUXFLTR),
-				    MSG_ARG_T_AUXFLTR_SIZE)) != 0) {
+				    MSG_ARG_T_AUXFLTR_SIZE, NULL)) != 0) {
 					return (c);
 				}
 				break;
@@ -429,7 +479,7 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'I',
 				    MSG_ORIG(MSG_ARG_T_INTERP),
-				    MSG_ARG_T_INTERP_SIZE)) != 0) {
+				    MSG_ARG_T_INTERP_SIZE, NULL)) != 0) {
 					return (c);
 				}
 				break;
@@ -437,15 +487,15 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				/* Translate --entry <optarg> to -e <optarg> */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'e',
 				    MSG_ORIG(MSG_ARG_T_ENTRY),
-				    MSG_ARG_T_ENTRY_SIZE)) != 0) {
+				    MSG_ARG_T_ENTRY_SIZE, NULL)) != 0) {
 					return (c);
 				}
 				/*
 				 * Translate --end-group to -z rescan-end
 				 */
 				if ((c = str2chr(lml, ndx, argc, argv,
-				    arg, 'z',
-				    MSG_ORIG(MSG_ARG_T_ENDGROUP), 0)) != 0) {
+				    arg, 'z', MSG_ORIG(MSG_ARG_T_ENDGROUP),
+				    0, NULL)) != 0) {
 					optarg = (char *)
 					    MSG_ORIG(MSG_ARG_RESCAN_END);
 					return (c);
@@ -455,14 +505,15 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				/* Translate --filter <optarg> to -F <optarg> */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'F',
 				    MSG_ORIG(MSG_ARG_T_STDFLTR),
-				    MSG_ARG_T_STDFLTR_SIZE)) != 0) {
+				    MSG_ARG_T_STDFLTR_SIZE, NULL)) != 0) {
 					return (c);
 				}
 				break;
 			case 'h':
 				/* Translate --help to -zhelp */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
-				    MSG_ORIG(MSG_ARG_T_HELP), 0)) != 0) {
+				    MSG_ORIG(MSG_ARG_T_HELP), 0, NULL)) !=
+				    0) {
 					optarg = (char *)MSG_ORIG(MSG_ARG_HELP);
 					return (c);
 				}
@@ -473,7 +524,7 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'l',
 				    MSG_ORIG(MSG_ARG_T_LIBRARY),
-				    MSG_ARG_T_LIBRARY_SIZE)) != 0) {
+				    MSG_ARG_T_LIBRARY_SIZE, NULL)) != 0) {
 					return (c);
 
 				/*
@@ -482,14 +533,15 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 */
 				} else if ((c = str2chr(lml, ndx, argc, argv,
 				    arg, 'L', MSG_ORIG(MSG_ARG_T_LIBPATH),
-				    MSG_ARG_T_LIBPATH_SIZE)) != 0) {
+				    MSG_ARG_T_LIBPATH_SIZE, NULL)) != 0) {
 					return (c);
 				}
 				break;
 			case 'n':
 				/* Translate --no-undefined to -zdefs */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'z',
-				    MSG_ORIG(MSG_ARG_T_NOUNDEF), 0)) != 0) {
+				    MSG_ORIG(MSG_ARG_T_NOUNDEF), 0, NULL)) !=
+				    0) {
 					optarg = (char *)MSG_ORIG(MSG_ARG_DEFS);
 					return (c);
 
@@ -498,8 +550,8 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 * -z defaultextract
 				 */
 				} else if ((c = str2chr(lml, ndx, argc, argv,
-				    arg, 'z',
-				    MSG_ORIG(MSG_ARG_T_NOWHOLEARC), 0)) != 0) {
+				    arg, 'z', MSG_ORIG(MSG_ARG_T_NOWHOLEARC),
+				    0, NULL)) != 0) {
 					optarg =
 					    (char *)MSG_ORIG(MSG_ARG_DFLEXTRT);
 					return (c);
@@ -509,29 +561,31 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				/* Translate --output <optarg> to -o <optarg> */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'o',
 				    MSG_ORIG(MSG_ARG_T_OUTPUT),
-				    MSG_ARG_T_OUTPUT_SIZE)) != 0) {
+				    MSG_ARG_T_OUTPUT_SIZE, NULL)) != 0) {
 					return (c);
 				}
 				break;
 			case 'r':
 				/* Translate --relocatable to -r */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'r',
-				    MSG_ORIG(MSG_ARG_T_RELOCATABLE), 0)) != 0) {
+				    MSG_ORIG(MSG_ARG_T_RELOCATABLE), 0,
+				    NULL)) != 0) {
 					return (c);
 				}
 				break;
 			case 's':
 				/* Translate --strip-all to -s */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 's',
-				    MSG_ORIG(MSG_ARG_T_STRIP), 0)) != 0) {
+				    MSG_ORIG(MSG_ARG_T_STRIP), 0, NULL)) !=
+				    0) {
 					return (c);
 				}
 				/*
 				 * Translate --start-group to -z rescan-start
 				 */
 				if ((c = str2chr(lml, ndx, argc, argv,
-				    arg, 'z',
-				    MSG_ORIG(MSG_ARG_T_STARTGROUP), 0)) != 0) {
+				    arg, 'z', MSG_ORIG(MSG_ARG_T_STARTGROUP),
+				    0, NULL)) != 0) {
 					optarg = (char *)
 					    MSG_ORIG(MSG_ARG_RESCAN_START);
 					return (c);
@@ -544,14 +598,15 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'u',
 				    MSG_ORIG(MSG_ARG_T_UNDEF),
-				    MSG_ARG_T_UNDEF_SIZE)) != 0) {
+				    MSG_ARG_T_UNDEF_SIZE, NULL)) != 0) {
 					return (c);
 				}
 				break;
 			case 'v':
 				/* Translate --version to -V */
 				if ((c = str2chr(lml, ndx, argc, argv, arg, 'V',
-				    MSG_ORIG(MSG_ARG_T_VERSION), 0)) != 0) {
+				    MSG_ORIG(MSG_ARG_T_VERSION), 0, NULL)) !=
+				    0) {
 					return (c);
 				}
 				break;
@@ -560,10 +615,19 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 				 * Translate --whole-archive to -z alltextract
 				 */
 				if ((c = str2chr(lml, ndx, argc, argv,
-				    arg, 'z',
-				    MSG_ORIG(MSG_ARG_T_WHOLEARC), 0)) != 0) {
+				    arg, 'z', MSG_ORIG(MSG_ARG_T_WHOLEARC),
+				    0, NULL)) != 0) {
 					optarg =
 					    (char *)MSG_ORIG(MSG_ARG_ALLEXTRT);
+					return (c);
+				}
+				/*
+				 * Translate --wrap to -z wrap=
+				 */
+				if ((c = str2chr(lml, ndx, argc, argv,
+				    arg, 'z', MSG_ORIG(MSG_ARG_T_WRAP),
+				    MSG_ARG_T_WRAP_SIZE, str2chr_wrap_cb)) !=
+				    0) {
 					return (c);
 				}
 				break;
@@ -571,6 +635,7 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 			break;
 		}
 	}
+
 	if ((c = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != -1) {
 		/*
 		 * It is possible that a "-Wl," argument has been used to

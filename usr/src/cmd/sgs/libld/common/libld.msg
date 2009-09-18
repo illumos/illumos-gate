@@ -228,6 +228,8 @@
 			 text\n"
 @ MSG_ARG_DETAIL_ZTW	"\t[-z textwarn]\twarn if there are relocations \
 			 against text\n"
+@ MSG_ARG_DETAIL_ZWRAP	"\t[-z wrap=symbol], [-wrap=symbol], [--wrap=symbol]\n\
+			 \t\t\twrap symbol references\n"
 @ MSG_ARG_DETAIL_ZV	"\t[-z verbose]\t\
 			 generate warnings for suspicious processings\n"
 
@@ -652,11 +654,14 @@
 @ MSG_STR_ISALIST	"$ISALIST"
 @ MSG_STR_OSNAME	"$OSNAME"
 @ MSG_STR_OSREL		"$OSREL"
+@ MSG_STR_UU_REAL_U	"__real_"
+@ MSG_STR_UU_WRAP_U	"__wrap_"
 
 @ MSG_FMT_ARMEM		"%s(%s)"
 @ MSG_FMT_COLPATH	"%s:%s"
 @ MSG_FMT_SYMNAM	"`%s'"
 @ MSG_FMT_NULLSYMNAM	"%s[%d]"
+@ MSG_FMT_STRCAT	"%s%s"
 
 @ MSG_PTH_RTLD		"/usr/lib/ld.so.1"
 
@@ -1210,6 +1215,7 @@
 @ MSG_ARG_NOSIGHANDLER	"nosighandler"
 @ MSG_ARG_GLOBAUDIT	"globalaudit"
 @ MSG_ARG_TARGET	"target="
+@ MSG_ARG_WRAP		"wrap="
 @ MSG_ARG_HELP		"help"
 @ MSG_ARG_GROUP		"group"
 @ MSG_ARG_REDUCE	"reduce"
@@ -1242,6 +1248,7 @@
 @ MSG_ARG_T_UNDEF	"-undefined"
 @ MSG_ARG_T_VERSION	"-version"
 @ MSG_ARG_T_WHOLEARC	"-whole-archive"
+@ MSG_ARG_T_WRAP	"-wrap"
 @ MSG_ARG_T_OPAR	"("
 @ MSG_ARG_T_CPAR	")"
 

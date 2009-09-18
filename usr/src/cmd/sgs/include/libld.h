@@ -150,6 +150,20 @@ typedef struct sreloc_cache {
 } Rlxrel_cache;
 
 /*
+ * Nodes in an ofl_wrap AVL tree
+ *
+ * wsn_name is the name of the symbol to be wrapped. wsn_wrapname is used
+ * when we need to refer to the wrap symbol, and consists of the symbol
+ * name with a __wrap_ prefix.
+ */
+typedef struct wrap_sym_node {
+	avl_node_t	wsn_avlnode;	/* AVL book-keeping */
+	const char	*wsn_name;	/* Symbol name: XXX */
+	const char	*wsn_wrapname;	/* Wrap symbol name: __wrap_XXX */
+} WrapSymNode;
+
+
+/*
  * Output file processing structure
  */
 typedef Lword ofl_flag_t;
@@ -304,6 +318,7 @@ struct ofl_desc {
 					/*	sloppy_comdat_reloc() */
 	APlist		*ofl_maptext;	/* mapfile added text sections */
 	APlist		*ofl_mapdata;	/* mapfile added data sections */
+	avl_tree_t	*ofl_wrap;	/* -z wrap symbols  */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
