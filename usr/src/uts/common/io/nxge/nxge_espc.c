@@ -254,6 +254,8 @@ nxge_vpd_info_get(p_nxge_t nxgep)
 	} else if (strncmp(nxgep->vpd_info.bd_model,
 	    NXGE_RFEM_BM_STR, strlen(NXGE_RFEM_BM_STR)) == 0) {
 		nxgep->hot_swappable_phy = B_TRUE;
+		nxgep->platform_type = P_NEPTUNE_GENERIC;
+		nxgep->niu_type = NEPTUNE_2_10GF;
 	}
 
 	/* If Alonso platform, replace "mif" for the last 2 ports phy-type */

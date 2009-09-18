@@ -209,11 +209,13 @@ nxge_uninit_txdma_channel(p_nxge_t nxgep, int channel)
 		nxgep->statsp->tdc_ksp[channel] = 0;
 	}
 
-	(void) nxge_txdma_stop_channel(nxgep, channel);
+	if (nxge_txdma_stop_channel(nxgep, channel) != NXGE_OK)
+		goto nxge_uninit_txdma_channel_exit;
+
 	nxge_unmap_txdma_channel(nxgep, channel);
 
-	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-	    "<== nxge_uninit_txdma_channel"));
+nxge_uninit_txdma_channel_exit:
+	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "<== nxge_uninit_txdma_channel"));
 }
 
 void
@@ -684,6 +686,8 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 				    (mblk_len < stuff_len)) {
 					stuff_len -= mblk_len;
 					nmp = nmp->b_cont;
+					if (nmp)
+						mblk_len = MBLKL(nmp);
 				}
 				ASSERT(nmp);
 				up = (uint16_t *)(nmp->b_rptr + stuff_len);
@@ -2946,7 +2950,16 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	 */
 	(void) nxge_txdma_stop_inj_err(nxgep, channel);
 
+	if (nxgep->tx_rings == NULL) {
+		status = NXGE_ERROR;
+		goto nxge_txdma_stop_channel_exit;
+	}
+
 	tx_ring_p = nxgep->tx_rings->rings[channel];
+	if (tx_ring_p == NULL) {
+		status = NXGE_ERROR;
+		goto nxge_txdma_stop_channel_exit;
+	}
 
 	/*
 	 * Reset TXDMA channel

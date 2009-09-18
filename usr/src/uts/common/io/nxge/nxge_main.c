@@ -128,10 +128,12 @@ nxge_rxbuf_type_t nxge_rx_buf_size_type = RCR_PKTBUFSZ_0;
 nxge_rxbuf_threshold_t nxge_rx_threshold_lo = NXGE_RX_COPY_3;
 
 /* Use kmem_alloc() to allocate data buffers. */
-#if defined(_BIG_ENDIAN)
+#if defined(__sparc)
 uint32_t	nxge_use_kmem_alloc = 1;
-#else
+#elif defined(__i386)
 uint32_t	nxge_use_kmem_alloc = 0;
+#else
+uint32_t	nxge_use_kmem_alloc = 1;
 #endif
 
 rtrace_t npi_rtracebuf;
@@ -822,11 +824,12 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (isLDOMguest(nxgep)) {
 		/* Find our VR & channel sets. */
 		status = nxge_hio_vr_add(nxgep);
-		if (status != NXGE_OK) {
-			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+		if (status != DDI_SUCCESS) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_hio_vr_add failed"));
 			(void) hsvc_unregister(&nxgep->niu_hsvc);
 			nxgep->niu_hsvc_available = B_FALSE;
+			goto nxge_attach_fail;
 		}
 		goto nxge_attach_exit;
 	}
@@ -6530,6 +6533,8 @@ nxge_init_common_dev(p_nxge_t nxgep)
 	p_nxge_hw_list_t	hw_p;
 	dev_info_t 		*p_dip;
 
+	ASSERT(nxgep != NULL);
+
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "==> nxge_init_common_device"));
 
 	p_dip = nxgep->p_dip;
@@ -6643,6 +6648,8 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t	p_cfgp;
 	dev_info_t 		*p_dip;
+
+	ASSERT(nxgep != NULL);
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "==> nxge_uninit_common_device"));
 	if (nxgep->nxge_hw_p == NULL) {

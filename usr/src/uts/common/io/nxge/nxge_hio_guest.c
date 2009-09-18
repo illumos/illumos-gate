@@ -192,13 +192,21 @@ nxge_hio_vr_add(nxge_t *nxge)
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_vr_add"));
 
+	if (nhd->type == NXGE_HIO_TYPE_SERVICE) {
+		/*
+		 * Can't add VR to the service domain from which we came.
+		 */
+		ASSERT(nhd->type == NXGE_HIO_TYPE_GUEST);
+		return (DDI_FAILURE);
+	}
+
 	/*
 	 * Get our HV cookie.
 	 */
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxge->dip,
 	    0, "reg", &reg_val, &reg_len) != DDI_PROP_SUCCESS) {
 		NXGE_DEBUG_MSG((nxge, VPD_CTL, "`reg' property not found"));
-		return (NXGE_ERROR);
+		return (DDI_FAILURE);
 	}
 
 	cookie = (uint32_t)(reg_val[0]);
@@ -209,7 +217,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 	if (hv_rv != 0) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "vr->getinfo() failed"));
-		return (NXGE_ERROR);
+		return (DDI_FAILURE);
 	}
 
 	/*
@@ -239,7 +247,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "nxge_hio_vr_add(%d): cookie(0x%x)\n",
 		    nxge->instance, cookie));
-		return (NXGE_ERROR);
+		return (DDI_FAILURE);
 	}
 
 	vr = &nhd->vr[vr_index];
@@ -265,7 +273,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 	if (nxge_hio_intr_init(nxge) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "nxge_hio_intr_init() failed"));
-		return (NXGE_ERROR);
+		return (DDI_FAILURE);
 	}
 
 	/*
@@ -282,7 +290,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 		if (hv_rv != 0) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 			    "tx->get_map() failed"));
-			return (NXGE_ERROR);
+			return (DDI_FAILURE);
 		}
 		res_map_parse(nxge, NXGE_TRANSMIT_GROUP, tx_map);
 
@@ -297,7 +305,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 				if (dc == 0) {
 					NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 					    "DC add failed"));
-					return (NXGE_ERROR);
+					return (DDI_FAILURE);
 				}
 				dc->channel = (nxge_channel_t)i;
 			}
@@ -315,7 +323,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 		if (hv_rv != 0) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 			    "rx->get_map() failed"));
-			return (NXGE_ERROR);
+			return (DDI_FAILURE);
 		}
 		res_map_parse(nxge, NXGE_RECEIVE_GROUP, rx_map);
 
@@ -330,7 +338,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 				if (dc == 0) {
 					NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 					    "DC add failed"));
-					return (NXGE_ERROR);
+					return (DDI_FAILURE);
 				}
 				dc->channel = (nxge_channel_t)i;
 			}
@@ -341,14 +349,14 @@ nxge_hio_vr_add(nxge_t *nxge)
 	if (status != NXGE_OK) {
 		cmn_err(CE_WARN, "nxge(%d): nxge_mac_register failed\n",
 		    nxge->instance);
-		return (status);
+		return (DDI_FAILURE);
 	}
 
 	nxge->hio_vr = vr;	/* For faster lookups. */
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_vr_add"));
 
-	return (NXGE_OK);
+	return (DDI_SUCCESS);
 }
 
 /*

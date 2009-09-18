@@ -99,8 +99,8 @@ typedef struct {
 #define	NXGE_VR_SR_MAX		8 /* There are 8 subregions (SR). */
 
 typedef enum {
-	NXGE_HIO_TYPE_SERVICE,	/* We are a service domain driver. */
-	NXGE_HIO_TYPE_GUEST	/* We are a guest domain driver. */
+	NXGE_HIO_TYPE_SERVICE = 0x80,	/* We are a service domain driver. */
+	NXGE_HIO_TYPE_GUEST		/* We are a guest domain driver. */
 } nxge_hio_type_t;
 
 typedef enum {

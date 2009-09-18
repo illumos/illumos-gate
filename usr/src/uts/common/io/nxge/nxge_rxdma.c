@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -4268,12 +4269,13 @@ nxge_rxdma_start_channel(p_nxge_t nxgep, uint16_t channel,
 
 	if (isLDOMguest(nxgep)) {
 		/* Add interrupt handler for this channel. */
-		if (nxge_hio_intr_add(nxgep, VP_BOUND_RX, channel)
-		    != NXGE_OK) {
+		status = nxge_hio_intr_add(nxgep, VP_BOUND_RX, channel);
+		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    " nxge_rxdma_start_channel: "
 			    " nxge_hio_intr_add failed (0x%08x channel %d)",
-		    status, channel));
+			    status, channel));
+			return (status);
 		}
 	}
 
@@ -4556,7 +4558,6 @@ nxge_rxdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel)
 	rbrp = (p_rx_rbr_ring_t)nxgep->rx_rbr_rings->rbr_rings[channel];
 	rcrp = (p_rx_rcr_ring_t)nxgep->rx_rcr_rings->rcr_rings[channel];
 
-	MUTEX_ENTER(&rcrp->lock);
 	MUTEX_ENTER(&rbrp->lock);
 	MUTEX_ENTER(&rbrp->post_lock);
 
@@ -4651,20 +4652,17 @@ nxge_rxdma_fatal_err_recover(p_nxge_t nxgep, uint16_t channel)
 
 	MUTEX_EXIT(&rbrp->post_lock);
 	MUTEX_EXIT(&rbrp->lock);
-	MUTEX_EXIT(&rcrp->lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "Recovery Successful, RxDMAChannel#%d Restored",
 	    channel));
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_fatal_err_recover"));
-
 	return (NXGE_OK);
+
 fail:
 	MUTEX_EXIT(&rbrp->post_lock);
 	MUTEX_EXIT(&rbrp->lock);
-	MUTEX_EXIT(&rcrp->lock);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Recovery failed"));
-
 	return (NXGE_ERROR | rs);
 }
 
@@ -4673,6 +4671,7 @@ nxge_rx_port_fatal_err_recover(p_nxge_t nxgep)
 {
 	nxge_grp_set_t *set = &nxgep->rx_set;
 	nxge_status_t status = NXGE_OK;
+	p_rx_rcr_ring_t rcrp;
 	int rdc;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_port_fatal_err_recover"));
@@ -4689,10 +4688,16 @@ nxge_rx_port_fatal_err_recover(p_nxge_t nxgep)
 
 	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
 		if ((1 << rdc) & set->owned.map) {
-			if (nxge_rxdma_fatal_err_recover(nxgep, rdc)
-			    != NXGE_OK) {
-				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    "Could not recover channel %d", rdc));
+			rcrp = nxgep->rx_rcr_rings->rcr_rings[rdc];
+			if (rcrp != NULL) {
+				MUTEX_ENTER(&rcrp->lock);
+				if (nxge_rxdma_fatal_err_recover(nxgep,
+				    rdc) != NXGE_OK) {
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "Could not recover "
+					    "channel %d", rdc));
+				}
+				MUTEX_EXIT(&rcrp->lock);
 			}
 		}
 	}

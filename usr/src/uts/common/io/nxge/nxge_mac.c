@@ -312,6 +312,10 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 	 */
 	if (nxgep->mac.portmode == PORT_HSP_MODE) {
 		nxgep->hot_swappable_phy = B_TRUE;
+		if (portn > 1) {
+			return (NXGE_ERROR);
+		}
+
 		/*
 		 * If this is the 2nd NIU port, then check 2 addresses
 		 * to take care of the Goa NEM card. Port 1 can have addr 17

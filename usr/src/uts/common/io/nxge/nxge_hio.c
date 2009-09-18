@@ -132,9 +132,10 @@ nxge_hio_init(nxge_t *nxge)
 	int i;
 
 	nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
-	if (nhd == 0) {
+	if (nhd == NULL) {
 		nhd = KMEM_ZALLOC(sizeof (*nhd), KM_SLEEP);
 		MUTEX_INIT(&nhd->lock, NULL, MUTEX_DRIVER, NULL);
+		nhd->type = NXGE_HIO_TYPE_SERVICE;
 		nxge->nxge_hw_p->hio = (uintptr_t)nhd;
 	}
 
@@ -966,8 +967,7 @@ static void nxge_hio_dc_unshare(nxge_t *, nxge_hio_vr_t *,
  *	Any domain
  */
 int
-nxge_hio_init(
-	nxge_t *nxge)
+nxge_hio_init(nxge_t *nxge)
 {
 	nxge_hio_data_t *nhd;
 	int i, region;
@@ -976,6 +976,10 @@ nxge_hio_init(
 	if (nhd == 0) {
 		nhd = KMEM_ZALLOC(sizeof (*nhd), KM_SLEEP);
 		MUTEX_INIT(&nhd->lock, NULL, MUTEX_DRIVER, NULL);
+		if (isLDOMguest(nxge))
+			nhd->type = NXGE_HIO_TYPE_GUEST;
+		else
+			nhd->type = NXGE_HIO_TYPE_SERVICE;
 		nxge->nxge_hw_p->hio = (uintptr_t)nhd;
 	}
 
@@ -1917,15 +1921,12 @@ nxge_hio_unshare(
 }
 
 int
-nxge_hio_addres(
-	nxge_hio_vr_t *vr,
-	mac_ring_type_t type,
-	uint64_t *map)
+nxge_hio_addres(nxge_hio_vr_t *vr, mac_ring_type_t type, uint64_t *map)
 {
 	nxge_t		*nxge = (nxge_t *)vr->nxge;
 	nxge_grp_t	*group;
 	int		groupid;
-	int		i;
+	int		i, rv = 0;
 	int		max_dcs;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_addres"));
@@ -1958,8 +1959,6 @@ nxge_hio_addres(
 
 	for (i = 0; i < max_dcs; i++) {
 		if (group->map & (1 << i)) {
-			int rv;
-
 			if ((rv = nxge_hio_dc_share(nxge, vr, type, i)) < 0) {
 				if (*map == 0) /* Couldn't get even one DC. */
 					return (-rv);
@@ -1970,8 +1969,13 @@ nxge_hio_addres(
 		}
 	}
 
-	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_addres"));
+	if ((*map == 0) || (rv != 0)) {
+		NXGE_DEBUG_MSG((nxge, HIO_CTL,
+		    "<== nxge_hio_addres: rv(%x)", rv));
+		return (EIO);
+	}
 
+	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_addres"));
 	return (0);
 }
 
