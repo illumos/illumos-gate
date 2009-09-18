@@ -7834,12 +7834,11 @@ tcp_reinit_values(tcp)
 
 	PRESERVE(tcp->tcp_family);
 	if (tcp->tcp_family == AF_INET6) {
-		tcp->tcp_ipversion = IPV6_VERSION;
 		tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
 	} else {
-		tcp->tcp_ipversion = IPV4_VERSION;
 		tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
 	}
+	PRESERVE(tcp->tcp_ipversion);		/* Init in tcp_init_values */
 
 	tcp->tcp_bound_if = 0;
 	tcp->tcp_ipv6_recvancillary = 0;
@@ -7983,7 +7982,7 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_loopback_peer = NULL;
 
 	/* Initialize the header template */
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
+	if (tcp->tcp_family == AF_INET) {
 		err = tcp_header_init_ipv4(tcp);
 	} else {
 		err = tcp_header_init_ipv6(tcp);
@@ -8048,9 +8047,19 @@ tcp_header_init_ipv4(tcp_t *tcp)
 	connp->conn_mlp_type = mlptSingle;
 	connp->conn_ulp_labeled = !is_system_labeled();
 	ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
+
+	/*
+	 * tcp_do_get{sock,peer}name constructs the sockaddr from the
+	 * ip header, and decides which header to use based on ip version.
+	 * That operation happens outside the squeue, so we hold the lock
+	 * here to ensure that the ip version and header remain consistent.
+	 */
+	mutex_enter(&connp->conn_lock);
+	tcp->tcp_ipversion = IPV4_VERSION;
 	tcp->tcp_ipha = (ipha_t *)tcp->tcp_iphc;
 	tcp->tcp_ip6h = NULL;
-	tcp->tcp_ipversion = IPV4_VERSION;
+	mutex_exit(&connp->conn_lock);
+
 	tcp->tcp_hdr_len = sizeof (ipha_t) + sizeof (tcph_t);
 	tcp->tcp_tcp_hdr_len = sizeof (tcph_t);
 	tcp->tcp_ip_hdr_len = sizeof (ipha_t);
@@ -8120,12 +8129,21 @@ tcp_header_init_ipv6(tcp_t *tcp)
 	connp->conn_ulp_labeled = !is_system_labeled();
 
 	ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
-	tcp->tcp_ipversion = IPV6_VERSION;
 	tcp->tcp_hdr_len = IPV6_HDR_LEN + sizeof (tcph_t);
 	tcp->tcp_tcp_hdr_len = sizeof (tcph_t);
 	tcp->tcp_ip_hdr_len = IPV6_HDR_LEN;
+
+	/*
+	 * tcp_do_get{sock,peer}name constructs the sockaddr from the
+	 * ip header, and decides which header to use based on ip version.
+	 * That operation happens outside the squeue, so we hold the lock
+	 * here to ensure that the ip version and header remain consistent.
+	 */
+	mutex_enter(&connp->conn_lock);
+	tcp->tcp_ipversion = IPV6_VERSION;
 	tcp->tcp_ip6h = (ip6_t *)tcp->tcp_iphc;
 	tcp->tcp_ipha = NULL;
+	mutex_exit(&connp->conn_lock);
 
 	/* Initialize the header template */
 
@@ -17884,12 +17902,14 @@ tcp_do_getsockname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
 		sin6->sin6_family = AF_INET6;
 		if (tcp->tcp_state >= TCPS_BOUND) {
 			sin6->sin6_port = tcp->tcp_lport;
+			mutex_enter(&tcp->tcp_connp->conn_lock);
 			if (tcp->tcp_ipversion == IPV4_VERSION) {
 				IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
 				    &sin6->sin6_addr);
 			} else {
 				sin6->sin6_addr = tcp->tcp_ip6h->ip6_src;
 			}
+			mutex_exit(&tcp->tcp_connp->conn_lock);
 		}
 		*salenp = sizeof (sin6_t);
 		break;
@@ -17930,10 +17950,12 @@ tcp_do_getpeername(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_port = tcp->tcp_fport;
 		sin6->sin6_addr = tcp->tcp_remote_v6;
+		mutex_enter(&tcp->tcp_connp->conn_lock);
 		if (tcp->tcp_ipversion == IPV6_VERSION) {
 			sin6->sin6_flowinfo = tcp->tcp_ip6h->ip6_vcf &
 			    ~IPV6_VERS_AND_FLOW_MASK;
 		}
+		mutex_exit(&tcp->tcp_connp->conn_lock);
 		*salenp = sizeof (sin6_t);
 		break;
 	}
@@ -26090,7 +26112,7 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	in_port_t requested_port;
 	ipaddr_t	v4addr;
 	in6_addr_t	v6addr;
-	uint_t	origipversion;
+	uint_t	ipversion;
 	int	error = 0;
 
 	ASSERT((uintptr_t)len <= (uintptr_t)INT_MAX);
@@ -26104,7 +26126,6 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		}
 		return (-TOUTSTATE);
 	}
-	origipversion = tcp->tcp_ipversion;
 
 	ASSERT(sa != NULL && len != 0);
 
@@ -26132,7 +26153,7 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 			return (EAFNOSUPPORT);
 		}
 		requested_port = ntohs(sin->sin_port);
-		tcp->tcp_ipversion = IPV4_VERSION;
+		ipversion = IPV4_VERSION;
 		v4addr = sin->sin_addr.s_addr;
 		IN6_IPADDR_TO_V4MAPPED(v4addr, &v6addr);
 		break;
@@ -26144,7 +26165,7 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 			return (EAFNOSUPPORT);
 		}
 		requested_port = ntohs(sin6->sin6_port);
-		tcp->tcp_ipversion = IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr) ?
+		ipversion = IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr) ?
 		    IPV4_VERSION : IPV6_VERSION;
 		v6addr = sin6->sin6_addr;
 		break;
@@ -26161,9 +26182,9 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	tcp->tcp_bound_source_v6 = v6addr;
 
 	/* Check for change in ipversion */
-	if (origipversion != tcp->tcp_ipversion) {
+	if (tcp->tcp_ipversion != ipversion) {
 		ASSERT(tcp->tcp_family == AF_INET6);
-		error = tcp->tcp_ipversion == IPV6_VERSION ?
+		error = (ipversion == IPV6_VERSION) ?
 		    tcp_header_init_ipv6(tcp) : tcp_header_init_ipv4(tcp);
 		if (error) {
 			return (ENOMEM);
@@ -27075,14 +27096,12 @@ tcp_do_listen(conn_t *connp, struct sockaddr *sa, socklen_t len,
 				sin = (sin_t *)&addr;
 				*sin = sin_null;
 				sin->sin_family = AF_INET;
-				tcp->tcp_ipversion = IPV4_VERSION;
 			} else {
 				ASSERT(tcp->tcp_family == AF_INET6);
 				len = sizeof (sin6_t);
 				sin6 = (sin6_t *)&addr;
 				*sin6 = sin6_null;
 				sin6->sin6_family = AF_INET6;
-				tcp->tcp_ipversion = IPV6_VERSION;
 			}
 			sa = (struct sockaddr *)&addr;
 		}
