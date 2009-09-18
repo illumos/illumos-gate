@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation
+ * Copyright (c) 2009, Intel Corporation
  * All rights reserved.
  */
 
@@ -38,7 +38,7 @@ extern "C" {
 #endif
 
 /*
- * Defines to determine what SSE instructions can be used for memops or strops.
+ * Defines to determine what SSE instructions can be used for memops or strops
  */
 #define	NO_SSE		0x00	/* Default -- Don't use SSE instructions */
 #define	USE_SSE2	0x01	/* SSE2 */
@@ -46,6 +46,7 @@ extern "C" {
 #define	USE_SSSE3	0x04	/* Supplemental SSE3 */
 #define	USE_SSE4_1	0x08	/* SSE 4.1 */
 #define	USE_SSE4_2	0x10	/* SSE 4.2 */
+#define	USE_BSF		0x20	/* USE BSF class of instructions */
 
 /*
  * Cache size defaults for Core 2 Duo

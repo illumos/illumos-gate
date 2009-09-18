@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation
+ * Copyright (c) 2009, Intel Corporation
  * All rights reserved.
  */
 
@@ -37,8 +37,6 @@
  * Assembler support routines to getcpuid information used to set
  * cache size information. Cache information used by memset, strcpy, etc..
  */
-
-	.file	"proc64_support.s"
 
 #include <sys/asm_linkage.h>
 #include "proc64_id.h"

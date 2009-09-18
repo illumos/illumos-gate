@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation.
+ * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  */
 
@@ -226,6 +226,7 @@ __proc64id(void)
 		if (cpuid_info.edx & CPUID_INTC_EDX_SSE2) {
 			use_sse |= USE_SSE2;
 		}
+		use_sse |= USE_BSF;
 		__intel_set_memops_method(use_sse);
 	} else {
 		__set_cache_sizes(INTEL_DFLT_L1_CACHE_SIZE,
