@@ -558,6 +558,17 @@ trans_retry:
 		goto startconnectfail_transaction_start;
 	}
 
+	/* xentop requires the instance in xenstore */
+	e = xenbus_printf(xbt, xsnode, "instance", "%d",
+	    ddi_get_instance(ring->ri_dip));
+	if (e != 0) {
+		cmn_err(CE_WARN, "xdb@%s: failed to write 'instance'",
+		    ddi_get_name_addr(dip));
+		xvdi_fatal_error(dip, e, "writing 'instance'");
+		(void) xenbus_transaction_end(xbt, 1);
+		goto startconnectfail_xenbus_printf;
+	}
+
 	/* If feature-barrier isn't present in xenstore, add it */
 	e = xenbus_read(xbt, xsnode, "feature-barrier", (void **)&barrier,
 	    &len);
