@@ -403,7 +403,7 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 
 	switch (pstat) {
 	case 0x03:	/* idle */
-		printf(gettext("idle. enabled"));
+		printf(gettext("is idle. enabled"));
 		break;
 	case 0x04: /* processing */
 		status = papiPrinterListJobs(svc, name, NULL,
