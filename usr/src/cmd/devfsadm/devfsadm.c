@@ -42,6 +42,7 @@
 #include <utime.h>
 #include <sys/param.h>
 #include <bsm/libbsm.h>
+#include <zone.h>
 #include "devfsadm_impl.h"
 
 /* externs from devalloc.c */
@@ -265,6 +266,11 @@ main(int argc, char *argv[])
 		err_print(MUST_BE_ROOT);
 		devfsadm_exit(1);
 		/*NOTREACHED*/
+	}
+
+	if (getzoneid() != GLOBAL_ZONEID) {
+		err_print(MUST_BE_GLOBAL_ZONE);
+		devfsadm_exit(1);
 	}
 
 	/*

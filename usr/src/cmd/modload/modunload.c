@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -36,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/modctl.h>
+#include <zone.h>
 
 void	usage();
 void	exec_userfile(char *execfile, int id, char **envp);
@@ -70,6 +68,10 @@ main(int argc, char *argv[], char *envp[])
 		}
 	}
 
+	if (getzoneid() != GLOBAL_ZONEID) {
+		fatal("modunload can only be run from the global zone\n");
+	}
+
 	if (execfile) {
 		child = fork();
 		if (child == -1)
@@ -90,10 +92,10 @@ main(int argc, char *argv[], char *envp[])
 	 * Unload the module.
 	 */
 	if (modctl(MODUNLOAD, id) < 0) {
-	    if (errno == EPERM)
-		fatal("Insufficient privileges to unload a module\n");
-	    else if (id != 0)
-		error("can't unload the module");
+		if (errno == EPERM)
+			fatal("Insufficient privileges to unload a module\n");
+		else if (id != 0)
+			error("can't unload the module");
 	}
 
 	return (0);			/* success */

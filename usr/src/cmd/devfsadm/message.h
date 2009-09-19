@@ -255,6 +255,9 @@ major_number ]\n\t\t[ -n ]\n\t\t[ -r rootdir ]\n\t\t[ -v ]\n")
 #define	ZONE_PATHCHECK \
     gettext("cannot manage root path '%s': path is part of zone '%s'\n")
 
+#define	MUST_BE_GLOBAL_ZONE \
+    gettext("can only be run from the global zone\n")
+
 #define	DEVNAME_CONTACT_FAILED \
     gettext("cannot talk to devname fs %s: %s\n")
 

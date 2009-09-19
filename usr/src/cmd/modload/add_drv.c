@@ -42,6 +42,7 @@
 #include <libdevinfo.h>
 #include <sys/sysmacros.h>
 #include <fcntl.h>
+#include <zone.h>
 #include "addrem.h"
 #include "errmsg.h"
 #include "plcysubr.h"
@@ -197,6 +198,11 @@ main(int argc, char *argv[])
 
 	} else {
 		usage();
+		exit(1);
+	}
+
+	if (getzoneid() != GLOBAL_ZONEID) {
+		(void) fprintf(stderr, gettext(ERR_NOT_GLOBAL_ZONE));
 		exit(1);
 	}
 

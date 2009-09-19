@@ -63,6 +63,8 @@ extern "C" {
 #define	ERR_FORK_FAIL	"Fork failed; cannot exec : %s\n"
 #define	ERR_PROG_IN_USE	"add_drv/rem_drv currently busy; try later\n"
 #define	ERR_NOT_ROOT	"You must be root to run this program.\n"
+#define	ERR_NOT_GLOBAL_ZONE	\
+"add_drv/rem_drv can only be run from the global zone.\n"
 #define	ERR_BAD_LINE	"Bad line in file %s : %s\n"
 #define	ERR_CANNOT_OPEN	"Cannot open (%s): %s.\n"
 #define	ERR_MIS_TOK	"Option (%s) : missing token: (%s)\n"
