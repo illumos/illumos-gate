@@ -68,33 +68,32 @@ static devfsadm_remove_t audio_remove_cbt[] = {
 	 */
 
 	/* /dev/audio, /dev/audioctl, /dev/dsp */
-	{ "audio", "^(audio|audioctl|dsp)$",
-	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_link
+	{ "audio", "^audio$",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-	/* /dev/mixer0, /dev/dsp0 */
-	{ "audio", "^(mixer|dsp)[0-9]+$",
-	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_link
+	{ "audio", "^audioctl$",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-	/* /dev/sound/0, 0ctl */
-	{ "audio", "^sound/[0-9]+(ctl)?$",
-	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_link
+	{ "audio", "^dsp$",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-	/* /dev/mixer */
-	{ "pseudo", "^(mixer)$",
-	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_link
+	{ "audio", "^mixer",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-
-	/*
-	 * Primary links.
-	 */
-
-	/* /dev/sndstat */
-	{ "pseudo", "^sndstat$",
+	{ "audio", "^sndstat$",
 	    RM_PRE|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-	/* /dev/sound/audio810:0, 0ctl, etc */
-	{ "audio", "^sound/.*:[0-9]+(ctl|dsp|mixer)?$",
-	    RM_PRE|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
+	{ "audio", "^mixer[0-9]+$",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
+	},
+	{ "audio", "^dsp[0-9]+$",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
+	},
+	{ "audio", "^sound/[0-9]+$",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
+	},
+	{ "audio", "^sound/[0-9]+ctl$",
+	    RM_POST|RM_HOT|RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
 };
 
