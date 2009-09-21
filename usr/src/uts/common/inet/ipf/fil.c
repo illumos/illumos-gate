@@ -2151,6 +2151,7 @@ fr_info_t *fin;
 u_32_t *passp;
 {
 	frentry_t *fr;
+	fr_info_t *fc;
 	u_32_t pass;
 	int out;
 	ipf_stack_t *ifs = fin->fin_ifs;
@@ -2164,13 +2165,51 @@ u_32_t *passp;
 	else
 #endif
 		fin->fin_fr = ifs->ifs_ipfilter[out][ifs->ifs_fr_active];
-	if (fin->fin_fr != NULL)
+
+	/*
+	 * If there are no rules loaded skip all checks and return.
+	 */
+	if (fin->fin_fr == NULL) {
+
+		if ((pass & FR_NOMATCH)) {
+			IPF_BUMP(ifs->ifs_frstats[out].fr_nom);
+		}
+
+		return (NULL);
+	}
+
+	fc = &ifs->ifs_frcache[out][CACHE_HASH(fin)];
+	READ_ENTER(&ifs->ifs_ipf_frcache);
+	if (!bcmp((char *)fin, (char *)fc, FI_CSIZE)) {
+		/*
+		 * copy cached data so we can unlock the mutexes earlier.
+		 */
+		bcopy((char *)fc, (char *)fin, FI_COPYSIZE);
+		RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_chit);
+
+		if ((fr = fin->fin_fr) != NULL) {
+			IPF_BUMP(fr->fr_hits);
+			pass = fr->fr_flags;
+		}
+	} else {
+		RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
+
 		pass = fr_scanlist(fin, ifs->ifs_fr_pass);
+
+		if (((pass & FR_KEEPSTATE) == 0) &&
+		    ((fin->fin_flx & FI_DONTCACHE) == 0)) {
+			WRITE_ENTER(&ifs->ifs_ipf_frcache);
+			bcopy((char *)fin, (char *)fc, FI_COPYSIZE);
+			RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
+		}
+
+		fr = fin->fin_fr;
+	}
 
 	if ((pass & FR_NOMATCH)) {
 		IPF_BUMP(ifs->ifs_frstats[out].fr_nom);
 	}
-	fr = fin->fin_fr;
 
 	/*
 	 * Apply packets per second rate-limiting to a rule as required.
@@ -3520,6 +3559,7 @@ ipf_stack_t *ifs;
 	int flushed = 0, set;
 
 	WRITE_ENTER(&ifs->ifs_ipf_mutex);
+	bzero((char *)ifs->ifs_frcache, sizeof (ifs->ifs_frcache));
 
 	set = ifs->ifs_fr_active;
 	if ((flags & FR_INACTIVE) == FR_INACTIVE)
@@ -4504,6 +4544,7 @@ ipf_stack_t *ifs;
 		fp->fr_cksum += *p;
 
 	WRITE_ENTER(&ifs->ifs_ipf_mutex);
+	bzero((char *)ifs->ifs_frcache, sizeof (ifs->ifs_frcache));
 
 	for (; (f = *ftail) != NULL; ftail = &f->fr_next) {
 		if ((fp->fr_cksum != f->fr_cksum) ||

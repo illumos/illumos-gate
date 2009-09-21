@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,7 +396,7 @@ ipf_stack_create(const netid_t id)
 	 */
 	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
-
+	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf cache rwlock");
 	ifs->ifs_netid = id;
 	ifs->ifs_zone = net_getzoneidbynetid(id);
 	ipf_kstat_init(ifs);
@@ -553,6 +553,7 @@ ipf_stack_destroy(const netid_t id, void *arg)
 
 	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 	RW_DESTROY(&ifs->ifs_ipf_mutex);
+	RW_DESTROY(&ifs->ifs_ipf_frcache);
 	RW_DESTROY(&ifs->ifs_ipf_global);
 
 	KFREE(ifs);

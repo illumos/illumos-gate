@@ -260,6 +260,7 @@ ipf_stack_t *ifs;
 	ifs->ifs_fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
 #endif
 
+	bzero((char *)ifs->ifs_frcache, sizeof(ifs->ifs_frcache));
 	MUTEX_INIT(&ifs->ifs_ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ifs->ifs_ipf_timeoutlock, "ipf timeout lock mutex");
 	RWLOCK_INIT(&ifs->ifs_ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
@@ -643,6 +644,8 @@ int *rp;
 			error = EPERM;
 		else {
 			WRITE_ENTER(&ifs->ifs_ipf_mutex);
+			bzero((char *)ifs->ifs_frcache,
+			    sizeof (ifs->ifs_frcache));
 			error = COPYOUT((caddr_t)&ifs->ifs_fr_active,
 					(caddr_t)data,
 					sizeof(ifs->ifs_fr_active));

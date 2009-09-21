@@ -45,6 +45,7 @@ struct ipf_stack {
 	zoneid_t		ifs_zone;
 
 	/* ipf module */
+	fr_info_t		ifs_frcache[2][8];
 
 	filterstats_t		ifs_frstats[2];
 	frentry_t		*ifs_ipfilter[2][2];
@@ -91,6 +92,7 @@ struct ipf_stack {
 	ipfmutex_t	ifs_ipf_timeoutlock;
 	ipfrwlock_t	ifs_ipf_mutex;
 	ipfrwlock_t	ifs_ipf_global;
+	ipfrwlock_t	ifs_ipf_frcache;
 	ipfrwlock_t	ifs_ip_poolrw;
 	ipfrwlock_t	ifs_ipf_frag;
 	ipfrwlock_t	ifs_ipf_state;
