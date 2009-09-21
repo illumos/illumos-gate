@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysmacros.h>
 #include <sys/machsystm.h>
@@ -293,25 +291,8 @@ pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
 		DBG(DBG_TOOLS, dip, "get: bdf:0x%x, off:0x%" PRIx64 ", size:"
 		    "0x%" PRIx64 ", data:0x%" PRIx64 "\n",
 		    bdf, prg_p->offset, size, data.qw);
+		*data_p = data.qw;
 
-		switch (size) {
-			case sizeof (uint8_t):
-				*data_p = data.b;
-				break;
-			case sizeof (uint16_t):
-				*data_p = data.w;
-				break;
-			case sizeof (uint32_t):
-				*data_p = data.dw;
-				break;
-			case sizeof (uint64_t):
-				*data_p = data.qw;
-				break;
-			default:
-				DBG(DBG_TOOLS, dip,
-				    "bad size:0x%" PRIx64 "\n", size);
-				break;
-		}
 		if (PCITOOL_ACC_IS_BIG_ENDIAN(prg_p->acc_attr))
 			*data_p = pxtool_swap_endian(*data_p, size);
 	}

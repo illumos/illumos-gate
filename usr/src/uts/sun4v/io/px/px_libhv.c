@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,8 +61,7 @@ hvio_set_rp_mps(devhandle_t dev_hdl, pci_device_t bdf, int32_t mps)
 uint64_t
 hvio_rp_mps(devhandle_t dev_hdl, pci_device_t bdf, int32_t *mps, int op)
 {
-	uint32_t	data;
-	uint32_t	hdr, hdr_next_ptr, hdr_cap_id;
+	uint64_t	data, hdr, hdr_next_ptr, hdr_cap_id;
 	uint16_t	offset = PCI_CONF_STAT;
 	int		deadcount = 0;
 	pci_cfg_data_t	dataw;
@@ -117,7 +116,7 @@ hvio_rp_mps(devhandle_t dev_hdl, pci_device_t bdf, int32_t *mps, int op)
 
 		data = (data & 0xffffff1f) | (*mps << 5);
 
-		dataw.qw = (uint32_t)data;
+		dataw.qw = data;
 
 		(void) hvio_config_put(dev_hdl, bdf, offset + PCIE_DEVCTL,
 		    4, dataw);

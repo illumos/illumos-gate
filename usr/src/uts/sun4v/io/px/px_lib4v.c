@@ -1172,13 +1172,13 @@ px_pci_config_get(ddi_acc_impl_t *handle, uint32_t *addr, int size)
 	uint32_t pci_dev_addr = px_pvt->raddr;
 	uint32_t vaddr = px_pvt->vaddr;
 	uint16_t off = (uint16_t)(uintptr_t)(addr - vaddr) & 0xfff;
-	uint32_t rdata = 0;
+	uint64_t rdata = 0;
 
 	if (px_lib_config_get(px_pvt->dip, pci_dev_addr, off,
 	    size, (pci_cfg_data_t *)&rdata) != DDI_SUCCESS)
 		/* XXX update error kstats */
 		return (0xffffffff);
-	return (rdata);
+	return ((uint32_t)rdata);
 }
 
 static void
@@ -1935,13 +1935,13 @@ px_pmeq_intr(caddr_t arg)
  */
 uint32_t
 px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset) {
-	uint32_t 	data = 0;
+	uint64_t 	data = 0;
 
 	(void) hvio_config_get(px_p->px_dev_hdl,
 	    (bdf << PX_RA_BDF_SHIFT), offset, 4,
 	    (pci_cfg_data_t *)&data);
 
-	return (data);
+	return ((uint32_t)data);
 }
 
 void

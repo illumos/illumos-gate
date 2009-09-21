@@ -230,7 +230,7 @@ px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr)
 	mov	HVIO_CONFIG_GET, %o5
 	ta	FAST_TRAP
 	movrnz	%o1, -1, %o2
-	stuw	%o2, [%o4]
+	stx	%o2, [%o4]
 	retl
 	nop
 	SET_SIZE(hvio_config_get)
