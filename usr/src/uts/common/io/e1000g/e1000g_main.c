@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.12";
+static char e1000g_version[] = "Driver Ver. 5.3.13";
 
 /*
  * Proto types for DDI entry points

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -252,4 +252,4 @@ check_add_drv()
 	"pciex8086,10e5"
 	"pciex8086,10f5"
 	"pciex8086,294c"' \
-	-m '* 0666 root root' e1000g
+	-m '* 0666 root sys' e1000g

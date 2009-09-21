@@ -167,6 +167,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	mblk_t *tmp;
 	mblk_t *new_mp;
 	mblk_t *pre_mp;
+	mblk_t *next_mp;
 	e1000g_tx_ring_t *tx_ring;
 	context_data_t cur_context;
 
@@ -234,6 +235,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	/* Initialize variables */
 	desc_count = 1;	/* The initial value should be greater than 0 */
 	desc_total = 0;
+	new_mp = NULL;
 	QUEUE_INIT_LIST(&pending_list);
 
 	/* Process each mblk fragment and fill tx descriptors */
@@ -246,12 +248,12 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		/* find the last fragment of the header */
 		len = MBLKL(mp);
 		ASSERT(len > 0);
-		nmp = mp;
+		next_mp = mp;
 		pre_mp = NULL;
 		while (len < cur_context.hdr_len) {
-			pre_mp = nmp;
-			nmp = nmp->b_cont;
-			len += MBLKL(nmp);
+			pre_mp = next_mp;
+			next_mp = next_mp->b_cont;
+			len += MBLKL(next_mp);
 		}
 		/*
 		 * If the header and the payload are in different mblks,
@@ -261,7 +263,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		if (len == cur_context.hdr_len)
 			goto adjust_threshold;
 
-		hdr_frag_len = cur_context.hdr_len - (len - MBLKL(nmp));
+		hdr_frag_len = cur_context.hdr_len - (len - MBLKL(next_mp));
 		/*
 		 * There are two cases we need to reallocate a mblk for the
 		 * last header fragment:
@@ -270,8 +272,8 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		 * 2. the header is in a single mblk shared with the payload
 		 * and the header is physical memory non-contiguous
 		 */
-		if ((nmp != mp) ||
-		    (P2NPHASE((uintptr_t)nmp->b_rptr, Adapter->sys_page_sz)
+		if ((next_mp != mp) ||
+		    (P2NPHASE((uintptr_t)next_mp->b_rptr, Adapter->sys_page_sz)
 		    < cur_context.hdr_len)) {
 			E1000G_DEBUG_STAT(tx_ring->stat_lso_header_fail);
 			/*
@@ -282,16 +284,16 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 			new_mp = allocb(hdr_frag_len, NULL);
 			if (!new_mp)
 				return (B_FALSE);
-			bcopy(nmp->b_rptr, new_mp->b_rptr, hdr_frag_len);
+			bcopy(next_mp->b_rptr, new_mp->b_rptr, hdr_frag_len);
 			/* link the new header fragment with the other parts */
 			new_mp->b_wptr = new_mp->b_rptr + hdr_frag_len;
-			new_mp->b_cont = nmp;
+			new_mp->b_cont = next_mp;
 			if (pre_mp)
 				pre_mp->b_cont = new_mp;
 			else
 				mp = new_mp;
-			nmp->b_rptr += hdr_frag_len;
-			frag_count ++;
+			next_mp->b_rptr += hdr_frag_len;
+			frag_count++;
 		}
 adjust_threshold:
 		/*
@@ -402,6 +404,17 @@ adjust_threshold:
 	return (B_TRUE);
 
 tx_send_failed:
+	/* Restore mp to original */
+	if (new_mp) {
+		if (pre_mp) {
+			pre_mp->b_cont = next_mp;
+		}
+		new_mp->b_cont = NULL;
+		freemsg(new_mp);
+
+		next_mp->b_rptr -= hdr_frag_len;
+	}
+
 	/*
 	 * Enable Transmit interrupts, so that the interrupt routine can
 	 * call mac_tx_update() when transmit descriptors become available.
