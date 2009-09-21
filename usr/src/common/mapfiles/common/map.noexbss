@@ -1,4 +1,7 @@
 #
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -18,32 +21,20 @@
 #
 # CDDL HEADER END
 #
-
+# Link-editor mapfile to create a non-executable bss segment definition
+# within an executable.  This mapfile is similar to map.noexdata that
+# can be used on x86 architectures to create a non-executable data
+# segment.  On SPARC, the data segment contains a Procedure Linkage
+# Table (PLT) that must remain executable.
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# As the bss segment is extended by sbrk(2) to enlarge the heap, a
+# non-executable bss segment also results in a non-exutable heap.
 #
+# The link-editor does not use this file automatically, so one must
+# use the -M option to cc or ld:
+#
+#       cc -M /usr/lib/ld/map.noexbss myprogram.c
+#
+bss = ?RW;
 
-include		$(SRC)/Makefile.master
-
-ROOTDIR=	$(ROOT)/usr/lib/ld
-
-DIRS=		$(ROOTDIR)
-FILES=	\
-		$(ROOTDIR)/map.execdata \
-		$(ROOTDIR)/map.filter \
-		$(ROOTDIR)/map.bssalign \
-		$(ROOTDIR)/map.noexbss \
-		$(ROOTDIR)/map.noexstk
-
-install:	$(DIRS) $(FILES)
-
-$(FILES):=	FILEMODE=444
-
-$(DIRS):=	DIRMODE=755
-
-$(DIRS):
-	$(INS.dir)
-
-$(ROOTDIR)/%: %
-	$(INS.file)
+# See also /usr/lib/ld/map.noexdata.
