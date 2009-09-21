@@ -335,9 +335,8 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 					    intr_p.devi_intr_curr_type;
 				}
 
-				if ((info.intr_type == DDI_INTR_TYPE_FIXED) &&
-				    ((ino.ino_ipil_size > 1) ||
-				    (ipil.ipil_ih_size > 1))) {
+				if ((ino.ino_ipil_size > 1) ||
+				    (ipil.ipil_ih_size > 1)) {
 					info.shared = 1;
 				}
 
@@ -384,12 +383,12 @@ intr_print_banner(void)
 {
 	if (!detailed) {
 		mdb_printf("\n%<u>\tDevice\t"
-		    " Shared\t"
 		    " Type\t"
 		    " MSG #\t"
 		    " State\t"
 		    " INO\t"
 		    " Mondo\t"
+		    " Shared\t"
 		    "  Pil\t"
 		    " CPU   %</u>"
 		    "\n");
@@ -401,19 +400,18 @@ intr_print_elements(intr_info_t info)
 {
 	if (!detailed) {
 		mdb_printf(" %11s#%d\t", info.driver_name, info.instance);
-		mdb_printf(" %5s\t",
-		    info.shared ? "yes" : "no");
 		mdb_printf(" %s\t", intr_get_intr_type(info.intr_type));
 		if (info.intr_type == DDI_INTR_TYPE_FIXED) {
 			mdb_printf("  --- \t");
 		} else {
 			mdb_printf(" %4d\t", info.num);
 		}
-
 		mdb_printf(" %2s\t",
 		    info.intr_state ? "enbl" : "disbl");
 		mdb_printf(" 0x%x\t", info.ino_ino);
 		mdb_printf(" 0x%x\t", info.mondo);
+		mdb_printf(" %5s\t",
+		    info.shared ? "yes" : "no");
 		mdb_printf(" %4d\t", info.pil);
 		mdb_printf(" %3d \n", info.cpuid);
 	} else {
