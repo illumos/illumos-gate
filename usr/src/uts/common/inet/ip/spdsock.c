@@ -1420,11 +1420,16 @@ spdsock_dump_finish(spdsock_t *ss, int error)
 	mblk_t *m;
 	ipsec_policy_head_t *iph = ss->spdsock_dump_head;
 	mblk_t *req = ss->spdsock_dump_req;
+	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 
 	rw_enter(&iph->iph_lock, RW_READER);
 	m = spdsock_dump_ruleset(req, iph, ss->spdsock_dump_count, error);
 	rw_exit(&iph->iph_lock);
-	IPPH_REFRELE(iph, ss->spdsock_spds->spds_netstack);
+	IPPH_REFRELE(iph, ns);
+	if (ss->spdsock_itp != NULL) {
+		ITP_REFRELE(ss->spdsock_itp, ns);
+		ss->spdsock_itp = NULL;
+	}
 	ss->spdsock_dump_req = NULL;
 	freemsg(req);
 
