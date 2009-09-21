@@ -48,7 +48,7 @@ INCS += -I../../../common/zfs
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
-LDLIBS +=	-lc -lm -ldevinfo -ldevid -lgen -lnvpair -luutil -lavl -lefi \
+LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
 	-lidmap
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 

@@ -47,7 +47,8 @@ typedef enum vdev_dtl_type {
 extern boolean_t zfs_nocacheflush;
 
 extern int vdev_open(vdev_t *);
-extern void vdev_open_children(vdev_t *vd);
+extern void vdev_open_children(vdev_t *);
+extern boolean_t vdev_uses_zvols(vdev_t *);
 extern int vdev_validate(vdev_t *);
 extern void vdev_close(vdev_t *);
 extern int vdev_create(vdev_t *, uint64_t txg, boolean_t isreplace);

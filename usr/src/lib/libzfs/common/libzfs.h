@@ -66,7 +66,6 @@ enum {
 	EZFS_BADSTREAM,		/* bad backup stream */
 	EZFS_DSREADONLY,	/* dataset is readonly */
 	EZFS_VOLTOOBIG,		/* volume is too large for 32-bit system */
-	EZFS_VOLHASDATA,	/* volume already contains data */
 	EZFS_INVALIDNAME,	/* invalid dataset name */
 	EZFS_BADRESTORE,	/* unable to restore to destination */
 	EZFS_BADBACKUP,		/* backup failed */
@@ -85,7 +84,6 @@ enum {
 	EZFS_UMOUNTFAILED,	/* failed to unmount dataset */
 	EZFS_UNSHARENFSFAILED,	/* unshare(1M) failed */
 	EZFS_SHARENFSFAILED,	/* share(1M) failed */
-	EZFS_DEVLINKS,		/* failed to create zvol links */
 	EZFS_PERM,		/* permission denied */
 	EZFS_NOSPC,		/* out of space */
 	EZFS_IO,		/* I/O error */
@@ -581,12 +579,6 @@ extern int zpool_in_use(libzfs_handle_t *, int, pool_state_t *, char **,
  * ftyp special.  Read the label from a given device.
  */
 extern int zpool_read_label(int, nvlist_t **);
-
-/*
- * Create and remove zvol /dev links.
- */
-extern int zpool_create_zvol_links(zpool_handle_t *);
-extern int zpool_remove_zvol_links(zpool_handle_t *);
 
 /* is this zvol valid for use as a dump device? */
 extern int zvol_check_dump_config(char *);

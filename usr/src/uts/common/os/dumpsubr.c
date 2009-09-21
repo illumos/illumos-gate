@@ -217,6 +217,10 @@ dumpinit(vnode_t *vp, char *name, int justchecking)
 				error = ENOTSUP;
 			else if (vfs_devismounted(vattr.va_rdev))
 				error = EBUSY;
+			if (strcmp(ddi_driver_name(VTOS(cvp)->s_dip),
+			    ZFS_DRIVER) == 0 &&
+			    IS_SWAPVP(common_specvp(cvp)))
+					error = EBUSY;
 		} else {
 			if (vn_matchopval(cvp, VOPNAME_DUMP, fs_nosys) ||
 			    !IS_SWAPVP(cvp))
@@ -270,15 +274,16 @@ dumpinit(vnode_t *vp, char *name, int justchecking)
 				dumpbuf_resize();
 			}
 			/*
-			 * If we are working with a zvol then call into
-			 * it to dumpify itself.
+			 * If we are working with a zvol then dumpify it
+			 * if it's not being used as swap.
 			 */
 			if (strcmp(dki.dki_dname, ZVOL_DRIVER) == 0) {
-				if ((error = VOP_IOCTL(cdev_vp,
+				if (IS_SWAPVP(common_specvp(cvp)))
+					error = EBUSY;
+				else if ((error = VOP_IOCTL(cdev_vp,
 				    DKIOCDUMPINIT, NULL, FKIOCTL, kcred,
-				    NULL, NULL)) != 0) {
+				    NULL, NULL)) != 0)
 					dumpfini();
-				}
 			}
 
 			(void) VOP_CLOSE(cdev_vp, FREAD | FWRITE, 1, 0,

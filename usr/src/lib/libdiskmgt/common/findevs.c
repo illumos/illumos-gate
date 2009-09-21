@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 #include <sys/sunddi.h>
 #include <sys/types.h>
+#include <sys/mkdev.h>
 #include <ctype.h>
 #include <libgen.h>
 #include <unistd.h>
@@ -576,6 +577,32 @@ add_devs(di_node_t node, di_minor_t minor, void *arg)
 			if (add_disk2controller(diskp, args) != 0) {
 			    args->dev_walk_status = ENOMEM;
 			}
+		    }
+		}
+	    }
+	    if (is_zvol(node, minor)) {
+		char zvdsk[MAXNAMELEN];
+		char *str;
+		alias_t *ap;
+
+		if (di_prop_lookup_strings(di_minor_devt(minor),
+		    node, "name", &str) == -1)
+		      return (DI_WALK_CONTINUE);
+		(void) snprintf(zvdsk, MAXNAMELEN, "/dev/zvol/rdsk/%s",
+		    str);
+		if ((ap = find_alias(diskp, kernel_name)) == NULL) {
+			if (new_alias(diskp, kernel_name,
+			    zvdsk, args) != 0) {
+				args->dev_walk_status = ENOMEM;
+		    }
+		} else {
+		    /*
+		     * It is possible that we have already added this devpath.
+		     * Do not add it again. new_devpath will return a 0 if
+		     * found, and not add the path.
+		     */
+		    if (new_devpath(ap, zvdsk) != 0) {
+			args->dev_walk_status = ENOMEM;
 		    }
 		}
 	    }
@@ -1537,7 +1564,7 @@ static int
 is_zvol(di_node_t node, di_minor_t minor)
 {
 	if ((strncmp(di_node_name(node), ZFS_DRIVER, 3) == 0) &&
-	    di_minor_devt(minor))
+	    minor(di_minor_devt(minor)))
 		return (1);
 	return (0);
 }

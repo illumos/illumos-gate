@@ -141,7 +141,6 @@ SUNWprivate_1.1 {
 	zpool_clear;
 	zpool_close;
 	zpool_create;
-	zpool_create_zvol_links;
 	zpool_destroy;
 	zpool_disable_datasets;
 	zpool_enable_datasets;
@@ -183,7 +182,6 @@ SUNWprivate_1.1 {
 	zpool_prop_values;
 	zpool_read_label;
 	zpool_refresh_stats;
-	zpool_remove_zvol_links;
 	zpool_scrub;
 	zpool_set_history_str;
 	zpool_set_prop;

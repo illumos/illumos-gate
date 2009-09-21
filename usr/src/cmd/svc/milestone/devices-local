@@ -75,13 +75,4 @@ if [ $? -eq 0 ]; then
         fi
 fi
 
-# Create any zvol devices
-if [ -x /usr/sbin/zfs ]; then
-	/usr/sbin/zfs volinit || exit $SMF_EXIT_ERR_FATAL
-	#
-	# Add swap again to allow for swapping to zvols.
-	#
-	/sbin/swapadd
-fi
-
 exit $SMF_EXIT_OK

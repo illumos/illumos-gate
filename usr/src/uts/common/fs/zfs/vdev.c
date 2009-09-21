@@ -1007,12 +1007,35 @@ vdev_open_child(void *arg)
 	vd->vdev_open_thread = NULL;
 }
 
+boolean_t
+vdev_uses_zvols(vdev_t *vd)
+{
+	if (vd->vdev_path && strncmp(vd->vdev_path, ZVOL_DIR,
+	    strlen(ZVOL_DIR)) == 0)
+		return (B_TRUE);
+	for (int c = 0; c < vd->vdev_children; c++)
+		if (vdev_uses_zvols(vd->vdev_child[c]))
+			return (B_TRUE);
+	return (B_FALSE);
+}
+
 void
 vdev_open_children(vdev_t *vd)
 {
 	taskq_t *tq;
 	int children = vd->vdev_children;
 
+	/*
+	 * in order to handle pools on top of zvols, do the opens
+	 * in a single thread so that the same thread holds the
+	 * spa_namespace_lock
+	 */
+	if (vdev_uses_zvols(vd)) {
+		for (int c = 0; c < children; c++)
+			vd->vdev_child[c]->vdev_open_error =
+			    vdev_open(vd->vdev_child[c]);
+		return;
+	}
 	tq = taskq_create("vdev_open", children, minclsyspri,
 	    children, children, TASKQ_PREPOPULATE);
 

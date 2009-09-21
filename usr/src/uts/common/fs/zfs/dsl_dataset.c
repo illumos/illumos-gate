@@ -945,24 +945,6 @@ dsl_dataset_might_destroy_origin(dsl_dataset_t *ds)
 	return (might_destroy);
 }
 
-#ifdef _KERNEL
-static int
-dsl_dataset_zvol_cleanup(dsl_dataset_t *ds, const char *name)
-{
-	int error;
-	objset_t *os;
-
-	error = dmu_objset_from_ds(ds, &os);
-	if (error)
-		return (error);
-
-	if (dmu_objset_type(os) == DMU_OST_ZVOL)
-		error = zvol_remove_minor(name);
-
-	return (error);
-}
-#endif
-
 /*
  * If we're removing a clone, and these three conditions are true:
  *	1) the clone's origin has no other children
@@ -986,11 +968,6 @@ dsl_dataset_origin_rm_prep(struct dsl_ds_destroyarg *dsda, void *tag)
 		dsl_dataset_name(origin, name);
 #ifdef _KERNEL
 		error = zfs_unmount_snap(name, NULL);
-		if (error) {
-			kmem_free(name, namelen);
-			return (error);
-		}
-		error = dsl_dataset_zvol_cleanup(origin, name);
 		if (error) {
 			kmem_free(name, namelen);
 			return (error);
@@ -2324,7 +2301,7 @@ dsl_dataset_rename(char *oldname, const char *newname, boolean_t recursive)
 		return (err);
 	}
 	if (tail[0] != '@') {
-		/* the name ended in a nonexistant component */
+		/* the name ended in a nonexistent component */
 		dsl_dir_close(dd, FTAG);
 		return (ENOENT);
 	}
@@ -2365,6 +2342,7 @@ struct promotearg {
 	list_t shared_snaps, origin_snaps, clone_snaps;
 	dsl_dataset_t *origin_origin, *origin_head;
 	uint64_t used, comp, uncomp, unique, cloneusedsnap, originusedsnap;
+	char *err_ds;
 };
 
 static int snaplist_space(list_t *l, uint64_t mintxg, uint64_t *spacep);
@@ -2424,10 +2402,12 @@ dsl_dataset_promote_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		/* Check that the snapshot name does not conflict */
 		VERIFY(0 == dsl_dataset_get_snapname(ds));
 		err = dsl_dataset_snap_lookup(hds, ds->ds_snapname, &val);
-		if (err == 0)
-			return (EEXIST);
+		if (err == 0) {
+			err = EEXIST;
+			goto out;
+		}
 		if (err != ENOENT)
-			return (err);
+			goto out;
 
 		/* The very first snapshot does not have a deadlist */
 		if (ds->ds_phys->ds_prev_snap_obj == 0)
@@ -2435,7 +2415,7 @@ dsl_dataset_promote_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 		if (err = bplist_space(&ds->ds_deadlist,
 		    &dlused, &dlcomp, &dluncomp))
-			return (err);
+			goto out;
 		pa->used += dlused;
 		pa->comp += dlcomp;
 		pa->uncomp += dluncomp;
@@ -2493,6 +2473,9 @@ dsl_dataset_promote_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	}
 
 	return (0);
+out:
+	pa->err_ds =  snap->ds->ds_snapname;
+	return (err);
 }
 
 static void
@@ -2707,7 +2690,7 @@ snaplist_destroy(list_t *l, boolean_t own)
  * NULL, indicating that the clone is not a clone of a clone).
  */
 int
-dsl_dataset_promote(const char *name)
+dsl_dataset_promote(const char *name, char *conflsnap)
 {
 	dsl_dataset_t *ds;
 	dsl_dir_t *dd;
@@ -2779,6 +2762,8 @@ out:
 		err = dsl_sync_task_do(dp, dsl_dataset_promote_check,
 		    dsl_dataset_promote_sync, ds, &pa,
 		    2 + 2 * doi.doi_physical_blks);
+		if (err && pa.err_ds && conflsnap)
+			(void) strncpy(conflsnap, pa.err_ds, MAXNAMELEN);
 	}
 
 	snaplist_destroy(&pa.shared_snaps, B_TRUE);
@@ -3529,11 +3514,6 @@ dsl_dataset_user_release_one(char *dsname, void *arg)
 	if (might_destroy) {
 #ifdef _KERNEL
 		error = zfs_unmount_snap(name, NULL);
-		if (error) {
-			dsl_dataset_rele(ds, dtag);
-			return (error);
-		}
-		error = dsl_dataset_zvol_cleanup(ds, name);
 		if (error) {
 			dsl_dataset_rele(ds, dtag);
 			return (error);

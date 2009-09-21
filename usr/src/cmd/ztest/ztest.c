@@ -1712,7 +1712,7 @@ ztest_dsl_dataset_promote_busy(ztest_args_t *za)
 	error = dsl_dataset_own(snap1name, B_FALSE, FTAG, &ds);
 	if (error)
 		fatal(0, "dsl_dataset_own(%s) = %d", snap1name, error);
-	error = dsl_dataset_promote(clone2name);
+	error = dsl_dataset_promote(clone2name, NULL);
 	if (error != EBUSY)
 		fatal(0, "dsl_dataset_promote(%s), %d, not EBUSY", clone2name,
 		    error);

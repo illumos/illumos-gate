@@ -1215,26 +1215,19 @@ out:
 	return (ret);
 }
 
-
+/*ARGSUSED1*/
 static int
-zvol_cb(const char *dataset, void *data)
+zvol_cb(zfs_handle_t *zhp, void *unused)
 {
-	libzfs_handle_t *hdl = data;
-	zfs_handle_t *zhp;
+	int error = 0;
 
-	/*
-	 * Ignore snapshots and ignore failures from non-existant datasets.
-	 */
-	if (strchr(dataset, '@') != NULL ||
-	    (zhp = zfs_open(hdl, dataset, ZFS_TYPE_VOLUME)) == NULL)
-		return (0);
-
-	if (zfs_unshare_iscsi(zhp) != 0)
-		return (-1);
-
+	if (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM)
+		(void) zfs_iter_children(zhp, zvol_cb, NULL);
+	if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME)
+		error = zfs_unshare_iscsi(zhp);
 	zfs_close(zhp);
 
-	return (0);
+	return (error);
 }
 
 static int
@@ -1246,6 +1239,8 @@ mountpoint_compare(const void *a, const void *b)
 	return (strcmp(mountb, mounta));
 }
 
+/* alias for 2002/240 */
+#pragma weak zpool_unmount_datasets = zpool_disable_datasets
 /*
  * Unshare and unmount all datasets within the given pool.  We don't want to
  * rely on traversing the DSL to discover the filesystems within the pool,
@@ -1253,7 +1248,6 @@ mountpoint_compare(const void *a, const void *b)
  * arbitrarily (on I/O error, for example).  Instead, we walk /etc/mnttab and
  * gather all the filesystems that are currently mounted.
  */
-#pragma weak zpool_unmount_datasets = zpool_disable_datasets
 int
 zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
 {
@@ -1261,6 +1255,7 @@ zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
 	struct mnttab entry;
 	size_t namelen;
 	char **mountpoints = NULL;
+	zfs_handle_t *zfp;
 	zfs_handle_t **datasets = NULL;
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 	int i;
@@ -1270,8 +1265,12 @@ zpool_disable_datasets(zpool_handle_t *zhp, boolean_t force)
 	/*
 	 * First unshare all zvols.
 	 */
-	if (zpool_iter_zvol(zhp, zvol_cb, hdl) != 0)
-		return (-1);
+	zfp = zfs_open(zhp->zpool_hdl, zhp->zpool_name,
+	    ZFS_TYPE_FILESYSTEM);
+	if (zfp != NULL) {
+		(void) zfs_iter_children(zfp, zvol_cb, NULL);
+		zfs_close(zfp);
+	}
 
 	namelen = strlen(zhp->zpool_name);
 

@@ -85,6 +85,8 @@ sdev_open(struct vnode **vpp, int flag, struct cred *cred, caller_context_t *ct)
 	if (!SDEV_IS_GLOBAL(dv))
 		return (ENOTSUP);
 
+	if ((*vpp)->v_type == VLNK)
+		return (ENOENT);
 	ASSERT((*vpp)->v_type == VREG);
 	if ((*vpp)->v_type != VREG)
 		return (ENOTSUP);
@@ -1015,7 +1017,7 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
+	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred, ct)) != 0)
 		return (error);
 
 	/* check existing name */
@@ -1032,13 +1034,6 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
 		rw_exit(&parent->sdev_contents);
 		VN_RELE(vp);
 		return (ENOENT);
-	}
-
-	/* write access is required to remove a directory */
-	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred, ct)) != 0) {
-		rw_exit(&parent->sdev_contents);
-		VN_RELE(vp);
-		return (error);
 	}
 
 	/* some sanity checks */
@@ -1238,17 +1233,6 @@ sdev_frlock(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
 }
 
 static int
-sdev_setfl(struct vnode *vp, int oflags, int nflags, cred_t *cr,
-    caller_context_t *ct)
-{
-	struct sdev_node *dv = VTOSDEV(vp);
-	ASSERT(dv);
-	ASSERT(dv->sdev_attrvp);
-
-	return (VOP_SETFL(dv->sdev_attrvp, oflags, nflags, cr, ct));
-}
-
-static int
 sdev_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
     caller_context_t *ct)
 {
@@ -1288,7 +1272,6 @@ const fs_operation_def_t sdev_vnodeops_tbl[] = {
 	VOPNAME_SEEK,		{ .vop_seek = sdev_seek },
 	VOPNAME_FRLOCK,		{ .vop_frlock = sdev_frlock },
 	VOPNAME_PATHCONF,	{ .vop_pathconf = sdev_pathconf },
-	VOPNAME_SETFL,		{ .vop_setfl = sdev_setfl },
 	VOPNAME_SETSECATTR,	{ .vop_setsecattr = sdev_setsecattr },
 	VOPNAME_GETSECATTR,	{ .vop_getsecattr = sdev_getsecattr },
 	NULL,			NULL

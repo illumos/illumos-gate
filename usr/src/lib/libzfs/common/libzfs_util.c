@@ -94,8 +94,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_VOLTOOBIG:
 		return (dgettext(TEXT_DOMAIN, "volume size exceeds limit for "
 		    "this system"));
-	case EZFS_VOLHASDATA:
-		return (dgettext(TEXT_DOMAIN, "volume has data"));
 	case EZFS_INVALIDNAME:
 		return (dgettext(TEXT_DOMAIN, "invalid name"));
 	case EZFS_BADRESTORE:
@@ -142,8 +140,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN,
 		    "iscsitgt service need to be enabled by "
 		    "a privileged user"));
-	case EZFS_DEVLINKS:
-		return (dgettext(TEXT_DOMAIN, "failed to create /dev links"));
 	case EZFS_PERM:
 		return (dgettext(TEXT_DOMAIN, "permission denied"));
 	case EZFS_NOSPC:

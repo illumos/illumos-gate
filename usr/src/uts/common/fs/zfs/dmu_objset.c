@@ -389,12 +389,13 @@ dmu_objset_own(const char *name, dmu_objset_type_t type,
 	err = dmu_objset_from_ds(ds, osp);
 	if (err) {
 		dsl_dataset_disown(ds, tag);
-	} else if ((type != DMU_OST_ANY && type != (*osp)->os_phys->os_type) ||
-	    (!readonly && dsl_dataset_is_snapshot(ds))) {
+	} else if (type != DMU_OST_ANY && type != (*osp)->os_phys->os_type) {
 		dmu_objset_disown(*osp, tag);
 		return (EINVAL);
+	} else if (!readonly && dsl_dataset_is_snapshot(ds)) {
+		dmu_objset_disown(*osp, tag);
+		return (EROFS);
 	}
-
 	return (err);
 }
 

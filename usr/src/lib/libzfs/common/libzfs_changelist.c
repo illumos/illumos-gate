@@ -119,18 +119,8 @@ changelist_prefix(prop_changelist_t *clp)
 		if (ZFS_IS_VOLUME(cn->cn_handle)) {
 			switch (clp->cl_realprop) {
 			case ZFS_PROP_NAME:
-				/*
-				 * If this was a rename, unshare the zvol, and
-				 * remove the /dev/zvol links.
-				 */
+				/* If this was a rename, unshare the zvol */
 				(void) zfs_unshare_iscsi(cn->cn_handle);
-
-				if (zvol_remove_link(cn->cn_handle->zfs_hdl,
-				    cn->cn_handle->zfs_name) != 0) {
-					ret = -1;
-					cn->cn_needpost = B_FALSE;
-					(void) zfs_share_iscsi(cn->cn_handle);
-				}
 				break;
 
 			case ZFS_PROP_VOLSIZE:
@@ -235,15 +225,7 @@ changelist_postfix(prop_changelist_t *clp)
 		zfs_refresh_properties(cn->cn_handle);
 
 		if (ZFS_IS_VOLUME(cn->cn_handle)) {
-			/*
-			 * If we're doing a rename, recreate the /dev/zvol
-			 * links.
-			 */
-			if (clp->cl_realprop == ZFS_PROP_NAME &&
-			    zvol_create_link(cn->cn_handle->zfs_hdl,
-			    cn->cn_handle->zfs_name) != 0) {
-				errors++;
-			} else if (cn->cn_shared ||
+			if (cn->cn_shared ||
 			    clp->cl_prop == ZFS_PROP_SHAREISCSI) {
 				if (zfs_prop_get(cn->cn_handle,
 				    ZFS_PROP_SHAREISCSI, shareopts,

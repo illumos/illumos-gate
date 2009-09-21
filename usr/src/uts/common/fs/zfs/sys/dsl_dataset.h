@@ -193,7 +193,7 @@ dsl_syncfunc_t dsl_dataset_destroy_sync;
 dsl_checkfunc_t dsl_dataset_snapshot_check;
 dsl_syncfunc_t dsl_dataset_snapshot_sync;
 int dsl_dataset_rename(char *name, const char *newname, boolean_t recursive);
-int dsl_dataset_promote(const char *name);
+int dsl_dataset_promote(const char *name, char *conflsnap);
 int dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,
     boolean_t force);
 int dsl_dataset_user_hold(char *dsname, char *snapname, char *htag,

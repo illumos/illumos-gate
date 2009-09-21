@@ -27,7 +27,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include <libdevinfo.h>
 #include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,10 +35,6 @@
 #include <stddef.h>
 #include <fcntl.h>
 #include <sys/mount.h>
-#include <sys/mntent.h>
-#include <sys/mnttab.h>
-#include <sys/avl.h>
-#include <stddef.h>
 
 #include <libzfs.h>
 
@@ -1840,12 +1835,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 				return (-1);
 			}
 		}
-		if (!flags.dryrun && zhp->zfs_type == ZFS_TYPE_VOLUME &&
-		    zvol_remove_link(hdl, zhp->zfs_name) != 0) {
-			zfs_close(zhp);
-			zcmd_free_nvlists(&zc);
-			return (-1);
-		}
 		zfs_close(zhp);
 	} else {
 		/*
@@ -1988,12 +1977,9 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	}
 
 	/*
-	 * Mount or recreate the /dev links for the target filesystem
-	 * (if created, or if we tore them down to do an incremental
-	 * restore), and the /dev links for the new snapshot (if
-	 * created). Also mount any children of the target filesystem
-	 * if we did a replication receive (indicated by stream_avl
-	 * being non-NULL).
+	 * Mount the target filesystem (if created).  Also mount any
+	 * children of the target filesystem if we did a replication
+	 * receive (indicated by stream_avl being non-NULL).
 	 */
 	cp = strchr(zc.zc_value, '@');
 	if (cp && (ioctl_err == 0 || !newfs)) {
@@ -2005,10 +1991,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		if (h != NULL) {
 			if (h->zfs_type == ZFS_TYPE_VOLUME) {
 				*cp = '@';
-				err = zvol_create_link(hdl, h->zfs_name);
-				if (err == 0 && ioctl_err == 0)
-					err = zvol_create_link(hdl,
-					    zc.zc_value);
 			} else if (newfs || stream_avl) {
 				/*
 				 * Track the first/top of hierarchy fs,

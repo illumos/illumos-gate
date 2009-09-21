@@ -152,7 +152,7 @@ int		devtype;		/* fstype */
 
 /* static */
 static struct vnodeops *sdev_get_vop(struct sdev_node *);
-static void sdev_set_no_nocache(struct sdev_node *);
+static void sdev_set_no_negcache(struct sdev_node *);
 static fs_operation_def_t *sdev_merge_vtab(const fs_operation_def_t []);
 static void sdev_free_vtab(fs_operation_def_t *);
 
@@ -329,7 +329,7 @@ sdev_nodeinit(struct sdev_node *ddv, char *nm, struct sdev_node **newdv,
 		dhl = &(dv->sdev_handle);
 		dhl->dh_data = dv;
 		dhl->dh_args = NULL;
-		sdev_set_no_nocache(dv);
+		sdev_set_no_negcache(dv);
 		dv->sdev_gdir_gen = 0;
 	} else {
 		dv->sdev_flags &= ~SDEV_GLOBAL;
@@ -402,11 +402,8 @@ sdev_nodeready(struct sdev_node *dv, struct vattr *vap, struct vnode *avp,
 		else
 			*dv->sdev_attr = *vap;
 
-		if ((SDEV_IS_PERSIST(dv) && (dv->sdev_attrvp == NULL)) ||
-		    ((SDEVTOV(dv)->v_type == VDIR) &&
-		    (dv->sdev_attrvp == NULL))) {
+		if ((dv->sdev_attrvp == NULL) && SDEV_IS_PERSIST(dv))
 			error = sdev_shadow_node(dv, cred);
-		}
 	}
 
 	if (error == 0) {
@@ -517,6 +514,9 @@ static struct sdev_vop_table vtab[] =
 	{ "vt", devvt_vnodeops_tbl, NULL, &devvt_vnodeops, devvt_validate,
 	SDEV_DYNAMIC | SDEV_VTOR },
 
+	{ "zvol", devzvol_vnodeops_tbl, NULL, &devzvol_vnodeops,
+	devzvol_validate, SDEV_DYNAMIC | SDEV_VTOR | SDEV_SUBDIR },
+
 	{ "zcons", NULL, NULL, NULL, NULL, SDEV_NO_NCACHE },
 
 	{ "net", devnet_vnodeops_tbl, NULL, &devnet_vnodeops, devnet_validate,
@@ -528,6 +528,29 @@ static struct sdev_vop_table vtab[] =
 	{ NULL, NULL, NULL, NULL, NULL, 0}
 };
 
+struct sdev_vop_table *
+sdev_match(struct sdev_node *dv)
+{
+	int vlen;
+	int i;
+
+	for (i = 0; vtab[i].vt_name; i++) {
+		if (strcmp(vtab[i].vt_name, dv->sdev_name) == 0)
+			return (&vtab[i]);
+		if (vtab[i].vt_flags & SDEV_SUBDIR) {
+			char *ptr;
+
+			ASSERT(strlen(dv->sdev_path) > 5);
+			ptr = dv->sdev_path + 5;
+			vlen = strlen(vtab[i].vt_name);
+			if ((strncmp(vtab[i].vt_name, ptr,
+			    vlen - 1) == 0) && ptr[vlen] == '/')
+				return (&vtab[i]);
+		}
+
+	}
+	return (NULL);
+}
 
 /*
  *  sets a directory's vnodeops if the directory is in the vtab;
@@ -535,7 +558,7 @@ static struct sdev_vop_table vtab[] =
 static struct vnodeops *
 sdev_get_vop(struct sdev_node *dv)
 {
-	int i;
+	struct sdev_vop_table *vtp;
 	char *path;
 
 	path = dv->sdev_path;
@@ -544,33 +567,31 @@ sdev_get_vop(struct sdev_node *dv)
 	/* gets the relative path to /dev/ */
 	path += 5;
 
-	/* gets the vtab entry if matches */
-	for (i = 0; vtab[i].vt_name; i++) {
-		if (strcmp(vtab[i].vt_name, path) != 0)
-			continue;
-		dv->sdev_flags |= vtab[i].vt_flags;
+	/* gets the vtab entry it matches */
+	if ((vtp = sdev_match(dv)) != NULL) {
+		dv->sdev_flags |= vtp->vt_flags;
 
-		if (vtab[i].vt_vops) {
-			if (vtab[i].vt_global_vops)
-				*(vtab[i].vt_global_vops) = vtab[i].vt_vops;
-			return (vtab[i].vt_vops);
+		if (vtp->vt_vops) {
+			if (vtp->vt_global_vops)
+				*(vtp->vt_global_vops) = vtp->vt_vops;
+			return (vtp->vt_vops);
 		}
 
-		if (vtab[i].vt_service) {
+		if (vtp->vt_service) {
 			fs_operation_def_t *templ;
-			templ = sdev_merge_vtab(vtab[i].vt_service);
-			if (vn_make_ops(vtab[i].vt_name,
+			templ = sdev_merge_vtab(vtp->vt_service);
+			if (vn_make_ops(vtp->vt_name,
 			    (const fs_operation_def_t *)templ,
-			    &vtab[i].vt_vops) != 0) {
+			    &vtp->vt_vops) != 0) {
 				cmn_err(CE_PANIC, "%s: malformed vnode ops\n",
-				    vtab[i].vt_name);
+				    vtp->vt_name);
 				/*NOTREACHED*/
 			}
-			if (vtab[i].vt_global_vops) {
-				*(vtab[i].vt_global_vops) = vtab[i].vt_vops;
+			if (vtp->vt_global_vops) {
+				*(vtp->vt_global_vops) = vtp->vt_vops;
 			}
 			sdev_free_vtab(templ);
-			return (vtab[i].vt_vops);
+			return (vtp->vt_vops);
 		}
 		return (sdev_vnodeops);
 	}
@@ -583,7 +604,7 @@ sdev_get_vop(struct sdev_node *dv)
 }
 
 static void
-sdev_set_no_nocache(struct sdev_node *dv)
+sdev_set_no_negcache(struct sdev_node *dv)
 {
 	int i;
 	char *path;
@@ -603,14 +624,13 @@ sdev_set_no_nocache(struct sdev_node *dv)
 void *
 sdev_get_vtor(struct sdev_node *dv)
 {
-	int i;
+	struct sdev_vop_table *vtp;
 
-	for (i = 0; vtab[i].vt_name; i++) {
-		if (strcmp(vtab[i].vt_name, dv->sdev_name) != 0)
-			continue;
-		return ((void *)vtab[i].vt_vtor);
-	}
-	return (NULL);
+	vtp = sdev_match(dv);
+	if (vtp)
+		return ((void *)vtp->vt_vtor);
+	else
+		return (NULL);
 }
 
 /*
@@ -631,7 +651,7 @@ sdev_mkino(struct sdev_node *dv)
 	return (ino);
 }
 
-static int
+int
 sdev_getlink(struct vnode *linkvp, char **link)
 {
 	int err;
@@ -988,7 +1008,7 @@ sdev_dirdelete(struct sdev_node *ddv, struct sdev_node *dv)
 		rw_enter(&dv->sdev_contents, RW_WRITER);
 		if (dv->sdev_state == SDEV_READY) {
 			sdcmn_err9((
-			    "sdev_delete: node %s busy with count %d\n",
+			    "sdev_dirdelete: node %s busy with count %d\n",
 			    dv->sdev_name, vp->v_count));
 			dv->sdev_state = SDEV_ZOMBIE;
 		}
@@ -1287,7 +1307,7 @@ sdev_vattr_merge(struct sdev_node *dv, struct vattr *vap)
 	}
 }
 
-static struct vattr *
+struct vattr *
 sdev_getdefault_attr(enum vtype type)
 {
 	if (type == VDIR)
@@ -1324,34 +1344,6 @@ sdev_to_vp(struct sdev_node *dv, struct vnode **vpp)
 		break;
 	}
 	return (rv);
-}
-
-/*
- * the junction between devname and devfs
- */
-static struct vnode *
-devname_configure_by_path(char *physpath, struct vattr *vattr)
-{
-	int error = 0;
-	struct vnode *vp;
-
-	ASSERT(strncmp(physpath, "/devices/", sizeof ("/devices/") - 1)
-	    == 0);
-
-	error = devfs_lookupname(physpath + sizeof ("/devices/") - 1,
-	    NULLVPP, &vp);
-	if (error != 0) {
-		if (error == ENODEV) {
-			cmn_err(CE_CONT, "%s: not found (line %d)\n",
-			    physpath, __LINE__);
-		}
-
-		return (NULL);
-	}
-
-	if (vattr)
-		(void) VOP_GETATTR(vp, vattr, 0, kcred, NULL);
-	return (vp);
 }
 
 /*
@@ -1418,10 +1410,8 @@ sdev_filldir_from_store(struct sdev_node *ddv, int dlen, struct cred *cred)
 		if (error || dbuflen == 0)
 			break;
 
-		if (!(ddv->sdev_flags & SDEV_BUILD)) {
-			error = 0;
+		if (!(ddv->sdev_flags & SDEV_BUILD))
 			break;
-		}
 
 		for (dp = dbuf; ((intptr_t)dp <
 		    (intptr_t)dbuf + dbuflen);
@@ -1511,6 +1501,9 @@ sdev_filldir_dynamic(struct sdev_node *ddv)
 	ASSERT((ddv->sdev_flags & SDEV_BUILD));
 
 	vap = sdev_getdefault_attr(VDIR);
+	gethrestime(&vap->va_atime);
+	vap->va_mtime = vap->va_atime;
+	vap->va_ctime = vap->va_atime;
 	for (i = 0; vtab[i].vt_name != NULL; i++) {
 		nm = vtab[i].vt_name;
 		ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
@@ -1737,66 +1730,12 @@ sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
 {
 	int rv = 0;
 	char *physpath = NULL;
-	struct vnode *rvp = NULL;
 	struct vattr vattr;
 	struct vattr *vap;
-	struct sdev_node *dv = *dvp;
+	struct sdev_node *dv = NULL;
 
-	mutex_enter(&dv->sdev_lookup_lock);
-	SDEV_BLOCK_OTHERS(dv, SDEV_LOOKUP);
-	mutex_exit(&dv->sdev_lookup_lock);
-
-	/* for non-devfsadm devices */
-	if (flags & SDEV_PATH) {
-		physpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-		rv = callback(ddv, nm, (void *)&physpath, kcred, NULL,
-		    NULL);
-		if (rv) {
-			kmem_free(physpath, MAXPATHLEN);
-			return (-1);
-		}
-
-		rvp = devname_configure_by_path(physpath, NULL);
-		if (rvp == NULL) {
-			sdcmn_err3(("devname_configure_by_path: "
-			    "failed for /dev/%s/%s\n",
-			    ddv->sdev_name, nm));
-			kmem_free(physpath, MAXPATHLEN);
-			rv = -1;
-		} else {
-			vap = sdev_getdefault_attr(VLNK);
-			ASSERT(RW_READ_HELD(&ddv->sdev_contents));
-
-			/*
-			 * Sdev_mknode may return back a different sdev_node
-			 * that was created by another thread that
-			 * raced to the directroy cache before this thread.
-			 *
-			 * With current directory cache mechanism
-			 * (linked list with the sdev_node name as
-			 * the entity key), this is a way to make sure
-			 * only one entry exists for the same name
-			 * in the same directory. The outcome is
-			 * the winner wins.
-			 */
-			if (!rw_tryupgrade(&ddv->sdev_contents)) {
-				rw_exit(&ddv->sdev_contents);
-				rw_enter(&ddv->sdev_contents, RW_WRITER);
-			}
-			rv = sdev_mknode(ddv, nm, &dv, vap, NULL,
-			    (void *)physpath, cred, SDEV_READY);
-			rw_downgrade(&ddv->sdev_contents);
-			kmem_free(physpath, MAXPATHLEN);
-			if (rv) {
-				return (rv);
-			} else {
-				mutex_enter(&dv->sdev_lookup_lock);
-				SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
-				mutex_exit(&dv->sdev_lookup_lock);
-				return (0);
-			}
-		}
-	} else if (flags & SDEV_VLINK) {
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	if (flags & SDEV_VLINK) {
 		physpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 		rv = callback(ddv, nm, (void *)&physpath, kcred, NULL,
 		    NULL);
@@ -1807,60 +1746,18 @@ sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
 
 		vap = sdev_getdefault_attr(VLNK);
 		vap->va_size = strlen(physpath);
-		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
+		gethrestime(&vap->va_atime);
+		vap->va_mtime = vap->va_atime;
+		vap->va_ctime = vap->va_atime;
 
-		if (!rw_tryupgrade(&ddv->sdev_contents)) {
-			rw_exit(&ddv->sdev_contents);
-			rw_enter(&ddv->sdev_contents, RW_WRITER);
-		}
 		rv = sdev_mknode(ddv, nm, &dv, vap, NULL,
 		    (void *)physpath, cred, SDEV_READY);
-		rw_downgrade(&ddv->sdev_contents);
 		kmem_free(physpath, MAXPATHLEN);
 		if (rv)
 			return (rv);
-
-		mutex_enter(&dv->sdev_lookup_lock);
-		SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
-		mutex_exit(&dv->sdev_lookup_lock);
-		return (0);
-	} else if (flags & SDEV_VNODE) {
-		/*
-		 * DBNR has its own way to create the device
-		 * and return a backing store vnode in rvp
-		 */
-		ASSERT(callback);
-		rv = callback(ddv, nm, (void *)&rvp, kcred, NULL, NULL);
-		if (rv || (rvp == NULL)) {
-			sdcmn_err3(("devname_lookup_func: SDEV_VNODE "
-			    "callback failed \n"));
-			return (-1);
-		}
-		vap = sdev_getdefault_attr(rvp->v_type);
-		if (vap == NULL)
-			return (-1);
-
-		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
-		if (!rw_tryupgrade(&ddv->sdev_contents)) {
-			rw_exit(&ddv->sdev_contents);
-			rw_enter(&ddv->sdev_contents, RW_WRITER);
-		}
-		rv = sdev_mknode(ddv, nm, &dv, vap, rvp, NULL,
-		    cred, SDEV_READY);
-		rw_downgrade(&ddv->sdev_contents);
-		if (rv)
-			return (rv);
-
-		mutex_enter(&dv->sdev_lookup_lock);
-		SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
-		mutex_exit(&dv->sdev_lookup_lock);
-		return (0);
 	} else if (flags & SDEV_VATTR) {
 		/*
 		 * /dev/pts
-		 *
-		 * DBNR has its own way to create the device
-		 * "0" is returned upon success.
 		 *
 		 * callback is responsible to set the basic attributes,
 		 * e.g. va_type/va_uid/va_gid/
@@ -1874,22 +1771,12 @@ sdev_call_dircallback(struct sdev_node *ddv, struct sdev_node **dvp, char *nm,
 			return (-1);
 		}
 
-		ASSERT(RW_READ_HELD(&ddv->sdev_contents));
-		if (!rw_tryupgrade(&ddv->sdev_contents)) {
-			rw_exit(&ddv->sdev_contents);
-			rw_enter(&ddv->sdev_contents, RW_WRITER);
-		}
 		rv = sdev_mknode(ddv, nm, &dv, &vattr, NULL, NULL,
 		    cred, SDEV_READY);
-		rw_downgrade(&ddv->sdev_contents);
 
 		if (rv)
 			return (rv);
 
-		mutex_enter(&dv->sdev_lookup_lock);
-		SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
-		mutex_exit(&dv->sdev_lookup_lock);
-		return (0);
 	} else {
 		impossible(("lookup: %s/%s by %s not supported (%d)\n",
 		    SDEVTOV(ddv)->v_path, nm, curproc->p_user.u_comm,
@@ -1913,7 +1800,6 @@ is_devfsadm_thread(char *exec_name)
 		return (1);
 	return (0);
 }
-
 
 /*
  * Lookup Order:
@@ -2050,7 +1936,7 @@ tryagain:
 	 */
 	if (parent_state == SDEV_ZOMBIE) {
 		rw_exit(&ddv->sdev_contents);
-		*vpp = NULL;
+		*vpp = NULLVP;
 		SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
 		return (ENOENT);
 	}
@@ -2060,13 +1946,12 @@ tryagain:
 	 *	SDEV_PERSIST is default except:
 	 *		1) pts nodes
 	 *		2) non-chmod'ed local nodes
+	 *		3) zvol nodes
 	 */
 	if (SDEV_IS_PERSIST(ddv)) {
 		error = devname_backstore_lookup(ddv, nm, &rvp);
 
 		if (!error) {
-			sdcmn_err3(("devname_backstore_lookup: "
-			    "found attrvp %p for %s\n", (void *)rvp, nm));
 
 			vattr.va_mask = AT_MODE|AT_UID|AT_GID;
 			error = VOP_GETATTR(rvp, &vattr, 0, cred, NULL);
@@ -2133,6 +2018,23 @@ tryagain:
 
 lookup_create_node:
 	/* first thread that is doing the lookup on this node */
+	if (callback) {
+		ASSERT(dv == NULL);
+		if (!rw_tryupgrade(&ddv->sdev_contents)) {
+			rw_exit(&ddv->sdev_contents);
+			rw_enter(&ddv->sdev_contents, RW_WRITER);
+		}
+		error = sdev_call_dircallback(ddv, &dv, nm, callback,
+		    flags, cred);
+		rw_downgrade(&ddv->sdev_contents);
+		if (error == 0) {
+			goto found;
+		} else {
+			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+			rw_exit(&ddv->sdev_contents);
+			goto lookup_failed;
+		}
+	}
 	if (!dv) {
 		if (!rw_tryupgrade(&ddv->sdev_contents)) {
 			rw_exit(&ddv->sdev_contents);
@@ -2149,86 +2051,62 @@ lookup_create_node:
 		}
 		rw_downgrade(&ddv->sdev_contents);
 	}
-	ASSERT(dv);
-	ASSERT(SDEV_HELD(dv));
-
-	if (SDEV_IS_NO_NCACHE(dv)) {
-		failed_flags |= SLF_NO_NCACHE;
-	}
 
 	/*
 	 * (b1) invoking devfsadm once per life time for devfsadm nodes
 	 */
-	if (!callback) {
+	ASSERT(SDEV_HELD(dv));
 
-		if (sdev_reconfig_boot || !i_ddi_io_initialized() ||
-		    SDEV_IS_DYNAMIC(ddv) || SDEV_IS_NO_NCACHE(dv) ||
-		    ((moddebug & MODDEBUG_FINI_EBUSY) != 0)) {
-			ASSERT(SDEV_HELD(dv));
-			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
-			goto nolock_notfound;
-		}
-
-		/*
-		 * filter out known non-existent devices recorded
-		 * during initial reconfiguration boot for which
-		 * reconfig should not be done and lookup may
-		 * be short-circuited now.
-		 */
-		if (sdev_lookup_filter(ddv, nm)) {
-			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
-			goto nolock_notfound;
-		}
-
-		/* bypassing devfsadm internal nodes */
-		if (is_devfsadm_thread(lookup_thread)) {
-			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
-			goto nolock_notfound;
-		}
-
-		if (sdev_reconfig_disable) {
-			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
-			goto nolock_notfound;
-		}
-
-		error = sdev_call_devfsadmd(ddv, dv, nm);
-		if (error == 0) {
-			sdcmn_err8(("lookup of %s/%s by %s: reconfig\n",
-			    ddv->sdev_name, nm, curproc->p_user.u_comm));
-			if (sdev_reconfig_verbose) {
-				cmn_err(CE_CONT,
-				    "?lookup of %s/%s by %s: reconfig\n",
-				    ddv->sdev_name, nm, curproc->p_user.u_comm);
-			}
-			retried = 1;
-			failed_flags |= SLF_REBUILT;
-			ASSERT(dv->sdev_state != SDEV_ZOMBIE);
-			SDEV_SIMPLE_RELE(dv);
-			goto tryagain;
-		} else {
-			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
-			goto nolock_notfound;
-		}
+	if (SDEV_IS_NO_NCACHE(dv))
+		failed_flags |= SLF_NO_NCACHE;
+	if (sdev_reconfig_boot || !i_ddi_io_initialized() ||
+	    SDEV_IS_DYNAMIC(ddv) || SDEV_IS_NO_NCACHE(dv) ||
+	    ((moddebug & MODDEBUG_FINI_EBUSY) != 0)) {
+		ASSERT(SDEV_HELD(dv));
+		SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+		goto nolock_notfound;
 	}
 
 	/*
-	 * (b2) Directory Based Name Resolution (DBNR):
-	 *	ddv	- parent
-	 *	nm	- /dev/(ddv->sdev_name)/nm
-	 *
-	 *	note: module vnode ops take precedence than the build-in ones
+	 * filter out known non-existent devices recorded
+	 * during initial reconfiguration boot for which
+	 * reconfig should not be done and lookup may
+	 * be short-circuited now.
 	 */
-	if (callback) {
-		error = sdev_call_dircallback(ddv, &dv, nm, callback,
-		    flags, cred);
-		if (error == 0) {
-			goto found;
-		} else {
-			SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
-			goto notfound;
-		}
+	if (sdev_lookup_filter(ddv, nm)) {
+		SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+		goto nolock_notfound;
 	}
-	ASSERT(rvp);
+
+	/* bypassing devfsadm internal nodes */
+	if (is_devfsadm_thread(lookup_thread)) {
+		SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+		goto nolock_notfound;
+	}
+
+	if (sdev_reconfig_disable) {
+		SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+		goto nolock_notfound;
+	}
+
+	error = sdev_call_devfsadmd(ddv, dv, nm);
+	if (error == 0) {
+		sdcmn_err8(("lookup of %s/%s by %s: reconfig\n",
+		    ddv->sdev_name, nm, curproc->p_user.u_comm));
+		if (sdev_reconfig_verbose) {
+			cmn_err(CE_CONT,
+			    "?lookup of %s/%s by %s: reconfig\n",
+			    ddv->sdev_name, nm, curproc->p_user.u_comm);
+		}
+		retried = 1;
+		failed_flags |= SLF_REBUILT;
+		ASSERT(dv->sdev_state != SDEV_ZOMBIE);
+		SDEV_SIMPLE_RELE(dv);
+		goto tryagain;
+	} else {
+		SD_TRACE_FAILED_LOOKUP(ddv, nm, retried);
+		goto nolock_notfound;
+	}
 
 found:
 	ASSERT(!(dv->sdev_flags & SDEV_STALE));
@@ -2275,7 +2153,6 @@ found:
 			    "dev fs: validator failed: %s(%p)\n",
 			    dv->sdev_name, (void *)dv);
 			break;
-			/*NOTREACHED*/
 		}
 	}
 
@@ -2286,10 +2163,6 @@ found:
 	    dv->sdev_state, nm, rv));
 	return (rv);
 
-notfound:
-	mutex_enter(&dv->sdev_lookup_lock);
-	SDEV_UNBLOCK_OTHERS(dv, SDEV_LOOKUP);
-	mutex_exit(&dv->sdev_lookup_lock);
 nolock_notfound:
 	/*
 	 * Destroy the node that is created for synchronization purposes.
@@ -2668,7 +2541,7 @@ get_cache:
 		/* bypassing pre-matured nodes */
 		if (diroff < soff || (dv->sdev_state != SDEV_READY)) {
 			sdcmn_err3(("sdev_readdir: pre-mature node  "
-			    "%s\n", dv->sdev_name));
+			    "%s %d\n", dv->sdev_name, dv->sdev_state));
 			continue;
 		}
 

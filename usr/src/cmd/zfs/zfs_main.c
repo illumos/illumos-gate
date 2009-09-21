@@ -875,7 +875,7 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 
 	/*
 	 * Ignore pools (which we've already flagged as an error before getting
-	 * here.
+	 * here).
 	 */
 	if (strchr(zfs_get_name(zhp), '/') == NULL &&
 	    zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) {
@@ -3997,27 +3997,6 @@ manual_unmount(int argc, char **argv)
 }
 
 static int
-volcheck(zpool_handle_t *zhp, void *data)
-{
-	boolean_t isinit = *((boolean_t *)data);
-
-	if (isinit)
-		return (zpool_create_zvol_links(zhp));
-	else
-		return (zpool_remove_zvol_links(zhp));
-}
-
-/*
- * Iterate over all pools in the system and either create or destroy /dev/zvol
- * links, depending on the value of 'isinit'.
- */
-static int
-do_volcheck(boolean_t isinit)
-{
-	return (zpool_iter(g_zfs, volcheck, &isinit) ? 1 : 0);
-}
-
-static int
 find_command_idx(char *command, int *idx)
 {
 	int i;
@@ -4101,15 +4080,6 @@ main(int argc, char **argv)
 		 */
 		if (strcmp(cmdname, "-?") == 0)
 			usage(B_TRUE);
-
-		/*
-		 * 'volinit' and 'volfini' do not appear in the usage message,
-		 * so we have to special case them here.
-		 */
-		if (strcmp(cmdname, "volinit") == 0)
-			return (do_volcheck(B_TRUE));
-		else if (strcmp(cmdname, "volfini") == 0)
-			return (do_volcheck(B_FALSE));
 
 		/*
 		 * Run the appropriate command.

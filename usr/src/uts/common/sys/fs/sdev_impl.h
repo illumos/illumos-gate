@@ -229,6 +229,7 @@ typedef enum {
 #define	SDEV_VTOR		0x0040	/* validate sdev_nodes during search */
 #define	SDEV_ATTR_INVALID	0x0080	/* invalid node attributes, */
 					/* need update */
+#define	SDEV_SUBDIR		0x0100	/* match all subdirs under here */
 
 /* sdev_lookup_flags */
 #define	SDEV_LOOKUP	0x0001	/* node creation in progress */
@@ -249,7 +250,6 @@ typedef enum {
 	(dv->sdev_flags & SDEV_DYNAMIC)
 #define	SDEV_IS_NO_NCACHE(dv)	\
 	(dv->sdev_flags & SDEV_NO_NCACHE)
-
 #define	SDEV_IS_LOOKUP(dv)	\
 	(dv->sdev_lookup_flags & SDEV_LOOKUP)
 #define	SDEV_IS_READDIR(dv)	\
@@ -296,8 +296,6 @@ extern int devname_lookup_func(struct sdev_node *, char *, struct vnode **,
 /*
  * flags used by devname_lookup_func callbacks
  */
-#define	SDEV_PATH	0x1	/* callback returning /devices physical path */
-#define	SDEV_VNODE	0x2	/* callback returning backing store vnode */
 #define	SDEV_VATTR	0x4	/* callback returning node vattr */
 #define	SDEV_VLINK	0x8	/* callback returning /dev link */
 
@@ -316,11 +314,10 @@ extern int devname_readdir_func(vnode_t *, uio_t *, cred_t *, int *, int);
  */
 extern int devname_setattr_func(struct vnode *, struct vattr *, int,
     struct cred *, int (*)(struct sdev_node *, struct vattr *, int), int);
-
 /*
  * devname_inactive_func()
  */
-extern void devname_inactive_func(struct vnode *, struct cred *cred,
+extern void devname_inactive_func(struct vnode *, struct cred *,
     void (*)(struct vnode *));
 
 /*
@@ -397,51 +394,6 @@ extern struct sdev_data *sdev_find_mntinfo(char *);
 void sdev_mntinfo_rele(struct sdev_data *);
 extern struct vnodeops *devpts_getvnodeops(void);
 extern struct vnodeops *devvt_getvnodeops(void);
-
-/*
- * directory name rule
- */
-struct devname_nsmap {
-	struct devname_nsmap	*prev;	/* previous entry */
-	struct devname_nsmap	*next;	/* next entry */
-	char	*dir_name;	/* /dev subdir name, e.g. /dev/disk */
-	char	*dir_module;	/* devname module impl the operations */
-	char	*dir_map;	/* dev naming rules, e.g. /etc/dev/disks */
-	char    *dir_newmodule; /* to be reloaded  */
-	char    *dir_newmap;    /* to be reloaded */
-	int	dir_invalid;    /* map entry obsolete */
-	int	dir_maploaded;	/* map contents read */
-	krwlock_t dir_lock;	/* protects the data structure */
-};
-
-/*
- * name-property pairs to be looked up
- */
-typedef struct devname_lkp_arg {
-	char *devname_dir;	/* the directory to look */
-	char *devname_name;	/* the device name to be looked up */
-	char *devname_map;	/* the directory device naming map */
-	int reserved;
-} devname_lkp_arg_t;
-
-/*
- * directory name-value populating results
- */
-typedef struct devname_rdr_result {
-	uint32_t	ns_mapcount;
-} devname_rdr_result_t;
-
-/*
- * sdev_nsrdr work
- */
-typedef struct sdev_nsrdr_work {
-	char *dir_name;
-	char *dir_map;
-	struct sdev_node *dir_dv;
-	devname_rdr_result_t **result;
-	struct sdev_nsrdr_work *next;
-} sdev_nsrdr_work_t;
-
 
 /*
  * boot states - warning, the ordering here is significant
@@ -528,6 +480,8 @@ extern struct sdev_node *sdev_mkroot(struct vfs *, dev_t, struct vnode *,
 extern void sdev_filldir_dynamic(struct sdev_node *);
 extern int sdev_mknode(struct sdev_node *, char *, struct sdev_node **,
     struct vattr *, struct vnode *, void *, struct cred *, sdev_node_state_t);
+extern int sdev_getlink(struct vnode *linkvp, char **link);
+
 extern int sdev_nodeinit(struct sdev_node *, char *, struct sdev_node **,
     vattr_t *);
 extern int sdev_nodeready(struct sdev_node *, vattr_t *, vnode_t *, void *,
@@ -547,6 +501,7 @@ extern int sdev_cleandir(struct sdev_node *, char *, uint_t);
 extern int sdev_rnmnode(struct sdev_node *, struct sdev_node *,
     struct sdev_node *, struct sdev_node **, char *, struct cred *);
 extern size_t add_dir_entry(dirent64_t *, char *, size_t, ino_t, offset_t);
+extern struct vattr *sdev_getdefault_attr(enum vtype type);
 extern int sdev_to_vp(struct sdev_node *, struct vnode **);
 extern ino_t sdev_mkino(struct sdev_node *);
 extern int devname_backstore_lookup(struct sdev_node *, char *,
@@ -560,7 +515,15 @@ extern int devpts_validate(struct sdev_node *dv);
 extern int devnet_validate(struct sdev_node *dv);
 extern int devipnet_validate(struct sdev_node *dv);
 extern int devvt_validate(struct sdev_node *dv);
+extern int devzvol_validate(struct sdev_node *dv);
 extern void *sdev_get_vtor(struct sdev_node *dv);
+
+/*
+ * devinfo helpers
+ */
+extern int sdev_modctl_readdir(const char *, char ***, int *, int *, int);
+extern void sdev_modctl_readdir_free(char **, int, int);
+extern int sdev_modctl_devexists(const char *);
 
 /*
  * ncache handlers
@@ -575,13 +538,6 @@ extern void sdev_nc_path_exists(sdev_nc_list_t *, char *);
 extern void sdev_modctl_dump_files(void);
 
 /*
- * devinfo helpers
- */
-extern int sdev_modctl_readdir(const char *, char ***, int *, int *, int);
-extern void sdev_modctl_readdir_free(char **, int, int);
-extern int sdev_modctl_devexists(const char *);
-
-/*
  * globals
  */
 extern kmutex_t sdev_lock;
@@ -593,6 +549,8 @@ extern struct vnodeops		*devnet_vnodeops;
 extern struct vnodeops		*devipnet_vnodeops;
 extern struct vnodeops		*devvt_vnodeops;
 extern struct sdev_data *sdev_origins; /* mount info for global /dev instance */
+extern struct vnodeops		*devzvol_vnodeops;
+
 extern const fs_operation_def_t	sdev_vnodeops_tbl[];
 extern const fs_operation_def_t	devpts_vnodeops_tbl[];
 extern const fs_operation_def_t	devnet_vnodeops_tbl[];
@@ -600,6 +558,7 @@ extern const fs_operation_def_t devipnet_vnodeops_tbl[];
 extern const fs_operation_def_t	devvt_vnodeops_tbl[];
 extern const fs_operation_def_t	devsys_vnodeops_tbl[];
 extern const fs_operation_def_t	devpseudo_vnodeops_tbl[];
+extern const fs_operation_def_t	devzvol_vnodeops_tbl[];
 
 extern sdev_nc_list_t	*sdev_ncache;
 extern int		sdev_reconfig_boot;
@@ -628,6 +587,7 @@ extern int sdev_debug;
 #define	SDEV_DEBUG_MODCTL	0x400	/* trace modctl activity */
 #define	SDEV_DEBUG_FLK		0x800	/* trace failed lookups */
 #define	SDEV_DEBUG_NET		0x1000	/* /dev/net tracing */
+#define	SDEV_DEBUG_ZVOL		0x2000	/* /dev/zvol/tracing */
 
 #define	sdcmn_err(args)  if (sdev_debug & SDEV_DEBUG) printf args
 #define	sdcmn_err2(args) if (sdev_debug & SDEV_DEBUG_VOPS) printf args
@@ -641,6 +601,7 @@ extern int sdev_debug;
 #define	sdcmn_err10(args) if (sdev_debug & SDEV_DEBUG_PROFILE) printf args
 #define	sdcmn_err11(args) if (sdev_debug & SDEV_DEBUG_MODCTL) printf args
 #define	sdcmn_err12(args) if (sdev_debug & SDEV_DEBUG_NET) printf args
+#define	sdcmn_err13(args) if (sdev_debug & SDEV_DEBUG_ZVOL) printf args
 #define	impossible(args) printf args
 #else
 #define	sdcmn_err(args)		/* does nothing */
@@ -655,6 +616,7 @@ extern int sdev_debug;
 #define	sdcmn_err10(args)	/* does nothing */
 #define	sdcmn_err11(args)	/* does nothing */
 #define	sdcmn_err12(args)	/* does nothing */
+#define	sdcmn_err13(args) 	/* does nothing */
 #define	impossible(args)	/* does nothing */
 #endif
 

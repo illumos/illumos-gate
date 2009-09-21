@@ -20,15 +20,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/fs_include.sh
 
@@ -55,16 +53,6 @@ dump_setup()
 	# If we have a dedicated dump device, then go ahead and configure it.
 	# 
 	if [ "x$special" != "x$DUMPADM_DEVICE" ]; then
-		if [ -x /usr/sbin/zfs ]; then
-			dataset=`echo $DUMPADM_DEVICE | cut -d'/' -f5-`
-			[ -n "$dataset" ] && \
-			    /usr/sbin/zfs list -t volume $dataset > \
-			    /dev/null 2>&1
-			if [ $? -eq 0 ]; then
-				/usr/sbin/zfs volinit
-			fi
-		fi
-
 		if [ -x /usr/sbin/dumpadm -a -b $DUMPADM_DEVICE ]; then
 			/usr/sbin/dumpadm -u || exit $SMF_EXIT_ERR_CONFIG
 		fi

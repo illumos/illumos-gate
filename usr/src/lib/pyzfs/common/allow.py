@@ -204,8 +204,8 @@ def args_to_perms(parser, options, who, perms):
 perms_subcmd = dict(
     create=_("Must also have the 'mount' ability"),
     destroy=_("Must also have the 'mount' ability"),
-    snapshot=_("Must also have the 'mount' ability"),
-    rollback=_("Must also have the 'mount' ability"),
+    snapshot="",
+    rollback="",
     clone=_("""Must also have the 'create' ability and 'mount'
 \t\t\t\tability in the origin file system"""),
     promote=_("""Must also have the 'mount'
