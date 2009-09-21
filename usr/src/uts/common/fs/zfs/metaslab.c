@@ -57,12 +57,13 @@ int metaslab_df_free_pct = 30;
  * ==========================================================================
  */
 metaslab_class_t *
-metaslab_class_create(space_map_ops_t *ops)
+metaslab_class_create(spa_t *spa, space_map_ops_t *ops)
 {
 	metaslab_class_t *mc;
 
 	mc = kmem_zalloc(sizeof (metaslab_class_t), KM_SLEEP);
 
+	mc->mc_spa = spa;
 	mc->mc_rotor = NULL;
 	mc->mc_ops = ops;
 
@@ -124,6 +125,32 @@ metaslab_class_remove(metaslab_class_t *mc, metaslab_group_t *mg)
 	mg->mg_prev = NULL;
 	mg->mg_next = NULL;
 	mg->mg_class = NULL;
+}
+
+int
+metaslab_class_validate(metaslab_class_t *mc)
+{
+	metaslab_group_t *mg;
+	vdev_t *vd;
+
+	/*
+	 * Must hold one of the spa_config locks.
+	 */
+	ASSERT(spa_config_held(mc->mc_spa, SCL_ALL, RW_READER) ||
+	    spa_config_held(mc->mc_spa, SCL_ALL, RW_WRITER));
+
+	if ((mg = mc->mc_rotor) == NULL)
+		return (0);
+
+	do {
+		vd = mg->mg_vd;
+		ASSERT(vd->vdev_mg != NULL);
+		ASSERT3P(vd->vdev_top, ==, vd);
+		ASSERT3P(mg->mg_class, ==, mc);
+		ASSERT3P(vd->vdev_ops, !=, &vdev_hole_ops);
+	} while ((mg = mg->mg_next) != mc->mc_rotor);
+
+	return (0);
 }
 
 /*
@@ -634,6 +661,8 @@ metaslab_sync(metaslab_t *msp, uint64_t txg)
 	dmu_tx_t *tx;
 	int t;
 
+	ASSERT(!vd->vdev_ishole);
+
 	tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
 
 	/*
@@ -720,6 +749,8 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 	metaslab_group_t *mg = msp->ms_group;
 	vdev_t *vd = mg->mg_vd;
 	int t;
+
+	ASSERT(!vd->vdev_ishole);
 
 	mutex_enter(&msp->ms_lock);
 
@@ -932,10 +963,21 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 	 */
 	if (hintdva) {
 		vd = vdev_lookup_top(spa, DVA_GET_VDEV(&hintdva[d]));
-		if (flags & METASLAB_HINTBP_AVOID)
-			mg = vd->vdev_mg->mg_next;
-		else
+
+		/*
+		 * It's possible the vdev we're using as the hint no
+		 * longer exists (i.e. removed). Consult the rotor when
+		 * all else fails.
+		 */
+		if (vd != NULL && vd->vdev_mg != NULL) {
 			mg = vd->vdev_mg;
+
+			if (flags & METASLAB_HINTBP_AVOID &&
+			    mg->mg_next != NULL)
+				mg = mg->mg_next;
+		} else {
+			mg = mc->mc_rotor;
+		}
 	} else if (d != 0) {
 		vd = vdev_lookup_top(spa, DVA_GET_VDEV(&dva[d - 1]));
 		mg = vd->vdev_mg->mg_next;

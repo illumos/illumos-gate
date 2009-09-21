@@ -27,7 +27,7 @@
 /*
  * On-disk version number.
  */
-#define	SPA_VERSION			18ULL
+#define	SPA_VERSION			19ULL
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
@@ -61,6 +61,9 @@
 #define	ZPOOL_CONFIG_NPARITY		"nparity"
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_L2CACHE		"l2cache"
+#define	ZPOOL_CONFIG_HOLE_ARRAY		"hole_array"
+#define	ZPOOL_CONFIG_VDEV_CHILDREN	"vdev_children"
+#define	ZPOOL_CONFIG_IS_HOLE		"is_hole"
 /*
  * The persistent vdev state is stored as separate values rather than a single
  * 'vdev_state' entry.  This is because a device can be in multiple states, such
@@ -78,6 +81,7 @@
 #define	VDEV_TYPE_DISK			"disk"
 #define	VDEV_TYPE_FILE			"file"
 #define	VDEV_TYPE_MISSING		"missing"
+#define	VDEV_TYPE_HOLE			"hole"
 #define	VDEV_TYPE_SPARE			"spare"
 #define	VDEV_TYPE_L2CACHE		"l2cache"
 

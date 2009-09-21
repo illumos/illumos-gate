@@ -117,6 +117,7 @@ typedef struct zinject_record {
 	uint64_t	zi_type;
 	uint32_t	zi_freq;
 	uint32_t	zi_failfast;
+	char		zi_func[MAXNAMELEN];
 } zinject_record_t;
 
 #define	ZINJECT_NULL		0x1

@@ -42,6 +42,7 @@
 #include <sys/zil.h>
 #include <sys/vdev_impl.h>
 #include <sys/metaslab.h>
+#include <sys/metaslab_impl.h>
 #include <sys/uberblock_impl.h>
 #include <sys/txg.h>
 #include <sys/avl.h>
@@ -578,8 +579,8 @@ spa_activate(spa_t *spa, int mode)
 	spa->spa_state = POOL_STATE_ACTIVE;
 	spa->spa_mode = mode;
 
-	spa->spa_normal_class = metaslab_class_create(zfs_metaslab_ops);
-	spa->spa_log_class = metaslab_class_create(zfs_metaslab_ops);
+	spa->spa_normal_class = metaslab_class_create(spa, zfs_metaslab_ops);
+	spa->spa_log_class = metaslab_class_create(spa, zfs_metaslab_ops);
 
 	for (int t = 0; t < ZIO_TYPES; t++) {
 		const zio_taskq_info_t *ztip = &zio_taskqs[t];
@@ -1101,26 +1102,23 @@ spa_check_removed(vdev_t *vd)
  * that the label does not contain the most up-to-date information.
  */
 void
-spa_load_log_state(spa_t *spa)
+spa_load_log_state(spa_t *spa, nvlist_t *nv)
 {
-	nvlist_t *nv, *nvroot, **child;
-	uint64_t is_log;
-	uint_t children;
-	vdev_t *rvd = spa->spa_root_vdev;
+	vdev_t *ovd, *rvd = spa->spa_root_vdev;
 
-	VERIFY(load_nvlist(spa, spa->spa_config_object, &nv) == 0);
-	VERIFY(nvlist_lookup_nvlist(nv, ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
-	VERIFY(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
+	/*
+	 * Load the original root vdev tree from the passed config.
+	 */
+	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
+	VERIFY(spa_config_parse(spa, &ovd, nv, NULL, 0, VDEV_ALLOC_LOAD) == 0);
 
-	for (int c = 0; c < children; c++) {
-		vdev_t *tvd = rvd->vdev_child[c];
-
-		if (nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
-		    &is_log) == 0 && is_log)
-			vdev_load_log_state(tvd, child[c]);
+	for (int c = 0; c < rvd->vdev_children; c++) {
+		vdev_t *cvd = rvd->vdev_child[c];
+		if (cvd->vdev_islog)
+			vdev_load_log_state(cvd, ovd->vdev_child[c]);
 	}
-	nvlist_free(nv);
+	vdev_free(ovd);
+	spa_config_exit(spa, SCL_ALL, FTAG);
 }
 
 /*
@@ -1151,7 +1149,7 @@ static int
 spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 {
 	int error = 0;
-	nvlist_t *nvroot = NULL;
+	nvlist_t *nvconfig, *nvroot = NULL;
 	vdev_t *rvd;
 	uberblock_t *ub = &spa->spa_uberblock;
 	uint64_t config_cache_txg = spa->spa_config_txg;
@@ -1306,23 +1304,22 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		goto out;
 	}
 
+	if (load_nvlist(spa, spa->spa_config_object, &nvconfig) != 0) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		error = EIO;
+		goto out;
+	}
+
 	if (!mosconfig) {
-		nvlist_t *newconfig;
 		uint64_t hostid;
 
-		if (load_nvlist(spa, spa->spa_config_object, &newconfig) != 0) {
-			vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
-			    VDEV_AUX_CORRUPT_DATA);
-			error = EIO;
-			goto out;
-		}
-
-		if (!spa_is_root(spa) && nvlist_lookup_uint64(newconfig,
+		if (!spa_is_root(spa) && nvlist_lookup_uint64(nvconfig,
 		    ZPOOL_CONFIG_HOSTID, &hostid) == 0) {
 			char *hostname;
 			unsigned long myhostid = 0;
 
-			VERIFY(nvlist_lookup_string(newconfig,
+			VERIFY(nvlist_lookup_string(nvconfig,
 			    ZPOOL_CONFIG_HOSTNAME, &hostname) == 0);
 
 #ifdef	_KERNEL
@@ -1347,12 +1344,12 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 			}
 		}
 
-		spa_config_set(spa, newconfig);
+		spa_config_set(spa, nvconfig);
 		spa_unload(spa);
 		spa_deactivate(spa);
 		spa_activate(spa, orig_mode);
 
-		return (spa_load(spa, newconfig, state, B_TRUE));
+		return (spa_load(spa, nvconfig, state, B_TRUE));
 	}
 
 	if (zap_lookup(spa->spa_meta_objset,
@@ -1471,7 +1468,10 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		spa_config_exit(spa, SCL_ALL, FTAG);
 	}
 
-	spa_load_log_state(spa);
+	VERIFY(nvlist_lookup_nvlist(nvconfig, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) == 0);
+	spa_load_log_state(spa, nvroot);
+	nvlist_free(nvconfig);
 
 	if (spa_check_logs(spa)) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
@@ -2910,7 +2910,7 @@ spa_reset(char *pool)
 int
 spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 {
-	uint64_t txg;
+	uint64_t txg, id;
 	int error;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd, *tvd;
@@ -2951,9 +2951,19 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	 * Transfer each new top-level vdev from vd to rvd.
 	 */
 	for (int c = 0; c < vd->vdev_children; c++) {
+
+		/*
+		 * Set the vdev id to the first hole, if one exists.
+		 */
+		for (id = 0; id < rvd->vdev_children; id++) {
+			if (rvd->vdev_child[id]->vdev_ishole) {
+				vdev_free(rvd->vdev_child[id]);
+				break;
+			}
+		}
 		tvd = vd->vdev_child[c];
 		vdev_remove_child(vd, tvd);
-		tvd->vdev_id = rvd->vdev_children;
+		tvd->vdev_id = id;
 		vdev_add_child(rvd, tvd);
 		vdev_config_dirty(tvd);
 	}
@@ -3136,6 +3146,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	 */
 	vdev_remove_child(newrootvd, newvd);
 	newvd->vdev_id = pvd->vdev_children;
+	newvd->vdev_crtxg = oldvd->vdev_crtxg;
 	vdev_add_child(pvd, newvd);
 
 	tvd = newvd->vdev_top;
@@ -3444,16 +3455,127 @@ spa_vdev_remove_aux(nvlist_t *config, char *name, nvlist_t **dev, int count,
 }
 
 /*
+ * Removing a device from the vdev namespace requires several steps
+ * and can take a significant amount of time.  As a result we use
+ * the spa_vdev_config_[enter/exit] functions which allow us to
+ * grab and release the spa_config_lock while still holding the namespace
+ * lock.  During each step the configuration is synced out.
+ */
+
+/*
+ * Initial phase of device removal - stop future allocations from this device.
+ */
+void
+spa_vdev_remove_start(spa_t *spa, vdev_t *vd)
+{
+	metaslab_group_t *mg = vd->vdev_mg;
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == SCL_ALL);
+
+	/*
+	 * Remove our vdev from the allocatable vdevs
+	 */
+	if (mg)
+		metaslab_class_remove(mg->mg_class, mg);
+}
+
+/*
+ * Evacuate the device.
+ */
+int
+spa_vdev_remove_evacuate(spa_t *spa, vdev_t *vd)
+{
+	uint64_t txg;
+	int error;
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == 0);
+
+	/*
+	 * Evacuate the device.  We don't hold the config lock as writer
+	 * since we need to do I/O but we do keep the
+	 * spa_namespace_lock held.  Once this completes the device
+	 * should no longer have any blocks allocated on it.
+	 */
+	if (vd->vdev_islog) {
+		/*
+		 * Evacuate the device.
+		 */
+		if (error = dmu_objset_find(spa_name(spa),
+		    zil_vdev_offline, NULL, DS_FIND_CHILDREN)) {
+			uint64_t txg;
+
+			txg = spa_vdev_config_enter(spa);
+			metaslab_class_add(spa->spa_log_class,
+			    vd->vdev_mg);
+			return (spa_vdev_exit(spa, NULL, txg, error));
+		}
+		txg_wait_synced(spa_get_dsl(spa), 0);
+	}
+
+	/*
+	 * Remove any remaining MOS metadata associated with the device.
+	 */
+	txg = spa_vdev_config_enter(spa);
+	vd->vdev_removing = B_TRUE;
+	vdev_dirty(vd, 0, NULL, txg);
+	vdev_config_dirty(vd);
+	spa_vdev_config_exit(spa, NULL, txg, 0, FTAG);
+
+	return (0);
+}
+
+/*
+ * Complete the removal by cleaning up the namespace.
+ */
+void
+spa_vdev_remove_done(spa_t *spa, vdev_t *vd)
+{
+	vdev_t *rvd = spa->spa_root_vdev;
+	metaslab_group_t *mg = vd->vdev_mg;
+	uint64_t id = vd->vdev_id;
+	boolean_t last_vdev = (id == (rvd->vdev_children - 1));
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == SCL_ALL);
+
+	(void) vdev_label_init(vd, 0, VDEV_LABEL_REMOVE);
+	vdev_free(vd);
+
+	/*
+	 * It's possible that another thread is trying todo a spa_vdev_add()
+	 * at the same time we're trying remove it. As a result the
+	 * added vdev may not have initialized its metaslabs yet.
+	 */
+	if (mg != NULL)
+		metaslab_group_destroy(mg);
+
+	if (last_vdev) {
+		vdev_compact_children(rvd);
+	} else {
+		vd = vdev_alloc_common(spa, id, 0, &vdev_hole_ops);
+		vdev_add_child(rvd, vd);
+	}
+	vdev_config_dirty(rvd);
+
+	/*
+	 * Reassess the health of our root vdev.
+	 */
+	vdev_reopen(rvd);
+}
+
+/*
  * Remove a device from the pool.  Currently, this supports removing only hot
- * spares and level 2 ARC devices.
+ * spares, slogs, and level 2 ARC devices.
  */
 int
 spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 {
 	vdev_t *vd;
 	nvlist_t **spares, **l2cache, *nv;
-	uint_t nspares, nl2cache;
 	uint64_t txg = 0;
+	uint_t nspares, nl2cache;
 	int error = 0;
 	boolean_t locked = MUTEX_HELD(&spa_namespace_lock);
 
@@ -3489,6 +3611,29 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		    ZPOOL_CONFIG_L2CACHE, l2cache, nl2cache, nv);
 		spa_load_l2cache(spa);
 		spa->spa_l2cache.sav_sync = B_TRUE;
+	} else if (vd != NULL && vd->vdev_islog) {
+		ASSERT(!locked);
+
+		/*
+		 * XXX - Once we have bp-rewrite this should
+		 * become the common case.
+		 */
+
+		/*
+		 * 1. Stop allocations
+		 * 2. Evacuate the device (i.e. kill off stubby and
+		 *    metadata) and wait for it to complete (i.e. sync).
+		 * 3. Cleanup the vdev namespace.
+		 */
+		spa_vdev_remove_start(spa, vd);
+
+		spa_vdev_config_exit(spa, NULL, txg, 0, FTAG);
+		if ((error = spa_vdev_remove_evacuate(spa, vd)) != 0)
+			return (error);
+		txg = spa_vdev_config_enter(spa);
+
+		spa_vdev_remove_done(spa, vd);
+
 	} else if (vd != NULL) {
 		/*
 		 * Normal vdevs cannot be removed (yet).

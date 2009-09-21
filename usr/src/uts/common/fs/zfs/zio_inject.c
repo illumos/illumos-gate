@@ -96,6 +96,30 @@ zio_match_handler(zbookmark_t *zb, uint64_t type,
 }
 
 /*
+ * Panic the system when a config change happens in the function
+ * specified by tag.
+ */
+void
+zio_handle_panic_injection(spa_t *spa, char *tag)
+{
+	inject_handler_t *handler;
+
+	rw_enter(&inject_lock, RW_READER);
+
+	for (handler = list_head(&inject_handlers); handler != NULL;
+	    handler = list_next(&inject_handlers, handler)) {
+
+		if (spa != handler->zi_spa)
+			continue;
+
+		if (strcmp(tag, handler->zi_record.zi_func) == 0)
+			panic("Panic requested in function %s\n", tag);
+	}
+
+	rw_exit(&inject_lock);
+}
+
+/*
  * Determine if the I/O in question should return failure.  Returns the errno
  * to be returned to the caller.
  */
@@ -126,8 +150,9 @@ zio_handle_fault_injection(zio_t *zio, int error)
 		if (zio->io_spa != handler->zi_spa)
 			continue;
 
-		/* Ignore device errors */
-		if (handler->zi_record.zi_guid != 0)
+		/* Ignore device errors and panic injection */
+		if (handler->zi_record.zi_guid != 0 ||
+		    handler->zi_record.zi_func[0] != '\0')
 			continue;
 
 		/* If this handler matches, return EIO */
@@ -170,8 +195,9 @@ zio_handle_label_injection(zio_t *zio, int error)
 		uint64_t start = handler->zi_record.zi_start;
 		uint64_t end = handler->zi_record.zi_end;
 
-		/* Ignore device only faults */
-		if (handler->zi_record.zi_start == 0)
+		/* Ignore device only faults or panic injection */
+		if (handler->zi_record.zi_start == 0 ||
+		    handler->zi_record.zi_func[0] != '\0')
 			continue;
 
 		/*
@@ -205,8 +231,9 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 	for (handler = list_head(&inject_handlers); handler != NULL;
 	    handler = list_next(&inject_handlers, handler)) {
 
-		/* Ignore label specific faults */
-		if (handler->zi_record.zi_start != 0)
+		/* Ignore label specific faults or panic injection */
+		if (handler->zi_record.zi_start != 0 ||
+		    handler->zi_record.zi_func[0] != '\0')
 			continue;
 
 		if (vd->vdev_guid == handler->zi_record.zi_guid) {

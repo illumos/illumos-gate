@@ -1043,7 +1043,7 @@ ztop(char *arg, char *diskname)
 		libzfs_fini(lzfs);
 		return (-1);
 	}
-	vname = zpool_vdev_name(lzfs, zpool_handle, child[0]);
+	vname = zpool_vdev_name(lzfs, zpool_handle, child[0], B_FALSE);
 	if (vname == NULL) {
 		mesg(MERR, "couldn't determine vdev name\n");
 		zpool_close(zpool_handle);

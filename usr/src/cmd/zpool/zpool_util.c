@@ -49,22 +49,6 @@ safe_malloc(size_t size)
 }
 
 /*
- * Same as above, but for strdup()
- */
-char *
-zpool_safe_strdup(const char *str)
-{
-	char *ret;
-
-	if ((ret = strdup(str)) == NULL) {
-		(void) fprintf(stderr, "internal error: out of memory\n");
-		exit(1);
-	}
-
-	return (ret);
-}
-
-/*
  * Display an out of memory error message and abort the current program.
  */
 void

@@ -166,7 +166,7 @@ replace_with_spare(zpool_handle_t *zhp, nvlist_t *vdev)
 		return;
 	}
 
-	dev_name = zpool_vdev_name(NULL, zhp, vdev);
+	dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
 
 	/*
 	 * Try to replace each spare, ending when we successfully

@@ -166,6 +166,7 @@ SUNW_1.1 {
 
 SUNWprivate_1.1 {
     global:
+	dump_nvlist;
 	nvlist_add_hrtime;
 	nvlist_lookup_hrtime;
 	nvlist_print;

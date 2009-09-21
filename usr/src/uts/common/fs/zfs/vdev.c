@@ -54,6 +54,7 @@ static vdev_ops_t *vdev_ops_table[] = {
 	&vdev_disk_ops,
 	&vdev_file_ops,
 	&vdev_missing_ops,
+	&vdev_hole_ops,
 	NULL
 };
 
@@ -281,7 +282,7 @@ vdev_compact_children(vdev_t *pvd)
 /*
  * Allocate and minimally initialize a vdev_t.
  */
-static vdev_t *
+vdev_t *
 vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 {
 	vdev_t *vd;
@@ -293,7 +294,7 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 		spa->spa_root_vdev = vd;
 	}
 
-	if (guid == 0) {
+	if (guid == 0 && ops != &vdev_hole_ops) {
 		if (spa->spa_root_vdev == vd) {
 			/*
 			 * The root vdev's guid will also be the pool guid,
@@ -318,6 +319,7 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	vd->vdev_guid_sum = guid;
 	vd->vdev_ops = ops;
 	vd->vdev_state = VDEV_STATE_CLOSED;
+	vd->vdev_ishole = (ops == &vdev_hole_ops);
 
 	mutex_init(&vd->vdev_dtl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_stat_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -397,6 +399,9 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (islog && spa_version(spa) < SPA_VERSION_SLOGS)
 		return (ENOTSUP);
 
+	if (ops == &vdev_hole_ops && spa_version(spa) < SPA_VERSION_HOLES)
+		return (ENOTSUP);
+
 	/*
 	 * Set the nparity property for RAID-Z vdevs.
 	 */
@@ -470,6 +475,12 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	 * Get the alignment requirement.
 	 */
 	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ASHIFT, &vd->vdev_ashift);
+
+	/*
+	 * Retrieve the vdev creation time.
+	 */
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_CREATE_TXG,
+	    &vd->vdev_crtxg);
 
 	/*
 	 * If we're a top-level vdev, try to load the allocation parameters.
@@ -705,6 +716,7 @@ vdev_add_parent(vdev_t *cvd, vdev_ops_t *ops)
 	mvd->vdev_min_asize = cvd->vdev_min_asize;
 	mvd->vdev_ashift = cvd->vdev_ashift;
 	mvd->vdev_state = cvd->vdev_state;
+	mvd->vdev_crtxg = cvd->vdev_crtxg;
 
 	vdev_remove_child(pvd, cvd);
 	vdev_add_child(pvd, mvd);
@@ -772,8 +784,13 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	metaslab_t **mspp;
 	int error;
 
-	if (vd->vdev_ms_shift == 0)	/* not being allocated from yet */
+	/*
+	 * This vdev is not being allocated from yet or is a hole.
+	 */
+	if (vd->vdev_ms_shift == 0)
 		return (0);
+
+	ASSERT(!vd->vdev_ishole);
 
 	/*
 	 * Compute the raidz-deflation ratio.  Note, we hard-code
@@ -1105,6 +1122,12 @@ vdev_open(vdev_t *vd)
 		vd->vdev_state = VDEV_STATE_HEALTHY;
 	}
 
+	/*
+	 * For hole or missing vdevs we just return success.
+	 */
+	if (vd->vdev_ishole || vd->vdev_ops == &vdev_missing_ops)
+		return (0);
+
 	for (int c = 0; c < vd->vdev_children; c++) {
 		if (vd->vdev_child[c]->vdev_state != VDEV_STATE_HEALTHY) {
 			vdev_set_state(vd, B_TRUE, VDEV_STATE_DEGRADED,
@@ -1393,6 +1416,7 @@ void
 vdev_dirty(vdev_t *vd, int flags, void *arg, uint64_t txg)
 {
 	ASSERT(vd == vd->vdev_top);
+	ASSERT(!vd->vdev_ishole);
 	ASSERT(ISP2(flags));
 
 	if (flags & VDD_METASLAB)
@@ -1502,7 +1526,7 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		vdev_dtl_reassess(vd->vdev_child[c], txg,
 		    scrub_txg, scrub_done);
 
-	if (vd == spa->spa_root_vdev)
+	if (vd == spa->spa_root_vdev || vd->vdev_ishole)
 		return;
 
 	if (vd->vdev_ops->vdev_op_leaf) {
@@ -1592,6 +1616,8 @@ vdev_dtl_load(vdev_t *vd)
 	if (smo->smo_object == 0)
 		return (0);
 
+	ASSERT(!vd->vdev_ishole);
+
 	if ((error = dmu_bonus_hold(mos, smo->smo_object, FTAG, &db)) != 0)
 		return (error);
 
@@ -1618,6 +1644,8 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 	kmutex_t smlock;
 	dmu_buf_t *db;
 	dmu_tx_t *tx;
+
+	ASSERT(!vd->vdev_ishole);
 
 	tx = dmu_tx_create_assigned(spa->spa_dsl_pool, txg);
 
@@ -1755,7 +1783,7 @@ vdev_load(vdev_t *vd)
 	/*
 	 * If this is a top-level vdev, initialize its metaslabs.
 	 */
-	if (vd == vd->vdev_top &&
+	if (vd == vd->vdev_top && !vd->vdev_ishole &&
 	    (vd->vdev_ashift == 0 || vd->vdev_asize == 0 ||
 	    vdev_metaslab_init(vd, 0) != 0))
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
@@ -1812,9 +1840,47 @@ vdev_validate_aux(vdev_t *vd)
 }
 
 void
+vdev_remove(vdev_t *vd, uint64_t txg)
+{
+	spa_t *spa = vd->vdev_spa;
+	objset_t *mos = spa->spa_meta_objset;
+	dmu_tx_t *tx;
+
+	tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
+
+	if (vd->vdev_dtl_smo.smo_object) {
+		ASSERT3U(vd->vdev_dtl_smo.smo_alloc, ==, 0);
+		(void) dmu_object_free(mos, vd->vdev_dtl_smo.smo_object, tx);
+		vd->vdev_dtl_smo.smo_object = 0;
+	}
+
+	if (vd->vdev_ms != NULL) {
+		for (int m = 0; m < vd->vdev_ms_count; m++) {
+			metaslab_t *msp = vd->vdev_ms[m];
+
+			if (msp == NULL || msp->ms_smo.smo_object == 0)
+				continue;
+
+			ASSERT3U(msp->ms_smo.smo_alloc, ==, 0);
+			(void) dmu_object_free(mos, msp->ms_smo.smo_object, tx);
+			msp->ms_smo.smo_object = 0;
+		}
+	}
+
+	if (vd->vdev_ms_array) {
+		(void) dmu_object_free(mos, vd->vdev_ms_array, tx);
+		vd->vdev_ms_array = 0;
+		vd->vdev_ms_shift = 0;
+	}
+	dmu_tx_commit(tx);
+}
+
+void
 vdev_sync_done(vdev_t *vd, uint64_t txg)
 {
 	metaslab_t *msp;
+
+	ASSERT(!vd->vdev_ishole);
 
 	while (msp = txg_list_remove(&vd->vdev_ms_list, TXG_CLEAN(txg)))
 		metaslab_sync_done(msp, txg);
@@ -1828,6 +1894,8 @@ vdev_sync(vdev_t *vd, uint64_t txg)
 	metaslab_t *msp;
 	dmu_tx_t *tx;
 
+	ASSERT(!vd->vdev_ishole);
+
 	if (vd->vdev_ms_array == 0 && vd->vdev_ms_shift != 0) {
 		ASSERT(vd == vd->vdev_top);
 		tx = dmu_tx_create_assigned(spa->spa_dsl_pool, txg);
@@ -1837,6 +1905,9 @@ vdev_sync(vdev_t *vd, uint64_t txg)
 		vdev_config_dirty(vd);
 		dmu_tx_commit(tx);
 	}
+
+	if (vd->vdev_removing)
+		vdev_remove(vd, txg);
 
 	while ((msp = txg_list_remove(&vd->vdev_ms_list, txg)) != NULL) {
 		metaslab_sync(msp, txg);
@@ -2110,7 +2181,15 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 boolean_t
 vdev_is_dead(vdev_t *vd)
 {
-	return (vd->vdev_state < VDEV_STATE_DEGRADED);
+	/*
+	 * Holes and missing devices are always considered "dead".
+	 * This simplifies the code since we don't have to check for
+	 * these types of devices in the various code paths.
+	 * Instead we rely on the fact that we skip over dead devices
+	 * before issuing I/O to them.
+	 */
+	return (vd->vdev_state < VDEV_STATE_DEGRADED || vd->vdev_ishole ||
+	    vd->vdev_ops == &vdev_missing_ops);
 }
 
 boolean_t
@@ -2139,7 +2218,7 @@ vdev_allocatable(vdev_t *vd)
 	 * we're asking two separate questions about it.
 	 */
 	return (!(state < VDEV_STATE_DEGRADED && state != VDEV_STATE_CLOSED) &&
-	    !vd->vdev_cant_write);
+	    !vd->vdev_cant_write && !vd->vdev_ishole && !vd->vdev_removing);
 }
 
 boolean_t
@@ -2391,7 +2470,7 @@ vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta,
 		 * Don't count non-normal (e.g. intent log) space as part of
 		 * the pool's capacity.
 		 */
-		if (vd->vdev_mg->mg_class != spa->spa_normal_class)
+		if (vd->vdev_islog)
 			return;
 
 		mutex_enter(&rvd->vdev_stat_lock);
@@ -2472,7 +2551,8 @@ vdev_config_dirty(vdev_t *vd)
 	} else {
 		ASSERT(vd == vd->vdev_top);
 
-		if (!list_link_active(&vd->vdev_config_dirty_node))
+		if (!list_link_active(&vd->vdev_config_dirty_node) &&
+		    !vd->vdev_ishole)
 			list_insert_head(&spa->spa_config_dirty_list, vd);
 	}
 }
@@ -2545,6 +2625,12 @@ vdev_propagate_state(vdev_t *vd)
 	if (vd->vdev_children > 0) {
 		for (int c = 0; c < vd->vdev_children; c++) {
 			child = vd->vdev_child[c];
+
+			/*
+			 * Don't factor holes into the decision.
+			 */
+			if (child->vdev_ishole)
+				continue;
 
 			if (!vdev_readable(child) ||
 			    (!vdev_writeable(child) && spa_writeable(spa))) {
@@ -2739,32 +2825,31 @@ vdev_is_bootable(vdev_t *vd)
 	return (B_TRUE);
 }
 
+/*
+ * Load the state from the original vdev tree (ovd) which
+ * we've retrieved from the MOS config object. If the original
+ * vdev was offline then we transfer that state to the device
+ * in the current vdev tree (nvd).
+ */
 void
-vdev_load_log_state(vdev_t *vd, nvlist_t *nv)
+vdev_load_log_state(vdev_t *nvd, vdev_t *ovd)
 {
-	uint_t children;
-	nvlist_t **child;
-	uint64_t val;
-	spa_t *spa = vd->vdev_spa;
+	spa_t *spa = nvd->vdev_spa;
 
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0) {
-		for (int c = 0; c < children; c++)
-			vdev_load_log_state(vd->vdev_child[c], child[c]);
-	}
+	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
+	ASSERT3U(nvd->vdev_guid, ==, ovd->vdev_guid);
 
-	if (vd->vdev_ops->vdev_op_leaf && nvlist_lookup_uint64(nv,
-	    ZPOOL_CONFIG_OFFLINE, &val) == 0 && val) {
+	for (int c = 0; c < nvd->vdev_children; c++)
+		vdev_load_log_state(nvd->vdev_child[c], ovd->vdev_child[c]);
 
+	if (nvd->vdev_ops->vdev_op_leaf && ovd->vdev_offline) {
 		/*
 		 * It would be nice to call vdev_offline()
 		 * directly but the pool isn't fully loaded and
 		 * the txg threads have not been started yet.
 		 */
-		spa_config_enter(spa, SCL_STATE_ALL, FTAG, RW_WRITER);
-		vd->vdev_offline = val;
-		vdev_reopen(vd->vdev_top);
-		spa_config_exit(spa, SCL_STATE_ALL, FTAG);
+		nvd->vdev_offline = ovd->vdev_offline;
+		vdev_reopen(nvd->vdev_top);
 	}
 }
 

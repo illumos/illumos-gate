@@ -222,6 +222,11 @@ usage(void)
 	    "\t\tClear the particular record (if given a numeric ID), or\n"
 	    "\t\tall records if 'all' is specificed.\n"
 	    "\n"
+	    "\tzinject -p <function name> pool\n"
+	    "\t\tInject a panic fault at the specified function. Only \n"
+	    "\t\tfunctions which call spa_vdev_config_exit(), or \n"
+	    "\t\tspa_vdev_exit() will trigger a panic.\n"
+	    "\n"
 	    "\tzinject -d device [-e errno] [-L <nvlist|uber>] [-F] pool\n"
 	    "\t\tInject a fault into a particular device or the device's\n"
 	    "\t\tlabel.  Label injection can either be 'nvlist' or 'uber'.\n"
@@ -295,7 +300,7 @@ print_data_handler(int id, const char *pool, zinject_record_t *record,
 {
 	int *count = data;
 
-	if (record->zi_guid != 0)
+	if (record->zi_guid != 0 || record->zi_func[0] != '\0')
 		return (0);
 
 	if (*count == 0) {
@@ -327,7 +332,7 @@ print_device_handler(int id, const char *pool, zinject_record_t *record,
 {
 	int *count = data;
 
-	if (record->zi_guid == 0)
+	if (record->zi_guid == 0 || record->zi_func[0] != '\0')
 		return (0);
 
 	if (*count == 0) {
@@ -339,6 +344,27 @@ print_device_handler(int id, const char *pool, zinject_record_t *record,
 
 	(void) printf("%3d  %-15s  %llx\n", id, pool,
 	    (u_longlong_t)record->zi_guid);
+
+	return (0);
+}
+
+static int
+print_panic_handler(int id, const char *pool, zinject_record_t *record,
+    void *data)
+{
+	int *count = data;
+
+	if (record->zi_func[0] == '\0')
+		return (0);
+
+	if (*count == 0) {
+		(void) printf("%3s  %-15s  %s\n", "ID", "POOL", "FUNCTION");
+		(void) printf("---  ---------------  ----------------\n");
+	}
+
+	*count += 1;
+
+	(void) printf("%3d  %-15s  %s\n", id, pool, record->zi_func);
 
 	return (0);
 }
@@ -356,6 +382,9 @@ print_all_handlers(void)
 	(void) printf("\n");
 	count = 0;
 	(void) iter_handlers(print_data_handler, &count);
+	(void) printf("\n");
+	count = 0;
+	(void) iter_handlers(print_panic_handler, &count);
 
 	return (count);
 }
@@ -443,6 +472,9 @@ register_handler(const char *pool, int flags, zinject_record_t *record,
 		if (record->zi_guid) {
 			(void) printf("  vdev: %llx\n",
 			    (u_longlong_t)record->zi_guid);
+		} else if (record->zi_func[0] != '\0') {
+			(void) printf("  panic function: %s\n",
+			    record->zi_func);
 		} else {
 			(void) printf("objset: %llu\n",
 			    (u_longlong_t)record->zi_objset);
@@ -514,7 +546,7 @@ main(int argc, char **argv)
 		return (0);
 	}
 
-	while ((c = getopt(argc, argv, ":ab:d:f:Fqhc:t:l:mr:e:uL:")) != -1) {
+	while ((c = getopt(argc, argv, ":ab:d:f:Fqhc:t:l:mr:e:uL:p:")) != -1) {
 		switch (c) {
 		case 'a':
 			flags |= ZINJECT_FLUSH_ARC;
@@ -569,6 +601,10 @@ main(int argc, char **argv)
 		case 'm':
 			domount = 1;
 			break;
+		case 'p':
+			(void) strlcpy(record.zi_func, optarg,
+			    sizeof (record.zi_func));
+			break;
 		case 'q':
 			quiet = 1;
 			break;
@@ -617,7 +653,7 @@ main(int argc, char **argv)
 		 * '-c' is invalid with any other options.
 		 */
 		if (raw != NULL || range != NULL || type != TYPE_INVAL ||
-		    level != 0) {
+		    level != 0 || record.zi_func[0] != '\0') {
 			(void) fprintf(stderr, "cancel (-c) incompatible with "
 			    "any other options\n");
 			usage();
@@ -649,7 +685,7 @@ main(int argc, char **argv)
 		 * for doing injection, so handle it separately here.
 		 */
 		if (raw != NULL || range != NULL || type != TYPE_INVAL ||
-		    level != 0) {
+		    level != 0 || record.zi_func[0] != '\0') {
 			(void) fprintf(stderr, "device (-d) incompatible with "
 			    "data error injection\n");
 			usage();
@@ -677,7 +713,8 @@ main(int argc, char **argv)
 		if (!error)
 			error = ENXIO;
 	} else if (raw != NULL) {
-		if (range != NULL || type != TYPE_INVAL || level != 0) {
+		if (range != NULL || type != TYPE_INVAL || level != 0 ||
+		    record.zi_func[0] != '\0') {
 			(void) fprintf(stderr, "raw (-b) format with "
 			    "any other options\n");
 			usage();
@@ -704,10 +741,28 @@ main(int argc, char **argv)
 			return (1);
 		if (!error)
 			error = EIO;
+	} else if (record.zi_func[0] != '\0') {
+		if (raw != NULL || range != NULL || type != TYPE_INVAL ||
+		    level != 0 || device != NULL) {
+			(void) fprintf(stderr, "panic (-p) incompatible with "
+			    "other options\n");
+			usage();
+			return (2);
+		}
+
+		if (argc != 1) {
+			(void) fprintf(stderr, "panic (-p) injection requires "
+			    "a single pool name\n");
+			usage();
+			return (2);
+		}
+
+		(void) strcpy(pool, argv[0]);
+		dataset[0] = '\0';
 	} else if (type == TYPE_INVAL) {
 		if (flags == 0) {
 			(void) fprintf(stderr, "at least one of '-b', '-d', "
-			    "'-t', '-a', or '-u' must be specified\n");
+			    "'-t', '-a', '-p', or '-u' must be specified\n");
 			usage();
 			return (2);
 		}

@@ -37,7 +37,6 @@ extern "C" {
  * Basic utility functions
  */
 void *safe_malloc(size_t);
-char *zpool_safe_strdup(const char *);
 void zpool_no_memory(void);
 uint_t num_logs(nvlist_t *nv);
 

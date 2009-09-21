@@ -146,68 +146,6 @@ fatal(const char *fmt, ...)
 	exit(1);
 }
 
-static void
-dump_nvlist(nvlist_t *list, int indent)
-{
-	nvpair_t *elem = NULL;
-
-	while ((elem = nvlist_next_nvpair(list, elem)) != NULL) {
-		switch (nvpair_type(elem)) {
-		case DATA_TYPE_STRING:
-			{
-				char *value;
-
-				VERIFY(nvpair_value_string(elem, &value) == 0);
-				(void) printf("%*s%s='%s'\n", indent, "",
-				    nvpair_name(elem), value);
-			}
-			break;
-
-		case DATA_TYPE_UINT64:
-			{
-				uint64_t value;
-
-				VERIFY(nvpair_value_uint64(elem, &value) == 0);
-				(void) printf("%*s%s=%llu\n", indent, "",
-				    nvpair_name(elem), (u_longlong_t)value);
-			}
-			break;
-
-		case DATA_TYPE_NVLIST:
-			{
-				nvlist_t *value;
-
-				VERIFY(nvpair_value_nvlist(elem, &value) == 0);
-				(void) printf("%*s%s\n", indent, "",
-				    nvpair_name(elem));
-				dump_nvlist(value, indent + 4);
-			}
-			break;
-
-		case DATA_TYPE_NVLIST_ARRAY:
-			{
-				nvlist_t **value;
-				uint_t c, count;
-
-				VERIFY(nvpair_value_nvlist_array(elem, &value,
-				    &count) == 0);
-
-				for (c = 0; c < count; c++) {
-					(void) printf("%*s%s[%u]\n", indent, "",
-					    nvpair_name(elem), c);
-					dump_nvlist(value[c], indent + 8);
-				}
-			}
-			break;
-
-		default:
-
-			(void) printf("bad config type %d for %s\n",
-			    nvpair_type(elem), nvpair_name(elem));
-		}
-	}
-}
-
 /* ARGSUSED */
 static void
 dump_packed_nvlist(objset_t *os, uint64_t object, void *data, size_t size)

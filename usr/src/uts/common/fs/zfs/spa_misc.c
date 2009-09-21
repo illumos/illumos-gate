@@ -836,6 +836,18 @@ uint64_t
 spa_vdev_enter(spa_t *spa)
 {
 	mutex_enter(&spa_namespace_lock);
+	return (spa_vdev_config_enter(spa));
+}
+
+/*
+ * Internal implementation for spa_vdev_enter().  Used when a vdev
+ * operation requires multiple syncs (i.e. removing a device) while
+ * keeping the spa_namespace_lock held.
+ */
+uint64_t
+spa_vdev_config_enter(spa_t *spa)
+{
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
 	spa_config_enter(spa, SCL_ALL, spa, RW_WRITER);
 
@@ -843,14 +855,14 @@ spa_vdev_enter(spa_t *spa)
 }
 
 /*
- * Unlock the spa_t after adding or removing a vdev.  Besides undoing the
- * locking of spa_vdev_enter(), we also want make sure the transactions have
- * synced to disk, and then update the global configuration cache with the new
- * information.
+ * Used in combination with spa_vdev_config_enter() to allow the syncing
+ * of multiple transactions without releasing the spa_namespace_lock.
  */
-int
-spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
+void
+spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 {
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+
 	int config_changed = B_FALSE;
 
 	ASSERT(txg > spa_last_synced_txg(spa));
@@ -870,7 +882,21 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 		config_changed = B_TRUE;
 	}
 
+	/*
+	 * Verify the metaslab classes.
+	 */
+	ASSERT(metaslab_class_validate(spa->spa_normal_class) == 0);
+	ASSERT(metaslab_class_validate(spa->spa_log_class) == 0);
+
 	spa_config_exit(spa, SCL_ALL, spa);
+
+	/*
+	 * Panic the system if the specified tag requires it.  This
+	 * is useful for ensuring that configurations are updated
+	 * transactionally.
+	 */
+	if (zio_injection_enabled)
+		zio_handle_panic_injection(spa, tag);
 
 	/*
 	 * Note: this txg_wait_synced() is important because it ensures
@@ -892,7 +918,18 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	 */
 	if (config_changed)
 		spa_config_sync(spa, B_FALSE, B_TRUE);
+}
 
+/*
+ * Unlock the spa_t after adding or removing a vdev.  Besides undoing the
+ * locking of spa_vdev_enter(), we also want make sure the transactions have
+ * synced to disk, and then update the global configuration cache with the new
+ * information.
+ */
+int
+spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
+{
+	spa_vdev_config_exit(spa, vd, txg, error, FTAG);
 	mutex_exit(&spa_namespace_lock);
 
 	return (error);

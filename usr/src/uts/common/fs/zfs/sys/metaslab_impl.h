@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 struct metaslab_class {
+	spa_t			*mc_spa;
 	metaslab_group_t	*mc_rotor;
 	uint64_t		mc_allocated;
 	space_map_ops_t		*mc_ops;

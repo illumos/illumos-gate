@@ -92,6 +92,7 @@
 #include <sys/vdev_impl.h>
 #include <sys/vdev_file.h>
 #include <sys/spa_impl.h>
+#include <sys/metaslab_impl.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
 #include <sys/refcount.h>
@@ -231,7 +232,7 @@ ztest_info_t ztest_info[] = {
 typedef struct ztest_shared {
 	mutex_t		zs_vdev_lock;
 	rwlock_t	zs_name_lock;
-	uint64_t	zs_vdev_primaries;
+	uint64_t	zs_vdev_next_leaf;
 	uint64_t	zs_vdev_aux;
 	uint64_t	zs_enospc_count;
 	hrtime_t	zs_start_time;
@@ -558,7 +559,7 @@ make_vdev_file(char *path, char *aux, size_t size, uint64_t ashift)
 			(void) sprintf(path, ztest_aux_template,
 			    zopt_dir, zopt_pool, aux, vdev);
 		} else {
-			vdev = ztest_shared->zs_vdev_primaries++;
+			vdev = ztest_shared->zs_vdev_next_leaf++;
 			(void) sprintf(path, ztest_dev_template,
 			    zopt_dir, zopt_pool, vdev);
 		}
@@ -850,6 +851,26 @@ vdev_lookup_by_path(vdev_t *vd, const char *path)
 }
 
 /*
+ * Find the first available hole which can be used as a top-level.
+ */
+int
+find_vdev_hole(spa_t *spa)
+{
+	vdev_t *rvd = spa->spa_root_vdev;
+	int c;
+
+	ASSERT(spa_config_held(spa, SCL_VDEV, RW_READER) == SCL_VDEV);
+
+	for (c = 0; c < rvd->vdev_children; c++) {
+		vdev_t *cvd = rvd->vdev_child[c];
+
+		if (cvd->vdev_ishole)
+			break;
+	}
+	return (c);
+}
+
+/*
  * Verify that vdev_add() works as expected.
  */
 void
@@ -857,6 +878,7 @@ ztest_vdev_add_remove(ztest_args_t *za)
 {
 	spa_t *spa = za->za_spa;
 	uint64_t leaves = MAX(zopt_mirrors, 1) * zopt_raidz;
+	uint64_t guid;
 	nvlist_t *nvroot;
 	int error;
 
@@ -864,26 +886,52 @@ ztest_vdev_add_remove(ztest_args_t *za)
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
 
-	ztest_shared->zs_vdev_primaries =
-	    spa->spa_root_vdev->vdev_children * leaves;
-
-	spa_config_exit(spa, SCL_VDEV, FTAG);
+	ztest_shared->zs_vdev_next_leaf = find_vdev_hole(spa) * leaves;
 
 	/*
-	 * Make 1/4 of the devices be log devices.
+	 * If we have slogs then remove them 1/4 of the time.
 	 */
-	nvroot = make_vdev_root(NULL, NULL, zopt_vdev_size, 0,
-	    ztest_random(4) == 0, zopt_raidz, zopt_mirrors, 1);
+	if (spa_has_slogs(spa) && ztest_random(4) == 0) {
+		/*
+		 * Grab the guid from the head of the log class rotor.
+		 */
+		guid = spa->spa_log_class->mc_rotor->mg_vd->vdev_guid;
 
-	error = spa_vdev_add(spa, nvroot);
-	nvlist_free(nvroot);
+		spa_config_exit(spa, SCL_VDEV, FTAG);
+
+		/*
+		 * We have to grab the zs_name_lock as writer to
+		 * prevent a race between removing a slog (dmu_objset_find)
+		 * and destroying a dataset. Removing the slog will
+		 * grab a reference on the dataset which may cause
+		 * dmu_objset_destroy() to fail with EBUSY thus
+		 * leaving the dataset in an inconsistent state.
+		 */
+		(void) rw_wrlock(&ztest_shared->zs_name_lock);
+		error = spa_vdev_remove(spa, guid, B_FALSE);
+		(void) rw_unlock(&ztest_shared->zs_name_lock);
+
+		if (error && error != EEXIST)
+			fatal(0, "spa_vdev_remove() = %d", error);
+	} else {
+		spa_config_exit(spa, SCL_VDEV, FTAG);
+
+		/*
+		 * Make 1/4 of the devices be log devices.
+		 */
+		nvroot = make_vdev_root(NULL, NULL, zopt_vdev_size, 0,
+		    ztest_random(4) == 0, zopt_raidz, zopt_mirrors, 1);
+
+		error = spa_vdev_add(spa, nvroot);
+		nvlist_free(nvroot);
+
+		if (error == ENOSPC)
+			ztest_record_enospc("spa_vdev_add");
+		else if (error != 0)
+			fatal(0, "spa_vdev_add() = %d", error);
+	}
 
 	(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
-
-	if (error == ENOSPC)
-		ztest_record_enospc("spa_vdev_add");
-	else if (error != 0)
-		fatal(0, "spa_vdev_add() = %d", error);
 }
 
 /*
@@ -4004,7 +4052,7 @@ ztest_init(char *pool)
 	 * Create the storage pool.
 	 */
 	(void) spa_destroy(pool);
-	ztest_shared->zs_vdev_primaries = 0;
+	ztest_shared->zs_vdev_next_leaf = 0;
 	nvroot = make_vdev_root(NULL, NULL, zopt_vdev_size, 0,
 	    0, zopt_raidz, zopt_mirrors, 1);
 	error = spa_create(pool, nvroot, NULL, NULL, NULL);

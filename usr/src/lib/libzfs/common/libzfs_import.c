@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Pool import support functions.
@@ -388,8 +386,6 @@ refresh_config(libzfs_handle_t *hdl, nvlist_t *config)
 	}
 
 	if (err) {
-		(void) zpool_standard_error(hdl, errno,
-		    dgettext(TEXT_DOMAIN, "cannot discover pools"));
 		zcmd_free_nvlists(&zc);
 		return (NULL);
 	}
@@ -401,6 +397,21 @@ refresh_config(libzfs_handle_t *hdl, nvlist_t *config)
 
 	zcmd_free_nvlists(&zc);
 	return (nvl);
+}
+
+/*
+ * Determine if the vdev id is a hole in the namespace.
+ */
+boolean_t
+vdev_is_hole(uint64_t *hole_array, uint_t holes, uint_t id)
+{
+	for (int c = 0; c < holes; c++) {
+
+		/* Top-level is a hole */
+		if (hole_array[c] == id)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
 }
 
 /*
@@ -425,17 +436,20 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 	uint64_t version, guid;
 	uint_t children = 0;
 	nvlist_t **child = NULL;
+	uint_t holes;
+	uint64_t *hole_array, max_id;
 	uint_t c;
 	boolean_t isactive;
 	uint64_t hostid;
 	nvlist_t *nvl;
 	boolean_t found_one = B_FALSE;
+	boolean_t valid_top_config = B_FALSE;
 
 	if (nvlist_alloc(&ret, 0, 0) != 0)
 		goto nomem;
 
 	for (pe = pl->pools; pe != NULL; pe = pe->pe_next) {
-		uint64_t id;
+		uint64_t id, max_txg = 0;
 
 		if (nvlist_alloc(&config, NV_UNIQUE_NAME, 0) != 0)
 			goto nomem;
@@ -460,6 +474,42 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 				if (ce->ce_txg > best_txg) {
 					tmp = ce->ce_config;
 					best_txg = ce->ce_txg;
+				}
+			}
+
+			/*
+			 * We rely on the fact that the max txg for the
+			 * pool will contain the most up-to-date information
+			 * about the valid top-levels in the vdev namespace.
+			 */
+			if (best_txg > max_txg) {
+				(void) nvlist_remove(config,
+				    ZPOOL_CONFIG_VDEV_CHILDREN,
+				    DATA_TYPE_UINT64);
+				(void) nvlist_remove(config,
+				    ZPOOL_CONFIG_HOLE_ARRAY,
+				    DATA_TYPE_UINT64_ARRAY);
+
+				max_txg = best_txg;
+				hole_array = NULL;
+				holes = 0;
+				max_id = 0;
+				valid_top_config = B_FALSE;
+
+				if (nvlist_lookup_uint64(tmp,
+				    ZPOOL_CONFIG_VDEV_CHILDREN, &max_id) == 0) {
+					verify(nvlist_add_uint64(config,
+					    ZPOOL_CONFIG_VDEV_CHILDREN,
+					    max_id) == 0);
+					valid_top_config = B_TRUE;
+				}
+
+				if (nvlist_lookup_uint64_array(tmp,
+				    ZPOOL_CONFIG_HOLE_ARRAY, &hole_array,
+				    &holes) == 0) {
+					verify(nvlist_add_uint64_array(config,
+					    ZPOOL_CONFIG_HOLE_ARRAY,
+					    hole_array, holes) == 0);
 				}
 			}
 
@@ -522,6 +572,7 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 			    ZPOOL_CONFIG_VDEV_TREE, &nvtop) == 0);
 			verify(nvlist_lookup_uint64(nvtop, ZPOOL_CONFIG_ID,
 			    &id) == 0);
+
 			if (id >= children) {
 				nvlist_t **newchild;
 
@@ -542,8 +593,73 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 
 		}
 
+		/*
+		 * If we have information about all the top-levels then
+		 * clean up the nvlist which we've constructed. This
+		 * means removing any extraneous devices that are
+		 * beyond the valid range or adding devices to the end
+		 * of our array which appear to be missing.
+		 */
+		if (valid_top_config) {
+			if (max_id < children) {
+				for (c = max_id; c < children; c++)
+					nvlist_free(child[c]);
+				children = max_id;
+			} else if (max_id > children) {
+				nvlist_t **newchild;
+
+				newchild = zfs_alloc(hdl, (max_id) *
+				    sizeof (nvlist_t *));
+				if (newchild == NULL)
+					goto nomem;
+
+				for (c = 0; c < children; c++)
+					newchild[c] = child[c];
+
+				free(child);
+				child = newchild;
+				children = max_id;
+			}
+		}
+
 		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
 		    &guid) == 0);
+
+		/*
+		 * The vdev namespace may contain holes as a result of
+		 * device removal. We must add them back into the vdev
+		 * tree before we process any missing devices.
+		 */
+		if (holes > 0) {
+			ASSERT(valid_top_config);
+
+			for (c = 0; c < children; c++) {
+				nvlist_t *holey;
+
+				if (child[c] != NULL ||
+				    !vdev_is_hole(hole_array, holes, c))
+					continue;
+
+				if (nvlist_alloc(&holey, NV_UNIQUE_NAME,
+				    0) != 0)
+					goto nomem;
+
+				/*
+				 * Holes in the namespace are treated as
+				 * "hole" top-level vdevs and have a
+				 * special flag set on them.
+				 */
+				if (nvlist_add_string(holey,
+				    ZPOOL_CONFIG_TYPE,
+				    VDEV_TYPE_HOLE) != 0 ||
+				    nvlist_add_uint64(holey,
+				    ZPOOL_CONFIG_ID, c) != 0 ||
+				    nvlist_add_uint64(holey,
+				    ZPOOL_CONFIG_GUID, 0ULL) != 0)
+					goto nomem;
+				child[c] = holey;
+			}
+		}
 
 		/*
 		 * Look for any missing top-level vdevs.  If this is the case,
@@ -552,7 +668,7 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 		 * certain checks to make sure the vdev IDs match their location
 		 * in the configuration.
 		 */
-		for (c = 0; c < children; c++)
+		for (c = 0; c < children; c++) {
 			if (child[c] == NULL) {
 				nvlist_t *missing;
 				if (nvlist_alloc(&missing, NV_UNIQUE_NAME,
@@ -570,6 +686,7 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 				}
 				child[c] = missing;
 			}
+		}
 
 		/*
 		 * Put all of this pool's top-level vdevs into a root vdev.
@@ -636,8 +753,11 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 			continue;
 		}
 
-		if ((nvl = refresh_config(hdl, config)) == NULL)
-			goto error;
+		if ((nvl = refresh_config(hdl, config)) == NULL) {
+			nvlist_free(config);
+			config = NULL;
+			continue;
+		}
 
 		nvlist_free(config);
 		config = nvl;

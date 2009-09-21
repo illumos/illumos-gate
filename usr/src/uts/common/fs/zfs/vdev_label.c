@@ -287,6 +287,10 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_DTL,
 		    vd->vdev_dtl_smo.smo_object) == 0);
 
+	if (vd->vdev_crtxg)
+		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_CREATE_TXG,
+		    vd->vdev_crtxg) == 0);
+
 	if (getstats) {
 		vdev_stat_t vs;
 		vdev_get_stats(vd, &vs);
@@ -297,6 +301,8 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 	if (!vd->vdev_ops->vdev_op_leaf) {
 		nvlist_t **child;
 		int c;
+
+		ASSERT(!vd->vdev_ishole);
 
 		child = kmem_alloc(vd->vdev_children * sizeof (nvlist_t *),
 		    KM_SLEEP);
@@ -329,9 +335,43 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		if (vd->vdev_unspare)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_UNSPARE,
 			    B_TRUE) == 0);
+		if (vd->vdev_ishole)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_HOLE,
+			    B_TRUE) == 0);
 	}
 
 	return (nv);
+}
+
+/*
+ * Generate a view of the top-level vdevs.  If we currently have holes
+ * in the namespace, then generate an array which contains a list of holey
+ * vdevs.  Additionally, add the number of top-level children that currently
+ * exist.
+ */
+void
+vdev_top_config_generate(spa_t *spa, nvlist_t *config)
+{
+	vdev_t *rvd = spa->spa_root_vdev;
+	uint64_t *array;
+	uint_t idx;
+
+	array = kmem_alloc(rvd->vdev_children * sizeof (uint64_t), KM_SLEEP);
+
+	idx = 0;
+	for (int c = 0; c < rvd->vdev_children; c++) {
+		vdev_t *tvd = rvd->vdev_child[c];
+
+		if (tvd->vdev_ishole)
+			array[idx++] = c;
+	}
+
+	VERIFY(nvlist_add_uint64_array(config, ZPOOL_CONFIG_HOLE_ARRAY,
+	    array, idx++) == 0);
+	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_VDEV_CHILDREN,
+	    rvd->vdev_children) == 0);
+
+	kmem_free(array, rvd->vdev_children * sizeof (uint64_t));
 }
 
 nvlist_t *
@@ -515,6 +555,9 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		if ((error = vdev_label_init(vd->vdev_child[c],
 		    crtxg, reason)) != 0)
 			return (error);
+
+	/* Track the creation time for this vdev */
+	vd->vdev_crtxg = crtxg;
 
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return (0);
@@ -976,6 +1019,9 @@ vdev_label_sync_list(spa_t *spa, int l, uint64_t txg, int flags)
 	for (vd = list_head(dl); vd != NULL; vd = list_next(dl, vd)) {
 		uint64_t *good_writes = kmem_zalloc(sizeof (uint64_t),
 		    KM_SLEEP);
+
+		ASSERT(!vd->vdev_ishole);
+
 		zio_t *vio = zio_null(zio, spa, NULL,
 		    (vd->vdev_islog || vd->vdev_aux != NULL) ?
 		    vdev_label_sync_ignore_done : vdev_label_sync_top_done,

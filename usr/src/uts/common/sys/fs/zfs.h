@@ -295,14 +295,15 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_16			16ULL
 #define	SPA_VERSION_17			17ULL
 #define	SPA_VERSION_18			18ULL
+#define	SPA_VERSION_19			19ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_18
-#define	SPA_VERSION_STRING		"18"
+#define	SPA_VERSION			SPA_VERSION_19
+#define	SPA_VERSION_STRING		"19"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -342,6 +343,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_STMF_PROP		SPA_VERSION_16
 #define	SPA_VERSION_RAIDZ3		SPA_VERSION_17
 #define	SPA_VERSION_USERREFS		SPA_VERSION_18
+#define	SPA_VERSION_HOLES		SPA_VERSION_19
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -401,6 +403,9 @@ typedef enum zfs_cache_type {
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_IS_LOG		"is_log"
 #define	ZPOOL_CONFIG_L2CACHE		"l2cache"
+#define	ZPOOL_CONFIG_HOLE_ARRAY		"hole_array"
+#define	ZPOOL_CONFIG_VDEV_CHILDREN	"vdev_children"
+#define	ZPOOL_CONFIG_IS_HOLE		"is_hole"
 #define	ZPOOL_CONFIG_SUSPENDED		"suspended"	/* not stored on disk */
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp"	/* not stored on disk */
 #define	ZPOOL_CONFIG_BOOTFS		"bootfs"	/* not stored on disk */
@@ -422,6 +427,7 @@ typedef enum zfs_cache_type {
 #define	VDEV_TYPE_DISK			"disk"
 #define	VDEV_TYPE_FILE			"file"
 #define	VDEV_TYPE_MISSING		"missing"
+#define	VDEV_TYPE_HOLE			"hole"
 #define	VDEV_TYPE_SPARE			"spare"
 #define	VDEV_TYPE_LOG			"log"
 #define	VDEV_TYPE_L2CACHE		"l2cache"

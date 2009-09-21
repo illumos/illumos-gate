@@ -383,6 +383,13 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 		vd = vd->vdev_top;		/* label contains top config */
 	}
 
+	/*
+	 * Add the top-level config.  We even add this on pools which
+	 * don't support holes in the namespace as older pools will
+	 * just ignore it.
+	 */
+	vdev_top_config_generate(spa, config);
+
 	nvroot = vdev_config_generate(spa, vd, getstats, B_FALSE, B_FALSE);
 	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, nvroot) == 0);
 	nvlist_free(nvroot);

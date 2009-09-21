@@ -129,6 +129,7 @@ struct vdev {
 	boolean_t	vdev_expanding;	/* expand the vdev?		*/
 	int		vdev_open_error; /* error on last open		*/
 	kthread_t	*vdev_open_thread; /* thread opening children	*/
+	uint64_t	vdev_crtxg;	/* txg when top-level was added */
 
 	/*
 	 * Top-level vdev state.
@@ -143,10 +144,12 @@ struct vdev {
 	txg_node_t	vdev_txg_node;	/* per-txg dirty vdev linkage	*/
 	boolean_t	vdev_remove_wanted; /* async remove wanted?	*/
 	boolean_t	vdev_probe_wanted; /* async probe wanted?	*/
+	boolean_t	vdev_removing;	/* device is being removed?	*/
 	list_node_t	vdev_config_dirty_node; /* config dirty list	*/
 	list_node_t	vdev_state_dirty_node; /* state dirty list	*/
 	uint64_t	vdev_deflate_ratio; /* deflation ratio (x512)	*/
 	uint64_t	vdev_islog;	/* is an intent log device	*/
+	uint64_t	vdev_ishole;	/* is a hole in the namespace 	*/
 
 	/*
 	 * Leaf vdev state.
@@ -248,6 +251,8 @@ typedef struct vdev_label {
 /*
  * Allocate or free a vdev
  */
+extern vdev_t *vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid,
+    vdev_ops_t *ops);
 extern int vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *config,
     vdev_t *parent, uint_t id, int alloctype);
 extern void vdev_free(vdev_t *vd);
@@ -264,7 +269,7 @@ extern void vdev_remove_parent(vdev_t *cvd);
 /*
  * vdev sync load and sync
  */
-extern void vdev_load_log_state(vdev_t *vd, nvlist_t *nv);
+extern void vdev_load_log_state(vdev_t *nvd, vdev_t *ovd);
 extern void vdev_load(vdev_t *vd);
 extern void vdev_sync(vdev_t *vd, uint64_t txg);
 extern void vdev_sync_done(vdev_t *vd, uint64_t txg);
@@ -280,6 +285,7 @@ extern vdev_ops_t vdev_raidz_ops;
 extern vdev_ops_t vdev_disk_ops;
 extern vdev_ops_t vdev_file_ops;
 extern vdev_ops_t vdev_missing_ops;
+extern vdev_ops_t vdev_hole_ops;
 extern vdev_ops_t vdev_spare_ops;
 
 /*

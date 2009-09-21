@@ -1063,7 +1063,8 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "device '%s' contains an EFI label and "
 				    "cannot be used on root pools."),
-				    zpool_vdev_name(hdl, NULL, spares[s]));
+				    zpool_vdev_name(hdl, NULL, spares[s],
+				    B_FALSE));
 				return (zfs_error(hdl, EZFS_POOL_NOTSUP, msg));
 			}
 		}
@@ -1419,8 +1420,9 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 
 		/*
 		 * Search for the requested value. We special case the search
-		 * for ZPOOL_CONFIG_PATH when it's a wholedisk. Otherwise,
-		 * all other searches are simple string compares.
+		 * for ZPOOL_CONFIG_PATH when it's a wholedisk and when
+		 * Looking for a top-level vdev name (i.e. ZPOOL_CONFIG_TYPE).
+		 * Otherwise, all other searches are simple string compares.
 		 */
 		if (strcmp(srchkey, ZPOOL_CONFIG_PATH) == 0 && val) {
 			uint64_t wholedisk = 0;
@@ -1437,6 +1439,52 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 					return (nv);
 				break;
 			}
+		} else if (strcmp(srchkey, ZPOOL_CONFIG_TYPE) == 0 && val) {
+			char *type, *idx, *end, *p;
+			uint64_t id, vdev_id;
+
+			/*
+			 * Determine our vdev type, keeping in mind
+			 * that the srchval is composed of a type and
+			 * vdev id pair (i.e. mirror-4).
+			 */
+			if ((type = strdup(srchval)) == NULL)
+				return (NULL);
+
+			if ((p = strrchr(type, '-')) == NULL) {
+				free(type);
+				break;
+			}
+			idx = p + 1;
+			*p = '\0';
+
+			/*
+			 * If the types don't match then keep looking.
+			 */
+			if (strncmp(val, type, strlen(val)) != 0) {
+				free(type);
+				break;
+			}
+
+			verify(strncmp(type, VDEV_TYPE_RAIDZ,
+			    strlen(VDEV_TYPE_RAIDZ)) == 0 ||
+			    strncmp(type, VDEV_TYPE_MIRROR,
+			    strlen(VDEV_TYPE_MIRROR)) == 0);
+			verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ID,
+			    &id) == 0);
+
+			errno = 0;
+			vdev_id = strtoull(idx, &end, 10);
+
+			free(type);
+			if (errno != 0)
+				return (NULL);
+
+			/*
+			 * Now verify that we have the correct vdev id.
+			 */
+			if (vdev_id == id)
+				return (nv);
 		}
 
 		/*
@@ -1522,6 +1570,18 @@ zpool_find_vdev_by_physpath(zpool_handle_t *zhp, const char *ppath,
 	return (ret);
 }
 
+/*
+ * Determine if we have an "interior" top-level vdev (i.e mirror/raidz).
+ */
+boolean_t
+zpool_vdev_is_interior(const char *name)
+{
+	if (strncmp(name, VDEV_TYPE_RAIDZ, strlen(VDEV_TYPE_RAIDZ)) == 0 ||
+	    strncmp(name, VDEV_TYPE_MIRROR, strlen(VDEV_TYPE_MIRROR)) == 0)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
 nvlist_t *
 zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
     boolean_t *l2cache, boolean_t *log)
@@ -1536,6 +1596,8 @@ zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
 	guid = strtoull(path, &end, 10);
 	if (guid != 0 && *end == '\0') {
 		verify(nvlist_add_uint64(search, ZPOOL_CONFIG_GUID, guid) == 0);
+	} else if (zpool_vdev_is_interior(path)) {
+		verify(nvlist_add_string(search, ZPOOL_CONFIG_TYPE, path) == 0);
 	} else if (path[0] != '/') {
 		(void) snprintf(buf, sizeof (buf), "%s%s", "/dev/dsk/", path);
 		verify(nvlist_add_string(search, ZPOOL_CONFIG_PATH, buf) == 0);
@@ -2038,7 +2100,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	verify(nvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
 	    ZPOOL_CONFIG_VDEV_TREE, &config_root) == 0);
 
-	if ((newname = zpool_vdev_name(NULL, NULL, child[0])) == NULL)
+	if ((newname = zpool_vdev_name(NULL, NULL, child[0], B_FALSE)) == NULL)
 		return (-1);
 
 	/*
@@ -2235,22 +2297,32 @@ zpool_vdev_remove(zpool_handle_t *zhp, const char *path)
 	zfs_cmd_t zc = { 0 };
 	char msg[1024];
 	nvlist_t *tgt;
-	boolean_t avail_spare, l2cache;
+	boolean_t avail_spare, l2cache, islog;
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	uint64_t version;
 
 	(void) snprintf(msg, sizeof (msg),
 	    dgettext(TEXT_DOMAIN, "cannot remove %s"), path);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
-	    NULL)) == 0)
+	    &islog)) == 0)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
-
-	if (!avail_spare && !l2cache) {
+	/*
+	 * XXX - this should just go away.
+	 */
+	if (!avail_spare && !l2cache && !islog) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "only inactive hot spares or cache devices "
-		    "can be removed"));
+		    "only inactive hot spares, cache, top-level, "
+		    "or log devices can be removed"));
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
+	}
+
+	version = zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL);
+	if (islog && version < SPA_VERSION_HOLES) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "pool must be upgrade to support log removal"));
+		return (zfs_error(hdl, EZFS_BADVERSION, msg));
 	}
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
@@ -2420,7 +2492,8 @@ set_path(zpool_handle_t *zhp, nvlist_t *nv, const char *path)
  * of these checks.
  */
 char *
-zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv)
+zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
+    boolean_t verbose)
 {
 	char *path, *devid;
 	uint64_t value;
@@ -2497,6 +2570,20 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv)
 			    &value) == 0);
 			(void) snprintf(buf, sizeof (buf), "%s%llu", path,
 			    (u_longlong_t)value);
+			path = buf;
+		}
+
+		/*
+		 * We identify each top-level vdev by using a <type-id>
+		 * naming convention.
+		 */
+		if (verbose) {
+			uint64_t id;
+
+			verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_ID,
+			    &id) == 0);
+			(void) snprintf(buf, sizeof (buf), "%s-%llu", path,
+			    (u_longlong_t)id);
 			path = buf;
 		}
 	}
@@ -3036,6 +3123,7 @@ supported_dump_vdev_type(libzfs_handle_t *hdl, nvlist_t *config, char *errbuf)
 	if (strcmp(type, VDEV_TYPE_RAIDZ) == 0 ||
 	    strcmp(type, VDEV_TYPE_FILE) == 0 ||
 	    strcmp(type, VDEV_TYPE_LOG) == 0 ||
+	    strcmp(type, VDEV_TYPE_HOLE) == 0 ||
 	    strcmp(type, VDEV_TYPE_MISSING) == 0) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "vdev type '%s' is not supported"), type);

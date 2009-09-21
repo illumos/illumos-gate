@@ -430,6 +430,9 @@ extern int spa_config_held(spa_t *spa, int locks, krw_t rw);
 
 /* Pool vdev add/remove lock */
 extern uint64_t spa_vdev_enter(spa_t *spa);
+extern uint64_t spa_vdev_config_enter(spa_t *spa);
+extern void spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg,
+    int error, char *tag);
 extern int spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error);
 
 /* Pool vdev state change lock */
