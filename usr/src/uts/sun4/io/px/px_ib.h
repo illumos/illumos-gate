@@ -111,6 +111,7 @@ struct px_ino {
 	px_msiq_t	*ino_msiq_p;	/* pointer to MSIQ used */
 	px_ino_pil_t	*ino_ipil_p;	/* pointer to first px_ino_pil_t */
 	px_ino_t	*ino_next_p;	/* pointer to next px_ino_t */
+	ushort_t	ino_ipil_cntr;	/* counter for pil sharing ino */
 };
 
 #define	IB_INTR_WAIT	1		/* wait for interrupt completion */

@@ -72,7 +72,7 @@ static int
 px_spurintr(px_ino_pil_t *ipil_p)
 {
 	px_ino_t	*ino_p = ipil_p->ipil_ino_p;
-	px_ih_t		*ih_p = ipil_p->ipil_ih_start;
+	px_ih_t		*ih_p;
 	px_t		*px_p = ino_p->ino_ib_p->ib_px_p;
 	char		*err_fmt_str;
 	boolean_t	blocked = B_FALSE;
@@ -101,9 +101,13 @@ clear:
 	err_fmt_str = "!%s%d: spurious interrupt from ino 0x%x";
 warn:
 	cmn_err(CE_WARN, err_fmt_str, NAMEINST(px_p->px_dip), ino_p->ino_ino);
-	for (i = 0; i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next)
-		cmn_err(CE_CONT, "!%s-%d#%x ", NAMEINST(ih_p->ih_dip),
-		    ih_p->ih_inum);
+	for (ipil_p = ino_p->ino_ipil_p; ipil_p;
+	    ipil_p = ipil_p->ipil_next_p) {
+		for (i = 0, ih_p = ipil_p->ipil_ih_start;
+		    i < ipil_p->ipil_ih_size; i++, ih_p = ih_p->ih_next)
+			cmn_err(CE_CONT, "!%s-%d#%x ", NAMEINST(ih_p->ih_dip),
+			    ih_p->ih_inum);
+	}
 	cmn_err(CE_CONT, "!\n");
 
 	/* Clear the pending state */
@@ -269,6 +273,9 @@ px_msiq_intr(caddr_t arg)
 	 * records or will just return immediately.
 	 */
 	if (msiq_p->msiq_recs2process == 0) {
+		ASSERT(ino_p->ino_ipil_cntr == 0);
+		ino_p->ino_ipil_cntr = ino_p->ino_ipil_size;
+
 		/* Read current MSIQ tail index */
 		px_lib_msiq_gettail(dip, msiq_p->msiq_id, &curr_tail_index);
 		msiq_p->msiq_new_head_index = msiq_p->msiq_curr_head_index;
@@ -424,7 +431,7 @@ next_rec:
 
 intr_done:
 	/* Interrupt can only be cleared after all pil levels are handled */
-	if (pil != ino_p->ino_lopil)
+	if (--ino_p->ino_ipil_cntr != 0)
 		return (DDI_INTR_CLAIMED);
 
 	if (msiq_p->msiq_new_head_index <= msiq_p->msiq_curr_head_index)  {
