@@ -1,9 +1,7 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -196,6 +194,9 @@ krb5_gss_delete_sec_context(minor_status,
    if (ctx->mech_used)
        (void) KGSS_RELEASE_OID(minor_status, &ctx->mech_used);
    
+   if (ctx->authdata)
+	krb5_free_authdata(context, ctx->authdata);
+
    if (ctx->k5_context)
        krb5_free_context(ctx->k5_context);
 

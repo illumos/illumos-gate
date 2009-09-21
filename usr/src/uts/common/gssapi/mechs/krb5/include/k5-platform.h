@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -527,6 +527,20 @@ load_64_le (unsigned char *p)
 #define k5_getpwuid_r(UID, REC, BUF, BUFSIZE, OUT)  \
         (*(OUT) = getpwuid_r(UID,REC,BUF,BUFSIZE), *(OUT) == NULL ? -1 : 0)
 
+/* Return true if the snprintf return value RESULT reflects a buffer
+   overflow for the buffer size SIZE.
+
+   We cast the result to unsigned int for two reasons.  First, old
+   implementations of snprintf (such as the one in Solaris 9 and
+   prior) return -1 on a buffer overflow.  Casting the result to -1
+   will convert that value to UINT_MAX, which should compare larger
+   than any reasonable buffer size.  Second, comparing signed and
+   unsigned integers will generate warnings with some compilers, and
+   can have unpredictable results, particularly when the relative
+   widths of the types is not known (size_t may be the same width as
+   int or larger).
+*/
+#define SNPRINTF_OVERFLOW(result, size) \
+    ((unsigned int)(result) >= (size_t)(size))
 
 #endif /* K5_PLATFORM_H */
-

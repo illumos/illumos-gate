@@ -260,6 +260,15 @@
         krb5_set_key_enctype =	FUNCTION FILTER mech_krb5.so.1;
         krb5_set_key_data =	FUNCTION FILTER mech_krb5.so.1;
         krb5_set_key_length =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_pac_add_buffer =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_pac_free =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_pac_get_buffer =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_pac_get_types =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_pac_init =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_pac_parse =	FUNCTION FILTER mech_krb5.so.1;
+        krb5_pac_verify =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_decode_authdata_container  =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_encode_authdata_container  =	FUNCTION FILTER mech_krb5.so.1;
 
 # krb5.h - priv/deprecated
         krb5_string_to_key =	FUNCTION FILTER mech_krb5.so.1;
@@ -274,6 +283,9 @@
 	krb5_free_ap_rep =	FUNCTION FILTER mech_krb5.so.1;
 	krb5_free_cred =	FUNCTION FILTER mech_krb5.so.1;
 	krb5_decrypt_tkt_part =	FUNCTION FILTER mech_krb5.so.1;
+	krb5_get_error_message = 	FUNCTION FILTER mech_krb5.so.1;
+	krb5_free_error_message = FUNCTION FILTER mech_krb5.so.1;
+	krb5_clear_error_message =  FUNCTION FILTER mech_krb5.so.1;
 	valid_cksumtype =	FUNCTION FILTER mech_krb5.so.1;
 
 # k5-int.h (needed by Samba, openssl, etc)
@@ -283,5 +295,4 @@
 	krb5_rc_initialize =	FUNCTION FILTER mech_krb5.so.1;
 	krb5_rc_default	=	FUNCTION FILTER mech_krb5.so.1;
 	krb5_rc_destroy =	FUNCTION FILTER mech_krb5.so.1;
-
 };

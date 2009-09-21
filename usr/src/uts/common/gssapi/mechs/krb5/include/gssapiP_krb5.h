@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,7 @@
  */
 #include "gssapi_krb5.h"
 #include "gssapi_err_krb5.h"
+#include "gssapi_ext.h"
 
 /* for debugging */
 #undef CFX_EXERCISE
@@ -194,6 +195,7 @@ typedef struct _krb5_gss_ctx_id_rec {
    krb5_keyblock *enc;
    krb5_keyblock *seq;
    krb5_timestamp endtime;
+   krb5_ticket_times krb_times;
    krb5_flags krb_flags;
    /* XXX these used to be signed.  the old spec is inspecific, and
       the new spec specifies unsigned.  I don't believe that the change
@@ -213,6 +215,7 @@ typedef struct _krb5_gss_ctx_id_rec {
    krb5_keyblock *acceptor_subkey; /* CFX only */
    krb5_cksumtype acceptor_subkey_cksumtype;
    int cred_rcache;		/* did we get rcache from creds? */
+   krb5_authdata **authdata;
 } krb5_gss_ctx_id_rec, *krb5_gss_ctx_id_t;
 
 extern g_set kg_vdb;
@@ -716,15 +719,35 @@ OM_uint32 krb5_gss_userok(
  * These take unglued krb5-mech-specific contexts.
  */
 
-OM_uint32 KRB5_CALLCONV gss_krb5int_get_tkt_flags 
-	(OM_uint32 *minor_status,
-		   gss_ctx_id_t context_handle,
-		   krb5_flags *ticket_flags);
+#define GSS_KRB5_GET_TKT_FLAGS_OID_LENGTH 11
+#define GSS_KRB5_GET_TKT_FLAGS_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x01"
+
+#ifndef _KERNEL
+OM_uint32  gss_krb5int_get_tkt_flags
+(OM_uint32 *minor_status,
+ const gss_ctx_id_t context_handle,
+ const gss_OID desired_object,
+ gss_buffer_set_t *data_set);
+
 
 OM_uint32 KRB5_CALLCONV gss_krb5int_copy_ccache
 	(OM_uint32 *minor_status,
 		   gss_cred_id_t cred_handle,
 		   krb5_ccache out_ccache);
+
+#define GSS_KRB5_SET_ALLOWABLE_ENCTYPES_OID_LENGTH 11
+#define GSS_KRB5_SET_ALLOWABLE_ENCTYPES_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x04"
+
+struct krb5_gss_set_allowable_enctypes_req {
+    OM_uint32 num_ktypes;
+    krb5_enctype *ktypes;
+};
+
+#define GSS_KRB5_INQ_SSPI_SESSION_KEY_OID_LENGTH 11
+#define GSS_KRB5_INQ_SSPI_SESSION_KEY_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x05"
+
+OM_uint32
+gss_krb5int_inq_session_key(OM_uint32 *, const gss_ctx_id_t, const gss_OID, gss_buffer_set_t *);
 
 OM_uint32 KRB5_CALLCONV
 gss_krb5int_set_allowable_enctypes(OM_uint32 *minor_status, 
@@ -732,16 +755,123 @@ gss_krb5int_set_allowable_enctypes(OM_uint32 *minor_status,
 				   OM_uint32 num_ktypes,
 				   krb5_enctype *ktypes);
 
+#endif /* _KERNEL */
+
+#if 0
+/*
+ * SUNW17PACresync
+ * These two functions not needed yet, revisit for full 1.7 resync.
+ */
+OM_uint32 KRB5_CALLCONV
+gss_krb5int_set_allowable_enctypes(OM_uint32 *minor_status,
+                                   gss_cred_id_t cred,
+                                   const gss_OID desired_oid,
+                                   const gss_buffer_t value);
+
 OM_uint32 KRB5_CALLCONV
 gss_krb5int_export_lucid_sec_context(OM_uint32 *minor_status,
 				     gss_ctx_id_t *context_handle,
 				     OM_uint32 version,
 				     void **kctx);
+#endif
+
+#ifndef _KERNEL
+#define GSS_KRB5_EXPORT_LUCID_SEC_CONTEXT_OID_LENGTH 11
+#define GSS_KRB5_EXPORT_LUCID_SEC_CONTEXT_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x06"
+
+OM_uint32
+gss_krb5int_export_lucid_sec_context(OM_uint32 *minor_status,
+                                     const gss_ctx_id_t context_handle,
+                                     const gss_OID desired_object,
+                                     gss_buffer_set_t *data_set);
+
+#define GSS_KRB5_FREE_LUCID_SEC_CONTEXT_OID_LENGTH 11
+#define GSS_KRB5_FREE_LUCID_SEC_CONTEXT_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x07"
+
+OM_uint32
+gss_krb5int_free_lucid_sec_context(OM_uint32 *, const gss_OID,
+                                   const gss_OID, gss_buffer_t);
 
 
 extern k5_mutex_t kg_kdc_flag_mutex;
 krb5_error_code krb5_gss_init_context (krb5_context *ctxp);
 
+
+#define GSS_KRB5_INQ_SSPI_SESSION_KEY_OID_LENGTH 11
+#define GSS_KRB5_INQ_SSPI_SESSION_KEY_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x05"
+
+OM_uint32
+gss_krb5int_inq_session_key(OM_uint32 *, const gss_ctx_id_t, const gss_OID, gss_buffer_set_t *);
+
+
+#define GSS_KRB5_USE_KDC_CONTEXT_OID_LENGTH 11
+#define GSS_KRB5_USE_KDC_CONTEXT_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x08"
+
+OM_uint32 krb5int_gss_use_kdc_context(OM_uint32 *, const gss_OID,
+                                      const gss_OID, gss_buffer_t);
+
 krb5_error_code krb5_gss_use_kdc_context(void);
+
+#define GSS_KRB5_REGISTER_ACCEPTOR_IDENTITY_OID_LENGTH 11
+#define GSS_KRB5_REGISTER_ACCEPTOR_IDENTITY_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x09"
+
+OM_uint32
+gss_krb5int_register_acceptor_identity(OM_uint32 *, const gss_OID, const gss_OID, gss_buffer_t);
+
+#define GSS_KRB5_EXTRACT_AUTHZ_DATA_FROM_SEC_CONTEXT_OID_LENGTH 11
+#define GSS_KRB5_EXTRACT_AUTHZ_DATA_FROM_SEC_CONTEXT_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x0a"
+
+OM_uint32
+gss_krb5int_extract_authz_data_from_sec_context(OM_uint32 *minor_status,
+                                                const gss_ctx_id_t context_handle,
+                                                const gss_OID desired_object,
+                                                gss_buffer_set_t *ad_data);
+
+#define GSS_KRB5_SET_CRED_RCACHE_OID_LENGTH 11
+#define GSS_KRB5_SET_CRED_RCACHE_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x0b"
+
+OM_uint32
+gss_krb5int_set_cred_rcache(OM_uint32 *, gss_cred_id_t, const gss_OID, const gss_buffer_t);
+
+#define GSS_KRB5_EXTRACT_AUTHTIME_FROM_SEC_CONTEXT_OID_LENGTH 11
+#define GSS_KRB5_EXTRACT_AUTHTIME_FROM_SEC_CONTEXT_OID "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x0c"
+
+OM_uint32
+gss_krb5int_extract_authtime_from_sec_context(OM_uint32 *,
+                                              const gss_ctx_id_t,
+                                              const gss_OID,
+                                              gss_buffer_set_t *);
+#endif /* _KERNEL */
+
+/* For error message handling.  */
+/* Returns a shared string, not a private copy!  */
+extern char *
+krb5_gss_get_error_message(OM_uint32 minor_code);
+extern void
+krb5_gss_save_error_string(OM_uint32 minor_code, char *msg);
+extern void
+krb5_gss_save_error_message(OM_uint32 minor_code, const char *format, ...)
+#if !defined(__cplusplus) && (__GNUC__ > 2)
+    __attribute__((__format__(__printf__, 2, 3)))
+#endif
+    ;
+    extern void
+    krb5_gss_save_error_info(OM_uint32 minor_code, krb5_context ctx);
+#define get_error_message krb5_gss_get_error_message
+#define save_error_string krb5_gss_save_error_string
+#define save_error_message krb5_gss_save_error_message
+
+
+#if 0 /* SUNW17PACresync - revisit for full MIT 1.7 resync */
+#define save_error_info krb5_gss_save_error_info
+#endif
+#define save_error_info(m, ctx)
+
+
+extern void krb5_gss_delete_error_info(void *p);
+
+/* Prefix concatenated with Kerberos encryption type */
+#define GSS_KRB5_SESSION_KEY_ENCTYPE_OID_LENGTH 10
+#define GSS_KRB5_SESSION_KEY_ENCTYPE_OID  "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x04"
 
 #endif /* _GSSAPIP_KRB5_H_ */

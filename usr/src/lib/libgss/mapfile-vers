@@ -52,6 +52,7 @@ SUNW_1.2 {
 	GSS_C_NT_MACHINE_UID_NAME;
 	GSS_C_NT_STRING_UID_NAME;
 	GSS_C_NT_USER_NAME;
+	GSS_C_INQ_SSPI_SESSION_KEY;
 	gss_compare_name;
 	gss_context_time;
 	gss_create_empty_oid_set;
@@ -87,6 +88,10 @@ SUNW_1.2 {
 	gss_verify_mic;
 	gss_wrap;
 	gss_wrap_size_limit;
+	gss_add_buffer_set_member;
+	gss_create_empty_buffer_set;
+	gss_release_buffer_set;
+	gss_inquire_sec_context_by_oid;
 } SUNW_1.1;
 
 # Due to mistakes made early in the history of this library, there are
@@ -112,6 +117,7 @@ SUNWprivate_1.1 {
 	gsscred_set_options;
 	gss_get_group_info;
 	__gss_get_kmodName;
+	__gss_get_mechanism;
 	__gss_get_mechanisms;
 	__gss_get_mech_info;
 	__gss_get_mech_type;

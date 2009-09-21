@@ -1,5 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*
  * Copyright 1996 by Sun Microsystems, Inc.
  * 
@@ -26,7 +28,8 @@
  *  glue routine for gss_release_buffer
  */
 
-#include "gssapiP_generic.h"
+/* SUNW17PACresync - gssapi.h allows us to build in libgss also */
+#include "gssapi.h"
 
 #include <stdio.h>
 #ifdef HAVE_STDLIB_H

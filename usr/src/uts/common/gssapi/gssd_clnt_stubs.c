@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  GSSAPI library stub module for gssd.
@@ -766,6 +764,16 @@ kgss_init_sec_context_wrapped(
 	if (minor_status != NULL)
 		*minor_status = res.minor_status;
 
+	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
+		output_token->length =
+			(size_t)res.output_token.GSS_BUFFER_T_len;
+		output_token->value =
+			(void *)MALLOC(output_token->length);
+		(void) memcpy(output_token->value,
+			    res.output_token.GSS_BUFFER_T_val,
+			    output_token->length);
+	}
+
 	/* if the call was successful, copy out the results */
 	if (res.status == (OM_uint32) GSS_S_COMPLETE ||
 		res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
@@ -778,16 +786,6 @@ kgss_init_sec_context_wrapped(
 			*((gssd_ctx_id_t *)
 			res.context_handle.GSS_CTX_ID_T_val);
 		*gssd_context_verifier = res.gssd_context_verifier;
-
-		if (output_token != NULL) {
-			output_token->length =
-				(size_t)res.output_token.GSS_BUFFER_T_len;
-			output_token->value =
-				(void *)MALLOC(output_token->length);
-			(void) memcpy(output_token->value,
-				res.output_token.GSS_BUFFER_T_val,
-				output_token->length);
-		}
 
 		if (res.status == GSS_S_COMPLETE) {
 			if (actual_mech_type != NULL) {
@@ -1055,6 +1053,19 @@ kgss_accept_sec_context_wrapped(
 		return (GSS_S_FAILURE);
 	}
 
+	if (minor_status != NULL)
+		*minor_status = res.minor_status;
+
+	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
+		output_token->length =
+			res.output_token.GSS_BUFFER_T_len;
+		output_token->value =
+			(void *)  MALLOC(output_token->length);
+		(void) memcpy(output_token->value,
+			    res.output_token.GSS_BUFFER_T_val,
+			    output_token->length);
+	}
+
 	/* if the call was successful, copy out the results */
 
 	if (res.status == (OM_uint32) GSS_S_COMPLETE ||
@@ -1069,19 +1080,6 @@ kgss_accept_sec_context_wrapped(
 		*context_handle = *((gssd_ctx_id_t *)
 			res.context_handle.GSS_CTX_ID_T_val);
 			*gssd_context_verifier = res.gssd_context_verifier;
-
-		if (output_token != NULL) {
-			output_token->length =
-					res.output_token.GSS_BUFFER_T_len;
-			output_token->value =
-				(void *)  MALLOC(output_token->length);
-			(void) memcpy(output_token->value,
-				res.output_token.GSS_BUFFER_T_val,
-				output_token->length);
-		}
-
-		if (minor_status != NULL)
-			*minor_status = res.minor_status;
 
 		/* these other parameters are only ready upon GSS_S_COMPLETE */
 		if (res.status == (OM_uint32) GSS_S_COMPLETE) {

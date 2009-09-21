@@ -1,8 +1,6 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= kadmind
@@ -34,6 +32,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKSECURITY)
 DEFS = -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAVE_COMPILE=1 -DHAVE_STEP=1  -DKRB5_KRB4_COMPAT
 
 CPPFLAGS += -I. -I$(SRC)/uts/common/gssapi/mechs/krb5/include \
+		-I$(SRC)/uts/common/gssapi \
 		-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/krb5/kadm5 \
 		-I$(SRC)/lib/krb5/kadm5/srv \

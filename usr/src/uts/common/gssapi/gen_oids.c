@@ -1,9 +1,7 @@
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -66,6 +64,8 @@ static const gss_OID_desc oids[] = {
 	{6, "\053\006\001\005\006\002"},
 	{6, "\053\006\001\005\006\003"},
 	{6, "\053\006\001\005\006\004"},
+	{11, "\x2a\x86\x48\x86\xf7\x12\x01\x02\x02\x05\x05"},
+
 };
 
 const gss_OID_desc * const gss_nt_user_name = oids+0;
@@ -93,3 +93,4 @@ const gss_OID GSS_C_NT_STRING_UID_NAME = (gss_OID)oids+2;
 const gss_OID GSS_C_NT_HOSTBASED_SERVICE = (gss_OID)oids+4;
 const gss_OID GSS_C_NT_ANONYMOUS = (gss_OID)oids+5;
 const gss_OID GSS_C_NT_EXPORT_NAME = (gss_OID)oids+6;
+const gss_OID GSS_C_INQ_SSPI_SESSION_KEY   = (gss_OID)oids+7;

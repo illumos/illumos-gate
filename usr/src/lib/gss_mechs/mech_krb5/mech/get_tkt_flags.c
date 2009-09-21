@@ -1,8 +1,11 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/* -*- mode: c; indent-tabs-mode: nil -*- */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
- * 
+ *
  * Permission to use, copy, modify, distribute, and sell this software
  * and its documentation for any purpose is hereby granted without fee,
  * provided that the above copyright notice appears in all copies and
@@ -12,7 +15,7 @@
  * without specific, written prior permission. OpenVision makes no
  * representations about the suitability of this software for any
  * purpose.  It is provided "as is" without express or implied warranty.
- * 
+ *
  * OPENVISION DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
  * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
  * EVENT SHALL OPENVISION BE LIABLE FOR ANY SPECIAL, INDIRECT OR
@@ -23,35 +26,25 @@
  */
 
 #include "gssapiP_krb5.h"
+#include "mechglueP.h" /* SUNW17PACresync */
 
 /*
- * $Id: get_tkt_flags.c 18131 2006-06-14 22:27:54Z tlyu $
+ * $Id: get_tkt_flags.c 21778 2009-01-22 23:21:11Z tlyu $
  */
 
-OM_uint32 KRB5_CALLCONV 
-gss_krb5int_get_tkt_flags(minor_status, context_handle, ticket_flags)
-     OM_uint32 *minor_status;
-     gss_ctx_id_t context_handle;
-     krb5_flags *ticket_flags;
+OM_uint32 KRB5_CALLCONV
+gss_krb5int_get_tkt_flags(OM_uint32 *minor_status,
+                          const gss_ctx_id_t context_handle,
+                          const gss_OID desired_object,
+                          gss_buffer_set_t *data_set)
 {
-   krb5_gss_ctx_id_rec *ctx;
+    krb5_gss_ctx_id_rec *ctx;
+    gss_buffer_desc rep;
 
-   /* validate the context handle */
-   if (! kg_validate_ctx_id(context_handle)) {
-      *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-      return(GSS_S_NO_CONTEXT);
-   }
+    ctx = (krb5_gss_ctx_id_rec *) context_handle;
 
-   ctx = (krb5_gss_ctx_id_rec *) context_handle;
+    rep.value = &ctx->krb_flags;
+    rep.length = sizeof(ctx->krb_flags);
 
-   if (! ctx->established) {
-      *minor_status = KG_CTX_INCOMPLETE;
-      return(GSS_S_NO_CONTEXT);
-   }
-
-   if (ticket_flags)
-      *ticket_flags = ctx->krb_flags;
-
-   *minor_status = 0;
-   return(GSS_S_COMPLETE);
+    return generic_gss_add_buffer_set_member(minor_status, &rep, data_set);
 }

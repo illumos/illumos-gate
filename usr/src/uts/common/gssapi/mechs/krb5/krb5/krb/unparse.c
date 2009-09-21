@@ -1,12 +1,12 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * lib/krb5/krb/unparse.c
  *
- * Copyright 1990 by the Massachusetts Institute of Technology.
+ * Copyright 1990, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -21,7 +21,10 @@
  * this permission notice appear in supporting documentation, and that
  * the name of M.I.T. not be used in advertising or publicity pertaining
  * to distribution of the software without specific, written prior
- * permission.  M.I.T. makes no representations about the suitability of
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  * 
@@ -35,9 +38,31 @@
 
 
 #include "k5-int.h"
-#ifndef	_KERNEL
+#ifndef _KERNEL
 #include <stdio.h>
 #endif
+
+/*
+ * SUNW17PACresync / Solaris Kerberos
+ * This realloc works for both Solaris kernel and user space.
+ */
+void *
+krb5int_realloc(
+		void *oldp,
+		size_t new_size,
+		size_t old_size)
+{
+#ifdef _KERNEL
+    char *newp = MALLOC(new_size);
+
+    bcopy(oldp, newp, old_size < new_size ? old_size : new_size);
+    FREE(oldp, old_size);
+
+    return (newp);
+#else
+    return (realloc(oldp, new_size));
+#endif
+}
 
 /*
  * converts the multi-part principal format used in the protocols to a
@@ -61,39 +86,142 @@
 #define REALM_SEP	'@'
 #define	COMPONENT_SEP	'/'
 
-/*ARGSUSED*/
-krb5_error_code KRB5_CALLCONV
-krb5_unparse_name_ext(krb5_context context, krb5_const_principal principal, register char **name, unsigned int *size)
+static int
+component_length_quoted(const krb5_data *src, int flags)
 {
-	register char *cp, *q;
-	register int i,j;
-	int	length;
+    const char *cp = src->data;
+    int length = src->length;
+    int j;
+    int size = length;
+
+    if ((flags & KRB5_PRINCIPAL_UNPARSE_DISPLAY) == 0) {
+	int no_realm = (flags & KRB5_PRINCIPAL_UNPARSE_NO_REALM) &&
+		       !(flags & KRB5_PRINCIPAL_UNPARSE_SHORT);
+
+	for (j = 0; j < length; j++,cp++)
+	    if ((!no_realm && *cp == REALM_SEP) ||
+		*cp == COMPONENT_SEP ||
+		*cp == '\0' || *cp == '\\' || *cp == '\t' ||
+		*cp == '\n' || *cp == '\b')
+		size++;
+    }
+
+    return size;
+}
+
+static int
+copy_component_quoting(char *dest, const krb5_data *src, int flags)
+{
+    int j;
+    const char *cp = src->data;
+    char *q = dest;
+    int length = src->length;
+
+    if (flags & KRB5_PRINCIPAL_UNPARSE_DISPLAY) {
+        (void) memcpy(dest, src->data, src->length);
+	return src->length;
+    }
+
+    for (j=0; j < length; j++,cp++) {
+	int no_realm = (flags & KRB5_PRINCIPAL_UNPARSE_NO_REALM) &&
+		       !(flags & KRB5_PRINCIPAL_UNPARSE_SHORT);
+
+	switch (*cp) {
+	case REALM_SEP:
+	    if (no_realm) {
+		*q++ = *cp;
+		break;
+	    }
+	/*LINTED*/
+	case COMPONENT_SEP:
+	case '\\':
+	    *q++ = '\\';
+	    *q++ = *cp;
+	    break;
+	case '\t':
+	    *q++ = '\\';
+	    *q++ = 't';
+	    break;
+	case '\n':
+	    *q++ = '\\';
+	    *q++ = 'n';
+	    break;
+	case '\b':
+	    *q++ = '\\';
+	    *q++ = 'b';
+	    break;
+#if 0
+	/* Heimdal escapes spaces in principal names upon unparsing */
+	case ' ':
+	    *q++ = '\\';
+	    *q++ = ' ';
+	    break;
+#endif
+	case '\0':
+	    *q++ = '\\';
+	    *q++ = '0';
+	    break;
+	default:
+	    *q++ = *cp;
+	}
+    }
+    /*LINTED*/
+    return q - dest;
+}
+
+static krb5_error_code
+/*LINTED*/
+k5_unparse_name(krb5_context context, krb5_const_principal principal,
+		int flags, char **name, unsigned int *size)
+{
+#if 0
+	/* SUNW17PACresync - lint - cp/length not used */
+        char *cp;
+        int	length;
+#endif
+	char *q;
+	int i;
 	krb5_int32 nelem;
-	register unsigned int totalsize = 0;
+	unsigned int totalsize = 0;
+#ifndef _KERNEL
+	/* SUNW17PACresync - princ in kernel will always have realm */
+	char *default_realm = NULL;
+#endif
+	krb5_error_code ret = 0;
 
 	if (!principal || !name)
 		return KRB5_PARSE_MALFORMED;
 
-	cp = krb5_princ_realm(context, principal)->data;
-	length = krb5_princ_realm(context, principal)->length;
-	totalsize += length;
-	for (j = 0; j < length; j++,cp++)
-		if (*cp == REALM_SEP  || *cp == COMPONENT_SEP ||
-		    *cp == '\0' || *cp == '\\' || *cp == '\t' ||
-		    *cp == '\n' || *cp == '\b')
-			totalsize++;
-	totalsize++;		/* This is for the separator */
+#ifndef _KERNEL
+	if (flags & KRB5_PRINCIPAL_UNPARSE_SHORT) {
+		/* omit realm if local realm */
+		krb5_principal_data p;
+
+		ret = krb5_get_default_realm(context, &default_realm);
+		if (ret != 0)
+			goto cleanup;
+
+		krb5_princ_realm(context, &p)->length = strlen(default_realm);
+		krb5_princ_realm(context, &p)->data = default_realm;
+
+		if (krb5_realm_compare(context, &p, principal))
+			flags |= KRB5_PRINCIPAL_UNPARSE_NO_REALM;
+	}
+#endif
+	if ((flags & KRB5_PRINCIPAL_UNPARSE_NO_REALM) == 0) {
+		totalsize += component_length_quoted(krb5_princ_realm(context,
+								      principal),
+						     flags);
+		totalsize++;		/* This is for the separator */
+	}
 
 	nelem = krb5_princ_size(context, principal);
 	for (i = 0; i < (int) nelem; i++) {
+#if 0
+		/* SUNW17PACresync - lint - cp not used */
 		cp = krb5_princ_component(context, principal, i)->data;
-		length = krb5_princ_component(context, principal, i)->length;
-		totalsize += length;
-		for (j=0; j < length; j++,cp++)
-			if (*cp == REALM_SEP || *cp == COMPONENT_SEP ||
-			    *cp == '\0' || *cp == '\\' || *cp == '\t' ||
-			    *cp == '\n' || *cp == '\b')
-				totalsize++;
+#endif
+		totalsize += component_length_quoted(krb5_princ_component(context, principal, i), flags);
 		totalsize++;	/* This is for the separator */
 	}
 	if (nelem == 0)
@@ -104,107 +232,87 @@ krb5_unparse_name_ext(krb5_context context, krb5_const_principal principal, regi
 	 * provided, use it, realloc'ing it if necessary.
 	 * 
 	 * We need only n-1 seperators for n components, but we need
-	 * an extra byte for the NULL at the end.
+	 * an extra byte for the NUL at the end.
 	 */
-	/*The realloc case seems to be bogus 
-	* We never pass non-null name 
-	*/
 
-	/* if (*name) {
-		if (*size < (totalsize)) {
-			*size = totalsize;
-			*name = realloc(*name, totalsize);
-		}
-	   } else { 
-	*/
+        if (size) {
+            if (*name && (*size < totalsize)) {
+	        /* SUNW17PACresync - works for both kernel&user */
+	        *name = krb5int_realloc(*name, totalsize, *size);
+            } else {
+                *name = MALLOC(totalsize);
+            }
+            *size = totalsize;
+        } else {
+            *name = MALLOC(totalsize);
+        }
 
-	*name = MALLOC(totalsize);
-	if (size)
-		*size = totalsize;
-	
-	if (!*name)
-		return ENOMEM;
+	if (!*name) {
+		ret = ENOMEM;
+		goto cleanup;
+	}
 
 	q = *name;
 	
 	for (i = 0; i < (int) nelem; i++) {
+#if 0
+		/* SUNW17PACresync - lint - cp/length not used */
 		cp = krb5_princ_component(context, principal, i)->data;
 		length = krb5_princ_component(context, principal, i)->length;
-		for (j=0; j < length; j++,cp++) {
-		    switch (*cp) {
-		    case COMPONENT_SEP:
-		    case REALM_SEP:
-		    case '\\':
-			*q++ = '\\';
-			*q++ = *cp;
-			break;
-		    case '\t':
-			*q++ = '\\';
-			*q++ = 't';
-			break;
-		    case '\n':
-			*q++ = '\\';
-			*q++ = 'n';
-			break;
-		    case '\b':
-			*q++ = '\\';
-			*q++ = 'b';
-			break;
-		    case '\0':
-			*q++ = '\\';
-			*q++ = '0';
-			break;
-		    default:
-			*q++ = *cp;
-		    }
-		}
+#endif
+		q += copy_component_quoting(q,
+					    krb5_princ_component(context,
+								 principal,
+								 i),
+					    flags);
 		*q++ = COMPONENT_SEP;
 	}
 
 	if (i > 0)
 	    q--;		/* Back up last component separator */
-	*q++ = REALM_SEP;
-	
-	cp = krb5_princ_realm(context, principal)->data;
-	length = krb5_princ_realm(context, principal)->length;
-	for (j=0; j < length; j++,cp++) {
-		switch (*cp) {
-		case COMPONENT_SEP:
-		case REALM_SEP:
-		case '\\':
-			*q++ = '\\';
-			*q++ = *cp;
-			break;
-		case '\t':
-			*q++ = '\\';
-			*q++ = 't';
-			break;
-		case '\n':
-			*q++ = '\\';
-			*q++ = 'n';
-			break;
-		case '\b':
-			*q++ = '\\';
-			*q++ = 'b';
-			break;
-		case '\0':
-			*q++ = '\\';
-			*q++ = '0';
-			break;
-		default:
-			*q++ = *cp;
-		}
+	if ((flags & KRB5_PRINCIPAL_UNPARSE_NO_REALM) == 0) {
+		*q++ = REALM_SEP;
+		q += copy_component_quoting(q, krb5_princ_realm(context, principal), flags);
 	}
 	*q++ = '\0';
-	
-    return 0;
+
+cleanup:
+#ifndef _KERNEL
+	if (default_realm != NULL)
+		krb5_free_default_realm(context, default_realm);
+#endif
+	return ret;
 }
 
 krb5_error_code KRB5_CALLCONV
 krb5_unparse_name(krb5_context context, krb5_const_principal principal, register char **name)
 {
-        if (name)                       /* name == NULL will return error from _ext */
-            *name = NULL;
-	return(krb5_unparse_name_ext(context, principal, name, NULL));
+    if (name != NULL)                      /* name == NULL will return error from _ext */
+	*name = NULL;
+
+    return k5_unparse_name(context, principal, 0, name, NULL);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_unparse_name_ext(krb5_context context, krb5_const_principal principal,
+		      char **name, unsigned int *size)
+{
+    return k5_unparse_name(context, principal, 0, name, size);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_unparse_name_flags(krb5_context context, krb5_const_principal principal,
+			int flags, char **name)
+{
+    if (name != NULL)
+	*name = NULL;
+    return k5_unparse_name(context, principal, flags, name, NULL);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_unparse_name_flags_ext(krb5_context context, krb5_const_principal principal,
+			    int flags, char **name, unsigned int *size)
+{
+    return k5_unparse_name(context, principal, flags, name, size);
 }
 

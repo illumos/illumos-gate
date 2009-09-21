@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Private extensions and utilities to the GSS-API.
@@ -30,8 +29,6 @@
 
 #ifndef _GSSAPI_EXT_H
 #define	_GSSAPI_EXT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <gssapi/gssapi.h>
 #ifdef	_KERNEL
@@ -200,6 +197,13 @@ gss_add_cred_with_password(
 	OM_uint32		*initiator_time_rec,
 	OM_uint32		*acceptor_time_rec);
 
+/*
+ * Returns a buffer set with the first member containing the
+ * session key for SSPI compatibility. The optional second
+ * member contains an OID identifying the session key type.
+ */
+extern const gss_OID GSS_C_INQ_SSPI_SESSION_KEY;
+
 #else	/*	_KERNEL	*/
 
 OM_uint32
@@ -228,9 +232,36 @@ kgss_get_group_info(
 	gid_t *gids[],
 	int *gidsLen,
 	uid_t uid);
-
 #endif
 
+/*
+ * GGF extensions
+ */
+typedef struct gss_buffer_set_desc_struct {
+    size_t count;
+    gss_buffer_desc *elements;
+} gss_buffer_set_desc, *gss_buffer_set_t;
+
+#define	GSS_C_NO_BUFFER_SET ((gss_buffer_set_t)0)
+
+OM_uint32 gss_create_empty_buffer_set
+	(OM_uint32 *, /* minor_status */
+	gss_buffer_set_t *); /* buffer_set */
+
+OM_uint32 gss_add_buffer_set_member
+	(OM_uint32 *, /* minor_status */
+	const gss_buffer_t, /* member_buffer */
+	gss_buffer_set_t *); /* buffer_set */
+
+OM_uint32  gss_release_buffer_set
+	(OM_uint32 *, /* minor_status */
+	gss_buffer_set_t *); /* buffer_set */
+
+OM_uint32 gss_inquire_sec_context_by_oid
+	(OM_uint32 *, /* minor_status */
+	const gss_ctx_id_t, /* context_handle */
+	const gss_OID, /* desired_object */
+	gss_buffer_set_t *); /* data_set */
 
 #ifdef	__cplusplus
 }

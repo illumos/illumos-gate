@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,7 +173,7 @@ krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
     if (authorization_data) {
 	/* need to encrypt it in the request */
 
-	if ((retval = encode_krb5_authdata((const krb5_authdata**)authorization_data,
+	if ((retval = encode_krb5_authdata(authorization_data,
 					   &scratch)))
 	    return(retval);
 

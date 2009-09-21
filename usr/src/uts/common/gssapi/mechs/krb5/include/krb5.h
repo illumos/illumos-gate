@@ -315,6 +315,18 @@ typedef	krb5_principal_data * krb5_principal;
 #define KRB5_NT_SRV_XHST	4
 /* Unique ID */
 #define KRB5_NT_UID		5
+/* PKINIT */
+#define KRB5_NT_X500_PRINCIPAL          6
+/* Name in form of SMTP email name */
+#define KRB5_NT_SMTP_NAME               7
+/* Windows 2000 UPN */
+#define KRB5_NT_ENTERPRISE_PRINCIPAL    10
+/* Windows 2000 UPN and SID */
+#define KRB5_NT_MS_PRINCIPAL            -128
+/* NT 4 style name */
+#define KRB5_NT_MS_PRINCIPAL_AND_ID     -129
+/* NT 4 style name and SID */
+#define KRB5_NT_ENT_PRINCIPAL_AND_ID    -130
 
 /* constant version thereof: */
 typedef const krb5_principal_data *krb5_const_principal;
@@ -1010,6 +1022,9 @@ krb5_error_code krb5_decrypt_data
 #define KRB5_AUTHDATA_INITIAL_VERIFIED_CAS      9
 #define	KRB5_AUTHDATA_OSF_DCE	64
 #define KRB5_AUTHDATA_SESAME	65
+#define KRB5_AUTHDATA_WIN2K_PAC 128
+#define KRB5_AUTHDATA_ETYPE_NEGOTIATION 129     /* RFC 4537 */
+#define KRB5_AUTHDATA_FX_ARMOR 71
 
 /* password change constants */
 
@@ -1162,6 +1177,7 @@ typedef struct _krb5_enc_kdc_rep_part {
     krb5_principal server;		/* server's principal identifier */
     krb5_address **caddrs;	/* array of ptrs to addresses,
 					   optional */
+    krb5_pa_data **enc_padata;          /* Windows 2000 compat */
 } krb5_enc_kdc_rep_part;
 
 typedef struct _krb5_kdc_rep {
@@ -1263,6 +1279,24 @@ typedef struct _krb5_pwd_data {
 } krb5_pwd_data;
 
 /* these need to be here so the typedefs are available for the prototypes */
+
+typedef struct _krb5_pa_svr_referral_data {
+    /* Referred name, only realm is required */
+    krb5_principal     principal;
+} krb5_pa_svr_referral_data;
+
+typedef struct _krb5_pa_server_referral_data {
+    krb5_data          *referred_realm;
+    krb5_principal     true_principal_name;
+    krb5_principal     requested_principal_name;
+    krb5_timestamp     referral_valid_until;
+    krb5_checksum      rep_cksum;
+} krb5_pa_server_referral_data;
+
+typedef struct _krb5_pa_pac_req {
+    /* TRUE if a PAC should be included in TGS-REP */
+    krb5_boolean       include_pac;
+} krb5_pa_pac_req;
 
 /*
  * begin "safepriv.h"
@@ -1646,6 +1680,14 @@ krb5_error_code KRB5_CALLCONV krb5_parse_name
 	(krb5_context,
 		const char *,
 		krb5_principal * );
+#define KRB5_PRINCIPAL_PARSE_NO_REALM           0x1
+#define KRB5_PRINCIPAL_PARSE_REQUIRE_REALM      0x2
+#define KRB5_PRINCIPAL_PARSE_ENTERPRISE         0x4
+krb5_error_code KRB5_CALLCONV krb5_parse_name_flags
+	(krb5_context,
+	const char *,
+	int,
+	krb5_principal * );
 krb5_error_code KRB5_CALLCONV krb5_unparse_name
 	(krb5_context,
 		krb5_const_principal,
@@ -1655,6 +1697,20 @@ krb5_error_code KRB5_CALLCONV krb5_unparse_name_ext
 		krb5_const_principal,
 		char **,
 		unsigned int *);
+#define KRB5_PRINCIPAL_UNPARSE_SHORT            0x1
+#define KRB5_PRINCIPAL_UNPARSE_NO_REALM         0x2
+#define KRB5_PRINCIPAL_UNPARSE_DISPLAY          0x4
+krb5_error_code KRB5_CALLCONV krb5_unparse_name_flags
+        (krb5_context,
+                krb5_const_principal,
+                int,
+                char **);
+krb5_error_code KRB5_CALLCONV krb5_unparse_name_flags_ext
+        (krb5_context,
+                krb5_const_principal,
+                int,
+                char **,
+                unsigned int *);
 
 krb5_error_code KRB5_CALLCONV krb5_set_principal_realm
 	(krb5_context, krb5_principal, const char *);
@@ -1766,6 +1822,14 @@ krb5_error_code KRB5_CALLCONV krb5_copy_authdata
 	(krb5_context,
 		krb5_authdata * const *,
 		krb5_authdata ***);
+krb5_error_code KRB5_CALLCONV krb5_merge_authdata
+	(krb5_context,
+	krb5_authdata * const *,
+	krb5_authdata *const *,
+	krb5_authdata ***);
+/* Merge two authdata arrays, such as the array from a ticket
+ * and authenticator */
+
 krb5_error_code KRB5_CALLCONV krb5_copy_authenticator
 	(krb5_context,
 		const krb5_authenticator *,
@@ -2824,6 +2888,70 @@ krb5_free_error_message (krb5_context, const char *);
 void KRB5_CALLCONV
 krb5_clear_error_message (krb5_context);
 
+krb5_error_code KRB5_CALLCONV
+krb5_decode_authdata_container(krb5_context context,
+    krb5_authdatatype type,
+    const krb5_authdata *container,
+    krb5_authdata ***authdata);
+krb5_error_code KRB5_CALLCONV
+krb5_encode_authdata_container(krb5_context context,
+    krb5_authdatatype type,
+    krb5_authdata * const*authdata,
+    krb5_authdata ***container);
+
+/*
+ * Windows PAC
+ */
+struct krb5_pac_data;
+typedef struct krb5_pac_data *krb5_pac;
+
+krb5_error_code KRB5_CALLCONV
+krb5_pac_add_buffer
+(krb5_context context,
+                krb5_pac pac,
+                krb5_ui_4 type,
+                const krb5_data *data);
+
+void KRB5_CALLCONV
+krb5_pac_free
+(krb5_context context,
+                krb5_pac pac);
+
+krb5_error_code KRB5_CALLCONV
+krb5_pac_get_buffer
+(krb5_context context,
+                krb5_pac pac,
+                krb5_ui_4 type,
+                krb5_data *data);
+
+krb5_error_code KRB5_CALLCONV
+krb5_pac_get_types
+(krb5_context context,
+                krb5_pac pac,
+                size_t *len,
+                krb5_ui_4 **types);
+
+krb5_error_code KRB5_CALLCONV
+krb5_pac_init
+(krb5_context context,
+                krb5_pac *pac);
+
+krb5_error_code KRB5_CALLCONV
+krb5_pac_parse
+(krb5_context context,
+                const void *ptr,
+                size_t len,
+                krb5_pac *pac);
+
+krb5_error_code KRB5_CALLCONV
+krb5_pac_verify
+(krb5_context context,
+                const krb5_pac pac,
+                krb5_timestamp authtime,
+                krb5_const_principal principal,
+                const krb5_keyblock *server,
+                const krb5_keyblock *privsvr);
+
 
 #if TARGET_OS_MAC
 #    pragma pack(pop)
@@ -3111,6 +3239,13 @@ KRB5INT_END_DECLS
 #define KRB5_DELTAT_BADFORMAT			(-1765328133L)
 #define KRB5_PLUGIN_NO_HANDLE			(-1765328132L)
 #define KRB5_PLUGIN_OP_NOTSUPP			(-1765328131L)
+
+/* SUNW17PACresync */
+#define KRB5_ERR_INVALID_UTF8			(-1765328130L)
+#define KRB5_ERR_FAST_REQUIRED			(-1765328129L)
+#define KRB5_LOCAL_ADDR_REQUIRED		(-1765328128L)
+#define KRB5_REMOTE_ADDR_REQUIRED		(-1765328127L)
+
 
 #define ERROR_TABLE_BASE_krb5 (-1765328384L)
 

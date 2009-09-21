@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,4 +296,83 @@ kg_set_ccache_name (OM_uint32 *minor_status, const char *name)
     *minor_status = 0;
     return GSS_S_COMPLETE;
 }
+
+#define g_OID_prefix_equal(o1, o2) \
+        (((o1)->length >= (o2)->length) && \
+        (memcmp((o1)->elements, (o2)->elements, (o2)->length) == 0))
+
+/*
+ * gss_inquire_sec_context_by_oid() methods
+ */
+static struct {
+    gss_OID_desc oid;
+    OM_uint32 (*func)(OM_uint32 *, const gss_ctx_id_t, const gss_OID, gss_buffer_set_t *);
+} krb5_gss_inquire_sec_context_by_oid_ops[] = {
+    {
+        {GSS_KRB5_GET_TKT_FLAGS_OID_LENGTH, GSS_KRB5_GET_TKT_FLAGS_OID},
+        gss_krb5int_get_tkt_flags
+    },
+    {
+        {GSS_KRB5_EXTRACT_AUTHZ_DATA_FROM_SEC_CONTEXT_OID_LENGTH, GSS_KRB5_EXTRACT_AUTHZ_DATA_FROM_SEC_CONTEXT_OID},
+        gss_krb5int_extract_authz_data_from_sec_context
+    },
+    {
+        {GSS_KRB5_INQ_SSPI_SESSION_KEY_OID_LENGTH, GSS_KRB5_INQ_SSPI_SESSION_KEY_OID},
+        gss_krb5int_inq_session_key
+    },
+    {
+        {GSS_KRB5_EXPORT_LUCID_SEC_CONTEXT_OID_LENGTH, GSS_KRB5_EXPORT_LUCID_SEC_CONTEXT_OID},
+        gss_krb5int_export_lucid_sec_context
+    },
+    {
+        {GSS_KRB5_EXTRACT_AUTHTIME_FROM_SEC_CONTEXT_OID_LENGTH, GSS_KRB5_EXTRACT_AUTHTIME_FROM_SEC_CONTEXT_OID},
+        gss_krb5int_extract_authtime_from_sec_context
+    }
+};
+
+OM_uint32
+krb5_gss_inquire_sec_context_by_oid (OM_uint32 *minor_status,
+                                     const gss_ctx_id_t context_handle,
+                                     const gss_OID desired_object,
+                                     gss_buffer_set_t *data_set)
+{
+    krb5_gss_ctx_id_rec *ctx;
+    size_t i;
+
+    if (minor_status == NULL)
+        return GSS_S_CALL_INACCESSIBLE_WRITE;
+
+    *minor_status = 0;
+
+    if (desired_object == GSS_C_NO_OID)
+        return GSS_S_CALL_INACCESSIBLE_READ;
+
+    if (data_set == NULL)
+        return GSS_S_CALL_INACCESSIBLE_WRITE;
+
+    *data_set = GSS_C_NO_BUFFER_SET;
+
+    if (!kg_validate_ctx_id(context_handle))
+        return GSS_S_NO_CONTEXT;
+
+    ctx = (krb5_gss_ctx_id_rec *) context_handle;
+
+    if (!ctx->established)
+        return GSS_S_NO_CONTEXT;
+
+    for (i = 0; i < sizeof(krb5_gss_inquire_sec_context_by_oid_ops)/
+                    sizeof(krb5_gss_inquire_sec_context_by_oid_ops[0]); i++) {
+        if (g_OID_prefix_equal(desired_object, &krb5_gss_inquire_sec_context_by_oid_ops[i].oid)) {
+            return (*krb5_gss_inquire_sec_context_by_oid_ops[i].func)(minor_status,
+                                                                      context_handle,
+                                                                      desired_object,
+                                                                      data_set);
+        }
+    }
+
+    *minor_status = EINVAL;
+
+    return GSS_S_UNAVAILABLE;
+}
+
 #endif

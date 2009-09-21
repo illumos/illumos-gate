@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= libkadm5srv.a
@@ -75,6 +73,7 @@ CPPFLAGS += -I.. -I../.. -I../../.. \
 	-I$(SRC)/cmd/krb5/iprop \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/include/krb5 \
+	-I$(SRC)/uts/common/gssapi/ \
 	-I$(SRC)/uts/common/gssapi/include/ \
 	-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 	-I$(SRC)/lib/gss_mechs/mech_krb5/krb5/os \

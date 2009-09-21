@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  GSSAPI library stub module for gssd.
@@ -163,7 +160,7 @@ kgss_acquire_cred_wrapped(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (output_cred_handle != NULL)
 			*output_cred_handle = NULL;
 		if (actual_mechs != NULL)
@@ -511,7 +508,7 @@ OM_uint32 gssd_cred_verifier;
 		 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (cred_handle != NULL)
 			*cred_handle = NULL;
 
@@ -686,7 +683,7 @@ kgss_init_sec_context_wrapped(minor_status,
 
 	/* initialize the output parameters to empty values */
 	if (minor_status != NULL)
-		*minor_status = 0xffffffff;
+		*minor_status = DEFAULT_MINOR_STAT;
 	if (actual_mech_type != NULL)
 		*actual_mech_type = NULL;
 	if (output_token != NULL)
@@ -706,6 +703,21 @@ kgss_init_sec_context_wrapped(minor_status,
 		return (GSS_S_FAILURE);
 	}
 
+	/*
+	 * We could return from a GSS error here and need to return both the
+	 * minor_status and output_token, back to the caller if applicable.
+	 */
+	if (minor_status != NULL)
+		*minor_status = res.minor_status;
+
+	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
+		output_token->length =
+			(size_t)res.output_token.GSS_BUFFER_T_len;
+		output_token->value =
+			(void *)res.output_token.GSS_BUFFER_T_val;
+		res.output_token.GSS_BUFFER_T_val = NULL;
+		res.output_token.GSS_BUFFER_T_len = 0;
+	}
 
 	/* free the allocated memory for the flattened name */
 	gss_release_buffer(&minor_status_temp, &external_name);
@@ -714,29 +726,14 @@ kgss_init_sec_context_wrapped(minor_status,
 	if (res.status == (OM_uint32) GSS_S_COMPLETE ||
 		res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
 		/*
-		 * copy the rpc results into the return arguments
-		 * on CONTINUE_NEEDED only the output token, minor
-		 * code and ctxt handle are ready.
+		 * copy the rpc results into the return argument
+		 * on CONTINUE_NEEDED only ctx handle is ready.
 		 */
-		if (minor_status != NULL)
-			*minor_status = res.minor_status;
 		/*LINTED*/
 		*context_handle = *((OM_uint32 *)
 			res.context_handle.GSS_CTX_ID_T_val);
 
-		/*LINTED*/
-		*context_handle = *((OM_uint32 *)
-			res.context_handle.GSS_CTX_ID_T_val);
 		*gssd_context_verifier = res.gssd_context_verifier;
-
-		if (output_token != NULL) {
-			output_token->length =
-				(size_t)res.output_token.GSS_BUFFER_T_len;
-			output_token->value =
-				(void *)res.output_token.GSS_BUFFER_T_val;
-			res.output_token.GSS_BUFFER_T_val = NULL;
-			res.output_token.GSS_BUFFER_T_len = 0;
-		}
 
 		/* the rest of the parameters is only ready on COMPLETE */
 		if (res.status == GSS_S_COMPLETE) {
@@ -925,7 +922,7 @@ kgss_accept_sec_context_wrapped(minor_status,
 
 	/* set the output parameters to empty values.... */
 	if (minor_status != NULL)
-		*minor_status = 0xffffffff;
+		*minor_status = DEFAULT_MINOR_STAT;
 	if (src_name != NULL) {
 		src_name->length = 0;
 		src_name->value = NULL;
@@ -947,30 +944,32 @@ kgss_accept_sec_context_wrapped(minor_status,
 		return (GSS_S_FAILURE);
 	}
 
+	/*
+	 * We could return from a GSS error here and need to return both the
+	 * minor_status and output_token, back to the caller if applicable.
+	 */
+	if (minor_status != NULL)
+		*minor_status = res.minor_status;
+
+	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
+		output_token->length =
+			res.output_token.GSS_BUFFER_T_len;
+		output_token->value =
+			(void *) res.output_token.GSS_BUFFER_T_val;
+		res.output_token.GSS_BUFFER_T_val = 0;
+		res.output_token.GSS_BUFFER_T_len = 0;
+	}
 
 	if (res.status == (OM_uint32) GSS_S_COMPLETE ||
 		res.status == (OM_uint32) GSS_S_CONTINUE_NEEDED) {
 		/*
 		 * when gss returns CONTINUE_NEEDED we can only
-		 * use the context, minor, and output token
-		 * parameters.
+		 * use the context parameter.
 		 */
 		/*LINTED*/
 		*context_handle = *((gssd_ctx_id_t *)
 			res.context_handle.GSS_CTX_ID_T_val);
 		*gssd_context_verifier = res.gssd_context_verifier;
-
-		if (output_token != NULL) {
-			output_token->length =
-				res.output_token.GSS_BUFFER_T_len;
-			output_token->value =
-				(void *) res.output_token.GSS_BUFFER_T_val;
-			res.output_token.GSS_BUFFER_T_val = 0;
-			res.output_token.GSS_BUFFER_T_len = 0;
-		}
-
-		if (minor_status != NULL)
-			*minor_status = res.minor_status;
 
 		/* the other parameters are ready on for COMPLETE */
 		if (res.status == GSS_S_COMPLETE)
@@ -1127,7 +1126,7 @@ kgss_process_context_token(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 
 		return (GSS_S_FAILURE);
 	}
@@ -1182,7 +1181,7 @@ kgss_delete_sec_context_wrapped(minor_status,
 		 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (context_handle != NULL)
 			*context_handle = NULL;
 		if (output_token != NULL)
@@ -1203,7 +1202,7 @@ kgss_delete_sec_context_wrapped(minor_status,
 		*context_handle = *((gssd_ctx_id_t *)
 			res.context_handle.GSS_CTX_ID_T_val);
 
-	if (output_token != NULL) {
+	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
 		output_token->length = res.output_token.GSS_BUFFER_T_len;
 		output_token->value = res.output_token.GSS_BUFFER_T_val;
 		res.output_token.GSS_BUFFER_T_len = 0;
@@ -1309,7 +1308,7 @@ kgss_sign_wrapped(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (msg_token != NULL)
 			msg_token->length = 0;
 
@@ -1402,7 +1401,7 @@ kgss_verify_wrapped(
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (qop_state != NULL)
 			*qop_state = 0;
 
@@ -1498,7 +1497,7 @@ kgss_seal_wrapped(
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (conf_state != NULL)
 			*conf_state = 0;
 		if (output_message_buffer != NULL)
@@ -1604,7 +1603,7 @@ kgss_unseal_wrapped(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (output_message_buffer != NULL)
 			output_message_buffer->length = 0;
 		if (conf_state != NULL)
@@ -1723,17 +1722,17 @@ kgss_display_status(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 
 		return (GSS_S_FAILURE);
 	}
 
+	if (minor_status != NULL)
+		*minor_status = res.minor_status;
 
 	/* now process the results and pass them back to the caller */
 
 	if (res.status == GSS_S_COMPLETE) {
-		if (minor_status != NULL)
-			*minor_status = res.minor_status;
 		if (message_context != NULL)
 			*message_context = res.message_context;
 		if (status_string != NULL) {
@@ -1780,7 +1779,7 @@ kgss_indicate_mechs(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (mech_set != NULL)
 			*mech_set = NULL;
 
@@ -1873,7 +1872,7 @@ kgss_inquire_cred_wrapped(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		if (name != NULL)
 			*name = NULL;
 		if (lifetime != NULL)
@@ -2042,7 +2041,7 @@ kgss_inquire_cred_by_mech_wrapped(minor_status,
 	 */
 
 		if (minor_status != NULL)
-			*minor_status = 0xffffffff;
+			*minor_status = DEFAULT_MINOR_STAT;
 		return (GSS_S_FAILURE);
 	}
 
@@ -2348,7 +2347,7 @@ kgss_export_sec_context_wrapped(minor_status,
 		*context_handle =
 		    *((gssd_ctx_id_t *)res.context_handle.GSS_CTX_ID_T_val);
 
-	if (output_token != NULL) {
+	if (output_token != NULL && res.output_token.GSS_BUFFER_T_val != NULL) {
 		output_token->length = res.output_token.GSS_BUFFER_T_len;
 		output_token->value =
 			(void *) MALLOC(output_token->length);

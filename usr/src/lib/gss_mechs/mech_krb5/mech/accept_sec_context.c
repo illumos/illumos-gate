@@ -1,9 +1,7 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
 /*
  * Copyright 2000, 2004  by the Massachusetts Institute of Technology.
  * All Rights Reserved.
@@ -286,6 +284,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 {
    krb5_context context;
    unsigned char *ptr, *ptr2;
+   krb5_gss_ctx_id_rec *ctx = 0;
    char *sptr;
    long tmp;
    size_t md5len;
@@ -300,7 +299,6 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    krb5_checksum reqcksum;
    krb5_principal name = NULL;
    krb5_ui_4 gss_flags = 0;
-   krb5_gss_ctx_id_rec *ctx = 0;
    krb5_timestamp now;
    gss_buffer_desc token;
    krb5_auth_context auth_context = NULL;
@@ -316,6 +314,8 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    OM_uint32 saved_ap_options = 0;
    krb5int_access kaccess;
    int cred_rcache = 0;
+   int no_encap;
+   OM_uint32 t_minor_status = 0;
 
    KRB5_LOG0(KRB5_INFO,"krb5_gss_accept_sec_context() start");
 
@@ -393,9 +393,20 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 	* old behavior.
 	*/
        mech_used = gss_mech_krb5_old;
+  } else if (code == G_WRONG_TOKID) {
+	major_status = GSS_S_CONTINUE_NEEDED;
+        code = KRB5KRB_AP_ERR_MSG_TYPE;
+        mech_used = gss_mech_krb5;
+        goto fail;
+   } else if (code == G_BAD_TOK_HEADER) {
+	/* DCE style not encapsulated */
+        ap_req.length = input_token->length;
+        ap_req.data = input_token->value;
+        mech_used = gss_mech_krb5;
+        no_encap = 1;
    } else {
-       major_status = GSS_S_DEFECTIVE_TOKEN;
-       goto fail;
+	major_status = GSS_S_DEFECTIVE_TOKEN;
+        goto fail;
    }
 
    sptr = (char *) ptr;
@@ -552,7 +563,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 
    if ((code = krb5_rd_req_decoded(context, &auth_context, request,
 			   cred->princ, cred->keytab, NULL, &ticket))) {
-       KRB5_LOG(KRB5_ERR, "krb5_gss_accept_sec_context() "
+      KRB5_LOG(KRB5_ERR, "krb5_gss_accept_sec_context() "
 	      "krb5_rd_req() error code %d", code);
        if (code == KRB5_KT_KVNONOTFOUND || code == KRB5_KT_NOTFOUND) {
            major_status = GSS_S_DEFECTIVE_CREDENTIAL;
@@ -800,6 +811,15 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
        code = G_VALIDATE_FAILED;
        major_status = GSS_S_FAILURE;
        goto fail;
+   }
+
+   /* XXX move this into gss_name_t */
+   if ((code = krb5_merge_authdata(context,
+				ticket->enc_part2->authorization_data,
+				authdat->authorization_data,
+				&ctx->authdata))) {
+	major_status = GSS_S_FAILURE;
+        goto fail;
    }
 
    if ((code = krb5_copy_principal(context, cred->princ, &ctx->here))) {
@@ -1081,6 +1101,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
    major_status = GSS_S_COMPLETE;
 
  fail:
+
    if (authdat)
        krb5_free_authenticator(context, authdat);
    /* The ctx structure has the handle of the auth_context */
@@ -1157,6 +1178,25 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 				&krb_error_data.susec);
        krb_error_data.server = cred->princ;
 
+       if (code == KRB5KRB_AP_ERR_SKEW) {
+	    /*
+	     * SUNW17PACresync / Solaris Kerberos
+	     * Set e-data to Windows constant.
+	     * (verified by MSFT)
+	     * 
+	     * This facilitates the Windows CIFS client clock skew
+	     * recovery feature.
+	     */
+	    char *ms_e_data = "\x30\x05\xa1\x03\x02\x01\x02";
+	    int len = strlen(ms_e_data);
+
+	    krb_error_data.e_data.data = malloc(len);
+	    if (krb_error_data.e_data.data) {
+		    (void) memcpy(krb_error_data.e_data.data, ms_e_data, len);
+		    krb_error_data.e_data.length = len;
+	    }
+       }
+
        code = krb5_mk_error(context, &krb_error_data, &scratch);
        if (code)
            goto cleanup;
@@ -1180,7 +1220,7 @@ krb5_gss_accept_sec_context(minor_status, context_handle,
 
 cleanup:
    if (!verifier_cred_handle && cred_handle) {
-	   krb5_gss_release_cred(minor_status, &cred_handle);
+	krb5_gss_release_cred(&t_minor_status, &cred_handle);
    }
    krb5_free_context(context);
 

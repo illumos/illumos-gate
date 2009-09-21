@@ -1,4 +1,8 @@
 /*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
 ** set password functions added by Paul W. Nelson, Thursby Software Systems, Inc.
 */
 #include <string.h>
@@ -281,17 +285,21 @@ krb5int_mk_setpw_req(
     krb5_error_code ret;
     krb5_data	cipherpw;
     krb5_data	*encoded_setpw;
+    struct krb5_setpw_req req;
 
     char *ptr;
 
-     cipherpw.data = NULL;
-     cipherpw.length = 0;
+    cipherpw.data = NULL;
+    cipherpw.length = 0;
      
     if ((ret = krb5_auth_con_setflags(context, auth_context,
 				      KRB5_AUTH_CONTEXT_DO_SEQUENCE)))
 		return(ret);
 
-    ret = encode_krb5_setpw_req(targprinc, passwd, &encoded_setpw);
+    req.target = targprinc;
+    req.password.data = passwd;
+    req.password.length = strlen(passwd);
+    ret = encode_krb5_setpw_req(&req, &encoded_setpw);
     if (ret) {
 	return ret;
     }

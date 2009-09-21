@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -282,6 +282,23 @@ OM_uint32 generic_gss_str_to_oid
 	    gss_buffer_t,	/* oid_str */
 	    gss_OID *		/* oid */
 	   );
+
+OM_uint32
+generic_gss_oid_compose(
+    OM_uint32 *,        /* minor_status */
+    const char *,       /* prefix */
+    size_t,             /* prefix_len */
+    int,                /* suffix */
+    gss_OID_desc *);    /* oid */
+
+OM_uint32
+generic_gss_oid_decompose(
+    OM_uint32 *,        /* minor_status */
+    const char *,       /*prefix */
+    size_t,             /* prefix_len */
+    gss_OID_desc *,     /* oid */
+    int *);             /* suffix */
+
 #endif /* 0 */
 
 #endif /* _GSSAPIP_GENERIC_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -412,6 +412,12 @@ typedef struct _krb5_etype_info_entry {
 
 typedef krb5_etype_info_entry ** krb5_etype_info;
 
+/* RFC 4537 */
+typedef struct _krb5_etype_list {
+        int             length;
+        krb5_enctype    *etypes;
+} krb5_etype_list;
+
 /*
  * a sam_challenge is returned for alternate preauth 
  */
@@ -689,6 +695,14 @@ krb5_error_code krb5int_sendto (krb5_context context, const krb5_data *message,
 		void *msg_handler_data);
 
 krb5_error_code krb5int_get_fq_local_hostname (char *, size_t);
+
+krb5_error_code krb5_set_debugging_time
+        (krb5_context, krb5_timestamp, krb5_int32);
+krb5_error_code krb5_use_natural_time
+        (krb5_context);
+krb5_error_code krb5_set_time_offsets
+        (krb5_context, krb5_timestamp, krb5_int32);
+krb5_error_code krb5int_check_clockskew(krb5_context, krb5_timestamp);
 #endif
 
 /*
@@ -1139,6 +1153,54 @@ typedef struct _krb5_pa_enc_ts {
     krb5_timestamp	patimestamp;
     krb5_int32		pausec;
 } krb5_pa_enc_ts;
+
+typedef struct _krb5_pa_for_user {
+    krb5_principal      user;
+    krb5_checksum       cksum;
+    krb5_data           auth_package;
+} krb5_pa_for_user;
+
+enum {
+  KRB5_FAST_ARMOR_AP_REQUEST = 0x1
+};
+
+typedef struct _krb5_fast_armor {
+    krb5_int32 armor_type;
+    krb5_data armor_value;
+} krb5_fast_armor;
+typedef struct _krb5_fast_armored_req {
+    krb5_magic magic;
+    krb5_fast_armor *armor;
+    krb5_checksum req_checksum;
+    krb5_enc_data enc_part;
+} krb5_fast_armored_req;
+
+typedef struct _krb5_fast_req {
+    krb5_magic magic;
+    krb5_flags fast_options;
+    /* padata from req_body is used*/
+   krb5_kdc_req *req_body;
+} krb5_fast_req;
+
+
+/* Bits 0-15 are critical in fast options.*/
+#define UNSUPPORTED_CRITICAL_FAST_OPTIONS 0x00ff
+#define KRB5_FAST_OPTION_HIDE_CLIENT_NAMES 0x01
+
+typedef struct _krb5_fast_finished {
+    krb5_timestamp timestamp;
+    krb5_int32 usec;
+    krb5_principal client;
+    krb5_checksum ticket_checksum;
+} krb5_fast_finished;
+
+typedef struct _krb5_fast_response {
+    krb5_magic magic;
+    krb5_pa_data **padata;
+    krb5_keyblock *strengthen_key;
+    krb5_fast_finished *finished;
+    krb5_int32 nonce;
+} krb5_fast_response;
 
 typedef krb5_error_code (*krb5_preauth_obtain_proc)
     (krb5_context,
@@ -1809,8 +1871,13 @@ krb5_error_code encode_krb5_kdc_req_body
 krb5_error_code encode_krb5_safe
 	(const krb5_safe *rep, krb5_data **code);
 
+struct krb5_safe_with_body {
+	krb5_safe *safe;
+	krb5_data *body;
+};
+
 krb5_error_code encode_krb5_safe_with_body
-	(const krb5_safe *rep, const krb5_data *body, krb5_data **code);
+	(const struct krb5_safe_with_body *rep, krb5_data **code);
 
 krb5_error_code encode_krb5_priv
 	(const krb5_priv *rep, krb5_data **code);
@@ -1828,7 +1895,7 @@ krb5_error_code encode_krb5_error
 	(const krb5_error *rep, krb5_data **code);
 
 krb5_error_code encode_krb5_authdata
-	(const krb5_authdata **rep, krb5_data **code);
+	(krb5_authdata *const *rep, krb5_data **code);
 
 krb5_error_code encode_krb5_authdata_elt
 	(const krb5_authdata *rep, krb5_data **code);
@@ -1840,15 +1907,15 @@ krb5_error_code encode_krb5_pwd_data
 	(const krb5_pwd_data *rep, krb5_data **code);
 
 krb5_error_code encode_krb5_padata_sequence
-	(const krb5_pa_data ** rep, krb5_data **code);
+        (krb5_pa_data *const *rep, krb5_data **code);
 
 krb5_error_code encode_krb5_alt_method
 	(const krb5_alt_method *, krb5_data **code);
 
 krb5_error_code encode_krb5_etype_info
-	(const krb5_etype_info_entry **, krb5_data **code);
+        (krb5_etype_info_entry *const *, krb5_data **code);
 krb5_error_code encode_krb5_etype_info2
-	(const krb5_etype_info_entry **, krb5_data **code);
+        (krb5_etype_info_entry *const *, krb5_data **code);
 
 krb5_error_code encode_krb5_enc_data
     	(const krb5_enc_data *, krb5_data **);
@@ -1883,8 +1950,12 @@ krb5_error_code encode_krb5_sam_response_2
 krb5_error_code encode_krb5_predicted_sam_response
 	(const krb5_predicted_sam_response * , krb5_data **);
 
+struct krb5_setpw_req {
+    krb5_principal target;
+    krb5_data password;
+};
 krb5_error_code encode_krb5_setpw_req
-(const krb5_principal target, char *password, krb5_data **code);
+        (const struct krb5_setpw_req *rep, krb5_data **code);
 
 /*************************************************************************
  * End of prototypes for krb5_encode.c
@@ -2291,6 +2362,7 @@ typedef struct _krb5int_access {
 					    struct srv_dns_entry **answers);
     void (*free_srv_dns_data)(struct srv_dns_entry *);
     int (*use_dns_kdc)(krb5_context);
+    krb5_error_code (*clean_hostname)(krb5_context, const char *, char *, size_t);
 
     /* krb4 compatibility stuff -- may be null if not enabled */
     krb5_int32 (*krb_life_to_time)(krb5_int32, int);
@@ -2505,6 +2577,7 @@ typedef struct _krb5_donot_replay {
     krb5_ui_4 hash;
     char *server;			/* null-terminated */
     char *client;			/* null-terminated */
+    char *msghash;                      /* null-terminated */
     krb5_int32 cusec;
     krb5_timestamp ctime;
 } krb5_donot_replay;
@@ -2647,4 +2720,12 @@ krb5_error_code KRB5_CALLCONV krb5int_clean_hostname
 		char *,
 		size_t);
 
+/*
+ * Solaris Kerberos
+ * Kernel & user space realloc.
+ */
+void *krb5int_realloc
+	(void *oldp,
+	 size_t new_size,
+	 size_t old_size);
 #endif /* _KRB5_INT_H */

@@ -1,9 +1,7 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -340,6 +338,14 @@ static OM_uint32 k5glue_store_cred (
 	    gss_cred_usage_t *      /* cred_usage_stored */
 	   );
 
+/* SUNW17PACresync - this decl not needed in MIT but is for Sol */
+/* Note code is in gsspi_krb5.c */
+OM_uint32 krb5_gss_inquire_sec_context_by_oid(
+	OM_uint32 *,
+	const gss_ctx_id_t,
+	const gss_OID,
+	gss_buffer_set_t *);
+
 static OM_uint32
 k5glue_userok(
 		    void *,		/* context */
@@ -443,7 +449,8 @@ static struct gss_config krb5_mechanism = {
 /* EXPORT DELETE END */
     k5glue_sign,
     k5glue_verify,
-    k5glue_store_cred
+    k5glue_store_cred,
+    krb5_gss_inquire_sec_context_by_oid
 };
 
 static struct gss_config krb5_mechanism_old = {
@@ -495,7 +502,8 @@ static struct gss_config krb5_mechanism_old = {
 /* EXPORT DELETE END */
     k5glue_sign,
     k5glue_verify,
-    k5glue_store_cred
+    k5glue_store_cred,
+    krb5_gss_inquire_sec_context_by_oid
 };
 
 static struct gss_config krb5_mechanism_wrong = {
@@ -547,7 +555,8 @@ static struct gss_config krb5_mechanism_wrong = {
 /* EXPORT DELETE END */
     k5glue_sign,
     k5glue_verify,
-    k5glue_store_cred
+    k5glue_store_cred,
+    krb5_gss_inquire_sec_context_by_oid
 };
 
 static gss_mechanism krb5_mech_configs[] = {
@@ -1236,21 +1245,6 @@ k5glue_duplicate_name(ctx, minor_status, input_name, dest_name)
 }
 #endif
 
-OM_uint32 KRB5_CALLCONV
-gss_krb5_get_tkt_flags(
-    OM_uint32 *minor_status,
-    gss_ctx_id_t context_handle,
-    krb5_flags *ticket_flags)
-{
-    gss_union_ctx_id_t uctx;
-
-    uctx = (gss_union_ctx_id_t)context_handle;
-    if (!g_OID_equal(uctx->mech_type, &krb5_mechanism.mech_type) &&
-	!g_OID_equal(uctx->mech_type, &krb5_mechanism_old.mech_type))
-	return GSS_S_BAD_MECH;
-    return gss_krb5int_get_tkt_flags(minor_status, uctx->internal_ctx_id,
-				     ticket_flags);
-}
 
 OM_uint32 KRB5_CALLCONV 
 gss_krb5_copy_ccache(
@@ -1272,25 +1266,6 @@ gss_krb5_copy_ccache(
 	return gss_krb5int_copy_ccache(minor_status, mcred, out_ccache);
 
     return GSS_S_DEFECTIVE_CREDENTIAL;
-}
-
-/* XXX need to delete mechglue ctx too */
-OM_uint32 KRB5_CALLCONV
-gss_krb5_export_lucid_sec_context(
-    OM_uint32 *minor_status,
-    gss_ctx_id_t *context_handle,
-    OM_uint32 version,
-    void **kctx)
-{
-    gss_union_ctx_id_t uctx;
-
-    uctx = (gss_union_ctx_id_t)*context_handle;
-    if (!g_OID_equal(uctx->mech_type, &krb5_mechanism.mech_type) &&
-	!g_OID_equal(uctx->mech_type, &krb5_mechanism_old.mech_type))
-	return GSS_S_BAD_MECH;
-    return gss_krb5int_export_lucid_sec_context(minor_status,
-						&uctx->internal_ctx_id,
-						version, kctx);
 }
 
 OM_uint32 KRB5_CALLCONV
@@ -1366,3 +1341,104 @@ gss_mech_initialize(oid)
     return (&krb5_mechanism);
 }
 
+/*
+ * This API should go away and be replaced with an accessor
+ * into a gss_name_t.
+ */
+OM_uint32 KRB5_CALLCONV
+gsskrb5_extract_authz_data_from_sec_context(
+    OM_uint32 *minor_status,
+    gss_ctx_id_t context_handle,
+    int ad_type,
+    gss_buffer_t ad_data)
+{
+    gss_OID_desc req_oid;
+    unsigned char oid_buf[GSS_KRB5_EXTRACT_AUTHZ_DATA_FROM_SEC_CONTEXT_OID_LENGTH + 6];
+    OM_uint32 major_status;
+    gss_buffer_set_t data_set = GSS_C_NO_BUFFER_SET;
+
+    if (ad_data == NULL)
+        return GSS_S_CALL_INACCESSIBLE_WRITE;
+
+    req_oid.elements = oid_buf;
+    req_oid.length = sizeof(oid_buf);
+
+    major_status = generic_gss_oid_compose(minor_status,
+                                           GSS_KRB5_EXTRACT_AUTHZ_DATA_FROM_SEC_CONTEXT_OID,
+                                           GSS_KRB5_EXTRACT_AUTHZ_DATA_FROM_SEC_CONTEXT_OID_LENGTH,
+                                           ad_type,
+                                           &req_oid);
+    if (GSS_ERROR(major_status))
+        return major_status;
+
+    major_status = gss_inquire_sec_context_by_oid(minor_status,
+                                                  context_handle,
+                                                  (gss_OID)&req_oid,
+                                                  &data_set);
+    if (major_status != GSS_S_COMPLETE) {
+        return major_status;
+    }
+
+
+    /*
+     * SUNW17PACresync / Solaris Kerberos
+     * MIT17 expects just 1 but our testing with Win2008 shows
+     * it returns 2.  So we now handle that and rewhack mem mgmt as appro.
+     */
+    if (data_set == GSS_C_NO_BUFFER_SET ||
+        (data_set->count != 1 && data_set->count != 2)) {
+	    gss_release_buffer_set(minor_status, &data_set);
+
+	    return GSS_S_FAILURE;
+    }
+
+    ad_data->length = data_set->elements[0].length;
+    ad_data->value = malloc(ad_data->length);
+    if (!ad_data->value) {
+	    gss_release_buffer_set(minor_status, &data_set);
+	    return ENOMEM;
+    }
+    bcopy(data_set->elements[0].value, ad_data->value, ad_data->length);
+
+    gss_release_buffer_set(minor_status, &data_set);
+
+    return GSS_S_COMPLETE;
+}
+
+
+OM_uint32 KRB5_CALLCONV
+gsskrb5_extract_authtime_from_sec_context(OM_uint32 *minor_status,
+                                          gss_ctx_id_t context_handle,
+                                          krb5_timestamp *authtime)
+{
+    static const gss_OID_desc req_oid = {
+        GSS_KRB5_EXTRACT_AUTHTIME_FROM_SEC_CONTEXT_OID_LENGTH,
+        GSS_KRB5_EXTRACT_AUTHTIME_FROM_SEC_CONTEXT_OID };
+    OM_uint32 major_status;
+    gss_buffer_set_t data_set = GSS_C_NO_BUFFER_SET;
+
+    if (authtime == NULL)
+        return GSS_S_CALL_INACCESSIBLE_WRITE;
+
+    major_status = gss_inquire_sec_context_by_oid(minor_status,
+                                                  context_handle,
+                                                  (gss_OID)&req_oid,
+                                                  &data_set);
+    if (major_status != GSS_S_COMPLETE)
+        return major_status;
+
+    if (data_set == GSS_C_NO_BUFFER_SET ||
+        data_set->count != 1 ||
+        data_set->elements[0].length != sizeof(*authtime)) {
+        *minor_status = EINVAL;
+        return GSS_S_FAILURE;
+    }
+
+    *authtime = *((krb5_timestamp *)data_set->elements[0].value);
+
+    gss_release_buffer_set(minor_status, &data_set);
+
+    *minor_status = 0;
+
+    return GSS_S_COMPLETE;
+}

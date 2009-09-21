@@ -41,7 +41,6 @@ SUNWprivate {
     global:
 	spnego_gss_accept_sec_context;
 	spnego_gss_acquire_cred;
-	spnego_gss_context_time;
 	spnego_gss_delete_sec_context;
 	spnego_gss_display_name;
 	spnego_gss_display_status;
@@ -49,17 +48,16 @@ SUNWprivate {
 	spnego_gss_import_name;
 	spnego_gss_import_sec_context;
 	spnego_gss_init_sec_context;
-	spnego_gss_inquire_context;
-	spnego_gss_inquire_cred;
+#	spnego_gss_inquire_context;
+#	spnego_gss_inquire_cred;
 	spnego_gss_inquire_names_for_mech;
 	spnego_gss_process_context_token;
 	spnego_gss_release_cred;
 	spnego_gss_release_name;
-	spnego_gss_seal;
-	spnego_gss_sign;
-	spnego_gss_unseal;
-	spnego_gss_verify;
-	spnego_gss_wrap_size_limit;
+#	spnego_gss_seal;
+#	spnego_gss_sign;
+#	spnego_gss_unseal;
+#	spnego_gss_verify;
     local:
 	*;
 };

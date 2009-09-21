@@ -1,12 +1,12 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * lib/krb5/krb/parse.c
  *
- * Copyright 1990,1991 by the Massachusetts Institute of Technology.
+ * Copyright 1990,1991,2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -38,12 +38,6 @@
 
 #include "k5-int.h"
 
-#ifndef _KERNEL
-#include <assert.h>
-#include <stdarg.h> 
-#define ASSERT assert 
-#endif
-
 /*
  * converts a single-string representation of the name to the
  * multi-part principal format used in the protocols.
@@ -70,18 +64,18 @@
 
 #define FCOMPNUM	10
 
-
 /*
  * May the fleas of a thousand camels infest the ISO, they who think
  * that arbitrarily large multi-component names are a Good Thing.....
  */
-/*ARGSUSED*/
-krb5_error_code KRB5_CALLCONV
-krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincipal)
+static krb5_error_code
+/*LINTED*/
+k5_parse_name(krb5_context context, const char *name,
+	      int flags, krb5_principal *nprincipal)
 {
 	register const char	*cp;
 	register char	*q;
-	register int    i,c,size;
+	register int	i,c,size;
 	int		components = 0;
 	const char	*parsed_realm = NULL;
 	int		fcompsize[FCOMPNUM];
@@ -93,26 +87,32 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 #endif
 	char		*tmpdata;
 	krb5_principal	principal;
+	unsigned int	enterprise = (flags & KRB5_PRINCIPAL_PARSE_ENTERPRISE);
+	int		first_at;
+
+	*nprincipal = NULL;
 
 	/*
 	 * Pass 1.  Find out how many components there are to the name,
-	 * and get string sizes for the first FCOMPNUM components.
+	 * and get string sizes for the first FCOMPNUM components. For
+	 * enterprise principal names (UPNs), there is only a single
+	 * component.
 	 */
 	size = 0;
 	/*LINTED*/
-	for (i = 0, cp = name; (c = *cp); cp++) {
+	for (i=0,cp = name, first_at = 1; (c = *cp); cp++) {
 		if (c == QUOTECHAR) {
 			cp++;
 			/*LINTED*/
 			if (!(c = *cp))
 				/*
-				 * QUOTECHAR can't be at the last
-				 * character of the name!
-				 */
+			 	 * QUOTECHAR can't be at the last
+			 	 * character of the name!
+			 	 */
 				return(KRB5_PARSE_MALFORMED);
 			size++;
 			continue;
-		} else if (c == COMPONENT_SEP) {
+		} else if (c == COMPONENT_SEP && !enterprise) {
 			if (parsed_realm)
 				/*
 				 * Shouldn't see a component separator
@@ -124,22 +124,26 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 			}
 			size = 0;
 			i++;
-		} else if (c == REALM_SEP) {
+		} else if (c == REALM_SEP && (!enterprise || !first_at)) {
 			if (parsed_realm)
 				/*
 				 * Multiple realm separaters
 				 * not allowed; zero-length realms are.
 				 */
 				return(KRB5_PARSE_MALFORMED);
-			parsed_realm = cp+1;
+			parsed_realm = cp + 1;
 			if (i < FCOMPNUM) {
 				fcompsize[i] = size;
 			}
 			size = 0;
-		} else
+		} else {
+			if (c == REALM_SEP && enterprise && first_at)
+				first_at = 0;
+
 			size++;
+		}
 	}
-	if (parsed_realm)
+	if (parsed_realm != NULL)
 		realmsize = size;
 	else if (i < FCOMPNUM) 
 		fcompsize[i] = size;
@@ -149,39 +153,49 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 	 * component pieces
 	 */
 	principal = (krb5_principal)MALLOC(sizeof(krb5_principal_data));
-	if (!principal) {
-		return(ENOMEM);
+	if (principal == NULL) {
+	    return(ENOMEM);
 	}
 	principal->data = (krb5_data *)MALLOC(sizeof(krb5_data) * components);
-	if (!principal->data) {
-	    krb5_xfree_wrap((char *)principal, sizeof(krb5_principal_data));
+	if (principal->data == NULL) {
+	    krb5_xfree_wrap(principal, sizeof(krb5_principal_data));
 	    return ENOMEM;
 	}
 	principal->length = components;
-	/*
-	 * If a realm was not found, then use the defualt realm....
-	 */
-	/*
-	 * In the kernel we import the ctx and it always contains the
-	 * default realm
-	 */
 
+	/*
+	 * If a realm was not found, then use the default realm, unless
+	 * KRB5_PRINCIPAL_PARSE_NO_REALM was specified in which case the
+	 * realm will be empty.
+	 */
 #ifndef _KERNEL
 	if (!parsed_realm) {
-	    if (!default_realm) {
+	    if (flags & KRB5_PRINCIPAL_PARSE_REQUIRE_REALM) {
+		krb5_set_error_message(context, KRB5_PARSE_MALFORMED,
+				       "Principal %s is missing required realm", name);
+		krb5_xfree_wrap(principal->data, principal->length);
+		krb5_xfree_wrap(principal, sizeof(krb5_principal_data));
+		return KRB5_PARSE_MALFORMED;
+	    }
+	    if (!default_realm && (flags & KRB5_PRINCIPAL_PARSE_NO_REALM) == 0) {
 		retval = krb5_get_default_realm(context, &default_realm);
 		if (retval) {
-		    krb5_xfree_wrap(principal->data,
-			sizeof (krb5_data) * components);
-		    krb5_xfree_wrap((char *)principal,
-			sizeof (krb5_principal_data));
+		    krb5_xfree_wrap(principal->data, principal->length);
+		    krb5_xfree_wrap(principal, sizeof(krb5_principal_data));
 		    return(retval);
 		}
 		default_realm_size = strlen(default_realm);
 	    }
 	    realmsize = default_realm_size;
+	} else if (flags & KRB5_PRINCIPAL_PARSE_NO_REALM) {
+	    krb5_set_error_message(context, KRB5_PARSE_MALFORMED,
+				  "Principal %s has realm present", name);
+	    krb5_xfree_wrap(principal->data, principal->length);
+	    krb5_xfree_wrap(principal, sizeof(krb5_principal_data));
+	    return KRB5_PARSE_MALFORMED;
 	}
 #endif
+
 	/*
 	 * Pass 2.  Happens only if there were more than FCOMPNUM
 	 * component; if this happens, someone should be shot
@@ -217,14 +231,15 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 		if (i + 1 != components) {
 #ifndef _KERNEL
 #if !defined(_WIN32)
-		    fprintf(stderr,
+ 		    fprintf(stderr,
 			    "Programming error in krb5_parse_name!");
 #endif
-		    ASSERT(i + 1 == components);
-		    abort();
+ 		    ASSERT(i + 1 == components);
+ 		    abort();
 #else
-		    ASSERT(i + 1 == components);
+ 		    ASSERT(i + 1 == components);
 #endif /* !_KERNEL */
+
 		}
 	} else {
 		/*
@@ -238,47 +253,37 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 	/*	
 	 * Now, we need to allocate the space for the strings themselves.....
 	 */
-	tmpdata = MALLOC(realmsize+1);
+	tmpdata = MALLOC(realmsize + 1);
 	if (tmpdata == 0) {
-		krb5_xfree_wrap(principal->data,
-		    sizeof (krb5_data) * components);
-		krb5_xfree_wrap((char *)principal,
-		    sizeof (krb5_principal_data));
+		krb5_xfree_wrap(principal->data, principal->length);
+		krb5_xfree_wrap(principal, sizeof(krb5_principal_data));
 #ifndef _KERNEL
-		if (default_realm)
-			krb5_xfree_wrap(default_realm, strlen(default_realm));
+		krb5_xfree_wrap(default_realm, strlen(default_realm));
 #endif
-		return (ENOMEM);
+		return ENOMEM;
 	}
 	krb5_princ_set_realm_length(context, principal, realmsize);
 	krb5_princ_set_realm_data(context, principal, tmpdata);
 	for (i=0; i < components; i++) {
 		char *tmpdata2 =
 		  MALLOC(krb5_princ_component(context, principal, i)->length + 1);
-		if (!tmpdata2) {
-                        /*
-                         * Release the principle and realm strings remembering
-                         * that we allocated one additional byte beyond the
-                         * 'length' to hold the string terminating zero byte.
-                         * It's critical that the free size match the malloc
-			 * size.
-                         */
+		if (tmpdata2 == NULL) {
 			for (i--; i >= 0; i--)
-				krb5_xfree_wrap(krb5_princ_component(context,
+ 				krb5_xfree_wrap(krb5_princ_component(context,
 				    principal, i)->data,
-				    krb5_princ_component(context,
-				    principal, i)->length + 1);
-			krb5_xfree_wrap(krb5_princ_realm(context,
-			    principal)->data, krb5_princ_realm(context,
-			    principal)->length + 1);
+                                    krb5_princ_component(context,
+                                    principal, i)->length + 1);
+
+ 			krb5_xfree_wrap(krb5_princ_realm(context,
+ 			    principal)->data, krb5_princ_realm(context,
+ 			    principal)->length + 1);
+
 			krb5_xfree_wrap(principal->data, principal->length);
 			krb5_xfree_wrap(principal, sizeof(krb5_principal_data));
 #ifndef _KERNEL
-			if (default_realm)
-				krb5_xfree_wrap(default_realm,
-						strlen(default_realm));
+			krb5_xfree_wrap(default_realm, strlen(default_realm));
 #endif
-			return (ENOMEM);
+			return(ENOMEM);
 		}
 		krb5_princ_component(context, principal, i)->data = tmpdata2;
 		krb5_princ_component(context, principal, i)->magic = KV5M_DATA;
@@ -291,7 +296,7 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 	 */
 	q = krb5_princ_component(context, principal, 0)->data;
 	/*LINTED*/
-	for (i=0,cp = name; (c = *cp); cp++) {
+	for (i=0,cp = name, first_at = 1; (c = *cp); cp++) {
 		if (c == QUOTECHAR) {
 			cp++;
 			switch (c = *cp) {
@@ -308,35 +313,64 @@ krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincip
 				*q++ = '\0';
 				break;
 			default:
-				*q++ = (char) c;
+				*q++ = c;
+				break;
 			}
-		} else if ((c == COMPONENT_SEP) || (c == REALM_SEP)) {
+		} else if (c == COMPONENT_SEP && !enterprise) {
 			i++;
 			*q++ = '\0';
-			if (c == COMPONENT_SEP) 
-				q = krb5_princ_component(context, principal, i)->data;
-			else
-				q = krb5_princ_realm(context, principal)->data;
-		} else
-			*q++ = (char) c;
+			q = krb5_princ_component(context, principal, i)->data;
+		} else if (c == REALM_SEP && (!enterprise || !first_at)) {
+			i++;
+			*q++ = '\0';
+			q = krb5_princ_realm(context, principal)->data;
+		} else {
+			if (c == REALM_SEP && enterprise && first_at)
+				first_at = 0;
+
+			*q++ = c;
+		}
 	}
 	*q++ = '\0';
-	if (!parsed_realm)
+	/*LINTED*/
+	if (!parsed_realm) {
 #ifndef _KERNEL
-		(void) strcpy(krb5_princ_realm(context, principal)->data,
-			default_realm);
+
+		if (flags & KRB5_PRINCIPAL_PARSE_NO_REALM)
+			(krb5_princ_realm(context, principal)->data)[0] = '\0';
+		else
+			strlcpy(krb5_princ_realm(context, principal)->data, default_realm, realmsize+1);
 #endif
+	}
 	/*
 	 * Alright, we're done.  Now stuff a pointer to this monstrosity
 	 * into the return variable, and let's get out of here.
 	 */
-	krb5_princ_type(context, principal) = KRB5_NT_PRINCIPAL;
+	if (enterprise)
+		krb5_princ_type(context, principal) = KRB5_NT_ENTERPRISE_PRINCIPAL;
+	else
+		krb5_princ_type(context, principal) = KRB5_NT_PRINCIPAL;
 	principal->magic = KV5M_PRINCIPAL;
 	principal->realm.magic = KV5M_DATA;
 	*nprincipal = principal;
+
 #ifndef _KERNEL
-	if (default_realm)
-		krb5_xfree_wrap(default_realm, strlen(default_realm));
+	if (default_realm != NULL)
+ 	    krb5_xfree_wrap(default_realm, strlen(default_realm));
 #endif
+
 	return(0);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_parse_name(krb5_context context, const char *name, krb5_principal *nprincipal)
+{
+	 return k5_parse_name(context, name, 0, nprincipal);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_parse_name_flags(krb5_context context, const char *name,
+		      int flags, krb5_principal *nprincipal)
+{
+	 return k5_parse_name(context, name, flags, nprincipal);
 }

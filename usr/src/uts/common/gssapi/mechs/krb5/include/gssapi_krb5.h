@@ -1,10 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
  * 
@@ -178,17 +175,6 @@ typedef struct gss_krb5_lucid_context_version {
 
 OM_uint32 KRB5_CALLCONV krb5_gss_register_acceptor_identity(const char *);
 
-  /*
-   * SUNW15resync
-   * The name has changed (_krb5_ to _krb5int_) in MIT's
-   * get_tkt_flags.c but did not change here
-   * ...a bug I assume so we change it here.
-   */
-OM_uint32 KRB5_CALLCONV gss_krb5int_get_tkt_flags 
-	(OM_uint32 *minor_status,
-		   gss_ctx_id_t context_handle,
-		   krb5_flags *ticket_flags);
-
 OM_uint32 KRB5_CALLCONV gss_krb5_copy_ccache
 	(OM_uint32 *minor_status,
 		   gss_cred_id_t cred_handle,
@@ -288,6 +274,21 @@ gss_krb5_export_lucid_sec_context(OM_uint32 *minor_status,
 OM_uint32 KRB5_CALLCONV
 gss_krb5_free_lucid_sec_context(OM_uint32 *minor_status,
 				void *kctx);
+
+
+OM_uint32 KRB5_CALLCONV
+gsskrb5_extract_authz_data_from_sec_context(OM_uint32 *minor_status,
+                                            const gss_ctx_id_t context_handle,
+                                            int ad_type,
+                                            gss_buffer_t ad_data);
+
+OM_uint32 KRB5_CALLCONV
+gss_krb5_set_cred_rcache(OM_uint32 *minor_status,
+                         gss_cred_id_t cred,
+                         krb5_rcache rcache);
+
+OM_uint32 KRB5_CALLCONV
+gsskrb5_extract_authtime_from_sec_context(OM_uint32 *, gss_ctx_id_t, krb5_timestamp *);
 
 
 #ifdef __cplusplus

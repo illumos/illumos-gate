@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This header contains the private mechglue definitions.
@@ -72,7 +70,8 @@ typedef struct gss_union_ctx_id_t {
  * Generic GSSAPI names.  A name can either be a generic name, or a
  * mechanism specific name....
  */
-typedef struct gss_union_name_t {
+typedef struct gss_name_struct {
+	struct gss_name_struct *loopback;
 	gss_OID			name_type;
 	gss_buffer_t		external_name;
 	/*
@@ -161,6 +160,7 @@ typedef struct gss_config {
 	OM_uint32	    (*gss_acquire_cred)
 	(
 		    void *,		/* context */
+
 		    OM_uint32 *,	/* minor_status */
 		    const gss_name_t,	/* desired_name */
 		    OM_uint32,		/* time_req */
@@ -172,6 +172,7 @@ typedef struct gss_config {
 	/* */);
 	OM_uint32	    (*gss_release_cred)
 	(
+
 		    void *,		/* context */
 		    OM_uint32 *,	/* minor_status */
 		    gss_cred_id_t *	/* cred_handle */
@@ -516,6 +517,17 @@ typedef struct gss_config {
 		gss_OID_set *,		/* elements_stored */
 		gss_cred_usage_t *	/* cred_usage_stored */
 	/* */);
+
+	/* GGF extensions */
+
+        OM_uint32       (*gss_inquire_sec_context_by_oid)
+        (
+		OM_uint32 *,        /* minor_status */
+		const gss_ctx_id_t, /* context_handle */
+		const gss_OID,      /* OID */
+		gss_buffer_set_t *  /* data_set */
+	/* */);
+
 #endif
 } *gss_mechanism;
 
@@ -873,5 +885,59 @@ OM_uint32 generic_gss_str_to_oid
 	    gss_OID *		/* oid */
 	   );
 
+OM_uint32
+generic_gss_oid_compose(
+    OM_uint32 *,        /* minor_status */
+    const char *,       /* prefix */
+    size_t,             /* prefix_len */
+    int,                /* suffix */
+    gss_OID_desc *);    /* oid */
+
+OM_uint32
+generic_gss_oid_decompose(
+    OM_uint32 *,        /* minor_status */
+    const char *,       /*prefix */
+    size_t,             /* prefix_len */
+    gss_OID_desc *,     /* oid */
+    int *);             /* suffix */
+
+OM_uint32 generic_gss_create_empty_buffer_set
+(OM_uint32 * /*minor_status*/,
+            gss_buffer_set_t * /*buffer_set*/);
+
+OM_uint32 generic_gss_add_buffer_set_member
+(OM_uint32 * /*minor_status*/,
+            const gss_buffer_t /*member_buffer*/,
+            gss_buffer_set_t * /*buffer_set*/);
+
+OM_uint32 generic_gss_release_buffer_set
+(OM_uint32 * /*minor_status*/,
+            gss_buffer_set_t * /*buffer_set*/);
+
+/*
+ * SUNW17PACresync
+ * New map error API in MIT 1.7, at build time generates code for errors.
+ * Solaris does not gen the errors at build time so we just stub these
+ * for now, need to revisit.
+ * See mglueP.h and util_errmap.c in MIT 1.7.
+*/
+#ifdef _KERNEL
+
+#define map_error(MINORP, MECH)
+#define map_errcode(MINORP)
+
+#else  /* _KERNEL */
+
+#include <syslog.h>
+
+#define map_error(MINORP, MECH)				\
+	(void) syslog(LOG_AUTH|LOG_DEBUG,		\
+		    "map_error: minor status=%x",	\
+		    (MINORP) ? *(MINORP) : 0xffffffff)
+#define map_errcode(MINORP) \
+	(void) syslog(LOG_AUTH|LOG_DEBUG,		\
+		    "map_errcode: minor status=%x",	\
+		    (MINORP) ? *(MINORP) : 0xffffffff)
+#endif /* _KERNEL */
 
 #endif /* _GSS_MECHGLUEP_H */

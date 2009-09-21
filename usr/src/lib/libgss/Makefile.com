@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY = libgss.a
@@ -62,20 +60,29 @@ GSSOBJECTS	= g_acquire_cred.o \
 	  g_dup_name.o \
 	  g_export_name.o \
 	  g_utils.o \
-	  g_userok.o
+	  g_userok.o \
+	  g_buffer_set.o \
+	  g_inq_context_oid.o \
 
 
 # defines the duplicate sources we share with gsscred
 GSSCRED_DIR =	$(SRC)/cmd/gss/gsscred
 GSSCREDOBJ =	gsscred_utils.o gsscred_file.o
+# defines the duplicate sources we share with krb5 mech
+KRB5DIR= $(SRC)/lib/gss_mechs/mech_krb5/mech
+KRB5OBJ= rel_buffer.o util_buffer_set.o
+# defines the duplicate sources we share with kernel module
 UTSGSSDIR =	$(SRC)/uts/common/gssapi
 UTSGSSOBJ =	gen_oids.o
+
 SRCS +=		$(GSSCREDOBJ:%.o=$(GSSCRED_DIR)/%.c) \
+		$(KRB5OBJ:%.o=$(KRB5DIR)/%.c) \
 		$(UTSGSSOBJ:%.o=$(UTSGSSDIR)/%.c)
 GSSLINTSRC =	$(GSSOBJECTS:%.o=$(SRCDIR)/%.c) \
 		$(GSSCREDOBJ:%.o=$(GSSCRED_DIR)/%.c) \
+	        $(KRB5OBJ:%.o=$(KRB5DIR)/%.c) \
 		$(UTSGSSOBJ:%.o=$(UTSGSSDIR)/%.c)
-OBJECTS =	$(GSSOBJECTS) $(GSSCREDOBJ) $(UTSGSSOBJ)
+OBJECTS =	$(GSSOBJECTS) $(GSSCREDOBJ) $(KRB5OBJ) $(UTSGSSOBJ)
 
 # include library definitions
 include ../../Makefile.lib
@@ -86,6 +93,9 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS += 	-lc
 
 CPPFLAGS += 	-I$(GSSCRED_DIR) -I$(SRC)/uts/common/gssapi/include \
+		 -I$(SRC)/uts/common/gssapi/mechs/krb5/include \
+		 -I$(SRC)/uts/common/gssapi/ \
+		 -I$(SRC)/lib/gss_mechs/mech_krb5/include/ \
 		-DHAVE_STDLIB_H
 
 $(EXPORT_RELEASE_BUILD)include $(CLOSED)/lib/libgss/Makefile.export
@@ -100,6 +110,16 @@ lint:  lintcheck
 
 $(GSSCREDOBJ:%.o=pics/%.o):
 	$(COMPILE.c) -o $@ $(@:pics/%.o=$(GSSCRED_DIR)/%.c)
+	$(POST_PROCESS_O)
+
+# we need this in libgss so we don't have to link against mech_krb5
+pics/rel_buffer.o: $(SRC)/lib/gss_mechs/mech_krb5/mech/rel_buffer.c
+	$(COMPILE.c) -o $@ $(SRC)/lib/gss_mechs/mech_krb5/mech/rel_buffer.c
+	$(POST_PROCESS_O)
+
+# we need this in libgss so we don't have to link against mech_krb5
+pics/util_buffer_set.o: $(SRC)/lib/gss_mechs/mech_krb5/mech/util_buffer_set.c
+	$(COMPILE.c) -o $@ $(SRC)/lib/gss_mechs/mech_krb5/mech/util_buffer_set.c
 	$(POST_PROCESS_O)
 
 # gen_oids.c is kept in the kernel since the OIDs declared in them are

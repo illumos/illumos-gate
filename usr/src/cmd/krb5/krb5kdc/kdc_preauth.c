@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -852,7 +852,7 @@ void get_preauth_hint_list(krb5_kdc_req *request, krb5_db_entry *client,
 			  "%spreauth required but hint list is empty",
 			  hw_only ? "hw" : "");
     }
-    retval = encode_krb5_padata_sequence((const krb5_pa_data **) pa_data,
+    retval = encode_krb5_padata_sequence((krb5_pa_data * const *) pa_data,
 					 &edat);
     if (retval)
 	goto errout;
@@ -1461,9 +1461,9 @@ etype_info_helper(krb5_context context, krb5_kdc_req *request,
 	}
     }
     if (etype_info2)
-	retval = encode_krb5_etype_info2((const krb5_etype_info_entry **) entry,
+	retval = encode_krb5_etype_info2((krb5_etype_info_entry * const*) entry,
 				    &scratch);
-    else 	retval = encode_krb5_etype_info((const krb5_etype_info_entry **) entry,
+    else 	retval = encode_krb5_etype_info((krb5_etype_info_entry * const*) entry,
 				    &scratch);
     if (retval)
 	goto cleanup;
@@ -1556,9 +1556,9 @@ etype_info_as_rep_helper(krb5_context context, krb5_pa_data * padata,
 	goto cleanup;
 
     if (etype_info2)
-	retval = encode_krb5_etype_info2((const krb5_etype_info_entry **) entry, &scratch);
+	retval = encode_krb5_etype_info2((krb5_etype_info_entry * const*) entry, &scratch);
     else
-	retval = encode_krb5_etype_info((const krb5_etype_info_entry **) entry, &scratch);
+	retval = encode_krb5_etype_info((krb5_etype_info_entry * const*) entry, &scratch);
 
     if (retval)
 	goto cleanup;

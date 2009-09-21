@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 
 #
 # This make file will build mech_spnego.so.1. This shared object
@@ -42,14 +41,13 @@ LIBS = 		$(DYNLIB)
 ROOTLIBDIR =	$(ROOT)/usr/lib/gss
 ROOTLIBDIR64 = 	$(ROOT)/usr/lib/$(MACH64)/gss
 SRCDIR =	../mech
-LDLIBS += 	-lgss -lc
 
 MAPFILE_EXPORT = ../mapfile-vers-clean
 $(EXPORT_RELEASE_BUILD)MAPFILE_EXPORT = \
 		$(CLOSED)/lib/gss_mechs/mech_spnego/mapfile-vers-export
 MAPFILES =	../mapfile-vers $(MAPFILE_EXPORT)
 
-CPPFLAGS += -I$(SRC)/uts/common/gssapi/include -I$(ROOT)/usr/include/gssapi $(DEBUG)
+CPPFLAGS += -I$(SRC)/uts/common/gssapi/include $(DEBUG) -I$(SRC)/lib/gss_mechs/mech_krb5/include -I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
 MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_spnego/Makefile.export
 $(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
@@ -62,3 +60,4 @@ lint: lintcheck
 
 # include library targets
 include ../../../Makefile.targ
+

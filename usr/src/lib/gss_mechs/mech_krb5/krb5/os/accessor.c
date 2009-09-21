@@ -63,6 +63,8 @@ krb5int_accessor(krb5int_access *internals, krb5_int32 version)
 	    S (free_srv_dns_data, 0),
 	    S (use_dns_kdc, 0),
 #endif
+            S (clean_hostname, krb5int_clean_hostname),
+
 #ifdef KRB5_KRB4_COMPAT
 	    S (krb_life_to_time, krb5int_krb_life_to_time),
 	    S (krb_time_to_life, krb5int_krb_time_to_life),

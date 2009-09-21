@@ -137,7 +137,7 @@ K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	enc_helper.o gic_keytab.o gic_opt.o gic_pwd.o preauth2.o \
 	preauth.o vfy_increds.o vic_opt.o set_realm.o krb5_libinit.o chpw.o \
 	init_keyblock.o init_allocated_keyblock.o get_set_keyblock.o kerrs.o \
-	getuid.o
+	getuid.o pac.o
 
 K5_KRB_UTS= copy_athctr.o copy_auth.o copy_cksum.o copy_key.o \
 	copy_princ.o init_ctx.o kfree.o parse.o ser_actx.o \
@@ -175,7 +175,8 @@ MECH= 	accept_sec_context.o store_cred.o \
 	util_dup.o util_localhost.o \
 	util_cksum.o acquire_cred.o init_sec_context.o \
 	set_ccache.o acquire_cred_with_pw.o lucid_context.o \
-	set_allowable_enctypes.o oid_ops.o export_name.o gss_libinit.o
+	set_allowable_enctypes.o oid_ops.o export_name.o gss_libinit.o \
+	util_buffer_set.o
 
 MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 	import_sec_context.o k5seal.o k5sealv3.o \
@@ -190,7 +191,8 @@ GSSAPI_UTS= gen_oids.o
 PROFILE_OBJS= prof_tree.o prof_file.o prof_parse.o prof_init.o \
 	prof_set.o prof_get.o
 
-SUPPORT_OBJS= fake-addrinfo.o init-addrinfo.o threads.o errors.o plugins.o
+SUPPORT_OBJS= fake-addrinfo.o init-addrinfo.o threads.o errors.o plugins.o \
+	      utf8_conv.o utf8.o
 
 KWARN_OBJS= kwarnd_clnt_stubs.o kwarnd_clnt.o kwarnd_handle.o kwarnd_xdr.o
 

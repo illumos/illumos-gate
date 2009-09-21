@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *  RPC server procedures for the gssapi usermode daemon gssd.
@@ -1145,15 +1143,11 @@ struct svc_req *rqstp;
 			return (TRUE);
 		}
 
-	if (argp->input_token_buffer.GSS_BUFFER_T_len == 0) {
-		input_token_buffer_ptr = GSS_C_NO_BUFFER;
-	} else {
-		input_token_buffer_ptr = &input_token_buffer;
-		input_token_buffer.length = (size_t)argp->input_token_buffer.
-						GSS_BUFFER_T_len;
-		input_token_buffer.value = (void *)argp->input_token_buffer.
-						GSS_BUFFER_T_val;
-	}
+	input_token_buffer_ptr = &input_token_buffer;
+	input_token_buffer.length = (size_t)argp->input_token_buffer.
+		GSS_BUFFER_T_len;
+	input_token_buffer.value = (void *)argp->input_token_buffer.
+		GSS_BUFFER_T_val;
 
 	if (argp->input_chan_bindings.present == YES) {
 		input_chan_bindings_ptr = &input_chan_bindings;
@@ -1318,9 +1312,13 @@ struct svc_req *rqstp;
 		}
 		res->src_name.GSS_BUFFER_T_len = 0;
 		res->context_handle.GSS_CTX_ID_T_len = 0;
-		res->delegated_cred_handle.GSS_CRED_ID_T_len = 0;
-		res->output_token.GSS_BUFFER_T_len = 0;
-		res->mech_type.GSS_OID_len = 0;
+                res->delegated_cred_handle.GSS_CRED_ID_T_len = 0;
+                res->output_token.GSS_BUFFER_T_len =
+			(uint_t)output_token.length;
+                res->output_token.GSS_BUFFER_T_val =
+			(char *)output_token.value;
+
+                res->mech_type.GSS_OID_len = 0;
 	}
 
 /* return to caller */
@@ -1494,6 +1492,7 @@ struct svc_req *rqstp;
 	}
 
 	/* return to caller */
+
 
 	return (TRUE);
 }
