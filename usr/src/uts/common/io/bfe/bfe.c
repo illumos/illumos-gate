@@ -466,6 +466,7 @@ static void
 bfe_timeout(void *arg)
 {
 	bfe_t *bfe = (bfe_t *)arg;
+	int resched = 0;
 
 	/*
 	 * We don't grab any lock because bfe can't go away.
@@ -524,6 +525,8 @@ bfe_timeout(void *arg)
 					OUTL(bfe, BFE_MAC_FLOW, flow);
 				}
 
+				resched = 1;
+
 				OUTL(bfe, BFE_TX_CTRL, val);
 				DTRACE_PROBE1(link__up,
 				    int, bfe->bfe_unit);
@@ -532,6 +535,9 @@ bfe_timeout(void *arg)
 	}
 
 	rw_exit(&bfe->bfe_rwlock);
+
+	if (resched)
+		mac_tx_update(bfe->bfe_machdl);
 }
 
 /*
@@ -1218,7 +1224,7 @@ bfe_rx_desc_init(bfe_ring_t *r)
 static int
 bfe_chip_start(bfe_t *bfe)
 {
-	bfe_grab_locks(bfe);
+	ASSERT_ALL_LOCKS(bfe);
 
 	/*
 	 * Stop the chip first & then Reset the chip. At last enable interrupts.
@@ -1244,10 +1250,6 @@ bfe_chip_start(bfe_t *bfe)
 
 	/* Check link, speed and duplex mode */
 	(void) bfe_check_link(bfe);
-
-	bfe_release_locks(bfe);
-
-	mac_tx_update(bfe->bfe_machdl);
 
 	return (DDI_SUCCESS);
 }
@@ -1845,8 +1847,15 @@ bfe_mac_start(void *arg)
 {
 	bfe_t *bfe = (bfe_t *)arg;
 
-	if (bfe_chip_start(bfe) == DDI_FAILURE)
+	bfe_grab_locks(bfe);
+	if (bfe_chip_start(bfe) == DDI_FAILURE) {
+		bfe_release_locks(bfe);
 		return (EINVAL);
+	}
+
+	bfe_release_locks(bfe);
+
+	mac_tx_update(bfe->bfe_machdl);
 
 	return (0);
 }
@@ -1999,8 +2008,7 @@ bfe_mac_transmit_packet(void *arg, mblk_t *mp)
 	mutex_enter(&r->r_lock);
 
 	if (bfe->bfe_chip_state != BFE_CHIP_ACTIVE) {
-		bfe_error(bfe->bfe_dip, "bfe_mac_transmit_packet(): sending pkt"
-		    " while chip/link is not up");
+		DTRACE_PROBE1(tx__chip__not__active, int, bfe->bfe_unit);
 
 		freemsgchain(mp);
 		mutex_exit(&r->r_lock);
@@ -2082,7 +2090,9 @@ bfe_error_handler(bfe_t *bfe, int intr_mask)
 
 	if (intr_mask & BFE_ISTAT_RFO) {
 		bfe->bfe_stats.overflows++;
-		return;
+		bfe->bfe_chip_action |=
+		    (BFE_ACTION_RESTART | BFE_ACTION_RESTART_FAULT);
+		goto action;
 	}
 
 	if (intr_mask & BFE_ISTAT_TFU) {
@@ -2367,6 +2377,9 @@ bfe_interrupt(caddr_t arg1, caddr_t arg2)
 		rw_exit(&bfe->bfe_rwlock);
 		return (DDI_INTR_UNCLAIMED);
 	}
+
+	DTRACE_PROBE2(bfe__interrupt, int, bfe->bfe_unit,
+	    int, intr_stat);
 
 	if (bfe->bfe_chip_state != BFE_CHIP_ACTIVE) {
 		/*
@@ -2811,10 +2824,13 @@ bfe_resume(dev_info_t *dip)
 	if (bfe_chip_start(bfe) == DDI_FAILURE) {
 		bfe_error(dip, "Could not resume chip");
 		err = DDI_FAILURE;
-		goto done;
 	}
-done:
+
 	bfe_release_locks(bfe);
+
+	if (err == DDI_SUCCESS)
+		mac_tx_update(bfe->bfe_machdl);
+
 	return (err);
 }
 
