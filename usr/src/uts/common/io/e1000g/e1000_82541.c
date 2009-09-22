@@ -391,6 +391,16 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 		/* This is not fatal and we should not stop init due to this */
 	}
 
+	/*
+	 * workaround - Store Default value in dev_spec->spd_default for
+	 * later use
+	 */
+	ret_val = hw->phy.ops.read_reg(hw,
+	    IGP01E1000_GMII_FIFO,
+	    &dev_spec->spd_default);
+	if (ret_val)
+		goto out;
+
 	pba = E1000_READ_REG(hw, E1000_PBA);
 	dev_spec->tx_fifo_start = (pba & 0x0000FFFF) * E1000_FIFO_MULTIPLIER;
 	dev_spec->tx_fifo_size = (pba & 0xFFFF0000) >> 6;
@@ -431,6 +441,7 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	 */
 	e1000_clear_hw_cntrs_82541(hw);
 
+out:
 	return (ret_val);
 }
 

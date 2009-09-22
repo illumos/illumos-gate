@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.13";
+static char e1000g_version[] = "Driver Ver. 5.3.14";
 
 /*
  * Proto types for DDI entry points
@@ -1361,11 +1361,7 @@ e1000g_init(struct e1000g *Adapter)
 	 * Restore LED settings to the default from EEPROM
 	 * to meet the standard for Sun platforms.
 	 */
-	if ((hw->mac.type != e1000_82541) &&
-	    (hw->mac.type != e1000_82541_rev_2) &&
-	    (hw->mac.type != e1000_82547) &&
-	    (hw->mac.type != e1000_82547_rev_2))
-		(void) e1000_cleanup_led(hw);
+	(void) e1000_cleanup_led(hw);
 
 	/* Disable Smart Power Down */
 	phy_spd_state(hw, B_FALSE);
@@ -3001,6 +2997,7 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	struct e1000g *Adapter = arg;
 	struct e1000_mac_info *mac = &Adapter->shared.mac;
 	struct e1000_phy_info *phy = &Adapter->shared.phy;
+	struct e1000_hw *hw = &Adapter->shared;
 	struct e1000_fc_info *fc = &Adapter->shared.fc;
 	int err = 0;
 	link_flowctrl_t flowctrl;
@@ -3026,26 +3023,50 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 
 	switch (pr_num) {
 		case MAC_PROP_EN_1000FDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper) {
+				err = ENOTSUP;
+				break;
+			}
 			Adapter->param_en_1000fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_1000fdx = *(uint8_t *)pr_val;
 			goto reset;
 		case MAC_PROP_EN_100FDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper) {
+				err = ENOTSUP;
+				break;
+			}
 			Adapter->param_en_100fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_100fdx = *(uint8_t *)pr_val;
 			goto reset;
 		case MAC_PROP_EN_100HDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper) {
+				err = ENOTSUP;
+				break;
+			}
 			Adapter->param_en_100hdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_100hdx = *(uint8_t *)pr_val;
 			goto reset;
 		case MAC_PROP_EN_10FDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper) {
+				err = ENOTSUP;
+				break;
+			}
 			Adapter->param_en_10fdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_10fdx = *(uint8_t *)pr_val;
 			goto reset;
 		case MAC_PROP_EN_10HDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper) {
+				err = ENOTSUP;
+				break;
+			}
 			Adapter->param_en_10hdx = *(uint8_t *)pr_val;
 			Adapter->param_adv_10hdx = *(uint8_t *)pr_val;
 			goto reset;
 		case MAC_PROP_AUTONEG:
+			if (hw->phy.media_type != e1000_media_type_copper) {
+				err = ENOTSUP;
+				break;
+			}
 			Adapter->param_adv_autoneg = *(uint8_t *)pr_val;
 			goto reset;
 		case MAC_PROP_FLOWCTRL:
@@ -3146,6 +3167,7 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 {
 	struct e1000g *Adapter = arg;
 	struct e1000_fc_info *fc = &Adapter->shared.fc;
+	struct e1000_hw *hw = &Adapter->shared;
 	int err = 0;
 	link_flowctrl_t flowctrl;
 	uint64_t tmp = 0;
@@ -3179,6 +3201,8 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 				err = EINVAL;
 			break;
 		case MAC_PROP_AUTONEG:
+			if (hw->phy.media_type != e1000_media_type_copper)
+				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_adv_autoneg;
 			break;
 		case MAC_PROP_FLOWCTRL:
@@ -3206,6 +3230,8 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			*(uint8_t *)pr_val = Adapter->param_adv_1000fdx;
 			break;
 		case MAC_PROP_EN_1000FDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper)
+				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_1000fdx;
 			break;
 		case MAC_PROP_ADV_1000HDX_CAP:
@@ -3221,6 +3247,8 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			*(uint8_t *)pr_val = Adapter->param_adv_100fdx;
 			break;
 		case MAC_PROP_EN_100FDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper)
+				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_100fdx;
 			break;
 		case MAC_PROP_ADV_100HDX_CAP:
@@ -3228,6 +3256,8 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			*(uint8_t *)pr_val = Adapter->param_adv_100hdx;
 			break;
 		case MAC_PROP_EN_100HDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper)
+				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_100hdx;
 			break;
 		case MAC_PROP_ADV_10FDX_CAP:
@@ -3235,6 +3265,8 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			*(uint8_t *)pr_val = Adapter->param_adv_10fdx;
 			break;
 		case MAC_PROP_EN_10FDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper)
+				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_10fdx;
 			break;
 		case MAC_PROP_ADV_10HDX_CAP:
@@ -3242,6 +3274,8 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			*(uint8_t *)pr_val = Adapter->param_adv_10hdx;
 			break;
 		case MAC_PROP_EN_10HDX_CAP:
+			if (hw->phy.media_type != e1000_media_type_copper)
+				*perm = MAC_PROP_PERM_READ;
 			*(uint8_t *)pr_val = Adapter->param_en_10hdx;
 			break;
 		case MAC_PROP_ADV_100T4_CAP:
@@ -3925,11 +3959,16 @@ e1000g_reset_link(struct e1000g *Adapter)
 {
 	struct e1000_mac_info *mac;
 	struct e1000_phy_info *phy;
+	struct e1000_hw *hw;
 	boolean_t invalid;
 
 	mac = &Adapter->shared.mac;
 	phy = &Adapter->shared.phy;
+	hw = &Adapter->shared;
 	invalid = B_FALSE;
+
+	if (hw->phy.media_type != e1000_media_type_copper)
+		goto out;
 
 	if (Adapter->param_adv_autoneg == 1) {
 		mac->autoneg = B_TRUE;
@@ -3959,7 +3998,8 @@ e1000g_reset_link(struct e1000g *Adapter)
 		mac->autoneg = B_FALSE;
 
 		/*
-		 * 1000fdx and 1000hdx are not supported for forced link
+		 * For Intel copper cards, 1000fdx and 1000hdx are not
+		 * supported for forced link
 		 */
 		if (Adapter->param_adv_100fdx == 1)
 			mac->forced_speed_duplex = ADVERTISE_100_FULL;
@@ -3984,6 +4024,7 @@ e1000g_reset_link(struct e1000g *Adapter)
 		    ADVERTISE_10_FULL | ADVERTISE_10_HALF;
 	}
 
+out:
 	return (e1000_setup_link(&Adapter->shared));
 }
 
@@ -5753,83 +5794,130 @@ e1000g_get_phy_state(struct e1000g *Adapter)
 {
 	struct e1000_hw *hw = &Adapter->shared;
 
-	(void) e1000_read_phy_reg(hw, PHY_CONTROL, &Adapter->phy_ctrl);
-	(void) e1000_read_phy_reg(hw, PHY_STATUS, &Adapter->phy_status);
-	(void) e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &Adapter->phy_an_adv);
-	(void) e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &Adapter->phy_an_exp);
-	(void) e1000_read_phy_reg(hw, PHY_EXT_STATUS, &Adapter->phy_ext_status);
-	(void) e1000_read_phy_reg(hw, PHY_1000T_CTRL, &Adapter->phy_1000t_ctrl);
-	(void) e1000_read_phy_reg(hw, PHY_1000T_STATUS,
-	    &Adapter->phy_1000t_status);
-	(void) e1000_read_phy_reg(hw, PHY_LP_ABILITY, &Adapter->phy_lp_able);
+	if (hw->phy.media_type == e1000_media_type_copper) {
+		(void) e1000_read_phy_reg(hw, PHY_CONTROL, &Adapter->phy_ctrl);
+		(void) e1000_read_phy_reg(hw, PHY_STATUS, &Adapter->phy_status);
+		(void) e1000_read_phy_reg(hw, PHY_AUTONEG_ADV,
+		    &Adapter->phy_an_adv);
+		(void) e1000_read_phy_reg(hw, PHY_AUTONEG_EXP,
+		    &Adapter->phy_an_exp);
+		(void) e1000_read_phy_reg(hw, PHY_EXT_STATUS,
+		    &Adapter->phy_ext_status);
+		(void) e1000_read_phy_reg(hw, PHY_1000T_CTRL,
+		    &Adapter->phy_1000t_ctrl);
+		(void) e1000_read_phy_reg(hw, PHY_1000T_STATUS,
+		    &Adapter->phy_1000t_status);
+		(void) e1000_read_phy_reg(hw, PHY_LP_ABILITY,
+		    &Adapter->phy_lp_able);
 
-	Adapter->param_autoneg_cap =
-	    (Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
-	Adapter->param_pause_cap =
-	    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
-	Adapter->param_asym_pause_cap =
-	    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
-	Adapter->param_1000fdx_cap =
-	    ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-	    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
-	Adapter->param_1000hdx_cap =
-	    ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
-	    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
-	Adapter->param_100t4_cap =
-	    (Adapter->phy_status & MII_SR_100T4_CAPS) ? 1 : 0;
-	Adapter->param_100fdx_cap =
-	    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
-	    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
-	Adapter->param_100hdx_cap =
-	    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
-	    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
-	Adapter->param_10fdx_cap =
-	    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
-	Adapter->param_10hdx_cap =
-	    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
+		Adapter->param_autoneg_cap =
+		    (Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
+		Adapter->param_pause_cap =
+		    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+		Adapter->param_asym_pause_cap =
+		    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+		Adapter->param_1000fdx_cap =
+		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
+		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
+		Adapter->param_1000hdx_cap =
+		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
+		    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
+		Adapter->param_100t4_cap =
+		    (Adapter->phy_status & MII_SR_100T4_CAPS) ? 1 : 0;
+		Adapter->param_100fdx_cap =
+		    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+		Adapter->param_100hdx_cap =
+		    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
+		    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
+		Adapter->param_10fdx_cap =
+		    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
+		Adapter->param_10hdx_cap =
+		    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
 
-	Adapter->param_adv_autoneg = hw->mac.autoneg;
-	Adapter->param_adv_pause =
-	    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
-	Adapter->param_adv_asym_pause =
-	    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
-	Adapter->param_adv_1000hdx =
-	    (Adapter->phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
-	Adapter->param_adv_100t4 =
-	    (Adapter->phy_an_adv & NWAY_AR_100T4_CAPS) ? 1 : 0;
-	if (Adapter->param_adv_autoneg == 1) {
-		Adapter->param_adv_1000fdx =
-		    (Adapter->phy_1000t_ctrl & CR_1000T_FD_CAPS) ? 1 : 0;
-		Adapter->param_adv_100fdx =
-		    (Adapter->phy_an_adv & NWAY_AR_100TX_FD_CAPS) ? 1 : 0;
-		Adapter->param_adv_100hdx =
-		    (Adapter->phy_an_adv & NWAY_AR_100TX_HD_CAPS) ? 1 : 0;
-		Adapter->param_adv_10fdx =
-		    (Adapter->phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
-		Adapter->param_adv_10hdx =
-		    (Adapter->phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
+		Adapter->param_adv_autoneg = hw->mac.autoneg;
+		Adapter->param_adv_pause =
+		    (Adapter->phy_an_adv & NWAY_AR_PAUSE) ? 1 : 0;
+		Adapter->param_adv_asym_pause =
+		    (Adapter->phy_an_adv & NWAY_AR_ASM_DIR) ? 1 : 0;
+		Adapter->param_adv_1000hdx =
+		    (Adapter->phy_1000t_ctrl & CR_1000T_HD_CAPS) ? 1 : 0;
+		Adapter->param_adv_100t4 =
+		    (Adapter->phy_an_adv & NWAY_AR_100T4_CAPS) ? 1 : 0;
+		if (Adapter->param_adv_autoneg == 1) {
+			Adapter->param_adv_1000fdx =
+			    (Adapter->phy_1000t_ctrl & CR_1000T_FD_CAPS)
+			    ? 1 : 0;
+			Adapter->param_adv_100fdx =
+			    (Adapter->phy_an_adv & NWAY_AR_100TX_FD_CAPS)
+			    ? 1 : 0;
+			Adapter->param_adv_100hdx =
+			    (Adapter->phy_an_adv & NWAY_AR_100TX_HD_CAPS)
+			    ? 1 : 0;
+			Adapter->param_adv_10fdx =
+			    (Adapter->phy_an_adv & NWAY_AR_10T_FD_CAPS) ? 1 : 0;
+			Adapter->param_adv_10hdx =
+			    (Adapter->phy_an_adv & NWAY_AR_10T_HD_CAPS) ? 1 : 0;
+		}
+
+		Adapter->param_lp_autoneg =
+		    (Adapter->phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
+		Adapter->param_lp_pause =
+		    (Adapter->phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
+		Adapter->param_lp_asym_pause =
+		    (Adapter->phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
+		Adapter->param_lp_1000fdx =
+		    (Adapter->phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
+		Adapter->param_lp_1000hdx =
+		    (Adapter->phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
+		Adapter->param_lp_100t4 =
+		    (Adapter->phy_lp_able & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
+		Adapter->param_lp_100fdx =
+		    (Adapter->phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
+		Adapter->param_lp_100hdx =
+		    (Adapter->phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
+		Adapter->param_lp_10fdx =
+		    (Adapter->phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
+		Adapter->param_lp_10hdx =
+		    (Adapter->phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
+	} else {
+		/*
+		 * 1Gig Fiber adapter only offers 1Gig Full Duplex. Meaning,
+		 * it can only work with 1Gig Full Duplex Link Partner.
+		 */
+		Adapter->param_autoneg_cap = 0;
+		Adapter->param_pause_cap = 1;
+		Adapter->param_asym_pause_cap = 1;
+		Adapter->param_1000fdx_cap = 1;
+		Adapter->param_1000hdx_cap = 0;
+		Adapter->param_100t4_cap = 0;
+		Adapter->param_100fdx_cap = 0;
+		Adapter->param_100hdx_cap = 0;
+		Adapter->param_10fdx_cap = 0;
+		Adapter->param_10hdx_cap = 0;
+
+		Adapter->param_adv_autoneg = 0;
+		Adapter->param_adv_pause = 1;
+		Adapter->param_adv_asym_pause = 1;
+		Adapter->param_adv_1000fdx = 1;
+		Adapter->param_adv_1000hdx = 0;
+		Adapter->param_adv_100t4 = 0;
+		Adapter->param_adv_100fdx = 0;
+		Adapter->param_adv_100hdx = 0;
+		Adapter->param_adv_10fdx = 0;
+		Adapter->param_adv_10hdx = 0;
+
+		Adapter->param_lp_autoneg = 0;
+		Adapter->param_lp_pause = 0;
+		Adapter->param_lp_asym_pause = 0;
+		Adapter->param_lp_1000fdx = 0;
+		Adapter->param_lp_1000hdx = 0;
+		Adapter->param_lp_100t4 = 0;
+		Adapter->param_lp_100fdx = 0;
+		Adapter->param_lp_100hdx = 0;
+		Adapter->param_lp_10fdx = 0;
+		Adapter->param_lp_10hdx = 0;
 	}
-
-	Adapter->param_lp_autoneg =
-	    (Adapter->phy_an_exp & NWAY_ER_LP_NWAY_CAPS) ? 1 : 0;
-	Adapter->param_lp_pause =
-	    (Adapter->phy_lp_able & NWAY_LPAR_PAUSE) ? 1 : 0;
-	Adapter->param_lp_asym_pause =
-	    (Adapter->phy_lp_able & NWAY_LPAR_ASM_DIR) ? 1 : 0;
-	Adapter->param_lp_1000fdx =
-	    (Adapter->phy_1000t_status & SR_1000T_LP_FD_CAPS) ? 1 : 0;
-	Adapter->param_lp_1000hdx =
-	    (Adapter->phy_1000t_status & SR_1000T_LP_HD_CAPS) ? 1 : 0;
-	Adapter->param_lp_100t4 =
-	    (Adapter->phy_lp_able & NWAY_LPAR_100T4_CAPS) ? 1 : 0;
-	Adapter->param_lp_100fdx =
-	    (Adapter->phy_lp_able & NWAY_LPAR_100TX_FD_CAPS) ? 1 : 0;
-	Adapter->param_lp_100hdx =
-	    (Adapter->phy_lp_able & NWAY_LPAR_100TX_HD_CAPS) ? 1 : 0;
-	Adapter->param_lp_10fdx =
-	    (Adapter->phy_lp_able & NWAY_LPAR_10T_FD_CAPS) ? 1 : 0;
-	Adapter->param_lp_10hdx =
-	    (Adapter->phy_lp_able & NWAY_LPAR_10T_HD_CAPS) ? 1 : 0;
 }
 
 /*
@@ -5997,13 +6085,18 @@ e1000g_get_def_val(struct e1000g *Adapter, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
 {
 	link_flowctrl_t fl;
+	struct e1000_hw *hw = &Adapter->shared;
 	int err = 0;
 
 	ASSERT(pr_valsize > 0);
 	switch (pr_num) {
 	case MAC_PROP_AUTONEG:
-		*(uint8_t *)pr_val =
-		    ((Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0);
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*(uint8_t *)pr_val = 0;
+		else
+			*(uint8_t *)pr_val =
+			    ((Adapter->phy_status & MII_SR_AUTONEG_CAPS)
+			    ? 1 : 0);
 		break;
 	case MAC_PROP_FLOWCTRL:
 		if (pr_valsize < sizeof (link_flowctrl_t))
@@ -6013,37 +6106,54 @@ e1000g_get_def_val(struct e1000g *Adapter, mac_prop_id_t pr_num,
 		break;
 	case MAC_PROP_ADV_1000FDX_CAP:
 	case MAC_PROP_EN_1000FDX_CAP:
-		*(uint8_t *)pr_val =
-		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
-		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS)) ? 1 : 0;
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*(uint8_t *)pr_val = 1;
+		else
+			*(uint8_t *)pr_val =
+			    ((Adapter->phy_ext_status &
+			    IEEE_ESR_1000T_FD_CAPS) ||
+			    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS))
+			    ? 1 : 0;
 		break;
 	case MAC_PROP_ADV_1000HDX_CAP:
 	case MAC_PROP_EN_1000HDX_CAP:
-		*(uint8_t *)pr_val =
-		    ((Adapter->phy_ext_status & IEEE_ESR_1000T_HD_CAPS) ||
-		    (Adapter->phy_ext_status & IEEE_ESR_1000X_HD_CAPS)) ? 1 : 0;
+		*(uint8_t *)pr_val = 0;
 		break;
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_EN_100FDX_CAP:
-		*(uint8_t *)pr_val =
-		    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
-		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*(uint8_t *)pr_val = 0;
+		else
+			*(uint8_t *)pr_val =
+			    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
+			    (Adapter->phy_status & MII_SR_100T2_FD_CAPS))
+			    ? 1 : 0;
 		break;
 	case MAC_PROP_ADV_100HDX_CAP:
 	case MAC_PROP_EN_100HDX_CAP:
-		*(uint8_t *)pr_val =
-		    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
-		    (Adapter->phy_status & MII_SR_100T2_HD_CAPS)) ? 1 : 0;
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*(uint8_t *)pr_val = 0;
+		else
+			*(uint8_t *)pr_val =
+			    ((Adapter->phy_status & MII_SR_100X_HD_CAPS) ||
+			    (Adapter->phy_status & MII_SR_100T2_HD_CAPS))
+			    ? 1 : 0;
 		break;
 	case MAC_PROP_ADV_10FDX_CAP:
 	case MAC_PROP_EN_10FDX_CAP:
-		*(uint8_t *)pr_val =
-		    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*(uint8_t *)pr_val = 0;
+		else
+			*(uint8_t *)pr_val =
+			    (Adapter->phy_status & MII_SR_10T_FD_CAPS) ? 1 : 0;
 		break;
 	case MAC_PROP_ADV_10HDX_CAP:
 	case MAC_PROP_EN_10HDX_CAP:
-		*(uint8_t *)pr_val =
-		    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
+		if (hw->phy.media_type != e1000_media_type_copper)
+			*(uint8_t *)pr_val = 0;
+		else
+			*(uint8_t *)pr_val =
+			    (Adapter->phy_status & MII_SR_10T_HD_CAPS) ? 1 : 0;
 		break;
 	default:
 		err = ENOTSUP;

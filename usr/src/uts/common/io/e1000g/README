@@ -690,6 +690,13 @@ Notes on packaging:
     6870404 e1000g_reset can call e1000g_start after releasing dma resources
 
 5.3.13
+====
   This version has the following fixes:
    6681751 e1000g minor_perm inconsistent between package postinstall script and default minor_perm file
    6855964 e1000g driver corrupting LSO packets causes chipset hang and significant performance regression
+
+5.3.14
+====
+  This version has the following fix:
+   6820747 kstat output incorrect for MMF version of e1000g making it impossible to troubleshoot
+   6847888 HW initialization updates for 82541 and 82547 chips
