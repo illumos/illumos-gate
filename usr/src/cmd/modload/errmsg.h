@@ -100,8 +100,10 @@ extern "C" {
 			"larger\nthan the maximum allowed value %u.\n"
 
 #define	ERR_CREAT_LOCK	"Failed to create lock file(%s): %s\n"
+#define	ERR_STAT_LOCK	"Failed to stat lock file(%s): %s\n"
 #define	ERR_LOCK	"Failed to lock the lock file(%s): %s\n"
 #define	ERR_UNLOCK	"Failed to unlock the lock file(%s): %s\n"
+#define	ERR_OWNER_LOCK	"Lock file(%s) not owned by user\n"
 
 #define	ERR_LOCATION	\
 "Warning: %s-bit version of driver found at %s.\n"

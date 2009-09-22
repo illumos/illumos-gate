@@ -28,9 +28,9 @@
 include drv_utils
 
 AUDIOCMI_ALIASES="\
-	\"pci13f6,111\"	\
-	\"pci13f6,100\"	\
-	\"pci13f6,101\"	\
+	'\"pci13f6,111\"'	\
+	'\"pci13f6,100\"'	\
+	'\"pci13f6,101\"'	\
 	"
 
 pkg_drvadd -i "${AUDIOCMI_ALIASES}" audiocmi || exit 1

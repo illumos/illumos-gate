@@ -125,6 +125,7 @@ extern void exit_unlock(void);
 extern char *get_entry(char *, char *, char, int);
 extern int build_filenames(char *);
 extern int append_to_file(char *, char *, char *, char, char *, int);
+extern int append_to_minor_perm(char *, char *, char *);
 extern int get_major_no(char *, char *);
 extern int get_driver_name(int, char *, char *);
 extern int delete_entry(char *, char *, char *, char *);

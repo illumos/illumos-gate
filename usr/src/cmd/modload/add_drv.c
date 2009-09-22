@@ -538,8 +538,7 @@ update_minor_perm(
 	char *driver_name,
 	char *perm_list)
 {
-	return (append_to_file(driver_name, perm_list, minor_perm,
-	    ',', ":", 0));
+	return (append_to_minor_perm(driver_name, perm_list, minor_perm));
 }
 
 

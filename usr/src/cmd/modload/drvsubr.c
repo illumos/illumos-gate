@@ -42,8 +42,26 @@
 #include "errmsg.h"
 #include "plcysubr.h"
 
+/*
+ * Macros to produce a quoted string containing the value of a
+ * preprocessor macro. For example, if SIZE is defined to be 256,
+ * VAL2STR(SIZE) is "256". This is used to construct format
+ * strings for scanf-family functions below.
+ * Note: For format string use, the argument to VAL2STR() must
+ * be a numeric constant that is one less than the size of the
+ * corresponding data buffer.
+ */
+#define	VAL2STR_QUOTE(x)	#x
+#define	VAL2STR(x)		VAL2STR_QUOTE(x)
+
+/*
+ * Convenience macro to determine if a character is a quote
+ */
+#define	isquote(c)	(((c) == '"') || ((c) == '\''))
+
+
 static char *add_rem_lock;	/* lock file */
-static char *tmphold;		/* temperary file for updating */
+static char *tmphold;		/* temporary file for updating */
 static int  add_rem_lock_fd = -1;
 
 static int get_cached_n_to_m_file(char *filename, char ***cache);
@@ -108,7 +126,7 @@ append_to_file(
 	char *entry_separator,
 	int quoted)
 {
-	int	i, len, line_len;
+	int	len, line_len;
 	int	fpint;
 	char	*current_head, *previous_head;
 	char	*line, *one_entry;
@@ -149,24 +167,98 @@ append_to_file(
 	 */
 
 	do {
-
-		for (i = 0; i <= len; i++)
-			one_entry[i] = 0;
-
+		bzero(one_entry, len + 1);
 		bzero(line, line_len);
 
 		current_head = get_entry(previous_head, one_entry,
 		    list_separator, quoted);
 		previous_head = current_head;
 
-		(void) strlcpy(line, driver_name, line_len);
-		(void) strlcat(line, entry_separator, line_len);
-		if (quoted)
-			(void) strlcat(line, "\"", line_len);
-		(void) strlcat(line, one_entry, line_len);
-		if (quoted)
-			(void) strlcat(line, "\"", line_len);
-		(void) strlcat(line, "\n", line_len);
+		(void) snprintf(line, line_len,
+		    quoted ? "%s%s\"%s\"\n" : "%s%s%s\n",
+		    driver_name, entry_separator, one_entry);
+
+		if ((fputs(line, fp)) == EOF) {
+			perror(NULL);
+			(void) fprintf(stderr, gettext(ERR_NO_UPDATE),
+			    filename);
+		}
+
+	} while (*current_head != '\0');
+
+
+	(void) fflush(fp);
+
+	fpint = fileno(fp);
+	(void) fsync(fpint);
+
+	(void) fclose(fp);
+
+	free(one_entry);
+	free(line);
+
+	return (NOERR);
+}
+
+/*
+ *  open file
+ * for each entry in list
+ *	where list entries are separated by <list_separator>
+ * 	append entry : driver_name <entry_separator> entry
+ * close file
+ * return error/noerr
+ */
+int
+append_to_minor_perm(
+	char *driver_name,
+	char *entry_list,
+	char *filename)
+{
+	int	len, line_len;
+	int	fpint;
+	char	*current_head, *previous_head;
+	char	*line, *one_entry;
+	FILE	*fp;
+
+	if ((fp = fopen(filename, "a")) == NULL) {
+		perror(NULL);
+		(void) fprintf(stderr, gettext(ERR_CANT_ACCESS_FILE),
+		    filename);
+		return (ERROR);
+	}
+
+	len = strlen(entry_list);
+
+	one_entry = calloc(len + 1, 1);
+	if (one_entry == NULL) {
+		(void) fprintf(stderr, gettext(ERR_NO_UPDATE), filename);
+		(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		(void) fclose(fp);
+		return (ERROR);
+	}
+
+	previous_head = entry_list;
+
+	line_len = strlen(driver_name) + len + 4;
+	line = calloc(line_len, 1);
+	if (line == NULL) {
+		(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		(void) fclose(fp);
+		err_exit();
+	}
+
+	/*
+	 * get one entry at a time from list and append to <filename> file
+	 */
+	do {
+		bzero(one_entry, len + 1);
+		bzero(line, line_len);
+
+		current_head = get_perm_entry(previous_head, one_entry);
+		previous_head = current_head;
+
+		(void) snprintf(line, line_len, "%s:%s\n",
+		    driver_name, one_entry);
 
 		if ((fputs(line, fp)) == EOF) {
 			perror(NULL);
@@ -201,7 +293,7 @@ match_entry(char *line, char *match)
 	int	n;
 
 	/* skip any leading white space */
-	while (*line && ((*line == ' ') || (*line == '\t')))
+	while (*line && isspace(*line))
 		line++;
 	/*
 	 * Find separator for driver name, either space or colon
@@ -213,14 +305,12 @@ match_entry(char *line, char *match)
 		return (0);
 	token++;
 	/* skip leading white space and quotes */
-	while (*token && (*token == ' ' || *token == '\t' ||
-	    *token == '"' || *token == '\''))
+	while (*token && (isspace(*token) || isquote(*token)))
 		token++;
 	/* strip trailing newline, white space and quotes */
 	n = strlen(token);
 	p = token + n-1;
-	while (n > 0 && (*p == '\n' || *p == ' ' || *p == '\t' ||
-	    *p == '"' || *p == '\'')) {
+	while (n > 0 && (*p == '\n' || isspace(*p) || isquote(*p))) {
 		*p-- = 0;
 		n--;
 	}
@@ -256,7 +346,8 @@ delete_entry(
 	int		drvr_found = 0;
 	boolean_t 	nomatch = B_TRUE;
 	char		*newfile, *tptr, *cp;
-	char		line[MAX_DBFILE_ENTRY], drv[FILENAME_MAX + 1];
+	char		line[MAX_DBFILE_ENTRY];
+	char		drv[FILENAME_MAX + 1];
 	FILE		*fp, *newfp;
 	struct group	*sysgrp;
 	char		*copy;		/* same size as line */
@@ -269,7 +360,7 @@ delete_entry(
 	 */
 	if (match) {
 		cp = match;
-		while (*cp && (*cp == '"' || *cp == '\''))
+		while (*cp && (isspace(*cp)))
 			cp++;
 		i = strlen(cp);
 		if (i > 0) {
@@ -278,12 +369,11 @@ delete_entry(
 				(void) fprintf(stderr, gettext(ERR_NO_MEM));
 				return (ERROR);
 			}
-			if ((cp = strchr(match2, '\'')) != NULL)
-				*cp = 0;
-			if ((cp = strchr(match2, '"')) != NULL)
-				*cp = 0;
-			if ((cp = strchr(match2, ' ')) != NULL)
-				*cp = 0;
+			i = strlen(match2) - 1;
+			while (i >= 0 && (isspace(match2[i]))) {
+				match2[i] = 0;
+				i--;
+			}
 		}
 		if (match2 == NULL || (strlen(match2) == 0)) {
 			(void) fprintf(stderr,
@@ -351,8 +441,7 @@ delete_entry(
 		}
 
 		/* get the driver name */
-		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-		if (sscanf(copy, "%s", drv) != 1) {
+		if (sscanf(copy, "%" VAL2STR(FILENAME_MAX) "s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    oldfile, line);
 			status = ERROR;
@@ -545,8 +634,10 @@ get_cached_n_to_m_file(char *filename, char ***cache)
 			if (is_blank(line))
 				continue;
 			/* sanity-check */
-			/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-			if (sscanf(line, "%s%s", drv, entry) != 2) {
+			if (sscanf(line,
+			    "%" VAL2STR(FILENAME_MAX) "s"	/* drv */
+			    "%" VAL2STR(FILENAME_MAX) "s",	/* entry */
+			    drv, entry) != 2) {
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    filename, line);
 				continue;
@@ -587,8 +678,10 @@ get_cached_n_to_m_file(char *filename, char ***cache)
 			if (is_blank(line))
 				continue;
 			/* sanity-check */
-			/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-			if (sscanf(line, "%s%s", drv, entry) != 2) {
+			if (sscanf(line,
+			    "%" VAL2STR(FILENAME_MAX) "s"	/* drv */
+			    "%" VAL2STR(FILENAME_MAX) "s",	/* entry */
+			    drv, entry) != 2) {
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    filename, line);
 				continue;
@@ -714,7 +807,7 @@ get_entry(
 	ptr = prev_member;
 
 	/* skip white space */
-	while (*ptr == '\t' || *ptr == ' ')
+	while (isspace(*ptr))
 		ptr++;
 
 	/* if unquote skip leading quote */
@@ -725,8 +818,7 @@ get_entry(
 
 	/* read thru the current entry looking for end, separator, or unquote */
 	while (*ptr &&
-	    (*ptr != separator) &&
-	    ((separator != ' ') || (*ptr != '\t')) &&
+	    (*ptr != separator) && (!isspace(*ptr)) &&
 	    (!quoted || (*ptr != '"'))) {
 		*current_entry++ = *ptr++;
 	}
@@ -738,9 +830,56 @@ get_entry(
 		ptr++;	/* skip over trailing quote */
 
 	/* skip white space */
-	while (*ptr == '\t' || *ptr == ' ') {
+	while (isspace(*ptr))
 		ptr++;
+
+	return (ptr);
+}
+
+/*
+ * A parser specific to the add_drv "-m permission" syntax:
+ *
+ *	-m '<minor-name> <permissions> <owner> <group>', ...
+ *
+ * One entry is parsed starting at prev_member and returned
+ * in the string pointed at by current_entry.  A pointer
+ * to the entry following is returned.
+ */
+char *
+get_perm_entry(
+	char *prev_member,
+	char *current_entry)
+{
+	char	*ptr;
+	int	nfields = 0;
+	int	maxfields = 4;		/* fields in a permissions format */
+
+	ptr = prev_member;
+	while (isspace(*ptr))
+		ptr++;
+
+	while (*ptr) {
+		/* comma allowed in minor name token only */
+		if (*ptr == ',' && nfields > 0) {
+			break;
+		} else if (isspace(*ptr)) {
+			*current_entry++ = *ptr++;
+			while (isspace(*ptr))
+				ptr++;
+			if (++nfields == maxfields)
+				break;
+		} else
+			*current_entry++ = *ptr++;
 	}
+	*current_entry = '\0';
+
+	while (isspace(*ptr))
+		ptr++;
+	if (*ptr == ',') {
+		ptr++;	/* skip over optional trailing comma */
+	}
+	while (isspace(*ptr))
+		ptr++;
 
 	return (ptr);
 }
@@ -751,9 +890,11 @@ enter_lock(void)
 	struct flock lock;
 
 	/*
-	 * attempt to create the lock file
+	 * Attempt to create the lock file.  Open the file itself,
+	 * and not a symlink to some other file.
 	 */
-	add_rem_lock_fd = open(add_rem_lock, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+	add_rem_lock_fd = open(add_rem_lock,
+	    O_CREAT|O_RDWR|O_NOFOLLOW|O_NOLINKS, S_IRUSR|S_IWUSR);
 	if (add_rem_lock_fd < 0) {
 		(void) fprintf(stderr, gettext(ERR_CREAT_LOCK),
 		    add_rem_lock, strerror(errno));
@@ -1262,16 +1403,19 @@ create_reconfig(char *basedir)
 int
 update_minor_entry(char *driver_name, char *perm_list)
 {
-	FILE *fp;
-	FILE *newfp;
+	FILE	*fp;
+	FILE	*newfp;
+	int	match = 0;
+	char	line[MAX_DBFILE_ENTRY];
+	char	drv[FILENAME_MAX + 1];
+	char	minor[FILENAME_MAX + 1];
+	char	perm[OPT_LEN + 1];
+	char	own[OPT_LEN + 1];
+	char	grp[OPT_LEN + 1];
+	int	status = NOERR, i;
+	char	*newfile, *tptr;
+	char	*cp, *dup, *drv_minor;
 	struct group *sysgrp;
-	int match = 0;
-	char line[MAX_DBFILE_ENTRY], *cp, *dup;
-	char drv[FILENAME_MAX + 1], *drv_minor;
-	char minor[FILENAME_MAX + 1], perm[OPT_LEN + 1];
-	char own[OPT_LEN + 1], grp[OPT_LEN + 1];
-	int status = NOERR, i;
-	char *newfile, *tptr;
 
 	if ((fp = fopen(minor_perm, "r")) == NULL) {
 		perror(NULL);
@@ -1308,8 +1452,12 @@ update_minor_entry(char *driver_name, char *perm_list)
 		return (ERROR);
 	}
 
-	/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-	if (sscanf(perm_list, "%s%s%s%s", minor, perm, own, grp) != 4) {
+	if (sscanf(perm_list,
+	    "%" VAL2STR(FILENAME_MAX) "s"	/* minor */
+	    "%" VAL2STR(OPT_LEN) "s"		/* perm */
+	    "%" VAL2STR(OPT_LEN) "s"		/* own */
+	    "%" VAL2STR(OPT_LEN) "s",		/* grp */
+	    minor, perm, own, grp) != 4) {
 		status = ERROR;
 	}
 
@@ -1336,8 +1484,7 @@ update_minor_entry(char *driver_name, char *perm_list)
 		}
 
 		/* get the driver name */
-		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-		if (sscanf(dup, "%s", drv) != 1) {
+		if (sscanf(dup, "%" VAL2STR(FILENAME_MAX) "s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    minor_perm, line);
 			status = ERROR;
@@ -1483,8 +1630,7 @@ list_entry(
 		if (is_blank(line))
 			continue;
 		/* sanity-check */
-		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-		if (sscanf(line, "%s", drv) != 1) {
+		if (sscanf(line, "%" VAL2STR(FILENAME_MAX) "s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    oldfile, line);
 		}
@@ -1534,7 +1680,7 @@ check_perm_opts(char *perm_list)
 	char *current_head;
 	char *previous_head;
 	char *one_entry;
-	int i, len, scan_stat;
+	int len, scan_stat;
 	char minor[FILENAME_MAX + 1];
 	char perm[OPT_LEN + 1];
 	char own[OPT_LEN + 1];
@@ -1543,14 +1689,10 @@ check_perm_opts(char *perm_list)
 	int status = NOERR;
 	int intperm;
 
-	len = strlen(perm_list);
-
-	if (len == 0) {
+	if ((len = strlen(perm_list)) == 0)
 		return (ERROR);
-	}
 
-	one_entry = calloc(len + 1, 1);
-	if (one_entry == NULL) {
+	if ((one_entry = calloc(len + 1, 1)) == NULL) {
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
 		return (ERROR);
 	}
@@ -1559,16 +1701,17 @@ check_perm_opts(char *perm_list)
 	current_head = perm_list;
 
 	while (*current_head != '\0') {
-
-		for (i = 0; i <= len; i++)
-			one_entry[i] = 0;
-
-		current_head = get_entry(previous_head, one_entry, ',', 0);
+		bzero(one_entry, len + 1);
+		current_head = get_perm_entry(previous_head, one_entry);
 
 		previous_head = current_head;
-		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-		scan_stat = sscanf(one_entry, "%s%s%s%s%s", minor, perm, own,
-		    grp, dumb);
+		scan_stat = sscanf(one_entry,
+		    "%" VAL2STR(FILENAME_MAX) "s"	/* minor */
+		    "%" VAL2STR(OPT_LEN) "s"		/* perm */
+		    "%" VAL2STR(OPT_LEN) "s"		/* own */
+		    "%" VAL2STR(OPT_LEN) "s"		/* grp */
+		    "%" VAL2STR(OPT_LEN) "s",		/* dumb */
+		    minor, perm, own, grp, dumb);
 
 		if (scan_stat < 4) {
 			(void) fprintf(stderr, gettext(ERR_MIS_TOK),
@@ -1799,8 +1942,10 @@ unique_drv_alias(char *drv_alias)
 			if (is_blank(line))
 				continue;
 			/* sanity-check */
-			/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-			if (sscanf(line, "%s %s", drv, alias) != 2)
+			if (sscanf(line,
+			    "%" VAL2STR(FILENAME_MAX) "s" 	/* drv */
+			    "%" VAL2STR(FILENAME_MAX) "s",	/* alias */
+			    drv, alias) != 2)
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    driver_aliases, line);
 
@@ -1892,8 +2037,10 @@ check_duplicate_driver_alias(char *driver_name, char *drv_alias)
 		if (is_blank(line))
 			continue;
 		/* sanity-check */
-		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-		if (sscanf(line, "%s %s", drv, alias) != 2)
+		if (sscanf(line,
+		    "%" VAL2STR(FILENAME_MAX) "s"	/* drv */
+		    "%" VAL2STR(FILENAME_MAX) "s",	/* alias */
+		    drv, alias) != 2)
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    driver_aliases, line);
 
@@ -2234,8 +2381,8 @@ fill_n2m_array(char *filename, char **array, int *nelems)
 		if (is_blank(line))
 			continue;
 		/* sanity-check */
-		/* LINTED E_SEC_SCANF_UNBOUNDED_COPY */
-		if (sscanf(line, "%s %llu", drv, &dnum) != 2) {
+		if (sscanf(line,
+		    "%" VAL2STR(FILENAME_MAX) "s %llu", drv, &dnum) != 2) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    filename, line);
 			(void) fclose(fp);

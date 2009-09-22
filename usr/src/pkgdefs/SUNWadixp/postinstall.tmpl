@@ -33,9 +33,9 @@ include drv_utils
 # hardware to confirm with.
 #
 IXP_ALIASES="\
-	\"pci1002,4370\" \
-	\"pci1002,4361\" \
-	\"pci1002,4341\" \
+	'\"pci1002,4370\"' \
+	'\"pci1002,4361\"' \
+	'\"pci1002,4341\"' \
 	"
 	
 pkg_drvadd -i "${IXP_ALIASES}" audioixp || exit 1

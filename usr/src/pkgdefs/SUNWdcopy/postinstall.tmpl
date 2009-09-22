@@ -19,13 +19,16 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include drv_utils
 
-CB1="pciex8086,1a38 pciex8086,360b"
-CB2="pciex8086,402f"
+CB_ALIASES="\
+	'\"pciex8086,1a38\"' \
+	'\"pciex8086,360b\"' \
+	'\"pciex8086,402f\"' \
+	"
 
-pkg_drvadd -i "$CB1 $CB2" ioat || exit 1
+pkg_drvadd -i "${CB_ALIASES}" ioat || exit 1

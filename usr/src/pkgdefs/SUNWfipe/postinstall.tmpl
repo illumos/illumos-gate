@@ -28,6 +28,6 @@
 
 include drv_utils
 
-FIPE_ALIAS="pci8086,360c pci8086,25f0"
+FIPE_ALIAS="'\"pci8086,360c\"' '\"pci8086,25f0\"'"
 
 pkg_drvadd -i "$FIPE_ALIAS" fipe || exit 1
