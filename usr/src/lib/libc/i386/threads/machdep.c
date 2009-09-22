@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,19 @@
 #include <procfs.h>
 #include <ucontext.h>
 #include <setjmp.h>
+
+/*
+ * The i386 ABI says that the stack pointer need be only 4-byte aligned
+ * before a function call (STACK_ALIGN == 4).  We use a 16-byte stack
+ * alignment for the benefit of floating point code compiled using sse2.
+ * Even though the i386 ABI doesn't require it, both cc and gcc
+ * assume this alignment on entry to a function and maintain it
+ * for calls made from that function.  If the stack is initially
+ * aligned on a 16-byte boundary, it will continue to be so aligned.
+ * If it is not initially so aligned, it will never become so aligned.
+ */
+#undef	STACK_ALIGN
+#define	STACK_ALIGN	16
 
 extern int getlwpstatus(thread_t, lwpstatus_t *);
 extern int putlwpregs(thread_t, prgregset_t);
@@ -39,13 +52,18 @@ setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
 	struct {
 		uint32_t	rpc;
 		uint32_t	arg;
+		uint32_t	pad;
 		uint32_t	fp;
 		uint32_t	pc;
 	} frame;
 
 	/*
 	 * Top-of-stack must be rounded down to STACK_ALIGN and
-	 * there must be a minimum frame.
+	 * there must be a minimum frame.  Note: 'frame' is not a true
+	 * stack frame (see <sys/frame.h>) but a construction made here to
+	 * make it look like _lwp_start called the thread start function
+	 * with a 16-byte aligned stack pointer (the address of frame.arg
+	 * is the address that muet be aligned on a 16-byte boundary).
 	 */
 	stack = (uint32_t *)(((uintptr_t)stk + stksize) & ~(STACK_ALIGN-1));
 
@@ -55,9 +73,10 @@ setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
 	 * thr_create(), pthread_create() or pthread_attr_setstack()
 	 * to fail, passing the problem up to the application.
 	 */
-	stack -= 4;
+	stack -= 5;	/* make the address of frame.arg be 16-byte aligned */
 	frame.pc = 0;
-	frame.fp = 0;
+	frame.fp = 0;	/* initial address for %ebp (see EBP below) */
+	frame.pad = 0;
 	frame.arg = (uint32_t)ulwp;
 	frame.rpc = (uint32_t)_lwp_start;
 	if (uucopy(&frame, (void *)stack, sizeof (frame)) == 0)
@@ -118,7 +137,7 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 	ucp->uc_flags |= UC_CPU;
 	ucp->uc_mcontext.gregs[EIP] = (greg_t)func;
 	ucp->uc_mcontext.gregs[UESP] = (greg_t)stack;
-	ucp->uc_mcontext.gregs[EBP] = (greg_t)(stack + 2);
+	ucp->uc_mcontext.gregs[EBP] = (greg_t)(stack + 3);
 
 	return (0);
 }

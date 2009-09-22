@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,18 +86,21 @@
 /*
  * __sighndlr(int sig, siginfo_t *si, ucontext_t *uc, void (*hndlr)())
  *
- * This is called from sigacthandler() for the entire purpose of
- * communicating the ucontext to java's stack tracing functions.
+ * This is called from sigacthandler() for the purpose of
+ * communicating the ucontext to java's stack tracing functions
+ * and to ensure a 16-byte aligned stack pointer for the benefit
+ * of gcc-compiled floating point code
  */
 	ENTRY(__sighndlr)
 	.globl	__sighndlrend
 	pushl	%ebp
 	movl	%esp, %ebp
+	andl	$-16,%esp	/ make sure handler is called with
+	subl	$4,%esp		/ a 16-byte aligned stack pointer
 	pushl	16(%ebp)
 	pushl	12(%ebp)
 	pushl	8(%ebp)
 	call	*20(%ebp)
-	addl	$12, %esp
 	leave
 	ret
 __sighndlrend:

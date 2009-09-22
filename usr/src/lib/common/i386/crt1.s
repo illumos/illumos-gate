@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,7 +161,8 @@ __do_exit_code_ptr:
 	leal	16(%ebp,%eax,4),%edx	/* envp */
 	movl	%edx,_environ		/* copy to _environ */
 1:
-	andl	$-16,%esp
+	andl	$-16,%esp	/* make main() and exit() be called with */
+	subl	$4,%esp		/* a 16-byte aligned stack pointer */
 	pushl	%edx
 	leal	12(%ebp),%edx	/* argv */
 	movl	%edx,___Argv
@@ -171,13 +172,12 @@ __do_exit_code_ptr:
 	call	__fsr		/* support for ftrap/fround/fprecision  */
 	call	_init
 	call	main		/* main(argc,argv,envp) */
-	addl	$12,%esp
-	pushl	%eax		/* return value from main */
-	pushl	%eax		/* push it again (for _exit(), below) */
+	movl	%eax,(%esp)	/* return value from main, for exit() */
+	movl	%eax,4(%esp)	/* remember it for _exit(), below */
 	call	exit
-	addl	$4,%esp
-	call	_exit		/* if user redefined exit, call _exit */
-	addl	$4,%esp
+	movl	4(%esp),%eax	/* if user redefined exit, call _exit */
+	movl	%eax,(%esp)
+	call	_exit
 	hlt
 	.size	_start, .-_start
 
