@@ -1191,11 +1191,13 @@ zfs_put_prop_cb(int prop, void *pp)
 		return (ZPROP_INVAL);
 
 	mhp = (ndmp_metadata_header_t *)pp;
-	mpp = &mhp->nh_property[mhp->nh_count++];
 
+	if (zfs_prop_get(mhp->nh_handle, prop, buf, sizeof (buf),
+	    &stype, sbuf, sizeof (sbuf), B_TRUE) != 0)
+		return (ZPROP_CONT);
+
+	mpp = &mhp->nh_property[mhp->nh_count++];
 	(void) strlcpy(mpp->mp_name, zfs_prop_to_name(prop), NAME_MAX);
-	(void) zfs_prop_get(mhp->nh_handle,
-	    prop, buf, sizeof (buf), &stype, sbuf, sizeof (sbuf), B_TRUE);
 	(void) strlcpy(mpp->mp_value, buf, NAME_MAX);
 
 	switch (stype) {

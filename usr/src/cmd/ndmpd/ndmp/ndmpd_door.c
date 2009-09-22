@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,7 +182,8 @@ ndmp_door_server(void *cookie, char *ptr, size_t size,
 		return;
 	}
 
-	NDMP_LOG(LOG_DEBUG, "ndmp_door_server: req_type=%d", req_type);
+	if (req_type != NDMP_GET_STAT)
+		NDMP_LOG(LOG_DEBUG, "ndmp_door_server: req_type=%d", req_type);
 
 	switch (req_type) {
 	case NDMP_GET_DOOR_STATUS: {

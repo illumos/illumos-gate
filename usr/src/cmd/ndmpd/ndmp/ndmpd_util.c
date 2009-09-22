@@ -1409,7 +1409,9 @@ ndmp_execute_cdb(ndmpd_session_t *session, char *adapter_name, int sid, int lun,
 	}
 
 	if (ioctl(fd, USCSICMD, &cmd) < 0) {
-		NDMP_LOG(LOG_ERR, "Failed to send command to device: %m");
+		if (errno != EIO && errno != 0)
+			NDMP_LOG(LOG_ERR,
+			    "Failed to send command to device: %m");
 		NDMP_LOG(LOG_DEBUG, "ioctl(USCSICMD) error: %m");
 		if (cmd.uscsi_status == 0)
 			reply.error = NDMP_IO_ERR;
