@@ -1288,7 +1288,6 @@ ZFS_COMMON_OBJS +=		\
 	dsl_deleg.o		\
 	dsl_prop.o		\
 	dsl_scrub.o		\
-	fletcher.o		\
 	gzip.o			\
 	lzjb.o			\
 	metaslab.o		\
@@ -1330,6 +1329,7 @@ ZFS_SHARED_OBJS +=		\
 	zfs_deleg.o		\
 	zfs_prop.o		\
 	zfs_comutil.o		\
+	zfs_fletcher.o		\
 	zpool_prop.o		\
 	zprop_common.o
 

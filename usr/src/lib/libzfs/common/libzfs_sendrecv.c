@@ -40,9 +40,8 @@
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
+#include "zfs_fletcher.h"
 #include "libzfs_impl.h"
-
-#include <fletcher.c> /* XXX */
 
 static int zfs_receive_impl(libzfs_handle_t *, const char *, recvflags_t,
     int, avl_tree_t *, char **);

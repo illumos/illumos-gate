@@ -58,7 +58,7 @@ extern "C" {
 typedef struct dmu_replay_record {
 	enum {
 		DRR_BEGIN, DRR_OBJECT, DRR_FREEOBJECTS,
-		DRR_WRITE, DRR_FREE, DRR_END,
+		DRR_WRITE, DRR_FREE, DRR_END, DRR_NUMTYPES
 	} drr_type;
 	uint32_t drr_payloadlen;
 	union {

@@ -87,3 +87,4 @@ d none usr/sbin 755 root bin
 l none usr/sbin/zdb=../../usr/lib/isaexec
 s none usr/sbin/zfs=../../sbin/zfs
 s none usr/sbin/zpool=../../sbin/zpool
+f none usr/sbin/zstreamdump 555 root bin

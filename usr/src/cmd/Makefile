@@ -461,6 +461,7 @@ COMMON_SUBDIRS=		\
 	zonename	\
 	zpool		\
 	zlook		\
+	zstreamdump	\
 	ztest
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += \

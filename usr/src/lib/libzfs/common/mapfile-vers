@@ -39,6 +39,12 @@
 
 SUNWprivate_1.1 {
     global:
+	fletcher_2_native;
+	fletcher_2_byteswap;
+	fletcher_4_native;
+	fletcher_4_byteswap;
+	fletcher_4_incremental_native;
+	fletcher_4_incremental_byteswap;
 	libzfs_errno;
 	libzfs_error_action;
 	libzfs_error_description;

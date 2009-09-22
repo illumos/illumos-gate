@@ -23,9 +23,31 @@
  * Use is subject to license terms.
  */
 
-/*LINTLIBRARY*/
-/*PROTOLIB1*/
+#ifndef	_ZFS_FLETCHER_H
+#define	_ZFS_FLETCHER_H
 
-#include <libzfs.h>
-#include "../../../common/zfs/zfs_comutil.h"
-#include "../../../common/zfs/zfs_fletcher.h"
+#include <sys/types.h>
+#include <sys/spa.h>
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+/*
+ * fletcher checksum functions
+ */
+
+void fletcher_2_native(const void *, uint64_t, zio_cksum_t *);
+void fletcher_2_byteswap(const void *, uint64_t, zio_cksum_t *);
+void fletcher_4_native(const void *, uint64_t, zio_cksum_t *);
+void fletcher_4_byteswap(const void *, uint64_t, zio_cksum_t *);
+void fletcher_4_incremental_native(const void *, uint64_t,
+    zio_cksum_t *);
+void fletcher_4_incremental_byteswap(const void *, uint64_t,
+    zio_cksum_t *);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _ZFS_FLETCHER_H */
