@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,11 +187,9 @@ combined_walk_step(mdb_walk_state_t *wsp)
 		wsp->walk_addr = cwd->cwd_initial_walk_addr;
 		status = cw->cw_init(wsp);
 		cw->cw_data = wsp->walk_data;
+		if (status != WALK_NEXT)
+			goto done;
 		cw->cw_initialized = B_TRUE;
-		if (status != WALK_NEXT) {
-			wsp->walk_data = cwd;
-			return (status);
-		}
 	}
 
 	/* save cwd for fini() in case step() is interrupted */
@@ -200,15 +198,19 @@ combined_walk_step(mdb_walk_state_t *wsp)
 	/* control may never reach here */
 	combined_walk_data_drop(cwd);
 
-	if (status == WALK_DONE) {
-		(void) combined_walk_remove_current(cwd);
-		cw->cw_fini(wsp);
-		mdb_free(cw, sizeof (combined_walk_t));
-		wsp->walk_data = cwd;
-		return (combined_walk_step(wsp));
-	}
-
+	if (status == WALK_DONE)
+		goto done;
 	wsp->walk_data = cwd;
+	return (status);
+
+done:
+	(void) combined_walk_remove_current(cwd);
+	if (cw->cw_initialized)
+		cw->cw_fini(wsp);
+	mdb_free(cw, sizeof (combined_walk_t));
+	wsp->walk_data = cwd;
+	if (status == WALK_DONE)
+		return (combined_walk_step(wsp));
 	return (status);
 }
 
