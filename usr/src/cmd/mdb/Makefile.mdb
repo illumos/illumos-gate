@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -81,7 +81,8 @@ SRCS += \
 	mdb_umem.c \
 	mdb_value.c \
 	mdb_vcb.c \
-	mdb_wcb.c
+	mdb_wcb.c \
+	mdb_whatis.c
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -D_MDB -I. -I../.. -I../../../common

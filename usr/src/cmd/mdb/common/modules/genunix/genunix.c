@@ -4437,8 +4437,6 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "vmem_seg", ":[-sv] [-c caller] [-e earliest] [-l latest] "
 		"[-m minsize] [-M maxsize] [-t thread] [-T type]",
 		"print or filter a vmem_seg", vmem_seg, vmem_seg_help },
-	{ "whatis", ":[-abiqv]", "given an address, return information", whatis,
-		whatis_help },
 	{ "whatthread", ":[-v]", "print threads whose stack contains the "
 		"given address", whatthread },
 

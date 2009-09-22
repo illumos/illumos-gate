@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROMSRCS += \
 	prom_2path.c \
@@ -89,14 +88,7 @@ STANDLIBS += \
 KMDBLIBS = $(STANDLIBS) ../../../sparc/v9/mdb_ks/kmod/mdb_ks
 
 MAPFILE_SOURCES = \
-	../../../common/mdb/mdb_ctf.h \
-	../../../common/kmdb/kmdb_dpi.h \
-	../../../common/kmdb/kmdb_kctl.h \
-	../../../common/kmdb/kmdb_kdi.h \
-	../../../common/mdb/mdb_ks.h \
-	../../../common/mdb/mdb_modapi.h \
-	../../../common/mdb/mdb_param.h \
-	../../../common/kmdb/kmdb_wr.h \
+	$(MAPFILE_SOURCES_COMMON) \
 	../../../sparc/kmdb/kmdb_dpi_isadep.h \
 	$(MAPFILE_SOURCES_$(MACH))
 

@@ -101,6 +101,16 @@ ALLLINTFLAGS = $(LINTFLAGS) \
 MAPFILE = mapfile
 MAPFILE_INTERMEDIATE = $(MAPFILE).i
 MAPFILE_TEMPLATE = ../../../common/kmdb/mapfile_skel
+MAPFILE_SOURCES_COMMON = \
+	../../../common/kmdb/kmdb_dpi.h \
+	../../../common/kmdb/kmdb_kctl.h \
+	../../../common/kmdb/kmdb_kdi.h \
+	../../../common/kmdb/kmdb_wr.h \
+	../../../common/mdb/mdb_ctf.h \
+	../../../common/mdb/mdb_ks.h \
+	../../../common/mdb/mdb_modapi.h \
+	../../../common/mdb/mdb_param.h \
+	../../../common/mdb/mdb_whatis.h
 
 mdb_lex.o mdb_grammar.o := CCVERBOSE =
 

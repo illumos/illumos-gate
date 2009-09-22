@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -45,6 +43,7 @@
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_whatis.h>
 #include "sfmmu.h"
 
 #ifndef SYSTRAP_TT
@@ -882,7 +881,7 @@ httctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		htraptrace_buf_inuse = 1;
 		mdb_vread(&hdr, sizeof (htrap_trace_hdr_t),
-			(uintptr_t)ctl->d.hvaddr_base);
+		    (uintptr_t)ctl->d.hvaddr_base);
 		mdb_printf("htrap_trace_ctl[%d] = {\n", i);
 		mdb_printf("  vaddr_base = 0x%lx\n", (long)ctl->d.hvaddr_base);
 		mdb_printf("  last_offset = 0x%lx\n", hdr.last_offset);
@@ -917,8 +916,8 @@ httprint_short(uintptr_t addr, const htrap_trace_fullrec_t *full, int *cpu)
 	ttstr = ttp->tt_tt < ttndescr ? ttdescr[ttp->tt_tt] : "?";
 
 	mdb_printf("%016llx %02x  %04hx %04hx %-16s %02x  %02x  %0?p %A\n",
-		ttp->tt_tick, ttp->tt_ty, ttp->tt_tag, ttp->tt_tt, ttstr,
-		ttp->tt_tl, ttp->tt_gl, ttp->tt_tpc, ttp->tt_tpc);
+	    ttp->tt_tick, ttp->tt_ty, ttp->tt_tag, ttp->tt_tt, ttstr,
+	    ttp->tt_tl, ttp->tt_gl, ttp->tt_tpc, ttp->tt_tpc);
 
 	return (WALK_NEXT);
 }
@@ -935,10 +934,10 @@ httprint_long(uintptr_t addr, const htrap_trace_fullrec_t *full, int *cpu)
 		return (WALK_NEXT);
 
 	mdb_printf("%016llx %016llx %02x  %02x  %04hx %04hx %02x  %02x  %0?p "
-		"[%p,%p,%p,%p]\n",
-		ttp->tt_tick, ttp->tt_tstate, ttp->tt_hpstate, ttp->tt_ty,
-		ttp->tt_tag, ttp->tt_tt, ttp->tt_tl, ttp->tt_gl, ttp->tt_tpc,
-		ttp->tt_f1, ttp->tt_f2, ttp->tt_f3, ttp->tt_f4);
+	    "[%p,%p,%p,%p]\n",
+	    ttp->tt_tick, ttp->tt_tstate, ttp->tt_hpstate, ttp->tt_ty,
+	    ttp->tt_tag, ttp->tt_tt, ttp->tt_tl, ttp->tt_gl, ttp->tt_tpc,
+	    ttp->tt_f1, ttp->tt_f2, ttp->tt_f3, ttp->tt_f4);
 
 	return (WALK_NEXT);
 }
@@ -1006,9 +1005,9 @@ httrace_walk_init(mdb_walk_state_t *wsp)
 		} else {
 			hdr = (htrap_trace_hdr_t *)buf;
 			tc->tc_rec = (struct htrap_trace_record *)
-				((uintptr_t)buf + (uintptr_t)hdr->last_offset);
+			    ((uintptr_t)buf + (uintptr_t)hdr->last_offset);
 			tc->tc_stop = (struct htrap_trace_record *)
-				((uintptr_t)buf + (uintptr_t)hdr->offset);
+			    ((uintptr_t)buf + (uintptr_t)hdr->offset);
 		}
 	}
 	if (!htraptrace_buf_inuse) {
@@ -1114,13 +1113,13 @@ httrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (opt_x) {
 		mdb_printf("%-16s %-16s %-3s %-3s %-4s %-4s %-3s %-3s %-?s "
-			"F1-4\n", "%tick", "%tstate", "%hp", "%ty", "%tag",
-			"%tt", "%tl", "%gl", "%tpc");
+		    "F1-4\n", "%tick", "%tstate", "%hp", "%ty", "%tag",
+		    "%tt", "%tl", "%gl", "%tpc");
 		ttprint = (mdb_walk_cb_t)httprint_long;
 	} else {
 		mdb_printf("%-16s %-3s %-4s %-4s %-16s %-3s %-3s %s\n",
-			"%tick", "%ty", "%tag", "%tt", "", "%tl", "%gl",
-			"%tpc");
+		    "%tick", "%ty", "%tag", "%tt", "", "%tl", "%gl",
+		    "%tpc");
 		ttprint = (mdb_walk_cb_t)httprint_short;
 	}
 
@@ -1520,38 +1519,32 @@ softint_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 static int
-whatis_walk_tt(uintptr_t taddr, const trap_trace_fullrec_t *ttf, uintptr_t *ap)
+whatis_walk_tt(uintptr_t taddr, const trap_trace_fullrec_t *ttf,
+    mdb_whatis_t *w)
 {
-	uintptr_t addr = *ap;
+	uintptr_t cur = 0;
 
-	if (addr < taddr || addr > taddr + sizeof (struct trap_trace_record))
-		return (WALK_NEXT);
+	while (mdb_whatis_match(w, taddr, sizeof (struct trap_trace_record),
+	    &cur))
+		mdb_whatis_report_object(w, cur, taddr,
+		    "trap trace record for cpu %d\n", ttf->ttf_cpu);
 
-	mdb_printf("%p is %p+%p, trap trace record for cpu %d\n",
-	    addr, taddr, addr - taddr, ttf->ttf_cpu);
-
-	mdb_set_dot(1);
-	return (WALK_DONE);
+	return (WHATIS_WALKRET(w));
 }
 
 /*ARGSUSED*/
-int
-whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+static int
+whatis_run_traptrace(mdb_whatis_t *w, void *ignored)
 {
 	GElf_Sym sym;
 
-	if (!(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
 	if (mdb_lookup_by_name("trap_trace_ctl", &sym) == -1)
-		return (DCMD_NEXT);
+		return (0);
 
-	mdb_set_dot(0);
-
-	if (mdb_walk("ttrace", (mdb_walk_cb_t)whatis_walk_tt, &addr) == -1)
+	if (mdb_walk("ttrace", (mdb_walk_cb_t)whatis_walk_tt, w) == -1)
 		mdb_warn("failed to walk 'ttrace'");
 
-	return (DCMD_NEXT);
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -1598,7 +1591,6 @@ static const mdb_dcmd_t dcmds[] = {
 	    vecint_dcmd },
 	{ "softint", NULL, "display a registered software interrupt",
 	    softint_dcmd },
-	{ "whatis", ":[-abv]", "given an address, return information", whatis },
 	{ "sfmmu_vtop", ":[[-v] -a as]", "print virtual to physical mapping",
 	    sfmmu_vtop },
 	{ "page_num2pp", ":", "page frame number to page structure",
@@ -1638,6 +1630,9 @@ _mdb_init(void)
 		mdb_warn("couldn't find intr_vec_table");
 		return (NULL);
 	}
+
+	mdb_whatis_register("traptrace", whatis_run_traptrace, NULL,
+	    WHATIS_PRIO_EARLY, WHATIS_REG_NO_ID);
 
 	return (&modinfo);
 }

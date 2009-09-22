@@ -26,6 +26,7 @@
 #include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_whatis.h>
 #include <sys/cpuvar.h>
 #include <sys/kmem_impl.h>
 #include <sys/vmem_impl.h>
@@ -2089,33 +2090,19 @@ stack_active(const kthread_t *t, uintptr_t addr)
 	return (" (below sp)");
 }
 
-typedef struct whatis {
-	uintptr_t w_addr;
-	const kmem_cache_t *w_cache;
-	const vmem_t *w_vmem;
-	size_t w_slab_align;
-	int w_slab_found;
-	int w_found;
-	int w_kmem_lite_count;
-	uint_t w_all;
-	uint_t w_bufctl;
-	uint_t w_freemem;
-	uint_t w_idspace;
-	uint_t w_quiet;
-	uint_t w_verbose;
-} whatis_t;
-
-/* nicely report pointers as offsets from a base */
-static void
-whatis_report_pointer(uintptr_t addr, uintptr_t base, const char *description)
-{
-	if (addr == base)
-		mdb_printf("%p is %s",
-		    addr, description);
-	else
-		mdb_printf("%p is %p+%p, %s",
-		    addr, base, addr - base, description);
-}
+/*
+ * Additional state for the kmem and vmem ::whatis handlers
+ */
+typedef struct whatis_info {
+	mdb_whatis_t *wi_w;
+	const kmem_cache_t *wi_cache;
+	const vmem_t *wi_vmem;
+	vmem_t *wi_msb_arena;
+	size_t wi_slab_size;
+	uint_t wi_slab_found;
+	uint_t wi_kmem_lite_count;
+	uint_t wi_freemem;
+} whatis_info_t;
 
 /* call one of our dcmd functions with "-v" and the provided address */
 static void
@@ -2125,206 +2112,220 @@ whatis_call_printer(mdb_dcmd_f *dcmd, uintptr_t addr)
 	a.a_type = MDB_TYPE_STRING;
 	a.a_un.a_str = "-v";
 
+	mdb_printf(":\n");
 	(void) (*dcmd)(addr, DCMD_ADDRSPEC, 1, &a);
 }
 
 static void
-whatis_print_kmem(uintptr_t addr, uintptr_t baddr, whatis_t *w)
+whatis_print_kmf_lite(uintptr_t btaddr, size_t count)
 {
-	const kmem_cache_t *cp = w->w_cache;
+#define	KMEM_LITE_MAX	16
+	pc_t callers[KMEM_LITE_MAX];
+	pc_t uninit = (pc_t)KMEM_UNINITIALIZED_PATTERN;
+
+	kmem_buftag_t bt;
+	intptr_t stat;
+	const char *plural = "";
+	int i;
+
+	/* validate our arguments and read in the buftag */
+	if (count == 0 || count > KMEM_LITE_MAX ||
+	    mdb_vread(&bt, sizeof (bt), btaddr) == -1)
+		return;
+
+	/* validate the buffer state and read in the callers */
+	stat = (intptr_t)bt.bt_bufctl ^ bt.bt_bxstat;
+
+	if (stat != KMEM_BUFTAG_ALLOC || stat != KMEM_BUFTAG_FREE ||
+	    mdb_vread(callers, count * sizeof (pc_t),
+	    btaddr + offsetof(kmem_buftag_lite_t, bt_history)) == -1)
+		return;
+
+	/* If there aren't any filled in callers, bail */
+	if (callers[0] == uninit)
+		return;
+
+	plural = (callers[1] == uninit) ? "" : "s";
+
+	/* Everything's done and checked; print them out */
+	mdb_printf(":\n");
+
+	mdb_inc_indent(8);
+	mdb_printf("recent caller%s: %a", plural, callers[0]);
+	for (i = 1; i < count; i++) {
+		if (callers[i] == uninit)
+			break;
+		mdb_printf(", %a", callers[i]);
+	}
+	mdb_dec_indent(8);
+}
+
+static void
+whatis_print_kmem(whatis_info_t *wi, uintptr_t maddr, uintptr_t addr,
+    uintptr_t baddr)
+{
+	mdb_whatis_t *w = wi->wi_w;
+
+	const kmem_cache_t *cp = wi->wi_cache;
 	/* LINTED pointer cast may result in improper alignment */
 	uintptr_t btaddr = (uintptr_t)KMEM_BUFTAG(cp, addr);
-	intptr_t stat;
-	int call_printer;
-	int count = 0;
-	int i;
-	pc_t callers[16];
+	int quiet = (mdb_whatis_flags(w) & WHATIS_QUIET);
+	int call_printer = (!quiet && (cp->cache_flags & KMF_AUDIT));
 
-	if (cp->cache_flags & KMF_REDZONE) {
-		kmem_buftag_t bt;
-
-		if (mdb_vread(&bt, sizeof (bt), btaddr) == -1)
-			goto done;
-
-		stat = (intptr_t)bt.bt_bufctl ^ bt.bt_bxstat;
-
-		if (stat != KMEM_BUFTAG_ALLOC && stat != KMEM_BUFTAG_FREE)
-			goto done;
-
-		/*
-		 * provide the bufctl ptr if it has useful information
-		 */
-		if (baddr == 0 && (cp->cache_flags & KMF_AUDIT))
-			baddr = (uintptr_t)bt.bt_bufctl;
-
-		if (cp->cache_flags & KMF_LITE) {
-			count = w->w_kmem_lite_count;
-
-			if (count * sizeof (pc_t) > sizeof (callers))
-				count = 0;
-
-			if (count > 0 &&
-			    mdb_vread(callers, count * sizeof (pc_t),
-			    btaddr +
-			    offsetof(kmem_buftag_lite_t, bt_history)) == -1)
-				count = 0;
-
-			/*
-			 * skip unused callers
-			 */
-			while (count > 0 && callers[count - 1] ==
-			    (pc_t)KMEM_UNINITIALIZED_PATTERN)
-				count--;
-		}
-	}
-
-done:
-	call_printer =
-	    (!w->w_quiet && baddr != 0 && (cp->cache_flags & KMF_AUDIT));
-
-	whatis_report_pointer(w->w_addr, addr, "");
+	mdb_whatis_report_object(w, maddr, addr, "");
 
 	if (baddr != 0 && !call_printer)
 		mdb_printf("bufctl %p ", baddr);
 
-	mdb_printf("%s from %s%s\n",
-	    (w->w_freemem == FALSE) ? "allocated" : "freed", cp->cache_name,
-	    (call_printer || (!w->w_quiet && count > 0)) ? ":" : "");
+	mdb_printf("%s from %s",
+	    (wi->wi_freemem == FALSE) ? "allocated" : "freed", cp->cache_name);
 
-	if (call_printer)
+	if (baddr != 0 && call_printer) {
 		whatis_call_printer(bufctl, baddr);
-
-	if (!w->w_quiet && count > 0) {
-		mdb_inc_indent(8);
-		mdb_printf("recent caller%s: %a%s", (count != 1)? "s":"",
-		    callers[0], (count != 1)? ", ":"\n");
-		for (i = 1; i < count; i++)
-			mdb_printf("%a%s", callers[i],
-			    (i + 1 < count)? ", ":"\n");
-		mdb_dec_indent(8);
+		return;
 	}
+
+	/* for KMF_LITE caches, try to print out the previous callers */
+	if (!quiet && (cp->cache_flags & KMF_LITE))
+		whatis_print_kmf_lite(btaddr, wi->wi_kmem_lite_count);
+
+	mdb_printf("\n");
 }
 
 /*ARGSUSED*/
 static int
-whatis_walk_kmem(uintptr_t addr, void *ignored, whatis_t *w)
+whatis_walk_kmem(uintptr_t addr, void *ignored, whatis_info_t *wi)
 {
-	if (w->w_addr < addr || w->w_addr >= addr + w->w_cache->cache_bufsize)
-		return (WALK_NEXT);
+	mdb_whatis_t *w = wi->wi_w;
 
-	whatis_print_kmem(addr, 0, w);
-	w->w_found++;
-	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
+	uintptr_t cur;
+	size_t size = wi->wi_cache->cache_bufsize;
+
+	while (mdb_whatis_match(w, addr, size, &cur))
+		whatis_print_kmem(wi, cur, addr, NULL);
+
+	return (WHATIS_WALKRET(w));
+}
+
+/*ARGSUSED*/
+static int
+whatis_walk_bufctl(uintptr_t baddr, const kmem_bufctl_t *bcp, whatis_info_t *wi)
+{
+	mdb_whatis_t *w = wi->wi_w;
+
+	uintptr_t cur;
+	uintptr_t addr = (uintptr_t)bcp->bc_addr;
+	size_t size = wi->wi_cache->cache_bufsize;
+
+	while (mdb_whatis_match(w, addr, size, &cur))
+		whatis_print_kmem(wi, cur, addr, baddr);
+
+	return (WHATIS_WALKRET(w));
 }
 
 static int
-whatis_walk_seg(uintptr_t addr, const vmem_seg_t *vs, whatis_t *w)
+whatis_walk_seg(uintptr_t addr, const vmem_seg_t *vs, whatis_info_t *wi)
 {
-	if (w->w_addr < vs->vs_start || w->w_addr >= vs->vs_end)
+	mdb_whatis_t *w = wi->wi_w;
+
+	size_t size = vs->vs_end - vs->vs_start;
+	uintptr_t cur;
+
+	/* We're not interested in anything but alloc and free segments */
+	if (vs->vs_type != VMEM_ALLOC && vs->vs_type != VMEM_FREE)
 		return (WALK_NEXT);
 
-	whatis_report_pointer(w->w_addr, vs->vs_start, "");
+	while (mdb_whatis_match(w, vs->vs_start, size, &cur)) {
+		mdb_whatis_report_object(w, cur, vs->vs_start, "");
 
-	/*
-	 * If we're not printing it seperately, provide the vmem_seg
-	 * pointer if it has a stack trace.
-	 */
-	if (w->w_quiet && (w->w_bufctl == TRUE ||
-	    (vs->vs_type == VMEM_ALLOC && vs->vs_depth != 0))) {
-		mdb_printf("vmem_seg %p ", addr);
+		/*
+		 * If we're not printing it seperately, provide the vmem_seg
+		 * pointer if it has a stack trace.
+		 */
+		if ((mdb_whatis_flags(w) & WHATIS_QUIET) &&
+		    (!(mdb_whatis_flags(w) & WHATIS_BUFCTL) ||
+		    (vs->vs_type == VMEM_ALLOC && vs->vs_depth != 0))) {
+			mdb_printf("vmem_seg %p ", addr);
+		}
+
+		mdb_printf("%s from the %s vmem arena",
+		    (vs->vs_type == VMEM_ALLOC) ? "allocated" : "freed",
+		    wi->wi_vmem->vm_name);
+
+		if (!(mdb_whatis_flags(w) & WHATIS_QUIET))
+			whatis_call_printer(vmem_seg, addr);
+		else
+			mdb_printf("\n");
 	}
 
-	mdb_printf("%s from %s vmem arena%s\n",
-	    (w->w_freemem == FALSE) ? "allocated" : "freed", w->w_vmem->vm_name,
-	    !w->w_quiet ? ":" : "");
-
-	if (!w->w_quiet)
-		whatis_call_printer(vmem_seg, addr);
-
-	w->w_found++;
-	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
+	return (WHATIS_WALKRET(w));
 }
 
 static int
-whatis_walk_vmem(uintptr_t addr, const vmem_t *vmem, whatis_t *w)
+whatis_walk_vmem(uintptr_t addr, const vmem_t *vmem, whatis_info_t *wi)
 {
+	mdb_whatis_t *w = wi->wi_w;
 	const char *nm = vmem->vm_name;
-	w->w_vmem = vmem;
-	w->w_freemem = FALSE;
 
-	if (((vmem->vm_cflags & VMC_IDENTIFIER) != 0) ^ w->w_idspace)
+	int identifier = ((vmem->vm_cflags & VMC_IDENTIFIER) != 0);
+	int idspace = ((mdb_whatis_flags(w) & WHATIS_IDSPACE) != 0);
+
+	if (identifier != idspace)
 		return (WALK_NEXT);
 
-	if (w->w_verbose)
+	wi->wi_vmem = vmem;
+
+	if (mdb_whatis_flags(w) & WHATIS_VERBOSE)
 		mdb_printf("Searching vmem arena %s...\n", nm);
 
-	if (mdb_pwalk("vmem_alloc",
-	    (mdb_walk_cb_t)whatis_walk_seg, w, addr) == -1) {
-		mdb_warn("can't walk vmem seg for %p", addr);
+	if (mdb_pwalk("vmem_seg",
+	    (mdb_walk_cb_t)whatis_walk_seg, wi, addr) == -1) {
+		mdb_warn("can't walk vmem_seg for %p", addr);
 		return (WALK_NEXT);
 	}
 
-	if (w->w_found && w->w_all == FALSE)
+	return (WHATIS_WALKRET(w));
+}
+
+/*ARGSUSED*/
+static int
+whatis_walk_slab(uintptr_t saddr, const kmem_slab_t *sp, whatis_info_t *wi)
+{
+	mdb_whatis_t *w = wi->wi_w;
+
+	/* It must overlap with the slab data, or it's not interesting */
+	if (mdb_whatis_overlaps(w,
+	    (uintptr_t)sp->slab_base, wi->wi_slab_size)) {
+		wi->wi_slab_found++;
 		return (WALK_DONE);
-
-	if (w->w_verbose)
-		mdb_printf("Searching vmem arena %s for free virtual...\n", nm);
-
-	w->w_freemem = TRUE;
-
-	if (mdb_pwalk("vmem_free",
-	    (mdb_walk_cb_t)whatis_walk_seg, w, addr) == -1) {
-		mdb_warn("can't walk vmem seg for %p", addr);
-		return (WALK_NEXT);
 	}
-
-	return (w->w_found && w->w_all == FALSE ? WALK_DONE : WALK_NEXT);
-}
-
-/*ARGSUSED*/
-static int
-whatis_walk_bufctl(uintptr_t baddr, const kmem_bufctl_t *bcp, whatis_t *w)
-{
-	uintptr_t addr;
-
-	if (bcp == NULL)
-		return (WALK_NEXT);
-
-	addr = (uintptr_t)bcp->bc_addr;
-
-	if (w->w_addr < addr || w->w_addr >= addr + w->w_cache->cache_bufsize)
-		return (WALK_NEXT);
-
-	whatis_print_kmem(addr, baddr, w);
-	w->w_found++;
-	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
-}
-
-/*ARGSUSED*/
-static int
-whatis_walk_slab(uintptr_t saddr, const kmem_slab_t *sp, whatis_t *w)
-{
-	uintptr_t base = P2ALIGN((uintptr_t)sp->slab_base, w->w_slab_align);
-
-	if ((w->w_addr - base) >= w->w_cache->cache_slabsize)
-		return (WALK_NEXT);
-
-	w->w_slab_found++;
-	return (WALK_DONE);
+	return (WALK_NEXT);
 }
 
 static int
-whatis_walk_cache(uintptr_t addr, const kmem_cache_t *c, whatis_t *w)
+whatis_walk_cache(uintptr_t addr, const kmem_cache_t *c, whatis_info_t *wi)
 {
+	mdb_whatis_t *w = wi->wi_w;
+
 	char *walk, *freewalk;
 	mdb_walk_cb_t func;
-	vmem_t *vmp = c->cache_arena;
+	int do_bufctl;
 
-	if (((c->cache_flags & KMC_IDENTIFIER) != 0) ^ w->w_idspace)
+	int identifier = ((c->cache_flags & KMC_IDENTIFIER) != 0);
+	int idspace = ((mdb_whatis_flags(w) & WHATIS_IDSPACE) != 0);
+
+	if (identifier != idspace)
 		return (WALK_NEXT);
 
-	/* For caches with auditing info, we always walk the bufctls */
-	if (w->w_bufctl || (c->cache_flags & KMF_AUDIT)) {
+	/* Override the '-b' flag as necessary */
+	if (!(c->cache_flags & KMF_HASH))
+		do_bufctl = FALSE;	/* no bufctls to walk */
+	else if (c->cache_flags & KMF_AUDIT)
+		do_bufctl = TRUE;	/* we always want debugging info */
+	else
+		do_bufctl = ((mdb_whatis_flags(w) & WHATIS_BUFCTL) != 0);
+
+	if (do_bufctl) {
 		walk = "bufctl";
 		freewalk = "freectl";
 		func = (mdb_walk_cb_t)whatis_walk_bufctl;
@@ -2334,130 +2335,142 @@ whatis_walk_cache(uintptr_t addr, const kmem_cache_t *c, whatis_t *w)
 		func = (mdb_walk_cb_t)whatis_walk_kmem;
 	}
 
-	w->w_cache = c;
+	wi->wi_cache = c;
 
-	if (w->w_verbose)
-		mdb_printf("Searching %s's slabs...\n", c->cache_name);
-
-	/*
-	 * Verify that the address is in one of the cache's slabs.  If not,
-	 * we can skip the more expensive walkers.  (this is purely a
-	 * heuristic -- as long as there are no false-negatives, we'll be fine)
-	 *
-	 * We try to get the cache's arena's quantum, since to accurately
-	 * get the base of a slab, you have to align it to the quantum.  If
-	 * it doesn't look sensible, we fall back to not aligning.
-	 */
-	if (mdb_vread(&w->w_slab_align, sizeof (w->w_slab_align),
-	    (uintptr_t)&vmp->vm_quantum) == -1) {
-		mdb_warn("unable to read %p->cache_arena->vm_quantum", c);
-		w->w_slab_align = 1;
-	}
-
-	if ((c->cache_slabsize < w->w_slab_align) || w->w_slab_align == 0 ||
-	    (w->w_slab_align & (w->w_slab_align - 1))) {
-		mdb_warn("%p's arena has invalid quantum (0x%p)\n", c,
-		    w->w_slab_align);
-		w->w_slab_align = 1;
-	}
-
-	w->w_slab_found = 0;
-	if (mdb_pwalk("kmem_slab", (mdb_walk_cb_t)whatis_walk_slab, w,
-	    addr) == -1) {
-		mdb_warn("can't find kmem_slab walker");
-		return (WALK_DONE);
-	}
-	if (w->w_slab_found == 0)
-		return (WALK_NEXT);
-
-	if (c->cache_flags & KMF_LITE) {
-		if (mdb_readvar(&w->w_kmem_lite_count,
-		    "kmem_lite_count") == -1 || w->w_kmem_lite_count > 16)
-			w->w_kmem_lite_count = 0;
-	}
-
-	if (w->w_verbose)
+	if (mdb_whatis_flags(w) & WHATIS_VERBOSE)
 		mdb_printf("Searching %s...\n", c->cache_name);
 
-	w->w_freemem = FALSE;
+	/*
+	 * If more then two buffers live on each slab, figure out if we're
+	 * interested in anything in any slab before doing the more expensive
+	 * kmem/freemem (bufctl/freectl) walkers.
+	 */
+	wi->wi_slab_size = c->cache_slabsize - c->cache_maxcolor;
+	if (!(c->cache_flags & KMF_HASH))
+		wi->wi_slab_size -= sizeof (kmem_slab_t);
 
-	if (mdb_pwalk(walk, func, w, addr) == -1) {
+	if ((wi->wi_slab_size / c->cache_chunksize) > 2) {
+		wi->wi_slab_found = 0;
+		if (mdb_pwalk("kmem_slab", (mdb_walk_cb_t)whatis_walk_slab, wi,
+		    addr) == -1) {
+			mdb_warn("can't find kmem_slab walker");
+			return (WALK_DONE);
+		}
+		if (wi->wi_slab_found == 0)
+			return (WALK_NEXT);
+	}
+
+	wi->wi_freemem = FALSE;
+	if (mdb_pwalk(walk, func, wi, addr) == -1) {
 		mdb_warn("can't find %s walker", walk);
 		return (WALK_DONE);
 	}
 
-	if (w->w_found && w->w_all == FALSE)
+	if (mdb_whatis_done(w))
 		return (WALK_DONE);
 
 	/*
 	 * We have searched for allocated memory; now search for freed memory.
 	 */
-	if (w->w_verbose)
+	if (mdb_whatis_flags(w) & WHATIS_VERBOSE)
 		mdb_printf("Searching %s for free memory...\n", c->cache_name);
 
-	w->w_freemem = TRUE;
-
-	if (mdb_pwalk(freewalk, func, w, addr) == -1) {
+	wi->wi_freemem = TRUE;
+	if (mdb_pwalk(freewalk, func, wi, addr) == -1) {
 		mdb_warn("can't find %s walker", freewalk);
 		return (WALK_DONE);
 	}
 
-	return (w->w_found && w->w_all == FALSE ? WALK_DONE : WALK_NEXT);
+	return (WHATIS_WALKRET(w));
 }
 
 static int
-whatis_walk_touch(uintptr_t addr, const kmem_cache_t *c, whatis_t *w)
+whatis_walk_touch(uintptr_t addr, const kmem_cache_t *c, whatis_info_t *wi)
 {
-	if (c->cache_cflags & KMC_NOTOUCH)
+	if (c->cache_arena == wi->wi_msb_arena ||
+	    (c->cache_cflags & KMC_NOTOUCH))
 		return (WALK_NEXT);
 
-	return (whatis_walk_cache(addr, c, w));
+	return (whatis_walk_cache(addr, c, wi));
 }
 
 static int
-whatis_walk_notouch(uintptr_t addr, const kmem_cache_t *c, whatis_t *w)
+whatis_walk_metadata(uintptr_t addr, const kmem_cache_t *c, whatis_info_t *wi)
 {
-	if (!(c->cache_cflags & KMC_NOTOUCH))
+	if (c->cache_arena != wi->wi_msb_arena)
 		return (WALK_NEXT);
 
-	return (whatis_walk_cache(addr, c, w));
+	return (whatis_walk_cache(addr, c, wi));
 }
 
 static int
-whatis_walk_thread(uintptr_t addr, const kthread_t *t, whatis_t *w)
+whatis_walk_notouch(uintptr_t addr, const kmem_cache_t *c, whatis_info_t *wi)
 {
+	if (c->cache_arena == wi->wi_msb_arena ||
+	    !(c->cache_cflags & KMC_NOTOUCH))
+		return (WALK_NEXT);
+
+	return (whatis_walk_cache(addr, c, wi));
+}
+
+static int
+whatis_walk_thread(uintptr_t addr, const kthread_t *t, mdb_whatis_t *w)
+{
+	uintptr_t cur;
+	uintptr_t saddr;
+	size_t size;
+
 	/*
 	 * Often, one calls ::whatis on an address from a thread structure.
 	 * We use this opportunity to short circuit this case...
 	 */
-	if (w->w_addr >= addr && w->w_addr < addr + sizeof (kthread_t)) {
-		whatis_report_pointer(w->w_addr, addr,
+	while (mdb_whatis_match(w, addr, sizeof (kthread_t), &cur))
+		mdb_whatis_report_object(w, cur, addr,
 		    "allocated as a thread structure\n");
-		w->w_found++;
-		return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
-	}
 
-	if (w->w_addr < (uintptr_t)t->t_stkbase ||
-	    w->w_addr > (uintptr_t)t->t_stk)
-		return (WALK_NEXT);
-
+	/*
+	 * Now check the stack
+	 */
 	if (t->t_stkbase == NULL)
 		return (WALK_NEXT);
 
-	mdb_printf("%p is in thread %p's stack%s\n", w->w_addr, addr,
-	    stack_active(t, w->w_addr));
+	/*
+	 * This assumes that t_stk is the end of the stack, but it's really
+	 * only the initial stack pointer for the thread.  Arguments to the
+	 * initial procedure, SA(MINFRAME), etc. are all after t_stk.  So
+	 * that 't->t_stk::whatis' reports "part of t's stack", we include
+	 * t_stk in the range (the "+ 1", below), but the kernel should
+	 * really include the full stack bounds where we can find it.
+	 */
+	saddr = (uintptr_t)t->t_stkbase;
+	size = (uintptr_t)t->t_stk - saddr + 1;
+	while (mdb_whatis_match(w, saddr, size, &cur))
+		mdb_whatis_report_object(w, cur, cur,
+		    "in thread %p's stack%s\n", addr, stack_active(t, cur));
 
-	w->w_found++;
-	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
+	return (WHATIS_WALKRET(w));
+}
+
+static void
+whatis_modctl_match(mdb_whatis_t *w, const char *name,
+    uintptr_t base, size_t size, const char *where)
+{
+	uintptr_t cur;
+
+	/*
+	 * Since we're searching for addresses inside a module, we report
+	 * them as symbols.
+	 */
+	while (mdb_whatis_match(w, base, size, &cur))
+		mdb_whatis_report_address(w, cur, "in %s's %s\n", name, where);
 }
 
 static int
-whatis_walk_modctl(uintptr_t addr, const struct modctl *m, whatis_t *w)
+whatis_walk_modctl(uintptr_t addr, const struct modctl *m, mdb_whatis_t *w)
 {
+	char name[MODMAXNAMELEN];
 	struct module mod;
-	char name[MODMAXNAMELEN], *where;
 	Shdr shdr;
-	GElf_Sym sym;
 
 	if (m->mod_mp == NULL)
 		return (WALK_NEXT);
@@ -2467,207 +2480,138 @@ whatis_walk_modctl(uintptr_t addr, const struct modctl *m, whatis_t *w)
 		return (WALK_NEXT);
 	}
 
-	if (w->w_addr >= (uintptr_t)mod.text &&
-	    w->w_addr < (uintptr_t)mod.text + mod.text_size) {
-		where = "text segment";
-		goto found;
-	}
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)m->mod_modname) == -1)
+		(void) mdb_snprintf(name, sizeof (name), "0x%p", addr);
 
-	if (w->w_addr >= (uintptr_t)mod.data &&
-	    w->w_addr < (uintptr_t)mod.data + mod.data_size) {
-		where = "data segment";
-		goto found;
-	}
-
-	if (w->w_addr >= (uintptr_t)mod.bss &&
-	    w->w_addr < (uintptr_t)mod.bss + mod.bss_size) {
-		where = "bss";
-		goto found;
-	}
+	whatis_modctl_match(w, name,
+	    (uintptr_t)mod.text, mod.text_size, "text segment");
+	whatis_modctl_match(w, name,
+	    (uintptr_t)mod.data, mod.data_size, "data segment");
+	whatis_modctl_match(w, name,
+	    (uintptr_t)mod.bss, mod.bss_size, "bss segment");
 
 	if (mdb_vread(&shdr, sizeof (shdr), (uintptr_t)mod.symhdr) == -1) {
 		mdb_warn("couldn't read symbol header for %p's module", addr);
 		return (WALK_NEXT);
 	}
 
-	if (w->w_addr >= (uintptr_t)mod.symtbl && w->w_addr <
-	    (uintptr_t)mod.symtbl + (uintptr_t)mod.nsyms * shdr.sh_entsize) {
-		where = "symtab";
-		goto found;
-	}
+	whatis_modctl_match(w, name,
+	    (uintptr_t)mod.symtbl, mod.nsyms * shdr.sh_entsize, "symtab");
+	whatis_modctl_match(w, name,
+	    (uintptr_t)mod.symspace, mod.symsize, "symtab");
 
-	if (w->w_addr >= (uintptr_t)mod.symspace &&
-	    w->w_addr < (uintptr_t)mod.symspace + (uintptr_t)mod.symsize) {
-		where = "symspace";
-		goto found;
-	}
-
-	return (WALK_NEXT);
-
-found:
-	if (mdb_readstr(name, sizeof (name), (uintptr_t)m->mod_modname) == -1)
-		(void) mdb_snprintf(name, sizeof (name), "0x%p", addr);
-
-	mdb_printf("%p is ", w->w_addr);
-
-	/*
-	 * If we found this address in a module, then there's a chance that
-	 * it's actually a named symbol.  Try the symbol lookup.
-	 */
-	if (mdb_lookup_by_addr(w->w_addr, MDB_SYM_FUZZY, NULL, 0, &sym) != -1 &&
-	    (w->w_addr - (uintptr_t)sym.st_value) < sym.st_size) {
-		mdb_printf("%a, ", w->w_addr);
-	}
-
-	mdb_printf("in %s's %s\n", name, where);
-
-	w->w_found++;
-	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
+	return (WHATIS_WALKRET(w));
 }
 
 /*ARGSUSED*/
 static int
-whatis_walk_page(uintptr_t addr, const void *ignored, whatis_t *w)
+whatis_walk_memseg(uintptr_t addr, const struct memseg *seg, mdb_whatis_t *w)
 {
-	static int machsize = 0;
-	mdb_ctf_id_t id;
+	uintptr_t cur;
 
-	if (machsize == 0) {
-		if (mdb_ctf_lookup_by_name("unix`page_t", &id) == 0)
-			machsize = mdb_ctf_type_size(id);
-		else {
-			mdb_warn("could not get size of page_t");
-			machsize = sizeof (page_t);
-		}
+	uintptr_t base = (uintptr_t)seg->pages;
+	size_t size = (uintptr_t)seg->epages - base;
+
+	while (mdb_whatis_match(w, base, size, &cur)) {
+		/* round our found pointer down to the page_t base. */
+		size_t offset = (cur - base) % sizeof (page_t);
+
+		mdb_whatis_report_object(w, cur, cur - offset,
+		    "allocated as a page structure\n");
 	}
 
-	if (w->w_addr < addr || w->w_addr >= addr + machsize)
-		return (WALK_NEXT);
-
-	whatis_report_pointer(w->w_addr, addr,
-	    "allocated as a page structure\n");
-
-	w->w_found++;
-	return (w->w_all == TRUE ? WALK_NEXT : WALK_DONE);
+	return (WHATIS_WALKRET(w));
 }
 
-int
-whatis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+/*ARGSUSED*/
+static int
+whatis_run_modules(mdb_whatis_t *w, void *arg)
 {
-	whatis_t w;
-
-	if (!(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
-
-	w.w_all = FALSE;
-	w.w_bufctl = FALSE;
-	w.w_idspace = FALSE;
-	w.w_quiet = FALSE;
-	w.w_verbose = FALSE;
-
-	if (mdb_getopts(argc, argv,
-	    'a', MDB_OPT_SETBITS, TRUE, &w.w_all,
-	    'b', MDB_OPT_SETBITS, TRUE, &w.w_bufctl,
-	    'i', MDB_OPT_SETBITS, TRUE, &w.w_idspace,
-	    'q', MDB_OPT_SETBITS, TRUE, &w.w_quiet,
-	    'v', MDB_OPT_SETBITS, TRUE, &w.w_verbose,
-	    NULL) != argc)
-		return (DCMD_USAGE);
-
-	w.w_addr = addr;
-	w.w_found = 0;
-
-	if (w.w_verbose)
-		mdb_printf("Searching modules...\n");
-
-	if (!w.w_idspace) {
-		if (mdb_walk("modctl", (mdb_walk_cb_t)whatis_walk_modctl, &w)
-		    == -1) {
-			mdb_warn("couldn't find modctl walker");
-			return (DCMD_ERR);
-		}
-
-		if (w.w_found && w.w_all == FALSE)
-			return (DCMD_OK);
-
-		/*
-		 * Now search all thread stacks.  Yes, this is a little weak; we
-		 * can save a lot of work by first checking to see if the
-		 * address is in segkp vs. segkmem.  But hey, computers are
-		 * fast.
-		 */
-		if (w.w_verbose)
-			mdb_printf("Searching threads...\n");
-
-		if (mdb_walk("thread", (mdb_walk_cb_t)whatis_walk_thread, &w)
-		    == -1) {
-			mdb_warn("couldn't find thread walker");
-			return (DCMD_ERR);
-		}
-
-		if (w.w_found && w.w_all == FALSE)
-			return (DCMD_OK);
-
-		if (w.w_verbose)
-			mdb_printf("Searching page structures...\n");
-
-		if (mdb_walk("page", (mdb_walk_cb_t)whatis_walk_page, &w)
-		    == -1) {
-			mdb_warn("couldn't find page walker");
-			return (DCMD_ERR);
-		}
-
-		if (w.w_found && w.w_all == FALSE)
-			return (DCMD_OK);
+	if (mdb_walk("modctl", (mdb_walk_cb_t)whatis_walk_modctl, w) == -1) {
+		mdb_warn("couldn't find modctl walker");
+		return (1);
 	}
+	return (0);
+}
 
-	if (mdb_walk("kmem_cache",
-	    (mdb_walk_cb_t)whatis_walk_touch, &w) == -1) {
+/*ARGSUSED*/
+static int
+whatis_run_threads(mdb_whatis_t *w, void *ignored)
+{
+	/*
+	 * Now search all thread stacks.  Yes, this is a little weak; we
+	 * can save a lot of work by first checking to see if the
+	 * address is in segkp vs. segkmem.  But hey, computers are
+	 * fast.
+	 */
+	if (mdb_walk("thread", (mdb_walk_cb_t)whatis_walk_thread, w) == -1) {
+		mdb_warn("couldn't find thread walker");
+		return (1);
+	}
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+whatis_run_pages(mdb_whatis_t *w, void *ignored)
+{
+	if (mdb_walk("memseg", (mdb_walk_cb_t)whatis_walk_memseg, w) == -1) {
+		mdb_warn("couldn't find memseg walker");
+		return (1);
+	}
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+whatis_run_kmem(mdb_whatis_t *w, void *ignored)
+{
+	whatis_info_t wi;
+
+	bzero(&wi, sizeof (wi));
+	wi.wi_w = w;
+
+	if (mdb_readvar(&wi.wi_msb_arena, "kmem_msb_arena") == -1)
+		mdb_warn("unable to readvar \"kmem_msb_arena\"");
+
+	if (mdb_readvar(&wi.wi_kmem_lite_count,
+	    "kmem_lite_count") == -1 || wi.wi_kmem_lite_count > 16)
+		wi.wi_kmem_lite_count = 0;
+
+	/*
+	 * We process kmem caches in the following order:
+	 *
+	 *	non-KMC_NOTOUCH, non-metadata	(typically the most interesting)
+	 *	metadata			(can be huge with KMF_AUDIT)
+	 *	KMC_NOTOUCH, non-metadata	(see kmem_walk_all())
+	 */
+	if (mdb_walk("kmem_cache", (mdb_walk_cb_t)whatis_walk_touch,
+	    &wi) == -1 ||
+	    mdb_walk("kmem_cache", (mdb_walk_cb_t)whatis_walk_metadata,
+	    &wi) == -1 ||
+	    mdb_walk("kmem_cache", (mdb_walk_cb_t)whatis_walk_notouch,
+	    &wi) == -1) {
 		mdb_warn("couldn't find kmem_cache walker");
-		return (DCMD_ERR);
+		return (1);
 	}
+	return (0);
+}
 
-	if (w.w_found && w.w_all == FALSE)
-		return (DCMD_OK);
+/*ARGSUSED*/
+static int
+whatis_run_vmem(mdb_whatis_t *w, void *ignored)
+{
+	whatis_info_t wi;
 
-	if (mdb_walk("kmem_cache",
-	    (mdb_walk_cb_t)whatis_walk_notouch, &w) == -1) {
-		mdb_warn("couldn't find kmem_cache walker");
-		return (DCMD_ERR);
-	}
-
-	if (w.w_found && w.w_all == FALSE)
-		return (DCMD_OK);
+	bzero(&wi, sizeof (wi));
+	wi.wi_w = w;
 
 	if (mdb_walk("vmem_postfix",
-	    (mdb_walk_cb_t)whatis_walk_vmem, &w) == -1) {
+	    (mdb_walk_cb_t)whatis_walk_vmem, &wi) == -1) {
 		mdb_warn("couldn't find vmem_postfix walker");
-		return (DCMD_ERR);
+		return (1);
 	}
-
-	if (w.w_found == 0)
-		mdb_printf("%p is unknown\n", addr);
-
-	return (DCMD_OK);
-}
-
-void
-whatis_help(void)
-{
-	mdb_printf(
-	    "Given a virtual address, attempt to determine where it came\n"
-	    "from.\n"
-	    "\n"
-	    "\t-a\tFind all possible sources.  Default behavior is to stop at\n"
-	    "\t\tthe first (most specific) source.\n"
-	    "\t-b\tReport bufctls and vmem_segs for matches in kmem and vmem,\n"
-	    "\t\trespectively.  Warning: if the buffer exists, but does not\n"
-	    "\t\thave a bufctl, it will not be reported.\n"
-	    "\t-i\tSearch only identifier arenas and caches.  By default\n"
-	    "\t\tthese are ignored.\n"
-	    "\t-q\tDon't print multi-line reports (stack traces, etc.)\n"
-	    "\t-v\tVerbose output; display caches/arenas/etc as they are\n"
-	    "\t\tsearched\n");
+	return (0);
 }
 
 typedef struct kmem_log_cpu {
@@ -4322,6 +4266,18 @@ kmem_init(void)
 	}
 
 	kmem_statechange();
+
+	/* register our ::whatis handlers */
+	mdb_whatis_register("modules", whatis_run_modules, NULL,
+	    WHATIS_PRIO_EARLY, WHATIS_REG_NO_ID);
+	mdb_whatis_register("threads", whatis_run_threads, NULL,
+	    WHATIS_PRIO_EARLY, WHATIS_REG_NO_ID);
+	mdb_whatis_register("pages", whatis_run_pages, NULL,
+	    WHATIS_PRIO_EARLY, WHATIS_REG_NO_ID);
+	mdb_whatis_register("kmem", whatis_run_kmem, NULL,
+	    WHATIS_PRIO_ALLOCATOR, 0);
+	mdb_whatis_register("vmem", whatis_run_vmem, NULL,
+	    WHATIS_PRIO_ALLOCATOR, 0);
 }
 
 typedef struct whatthread {

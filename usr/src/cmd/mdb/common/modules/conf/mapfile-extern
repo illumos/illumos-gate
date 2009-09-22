@@ -144,6 +144,13 @@
 		mdb_walk =			EXTERN;
 		mdb_walk_dcmd =			EXTERN;
 		mdb_warn =			EXTERN;
+		mdb_whatis_done =		EXTERN;
+		mdb_whatis_flags =		EXTERN;
+		mdb_whatis_match =		EXTERN;
+		mdb_whatis_overlaps =		EXTERN;
+		mdb_whatis_register =		EXTERN;
+		mdb_whatis_report_address =	EXTERN;
+		mdb_whatis_report_object =	EXTERN;
 		mdb_writevar =			EXTERN;
 		mdb_writestr =			EXTERN;
 		mdb_writesym =			EXTERN;

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/elf.h>
 #include <sys/elf_SPARC.h>
@@ -60,6 +58,8 @@
 #include <mdb/mdb_set.h>
 #include <mdb/mdb_demangle.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_whatis.h>
+#include <mdb/mdb_whatis_impl.h>
 #include <mdb/mdb_macalias.h>
 #ifdef _KMDB
 #include <kmdb/kmdb_kdi.h>
@@ -1406,23 +1406,33 @@ cmd_files(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static const char *
+map_name(const mdb_map_t *map, const char *name)
+{
+	if (map->map_flags & MDB_TGT_MAP_HEAP)
+		return ("[ heap ]");
+	if (name != NULL && name[0] != 0)
+		return (name);
+
+	if (map->map_flags & MDB_TGT_MAP_SHMEM)
+		return ("[ shmem ]");
+	if (map->map_flags & MDB_TGT_MAP_STACK)
+		return ("[ stack ]");
+	if (map->map_flags & MDB_TGT_MAP_ANON)
+		return ("[ anon ]");
+	if (map->map_name != NULL)
+		return (map->map_name);
+	return ("[ unknown ]");
+}
+
 /*ARGSUSED*/
 static int
 print_map(void *ignored, const mdb_map_t *map, const char *name)
 {
-	if (name == NULL || *name == '\0') {
-		if (map->map_flags & MDB_TGT_MAP_SHMEM)
-			name = "[ shmem ]";
-		else if (map->map_flags & MDB_TGT_MAP_STACK)
-			name = "[ stack ]";
-		else if (map->map_flags & MDB_TGT_MAP_HEAP)
-			name = "[ heap ]";
-		else if (map->map_flags & MDB_TGT_MAP_ANON)
-			name = "[ anon ]";
-	}
+	name = map_name(map, name);
 
-	mdb_printf("%?p %?p %?lx %s\n", map->map_base, map->map_base +
-	    map->map_size, map->map_size, name ? name : map->map_name);
+	mdb_printf("%?p %?p %?lx %s\n", map->map_base,
+	    map->map_base + map->map_size, map->map_size, name);
 	return (0);
 }
 
@@ -1458,6 +1468,29 @@ cmd_mappings(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("failed to iterate over mappings");
 
 	return (DCMD_OK);
+}
+
+static int
+whatis_map_callback(void *wp, const mdb_map_t *map, const char *name)
+{
+	mdb_whatis_t *w = wp;
+	uintptr_t cur;
+
+	name = map_name(map, name);
+
+	while (mdb_whatis_match(w, map->map_base, map->map_size, &cur))
+		mdb_whatis_report_address(w, cur, "in %s [%p,%p)\n",
+		    name, map->map_base, map->map_base + map->map_size);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+whatis_run_mappings(mdb_whatis_t *w, void *ignored)
+{
+	(void) mdb_tgt_mapping_iter(mdb.m_target, whatis_map_callback, w);
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -2922,6 +2955,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    cmd_vtop },
 	{ "walk", "?name [variable]", "walk data structure", cmd_walk },
 	{ "walkers", NULL, "list available walkers", cmd_walkers },
+	{ "whatis", ":[-aikqv]", "given an address, return information",
+	    cmd_whatis, whatis_help },
 	{ "whence", "[-v] name ...", "show source of walk or dcmd", cmd_which },
 	{ "which", "[-v] name ...", "show source of walk or dcmd", cmd_which },
 	{ "xdata", NULL, "print list of external data buffers", cmd_xdata },
